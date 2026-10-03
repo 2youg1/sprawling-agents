@@ -372,3 +372,27 @@ fn the_city_lists_its_open_cards_newest_first_with_their_offer_time() {
         .collect();
     assert_eq!(listed, vec![(notes(), last, true), (notes(), first, true)]);
 }
+
+/// Each card names its `proposal_offered` line, in its run's session (wire D44).
+#[test]
+fn a_card_names_the_line_that_offered_it() {
+    let source = "One. Two. Three.\n";
+    let (dir, mut worker) = city(source);
+    let ids = [(1, (0, 4, "Uno.")), (2, (5, 9, "Deux."))]
+        .map(|(run, change)| offer(&mut worker, run, source, change));
+    drop(worker);
+    let ledger = kernel::layout::CityLayout::new(dir.path()).ledger();
+    let verified = runtime::replay::verify_ledger_dir(&ledger).unwrap();
+    let offered = verified.raw_lines().iter().filter_map(|line| {
+        let value = serde_json::from_slice::<serde_json::Value>(line).unwrap();
+        (value["kind"] == "proposal_offered").then(|| value["seq"].as_u64().map(kernel::Seq::new))
+    });
+    let expected: Vec<_> = ids.into_iter().zip(offered).collect();
+    let wire::Answer::Proposals(answer) =
+        crate::views::ask(dir.path(), &wire::Query::Proposals(notes())).unwrap()
+    else {
+        panic!("the open cards of one document");
+    };
+    let named = answer.open.iter().map(|card| (card.id, card.offered));
+    assert_eq!(named.collect::<Vec<_>>(), expected);
+}

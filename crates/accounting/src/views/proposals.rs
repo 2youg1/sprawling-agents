@@ -207,6 +207,7 @@ pub(super) fn proposals_answer(city_root: &Path, doc: Address, open: Vec<Offer>)
             baseline: offer.baseline(),
             span: offer.span(),
             slices: offer.review().into_slices(),
+            offered: None,
         })
         .collect();
     wire::Answer::Proposals(Box::new(wire::ProposalsAnswer { doc, version, open }))

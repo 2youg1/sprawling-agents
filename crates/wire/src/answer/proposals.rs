@@ -13,7 +13,7 @@
 //! about the history.
 
 use documents::{Slice, Span};
-use kernel::{Address, B3Hash, RunId, TimeMs};
+use kernel::{Address, B3Hash, RunId, Seq, TimeMs};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -37,6 +37,12 @@ pub struct ProposalCard {
     pub baseline: B3Hash,
     pub span: Span,
     pub slices: Vec<Slice>,
+    /// The `proposal_offered` line that offered this card, in `run`'s
+    /// session (`crates/wire/spec/Answer/Proposals.lean` D44). `None`
+    /// when the line is outside that session's window or does not read
+    /// back; a letter then draws the whole conversation.
+    #[serde(default)]
+    pub offered: Option<Seq>,
 }
 
 /// Every card still open in the city, newest offer first: the list a
