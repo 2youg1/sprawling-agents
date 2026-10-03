@@ -305,6 +305,7 @@ workspace 内的依赖由 ARCHITECTURE.md §3 的 `depmap` 定；规格只 impor
 | D42 | `crates/accounting/spec/Worker/Workbench/Tools.lean` |
 | D45 | `crates/accounting/spec/Views/Rounds.lean` |
 | D47 | `crates/accounting/spec/Playback/Project.lean` |
+| D48 | `crates/accounting/spec/Views/Rounds.lean` |
 | D49 | `crates/accounting/spec/Views/Usage.lean` |
 -/
 
