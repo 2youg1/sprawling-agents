@@ -396,3 +396,7 @@ fn unversioned(v: u64) -> AxError {
     reason = "test code"
 )]
 mod tests;
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, reason = "test code")]
+mod preallocated;
