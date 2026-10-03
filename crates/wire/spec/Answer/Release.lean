@@ -30,7 +30,7 @@ pub enum InstallChannel { Npm, Cargo, Archive, Source }
 pub struct UpdateHint { pub channel: InstallChannel, pub command: Option<String> }
 ```
 
-`verdict` 是本城对这份二进制安装渠道的那个注册表的判定：`update.channel` 是 `Cargo` 时取 crates.io 那一行，其余取 npm 那一行——npm 的 `latest` 是发布流程最后写的那一处，也是口径 2 说的「真正解析的东西」，而 cargo 装的人只取得到 crates.io 上有的版本。所取的那个注册表读不到时整条答 `Refused`（口径 3）。crates.io 那一行是裸版本号（`0.0.8`），经 kernel 的 `Version::from_crates_version` 读、`stands_on_crates` 判：只比版本号，同一版本号恒答 `Current`，与 npm 的判定在每一对版本号不同的发布上相同（`crates/kernel/Spec.lean` §8-54-1、D35）；它的 `ReleaseLine.released` 是空串，因为注册表的版本串里没有日期，城不替它补一个。`update` 由 `release::channel` 按这份二进制自己的路径判（D24）：源码构建答 `Source`、命令为 `None`；发布版按路径分四种，路径里有 `node_modules`、`.bun` 或 `_npx` 一节是 `Npm`，所在目录等于 cargo 的 bin 目录是 `Cargo`（`cargo binstall` 装在同一目录，路径分不出，答同一条命令），旁边有发行归档的 `skills/` 是 `Archive`，都不是答 `Source`；读不出自己路径的二进制也答 `Source`，宁可不印命令，不印一条错渠道的命令。终端 `status --check` 与页面印同一个 `command`，命令只有这一处。
+`verdict` 是本城对这份二进制安装渠道的那个注册表的判定：`update.channel` 是 `Cargo` 时取 crates.io 那一行，其余取 npm 那一行——npm 的 `latest` 是发布流程最后写的那一处，也是口径 2 说的「真正解析的东西」，而 cargo 装的人只取得到 crates.io 上有的版本。所取的那个注册表读不到时整条答 `Refused`（口径 3）。crates.io 那一行是裸版本号（`0.0.9`），经 kernel 的 `Version::from_crates_version` 读、`stands_on_crates` 判：只比版本号，同一版本号恒答 `Current`，与 npm 的判定在每一对版本号不同的发布上相同（`crates/kernel/Spec.lean` §8-54-1、D35）；它的 `ReleaseLine.released` 是空串，因为注册表的版本串里没有日期，城不替它补一个。`update` 由 `release::channel` 按这份二进制自己的路径判（D24）：源码构建答 `Source`、命令为 `None`；发布版按路径分四种，路径里有 `node_modules`、`.bun` 或 `_npx` 一节是 `Npm`，所在目录等于 cargo 的 bin 目录是 `Cargo`（`cargo binstall` 装在同一目录，路径分不出，答同一条命令），旁边有发行归档的 `skills/` 是 `Archive`，都不是答 `Source`；读不出自己路径的二进制也答 `Source`，宁可不印命令，不印一条错渠道的命令。终端 `status --check` 与页面印同一个 `command`，命令只有这一处。
 
 **五条口径：**
 

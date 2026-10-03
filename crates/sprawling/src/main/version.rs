@@ -19,7 +19,7 @@ use std::process::ExitCode;
 use wire::{Registry, RegistryNewest, RegistryReading, ReleaseAnswer};
 
 /// The first line `status` prints, as in
-/// `sprawling 0.0.8 (pre-alpha), built from source`.
+/// `sprawling 0.0.9 (alpha), built from source`.
 ///
 /// The production path passes `kernel::release::MATURITY`, the one place
 /// the maturity is written (kernel D18); taking it as a parameter is what

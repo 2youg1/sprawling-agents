@@ -25,7 +25,7 @@
 //! travel with the version rather than beside it.
 //!
 //! **The maturity is written once.** A tag carries it between the
-//! version and the date, `-Pre-alpha-` today; [`MATURITY`] is the one
+//! version and the date, `-Alpha-` today; [`MATURITY`] is the one
 //! place it is decided, and the tag, the first line of `sprawling status`
 //! and the documents render it (kernel D18). The npm spelling keeps
 //! `-pre.` whatever the maturity, because semver sorts pre-release
@@ -57,7 +57,7 @@ pub enum Maturity {
 /// The one place it is written: the tag infix, the first line of
 /// `sprawling status` and the documents' `maturity` spans are rendered
 /// from it, so entering alpha moves this constant and nothing else.
-pub const MATURITY: Maturity = Maturity::PreAlpha;
+pub const MATURITY: Maturity = Maturity::Alpha;
 
 impl Maturity {
     /// `pre-alpha`, the word as a sentence writes it.
@@ -251,7 +251,7 @@ impl Release {
         self.version.to_string()
     }
 
-    /// `v0.0.5-Pre-alpha-260912`, the tag this release was cut from.
+    /// `v0.0.9-Alpha-261004`, the tag this release was cut from.
     #[must_use]
     pub fn tag(&self) -> String {
         self.tag_at(MATURITY)
@@ -283,7 +283,7 @@ impl Release {
     /// `2026-09-12`, the day this release was cut.
     ///
     /// The one rendering meant for a person rather than for a registry:
-    /// a pre-alpha version number says almost nothing about how old a
+    /// a 0.0.x version number says almost nothing about how old a
     /// tree is, and how old it is, is what its reader most needs
     /// (CHANGELOG.md, opening note).
     #[must_use]

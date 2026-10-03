@@ -13,7 +13,7 @@
 
 </div>
 
-> **Status: <!-- xtask:begin maturity:word -->pre-alpha<!-- xtask:end -->, research and development.** The main loop works: connect a provider or a harness, raise a building, dispatch work, and several agents call tools and write files there at once. Read [What works today, and what does not](#what-works-today-and-what-does-not) before you hand it real work.
+> **Status: <!-- xtask:begin maturity:word -->alpha<!-- xtask:end -->, research and development.** The main loop works: connect a provider or a harness, raise a building, dispatch work, and several agents call tools and write files there at once. Read [What works today, and what does not](#what-works-today-and-what-does-not) before you hand it real work.
 >
 > 中文：[README.zh-CN.md](README.zh-CN.md) · For an agent driving a city from outside: [LLM.md](LLM.md) · To change the code: [AGENTS.md](AGENTS.md)
 

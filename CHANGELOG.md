@@ -1,7 +1,7 @@
 # Changelog
 
 Every release is a tag of the form `v<version>-<maturity>-<YYMMDD>`, and the
-releases this tree cuts are <!-- xtask:begin maturity:word -->pre-alpha<!-- xtask:end -->; `kernel::release::MATURITY`
+releases this tree cuts are <!-- xtask:begin maturity:word -->alpha<!-- xtask:end -->; `kernel::release::MATURITY`
 is the one place that is decided. The date is part of the name because an
 early version number says almost nothing about how old the tree is, and how
 old the tree is, is what a reader of an early release most needs to know. A

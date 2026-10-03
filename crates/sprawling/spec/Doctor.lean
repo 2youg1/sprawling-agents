@@ -793,7 +793,7 @@ pub(crate) fn pinned(pin: Pin) -> Option<String>;   // 文件为空即 None，�
 
 ```rust
 // main::version
-/// `sprawling 0.0.8 (pre-alpha), built from source`：`status` 打印的第一行。
+/// `sprawling 0.0.9 (alpha), built from source`：`status` 打印的第一行。
 /// 生产路径传 `kernel::release::MATURITY`；参数让一条测试看得见成熟度换成 alpha 时这一行跟着变。
 pub(super) fn headline(maturity: kernel::Maturity) -> String;
 

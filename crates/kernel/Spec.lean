@@ -421,7 +421,7 @@ ARCHITECTURE.md §3「nothing here is published」是这条判定成立的前提
 - `SECRET_SHAPES` 条目（公开 provider 令牌前缀，随外界增补）：`sk-ant-`（Anthropic）、`sk-proj-`（OpenAI）、`ghp_`/`gho_`（GitHub）、`AKIA`（AWS AccessKeyId）、`glpat-`（GitLab）、`xoxb-`（Slack）、`AIza`（Google API key）、`sk-or-v1-`（OpenRouter）、`sk-ai-v1-`（zenmux）、`gsk_`（Groq）。字符集与长度按各 provider 公开文档；条目形状见 §8-7。
 - **聚合型转发商的令牌体是纯小写十六进制，故它们必须有形状条目而不能依赖熵侦测器**。熵侦测器的 `mixed_alphabet` 要求同时出现大写、小写与数字，这一条件本身是对的（城自己的 blake3 十六进制与 uuid 均单一大小写，否则每一行账本都会亮），但它使 `sk-or-v1-` 与 `sk-ai-v1-` 这类 64 位小写十六进制令牌两道侦测器都不响——形状表是它们唯一的网。S2 模块头早已写明「全小写的密钥避开本侦测器」，本条是那句话的具体后果。
 
-- `MATURITY = Maturity::PreAlpha`：这棵树切出的发布处在哪一级；tag 的中缀、`status` 的说法与文档里的字样都从它渲染，进 alpha 只改它（`spec/Release.lean` D18）。
+- `MATURITY = Maturity::Alpha`：这棵树切出的发布处在哪一级；tag 的中缀、`status` 的说法与文档里的字样都从它渲染，进 alpha 只改它（`spec/Release.lean` D18）。
 - `AUTONOMY_DEFAULT = Autonomy::Owner`、`CLOCK_STAMP_DEFAULT = ClockStampGranularity::Minute`（直写，随类型落位）。
 - 定点 log2 小数位数 10（熵判定内部事务）；`ENTROPY_SPAN_MIN_BYTES = 20`（熵侦测器最短跨度：主流 API key 最短约 20 字符；pub(crate)，改动随本规格）。
 - `HEX_SPAN_MIN_BYTES = 32`、`HEX_ENTROPY_MIN_MILLIBITS = 3100`（hex 侦测器，pub(crate)，改动随本规格）。证据：以固定种子的 splitmix 生成每档长度各 1000 个随机小写 hex 样本，以产品的 `entropy_millibits_per_char` 读数（最小／均值／最大，millibit）：28 字符 2952／3553／3922；32 字符 3144／3610／3929；40 字符 3307／3691／3933；48 字符 3404／3751／3933；64 字符 3544／3819／3970。32 是常见密钥最短的 128 bit；3100 让 32 字符及以上的全部样本通过，又高于 8 个符号均匀出现的 3000（如 `0f1e2d3c` 重复），把有规律的 hex 挡在外面。
