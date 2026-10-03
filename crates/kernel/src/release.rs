@@ -97,14 +97,78 @@ const CENTURY: u32 = 2000;
 /// semver's: version first, then the date inside the pre-release field.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Release {
-    major: u32,
-    minor: u32,
-    patch: u32,
+    version: Version,
     /// Four digits. The tag carries two and this holds what they mean,
     /// so a reader is never asked whether `26` is a year or a week.
     year: u32,
     month: u32,
     day: u32,
+}
+
+/// A release named by its version number alone, as crates.io names it
+/// (`crates/kernel/spec/Release.lean` §8-54-1, kernel D35).
+///
+/// Its own type rather than a [`Release`] with a date made up, because
+/// crates.io states no date, and a date filled in for it is a value the
+/// registry never said.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Version {
+    major: u32,
+    minor: u32,
+    patch: u32,
+}
+
+impl Version {
+    /// The version crates.io carries: three dot-separated numbers, read by
+    /// the same rule as the version half of every other spelling.
+    ///
+    /// # Errors
+    /// When the string is not three dot-separated numbers.
+    pub fn from_crates_version(text: &str) -> Result<Version, AxError> {
+        Version::parse(text, &|msg| {
+            AxError::failure(
+                AxCode::ConfigInvalid,
+                "read a crates.io version",
+                text.to_owned(),
+            )
+            .with_recovery(msg)
+        })
+    }
+
+    /// The one reading of a version number, shared by every spelling so
+    /// none accepts what another refuses.
+    fn parse(version: &str, refused: &dyn Fn(String) -> AxError) -> Result<Version, AxError> {
+        let mut parts = version.split('.');
+        let mut next_number = || parts.next().and_then(number);
+        let (Some(major), Some(minor), Some(patch)) = (next_number(), next_number(), next_number())
+        else {
+            return Err(refused(format!(
+                "`{version}` is not three dot-separated numbers, as in `0.0.5`"
+            )));
+        };
+        if parts.next().is_some() {
+            return Err(refused(format!(
+                "`{version}` carries more than the three numbers a version of \
+                 this project has"
+            )));
+        }
+        Ok(Version {
+            major,
+            minor,
+            patch,
+        })
+    }
+}
+
+impl std::fmt::Display for Version {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let Version {
+            major,
+            minor,
+            patch,
+        } = *self;
+        write!(f, "{major}.{minor}.{patch}")
+    }
 }
 
 /// Where one release stands against the newest one published.
@@ -213,20 +277,7 @@ impl Release {
         let refused = |msg: String| {
             AxError::failure(AxCode::ConfigInvalid, action, subject.to_owned()).with_recovery(msg)
         };
-        let mut parts = version.split('.');
-        let mut next_number = || parts.next().and_then(number);
-        let (Some(major), Some(minor), Some(patch)) = (next_number(), next_number(), next_number())
-        else {
-            return Err(refused(format!(
-                "`{version}` is not three dot-separated numbers, as in `0.0.5`"
-            )));
-        };
-        if parts.next().is_some() {
-            return Err(refused(format!(
-                "`{version}` carries more than the three numbers a version of \
-                 this project has"
-            )));
-        }
+        let version = Version::parse(version, &refused)?;
         let mut digits = date.chars();
         let (Some(year), Some(month), Some(day)) =
             (pair(&mut digits), pair(&mut digits), pair(&mut digits))
@@ -249,25 +300,18 @@ impl Release {
             )));
         }
         Ok(Release {
-            major,
-            minor,
-            patch,
+            version,
             year,
             month,
             day,
         })
     }
 
-    /// `0.0.5`, the number alone.
+    /// `0.0.5`, the number alone, which is also the version crates.io
+    /// carries.
     #[must_use]
     pub fn version(&self) -> String {
-        let Release {
-            major,
-            minor,
-            patch,
-            ..
-        } = *self;
-        format!("{major}.{minor}.{patch}")
+        self.version.to_string()
     }
 
     /// `v0.0.5-Pre-alpha-260912`, the tag this release was cut from.
@@ -317,7 +361,29 @@ impl Release {
 /// Where `mine` stands against the newest release published.
 #[must_use]
 pub fn stands(mine: &Release, newest: &Release) -> ReleaseVerdict {
-    match mine.cmp(newest) {
+    verdict_of(mine.cmp(newest))
+}
+
+/// Where `mine` stands against the newest version crates.io offers,
+/// judged on the version number alone (kernel D35): crates.io takes one
+/// upload per version, so a re-cut that changed only the date never
+/// reaches it, and for a binary cargo installed the same version is
+/// current.
+#[must_use]
+pub fn stands_on_crates(mine: &Release, newest: &Version) -> ReleaseVerdict {
+    let padded = Release {
+        version: *newest,
+        year: 0,
+        month: 0,
+        day: 0,
+    };
+    stands(mine, &padded)
+}
+
+/// The step `stands` and `stands_on_crates` share: an order read as a
+/// verdict.
+fn verdict_of(order: std::cmp::Ordering) -> ReleaseVerdict {
+    match order {
         std::cmp::Ordering::Less => ReleaseVerdict::Behind,
         std::cmp::Ordering::Equal => ReleaseVerdict::Current,
         std::cmp::Ordering::Greater => ReleaseVerdict::Ahead,
@@ -356,7 +422,76 @@ fn pair(digits: &mut impl Iterator<Item = char>) -> Option<u32> {
     reason = "test code"
 )]
 mod tests {
-    use super::{Maturity, Release, ReleaseVerdict, stands};
+    use super::{Maturity, Release, ReleaseVerdict, Version, stands, stands_on_crates};
+    use proptest::prelude::*;
+
+    fn any_release() -> impl Strategy<Value = Release> {
+        (
+            0u32..=9,
+            0u32..=9,
+            0u32..=9,
+            0u32..=99,
+            1u32..=12,
+            1u32..=31,
+        )
+            .prop_map(|(major, minor, patch, year, month, day)| {
+                Release::from_npm_version(&format!(
+                    "{major}.{minor}.{patch}-pre.{year:02}{month:02}{day:02}"
+                ))
+                .unwrap()
+            })
+    }
+
+    /// Semver's rule 11 for the one shape this project publishes, written
+    /// out by hand: the three numbers, then the numeric identifier after
+    /// `pre`, each compared as a number.
+    fn semver_key(npm: &str) -> (u32, u32, u32, u32) {
+        let (core, pre) = npm.split_once("-pre.").unwrap();
+        let mut numbers = core.split('.').map(|part| part.parse::<u32>().unwrap());
+        let mut next = || numbers.next().unwrap();
+        (next(), next(), next(), pre.parse().unwrap())
+    }
+
+    proptest! {
+        /// kernel D35 over every pair of releases: crates.io and npm give
+        /// one verdict when the versions differ, crates.io cannot tell two
+        /// cuts of one version apart, and the npm spelling orders as
+        /// `Release` does.
+        #[test]
+        fn the_three_spellings_give_one_order(
+            a in any_release(),
+            other in any_release(),
+            same_version in any::<bool>(),
+        ) {
+            // Half the pairs are two cuts of one version, which a draw of
+            // two independent releases almost never makes.
+            let b = if same_version {
+                Release { version: a.version, ..other }
+            } else {
+                other
+            };
+            let crates = Version::from_crates_version(&b.version()).unwrap();
+            if a.version == b.version {
+                prop_assert_eq!(stands_on_crates(&a, &crates), ReleaseVerdict::Current);
+            } else {
+                prop_assert_eq!(stands_on_crates(&a, &crates), stands(&a, &b));
+            }
+            prop_assert_eq!(
+                semver_key(&a.npm_version()).cmp(&semver_key(&b.npm_version())),
+                a.cmp(&b)
+            );
+        }
+    }
+
+    /// The answer a binary cargo installed reads: crates.io names the
+    /// same version, and that is current.
+    #[test]
+    fn a_crates_answer_of_the_same_release_reads_as_current() {
+        let mine = Release::from_npm_version("0.0.8-pre.261002").unwrap();
+        let newest = Version::from_crates_version("0.0.8").unwrap();
+        assert_eq!(stands_on_crates(&mine, &newest), ReleaseVerdict::Current);
+        assert!(Version::from_crates_version("0.0.8-pre.261002").is_err());
+    }
 
     /// Entering alpha moves `MATURITY` and nothing else, so the tag a
     /// build cuts and the tag it reads have to follow the maturity they
