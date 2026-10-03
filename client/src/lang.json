@@ -7233,7 +7233,8 @@
   },
   "usage_mcp_none": {
     "en": "no building names a tool server, and no run has called one",
-    "zh": "没有楼配置工具服务器，也没有 run 调用过",
+    "zh": "没有楼配置工具服务器，也没有 run 调用过"
+  },
   "shells_title": {
     "en": "Shell lines by interpreter",
     "zh": "各解释器的 shell 行"
