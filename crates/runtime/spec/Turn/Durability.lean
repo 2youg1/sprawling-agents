@@ -25,7 +25,7 @@
 * **记录按调用序**——TF1 与参照追加的记录逐条相同，落盘的总是这串记录的前缀（`tf1_records_match_reference`、`tf1_durable_is_reference_prefix`）；所以崩溃后 `resume` 读到的，是参照次序在某个崩溃点也会留下的历史：缺的只有只读调用的记录，而只读调用没有对外效果，重做它们不改变世界；写调用的 `tool_called` 已落盘，`replay::DanglingCalls` 照旧把没有结果的那条补成 `E_TOOL_OUTCOME_UNKNOWN`；
 * **`EventRef` 只给已落盘的记录**（`refs_are_durable`）；
 * **屏障数**（`tf1_turn_barriers`、`reference_turn_barriers`、`tf1_turn_at_most_two`）；
-* **攒下的记录跨过回合**（D36，末两节）：ref 在下一个对外效果之前到齐、run 结束时每条记录都有 ref，任一崩溃点盘上的历史是今天的 `closedTurn` 也会留下的历史，以及 W7c 的派生检查与它必须抓到的坏实现。
+* **攒下的记录跨过回合**（D36，末两节）：ref 在下一个对外效果之前到齐、run 结束时每条记录都有 ref，任一崩溃点盘上的历史是今天的 `closedTurn` 也会留下的历史，以及待实现的派生检查与它必须抓到的坏实现。
 
 崩溃点写成「轨迹 = 已做 ++ 未做」：`exec State.empty done` 是在 `done` 之后掉电时的状态，`durable` 是重启后还在盘上的记录。只读调用的执行在模型里排成一列，因为它们没有对外效果、不改变状态，所以它们实际并行时彼此怎样交错不影响任何一条性质。
 -/
@@ -521,7 +521,7 @@ D36：`Journal` 改由 `Run<Active>` 持有、活整个 run，回合收尾不再
 
 落选：每回合收尾仍付一道（今天的 `closedTurn`）——安全，但只读回合要付 2 道而不是 1 道，而它不换来任何可恢复性，因为下一道屏障在任何对外效果之前；把 ref 在追加时就交出（`eagerStep`）——`EventRef` 会指向可能不存在的历史，违反 `kernel::ledger` 的「`Ok(ref)` 即已落盘」，见 `eager_ref_is_not_durable`。重新打开的参数：一个回合的 ref 必须在回合内被对外读到（例如 `TurnReport` 的 ref 在下一道屏障之前就被发上 wire），或者一次屏障的价钱与它带的记录数变得成正比。三个平台相同：本模型只决定屏障的次数与位置，屏障本身是 `File::sync_data`（Windows 上 `FlushFileBuffers`，Linux 上 `fdatasync`，macOS 上走哪一个由 `crates/storage/spec/Jsonl/Barrier.lean` 与 storage §8-1 决定），计数上界 `1 + 写调用数` 在三个平台上都成立。
 
-**留给 storage 的问题**：跨回合攒下的记录在两回合之间只在进程内存里，这不改变 storage 的任何契约（`append_all` 仍是一批一屏障、成功即落盘）；若 storage 要为「两次 `append_all` 之间隔着一次模型调用」写下任何保证（例如段轮换不得在批内发生），那是 `crates/storage/spec/Jsonl/Barrier.lean` 的一个问题，不在本模型里。 -/
+**storage 一侧的开放问题**：跨回合攒下的记录在两回合之间只在进程内存里，这不改变 storage 的任何契约（`append_all` 仍是一批一屏障、成功即落盘）；若 storage 要为「两次 `append_all` 之间隔着一次模型调用」写下任何保证（例如段轮换不得在批内发生），那是 `crates/storage/spec/Jsonl/Barrier.lean` 的一个问题，不在本模型里。 -/
 
 /-- 一道屏障之后的状态。 -/
 def flush (s : State) : State := s.step .barrier
@@ -665,11 +665,11 @@ theorem tf1_run_refs_complete (ws : List (List Effect)) :
   simp only [appended, List.filterMap_append]
   rfl
 
-/-! ## 派生检查的规格（W7c 实现，`turn::tests::durability`）
+/-! ## 派生检查的规格（待实现，`turn::tests::durability`）
 
 **生成器。** proptest 生成 `List (List Effect)`：0 到 6 个回合，每回合 0 到 8 条调用，每条 `read` 或 `write`；对每一份，用计数账本（`turn::tests::durability` 的 `Barriers`，另记下每次 `append_all`、每次模型调用、每次写动手的先后）跑一个 run，把记下的先后译成本模型的 `Step` 轨迹。检查五条，每条对应一个定理：`guarded 0 trace`（`tf1_effect_after_durability`）；`intentFirst [] trace`（`tf1_write_intent_durable`）；每个回合两次模型调用之间的 `append_all` 次数等于 `1 + 写调用数`，run 末尾一次（`tf1_turn_barriers`）；记录的 kind 序列等于参照次序（`tf1_records_match_reference`）；run 结束时交出的 ref 条数等于追加条数（`tf1_run_refs_complete`）。**崩溃点重放**：在轨迹里每一次 `append_all` 之后截断，用截断的历史跑 `resume`，结论（`replay::DanglingCalls` 补出的 `E_TOOL_OUTCOME_UNKNOWN`、下一回合的编号、会话）与今天的形状在 `held_cut_is_closed_cut` 给出的对应崩溃点截断时相同；两边的盘上记录由 `cutsOf` 在 Lean 里算出，Rust 测试逐条重放。
 
-**必须变红的坏实现。** 写调用的 `tool_called` 留到下一道屏障（`leakyCall`）：`guarded` 为假，见 `leaky_wave_is_caught`；追加时就交出 ref（`eagerStep`）：交出的 ref 指向未落盘的记录，见 `eager_ref_is_not_durable`。W7c 先提交用其中一个坏实现跑红的测试，再提交实现。 -/
+**必须变红的坏实现。** 写调用的 `tool_called` 留到下一道屏障（`leakyCall`）：`guarded` 为假，见 `leaky_wave_is_caught`；追加时就交出 ref（`eagerStep`）：交出的 ref 指向未落盘的记录，见 `eager_ref_is_not_durable`。实现时先提交用其中一个坏实现跑红的测试，再提交实现。 -/
 
 /-- 一段轨迹每道屏障之后盘上的记录：崩溃点重放的向量。 -/
 def cutsOf (steps : List Step) : List (List Record) :=
