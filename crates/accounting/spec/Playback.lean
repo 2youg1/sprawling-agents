@@ -82,7 +82,7 @@ pub enum Reader { Person(Confidential), Resident(Address) }
 
 一端的状态分五种，互不混同：`{"at":seq}`（在范围内）、`{"outside":seq}`（cutoff 以内、范围外，行在 `context`）、`"withheld"`、`"pending"`（关闭端到 cutoff 还没有出现）、`"missing"`（打开端不在本账到 cutoff 的历史里）。关键时刻、消息与调用只在至少一个成员在范围内可见时出现。闭合只看真实的关闭事件（`run_frozen`、`approval_resolved`、`pr_merged`/`pr_rejected`、`signal_consumed`），窗口的右端不是关闭（`Project.lean` 的 `closedAt` 不读选择）。PR 按 `branch` 与打开它的那一行识别，所以同一分支重开是另一个关键时刻。
 
-**规范字节与安全嵌入。** `playback::encode` 是唯一的序列化：serde 按结构体字段次序写紧凑 JSON，再把字符串里的 `<`、`>`、`&`、U+2028、U+2029 写成 `\u` 转义，所以同一份字节原样放进 HTML 的 `<script type="application/json">` 也不会提前结束那个块。所有 u64（seq、时刻、金额、计数）写成十进制字符串，JS 的 `Number` 不经手它们；`rules` 是小整数。摘要是这份字节的 BLAKE3（`B3Hash::digest`）。读回时先比尺寸上限，再按 `deny_unknown_fields` 解析，再重新编码并与原字节逐字节比较：重复键、多余空白、字段次序、未知字段、非规范的十进制都在这一步被拒。
+**规范字节与安全嵌入。** `playback::encode` 是唯一的序列化：serde 按结构体字段次序写紧凑 JSON，再把字符串里的 `<`、`>`、`&`、U+2028、U+2029 写成 `\u` 转义，所以同一份字节原样放进 HTML 的 `<script type="application/json">` 也不会提前结束那个块。转义在 serde 写出的路上做：serde 的输出经一个转义写者（`playback::encode` 的 `Escaping`）直接写进 bundle 的那一份缓冲，写者跨越 serde 两次写入的边界认出 U+2028、U+2029 的三个字节，所以字节与先写整份紧凑 JSON 再转义的结果逐字节相同；缓冲写到 `BUNDLE_MAX_BYTES` 时写者拒绝再写，serde 停下，一份超限的文档不会先被整份写出来再被拒。所有 u64（seq、时刻、金额、计数）写成十进制字符串，JS 的 `Number` 不经手它们；`rules` 是小整数。摘要是这份字节的 BLAKE3（`B3Hash::digest`）。读回时先比尺寸上限，再按 `deny_unknown_fields` 解析，再重新编码并与原字节逐字节比较：重复键、多余空白、字段次序、未知字段、非规范的十进制都在这一步被拒。
 
 **自洽与来源复核。** 一份 bundle 自洽，是指它按上一段读得回，并且：`schema` 是 `SCHEMA`；`events` 与 `context` 各自 seq 严格递增、互不相交；每条 `line` 过 `storage::read_line` 且 seq 与条目一致；每个 `{"at":seq}` 指向 `events`，每个 `{"outside":seq}` 指向 `context`；`runs` 的每个 run 在 `events` 里出现过。自洽只说这份文件内部不矛盾，不说它没被改过。复核有两种：
 
@@ -92,9 +92,9 @@ pub enum Reader { Person(Confidential), Resident(Address) }
 
 两种复核与页面的检查怎样分项报出，见 §8-13。
 
-**失败。** 全部是 `AxError`：`Selection::new` 的矛盾区间、bundle 读不懂或不规范是 `E_INVALID_ARGS`（action `select a playback range` / `read a playback bundle`）；链上的行按 `LineFault::into_ax` 报（`E_CAS_CORRUPT`、`E_LOG_VERSION_UNSUPPORTED`），recovery 指向 `sprawling replay`；序列化后超过 `BUNDLE_MAX_BYTES` 是 `E_INVALID_ARGS`，recovery 是用 `--from`/`--through`、`--run` 或 `--building` 收窄；规则、payload 读不了按各自的 `AxError` 原样上抛。任何失败都不交回部分的 bundle。错误文字不回显被隐去的内容。
+**失败。** 全部是 `AxError`：`Selection::new` 的矛盾区间、bundle 读不懂或不规范是 `E_INVALID_ARGS`（action `select a playback range` / `read a playback bundle`）；链上的行按 `LineFault::into_ax` 报（`E_CAS_CORRUPT`、`E_LOG_VERSION_UNSUPPORTED`），recovery 指向 `sprawling replay`；序列化写到 `BUNDLE_MAX_BYTES` 还没写完是 `E_INVALID_ARGS`（subject 说超过了这个上限，不说整份有多大，因为写者在上限处就停了），recovery 是用 `--from`/`--through`、`--run` 或 `--building` 收窄；规则、payload 读不了按各自的 `AxError` 原样上抛。任何失败都不交回部分的 bundle。错误文字不回显被隐去的内容。
 
-**资源。** 一遍读，一个段的字节常驻；另外常驻的是 `Lineage`（每个 run 一行）、关键时刻与消息的两端（每个键一项）、可能成为上下文的范围外可见行（run 的首行与各对的两端），范围内的投影，以及折到当前行的视图（§8-25）。`BUNDLE_MAX_BYTES` 只限最终字节，不限这些常驻量。32 MiB 是待测的初值：多日夹具上的导出峰值与读取成本量出来之前，不把它当作内存上界。
+**资源。** 一遍读，一个段的字节常驻；另外常驻的是 `Lineage`（每个 run 一行）、关键时刻与消息的两端（每个键一项）、可能成为上下文的范围外可见行（run 的首行与各对的两端），范围内的投影，以及折到当前行的视图（§8-25）。`BUNDLE_MAX_BYTES` 只限最终字节，不限这些常驻量。编码时进程里多出的只有 bundle 的那一份缓冲（至多 `BUNDLE_MAX_BYTES`），没有整份紧凑 JSON 与它的转义副本这两份中间串（`crates/sprawling/spec/Serving/Memory.lean` §8-173 清点表的 playback 一行）。整份 `Document` 仍在内存里：`finish` 给提交找证据时按 seq 查 `events`（`playback::traced`），边走边编码要先把那次查找改成经账本旁索引读回，`crates/accounting/Spec.lean` §3 记着这件事。32 MiB 是待测的初值：多日夹具上的导出峰值与读取成本量出来之前，不把它当作内存上界。
 
 **版本。** bundle 的内容或某张表的求法每变一次，`PROJECTION_RULES` 进一位，于是旧构建导出、本构建读得开的 bundle 复核时报「复核不了」，而不是报「不同」。字段增减是形状的变化，`SCHEMA` 随之进一位：读回时先只读 `schema` 一个键，不是本构建的 `SCHEMA` 就在结构一项报出两个版本、要求用写它的那个版本复核，而不报一条字段缺失。
 

@@ -113,6 +113,7 @@ import crates.accounting.spec.Worker.Workbench.Tools
 - `views::mcp_health` 自己用 `agent_protocols::McpLink` 启动一个 MCP server 去问它的健康，不经 `Connectors`。未定的是这次读要不要也经端口：`views` 搬进本 crate 时它照原样搬（`agent_protocols` 本来就是本 crate 的依赖）；能定下它的证据是一个脚本场景需不需要回答 MCP 健康查询。
 - `playback` 的导出在 40 万行的城上要 27 s，分段计时里约七成是投影做的 credential 扫描（`kernel::secret::scan`，每行约 60 µs，在 `opt-level = "z"` 下量；读数见 §8-25）。D47 定下投影只扫命运会被某张表读到的行——范围内的、`remember()` 要的、与范围内的行同一个配对键的——并证明它交出的命运与全扫描逐条相同（`crates/accounting/spec/Playback/Project.lean` 末节）；一行的命运仍只在 `playback::project` 一处判定，`scanned` 只决定要不要读回它的字节。Rust 照它实现：范围外的行的命运先记作待定，`finish` 在任何一张表读之前只扫被配对读到的那些，字节取自已留着的副本或经 `storage::LineReader` 按段内偏移读回；派生检查（`accounting::playback::tests::lazy`）在随机历史上比较懒扫描与全扫描的整份 bundle 与扫描次数。三个平台相同：只用 seq 与段内偏移，读回走 `storage` 的同一个接口。`kernel::secret::scan` 本身变快是另一件事，每个扫描者都受益。
 - `playback`（§8-12、§8-13）的两个上限是待测初值：`BUNDLE_MAX_BYTES` 与 `PAGE_MAX_BYTES` 要在多日夹具上量过导出峰值、页面解析与首屏成本才定值，定值的证据是 citysim 的多日场景读数。居民导出位置（§8-13）里崩溃留下的暂存文件 `<名>.partial-<pid>` 没有人收走：它不会被当成导出件读（`check` 只认 `.json`/`.html` 的名字），能定下要不要收的是这类文件在真实城里出现的频率。
+- `playback::export` 还不是边走边编码：`finish` 给提交找证据时按 seq 在整份 `events` 里查（`playback::traced`），所以 `Document` 在编码之前整份留在内存里；编码本身已经直接写进 bundle 的那一份缓冲（§8-12）。能让 `events` 在 walk 里一边投影一边编码掉的，是证据查找改成经账本旁索引读回那几行；能定下值不值得改的是多日夹具上导出的私有字节峰值里 `Document` 占多少。
 - **本 crate 有一百九十五个模块的接口仍写在 sprawling 的规格里。** 模块从 `sprawling` 搬过来时，它在 `crates/sprawling/Spec.lean` 里的那一节留在原处，只把模块路径改成新的拼写（原先在 sprawling 的 views 目录下的模块改写到 `accounting::views` 之下，`bin::assembly` 下的模块改写到 `accounting::worker` 之下）。`architecture.toml` 里这些行指向本 crate 的分部（`spec/Views.lean`、`spec/Views/Snapshot.lean`、`spec/Views/Rounds.lean`、`spec/PlanView.lean`、`spec/Worker.lean`、`spec/Worker/Attend.lean`、`spec/Worker/Workbench/Tools.lean`），每个分部末尾一张表按 sprawling 的标签列出它们；搬法见 D15。
 -/
 
@@ -122,7 +123,7 @@ import crates.accounting.spec.Worker.Workbench.Tools
 
 生产消费者是 `crates/sprawling`：装配根造 `Hands`、起写者线程与视图折叠线程，服务面与 CLI 经 §8-10、§8-11 列出的 `pub` 面读本 crate；citysim 经同一组端口驱动一次 dispatch（§3）。
 
-**常驻内存。** 本 crate 在进程里留三份随城增长、今天没有上界的工作集：视图折叠（`views`，每个 run 一份摘要，随记录数与 run 数增长）、待批项的 `sent` 表（`worker`，每个 run 一条）、playback 导出（`playback::export` 走账本是流式的，但整份 `Document` 与整份 `Bundle` 留在内存里，上界 `BUNDLE_MAX_BYTES`）。冻结的 run 的记录在账本里，视图只该留它的摘要，不留它的消息与工具结果。它们的字节预算（视图 `VIEWS_RESIDENT_BYTES`）、按字节计的缓存与读回规则都写在 `crates/sprawling/spec/Serving/Memory.lean` §8-173，本 crate 照它改：视图与 `sent` 经那份缓存读回，playback 导出改成边走边编码。三个平台上做法相同，读回走 std 的定位读。
+**常驻内存。** 本 crate 在进程里留三份随城增长、今天没有上界的工作集：视图折叠（`views`，每个 run 一份摘要，随记录数与 run 数增长）、待批项的 `sent` 表（`worker`，每个 run 一条）、playback 导出（`playback::export` 走账本是流式的，编码直接写进 bundle 的那一份缓冲、到 `BUNDLE_MAX_BYTES` 即停，但整份 `Document` 在编码之前留在内存里，§3）。冻结的 run 的记录在账本里，视图只该留它的摘要，不留它的消息与工具结果。它们的字节预算（视图 `VIEWS_RESIDENT_BYTES`）、按字节计的缓存与读回规则都写在 `crates/sprawling/spec/Serving/Memory.lean` §8-173，本 crate 照它改：视图与 `sent` 经那份缓存读回，playback 的 `Document` 改成边走边编码（§3）。三个平台上做法相同，读回走 std 的定位读。
 -/
 
 /-! ## 5 权威信源
