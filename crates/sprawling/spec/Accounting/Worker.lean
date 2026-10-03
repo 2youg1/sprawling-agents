@@ -430,7 +430,7 @@ struct BlockedJob { addr: Address, run: RunId }
 
 **进程里不留每个 run 被派去做什么，答复时从账本读回**。`origins` 只记一项待批由哪个房间、哪个 run 提出；人答「允许」时，`answer_approval` 先刷新账本旁索引，按索引从这个 run 最早的一行往后读，读到它的 `run_started` 就取出 `task` 与 `goal`，再在原房间续上这件活。读回走 `storage::LineReader` 的定位读，读到的页留在操作系统的文件缓存里，进程里不另存一份（`crates/sprawling/spec/Serving/Memory.lean` §8-173）。这个 run 的 `run_started` 不在账本里时（只有一段尾巴的历史），答复照常落账，不续活，与这项待批从来没有记下来源时相同。`origins` 在 `ApprovalResolved` 上裁，因为答过的项不再阻着任何东西。
 
-理由：一张按 run 记 `task` 与 `goal` 的表每派一跑长一条，从不裁剪，而 `task` 是人写给这一跑的整段话，长度没有上界；冻结的 run 也一直占着它。它不能按 `RunFrozen` 裁：账本次序是 `RunStarted … RunFrozen … ApprovalRequested`，装配层在 drive 之后才记下待批项。被否的做法：①照旧留这张表——随 run 数无界增长，与「冻结的 run 不留任何东西」相反；②表里只留 `run_started` 的 seq——每跑仍留一条，只是短一些；③经 `storage::resident` 缓存读回——答复是人点一下的事，频率低，一份按字节计的缓存省下的只是一次定位读，文件缓存已经替它做了。代价：一次答复多一次索引刷新与几次定位读，与这个 run 的行数无关（读到 `run_started` 即停，它在 run 的头几行里）。
+理由：一张按 run 记 `task` 与 `goal` 的表每派一跑长一条，从不裁剪，而 `task` 是人写给这一跑的整段话，长度没有上界；冻结的 run 也一直占着它。它不能按 `RunFrozen` 裁：账本次序是 `RunStarted … RunFrozen … ApprovalRequested`，装配层在 drive 之后才记下待批项。被否的做法：①照旧留这张表——随 run 数无界增长，与「冻结的 run 不留任何东西」相反；②表里只留 `run_started` 的 seq——每跑仍留一条，只是短一些；③经 `storage::resident` 缓存读回——答复是人点一下的事，频率低，一份按字节计的缓存省下的只是一次定位读，文件缓存已经替它做了。代价：一次答复多一次索引刷新与几次定位读，与这个 run 的行数无关（读到 `run_started` 即停，它在 run 的头几行里）。三个平台相同：索引与读回都经 `storage` 的 `Vfs::read_at`，那是同一段 std 代码。
 
 **读在落账之前，派活在落账之后**：`answer_approval` 先取一份 `origins`（读，不是变化），再落 `approval_resolved`（它自身就是关闭动作，`absorb` 随之丢掉 pending 与 origin），最后才派活。与 §8-24 同一条规矩。
 
