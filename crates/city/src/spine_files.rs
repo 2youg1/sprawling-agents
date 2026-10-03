@@ -327,14 +327,9 @@ pub fn roadmap(city_root: &Path, building_addr: &Address) -> Result<String, AxEr
 /// close its element (`crates/city/spec/SpineFiles.lean` D21); holding no
 /// `<`, neither can spell a marker, so the markers fill one after another.
 fn filled(brief: &JobBrief<'_>) -> String {
-    let escaped = |text: &str| {
-        text.replace('&', "&amp;")
-            .replace('<', "&lt;")
-            .replace('>', "&gt;")
-    };
     JOB_TEMPLATE
-        .replace(TASK_PLACEHOLDER, &escaped(brief.task))
-        .replace(GOAL_PLACEHOLDER, &escaped(brief.goal))
+        .replace(TASK_PLACEHOLDER, &kernel::event::escape_markup(brief.task))
+        .replace(GOAL_PLACEHOLDER, &kernel::event::escape_markup(brief.goal))
         .replace(FROM_PLACEHOLDER, brief.from)
 }
 

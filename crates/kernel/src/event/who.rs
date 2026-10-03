@@ -111,6 +111,26 @@ impl Who {
     }
 }
 
+/// `<`, `>` and `&` as entities, so text written into a marked-up
+/// section holds no angle bracket and cannot close that section or open
+/// another. The one escaper: the job file's sections, a resident's
+/// letter and a rebuilt opening all write through it, so what one
+/// renderer refuses the others refuse too (`crates/city/spec/SpineFiles.lean`
+/// D21, `crates/runtime/spec/Conversation.lean` §8-47-2).
+#[must_use]
+pub fn escape_markup(text: &str) -> String {
+    text.chars()
+        .fold(String::with_capacity(text.len()), |mut out, c| {
+            match c {
+                '<' => out.push_str("&lt;"),
+                '>' => out.push_str("&gt;"),
+                '&' => out.push_str("&amp;"),
+                other => out.push(other),
+            }
+            out
+        })
+}
+
 impl fmt::Display for Who {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(self.as_str())

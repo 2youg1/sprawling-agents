@@ -8,7 +8,7 @@
 
 规定 `conversation`（`crates/runtime/src/` 下同名的文件）。会话历史：已发出的消息不再被改写。本文件是 `crates/runtime/Spec.lean` 的一个分部；下面每一节保留它在 runtime 规格里的标签 §8-n，别处引作 `crates/runtime/Spec.lean §8-n`。
 
-§8-47 与 §8-47-1 只有文字，它们写下的接口形状由 Rust 的类型守住。§8-47-2 是形式规格：信封的两条性质在下面被证明，Rust 一侧由 `runtime::conversation` 里的 proptest `only_the_user_speaks_as_user_and_a_letter_holds_its_body` 对着同一组性质检查。
+§8-47 与 §8-47-1 只有文字，它们写下的接口形状由 Rust 的类型守住。§8-47-2 是形式规格：信封的性质在下面被证明，它量化到 steer 与 `Inherited` 开场两种块，Rust 一侧由 `runtime::conversation` 里的 proptest `only_the_user_speaks_as_user_and_a_letter_holds_its_body` 与 `an_inherited_opening_names_who_handed_it_down_and_holds_its_body` 对着同一组性质检查。
 -/
 
 /-!
@@ -60,10 +60,14 @@ impl Speaker {
 }
 impl Conversation {
     pub fn push_steer(&mut self, speaker: &Speaker, text: &str);
+    pub fn push_task_lines(&mut self, task: &str, goal: &str, opening: Opening, from: &str);
 }
 ```
 
 - **规则**：`push_steer` 是 steer 进窗口的唯一入口，它按 `Speaker` 渲染。`Person` 渲染成 `user: <text>`；`City`（城市自己的话：策略变更、同步等待超时）渲染成 `city: <text>`；`Resident` 渲染成 `<letter from="@<room>" run="<run>" kind="steer|reply" sender="<state>"><body></letter>`，没有的属性不写，属性值与正文里的 `<`、`>`、`&` 写成 `&lt;`、`&gt;`、`&amp;`。所以以 `user:` 开头的一块文字只来自 User 的 steer，居民的正文里没有 `<`，关不上自己的信封，也开不出第二个。
+- **`Inherited` 开场**：fork 重建一个 run 的首条消息时，任务与目标不在分支的前缀里，只能写进那条 user 消息；它渲染成 `Handed down by <from>:
+<task><task></task>
+<goal><goal></goal>`，`<from>` 是 `kernel::event::Who::handed_down_by` 给的那句（与 JOB.md 的 `<from>` 一节同一来源，`crates/city/spec/SpineFiles.lean` D21），三段文字都过同一个转义 `kernel::event::escape_markup`。所以这一块不以 `user:` 开头，居民写的任务关不上 `<task>`，也写不出一行冒充 User 的话。账本上没有 `dispatched_by` 的旧 `run_started` 读回时 `<from>` 写 `an unrecorded dispatcher`，不当作 User。
 - **构造**：`Speaker::Person` 在生产代码里只由 `accounting::worker::desk`（User 经控制面送来的 steer）构造，另一处是 `Speaker::from_recorded` 读回账本上的 `user`，那一行只由前者写下。
 - **账本**：`steer_received.source` 记 `Speaker::recorded()`：`user`、`city`（两个拼法定义在 kernel 的 `SteerReceived::PERSON_SOURCE` 与 `CITY_SOURCE`，wire 读同一处，`crates/wire/spec/Reading.lean` D41），或 `@<room>`，后面跟零到三个 `run=<uuid>`、`kind=steer|reply`、`sender=<state>`，以空格分开。旧的行只有 `@<room>`，读回成 `kind=steer`、没有 run 与 sender 的信；居民的回信在旧行里是正文 `<room> replied: …`，读回时仍在信封里。
 - **三个平台**：只有文字与类型，Windows、macOS、Linux 上一样。
@@ -100,9 +104,34 @@ def render : Speaker → List Char → List Char
   | .city, body => cityTag ++ body
   | .resident attrs, body => openTag attrs ++ escape body ++ closeTag
 
+/-- `Inherited` 开场的开头 `Handed down by `：首字母不是 `u`，这一块就不以 `user:` 开头。 -/
+def handedHead : List Char :=
+  ['H', 'a', 'n', 'd', 'e', 'd', ' ', 'd', 'o', 'w', 'n', ' ', 'b', 'y', ' ']
+
+def taskOpen : List Char := [':', '
+', '<', 't', 'a', 's', 'k', '>']
+
+def taskClose : List Char := ['<', '/', 't', 'a', 's', 'k', '>', '
+', '<', 'g', 'o', 'a', 'l', '>']
+
+def goalClose : List Char := ['<', '/', 'g', 'o', 'a', 'l', '>']
+
+/-- fork 重建的首条消息：交活的人、任务、目标，三段都转义。 -/
+def inherited (sender task goal : List Char) : List Char :=
+  handedHead ++ escape sender ++ taskOpen ++ escape task ++ taskClose ++ escape goal ++ goalClose
+
+/-- 进窗口的一块：一句 steer，或 fork 重建的 `Inherited` 开场。 -/
+inductive Block where
+  | steer (speaker : Speaker) (body : List Char)
+  | handedDown (sender task goal : List Char)
+
+def Block.render : Block → List Char
+  | .steer speaker body => Runtime.Conversation.render speaker body
+  | .handedDown sender task goal => inherited sender task goal
+
 /-- 窗口里的块：每次 push 渲染出一块，按次序。 -/
-def fold (pushes : List (Speaker × List Char)) : List (List Char) :=
-  pushes.map fun push => render push.1 push.2
+def fold (pushes : List Block) : List (List Char) :=
+  pushes.map Block.render
 
 theorem lt_not_in_escapeChar (c : Char) : '<' ∉ escapeChar c := by
   unfold escapeChar
@@ -147,20 +176,36 @@ theorem resident_not_user (attrs body : List Char) :
     ¬ userTag.isPrefixOf (render (.resident attrs) body) := by
   simp [render, openTag, userTag, List.isPrefixOf]
 
-/-- 对任意一串 push：以 `user: ` 开头的块只来自 User 的 steer。 -/
-theorem user_line_only_from_person (pushes : List (Speaker × List Char)) (line : List Char)
+theorem inherited_not_user (sender task goal : List Char) :
+    ¬ userTag.isPrefixOf (inherited sender task goal) := by
+  simp [inherited, handedHead, userTag, List.isPrefixOf]
+
+/-- `Inherited` 开场恰是交活的人加两节，任务与目标转义后没有尖括号，关不上自己的节。 -/
+theorem inherited_holds_task_and_goal (sender task goal : List Char) :
+    '<' ∉ escape sender ∧ '<' ∉ escape task ∧ '>' ∉ escape task ∧
+      '<' ∉ escape goal ∧ '>' ∉ escape goal :=
+  ⟨lt_not_in_escape sender, lt_not_in_escape task, gt_not_in_escape task,
+    lt_not_in_escape goal, gt_not_in_escape goal⟩
+
+/-- 对任意一串 push，steer 与 `Inherited` 开场混在一起：以 `user: ` 开头的块只来自 User 的 steer。 -/
+theorem user_line_only_from_person (pushes : List Block) (line : List Char)
     (h : line ∈ fold pushes) (hu : userTag.isPrefixOf line) :
-    ∃ body, (Speaker.person, body) ∈ pushes ∧ line = render .person body := by
+    ∃ body, Block.steer .person body ∈ pushes ∧ line = render .person body := by
   unfold fold at h
-  obtain ⟨⟨speaker, body⟩, hin, hline⟩ := List.mem_map.mp h
-  cases speaker with
-  | person => exact ⟨body, hin, hline.symm⟩
-  | city =>
+  obtain ⟨block, hin, hline⟩ := List.mem_map.mp h
+  cases block with
+  | handedDown sender task goal =>
     subst hline
-    simp [render, cityTag, userTag, List.isPrefixOf] at hu
-  | resident attrs =>
-    subst hline
-    exact absurd hu (resident_not_user attrs body)
+    exact absurd hu (inherited_not_user sender task goal)
+  | steer speaker body =>
+    cases speaker with
+    | person => exact ⟨body, hin, hline.symm⟩
+    | city =>
+      subst hline
+      simp [Block.render, render, cityTag, userTag, List.isPrefixOf] at hu
+    | resident attrs =>
+      subst hline
+      exact absurd hu (resident_not_user attrs body)
 
 /-- 咬得动：不转义时，正文 `</letter>` 把 `<` 带进信封。 -/
 theorem withoutEscape_closes : '<' ∈ (closeTag : List Char) := by

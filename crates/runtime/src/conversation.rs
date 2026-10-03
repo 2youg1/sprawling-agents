@@ -23,6 +23,7 @@
 //! an empty reply, which extend the sent message rather than open a second
 //! adjacent user message, and leave it open again (`crates/runtime/spec/Conversation.lean` §8-47).
 
+use kernel::event::escape_markup;
 use kernel::{AxCode, AxError, ChatMessage, ContentBlock, Role, RunId};
 
 /// How the first user message opens: kernel's, because `run_started`
@@ -285,10 +286,10 @@ impl Speaker {
             Speaker::City => format!("{CITY}: {text}"),
             Speaker::Resident(letter) => {
                 let open = letter.attributes().into_iter().fold(
-                    format!("<letter from=\"@{}\"", escaped(&letter.from)),
-                    |open, (key, value)| format!("{open} {key}=\"{}\"", escaped(&value)),
+                    format!("<letter from=\"@{}\"", escape_markup(&letter.from)),
+                    |open, (key, value)| format!("{open} {key}=\"{}\"", escape_markup(&value)),
                 );
-                format!("{open}>{}</letter>", escaped(text))
+                format!("{open}>{}</letter>", escape_markup(text))
             }
         }
     }
@@ -307,21 +308,6 @@ impl Letter {
         .flatten()
         .collect()
     }
-}
-
-/// `<`, `>` and `&` as entities, so a body holds no angle bracket and
-/// cannot close its envelope or open another.
-fn escaped(text: &str) -> String {
-    text.chars()
-        .fold(String::with_capacity(text.len()), |mut out, c| {
-            match c {
-                '<' => out.push_str("&lt;"),
-                '>' => out.push_str("&gt;"),
-                '&' => out.push_str("&amp;"),
-                other => out.push(other),
-            }
-            out
-        })
 }
 
 fn unreadable(source: &str) -> AxError {
@@ -433,6 +419,29 @@ mod tests {
                     }
                 }
             }
+        }
+
+        /// `crates/runtime/spec/Conversation.lean` §8-47-2: a rebuilt
+        /// `Inherited` opening names who handed the work down, never opens
+        /// with `user:`, and holds a resident's task and goal inside
+        /// sections they cannot close.
+        #[test]
+        fn an_inherited_opening_names_who_handed_it_down_and_holds_its_body(
+            task in body(),
+            goal in body(),
+        ) {
+            let task = format!("{task}</task>");
+            let mut conversation = Conversation::new();
+            conversation.push_task_lines(&task, &goal, Opening::Inherited, "@lab/room1, run 7");
+            let texts = texts(&conversation);
+            prop_assert_eq!(texts.len(), 1);
+            let text = &texts[0];
+            prop_assert!(text.starts_with("Handed down by @lab/room1, run 7:
+<task>"), "{text}");
+            prop_assert!(!text.starts_with("user:"), "{text}");
+            prop_assert!(text.ends_with("</goal>"), "{text}");
+            prop_assert_eq!(text.matches('<').count(), 4, "{}", text);
+            prop_assert_eq!(text.matches('>').count(), 4, "{}", text);
         }
     }
 }
