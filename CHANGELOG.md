@@ -118,7 +118,10 @@ digest and machine class. These readings are owed and not stated here:
 - private bytes on a 100 ms tick, and their slope over an hour. On Linux
   private bytes are now `Private_Clean` plus `Private_Dirty` from
   `/proc/self/smaps_rollup`, or `RssAnon` where the rollup is absent;
-  Windows reads `PagefileUsage`;
+  Windows reads `PagefileUsage`. While somebody watches the monitor, the
+  city notes private bytes every 100 ms inside its one-second beat and
+  reports the highest of each second, so a peak of a few milliseconds is
+  not lost between two readings; an unwatched city reads nothing;
 - a profile-guided release build against the plain one. `on-demand.yml`
   builds the Windows release in three stages, and the profile is kept only
   when the geometric-mean gain on the held-out load is at least 3 % and
@@ -194,7 +197,11 @@ digest and machine class. These readings are owed and not stated here:
   button keeps its label on one line (G7). The second context reminder is
   set in the settings tree's run group, after autonomy, with a building
   picker, instead of under the MCP page's desktop form; the welcome page's
-  back key stands at the top of its one column.
+  back key stands at the top of its one column. The remote door's open and
+  replace-key controls carry a door and a key glyph, and a door command the
+  page could not send says the page is not connected instead of asking for
+  a newer city. The Composio key field keeps its width, with the link to
+  composio.dev on a line of its own.
 - Tools (F1–F9): `archive record` files its entry at the call, so `recall`
   in the same run finds it; the Mayor writes an empty plan's first line with
   `plan add`; `rules read` and `city list` are admitted in a run; `read` and
@@ -262,8 +269,7 @@ digest and machine class. These readings are owed and not stated here:
   threads and does not yet put them on the faster cores first; a run's
   lane takes no seat yet. macOS and Linux place nothing.
 - The byte-budgeted resident cache (`storage::resident`) exists and keeps
-  its budget, and nothing reads through it yet. The 100 ms memory beat
-  inside the monitor's one-second beat is specified and not built.
+  its budget, and nothing reads through it yet.
 - macOS reports the process's virtual size where the other platforms
   report private bytes, until a safe interface reaches its physical
   footprint.
