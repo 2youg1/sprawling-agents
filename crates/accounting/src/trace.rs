@@ -346,7 +346,12 @@ mod tests {
             (run(1), "lab/room1", EventKind::RunStarted, json!({})),
             (run(2), "lab/room2", EventKind::RunStarted, json!({})),
             (run(3), "yard/room3", EventKind::RunStarted, json!({})),
-            (run(1), "lab/room1", EventKind::ModelCalled, json!({})),
+            (
+                run(1),
+                "lab/room1",
+                EventKind::ModelCalled,
+                json!({"segments": [], "model": "m"}),
+            ),
             (
                 run(1),
                 "lab/room1",
@@ -371,7 +376,12 @@ mod tests {
                 EventKind::ToolCalled,
                 called("c2", "edit", write()),
             ),
-            (run(2), "lab/room2", EventKind::ModelCalled, json!({})),
+            (
+                run(2),
+                "lab/room2",
+                EventKind::ModelCalled,
+                json!({"segments": [], "model": "m"}),
+            ),
             (
                 run(2),
                 "lab/room2",

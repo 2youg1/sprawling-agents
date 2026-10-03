@@ -287,7 +287,12 @@ pub(super) fn committed_in(root: &Path) -> (Vec<Line>, [String; 3]) {
         ),
         (r1, at, EventKind::RunStarted, json!({})),
         checkpoint(&first, &["lab/a/notes.md"]),
-        (r1, at, EventKind::ModelCalled, json!({})),
+        (
+            r1,
+            at,
+            EventKind::ModelCalled,
+            json!({"segments": [], "model": "m"}),
+        ),
         (r1, at, EventKind::ToolCalled, called("c1", "edit")),
         (r1, at, EventKind::ToolResult, answered("c1", "edit")),
         checkpoint(

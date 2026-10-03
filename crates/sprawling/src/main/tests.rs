@@ -248,7 +248,12 @@ fn whose_trace_names_the_run_its_calls_and_who_else_called_in_the_building() {
         (RunId::CITY, None, EventKind::CityInitialized, json!({})),
         (first, Some("lab/room1"), EventKind::RunStarted, json!({})),
         (second, Some("lab/room2"), EventKind::RunStarted, json!({})),
-        (first, Some("lab/room1"), EventKind::ModelCalled, json!({})),
+        (
+            first,
+            Some("lab/room1"),
+            EventKind::ModelCalled,
+            json!({"segments": [], "model": "m"}),
+        ),
         (
             first,
             Some("lab/room1"),

@@ -45,7 +45,7 @@ fn rounds_of(
         ),
         (
             EventKind::ModelCalled,
-            serde_json::json!({}),
+            serde_json::json!({ "segments": [], "model": "m" }),
             TimeMs::new(11),
         ),
         (
