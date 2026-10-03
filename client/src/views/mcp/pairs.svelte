@@ -86,13 +86,17 @@
     </div>
   {/each}
   <div class="flex items-center gap-base">
-    <Button
-      label={say($lang, "mcp_pair_add")}
-      tone="quiet"
-      onPress={() => {
-        onChange([...rows, { name: "", value: "" }]);
-      }}
-    />
+    <!-- The note beside the button is the part that wraps: squeezed, the
+      button broke its own label over two lines at 1440. -->
+    <span class="shrink-0">
+      <Button
+        label={say($lang, "mcp_pair_add")}
+        tone="quiet"
+        onPress={() => {
+          onChange([...rows, { name: "", value: "" }]);
+        }}
+      />
+    </span>
     {#if note !== undefined}
       <span class="min-w-0 text-note text-text-faint">{note}</span>
     {/if}
