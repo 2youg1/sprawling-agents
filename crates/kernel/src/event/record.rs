@@ -101,7 +101,7 @@ pub use run::{
     EvalRun, EvidenceCite, FreezeCause, Opening, RunForked, RunFrozen, RunPolicyChanged,
     RunStarted, SessionNamed, SessionOpened, SkillPin,
 };
-pub use skill::{AuditSource, AuditVerdict, SkillAudited};
+pub use skill::{AuditSource, AuditVerdict, ShelvedFrom, SkillAudited, SkillShelved};
 pub use tool::{ToolAnswer, ToolCalled, ToolResult};
 pub use turn::{
     ModelCalled, ModelReturned, PartChange, PromptAssembled, PromptSegment, PromptShapeCompared,

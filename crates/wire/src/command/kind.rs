@@ -369,8 +369,9 @@ pub enum Command<Secret = Sealed<String>> {
     /// a person writes there through and there is no path to spell. `name` may carry
     /// sub-directories, which is how a script keeps its folder.
     ///
-    /// The body replaces the file whole, for the reason [`Command::PutDocument`] gives. Writes
-    /// `skill_shelved`, the planned kind of kernel D23.
+    /// The body replaces the file whole, for the reason [`Command::PutDocument`] gives. Its
+    /// executor writes `skill_shelved` (kernel D23) once it lands; until then the city answers
+    /// `not_built`.
     PutShelved {
         shelf: Shelf,
         name: String,

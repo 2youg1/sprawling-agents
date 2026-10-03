@@ -113,6 +113,7 @@ pub use usage::{
 };
 pub use usage::{ShellCalls, ShellsAnswer, UsageExportAnswer, UsageKind, UseOutcome};
 pub use usage::{SkillAudit, SkillUsageAnswer, SkillUsageLine, SkillUse, SkillVersion};
+pub use usage::VersionAuthor;
 
 /// What moved between two checkpoints, one row per file, path order.
 ///

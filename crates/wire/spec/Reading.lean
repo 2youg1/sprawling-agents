@@ -290,7 +290,8 @@ pub struct SkillUsageAnswer { pub skills: Vec<SkillUsageLine> }                 
 pub struct SkillUsageLine { name: String, held: Vec<HeldSkill>, versions: Vec<SkillVersion>, uses: Vec<SkillUse>, per_day: Vec<DayCount> }
 pub struct HeldSkill { shelf: SkillShelf, digest: B3Hash, audit: SkillAudit }   // 每格书架一项；书架上没有了为空
 #[serde(tag = "state")] pub enum SkillAudit { Unaudited, Audited { verdict: AuditVerdict, at: Seq }, Stale { audited: B3Hash } }
-pub struct SkillVersion { digest: B3Hash, seq: Seq, at: TimeMs, run: RunId }    // 第一个钉住这一版的 run_started
+pub struct SkillVersion { digest: B3Hash, seq: Seq, at: TimeMs, run: RunId, #[serde(default)] author: VersionAuthor }   // 账上第一次出现这一版的那一行
+#[serde(tag = "by")] pub enum VersionAuthor { Shelved { seq: Seq, from: ShelvedFrom }, OutsideShelf, #[default] Unrecorded }   // 谁把这一版放上书架；ShelvedFrom 是 kernel 的
 pub struct SkillUse { run: RunId, resident: Option<Address>, seq: Seq, at: TimeMs, part: String, digest: B3Hash, outcome: UseOutcome }
 pub enum UseOutcome { Ok, Failed, Unknown }
 pub struct DayCount { day: String, count: u32 }                                  // `YYYY-MM-DD`，旧日在前
@@ -303,7 +304,7 @@ pub enum ExportFormat { Jsonl, Csv }
 pub struct UsageExportAnswer { what: UsageKind, format: ExportFormat, body: String }
 ```
 
-- **内容版本**是第一个以某个哈希钉住这件 skill 的 `run_started`：摘要、那一行的 `seq` 与时刻、它的 run。账本里还没有一种行记下「谁把这一版放上书架」（kernel D23 预留的 `skill_shelved`），所以版本说的是「从哪一刻起有 run 读到它」；那种行落地时，`SkillVersion` 多一件写它的那一行。
+- **内容版本**是账上第一次以某个摘要说出这件 skill 的那一行：一行 `skill_shelved`（kernel D23，城经上架的门落下这一版），或一个钉住它的 `run_started`；`seq`、时刻与 run 是那一行的。`author` 说谁放上去的：有一行 `skill_shelved` 带这个摘要时是 `Shelved`，携那一行的 `seq` 与它的 `source`；没有而这个名字在钉住它的那一刻之前已有过 `skill_shelved` 时是 `OutsideShelf`——内容在城的门之外被改过，页面写「在架外」；这个名字在那一刻之前从没有过 `skill_shelved` 时是 `Unrecorded`——这一版在城开始记上架之前就在架上。判法只看账本次序，所以重放答同一张表。
 - **审核**按每格书架此刻的摘要，由 `city::library::audit_state` 读账上这个名字的每一行 `skill_audited` 判出；`Stale` 就是「内容改过，请再审一次」。
 - **一次 skill 使用**是一行 `tool_called`，它所在的 run 的 `run_started` 钉住了一件 skill（名字与哈希，`crates/runtime/Spec.lean` §8-11），而这一行是：`describe`，问的就是那个名字（部分记作 `guide`）；或 `read`，路径是那个名字（部分记作 `SKILL.md`）或 `<名字>/<相对路径>`（部分记作那个相对路径）。认的是「这个 run 钉住了这个名字」，不从路径的写法猜：一个恰好与某件 skill 同名的普通文件，在没钉住它的 run 里不是一次使用。使用的内容版本是钉住时的哈希，所以 skill 改过之后，旧的使用仍指向它当时读到的那一版。
 - **一次 MCP 使用**是一行 `tool_called`，它记下的 `effect` 是 `Connector { label }`：服务器就是那个 `label`，工具是行上的名字去掉 `<label>_` 前缀。这个 `effect` 是 `agent_protocols::mcp::tools` 注册工具时写下、随行进账本的，所以它说的是调用那一刻的服务器，配置改过、服务器删掉之后仍然对，答问也不必握手。`call` 一行指名的工具按第一个 `_` 拆：`kernel::ServerLabel` 只收小写字母与数字，服务器名里没有 `_`；拆出的头是已知的服务器名（账上见过的与此刻配置的）才归属，因为城自己的工具名里也有 `_`。头不是已知服务器名的，归在 `server: None` 下，页面写作「已移除」并给出完整工具名（accounting D49）。

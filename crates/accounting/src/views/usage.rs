@@ -15,9 +15,9 @@
 //! reading is the shell table (wire D48).
 
 use std::borrow::Borrow;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
-use kernel::event::record::{AuditVerdict, RunStarted, SkillAudited};
+use kernel::event::record::{AuditVerdict, RunStarted, SkillAudited, SkillShelved};
 use kernel::event::record::{ToolAnswer, ToolCalled, ToolResult};
 use kernel::{Address, B3Hash, Effect, EventKind, EventRecord, RunId, Seq, TimeMs};
 
@@ -104,6 +104,8 @@ struct McpCall {
 pub(crate) struct Usage {
     pins: BTreeMap<RunId, BTreeMap<String, B3Hash>>,
     versions: BTreeMap<String, Vec<wire::SkillVersion>>,
+    /// Every skill name a `skill_shelved` line has named so far.
+    shelved: BTreeSet<String>,
     reads: Vec<SkillRead>,
     calls: Vec<McpCall>,
     audits: BTreeMap<String, Vec<(B3Hash, AuditVerdict, Seq)>>,
@@ -196,7 +198,7 @@ impl Usage {
 
     /// Moves the table by one record. A payload that does not read as
     /// its kind adds nothing: the record is the writer's, and a guess at
-    /// what it meant would be a use nobody made. Four kinds move it, so
+    /// what it meant would be a use nobody made. Five kinds move it, so
     /// the test is by kind rather than a match over every kind there is.
     fn apply(&mut self, record: &EventRecord) {
         let kind = record.kind();
@@ -234,14 +236,53 @@ impl Usage {
                 audited.verdict,
                 record.seq(),
             ));
+        } else if kind == EventKind::SkillShelved
+            && let Ok(shelved) = record.data().read::<SkillShelved>()
+        {
+            self.shelving(record, shelved);
         }
     }
 
+    /// Files who put one content of a skill on its shelf: the version it
+    /// names gains its author, or begins with this line (wire D33).
+    fn shelving(&mut self, record: &EventRecord, shelved: SkillShelved) {
+        let author = wire::VersionAuthor::Shelved {
+            seq: record.seq(),
+            from: shelved.source,
+        };
+        let versions = self.versions.entry(shelved.skill.clone()).or_default();
+        match versions
+            .iter_mut()
+            .find(|version| version.digest == shelved.digest)
+        {
+            Some(version) => match version.author {
+                wire::VersionAuthor::Shelved { .. } => {}
+                wire::VersionAuthor::OutsideShelf | wire::VersionAuthor::Unrecorded => {
+                    version.author = author;
+                }
+            },
+            None => versions.push(wire::SkillVersion {
+                digest: shelved.digest,
+                seq: record.seq(),
+                at: record.t(),
+                run: record.run(),
+                author,
+            }),
+        }
+        self.shelved.insert(shelved.skill);
+    }
+
     /// Files the skills one run was frozen with, and the first run that
-    /// read each content.
+    /// read each content no shelving line named: changed outside the
+    /// city's doors when the name was shelved before, unrecorded when not.
     fn pinned(&mut self, record: &EventRecord, started: RunStarted) {
         let pins = self.pins.entry(record.run()).or_default();
         for pin in started.skills {
+            let author = if self.shelved.contains(&pin.name) {
+                wire::VersionAuthor::OutsideShelf
+            } else {
+                wire::VersionAuthor::Unrecorded
+            };
             let versions = self.versions.entry(pin.name.clone()).or_default();
             if !versions.iter().any(|version| version.digest == pin.hash) {
                 versions.push(wire::SkillVersion {
@@ -249,6 +290,7 @@ impl Usage {
                     seq: record.seq(),
                     at: record.t(),
                     run: record.run(),
+                    author,
                 });
             }
             pins.insert(pin.name, pin.hash);

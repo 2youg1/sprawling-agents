@@ -146,7 +146,10 @@ impl EventKind {
             | EventKind::SkillAudited
             // The sender already read its tool's answer; where the letter
             // landed is what a page draws (kernel D38).
-            | EventKind::SignalLanded => WindowClass::RecordOnly,
+            | EventKind::SignalLanded
+            // Who put which version of a skill on a shelf is what the
+            // skill page shows; a run reads the skill, never this line.
+            | EventKind::SkillShelved => WindowClass::RecordOnly,
         }
     }
 }

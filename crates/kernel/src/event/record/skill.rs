@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What an audit of a skill on the shelf records
+//! What shelving a skill and auditing it record
 //! (`crates/kernel/spec/Event/Record.lean` D23).
 //!
 //! The line is record-only: what an auditor said about a skill decides
@@ -38,6 +38,38 @@ pub struct SkillAudited {
     /// Where a person reads the audit when the city could not fetch it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub link: Option<String>,
+}
+
+/// `skill_shelved`: one version of a skill landed on a shelf through the
+/// city's install door.
+///
+/// Written only when bytes actually landed: a reinstall of the same
+/// content changes nothing and writes nothing. `digest` is the value the
+/// audit binds to, so a version, its shelving and its audits meet on one
+/// digest.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct SkillShelved {
+    pub skill: String,
+    pub digest: B3Hash,
+    pub source: ShelvedFrom,
+}
+
+/// Where a shelved version came from.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub enum ShelvedFrom {
+    /// A directory or document on this machine.
+    Path,
+    /// A clone of an `https://` repository at a revision.
+    Git { url: String, rev: Option<String> },
+    /// A skill skills.sh names as `<owner>/<repo>/<skill>`.
+    SkillsSh { name: String },
+    /// One of the skills the binary carries.
+    Shipped,
+    /// Text written on the shelf page.
+    Page,
 }
 
 /// Who audited.

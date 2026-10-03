@@ -11,7 +11,7 @@
 
 use std::collections::BTreeMap;
 
-use kernel::event::record::AuditVerdict;
+use kernel::event::record::{AuditVerdict, ShelvedFrom};
 use kernel::{Address, B3Hash, RunId, Seq, TimeMs};
 use serde::{Deserialize, Serialize};
 
@@ -68,15 +68,36 @@ pub enum SkillAudit {
     Stale { audited: B3Hash },
 }
 
-/// One content of a skill, from the first run frozen with it.
+/// One content of a skill, from the first line that named it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct SkillVersion {
     pub digest: B3Hash,
-    /// The `run_started` line that first pinned this content.
+    /// The first line with this content: its `skill_shelved`, or the
+    /// `run_started` that first pinned it.
     pub seq: Seq,
     pub at: TimeMs,
     pub run: RunId,
+    #[serde(default)]
+    pub author: VersionAuthor,
+}
+
+/// Who put one content of a skill on its shelf, read off the ledger in
+/// ledger order (`crates/wire/spec/Reading.lean` D33).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "by", rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub enum VersionAuthor {
+    /// The city shelved it: the `skill_shelved` line and where it came
+    /// from.
+    Shelved { seq: Seq, from: ShelvedFrom },
+    /// The name was shelved before a run first read this content, never
+    /// with it: the content was changed outside the city's doors.
+    OutsideShelf,
+    /// No shelving line names the skill before a run first read this
+    /// content: it was on the shelf before the city recorded shelving.
+    #[default]
+    Unrecorded,
 }
 
 /// One read of a skill by a run that pinned it.

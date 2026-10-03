@@ -80,6 +80,7 @@ pub use answer::{SESSION_PREVIEW_MAX, SESSIONS_MAX, SessionLine, SessionStart, S
 pub use answer::{SecondDomain, SettledEffort, SettledSecond, TuningDefaults};
 pub use answer::{ShellCalls, ShellsAnswer, UsageExportAnswer, UsageKind, UseOutcome};
 pub use answer::{SkillAudit, SkillUsageAnswer, SkillUsageLine, SkillUse, SkillVersion};
+pub use answer::VersionAuthor;
 pub use answer::{Standing, ToolkitLine, ToolkitsAnswer};
 pub use answer::{VERSIONS_MAX, VersionSource, VersionsAnswer};
 #[cfg(feature = "server")]

@@ -243,9 +243,11 @@ fn fold_run<'a>(
             // The sentence a policy change appends is not in the
             // conversation yet: no run reads the line today (kernel D21).
             | EventKind::RunPolicyChanged
-            // A session's name and a skill's audit are the person's page.
+            // A session's name, a skill's audit and who shelved it are
+            // the person's page.
             | EventKind::SessionNamed
             | EventKind::SkillAudited
+            | EventKind::SkillShelved
             // How a reply wait ended reaches the conversation as the
             // `steer_received` line the turn writes when the run goes on
             // (collab D9), so it is rebuilt above; these two lines are

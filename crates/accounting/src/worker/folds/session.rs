@@ -215,6 +215,7 @@ impl SessionOrigins {
             | EventKind::ProposalWithdrawn
             | EventKind::SessionNamed
             | EventKind::SkillAudited
+            | EventKind::SkillShelved
             | EventKind::SignalWaitStarted
             | EventKind::SignalWaitEnded => Ok(()),
         }

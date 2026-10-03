@@ -532,7 +532,9 @@ pub struct SkillAudited {
 
 `Unreachable` 是「这次问了、没审成」：skills.sh 不答、答 401／403、超时或答复读不出，SkillSpector 的退出码既不是 0 也不是 1；不拦上架（D89：skills.sh 默认、SkillSpector 可选）。没有一个审核方适用时（本地路径或自带的 skill，且 PATH 上没有 SkillSpector）不写行：没人问过就不该有一行说问过。skills.sh 每个合作方一行，`scanner` 是合作方名。使用记录不入新行：`describe` 取指南与读 skill 目录下的文件都已在 `tool_called` 里，按 skill 折叠的视图由 accounting 从这些行折出；MCP 的使用同样从 `call` 与 MCP 工具调用的 `tool_called` 折出。
 
-**内容版本另有一行**：skill 页的「内容版本（摘要、时刻、谁改的）」读一个计划中的 record-only 种类 `skill_shelved`：载荷 `SkillShelved { skill: String, digest: B3Hash, source: ShelvedFrom }`，`ShelvedFrom { Path, Git { url, rev }, SkillsSh { name }, Shipped, Page }`，`addr` 是书架所在的 scope，`run` 为 `RunId::CITY`；`InstallSkill`（wire D32）与 `PutShelved` 每次真正落位（`Placed::Fresh`）时由城写一行，答 `AlreadyShelved` 时一个字节没变、不写，`digest` 是 `Installed::hash`。它取代此前为 `PutShelved` 计划的 `shelved_document_written`：两条上架的路是同一件事，一个种类；种类表的行与 `InstallSkill` 的执行者同一次改动落地。User 在架外直接改文件没有行，由扫架时架上摘要与这件 skill 最近一行 `skill_shelved` 的 `digest` 不同读出，页面把这一版的「谁改的」显示为「在架外」。
+**内容版本另有一行**：skill 页的「内容版本（摘要、时刻、谁改的）」读 record-only 种类 `skill_shelved`（`EventKind::SkillShelved`，追加在 `ALL` 末尾）：载荷 `SkillShelved { skill: String, digest: B3Hash, source: ShelvedFrom }`，`ShelvedFrom { Path, Git { url, rev }, SkillsSh { name }, Shipped, Page }`（线上以 `kind` 键区分五臂），`run` 为 `RunId::CITY`，`addr` 是书架所在的 scope：城库缺席（与 `autonomy_changed` 的 `Scope::City` 同一读法），楼架是那栋楼的地址。经 §8-28 的门（`library::install`）每次真正落位（`Placed::Fresh`）时由城写一行，答 `AlreadyShelved` 时一个字节没变、不写，`digest` 是 `Installed::hash`。它取代此前为 `PutShelved` 计划的 `shelved_document_written`：两条上架的路是同一件事，一个种类。User 在架外直接改文件没有行，由 `run_started` 钉住的摘要与这件 skill 的任何一行 `skill_shelved` 都不同读出，页面把这一版的「谁改的」显示为「在架外」（wire D33）。
+
+**现状**：种类、载荷（`kernel::event::record::skill`）与表的行都在；今天唯一的写方是新城成形（`accounting::worker::genesis::form`）：自带的 skill 在第零行之前落位，成形在第零行之后为每件 `Fresh` 的写一行 `source = Shipped`，因为账本在第零行之前不存在。`InstallSkill` 还不是线上的动词（wire D32 定了形，wire 的文法里没有这一臂），`PutShelved` 仍答 `not_built`；两者的执行者落地时各写一行，`source` 分别是来源的那一臂与 `Page`。
 
 **理由**：审核的结论要和它审的那份内容绑定，才能说「内容变了要重审」，所以摘要必须在同一行；审核来自城外，结论是城收到的事实，重放不能再去问一次外网，所以入账。使用早已入账，再记一行只是同一件事的第二份。
 
