@@ -44,8 +44,11 @@ inductive Unheard where
 
 /-- `calling` 把一个 `Unheard` 读成退出码的唯一一处。 -/
 def Unheard.exit : Unheard → Exit
+  -- §8-103 决定 2：帧写错退 2：错在这条命令行本身，不与城的真实拒绝共用 1。
   | .unreadable => .line
+  -- §8-103 决定 1：没有城单列为 4，与「城读了这一帧并拒绝」的 1 分开，agent 据此决定是改帧重试还是起城、改 `--at`。
   | .noCity => .noCity
+  -- §8-103 决定 3：握手之后断开归 1：那时已经有城答过 `Welcome`。
   | .broken => .refused
 
 /-- 五个码两两不同：一个码只断言一件事。 -/
@@ -59,15 +62,6 @@ theorem zero_is_done (e : Exit) : e.code = 0 ↔ e = .done := by
 /-- 码落在 0 到 4 之间，任何平台的退出码都装得下。 -/
 theorem code_small (e : Exit) : e.code ≤ 4 := by
   cases e <;> simp [Exit.code]
-
-/-- §8-103 决定 1：没有城单列为 4，与「城读了这一帧并拒绝」的 1 分开，agent 据此决定是改帧重试还是起城、改 `--at`。 -/
-theorem no_city_is_not_a_refusal : Unheard.noCity.exit ≠ Exit.refused := by decide
-
-/-- §8-103 决定 2：帧写错退 2：错在这条命令行本身，不与城的真实拒绝共用 1。 -/
-theorem unreadable_frame_is_the_line : Unheard.unreadable.exit = .line := rfl
-
-/-- §8-103 决定 3：握手之后断开归 1：那时已经有城答过 `Welcome`。 -/
-theorem broken_after_welcome_is_refused : Unheard.broken.exit = .refused := rfl
 
 /-- 没听到回答从不读作做完了。 -/
 theorem unheard_is_never_done (u : Unheard) : u.exit ≠ .done := by

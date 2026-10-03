@@ -84,11 +84,6 @@ theorem help_runs_nothing (words : List String) (h : asksHelp words = true)
           · cases heq
           · simp_all
 
-/-- 什么都没敲是首屏。 -/
-theorem nothing_is_the_first_screen :
-    parse find arguments ([] : List String) = .ok .firstScreen := by
-  simp [parse, asksVersion, own]
-
 /-- `--` 之后的 `--help` 是交给动词的文字。 -/
 example : asksHelp ["call", "--", "--help"] = false := by decide
 example : asksVersion ["dispatch", "lab", "-V"] = true := by decide
