@@ -166,7 +166,7 @@ number appears in this sentence.
 kernel:
 storage: kernel
 gateway: kernel
-runtime: kernel, storage, gateway
+runtime: kernel, storage, gateway, desktop_ffi
 collab: kernel, storage
 city: kernel
 browser: kernel
@@ -175,7 +175,7 @@ agent_protocols: kernel, gateway
 wire: kernel, documents
 remote_access: kernel
 accounting: kernel, storage, gateway, runtime, collab, city, agent_protocols, wire, documents
-sprawling: kernel, storage, gateway, runtime, collab, city, browser, agent_protocols, wire, accounting, desktop, remote_access
+sprawling: kernel, storage, gateway, runtime, collab, city, browser, agent_protocols, wire, accounting, desktop, desktop_ffi, remote_access
 desktop: kernel, agent_protocols, desktop_ffi
 desktop_ffi:
 ```
@@ -183,7 +183,9 @@ desktop_ffi:
 The `desktop_ffi` row is the desktop server's FFI seam (`crates/desktop/ffi`),
 the one member whose lint table is its own: it is the workspace's table with
 `unsafe_code` at `deny`, so each call into its Zig leaf can relax the lint at
-that one statement (`crates/desktop/Spec.lean` D14). `desktop` reads `kernel`
+that one statement (`crates/desktop/Spec.lean` D14). `sprawling` and `runtime` read it for the
+processor topology, the power-throttling opt-out and a job's CPU weight and
+memory limit, which no safe crate offers (`crates/desktop/ffi/Spec.lean` D4). `desktop` reads `kernel`
 and `agent_protocols` for four facts the city defines, the error codes, the
 image quality domain, the MCP revision and the effect-unknown key, and for
 nothing else.
