@@ -159,7 +159,7 @@ Signal、Inbox、Steer、Workshop、NodeContract、fan-in、Artifact、arbitrati
 
 **`collab::triage`**（形状 1 判定；性质见 `spec/Triage.lean`）。`Reflex::{Discard, Notify, Light, Full}`、`Arrival`、`Rule`、`Landing { addr, reflex, because }`；`Triage::new(rules, fallback)` 在构造点拒空匹配串。
 
-**`collab::claim_tool`、`collab::claim_effect`**（形状 4 适配器、形状 2 值类型）。`ClaimEffect::{Claimed, PutDown { exit: PlanExit }, Split { children }}` 与它的 `id`、`kind`、`payload`（形状是 `kernel::event::record::RoadmapMoved`）、`apply`；`ClaimDesk::new(who, room, roadmap, booking)`、`take_effects`、`roadmap`（仅当本次 drive 改过）、`holding`、`abandon`；`Booking` 是调用时判定认领的权威（城里是记账线程）；`still_true(text, effect)`。六个动作：`list`、`claim`、`finish`、`block`、`release`、`split`。
+**`collab::claim_tool`、`collab::claim_effect`**（形状 4 适配器、形状 2 值类型）。`ClaimEffect::{Claimed, PutDown { exit: PlanExit }, Split { children }, Added { id, child }}` 与它的 `id`、`kind`（`Added` 为 `None`）、`line`（种类与载荷一起，载荷形状是 `kernel::event::record::RoadmapMoved`）、`apply`；`ClaimDesk::new(who, room, roadmap, booking)`、`take_effects`、`roadmap`（仅当本次 drive 改过）、`holding`、`abandon`；`Booking` 是调用时判定认领的权威（城里是记账线程）；`still_true(text, effect)`。七个动作：`list`、`claim`、`finish`、`block`、`release`、`split`、`add`。
 
 - `Roadmap.md` 是唯一权威，不另立认领登记表：文件被人读、被 `PlanTree::progress` 数、被这个工具改，一处事实，三个读者。
 - 六个动作长在同一条 catalog 行上：模型每一轮读的行数是成本，一行背后的动词数不是（§14 的字节上限）。
@@ -167,6 +167,7 @@ Signal、Inbox、Steer、Workshop、NodeContract、fan-in、Artifact、arbitrati
 - 认领在调用时由 `Booking` 判定，桌子的副本先答：先让 `PlanTree::claim` 在副本上判，再问 `Booking`；`Booking` 拒绝时桌子不持有节点、不排效应、不改文本。`Booking` 记的是哪轮在飞的活持有哪个节点，只活到那轮活落地为止，所以它不是第二份登记表；它拿到整条 `ClaimEffect::Claimed`，因为那一行的种类与载荷只由 `ClaimEffect::kind` 与 `payload` 定义。
 - 一次 drive 只持有一个节点。计划门禁就是那个 `Held` 值：它由 `PlanTree::claim` 铸出，只能花在 `finish` 或 `stop` 上，没有第三个出口；一个只是结束了的 run 由 `abandon` 把它花在 `FrozeWithoutEvidence` 上，「认领了却没交代」在冻结之后不可达。
 - `split` 只分本次 drive 握着的那一行，没握着就拒绝，拒词说这个 run 握着什么、恢复语叫它先认领那一行，桌子不排效应、不改副本（D6；`spec/Claim.lean` 的 `split_needs_hold`）。分完之后不再持有那根枝；写盘前把新文本重新解析并 `PlanTree::build` 一次，拆不出合法树就一个字节都不写。拆分结果带 `unfinished`：该节点下尚未 Done 的子节点数，由拆完的树数出。
+- `add` 只在根下加顶层行，只有 `hall/mayor` 能调（D12）；它带 `parts`，每一份成为一个顶层行，编号接在最后一个顶层行之后；写进副本之前同 `split` 一样重新解析并 `PlanTree::build`，建不出合法树就一个字节都不写。回答带 `nodes`：新行的编号。
 - `block` 与 `release` 必须带一句原因，原因随记录走（`roadmap_blocked` 的载荷），不随表格走。哪一种记录由出口决定（`ClaimEffect::kind`）：绿是 `roadmap_finished`，红是 `roadmap_blocked`，交回是 `roadmap_released`，拆是 `roadmap_split`。效应穷尽，新增一个变体应当是写入处的编译错误。
 - 效应怎么改文本只有 `ClaimEffect::apply` 一个定义：桌子在调用时用它改副本，工人落地时用它把同一组效应重放到盘上；`Split` 因此带着子节点的 weight。`PutDown` 携 `PlanExit` 而不是一个动词，把出口的两条臂抄进第二个枚举，就是对「一个节点可以怎么离开」的第二份意见。`still_true` 问的是记录答不了的那个问题：盘上的文档现在是否仍然容得下这条效应。只有认领会答「不」——它要那一行仍是 `Not started`；放下与拆分只作用于本 run 握着的那一行，它们的新鲜由握持之前的那条认领担保（D6），`still_true` 不为它们另判一个期待状态。
 - 并发口径：工人写盘前重读文件，把效应按次序重放上去，每条在前面几条留下的文本上问 `still_true`（`spec/Claim.lean` 的 `land`；`crates/accounting/Spec.lean` §8-27）：本 run 拆出又认领的子行因此在那里；一条认领的行若已不是 `Not started` 则整组丢弃并留一条诊断，而不是覆盖；都对得上时只有本轮碰过的行改变。桌子答应的效应落在派活那份计划上全部落下（`admitted_lands`），工具答成功而落地一字不写只在别的写者动过那一行时发生，并且有那条诊断。
@@ -203,6 +204,8 @@ D7 信与派活在发出时生效（ruling）。`signal send` 与 `delegate` 在
 D8 取走不等于消费：读过它的那次模型回答落账，才是消费（F8）。安全点取走的信由取走它的 run 拿着；那个 run 下一次模型回答落账（`model_returned`）时，它拿着的每一件各写一行 `signal_consumed`；run 在那之前离开房间（Done、失败、取消一样），它拿着的信回到房间队列，并为房间敲一次门（`Collab.Delivery.leave_requeues`）。已消费的不再回来（`consumed_stays`）。被否决的有两种。其一是今天的「取走即消费」：被取消的 run 取走的信既不在队列里，也没有模型读过它，信就丢了（`withoutRequeue_loses`）。其二是「run 以 Done 结束才算消费」：一个模型已经读过、已经照着做了一半的信，在 run 被取消后会再投一次，副作用发生两次。以模型回答落账为界，被读过的信留在 transcript 里，下一个 run 从 handoff 读到它；没被读过的信重新投递。
 
 D9 `send` 的同步开关。`send` 带一个开关，异步是默认：发完即返回。同步时发信 run 停在安全点，不调模型、不花 token，直到收信房间回一封信给它，或注入的时钟走到 deadline；deadline 是此刻加 `patience`。回信就是收信房间发给等待者房间的任何一封信；超时与回信都让 run 继续，超时的结果告诉模型没有回信。run 离开房间时它的等待一并结束。模型证明每个等待的 deadline 至多在此刻之后 `patience`（`wait_bounded`），时钟再走 `patience + 1` 拍后没有等待剩下（`waits_end`），所以两个互相同步等待的 run 由超时解开，不需要死锁检测。`patience` 的默认值是 240 秒，短于 provider 提示缓存的有效期：Anthropic 的 prompt caching 默认缓存 5 分钟、每次命中刷新，OpenAI 的自动缓存在不活动 5 到 10 分钟后清除；等待短于这个时长，回信到达后的下一次模型调用仍然命中缓存。它是 `collab::signal_tool` 的一个具名常量，城的配置里的一个值可以替换它，替换只改这一个值（推断选择，待人确认）。被否决的是没有上限的同步等待：两个互等的 run 永远停住，且一次长于缓存有效期的等待让下一次调用付整份前缀。
+
+D12 空计划的第一行由谁写：这栋楼的 Mayor，经 `plan add`（roadmap F2；kernel `spec/Share.lean` D25）。根的份额是整份计划，从来没有交给任何一方，所以六个动作都相对已有节点、空的 `Roadmap.md` 写不进第一行。`ClaimDesk::add` 只对 `hall/mayor` 开，在根下接着最后一个顶层行编号；`add` 复用 `split` 的 `parts`，`plan` 条目因此只多 33 B（`catalog_tests` 钉在 581 B）。加出的行是 `ClaimEffect::Added`，不写 `roadmap_*` 行，随计划文件写盘；`still_true` 对它答真，编号若在落地时已被别的写者占了，`apply` 拒绝，那次落地报错而不是改号，因为本 run 之后的 `claim` 用的是这个编号。被否决的有两种：其一，`add` 点名节点在它下面加子行——那就是 `split`，握持由 D6 判，第二个入口是第二个权威；其二，根归派活的 JOB——空计划里还没有可派的活。重开参数：除 hall 以外的楼也有了 Mayor 席位，或 User 改定根的持有者；只改 `ClaimDesk::add` 里那一条授权。
 
 D10 发信方之后被取消或失败：信已经是历史，不撤回。收信方看到的信带着发信 run 在投递那一刻的状态（仍在跑、已冻结、被取消、失败），由投递处从账本读出，写进落地文字 `@<address>` 之后；收信方据此决定还要不要照做。被否决的是取消时撤回已发的信：账本只追加，撤回要写第二条事实去否定第一条，而收信方可能已经照着做了，撤回只能让两边对「发生了什么」各持一份。
 

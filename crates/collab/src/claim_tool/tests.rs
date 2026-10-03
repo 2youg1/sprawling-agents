@@ -81,7 +81,7 @@ fn claiming_a_ready_node_marks_it_and_queues_one_effect() {
     let effects = borrowed.take_effects();
     assert_eq!(effects.len(), 1);
     assert_eq!(effects[0].id(), &node("1"));
-    assert_eq!(effects[0].kind(), kernel::EventKind::RoadmapClaimed);
+    assert_eq!(effects[0].kind(), Some(kernel::EventKind::RoadmapClaimed));
     assert!(
         borrowed.take_effects().is_empty(),
         "an effect read twice would be a claim recorded twice"
@@ -220,8 +220,8 @@ fn blocking_paints_the_node_red_and_says_why() {
     let text = shared.lock().unwrap().roadmap().unwrap().to_owned();
     assert!(text.contains("| 1 | wire the kiln | 1 |  | Blocked |  |"));
     let effects = shared.lock().unwrap().take_effects();
-    assert_eq!(effects[1].kind(), kernel::EventKind::RoadmapBlocked);
-    let payload = effects[1].payload("potter@lab.1").unwrap();
+    assert_eq!(effects[1].kind(), Some(kernel::EventKind::RoadmapBlocked));
+    let payload = effects[1].line("potter@lab.1").unwrap().unwrap().1;
     assert_eq!(
         payload.as_map().get("verb").and_then(Value::as_str),
         Some("blocked")
@@ -255,7 +255,7 @@ fn releasing_puts_the_node_back_where_another_run_can_take_it() {
     let text = shared.lock().unwrap().roadmap().unwrap().to_owned();
     assert!(text.contains("| 1 | wire the kiln | 1 |  | Not started |  |"));
     let effects = shared.lock().unwrap().take_effects();
-    assert_eq!(effects[1].kind(), kernel::EventKind::RoadmapReleased);
+    assert_eq!(effects[1].kind(), Some(kernel::EventKind::RoadmapReleased));
 }
 
 #[test]
@@ -282,7 +282,7 @@ fn a_run_that_freezes_still_holding_a_node_leaves_it_red() {
     let text = shared.lock().unwrap().roadmap().unwrap().to_owned();
     assert!(text.contains("| 1 | wire the kiln | 1 |  | Blocked |  |"));
     let effects = shared.lock().unwrap().take_effects();
-    assert_eq!(effects[1].kind(), kernel::EventKind::RoadmapBlocked);
+    assert_eq!(effects[1].kind(), Some(kernel::EventKind::RoadmapBlocked));
     assert!(
         shared.lock().unwrap().abandon().is_ok(),
         "a run that put its node down properly abandons nothing"

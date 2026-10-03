@@ -264,16 +264,21 @@ impl Claims {
                 collab::ClaimEffect::Claimed { .. } => continue,
                 collab::ClaimEffect::PutDown { id, .. } => Some(id.clone()),
                 collab::ClaimEffect::Split { parent, .. } => Some(parent.clone()),
+                // An added row rides on the plan file's write below.
+                collab::ClaimEffect::Added { .. } => None,
+            };
+            // Which record this is, is the effect's own answer: the exit
+            // decided it, and a second match here would be a second
+            // opinion about what a stop means.
+            let Some((kind, data)) = effect.line(who)? else {
+                continue;
             };
             lines.push(Closing {
                 line: Line {
                     who: who.to_owned(),
                     addr: room.clone(),
-                    // Which record this is, is the effect's own answer: the
-                    // exit decided it, and a second match here would be a
-                    // second opinion about what a stop means.
-                    kind: effect.kind(),
-                    data: effect.payload(who)?,
+                    kind,
+                    data,
                 },
                 closes,
             });
@@ -332,15 +337,17 @@ pub fn handed_back(
                 },
             },
         },
-        collab::ClaimEffect::PutDown { .. } | collab::ClaimEffect::Split { .. } => {
+        collab::ClaimEffect::PutDown { .. }
+        | collab::ClaimEffect::Split { .. }
+        | collab::ClaimEffect::Added { .. } => {
             return Ok(None);
         }
     };
-    Ok(Some(Line {
+    Ok(put_down.line(who)?.map(|(kind, data)| Line {
         who: who.to_owned(),
         addr: room.clone(),
-        kind: put_down.kind(),
-        data: put_down.payload(who)?,
+        kind,
+        data,
     }))
 }
 

@@ -8,11 +8,11 @@ use kernel::Tool;
 use super::tests::desk;
 use super::*;
 
-/// Six actions cost no more catalog bytes than four did. The catalog is
-/// what every turn pays for, so a verb that grows it is a verb charged
-/// to every run in the city whether or not it is ever called.
+/// The plan entry's catalog bytes are pinned. The catalog is what every
+/// turn pays for, so a verb that grows it is a verb charged to every run
+/// in the city whether or not it is ever called.
 #[test]
-fn six_actions_cost_no_more_catalog_bytes_than_four_did() {
+fn the_plan_entry_costs_no_more_catalog_bytes_than_its_pin() {
     let tool = ClaimTool::new(desk()).unwrap();
     let meta = tool.meta();
     let bytes = meta.disclosure.len()
@@ -23,10 +23,12 @@ fn six_actions_cost_no_more_catalog_bytes_than_four_did() {
     // more verbs and two more arguments fit under it because the
     // locator grammar left the schema for the refusal that needs it:
     // a description repeating what a refusal already says is paid
-    // for every turn and read once.
+    // for every turn and read once. The seventh verb, `add`, is the only
+    // door into an empty plan (roadmap F2) and costs 33 B: it reuses
+    // `parts` instead of carrying a schema field of its own.
     assert!(meta.disclosure.contains("Must this be expanded?"));
     assert!(
-        bytes <= 548,
-        "the plan entry costs {bytes} B, and four actions cost 548"
+        bytes <= 581,
+        "the plan entry costs {bytes} B, and its pin is 581"
     );
 }

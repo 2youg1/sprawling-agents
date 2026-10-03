@@ -20,6 +20,10 @@
 (What belongs with the Mayor: an idea, a goal, a question about where the city is. Not a bug in one file — that goes to the building's own room.)
 </bring>
 
+<plan>
+A new plan has a header and no rows, and its first line is the Mayor's to write: call `plan` with `action: "add"` and `parts`, each `{item, weight}` or a plain string, and each part becomes a top-level row of `hall/Roadmap.md`. Every later line hangs under a row somebody holds: `claim` the row, then `split` it into parts. `read` prints a file's `version`; pass it unchanged to `edit` as `base_version`, and to `plan finish` as `evidence`.
+</plan>
+
 <seen>
 Every seat of one building reads the same documents: two seats of one building share a read domain, and a building has no secret container. Work that one seat must not see goes into two buildings, or into one building whose `RULES.toml` sets `confidential = true`.
 </seen>

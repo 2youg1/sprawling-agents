@@ -149,22 +149,7 @@ impl ClaimBook {
 /// The claim's instant is taken when the model makes it.
 pub(crate) fn booking(bell: mpsc::Sender<Wake>, claimant: Claimant) -> collab::Booking {
     collab::Booking::new(move |claim: &collab::ClaimEffect| {
-        let line = EventDraft {
-            run: claimant.run,
-            t: claimant.clock.now()?,
-            who: claimant.who.clone(),
-            addr: Some(claimant.room.clone()),
-            kind: claim.kind(),
-            data: claim.payload(&claimant.who)?,
-            ig: false,
-        };
-        let put_back = effect::handed_back(
-            claim,
-            "this run came home without landing its plan",
-            &claimant.room,
-            &claimant.who,
-        )?
-        .ok_or_else(|| {
+        let not_a_claim = || {
             AxError::failure(
                 AxCode::InvalidArgs,
                 "claim a plan node",
@@ -174,7 +159,24 @@ pub(crate) fn booking(bell: mpsc::Sender<Wake>, claimant: Claimant) -> collab::B
                 ),
             )
             .with_recovery("report this against collab::claim_tool: its desk books claims alone")
-        })?;
+        };
+        let (kind, data) = claim.line(&claimant.who)?.ok_or_else(not_a_claim)?;
+        let line = EventDraft {
+            run: claimant.run,
+            t: claimant.clock.now()?,
+            who: claimant.who.clone(),
+            addr: Some(claimant.room.clone()),
+            kind,
+            data,
+            ig: false,
+        };
+        let put_back = effect::handed_back(
+            claim,
+            "this run came home without landing its plan",
+            &claimant.room,
+            &claimant.who,
+        )?
+        .ok_or_else(not_a_claim)?;
         let (back, answer) = mpsc::sync_channel(0);
         bell.send(Wake::Claim(ClaimAsk {
             building: claimant.building.clone(),
@@ -243,8 +245,8 @@ mod tests {
                     t: kernel::TimeMs::new(0),
                     who: "potter".to_owned(),
                     addr: None,
-                    kind: claim.kind(),
-                    data: claim.payload("potter").unwrap(),
+                    kind: claim.kind().unwrap(),
+                    data: claim.line("potter").unwrap().unwrap().1,
                     ig: false,
                 },
                 put_back: crate::effect::handed_back(

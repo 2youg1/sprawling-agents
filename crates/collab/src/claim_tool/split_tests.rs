@@ -50,7 +50,7 @@ fn splitting_grows_the_plan_and_the_run_stops_holding_the_branch() {
         "the work it took is now several pieces; it takes one of them next"
     );
     let effects = shared.lock().unwrap().take_effects();
-    assert_eq!(effects[1].kind(), kernel::EventKind::RoadmapSplit);
+    assert_eq!(effects[1].kind(), Some(kernel::EventKind::RoadmapSplit));
 }
 
 /// The eighth finding of `tools/adversary/Spec.lean`: a split of a row
@@ -68,7 +68,11 @@ fn a_split_of_a_row_this_run_does_not_hold_is_refused_at_the_call() {
     // What a desk queued and wrote, and what it still holds.
     let left = |shared: &Arc<Mutex<ClaimDesk>>| {
         let mut desk = shared.lock().unwrap();
-        let kinds: Vec<_> = desk.take_effects().iter().map(ClaimEffect::kind).collect();
+        let kinds: Vec<_> = desk
+            .take_effects()
+            .iter()
+            .filter_map(ClaimEffect::kind)
+            .collect();
         (
             kinds,
             desk.roadmap().map(str::to_owned),
@@ -145,10 +149,10 @@ fn the_mayor_writes_the_first_line_of_an_empty_plan() {
     let tool = ClaimTool::new(Arc::clone(&shared)).unwrap();
     let added = tool
         .invoke(&call(serde_json::json!({
-            "action": "add", "item": "survey the river", "weight": 2
+            "action": "add", "parts": [{"item": "survey the river", "weight": 2}]
         })))
         .ok()
-        .map(|outcome| outcome.result.as_map().get("node").cloned());
+        .map(|outcome| outcome.result.as_map().get("nodes").cloned());
     let text = shared.lock().unwrap().roadmap().map(str::to_owned);
     let whole = text.as_deref().and_then(|text| {
         let RoadmapShape::WellFormed { rows } = check_roadmap_shape(text) else {
@@ -165,7 +169,7 @@ fn the_mayor_writes_the_first_line_of_an_empty_plan() {
     assert_eq!(
         (added, text, whole),
         (
-            Some(Some(Value::String("1".to_owned()))),
+            Some(Some(serde_json::json!(["1"]))),
             Some(format!(
                 "{EMPTY_PLAN}| 1 | survey the river | 2 |  | Not started |  |\n"
             )),
@@ -183,7 +187,7 @@ fn a_run_that_is_not_the_mayor_cannot_add_under_the_root() {
     let refused = ClaimTool::new(Arc::clone(&shared))
         .unwrap()
         .invoke(&call(
-            serde_json::json!({ "action": "add", "item": "survey the river" }),
+            serde_json::json!({ "action": "add", "parts": ["survey the river"] }),
         ))
         .err();
     assert_eq!(

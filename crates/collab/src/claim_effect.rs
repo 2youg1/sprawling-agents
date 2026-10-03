@@ -16,7 +16,7 @@
 //! Two shapes, so two files (ARCHITECTURE.md section 9).
 
 use kernel::event::record::{RoadmapMoved, RoadmapStep};
-use kernel::spine::{check_roadmap_shape, insert_children, set_roadmap_status};
+use kernel::spine::{append_top_level, check_roadmap_shape, insert_children, set_roadmap_status};
 use kernel::{AxError, NewChild, NodeId, Payload, PlanExit};
 use kernel::{RoadmapShape, RoadmapStatus};
 
@@ -46,6 +46,16 @@ pub enum ClaimEffect {
         parent: NodeId,
         children: Vec<NewChild>,
     },
+    /// A top-level row written under the plan's root by the root's
+    /// holder (kernel `Share.lean` D25). It carries the index the desk
+    /// chose, because a claim this run makes next names the row by it.
+    /// It is no ledger line of its own: the row rides on the plan file's
+    /// write, which is how the plan reached the ledger before any row
+    /// existed to claim.
+    Added {
+        id: NodeId,
+        child: NewChild,
+    },
 }
 
 impl ClaimEffect {
@@ -54,7 +64,9 @@ impl ClaimEffect {
     #[must_use]
     pub fn id(&self) -> &NodeId {
         match self {
-            ClaimEffect::Claimed { id, .. } | ClaimEffect::PutDown { id, .. } => id,
+            ClaimEffect::Claimed { id, .. }
+            | ClaimEffect::PutDown { id, .. }
+            | ClaimEffect::Added { id, .. } => id,
             ClaimEffect::Split { parent, .. } => parent,
         }
     }
@@ -77,13 +89,15 @@ impl ClaimEffect {
                 set_roadmap_status(text, id, exit.status(), exit.evidence())
             }
             ClaimEffect::Split { parent, children } => insert_children(text, parent, children),
+            ClaimEffect::Added { id, child } => append_top_level(text, id, child),
         }
     }
 
-    /// Which record this becomes.
+    /// Which record this becomes, or `None` for an added row, which
+    /// rides on the plan file's write and is no line of its own.
     #[must_use]
-    pub fn kind(&self) -> kernel::EventKind {
-        match self {
+    pub fn kind(&self) -> Option<kernel::EventKind> {
+        Some(match self {
             ClaimEffect::Claimed { .. } => kernel::EventKind::RoadmapClaimed,
             ClaimEffect::Split { .. } => kernel::EventKind::RoadmapSplit,
             ClaimEffect::PutDown { exit, .. } => match exit {
@@ -91,15 +105,33 @@ impl ClaimEffect {
                 PlanExit::Stopped { why, .. } if why.is_red() => kernel::EventKind::RoadmapBlocked,
                 PlanExit::Stopped { .. } => kernel::EventKind::RoadmapReleased,
             },
+            ClaimEffect::Added { .. } => return None,
+        })
+    }
+
+    /// The record this becomes, kind and payload together, or `None`
+    /// for an added row (see [`Self::kind`]).
+    ///
+    /// # Errors
+    /// Propagates the payload's refusal to hold what it was given.
+    pub fn line(&self, who: &str) -> Result<Option<(kernel::EventKind, Payload)>, AxError> {
+        match self.kind() {
+            Some(kind) => Ok(Some((kind, self.payload(who)?))),
+            None => Ok(None),
         }
     }
 
     /// The `roadmap_*` payload: what a rebuild reads back.
-    ///
-    /// # Errors
-    /// Propagates the payload's refusal to hold what it was given.
-    pub fn payload(&self, who: &str) -> Result<Payload, AxError> {
+    fn payload(&self, who: &str) -> Result<Payload, AxError> {
         let step = match self {
+            ClaimEffect::Added { id, .. } => {
+                return Err(AxError::failure(
+                    kernel::AxCode::InvalidArgs,
+                    "record a plan step",
+                    format!("the row added as {id} is written with the plan file, not as a line"),
+                )
+                .with_recovery("write the plan file; an added row has no record of its own"));
+            }
             ClaimEffect::Claimed { item, .. } => RoadmapStep::Claimed { item: item.clone() },
             ClaimEffect::Split { children, .. } => RoadmapStep::Split {
                 children: children.iter().map(|child| child.item.clone()).collect(),
@@ -153,6 +185,6 @@ pub fn still_true(text: &str, effect: &ClaimEffect) -> bool {
                 .find(|row| &row.id == id)
                 .is_some_and(|row| row.status == RoadmapStatus::NotStarted)
         }
-        ClaimEffect::PutDown { .. } | ClaimEffect::Split { .. } => true,
+        ClaimEffect::PutDown { .. } | ClaimEffect::Split { .. } | ClaimEffect::Added { .. } => true,
     }
 }

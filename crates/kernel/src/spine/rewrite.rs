@@ -119,33 +119,12 @@ pub fn insert_children(
         .unwrap_or(0);
     let mut drawn = Vec::with_capacity(children.len());
     for child in children {
-        if child.item.trim().is_empty() {
-            return Err(refuse(
-                "a child with no text".to_owned(),
-                "say what each child is; a row nobody can read is a row nobody can take",
-            ));
-        }
-        if child.item.contains('|') {
-            return Err(refuse(
-                format!("`{}` carries a column separator", child.item),
-                "write the item without `|`; it would split the row into more cells",
-            ));
-        }
-        if child.weight == 0 {
-            return Err(refuse(
-                format!("`{}` is weighted zero", child.item),
-                "give every child a weight of at least one; a node worth nothing is never given \
-                 to anybody",
-            ));
-        }
         next = next.saturating_add(1);
-        let id = parent.child(next)?;
-        drawn.push(format!(
-            "| {id} | {} | {} |  | {} |  |",
-            child.item.trim(),
-            child.weight,
-            RoadmapStatus::NotStarted.spelling()
-        ));
+        drawn.push(draw_child(
+            &parent.child(next)?,
+            child,
+            "split a plan node",
+        )?);
     }
     let Some((first, last)) = locate_table(text) else {
         return Err(refuse(
@@ -173,7 +152,86 @@ pub fn insert_children(
             after = Some(n);
         }
     }
-    let seam = after.unwrap_or(last);
+    Ok(insert_after(text, after.unwrap_or(last), &drawn))
+}
+
+/// Appends one top-level row under the plan's root, returning the whole
+/// text.
+///
+/// The row lands after the table's last line, so a plan with a header
+/// and no rows gets its first line. `id` is the index the caller chose
+/// from the plan it read, and it is checked against this text rather
+/// than recomputed: a caller that goes on to claim the row it added
+/// names it by that index, and renumbering here would point the claim at
+/// a row it never wrote.
+///
+/// # Errors
+/// Refuses a table that does not parse or is not there, an `id` that is
+/// not top-level or that a row already carries, and a child the table
+/// cannot hold (blank, carrying `|`, weighted zero).
+pub fn append_top_level(text: &str, id: &NodeId, child: &NewChild) -> Result<String, AxError> {
+    let refuse = |subject: String, recovery: &str| {
+        AxError::failure(AxCode::InvalidArgs, "add a plan row", subject)
+            .with_recovery(recovery.to_owned())
+    };
+    if id.parent().is_some() {
+        return Err(refuse(
+            format!("{id} is not a top-level index"),
+            "add under a node by splitting the node you hold",
+        ));
+    }
+    let rows = well_formed(text, "add a plan row")?;
+    if rows.iter().any(|row| &row.id == id) {
+        return Err(refuse(
+            format!("a row numbered {id} is already there"),
+            "read the plan again and add after its last top-level row",
+        ));
+    }
+    let drawn = draw_child(id, child, "add a plan row")?;
+    let Some((_, last)) = locate_table(text) else {
+        return Err(refuse(
+            "the roadmap table is not there".to_owned(),
+            "repair the table before adding a row",
+        ));
+    };
+    Ok(insert_after(text, last, &[drawn]))
+}
+
+/// One new row as the table writes it, or the refusal that says why the
+/// table cannot hold it.
+fn draw_child(id: &NodeId, child: &NewChild, action: &'static str) -> Result<String, AxError> {
+    let refuse = |subject: String, recovery: &str| {
+        AxError::failure(AxCode::InvalidArgs, action, subject).with_recovery(recovery.to_owned())
+    };
+    if child.item.trim().is_empty() {
+        return Err(refuse(
+            "a child with no text".to_owned(),
+            "say what each child is; a row nobody can read is a row nobody can take",
+        ));
+    }
+    if child.item.contains('|') {
+        return Err(refuse(
+            format!("`{}` carries a column separator", child.item),
+            "write the item without `|`; it would split the row into more cells",
+        ));
+    }
+    if child.weight == 0 {
+        return Err(refuse(
+            format!("`{}` is weighted zero", child.item),
+            "give every child a weight of at least one; a node worth nothing is never given to \
+             anybody",
+        ));
+    }
+    Ok(format!(
+        "| {id} | {} | {} |  | {} |  |",
+        child.item.trim(),
+        child.weight,
+        RoadmapStatus::NotStarted.spelling()
+    ))
+}
+
+/// The text with `drawn` inserted after line `seam` of `text.split('\n')`.
+fn insert_after(text: &str, seam: usize, drawn: &[String]) -> String {
     let mut out: Vec<String> = Vec::new();
     for (n, line) in text.split('\n').enumerate() {
         out.push(line.to_owned());
@@ -181,7 +239,7 @@ pub fn insert_children(
             out.extend(drawn.iter().cloned());
         }
     }
-    Ok(out.join("\n"))
+    out.join("\n")
 }
 
 /// The rows of a well-formed table, or the refusal that says which line

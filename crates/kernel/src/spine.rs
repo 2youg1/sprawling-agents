@@ -32,7 +32,7 @@ mod row;
 
 pub use grammar::check_roadmap_shape;
 pub use memo::{ScopeChange, WriteMoment};
-pub use rewrite::{insert_children, set_roadmap_status};
+pub use rewrite::{append_top_level, insert_children, set_roadmap_status};
 pub use row::{
     EvidenceCell, NewChild, ROADMAP_COLUMNS, ROADMAP_FILE, ROADMAP_STATUS_SPELLINGS, RoadmapRow,
     RoadmapShape, RoadmapStatus,

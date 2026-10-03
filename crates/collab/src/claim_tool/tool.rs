@@ -3,15 +3,17 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The tool itself: the six actions, and the arguments they are
+//! The tool itself: the seven actions, and the arguments they are
 //! spelled with.
 
 use std::sync::{Arc, Mutex};
 
 use super::ClaimDesk;
+use crate::claim_effect::ClaimEffect;
+use kernel::spine::check_roadmap_shape;
 use kernel::{
-    AxCode, AxError, CostTier, Effect, NewChild, NodeId, Payload, RenderIntent, StopCause,
-    Temporal, Tool, ToolCall, ToolMeta, ToolName, ToolOutcome,
+    AxCode, AxError, CostTier, Effect, NewChild, NodeId, Payload, PlanTree, RenderIntent,
+    RoadmapShape, StopCause, Temporal, Tool, ToolCall, ToolMeta, ToolName, ToolOutcome,
 };
 use serde_json::{Map, Value};
 
@@ -44,7 +46,7 @@ impl ClaimTool {
                 "action",
                 "string",
                 "`list` | `claim` | `finish` (evidence) | `block` (reason) | `release` (reason) \
-                 | `split` (parts)",
+                 | `split` (parts) | `add` (parts; Mayor, empty plan)",
             ),
             ("node", "string", "dotted index, such as `2.3`"),
             ("evidence", "string", "a retrievable locator"),
@@ -148,6 +150,7 @@ impl Tool for ClaimTool {
                 desk.put_down(&node_of(args)?, StopCause::HandedBack { note })?
             }
             "split" => desk.split(&node_of(args)?, &parts_of(args)?)?,
+            "add" => desk.add(&parts_of(args)?)?,
             other => {
                 return Err(AxError::failure(
                     AxCode::InvalidArgs,
@@ -164,9 +167,90 @@ impl Tool for ClaimTool {
     }
 }
 
-/// The one place the six actions are spelled for a caller that got it
+impl ClaimDesk {
+    /// Writes a top-level row under the plan's root, the one door into
+    /// an empty plan (roadmap F2).
+    ///
+    /// The root's share is held by the building's Mayor (kernel
+    /// `Share.lean` D25), so only `hall/mayor` adds here; a run elsewhere
+    /// adds under the branch it holds, which is `split`. The new index
+    /// follows the last top-level row, and the grown table is rebuilt
+    /// before anything is written, as a split's is.
+    fn add(&mut self, rows: &[NewChild]) -> Result<Payload, AxError> {
+        let refuse = |subject: String, recovery: String| {
+            AxError::failure(AxCode::InvalidArgs, "add a plan row", subject).with_recovery(recovery)
+        };
+        if self.room.as_str() != kernel::consts_policy::HALL_MAYOR {
+            return Err(refuse(
+                format!(
+                    "the plan's root belongs to the building's Mayor, and this run is {}",
+                    self.room
+                ),
+                format!(
+                    "claim a row and split it to add work under it, or signal {} to add a \
+                     top-level row",
+                    kernel::consts_policy::HALL_MAYOR
+                ),
+            ));
+        }
+        if rows.is_empty() {
+            return Err(refuse(
+                "no rows given".to_owned(),
+                "pass `parts` as the rows to add, each `{item, weight}` or a plain string"
+                    .to_owned(),
+            ));
+        }
+        let last = self
+            .tree()?
+            .nodes()
+            .filter(|node| node.row.id.parent().is_none())
+            .map(|node| node.row.id.ordinal())
+            .max()
+            .unwrap_or(0);
+        let mut grown = self.text.clone();
+        let mut added = Vec::with_capacity(rows.len());
+        let mut effects = Vec::with_capacity(rows.len());
+        for (offset, row) in (1u32..).zip(rows) {
+            let ordinal = last.checked_add(offset).ok_or_else(|| {
+                refuse(
+                    "the plan has no top-level index left".to_owned(),
+                    "split an existing row instead".to_owned(),
+                )
+            })?;
+            let id = NodeId::parse(&ordinal.to_string())?;
+            let effect = ClaimEffect::Added {
+                id: id.clone(),
+                child: NewChild {
+                    item: row.item.trim().to_owned(),
+                    weight: row.weight,
+                },
+            };
+            grown = effect.apply(&grown)?;
+            added.push(Value::String(id.to_string()));
+            effects.push(effect);
+        }
+        // Built before it is written, as a split's table is: rows that
+        // would not parse or build are refused with the file untouched.
+        let RoadmapShape::WellFormed { rows: parsed } = check_roadmap_shape(&grown) else {
+            return Err(refuse(
+                "the rows would leave a table that does not parse".to_owned(),
+                "shorten the items; each must fit one table row".to_owned(),
+            ));
+        };
+        PlanTree::build(parsed)?;
+        self.text = grown;
+        self.changed = true;
+        self.effects.extend(effects);
+        let mut result = Map::new();
+        result.insert("nodes".to_owned(), Value::Array(added));
+        Payload::new(result)
+    }
+}
+
+/// The one place the seven actions are spelled for a caller that got it
 /// wrong. A second list would drift from the schema above.
-pub(super) const ACTIONS: &str = "use `list`, `claim`, `finish`, `block`, `release` or `split`";
+pub(super) const ACTIONS: &str =
+    "use `list`, `claim`, `finish`, `block`, `release`, `split` or `add`";
 
 fn node_of(args: &Map<String, Value>) -> Result<NodeId, AxError> {
     let raw = args.get("node").and_then(Value::as_str).ok_or_else(|| {

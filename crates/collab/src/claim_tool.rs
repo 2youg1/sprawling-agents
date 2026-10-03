@@ -10,10 +10,11 @@
 //! drifts is always the one nobody reads — while this file is read by
 //! the person, counted by `kernel::PlanTree`, and edited here.
 //!
-//! **Six actions on one catalog line.** `list` and `claim` are how a run
+//! **Seven actions on one catalog line.** `list` and `claim` are how a run
 //! finds work without being told what to do; `finish`, `block` and
 //! `release` are the ways a held node is put down; `split` is how a run
-//! that has found more work says so. They are actions of the entry that
+//! that has found more work says so; `add` is how the Mayor writes the
+//! first line of an empty plan. They are actions of the entry that
 //! already existed rather than a second tool, because the number of
 //! lines a model reads every turn is a cost and the number of verbs
 //! behind one line is not.
