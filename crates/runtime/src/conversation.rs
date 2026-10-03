@@ -218,10 +218,10 @@ impl LetterKind {
 }
 
 /// How the User's steer is attributed, in the window and on the ledger.
-const PERSON: &str = "user";
+const PERSON: &str = kernel::event::record::SteerReceived::PERSON_SOURCE;
 
 /// How the city's own word is attributed, in the window and on the ledger.
-const CITY: &str = "city";
+const CITY: &str = kernel::event::record::SteerReceived::CITY_SOURCE;
 
 impl Speaker {
     /// The spelling `steer_received.source` records: `user`, `city`, or

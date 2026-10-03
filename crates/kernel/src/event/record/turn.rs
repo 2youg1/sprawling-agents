@@ -160,13 +160,26 @@ pub struct ModelReturned {
     pub took_us: Option<u64>,
 }
 
-/// `steer_received`: text a person added at a phase boundary, and where
-/// it came from.
+/// `steer_received`: text added to a run at a phase boundary, and who
+/// spoke it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct SteerReceived {
+    /// [`SteerReceived::PERSON_SOURCE`], [`SteerReceived::CITY_SOURCE`],
+    /// or a resident's `@<room>` followed by its letter's attributes.
     pub source: String,
     pub text: String,
+}
+
+impl SteerReceived {
+    /// The `source` of a steer the person spoke. `runtime::conversation`
+    /// writes it and `wire::note_of` reads it; the spelling lives here
+    /// because both depend on this crate and neither on the other
+    /// (`crates/wire/spec/Reading.lean` D41).
+    pub const PERSON_SOURCE: &'static str = "user";
+    /// The `source` of the city's own word to a run: a policy change, a
+    /// sync wait that ran out.
+    pub const CITY_SOURCE: &'static str = "city";
 }
 
 /// One part of a request's cache shape, as a record states it: how many

@@ -136,7 +136,7 @@
       at: TimeMs.make(startOf(seq, now) + 60_000),
       runs: 1,
       model: MODEL,
-      start: room === CHILD ? "dispatched" : { opened: { carry: index === 0 ? "nothing" : "handoff", from: null } },
+      start: room === CHILD ? { dispatched: { by: null } } : { opened: { carry: index === 0 ? "nothing" : "handoff", from: null } },
     }));
   }
 

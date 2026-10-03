@@ -70,7 +70,7 @@
         last: Seq.make(seq + 1),
         at: TimeMs.make(now - (40 - seq) * 120_000 + 90_000),
         runs: 1,
-        start: index === 0 ? "dispatched" : { opened: { carry: index === 1 ? "handoff" : "nothing", from: null } },
+        start: index === 0 ? { dispatched: { by: null } } : { opened: { carry: index === 1 ? "handoff" : "nothing", from: null } },
       }))
       .reverse();
   }

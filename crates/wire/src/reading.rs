@@ -27,11 +27,6 @@ use kernel::{AxCode, AxError, EventKind, EventRecord, Seq, TimeMs};
 
 use crate::answer::{Note, Output, Speaker, Used};
 
-/// The `source` a `steer_received` line carries when the User spoke:
-/// the token `collab::Steer::from_person` writes, the only entrance
-/// that can produce it. A resident's steer carries `@` and its id.
-const USER_SOURCE: &str = "user";
-
 /// The most lines of one tool's output a row carries.
 pub const OUTPUT_LINES: usize = 12;
 
@@ -207,10 +202,7 @@ pub fn note_of(kind: EventKind, record: &EventRecord) -> Option<Note> {
         },
         EventKind::SteerReceived => Some(match record.data().read::<SteerReceived>() {
             Ok(steer) => Note::Arrived {
-                by: match steer.source.as_str() {
-                    USER_SOURCE => Speaker::User,
-                    _resident => Speaker::Resident,
-                },
+                by: speaker_of(&steer.source),
                 // A resident's source carries its envelope after the
                 // address (`@<room> run=… kind=… sender=…`, collab D16);
                 // the note names only who spoke.
@@ -265,6 +257,16 @@ pub fn note_of(kind: EventKind, record: &EventRecord) -> Option<Note> {
 /// action and the recovery are composed here from the kind of line it is,
 /// not read back. A steer and a freeze earn no note of their own, because
 /// the steer and the frozen run are lines of their own.
+/// Who spoke a steer, read from the spellings the kernel defines for
+/// `steer_received.source` (D41); anything else is a resident's `@<room>`.
+fn speaker_of(source: &str) -> Speaker {
+    match source {
+        SteerReceived::PERSON_SOURCE => Speaker::User,
+        SteerReceived::CITY_SOURCE => Speaker::City,
+        _resident => Speaker::Resident,
+    }
+}
+
 fn backed_off(action: FiredAction, at: Seq) -> Option<Note> {
     match action {
         FiredAction::BackOff {

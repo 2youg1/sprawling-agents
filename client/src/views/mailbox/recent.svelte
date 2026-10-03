@@ -82,7 +82,7 @@
   const earlier = $derived(stretches.earlier);
 
   function startOf(line: SessionLine): Key {
-    if (line.start === "dispatched") return "mailbox_start_dispatched";
+    if ("dispatched" in line.start) return "mailbox_start_dispatched";
     const opened = line.start.opened;
     if (opened.from !== undefined && opened.from !== null) return "mailbox_start_forked";
     return opened.carry === "handoff" ? "mailbox_start_carried" : "mailbox_start_new";

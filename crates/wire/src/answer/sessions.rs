@@ -68,12 +68,17 @@ pub struct SessionLine {
 }
 
 /// How a stretch began.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum SessionStart {
-    /// Dispatching into the room opened it; no `session_opened` was written.
-    Dispatched,
+    /// Dispatching into the room opened it; no `session_opened` was
+    /// written. `by` is who dispatched, as that first `run_started`
+    /// records it; `None` for a line written before the key existed (D40).
+    Dispatched {
+        #[cfg_attr(feature = "schema", schemars(with = "Option<String>"))]
+        by: Option<kernel::event::Who>,
+    },
     /// `/new`: what crossed from the stretch before - `Handoff` when the
     /// previous stretch's handoff travelled - and the run line it branched
     /// from, when it is a branch.

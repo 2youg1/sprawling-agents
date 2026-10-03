@@ -93,7 +93,11 @@ fn a_steer_is_read_as_the_user_the_city_or_a_resident() {
         serde_json::to_value(note).unwrap()["arrived"]["by"].clone()
     };
     assert_eq!(
-        [spoken("user"), spoken("city"), spoken("@lab/room1 kind=steer")],
+        [
+            spoken("user"),
+            spoken("city"),
+            spoken("@lab/room1 kind=steer")
+        ],
         [
             serde_json::json!("user"),
             serde_json::json!("city"),

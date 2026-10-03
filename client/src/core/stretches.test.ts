@@ -24,7 +24,7 @@ const line = (began: number, at: number): SessionLine => ({
   last: Seq.make(began + 1),
   at: TimeMs.make(at),
   runs: 1,
-  start: "dispatched",
+  start: { dispatched: { by: null } },
 });
 // Newest first, as the city answers.
 const answer = (room: Address, ...lines: SessionLine[]): SessionsAnswer => ({ room, sessions: lines, earlier: 0 });

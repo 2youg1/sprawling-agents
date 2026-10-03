@@ -31,6 +31,7 @@ pub(super) fn opening(records: &[EventRecord], city_root: &Path) -> Option<wire:
                 goal: started.goal,
                 at: record.t(),
                 dispatched_by: started.dispatched_by,
+                parent: started.parent,
                 policy: started.policy,
                 effort: started.effort,
                 names: started

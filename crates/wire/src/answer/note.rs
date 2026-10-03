@@ -92,12 +92,14 @@ impl Note {
 }
 
 /// Who spoke a word that arrived: the person who owns the city, through
-/// a steer, or a resident, through a steer or a signal (D36).
+/// a steer; the city itself, through a steer; or a resident, through a
+/// steer or a signal (D36, D41).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum Speaker {
     User,
+    City,
     Resident,
 }
 

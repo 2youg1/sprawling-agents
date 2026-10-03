@@ -9,9 +9,9 @@
 import { Schema } from "effect";
 
 /** The wire version both ends compare on connect. */
-export const WIRE_V = 52 as const;
+export const WIRE_V = 53 as const;
 /** The schema hash the server checks: `wire::schema_hash()`. */
-export const WIRE_HASH = "41aebd7fbcd47151913ed34dbfd877a528c0fa7469988258a112026dcfab7f79" as const;
+export const WIRE_HASH = "7f868c8331157f5fd2e90e62f012433f99699cd40cfda2620c3ee4ee6aa24bf8" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 /** The body sizes a person may ask for: `wire::BODY_PX_MIN` and `BODY_PX_MAX`. */
@@ -3044,6 +3044,7 @@ export const Opening = Schema.Struct({
   effort: Schema.optional(Schema.NullOr(Effort)),
   goal: Schema.String,
   names: Schema.optional(Schema.NullOr(FrozenNames)),
+  parent: Schema.optional(Schema.NullOr(RunId)),
   policy: Schema.optional(Schema.NullOr(RunPolicy)),
   task: Schema.String,
 }).annotate({ identifier: "Opening" });
@@ -3198,9 +3199,10 @@ export type ReplyEnded = typeof ReplyEnded.Type;
 
 /**
  * Who spoke a word that arrived: the person who owns the city, through
- * a steer, or a resident, through a steer or a signal (D36).
+ * a steer; the city itself, through a steer; or a resident, through a
+ * steer or a signal (D36, D41).
  */
-export const Speaker = Schema.Literals(["user", "resident"]).annotate({ identifier: "Speaker" });
+export const Speaker = Schema.Literals(["user", "city", "resident"]).annotate({ identifier: "Speaker" });
 export type Speaker = typeof Speaker.Type;
 
 /**
@@ -3367,7 +3369,11 @@ export type Origin = typeof Origin.Type;
  * How a stretch began.
  */
 export const SessionStart = Schema.Union([
-  Schema.Literal("dispatched"),
+  Schema.Struct({
+    dispatched: Schema.Struct({
+      by: Schema.optional(Schema.NullOr(Schema.String)),
+    }),
+  }),
   Schema.Struct({
     opened: Schema.Struct({
       carry: Carry,

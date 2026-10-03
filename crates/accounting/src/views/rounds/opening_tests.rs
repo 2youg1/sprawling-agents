@@ -117,6 +117,7 @@ fn the_opening_carries_the_effort_and_the_names_the_run_froze() {
             names: Some(wire::FrozenNames {
                 mayor: Some("Cat".to_owned()),
             }),
+            parent: None,
         }),
         "the opening carries what run_started records, and the names its version holds"
     );
@@ -154,8 +155,8 @@ fn a_delegated_childs_opening_names_its_parent_run() {
         serde_json::json!({ "task": "t", "parent": parent.to_string() }),
         &[],
     );
-    let opening = serde_json::to_value(answer.opening.expect("the window held run_started"))
-        .unwrap();
+    let opening =
+        serde_json::to_value(answer.opening.expect("the window held run_started")).unwrap();
     assert_eq!(
         opening.get("parent"),
         Some(&serde_json::json!(parent.to_string())),

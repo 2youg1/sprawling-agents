@@ -92,7 +92,9 @@ impl RoomSessions {
             None if runs > 0 => {
                 let mut opened = SessionLine {
                     began: seq,
-                    start: SessionStart::Dispatched,
+                    start: SessionStart::Dispatched {
+                        by: record.data().read::<RunStarted>()?.dispatched_by,
+                    },
                     runs,
                     last: seq,
                     at,

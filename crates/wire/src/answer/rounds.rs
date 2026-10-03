@@ -282,6 +282,12 @@ pub struct Opening {
     /// back to the address and the role's name, never to today's names.
     #[serde(default)]
     pub names: Option<FrozenNames>,
+    /// The run that dispatched this one, as its `run_started` records it
+    /// (`crates/wire/spec/Answer/Sessions.lean` D40); `None` for a run
+    /// the User or the city dispatched, and for a line written before
+    /// the key existed.
+    #[serde(default)]
+    pub parent: Option<RunId>,
 }
 
 /// The names a session froze, as a page draws them.

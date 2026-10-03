@@ -148,7 +148,7 @@
 
   function startOf(stretch: Stretch): Key {
     const start = stretch.line.start;
-    if (start === "dispatched") return "mailbox_start_dispatched";
+    if ("dispatched" in start) return "mailbox_start_dispatched";
     if (start.opened.from !== undefined && start.opened.from !== null) return "mailbox_start_forked";
     return start.opened.carry === "handoff" ? "mailbox_start_carried" : "mailbox_start_new";
   }
@@ -161,7 +161,7 @@
   const openers = $derived(
     stretches.all.flatMap((stretch) => {
       const first = stretch.runs.at(0);
-      return stretch.line.start === "dispatched" && first !== undefined ? [first.run] : [];
+      return "dispatched" in stretch.line.start && first !== undefined ? [first.run] : [];
     }),
   );
   const openersKey = $derived(openers.join("\n"));

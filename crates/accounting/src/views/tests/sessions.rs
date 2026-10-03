@@ -49,7 +49,10 @@ fn a_room_s_sessions_are_answered_from_the_fold() {
             runs[1],
             EventKind::RunStarted,
             &there,
-            serde_json::Map::new(),
+            serde_json::json!({ "dispatched_by": "person" })
+                .as_object()
+                .unwrap()
+                .clone(),
         ),
         (
             4,
@@ -127,13 +130,20 @@ fn a_room_s_sessions_are_answered_from_the_fold() {
                         1,
                         5,
                     ),
-                    stretch(1, wire::SessionStart::Dispatched, 1, 2),
+                    stretch(1, wire::SessionStart::Dispatched { by: None }, 1, 2),
                 ],
                 earlier: 0,
             }),
             wire::Answer::Sessions(wire::SessionsAnswer {
                 room: there.clone(),
-                sessions: vec![stretch(3, wire::SessionStart::Dispatched, 1, 7)],
+                sessions: vec![stretch(
+                    3,
+                    wire::SessionStart::Dispatched {
+                        by: Some(kernel::event::Who::Person),
+                    },
+                    1,
+                    7,
+                )],
                 earlier: 0,
             }),
         ]

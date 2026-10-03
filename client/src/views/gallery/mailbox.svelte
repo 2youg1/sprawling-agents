@@ -74,10 +74,10 @@
   const SESSIONS: Readonly<Record<string, readonly SessionLine[]>> = {
     [MAYOR]: [
       line(1, 2, 31 * MINUTE, 1, { opened: { carry: "handoff", from: null } }),
-      line(0, 0, 3 * 60 * MINUTE, 4, "dispatched"),
+      line(0, 0, 3 * 60 * MINUTE, 4, { dispatched: { by: null } }),
     ],
     [EAST]: [line(3, 4, 1 * MINUTE, 1, { opened: { carry: "nothing", from: { run: RUN_C, at_seq: Seq.make(2) } } })],
-    [WEST]: [line(5, 6, 2 * MINUTE, 1, "dispatched")],
+    [WEST]: [line(5, 6, 2 * MINUTE, 1, { dispatched: { by: null } })],
   };
 
   function sessions(query: Query): Answer | undefined {
