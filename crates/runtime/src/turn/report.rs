@@ -6,7 +6,9 @@
 //! What a completed turn hands the run loop, and the frozen `[model]`
 //! section the call is shaped by.
 
-use kernel::{AxCode, AxError, Ceiling, ContentBlock, EventRef, ModelUsage, StopReason};
+use kernel::{AxCode, AxError, Ceiling, ContentBlock, ModelUsage, StopReason};
+
+use super::Entry;
 
 /// What a completed turn hands the run loop. `assistant` and
 /// `wave_results` are the window-folding material — the turn's
@@ -18,9 +20,8 @@ use kernel::{AxCode, AxError, Ceiling, ContentBlock, EventRef, ModelUsage, StopR
 /// rebuild and a live fold still share one source.
 #[derive(Debug, Clone, PartialEq)]
 pub struct TurnReport {
-    pub(super) refs: Vec<EventRef>,
     pub(super) redacted: u32,
-    pub(super) model_returned: EventRef,
+    pub(super) model_returned: Entry,
     pub(super) calls_made: usize,
     pub(super) assistant: Vec<ContentBlock>,
     pub(super) wave_results: Vec<ContentBlock>,
@@ -35,10 +36,6 @@ impl TurnReport {
         self.usage.as_ref()
     }
 
-    pub fn refs(&self) -> &[EventRef] {
-        &self.refs
-    }
-
     /// How many secret-shaped spans this turn replaced before its model
     /// and tool events reached the ledger. A diagnostic line can say
     /// this number without saying what was found.
@@ -46,9 +43,11 @@ impl TurnReport {
         self.redacted
     }
 
-    /// The in-window evidence candidate for `Completion::Done`.
-    pub fn model_returned(&self) -> &EventRef {
-        &self.model_returned
+    /// The in-window evidence candidate for `Completion::Done`, by its
+    /// place among the run's lines: `HeldLines::durable` gives its ref
+    /// once a barrier has carried it (runtime D36).
+    pub fn model_returned(&self) -> Entry {
+        self.model_returned
     }
 
     pub fn calls_made(&self) -> usize {

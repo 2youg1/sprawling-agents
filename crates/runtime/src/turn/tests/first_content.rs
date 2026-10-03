@@ -47,22 +47,23 @@ impl Model for Streaming {
 }
 
 /// A turn on a clock that moves ten milliseconds each time it is read.
-fn ticking() -> Turn<'static, Assembling> {
+fn ticking(lines: &mut HeldLines) -> Turn<'_, Assembling> {
     let ticks: &'static mut u64 = Box::leak(Box::new(0));
     let now: &'static mut dyn FnMut() -> Result<TimeMs, AxError> =
         Box::leak(Box::new(move || -> Result<TimeMs, AxError> {
             *ticks = ticks.saturating_add(10);
             Ok(TimeMs::new(*ticks))
         }));
-    Turn::begin(run_id(), "resident@sim.1".into(), TimeMs::new(1), now)
+    Turn::begin(lines, TimeMs::new(1), now)
 }
 
 /// The `t` of `model_called`, the `first_at` of `model_returned` and the
 /// `t` of `model_returned`, after one call through `generating`.
 fn readings(generating: Generating<'_, '_>) -> (Option<u64>, Option<u64>, Option<u64>) {
     let mut ledger = TestLedger::new();
+    let mut lines = lines();
     let turn = advance(
-        ticking()
+        ticking(&mut lines)
             .assemble(
                 Interrupt::None,
                 &mut ledger,
@@ -83,7 +84,7 @@ fn readings(generating: Generating<'_, '_>) -> (Option<u64>, Option<u64>, Option
         )
         .unwrap(),
     );
-    // `model_returned` is held until the turn's closing barrier.
+    // `model_returned` is held until the run's next barrier.
     let recording = advance(
         wave.execute_concurrent(
             Interrupt::None,
@@ -99,6 +100,7 @@ fn readings(generating: Generating<'_, '_>) -> (Option<u64>, Option<u64>, Option
         .unwrap(),
     );
     advance(recording.record(Interrupt::None, &mut ledger).unwrap());
+    lines.barrier(&mut ledger).unwrap();
     let line =
         |at: usize| -> serde_json::Value { serde_json::from_slice(&ledger.lines[at]).unwrap() };
     let (called, returned) = (line(1), line(2));
@@ -165,8 +167,9 @@ fn a_timed_turn_records_its_reply_in_microseconds_from_the_attempt() {
         *micros
     }));
     let mut ledger = TestLedger::new();
+    let mut lines = lines();
     let turn = advance(
-        ticking()
+        ticking(&mut lines)
             .timed(monotonic_us)
             .assemble(
                 Interrupt::None,
@@ -190,6 +193,7 @@ fn a_timed_turn_records_its_reply_in_microseconds_from_the_attempt() {
         .unwrap(),
     );
     closed(turn, &mut ledger);
+    lines.barrier(&mut ledger).unwrap();
     let returned: serde_json::Value = serde_json::from_slice(&ledger.lines[2]).unwrap();
     assert_eq!(
         (

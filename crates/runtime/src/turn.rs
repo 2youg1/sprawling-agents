@@ -29,7 +29,7 @@ use kernel::event::record::{CancelReceived, ModelReturned, SteerReceived};
 use kernel::model::content_from_message;
 use kernel::{
     Address, AxCode, AxError, B3Hash, BuildingPolicy, ChatRequest, ContentBlock, Ledger, Model,
-    ModelRequest, ModelReturn, ModelUsage, Payload, RunId, StopReason, TimeMs, ToolCall, ToolDef,
+    ModelRequest, ModelReturn, ModelUsage, Payload, StopReason, TimeMs, ToolCall, ToolDef,
 };
 
 use crate::compaction::Exchange;
@@ -44,7 +44,8 @@ mod speculation;
 mod wave;
 
 pub(crate) use ledger::RunLine;
-use ledger::{Authored, Carried, Entry, Journal};
+use ledger::{Authored, Carried, Journal};
+pub use ledger::{Entry, HeldLines};
 
 pub use boundary::{Interrupt, NextCall, PhaseOutcome, TurnCancelled};
 pub use prompt::{PromptRecord, RunPrompt};
@@ -91,18 +92,19 @@ pub struct Recording {
 }
 
 impl<'h> Turn<'h, Assembling> {
-    /// Opens a turn. `t` is the turn's stamp, which every line of this
-    /// turn carries but the four it waited for; the executor advances it
-    /// between turns (determinism rule 2). `now` is read for those four
-    /// moments only, on this thread, and never by a tool.
+    /// Opens a turn on the run's `lines`. `t` is the turn's stamp, which
+    /// every line of this turn carries but the four it waited for; the
+    /// executor advances it between turns (determinism rule 2). `now` is
+    /// read for those four moments only, on this thread, and never by a
+    /// tool. Lines an earlier turn held are still held, and go down at
+    /// this turn's first barrier ahead of its own (runtime D36).
     pub fn begin(
-        run: RunId,
-        who: String,
+        lines: &'h mut HeldLines,
         t: TimeMs,
         now: &'h mut dyn FnMut() -> Result<TimeMs, AxError>,
     ) -> Turn<'h, Assembling> {
         Turn {
-            journal: Journal::open(run, who, t, now),
+            journal: Journal::open(lines, t, now),
             state: Assembling(()),
         }
     }
@@ -268,6 +270,11 @@ impl Turn<'_, Recording> {
     /// `runtime::fork` rebuilding one turn at a time would answer
     /// different bytes for the same history.
     ///
+    /// It pays no barrier: what the wave held waits in the run's lines
+    /// for the next turn's model call, or for the run's freeze, and the
+    /// report names `model_returned` by its [`Entry`] until then
+    /// (runtime D36).
+    ///
     /// # Errors
     /// Propagates the ledger's refusal to record the boundary event and
     /// a text the compaction cannot count.
@@ -287,11 +294,8 @@ impl Turn<'_, Recording> {
             stop,
         } = self.state;
         exchange.compact()?;
-        self.journal.barrier(ledger)?;
-        let model_returned = self.journal.durable(model_returned)?;
         Ok(PhaseOutcome::Advanced(TurnReport {
             redacted: self.journal.redacted(),
-            refs: self.journal.close(ledger)?,
             model_returned,
             calls_made,
             assistant: exchange.assistant().to_vec(),
@@ -311,8 +315,9 @@ impl<S> Turn<'_, S> {
         self.journal.append_run_line(line, addr, data);
     }
 
-    /// Ends the turn where it stands: `cancel_received` and the refs of
-    /// everything this turn wrote.
+    /// Ends the turn where it stands: `cancel_received`, one barrier that
+    /// carries it with every line the run still held, and the refs of
+    /// every line the run wrote so far.
     ///
     /// Reached from the boundary consumer below and from a wave that was
     /// halted between two calls, so both endings are one line written in
@@ -320,8 +325,10 @@ impl<S> Turn<'_, S> {
     fn cancel_here(&mut self, ledger: &mut dyn Ledger) -> Result<TurnCancelled, AxError> {
         self.journal
             .append_authored(Authored::CancelReceived, Payload::of(&CancelReceived {})?);
+        let lines = self.journal.lines();
+        lines.barrier(ledger)?;
         Ok(TurnCancelled {
-            refs: self.journal.close(ledger)?,
+            refs: lines.refs().to_vec(),
         })
     }
 

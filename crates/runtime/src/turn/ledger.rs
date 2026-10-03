@@ -50,7 +50,7 @@ pub(super) enum Authored {
 /// through the turn's journal so that it takes its place among the
 /// turn's held lines rather than ahead of them, which is what lets those
 /// lines wait for the next barrier instead of going down first
-/// (`crates/runtime/spec/Turn/Durability.lean`, `closedTurn`).
+/// (`crates/runtime/spec/Turn/Durability.lean`, `tf1Turn`).
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum RunLine {
     /// What the assembled request looks like to a prompt cache.
@@ -136,45 +136,119 @@ impl Moment {
     }
 }
 
-/// One turn's line of history: the turn's stamp, the clock the lines it
-/// waited for are read from, the lines appended but not yet durable, the
-/// refs of the lines already durable, and how many secret-shaped spans it
-/// kept out of the ledger.
+/// The run's line of history: the lines appended but not yet durable,
+/// and the refs of the lines already durable, in the order they were
+/// appended. It lives as long as the run (`Run<Active>`) and every turn
+/// borrows it, so a turn's last lines wait for the barrier of the next
+/// turn instead of paying one of their own (runtime D36).
 ///
-/// Appending holds a line; [`Journal::barrier`] hands every held line to
-/// the ledger in one `Ledger::append_all` and only then keeps their refs,
-/// so a ref this journal hands out names a durable record. The turn calls
-/// the barrier before each outside effect - a model call, a write - and
-/// at the turn's end, and nowhere else (runtime D24,
+/// [`HeldLines::barrier`] hands every held line to the ledger in one
+/// `Ledger::append_all` and only then keeps their refs, so a ref it hands
+/// out names a durable record. A turn calls it before each outside
+/// effect - a model call, a write - and the run calls it once more before
+/// it freezes, and nowhere else (runtime D24, D36,
 /// `crates/runtime/spec/Turn/Durability.lean`).
+#[derive(Debug, Clone, PartialEq)]
+pub struct HeldLines {
+    run: RunId,
+    who: String,
+    held: Vec<EventDraft>,
+    refs: Vec<EventRef>,
+}
+
+/// A line this run appended, by its place among the run's lines: what a
+/// phase or a report keeps in place of a ref it cannot have until the
+/// next barrier.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Entry(usize);
+
+impl HeldLines {
+    /// The lines of run `run`, written by `who`; nothing is held yet.
+    pub fn open(run: RunId, who: String) -> HeldLines {
+        HeldLines {
+            run,
+            who,
+            held: Vec::new(),
+            refs: Vec::new(),
+        }
+    }
+
+    /// Every held line, in the order it was appended, through one
+    /// `Ledger::append_all`. Holding nothing, it asks the ledger nothing.
+    ///
+    /// # Errors
+    /// Propagates the ledger's refusal; the lines it refused are dropped,
+    /// and the run ends on that error.
+    pub fn barrier(&mut self, ledger: &mut dyn Ledger) -> Result<(), AxError> {
+        if self.held.is_empty() {
+            return Ok(());
+        }
+        let echoes = ledger.append_all(std::mem::take(&mut self.held))?;
+        self.refs.extend(echoes);
+        Ok(())
+    }
+
+    /// The refs of every line already made durable, in appending order.
+    pub fn refs(&self) -> &[EventRef] {
+        &self.refs
+    }
+
+    /// The ref of a line already made durable.
+    ///
+    /// # Errors
+    /// Reports `E_INVALID_ARGS` when the line is still held: a ref for a
+    /// line no barrier has carried would name a history that may not exist.
+    pub fn durable(&self, entry: Entry) -> Result<EventRef, AxError> {
+        self.refs.get(entry.0).copied().ok_or_else(|| {
+            AxError::failure(
+                AxCode::InvalidArgs,
+                "read a run line's ref",
+                "the line is not durable yet",
+            )
+            .with_recovery(
+                "report this against runtime::turn::ledger: a ref was asked for                  before the barrier that carries its line",
+            )
+        })
+    }
+
+    /// The single place an [`EventDraft`] of this run's turns is built:
+    /// the author and the place among the run's lines cannot drift
+    /// between turns.
+    fn hold(&mut self, kind: EventKind, at: TimeMs, addr: Option<Address>, data: Payload) -> Entry {
+        let entry = Entry(self.refs.len().saturating_add(self.held.len()));
+        self.held.push(EventDraft {
+            run: self.run,
+            t: at,
+            who: self.who.clone(),
+            addr,
+            kind,
+            data,
+            ig: false,
+        });
+        entry
+    }
+}
+
+/// One turn's pen on the run's lines: the turn's stamp, the clock the
+/// lines it waited for are read from, and how many secret-shaped spans
+/// it kept out of the ledger.
 ///
 /// The phase data lives beside this in `Turn`, not inside it, so a
 /// phase change can move the phase out while the journal stays put and
 /// keeps appending.
 pub(super) struct Journal<'h> {
-    run: RunId,
-    who: String,
+    lines: &'h mut HeldLines,
     t: TimeMs,
     now: &'h mut dyn FnMut() -> Result<TimeMs, AxError>,
     stopwatch: Option<&'h mut dyn FnMut() -> u64>,
-    held: Vec<EventDraft>,
-    refs: Vec<EventRef>,
     redacted: u32,
 }
-
-/// A line this turn appended, by its place among the turn's lines: what
-/// a phase keeps in place of a ref it cannot have until the next barrier.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) struct Entry(usize);
 
 impl std::fmt::Debug for Journal<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Journal")
-            .field("run", &self.run)
-            .field("who", &self.who)
+            .field("lines", &self.lines)
             .field("t", &self.t)
-            .field("held", &self.held.len())
-            .field("refs", &self.refs)
             .field("redacted", &self.redacted)
             .finish_non_exhaustive()
     }
@@ -182,19 +256,15 @@ impl std::fmt::Debug for Journal<'_> {
 
 impl<'h> Journal<'h> {
     pub(super) fn open(
-        run: RunId,
-        who: String,
+        lines: &'h mut HeldLines,
         t: TimeMs,
         now: &'h mut dyn FnMut() -> Result<TimeMs, AxError>,
     ) -> Journal<'h> {
         Journal {
-            run,
-            who,
+            lines,
             t,
             now,
             stopwatch: None,
-            held: Vec::new(),
-            refs: Vec::new(),
             redacted: 0,
         }
     }
@@ -211,51 +281,18 @@ impl<'h> Journal<'h> {
         self.redacted
     }
 
-    /// Makes every held line durable and ends the journal: the one way a
-    /// turn's refs reach a report or a cancellation, so every ref they
-    /// carry names a durable record.
-    ///
-    /// # Errors
-    /// Propagates the ledger's refusal of the held lines.
-    pub(super) fn close(&mut self, ledger: &mut dyn Ledger) -> Result<Vec<EventRef>, AxError> {
-        self.barrier(ledger)?;
-        let mut refs = std::mem::take(&mut self.refs);
-        refs.shrink_to_fit();
-        Ok(refs)
+    /// The run's lines this turn writes to.
+    pub(super) fn lines(&mut self) -> &mut HeldLines {
+        self.lines
     }
 
-    /// The ref of a line already made durable.
+    /// The barrier a turn pays before an outside effect
+    /// ([`HeldLines::barrier`]).
     ///
     /// # Errors
-    /// Reports `E_INVALID_ARGS` when the line is still held: a ref for a
-    /// line no barrier has carried would name a history that may not exist.
-    pub(super) fn durable(&self, entry: Entry) -> Result<EventRef, AxError> {
-        self.refs.get(entry.0).copied().ok_or_else(|| {
-            AxError::failure(
-                AxCode::InvalidArgs,
-                "read a turn line's ref",
-                "the line is not durable yet",
-            )
-            .with_recovery(
-                "report this against runtime::turn::ledger: a phase asked for a ref                  before the barrier that carries its line",
-            )
-        })
-    }
-
-    /// The one disk barrier a turn pays before an outside effect: every
-    /// held line, in the order it was appended, through one
-    /// `Ledger::append_all`. Holding nothing, it asks the ledger nothing.
-    ///
-    /// # Errors
-    /// Propagates the ledger's refusal; the lines it refused are dropped
-    /// with the turn, which ends on that error.
+    /// Propagates the ledger's refusal.
     pub(super) fn barrier(&mut self, ledger: &mut dyn Ledger) -> Result<(), AxError> {
-        if self.held.is_empty() {
-            return Ok(());
-        }
-        let echoes = ledger.append_all(std::mem::take(&mut self.held))?;
-        self.refs.extend(echoes);
-        Ok(())
+        self.lines.barrier(ledger)
     }
 
     /// Appends an event the turn authored, verbatim. The line is held
@@ -311,9 +348,6 @@ impl<'h> Journal<'h> {
         })
     }
 
-    /// The single place an [`EventDraft`] of this turn is built: the
-    /// time, the author and the place among the turn's lines cannot drift
-    /// between phases.
     fn append(
         &mut self,
         kind: EventKind,
@@ -321,16 +355,6 @@ impl<'h> Journal<'h> {
         addr: Option<Address>,
         data: Payload,
     ) -> Entry {
-        let entry = Entry(self.refs.len().saturating_add(self.held.len()));
-        self.held.push(EventDraft {
-            run: self.run,
-            t: at,
-            who: self.who.clone(),
-            addr,
-            kind,
-            data,
-            ig: false,
-        });
-        entry
+        self.lines.hold(kind, at, addr, data)
     }
 }

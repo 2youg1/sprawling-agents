@@ -10,14 +10,16 @@
 //! its end, and a power cut at any line still leaves a prefix of the
 //! uncut history with no write ahead of its intent.
 
-use std::sync::atomic::{AtomicUsize, Ordering};
+#![allow(clippy::arithmetic_side_effects, reason = "test code")]
+
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use super::super::*;
 use super::durability::{Durable, Face};
 use super::helpers::*;
-use crate::handoff::Handoff;
 use crate::conversation::Opening;
+use crate::handoff::Handoff;
 use crate::run::{RunHooks, RunPlan, SafePoint};
 use kernel::{EventDraft, EventRef, ModelRequest};
 use proptest::prelude::*;

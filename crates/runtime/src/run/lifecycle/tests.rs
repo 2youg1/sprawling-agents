@@ -178,10 +178,11 @@ fn a_dispatch_writes_two_lines_and_samples_the_clock_twice() {
     assert_eq!(samples, 2, "one stamp per fact, and no third sample");
 }
 
-/// `closed_turn_barriers` through the run: the run's own
+/// `tf1_turn_barriers` through the run: the run's own
 /// `prompt_shape_compared` waits among the turn's lines, so a run's first
 /// turn that calls no tool pays one barrier for its model call, which
-/// carries `prompt_assembled` too, and one to close.
+/// carries `prompt_assembled` too, and the one a run pays before it
+/// concludes, which carries `model_returned` (runtime D36).
 #[test]
 fn tf1_run_turn_barriers() {
     let mut ledger = CountingLedger::new();

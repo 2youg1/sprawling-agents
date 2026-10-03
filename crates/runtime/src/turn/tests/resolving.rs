@@ -7,7 +7,7 @@
 //! (`crates/runtime/Spec.lean` §8-61).
 
 use super::super::*;
-use super::concurrent::{Placed, wave_of};
+use super::concurrent::{Placed, waved};
 use super::helpers::*;
 use crate::bench::Ticket;
 use kernel::{Tool, ToolOutcome};
@@ -72,7 +72,8 @@ fn a_call_through_call_is_accounted_as_the_tool_it_names() {
         name: kernel::ToolName::parse("call").unwrap(),
         args: Payload::of(&serde_json::json!({ "name": "read", "args": {} })).unwrap(),
     };
-    let turn = wave_of(&mut ledger, vec![through]);
+    let mut lines = lines();
+    let turn = waved(opened_on::<1>(&mut lines), &mut ledger, vec![through]);
     let recording = advance(
         turn.execute_concurrent(
             Interrupt::None,
@@ -83,6 +84,7 @@ fn a_call_through_call_is_accounted_as_the_tool_it_names() {
         .unwrap(),
     );
     advance(recording.record(Interrupt::None, &mut ledger).unwrap());
+    lines.barrier(&mut ledger).unwrap();
     let lines: Vec<serde_json::Value> = ledger
         .lines
         .iter()

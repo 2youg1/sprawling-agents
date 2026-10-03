@@ -198,13 +198,14 @@ fn call(id: &str, tool: &str) -> ToolCall {
     }
 }
 
-/// One whole turn whose model asks for `calls`, on `ledger`; what each
-/// tool saw durable when it ran comes back in call order.
-fn turn_of(ledger: &mut Barriers, calls: Vec<ToolCall>) -> (TurnReport, Vec<Vec<String>>) {
+/// One whole turn whose model asks for `calls`, on `ledger`, and the
+/// barrier the run pays at its end; how many refs the run's lines hold
+/// then, and what each tool saw durable when it ran, in call order.
+fn turn_of(ledger: &mut Barriers, calls: Vec<ToolCall>) -> (usize, Vec<Vec<String>>) {
     let saw = Arc::default();
-    let report = run_turn(ledger, calls, &saw).unwrap();
+    let refs = run_turn(ledger, calls, &saw).unwrap();
     let saw = saw.lock().unwrap().clone();
-    (report, saw)
+    (refs, saw)
 }
 
 /// The same turn, ending on the ledger's refusal instead of unwrapping it.
@@ -212,12 +213,13 @@ fn run_turn(
     ledger: &mut Barriers,
     calls: Vec<ToolCall>,
     saw: &Arc<Mutex<Vec<Vec<String>>>>,
-) -> Result<TurnReport, AxError> {
+) -> Result<usize, AxError> {
+    let mut lines = lines();
     let mut face = Face::new(&ledger.durable, saw);
     let mut model = OneShotModel { calls };
     let mut conversation = Conversation::new();
     conversation.push_task_lines("read and write", "a mixed wave", Opening::FromJob);
-    let turn = advance(opened::<1>().assemble(
+    let turn = advance(opened_on::<1>(&mut lines).assemble(
         Interrupt::None,
         ledger,
         RunPrompt::new(&prefix(), &mut PromptRecord::default()),
@@ -235,7 +237,9 @@ fn run_turn(
     let turn = advance(
         turn.execute_concurrent(Interrupt::None, ledger, &mut face, &mut |_| Interrupt::None)?,
     );
-    Ok(advance(turn.record(Interrupt::None, ledger)?))
+    advance(turn.record(Interrupt::None, ledger)?);
+    lines.barrier(ledger)?;
+    Ok(lines.refs().len())
 }
 
 /// `tf1_write_intent_durable`: when a write runs, its own `tool_called`
@@ -263,14 +267,15 @@ fn tf1_write_intent_is_durable_before_the_write_runs() {
     );
 }
 
-/// `closed_turn_barriers`: a turn pays one barrier for its model call,
-/// which carries a first turn's `prompt_assembled` too, one for each
-/// write, and one to close, however many reads it makes; the report's
-/// refs are every line the turn wrote, all durable.
+/// `tf1_turn_barriers`: a turn pays one barrier for its model call,
+/// which carries a first turn's `prompt_assembled` too, and one for each
+/// write, however many reads it makes; the run's barrier at its end
+/// carries the rest, and then every line the turn wrote has its ref
+/// (`tf1_run_refs_complete`).
 #[test]
 fn tf1_turn_barriers() {
     let mut ledger = Barriers::new();
-    let (report, _) = turn_of(
+    let (refs, _) = turn_of(
         &mut ledger,
         vec![
             call("r1", "read"),
@@ -281,12 +286,8 @@ fn tf1_turn_barriers() {
         ],
     );
     assert_eq!(
-        (
-            ledger.barriers,
-            report.refs().len(),
-            ledger.inner.lines.len()
-        ),
-        (2 + 2, 13, 13)
+        (ledger.barriers, refs, ledger.inner.lines.len()),
+        (1 + 2 + 1, 13, 13)
     );
 }
 

@@ -14,7 +14,7 @@
 use super::super::*;
 use crate::prefix::{FrozenPrefix, FrozenSegment, SegmentSlot};
 use kernel::ledger::chain_hash;
-use kernel::{EventDraft, EventRef, GENESIS_PREV};
+use kernel::{EventDraft, EventRef, GENESIS_PREV, RunId};
 
 /// Minimal in-memory ledger for turn tests (the citysim MemLedger is
 /// the real second adapter; this one keeps the crate's tests local).
@@ -94,15 +94,28 @@ pub(super) fn stopped(at: u64) -> impl FnMut() -> Result<TimeMs, AxError> {
     move || Ok(TimeMs::new(at))
 }
 
-/// A turn opened at stamp `AT` on a clock stopped there. The clock
-/// captures nothing, so leaking its box allocates nothing, and the turn
-/// can outlive the test's own frames.
+/// A turn opened at stamp `AT` on a clock stopped there, on lines of
+/// its own that nothing reads afterwards: what reaches the ledger is what
+/// the turn's own barriers carried. The clock captures nothing, so
+/// leaking its box allocates nothing, and the turn can outlive the test's
+/// own frames.
 pub(super) fn opened<const AT: u64>() -> Turn<'static, Assembling> {
+    opened_on::<AT>(Box::leak(Box::new(lines())))
+}
+
+/// A turn opened at stamp `AT` on `lines`, which the test keeps so it can
+/// pay the barrier the run would pay after the turn.
+pub(super) fn opened_on<const AT: u64>(lines: &mut HeldLines) -> Turn<'_, Assembling> {
     let now: &'static mut dyn FnMut() -> Result<TimeMs, AxError> =
         Box::leak(Box::new(|| -> Result<TimeMs, AxError> {
             Ok(TimeMs::new(AT))
         }));
-    Turn::begin(run_id(), "resident@sim.1".into(), TimeMs::new(AT), now)
+    Turn::begin(lines, TimeMs::new(AT), now)
+}
+
+/// The lines of the run every turn test writes for.
+pub(super) fn lines() -> HeldLines {
+    HeldLines::open(run_id(), "resident@sim.1".into())
 }
 
 pub(super) fn run_id() -> RunId {

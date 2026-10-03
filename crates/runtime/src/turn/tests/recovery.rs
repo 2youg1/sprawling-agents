@@ -100,7 +100,8 @@ fn the_relay_asks_segments_in_order_and_stops_at_the_first_recovery() {
     let mut model = OneShotModel { calls: Vec::new() };
     let request = request();
     let mut clock = stopped(1);
-    let mut journal = Journal::open(run_id(), "sim".into(), TimeMs::new(1), &mut clock);
+    let mut lines = lines();
+    let mut journal = Journal::open(&mut lines, TimeMs::new(1), &mut clock);
     let mut call = ModelCall::open(&mut journal, &mut ledger, &mut model, &request);
     let outcome = recover(
         &mut [&mut one, &mut two, &mut three],
@@ -136,7 +137,8 @@ fn when_every_segment_skips_the_original_failure_surfaces_unchanged() {
     let mut model = OneShotModel { calls: Vec::new() };
     let request = request();
     let mut clock = stopped(1);
-    let mut journal = Journal::open(run_id(), "sim".into(), TimeMs::new(1), &mut clock);
+    let mut lines = lines();
+    let mut journal = Journal::open(&mut lines, TimeMs::new(1), &mut clock);
     let mut call = ModelCall::open(&mut journal, &mut ledger, &mut model, &request);
     let outcome = recover(&mut [&mut one, &mut two], &mut call, original.clone());
     match outcome {
@@ -174,7 +176,8 @@ fn a_segment_that_cannot_repair_ends_the_relay_with_its_own_code() {
     let mut model = OneShotModel { calls: Vec::new() };
     let request = request();
     let mut clock = stopped(1);
-    let mut journal = Journal::open(run_id(), "sim".into(), TimeMs::new(1), &mut clock);
+    let mut lines = lines();
+    let mut journal = Journal::open(&mut lines, TimeMs::new(1), &mut clock);
     let mut call = ModelCall::open(&mut journal, &mut ledger, &mut model, &request);
     let outcome = recover(&mut [&mut one, &mut two], &mut call, wire_mismatch());
     match outcome {
@@ -227,7 +230,8 @@ fn a_wire_mismatch_on_the_streaming_door_is_repaired_through_the_blocking_door()
         "one probe",
         crate::conversation::Opening::FromJob,
     );
-    let turn = opened::<1>();
+    let mut lines = lines();
+    let turn = opened_on::<1>(&mut lines);
     let turn = advance(
         turn.assemble(
             Interrupt::None,
@@ -254,6 +258,7 @@ fn a_wire_mismatch_on_the_streaming_door_is_repaired_through_the_blocking_door()
         .unwrap(),
     );
     closed(turn, &mut ledger);
+    lines.barrier(&mut ledger).unwrap();
     assert_eq!(
         ledger.kinds(),
         vec![

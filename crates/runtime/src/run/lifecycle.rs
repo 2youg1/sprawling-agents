@@ -13,7 +13,9 @@ use crate::handoff::Handoff;
 use crate::mode::{PolicyCell, policy_note};
 use crate::prefix::shape::PromptShape;
 use crate::reminder::ContextGauge;
-use crate::turn::{Generating, Interrupt, PhaseOutcome, RunLine, RunPrompt, Turn, TurnReport};
+use crate::turn::{
+    Generating, HeldLines, Interrupt, PhaseOutcome, RunLine, RunPrompt, Turn, TurnReport,
+};
 
 use super::checkpoint::{CheckpointPolicy, Wave, WaveCheckpoint};
 use super::{Active, Advance, Frozen, Run, RunHooks, RunPlan, SafePoint};
@@ -44,8 +46,8 @@ fn hold_policy(cell: &mut PolicyCell, interrupt: &Interrupt) {
 /// What a safe point hands the driver: a steer joins the window, a policy
 /// change waits in the cell. One door for both, so no safe point can
 /// forget either.
-fn fold_arrival(state: &mut Active, policy: &mut PolicyCell, interrupt: &Interrupt) {
-    fold_steer(&mut state.conversation, interrupt);
+fn fold_arrival(conversation: &mut Conversation, policy: &mut PolicyCell, interrupt: &Interrupt) {
+    fold_steer(conversation, interrupt);
     hold_policy(policy, interrupt);
 }
 
@@ -60,12 +62,15 @@ fn fold_arrival(state: &mut Active, policy: &mut PolicyCell, interrupt: &Interru
 /// `model_returned` holding no content as the evidence for it. Both are
 /// `Limit`: the run ended against something rather than at the end of
 /// its work, and the account says which.
-fn concluded(report: &TurnReport) -> Result<Completion, AxError> {
+///
+/// `lines` must already have carried the report's `model_returned` to
+/// the ledger, because the evidence cites its ref.
+fn concluded(report: &TurnReport, lines: &HeldLines) -> Result<Completion, AxError> {
     if report.assistant().is_empty() || report.stop() == Some(StopReason::MaxTokens) {
         return Ok(Completion::Limit);
     }
     Ok(Completion::Done(Evidence::new(vec![
-        *report.model_returned(),
+        lines.durable(report.model_returned())?,
     ])?))
 }
 
@@ -84,6 +89,7 @@ impl Run<Active> {
         hooks: &mut RunHooks<'_>,
     ) -> Result<Run<Active>, AxError> {
         plan.charter().open(ledger, &mut *hooks.now)?;
+        let lines = HeldLines::open(plan.run, plan.who.clone());
 
         let mut conversation = Conversation::new();
         // A branch opens with the conversation it branched from, and then
@@ -105,6 +111,7 @@ impl Run<Active> {
                 prior_shape: None,
                 prompt: crate::turn::PromptRecord::default(),
                 checkpoint: CheckpointPolicy::opening(),
+                lines,
             },
         })
     }
@@ -126,10 +133,14 @@ impl Run<Active> {
         let t = (hooks.now)()?;
         self.state.last_turn_t = Some(t);
 
-        let turn = Turn::begin(self.plan.run, self.plan.who.clone(), t, &mut *hooks.now)
-            .timed(&mut *hooks.monotonic_us);
+        let turn =
+            Turn::begin(&mut self.state.lines, t, &mut *hooks.now).timed(&mut *hooks.monotonic_us);
         let opening = (hooks.interrupt)(SafePoint::BeforeAssemble { turn: index });
-        fold_arrival(&mut self.state, &mut self.plan.run_policy, &opening);
+        fold_arrival(
+            &mut self.state.conversation,
+            &mut self.plan.run_policy,
+            &opening,
+        );
         let mut turn = match turn.assemble(
             opening,
             ledger,
@@ -178,7 +189,11 @@ impl Run<Active> {
         // the wire, and a steer that arrived before the call joins the
         // next request, whatever the call answered.
         self.state.conversation.mark_sent();
-        fold_arrival(&mut self.state, &mut self.plan.run_policy, &calling);
+        fold_arrival(
+            &mut self.state.conversation,
+            &mut self.plan.run_policy,
+            &calling,
+        );
         let mut turn = match called? {
             PhaseOutcome::Advanced(next) => next,
             PhaseOutcome::Cancelled(_) => return Ok(Advance::Concluded(Completion::Cancelled)),
@@ -204,7 +219,11 @@ impl Run<Active> {
         self.state.checkpoint.record_wave(decided, touches);
 
         let wave = (hooks.interrupt)(SafePoint::BeforeWave { turn: index });
-        fold_arrival(&mut self.state, &mut self.plan.run_policy, &wave);
+        fold_arrival(
+            &mut self.state.conversation,
+            &mut self.plan.run_policy,
+            &wave,
+        );
         // The one place the policy in force changes: every call of the
         // wave below is judged under what the cell holds now.
         let taken = self.plan.run_policy.take_at_wave();
@@ -215,7 +234,7 @@ impl Run<Active> {
         // effect at the next assembly and stopping is the only
         // instruction that can be carried out between two calls.
         let asking = &mut hooks.interrupt;
-        let state = &mut self.state;
+        let state = &mut self.state.conversation;
         let cell = &mut self.plan.run_policy;
         let mut still_going = |call: u32| {
             let arrived = asking(SafePoint::BeforeToolCall { turn: index, call });
@@ -229,7 +248,11 @@ impl Run<Active> {
             };
 
         let settling = (hooks.interrupt)(SafePoint::BeforeSpawn { turn: index });
-        fold_arrival(&mut self.state, &mut self.plan.run_policy, &settling);
+        fold_arrival(
+            &mut self.state.conversation,
+            &mut self.plan.run_policy,
+            &settling,
+        );
         let report = match turn.record(settling, ledger)? {
             PhaseOutcome::Advanced(report) => report,
             PhaseOutcome::Cancelled(_) => return Ok(Advance::Concluded(Completion::Cancelled)),
@@ -259,12 +282,15 @@ impl Run<Active> {
             self.state.conversation.push_reminder(&reminder);
         }
         if report.calls_made() == 0 {
-            return Ok(Advance::Concluded(concluded(&report)?));
+            self.state.lines.barrier(ledger)?;
+            return Ok(Advance::Concluded(concluded(&report, &self.state.lines)?));
         }
         Ok(Advance::Turned)
     }
 
-    /// The only exit. Both lines are written here, so no caller can end a
+    /// The only exit. The run's held lines go down first, in the one
+    /// barrier a run pays at its end (runtime D36); then both lines are
+    /// written here, so no caller can end a
     /// run by simply dropping it and leaving the ledger without a verdict.
     ///
     /// A cancelled run freezes inside the turn it interrupted and carries
@@ -281,6 +307,8 @@ impl Run<Active> {
         completion: Completion,
         hooks: &mut RunHooks<'_>,
     ) -> Result<Run<Frozen>, AxError> {
+        let mut lines = self.state.lines;
+        lines.barrier(ledger)?;
         let t = match (&completion, self.state.last_turn_t) {
             (Completion::Cancelled, Some(turn_t)) => turn_t,
             _ => (hooks.now)()?,

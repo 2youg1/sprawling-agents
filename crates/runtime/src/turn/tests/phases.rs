@@ -24,7 +24,8 @@ fn a_full_turn_appends_the_canonical_event_sequence() {
     };
     let mut conversation = Conversation::new();
     conversation.push_task_lines("probe the city", "one probe", Opening::FromJob);
-    let turn = opened::<1>();
+    let mut lines = lines();
+    let turn = opened_on::<1>(&mut lines);
     let turn = advance(
         turn.assemble(
             Interrupt::None,
@@ -67,6 +68,7 @@ fn a_full_turn_appends_the_canonical_event_sequence() {
     };
     assert_eq!(invoked, 1);
     assert_eq!(report.calls_made(), 1);
+    lines.barrier(&mut ledger).unwrap();
     assert_eq!(
         ledger.kinds(),
         [
@@ -77,9 +79,9 @@ fn a_full_turn_appends_the_canonical_event_sequence() {
             "tool_result"
         ]
     );
-    assert_eq!(report.refs().len(), 5);
+    assert_eq!(lines.refs().len(), 5);
     assert_eq!(
-        report.model_returned().kind(),
+        lines.durable(report.model_returned()).unwrap().kind(),
         kernel::EventKind::ModelReturned
     );
     // Conversation-folding material mirrors the ledger content.
@@ -146,7 +148,8 @@ fn cancel_at_the_call_boundary_stops_before_any_model_bytes() {
 fn steer_at_a_boundary_records_and_advances() {
     let mut ledger = TestLedger::new();
     let mut model = OneShotModel { calls: vec![] };
-    let turn = opened::<4>();
+    let mut lines = lines();
+    let turn = opened_on::<4>(&mut lines);
     let turn = advance(
         turn.assemble(
             Interrupt::Steer {
@@ -172,6 +175,7 @@ fn steer_at_a_boundary_records_and_advances() {
         .unwrap(),
     );
     closed(turn, &mut ledger);
+    lines.barrier(&mut ledger).unwrap();
     assert_eq!(
         ledger.kinds(),
         [
@@ -195,7 +199,8 @@ fn a_tool_error_lands_in_tool_result_not_in_the_turn() {
             args: Payload::empty(),
         }],
     };
-    let turn = opened::<2>();
+    let mut lines = lines();
+    let turn = opened_on::<2>(&mut lines);
     let turn = advance(
         turn.assemble(
             Interrupt::None,
@@ -236,6 +241,7 @@ fn a_tool_error_lands_in_tool_result_not_in_the_turn() {
     let PhaseOutcome::Advanced(report) = turn.record(Interrupt::None, &mut ledger).unwrap() else {
         panic!("the boundary was not interrupted");
     };
+    lines.barrier(&mut ledger).unwrap();
     assert_eq!(report.calls_made(), 1);
     let last = ledger.lines.last().unwrap();
     let value: serde_json::Value = serde_json::from_slice(last).unwrap();

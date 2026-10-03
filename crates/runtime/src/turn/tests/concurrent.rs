@@ -144,7 +144,7 @@ pub(super) fn wave_of(ledger: &mut TestLedger, calls: Vec<ToolCall>) -> Turn<'st
 }
 
 /// `turn`, assembled and called until it holds a wave of `calls`.
-fn waved<'h>(
+pub(super) fn waved<'h>(
     turn: Turn<'h, Assembling>,
     ledger: &mut TestLedger,
     calls: Vec<ToolCall>,
@@ -253,7 +253,12 @@ fn a_steer_inside_the_reads_lands_where_the_serial_wave_writes_it() {
 #[test]
 fn a_call_line_carries_its_tools_registration() {
     let mut ledger = TestLedger::new();
-    let turn = wave_of(&mut ledger, vec![call("c1", "read"), call("c2", "unknown")]);
+    let mut lines = lines();
+    let turn = waved(
+        opened_on::<1>(&mut lines),
+        &mut ledger,
+        vec![call("c1", "read"), call("c2", "unknown")],
+    );
     let recording = advance(
         turn.execute_concurrent(
             Interrupt::None,
@@ -264,6 +269,7 @@ fn a_call_line_carries_its_tools_registration() {
         .unwrap(),
     );
     advance(recording.record(Interrupt::None, &mut ledger).unwrap());
+    lines.barrier(&mut ledger).unwrap();
     let registered: Vec<(serde_json::Value, serde_json::Value)> = ledger
         .lines
         .iter()
@@ -347,12 +353,8 @@ fn a_stamp_the_face_reads_is_the_moment_its_answer_records() {
             Ok(TimeMs::new(next))
         };
         let mut ledger = TestLedger::new();
-        let begun = Turn::begin(
-            run_id(),
-            "resident@sim.1".into(),
-            TimeMs::new(100),
-            &mut now,
-        );
+        let mut lines = lines();
+        let begun = Turn::begin(&mut lines, TimeMs::new(100), &mut now);
         let turn = waved(
             begun,
             &mut ledger,
@@ -371,6 +373,7 @@ fn a_stamp_the_face_reads_is_the_moment_its_answer_records() {
             .unwrap(),
         );
         advance(recording.record(Interrupt::None, &mut ledger).unwrap());
+        lines.barrier(&mut ledger).unwrap();
         let answered: Vec<TimeMs> = ledger
             .lines
             .iter()

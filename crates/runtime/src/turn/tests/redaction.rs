@@ -46,7 +46,8 @@ fn a_key_in_tool_args_and_tool_result_never_reaches_the_ledger() {
     let mut model = OneShotModel {
         calls: vec![read_env_call(&key)],
     };
-    let turn = opened::<7>();
+    let mut lines = lines();
+    let turn = opened_on::<7>(&mut lines);
     let turn = advance(
         turn.assemble(
             Interrupt::None,
@@ -91,6 +92,7 @@ fn a_key_in_tool_args_and_tool_result_never_reaches_the_ledger() {
     let PhaseOutcome::Advanced(report) = turn.record(Interrupt::None, &mut ledger).unwrap() else {
         panic!("the boundary was not interrupted");
     };
+    lines.barrier(&mut ledger).unwrap();
 
     // No ledger line holds the key, in any event of the turn.
     for line in &ledger.lines {

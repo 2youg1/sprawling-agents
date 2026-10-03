@@ -221,6 +221,9 @@ pub struct Active {
     prompt: crate::turn::PromptRecord,
     /// Whether the next wave needs a checkpoint (§8-45).
     checkpoint: checkpoint::CheckpointPolicy,
+    /// The lines the run's turns appended and no barrier has carried
+    /// yet, with the refs of those that one has (runtime D36).
+    lines: crate::turn::HeldLines,
 }
 
 /// A frozen run. There is no method back to [`Active`]: waking an old run
@@ -310,6 +313,11 @@ pub fn drive(
             // honest than deciding in advance that nothing can be
             // written.
             Err(err) => {
+                // What the failed turn and the one before it held goes
+                // down first, so the carrier event and the watchdog's line
+                // follow them in the ledger as they followed them in time
+                // (runtime D36).
+                run.state.lines.barrier(ledger)?;
                 let Carrier::Event(kind) = err.code().carrier() else {
                     run.freeze(ledger, handoff, Completion::Cancelled, hooks)?;
                     return Err(err);

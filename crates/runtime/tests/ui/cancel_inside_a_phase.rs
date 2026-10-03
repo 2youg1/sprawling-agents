@@ -8,11 +8,7 @@
 
 fn main() {
     let mut now = || -> Result<kernel::TimeMs, kernel::AxError> { Ok(kernel::TimeMs::new(0)) };
-    let turn = runtime::turn::Turn::begin(
-        kernel::RunId::CITY,
-        "who".to_owned(),
-        kernel::TimeMs::new(0),
-        &mut now,
-    );
+    let mut lines = runtime::turn::HeldLines::open(kernel::RunId::CITY, "who".to_owned());
+    let turn = runtime::turn::Turn::begin(&mut lines, kernel::TimeMs::new(0), &mut now);
     turn.cancel();
 }
