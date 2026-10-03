@@ -894,7 +894,7 @@ measured_by = "cargo xtask gates spec (spec::ratchet, assertion 6)"
 status = "held by spec, not weighed by budget"
 pinned = 9
 
-# Backticked crate paths in .lean, .md and rustdoc that resolve to no item; may only fall (§8-42, assertion 7). 71: the gateway::admission and DRIVING_LANES citations are gone.
+# Backticked crate paths in .lean, .md and rustdoc that resolve to no item; may only fall (§8-42, assertion 7).
 [rust_paths_unresolved]
 what = "backticked crate paths in .lean, .md and rustdoc that resolve to no item"
 measured_by = "cargo xtask gates spec (spec::ratchet, assertion 7)"
