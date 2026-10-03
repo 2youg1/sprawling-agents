@@ -371,8 +371,10 @@ jobs:
   # a home directory created empty, so its report is what a person who
   # has installed nothing else would read. The walk (`just acceptance`)
   # additionally has just, lake, cargo and, on Windows, Git Bash's
-  # /usr/bin on its PATH, because those run the checker and the stand-in
-  # provider, which are built before the environment narrows; the city it
+  # /usr/bin and zig on its PATH, because those run the checker and the
+  # stand-in provider, which are built before the environment narrows:
+  # the narrower PATH reruns the build script of crates/desktop/ffi,
+  # which watches PATH and on Windows compiles its Zig leaf; the city it
   # serves is the archive's binary and nothing from the checkout.
   #
   # What a hosted runner cannot show: its account is an administrator on
@@ -496,7 +498,7 @@ jobs:
           tools=""
           for tool in just lake cargo unzip; do tools="$tools:$(dirname "$(command -v "$tool")")"; done
           walk="${{ steps.fresh.outputs.path }}$tools"
-          [ "$RUNNER_OS" != Windows ] || walk="/usr/bin:$walk"
+          [ "$RUNNER_OS" != Windows ] || walk="/usr/bin:$walk:$(dirname "$(command -v zig)")"
           env -u CARGO_HOME -u RUSTUP_HOME PATH="$walk" \
             just acceptance "${{ steps.fresh.outputs.archive }}" 2>&1 | tee "${{ steps.fresh.outputs.dir }}/logs/acceptance.log"
       - uses: actions/upload-artifact@v7
@@ -511,28 +513,43 @@ jobs:
             ${{ runner.temp }}/fresh/logs
           if-no-files-found: warn
 
-  # Whether the macOS Keychain asks again for the city key after the
-  # binary is replaced (crates/remote_access/Spec.lean §3, item 4 of the
-  # remote door's work list). Every `serve` reads the key kept under the
-  # service `sprawling/remote` and writes one the first time
-  # (`bin::outside::keeper::city_key`). The first build serves a new city
-  # once, so the key is written by it; the second build of the same tree
-  # (a release build where the first was a debug build, so the bytes and
-  # the code signature differ, as they do after an update) is copied over
-  # the first at the same path and serves the same city again.
+  # Whether the city key survives a binary update on macOS, where the
+  # Keychain may ask again before it lets a newly signed binary read an
+  # item an older one wrote (crates/remote_access/Spec.lean §3). The city
+  # key is kept by the remote door, and a serve keeps the door only when it
+  # has a console (crates/sprawling/spec/Outside.lean, "没有控制台"), so
+  # each serve here runs with `--console` and an empty stdin: the door and
+  # its key are kept at start-up, then the console reads end of input and
+  # stops while the city serves on. Without `--console` no serve ever
+  # asks the vault for the key and the reading is an empty Keychain.
+  # Every kept door reads the key under the service `sprawling/remote`
+  # and writes one the first time (`bin::outside::keeper::city_key`). The
+  # first build serves a new city once, so the key is written by it; the
+  # second build of the same tree (a release build where the first was a
+  # debug build, so the bytes and the code signature differ, as they do
+  # after an update) is copied over the first at the same path and serves
+  # the same city again.
   #
-  # The reading has three outcomes. The second serve never takes commands
-  # within a minute: the read is waiting on a Keychain dialog nobody
-  # answers. It takes commands and the item was rewritten (its `mdat`
-  # moved): the Keychain answered "not found" and the city made a new
-  # key, which unpairs every device. It takes commands and the item is
-  # untouched: the read either succeeded silently or was refused with the
-  # platform's words, which the city keeps until the next pairing; the
+  # The store the vault chose is read from the city's ledger: the startup
+  # probe writes a `provider_degraded` line whose `fallback` is
+  # `session-memory` when the Keychain refused it, and no such line when
+  # the Keychain kept the probe's value. The verdict names that store and
+  # gives one of five outcomes. Not written: no item after the first
+  # serve, which on the Keychain is a defect in the city and in session
+  # memory is what a runner whose Keychain refused can show. A prompt: the
+  # second serve did not close in order, because the door is kept before
+  # the Ctrl-C handler is installed and a read that waits on a dialog
+  # nobody answers holds the start-up there. Rewritten: the item's `mdat`
+  # moved, so the Keychain answered "not found" and the city made a new
+  # key, which unpairs every device. Kept: the item is untouched, so the
+  # read succeeded silently or was refused with the platform's words; the
   # item's access list, printed beside it, says which of the two the
   # Keychain was asked to apply. The job always succeeds once both serves
   # ran: it reports, and the reading is for a person. A hosted runner is
   # logged in to a desktop session with an unlocked login keychain, which
-  # a person's Mac has too; a dialog it would show nobody sees.
+  # a person's Mac has too; a dialog it would show nobody sees. Windows
+  # Credential Manager and the Linux kernel keyring do not tie a read to
+  # the binary's signature, so the question has no other row.
   keychain:
     if: inputs.job == 'keychain'
     runs-on: macos-latest
@@ -574,7 +591,7 @@ jobs:
           at="127.0.0.1:47614"
           item() { security find-generic-password -s sprawling/remote 2>&1 | grep -E '"(acct|cdat|mdat)"|could not be found' ; }
           serve() {
-            "$bin" serve "$city" "$at" --no-open > "$out/$1.out" 2> "$out/$1.err" &
+            "$bin" serve "$city" "$at" --no-open --console < /dev/null > "$out/$1.out" 2> "$out/$1.err" &
             server=$!
             taken=no
             for _ in $(seq 1 600); do
@@ -593,20 +610,22 @@ jobs:
           }
           cp "$out/first" "$bin"
           "$bin" init "$city" > "$out/init.out" 2>&1
-          # Which store the vault chose on this runner: a Keychain that
-          # refuses the probe sends every secret to session memory, and
-          # then no item is the expected reading rather than a lost key.
-          "$bin" doctor --no-color > "$out/doctor.txt" 2>&1
-          echo "doctor exited $?" >> "$out/doctor.txt"
           serve first
+          # The store the vault chose: the probe's fallback line on the
+          # ledger, or none when the Keychain kept the probe's value.
+          fell=$(grep -rhoE '"fallback": *"session-memory"[^}]*' "$city/.sprawling/ledger" | head -n 1)
+          if [ -n "$fell" ]; then store="session memory, because the Keychain refused the vault's probe ($fell)"
+          else store="the login Keychain"
+          fi
+          echo "store: $store" | tee -a "$out/reading.txt"
           cp "$out/second" "$bin"
           serve second
-          before=$(sed -n '/^first: the item/,/^second:/p' "$out/reading.txt" | grep mdat)
+          before=$(sed -n '/^first: the item/,/^store:/p' "$out/reading.txt" | grep mdat)
           after=$(sed -n '/^second: the item/,$p' "$out/reading.txt" | grep mdat)
-          if [ -z "$after" ]; then verdict="no city key is kept after the second serve; doctor.txt says which store the vault chose"
-          elif grep -q '^second: took commands within a minute: no' "$out/reading.txt"; then verdict="the second build's read waited on the Keychain: a prompt"
-          elif [ "$before" != "$after" ]; then verdict="the second build found no key and wrote a new one"
-          else verdict="the second build left the key as the first wrote it: read silently, or refused with the words its access list implies"
+          if [ -z "$before" ]; then verdict="not written: the first build kept no city key; the vault chose $store"
+          elif grep -q '^second: did not close in order' "$out/reading.txt"; then verdict="a prompt: the second build's read of the key in $store waited on a Keychain dialog"
+          elif [ -z "$after" ] || [ "$before" != "$after" ]; then verdict="not kept across the update: the second build found no key in $store and wrote a new one"
+          else verdict="kept across the update: the second build left the key the first wrote in $store, read silently or refused with the words its access list implies"
           fi
           echo "verdict: $verdict" | tee -a "$out/reading.txt"
           security dump-keychain -a 2> /dev/null | python3 -c 'import sys; print("".join("keychain: " + b for b in sys.stdin.read().split("keychain: ") if "sprawling/remote" in b))' > "$out/access-list.txt"
