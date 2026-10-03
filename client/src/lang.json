@@ -7030,5 +7030,69 @@
   "machine_walk_progress": {
     "en": "install steps run",
     "zh": "已运行的安装步骤"
+  },
+  "talk_letter": {
+    "en": "letter",
+    "zh": "来信"
+  },
+  "talk_handback": {
+    "en": "handed back:",
+    "zh": "交回："
+  },
+  "talk_handback_finished": {
+    "en": "finished (verified by {by})",
+    "zh": "完成（由 {by} 验证）"
+  },
+  "talk_handback_stopped": {
+    "en": "stopped, because {because}",
+    "zh": "停下，因为 {because}"
+  },
+  "talk_reply_wait": {
+    "en": "waiting for a reply from",
+    "zh": "在等回信："
+  },
+  "talk_reply_left": {
+    "en": "{left} left",
+    "zh": "还剩 {left}"
+  },
+  "talk_reply_due": {
+    "en": "past the deadline",
+    "zh": "已过期限"
+  },
+  "talk_reply_ended_reply": {
+    "en": "replied",
+    "zh": "已回信"
+  },
+  "talk_reply_ended_timeout": {
+    "en": "no reply before the deadline",
+    "zh": "到期限没有回信"
+  },
+  "talk_reply_ended_left": {
+    "en": "left without replying",
+    "zh": "没有回信就离开了"
+  },
+  "talk_reply_waited": {
+    "en": "waited for a reply from",
+    "zh": "等过回信："
+  },
+  "inbox_count_one": {
+    "en": "1 signal waiting for a run here",
+    "zh": "1 条信号在等这里的 run 读"
+  },
+  "signal_kind_mention": {
+    "en": "mention",
+    "zh": "提及"
+  },
+  "signal_kind_thread": {
+    "en": "thread",
+    "zh": "线程"
+  },
+  "signal_kind_broadcast": {
+    "en": "broadcast",
+    "zh": "广播"
+  },
+  "signal_kind_steer": {
+    "en": "steer",
+    "zh": "插话"
   }
 }

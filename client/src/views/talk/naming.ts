@@ -46,8 +46,13 @@ export function dispatcherOf(by: string | null | undefined): Dispatcher | null {
   if (by === undefined || by === null) return null;
   if (by === "person") return { kind: "person" };
   if (by === "city") return { kind: "city" };
-  return Option.match(readAddress(by), {
-    onNone: () => null,
-    onSome: (address): Dispatcher => ({ kind: "resident", address }),
-  });
+  const address = residentAt(by);
+  return address === null ? null : { kind: "resident", address };
+}
+
+// The resident's address a wire string names, or null where the string
+// is not one: a guessed address would link to a room nobody named.
+export function residentAt(text: string | null | undefined): Address | null {
+  if (text === undefined || text === null) return null;
+  return Option.getOrNull(readAddress(text));
 }

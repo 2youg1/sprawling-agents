@@ -15,8 +15,8 @@
   // child's session.
   //
   // The send and the pull are drawn the way the generic tool line draws
-  // them today; their own lines, a received signal as a letter, a reply
-  // wait and a handback wait for the fields the next wire carries.
+  // them; a received signal as a letter, a reply wait and a handback are
+  // the cases of `agent_letters.svelte` (client D86).
 
   import type { Answer, Call, EventKind, EventRecord, Query, SessionLine, SignalLine, Turn } from "../../wire";
   import { Address, B3Hash, RunId, Seq, TimeMs, Tokens } from "../../wire";

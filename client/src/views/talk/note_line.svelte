@@ -4,15 +4,19 @@ file, You can obtain one at https://mozilla.org/MPL/2.0/.
 Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <!-- What else a turn came to beside what it said: words that arrived
-from a person, a refusal, a wait on the person, messages the run let
-go, and a record that did not read back. `checkpointed` draws nothing:
+from the User or a resident, a child's handback, a wait on the User or
+on another room's reply, a refusal, messages the run let go, and a
+record that did not read back (client D86). `checkpointed` draws nothing:
 a commit the run checkpointed is a fact for the run page, and the thread's
 question is what this turn did or waits on. -->
 <script lang="ts">
   import { ui } from "../../ui";
   import { fill, say } from "../../core/lang";
   import { toFragment } from "../../core/route";
+  import HandbackNote from "./handback_note.svelte";
+  import LetterNote from "./letter_note.svelte";
   import Person from "./person.svelte";
+  import ReplyWaitNote from "./reply_wait_note.svelte";
   import RefusedNote from "./refused_note.svelte";
   import type { ForkEntry, ForkPlan } from "./forking";
   import type { Note, RunId, Turn } from "../../wire";
@@ -32,15 +36,23 @@ question is what this turn did or waits on. -->
 </script>
 
 {#if "arrived" in note}
-  <Person
-    text={note.arrived.said ?? ""}
-    label={note.arrived.from ?? ""}
-    at={undefined}
-    entry={{ kind: "message", turn, text: note.arrived.said ?? "" }}
-    {run}
-    {onFork}
-    {onHover}
-  />
+  {#if note.arrived.handback !== undefined && note.arrived.handback !== null}
+    <HandbackNote from={note.arrived.from} handback={note.arrived.handback} t={note.arrived.t} />
+  {:else if note.arrived.by === "resident"}
+    <LetterNote from={note.arrived.from} said={note.arrived.said ?? ""} t={note.arrived.t} />
+  {:else}
+    <Person
+      text={note.arrived.said ?? ""}
+      label={say($lang, "talk_you")}
+      at={note.arrived.t}
+      entry={{ kind: "message", turn, text: note.arrived.said ?? "" }}
+      {run}
+      {onFork}
+      {onHover}
+    />
+  {/if}
+{:else if "awaiting_reply" in note}
+  <ReplyWaitNote on={note.awaiting_reply.on} until={note.awaiting_reply.until} ended={note.awaiting_reply.ended} />
 {:else if "refused" in note}
   <RefusedNote error={note.refused.error} />
 {:else if "waiting" in note}

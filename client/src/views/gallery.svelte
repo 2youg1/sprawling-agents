@@ -74,6 +74,7 @@
   import Talking from "./gallery/talking.svelte";
   import Thr from "./gallery/thr.svelte";
   import AgentMessages from "./gallery/agent_messages.svelte";
+  import AgentLetters from "./gallery/agent_letters.svelte";
   import Tables from "./gallery/tables.svelte";
   import Monitored from "./gallery/monitored.svelte";
   import Timed from "./gallery/timed.svelte";
@@ -118,6 +119,7 @@
   <Talking />
   <Thr />
   <AgentMessages />
+  <AgentLetters />
   <G1 />
   <Folded />
   <Followed />
