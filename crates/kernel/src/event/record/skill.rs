@@ -59,7 +59,10 @@ pub enum AuditVerdict {
     Pass,
     Warn,
     Fail,
-    /// The audit could not be had: the service did not answer or the
-    /// scanner is not installed. Shelving goes ahead.
+    /// An auditor applied and no audit could be had: skills.sh did not
+    /// answer or refused, or SkillSpector exited with neither verdict code.
+    /// Shelving goes ahead, and the audit state never counts this line as
+    /// an audit. When no auditor applies - a local or shipped skill and no
+    /// SkillSpector on the PATH - no line is written at all (city D19).
     Unreachable,
 }
