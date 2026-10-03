@@ -156,7 +156,12 @@
     <div class="flex flex-col gap-tight rounded-card bg-raised px-base py-snug">
       <span class="text-label font-label text-text">{say($lang, "colours_css")}</span>
       <p class="text-note text-text-faint">{say($lang, "colours_css_note")}</p>
-      <div bind:this={host} class="h-output overflow-auto rounded-control border border-edge-input bg-chrome"></div>
+      <!-- The editor is RefRain's, so it takes RefRain's dress: outside a
+      `refrain` box CodeMirror falls back to its own light theme and
+      paints the active line's gutter as a light block on a dark page. -->
+      <div class="refrain">
+        <div bind:this={host} class="refrain-editor h-output overflow-auto rounded-control border border-edge-input"></div>
+      </div>
       <div class="flex justify-end">
         <Button label={say($lang, "colours_css_apply")} onPress={applyCss} />
       </div>
