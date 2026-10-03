@@ -11,6 +11,15 @@
 #   release   the shipped Windows binary and its archive (`just package`),
 #             the artifact `release-<tree>`, for measurement on the
 #             machine the readings belong to
+#   pgo       the same binary built with profile-guided optimisation in
+#             three stages: an instrumented build of the same tree,
+#             toolchain, target and feature set; the training load
+#             (`just pgo-train`); the profiles merged and the optimised
+#             build. The artifact `release-pgo-<tree>` holds the binary,
+#             the archive, the merged profile, its SHA-256 and the exact
+#             commands, so a reading against `release-<tree>` names both
+#             arms. Dispatch-only: release.yml gains nothing until a
+#             reading judges it (END-READING.md, Roadmap P2).
 #
 # Ask with `gh workflow run on-demand.yml --ref <branch> -f job=<name>`;
 # `mutants` also takes `-f base=<ref>` (default `main`). An artifact is
@@ -19,8 +28,11 @@
 #
 # Every job here runs on Windows, the platform a person reproduces a red
 # on, except that nothing stops a later job from naming another runner.
-# The three-stage PGO build is not here yet: it belongs to the release
-# build it optimises, and arrives with the measurement that judges it.
+# `pgo` runs on Windows, the platform the readings belong to. The same
+# three stages run unchanged on macOS and Linux (the rustc flags and
+# `llvm-profdata` from the `llvm-tools` component are the same there,
+# and the triple is the runner's host triple); their release builds
+# stay without PGO until a reading on that platform judges it.
 name: on-demand
 on:
   workflow_dispatch:
@@ -29,7 +41,7 @@ on:
         description: which run
         required: true
         type: choice
-        options: [mutants, sim, shots, release]
+        options: [mutants, sim, shots, release, pgo]
       base:
         description: the ref `mutants` diffs against
         required: false
@@ -163,4 +175,90 @@ jobs:
           path: |
             target/release/sprawling.exe
             target/package/*
+          if-no-files-found: error
+
+  # The rustc book's "Profile-guided Optimization" recipe: the host
+  # triple is named with `--target` (through `just package <triple>`), so
+  # RUSTFLAGS reaches the product and not the build scripts or proc
+  # macros. A process that cargo itself starts without `--target` (the
+  # `cargo xtask` steps of `just package`) is instrumented too and writes
+  # profiles while it builds, so the profile directory is emptied after
+  # the build and before the training load.
+  pgo:
+    if: inputs.job == 'pgo'
+    runs-on: windows-latest
+    timeout-minutes: 180
+    env:
+      TRIPLE: x86_64-pc-windows-msvc
+    steps:
+      - uses: actions/checkout@v7
+      - name: install pinned toolchain and llvm-profdata
+        shell: bash
+        run: |
+          rustup show
+          rustup component add llvm-tools
+      - uses: ./.github/actions/zig
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: release
+          key: ${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+          save-if: false
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: just
+      - uses: ./.github/actions/client-artifacts
+      - uses: ./.github/actions/lean
+      - id: tree
+        shell: bash
+        run: |
+          echo "sha=$(git rev-parse 'HEAD^{tree}')" >> "$GITHUB_OUTPUT"
+          pgo="$(cygpath -m "$RUNNER_TEMP")/pgo"
+          mkdir -p "$pgo/raw" "$pgo/out"
+          echo "dir=$pgo" >> "$GITHUB_OUTPUT"
+      - name: "stage 1: the instrumented build"
+        shell: bash
+        env:
+          RUSTFLAGS: -Cprofile-generate=${{ steps.tree.outputs.dir }}/raw
+        run: |
+          set -euo pipefail
+          echo "RUSTFLAGS=$RUSTFLAGS just package $TRIPLE" >> "${{ steps.tree.outputs.dir }}/out/commands.txt"
+          just package "$TRIPLE"
+          mkdir -p "${{ steps.tree.outputs.dir }}/instrumented"
+          cp target/package/*.zip "${{ steps.tree.outputs.dir }}/instrumented/"
+          rm -rf "${{ steps.tree.outputs.dir }}/raw"
+          mkdir -p "${{ steps.tree.outputs.dir }}/raw"
+      - name: "stage 2: the training load"
+        shell: bash
+        env:
+          LLVM_PROFILE_FILE: ${{ steps.tree.outputs.dir }}/raw/sprawling-%p-%m.profraw
+        run: |
+          set -euo pipefail
+          archive=$(ls "${{ steps.tree.outputs.dir }}"/instrumented/*.zip)
+          echo "LLVM_PROFILE_FILE=$LLVM_PROFILE_FILE just pgo-train $archive" >> "${{ steps.tree.outputs.dir }}/out/commands.txt"
+          just pgo-train "$archive"
+          count=$(find "${{ steps.tree.outputs.dir }}/raw" -name '*.profraw' | wc -l)
+          echo "profiles written by the training load: $count"
+          test "$count" -gt 0
+      - name: "stage 3: merge the profiles, then the optimised build"
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="${{ steps.tree.outputs.dir }}/out"
+          profdata="$(rustc --print sysroot)/lib/rustlib/$TRIPLE/bin/llvm-profdata.exe"
+          "$profdata" merge -o "$out/sprawling.profdata" "${{ steps.tree.outputs.dir }}/raw"
+          "$profdata" show "$out/sprawling.profdata" > "$out/profile-summary.txt"
+          sha256sum "$out/sprawling.profdata" > "$out/sprawling.profdata.sha256"
+          echo "llvm-profdata merge -o sprawling.profdata <raw>" >> "$out/commands.txt"
+          echo "RUSTFLAGS=-Cprofile-use=$out/sprawling.profdata just package $TRIPLE" >> "$out/commands.txt"
+          RUSTFLAGS="-Cprofile-use=$out/sprawling.profdata" just package "$TRIPLE"
+          rustc --version --verbose > "$out/toolchain.txt"
+          sha256sum "target/$TRIPLE/release/sprawling.exe" > "$out/sprawling.exe.sha256"
+          cp -r "$out" target/pgo-out
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-pgo-${{ steps.tree.outputs.sha }}
+          path: |
+            target/${{ env.TRIPLE }}/release/sprawling.exe
+            target/package/*
+            target/pgo-out/*
           if-no-files-found: error
