@@ -11,11 +11,9 @@
 // goes back in `ConfirmRemoteDoor` (`crates/remote_access/Spec.lean` D4).
 // Closing needs no code and does not pass through this machine.
 
-import { Option, Schema } from "effect";
-
-import { mintIdem } from "../../core/idem";
+import { closeRemoteDoor, confirmRemoteDoor, openRemoteDoor, replaceCityKey } from "../../core/commands";
 import type { Key } from "../../core/lang";
-import { Command, type AxCode, type IdemKey } from "../../wire";
+import type { AxCode, Command } from "../../wire";
 
 export type Opener = "door" | "key";
 
@@ -120,34 +118,15 @@ export const LASTINGS: readonly (readonly [string, number])[] = [
 ];
 export const LASTING_DEFAULT = "12h";
 
-// The four door frames, spelled until `client/src/wire.ts` is
-// regenerated with the wire's `OpenRemoteDoor`, `ReplaceCityKey`,
-// `ConfirmRemoteDoor` and `CloseRemoteDoor` arms; then these shapes are
-// the generated `Command` arms and this declaration goes. Each frame is
-// read through the generated `Command` schema, so a wire that does not
-// carry the arm yet yields nothing to send rather than a frame the city
-// would refuse.
-type DoorFrame =
-  | { readonly open_remote_door: { readonly lasting_ms: number; readonly idem: IdemKey } }
-  | { readonly replace_city_key: { readonly idem: IdemKey } }
-  | { readonly confirm_remote_door: { readonly code: string; readonly idem: IdemKey } }
-  | { readonly close_remote_door: { readonly idem: IdemKey } };
-
-const asCommand = Schema.decodeUnknownOption(Command);
-
-export function doorCommand(sent: DoorSent | "close", lastingMs: number): Command | null {
-  return Option.getOrNull(asCommand(frameOf(sent, lastingMs)));
-}
-
-function frameOf(sent: DoorSent | "close", lastingMs: number): DoorFrame {
-  const idem = mintIdem();
-  if (sent === "close") return { close_remote_door: { idem } };
+// The command a sent event or the close control puts on the wire.
+export function doorCommand(sent: DoorSent | "close", lastingMs: number): Command {
+  if (sent === "close") return closeRemoteDoor();
   switch (sent.kind) {
     case "open":
-      return { open_remote_door: { lasting_ms: lastingMs, idem } };
+      return openRemoteDoor(lastingMs);
     case "replace":
-      return { replace_city_key: { idem } };
+      return replaceCityKey();
     case "confirm":
-      return { confirm_remote_door: { code: sent.code, idem } };
+      return confirmRemoteDoor(sent.code);
   }
 }

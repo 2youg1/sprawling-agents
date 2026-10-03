@@ -359,6 +359,7 @@ export function restoreFile(at: Address, point: GitOid): Command {
 }
 
 export { putGuide } from "./commands/guide";
+export { closeRemoteDoor, confirmRemoteDoor, openRemoteDoor, replaceCityKey } from "./commands/door";
 export { decideProposals, putRange } from "./commands/document";
 
 // The city's own layer: `null` leaves a key as it is.

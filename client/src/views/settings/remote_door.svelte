@@ -76,8 +76,7 @@
   }
 
   function send(sent: DoorSent): void {
-    const command = doorCommand(sent, lastingMs());
-    if (command === null || !u.send(command)) {
+    if (!u.send(doorCommand(sent, lastingMs()))) {
       move({ kind: "refusal", code: "E_WIRE_MISMATCH" });
       return;
     }
@@ -110,8 +109,7 @@
   }
 
   function close(): void {
-    const command = doorCommand("close", 0);
-    told = command !== null && u.send(command) ? { key: "remote_door_closing", code: "" } : { key: "remote_door_unknown", code: "" };
+    told = u.send(doorCommand("close", 0)) ? { key: "remote_door_closing", code: "" } : { key: "remote_door_unknown", code: "" };
   }
 
   const asking = $derived(door.phase.kind === "awaiting" || door.phase.kind === "confirming");
