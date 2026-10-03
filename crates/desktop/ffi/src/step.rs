@@ -59,11 +59,20 @@ pub enum Step {
     Emptying,
     /// The clipboard was emptied and refused the new block.
     Handing,
+    /// `GetSystemCpuSetInformation` refused.
+    CpuSets,
+    /// `GetThreadGroupAffinity` refused.
+    Affinity,
+    /// `SetProcessInformation` refused the power-throttling state.
+    Throttling,
+    /// A job refused its CPU weight, or the reading or writing of its
+    /// memory limit; with no reason of the machine's, no job was named.
+    JobShare,
 }
 
 impl Step {
     /// Every step, in the order of its number.
-    pub const ALL: [Step; 20] = [
+    pub const ALL: [Step; 24] = [
         Step::Finished,
         Step::Absent,
         Step::NoRoom,
@@ -84,6 +93,10 @@ impl Step {
         Step::Allocating,
         Step::Emptying,
         Step::Handing,
+        Step::CpuSets,
+        Step::Affinity,
+        Step::Throttling,
+        Step::JobShare,
     ];
 
     /// The number this step crosses the boundary as.
@@ -109,6 +122,10 @@ impl Step {
             Step::Allocating => 17,
             Step::Emptying => 18,
             Step::Handing => 19,
+            Step::CpuSets => 20,
+            Step::Affinity => 21,
+            Step::Throttling => 22,
+            Step::JobShare => 23,
         }
     }
 }

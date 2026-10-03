@@ -28,4 +28,8 @@ pub const Step = enum(u32) {
     Allocating = 17,
     Emptying = 18,
     Handing = 19,
+    CpuSets = 20,
+    Affinity = 21,
+    Throttling = 22,
+    JobShare = 23,
 };

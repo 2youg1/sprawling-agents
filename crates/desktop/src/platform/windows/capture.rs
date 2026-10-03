@@ -145,7 +145,11 @@ fn refused(failure: Failure, width: u32, height: u32) -> Refusal {
         | Step::EmptyBlock
         | Step::Allocating
         | Step::Emptying
-        | Step::Handing => fault::stray(DOING, step),
+        | Step::Handing
+        | Step::CpuSets
+        | Step::Affinity
+        | Step::Throttling
+        | Step::JobShare => fault::stray(DOING, step),
     }
 }
 

@@ -118,7 +118,11 @@ fn refused(failure: Failure) -> Refusal {
         | Step::Selecting
         | Step::Drawing
         | Step::Reading
-        | Step::ShortRows => fault::stray(DOING, step),
+        | Step::ShortRows
+        | Step::CpuSets
+        | Step::Affinity
+        | Step::Throttling
+        | Step::JobShare => fault::stray(DOING, step),
     }
 }
 

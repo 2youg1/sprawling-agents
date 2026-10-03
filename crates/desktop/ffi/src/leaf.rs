@@ -81,4 +81,26 @@ unsafe extern "C" {
 
     pub(crate) fn sprawling_desktop_bitmap_bytes(width: i32, height: i32, bytes: *mut usize)
     -> u32;
+
+    pub(crate) fn sprawling_desktop_cpu_sets(
+        into: *mut u8,
+        capacity: usize,
+        found: *mut usize,
+        code: *mut co::ERROR,
+    ) -> u32;
+
+    pub(crate) fn sprawling_desktop_thread_group(
+        group: *mut u16,
+        mask: *mut u64,
+        code: *mut co::ERROR,
+    ) -> u32;
+
+    pub(crate) fn sprawling_desktop_full_speed(code: *mut co::ERROR) -> u32;
+
+    pub(crate) fn sprawling_desktop_job_share(
+        job: *mut c_void,
+        weight: u32,
+        memory: usize,
+        code: *mut co::ERROR,
+    ) -> u32;
 }

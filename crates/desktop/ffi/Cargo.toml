@@ -31,6 +31,13 @@ windows = { workspace = true, optional = true, features = [
     "Win32_UI_WindowsAndMessaging",
 ] }
 
+[dev-dependencies]
+proptest = { workspace = true }
+
+# A job for the job-share test to name.
+[target.'cfg(windows)'.dev-dependencies]
+win32job = { workspace = true }
+
 # The workspace's lint table, written out because one line differs:
 # `unsafe_code` is `deny` rather than `forbid`, so each call into the Zig
 # leaf can relax it at that one statement, with a written reason. Every

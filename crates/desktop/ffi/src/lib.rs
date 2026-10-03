@@ -15,6 +15,7 @@
 //! refusal, what a black picture means — stays on the Rust side; the
 //! leaf owns no wording and no policy.
 
+pub mod cpu_set;
 pub mod step;
 
 #[cfg(windows)]
@@ -23,6 +24,8 @@ pub mod boundary;
 pub mod capture;
 #[cfg(windows)]
 pub mod clipboard;
+#[cfg(windows)]
+pub mod cpu;
 #[cfg(windows)]
 pub mod dpi;
 #[cfg(windows)]

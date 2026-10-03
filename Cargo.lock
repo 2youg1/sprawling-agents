@@ -2811,6 +2811,7 @@ dependencies = [
  "futures-util",
  "getrandom 0.4.3",
  "memory-stats",
+ "proptest",
  "qrcodegen",
  "reqwest",
  "serde",
@@ -2821,6 +2822,7 @@ dependencies = [
  "sprawling-city",
  "sprawling-collab",
  "sprawling-desktop",
+ "sprawling-desktop-ffi",
  "sprawling-gateway",
  "sprawling-kernel",
  "sprawling-remote-access",
@@ -2933,6 +2935,8 @@ dependencies = [
 name = "sprawling-desktop-ffi"
 version = "0.0.9"
 dependencies = [
+ "proptest",
+ "win32job",
  "windows 0.62.2",
  "winsafe",
 ]
