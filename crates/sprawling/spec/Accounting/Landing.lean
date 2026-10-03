@@ -45,6 +45,9 @@ def Wake.records : Wake → List Record
 /-- 记账线程持有的：账本，与哪些 run 已冻结。 -/
 structure Accounts where
   ledger : List Record
+  /-- 记账线程记下的「这个 run 已落定」：代码里是 `serve_flight` 取走它的 `Arrival`、`land` 写完它落 run 的记录之后的状态，
+  不是 `run_frozen` 这一条记录。`run_frozen` 由 lane 在驱动结束时经 relay 写下，在模型里是 `Wake.relay` 的一条，
+  所以它排在落 run 的记录之前；把它挪到落 run 记录之后要改账本的次序，属于改得了事件的那一版。 -/
   frozen : Run → Bool
 
 /-! D37 落 run 的切线：读盘与写盘的重活在 lane 上，改写折叠的步骤留在记账线程上
