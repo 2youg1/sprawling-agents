@@ -77,7 +77,7 @@
 
 ### 待做
 
-1. 内存节拍：100 ms 的采样与 p50／p99／max／高于 p50 的时长／每小时斜率，进 `bin::monitor`。
+1. 内存节拍的统计：`bin::monitor::sampler` 已按 100 ms 的 `MEMORY_BEAT` 读私有字节，每秒的读数报这一秒的峰（`crates/sprawling/spec/Monitor.lean` §8-96）；p50／p99／max／高于 p50 的时长／每小时斜率还没有人算，它们由读监视帧的测量（`sprawling gauge` 或 TP1 台）在那一侧算，不在城的进程里攒一小时的点。
 2. 清点表里随城增长的四项（视图、墓碑、`sent`、旁索引）逐一改成经 `storage::resident` 读回，每一项一个上表的常量，读回用上面的定位读。
 3. playback 导出把 `Document` 改成边走边编码，doctor 扫描按行读子进程的输出，不整份读进内存。
 4. `tools/xtask/budgets.toml` 加内存节拍与一小时斜率的两行（由那一波拥有 budgets.toml 的车道提交）。
