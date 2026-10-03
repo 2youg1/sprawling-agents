@@ -19,7 +19,7 @@ use proptest::prelude::*;
 
 /// The kinds of the lines a ledger holds, shared with the tools so a
 /// tool can read what is durable at the moment it runs.
-type Durable = Arc<Mutex<Vec<String>>>;
+pub(super) type Durable = Arc<Mutex<Vec<String>>>;
 
 /// A ledger that counts its barriers: each call into it is one round
 /// trip through the relay, and so one disk barrier. The power goes out
@@ -117,14 +117,14 @@ fn meta(name: &str, effect: Effect) -> kernel::ToolMeta {
 /// A face over a bench holding `read` and `write`. The bench clears both
 /// as reads, so no door stands in the way; the face names `write` as a
 /// write, which is what decides the wave's order.
-struct Face {
+pub(super) struct Face {
     bench: ToolBench,
     write: kernel::ToolMeta,
     next: u64,
 }
 
 impl Face {
-    fn new(durable: &Durable, saw: &Arc<Mutex<Vec<Vec<String>>>>) -> Face {
+    pub(super) fn new(durable: &Durable, saw: &Arc<Mutex<Vec<Vec<String>>>>) -> Face {
         let domain =
             kernel::WriteDomain::new(vec![kernel::Address::parse("lab").unwrap()]).unwrap();
         let mut bench = ToolBench::new(domain);
