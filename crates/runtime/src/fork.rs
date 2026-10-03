@@ -237,8 +237,10 @@ fn fold_run<'a>(
             // A session's name and a skill's audit are the person's page.
             | EventKind::SessionNamed
             | EventKind::SkillAudited
-            // No run writes a reply wait yet (kernel D32); the line that
-            // tells the next call how the wait ended lands with its writer.
+            // How a reply wait ended reaches the conversation as the
+            // `steer_received` line the turn writes when the run goes on
+            // (collab D9), so it is rebuilt above; these two lines are
+            // the wait's own accounting (kernel D32).
             | EventKind::SignalWaitStarted
             | EventKind::SignalWaitEnded => {}
         }
