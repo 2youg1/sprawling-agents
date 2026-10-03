@@ -313,12 +313,17 @@ than any diagram of boxes.
 4. **The city writes `run_started` before anything happens.** Every effect
    becomes an event first; that ordering is the design's load-bearing rule,
    not a logging preference. A tool that only reads (`Effect::Read`) runs
-   before its `tool_called` is durable; every record of a wave is durable
-   before the next outside effect — a model call, a write, the run's
-   freeze — and before the run appends a line of its own between two
-   phases, so seq stays the order of appending; a write's `tool_called`
-   is durable before the write runs
-   (runtime D24, `crates/runtime/spec/Turn/Durability.lean`).
+   before its `tool_called` is durable. The lines a run appends are its
+   held lines (`runtime::turn::ledger::HeldLines`): they belong to the run
+   rather than to one turn, and every one of them is durable before the
+   next outside effect. One barrier after `model_called` covers the model
+   call and the previous turn's wave; a write's `tool_called` is durable
+   before the write runs; and the run pays one more before it freezes, is
+   cancelled, or writes a carrier event, so a carrier line never lands
+   ahead of what the run held. A turn therefore pays one barrier plus one
+   per write, seq stays the order of appending, and a power cut at any
+   line leaves a prefix with no write ahead of its intent
+   (runtime D24 and D36, `crates/runtime/spec/Turn/Durability.lean`).
 5. **`runtime::prefix` assembles the frozen prefix** in four segments —
    city, building, resident, run — from `city::spine_files`, `city::policy`
    and `city::resident`. Assembling it is itself an event, and the result
@@ -342,9 +347,12 @@ than any diagram of boxes.
    attached to this tag; `gateway::dialect` translates the canonical
    Anthropic-shaped conversation into the provider's dialect;
    `gateway::credential` redeems a `secret:realm/name` reference into a
-   header at the last moment. Nothing here holds a concurrency limit; how
-   many runs call at once is the width of the driving pool (§11), and what
-   a limit here would need is in `crates/gateway/Spec.lean` §8-6.
+   header at the last moment. Each endpoint hands out permits in arrival
+   order under its `max_in_flight`, and `gateway::concurrency` narrows it
+   after a 429 until the provider's `Retry-After` instant has passed; this
+   provider queue is the one concurrency limit, because the driving pool
+   sets no lane count (`crates/gateway/Spec.lean` §8-6,
+   `crates/sprawling/Spec.lean` D34).
 9. **The reply is scanned before it is recorded.** `runtime::redact` puts
    model output through the same secret scan as everything else, so a key a
    model repeated does not become permanent.
