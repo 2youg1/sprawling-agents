@@ -184,15 +184,18 @@
       />
     </div>
     <Button label={say($lang, "mcp_key_store")} tone="secondary" onPress={store} />
-    <a
-      href="https://platform.composio.dev"
-      target="_blank"
-      rel="noopener noreferrer"
-      class="text-note text-text-faint hover:text-text-quiet"
-    >
-      {say($lang, "mcp_open_composio")}
-    </a>
   </div>
+  <!-- Where a key comes from, on a line of its own: beside the field and
+       the store key it took the field's width in the page's narrow right
+       column and stood off their baseline. -->
+  <a
+    href="https://platform.composio.dev"
+    target="_blank"
+    rel="noopener noreferrer"
+    class="w-fit text-note text-text-faint hover:text-text-quiet"
+  >
+    {say($lang, "mcp_open_composio")}
+  </a>
   {#if reference !== null}
     <div class="flex min-w-0 items-center gap-snug text-note">
       <Badge text={say($lang, "mcp_key_stored")} weight="live" dot />
