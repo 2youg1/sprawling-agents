@@ -1859,6 +1859,11 @@ impl RunWorker {
 
 **断电那一半归 storage。** 断电比被杀多丢的，是平台还没落盘的字节；那是账本自己的耐久契约，由 `storage` 在它的故障文件系统上证（`power_cut_matrix_over_every_op_keeps_acknowledged_waves`，`crates/storage/Spec.lean` §8-2）。这里不重证它：故障文件系统只承载账本，城的其余文件与 `Standing::fold`、视图的折叠读的是真目录，在它上面重开的不是一座完整的城（D13「崩溃验收在盘上造死亡」）。
 
+**另外三个死亡点，同一种造法、同一个结论（不丢一行、不重一行）。** 都在盘上造，所以 Windows、macOS、Linux 上是同一组字节：被杀的进程（Windows 的 `TerminateProcess`、别处的 `SIGKILL`）留下的正是这些。
+- 派活的 job 已进内容存储、引它的 `checkpoint_committed` 行还没写（`a_city_killed_between_a_job_put_and_its_checkpoint_line_reopens_with_nothing_to_cut`）：没有要截的、没有要冻结的，房间照样派得出活。
+- 一道 git 检查点的提交与它的引用已经进了仓库（比较后交换已经做完），带 `oid` 的那行还没写（`a_city_killed_after_a_checkpoint_swap_and_before_its_line_loses_and_doubles_nothing`）：检查点在它守的那一波之前，所以那一波的调用没写进账，它写的文件也从盘上拿掉；重开的城不替死掉的 run 记这道提交（账里没有一行提到那个 oid），也不替它重做那次写；引用留在仓库里，是崩溃的写者只留下的垃圾（storage D25）。
+- 一波多行的屏障做到一半：两次模型调用之间那一波（头一次的回答、它要的读调用与那次调用的结果，回合在下一次模型调用之前一道屏障写下，runtime D36），第一行整行落了盘，第二行落了一半（`a_city_killed_inside_a_barrier_keeps_the_whole_lines_once_and_cuts_the_torn_one`）：这一波没有答过 `Ok`，谁也没被告知；重开的城截掉那半行并说出截了多少，整行的那一行恰出现一次，死掉的 run 冻结，房间照样派得出活。
+
 **死掉的 run 由谁冻结。** `startup_scan` 补完悬空调用之后，为每一次有 `run_started`、没有 `run_frozen` 的 run 写一行 `RunFrozen::lost()`：结局 `cancelled`，载荷 `cause: process_died`，作者是那次 run 的居民（`crates/accounting/Spec.lean` §8-18-1；为什么不是第四种结局，见 kernel D14）。所以第 4 项比的是城景里那次 run 的整行状态：已冻结、结局、最后一行与它的序号。
 -/
 
