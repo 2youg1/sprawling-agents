@@ -764,4 +764,4 @@ pinned = 9
 what = "backticked crate paths in .lean, .md and rustdoc that resolve to no item"
 measured_by = "cargo xtask gates spec (spec::ratchet, assertion 7)"
 status = "held by spec, not weighed by budget"
-pinned = 71
+pinned = 69  # merged W3 tree: lanes struck seven more unresolved paths
