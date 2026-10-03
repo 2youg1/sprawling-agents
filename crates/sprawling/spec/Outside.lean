@@ -24,7 +24,7 @@ pub(crate) struct Inside { pub(crate) desk: Arc<CommandDesk>, pub(crate) answeri
                            pub(crate) remote: Result<Remote, AxError> }
 ```
 
-- **六个子动词**：`/remote open [--for <时长>]`、`/remote pair <名字> [--watch]`、`/remote close`、`/remote devices`、`/remote revoke <名字>|--all`、`/remote replace-key`。`remote` 是控制台自己的第六个动词（§8-11 的 `CONTROL`），不在线上，所以浏览器、远程设备与居民手里的任何工具都发不出它。设置页的门开关与「更换城钥匙」按钮随 `remote_access::confirm` 到来（crates/remote_access/Spec.lean §3）：页面发的开门与换钥匙只在控制台上印出一个确认码，User 把它输回页面才做，做的是这里的同一条路；配对与撤销仍只在这里（remote_access D4）。
+- **六个子动词**：`/remote open [--for <时长>]`、`/remote pair <名字> [--watch]`、`/remote close`、`/remote devices`、`/remote revoke <名字>|--all`、`/remote replace-key`。`remote` 是控制台自己的第六个动词（§8-11 的 `CONTROL`），不在线上，所以浏览器、远程设备与居民手里的任何工具都发不出它。设置页的门开关与「更换城钥匙」按钮随 remote_access 的 `confirm` 模块到来（crates/remote_access/Spec.lean §3）：页面发的开门与换钥匙只在控制台上印出一个确认码，User 把它输回页面才做，做的是这里的同一条路；配对与撤销仍只在这里（remote_access D4）。
 - **时长**：一个整数加单位 `m`、`h`、`d`，至少一分钟，至多七天；不写 `--for` 是 12 小时。读不成的一行打印用法。
 - **名字可以有空格**：`pair` 与 `revoke` 后面除 `--watch` 之外的词连起来就是名字，所以「客厅的 iPad」不必加引号。`--watch` 写在名字前后都行；不写就是 `act`。
 - **`/remote pair` 印二维码**：邀请链接（`https://<主机名>/#pair=<配对码>&city=<指纹>`，crates/remote_access/Spec.lean §8-6）用 `qrcodegen` 以低纠错级编码，两行模块合一行字符，亮模块印成方块、暗模块印成空格，四周留两格亮边：终端是浅字深底，扫码器要深码浅底。码下面再印链接与分组的配对码，说明它十分钟内有效、只用一次。

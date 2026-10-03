@@ -54,7 +54,7 @@
 - `class` 只判 Command。`Ask` 与 `Monitor` 两种帧属 `Read`；设备发来的 `Hello` 由中继换成城自己的令牌再发（§8-66）；远程门的配对与撤销不在线上，开门、关门、更换城钥匙与它们的确认在线上的方式见下面四行（remote_access D4）。
 - 这一列是权威，中继按它判，`xtask wiring` 把表与中继的穷尽匹配（`bin::outside::verbs::command_class`）逐行对照（§8-65）。
 
-**远程门的四个动词尚不在线上。** 设置页要开关远程门、更换城钥匙（Roadmap 的 A7），remote_access D4 定下它们上线的方式；它们随 `remote_access::confirm`（crates/remote_access/Spec.lean §3）一起进 `inductive Command`，在那之前 `xtask wiring` 与 `specalign` 照旧对照今天的枚举。
+**远程门的四个动词尚不在线上。** 设置页要开关远程门、更换城钥匙（Roadmap 的 A7），remote_access D4 定下它们上线的方式；它们随 remote_access 的 `confirm` 模块（crates/remote_access/Spec.lean §3）一起进 `inductive Command`，在那之前 `xtask wiring` 与 `specalign` 照旧对照今天的枚举。
 
 | Command | 载荷 | reach | class | 守卫 | 执行者做的事 |
 |---|---|---|---|---|---|

@@ -6,7 +6,7 @@
 /-!
 # Console confirmation: a page asks, the console shows a code, the User types it.
 
-Specifies the module `remote_access::confirm`, which is not built yet
+Specifies the `confirm` module of remote_access, which is not built yet
 (crates/remote_access/Spec.lean §3 lists it), and the two wire commands that
 reach it (crates/wire/spec/Command/Kind.lean, the rows for the remote door).
 The model is the authority on which properties must hold; the Rust module,
