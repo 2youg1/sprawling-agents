@@ -40,10 +40,19 @@ const LATEST_URL: &str = "https://registry.npmjs.org/sprawling/latest";
 /// answer that is useful when this command cannot give its own.
 const RELEASES: &str = "https://github.com/2youg1/sprawling-agents/releases";
 
-/// The command that updates a released binary, printed and never run.
-/// Every released binary is answered with it until the install channel
-/// is read from the binary's own path (`crates/wire/spec/Answer/Release.lean` D24).
-const NPM_UPDATE: &str = "bunx sprawling@latest up";
+/// The command that updates a binary npm or bun installed, printed and
+/// never run (`crates/wire/spec/Answer/Release.lean` D24).
+const NPM_UPDATE: &str = "npm install -g sprawling@latest";
+
+/// The command that updates a binary cargo installed. `cargo binstall`
+/// puts its binary in the same directory and is answered the same way,
+/// because the path cannot tell the two apart and this command updates
+/// either.
+const CARGO_UPDATE: &str = "cargo install sprawling --locked";
+
+/// A directory a release archive carries beside the binary, and no
+/// other install channel does (`tools/xtask/src/package/contents.rs`).
+const ARCHIVE_SIBLING: &str = "skills";
 
 /// One version manifest is a few hundred bytes, so a reader waiting on
 /// it has either been answered or is not going to be. Long enough for a
@@ -220,12 +229,71 @@ pub fn answer() -> ReleaseAnswer {
             verdict: kernel::release::stands(&mine, &newest),
             mine: line(&mine),
             registries,
-            update: UpdateHint {
-                channel: InstallChannel::Npm,
-                command: Some(NPM_UPDATE.to_owned()),
-            },
+            update: hint(this_channel()),
         },
     }
+}
+
+/// How the running binary was installed, read from its own path.
+///
+/// A binary that cannot name its own path cannot say how it got there,
+/// so it is answered as one built from source: no command is printed
+/// rather than one for a channel this binary did not come through.
+fn this_channel() -> InstallChannel {
+    // cargo's own rule: `CARGO_HOME` when set, else `.cargo` under the
+    // home directory, whose reading `accounting::home` owns.
+    let cargo_home = match std::env::var_os("CARGO_HOME") {
+        Some(set) => Some(std::path::PathBuf::from(set)),
+        None => match accounting::home::Home::detect() {
+            Ok(home) => Some(home.path().join(".cargo")),
+            Err(_no_home) => None,
+        },
+    };
+    let cargo_bin = cargo_home.map(|cargo_home| cargo_home.join("bin"));
+    match std::env::current_exe() {
+        Ok(exe) => channel(&exe, cargo_bin.as_deref()),
+        Err(_unnamed) => InstallChannel::Source,
+    }
+}
+
+/// The channel a binary at `exe` came through, on every platform by the
+/// same rule (`crates/wire/spec/Answer/Release.lean` D24): under a
+/// `node_modules`, bun's or npx's package cache is npm; in cargo's bin
+/// directory is cargo; beside the archive's `skills/` is the archive;
+/// anywhere else is a build nobody published.
+pub(crate) fn channel(
+    exe: &std::path::Path,
+    cargo_bin: Option<&std::path::Path>,
+) -> InstallChannel {
+    let packaged = exe.components().any(|part| {
+        matches!(
+            part.as_os_str().to_str(),
+            Some("node_modules" | ".bun" | "_npx")
+        )
+    });
+    let dir = exe.parent();
+    if packaged {
+        InstallChannel::Npm
+    } else if cargo_bin.is_some() && dir == cargo_bin {
+        InstallChannel::Cargo
+    } else if dir.is_some_and(|dir| dir.join(ARCHIVE_SIBLING).is_dir()) {
+        InstallChannel::Archive
+    } else {
+        InstallChannel::Source
+    }
+}
+
+/// The command a User runs to update a binary from `channel`.
+fn hint(channel: InstallChannel) -> UpdateHint {
+    let command = match channel {
+        InstallChannel::Npm => Some(NPM_UPDATE.to_owned()),
+        InstallChannel::Cargo => Some(CARGO_UPDATE.to_owned()),
+        InstallChannel::Archive => Some(format!(
+            "download the newest archive from {RELEASES}, then run `sprawling install` from it"
+        )),
+        InstallChannel::Source => None,
+    };
+    UpdateHint { channel, command }
 }
 
 #[cfg(test)]
@@ -236,7 +304,45 @@ pub fn answer() -> ReleaseAnswer {
     reason = "test code"
 )]
 mod tests {
-    use super::{Built, built};
+    use super::{Built, built, channel};
+    use wire::InstallChannel;
+
+    /// The four channels, read from fixture paths rather than from where
+    /// this test binary happens to run. Each OS spells its paths its own
+    /// way; the rule reads components, so one fixture set covers all three.
+    #[test]
+    fn the_update_command_follows_the_channel_the_binary_came_through() {
+        let root = tempfile::tempdir().unwrap();
+        let cargo_bin = root.path().join(".cargo").join("bin");
+        let archive = root.path().join("sprawling-0.0.9");
+        std::fs::create_dir_all(archive.join("skills")).unwrap();
+        let exe = |dir: &std::path::Path| dir.join("sprawling");
+        let npm = root
+            .path()
+            .join("lib")
+            .join("node_modules")
+            .join("sprawling")
+            .join("bin");
+        let bunx = root.path().join(".bun").join("install").join("cache");
+        assert_eq!(
+            [
+                channel(&exe(&npm), Some(&cargo_bin)),
+                channel(&exe(&bunx), Some(&cargo_bin)),
+                channel(&exe(&cargo_bin), Some(&cargo_bin)),
+                channel(&exe(&archive), Some(&cargo_bin)),
+                channel(&exe(&root.path().join("target")), Some(&cargo_bin)),
+                channel(&exe(&cargo_bin), None),
+            ],
+            [
+                InstallChannel::Npm,
+                InstallChannel::Npm,
+                InstallChannel::Cargo,
+                InstallChannel::Archive,
+                InstallChannel::Source,
+                InstallChannel::Source,
+            ]
+        );
+    }
 
     /// The check this test exists for is not which state a test binary
     /// is in, but that reading it never panics and never invents a

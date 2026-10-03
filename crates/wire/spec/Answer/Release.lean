@@ -28,7 +28,7 @@ pub enum InstallChannel { Npm, Cargo, Archive, Source }
 pub struct UpdateHint { pub channel: InstallChannel, pub command: Option<String> }
 ```
 
-`verdict` 是本城对 npm 那一行的判定：npm 的 `latest` 是发布流程最后写的那一处，也是口径 2 说的「真正解析的东西」。npm 读不到时整条答 `Refused`（口径 3）；crates.io 那一行今天答 `Unasked`——crates.io 上的版本串与 npm 的 pre 版本串怎么对应还没有一条 `kernel::Release` 的规则，比出来的先后会是猜的，所以如实说没问。`update` 今天按 `release::built` 判：源码构建答 `Source`、命令为 `None`；发布版答 `Npm` 与终端一直印的那一行 `bunx sprawling@latest up`，按二进制路径区分四种安装方式归 CON-DOC（D24）。终端 `status --check` 与页面印同一个 `command`，命令只有这一处。
+`verdict` 是本城对 npm 那一行的判定：npm 的 `latest` 是发布流程最后写的那一处，也是口径 2 说的「真正解析的东西」。npm 读不到时整条答 `Refused`（口径 3）；crates.io 那一行今天答 `Unasked`——crates.io 上的版本串与 npm 的 pre 版本串怎么对应还没有一条 `kernel::Release` 的规则，比出来的先后会是猜的，所以如实说没问。`update` 由 `release::channel` 按这份二进制自己的路径判（D24）：源码构建答 `Source`、命令为 `None`；发布版按路径分四种，路径里有 `node_modules`、`.bun` 或 `_npx` 一节是 `Npm`，所在目录等于 cargo 的 bin 目录是 `Cargo`（`cargo binstall` 装在同一目录，路径分不出，答同一条命令），旁边有发行归档的 `skills/` 是 `Archive`，都不是答 `Source`；读不出自己路径的二进制也答 `Source`，宁可不印命令，不印一条错渠道的命令。终端 `status --check` 与页面印同一个 `command`，命令只有这一处。
 
 **五条口径：**
 
@@ -64,7 +64,7 @@ pub enum InstallChannel { Npm, Cargo, Archive, Source }
 pub struct UpdateHint { pub channel: InstallChannel, pub command: Option<String> }
 ```
 
-安装方式从这份二进制自己的路径判：落在 npm 的全局包目录（经 `bunx`／`npx` 解出的缓存也算）是 `Npm`，命令 `npm install -g sprawling@latest`；落在 cargo 的 bin 目录（`$CARGO_HOME/bin`，缺省 `~/.cargo/bin`，Windows 上是 `%USERPROFILE%\.cargo\bin`）是 `Cargo`，命令 `cargo install sprawling --locked`；带着发行归档的兄弟文件（`skills/` 与物料清单）是 `Archive`，命令是 `sprawling install` 的那一行；都不是则 `Source`，`command` 为 `None`。三个平台用同一套规则，只有路径的展开不同。仍然只在人按下时问（§8-36 口径 1），仍然什么都不更新（口径 5）；口径 2「问 npm、不问 GitHub」扩成「问 npm 与 crates.io、不问 GitHub」。
+安装方式从这份二进制自己的路径判：落在 npm 的全局包目录（经 `bunx`／`npx` 解出的缓存也算）是 `Npm`，命令 `npm install -g sprawling@latest`；落在 cargo 的 bin 目录（`$CARGO_HOME/bin`，缺省 `~/.cargo/bin`，Windows 上是 `%USERPROFILE%\.cargo\bin`）是 `Cargo`，命令 `cargo install sprawling --locked`；带着发行归档的兄弟文件（`skills/` 与物料清单）是 `Archive`，`command` 是一句「从发布页下载最新归档，再从里面跑 `sprawling install`」——归档没有能自己更新的包管理器；都不是则 `Source`，`command` 为 `None`。三个平台用同一套规则，只有路径的展开不同。仍然只在人按下时问（§8-36 口径 1），仍然什么都不更新（口径 5）；口径 2「问 npm、不问 GitHub」扩成「问 npm 与 crates.io、不问 GitHub」。
 
 **理由**：页面只去 npm 查，而 crates.io 上也有发布（roadmap A10）；用 cargo 装的人照 npm 的命令更新，会装出第二份二进制。两边各自可能读不到，所以每个注册表各带自己的结果。
 

@@ -98,11 +98,12 @@ pub(super) fn check() -> ExitCode {
                         newest.version, newest.released, mine.version
                     );
                     println!();
-                    if let Some(command) = &update.command {
-                        println!("  npm      {command}");
+                    match &update.command {
+                        Some(command) => println!("  update   {command}"),
+                        None => println!(
+                            "  update   this binary's install channel is not one this city can name;                              every archive is at https://github.com/2youg1/sprawling-agents/releases"
+                        ),
                     }
-                    println!("  archive  download it, then run `sprawling install` again:");
-                    println!("           https://github.com/2youg1/sprawling-agents/releases");
                     println!();
                     println!(
                         "Nothing was downloaded and nothing was changed. \
