@@ -12,7 +12,7 @@
 /-!
 ## §7 `views/parts/` 的交互契约
 
-> **这是规格，不是描述。** 表里写的是部件欠使用者什么；今天的代码欠而未还的十二处，逐条点名在 7-8。模式名与键表借鉴自哪几份文档、为什么不产生许可证义务，一处记在 `docs/third-party.md` §6，本节不复述。
+> **这是规格，不是描述。** 表里写的是部件欠使用者什么；今天的代码欠而未还的十一处，逐条点名在 7-8。模式名与键表借鉴自哪几份文档、为什么不产生许可证义务，一处记在 `docs/third-party.md` §6，本节不复述。
 
 **判定：一个库只在它替换掉一样东西、并且同一变更集里有生产读者时才进来（由人定）。** `tools/xtask/src/npm.rs` 的 `RUNTIME` 是这条判定的机器面——运行时依赖恰为那张表所列，名单以表为准；加一项是门机制的一次提交，与引入它的变更集分开，好让评审看见门为什么动。**平台先来**：`parts/dialog.svelte` 把模态整个交给原生 `<dialog>`（top layer、焦点陷阱、Esc、其余页面 `inert`，见设计 4-20），`parts/tip.svelte` 把 `title` 换成一个 `role="tooltip"` 的兄弟节点（设计 4-18）；平台已经提供的行为不再引一个库来提供第二遍，因为同一件事两个提供者，第一次分歧就落在键盘用户身上。今天名单上的界面库有两项：`@lucide/svelte`，它替换了 `parts/glyph.ts` 手画的那张路径表，换来人在别的软件里已经认得的图标（`docs/frontend-method.md` §4-34）；CodeMirror 6 的五个包，它替换了 RefRain 原本要手写的编辑面与行级 diff（D23）；pdf.js 与 docx-preview，它们替换了本客户端画不出的 PDF 页与 DOCX 页（D32）。引入的条件写在 7-9。
 -/
@@ -66,7 +66,9 @@
 | `tip.svelte` | APG Tooltip | Escape | **规格要求撤下提示；今天没有实现**（7-8 第 9 条）|
 | `dialog.svelte` | APG Modal Dialog | Tab／Shift+Tab | 在对话框内循环，由平台实现 |
 | | | Escape | 平台发 `cancel`，本部件 `preventDefault()` 后回调 `onCancel`——默认行为会绕过调用方关掉元素，而 `open` 还说着开着 |
-| `kbd.svelte` 的 `Cheatsheet` | 手写的 dialog | Escape | 由外壳 `app.svelte` 的按键处理器答，不在部件里（7-8 第 12 条）|
+| `kbd.svelte` 的 `Cheatsheet`（`seat="modal"`） | APG Modal Dialog，原生 `<dialog>` 加 `showModal()` | Tab／Shift+Tab | 在表内循环，由平台实现 |
+| | | Escape | 平台发 `cancel`，本部件 `preventDefault()` 后回调 `onClose`；外壳 `app.svelte` 的按键处理器在同一次 Escape 上也调 `closeSheet`，两条路落到同一个关闭 |
+| `kbd.svelte` 的 `Cheatsheet`（`seat="specimen"`） | 无：`#/gallery` 的标本，`<dialog open>` 留在折页的流里 | 无 | 不取焦、不令页面 `inert`、不收 Escape——那条路由上没有人向它提问，进 top layer 只会盖住每一个折页 |
 
 `tip.svelte` 的 `aria-*`：提示节点是 `role="tooltip"`，id 交给调用方——控件自己有可见文字时写 `aria-describedby`，这句话就是它唯一的名字时写 `aria-labelledby`。**组件不猜**，因为只有调用点知道控件有没有名字。显示由 `:hover` 与 `:focus-within` 触发，延迟 300 ms；提示自己 `pointer-events-none`，永不取焦。
 
@@ -137,7 +139,7 @@
 | 平台 | `dialog.svelte` | `close()` 按 HTML 标准把焦点还给 `showModal()` 之前持焦点的元素，本文件因此没有一行取焦代码 |
 | 状态模块 | 检视面（`views/inspect/open.svelte.ts`） | 从检视面之外打开一项时记下当时持焦点的元素；关上检视面或它最后一个页签时，焦点若在检视面里（或因面板卸载落到 `body`），交还给那个元素，它已不在页面上时不还 |
 | 部件自己 | `combobox.svelte`、`popover.svelte` | 前者记住触发按钮的 ref，`shut()` 时还；后者在 `onMount` 记下当时的 `document.activeElement`，`onCleanup` 还（`bind` 模式下焦点从未离开文本框，因此不还）|
-| 外壳 | `kbd.svelte` 的 `Cheatsheet` | `app.svelte` 在打开前记 `opener`，`closeSheet` 时还——**全客户端唯一一处还原权威不在部件里**，它随 7-8 第 12 条的搬家一起消失 |
+| 外壳 | `kbd.svelte` 的 `Cheatsheet` | `app.svelte` 在打开前记 `opener`，`closeSheet` 时还。表关上时它所在的 `{#if}` 分支连同 `<dialog>` 一起离开页面，平台的 `close()` 落在一个已摘下的元素上，外壳不把还原押在那一步上——**全客户端唯一一处还原权威不在部件里** |
 -/
 
 /-!

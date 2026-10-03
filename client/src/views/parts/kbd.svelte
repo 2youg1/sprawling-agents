@@ -22,6 +22,13 @@
 // backdrop closes nothing - a sheet of key chords is not a question one
 // answers by missing it (SPEC 7-3).
 //
+// **The sheet has two seats.** `modal` is the one above; `specimen` is
+// the same box drawn open in the page's flow, with no `showModal()`, for
+// `#/gallery`, where a top-layer sheet would cover every other fold of
+// the route and dim it behind a backdrop. The specimen takes no focus,
+// marks nothing `inert` and answers no Escape, because nothing on that
+// route asked a question of it.
+//
 // A caller writes `import Cheatsheet, { Kbd } from ".../kbd.svelte"`:
 // `Kbd` is the exported snippet, one glyph per `<kbd>`, no focus and no
 // keys of its own (SPEC 7-1).
@@ -30,7 +37,12 @@ import { ACTIONS, LABELS } from "../../core/keys";
 import { say } from "../../core/lang";
 import { ui } from "../../ui";
 
+// Where the sheet stands: in the top layer as the page's one modal, or
+// in the gallery's flow as a picture of itself.
+type Seat = "modal" | "specimen";
+
 interface CheatsheetProps {
+  readonly seat: Seat;
   readonly onClose: () => void;
 }
 
@@ -51,7 +63,15 @@ const SHEET =
 
 const uid = $props.id();
 const { lang } = ui();
-const { onClose }: CheatsheetProps = $props();
+const { seat, onClose }: CheatsheetProps = $props();
+
+// The specimen stands in the flow of its fold, so the platform's
+// `position: absolute` for a non-modal dialog is undone and the box is
+// measured inside the fold that holds it.
+const PLACE: Record<Seat, string> = {
+  modal: "",
+  specimen: "static",
+};
 
 let sheet = $state<HTMLDialogElement | undefined>(undefined);
 
@@ -60,7 +80,7 @@ let sheet = $state<HTMLDialogElement | undefined>(undefined);
 // so the call is made once, on the edge this component's life gives it.
 $effect(() => {
   const node = sheet;
-  if (node === undefined) {
+  if (node === undefined || seat === "specimen") {
     return;
   }
   node.showModal();
@@ -110,7 +130,8 @@ function chordMarks(props: KbdProps): readonly string[] {
 
 <dialog
   bind:this={sheet}
-  class={SHEET}
+  class={[SHEET, PLACE[seat]]}
+  open={seat === "specimen"}
   aria-labelledby="{uid}-title"
   aria-describedby="{uid}-where"
   oncancel={(event) => {

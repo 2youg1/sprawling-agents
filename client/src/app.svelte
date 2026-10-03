@@ -391,7 +391,7 @@
     <Palette onClose={() => (paletteOpen = false)} />
   {/if}
   {#if sheetOpen}
-    <Cheatsheet onClose={closeSheet} />
+    <Cheatsheet seat="modal" onClose={closeSheet} />
   {/if}
   {#if finderShown()}
     <Finder under={underOf(view)} onClose={closeFinder} />

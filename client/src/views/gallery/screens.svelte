@@ -252,9 +252,7 @@
 </Case>
 
 <Case label="keys · the sheet every chord is read on">
-  <div class="relative h-screen transform-gpu overflow-hidden">
-    <Cheatsheet onClose={() => undefined} />
-  </div>
+  <Cheatsheet seat="specimen" onClose={() => undefined} />
 </Case>
 
 <Case label="keys · one row per action, rebound where it stands">
