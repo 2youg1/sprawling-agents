@@ -484,7 +484,7 @@ status = "measured, not gated: p50 3.287 ms, three runs 2.978-3.355 ms (fixture 
 what = "assembling one frozen prefix"
 budget_us = 1000 # was 1 ms
 measured_by = "just bench (citysim bench bin, release)"
-status = "measured, not gated: p50 0.009 ms for 16.5 KB over four slots, 1000 rounds (fixture 1dc560ad5766de65, features sprawling/sandbox, windows-x86_64, 16 cores, NVMe, release, 2026-10-01)"
+status = "measured, not gated: p50 0.009 ms for 16.5 KB over four slots, 1000 rounds (fixture 1dc560ad5766de65, features sprawling/sandbox, windows-x86_64, 16 cores, NVMe, release, 2026-10-01). This version's reading is owed, because the User ruled to skip measurement in this version: the figures above were taken on an earlier tree, and just bench retakes it"
 
 # What one query pays for the appends that arrived since the last one.
 # `Views` refreshes the resident index before every history query, so a
@@ -511,7 +511,7 @@ status = "measured, not gated: 191 B read out of a 76,180 B segment, which is th
 [rules_lookup]
 what = "ns per rules lookup for another building, a fresh city::load against city::RulesCache::load, alternating rounds"
 measured_by = "cargo test --release -p sprawling-city --lib rules_lookup_reading -- --ignored --nocapture"
-status = "measured, not gated: median of 15 rounds of 2000, three runs, load 186,793-212,885 ns against cache 76,112-91,730 ns (release test profile, Windows NTFS, sixteen cores shared by eight build lanes)"
+status = "measured, not gated: median of 15 rounds of 2000, three runs, load 186,793-212,885 ns against cache 76,112-91,730 ns (release test profile, Windows NTFS, sixteen cores shared by eight build lanes). This version's reading is owed, because the User ruled to skip measurement in this version: the figures above were taken on an earlier tree, and the cargo test in measured_by retakes it"
 
 # Read amplification on a range retrieval: the bytes a `Vfs` hands back
 # while `Cas::get_range` answers, over the bytes in the answer.
@@ -717,7 +717,7 @@ stage_one_p95_us = 16000
 stage_two_p99_us = 1000
 scope = "sub-metric `harness` only, and the `store=memory` line of `[relay_round_trip]` for multi-run parallel; `whole` carries no tier (tools/citysim/Spec.lean section 8-6)"
 measured_by = "just bench, release: the citysim bench bin gives one reading line per scenario and sub-metric for three scenarios, and `instrument_relay_round_trip` gives multi-run parallel; each line carries its machine class"
-status = "staged targets, not gated: a wall-clock figure is the machine's. Baselines sit in the ARCHITECTURE.md performance book. Under the registered fixture a reading only goes down; relaxing a tier or fattening the fixture lands in a commit of its own"
+status = "staged targets, not gated: a wall-clock figure is the machine's. Baselines sit in the ARCHITECTURE.md performance book. Under the registered fixture a reading only goes down; relaxing a tier or fattening the fixture lands in a commit of its own. This version's reading is owed, because the User ruled to skip measurement in this version: the baselines in the performance book were taken on an earlier tree, and just bench retakes them"
 
 [relay_round_trip]
 what = "one relay append from a lane to the accounting thread and back, while a run is in flight, with `attend` as the city runs it"
@@ -808,7 +808,7 @@ status = "measured, not gated: summary floor 2 us, p50 2 us, p99 3 us; page floo
 [tool_wave_reads]
 what = "one wave of three read calls of 50 ms each, from the first call started to the last result accounted"
 measured_by = "not instrumented: taken with a wall-clock bound before that bound became the rendezvous check, which now lives in crates/runtime/tests/run_driver.rs"
-status = "measured, not gated: serial 153.0 ms; concurrent 51-60 ms on an idle machine and 82.8 ms under a merge-train build (debug build, windows-x86_64, 16 cores). A wall-clock figure is the machine's, so it is recorded, never gated"
+status = "measured, not gated: serial 153.0 ms; concurrent 51-60 ms on an idle machine and 82.8 ms under a merge-train build (debug build, windows-x86_64, 16 cores). A wall-clock figure is the machine's, so it is recorded, never gated. This version's reading is owed, because the User ruled to skip measurement in this version: the figures above were taken on an earlier tree, and no recipe retakes it yet (measured_by names what is missing)"
 
 # What the client pays to fold one animation frame of stream into the
 # belief, with one subscriber reading the run table the way the views do.
@@ -818,7 +818,7 @@ status = "measured, not gated: serial 153.0 ms; concurrent 51-60 ms on an idle m
 [client_fold]
 what = "one animation frame of 50 token deltas folded into a belief of R runs, one subscriber reading the run table"
 measured_by = "bun test --conditions=browser client/src/core/belief/fold_cost.test.ts (the frame test prints one client_fold line per R and holds the subscriber to one read per city answer; the delta test holds R=1e4 within 5x of R=1e2 in the same run)"
-status = "measured, not gated here: per frame with the `$state` run table 30-37 us at R=1e3 and 30-54 us at R=1e4, and 30 us at R=1e2 once warm (the first size measured pays the runes runtime warm-up, 94-330 us), against 29-34 us, 58-73 us and 471-539 us with belief.batch alone, interleaved on the same instrument (x86_64 desktop class). A wall-clock figure is the machine's, so this register records it and the test guards only what every machine agrees on: the read count and the ratio between two sizes"
+status = "measured, not gated here: per frame with the `$state` run table 30-37 us at R=1e3 and 30-54 us at R=1e4, and 30 us at R=1e2 once warm (the first size measured pays the runes runtime warm-up, 94-330 us), against 29-34 us, 58-73 us and 471-539 us with belief.batch alone, interleaved on the same instrument (x86_64 desktop class). A wall-clock figure is the machine's, so this register records it and the test guards only what every machine agrees on: the read count and the ratio between two sizes. This version's reading is owed, because the User ruled to skip measurement in this version: the figures above were taken on an earlier tree, and the bun test in measured_by retakes it"
 
 # What the page pays to read one event frame off the socket. Event and
 # delta frames arrive once per ledger record and once per token, so they
@@ -828,7 +828,7 @@ status = "measured, not gated here: per frame with the `$state` run table 30-37 
 [client_frame_decode]
 what = "one event frame decoded from its text, by the hot decoder and by the Effect schema it stands in for"
 measured_by = "cd client && bun scripts/frame_cost.ts (prints one client_frame_decode line: the fastest of 15 batches of 2000 decodes, per path)"
-status = "measured, not gated: on Effect 4, hot 1.1-1.3 us against 6.9-8.4 us for the schema path, interleaved on the same instrument (x86_64 desktop class, 16 cores, other builds beside it). On Effect 3 the floor read 3.7-8.6 us with 32 busy loops beside it, so a wall-clock bound held as a unit test failed on a loaded machine; the register records the reading and nothing gates it"
+status = "measured, not gated: on Effect 4, hot 1.1-1.3 us against 6.9-8.4 us for the schema path, interleaved on the same instrument (x86_64 desktop class, 16 cores, other builds beside it). On Effect 3 the floor read 3.7-8.6 us with 32 busy loops beside it, so a wall-clock bound held as a unit test failed on a loaded machine; the register records the reading and nothing gates it. This version's reading is owed, because the User ruled to skip measurement in this version: the figures above were taken on an earlier tree, and bun scripts/frame_cost.ts retakes it"
 
 # What one streamed token costs the page while a reply is still arriving
 # (T12): script plus the layout the token forces. The raw shape drew the
@@ -841,7 +841,7 @@ status = "measured, not gated: on Effect 4, hot 1.1-1.3 us against 6.9-8.4 us fo
 [stream_relayout]
 what = "one streamed token in a live turn: script plus forced layout, and how far the turn jumps when the record takes over"
 measured_by = "cd client && bun scripts/relayout.ts - headless Edge, a 2,753-character reply with lists, tables, code and headings in 689 four-character tokens, 7 interleaved rounds of each shape"
-status = "measured, not gated: on windows-x86_64, 16 cores, NVMe, three runs each - raw shape mean 426-441 us, p99 1.0 ms, takeover 3.8-4.3 ms, jump 793 px; block shape mean 72-80 us, p99 0.5-0.6 ms, takeover 2.5-2.8 ms, jump 0 px"
+status = "measured, not gated: on windows-x86_64, 16 cores, NVMe, three runs each - raw shape mean 426-441 us, p99 1.0 ms, takeover 3.8-4.3 ms, jump 793 px; block shape mean 72-80 us, p99 0.5-0.6 ms, takeover 2.5-2.8 ms, jump 0 px. This version's reading is owed, because the User ruled to skip measurement in this version: the figures above were taken on an earlier tree, and bun scripts/relayout.ts retakes it"
 
 # What the city pays, in results-only mode, to sort its runs into the
 # three outcomes a person acts on and keep the newest few of each. The
@@ -850,7 +850,7 @@ status = "measured, not gated: on windows-x86_64, 16 cores, NVMe, three runs eac
 [city_results]
 what = "one triage of a 200-run city into waiting, failed and done, each cut to its FIRST newest (client/src/core/results.ts)"
 measured_by = "bun test --conditions=browser client/src/core/results.test.ts (prints one city_results line and holds a triage to 1600 us, a tenth of a 16 ms frame)"
-status = "measured, not gated here: 45-124 us per city across three runs (x86_64 desktop class, other builds running beside it). A wall-clock figure is the machine's, so this register records it and the test guards only what every machine agrees on: the read count and the ratio between two sizes"
+status = "measured, not gated here: 45-124 us per city across three runs (x86_64 desktop class, other builds running beside it). A wall-clock figure is the machine's, so this register records it and the test guards only what every machine agrees on: the read count and the ratio between two sizes. This version's reading is owed, because the User ruled to skip measurement in this version: the figures above were taken on an earlier tree, and the bun test in measured_by retakes it"
 
 # How many controls stand on the conversation page at once (refrain P11,
 # docs/frontend-method.md §4-43): the edge keys, the composer's row and the inspect
