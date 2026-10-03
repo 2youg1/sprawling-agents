@@ -6830,5 +6830,45 @@
   "release_channel_source": {
     "en": "Built from source. To update, pull the repository and build again.",
     "zh": "从源码构建。要更新，拉取仓库后重新构建。"
+  },
+  "remote_steps": {
+    "en": "Pair a device, step by step",
+    "zh": "一步一步配对一台设备"
+  },
+  "remote_step_open": {
+    "en": "At the city's console, open the door. The console prints the address the device opens.",
+    "zh": "在城的控制台上开门。控制台印出设备要打开的地址。"
+  },
+  "remote_step_pair": {
+    "en": "At the console, name the device. The console prints a QR code and a link, good once for ten minutes.",
+    "zh": "在控制台上给设备起个名字。控制台印出一个二维码和一条链接，只用一次，十分钟内有效。"
+  },
+  "remote_step_device": {
+    "en": "On the other device, scan the code or open the link. The link looks like this; the page it opens says Pair this device.",
+    "zh": "在另一台设备上扫码或打开链接。链接长这样；打开的页面写着「配对这台设备」。"
+  },
+  "remote_step_seed": {
+    "en": "Press Pair on the device. It shows a seed once, in groups of four letters; write it down, then press the button under it.",
+    "zh": "在设备上按「配对」。它只显示一次种子，四个字母一组；抄下来，再按它下面的按钮。"
+  },
+  "remote_restart_unknown": {
+    "en": "When the city's computer restarts: on Windows and macOS the pairing stays, kept by Credential Manager or the Keychain; on Linux it lasts until the computer reboots, unless the city uses the encrypted vault file. Open the dependencies page to see which this city has.",
+    "zh": "城所在的电脑重启时：Windows 与 macOS 上配对仍在，由凭据管理器或钥匙串保管；Linux 上只到这次开机结束，除非这座城用加密的 vault 文件。打开依赖项页能看到这座城是哪一种。"
+  },
+  "remote_restart_kept": {
+    "en": "When the city's computer restarts, paired devices stay paired: the system's credential store keeps the city key.",
+    "zh": "城所在的电脑重启后，配对过的设备仍是配对的：系统的凭据存放处保管着城钥匙。"
+  },
+  "remote_restart_passphrase": {
+    "en": "When the city's computer restarts, paired devices stay paired once you type the vault's passphrase at start.",
+    "zh": "城所在的电脑重启后，启动时输入 vault 口令，配对过的设备就仍是配对的。"
+  },
+  "remote_restart_until_reboot": {
+    "en": "When the city's computer reboots, every device pairs again: the kernel keyring keeps the city key only until then. An encrypted vault file keeps it across reboots.",
+    "zh": "城所在的电脑重启后，每台设备都要重新配对：内核的 keyring 只保管城钥匙到那时。用加密的 vault 文件就能跨重启保留。"
+  },
+  "remote_restart_process": {
+    "en": "When the city restarts, every device pairs again: no system credential store answered, so the city key lives only in the city's memory.",
+    "zh": "城重启后，每台设备都要重新配对：没有系统凭据存放处应答，城钥匙只在城的内存里。"
   }
 }

@@ -8,12 +8,28 @@
   // the door explained on the city's own machine, an invitation that
   // does not read, a browser lacking a curve, an invitation the city
   // answered with someone else's key, the seed shown once, and a paired
-  // device whose door was just locked. Drawn through the group's own
+  // device whose door was just locked. Each standing is drawn with one
+  // of the vault's lifetimes, so the restart step shows every wording:
+  // before the doctor answered, across restarts, until reboot, and in
+  // the city's memory only. Drawn through the group's own
   // body, with the presses going nowhere; the dialog that confirms a
   // forget is `parts/dialog.svelte`'s, drawn in the parts section.
 
   import type { Device } from "../../core/remote/device";
   import type { Standing } from "../settings/remote";
+  import type { DoctorCustodyLifetime } from "../../wire";
+
+  // The lifetime each standing is drawn with, in the order of `standings`.
+  const KEEPS: readonly (DoctorCustodyLifetime | null)[] = [
+    null,
+    "until_reboot",
+    "this_process",
+    "with_passphrase",
+    "across_reboots",
+    "across_reboots",
+    "until_reboot",
+    "across_reboots",
+  ];
 
   const FINGERPRINT = new Uint8Array(32).map((_, at) => (at * 37 + 11) % 256);
   const ID = new Uint8Array(16).map((_, at) => (at * 53 + 7) % 256);
@@ -57,15 +73,15 @@
   import RemoteState from "../settings/remote_state.svelte";
   import Case from "./case.svelte";
 
-  const WIDTHS = [760, 390] as const;
+  const WIDTHS = [1040, 390] as const;
 </script>
 
 {#await KEY then pair}
-  {#each standings(pair.privateKey) as [name, standing] (name)}
+  {#each standings(pair.privateKey) as [name, standing], at (name)}
     {#each WIDTHS as width (width)}
       <Case label={`remote group · ${name} at ${String(width)}`} {width}>
         <div class="@container/page">
-          <RemoteState {standing} onPair={() => undefined} onSeen={() => undefined} onLock={() => undefined} onForget={() => undefined} />
+          <RemoteState {standing} keeps={KEEPS[at] ?? null} onPair={() => undefined} onSeen={() => undefined} onLock={() => undefined} onForget={() => undefined} />
         </div>
       </Case>
     {/each}

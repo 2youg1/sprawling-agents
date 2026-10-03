@@ -5,7 +5,9 @@
 
 <script lang="ts">
   // The remote group drawn from one standing (client/Spec.lean §4-57): what
-  // the door is and the console verbs that open it, an invitation to
+  // the door is, the numbered steps of a pairing with the console verbs
+  // each step types (`STEPS`), and what a restart of the city's computer
+  // does to a pairing (`restartOf`), an invitation to
   // pair, the seed shown once, and the device this browser holds. Every
   // press goes back to the caller; the one status line is always
   // mounted, so what a press came back with is announced when it lands.
@@ -20,17 +22,22 @@
   import { ui } from "../../ui";
   import Button from "../parts/button.svelte";
   import Dialog from "../parts/dialog.svelte";
-  import { LACKS, VERBS, grouped, toldKey, type Standing } from "./remote";
+  import type { DoctorCustodyLifetime } from "../../wire";
+  import Copy from "../machine/copy.svelte";
+  import { LACKS, STEPS, VERBS, grouped, restartOf, toldKey, type Standing } from "./remote";
 
   interface Props {
     readonly standing: Standing;
+    // How long the city's vault keeps a credential, once the doctor has
+    // answered; it decides what a restart does to a pairing.
+    readonly keeps: DoctorCustodyLifetime | null;
     readonly onPair: () => void;
     readonly onSeen: () => void;
     readonly onLock: () => void;
     readonly onForget: () => void;
   }
 
-  const { standing, onPair, onSeen, onLock, onForget }: Props = $props();
+  const { standing, keeps, onPair, onSeen, onLock, onForget }: Props = $props();
   const { lang } = ui();
   const uid = $props.id();
 
@@ -65,6 +72,29 @@
     {:else if standing.kind === "lacking"}
       <p class="text-body text-alert">{say($lang, LACKS[standing.lack])}</p>
     {/if}
+    <section class="flex flex-col gap-snug" aria-labelledby={`${uid}-steps`}>
+      <h3 id={`${uid}-steps`} class="text-label font-label text-text">{say($lang, "remote_steps")}</h3>
+      <ol class="flex flex-col">
+        {#each STEPS as step, at (step.key)}
+          <li class="grid grid-cols-[2rem_minmax(0,1fr)] gap-x-snug border-b border-edge py-snug">
+            <span class="font-mono text-label text-text-quiet" aria-hidden="true">{String(at + 1)}</span>
+            <div class="flex min-w-0 flex-col gap-tight">
+              <p class="text-note text-text">{say($lang, step.key)}</p>
+              {#if step.spelling !== null}
+                <div class="flex min-w-0 items-start gap-tight">
+                  <code class="min-w-0 flex-1 break-all rounded-control bg-chrome px-snug py-tight font-mono text-note text-text-quiet">{step.spelling}</code>
+                  <Copy text={step.spelling} />
+                </div>
+              {/if}
+            </div>
+          </li>
+        {/each}
+        <li class="grid grid-cols-[2rem_minmax(0,1fr)] gap-x-snug py-snug">
+          <span class="font-mono text-label text-text-quiet" aria-hidden="true">{String(STEPS.length + 1)}</span>
+          <p class="text-note text-text">{say($lang, restartOf(keeps))}</p>
+        </li>
+      </ol>
+    </section>
     <section class="flex flex-col" aria-labelledby={`${uid}-console`}>
       <h3 id={`${uid}-console`} class="pb-tight text-label font-label text-text">{say($lang, "remote_console")}</h3>
       <dl class="flex flex-col">
@@ -76,7 +106,6 @@
         {/each}
       </dl>
     </section>
-    <p class="text-note text-text-faint">{say($lang, "remote_route")}</p>
     {#if standing.kind === "unpaired"}
       <p class="text-note text-text-faint">{say($lang, "remote_not_paired")}</p>
     {/if}
@@ -112,6 +141,7 @@
         <dt class={LABEL}>{say($lang, "remote_device_at")}</dt>
         <dd class={VALUE}>{`${isoDay(standing.device.at)} ${isoTime(standing.device.at)}`}</dd>
       </dl>
+      <p class="text-note text-text-faint">{say($lang, restartOf(keeps))}</p>
       <div class="flex flex-wrap gap-snug">
         <Button label={say($lang, standing.busy ? "remote_locking" : "remote_lock")} loading={standing.busy} onPress={onLock} />
         <span bind:this={forgetButton} class="contents">

@@ -11,6 +11,7 @@ import type { Key } from "../../core/lang";
 import type { Refusal } from "../../core/remote/connect";
 import type { Device } from "../../core/remote/device";
 import type { Invitation } from "../../core/remote/invitation";
+import type { DoctorCustodyLifetime } from "../../wire";
 
 // What this browser lacks to pair at all: an https:// page, a WebCrypto
 // with Ed25519 and X25519, an IndexedDB to keep the key in.
@@ -34,15 +35,64 @@ export type Told =
   | { readonly kind: "unkept" }
   | { readonly kind: "locked" };
 
-// The console verbs, spelled as a person types them, beside what each
-// does; `docs/operating.md` is where they are written out in full.
+// The console verbs, spelled as a User types them, beside what each
+// does; `docs/operating.md` is where they are written out in full. The
+// two a pairing starts with are named once, because the steps below
+// spell them too.
+const OPEN = "/remote open [--for 12h]";
+const PAIR = "/remote pair <name> [--watch]";
+
 export const VERBS: readonly (readonly [string, Key])[] = [
-  ["/remote open [--for 12h]", "remote_verb_open"],
-  ["/remote pair <name> [--watch]", "remote_verb_pair"],
+  [OPEN, "remote_verb_open"],
+  [PAIR, "remote_verb_pair"],
   ["/remote devices", "remote_verb_devices"],
   ["/remote revoke <name>", "remote_verb_revoke"],
   ["/remote close", "remote_verb_close"],
 ];
+
+// What a pairing looks like from start to end, one numbered step each:
+// what the User does at the city's console, what the other device
+// opens, and what it shows. The door's verbs are not on the wire
+// (`crates/remote_access/Spec.lean` D4), so a step that happens at the
+// console carries its spelling and a copy key, never a button.
+export interface Step {
+  readonly key: Key;
+  readonly spelling: string | null;
+}
+
+// wording-ok: the shape of the link `/remote pair` prints, a machine
+// spelling identical in both languages
+const INVITATION = "https://<host>/#pair=<code>&city=<fingerprint>";
+
+export const STEPS: readonly Step[] = [
+  { key: "remote_route", spelling: null },
+  { key: "remote_step_open", spelling: OPEN },
+  { key: "remote_step_pair", spelling: PAIR },
+  { key: "remote_step_device", spelling: INVITATION },
+  { key: "remote_step_seed", spelling: null },
+];
+
+// What happens to the pairing when the city's computer restarts. The
+// city key rests in the city's vault, which keeps it as long as the
+// vault keeps any credential: Windows Credential Manager and the macOS
+// Keychain across restarts, Linux keyutils until the computer reboots
+// unless the city uses the encrypted vault file, and the city's own
+// memory when no platform store answered. The doctor's `custody` says
+// which one this city has; before the doctor has answered, the page
+// says all three.
+export function restartOf(keeps: DoctorCustodyLifetime | null): Key {
+  if (keeps === null) return "remote_restart_unknown";
+  switch (keeps) {
+    case "across_reboots":
+      return "remote_restart_kept";
+    case "with_passphrase":
+      return "remote_restart_passphrase";
+    case "until_reboot":
+      return "remote_restart_until_reboot";
+    case "this_process":
+      return "remote_restart_process";
+  }
+}
 
 export const LACKS: Readonly<Record<Lack, Key>> = {
   insecure: "remote_lacks_insecure",

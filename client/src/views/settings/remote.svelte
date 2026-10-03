@@ -23,12 +23,21 @@
   import { forget, keep, kept, type Device } from "../../core/remote/device";
   import { invitationIn, isInvitation, type Invitation } from "../../core/remote/invitation";
   import { SEED_BYTES, keyFrom } from "../../core/remote/keys";
+  import { QUERIES } from "../../core/asking";
   import { toFragment } from "../../core/route";
   import { ui } from "../../ui";
   import type { Lack, Standing } from "./remote";
   import RemoteState from "./remote_state.svelte";
 
   const u = ui();
+  // The doctor's custody line says how long the city's vault keeps a
+  // credential, which is what a restart does to a pairing; an answer the
+  // city does not hold yet leaves the step naming every platform.
+  const doctor = u.conn.asking.ask(QUERIES.doctor);
+  const keeps = $derived.by(() => {
+    const now = $doctor;
+    return now !== undefined && "doctor" in now ? now.doctor.custody.keeps : null;
+  });
   let standing = $state<Standing>({ kind: "reading" });
 
   onMount(() => {
@@ -100,6 +109,7 @@
 
 <RemoteState
   {standing}
+  {keeps}
   onPair={() => {
     if (standing.kind === "invited" && !standing.busy) void pair(standing.invitation);
   }}
