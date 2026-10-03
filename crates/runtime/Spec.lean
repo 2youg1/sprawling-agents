@@ -126,7 +126,7 @@ Fork 三规则；重放/分叉/幂等；at_seq 越界、未知 kind、崩溃恢�
 
 /-! ## 6 命名统一
 
-**跨 crate 类型住处**：`kernel` 的门／计划／脊／事件／错误／弃置／秘密七面已切目录，`cargo public-api` 基线记其定义位簇路径（如 `error::shape::AxError`）；本 crate 经 `kernel` 顶层重导出引用，公共拼写不变，住处是 kernel 内政（`storage::checkpoint::Checkpoint` 住 `checkpoint` 同例）。
+**跨 crate 类型住处**：`kernel` 的门／计划／脊／事件／错误／弃置／秘密七面已切目录（如 `error::shape::AxError`）；本 crate 经 `kernel` 顶层重导出引用，公共拼写不变，住处是 kernel 内政（`storage::checkpoint::Checkpoint` 住 `checkpoint` 同例）。
 
 replay、verify、VerifiedLedger、VerifiedLine、fork prefix、`at_seq`。不引入「重播/回放/复演」等同义词。
 
@@ -354,7 +354,7 @@ A4 golden（build_prefix 重跑逐字节同）；A15（rebuild_prefix 对拍）�
 
 /-! ## 17 文档关系
 
-模块登记在 ARCHITECTURE 的模块图（`xtask modmap`）；canonical 类型的改动与 `crates/kernel/Spec.lean` §8-23/§8-24 同一变更集；runtime 没有 api-baseline 文件，公开面即 `lib.rs` 的 `pub mod` 与根重导出。
+模块登记在 ARCHITECTURE 的模块图（`xtask modmap`）；canonical 类型的改动与 `crates/kernel/Spec.lean` §8-23/§8-24 同一变更集；runtime 的公开面即 `lib.rs` 的 `pub mod` 与根重导出。
 
 - ARCHITECTURE.md §11「Specifications in Lean」：本规格的布局；它改了，分部的路径与 `architecture.toml` 里 runtime 各行的 `spec` 锚点一起重看。
 - `architecture.toml` 的模块图：runtime 每一行的 `spec` 指向规定它的分部，`cargo xtask gates specalign` 检查锚点在盘上。

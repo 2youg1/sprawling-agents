@@ -113,8 +113,6 @@ pub deltas: Option<&'a mut (dyn FnMut(&Increment) + 'a)>,   // RunHooks 的一�
 | `run/lifecycle.rs` | 一个活着的 Run 在账本上做的三件事：`dispatch` 的调度对（job pin＋run_started）、`advance` 的一回合（四个安全点、波前检查点、报告前推入窗），以及唯一出口 `freeze`（handoff_written＋run_frozen）；连同只有 `advance` 用得上的 `fold_steer`。调度对与收尾对的字节由 `run/charter.rs` 写 |
 | `run/charter.rs` | 一个 run 的开篇两行与收尾两行，模型 run 与 harness run 同一个作者（§8-52） |
 | `run/harness.rs` | 回合由 harness 自己走完的 run：它在账本上写的每一行，与回答冻成哪一种 `Completion`（§8-52） |
-
-**`impl Run<Active>` 保持为一整块，不按 dispatch／advance／freeze 三分**：`cargo public-api` 按 impl 块计数，三分会让公开面输出多出四行而规范路径不变。
 -/
 
 /-!
