@@ -25,7 +25,7 @@ impl kernel::conformance::LedgerInspect for MemLedger { … }   // citysim 恒�
 pub fn check_chain(lines: Vec<Vec<u8>>) -> Result<(), AxError>;   // replay::verify_lines 薄封
 ```
 
-`MemLedger` 的 append 是 from_draft→canonical_line→chain_hash 推进，没有别的逻辑；它不落盘，也不采时钟（t 由执行器的计数时钟给出）。`raw_lines` 是它固有的读面：执行器的报告与字节对拍从这里读，`LedgerInspect` 的实现留给 conformance 套件。模型的 seq 是 `Nat`；Rust 的 `Seq::next` 到顶时返回错误，那一档模型不写（一本内存账走不到 2⁶⁴ 行）。
+`MemLedger` 的 append 是 from_draft→canonical_line→chain_hash 推进，没有别的逻辑；它不落盘，也不采时钟（t 由执行器的计数时钟给出）。`raw_lines` 是它固有的读面：执行器的报告与字节对拍从这里读，`LedgerInspect` 的实现留给 conformance 套件。模型的 seq 是 `Nat`；Rust 的 `Seq::next` 到顶时返回错误，那一档模型不写（一本内存账走不到 2⁶⁴ 行）。append 把每一步可失败的操作（拼行、推进 seq）放在第一次写之前，所以被拒的 draft 不动账本：行、seq、链摘要都留在原处（`an_append_past_the_last_seq_leaves_the_ledger_unchanged`）。
 
 平台：Windows、macOS、Linux 上逐字节相同，`golden_fixture_pins_cross_os_bytes` 在三个平台上判同一份夹具。
 

@@ -46,8 +46,10 @@ impl Ledger for MemLedger {
     fn append(&mut self, draft: EventDraft) -> Result<EventRef, AxError> {
         let record = EventRecord::from_draft(draft, self.next_seq, self.prev);
         let line = record.canonical_line()?;
-        self.prev = chain_hash(&line);
+        // Every fallible step comes before the first write, so a refused
+        // draft leaves the ledger as it found it.
         self.next_seq = self.next_seq.next()?;
+        self.prev = chain_hash(&line);
         self.lines.push(line);
         Ok(record.to_ref())
     }

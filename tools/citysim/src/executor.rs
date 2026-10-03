@@ -137,10 +137,19 @@ fn clock_overflow() -> AxError {
     )
 }
 
-/// The place of the next tool call in this run (citysim D20).
-fn next_place(placed: &Cell<u64>) -> Result<Seq, AxError> {
-    let at = placed.get();
-    placed.set(at.saturating_add(1));
+/// The place of the next tool call in this run (citysim D20); `None`
+/// once the last place a u64 holds has been handed out.
+///
+/// The call after that is refused, because a saturated place would give
+/// it the key of the call before and the bench would answer it as a
+/// duplicate.
+fn next_place(placed: &Cell<Option<u64>>) -> Result<Seq, AxError> {
+    let at = placed.get().ok_or_else(|| {
+        AxError::failure(AxCode::InvalidArgs, "place a tool call", "u64 overflow").with_recovery(
+            "split this scenario into shorter runs: every place a u64 counts is taken",
+        )
+    })?;
+    placed.set(at.checked_add(1));
     Ok(Seq::new(at))
 }
 
@@ -248,7 +257,7 @@ pub fn run_scenario_on(
     // so a clock reading would give two calls of one tool inside one wave
     // one key, and the second would come back deduplicated. Determinism
     // rule 7 rules a clock out of a key outright (citysim D20).
-    let placed = Cell::new(0u64);
+    let placed = Cell::new(Some(0u64));
     let mut invoke = |call: &kernel::ToolCall, t: TimeMs| {
         // Every door the call must pass is the bench's to route; the
         // simulator stays thin (`spec/Executor.lean` §8-3).
@@ -366,7 +375,7 @@ mod tests {
     /// refused rather than keyed like the one before.
     #[test]
     fn the_call_after_the_last_place_is_refused() {
-        let placed = Cell::new(u64::MAX);
+        let placed = Cell::new(Some(u64::MAX));
         assert_eq!(next_place(&placed).unwrap(), Seq::new(u64::MAX));
         let err = next_place(&placed).unwrap_err();
         assert_eq!(

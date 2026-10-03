@@ -75,9 +75,12 @@ pub fn run_scenario_on(ledger: &mut MemLedger, scenario: Scenario) -> Result<Sce
 
 ```rust
 // citysim::executor——驱动块内
-let placed = Cell::new(0u64);              // 位次：每跑一个计数器，与 accounting::worker 同形
-let key = IdemKey::derive(&run, Seq::new(at), &call.action()?);   // 动作字节：kernel::tool 唯一一份
+let placed = Cell::new(Some(0u64));        // 位次：每跑一个计数器，与 accounting::worker 同形
+let key = IdemKey::derive(&run, next_place(&placed)?, &call.action()?);   // 动作字节：kernel::tool 唯一一份
+fn next_place(placed: &Cell<Option<u64>>) -> Result<Seq, AxError>;   // 交出 u64::MAX 之后为 None，下一次 → E_INVALID_ARGS「place a tool call」
 ```
+
+模型的位次是 `Nat`，没有顶；Rust 的位次交出 `u64::MAX` 之后拒绝下一次调用，而不是饱和在顶上——饱和会让两次调用共用一把键，第二次被 bench 当作重复（`the_call_after_the_last_place_is_refused`）。
 
 **动作字节取 `ToolCall::action`**（`crates/kernel/Spec.lean` §8-23，全库唯一一份），**位次取每跑一个的计数器**，与 `accounting::worker` 同形，故两个驱动器对「一次工具调用的键怎么算」只有一份读法（D20）。
 
