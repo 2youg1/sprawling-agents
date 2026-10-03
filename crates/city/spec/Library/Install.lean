@@ -88,12 +88,13 @@ pub fn shelve_shipped(city_root: &Path,
 - **字节照原样**：表里是源树里的字节，写出与登记都不改行尾——仓库的 `.gitattributes` 让它们在三个平台的检出里都是 LF，书架上的那一份就是二进制里的那一份。
 - **一件自带 skill 的「版本」就是它的内容哈希**：没有另记的版本号。§8-28 的整包哈希回答「装下的是哪一份」；新的二进制带来不同的字节时，已有的城不被改动（D20），新城得到新的那份。
 - **何时调用**：只在新城成形时一次（`form`，它对已有历史的目录恒拒，所以对一座城至多一次）。开城不调用：书架上缺一件自带 skill，可能是 User 拿下了它（D20 被否的③）。
+- **记在账上**：`shelve_shipped` 答回每一件的 `Installed`；`form` 在第零行之后为其中每件 `Placed::Fresh` 的写一行 `skill_shelved`（kernel D23，`source = Shipped`，`digest` 是 `Installed::hash`，`addr` 缺席），按 `shelve_shipped` 答回的次序。账本在第零行之前不存在，所以行晚于落位；被拒的成形既不落行也不留历史，重来的成形里已落下的那几件答 `AlreadyShelved`、不写行——它们的这一版于是没有上架行，读者读作 `Unrecorded`（wire D33）。
 - **失败**：任一件被 §8-28 拒（例如目录里事先已有同名而内容不同的一件）即返回那条拒词，`form` 在写下账本第零行之前放 skill，于是被拒的成形不留下历史，修好之后再成形时已落下的那几件答 `AlreadyShelved`；暂存目录写不了是 `E_STORAGE_FATAL`。
 - **三个平台**：表与字节与平台无关；城库在三个平台上都是 `<city>/.sprawling/library/shipped/<name>/`；路径一律经 `Path::join` 拼。
 
 下面的模型是一座城在一条事件轨迹上的书架：成形、开城、User 拿下一件、User 改一件。证明两条，各在一条轨迹上量化：自带的每一件至多被放一次（`a_builtin_is_placed_at_most_once`）；成形之后被 User 拿下的一件，此后无论再发生什么都不回到书架上（`a_removed_builtin_is_not_put_back`）。
 
-**本节测试**：`accounting::worker::genesis::tests` 里一例：成形一座新城，扫描城库，`shipped` 格里的名字恰是包目录 `skills/` 下每件 skill 的名字，且第二次成形被拒后书架不变。
+**本节测试**：`accounting::worker::genesis::tests` 里两例：成形一座新城，扫描城库，`shipped` 格里的名字恰是包目录 `skills/` 下每件 skill 的名字，且第二次成形被拒后书架不变；成形的账上每件自带 skill 恰有一行 `skill_shelved`，摘要等于书架上那一件的整包哈希、`source` 是 `Shipped`。
 -/
 
 namespace City.Library.Shipped
