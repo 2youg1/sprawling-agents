@@ -48,12 +48,39 @@ impl OwnProcess {
         let storage = storage_bytes();
         OwnReading {
             cpu_permille,
-            private_bytes: memory.map_or(0, |stats| widen(stats.virtual_mem)),
+            private_bytes: private_bytes(memory.as_ref()),
             working_set_bytes: memory.map_or(0, |stats| widen(stats.physical_mem)),
             read_bytes: storage.read,
             written_bytes: storage.written,
         }
     }
+}
+
+/// Windows reads `PagefileUsage`, the committed private bytes; macOS
+/// reads the virtual size, which overstates them, until a safe interface
+/// reaches `phys_footprint` (`crates/sprawling/spec/Serving/Memory.lean` D43).
+#[cfg(not(target_os = "linux"))]
+fn private_bytes(memory: Option<&memory_stats::MemoryStats>) -> u64 {
+    memory.map_or(0, |stats| widen(stats.virtual_mem))
+}
+
+/// Linux sums the private lines of `/proc/self/smaps_rollup`, and reads
+/// `RssAnon` from `/proc/self/status` where the kernel has no rollup;
+/// both are plain files std reads safely (Memory.lean D43).
+#[cfg(target_os = "linux")]
+fn private_bytes(_memory: Option<&memory_stats::MemoryStats>) -> u64 {
+    let read = |path: &str| std::fs::read_to_string(path).ok();
+    read("/proc/self/smaps_rollup")
+        .and_then(|rollup| kib_sum(&rollup, &["Private_Clean:", "Private_Dirty:"]))
+        .or_else(|| read("/proc/self/status").and_then(|status| kib_sum(&status, &["RssAnon:"])))
+        .unwrap_or(0)
+}
+
+/// The sum, in bytes, of the `kB` lines named by `fields`; `None` when
+/// the text carries none of them.
+#[cfg(any(target_os = "linux", test))]
+fn kib_sum(text: &str, fields: &[&str]) -> Option<u64> {
+    None
 }
 
 /// The bytes this process has read from and written to storage.
