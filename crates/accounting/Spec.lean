@@ -123,7 +123,7 @@ import crates.accounting.spec.Worker.Workbench.Tools
 
 生产消费者是 `crates/sprawling`：装配根造 `Hands`、起写者线程与视图折叠线程，服务面与 CLI 经 §8-10、§8-11 列出的 `pub` 面读本 crate；citysim 经同一组端口驱动一次 dispatch（§3）。
 
-**常驻内存。** 本 crate 在进程里留三份随城增长、今天没有上界的工作集：视图折叠（`views`，每个 run 一份摘要，随记录数与 run 数增长）、待批项的 `sent` 表（`worker`，每个 run 一条）、playback 导出（`playback::export` 走账本是流式的，编码直接写进 bundle 的那一份缓冲、到 `BUNDLE_MAX_BYTES` 即停，但整份 `Document` 在编码之前留在内存里，§3）。冻结的 run 的记录在账本里，视图只该留它的摘要，不留它的消息与工具结果。它们的字节预算（视图 `VIEWS_RESIDENT_BYTES`）、按字节计的缓存与读回规则都写在 `crates/sprawling/spec/Serving/Memory.lean` §8-173，本 crate 照它改：视图与 `sent` 经那份缓存读回，playback 的 `Document` 改成边走边编码（§3）。三个平台上做法相同，读回走 std 的定位读。
+**常驻内存。** 本 crate 在进程里留两份今天没有上界的工作集：视图折叠（`views`，每个 run 一份摘要，随记录数与 run 数增长）与 playback 导出（`playback::export` 走账本是流式的，编码直接写进 bundle 的那一份缓冲、到 `BUNDLE_MAX_BYTES` 即停，但整份 `Document` 在编码之前留在内存里，§3）。冻结的 run 的记录在账本里，视图只该留它的摘要，不留它的消息与工具结果。它们的字节预算（视图 `VIEWS_RESIDENT_BYTES`）、按字节计的缓存与读回规则都写在 `crates/sprawling/spec/Serving/Memory.lean` §8-173，本 crate 照它改：视图经那份缓存读回（一项待批阻着的活已经在答复时从账本读回，`crates/sprawling/spec/Accounting/Worker.lean` §8-25），playback 的 `Document` 改成边走边编码（§3）。三个平台上做法相同，读回走 std 的定位读。
 -/
 
 /-! ## 5 权威信源

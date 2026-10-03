@@ -407,14 +407,13 @@ struct Governance {
     pending: BTreeMap<String, ApprovalItem>, autonomy: Autonomy,
     granted: Vec<ClusterKey>, halted: BTreeSet<kernel::event::Scope>,
     rules: BTreeMap<(kernel::event::Scope, GoverningDocument), B3Hash>, // 从 rules_changed 折；每份治理文档上次记下的摘要（§8-40）
-    sent: BTreeMap<RunId, Sent>,          // 从 run_started 折；task、goal、budget
     origins: BTreeMap<String, BlockedJob>, // 从 approval_requested 折；答复时 O(log n)
 }
 impl Governance {
-    fn sent(&mut self, RunId, task: &str, goal: &str, BudgetCap);   // 两个调用方，一个形状
     fn absorb(&mut self, EventKind, RunId, Option<&Address>, &Payload);
 }
-struct BlockedJob { addr: Address, task: String, goal: String, budget: BudgetCap }
+/// 一项待批阻着的活：提它的房间与 run。那一跑被派去做什么，答复时从它的 `run_started` 读回。
+struct BlockedJob { addr: Address, run: RunId }
 ```
 
 **三个原因，一个改动**（§8-23 留下的那一半）：
@@ -429,7 +428,9 @@ struct BlockedJob { addr: Address, task: String, goal: String, budget: BudgetCap
 
 **一个未决问题，用测试回答了**：甲案是进程内存，重启后的 worker 从账本重建，那「重启前提出、重启后才批」的项接不接得上活？答：接得上，因为 `origins` 就在 `Governance` 里，而 `Standing::fold` 对每一行调的正是 `absorb`——与 `pending` 同一折、同一遍。`what_a_worker_holds_is_what_a_restart_rebuilds` 增一条断言盯住它。
 
-**不裁剪 `sent`，写明代价**。每跑一条（两个短字串加 16 字节），与 `storage::HotView` 的墓碑同一增长级（每跑一条）。**不能按 `RunFrozen` 裁**：`freeze` 在 drive 内落账，而装配层的待批项清扫在 drive 之后，账本顺序是 `RunStarted … RunFrozen … ApprovalRequested`，按 freeze 裁会先删掉待用条目。`origins` 则在 `ApprovalResolved` 上裁，因为答过的项不再阻着任何东西。
+**进程里不留每个 run 被派去做什么，答复时从账本读回**。`origins` 只记一项待批由哪个房间、哪个 run 提出；人答「允许」时，`answer_approval` 先刷新账本旁索引，按索引从这个 run 最早的一行往后读，读到它的 `run_started` 就取出 `task` 与 `goal`，再在原房间续上这件活。读回走 `storage::LineReader` 的定位读，读到的页留在操作系统的文件缓存里，进程里不另存一份（`crates/sprawling/spec/Serving/Memory.lean` §8-173）。这个 run 的 `run_started` 不在账本里时（只有一段尾巴的历史），答复照常落账，不续活，与这项待批从来没有记下来源时相同。`origins` 在 `ApprovalResolved` 上裁，因为答过的项不再阻着任何东西。
+
+理由：一张按 run 记 `task` 与 `goal` 的表每派一跑长一条，从不裁剪，而 `task` 是人写给这一跑的整段话，长度没有上界；冻结的 run 也一直占着它。它不能按 `RunFrozen` 裁：账本次序是 `RunStarted … RunFrozen … ApprovalRequested`，装配层在 drive 之后才记下待批项。被否的做法：①照旧留这张表——随 run 数无界增长，与「冻结的 run 不留任何东西」相反；②表里只留 `run_started` 的 seq——每跑仍留一条，只是短一些；③经 `storage::resident` 缓存读回——答复是人点一下的事，频率低，一份按字节计的缓存省下的只是一次定位读，文件缓存已经替它做了。代价：一次答复多一次索引刷新与几次定位读，与这个 run 的行数无关（读到 `run_started` 即停，它在 run 的头几行里）。
 
 **读在落账之前，派活在落账之后**：`answer_approval` 先取一份 `origins`（读，不是变化），再落 `approval_resolved`（它自身就是关闭动作，`absorb` 随之丢掉 pending 与 origin），最后才派活。与 §8-24 同一条规矩。
 
@@ -755,7 +756,7 @@ the work: a halted city that laid a job file down would leave a task in a room n
 | 5 | 同上 | `city::write_brief` | 存储错 | **写：`JOB.md`** |
 | 6 | 同上 | `cas.put` | 存储错 | 写：CAS 对象（`.sprawling/` 内，内容寻址） |
 | 7 | `workbench::stand_up` | `Building::of`／`city::load`／`load_config`／`Router::select`／`adapter_for`／`Identity::load` | `E_INVALID_ARGS`／`E_CONFIG_INVALID`／`E_MODEL_UNCHOSEN`／`E_GATE_DENIED` | 否 |
-| 8 | 同上 | `run_id_for`／`governance.sent`／worktree 租约 | 存储错 | 写 |
+| 8 | 同上 | `run_id_for`／worktree 租约 | 存储错 | 写 |
 
 实测（`sprawling call` 打到一座刚 init 的城）：派活到从没立过的楼 `gamma`，得到
 `E_MODEL_UNCHOSEN「no model is chosen for this tag」`——**来自第 7 段的 `Router::select`**——

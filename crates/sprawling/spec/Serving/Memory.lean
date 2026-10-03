@@ -19,7 +19,7 @@
 | 视图折叠（`Governance`、各房间与 run 的视图） | `accounting::views` | 无；随账本折叠，每个 run 留一份摘要 | run 数、记录数 |
 | 对话窗口（`Conversation` 的 `messages` 与 `held`） | `runtime::conversation` | 模型的上下文窗口经 `runtime::compaction` 与 `runtime::offload` 压住；进程里没有按字节计的上界 | 回合数、工具结果的字节 |
 | 冻结 run 的热视图墓碑（`HotView::evicted`） | `storage::hot` | 无；每个冻结的 run 一个 `RunId` | run 数 |
-| 待批项的 `sent` 表 | `accounting::worker` | 无；每个 run 一条（两个短字串加 16 字节，`crates/sprawling/spec/Accounting/Worker.lean` 记下了这个代价） | run 数 |
+| 待批项阻着的活 | `accounting::views::governance` | 只记每项待批的房间与 run，答过即删；那一跑被派去做什么在答复时从账本读回（`crates/sprawling/spec/Accounting/Worker.lean` §8-25） | 待批项数 |
 | 账本旁索引（seq → 段与偏移） | `storage::index::ledger` | 无；每条记录一项 | 记录数 |
 | 楼规缓存（`RulesCache`） | `city::policy::cache` | 每栋读过的楼一份，按文件戳失效 | 楼数 |
 | sieve 历史（`SieveHistory`） | `runtime::sieve` | 每个 run 内每种命令一个 `Locator` | 命令种数 |
@@ -29,7 +29,7 @@
 | playback 导出 | `accounting::playback` | 走账本是流式的，编码直接写进 bundle 的那一份缓冲、到 `BUNDLE_MAX_BYTES`（32 MiB）即停；整份 `Document` 在编码之前仍在内存里（`crates/accounting/Spec.lean` §3） | 选中的记录数 |
 | doctor 扫描 | `bin::doctor` | 子进程的输出逐行读，每行至多 4 KiB，只留调用者选中的行（`doctor::asking`，`crates/sprawling/spec/Doctor.lean` §8-166 之一） | 选中的行数 |
 
-账本与 CAS 已经在盘上，所以上表里随城增长的几项（视图、墓碑、`sent`、旁索引）都可以改成「在盘上，按需读回」；它们读回时走下面的缓存模型。
+账本与 CAS 已经在盘上，所以上表里随城增长的几项（视图、墓碑、旁索引）都可以改成「在盘上，按需读回」；它们读回时走下面的缓存模型。
 
 ### 模型：一份按字节计预算的缓存
 
@@ -78,7 +78,7 @@
 ### 待做
 
 1. 内存节拍的统计：`bin::monitor::sampler` 已按 100 ms 的 `MEMORY_BEAT` 读私有字节，每秒的读数报这一秒的峰（`crates/sprawling/spec/Monitor.lean` §8-96）；p50／p99／max／高于 p50 的时长／每小时斜率还没有人算，它们由读监视帧的测量（`sprawling gauge` 或 TP1 台）在那一侧算，不在城的进程里攒一小时的点。
-2. 清点表里随城增长的四项（视图、墓碑、`sent`、旁索引）逐一改成经 `storage::resident` 读回，每一项一个上表的常量，读回用上面的定位读。
+2. 清点表里随城增长的三项（视图、墓碑、旁索引）逐一改成经 `storage::resident` 读回，每一项一个上表的常量，读回用上面的定位读。
 3. playback 导出把 `Document` 改成边走边编码，doctor 扫描按行读子进程的输出，不整份读进内存。
 4. `tools/xtask/budgets.toml` 加内存节拍与一小时斜率的两行（由那一波拥有 budgets.toml 的车道提交）。
 -/
