@@ -31,7 +31,7 @@ pub fn audit_state(content: &B3Hash, audits: &[(B3Hash, AuditVerdict, Seq)]) -> 
 
 **派生检查**（`library::audit::tests`）：一张轨迹向量表——上架、拒收、审、改、改回审过的字节、迟到的旧摘要审核、失败的取——逐行比对 `audit_state` 读出的状态与本模型 `shown` 在同一条轨迹上的答案；同一张表的每一行再各回放一遍上面的四条性质。表能咬住两种坏实现：「审核后只记布尔标志」（不看摘要）让向量表与两条已审性质变红，「把 `Unreachable` 当一条审核」让失败的取那条也变红。
 
-- **现状：`audit_state` 还没有生产调用者，D19 的审核任务也还没有实现**：它的调用者是 wire D32 的审核折叠与书架页上的审核标记，与 `InstallSkill` 的执行者同一次改动落地；D19 写的取审核（skills.sh 请求、`SKILLS_SH_TIMEOUT`、SkillSpector）与后台发起点今天在代码里都还没有，那是 D19 的意图，不是现状；在那之前它与 D4（没有生产调用者的公开面不留）不合，留着是因为折叠只读本模块的判定，不另写一份规则。
+- **现状：`audit_state` 的生产调用者是 wire D33 的使用折叠**（`accounting::views::usage` 为每格书架此刻的摘要判审核状态，技能页据此画审核标记）；**D19 的审核任务还没有实现**：D19 写的取审核（skills.sh 请求、`SKILLS_SH_TIMEOUT`、SkillSpector）与后台发起点今天在代码里都还没有，那是 D19 的意图，不是现状，所以账上今天没有 `skill_audited` 行，每件 skill 读作 `Unaudited`。
 -/
 
 /-! D19 审核状态是从账本与书架摘要读出的判定；审核由城在落位之后、对落下的那份摘要发起，不拦上架
