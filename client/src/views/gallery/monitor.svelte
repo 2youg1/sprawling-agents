@@ -33,6 +33,7 @@
     queued_runs: Math.floor(second / 60),
     view_backlog: second % 7,
     read_nanos: 1_000 + (second % 9) * 100,
+    beat_ms: 100,
   }));
 
   // Ten seconds where each counter moves by a sliver of a large value or
@@ -54,6 +55,7 @@
     queued_runs: 0,
     view_backlog: 0,
     read_nanos: 1_000,
+    beat_ms: 100,
   }));
 
   // The gallery has no city to ask, so opening the panel starts nothing.

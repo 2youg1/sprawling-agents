@@ -7194,5 +7194,13 @@
   "usage_unconfigured": {
     "en": "no building names it now",
     "zh": "现在没有楼配置它"
+  },
+  "monitor_beat": {
+    "en": "Sampling beat",
+    "zh": "采样节拍"
+  },
+  "monitor_beat_ms": {
+    "en": "{n} ms",
+    "zh": "{n} 毫秒"
   }
 }

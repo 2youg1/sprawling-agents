@@ -70,6 +70,7 @@ describe("watching the monitor", () => {
       queued_runs: 0,
       view_backlog: 0,
       read_nanos: 0,
+      beat_ms: 100,
     };
     for (let second = 0; second < 301; second += 1) {
       watching.sampled({ ...zero, queued_runs: second });

@@ -28,9 +28,23 @@
 
   import type { Sample } from "../wire";
 
+  // The beats a User picks from, in milliseconds: the city's default,
+  // finer ones for a short spike, and coarser ones for a long watch. The
+  // city takes any beat from 10 to 1000 ms (`wire::BeatMs`); this list
+  // is the page's offer, so changing it changes no rule.
+  export const BEATS = ["50", "100", "250", "500", "1000"] as const;
+  export type BeatChoice = (typeof BEATS)[number];
+
+  export function beatOf(latest: Sample | undefined): BeatChoice | null {
+    return BEATS.find((beat) => Number(beat) === latest?.beat_ms) ?? null;
+  }
+
   export interface MonitorProps {
     readonly samples: readonly Sample[];
     readonly watch: () => () => void;
+    // Sets the city's sampling beat; absent where nothing is watched
+    // live, as in the gallery.
+    readonly beat?: ((ms: number) => void) | undefined;
     // The shell draws this panel as a page; the gallery draws it as one
     // region among many, where it may not carry the page's heading.
     readonly rank?: "page" | "section" | undefined;
@@ -43,8 +57,9 @@
   import { ui } from "../ui";
 
   import Page from "./parts/page.svelte";
+  import Segmented from "./parts/segmented.svelte";
 
-  const { samples, watch, rank = "page" }: MonitorProps = $props();
+  const { samples, watch, beat, rank = "page" }: MonitorProps = $props();
 
   const { lang } = ui();
 
@@ -69,10 +84,27 @@
       .join("");
   }
 
+  const held = $derived(beatOf(samples.at(-1)));
+  const beats = $derived(BEATS.map((value) => ({ value, label: fill(say($lang, "monitor_beat_ms"), { n: value }) })));
+
   const PLOT = "col-span-full block h-10 w-full min-w-0 pt-tight @min-[40rem]:col-span-1 @min-[40rem]:pt-0";
 </script>
 
-<Page title={say($lang, "monitor_title")} {rank}>
+{#snippet beatControl()}
+  {#if beat !== undefined}
+    <span class="text-note text-text-quiet">{say($lang, "monitor_beat")}</span>
+    <Segmented
+      label={say($lang, "monitor_beat")}
+      options={beats}
+      {held}
+      onPick={(value) => {
+        beat(Number(value));
+      }}
+    />
+  {/if}
+{/snippet}
+
+<Page title={say($lang, "monitor_title")} aside={beatControl} {rank}>
 <section
   class="@container relative flex min-w-0 flex-col"
   aria-label={say($lang, "monitor_title")}

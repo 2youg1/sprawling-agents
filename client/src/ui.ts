@@ -178,7 +178,7 @@ export function ui(): Ui {
       retry: () => undefined,
       dismissRefusal: () => undefined,
       markNoticesSeen: () => undefined,
-      monitor: { samples: readable([]), watch: () => () => undefined, watchSummary: () => () => undefined },
+      monitor: { samples: readable([]), watch: () => () => undefined, watchSummary: () => () => undefined, setBeat: () => undefined },
     },
     prefs: loadPreferences(memory(), ""),
     bar: { hash: "" },

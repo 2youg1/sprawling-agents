@@ -17,6 +17,7 @@ import { writable } from "svelte/store";
 import type { Readable } from "svelte/store";
 
 import { encodeFrame } from "./frames";
+import { BeatMs } from "../wire";
 import type { Monitoring, Sample } from "../wire";
 
 // The readings kept: one a second for five minutes, the length of the
@@ -33,6 +34,9 @@ export interface Watching {
   readonly watchSummary: () => () => void;
   readonly sampled: (sample: Sample) => void;
   readonly reconnected: () => void;
+  // Asks the city to sample at this beat, in milliseconds, from now on;
+  // the city keeps it, and each reading says the beat it was taken at.
+  readonly setBeat: (ms: number) => void;
 }
 
 export function createWatching(sendText: (text: string) => boolean): Watching {
@@ -82,6 +86,9 @@ export function createWatching(sendText: (text: string) => boolean): Watching {
     },
     reconnected() {
       if (said !== "release") sendText(encodeFrame({ monitor: said }));
+    },
+    setBeat(ms) {
+      sendText(encodeFrame({ monitor: { beat: BeatMs.make(ms) } }));
     },
   };
 }

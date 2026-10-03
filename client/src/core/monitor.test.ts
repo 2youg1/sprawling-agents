@@ -30,6 +30,7 @@ const ZERO: Sample = {
   queued_runs: 0,
   view_backlog: 0,
   read_nanos: 0,
+  beat_ms: 100,
 };
 
 describe("monitor", () => {
@@ -58,6 +59,7 @@ describe("monitor", () => {
       queued_runs: 1,
       view_backlog: 0,
       read_nanos: 0,
+      beat_ms: 100,
     };
     const after: Sample = {
       ...before,

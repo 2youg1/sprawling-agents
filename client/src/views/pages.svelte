@@ -77,7 +77,7 @@
   {:else if view.kind === "welcome"}
     <Welcome step={view.step} back={backKey} />
   {:else if view.kind === "monitor"}
-    <Monitor samples={$samples} watch={u.conn.monitor.watch} />
+    <Monitor samples={$samples} watch={u.conn.monitor.watch} beat={u.conn.monitor.setBeat} />
   {:else if view.kind === "gallery"}
     <!-- The storybook and its fixture tables are a chunk of their own,
          fetched only when a person opens `#/gallery`, so the page every
