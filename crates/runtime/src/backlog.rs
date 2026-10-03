@@ -73,46 +73,6 @@ struct Table {
 }
 
 impl Backlog {
-    #[must_use]
-    pub fn new() -> Backlog {
-        Backlog::default()
-    }
-
-    /// A table whose callers block for this window before a command is
-    /// handed to the background.
-    #[must_use]
-    pub fn with_window(window: PollBudget) -> Backlog {
-        Backlog {
-            table: std::sync::Arc::default(),
-            scratch: Scratch::open(),
-            window,
-            sink: None,
-            shares: Shares::Unset,
-        }
-    }
-
-    /// The same table, handing what a command writes to `sink` while
-    /// the command is still inside its window (`crates/runtime/spec/Backlog.lean` §8-28-3).
-    #[must_use]
-    pub fn with_sink(self, sink: Sink) -> Backlog {
-        Backlog {
-            sink: Some(sink),
-            ..self
-        }
-    }
-
-    /// The same table, asking these shares for every run whose command
-    /// it starts (`crates/runtime/spec/Tools/Exec.lean` D29).
-    #[must_use]
-    pub fn with_shares(self, shares: Shares) -> Backlog {
-        Backlog { shares, ..self }
-    }
-
-    /// The shares this table asks for each run.
-    #[must_use]
-    pub fn shares(&self) -> Shares {
-        self.shares
-    }
 
     /// Starts a command, waits out the short window, and hands back
     /// either its result or a handle onto it.
@@ -399,6 +359,7 @@ impl Backlog {
 mod tests;
 
 mod cgroup;
+mod config;
 mod jobs;
 mod member;
 mod report;
