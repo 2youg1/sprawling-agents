@@ -86,10 +86,10 @@ fn counted(len: usize) -> Result<u64, AxError> {
 /// The `upper_bound` of every `prompt_shape_compared` line, in order.
 fn windows_of(lines: &[Vec<u8>]) -> Result<Vec<u64>, AxError> {
     let unreadable = |detail: String| {
-        AxError::failure(AxCode::InvalidArgs, "read a long turn's window", detail)
-            .with_recovery(
-                "the prompt_shape_compared line changed shape; read its upper bound where                  kernel::event::record::PromptShapeCompared now keeps it",
-            )
+        AxError::failure(AxCode::InvalidArgs, "read a long turn's window", detail).with_recovery(
+            "the prompt_shape_compared line changed shape; read its upper bound where \
+                 kernel::event::record::PromptShapeCompared now keeps it",
+        )
     };
     let mut windows = Vec::new();
     for line in lines {
@@ -185,7 +185,7 @@ impl Tool for Notes {
     fn invoke(&self, _call: &ToolCall) -> Result<ToolOutcome, AxError> {
         let read = self.read.fetch_add(1, Ordering::SeqCst).saturating_add(1);
         let mut map = serde_json::Map::new();
-        map.insert("text".to_owned(), Value::String(notes_at(read)));
+        map.insert("text".to_owned(), Value::String(notes_at(read)?));
         let outcome = ToolOutcome {
             result: Payload::new(map)?,
             attachments: Vec::new(),
@@ -200,17 +200,25 @@ impl Tool for Notes {
 
 /// The notes at their `read`-th reading: the step number, then letters
 /// that turn by one with every step, [`STEP_BYTES`] in all.
-fn notes_at(read: u32) -> String {
+fn notes_at(read: u32) -> Result<String, AxError> {
     let head = format!("step {read:06} ");
-    let turn = usize::try_from(read % 26).unwrap_or(0);
-    head.chars()
+    let turn = usize::try_from(read % 26).map_err(|err| {
+        AxError::failure(
+            AxCode::InvalidArgs,
+            "write a long turn's notes",
+            err.to_string(),
+        )
+        .with_recovery("run this simulator on a target whose usize holds 26")
+    })?;
+    Ok(head
+        .chars()
         .chain(
             ('a'..='z')
                 .cycle()
                 .skip(turn)
                 .take(STEP_BYTES.saturating_sub(head.len())),
         )
-        .collect()
+        .collect())
 }
 
 #[cfg(test)]

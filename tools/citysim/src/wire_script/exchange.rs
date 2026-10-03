@@ -42,7 +42,7 @@ const REDACTED: &str = "redacted";
 /// recording every exchange.
 pub struct ScriptedProvider {
     listener: TcpListener,
-    /// Where the script was read from, and is read again (§3-15).
+    /// Where the script was read from, and is read again (citysim D15).
     script: PathBuf,
     replay: Replay,
     record: Record,

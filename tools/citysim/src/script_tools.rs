@@ -9,7 +9,7 @@
 //!
 //! Specified by `tools/citysim/spec/Executor.lean` §8-2.
 
-use std::collections::{BTreeMap, VecDeque};
+use std::collections::VecDeque;
 use std::sync::Mutex;
 
 use kernel::{AxCode, AxError, Tool, ToolCall, ToolMeta, ToolOutcome};
@@ -68,46 +68,6 @@ impl Tool for ScriptTool {
     }
 }
 
-/// Name-routed set of scripted tools; the executor's dispatch face.
-pub struct ScriptToolSet {
-    tools: BTreeMap<String, ScriptTool>,
-}
-
-impl ScriptToolSet {
-    pub fn new(tools: Vec<ScriptTool>) -> Self {
-        ScriptToolSet {
-            tools: tools
-                .into_iter()
-                .map(|tool| (tool.meta.name.to_string(), tool))
-                .collect(),
-        }
-    }
-
-    pub fn empty() -> Self {
-        ScriptToolSet {
-            tools: BTreeMap::new(),
-        }
-    }
-
-    pub fn meta_of(&self, name: &str) -> Option<&ToolMeta> {
-        self.tools.get(name).map(|tool| &tool.meta)
-    }
-
-    pub fn invoke(&mut self, call: &ToolCall) -> Result<ToolOutcome, AxError> {
-        let names: Vec<String> = self.tools.keys().cloned().collect();
-        match self.tools.get_mut(call.name.as_str()) {
-            Some(tool) => tool.invoke(call),
-            None => Err(AxError::failure(
-                AxCode::ToolUnknown,
-                "invoke scripted tool",
-                call.name.to_string(),
-            )
-            .with_nearby(names)
-            .with_recovery("a tool not in the list does not exist; use a registered one")),
-        }
-    }
-}
-
 #[cfg(test)]
 #[allow(
     clippy::unwrap_used,
@@ -142,24 +102,17 @@ mod tests {
     }
 
     #[test]
-    fn routes_by_name_and_fails_closed_on_unknown() {
-        let mut set = ScriptToolSet::new(vec![ScriptTool::new(
-            meta("probe"),
-            vec![Ok(ToolOutcome {
-                result: Payload::empty(),
-                attachments: Vec::new(),
-            })],
-        )]);
-        assert!(set.invoke(&call("probe")).is_ok());
-        let err = set.invoke(&call("ghost")).unwrap_err();
-        assert_eq!(err.code(), &AxCode::ToolUnknown);
+    fn a_call_by_another_name_is_refused_with_its_own_name_nearby() {
+        let tool = ScriptTool::new(meta("probe"), vec![]);
+        let err = tool.invoke(&call("ghost")).unwrap_err();
+        assert_eq!(err.code(), &AxCode::InvalidArgs);
         assert_eq!(err.nearby(), ["probe"]);
     }
 
     #[test]
     fn exhausted_script_is_a_typed_failure() {
-        let mut set = ScriptToolSet::new(vec![ScriptTool::new(meta("probe"), vec![])]);
-        let err = set.invoke(&call("probe")).unwrap_err();
+        let tool = ScriptTool::new(meta("probe"), vec![]);
+        let err = tool.invoke(&call("probe")).unwrap_err();
         assert_eq!(err.code(), &AxCode::ToolUnavailable);
     }
 

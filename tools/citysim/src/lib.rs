@@ -40,7 +40,7 @@ pub use long_turn::{Pauses, STEP_BYTES, TurnReading, long_turn};
 pub use mem_ledger::MemLedger;
 pub use red_team::{Arm, Case, Claim, Comparison, Plant, compare};
 pub use script_model::{ScriptModel, concluding};
-pub use script_tools::{ScriptTool, ScriptToolSet};
+pub use script_tools::ScriptTool;
 pub use sieving::SieveWorld;
 pub use suite::{Half, Outcome, Report, Suite, Tally, Task};
 pub use wire_script::{ScriptedProvider, WireScript};

@@ -28,11 +28,6 @@ pub struct ScriptTool { /* meta、outcomes: Mutex<VecDeque<Result<ToolOutcome, A
 impl ScriptTool { pub fn new(meta: ToolMeta, outcomes: Vec<Result<ToolOutcome, AxError>>) -> Self; }
 impl kernel::Tool for ScriptTool { … }
                      // 名字不是自己的 → E_INVALID_ARGS＋nearby＝自己的名字；脚本耗尽或锁中毒 → E_TOOL_UNAVAILABLE
-pub struct ScriptToolSet { /* BTreeMap<String, ScriptTool> */ }
-impl ScriptToolSet { pub fn new(tools: Vec<ScriptTool>) -> Self; pub fn empty() -> Self;
-                     pub fn meta_of(&self, name: &str) -> Option<&ToolMeta>;
-                     pub fn invoke(&mut self, call: &ToolCall) -> Result<ToolOutcome, AxError>; }
-                     // 未知工具名 → E_TOOL_UNKNOWN＋nearby＝已注册名
 
 pub enum CancelPoint { BeforeAssemble { turn: u32 }, BeforeCall { turn: u32 }, BeforeWave { turn: u32 } }
 pub struct Scenario { pub run: RunId, pub who: String, pub addr: Address, pub task: String,
@@ -54,7 +49,7 @@ pub fn run_scenario_on(ledger: &mut MemLedger, scenario: Scenario) -> Result<Sce
 - `steer` 在给定回合的波边界递一句人话（`Interrupt::Steer`，说话者是 `Speaker::Person`）：它追加到下一个结果里，不打断正在进行的动作，故剧本断言循环照常继续。同一边界上取消压过 steer（`every_cancel_point_is_reached` 对任意 steer 成立）。
 - 回合数没有上限：驱动器跑到模型回空 calls 或被取消为止（`runtime::run::drive`）。
 - 一个空的剧本模型在第一次调用就什么也不说（`ScriptModel::silent`），run 以 `Completion::Limit` 冻结；一个要走到工作结尾的剧本用 `concluding` 写下它最后那句话，而不是让剧本用尽。
-- `ScriptToolSet` 今天只有它自己的测试调用：场景把 `ScriptTool` 一个一个注册进真 `ToolBench`（§8-3），按名分发归 bench。
+- 脚本工具没有自己的分发集：按名分发只有一处，是真 `ToolBench`，场景把 `ScriptTool` 一个一个注册进去（§8-3），未知工具名的 `E_TOOL_UNKNOWN` 由 bench 给出。
 - 平台：本节与 §8-3、§8-4 的行为在 Windows、macOS、Linux 上相同；单线程、计数时钟、无 I/O 等待，字节由 kernel 的规范行决定，`golden-s1` 夹具在三个平台上判同一份字节（§2）。
 -/
 

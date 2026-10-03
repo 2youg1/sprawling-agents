@@ -29,6 +29,7 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use kernel::{AxCode, AxError};
+use sprawling::monitor::spread::SUSPICIOUS_TIMES;
 
 use actions::Action;
 use actions::history::History;
@@ -64,7 +65,7 @@ fn main() -> ExitCode {
     );
     println!(
         "{} samples per action; p50/p95/p99 nearest-rank over every sample; \
-         suspicious = over 3 x p50, flagged and never removed\n",
+         suspicious = over {SUSPICIOUS_TIMES} x p50, flagged and never removed\n",
         actions::SAMPLES
     );
     match run() {
@@ -280,7 +281,7 @@ fn report(rows: &[(&str, &Action)], archive_bytes: u64) {
         })
         .collect();
     println!(
-        "  interference    suspicious samples (over 3 x p50): {}",
+        "  interference    suspicious samples (over {SUSPICIOUS_TIMES} x p50): {}",
         marks.join(" | ")
     );
 }

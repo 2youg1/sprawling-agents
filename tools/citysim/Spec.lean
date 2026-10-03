@@ -33,7 +33,7 @@ import tools.citysim.spec.WireScript.Exchange
 | `mem_ledger` | kernel Ledger 的第二适配器：全内存、确定性、conformance 的对照实现 | `spec/MemLedger.lean` |
 | `checker` | 不变量检查器：链完整且 seq 连续（`check_chain`，复用 `runtime::replay::verify_lines`） | `spec/MemLedger.lean` |
 | `script_model` | kernel Model 的第二适配器：脚本驱动的 ModelReturn 序列，确定性 | `spec/Executor.lean` |
-| `script_tools` | kernel Tool 的第二适配器：脚本工具加按名分发，全失败模式可注入 | `spec/Executor.lean` |
+| `script_tools` | kernel Tool 的第二适配器：脚本工具，全失败模式可注入；按名分发归 `ToolBench` | `spec/Executor.lean` |
 | `executor` | 薄执行器：把剧本世界（计数时钟、剧本中断、检查点网、工具台）交给 `runtime::run::drive`，驱动到 `run_frozen` | `spec/Executor.lean` |
 | `sieving` | 场景里的 `exec` 结果经筛子打包（`SieveWorld`） | `spec/Executor.lean` |
 | `red_team` | 有无验证 run 两臂的结论质量（§8-7） | `spec/RedTeam.lean` |

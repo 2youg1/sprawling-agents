@@ -3,9 +3,9 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Invariant checker, first entry: chain intact and seq contiguous
-//!. A thin veneer over runtime::replay
-//! on purpose — one verification authority, never a second one.
+//! Invariant checker, first entry: chain intact and seq contiguous.
+//! A thin veneer over `runtime::replay` on purpose: one verification
+//! authority, never a second one (citysim D16).
 //!
 //! Specified by `tools/citysim/spec/MemLedger.lean` §8-1.
 
