@@ -441,11 +441,11 @@ theorem withoutCallRegistration_strands :
 /-!
 ## 导出检查：轨迹向量与两个故意改坏的实现
 
-Rust 测试经生产入口（`RunWorker::hand_over_at_call`、子 run 的落地与 handback、`end_hand_over`）重放下面的动作序列，断言派活记录（`handed`，按 `run_started` 次序）、汇合集与关图与否等于这里的值：`crates/accounting/src/worker/waking/delegating_tests.rs` 的 `vectors` 重放 `vectorEarly` 与 `vectorCancelled`；`vectorFailed` 与 `vectorCancelled` 在 Rust 里走 `GraphAfter::Closed` 同一臂。节点 id 是子房间地址的序号；`Back.finished` 是子 run 以 Done 落地并通过 done check，`Back.stopped` 是它停下；`Ending` 是父 run 的落地结局。每条向量由 `lake build` 经 `#guard` 判定，模型改了而向量没跟上，构建就红。
+Rust 测试经生产入口（`RunWorker::hand_over_at_call`、子 run 的落地与 handback、`end_hand_over`）重放下面的动作序列，断言派活记录（`handed`，按 `run_started` 次序）、汇合集与关图与否等于这里的值：`crates/accounting/src/worker/waking/delegating_tests.rs` 的 `vectors` 重放全部四条向量。`vectorFailed` 的父 run 是一次失败的驱动，经 `GraphAfter::of` 读成 `GraphAfter::Closed`，与 `vectorCancelled` 同一臂；节点 3 的模型调用被扣到父 run 结束之后，所以落地次序是向量的次序，不是 lane 谁快。`vectorStopped` 的节点 2 以空回复落成 `Limit`，即 `Handback::Stopped`；它的末一步（节点 2 第二次落地）在生产里没有入口，一个 run 只落地一次，所以 Rust 重放前五步。节点 id 是子房间地址的序号；`Back.finished` 是子 run 以 Done 落地并通过 done check，`Back.stopped` 是它停下；`Ending` 是父 run 的落地结局。每条向量由 `lake build` 经 `#guard` 判定，模型改了而向量没跟上，构建就红。
 
-两个故意改坏的实现必须各让至少一条向量变红：
+两个故意改坏的实现必须各让至少一条向量变红，在模型里由下面的 `#guard` 判，在 Rust 里由同名测试判：Rust 测试服务到汇合数够了或已无 run 在驱动为止，所以一个什么也不派的实现让断言变红，而不是让测试挂住。
 
-- **落地才登记**（`stepRegisteringAtLanding`，即被否决的半步）：`vectorEarly`、`vectorCancelled`、`vectorFailed` 都变红，节点 2 与 3 不派（最后一条 `#guard` 判这件事）。
+- **落地才登记**（`stepRegisteringAtLanding`，即被否决的半步）：`vectorEarly`、`vectorCancelled`、`vectorFailed` 都变红，三条下都只派出节点 1，节点 2 与 3 不派（紧跟四条向量之后的那条 `#guard` 判这件事）。
 - **关图不挡**（`stepIgnoringEnding`）：`hand_down_what_is_ready` 不看父 run 的结局（`holds`），`vectorCancelled` 与 `vectorFailed` 变红，节点 4 被派出。
 
 `vectorStopped` 记下 `crates/collab/Spec.lean` §3 那个未定的问题：停下的子节点投了 handback 却不汇合，图永远开着、节点 4 永远不派；要改这条，先改模型。
@@ -478,7 +478,7 @@ def vectorStopped : List Act :=
 #guard run Room.empty vectorStopped ==
   ⟨diamond, .live, [1, 2, 3], [1, 3], [1, 2, 3]⟩
 #guard [vectorEarly, vectorCancelled, vectorFailed].all fun v =>
-  (v.foldl stepRegisteringAtLanding Room.empty).handed != (run Room.empty v).handed
+  (v.foldl stepRegisteringAtLanding Room.empty).handed == [1]
 
 /-- 第二个改坏的实现：父 run 的结局不关图。 -/
 def stepIgnoringEnding (r : Room) : Act → Room

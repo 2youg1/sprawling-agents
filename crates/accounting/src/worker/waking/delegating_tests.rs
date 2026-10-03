@@ -116,7 +116,7 @@ fn a_delegated_child_starts_before_its_parent_freezes() {
 /// the children as real runs that land and hand back.
 mod vectors {
     use std::collections::BTreeSet;
-    use std::sync::{Arc, Mutex};
+    use std::sync::{Arc, Condvar, Mutex};
 
     use super::super::super::*;
     use crate::worker::fixture::*;
@@ -152,19 +152,29 @@ mod vectors {
     }
 
     /// A city with the building, a worker whose provider ends every node
-    /// Done, and the parent's graph laid out on its desks and handed to
-    /// the city the way a call is: `hand_over_at_call`.
-    fn laid_out(dir: &std::path::Path) -> (RunWorker, std::path::PathBuf, Box<dyn std::any::Any>) {
+    /// Done except those named in `stopping`, whose empty reply ends them
+    /// Limit and so hands back `Handback::Stopped`, every model call
+    /// passed through `pace` first, and the parent's graph laid out on
+    /// its desks and handed to the city the way a call is:
+    /// `hand_over_at_call`.
+    fn laid_out(
+        dir: &std::path::Path,
+        stopping: &[&str],
+        pace: Pace,
+    ) -> (RunWorker, std::path::PathBuf, Box<dyn std::any::Any>) {
         let report = crate::worker::fixture::init_city(dir).unwrap();
-        let routes = ["n1", "n2", "n3", "n4"]
-            .map(|id| (format!("{id} is checked"), vec![completion("done", None)]));
-        let (base_url, provider) = fake_openai_routed(
+        let routes = ["n1", "n2", "n3", "n4"].map(|id| {
+            let reply = if stopping.contains(&id) { "" } else { "done" };
+            (format!("{id} is checked"), vec![completion(reply, None)])
+        });
+        let (base_url, provider) = fake_openai_paced(
             &["m-local"],
             routes
                 .iter()
                 .map(|(key, replies)| (key.as_str(), replies.clone()))
                 .collect(),
             vec![completion("done", None)],
+            pace,
         );
         let mut worker = worker_with_provider(dir, &base_url, "m-local").unwrap();
         worker
@@ -216,6 +226,53 @@ mod vectors {
             .collect()
     }
 
+    /// A pace that lets every model call through.
+    fn unpaced() -> Pace {
+        Arc::new(|_: &str| {})
+    }
+
+    /// Opened once by the test; until then a held model call waits.
+    type Gate = Arc<(Mutex<bool>, Condvar)>;
+
+    /// A pace that holds every model call naming `key` until `gate`
+    /// opens, so the node's landing follows a step the test takes
+    /// rather than whichever lane is faster.
+    fn holding(key: &'static str, gate: &Gate) -> Pace {
+        let gate = Arc::clone(gate);
+        Arc::new(move |request: &str| {
+            if !request.contains(key) {
+                return;
+            }
+            let (opened, opening) = &*gate;
+            drop(
+                opening
+                    .wait_timeout_while(
+                        opened.lock().unwrap(),
+                        std::time::Duration::from_secs(10),
+                        |opened| !*opened,
+                    )
+                    .unwrap(),
+            );
+        })
+    }
+
+    fn open(gate: &Gate) {
+        *gate.0.lock().unwrap() = true;
+        gate.1.notify_all();
+    }
+
+    /// How many handbacks reached the parent's room: the model's `backs`,
+    /// which counts a stopped node as well as a finished one.
+    fn handed_back(ledger_dir: &std::path::Path) -> usize {
+        runtime::replay::verify_ledger_dir(ledger_dir)
+            .unwrap()
+            .raw_lines()
+            .iter()
+            .filter_map(|line| serde_json::from_slice::<serde_json::Value>(line).ok())
+            .filter(|line| line["kind"] == "signal_enqueued" && line["addr"] == PARENT)
+            .count()
+    }
+
     fn joined(worker: &RunWorker) -> usize {
         worker
             .collaborating
@@ -224,9 +281,11 @@ mod vectors {
             .map_or(0, |join| join.artifacts().count())
     }
 
-    /// Serves the crossing until `count` nodes have joined.
+    /// Serves the crossing until `count` nodes have joined, or until no
+    /// run is left driving, so an implementation that hands nothing down
+    /// fails the test's assertions instead of hanging it.
     fn until_joined(worker: &mut RunWorker, count: usize) {
-        while joined(worker) < count {
+        while joined(worker) < count && worker.driving() {
             worker
                 .serve_flight(crate::worker::relay::Patience::Unbounded)
                 .unwrap();
@@ -238,7 +297,7 @@ mod vectors {
     #[test]
     fn vector_early_hands_every_node_once_in_dependency_order() {
         let dir = tempfile::tempdir().unwrap();
-        let (mut worker, ledger, _provider) = laid_out(dir.path());
+        let (mut worker, ledger, _provider) = laid_out(dir.path(), &[], unpaced());
         worker.land_the_rest().unwrap();
         worker.end_hand_over(RunId::CITY, GraphAfter::Open).unwrap();
         let order = handed(&ledger);
@@ -263,7 +322,7 @@ mod vectors {
     #[test]
     fn vector_cancelled_hands_nothing_after_the_parent_ends() {
         let dir = tempfile::tempdir().unwrap();
-        let (mut worker, ledger, _provider) = laid_out(dir.path());
+        let (mut worker, ledger, _provider) = laid_out(dir.path(), &[], unpaced());
         until_joined(&mut worker, 1);
         worker
             .end_hand_over(RunId::CITY, GraphAfter::Closed)
@@ -287,6 +346,76 @@ mod vectors {
                 .collaborating
                 .workshops
                 .contains_key(&Address::parse(PARENT).unwrap())
+        );
+    }
+
+    /// `vectorFailed`: 1 and 2 land, the parent fails, and 3, still in
+    /// flight, hands back after it, so 4 is never handed down. Node 3's
+    /// model call is held until the parent has ended, which makes the
+    /// order the vector's rather than the lanes'.
+    #[test]
+    fn vector_failed_hands_nothing_after_the_parent_fails() {
+        let dir = tempfile::tempdir().unwrap();
+        let gate = Gate::default();
+        let (mut worker, ledger, _provider) =
+            laid_out(dir.path(), &[], holding("n3 is checked", &gate));
+        until_joined(&mut worker, 2);
+        let failed =
+            Err(
+                kernel::AxError::failure(kernel::AxCode::Provider, "drive the parent", PARENT)
+                    .with_recovery("none: the parent stands in for a failed drive"),
+            );
+        worker
+            .end_hand_over(RunId::CITY, GraphAfter::of(&failed))
+            .unwrap();
+        open(&gate);
+        worker.land_the_rest().unwrap();
+        let order = handed(&ledger);
+        assert_eq!(order.len(), 3, "{order:?}");
+        assert_eq!(order[0], "lab/n1");
+        assert_eq!(
+            order[1..].iter().cloned().collect::<BTreeSet<_>>(),
+            ["lab/n2".to_owned(), "lab/n3".to_owned()].into()
+        );
+        assert_eq!(joined(&worker), 3, "a node in flight still hands back");
+        assert!(
+            !worker
+                .collaborating
+                .workshops
+                .contains_key(&Address::parse(PARENT).unwrap())
+        );
+    }
+
+    /// `vectorStopped`: the parent ends Limit first, which leaves the
+    /// graph open; 1 finishes, 2 stops, 3 finishes. All three hand back,
+    /// but the stopped node does not join, so 4 never becomes ready and
+    /// the graph stays registered for a join that cannot come. This is
+    /// the behaviour the model states while the open question of
+    /// `crates/collab/Spec.lean` §3, what a stopped node does to its
+    /// graph, stands; settling it changes the model first and this test
+    /// with it. The model's last act, a second landing of 2, has no
+    /// production door: a run lands once.
+    #[test]
+    fn vector_stopped_leaves_the_graph_open_and_hands_no_more() {
+        let dir = tempfile::tempdir().unwrap();
+        let (mut worker, ledger, _provider) = laid_out(dir.path(), &["n2"], unpaced());
+        worker.end_hand_over(RunId::CITY, GraphAfter::Open).unwrap();
+        worker.land_the_rest().unwrap();
+        let order = handed(&ledger);
+        assert_eq!(order.len(), 3, "{order:?}");
+        assert_eq!(order[0], "lab/n1");
+        assert_eq!(
+            order[1..].iter().cloned().collect::<BTreeSet<_>>(),
+            ["lab/n2".to_owned(), "lab/n3".to_owned()].into()
+        );
+        assert_eq!(handed_back(&ledger), 3, "the stopped node hands back too");
+        assert_eq!(joined(&worker), 2, "only 1 and 3 join");
+        assert!(
+            worker
+                .collaborating
+                .workshops
+                .contains_key(&Address::parse(PARENT).unwrap()),
+            "the graph stays open"
         );
     }
 }
