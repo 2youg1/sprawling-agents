@@ -59,6 +59,7 @@ mod scanning;
 mod sessions;
 mod skills;
 mod toolkits;
+mod usage;
 
 pub use automation::{AutomationAnswer, Cadence, ScheduledJob, WatchedSource};
 pub use building::{ArchiveLine, BlockedLine, BuildingAnswer, BuildingDoc};
@@ -107,6 +108,11 @@ pub use scanning::{DoctorDrive, DoctorExclusion, DoctorScanning, DoctorUntold};
 pub use sessions::{SESSION_PREVIEW_MAX, SESSIONS_MAX, SessionLine, SessionStart, SessionsAnswer};
 pub use skills::{SkillLine, SkillShelf, SkillsAnswer};
 pub use toolkits::{Standing, ToolkitLine, ToolkitsAnswer};
+pub use usage::{
+    DayCount, ExportFormat, HeldSkill, McpServerUsage, McpToolUsage, McpUsageAnswer, McpUse,
+};
+pub use usage::{SkillAudit, SkillUsageAnswer, SkillUsageLine, SkillUse, SkillVersion};
+pub use usage::{UsageExportAnswer, UsageKind, UseOutcome};
 
 /// What moved between two checkpoints, one row per file, path order.
 ///
@@ -226,6 +232,9 @@ pub enum Answer {
     Skills(Box<SkillsAnswer>),
     GitStatus(Box<GitStatusAnswer>),
     McpHealth(Box<McpHealthAnswer>),
+    SkillUsage(Box<SkillUsageAnswer>),
+    McpUsage(Box<McpUsageAnswer>),
+    UsageExport(Box<UsageExportAnswer>),
     Toolkits(Box<ToolkitsAnswer>),
     Release(Box<ReleaseAnswer>),
     Preferences(Box<PreferencesAnswer>),

@@ -117,6 +117,8 @@ pub enum Prepared {
     McpHealth { live: LiveAsk, addr: Address },
     /// The broker's shelf, read after the snapshot is let go.
     Toolkits(LiveAsk),
+    /// The skill and tool server usage, folded from the whole ledger.
+    Usage(super::usage::UsageAsk),
     /// The vital signs: every figure the fold holds, and the building
     /// count, which only the directory can give, still to read.
     Metrics {
@@ -267,8 +269,7 @@ impl Prepared {
                 Some(summary) => wire::Answer::Run(Some(Box::new(summary))),
                 None => unavailable(format!("RunView({run})")),
             },
-            // A settings file that cannot be read is "I could not
-            // look", not an empty set of preferences.
+            // An unreadable settings file is not an empty one.
             Self::Preferences => match crate::person::read() {
                 Ok(settled) => wire::Answer::Preferences(Box::new(settled)),
                 Err(_) => unavailable("Preferences".to_owned()),
@@ -280,15 +281,13 @@ impl Prepared {
             Self::GithubLogin { ask, host } => {
                 super::answering::github::github_answer(ask, host.as_deref())
             }
-            // A file that does not read is "I could not look", not a
-            // guide at its start that the next write would put over it.
+            // An unreadable file is not a guide the next write would reset.
             Self::Guide(city_root) => match crate::guide::read(&city_root) {
                 Ok(progress) => wire::Answer::Guide(progress),
                 Err(_) => unavailable("Guide".to_owned()),
             },
-            // A ladder that cannot be read is "I could not look": the
-            // files are the person's own and the page says so rather
-            // than drawing figures nothing on disk states.
+            // A ladder that cannot be read is "I could not look", not
+            // figures nothing on disk states.
             Self::Config { city_root, addr } => match config_answer(&city_root, &addr) {
                 Ok(answer) => wire::Answer::Config(Box::new(answer)),
                 Err(_) => unavailable(format!("Config({})", addr.as_str())),
@@ -384,6 +383,7 @@ impl Prepared {
                 wire::Answer::McpHealth(Box::new(live.mcp_health_answer(&addr)))
             }
             Self::Toolkits(live) => wire::Answer::Toolkits(Box::new(live.toolkits_answer())),
+            Self::Usage(ask) => ask.answer(),
             // A count that cannot be expressed is reported as the largest
             // count this wire can carry, for the reason every figure of
             // `Views::metrics` is.

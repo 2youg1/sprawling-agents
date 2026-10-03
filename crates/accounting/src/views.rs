@@ -58,6 +58,7 @@ mod standing_tests;
 #[cfg(test)]
 mod tests;
 pub mod toolkits;
+pub mod usage;
 pub mod versions;
 
 pub use asking::ask;

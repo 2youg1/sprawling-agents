@@ -29,6 +29,8 @@ use kernel::UsdMicros;
 
 use super::holding::Views;
 use super::prepared::{LedgerAsk, LiveAsk, Prepared, unavailable};
+use super::usage::UsageAsk;
+use super::usage::UsageQuestion::{self, Export, Mcp, Skills};
 
 pub(crate) mod automation;
 pub(crate) mod github;
@@ -103,6 +105,15 @@ impl Views {
             city_root: self.city_root.clone(),
             index: std::sync::Arc::clone(&self.index),
         }
+    }
+
+    /// The usage questions, answered from the whole ledger once the
+    /// snapshot is let go (accounting D49).
+    fn usage_ask(&self, question: UsageQuestion) -> Prepared {
+        Prepared::Usage(UsageAsk {
+            ledger: self.ledger_ask(),
+            question,
+        })
     }
 
     /// What a read of now needs, copied out of the snapshot.
@@ -289,6 +300,11 @@ impl Views {
                 };
             }
             wire::Query::Toolkits => return Prepared::Toolkits(self.live_ask()),
+            wire::Query::SkillUsage { skill } => return self.usage_ask(Skills(skill.clone())),
+            wire::Query::McpUsage { server } => return self.usage_ask(Mcp(server.clone())),
+            wire::Query::UsageExport { what, format } => {
+                return self.usage_ask(Export(*what, *format));
+            }
             wire::Query::NewestRelease => return Prepared::Release(self.reach.registry),
             wire::Query::UpstreamVersion { item } => return self.upstream_of(item),
             wire::Query::BuildingView { addr } => {

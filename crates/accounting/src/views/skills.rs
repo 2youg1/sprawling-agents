@@ -109,7 +109,7 @@ fn pinned_by(pins: &SkillPins, name: &str, hash: &B3Hash) -> Vec<RunId> {
 /// it was reading, so nothing here derives a shelf from a path - a
 /// derivation that could only be right about the shelves that happen to
 /// sit in different places.
-fn shelf_of(shelf: &city::Shelf) -> wire::SkillShelf {
+pub(super) fn shelf_of(shelf: &city::Shelf) -> wire::SkillShelf {
     match shelf {
         city::Shelf::Library(addr) => wire::SkillShelf::Library(addr.clone()),
         city::Shelf::Building(addr) => wire::SkillShelf::Building(addr.clone()),

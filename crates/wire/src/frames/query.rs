@@ -390,6 +390,27 @@ pub enum Query {
     UpstreamVersion {
         item: String,
     },
+    /// Every skill on a shelf and every skill the ledger saw used: its
+    /// contents, its audit, and every use, by day
+    /// (`crates/wire/spec/Reading.lean` D28, D33). `skill` narrows the
+    /// answer to one name.
+    ///
+    /// Folded from the whole ledger at the moment of asking, so a page
+    /// asks it when the skill page opens, never on a timer.
+    SkillUsage {
+        skill: Option<String>,
+    },
+    /// The same table per tool server and tool; `server` narrows it to
+    /// one server.
+    McpUsage {
+        server: Option<String>,
+    },
+    /// Every use of a skill or of a tool server as one row, written as
+    /// JSONL or CSV for the User to download; the city writes no file.
+    UsageExport {
+        what: crate::UsageKind,
+        format: crate::ExportFormat,
+    },
 }
 
 /// The Query surface, in declaration order — the order the handshake
