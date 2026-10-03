@@ -403,12 +403,12 @@ pub enum ReplyEnd { Reply, Timeout, Left }
 
 ```rust
 pub enum HandbackNote {
-    Finished { verified_by: String, session: RunId },
-    Stopped { because: String, session: RunId },
+    Finished { verified_by: String },
+    Stopped { because: String },
 }
 ```
 
-**决定**：交接的标记由 collab 写在 signal 载荷里（`handback` 标签，collab `Handback::signal`），唯一的逆读是 `collab::Handback::from_signal`。rounds 折叠在 D36 配上 `signal_enqueued` 之后，用这个逆读读那条 signal：是交接就填 `Arrived.handback`，不是就 `None`。`session` 是那一行 `signal_enqueued` 的 run——派活台把交接记在子会话的 run 下（`accounting::worker::dispatching::handback`）。`said` 仍是载荷的 `text`。
+**决定**：交接的标记由 collab 写在 signal 载荷里（`handback` 标签，collab `Handback::signal`），唯一的逆读是 `collab::Handback::from_signal`。rounds 折叠在 D36 配上 `signal_enqueued` 之后，用这个逆读读那条 signal：是交接就填 `Arrived.handback`，不是就 `None`。是哪一次会话由 `Arrived.session` 说（D43）：派活台把交接记在子会话的 run 下（`accounting::worker::dispatching::handback`），所以它就是子会话。`said` 仍是载荷的 `text`。
 
 **理由**：父会话收到的交接原来与普通一句话没有区别；完成与停下、谁验的、为什么停，是父会话接下来要做什么的依据。
 
@@ -449,4 +449,55 @@ D36 至 D39 与本版其他改形同一次 `WIRE_V` 进位（D22）：51 → 52�
 **重开参数**：`source` 的整套文法（信封属性）也要在 wire 里读回时，把 `from_recorded` 的解析整体移进 kernel。
 
 **三个平台**：只有字符串比较，Windows、macOS、Linux 相同。
+-/
+
+/-! D42 一次 `send` 调用带上它那封信落在哪里
+
+```rust
+pub struct Call {
+    // …既有字段…
+    #[serde(default)]
+    pub landing: Option<kernel::event::record::Landing>,   // delivered｜queued｜knocked；配不上为 None
+}
+```
+
+**决定**：rounds 折叠（`accounting::views::rounds::paired`）在同一会话的行里配三样：`signal` 工具的一次 `send` 调用（`tool_called` 的 `name` 是 `signal`、`args.action` 是 `send`），它答复之前、同一个 run 写下的 `signal_enqueued`（收信房间与调用参数的 `to` 相同、还没配过的那一次调用里最早的一个），以及按 `SignalId` 配上的 `signal_landed`（kernel `spec/Event/Record.lean` D38；三条投递路径都把这一行记在发信 run 下，所以它就在同一会话的窗口里）。三样都配上，`landing` 照录那一行的三臂；`delegate` 与别的工具恒为 `None`。kernel 的 `Landing` 直接上线（它的三臂是线上的拼法），不在 wire 另立一个同形的枚举。
+
+`None` 有三种来由，页面都画工具自己答的东西（`send` 答的 `delivered` 与同步时的 `waiting`），不猜：这一行出现之前写下的账本（「没有记下」），落点行落在窗口外，以及调用还没答复、信还没投。
+
+**理由**：工具答复的那一刻还不知道信落在哪里（collab D17），页面要在发信那一行上画「投进正在跑的 run」「排队」「敲门开了新 run」，就要读投递那一刻写下的那一行；按 `SignalId` 配，与 D36 配到达的话是同一个键。
+
+**被否**：①页面自己拉 `signal_landed` 再配：浏览器里多一份配对规则；②按调用与信在窗口里的先后位置配：同一个回合并行的两次 `send` 会配错，按收信房间配才说得清是哪一次。
+
+**重开参数**：一次调用可以发出几封信（广播）时，`landing` 改成一张按收信房间的表。
+
+**三个平台**：只读账本、只折叠，Windows、macOS、Linux 相同。
+-/
+
+/-! D43 一条到达的信说出它的种类与发信的那一次会话
+
+```rust
+pub enum Note {
+    // …
+    Arrived {
+        // …D36 的字段…
+        kind: Option<SignalKind>,   // 配上的 signal_enqueued 的种类；steer 与配不上为 None
+        session: Option<RunId>,     // 配上的 signal_enqueued 记在哪个 run 下；steer 与配不上为 None
+    },
+}
+pub enum HandbackNote {
+    Finished { verified_by: String },
+    Stopped { because: String },
+}
+```
+
+**决定**：rounds 折叠在 D36 配上 `signal_enqueued` 之后，从那一行再读两样：信的种类（collab `Signal::kind`，线上是种类表的那个词）与那一行的 `run`，也就是发信的那一次会话（relay 路径是调用 `send` 的 run，交接是落地的子 run，落定投递是正在落定的 run，kernel D38）。交接的会话就是这个 `session`，所以 `HandbackNote` 不再另带 `session`：同一个事实只有 `Arrived.session` 一个家。steer 自带说话人（D36、D41），不是一封信，两样都为 `None`；配不上时也为 `None`，页面写「信」并链到发信房间，不猜会话。
+
+**理由**：信件卡原来只能写「信」、只能链到发信的房间（client D86 的重开参数）：线上没有种类，也没有发信 run。两样都在 `signal_enqueued` 那一行上，读面配那一行时一起读出，不多一次读盘。
+
+**被否**：①从 `SignalId` 的字面解析出发信 run：id 的拼法是 collab 的铸造约定（D36 被否①）；②`HandbackNote` 保留 `session` 与 `Arrived.session` 并存：两份拷贝今天相同，但没有东西把它们绑在一起。
+
+**三个平台**：相同。
+
+D42、D43 与本波其他改形同一次 `WIRE_V` 进位（D22）。
 -/
