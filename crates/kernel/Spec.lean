@@ -96,7 +96,7 @@ kernel 是纯判定函数层：只吃入参吐 verdict，零内部 crate 依赖�
 
 分部里的定理是模型对性质的证明：
 
-- `spec/Event/Kind.lean`：`EventKind` 的每个种类恰落在一个窗类里（`EventKind.windowClass` 是穷尽的定义），入窗的恰是那九种（`the_in_window_kinds`）；名册完整、无重复（`EventKind.all_complete`、`EventKind.all_nodup`）。
+- `spec/Event/Kind.lean`：`EventKind` 的每个种类恰落在一个窗类里（`EventKind.windowClass` 是穷尽的定义），入窗的恰是那十种（`the_in_window_kinds`）；名册完整、无重复（`EventKind.all_complete`、`EventKind.all_nodup`）。
 - `spec/Error.lean`：每个码恰有一个 carrier（`AxCode.carrier` 是穷尽的定义），装载期白名单恰是那七个码（`the_loadtime_whitelist_is_closed`），门的码都由 `gate_denied` 携带；只要拼写是单射，每个码的拼写读回它自己（`parse_inverts_as_str`），单射去掉即有反例（`a_shared_spelling_loses_a_code`）；不论构造器按什么次序调用，「不是 `Yes` 却带等待」拼不出来（`no_order_of_calls_waits_without_retrying`）。
 - `spec/Event.lean`：`ig` 不藏认得的种类，一行被跳过当且仅当它的种类未知且写方标了 `ig`（`a_line_is_skipped_exactly_when_unknown_and_marked`）；有时刻的行恰是那四种之一且时刻就是信封的 `t`，早于时刻版本的行没有时刻；`Seq::next` 恒加一。
 - `spec/Ledger.lean`：被覆盖的行决定声索，单射时声索决定被覆盖的行，最后一行不被链证明，追加一行不动已欠的声索。
@@ -120,7 +120,7 @@ kernel 是纯判定函数层：只吃入参吐 verdict，零内部 crate 依赖�
 7. **存储写失败码**：装载期码 `E_STORAGE_FATAL` 承载 Ledger append 等存储写失败；与 `E_CAS_CORRUPT`（读到的对象不可信）分立，recovery 相反。
 8. **深度上限在构造点**：读侧 `parse_line` 走 serde_json，递归上限 128 在第 128 层容器处拒绝，故一行最多 127 层，其中信封（`EventRecord` 这个对象）占 1 层；于是 `Payload::new` 与其 `Deserialize` 双侧拒绝嵌套超过 `PAYLOAD_DEPTH_MAX`＝126 层的载荷（载荷自身的对象算第 1 层），码 `E_INVALID_ARGS`，recovery 是把正文存进 CAS、载荷只带它的 locator。模型给的工具参数（`ToolCalled.args`）与工具结果（`ToolAnswer`）原样进 `data`，所以写得进却读不回的一行会让整条链重放失败；拒在写侧，读侧永远读得动自己写下的东西。浮点与深度在同一趟迭代遍历里判，只用一个 `(值, 层数)` 栈：不递归，所以敌意载荷耗不掉写方的栈；一个载荷只分配这一次，落选的是两趟分开的遍历（深度一趟、浮点一趟递归），它每层、每个节点各分配一个 `Vec`，在 dev 构建上对同一份两百来个节点的载荷交错计时，慢三倍多（每次约 58 µs 对 17 µs）。
 9. **没有写方的 kind 不定型**：`credential_lent`、`backpressure_shed`、`digest_invalidated` 在 `EventKind` 里有名字，但本树没有任何写方。结构体要以写方的字节为准（record 模块规则 1），没有写方就没有可对齐的字节，故它们留在 `record` 之外；哪天出现写方，它的第一版就经 `Payload::of` 写，结构体随之落在 `record` 下。
-10. **V0.0.9 的事件增改已定形、尚未进枚举**：`run_policy_changed`（D21，入窗）、`session_named`（D22，record-only）、`skill_audited`（D23，record-only）三个种类，`tool_result.took_us` 与 `model_returned.first_us`／`took_us` 三把可缺席的键（D20），以及写方挪动的 `asset_archived`（D24）。它们的形状写在各条决定里；变体还不在 `inductive EventKind` 里，因为 `specalign` 逐变体对账，先加 Lean 一侧会让门变红。实现它们的变更集同时改 Rust 枚举、`spec/Event/Kind.lean` 的那几臂、golden 与 docnum，届时删去本条。另有四项留着位置，形状由各自的设计定：信号与派活发出即生效（roadmap TP3，含同步发信的等待回信动作）、只读工具不在执行前等落盘（TF1）、检查点不再全城排队（TF4）、账本线程只做账（TP4）；它们若要新种类或新键，写成本分部的下一条决定。
+10. **V0.0.9 留着位置的四项**：信号与派活发出即生效（roadmap TP3，含同步发信的等待回信动作）、只读工具不在执行前等落盘（TF1）、检查点不再全城排队（TF4）、账本线程只做账（TP4）；它们若要新种类或新键，写成 `spec/Event/Record.lean` 的下一条决定。`run_policy_changed` 已入枚举而没有读者：正在跑的 run 在安全点读它、追加那一句说明、按新策略过门，由 roadmap A15 的门一侧实现（D21）；`skill_audited` 已入枚举而没有写方，写方是 skill 上架时的审核（D23）。
 
 模型自己的假设写在各分部的定理假设里，不写成公理：拼写函数（`spec/Error.lean`）、受保护的段名与 ASCII 折叠（`spec/Address.lean`）、布局的目录名与文件名（`spec/Layout.lean`）、`EVENT_LOG_V` 与首版本（`spec/ConstsExternal.lean`）、`u64` 的上界（`spec/Event.lean`、`spec/Backpressure.lean`）都是参数，它们的值只住 Rust；摘要函数是单射这一条写在 `spec/Ledger.lean` 的定理假设里。
 -/

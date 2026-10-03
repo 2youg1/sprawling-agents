@@ -95,6 +95,9 @@ pub fn outcome_unknown_draft(call: &EventRecord, t: TimeMs) -> Result<EventDraft
         tool_use_id: called.id.clone(),
         name: called.name.clone(),
         answer,
+        // The call's own end was never seen: this answer is the city's
+        // verdict at reopening, so no duration belongs to it.
+        took_us: None,
     })?;
     Ok(EventDraft {
         run: call.run(),

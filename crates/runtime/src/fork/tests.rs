@@ -103,6 +103,8 @@ fn mother_drafts() -> Vec<EventDraft> {
                 stop: None,
                 billed_usd_micros: None,
                 first_at: None,
+                first_us: None,
+                took_us: None,
             })
             .unwrap(),
         ),
@@ -131,6 +133,7 @@ fn mother_drafts() -> Vec<EventDraft> {
                     )
                     .unwrap(),
                 },
+                took_us: None,
             })
             .unwrap(),
         ),
@@ -294,6 +297,8 @@ fn a_branch_of_a_branch_keeps_the_grandmother_conversation() {
             stop: None,
             billed_usd_micros: None,
             first_at: None,
+            first_us: None,
+            took_us: None,
         })
         .unwrap(),
     )));

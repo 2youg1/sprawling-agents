@@ -28,7 +28,10 @@ impl EventKind {
             | EventKind::ResultOffloaded
             | EventKind::SteerReceived
             | EventKind::SignalConsumed
-            | EventKind::AdviserAnswered => WindowClass::InWindow,
+            | EventKind::AdviserAnswered
+            // The run under way appends one sentence about the new policy
+            // to its next message, so the line decides request bytes.
+            | EventKind::RunPolicyChanged => WindowClass::InWindow,
             EventKind::CityInitialized
             | EventKind::BuildingCreated
             | EventKind::BuildingConfigured
@@ -132,7 +135,11 @@ impl EventKind {
             | EventKind::DocumentWritten
             | EventKind::ProposalOffered
             | EventKind::ProposalDecided
-            | EventKind::ProposalWithdrawn => WindowClass::RecordOnly,
+            | EventKind::ProposalWithdrawn
+            // A session's name is what a page shows, and an audit is what
+            // an auditor said about a skill; neither reaches a request.
+            | EventKind::SessionNamed
+            | EventKind::SkillAudited => WindowClass::RecordOnly,
         }
     }
 }

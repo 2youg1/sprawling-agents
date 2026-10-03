@@ -227,12 +227,21 @@ pub enum EventKind {
     ProposalDecided,
     /// The run that offered a card took it back while it was open.
     ProposalWithdrawn,
+
+    // Sessions and the shelf (3).
+    /// The room's run policy, changed while a session is open
+    /// (`crates/kernel/spec/Event/Record.lean` D21).
+    RunPolicyChanged,
+    /// The name a person gave one session (D22).
+    SessionNamed,
+    /// One audit of one version of a skill on the shelf (D23).
+    SkillAudited,
 }
 
 impl EventKind {
     /// Every kind, in the order the SPEC table lists them. Data face for counting tests
     /// and `xtask specalign`.
-    pub const ALL: [EventKind; 89] = [
+    pub const ALL: [EventKind; 92] = [
         EventKind::CityInitialized,
         EventKind::BuildingCreated,
         EventKind::BuildingConfigured,
@@ -322,6 +331,9 @@ impl EventKind {
         EventKind::ProposalOffered,
         EventKind::ProposalDecided,
         EventKind::ProposalWithdrawn,
+        EventKind::RunPolicyChanged,
+        EventKind::SessionNamed,
+        EventKind::SkillAudited,
     ];
 }
 

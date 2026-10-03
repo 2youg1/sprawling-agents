@@ -193,7 +193,10 @@ impl SessionOrigins {
             | EventKind::DocumentWritten
             | EventKind::ProposalOffered
             | EventKind::ProposalDecided
-            | EventKind::ProposalWithdrawn => Ok(()),
+            | EventKind::ProposalWithdrawn
+            | EventKind::RunPolicyChanged
+            | EventKind::SessionNamed
+            | EventKind::SkillAudited => Ok(()),
         }
     }
 

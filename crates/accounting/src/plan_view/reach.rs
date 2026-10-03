@@ -126,7 +126,12 @@ pub(super) fn may_move_plan(kind: EventKind) -> PlanReach {
         | EventKind::DocumentWritten
         | EventKind::ProposalOffered
         | EventKind::ProposalDecided
-        | EventKind::ProposalWithdrawn => PlanReach::Untouched,
+        | EventKind::ProposalWithdrawn
+        // A run's policy, a session's name and a skill's audit move no
+        // plan row.
+        | EventKind::RunPolicyChanged
+        | EventKind::SessionNamed
+        | EventKind::SkillAudited => PlanReach::Untouched,
     }
 }
 

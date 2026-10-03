@@ -200,6 +200,8 @@ fn a_reply_line_writes_the_bytes_the_hand_written_map_wrote() {
         stop: Some(StopReason::ToolUse),
         billed_usd_micros: Some(UsdMicros::new(3400)),
         first_at: None,
+        first_us: None,
+        took_us: None,
     };
     let typed = Payload::of(&returned).unwrap();
     assert_eq!(
@@ -226,6 +228,8 @@ fn a_reply_that_reported_nothing_leaves_the_three_keys_absent() {
         stop: None,
         billed_usd_micros: None,
         first_at: None,
+        first_us: None,
+        took_us: None,
     };
     let typed = Payload::of(&returned).unwrap();
     assert_eq!(
@@ -251,4 +255,35 @@ fn a_steer_line_writes_the_bytes_the_hand_written_map_wrote() {
     let typed = Payload::of(&steer).unwrap();
     assert_eq!(bytes(&typed), bytes(&hand));
     assert_eq!(typed.read::<SteerReceived>().unwrap(), steer);
+}
+
+/// A reply line keeps its two durations in whole microseconds, and a
+/// line written before the keys existed reads back with neither (D20).
+#[test]
+fn a_reply_line_carries_its_microseconds_and_an_older_line_reads_without_them() {
+    let message = assistant_message();
+    let timed = ModelReturned {
+        message: message.clone(),
+        calls: 2,
+        usage: None,
+        stop: None,
+        billed_usd_micros: None,
+        first_at: None,
+        first_us: Some(180_250),
+        took_us: Some(2_400_125),
+    };
+    let typed = Payload::of(&timed).unwrap();
+    assert_eq!(typed.as_map().get("first_us"), Some(&json!(180_250)));
+    assert_eq!(typed.as_map().get("took_us"), Some(&json!(2_400_125)));
+    assert_eq!(typed.read::<ModelReturned>().unwrap(), timed);
+
+    let older = hand_written_returned(&message, None, None, None);
+    assert_eq!(
+        older.read::<ModelReturned>().unwrap(),
+        ModelReturned {
+            first_us: None,
+            took_us: None,
+            ..timed
+        }
+    );
 }

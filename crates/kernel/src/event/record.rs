@@ -57,6 +57,7 @@ mod remote;
 mod renewal;
 mod roadmap;
 mod run;
+mod skill;
 mod tool;
 mod turn;
 
@@ -96,9 +97,10 @@ pub use remote::{
 pub use renewal::CacheRenewed;
 pub use roadmap::{RoadmapMoved, RoadmapStep};
 pub use run::{
-    EvalRun, EvidenceCite, FreezeCause, Opening, RunForked, RunFrozen, RunStarted, SessionOpened,
-    SkillPin,
+    EvalRun, EvidenceCite, FreezeCause, Opening, RunForked, RunFrozen, RunPolicyChanged,
+    RunStarted, SessionNamed, SessionOpened, SkillPin,
 };
+pub use skill::{AuditSource, AuditVerdict, SkillAudited};
 pub use tool::{ToolAnswer, ToolCalled, ToolResult};
 pub use turn::{
     ModelCalled, ModelReturned, PartChange, PromptAssembled, PromptSegment, PromptShapeCompared,

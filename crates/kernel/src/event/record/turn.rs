@@ -147,6 +147,17 @@ pub struct ModelReturned {
     /// existed - none of which is a zero.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub first_at: Option<TimeMs>,
+    /// Whole microseconds from the moment the attempt that returned went
+    /// out to its first non-empty prose or reasoning, on the turn's
+    /// monotonic clock (`crates/kernel/spec/Event/Record.lean` D20).
+    /// Absent exactly where `first_at` is.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub first_us: Option<u64>,
+    /// Whole microseconds from the moment the attempt that returned went
+    /// out to the moment its reply was whole, on the same clock. Absent
+    /// on every line written before the key existed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub took_us: Option<u64>,
 }
 
 /// `steer_received`: text a person added at a phase boundary, and where

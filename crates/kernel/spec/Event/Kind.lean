@@ -121,6 +121,10 @@ inductive EventKind where
   | ProposalOffered
   | ProposalDecided
   | ProposalWithdrawn
+  -- 会话与书架
+  | RunPolicyChanged
+  | SessionNamed
+  | SkillAudited
   deriving DecidableEq, Repr
 
 /-- 一个种类的载荷决不决定模型请求的字节：入窗（`InWindow`）或只入账（`RecordOnly`）。与 `kernel::WindowClass` 逐变体同名。依据唯一，不存在第三类。 -/
@@ -262,6 +266,13 @@ def EventKind.windowClass : EventKind → WindowClass
   | .ProposalDecided => .RecordOnly
   /- 提出它的 run 收回一处还没决定的提案：载荷携 `proposal` -/
   | .ProposalWithdrawn => .RecordOnly
+  -- 会话与书架
+  /- 人在会话中改了房间的运行策略：载荷携 `policy`（新的 `RunPolicy`）与 `by`。正在跑的 run 在下一个安全点读到它，在下一段消息末尾追加一句说明，所以它决定模型请求的字节（`Record.lean` D21） -/
+  | .RunPolicyChanged => .InWindow
+  /- 人给一段 session 起的显示名：载荷携 `began`（开这段 session 的 seq）与 `name`；空串撤回显示名。地址仍是身份，名字只是页面显示的字（`Record.lean` D22） -/
+  | .SessionNamed => .RecordOnly
+  /- 一个 skill 上架时的一次审核：载荷携 `skill`、`digest`（被审内容的摘要）、`source`、`scanner`、`verdict`，以及可缺席的 `risk`、`audited_at`、`link`。审核方说了什么不进任何模型请求（`Record.lean` D23） -/
+  | .SkillAudited => .RecordOnly
 
 /-- 每个种类，依 `EventKind::ALL` 的次序。 -/
 def EventKind.all : List EventKind := [
@@ -353,7 +364,10 @@ def EventKind.all : List EventKind := [
   .DocumentWritten,
   .ProposalOffered,
   .ProposalDecided,
-  .ProposalWithdrawn
+  .ProposalWithdrawn,
+  .RunPolicyChanged,
+  .SessionNamed,
+  .SkillAudited
 ]
 
 theorem EventKind.all_complete : ∀ kind : EventKind, kind ∈ EventKind.all := by
@@ -363,11 +377,11 @@ theorem EventKind.all_complete : ∀ kind : EventKind, kind ∈ EventKind.all :=
 theorem EventKind.all_nodup : EventKind.all.Nodup := by
   decide
 
-/-- **入窗的种类恰是这九种。** 它们的载荷决定模型请求的字节，所以重放与分叉要读它们；其余每一种都只入账。让一个种类改变窗类，要先改这条定理，而改它就是改模型请求的字节。 -/
+/-- **入窗的种类恰是这十种。** 它们的载荷决定模型请求的字节，所以重放与分叉要读它们；其余每一种都只入账。让一个种类改变窗类，要先改这条定理，而改它就是改模型请求的字节。 -/
 theorem the_in_window_kinds :
     EventKind.all.filter (fun kind => kind.windowClass == .InWindow) =
       [.PromptAssembled, .ModelCalled, .ModelReturned, .ToolCalled, .ToolResult, .ResultOffloaded,
-        .SteerReceived, .SignalConsumed, .AdviserAnswered] := by
+        .SteerReceived, .SignalConsumed, .AdviserAnswered, .RunPolicyChanged] := by
   decide
 
 end Kernel.Event.Kind

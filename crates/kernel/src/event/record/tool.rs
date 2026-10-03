@@ -91,6 +91,13 @@ pub struct ToolResult {
     pub name: ToolName,
     #[serde(flatten)]
     pub answer: ToolAnswer,
+    /// Whole microseconds from the moment the call started to the moment
+    /// it answered, read off the turn's monotonic clock
+    /// (`crates/kernel/spec/Event/Record.lean` D20). Absent on every line
+    /// written before the key existed: a reader then falls back to the
+    /// difference of the two envelope moments, in milliseconds.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub took_us: Option<u64>,
 }
 
 /// A call answers exactly one way, and the enum is what says so: two

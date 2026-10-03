@@ -260,6 +260,35 @@ pub struct EvalRun {
     pub after: Vec<String>,
 }
 
+/// `run_policy_changed`: the room's run policy, changed while a session
+/// is open (`crates/kernel/spec/Event/Record.lean` D21).
+///
+/// The run under way reads it at its next safe point and passes the
+/// gate under it from that step on; the next run's `run_started.policy`
+/// is the room's last change. The model and the effort stay what the
+/// session froze.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct RunPolicyChanged {
+    pub policy: RunPolicy,
+    #[cfg_attr(feature = "schema", schemars(with = "String"))]
+    pub by: Who,
+}
+
+/// `session_named`: the name a person gave one session of a room
+/// (`crates/kernel/spec/Event/Record.lean` D22).
+///
+/// The address stays the session's identity; the name is what a page
+/// shows. `began` is the seq that opened the session, the same value
+/// `wire::SessionLine.began` carries; an empty name takes the name back,
+/// and the last line for a session is the one that holds.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct SessionNamed {
+    pub began: Seq,
+    pub name: String,
+}
+
 #[cfg(test)]
 #[allow(
     clippy::unwrap_used,

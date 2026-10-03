@@ -125,6 +125,7 @@ fn a_call_that_answered_writes_result_and_no_error() {
         tool_use_id: "call_1".to_owned(),
         name: ToolName::parse("read").unwrap(),
         answer: ToolAnswer::Answered { result },
+        took_us: None,
     };
     let typed = Payload::of(&answered).unwrap();
     assert_eq!(bytes(&typed), bytes(&hand));
@@ -146,8 +147,38 @@ fn a_call_that_failed_writes_error_and_no_result() {
         answer: ToolAnswer::Failed {
             error: Payload::of(&err).unwrap(),
         },
+        took_us: None,
     };
     let typed = Payload::of(&failed).unwrap();
     assert_eq!(bytes(&typed), bytes(&hand));
     assert_eq!(typed.read::<ToolResult>().unwrap(), failed);
+}
+
+/// A result line keeps its duration in whole microseconds beside the
+/// answer, and a line written before the key existed reads back with
+/// none: the reader falls back to the envelope moments (D20).
+#[test]
+fn a_result_line_carries_its_microseconds_and_an_older_line_reads_without_them() {
+    let timed = ToolResult {
+        tool_use_id: "call_3".to_owned(),
+        name: ToolName::parse("read").unwrap(),
+        answer: ToolAnswer::Answered {
+            result: read_result(),
+        },
+        took_us: Some(420),
+    };
+    let typed = Payload::of(&timed).unwrap();
+    assert_eq!(typed.as_map().get("took_us"), Some(&Value::from(420u64)));
+    assert_eq!(typed.read::<ToolResult>().unwrap(), timed);
+
+    let mut older = typed.as_map().clone();
+    older.remove("took_us");
+    let read = Payload::new(older).unwrap().read::<ToolResult>().unwrap();
+    assert_eq!(
+        read,
+        ToolResult {
+            took_us: None,
+            ..timed
+        }
+    );
 }

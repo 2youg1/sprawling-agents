@@ -59,6 +59,8 @@ fn a_branch_inherits_the_compacted_exchange_not_the_raw_records() {
                 stop: None,
                 billed_usd_micros: None,
                 first_at: None,
+                first_us: None,
+                took_us: None,
             })
             .unwrap(),
         ),
@@ -82,6 +84,7 @@ fn a_branch_inherits_the_compacted_exchange_not_the_raw_records() {
                 answer: ToolAnswer::Answered {
                     result: Payload::of(&serde_json::json!({ "note": prose(20_000) })).unwrap(),
                 },
+                took_us: None,
             })
             .unwrap(),
         ),

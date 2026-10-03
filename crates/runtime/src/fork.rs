@@ -230,7 +230,13 @@ fn fold_run<'a>(
             | EventKind::DocumentWritten
             | EventKind::ProposalOffered
             | EventKind::ProposalDecided
-            | EventKind::ProposalWithdrawn => {}
+            | EventKind::ProposalWithdrawn
+            // The sentence a policy change appends is not in the
+            // conversation yet: no run reads the line today (kernel D21).
+            | EventKind::RunPolicyChanged
+            // A session's name and a skill's audit are the person's page.
+            | EventKind::SessionNamed
+            | EventKind::SkillAudited => {}
         }
     }
     // A wave the cut landed inside is dropped whole: the assistant
