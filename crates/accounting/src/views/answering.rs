@@ -109,7 +109,7 @@ impl Views {
 
     /// The usage questions, answered from the whole ledger once the
     /// snapshot is let go (accounting D49).
-    fn usage_ask(&self, question: UsageQuestion) -> Prepared {
+    fn usage(&self, question: UsageQuestion) -> Prepared {
         Prepared::Usage(UsageAsk {
             ledger: self.ledger_ask(),
             question,
@@ -138,9 +138,8 @@ impl Views {
     pub fn prepare(&self, query: &wire::Query) -> Prepared {
         Prepared::Held(match query {
             wire::Query::CityView => return Prepared::City(self.city_ask()),
-            // An evicted run always has records in the Ledger, so a
-            // recall that cannot read them is "I could not look"; the
-            // Ledger is read after the snapshot is let go.
+            // An evicted run always has records in the Ledger, so a recall that
+            // cannot read them, after the snapshot is let go, is "I could not look".
             wire::Query::RunView { run } => match self.hot.get(run) {
                 Some(hot) => wire::Answer::Run(Some(Box::new(summarize(*run, hot)))),
                 None if self.hot.was_evicted(run) => {
@@ -300,11 +299,9 @@ impl Views {
                 };
             }
             wire::Query::Toolkits => return Prepared::Toolkits(self.live_ask()),
-            wire::Query::SkillUsage { skill } => return self.usage_ask(Skills(skill.clone())),
-            wire::Query::McpUsage { server } => return self.usage_ask(Mcp(server.clone())),
-            wire::Query::UsageExport { what, format } => {
-                return self.usage_ask(Export(*what, *format));
-            }
+            wire::Query::SkillUsage { skill } => return self.usage(Skills(skill.clone())),
+            wire::Query::McpUsage { server } => return self.usage(Mcp(server.clone())),
+            wire::Query::UsageExport { what, format } => return self.usage(Export(*what, *format)),
             wire::Query::NewestRelease => return Prepared::Release(self.reach.registry),
             wire::Query::UpstreamVersion { item } => return self.upstream_of(item),
             wire::Query::BuildingView { addr } => {

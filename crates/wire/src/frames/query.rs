@@ -331,22 +331,17 @@ pub enum Query {
     /// so a frame from a socket names nothing secret and an unenrolled city answers
     /// `ToolkitsAnswer::Unenrolled` rather than failing.
     Toolkits,
-    /// Which release this city is running, and which one npm offers.
+    /// Which release this city is running, and which ones npm and crates.io offer.
     ///
-    /// **Asked when a person presses the button, and at no other time.** Not on connect, not on a
-    /// timer, and not folded into another query: `QUICKSTART.md` opens by promising that nothing
-    /// was installed and nothing outside the folder was written, and a city that reached a registry
-    /// on its own schedule would be spending that sentence on a question nobody asked.
-    /// `docs/third-party.md` rules out the same traffic for the broker.
+    /// **Asked when a person presses the button, and at no other time**: not on connect, not on a
+    /// timer, not folded into another query. `QUICKSTART.md` promises that nothing outside the
+    /// folder was written, and a city that reached a registry on its own schedule would spend that
+    /// promise on a question nobody asked; `docs/third-party.md` rules out the same traffic.
     ///
-    /// Answering it costs one request to `registry.npmjs.org`, so it is the slowest query here and
-    /// the only one whose cost a person chose. A registry that cannot be reached is
-    /// [`ReleaseAnswer::Refused`](crate::ReleaseAnswer::Refused) rather than
+    /// The slowest query here, and the only one whose cost a person chose. A registry that cannot
+    /// be reached is [`ReleaseAnswer::Refused`](crate::ReleaseAnswer::Refused) rather than
     /// [`Answer::Unavailable`](crate::Answer::Unavailable): the city is available, the registry is
-    /// not, and the page has to be able to say which.
-    ///
-    /// Nothing it answers updates anything. Where a binary lives belongs to whoever installed it,
-    /// so this reports and stops.
+    /// not. Nothing it answers updates anything; this reports and stops.
     NewestRelease,
     /// Everything this person settled about their own reading of the
     /// city: the language, the appearance, the chords they rebound.
@@ -390,27 +385,13 @@ pub enum Query {
     UpstreamVersion {
         item: String,
     },
-    /// Every skill on a shelf and every skill the ledger saw used: its
-    /// contents, its audit, and every use, by day
-    /// (`crates/wire/spec/Reading.lean` D28, D33). `skill` narrows the
-    /// answer to one name.
-    ///
-    /// Folded from the whole ledger at the moment of asking, so a page
-    /// asks it when the skill page opens, never on a timer.
-    SkillUsage {
-        skill: Option<String>,
-    },
-    /// The same table per tool server and tool; `server` narrows it to
-    /// one server.
-    McpUsage {
-        server: Option<String>,
-    },
-    /// Every use of a skill or of a tool server as one row, written as
-    /// JSONL or CSV for the User to download; the city writes no file.
-    UsageExport {
-        what: crate::UsageKind,
-        format: crate::ExportFormat,
-    },
+    /// Every skill's contents, audit and uses by day, folded from the whole ledger when the
+    /// skill page opens (`crates/wire/spec/Reading.lean` D28, D33); `skill` narrows it to one.
+    SkillUsage { skill: Option<String> },
+    /// The same table per tool server and tool; `server` narrows it to one.
+    McpUsage { server: Option<String> },
+    /// Every use as one JSONL or CSV row for the User to download; the city writes no file.
+    UsageExport { what: crate::UsageKind, format: crate::ExportFormat },
 }
 
 /// The Query surface, in declaration order — the order the handshake

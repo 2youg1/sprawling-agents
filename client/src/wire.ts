@@ -11,7 +11,7 @@ import { Schema } from "effect";
 /** The wire version both ends compare on connect. */
 export const WIRE_V = 53 as const;
 /** The schema hash the server checks: `wire::schema_hash()`. */
-export const WIRE_HASH = "cdd0eed88c053c3933534938ae9cf43373362edea25a36a480d45cc6f602516d" as const;
+export const WIRE_HASH = "17022b0cfb4c30f619ec49ce299a3ae762a64f5557699fb9ca5cbbdac00e338b" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 /** The body sizes a person may ask for: `wire::BODY_PX_MIN` and `BODY_PX_MAX`. */
@@ -2524,6 +2524,65 @@ export const McpHealthAnswer = Schema.Struct({
 export type McpHealthAnswer = typeof McpHealthAnswer.Type;
 
 /**
+ * How many uses one UTC calendar day holds.
+ */
+export const DayCount = Schema.Struct({
+  count: Schema.Int,
+  day: Schema.String,
+}).annotate({ identifier: "DayCount" });
+export type DayCount = typeof DayCount.Type;
+
+/**
+ * How the call that used it ended.
+ */
+export const UseOutcome = Schema.Union([
+  Schema.Literals(["ok", "failed"]),
+  Schema.Literal("unknown"),
+]).annotate({ identifier: "UseOutcome" });
+export type UseOutcome = typeof UseOutcome.Type;
+
+/**
+ * One call of a server's tool.
+ */
+export const McpUse = Schema.Struct({
+  at: TimeMs,
+  outcome: UseOutcome,
+  resident: Schema.optional(Schema.NullOr(Address)),
+  run: RunId,
+  seq: Seq,
+}).annotate({ identifier: "McpUse" });
+export type McpUse = typeof McpUse.Type;
+
+/**
+ * One tool of a server.
+ */
+export const McpToolUsage = Schema.Struct({
+  per_day: Schema.Array(DayCount),
+  tool: Schema.String,
+  uses: Schema.Array(McpUse),
+}).annotate({ identifier: "McpToolUsage" });
+export type McpToolUsage = typeof McpToolUsage.Type;
+
+/**
+ * One tool server and the tools of it that were used.
+ */
+export const McpServerUsage = Schema.Struct({
+  configured: Schema.Boolean,
+  server: Schema.optional(Schema.NullOr(Schema.String)),
+  tools: Schema.Array(McpToolUsage),
+}).annotate({ identifier: "McpServerUsage" });
+export type McpServerUsage = typeof McpServerUsage.Type;
+
+/**
+ * Every tool server a building is configured with, and every one the
+ * ledger saw used.
+ */
+export const McpUsageAnswer = Schema.Struct({
+  servers: Schema.Array(McpServerUsage),
+}).annotate({ identifier: "McpUsageAnswer" });
+export type McpUsageAnswer = typeof McpUsageAnswer.Type;
+
+/**
  * The city's vital signs: the counts a page would otherwise assemble
  * by asking four questions and adding up the answers.
  * 
@@ -3430,6 +3489,35 @@ export const SessionsAnswer = Schema.Struct({
 export type SessionsAnswer = typeof SessionsAnswer.Type;
 
 /**
+ * What the audit concluded.
+ */
+export const AuditVerdict = Schema.Union([
+  Schema.Literals(["pass", "warn", "fail"]),
+  Schema.Literal("unreachable"),
+]).annotate({ identifier: "AuditVerdict" });
+export type AuditVerdict = typeof AuditVerdict.Type;
+
+/**
+ * What the audits on the ledger say about the content a shelf holds now
+ * (`city::library::audit_state`).
+ */
+export const SkillAudit = Schema.Union([
+  Schema.Struct({
+    state: Schema.Literal("unaudited"),
+  }),
+  Schema.Struct({
+    at: Seq,
+    state: Schema.Literal("audited"),
+    verdict: AuditVerdict,
+  }),
+  Schema.Struct({
+    audited: B3Hash,
+    state: Schema.Literal("stale"),
+  }),
+]).annotate({ identifier: "SkillAudit" });
+export type SkillAudit = typeof SkillAudit.Type;
+
+/**
  * Which shelf a holding sits on, and where its document is.
  * 
  * One value rather than a shelf name beside a path, because a holding
@@ -3461,6 +3549,63 @@ export const SkillShelf = Schema.Union([
   }),
 ]).annotate({ identifier: "SkillShelf" });
 export type SkillShelf = typeof SkillShelf.Type;
+
+/**
+ * One shelf's copy of a skill as it is now.
+ */
+export const HeldSkill = Schema.Struct({
+  audit: SkillAudit,
+  digest: B3Hash,
+  shelf: SkillShelf,
+}).annotate({ identifier: "HeldSkill" });
+export type HeldSkill = typeof HeldSkill.Type;
+
+/**
+ * One read of a skill by a run that pinned it.
+ */
+export const SkillUse = Schema.Struct({
+  at: TimeMs,
+  digest: B3Hash,
+  outcome: UseOutcome,
+  part: Schema.String,
+  resident: Schema.optional(Schema.NullOr(Address)),
+  run: RunId,
+  seq: Seq,
+}).annotate({ identifier: "SkillUse" });
+export type SkillUse = typeof SkillUse.Type;
+
+/**
+ * One content of a skill, from the first run frozen with it.
+ */
+export const SkillVersion = Schema.Struct({
+  at: TimeMs,
+  digest: B3Hash,
+  run: RunId,
+  seq: Seq,
+}).annotate({ identifier: "SkillVersion" });
+export type SkillVersion = typeof SkillVersion.Type;
+
+/**
+ * One skill, by name: where it sits now, the contents runs have read,
+ * and every time one of them read it.
+ */
+export const SkillUsageLine = Schema.Struct({
+  held: Schema.Array(HeldSkill),
+  name: Schema.String,
+  per_day: Schema.Array(DayCount),
+  uses: Schema.Array(SkillUse),
+  versions: Schema.Array(SkillVersion),
+}).annotate({ identifier: "SkillUsageLine" });
+export type SkillUsageLine = typeof SkillUsageLine.Type;
+
+/**
+ * Every skill on a shelf, and every skill the ledger saw used, one line
+ * each.
+ */
+export const SkillUsageAnswer = Schema.Struct({
+  skills: Schema.Array(SkillUsageLine),
+}).annotate({ identifier: "SkillUsageAnswer" });
+export type SkillUsageAnswer = typeof SkillUsageAnswer.Type;
 
 /**
  * One shelved skill.
@@ -3555,6 +3700,28 @@ export const ToolkitsAnswer = Schema.Union([
   }),
 ]).annotate({ identifier: "ToolkitsAnswer" });
 export type ToolkitsAnswer = typeof ToolkitsAnswer.Type;
+
+/**
+ * How an export is written.
+ */
+export const ExportFormat = Schema.Literals(["jsonl", "csv"]).annotate({ identifier: "ExportFormat" });
+export type ExportFormat = typeof ExportFormat.Type;
+
+/**
+ * Which table an export writes.
+ */
+export const UsageKind = Schema.Literals(["skills", "mcp"]).annotate({ identifier: "UsageKind" });
+export type UsageKind = typeof UsageKind.Type;
+
+/**
+ * One export: every use as one row, in the format asked for.
+ */
+export const UsageExportAnswer = Schema.Struct({
+  body: Schema.String,
+  format: ExportFormat,
+  what: UsageKind,
+}).annotate({ identifier: "UsageExportAnswer" });
+export type UsageExportAnswer = typeof UsageExportAnswer.Type;
 
 /**
  * Where a version came from, as far as the city can say.
@@ -3734,6 +3901,15 @@ export const Answer = Schema.Union([
   }),
   Schema.Struct({
     mcp_health: McpHealthAnswer,
+  }),
+  Schema.Struct({
+    skill_usage: SkillUsageAnswer,
+  }),
+  Schema.Struct({
+    mcp_usage: McpUsageAnswer,
+  }),
+  Schema.Struct({
+    usage_export: UsageExportAnswer,
   }),
   Schema.Struct({
     toolkits: ToolkitsAnswer,
@@ -4010,6 +4186,22 @@ export const Query = Schema.Union([
   Schema.Struct({
     upstream_version: Schema.Struct({
       item: Schema.String,
+    }),
+  }),
+  Schema.Struct({
+    skill_usage: Schema.Struct({
+      skill: Schema.optional(Schema.NullOr(Schema.String)),
+    }),
+  }),
+  Schema.Struct({
+    mcp_usage: Schema.Struct({
+      server: Schema.optional(Schema.NullOr(Schema.String)),
+    }),
+  }),
+  Schema.Struct({
+    usage_export: Schema.Struct({
+      format: ExportFormat,
+      what: UsageKind,
     }),
   }),
 ]).annotate({ identifier: "Query" });

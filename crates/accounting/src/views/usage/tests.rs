@@ -5,13 +5,11 @@
 
 //! A synthetic ledger folds to the usage table wire D33 describes, a skill
 //! whose content changed asks for a new audit, an export writes each use
-//! once, and the fold holds the three properties
-//! `crates/accounting/spec/Views/Usage.lean` proves of its model.
+//! once.
 
 use std::collections::BTreeSet;
 
 use kernel::{Address, B3Hash, EventDraft, EventKind, EventRecord, Payload, RunId, Seq, TimeMs};
-use proptest::prelude::*;
 use serde_json::json;
 
 use super::{Shelved, Usage, export};
@@ -30,84 +28,79 @@ fn room() -> Address {
     Address::parse("lab/parser").unwrap()
 }
 
-fn record(seq: u64, by: u8, at: u64, kind: EventKind, data: serde_json::Value) -> EventRecord {
+/// Where a line sits: its sequence number, the run that wrote it, and
+/// its moment.
+#[derive(Debug, Clone, Copy)]
+pub(super) struct At {
+    seq: u64,
+    by: u8,
+    at: u64,
+}
+
+/// A line whose moment is its sequence number.
+pub(super) fn now(seq: u64, by: u8) -> At {
+    At { seq, by, at: seq }
+}
+
+fn later(seq: u64, by: u8, at: u64) -> At {
+    At { seq, by, at }
+}
+
+pub(super) fn record(at: At, kind: EventKind, data: serde_json::Value) -> EventRecord {
     EventRecord::from_draft(
         EventDraft {
-            run: run(by),
-            t: TimeMs::new(at),
+            run: run(at.by),
+            t: TimeMs::new(at.at),
             who: "lab/parser".to_owned(),
             addr: Some(room()),
             kind,
             data: Payload::new(data.as_object().unwrap().clone()).unwrap(),
             ig: false,
         },
-        Seq::new(seq),
+        Seq::new(at.seq),
         B3Hash::digest(b"prev"),
     )
 }
 
-fn started(seq: u64, by: u8, pins: &[(&str, &str)]) -> EventRecord {
+pub(super) fn started(seq: u64, by: u8, pins: &[(&str, &str)]) -> EventRecord {
     let skills: Vec<_> = pins
         .iter()
         .map(|(name, text)| json!({ "name": name, "hash": hash(text).to_string() }))
         .collect();
     record(
-        seq,
-        by,
-        seq,
+        now(seq, by),
         EventKind::RunStarted,
         json!({ "skills": skills }),
     )
 }
 
-fn called(seq: u64, by: u8, at: u64, id: &str, tool: &str, args: serde_json::Value) -> EventRecord {
-    record(
-        seq,
-        by,
-        at,
-        EventKind::ToolCalled,
-        json!({ "id": id, "name": tool, "args": args }),
-    )
+pub(super) fn called(at: At, id: &str, tool: &str, args: serde_json::Value) -> EventRecord {
+    let data = json!({ "id": id, "name": tool, "args": args });
+    record(at, EventKind::ToolCalled, data)
 }
 
-fn connector(seq: u64, by: u8, id: &str, tool: &str, label: &str) -> EventRecord {
-    let data = json!({ "id": id, "name": tool, "args": {}, "effect": { "connector": { "label": label } } });
-    record(seq, by, seq, EventKind::ToolCalled, data)
+fn connector(at: At, id: &str, tool: &str, label: &str) -> EventRecord {
+    let effect = json!({ "connector": { "label": label } });
+    let data = json!({ "id": id, "name": tool, "args": {}, "effect": effect });
+    record(at, EventKind::ToolCalled, data)
 }
 
 fn answered(seq: u64, by: u8, id: &str) -> EventRecord {
-    record(
-        seq,
-        by,
-        seq,
-        EventKind::ToolResult,
-        json!({ "tool_use_id": id, "name": "read", "result": {} }),
-    )
+    let data = json!({ "tool_use_id": id, "name": "read", "result": {} });
+    record(now(seq, by), EventKind::ToolResult, data)
 }
 
 fn failed(seq: u64, by: u8, id: &str) -> EventRecord {
-    record(
-        seq,
-        by,
-        seq,
-        EventKind::ToolResult,
-        json!({ "tool_use_id": id, "name": "read", "error": {} }),
-    )
+    let data = json!({ "tool_use_id": id, "name": "read", "error": {} });
+    record(now(seq, by), EventKind::ToolResult, data)
 }
 
-fn used(
-    seq: u64,
-    by: u8,
-    at: u64,
-    part: &str,
-    text: &str,
-    outcome: wire::UseOutcome,
-) -> wire::SkillUse {
+fn used(at: At, part: &str, text: &str, outcome: wire::UseOutcome) -> wire::SkillUse {
     wire::SkillUse {
-        run: run(by),
+        run: run(at.by),
         resident: Some(room()),
-        seq: Seq::new(seq),
-        at: TimeMs::new(at),
+        seq: Seq::new(at.seq),
+        at: TimeMs::new(at.at),
         part: part.to_owned(),
         digest: hash(text),
         outcome,
@@ -129,35 +122,39 @@ fn library(name: &str, text: &str) -> Shelved {
 fn fixture() -> Vec<EventRecord> {
     vec![
         started(1, 1, &[("kiln", "kiln v1")]),
-        called(2, 1, 2, "c1", "describe", json!({ "name": "skill kiln" })),
+        called(
+            later(2, 1, 2),
+            "c1",
+            "describe",
+            json!({ "name": "skill kiln" }),
+        ),
         answered(3, 1, "c1"),
-        called(4, 1, DAY + 4, "c2", "read", json!({ "path": "kiln" })),
+        called(
+            later(4, 1, DAY + 4),
+            "c2",
+            "read",
+            json!({ "path": "kiln" }),
+        ),
         failed(5, 1, "c2"),
         called(
-            6,
-            1,
-            DAY + 6,
+            later(6, 1, DAY + 6),
             "c3",
             "read",
             json!({ "path": "kiln/scripts/fire.py" }),
         ),
-        called(7, 1, 7, "c4", "read", json!({ "path": "notes.md" })),
+        called(later(7, 1, 7), "c4", "read", json!({ "path": "notes.md" })),
         started(8, 2, &[]),
-        called(9, 2, 9, "c5", "read", json!({ "path": "kiln" })),
-        connector(10, 1, "c6", "github_search", "github"),
+        called(later(9, 2, 9), "c5", "read", json!({ "path": "kiln" })),
+        connector(now(10, 1), "c6", "github_search", "github"),
         answered(11, 1, "c6"),
         called(
-            12,
-            1,
-            12,
+            later(12, 1, 12),
             "c7",
             "call",
             json!({ "name": "github_list", "args": {} }),
         ),
         called(
-            13,
-            1,
-            13,
+            later(13, 1, 13),
             "c8",
             "call",
             json!({ "name": "plan_finish", "args": {} }),
@@ -188,19 +185,15 @@ fn a_fixture_ledger_folds_a_usage_table_per_skill_and_server() {
             run: run(1),
         }],
         uses: vec![
-            used(2, 1, 2, "guide", "kiln v1", wire::UseOutcome::Ok),
+            used(later(2, 1, 2), "guide", "kiln v1", wire::UseOutcome::Ok),
             used(
-                4,
-                1,
-                DAY + 4,
+                later(4, 1, DAY + 4),
                 "SKILL.md",
                 "kiln v1",
                 wire::UseOutcome::Failed,
             ),
             used(
-                6,
-                1,
-                DAY + 6,
+                later(6, 1, DAY + 6),
                 "scripts/fire.py",
                 "kiln v1",
                 wire::UseOutcome::Unknown,
@@ -288,9 +281,7 @@ fn a_fixture_ledger_folds_a_usage_table_per_skill_and_server() {
 fn a_skill_whose_content_changed_is_asked_to_re_audit() {
     let mut ledger = fixture();
     ledger.push(record(
-        14,
-        3,
-        14,
+        now(14, 3),
         EventKind::SkillAudited,
         json!({ "skill": "kiln", "digest": hash("kiln v1").to_string(), "source": "skill_spector",
                 "scanner": "skillspector 1", "verdict": "pass" }),
@@ -352,72 +343,4 @@ fn an_export_writes_one_row_per_use_in_both_formats() {
              \"outcome\":\"failed\"}}\n"
         )
     );
-}
-
-/// One line of the model in `Usage.lean`: a pin, a read, or another line.
-#[derive(Debug, Clone)]
-enum Line {
-    Pinned { run: u8, skill: u8 },
-    Read { run: u8, skill: u8 },
-    Other,
-}
-
-fn lines() -> impl Strategy<Value = Vec<Line>> {
-    let line = prop_oneof![
-        (0u8..3, 0u8..3).prop_map(|(run, skill)| Line::Pinned { run, skill }),
-        (0u8..3, 0u8..3).prop_map(|(run, skill)| Line::Read { run, skill }),
-        Just(Line::Other),
-    ];
-    proptest::collection::vec(line, 0..24)
-}
-
-fn records(lines: &[Line]) -> Vec<EventRecord> {
-    lines
-        .iter()
-        .zip(1u64..)
-        .map(|(line, seq)| match line {
-            Line::Pinned { run, skill } => started(seq, *run, &[(&format!("s{skill}"), "body")]),
-            Line::Read { run, skill } => called(
-                seq,
-                *run,
-                seq,
-                &format!("c{seq}"),
-                "read",
-                json!({ "path": format!("s{skill}") }),
-            ),
-            Line::Other => record(seq, 0, seq, EventKind::RunFrozen, json!({})),
-        })
-        .collect()
-}
-
-proptest! {
-    /// `a_read_the_run_did_not_pin_is_not_a_use` and `every_use_was_pinned`:
-    /// a read counts exactly when its run pinned that skill before it.
-    #[test]
-    fn a_read_counts_exactly_when_its_run_pinned_the_skill(lines in lines()) {
-        let usage = Usage::fold(&records(&lines));
-        let mut pinned = BTreeSet::new();
-        let mut expected = Vec::new();
-        for (line, seq) in lines.iter().zip(1u64..) {
-            match line {
-                Line::Pinned { run, skill } => { pinned.insert((*run, *skill)); }
-                Line::Read { run, skill } => if pinned.contains(&(*run, *skill)) { expected.push(seq); },
-                Line::Other => {}
-            }
-        }
-        let counted: Vec<u64> = usage.reads.iter().map(|read| read.used.seq.value()).collect();
-        prop_assert_eq!(counted, expected);
-    }
-
-    /// `the_fold_only_appends`: folding more of the ledger never moves a
-    /// use already counted.
-    #[test]
-    fn folding_more_only_appends_uses(lines in lines(), cut in 0usize..24) {
-        let all = records(&lines);
-        let cut = cut.min(all.len());
-        let seqs = |usage: Usage| usage.reads.iter().map(|read| read.used.seq).collect::<Vec<_>>();
-        let before = seqs(Usage::fold(&all[..cut]));
-        let after = seqs(Usage::fold(&all));
-        prop_assert_eq!(&after[..before.len()], &before[..]);
-    }
 }

@@ -23,6 +23,15 @@ use super::prepared::LedgerAsk;
 
 mod answers;
 mod export;
+#[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing,
+    reason = "test code"
+)]
+mod model_tests;
 mod shelves;
 #[cfg(test)]
 #[allow(
@@ -167,7 +176,9 @@ impl Usage {
     /// Folds a run of records in ledger order.
     pub(crate) fn fold(records: impl IntoIterator<Item = impl Borrow<EventRecord>>) -> Usage {
         let mut usage = Usage::default();
-        records.into_iter().for_each(|record| drop(record.borrow()));
+        records
+            .into_iter()
+            .for_each(|record| usage.apply(record.borrow()));
         usage
     }
 

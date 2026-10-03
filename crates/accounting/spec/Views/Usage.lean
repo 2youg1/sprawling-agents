@@ -8,7 +8,7 @@
 
 规定 `crates/accounting/src/views/usage.rs` 与它的三个子模块 `answers`、`export`、`shelves`。本文件是 `crates/accounting/Spec.lean` 的一个分部；下面每一节保留它在 accounting 规格里的标签 §8-n，别处引作 `crates/accounting/Spec.lean §8-n`，决定引作 `accounting D<n>`。
 
-前半是接口与决定，后半是折叠的模型：一次读在没有钉住那件 skill 的 run 里不算使用，折叠只往使用列表的末尾加，每一次使用都有一个钉住它的 run。Rust 侧由 `accounting::views::usage::tests` 的 proptest 从同一个输入空间抽轨迹，判同三条性质。
+前半是接口与决定，后半是折叠的模型：一次读在没有钉住那件 skill 的 run 里不算使用，折叠只往使用列表的末尾加，每一次使用都有一个钉住它的 run。Rust 侧由 `accounting::views::usage::model_tests` 的 proptest 从同一个输入空间抽轨迹，判同三条性质。
 -/
 
 /-!
@@ -39,7 +39,7 @@ pub(super) fn write(rows: &[Row], format: wire::ExportFormat) -> String;
 - **从没用过的 MCP 服务器**：每栋楼的配置（`city::load_config`）里列出的服务器各有一项，没有用过的工具表为空；此刻提供哪些工具要一次握手，那是 `McpHealth` 的问题。
 - **导出**的列与格式照 wire D33；JSONL 与 CSV 由同一张行表写出，行表由 `skills` 与 `mcp` 两个答复展开。
 - **三个平台**：只读账本与书架，Windows、macOS 与 Linux 相同；CSV 的 `\r\n` 是 RFC 4180 的。
-- 验收：`views::usage::tests` 的 `a_fixture_ledger_folds_a_usage_table_per_skill_and_server`、`a_skill_whose_content_changed_is_asked_to_re_audit`、`an_export_writes_one_row_per_use_in_both_formats` 与三条 proptest。
+- 验收：`views::usage::tests` 的 `a_fixture_ledger_folds_a_usage_table_per_skill_and_server`、`a_skill_whose_content_changed_is_asked_to_re_audit`、`an_export_writes_one_row_per_use_in_both_formats`；`views::usage::model_tests` 的两条 proptest 判模型的三条性质。
 -/
 
 /-! D49 使用表在答问时从账本折，不进 `Views` 的常驻折叠
