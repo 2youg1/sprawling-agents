@@ -7,155 +7,64 @@
 # bin::assembly
 
 规定 `crates/sprawling/src/assembly.rs` 与 `crates/sprawling/src/assembly/`：装配根，造生产的手、接上端口、起线程、开城（`bin::assembly`）；开城的次序在 `spec/Assembly/Listening.lean`，审计线程的结局在 `spec/Assembly/ChainWatch.lean`。本文件是 `crates/sprawling/Spec.lean` 的一个分部；下面每一节保留它的标签 §8-n，别处引作 `crates/sprawling/Spec.lean §8-n`，决定引作 `sprawling D<n>`。
+
+本文件是描述，不是被证明的规格：它不含 Lean 定义与定理，它说的每一条由各节点名的测试判。城的唯一写者 `RunWorker` 住 `accounting` crate（`crates/accounting/src/worker/`），§8-7、§8-39、§8-51、§8-102、§8-165 与 D16 说的是那个写者被装配层用到的那一面；`accounting::worker::…` 这样的路径指的就是那个 crate。
 -/
 
 /-!
 ## 8-7 ACP 入站
 
 ```rust
-fn acp_dispatch(desk: &CommandDesk, body: wire::AcpBody, authentic: bool)
+// accounting::worker::dispatching::agreeing
+pub fn acp_dispatch(desk: &CommandDesk, body: &serde_json::Value, pairing: wire::Pairing)
     -> Result<wire::AcpProgress, AxError>;          // 外来请求 → 普通 Dispatch
 ```
 
-- **令牌在门那侧判，判定在协议那侧措辞**：`wire` 持配对令牌，故常数时间比对住 `/acp` 路由；`authentic` 这一位传进来，由 `agent_protocols::admit` 说拒词——未配对者只学到一位，这句话的权威只有一个。
+- **令牌在门那侧判，判定在协议那侧措辞**：`wire` 持配对令牌，故常数时间比对住 `/acp` 路由；`pairing`（`wire::Pairing`，`Held` 或 `Absent`，不是 bool）这一位传进来，由 `agent_protocols::admit` 说拒词——未配对者只学到一位，这句话的权威只有一个。
 - **入站不是第二个 control surface**：admit 之后就是人按派活条时走的同一条路（同一个 `CommandDesk`、同一个 `Command::Dispatch`）。回给编辑器的只有 progress 三字段，且 run id 是工人接单时才铸的，故此刻诚实的答案是「已受理、尚未完成」。
 -/
 
 /-!
-## 8-15 装配层长出一扇门
+## 8-15 装配层的公开面（`crates/sprawling/src/lib.rs`、`assembly.rs`）
 
 ```rust
-// crates/sprawling/src/lib.rs —— 索引文件，只准声明（modmap 已看守）
-pub mod assembly;
-pub mod console;
-pub mod firstrun;
+// crates/sprawling/src/lib.rs —— 索引文件，只准声明（modmap 看守）
+pub mod assembly; pub mod audience; pub mod console; pub mod doctor; pub mod firstrun;
+pub mod monitor; pub mod release; pub mod serving; pub mod supervising;
+mod browser_bidi; mod browser_tool; mod keying; mod outside; mod revealing;
 
 // assembly：跨出 crate 的项，逐个放行
-pub struct InitReport { pub ledger_dir, pub genesis, pub standing, pub adopted }
-pub enum Adopt { Nothing, EveryFolder }
-pub enum History { Absent, Present }   // 目录不存在或为空是 Absent；读不了是 Err，不是 Absent
-pub fn has_history(&Path) -> Result<History, AxError>;   // StorageFatal：账本目录存在却列不出来
-pub fn init_city(&Path) -> Result<InitReport, AxError>;
-pub fn form_city(&Path, Adopt) -> Result<InitReport, AxError>;
-pub fn open_vault() -> (gateway::Custodian, Option<Payload>);
-pub struct Serving { /* 八个字段全 pub：调用方构造它 */ }
-pub async fn listen(Serving) -> Result<Listening, AxError>;   // §8-88
-impl Listening { pub async fn serve(self) -> Result<(), AxError>; }
-pub struct ScanReport { pub waiting_approvals: usize /* lines、closed_calls 不跨出 */ }
-impl ScanReport { pub fn summary(&self) -> String; }
-pub struct RunWorker;
-impl RunWorker {
-    pub fn new(&Path, gateway::Custodian, Diagnostics) -> Result<Self, AxError>;
-    pub fn handle(&mut self, wire::Command) -> Result<(), AxError>;
-    pub fn startup_scan(&mut self) -> Result<ScanReport, AxError>;
-    pub fn fork(&mut self, RunId, Seq, Option<Address>) -> Result<RunId, AxError>;
-    pub fn adopt_building(&mut self, Address) -> Result<(), AxError>;   // 收楼即立基线 checkpoint（`crates/storage/Spec.lean` §8-8 base_checkpoint），进度写诊断
+pub struct SystemClock;                                   // 墙钟只在这里取样（确定性规则 2）
+pub fn hands(vault: gateway::Custodian) -> accounting::worker::Hands;  // 生产的手只在这里造
+pub fn init_city(city_root: &Path) -> Result<InitReport, AxError>;     // = form_city(.., Adopt::Nothing)
+pub fn form_city(city_root: &Path, adopt: Adopt) -> Result<InitReport, AxError>;
+pub async fn listen(serving: serving::Serving) -> Result<Listening, AxError>;   // §8-88
+impl Listening {
+    pub fn local_addr(&self) -> SocketAddr;                // wire D16
+    pub async fn serve(self, console: Option<console::Terminal>) -> Result<(), AxError>;
 }
-
-// console
-pub struct Terminal { pub url: String, pub token: Option<String> }
-
-// firstrun
-pub enum FirstScreen { Start(PathBuf), Use(PathBuf), Quit }
-pub fn ask<R: BufRead, W: Write>(&Path, &mut R, &mut W) -> std::io::Result<FirstScreen>;
-pub fn default_city(&Path, Option<&Path>, bool) -> PathBuf;
-pub fn is_writable(&Path) -> bool;
-pub fn local_url(SocketAddr) -> String;
-pub fn open_when_ready(SocketAddr, String);
 ```
 
-- **为什么需要一个 lib target**：`crates/sprawling` 至今只有 `src/main.rs`，`mod assembly` 是私有模块，于是工作区里**没有任何东西能依赖它**——4377 行生产代码（含 1058 行的 `dispatch_in`）只由同文件内的 66 个测试看守，citysim 与任何 `tests/` 都够不到。加一个 lib target 让它可被依赖。
-- **`pub mod` 而非扁平 facade**：§12 模块表以 `bin::assembly`／`bin::console`／`bin::firstrun` 命名模块，模块名本身是已记录的架构事实；折成 `sprawling::init_city` 会抹掉这层限定，而本 crate `publish = false`，C-REEXPORT 要替第三方省的那段路径没有受益人。**取窄的地方在项，不在模块**：只有跨出 crate 的项改 `pub`，其余留 `pub(crate)`——公开面因此是逐项决定的，不是逐模块授予的。
-- **`install` 与 `wire_client` 留在 bin**：前者把二进制放上 PATH，后者从终端连一座已服务的城并从 stdin 读 enrolment——两者都是关于命令行的，不是关于城的，且除 `main` 外零引用。留在 bin 让公开面少六项。
-- **`handle` 进公开面不是为测试拓宽**：AGENTS.md 写着「Tests use the same doors as production code」。`handle` 正是服务中的 worker 循环走的那扇门，把它命名出来是承认已有的门。反过来，那 66 个内部测试**不搬去 `tests/`**：它们触及 `Views::rebuild`／`read_building`／`run_id_for` 这类内部项，搬迁会为测试拓宽公开面，正是同一条规矩禁止的事。本 crate 的文件长度因此不变——它变短要等拆 `dispatch_in` 时把生产代码连同其测试一起搬走。
-- **`ScanReport` 只放行一个字段**：`main` 读 `waiting_approvals` 决定是否多印一行，`lines` 与 `closed_calls` 只进 `summary()`。按需放行而非按结构对齐——`InitReport` 四个字段全跨出，是因为 `report_standing` 四个全读。
-- **零行为变更**：`main.rs` 只改开头的声明块（七行 `mod` → 两行 `mod` ＋ 一行 `use sprawling::{assembly, console, firstrun}`），其余调用点逐字节不变。`Cargo.toml` 不改：Cargo 对同一 package 自动发现 `src/lib.rs` 与 `src/main.rs` 两个 target，OUT_DIR 对两者相同，`include!(client_embed.rs)` 与 `DEPENDENCIES` 因此留在 `main.rs` 原地。
-- **红**：`crates/sprawling/tests/assembly_door.rs` 走 `init_city → RunWorker::new → handle(Command::CreateBuilding) → 读 InitReport.ledger_dir 下的账本`，断言 `building_created` 落账。改动之前它连编译都过不去（`sprawling` 这个 crate 名不存在），这就是「这条测试咬得动」的证据。
-- **门禁连带**：`header` 要求 `lib.rs` 与新测试文件各带三行 MPL 通告；`modmap` 对 `*/lib.rs` 自动按索引文件判定，只准 `mod`／`use`／`pub use`／注释／属性——facade 因此只能是声明，正是要的形状。
-- **一处文档更正**：ARCHITECTURE.md §3 写着「citysim is a second assembly layer: the same code with simulated adapters」。此句与现实不符——`tools/citysim/Cargo.toml` 依赖 kernel／storage／runtime／gateway，其中没有 sprawling；`run_scenario` 手工构造 `RunPlan`，够到的最高层是 `runtime::run::drive`。这次改动使 assembly **可被依赖**，但没有让 citysim 依赖它：模型适配器仍由 `adapter_for` 从 `EndpointBook` 内部构造，那条缝要不要倒置是另一个决定。按 AGENTS.md「reality wins and the document is corrected first, with its reason」，先把这句改成现实。
+`InitReport`、`Adopt` 住 `accounting::worker::genesis`，`RunWorker`、`ScanReport` 住 `accounting::worker`，`History`／`has_history` 住 `city::history`，`open_vault` 与 `Serving` 住 `bin::serving`；装配层只把它们接起来。
+
+- **为什么有 lib target**：只有 `src/main.rs` 时，工作区里没有任何东西能依赖装配层，citysim 与 `tests/` 都够不到它。`crates/sprawling/tests/assembly_door.rs` 走的正是这扇门：`init_city` 造城，再读 `InitReport.ledger_dir` 下的账本。
+- **`pub mod` 而非扁平 facade**：模块表以 `bin::assembly`／`bin::console`／`bin::firstrun` 命名模块，模块名本身是已记录的架构事实；本 crate `publish = false`，C-REEXPORT 要替第三方省的那段路径没有受益人。**取窄的地方在项，不在模块**：只有跨出 crate 的项是 `pub`，其余留 `pub(crate)` 或 `pub(super)`。
+- **`install` 与 `wire_client` 留在 bin**：前者把二进制放上 PATH，后者从终端连一座已服务的城并从 stdin 读 enrolment——两者都是关于命令行的，不是关于城的。
+- **`Cargo.toml` 不分 target 配置**：Cargo 对同一 package 自动发现 `src/lib.rs` 与 `src/main.rs` 两个 target，OUT_DIR 对两者相同，`include!(client_embed.rs)` 与 `DEPENDENCIES` 因此留在 `main.rs`。
+- **门禁**：`header` 要求 `lib.rs` 带 MPL 通告；`modmap` 对 `*/lib.rs` 按索引文件判定，只准 `mod`／`use`／`pub use`／注释／属性。
+- **citysim 不是第二个装配层**：`tools/citysim/Cargo.toml` 不依赖 sprawling，`run_scenario` 手工构造 `RunPlan`，够到的最高层是 `runtime::run::drive`；装配层可被依赖，但 citysim 不依赖它。
 -/
 
 /-!
-## 8-39 装配点成为一棵模块树，十五条签名被消掉（`bin::assembly::*`）
+## 8-39 写者是一棵模块树（`accounting::worker::*`）
 
-`bin::assembly` 10,695 → 一棵树，每个文件在 1000 行以内，`[file_length.predating]` 的最后一行被划掉。
+`RunWorker` 的定义在 `crates/accounting/src/worker.rs`，它的方法按字段簇散进 `worker/` 下的子模块（`credentials`、`workbench`、`settling`、`reviewing`、`commanding`、`driving`、`dispatching`、`waking`、`genesis`、`lifetime` 等），每个文件守 `xtask length` 的上限。下面说的是它的切法，不是一份文件清单；文件清单是 ARCHITECTURE 的模块表。
 
-### 为什么是子模块，不是兄弟模块
-
-`RunWorker` 22 个私有字段。**子模块看得见父模块的私有项**——Rust Reference 的 *Visibility and Privacy*：
-"If an item is private, it may be accessed by the current module and its descendants"。
-于是 `RunWorker` 的定义留在 `assembly.rs`，`impl RunWorker` 的方法散进 `assembly/*.rs`，
-**可见性一个字不动**：crate 里 `assembly` 之外的任何模块看到的仍是今天那张脸。
-兄弟模块做不到这件事，§8-37 与 §8-38 因此付了 `pub(crate)` 的价；这里不付。
-
-### 缝在哪：先量再切
-
-切缝取自一次 LCOM 测量（66 个方法对 21 个字段的接触矩阵），不取行数。读数：
-`city_root` 被 21 个方法碰，`ledger` 与 `governance` 各 8，`inboxes` 5，`vault` 4，**其余 15 个字段各 ≤ 2 且成簇不交叉**：
-
-| 簇 | 碰它的方法 | 落到 |
-|---|---|---|
-| `vault` | `put_secret`／`resolver` | `accounting::worker::credentials` |
-| `inboxes`／`joins`／`requests`／`goals` | `lay_out_workbench`／`open_desks`／`settle_desks`／`settle`／`deliver_handback` | `accounting::worker::workbench`＋`accounting::worker::settling` |
-| `pursuits`／`delegator` | `set_pursuit`／`pursue` | `accounting::worker::commanding` |
-| `interrupts`／`watching` | `attach_interrupts`／`watch`／`drive_dispatch` | `assembly.rs`（装的两个钩子）＋`accounting::worker::driving` |
-| `knocks` | `knock`／`answer_knocks` | `accounting::worker::dispatching` |
-
-**这份读数说的是 `RunWorker` 是五个类**，而这里只把它们搬进各自的文件、让边界看得见；
-把它们变成真的对象要先分开「判定」与「记账」（每个簇的方法都在 `self.record(...)` 写账本），那是 ARCHITECTURE §5 的
-invert the model seam，仍未动手。**这里不假装做过它。**
-
-### 门给这次拆分定的价：十五条签名必须被修好
-
-`tools/xtask/src/length.rs` 的豁免键是 `路径::函数名`，而 `guard::strikes_only_exemptions` 的 rustdoc 写死了
-"an over-long signature may be fixed or left alone, never relocated with its excuse"。
-`assembly.rs` 里有十五条超标签名，**它们随文件搬家就失去豁免**，所以逐条消掉。
-消法是同一条：**总在一起走、从不被单独选择的值，是一个还没有名字的值**（`Reporter` 的 doc 写下的先例）。
-
-| 新值 | 它是什么 | 消掉了 |
-|---|---|---|
-| `Assignment` | 一次派活是什么：地址、模式、天花板、谁把它交下来（深度由它推出，不再第二次传） | `dispatch_in` 6→3、`lay_out_workbench` 7→4、`stand_up` 5→2、`settle` 5→3 |
-| `Given` | 这一轮活被给了什么：brief、task、goal，与那份字节的 pin | `freeze_plan` 9→4 |
-| `Driving` | 一次 drive 跑在什么上面：适配器、工作台、信号桌、写根、检查点域、身份 | `drive_dispatch` 9→3 |
-| `Ending` | 一次 drive 以什么结束：结局、被抬起来的审批、代表桌 | `conclude` 10→3 |
-| `Sweep` | drive 之后要收的东西：检查点、被抬起来的审批、job locator | `settle_desks` 11→4 |
-| `Reach` | 这一轮活够得到谁：邻里与代表 | `status_tool` 7→4 |
-| `Entered` | 一个人为接一个 endpoint 输入了什么：名字、base URL、兼容格式、凭证（`Credential` 枚举，不是「密钥＋鉴权头」两个 `Option`） | `endpoint_of` 5→1、`probe_endpoint` 5→1、`attach_endpoint` 6→2 |
-| `Ceilings` | 一行模型声明的两个上限：上下文与最大输出（后者 `Option<Ceiling>`；人没填就沿用这个模型上一次登记的值，再退回目录行，见 §8-71） | `select_model` 5→4 |
-
-`record_for` 的五参消得不需要新类型：`effect::Line` 已经装着 `who`／`addr`／`kind`／`data`，
-调用点原本就在把它拆开再递进去，改成整份递。
-`settle_requests` 与 `settle_desks` 另外收掉四个参数，因为 `who`／`run_id`／`write_root`／`building`
-**本来就是 `Site` 的字段**，调用点在一个一个地从 `site` 里取出来递；`checkpoint_scope` 成为 `Site` 上的方法，
-于是「检查点落在楼上还是落在房间上」在本模块只有一个答案。
-三处 `#[expect(clippy::too_many_arguments)]` 随之报「这条压制没有被用到」而自己清掉——**修好之后压制自己消失，正是它该有的形状**。
-
-### 十六个子模块，与两次为了行数之外的理由再切的缝
-
-`assembly.rs` 756 行，十六个子模块各在 1000 行以内。其中两次是重新分配时切的，而切缝仍取自形状：
-`settling` 里 `settle_requests` 回答的是「一个不能直接写的楼怎么收下这次改动」，那是评审与合并，成 `reviewing`；
-`dispatching` 里 `wake`／`knock`／`answer_knocks` 回答的是「一个没在干活的居民怎么被叫起来」，成 `waking`。
-`configure_building`／`create_building`／`adopt_building`／`startup_scan` 从动词表挪进 `genesis`：
-**`form_city` 本来就在调 `adopt_building`**，一座城怎么长出楼、重启后看见什么，和一个人发一个动词不是一件事。
-
-### 测试跟着它咬的那个模块，一份夹具留在父模块
-
-`mod tests` 5,576 行，一百个测试函数。**先量后放**：3,490 行只用这个 crate 已经公开的面，
-本来可以按 `assembly_door.rs` 的先例去 `crates/sprawling/tests/`。**没有那样做，理由是夹具。**
-`fake_openai`（一台按脚本作答的 OpenAI 服务器）、`worker_with_provider`、`completion` 这一簇 443 行，
-被两边同时需要：`what_a_worker_holds_is_what_a_restart_rebuilds` 要用它造一段历史再去核 `Standing::fold`，
-而 `tests/` 里的验收测试也要用它。**`#[cfg(test)]` 的东西到不了 `tests/`，`tests/` 的东西到不了 `src/`**——
-分家就要养两份同名夹具，那是一个夹具两个权威。
-
-所以整套留在 `src/`：夹具成为 `accounting::worker::fixture`（父模块下的 `#[cfg(test)] mod`，十六个子模块都从 `super` 够得到），
-每个测试搬到**它咬的那个模块**旁边。**crate 的公开面因此一个条目都没有增加**——
-`Views`／`Standing`／`CommandDesk` 全部仍是 `pub(crate)`；`RunWorker` 的方法写在三个文件的三个 impl 块里，公开拼写不变。
-
-### 验收
-
-`cargo xtask length` 里 `assembly.rs` 的钉子被划掉而不是被调小；`[argument_count.predating]` 少十五行。
-两者都是纯删除，所以 `guard::strikes_only_exemptions` 放行，不需要 `Verdict:` trailer；
-budgets.toml 里那两段已经失真的注释单独一枚提交改，因为改注释会让豁免形状判定失效。
+- **子模块，不是兄弟模块**：子模块看得见父模块的私有项（Rust Reference，*Visibility and Privacy*："If an item is private, it may be accessed by the current module and its descendants"），所以 `RunWorker` 的字段保持私有，跨文件调用收成 `pub(in crate::worker)`，`worker` 之外看到的仍是同一张脸。
+- **缝取自字段簇，不取行数**：`city_root`、`ledger`、`governance` 被多数方法碰；其余字段成簇不交叉——凭据（`vault`）落 `credentials`，工作台与收尾（`inboxes`／`joins`／`requests`／`goals`）落 `workbench` 与 `settling`，追求（`pursuits`／`delegator`）落 `plans`，打断与观察落 `driving`，敲门（`knocks`）落 `waking`。`settle_requests` 回答「一个不能直接写的楼怎么收下这次改动」，所以住 `reviewing`；`create_building`／`adopt_building`／`startup_scan` 回答一座城怎么长出楼、重启后看见什么，所以住 `genesis`；`configure_building` 是人发的一个动词，住 `commanding::configure`。
+- **总在一起走的值是一个有名字的值**：`Assignment`（一次派活：地址、模式、天花板、谁交下来）、`Given`（这一轮活被给了什么）、`Driving`／`Driven`（一次 drive 跑在什么上、以什么结束）、`Ending`、`Sweep`、`Reach`、`Entered`（一个人为接一个 endpoint 输入的东西，凭证是 `Credential` 枚举）、`Stated`（人为一个模型声明的东西：`Option<Window>` 上下文、`Option<Ceiling>` 最大输出与输入梯子的第一档；缺席即「没人声明过」，§8-71）。它们让函数守 4 个参数的上限，而不是压制 lint；`checkpoint_scope` 是 `Site` 上的方法，「检查点落在楼上还是落在房间上」只有一个答案。
+- **簇还不是对象**：每个簇的方法都经 `self.record(...)` 写账本，把簇变成真对象要先分开「判定」与「记账」（ARCHITECTURE §5 的 invert the model seam），这件事还没做。
+- **测试跟着它咬的那个模块，夹具一份**：按脚本作答的 OpenAI 服务器与 `worker_with_provider` 这一簇夹具住 `accounting::worker::fixture`（`#[cfg(test)] mod`，子模块从 `super` 够得到）。`#[cfg(test)]` 的东西到不了 `tests/`，`tests/` 的东西到不了 `src/`，分家就要养两份同名夹具，所以写者的测试留在 `src/`，`Views`／`Standing`／`CommandDesk` 不为测试变 `pub`。
 
 ### 交接探针（`accounting::worker::probing::probe`，形状 2 值类型）
 
@@ -179,98 +88,14 @@ pub(crate) fn handoff_probe() -> Result<Probe, AxError>;   // 名 handoff、版�
 -/
 
 /-!
-## 8-165 落点三 · Assembly 显式化：接线是一处，判定住 kernel，搬运是值
+## 8-165 Assembly 显式化：接线是一处，判定住折叠，搬运是值
 
-§8-28 留下的依据是「凡调用方仍在做区间比较、仍在记 `last_*` 的，皆是
-epoch 机器要收走的东西」。这里把它收走，并连带回答那三句话。
-**三句话各是一处代码动作，不多不少**：
-
-### 接线留——`adapter_for` 搬出 `credentials.rs`
-
-今天 `agree_to_work`（`dispatching.rs:252`）与 `name_the_work`
-（`dispatching.rs:497`）各调一次 `self.adapter_for(&chosen)`，而
-`adapter_for` 住在 `credentials.rs:581`——凭据簇里住着一条装配线。
-搬家：`adapter_for(chosen, resolver)` 成为 `gateway` 的自由函数
-（`endpoint/adapter.rs`，与 `Endpoint::new` 同簇），`resolver` 由调用方传入。
-`credentials.rs` 留下 `resolver`（赎回闭包是凭据的形状），`dispatching`
-的两个调用点各多传一个 `self.resolver()`。
-
-**为什么是值参不是方法**：`adapter_for` 读的只有 `chosen` 与 `resolver`，
-`self` 的其余 21 个字段与它无关；挂在 `RunWorker` 上等于说「装配需要整座城」。
-搬出去后 `credentials.rs` 少一个 `impl RunWorker` 方法，多一个跨 crate 调用——
-接线只有一处（`gateway::endpoint::adapter`），这就是「接线留」。
-
-### 判定进 kernel——`halted_by` 的归属不变，调用点收敛
-
-`halted_by` 住在 `commanding/governing.rs:45`（`pub(in crate::assembly)`），
-读的是 `governance` 折叠（`HALTED`／`RELEASED`）。「判定进 kernel」的
-含义经核对后收窄：停摆判定读的是**本进程的折叠状态**（`self.governance`），
-不是纯函数能回答的问题；硬搬进 kernel 等于把 `Governance` 也搬过去，
-那是另一步的事（`folds.rs` 957 行）。这里只做收敛：`halted_by` 的两个调用点
-（`dispatching.rs:229` 与 gate 面）确认走同一函数——量过，只有一处定义，
-调用点已收敛，**本句的验收是「无代码变更」，理由记在这里而不是被含糊过去**。
-
-### 搬运下沉 adapter——`Driving.adapter` 由 `&mut dyn Model` 改为拥有值
-
-今天 `Driving<'a>`（`driving.rs:28`）的 `adapter` 字段是 `&'a mut dyn Model`，
-由 `dispatching.rs:350` 的 `site.adapter.as_mut()` 出借。`Agreed.adapter`
-与 `Site.adapter` 是 `Box<dyn Model + Send>` 拥有值，`Driving` 是唯一的
-出借点。搬运下沉：`Driving` 改为拥有 `Box<dyn Model + Send>`（调用点 `move`），
-`drive_dispatch` 结束时把 `adapter` 还回——还法是 `Driven` 多一个字段
-`adapter: Box<dyn Model + Send>`，调用方拆开归位（`Site` 字段名不增不减，
-`adapter` 的类型由 `Box` 变为 `Option<Box>`——`Option` 是这次搬运的载具而非新状态，
-跨过调用时两侧皆为 `Some`，`None` 不可观察；`None` 分支以 `E_CONFIG_INVALID` 拒绝告之而非 panic，
-§8-40 的先例）。
-
-**为什么**：`&mut` 出借把「谁拥有 adapter」这个问题悬在一次调用上；
-拥有值随 `Driven` 回来，适配器的来去在类型上闭合——这就是「搬运下沉」，
-与 §8-40 `Standing` 四样东西「拆开归位」的同一条道理。
-
-### epoch 机器——`last_tick` 的区间比较收归一处
-
-§8-28 的依据点名 `last_*`。量过：`last_tick` 是全仓唯一的 `last_*`
-（`grep last_` 全仓仅 `assembly.rs:185` 定义＋`routing.rs` 读写＋测试）。
-收走：`tick` 的「读表→判断→推进 `last_tick`」三步收成
-`RunWorker::tick_after(now)` 仍三步，但 `last_tick` 的读写只在此一函数——
-今天已是如此（`routing.rs` 的 `tick` 是唯一读写点），**本句的验收同样是
-「无代码变更」**：epoch 机器的第一条轨道（到期判断下沉 `city`）已在上一步
-落定，剩下的 `last_tick` 字段本身是 worker 状态而非散装轮询，
-删它等于把「开机不补跑昨日」这个产品语义（§8-6）一并删掉，不删的理由在此。
-
-### LOADING / UNLOADING 在哪
-
-LOADING／UNLOADING 落在 `RunWorker::over`（`assembly.rs:239`）：
-`Standing::fold` 即全量 LOADING（一次验证、三折叠，一句注释已写明），
-而 UNLOADING 是 `close_city` 写 handoff（`assembly.rs:394`）。
-两者皆已有名有主，不给它们改名——**给已存在的东西改名是第二权威，
-§8-39 的教训**。这里只在 `over` 的 doc 上加一句：「此即 LOADING；
-UNLOADING 见 `close_city`」，让设计里的词与代码的名在文档里相遇。
-
-### `RunWorker` 立面只减不增
-
-`adapter_for` 搬出后，`impl RunWorker` 方法数减一；`halted_by`／`tick`／
-`last_tick` 零增；`Driving`／`Driven` 的字段变化是 `driving.rs` 内部形状，
-不进立面：`sprawling` 的公开项一项不增；`commanding/governing` 与 `commanding/routing`
-各多一个 `impl RunWorker` 块，是住处，不是接口。
-
-### 验收
-
-1. `gateway::endpoint::adapter::adapter_for` 新建，`dispatching` 两调用点
-   传 `self.resolver()`；`credentials.rs` 的 `adapter_for` 删除。
-   既有测试 `a_loopback_endpoint_with_a_credential_sends_it_on_every_call`
-   与 `a_dispatch_without_a_provider_fails_saying_what_to_configure`
-   逐字绿（它们咬的正是这条装配线）。
-2. `Driving` 拥有 adapter，`Driven` 带回 adapter；`dispatching.rs:350`
-   处拆开归位。`sprawling` 全绿。
-3. `over` 的 doc 增 LOADING／`close_city` 互指一句；`halted_by`／`tick`／
-   `last_tick` 零代码变更（本节即其理由）。
-4. `just check` 绿；`sprawling` 基线按口径同集改写（只增减 impl 行）。
-
-### 文档同步
-
-本节；`ARCHITECTURE.md` §6（`gateway::endpoint::adapter` 新行；
-`commanding::governing` 职责减一句）；gateway 规格的 endpoint 节（`crates/gateway/spec/Endpoint.lean`）记
-`adapter_for` 的归属理由（装配线住适配器簇，凭据只出 `resolver`）。
+- **接线是一处**：把一个选择变成一个模型适配器只在 `gateway::adapter_for`（`crates/gateway/src/endpoint/adapter.rs`，与 `Endpoint::new` 同簇）发生，凭据由调用方以 `resolver` 递入；`accounting::worker::credentials` 只出 `resolver`（赎回闭包是凭据的形状），不在 `RunWorker` 上挂装配线。值参而非方法，因为 `adapter_for` 读的只有选择与 `resolver`，挂在 `RunWorker` 上等于说「装配需要整座城」。
+- **停摆判定只有一处**：`halted_by`（`accounting::worker::commanding::governing`，`pub(in crate::worker)`）读本进程的 `governance` 折叠（`HALTED`／`RELEASED`），每个调用点走它。它不进 kernel：它答的是折叠状态，不是纯函数能回答的问题，搬进 kernel 等于把 `Governance` 一起搬过去。
+- **适配器随值来去**：`Driving` 拥有它的适配器（`accounting::worker::keeping_warm::Door`），drive 结束时经 `Driven.adapter` 交回，调用方拆开归位；`&mut` 出借会把「谁拥有适配器」悬在一次调用上。`Site` 一侧的 `adapter` 是 `Option<Door>`，只是这次搬运的载具，跨过调用时两端皆为 `Some`；`None` 分支以 `E_CONFIG_INVALID` 拒绝而不 panic（§8-40 的先例）。
+- **定时只有一个 `last_*`**：`last_tick` 的读写只在 `commanding::routing` 的 `tick`（读表→判断到期→推进）；它是写者状态而不是散装轮询，删它等于删掉「开机不补跑昨日」这条产品语义（§8-6）。
+- **LOADING／UNLOADING 有名有主**：LOADING 是 `RunWorker::over` 里的 `Standing::fold`（一次验证、三折叠），UNLOADING 是 `close_city` 写 handoff；不给它们另起名字，因为给已存在的东西改名是第二个权威。
+- **判据**：`a_loopback_endpoint_with_a_credential_sends_it_on_every_call` 与 `a_dispatch_without_a_provider_fails_saying_what_to_configure` 咬的正是这条装配线。
 -/
 
 /-!
@@ -282,16 +107,16 @@ UNLOADING 见 `close_city`」，让设计里的词与代码的名在文档里相
 
 **缓存一份副本在这里不构成第二权威**：第二权威的危险来自**会变的**事实被抄了一份；创世哈希不会变。真正被消掉的风险是相反的一个——每次重读都可能读出不同的答案（有人换了账本），而一次运行里换了城的身份是比陈旧副本坏得多的事。
 
-- **接口随之改形**：`workbench::standing::provenance` 与 `Site::provenance` 收 `city: B3Hash` 而不再收 `&Path`，于是「谁去读盘」这件事只剩 `RunWorker::city_hash` 一个答案，四个调用点都从它取。
+- **接口随之改形**：`workbench::standing::provenance` 与 `Site::provenance` 收 `city: B3Hash` 而不再收 `&Path`，于是「谁去读盘」这件事只剩 `RunWorker::city_hash` 一个答案，每个调用点都从它取。
 - **作证方式**：城的创世哈希被读过一次之后，把账本首段从盘上删掉，`city_hash` 仍答同一个值——记住了才可能如此。
 -/
 
 /-!
-## 8-134 页面读到历史证明到哪里（`accounting::views::city`、`bin::assembly::attending`；`crates/wire/Spec.lean` §8-63）
+## 8-134 页面读到历史证明到哪里（`accounting::views::city`、`bin::assembly::listening`、`bin::assembly::attending`；`crates/wire/Spec.lean` §8-63）
 
 服务中的城在后台证明整条链（§8-90、§8-122），证明完成之前写者拒绝每一次追加。页面需要在同一刻知道这件事，否则一次被拒的命令看起来是坏了。`CityAnswer.proved` 回答它。
 
-- **一个句柄，两个读者。** 写者线程挂上的 `storage::ChainHalt` 是判定的唯一一处：写者用它决定接不接一行，视图用它决定答不答「已证明」。`bin::assembly::attending` 在起写者之前造这只 halt，经 `RunWorker::chain_under_audit(halt)` 挂给写者，同一只的克隆经 `Views::watch_proof` 交给发布与备用两份视图。
+- **一个句柄，两个读者。** 写者线程挂上的 `storage::ChainHalt` 是判定的唯一一处：写者用它决定接不接一行，视图用它决定答不答「已证明」。`bin::assembly::listening` 在起写者之前造这只 halt，经 `Views::watch_proof` 交给重建的视图（备用的那份由 `twin` 从它复制），`bin::assembly::attending` 经 `RunWorker::chain_under_audit(halt)` 把同一只挂给写者。
 - **答什么。** `halt.proved()` 为真时答视图此刻的头（`Some(head)`）：证明完成时写者还没写过一行，之后的每一行都由这个已证明的写者接上；为假（还在证明，或证明发现链断了）答 `None`。不经 halt 起步的视图（一次性查询、测试）起步前已同步证明过整条链，答它们的头。
 - **不进账本。** 证明是这台主机对这份账本的一次核对，不是城的历史；它记在 `the history is proved` 那一行诊断里（§8-121），页面读的是此刻的判定。
 - 验收：`accounting::views::city` 的 `a_city_answer_says_the_history_is_proved_only_once_the_halt_says_so`。
@@ -300,11 +125,11 @@ UNLOADING 见 `close_city`」，让设计里的词与代码的名在文档里相
 /-!
 ## 8-56 说出来的那句话：录音进城，一行字出来（`accounting::views::hearing`、`bin::assembly::listening::hearing`；`crates/wire/Spec.lean` §8-27）
 
-服务端此前只有 `gateway::transcribe` 这个适配器：一件没有任何路可以走到的东西。本节把路修通。
+`gateway::transcribe` 是转写的适配器；本节是从 `/transcribe` 走到它的那条路。
 
 - **人填 URL 与 key 走既有的 attach 表单**。「哪个 endpoint、哪个 model 答这一类活」已有机制——`ModelTag`。第三个 tag `Transcribe` 因此是全部的新增面：第二张表单加第二份存储会是同一个问题的第二个答案，而那把 key 还要有第二条进金库的路。
-- **`Views::transcriber`**（`views::hearing`）：锁内读出选择、造出 `Transcriber`，锁外发请求。一次转写是数秒，而那把锁是全部读的答案所在。录音到达的是城一级的门、身上没有地址，读不出任何一座楼的规矩，故这里**写明** `BuildingPolicy::new(false)` 而不是取默认值——把「口述按普通楼出门」这件事摆在读者眼前。上传带上它所属的那座楼之后，这个值同样从楼规来。
-- **`assembly::listening::hearing`**：把 views 与金库收成一条 `TranscribeSink`。金库是**工人开的那一把**，经启动握手那条通道交出来（`Started.vault`）——第二个 `Custodian` 会是同一批机密的第二扇门。
+- **`Views::transcriber`**（`accounting::views::hearing`）：从视图的一份快照读出选择、造出 `Transcriber`，放开快照之后才发请求。一次转写是数秒，而一份被握着的旧快照会让折叠迟迟收不回它。录音到达的是城一级的门、身上没有地址，读不出任何一座楼的规矩，故这里**写明** `BuildingPolicy::new(false)` 而不是取默认值——把「口述按普通楼出门」这件事摆在读者眼前。上传带上它所属的那座楼之后，这个值同样从楼规来。
+- **`assembly::listening::hearing`**：把发布的视图与金库收成一条 `TranscribeSink`。金库是**工人开的那一把**（`Arc<Mutex<Custodian>>`），经启动握手那条通道交出来（`Started.vault`），经 `accounting::held_vault::resolving` 赎回凭据——第二个 `Custodian` 会是同一批机密的第二扇门。
 - **容器从请求头读**：`AudioType::of_media_type` fail closed，拒词列出这座城发得出去的五种。浏览器录进它手上有的容器，而只有它知道是哪一个。
 - **页面**：`core/speaking.ts` 管录音与上传，composer 多一个按钮，**转写结果落进输入框而不是直接发出去**——机器听错的那一句必须能改，否则它会花掉一次 run。没有 `transcribe` 选择的城不画这个按钮（`useHearing`）。
 - **同一个选择也给 run 一件工具**：`transcribe`，有没有它读的是同一次 `select`，只是按 run 所在那座楼的楼规读（§8-131）。
@@ -314,21 +139,21 @@ UNLOADING 见 `close_city`」，让设计里的词与代码的名在文档里相
 /-!
 ## 8-102 开城时修过什么，要说给人（`accounting::worker::lifetime`、`accounting::worker::genesis`、`bin::assembly::attending`）
 
-**原因**：`JsonlLedger::open` 在断尾恢复时截掉撑裂的尾行，并返回 `OpenReport`（`crates/storage/Spec.lean` §8-1）。账上虽然多了一行 `log_truncated`，但页面不画它，CLI 也不读它；`RunWorker::new` 与 `form_city` 把报告丢掉，人于是不知道上一次进程死时丢了几个字节。
+**原因**：`JsonlLedger::open` 在断尾恢复时截掉撑裂的尾行，并返回 `OpenReport`（`crates/storage/Spec.lean` §8-1）。账上虽然多了一行 `log_truncated`，但页面不画它，CLI 也不读它；报告若被丢掉，人就不知道上一次进程死时丢了几个字节。
 
 **形状**：值（形状 2）。`RunWorker` 持有 `LedgerOpening`，它是 `OpenReport` 在本 crate 的类型化状态，只由 `LedgerOpening::from(OpenReport)` 生成：
 
 ```rust
-pub(crate) enum LedgerOpening { Intact, TailDropped { bytes: u64 } }
+pub enum LedgerOpening { Intact, TailDropped { bytes: u64 } }
 impl From<storage::OpenReport> for LedgerOpening { … }
 impl LedgerOpening {
     /// 给人看的一句：截掉了什么、为什么、怎么恢复；`Intact` 答 `None`。
-    pub(crate) fn notice(self) -> Option<String>;
+    pub fn notice(self) -> Option<String>;
 }
 impl RunWorker {
     // 第四个参数就是 JsonlLedger::open 返回的那一对：账与它开时修过什么一起到，调用方没法只交一半。
-    pub(crate) fn over(&Path, Custodian, Diagnostics, (JsonlLedger, OpenReport)) -> Result<Self, AxError>;
-    pub(crate) fn opening(&self) -> LedgerOpening;
+    pub fn over(&Path, Diagnostics, Hands, (JsonlLedger, OpenReport)) -> Result<Self, AxError>;
+    pub fn opening(&self) -> LedgerOpening;
 }
 ```
 
@@ -336,7 +161,7 @@ impl RunWorker {
 - **`form_city` 不丢报告**：它只在目录没有账本时开账，报告因此恒为 `Intact`；它照样把 `open` 返回的那一对原样交给 `over`，让「worker 知道自己的账是怎么开的」对每条构造路径都成立，而不是靠一句注释说这里不会发生。
 - **恢复**：截掉的是进程死时没写完的那一行，它之前的每一行都已按链校验。人要做的是确认最后一次动作是否需要重做；要逐字节看原状，就在再次打开之前从备份拷回 `.ledger`。
 - **仍未到页面**：页面对 `log_truncated` 什么也不画（`client/src/core/belief.ts` 把它归进不显示的一组）。让城页说出这件事，需要一个视图字段与客户端的一个位置，这是本节接口尚未覆盖的一半。
-- **不进公开面**：`ScanReport::summary()` 是跨出 crate 的唯一读法，`LedgerOpening` 因此留在 `pub(crate)`。
+- **`pub` 是因为读者在另一个 crate**：`LedgerOpening`、`opening`、`notice` 住 `accounting`，而印出那一句的 `bin::assembly::attending` 在 `sprawling`；`sprawling resume` 仍只经 `ScanReport::summary()` 读它。
 - **被否：只把 `notice` 写进 `Diagnostics`**。`serve` 默认不开日志，`resume` 用的是 `Diagnostics::off()`，写进去就等于没说。
 
 **本节测试**：`accounting::worker::lifetime::tests::a_torn_tail_is_told_in_the_startup_scan`：写一座城，在账尾追加半行，`RunWorker::new` 后 `startup_scan().summary()` 必须说出截掉的字节数。
@@ -359,6 +184,7 @@ pub(super) fn dropping(city_root: PathBuf) -> wire::DropSink;   // listening 把
 - 名字由地址文法判：`hall/dropped/<hash>/<name>` 必须能被 `kernel::Address::parse` 读出来，否则 `E_INVALID_ARGS`，recovery 说改个名字再拖。空名字、`..`、带路径分隔符的名字都在这一步被拒。
 - 同样的字节、同样的名字再拖一次，落在同一个文件上并答出同一条路径，文件只写一次；同名而字节不同的两个文件落在两个目录里，互不覆盖。
 - 写失败是 `E_STORAGE_FATAL`，subject 是那条路径。
+- **三个平台同一条规则**：地址文法在 Windows、macOS、Linux 上都拒反斜杠与 `:`（盘符与 NTFS 流），所以在 Linux 上本来合法的、带反斜杠的文件名在这里同样被拒，同一个名字在三个平台上得到同一个答复；答出的路径用本平台的分隔符（`std::path::absolute`）。
 
 **决定。**
 
