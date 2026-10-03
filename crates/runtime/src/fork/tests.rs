@@ -211,6 +211,7 @@ fn a_steer_after_assembly_is_inherited_after_the_results() {
         "measure the meter",
         "a number is written down",
         crate::conversation::Opening::WithPerson,
+        "the User",
     );
     expected.push_assistant(vec![ContentBlock::Text {
         text: "reading it now".to_owned(),
@@ -241,6 +242,7 @@ fn a_branch_inherits_the_mother_window_message_for_message() {
         "measure the meter",
         "a number is written down",
         crate::conversation::Opening::WithPerson,
+        "the User",
     );
     expected.push_assistant(vec![ContentBlock::Text {
         text: "reading it now".to_owned(),
@@ -311,6 +313,7 @@ fn a_branch_of_a_branch_keeps_the_grandmother_conversation() {
         "write it down twice",
         "two numbers",
         crate::conversation::Opening::WithPerson,
+        "the User",
     );
     expected.push_assistant(vec![ContentBlock::Text {
         text: "written".to_owned(),

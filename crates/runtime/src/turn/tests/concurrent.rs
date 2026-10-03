@@ -151,7 +151,12 @@ pub(super) fn waved<'h>(
 ) -> Turn<'h, ToolWave> {
     let mut model = OneShotModel { calls };
     let mut conversation = Conversation::new();
-    conversation.push_task_lines("read three files", "three reads", Opening::FromJob);
+    conversation.push_task_lines(
+        "read three files",
+        "three reads",
+        Opening::FromJob,
+        "the User",
+    );
     let turn = advance(
         turn.assemble(
             Interrupt::None,

@@ -229,6 +229,7 @@ fn a_wire_mismatch_on_the_streaming_door_is_repaired_through_the_blocking_door()
         "probe the city",
         "one probe",
         crate::conversation::Opening::FromJob,
+        "the User",
     );
     let mut lines = lines();
     let turn = opened_on::<1>(&mut lines);

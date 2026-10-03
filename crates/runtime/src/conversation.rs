@@ -54,7 +54,7 @@ impl Conversation {
     /// the assigned opening names it rather than repeating it: the run
     /// segment is not cached, and a pasted task written here again
     /// would be paid for twice on every turn.
-    pub fn push_task_lines(&mut self, task: &str, goal: &str, opening: Opening) {
+    pub fn push_task_lines(&mut self, task: &str, goal: &str, opening: Opening, _from: &str) {
         self.push_user_text(match opening {
             Opening::FromJob => format!("The task is in JOB.md above.\nGoal: {goal}"),
             Opening::Inherited => format!("Task: {task}\nGoal: {goal}"),

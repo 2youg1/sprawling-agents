@@ -209,9 +209,9 @@ fn a_bare_building_is_named_by_rule_and_the_run_is_the_first_call() {
         .into_iter()
         .find(|body| body.contains("messages"));
     assert!(
-        first
-            .as_deref()
-            .is_some_and(|body| body.contains("The task is in JOB.md above.")),
+        first.as_deref().is_some_and(
+            |body| body.contains("The task is in JOB.md above, handed down by the User.")
+        ),
         "the first chat call is the run itself: {first:?}"
     );
     assert!(

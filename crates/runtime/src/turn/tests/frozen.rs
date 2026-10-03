@@ -27,7 +27,7 @@ use crate::conversation::Opening;
 fn a_prefix_whose_bytes_moved_is_refused_before_anything_is_assembled() {
     let mut ledger = TestLedger::new();
     let mut conversation = Conversation::new();
-    conversation.push_task_lines("probe the city", "one probe", Opening::FromJob);
+    conversation.push_task_lines("probe the city", "one probe", Opening::FromJob, "the User");
     let drifted = crate::prefix::FrozenPrefix::assemble(
         crate::prefix::FrozenSegment::mislabelled(
             crate::prefix::SegmentSlot::City,

@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::address::Address;
 use crate::error::{AxCode, AxError};
+use crate::event::identity::RunId;
 
 /// The city's own desk, as every ledger line it writes spells it.
 const CITY: &str = "city";
@@ -75,6 +76,27 @@ impl Who {
         }
     }
 
+    /// Who handed a piece of work down, in the words a model reads in
+    /// its job file and its opening message (`crates/city/spec/SpineFiles.lean`
+    /// D21).
+    ///
+    /// A resident is named with the run that handed the work down: the
+    /// predecessor when this is a succession, otherwise the delegating
+    /// parent; a knock has neither and names the address alone. Spelled
+    /// here because the city's dispatch writes the job file and the
+    /// runtime writes the opening message, and both must say the same.
+    #[must_use]
+    pub fn handed_down_by(&self, predecessor: Option<RunId>, parent: Option<RunId>) -> String {
+        match self {
+            Who::City => "the city".to_owned(),
+            Who::Person => "the User".to_owned(),
+            Who::Resident(addr) => match predecessor.or(parent) {
+                Some(run) => format!("@{addr}, run {run}", addr = addr.as_str()),
+                None => format!("@{addr}", addr = addr.as_str()),
+            },
+        }
+    }
+
     /// Reads back what [`Who::as_str`] wrote.
     ///
     /// # Errors
@@ -132,6 +154,29 @@ mod tests {
                 format!("\"{party}\"")
             );
         }
+    }
+
+    #[test]
+    fn work_handed_down_names_the_run_that_handed_it_down() {
+        let lead = Who::resident(Address::parse("lab/lead").unwrap()).unwrap();
+        let parent = RunId::parse("0198f6a2-7c4a-7bbb-9d1e-000000000001").unwrap();
+        let before = RunId::parse("0198f6a2-7c4a-7bbb-9d1e-000000000002").unwrap();
+        assert_eq!(
+            [
+                Who::Person.handed_down_by(None, None),
+                Who::City.handed_down_by(None, Some(parent)),
+                lead.handed_down_by(None, Some(parent)),
+                lead.handed_down_by(Some(before), Some(parent)),
+                lead.handed_down_by(None, None),
+            ],
+            [
+                "the User".to_owned(),
+                "the city".to_owned(),
+                format!("@lab/lead, run {parent}"),
+                format!("@lab/lead, run {before}"),
+                "@lab/lead".to_owned(),
+            ]
+        );
     }
 
     #[test]

@@ -218,7 +218,12 @@ fn run_turn(
     let mut face = Face::new(&ledger.durable, saw);
     let mut model = OneShotModel { calls };
     let mut conversation = Conversation::new();
-    conversation.push_task_lines("read and write", "a mixed wave", Opening::FromJob);
+    conversation.push_task_lines(
+        "read and write",
+        "a mixed wave",
+        Opening::FromJob,
+        "the User",
+    );
     let turn = advance(opened_on::<1>(&mut lines).assemble(
         Interrupt::None,
         ledger,

@@ -96,7 +96,14 @@ impl Run<Active> {
         // its own lines: the task joins the mother's last user message when
         // one is open, which is the same rule a steer follows.
         conversation.push_inherited(&plan.inherited);
-        conversation.push_task_lines(&plan.task, &plan.goal, plan.opening);
+        conversation.push_task_lines(
+            &plan.task,
+            &plan.goal,
+            plan.opening,
+            &plan
+                .dispatched_by
+                .handed_down_by(plan.predecessor, plan.parent),
+        );
         let gauge = ContextGauge::new(
             kernel::Tokens::new(plan.shape.context_tokens),
             plan.second_threshold,

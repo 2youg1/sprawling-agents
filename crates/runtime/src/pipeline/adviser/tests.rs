@@ -25,7 +25,12 @@ use storage::Cas;
 
 fn conversation() -> Conversation {
     let mut conversation = Conversation::new();
-    conversation.push_task_lines("do it", "it is done", crate::conversation::Opening::FromJob);
+    conversation.push_task_lines(
+        "do it",
+        "it is done",
+        crate::conversation::Opening::FromJob,
+        "the User",
+    );
     conversation
 }
 
@@ -131,7 +136,7 @@ fn a_fallback_records_the_reason() {
 fn a_density_score_scales_the_budget_and_records_the_two_lines() {
     let text = "The first sentence says what this result is about. ".repeat(40);
     let mut conversation = Conversation::new();
-    conversation.push_task_lines("t", "g", crate::conversation::Opening::FromJob);
+    conversation.push_task_lines("t", "g", crate::conversation::Opening::FromJob, "the User");
     let mut adviser = Adviser::with(|_ask, _window| {
         Ok(kernel::event::record::AdviserAnswer::Score { score_bp: 1_000 })
     });
@@ -161,7 +166,7 @@ fn a_density_score_scales_the_budget_and_records_the_two_lines() {
 fn a_fallback_is_recorded_and_leaves_every_figure_alone() {
     let text = "The first sentence says what this result is about. ".repeat(40);
     let mut conversation = Conversation::new();
-    conversation.push_task_lines("t", "g", crate::conversation::Opening::FromJob);
+    conversation.push_task_lines("t", "g", crate::conversation::Opening::FromJob, "the User");
     let mut adviser = Adviser::none();
     let consultation = adviser.consult(Ask::score("result", text.as_str()), &conversation, 0);
     let mut ctx = no_offload(4_096);
@@ -184,7 +189,7 @@ fn an_advisers_not_needed_acts_only_where_a_store_could_hold_it() {
     let env = dir.path().join("env");
     std::fs::create_dir_all(&env).unwrap();
     let mut conversation = Conversation::new();
-    conversation.push_task_lines("t", "g", crate::conversation::Opening::FromJob);
+    conversation.push_task_lines("t", "g", crate::conversation::Opening::FromJob, "the User");
     let mut adviser = Adviser::with(|_ask, _window| {
         Ok(kernel::event::record::AdviserAnswer::Noul {
             keep: false,

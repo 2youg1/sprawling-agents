@@ -86,6 +86,9 @@ const PROJECT_PLACEHOLDER: &str = "<project name>";
 
 /// What a dispatch knows about the work when the job file is written.
 pub struct JobBrief<'a> {
+    /// Who handed this work down, as `kernel::event::Who::handed_down_by`
+    /// renders it (`crates/city/spec/SpineFiles.lean` D21).
+    pub from: &'a str,
     /// One line: what to produce.
     pub task: &'a str,
     /// What counts as success, what counts as failure, when to stop.

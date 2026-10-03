@@ -138,6 +138,7 @@ impl super::RunWorker {
             &self.city_root,
             &at.addr,
             &city::JobBrief {
+                from: &at.dispatched_by.handed_down_by(at.predecessor(), at.parent),
                 task: &task,
                 goal: &goal,
             },

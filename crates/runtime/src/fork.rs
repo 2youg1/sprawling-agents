@@ -94,7 +94,7 @@ fn fold_run<'a>(
         match record.kind() {
             EventKind::RunStarted => {
                 let started = record.data().read::<RunStarted>()?;
-                conversation.push_task_lines(&started.task, &started.goal, rebuilt(&started));
+                conversation.push_task_lines(&started.task, &started.goal, rebuilt(&started), NO_SENDER);
                 at = record.seq();
             }
             EventKind::ModelReturned => {
@@ -257,6 +257,11 @@ fn fold_run<'a>(
         at,
     })
 }
+
+/// The sender a rebuilt opening names: none, because [`rebuilt`] never
+/// answers `FromJob`, the one opening that names who handed the work
+/// down (`crates/city/spec/SpineFiles.lean` D21).
+const NO_SENDER: &str = "";
 
 /// How a branch writes the first message of a run it rebuilds: the way
 /// the mother wrote it, so a provider's cached prefix holds from the

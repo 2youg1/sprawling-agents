@@ -23,7 +23,7 @@ fn a_full_turn_appends_the_canonical_event_sequence() {
         calls: vec![probe_call()],
     };
     let mut conversation = Conversation::new();
-    conversation.push_task_lines("probe the city", "one probe", Opening::FromJob);
+    conversation.push_task_lines("probe the city", "one probe", Opening::FromJob, "the User");
     let mut lines = lines();
     let turn = opened_on::<1>(&mut lines);
     let turn = advance(
@@ -372,7 +372,7 @@ fn a_wave_halted_between_two_calls_does_not_make_the_second() {
 fn assembling_borrows_the_conversation_and_the_tools() {
     let mut ledger = TestLedger::new();
     let mut conversation = Conversation::new();
-    conversation.push_task_lines("probe the city", "one probe", Opening::FromJob);
+    conversation.push_task_lines("probe the city", "one probe", Opening::FromJob, "the User");
     let tools = [kernel::ToolDef {
         name: kernel::ToolName::parse("exec").unwrap(),
         description: "run a command".to_owned(),
