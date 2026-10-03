@@ -54,10 +54,10 @@ impl RealFs {
     /// write and no position has to be remembered across calls.
     fn writer(&mut self, path: &Path) -> io::Result<&mut std::fs::File> {
         if self.open.as_ref().is_none_or(|held| held.path != path) {
-            let file = std::fs::OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open(path)?;
+            let mut options = std::fs::OpenOptions::new();
+            options.create(true).append(true);
+            write_through(&mut options);
+            let file = options.open(path)?;
             self.open = Some(OpenAppend {
                 path: path.to_path_buf(),
                 file,
@@ -189,6 +189,114 @@ impl Vfs for RealFs {
 
     fn exists(&self, path: &Path) -> bool {
         path.is_file()
+    }
+}
+
+/// How the bytes of the file `RealFs` appends to travel to the device.
+/// Every arm still issues `sync_data` at the barrier, so the durability
+/// `append_all` answers `Ok` for is the same in each and an arm changes
+/// only the cost (`crates/storage/spec/Jsonl/Barrier.lean`, storage D24).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum SegmentDurability {
+    /// Buffered writes, then `File::sync_data`: `FlushFileBuffers` on
+    /// Windows, `fdatasync` on Linux, `fcntl(F_FULLFSYNC)` on macOS.
+    SyncData,
+    /// The file opened write-through (`FILE_FLAG_WRITE_THROUGH` on
+    /// Windows, `O_DSYNC` on Linux), so each write reaches the device
+    /// before it returns and the barrier has little left to flush.
+    /// macOS has no such arm: `O_DSYNC` there leaves the bytes in the
+    /// drive's cache, which only `F_FULLFSYNC` empties.
+    #[expect(
+        dead_code,
+        reason = "a candidate arm; the release-build reading chooses between the arms"
+    )]
+    WriteThrough,
+}
+
+/// This platform's arm. Each stays `SyncData` until the release-build
+/// reading of the barrier (storage D24) chooses; choosing is this one
+/// value.
+#[cfg(windows)]
+pub(crate) const SEGMENT_DURABILITY: SegmentDurability = SegmentDurability::SyncData;
+/// This platform's arm; see the Windows constant.
+#[cfg(target_os = "linux")]
+pub(crate) const SEGMENT_DURABILITY: SegmentDurability = SegmentDurability::SyncData;
+/// This platform's arm; see the Windows constant. `F_FULLFSYNC` is the
+/// only barrier that empties the drive's cache here, so macOS (and any
+/// other platform) has `SyncData` alone.
+#[cfg(not(any(windows, target_os = "linux")))]
+pub(crate) const SEGMENT_DURABILITY: SegmentDurability = SegmentDurability::SyncData;
+
+/// `FILE_FLAG_WRITE_THROUGH`, from the Win32 `CreateFileW` flags.
+#[cfg(windows)]
+const FILE_FLAG_WRITE_THROUGH: u32 = 0x8000_0000;
+
+/// `O_DSYNC` on the Linux architectures whose `asm-generic` flag table
+/// gives it this value.
+#[cfg(all(
+    target_os = "linux",
+    any(
+        target_arch = "x86_64",
+        target_arch = "x86",
+        target_arch = "aarch64",
+        target_arch = "arm",
+        target_arch = "riscv64"
+    )
+))]
+const O_DSYNC: i32 = 0o10000;
+
+#[cfg(windows)]
+fn write_through(options: &mut std::fs::OpenOptions) {
+    use std::os::windows::fs::OpenOptionsExt as _;
+    match SEGMENT_DURABILITY {
+        SegmentDurability::SyncData => {}
+        SegmentDurability::WriteThrough => {
+            options.custom_flags(FILE_FLAG_WRITE_THROUGH);
+        }
+    }
+}
+
+#[cfg(all(
+    target_os = "linux",
+    any(
+        target_arch = "x86_64",
+        target_arch = "x86",
+        target_arch = "aarch64",
+        target_arch = "arm",
+        target_arch = "riscv64"
+    )
+))]
+fn write_through(options: &mut std::fs::OpenOptions) {
+    use std::os::unix::fs::OpenOptionsExt as _;
+    match SEGMENT_DURABILITY {
+        SegmentDurability::SyncData => {}
+        SegmentDurability::WriteThrough => {
+            options.custom_flags(O_DSYNC);
+        }
+    }
+}
+
+/// No write-through arm here, so a constant that names one does not
+/// compile instead of falling back in silence.
+#[cfg(not(any(
+    windows,
+    all(
+        target_os = "linux",
+        any(
+            target_arch = "x86_64",
+            target_arch = "x86",
+            target_arch = "aarch64",
+            target_arch = "arm",
+            target_arch = "riscv64"
+        )
+    )
+)))]
+fn write_through(_options: &mut std::fs::OpenOptions) {
+    const {
+        assert!(
+            matches!(SEGMENT_DURABILITY, SegmentDurability::SyncData),
+            "this platform has no write-through arm"
+        );
     }
 }
 

@@ -270,5 +270,7 @@ end Storage.Jsonl.Barrier
 * Linux：`fdatasync`（今天）；`O_DSYNC`，经 `std::os::unix::fs::OpenOptionsExt::custom_flags`，每次写带数据同步；两者都可加预分配，预分配让 `fdatasync` 不必再写文件长度这条元数据。
 * macOS：`F_FULLFSYNC`（今天）；`F_BARRIERFSYNC` 只给次序不给持久，是更弱的屏障，不入选；预分配可选。
 
+**实现**：写直达两臂是 `crates/storage/src/real_fs.rs` 的 `SegmentDurability::WriteThrough`，每个平台的选择是一个常量 `SEGMENT_DURABILITY`，今天三处都是 `SyncData`；写直达之后屏障照发，所以上面的不变式不随臂变。读源码的结论在 1.97.1 上成立；`rust-toolchain.toml` 现在钉的是 1.99.0，那一版的 `library/std/src/sys/fs/unix.rs` 与 `windows.rs` 的 `File::datasync` 还要重读一遍，读法同上。预分配那一臂要求写者按位置写（`Vfs` 今天只有写在文件末尾的 `append`），所以还没有实现；读者一侧已经守着 `crates/storage/spec/Jsonl/Preallocate.lean` 的三条性质。
+
 **落选**：一个平台用一臂、其余平台跟着它——三个平台的系统调用与它们的持久语义各不相同，同一个名字在三处是三件事。重新打开它的参数：标准库改变 `File::sync_data` 在某个平台上落到的系统调用（W5 的实现者先在 `rust-toolchain.toml` 钉住的版本上重读上面两个源文件），或某一臂的测量在 p99 上不再胜出。
 -/

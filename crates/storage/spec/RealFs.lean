@@ -18,7 +18,14 @@
 pub(crate) struct RealFs { open: Option<OpenAppend> }   // std::fs 直译，零策略
 impl RealFs { pub(crate) fn new() -> RealFs; }
 impl Vfs for RealFs { … }
+/// 段文件的字节怎样到介质：每一臂在屏障处照样 `sync_data`，所以 `append_all` 答 `Ok` 的持久语义各臂相同，臂只改代价（storage D24）。
+pub(crate) enum SegmentDurability { SyncData, WriteThrough }
+/// 每个平台一个常量；选臂就是改这一个值。今天三个平台都是 `SyncData`。
+pub(crate) const SEGMENT_DURABILITY: SegmentDurability;
 ```
+
+- **写直达只在有它的平台上能选**：Windows 经 `std::os::windows::fs::OpenOptionsExt::custom_flags` 加 `FILE_FLAG_WRITE_THROUGH`（`0x8000_0000`），Linux 经 `std::os::unix::fs::OpenOptionsExt::custom_flags` 加 `O_DSYNC`（`0o10000`，只在 `asm-generic` 标志表给出这个值的 x86_64、x86、aarch64、arm、riscv64 上；本 crate 不依赖 `libc`，所以这个值写在这里）。macOS 与其余平台没有这一臂：那里的常量若写成 `WriteThrough`，编译期断言拒绝它，而不是静默退回 `SyncData`。
+- **写直达仍发屏障**：Linux 上 `O_DSYNC` 按 POSIX 已含 `fdatasync` 的保证，Windows 上写直达是否连文件长度一起落盘，微软的文档没有说清（推断，未在掉电下验证），所以两处都照样 `sync_data`；臂的问题只剩代价，留给发布构建上的读数。
 
 - **唯一的状态是那个句柄**：追写与 sync 走同一个句柄，所以被做持久的就是刚写的那些字节，也省掉每条记录两次重开（§7）。
 - **句柄命名的是文件不是路径**：`rename`／`remove_file`／`truncate` 前必须 `release`。两条断言随这个模块走，它们问的是「之后字节落在哪个文件里」。
