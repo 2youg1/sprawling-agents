@@ -278,7 +278,7 @@ pub(crate) fn seat_this_thread(name: &'static str) -> Seat; // 要座位并设�
 pub(crate) fn report() -> String;               // doctor 的一行：读到的拓扑与计划做了什么（D47）
 ```
 
-全进程一张座位表，放在一个 `Mutex` 后面，第一次要座位时读拓扑、算计划、建表：只在线程起动与退出时取锁，不在热路径上。哪一臂由常量 `ARM` 定（`Off` 不读拓扑、不要座位、不调平台；`Soft` 是默认），见 D47。
+全进程一张座位表，放在一个 `Mutex` 后面，第一次要座位时读设置与拓扑、算计划、建表：只在线程起动与退出时取锁，不在热路径上。哪一臂由人的配置 `[core] placement` 定，见 D47。
 
 **决定**（AF1 的 (b) 与 (c)，D88 第 3 条）：
 
@@ -344,7 +344,7 @@ pub(crate) struct Unread(String);                   // 为什么没读到，写�
 
 **决定**：
 
-- 关掉放置的是常量 `ARM`（`Off` 不读拓扑、不要座位、不调平台），对照时只改这一个值；读数定下默认之后它挪到人的配置 `[core] placement`（下面四臂对照），那是 `accounting::person` 的一个读者加一行，这一步与四臂对照的读数一起做。
+- 关掉放置的是人的配置 `[core] placement`，由 `accounting::person::core_placement` 读：缺省 `"soft"`（关掉节能限流、热线程与 lane 要座位），`"none"` 是四臂对照的「不做」臂（不读拓扑、不要座位、不调平台）。另外两臂 `"soft_shares"` 与 `"pinned"` 还没有建成：前者要把物理内存交进 `runtime` 才能设作业级内存上限，后者在进程之外设（D41）；它们的拼写今天按读不懂的值拒绝（`E_CONFIG_INVALID`），而不是默默当作 `"soft"`。设置读不懂时，起动照常、放置按 `"soft"` 做，并向标准错误说一次；doctor 那一行说出读不懂。读数定下默认之后只改缺省这一个值。
 - doctor 一行，例：「CPU: 2 classes — 4 performance cores (8 threads), 8 efficiency cores; hot threads prefer the 4 performance cores」；「CPU: one class, 8 cores; left to the operating system」；「CPU: one class, 16 cores in 2 cache groups; left to the operating system and its cache steering」；读不到时「CPU: topology unread (<原因>); left to the operating system」；macOS 与 Linux 上计划有座位时，句末写「this platform has no placement call; its scheduler places threads」。措辞只在 `placement::report` 一处。
 
 **被否**：doctor 打出原始的记录表——User 要的是机器被怎样对待，不是 `EfficiencyClass` 的数。
@@ -354,8 +354,8 @@ pub(crate) struct Unread(String);                   // 为什么没读到，写�
 
 测量归波后的 mid 读数（Roadmap §0 第 7 条），这里只写计划，实现照它留出开关与采样点。
 
-- **开关是一个配置值**：人的配置文件 `[core]` 一节的 `placement`，与 `priority` 同处（`accounting::person`，`crates/accounting/Spec.lean` §8-8），取 `"none"`、`"soft"`、`"soft_shares"`、`"pinned"`，分别是下面四臂。读数出来之前的默认是 `"soft"`；读数定下默认之后只改这一个默认值。
-- **四臂**：①不做——不关 EcoQoS、不设理想处理器、run 的 job 不设份额；②(a)+(b)+(c)；③再加 (d)，即 `crates/runtime/spec/Tools/Exec.lean` D29 的按 run CPU 权重与作业级内存上限；④硬亲和（D41 的对照臂）。不做那一臂就是 `ARM = Off`。
+- **开关是一个配置值**：人的配置文件 `[core]` 一节的 `placement`，与 `priority` 同处（`accounting::person`，`crates/accounting/Spec.lean` §8-8），取 `"none"`、`"soft"`、`"soft_shares"`、`"pinned"`，分别是下面四臂；今天读得懂的是 `"none"` 与 `"soft"`，另两臂建成之前按读不懂拒绝（D47）。读数出来之前的默认是 `"soft"`；读数定下默认之后只改这一个默认值。
+- **四臂**：①不做——不关 EcoQoS、不设理想处理器、run 的 job 不设份额；②(a)+(b)+(c)；③再加 (d)，即 `crates/runtime/spec/Tools/Exec.lean` D29 的按 run CPU 权重与作业级内存上限；④硬亲和（D41 的对照臂）。不做那一臂就是 `[core] placement = "none"`。
 - **负载**：TP1 吞吐台的同一个 citysim 场景，并发 run 数 4 与 16，另在后台跑 N ∈ {0, 4, 16} 个 `cargo build`，每个都经一个 run 的 exec 起动（于是它们落在各自 run 的 job 里，与真实城一样）。每臂每格重复 5 次，报中位数，写明机器类别（核数与 P/E 之分）。
 - **读数**：工具调用的 harness 开销（`tool_called` 到 `tool_result`）与 relay 往返，各自的 p50、p99、p999；每步计算中途换核的次数——在 M2 的阶段边界（醒来、工具执行前、工具执行后、再次阻塞）各采一次当前处理器号，一步里前后不同就计一次，按热线程的种类分开计。
 - **处理器号怎么采**：Windows 是 `GetCurrentProcessorNumberEx`，没有安全接口，放进 D41 的同一个 Zig 叶子；Linux 读 `/proc/thread-self/stat` 的第 39 个字段（标准库读文件，第一档；`sched_getcpu` 要 `unsafe`），只在测量构建里读，因为每次一个系统调用；macOS 没有读当前处理器的接口，只报延迟，换核次数写「不可测」。
