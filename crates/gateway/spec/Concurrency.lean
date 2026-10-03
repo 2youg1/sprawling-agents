@@ -16,6 +16,7 @@
 3. 在 `Retry-After` 给出的时刻之前，上限不会变大；上限变大的唯一一步是那个时刻之后的一次成功。
 4. 连续 `WIDEN_AFTER` 次成功（在那个时刻之后）让上限加一，直到配置值。
 5. 一次取答「取到」「已满」或「等到某一刻」：已满只在名额都在用时答（由一次归还唤醒），等到的时刻严格晚于此刻，所以调用方不会忙等。
+6. 排队按号先来后到：取到名额的号严格按拿号的次序（文末「排队」一节，D20）。
 -/
 
 namespace Gateway.Concurrency
@@ -281,5 +282,116 @@ theorem successes_stop_at_cap (s : Permits) (trace : List Event) (hv : Valid s) 
     (run s trace).limit ≤ s.cap := by
   rw [← run_keeps_cap s trace]
   exact (run_valid s trace hv).2.1
+
+
+/-!
+## 排队：按号先来后到（D20）
+
+`Full` 时调用拿一张号排队，名额空出时只有队首那张号取到；排得太久的号被拒出队（`QUEUE_WAIT_MAX`）。模型只看号：到达、给队首一个名额、拒掉某张号。下面证明，在任意一条轨迹上，取到名额的号按拿号的次序排列——后到的调用从不先于先到的取到（`grants_follow_arrival`）。派生检查（接线那一次改动写）：proptest 对随机的到达、归还与超时轨迹驱动 `Transport::admit`，断言取到的号严格递增；先对一个用 `notify_one` 任挑醒者的实现看它变红。
+-/
+
+/-- 一个端点的排队（`Transport` 里的号与队列）。 -/
+structure Queue where
+  next : Nat
+  waiting : List Nat
+  granted : List Nat
+  deriving Repr
+
+inductive QueueEvent where
+  /-- 一次调用拿到号 `next`，排到队尾。 -/
+  | arrive
+  /-- 一个名额空出，队首那张号取到。 -/
+  | grantHead
+  /-- 号 `t` 等过了 `QUEUE_WAIT_MAX`，被拒出队。 -/
+  | shed (t : Nat)
+  deriving Repr
+
+def Queue.empty : Queue := ⟨0, [], []⟩
+
+def queueStep (q : Queue) : QueueEvent → Queue
+  | .arrive => { q with next := q.next + 1, waiting := q.waiting ++ [q.next] }
+  | .grantHead =>
+    match q.waiting with
+    | [] => q
+    | h :: t => { q with waiting := t, granted := q.granted ++ [h] }
+  | .shed t => { q with waiting := q.waiting.filter (fun w => w != t) }
+
+def queueRun (q : Queue) (trace : List QueueEvent) : Queue := trace.foldl queueStep q
+
+/-- 排队的不变量：队里与已取到的号各自递增，已取到的都早于还在排的，所有号都早于下一张。 -/
+structure QueueInv (q : Queue) : Prop where
+  waitingSorted : q.waiting.Pairwise (· < ·)
+  grantedSorted : q.granted.Pairwise (· < ·)
+  grantedFirst : ∀ g ∈ q.granted, ∀ w ∈ q.waiting, g < w
+  waitingIssued : ∀ w ∈ q.waiting, w < q.next
+  grantedIssued : ∀ g ∈ q.granted, g < q.next
+
+theorem queueInv_empty : QueueInv Queue.empty :=
+  ⟨List.Pairwise.nil, List.Pairwise.nil, by simp [Queue.empty], by simp [Queue.empty],
+    by simp [Queue.empty]⟩
+
+theorem queueStep_inv {q : Queue} (h : QueueInv q) (e : QueueEvent) : QueueInv (queueStep q e) := by
+  cases e with
+  | arrive =>
+    refine ⟨?_, h.grantedSorted, ?_, ?_, ?_⟩
+    · simp only [queueStep]
+      rw [List.pairwise_append]
+      exact ⟨h.waitingSorted, List.pairwise_singleton _ _,
+        fun a ha b hb => by simp at hb; subst hb; exact h.waitingIssued a ha⟩
+    · intro g hg w hw
+      simp only [queueStep, List.mem_append, List.mem_singleton] at hw
+      rcases hw with hw | hw
+      · exact h.grantedFirst g hg w hw
+      · subst hw; exact h.grantedIssued g hg
+    · intro w hw
+      simp only [queueStep, List.mem_append, List.mem_singleton] at hw
+      rcases hw with hw | hw
+      · exact Nat.lt_succ_of_lt (h.waitingIssued w hw)
+      · subst hw; exact Nat.lt_succ_self _
+    · intro g hg
+      exact Nat.lt_succ_of_lt (h.grantedIssued g hg)
+  | grantHead =>
+    rcases h with ⟨hw, hg, hgw, hwi, hgi⟩
+    cases hq : q.waiting with
+    | nil => simp only [queueStep, hq]; exact ⟨hw, hg, hgw, hwi, hgi⟩
+    | cons x t =>
+      simp only [queueStep, hq]
+      rw [hq] at hw hgw hwi
+      have hx : ∀ w ∈ t, x < w := fun w hw' => List.rel_of_pairwise_cons hw hw'
+      refine ⟨hw.of_cons, ?_, ?_, ?_, ?_⟩
+      · rw [List.pairwise_append]
+        exact ⟨hg, List.pairwise_singleton _ _,
+          fun a ha b hb => by simp at hb; subst hb; exact hgw a ha b (by simp)⟩
+      · intro g hg' w hw'
+        simp only [List.mem_append, List.mem_singleton] at hg'
+        rcases hg' with hg' | hg'
+        · exact hgw g hg' w (List.mem_cons_of_mem _ hw')
+        · subst hg'; exact hx w hw'
+      · intro w hw'
+        exact hwi w (List.mem_cons_of_mem _ hw')
+      · intro g hg'
+        simp only [List.mem_append, List.mem_singleton] at hg'
+        rcases hg' with hg' | hg'
+        · exact hgi g hg'
+        · subst hg'; exact hwi g (by simp)
+  | shed t =>
+    refine ⟨h.waitingSorted.filter _, h.grantedSorted, ?_, ?_, h.grantedIssued⟩
+    · intro g hg w hw
+      simp only [queueStep, List.mem_filter] at hw
+      exact h.grantedFirst g hg w hw.1
+    · intro w hw
+      simp only [queueStep, List.mem_filter] at hw
+      exact h.waitingIssued w hw.1
+
+theorem queueRun_inv (q : Queue) (trace : List QueueEvent) (h : QueueInv q) :
+    QueueInv (queueRun q trace) := by
+  induction trace generalizing q with
+  | nil => exact h
+  | cons e es ih => exact ih (queueStep q e) (queueStep_inv h e)
+
+/-- 在任意一条轨迹上，取到名额的号严格按拿号的次序：后到的调用从不先取到。 -/
+theorem grants_follow_arrival (trace : List QueueEvent) :
+    (queueRun Queue.empty trace).granted.Pairwise (· < ·) :=
+  (queueRun_inv Queue.empty trace queueInv_empty).grantedSorted
 
 end Gateway.Concurrency

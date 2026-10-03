@@ -192,7 +192,7 @@ market／cost：纯判定与数据面，被 endpoint 与 runtime 回合层消费
 
 现状：线上每一次模型调用还不问它，模块因此在文件开头带一条 `#![expect(dead_code)]`，接上调用者那一刻这条 `expect` 不再触发、构建失败，抑制随之清走。端点配置也还没有 `max_in_flight`，`MaxInFlight` 的合法域与 `IN_FLIGHT_DEFAULT` 只在本模块里。
 
-**要接时接在哪**：名额状态随端点住 `endpoint::transport::Transport`（每个端点一份、所有克隆共享，与 HTTP client 同一个槽），`kernel::Model` 的门（`endpoint/model.rs` 的 `call` 与 `call_speculating`）在发出请求前取、得到结果后还，429 时把 `ProviderFailure::retry_after_ms` 交给 `rate_limited`。还缺两样：①一个注入的时钟，因为本 crate 不采样时间、门的签名里也没有时刻，时钟要从 `bin::assembly` 经路由簿交给 `Transport`；②`max_in_flight` 进端点的 tuning 要改 wire 命令与 `endpoint_attached` 的载荷，是一次 wire 与账本载荷的变更。
+**要接时接在哪**（D20 定接线，D21 定配置与仪表）：名额状态随端点住 `endpoint::transport::Transport`（每个端点一份、所有克隆共享，与 HTTP client 同一个槽），`kernel::Model` 的门（`endpoint/model.rs` 的 `call`、`call_streaming` 与 `call_speculating`）在发出请求前取、得到结果后还，429 时把 `ProviderFailure::retry_after_ms` 交给 `rate_limited`；时刻来自 `bin::assembly` 注入、经路由簿交给 `Transport` 的单调时钟（D20），`max_in_flight` 经端点的 tuning 与 `endpoint_attached` 的载荷到达（D21）。
 
 **代价**：在接上之前，429 的等待仍只由对端的 `retry-after` 提示与 watchdog 的退避表给出（D2），每条 run 各自退避；`provider_degraded` 事件由 `E_PROVIDER` 的 carrier 产出。
 -/
@@ -206,6 +206,41 @@ market／cost：纯判定与数据面，被 endpoint 与 runtime 回合层消费
 **被否**：①一个城级的总车道数（V0.0.8 写死的四条）：第五个准备好的 run 等一个与任何 provider 都无关的名额；②只靠 watchdog 的退避（D2）：退避是一条 run 自己的事，挡不住其余 run 继续撞同一个端点。
 
 **重开参数**：厂商在响应头里给出当下余量时，缺省改读响应头，`IN_FLIGHT_DEFAULT` 只作没有头时的退路。256、16 与 8 是推断值，各是一个常量，改它们不改形状。
+-/
+
+/-! D20 名额的接线：一个注入的单调时钟，取在门里、按先来后到排队，等待有界
+
+**决定**：
+- **时钟是一个参数**：`EndpointBook::new(monotonic: Monotonic)`，`pub type Monotonic = Arc<dyn Fn() -> Instant + Send + Sync>`，由 `bin::assembly` 给出（生产里是 `Instant::now`，那是全仓唯一采样它的地方），路由簿把同一个值克隆进每个 `Transport`；本 crate 仍不调用 `Instant::now`（clippy 的 `disallowed-methods` 照旧拦它）。测试与 citysim 给一个计数的时钟，这就是这条接缝的第二个实现，所以它是一个闭包类型，不立 trait。
+- **取与还在门里**：`call`、`call_streaming`、`call_speculating` 的第一步是 `Transport::admit()`，它返回一个持有名额的守卫 `Admitted`，守卫被丢弃时 `give_back` 并唤醒排在最前的那一个——于是任何一条返回路径（成功、失败、`?` 提前返回、流读到一半出错）都还名额，不靠每条路径记得还。结果是成功时守卫先调 `succeeded(now)`；结果是 429（`E_PROVIDER` 且 `ProviderFailure` 是限流）时先调 `rate_limited(now, retry_after_ms)`。流式调用在流收齐或放弃时才还，因为在那之前它在对端仍占一个并发。
+- **排队按先来后到**：`Full` 时调用拿一张号（端点上一个单调递增的计数），在 `Condvar` 上等，只有号在队首的那一个在被唤醒时重新 `take`；`WaitUntil(t)` 时队首按 `t - now()` 定时等，其余照排。这样一个端点上的等待按到达次序得到名额，不靠操作系统唤醒谁。
+- **等待有界**：一次排队至多等 `QUEUE_WAIT_MAX`（10 分钟，从拿号时的单调读数算），超过即以 `E_BACKPRESSURE_SHED` 拒这一次调用，主体是端点名与排了多久，恢复语「这个端点的并发上限比同时想调它的 run 少：在端点设置里调大 `max_in_flight`，或少派几条」；拒后号出队，下一个顶上。排队的时间不计入 `timeout_ms`：那个期限说的是一次请求对端多久答，不是城里排了多久。
+- **取消**：门的签名没有取消信号，一个排着队的 run 在它拿到名额、调用返回之后的那个安全点才看见取消；`QUEUE_WAIT_MAX` 封住这段延迟的上限。
+
+**理由**：本 crate 的每个判定只读传给它的时刻（D17），而名额要按时刻放宽，所以时刻必须有一个来处；放在路由簿的构造参数里，生产与测试各给一个，门的签名（`kernel::Model`）一行不改，runtime 也就一行不改。守卫还名额，是因为门里有七八条提前返回的路，漏还一次就让这个端点永远少一个名额。先来后到，是因为车道不设上限之后（`crates/sprawling/Spec.lean` D34）几十条 run 可能同时排在一个端点上，没有次序时一条 run 可以一直被后来者插队。
+
+**被否**：①门的签名里加一个 `now`：`kernel::Model` 的每个实现与每个调用方都要改，而只有这一个实现用它；②`Condvar::notify_one` 交给操作系统挑：Windows、macOS 与 Linux 的唤醒次序不同，同一个场景在三个平台上排出三种次序；③无界等待：一个被收窄到 1 的端点后面排着的 run 会停到人发现为止；④把名额放在 runtime 的 `run::drive`：每条 run 各持一份状态，正是 D17 要去掉的那件事。
+
+**重开参数**：`kernel::Model` 的门长出取消信号时，排队改为同时等它；`QUEUE_WAIT_MAX` 是推断值，一个常量。
+
+**三个平台**：时钟在 Windows、macOS 与 Linux 上都是注入的 `Instant`（单调时钟：Windows 的 QueryPerformanceCounter，macOS 的 `mach_absolute_time`，Linux 的 `CLOCK_MONOTONIC`，由标准库选），排队次序由号决定，与平台无关。
+-/
+
+/-! D21 `max_in_flight` 进端点的 tuning 与 `endpoint_attached`；排队数与等待时长是每个端点的一份读数
+
+**决定**：
+- **配置**：wire 的 `EndpointTuning` 多 `max_in_flight: Option<u32>`（`crates/wire/spec/Command/Tuning.lean` §8-29），装配层的 `tuning_of` 把零与缺席读成 `None`、把 1 到 `IN_FLIGHT_MAX` 的值经 `MaxInFlight::try_from` 收下、其余拒 `E_INVALID_ARGS`；gateway 的 `EndpointConfig::max_in_flight: Option<MaxInFlight>` 是 D17 那把键。`router/payload.rs` 的 `endpoint_attached` 载荷多同一把键，`#[serde(default, skip_serializing_if = "Option::is_none")]`：旧账本没有它的行读作 `None`，重开的城取缺省，从没被定过的端点写出的字节与今天相同。
+- **缺省**：`None` 时取 `vendor_in_flight(dialect, base_url)`，一张住在 `gateway::concurrency` 的小表；今天没有厂商在文档里给出并发数（厂商给的是每分钟请求数与 token 数），所以表里只有一行：回环地址上的本地服务器取 `IN_FLIGHT_LOCAL`（4，本地推理服务器的并行槽位常见的缺省），其余取 `IN_FLIGHT_DEFAULT`（16）。
+- **读数**（Roadmap M2）：每个 `Transport` 记三样，`EndpointBook::queue_readings()` 按端点名一次读出 `QueueReading { endpoint, limit, in_use, queued, waited: WaitTally }`——`queued` 是此刻排队的号数，`waited` 是自启动以来每次排队等了多少微秒的计数直方图（与 `throughput` 台的 `relay_queue` 同一个分桶，p50／p99／p999 与 max 由它读出），没排队就拿到名额的调用记作 0 µs 一次，于是「等待为 0」可以被读出而不是被推断。读数是内存里的计数，不进账本：它说的是这一个进程的排队，不是城的历史。
+- **预算行**：`tools/xtask/budgets.toml` 加一行 `[provider_queue]`（测量、不设门），`what` 写「一次模型调用在端点名额前从拿号到取到的等待，注入的单调时钟，p50／p99／p999 与 max」，读数来自 TP1 吞吐台在 N = 16 与 64 时的 `queue_readings()`。
+
+**理由**：上限是 User 对一个端点定的规矩，与 `timeout_ms` 同属 tuning，随端点上线、随 `endpoint_attached` 进账本，重放才能说出某次调用是在什么上限下排的队。缺省写成一张表而不是一个常数，是因为本地服务器与云端的可承受并发差一个数量级；表今天几乎是空的，因为编一个厂商没写的数比给一个保守的缺省更糟。排队读数放在 gateway，是因为排队只发生在这里（D17）；不入账，是因为每次调用一行等待会让账本随调用数线性长，而它回答的是「这个进程现在堵不堵」。
+
+**被否**：①上限住在城的 `CONFIG.toml`：一个端点的规矩分在两处，attach 的那一刻看不见；②每次排队写一行事件：账本行数翻倍，回答的问题只在进程活着时有意义；③缺省按厂商的 RPM 换算：RPM 说的是速率不是并发，换算要假设每次调用多长，而那正是不知道的量。
+
+**重开参数**：厂商开始在文档或响应头里给出并发余量时，`vendor_in_flight` 加行或改读响应头（D17 的重开参数）；`IN_FLIGHT_LOCAL` 是推断值，一个常量。页面在 provider 一处显示排队，要一件线上字段，由接线之后、读数第一次有读者的那一次改动加（wire 的下一条决定）。
+
+**三个平台**：配置、载荷与读数都与平台无关；直方图按注入的单调时钟计时，三个平台相同。
 -/
 
 /-!
@@ -294,6 +329,8 @@ kernel 已有码，语义照 Custody 一节；不新增码。
 - D16 人那一档是 `SelectModel` 的一个可选字段，出现即作答，缺席即「这一次没人说」（§8-37）：`crates/gateway/spec/Provider/Input.lean`，在 D14 之后
 - D15 凭证库经 `keyring-core` 与各平台 store 接入，不经 `keyring`：`crates/gateway/spec/Credential.lean`
 - D17 每个端点一个并发上限：可配置，缺省取厂商文档的值，遇 429 收窄、恢复后放宽：本文件 §8-6 之后
+- D20 名额的接线：一个注入的单调时钟，取在门里、按先来后到排队，等待有界：本文件 §8-6 之后
+- D21 `max_in_flight` 进端点的 tuning 与 `endpoint_attached`；排队数与等待时长是每个端点的一份读数：本文件 §8-6 之后
 -/
 
 /-! ## 13 依赖选型
