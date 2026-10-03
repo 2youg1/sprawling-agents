@@ -363,9 +363,5 @@ fn tp2_more_than_four_runs_start_at_once() {
         .iter()
         .filter(|line| line["kind"] == "run_frozen")
         .count();
-    assert_eq!(
-        frozen,
-        rooms.len(),
-        "every run that started froze"
-    );
+    assert_eq!(frozen, rooms.len(), "every run that started froze");
 }

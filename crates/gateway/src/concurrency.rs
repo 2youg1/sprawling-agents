@@ -12,6 +12,10 @@
 //! Linux. The properties it keeps are proved in
 //! `crates/gateway/spec/Concurrency.lean`; the proptest below checks
 //! this implementation against them over random traces.
+#![expect(
+    dead_code,
+    reason = "no model call takes a permit yet (crates/gateway/Spec.lean §8-6)"
+)]
 
 use std::num::NonZeroU32;
 use std::time::{Duration, Instant};
@@ -164,7 +168,7 @@ mod tests {
         GiveBack,
         RateLimited(u64, Option<u64>),
         Success(u64),
-        Tick(u64),
+        Tick,
     }
 
     fn event() -> impl Strategy<Value = Event> {
@@ -174,7 +178,7 @@ mod tests {
             ((0u64..10_000), proptest::option::of(0u64..5_000))
                 .prop_map(|(at, wait)| Event::RateLimited(at, wait)),
             (0u64..10_000).prop_map(Event::Success),
-            (0u64..10_000).prop_map(Event::Tick),
+            Just(Event::Tick),
         ]
     }
 
@@ -203,7 +207,7 @@ mod tests {
                         permits.rate_limited(at(ms), wait.map(Duration::from_millis));
                     }
                     Event::Success(ms) => permits.succeeded(at(ms)),
-                    Event::Tick(_) => {}
+                    Event::Tick => {}
                 }
                 prop_assert!(1 <= permits.limit && permits.limit <= cap.0.get());
                 prop_assert!(permits.streak < WIDEN_AFTER);
