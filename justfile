@@ -687,6 +687,85 @@ acceptance archive:
     SPRAWLING_BIN="$binary" SPRAWLING_PROVIDER="$url" \
         lake exe acceptance walk "$shelf" "$out/script.json" "$out/record.jsonl" "$out/checklist.md"
 
+# The PGO training load (Roadmap P2): what the instrumented release
+# binary in `archive` is driven through before its profiles are merged.
+# It is the acceptance walk above - a scripted city on the stand-in
+# provider: an endpoint attached, a building raised, runs that edit,
+# read and ask status, two runs sent at once, a plan divided, a review,
+# a kill mid-run and the resume - followed by the one-shot verbs on a
+# city of its own: init, adopt, check, the ledger views, playback
+# export over three ranges and its check, and the offline verifier.
+#
+# LLVM_PROFILE_FILE must name where the profiles land, with `%p` and
+# `%m` in it, because several instrumented processes run at once and a
+# shared name would let the last one overwrite the rest. A process that
+# is killed writes no profile, so the walk's served city, which the walk
+# ends by terminating it, contributes nothing on Windows; the one-shot
+# verbs exit normally and always do. The held-out load below shares no
+# step with this one, so a gain it shows is not a gain on the training
+# script alone.
+pgo-train archive:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    case "${LLVM_PROFILE_FILE:-}" in
+        *%p*%m* | *%m*%p*) ;;
+        *) echo "pgo-train: set LLVM_PROFILE_FILE to a path holding %p and %m, where the instrumented binary writes its profiles" >&2; exit 1 ;;
+    esac
+    '{{just_executable()}}' --justfile '{{justfile()}}' acceptance '{{archive}}'
+    shopt -s nullglob
+    binaries=("$PWD"/target/acceptance/archive/*/sprawling.exe)
+    [ "${#binaries[@]}" -gt 0 ] || binaries=("$PWD"/target/acceptance/archive/*/sprawling)
+    binary="${binaries[0]}"
+    city="$PWD/target/pgo-train/city"
+    rm -rf "$PWD/target/pgo-train"
+    mkdir -p "$city/../adopted/notes"
+    echo "a folder the city takes in" > "$city/../adopted/notes/readme.md"
+    "$binary" init "$city"
+    cp -r "$city/../adopted" "$city/adopted"
+    "$binary" adopt "$city" adopted
+    "$binary" check "$city"
+    "$binary" view "$city" > /dev/null
+    "$binary" view "$city" --runs > /dev/null
+    "$binary" view "$city" --tail 2 --kind building_created > /dev/null
+    "$binary" playback export "$city" --out "$city/../whole.json"
+    "$binary" playback export "$city" --from 1 --through 2 --out "$city/../narrow.json"
+    "$binary" playback export "$city" --building hall --out "$city/../hall.json"
+    "$binary" playback check "$city/../whole.json" --city "$city"
+    "$binary" replay "$city/.sprawling/ledger"
+
+# The PGO held-out acceptance load (Roadmap P2), which judges an arm and
+# trains nothing: the four-action pressure reading and the first byte over
+# the empty, l100k and l400k cities (`bench_startup`), then a narrow
+# playback export and a tail of the ledger view on the l400k city, each
+# timed by the arm's own `gauge` over thirty runs. `arm` names the
+# directory under target/pgo-arms the arm is measured from; `binary` is the
+# arm's executable, copied there beside a release `bench_startup`, which
+# measures the binary beside itself. The fixture cities are kept in
+# target/pgo-arms/bench-cities and shared by every arm, so both arms read
+# the same bytes. Interleave the arms as END-READING.md orders them.
+pgo-heldout arm binary:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cargo build --release -p citysim --bin bench_startup --locked
+    targets="${CARGO_TARGET_DIR:-target}"
+    case "$targets" in /* | ?:*) ;; *) targets="$PWD/$targets" ;; esac
+    suffix=""
+    [ -f "$targets/release/bench_startup.exe" ] && suffix=".exe"
+    dir="$targets/pgo-arms/{{arm}}"
+    mkdir -p "$dir"
+    cp "$targets/release/bench_startup$suffix" "$dir/bench_startup$suffix"
+    cp '{{binary}}' "$dir/sprawling$suffix"
+    sha256sum "$dir/sprawling$suffix"
+    "$dir/bench_startup$suffix"
+    city="$targets/pgo-arms/bench-cities/l400k"
+    out="$dir/exports"
+    rm -rf "$out"
+    mkdir -p "$out"
+    "$dir/sprawling$suffix" gauge --samples 30 -- "$dir/sprawling$suffix" view "$city" --tail 1000 | grep '^{"line":"spread"' | sed 's/^/view_tail_1000 /'
+    for n in $(seq 1 30); do
+        "$dir/sprawling$suffix" gauge --samples 1 -- "$dir/sprawling$suffix" playback export "$city" --from 1 --through 1000 --out "$out/narrow-$n.json" | grep '^{"line":"run"' | sed 's/^/playback_export_narrow /'
+    done
+
 # The acceptance gate for a real endpoint (never a gate in `just
 # check`; without credentials it prints one line and succeeds).
 #
