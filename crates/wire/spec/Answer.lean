@@ -27,7 +27,8 @@ pub struct CityAnswer { ..., pub halted: Vec<String> }
 pub struct RoundsAnswer { pub run: RunId, pub turns: Vec<Turn>, pub opened_at: Option<GitOid>,
                           pub opening: Option<Opening>, pub closing: Option<Closing> }
 pub struct Opening { pub task: String, pub goal: String, pub at: TimeMs,
-                     pub dispatched_by: Option<Who> }   // §8-48；policy §8-76，effort 与 names §8-79
+                     pub dispatched_by: Option<Who>,    // §8-48；policy §8-76，effort 与 names §8-79
+                     pub parent: Option<RunId> }        // 派它的那个 run，`Answer/Sessions.lean` D40
 pub struct Closing { pub completion: String, pub at: TimeMs }
 
 // Query 第 21、22 条（声明序，QUERY_NAMES 同序追加）

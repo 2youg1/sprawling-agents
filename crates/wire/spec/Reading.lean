@@ -329,17 +329,17 @@ pub enum Note {
     Arrived {
         from: Option<String>,   // steer：source；signal：配上的 signal_enqueued 的 from；配不上为 None
         said: Option<String>,   // steer：text；signal：配上的那一行载荷里的 text；配不上为 None
-        by: Speaker,            // User 或 Resident
+        by: Speaker,            // User、City 或 Resident（D41 说拼法的出处）
         t: TimeMs,              // 这一行（steer_received／signal_consumed）的 t
         handback: Option<HandbackNote>,   // D38
         at: Seq,
     },
 }
 #[serde(rename_all = "snake_case")]
-pub enum Speaker { User, Resident }
+pub enum Speaker { User, City, Resident }
 ```
 
-**决定**：`signal_consumed` 的载荷只有 `{id, by}`（kernel `SignalConsumed`），话本身在发信那一行 `signal_enqueued` 里，而那一行记在发信者的 run 下，不在收信者的会话里。所以 `wire::note_of` 读到 `signal_consumed` 时只读出 `by: Resident`、`t` 与 `at`，`from` 与 `said` 留 `None`；服务端的 rounds 折叠（`accounting::views::rounds::paired`）按 `SignalId` 在账本里从这一行往前找配对的 `signal_enqueued`，找到了才填 `from`（发信者）与 `said`（载荷的 `text`）。往前找有界：整本账里最多 `SENDING_REACH`（4096）行，界外配不上就留 `None`，页面写「不知道」而不猜。`steer_received` 一行自带 `source` 与 `text`（kernel `SteerReceived`），直接读；读不回这个形状的载荷是一条 `Note::Unreadable`。`by` 是 `User` 当且仅当 steer 的 `source` 是 User 入口写下的 `user`；居民的 steer（`@id`）与每一条 signal 都是 `Resident`，因为 User 只经 steer 说话。
+**决定**：`signal_consumed` 的载荷只有 `{id, by}`（kernel `SignalConsumed`），话本身在发信那一行 `signal_enqueued` 里，而那一行记在发信者的 run 下，不在收信者的会话里。所以 `wire::note_of` 读到 `signal_consumed` 时只读出 `by: Resident`、`t` 与 `at`，`from` 与 `said` 留 `None`；服务端的 rounds 折叠（`accounting::views::rounds::paired`）按 `SignalId` 在账本里从这一行往前找配对的 `signal_enqueued`，找到了才填 `from`（发信者）与 `said`（载荷的 `text`）。往前找有界：整本账里最多 `SENDING_REACH`（4096）行，界外配不上就留 `None`，页面写「不知道」而不猜。`steer_received` 一行自带 `source` 与 `text`（kernel `SteerReceived`），直接读；读不回这个形状的载荷是一条 `Note::Unreadable`。`by` 按 steer 的 `source` 分三臂（D41）：User 入口写下的那个拼法是 `User`，城市自己的话（策略变更、同步等待超时）是 `City`，居民的 steer（`@<room> …`）与每一条 signal 都是 `Resident`，因为 User 与城市只经 steer 说话。
 
 **理由**：原来的读法在 `signal_consumed` 上读 `source`／`from`／`text` 三个它根本不带的键，于是 `said` 恒为空、`from` 落到这一行的作者——也就是收信者自己：页面上每一条到达的话都像是收信者对自己说了一句空话。
 
@@ -414,4 +414,17 @@ pub struct SignalLine {
 **三个平台**：`\r\n` 与 `\n` 都按一行切，三个平台相同。
 
 D36 至 D39 与本版其他改形同一次 `WIRE_V` 进位（D22）：51 → 52。
+-/
+
+/-! D41 steer 的说话人拼法只在 kernel 定义一次，wire 读它，不抄
+
+**决定**：`steer_received.source` 里 User 与城市的两个拼法是 kernel 的 `SteerReceived::PERSON_SOURCE`（`user`）与 `SteerReceived::CITY_SOURCE`（`city`）。`runtime::conversation::Speaker::recorded` 写它们、`from_recorded` 读回它们，`wire::note_of` 也读它们，三处都不再写字面量；wire 没有自己的常量。`Speaker` 因此是三臂：`User`、`City`、`Resident`，城市的话不再算作一个叫 `city` 的居民。
+
+**理由**：wire 只依赖 kernel 与 documents（ARCHITECTURE.md 的 depmap），读不到 runtime；原先 wire 里抄了一份 `"user"`，runtime 改拼法时 wire 照旧编译、照旧通过，只是此后每一句 User 的话都被画成居民的。两边都依赖 kernel，而这两个拼法是账本行 `steer_received` 的一部分，所以出处放在定义这一行的 kernel 记录上。
+
+**被否**：①让 wire 依赖 runtime：把整个 runtime 拉进一个浏览器与服务端共用的线协议 crate，只为两个字符串；②在 accounting 折叠时把说话人算好再交给 wire：`note_of` 的另一个调用者（wire 自己的测试与客户端的同一条规则）就拿不到它。
+
+**重开参数**：`source` 的整套文法（信封属性）也要在 wire 里读回时，把 `from_recorded` 的解析整体移进 kernel。
+
+**三个平台**：只有字符串比较，Windows、macOS、Linux 相同。
 -/

@@ -65,7 +65,7 @@ impl Conversation {
 
 - **规则**：`push_steer` 是 steer 进窗口的唯一入口，它按 `Speaker` 渲染。`Person` 渲染成 `user: <text>`；`City`（城市自己的话：策略变更、同步等待超时）渲染成 `city: <text>`；`Resident` 渲染成 `<letter from="@<room>" run="<run>" kind="steer|reply" sender="<state>"><body></letter>`，没有的属性不写，属性值与正文里的 `<`、`>`、`&` 写成 `&lt;`、`&gt;`、`&amp;`。所以以 `user:` 开头的一块文字只来自 User 的 steer，居民的正文里没有 `<`，关不上自己的信封，也开不出第二个。
 - **构造**：`Speaker::Person` 在生产代码里只由 `accounting::worker::desk`（User 经控制面送来的 steer）构造，另一处是 `Speaker::from_recorded` 读回账本上的 `user`，那一行只由前者写下。
-- **账本**：`steer_received.source` 记 `Speaker::recorded()`：`user`、`city`，或 `@<room>`，后面跟零到三个 `run=<uuid>`、`kind=steer|reply`、`sender=<state>`，以空格分开。旧的行只有 `@<room>`，读回成 `kind=steer`、没有 run 与 sender 的信；居民的回信在旧行里是正文 `<room> replied: …`，读回时仍在信封里。
+- **账本**：`steer_received.source` 记 `Speaker::recorded()`：`user`、`city`（两个拼法定义在 kernel 的 `SteerReceived::PERSON_SOURCE` 与 `CITY_SOURCE`，wire 读同一处，`crates/wire/spec/Reading.lean` D41），或 `@<room>`，后面跟零到三个 `run=<uuid>`、`kind=steer|reply`、`sender=<state>`，以空格分开。旧的行只有 `@<room>`，读回成 `kind=steer`、没有 run 与 sender 的信；居民的回信在旧行里是正文 `<room> replied: …`，读回时仍在信封里。
 - **三个平台**：只有文字与类型，Windows、macOS、Linux 上一样。
 - **被否**见 `crates/collab/Spec.lean` D16。
 -/

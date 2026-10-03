@@ -32,7 +32,7 @@ pub struct SessionLine {
     pub at: TimeMs,          // 那一行的时刻
 }
 pub enum SessionStart {
-    Dispatched,                                     // 房间由派活打开，没有 `session_opened`
+    Dispatched { by: Option<Who> },                 // 房间由派活打开，没有 `session_opened`；`by` 见 D40
     Opened { carry: Carry, from: Option<Origin> },  // `/new`：带过去的是什么，从哪里分叉（分叉时）
 }
 ```
@@ -77,4 +77,17 @@ pub struct SessionLine {
 **被否**：①页面为每段再问一次 `Rounds` 拼出这几件：一屏几十次往返；②`preview` 带整条回复：答复的大小随回复长度无界。
 
 **重开参数**：页面要一段里多个模型的历史时（会话中不换模型，今天只有一个），`model` 改成表。
+-/
+
+/-! D40 一个被派出的 run 说出派它的 run；一段由派活打开的 session 说出是谁派的
+
+**决定**：`Opening` 多一件 `#[serde(default)] parent: Option<RunId>`，原样读自这个 run 的 `run_started.parent`；`SessionStart::Dispatched` 由单元臂改成 `Dispatched { by: Option<Who> }`，`by` 读自这一段第一个 `run_started` 的 `dispatched_by`。两处都只读账本已经写下的那一行，旧行没有这个键时为 `None`，页面不猜。改形，`WIRE_V` 进一位。
+
+**理由**：被派出的孩子的对话页要链回派它的那个 session，房间信箱的每一段要说出谁派的（roadmap UC6）；`Opening` 只带派活的房间（`dispatched_by`），一个房间里先后有很多 run，从房间猜不出是哪一个 run 派的。信箱若为每一段再问一次 `Rounds` 才知道派活者，一屏是几十次往返（与 D27 被否的①同理）。
+
+**被否**：①页面从 `RunSummary` 的列表里按时间猜父 run：同一房间并发的两个 run 会猜错；②在 `SessionLine` 上另加一个 `dispatched_by` 字段：它只对 `Dispatched` 有意义，挂在 `Opened` 段上永远是 `None`，一个不可能的组合就能写出来。
+
+**重开参数**：一个 run 可以由多个父 run 共同派出时，`parent` 改成表。
+
+**三个平台**：只读账本、只折叠，Windows、macOS、Linux 相同。
 -/
