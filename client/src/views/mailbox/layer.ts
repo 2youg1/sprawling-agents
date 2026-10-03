@@ -42,3 +42,31 @@ export function stepMail(mail: Mail, input: MailInput): Mail {
       return mail.shown ? { ...mail, focus: "inside" } : mail;
   }
 }
+
+// A letter open on the right side (client/spec/Views/Workspace.lean
+// `stepLetter`, client D73). The right side is outside the column, so the
+// mailbox stows while a letter is open; closing the letter brings the
+// mailbox back with the focus on the row that opened it. A row is named
+// by its card's id, because the column mounts new elements when it
+// comes back.
+export interface LetterSide<Row> {
+  readonly mail: Mail;
+  readonly opener: Row | null;
+  readonly row: Row | null;
+}
+
+export type LetterInput<Row> =
+  | { readonly kind: "mail"; readonly input: MailInput }
+  | { readonly kind: "open"; readonly row: Row }
+  | { readonly kind: "close" };
+
+export function stepLetter<Row>(side: LetterSide<Row>, input: LetterInput<Row>): LetterSide<Row> {
+  switch (input.kind) {
+    case "mail":
+      return { ...side, mail: stepMail(side.mail, input.input) };
+    case "open":
+      return { mail: { shown: false, focus: "elsewhere" }, opener: input.row, row: null };
+    case "close":
+      return side;
+  }
+}

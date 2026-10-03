@@ -93,6 +93,7 @@ import client.spec.Views.Parts
 2. **硬币键**（`views/talk/`，client D18）：做朝上那一面，变淡的发送面一按落进空操作（`a_faded_face_does_nothing`），停止面只发 `cancel`、从不发出框里的字（`stop_never_sends`）。
 3. **信箱的条目**（`client/src/views/mailbox/entries.ts`）：j／k 与 `RowList` 同一种钳住的走法，到最后一条不再走（`k_stops_at_the_last_entry`）；1–9 只落到前九个、且存在的条目上（`a_digit_reaches_only_a_drawn_entry`）。
 4. **信箱面这一层**（`client/src/views/mailbox/layer.ts`，D60）：不论按什么顺序按键，关上的信箱里不留焦点（`no_focus_stays_in_a_closed_mailbox`）；Escape 总是关上它，焦点在面里时回到信箱键（`escape_closes_and_returns_focus`）；信箱键与 Accel-B 是同一个开关，按两下回到原样（`two_presses_come_home`）；点面外——另两个边缘键也在面外——总是关上它（`a_press_outside_closes`）。
+5. **信件在右侧**（`client/src/views/mailbox/layer.ts` 的 `stepLetter`，D73）：信件关上时信箱重新打开、焦点回到打开它的那一行，中间信箱收到什么输入都不改（`closing_a_letter_returns_to_its_row`）；信件的开合不让焦点留在关上的信箱里（`letters_hold_mail_focus`）。
 -/
 
 namespace Client.Views.Workspace
@@ -300,5 +301,68 @@ theorem two_presses_come_home (mail : Mail) (closed : mail.shown = false)
 theorem a_press_outside_closes (mail : Mail) (inputs : List MailInput) :
     (runMail mail (inputs ++ [.outside])).shown = false := by
   simp [runMail, List.foldl_append, stepMail]
+
+/-! D73 信件在右侧打开时信箱收起，信件关上时信箱重新打开、焦点回到打开它的那一行。
+理由：右侧在面外，信箱开着时点进信件就是一次 `outside`（`a_press_outside_closes`），所以信件与信箱不能同时开着；而人读完一封信要回到下一封，所以关上信件不能只把焦点交还给一个已经卸下的按钮（`inspect/open.svelte.ts` 的 opener 在信箱收起时已不在页上）。行由信件卡的 `id` 认出，不由元素认出，因为信箱重新挂上时元素是新的。
+被否决的另一条路：信件打开时信箱不收，点信件不算面外——那要给 `outside` 开一个例外，信箱就有了两种「面外」。
+重新打开的条件：信箱不再是左缘推出的一层（D60 重开）时，信件可以与它并排。 -/
+
+/-- 信箱与右侧的信件：`opener` 是打开此刻这封信的那一行，`row` 是信箱里拿着焦点的那一行。 -/
+structure LetterSide where
+  mail : Mail
+  opener : Option Nat
+  row : Option Nat
+  deriving DecidableEq, Repr
+
+/-- 落到这两处的输入：信箱自己的输入、从第 `row` 行打开一封信、关上信件。 -/
+inductive LetterInput where
+  | mail (input : MailInput)
+  | openLetter (row : Nat)
+  | closeLetter
+  deriving DecidableEq, Repr
+
+/-- 一个输入之后的信箱与信件。打开信件收起信箱、焦点进右侧；关上信件时有打开它的那一行就回到那一行。 -/
+def stepLetter (side : LetterSide) : LetterInput → LetterSide
+  | .mail input => { side with mail := stepMail side.mail input }
+  | .openLetter row => { mail := { shown := false, focus := .elsewhere }, opener := some row, row := none }
+  | .closeLetter =>
+    match side.opener with
+    | some row => { mail := { shown := true, focus := .inside }, opener := none, row := some row }
+    | none => side
+
+/-- 按顺序走完一串输入。 -/
+def runLetter (side : LetterSide) (inputs : List LetterInput) : LetterSide :=
+  inputs.foldl stepLetter side
+
+theorem mail_inputs_keep_the_opener (side : LetterSide) (inputs : List MailInput) :
+    (runLetter side (inputs.map .mail)).opener = side.opener := by
+  induction inputs generalizing side with
+  | nil => rfl
+  | cons input rest ih => exact ih _
+
+theorem closing_a_letter_returns_to_its_row (side : LetterSide) (row : Nat)
+    (between : List MailInput) :
+    runLetter side ([.openLetter row] ++ between.map .mail ++ [.closeLetter]) =
+      { mail := { shown := true, focus := .inside }, opener := none, row := some row } := by
+  have kept := mail_inputs_keep_the_opener
+    { mail := { shown := false, focus := .elsewhere }, opener := some row, row := none } between
+  simp only [runLetter, List.foldl_append, List.foldl_cons, List.foldl_nil] at *
+  simp only [stepLetter] at *
+  rw [kept]
+
+theorem letters_hold_mail_focus (side : LetterSide) (inputs : List LetterInput)
+    (h : FocusHeld side.mail) : FocusHeld (runLetter side inputs).mail := by
+  induction inputs generalizing side with
+  | nil => exact h
+  | cons input rest ih =>
+    apply ih
+    cases input with
+    | mail i => exact step_holds_focus side.mail i h
+    | openLetter r => right; simp [stepLetter]
+    | closeLetter =>
+      unfold stepLetter
+      cases side.opener with
+      | some r => left; rfl
+      | none => exact h
 
 end Client.Views.Workspace
