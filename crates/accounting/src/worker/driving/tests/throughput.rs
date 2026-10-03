@@ -85,11 +85,8 @@ impl Latency {
 struct Taken {
     lines: Vec<serde_json::Value>,
     relay: Vec<Duration>,
-    /// Each relay request's wait in the accounting thread's queue, read
-    /// off the worker's monotonic clock (Worker.lean §8-98).
+    /// Relay queue waits and the accounting thread's sleep, µs (§8-98).
     relay_queue: Vec<u64>,
-    /// How long the accounting thread slept on its queue while the runs
-    /// drove, on the same clock.
     idle_us: u64,
     posted_ms: u64,
     wall: Duration,
@@ -128,7 +125,6 @@ fn instrument_throughput() {
             let taken = scenario(runs, latency);
             let head = format!("n_runs={runs} latency={}", latency.name());
             println!("{}", throughput_line(&head, &taken));
-            println!("{}", busy_line(&head, &taken));
             for (wait, samples) in waits(&taken, &idle) {
                 println!("{}", wait_line(&head, wait, samples));
             }
@@ -195,8 +191,6 @@ fn scenario(runs: usize, latency: Latency) -> Taken {
     let lines = until_frozen(dir.path(), runs);
     let wall = started.elapsed();
     let idle_us = health.idle_us().saturating_sub(idle_before);
-    // A reading past `RELAY_QUEUE_KEPT` loses its oldest waits; the
-    // bench's arms stay below it.
     let relay_queue = health
         .relay_queue_us()
         .into_iter()
@@ -332,23 +326,13 @@ fn throughput_line(head: &str, taken: &Taken) -> String {
         format!("{}.{:03}", milli / 1000, milli % 1000)
     };
     format!(
-        "throughput {head} tool_calls_per_run={TOOL_CALLS} runs={runs} records={records} tool_calls={tool_calls} wall_us={wall_us} runs_per_s={} records_per_s={} tool_calls_per_s={} {}",
+        "throughput {head} tool_calls_per_run={TOOL_CALLS} runs={runs} records={records} tool_calls={tool_calls} wall_us={wall_us} runs_per_s={} records_per_s={} tool_calls_per_s={} ledger_thread_idle_us={} ledger_thread_busy_permille={} {}",
         per_s(runs),
         per_s(records),
         per_s(tool_calls),
-        machine()
-    )
-}
-
-/// The accounting thread's busy share over the reading: the wall time
-/// it did not spend asleep on its queue, in permille.
-fn busy_line(head: &str, taken: &Taken) -> String {
-    let wall_us = u64::try_from(taken.wall.as_micros()).unwrap().max(1);
-    let busy_us = wall_us.saturating_sub(taken.idle_us);
-    format!(
-        "throughput_busy {head} wait=ledger_thread_busy wall_us={wall_us} idle_us={} busy_us={busy_us} busy_permille={} {}",
         taken.idle_us,
-        busy_us * 1000 / wall_us,
+        // The accounting thread's busy share: the wall it did not sleep.
+        wall_us.saturating_sub(u128::from(taken.idle_us)) * 1000 / wall_us,
         machine()
     )
 }
