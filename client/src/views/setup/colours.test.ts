@@ -11,7 +11,8 @@
 import { describe, expect, test } from "bun:test";
 import { get } from "svelte/store";
 
-import { BUILT_IN_THEME, loadPreferences } from "../../core/prefs";
+import { loadPreferences } from "../../core/prefs";
+import { BUILT_IN_THEME } from "../../core/theme_override";
 import { memory } from "../../core/rows";
 import {
   apcaLc,

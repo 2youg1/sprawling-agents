@@ -24,7 +24,8 @@
 
 import { get } from "svelte/store";
 
-import type { PreferenceDoor, Theme } from "../../core/prefs";
+import type { PreferenceDoor } from "../../core/prefs";
+import type { Theme } from "../../core/theme_override";
 
 // The prefix the `@theme` block gives every colour token.
 const TOKEN_PREFIX = "--color-";

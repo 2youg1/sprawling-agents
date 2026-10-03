@@ -17,7 +17,7 @@
   import { onMount } from "svelte";
 
   import { fill, say } from "../../core/lang";
-  import { BUILT_IN_THEME, type Theme } from "../../core/prefs";
+  import { BUILT_IN_THEME, type Theme } from "../../core/theme_override";
   import { ui } from "../../ui";
   import type { Editing } from "../refrain/editing";
   import { phrasesIn } from "../refrain/reading";

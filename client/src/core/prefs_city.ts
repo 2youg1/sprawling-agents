@@ -18,9 +18,25 @@ import { get } from "svelte/store";
 import { QUERIES } from "./asking";
 import { putPreferences } from "./commands";
 import { blendOf, type Appearance } from "./appearance";
-import { themeOf, type PreferenceDoor, type Preferences } from "./prefs";
+import type { PreferenceDoor, Preferences } from "./prefs";
+import { themeOf } from "./theme_override";
 import type { Connection } from "./socket";
 import type { Appearance as WireAppearance, PreferencesAnswer } from "../wire";
+
+// Who keeps these preferences between one visit and the next.
+//
+// Two answers, and a person is entitled to both of them: somebody who
+// picks a face for the page needs to know whether the choice follows
+// them to their next browser or dies with this profile's data.
+export type Keeper =
+  // This browser and nothing else. Clearing its data loses them, and
+  // another browser reaching the same city starts from the postures
+  // this client ships with.
+  | "browser"
+  // The city, in the person's own `~/.sprawling/config.toml`. This
+  // browser still caches the record, and the cache never outranks the
+  // answer: every answer that arrives replaces it whole.
+  | "city";
 
 export function keepWithCity(door: PreferenceDoor, conn: Connection): void {
   door.tell((patch) => {

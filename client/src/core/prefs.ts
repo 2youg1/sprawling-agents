@@ -30,7 +30,6 @@
 // `[model] effort`, and a copy kept here would ride on every dispatch
 // from this browser and quietly overrule the city's own file.
 
-import { Option, Schema } from "effect";
 import { derived, get, writable } from "svelte/store";
 import type { Readable } from "svelte/store";
 
@@ -40,13 +39,13 @@ import { browserRows, type Rows } from "./rows";
 import { sizingOf } from "./sizing";
 import {
   Proxying,
-  ThemeOverride,
   Tier as TierSchema,
   type Chord,
   type PreferencePatch,
   type Tier as WireTier,
 } from "../wire";
-import { appearanceOnWire } from "./prefs_city";
+import { appearanceOnWire, type Keeper } from "./prefs_city";
+import { readTheme, type Theme } from "./theme_override";
 import { CHROMAS, DENSITIES, FACES, GLASSES, LIGHTINGS, MOTIONS, STACK_SHAPE, blendOf, type Appearance } from "./appearance";
 import type { Notifying } from "./notify";
 import { SHOWINGS, type Showing } from "./results";
@@ -128,22 +127,6 @@ export const PROXYING_RULES: readonly Proxying[] = Proxying.members.map((rule) =
 
 export const NOTIFYINGS: readonly Notifying[] = ["off", "on"];
 
-// The colours the person laid over the built-in theme: CSS colours by
-// `@theme` variable, and a stylesheet of their own laid after them
-// (`crates/wire/spec/Preference.lean` D29). Whole rather than the wire's
-// optional fields, so a reader never asks whether absent means empty.
-export interface Theme {
-  readonly tokens: Readonly<Record<string, string>>;
-  readonly css: string | null;
-}
-
-// Nothing laid over the theme `theme.css` ships: what "restore default" writes.
-export const BUILT_IN_THEME: Theme = { tokens: {}, css: null };
-
-export function themeOf(stated: ThemeOverride): Theme {
-  return { tokens: stated.tokens ?? {}, css: stated.css ?? null };
-}
-
 // ---------------------------------------------------------- the reading
 
 // The person's preferences, whole. One value rather than a dozen
@@ -164,21 +147,6 @@ export interface Preferences {
   readonly notifying: Notifying;
   readonly showing: Showing;
 }
-
-// Who keeps these preferences between one visit and the next.
-//
-// Two answers, and a person is entitled to both of them: somebody who
-// picks a face for the page needs to know whether the choice follows
-// them to their next browser or dies with this profile's data.
-export type Keeper =
-  // This browser and nothing else. Clearing its data loses them, and
-  // another browser reaching the same city starts from the postures
-  // this client ships with.
-  | "browser"
-  // The city, in the person's own `~/.sprawling/config.toml`. This
-  // browser still caches the record, and the cache never outranks the
-  // answer: every answer that arrives replaces it whole.
-  | "city";
 
 // The one way to the person's preferences: the record as it stands,
 // who is keeping it, the city's answer coming the other way, named
@@ -249,12 +217,6 @@ function readBody(raw: string | null): number | null {
 
 function readStack(raw: string | null): string {
   return raw !== null && STACK_SHAPE.test(raw) ? raw : "";
-}
-
-const readThemeRow = Schema.decodeOption(Schema.fromJsonString(ThemeOverride));
-
-function readTheme(raw: string | null): Theme {
-  return raw === null ? BUILT_IN_THEME : Option.match(readThemeRow(raw), { onNone: () => BUILT_IN_THEME, onSome: themeOf });
 }
 
 function readLang(raw: string | null, fallback: string): Lang {

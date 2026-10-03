@@ -21,7 +21,7 @@
 
   import type { Key } from "../../core/lang";
   import { say } from "../../core/lang";
-  import type { Keeper } from "../../core/prefs";
+  import type { Keeper } from "../../core/prefs_city";
   import { ui } from "../../ui";
   import Badge from "../parts/badge.svelte";
 
