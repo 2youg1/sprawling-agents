@@ -211,7 +211,10 @@ pub fn note_of(kind: EventKind, record: &EventRecord) -> Option<Note> {
                     USER_SOURCE => Speaker::User,
                     _resident => Speaker::Resident,
                 },
-                from: Some(steer.source),
+                // A resident's source carries its envelope after the
+                // address (`@<room> run=… kind=… sender=…`, collab D16);
+                // the note names only who spoke.
+                from: steer.source.split(' ').next().map(str::to_owned),
                 said: Some(steer.text),
                 t: record.t(),
                 handback: None,
