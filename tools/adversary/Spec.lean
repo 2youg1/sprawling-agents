@@ -67,7 +67,7 @@ import tools.adversary.spec.Model
 | 静默 | 门的第三种回答。**不是接受**——见 §10「静默不是接受」 | 若将来 `call` 改为「命令被受理才返回」，`quiet` 这一支变成异常而不是取值 |
 | provider | `Model` 的世界一个都不挂，于是每一次派活在配置这道门上被拒，而模型知道这一点；`Provider` 的世界挂一个**这台电脑上没人听的地址**，于是每一次调用停在 socket 上；U9 挂 `just acceptance` 起的替身，调用成功，替身不在本目录里（§13） | 检查树里的世界要一个会应答的 endpoint 时，它们照 U9 的样子从 justfile 接收一个 URL，而不是在本目录里起一个 |
 | 替身怎样分 run | 替身按请求带回来的调用 id 认出 run 与它走到哪一条，一个 id 都没带的第一轮按到达次序开启脚本里下一个 run（citysim D11、`tools/citysim/Spec.lean` §8-13；`spec/Acceptance.lean`）。所以 U9 只在第一轮可能同时到达的地方——两个同时派出的认领——把那几个 run 写成一样，其余的活都等前一个 run 冻结再派，第一轮的次序就是脚本的次序（D6） | 两个同时开启、要拿不同回复的 run 进 U9 时，替身要能认第一轮（citysim D11 的重开参数） |
-| 杀进程 | `Serving.hangUp` 结束被服务的进程（Windows 上是 `TerminateProcess`，Unix 上是 `SIGKILL`），等被杀的 run 写下 `inFlight` 条 `tool_result` 之后才杀，所以刀落在两次写之间，而不是在最后一次写之后；被杀的 run 若已冻结，那一步报红并说明替身给的调用太少 | 城回来之后怎么处理那个死掉的 run，不是 U9 断言的事：它断言的是历史自证、城再服务、新的活跑到它自己的结尾 |
+| 杀进程 | `Serving.hangUp` 结束被服务的进程（Lean 的 `IO.Process.Child.kill`：Windows 上是 `TerminateProcess`，Unix 上是 `SIGTERM`；城只把 Ctrl-C、Ctrl-Break 与 `SIGINT` 当作有序关闭，所以 `SIGTERM` 同样不留交接），等被杀的 run 写下 `inFlight` 条 `tool_result` 之后才杀，所以刀落在两次写之间，而不是在最后一次写之后；被杀的 run 若已冻结，那一步报红并说明替身给的调用太少 | 城回来之后怎么处理那个死掉的 run，不是 U9 断言的事：它断言的是历史自证、城再服务、新的活跑到它自己的结尾 |
 | 配置写回 | 「写了什么就读得回什么」这条不变量的对象是 **TOML 文件**，不是哪一条帧。人层偏好的那一条（`PutPreferences` / `Query::Preferences`）今天并不存在，而 `configure_building` 写楼自己那层、`Query::BuildingView` 把它折回来，是同一条不变量今天已经承载的地方，所以性质写在那里 | 那一对帧落地后，`Layer` 换成它们驱动，断言一字不改：变的是谁写进文件，不是文件欠谁什么 |
 | 时钟 | 只用于超时，从不被预测 | —— |
 | 端口 | 从 47100 起向上探，第一个能答 `city_view` 的即用 | 机器上有别的东西占着整段时报错并说明 |
@@ -255,7 +255,7 @@ structure Door where binary : System.FilePath
 inductive Answer | accepted (frames : List Frame) | denied (complaint : Complaint) | quiet
 def discover     : IO (Option Door)
 def Door.raise   : Door → System.FilePath → IO Unit
-def Door.serve   : Door → System.FilePath → Port → IO Serving
+def Door.serve   : Door → System.FilePath → Port → System.FilePath → IO Serving  -- 城、端口、给城的 home
 def Door.ask     : Door → Port → Verb → IO Answer
 def Door.verify  : Door → System.FilePath → IO (Except String Nat)
 def idemKey      : Nat → IdemKey
@@ -297,7 +297,9 @@ def render : String → Trace → String
 
 ```lean
 -- Ground.lean —— 服务一个已经起好的目录；withGround 是它加一个一次性目录
-def servingAt : Door → System.FilePath → System.FilePath → (Ground → IO α) → IO α
+inductive Leaving | killed | closedInOrder        -- 服务结束时城怎样离开（D8）
+def Serving.leave : Serving → Leaving → IO Unit  -- 有序关闭不成就结束进程，并印出退回
+def servingAt : Door → System.FilePath → System.FilePath → Leaving → (Ground → IO α) → IO α
 
 -- Acceptance/Script.lean —— 替身回放什么
 def standInModel : String                          -- 替身列出的唯一模型
@@ -320,7 +322,7 @@ def scriptWithChecker : List String → String → Json -- 同一份脚本，后
 -- Acceptance/Stage.lean —— 陌生人的目录
 structure Stage where root city home : System.FilePath
 def Stage.raise   : Door → IO Stage
-def Stage.serving : Stage → Door → (Ground → IO α) → IO α
+def Stage.serving : Stage → Door → Leaving → (Ground → IO α) → IO α
 def shipped    : System.FilePath → IO (List String) -- 书架上带 SKILL.md 的目录名，排序
 def mountShelf : System.FilePath → System.FilePath → IO Unit  -- 把书架写进城那一层
 def admit      : System.FilePath → String → List String → IO Unit  -- 改阅览室那一行
@@ -414,6 +416,8 @@ def writtenReadsBack  : Door → List Nat → IO Verdict
 6. `just acceptance <archive>`：把归档解进 `target/acceptance/`，构建替身与 `acceptance`；`lake exe acceptance script <书架> <脚本>` 按归档的 `skills/` 写出脚本；配方起替身，从它印出的第一行读 `SPRAWLING_PROVIDER`；`lake exe acceptance walk <书架> <脚本> <记录> <清单>` 在 `SPRAWLING_BIN` 指着归档里的二进制时走完四段：
    - **第一天**（一次服务）：城答出它起城时的那栋 hall；替身被挂上、它的模型被选中；立一栋楼并被列出；人在楼的阅览室里准入每一件 skill；派活跑到脚本给的结尾并在盘上留下文件；run 钉住的 skill 恰是书架上的那些，按名读到的每一件以它自己的正文到达模型；模型拿到的目录里有脚本调用的每件工具；城列出的楼恰是历史创建过的楼；历史自证。
    - **进程被杀**（第二次服务）：派活，等那个 run 写下几条工具结果，然后结束进程。
+
+   第一次与第三次服务结束时城被有序关闭（D8，`Leaving.closedInOrder`）：macOS 与 Linux 上送 `SIGINT`，等进程自己退出；Windows 上、或十秒内没退出时，退回到结束进程，并在输出里印一行 `note` 说出退回与原因。只有第二次服务是被杀的。
    - **第二天早上**（第三次服务）：被杀的城留下的历史自证；城再服务，新派的活跑到它自己的结尾；历史再自证。
    - **协作**（仍是第三次服务）：立第二栋楼 `beta`，人把它的 `review` 改成 true、在它的计划表里写下一行；`beta/planner` 认领那一行并把它分成两片叶子（分一行要先握着它，collab D6；§4 第八个发现）；`beta/left` 与 `beta/right` 同时派活、都去认第一片叶子，历史里只有一条认领；活重派到 `beta/left`，它认下第二片叶子、写一个文件、提出评审，文件不在城里；检查从历史读出那条请求的分支，把查它的 run 接到脚本后面（D7），派给 `beta/right`，它判不通过，历史里有一条以同一个分支、同一句理由被拒的记录，文件仍不在城里；历史再自证；最后问城 `known_hosts`。
 
@@ -471,6 +475,8 @@ D5 由 D6 取代。
 D6 **验收世界在协作那一串里并发派活，仍走到第一处失败就停；它取代 D5。** 替身按 run 分开作答（citysim D11）：一个续轮由它带回的调用 id 放进它自己的 run，与别的 run 怎么交错无关（`spec/Acceptance.lean` 的 `every_run_is_answered_from_its_own_replies`）；第一轮按到达次序开启脚本里的下一个 run（`openings_take_the_runs_in_order`）。所以只有第一轮可能同时到达的 run 要写成一样（`alike_runs_answer_alike`）——两个同时派出的认领正是这样：两个 run 都去认同一片叶子，谁先到替身都答同一条，谁拿到叶子由城的认领决定，而那正是这一步要看的。其余的活仍等前一个 run 冻结再派，第一轮的次序就是脚本的次序。被杀的 run 不再与之后的活分一段回复：城回来之后若接着送它的对话，它续自己的那一段，新派的活开启自己的那一段。每一步站在前面几步留下的城上，一处失败之后接着走只会把一个原因报成许多个，所以仍停在第一处失败（`the_reported_step_broke_and_every_earlier_one_held`）。被否：D5 的做法——一次只派一个 run，并发认领就走不了，认领冲突只有白盒的 `crates/accounting/src/worker/plans/tests/rows.rs` 守着；给两个认领的 run 写不同的回复——它们第一轮同时到达，替身分不出谁是谁。
 
 D7 **城才知道的东西，检查从历史里读出来，再把要用它的 run 接到脚本后面。** 查一条请求要说出它的分支，分支名由城按房间地址的摘要取，而本目录不预测任何摘要（§2 第 3 条）。所以 `beta/left` 提出评审之后，检查从 `pr_opened` 读出分支，把整份脚本连同查它的那个 run 写回脚本文件，再派活给 `beta/right`；替身在新开的 run 找不到还没开启的 run 时重读这个文件（citysim D15），接上的 run 不改动已经在答的那些（`a_grown_script_answers_the_runs_it_held_alike`）。写回时没有别的 run 在开启：前一个 run 已经冻结，下一个活还没派。被否：把分支名写死在脚本里——那是在预测一个摘要；让替身从上一次工具结果里抄出分支——替身就在写自己的文字（citysim D11）；用 `pr list` 让模型自己看——脚本写好的回复不会读它拿到的结果。
+
+D8 **U9 只在第二次服务里杀城；第一次与第三次服务按人在键盘前的做法有序关闭，关不了才杀，并说出来。** 有序关闭让城写下交接、进程正常退出，于是交接那条路径被走到，而插桩的发行件（`just pgo-train`）只有正常退出才写出 profile：一个全被杀的走查对 PGO 一份都不贡献。macOS 与 Linux 上是对子进程 `kill -s INT <pid>`；之后每 100 毫秒问一次是否退出，十秒为限。Windows 上城只认它自己控制台上的 Ctrl-Break，而 Lean 的 `IO.Process.spawn` 不能让城另起一个进程组（`SpawnArgs.setsid` 在 POSIX 之外不起作用），在共享的控制台上发 Ctrl-Break 会连同走查本身与它上面的 `lake`、`just` 一起关掉；所以 Windows 上直接退回到结束进程，`note` 一行写明原因。这一条在 `Door.serve` 能把城起在自己的进程组里时重开（例如经一个用 `CommandExt::creation_flags` 设 `CREATE_NEW_PROCESS_GROUP` 的启动器，再向那个组发 Ctrl-Break）。退回只印一行而不报红：U9 判的是一个人第一天的路径，城怎样被这个检查器关掉不在那条路径上。被否：三次服务都有序关闭——第二次服务要的正是一次崩溃；关不了就报红——Windows 上每一跑都会红在检查器自己的缺口上。
 -/
 
 /-! ## 11 边界枚举
