@@ -54,7 +54,7 @@ import client.spec.Views.Workspace
 | `client/spec/Views/Guide.lean` | 启动时进不进上手指南，跳过之后落在哪 | （§7G、D54） |
 | `client/spec/Views/Door.lean` | 远程组的门开关、「更换城钥匙」与确认码输入框：焦点、Escape 与拒绝 | （4-57） |
 
-其余标签都在本文件：§3-1、§3-2 在 §8，§3-4 在 §3，其余 §4-n 与 §7C、§7G、§7K、§7L、§7N 在 §10，§7-8 在 §4，§7-9 在 §13；决定 D1 至 D48（含 D42a）、D52 至 D55、D72、D78、D80、D81、D82、D83、D85 与 D86 在 §10 之后，D60 与 D73 在 `client/spec/Views/Workspace.lean`。
+其余标签都在本文件：§3-1、§3-2 在 §8，§3-4 在 §3，其余 §4-n 与 §7C、§7G、§7K、§7L、§7N 在 §10，§7-8 在 §4，§7-9 在 §13；决定 D1 至 D48（含 D42a）、D52 至 D55、D72、D78、D80、D81、D82、D83、D85、D86 与 D88 在 §10 之后，D60 与 D73 在 `client/spec/Views/Workspace.lean`。
 -/
 
 /-! ## 2 验收标准
@@ -145,7 +145,7 @@ import client.spec.Views.Workspace
 | `belief/rooms.ts` | 7 投影 | `Belief.rooms: ReadonlyMap<string, readonly RunId[]>`——每个房间持有过的 run（在干活的与已冻结的），按 `started` 从旧到新，只存 `RunId`，所以一次折叠只在 run 进表、换房间或换开始时刻时改写那一个房间的列表，O(k)（k 为该房间的 run 数），其余折叠不动索引；`adoptCity` 整表换写时 O(R log R) 重建。`heldIn(belief, room) -> RunBelief[]`（恰在这个房间）与 `heldWithin(belief, room) -> RunBelief[]`（这个房间及其下，按 `inside`）是房间页、目录、城市面板与天际线共读的答案，读者付 O(房间数 + k)：R = 1e4、百个房间时一次记录折叠加一次读一个房间 ≤ 500 µs（`belief/live.test.ts`）。同一开始时刻的两个 run 按进表先后排 |
 | `belief/cancelled.ts` | 7 投影 | `Belief.cancelled: number`——冻结原因是 `cancelled` 的 run 数（线协议不带一次停机冻结了多少，停机写的正是这个原因）。`recounted(count, was, run) -> number` 在每次折叠里只看这一个 run 的前后两次读数，O(1)；`cancelledOf(runs)` 只在 `adoptCity` 整表换写时 O(R) 重数。页面的停机行读它：R = 1e4 时一次记录折叠加一次读 ≤ 500 µs（`belief/live.test.ts`） |
 
-| `doing.ts` | 2 值 | `Doing = unknown \| thinking \| calling { tool: string \| null, subject } \| waiting \| frozen { completion }`、`Sending = dispatch \| steer \| queued`、`sendingInto(doing)`；`MOVING`／`moves(kind)`／`PHASES` 是「哪些 kind 陈述姿态、各自陈述什么」的独家表，流与答案两条路都读它 |
+| `doing.ts` | 2 值 | `Doing = unknown \| thinking \| calling { tool: string \| null, subject } \| waiting \| awaiting_reply { wait: Waiting } \| frozen { completion }`、`Sending = dispatch \| steer \| queued`、`sendingInto(doing)`、`afterWait(doing, end) -> Doing`（一次回信等待的结束把姿态送到哪里，D88）；`MOVING`／`moves(kind)`／`PHASES` 是「哪些 kind 单凭 kind 就陈述姿态、各自陈述什么」的独家表，流与答案两条路都读它；`signal_wait_started`／`signal_wait_ended` 要读载荷才说得出等谁，所以不在表里，流的一路由 `belief/fold.ts` 折，答案的一路读 `RunSummary.waiting` |
 | `landing.ts` | 1 判定 | `sentFrom(from, task, runs) -> Sent`（发出那一刻记下房间、任务原文与已知的 run）、`landingOf(sent, runs) -> Landing`，`Landing` 穷尽（`pending`／`here`／`elsewhere { run, addr }`）：`run_started` 之后第一个「发出时不认识、`task` 与原文相同、`addr` 是发出的房间或它下面任一层的房间」的 run 就是这次派的活；落在原房间时线程已经画出它，落在别处时 `talk/landed.svelte` 在原地留一行可点的去处（见 D6） |
 | `reading.ts` | 4 适配器 | `taskOf(record)`、`toolCall(record)`、`modelOf(record)`、`completionOf(record)`、`askOf(record)`、`branchOf(record)`、`haltOf(record)`，各答 `[值, 读不出的字段名 \| null]`；`sessionStart(record) -> SessionStart \| null`（不是会话开头、或没说房间的记录答 `null`）；`policyChange(record) -> PolicyChange \| null`（`run_policy_changed` 的房间、seq、时刻与按生成的 `RunPolicy` 读出的策略，读不出答 `null`）；`offeredOn(record) -> [Address \| null, string \| null]`（`proposal_offered` 的 `doc`，按生成的 `Address` 文法读）；`kernel::event::record` 的字段名与 serde 属性（`Option` 与 `#[serde(default)]` 各是什么意思）在客户端只有这一处拼写 |
 | `scope.ts` | 4 适配器 | `scopeOf(spelled) -> HaltScope \| null`（Ledger 拼法→frame 拼法，唯一相遇点）、`sameScope`、`buildingIsShut`、`cityIsShut`、`CITY`；`CITY` 是两套拼法共同的那一个词，五个视图改读它，不再手写 `"city"` |
@@ -796,6 +796,14 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
 - **理由**：居民的话以前画成人的气泡，人会以为那是自己说过的话（UC3）；形状不同才不靠标签区分。`Note::Arrived` 不带 `SignalKind`，所以信卡只写「来信」，不猜是哪一种；发信 run 也不在线上，所以链接到房间而不是那一段，与 D83 同一取法。
 - **被击败的备选**：一，在气泡上换一个标签——同一形状的两种话仍要读字才分得开；二，在页面里按 `from` 是不是 `user` 判断——`by` 已在线上，第二处判断就是第二个权威。
 - **重开参数**：`Note::Arrived` 带上信的种类或发信 run 时，信卡头改写种类、链接改到那一段。
+-/
+
+/-! D88 停在同步 `send` 上的 run 有自己的姿态：在等谁回信、还剩多久
+
+- **决策**：`core/doing.ts` 的 `Doing` 多一臂 `awaiting_reply { wait: Waiting }`，`Waiting { on, until }` 就是线上 `RunSummary.waiting` 的那个类型（wire D34），客户端不另拼一份。流的一路：`belief/fold.ts` 读到 `signal_wait_started` 时按载荷（`on`、`deadline_ms`，经 `core/reading.ts` 的 `waitOf`）进入这一臂；读到 `signal_wait_ended` 时由 `afterWait` 一处决定离开到哪里——`reply` 与 `timeout` 回到 `thinking`（run 从安全点接着走，下一次模型调用会再说一次），`left` 到 `unknown`（run 离开了房间，说它怎样结束的是随后的 `run_frozen`）；姿态已不是这一臂时（例如 `run_frozen` 先到）结束行不改它。答案的一路：`belief/adopted.ts` 在 `RunSummary.waiting` 在场时给这一臂，缺席而本页仍以为在等时给 `unknown`，因为答案比本页新、又不陈述别的姿态。等待中发出的话是 `queued`：run 停在 `send` 的工具调用里，与 `calling` 同理。画法：run 板的阶段多一个 `reply`（`send` 字形、live 墨色、accent 填色），信箱「在跑」一行与 run 板的一行写「在等 <房间> 回信，还剩 <时长>」，过了时限写「已过时限」，词都来自 `lang.json`，时长按页面的同一只钟（`talk/timing.ts` 的 `ticker`）。三个平台上是同一段 TypeScript，没有平台分支。
+- **理由**：一个停着等回信的 run 以前在信箱与 run 板上读作「在想」，人分不出它是在推理、卡住了，还是在等另一个居民；等谁与时限都已在账本那一行与线上的摘要里，不需要新的线协议。
+- **被击败的备选**：一，借用 `waiting`——那是「等你批准」，信箱会把它算进需要你的事；二，只在线程里画（`Note::AwaitingReply`）——信箱与 run 板不问 `Rounds`，那样它们照旧说「在想」；三，把结束的方式留在 `RunBelief` 上画一行「已回信／超时」——那是线程注记已经说的事，在两处画就是两个说法。
+- **重开参数**：一个 run 可以同时等两个房间时（wire D34 的重开参数），`wait` 改成一张表，这一臂跟着改。
 -/
 
 /-! D25 设置面开着是一个地址，开在一页之上
