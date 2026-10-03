@@ -16,9 +16,13 @@
 
 ```rust
 pub struct TaintSource(String);            // 非空来源标签（如 "web:example.com"）；文法 P1 随 Endpoint 收紧
+impl TaintSource { pub fn new(label: impl Into<String>) -> Option<TaintSource>;  // 空串即 None
+                   pub fn as_str(&self) -> &str; }
 pub struct TaintSet(BTreeSet<TaintSource>); // 空集＝内生数据；并集半格
-impl TaintSet { pub fn empty() -> Self;  pub fn union(&self, other: &TaintSet) -> TaintSet;
-                pub fn is_empty(&self) -> bool;  pub fn contains(&self, s: &TaintSource) -> bool; }
+impl TaintSet { pub fn empty() -> Self;  pub fn of(source: TaintSource) -> Self;  // 单一来源
+                pub fn union(&self, other: &TaintSet) -> TaintSet;
+                pub fn is_empty(&self) -> bool;  pub fn contains(&self, s: &TaintSource) -> bool;
+                pub fn len(&self) -> usize;  pub fn sources(&self) -> impl Iterator<Item = &TaintSource>; }  // 按集合次序
 impl Display for TaintSet;                  // 来源标签按集合次序以 ", " 连接
 
 pub struct Tainted<T> { /* value, taint —— 字段私有 */ }
