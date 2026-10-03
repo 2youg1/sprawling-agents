@@ -16,11 +16,16 @@
 pub use kernel::layout::CONFIG_FILE;               // 文件名的权威在 kernel::layout
 pub enum Layer { City, Building, Resident }        // 穷尽三级，与 kernel::LayeredValue 同形
 pub fn path(city_root: &Path, addr: &Address, layer: Layer) -> Result<PathBuf, AxError>;
-pub struct ConfigLayer { /* model / harness / effort / sandbox / mcp / shelves / remote —— 私有 */ }
+pub struct ConfigLayer { /* model / harness / effort / sandbox / mcp / second_threshold / clock_stamp / keep_warm / shelves / naming / remote —— 私有 */ }
 impl ConfigLayer {
     pub fn parse(text: &str) -> Result<ConfigLayer, AxError>;   // 纯函数，无 I/O
     pub fn model(&self) -> Option<&str>;                        // 这一级冻下的模型，照写下的读回
     pub fn effort(&self) -> Option<Effort>;
+    pub fn sandbox(&self) -> Option<&SandboxLimits>;   pub fn mcp(&self) -> Option<&[McpServer]>;
+    pub fn second_threshold(&self) -> Option<SecondThreshold>;
+    pub fn clock_stamp(&self) -> Option<ClockStampGranularity>;   // §8-31
+    pub fn keep_warm(&self) -> Option<KeepWarm>;                  // [cache] 一节
+    pub fn naming(&self) -> Option<B3Hash>;                       // 会话冻下的命名版本（Identity 分部）
     pub fn shelves(&self) -> Option<&[String]>;                 // 这一级声明挂载的外部书架目录；只有 City 级可以（§8-8）
     pub fn remote(&self) -> Option<&RemoteRoute>;              // 这一级选的远程门通路；只有 City 级可以（§8-39）
 }
@@ -34,6 +39,8 @@ pub fn settled_harness(city_root: &Path, addr: &Address)
     -> Result<Option<(String, Layer)>, AxError>;       // 房间下一段会话交给哪家 harness，连同点名它的那一级
 pub fn write_second_threshold(city_root: &Path, addr: &Address, layer: Layer,
     threshold: SecondThreshold) -> Result<(), AxError>;    // 与 write_session 同一扇门
+pub fn keep_warm(city_root: &Path, addr: &Address) -> Result<KeepWarm, AxError>;   // [cache] 爬梯，一层不说即 Off
+pub fn freeze_naming(city_root: &Path, addr: &Address, version: B3Hash) -> Result<(), AxError>;   // 写地址自己那一层
 
 // config_layers::ladder（crate 内）
 impl Layer {
@@ -48,7 +55,7 @@ impl Ladder {
 }
 ```
 
-**一条梯子是一个值**：`Ladder::read` 按 `Layer::ALL` 由远及近读一遍，落点重复的一级丢弃；`load` 逐个关切在梯子上 fold，不逐级点名。加一级因此是 `Layer` 多一个臂：`ALL`、`file` 与 `resolve` 三处穷尽匹配同时报编译错，直到新一级被安置，而每个关切一次拿到它。`resolve` 是「哪一级填 `LayeredValue` 的哪一格」的唯一一处答案——今天 `kernel::LayeredValue` 只有三格，所以人层（`~/.sprawling/config.toml`）进梯子时，`kernel::config` 与本模块在同一次改动里走完。
+**一条梯子是一个值**：`Ladder::read` 按 `Layer::ALL` 由远及近读一遍，落点重复的一级丢弃；`load` 逐个关切在梯子上 fold，不逐级点名。加一级因此是 `Layer` 多一个臂：`file` 与 `tagged` 两处穷尽匹配同时报编译错，直到新一级被安置，而每个关切一次拿到它；`ALL` 是一个数组字面量，编译器不会因为它漏了一级而报错，新一级要在同一次改动里写进去。`tagged` 是「哪一级填 `LayeredValue` 的哪一格」的唯一一处答案——今天 `kernel::LayeredValue` 只有三格，所以人层（`~/.sprawling/config.toml`）进梯子时，`kernel::config` 与本模块在同一次改动里走完。
 
 **来源与值一起答**：`settled_effort` 与 `load` 爬同一条梯子，区别只在它把说出这个值的那一级留着而不是丢掉。只被告知结果的设置页说不出「这是这间房自己写的」还是「这是全城都有的」，于是它只能把三份文件各读一遍、把同一条梯子再爬一次——**同一个问题两个答案，就是从第二次爬梯开始的**。谁压过谁仍由 `kernel::LayeredValue::resolve` 判：`tagged` 只负责「哪一级填哪一格」，`resolve` 是 `tagged` 去掉那一级，所以这条映射在本 crate 里只有一处。`None` 是整条梯子什么都没说，也就是这座城有意把强度交给供应方，而不是替人填一档。`settled_second` 是同一条路的第二个值：第二道提醒阈值也说得出是那一级写的。
 
@@ -104,7 +111,7 @@ pub fn write_mcp(city_root: &Path, addr: &Address, layer: Layer, servers: &[McpS
 - **空的 `mcp` 表要写出来而不是省略**：省略即继承上一级，而一个人删掉最后一台服务器不是想继承一台。
 - **`env` 与 `headers` 逐值判定凭据，落盘之前就拒**：一个值只要不是 `SecretRef::parse` 认得的 `secret:realm/name`，名字命中 `kernel::secret::scan::names_a_credential` 或值命中 `kernel::secret::scan::scan` 即以 `AxCode::ConfigInvalid` 拒，恢复语指向金库。判定在 `write_mcp` 进 `change` 之前逐对做，因此一次被拒的写入一个字节都没落；拒绝文字报出是哪一台服务器、哪一张表、哪一个名字，因为人手里只有那句话。**理由是这份文件进版本库**：楼的 `CONFIG.toml` 由 `city::gitignore` 放行进历史（§8-21），写进去的 key 就在这个项目的每一次克隆里。**判定不重建**：「什么叫凭据」是 `kernel::secret` 的答案，与 `[sandbox] env_passthrough` 走 `EnvVarName::parse` 是同一个权威的两次调用。
 - **读面不判这一条**：手写进 `CONFIG.toml` 的明文 key 仍然读得回来（`ConfigLayer::parse` 不调凭据谓词）。补齐要让 `ConfigLayer::parse` 调同一个谓词，那时谓词升为 `pub(crate)` 并只有一处实现。
-- **所有写面只有一条写路径**：各自把要说的话包成 `Change`（穷尽：`Session` / `Forget` / `Sandbox` / `Mcp` / `SecondThreshold`），同走内部的 `change`——取 `city::document` 对这份文件的持有、读、改一个键、整份原子换上去。各自读写时，两个会话改同一份 `CONFIG.toml` 会各自从同一份原件出发，后写的那一个抄掉先写的那一个的改动。`[model]` 那一节的三个值由同一条 `table` 找到或建出，免得三处对「该写进哪张表」各有各的说法。
+- **所有写面只有一条写路径**：各自把要说的话包成 `Change`（穷尽：`Session` / `Forget` / `Sandbox` / `Mcp` / `SecondThreshold` / `Naming` / `KeepWarm` / `Effort`），同走内部的 `change`——取 `city::document` 对这份文件的持有、读、改一个键、整份原子换上去。各自读写时，两个会话改同一份 `CONFIG.toml` 会各自从同一份原件出发，后写的那一个抄掉先写的那一个的改动。`[model]` 那一节的三个值由同一条 `table` 找到或建出，免得三处对「该写进哪张表」各有各的说法。
 -/
 
 /-!
@@ -155,7 +162,7 @@ stamp = "minute"   # "off" | "minute" | "five_minute" | "hour"
 /-!
 ## 模型：每一次写都先让读者读一遍
 
-所有写面（`write_session`、`forget_shape`、`write_sandbox`、`write_mcp`、`write_second_threshold`、`write_city_setting`、`freeze_naming`）都把要说的话包成一个 `Change`，走同一个 `change`：在文档锁里读出整份文件，读不成一份 TOML 文档就拒；改它要改的键；把改好的整份文本交给 `ConfigLayer::parse`，读者拒了就拒这次写，什么都不落；读者收下才整份换上（§8-4b、D6）。锁与整份换上是 `crates/city/spec/Document.lean` 的模型，这里只说「写下的总是读者收得下的」。
+所有写面（`write_session`、`forget_session`、`write_sandbox`、`write_mcp`、`write_second_threshold`、`write_city_setting`、`freeze_naming`）都把要说的话包成一个 `Change`，走同一个 `change`：在文档锁里读出整份文件，读不成一份 TOML 文档就拒；改它要改的键；把改好的整份文本交给 `ConfigLayer::parse`，读者拒了就拒这次写，什么都不落；读者收下才整份换上（§8-4b、D6）。锁与整份换上是 `crates/city/spec/Document.lean` 的模型，这里只说「写下的总是读者收得下的」。
 
 * `change` 交出的文本读者一定收下（`a_change_lands_only_what_the_reader_accepts`）。
 * 被拒的一次写不动文件（`a_refused_change_leaves_the_file`）。

@@ -24,9 +24,15 @@ impl UserBrowserEndpoint {
     pub fn url(&self) -> &str;
     pub fn host(&self) -> &str;
 }
-pub struct BuildingRules { /* addr、policy、write_prefixes、browser、usersbrowser —— 私有 */ }
+pub struct BuildingRules { /* addr、policy、write_prefixes、reach、egress、review、browser、usersbrowser、desktop、reading_room、harness_minutes —— 私有 */ }
 impl BuildingRules {
     pub fn policy(&self) -> &BuildingPolicy;          // 随每次模型调用出行
+    pub fn addr(&self) -> &Address;
+    pub fn egress(&self) -> &EgressAllowlist;         // confidential 楼恒空；它声明的表在 evaluate 处即拒
+    pub fn review(&self) -> bool;                     // 缺这一行读作 false：run 的写由别的居民合并后才可见
+    pub fn browser(&self) -> bool;                    // 缺这一行读作 false；confidential 楼恒 false
+    pub fn reach(&self) -> DomainReach;               // Building 分部
+    pub fn reading_room(&self) -> &[String];          // AGENTS.md 的 `## Reading room`，Library 分部
     pub fn model_pool(&self) -> ModelPool;
     pub fn usersbrowser(&self) -> Option<&UserBrowser>;
     pub fn write_domain(&self) -> Result<WriteDomain, AxError>;
