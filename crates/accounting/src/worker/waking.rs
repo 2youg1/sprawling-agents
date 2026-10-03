@@ -355,3 +355,6 @@ impl RunWorker {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod sending_tests;

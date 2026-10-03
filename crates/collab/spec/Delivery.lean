@@ -6,7 +6,7 @@
 /-!
 # Delivery：信与派活在发出时生效
 
-规定 `crates/collab/src/signal_tool.rs`（`collab::signal_tool`）与 `crates/collab/src/delegate_tool.rs`（`collab::delegate_tool`）在城里的投递语义，以及装配层（`accounting::worker::waking`、`accounting::worker::rooms`）为它守住的那一半。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。`spec/Inbox.lean` 管一个房间的队列内部（去重、lane、bandwidth）；本模型管全城：谁在什么时候收到哪一件。
+规定 `crates/collab/src/signal_desk.rs`（`collab::signal_desk`）与 `crates/collab/src/delegate_tool.rs`（`collab::delegate_tool`）在城里的投递语义，以及装配层（`accounting::worker::waking`、`accounting::worker::rooms`）为它守住的那一半。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。`spec/Inbox.lean` 管一个房间的队列内部（去重、lane、bandwidth）；本模型管全城：谁在什么时候收到哪一件。
 
 城的投递状态：
 
@@ -478,7 +478,7 @@ theorem consumed_stays {patience : Nat} (c : City) (a : Act) :
 /-!
 ## 咬得动的演示
 
-今天的代码在安全点取走一件就当场记 `Consumed`（`collab::signal_tool::SignalDesk::take_steer`、`pull`）。把 `take` 写成那样，被取消的 run 拿走的那件就既不在队列里、也不在任何 run 手里，而它的回答从没落账：信丢了。下面的定理就是那条反例。
+D8 之前的代码在安全点取走一件就当场记 `Consumed`（`collab::signal_desk::SignalDesk::take_steer`、`pull` 的前身）。把 `take` 写成那样，被取消的 run 拿走的那件就既不在队列里、也不在任何 run 手里，而它的回答从没落账：信丢了。下面的定理就是那条反例。
 -/
 
 def stepConsumingAtTake (patience : Nat) (c : City) : Act → City

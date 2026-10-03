@@ -20,7 +20,7 @@ import crates.collab.spec.Delivery
 | 模块 | 回答的问题 |
 |---|---|
 | `inbox`、`steer` | 一条消息怎么从一个居民到另一个，而重复投递不变成重复副作用（`spec/Inbox.lean`；本文件 §8 的 steer 一条） |
-| `signal_tool`、`delegate_tool` 的投递语义 | 信与派活在什么时候、经哪扇门到达收信方，发信方被取消时那封信怎样（`spec/Delivery.lean`；D7–D11） |
+| `signal_desk`、`delegate_tool` 的投递语义 | 信与派活在什么时候、经哪扇门到达收信方，发信方被取消时那封信怎样（`spec/Delivery.lean`；D7–D11） |
 | `workshop`、`fanin` | 一件活拆成多个节点后，谁按什么序跑、结果怎么收回来（`spec/Workshop.lean`、`spec/Fanin.lean`） |
 | `pr` | 写代码的人不验自己的代码，由什么强制（`spec/Fanin.lean`） |
 | `arbiter` | 两个居民不同意时，升到哪里（§8、D1） |
@@ -49,7 +49,7 @@ Rust 实现对模型的一致性由测试检查，不由证明：每个模块旁
 
 /-! ## 4 现状分析
 
-十七个模块（§1）。**`send` 在调用时生效，取走的信被拿着直到读过它的回答落账（D7、D8 已落进 Rust）。** `SignalDesk` 经它的 `Post` 写 `signal_enqueued`：城里的 `Post` 经 relay 把那一行交给记账线程，记账线程在把这一行展示给各个 fold 时把信投进收信房间（`accounting::worker::waking` 的 `deliver_sent`）：房间空着就进队列，有 run 在读就进那个 run 的 `Mailslot`，它在下一个安全点经 steer 那扇门或 `pull` 读到。安全点取走的信被 desk 拿着（`held`），run 的下一次 `SafePoint::BeforeWave`（此时这一回合的 `model_returned` 已落盘）才为它们各写一行 `signal_consumed`；run 在那之前离开，`take_inbox` 把它们放回队列最前，落地时为本房间敲一次门（`knock_for_returned`）。
+十八个模块（§1）。**`send` 在调用时生效，取走的信被拿着直到读过它的回答落账（D7、D8 已落进 Rust）。** `SignalDesk` 经它的 `Post` 写 `signal_enqueued`：城里的 `Post` 经 relay 把那一行交给记账线程，记账线程在把这一行展示给各个 fold 时把信投进收信房间（`accounting::worker::waking` 的 `deliver_sent`）：房间空着就进队列，有 run 在读就进那个 run 的 `Mailslot`，它在下一个安全点经 steer 那扇门或 `pull` 读到。安全点取走的信被 desk 拿着（`held`），run 的下一次 `SafePoint::BeforeWave`（此时这一回合的 `model_returned` 已落盘）才为它们各写一行 `signal_consumed`；run 在那之前离开，`take_inbox` 把它们放回队列最前，落地时为本房间敲一次门（`knock_for_returned`）。
 
 仍与意图不符的有三处。其一，敲门不在调用时：空房间要等发信 run 落地才敲（`settle_desks` 读 `take_sent`），因为敲门携发信 run 在对话链里的位置（`KnockChain`），而那个位置今天只在落地处可读；信本身已在调用时进了房间，所以一个正在跑的收信 run 不受影响。其二，`delegate` 仍只答「在哪个房间开」，子 run 在父 run 冻结之后才开（`accounting::worker::dispatching`）。其三，D10 的投递时状态文字未写，`send` 没有同步开关（D9）。一个敲门在房间队列已空时被跳过（`answer_knocks`），因为它要叫醒读的那封信可能已被在场的 run 读过。
 
@@ -134,7 +134,7 @@ Signal、Inbox、Steer、Workshop、NodeContract、fan-in、Artifact、arbitrati
 - `from_signal`：不是 handback 的信号答 `None`，是 handback 而读不出的答 `E_WIRE_MISMATCH`；两者都答 `None`，「子停了」与「这一行本 build 读不懂」在父那里就是同一种沉默。载荷的键住内部标签枚举 `HandbackBody`，写读两端同经它。
 - 它不叫 `Verified`：本 crate 已有 `pr::Verified`，两个同名项一出现 rustc 就不再剪短路径，`tests/ui/merge_without_verification.stderr` 当场变红，编译器替「一个概念一个名字」执行了一次。
 
-**`collab::signal_tool`**（形状 4 适配器）。`SignalEffect::{Enqueued, Consumed}`；`Post::new(write)` 是调用时写下一行信件账并据此行事的权威（城里是 relay 到记账线程）；`RoomMail { inbox, slot, post }` 三者一起借出；`SignalDesk::new(run, room, who, reach, at, mail)`（`at` 是本 run 的时刻，工具面没有时钟）、`pending`、`take_steer`、`answered`、`take_sent`、`take_inbox`、`take_unread`；`SignalTool` 两个 action：`send`、`pull`。
+**`collab::signal_desk`、`collab::signal_tool`**（形状 4 适配器）。desk 是 run 那一侧，tool 是模型看到的那一面、只路由到 desk。`SignalEffect::{Enqueued, Consumed}`；`Post::new(write)` 是调用时写下一行信件账并据此行事的权威（城里是 relay 到记账线程）；`RoomMail { inbox, slot, post }` 三者一起借出；`SignalDesk::new(run, room, who, reach, at, mail)`（`at` 是本 run 的时刻，工具面没有时钟）、`pending`、`take_steer`、`answered`、`take_sent`、`take_inbox`、`take_unread`；`SignalTool` 两个 action：`send`、`pull`。
 
 - Inbox 是借出的，不是拷贝的（D3）：整个 run 期间该房间的 Inbox 恰存一份，住在 desk 里，工人与工具共享一个 `Arc<Mutex<..>>`；驱动返回后无论成败都归还。
 - `send` 在调用时生效（D7）：先写 `signal_enqueued`，再 `deliver` 到收件房间，因为投影只因一条已追加的事件而改变；收件房间有 run 在跑就在它下一个安全点收到，没有就敲门。发信 run 接着做自己的事，除非它要了同步（D9）。现状见 §4。
