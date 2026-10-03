@@ -33,6 +33,7 @@
   import EmptyState from "../parts/empty.svelte";
   import { BuildingColumn, HALL, useBuildings } from "../shared/buildings";
   import Shelves from "./shelves.svelte";
+  import SkillUsage from "./skill_usage.svelte";
 
   const { lang } = ui();
   const buildings = useBuildings();
@@ -83,5 +84,8 @@
         <EmptyState missing="skills_unopened" seat="region" />
       {/if}
     </div>
+  </div>
+  <div class="border-t border-edge pt-base">
+    <SkillUsage />
   </div>
 </div>

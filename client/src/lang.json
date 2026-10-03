@@ -7114,5 +7114,85 @@
   "machine_enables_pwsh": {
     "en": "the exec tool's shell arm under PowerShell 7, where a building's CONFIG.toml sets interpreter = \"pwsh\"",
     "zh": "exec 工具的 shell 一支改用 PowerShell 7，用于 CONFIG.toml 写了 interpreter = \"pwsh\" 的楼"
+  },
+  "usage_skills_title": {
+    "en": "Use of each skill",
+    "zh": "每件 skill 的使用"
+  },
+  "usage_mcp_title": {
+    "en": "Use of each tool server",
+    "zh": "每个工具服务器的使用"
+  },
+  "usage_export_jsonl": {
+    "en": "Export JSONL",
+    "zh": "导出 JSONL"
+  },
+  "usage_export_csv": {
+    "en": "Export CSV",
+    "zh": "导出 CSV"
+  },
+  "usage_never": {
+    "en": "never used",
+    "zh": "没人用过"
+  },
+  "usage_never_list": {
+    "en": "Never used",
+    "zh": "从没用过"
+  },
+  "usage_count": {
+    "en": "{n} uses, last {when}",
+    "zh": "用过 {n} 次，最近一次 {when}"
+  },
+  "usage_every_use": {
+    "en": "Every use",
+    "zh": "每一次使用"
+  },
+  "usage_outcome_ok": {
+    "en": "answered",
+    "zh": "答了"
+  },
+  "usage_outcome_failed": {
+    "en": "refused",
+    "zh": "被拒"
+  },
+  "usage_outcome_unknown": {
+    "en": "no answer recorded",
+    "zh": "没有记下结果"
+  },
+  "usage_audit_none": {
+    "en": "not audited",
+    "zh": "未审核"
+  },
+  "usage_audit_pass": {
+    "en": "audit passed",
+    "zh": "审核通过"
+  },
+  "usage_audit_warn": {
+    "en": "audit warned",
+    "zh": "审核有警告"
+  },
+  "usage_audit_fail": {
+    "en": "audit failed",
+    "zh": "审核未通过"
+  },
+  "usage_reaudit": {
+    "en": "content changed since its last audit: audit it again",
+    "zh": "内容在上次审核之后改过：请重新审核"
+  },
+  "usage_off_shelf": {
+    "en": "no shelf holds it now",
+    "zh": "现在没有书架放着它"
+  },
+  "usage_version": {
+    "en": "content {digest} read from {when}, first by run {run}",
+    "zh": "内容 {digest}，自 {when} 起被读，第一个读它的 run 是 {run}"
+  },
+  "usage_removed": {
+    "en": "removed",
+    "zh": "已移除"
+  },
+  "usage_unconfigured": {
+    "en": "no building names it now",
+    "zh": "现在没有楼配置它"
   }
 }

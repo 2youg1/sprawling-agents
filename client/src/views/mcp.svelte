@@ -88,6 +88,7 @@
   import DesktopForm from "./desktop.svelte";
   import { reachOf } from "./mcp/reach.svelte";
   import Servers from "./mcp/servers.svelte";
+  import McpUsage from "./mcp/usage.svelte";
   import { BuildingColumn, HALL, useBuildings } from "./shared/buildings";
 
   interface Props {
@@ -225,6 +226,9 @@ other. -->
           <h2 class="text-note text-text-faint">{say($lang, "desktop_title")}</h2>
           <DesktopForm addr={chosen} />
         </section>
+        <div class="border-t border-edge pt-base">
+          <McpUsage />
+        </div>
       </div>
     </div>
   </div>

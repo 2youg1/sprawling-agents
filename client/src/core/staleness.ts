@@ -121,6 +121,11 @@ export function reachOf(name: string, kind: EventKind): Reach {
     // or ends, which is also when its last line and run count move.
     case "sessions":
       return reached(kind === "session_opened" || kind === "run_started" || kind === "run_frozen");
+    // The usage tables fold the whole ledger, so they are asked again when
+    // a run ends with its uses complete and when an audit lands, not on
+    // every call; an export is asked on each press.
+    case "skill_usage": case "mcp_usage":
+      return reached(kind === "run_frozen" || kind === "skill_audited");
     default:
       return "none";
   }
