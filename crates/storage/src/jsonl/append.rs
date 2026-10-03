@@ -199,7 +199,7 @@ impl kernel::Ledger for JsonlLedger {
     }
 }
 
-#[cfg(feature = "conformance")]
+#[cfg(any(test, feature = "conformance"))]
 impl kernel::ledger::conformance::LedgerInspect for JsonlLedger {
     fn raw_lines(&self) -> Result<Vec<Vec<u8>>, AxError> {
         self.read_raw_lines().map_err(StorageError::into_ax)
@@ -240,7 +240,6 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "conformance")]
     #[test]
     fn passes_the_kernel_conformance_suite() {
         use kernel::ledger::conformance::assert_ledger_conformance;
@@ -320,6 +319,152 @@ mod tests {
         files.sort();
         assert_eq!(files.len(), 1);
         files.remove(0)
+    }
+
+    fn faulty(dir: &Path) -> (JsonlLedger, crate::fault_fs::FaultFs) {
+        let fs = crate::fault_fs::FaultFs::new(crate::fault_fs::FaultPlan {
+            cut_at_op: None,
+            cut_on_write: None,
+            torn_tail: crate::fault_fs::TornTail::None,
+        });
+        let (ledger, _) = JsonlLedger::open_faulty(fs.clone(), dir, TimeMs::new(0)).unwrap();
+        (ledger, fs)
+    }
+
+    fn drafts(count: u64) -> Vec<EventDraft> {
+        (0..count)
+            .map(|t| draft(EventKind::GateChecked, t))
+            .collect()
+    }
+
+    /// Group commit: a wave of three records in one segment costs the
+    /// disk what a wave of one costs - one write and one barrier.
+    #[test]
+    fn a_wave_costs_one_write_and_one_barrier_whatever_it_carries() {
+        let dir = tempfile::tempdir().unwrap();
+        let (mut ledger, fs) = faulty(dir.path());
+        ledger.append_all(drafts(1)).unwrap();
+        let before_one = fs.op_count();
+        ledger.append_all(drafts(1)).unwrap();
+        let one = fs.op_count() - before_one;
+        let before_three = fs.op_count();
+        ledger.append_all(drafts(3)).unwrap();
+        let three = fs.op_count() - before_three;
+        assert_eq!(three, one);
+    }
+
+    /// A wave that crosses the roll puts each line in the segment its
+    /// seq names, so the names stay the authority on where a seq lives.
+    #[test]
+    fn a_wave_across_the_roll_puts_each_line_in_the_segment_named_for_it() {
+        let dir = tempfile::tempdir().unwrap();
+        let (mut ledger, _) = JsonlLedger::open(dir.path(), TimeMs::new(0)).unwrap();
+        ledger.set_roll_bytes_for_test(1);
+        ledger.append_all(drafts(3)).unwrap();
+        let mut held: Vec<(String, Vec<u64>)> = fs::read_dir(dir.path())
+            .unwrap()
+            .map(|entry| entry.unwrap().path())
+            .filter(|path| is_segment(path))
+            .map(|path| {
+                let seqs = fs::read(&path)
+                    .unwrap()
+                    .split(|byte| *byte == b'\n')
+                    .filter(|line| !line.is_empty())
+                    .map(|line| EventRecord::parse_line(line).unwrap().seq().value())
+                    .collect();
+                (
+                    path.file_name().unwrap().to_string_lossy().into_owned(),
+                    seqs,
+                )
+            })
+            .collect();
+        held.sort();
+        let expected: Vec<(String, Vec<u64>)> = (0..3)
+            .map(|seq| (segment_file_name(Seq::new(seq)), vec![seq]))
+            .collect();
+        assert_eq!(held, expected);
+    }
+
+    /// The roll is for a line that would carry a segment past its
+    /// budget; a line that fills it exactly stays.
+    #[test]
+    fn a_line_that_fills_the_segment_exactly_does_not_roll() {
+        let dir = tempfile::tempdir().unwrap();
+        let (mut ledger, _) = JsonlLedger::open(dir.path(), TimeMs::new(0)).unwrap();
+        ledger.append_all(drafts(2)).unwrap();
+        let exact = u64::try_from(fs::read(only_segment(dir.path())).unwrap().len()).unwrap();
+        let fresh = tempfile::tempdir().unwrap();
+        let (mut ledger, _) = JsonlLedger::open(fresh.path(), TimeMs::new(0)).unwrap();
+        ledger.set_roll_bytes_for_test(exact);
+        ledger.append_all(drafts(1)).unwrap();
+        ledger.append_all(drafts(1)).unwrap();
+        assert_eq!(
+            fs::read(only_segment(fresh.path())).unwrap().len(),
+            usize::try_from(exact).unwrap()
+        );
+    }
+
+    /// The observer hears every record of a wave, in seq order, once the
+    /// wave is durable.
+    #[test]
+    fn the_observer_hears_each_record_of_a_wave_in_order() {
+        let dir = tempfile::tempdir().unwrap();
+        let (mut ledger, _) = JsonlLedger::open(dir.path(), TimeMs::new(0)).unwrap();
+        let heard = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let sink = std::sync::Arc::clone(&heard);
+        ledger.observe(Box::new(move |record| {
+            sink.lock().unwrap().push(record.seq().value());
+        }));
+        ledger.append_all(drafts(3)).unwrap();
+        assert_eq!(*heard.lock().unwrap(), vec![0, 1, 2]);
+    }
+
+    /// The port's batch append echoes one reference per draft, the
+    /// reference of the line it wrote.
+    #[test]
+    fn the_port_s_batch_append_echoes_what_it_wrote() {
+        let dir = tempfile::tempdir().unwrap();
+        let (mut ledger, _) = JsonlLedger::open(dir.path(), TimeMs::new(0)).unwrap();
+        let echoed = kernel::Ledger::append_all(&mut ledger, drafts(2)).unwrap();
+        let written: Vec<_> = ledger
+            .read_raw_lines()
+            .unwrap()
+            .iter()
+            .map(|line| EventRecord::parse_line(line).unwrap().to_ref())
+            .collect();
+        assert_eq!(echoed, written);
+    }
+
+    /// A segment a crash created before its first byte is appended to,
+    /// not created again: its directory entry is already durable, so the
+    /// first wave pays no directory barrier.
+    #[test]
+    fn an_empty_segment_a_crash_left_is_appended_to_without_a_directory_barrier() {
+        let dir = tempfile::tempdir().unwrap();
+        let fs = crate::fault_fs::FaultFs::new(crate::fault_fs::FaultPlan {
+            cut_at_op: None,
+            cut_on_write: None,
+            torn_tail: crate::fault_fs::TornTail::None,
+        });
+        // The opening reads the tail and keeps the empty segment where
+        // it is (`crates/storage/Spec.lean` §8-1 step 5: nothing is cut).
+        let mut seeded = fs.clone();
+        crate::vfs::Vfs::create_dir_all(&mut seeded, dir.path()).unwrap();
+        crate::vfs::Vfs::append(
+            &mut seeded,
+            &dir.path().join(segment_file_name(Seq::FIRST)),
+            b"",
+        )
+        .unwrap();
+        let (mut ledger, _) =
+            JsonlLedger::open_faulty(fs.clone(), dir.path(), TimeMs::new(0)).unwrap();
+        let before_first = fs.op_count();
+        ledger.append_all(drafts(1)).unwrap();
+        let first = fs.op_count() - before_first;
+        let before_second = fs.op_count();
+        ledger.append_all(drafts(1)).unwrap();
+        let second = fs.op_count() - before_second;
+        assert_eq!(first, second);
     }
 
     proptest::proptest! {

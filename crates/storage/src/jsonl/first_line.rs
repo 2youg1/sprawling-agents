@@ -48,3 +48,69 @@ pub(crate) fn first_line(vfs: &dyn Vfs, path: &Path) -> io::Result<Option<Vec<u8
         window = window.saturating_mul(2);
     }
 }
+
+#[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing,
+    reason = "test code"
+)]
+mod tests {
+    use super::super::*;
+    use crate::error::StorageError;
+    use kernel::{EventDraft, EventKind, Payload, RunId, Seq, TimeMs};
+    use std::fs;
+
+    fn draft(kind: EventKind, t: u64) -> EventDraft {
+        EventDraft {
+            run: RunId::CITY,
+            t: TimeMs::new(t),
+            who: "city".to_string(),
+            addr: None,
+            kind,
+            data: Payload::empty(),
+            ig: false,
+        }
+    }
+
+    /// With more segments behind it, a first line that carries no version is
+    /// damage inside the history, not a torn tail: open refuses at line 1
+    /// rather than reading past it (`crates/storage/spec/Jsonl.lean` §8-1).
+    #[test]
+    fn a_mangled_first_line_with_segments_behind_it_is_refused() {
+        let dir = tempfile::tempdir().unwrap();
+        let (mut ledger, _) = JsonlLedger::open(dir.path(), TimeMs::new(0)).unwrap();
+        ledger.set_roll_bytes_for_test(1);
+        ledger
+            .append_all(vec![
+                draft(EventKind::CityInitialized, 0),
+                draft(EventKind::RunStarted, 1),
+            ])
+            .unwrap();
+        drop(ledger);
+        let first = dir.path().join(segment_file_name(Seq::FIRST));
+        fs::write(&first, b"{\"no\":\"version\"}\n").unwrap();
+
+        let refused =
+            JsonlLedger::open(dir.path(), TimeMs::new(2)).map(|(ledger, _)| ledger.position());
+        assert!(
+            matches!(&refused, Err(StorageError::Envelope { path, line: 1, .. }) if *path == first),
+            "{refused:?}"
+        );
+    }
+
+    /// The first line is read whole however far it runs past the first
+    /// window, so a long first record is probed for its version rather than
+    /// read as torn.
+    #[test]
+    fn a_first_line_longer_than_the_first_window_is_read_whole() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("segment");
+        let line = vec![b'x'; 3 * 4096];
+        fs::write(&path, [line.as_slice(), b"\nnext\n"].concat()).unwrap();
+        let read = super::first_line(&crate::real_fs::RealFs::new(), &path).unwrap();
+        assert_eq!(read, Some(line));
+    }
+}

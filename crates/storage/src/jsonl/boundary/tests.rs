@@ -4,6 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 use super::super::*;
+use crate::error::StorageError;
 use kernel::ledger::chain_hash;
 use kernel::{EventDraft, EventKind, Payload, RunId, Seq, TimeMs};
 use std::fs;
@@ -62,5 +63,70 @@ fn a_prior_segment_ending_in_an_ignorable_line_opens() {
         opened,
         Ok(Seq::new(3)),
         "the prior segment's ignorable last line refused the open"
+    );
+}
+
+fn long_draft(t: u64) -> EventDraft {
+    EventDraft {
+        who: "x".repeat(40 * 1024),
+        ..draft(EventKind::RunStarted, t)
+    }
+}
+
+/// The prior segment's last line is read whole however far it runs past
+/// the boundary window, or its chain hash would be taken of a fragment.
+#[test]
+fn a_prior_segment_ending_in_a_line_longer_than_the_window_opens() {
+    let dir = tempfile::tempdir().unwrap();
+    let (mut ledger, _) = JsonlLedger::open(dir.path(), TimeMs::new(0)).unwrap();
+    ledger
+        .append_all(vec![draft(EventKind::CityInitialized, 0), long_draft(1)])
+        .unwrap();
+    ledger.set_roll_bytes_for_test(1);
+    ledger
+        .append_all(vec![draft(EventKind::RunStarted, 2)])
+        .unwrap();
+    drop(ledger);
+    assert!(dir.path().join(segment_file_name(Seq::new(2))).exists());
+
+    let opened = JsonlLedger::open(dir.path(), TimeMs::new(3))
+        .map(|(ledger, _)| ledger.position())
+        .map_err(|refused| refused.to_string());
+    assert_eq!(opened, Ok(Seq::new(3)));
+}
+
+/// A damaged last line of the prior segment is refused at its own line
+/// number, read off the two segments' names.
+#[test]
+fn a_damaged_prior_last_line_is_refused_at_its_line() {
+    let dir = tempfile::tempdir().unwrap();
+    let (mut ledger, _) = JsonlLedger::open(dir.path(), TimeMs::new(0)).unwrap();
+    ledger
+        .append_all(vec![
+            draft(EventKind::CityInitialized, 0),
+            draft(EventKind::RunStarted, 1),
+            draft(EventKind::RunStarted, 2),
+        ])
+        .unwrap();
+    ledger.set_roll_bytes_for_test(1);
+    ledger
+        .append_all(vec![draft(EventKind::RunStarted, 3)])
+        .unwrap();
+    drop(ledger);
+    let first = dir.path().join(segment_file_name(Seq::FIRST));
+    let bytes = fs::read(&first).unwrap();
+    let last_start = bytes[..bytes.len() - 1]
+        .iter()
+        .rposition(|byte| *byte == b'\n')
+        .unwrap()
+        + 1;
+    let damaged = [&bytes[..last_start], b"{ ", &bytes[last_start + 1..]].concat();
+    fs::write(&first, damaged).unwrap();
+
+    let refused =
+        JsonlLedger::open(dir.path(), TimeMs::new(4)).map(|(ledger, _)| ledger.position());
+    assert!(
+        matches!(&refused, Err(StorageError::Envelope { path, line: 3, .. }) if *path == first),
+        "{refused:?}"
     );
 }

@@ -33,6 +33,10 @@ fault = []
 conformance = ["kernel/conformance"]
 
 [dev-dependencies]
+# The kernel's ledger conformance suite runs in every test build of this
+# crate, not only under the `conformance` feature, so the adapter is
+# judged by it wherever its tests run.
+kernel = { workspace = true, features = ["conformance"] }
 proptest.workspace = true
 tempfile.workspace = true
 trybuild.workspace = true

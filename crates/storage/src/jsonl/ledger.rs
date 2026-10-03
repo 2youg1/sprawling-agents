@@ -207,3 +207,67 @@ pub(crate) fn complete_lines(bytes: &[u8]) -> (Vec<&[u8]>, usize) {
     }
     (lines, consumed)
 }
+
+#[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing,
+    reason = "test code"
+)]
+mod tests {
+    use super::super::*;
+    use kernel::{EventDraft, EventKind, Payload, RunId, TimeMs};
+    use std::fs;
+
+    fn draft(kind: EventKind, t: u64) -> EventDraft {
+        EventDraft {
+            run: RunId::CITY,
+            t: TimeMs::new(t),
+            who: "city".to_string(),
+            addr: None,
+            kind,
+            data: Payload::empty(),
+            ig: false,
+        }
+    }
+
+    /// The ledger directory holds segments and may hold other files; only a
+    /// file named like a segment is read or repaired as one.
+    #[test]
+    fn a_file_not_named_like_a_segment_is_neither_read_nor_repaired() {
+        let dir = tempfile::tempdir().unwrap();
+        let (mut ledger, _) = JsonlLedger::open(dir.path(), TimeMs::new(0)).unwrap();
+        ledger
+            .append_all(vec![draft(EventKind::CityInitialized, 0)])
+            .unwrap();
+        let lines = ledger.read_raw_lines().unwrap();
+        drop(ledger);
+        let strays = [
+            ("notes.txt", b"not a line".as_slice()),
+            ("other.jsonl", b"{\"torn"),
+        ];
+        for (name, bytes) in strays {
+            fs::write(dir.path().join(name), bytes).unwrap();
+        }
+
+        let (reopened, report) = JsonlLedger::open(dir.path(), TimeMs::new(1)).unwrap();
+        let kept: Vec<Vec<u8>> = strays
+            .iter()
+            .map(|(name, _)| fs::read(dir.path().join(name)).unwrap())
+            .collect();
+        assert_eq!(
+            (
+                report.recovered.is_none(),
+                reopened.read_raw_lines().unwrap(),
+                kept
+            ),
+            (
+                true,
+                lines,
+                strays.iter().map(|(_, bytes)| bytes.to_vec()).collect()
+            )
+        );
+    }
+}

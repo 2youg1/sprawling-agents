@@ -315,7 +315,7 @@ runtime::replay 读 `read_raw_lines`；citysim 夹具对拍与断电点阵消费
 
 /-! ## 16 测试与约束
 
-单测：open 六步各分支；滚动边界；append_all 原子性（注入 Io 后内存态不前进）；cas put/get/get_range/dedup。proptest：链续与断尾（任意截断点/垃圾尾）；FaultFs 点阵（cut_at_op 扫描）。夹具：A16 高版本拒读。conformance：JsonlLedger 过 kernel 六断言。约束：clippy 零告警；fault_fs 在非 test/fault 构建中零字节。
+单测：open 六步各分支；滚动边界；append_all 原子性（注入 Io 后内存态不前进）；cas put/get/get_range/dedup。proptest：链续与断尾（任意截断点/垃圾尾）；FaultFs 点阵（cut_at_op 扫描）。夹具：A16 高版本拒读。conformance：JsonlLedger 在本 crate 的每一次测试构建里过 kernel 六断言（dev-dependency 打开 kernel 的 `conformance`，所以不必打开本 crate 的同名特性）。约束：clippy 零告警；fault_fs 在非 test/fault 构建中零字节。
 
 形式化的义务由证明清偿：`lake build crates.storage.Spec`（`just models` 在 `just check` 里构建全部规格），不留 `sorry`、`admit` 与 `axiom`，`cargo xtask gates spec` 检查这一点。模型与生产实现的对应由这些 Rust 测试检查，它们是行为比对，不是精化证明：
 

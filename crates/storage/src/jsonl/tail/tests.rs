@@ -117,3 +117,57 @@ fn a_line_that_does_not_link_to_the_newer_one_ends_the_walk_with_its_line() {
     };
     assert_eq!(*line, lines.len() as u64 - 2);
 }
+
+/// A blank line is no line: the walk steps over it, as the forward
+/// reader of raw lines does.
+#[test]
+fn a_blank_line_is_stepped_over() {
+    let (dir, fs, lines) = city_of(2, 1 << 20);
+    let last = segments(&fs, dir.path()).pop().unwrap();
+    let bytes = fs.read(&last).unwrap();
+    let mut blank = fs.clone();
+    blank.truncate(&last, 0).unwrap();
+    let first_end = bytes.iter().position(|byte| *byte == b'\n').unwrap() + 1;
+    blank
+        .append(
+            &last,
+            &[&bytes[..first_end], b"\n", &bytes[first_end..]].concat(),
+        )
+        .unwrap();
+
+    let walked: Vec<Vec<u8>> = TailLines::through(Box::new(fs.clone()), dir.path())
+        .unwrap()
+        .map(|line| line.unwrap().raw)
+        .collect();
+    assert_eq!(walked, lines.iter().rev().cloned().collect::<Vec<_>>());
+}
+
+/// A line longer than the first window comes back whole.
+#[test]
+fn a_line_longer_than_the_window_comes_back_whole() {
+    let dir = tempfile::tempdir().unwrap();
+    let fs = FaultFs::new(FaultPlan {
+        cut_at_op: None,
+        cut_on_write: None,
+        torn_tail: TornTail::None,
+    });
+    let (mut ledger, _) = JsonlLedger::open_faulty(fs.clone(), dir.path(), TimeMs::new(0)).unwrap();
+    ledger
+        .append_all(vec![EventDraft {
+            run: RunId::from_bytes([5u8; 16]),
+            t: TimeMs::new(0),
+            who: "x".repeat(3 * 4096),
+            addr: None,
+            kind: EventKind::ToolCalled,
+            data: Payload::empty(),
+            ig: false,
+        }])
+        .unwrap();
+    let lines = ledger.read_raw_lines().unwrap();
+
+    let walked: Vec<Vec<u8>> = TailLines::through(Box::new(fs.clone()), dir.path())
+        .unwrap()
+        .map(|line| line.unwrap().raw)
+        .collect();
+    assert_eq!(walked, lines);
+}
