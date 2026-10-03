@@ -304,3 +304,26 @@ fn an_answered_steer_is_consumed_and_a_later_one_is_held() {
         "only the unread steer went back"
     );
 }
+
+/// The tool's words sit in the cached prefix of every request and are
+/// read by a model as written: a line broken inside a string literal
+/// without its continuation once put a run of spaces into `wait`.
+#[test]
+fn the_tool_speaks_to_the_model_without_runs_of_spaces() {
+    fn words(value: &Value, into: &mut Vec<String>) {
+        match value {
+            Value::String(text) => into.push(text.clone()),
+            Value::Array(items) => items.iter().for_each(|item| words(item, into)),
+            Value::Object(map) => map.values().for_each(|item| words(item, into)),
+            Value::Null | Value::Bool(_) | Value::Number(_) => {}
+        }
+    }
+    let tool = SignalTool::new(desk("lab/room1", "lab")).unwrap();
+    let mut said = vec![tool.meta().disclosure.clone()];
+    words(
+        &Value::Object(tool.meta().params.as_map().clone()),
+        &mut said,
+    );
+    let spaced: Vec<&String> = said.iter().filter(|text| text.contains("  ")).collect();
+    assert!(spaced.is_empty(), "{spaced:?}");
+}
