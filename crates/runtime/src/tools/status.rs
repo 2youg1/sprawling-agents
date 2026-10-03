@@ -23,6 +23,9 @@
 //! time is the driver's latest reading (`crates/runtime/spec/Clock.lean` §8-53): a tool that
 //! read a clock of its own would be a second sampling point in the run,
 //! and its "now" could name a moment no line of the ledger records.
+//! The worktree's size is the one reading taken at the call, from the
+//! disk rather than a clock: the tree is what the run is changing, so a
+//! size frozen at dispatch would be wrong after its first write.
 
 use kernel::{
     Address, AxCode, AxError, ByteLen, CostTier, DelegateKind, Effect, Payload, RenderIntent,
@@ -34,6 +37,7 @@ use crate::backlog::{Backlog, Standing};
 use crate::clock::{ClockReading, iso};
 use crate::reminder::ContextReading;
 use kernel::RunPolicy;
+use std::path::{Path, PathBuf};
 
 /// How the gateway is currently able to serve. Degraded and LocalOnly
 /// are situations the model should plan around, so they are reported
@@ -83,8 +87,8 @@ pub struct StatusSnapshot {
     pub trust: String,
     pub write_domain: String,
     pub locks: Vec<String>,
-    pub worktree_path: String,
-    pub worktree_disk: ByteLen,
+    /// The tree this run writes; its size is read at each call.
+    pub worktree: PathBuf,
     pub signals_pending: u32,
     pub provider_mode: ProviderMode,
     /// How many residents this run can reach, itself excluded. A count
@@ -217,13 +221,14 @@ impl StatusSnapshot {
     /// sorts its keys, so "the frozen order" would silently become
     /// alphabetical. Order is a property of what the model reads, so it
     /// is expressed where the model reads it.
-    pub fn render(
-        &self,
-        used: Tokens,
-        now: Option<TimeMs>,
-        children: &[ChildStatus],
-        standing: &[Standing],
-    ) -> String {
+    fn render(&self, live: &Live<'_>) -> String {
+        let Live {
+            used,
+            now,
+            children,
+            standing,
+            disk,
+        } = live;
         let locks = if self.locks.is_empty() {
             "none".to_owned()
         } else {
@@ -232,6 +237,10 @@ impl StatusSnapshot {
         let children = render_children(children);
         let backlog = render_standing(standing);
         let now = now.map_or_else(|| "not stamped".to_owned(), iso);
+        let disk = match disk {
+            Ok(bytes) => format!("{} bytes", bytes.get()),
+            Err(err) => format!("size unreadable: {err}"),
+        };
         [
             format!("who: {}", self.who),
             format!("addr: {}", self.addr),
@@ -245,11 +254,7 @@ impl StatusSnapshot {
             format!("ctx: {}/{}", used.get(), self.ctx_limit.get()),
             format!("trust: {}", self.trust),
             format!("write_domain: {} (locks: {locks})", self.write_domain),
-            format!(
-                "worktree: {} ({} bytes)",
-                self.worktree_path,
-                self.worktree_disk.get()
-            ),
+            format!("worktree: {} ({disk})", self.worktree.display()),
             format!("signals_pending: {}", self.signals_pending),
             format!("children: {children}"),
             format!("now: {now}"),
@@ -259,6 +264,40 @@ impl StatusSnapshot {
         ]
         .join("\n")
     }
+}
+
+/// What moves while the run goes on, read at the call and rendered in
+/// the frozen order beside the snapshot.
+struct Live<'a> {
+    used: Tokens,
+    now: Option<TimeMs>,
+    children: &'a [ChildStatus],
+    standing: &'a [Standing],
+    disk: std::io::Result<ByteLen>,
+}
+
+/// Every regular file under `root`, summed. The city's own state under
+/// `.sprawling` is left out, because a run can read none of it, and a
+/// link is neither followed nor counted, so a link back up the tree
+/// cannot make the walk loop. `DirEntry::file_type` does not follow
+/// links on any platform, which is what keeps the second promise.
+fn tree_bytes(root: &Path) -> std::io::Result<ByteLen> {
+    let mut total: u64 = 0;
+    let mut pending = vec![root.to_path_buf()];
+    while let Some(dir) = pending.pop() {
+        for entry in std::fs::read_dir(&dir)? {
+            let entry = entry?;
+            let kind = entry.file_type()?;
+            if kind.is_dir() {
+                if entry.file_name() != kernel::RESERVED_PREFIX {
+                    pending.push(entry.path());
+                }
+            } else if kind.is_file() {
+                total = total.saturating_add(entry.metadata()?.len());
+            }
+        }
+    }
+    Ok(ByteLen::new(total))
 }
 
 /// What is still running at this run's address, or the word for none.
@@ -310,12 +349,13 @@ impl Tool for StatusTool {
         let mut result = Map::new();
         result.insert(
             "text".to_owned(),
-            Value::String(self.snapshot.render(
-                self.context.tokens(),
-                self.clock.latest(),
-                &(self.children)(),
-                &self.standing(),
-            )),
+            Value::String(self.snapshot.render(&Live {
+                used: self.context.tokens(),
+                now: self.clock.latest(),
+                children: &(self.children)(),
+                standing: &self.standing(),
+                disk: tree_bytes(&self.snapshot.worktree),
+            })),
         );
         Ok(ToolOutcome {
             result: Payload::new(result)?,

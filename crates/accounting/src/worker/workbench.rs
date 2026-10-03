@@ -356,9 +356,8 @@ impl Desks {
 /// ask again.
 ///
 /// The context used and the children are not here: both move while the
-/// run goes on, so `status` reads them live. `worktree_disk` is zero
-/// because measuring a tree costs a walk of it, and a number nobody has
-/// asked for is not worth one.
+/// run goes on, so `status` reads them live, and so is the worktree's
+/// size, which `status` walks the tree for at each call.
 pub(super) struct Situation<'a> {
     pub(super) addr: &'a Address,
     pub(super) who: &'a str,
@@ -386,8 +385,7 @@ pub(super) fn status_snapshot(situation: Situation<'_>) -> runtime::StatusSnapsh
             .collect::<Vec<String>>()
             .join(", "),
         locks: situation.locks,
-        worktree_path: situation.worktree.display().to_string(),
-        worktree_disk: kernel::ByteLen::default(),
+        worktree: situation.worktree.to_path_buf(),
         signals_pending: situation.signals_pending,
         provider_mode: runtime::ProviderMode::Normal,
         neighbours: situation.neighbours,

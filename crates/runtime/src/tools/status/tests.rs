@@ -22,8 +22,7 @@ fn snapshot() -> StatusSnapshot {
         trust: "trusted".to_owned(),
         write_domain: "work".to_owned(),
         locks: vec!["work/a.txt".to_owned()],
-        worktree_path: "/city/work".to_owned(),
-        worktree_disk: ByteLen::new(4096),
+        worktree: std::path::PathBuf::from("no-such-tree"),
         signals_pending: 2,
         provider_mode: ProviderMode::Normal,
         neighbours: 3,
@@ -164,8 +163,7 @@ fn the_worktree_line_counts_the_files_the_tree_holds_at_the_call() {
     std::fs::create_dir_all(tree.path().join(".sprawling")).unwrap();
     std::fs::write(tree.path().join(".sprawling").join("ledger"), "not counted").unwrap();
     let mut seen = snapshot();
-    seen.worktree_path = tree.path().display().to_string();
-    seen.worktree_disk = ByteLen::default();
+    seen.worktree = tree.path().to_path_buf();
     let tool = StatusTool::new(seen).unwrap();
     let line = |tool: &StatusTool| -> String {
         let outcome = tool.invoke(&call()).unwrap();

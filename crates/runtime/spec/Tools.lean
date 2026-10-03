@@ -67,9 +67,9 @@ impl Tool for ReadTool { /* meta：name=read、effect=Read、cost=Light、render
 // 创建住 edit 而非新工具，因为「文件变更＋乐观并发」已是本工具拥有的唯一权威，“absent”只是版本的一个取值。
 
 // crates/runtime/src/tools/status.rs —— 十三字段
-pub struct StatusSnapshot { pub who: String, pub addr: Address, pub mode: Mode,
+pub struct StatusSnapshot { pub who: String, pub addr: Address, pub policy: RunPolicy,
     pub ctx_limit: Tokens, pub trust: String,
-    pub write_domain: String, pub locks: Vec<String>, pub worktree_path: String, pub worktree_disk: ByteLen,
+    pub write_domain: String, pub locks: Vec<String>, pub worktree: PathBuf,
     pub signals_pending: u32,
     pub provider_mode: ProviderMode, pub neighbours: u32 }   // neighbours 在末尾，渲染序与声明序同一
 pub enum ProviderMode { Normal, Degraded, LocalOnly }
@@ -86,6 +86,7 @@ impl Tool for StatusTool { /* meta：name=status、effect=Read、temporal=Timest
 // ToolBench 住 runtime::bench（§8-3）：按 Effect 过门是回合层的次序，工具本身以 Box<dyn Tool> 递入。
 
 - **`children` 只携地址与代理类别**：子 Run 在父嚽结之后才开，故父自己那一跑里 **子既无 run id 也无上下文读数**——四个字段里三个只能填零，而零与未知是两件事。现形状只携得出口的两件：派到哪个房间、哪一类代理。
+- **`worktree` 的大小为何现读**：快照里只有树的路径，大小在每次调用时走一遍树算出：每个普通文件的长度相加，`.sprawling`（`kernel::RESERVED_PREFIX`）下城自己的状态不算，链接既不跟也不计，所以一条指回上层的链接走不成环。冻结在派发时的大小在本跑第一次写之后就错了，而派发时一律填零（测试城里 `status` 答 `0 bytes`）正是这个形状留下的缺陷。读不出来时这一行答 `size unreadable` 与原因，而不是一个看起来像真的零。目录名按字节比较，三个平台一样：Windows 与 macOS 的默认卷不分大小写，一个拼成 `.SPRAWLING` 的目录在那里与 `.sprawling` 是同一个，会被计入，这一偏差只多算、不少算。
 - **`ctx` 的用量为何现读**：快照在派发时冻结，那时还没有任何一次调用，冻结的用量只能是零，而且整跑都是零——一个照 City.md 去问 `status` 的模型会被告知窗口是空的。用量住 `ContextReading`：Run 每回合把 provider 报的 `input_tokens` 写进去，`status` 被调用时读出，所以报的是本跑最近一次已完成调用的计数。上限 `ctx_limit` 仍在快照里，因为它整跑不变。
 - **`neighbours` 追加在末尾而不插入到 `signals_pending` 旁边**：冻结序存在的理由是字段表增长时居民的习惯仍可迁移，而一次插入会把前十二行里的一半挪位。它只报**人数**不报名单：名单长度随人口增长，而 `status` 是一份定长文本（`render_children` 已为同一条理由被压成一行）；详情归 `neighbours` 工具，`crates/city/Spec.lean` §8-15b。
 - **数的是人，不是地址**：一间没人站着的房间没有读者，把它计入会让 `neighbours: 3` 读起来像「有三个人可以说话」而实际上一个都没有。空房间仍然在工具的答案里，因为它对 delegate 与搬入是真信息。
