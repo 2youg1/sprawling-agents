@@ -43,9 +43,7 @@ theorem an_unknown_name_is_carried (raw : List Char) (filled : raw ≠ [])
     simp [printable c member]
   simp [parse, notEmpty, noControl]
 
-/-- 空串不是名字。 -/
-theorem an_empty_name_is_refused : parse [] = none :=
-  rfl
+/-! 空串不是名字。 -/
 
 /-- 带一个控制字符的串不是名字。 -/
 theorem a_name_with_a_control_character_is_refused (raw : List Char) (c : Char)

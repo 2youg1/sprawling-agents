@@ -32,9 +32,9 @@ ServerFrame::Answered(Box<Answered>)            // 对一问的拒绝也走这�
 
 namespace Wire.Frames.Ask
 
-/-- 视图下一条待折叠记录的 `seq`：折过的最后一条之后那一条；什么都没折时是 `Seq::FIRST`，即 1。`folded` 是视图按次序折过的记录的 `seq`，从 1 起连续。 -/
+/-- 视图下一条待折叠记录的 `seq`：折过的最后一条之后那一条；什么都没折时是 `Seq::FIRST`，即 0。`folded` 是视图按次序折过的记录的 `seq`，从 0 起连续。 -/
 def asOf (folded : List Nat) : Nat :=
-  folded.length + 1
+  folded.length
 
 /-- 页面判陈旧：`seq < as_of` 的记录已经在答复里。 -/
 def Contains (answerAsOf seq : Nat) : Prop :=
@@ -42,18 +42,15 @@ def Contains (answerAsOf seq : Nat) : Prop :=
 
 /-- 被否的读法：`as_of` 取折过的最后一条，什么都没折时也只能写 `Seq::FIRST`。 -/
 def lastFolded (folded : List Nat) : Nat :=
-  max folded.length 1
+  folded.length - 1
 
-/-- **创世之前问出的答复不含创世**：什么都没折的视图答 `Seq::FIRST`，随后到来的创世那一行（`seq` 1）对页面是新闻，问题会被重问。 -/
-theorem an_answer_before_genesis_does_not_contain_genesis : ¬ Contains (asOf []) 1 := by
-  simp [Contains, asOf]
-
-/-- 折过创世之后的答复含创世。 -/
-theorem an_answer_after_genesis_contains_it : Contains (asOf [1]) 1 := by
-  simp [Contains, asOf]
+/-- **答复含创世，恰在视图已经折过至少一条记录时**：什么都没折的视图答 `Seq::FIRST`，随后到来的创世那一行（`seq` 0）对页面是新闻，问题会被重问；折过创世之后的答复含创世。 -/
+theorem an_answer_contains_genesis_exactly_when_something_was_folded (folded : List Nat) :
+    Contains (asOf folded) 0 ↔ folded ≠ [] := by
+  cases folded <;> simp [Contains, asOf]
 
 /-- **被否的读法分不开两种视图**：什么都没折与只折了创世，取「最后折过的一条」时拼成同一个值，创世之前问出的答复会把随后到来的创世当成已含。 -/
-theorem the_last_folded_reading_confuses_nothing_with_genesis : lastFolded [] = lastFolded [1] := by
+theorem the_last_folded_reading_confuses_nothing_with_genesis : lastFolded [] = lastFolded [0] := by
   decide
 
 end Wire.Frames.Ask

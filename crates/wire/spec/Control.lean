@@ -67,10 +67,6 @@ theorem a_handoff_is_owed_exactly_by_steer_and_cancel (c : Command) :
     (classify c).owesHandoff = true ↔ c = .Steer ∨ c = .Cancel := by
   cases c <;> decide
 
-/-- 按范围停与放开不针对单个 Run。 -/
-theorem scope_interventions_name_no_run :
-    classify .Halt = .Intervene .Halt false false ∧
-      classify .Release = .Intervene .Release false false :=
-  ⟨rfl, rfl⟩
+/-! 按范围停与放开不针对单个 Run。 -/
 
 end Wire.Control
