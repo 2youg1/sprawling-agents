@@ -141,8 +141,7 @@ fn what_a_worker_holds_is_what_a_restart_rebuilds() {
         worker.governance.origins.get("item-held"),
         Some(&BlockedJob {
             addr: Address::parse("market/ito").unwrap(),
-            task: "ask hana what she charges".to_owned(),
-            goal: "a price".to_owned(),
+            run: started,
         }),
         "and the comparison above is not two empty maps agreeing"
     );

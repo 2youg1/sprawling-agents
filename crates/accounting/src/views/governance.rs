@@ -18,20 +18,15 @@ use kernel::event::record::{
 };
 use kernel::{Address, AxError, EventKind, Payload, RunId};
 
-/// The work an answered item was holding up.
+/// The work an answered item was holding up: the room that raised it
+/// and the run that was working there. What that run was sent to do is
+/// read back from its `run_started` when the item is answered, so no
+/// run's task stays in this process after it froze
+/// (`crates/sprawling/spec/Accounting/Worker.lean` §8-25).
 #[derive(Clone, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize)]
 pub struct BlockedJob {
     pub addr: Address,
-    pub task: String,
-    pub goal: String,
-}
-
-/// What a run was sent out to do. Read back from `run_started`, which is
-/// the record that carries both halves.
-#[derive(Clone, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize)]
-pub(crate) struct Sent {
-    pub task: String,
-    pub goal: String,
+    pub run: RunId,
 }
 
 /// Who may answer, what is waiting, what has already been allowed, and
@@ -55,15 +50,6 @@ pub struct Governance {
     /// document. Folded from `rules_changed`, so a restarted city knows
     /// what the account already covers and books only what moved.
     pub rules: std::collections::BTreeMap<(Scope, GoverningDocument), kernel::B3Hash>,
-    /// What each run was sent to do, by run.
-    ///
-    /// Never pruned, and one short entry per run - the same growth class
-    /// as the tombstones `storage::HotView` keeps for evicted runs. It cannot
-    /// be pruned on `run_frozen`: `freeze` writes inside the drive while
-    /// the assembly records waiting items after it, so the ledger order
-    /// is `run_started … run_frozen … approval_requested` and pruning
-    /// there would drop the entry one line before it is read.
-    sent: std::collections::BTreeMap<RunId, Sent>,
     /// What each waiting item is holding up, by approval id. Pruned when
     /// the item is answered, because an answered item holds nothing up.
     pub origins: std::collections::BTreeMap<String, BlockedJob>,
@@ -81,26 +67,9 @@ impl Governance {
             granted: Vec::new(),
             halted: std::collections::BTreeSet::new(),
             rules: std::collections::BTreeMap::new(),
-            sent: std::collections::BTreeMap::new(),
             origins: std::collections::BTreeMap::new(),
             proposals: super::proposals::Proposals::default(),
         }
-    }
-
-    /// Registers what a run was sent to do.
-    ///
-    /// Two callers, one shape: the dispatch that is about to build the
-    /// `RunPlan` out of these very values, and `absorb` reading them back
-    /// out of `run_started`. `what_a_worker_holds_is_what_a_restart_rebuilds`
-    /// is what holds the two to the same answer.
-    pub fn sent(&mut self, run: RunId, task: &str, goal: &str) {
-        self.sent.insert(
-            run,
-            Sent {
-                task: task.to_owned(),
-                goal: goal.to_owned(),
-            },
-        );
     }
 
     /// Folds one line in, from whichever of the two directions it came.
@@ -130,23 +99,18 @@ impl Governance {
         payload: &Payload,
     ) -> Result<(), AxError> {
         match kind {
-            EventKind::RunStarted => {
-                let started = payload.read::<kernel::event::record::RunStarted>()?;
-                self.sent(run, &started.task, &started.goal);
-            }
             EventKind::ApprovalRequested => {
                 let item = payload.read::<kernel::ApprovalItem>()?;
-                // What this item is holding up, joined here rather than
-                // hunted for later. Both halves come from the history:
-                // the room from this record's envelope, the work from
-                // the `run_started` of the run that raised it.
-                if let (Some(addr), Some(sent)) = (addr, self.sent.get(&run)) {
+                // What this item is holding up: the room from this
+                // record's envelope and the run that raised it. The work
+                // itself is that run's `run_started`, read back when the
+                // item is answered.
+                if let Some(addr) = addr {
                     self.origins.insert(
                         item.id.as_str().to_owned(),
                         BlockedJob {
                             addr: addr.clone(),
-                            task: sent.task.clone(),
-                            goal: sent.goal.clone(),
+                            run,
                         },
                     );
                 }

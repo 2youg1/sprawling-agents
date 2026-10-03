@@ -299,12 +299,6 @@ impl RunWorker {
         // of them mint ids from it, and an id minted from a run that did
         // not exist yet would not be the same id on a replay.
         let run_id = run_id_for(&given.job, addr, self.clock.now()?);
-        // What this run was sent to do, held for as long as anything it
-        // raises is still waiting. `run_started` carries the same three
-        // facts and a restarted worker folds them from there; this is the
-        // live half, registered out of the values the plan below is built
-        // from so the two cannot say different things.
-        self.governance.sent(run_id, &given.task, &given.goal);
 
         let filters = filter_table(&self.city_root, building.addr())?;
         Ok(Site {

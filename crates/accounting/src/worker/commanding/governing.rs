@@ -7,10 +7,10 @@
 
 use kernel::event::Scope;
 use kernel::event::record::{
-    Admittance, ApprovalResolved, AutonomyChanged, CityHalted, GovernedDocumentWritten,
+    Admittance, ApprovalResolved, AutonomyChanged, CityHalted, GovernedDocumentWritten, RunStarted,
     SpineDocumentWritten,
 };
-use kernel::{Address, AxCode, AxError, EventKind, Payload};
+use kernel::{Address, AxCode, AxError, EventKind, Payload, RunId, Seq};
 
 use super::super::{RunWorker, Unasked, scope_of};
 
@@ -156,6 +156,7 @@ impl RunWorker {
         // already holds.
         if verdict == kernel::Ruling::Allow
             && let Some(job) = blocked
+            && let Some(sent) = self.sent_out(job.run)?
         {
             // The work the person just unblocked carries on without
             // them: an answer that still needed the same command typed
@@ -171,9 +172,45 @@ impl RunWorker {
             // is opened.
             // The start reports its own refusal; there is no run id to
             // carry back here, because the person already left this desk.
-            self.start_unasked(job.addr, job.task, job.goal, Unasked::Unblocked);
+            self.start_unasked(job.addr, sent.task, sent.goal, Unasked::Unblocked);
         }
         Ok(())
+    }
+
+    /// What `run` was sent to do, read back from its `run_started`
+    /// through the side index: the run's lines oldest first, until that
+    /// record. `None` when the history holds no `run_started` for it.
+    ///
+    /// The read is positional and its pages stay in the operating
+    /// system's file cache, so this process keeps no copy of any run's
+    /// task (`crates/sprawling/spec/Accounting/Worker.lean` §8-25).
+    ///
+    /// # Errors
+    /// A ledger that cannot be listed or read, and a line of the run that
+    /// is no record.
+    fn sent_out(&mut self, run: RunId) -> Result<Option<RunStarted>, AxError> {
+        let dir = kernel::layout::CityLayout::new(&self.city_root).ledger();
+        self.index
+            .refresh(&dir)
+            .map_err(storage::StorageError::into_ax)?;
+        let mut seqs: Vec<Seq> = self.index.run_seqs_before(run, None).collect();
+        seqs.reverse();
+        let mut reader = self.index.reader(&dir);
+        for seq in seqs {
+            let line = reader
+                .line_at(seq)
+                .map_err(storage::StorageError::into_ax)?;
+            match storage::read_line(&line) {
+                Ok(storage::CheckedLine::Known(record))
+                    if record.kind() == EventKind::RunStarted =>
+                {
+                    return record.data().read::<RunStarted>().map(Some);
+                }
+                Ok(storage::CheckedLine::Known(_) | storage::CheckedLine::IgnoredUnknown(_)) => {}
+                Err(fault) => return Err(fault.into_ax(seq.value().saturating_add(1))),
+            }
+        }
+        Ok(None)
     }
 
     /// Writes one of the three documents that govern this city, only if
