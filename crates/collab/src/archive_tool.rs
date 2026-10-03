@@ -293,6 +293,32 @@ mod tests {
     }
 
     #[test]
+    fn what_a_run_records_its_own_recall_reads_back() {
+        let tool = ArchiveTool::new(desk(Vec::new())).unwrap();
+        tool.invoke(&call(serde_json::json!({
+            "action": "record",
+            "kind": "fact",
+            "text": "probe marker 7171",
+        })))
+        .unwrap();
+        let outcome = tool
+            .invoke(&call(
+                serde_json::json!({ "action": "recall", "query": "7171" }),
+            ))
+            .unwrap();
+        assert_eq!(
+            outcome.result.as_map().clone(),
+            serde_json::json!({
+                "searched": 1,
+                "found": [{ "kind": "fact", "text": "probe marker 7171" }],
+            })
+            .as_object()
+            .unwrap()
+            .clone()
+        );
+    }
+
+    #[test]
     fn a_fifth_kind_is_refused_with_the_four_it_could_be() {
         let shared = desk(Vec::new());
         let tool = ArchiveTool::new(Arc::clone(&shared)).unwrap();
