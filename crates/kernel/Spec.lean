@@ -397,6 +397,7 @@ ARCHITECTURE.md §3「nothing here is published」是这条判定成立的前提
 | D25 | 一份空计划的根份额归这栋楼的 Mayor，`plan` 因此有 `add` | `crates/kernel/spec/Share.lean` |
 | D26 | Govern 类工具的只读操作在 run 里放行：效果按一次调用定 | `crates/kernel/spec/Gate.lean` |
 | D27 | `read` 与 `edit` 答出的版本就是 `plan finish` 收的那个形式 | `crates/kernel/spec/Locator.lean` |
+| D32 | 同步 `send` 的一次等待是一对种类 `signal_wait_started`／`signal_wait_ended` | `crates/kernel/spec/Event/Record.lean` |
 -/
 
 /-! ## 13 依赖选型

@@ -119,7 +119,7 @@ import crates.wire.spec.Server.Listener
 - **Signal 不在 Command 面**：Signal 的投递与消费住 `collab::inbox`。
 - **`Welcome.resume_from` 读自 `LedgerHead`，`Welcome.epoch` 是创世记录的链哈希**：`decide_frame` 的第四个参数是 `WelcomeFacts { city, head, epoch }`——城名、账本头与 epoch 合成一个值，因为 `decide_frame` 已占满 4 个参数。`LedgerHead` 是 `ServeConfig.head` 递进来的一个 `AtomicU64`：装配层以重建视图时读到的最后一条记录的 `seq` 起头，折叠线程在每条记录**广播之前**把头推到它的 `seq`，socket 在 hello 时读一次。头放在原子量里而不放在视图锁里，因为读者可能长时间持有视图，而 hello 跑在 tokio 任务上，读头只是一次 Acquire load。先推头、后广播，加上会话在 hello 之前已订阅事件流，保证 `resume_from` 之后的记录必在流上：头之前而在订阅之后广播的记录会同时出现在流上与补拉里，所以边界上只可能重复、不可能缺失。`epoch` 是 `kernel::ledger::chain_hash(创世行)`，装配层在重建视图时读一次，由 `ServeConfig.epoch` 递进来：同一份账本的 epoch 永不改变，换了账本（重新 init、换了城目录）epoch 必变，所以客户端见到与上次不同的 epoch 就丢弃 belief、按快照重建，而不是拿旧水位去新账本里补拉。
 
-- **V0.0.9 的线上改形已定形、尚未落进类型**：D22 到 D29 写下了形状；`Command` 与 `Query` 的帧名表由 `specalign` 与 schema golden 逐项对账，所以新帧与新字段由实现它们的那一个变更集同时加进 Rust、`spec/Command/Kind.lean`、golden 与 `client/src/wire.ts`，届时删去本条。信号与派活发出即生效（roadmap TP3）若要新帧，形状由它的设计写成本规格的下一条决定。
+- **V0.0.9 的线上改形已定形、尚未落进类型**：D22 到 D34 写下了形状；`Command` 与 `Query` 的帧名表由 `specalign` 与 schema golden 逐项对账，所以新帧与新字段由实现它们的那一个变更集同时加进 Rust、`spec/Command/Kind.lean`、golden 与 `client/src/wire.ts`，届时删去本条。信号与派活发出即生效（roadmap TP3）若要新帧，形状由它的设计写成本规格的下一条决定。
 
 模型自己的假设写在定理的假设里，不写成公理：哈希对名字表单射是 `distinct_grammars_never_handshake` 的前提（blake3 的抗碰撞给出它）；名字不变而改形必进位是同一条定理的前提（D1 给出它，`tests/wire_contract.rs` 的形状摘要提醒改的人）；`decide_lag` 的 `checked_add` 溢出一支在模型里不写，因为产出 `next` 的账本到不了那一步。
 -/
@@ -347,6 +347,9 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 | D27 | 一段 session 带出显示名、模型、思考强度、工作区与最后一条回复；改名与改运行策略各是一帧命令 | `crates/wire/spec/Answer/Sessions.lean` |
 | D28 | `Call` 带出整数微秒的耗时；skill 与 MCP 的使用各是一个查询 | `crates/wire/spec/Reading.lean` |
 | D29 | 配色的覆盖是人的偏好，经 `PutPreferences` 写进偏好文件的 `[ui]` | `crates/wire/spec/Preference.lean` |
+| D32 | `InstallSkill` 是往书架上加 skill 的命令，来源是一个四臂的值 | `crates/wire/spec/Command.lean` |
+| D33 | skill 与 MCP 的使用各从哪一行折出、按天怎么数、怎样导出 | `crates/wire/spec/Reading.lean` |
+| D34 | 停在同步 `send` 上的 run 在 `RunSummary` 上多一个 `waiting`；`wait` 是工具参数 | `crates/wire/spec/Reading.lean` |
 -/
 
 /-! ## 13 依赖选型

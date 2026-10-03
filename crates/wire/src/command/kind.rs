@@ -374,7 +374,7 @@ pub enum Command<Secret = Sealed<String>> {
     /// sub-directories, which is how a script keeps its folder.
     ///
     /// The body replaces the file whole, for the reason [`Command::PutDocument`] gives. Writes
-    /// `shelved_document_written`.
+    /// `skill_shelved`, the planned kind of kernel D23.
     PutShelved {
         shelf: Shelf,
         name: String,
