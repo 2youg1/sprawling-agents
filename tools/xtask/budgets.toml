@@ -784,7 +784,7 @@ pinned = 9
 what = "backticked crate paths in .lean, .md and rustdoc that resolve to no item"
 measured_by = "cargo xtask gates spec (spec::ratchet, assertion 7)"
 status = "held by spec, not weighed by budget"
-pinned = 19  # fifty paths in specs and rustdoc renamed to the item that exists now, or said in words where the item is gone; the 19 left sit in files other lanes own (client, citysim, adversary, docs, accounting Spec.lean, wire Command/Kind, remote_access) and in three xtask rustdoc lines
+pinned = 17  # the merged tree after the lanes that renamed cited paths to the item that exists now; the 17 left sit in client, citysim, adversary, docs, accounting Spec.lean, wire Command/Kind and remote_access files, and in three xtask rustdoc lines
 
 # The object files the city's first base writes (storage D27). The loose
 # path wrote one file per blob, two trees and the commit: 11, 19 and 35 at
