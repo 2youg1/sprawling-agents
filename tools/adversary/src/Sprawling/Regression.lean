@@ -172,7 +172,12 @@ private def imports (trace : Trace) : List String :=
     match wanted with
     | [only] => "use kernel::" ++ only ++ ";"
     | names => "use kernel::{" ++ String.intercalate ", " names ++ "};"
-  [taken, "use sprawling::assembly;"]
+  [ taken
+  , "// The city is formed with an in-memory vault, because these tests are"
+  , "// about the worker and must not write to the credential service of the"
+  , "// machine that runs them."
+  , "use accounting::worker::genesis::{Adopt, form};"
+  , "use sprawling::assembly;" ]
 
 /-- The helper a `look` step calls, emitted only when one is in the trace.
 
@@ -198,12 +203,20 @@ private def standingHelper : String :=
 
 /-- A city raised, and the worker every test here drives.
 
+The city is formed through `genesis::form` with the in-memory vault rather than
+through `assembly::init_city`, which probes the platform credential service: a
+test in the test process must not reach the machine's keychain.
+
 `named` says whether the test reads the city's history back afterwards. A name
 nothing reads is a warning, and this workspace refuses one. -/
 private def cityAndWorker (named : Bool) : List String :=
   [ "    let dir = tempfile::tempdir().unwrap();"
-  , if named then "    let raised = assembly::init_city(dir.path()).unwrap();"
-    else "    assembly::init_city(dir.path()).unwrap();"
+  , if named then "    let raised = form(" else "    form("
+  , "        dir.path(),"
+  , "        Adopt::Nothing,"
+  , "        assembly::hands(gateway::Custodian::in_memory()),"
+  , "    )"
+  , "    .unwrap();"
   , ""
   , "    // The vault is the in-session one: a test that reached the platform"
   , "    // credential service would write to the machine running it."
