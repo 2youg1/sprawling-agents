@@ -139,8 +139,9 @@ pub fn place_everywhere(city_root: &Path) -> Result<(), AxError> {
 /// written. A file that is not there is not a failure — it is the
 /// ordinary case for a building the city just raised.
 fn append_missing(path: &Path, rules: &[String]) -> Result<(), AxError> {
-    // Read and write under one hold: the file belongs to the project
-    // and a person may be adding a line to it at the same moment.
+    // Read and write under one hold, so two writers in this process
+    // cannot each append the same missing line. The hold is this
+    // process's: a person editing the file meanwhile is not held back.
     crate::document::edit(path, |held| {
         let existing = match std::fs::read_to_string(path) {
             Ok(text) => text,

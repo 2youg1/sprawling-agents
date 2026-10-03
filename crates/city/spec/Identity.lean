@@ -27,9 +27,9 @@ impl Naming {
     pub fn imported_from(&self) -> Option<&str>;
     pub fn about(&self) -> &str;
     pub fn mayor(&self) -> Option<&str>;
-    pub fn to_bytes(&self) -> Vec<u8>;                                // 冻进内容库的那份字节（JSON）
+    pub fn to_bytes(&self) -> Result<Vec<u8>, AxError>;               // 冻进内容库的那份字节（JSON）；编码失败＝E_STORAGE_FATAL，纯字符串的值不会失败，但不 panic
     pub fn from_bytes(bytes: &[u8]) -> Result<Naming, AxError>;
-    pub fn version(&self) -> B3Hash;                                  // = B3Hash::digest(to_bytes())
+    pub fn version(&self) -> Result<B3Hash, AxError>;                 // = B3Hash::digest(to_bytes()?)
     pub fn context(&self) -> Option<String>;                         // 接在 city 段之后的那一块；什么都没说时为 None
 }
 pub enum NamingEdit {
@@ -38,10 +38,11 @@ pub enum NamingEdit {
 }
 pub struct Unreadable { pub document: Governed, pub line: u32, pub why: String }
 pub fn read_naming(city_root: &Path) -> Result<Result<Naming, Unreadable>, AxError>;   // 页面读：读不出给出位置
-pub fn write_naming(city_root: &Path, edit: &NamingEdit, base: &str) -> Result<Naming, AxError>;
+pub struct NamingWritten { pub naming: Naming, pub bytes: usize }   // 存下之后城的名字，与写下的文档长度
+pub fn write_naming(city_root: &Path, edit: &NamingEdit, base: &str) -> Result<NamingWritten, AxError>;
 pub fn write_governed(city_root: &Path, which: Governed, base: &str, body: &str) -> Result<PathBuf, AxError>;
-pub fn persona(written: &[u8]) -> &[u8];                              // 身份区之后的正文
-pub fn freeze_naming(city_root: &Path, room: &Address, version: B3Hash) -> Result<(), AxError>;
+pub fn persona(written: Vec<u8>) -> Vec<u8>;                          // 身份区之后的正文；收下所有权，没有身份区时原样交回
+pub fn freeze_naming(city_root: &Path, addr: &Address, version: B3Hash) -> Result<(), AxError>;
 impl ConfigLayer { pub fn naming(&self) -> Option<B3Hash>; }          // 房间这一层冻下的身份版本
 ```
 

@@ -35,7 +35,7 @@ pub(crate) fn place_tree(target: &Path, entries: &[TreeEntry<'_>]) -> Result<(),
 
 **暂存文件名固定为 `.<文件名>.staging`**：写者在 flush 与 rename 之间被杀会留下它，固定名让下一次写复用同一个位置，而不是攒出一目录谁也说不清归属的碎片；点前缀使城里每一处扫描都跳过它（扫描一律跳过点开头的项）。
 
-**父目录的 `sync_all` 只在 unix 上做**：目录项住在目录里，光刷文件不够；Windows 没有可供进程打开的目录句柄，也不需要——`rename` 调到的 `MoveFileEx`（`REPLACE_EXISTING`）由文件系统自己记日志。
+**父目录的 `sync_all` 只在 unix 上做**（macOS 与 Linux）：目录项住在目录里，光刷文件不够；Windows 没有可供进程打开的目录句柄，也不需要——`rename` 调到的 `MoveFileEx`（`REPLACE_EXISTING`）由文件系统自己记日志。
 
 **锁是本进程的**：一个人在编辑器里改同一份文件不受它约束，而在本仓库现有依赖下也无法约束（跨进程文件锁需要新依赖，`crates/city/Cargo.toml` 只认 `kernel` + std + `toml`/`serde`）。挡住那个人的是原子替换：他的编辑器永远读不到半份文档。
 
