@@ -115,3 +115,33 @@ fn the_contract_is_the_job_file_so_the_agent_reads_one_authority() {
     assert!(text.contains("## Stop"));
     assert!(text.contains("lab/a"), "the node writes where it may write");
 }
+
+#[test]
+fn a_refused_ask_in_the_middle_of_hand_next_counts_nothing_as_handed() {
+    // `a` passes both doors; `b` writes outside the building and is
+    // refused. The call answers with the refusal and hands out nothing,
+    // so nothing may be counted as handed (`spec/Workshop.lean`: handed
+    // is handed out).
+    let outside = NodeContract::new(
+        NodeId::parse("b").unwrap(),
+        "produce b".to_owned(),
+        BTreeSet::new(),
+        Vec::new(),
+        Address::parse("yard/b").unwrap(),
+        "lab/room1".to_owned(),
+        "the test suite passes".to_owned(),
+        "stop when the check passes".to_owned(),
+    )
+    .unwrap();
+    let mut underway = Underway::new(
+        Workshop::new(vec![node("a", &[]), outside]).unwrap(),
+        BTreeSet::new(),
+        crate::delegate_tool::DelegateDesk::new(
+            kernel::Depth::Root,
+            Address::parse("lab").unwrap(),
+        ),
+    );
+    let err = underway.hand_next(&BTreeSet::new()).unwrap_err();
+    assert_eq!(err.code(), &AxCode::CrossBuildingDenied);
+    assert_eq!(underway.handed(), &BTreeSet::new());
+}
