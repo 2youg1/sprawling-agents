@@ -77,7 +77,12 @@ pub(crate) fn run(mut command: Command, launch: &Launch) -> Result<Vec<u8>, Xtas
     };
     let stderr = match launch.stderr {
         Stderr::Discarded => Stdio::null(),
-        Stderr::KeptIn(_) => Stdio::null(),
+        Stderr::KeptIn(path) => std::fs::File::create(path)
+            .map(Stdio::from)
+            .map_err(|source| XtaskError::Io {
+                path: path.display().to_string(),
+                source,
+            })?,
     };
     in_own_group(&mut command);
     let mut child = command
@@ -112,11 +117,7 @@ pub(crate) fn run(mut command: Command, launch: &Launch) -> Result<Vec<u8>, Xtas
             }
         }
         AfterExit::AwaitTree(bound) => {
-            let _ = bound;
-            while let Ok(bytes) = arrived.recv_timeout(DRAIN) {
-                out.extend_from_slice(&bytes);
-            }
-            if false {
+            if !drained(&arrived, &mut out, bound) {
                 let killed = kill_tree(&mut child);
                 let released = drained(&arrived, &mut out, AFTER_KILL);
                 return Err(failed(format!(
@@ -212,7 +213,13 @@ fn polls_in(span: Duration) -> u128 {
 /// the helpers only while the child is alive; macOS and Linux signal the
 /// process group [`in_own_group`] made, which outlives its leader.
 fn kill_tree(child: &mut Child) -> Result<(), String> {
-    let status = Ok::<_, std::io::Error>(std::process::ExitStatus::default());
+    let pid = child.id().to_string();
+    let mut tree = tree_kill_command(&pid);
+    let status = tree
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status();
     let leader = child.kill().or_else(|err| match child.try_wait() {
         Ok(Some(_)) => Ok(()),
         Ok(None) | Err(_) => Err(err),
