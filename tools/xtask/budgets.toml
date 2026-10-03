@@ -785,3 +785,21 @@ what = "backticked crate paths in .lean, .md and rustdoc that resolve to no item
 measured_by = "cargo xtask gates spec (spec::ratchet, assertion 7)"
 status = "held by spec, not weighed by budget"
 pinned = 69  # merged W3 tree: lanes struck seven more unresolved paths
+
+# The object files the city's first base writes (storage D27). The loose
+# path wrote one file per blob, two trees and the commit: 11, 19 and 35 at
+# 8, 16 and 32 files. The mempack path writes one pack and no loose object
+# at every size, so the count no longer grows with the city.
+[first_base_objects]
+what = "loose objects and packs one ensure_base writes into .git/objects, at 8, 16 and 32 files"
+measured_by = "cargo nextest run -p sprawling-storage -E 'test(a_first_base_writes_one_pack_and_no_loose_object_at_any_file_count)'"
+status = "measured, held by that test rather than weighed by budget: 0 loose objects and 1 pack at each size, against 11, 19 and 35 loose objects on the loose path"
+
+# Files created while rooms are delegated in a row (storage D28): the
+# first room takes the stock, a room placed while the restock still holds
+# its lock checks out its own tree, and the stock it did not wait for goes
+# to the next room.
+[stock_overlap_checkouts]
+what = "files created per step of three rooms delegated in a row with the restock still checking out at the second, at N = 8, 16 and 32 files"
+measured_by = "cargo nextest run -p sprawling-storage -E 'test(a_room_placed_while_the_stock_is_being_made_checks_out_once_and_the_stock_survives)'"
+status = "measured, held by that test rather than weighed by budget: first room 0, restock N, second room N, refresh 0, third room 0"
