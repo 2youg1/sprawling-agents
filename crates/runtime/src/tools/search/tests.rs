@@ -383,23 +383,15 @@ fn the_unread_list_follows_the_walk_order() {
     assert_eq!(paths, ["broken", "lab/Big.md", "mill"]);
 }
 
-/// A name the city cannot spell as an address is something the walk could
-/// not look at, not something policy hides, so it is named among the
-/// unread with the reason the parse gave. Such names cannot be made on
-/// Windows, so the walk's decision is asked directly.
+/// A name the city cannot spell as an address is named among the unread
+/// with the parse's reason; Windows cannot make one, so the walk is asked.
 #[test]
 fn a_name_that_is_no_address_is_named_among_the_unread() {
-    let open = |_: &Address| ReadVerdict::Open;
-    let named = match descent::admissible("lab", "a:b", &open) {
+    let named = match descent::admissible("lab", "a:b", &|_: &Address| ReadVerdict::Open) {
         descent::Entry::Unread { child, why } => Some((child, why)),
         descent::Entry::Descend(_) | descent::Entry::Passed => None,
     };
     let reason = Address::parse("lab/a:b").unwrap_err().recovery().to_owned();
-    assert_eq!(
-        named,
-        Some((
-            "lab/a:b".to_owned(),
-            format!("its name is not an address: {reason}")
-        ))
-    );
+    let why = format!("its name is not an address: {reason}");
+    assert_eq!(named, Some(("lab/a:b".to_owned(), why)));
 }
