@@ -11,9 +11,10 @@
 //! never silently falls back.
 //!
 //! The inner seam `Vault` stays `pub(crate)`: two sentences of interface,
-//! backends and their politics hidden. We never write our own encrypted
-//! files — the platform credential service or session memory, nothing
-//! between.
+//! backends and their politics hidden. Three backends sit behind it: the
+//! platform credential service, an encrypted file opened with a
+//! passphrase (`crates/gateway/spec/Credential/Vault/File.lean` §8-21),
+//! and session memory.
 
 mod custodian;
 mod vault;

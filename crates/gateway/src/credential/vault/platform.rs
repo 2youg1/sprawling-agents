@@ -35,7 +35,8 @@ pub(super) fn entry(reference: &SecretRef) -> Result<keyring_core::Entry, AxErro
             err.to_string(),
         )
         .with_recovery(
-            "start this machine's credential service (Keychain on macOS, Credential              Manager on Windows, the kernel keyring on Linux), then try again",
+            "start this machine's credential service (Keychain on macOS, Credential \
+             Manager on Windows, the kernel keyring on Linux), then try again",
         )
     })
 }

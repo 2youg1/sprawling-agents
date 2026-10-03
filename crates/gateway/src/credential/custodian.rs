@@ -12,7 +12,9 @@
 //! deliberately handed the city, kept under the name the caller asked
 //! for and never handed back except to the wire.
 
-use super::vault::{Described, EnvReader, KeyringVault, MemoryVault, Persistence, Vault, env_key};
+use super::vault::{
+    Described, EnvReader, FileVault, KeyringVault, MemoryVault, Persistence, Vault, env_key,
+};
 
 use kernel::event::record::{ProviderDegraded, VaultFellBack};
 use kernel::{AxCode, AxError, Payload, Sealed, SecretRef};
@@ -74,7 +76,7 @@ impl Store {
     fn source(self) -> &'static str {
         match self {
             Store::PlatformService => KeyringVault::SOURCE,
-            Store::EncryptedFile => "encrypted-file",
+            Store::EncryptedFile => FileVault::SOURCE,
             Store::SessionMemory => MemoryVault::SOURCE,
         }
     }
@@ -85,7 +87,7 @@ impl Store {
     fn persistence(self) -> Persistence {
         match self {
             Store::PlatformService => KeyringVault::PERSISTENCE,
-            Store::EncryptedFile => Persistence::AcrossRebootsWithPassphrase,
+            Store::EncryptedFile => FileVault::PERSISTENCE,
             Store::SessionMemory => MemoryVault::PERSISTENCE,
         }
     }

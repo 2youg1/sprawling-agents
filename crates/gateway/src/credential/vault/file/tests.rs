@@ -68,6 +68,9 @@ fn a_stored_credential_returns_and_a_wrong_passphrase_is_refused() {
         .expect("a wrong passphrase is refused rather than opening an empty vault");
     assert_eq!(refused.code(), &AxCode::ConfigInvalid);
     assert!(refused.recovery().contains("passphrase"), "{refused:?}");
+    // A line continuation that lost its backslash keeps the next line's
+    // indent inside the sentence.
+    assert!(!refused.recovery().contains("  "), "{refused:?}");
     assert_eq!(
         String::from_utf8(std::fs::read(&path).unwrap()).unwrap(),
         on_disk

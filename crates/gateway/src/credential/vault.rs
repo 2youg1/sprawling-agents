@@ -11,16 +11,18 @@ use zeroize::Zeroizing;
 
 // The third backend. `dead_code` rather than `expect`: the module is
 // complete and its one production caller is the backend choice in
-// `Custodian::probe`, which lands with the wiring change 14.5 names;
+// `Custodian::probe`, which lands with the passphrase prompt at start-up;
 // the test build does construct it, so an expectation here would be
 // unfulfilled in one of the two configurations and warn about that
 // instead.
 #[allow(
     dead_code,
-    reason = "the passphrase backend awaits its one caller in Custodian::probe (14.5 wiring)"
+    reason = "the passphrase backend awaits its one caller in Custodian::probe"
 )]
 mod file;
 mod platform;
+
+pub(crate) use file::FileVault;
 
 /// The inner seam: store, fetch, delete. Nothing else leaves the crate.
 pub(crate) trait Vault {

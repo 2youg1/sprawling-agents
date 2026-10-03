@@ -12,7 +12,7 @@
 //! disk theft is a different question (`crates/gateway/spec/Credential/Vault/File.lean` §8-21).
 //!
 //! One entry is sealed on its own with ChaCha20-Poly1305 under a fresh
-//! 96-bit nonce, and the additional data binds the format version, the
+//! 96-bit nonce, and the additional data binds the format version and
 //! the entry's name, so a ciphertext only opens where it was sealed.
 
 use std::collections::BTreeMap;
@@ -126,7 +126,8 @@ impl FileVault {
                 refusal(
                     "unlock the credential file",
                     "the passphrase does not open this file".to_owned(),
-                    "enter the passphrase this file was created with; nothing in it can                      be read without that passphrase",
+                    "enter the passphrase this file was created with; nothing in it can \
+                     be read without that passphrase",
                 )
             })?;
         if verifier.as_slice() != VERIFIER_PLAINTEXT {
