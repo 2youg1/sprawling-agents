@@ -52,8 +52,10 @@ const MOST_FOLDS: usize = 200;
 pub(super) const CASE_PATIENCE: Duration = Duration::from_secs(45);
 
 /// How long the helpers of a launch may hold its output after the
-/// engine itself exited.
-const TREE_PATIENCE: Duration = Duration::from_secs(5);
+/// engine itself exited: the two seconds the render gate drains for.
+/// On Edge under Windows a helper routinely holds it longer, and a run
+/// of some six hundred launches pays this bound on each of them.
+const TREE_PATIENCE: Duration = Duration::from_secs(2);
 
 /// How long a profile directory is given to come free for removal.
 const PROFILE_RELEASE: Duration = Duration::from_secs(5);
