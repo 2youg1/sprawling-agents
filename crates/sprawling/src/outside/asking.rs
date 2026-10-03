@@ -194,7 +194,9 @@ fn no_console() -> AxError {
         "work the remote door from the page",
         "this city has no console to print the confirmation code on",
     )
-    .with_recovery("run `sprawling serve` in the city's own terminal")
+    .with_recovery(
+        "close this city and start it again in a terminal of your own with `sprawling up`          or `sprawling serve --console`",
+    )
 }
 
 fn unlasting(ms: u64) -> AxError {
