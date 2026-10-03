@@ -169,9 +169,9 @@ Signal、Inbox、Steer、Workshop、NodeContract、fan-in、Artifact、arbitrati
 **`collab::claim_tool`、`collab::claim_effect`**（形状 4 适配器、形状 2 值类型）。`ClaimEffect::{Claimed, PutDown { exit: PlanExit }, Split { children }, Added { id, child }}` 与它的 `id`、`kind`（`Added` 为 `None`）、`line`（种类与载荷一起，载荷形状是 `kernel::event::record::RoadmapMoved`）、`apply`；`ClaimDesk::new(who, room, roadmap, booking)`、`take_effects`、`roadmap`（仅当本次 drive 改过）、`holding`、`abandon`；`Booking` 是调用时判定认领的权威（城里是记账线程）；`still_true(text, effect)`。七个动作：`list`、`claim`、`finish`、`block`、`release`、`split`、`add`。
 
 - `Roadmap.md` 是唯一权威，不另立认领登记表：文件被人读、被 `PlanTree::progress` 数、被这个工具改，一处事实，三个读者。
-- 六个动作长在同一条 catalog 行上：模型每一轮读的行数是成本，一行背后的动词数不是（§14 的字节上限）。
+- 七个动作长在同一条 catalog 行上：模型每一轮读的行数是成本，一行背后的动词数不是（§14 的字节上限）。
 - 状态迁移由 `kernel::PlanTree` 从计划自身判：`claim` 只从就绪集里取（叶子、无人认领、依赖全绿），`finish`、`block`、`release`、`split` 只作用于本次 drive 认领的那个节点（D6）；拒词报出此刻的状态并指向一个真能拿的节点。
-- 认领在调用时由 `Booking` 判定，桌子的副本先答：先让 `PlanTree::claim` 在副本上判，再问 `Booking`；`Booking` 拒绝时桌子不持有节点、不排效应、不改文本。`Booking` 记的是哪轮在飞的活持有哪个节点，只活到那轮活落地为止，所以它不是第二份登记表；它拿到整条 `ClaimEffect::Claimed`，因为那一行的种类与载荷只由 `ClaimEffect::kind` 与 `payload` 定义。
+- 认领在调用时由 `Booking` 判定，桌子的副本先答：先让 `PlanTree::claim` 在副本上判，再问 `Booking`；`Booking` 拒绝时桌子不持有节点、不排效应、不改文本。`Booking` 记的是哪轮在飞的活持有哪个节点，只活到那轮活落地为止，所以它不是第二份登记表；它拿到整条 `ClaimEffect::Claimed`，因为那一行的种类与载荷只由 `ClaimEffect::kind` 与 `line` 定义。
 - 一次 drive 只持有一个节点。计划门禁就是那个 `Held` 值：它由 `PlanTree::claim` 铸出，只能花在 `finish` 或 `stop` 上，没有第三个出口；一个只是结束了的 run 由 `abandon` 把它花在 `FrozeWithoutEvidence` 上，「认领了却没交代」在冻结之后不可达。
 - `split` 只分本次 drive 握着的那一行，没握着就拒绝，拒词说这个 run 握着什么、恢复语叫它先认领那一行，桌子不排效应、不改副本（D6；`spec/Claim.lean` 的 `split_needs_hold`）。分完之后不再持有那根枝；写盘前把新文本重新解析并 `PlanTree::build` 一次，拆不出合法树就一个字节都不写。拆分结果带 `unfinished`：该节点下尚未 Done 的子节点数，由拆完的树数出。
 - `add` 只在根下加顶层行，只有 `hall/mayor` 能调（D12）；它带 `parts`，每一份成为一个顶层行，编号接在最后一个顶层行之后；写进副本之前同 `split` 一样重新解析并 `PlanTree::build`，建不出合法树就一个字节都不写。回答带 `nodes`：新行的编号。
@@ -252,7 +252,7 @@ D2 没有草稿退回机制。房间没有版本，发言不带「作者所见�
 
 `ARCHIVE_KINDS` 是封闭的四类：`preference`、`decision`、`correction`、`fact`。第五类要有理由，而「它不属于前四类」正是让分类腐烂的那个理由，所以拒词点名四类并问这是哪一类。
 
-`plan` 条目的 548 B 上限：六个动作的 disclosure 加 schema 的紧凑 JSON，由一条断言钉住。disclosure 里那句 *Must this be expanded?* 是 LLM First（ARCHITECTURE.md §9）的提醒，在缓存前缀里，零延迟、零花费；不追问、不设深度上限、不设审批。省下的字节来自把 Locator 文法从 schema 移进拒词：一句重复了拒词内容的说明，是每一轮都在付、只读一次的字节；schema 里没有的东西，模型第一次写错时会从三段式拒词里拿到。
+`plan` 条目的 581 B 上限：七个动作的 disclosure 加 schema 的紧凑 JSON，由一条断言钉住（`claim_tool::catalog_tests`）；四个动作时同一读法量得 548 B，`add` 复用 `parts` 只多 33 B（D12）。disclosure 里那句 *Must this be expanded?* 是 LLM First（ARCHITECTURE.md §9）的提醒，在缓存前缀里，零延迟、零花费；不追问、不设深度上限、不设审批。多出的动词放得进来，省下的字节来自把 Locator 文法从 schema 移进拒词：一句重复了拒词内容的说明，是每一轮都在付、只读一次的字节；schema 里没有的东西，模型第一次写错时会从三段式拒词里拿到。
 -/
 
 /-! ## 15 影响面
