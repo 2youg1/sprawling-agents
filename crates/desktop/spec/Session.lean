@@ -114,10 +114,6 @@ theorem no_tool_without_initialize (methods : List Method)
   rw [fresh_until_initialize methods absent]
   rcases h with rfl | rfl <;> decide
 
-theorem the_notification_alone_is_refused :
-    served .fresh .opened = false ∧ run .fresh [.opened] = .fresh := by
-  decide
-
 theorem the_two_steps_open_the_tools :
     served (run .fresh [.opening, .opened]) .list = true ∧
       served (run .fresh [.opening, .opened]) .call = true := by

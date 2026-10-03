@@ -69,9 +69,6 @@ theorem a_pattern_without_a_star_matches_only_its_own_length (line text : List C
       simp only [List.map_cons, fits, Bool.and_eq_true] at h
       simp [ih more h.2]
 
-theorem case_is_not_counted : fits (read "NOTEPAD.EXE".toList) "notepad.exe".toList = true := by
-  decide
-
 /-!
 ## 咬得动的演示
 

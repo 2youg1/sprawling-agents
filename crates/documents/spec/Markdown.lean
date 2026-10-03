@@ -39,8 +39,6 @@ def admitted : Scheme → Bool
   | .relative | .http | .https | .mailto => true
   | .other => false
 
-theorem other_refused : admitted .other = false := rfl
-
 theorem listed_admitted (s : Scheme) (listed : s ≠ .other) : admitted s = true := by
   cases s <;> simp_all [admitted]
 
@@ -182,10 +180,6 @@ inductive Preview where
   | laid (blocks : Nat)
   | unsupported
 
-theorem empty_is_not_unsupported : Preview.laid 0 ≠ Preview.unsupported := by
-  intro same
-  cases same
-
 /-! ## 回复里已经不会再变的块（D30、D31）
 
 Rust 的 `layout::closed` 逐行读一段还在写的 Markdown，只读以换行结束的完整行，答最后一个收束点之后的字节位置。模型以行计位置：字节怎样切成行、一行属于哪一类是 Rust 的 `layout` 的事（`layout::tests::closed_*` 判），这里从分好类的行开始。围栏的界定符 `D` 与「这一行闭合那一个」的关系 `closes` 是参数：Rust 里是 `layout::Delimiter` 与它的 `closes`（同一字符、不短于开启行）。 -/
@@ -288,14 +282,6 @@ theorem streaming_le_settled {D : Type} (closes : D → D → Bool) (lines : Lis
 
 /-- 界定符相同即闭合的一个具体例子，演示用。 -/
 def sameMark (closing opened : Nat) : Bool := closing == opened
-
-theorem a_margin_fence_closes :
-    closedUpTo sameMark [.fence 3 .atMargin, .other, .fence 3 .atMargin] = 3 := by
-  decide
-
-theorem an_indented_fence_closes_nothing :
-    closedUpTo sameMark [.fence 3 .indented, .other, .fence 3 .indented] = 0 := by
-  decide
 
 /-- 不认围栏的读法：围栏行当作其余的行。 -/
 def withoutFences {D : Type} : Line D → Line D

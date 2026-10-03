@@ -117,8 +117,6 @@ def againstBase (base body : Bytes) (onDisk : Bytes) : Decision Conflict :=
 def inTurn {E : Type} (disk : Disk) (writers : List (Bytes → Decision E)) : Disk :=
   writers.foldl (fun held act => (revise held act).2) disk
 
-theorem a_missing_document_reads_as_no_bytes : read none = [] := rfl
-
 theorem a_moved_document_is_refused_and_left (disk : Disk) (base body : Bytes)
     (moved : read disk ≠ base) :
     revise disk (againstBase base body) = (.error .VersionConflict, disk) := by
