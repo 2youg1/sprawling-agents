@@ -122,9 +122,7 @@ impl Custodian {
                 // took - is answered by `resolve` below, in words.
                 None,
             ),
-            Ok(_) => {
-                Custodian::fell_back("platform service returned a different value".to_owned())
-            }
+            Ok(_) => Custodian::fell_back("platform service returned a different value".to_owned()),
             Err(err) => Custodian::fell_back(err.subject().to_owned()),
         }
     }
@@ -148,7 +146,12 @@ impl Custodian {
     ) -> (Custodian, Option<Payload>) {
         let (refusal, notice) = match notice {
             Ok(payload) => (reason, Some(payload)),
-            Err(_dropped) => (reason, None),
+            Err(err) => (
+                format!(
+                    "{reason}; the provider_degraded notice for it could not be encoded: {err}"
+                ),
+                None,
+            ),
         };
         (
             Custodian::with_backend(
