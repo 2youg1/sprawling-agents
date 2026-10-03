@@ -250,6 +250,9 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
     );
 
     let audio_views = Arc::clone(&views);
+    // The remote door's key is named by this city's genesis line and kept
+    // in the same vault as every other credential (remote_access D23).
+    let remote_key = crate::outside::keeper::CityKey::of(Arc::clone(&city_vault), epoch);
     let audio_vault = city_vault;
     let page = Arc::new(client);
     let config = wire::ServeConfig {
@@ -297,7 +300,7 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
         desk,
         answering,
         worker: worker_thread,
-        outdoors: Outdoors::new(city_root, relay, CityPort { at, token, page }),
+        outdoors: Outdoors::new(city_root, relay, CityPort { at, token, page }, remote_key),
     })
 }
 

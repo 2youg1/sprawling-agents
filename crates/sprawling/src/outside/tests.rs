@@ -31,7 +31,7 @@ use remote_access::seal::Payload;
 
 use super::conduit::{Conduit, Step};
 use super::console::{Lasting, RemoteLine, parse};
-use super::keeper::{Doorway, Keeping, Revoking, Senses};
+use super::keeper::{CityKey, Doorway, Keeping, Revoking, Senses};
 
 /// Every kind a door wrote, in the order it wrote them.
 #[derive(Clone, Default)]
@@ -52,10 +52,10 @@ impl Written {
 }
 
 /// A clock that moves one second per reading, and a random source that
-/// never repeats itself.
-fn senses() -> Senses {
+/// never repeats itself from its `first` draw on.
+fn senses(first: u64) -> Senses {
     let ticks = Arc::new(AtomicU64::new(1_000));
-    let draws = Arc::new(AtomicU64::new(1));
+    let draws = Arc::new(AtomicU64::new(first));
     Senses {
         clock: Arc::new(move || Ok(TimeMs::new(ticks.fetch_add(1_000, Ordering::SeqCst)))),
         entropy: Arc::new(move |bytes: &mut [u8]| {
@@ -75,12 +75,26 @@ fn opened() -> Opened {
     }
 }
 
+/// The vault one city keeps its key in, across every start of it.
+type Vault = Arc<Mutex<gateway::Custodian>>;
+
+fn vault() -> Vault {
+    Arc::new(Mutex::new(gateway::Custodian::in_memory()))
+}
+
 fn kept(devices: &std::path::Path, written: &Written) -> Doorway {
+    started(devices, written, &vault(), 1)
+}
+
+/// One start of a city whose vault is `vault`, its random source drawing
+/// from `first` on.
+fn started(devices: &std::path::Path, written: &Written, vault: &Vault, first: u64) -> Doorway {
     Doorway::keep(Keeping {
         devices: devices.join("remote").join("devices.toml"),
         ledger: Box::new(written.clone()),
         choose: Box::new(|| Ok(Box::new(ScriptedRoute::new(opened())))),
-        senses: senses(),
+        senses: senses(first),
+        key: CityKey::of(Arc::clone(vault), Some(B3Hash::digest(b"genesis"))).unwrap(),
     })
     .unwrap()
 }
@@ -240,6 +254,20 @@ fn the_device_table_survives_a_reopen() {
     drop(doorway);
     let after = kept(dir.path(), &Written::default()).devices().unwrap();
     assert_eq!((before.len(), after), (2, before));
+}
+
+#[test]
+fn a_restarted_city_keeps_its_key() {
+    let dir = tempfile::tempdir().unwrap();
+    let vault = vault();
+    let first = started(dir.path(), &Written::default(), &vault, 1);
+    first.open(local(), lasting("1h")).unwrap();
+    let phone = pair(&first, "phone", Authority::Act, 6);
+    drop(first);
+    let again = started(dir.path(), &Written::default(), &vault, 1_000);
+    again.open(local(), lasting("1h")).unwrap();
+    let tablet = pair(&again, "tablet", Authority::Act, 7);
+    assert_eq!(tablet.city, phone.city);
 }
 
 #[test]

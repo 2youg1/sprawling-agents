@@ -29,7 +29,7 @@ impl Doorway {
         if kept.door.device(hello.device()).is_none() {
             return Err(unpaired());
         }
-        handshake::city_reply(hello, &kept.city, nonce)
+        handshake::city_reply(hello, kept.city()?, nonce)
     }
 
     /// Checks the device's finish against the key it paired with, admits

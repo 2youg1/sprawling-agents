@@ -15,8 +15,7 @@
 //!
 //! [`chosen`] is the one place a route is built: the door asks it at
 //! each `/remote open`, so a person who edits the table opens the door
-//! on the new route without restarting the city, which would change the
-//! city's key and make every device pair again.
+//! on the new route without restarting the city.
 
 use std::net::{Ipv4Addr, SocketAddr};
 use std::path::{Path, PathBuf};
@@ -29,7 +28,7 @@ use remote_access::route::command::{CommandRoute, RouteCommand};
 use remote_access::route::{Permanence, PublicUrl, Route};
 
 use crate::outside::console::Remote;
-use crate::outside::keeper::{Doorway, Keeping, Senses};
+use crate::outside::keeper::{CityKey, Doorway, Keeping, Senses};
 use crate::outside::listener::Reaching;
 
 /// The program a Cloudflare route runs when the table names none: the
@@ -47,6 +46,8 @@ pub(super) struct Outdoors {
     city_root: PathBuf,
     relay: accounting::worker::Relay,
     port: CityPort,
+    /// Where the city's signing key lives, or why it has no name yet.
+    key: Result<CityKey, AxError>,
 }
 
 /// The city's own listener, as the remote relay on this machine reaches
@@ -65,25 +66,30 @@ impl Outdoors {
         city_root: &Path,
         relay: accounting::worker::Relay,
         port: CityPort,
+        key: Result<CityKey, AxError>,
     ) -> Outdoors {
         Outdoors {
             city_root: city_root.to_path_buf(),
             relay,
             port,
+            key,
         }
     }
 
     /// The door this serve keeps, closed, with the devices paired before.
     ///
     /// # Errors
-    /// An unreadable device table; a random source that refuses.
+    /// A ledger with no genesis line to name the city key by; an
+    /// unreadable device table; a vault or a random source that refuses.
     pub(super) fn keep(self) -> Result<Remote, AxError> {
         let Outdoors {
             city_root,
             relay,
             port: CityPort { at, token, page },
+            key,
         } = self;
         let doorway = Doorway::keep(Keeping {
+            key: key?,
             devices: kernel::layout::CityLayout::new(&city_root).devices(),
             ledger: Box::new(relay),
             choose: Box::new(move || chosen(&city_root)),

@@ -63,10 +63,11 @@ impl Doorway {
             )
             .with_recovery("choose another name, or `/remote revoke` the device first"));
         }
+        let city = CityFingerprint::of(&kept.city()?.public());
         let expires = TimeMs::new(now.value().saturating_add(PAIRING_MS));
         kept.door.expect_pairing(code, name, authority, expires)?;
         let invitation = Invitation {
-            city: CityFingerprint::of(&kept.city.public()),
+            city,
             code: shown.chars().filter(|each| *each != '-').collect(),
         };
         let link = format!(
@@ -95,7 +96,7 @@ impl Doorway {
         let nonce = nonce(&self.senses)?;
         let kept = self.kept()?;
         kept.require_open("pair a device")?;
-        handshake::city_pair_reply(hello, &kept.city, nonce)
+        handshake::city_pair_reply(hello, kept.city()?, nonce)
     }
 
     /// Opens a device's sealed claim, pairs it, keeps the table, writes

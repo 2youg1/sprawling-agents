@@ -17,11 +17,12 @@
 //! Time and randomness come in as [`Senses`], made in `bin::assembly`,
 //! so a test drives the door on a counted clock.
 //!
-//! The point a reader most often gets wrong: the city's signing key is
-//! drawn when the process starts and lives only in it. A device pins the
-//! key it paired with, so a restart is a new key and every device pairs
-//! again; keeping the key across restarts is the vault's work, which
-//! `crates/sprawling/spec/Outside/Conduit.lean` §8-139 leaves open.
+//! The point a reader most often gets wrong: a device pins the city key it
+//! paired with, so the key outlives this process exactly as long as the
+//! vault keeps it ([`CityKey`]), and replacing it unpairs every device.
+//! A seed the vault holds but that does not read back does not stop the
+//! door from being kept: the refusal is kept instead, every invitation and
+//! handshake answers with it, and `/remote replace-key` still works.
 
 use std::net::SocketAddr;
 use std::path::PathBuf;
@@ -32,14 +33,16 @@ use kernel::event::record::{DeviceRevoked, RemoteClosed, RemoteClosing, RemoteOp
 use kernel::{AxCode, AxError, EventDraft, EventKind, Ledger, Payload, RunId, TimeMs};
 use remote_access::door::{Device, DeviceName, Door, Epoch};
 use remote_access::handshake::NONCE_BYTES;
-use remote_access::keys::{SEED_BYTES, SigningKey};
+use remote_access::keys::SigningKey;
 use remote_access::route::{Opened, Route};
 
 use super::console::Lasting;
 
+mod city_key;
 mod pairing;
 mod sessions;
 
+pub(crate) use city_key::CityKey;
 pub(crate) use pairing::Inviting;
 
 /// The wall clock, read where `bin::assembly` says.
@@ -67,6 +70,8 @@ pub(crate) struct Keeping {
     /// How each opening of the door builds its route.
     pub(crate) choose: Choosing,
     pub(crate) senses: Senses,
+    /// Where the city's signing key lives.
+    pub(crate) key: CityKey,
 }
 
 /// Which paired devices to revoke.
@@ -93,7 +98,9 @@ pub(crate) struct Doorway {
 
 struct Kept {
     door: Door,
-    city: SigningKey,
+    /// The city's signing key, or why the vault's seed did not read back.
+    city: Result<SigningKey, AxError>,
+    key: CityKey,
     devices: PathBuf,
     ledger: Box<dyn Ledger + Send>,
     choose: Choosing,
@@ -121,16 +128,18 @@ impl Doorway {
             ledger,
             choose,
             senses,
+            key,
         } = keeping;
         let known = super::devices::read(&devices)?;
-        let mut seed = [0u8; SEED_BYTES];
+        let mut seed = [0u8; remote_access::keys::SEED_BYTES];
         (senses.entropy)(&mut seed)?;
-        let city = SigningKey::from_seed(&seed)?;
+        let city = Ok(SigningKey::from_seed(&seed)?);
         let door = Door::start(known, Epoch::from_entropy(drawn(&senses)?));
         Ok(Doorway {
             kept: Arc::new(Mutex::new(Kept {
                 door,
                 city,
+                key,
                 devices,
                 ledger,
                 choose,
@@ -287,6 +296,11 @@ impl Doorway {
 }
 
 impl Kept {
+    /// The city's signing key, or the refusal its seed was read with.
+    fn city(&self) -> Result<&SigningKey, AxError> {
+        self.city.as_ref().map_err(Clone::clone)
+    }
+
     fn close(&mut self, now: TimeMs, why: RemoteClosing) -> Result<(), AxError> {
         let Some(Standing {
             mut route,
