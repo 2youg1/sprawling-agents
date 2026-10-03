@@ -229,3 +229,108 @@ fn a_signal_to_an_empty_room_starts_its_run_before_the_sender_freezes() {
         "the knock goes out at delivery: {woken:?} {frozen:?}"
     );
 }
+
+/// How the receiving room stands when ito's letter to it is delivered.
+enum Receiver {
+    /// A run is working in `market/hana`.
+    Working,
+    /// `market/hana` is a room with no resident: nobody to knock for.
+    Unoccupied,
+    /// `market/hana` is a resident who is not working.
+    Idle,
+}
+
+/// Ito sends one letter to `market/hana`; answers each `signal_enqueued`
+/// id paired with the landing of the `signal_landed` line that names it.
+fn landings_after_a_send(receiver: Receiver) -> Vec<(String, Option<String>)> {
+    let dir = tempfile::tempdir().unwrap();
+    let report = crate::worker::fixture::init_city(dir.path()).unwrap();
+    move_in(dir.path(), "market/ito");
+    let hana = Address::parse("market/hana").unwrap();
+    match receiver {
+        Receiver::Working | Receiver::Idle => move_in(dir.path(), "market/hana"),
+        Receiver::Unoccupied => {}
+    }
+    let (base_url, _provider) = fake_openai(
+        &["m-local"],
+        vec![
+            tool_completion(
+                "asking hana",
+                "tu_1",
+                "signal",
+                serde_json::json!({ "action": "send", "to": "market/hana", "text": "rate?" }),
+            ),
+            completion("done", None),
+            completion("hana answers", None),
+        ],
+    );
+    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
+    let _lent = match receiver {
+        Receiver::Working => Some(
+            worker
+                .collaborating
+                .rooms
+                .lend(&hana, RunId::from_bytes([7u8; 16])),
+        ),
+        Receiver::Unoccupied | Receiver::Idle => None,
+    };
+    worker
+        .handle(wire::Command::Dispatch {
+            addr: Address::parse("market/ito").unwrap(),
+            task: "ask hana what she charges".to_owned(),
+            goal: "a price".to_owned(),
+            policy: kernel::RunPolicy::of(kernel::Mode::Work),
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
+            session: None,
+            effort: None,
+            model: None,
+        })
+        .unwrap();
+    let lines: Vec<serde_json::Value> = runtime::replay::verify_ledger_dir(&report.ledger_dir)
+        .unwrap()
+        .raw_lines()
+        .iter()
+        .filter_map(|line| serde_json::from_slice::<serde_json::Value>(line).ok())
+        .collect();
+    lines
+        .iter()
+        .filter(|line| line["kind"] == "signal_enqueued")
+        .map(|sent| {
+            let id = sent["data"]["id"].as_str().unwrap().to_owned();
+            let landing = lines
+                .iter()
+                .filter(|line| {
+                    line["kind"] == "signal_landed" && line["data"]["signal"] == id.as_str()
+                })
+                .map(|line| line["data"]["landing"].as_str().unwrap().to_owned())
+                .collect::<Vec<_>>();
+            assert!(
+                landing.len() <= 1,
+                "one landing line per signal: {landing:?}"
+            );
+            (id, landing.into_iter().next())
+        })
+        .collect()
+}
+
+/// collab D17, kernel D38: the delivery writes where the letter landed,
+/// once, paired to its signal by id.
+#[test]
+fn a_sent_letter_says_where_it_landed() {
+    for (receiver, expected) in [
+        (Receiver::Working, "delivered"),
+        (Receiver::Unoccupied, "queued"),
+        (Receiver::Idle, "knocked"),
+    ] {
+        let landings = landings_after_a_send(receiver);
+        assert_eq!(landings.len(), 1, "{landings:?}");
+        assert_eq!(
+            landings
+                .iter()
+                .map(|(_, landing)| landing.as_deref())
+                .collect::<Vec<_>>(),
+            vec![Some(expected)],
+            "{landings:?}"
+        );
+    }
+}
