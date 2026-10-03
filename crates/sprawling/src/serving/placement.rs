@@ -13,6 +13,7 @@
 //! This module is also the one place that decides what each arm of the
 //! person's `[core] placement` turns on (D47), the runs' shares included.
 
+mod pinned;
 pub(crate) mod plan;
 pub(crate) mod reading;
 
@@ -180,6 +181,7 @@ fn first_table() -> Seats {
     match setting() {
         CorePlacement::Off => Seats::new(Vec::new()),
         CorePlacement::Soft | CorePlacement::SoftShares => soft_table(),
+        CorePlacement::Pinned => pinned_table(),
     }
 }
 
@@ -203,13 +205,13 @@ pub(crate) fn run_shares() -> Shares {
 }
 
 /// What one arm asks for each run: nothing with placement off, an even
-/// CPU share by default, and with `"soft_shares"` a memory limit of half
-/// the physical memory as well. A physical memory read as zero leaves the
-/// limit out, and says so on stderr.
+/// CPU share for the other three, and with `"soft_shares"` a memory limit
+/// of half the physical memory as well. A physical memory read as zero
+/// leaves the limit out, and says so on stderr.
 fn shares_of(arm: CorePlacement, physical: u64) -> Shares {
     match arm {
         CorePlacement::Off => Shares::Unset,
-        CorePlacement::Soft => Shares::Cpu,
+        CorePlacement::Soft | CorePlacement::Pinned => Shares::Cpu,
         CorePlacement::SoftShares => match NonZeroU64::new(physical / RUN_MEMORY_PARTS) {
             Some(limit) => Shares::CpuAndMemory { limit },
             None => {
@@ -226,19 +228,50 @@ fn shares_of(arm: CorePlacement, physical: u64) -> Shares {
 /// physical memory (`crates/runtime/spec/Tools/Exec.lean` D29).
 const RUN_MEMORY_PARTS: u64 = 2;
 
-fn soft_table() -> Seats {
+/// Lifts this process out of the throttling background work gets,
+/// telling the reason once when the platform refuses (D40).
+fn lift() {
     if let Err(reason) = full_speed() {
         eprintln!("the city may be power-throttled as background work: {reason}");
     }
+}
+
+/// The seats of a reading: empty when the plan is left to the operating
+/// system.
+fn seats_of(read: &Result<Topology, Unread>) -> Vec<Processor> {
+    match read.as_ref().map(plan::plan) {
+        Ok(Plan::Seats(seats)) => seats,
+        Ok(Plan::LeftToOs(_)) | Err(_) => Vec::new(),
+    }
+}
+
+/// The plan for a topology read now, with the reason there is none told
+/// once when the topology cannot be read (D45).
+fn planned() -> Vec<Processor> {
     let read = reading::read();
     if let Err(Unread(reason)) = &read {
         eprintln!("the hot threads are placed by the operating system: {reason}");
     }
-    let seats = match read.as_ref().map(plan::plan) {
-        Ok(Plan::Seats(seats)) if SOFT_CALL => seats,
-        Ok(Plan::Seats(_) | Plan::LeftToOs(_)) | Err(_) => Vec::new(),
-    };
-    Seats::new(seats)
+    seats_of(&read)
+}
+
+/// The seats a hot thread may prefer: none where the platform has no soft
+/// ideal-processor call to hand one to (D41, Windows alone).
+fn soft_table() -> Seats {
+    lift();
+    Seats::new(if SOFT_CALL { planned() } else { Vec::new() })
+}
+
+/// The pinned arm's table: the soft seats where the platform has them,
+/// and the hard affinity taking this process (D41, D49). Where the
+/// platform has no hard call, or the plan names no processor, the arm says
+/// so and the seats stay soft. One reading serves both, so the mask and
+/// the seats cannot name different processors.
+fn pinned_table() -> Seats {
+    lift();
+    let seats = planned();
+    pinned::take(&seats);
+    Seats::new(if SOFT_CALL { seats } else { Vec::new() })
 }
 
 /// The doctor's line: the topology this machine reports, what the plan
@@ -258,6 +291,10 @@ pub(crate) fn report() -> String {
                 .to_owned()
         }
         CorePlacement::Soft | CorePlacement::SoftShares => describe(&reading::read()),
+        CorePlacement::Pinned => {
+            let read = reading::read();
+            format!("{} ({})", describe(&read), pinned::clause(&seats_of(&read)))
+        }
     };
     let runs = runs_share(shares_of(arm, crate::monitor::memory::read().physical));
     format!("{threads}; {runs}{unread}")

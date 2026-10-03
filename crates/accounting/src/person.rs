@@ -159,18 +159,22 @@ pub enum CorePlacement {
     Soft,
     /// `Soft`, and each run's commands held to a memory limit.
     SoftShares,
+    /// The comparison arm: the plan's processors held by hard affinity
+    /// (`crates/sprawling/spec/Serving/Placement.lean` D41).
+    Pinned,
 }
 
 /// Which arm of CPU placement the core takes: `placement` in the
 /// `[core]` section, `"soft"` when absent, `"soft_shares"` to hold each
-/// run to a memory limit as well, `"none"` to turn placement off
+/// run to a memory limit as well, `"none"` to turn placement off, and
+/// `"pinned"` for the hard-affinity comparison arm
 /// (`crates/sprawling/spec/Serving/Placement.lean` D47).
 ///
 /// # Errors
 ///
 /// As [`read`] for a file that cannot be read or parsed, and
 /// `ConfigInvalid` for a `placement` that is none of those three,
-/// including the comparison arm `"pinned"`, not yet built.
+/// for a `placement` that is none of those four.
 pub fn core_placement() -> Result<CorePlacement, AxError> {
     stated_core_placement(&file()?)
 }
@@ -185,13 +189,14 @@ fn stated_core_placement(file: &Path) -> Result<CorePlacement, AxError> {
             Some("soft") => Ok(CorePlacement::Soft),
             Some("soft_shares") => Ok(CorePlacement::SoftShares),
             Some("none") => Ok(CorePlacement::Off),
+            Some("pinned") => Ok(CorePlacement::Pinned),
             Some(_) | None => Err(AxError::failure(
                 AxCode::ConfigInvalid,
                 "read how the core places its threads",
                 format!("{}: [{CORE}] {PLACEMENT} = {stated}", file.display()),
             )
             .with_recovery(
-                "write placement = \"soft\", \"soft_shares\" or \"none\" under [core], or delete the line",
+                "write placement = \"soft\", \"soft_shares\", \"pinned\" or \"none\" under [core], or delete the line",
             )),
         },
     }
@@ -348,15 +353,18 @@ priority = \"fast\"
         );
     }
 
-    /// Each spelling of `[core] placement` reads as its arm; an absent
-    /// line, and an arm this build has not built, are told apart.
+    /// Each spelling of `[core] placement` reads as its arm, and a
+    /// spelling this build does not know is refused rather than taken
+    /// for the default.
     #[test]
     fn each_placement_spelling_reads_as_its_arm() {
         let dir = tempfile::tempdir().unwrap();
         let file = dir.path().join("config.toml");
         let absent = stated_core_placement(&file).map_err(|err| *err.code());
-        let stated = ["none", "soft", "soft_shares", "pinned"].map(|arm| {
-            std::fs::write(&file, format!("[core]\nplacement = \"{arm}\"\n")).unwrap();
+        let stated = ["none", "soft", "soft_shares", "pinned", "hard"].map(|arm| {
+            std::fs::write(&file, format!("[core]
+placement = \"{arm}\"
+")).unwrap();
             stated_core_placement(&file).map_err(|err| *err.code())
         });
         assert_eq!(
@@ -367,6 +375,7 @@ priority = \"fast\"
                     Ok(CorePlacement::Off),
                     Ok(CorePlacement::Soft),
                     Ok(CorePlacement::SoftShares),
+                    Ok(CorePlacement::Pinned),
                     Err(AxCode::ConfigInvalid),
                 ]
             )
