@@ -13,7 +13,8 @@
   // out. An archive past the bounds is refused unopened, and the line
   // says why.
   import { fill, say } from "../../../core/lang";
-  import { kib } from "../../../core/time";
+  import type { Key } from "../../../core/lang";
+  import { count, kib } from "../../../core/time";
   import { ui } from "../../../ui";
   import type { B3Hash } from "../../../wire";
   import type { Read } from "./docx";
@@ -48,13 +49,20 @@
     };
   });
 
+  // One note for a kind the document holds, none for a kind it lacks;
+  // a single one is said in the singular, as "1 comments" is not a phrase.
+  function counted(n: number, one: Key, many: Key): readonly string[] {
+    if (n === 0) return [];
+    return [n === 1 ? say($lang, one) : fill(say($lang, many), { n: count(n) })];
+  }
+
   const notes = $derived.by((): readonly string[] => {
     if (read?.kind !== "drawn") return [];
     const { revisions, comments, objects } = read.coverage;
     return [
-      ...(revisions > 0 ? [fill(say($lang, "format_docx_revisions"), { n: String(revisions) })] : []),
-      ...(comments > 0 ? [fill(say($lang, "format_docx_comments"), { n: String(comments) })] : []),
-      ...(objects > 0 ? [fill(say($lang, "format_docx_objects"), { n: String(objects) })] : []),
+      ...counted(revisions, "format_docx_revisions_one", "format_docx_revisions"),
+      ...counted(comments, "format_docx_comments_one", "format_docx_comments"),
+      ...counted(objects, "format_docx_objects_one", "format_docx_objects"),
     ];
   });
 

@@ -44,7 +44,7 @@ const TITLES: Record<Cut, Key> = {
   import { readAnswer } from "../core/answered";
   import { MAYOR, toFragment } from "../core/route";
   import { fill, say } from "../core/lang";
-  import { usd } from "../core/time";
+  import { count, usd } from "../core/time";
   import { ui } from "../ui";
   import EmptyState from "./parts/empty.svelte";
   import Page from "./parts/page.svelte";
@@ -68,9 +68,9 @@ const TITLES: Record<Cut, Key> = {
   const reading = $derived(answer === undefined ? undefined : costReading(answer));
 </script>
 
-{#snippet unpriced(count: UnpricedCalls)}
+{#snippet unpriced(unpaid: UnpricedCalls)}
   <p class="text-note text-text-quiet">
-    {fill(say($lang, "cost_unpriced"), { calls: String(count.calls), tokens: String(count.tokens) })}
+    {fill(say($lang, "cost_unpriced"), { calls: count(unpaid.calls), tokens: count(unpaid.tokens) })}
   </p>
 {/snippet}
 

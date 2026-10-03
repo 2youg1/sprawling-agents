@@ -22,6 +22,7 @@
 
 <script lang="ts">
   import { fill, say } from "../../core/lang";
+  import { count } from "../../core/time";
   import { ui } from "../../ui";
   import type { Turn } from "../../wire";
   import CodeColumn from "./code_column.svelte";
@@ -101,7 +102,7 @@
 <section class="flex min-h-0 flex-1 flex-col" aria-label={say($lang, "mon_monitor")}>
   <header class="flex flex-wrap items-center gap-snug border-b border-edge bg-chrome px-pane py-snug text-note">
     <span class="text-label text-text">{say($lang, "mon_code")}</span>
-    <span class="text-text-faint figure">{fill(say($lang, "mon_files_n"), { n: String(trace.files.length) })}</span>
+    <span class="text-text-faint figure">{trace.files.length === 1 ? say($lang, "mon_files_one") : fill(say($lang, "mon_files_n"), { n: count(trace.files.length) })}</span>
     <button
       type="button"
       class="ms-auto inline-flex h-control-sm items-center rounded-control px-snug text-label {following === 'following'
