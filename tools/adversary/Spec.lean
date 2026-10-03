@@ -574,6 +574,8 @@ D3 **一个会应答的 provider 从 justfile 接收，不在本目录里起。*
 
 U9 不在这棵树里，它由 `just acceptance` 单独跑：第一天约 1.8 s，被杀那一步约 0.75 s，第二天早上约 2 s（debug 二进制，同一台四核 Windows）；协作那一串约 3.4 s，其中两个认领的 run 1.3 s，多半花在 `holdCalls` 上（debug 二进制，十六核 Windows）。
 
+**全新机器上的 U9 还没有读数。** `.github/workflows/on-demand.yml` 的 `fresh` 作业在 windows、macos、ubuntu 三个全新 runner 上各走一遍：打出发行归档，解进一个别的东西都没写过的目录，先在只有系统目录与归档目录的 PATH 上跑 `sprawling doctor`、记下它的退出码，再跑 `just acceptance <archive>`；runner 的账号有管理员权限，于是「没有管理员权限」只由那条窄 PATH 与空的 HOME 模拟。第一次运行里 macos 与 ubuntu 两行停在 doctor 那一步：步骤写的是 `set -uo pipefail`，而 `shell: bash` 本来就带 `-e`，doctor 报出缺一件开发工具、以非零退出时，步骤在记下退出码之前就结束了，`just acceptance` 一步都没走。作业现在写 `set +e`；能定下这一条的是下一次运行里每一行的 `checklist.md` 与 `doctor.exit`。
+
 **树里没有一条是被期待失败的。** 一条因为预期会红而被留下的检查，教会每一个看到它的人把红当成常态，于是下一个真的发现落进一次没人读的运行里。
 
 曾经红的那三条现在是绿的，两处修复都在 `crates/` 下（§4 第四、第五个发现）。当时留着它们而不是摘掉，理由在期限：被期待失败的检查，是没有修复日期的那一条；那三条点名了要改的那一处，红只活到修复落地为止。
