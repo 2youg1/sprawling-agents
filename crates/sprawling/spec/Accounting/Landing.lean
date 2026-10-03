@@ -47,6 +47,17 @@ structure Accounts where
   ledger : List Record
   frozen : Run → Bool
 
+/-! D37 落 run 的切线：读盘与写盘的重活在 lane 上，改写折叠的步骤留在记账线程上
+
+**决定**：`land` 的每一步按它读写的状态分成两半。只读这个 run 的 `Flown` 与盘、不碰记账线程任何折叠的步骤在 lane 上做完，然后才发 `Wake::Home`：transcript 的物化（往 lanes 共用的 CAS 里放字节、在房间旁写文件，诊断行经 lane 的 `Notes` 写出）与检查点清扫（`Checkpoint::wave_post`，把这次驱动删掉的文件对着它的第一道检查点比出来），结果随 `Flown::Model` 的 `swept` 回家。记账线程只把清扫结果折成记录草稿追加，再做改写折叠的步骤：房间队列与 backlog 成员的归还、三张 desk 的结算（信号、清扫行、计划认领）、评审请求、worktree 租约的归还、`conclude`（待答项、往下派活、接班、答复派活者）、`answer_knocks`、认领的归还与 `advance_pursuits`。今天的 `land` 里没有合并这一步；合并落地时（roadmap TF4）它属于 lane 那一半。三个平台相同：搬动的只是哪条 `std::thread` 调用同一个函数。
+
+**理由**：transcript 的物化与清扫的 diff 是 `land` 里仅有的两步与 run 的大小成正比的盘上工作，它们在记账线程上时，期间到达的 relay 请求都排在它们后面（`the_landing_work_never_delays_a_relay` 证明搬走之后 relay 在账本里的位置与它们多重无关）。留下的步骤每一步都改写一个只有记账线程持有的折叠，搬走它们就要给折叠第二个写者。租约的归还留下，是因为它必须排在清扫之后（§8-113），且只是解开一个 worktree 的锁。
+
+**被否**：①整个 `land` 搬进 lane：房间队列、认领簿与派活表就有了第二个写者；②把清扫留在记账线程、只搬 transcript：清扫的 diff 随 run 写过的文件数增长，是两步里更重的那一步。
+
+**重开参数**：吞吐台（roadmap TP1）在 relay 排队的 p99 里仍量到落 run 的一段时，逐步给留下的步骤计时，再议哪一步搬走。
+-/
+
 /-- 服务一条消息：追加它的记录；回家的 run 在它的记录追加之后才记成已冻结，两者是同一步。 -/
 def serve (a : Accounts) : Wake → Accounts
   | .relay d => { a with ledger := a.ledger ++ [d] }

@@ -1181,16 +1181,15 @@ pub(crate) struct Drained { pub(crate) written: Vec<EventDraft>, pub(crate) goal
 不会丢命令：命令在 desk 上，外层循环回来时先看 desk，再睡。这个枚举不叫 `Inbox`：词汇表里 Inbox 是
 Approval Inbox，人的待答队列。
 
-**落 run 的重活要离开记账线程（未定的接口）。** 代码里第二张嘴做的是整次落 run：`serve_flight` 取到一个 `Arrival`
-之后在记账线程上调 `RunWorker::land`，而 `land` 写 transcript、还树、答复派活者、往下派活；这期间到达的 relay
-请求排在队列里，等这一次落 run 做完。三张嘴的次序与 ARCHITECTURE §13.4 一致（relay 先、再至多一个回家、再 desk），
-问题不在次序，在第二张嘴上做的事有多重。目标的形状由 `crates/sprawling/spec/Accounting/Landing.lean` 定：重活
-（transcript、最后一道检查点、合并）在这个 run 的 lane 上做完，结果作为一组记录草稿随 `Wake::Home` 回来；记账线程
-只追加这组草稿，再把 run 记成已冻结。模型证明 relay 请求在账本里的位置与重活多重无关、记录仍只有一个追加者与一个全局
-次序、run 被看见冻结时它落 run 的记录已在账上、视图广播按帧取走全部未发记录且正在看的 session 先走。
-没定的是切线：`land` 里哪些步骤改写记账线程的折叠（房间队列的归还、认领的归还、`advance_pursuits`），它们必须留在
-记账线程上；哪些只读 `Flown` 与盘（transcript、合并），它们可以搬进 lane。判定的证据是逐步列出 `land` 每一步读写的
-状态，与 relay 排队的 p99/p999、记账线程忙占比在搬之前与之后的读数。
+**落 run 的重活不在记账线程上。** 第二张嘴取到一个 `Arrival` 之后在记账线程上调 `RunWorker::land`；transcript 的物化
+与检查点清扫在这之前已经在这个 run 的 lane 上做完（`Staged::fly` 在调 `home` 之前做），清扫结果随 `Flown::Model` 的
+`swept` 回家，于是 `land` 在记账线程上只把结果折成记录追加，并做改写折叠的那些步骤。切线与每一步留在哪一边的理由是
+`crates/sprawling/spec/Accounting/Landing.lean` 的 D37。三张嘴的次序与 ARCHITECTURE §13.4 一致（relay 先、再至多一个回家、
+再 desk）。模型证明 relay 请求在账本里的位置与重活多重无关、记录仍只有一个追加者与一个全局次序、run 被看见冻结时它
+落 run 的记录已在账上、视图广播按帧取走全部未发记录且正在看的 session 先走。由模型导出的 Rust 检查是
+`dispatching::preparing::tests::tp4_a_lane_keeps_the_transcript_before_its_run_comes_home`：run 回家的那一刻它的
+transcript 已经在盘上，所以记账线程的 `land` 里没有这一步。视图广播的按帧合并与「正在看的 session 先走」今天还没有
+实现：`serving::folding` 每一批折叠发一帧，服务端不知道 User 在看哪个 session；后者要一个 wire 字段，留给改得了帧的那一版。
 
 ### 8-42-5 被否决的备选
 
