@@ -213,7 +213,7 @@ status = "gated, with a register of the signatures that predate the rule"
 names = [
   "crates/collab/src/workshop.rs::new",            # 9
   "crates/collab/src/inbox.rs::new",               # 7
-  "crates/collab/src/signal_tool.rs::new",         # 6
+  "crates/collab/src/signal_desk.rs::new",          # 6
   "crates/runtime/src/turn.rs::assemble",          # 6
   "crates/accounting/src/effect.rs::of",            # 6
   "crates/accounting/src/effect.rs::shelf",         # 6
