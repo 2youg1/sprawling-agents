@@ -19,10 +19,17 @@ pub enum GateOutcome { Allow, Deny { refusal: Box<AxError> }, Ask { question: Bo
 
 pub fn domain(domain: &WriteDomain, target: &Address, taint: &TaintSet) -> GateOutcome;   // 判一个文件
 pub fn reach(domain: &WriteDomain, area: &Address, taint: &TaintSet) -> GateOutcome;      // 判一块声明的区域
+pub fn replacing(limit: WriteLimit, target: &Address) -> GateOutcome;  // 会动到已有文件的写；判定见 spec/WriteDomain.lean §8-78
 pub enum EgressTarget { Loopback, Private, Public { host: String },
                         Connector { label: ServerLabel } }   // 分类由效果层解好址后注入
 pub enum EgressOutcome { Allow { first_public_egress: bool }, Deny { refusal: Box<AxError> } }
 pub fn egress(spans: &[SecretSpan], target: &EgressTarget, prior_public_egress: bool) -> EgressOutcome;
+pub struct EgressAllowlist { /* suffixes —— 私有 */ }    // 楼的出网后缀表；空表＝不出公网（机密楼恰是它）
+impl EgressAllowlist {
+    pub fn new(entries: Vec<String>) -> EgressAllowlist;    // 去首尾空白与开头的点、转小写、排序去重：`.example.com` 与 `example.com` 是同一条
+    pub fn is_empty(&self) -> bool;  pub fn entries(&self) -> impl Iterator<Item = &str>;
+    pub fn admits(&self, host: &str) -> bool;              // 域名本身或其子域，按标签边界：`notexample.com` 不中 `example.com`
+}
 pub fn egress_target(list: &EgressAllowlist, target: &EgressTarget) -> EgressOutcome;
 pub fn discard(req: &DiscardRequest, action_desc: &str) -> GateOutcome;
 pub fn spawn(parent: Depth, kind: &DelegateKind) -> GateOutcome;      // E_DELEGATION_DEPTH 的塑形处
