@@ -7,8 +7,8 @@
 //! citysim D25 and D26): a coordinator that delegates three rooms, the
 //! turtle-soup game played between `hall/mayor` and `hall/clerk` under
 //! the asynchronous and the synchronous send, and the plan's
-//! scripts: a claim conflict between two residents
-//! and a re-dispatch after a failed child.
+//! scripts: a claim conflict between two residents, a re-dispatch
+//! after a failed child, and a verification that fails.
 //!
 //! The city is the product's, served through `attend`, the loop a city
 //! runs: lanes, the workbench, the signal desk, the delegate desk and
@@ -592,9 +592,44 @@ type Lines = Vec<(EventRecord, String)>;
 /// Serves the city through `attend`, posts `commands` in order, and reads the
 /// history until `done` holds, in counted looks.
 fn serve(
-    mut worker: RunWorker,
+    worker: RunWorker,
     ledger: &Path,
     commands: Vec<wire::Command>,
+    done: impl Fn(&Lines) -> bool,
+) -> Lines {
+    serve_in_turn(
+        worker,
+        ledger,
+        commands
+            .into_iter()
+            .map(|command| {
+                let now: Mark = Box::new(|_: &Lines| true);
+                (now, command)
+            })
+            .collect(),
+        done,
+    )
+}
+
+/// What the history must hold before a command is posted.
+type Mark = Box<dyn Fn(&Lines) -> bool>;
+
+/// Waits, in counted looks, until the history holds `mark`.
+fn look_until(ledger: &Path, mark: &dyn Fn(&Lines) -> bool) {
+    for _ in 0..3_000 {
+        if mark(&read(ledger)) {
+            return;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+}
+
+/// Serves the city through `attend`, posts each command once the history
+/// holds the mark beside it, and reads the history until `done` holds.
+fn serve_in_turn(
+    mut worker: RunWorker,
+    ledger: &Path,
+    steps: Vec<(Mark, wire::Command)>,
     done: impl Fn(&Lines) -> bool,
 ) -> Lines {
     let desk = Arc::new(CommandDesk::default());
@@ -602,15 +637,11 @@ fn serve(
         let desk = Arc::clone(&desk);
         std::thread::spawn(move || accounting::worker::attend::attend(&mut worker, &desk))
     };
-    for command in commands {
+    for (mark, command) in steps {
+        look_until(ledger, &mark);
         desk.post(command, wire::Reply::nowhere());
     }
-    for _ in 0..3_000 {
-        if done(&read(ledger)) {
-            break;
-        }
-        std::thread::sleep(Duration::from_millis(10));
-    }
+    look_until(ledger, &done);
     desk.close(Closing::Chosen);
     attending.join().unwrap();
     let lines = read(ledger);
@@ -812,6 +843,89 @@ fn a_room_delegated_again_after_its_child_failed_starts_under_the_same_parent() 
     );
 }
 
+/// Verification failure (`tools/citysim/Spec.lean` §16, citysim D26): in
+/// a building whose rules ask for review, the maker claims node 1,
+/// changes the kiln's notes in its own tree and offers the work; once the
+/// request is recorded, a second resident checks it and finds the done
+/// check failed. The request is rejected, nothing reaches the
+/// building, and the node is never finished: the maker froze with no
+/// evidence, so the node is blocked (`crates/kernel/spec/Plan.lean`).
+#[test]
+fn a_verification_that_fails_lands_nothing_and_finishes_no_node() {
+    let dir = tempfile::tempdir().unwrap();
+    let board = Arc::new(Board::default());
+    let (mut worker, ledger) = city(dir.path(), Planners(Arc::clone(&board)));
+    raise(&mut worker, "lab");
+    plan_lab(dir.path());
+    let lab = CityLayout::new(dir.path()).scope(&Address::parse("lab").unwrap());
+    // The User asks for review the way the User does: in the rules file.
+    std::fs::write(
+        lab.join(kernel::RESERVED_PREFIX).join("RULES.toml"),
+        "confidential = false\nwrite = \"everything\"\nreview = true\n",
+    )
+    .unwrap();
+    let notes = lab.join("kiln").join(NOTES);
+    std::fs::create_dir_all(notes.parent().unwrap()).unwrap();
+    std::fs::write(&notes, NOTES_BEFORE).unwrap();
+    *board.ledger.lock().unwrap() = Some(ledger.clone());
+    // The request is recorded when the maker's run lands, which can come
+    // after its freeze line, so the checker is sent once both are there.
+    let offered: Mark = Box::new(|lines: &Lines| {
+        quiet(lines)
+            && lines
+                .iter()
+                .any(|(record, _)| record.kind() == EventKind::PrOpened)
+    });
+    let lines = serve_in_turn(
+        worker,
+        &ledger,
+        vec![
+            (Box::new(|_: &Lines| true), dispatch("lab/kiln", MAKER)),
+            (offered, dispatch("lab/glaze", CHECKER)),
+        ],
+        |lines| frozen(lines) == 2 && quiet(lines),
+    );
+    let review = |line: &(EventRecord, String)| {
+        matches!(
+            line.0.kind(),
+            EventKind::PrOpened | EventKind::PrMerged | EventKind::PrRejected
+        )
+    };
+    assert_eq!(
+        (
+            plan_trace(&lines, |line| !review(line)),
+            lines
+                .iter()
+                .filter(|line| review(line))
+                .map(|(record, _)| format!("{:?}", record.kind()))
+                .collect::<Vec<_>>(),
+            std::fs::read_to_string(&notes).unwrap(),
+        ),
+        (
+            [
+                "RunStarted lab/kiln",
+                "RoadmapClaimed lab/kiln",
+                "ToolResult lab/kiln plan answered",
+                "RunFrozen lab/kiln done",
+                "RoadmapBlocked lab/kiln",
+                "RunStarted lab/glaze",
+                "RunFrozen lab/glaze done",
+            ]
+            .map(str::to_owned)
+            .to_vec(),
+            vec!["PrOpened".to_owned(), "PrRejected".to_owned()],
+            NOTES_BEFORE.to_owned(),
+        ),
+        "a failed check merges nothing, and the node its maker held is not finished"
+    );
+}
+
+/// The file the maker changes, in its room, and what it held before.
+const NOTES: &str = "notes.md";
+const NOTES_BEFORE: &str = "before\n";
+const MAKER: &str = "fire the kiln and offer it for review";
+const CHECKER: &str = "check the kiln work offered for review";
+
 const POTTER: &str = "fire the kiln as the potter";
 const GLAZER: &str = "fire the kiln as the glazer";
 const REDO: &str = "the kiln fired, delegated again if it cracks";
@@ -842,6 +956,23 @@ impl Board {
             .unwrap();
         drop(marks);
         assert!(!waited.timed_out(), "nobody marked {mark}");
+    }
+
+    /// The branch the one request in the history was opened on.
+    fn branch_opened(&self) -> String {
+        let ledger = self.ledger.lock().unwrap().clone().unwrap();
+        read(&ledger)
+            .iter()
+            .find(|(record, _)| record.kind() == EventKind::PrOpened)
+            .and_then(|(record, _)| {
+                record
+                    .data()
+                    .as_map()
+                    .get("branch")
+                    .and_then(Value::as_str)
+                    .map(str::to_owned)
+            })
+            .expect("the maker opened a request before the checker was sent")
     }
 
     /// Waits until `count` runs in `lab/kiln` have frozen.
@@ -901,6 +1032,8 @@ enum Part {
     Glazer,
     Lead,
     Child,
+    Maker,
+    Checker,
 }
 
 struct Planner {
@@ -956,14 +1089,46 @@ impl Model for Planner {
                 "the kiln cracked",
             )
             .with_recovery("delegate the room again")),
-            (Part::Potter | Part::Glazer | Part::Lead | Part::Child, _) => says("fired"),
+            (Part::Maker, 1) => claim_node_one(),
+            (Part::Maker, 2) => calls(
+                "edit",
+                json!({
+                    "path": format!("lab/kiln/{NOTES}"),
+                    "base_version": runtime::version_of(NOTES_BEFORE.as_bytes()),
+                    "old": "before",
+                    "new": "after",
+                }),
+            ),
+            (Part::Maker, 3) => calls("pr", json!({ "action": "open" })),
+            (Part::Checker, 1) => calls(
+                "pr",
+                json!({
+                    "action": "check",
+                    "branch": self.board.branch_opened(),
+                    "passed": false,
+                    "why": "the kiln cracked on the second firing",
+                }),
+            ),
+            (
+                Part::Potter
+                | Part::Glazer
+                | Part::Lead
+                | Part::Child
+                | Part::Maker
+                | Part::Checker,
+                _,
+            ) => says("fired"),
         }
     }
 }
 
 fn part_of(req: &ModelRequest) -> Part {
     let text = first_text(req);
-    if text.contains(POTTER) {
+    if text.contains(MAKER) {
+        Part::Maker
+    } else if text.contains(CHECKER) {
+        Part::Checker
+    } else if text.contains(POTTER) {
         Part::Potter
     } else if text.contains(GLAZER) {
         Part::Glazer
