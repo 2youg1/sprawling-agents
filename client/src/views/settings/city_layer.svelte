@@ -86,6 +86,7 @@
     <span class="text-note text-text-quiet">{say($lang, "city_effort")}</span>
     <Segmented
       label={say($lang, "city_effort")}
+      tone="accent"
       options={EFFORTS.map((each) => ({ value: each, label: say($lang, `effort_${each}`) }))}
       held={effort}
       onPick={(next: Effort) => {
