@@ -312,3 +312,75 @@ fn asking_for_rounds_answers_the_fold_the_view_layer_ran() {
         Some("src/lex.rs")
     );
 }
+
+/// One line drafted under `run` by `who`.
+fn drafted(run: RunId, who: &str, kind: EventKind, data: Payload) -> EventDraft {
+    EventDraft {
+        run,
+        t: TimeMs::new(9),
+        who: who.to_owned(),
+        addr: None,
+        kind,
+        data,
+        ig: false,
+    }
+}
+
+/// A sends to B's room under A's own run; B pulls it in its session.
+/// The rounds answer for B says A spoke, and what A said (wire D36).
+#[test]
+fn a_signal_pulled_from_another_session_says_who_sent_it_and_what() {
+    use kernel::Ledger;
+    use kernel::event::record::{SignalId, SignalKind};
+    let dir = tempfile::tempdir().unwrap();
+    let report = crate::worker::fixture::init_city(dir.path()).unwrap();
+    let (sender, receiver) = (RunId::from_bytes([1u8; 16]), RunId::from_bytes([2u8; 16]));
+    let mut ledger = storage::JsonlLedger::open(&report.ledger_dir, TimeMs::new(9))
+        .unwrap()
+        .0;
+    let mut said = serde_json::Map::new();
+    said.insert("text".to_owned(), serde_json::json!("the lexer is yours now"));
+    let signal = collab::Signal::new(
+        SignalId::parse("a-s1").unwrap(),
+        SignalKind::Mention,
+        "lab/a".to_owned(),
+        kernel::Address::parse("lab/b").unwrap(),
+        kernel::Version::FIRST,
+        Payload::new(said).unwrap(),
+        TimeMs::new(9),
+    )
+    .unwrap();
+    for draft in [
+        drafted(
+            sender,
+            "lab/a",
+            EventKind::SignalEnqueued,
+            signal.enqueued_payload().unwrap(),
+        ),
+        drafted(receiver, "lab/b", EventKind::ModelCalled, Payload::empty()),
+        drafted(
+            receiver,
+            "lab/b",
+            EventKind::SignalConsumed,
+            signal.consumed_payload("lab/b").unwrap(),
+        ),
+    ] {
+        ledger.append(draft).unwrap();
+    }
+    drop(ledger);
+
+    let mut views = crate::views::Views::rebuild(&report.ledger_dir).unwrap();
+    let wire::Answer::Rounds(answer) = views.answer(&wire::Query::Rounds { run: receiver }) else {
+        panic!("Rounds answers with rounds");
+    };
+    match answer.turns[0].notes.as_slice() {
+        [wire::Note::Arrived { from, said, .. }] => {
+            assert_eq!(
+                (from.as_str(), said.as_str()),
+                ("lab/a", "the lexer is yours now"),
+                "the sender and its words, not the receiver and nothing"
+            );
+        }
+        other => panic!("one arrival on the turn, got {other:?}"),
+    }
+}
