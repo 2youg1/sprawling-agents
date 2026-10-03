@@ -25,7 +25,9 @@ open Sprawling Sprawling.Acceptance
 private def usage : String :=
   "usage: acceptance script <shelf> <script.json>\n" ++
   "       acceptance walk <shelf> <script.json> <record.jsonl> <checklist.md>\n" ++
-  "SPRAWLING_BIN names the binary to walk, SPRAWLING_PROVIDER the stand-in's URL."
+  "SPRAWLING_BIN names the binary to walk, SPRAWLING_PROVIDER the stand-in's URL,
+" ++
+  "SPRAWLING_LAUNCHER, where set, the launcher that closes each city in order on Windows."
 
 /-- Writes the stand-in's script for the skills the archive's shelf holds. -/
 private def writeScript (shelf out : System.FilePath) : IO UInt32 := do
@@ -43,6 +45,12 @@ private def required (name : String) : IO String := do
 where
   absent := throw <| IO.userError s!"{name} is not set; run this through `just acceptance <archive>`"
 
+/-- The launcher the recipe names on Windows, or none (tools/adversary/Spec.lean D8). -/
+private def launcher : IO (Option System.FilePath) := do
+  match (← IO.getEnv "SPRAWLING_LAUNCHER").map (·.trimAscii.toString) with
+  | some named => if named.isEmpty then return none else return some named
+  | none => return none
+
 /-- Walks the archive's binary, says where the walk stopped if it did, and
 writes the person's checklist once it held. -/
 private def walkWith (shelf script record checklist : System.FilePath) : IO UInt32 := do
@@ -50,7 +58,7 @@ private def walkWith (shelf script record checklist : System.FilePath) : IO UInt
   if !(← binary.pathExists) then
     throw <| IO.userError s!"SPRAWLING_BIN names no file: {binary}"
   let setting : Setting :=
-    { door := ⟨binary⟩, url := ← required "SPRAWLING_PROVIDER", shelf
+    { door := { binary, launcher := ← launcher }, url := ← required "SPRAWLING_PROVIDER", shelf
     , skills := ← shipped shelf, script, record }
   try
     let hosts ← walk setting (knownHosts setting.door)

@@ -33,6 +33,11 @@ toml.workspace = true
 sha2.workspace = true
 zip.workspace = true
 
+# The launcher serve_grouped ties the city it starts to its own lifetime
+# through a job object (tools/adversary/Spec.lean D8).
+[target.'cfg(windows)'.dependencies]
+win32job = { workspace = true }
+
 [dev-dependencies]
 tempfile.workspace = true
 zeroize.workspace = true

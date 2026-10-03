@@ -139,13 +139,22 @@ def Serving.leave (serving : Serving) : Leaving → IO Unit
       if ← exited closingTries then
         return ()
       else
-        fallBack s!"it was still running {closingTries / 10} s after SIGINT"
+        fallBack s!"it was still running {closingTries / 10} s after it was asked to close"
 where
   /-- Asks the process to close in order, or says why that cannot be asked. -/
   interrupt : IO (Except String Unit) := do
+    match serving.closing with
+    | .launcher =>
+      try
+        serving.child.stdin.putStrLn "close"
+        serving.child.stdin.flush
+        return .ok ()
+      catch error => return .error s!"the launcher would not take the request: {error}"
+    | .interrupt => signal
+  signal : IO (Except String Unit) := do
     if System.Platform.isWindows then
-      return .error <| "on Windows the city closes in order only on a Ctrl-Break of its own console, "
-        ++ "and a Ctrl-Break on the console it shares with this walk would close the walk too"
+      return .error <| "on Windows the city closes in order only on a Ctrl-Break of its own process group, "
+        ++ "and no launcher was named through SPRAWLING_LAUNCHER to start it in one"
     let sent ← IO.Process.output
       { cmd := "kill", args := #["-s", "INT", toString serving.child.pid] }
     if sent.exitCode == 0 then

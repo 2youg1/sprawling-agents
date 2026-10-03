@@ -251,11 +251,12 @@ def decodeFrame  : String → Except String Frame
 def cityBuildings : Json → Option (List String)
 
 -- Door.lean —— 怎么问
-structure Door where binary : System.FilePath
+structure Door where binary : System.FilePath; launcher : Option System.FilePath := none  -- 启动器只在 Windows 的 U9 里给（D8）
+inductive Closing | interrupt | launcher         -- 怎样请一个被服务的进程有序关闭（D8）
 inductive Answer | accepted (frames : List Frame) | denied (complaint : Complaint) | quiet
 def discover     : IO (Option Door)
 def Door.raise   : Door → System.FilePath → IO Unit
-def Door.serve   : Door → System.FilePath → Port → System.FilePath → IO Serving  -- 城、端口、给城的 home
+def Door.serve   : Door → System.FilePath → Port → System.FilePath → IO Serving  -- 城、端口、给城的 home；有 launcher 时经它起城
 def Door.ask     : Door → Port → Verb → IO Answer
 def Door.verify  : Door → System.FilePath → IO (Except String Nat)
 def idemKey      : Nat → IdemKey
@@ -417,7 +418,7 @@ def writtenReadsBack  : Door → List Nat → IO Verdict
    - **第一天**（一次服务）：城答出它起城时的那栋 hall；替身被挂上、它的模型被选中；立一栋楼并被列出；人在楼的阅览室里准入每一件 skill；派活跑到脚本给的结尾并在盘上留下文件；run 钉住的 skill 恰是书架上的那些，按名读到的每一件以它自己的正文到达模型；模型拿到的目录里有脚本调用的每件工具；城列出的楼恰是历史创建过的楼；历史自证。
    - **进程被杀**（第二次服务）：派活，等那个 run 写下几条工具结果，然后结束进程。
 
-   第一次与第三次服务结束时城被有序关闭（D8，`Leaving.closedInOrder`）：macOS 与 Linux 上送 `SIGINT`，等进程自己退出；Windows 上、或十秒内没退出时，退回到结束进程，并在输出里印一行 `note` 说出退回与原因。只有第二次服务是被杀的。
+   第一次与第三次服务结束时城被有序关闭（D8，`Leaving.closedInOrder`）：macOS 与 Linux 上送 `SIGINT`，等进程自己退出；Windows 上配方经 `SPRAWLING_LAUNCHER` 交进 `tools/citysim` 的 `serve_grouped`，城由它起在自己的进程组里，走查向它写一行 `close`，它向那个组发 Ctrl-Break。没有启动器、请求发不出、或十秒内没退出时，退回到结束进程，并在输出里印一行 `note` 说出退回与原因。只有第二次服务是被杀的。
    - **第二天早上**（第三次服务）：被杀的城留下的历史自证；城再服务，新派的活跑到它自己的结尾；历史再自证。
    - **协作**（仍是第三次服务）：立第二栋楼 `beta`，人把它的 `review` 改成 true、在它的计划表里写下一行；`beta/planner` 认领那一行并把它分成两片叶子（分一行要先握着它，collab D6；§4 第八个发现）；`beta/left` 与 `beta/right` 同时派活、都去认第一片叶子，历史里只有一条认领；活重派到 `beta/left`，它认下第二片叶子、写一个文件、提出评审，文件不在城里；检查从历史读出那条请求的分支，把查它的 run 接到脚本后面（D7），派给 `beta/right`，它判不通过，历史里有一条以同一个分支、同一句理由被拒的记录，文件仍不在城里；历史再自证；最后问城 `known_hosts`。
 
@@ -476,7 +477,7 @@ D6 **验收世界在协作那一串里并发派活，仍走到第一处失败就
 
 D7 **城才知道的东西，检查从历史里读出来，再把要用它的 run 接到脚本后面。** 查一条请求要说出它的分支，分支名由城按房间地址的摘要取，而本目录不预测任何摘要（§2 第 3 条）。所以 `beta/left` 提出评审之后，检查从 `pr_opened` 读出分支，把整份脚本连同查它的那个 run 写回脚本文件，再派活给 `beta/right`；替身在新开的 run 找不到还没开启的 run 时重读这个文件（citysim D15），接上的 run 不改动已经在答的那些（`a_grown_script_answers_the_runs_it_held_alike`）。写回时没有别的 run 在开启：前一个 run 已经冻结，下一个活还没派。被否：把分支名写死在脚本里——那是在预测一个摘要；让替身从上一次工具结果里抄出分支——替身就在写自己的文字（citysim D11）；用 `pr list` 让模型自己看——脚本写好的回复不会读它拿到的结果。
 
-D8 **U9 只在第二次服务里杀城；第一次与第三次服务按人在键盘前的做法有序关闭，关不了才杀，并说出来。** 有序关闭让城写下交接、进程正常退出，于是交接那条路径被走到，而插桩的发行件（`just pgo-train`）只有正常退出才写出 profile：一个全被杀的走查对 PGO 一份都不贡献。macOS 与 Linux 上是对子进程 `kill -s INT <pid>`；之后每 100 毫秒问一次是否退出，十秒为限。Windows 上城只认它自己控制台上的 Ctrl-Break，而 Lean 的 `IO.Process.spawn` 不能让城另起一个进程组（`SpawnArgs.setsid` 在 POSIX 之外不起作用），在共享的控制台上发 Ctrl-Break 会连同走查本身与它上面的 `lake`、`just` 一起关掉；所以 Windows 上直接退回到结束进程，`note` 一行写明原因。这一条在 `Door.serve` 能把城起在自己的进程组里时重开（例如经一个用 `CommandExt::creation_flags` 设 `CREATE_NEW_PROCESS_GROUP` 的启动器，再向那个组发 Ctrl-Break）。退回只印一行而不报红：U9 判的是一个人第一天的路径，城怎样被这个检查器关掉不在那条路径上。被否：三次服务都有序关闭——第二次服务要的正是一次崩溃；关不了就报红——Windows 上每一跑都会红在检查器自己的缺口上。
+D8 **U9 只在第二次服务里杀城；第一次与第三次服务按人在键盘前的做法有序关闭，关不了才杀，并说出来。** 有序关闭让城写下交接、进程正常退出，于是交接那条路径被走到，而插桩的发行件（`just pgo-train`）只有正常退出才写出 profile：一个全被杀的走查对 PGO 一份都不贡献。macOS 与 Linux 上是对子进程 `kill -s INT <pid>`（`Closing.interrupt`），不经启动器；之后每 100 毫秒问一次是否退出，十秒为限。Windows 上城只认它自己控制台上的 Ctrl-Break，而 Lean 的 `IO.Process.spawn` 不能让城另起一个进程组（`SpawnArgs.setsid` 在 POSIX 之外不起作用），在共享的控制台上发 Ctrl-Break 会连同走查本身与它上面的 `lake`、`just` 一起关掉。所以 Windows 上城经启动器起（`Closing.launcher`）：`tools/citysim/src/bin/serve_grouped.rs` 用标准库的 `CommandExt::creation_flags` 设 `CREATE_NEW_PROCESS_GROUP` 起 `sprawling serve`，把它放进一个设了 kill-on-close 的 job（`win32job`，公开面是安全的），于是走查结束启动器时城随之结束、不留一个占着端口的孤儿；走查向启动器的 stdin 写一行 `close`，启动器向城的进程组发 Ctrl-Break，等城退出并以城的成败退出。发 Ctrl-Break 是唯一一次平台调用 `GenerateConsoleCtrlEvent`：没有一个公开面安全的 crate 提供它，Zig 叶子要为一个只在检查里用的启动器付等价检验、双侧 fuzz 与 Lean 边界证明，`unsafe` Rust 在工作区里是 `forbid`；所以启动器按 AGENTS.md 的第一条安全路径，经标准库的 `Command` 起 Windows 自带的 `powershell`，由它调用这个函数，`powershell` 与城共用启动器的控制台而不在城的组里。启动器在检查树之外、不进发行件（`xtask artifact`），配方只在 Windows 上经 `SPRAWLING_LAUNCHER` 交给 U9；没给时 Windows 退回到结束进程，`note` 一行写明原因。退回只印一行而不报红：U9 判的是一个人第一天的路径，城怎样被这个检查器关掉不在那条路径上。被否：三次服务都有序关闭——第二次服务要的正是一次崩溃；关不了就报红——一台没有控制台的 Windows 机器上每一跑都会红在检查器自己的缺口上；在 Lean 里调用 `GenerateConsoleCtrlEvent`——检查器不带 FFI（§13），而共享的控制台仍会把走查自己关掉。
 -/
 
 /-! ## 11 边界枚举

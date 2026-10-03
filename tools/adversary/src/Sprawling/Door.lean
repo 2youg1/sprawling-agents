@@ -25,6 +25,10 @@ open Lean (Json JsonNumber)
 /-- A binary that has already been built. -/
 structure Door where
   binary : System.FilePath
+  /-- The launcher that serves the city in a process group of its own, named
+  only where the acceptance walk closes cities in order on Windows
+  (tools/adversary/Spec.lean D8). -/
+  launcher : Option System.FilePath := none
 deriving Inhabited
 
 /-- Where a city is listening. -/
@@ -365,7 +369,7 @@ where
     | [] => return none
     | candidate :: rest => do
       if ← System.FilePath.pathExists candidate then
-        return some ⟨candidate⟩
+        return some { binary := candidate }
       else
         pick rest
 
@@ -409,11 +413,21 @@ private def drained (stream : IO.FS.Handle) : IO (IO String) := do
 
 /-- The pipes a served city is given. -/
 def servedStdio : IO.Process.StdioConfig :=
-  { stdin := .null, stdout := .piped, stderr := .piped }
+  { stdin := .piped, stdout := .piped, stderr := .piped }
 
-/-- A city that is being served, and the tail of what it complained about. -/
+/-- How a served process is asked to close in order (tools/adversary/Spec.lean D8). -/
+inductive Closing where
+  /-- `kill -s INT` to the city itself, which only macOS and Linux can send. -/
+  | interrupt
+  /-- The line `close` to the launcher, which sends Ctrl-Break to the city's
+  own process group. -/
+  | launcher
+
+/-- A city that is being served, how it is asked to close, and the tail of what
+it complained about. -/
 structure Serving where
   child : IO.Process.Child servedStdio
+  closing : Closing
   said : IO String
 
 /-- Starts serving a city, and hands back the process still running.
@@ -430,16 +444,19 @@ it was raised on rather than into the configuration of whoever is running this
 suite. Overriding only one of the two would leave the answer to the platform. -/
 def Door.serve (door : Door) (city : System.FilePath) (port : Port)
     (home : System.FilePath) : IO Serving := do
+  let served := #["serve", city.toString, s!"127.0.0.1:{port}", "--no-console"]
+  let (cmd, args, closing) := match door.launcher with
+    | some launcher => (launcher.toString, #[door.binary.toString] ++ served, Closing.launcher)
+    | none => (door.binary.toString, served, Closing.interrupt)
   let child ← IO.Process.spawn
-    { cmd := door.binary.toString
-    , args := #["serve", city.toString, s!"127.0.0.1:{port}", "--no-console"]
+    { cmd, args
     , env := #[("USERPROFILE", some home.toString), ("HOME", some home.toString)]
     , stdin := servedStdio.stdin
     , stdout := servedStdio.stdout
     , stderr := servedStdio.stderr }
   let _ ← drained child.stdout
   let said ← drained child.stderr
-  return { child, said }
+  return { child, closing, said }
 
 /-- Stops a served city and waits for it to be gone.
 

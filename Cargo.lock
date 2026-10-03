@@ -432,6 +432,7 @@ dependencies = [
  "sprawling-wire",
  "tempfile",
  "toml",
+ "win32job",
  "zeroize",
  "zip",
 ]

@@ -44,6 +44,7 @@ import tools.citysim.spec.WireScript.Exchange
 | `long_turn`、`bin/long_turn` | 长回合：一个 run 连续读一个在变的文件，逐次记下模型请求的字节上界；内存读数经 `just mem long-turn`（§8-9） | `spec/LongTurn.lean` |
 | `wire_script` | provider 线上 JSON 的脚本，与在回环地址上逐条回放它、把每次交换记进文件的替身（§8-10、§8-13） | `spec/WireScript.lean`、`spec/WireScript/Exchange.lean` |
 | `bin/provider` | 替身的进程：绑一个回环端口，印出 `SPRAWLING_PROVIDER=<url>`，然后回放（§8-10） | `spec/WireScript.lean` |
+| `bin/serve_grouped` | 启动器：把 `sprawling serve` 起在自己的进程组里（Windows 上 `CREATE_NEW_PROCESS_GROUP`，城再放进随启动器结束的 job），stdin 上一行 `close` 让它经 `powershell` 向那个组发 Ctrl-Break（别处是 `SIGINT`），stdin 关闭则结束城；只供 U9 与 `just pgo-train` 在 Windows 上有序关城。决定与被否的路径记在 `tools/adversary/Spec.lean` D8 | `tools/adversary/Spec.lean` |
 -/
 
 /-! ## 2 验收标准
