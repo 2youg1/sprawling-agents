@@ -29,7 +29,7 @@
 6. **每次等待都会结束**（`wait_bounded`、`waits_end`）：每个等待的 deadline 至多在此刻之后 `patience` 拍；时钟再走 `patience + 1` 拍后没有等待剩下。两个 run 互等也由此解开。
 7. **F8：被取消的 run 拿过的信重新投递**（`leave_requeues`、`consumed_stays`）：一个 run 无论以 Done、失败还是取消结束，它拿着而没被落账的回答读过的信回到房间队列，并为那个房间敲一次门；已消费的不再回来。
 
-`withoutRequeue_loses` 是咬得动的演示：照今天的代码在安全点取走即记消费，被取消的 run 拿走的那件就既不在队列里，也没有人读过。
+`withoutRequeue_loses` 是咬得动的演示：照 D8 否决的「取走即消费」在安全点取走就记消费，被取消的 run 拿走的那件就既不在队列里，也没有人读过。
 
 模型与平台无关：时间由注入的时钟一拍一拍走（`tick`），Windows、macOS、Linux 上同一段 trace 得同一个结果。
 -/

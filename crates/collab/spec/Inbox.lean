@@ -13,7 +13,7 @@
 四条性质：
 
 1. **重复投递不产生第二件**（`deliver_twice`）：同一件 Signal 投两次，与投一次得到同一个 Inbox。
-2. **lane 由 kind 推出**（`lane`）：急件 lane 恰是 `Steer`，于是「取一件能插队的东西」不需要再按 kind 筛一次（`takeSteer_is_steer`）。
+2. **lane 由 kind 推出**（`lane`、`delivered_sorted`）：任意一串投递之后，急件 lane 恰装 `Steer`，于是「取一件能插队的东西」不需要再按 kind 筛一次（`takeSteer_is_steer`）。
 3. **急件先出，一次最多 bandwidth 件**（`pull_bounded`、`pull_is_prefix`）：接收方的上下文窗口由接收方定上限，发送方推不动它。
 4. **拿掉去重，第二件就会出现**（`withoutSeen_duplicates`）：这是本模型咬得动的演示，见文末。
 
@@ -104,6 +104,13 @@ theorem deliver_sorted (q : Inbox) (s : Signal) (h : q.Sorted) : (q.deliver s).S
       rcases ht with ht | ht
       · exact o t ht
       · rw [ht]; exact not_steer
+
+/-- 从空 Inbox 出发，任意一串投递之后两条 lane 仍各装各的：`empty_sorted` 是起点，`deliver_sorted` 是一步。 -/
+theorem delivered_sorted (ss : List Signal) : (ss.foldl Inbox.deliver Inbox.empty).Sorted := by
+  suffices h : ∀ q : Inbox, q.Sorted → (ss.foldl Inbox.deliver q).Sorted from h _ empty_sorted
+  induction ss with
+  | nil => exact fun _ h => h
+  | cons s rest ih => exact fun q h => ih _ (deliver_sorted q s h)
 
 /-- `take_steer`：只从急件 lane 取一件。它不碰普通 lane，因为插队与拆信是两件事。 -/
 def Inbox.takeSteer (q : Inbox) : Option Signal × Inbox :=
