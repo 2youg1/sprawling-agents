@@ -1021,7 +1021,8 @@ pub(crate) enum Tree { Released, Stray(String) }
 pub(crate) fn run(command: Command, launch: &Launch) -> Result<Ran, XtaskError>;
 ```
 
-- **一页是一条路由在一个窗口里画出的样子，一页里的状态按屏往下拍。** 内容在 `<main>` 里滚动，所以先用 `--dump-dom` 开一次，量 `<main>` 的滚动高度与可见高度，得出要几屏（`fold`）；再每屏、每种光照开一次，用 `--screenshot` 拍下 `<main>` 滚到那一屏时的窗口。量的那一次同时记下每个顶层 `section[aria-label]` 的位置，索引里每张图后面列出落在这一屏里的状态名。文件名 `<route>-<fold 两位>-<宽>-<光照>.png`。
+- **一页是一条路由在一个窗口里画出的样子，一页里的状态按屏往下拍。** 内容在 `<main>` 里滚动，所以先用 `--dump-dom` 开一次，量 `<main>` 的滚动高度与可见高度，得出要几屏（`fold`）；再每屏、每种光照开一次，用 `--screenshot` 拍下 `<main>` 滚到那一屏时的窗口。量的那一次同时记下每个顶层 `section[aria-label]` 的位置，索引里每张图后面列出落在这一屏里的状态名。文件名 `<route>-<fold 两位>-<宽>-<光照>.png`。一页最多拍 `MOST_FOLDS` = 200 屏，主区比这更高的页被当成不停长高的页，第 200 屏之后不拍；索引上这一页的每一行写「第 n 屏，共 200 屏」，运行的输出不单独点名被截断的页。`#/gallery` 在 1440 宽时已超过 200 屏，RefRain 与格式的夹具落在截断之后。
+- **滚到一屏之后，等那一屏画完两帧再读、再拍。** 插进页面的脚本把 `<main>` 滚到这一屏后，先等一轮 IntersectionObserver，再等两帧 `requestAnimationFrame`，然后才写下量到的高度与各状态的位置；拍图的那一次也等同样的两帧。等的时候它一直让一次加载在途：把页面自己的副本 `sprawling-shots.html?hold=<n>` 当图片取，一次落地就取下一次，至多 `MOST_HOLDING_LOADS` = 100 次。没有加载在途时，引擎的虚拟时钟从一个计时器直接跳到下一个，中间不出帧；有加载在途时时钟停住、帧照常来，每次加载落地时钟走 10 ms，所以一张图至多多走约一秒虚拟时间，一页永远不出帧也不会让这一例停住。决定见 D25。
 - **光照经引擎的配色偏好给，不改页面。** 每次开页用一个新的引擎资料目录，页面里的光照设置因此是缺省的 `system`，按 `prefers-color-scheme` 画；引擎开关 `--blink-settings=preferredColorScheme=0` 是暗、`=1` 是亮。这台机器自己的明暗设置于是不影响结果：不带这个开关时，无头引擎跟着操作系统走。
 - **两种来源**：缺省开 `just build-web` 产出的包，与 `render` 一样给包旁边写一份插了脚本的副本（`sprawling-shots.html`，带 `render::engine::preloads` 给出的预取行），跑完删掉；给了 `--origin` 时，路由页开 `<origin>/#/<route>`，那是一座正在服务的城，页面上是真数据，页面不能插脚本，所以每页只拍一屏。
 - **拍完核对**：每张计划中的图都要在、都不为空，否则整次运行以 `XtaskError::Cmd` 失败并列出缺的文件名——引擎有时退出了却没写图，一份缺图的索引读起来像是那一页什么都没有。
@@ -1029,11 +1030,13 @@ pub(crate) fn run(command: Command, launch: &Launch) -> Result<Ran, XtaskError>;
 - **一例超时就杀整棵树，重拍一次，点名这一例。** 一例（量一次屏或拍一张图）超过 `CASE_PATIENCE` 就杀掉引擎的进程树——Windows 用 `taskkill /T /F /PID <pid>`，macOS 与 Linux 把引擎放进自己的进程组（`CommandExt::process_group(0)`）再 `kill -KILL -- -<pid>`——然后同一例重来一次，重拍的 stderr 写进 `<图名>.retry.log`。第二次也失败时整次运行以 `XtaskError::Cmd` 失败，`cmd` 点名这一例，`msg` 给出两次各自的原因；重拍成功的例在输出里逐个列出。
 - **失败**：没有包时 `XtaskError::Doc`，recovery 是 `just build-web`；没有引擎时 `XtaskError::Doc`，recovery 是装一个 Chromium 一族的浏览器或设 `SPRAWLING_BROWSER`；读不出 `BARE` 时 `XtaskError::Doc` 点名 `route.ts`；引擎失败沿用 `render::engine::launch::run` 的 `XtaskError::Cmd`。
 
-**测试**：`shots::pages::tests::every_route_gets_four_pictures_and_a_missing_one_is_named`：一份夹具 `route.ts` 读出的每条路由，在两个宽度、两种光照下各有一张图，夹具目录里缺一张时 `missing` 恰好点名那一张。`shots::case::tests`：`twice` 第一次失败第二次成功时报 `Took::Retried`，两次都失败时的错误点名这一例。`render::engine::launch::tests` 用测试二进制自己当夹具进程：stderr 进了 `KeptIn` 的文件；一个超时的进程连同它的子进程被杀掉，管道随即关闭；`AwaitTree` 收得到辅助进程在浏览器退出之后才写的输出。真跑要先 `just build-web`，归整合者或前端会话。
+**测试**：`shots::camera::tests::a_fold_is_read_after_the_frames_its_scroll_brings` 用这台机器上的引擎开一页夹具：夹具里唯一的状态在脚本滚动之后才开始看自己，看见之后的下一帧才给自己挂上 `aria-label`（CodeMirror 只在编辑器进入视口之后的帧里量自己，夹具照这个样子做），量出来的读数里要有这个状态；找不到引擎时 `render` 门已经失败，这个测试没有东西可开，直接结束。`shots::pages::tests::every_route_gets_four_pictures_and_a_missing_one_is_named`：一份夹具 `route.ts` 读出的每条路由，在两个宽度、两种光照下各有一张图，夹具目录里缺一张时 `missing` 恰好点名那一张。`shots::case::tests`：`twice` 第一次失败第二次成功时报 `Took::Retried`，两次都失败时的错误点名这一例。`render::engine::launch::tests` 用测试二进制自己当夹具进程：stderr 进了 `KeptIn` 的文件；一个超时的进程连同它的子进程被杀掉，管道随即关闭；`AwaitTree` 收得到辅助进程在浏览器退出之后才写的输出。真跑要先 `just build-web`，归整合者或前端会话。
 
 **本节属门禁机具，与产品代码分开提交。**
 
 D10 **截图矩阵是给人看的产物，不是门。** `cargo xtask shots`（§8-44）不进 `gates::GATES`，不断言任何性质，也不比较两张图：它产出每一页在两个宽度、两种光照下的 PNG 与一份索引，给改画面的人与验收的人逐张看。理由与 `render` 断性质、不断图片（本规格的「`render`」一节）是同一条：截图对比会被字体 hinting 弄红，也放过没人拍过的错版面，所以机器判性质，人判图片，两件事各有一个工具。页面清单不另写一份：路由取 `client/src/core/route.ts` 里 `BARE` 那张表的键，一个页面里的状态取画出来的页面上每个带 `aria-label` 的顶层 `section`（`#/gallery` 的每个夹具就是这样画的），所以前端改了外壳或加了夹具，这个工具不用跟着改。浏览器只经 `render::engine::browser` 找，与 `render` 门在同样的地方找同样的牌子。被击败的备选：①把截图当 `render` 的第六次开页——门就要为一件不判的事多开一次引擎，门名册上也多一个不会变红的步骤；②在 xtask 里写一张页面清单——前端加一条路由而这里没加，那一页就悄悄没有图。
+
+D25 **截图等滚动之后的两帧，等的时候用一次在途的加载停住虚拟时钟。** CodeMirror 编辑器只在进入视口之后的帧里量自己（IntersectionObserver 的回调要求量，下一帧的 `requestAnimationFrame` 才量），而 `--virtual-time-budget` 下的引擎在没有加载在途时从一个计时器跳到下一个、中间不出帧，所以滚到一屏之后预算可能先用完，行号栏留着估计的行高——画廊里 RefRain 的几屏就是这样拍坏的。脚本因此滚完之后等一轮 IntersectionObserver 和两帧，并在等的时候让一次加载一直在途，把时钟停住、让帧进来。被击败的备选：①用 `setTimeout` 等——计时器正是虚拟时钟跳过去的东西，等多久都不出帧；②加大 `render::engine::BUDGET_MS`——两个工具开页的方式要一致，而且更大的预算只是让时钟跳得更远，并不多给一帧；③在客户端给 CodeMirror 一个同步量的钩子——为了截图改产品代码，且每一种只在视口里量的部件都要一个钩子。重议的参数：引擎改用由调用方发帧的模式（BeginFrame 控制），或页面有办法告诉 `--screenshot` 何时拍。
 -/
 
 /-! ### 8-45 `wiring::class`：§19-2 的 `class` 列与中继的匹配是一个决定（形状 1 判定）
