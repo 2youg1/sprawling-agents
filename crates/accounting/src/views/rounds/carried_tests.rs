@@ -256,6 +256,23 @@ fn a_turn_carries_cache_reads_and_cache_writes_apart() {
         .expect("usage is on the wire");
     assert_eq!(
         (used.cached, used.cache_write),
-        (wire::Tokens::new(800), Some(wire::Tokens::new(150)))
+        (Some(wire::Tokens::new(800)), Some(wire::Tokens::new(150)))
     );
+}
+
+/// A provider that reports no cache counts leaves the line without
+/// them; the turn says the counts are unknown, so a page cannot show a
+/// 0% hit for a cache nobody measured (`crates/wire/spec/Reading.lean` D35).
+#[test]
+fn a_turn_whose_provider_reported_no_cache_counts_leaves_them_unknown() {
+    let returned = record(
+        2,
+        EventKind::ModelReturned,
+        serde_json::json!({ "message": { "content": [] }, "calls": 0, "usage": {
+            "input_tokens": 1200, "output_tokens": 340, "v": 1 } }),
+    );
+    let used = turns(&[asked(1), returned])[0]
+        .used
+        .expect("usage is on the wire");
+    assert_eq!((used.cached, used.cache_write), (None, None));
 }

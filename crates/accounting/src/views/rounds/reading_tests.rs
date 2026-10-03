@@ -89,7 +89,7 @@ fn a_turn_says_what_the_model_said_and_what_it_cost() {
     let used = folded[0].used.expect("usage is on the wire");
     assert_eq!(used.input, Tokens::new(1200));
     assert_eq!(used.output, Tokens::new(340));
-    assert_eq!(used.cached, Tokens::new(800));
+    assert_eq!(used.cached, Some(Tokens::new(800)));
 }
 
 /// Thinking blocks are carried end to end so the provider can verify

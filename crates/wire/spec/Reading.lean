@@ -33,7 +33,7 @@ pub struct Call { pub tool: String, pub subject: Option<String>,
                   pub outcome: Outcome, pub at: Seq, pub output: Option<Output> }
 pub enum Outcome { Waiting, Answered, Failed }
 pub struct Output { pub head: String, pub cut: usize }
-pub struct Used { pub input: Tokens, pub output: Tokens, pub cached: Tokens }
+pub struct Used { pub input: Tokens, pub output: Tokens, #[serde(default)] pub cached: Option<Tokens> }  // D35
 pub enum Note { Refused { error: AxError, at: Seq }, Checkpointed { oid: GitOid, at: Seq },
                 Waiting { at: Seq }, Arrived { from: String, said: String, at: Seq },
                 Discarded { count: usize, at: Seq }, Unreadable { cause: String, at: Seq } }
@@ -196,8 +196,8 @@ pub struct Output {
 
 ```rust
 pub struct Used {
-    // …既有字段…（`cached` 是缓存读，即 `kernel::ModelUsage::cache_read_tokens`）
-    #[serde(default)] pub cache_write: Option<Tokens>,   // 缓存写，即 `ModelUsage::cache_write_tokens`
+    // …既有字段…（`cached` 是缓存读，即 `kernel::ModelUsage::cache_read_tokens` 报了的数，没报时缺席，D35）
+    #[serde(default)] pub cache_write: Option<Tokens>,   // 缓存写，即 `ModelUsage::cache_write_tokens` 报了的数，没报时缺席
 }
 pub struct Call {
     // …既有字段…
@@ -295,6 +295,17 @@ pub struct FrozenNames {
 **重开参数**：一次查询在一座大城里要读的行多到答复超过 100 ms 时，把折叠改成随账本增量维护；User 要求按本地日历日看时，加一个由页面送来的 UTC 偏移参数。
 
 **三个平台**：折叠只读账本，三个平台相同；CSV 的 `\r\n` 是 RFC 4180 的规定，与平台无关。
+-/
+
+/-! D35 `Used` 的两个缓存数，provider 没报时缺席
+
+**决定**：`Used.cached` 是 `#[serde(default)] Option<Tokens>`，与 `cache_write` 同形：`kernel::CacheCount::Reported(n)` 读成 `Some(n)`，`Unreported` 读成 `None`（kernel D36）。`cache_write` 的 `None` 原来只表示「旧城的帧」，现在同时表示「provider 没报」，两者对页面是同一件事：不知道。页面在 `None` 处写 `lang.json` 里的「未知」字样，而不是 0 或 0%。这一改形与本版其他改形同一次 `WIRE_V` 进位（D22）。三个平台上形状相同。
+
+**理由**：线上的 0 页面只能照写成「命中 0%」，而一个从不报缓存的 provider 的命中率是不知道，不是零；把这个区别在线上丢掉，kernel 记下它就没有用处。
+
+**被否**：①线上照旧写 0、另加一个「报了没有」的布尔：读者照样会先读到那个 0；②`cached` 保持必有、只让 `cache_write` 可缺：缓存读正是页面算命中率的那个数。
+
+**重开参数**：provider 开始分别报告「没有缓存功能」与「有缓存但这次没报」时，`None` 拆成两臂。
 -/
 
 /-! D34 一个停在同步 `send` 上的 run，在 `RunSummary` 上多一个 `waiting`；`send` 的 `wait` 是工具参数，不是线上帧

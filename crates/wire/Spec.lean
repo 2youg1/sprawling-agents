@@ -350,6 +350,7 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 | D32 | `InstallSkill` 是往书架上加 skill 的命令，来源是一个四臂的值 | `crates/wire/spec/Command.lean` |
 | D33 | skill 与 MCP 的使用各从哪一行折出、按天怎么数、怎样导出 | `crates/wire/spec/Reading.lean` |
 | D34 | 停在同步 `send` 上的 run 在 `RunSummary` 上多一个 `waiting`；`wait` 是工具参数 | `crates/wire/spec/Reading.lean` |
+| D35 | `Used` 的两个缓存数在 provider 没报时缺席，页面写「未知」 | `crates/wire/spec/Reading.lean` |
 -/
 
 /-! ## 13 依赖选型

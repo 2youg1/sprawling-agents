@@ -179,8 +179,10 @@ mod tests {
         assert!(err.subject().contains("pause_turn"));
     }
 
+    /// A cache count the provider left out is not a zero hit (kernel D36);
+    /// a count it must report reads as zero when absent.
     #[test]
-    fn missing_usage_fields_read_as_zero() {
+    fn missing_cache_counts_read_as_unreported() {
         let wire = json!({
             "content": [ { "type": "text", "text": "hi" } ],
             "stop_reason": "end_turn",
@@ -188,10 +190,33 @@ mod tests {
         });
         let resp = response_from_wire(DialectKind::Anthropic, &wire).unwrap();
         assert_eq!(
-            resp.usage.cache_read_tokens,
-            CacheCount::Reported(Tokens::new(0))
+            (resp.usage.cache_read_tokens, resp.usage.cache_write_tokens),
+            (CacheCount::Unreported, CacheCount::Unreported)
         );
         assert_eq!(resp.usage.input_tokens, Tokens::new(7));
+        let responses = json!({
+            "output": [], "status": "completed",
+            "usage": { "input_tokens": 7, "output_tokens": 3 },
+        });
+        let chat = json!({
+            "choices": [ { "message": { "role": "assistant", "content": "hi" }, "finish_reason": "stop" } ],
+            "usage": { "prompt_tokens": 7, "completion_tokens": 3,
+                       "prompt_tokens_details": { "cached_tokens": 0 } },
+        });
+        let read = |dialect, wire: &Value| {
+            let usage = response_from_wire(dialect, wire).unwrap().usage;
+            (usage.cache_read_tokens, usage.cache_write_tokens)
+        };
+        assert_eq!(
+            [
+                read(DialectKind::OpenAiResponses, &responses),
+                read(DialectKind::OpenAi, &chat),
+            ],
+            [
+                (CacheCount::Unreported, CacheCount::Unreported),
+                (CacheCount::Reported(Tokens::new(0)), CacheCount::Unreported),
+            ]
+        );
     }
     /// Anthropic counts only the uncached input in `input_tokens`; the
     /// city's count is the whole prompt, as both OpenAI faces report it.

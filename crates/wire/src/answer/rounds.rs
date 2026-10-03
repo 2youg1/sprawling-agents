@@ -148,13 +148,16 @@ pub struct Used {
     pub input: Tokens,
     pub output: Tokens,
     /// The part of `input` read from the provider's cache
-    /// (`kernel::ModelUsage::cache_read_tokens`).
-    pub cached: Tokens,
+    /// (`kernel::ModelUsage::cache_read_tokens`); `None` when the provider
+    /// did not report it, which a page shows as unknown rather than zero
+    /// (`crates/wire/spec/Reading.lean` D35).
+    #[serde(default)]
+    pub cached: Option<Tokens>,
     /// The part of `input` written into the provider's cache
     /// (`kernel::ModelUsage::cache_write_tokens`), priced apart from a
-    /// read. Always present beside the other three in this build; absent
-    /// only in a frame from a city written before it was answered
-    /// (`crates/wire/Spec.lean` D13).
+    /// read. `None` when the provider did not report it, and in a frame
+    /// from a city written before it was answered (`crates/wire/Spec.lean`
+    /// D13, D35).
     #[serde(default)]
     pub cache_write: Option<Tokens>,
     /// Whole microseconds from the attempt going out to the reply's first
