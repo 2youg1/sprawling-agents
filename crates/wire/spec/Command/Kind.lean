@@ -54,6 +54,16 @@
 - `class` 只判 Command。`Ask` 与 `Monitor` 两种帧属 `Read`；设备发来的 `Hello` 由中继换成城自己的令牌再发（§8-66）；远程门自己的动词（开门、配对、撤销）不在线上，表里没有它们（remote_access D4）。
 - 这一列是权威，中继按它判，`xtask wiring` 把表与中继的穷尽匹配（`bin::outside::verbs::command_class`）逐行对照（§8-65）。
 
+**远程门的三个动词尚不在线上。** 设置页要开关远程门、更换城钥匙（Roadmap 的 A7），它们上线时是下面三行；在那之前 `inductive Command` 没有它们，`xtask wiring` 与 `specalign` 照旧对照今天的枚举。
+
+| Command | 载荷 | reach | class | 执行者做的事 |
+|---|---|---|---|---|
+| `OpenRemoteDoor` | `lasting_ms: u64`（一分钟到七天，与控制台 `--for` 同一条界） | `client` | `LocalOnly` | `Doorway::open` 与远程监听，同 `/remote open`（`crates/sprawling/spec/Outside.lean` §8-140） |
+| `CloseRemoteDoor` | 无 | `client` | `LocalOnly` | `Doorway::close(Console)`，同 `/remote close` |
+| `ReplaceCityKey` | 无 | `client` | `LocalOnly` | `Doorway::replace_key`，同 `/remote replace-key`；门开着时以 `E_BUSY` 拒 |
+
+三行都是 `LocalOnly`：一台远程设备开不了门、换不了钥匙，不论它的权限，因为门要保护的正是从城外来的那一端。它们上线之前要先改写 remote_access D4：D4 今天说开门、配对、撤销只在控制台，理由是 agent 拿到的浏览器工具能驱动本地页面，一个页面上的开关它也点得到。改写 D4 要回答的就是这一点：本地页面发来的这三条帧，与 agent 的浏览器工具发来的同样三条，执行者如何区分，或者为什么不必区分。配对（发邀请）是同一个问题，A7 要求设置页也能配对时一并回答。
+
 **`client` 而尚未落地的三个**（`HandOff`／`PutShelved`／`BatchByBuilding`）今天由 `not_built` 作答，
 所以门对它们要求的是**客户端不画**——`not_built` 的 rustdoc 说的就是这件事，现在有机器看着了。
 它们的 reach 仍写 `client`，因为那是它们做完之后该去的地方；写成别的取值等于把「还没做」记成「不该做」。
