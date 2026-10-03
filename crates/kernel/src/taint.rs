@@ -179,6 +179,27 @@ mod tests {
     }
 
     proptest! {
+        /// A set built by union holds exactly the labels it was built
+        /// from, in sorted order, and says so in one comma-separated
+        /// line: the wording every C15 refusal gives for where content
+        /// came from.
+        #[test]
+        fn a_set_holds_and_names_exactly_its_sources(
+            labels in proptest::collection::btree_set("[a-z]{1,6}", 0..5),
+            stranger in "[A-Z]{1,6}",
+        ) {
+            let set = labels
+                .iter()
+                .map(|label| TaintSet::of(source(label)))
+                .fold(TaintSet::empty(), |all, one| all.union(&one));
+            let named: Vec<&str> = set.sources().map(TaintSource::as_str).collect();
+            let expected: Vec<&str> = labels.iter().map(String::as_str).collect();
+            prop_assert_eq!(&named, &expected);
+            prop_assert_eq!((set.len(), set.is_empty()), (labels.len(), labels.is_empty()));
+            prop_assert!(!set.contains(&source(&stranger)));
+            prop_assert_eq!(set.to_string(), expected.join(", "));
+        }
+
         /// The kani mirror (union monotonicity), runnable on every host.
         #[test]
         fn join_output_contains_both_inputs(labels_a in proptest::collection::vec("[a-z]{1,8}", 1..4),

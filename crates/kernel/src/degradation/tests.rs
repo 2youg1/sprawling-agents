@@ -166,3 +166,29 @@ fn the_floor_is_a_share_of_the_volume_clamped_at_both_ends() {
     assert_eq!(free_space_floor(100 * GIB), 2 * GIB);
     assert_eq!(free_space_floor(u64::MAX), FREE_SPACE_FLOOR_MAX);
 }
+
+/// Each line is crossed only by going past it: a reading that sits
+/// exactly on its line is calm, so a resource working at its limit is not
+/// reported as the bottleneck and the state does not flap there.
+#[test]
+fn a_reading_exactly_on_its_line_is_calm() {
+    let on_the_lines = ResourceReadings {
+        durable_lag: Duration::from_millis(5) * DISK_SLOW_FACTOR,
+        commit_floor: Duration::from_millis(5),
+        volume: VolumeSpace {
+            free_bytes: free_space_floor(1000 * GIB),
+            total_bytes: 1000 * GIB,
+        },
+        schedule_delay: CPU_SATURATED_DELAY,
+        ..calm()
+    };
+    let at_the_slow_line = ResourceReadings {
+        durable_lag: DISK_SLOW_MIN,
+        ..calm()
+    };
+    assert_eq!(
+        (verdict(&on_the_lines), verdict(&at_the_slow_line)),
+        (vec![], vec![])
+    );
+    assert_eq!(admit_work(on_the_lines.volume), Ok(()));
+}

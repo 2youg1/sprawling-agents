@@ -79,3 +79,43 @@ fn the_attach_door_asks_then_allows_loopback_then_refuses_a_network() {
         GateOutcome::Deny { .. }
     ));
 }
+
+/// Each private range of RFC 1918 and the link-local range is the
+/// private network on its own, and an address just outside every one of
+/// them is a public host: one octet does not make a range.
+#[test]
+fn each_private_range_is_private_on_its_own() {
+    for host in [
+        "10.1.2.3",
+        "192.168.0.9",
+        "172.16.0.1",
+        "172.31.255.1",
+        "169.254.1.1",
+    ] {
+        assert_eq!(target_of(host), EgressTarget::Private, "{host}");
+    }
+    for host in [
+        "11.1.2.3",
+        "192.169.0.9",
+        "193.168.0.9",
+        "172.32.0.1",
+        "173.16.0.1",
+        "169.255.1.1",
+        "170.254.1.1",
+    ] {
+        assert_eq!(
+            target_of(host),
+            EgressTarget::Public {
+                host: host.to_owned()
+            },
+            "{host}"
+        );
+    }
+}
+
+/// An allowlist is empty exactly when nothing was entered on it.
+#[test]
+fn an_allowlist_is_empty_only_when_nothing_was_entered() {
+    assert!(EgressAllowlist::new(Vec::new()).is_empty());
+    assert!(!EgressAllowlist::new(vec!["example.com".to_owned()]).is_empty());
+}

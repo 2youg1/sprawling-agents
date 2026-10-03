@@ -58,3 +58,19 @@ fn a_shelved_entry_writes_the_bytes_the_shelf_wrote() {
     assert_eq!(bytes(&Payload::of(&typed).unwrap()), SHELVED);
     assert_eq!(line(SHELVED).read::<AssetArchived>().unwrap(), typed);
 }
+
+/// An entry that names no kind is a fact, the kind an unmarked entry has
+/// always been shown as.
+#[test]
+fn an_entry_that_names_no_kind_is_a_fact() {
+    assert_eq!(
+        line(r#"{"day":3,"subject":"s"}"#)
+            .read::<AssetArchived>()
+            .unwrap(),
+        AssetArchived {
+            kind: "fact".to_owned(),
+            day: 3,
+            subject: "s".to_owned(),
+        }
+    );
+}

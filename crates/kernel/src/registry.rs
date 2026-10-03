@@ -248,6 +248,49 @@ mod tests {
         assert!(registry.is_asset(&locator()));
     }
 
+    /// The registry answers yes only for what it holds, and what it holds
+    /// moves one step at a time: a registered artifact is found but is no
+    /// asset until promoted, and a promoted `file:` asset makes its own
+    /// address an asset and no other.
+    #[test]
+    fn each_query_answers_for_what_the_registry_holds_and_nothing_else() {
+        let held = Locator::parse(&format!("file:lab/notes.md@{}", "ab".repeat(20))).unwrap();
+        let place = crate::address::Address::parse("lab/notes.md").unwrap();
+        let elsewhere = crate::address::Address::parse("lab/other.md").unwrap();
+        let resident = ResidentId::new("worker@sim.1").unwrap();
+        let mut registry = Registry::new();
+        let ask = |registry: &Registry| {
+            (
+                registry.artifact(&held).cloned(),
+                registry.is_asset(&held),
+                registry.is_asset_at(&place),
+                registry.is_asset_at(&elsewhere),
+                registry.is_resident(&resident),
+            )
+        };
+        assert_eq!(ask(&registry), (None, false, false, false, false));
+        let artifact = Artifact::verify(
+            Claim {
+                locator: held.clone(),
+                by: "worker@sim.1".into(),
+            },
+            evidence(EventKind::ToolResult),
+        )
+        .unwrap();
+        registry.register_artifact(artifact.clone());
+        assert_eq!(
+            ask(&registry),
+            (Some(artifact.clone()), false, false, false, false)
+        );
+        registry.promote_asset(&held).unwrap();
+        assert_eq!(
+            ask(&registry),
+            (Some(artifact.clone()), true, true, false, false)
+        );
+        registry.register_resident(ResidentId::new("someone@else").unwrap());
+        assert_eq!(ask(&registry), (Some(artifact), true, true, false, false));
+    }
+
     #[test]
     fn the_census_deduplicates() {
         let mut registry = Registry::new();

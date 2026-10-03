@@ -244,3 +244,35 @@ fn read_lends_the_payload_instead_of_copying_it() {
         Payload::new(Map::from_iter([("body".to_owned(), json!("x".repeat(64)))])).unwrap();
     assert_eq!(payload.read::<Held>().unwrap(), Held { body: Handed::Lent });
 }
+
+/// A record keeps every field its draft said, and a payload hands back
+/// the map it was made from: what the ledger reads is what was appended.
+#[test]
+fn a_record_reads_back_what_its_draft_said() {
+    let mut map = Map::new();
+    map.insert("tool".into(), json!("exec"));
+    map.insert("args".into(), json!({"cmd": ["ls"]}));
+    let data = Payload::new(map.clone()).unwrap();
+    for (who, addr, ig) in [
+        ("lab/worker", Some("lab/room1"), true),
+        ("city", None, false),
+    ] {
+        let addr = addr.map(|raw| Address::parse(raw).unwrap());
+        let record = EventRecord::from_draft(
+            EventDraft {
+                who: who.to_owned(),
+                addr: addr.clone(),
+                data: data.clone(),
+                ig,
+                ..draft(EventKind::ToolCalled)
+            },
+            Seq::FIRST,
+            crate::ledger::GENESIS_PREV,
+        );
+        assert_eq!(
+            (record.who(), record.addr(), record.ig(), record.kind()),
+            (who, addr.as_ref(), ig, EventKind::ToolCalled)
+        );
+        assert_eq!(record.data().clone().into_map(), map);
+    }
+}

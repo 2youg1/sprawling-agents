@@ -113,3 +113,37 @@ proptest::proptest! {
         let _ = Locator::parse(&s);
     }
 }
+
+/// A malformed range bound is refused with the rule it broke, which is
+/// what the writer of the locator fixes: a missing bound is not a number,
+/// and `01` is a number written with a leading zero.
+#[test]
+fn a_refused_range_bound_names_the_rule_it_broke() {
+    for (fragment, rule) in [
+        ("L-5", "range bound must be decimal digits"),
+        ("L1-", "range bound must be decimal digits"),
+        ("L1-x", "range bound must be decimal digits"),
+        ("B01-2", "range bound must not carry leading zeros"),
+        ("B0-02", "range bound must not carry leading zeros"),
+        ("B0-99999999999999999999", "range bound exceeds u64"),
+    ] {
+        let raw = format!("cas:b3-{H64}#{fragment}");
+        let err = Locator::parse(&raw).unwrap_err();
+        assert_eq!(
+            (err.code(), err.subject(), err.recovery()),
+            (&AxCode::LocatorInvalid, raw.as_str(), rule)
+        );
+    }
+}
+
+/// The bytes a hash lends are the bytes it was made from, and the digest
+/// of a content is BLAKE3's digest of it.
+#[test]
+fn a_hash_lends_the_bytes_it_holds() {
+    let bytes: [u8; 32] = std::array::from_fn(|at| u8::try_from(at).unwrap());
+    assert_eq!(B3Hash::from_bytes(bytes).as_bytes(), &bytes);
+    assert_eq!(
+        B3Hash::digest(b"content").as_bytes(),
+        blake3::hash(b"content").as_bytes()
+    );
+}

@@ -269,3 +269,61 @@ fn an_empty_plan_is_a_tree_with_nothing_ready() {
     assert_eq!(planned.total, 0);
     assert_eq!(planned.done_ppb, 0);
 }
+
+/// The plan holds `NODE_DEPTH_MAX` levels and no more, and a refused
+/// index names the part of it that is wrong: an empty segment is not a
+/// number, whatever else it fails.
+#[test]
+fn an_index_is_held_to_the_plan_s_depth_and_its_refusal_names_the_part() {
+    let deepest = ["1"; crate::node_id::NODE_DEPTH_MAX].join(".");
+    assert_eq!(
+        NodeId::parse(&deepest).unwrap().depth(),
+        crate::node_id::NODE_DEPTH_MAX
+    );
+    let too_deep = format!("{deepest}.1");
+    for (raw, why) in [
+        (too_deep.as_str(), "11 levels deep, the plan holds 10"),
+        ("1..2", "`` is not a number"),
+        ("1.02", "`02` has a leading zero"),
+        ("1.99999999999", "`99999999999` does not fit a plan index"),
+    ] {
+        assert_eq!(NodeId::parse(raw).unwrap_err().subject(), why, "{raw}");
+    }
+}
+
+/// A tree holds one node per row it was built from.
+#[test]
+fn a_tree_holds_one_node_per_row() {
+    let plan = tree(&format!(
+        "{HEAD}\
+| 1 | build | 1 |  | In progress | |
+| 1.1 | design | 1 |  | Not started | |
+| 2 | ship | 1 |  | Not started | |
+"
+    ));
+    assert_eq!(
+        (plan.len(), plan.is_empty(), plan.nodes().count()),
+        (3, false, 3)
+    );
+    let empty = PlanTree::build(Vec::new()).unwrap();
+    assert_eq!((empty.len(), empty.is_empty()), (0, true));
+}
+
+/// A stop is red exactly when it leaves its node blocked: the one stop
+/// that hands a node back for another run is the one that is not red.
+#[test]
+fn a_stop_is_red_exactly_when_it_blocks_its_node() {
+    for stop in [
+        StopCause::Blocked { note: "n".into() },
+        StopCause::HandedBack { note: "n".into() },
+        StopCause::FrozeWithoutEvidence,
+        StopCause::Stalled { repeats: 3 },
+        StopCause::GateOverdue { waited_ms: 9 },
+    ] {
+        assert_eq!(
+            stop.is_red(),
+            stop.status() == crate::spine::RoadmapStatus::Blocked,
+            "{stop:?}"
+        );
+    }
+}

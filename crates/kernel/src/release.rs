@@ -447,6 +447,25 @@ mod tests {
         assert_eq!(Release::from_npm_version(&cut.npm_version()).unwrap(), cut);
     }
 
+    proptest! {
+        /// The tag a build reads is the tag it cuts: the public reader and
+        /// the public writer, both at this tree's maturity, are one spelling.
+        #[test]
+        fn a_release_reads_back_from_the_tag_it_cuts(cut in any_release()) {
+            let read = Release::from_tag(&cut.tag(), &cut.version()).unwrap();
+            prop_assert_eq!(read, cut);
+        }
+    }
+
+    /// A maturity is one word, which a sentence writes in lower case and a
+    /// tag or a heading writes with a capital.
+    #[test]
+    fn a_maturity_is_one_word_in_two_cases() {
+        for maturity in [Maturity::PreAlpha, Maturity::Alpha] {
+            assert_eq!(maturity.word(), maturity.titled().to_lowercase());
+        }
+    }
+
     /// The check that keeps one release from having two version numbers.
     #[test]
     fn a_tag_disagreeing_with_the_build_is_refused() {

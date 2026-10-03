@@ -162,3 +162,39 @@ fn a_document_staging_name_is_recognised_and_a_document_is_not() {
         assert!(!is_document_staging_name(OsStr::new(name)), "{name}");
     }
 }
+
+/// One path per kind of file: every file and directory the layout names
+/// for one city, one building and one room lies inside the city, and no
+/// two kinds share a path, so no reader of one kind opens another's file.
+#[test]
+fn every_kind_of_file_has_a_path_of_its_own_inside_the_city() {
+    let city = layout();
+    let building = addr("lab");
+    let room = addr("lab/refactor");
+    let paths = [
+        city.ledger(),
+        city.snapshot(),
+        city.cas(),
+        city.library(),
+        city.city_config(),
+        city.city_filters(),
+        city.guide(),
+        city.devices(),
+        city.playback_exports(),
+        city.config(&building),
+        city.filters(&building),
+        city.building_skills(&building),
+        city.archive(&building),
+        city.job(&room),
+        city.handoff(&room),
+        city.urbanite(&room),
+    ];
+    let distinct: std::collections::BTreeSet<&PathBuf> = paths.iter().collect();
+    assert_eq!(distinct.len(), paths.len(), "{paths:?}");
+    for path in &paths {
+        assert!(
+            path.starts_with(city.root()) && path != city.root(),
+            "{path:?} is not inside the city"
+        );
+    }
+}

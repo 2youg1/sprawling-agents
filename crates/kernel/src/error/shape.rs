@@ -276,6 +276,41 @@ mod tests {
         assert_eq!(json.get("gate"), None);
     }
 
+    /// A wait belongs to a retriable error and to nothing else: the
+    /// raiser's word on when to ask again reads back as given, and
+    /// declaring the effect unknown takes it away with the retry.
+    #[test]
+    fn a_stated_wait_reads_back_until_the_effect_is_declared_unknown() {
+        let draft = AxError::failure(AxCode::Provider, "call model", "429").retriable_after(1500);
+        let waiting = draft.with_recovery("wait, then send the request again");
+        assert_eq!(
+            (waiting.retry(), waiting.retry_after_ms()),
+            (Retry::Yes, Some(1500))
+        );
+        let unknown = AxError::failure(AxCode::Provider, "call model", "cut")
+            .retriable_after(1500)
+            .effect_unknown()
+            .with_recovery("read the ledger before sending it again");
+        assert_eq!(
+            (unknown.retry(), unknown.retry_after_ms()),
+            (Retry::Unknown, None)
+        );
+    }
+
+    /// A provider error names the kind of failure it met, and an error
+    /// raised any other way names none.
+    #[test]
+    fn only_a_provider_error_names_a_provider_failure() {
+        let kind = ProviderFailureKind::Refused { status: 503 };
+        let named = AxError::provider(kind, "call model", "503").with_recovery("try later");
+        assert_eq!(
+            (named.code(), named.provider_failure()),
+            (&AxCode::Provider, Some(kind))
+        );
+        let plain = AxError::failure(AxCode::Provider, "call model", "503").with_recovery("r");
+        assert_eq!(plain.provider_failure(), None);
+    }
+
     #[test]
     fn axerror_serde_field_order_is_declaration_order() {
         let err = AxError::failure(AxCode::Timeout, "run exec", "build.sh").with_recovery(

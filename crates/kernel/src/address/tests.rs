@@ -99,6 +99,81 @@ fn a_session_name_is_one_segment_a_person_typed() {
     assert!(SessionName::parse(&"x".repeat(64)).is_ok());
 }
 
+/// A refusal names the first rule the spelling broke, because that rule
+/// is what the person fixes: `..` is a dot segment before it is a
+/// segment ending in a dot, and the recovery says so.
+#[test]
+fn a_refused_address_names_the_first_rule_it_broke() {
+    for (raw, rule) in [
+        ("", "address is empty"),
+        ("/a", "address is absolute"),
+        ("a\\b", "address contains a backslash"),
+        ("c:a", "address contains `:`"),
+        ("a\u{7}", "address contains a control character"),
+        ("a//b", "address contains an empty segment"),
+        ("a/.", "address contains a `.` or `..` segment"),
+        ("a/../b", "address contains a `.` or `..` segment"),
+        ("a./b", "a segment ends with a dot or whitespace"),
+        ("a /b", "a segment ends with a dot or whitespace"),
+    ] {
+        let err = Address::parse(raw).unwrap_err();
+        assert_eq!(
+            (err.code(), err.action(), err.subject()),
+            (&AxCode::InvalidArgs, "parse address", raw)
+        );
+        assert!(
+            err.recovery().starts_with(rule),
+            "{raw:?}: {}",
+            err.recovery()
+        );
+    }
+}
+
+/// The same for a session name, whose rules are checked in the order a
+/// person would want to hear them: `..` names a directory, which says
+/// more than that it is not one usable segment.
+#[test]
+fn a_refused_session_name_names_the_first_rule_it_broke() {
+    for (raw, rule) in [
+        ("  ", "a session with no name has no folder to work in"),
+        (".", "that names a directory rather than a session"),
+        (" .. ", "that names a directory rather than a session"),
+        (".Git", "that name belongs to the city itself"),
+        (
+            "a/b",
+            "a session name is one segment that stands on its own",
+        ),
+        ("a.", "a session name is one segment that stands on its own"),
+    ] {
+        let err = SessionName::parse(raw).unwrap_err();
+        assert_eq!(
+            (err.code(), err.action(), err.subject()),
+            (&AxCode::InvalidArgs, "name a session", raw)
+        );
+        assert!(
+            err.recovery().starts_with(rule),
+            "{raw:?}: {}",
+            err.recovery()
+        );
+    }
+}
+
+/// The name of a place is the word its last segment carries, and a
+/// session name reads back as the trimmed text it was parsed from.
+#[test]
+fn a_name_is_the_last_segment_and_a_session_name_displays_as_parsed() {
+    for (raw, name) in [
+        ("solo", "solo"),
+        ("lab/room1", "room1"),
+        ("a/b/notes.md", "notes.md"),
+    ] {
+        assert_eq!(Address::parse(raw).unwrap().name(), name);
+    }
+    let session = SessionName::parse(" ship it ").unwrap();
+    assert_eq!(session.to_string(), "ship it");
+    assert_eq!(SessionName::parse(&session.to_string()).unwrap(), session);
+}
+
 #[test]
 fn a_reserved_subtree_is_reserved_at_whatever_depth_it_sits() {
     assert!(Address::parse(".sprawling").unwrap().is_reserved());

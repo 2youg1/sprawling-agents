@@ -214,7 +214,12 @@ impl JsonSchema for Locator {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used, reason = "test code")]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    reason = "test code"
+)]
 mod tests {
     use std::sync::LazyLock;
 
@@ -315,6 +320,63 @@ mod tests {
         Regex::new(pattern)
             .unwrap()
             .is_match(value.as_str().unwrap())
+    }
+
+    /// The declaration `cargo xtask wire-ts` writes for a string schema,
+    /// read back out of what this file states: the description as the doc
+    /// comment, the name as both the binding and the brand, and the
+    /// pattern, when there is one, as a Unicode regular expression.
+    fn declaration<T: JsonSchema>() -> String {
+        let schema = T::json_schema(&mut SchemaGenerator::default());
+        let name = T::schema_name();
+        let description = schema.get("description").and_then(Value::as_str).unwrap();
+        let body = match (schema.get("pattern"), schema.get("enum")) {
+            (Some(pattern), None) => format!(
+                "Schema.String.check(Schema.isPattern(new RegExp({pattern}, \"u\"))).pipe(Schema.brand(\"{name}\"))"
+            ),
+            (None, Some(Value::Array(codes))) => {
+                let codes: Vec<String> = codes.iter().map(Value::to_string).collect();
+                format!(
+                    "Schema.Literals([{}]).annotate({{ identifier: \"{name}\" }})",
+                    codes.join(", ")
+                )
+            }
+            (None, None) => format!("Schema.String.pipe(Schema.brand(\"{name}\"))"),
+            other => panic!("{name}: no declaration shape for {other:?}"),
+        };
+        format!("/**\n * {description}\n */\nexport const {name} = {body};\n")
+    }
+
+    /// The client reads these values through `client/src/wire.ts`, which
+    /// is generated from the schemas this file states and committed. Each
+    /// hand-written schema, its name and its grammar, is found in that file
+    /// exactly as the generator writes it, so a schema changed here without
+    /// the client regenerated is a red test rather than a page that judges
+    /// a value by a grammar the city no longer holds.
+    #[test]
+    fn the_committed_client_declares_every_hand_written_schema() {
+        let client = std::fs::read_to_string(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../client/src/wire.ts"
+        ))
+        .unwrap()
+        .replace("\r\n", "\n");
+        for declared in [
+            declaration::<AxCode>(),
+            declaration::<Address>(),
+            declaration::<ServerLabel>(),
+            declaration::<RunId>(),
+            declaration::<SessionName>(),
+            declaration::<IdemKey>(),
+            declaration::<B3Hash>(),
+            declaration::<GitOid>(),
+            declaration::<Locator>(),
+        ] {
+            assert!(
+                client.contains(&declared),
+                "client/src/wire.ts lacks\n{declared}"
+            );
+        }
     }
 
     #[test]

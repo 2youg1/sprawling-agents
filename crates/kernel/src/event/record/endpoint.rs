@@ -341,4 +341,14 @@ mod tests {
         assert_eq!(read.input, InputKinds::Text);
         assert_eq!(read.ceiling(), None);
     }
+
+    /// A registered ceiling is the one the line states.
+    #[test]
+    fn a_stated_ceiling_reads_back_as_that_ceiling() {
+        assert_eq!(
+            selected(Some(8192), Some("catalogue")).ceiling(),
+            Ceiling::new(8192)
+        );
+        assert_eq!(selected(None, None).ceiling(), None);
+    }
 }
