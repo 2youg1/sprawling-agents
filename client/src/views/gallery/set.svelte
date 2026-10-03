@@ -9,7 +9,8 @@
   // identity cards read, an identity area that does not read, a
   // building's rules, the city's automation, the run group, and the
   // accounts group, which holds the city's own layer beside the default
-  // model (client D52). The panel's `<dialog>` is not mounted here: a
+  // model (client D52), and the colour page at both widths, drawn with
+  // the kept override of whoever opens the gallery. The panel's `<dialog>` is not mounted here: a
   // modal covers every other specimen on this route, so the fixture
   // draws what the dialog holds (`views/settings/sheet.svelte`).
 
@@ -94,6 +95,8 @@
     ["automation", STATED, 1040],
     ["run", STATED, 1040],
     ["accounts", STATED, 1040],
+    ["colours", STATED, 1040],
+    ["colours", STATED, 390],
     ["you", STATED, 390],
   ] as const;
 </script>
