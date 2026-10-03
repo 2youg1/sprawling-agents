@@ -23,6 +23,7 @@ use std::collections::BTreeMap;
 use kernel::event::record::EndpointLost;
 use kernel::{AxCode, AxError, BuildingPolicy, EventKind, EventRecord, ModelTag, Payload};
 
+use crate::concurrency::vendor_in_flight;
 use crate::endpoint::Transport;
 use crate::market::ModelEntry;
 
@@ -57,10 +58,38 @@ pub struct EndpointBook {
 /// A snapshot keeps the endpoint alone: the client is built again on
 /// first use, as it is after an attachment.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(from = "Kept", into = "Kept")]
 struct Held {
     endpoint: AttachedEndpoint,
-    #[serde(skip)]
     transport: Transport,
+}
+
+/// What a snapshot keeps of a [`Held`]: the endpoint alone.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+struct Kept {
+    endpoint: AttachedEndpoint,
+}
+
+impl From<Kept> for Held {
+    /// The endpoint with a transport whose gate admits its tuning's
+    /// ceiling, or the default for its kind of connection, so an
+    /// attachment and a snapshot restore build the same gate.
+    fn from(Kept { endpoint }: Kept) -> Held {
+        let ceiling = endpoint
+            .tuning
+            .max_in_flight
+            .unwrap_or_else(|| vendor_in_flight(&endpoint.base_url));
+        Held {
+            endpoint,
+            transport: Transport::admitting(ceiling),
+        }
+    }
+}
+
+impl From<Held> for Kept {
+    fn from(Held { endpoint, .. }: Held) -> Kept {
+        Kept { endpoint }
+    }
 }
 
 impl EndpointBook {
@@ -97,10 +126,7 @@ impl EndpointBook {
                 let attached = read_attached(data)?;
                 self.endpoints.insert(
                     attached.name.clone(),
-                    Held {
-                        endpoint: attached,
-                        transport: Transport::default(),
-                    },
+                    Held::from(Kept { endpoint: attached }),
                 );
                 Ok(())
             }
@@ -271,6 +297,40 @@ mod tests {
         ))
         .unwrap();
         book
+    }
+
+    /// An endpoint's max_in_flight rides its endpoint_attached line: the
+    /// gate a replay builds admits that ceiling, and so does the gate a
+    /// snapshot restore builds; a line without the key, as every line
+    /// written before it existed, gives the default for its kind of
+    /// connection.
+    #[test]
+    fn max_in_flight_survives_a_replay_and_a_snapshot() {
+        let mut capped = attached("capped", "https://api.example.test/v1");
+        capped.tuning.max_in_flight = Some(crate::concurrency::MaxInFlight::try_from(3).unwrap());
+        let mut book = EndpointBook::new();
+        for endpoint in [
+            capped,
+            attached("remote", "https://api.example.test/v1"),
+            attached("local", "http://127.0.0.1:11434/v1"),
+        ] {
+            let mut line = attached_payload(&endpoint).unwrap().as_map().clone();
+            if endpoint.name != "capped" {
+                assert!(!line.contains_key("tuning"), "{line:?}");
+                line.remove("tuning");
+            }
+            book.apply(&record(
+                EventKind::EndpointAttached,
+                Payload::new(line).unwrap(),
+            ))
+            .unwrap();
+        }
+        let restored: EndpointBook =
+            serde_json::from_str(&serde_json::to_string(&book).unwrap()).unwrap();
+        let limits = |book: &EndpointBook| {
+            ["capped", "remote", "local"].map(|name| book.endpoints[name].transport.limit())
+        };
+        assert_eq!((limits(&book), limits(&restored)), ([3, 16, 4], [3, 16, 4]));
     }
 
     /// A record written while this build carried a retreat arm names

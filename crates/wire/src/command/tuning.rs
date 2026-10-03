@@ -84,4 +84,8 @@ pub struct EndpointTuning {
     /// because that rule is right about the common machine and wrong
     /// about some real ones.
     pub proxying: Option<Proxying>,
+    /// How many calls to this endpoint may be in flight at once. Absent
+    /// and zero both mean nobody settled it, and the city takes the
+    /// default for this kind of connection.
+    pub max_in_flight: Option<u32>,
 }

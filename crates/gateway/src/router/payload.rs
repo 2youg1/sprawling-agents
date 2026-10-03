@@ -21,6 +21,7 @@
 use kernel::event::record::{AttachedTuning, EndpointAttached, ModelSelected};
 use kernel::{AxError, ModelTag, Payload, Proxying, SecretRef};
 
+use crate::concurrency::MaxInFlight;
 use crate::endpoint::AuthSpec;
 use crate::market::ModelEntry;
 
@@ -77,6 +78,7 @@ fn settled(tuning: &EndpointTuning) -> Option<AttachedTuning> {
             .map(|(name, value)| (name.clone(), value.spelled()))
             .collect(),
         overrides: tuning.overrides.clone(),
+        max_in_flight: tuning.max_in_flight.map(MaxInFlight::get),
     };
     (kept != AttachedTuning::default()).then_some(kept)
 }

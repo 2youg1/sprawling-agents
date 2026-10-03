@@ -25,12 +25,43 @@ pub(crate) const IN_FLIGHT_MAX: u32 = 256;
 /// its vendor's documentation states one.
 pub(crate) const IN_FLIGHT_DEFAULT: MaxInFlight = MaxInFlight(NonZeroU32::MIN.saturating_add(15));
 
+/// The concurrency a server on this machine gets when nobody settled
+/// one: the parallel slots a local inference server commonly starts
+/// with (`crates/gateway/Spec.lean` D21).
+pub(crate) const IN_FLIGHT_LOCAL: MaxInFlight = MaxInFlight(NonZeroU32::MIN.saturating_add(3));
+
+/// The concurrency an endpoint at `base_url` gets when its tuning
+/// states none. No vendor documents a concurrency today, so the table
+/// tells only this machine from the rest.
+pub(crate) fn vendor_in_flight(base_url: &str) -> MaxInFlight {
+    if crate::reach::is_local(base_url) {
+        IN_FLIGHT_LOCAL
+    } else {
+        IN_FLIGHT_DEFAULT
+    }
+}
+
 /// How many successes in a row widen a narrowed limit by one.
 pub(crate) const WIDEN_AFTER: u32 = 8;
 
 /// A configured concurrency ceiling, 1 to [`IN_FLIGHT_MAX`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct MaxInFlight(NonZeroU32);
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(try_from = "u32", into = "u32")]
+pub struct MaxInFlight(NonZeroU32);
+
+impl From<MaxInFlight> for u32 {
+    fn from(ceiling: MaxInFlight) -> u32 {
+        ceiling.0.get()
+    }
+}
+
+impl MaxInFlight {
+    /// The ceiling as the number a person entered.
+    #[must_use]
+    pub fn get(self) -> u32 {
+        self.0.get()
+    }
+}
 
 impl TryFrom<u32> for MaxInFlight {
     type Error = AxError;

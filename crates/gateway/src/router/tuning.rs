@@ -18,6 +18,8 @@
 //! JSON is answered here, once, by [`EndpointTuning::applied_overrides`].
 
 use kernel::Proxying;
+
+use crate::concurrency::MaxInFlight;
 use serde_json::Value;
 
 use crate::endpoint::HeaderValue;
@@ -74,6 +76,9 @@ pub struct EndpointTuning {
     /// this decision and "nobody settled it" is the default, not a
     /// third state a caller has to handle.
     pub proxying: Proxying,
+    /// How many calls may be in flight at once; absent means the
+    /// default for this kind of connection (`crates/gateway/Spec.lean` D21).
+    pub max_in_flight: Option<MaxInFlight>,
 }
 
 impl EndpointTuning {

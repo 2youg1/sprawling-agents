@@ -24,6 +24,7 @@ mod router;
 mod transcribe;
 
 pub use adviser::{AdviserClient, Question};
+pub use concurrency::MaxInFlight;
 pub use cost::settle;
 pub use credential::{Custodian, Custody, Persistence, Store};
 pub use dialect::{ImageBytes, response_from_wire};

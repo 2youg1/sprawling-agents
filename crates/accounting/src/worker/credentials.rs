@@ -113,6 +113,11 @@ pub(super) fn tuning_of(wire: wire::EndpointTuning) -> Result<gateway::EndpointT
             .filter(|(pointer, _)| pointer.starts_with('/'))
             .collect(),
         proxying: wire.proxying.unwrap_or_default(),
+        max_in_flight: wire
+            .max_in_flight
+            .filter(|ceiling| *ceiling > 0)
+            .map(gateway::MaxInFlight::try_from)
+            .transpose()?,
     })
 }
 

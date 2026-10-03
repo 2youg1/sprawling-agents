@@ -95,6 +95,14 @@ pub struct AttachedTuning {
         deserialize_with = "readable"
     )]
     pub proxying: Option<Proxying>,
+    /// How many calls may be in flight at once; absent when nobody
+    /// settled it, and a line written before the key existed reads so.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "readable"
+    )]
+    pub max_in_flight: Option<u32>,
     /// Header name and the person's own spelling of its value, which for
     /// a credential is its reference.
     #[serde(

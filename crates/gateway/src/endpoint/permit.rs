@@ -21,7 +21,7 @@ use std::time::{Duration, Instant};
 
 use kernel::{AxCode, AxError, ModelRequest, ModelReturn, ProviderFailureKind};
 
-use crate::concurrency::{IN_FLIGHT_DEFAULT, Permits, Take};
+use crate::concurrency::{IN_FLIGHT_DEFAULT, MaxInFlight, Permits, Take};
 
 use super::config::Endpoint;
 
@@ -41,14 +41,19 @@ pub(crate) struct Gate {
 
 impl Default for Gate {
     fn default() -> Gate {
-        Gate {
-            queue: Mutex::new(Queue::over(Permits::new(IN_FLIGHT_DEFAULT))),
-            turn: Condvar::new(),
-        }
+        Gate::admitting(IN_FLIGHT_DEFAULT)
     }
 }
 
 impl Gate {
+    /// A gate that lets `ceiling` calls be in flight at once.
+    pub(crate) fn admitting(ceiling: MaxInFlight) -> Gate {
+        Gate {
+            queue: Mutex::new(Queue::over(Permits::new(ceiling))),
+            turn: Condvar::new(),
+        }
+    }
+
     /// Waits in arrival order for a permit and returns the guard that
     /// holds it.
     ///
@@ -94,6 +99,11 @@ impl Gate {
                 }
             }
         }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn limit(&self) -> u32 {
+        self.lock().permits.limit()
     }
 
     /// The queue, recovered from a holder that panicked: it holds only

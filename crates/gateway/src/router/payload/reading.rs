@@ -17,6 +17,7 @@ use kernel::{AxError, DialectKind, ModelTag, Payload, Retries};
 use super::super::AttachedEndpoint;
 use super::super::book::Choice;
 use super::super::tuning::EndpointTuning;
+use crate::concurrency::MaxInFlight;
 use crate::endpoint::{AuthSpec, HeaderValue, ModelFacts};
 use crate::market::ModelEntry;
 use crate::provider::registry::ConnectionKind;
@@ -93,6 +94,13 @@ fn tuning_of(kept: AttachedTuning) -> EndpointTuning {
             .collect(),
         overrides: kept.overrides,
         proxying: kept.proxying.unwrap_or_default(),
+        // A ceiling outside 1 to 256 was never admitted at entry, so a
+        // line holding one reads as nothing settled, like every other
+        // tuning key this build cannot read.
+        max_in_flight: match kept.max_in_flight.map(MaxInFlight::try_from) {
+            Some(Ok(ceiling)) => Some(ceiling),
+            Some(Err(_)) | None => None,
+        },
     }
 }
 

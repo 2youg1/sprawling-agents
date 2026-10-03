@@ -496,6 +496,7 @@ title = \"a window\"
                     value: "high".to_owned(),
                 }],
                 proxying: Some(kernel::Proxying::Always),
+                max_in_flight: None,
             },
             idem,
         },

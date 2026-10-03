@@ -20,6 +20,7 @@ use kernel::{AxCode, AxError};
 use super::config::{Endpoint, EndpointConfig};
 use super::permit::{Gate, Gated};
 use super::redemption::Redemption;
+use crate::concurrency::MaxInFlight;
 
 /// One endpoint's client, built the first time a call needs it.
 ///
@@ -39,6 +40,20 @@ pub(crate) struct Transport {
 }
 
 impl Transport {
+    /// How many calls the gate lets be in flight now.
+    #[cfg(test)]
+    pub(crate) fn limit(&self) -> u32 {
+        self.gate.limit()
+    }
+
+    /// A transport whose gate lets `ceiling` calls be in flight at once.
+    pub(crate) fn admitting(ceiling: MaxInFlight) -> Transport {
+        Transport {
+            gate: Arc::new(Gate::admitting(ceiling)),
+            ..Transport::default()
+        }
+    }
+
     /// The shared client, built from `config` if this is the first call.
     ///
     /// Two callers racing on an empty slot each build one; the slot keeps
