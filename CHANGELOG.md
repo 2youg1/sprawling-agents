@@ -26,12 +26,14 @@ release notes and their commits.
 
 Not cut yet: the workspace manifest moves to 0.0.9 and the section takes its
 tag when the release is cut. It records what landed after
-`v0.0.8-Pre-alpha-261002`. The wire moved from WIRE_V 46 to 49, once for each
+`v0.0.8-Pre-alpha-261002`. The wire moved from WIRE_V 46 to 50, once for each
 push in which its shape changed (`crates/wire/Spec.lean` D1): 47 when sessions
 began to carry a display name and their last run, together with the harness
 states, registry lines, the doctor's scanning answer, the sandbox arm names
 and a colour theme; 48 when an endpoint's tuning gained `max_in_flight`; 49
-when `RunSummary` gained `waiting`. `EVENT_LOG_V` stays at 2: every new
+when `RunSummary` gained `waiting`; 50 when the four remote door commands
+`OpenRemoteDoor`, `ReplaceCityKey`, `ConfirmRemoteDoor` and
+`CloseRemoteDoor` arrived. `EVENT_LOG_V` stays at 2: every new
 payload field is optional, and a line written by 0.0.8 reads unchanged.
 
 ### What the Ledger and the wire now record
@@ -68,8 +70,14 @@ payload field is optional, and a line written by 0.0.8 reads unchanged.
   offers the same tool list and the mode is asked at the call, so a policy
   change keeps the prompt cache: `edit` and `exec` in chat mode answer
   `E_GATE_DENIED` with the way to switch.
-- A read-only tool runs before its intent is durable, and a turn pays
-  2 + writes durability barriers rather than one per line.
+- A read-only tool runs before its intent is durable. The run holds its
+  lines across turns, so a turn pays one durability barrier plus one per
+  write, rather than one per line, and the run pays one more before it
+  freezes, is cancelled, or writes a carrier event. A power cut at any line
+  leaves a prefix of the run with no write ahead of its intent, and the
+  count and the cut are the same on Windows, macOS and Linux, where the
+  barrier is `File::sync_data` (`crates/runtime/spec/Turn/Durability.lean`
+  D36).
 - A checkpoint takes no lock across runs: each run stages into an index of
   its own, a city gets one base however many writers race, and the first base
   is written as one pack, so it leaves no loose objects.
@@ -96,8 +104,13 @@ digest and machine class. These readings are owed and not stated here:
   the provider-queue instrument;
 - the per-tool phases of `read`, `write`, `edit`, `exec` and `search`;
 - the secret scanner, which now reads its input once, and the playback
-  export, whose credential scan is now lazy and is proved to equal the full
-  scan;
+  export. A narrow export's credential scan is now lazy: it reads the lines
+  its tables select, every tool call and every run's opening line, and
+  settles the far end of a pair from the copy it kept or from the line's
+  offset. A property test holds the lazy bundle byte for byte to the full
+  scan's. On the 1004-line test fixture with five lines selected, it scans
+  208 lines where the full scan read all 1004; the wall clock of a large
+  export is owed;
 - the first base of a city and the checkouts of overlapping delegations;
 - private bytes on a 100 ms tick, and their slope over an hour;
 - a profile-guided release build against the plain one. `on-demand.yml`
@@ -143,7 +156,15 @@ digest and machine class. These readings are owed and not stated here:
 - The update check asks npm and crates.io and gives the update command of the
   channel this binary was installed through (A10).
 - The remote group in settings walks a pairing in numbered steps, says what a
-  restart does, and lists `/remote replace-key` (A7). The city key is kept in
+  restart does, and lists `/remote replace-key` (A7). It opens the remote
+  door for 30 minutes, 2 hours, 12 hours (the default), 2 days or 7 days,
+  closes it, and replaces the city key. Opening and replacing the key
+  print a code on the terminal that runs `sprawling serve`, and act only
+  when that code is typed into the page within two minutes, because a
+  browser tool or a command can drive the page but cannot read the
+  console. Closing needs no code. A city started without a console refuses
+  both with `E_TOOL_UNAVAILABLE`. The page and the code are the same on
+  Windows, macOS and Linux. Pairing a device stays at the console. The city key is kept in
   the city's vault and read back at every start: Credential Manager on
   Windows, the Keychain on macOS, the kernel keyring on Linux until reboot
   (or the encrypted vault file across reboots), and the city's memory where
@@ -157,6 +178,9 @@ digest and machine class. These readings are owed and not stated here:
   platform (A14).
 - A colour page under preferences lists every theme token with a picker, a
   stylesheet field, legibility warnings and restore default (CT).
+- The key sheet's gallery specimen stays inside its fold, the city bar
+  draws nothing until the city answers, and the MCP environment's add-a-row
+  button keeps its label on one line (G7).
 - Tools (F1–F9): `archive record` files its entry at the call, so `recall`
   in the same run finds it; the Mayor writes an empty plan's first line with
   `plan add`; `rules read` and `city list` are admitted in a run; `read` and
@@ -188,6 +212,18 @@ digest and machine class. These readings are owed and not stated here:
   parts as ratchets, and xtask keeps no public-API baseline.
 - The shipped skills live in `crates/city/skills/`, and the city crate
   embeds them.
+- `on-demand.yml -f job=fresh` walks this tree's release archive from
+  install to the first dispatch on Windows, macOS and Linux runners, with
+  the environment a new account has, and uploads the checklist and logs as
+  `fresh-<os>-<tree>`. On macOS and Linux the walk ends its first and third
+  servings with SIGINT, so they close in order; on Windows it terminates
+  them, because the walk cannot yet start the city in a process group of
+  its own. `-f job=keychain` reads on macOS whether the Keychain asks again
+  for the city key after the binary is replaced.
+- citysim measures collaboration on its counted clock: three delegated
+  children run at the same time while the lead still drives, and the
+  second game takes 7 runs with asynchronous sends and 4 with `wait: true`
+  (TP3).
 - Text a User or a model reads says User for the person who owns the city.
 
 ### Designed, not yet built
@@ -202,9 +238,13 @@ digest and machine class. These readings are owed and not stated here:
   state exist; no auditor (the skills.sh partner audits, or SkillSpector when
   installed) runs yet, and the usage table is not folded.
 - Hot-thread placement on the best cores, a CPU weight and memory limit per
-  run's job, `[sandbox] interpreter = "pwsh"` for PowerShell 7, the
-  byte-budgeted resident cache, and the remote door's verbs behind a console
-  confirm code are specified in Lean and wait for their code.
+  run's job, `[sandbox] interpreter = "pwsh"` for PowerShell 7 and the
+  byte-budgeted resident cache are specified in Lean and wait for their
+  code.
+- The skill wire: `InstallSkill`, shelving a skill, and the skill, MCP and
+  usage exports have no command yet.
+- A clean tool payload is still copied once by the redaction step, and
+  `resume` is not yet compared with every power-cut prefix of a run.
 
 ### Known and unfixed
 
