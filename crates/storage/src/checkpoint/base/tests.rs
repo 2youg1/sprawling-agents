@@ -109,3 +109,53 @@ fn a_refused_base_checkpoint_leaves_no_reference_to_objects_it_never_wrote() {
         (true, Ok(()))
     );
 }
+
+/// The object files under `.git/objects`: loose objects (one file each under
+/// a two-digit directory) and packs. Counted by name, so the count does not
+/// depend on the order a platform lists a directory in.
+fn object_files(root: &std::path::Path) -> (usize, usize) {
+    let objects = root.join(".git").join("objects");
+    let names = |dir: &std::path::Path| -> Vec<std::path::PathBuf> {
+        std::fs::read_dir(dir)
+            .unwrap()
+            .map(|entry| entry.unwrap().path())
+            .collect()
+    };
+    let dirs = names(&objects);
+    let loose = dirs
+        .iter()
+        .filter(|dir| dir.file_name().is_some_and(|name| name.len() == 2))
+        .map(|dir| names(dir).len())
+        .sum();
+    let packs = names(&objects.join("pack"))
+        .iter()
+        .filter(|file| file.extension().is_some_and(|ext| ext == "pack"))
+        .count();
+    (loose, packs)
+}
+
+/// The first base of a city writes every object it makes as one pack, at
+/// N, 2N and 4N files alike: the cost that grew with the file count was one
+/// new loose-object file per blob (storage §8-8).
+#[test]
+fn a_first_base_writes_one_pack_and_no_loose_object_at_any_file_count() {
+    let counts: Vec<(bool, usize, usize)> = [8usize, 16, 32]
+        .iter()
+        .map(|&n| {
+            let tmp = tempfile::tempdir().unwrap();
+            let bulk = tmp.path().join("bulk");
+            std::fs::create_dir_all(&bulk).unwrap();
+            for i in 0..n {
+                std::fs::write(bulk.join(format!("{i}.md")), format!("file {i}")).unwrap();
+            }
+            let made = Checkpoint::open(tmp.path())
+                .unwrap()
+                .ensure_base(&["bulk".to_owned()], TimeMs::new(1_000), &resident())
+                .unwrap();
+            let born = git2::Repository::open(tmp.path()).unwrap().head().is_ok();
+            let (loose, packs) = object_files(tmp.path());
+            (made.is_some() && born, loose, packs)
+        })
+        .collect();
+    assert_eq!(counts, vec![(true, 0, 1); 3]);
+}
