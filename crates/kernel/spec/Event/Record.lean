@@ -487,9 +487,9 @@ pub struct ProposalWithdrawn { pub proposal: B3Hash }
 写方：`runtime::turn` 从 `RunHooks.monotonic_us` 读三次单调读数（工具开始与答复、尝试发出、首个内容、回复收齐），差即这三把键；它与线上的 `Call`、`Used` 帧同一次 `WIRE_V` 进位（`crates/wire/Spec.lean` D22）。
 -/
 
-/-! D21 会话中改运行策略是一个入窗的种类 `run_policy_changed`，在下一个安全点生效
+/-! D21 会话中改运行策略是一个入窗的种类 `run_policy_changed`，在下一个 `SafePoint::BeforeWave` 生效
 
-**决定**：加一个种类 `run_policy_changed`（`EventKind::RunPolicyChanged`，追加在 `ALL` 末尾，不写 `ig`），载荷 `RunPolicyChanged { policy: RunPolicy, by: Who }`，`addr` 是房间，`run` 恒为 `RunId::CITY`：这一行是人经城做的事，由 accounting 的 `record_at` 这一扇城自己的门写下；正在跑的 run 按 `addr` 认出它，不按 `run`。写方是城：收到线上的 `Command::ChangeRunPolicy { room, policy, idem }` 时写这一行；正在跑的 run 在它下一个安全点 `SafePoint::BeforeWave`（与 Steer 同一扇门，runtime D28，`crates/runtime/spec/PolicyTake.lean`）读到它，从那一步起按新策略过门，并在下一段消息的末尾追加一句说明，冻结的前缀不动。下一次 run 的 `run_started.policy` 取房间最后一次改过的策略。窗类：入窗，因为那一句说明决定下一次模型请求的字节。模型与思考强度在会话中不变（roadmap A15）。
+**决定**：加一个种类 `run_policy_changed`（`EventKind::RunPolicyChanged`，追加在 `ALL` 末尾，不写 `ig`），载荷 `RunPolicyChanged { policy: RunPolicy, by: Who }`，`addr` 是房间，`run` 恒为 `RunId::CITY`：这一行是人经城做的事，由 accounting 的 `record_at` 这一扇城自己的门写下；正在跑的 run 按 `addr` 认出它，不按 `run`。写方是城：收到线上的 `Command::ChangeRunPolicy { room, policy, idem }` 时写这一行；正在跑的 run 经 `Interrupt::Policy` 在任一安全点收到它（与 Steer 同一扇门），在下一个 `SafePoint::BeforeWave` 生效（runtime D28，`crates/runtime/spec/PolicyTake.lean`）：从那一波起按新策略过门，并在那一波工具结果之后追加一句说明，冻结的前缀不动。下一次 run 的 `run_started.policy` 取房间最后一次改过的策略。窗类：入窗，因为那一句说明决定下一次模型请求的字节。模型与思考强度在会话中不变（roadmap A15）。
 
 **理由**：改策略是城里发生过的事，重放要能说出某一步是在哪个策略下过的门；把它记在 `run_started` 里只够说一次 run 开头的策略。生效点放在安全点而不是立即，是因为一个工具波已经按旧策略过了门，半途换门会让同一波的两次调用被不同的规则判。工具定义不随策略变：会话开始时工具清单定成各模式的并集（`crates/runtime/spec/Catalog.lean` D25），所以改策略只动门与那一句说明，提示缓存不失效。
 
@@ -497,7 +497,7 @@ pub struct ProposalWithdrawn { pub proposal: B3Hash }
 
 **重开参数**：出现会话中改模型或思考强度的需求时，重议是否把它们并进同一个种类（今天它们在会话中固定，因为换模型使缓存整段失效）。
 
-载荷在 `kernel::event::record::run`（`RunPolicyChanged`，`by` 经 `Who` 的拼写）；窗类在 `spec/Event/Kind.lean` 记作 `InWindow`。门一侧（安全点读它、追加那一句、按新策略过门）尚无实现，今天写下这一行的只有 `Command::ChangeRunPolicy`。
+载荷在 `kernel::event::record::run`（`RunPolicyChanged`，`by` 经 `Who` 的拼写）；窗类在 `spec/Event/Kind.lean` 记作 `InWindow`。门一侧的取用（`Interrupt::Policy`、`runtime::PolicyCell` 在 `BeforeWave` 取用、追加那一句）在 `crates/runtime/src/run/lifecycle.rs`；尚未落地的是把这一行投进正在跑的 run 的信箱，以及 `edit` 与 `exec` 改读 `PolicyReader`，所以今天的写门仍按 `run_started.policy` 判。
 -/
 
 /-! D22 会话的显示名是一个 record-only 种类 `session_named`；地址仍是身份，标签仍在偏好文件里
