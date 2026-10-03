@@ -157,6 +157,30 @@ mod tests {
         assert_eq!(forecast(&arm("echo", &["clean"])), DiscardForecast::Clear);
     }
 
+    /// `find` discards only when told `-delete`, and `-delete` handed to
+    /// another program is that program's word.
+    #[test]
+    fn find_discards_only_when_told_to_delete() {
+        let arm = |path: &str, args: &[&str]| ExecArm::Program {
+            path: path.into(),
+            args: args.iter().map(|arg| (*arg).to_owned()).collect(),
+        };
+        assert_eq!(
+            [
+                forecast(&arm("find", &[".", "-delete"])),
+                forecast(&arm("find", &[".", "-name", "x"])),
+                forecast(&arm("echo", &["-delete"])),
+            ],
+            [
+                DiscardForecast::Suspected {
+                    pattern: "find -delete".to_owned()
+                },
+                DiscardForecast::Clear,
+                DiscardForecast::Clear,
+            ]
+        );
+    }
+
     #[test]
     fn program_forecast_reads_path_and_args_whole() {
         let rm = ExecArm::Program {
