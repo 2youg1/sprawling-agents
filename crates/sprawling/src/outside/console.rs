@@ -6,11 +6,13 @@
 //! `/remote` on the city's console: open, pair, close, devices, revoke,
 //! replace-key (`crates/sprawling/spec/Outside.lean` §8-140).
 //!
-//! These verbs are not on the wire, so no frame - from a browser, a
-//! remote device or a tool a resident holds - can open the door or pair
-//! a device (remote_access D4). The console reads the line
-//! here ([`parse`], pure) and carries it out here ([`carry`]), and what
-//! it prints is the whole answer: a refusal prints its three parts.
+//! `/remote` is not on the wire, so no frame - from a browser, a remote
+//! device or a tool a resident holds - can pair or revoke a device; the
+//! page's open and replace-key reach [`perform`] only after the User
+//! types back the code this console printed (`super::asking`,
+//! remote_access D4). The console reads the line here ([`parse`], pure)
+//! and carries it out here ([`carry`]), and what it prints is the whole
+//! answer: a refusal prints its three parts.
 //!
 //! `/remote pair` prints the invitation as a QR code drawn with block
 //! characters, the light modules as blocks and the dark ones as spaces,
@@ -65,6 +67,17 @@ impl Lasting {
         self.0
     }
 
+    /// A length a page sent, in milliseconds, inside the bounds `read`
+    /// holds a typed one to: a minute at least, a week at most.
+    pub(crate) fn of_ms(ms: u64) -> Option<Lasting> {
+        (MS_PER_MINUTE
+            ..=LONGEST_HOURS
+                .saturating_mul(60)
+                .saturating_mul(MS_PER_MINUTE))
+            .contains(&ms)
+            .then_some(Lasting(ms))
+    }
+
     /// `30m`, `12h` or `2d`: a whole number, then its unit, at most a week.
     pub(super) fn read(text: &str) -> Option<Lasting> {
         let unit = text.chars().last()?;
@@ -81,6 +94,7 @@ impl Lasting {
 }
 
 /// What `/remote` reaches the door through, assembled once per serve.
+#[derive(Clone)]
 pub(crate) struct Remote {
     pub(crate) doorway: Doorway,
     pub(crate) reaching: Reaching,
@@ -131,12 +145,22 @@ pub(crate) fn parse(tail: &str) -> RemoteLine {
 
 /// Carries out one `/remote` line and says what happened.
 pub(crate) fn carry(remote: &Result<Remote, AxError>, line: RemoteLine) -> String {
-    let remote = match remote {
-        Ok(remote) => remote,
-        Err(unkept) => return refusal(unkept),
-    };
+    perform(remote, line).unwrap_or_else(|refused| refusal(&refused))
+}
+
+/// Carries out one `/remote` line: what to print, or the refusal. The
+/// console and the door's wire verbs (`super::asking`) both come here, so
+/// a verb does the same thing from either.
+///
+/// # Errors
+/// The door this serve could not keep, and every refusal of the verb.
+pub(crate) fn perform(
+    remote: &Result<Remote, AxError>,
+    line: RemoteLine,
+) -> Result<String, AxError> {
+    let remote = remote.as_ref().map_err(Clone::clone)?;
     let doorway = &remote.doorway;
-    let carried = match line {
+    match line {
         RemoteLine::Open(lasting) => super::listener::open(doorway, &remote.reaching, lasting)
             .and_then(|opened| {
                 doorway
@@ -185,8 +209,7 @@ pub(crate) fn carry(remote: &Result<Remote, AxError>, line: RemoteLine) -> Strin
                 .map(|keeps| format!("  the city has a new key; {who}\n  {}", kept_for(keeps)))
         }),
         RemoteLine::Unreadable => Ok(format!("  {USAGE}")),
-    };
-    carried.unwrap_or_else(|refused| refusal(&refused))
+    }
 }
 
 fn opening(opened: &Opened, lasting: Lasting, keeps: Persistence) -> String {

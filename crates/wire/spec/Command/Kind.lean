@@ -54,14 +54,14 @@
 - `class` 只判 Command。`Ask` 与 `Monitor` 两种帧属 `Read`；设备发来的 `Hello` 由中继换成城自己的令牌再发（§8-66）；远程门的配对与撤销不在线上，开门、关门、更换城钥匙与它们的确认在线上的方式见下面四行（remote_access D4）。
 - 这一列是权威，中继按它判，`xtask wiring` 把表与中继的穷尽匹配（`bin::outside::verbs::command_class`）逐行对照（§8-65）。
 
-**远程门的四个动词尚不在线上。** 设置页要开关远程门、更换城钥匙（Roadmap 的 A7），remote_access D4 定下它们上线的方式；它们随 remote_access 的 `confirm` 模块（crates/remote_access/Spec.lean §3）一起进 `inductive Command`，在那之前 `xtask wiring` 与 `specalign` 照旧对照今天的枚举。
+**远程门的四个动词**：设置页开关远程门、更换城钥匙（Roadmap 的 A7），上线的方式由 remote_access D4 定下；四行在下方 `inductive Command`、`reach` 与 `verbClass` 里各有一臂，等控制台确认的那一次请求是 `remote_access::confirm`（crates/remote_access/Spec.lean §8-13）。四个命令都带 `idem`，与其余改东西的命令同一条类型不变量，Rust 一侧的载荷是 `wire::DoorOpening`、`wire::DoorStep`（换钥匙与关门共用）与 `wire::DoorAnswer`；执行者不在 worker 的队列上，而在装配层 `bin::outside::asking`，因为远程门由它持有（`crates/sprawling/spec/Outside.lean` §8-140）。
 
 | Command | 载荷 | reach | class | 守卫 | 执行者做的事 |
 |---|---|---|---|---|---|
-| `OpenRemoteDoor` | `lasting_ms: u64`（一分钟到七天，与控制台 `--for` 同一条界） | `client` | `LocalOnly` | 控制台确认 | `Confirm::request`，在控制台印出确认码，答 `E_APPROVAL_PENDING` |
-| `ReplaceCityKey` | 无 | `client` | `LocalOnly` | 控制台确认 | 同上 |
-| `ConfirmRemoteDoor` | `code: String`（控制台印出的确认码，大小写、空白与连字符不论） | `client` | `LocalOnly` | 它自己就是确认 | `Confirm::confirm` 取回动词：开门走 `Doorway::open` 与远程监听，同 `/remote open`；换钥匙走 `Doorway::replace_key`，同 `/remote replace-key`，门开着时以 `E_BUSY` 拒（`crates/sprawling/spec/Outside.lean` §8-140） |
-| `CloseRemoteDoor` | 无 | `client` | `LocalOnly` | 无 | `Doorway::close(Console)`，同 `/remote close` |
+| `OpenRemoteDoor` | `lasting_ms: u64`、`idem`（一分钟到七天，与控制台 `--for` 同一条界） | `client` | `LocalOnly` | 控制台确认 | `Confirm::request`，在控制台印出确认码，答 `E_APPROVAL_PENDING` |
+| `ReplaceCityKey` | `idem` | `client` | `LocalOnly` | 控制台确认 | 同上 |
+| `ConfirmRemoteDoor` | `code: String`（控制台印出的确认码，大小写、空白与连字符不论）、`idem` | `client` | `LocalOnly` | 它自己就是确认 | `Confirm::confirm` 取回动词：开门走 `Doorway::open` 与远程监听，同 `/remote open`；换钥匙走 `Doorway::replace_key`，同 `/remote replace-key`，门开着时以 `E_BUSY` 拒（`crates/sprawling/spec/Outside.lean` §8-140） |
+| `CloseRemoteDoor` | `idem` | `client` | `LocalOnly` | 无 | `Doorway::close(Console)`，同 `/remote close` |
 
 - **守卫一列说一帧到了执行者之后还要什么**：「控制台确认」的请求本身什么也不做，城取一个确认码、只印在城的控制台上，紧接着的一帧 `ConfirmRemoteDoor` 带回它、且在它到期之前（期限写在 crates/remote_access/Spec.lean §3），城才做那个动词（crates/remote_access/spec/Confirm.lean）。理由：城的回环端口上任何本地客户端都发得出这几帧，包括驱动页面的浏览器工具，而控制台的输出不进任何一帧，所以只有读得到控制台的那一位能确认。关门不要守卫，因为它只减少访问（remote_access D5）。改一个动词的守卫是这一格与执行者里的一臂。
 - **四行都是 `LocalOnly`**：一台远程设备开不了门、换不了钥匙，不论它的权限，因为门要保护的正是从城外来的那一端；远程设备锁门走封装的锁门字节（remote_access D13），不走 `CloseRemoteDoor`。
@@ -136,6 +136,10 @@ inductive Command where
   | PutSecret
   | NameSession
   | ChangeRunPolicy
+  | OpenRemoteDoor
+  | ReplaceCityKey
+  | ConfirmRemoteDoor
+  | CloseRemoteDoor
   deriving DecidableEq, Repr
 
 /-- §19-1 的四个取值：城里谁该够得到一个动词。 -/
@@ -231,6 +235,14 @@ def Command.reach : Command → Reach
   | .NameSession => .client
   -- 会话中改房间的运行策略，写 `run_policy_changed`（Sessions.lean D27）；控件在 W3 FE-SESS
   | .ChangeRunPolicy => .client
+  -- 请城开远程门：城在自己的控制台印一个确认码，答 `E_APPROVAL_PENDING`（remote_access D4）；控件在设置 → 远程
+  | .OpenRemoteDoor => .client
+  -- 请城更换城钥匙，每台设备都要重新配对；与开门同一种守卫
+  | .ReplaceCityKey => .client
+  -- 带回控制台印出的确认码，做那一次请求的动词；答错也结束那一次请求
+  | .ConfirmRemoteDoor => .client
+  -- 立刻关远程门，结束每一个远程会话；不要守卫，因为关门只减少访问（remote_access D5）
+  | .CloseRemoteDoor => .client
 
 /-! D6 动词类是 §19-2 的一列，由中继的穷尽匹配实现、门机器对照
 
@@ -283,6 +295,10 @@ def Command.verbClass : Command → VerbClass
   | .PutSecret => .LocalOnly
   | .NameSession => .Act
   | .ChangeRunPolicy => .Act
+  | .OpenRemoteDoor => .LocalOnly
+  | .ReplaceCityKey => .LocalOnly
+  | .ConfirmRemoteDoor => .LocalOnly
+  | .CloseRemoteDoor => .LocalOnly
 
 /-- **没有一个 Command 属 `Read`**：读城的是 `Ask` 与 `Monitor` 两种帧，不是命令（§19-3）。一行写成 `Read` 的命令就是一个改东西的动词被当成只读放进了城。 -/
 theorem no_command_is_a_read (c : Command) : c.verbClass ≠ .Read := by
@@ -301,6 +317,12 @@ theorem a_verb_no_person_draws_stays_local (c : Command) :
 /-- **线上只有一个动词没有字节形式**：`PutSecret`。 -/
 theorem only_put_secret_is_sealed (c : Command) : c.reach = .sealed ↔ c = .PutSecret := by
   cases c <;> decide
+
+/-- **远程门的动词从城外够不到**：一台远程设备开不了门、换不了钥匙、确认不了，也不经线协议锁门（它走封装的锁门字节，remote_access D13）。 -/
+theorem the_remote_door_is_worked_from_inside (c : Command)
+    (h : c = .OpenRemoteDoor ∨ c = .ReplaceCityKey ∨ c = .ConfirmRemoteDoor ∨
+      c = .CloseRemoteDoor) : c.verbClass = .LocalOnly := by
+  rcases h with rfl | rfl | rfl | rfl <;> decide
 
 /-- 表不是空的：至少有一个城外设备做得了的动词，这条 `Act` 的保证不是空真。 -/
 example : Command.Dispatch.verbClass = .Act ∧ Command.Dispatch.reach = .client := by decide

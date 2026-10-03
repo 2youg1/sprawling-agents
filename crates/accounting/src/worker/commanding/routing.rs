@@ -22,8 +22,38 @@ use super::super::{
 /// Both reach this file only after `Desk::interrupt_for` failed to lift
 /// them off the queue, so the subject is the id rather than the verb:
 /// the verb is built, and the run is what is missing.
-fn no_run_answers(action: &'static str, run: kernel::RunId, recovery: &'static str) -> AxError {
-    AxError::failure(AxCode::InvalidArgs, action, run.to_string()).with_recovery(recovery)
+#[derive(Clone, Copy)]
+enum Unanswered {
+    Cancel,
+    Steer,
+}
+
+impl Unanswered {
+    fn refusal(self, run: kernel::RunId) -> AxError {
+        let (action, recovery) = match self {
+            Unanswered::Cancel => (
+                "cancel a run",
+                "no run in flight answers to that id: it has already finished, or it never started",
+            ),
+            Unanswered::Steer => (
+                "steer a run",
+                "no run in flight answers to that id: steer one while it runs, or dispatch a new one",
+            ),
+        };
+        AxError::failure(AxCode::InvalidArgs, action, run.to_string()).with_recovery(recovery)
+    }
+}
+
+/// The serving binary holds the remote door and answers its four verbs
+/// before they reach the desk (`crates/sprawling/spec/Outside.lean`
+/// §8-140), so one arriving here came by a path that skipped it.
+fn the_door_is_held_elsewhere() -> AxError {
+    AxError::failure(
+        AxCode::ToolUnavailable,
+        "work the remote door",
+        "the run worker does not hold the remote door",
+    )
+    .with_recovery("send it to the city's own listener, which serves the remote door")
 }
 
 /// The task and the goal a person typed, travelling together.
@@ -245,16 +275,8 @@ impl RunWorker {
             // lifts them off the queue at the next safe point of the run
             // they name, so arriving here means no run answered - which
             // is what the refusal says, instead of naming the verb.
-            wire::Command::Cancel { run, .. } => Err(no_run_answers(
-                "cancel a run",
-                run,
-                "no run in flight answers to that id: it has already finished, or it never started",
-            )),
-            wire::Command::Steer { run, .. } => Err(no_run_answers(
-                "steer a run",
-                run,
-                "no run in flight answers to that id: steer one while it runs, or dispatch a new one",
-            )),
+            wire::Command::Cancel { run, .. } => Err(Unanswered::Cancel.refusal(run)),
+            wire::Command::Steer { run, .. } => Err(Unanswered::Steer.refusal(run)),
             // Verbs the wire spells and this city cannot perform, one arm each and no
             // catch-all, so a Command added without an executor stops the build here.
             wire::Command::BatchByBuilding { addr, .. } => {
@@ -265,6 +287,10 @@ impl RunWorker {
             // before any command is read. A second door for the same
             // question would be a second authority on it.
             wire::Command::Auth { .. } => Err(Unbuilt::Auth.not_built()),
+            wire::Command::OpenRemoteDoor { .. }
+            | wire::Command::ReplaceCityKey { .. }
+            | wire::Command::ConfirmRemoteDoor { .. }
+            | wire::Command::CloseRemoteDoor { .. } => Err(the_door_is_held_elsewhere()),
         }
     }
 

@@ -16,8 +16,9 @@ use serde::{Deserialize, Serialize};
 use crate::carried_name::{ProviderName, TemplateName, ToolkitSlug};
 use crate::command::shelf::Shelf;
 use crate::command::step::{
-    Carry, CitySettings, GovernedDocument, HaltScope, IdentityCard, PolicyChange,
-    ProposalDecisions, PursuitStep, RangeWrite, RulesWrite, SessionNaming, SpineDocument,
+    Carry, CitySettings, DoorAnswer, DoorOpening, DoorStep, GovernedDocument, HaltScope,
+    IdentityCard, PolicyChange, ProposalDecisions, PursuitStep, RangeWrite, RulesWrite,
+    SessionNaming, SpineDocument,
 };
 use crate::command::tuning::EndpointTuning;
 use crate::guide::GuideProgress;
@@ -25,13 +26,8 @@ use crate::named_frames::named_frames;
 use crate::preference::PreferencePatch;
 
 named_frames! {
-/// Commands change state, require authorization, and are idempotent.
-///
-/// Deliberately *not* `#[non_exhaustive]`: the schema hash is this type's
-/// version mechanism, so the assembly layer must handle every one of them
-/// and a new one fails to compile until somebody decides what it does.
-/// That is the rule that keeps a button off the client until the city can
-/// answer the frame behind it.
+/// Commands change state, require authorization, and are idempotent. Deliberately *not*
+/// `#[non_exhaustive]`, for the reason the module documentation of `command::wire` gives.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
@@ -385,6 +381,10 @@ pub enum Command<Secret = Sealed<String>> {
     NameSession(SessionNaming),
     /// Changes a room's run policy; writes `run_policy_changed` (same decision).
     ChangeRunPolicy(PolicyChange),
+    OpenRemoteDoor(DoorOpening),
+    ReplaceCityKey(DoorStep),
+    ConfirmRemoteDoor(DoorAnswer),
+    CloseRemoteDoor(DoorStep),
     /// Presenting a pairing token. Read-only, hence no `IdemKey`; the token is plain here because a
     /// token that must cross a wire has, by definition, no secrecy left to protect in transit - it
     /// is sealed the moment it lands (see `server::decide_handshake`).

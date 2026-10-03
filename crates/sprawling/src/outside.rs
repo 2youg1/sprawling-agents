@@ -19,6 +19,7 @@
 //! binary already gives to the ledger crossing and to its own listener's
 //! key.
 
+pub(crate) mod asking;
 mod conduit;
 pub(crate) mod console;
 mod devices;

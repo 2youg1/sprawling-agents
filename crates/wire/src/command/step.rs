@@ -48,6 +48,34 @@ pub struct PolicyChange {
     pub idem: IdemKey,
 }
 
+/// What `OpenRemoteDoor` asks for: the remote door open for `lasting_ms`, one minute to seven
+/// days. The request does nothing by itself; the city prints a code at its own console and
+/// refuses the frame with `E_APPROVAL_PENDING` (`crates/wire/spec/Command/Kind.lean`,
+/// remote_access D4).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct DoorOpening {
+    pub lasting_ms: u64,
+    pub idem: IdemKey,
+}
+
+/// What `ConfirmRemoteDoor` carries: the code the city's console printed, read however it was
+/// retyped. Every answer, right or wrong, ends the request it answers.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct DoorAnswer {
+    pub code: String,
+    pub idem: IdemKey,
+}
+
+/// A door verb with nothing to say but its key: `ReplaceCityKey`, guarded the way opening is,
+/// and `CloseRemoteDoor`, unguarded because closing only takes access away (remote_access D5).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct DoorStep {
+    pub idem: IdemKey,
+}
+
 /// A person's decision on proposal cards of one document, landed as one
 /// save (`crates/wire/spec/Answer/Proposals.lean` §8-73).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

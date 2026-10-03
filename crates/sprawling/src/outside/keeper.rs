@@ -187,6 +187,12 @@ impl Doorway {
         Ok(opened)
     }
 
+    /// This machine's clock and random source, which the door's wire
+    /// verbs draw their confirmation codes from as well.
+    pub(crate) fn senses(&self) -> &Senses {
+        &self.senses
+    }
+
     /// Keeps `listening` for as long as the door stays open, and drops it
     /// at once when the door already closed.
     pub(crate) fn attend(&self, listening: Box<dyn Send>) -> Result<(), AxError> {

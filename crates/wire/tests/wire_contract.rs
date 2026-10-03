@@ -45,13 +45,13 @@ fn exposed() -> SocketAddr {
 #[test]
 fn the_command_and_query_tables_hold_their_declared_counts() {
     // The counts are the wire's closed surface, not a style choice.
-    assert_eq!(COMMAND_NAMES.len(), 38, "command table");
+    assert_eq!(COMMAND_NAMES.len(), 42, "command table");
     assert_eq!(QUERY_NAMES.len(), 52, "query table");
 
     let mut sorted = COMMAND_NAMES.to_vec();
     sorted.sort_unstable();
     sorted.dedup();
-    assert_eq!(sorted.len(), 38, "command names are distinct");
+    assert_eq!(sorted.len(), 42, "command names are distinct");
 
     let mut sorted = QUERY_NAMES.to_vec();
     sorted.sort_unstable();
@@ -615,6 +615,16 @@ title = \"a window\"
             policy: wire::RunPolicy::of(Mode::Work),
             idem,
         }),
+        Command::OpenRemoteDoor(wire::DoorOpening {
+            lasting_ms: 60 * 60 * 1000,
+            idem,
+        }),
+        Command::ReplaceCityKey(wire::DoorStep { idem }),
+        Command::ConfirmRemoteDoor(wire::DoorAnswer {
+            code: "abcd-efgh".to_owned(),
+            idem,
+        }),
+        Command::CloseRemoteDoor(wire::DoorStep { idem }),
     ]
 }
 

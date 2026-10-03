@@ -153,6 +153,129 @@ fn a_device_reaches_the_city_through_the_door_over_real_sockets() {
     );
 }
 
+/// The door's wire verbs from a page on the city's own port
+/// (`crates/sprawling/spec/Outside.lean` §8-140, remote_access D4): a
+/// request answers `E_APPROVAL_PENDING` and prints a code only on the
+/// console; a wrong code is refused and ends the request, so the right
+/// code after it is refused too; a fresh request confirmed with its own
+/// code opens the door, and closing needs no code. Expiry is judged by
+/// the trace vectors of `remote_access::confirm`, because a test that
+/// waited two minutes on a real clock would only repeat them slowly.
+#[test]
+fn a_page_opens_the_door_only_with_the_code_the_console_printed() {
+    let dir = tempfile::tempdir().unwrap();
+    let raised = sprawling::assembly::init_city(dir.path()).unwrap();
+    choose_this_binary_as_the_route(dir.path());
+    let mut city = Served::start(dir.path());
+    let banner = city.type_line("/remote devices", "no device is paired");
+    let home = between(&banner, "WebUI    http://", char::is_whitespace);
+    let home = home.trim_end_matches('/').to_owned();
+
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let (refusals, printed) = runtime.block_on(async {
+        let mut page = connect(&home, "/ws").await;
+        let mut refusals = Vec::new();
+        let mut printed = Vec::new();
+        let hello = wire::ClientFrame::Hello(wire::Hello {
+            wire_v: wire::WIRE_V,
+            schema: wire::schema_hash(),
+            token: None,
+        });
+        page.send(Message::Text(serde_json::to_string(&hello).unwrap().into()))
+            .await
+            .unwrap();
+        let open = |n: &[u8]| {
+            door_frame(wire::WireCommand::OpenRemoteDoor(wire::DoorOpening {
+                lasting_ms: 60 * 60 * 1000,
+                idem: IdemKey::derive(&RunId::CITY, Seq::FIRST, n),
+            }))
+        };
+        let confirm = |code: &str, n: &[u8]| {
+            door_frame(wire::WireCommand::ConfirmRemoteDoor(wire::DoorAnswer {
+                code: code.to_owned(),
+                idem: IdemKey::derive(&RunId::CITY, Seq::FIRST, n),
+            }))
+        };
+        refusals.push(refused(&mut page, &open(b"open 1")).await);
+        let asked = read_until(&city.printed, &["within two minutes"]).0;
+        let first = between(&asked, "type ", char::is_whitespace);
+        refusals.push(refused(&mut page, &confirm("aaaa-aaaa", b"wrong")).await);
+        refusals.push(refused(&mut page, &confirm(&first, b"late")).await);
+        refusals.push(refused(&mut page, &open(b"open 2")).await);
+        let asked = read_until(&city.printed, &["within two minutes"]).0;
+        let second = between(&asked, "type ", char::is_whitespace);
+        send_text(&mut page, &confirm(&second.to_uppercase(), b"right")).await;
+        printed.push(
+            read_until(&city.printed, &["the remote door is open"])
+                .1
+                .is_some(),
+        );
+        send_text(
+            &mut page,
+            &door_frame(wire::WireCommand::CloseRemoteDoor(wire::DoorStep {
+                idem: IdemKey::derive(&RunId::CITY, Seq::FIRST, b"close"),
+            })),
+        )
+        .await;
+        printed.push(
+            read_until(&city.printed, &["the remote door is closed"])
+                .1
+                .is_some(),
+        );
+        (refusals, printed)
+    });
+    drop(city);
+
+    let verified = runtime::replay::verify_ledger_dir(&raised.ledger_dir).unwrap();
+    let door: Vec<EventKind> = verified
+        .raw_lines()
+        .iter()
+        .map(|line| EventRecord::parse_line(line).unwrap().kind())
+        .filter(|kind| matches!(kind, EventKind::RemoteOpened | EventKind::RemoteClosed))
+        .collect();
+    assert_eq!(
+        (refusals, printed, door),
+        (
+            vec![
+                Some(AxCode::ApprovalPending),
+                Some(AxCode::GateDenied),
+                Some(AxCode::GateDenied),
+                Some(AxCode::ApprovalPending),
+            ],
+            vec![true, true],
+            vec![EventKind::RemoteOpened, EventKind::RemoteClosed],
+        )
+    );
+}
+
+fn door_frame(command: wire::WireCommand) -> String {
+    serde_json::to_string(&wire::ClientFrame::Command(Box::new(command))).unwrap()
+}
+
+async fn send_text(page: &mut Socket, text: &str) {
+    page.send(Message::Text(text.to_owned().into()))
+        .await
+        .unwrap();
+}
+
+/// Sends `text` on the page's socket and answers the code of the first
+/// refusal back; `None` when none came in time.
+async fn refused(page: &mut Socket, text: &str) -> Option<AxCode> {
+    send_text(page, text).await;
+    let deadline = tokio::time::Instant::now().checked_add(PATIENCE)?;
+    loop {
+        let message = tokio::time::timeout_at(deadline, page.next())
+            .await
+            .ok()??;
+        let Ok(Message::Text(text)) = message else {
+            continue;
+        };
+        if let Ok(wire::ServerFrame::Refusal(refusal)) = serde_json::from_str(&text) {
+            return Some(*refusal.code());
+        }
+    }
+}
+
 /// What a browser reads from `GET <path>` on `at` by a request that is
 /// not a WebSocket upgrade: the status line, every header but the date in
 /// a fixed order, and the body. Two listeners that serve the same page

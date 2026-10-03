@@ -89,6 +89,7 @@ pub struct Listening {
     answering: crate::console::Answering,
     worker: std::thread::JoinHandle<()>,
     outdoors: Outdoors,
+    front: crate::outside::asking::Front,
 }
 
 /// Takes the city's port, then opens its one writer.
@@ -115,10 +116,8 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
         core,
     } = serving;
     let city_root = city_root.as_path();
-    let token_digest = match token.as_deref() {
-        Some(raw) => Some(wire::PairingToken::from_configured(raw)?.digest()),
-        None => None,
-    };
+    let configured = token.as_deref().map(wire::PairingToken::from_configured);
+    let token_digest = configured.transpose()?.map(|token| token.digest());
     // Each phase of opening is lapped on the monotonic sampling point,
     // and said in one line once the writer runs (`crates/sprawling/spec/Assembly/Listening.lean` §8-121).
     let mut cost = OpeningCost::begin(monotonic_now);
@@ -254,9 +253,10 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
     let remote_key = CityKey::of(Arc::clone(&city_vault), epoch);
     let audio_vault = city_vault;
     let page = Arc::new(client);
+    let front = crate::outside::asking::Front::default();
     let config = wire::ServeConfig {
         client: Arc::clone(&page),
-        commands: Arc::new(move |command: wire::WireCommand, reply: wire::Reply| {
+        commands: front.commands(move |command: wire::WireCommand, reply: wire::Reply| {
             commands_desk.post(command.into(), reply);
             Ok(())
         }),
@@ -300,6 +300,7 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
         answering,
         worker: worker_thread,
         outdoors: Outdoors::new(city_root, relay, CityPort { at, token, page }, remote_key),
+        front,
     })
 }
 
@@ -329,6 +330,7 @@ impl Listening {
             answering,
             worker,
             outdoors,
+            front,
         } = self;
         // The terminal this city is running in, if it was asked for. It gets
         // the same desk the socket posts to and the same event stream the
@@ -336,11 +338,13 @@ impl Listening {
         // the first one, reached from the keyboard that started the city.
         if let Some(terminal) = console {
             let watching = config.events.subscribe();
+            let remote = outdoors.keep();
+            front.attend(&remote, Arc::new(|line: &str| println!("{line}")));
             // The same answering function the socket was given.
             let inside = crate::console::Inside {
                 desk: Arc::clone(&desk),
                 answering: Arc::clone(&answering),
-                remote: outdoors.keep(),
+                remote,
             };
             crate::console::start(terminal, inside, watching);
         }

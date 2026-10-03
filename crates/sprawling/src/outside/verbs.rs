@@ -86,6 +86,10 @@ pub(super) fn command_class(command: &wire::WireCommand) -> VerbClass {
         | wire::Command::PutGuide { .. }
         | wire::Command::PutRange(_)
         | wire::Command::DecideProposals(_)
+        | wire::Command::OpenRemoteDoor { .. }
+        | wire::Command::ReplaceCityKey { .. }
+        | wire::Command::ConfirmRemoteDoor { .. }
+        | wire::Command::CloseRemoteDoor { .. }
         | wire::Command::Auth { .. } => VerbClass::LocalOnly,
     }
 }

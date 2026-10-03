@@ -28,7 +28,8 @@ use kernel::IdemKey;
 use super::kind::Command;
 use super::no_secret::NoSecret;
 use super::step::{
-    CitySettings, PolicyChange, ProposalDecisions, RangeWrite, RulesWrite, SessionNaming,
+    CitySettings, DoorAnswer, DoorOpening, DoorStep, PolicyChange, ProposalDecisions, RangeWrite,
+    RulesWrite, SessionNaming,
 };
 
 /// The Command set a socket can carry. `PutSecret` is unreachable because
@@ -76,7 +77,11 @@ impl<Secret> Command<Secret> {
             | Self::DoctorRefresh { ref idem, .. }
             | Self::ConnectToolkit { ref idem, .. }
             | Self::NameSession(SessionNaming { ref idem, .. })
-            | Self::ChangeRunPolicy(PolicyChange { ref idem, .. }) => Some(idem),
+            | Self::ChangeRunPolicy(PolicyChange { ref idem, .. })
+            | Self::OpenRemoteDoor(DoorOpening { ref idem, .. })
+            | Self::ConfirmRemoteDoor(DoorAnswer { ref idem, .. })
+            | Self::ReplaceCityKey(DoorStep { ref idem })
+            | Self::CloseRemoteDoor(DoorStep { ref idem }) => Some(idem),
             Self::PutSecret { .. } | Self::Auth { .. } => None,
         }
     }
@@ -87,17 +92,9 @@ impl From<WireCommand> for Command {
     /// `PutSecret` arm is unreachable because its payload cannot exist.
     fn from(wire: WireCommand) -> Self {
         match wire {
-            Command::Wake {
-                source,
-                subject,
-                body,
-                idem,
-            } => Self::Wake {
-                source,
-                subject,
-                body,
-                idem,
-            },
+            // One line per variant keeps this table inside the function budget.
+            #[rustfmt::skip]
+            Command::Wake { source, subject, body, idem } => Self::Wake { source, subject, body, idem },
             Command::Dispatch {
                 addr,
                 task,
@@ -268,6 +265,10 @@ impl From<WireCommand> for Command {
             Command::PutPreferences { patch, idem } => Self::PutPreferences { patch, idem },
             Command::NameSession(naming) => Self::NameSession(naming),
             Command::ChangeRunPolicy(change) => Self::ChangeRunPolicy(change),
+            Command::OpenRemoteDoor(opening) => Self::OpenRemoteDoor(opening),
+            Command::ReplaceCityKey(step) => Self::ReplaceCityKey(step),
+            Command::ConfirmRemoteDoor(answer) => Self::ConfirmRemoteDoor(answer),
+            Command::CloseRemoteDoor(step) => Self::CloseRemoteDoor(step),
             Command::PutShelved {
                 shelf,
                 name,

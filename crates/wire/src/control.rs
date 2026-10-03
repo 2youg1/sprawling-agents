@@ -160,6 +160,13 @@ pub fn classify(command: &Command) -> ControlVerdict {
         // point, so it interrupts no turn and owes no handoff.
         | Command::NameSession(_)
         | Command::ChangeRunPolicy(_)
+        // The remote door decides who reaches the city from outside; it
+        // reaches no run. Closing it ends remote sessions, which are
+        // connections, not turns.
+        | Command::OpenRemoteDoor { .. }
+        | Command::ReplaceCityKey { .. }
+        | Command::ConfirmRemoteDoor { .. }
+        | Command::CloseRemoteDoor { .. }
         | Command::Auth { .. } => ControlVerdict::NotAnIntervention,
     }
 }

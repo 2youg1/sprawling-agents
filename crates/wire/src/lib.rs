@@ -86,6 +86,7 @@ pub use command::COMMAND_NAMES;
 pub use command::{BodyOverride, EndpointTuning, HeaderPair};
 pub use command::{Carry, Command, WireCommand};
 pub use command::{CitySettings, GovernedDocument, HaltScope, IdentityCard, NoSecret, RulesWrite};
+pub use command::{DoorAnswer, DoorOpening, DoorStep};
 pub use command::{PolicyChange, ProposalDecision, ProposalDecisions, RangeWrite, SessionNaming};
 pub use command::{PursuitStep, Shelf, SpineDocument};
 pub use control::{ControlVerdict, Intervention, classify};
