@@ -30,6 +30,7 @@
 // `[model] effort`, and a copy kept here would ride on every dispatch
 // from this browser and quietly overrule the city's own file.
 
+import { Option, Schema } from "effect";
 import { derived, get, writable } from "svelte/store";
 import type { Readable } from "svelte/store";
 
@@ -37,7 +38,14 @@ import { EDITORS, type Opening } from "./editor";
 import { langOf, type Lang } from "./lang";
 import { browserRows, type Rows } from "./rows";
 import { sizingOf } from "./sizing";
-import { Proxying, Tier as TierSchema, type Chord, type PreferencePatch, type Tier as WireTier } from "../wire";
+import {
+  Proxying,
+  ThemeOverride,
+  Tier as TierSchema,
+  type Chord,
+  type PreferencePatch,
+  type Tier as WireTier,
+} from "../wire";
 import { appearanceOnWire } from "./prefs_city";
 import { CHROMAS, DENSITIES, FACES, GLASSES, LIGHTINGS, MOTIONS, STACK_SHAPE, blendOf, type Appearance } from "./appearance";
 import type { Notifying } from "./notify";
@@ -66,6 +74,10 @@ const ROWS = {
   motion: "sprawling.appearance.motion",
   glass: "sprawling.appearance.glass",
   blend: "sprawling.appearance.blend",
+  // The colours laid over the built-in theme, as the wire spells them
+  // (`crates/wire/spec/Preference.lean` D29), so the cache and the
+  // city's record read through one grammar.
+  theme: "sprawling.appearance.theme",
   // Which rule a provider attached from now on starts with. A person
   // behind a relay settles it once, on the network screen, instead of
   // on every form they open; an endpoint already attached keeps the
@@ -116,6 +128,22 @@ export const PROXYING_RULES: readonly Proxying[] = Proxying.members.map((rule) =
 
 export const NOTIFYINGS: readonly Notifying[] = ["off", "on"];
 
+// The colours the person laid over the built-in theme: CSS colours by
+// `@theme` variable, and a stylesheet of their own laid after them
+// (`crates/wire/spec/Preference.lean` D29). Whole rather than the wire's
+// optional fields, so a reader never asks whether absent means empty.
+export interface Theme {
+  readonly tokens: Readonly<Record<string, string>>;
+  readonly css: string | null;
+}
+
+// Nothing laid over the theme `theme.css` ships: what "restore default" writes.
+export const BUILT_IN_THEME: Theme = { tokens: {}, css: null };
+
+export function themeOf(stated: ThemeOverride): Theme {
+  return { tokens: stated.tokens ?? {}, css: stated.css ?? null };
+}
+
 // ---------------------------------------------------------- the reading
 
 // The person's preferences, whole. One value rather than a dozen
@@ -131,6 +159,7 @@ export interface Preferences {
   readonly panel: boolean;
   readonly tier: Tier;
   readonly appearance: Appearance;
+  readonly theme: Theme;
   readonly proxying: Proxying;
   readonly notifying: Notifying;
   readonly showing: Showing;
@@ -185,6 +214,7 @@ export interface PreferenceDoor {
   // Changes this tab's tier only: nothing stored, nothing told (D47).
   readonly setTier: (tier: Tier) => void;
   readonly setAppearance: (next: Appearance) => void;
+  readonly setTheme: (next: Theme) => void;
   readonly setProxying: (rule: Proxying) => void;
   readonly setNotifying: (switched: Notifying) => void;
   readonly setShowing: (showing: Showing) => void;
@@ -219,6 +249,12 @@ function readBody(raw: string | null): number | null {
 
 function readStack(raw: string | null): string {
   return raw !== null && STACK_SHAPE.test(raw) ? raw : "";
+}
+
+const readThemeRow = Schema.decodeOption(Schema.fromJsonString(ThemeOverride));
+
+function readTheme(raw: string | null): Theme {
+  return raw === null ? BUILT_IN_THEME : Option.match(readThemeRow(raw), { onNone: () => BUILT_IN_THEME, onSome: themeOf });
 }
 
 function readLang(raw: string | null, fallback: string): Lang {
@@ -275,6 +311,7 @@ function readPreferences(rows: Rows, browserLang: string): Preferences {
     panel: rows.getItem(ROWS.panel) !== NO,
     tier: LAUNCH_TIER,
     appearance: readAppearance(rows),
+    theme: readTheme(rows.getItem(ROWS.theme)),
     proxying: readOne(PROXYING_RULES, rows.getItem(ROWS.proxying), "except_local"),
     notifying: readOne(NOTIFYINGS, rows.getItem(ROWS.notifying), "off"),
     showing: readOne(SHOWINGS, rows.getItem(ROWS.showing), "whole"),
@@ -288,6 +325,7 @@ function writePreferences(rows: Rows, next: Preferences): void {
   rows.setItem(ROWS.welcomed, next.welcomed ? YES : NO);
   rows.setItem(ROWS.panel, next.panel ? YES : NO);
   writeAppearance(rows, next.appearance);
+  rows.setItem(ROWS.theme, JSON.stringify(next.theme));
   rows.setItem(ROWS.proxying, next.proxying);
   rows.setItem(ROWS.notifying, next.notifying);
   rows.setItem(ROWS.showing, next.showing);
@@ -343,6 +381,9 @@ export function loadPreferences(rows: Rows, browserLang: string): PreferenceDoor
     setAppearance(appearance) {
       settle({ ...get(held), appearance });
       told({ appearance: appearanceOnWire(appearance) });
+    },
+    setTheme() {
+      return undefined;
     },
     setProxying(proxying) {
       settle({ ...get(held), proxying });

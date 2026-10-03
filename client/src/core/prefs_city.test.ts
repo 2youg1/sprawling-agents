@@ -55,6 +55,18 @@ describe("the preferences the city keeps", () => {
     });
   });
 
+  test("the city's colours replace this browser's, and a city that states none leaves them", () => {
+    const door = loadPreferences(memory(), "en");
+    door.setTheme({ tokens: { "--color-g2": "#202020" }, css: null });
+    const held = get(door.held);
+
+    expect(adopted(held, { theme: { tokens: { "--color-accent": "#3366ff" } } }).theme).toEqual({
+      tokens: { "--color-accent": "#3366ff" },
+      css: null,
+    });
+    expect(adopted(held, {}).theme).toEqual(held.theme);
+  });
+
   test("a city that never heard of the tier or the glass leaves this browser's, and an opacity outside the slider is no opacity", () => {
     const door = loadPreferences(memory(), "en");
     door.setTier("zen");
@@ -77,6 +89,7 @@ describe("the preferences the city keeps", () => {
     door.setProxying("never");
     door.setChord("go.city", "accel+2");
     door.setTier("zen");
+    door.setTheme({ tokens: { "--color-accent": "#3366ff" }, css: ".x {}" });
 
     expect(told).toEqual([
       { lang: "zh" },
@@ -99,6 +112,7 @@ describe("the preferences the city keeps", () => {
       },
       { proxying: "never" },
       { chord: { action: "go.city", spelled: "accel+2" } },
+      { theme: { tokens: { "--color-accent": "#3366ff" }, css: ".x {}" } },
     ]);
   });
 });
