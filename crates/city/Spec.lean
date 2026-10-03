@@ -16,6 +16,7 @@ import crates.city.spec.Governed
 import crates.city.spec.History
 import crates.city.spec.Identity
 import crates.city.spec.Library
+import crates.city.spec.Library.Audit
 import crates.city.spec.Library.Install
 import crates.city.spec.Neighbourhood
 import crates.city.spec.NeighboursTool
@@ -36,7 +37,7 @@ import crates.city.spec.Wizard
 
 本文件是 crate 的规格入口，分部在 `spec/` 下，布局见 ARCHITECTURE.md §11「Specifications in Lean」。接口一节一节写在规定它的那个模块的分部里，每一节保留它的标签 §8-n，别处引作 `crates/city/Spec.lean §8-n`；本文件 §8 列出每个标签住在哪个分部。标签被别的规格与 rustdoc 的引用锚住，所以不重排。决定写作 `D<n>`，放在它所管的声明正上方，或它所管主题的那个分部里，别处引作 `city D<n>`；D7、D12、D14、D15 是空号，§12 末尾列出其余每条住在哪里。
 
-能写成定理的规则在分部里证明，Lean 模型是「必须守住哪些性质」的权威，Rust 代码是「怎样守住」的权威：配置梯子（`spec/ConfigLayers/Ladder.lean`）、写配置先过读者（`spec/ConfigLayers.lean`）、一个地址归哪栋楼管与建楼的三道拒（`spec/Building.lean`）、楼规的求值与写域（`spec/Policy.lean`）、读—判—换的锁（`spec/Document.lean`）、近的书架盖远的（`spec/Library.lean`）、治理文件在一切写域之外（`spec/Governed.lean`、`spec/Policy.lean`）、谁规划（`spec/Vocation.lean`）。其余分部只有节注释：它们写的是接口的形状、取舍与被否的备选，由 Rust 的类型与各模块旁的测试守住（§16）。
+能写成定理的规则在分部里证明，Lean 模型是「必须守住哪些性质」的权威，Rust 代码是「怎样守住」的权威：配置梯子（`spec/ConfigLayers/Ladder.lean`）、写配置先过读者（`spec/ConfigLayers.lean`）、一个地址归哪栋楼管与建楼的三道拒（`spec/Building.lean`）、楼规的求值与写域（`spec/Policy.lean`）、读—判—换的锁（`spec/Document.lean`）、近的书架盖远的（`spec/Library.lean`）、审核绑在内容摘要上（`spec/Library/Audit.lean`）、治理文件在一切写域之外（`spec/Governed.lean`、`spec/Policy.lean`）、谁规划（`spec/Vocation.lean`）。其余分部只有节注释：它们写的是接口的形状、取舍与被否的备选，由 Rust 的类型与各模块旁的测试守住（§16）。
 -/
 
 /-! ## 1 需求分解
@@ -53,7 +54,7 @@ import crates.city.spec.Wizard
 | `spine_files` | 一栋楼开局有哪几份文档，一件活的 JOB.md 落在哪 | `spec/SpineFiles.lean` |
 | `schedule` | 到点发车：谁在什么节奏上自己开始 | `spec/Schedule.lean` |
 | `watch` | 盘上的文件变了，谁该知道 | `spec/Watch.lean` |
-| `library`、`archive` | 书架上有什么、怎么装上去；一条记录存哪里、怎么找回来 | `spec/Library.lean`、`spec/Library/Install.lean`、`spec/Archive.lean` |
+| `library`、`archive` | 书架上有什么、怎么装上去、审过没有；一条记录存哪里、怎么找回来 | `spec/Library.lean`、`spec/Library/Install.lean`、`spec/Library/Audit.lean`、`spec/Archive.lean` |
 | `wizard` | 建城向导 | `spec/Wizard.lean` |
 | `room` | 一个地址是不是房间，会话没指名时开哪一间 | `spec/Room.lean` |
 | `session` | 一段会话开始时清掉什么 | `spec/Session.lean` |
@@ -81,6 +82,7 @@ import crates.city.spec.Wizard
 - `spec/Policy.lean`：不说 `confidential` 或 `write` 即拒（`a_rules_file_that_does_not_say_confidential_is_refused`）；机密楼没有出路（`a_confidential_building_has_no_way_out`）；机密楼的写域止于本楼，没写前缀就是整栋楼（`a_confidential_domain_stays_in_its_building`、`no_prefix_means_the_building_alone`）；楼规与桌面白名单在一切写域之外（`the_rules_are_out_of_every_write_domain`）；留着的规则就是现读的规则（`kept_rules_answer_what_a_read_would`，D3）。
 - `spec/Document.lean`：不在的文档读作空（`a_missing_document_reads_as_no_bytes`）；文件动过即拒且不动（`a_moved_document_is_refused_and_left`）；同一版出发的两次保存只落先到的（`two_saves_from_one_version_land_once`）；锁里的 `n` 次加一恰好加了 `n`，锁外有反例（`increments_under_the_lock_add_up`、`without_the_lock_an_update_is_lost`，D17）。
 - `spec/Library.lean`：一个名字留下最近一格书架上的那一件（`the_nearest_shelf_keeps_the_name`、`the_building_shelf_beats_the_city_and_the_outside`）。
+- `spec/Library/Audit.lean`：显示为已审时轨迹里有对此刻这份摘要的审核（`audited_only_what_was_audited`），内容改成没审过的字节之后不显示为已审（`changed_content_is_never_shown_audited`）；取审核失败不改变书架（`failed_fetches_change_nothing`），也拦不住上架（`a_failed_fetch_never_blocks_an_install`，D19）。
 - `spec/Governed.lean`：三份治理文件在一切写域之外（`the_governed_documents_are_out_of_every_write_domain`）。
 - `spec/Vocation.lean`：规划的恰是 City Hall（`only_the_hall_plans`）。
 
@@ -173,6 +175,7 @@ workspace 内只依赖 `kernel`（ARCHITECTURE.md §3 的 `depmap`），规格�
 | 8-26 | `crates/city/spec/Policy.lean` |
 | 8-27 | `crates/city/spec/Document.lean` |
 | 8-28 | `crates/city/spec/Library/Install.lean` |
+| 8-28b | `crates/city/spec/Library/Audit.lean` |
 | 8-29 | `crates/city/spec/Check.lean` |
 | 8-30 | `crates/city/spec/History.lean` |
 | 8-31 | `crates/city/spec/ConfigLayers.lean` |
@@ -263,6 +266,8 @@ resident 段是模型每回合都读到的四段之一。`URBANITE.md` 建议 30
 | D16 | `[remote]` 只在城那一层，值照写下的读，判在开门时 | `crates/city/spec/ConfigLayers/Remote.lean` |
 | D17 | 读-判-换的门把此刻的字节交给判定，判定留在调用方 | `crates/city/spec/Document.lean` |
 | D18 | 模板与 `City.md` 住进 city 的包目录，不留在 `docs/` | `crates/city/spec/SpineFiles.lean` |
+| D19 | 审核状态从账本与书架摘要读出；审核在落位之后发起，不拦上架 | `crates/city/spec/Library/Audit.lean` |
+| D20 | User 加 skill 只经 `InstallSkill` 一扇门，自带的 skill 编进二进制 | `crates/city/spec/Library/Install.lean` |
 -/
 
 /-! D8 定规：拒词的恢复语归写拒词的那一处

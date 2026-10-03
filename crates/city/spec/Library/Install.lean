@@ -47,7 +47,28 @@ pub fn install(city_root: &Path, slot: &Slot, package: &Path,
 - **staging 原子换入只在 `city::document` 里**：文档经 `document::replace`（暂存文件＋`rename`）；包经 `document::place_tree`——在同一 section 里一个点开头的暂存目录中写齐每一项（每个文件在暂存目录里经 `stage` 写入并 `sync_all`，不再各自暂存改名；扫描跳过点开头的项），再一次 `rename` 把整个目录换进 `<name>/`。目录换入的目标此刻不存在（存在就是 `AlreadyShelved` 或拒），所以读者看到的要么没有这件包、要么整包，没有第三种。上次崩溃留下的同名暂存目录先删掉再写：它从未被换入，没有读者见过它。
 - **内容哈希入 CAS，登记先于换入**：`register` 由装配层供给（本 crate 依赖只有 `kernel`，CAS 归 `storage`；与 `Neighbourhood::scan` 的 `waiting` 同一口径），绑定的是 `storage::Cas::put`。登记的是哈希所算的那串字节——文档登记正文，包登记整包规范串（一个 blob，键就是人批准的哈希，历史能从它还原整包；逐项分别登记会留下一堆没有清单的 blob，整包哈希在 CAS 里指不到任何东西）。登记哈希与 `Installed::hash` 不符即拒（`E_CAS_CORRUPT`）：书架与 CAS 说的是同一份字节才叫有据可查。**来源记名即内容哈希**：盘上那份是现场，CAS 那份是历史（与 JOB.md 同一口径，§8-13 的 hash 答的正是「它变了没有」）。
 - **失败码**：来源不在＝`E_PATH_NOT_FOUND`；来源不是包（缺 `SKILL.md`、既不是目录也不是 `.md` 文件）、包里有链接、包超过大小上限、名字或 section 不可用、名称冲突（含同格 `<name>.md` 与 `<name>/` 并存）＝`E_INVALID_ARGS`（与 `building::create` 的「名字已被占」同码同形）；依据被换＝`E_VERSION_CONFLICT`；登记哈希不符＝`E_CAS_CORRUPT`；落盘失败沿 `document::replace` 的 `E_STORAGE_FATAL`。每条拒因都带动作、主体与可执行的恢复语。
+- **现状：这扇门还没有生产调用者**：今天调用 `install` 的只有 `crates/sprawling/tests/` 下的两个测试，与 D4（没有生产调用者的公开面不留）不合；它留着，因为 D20 的 `InstallSkill` 执行者就是它的生产调用者，落地那一次改动关上这条例外。
 - **外部书架没有臂**：`Slot` 只有两个构造点，城库与楼架。外部书架是别人目录的只读挂载（§8-8），往那里落东西在类型上就拼不出来。
 
 **本节测试**：`library::install::tests`——装上架的字节等于来源字节且扫描读回的 `Holding` 与 `Installed::holding` 整体相等；带子目录与多个文件的包整包落成 `<name>/`、逐项字节相等、登记的一个 blob 的哈希等于 `Installed::hash`；同哈希重装幂等（`AlreadyShelved`，盘上字节不变）；**plan 与 apply 之间来源被换即整体拒收**（`SKILL.md` 被改、多出一项、深层一项被改；拒后盘上无文件、登记零调用）；经符号链接的包恒拒，深层一项是链接也拒且拒词点出那一项；异哈希占名与跨 section 同名各拒一次；同格 `<name>.md` 与 `<name>/` 并存即拒；超过大小上限的包即拒（按句柄报出的长度，不读字节）。`document::tests` 另有一例：目标已在时 `place_tree` 拒收，目标旁不留暂存目录、目标原样。CAS 绑定的端到端一例在 `crates/sprawling/tests/skill_install.rs`（`Cas::put` 兑付 `register`，装上架的内容可按 `Installed::hash` 从 CAS 取回同一份字节）。
+-/
+
+/-! D20 User 加 skill 只有一扇门：`InstallSkill` 的执行者把三种来源都变成一个本地目录，再交给 `library::install`；自带的 skill 编进二进制，经同一扇门放上城库
+
+**决定**：
+- **来源四臂，落点两臂**（wire D32 拼写）：`SkillSource::Path { path }`、`Git { url, rev, subdir }`、`SkillsSh { name }`、`Shipped`；`ShelfChoice::Library { section }` 与 `Building { building, section }` 一对一映到 `Slot::library` 与 `Slot::building`。城外书架没有臂，与 §8-28 同理。
+- **`Path`**：User 写下的路径照原样读；必须是绝对路径（Windows 上是盘符或 UNC 开头，macOS 与 Linux 上以 `/` 开头）或以 `~` 开头（`~` 指 `bin::assembly` 给出的 `Home`，与 §8-8 外部书架同一条规则）；相对路径即拒 `E_INVALID_ARGS`，恢复语说「给出绝对路径」——城的工作目录不是 User 在页面上看到的任何一个目录。随后直接 `install(city_root, slot, path, register)`。
+- **`Git`**：只收 `https://` 地址（`E_INVALID_ARGS` 拒其余：ssh 会读 User 的 ssh 配置并可能等口令，`file://` 与 `Path` 重复）。执行者在 `<city>/.sprawling/` 之下一个按 `idem` 命名、点开头的暂存目录里跑 `git clone --depth 1 [--branch <rev>] <url> <暂存目录>`，环境带 `GIT_TERMINAL_PROMPT=0`，超时 `CLONE_TIMEOUT`（120 s）；git 由 doctor 在 PATH 上找（Windows 上是 `git.exe`），不在即拒 `E_TOOL_UNAVAILABLE`，恢复语说出 doctor 给的安装行；clone 失败拒 `E_TOOL_UNAVAILABLE`，主体带 git 标准错误的最后一行，恢复语「在浏览器里打开这个地址确认它存在，再试一次」；超时拒 `E_TIMEOUT`。`subdir` 缺席时包根就是仓库根。之后 `plan_install` 读暂存目录里那一层，`apply` 落位；暂存目录无论成败都删掉，上次崩溃留下的同名暂存目录先删再 clone（与 `place_tree` 的暂存同一口径）。`.git/` 不是包的一部分：clone 之后、预检之前删掉它，因为它不是 skill 的内容，而它的对象文件会让整包超过 `PACKAGE_BYTES_LIMIT`。
+- **`SkillsSh`**：名字是 `<owner>/<repo>/<skill>` 三段（与 skills.sh 页面上的写法相同），换成 `Git { url: https://github.com/<owner>/<repo>, rev: None, subdir }`，`subdir` 是 clone 里**唯一一个**名为 `<skill>`、内含 `SKILL.md` 的目录；零个或多于一个即拒 `E_INVALID_ARGS`，拒词列出找到的候选。审核随后按 D19 去问 skills.sh 的同一个名字。
+- **`Shipped`：自带的 skill 编进二进制**。源树的 `skills/` 在构建时经 city 的构建脚本写进 `OUT_DIR` 并 `include_bytes!`（`xtask packaged` 准许的两处之一），所以四条安装渠道——发行归档、安装脚本（只复制二进制）、npm 与 `cargo binstall`（都只带二进制）、`cargo install`（crates.io 的包里只有包目录）——得到同一份自带 skill；为此源树根上的 `skills/` 搬进 city 的包目录、仍叫 `skills/`（与 city D18 把模板搬进包目录同一条理由），引用它的文档同一次改动改路径，归档的 Skills 部分（`tools/xtask/src/package/contents.rs`）改读新路径。执行者把每一件经 `install` 放进城库的 `shipped` 格（`SHIPPED_SECTION`），来源是一个从内嵌字节在暂存目录里写出的目录，于是预检、原子落位与 CAS 登记仍只有 §8-28 一处。同哈希的那一件答 `AlreadyShelved`，不写一个字节；架上同名而内容不同（User 改过）即按 §8-28 拒，那一件留在架上，拒词说出名字。
+- **何时放自带的**：新城由向导建成的那一刻放一次（`Shipped`，城库）；已有的城不自动放——它的书架上没有某件自带 skill，可能正是 User 拿下了它——书架页给一个放自带 skill 的控件，发的是同一条 `InstallSkill { source: Shipped }`。放上书架不等于准入：阅览室仍只收 `RULES.toml` 的 `reading_room` 写下的名字（§8-8）。
+- **答复**：命令按 `idem` 回执；成功之后页面重读书架（已有的书架查询），失败经命令的拒词回到页面。审核由 D19 在落位之后另起，不进这次答复。
+
+**理由**：§8-28 已经是预检、原子落位与内容哈希的唯一入口，三种远处的来源在门外变成一个本地目录，门里一行不改，规则就只有一份。自带 skill 编进二进制，是因为只有发行归档在二进制旁边带 `skills/`，安装脚本只复制二进制，其余渠道也只有二进制；按「二进制旁边」去找，在四条渠道里有三条找到空。新城自动放、旧城不放，是因为旧城的空书架是 User 的状态，不是缺失。
+
+**被否**：①按 `current_exe()` 旁边的 `skills/` 去找：只在解开的归档里成立；②客户端拼一个 `PutShelved` 把文件逐个发来：`PutShelved` 只携一份文本，包里的目录与脚本进不来，而且预检会在页面与城里各有一份；③每次开城把缺的自带 skill 补回去：User 拿下的那件会在下次开城时回来；④用库克隆（`gix`）代替 git 程序：多一棵依赖树，换来的只是不需要 PATH 上的 git，而 doctor 已经为工作树找 git。
+
+**重开参数**：自带 skill 的总字节超过 1 MiB，或 User 要求不带自带 skill 的二进制时，重议内嵌；`CLONE_TIMEOUT` 与 `SHIPPED_SECTION` 是推断值，各是一个常量。
+
+**三个平台**：内嵌与安装渠道无关，三个平台上自带 skill 都在二进制里；城库在三个平台上都是 `<city>/.sprawling/library/shipped/`；git 在 Windows 上找 `git.exe`，在 macOS 与 Linux 上找 `git`，都按 PATH。
 -/
