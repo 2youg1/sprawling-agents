@@ -11,14 +11,15 @@
   // down to a parser room and sends it a signal without waiting; the
   // child room opens on the planner's words, named and linked rather
   // than signed "you", pulls the signals waiting for it, and still has
-  // two more queued; the sessions pane says which resident delegated the
-  // child's session.
+  // two more queued. The sessions pane's rows of the two, and the
+  // openings the User and the city dispatched, are the cases of
+  // `agent_children.svelte`.
   //
   // The send and the pull are drawn the way the generic tool line draws
   // them; a received signal as a letter, a reply wait and a handback are
   // the cases of `agent_letters.svelte` (client D86).
 
-  import type { Answer, Call, EventKind, EventRecord, Query, SessionLine, SignalLine, Turn } from "../../wire";
+  import type { Answer, Call, EventKind, EventRecord, Query, SignalLine, Turn } from "../../wire";
   import { Address, B3Hash, RunId, Seq, TimeMs, Tokens } from "../../wire";
 
   export const PARENT = Address.make("lab/planner");
@@ -112,6 +113,7 @@
           task,
           goal: run === CHILD_RUN ? CHILD_GOAL : "",
           dispatched_by: by,
+          parent: run === CHILD_RUN ? PARENT_RUN : null,
           policy: { mode: "work", write: "full", admit: "standing", landing: "ordinary" },
         },
         worktree: null,
@@ -127,19 +129,6 @@
     ];
   }
 
-  // Each room's one session: the planner's opened by the User, the
-  // parser's dispatched.
-  function sessionsOf(room: string, now: number): SessionLine[] {
-    return RUNS.filter(([, at]) => at === room).map(([, , seq], index): SessionLine => ({
-      began: Seq.make(seq),
-      last: Seq.make(seq + 2),
-      at: TimeMs.make(startOf(seq, now) + 60_000),
-      runs: 1,
-      model: MODEL,
-      start: room === CHILD ? { dispatched: { by: null } } : { opened: { carry: index === 0 ? "nothing" : "handoff", from: null } },
-    }));
-  }
-
   export function answering(now: number): (query: Query) => Answer | undefined {
     return (query) => {
       if (query === "preferences") return { preferences: { tags: [] } };
@@ -148,30 +137,22 @@
       if ("inbox_view" in query) {
         return { inbox: { addr: query.inbox_view.addr, waiting: query.inbox_view.addr === CHILD ? queued(now) : [] } };
       }
-      if ("sessions" in query) return { sessions: { room: query.sessions.room, sessions: sessionsOf(query.sessions.room, now), earlier: 0 } };
       return undefined;
     };
   }
 </script>
 
 <script lang="ts">
-  import { say } from "../../core/lang";
   import { ui } from "../../ui";
   import Talk from "../talk.svelte";
-  import Sessions from "../world/sessions.svelte";
   import Case from "./case.svelte";
   import Stand from "./stand.svelte";
 
   const u = ui();
-  const { lang } = u;
   const now = u.now();
   const records = recordsAt(now);
   const answers = answering(now);
 </script>
-
-{#snippet head()}
-  <h2 class="flex h-control shrink-0 items-center text-note text-text-faint">{say($lang, "world_sessions")}</h2>
-{/snippet}
 
 <Case label="agent messages · a child room opened by a resident, a pulled signal, two signals queued" width={760}>
   <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} {answers} {records}>
@@ -189,10 +170,3 @@
   </Stand>
 </Case>
 
-<Case label="agent messages · session rows of a parent and the child it delegated" width={360}>
-  <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} {answers} {records}>
-    <div class="flex h-[360px] flex-col">
-      <Sessions here={CHILD} narrow={false} {head} />
-    </div>
-  </Stand>
-</Case>

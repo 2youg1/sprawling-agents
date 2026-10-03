@@ -147,10 +147,12 @@
   // Who the opening task came from (`Opening.dispatched_by`): the User's
   // own words are "you", a task a resident handed down names that
   // resident and links to its room, and one the city's desk dispatched
-  // says so. The room and not the session, because the opening names
-  // the dispatching room and not the run it spoke from.
+  // says so. The link goes to the run that delegated the task
+  // (`Opening.parent`), whose page is the parent's session; a ledger
+  // written before the parent was recorded links to the resident's room.
   const from = $derived.by((): { readonly label: string; readonly href: string | undefined } => {
     const by = dispatcherOf(answer?.opening?.dispatched_by);
+    const parent = answer?.opening?.parent ?? null;
     if (by === null) return { label: say($lang, "talk_you"), href: undefined };
     switch (by.kind) {
       case "person":
@@ -160,7 +162,7 @@
       case "resident":
         return {
           label: fill(say($lang, "talk_dispatched_by"), { who: called(by.address, answer?.opening?.names?.mayor, $lang) }),
-          href: toFragment({ kind: "talk", address: by.address }),
+          href: toFragment(parent === null ? { kind: "talk", address: by.address } : { kind: "run", run: parent }),
         };
     }
   });
