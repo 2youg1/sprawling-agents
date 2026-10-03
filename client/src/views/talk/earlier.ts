@@ -13,5 +13,5 @@ export type EarlierDrawn = "none" | "folded" | "open";
 
 export function earlierDrawn(shown: number, earlier: number): EarlierDrawn {
   if (earlier === 0) return "none";
-  return shown < 0 ? "open" : "folded";
+  return shown === 0 ? "open" : "folded";
 }

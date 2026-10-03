@@ -324,7 +324,7 @@ composition is rebuilt on the way. -->
       {#if runs.length > 0}
         <div class="mb-base flex justify-end"><Showing /></div>
         {#if drawsCalls($held.showing)}
-          <Divider {earlier} boundary={story} onFork={doFork} onRetry={send} />
+          <Divider {earlier} shown={shown.length} boundary={story} onFork={doFork} onRetry={send} />
           {#each shown as run, at (run.run)}
             <Thread {run} opens={at === 0} onFork={doFork} onRetry={send} />
           {/each}

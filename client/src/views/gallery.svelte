@@ -43,6 +43,7 @@
   import Fmt from "./gallery/fmt.svelte";
   import G1 from "./gallery/g1.svelte";
   import G3 from "./gallery/g3.svelte";
+  import Folded from "./gallery/folded.svelte";
   import Followed from "./gallery/followed.svelte";
   import G5 from "./gallery/g5.svelte";
   import Hints from "./gallery/hints.svelte";
@@ -115,6 +116,7 @@
   <Talking />
   <Thr />
   <G1 />
+  <Folded />
   <Followed />
   <Anchored />
   <Produced />

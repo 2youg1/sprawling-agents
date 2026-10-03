@@ -11,6 +11,7 @@
   import { ui } from "../../ui";
   import { motherName } from "./forking";
   import type { Boundary, ForkPlan } from "./forking";
+  import { earlierDrawn } from "./earlier";
   import Thread from "./thread.svelte";
 
   interface Props {
@@ -19,17 +20,23 @@
     // neither a dialog nor a route is the right weight for a scroll
     // (ux B7).
     readonly earlier: readonly RunBelief[];
+    // How many runs the session now open holds, which decides whether
+    // the earlier stretch starts open (client D80).
+    readonly shown: number;
     readonly boundary: Boundary | null;
     readonly onFork: (plan: ForkPlan) => void;
     readonly onRetry: (task: string) => void;
   }
 
-  const { earlier, boundary, onFork, onRetry }: Props = $props();
+  const { earlier, shown, boundary, onFork, onRetry }: Props = $props();
 
   const { lang, conn } = ui();
   const belief = conn.belief;
 
-  let open = $state(false);
+  // The person's own choice, once they press the line; until then the
+  // rule both modes share decides.
+  let pressed = $state<boolean | null>(null);
+  const open = $derived(pressed ?? earlierDrawn(shown, earlier.length) === "open");
 
   // The count is the folded runs themselves: what expands is one thread
   // per run, so the number a person reads is the number of things the
@@ -76,7 +83,7 @@
       class="rounded-control px-tight hover:bg-chrome hover:text-text-quiet"
       aria-expanded={open}
       onclick={() => {
-        open = !open;
+        pressed = !open;
       }}
     >
       {holding} · {open ? say($lang, "session_collapse") : say($lang, "session_expand")}
