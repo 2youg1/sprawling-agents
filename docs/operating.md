@@ -143,12 +143,22 @@ The remote door lets a phone or a second computer reach a city that runs on this
 | `/remote devices` | One line per paired device: its name, `watch` or `act`, and its id. |
 | `/remote revoke <name>` or `--all` | Forgets the device; its sessions end. |
 | `/remote close` | Closes the door. Paired devices stay paired. |
+| `/remote replace-key` | Makes a new city key and revokes every paired device, so each one pairs again; a device that was revoked stays revoked. Refused while the door is open, because open sessions were made with the old key: close the door first. |
 
 Nothing that widens access, reaches a credential, or changes the machine or the city's rules can be done from a device, whatever it was paired as: attaching an endpoint, choosing a model, writing rules or configuration, installing a tool, raising or removing a building. Those stay at the machine the city runs on. The full list is the `class` column of `crates/wire/Spec.lean` §19-2.
 
 The history records `remote_opened`, `device_paired`, `remote_session_started`, `device_revoked` and `remote_closed`, without keys, pairing codes or session ids.
 
-The city's key lives only in the running process, so a device paired now pairs again after the city restarts.
+The city's key is kept in the city's vault, one key per city, and `sprawling export` does not carry it. How long a pairing lasts is how long the vault keeps the key on this platform; `/remote open` and `/remote replace-key` print which one applies, and the dependencies page shows it as `custody`:
+
+| Platform | Where the key is kept | A paired device pairs again |
+|---|---|---|
+| Windows | Credential Manager | only after `/remote replace-key` or a revoke; restarts of the city and the computer keep the key |
+| macOS | the Keychain | the same as Windows; after the binary is updated, the Keychain may ask once more whether `sprawling` may read the entry |
+| Linux | the kernel keyring (keyutils) | after the computer reboots, because the keyring keeps the key only until then; with the encrypted vault file, whose passphrase you type when the city starts, the key is kept across reboots |
+| any, when no system store answers | the city's own memory | every time the city restarts |
+
+Any program that runs as your user account can read that account's credential store, the same as for a provider key.
 
 ### Choosing the route
 

@@ -48,12 +48,14 @@ export const VERBS: readonly (readonly [string, Key])[] = [
   ["/remote devices", "remote_verb_devices"],
   ["/remote revoke <name>", "remote_verb_revoke"],
   ["/remote close", "remote_verb_close"],
+  ["/remote replace-key", "remote_verb_replace_key"],
 ];
 
 // What a pairing looks like from start to end, one numbered step each:
 // what the User does at the city's console, what the other device
-// opens, and what it shows. The door's verbs are not on the wire
-// (`crates/remote_access/Spec.lean` D4), so a step that happens at the
+// opens, and what it shows. Pairing stays at the console
+// (`crates/remote_access/Spec.lean` D4: an invitation shown on a page is
+// read by whatever drives the page), so a step that happens at the
 // console carries its spelling and a copy key, never a button.
 export interface Step {
   readonly key: Key;

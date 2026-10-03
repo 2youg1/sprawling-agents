@@ -6870,5 +6870,9 @@
   "copy_note": {
     "en": "Puts this on the clipboard exactly as written: {text}",
     "zh": "把这段原样放进剪贴板：{text}"
+  },
+  "remote_verb_replace_key": {
+    "en": "makes a new city key; every device pairs again",
+    "zh": "换一把新的城钥匙，每台设备都要重新配对"
   }
 }
