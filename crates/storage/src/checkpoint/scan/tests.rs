@@ -225,8 +225,6 @@ fn a_staged_blob_the_scan_cannot_read_refuses_the_checkpoint() {
     lose_the_object_of(later.path(), "work/b.md");
     let on_later = checkpoint.scan_staged();
 
-    let refused = |result: Result<(), StorageError>| {
-        matches!(result, Err(StorageError::Checkpoint { op, .. }) if op == "scan a staged file")
-    };
+    let refused = |result: Result<(), StorageError>| matches!(result, Err(StorageError::Checkpoint { op, .. }) if op == "scan a staged file");
     assert_eq!((refused(on_first), refused(on_later)), (true, true));
 }

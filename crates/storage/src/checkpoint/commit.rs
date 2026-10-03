@@ -217,7 +217,20 @@ impl Checkpoint {
             if entry.kind() != Some(git2::ObjectType::Blob) {
                 return git2::TreeWalkResult::Ok;
             }
-            let path = format!("{dir}{}", entry.name().unwrap_or_default());
+            // An address is UTF-8, so a name that is not cannot be swept
+            // to a `file:` address; reading it as its directory would hide
+            // a deletion.
+            let Ok(name) = entry.name() else {
+                fault = Some(StorageError::Checkpoint {
+                    op: "sweep the working tree",
+                    detail: format!(
+                        "{dir}{}: the checkpoint holds a name that is not UTF-8",
+                        String::from_utf8_lossy(entry.name_bytes())
+                    ),
+                });
+                return git2::TreeWalkResult::Abort;
+            };
+            let path = format!("{dir}{name}");
             match std::fs::symlink_metadata(workdir.join(&path)) {
                 Ok(_) => {}
                 Err(err) if err.kind() == std::io::ErrorKind::NotFound => deleted.push(path),

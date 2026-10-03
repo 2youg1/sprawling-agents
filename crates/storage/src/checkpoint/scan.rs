@@ -16,6 +16,10 @@ use super::commit::{Checkpoint, git_err};
 use super::opening::{HeadMove, commit_refused};
 use super::provenance::Provenance;
 
+/// The index mode of a submodule entry: a commit of another repository,
+/// which this repository's object database does not hold.
+const GITLINK: u32 = 0o160_000;
+
 pub(crate) mod pathspec;
 mod stage_filter;
 use stage_filter::{StageFilter, workdir};
@@ -44,7 +48,9 @@ impl Checkpoint {
             // writing all of it, so all of it is read.
             None => {
                 for entry in index.iter() {
-                    self.scan_blob(entry.id, &String::from_utf8_lossy(&entry.path), &mut hits);
+                    if entry.mode != GITLINK {
+                        self.scan_blob(entry.id, &String::from_utf8_lossy(&entry.path), &mut hits)?;
+                    }
                 }
             }
             // git is asked what changed, the same way `wave_post` asks it
@@ -57,10 +63,14 @@ impl Checkpoint {
                     .map_err(git_err("diff checkpoint against the staged tree"))?;
                 for delta in diff.deltas() {
                     let staged = delta.new_file();
-                    let Some(path) = staged.path().and_then(|p| p.to_str()) else {
+                    // A deletion names no new content, and a submodule's
+                    // commit is not this repository's to read.
+                    if staged.id().is_zero() || staged.mode() == git2::FileMode::Commit {
                         continue;
-                    };
-                    self.scan_blob(staged.id(), &path.replace('\\', "/"), &mut hits);
+                    }
+                    let path = String::from_utf8_lossy(staged.path_bytes().unwrap_or_default())
+                        .replace('\\', "/");
+                    self.scan_blob(staged.id(), &path, &mut hits)?;
                 }
             }
         }
@@ -73,16 +83,30 @@ impl Checkpoint {
     }
 
     /// One blob against the secret shapes, appending `path:start+len` per
-    /// match. An id the object database will not hand back as a blob is
-    /// skipped: a deletion names no new content, and a submodule is not
-    /// this repository's to read.
-    fn scan_blob(&self, id: git2::Oid, path: &str, hits: &mut Vec<String>) {
-        let Ok(blob) = self.repo.find_blob(id) else {
-            return;
-        };
+    /// match.
+    ///
+    /// # Errors
+    /// A blob the object database will not hand back: a byte that enters
+    /// the tree unread breaks "every byte that entered the tree was scanned
+    /// once" (`crates/storage/spec/Checkpoint.lean` §8-8), so the checkpoint
+    /// is refused rather than the blob skipped.
+    fn scan_blob(
+        &self,
+        id: git2::Oid,
+        path: &str,
+        hits: &mut Vec<String>,
+    ) -> Result<(), StorageError> {
+        let blob = self
+            .repo
+            .find_blob(id)
+            .map_err(|err| StorageError::Checkpoint {
+                op: "scan a staged file",
+                detail: format!("{path}: {}", err.message()),
+            })?;
         for span in scan(blob.content()) {
             hits.push(format!("{path}:{}+{}", span.start, span.len));
         }
+        Ok(())
     }
 
     /// The tree the last checkpoint committed, or `None` when this city
@@ -117,7 +141,7 @@ impl Checkpoint {
     /// Only an unborn branch and a missing reference mean "none yet";
     /// anything else that stops HEAD being read is an error, because
     /// reading it as "none" would turn the next checkpoint into a parentless
-    /// root commit cut off from the history before it (`crates/storage/spec/Checkpoint/Provenance.lean` §8-17).
+    /// root commit cut off from the history before it (`crates/storage/spec/Checkpoint.lean` §8-8).
     pub(super) fn head_commit(
         repo: &git2::Repository,
     ) -> Result<Option<git2::Commit<'_>>, StorageError> {

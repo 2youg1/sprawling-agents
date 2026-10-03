@@ -155,7 +155,7 @@ impl Provenance {
             self.run,
             self.actor.as_str(),
             self.model,
-            effort_word(recorded_effort(self.effort)),
+            recorded_effort(self.effort).as_str(),
             self.city,
         );
         if let Some(predecessor) = self.predecessor {
@@ -181,23 +181,6 @@ const CITY_PREFIX_HEX: usize = 12;
 #[must_use]
 pub fn recorded_effort(effort: Option<Effort>) -> Effort {
     effort.unwrap_or(Effort::None)
-}
-
-/// How an effort is spelled, taken from `kernel::Effort`'s own serde
-/// names so this repository has one authority for the word rather than a
-/// second table that drifts. A `match` here would be that second table:
-/// it would compile while spelling one level differently from the wire.
-///
-/// Public because three readers show a person this word — the commit's
-/// trailers, the ledger payload beside them, and `sprawling whose` —
-/// and three spellings of one effort is how a reader starts doubting
-/// all three.
-#[must_use]
-pub fn effort_word(effort: Effort) -> String {
-    serde_json::to_value(effort)
-        .ok()
-        .and_then(|value| value.as_str().map(str::to_owned))
-        .unwrap_or_else(|| "none".to_owned())
 }
 
 #[cfg(test)]
@@ -277,8 +260,7 @@ mod tests {
         // now settled once instead of at each output.
         assert_eq!(recorded_effort(None), Effort::None);
         assert_eq!(recorded_effort(Some(Effort::High)), Effort::High);
-        assert_eq!(effort_word(recorded_effort(None)), "none");
-        assert_eq!(effort_word(Effort::XHigh), "xhigh");
+        assert_eq!(recorded_effort(None).as_str(), "none");
     }
 
     #[test]

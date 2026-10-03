@@ -106,7 +106,7 @@ fn write_commit(said: &wire::CommitAnswer, out: &mut impl Write) -> std::io::Res
     writeln!(
         out,
         "model   {model} (effort {})",
-        storage::effort_word(storage::recorded_effort(said.effort))
+        storage::recorded_effort(said.effort).as_str()
     )?;
     writeln!(out, "ledger  seq {}", said.seq.value())?;
     for before in said.lineage.iter().skip(1) {

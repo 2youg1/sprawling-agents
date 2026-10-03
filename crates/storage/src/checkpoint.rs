@@ -40,4 +40,4 @@ pub(crate) mod scan;
 
 pub use base::BaseProgress;
 pub use commit::Checkpoint;
-pub use provenance::{ModelChoice, Provenance, effort_word, recorded_effort};
+pub use provenance::{ModelChoice, Provenance, recorded_effort};

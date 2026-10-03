@@ -70,10 +70,8 @@ impl Provenance {
 /// 没人点过的档位怎么记：记成 `Effort::None`。
 /// `Option` 划出的那条线（由提供方决定 / 要它别想）从未上过 trailer 或账本，
 /// 两边一向都写 `none`；这个坍缩全仓只在这里发生一次。
+/// 档位的拼法只有一个权威：`kernel::Effort::as_str`；trailer 与 `sprawling whose` 都问它。
 pub fn recorded_effort(effort: Option<kernel::Effort>) -> Effort;
-
-/// 档位怎么拼的唯一权威（取自 `kernel::Effort` 的 serde 名）。
-pub fn effort_word(effort: kernel::Effort) -> String;
 ```
 
 - **键的权威在 kernel。** `model` / `effort` / `predecessor` 三个键由

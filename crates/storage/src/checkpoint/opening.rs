@@ -96,13 +96,20 @@ impl Checkpoint {
     /// repository is a valid state, and inventing history here would
     /// make the first checkpoint unattributable.
     ///
+    /// Initialises only where there is no repository: a repository that is
+    /// there and does not open (a damaged `.git`, a permission refused) is
+    /// refused, because initialising over it would hide the history it holds.
+    ///
     /// # Errors
-    /// A repository that neither opens nor initialises, and a
-    /// configuration that cannot be read or written.
+    /// A repository that is there and does not open, one that cannot be
+    /// initialised, and a configuration that cannot be read or written.
     pub fn open(city_root: &Path) -> Result<Checkpoint, StorageError> {
         let repo = match git2::Repository::open(city_root) {
             Ok(repo) => repo,
-            Err(_) => git2::Repository::init(city_root).map_err(git_err("init repository"))?,
+            Err(err) if err.code() == git2::ErrorCode::NotFound => {
+                git2::Repository::init(city_root).map_err(git_err("init repository"))?
+            }
+            Err(err) => return Err(git_err("open the city repository")(err)),
         };
         // The city's files round-trip byte for byte, whatever this
         // machine's git is configured to do to other people's
