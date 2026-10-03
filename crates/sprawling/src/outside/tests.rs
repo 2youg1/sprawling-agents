@@ -33,6 +33,8 @@ use super::conduit::{Conduit, Step};
 use super::console::{Lasting, RemoteLine, parse};
 use super::keeper::{CityKey, Doorway, Keeping, Revoking, Senses};
 
+mod expiry;
+
 /// Every kind a door wrote, in the order it wrote them.
 #[derive(Clone, Default)]
 struct Written(Arc<Mutex<Vec<EventKind>>>);
