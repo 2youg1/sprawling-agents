@@ -6,10 +6,10 @@
 //! The engine half of the render gate: find a browser, open the gallery
 //! out of the bundle a person runs, and read back what was drawn.
 
-use std::io::Read as _;
+pub(crate) mod launch;
+
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
-use std::sync::mpsc;
+use std::process::Command;
 use std::time::Duration;
 
 use super::pass::{HEIGHT, Pass, Reported};
@@ -35,17 +35,10 @@ const FORCED_COLOURS: &str = "--force-high-contrast";
 /// at, in the same virtual time the probe's own wait is counted in.
 pub(crate) const BUDGET_MS: u32 = 8000;
 
-/// How often an opening's engine is asked whether it has finished.
-const POLL: Duration = Duration::from_millis(100);
-/// How many polls an opening gets before the gate calls the engine stuck:
+/// How long an opening's engine may run before the gate calls it stuck:
 /// two minutes, fifteen times the virtual budget, so only an engine that
 /// will never finish reaches it.
-const PATIENCE_POLLS: u32 = 1200;
-/// How long the DOM may keep arriving after the engine has exited. The
-/// engine writes the whole dump before it exits, so this only drains a
-/// pipe; its helper processes may hold the pipe open far longer, which is
-/// why the dump is not read to its end.
-const DRAIN: Duration = Duration::from_secs(2);
+const PATIENCE: Duration = Duration::from_secs(120);
 
 /// The Chromium family as the doctor states it: one brand per line,
 /// with the program a shell resolves and where each platform installs
@@ -198,9 +191,14 @@ pub(super) fn measure(opening: &Opening, pass: &Pass) -> Result<Measured, XtaskE
         .arg(format!("--virtual-time-budget={BUDGET_MS}"))
         .arg("--dump-dom")
         .arg(format!("{}#/{route}", url_of(&instrumented)));
-    let dumped = dump(
+    let dumped = launch::run(
         command,
-        &format!("{} --dump-dom {route}", browser.display()),
+        &launch::Launch {
+            cmd: &format!("{} --dump-dom {route}", browser.display()),
+            stderr: launch::Stderr::Discarded,
+            patience: PATIENCE,
+            after_exit: launch::AfterExit::Drain,
+        },
     );
     let _ = std::fs::remove_file(&instrumented);
     let dumped = dumped?;
@@ -260,71 +258,6 @@ pub(super) fn measure(opening: &Opening, pass: &Pass) -> Result<Measured, XtaskE
         }),
         reported: Reported::read(forced, scheme),
     })
-}
-
-/// Runs the engine and takes what it wrote to stdout, without waiting for
-/// the pipe to close and without waiting for ever.
-///
-/// Reading to the end of stdout, as `Command::output` does, waits for every
-/// process holding the pipe, and a Chromium-family engine leaves helper
-/// processes that hold it after the browser itself exits; on a macOS runner
-/// that wait never ended. So the dump is read as it arrives, the browser's
-/// own exit is what ends the wait, and an engine that does not exit within
-/// the patience is killed and reported rather than waited on.
-pub(crate) fn dump(mut command: Command, cmd: &str) -> Result<Vec<u8>, XtaskError> {
-    let failed = |msg: String| XtaskError::Cmd {
-        cmd: cmd.to_owned(),
-        msg,
-    };
-    let mut child = command
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .spawn()
-        .map_err(|err| failed(err.to_string()))?;
-    let mut stdout = child
-        .stdout
-        .take()
-        .ok_or_else(|| failed("the engine was started without a stdout to read".to_owned()))?;
-    let (send, arrived) = mpsc::channel::<Vec<u8>>();
-    std::thread::spawn(move || {
-        let mut chunk = [0u8; 64 * 1024];
-        while let Ok(read) = stdout.read(&mut chunk) {
-            let Some(bytes) = chunk.get(..read).filter(|bytes| !bytes.is_empty()) else {
-                break;
-            };
-            if send.send(bytes.to_vec()).is_err() {
-                break;
-            }
-        }
-    });
-    let mut exited = false;
-    for _ in 0..PATIENCE_POLLS {
-        if child
-            .try_wait()
-            .map_err(|err| failed(err.to_string()))?
-            .is_some()
-        {
-            exited = true;
-            break;
-        }
-        std::thread::sleep(POLL);
-    }
-    if !exited {
-        let killed = child.kill().map_or_else(
-            |err| format!("; killing it failed too: {err}"),
-            |()| String::new(),
-        );
-        return Err(failed(format!(
-            "the engine did not finish within {} s{killed}; run the same command by hand to see where it stops",
-            PATIENCE_POLLS.saturating_mul(100) / 1000
-        )));
-    }
-    let mut dom = Vec::new();
-    while let Ok(bytes) = arrived.recv_timeout(DRAIN) {
-        dom.extend_from_slice(&bytes);
-    }
-    Ok(dom)
 }
 
 /// What the probe left in one of its two elements, if it ran.

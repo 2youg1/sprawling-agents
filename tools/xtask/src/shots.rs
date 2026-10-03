@@ -17,7 +17,7 @@ mod pages;
 
 use std::path::Path;
 
-use camera::{Camera, Source};
+use camera::{Camera, Source, Took};
 use pages::{FRAMES, Shot};
 
 use crate::report::XtaskError;
@@ -71,7 +71,7 @@ pub(crate) fn run(root: &Path, args: &[String]) -> Result<String, XtaskError> {
     let camera = Camera::open(&browser, &out, source)?;
     let taken = take(&camera, &routes, &out);
     camera.close()?;
-    let shots = taken?;
+    let (shots, retried) = taken?;
     let index = out.join("index.md");
     std::fs::write(&index, pages::index(&shots)).map_err(|source| XtaskError::Io {
         path: walk::rel(root, &index),
@@ -91,25 +91,43 @@ pub(crate) fn run(root: &Path, args: &[String]) -> Result<String, XtaskError> {
         });
     }
     Ok(format!(
-        "{} pictures of {} pages in {OUT}; the index is {OUT}/index.md\n",
+        "{} pictures of {} pages in {OUT}; the index is {OUT}/index.md; each engine's stderr \
+         is in {OUT}/engine\n{}",
         shots.len(),
-        routes.len()
+        routes.len(),
+        retried
+            .iter()
+            .map(|(case, why)| format!("retried once: {case}, after {why}\n"))
+            .collect::<String>()
     ))
 }
 
-/// Every picture of every route, in route order, then window, then fold.
-fn take(camera: &Camera<'_>, routes: &[String], out: &Path) -> Result<Vec<Shot>, XtaskError> {
+/// Every picture of every route, in route order, then window, then fold,
+/// and each case that took a second try with why its first failed.
+fn take(camera: &Camera<'_>, routes: &[String], out: &Path) -> Result<Taken, XtaskError> {
     let mut shots = Vec::new();
+    let mut retried = Vec::new();
+    let mut note = |case: String, took: Took| match took {
+        Took::First => {}
+        Took::Retried(why) => retried.push((case, why)),
+    };
     for route in routes {
         for frame in FRAMES {
-            for shot in pages::shots_of(route, frame, &camera.folds(route, frame)?) {
-                camera.shoot(&shot, &out.join(shot.file()))?;
+            let (folds, took) = camera.folds(route, frame)?;
+            note(format!("{route} at {} (measuring)", frame.width), took);
+            for shot in pages::shots_of(route, frame, &folds) {
+                let took = camera.shoot(&shot, &out.join(shot.file()))?;
+                note(shot.file(), took);
                 shots.push(shot);
             }
         }
     }
-    Ok(shots)
+    Ok((shots, retried))
 }
+
+/// The pictures one run took, and the cases it ran twice with the reason
+/// the first try failed.
+type Taken = (Vec<Shot>, Vec<(String, String)>);
 
 /// The served city named after `--origin`, if one is; any other
 /// argument is refused rather than ignored.
