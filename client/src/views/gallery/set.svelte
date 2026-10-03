@@ -7,8 +7,9 @@
   // The settings panel's content - the tree and one group beside it - at
   // the panel's own width, in the states the new groups have: both
   // identity cards read, an identity area that does not read, a
-  // building's rules, the city's automation, and the run group with the
-  // city's own layer. The panel's `<dialog>` is not mounted here: a
+  // building's rules, the city's automation, the run group, and the
+  // accounts group, which holds the city's own layer beside the default
+  // model (client D52). The panel's `<dialog>` is not mounted here: a
   // modal covers every other specimen on this route, so the fixture
   // draws what the dialog holds (`views/settings/sheet.svelte`).
 
@@ -92,6 +93,7 @@
     ["rules", STATED, 1040],
     ["automation", STATED, 1040],
     ["run", STATED, 1040],
+    ["accounts", STATED, 1040],
     ["you", STATED, 390],
   ] as const;
 </script>
