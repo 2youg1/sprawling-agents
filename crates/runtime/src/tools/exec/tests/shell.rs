@@ -160,3 +160,32 @@ fn the_tally_counts_ended_shell_lines_per_interpreter_and_nothing_else() {
         ]
     );
 }
+
+/// The description names the interpreter a shell line runs under, in
+/// the spelling the result records, and says nothing of one that is not
+/// offered.
+#[test]
+fn the_tool_description_names_the_interpreter_its_shell_lines_run_under() {
+    let chamber = tempfile::tempdir().unwrap();
+    let described = |shell: Shell| {
+        ExecTool::new(
+            ExecSetup {
+                shell,
+                ..setup(chamber.path(), None, None)
+            },
+            Box::new(EchoSandbox::new()),
+            patient(),
+        )
+        .unwrap()
+        .meta()
+        .disclosure
+        .clone()
+    };
+    let pwsh = described(Shell::Found {
+        program: PathBuf::from("/opt/microsoft/powershell/7/pwsh"),
+        interpreter: kernel::Interpreter::Pwsh,
+    });
+    assert!(pwsh.ends_with("A shell line runs under pwsh."), "{pwsh}");
+    let absent = described(Shell::Absent);
+    assert!(!absent.contains("A shell line runs under"), "{absent}");
+}
