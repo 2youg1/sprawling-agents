@@ -4,7 +4,12 @@ file, You can obtain one at https://mozilla.org/MPL/2.0/.
 Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <!-- One tool call, pressed to one line: `kind  subject  time  result`
-(refrain §3-4, client/Spec.lean §4-44). The line is the trigger of the right
+(refrain §3-4, client/Spec.lean §4-44). A send and a delegation read their
+subject and result from the call itself (`call_kind.ts`, client D85).
+
+**The time cell is at least nine characters and grows past that** rather
+than spilling over the subject: a long running reading pushes the subject
+narrower, and the subject truncates. The line is the trigger of the right
 side: pressing it shows the whole call there, through the one door every
 opener uses (`inspect/open.svelte.ts`).
 
@@ -33,7 +38,7 @@ third layer). -->
   import { Kbd } from "../parts/kbd.svelte";
   import Tip from "../parts/tip.svelte";
   import { closeRight, openCall, rightItem } from "../inspect/open.svelte";
-  import { kindOf } from "./call_kind";
+  import { kindOf, lineOf, outcomeOf } from "./call_kind";
   import { NAMED_AFTER_MS, callTime, runningWords, tookWords, ticker } from "./timing";
 
   interface Props {
@@ -51,6 +56,8 @@ third layer). -->
   const tick = ticker(u.now);
 
   const kind = $derived(kindOf(call));
+  const line = $derived(lineOf(call));
+  const outcome = $derived(outcomeOf(call));
   const time = $derived(callTime(call, call.outcome === "waiting" ? $tick : 0));
   const opened = $derived.by(() => {
     const item = rightItem();
@@ -121,7 +128,7 @@ third layer). -->
       aria-describedby={id}
       aria-pressed={opened}
       class={[
-        "group relative grid h-control w-full grid-cols-[7ch_minmax(0,1fr)_9ch_auto] items-center gap-x-pane rounded-control px-snug text-left text-note narrow:grid-cols-[6ch_minmax(0,1fr)_auto_auto] narrow:gap-x-snug",
+        "group relative grid h-control w-full grid-cols-[8ch_minmax(0,1fr)_minmax(9ch,max-content)_auto] items-center gap-x-pane rounded-control px-snug text-left text-note narrow:grid-cols-[6ch_minmax(0,1fr)_auto_auto] narrow:gap-x-snug",
         "before:absolute before:inset-y-snug before:left-0 before:w-hair before:rounded-pill",
         opened ? "bg-raised text-text before:bg-accent" : "text-text-quiet hover:wash",
       ]}
@@ -133,7 +140,9 @@ third layer). -->
       <span class="truncate text-text-faint">
         {kind.kind === "registered" ? say($lang, kind.word) : kind.tool}
       </span>
-      <span class={["truncate", call.outcome === "waiting" ? "text-text" : ""]}>{call.subject ?? ""}</span>
+      <span class={["min-w-0 truncate", call.outcome === "waiting" ? "text-text" : ""]}>
+        {line.kind === "worded" ? fill(say($lang, line.word), line.fills) : line.subject}
+      </span>
       <span class="figure flex items-center justify-end gap-tight whitespace-nowrap text-text-faint">
         {#if call.outcome === "waiting"}
           <span class="inline-block size-dot shrink-0 animate-pulse rounded-pill bg-accent" aria-hidden="true"></span>
@@ -147,6 +156,8 @@ third layer). -->
       <span class="flex items-center gap-tight">
         {#if call.outcome === "failed"}
           <span class="text-alert">{say($lang, "talk_call_failed")}</span>
+        {:else if outcome !== null}
+          <span class="whitespace-nowrap text-text-faint">{say($lang, outcome)}</span>
         {:else if waitsForYou}
           <span class="text-alert">{say($lang, "talk_waiting_you")}</span>
         {/if}

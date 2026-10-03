@@ -7,7 +7,7 @@ import { describe, expect, test } from "bun:test";
 
 import { fill, say } from "../../core/lang";
 import { readingOf } from "../inspect/reading";
-import { Seq, TimeMs, type Call } from "../../wire";
+import { Address, Seq, TimeMs, type Call } from "../../wire";
 import { kindOf, lineOf, outcomeOf } from "./call_kind";
 
 function call(render: Call["render"], args: object, said: object | null, cut = 0): Call {
@@ -17,12 +17,12 @@ function call(render: Call["render"], args: object, said: object | null, cut = 0
     subject: "send",
     arguments: { head: JSON.stringify(args, null, 2), cut },
     output: said === null ? null : { head: JSON.stringify(said), cut: 0 },
-    outcome: said === null ? "waiting" : "ok",
+    outcome: said === null ? "waiting" : "answered",
     at: Seq.make(9),
     called: TimeMs.make(1000),
     answered: said === null ? null : TimeMs.make(1200),
     timing: "measured",
-    effect: render === "delegate" ? "spawn" : { write: { domain: "lab/potter" } },
+    effect: render === "delegate" ? "spawn" : { write: { domain: Address.make("lab/potter") } },
     render,
   };
 }

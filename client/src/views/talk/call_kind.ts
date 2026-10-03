@@ -16,6 +16,8 @@
 // did not know, a line written before the keys existed - is named by the
 // tool itself, which is the one honest word left.
 
+import { Option, Schema } from "effect";
+
 import type { Key } from "../../core/lang";
 import type { Call } from "../../wire";
 
@@ -30,6 +32,8 @@ export type CallKind = { readonly kind: "registered"; readonly word: Key } | { r
 export function kindOf(call: Call): CallKind {
   const render = call.render ?? null;
   if (render === "terminal") return { kind: "registered", word: "talk_kind_exec" };
+  if (render === "signal") return { kind: "registered", word: Option.isSome(decoded(call.arguments, Pull)) ? "talk_kind_pull" : "talk_kind_send" };
+  if (render === "delegate") return { kind: "registered", word: "talk_kind_delegate" };
   if (render !== null && render !== "generic") return { kind: "registered", word: "talk_kind_edit" };
   const effect = call.effect ?? null;
   if (effect === null) return { kind: "unregistered", tool: call.tool };
@@ -46,10 +50,52 @@ export function kindOf(call: Call): CallKind {
   return unnamed;
 }
 
+// The subject cell. Arguments cut by the window, or not readable as the
+// tool's own grammar, fall back to the recorded subject: the line keeps
+// what the Ledger says rather than a guess at the missing half.
 export function lineOf(call: Call): CallLine {
-  return { kind: "subject", subject: call.subject ?? "" };
+  const fallback: CallLine = { kind: "subject", subject: call.subject ?? "" };
+  if (call.render === "signal") {
+    return Option.match(decoded(call.arguments, Asked), {
+      onNone: () => fallback,
+      onSome: (sent): CallLine => ({ kind: "worded", word: "talk_send_line", fills: { to: sent.to, text: firstLine(sent.text) } }),
+    });
+  }
+  if (call.render === "delegate") {
+    return Option.match(decoded(call.arguments, Handed), {
+      onNone: () => fallback,
+      onSome: (handed): CallLine => ({ kind: "worded", word: "talk_delegate_line", fills: { room: handed.room, task: firstLine(handed.task) } }),
+    });
+  }
+  return fallback;
 }
 
-export function outcomeOf(_call: Call): Key | null {
+// What the result cell says once the tool answered: what the tool itself
+// reported, never where the letter landed, which is decided after the
+// call (collab D17). `null` while the call runs and for every other tool.
+export function outcomeOf(call: Call): Key | null {
+  if (call.outcome !== "answered") return null;
+  if (call.render === "signal") {
+    return Option.match(decoded(call.output, Sent), {
+      onNone: () => null,
+      onSome: (sent): Key => (sent.waiting === undefined ? "talk_send_sent" : "talk_send_waiting"),
+    });
+  }
+  if (call.render === "delegate") return Option.isSome(decoded(call.output, Started)) ? "talk_delegate_starts" : null;
   return null;
+}
+
+const Pull = Schema.Struct({ action: Schema.Literal("pull") });
+const Asked = Schema.Struct({ action: Schema.Literal("send"), to: Schema.String, text: Schema.String });
+const Handed = Schema.Struct({ room: Schema.String, task: Schema.String });
+const Sent = Schema.Struct({ delivered: Schema.Boolean, waiting: Schema.optional(Schema.String) });
+const Started = Schema.Struct({ room: Schema.String, starts: Schema.String });
+
+function decoded<A>(output: Call["arguments"], schema: Schema.Decoder<A>): Option.Option<A> {
+  if (output === null || output === undefined || output.cut > 0) return Option.none();
+  return Schema.decodeUnknownOption(Schema.fromJsonString(schema))(output.head);
+}
+
+function firstLine(text: string): string {
+  return text.split("\n", 1)[0] ?? "";
 }

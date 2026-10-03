@@ -9,7 +9,8 @@
   // The thread as the template draws it (client/Spec.lean §4-44): message heads
   // with the frozen model on the first and the time to first content on
   // each reply, tool lines of every kind a registration names - with a
-  // failed one and one whose line carried no registration - and a call
+  // failed one, one whose line carried no registration, a send that went
+  // out, a send waiting for its reply, a pull and a delegation - and a call
   // still running with the steer pin on it; then the same room waiting on
   // the person past ten seconds, the head with the rhythm this page
   // watched a reply arrive in, and the words a person just sent in each
@@ -18,7 +19,7 @@
   // The running calls are placed against the page's clock when the route
   // opens, so their timers read a few seconds and move.
 
-  import type { Answer, Call, EventKind, EventRecord, Query, Turn } from "../../wire";
+  import type { Answer, Call, EventKind, EventRecord, Output, Query, Turn } from "../../wire";
   import { Address, B3Hash, RunId, Seq, TimeMs, Tokens, UsdMicros } from "../../wire";
   import type { Delivery } from "../talk/delivery";
 
@@ -73,6 +74,16 @@
     };
   }
 
+  // A call's arguments and answer as the city lays them out
+  // (`wire::arguments_in` pretty-prints; `wire::output_in` does not).
+  function shown(args: object): Output {
+    return { head: JSON.stringify(args, null, 2), cut: 0 };
+  }
+
+  function said(answer: object): Output {
+    return { head: JSON.stringify(answer), cut: 0 };
+  }
+
   function turn(number: number, t: number, said: string | null, calls: readonly Call[], ttft: number | null): Turn {
     return {
       calls,
@@ -107,6 +118,38 @@
             render: { diff: { locations: [] } },
           }),
           call(105, going + 6_200, 220, { tool: "fetch_docs", subject: "docs.rs/git2", outcome: "failed", effect: null, render: null }),
+          call(106, going + 6_500, 4, {
+            tool: "signal",
+            subject: "send",
+            effect: { write: { domain: Address.make("lab/thread") } },
+            render: "signal",
+            arguments: shown({ action: "send", to: "lab/kiln", text: "The stale save now refuses; your draft is kept.\nPlease rerun the kiln checks." }),
+            output: said({ id: "r-s1", to: "lab/kiln", kind: "mention", delivered: true }),
+          }),
+          call(107, going + 6_600, 3, {
+            tool: "signal",
+            subject: "send",
+            effect: { write: { domain: Address.make("lab/thread") } },
+            render: "signal",
+            arguments: shown({ action: "send", to: "lab/review", text: "Is refusing a stale save the behaviour you want?", wait: true }),
+            output: said({ id: "r-s2", to: "lab/review", kind: "mention", delivered: true, waiting: "a reply from lab/review" }),
+          }),
+          call(108, going + 6_700, 2, {
+            tool: "signal",
+            subject: "pull",
+            effect: { write: { domain: Address.make("lab/thread") } },
+            render: "signal",
+            arguments: shown({ action: "pull" }),
+            output: said({ signals: [] }),
+          }),
+          call(109, going + 6_800, 5, {
+            tool: "delegate",
+            subject: "a passing run of the city tests",
+            effect: "spawn",
+            render: "delegate",
+            arguments: shown({ room: "lab/helper", task: "Run the city tests against the new save", goal: "a passing run of the city tests" }),
+            output: said({ room: "lab/helper", starts: "when this turn settles" }),
+          }),
         ], 412),
         turn(2, going + 40_000, "Done: a save against a stale version is refused and your draft stays. Running the client checks now.", [
           call(201, now - 4_700, null, { tool: "exec", subject: "just check-client", effect: "read", render: "terminal" }),
@@ -152,7 +195,7 @@
   const answers = answering(now);
 </script>
 
-<Case label="thread · heads, tool lines of every kind, a call running with the steer pin" width={760}>
+<Case label="thread · heads, tool lines of every kind with send and delegate, a call running with the steer pin" width={760}>
   <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} {answers} {records}>
     <div class="h-[760px] px-wide">
       <Talk address={WORKING} band={false} />

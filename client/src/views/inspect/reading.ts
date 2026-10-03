@@ -87,6 +87,9 @@ export function pictureOf(call: Call): Picture | null {
 export function readingOf(call: Call): Reading {
   const render = call.render ?? "generic";
   if (render === "terminal") return "terminal";
+  // A letter and a delegation have no file to open; what they asked for
+  // and answered is printed (kernel D37).
+  if (render === "signal" || render === "delegate") return "printed";
   if (render !== "generic") return "diff";
   if (pictureOf(call) !== null) return "shot";
   return readFrom(call) === null ? "printed" : "file";
