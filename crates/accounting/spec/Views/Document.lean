@@ -21,9 +21,9 @@ pub(in crate::views) fn range_answer(city_root: &Path, version: B3Hash, range: d
 ```
 
 - **读盘只读一次，判定全在 `documents`。** `document_answer` 读文件的全部字节：读不到且是 `NotFound` 答 `Missing`，别的读错（目录、无权限）答 `Unreadable`，带系统的原话；零字节答 `Empty`；否则 `B3Hash::digest` 得版本，`Format::of_name` 读文件名，`Reading::of` 判文本，是文本就 `documents::head` 取第一个窗口（`crates/wire/Spec.lean` §8-69）。本模块不写任何一条判定，所以页面、`Content` 与 `Prefix` 对「这是不是文本」只有一个答案。
-- **第一个窗口盖不住整份时，或格式是 Markdown 时，这一版进内容库**（`storage::Cas::put`，`crates/storage/Spec.lean` §8-36），然后才作答：之后的 `Query::Range` 与 `Query::Preview` 读的是这一版。放不进去（盘满、目录不可写）答 `Unreadable`，原话是内容库的拒因：答一个之后读不到的版本等于许诺一件做不到的事。整份放得下的纯文本版本不存（wire D8，D33）。
+- **读到的每一版都进内容库**（`storage::Cas::put`，`crates/storage/Spec.lean` §8-36），然后才作答：文本与 `Opaque` 一样，空文件与整份已在答复里的小文件也一样（`crates/wire/spec/Answer/Document.lean` D8，D33）。之后的 `Query::Range`、`Query::Preview`、取字节、比较与导出读的是这一版。放不进去（盘满、目录不可写）答 `Unreadable`，原话是内容库的拒因：答一个之后读不到的版本等于许诺一件做不到的事。
 - **读内容库只有一处：`range::stored`。** `Cas::size` 得这一版的长度，前三个字节经 `Encoding::of_mark` 得编码，`documents::lift` 说要抬起哪一段，`Cas::get_range` 读它；交回编码与抬起的字节。`range_answer` 拿它经 `documents::cut` 切出窗口，`preview_answer` 拿它经 `documents::preview` 读出块（§8-23）。内容库没有这一版、或切出的字节不是文本，答 `Unavailable { query: "Range(<version>)" }`。
-- **`read_bytes` 留给 `Content` 与 `Prefix`。** 两者的答复形状不变（头 `DOC_BYTES_MAX` 字节、`truncated`、`binary`），判定换成 `Reading::of`，切法换成 `documents::cut`：一个块在内容库里、又是城里的一份文件时，两处给同一个判断。
+- **`read_bytes` 留给 `Content` 与 `Prefix`。** 两者的答复形状不变（第一个窗口的文字、`truncated`、`binary`），判定是 `Reading::of`，切法是 `documents::cut`，窗口的上限因此是 `documents` 的 `WINDOW_BYTES_MAX`（64 KiB）：一个块在内容库里、又是城里的一份文件时，两处给同一个判断。
 - 验收：`views::document::tests` 与 `views::answering::range::tests`，名字见 `crates/wire/Spec.lean` §8-69、§8-70。
 -/
 
@@ -39,7 +39,7 @@ pub(in crate::views) fn preview_answer(city_root: &Path, version: B3Hash, viewpo
 - **读内容库，判定全在 `documents`。** 读内容库的那一步与 `Range` 是同一个函数（`range::stored`，§8-21）；然后 `documents::preview` 判编码、切窗口、止于块末、读出块（`crates/documents/Spec.lean` D20–D26）。本模块不写一条判定，所以预览、`Range` 与 `Document` 对「这一版是什么编码、窗口在哪里切」只有一个答案。
 - **答复。** 读出来就是 `Answer::Preview`：`Laid` 带实际读的区间与块，UTF-16 的版本是 `Unsupported`（`crates/wire/Spec.lean` §8-74）。内容库没有这一版、打不开、或抬起的字节在这种编码下拼不出文本，答 `Unavailable { query: "Preview(<version>)" }`，与 `Range` 同一个口径：「我没能看」。
 - **代价。** 只读内容库里这一窗要的那几个字节，加一次 comrak 读一个至多 64 KiB 的窗口；读数还没有，属 refrain 路线图 A11 的那一组。
-- **Markdown 的版本都在内容库里。** 答 `Document` 的读面把每一个 Markdown 版本放进内容库，不论它的第一个窗口盖不盖得住整份（D33），所以从 `Document` 打开的任何一份 Markdown 文件都能按版本预览。
+- **Markdown 的版本都在内容库里。** 答 `Document` 的读面把读到的每一版放进内容库，Markdown 版本不论它的第一个窗口盖不盖得住整份都在其中（D33），所以从 `Document` 打开的任何一份 Markdown 文件都能按版本预览。
 - 验收：`views::answering::preview::tests`——内容库里没有的版本答 `Unavailable`；超过一个窗口的 Markdown 文件经 `Document` 打开后，从 0 起按答复的 `span.end` 逐窗预览，每一窗止于块末，读到末尾时每一段恰好出现一次；整份放得下一个窗口的 Markdown 文件经 `Document` 打开后预览出它的块（`a_short_document_previews_by_its_version`）；字节不是文本的版本答 `Unavailable`；UTF-16 的版本答 `Preview::Unsupported`。
 -/
 
@@ -58,9 +58,9 @@ pub(in crate::views) fn reply_answer(text: &str, state: documents::ReplyState) -
 - 验收：`views::answering::reply::tests`——一段带标题、列表、表、代码块与脚注的回复存成一个版本，经 `Query::Preview` 读出的 `Laid` 与经 `Query::Reply { state: Settled }` 读出的相等；同一段文字截在一个开着的段落里、以 `Streaming` 问，只答闭合的块，`span.end` 停在那一段之前；含 NUL 的文字答 `Unavailable`。
 -/
 
-/-! D33 文档的版本在第一个窗口盖不住整份时、或格式是 Markdown 时进内容库，由答 `Document` 的读面放进去
+/-! D33 读到的每一版都进内容库，由答 `Document` 的读面放进去
 
-理由：之后的 `Range` 与 `Preview` 要读的是这一版，而版本的身份本来就是内容库的地址（documents D3），放进去之后按版本读就是按地址读对象，不需要第二个存放处；整份已经在答复里的纯文本版本页面不会再按版本要，存它只是让每一次打开多付一份拷贝，而 Markdown 版本不论长短页面都按版本预览（§8-23）。内容库按内容去重，同一版第二次放入不多写一份。放进去的是读面而不是写者：这是一次查询的副作用，但它只添一个按内容寻址、重复放入即去重的对象，不改任何一条历史，写者也不知道哪个页面在读哪一版。被否决的做法：①`Range` 读文件此刻、版本不符就拒——居民在写的文件每几秒动一次，读到一半的页面要从头重读；②每次打开都存——小文件的每一次打开都多一份拷贝；③由写者在每次保存时存——城之外的写者（人的编辑器、居民的 `edit`）不经过写者；④小的 Markdown 版本让 `Preview` 读文件此刻、摘要相符才答——两条读法各判一次「这是不是那一版」，而文件在两次读之间可能被改。重开参数：内容库长出回收时，被回收的版本要有自己的答复；页面要对比一份小的纯文本文件的两个版本时，小文件也存。
+理由：之后的 `Range` 与 `Preview` 要读的是这一版，取字节、比较两版与导出也是，而版本的身份本来就是内容库的地址（documents D3），放进去之后按版本读就是按地址读对象，不需要第二个存放处；一份文档的版本列表要列得出城读过的每一版并能比较其中两版，所以小的纯文本版本与 `Opaque` 版本也存（`crates/wire/spec/Answer/Document.lean` D8）。内容库按内容去重，同一版第二次放入只是一次存在性判断。放进去的是读面而不是写者：这是一次查询的副作用，但它只添一个按内容寻址、重复放入即去重的对象，不改任何一条历史，写者也不知道哪个页面在读哪一版。被否决的做法：①`Range` 读文件此刻、版本不符就拒——居民在写的文件每几秒动一次，读到一半的页面要从头重读；②只存页面之后还会按版本来要的那几版（第一个窗口盖不住整份的文本与 Markdown）——一份小文件的旧版本、一份二进制文件的任何一版就读不回，页面列得出版本却比不了其中两版；③由写者在每次保存时存——城之外的写者（人的编辑器、居民的 `edit`）不经过写者；④小的 Markdown 版本让 `Preview` 读文件此刻、摘要相符才答——两条读法各判一次「这是不是那一版」，而文件在两次读之间可能被改。代价是每读到一个新版本付一份拷贝。重开参数：内容库长出回收时，被回收的版本要有自己的答复；一座城的内容库因为反复读一份大的二进制文件而长到人在意的大小时，按格式或大小限定哪些版本存（与 wire D8 的重开参数同一条）。
 -/
 
 /-! D35 预览由读面按版本从内容库读，判定全在 `documents`，读出的块不缓存
