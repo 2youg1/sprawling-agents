@@ -253,3 +253,20 @@ fn door_verb(command: WireCommand) -> Result<Verb, Box<WireCommand>> {
         | Command::ChangeRunPolicy(_) => Err(Box::new(command)),
     }
 }
+
+#[cfg(test)]
+mod without_a_console {
+    /// `serve` alone has no console, so the recovery names the two
+    /// commands that start a city with one.
+    #[test]
+    fn the_recovery_names_a_command_that_has_a_console() {
+        let refused = super::no_console();
+        assert_eq!(
+            ["sprawling up", "sprawling serve --console"]
+                .map(|command| refused.recovery().contains(command)),
+            [true, true],
+            "{}",
+            refused.recovery()
+        );
+    }
+}
