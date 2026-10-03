@@ -162,13 +162,13 @@
   </div>
   <div class="flex flex-wrap gap-snug">
     <span bind:this={openButton} class="contents">
-      {@render drawn("capped", "remote_door_open", "remote_door_open_note", busy || asking, () => {
+      {@render drawn("door", "remote_door_open", "remote_door_open_note", busy || asking, () => {
         move({ kind: "press", opener: "door" });
       })}
     </span>
     {@render drawn("gate", "remote_door_close", "remote_door_close_note", false, close)}
     <span bind:this={keyButton} class="contents">
-      {@render drawn("pin", "remote_key_replace", "remote_key_replace_note", busy || asking, () => {
+      {@render drawn("key", "remote_key_replace", "remote_key_replace_note", busy || asking, () => {
         move({ kind: "press", opener: "key" });
       })}
     </span>
