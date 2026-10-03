@@ -153,11 +153,12 @@ pub(crate) fn plan(topology: &Topology) -> Plan {
     if slowest == fastest {
         return Plan::LeftToOs(Left::OneClass);
     }
-    let mut seats: Vec<Processor> = topology
-        .usable()
-        .filter(|cpu| cpu.class == fastest)
-        .map(|cpu| cpu.processor)
-        .collect();
+    let mut leads: BTreeMap<(u16, u32), Processor> = BTreeMap::new();
+    for cpu in topology.usable().filter(|cpu| cpu.class == fastest) {
+        let lead = leads.entry(cpu.core_key()).or_insert(cpu.processor);
+        *lead = (*lead).min(cpu.processor);
+    }
+    let mut seats: Vec<Processor> = leads.into_values().collect();
     seats.sort_unstable();
     Plan::Seats(seats)
 }

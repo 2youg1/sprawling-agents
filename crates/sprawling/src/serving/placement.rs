@@ -204,7 +204,10 @@ fn classes(shape: &Shape) -> String {
     let usable = if shape.usable == shape.logical {
         String::new()
     } else {
-        format!(" (this process may use {} of {} logical processors)", shape.usable, shape.logical)
+        format!(
+            " (this process may use {} of {} logical processors)",
+            shape.usable, shape.logical
+        )
     };
     let kinds: Vec<String> = shape
         .classes
@@ -234,9 +237,12 @@ fn class_names(count: usize) -> Vec<&'static str> {
 /// to (D41): Windows alone.
 const SOFT_CALL: bool = cfg!(windows);
 
+/// A Windows without power throttling has nothing to lift (D40).
 #[cfg(windows)]
 fn full_speed() -> Result<(), String> {
-    desktop_ffi::cpu::full_speed().map_err(|err| format!("Windows refused to lift it ({err:?})"))
+    desktop_ffi::cpu::full_speed()
+        .map(|_lifted_or_absent| ())
+        .map_err(|err| format!("Windows refused to lift it ({err:?})"))
 }
 
 /// macOS and Linux throttle no process for running in the background,

@@ -23,8 +23,11 @@ pub(crate) struct Unread(pub(crate) String);
 pub(crate) fn read() -> Result<Topology, Unread> {
     let sets = desktop_ffi::cpu::sets()
         .map_err(|err| Unread(format!("Windows did not list the CPU sets ({err:?})")))?;
-    let group = desktop_ffi::cpu::thread_group()
-        .map_err(|err| Unread(format!("Windows did not name this thread's processor group ({err:?})")))?;
+    let group = desktop_ffi::cpu::thread_group().map_err(|err| {
+        Unread(format!(
+            "Windows did not name this thread's processor group ({err:?})"
+        ))
+    })?;
     Ok(from_cpu_sets(&sets, group.group, group.mask))
 }
 
@@ -43,24 +46,37 @@ pub(crate) fn read() -> Result<Topology, Unread> {
 /// This machine's topology.
 #[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
 pub(crate) fn read() -> Result<Topology, Unread> {
-    Err(Unread("this platform reports no processor topology".to_owned()))
+    Err(Unread(
+        "this platform reports no processor topology".to_owned(),
+    ))
 }
 
 /// Windows' CPU sets as a topology: the process may use a processor of
 /// the reading thread's `group` whose bit is in `mask`, unless another
 /// process holds it for its exclusive use. An ideal processor is named
 /// inside the thread's group, so the other groups are barred.
-#[cfg_attr(not(any(windows, test)), expect(dead_code, reason = "read on Windows, tested everywhere"))]
-pub(crate) fn from_cpu_sets(sets: &[desktop_ffi::cpu_set::CpuSet], group: u16, mask: u64) -> Topology {
+#[cfg_attr(
+    not(any(windows, test)),
+    expect(dead_code, reason = "read on Windows, tested everywhere")
+)]
+pub(crate) fn from_cpu_sets(
+    sets: &[desktop_ffi::cpu_set::CpuSet],
+    group: u16,
+    mask: u64,
+) -> Topology {
     Topology::new(
         sets.iter()
             .map(|set| {
                 let in_mask = 1u64
                     .checked_shl(u32::from(set.logical))
                     .is_some_and(|bit| mask & bit != 0);
-                let held_elsewhere = set.flags.allocated() && !set.flags.allocated_to_this_process();
+                let held_elsewhere =
+                    set.flags.allocated() && !set.flags.allocated_to_this_process();
                 Cpu {
-                    processor: Processor { group: set.group, number: u32::from(set.logical) },
+                    processor: Processor {
+                        group: set.group,
+                        number: u32::from(set.logical),
+                    },
                     class: set.class,
                     core: u32::from(set.core),
                     cache: u32::from(set.cache),
@@ -76,7 +92,10 @@ pub(crate) fn from_cpu_sets(sets: &[desktop_ffi::cpu_set::CpuSet], group: u16, m
 }
 
 /// A Linux CPU list such as `0-3,8,10-11`, or `None` when it does not parse.
-#[cfg_attr(not(any(target_os = "linux", test)), expect(dead_code, reason = "read on Linux, tested everywhere"))]
+#[cfg_attr(
+    not(any(target_os = "linux", test)),
+    expect(dead_code, reason = "read on Linux, tested everywhere")
+)]
 pub(crate) fn cpu_list(text: &str) -> Option<BTreeSet<u32>> {
     let mut cpus = BTreeSet::new();
     for part in text.trim().split(',').filter(|part| !part.is_empty()) {
@@ -96,7 +115,10 @@ pub(crate) fn cpu_list(text: &str) -> Option<BTreeSet<u32>> {
 }
 
 /// What sysfs says of one Linux CPU.
-#[cfg_attr(not(any(target_os = "linux", test)), expect(dead_code, reason = "read on Linux, tested everywhere"))]
+#[cfg_attr(
+    not(any(target_os = "linux", test)),
+    expect(dead_code, reason = "read on Linux, tested everywhere")
+)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct LinuxCpu {
     pub(crate) number: u32,
@@ -109,7 +131,10 @@ pub(crate) struct LinuxCpu {
 /// Linux's words as a topology. `hybrid` is Intel's split into
 /// `cpu_core` and `cpu_atom` when the kernel offers it; otherwise each
 /// distinct `cpu_capacity` is a class, and with neither there is one.
-#[cfg_attr(not(any(target_os = "linux", test)), expect(dead_code, reason = "read on Linux, tested everywhere"))]
+#[cfg_attr(
+    not(any(target_os = "linux", test)),
+    expect(dead_code, reason = "read on Linux, tested everywhere")
+)]
 pub(crate) fn from_sysfs(
     cpus: &[LinuxCpu],
     allowed: &BTreeSet<u32>,
@@ -129,18 +154,28 @@ pub(crate) fn from_sysfs(
             (None, None) => 0,
         };
         read.push(Cpu {
-            processor: Processor { group: 0, number: cpu.number },
+            processor: Processor {
+                group: 0,
+                number: cpu.number,
+            },
             class,
             core: cpu.package.checked_mul(1 << 16)?.checked_add(cpu.core)?,
             cache: cpu.cache,
-            access: if allowed.contains(&cpu.number) { Access::Allowed } else { Access::Barred },
+            access: if allowed.contains(&cpu.number) {
+                Access::Allowed
+            } else {
+                Access::Barred
+            },
         });
     }
     Some(Topology::new(read))
 }
 
 /// One macOS performance level: `perflevel0` is the fastest.
-#[cfg_attr(not(any(target_os = "macos", test)), expect(dead_code, reason = "read on macOS, tested everywhere"))]
+#[cfg_attr(
+    not(any(target_os = "macos", test)),
+    expect(dead_code, reason = "read on macOS, tested everywhere")
+)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct PerfLevel {
     pub(crate) physical: u32,
@@ -149,7 +184,10 @@ pub(crate) struct PerfLevel {
 
 /// macOS's performance levels as a topology, fastest level first, each
 /// core's threads numbered next to each other.
-#[cfg_attr(not(any(target_os = "macos", test)), expect(dead_code, reason = "read on macOS, tested everywhere"))]
+#[cfg_attr(
+    not(any(target_os = "macos", test)),
+    expect(dead_code, reason = "read on macOS, tested everywhere")
+)]
 pub(crate) fn from_perf_levels(levels: &[PerfLevel]) -> Option<Topology> {
     let count = u8::try_from(levels.len()).ok()?;
     let mut cpus = Vec::new();
@@ -215,7 +253,9 @@ mod linux {
             number,
             package: at("topology/physical_package_id").unwrap_or(0),
             core: at("topology/core_id").unwrap_or(number),
-            cache: at("cache/index3/id").or_else(|| at("cache/index2/id")).unwrap_or(0),
+            cache: at("cache/index3/id")
+                .or_else(|| at("cache/index2/id"))
+                .unwrap_or(0),
             capacity: at("cpu_capacity"),
         }
     }
@@ -253,7 +293,8 @@ mod macos {
                 logical: sysctl("hw.logicalcpu")?,
             }],
         };
-        from_perf_levels(&levels).ok_or_else(|| Unread("sysctl describes a topology that does not add up".to_owned()))
+        from_perf_levels(&levels)
+            .ok_or_else(|| Unread("sysctl describes a topology that does not add up".to_owned()))
     }
 
     fn sysctl(name: &str) -> Result<u32, Unread> {
@@ -272,7 +313,11 @@ mod macos {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, reason = "test code")]
+#[allow(
+    clippy::unwrap_used,
+    clippy::arithmetic_side_effects,
+    reason = "test code"
+)]
 mod tests {
     use super::*;
     use crate::serving::placement::plan::{Left, Plan, plan};
@@ -283,7 +328,12 @@ mod tests {
     const I5_1340P: &[u8] = include_bytes!("reading/i5-1340p.cpusets");
 
     fn seats(numbers: &[u32]) -> Plan {
-        Plan::Seats(numbers.iter().map(|&number| Processor { group: 0, number }).collect())
+        Plan::Seats(
+            numbers
+                .iter()
+                .map(|&number| Processor { group: 0, number })
+                .collect(),
+        )
     }
 
     #[test]
@@ -293,8 +343,11 @@ mod tests {
         let topology = from_cpu_sets(&sets, 0, 0xFFFF);
         assert_eq!(plan(&topology), seats(&[0, 2, 4, 6]));
         let shape = topology.shape();
-        let classes: Vec<(u8, usize, usize)> =
-            shape.classes.iter().map(|c| (c.class, c.cores, c.logical)).collect();
+        let classes: Vec<(u8, usize, usize)> = shape
+            .classes
+            .iter()
+            .map(|c| (c.class, c.cores, c.logical))
+            .collect();
         assert_eq!(classes, vec![(1, 4, 8), (0, 8, 8)]);
     }
 
@@ -304,27 +357,44 @@ mod tests {
         // Processors 3 and 8..15: one P-core thread and the E-cores.
         assert_eq!(plan(&from_cpu_sets(&sets, 0, 0xFF08)), seats(&[3]));
         // The E-cores alone are one class.
-        assert_eq!(plan(&from_cpu_sets(&sets, 0, 0xFF00)), Plan::LeftToOs(Left::OneClass));
+        assert_eq!(
+            plan(&from_cpu_sets(&sets, 0, 0xFF00)),
+            Plan::LeftToOs(Left::OneClass)
+        );
         // A thread in another group may name none of these.
-        assert_eq!(plan(&from_cpu_sets(&sets, 1, 0xFFFF)), Plan::LeftToOs(Left::NothingUsable));
+        assert_eq!(
+            plan(&from_cpu_sets(&sets, 1, 0xFFFF)),
+            Plan::LeftToOs(Left::NothingUsable)
+        );
     }
 
     #[test]
     fn a_linux_cpu_list_reads_ranges_and_refuses_what_is_not_one() {
-        assert_eq!(cpu_list("0-3,8,10-11\n"), Some([0, 1, 2, 3, 8, 10, 11].into()));
+        assert_eq!(
+            cpu_list("0-3,8,10-11\n"),
+            Some([0, 1, 2, 3, 8, 10, 11].into())
+        );
         assert_eq!(cpu_list(""), Some(BTreeSet::new()));
         assert_eq!(cpu_list("3-1"), None);
         assert_eq!(cpu_list("a"), None);
     }
 
     fn linux(number: u32, core: u32, capacity: Option<u32>) -> LinuxCpu {
-        LinuxCpu { number, package: 0, core, cache: 0, capacity }
+        LinuxCpu {
+            number,
+            package: 0,
+            core,
+            cache: 0,
+            capacity,
+        }
     }
 
     #[test]
     fn linux_on_intel_hybrid_reads_cpu_core_as_the_fast_class() {
         // i5-1340P under Linux: cpu0-7 are cpu_core (SMT pairs), 8-15 cpu_atom.
-        let cpus: Vec<LinuxCpu> = (0..16).map(|n| linux(n, if n < 8 { n / 2 } else { n }, None)).collect();
+        let cpus: Vec<LinuxCpu> = (0..16)
+            .map(|n| linux(n, if n < 8 { n / 2 } else { n }, None))
+            .collect();
         let allowed: BTreeSet<u32> = (0..16).collect();
         let big: BTreeSet<u32> = (0..8).collect();
         let topology = from_sysfs(&cpus, &allowed, Some(&big)).unwrap();
@@ -341,7 +411,10 @@ mod tests {
         };
         let cpus: Vec<LinuxCpu> = (0..8).map(|n| linux(n, n, Some(capacity(n)))).collect();
         let allowed: BTreeSet<u32> = (0..8).collect();
-        assert_eq!(plan(&from_sysfs(&cpus, &allowed, None).unwrap()), seats(&[0]));
+        assert_eq!(
+            plan(&from_sysfs(&cpus, &allowed, None).unwrap()),
+            seats(&[0])
+        );
         // A container given two little cores.
         let two: BTreeSet<u32> = [6, 7].into();
         assert_eq!(
@@ -354,13 +427,23 @@ mod tests {
     fn an_apple_silicon_mac_reads_its_performance_levels_as_classes() {
         // M3 Pro: perflevel0 has 6 performance cores, perflevel1 6 efficiency cores.
         let topology = from_perf_levels(&[
-            PerfLevel { physical: 6, logical: 6 },
-            PerfLevel { physical: 6, logical: 6 },
+            PerfLevel {
+                physical: 6,
+                logical: 6,
+            },
+            PerfLevel {
+                physical: 6,
+                logical: 6,
+            },
         ])
         .unwrap();
         assert_eq!(plan(&topology), seats(&[0, 1, 2, 3, 4, 5]));
         // An Intel Mac reports no levels and is read as one.
-        let intel = from_perf_levels(&[PerfLevel { physical: 8, logical: 16 }]).unwrap();
+        let intel = from_perf_levels(&[PerfLevel {
+            physical: 8,
+            logical: 16,
+        }])
+        .unwrap();
         assert_eq!(plan(&intel), Plan::LeftToOs(Left::OneClass));
     }
 }

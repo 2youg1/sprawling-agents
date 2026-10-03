@@ -91,10 +91,21 @@ pub fn thread_group() -> Result<Group, Failure> {
     // SAFETY: `group`, `mask` and `code` are live locals the leaf writes
     // one value each into, during this call only.
     #[expect(unsafe_code, reason = "the one call that reads the thread's group")]
-    let raw =
-        unsafe { leaf::sprawling_desktop_thread_group(&raw mut group, &raw mut mask, &raw mut code) };
+    let raw = unsafe {
+        leaf::sprawling_desktop_thread_group(&raw mut group, &raw mut mask, &raw mut code)
+    };
     ended::finished(raw, code)?;
     Ok(Group { group, mask })
+}
+
+/// What lifting power throttling came to.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Throttling {
+    /// This process's execution speed is no longer throttled.
+    Lifted,
+    /// This system has no power throttling: it answers
+    /// `ERROR_INVALID_FUNCTION` to the class, even to the matching read.
+    Absent,
 }
 
 /// Opts this process out of EcoQoS: its execution speed is never
@@ -102,13 +113,20 @@ pub fn thread_group() -> Result<Group, Failure> {
 ///
 /// # Errors
 /// [`Failure::At`] `Throttling` with the operating system's reason.
-pub fn full_speed() -> Result<(), Failure> {
+pub fn full_speed() -> Result<Throttling, Failure> {
     let mut code = co::ERROR::SUCCESS;
     // SAFETY: `code` is a live local the leaf writes once; the state the
     // leaf passes is its own, and the process it changes is this one.
     #[expect(unsafe_code, reason = "the one call that lifts power throttling")]
     let raw = unsafe { leaf::sprawling_desktop_full_speed(&raw mut code) };
-    ended::finished(raw, code)
+    match ended::finished(raw, code) {
+        Ok(()) => Ok(Throttling::Lifted),
+        Err(Failure::At {
+            step: Step::Throttling,
+            code: co::ERROR::INVALID_FUNCTION,
+        }) => Ok(Throttling::Absent),
+        Err(failure) => Err(failure),
+    }
 }
 
 /// Gives the job behind `job` a weighted CPU share (`weight` from 1 to 9,

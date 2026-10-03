@@ -112,7 +112,13 @@ fn field<const N: usize>(record: &[u8], at: usize) -> Option<[u8; N]> {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::indexing_slicing, reason = "test code")]
+#[allow(
+    clippy::unwrap_used,
+    clippy::indexing_slicing,
+    clippy::arithmetic_side_effects,
+    clippy::as_conversions,
+    reason = "test code"
+)]
 mod tests {
     use super::*;
     use proptest::prelude::*;
@@ -135,8 +141,10 @@ mod tests {
         bytes.extend(record(40, 7, 0, 9, 9, 9));
         bytes.extend(record(32, 0, 1, 3, 2, 0));
         let sets = parse(&bytes).unwrap();
-        let read: Vec<(u16, u8, u8, u8)> =
-            sets.iter().map(|s| (s.group, s.logical, s.core, s.class)).collect();
+        let read: Vec<(u16, u8, u8, u8)> = sets
+            .iter()
+            .map(|s| (s.group, s.logical, s.core, s.class))
+            .collect();
         assert_eq!(read, vec![(0, 0, 0, 1), (1, 3, 2, 0)]);
     }
 

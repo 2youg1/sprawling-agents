@@ -154,6 +154,9 @@ pub(crate) fn run<R: BufRead, W: Write>(
     for line in priority_lines(&machine.core_standing()) {
         writeln!(out, "{line}")?;
     }
+    // What placement read of this machine's processors and what it does
+    // with them (`crates/sprawling/spec/Serving/Placement.lean` D47).
+    writeln!(out, "    {}\n", crate::serving::placement::report())?;
     for line in scanning::lines(&scanning) {
         writeln!(out, "{line}")?;
     }

@@ -9,7 +9,12 @@
 //! exhaustive rather than sampled: the space is small enough to walk
 //! whole, so a defect in it cannot hide behind a seed.
 
-#![allow(clippy::unwrap_used, clippy::indexing_slicing, clippy::panic)]
+#![allow(
+    clippy::unwrap_used,
+    clippy::indexing_slicing,
+    clippy::panic,
+    clippy::arithmetic_side_effects
+)]
 
 use std::collections::BTreeSet;
 
@@ -30,7 +35,12 @@ enum Event {
 #[test]
 fn the_seat_table_keeps_every_property_on_every_trace() {
     for count in 0..=MOST_SEATS {
-        let plan: Vec<Processor> = (0..count).map(|number| Processor { group: 0, number: number * 2 }).collect();
+        let plan: Vec<Processor> = (0..count)
+            .map(|number| Processor {
+                group: 0,
+                number: number * 2,
+            })
+            .collect();
         for trace in every_trace() {
             check_trace(&plan, &trace);
         }
@@ -48,19 +58,31 @@ fn check_trace(plan: &[Processor], trace: &[Event]) {
             }
             Event::Exit(holder) => {
                 table.exit(holder);
-                assert_eq!(table.seat_of(holder), None, "an exit gives the seat back: {trace:?}");
+                assert_eq!(
+                    table.seat_of(holder),
+                    None,
+                    "an exit gives the seat back: {trace:?}"
+                );
             }
         }
         // every_trace_keeps_the_table_good: one holder per seat, every seat in the plan.
         let seated: Vec<Processor> = holders().filter_map(|h| table.seat_of(h)).collect();
         let distinct: BTreeSet<Processor> = seated.iter().copied().collect();
-        assert_eq!(distinct.len(), seated.len(), "one seat holds one thread: {plan:?} {trace:?}");
+        assert_eq!(
+            distinct.len(),
+            seated.len(),
+            "one seat holds one thread: {plan:?} {trace:?}"
+        );
         assert!(seated.iter().all(|seat| plan.contains(seat)));
         // a_seat_is_kept_while_its_thread_lives
         for (other, was) in holders().zip(&before) {
             let lives = !matches!(event, Event::Exit(h) if h == other);
             if lives && let Some(seat) = was {
-                assert_eq!(table.seat_of(other), Some(*seat), "a seat is kept: {plan:?} {trace:?}");
+                assert_eq!(
+                    table.seat_of(other),
+                    Some(*seat),
+                    "a seat is kept: {plan:?} {trace:?}"
+                );
             }
         }
     }
@@ -79,8 +101,15 @@ fn check_start(
     if before[index].is_some() {
         return;
     }
-    let first_free = plan.iter().find(|seat| !before.contains(&Some(**seat))).copied();
-    assert_eq!(table.seat_of(holder), first_free, "the first free seat or none: {plan:?} {trace:?}");
+    let first_free = plan
+        .iter()
+        .find(|seat| !before.contains(&Some(**seat)))
+        .copied();
+    assert_eq!(
+        table.seat_of(holder),
+        first_free,
+        "the first free seat or none: {plan:?} {trace:?}"
+    );
 }
 
 fn holders() -> impl Iterator<Item = Holder> {
@@ -88,7 +117,9 @@ fn holders() -> impl Iterator<Item = Holder> {
 }
 
 fn every_trace() -> Vec<Vec<Event>> {
-    let events: Vec<Event> = holders().flat_map(|h| [Event::Start(h), Event::Exit(h)]).collect();
+    let events: Vec<Event> = holders()
+        .flat_map(|h| [Event::Start(h), Event::Exit(h)])
+        .collect();
     (0..EVENTS).fold(vec![Vec::new()], |traces, _| {
         traces
             .iter()
@@ -127,7 +158,9 @@ fn the_doctor_line_names_the_classes_and_what_the_plan_did() {
     };
     assert_eq!(
         line,
-        format!("CPU: 2 classes, 4 performance cores (8 threads), 8 efficiency cores (8 threads); {tail}")
+        format!(
+            "CPU: 2 classes, 4 performance cores (8 threads), 8 efficiency cores (8 threads); {tail}"
+        )
     );
     let dual_ccd = Topology::new((0..32).map(|n| cpu(n, 0, n / 2 * 2, n / 16)).collect());
     assert_eq!(
@@ -138,6 +171,16 @@ fn the_doctor_line_names_the_classes_and_what_the_plan_did() {
         describe(&Err(Unread("sysfs is absent".to_owned()))),
         "CPU: topology unread (sysfs is absent); left to the operating system"
     );
-    assert_eq!(super::plan::plan(&hybrid), Plan::Seats((0..4).map(|n| Processor { group: 0, number: n * 2 }).collect()));
+    assert_eq!(
+        super::plan::plan(&hybrid),
+        Plan::Seats(
+            (0..4)
+                .map(|n| Processor {
+                    group: 0,
+                    number: n * 2
+                })
+                .collect()
+        )
+    );
     assert_ne!(super::plan::plan(&hybrid), Plan::LeftToOs(Left::OneClass));
 }
