@@ -72,6 +72,21 @@ pub fn lineage_of(ledger_dir: &Path) -> Result<Lineage, AxError>;
 理由：页面读到的城就是创世留下的城；测试用真正的 `worker::genesis::form`（带测试的手），市政厅的布局、创世两行与 `City.md` 改了，读面的测试跟着看到。被否决的做法：保留一份只写读面测试读到的东西的第二份创世——worker 搬进本 crate 之前确实这样做过，因为那时本 crate 够不到 `genesis`；它与真正的创世没有东西把两者拴在一起，一旦市政厅的布局变了，读面的测试就在一座不存在的城上判定。
 -/
 
+/-! D49 读面按事件种类作的判定，一个问题一个穷尽的 `match`，住 `accounting::views::kinds`
+
+```rust
+pub(super) enum Holding { City, SignalQueued, SignalTaken, Pursuit, Discarded, Restored, Claimed,
+                          Commit, RunStarted, Asset, Ruling, Document, Prompt, Nothing }
+impl Holding { pub(super) fn of(kind: EventKind) -> Holding; }      // Views::apply 问它
+pub(super) enum Evidence { ToolResult, Finished, Nothing }
+impl Evidence { pub(super) fn of(kind: EventKind) -> Evidence; }    // evidence_in 问它
+```
+
+理由：`Views::apply` 与 `evidence_in` 原来各写一个带通配臂的 `match record.kind()`，靠 `#[expect(clippy::wildcard_enum_match_arm)]` 放行；kernel 加一种事件时编译器不会让这两处表态，新事件悄悄落进「什么都不做」。现在每个问题一张表：`of` 把 `EventKind` 的每一个变体写出来、归进本问题的一个类，调用处对类作穷尽的 `match`，于是加一种事件就是这里的一处编译错误，答它的人看得见所有同类。两张表放在一个文件里，因为它们回答的是同一种事（这一行对读面意味着什么），并排读才看得出哪种事件对哪个问题有意义。被否决的做法：①把 95 个变体直接写进 `Views::apply`——`holding.rs` 会超过 400 行，而且把「判类」与「折进去」混在一处；②给 `EventKind` 在 kernel 里加方法——读面的问题不属于 kernel。三个平台上相同：纯函数。
+
+重开参数：同一种按种类的判定在 accounting 里还有约十处（`effect.rs`、`lineage.rs`、`playback/links.rs`、`views/city.rs`、`commits.rs`、`governance.rs`、`rounds.rs`、`worker/credentials.rs`）；它们各自迁进一张这样的表，属于各自所有者的改动。
+-/
+
 /-! ### 接口仍写在 sprawling 规格里的模块
 
 下面这些模块的接口与取舍今天写在 `crates/sprawling/Spec.lean` 的这几节里，按标签列出；`architecture.toml` 里它们的行指向本分部，这张表把读者带到那一节。它们搬进本 crate 的规格是 D15 记下的下一步。
