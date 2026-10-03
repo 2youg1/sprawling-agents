@@ -328,6 +328,7 @@ impl LaneHalf {
             adapter,
             bench,
             signals: std::sync::Arc::clone(&desks.signals),
+            policy: desks.policy.clone(),
             write_root: site.write_root.clone(),
             checkpoint_scope,
             run_id: site.run_id,

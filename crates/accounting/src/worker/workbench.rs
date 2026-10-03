@@ -339,6 +339,8 @@ pub(super) struct Desks {
     /// This run's tenure over its room's queue, shown when it lands:
     /// only the holder gives a queue back (`crates/sprawling/Spec.lean` §8-46-9).
     pub(super) tenure: super::QueueTenure,
+    /// Where a change of the room's run policy waits for this run.
+    pub(super) policy: super::rooms::PolicySlot,
 }
 
 /// The desks a run's bench holds while it drives: clones of the handles
@@ -355,6 +357,7 @@ pub(in crate::worker) struct BenchDesks {
     workshop: std::sync::Arc<std::sync::Mutex<collab::WorkshopDesk>>,
     delegates: std::sync::Arc<std::sync::Mutex<collab::DelegateDesk>>,
     waiting: u32,
+    pub(in crate::worker) policy: super::rooms::PolicySlot,
 }
 
 impl Desks {
@@ -369,6 +372,7 @@ impl Desks {
             workshop: std::sync::Arc::clone(&self.workshop),
             delegates: std::sync::Arc::clone(&self.delegates),
             waiting: self.waiting,
+            policy: self.policy.clone(),
         }
     }
 }

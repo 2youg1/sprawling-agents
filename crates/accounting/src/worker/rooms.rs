@@ -23,6 +23,7 @@
 //! never held.
 
 use std::collections::BTreeMap;
+use std::sync::{Arc, Mutex, PoisonError};
 
 use kernel::{Address, Admission, AxCode, AxError, RunId};
 
@@ -35,7 +36,37 @@ enum RoomQueue {
     /// One run holds this room's queue at its signal desk, and what
     /// arrives meanwhile is dropped into the slot that desk empties at
     /// each safe point.
-    Lent { to: RunId, slot: collab::Mailslot },
+    Lent {
+        to: RunId,
+        slot: collab::Mailslot,
+        policy: PolicySlot,
+    },
+}
+
+/// Where a run policy the User chose for a room waits for the run
+/// working there, beside the room's mailslot (`crates/runtime/spec/PolicyTake.lean`
+/// §8-62).
+///
+/// One writer, [`RoomQueues::post_policy`], on the accounting thread;
+/// one reader, the lane's interrupt source, which hands what it takes to
+/// the run as `Interrupt::Policy` at its next safe point. It holds the
+/// last change only: a later one overrides an earlier one the run has
+/// not read, which is what the run's own cell would do with both.
+#[derive(Clone, Default)]
+pub(in crate::worker) struct PolicySlot(Arc<Mutex<Option<kernel::RunPolicy>>>);
+
+impl PolicySlot {
+    /// Puts `policy` in the slot, over whatever waited there.
+    fn post(&self, policy: kernel::RunPolicy) {
+        // A poisoned lock still holds a whole policy: the only write is
+        // the assignment of a `Copy` value, which cannot stop halfway.
+        *self.0.lock().unwrap_or_else(PoisonError::into_inner) = Some(policy);
+    }
+
+    /// Takes the change waiting for the run, if one is.
+    pub(in crate::worker) fn take(&self) -> Option<kernel::RunPolicy> {
+        self.0.lock().unwrap_or_else(PoisonError::into_inner).take()
+    }
 }
 
 /// This run's tenure over its room's queue.
@@ -58,6 +89,9 @@ pub(in crate::worker) struct Lent {
     /// Where the city drops what arrives for the room while the run
     /// reads; a spare's slot is one nothing is dropped into.
     pub(in crate::worker) slot: collab::Mailslot,
+    /// Where a change of the room's run policy waits for this run; a
+    /// spare's is one nothing is posted into.
+    pub(in crate::worker) policy: PolicySlot,
     pub(in crate::worker) tenure: QueueTenure,
 }
 
@@ -114,19 +148,23 @@ impl RoomQueues {
             Some(RoomQueue::Lent { to: holder, .. }) => Lent {
                 inbox: new_inbox(),
                 slot: collab::Mailslot::default(),
+                policy: PolicySlot::default(),
                 tenure: QueueTenure::ASpare { held_by: *holder },
             },
             Some(entry) => {
                 let slot = collab::Mailslot::default();
+                let policy = PolicySlot::default();
                 let lent = std::mem::replace(
                     entry,
                     RoomQueue::Lent {
                         to,
                         slot: slot.clone(),
+                        policy: policy.clone(),
                     },
                 );
                 Lent {
                     slot,
+                    policy,
                     inbox: match lent {
                         RoomQueue::Home(inbox) => inbox,
                         // Unreachable by the arm above, and answered
@@ -140,16 +178,19 @@ impl RoomQueues {
             }
             None => {
                 let slot = collab::Mailslot::default();
+                let policy = PolicySlot::default();
                 self.rooms.insert(
                     addr.clone(),
                     RoomQueue::Lent {
                         to,
                         slot: slot.clone(),
+                        policy: policy.clone(),
                     },
                 );
                 Lent {
                     inbox: new_inbox(),
                     slot,
+                    policy,
                     tenure: QueueTenure::TheRoomQueue,
                 }
             }
@@ -170,7 +211,7 @@ impl RoomQueues {
         mut returned: collab::Inbox,
     ) -> Result<(), AxError> {
         let slot = match self.rooms.get(addr) {
-            Some(RoomQueue::Lent { to, slot }) if *to == from => slot.clone(),
+            Some(RoomQueue::Lent { to, slot, .. }) if *to == from => slot.clone(),
             Some(RoomQueue::Lent { to, .. }) => {
                 return Err(not_the_holder(addr, from, &format!("{to} is")));
             }
@@ -221,6 +262,16 @@ impl RoomQueues {
             RoomQueue::Lent { slot, .. } => slot.drop_in(signal.clone(), INBOX_CAPACITY)?,
         };
         admitted(admission, signal)
+    }
+
+    /// Hands a new run policy for the room at `addr` to the run working
+    /// there, if one is; a room nobody works in keeps it on the ledger
+    /// alone, where the next dispatch reads it.
+    pub(in crate::worker) fn post_policy(&self, addr: &Address, policy: kernel::RunPolicy) {
+        match self.rooms.get(addr) {
+            Some(RoomQueue::Lent { policy: slot, .. }) => slot.post(policy),
+            Some(RoomQueue::Home(_)) | None => {}
+        }
     }
 
     /// How many signals the room at `addr` is holding for a reader that

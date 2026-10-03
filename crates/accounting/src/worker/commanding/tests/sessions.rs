@@ -114,3 +114,31 @@ fn changing_a_run_policy_records_the_policy_the_person_chose() {
         )]
     );
 }
+
+/// A new run policy for a room a run is working in reaches that run: it
+/// waits in the slot the run's safe points read, and only the last
+/// change waits (`crates/runtime/spec/PolicyTake.lean` §8-62).
+#[test]
+fn changing_the_policy_of_a_worked_room_reaches_the_run_working_there() {
+    let (_dir, mut worker) = city();
+    let running = RunId::from_bytes([9u8; 16]);
+    let lent = worker.collaborating.rooms.lend(&room(), running);
+    let chat = RunPolicy::of(Mode::Chat);
+    let tighter = RunPolicy {
+        write: kernel::WriteLimit::Create,
+        ..RunPolicy::of(Mode::Work)
+    };
+    for (policy, idem) in [(chat, b"first".as_slice()), (tighter, b"second".as_slice())] {
+        worker
+            .handle(wire::Command::ChangeRunPolicy(wire::PolicyChange {
+                room: room(),
+                policy,
+                idem: key(idem),
+            }))
+            .unwrap();
+    }
+    assert_eq!(
+        (lent.policy.take(), lent.policy.take()),
+        (Some(tighter), None)
+    );
+}

@@ -155,6 +155,7 @@ impl RunWorker {
             plan_path,
             waiting,
             tenure: lent.tenure,
+            policy: lent.policy,
         })
     }
 

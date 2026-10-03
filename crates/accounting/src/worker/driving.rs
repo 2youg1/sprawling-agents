@@ -48,6 +48,9 @@ pub(crate) struct Driving {
     /// A handle of its own rather than a loan: the drive may leave the
     /// thread that opened the desk (`crates/sprawling/Spec.lean` §8-44).
     pub signals: std::sync::Arc<std::sync::Mutex<collab::SignalDesk>>,
+    /// Where a change of the room's run policy waits for the drive's
+    /// safe points (`crates/runtime/spec/PolicyTake.lean` §8-62).
+    pub(in crate::worker) policy: super::rooms::PolicySlot,
     /// The tree the run writes in: its own worktree under review, the
     /// city itself otherwise.
     pub write_root: PathBuf,

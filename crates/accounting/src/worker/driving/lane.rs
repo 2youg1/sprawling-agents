@@ -65,6 +65,8 @@ struct Interrupting {
     backlog: runtime::Backlog,
     person: Option<std::sync::Arc<dyn Fn(RunId) -> Interrupt + Send + Sync>>,
     steers: std::sync::Arc<std::sync::Mutex<collab::SignalDesk>>,
+    /// Where the User's change of this room's run policy waits.
+    policy: crate::worker::rooms::PolicySlot,
     /// What arrived while the run waited out a provider and was not a
     /// halt. The desk hands each steer out once, so one taken during a
     /// wait is kept here for the safe point that follows it.
@@ -176,6 +178,9 @@ impl Interrupting {
         if !matches!(from_person, Interrupt::None) {
             return from_person;
         }
+        if let Some(policy) = self.policy.take() {
+            return Interrupt::Policy { policy };
+        }
         // A desk nobody can take answers nothing rather than refusing:
         // a safe point is the wrong place to fail over a lock, and the
         // drive's own end will report it.
@@ -251,6 +256,7 @@ pub(crate) fn drive_run<L: Ledger>(
         mut adapter,
         bench,
         signals,
+        policy,
         write_root,
         checkpoint_scope,
         run_id,
@@ -295,6 +301,7 @@ pub(crate) fn drive_run<L: Ledger>(
         backlog,
         person,
         steers: signals,
+        policy,
         held: None,
     });
     let (driven, ran) = {
