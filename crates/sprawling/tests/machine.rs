@@ -29,7 +29,7 @@ use sprawling::assembly;
 struct OneItem;
 
 impl accounting::Machine for OneItem {
-    fn report(&self) -> wire::DoctorAnswer {
+    fn report(&self, _city: &std::path::Path) -> wire::DoctorAnswer {
         wire::DoctorAnswer {
             items: vec![wire::DoctorItem {
                 name: "scripted".to_owned(),
@@ -48,6 +48,7 @@ impl accounting::Machine for OneItem {
             tiers: Vec::new(),
             sandbox: wire::DoctorSandbox {
                 arm: wire::DoctorSandboxArm::CopiedTree,
+                named: wire::SandboxArm::CopiedTree,
                 coverage: Vec::new(),
             },
             custody: wire::DoctorCustody {
@@ -56,6 +57,7 @@ impl accounting::Machine for OneItem {
                 refusal: None,
             },
             core: wire::DoctorCore::HeldBySetting,
+            scanning: wire::DoctorScanning::DoesNotApply,
         }
     }
 
@@ -109,8 +111,8 @@ impl accounting::Machine for Recording {
     /// What it installed is present afterwards, so the install ends
     /// with the item found rather than with the refusal a package
     /// manager that left it unfindable earns.
-    fn report(&self) -> wire::DoctorAnswer {
-        let mut answer = OneItem.report();
+    fn report(&self, city: &std::path::Path) -> wire::DoctorAnswer {
+        let mut answer = OneItem.report(city);
         answer.items.extend(
             self.0
                 .lock()

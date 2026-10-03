@@ -138,11 +138,15 @@ mod tests {
         let wire::Answer::Harnesses(page) = views.prepare(&wire::Query::Harnesses).finish() else {
             panic!("Harnesses answers with the harness page");
         };
-        let found: Vec<bool> = page.harnesses.iter().map(|line| line.found).collect();
+        let found: Vec<wire::HarnessState> =
+            page.harnesses.into_iter().map(|line| line.state).collect();
         assert_eq!(
             (found, ASKED.load(std::sync::atomic::Ordering::Relaxed)),
             (
-                vec![true; agent_protocols::Harness::ALL.len()],
+                vec![
+                    wire::HarnessState::NotSetUp { looked: Vec::new() };
+                    agent_protocols::Harness::ALL.len()
+                ],
                 agent_protocols::Harness::ALL.len()
             ),
         );

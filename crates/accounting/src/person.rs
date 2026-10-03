@@ -95,7 +95,8 @@ fn land(file: &Path, patch: PreferencePatch) -> Result<(), AxError> {
             | PreferencePatch::Appearance(_)
             | PreferencePatch::Proxying(_)
             | PreferencePatch::Chord(_)
-            | PreferencePatch::Tags(_) => {
+            | PreferencePatch::Tags(_)
+            | PreferencePatch::Theme(_) => {
                 let mut settled = section(&document, file)?;
                 settled.apply(patch);
                 document.insert(UI.to_owned(), rendered(&settled, file)?);

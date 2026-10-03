@@ -174,7 +174,15 @@ pub(crate) fn harnesses_answer(find: fn(&str) -> Option<PathBuf>) -> wire::Answe
                         .chain(launch.args.iter().copied())
                         .map(str::to_owned)
                         .collect(),
-                    found: find(launch.program.name()).is_some(),
+                    // No harness registers its install or sign-in
+                    // directories yet, so a present launcher is a harness
+                    // nobody has looked for (`crates/wire/spec/Answer/Harnesses.lean` §8-52).
+                    state: match find(launch.program.name()) {
+                        None => wire::HarnessState::LauncherMissing {
+                            program: launch.program.name().to_owned(),
+                        },
+                        Some(_) => wire::HarnessState::NotSetUp { looked: Vec::new() },
+                    },
                     docs: harness.docs().to_owned(),
                 }
             })

@@ -71,8 +71,8 @@ impl Machine for ScriptedMachine {
 }
 
 impl accounting::Machine for ScriptedMachine {
-    fn report(&self) -> wire::DoctorAnswer {
-        super::answer(self)
+    fn report(&self, city: &std::path::Path) -> wire::DoctorAnswer {
+        super::answer(self, city)
     }
 
     fn install(&self, name: &str, _runnable: &Runnable) -> Result<(), kernel::AxError> {

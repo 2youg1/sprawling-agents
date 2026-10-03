@@ -53,6 +53,7 @@ mod proposals;
 mod range;
 mod release;
 mod rounds;
+mod scanning;
 mod sessions;
 mod skills;
 mod toolkits;
@@ -66,12 +67,12 @@ pub use config::{
 };
 pub use cost::{CostAnswer, UnpricedCalls};
 pub use cost_of::{CostOfAnswer, RUN_COSTS_MAX, RunCostsAnswer};
-pub use doctor::DoctorSandboxMissing;
 pub use doctor::{DoctorAbsence, DoctorAnswer, DoctorCore, DoctorFault, DoctorInstall, DoctorItem};
 pub use doctor::{DoctorCoverage, DoctorCustody, DoctorCustodyLifetime, DoctorCustodyStore};
 pub use doctor::{DoctorGuarantee, DoctorGuaranteeAxis, DoctorSandbox, DoctorSandboxArm};
 pub use doctor::{DoctorNeed, DoctorState, DoctorTier, DoctorVerdict, DoctorVersion};
 pub use doctor::{DoctorNewest, DoctorPack, DoctorUnread, DoctorUpstream};
+pub use doctor::{DoctorSandboxMissing, SandboxArm};
 pub use document::{Coverage, DocumentAnswer, DocumentBody, DocumentState, HeldDocument};
 pub use document_bytes::{BYTES_WINDOW_MAX, BytesAnswer, ExportAnswer};
 pub use document_versions::{DocumentVersion, VERSIONS_MAX, VersionSource, VersionsAnswer};
@@ -80,7 +81,7 @@ pub use evidence::{EvidenceAnswer, EvidenceItem, EvidenceKind, Picture};
 pub use find::{FIND_MAX, FIND_WALK_MAX, FindAnswer, Walked};
 pub use git_status::{Drift, GitStatusAnswer};
 pub use github::{GithubLoginAnswer, GithubReading};
-pub use harnesses::{HarnessLine, HarnessesAnswer};
+pub use harnesses::{HarnessLine, HarnessState, HarnessesAnswer};
 pub use history::{HistoryAnswer, HistoryRangeAnswer};
 pub use hunks::{HunksAnswer, PatchLine, Withheld};
 pub use identity::{IdentityAnswer, StatedIdentity};
@@ -93,10 +94,12 @@ pub use prefix::{ContentAnswer, PrefixAnswer, PrefixSegment, PrefixSlot, PrefixS
 pub use preview::PreviewAnswer;
 pub use proposals::{OfferedCard, OpenProposalsAnswer, ProposalCard, ProposalsAnswer};
 pub use range::RangeAnswer;
-pub use release::{ReleaseAnswer, ReleaseLine};
+pub use release::{InstallChannel, Registry, RegistryNewest, RegistryReading};
+pub use release::{ReleaseAnswer, ReleaseLine, UpdateHint};
 pub use rounds::{
     Call, Closing, FrozenNames, Note, Opening, Outcome, Output, RoundsAnswer, Timing, Turn, Used,
 };
+pub use scanning::{DoctorDrive, DoctorExclusion, DoctorScanning, DoctorUntold};
 pub use sessions::{SESSIONS_MAX, SessionLine, SessionStart, SessionsAnswer};
 pub use skills::{SkillLine, SkillShelf, SkillsAnswer};
 pub use toolkits::{Standing, ToolkitLine, ToolkitsAnswer};

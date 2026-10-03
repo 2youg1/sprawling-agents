@@ -47,16 +47,78 @@ pub struct ReleaseLine {
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum ReleaseAnswer {
     /// This binary came out of a release, and here is where it stands.
+    /// `verdict` judges `mine` against npm's line, which is what
+    /// `bunx sprawling` resolves.
     Stands {
         mine: ReleaseLine,
-        newest: ReleaseLine,
+        registries: Vec<RegistryNewest>,
         verdict: ReleaseVerdict,
+        update: UpdateHint,
     },
     /// This binary was built from a working tree, so it is none of the
     /// published releases. Reporting it as out of date would be
     /// answering about a binary the person is not running.
-    Unreleased { newest: ReleaseLine },
+    Unreleased {
+        registries: Vec<RegistryNewest>,
+        update: UpdateHint,
+    },
     /// The check could not be made. Carries why, because "could not
     /// check" leaves a person believing they checked.
     Refused { refusal: AxError },
+}
+
+/// What one registry said about the newest release
+/// (`crates/wire/spec/Answer/Release.lean` D24).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct RegistryNewest {
+    pub registry: Registry,
+    pub reading: RegistryReading,
+}
+
+/// A registry this project publishes to.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub enum Registry {
+    Npm,
+    CratesIo,
+}
+
+/// What one registry answered.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub enum RegistryReading {
+    Read {
+        newest: ReleaseLine,
+    },
+    Refused {
+        refusal: AxError,
+    },
+    /// Not asked: no rule yet compares this registry's version with
+    /// this binary's, so an answer would be a guess.
+    Unasked,
+}
+
+/// How this binary was installed, which decides the command that
+/// updates it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub enum InstallChannel {
+    Npm,
+    Cargo,
+    Archive,
+    Source,
+}
+
+/// The command a person runs to update, printed and never run: the
+/// channel that installed the binary owns updating it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct UpdateHint {
+    pub channel: InstallChannel,
+    /// `None` for a binary built from source, which nothing updates.
+    pub command: Option<String>,
 }

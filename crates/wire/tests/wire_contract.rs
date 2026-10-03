@@ -79,7 +79,7 @@ fn every_command_name_is_registered_in_the_table() {
 fn the_schema_hash_is_stable_across_calls_and_covers_the_wire_version() {
     assert_eq!(schema_hash(), schema_hash(), "hash is a pure function");
     // Golden: this pins the current wire. Changing a variant changes the hash,
-    // which forces the SPEC to move in the same change set (apisync gate).
+    // so a change to the wire is a visible change to this line.
     // A changed name moves the hash the handshake compares; `WIRE_V` rises
     // only for a shape change under names that stay, once between two
     // pushes (wire D1).
@@ -153,7 +153,7 @@ fn strip_prose(value: &mut serde_json::Value) {
 
 /// The digest of `wire_schema()` with its prose removed.
 #[cfg(feature = "schema")]
-const WIRE_SHAPE_GOLDEN: &str = "e6d1e3e83fa49e3eb101e9872587a159c3d1cbcaece418161a8d5920c55335e9";
+const WIRE_SHAPE_GOLDEN: &str = "24204652b5d3276e01ded7ea5f3390e7fd3b240c98eddac421eb83987efc6bff";
 
 // -------------------------------------------------------------- binding face
 

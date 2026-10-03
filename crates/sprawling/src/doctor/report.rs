@@ -11,11 +11,13 @@
 //! machine a second time, and neither decides anything - what is here
 //! and what a tier needs are settled in `doctor` and in `table`.
 
+use super::scanning::{Drive, Exclusion, Scanning, Untold};
 use super::{Absence, Fault, Version};
 use super::{Finding, Machine, Need, Platform, Presence, Tier, Verdict};
 use super::{examine, verdict};
 use crate::serving::standing::{Held, Standing};
 use kernel::AxError;
+use std::path::Path;
 
 /// Asks `machine` once and folds what it said into the answer the
 /// wire carries. `ThisMachine`'s `accounting::Machine::report` is this.
@@ -26,9 +28,21 @@ use kernel::AxError;
 /// seconds rather than milliseconds, so neither a serve nor a query
 /// waits for it - a person opening the page that shows it asks for it,
 /// and the city holds the answer until they ask again.
-pub(crate) fn answer(machine: &dyn Machine) -> wire::DoctorAnswer {
-    let platform = Platform::current();
-    fold(machine, platform, confinement(), custody())
+///
+/// `city` is the directory whose disk the scanning reading judges.
+pub(crate) fn answer(machine: &dyn Machine, city: &Path) -> wire::DoctorAnswer {
+    let wide = MachineWide {
+        sandbox: confinement(),
+        custody: custody(),
+    };
+    fold(machine, Platform::current(), wide, city)
+}
+
+/// The two machine-wide reads that are not asked of `Machine`: the box
+/// a command runs in, and where credentials rest.
+struct MachineWide {
+    sandbox: wire::DoctorSandbox,
+    custody: wire::DoctorCustody,
 }
 
 /// The findings, in the shape the wire carries. Separate from the ask
@@ -39,8 +53,8 @@ pub(crate) fn answer(machine: &dyn Machine) -> wire::DoctorAnswer {
 fn fold(
     machine: &dyn Machine,
     platform: Option<Platform>,
-    sandbox: wire::DoctorSandbox,
-    custody: wire::DoctorCustody,
+    wide: MachineWide,
+    city: &Path,
 ) -> wire::DoctorAnswer {
     let findings = &examine(machine);
     wire::DoctorAnswer {
@@ -55,9 +69,64 @@ fn fold(
                 },
             })
             .collect(),
-        sandbox,
-        custody,
+        sandbox: wide.sandbox,
+        custody: wide.custody,
         core: core_level(machine.core_standing()),
+        scanning: scanned(machine.scanning(city)),
+    }
+}
+
+/// The scanning reading, arm for arm as the terminal's part reads it
+/// (`crates/wire/spec/Answer/Doctor.lean` D25).
+fn scanned(scanning: Scanning) -> wire::DoctorScanning {
+    match scanning {
+        Scanning::DoesNotApply => wire::DoctorScanning::DoesNotApply,
+        Scanning::Stopped => wire::DoctorScanning::Stopped,
+        Scanning::Read {
+            city,
+            drive,
+            exclusion,
+        } => wire::DoctorScanning::Read {
+            city: city.display().to_string(),
+            drive: match drive {
+                Drive::Trusted => wire::DoctorDrive::Trusted,
+                Drive::Untrusted { volume } => wire::DoctorDrive::Untrusted { volume },
+                Drive::Not {
+                    volume,
+                    file_system,
+                } => wire::DoctorDrive::Not {
+                    volume,
+                    file_system,
+                },
+                Drive::Untold(why) => wire::DoctorDrive::Untold { why: untold(why) },
+            },
+            exclusion: match exclusion {
+                Exclusion::Inside { under } => wire::DoctorExclusion::Inside { under },
+                Exclusion::Outside => wire::DoctorExclusion::Outside,
+                Exclusion::Untold(why) => wire::DoctorExclusion::Untold { why: untold(why) },
+            },
+        },
+    }
+}
+
+fn untold(why: Untold) -> wire::DoctorUntold {
+    match why {
+        Untold::NoDisk => wire::DoctorUntold::NoDisk,
+        Untold::AdminOnly => wire::DoctorUntold::AdminOnly,
+        Untold::Unread { command } => wire::DoctorUntold::Unread {
+            command: command.to_owned(),
+        },
+        Untold::Failed { command, code } => wire::DoctorUntold::Failed {
+            command: command.to_owned(),
+            code,
+        },
+        Untold::Unstarted { command } => wire::DoctorUntold::Unstarted {
+            command: command.to_owned(),
+        },
+        Untold::Unanswered { command, stopping } => wire::DoctorUntold::Unanswered {
+            command: command.to_owned(),
+            stopping,
+        },
     }
 }
 
@@ -83,6 +152,7 @@ fn confinement() -> wire::DoctorSandbox {
     let arm = runtime::tools::Confinement::detect();
     wire::DoctorSandbox {
         arm: arm_name(&arm),
+        named: chosen_name(&arm),
         coverage: runtime::tools::Guarantee::ALL
             .iter()
             .map(|axis| wire::DoctorGuarantee {
@@ -141,6 +211,17 @@ fn arm_name(arm: &runtime::tools::Confinement) -> wire::DoctorSandboxArm {
                 },
             }
         }
+    }
+}
+
+/// The arm's name in the set a setting chooses from (wire D26). An
+/// unavailable arm runs a command on the host itself, which is `None`.
+fn chosen_name(arm: &runtime::tools::Confinement) -> wire::SandboxArm {
+    match arm {
+        runtime::tools::Confinement::LinuxNamespaces { .. }
+        | runtime::tools::Confinement::WindowsJobObject => wire::SandboxArm::Native,
+        runtime::tools::Confinement::CopiedTree => wire::SandboxArm::CopiedTree,
+        runtime::tools::Confinement::Unavailable { .. } => wire::SandboxArm::None,
     }
 }
 
@@ -253,17 +334,19 @@ fn install(recipe: &super::Recipe) -> wire::DoctorInstall {
 #[expect(clippy::expect_used, reason = "test code")]
 mod tests {
     use super::axis_name;
-    use super::fold;
+    use super::{MachineWide, fold};
     use crate::doctor::Platform;
     use crate::doctor::tests::ScriptedMachine;
     use crate::serving::standing::{Held, Standing};
+    use std::path::Path;
 
     /// The two machine-wide reads a fold is given, so that a verdict is
     /// judged without a machine that has a search path and a keyring.
-    fn stated() -> (wire::DoctorSandbox, wire::DoctorCustody) {
-        (
-            wire::DoctorSandbox {
+    fn stated() -> MachineWide {
+        MachineWide {
+            sandbox: wire::DoctorSandbox {
                 arm: wire::DoctorSandboxArm::CopiedTree,
+                named: wire::SandboxArm::CopiedTree,
                 coverage: runtime::tools::Guarantee::ALL
                     .iter()
                     .map(|axis| wire::DoctorGuarantee {
@@ -278,12 +361,12 @@ mod tests {
                     })
                     .collect(),
             },
-            wire::DoctorCustody {
+            custody: wire::DoctorCustody {
                 store: wire::DoctorCustodyStore::SessionMemory,
                 keeps: wire::DoctorCustodyLifetime::ThisProcess,
                 refusal: None,
             },
-        )
+        }
     }
 
     /// The page is told the same thing the terminal is told, item for
@@ -294,8 +377,12 @@ mod tests {
     fn the_answer_says_what_is_missing_and_what_would_get_it() {
         let machine =
             ScriptedMachine::missing(&["gecko", "webkit", "chromedriver", "msedgedriver"]);
-        let (sandbox, custody) = stated();
-        let answer = fold(&machine, Some(Platform::Windows), sandbox, custody);
+        let answer = fold(
+            &machine,
+            Some(Platform::Windows),
+            stated(),
+            Path::new("city"),
+        );
 
         let gecko = answer
             .items
@@ -346,8 +433,7 @@ mod tests {
     fn a_platform_with_no_recipes_offers_none() {
         let machine =
             ScriptedMachine::missing(&["gecko", "webkit", "chromedriver", "msedgedriver"]);
-        let (sandbox, custody) = stated();
-        let answer = fold(&machine, None, sandbox, custody);
+        let answer = fold(&machine, None, stated(), Path::new("city"));
         assert!(
             answer
                 .items
@@ -364,8 +450,12 @@ mod tests {
     #[test]
     fn the_sandbox_rows_are_the_arms_own_assurances() {
         let machine = ScriptedMachine::missing(&[]);
-        let (sandbox, custody) = stated();
-        let answer = fold(&machine, Some(Platform::Windows), sandbox, custody);
+        let answer = fold(
+            &machine,
+            Some(Platform::Windows),
+            stated(),
+            Path::new("city"),
+        );
         assert_eq!(answer.sandbox.arm, wire::DoctorSandboxArm::CopiedTree);
         assert_eq!(answer.sandbox.coverage.len(), 5, "one row per axis");
         let network = answer
@@ -389,8 +479,7 @@ mod tests {
         let machine = ScriptedMachine::missing(&[]).standing(Standing::Normal(Held::Refused(
             "the raise needs CAP_SYS_NICE".to_owned(),
         )));
-        let (sandbox, custody) = stated();
-        let answer = fold(&machine, None, sandbox, custody);
+        let answer = fold(&machine, None, stated(), Path::new("city"));
         assert_eq!(
             answer.core,
             wire::DoctorCore::Refused {

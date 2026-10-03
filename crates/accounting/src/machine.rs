@@ -24,8 +24,9 @@ use kernel::{AxCode, AxError};
 /// command is run.
 pub trait Machine {
     /// Asks this machine every question the requirement table holds,
-    /// in the shape a page reads.
-    fn report(&self) -> wire::DoctorAnswer;
+    /// in the shape a page reads. `city` is the directory whose disk
+    /// the scanning reading judges.
+    fn report(&self, city: &std::path::Path) -> wire::DoctorAnswer;
 
     /// Runs one install command the person has just agreed to.
     ///

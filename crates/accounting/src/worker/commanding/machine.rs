@@ -77,7 +77,7 @@ impl RunWorker {
             "bin::doctor",
             &format!("installed {item}; this city looked again"),
         );
-        let found = self.machine.report();
+        let found = self.machine.report(&self.city_root);
         let here = found.items.iter().any(|each| {
             each.name == item && matches!(each.state, wire::DoctorState::Present { .. })
         });
@@ -107,7 +107,7 @@ impl RunWorker {
     }
 
     pub(in crate::worker) fn look_at_this_machine(&mut self) {
-        let found = self.machine.report();
+        let found = self.machine.report(&self.city_root);
         self.show_this_machine(found);
     }
 
@@ -201,7 +201,7 @@ mod tests {
     }
 
     impl crate::Machine for Recording {
-        fn report(&self) -> wire::DoctorAnswer {
+        fn report(&self, _city: &std::path::Path) -> wire::DoctorAnswer {
             let items = match self.1 {
                 Finds::Nothing => Vec::new(),
                 Finds::WhatWasInstalled => self
@@ -229,6 +229,7 @@ mod tests {
                 tiers: Vec::new(),
                 sandbox: wire::DoctorSandbox {
                     arm: wire::DoctorSandboxArm::CopiedTree,
+                    named: wire::SandboxArm::CopiedTree,
                     coverage: Vec::new(),
                 },
                 custody: wire::DoctorCustody {
@@ -237,6 +238,7 @@ mod tests {
                     refusal: None,
                 },
                 core: wire::DoctorCore::HeldBySetting,
+                scanning: wire::DoctorScanning::DoesNotApply,
             }
         }
 

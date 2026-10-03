@@ -32,7 +32,6 @@ mod reply;
 mod server;
 
 pub use aggregate::{Aggregate, CityLabel, Forwarded, Sighting, Upstream};
-pub use answer::DoctorSandboxMissing;
 pub use answer::HistoryAnswer;
 pub use answer::HistoryRangeAnswer;
 pub use answer::PlanRow;
@@ -54,22 +53,27 @@ pub use answer::{Coverage, DocumentAnswer, DocumentBody, DocumentState, HeldDocu
 pub use answer::{Decision, GovernanceAnswer};
 pub use answer::{DoctorAbsence, DoctorAnswer, DoctorCore, DoctorFault, DoctorInstall, DoctorItem};
 pub use answer::{DoctorCoverage, DoctorCustody, DoctorCustodyLifetime, DoctorCustodyStore};
+pub use answer::{DoctorDrive, DoctorExclusion, DoctorScanning, DoctorUntold};
 pub use answer::{DoctorGuarantee, DoctorGuaranteeAxis, DoctorSandbox, DoctorSandboxArm};
 pub use answer::{DoctorNeed, DoctorState, DoctorTier, DoctorVerdict, DoctorVersion};
 pub use answer::{DoctorNewest, DoctorPack, DoctorUnread, DoctorUpstream};
+pub use answer::{DoctorSandboxMissing, SandboxArm};
 pub use answer::{EndpointSummary, EndpointsAnswer, UnpricedCalls};
 pub use answer::{Entry, EntryKind, ListingAnswer, PreviewAnswer, RangeAnswer};
 pub use answer::{EvidenceItem, EvidenceKind, Picture};
 pub use answer::{FIND_MAX, FIND_WALK_MAX, FindAnswer, Walked};
 pub use answer::{GithubLoginAnswer, GithubReading};
-pub use answer::{HarnessLine, HarnessesAnswer, KnownFace, KnownHost, KnownHostsAnswer};
+pub use answer::{
+    HarnessLine, HarnessState, HarnessesAnswer, KnownFace, KnownHost, KnownHostsAnswer,
+};
 pub use answer::{HunksAnswer, PatchLine, Withheld};
 pub use answer::{IdentityAnswer, StatedIdentity};
 pub use answer::{InboxAnswer, MetricsAnswer, RegistryAnswer, RegistryLine, SignalLine};
+pub use answer::{InstallChannel, Registry, RegistryNewest, RegistryReading};
 pub use answer::{McpHealthAnswer, McpServerHealth, McpState, McpToolLine};
 pub use answer::{OfferedCard, OpenProposalsAnswer, ProposalCard, ProposalsAnswer};
 pub use answer::{PrefixSlot, PrefixSource, SkillLine, SkillShelf, SkillsAnswer};
-pub use answer::{ReleaseAnswer, ReleaseLine};
+pub use answer::{ReleaseAnswer, ReleaseLine, UpdateHint};
 pub use answer::{RoundsAnswer, Timing, Turn};
 pub use answer::{SESSIONS_MAX, SessionLine, SessionStart, SessionsAnswer};
 pub use answer::{SecondDomain, SettledEffort, SettledSecond, TuningDefaults};
@@ -97,7 +101,7 @@ pub use guide::{GuideMark, GuideProgress, GuideState, GuideStep};
 pub use kernel::{FileChange, How, Lines};
 pub use preference::{Appearance, Chord, Chroma, Density, Face, Lang, Lighting, Motion};
 pub use preference::{BODY_PX_MAX, BODY_PX_MIN, CorePriority, PreferencePatch, PreferencesAnswer};
-pub use preference::{Glass, Tier};
+pub use preference::{Glass, ThemeOverride, Tier};
 pub use preference::{SessionTags, TAG_MAX, Tag};
 pub use reading::{OUTPUT_LINES, arguments_in, note_of, output_in, said_in};
 pub use reading::{text, thought_in, used_in};

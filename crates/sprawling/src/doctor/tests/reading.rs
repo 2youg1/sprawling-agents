@@ -186,8 +186,8 @@ fn the_heading_is_written_before_any_item_is_asked() {
         }
     }
     impl accounting::Machine for Watched {
-        fn report(&self) -> wire::DoctorAnswer {
-            crate::doctor::answer(self)
+        fn report(&self, city: &std::path::Path) -> wire::DoctorAnswer {
+            crate::doctor::answer(self, city)
         }
         fn install(&self, _name: &str, _runnable: &Runnable) -> Result<(), kernel::AxError> {
             Ok(())
@@ -275,8 +275,8 @@ fn the_first_row_is_written_while_the_other_items_are_still_asked() {
         }
     }
     impl accounting::Machine for Waiting {
-        fn report(&self) -> wire::DoctorAnswer {
-            crate::doctor::answer(self)
+        fn report(&self, city: &std::path::Path) -> wire::DoctorAnswer {
+            crate::doctor::answer(self, city)
         }
         fn install(&self, _name: &str, _runnable: &Runnable) -> Result<(), kernel::AxError> {
             Ok(())

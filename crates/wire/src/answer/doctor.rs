@@ -32,6 +32,9 @@ pub struct DoctorAnswer {
     pub custody: DoctorCustody,
     /// Where this machine lets the core's threads stand.
     pub core: DoctorCore,
+    /// Whether real-time scanning stands in front of the city
+    /// directory's writes (`crates/wire/spec/Answer/Doctor.lean` D25).
+    pub scanning: super::scanning::DoctorScanning,
 }
 
 /// The level this machine gives the core's threads under the person's
@@ -263,6 +266,9 @@ pub struct DoctorVerdict {
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct DoctorSandbox {
     pub arm: DoctorSandboxArm,
+    /// The arm's name in the closed set a setting chooses from
+    /// (`crates/wire/spec/Answer/Doctor.lean` D26).
+    pub named: SandboxArm,
     /// One row per axis, in the order the axes are declared. The rows
     /// are stated rather than left to the page to infer: an arm that
     /// holds some axes and not others is the whole reason this report
@@ -286,6 +292,24 @@ pub enum DoctorSandboxArm {
     CopiedTree,
     /// No arm at all, and what this machine is missing.
     Unavailable { missing: DoctorSandboxMissing },
+}
+
+/// The names a sandbox arm is chosen by, one per mechanism family, so
+/// that every name has an arm to fill on Windows, macOS and Linux
+/// (`crates/wire/spec/Answer/Doctor.lean` D26).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub enum SandboxArm {
+    /// The host itself: no axis is held.
+    None,
+    CopiedTree,
+    /// The platform's own mechanism: namespaces on Linux, Seatbelt on
+    /// macOS, a job object on Windows.
+    Native,
+    Container,
+    /// Python inside a WebAssembly sandbox.
+    Python,
 }
 
 /// What a machine lacks when it can give no confinement at all.

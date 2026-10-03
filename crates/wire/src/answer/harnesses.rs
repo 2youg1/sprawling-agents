@@ -28,8 +28,24 @@ pub struct HarnessLine {
     pub name: String,
     /// The command that starts it as an ACP agent, word by word.
     pub launch: Vec<String>,
-    /// Whether the command's program is on this machine's search path.
-    pub found: bool,
+    /// Whether this machine can use it (`crates/wire/spec/Answer/Harnesses.lean` D23).
+    pub state: HarnessState,
     /// Where its vendor says how a person signs in.
     pub docs: String,
+}
+
+/// What a person does next about one harness: install its launcher,
+/// install or sign in to the harness, or use it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub enum HarnessState {
+    /// The launcher program (mostly `npx`) is not on the search path.
+    LauncherMissing { program: String },
+    /// The launcher is there, and none of the harness's install or
+    /// sign-in directories is. `looked` lists every directory checked,
+    /// expanded; empty while the harness has no directories registered.
+    NotSetUp { looked: Vec<String> },
+    /// The directory found.
+    Ready { at: String },
 }

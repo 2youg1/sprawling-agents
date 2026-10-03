@@ -168,8 +168,8 @@ impl Machine for ThisMachine {
 }
 
 impl accounting::Machine for ThisMachine {
-    fn report(&self) -> wire::DoctorAnswer {
-        super::answer(self)
+    fn report(&self, city: &std::path::Path) -> wire::DoctorAnswer {
+        super::answer(self, city)
     }
 
     fn install(&self, item: &str, runnable: &Runnable<'_>) -> Result<(), AxError> {

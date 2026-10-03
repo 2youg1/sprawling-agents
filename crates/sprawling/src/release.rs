@@ -27,7 +27,8 @@
 //! it is asking the question a person actually has.
 
 use kernel::{AxCode, AxError, Proxying, Reach, Release};
-use wire::{ReleaseAnswer, ReleaseLine};
+use wire::{InstallChannel, Registry, RegistryNewest, RegistryReading};
+use wire::{ReleaseAnswer, ReleaseLine, UpdateHint};
 
 /// The root package `release.yml` publishes, and the name `bunx
 /// sprawling` resolves. Its `latest` dist-tag is the newest release by
@@ -38,6 +39,11 @@ const LATEST_URL: &str = "https://registry.npmjs.org/sprawling/latest";
 /// Where every archive is, whether or not npm could be reached. The one
 /// answer that is useful when this command cannot give its own.
 const RELEASES: &str = "https://github.com/2youg1/sprawling-agents/releases";
+
+/// The command that updates a released binary, printed and never run.
+/// Every released binary is answered with it until the install channel
+/// is read from the binary's own path (`crates/wire/spec/Answer/Release.lean` D24).
+const NPM_UPDATE: &str = "bunx sprawling@latest up";
 
 /// One version manifest is a few hundred bytes, so a reader waiting on
 /// it has either been answered or is not going to be. Long enough for a
@@ -190,14 +196,34 @@ pub fn answer() -> ReleaseAnswer {
         Ok(found) => found,
         Err(refusal) => return ReleaseAnswer::Refused { refusal },
     };
+    let registries = vec![
+        RegistryNewest {
+            registry: Registry::Npm,
+            reading: RegistryReading::Read {
+                newest: line(&newest),
+            },
+        },
+        RegistryNewest {
+            registry: Registry::CratesIo,
+            reading: RegistryReading::Unasked,
+        },
+    ];
     match mine {
         Built::FromSource => ReleaseAnswer::Unreleased {
-            newest: line(&newest),
+            registries,
+            update: UpdateHint {
+                channel: InstallChannel::Source,
+                command: None,
+            },
         },
         Built::Released(mine) => ReleaseAnswer::Stands {
-            mine: line(&mine),
-            newest: line(&newest),
             verdict: kernel::release::stands(&mine, &newest),
+            mine: line(&mine),
+            registries,
+            update: UpdateHint {
+                channel: InstallChannel::Npm,
+                command: Some(NPM_UPDATE.to_owned()),
+            },
         },
     }
 }

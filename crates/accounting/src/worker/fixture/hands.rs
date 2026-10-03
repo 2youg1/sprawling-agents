@@ -99,12 +99,13 @@ pub(crate) fn monotonic() -> std::time::Instant {
 struct NoMachine;
 
 impl crate::Machine for NoMachine {
-    fn report(&self) -> wire::DoctorAnswer {
+    fn report(&self, _city: &std::path::Path) -> wire::DoctorAnswer {
         wire::DoctorAnswer {
             items: Vec::new(),
             tiers: Vec::new(),
             sandbox: wire::DoctorSandbox {
                 arm: wire::DoctorSandboxArm::CopiedTree,
+                named: wire::SandboxArm::CopiedTree,
                 coverage: Vec::new(),
             },
             custody: wire::DoctorCustody {
@@ -113,6 +114,7 @@ impl crate::Machine for NoMachine {
                 refusal: None,
             },
             core: wire::DoctorCore::HeldBySetting,
+            scanning: wire::DoctorScanning::DoesNotApply,
         }
     }
 

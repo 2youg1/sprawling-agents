@@ -23,6 +23,8 @@
 //! screens that each settle one thing must not be able to overwrite
 //! each other's field on the way past.
 
+use std::collections::BTreeMap;
+
 use serde::{Deserialize, Serialize};
 
 mod tag;
@@ -223,6 +225,26 @@ pub struct PreferencesAnswer {
     /// The tags this person gave sessions, in session order
     /// (`crates/wire/spec/Preference.lean` §8-84).
     pub tags: Vec<SessionTags>,
+    /// The person's colours laid over the built-in theme
+    /// (`crates/wire/spec/Preference.lean` D29).
+    pub theme: ThemeOverride,
+}
+
+/// Colours laid over the theme the page ships with. The empty value is
+/// the built-in theme.
+///
+/// The values are CSS, and the city does not parse them: the page owns
+/// both the theme and the stylesheet that reads it, and checks the keys
+/// against the `@theme` block and the legibility of the result.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct ThemeOverride {
+    /// A CSS variable of the `@theme` block in `client/src/theme.css`,
+    /// mapped to the CSS colour that replaces it.
+    pub tokens: BTreeMap<String, String>,
+    /// A whole stylesheet the person wrote, laid after the tokens.
+    pub css: Option<String>,
 }
 
 /// What a person who has settled nothing is answered.
@@ -243,6 +265,7 @@ impl Default for PreferencesAnswer {
             proxying: kernel::Proxying::ExceptLocal,
             chords: Vec::new(),
             tags: Vec::new(),
+            theme: ThemeOverride::default(),
         }
     }
 }
@@ -284,6 +307,7 @@ impl PreferencesAnswer {
             // section, which `accounting::person` writes beside `[ui]`.
             PreferencePatch::CorePriority(_) => {}
             PreferencePatch::Tags(next) => tag::retagged(&mut self.tags, next),
+            PreferencePatch::Theme(theme) => self.theme = theme,
             PreferencePatch::Chord(chord) => {
                 self.chords.retain(|held| held.action != chord.action);
                 // An action returned to the chord this build ships has
@@ -326,6 +350,9 @@ pub enum PreferencePatch {
     /// Replace one session's tags with these; an empty set removes them
     /// (`crates/wire/spec/Preference.lean` §8-84).
     Tags(SessionTags),
+    /// Replace the colour override; the empty value returns to the
+    /// built-in theme (`crates/wire/spec/Preference.lean` D29).
+    Theme(ThemeOverride),
 }
 
 /// Whether the core's threads stand above normal (`crates/sprawling/Spec.lean`

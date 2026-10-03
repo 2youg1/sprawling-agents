@@ -16,7 +16,7 @@ use kernel::Maturity;
 use sprawling::release;
 use sprawling::release::Built;
 use std::process::ExitCode;
-use wire::ReleaseAnswer;
+use wire::{Registry, RegistryNewest, RegistryReading, ReleaseAnswer};
 
 /// The first line `status` prints, as in
 /// `sprawling 0.0.8 (pre-alpha), built from source`.
@@ -65,19 +65,28 @@ pub(super) fn check() -> ExitCode {
             eprintln!("recovery: {}", refusal.recovery());
             ExitCode::FAILURE
         }
-        ReleaseAnswer::Unreleased { newest } => {
+        ReleaseAnswer::Unreleased { registries, .. } => {
             println!("this binary was built from source, so it is none of the published releases.");
-            println!(
-                "newest published: {}, cut {}",
-                newest.version, newest.released
-            );
+            for line in &registries {
+                println!("{}", registry_said(line));
+            }
             ExitCode::SUCCESS
         }
         ReleaseAnswer::Stands {
             mine,
-            newest,
+            registries,
             verdict,
+            update,
         } => {
+            let Some(newest) = registries.iter().find_map(|line| match &line.reading {
+                RegistryReading::Read { newest } if line.registry == Registry::Npm => Some(newest),
+                RegistryReading::Read { .. }
+                | RegistryReading::Refused { .. }
+                | RegistryReading::Unasked => None,
+            }) else {
+                eprintln!("could not check: the answer carried no npm reading");
+                return ExitCode::FAILURE;
+            };
             match verdict {
                 kernel::ReleaseVerdict::Current => println!(
                     "{} is the newest release published. Nothing to do.",
@@ -89,7 +98,9 @@ pub(super) fn check() -> ExitCode {
                         newest.version, newest.released, mine.version
                     );
                     println!();
-                    println!("  npm      bunx sprawling@latest up");
+                    if let Some(command) = &update.command {
+                        println!("  npm      {command}");
+                    }
                     println!("  archive  download it, then run `sprawling install` again:");
                     println!("           https://github.com/2youg1/sprawling-agents/releases");
                     println!();
@@ -109,6 +120,22 @@ pub(super) fn check() -> ExitCode {
             }
             ExitCode::SUCCESS
         }
+    }
+}
+
+/// One registry's line, as the terminal prints it.
+fn registry_said(line: &RegistryNewest) -> String {
+    let registry = match line.registry {
+        Registry::Npm => "npm",
+        Registry::CratesIo => "crates.io",
+    };
+    match &line.reading {
+        RegistryReading::Read { newest } => format!(
+            "newest on {registry}: {}, cut {}",
+            newest.version, newest.released
+        ),
+        RegistryReading::Refused { refusal } => format!("{registry} could not be read: {refusal}"),
+        RegistryReading::Unasked => format!("{registry} was not asked"),
     }
 }
 
