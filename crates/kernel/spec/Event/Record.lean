@@ -133,6 +133,7 @@ pub struct EndpointAttached { pub name: String, pub base_url: String, pub dialec
 pub struct AttachedTuning { pub label: Option<String>, pub timeout_ms: Option<u64>,
                             pub stream_idle_timeout_ms: Option<u64>, pub request_max_retries: Option<u32>,
                             pub proxying: Option<Proxying>,        // 默认值省略
+                            pub max_in_flight: Option<u32>,        // 没人定过就省略；1 到 256 之外读作未设
                             pub extra_headers: Vec<(String, String)>, pub overrides: Vec<(String, String)> }
 // AttachedTuning 的每个键缺席读作未设、在而读不懂也读作未设（行不被拒）：编造一个期限比没有期限更难解释。
 // EndpointAttached 顶层的键则不然：probed、auth、connection_kind 在而读不懂，整行读不成（E_WIRE_MISMATCH），
