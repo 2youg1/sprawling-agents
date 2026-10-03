@@ -214,7 +214,7 @@ D9 `send` 的同步开关。`send` 带一个开关，异步是默认：发完即
 
 D12 空计划的第一行由谁写：这栋楼的 Mayor，经 `plan add`（roadmap F2；kernel `spec/Share.lean` D25）。根的份额是整份计划，从来没有交给任何一方，所以六个动作都相对已有节点、空的 `Roadmap.md` 写不进第一行。`ClaimDesk::add` 只对 `hall/mayor` 开，在根下接着最后一个顶层行编号；`add` 复用 `split` 的 `parts`，`plan` 条目因此只多 33 B（`catalog_tests` 钉在 581 B）。加出的行是 `ClaimEffect::Added`，不写 `roadmap_*` 行，随计划文件写盘；`still_true` 对它答真，编号若在落地时已被别的写者占了，`apply` 拒绝，那次落地报错而不是改号，因为本 run 之后的 `claim` 用的是这个编号。被否决的有两种：其一，`add` 点名节点在它下面加子行——那就是 `split`，握持由 D6 判，第二个入口是第二个权威；其二，根归派活的 JOB——空计划里还没有可派的活。重开参数：除 hall 以外的楼也有了 Mayor 席位，或 User 改定根的持有者；只改 `ClaimDesk::add` 里那一条授权。
 
-D10 发信方之后被取消或失败：信已经是历史，不撤回。收信方看到的信带着发信 run 在投递那一刻的状态（仍在跑、已冻结、被取消、失败），由投递处从账本读出，写进落地文字 `@<address>` 之后；收信方据此决定还要不要照做。被否决的是取消时撤回已发的信：账本只追加，撤回要写第二条事实去否定第一条，而收信方可能已经照着做了，撤回只能让两边对「发生了什么」各持一份。
+D10 发信方之后被取消或失败：信已经是历史，不撤回。收信方看到的信带着发信 run 在投递那一刻的状态（`SenderState` 的 `running`、`frozen`、`cancelled`；失败的子 run 不回程，所以「失败」今天没有一封信可盖，见 §4），由投递处从账本读出，写进落地文字 `@<address>` 之后；收信方据此决定还要不要照做。被否决的是取消时撤回已发的信：账本只追加，撤回要写第二条事实去否定第一条，而收信方可能已经照着做了，撤回只能让两边对「发生了什么」各持一份。
 
 D11 一个房间同一时刻只有一个 run 读它的队列，连锁敲门由此有界。对账的结论：「一个房间同一时刻只有一个 run」在今天的代码里不成立：人的派活与 pursuit 可以在一个有人的房间再开一个 run，那个 run 拿到一份空的备用队列（`accounting::worker::rooms::RoomQueues::lend` 的 `QueueTenure::ASpare`）。成立的是更窄的那条：房间的队列同一时刻只借给一个 run，敲门在房间有人时推迟、等那个 run 离开再敲（`accounting::worker::waking` 的 `answer_knocks`），一个房间至多挂一次敲门（`accounting::worker::doorstep::Doorstep::queue`）。模型证明的正是这条（`knock_once`：敲门在 `knocks` 里不重复，有 run 在跑的房间不挂敲门）。A→B→C→A 的连锁因此不会在一个房间里叠出第二个 run：信落进那个房间的队列，由正在读它的 run 在安全点收到；连锁的长度另由 `CONVERSATION_HOPS_MAX` 封顶（`crates/sprawling/Spec.lean` §8-46-12）。被否决的是把规则加强成「一个房间一个 run」：它会拒掉人对一个忙房间的直接派活，而那是人有权要的东西。
 
@@ -240,7 +240,7 @@ D17 `signal` 登记 `RenderIntent::Signal`，`delegate` 登记 `RenderIntent::De
 
 D1 仲裁只有两级（ruling）。`Level` 只有 `Serialize` 与 `Arbitrate`，`arbitrate` 收两个入参，这是人的 ruling。第三级「升到人」在生产里不可达：唯一的生产调用点没有能让它成立的输入，门只答 Allow 或 Deny，被门拒掉的 run 不占地盘，也就无从与人相撞；一个不可达的级别仍会散布在公共面、账本载荷与恢复语里。一个居民读不定的冲突是一个设计问题，按设计问题进 Inbox。被否决的是用一个穷尽的 `Occasion` 枚举描述何时升到人：它把一个到不了的级别保留成一个更整齐的到不了的级别。
 
-D2 没有草稿退回机制。房间没有版本，发言不带「作者所见的房间版本」进房间，也就没有退回作者、四路择一与 hold token。它要防的两种冲突各有权威：同一份文件的并发写由 `storage` 的 `base_version` 乐观并发与 worktree 隔离解决；同一件事的并发认领由 `kernel::goal` 的同资源相斥与 `arbiter` 解决，第三套机制就是第三个权威。`Signal` 的 `room_version` 在生产写点（`signal_tool`、`handback`）恒为 `Version::FIRST`。重开参数：出现一个真的会前进的房间版本，即有生产写点把 `room_version` 填成 `Version::FIRST` 以外的值，那时退回从那个写点长出来。
+D2 没有草稿退回机制。房间没有版本，发言不带「作者所见的房间版本」进房间，也就没有退回作者、四路择一与 hold token。它要防的两种冲突各有权威：同一份文件的并发写由 `storage` 的 `base_version` 乐观并发与 worktree 隔离解决；同一件事的并发认领由 `kernel::goal` 的同资源相斥与 `arbiter` 解决，第三套机制就是第三个权威。`Signal` 的 `room_version` 在生产写点（`signal_desk` 的 `send`、`handback`）恒为 `Version::FIRST`。重开参数：出现一个真的会前进的房间版本，即有生产写点把 `room_version` 填成 `Version::FIRST` 以外的值，那时退回从那个写点长出来。
 -/
 
 /-! ## 13 依赖选型
