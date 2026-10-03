@@ -19,7 +19,7 @@
 pub struct ModelChoice { pub id: String, pub effort: Option<kernel::Effort> }
 
 /// 一次提交出自谁：唯一构造点在 `Provenance::new`，字段私有。
-pub struct Provenance { /* run、actor、model、effort、city —— 私有 */ }
+pub struct Provenance { /* run、actor、model、effort、city、predecessor —— 私有 */ }
 impl Provenance {
     pub fn new(run: RunId, actor: Address, city: B3Hash, chosen: ModelChoice) -> Provenance;
     /// 城的身份＝创世行的链哈希，从账本首段的第一行读出（只读一行）。
