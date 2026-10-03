@@ -349,6 +349,40 @@ mod tests {
         assert!(desk.lock().unwrap().take().is_empty(), "taken once");
     }
 
+    /// collab D7: the child's run opens at the call, while this run goes
+    /// on, so the answer must not tell the model to wait for its turn.
+    #[test]
+    fn the_answer_says_the_delegate_starts_while_this_run_goes_on() {
+        let tool = DelegateTool::new(desk(Depth::Root)).unwrap();
+        let outcome = tool.invoke(&call("lab/helper", None)).unwrap();
+        let starts = outcome.result.as_map()["starts"].as_str().unwrap();
+        assert!(!starts.contains("settles"), "{starts}");
+    }
+
+    /// The refusal a desk left locked by a dead thread gives reaches the
+    /// model as written, on one line.
+    #[test]
+    fn a_desk_a_dead_thread_held_is_refused_in_one_plain_line() {
+        let desk = desk(Depth::Root);
+        let held = std::sync::Arc::clone(&desk);
+        std::thread::spawn(move || {
+            let _guard = held.lock().unwrap();
+            panic!("die holding the desk");
+        })
+        .join()
+        .unwrap_err();
+        let err = DelegateTool::new(desk)
+            .unwrap()
+            .invoke(&call("lab/helper", None))
+            .unwrap_err();
+        assert_eq!(err.code(), &AxCode::StorageFatal);
+        assert!(
+            !err.recovery().contains('\n') && !err.recovery().contains("  "),
+            "{:?}",
+            err.recovery()
+        );
+    }
+
     /// The rule this whole mechanism exists to hold, now with a caller:
     /// one level deep, whatever kind is asked for.
     #[test]
