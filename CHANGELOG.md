@@ -20,6 +20,205 @@ release notes and their commits.
 
 ---
 
+## 0.0.9
+
+**sprawling 0.0.9 something and nothing**
+
+Not cut yet: the workspace manifest moves to 0.0.9 and the section takes its
+tag when the release is cut. It records what landed after
+`v0.0.8-Pre-alpha-261002`. The wire moved from WIRE_V 46 to 49, once for each
+push in which its shape changed (`crates/wire/Spec.lean` D1): 47 when sessions
+began to carry a display name and their last run, together with the harness
+states, registry lines, the doctor's scanning answer, the sandbox arm names
+and a colour theme; 48 when an endpoint's tuning gained `max_in_flight`; 49
+when `RunSummary` gained `waiting`. `EVENT_LOG_V` stays at 2: every new
+payload field is optional, and a line written by 0.0.8 reads unchanged.
+
+### What the Ledger and the wire now record
+
+- A tool result carries `took_us`, and a turn carries `first_us` and
+  `took_us`: whole microseconds read off the turn's monotonic clock, beside
+  the millisecond moments the envelope already had. A line written before
+  these keys existed has none of them, and a reader falls back to the
+  difference of the two moments (`crates/kernel/spec/Event/Record.lean` D20).
+- Five new kinds, 94 in all: `run_policy_changed`, `session_named`,
+  `skill_audited`, `signal_wait_started` and `signal_wait_ended`.
+- `endpoint_attached` may carry `max_in_flight`, which survives a replay.
+- Every duration that `just bench`, `sprawling gauge`, the citysim bench and
+  the monitor page print is an integer microsecond. A duration shown to a
+  reader is in µs below 10 ms and in ms from 10 ms up.
+
+### A run's work takes effect when it is done
+
+- A signal is on the Ledger and in its room when it is sent, not when the
+  sender freezes. A delivered signal knocks on an empty room, names where its
+  sender stood, and a signal a run took is held until a model answer reads
+  it; a run that leaves first gives it back to the room (collab D8, D10).
+- `delegate` and `workshop` take effect at the call: the children start and
+  the graph registers while the parent still drives. A cancelled or failed
+  parent closes its graph, and children already in flight hand their work
+  back (collab D14).
+- `signal send` with `wait: true` is the reply wait: the run stops at its next
+  safe point, calls no model and spends no tokens until the reply comes, the
+  run leaves its room, or 240 s of patience run out. A reply that lands
+  before the run stops is kept for the wait, one run has at most one open
+  wait, and the page reads `waiting` off the run's summary.
+- A run policy the User changes reaches the run working in the room at its
+  next `BeforeWave`, so one wave never runs under two policies. Every mode
+  offers the same tool list and the mode is asked at the call, so a policy
+  change keeps the prompt cache: `edit` and `exec` in chat mode answer
+  `E_GATE_DENIED` with the way to switch.
+- A read-only tool runs before its intent is durable, and a turn pays
+  2 + writes durability barriers rather than one per line.
+- A checkpoint takes no lock across runs: each run stages into an index of
+  its own, a city gets one base however many writers race, and the first base
+  is written as one pack, so it leaves no loose objects.
+- The lane writes a landing's transcript and reads its sweep before the run
+  comes home, so the accounting thread only appends.
+- A prepared run gets a lane at once; the driving pool asks only for memory.
+  Each endpoint hands out permits in arrival order under its `max_in_flight`
+  (16 by default, 4 for a local model, 256 at most), sheds a call after
+  600 s in its queue, and narrows after a 429 until the provider's
+  `Retry-After` instant has passed.
+
+### Performance
+
+The changes above remove waits; they do not yet have readings. The
+before-and-after readings are taken at the end-reading sitting under one
+basis: integer microseconds, nearest rank with n beside every figure, p50 and
+p99 for ordinary latency, p50, p99, p999 and max for the high-frequency
+operations, and every duration split into waiting, work and the durability
+barrier. Each set names its tree, toolchain, feature set, platform, fixture
+digest and machine class. These readings are owed and not stated here:
+
+- throughput and the four waits (lane, provider queue, relay queue, fold and
+  broadcast lag) of N concurrent runs, from the citysim throughput bench and
+  the provider-queue instrument;
+- the per-tool phases of `read`, `write`, `edit`, `exec` and `search`;
+- the secret scanner, which now reads its input once, and the playback
+  export, whose credential scan is now lazy and is proved to equal the full
+  scan;
+- the first base of a city and the checkouts of overlapping delegations;
+- private bytes on a 100 ms tick, and their slope over an hour;
+- a profile-guided release build against the plain one. `on-demand.yml`
+  builds the Windows release in three stages, and the profile is kept only
+  when the geometric-mean gain on the held-out load is at least 3 % and
+  beyond the round spread.
+
+### Fixes from the User's report
+
+- The page opens in zen at every launch, and the layers key closes the
+  settings panel and every page before it changes tier (A1, A20). The right
+  side and a settings group move in with the theme's durations (A17, A21).
+- With no provider endpoint the guide opens at every launch; it opens one
+  step at a time, and skipping every optional step goes to the conversation
+  (A2, A11, A12).
+- The settings tree folds by object, keeps one branch open, and gathers
+  second-level settings under "more"; the hall is listed even in a city with
+  one building, and every page reached from the tree has a back key at its
+  top left (ST, A3, A4, A6).
+- A tool call shows µs below 10 ms instead of 0 ms (A13). The session sheet
+  shows TTFT as median and mean and tokens per second as p50 and p99 (A26).
+- Each button beside a reply has a glyph, a name and a hover note; copying a
+  whole reply gives its Markdown; a reply fills the reading column, and the
+  read-wear bar says what it is (A16a, A16b, A16c, A22). The send and stop
+  key is one coin with two faces, as in the template (A16d). An open sandbox
+  no longer draws a warning edge (A31).
+- "Whole" and "results" fold the earlier stretch by one rule (A23), and a
+  hint in the conversation can be expanded (A30).
+- A session row shows its display name, model, effort, workspace and last
+  reply; its menu renames it and changes its run policy, and tags default to
+  the workspace (A28, A15).
+- The mailbox pushes in from the left under the three edge keys; a letter
+  opens on the right side with the text before and after, and every card in
+  "deciding" says which event or refusal put it there (A19, A25, A27).
+- Switching a Markdown document between source and preview keeps the line at
+  the top of the view, and hall folders open and close (A34, A33).
+- The chosen effort is drawn in accent (A8). The open right side starts on
+  column line 8, so RefRain is wider at 1920 px (SR).
+- The doctor page lists every item with its state, version and install
+  line, every harness state, both registries and the drive scan (A9). A
+  harness reads Ready only where its vendor's own directory exists, and
+  otherwise NotSetUp with the paths it looked at (A5).
+- The update check asks npm and crates.io and gives the update command of the
+  channel this binary was installed through (A10).
+- The remote group in settings walks a pairing in numbered steps, says what a
+  restart does, and lists `/remote replace-key` (A7). The city key is kept in
+  the city's vault and read back at every start: Credential Manager on
+  Windows, the Keychain on macOS, the kernel keyring on Linux until reboot
+  (or the encrypted vault file across reboots), and the city's memory where
+  no store answers. `/remote replace-key` makes a new key and unpairs every
+  device.
+- A new city finds the nine shipped skills on its library shelf; the shelf
+  shows where each skill lives and where a new one goes, and the rules page
+  picks its building (A32).
+- The console prints one line per committed record — seq, kind and
+  address — and the whole record only behind `--whole-records`, on every
+  platform (A14).
+- A colour page under preferences lists every theme token with a picker, a
+  stylesheet field, legibility warnings and restore default (CT).
+- Tools (F1–F9): `archive record` files its entry at the call, so `recall`
+  in the same run finds it; the Mayor writes an empty plan's first line with
+  `plan add`; `rules read` and `city list` are admitted in a run; `read` and
+  `edit` answer the whole version `plan finish` takes; `status` walks the
+  worktree at the call; a search hit carries a window of its line and a
+  stopped search names its limit; a reply a leaving run took reaches the
+  room's next run; the hall templates name no `pursue` address and say that
+  two seats in one building share a read domain.
+
+### Storage and recovery
+
+- A preallocated segment's trailing zeros read as the end, and a record
+  hidden behind zeros is refused; a restore makes its truncation and its
+  removals durable. Each platform's segment durability arm is one constant.
+- A staged blob the scan cannot read refuses the checkpoint.
+
+### What a contributor notices
+
+- The toolchain is pinned to Rust 1.99.0 and every member inherits
+  `rust-version` 1.97; the lockfile and the client take the newest compatible
+  releases, with TypeScript held below 7.
+- `release.yml` publishes the workspace to crates.io through trusted
+  publishing, and `cargo binstall sprawling` fetches the release archive for
+  Windows x86-64, macOS on Apple silicon and Linux x86-64.
+- CI runs the suite in four slices of one archive and the core packages on
+  Ubuntu and macOS. Mutation, citysim, the screenshots, a release build and
+  the PGO build run from `on-demand.yml`.
+- The spec gate counts unresolved Rust paths and stateless state-machine
+  parts as ratchets, and xtask keeps no public-API baseline.
+- The shipped skills live in `crates/city/skills/`, and the city crate
+  embeds them.
+- Text a User or a model reads says User for the person who owns the city.
+
+### Designed, not yet built
+
+- Sandbox arms are named `none`, `copied_tree`, `native`, `container` and
+  `python` on every platform, and each platform's default is one column of
+  `crates/wire/spec/Answer/Doctor.lean` D26: `native` on Windows (Job Object
+  with AppContainer) and Linux (`bwrap`), `copied_tree` on macOS. Until that
+  arm lands, every platform resolves `copied_tree`, or `native` on Linux
+  where `bwrap` is present.
+- Skill audit and the usage record: the `skill_audited` kind and the audit
+  state exist; no auditor (the skills.sh partner audits, or SkillSpector when
+  installed) runs yet, and the usage table is not folded.
+- Hot-thread placement on the best cores, a CPU weight and memory limit per
+  run's job, `[sandbox] interpreter = "pwsh"` for PowerShell 7, the
+  byte-budgeted resident cache, and the remote door's verbs behind a console
+  confirm code are specified in Lean and wait for their code.
+
+### Known and unfixed
+
+- The performance bars on the monitor page are a few pixels high and do not
+  autoscale (A18).
+- The thread's progress bar can scroll below the page; it was not reproduced
+  without a live city (A24).
+- The cache-hit count may read 0 for a provider that reports hits under
+  another field name (A29).
+- A dispatch takes the run policy the client sends, while `crates/sprawling/spec/Accounting/Worker.lean` says
+  it inherits the room's last changed policy; one of the two will change.
+
+---
+
 ## v0.0.8-Pre-alpha-261002
 
 **sprawling 0.0.8 something (pre-alpha)**
