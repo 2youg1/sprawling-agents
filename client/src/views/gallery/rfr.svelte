@@ -152,8 +152,10 @@
 </script>
 
 <script lang="ts">
+  import { positionsOf } from "../../core/document_pos";
   import { ui } from "../../ui";
   import Document from "../refrain/document.svelte";
+  import Preview from "../refrain/preview.svelte";
   import RefRain from "../refrain/refrain.svelte";
   import Case from "./case.svelte";
   import Stand from "./stand.svelte";
@@ -171,7 +173,20 @@
   </Case>
   <Case label="refrain · Markdown, its preview" width={600}>
     <div class={FRAME}>
-      <Document at={Address.make(`shop/${NOTES}`)} building={SHOP} version={null} reading="preview" />
+      <!-- The preview itself rather than the document around it: the
+      document mounts its preview once the text has landed, after the
+      stand has handed `ui.ts`'s door back to the real city, which holds
+      no preview of this version. -->
+      <div class="refrain flex min-h-0 flex-1 flex-col bg-page">
+        <Preview
+          positions={positionsOf(V1, "utf8", MARKDOWN)}
+          building={SHOP}
+          at={Address.make(`shop/${NOTES}`)}
+          drafted={false}
+          anchor={null}
+          onTop={() => undefined}
+        />
+      </div>
     </div>
   </Case>
   <Case label="refrain · a text file read literally: a mark, CRLF lines, a tab" width={600}>

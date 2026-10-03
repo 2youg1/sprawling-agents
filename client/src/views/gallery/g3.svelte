@@ -76,7 +76,6 @@
         },
       },
     },
-    [`shop/${REPORT}`]: { held: { version: PDF, format: "plain", bytes: REPORT_BYTES.length, body: "opaque" } },
   };
 
   // At most this many bytes a window, so the PDF arrives in several.
@@ -125,6 +124,7 @@
 <script lang="ts">
   import Shot from "../inspect/shot.svelte";
   import Document from "../refrain/document.svelte";
+  import Opaque from "../refrain/formats/opaque.svelte";
   import Case from "./case.svelte";
   import Stand from "./stand.svelte";
 
@@ -139,7 +139,11 @@
   </Case>
   <Case label="refrain · a city's PDF drawn from bytes fetched by its version" width={600}>
     <div class={FRAME}>
-      <Document at={Address.make(`shop/${REPORT}`)} building={SHOP} version={null} />
+      <!-- The part itself rather than the document around it: a part a
+      document mounts once its answer lands mounts after the stand has
+      handed `ui.ts`'s door back to the real city, and would ask that
+      city for bytes this one holds. -->
+      <Opaque path={Address.make(`shop/${REPORT}`)} version={PDF} bytes={REPORT_BYTES.length} />
     </div>
   </Case>
   <Case label="inspect · a screenshot drawn from the content store" width={600}>
