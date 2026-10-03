@@ -329,17 +329,18 @@ fn a_stop_is_red_exactly_when_it_blocks_its_node() {
 }
 
 /// The refusal walks the circle itself, from its first node back to it,
-/// and a chain that resolves beside it is no part of the walk.
+/// and a chain that resolves beside it, numbered before it, is no part of
+/// the walk.
 #[test]
 fn the_named_walk_is_the_circle_and_nothing_that_resolves() {
     let refusal = refused(&format!(
         "{HEAD}\
-| 1 | a | 1 | 3 | Not started | |
+| 1 | a | 1 |  | Not started | |
 | 2 | b | 1 | 1 | Not started | |
-| 3 | c | 1 | 2 | Not started | |
-| 4 | d | 1 |  | Not started | |
+| 3 | c | 1 | 5 | Not started | |
+| 4 | d | 1 | 3 | Not started | |
 | 5 | e | 1 | 4 | Not started | |
 "
     ));
-    assert_eq!(refusal.subject(), "1 → 3 → 2 → 1 runs in a circle");
+    assert_eq!(refusal.subject(), "3 → 5 → 4 → 3 runs in a circle");
 }
