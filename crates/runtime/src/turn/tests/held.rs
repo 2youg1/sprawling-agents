@@ -20,9 +20,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use super::super::*;
 use super::durability::{Durable, Face};
 use super::helpers::*;
-use crate::conversation::Opening;
 use crate::handoff::Handoff;
-use crate::run::{RunHooks, RunPlan, SafePoint};
+use crate::run::{RunHooks, SafePoint};
 use kernel::{EventDraft, EventRef, ModelRequest, RunId};
 use proptest::prelude::*;
 
@@ -119,37 +118,6 @@ impl Model for Waves {
     }
 }
 
-fn plan() -> RunPlan {
-    let addr = kernel::Address::parse("lab").unwrap();
-    RunPlan {
-        run: run_id(),
-        who: "lab".to_owned(),
-        addr,
-        task: "read and write".to_owned(),
-        goal: "turns that hold their lines".to_owned(),
-        opening: Opening::FromJob,
-        job: job(),
-        parent: None,
-        predecessor: None,
-        dispatched_by: kernel::event::Who::Person,
-        run_policy: crate::PolicyCell::new(kernel::RunPolicy::of(kernel::Mode::Work)),
-        naming: None,
-        inherited: Vec::new(),
-        shape: shape(),
-        second_threshold: None,
-        context: crate::ContextReading::default(),
-        prefix: prefix(),
-        policy: BuildingPolicy::default(),
-        tools: Vec::new(),
-        skills: Vec::new(),
-        retries: kernel::Retries::UntilHalted,
-    }
-}
-
-fn job() -> kernel::Locator {
-    kernel::Locator::parse(&format!("file:lab/JOB.md@{}", "a".repeat(40))).unwrap()
-}
-
 /// The wave a model asks for: `true` is a write, `false` a read.
 fn wave_of(turn: usize, writes: &[bool]) -> Vec<ToolCall> {
     writes
@@ -203,14 +171,15 @@ fn run_of(waves: &[Vec<bool>], cut_at: usize) -> Ran {
         deltas: None,
     };
     let handoff = Handoff::new(
-        vec![job()],
+        vec![job_locator()],
         "held lines".to_owned(),
         "not recorded".to_owned(),
         "a test ran it".to_owned(),
         "not recorded".to_owned(),
     )
     .unwrap();
-    let froze = crate::run::drive(plan(), &mut ledger, &mut model, &mut hooks, &handoff).is_ok();
+    let froze =
+        crate::run::drive(run_plan(), &mut ledger, &mut model, &mut hooks, &handoff).is_ok();
     let durable = ledger.durable.lock().unwrap().clone();
     let tools_saw = saw.lock().unwrap().clone();
     Ran {

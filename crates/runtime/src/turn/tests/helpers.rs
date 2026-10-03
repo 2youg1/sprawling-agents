@@ -165,3 +165,35 @@ pub(super) fn probe_call() -> ToolCall {
         args: Payload::empty(),
     }
 }
+
+/// The plan of the whole runs the held-run checks drive.
+pub(super) fn run_plan() -> crate::run::RunPlan {
+    let addr = kernel::Address::parse("lab").unwrap();
+    crate::run::RunPlan {
+        run: run_id(),
+        who: "lab".to_owned(),
+        addr,
+        task: "read and write".to_owned(),
+        goal: "turns that hold their lines".to_owned(),
+        opening: crate::conversation::Opening::FromJob,
+        job: job_locator(),
+        parent: None,
+        predecessor: None,
+        dispatched_by: kernel::event::Who::Person,
+        run_policy: crate::PolicyCell::new(kernel::RunPolicy::of(kernel::Mode::Work)),
+        naming: None,
+        inherited: Vec::new(),
+        shape: shape(),
+        second_threshold: None,
+        context: crate::ContextReading::default(),
+        prefix: prefix(),
+        policy: BuildingPolicy::default(),
+        tools: Vec::new(),
+        skills: Vec::new(),
+        retries: kernel::Retries::UntilHalted,
+    }
+}
+
+pub(super) fn job_locator() -> kernel::Locator {
+    kernel::Locator::parse(&format!("file:lab/JOB.md@{}", "a".repeat(40))).unwrap()
+}
