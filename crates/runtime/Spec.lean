@@ -328,6 +328,7 @@ envelope 探查与全解共用 kernel 的解析（Value 探查仅取五键，不
 | D30 | shell 默认仍是平台的 shell，一栋楼可以换成 pwsh 7，exec 的失败按 shell 从账本折出 | `crates/runtime/spec/Tools/Exec.lean` |
 | D32 | 沙箱臂的调研表（SB0）与按平台的缺省臂、可选臂 | `crates/runtime/spec/Tools/Exec.lean` |
 | D34 | 对话窗口每个 run 有字节预算，已发出的消息超出时移出进程、按 `Locator` 从 CAS 读回 | `crates/runtime/spec/Conversation.lean`（§8-47-1） |
+| D36 | 攒下的记录跨过回合：`Journal` 归 `Run<Active>`，回合收尾不付屏障，`TurnReport` 的 ref 在下一道屏障换出，一回合 `1 + 写调用数` | `crates/runtime/spec/Turn/Durability.lean` |
 -/
 
 /-! ## 13 依赖选型

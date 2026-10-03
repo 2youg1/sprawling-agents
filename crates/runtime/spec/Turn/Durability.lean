@@ -24,7 +24,8 @@
 * **写调用的意图先落盘**（`tf1_write_intent_durable`）；
 * **记录按调用序**——TF1 与参照追加的记录逐条相同，落盘的总是这串记录的前缀（`tf1_records_match_reference`、`tf1_durable_is_reference_prefix`）；所以崩溃后 `resume` 读到的，是参照次序在某个崩溃点也会留下的历史：缺的只有只读调用的记录，而只读调用没有对外效果，重做它们不改变世界；写调用的 `tool_called` 已落盘，`replay::DanglingCalls` 照旧把没有结果的那条补成 `E_TOOL_OUTCOME_UNKNOWN`；
 * **`EventRef` 只给已落盘的记录**（`refs_are_durable`）；
-* **屏障数**（`tf1_turn_barriers`、`reference_turn_barriers`、`tf1_turn_at_most_two`）。
+* **屏障数**（`tf1_turn_barriers`、`reference_turn_barriers`、`tf1_turn_at_most_two`）；
+* **攒下的记录跨过回合**（D36，末两节）：ref 在下一个对外效果之前到齐、run 结束时每条记录都有 ref，任一崩溃点盘上的历史是今天的 `closedTurn` 也会留下的历史，以及 W7c 的派生检查与它必须抓到的坏实现。
 
 崩溃点写成「轨迹 = 已做 ++ 未做」：`exec State.empty done` 是在 `done` 之后掉电时的状态，`durable` 是重启后还在盘上的记录。只读调用的执行在模型里排成一列，因为它们没有对外效果、不改变状态，所以它们实际并行时彼此怎样交错不影响任何一条性质。
 -/
@@ -509,5 +510,187 @@ theorem closed_turn_barriers (t : Nat) (calls : List Effect) :
   simp only [barriers] at this ⊢
   simp [closedTurn, this]
   omega
+
+/-! ## 攒下的记录跨过回合：`1 + 写调用数`（D36）
+
+D36：`Journal` 改由 `Run<Active>` 持有、活整个 run，回合收尾不再付屏障；回合 t 工具波攒下的只读记录，搭回合 t+1 在 `model_called` 之后、模型调用之前的那一道屏障（或下一条写动手前的那一道，或冻结前的那一道）落盘，`TurnReport` 交出的是 `Entry`，它们的 ref 在下一道屏障处才换出来。这个形状就是上面的 `run tf1Turn`：它本来就不在回合之间放屏障。所以「对外效果之前全部落盘」「写的意图先落盘」「记录次序同参照」「`1 + 写调用数`」已由前几节对它证完；本节补三件 D36 要的事：
+
+* **ref 在下一个对外效果之前到齐**（`tf1_refs_before_effect`）：任一个对外效果发生时，此前追加的每条记录都已有 ref，ref 也只指向已落盘的记录；
+* **run 结束时每条记录都有 ref**（`tf1_run_refs_complete`）；
+* **任一崩溃点，盘上的历史是今天的形状（`closedTurn`）在某个崩溃点也会留下的历史**（`held_cut_is_closed_cut`）。`resume` 与重放只读盘上的记录，所以它们在新形状的任一崩溃点得出的结论，就是今天的形状在那个对应崩溃点得出的结论；缺的只是收尾屏障之前那段只读记录，而那是今天在收尾屏障之前掉电也会缺的。
+
+落选：每回合收尾仍付一道（今天的 `closedTurn`）——安全，但只读回合要付 2 道而不是 1 道，而它不换来任何可恢复性，因为下一道屏障在任何对外效果之前；把 ref 在追加时就交出（`eagerStep`）——`EventRef` 会指向可能不存在的历史，违反 `kernel::ledger` 的「`Ok(ref)` 即已落盘」，见 `eager_ref_is_not_durable`。重新打开的参数：一个回合的 ref 必须在回合内被对外读到（例如 `TurnReport` 的 ref 在下一道屏障之前就被发上 wire），或者一次屏障的价钱与它带的记录数变得成正比。三个平台相同：本模型只决定屏障的次数与位置，屏障本身是 `File::sync_data`（Windows 上 `FlushFileBuffers`，Linux 上 `fdatasync`，macOS 上走哪一个由 `crates/storage/spec/Jsonl/Barrier.lean` 与 storage §8-1 决定），计数上界 `1 + 写调用数` 在三个平台上都成立。
+
+**留给 storage 的问题**：跨回合攒下的记录在两回合之间只在进程内存里，这不改变 storage 的任何契约（`append_all` 仍是一批一屏障、成功即落盘）；若 storage 要为「两次 `append_all` 之间隔着一次模型调用」写下任何保证（例如段轮换不得在批内发生），那是 `crates/storage/spec/Jsonl/Barrier.lean` 的一个问题，不在本模型里。 -/
+
+/-- 一道屏障之后的状态。 -/
+def flush (s : State) : State := s.step .barrier
+
+/-- 落盘的与排队的都相同：此后同一串步骤留下的盘上记录也相同。 -/
+def SameDisk (s s' : State) : Prop := s.durable = s'.durable ∧ s.pending = s'.pending
+
+theorem exec_append (s : State) (a b : List Step) : exec s (a ++ b) = exec (exec s a) b := by
+  simp [exec, List.foldl_append]
+
+theorem exec_sameDisk (s s' : State) (xs : List Step) (h : SameDisk s s') :
+    SameDisk (exec s xs) (exec s' xs) := by
+  induction xs generalizing s s' with
+  | nil => simpa [exec] using h
+  | cons x xs ih =>
+    apply ih
+    obtain ⟨h1, h2⟩ := h
+    cases x with
+    | append r => exact ⟨by simp [State.step, h1], by simp [State.step, h2]⟩
+    | barrier => exact ⟨by simp [State.step, h1, h2], by simp [State.step]⟩
+    | act c e => cases e <;> exact ⟨by simp [State.step, h1], by simp [State.step, h2]⟩
+    | boundary => exact ⟨by simp [State.step, h1], by simp [State.step, h2]⟩
+
+/-- 回合开头的三步：`prompt_shape_compared`、`model_called`、屏障。 -/
+def turnHead (t : Nat) : List Step := [.append (.shapeCompared t), .append (.modelCalled t), .barrier]
+
+def turnTail (t : Nat) (calls : List Effect) : List Step :=
+  [.boundary, .append (.modelReturned t), .append (.checkpointCommitted t)] ++ wave tf1Call t 0 calls
+
+theorem tf1Turn_split (t : Nat) (calls : List Effect) :
+    tf1Turn t calls = turnHead t ++ turnTail t calls := rfl
+
+/-- 过了回合的第一道屏障，前一回合是否付过收尾屏障就看不出来了。 -/
+theorem head_forgets_flush (s : State) (t : Nat) :
+    SameDisk (exec s (turnHead t)) (exec (flush s) (turnHead t)) := by
+  constructor <;> simp [exec, turnHead, flush, State.step]
+
+theorem turn_forgets_flush (s : State) (t : Nat) (calls : List Effect) :
+    SameDisk (exec s (tf1Turn t calls)) (exec (flush s) (tf1Turn t calls)) := by
+  rw [tf1Turn_split, exec_append, exec_append]
+  exact exec_sameDisk _ _ _ (head_forgets_flush s t)
+
+/-- 回合之内的崩溃点：要么第一道屏障还没过、盘上什么也没多，要么已过、与前一回合付过收尾屏障时相同。 -/
+theorem cut_in_turn (s : State) (t : Nat) (calls : List Effect) (done rest : List Step)
+    (h : done ++ rest = tf1Turn t calls) :
+    (exec s done).durable = s.durable ∨ SameDisk (exec s done) (exec (flush s) done) := by
+  rw [tf1Turn_split] at h
+  rcases List.append_eq_append_iff.mp h with ⟨a, hh, _⟩ | ⟨c, hd, _⟩
+  · rcases done with _ | ⟨x, _ | ⟨y, _ | ⟨z, more⟩⟩⟩
+    · exact Or.inl rfl
+    · simp [turnHead] at hh
+      obtain ⟨rfl, _⟩ := hh
+      exact Or.inl (by simp [exec, State.step])
+    · simp [turnHead] at hh
+      obtain ⟨rfl, rfl, _⟩ := hh
+      exact Or.inl (by simp [exec, State.step])
+    · simp [turnHead] at hh
+      obtain ⟨rfl, rfl, rfl, rfl, _⟩ := hh
+      exact Or.inr (head_forgets_flush s t)
+  · subst hd
+    rw [exec_append, exec_append]
+    exact Or.inr (exec_sameDisk _ _ _ (head_forgets_flush s t))
+
+/-- 新形状从 `s` 起的任一崩溃点：要么盘上什么也没多，要么今天的形状从 `flush s` 起在某个崩溃点留下同样的盘。 -/
+theorem held_cut_from (ws : List (List Effect)) (s : State) (t : Nat) (done rest : List Step)
+    (h : done ++ rest = run tf1Turn t ws) :
+    (exec s done).durable = s.durable ∨
+      ∃ cut more, cut ++ more = run closedTurn t ws ∧
+        (exec (flush s) cut).durable = (exec s done).durable := by
+  induction ws generalizing s t done rest with
+  | nil =>
+    rcases done with _ | ⟨x, xs⟩
+    · exact Or.inl rfl
+    · simp only [run, List.cons_append, List.cons.injEq] at h
+      obtain ⟨rfl, htail⟩ := h
+      refine Or.inr ⟨.barrier :: xs, rest, by simp [run, htail], ?_⟩
+      have hs : SameDisk (exec (flush (flush s)) xs) (exec (flush s) xs) :=
+        exec_sameDisk _ _ _ ⟨by simp [flush, State.step], by simp [flush, State.step]⟩
+      simpa [exec, flush] using hs.1
+  | cons w ws ih =>
+    simp only [run] at h
+    rcases List.append_eq_append_iff.mp h with ⟨a, ht, _⟩ | ⟨c, hd, hr⟩
+    · rcases cut_in_turn s t w done a ht.symm with hl | hsame
+      · exact Or.inl hl
+      · refine Or.inr ⟨done, a ++ [.barrier] ++ run closedTurn (t + 1) ws, ?_, hsame.1.symm⟩
+        simp [run, closedTurn, ht]
+    · subst hd
+      rcases ih (exec s (tf1Turn t w)) (t + 1) c rest hr.symm with hl | ⟨cut, more, hc, hdur⟩
+      · refine Or.inr ⟨tf1Turn t w, [.barrier] ++ run closedTurn (t + 1) ws,
+          by simp [run, closedTurn], ?_⟩
+        rw [exec_append, hl]
+        exact (turn_forgets_flush s t w).1.symm
+      · refine Or.inr ⟨tf1Turn t w ++ [.barrier] ++ cut, more, by simp [run, closedTurn, ← hc], ?_⟩
+        have hb : SameDisk (exec (exec (flush s) (tf1Turn t w)) [.barrier])
+            (flush (exec s (tf1Turn t w))) := by
+          obtain ⟨h1, h2⟩ := turn_forgets_flush s t w
+          constructor
+          · show (exec (flush s) (tf1Turn t w)).durable ++ (exec (flush s) (tf1Turn t w)).pending =
+              (exec s (tf1Turn t w)).durable ++ (exec s (tf1Turn t w)).pending
+            rw [h1, h2]
+          · rfl
+        rw [exec_append, exec_append, exec_append, ← hdur]
+        exact (exec_sameDisk _ _ cut hb).1
+
+/-- **任一崩溃点，新形状盘上的历史是今天的形状在某个崩溃点也会留下的历史**：`resume` 与重放从它得出的，就是今天会得出的。 -/
+theorem held_cut_is_closed_cut (ws : List (List Effect)) (done rest : List Step)
+    (h : done ++ rest = run tf1Turn 0 ws) :
+    ∃ cut more, cut ++ more = run closedTurn 0 ws ∧
+      (exec State.empty cut).durable = (exec State.empty done).durable := by
+  rcases held_cut_from ws State.empty 0 done rest h with hl | hr
+  · exact ⟨[], run closedTurn 0 ws, rfl, by rw [hl]; rfl⟩
+  · exact hr
+
+/-- **ref 在下一个对外效果之前到齐**：对外效果发生时，此前追加的每条记录都已有 ref，而有 ref 的都已落盘。 -/
+theorem tf1_refs_before_effect (ws : List (List Effect)) (done rest : List Step) (v : Step)
+    (h : done ++ v :: rest = run tf1Turn 0 ws) (hv : v.visible = true) :
+    (exec State.empty done).refs = appended done ∧
+      (exec State.empty done).refs = (exec State.empty done).durable := by
+  have hr := refs_are_durable State.empty done rfl
+  have ⟨_, hd⟩ := tf1_effect_after_durability ws done rest v h hv
+  exact ⟨hr.trans hd, hr⟩
+
+theorem run_ends (turn : Nat → List Effect → List Step) (t : Nat) (ws : List (List Effect)) :
+    ∃ body, run turn t ws = body ++ [.barrier, .boundary] := by
+  induction ws generalizing t with
+  | nil => exact ⟨[], rfl⟩
+  | cons w ws ih =>
+    obtain ⟨body, hb⟩ := ih (t + 1)
+    exact ⟨turn t w ++ body, by simp [run, hb]⟩
+
+/-- **run 结束时每条记录都有 ref**：跨回合攒下的记录没有一条被丢下。 -/
+theorem tf1_run_refs_complete (ws : List (List Effect)) :
+    (exec State.empty (run tf1Turn 0 ws)).refs = appended (run tf1Turn 0 ws) := by
+  obtain ⟨body, hb⟩ := run_ends tf1Turn 0 ws
+  have ⟨href, _⟩ := tf1_refs_before_effect ws (body ++ [.barrier]) [] .boundary
+    (by simp [hb]) rfl
+  have hsplit : run tf1Turn 0 ws = (body ++ [.barrier]) ++ [.boundary] := by simp [hb]
+  rw [hsplit, exec_append]
+  show (exec State.empty (body ++ [.barrier])).refs = _
+  rw [href, List.append_assoc]
+  simp only [appended, List.filterMap_append]
+  rfl
+
+/-! ## 派生检查的规格（W7c 实现，`turn::tests::durability`）
+
+**生成器。** proptest 生成 `List (List Effect)`：0 到 6 个回合，每回合 0 到 8 条调用，每条 `read` 或 `write`；对每一份，用计数账本（`turn::tests::durability` 的 `Barriers`，另记下每次 `append_all`、每次模型调用、每次写动手的先后）跑一个 run，把记下的先后译成本模型的 `Step` 轨迹。检查五条，每条对应一个定理：`guarded 0 trace`（`tf1_effect_after_durability`）；`intentFirst [] trace`（`tf1_write_intent_durable`）；每个回合两次模型调用之间的 `append_all` 次数等于 `1 + 写调用数`，run 末尾一次（`tf1_turn_barriers`）；记录的 kind 序列等于参照次序（`tf1_records_match_reference`）；run 结束时交出的 ref 条数等于追加条数（`tf1_run_refs_complete`）。**崩溃点重放**：在轨迹里每一次 `append_all` 之后截断，用截断的历史跑 `resume`，结论（`replay::DanglingCalls` 补出的 `E_TOOL_OUTCOME_UNKNOWN`、下一回合的编号、会话）与今天的形状在 `held_cut_is_closed_cut` 给出的对应崩溃点截断时相同；两边的盘上记录由 `cutsOf` 在 Lean 里算出，Rust 测试逐条重放。
+
+**必须变红的坏实现。** 写调用的 `tool_called` 留到下一道屏障（`leakyCall`）：`guarded` 为假，见 `leaky_wave_is_caught`；追加时就交出 ref（`eagerStep`）：交出的 ref 指向未落盘的记录，见 `eager_ref_is_not_durable`。W7c 先提交用其中一个坏实现跑红的测试，再提交实现。 -/
+
+/-- 一段轨迹每道屏障之后盘上的记录：崩溃点重放的向量。 -/
+def cutsOf (steps : List Step) : List (List Record) :=
+  (List.range (steps.length + 1)).filterMap fun k =>
+    if (steps.take k).getLast? = some .barrier then some (exec State.empty (steps.take k)).durable
+    else none
+
+/-- 坏实现：写调用不先落盘意图。 -/
+def leakyCall (c : CallId) : Effect → List Step
+  | .read => tf1Call c .read
+  | .write => [.append (.toolCalled c), .act c .write, .append (.toolResult c)]
+
+theorem leaky_wave_is_caught : guarded 0 (wave leakyCall 0 0 [.read, .write]) = false := by decide
+
+/-- 坏实现：追加时就交出 ref。 -/
+def eagerStep (s : State) : Step → State
+  | .append r => { s with pending := s.pending ++ [r], refs := s.refs ++ [r] }
+  | x => s.step x
+
+theorem eager_ref_is_not_durable :
+    (eagerStep State.empty (.append (.toolCalled (0, 0)))).refs ≠
+      (eagerStep State.empty (.append (.toolCalled (0, 0)))).durable := by decide
 
 end Runtime.Turn.Durability
