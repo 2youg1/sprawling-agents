@@ -276,13 +276,16 @@ jobs:
             target/package/*
           if-no-files-found: error
 
-  # The rustc book's "Profile-guided Optimization" recipe: the host
-  # triple is named with `--target` (through `just package <triple>`), so
-  # RUSTFLAGS reaches the product and not the build scripts or proc
-  # macros. A process that cargo itself starts without `--target` (the
-  # `cargo xtask` steps of `just package`) is instrumented too and writes
-  # profiles while it builds, so the profile directory is emptied after
-  # the build and before the training load.
+  # The rustc book's "Profile-guided Optimization" recipe, built for the
+  # host with `just package` and no triple: the packager names the Windows
+  # archive `-windows-x86_64.zip` only for a host build and refuses
+  # `--target x86_64-pc-windows-msvc`, because no platform row claims that
+  # suffix. Without `--target`, RUSTFLAGS reaches the build scripts, proc
+  # macros and the `cargo xtask` steps of `just package` as well, and
+  # every instrumented one of them writes profiles while it builds, so the
+  # profile directory is emptied after the build and before the training
+  # load. TRIPLE names the host only to find `llvm-profdata` in the
+  # sysroot.
   pgo:
     if: inputs.job == 'pgo'
     runs-on: windows-latest
@@ -320,8 +323,8 @@ jobs:
           RUSTFLAGS: -Cprofile-generate=${{ steps.tree.outputs.dir }}/raw
         run: |
           set -euo pipefail
-          echo "RUSTFLAGS=$RUSTFLAGS just package $TRIPLE" >> "${{ steps.tree.outputs.dir }}/out/commands.txt"
-          just package "$TRIPLE"
+          echo "RUSTFLAGS=$RUSTFLAGS just package" >> "${{ steps.tree.outputs.dir }}/out/commands.txt"
+          just package
           mkdir -p "${{ steps.tree.outputs.dir }}/instrumented"
           cp target/package/*.zip "${{ steps.tree.outputs.dir }}/instrumented/"
           rm -rf "${{ steps.tree.outputs.dir }}/raw"
@@ -348,16 +351,16 @@ jobs:
           "$profdata" show "$out/sprawling.profdata" > "$out/profile-summary.txt"
           sha256sum "$out/sprawling.profdata" > "$out/sprawling.profdata.sha256"
           echo "llvm-profdata merge -o sprawling.profdata <raw>" >> "$out/commands.txt"
-          echo "RUSTFLAGS=-Cprofile-use=$out/sprawling.profdata just package $TRIPLE" >> "$out/commands.txt"
-          RUSTFLAGS="-Cprofile-use=$out/sprawling.profdata" just package "$TRIPLE"
+          echo "RUSTFLAGS=-Cprofile-use=$out/sprawling.profdata just package" >> "$out/commands.txt"
+          RUSTFLAGS="-Cprofile-use=$out/sprawling.profdata" just package
           rustc --version --verbose > "$out/toolchain.txt"
-          sha256sum "target/$TRIPLE/release/sprawling.exe" > "$out/sprawling.exe.sha256"
+          sha256sum target/release/sprawling.exe > "$out/sprawling.exe.sha256"
           cp -r "$out" target/pgo-out
       - uses: actions/upload-artifact@v7
         with:
           name: release-pgo-${{ steps.tree.outputs.sha }}
           path: |
-            target/${{ env.TRIPLE }}/release/sprawling.exe
+            target/release/sprawling.exe
             target/package/*
             target/pgo-out/*
           if-no-files-found: error
