@@ -29,6 +29,7 @@ import type {
 } from "../../wire";
 import type { Doing } from "../doing";
 import type { Probed } from "../probed";
+import type { PolicyChange } from "../reading";
 import { readRunId } from "../run_id";
 
 export interface RunBelief {
@@ -96,6 +97,10 @@ export interface Belief {
   city: string | null;
   // Where the newest session in each room began (core/session.ts reads it).
   sessions: Record<string, Seq>;
+  // The newest run policy change in each room (`run_policy_changed`),
+  // which the session menu starts a change from and the conversation
+  // marks where it landed.
+  policies: Record<string, PolicyChange>;
   // The last probe's answer: which endpoint, what it serves, what each
   // row stated, and where the call stopped. Held here rather than read
   // off the history's tail, where a long city would push it out.

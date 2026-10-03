@@ -6658,5 +6658,9 @@
   "colours_fine": {
     "en": "Every text colour is legible on the brightest surface it sits on.",
     "zh": "每种文字颜色在它所在的最亮表面上都清晰可读。"
+  },
+  "talk_policy_changed": {
+    "en": "From the next step: {mode} mode, {limit}",
+    "zh": "从下一步起：{mode}模式，{limit}"
   }
 }

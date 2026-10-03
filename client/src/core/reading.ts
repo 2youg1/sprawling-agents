@@ -26,8 +26,11 @@
 // `core/socket.ts` reports it the way a frame it cannot decode is
 // reported.
 
+import { Option, Schema } from "effect";
+
 import { scopeOf } from "./scope";
-import type { EventRecord, HaltScope, Seq } from "../wire";
+import { RunPolicy } from "../wire";
+import type { EventRecord, HaltScope, Seq, TimeMs } from "../wire";
 
 // One field of a payload, with the name that field is known by when this
 // build cannot read it. `at` is null when it could.
@@ -186,6 +189,24 @@ export function sessionStart(record: EventRecord): SessionStart | null {
   if (record.kind !== "session_opened") return null;
   const addr = record.addr ?? null;
   return addr === null ? null : { addr, seq: record.seq };
+}
+
+// `run_policy_changed`: the room's run policy from the next safe point
+// on (`kernel::event::record::RunPolicyChanged`). A record that is not
+// one, names no room, or carries a policy this build cannot read
+// answers null: the page then keeps the policy the run opened under.
+export function policyChange(record: EventRecord): PolicyChange | null {
+  if (record.kind !== "run_policy_changed") return null;
+  const addr = record.addr ?? null;
+  const policy = Option.getOrNull(Schema.decodeUnknownOption(RunPolicy)(record.data.policy));
+  return addr === null || policy === null ? null : { addr, seq: record.seq, at: record.t, policy };
+}
+
+export interface PolicyChange {
+  readonly addr: string;
+  readonly seq: Seq;
+  readonly at: TimeMs;
+  readonly policy: RunPolicy;
 }
 
 export interface SessionStart {

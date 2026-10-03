@@ -62,15 +62,24 @@
   // The policy the run opened under, asked only while the menu is open;
   // until it is held the menu offers no policy change, because a change
   // carries the whole policy and a guessed field would be sent with it.
-  let policy = $state<RunPolicy | null>(null);
+  let opened = $state<RunPolicy | null>(null);
   $effect(() => {
     const run = session.run;
-    policy = null;
+    opened = null;
     if (!open || run === null) return;
     return u.conn.asking.ask({ rounds: { run } }).subscribe((answer) => {
       const read = readAnswer(answer, (held) => ("rounds" in held ? held.rounds.opening?.policy ?? null : undefined));
-      policy = read.kind === "held" ? read.value : null;
+      opened = read.kind === "held" ? read.value : null;
     });
+  });
+
+  // The policy now in force: the room's newest change inside this
+  // session (`run_policy_changed`), else the one the run opened under.
+  const belief = u.conn.belief;
+  const policy = $derived.by((): RunPolicy | null => {
+    if (named === null || session.run === null) return null;
+    const changed = $belief.policies[named.room] ?? null;
+    return changed !== null && changed.seq > named.began ? changed.policy : opened;
   });
 
   function policyItems(now: RunPolicy): Item[] {

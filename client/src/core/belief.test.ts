@@ -376,3 +376,23 @@ describe("the model a session answers with", () => {
     expect(get(store.belief).runs[ONE]?.model).toBe("fake-small");
   });
 });
+
+describe("the run policy a room holds", () => {
+  // Roadmap A15: a change lands as `run_policy_changed`, and the menu
+  // and the conversation read the newest one per room. A page that
+  // reloads folds an older range after a newer one, so the newest seq
+  // holds whatever order the records arrive in; a policy the build
+  // cannot read leaves the held one.
+  test("the newest readable change holds per room, in any arrival order", () => {
+    const store = createBelief(() => 0);
+    const room = Address.make("lab/policy");
+    const policy = (mode: string) => ({ admit: "standing", landing: "ordinary", mode, write: "create" });
+    const change = (at: number, data: Record<string, unknown>): EventRecord => ({ ...event(ONE, at, "run_policy_changed", data), addr: room });
+    store.apply(change(9, { policy: policy("work"), by: "person" }));
+    store.apply(change(5, { policy: policy("chat"), by: "person" }));
+    store.apply(change(12, { policy: { mode: 3 }, by: "person" }));
+    expect(get(store.belief).policies).toEqual({
+      [room]: { addr: room, seq: Seq.make(9), at: TimeMs.make(9), policy: policy("work") },
+    });
+  });
+});

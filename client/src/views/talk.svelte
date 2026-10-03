@@ -94,6 +94,23 @@
   const earlier = $derived(began === null ? [] : runs.filter((run) => run.lastSeq <= began));
   const shown = $derived(began === null ? runs : runs.filter((run) => run.lastSeq > began));
 
+  // The room's newest run policy change inside the open session, drawn
+  // as one short line before the first run that started after it
+  // (`policyAt`, or after every run when none did).
+  const changed = $derived.by(() => {
+    const change = $belief.policies[address] ?? null;
+    return change === null || (began !== null && change.seq <= began) ? null : change;
+  });
+  const policyAt = $derived(changed === null ? -1 : shown.findIndex((run) => (run.started ?? 0) > changed.at));
+  const policyLine = $derived(
+    changed === null
+      ? null
+      : fill(say($lang, "talk_policy_changed"), {
+          mode: say($lang, `mode_${changed.policy.mode}`),
+          limit: say($lang, `admission_value_${changed.policy.write}`),
+        }),
+  );
+
   // The run the band and the fork picker speak for: the one still going,
   // or the last one this room finished. The same question `Thread` asks, merged with it
   // by `asking` because the two ask it in the same words.
@@ -326,8 +343,14 @@ composition is rebuilt on the way. -->
         {#if drawsCalls($held.showing)}
           <Divider {earlier} shown={shown.length} boundary={story} onFork={doFork} onRetry={send} />
           {#each shown as run, at (run.run)}
+            {#if policyLine !== null && policyAt === at}
+              <p class="my-snug text-center text-note text-text-faint">{policyLine}</p>
+            {/if}
             <Thread {run} opens={at === 0} onFork={doFork} onRetry={send} />
           {/each}
+          {#if policyLine !== null && policyAt === -1}
+            <p class="my-snug text-center text-note text-text-faint">{policyLine}</p>
+          {/if}
         {:else}
           <Stream {shown} {earlier} boundary={story} />
         {/if}

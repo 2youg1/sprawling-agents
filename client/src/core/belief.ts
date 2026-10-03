@@ -21,7 +21,7 @@ import type { Readable } from "svelte/store";
 
 import { readProbed } from "./probed";
 import { PHASES } from "./doing";
-import { haltOf, sessionStart } from "./reading";
+import { haltOf, policyChange, sessionStart } from "./reading";
 import { sameScope } from "./scope";
 
 import { CITY_RUN, Seq, TimeMs } from "../wire";
@@ -73,6 +73,7 @@ export function createBelief(now: () => number): BeliefStore {
     notices: [],
     city: null,
     sessions: {},
+    policies: {},
     probed: null,
     logs: [],
   });
@@ -184,6 +185,12 @@ export function createBelief(now: () => number): BeliefStore {
         written({ ...held, sessions: { ...held.sessions, [start.addr]: start.seq } });
       }
       return null;
+    }
+    const changed = policyChange(record);
+    if (changed !== null && changed.seq > (held.policies[changed.addr]?.seq ?? Seq.make(0))) {
+      // Written only forwards, as a session start is; the record still
+      // advances the run that wrote it below.
+      written({ ...held, policies: { ...held.policies, [changed.addr]: changed } });
     }
     if (record.kind === "endpoint_probed") {
       const found = readProbed(record.data);
