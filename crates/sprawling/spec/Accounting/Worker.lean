@@ -1592,12 +1592,14 @@ impl DrivingPool {
 /// 一个 `Driven` 不说自己属于哪一轮，一个 run id 也不说要归位什么。
 pub(crate) struct Arrival { run: RunId, flown: Flown }
 
-pub(crate) struct DrivingPool { /* 回家的那一头、在驾驶与在补货的车道的 JoinHandle、内存紧时排着的活、read_memory、monotonic、health */ }
+pub(crate) struct DrivingPool { /* 回家的那一头、在驾驶与在补货的车道的 JoinHandle、内存紧时排着的活、read_memory、monotonic、seat_lane、health */ }
+/// 池取自这台电脑的三只手，总是一起交进来。
+pub(crate) struct LaneHands { pub(crate) read_memory: fn() -> Memory, pub(crate) monotonic: fn() -> Instant, pub(crate) seat_lane: SeatLane }
 impl DrivingPool {
     /// `read_memory` 是池判断内存紧不紧时唯一的读数来源；生产交 `bin::monitor::memory::read`。
     /// `monotonic` 给每一轮等车道的时长计时，`health` 是记下它的地方（与 relay 排队同一份 `Health`）。
-    pub(crate) fn open(home: mpsc::Sender<Wake>, read_memory: fn() -> Memory,
-                       monotonic: fn() -> Instant, health: Health) -> DrivingPool;
+    /// `seat_lane` 在每条车道的线程开头调一次，答的座位活到车道结束（`spec/Serving/Placement.lean` D46）。
+    pub(crate) fn open(home: mpsc::Sender<Wake>, lanes: LaneHands, health: Health) -> DrivingPool;
     pub(crate) fn full(&self) -> bool;
     pub(crate) fn in_flight(&self) -> u32;
     /// 交出一次驾驶：起一条车道，内存紧时排队。run id 取自 `staged` 自己，不另传一份——

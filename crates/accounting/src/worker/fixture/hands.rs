@@ -41,7 +41,13 @@ pub(crate) fn hands() -> Hands {
             pwsh: absent_path,
             engine: absent_engine,
         },
+        seat_lane: no_seat,
     }
+}
+
+/// A lane in a test takes no seat.
+fn no_seat() -> Box<dyn std::any::Any> {
+    Box::new(())
 }
 
 /// The wall clock, read the way the production clock reads it, for the

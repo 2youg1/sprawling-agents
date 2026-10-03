@@ -137,6 +137,12 @@ pub(crate) fn seat_this_thread(name: &'static str) -> Seat {
     }
 }
 
+/// A driving lane's seat, through the hook `accounting` calls at the top
+/// of every lane (D46); the seat goes back when the lane drops it.
+pub(crate) fn seat_lane() -> Box<dyn std::any::Any> {
+    Box::new(seat_this_thread("sprawling-drive"))
+}
+
 /// The table of the first seat: power throttling lifted for the whole
 /// process (D40), the topology read, and the plan's seats where the
 /// platform has a soft call to give them to (D41).

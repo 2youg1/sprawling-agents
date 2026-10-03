@@ -80,6 +80,7 @@ pub fn hands(vault: gateway::Custodian) -> Hands {
             pwsh: crate::doctor::host::usable_pwsh,
             engine: crate::doctor::host::execution_engine,
         },
+        seat_lane: crate::serving::placement::seat_lane,
     }
 }
 

@@ -156,6 +156,7 @@ impl RunWorker {
             desktop_program,
             recipe_for,
             exec_host,
+            seat_lane,
         } = hands;
         let now = crate::Clock::now(&*clock)?;
         // Holding the one writer is what makes every worktree lock a
@@ -226,7 +227,7 @@ impl RunWorker {
             log: super::recording::Notes::over(log),
             doorstep: Doorstep::opened(entrance),
             origins,
-            flight: Flight::open(read_memory, monotonic),
+            flight: Flight::open(read_memory, monotonic, seat_lane),
             index: storage::LedgerIndex::empty(),
             warm: super::keeping_warm::Kept::default(),
             models: Box::new(GatewayModels { monotonic }),

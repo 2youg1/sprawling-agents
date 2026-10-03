@@ -88,7 +88,19 @@ pub(crate) struct DrivingPool {
     /// The clock a run's wait in `waiting` is read off, and where the
     /// wait is kept (Roadmap M2, the pure lane wait).
     monotonic: fn() -> Instant,
+    /// Called at the top of every lane, on the lane's thread.
+    seat_lane: crate::worker::hands::SeatLane,
     health: Health,
+}
+
+/// What the pool takes from this machine, as one value: where it reads
+/// free memory (`crates/sprawling/Spec.lean` §8-46-3), the clock a
+/// run's wait is read off, and the hook each lane takes its seat through
+/// (`crates/sprawling/spec/Serving/Placement.lean` D46).
+pub(crate) struct LaneHands {
+    pub(crate) read_memory: fn() -> Memory,
+    pub(crate) monotonic: fn() -> Instant,
+    pub(crate) seat_lane: crate::worker::hands::SeatLane,
 }
 
 /// One staged dispatch and the two things its lane will be given. It
@@ -101,21 +113,17 @@ struct Waiting {
 }
 
 impl DrivingPool {
-    /// `monotonic` times each run's wait for a lane, and `health` keeps
-    /// it beside the relay queue's waits.
-    pub fn open(
-        home: mpsc::Sender<Wake>,
-        read_memory: fn() -> Memory,
-        monotonic: fn() -> Instant,
-        health: Health,
-    ) -> DrivingPool {
+    /// `lanes.monotonic` times each run's wait for a lane, and `health`
+    /// keeps it beside the relay queue's waits.
+    pub fn open(home: mpsc::Sender<Wake>, lanes: LaneHands, health: Health) -> DrivingPool {
         DrivingPool {
             home,
             running: std::collections::BTreeMap::new(),
             trailing: Vec::new(),
             waiting: VecDeque::new(),
-            read_memory,
-            monotonic,
+            read_memory: lanes.read_memory,
+            monotonic: lanes.monotonic,
+            seat_lane: lanes.seat_lane,
             health,
         }
     }
@@ -226,9 +234,11 @@ impl DrivingPool {
     ) -> Result<(), AxError> {
         let run = staged.run_id();
         let home = self.home.clone();
+        let seat_lane = self.seat_lane;
         let lane = std::thread::Builder::new()
             .name(format!("sprawling-drive-{run}"))
             .spawn(move || {
+                let _seat = seat_lane();
                 staged.fly(&mut ledger, context, |flown| {
                     // Nobody listening means the city stopped pursuing
                     // while this run was going: the history already has
@@ -329,8 +339,11 @@ mod tests {
         let (home, _arrivals) = std::sync::mpsc::channel();
         let mut pool = DrivingPool::open(
             home,
-            tight,
-            crate::worker::fixture::monotonic,
+            super::LaneHands {
+                read_memory: tight,
+                monotonic: crate::worker::fixture::monotonic,
+                seat_lane: || Box::new(()),
+            },
             super::Health::default(),
         );
         pool.running

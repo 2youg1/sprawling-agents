@@ -60,7 +60,16 @@ pub struct Hands {
     pub recipe_for: fn(&str) -> Result<&'static crate::Recipe, AxError>,
     /// Where the exec tool's interpreter, shell and engine come from.
     pub exec_host: ExecHost,
+    /// Called once at the top of every driving lane, on the lane's own
+    /// thread: what it answers is held until the lane ends. Production
+    /// gives the lane a seat on the placement plan, a soft ideal
+    /// processor (`crates/sprawling/spec/Serving/Placement.lean` D46).
+    pub seat_lane: SeatLane,
 }
+
+/// The hook a lane takes its seat through; the answer is the seat, and
+/// dropping it gives the seat back.
+pub type SeatLane = fn() -> Box<dyn std::any::Any>;
 
 /// The browser tools a building's rules ask for: its own browser, then
 /// the person's when they declared one (`crates/sprawling/Spec.lean` §8-45-2).

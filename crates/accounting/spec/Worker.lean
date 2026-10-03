@@ -27,7 +27,9 @@ pub struct Hands {
     pub desktop_program: DesktopProgram,                 // `crates/sprawling/Spec.lean` §8-4d
     pub recipe_for: fn(&str) -> Result<&'static Recipe, AxError>,
     pub exec_host: ExecHost,
+    pub seat_lane: SeatLane,                             // 每条车道在自己的线程上开头调一次，答的东西活到车道结束；生产交 `bin::serving::placement::seat_lane`（`crates/sprawling/spec/Serving/Placement.lean` D46）
 }
+pub type SeatLane = fn() -> Box<dyn std::any::Any>;
 /// exec 工具取自这台电脑的三件事。
 pub struct ExecHost {
     pub python_wasm: fn() -> Option<PathBuf>,            // 可用的那一份，坏的不算
