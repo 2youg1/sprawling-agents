@@ -8,7 +8,7 @@
 
 规定 `conversation`（`crates/runtime/src/` 下同名的文件）。会话历史：已发出的消息不再被改写。本文件是 `crates/runtime/Spec.lean` 的一个分部；下面每一节保留它在 runtime 规格里的标签 §8-n，别处引作 `crates/runtime/Spec.lean §8-n`。
 
-这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状由 Rust 的类型守住，`runtime::conversation` 旁还没有测试。
+§8-47 与 §8-47-1 只有文字，它们写下的接口形状由 Rust 的类型守住。§8-47-2 是形式规格：信封的两条性质在下面被证明，Rust 一侧由 `runtime::conversation` 里的 proptest `only_the_user_speaks_as_user_and_a_letter_holds_its_body` 对着同一组性质检查。
 -/
 
 /-!
@@ -46,3 +46,118 @@ impl Conversation {
 
 理由：§8-47 保证已发出的消息不再被改写，所以移出去的字节与读回来的字节相同，下一次请求逐字节不变，provider 的前缀缓存不受影响；这正是 `crates/sprawling/spec/Serving/Memory.lean` 里 `evicted_reads_back` 证明的性质，模型里的 `disk` 就是 CAS。被否的做法：①按条数截掉最旧的消息——那会改变下一次请求的字节，是 compaction 的事，不是内存的事；②整个窗口一直留在进程里——常驻字节随回合数与并发 run 数相乘增长，违背 Roadmap M0 第 7 条「斜率在噪声以内」。代价：每次组装多读一次盘，读的是操作系统文件缓存里的热页；交互路径上这一读不让 p99 超过 16 ms，由 W7 的读数判。重开的条件：组装请求的读盘在读数里超过 16 ms。
 -/
+
+/-!
+### 8-47-2 runtime::conversation：谁在说话写在类型里，居民的话装在一个它关不上的信封里（形状 2 值类型）
+
+```rust
+pub enum Speaker { Person, Resident(Letter) }
+pub struct Letter { pub from: String, pub run: Option<kernel::RunId>, pub kind: LetterKind, pub sender: Option<String> }
+pub enum LetterKind { Steer, Reply }
+impl Speaker {
+    pub fn recorded(&self) -> String;                         // 写进 steer_received.source 的拼法
+    pub fn from_recorded(source: &str) -> Result<Speaker, AxError>;   // fork 把它读回来
+}
+impl Conversation {
+    pub fn push_steer(&mut self, speaker: &Speaker, text: &str);
+    pub fn push_city_note(&mut self, text: &str);             // 城市自己的话（策略变更），以 `city: ` 开头
+}
+```
+
+- **规则**：`push_steer` 是 steer 进窗口的唯一入口，它按 `Speaker` 渲染。`Person` 渲染成 `user: <text>`；`Resident` 渲染成 `<letter from="@<room>" run="<run>" kind="steer|reply" sender="<state>"><body></letter>`，没有的属性不写，属性值与正文里的 `<`、`>`、`&` 写成 `&lt;`、`&gt;`、`&amp;`。所以以 `user:` 开头的一块文字只来自 User 的 steer，居民的正文里没有 `<`，关不上自己的信封，也开不出第二个。
+- **构造**：`Speaker::Person` 在生产代码里只由 `accounting::worker::desk`（User 经控制面送来的 steer）构造，另一处是 `Speaker::from_recorded` 读回账本上的 `user`，那一行只由前者写下。
+- **账本**：`steer_received.source` 记 `Speaker::recorded()`：`user`，或 `@<room>`，后面跟零到三个 `run=<uuid>`、`kind=steer|reply`、`sender=<state>`，以空格分开。旧的行只有 `@<room>`，读回成 `kind=steer`、没有 run 与 sender 的信；居民的回信在旧行里是正文 `<room> replied: …`，读回时仍在信封里。
+- **三个平台**：只有文字与类型，Windows、macOS、Linux 上一样。
+- **被否**见 `crates/collab/Spec.lean` D16。
+-/
+
+namespace Runtime.Conversation
+
+/-- 谁在说话。居民的属性由城市写，模型里只是一串字符。 -/
+inductive Speaker where
+  | person
+  | resident (attrs : List Char)
+
+def escapeChar (c : Char) : List Char :=
+  if c = '<' then ['&', 'l', 't', ';']
+  else if c = '>' then ['&', 'g', 't', ';']
+  else if c = '&' then ['&', 'a', 'm', 'p', ';']
+  else [c]
+
+def escape (text : List Char) : List Char := text.flatMap escapeChar
+
+def userTag : List Char := ['u', 's', 'e', 'r', ':', ' ']
+
+def closeTag : List Char := ['<', '/', 'l', 'e', 't', 't', 'e', 'r', '>']
+
+def openTag (attrs : List Char) : List Char :=
+  ['<', 'l', 'e', 't', 't', 'e', 'r', ' '] ++ escape attrs ++ ['>']
+
+def render : Speaker → List Char → List Char
+  | .person, body => userTag ++ body
+  | .resident attrs, body => openTag attrs ++ escape body ++ closeTag
+
+/-- 窗口里的块：每次 push 渲染出一块，按次序。 -/
+def fold (pushes : List (Speaker × List Char)) : List (List Char) :=
+  pushes.map fun push => render push.1 push.2
+
+theorem lt_not_in_escapeChar (c : Char) : '<' ∉ escapeChar c := by
+  unfold escapeChar
+  by_cases h1 : c = '<'
+  · simp [h1]
+  · by_cases h2 : c = '>'
+    · simp [h2]
+    · by_cases h3 : c = '&'
+      · simp [h3]
+      · simp [h1, h2, h3]
+        exact fun h => h1 h.symm
+
+/-- 正文转义之后没有 `<`：它写不出 `</letter>`，也写不出 `<letter`。 -/
+theorem lt_not_in_escape (text : List Char) : '<' ∉ escape text := by
+  unfold escape
+  simp only [List.mem_flatMap, not_exists, not_and]
+  exact fun c _ => lt_not_in_escapeChar c
+
+theorem gt_not_in_escapeChar (c : Char) : '>' ∉ escapeChar c := by
+  unfold escapeChar
+  by_cases h1 : c = '<'
+  · simp [h1]
+  · by_cases h2 : c = '>'
+    · simp [h2]
+    · by_cases h3 : c = '&'
+      · simp [h3]
+      · simp [h1, h2, h3]
+        exact fun h => h2 h.symm
+
+theorem gt_not_in_escape (text : List Char) : '>' ∉ escape text := by
+  unfold escape
+  simp only [List.mem_flatMap, not_exists, not_and]
+  exact fun c _ => gt_not_in_escapeChar c
+
+/-- 居民的一块恰是一个信封：开标签、转义后的正文、闭标签，正文里没有尖括号。 -/
+theorem letter_holds_its_body (attrs body : List Char) :
+    render (.resident attrs) body = openTag attrs ++ escape body ++ closeTag ∧
+      '<' ∉ escape body ∧ '>' ∉ escape body :=
+  ⟨rfl, lt_not_in_escape body, gt_not_in_escape body⟩
+
+theorem resident_not_user (attrs body : List Char) :
+    ¬ userTag.isPrefixOf (render (.resident attrs) body) := by
+  simp [render, openTag, userTag, List.isPrefixOf]
+
+/-- 对任意一串 push：以 `user: ` 开头的块只来自 User 的 steer。 -/
+theorem user_line_only_from_person (pushes : List (Speaker × List Char)) (line : List Char)
+    (h : line ∈ fold pushes) (hu : userTag.isPrefixOf line) :
+    ∃ body, (Speaker.person, body) ∈ pushes ∧ line = render .person body := by
+  unfold fold at h
+  obtain ⟨⟨speaker, body⟩, hin, hline⟩ := List.mem_map.mp h
+  cases speaker with
+  | person => exact ⟨body, hin, hline.symm⟩
+  | resident attrs =>
+    subst hline
+    exact absurd hu (resident_not_user attrs body)
+
+/-- 咬得动：不转义时，正文 `</letter>` 把 `<` 带进信封。 -/
+theorem withoutEscape_closes : '<' ∈ (closeTag : List Char) := by
+  simp [closeTag]
+
+end Runtime.Conversation

@@ -246,6 +246,7 @@ tools/ ──▶ kernel(tool/version/discard/gate)、sandbox、storage(cas 经 p
 | 8-46 | `crates/runtime/spec/Bench.lean` |
 | 8-47 | `crates/runtime/spec/Conversation.lean` |
 | 8-47-1 | `crates/runtime/spec/Conversation.lean` |
+| 8-47-2 | `crates/runtime/spec/Conversation.lean` |
 | 8-52 | `crates/runtime/spec/Run.lean` |
 -/
 
