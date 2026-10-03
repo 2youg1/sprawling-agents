@@ -256,9 +256,10 @@ impl Prepared {
                 before,
                 limit,
             } => wire::Answer::History(Box::new(ledger.run_history(run, before, limit))),
-            Self::Rounds { ledger, run } => {
-                wire::Answer::Rounds(Box::new(ledger.rounds_answer(run)))
-            }
+            Self::Rounds { ledger, run } => match ledger.rounds_answer(run) {
+                Ok(rounds) => wire::Answer::Rounds(Box::new(rounds)),
+                Err(_unreadable_freeze) => unavailable(format!("Rounds({run})")),
+            },
             Self::Evidence { ledger, run } => wire::Answer::Evidence(ledger.evidence_answer(run)),
             // An evicted run always has records in the Ledger, so a
             // recall that cannot read them is "I could not look".
@@ -370,9 +371,10 @@ impl Prepared {
                 Some(answer) => wire::Answer::Content(Box::new(answer)),
                 None => unavailable(format!("Content({locator})")),
             },
-            Self::Archives { city_root, needle } => {
-                wire::Answer::Archive(search_archives(&city_root, &needle))
-            }
+            Self::Archives { city_root, needle } => match search_archives(&city_root, &needle) {
+                Ok(answer) => wire::Answer::Archive(answer),
+                Err(_unreadable_root) => unavailable(format!("Archives({needle})")),
+            },
             Self::Skills {
                 city_root,
                 building,
@@ -388,12 +390,13 @@ impl Prepared {
             // A count that cannot be expressed is reported as the largest
             // count this wire can carry, for the reason every figure of
             // `Views::metrics` is.
-            Self::Metrics { city_root, held } => {
-                wire::Answer::Metrics(Box::new(wire::MetricsAnswer {
-                    buildings: u64::try_from(buildings_of(&city_root).len()).unwrap_or(u64::MAX),
+            Self::Metrics { city_root, held } => match buildings_of(&city_root) {
+                Ok(buildings) => wire::Answer::Metrics(Box::new(wire::MetricsAnswer {
+                    buildings: u64::try_from(buildings.len()).unwrap_or(u64::MAX),
                     ..held
-                }))
-            }
+                })),
+                Err(_unreadable_root) => unavailable("Metrics".to_owned()),
+            },
         }
     }
 }

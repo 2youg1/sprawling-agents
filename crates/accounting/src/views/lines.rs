@@ -237,15 +237,17 @@ pub fn pursued(record: &EventRecord) -> Result<Address, AxError> {
 /// well would be a second parse of the same file, and the two would
 /// disagree the first time one of them was invalidated and the other was
 /// not.
-pub(crate) fn buildings_of(city_root: &Path) -> Vec<Address> {
-    let mut found = city::buildings(city_root).unwrap_or_default();
+///
+/// # Errors
+/// Propagates `city::buildings`' refusal: a city root that cannot be
+/// read is not a city with no buildings, and a caller answers
+/// `Unavailable` rather than an empty list.
+pub(crate) fn buildings_of(city_root: &Path) -> Result<Vec<Address>, AxError> {
+    let mut found = city::buildings(city_root)?;
     found.sort_by(|left, right| left.as_str().cmp(right.as_str()));
-    found
+    Ok(found)
 }
 
-/// One signal, as a room's queue would show it. `None` for a record
-/// this version cannot read as a signal: a view skips what it cannot
-/// read rather than inventing a row for it.
 /// The waiting row a `signal_enqueued` line adds, and the room it waits
 /// in, read through the struct its writer wrote.
 ///
@@ -267,7 +269,8 @@ pub(crate) fn signal_line(record: &EventRecord) -> Result<(Address, wire::Signal
 
 /// The rows one `file_discarded` record states: one per path, each with
 /// the record's way back. A record this version cannot read states no
-/// rows, for the reason [`signal_line`] gives.
+/// rows: a discard view that refused the whole fold over one old record
+/// would lose every row it can read.
 pub(crate) fn discard_lines(record: &EventRecord) -> Vec<wire::DiscardLine> {
     let Ok(FileDiscarded { paths, restoration }) = record.data().read() else {
         return Vec::new();

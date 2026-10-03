@@ -360,7 +360,7 @@ impl Views {
                     .node;
                 self.claims.entry(node).or_default().insert(record.run());
             }
-            EventKind::CheckpointCommitted | EventKind::PrMerged => self.fold_commit(record),
+            EventKind::CheckpointCommitted | EventKind::PrMerged => self.fold_commit(record)?,
             EventKind::RunStarted => {
                 self.fold_predecessor(record);
                 self.fold_skill_pins(record);

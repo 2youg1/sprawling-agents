@@ -74,6 +74,9 @@ impl Views {
                 .iter()
                 .map(|(addr, (goal, state))| (addr.clone(), goal.clone(), *state))
                 .collect(),
+            // More runs than a u32 counts is reported as the largest count
+            // the wire carries, for the reason every figure of
+            // `Views::metrics` is: a saturated count still says "many".
             in_flight: u32::try_from(self.hot.active_count()).unwrap_or(u32::MAX),
         }
     }
@@ -87,7 +90,11 @@ impl CityAsk {
     /// condition has one authority: a client that worked out for itself
     /// whether a city had finished would be the second.
     pub(super) fn read(self) -> wire::Answer {
-        let buildings = buildings_of(&self.city_root);
+        let Ok(buildings) = buildings_of(&self.city_root) else {
+            return wire::Answer::Unavailable {
+                query: "CityView".to_owned(),
+            };
+        };
         let wanted: BTreeSet<Address> = buildings
             .iter()
             .chain(self.pursuits.iter().map(|(addr, _, _)| addr))

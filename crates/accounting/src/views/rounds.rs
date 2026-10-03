@@ -62,7 +62,12 @@ impl LedgerAsk {
     }
 
     /// One session, folded into the rounds a person reads.
-    pub(super) fn rounds_answer(&self, run: RunId) -> wire::RoundsAnswer {
+    ///
+    /// # Errors
+    /// A `run_frozen` whose payload does not read: an empty ending would
+    /// tell the reader the run said nothing when it said something this
+    /// build cannot read.
+    pub(super) fn rounds_answer(&self, run: RunId) -> Result<wire::RoundsAnswer, kernel::AxError> {
         let records = self.records_of(run);
         let mut turns = turns(records.iter());
         if records
@@ -71,14 +76,14 @@ impl LedgerAsk {
         {
             answer_waits(&mut turns, &records, &self.records_of(RunId::CITY));
         }
-        wire::RoundsAnswer {
+        Ok(wire::RoundsAnswer {
             opened_at: opened_at(&turns),
-            closing: closing(&records),
+            closing: closing(&records)?,
             worktree: worktree(&records),
             opening: opening::opening(&records, &self.city_root),
             turns,
             run,
-        }
+        })
     }
 }
 
@@ -154,15 +159,23 @@ fn worktree(records: &[EventRecord]) -> Option<String> {
 }
 
 /// How the session closed, from the first `run_frozen` in the window.
-#[must_use]
-fn closing(records: &[EventRecord]) -> Option<wire::Closing> {
+///
+/// # Errors
+/// That record's payload does not read as a `run_frozen`.
+fn closing(records: &[EventRecord]) -> Result<Option<wire::Closing>, kernel::AxError> {
     records
         .iter()
         .find(|record| record.kind() == EventKind::RunFrozen)
-        .map(|record| wire::Closing {
-            completion: wire::text(record.data().as_map().get("completion")).unwrap_or_default(),
-            at: record.t(),
+        .map(|record| {
+            Ok(wire::Closing {
+                completion: record
+                    .data()
+                    .read::<kernel::event::record::RunFrozen>()?
+                    .completion,
+                at: record.t(),
+            })
         })
+        .transpose()
 }
 
 /// Folds a session's events into turns, oldest first.

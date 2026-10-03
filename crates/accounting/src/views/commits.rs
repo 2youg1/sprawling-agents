@@ -23,7 +23,9 @@
 use std::path::PathBuf;
 
 use kernel::event::record::{CheckpointCommitted, CommitAttribution};
-use kernel::{Address, EventKind, EventRecord, GitOid, RunId, Seq, SessionName, UsdMicros};
+use kernel::{
+    Address, AxError, EventKind, EventRecord, GitOid, RunId, Seq, SessionName, UsdMicros,
+};
 
 use super::prepared::{Prepared, unavailable};
 
@@ -90,8 +92,12 @@ impl super::holding::Views {
     /// Both kinds of record are asked the same question - does this one
     /// name a commit - because the line that opens a dispatch is a
     /// `checkpoint_committed` that checkpoints nothing.
-    pub(super) fn fold_commit(&mut self, record: &EventRecord) {
-        if let Some((oid, mut facts)) = commit_facts(record) {
+    ///
+    /// # Errors
+    /// Propagates [`commit_facts`]'s refusal of a payload that does not
+    /// read.
+    pub(super) fn fold_commit(&mut self, record: &EventRecord) -> Result<(), AxError> {
+        if let Some((oid, mut facts)) = commit_facts(record)? {
             facts.previous = match self.commits.get(&oid) {
                 // The same commit announced again keeps the previous one
                 // it was first folded with, rather than naming itself.
@@ -108,6 +114,7 @@ impl super::holding::Views {
             self.commit_seqs.insert(facts.seq, oid);
             self.commits.insert(oid, facts);
         }
+        Ok(())
     }
 
     /// The commits this city made, newest first, one page at a time
@@ -222,39 +229,54 @@ impl super::holding::Views {
 ///
 /// `None` for every record that names no commit — including the job pin
 /// that opens a dispatch, which is a `checkpoint_committed` carrying a
-/// job locator and no oid — for an oid this build cannot parse, and for
-/// a record naming no address, which is a commit with no actor to
-/// attribute it to. A projection skips what it cannot read rather than
-/// inventing a row.
+/// job locator and no oid — for a `pr_merged` whose oid this build cannot
+/// parse, and for a record naming no address, which is a commit with no
+/// actor to attribute it to.
+///
+/// # Errors
+/// A `checkpoint_committed` or a `pr_merged` attribution whose payload
+/// does not read: skipping it would drop a commit the city made from the
+/// commit views and from playback without a word.
 #[expect(
     clippy::wildcard_enum_match_arm,
     reason = "a few kinds name a commit; the rest of the event vocabulary does not"
 )]
-pub(crate) fn commit_facts(record: &EventRecord) -> Option<(GitOid, CommitFacts)> {
+pub(crate) fn commit_facts(record: &EventRecord) -> Result<Option<(GitOid, CommitFacts)>, AxError> {
     let data = record.data();
     let (oid, by) = match record.kind() {
-        EventKind::CheckpointCommitted => match data.read::<CheckpointCommitted>().ok()? {
+        EventKind::CheckpointCommitted => match data.read::<CheckpointCommitted>()? {
             // The job pin that opens a dispatch names no commit, which
             // is the one thing this whole enum exists to say out loud.
-            CheckpointCommitted::JobPinned { .. } => return None,
+            CheckpointCommitted::JobPinned { .. } => return Ok(None),
             CheckpointCommitted::Committed(commit) => (commit.oid, commit.by),
         },
         // `pr_merged` carries the same attribution beside a payload of
         // its own, which keeps its hand-written keys until that family
         // is typed.
-        EventKind::PrMerged => (
-            GitOid::parse(data.as_map().get("commit")?.as_str()?)?,
-            data.read::<CommitAttribution>().ok()?,
-        ),
-        _ => return None,
+        EventKind::PrMerged => {
+            let by = data.read::<CommitAttribution>()?;
+            let Some(oid) = data
+                .as_map()
+                .get("commit")
+                .and_then(serde_json::Value::as_str)
+                .and_then(GitOid::parse)
+            else {
+                return Ok(None);
+            };
+            (oid, by)
+        }
+        _ => return Ok(None),
     };
-    Some((
+    let Some(actor) = record.addr().cloned() else {
+        return Ok(None);
+    };
+    Ok(Some((
         oid,
         CommitFacts {
             run: record.run(),
             seq: record.seq(),
             at: record.t(),
-            actor: record.addr()?.clone(),
+            actor,
             chosen: storage::ModelChoice {
                 id: by.model,
                 effort: by.effort,
@@ -268,7 +290,7 @@ pub(crate) fn commit_facts(record: &EventRecord) -> Option<(GitOid, CommitFacts)
                 Err(_unserialisable) => None,
             },
         },
-    ))
+    )))
 }
 
 /// A commit answer the views settled, and the repository its parents
@@ -445,7 +467,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let mut views = super::super::holding::Views::new(dir.path());
         let line = checkpoint_by(3, &oid_at(3), 1);
-        views.fold_commit(&line);
+        views.fold_commit(&line).unwrap();
         let page = views.commits_answer(None, None, 20).unwrap();
         let b3s: Vec<Option<B3Hash>> = page.commits.iter().map(|commit| commit.b3).collect();
         assert_eq!(
@@ -459,7 +481,9 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let mut views = super::super::holding::Views::new(dir.path());
         for (seq, run) in [(3, 1), (5, 2), (8, 1)] {
-            views.fold_commit(&checkpoint_by(seq, &oid_at(seq), run));
+            views
+                .fold_commit(&checkpoint_by(seq, &oid_at(seq), run))
+                .unwrap();
         }
         let first = wire::CommitAt {
             oid: GitOid::parse(&oid_at(3)).unwrap(),
@@ -504,7 +528,7 @@ mod tests {
             (5, child.to_string()),
             (8, oid_at(8)),
         ] {
-            views.fold_commit(&checkpoint_by(seq, &oid, 1));
+            views.fold_commit(&checkpoint_by(seq, &oid, 1)).unwrap();
         }
         let asked = wire::Query::Commits {
             building: None,
@@ -554,8 +578,10 @@ Sprawling-Actor: lab/room1
             .commit(Some("HEAD"), &signature, &signature, said, &tree, &[])
             .unwrap();
         let mut views = super::super::holding::Views::new(dir.path());
-        views.fold_commit(&checkpoint_by(3, &made.to_string(), 1));
-        views.fold_commit(&checkpoint_by(5, &oid_at(5), 1));
+        views
+            .fold_commit(&checkpoint_by(3, &made.to_string(), 1))
+            .unwrap();
+        views.fold_commit(&checkpoint_by(5, &oid_at(5), 1)).unwrap();
         let asked = wire::Query::Commits {
             building: None,
             before: None,
@@ -585,7 +611,7 @@ Sprawling-Actor: lab/room1
             checkpointed(5, "hall/mayor"),
             checkpointed(8, "lab"),
         ] {
-            views.fold_commit(&record);
+            views.fold_commit(&record).unwrap();
         }
 
         let lab = views.commits_answer(Some(&addr("lab")), None, 20).unwrap();
@@ -634,9 +660,15 @@ Sprawling-Actor: lab/room1
         let mut pin = serde_json::Map::new();
         pin.insert(
             "job".to_owned(),
-            serde_json::Value::String("cas:b3-00".to_owned()),
+            serde_json::Value::String(
+                "file:hall/mayor@0123456789abcdef0123456789abcdef01234567".to_owned(),
+            ),
         );
-        assert!(commit_facts(&record(EventKind::CheckpointCommitted, pin)).is_none());
+        assert!(
+            commit_facts(&record(EventKind::CheckpointCommitted, pin))
+                .unwrap()
+                .is_none()
+        );
     }
 
     #[test]
@@ -644,7 +676,9 @@ Sprawling-Actor: lab/room1
         let oid = "cd".repeat(20);
         let mut merged = serde_json::Map::new();
         merged.insert("commit".to_owned(), serde_json::Value::String(oid.clone()));
-        let (found, facts) = commit_facts(&record(EventKind::PrMerged, merged)).unwrap();
+        let (found, facts) = commit_facts(&record(EventKind::PrMerged, merged))
+            .unwrap()
+            .unwrap();
         assert_eq!(found.to_string(), oid);
         // A record written before the city put the model on the ledger
         // says nothing about it, and the answer says nothing back.

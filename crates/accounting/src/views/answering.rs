@@ -86,7 +86,7 @@ impl Views {
                 .waiting
                 .values()
                 .map(|queue| u64::try_from(queue.len()).unwrap_or(u64::MAX))
-                .sum(),
+                .fold(0, u64::saturating_add),
             discards_outstanding: self
                 .discards
                 .values()

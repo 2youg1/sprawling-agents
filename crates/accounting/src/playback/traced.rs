@@ -69,13 +69,18 @@ impl Evidence {
 
     /// Folds one verified line in, in seq order, and notes whether it
     /// announces a commit an earlier line announced.
-    pub(super) fn absorb(&mut self, record: &EventRecord) {
+    ///
+    /// # Errors
+    /// Propagates [`commit_facts`]'s refusal of a commit payload that
+    /// does not read.
+    pub(super) fn absorb(&mut self, record: &EventRecord) -> Result<(), AxError> {
         self.history.absorb(record);
-        if let Some((oid, _)) = commit_facts(record)
+        if let Some((oid, _)) = commit_facts(record)?
             && !self.announced.insert(oid)
         {
             self.repeated.insert(record.seq());
         }
+        Ok(())
     }
 
     /// Holds what the history folded so far says about `oid`, which the
@@ -198,7 +203,7 @@ fn cited(at: Seq, known: &Known<'_>) -> Cited {
 /// which lines name a commit and which oid, identifies it
 /// (`crates/accounting/spec/Playback.lean` §8-12, accounting D24 (f)).
 pub(super) fn checkpoint_of(record: &EventRecord) -> Result<Option<Holds>, AxError> {
-    let named = commit_facts(record).map(|(oid, _)| oid);
+    let named = commit_facts(record)?.map(|(oid, _)| oid);
     if record.kind() == EventKind::CheckpointCommitted {
         return Ok(
             match (record.data().read::<CheckpointCommitted>()?, named) {

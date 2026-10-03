@@ -117,7 +117,7 @@ impl<'selection> Projection<'selection> {
                 return Ok(());
             }
         };
-        self.evidence.absorb(&record);
+        self.evidence.absorb(&record)?;
         self.lineage.apply(&record)?;
         let room = record.addr().map(building_of);
         self.learn_buildings(&record, room.as_ref())?;
