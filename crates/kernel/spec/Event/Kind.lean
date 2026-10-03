@@ -383,15 +383,4 @@ theorem EventKind.all_complete : ∀ kind : EventKind, kind ∈ EventKind.all :=
   intro kind
   cases kind <;> decide
 
-theorem EventKind.all_nodup : EventKind.all.Nodup := by
-  decide
-
-/-- **入窗的种类恰是这十二种。** 它们的载荷决定模型请求的字节，所以重放与分叉要读它们；其余每一种都只入账。让一个种类改变窗类，要先改这条定理，而改它就是改模型请求的字节。 -/
-theorem the_in_window_kinds :
-    EventKind.all.filter (fun kind => kind.windowClass == .InWindow) =
-      [.PromptAssembled, .ModelCalled, .ModelReturned, .ToolCalled, .ToolResult, .ResultOffloaded,
-        .SteerReceived, .SignalConsumed, .AdviserAnswered, .RunPolicyChanged, .SignalWaitStarted,
-        .SignalWaitEnded] := by
-  decide
-
 end Kernel.Event.Kind

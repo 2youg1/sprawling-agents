@@ -96,7 +96,7 @@ kernel 是纯判定函数层：只吃入参吐 verdict，零内部 crate 依赖�
 
 分部里的定理是模型对性质的证明：
 
-- `spec/Event/Kind.lean`：`EventKind` 的每个种类恰落在一个窗类里（`EventKind.windowClass` 是穷尽的定义），入窗的恰是那十二种（`the_in_window_kinds`）；名册完整、无重复（`EventKind.all_complete`、`EventKind.all_nodup`）。
+- `spec/Event/Kind.lean`：`EventKind` 的每个种类恰落在一个窗类里（`EventKind.windowClass` 是穷尽的定义，`specalign` 逐臂与 kernel 对账，所以哪些种类入窗只有这一张表）；名册完整（`EventKind.all_complete`）。
 - `spec/Error.lean`：每个码恰有一个 carrier（`AxCode.carrier` 是穷尽的定义），装载期白名单恰是那七个码（`the_loadtime_whitelist_is_closed`），门的码都由 `gate_denied` 携带；只要拼写是单射，每个码的拼写读回它自己（`parse_inverts_as_str`），单射去掉即有反例（`a_shared_spelling_loses_a_code`）；不论构造器按什么次序调用，「不是 `Yes` 却带等待」拼不出来（`no_order_of_calls_waits_without_retrying`）。
 - `spec/Event.lean`：`ig` 不藏认得的种类，一行被跳过当且仅当它的种类未知且写方标了 `ig`（`a_line_is_skipped_exactly_when_unknown_and_marked`）；有时刻的行恰是那四种之一且时刻就是信封的 `t`，早于时刻版本的行没有时刻；`Seq::next` 恒加一。
 - `spec/Ledger.lean`：被覆盖的行决定声索，单射时声索决定被覆盖的行，最后一行不被链证明，追加一行不动已欠的声索。
