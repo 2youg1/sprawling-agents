@@ -233,7 +233,7 @@ pub(in crate::assembly) struct Flight {
 | 事实 | 住处 | 理由 |
 |---|---|---|
 | 一个居民或房间叫什么 | `kernel::Address::name`（`crates/kernel/Spec.lean` §8-2 的 `Address`） | 地址的最后一段是地址自己的事实；城的名册与楼的页面都从这里读 |
-| 一栋楼的页面、`DOC_BYTES_MAX` | `accounting::views::building_page` | 页面是一个读面：按问的那一刻读盘，不持有第二份 |
+| 一栋楼的页面、`documents::WINDOW_BYTES_MAX` | `accounting::views::building_page` | 页面是一个读面：按问的那一刻读盘，不持有第二份 |
 | 一台 MCP server 经哪种传输到达（`McpLink`） | `agent_protocols::mcp::link` | 三种传输（`agent_protocols::mcp` 下的 `stdio`、`http`、`sse`）与把它们合成 `agent_protocols::Outbound` 的那个枚举同住 `agent_protocols`；读面与装配点都经 `agent_protocols` 的握手与列工具说话 |
 | broker 的钥匙登记在哪、这座城对 broker 是谁（`broker_for`） | `accounting::toolkit_broker`（`crates/accounting/Spec.lean` §8-9） | 页面与命令读同一组事实；连接动作 `connect_toolkit` 仍是 worker 的 |
 | 一个锁着的 vault 的解析器与锁中毒时的拒绝（`resolving`、`poisoned_vault`） | `accounting::held_vault`（`crates/accounting/Spec.lean` §8-9） | worker、读面与 serving 都要一次性的解析器；拒绝的措辞只有一处 |
