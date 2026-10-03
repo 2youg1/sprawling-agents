@@ -40,3 +40,64 @@ pub fn gather(parts: &[Share]) -> Share;    // 自由函数，不是 Add
 
 **重开参数**：User 改定根份额的持有者时，只改「谁持根」这一条判定（`plan` 的 `add` 授权），份额的算术不动。
 -/
+
+namespace Kernel.Share.Root
+
+/-- 计划的一片叶子：持有者与它持有的十亿分之一数。持有者的身份在这条性质里只需能比较相等。 -/
+structure Leaf (Holder : Type) where
+  holder : Holder
+  ppb : Nat
+
+/-- 一份计划此刻的叶子，按行序。 -/
+abbrev Leaves (Holder : Type) := List (Leaf Holder)
+
+/-- 叶子持有的份额之和。 -/
+def held {Holder : Type} (leaves : Leaves Holder) : Nat :=
+  (leaves.map Leaf.ppb).sum
+
+/-- 一份空计划（D25）：一个根，持有整份，持有者是这栋楼的 Mayor。 -/
+def empty {Holder : Type} (whole : Nat) (mayor : Holder) : Leaves Holder :=
+  [⟨mayor, whole⟩]
+
+/-- 一步改动：`plan add` 与 `split` 都是把一片叶子 `x` 换成若干片，新片之和恰为 `x`——
+`Share::split` 取走自己、分出恰好等于自己的诸份（§8-32），`add` 是在 `x` 下加子节点后自 `x` 重分。 -/
+inductive Step {Holder : Type} : Leaves Holder → Leaves Holder → Prop where
+  | divide (pre post parts : Leaves Holder) (x : Leaf Holder) (exact : held parts = x.ppb) :
+      Step (pre ++ x :: post) (pre ++ parts ++ post)
+
+/-- 若干步改动组成的一条轨迹。 -/
+inductive Trace {Holder : Type} : Leaves Holder → Leaves Holder → Prop where
+  | stay (s : Leaves Holder) : Trace s s
+  | step {s t u : Leaves Holder} : Step s t → Trace t u → Trace s u
+
+theorem held_append {Holder : Type} (a b : Leaves Holder) : held (a ++ b) = held a + held b := by
+  simp [held, List.map_append, List.sum_append]
+
+theorem held_cons {Holder : Type} (x : Leaf Holder) (rest : Leaves Holder) :
+    held (x :: rest) = x.ppb + held rest := by
+  simp [held]
+
+/-- 一步改动不改变叶子之和。 -/
+theorem step_conserves {Holder : Type} {s t : Leaves Holder} (move : Step s t) : held t = held s := by
+  cases move with
+  | divide pre post parts x exact =>
+    rw [held_append, held_append, held_append, held_cons, exact, Nat.add_assoc]
+
+/-- 从空计划出发的任何一条 add／split 轨迹上，叶子之和恒为整份。 -/
+theorem every_trace_from_the_empty_plan_holds_the_whole {Holder : Type} (whole : Nat)
+    (mayor : Holder) {s : Leaves Holder} (trace : Trace (empty whole mayor) s) : held s = whole := by
+  have conserved : ∀ {a b : Leaves Holder}, Trace a b → held b = held a := by
+    intro a b path
+    induction path with
+    | stay => rfl
+    | step move _ rest => rw [rest, step_conserves move]
+  rw [conserved trace]
+  simp [held, empty]
+
+/-- 空计划的根恰有一个持有者，它是这栋楼的 Mayor，持有整份。 -/
+theorem the_empty_plan_has_one_root_held_by_the_mayor {Holder : Type} (whole : Nat)
+    (mayor : Holder) : empty whole mayor = [⟨mayor, whole⟩] ∧
+      (empty whole mayor).map Leaf.holder = [mayor] := by
+  exact ⟨rfl, rfl⟩
+
+end Kernel.Share.Root
