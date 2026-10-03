@@ -140,3 +140,25 @@ fn a_naming_the_store_lost_answers_no_names() {
     let opening = answer.opening.expect("the window held run_started");
     assert_eq!((opening.names, opening.effort), (None, None));
 }
+
+/// A delegated child's opening names the run that dispatched it, read
+/// from its `run_started.parent`, so its page can link back to the
+/// parent's session (`crates/wire/spec/Answer/Sessions.lean` D40).
+#[test]
+fn a_delegated_childs_opening_names_its_parent_run() {
+    let dir = tempfile::tempdir().unwrap();
+    let parent = RunId::from_bytes([3u8; 16]);
+    let answer = rounds_of(
+        dir.path(),
+        RunId::from_bytes([4u8; 16]),
+        serde_json::json!({ "task": "t", "parent": parent.to_string() }),
+        &[],
+    );
+    let opening = serde_json::to_value(answer.opening.expect("the window held run_started"))
+        .unwrap();
+    assert_eq!(
+        opening.get("parent"),
+        Some(&serde_json::json!(parent.to_string())),
+        "the child's opening names the run that dispatched it"
+    );
+}
