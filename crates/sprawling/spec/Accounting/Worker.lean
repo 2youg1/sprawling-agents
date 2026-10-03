@@ -1575,10 +1575,12 @@ impl DrivingPool {
 /// 一个 `Driven` 不说自己属于哪一轮，一个 run id 也不说要归位什么。
 pub(crate) struct Arrival { run: RunId, flown: Flown }
 
-pub(crate) struct DrivingPool { /* 回家的那一头、在驾驶与在补货的车道的 JoinHandle、内存紧时排着的活、read_memory */ }
+pub(crate) struct DrivingPool { /* 回家的那一头、在驾驶与在补货的车道的 JoinHandle、内存紧时排着的活、read_memory、monotonic、health */ }
 impl DrivingPool {
     /// `read_memory` 是池判断内存紧不紧时唯一的读数来源；生产交 `bin::monitor::memory::read`。
-    pub(crate) fn open(home: mpsc::Sender<Wake>, read_memory: fn() -> Memory) -> DrivingPool;
+    /// `monotonic` 给每一轮等车道的时长计时，`health` 是记下它的地方（与 relay 排队同一份 `Health`）。
+    pub(crate) fn open(home: mpsc::Sender<Wake>, read_memory: fn() -> Memory,
+                       monotonic: fn() -> Instant, health: Health) -> DrivingPool;
     pub(crate) fn full(&self) -> bool;
     pub(crate) fn in_flight(&self) -> u32;
     /// 交出一次驾驶：起一条车道，内存紧时排队。run id 取自 `staged` 自己，不另传一份——
@@ -1604,6 +1606,8 @@ impl DrivingPool {
 `tp2_more_than_four_runs_start_at_once` 守着「五轮以上同时起，没有一轮等车道」。
 
 **内存紧时计划的下一行排队**：`full` 只在已有 run 在跑、而整机可用内存低于物理内存的十分之一时为真（`admits(in_flight, memory)` 是这一条规则的唯一出处）。三个平台的读数都经 `sysinfo`：Windows 读 `GlobalMemoryStatusEx` 的总物理内存与可用物理内存，Linux 读 `/proc/meminfo` 的 `MemTotal` 与 `MemAvailable`，macOS 读 `hw.memsize` 与 Mach 的 `vm_statistics64`（可用量把 inactive 与 purgeable 页算在内，因此比另两个平台的口径宽）。读数来自 `open` 时交给池的 `read_memory`，池自己不碰主机：生产交 `bin::monitor::memory::read`，worker 搬进 `accounting` 时 `monitor` 留在 `sprawling`、经这个 `fn` 指针进来（`crates/accounting/Spec.lean` §7、accounting D10），脚本场景交一个自己的读数就能造出内存紧的机器。`full` 每次被问都读一次，所以跟着实时的可用内存走；问它的有三处：`DrivingPool::start`（每一轮进车道都经过的门，内存紧就排队）、`start_waiting`（一轮回家后按到达顺序起排着的活）与 `Flight::full`（计划推进循环 `accounting::worker::plans::pursuing` 每次决定是否起下一行）。读一次约 1.6 µs（Windows x86-64 桌面级机器、测试档构建），只发生在起一轮之前。没有 run 在跑时总放一轮进来：否则一台内存一直紧的机器上城永远不动，而一轮自己占的内存远小于它派出的构建。排着的计划行在下一轮回家时再判一次。取物理内存的十分之一而不是一个字节数，是因为一个字节数只适合某一类机器；十分之一留给人的其他程序与页缓存。**被否**：按「每轮估计占用」算出可同时驱动的轮数——一轮的边际内存还没有测过，估计值就是一个没有来源的常数。**重开参数**：测得一轮的边际内存之后，改成「可用内存 ≥ 留给别人的那一份 + 一轮的实测边际」。证据：`crates/accounting/src/worker/pool.rs` 的 `a_new_run_waits_while_memory_is_tight` 与 `a_pool_judges_memory_by_the_reader_it_was_handed`。
+
+**纯车道等待是一份读数**（Roadmap M2）：一轮在 `start` 时排进 `waiting` 就记下 `monotonic()`，在 `start_waiting` 里出队、车道开起时把差值交给 `Health::lane_waited`；不排队就开车道的那一轮记 0 µs 一次，于是「没有一轮等车道」可以被读出而不是被推断。`Health::lane_wait_us` 按到达次序读出（至多 `RELAY_QUEUE_KEPT` 个，最旧的先丢），`instrument_throughput` 把它印成 `wait=lane_pure`。读数是内存里的计数，不进账本；时钟是 worker 的同一个单调时钟，Windows、macOS 与 Linux 上由标准库各选单调源，读法相同。
 
 ### 8-46-4 `pursue` 拿走整个 ready set（`accounting::worker::plans::pursuing`）
 
