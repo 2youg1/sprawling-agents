@@ -8,7 +8,7 @@
 
 规定 `crates/sprawling/src/serving/placement.rs`（`bin::serving::placement`，形状：状态机）里核心热线程的软放置（§8-93 的放置一半，AF1 的 (b) 与 (c)）。`crates/sprawling/src/serving/placement/tests.rs` 在 Rust 的放置表上逐条检查下面两组性质：至多四个处理器、三档等级、任意顺序给出的每一张处理器表，三条线程五次起动与退出的每一条轨迹，穷举而不抽样，所以缺陷躲不到某个随机种子后面。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
 
-热线程是：账本线程 `sprawling-runs`（`bin::assembly::attending`）、视图折叠线程 `sprawling-views`（`bin::serving::folding`）与 socket 服务的 tokio worker（`serving_runtime`）。每个 run 的 lane（`accounting::worker::pool` 起的 OS 线程）也是热线程，但现在还不要座位：`accounting` 不依赖本 crate，要座位得经 `accounting::worker::Hands` 交进去一个起动钩子，像 `Hands.monotonic` 交进单调钟那样；在那之前 lane 由调度器自己放。每条热线程起动时向放置表要一个座位（一个逻辑处理器的下标），把它设成自己的理想处理器，退出时交还：后两种由 `CoreThread::raise` 要座位，座位随 `CoreThread` 析构交还；`sprawling-runs` 在线程闭包开头要一个 `Seat`，线程结束时交还。
+热线程是：账本线程 `sprawling-runs`（`bin::assembly::attending`）、视图折叠线程 `sprawling-views`（`bin::serving::folding`）与 socket 服务的 tokio worker（`serving_runtime`）。每个 run 的 lane（`accounting::worker::pool` 起的 OS 线程）也是热线程，但现在还不要座位：`accounting` 不依赖本 crate，要座位得经 `accounting::worker::hands::Hands` 交进去一个起动钩子，像 `Hands.monotonic` 交进单调钟那样；在那之前 lane 由调度器自己放。每条热线程起动时向放置表要一个座位（一个逻辑处理器的下标），把它设成自己的理想处理器，退出时交还：后两种由 `CoreThread::raise` 要座位，座位随 `CoreThread` 析构交还；`sprawling-runs` 在线程闭包开头要一个 `Seat`，线程结束时交还。
 
 处理器表是一张按「好坏」排好的表：每一项是一个逻辑处理器的等级 `rank`，数越小越好，表按等级从小到大排。等级由平台给出（见 D41）；模型只要求表是排好的（`RankedBest`），不关心等级是怎么来的，所以三档、两档、一档（不是混合架构的机器）都在模型里。
 
