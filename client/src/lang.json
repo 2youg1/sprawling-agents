@@ -7106,5 +7106,9 @@
   "run_awaiting_reply_due": {
     "en": "waiting for {room}, past its deadline",
     "zh": "在等 {room} 回信，已过时限"
+  },
+  "event_signal_landed": {
+    "en": "a signal reached its room",
+    "zh": "一个信号到了它的房间"
   }
 }
