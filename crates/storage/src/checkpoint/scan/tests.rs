@@ -186,3 +186,47 @@ fn a_head_that_cannot_be_read_refuses_the_checkpoint_instead_of_orphaning_it() {
         "{outcome:?}"
     );
 }
+
+/// Removes the loose object a staged file was written as, so the scan meets
+/// an index entry whose bytes it cannot read.
+fn lose_the_object_of(root: &Path, rel: &str) {
+    let id = git2::Repository::open(root)
+        .unwrap()
+        .index()
+        .unwrap()
+        .get_path(Path::new(rel), 0)
+        .unwrap()
+        .id
+        .to_string();
+    let (dir, file) = id.split_at(2);
+    std::fs::remove_file(root.join(".git").join("objects").join(dir).join(file)).unwrap();
+}
+
+/// A staged blob the scan cannot read refuses the checkpoint, on the first
+/// checkpoint (every index entry) and on a later one (the staged diff):
+/// skipping it would let bytes into the tree that no scan read.
+#[test]
+fn a_staged_blob_the_scan_cannot_read_refuses_the_checkpoint() {
+    let first = tempfile::tempdir().unwrap();
+    write(first.path(), "work/a.md", "a");
+    let mut checkpoint = Checkpoint::open(first.path()).unwrap();
+    checkpoint.stage_scopes(&["work".to_owned()]).unwrap();
+    lose_the_object_of(first.path(), "work/a.md");
+    let on_first = checkpoint.scan_staged();
+
+    let later = tempfile::tempdir().unwrap();
+    write(later.path(), "work/a.md", "a");
+    let mut checkpoint = Checkpoint::open(later.path()).unwrap();
+    checkpoint
+        .ensure_base(&["work".to_owned()], TimeMs::new(0), &resident())
+        .unwrap();
+    write(later.path(), "work/b.md", "b");
+    checkpoint.stage_scopes(&["work".to_owned()]).unwrap();
+    lose_the_object_of(later.path(), "work/b.md");
+    let on_later = checkpoint.scan_staged();
+
+    let refused = |result: Result<(), StorageError>| {
+        matches!(result, Err(StorageError::Checkpoint { op, .. }) if op == "scan a staged file")
+    };
+    assert_eq!((refused(on_first), refused(on_later)), (true, true));
+}
