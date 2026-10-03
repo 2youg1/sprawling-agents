@@ -52,7 +52,7 @@ Every line carries three required fields: `run`, `seq` (the Ledger position at t
 
 `seq` is the one the design rests on: **it anchors the log to the only history**. From a surprising log line, go to that position in the Ledger and read what happened; from a surprising event, pull the logs around it. Two timelines line up on one integer, with no guessing from timestamps.
 
-The format is one JSON object per line, for the same reason the wire format is: the receiver may be a browser, and a person can still read it. `runtime::diagnostics::render` is the one place a line becomes text. A served city sends its lines to the terminal it runs in and to **the log** lens of **the record**.
+The format is one JSON object per line, for the same reason the wire format is: the receiver may be a browser, and a person can still read it. `runtime::diagnostics::render` is the one place a line becomes text. A served city sends its lines to the terminal it runs in and to **the log** lens of **the record**. A line at `effect` names what was done and where, such as a command's name or a file's path, and never carries the text of a message or a reply: those are in the Ledger, and the terminal is not a place to keep them ([`operating.md`](operating.md), *What the console prints*).
 
 ## 5 Secrets and logs
 

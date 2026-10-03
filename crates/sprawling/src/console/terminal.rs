@@ -206,7 +206,12 @@ pub(super) fn printed(
 ) -> Result<String, serde_json::Error> {
     match records {
         Records::Whole => serde_json::to_string(record),
-        Records::Summary => serde_json::to_string(record),
+        Records::Summary => {
+            let kind = serde_json::to_value(record.kind())?;
+            let kind = kind.as_str().unwrap_or("?");
+            let at = record.addr().map_or("city", Address::as_str);
+            Ok(format!("  seq {}  {kind}  {at}", record.seq().value()))
+        }
     }
 }
 

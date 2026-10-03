@@ -48,6 +48,7 @@ pub(crate) fn snake(camel: &str) -> String;
 - **普通一行就是派活**。要人为一件活敲 `/dispatch {"addr":…}` 是把 JSON 当人机界面；选中一个 room（`/at`）后直接写任务，才是终端本来的手势。未选中任何 room 时拒，并说该敲什么。
 - **不是 TTY 就不进控制台**。stdin 读到 EOF（管道、服务、CI）即退出控制台循环而**城照跑**：一座因为没人敲键盘而停止服务的城是一个以交互换服务的回归。
 - **拒长表与图**。查询的答案在控制台以 JSONL 逐行输出，与 `sprawling call` 同形；表格与图归浏览器。一个同时伺候两个主人的 CLI 是 CLI 文献里的反面教材。`sprawling view` 是另一个动词、另一个进程，按 stdout 是不是终端把两个主人分开（§8-105、§8-117）。
+- **事件流默认每条记录一行，不印正文**（sprawling D44）：`start` 订阅 Committed 事件流，按 `Terminal.records: Records` 打印，`printed(record, records)` 是唯一的渲染。`Records::Summary`（默认）印 `  seq <n>  <kind>  <addr>`——kind 用账本与 wire 共用的 serde 名，没有地址的记录写 `city`；`Records::Whole` 印整条记录，与 `sprawling call` 同形，只在 `up`／`serve` 带 `--whole-records` 时取。**原因**：一条记录里有 User 打的字与模型的回复，终端会被旁人看到、被录屏、留在滚动缓冲里，所以默认只说发生了什么、在哪里。**被否掉的做法**：默认整条、加一个 `--quiet` 去掉——泄露成了默认，要人知道去关。三个平台行为相同。
 - **`/web` 携配对令牌**，故没有人需要手拷一串东西。令牌在 `serve` 里只被读一次，控制台拿到的是那一次的副本，不重新读环境。
 - **Ctrl-C 是有序收口**：`serve` 在 `wire::serve` 与 `tokio::signal::ctrl_c` 之间 `select!`。收到信号后先停止接受连接，再 `CommandDesk::close(Closing::Chosen)` 告诉 worker，worker **在读队列的同一处**读到它，于是正在跑的那条命令先跑完，`handoff_written` 是最后一行而不是某一行的中间。主线程 join worker 线程再返回——先返回的 main 会在那一行写出来之前结束进程。
   - **`DeskWait::Close` 与 `Gone` 不是一回事**：前者是城要停了，值一份 Handoff；后者是桌子自己坏了，那座城已经写不出 Handoff 了。

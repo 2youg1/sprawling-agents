@@ -200,6 +200,10 @@ The manifest is the integrity test: restore walks the chain and compares it with
 
 **Let the agents keep their own notes.** `Memo.md` for what needs recording and has no other home, `Handoff.md` for the next session, the archive for what was worth keeping. They are ordinary files: readable in the browser, editable in your editor, and the same bytes either way.
 
+## What the console prints
+
+The terminal a city runs in prints one line for each record the city commits: its position in the Ledger, its event kind and its address, such as `  seq 42  steer_received  lab/room1`, with `city` where a record has no address. It never prints a payload by default, because a record holds what the User typed and what a model answered, and a terminal is seen by people nearby, recorded on screen and kept in scrollback. `sprawling up --whole-records` (or `serve --whole-records`) prints each record whole instead, in the shape `sprawling call` prints. The page, `sprawling call` and `sprawling view` still show every record in full. The console prints the same lines on Windows, macOS and Linux.
+
 ## Which browser the page opens in
 
 `sprawling up` hands the address to whatever your operating system opens links with, once the port answers — the browser you already use, with its profile and its logins. `sprawling serve` opens nothing unless given `--open`. `--no-open`, or `SPRAWLING_OPEN=never` in the environment, keeps the screen alone; a refusal beats a request. When nothing can be opened, the address is already in the console.
