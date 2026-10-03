@@ -12,7 +12,7 @@
 
 这里没有状态机：`resolve` 是一架梯子，每一档压过下一档是它的一条 `match` 臂，读定义即可，不另写定理。证明的是两条跨过所有臂的性质：要这个字段的一面恒得到一个数（`a_face_that_needs_a_figure_always_gets_one`），本城钉下的数与策略缺省只在那样的一面上作答（`the_city_states_a_figure_only_where_the_face_needs_one`）。Rust 的 `resolve` 取 `Target`（`base_url`、`id`、`wire`），在梯子走到那一档时才问预置表；模型把预置表的答案当作一个值传进来，结果相同。平台：纯判定，三个平台相同。
 
-派生检查：`provider::ceiling` 的测试各判一个输入（`the_higher_rung_wins_and_says_that_it_did`、`on_a_face_that_takes_no_figure_the_provider_picks_when_nobody_stated_one`、`an_unknown_model_at_an_unknown_host_is_still_callable`）；两条性质还没有覆盖整个输入空间的 proptest（人、上游、钉版、预置各有无，三面），记为债。
+派生检查：`provider::ceiling` 的 proptest `the_ceiling_ladder_keeps_the_lean_properties` 走遍模型的输入空间——人、上游、钉版目录各沉默或说一个数，预置表答或不答（厂商主机、中转站、这台电脑、谁都没写过的 id），三面——对每个输入断言两条性质；它先对一个在可选字段的面上也以策略缺省作答的 `resolve` 变红过。`the_higher_rung_wins_and_says_that_it_did` 等测试各判一个输入，钉住每一档的答案。
 -/
 
 namespace Gateway.Provider.Ceiling

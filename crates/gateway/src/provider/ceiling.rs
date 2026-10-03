@@ -331,4 +331,55 @@ mod tests {
         assert_eq!(words, ["person", "upstream", "preset", "policy"]);
         assert_eq!(OutputCeiling::ProviderDefault.word(), "provider");
     }
+
+    use proptest::prelude::*;
+
+    fn rung() -> impl proptest::strategy::Strategy<Value = Option<Ceiling>> {
+        proptest::option::of((1u64..200_000).prop_map(|count| Ceiling::new(count).unwrap()))
+    }
+
+    proptest::proptest! {
+        /// The two properties of `crates/gateway/spec/Provider/Ceiling.lean`
+        /// over the model's whole input space: each of the person, the
+        /// upstream list and the pinned catalogue silent or stating a
+        /// figure, the preset table answering or not (a vendor host, a
+        /// relay, this machine, and an id nobody documents), on all three
+        /// faces.
+        #[test]
+        fn the_ceiling_ladder_keeps_the_lean_properties(
+            person in rung(),
+            upstream in rung(),
+            pinned in rung(),
+            base_url in proptest::sample::select(vec![
+                ANTHROPIC,
+                RELAY,
+                LOCAL,
+                "https://api.openai.com/v1",
+            ]),
+            id in proptest::sample::select(vec![SONNET, "gpt-5", "some-unreleased-model"]),
+            wire in proptest::sample::select(vec![
+                DialectKind::Anthropic,
+                DialectKind::OpenAi,
+                DialectKind::OpenAiResponses,
+            ]),
+        ) {
+            let answer = OutputCeiling::resolve(
+                Stated { person, upstream },
+                pinned,
+                Target { base_url, id, wire },
+            );
+            let needs_figure = matches!(field_on(wire), Field::Required);
+            // a_face_that_needs_a_figure_always_gets_one
+            let sent = matches!(answer, Some(OutputCeiling::Sent { .. }));
+            proptest::prop_assert!(!needs_figure || sent);
+            // the_city_states_a_figure_only_where_the_face_needs_one
+            if let Some(OutputCeiling::Sent {
+                from: CeilingSource::Preset | CeilingSource::Policy,
+                ..
+            }) = answer
+            {
+                proptest::prop_assert!(needs_figure);
+            }
+        }
+    }
 }
