@@ -326,3 +326,35 @@ fn stock_is_ready(city_root: &Path) -> bool {
                 )
         })
 }
+
+/// `crates/sprawling/spec/Accounting/Landing.lean` D37, derived from
+/// `the_landing_work_never_delays_a_relay`: the transcript is the heavy
+/// half of a landing, so the lane writes it before it hands the run home,
+/// and the accounting thread's `land` has nothing of it left to do while
+/// relay requests wait behind it.
+#[test]
+fn tp4_a_lane_keeps_the_transcript_before_its_run_comes_home() {
+    let dir = tempfile::tempdir().unwrap();
+    crate::worker::fixture::init_city(dir.path()).unwrap();
+    std::fs::create_dir_all(dir.path().join("lab").join("room1")).unwrap();
+    let (base_url, _provider) = fake_openai(&["m-local"], vec![completion("done", None)]);
+    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
+    let (staged, _continuation) = worker
+        .stage_dispatch(asked("lab/room1"), "work".to_owned(), "work".to_owned())
+        .unwrap();
+    let transcript = dir
+        .path()
+        .join("lab")
+        .join("room1")
+        .join(format!("{}.jsonl", staged.run_id()));
+    let context = worker.drive_context();
+    let mut kept_at_home = None;
+    staged.fly(&mut worker.ledger, context, |_flown| {
+        kept_at_home = Some(transcript.is_file());
+    });
+    assert_eq!(
+        kept_at_home,
+        Some(true),
+        "the transcript is on disk when the run comes home"
+    );
+}
