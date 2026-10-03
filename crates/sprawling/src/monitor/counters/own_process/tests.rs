@@ -54,3 +54,23 @@ RssAnon:	    2048 kB
         (Some(112 * 1024), Some(2048 * 1024), None)
     );
 }
+
+/// A peak noted between two readings is what the next reading reports,
+/// and only that one: the reading after it starts a new second.
+#[test]
+fn a_noted_peak_is_reported_once_by_the_next_reading() {
+    let mut own = OwnProcess::new();
+    own.note_private();
+    let noted = own.peak_private;
+    own.peak_private = u64::MAX;
+    let peaked = own.read(Duration::ZERO);
+    let after = own.read(Duration::ZERO);
+    assert_eq!(
+        (
+            noted > 0,
+            peaked.private_bytes,
+            after.private_bytes < u64::MAX
+        ),
+        (true, u64::MAX, true)
+    );
+}

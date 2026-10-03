@@ -22,19 +22,33 @@ pub(crate) struct OwnReading {
 }
 
 /// The previous reading's CPU time, which the next reading's CPU share
-/// is measured against.
+/// is measured against, and the highest private bytes noted since the
+/// previous reading.
 pub(crate) struct OwnProcess {
     previous: Option<Duration>,
+    peak_private: u64,
 }
 
 impl OwnProcess {
     pub(crate) fn new() -> Self {
-        Self { previous: None }
+        Self {
+            previous: None,
+            peak_private: 0,
+        }
+    }
+
+    /// Reads private bytes alone, between two readings, so the next
+    /// reading reports the highest of them (`crates/sprawling/spec/Monitor.lean` §8-96).
+    pub(crate) fn note_private(&mut self) {
+        let now = private_bytes(memory_stats::memory_stats().as_ref());
+        self.peak_private = self.peak_private.max(now);
     }
 
     /// Reads this process once; `elapsed` is the wall time since the
     /// previous reading. The first reading has nothing to compare with,
-    /// so its CPU reads 0; a figure the platform refuses reads 0.
+    /// so its CPU reads 0; a figure the platform refuses reads 0. Private
+    /// bytes are the highest of this reading and those noted since the
+    /// previous one.
     pub(crate) fn read(&mut self, elapsed: Duration) -> OwnReading {
         let cpu = ProcessTime::try_now().ok().map(|time| time.as_duration());
         let cpu_permille = match (cpu, self.previous) {
