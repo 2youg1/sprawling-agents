@@ -31,6 +31,7 @@ use super::instruments::{attending, dispatch, machine, marker};
 use crate::worker::CommandDesk;
 use crate::worker::fixture::*;
 use crate::worker::*;
+use lines::{chosen, wait_line};
 
 /// The run counts the bench reads, unless `SPRAWLING_TP1_RUNS` names others.
 const RUN_COUNTS: [usize; 4] = [1, 4, 16, 64];
@@ -38,6 +39,8 @@ const RUN_COUNTS: [usize; 4] = [1, 4, 16, 64];
 const TOOL_CALLS: usize = 4;
 /// The fewest samples a wait needs before its p999 is printed.
 const P999_FLOOR: usize = 1_000;
+
+mod lines;
 /// The test city's model-call latencies, `model_called` to
 /// `model_returned`, at p10 through p90 and p95 of 261 calls; p99 and
 /// the max (89 s, 111 s) are left out so that one run does not hold a
@@ -131,19 +134,6 @@ fn instrument_throughput() {
                 println!("{}", wait_line(&head, wait, samples));
             }
         }
-    }
-}
-
-/// The arms an environment variable names, as a comma list of their
-/// names, or every arm when it is unset.
-fn chosen<T: Copy>(var: &str, all: &[T], name: impl Fn(&T) -> String) -> Vec<T> {
-    match std::env::var(var) {
-        Ok(list) => all
-            .iter()
-            .filter(|arm| list.split(',').any(|item| item.trim() == name(arm)))
-            .copied()
-            .collect(),
-        Err(_) => all.to_vec(),
     }
 }
 
@@ -385,26 +375,4 @@ fn waits(taken: &Taken, idle: &[Duration]) -> Vec<(&'static str, Vec<u64>)> {
         ("lane_pure", taken.lane_wait.clone()),
         ("relay_idle", micros(idle)),
     ]
-}
-
-/// One wait's line: n, p50, p99, and p999 when there are `P999_FLOOR`
-/// samples, else the mark that there are too few; the max always.
-fn wait_line(head: &str, wait: &str, mut samples: Vec<u64>) -> String {
-    samples.sort_unstable();
-    let n = samples.len();
-    let at = |permille: usize| {
-        let rank = (n * permille).div_ceil(1000).max(1);
-        samples.get(rank - 1).copied().unwrap_or(0)
-    };
-    let tail = if n >= P999_FLOOR {
-        format!("p999_us={}", at(999))
-    } else {
-        "p999=insufficient".to_owned()
-    };
-    format!(
-        "throughput_wait {head} wait={wait} n={n} p50_us={} p99_us={} {tail} max_us={}",
-        at(500),
-        at(990),
-        samples.last().copied().unwrap_or(0)
-    )
 }
