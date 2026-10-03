@@ -12,6 +12,7 @@
   // itself out by the tier and is not here (`workspace.svelte`).
   import type { View } from "../core/route";
   import { say } from "../core/lang";
+  import { toFragment } from "../core/route";
   import { ui } from "../ui";
   import Building from "./building.svelte";
   import City from "./city.svelte";
@@ -22,6 +23,8 @@
   import Registry from "./registry.svelte";
   import Run from "./run.svelte";
   import Welcome from "./welcome.svelte";
+  import { backOf } from "./parts/back";
+  import Glyph from "./parts/glyph.svelte";
 
   interface Props {
     readonly view: View;
@@ -31,6 +34,7 @@
   const u = ui();
   const { lang } = u;
   const samples = u.conn.monitor.samples;
+  const back = $derived(backOf(view));
 </script>
 
 <main
@@ -38,6 +42,17 @@
   class="col-[2/12] row-start-2 flex min-h-0 min-w-0 flex-col overflow-y-auto narrow:col-span-full"
   aria-label={say($lang, "region_main")}
 >
+  <!-- One back key for every page, at the top left of the frame, so no
+       page draws its own (A3, A6). -->
+  {#if back !== null}
+    <a
+      href={toFragment(back)}
+      class="mb-snug flex h-control-sm w-fit items-center gap-tight rounded-control pr-snug text-note text-text-faint hover:wash hover:text-text"
+    >
+      <Glyph name="chevron" size="sm" class="rotate-180" />
+      {say($lang, back.kind === "city" ? "nav_city" : "nav_settings")}
+    </a>
+  {/if}
   {#if view.kind === "city"}
     <City />
   {:else if view.kind === "building"}

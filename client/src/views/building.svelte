@@ -49,7 +49,6 @@
   import { halt, release, removeBuilding } from "../core/commands";
   import { fill, say } from "../core/lang";
   import { removalOf } from "../core/removal";
-  import { toFragment } from "../core/route";
   import { within } from "../core/belief/live";
   import { buildingIsShut } from "../core/scope";
   import { ui } from "../ui";
@@ -133,12 +132,6 @@
   }
 </script>
 
-{#snippet above()}
-  <a href={toFragment({ kind: "city" })} class="hover:text-text-quiet">{say($lang, "nav_city")}</a>
-  <!-- wording-ok: the path separator between two addresses, hidden from readers -->
-  <span aria-hidden="true">/</span>
-{/snippet}
-
 {#snippet aside()}
   {#if done !== null}
     <span class="figure text-note text-text-quiet">
@@ -170,7 +163,7 @@
   {/if}
 {/snippet}
 
-<Page title={address} {rank} {above} {aside}>
+<Page title={address} {rank} {aside}>
   <Goal {address} />
   <!-- In source order the index, the section and the tree: one column
        under 768 px reads them in that order, so a phone reaches the

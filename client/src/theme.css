@@ -374,6 +374,10 @@
   --spacing-dot: 8px;
   --spacing-tree: 300px;
   --spacing-figure: 72px;
+  /* A glyph and a count of up to four digits in the mono face, the box
+   * each count of the city's building table stands in so the columns
+   * line up down the rows. */
+  --spacing-count: 56px;
   --spacing-step: 28px;
   --spacing-output: 240px;
   --spacing-palette: 360px;

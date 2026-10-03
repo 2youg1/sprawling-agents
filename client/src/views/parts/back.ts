@@ -12,9 +12,27 @@
 
 import type { View } from "../../core/route";
 
+// `null` where the page draws no back key: the conversation and the
+// settings panel are the places a back key leads to, and the gallery is
+// a bench.
 export function backOf(page: View): View | null {
   switch (page.kind) {
-    default:
+    case "building":
+      return { kind: "city" };
+    case "city":
+    case "mcp":
+    case "record":
+    case "cost":
+    case "registry":
+    case "welcome":
+    case "monitor":
+      return { kind: "setup" };
+    // A run is opened from a conversation or a building, whichever the
+    // reader came by, so it keeps the browser's own back.
+    case "run":
+    case "talk":
+    case "setup":
+    case "gallery":
       return null;
   }
 }

@@ -30,9 +30,6 @@ export interface PageProps {
   readonly rank?: "page" | "section" | undefined;
   // One line under the title saying what the page governs.
   readonly note?: string | undefined;
-  // One line over the title saying what the page belongs to: the way
-  // back up, such as the city above a building.
-  readonly above?: Snippet | undefined;
   // What stands at the right end of the header line.
   readonly aside?: Snippet | undefined;
   readonly children: Snippet;
@@ -40,15 +37,12 @@ export interface PageProps {
 </script>
 
 <script lang="ts">
-  const { title, rank = "page", note, above, aside, children }: PageProps = $props();
+  const { title, rank = "page", note, aside, children }: PageProps = $props();
 </script>
 
 <div class="flex w-full min-w-0 flex-1 flex-col gap-wide pb-section">
   <header class="flex min-w-0 flex-wrap items-end justify-between gap-x-wide gap-y-snug border-b border-edge pb-base">
     <div class="flex min-w-0 flex-col gap-tight">
-      {#if above !== undefined}
-        <div class="flex min-w-0 items-center gap-snug text-note text-text-faint">{@render above()}</div>
-      {/if}
       {#if rank === "page"}
         <h1 class="text-title font-title" tabindex="-1">{title}</h1>
       {:else}

@@ -11,6 +11,10 @@
   // is a run's start, coloured by what that run is doing now, and the
   // quiet stretch runs from the oldest run still going to now.
   //
+  // The header carries the row's right inset and every count stands in a
+  // box of one width, so the fold lines over the bars and the counts down
+  // the rows stay on one line whatever the digits (A3).
+  //
   // Where the table is wide a row is one line; where it is narrow the
   // bar takes a line of its own under the counts, so neither the names
   // nor the bar shrink to a sliver. The table asks its own width rather
@@ -51,7 +55,7 @@
 </script>
 
 <section class="@container/table flex w-full min-w-0 flex-col" aria-label={say($lang, "city_table")}>
-  <div class="flex min-w-0 flex-wrap items-end gap-x-base border-b border-edge pb-tight font-mono figure text-note text-text-quiet" aria-hidden="true">
+  <div class="flex min-w-0 flex-wrap items-end gap-x-base border-b border-edge pr-snug pb-tight font-mono figure text-note text-text-quiet" aria-hidden="true">
     <span class="hidden min-w-0 flex-1 @lg/table:block"></span>
     <span class="relative h-base w-full shrink-0 @lg/table:w-[40%]">
       {#each FOLDS.filter((fold) => fold.minutes > 0) as fold (fold.minutes)}
@@ -83,13 +87,13 @@
           <span class="flex min-w-0 flex-1 items-center gap-base">
             <span class="shrink-0 pl-snug font-mono whitespace-pre text-text-quiet" aria-hidden="true">{row.guide}</span>
             <span class="min-w-0 flex-1 truncate font-mono font-label text-text">{nameOf(row.addr)}</span>
-            <span class={["inline-flex shrink-0 items-center gap-tight font-mono figure", row.waiting === 0 ? "text-text-quiet" : "text-alert"]}>
+            <span class={["inline-flex w-count shrink-0 items-center justify-end gap-tight font-mono figure", row.waiting === 0 ? "text-text-quiet" : "text-alert"]}>
               <Glyph name="hand" size="sm" />{String(row.waiting)}
             </span>
-            <span class={["inline-flex shrink-0 items-center gap-tight font-mono figure", row.working === 0 ? "text-text-quiet" : "text-accent"]}>
+            <span class={["inline-flex w-count shrink-0 items-center justify-end gap-tight font-mono figure", row.working === 0 ? "text-text-quiet" : "text-accent"]}>
               <Glyph name="pulse" size="sm" />{String(row.working)}
             </span>
-            <span class="inline-flex shrink-0 items-center gap-tight font-mono figure text-text-quiet">
+            <span class="inline-flex w-count shrink-0 items-center justify-end gap-tight font-mono figure text-text-quiet">
               <Glyph name="check" size="sm" />{String(row.done)}
             </span>
             <span class="hidden w-[12ch] shrink-0 truncate text-right figure text-text-quiet @lg/table:block">
