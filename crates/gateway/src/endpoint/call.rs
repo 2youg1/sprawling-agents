@@ -16,7 +16,7 @@
 #[cfg(test)]
 use kernel::UsdMicros;
 use kernel::consts_policy::{IMAGE_MAX_BYTES, IMAGES_PER_TURN};
-use kernel::{AxError, ChatRequest, ContentBlock, ImageRef, ModelRequest};
+use kernel::{AxError, ChatRequest, ContentBlock, DialectKind, ImageRef, ModelRequest};
 use serde_json::Value;
 
 use crate::dialect::{ImageBytes, request_wire};
@@ -254,6 +254,19 @@ impl Endpoint {
         Ok(images)
     }
 
+    /// The body field this endpoint's prompt cache key goes in: the
+    /// preset row's, on the two OpenAI-compatible faces only, because
+    /// the messages face caches by its `cache_control` breakpoints and
+    /// has no such field (gateway D25).
+    fn cache_key_field(&self) -> Option<&'static str> {
+        match self.config.dialect {
+            DialectKind::OpenAi | DialectKind::OpenAiResponses => {
+                crate::provider::preset::cache_key_field(&self.config.base_url)
+            }
+            DialectKind::Anthropic => None,
+        }
+    }
+
     pub(crate) fn wire_request(&self, req: &ModelRequest) -> Result<Value, AxError> {
         let mut chat = req.chat.clone();
         chat.model = self.config.model.clone();
@@ -264,6 +277,14 @@ impl Endpoint {
             &images,
             crate::provider::preset::chat_spelling(&self.config.base_url),
         )?;
+        // Before the overrides, so a person who named this path wins.
+        if let Some(field) = self.cache_key_field() {
+            apply_override(
+                &mut wire,
+                &format!("/{field}"),
+                &Value::String(conversation_id(req)?),
+            )?;
+        }
         for (pointer, value) in &self.config.overrides {
             apply_override(&mut wire, pointer, value)?;
         }
