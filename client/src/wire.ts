@@ -4218,7 +4218,7 @@ export type Ask = typeof Ask.Type;
 
 /**
  * How often the monitor reads this process's private bytes, and a tenth
- * of how often it sends a reading (§8-47h). Only a beat inside
+ * of how often it sends a reading (§8-47i). Only a beat inside
  * [`BEAT_MIN_MS`]`..=`[`BEAT_MAX_MS`] can be made, on the wire as off it.
  */
 export const BeatMs = Schema.Int.pipe(Schema.brand("BeatMs"));

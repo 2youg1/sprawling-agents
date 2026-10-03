@@ -223,7 +223,7 @@ pub struct MonitorFeed {
     /// session missed is not stated: the next one is a second away.
     pub samples: broadcast::Sender<crate::frames::Sample>,
     /// Sets the beat the monitor samples at and remembers it for the
-    /// city (`crates/wire/spec/Frames/Monitor.lean` §8-47h).
+    /// city (`crates/wire/spec/Frames/Monitor.lean` §8-47i).
     pub beat: Arc<dyn Fn(crate::frames::BeatMs) + Send + Sync>,
 }
 

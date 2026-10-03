@@ -5,7 +5,7 @@
 
 //! The performance monitor's pair of frames (`crates/wire/spec/Frames/Monitor.lean` §8-47g):
 //! whether a session is watching, and one reading sent to it; and the
-//! sampling beat a page sets for the city (§8-47h).
+//! sampling beat a page sets for the city (§8-47i).
 
 use kernel::{AxCode, AxError};
 use serde::{Deserialize, Serialize};
@@ -16,7 +16,7 @@ pub const BEAT_MIN_MS: u32 = 10;
 pub const BEAT_MAX_MS: u32 = 1_000;
 
 /// How often the monitor reads this process's private bytes, and a tenth
-/// of how often it sends a reading (§8-47h). Only a beat inside
+/// of how often it sends a reading (§8-47i). Only a beat inside
 /// [`BEAT_MIN_MS`]`..=`[`BEAT_MAX_MS`] can be made, on the wire as off it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(try_from = "u32", into = "u32")]
@@ -112,7 +112,7 @@ pub struct Sample {
     /// the sampler's own monotonic clock; 0 on the first beat
     /// (`crates/sprawling/Spec.lean` §8-129-6).
     pub read_nanos: u64,
-    /// The beat this reading was sampled at, in milliseconds (§8-47h):
+    /// The beat this reading was sampled at, in milliseconds (§8-47i):
     /// what the page's beat control reads as the current setting.
     pub beat_ms: u64,
 }
@@ -125,7 +125,7 @@ mod tests {
 
     /// A beat inside the range reaches the shell as the step that sets it;
     /// one outside it is not a frame at all, so the shell never holds a
-    /// beat it has to judge again (§8-47h).
+    /// beat it has to judge again (§8-47i).
     #[test]
     fn a_beat_in_range_is_a_step_and_one_outside_is_no_frame() {
         let read = |text: &str| serde_json::from_str::<ClientFrame>(text);
