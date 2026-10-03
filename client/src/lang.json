@@ -4395,6 +4395,10 @@
     "en": "jump to the newest",
     "zh": "回到最新"
   },
+  "talk_wear_hint": {
+    "en": "Map of this conversation: each tick is a round, coloured by what it did; the darker line is what you have read; press to go there",
+    "zh": "这段对话的地图：每个刻点是一个回合，颜色表示它做了什么；较深的线是你读过的部分；按下去就跳到那里"
+  },
   "talk_choose": {
     "en": "model, workspace and effort",
     "zh": "模型、工作区与强度"

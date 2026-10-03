@@ -97,7 +97,7 @@ bar and the thread cannot disagree about where a round is. -->
     </details>
   {/if}
   {#if said !== ""}
-    <div class="max-w-[64ch] text-body"><Prose text={said} /></div>
+    <div class="text-body"><Prose text={said} /></div>
   {/if}
   {#if turn.calls.length > 0 && whole}
     <Calls calls={turn.calls} {run} {turn} {doing} onFork={onCall} />

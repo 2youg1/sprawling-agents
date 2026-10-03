@@ -18,6 +18,12 @@ Three layers on one narrow track at the column's right edge:
   room opened, worn a shade darker;
 - **where the view is now**, the thumb.
 
+A pointer resting on it is told what the three layers are, because a
+column of coloured dashes says nothing by itself. The track clips what
+it draws: a round's tick has a floor of three pixels, and one at the
+very foot would otherwise reach past the column and give the page
+below it room to scroll.
+
 It is the pointer's scrollbar: pressing the track moves the view there
 and dragging follows the pointer. The column itself still scrolls by
 wheel, touch and keys, and the native scrollbar's job for a screen
@@ -25,6 +31,8 @@ reader is the scroller's, so the bar is hidden from the accessibility
 tree. Measuring waits for the next frame, so a burst of deltas costs one
 read of the page, not one per delta. -->
 <script lang="ts">
+  import { say } from "../../core/lang";
+  import { ui } from "../../ui";
   import type { Phase } from "../runs/lineage";
   import { PHASES, PHASE_FILL } from "../runs/phase";
 
@@ -34,6 +42,7 @@ read of the page, not one per delta. -->
   }
 
   const { scroller, column }: Props = $props();
+  const { lang } = ui();
 
   interface Mark {
     readonly top: number;
@@ -121,8 +130,9 @@ read of the page, not one per delta. -->
 
 {#if overflows}
   <div
-    class="absolute inset-y-0 right-0 w-snug cursor-pointer touch-none narrow:hidden"
+    class="absolute inset-y-0 right-0 w-snug cursor-pointer touch-none overflow-hidden narrow:hidden"
     aria-hidden="true"
+    title={say($lang, "talk_wear_hint")}
     onpointerdown={(event) => {
       event.currentTarget.setPointerCapture(event.pointerId);
       moveTo(event);
