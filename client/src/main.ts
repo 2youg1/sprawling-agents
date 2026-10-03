@@ -21,6 +21,7 @@ import { preferences } from "./core/prefs";
 import { keepWithCity } from "./core/prefs_city";
 import { dialFor } from "./core/remote/session";
 import { openConnection, tokenIn } from "./core/socket";
+import { timeAtRoot } from "./core/timing";
 import type { Opening } from "./ui";
 import { applyAppearance, watchMachineLighting } from "./views/setup/appearance";
 import { documentStage, wearKeptTheme } from "./views/setup/colours";
@@ -50,5 +51,8 @@ if (main !== null) {
     now: () => Date.now(),
   };
   keepWithCity(prefs, opening.conn);
+  // The page's key interactions as User Timing entries, for whoever
+  // measures the page; nothing reads them in a session of use.
+  timeAtRoot(document);
   mount(App, { target: main, props: { opening } });
 }
