@@ -216,7 +216,7 @@ pub fn new(setup: ExecSetup, sandbox: Box<dyn Sandbox>, backlog: Backlog) -> Res
 **接口**（`crates/runtime/src/backlog/cgroup.rs`，形状 4 adapter）
 
 ```rust
-pub enum PlatformShares { None, Cpu, CpuAndMemory }  // 这台机器给得了哪几半（D29）；根上导出
+pub enum PlatformShares { None, Cpu, CpuAndMemory }  // 运行中的机器给得了哪几半（D29）；根上导出
 pub fn platform_shares() -> PlatformShares;          // 一处读委派：Linux 的 cgroup 可写给 CpuAndMemory，否则 None
 struct Cgroups { ... }                                // 每个 run 一个子 cgroup，父 cgroup 由建它的那一方给
 impl Cgroups {
@@ -229,13 +229,13 @@ impl Cgroups {
 **决定**：
 
 - **根是参数**：`Cgroups::adopt` 收一个父 cgroup 路径，生产路径给的是 `/sys/fs/cgroup` 接上 `/proc/self/cgroup` 的 `0::` 行，测试给的是一个临时目录。于是这个模块的全部读写能在 Windows 上用一个仿 `/sys/fs/cgroup` 的目录树验证，不必等一台 Linux 机器：cgroup v2 的接口就是几个普通文件，读写它们用的也是普通文件读写。
-- **可写性是干读**：`platform_shares` 与 `adopt` 都先看父 cgroup 的 `cgroup.procs` 与 `cgroup.subtree_control` 能不能以写方式打开；打开失败即没有委派，什么也不建。这是在不改动机器状态的前提下能问的问题，也是 doctor（另一个进程，只知道这台机器、不知道服务进程建过什么）读到的同一个答案。真正动状态的是 `adopt` 的三步：建 `core`、把自己的 pid 写进 `core/cgroup.procs`、把 `+cpu +memory` 写进父 cgroup 的 `cgroup.subtree_control`。
+- **可写性是干读**：`platform_shares` 与 `adopt` 都先看父 cgroup 的 `cgroup.procs` 与 `cgroup.subtree_control` 能不能以写方式打开；打开失败即没有委派，什么也不建。这是在不改动机器状态的前提下能问的问题，也是 doctor（另一个进程，只知道运行中的机器、不知道服务进程建过什么）读到的同一个答案。真正动状态的是 `adopt` 的三步：建 `core`、把自己的 pid 写进 `core/cgroup.procs`、把 `+cpu +memory` 写进父 cgroup 的 `cgroup.subtree_control`。
 - **一个 run 一个孩子，名字是 `run-<RunId>`**：第一条命令进表时建目录并写下份额，之后同一条 run 的每条命令只把自己的 pid 写进 `cgroup.procs`——cgroup 是进程表，不是每个命令一张。第一条命令的 pid 与份额同一次写进，所以这个 run 从第一条命令起就在自己的份额里；写 pid 失败不让命令失败，这个 run 读作它已经拿到的份额（Windows 的 job 装不下时同样只落在 `unfollowed` 里）。
 - **读回**：`RunProcesses.share` 读的是这个模块记下的、当时确实写下的值；`Shares::Unset` 一个字节也不写，一个目录也不建，所以四臂对照的 ① 臂在 Linux 上不留任何 cgroup。`release` 丢掉这个 run 的记录，不删目录：cgroup 里有活进程时目录删不掉，而停进程仍只归 `release` 与 `halt`。
 
 **被否**：①`systemd-run --user --scope` 包每条命令：要用户级 systemd、每条命令一次 D-Bus 往返（D29 已否）；②对每条命令建一个 cgroup：份额按 run 分，不按命令分（与 job 同理）；③建之前用 `stat` 的权限位判断可写：cgroup 文件系统的权限位由内核按挂载参数报出，不以写方式打开一次就问不出「写下去会不会被拒」；④把父 cgroup 的位置编译进常量：容器与 systemd 的用户实例把 harness 放在哪一层各不相同，`/proc/self/cgroup` 是唯一的权威。
 
-**重开参数**：Linux 的读数显示按权重分与 `nice` 相比没有差别（与 D29 的四臂对照同一个判据）；或者一个文件系统事件使 harness 的 cgroup 在进程中途变得可写——那时才需要重试 `adopt`，今天 `adopt` 只在第一条要份额的命令进表时试一次。
+**重开参数**：Linux 的读数显示按权重分与 `nice` 相比没有差别（与 D29 的四臂对照同一个标准）；或者一个文件系统事件使 harness 的 cgroup 在进程中途变得可写——那时才需要重试 `adopt`，今天 `adopt` 只在第一条要份额的命令进表时试一次。
 -/
 
 /-! D30 shell 默认仍是平台的 shell；一栋楼可以在 `CONFIG.toml` 里换成 pwsh 7；exec 的失败按 shell 分类，从账本折出（TF5，D88 第 1、7 条，D83 第 10 条，D94）

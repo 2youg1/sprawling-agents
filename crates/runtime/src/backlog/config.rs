@@ -41,17 +41,4 @@ impl Backlog {
             ..self
         }
     }
-
-    /// The same table, asking these shares for every run whose command
-    /// it starts (`crates/runtime/spec/Tools/Exec.lean` D29).
-    #[must_use]
-    pub fn with_shares(self, shares: Shares) -> Backlog {
-        Backlog { shares, ..self }
-    }
-
-    /// The shares this table asks for each run.
-    #[must_use]
-    pub fn shares(&self) -> Shares {
-        self.shares
-    }
 }
