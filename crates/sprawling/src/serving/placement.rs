@@ -11,6 +11,7 @@
 //! D45-D47). The seats are the plan `plan` makes of the topology
 //! `reading` reports; `tests` checks this table against the seat model.
 
+mod pinned;
 pub(crate) mod plan;
 pub(crate) mod reading;
 
@@ -133,6 +134,7 @@ fn first_table() -> SeatTable {
     match setting() {
         CorePlacement::Off => SeatTable::new(Vec::new()),
         CorePlacement::Soft => soft_table(),
+        CorePlacement::Pinned => pinned_table(),
     }
 }
 
@@ -145,19 +147,49 @@ fn setting() -> CorePlacement {
     })
 }
 
-fn soft_table() -> SeatTable {
+/// Lifts this process out of the throttling background work gets,
+/// telling the reason once when the platform refuses (D40).
+fn lift() {
     if let Err(reason) = full_speed() {
         eprintln!("the city may be power-throttled as background work: {reason}");
     }
+}
+
+/// The seats of a reading: empty when the plan is left to the operating
+/// system.
+fn seats_of(read: &Result<Topology, Unread>) -> Vec<Processor> {
+    match read.as_ref().map(plan::plan) {
+        Ok(Plan::Seats(seats)) => seats,
+        Ok(Plan::LeftToOs(_)) | Err(_) => Vec::new(),
+    }
+}
+
+/// The plan for a topology read now, with the reason there is none told
+/// once when the topology cannot be read (D45).
+fn planned() -> Vec<Processor> {
     let read = reading::read();
     if let Err(Unread(reason)) = &read {
         eprintln!("the hot threads are placed by the operating system: {reason}");
     }
-    let seats = match read.as_ref().map(plan::plan) {
-        Ok(Plan::Seats(seats)) if SOFT_CALL => seats,
-        Ok(Plan::Seats(_) | Plan::LeftToOs(_)) | Err(_) => Vec::new(),
-    };
-    SeatTable::new(seats)
+    seats_of(&read)
+}
+
+fn soft_table() -> SeatTable {
+    lift();
+    let seats = planned();
+    SeatTable::new(if SOFT_CALL { seats } else { Vec::new() })
+}
+
+/// The pinned arm's table: the soft seats, and the hard-affinity taking
+/// of this process (D41, D49). Where the platform has no call, or the
+/// plan names no processor, the arm says so and the seats stay soft.
+/// One reading serves both, so the mask and the seats cannot name
+/// different processors.
+fn pinned_table() -> SeatTable {
+    lift();
+    let seats = planned();
+    pinned::take(&seats);
+    SeatTable::new(if SOFT_CALL { seats } else { Vec::new() })
 }
 
 /// The doctor's line: the topology this machine reports and what the
@@ -169,6 +201,10 @@ pub(crate) fn report() -> String {
                 .to_owned()
         }
         Ok(CorePlacement::Soft) => describe(&reading::read()),
+        Ok(CorePlacement::Pinned) => {
+            let read = reading::read();
+            format!("{} ({})", describe(&read), pinned::clause(&seats_of(&read)))
+        }
         Err(err) => format!(
             "{} ([core] placement does not read, so placement stays on: {err})",
             describe(&reading::read())

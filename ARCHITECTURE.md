@@ -778,10 +778,14 @@ No platform sets a per-run memory limit, and Linux sets no cgroup
 as open.
 
 **One setting turns it off, and the doctor says what it did.** The
-User's configuration `[core] placement` takes `"soft"`, the default, or
+User's configuration `[core] placement` takes `"soft"`, the default,
 `"none"`, which reads no topology, takes no seat and makes no platform
-call; the two other arms of the planned comparison, `"soft_shares"` and
-`"pinned"`, are refused as unreadable until they are built (sprawling
+call, or `"pinned"`, the hard-affinity comparison arm: on Windows the
+harness process is taken into a Job Object whose affinity limit is the
+plan's mask, on Linux the arm names the `taskset -c` list the whole
+binary is started under, and on macOS it does nothing and says so
+(sprawling D41 and D49). The third arm of the planned comparison,
+`"soft_shares"`, is refused as unreadable until it is built (sprawling
 D47). `sprawling doctor` prints one line, written only in
 `placement::report`, naming the classes it read and whether hot threads
 prefer the top class or are left to the operating system.

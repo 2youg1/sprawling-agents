@@ -154,17 +154,21 @@ pub enum CorePlacement {
     Soft,
     /// Nothing read, nothing asked of the platform: the scheduler alone.
     Off,
+    /// The comparison arm: the plan's processors held by hard affinity
+    /// (`crates/sprawling/spec/Serving/Placement.lean` D41).
+    Pinned,
 }
 
 /// How the core places its hot threads: `placement` in the `[core]`
-/// section, `"soft"` when absent and `"none"` to turn placement off
+/// section, `"soft"` when absent, `"none"` to turn placement off, and
+/// `"pinned"` for the hard-affinity comparison arm
 /// (`crates/sprawling/spec/Serving/Placement.lean` D47).
 ///
 /// # Errors
 ///
 /// As [`read`] for a file that cannot be read or parsed, and
-/// `ConfigInvalid` for a `placement` that is neither `"soft"` nor
-/// `"none"`, including the two comparison arms not yet built.
+/// `ConfigInvalid` for a `placement` that is none of those three,
+/// including the comparison arm not yet built.
 pub fn core_placement() -> Result<CorePlacement, AxError> {
     stated_core_placement(&file()?)
 }
@@ -178,6 +182,7 @@ fn stated_core_placement(file: &Path) -> Result<CorePlacement, AxError> {
         Some(stated) => match stated.as_str() {
             Some("soft") => Ok(CorePlacement::Soft),
             Some("none") => Ok(CorePlacement::Off),
+            Some("pinned") => Ok(CorePlacement::Pinned),
             Some(_) | None => Err(AxError::failure(
                 AxCode::ConfigInvalid,
                 "read how the core places its threads",
@@ -351,12 +356,15 @@ priority = \"fast\"
         std::fs::write(&file, "[core]\nplacement = \"none\"\n").unwrap();
         let off = stated_core_placement(&file).unwrap();
         std::fs::write(&file, "[core]\nplacement = \"pinned\"\n").unwrap();
+        let pinned = stated_core_placement(&file).unwrap();
+        std::fs::write(&file, "[core]\nplacement = \"soft_shares\"\n").unwrap();
         let unbuilt = stated_core_placement(&file).map_err(|err| *err.code());
         assert_eq!(
-            (absent, off, unbuilt),
+            (absent, off, pinned, unbuilt),
             (
                 CorePlacement::Soft,
                 CorePlacement::Off,
+                CorePlacement::Pinned,
                 Err(AxCode::ConfigInvalid)
             )
         );
