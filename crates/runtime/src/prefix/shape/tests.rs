@@ -257,3 +257,16 @@ fn a_line_whose_attribution_disagrees_is_refused() {
         "a recorded FirstRequest beside a comparable baseline is a lie"
     );
 }
+
+/// A damaged `prompt_assembled` row is refused in one sentence: the
+/// recovery continues on the next source line without carrying that
+/// line's indentation.
+#[test]
+fn a_damaged_prompt_assembled_row_is_refused_in_one_sentence() {
+    let damaged = serde_json::Value::String("not a row".to_owned());
+    let refused = segment_parts_of(&damaged).unwrap_err();
+    assert_eq!(
+        refused.recovery(),
+        "replay with the build that wrote this ledger, or report the damaged line: its prompt_assembled payload is not what this build reads"
+    );
+}

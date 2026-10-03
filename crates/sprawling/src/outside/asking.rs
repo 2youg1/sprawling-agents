@@ -195,7 +195,8 @@ fn no_console() -> AxError {
         "this city has no console to print the confirmation code on",
     )
     .with_recovery(
-        "close this city and start it again in a terminal of your own with `sprawling up`          or `sprawling serve --console`",
+        "close this city and start it again in a terminal of your own with `sprawling up` \
+         or `sprawling serve --console`",
     )
 }
 
@@ -259,16 +260,14 @@ fn door_verb(command: WireCommand) -> Result<Verb, Box<WireCommand>> {
 #[cfg(test)]
 mod without_a_console {
     /// `serve` alone has no console, so the recovery names the two
-    /// commands that start a city with one.
+    /// commands that start a city with one, in one sentence: the wrapped
+    /// source line leaves no run of spaces in what a person reads.
     #[test]
-    fn the_recovery_names_a_command_that_has_a_console() {
+    fn the_recovery_is_one_sentence_naming_a_command_that_has_a_console() {
         let refused = super::no_console();
         assert_eq!(
-            ["sprawling up", "sprawling serve --console"]
-                .map(|command| refused.recovery().contains(command)),
-            [true, true],
-            "{}",
-            refused.recovery()
+            refused.recovery(),
+            "close this city and start it again in a terminal of your own with `sprawling up` or `sprawling serve --console`"
         );
     }
 }

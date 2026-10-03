@@ -42,7 +42,8 @@ fn read_admitted(
 ) -> Result<(Locator, Vec<u8>), AxError> {
     let locator = Locator::parse(asked).map_err(|err| {
         AxError::failure(AxCode::InvalidArgs, action, err.subject().to_owned()).with_recovery(
-            "write a Locator as `cas:b3-<hash>` or `file:<address>@<commit>`, as the ledger              spells it",
+            "write a Locator as `cas:b3-<hash>` or `file:<address>@<commit>`, as the ledger \
+             spells it",
         )
     })?;
     let bound = &*reader.bound;

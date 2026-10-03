@@ -132,7 +132,8 @@ impl ScanReport {
     #[must_use]
     pub fn summary(&self) -> String {
         let counts = format!(
-            "{} line(s) verified; {} unknown-outcome call(s) closed; {} lost run(s) frozen;              {} approval(s) waiting",
+            "{} line(s) verified; {} unknown-outcome call(s) closed; {} lost run(s) frozen; \
+             {} approval(s) waiting",
             self.lines, self.closed_calls, self.frozen_runs, self.waiting_approvals
         );
         match self.opening.notice() {
@@ -373,3 +374,26 @@ pub mod fixture;
     reason = "test code"
 )]
 mod building_page_tests;
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, reason = "test code")]
+mod the_scan_summary {
+    use super::*;
+
+    /// The counts a person reads are one sentence, so each join where
+    /// the source wrapped keeps one space instead of the indentation.
+    #[test]
+    fn joins_its_counts_with_one_space() {
+        let report = ScanReport {
+            opening: LedgerOpening::Intact,
+            lines: 3,
+            closed_calls: 1,
+            frozen_runs: 2,
+            waiting_approvals: 4,
+        };
+        assert_eq!(
+            report.summary(),
+            "3 line(s) verified; 1 unknown-outcome call(s) closed; 2 lost run(s) frozen; 4 approval(s) waiting"
+        );
+    }
+}

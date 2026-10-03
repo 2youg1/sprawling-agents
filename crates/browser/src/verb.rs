@@ -247,7 +247,8 @@ impl Verb {
                 other.to_owned(),
             )
             .with_recovery(
-                "one of open, snapshot, act, screenshot, measure, survey, fetch, console,                  viewport, close",
+                "one of open, snapshot, act, screenshot, measure, survey, fetch, console, \
+                 viewport, close",
             )),
         }
     }

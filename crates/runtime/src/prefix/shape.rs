@@ -230,7 +230,8 @@ pub(crate) fn segment_parts_of(assembled: &serde_json::Value) -> Result<[ShapePa
             format!("a prompt_assembled payload does not parse: {err}"),
         )
         .with_recovery(
-            "replay with the build that wrote this ledger, or report the damaged line: its \n             prompt_assembled payload is not what this build reads",
+            "replay with the build that wrote this ledger, or report the damaged line: its \
+             prompt_assembled payload is not what this build reads",
         )
     })?;
     let mut parts = Vec::new();
