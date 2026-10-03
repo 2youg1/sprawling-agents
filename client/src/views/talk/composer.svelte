@@ -24,7 +24,8 @@
   import { heldIn } from "../../core/belief/rooms";
   import type { Sending } from "../../core/doing";
   import { runInFront } from "../../core/in_front";
-  import { fill, say } from "../../core/lang";
+  import { say } from "../../core/lang";
+  import { markEndAtFrame, markStart } from "../../core/timing";
   import { current } from "../../core/route";
   import { completed } from "../../core/completion";
   import { find, parse } from "../../core/slash";
@@ -56,6 +57,7 @@
   import type { Handing } from "./handing";
   import { insertAt } from "./dropping";
   import { DropZone } from "./drop_zone.svelte";
+  import DropRefused from "./drop_refused.svelte";
   import { hearQuotes, joined } from "./quoting";
   import { keepSelection, recalled, restoreSelection } from "./standing";
 
@@ -177,7 +179,9 @@
       pick(chosen);
       return;
     }
+    markStart("send_shown");
     if (onSend(words)) {
+      markEndAtFrame("send_shown");
       handing = hand(words, get(belief));
       write("");
       kept = false;
@@ -389,12 +393,6 @@ strength, and a drag over the box by the wash it takes. -->
   {#if $unkept && text !== ""}
     <Unkept words={() => text} />
   {/if}
-  {#each zone.refused as each (each.kind === "refused" ? each.name : "")}
-    {#if each.kind === "refused"}
-      <p class="text-note text-alert" role="alert">
-        {fill(say($lang, "talk_drop_refused"), { name: each.name, why: each.said === "" ? say($lang, "talk_not_live") : each.said })}
-      </p>
-    {/if}
-  {/each}
+  <DropRefused refused={zone.refused} />
   <SettingsRow {specs} room={here} draws={band !== undefined ? "notice" : session === null ? "everything" : "facts"} {kept} />
 </form>

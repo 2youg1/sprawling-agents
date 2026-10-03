@@ -11,6 +11,7 @@
 // shell reads the result on `hashchange` like any other page.
 
 import { DEFAULT_VIEW, toFragment } from "../../core/route";
+import { markEndAtFrame, markStart } from "../../core/timing";
 import type { SetupGroup, View } from "../../core/route";
 import { FIRST_GROUP } from "./tree";
 
@@ -32,11 +33,14 @@ export function panelGroup(view: { readonly group?: SetupGroup }): SetupGroup {
   return view.group ?? last;
 }
 
-// Reads one view the shell settled on, after `was`. Answers the control
-// the focus goes back to when this view closed the panel, else `null`.
+// Reads one view the shell settled on, after `was`, and ends the timing
+// of a group switch at the frame that draws the new group. Answers the
+// control the focus goes back to when this view closed the panel, else
+// `null`.
 export function hostSettled(was: View, now: View, arrived: boolean): HTMLElement | null {
   if (now.kind === "setup") {
     if (now.group !== undefined) last = now.group;
+    if (was.kind === "setup" && was.group !== now.group) markEndAtFrame("settings_switch");
     if (was.kind !== "setup") {
       pushed = arrived;
       opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -52,6 +56,7 @@ export function hostSettled(was: View, now: View, arrived: boolean): HTMLElement
 // A group picked in the panel replaces the address, so the back button
 // leaves the panel rather than walking back through every group.
 export function pickGroup(group: SetupGroup): void {
+  markStart("settings_switch");
   location.replace(toFragment({ kind: "setup", group }));
 }
 

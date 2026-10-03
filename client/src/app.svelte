@@ -17,28 +17,25 @@
   import { onMount, tick } from "svelte";
 
   import { QUERIES } from "./core/asking";
-  import { cancel, release } from "./core/commands";
+  import { cancel } from "./core/commands";
   import { runInFront } from "./core/in_front";
   import { keymap } from "./core/keys";
   import { HOLD_MS, pressedOf } from "./core/press";
   import type { Action } from "./core/keys";
-  import { fill, say } from "./core/lang";
-  import { RELEASE_ALL } from "./core/slash";
+  import { say } from "./core/lang";
   import { markOf, paintMark } from "./core/mark";
   import { TIERS, type Tier } from "./core/prefs";
-  import { cityIsShut, CITY } from "./core/scope";
   import { DEFAULT_VIEW, MAYOR, current, toFragment } from "./core/route";
+  import { markEndAtFrame, markStart } from "./core/timing";
   import type { View } from "./core/route";
   import { setUi, ui } from "./ui";
   import type { Opening } from "./ui";
-  import Banner from "./views/parts/banner.svelte";
-  import Button from "./views/parts/button.svelte";
+  import Banners from "./views/banners.svelte";
   import Cheatsheet from "./views/parts/kbd.svelte";
   import Edge from "./views/edge.svelte";
   import Finder from "./views/finder.svelte";
   import { closeFinder, finderShown, openFinder, underOf } from "./views/finding.svelte";
   import { closeRight, rightItem } from "./views/inspect/open.svelte";
-  import LinkBanner from "./views/link_banner.svelte";
   import Notifier from "./views/notifier.svelte";
   import Pages from "./views/pages.svelte";
   import Palette from "./views/palette.svelte";
@@ -93,18 +90,6 @@
 
   const waiting = $derived($approvals?.length ?? 0);
   const working = $derived($belief.live.length > 0);
-  const halted = $derived(cityIsShut($belief.halted));
-  const unsent = u.conn.unsent;
-  // The attempt the ladder is on since the link was lost, held through
-  // each `opening` between two waits so the banner does not blink off
-  // for every try; null while the page is live or has never been.
-  let lostAttempt = $state<number | null>(null);
-  $effect(() => {
-    const now = $linkState;
-    if (now.kind === "backoff") lostAttempt = now.attempt + 1;
-    else if (now.kind === "live" || now.kind === "refused") lostAttempt = null;
-  });
-  const frozen = $derived($belief.cancelled);
   // What a launch reads to decide whether it opens the guide (client D54).
   const launch = $derived($endpoints !== undefined && "endpoints" in $endpoints ? launchOf($endpoints.endpoints, $held.welcomed) : undefined);
 
@@ -128,14 +113,21 @@
   }
 
   // The settings panel takes the focus itself, inside the top layer;
-  // closing it gives the focus back to the control that opened it.
+  // closing it gives the focus back to the control that opened it. A
+  // move to another session of the conversation is timed to the frame
+  // that draws it.
   function settle(): void {
     const was = view;
     view = Option.getOrElse(current(u.bar), () => DEFAULT_VIEW);
     const back = hostSettled(was, view, arrived);
+    if (was.kind === "talk" && view.kind === "talk" && (was.address !== view.address || was.session !== view.session)) {
+      markStart("session_switch");
+      markEndAtFrame("session_switch");
+    }
     if (tierOnLanding !== null && view.kind === "talk") {
       u.prefs.setTier(tierOnLanding);
       tierOnLanding = null;
+      markEndAtFrame("layer_drawn");
       void tick().then(focusComposer);
     } else if (arrived && view.kind !== "setup") void tick().then(() => { if (back === null) focusTitle(); else back.focus(); });
     arrived = true;
@@ -170,13 +162,16 @@
   let columns = $state<Columns>("twelve");
   let tierOnLanding: Tier | null = null;
   function cycleTier(): void {
+    markStart("layer_drawn");
     if (columns === "one") {
       (sheetsOpen().includes("world") ? leaveSheet : openSheet)("world");
+      markEndAtFrame("layer_drawn");
       return;
     }
     const next = TIERS[(TIERS.indexOf($held.tier) + 1) % TIERS.length] ?? "zen";
     if (view.kind === "talk") {
       u.prefs.setTier(next);
+      markEndAtFrame("layer_drawn");
       focusComposer();
       return;
     }
@@ -352,24 +347,7 @@
   >
     {say($lang, "skip_main")}
   </a>
-  {#if lostAttempt !== null || halted}
-    <div class="col-[2/12] row-start-1 flex flex-col gap-snug pb-base narrow:col-span-full">
-      {#if lostAttempt !== null}
-        <LinkBanner attempt={lostAttempt} unsent={$unsent} onRetry={u.conn.retry} />
-      {/if}
-      {#if halted}
-        <Banner
-          text={say($lang, "halt_title")}
-          {...frozen > 0 ? { detail: fill(say($lang, "halt_frozen"), { n: String(frozen) }) } : {}}
-          weight="alert"
-        >
-          {#snippet action()}
-            <Button label={RELEASE_ALL} tone="secondary" onPress={() => u.send(release(CITY))} />
-          {/snippet}
-        </Banner>
-      {/if}
-    </div>
-  {/if}
+  <Banners />
   {#if view.kind === "setup"}
     {@const beneath = panelBeneath()}
     {#if beneath.kind === "talk"}

@@ -31,6 +31,7 @@
 
   import { urgencyOf } from "../../core/deferral";
   import { fill, say } from "../../core/lang";
+  import { markEndAtFrame, markStart } from "../../core/timing";
   import { ui } from "../../ui";
   import { EDGE_KEY } from "../edge.svelte";
   import Glyph from "../parts/glyph.svelte";
@@ -85,8 +86,13 @@
   function feed(input: MailInput): void {
     const focus = focusNow();
     const next = stepMail({ shown: open, focus }, input);
-    if (next.shown && !open) u.conn.markNoticesSeen();
+    const opening = next.shown && !open;
+    if (opening) {
+      markStart("mailbox_open");
+      u.conn.markNoticesSeen();
+    }
     open = next.shown;
+    if (opening) markEndAtFrame("mailbox_open");
     if (next.focus === "key" && focus !== "key") key?.focus();
   }
 

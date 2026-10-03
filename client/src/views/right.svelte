@@ -33,6 +33,7 @@
 
   import { say } from "../core/lang";
   import { toFragment } from "../core/route";
+  import { markEndAtFrame, markStart } from "../core/timing";
   import { ui } from "../ui";
   import type { Address, Call, RoundsAnswer } from "../wire";
   import Changes from "./changes.svelte";
@@ -150,9 +151,12 @@
   const editorFront = $derived(frontOf("editor"));
   const terminalFront = $derived(frontOf("terminal"));
 
+  // A tab picked is timed to the frame that draws what it holds.
   function pick(item: RightItem): void {
+    markStart("panel_frame");
     if (held.length === 0) for (const kept of following) if (!sameItem(item, kept)) showItem(kept);
     showItem(item);
+    markEndAtFrame("panel_frame");
   }
 
   function close(item: RightItem): void {
