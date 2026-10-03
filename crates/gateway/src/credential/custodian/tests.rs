@@ -208,7 +208,7 @@ fn a_credential_variable_that_is_not_unicode_is_refused_by_its_name() {
         .unwrap_err();
     let refused = custodian.resolve(&reference).map(|_| ()).unwrap_err();
     assert_eq!(
-        (refused.code().clone(), refused.subject().to_owned()),
+        (*refused.code(), refused.subject().to_owned()),
         (
             AxCode::ConfigInvalid,
             "SPRAWLING_SECRET_ACME_KEY is set to a value that is not Unicode".to_owned()

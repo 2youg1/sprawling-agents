@@ -218,7 +218,12 @@ impl Custodian {
             ));
         }
         let key = env_key(reference);
-        if (self.env)(&key).is_ok_and(|v| !v.is_empty()) {
+        let shaded = match (self.env)(&key) {
+            Ok(value) => !value.is_empty(),
+            Err(std::env::VarError::NotUnicode(_)) => true,
+            Err(std::env::VarError::NotPresent) => false,
+        };
+        if shaded {
             return Err(AxError::failure(
                 AxCode::ConfigInvalid,
                 "store credential",
@@ -233,10 +238,20 @@ impl Custodian {
     /// second copy survives between operations.
     pub fn resolve(&self, reference: &SecretRef) -> Result<Sealed<String>, AxError> {
         let key = env_key(reference);
-        if let Ok(value) = (self.env)(&key)
-            && !value.is_empty()
-        {
-            return Ok(Sealed::new(Box::new(value)));
+        match (self.env)(&key) {
+            Ok(value) if !value.is_empty() => return Ok(Sealed::new(Box::new(value))),
+            Err(std::env::VarError::NotUnicode(_)) => {
+                return Err(AxError::failure(
+                    AxCode::ConfigInvalid,
+                    "resolve credential",
+                    format!("{key} is set to a value that is not Unicode"),
+                )
+                .with_recovery(format!(
+                    "set {key} to the key's text, or unset it so the stored credential answers"
+                )));
+            }
+            // An empty or absent variable leaves the store to answer.
+            Ok(_) | Err(std::env::VarError::NotPresent) => {}
         }
         match self.backend.get(reference)? {
             Some(value) if !value.is_empty() => {
@@ -261,9 +276,16 @@ impl Custodian {
     /// State you can render; the value stays unreachable.
     pub fn describe(&self, reference: &SecretRef) -> Described {
         let key = env_key(reference);
-        if (self.env)(&key).is_ok_and(|v| !v.is_empty()) {
+        let configured = match (self.env)(&key) {
+            Ok(value) if !value.is_empty() => Some(true),
+            // Set, so it shades the store, and unusable, so nothing is
+            // configured: the same answer `resolve` gives (gateway D24).
+            Err(std::env::VarError::NotUnicode(_)) => Some(false),
+            Ok(_) | Err(std::env::VarError::NotPresent) => None,
+        };
+        if let Some(configured) = configured {
             return Described {
-                configured: true,
+                configured,
                 source: format!("environment ({key})"),
                 persistence: Persistence::ThisProcess,
                 writable: false,
