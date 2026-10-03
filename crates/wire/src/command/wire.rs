@@ -196,15 +196,10 @@ impl From<WireCommand> for Command {
                 from,
                 idem,
             },
-            Command::CreateBuilding {
-                addr,
-                template,
-                idem,
-            } => Self::CreateBuilding {
-                addr,
-                template,
-                idem,
-            },
+            // One line per variant keeps this table inside the function budget.
+            #[rustfmt::skip]
+            Command::CreateBuilding { addr, template, idem } =>
+                Self::CreateBuilding { addr, template, idem },
             Command::PutSecret { value, .. } => match value {},
             Command::Steer { run, text, idem } => Self::Steer { run, text, idem },
             Command::Cancel { run, idem } => Self::Cancel { run, idem },
