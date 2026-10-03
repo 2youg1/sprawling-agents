@@ -18,6 +18,7 @@ namespace DesktopFfi
 
 - **边界规则**（`zig/boundary.zig`，Rust 面 `desktop_ffi::boundary`）：叶子往 Rust 的内存里写什么。四条：一串句柄按缓冲长度保留、按全长计数（`kept`）；一段别的程序写的剪贴板文本复制到第一个零单元为止、恒不越过块的大小（`textCopy`）；一段新文本恰好带一个终止符写进恰好那么长的块（`textFill`）；一张位图的字节数不溢出（`bitmapBytes`）。
 - **资源配对**（`zig/leaf.zig`）：每个操作在它自己的 export 之内取得、也释放它取得的一切。剪贴板写的那块内存要么交给剪贴板、要么由叶子释放（`write`）；捕获取得的三个 GDI 对象各释放一次，位图解除选择之后才读回（`captured`）。
+- **处理器与份额**（`desktop_ffi` 的 `cpu_set`、`cpu`，D4）：叶子把 CPU set 的原始记录写进借来的缓冲、读调用线程的组亲和、关掉本进程的执行速度限流、给一只 job 设 CPU 权重与内存上限；记录由 `cpu_set::parse` 按每条自己的 `Size` 走，走法的性质在 §10 证明。
 - **Rust 面**（`desktop_ffi` 的 `top_level`、`capture`、`clipboard`、`dpi`、`ended`）：每个 export 一个安全函数，函数里恰好一个 `unsafe` 块，块上一行 `SAFETY:` 写使它成立、并且可能为假的前提。来源：AGENTS.md「Rust」一节的平台调用次序；路线图 X3。
 -/
 
@@ -71,6 +72,16 @@ pub fn clipboard::put_text(units: &[u16]) -> Result<(), Failure>;
 pub fn dpi::declare(awareness: u32) -> Result<(), winsafe::co::HRESULT>;
 pub fn dpi::awareness() -> Result<u32, winsafe::co::HRESULT>;
 pub fn boundary::{keep, text_copy, text_fill, bitmap_bytes};   // 边界规则本身，供对拍与 fuzz
+// 处理器拓扑、节能限流与 job 份额（D4）；cpu_set 在每个平台上都编译，cpu 只在 Windows 上
+pub struct cpu_set::CpuSet { pub group: u16, pub logical: u8, pub core: u8, pub cache: u8, pub numa: u8,
+    pub class: u8, pub flags: cpu_set::Flags }       // GetSystemCpuSetInformation 的一条 CpuSet 记录
+pub struct cpu_set::Flags(u8);                      // parked()、allocated()、allocated_to_this_process()
+pub struct cpu_set::Malformed { pub offset: usize }  // 那条记录的 Size 不够一条记录，或越过缓冲尾
+pub fn cpu_set::parse(bytes: &[u8]) -> Result<Vec<CpuSet>, Malformed>; // 按每条记录自己的 Size 走；别种记录跳过
+pub fn cpu::sets() -> Result<Vec<cpu_set::CpuSet>, cpu::Unread>;
+pub struct cpu::Group { pub group: u16, pub mask: u64 }
+pub fn cpu::thread_group() -> Result<cpu::Group, Failure>;   // 调用线程的组与它能用的处理器掩码
+pub fn cpu::full_speed() -> Result<(), Failure>;             // 本进程不受 EcoQoS 的执行速度限流
 ```
 
 C ABI 的 export 一律 `sprawling_desktop_<名>`，声明在 `src/leaf.rs`。
@@ -461,6 +472,83 @@ theorem read_back_follows_unselect (d : Drawn) : before .unselect .read (capture
 theorem reading_inside_the_selection_breaks_it :
     before .unselect .read [.take .context, .select, .draw, .read, .unselect] = false := by decide
 
+/-! ### 处理器记录的走法（D4）
+
+`GetSystemCpuSetInformation` 写进缓冲的是一串长度不一的记录，每条以自己的 `Size` 开头。Rust 的 `cpu_set::parse` 从偏移 0 起：剩下的不够一条记录的头、`Size` 小于一条 CpuSet 记录、或 `Size` 越过缓冲尾，就报 `Malformed`；否则读这一条，跳过 `Size` 个字节。下面证明：走得通时，读过的每一条记录都整个落在缓冲里，偏移严格递增，所以走法恒终止、恒不越界。
+-/
+
+/-- 一条 CpuSet 记录的字节数（`SYSTEM_CPU_SET_INFORMATION`）。 -/
+def record : Nat := 32
+
+/-- 从 `off` 起走记录；`sizeAt` 是每个偏移上读到的 `Size`，`fuel` 是剩下能走的步数。 -/
+def walk (sizeAt : Nat → Nat) (len : Nat) : Nat → Nat → Option (List Nat)
+  | 0, _ => none
+  | fuel + 1, off =>
+    if off = len then some []
+    else if off + record ≤ len ∧ record ≤ sizeAt off ∧ off + sizeAt off ≤ len then
+      (walk sizeAt len fuel (off + sizeAt off)).map (off :: ·)
+    else none
+
+theorem walk_in_bounds (sizeAt : Nat → Nat) (len : Nat) :
+    ∀ fuel off offs, walk sizeAt len fuel off = some offs → ∀ o ∈ offs, off ≤ o ∧ o + record ≤ len := by
+  intro fuel
+  induction fuel with
+  | zero => intro off offs h; simp [walk] at h
+  | succ fuel ih =>
+    intro off offs h o ho
+    simp only [walk] at h
+    split at h
+    · simp at h; subst h; simp at ho
+    · split at h
+      · rename_i hok
+        cases hw : walk sizeAt len fuel (off + sizeAt off) with
+        | none => rw [hw] at h; simp at h
+        | some rest =>
+          rw [hw] at h
+          simp at h
+          subst h
+          rcases List.mem_cons.mp ho with rfl | ho
+          · exact ⟨Nat.le_refl _, hok.1⟩
+          · have := ih _ rest hw o ho
+            unfold record at hok this ⊢
+            omega
+      · simp at h
+
+/-- 有 `len` 步就够：每步至少前进一条记录的长度，所以一个走得通的缓冲不会因为步数用完而被拒。 -/
+theorem walk_fuel_suffices (sizeAt : Nat → Nat) (len : Nat) :
+    ∀ fuel off, len - off < fuel → off ≤ len → walk sizeAt len fuel off ≠ none →
+      walk sizeAt len (fuel + 1) off ≠ none := by
+  intro fuel
+  induction fuel with
+  | zero => intro off h; omega
+  | succ fuel ih =>
+    intro off hfuel hle hw
+    simp only [walk] at hw ⊢
+    split
+    · simp
+    · rename_i hne
+      split at hw
+      · contradiction
+      · split
+        · rename_i hok
+          rw [if_pos hok] at hw
+          intro hnone
+          apply hw
+          cases hr : walk sizeAt len fuel (off + sizeAt off) with
+          | none => rfl
+          | some r =>
+            exfalso
+            have hr' : walk sizeAt len fuel (off + sizeAt off) ≠ none := by simp [hr]
+            have := ih (off + sizeAt off) (by unfold record at hok; omega) (by omega) hr'
+            simp only [Option.map_eq_none_iff] at hnone
+            exact this hnone
+        · rename_i hok
+          rw [if_neg hok] at hw
+          exact absurd rfl hw
+
+/-- 反例：不要求 `Size` 至少一条记录时，一条 `Size` 为零的记录让走法停在原地。 -/
+example : walk (fun _ => 0) 64 3 0 = none := by decide
+
 /-! ## 11 边界枚举
 
 缓冲长度为零（保留、复制都只报计数，什么都不写）；流或文本为空；块没有终止符（终点是块尾）；块报出大小为零（`EmptyBlock`，不当作没有文本）；文本恰好填满缓冲；位图一边为零、为负、乘积溢出；剪贴板写的六步各自失败；捕获的五步各自失败。前四条与位图三条由 §10 的定理覆盖，写与捕获的每一种失败组合由 `cases` 穷举覆盖。
@@ -469,6 +557,8 @@ theorem reading_inside_the_selection_breaks_it :
 /-! ## 12 错误处理
 
 叶子恒以 step 答：`Finished`、`Absent`（剪贴板没有文本，是成功）、`NoRoom`（附长度，Rust 重试），其余是停下的那一步，附调用线程当时的 `GetLastError`。Rust 面把 step 读成 `Failure::At { step, code }`；一个不是任何 step 的数读成 `Failure::Unspelled`，而不是假定它有效。DPI 两个调用直接答 HRESULT。失败之后叶子不留任何资源（§10 的两组资源定理），剪贴板写在 `Handing` 之后是空的，这一件由拒词说出。
+
+**D4 处理器拓扑、节能限流与 run 的 job 份额也在这片叶子里，叶子只做调用，记录由安全的 Rust 解析。** `sprawling` 的放置（`crates/sprawling/spec/Serving/Placement.lean` D41、D45）要 `GetSystemCpuSetInformation` 与 `GetThreadGroupAffinity`，D40 要 `SetProcessInformation(ProcessPowerThrottling)`，`crates/runtime/spec/Tools/Exec.lean` D29 要 job 的 CPU 权重与作业级内存上限；`std`、`thread-priority` 3.1.1、`win32job` 2.0.3、`winsafe` 0.0.29 都不给这几项，而 `unsafe` 只许在本包（`xtask guard`），所以它们是本叶子的新 export，各做一次完整的调用：CPU set 的记录原样写进 Rust 借出的字节缓冲（`NoRoom` 附需要的长度，Rust 加大重试），组亲和与限流各写一个小结构。解析不进叶子：记录的走法（上面 `walk` 的两条定理）在 `cpu_set::parse` 里，是纯的安全 Rust，在每个平台上都编译，于是本机实读的记录作为夹具在 Linux 与 macOS 的 runner 上也被解析；它的 fuzz 是 proptest 在任意字节上跑（不 panic、只报 `Malformed`），叶子一侧没有可对拍的纯函数，所以这一组没有 Zig 侧的对拍。被否：①叶子解析好再交结构——解析是最可能出错的一段，放在 Zig 里就只能在 Windows 上测，也离开了 Rust 的类型；②为它们另开一个 FFI crate——要动门的机器（guard 的 lint 表名单），换来的只是名字更贴切。重开参数：一个对外安全的 crate 给出这些调用，那一组离开叶子。
 
 **D1 一个 export 做完整段操作，句柄恒不跨边界。** 被否：把每个 Win32 调用各包一个 export、在 Rust 里持 HDC 与 HGLOBAL 并靠 `Drop` 释放——那样释放的前提又回到 Rust 的 `unsafe` 里，缝也变成二十个而不是六个。重开参数：一个操作需要跨两次工具调用持有系统资源。
 -/
