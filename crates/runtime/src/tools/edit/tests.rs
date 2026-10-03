@@ -36,6 +36,28 @@ fn call(path: &str, base: &str, old: &str, new: &str) -> ToolCall {
     }
 }
 
+/// The tool list is the same in every mode, so the mode in force is
+/// asked at the call: a chat run creates nothing (runtime D25).
+#[test]
+fn a_chat_run_is_refused_an_edit_and_the_disk_is_untouched() {
+    let tmp = tempfile::tempdir().unwrap();
+    let work = Address::parse("work").unwrap();
+    std::fs::create_dir_all(tmp.path().join("work")).unwrap();
+    let tool = EditTool::new(
+        tmp.path(),
+        work.clone(),
+        kernel::WriteDomain::new(vec![work]).unwrap(),
+        crate::PolicyCell::new(kernel::RunPolicy::of(kernel::Mode::Chat)).reader(),
+    )
+    .unwrap();
+    let refused = tool.invoke(&call("work/new.md", "new", "", "text"));
+    assert_eq!(
+        refused.err().map(|err| *err.code()),
+        Some(AxCode::GateDenied)
+    );
+    assert!(!tmp.path().join("work/new.md").exists());
+}
+
 #[test]
 fn an_edit_against_the_version_it_saw_lands_and_echoes_a_diff() {
     let tmp = tempfile::tempdir().unwrap();

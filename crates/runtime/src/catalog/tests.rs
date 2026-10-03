@@ -111,7 +111,7 @@ fn duplicates_and_empty_disclosures_are_refused() {
 /// The mode's core travels as tools and nothing else does: an admitted
 /// tool outside the core is a line of the index and not a definition.
 #[test]
-fn only_the_modes_core_travels_as_tools() {
+fn the_union_of_the_modes_cores_travels_as_tools_in_every_mode() {
     let mut catalog = Catalog::new();
     for name in ["read", "edit", "probe", "describe", "call"] {
         catalog.admit_tool(&meta(name)).unwrap();
@@ -124,9 +124,9 @@ fn only_the_modes_core_travels_as_tools() {
             .map(|def| def.name.as_str().to_owned())
             .collect()
     };
-    assert_eq!(names(&catalog), ["call", "describe", "read"]);
+    assert_eq!(names(&catalog), ["call", "describe", "edit", "read"]);
     let text = catalog.render();
-    assert!(dormant_block(&text).contains("- edit:"));
+    assert!(!dormant_block(&text).contains("- edit:"));
     assert!(dormant_block(&text).contains("- probe:"));
     assert!(
         !dormant_block(&text).contains("- read:"),
