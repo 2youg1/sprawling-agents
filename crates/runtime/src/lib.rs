@@ -28,7 +28,10 @@ pub mod tools;
 pub mod transcript;
 
 pub use backlog::{Backlog, BacklogId, BacklogKind, Finished, Standing, Started};
-pub use backlog::{Chunk, Exit, PollBudget, RunProcesses, Shares, Sink, Stream, Unseen};
+pub use backlog::{
+    Chunk, Exit, PlatformShares, PollBudget, RunProcesses, Shares, Sink, Stream, Unseen,
+    platform_shares,
+};
 pub use tools::BoundReader;
 pub use tools::CallTool;
 pub use tools::ChildStatus;

@@ -67,10 +67,16 @@ pub enum Shares {
 }
 
 /// Each run's job, and how many of its commands did not get into it.
+///
+/// On Linux the same work is done by a child cgroup per run
+/// ([`cgroup`](super::cgroup), D29): its parent is this process's own
+/// cgroup, and its reads and writes are plain files.
 #[derive(Default)]
 pub(super) struct Jobs {
     #[cfg(windows)]
     runs: BTreeMap<RunId, RunJob>,
+    #[cfg(not(windows))]
+    cgroups: super::cgroup::Cgroups,
 }
 
 impl Backlog {
@@ -113,7 +119,9 @@ impl Jobs {
     }
 
     #[cfg(not(windows))]
-    pub(super) fn forget(&mut self, _owner: RunId) {}
+    pub(super) fn forget(&mut self, owner: RunId) {
+        self.cgroups.forget(owner);
+    }
 
     #[cfg(windows)]
     fn enter(&mut self, member: &Member, shares: Shares) {
@@ -132,7 +140,17 @@ impl Jobs {
     }
 
     #[cfg(not(windows))]
-    fn enter(&mut self, _member: &Member, _shares: Shares) {}
+    fn enter(&mut self, member: &Member, shares: Shares) {
+        let Body::Command {
+            child,
+            claim: Claim::Window(owner) | Claim::Run(owner),
+            ..
+        } = &member.body
+        else {
+            return;
+        };
+        self.cgroups.enter(*owner, child.id(), shares);
+    }
 
     #[cfg(windows)]
     fn follow(&self, readings: &mut BTreeMap<RunId, RunProcesses>) {
@@ -154,8 +172,9 @@ impl Jobs {
 
     #[cfg(not(windows))]
     fn follow(&self, readings: &mut BTreeMap<RunId, RunProcesses>) {
-        for reading in readings.values_mut() {
+        for (owner, reading) in readings.iter_mut() {
             reading.unfollowed = u32::try_from(reading.pids.len()).unwrap_or(u32::MAX);
+            reading.share = self.cgroups.held(*owner);
         }
     }
 }
