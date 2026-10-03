@@ -9,7 +9,16 @@
 //!
 //! Apart from `answering` because the two change for different reasons:
 //! that module decides what a query takes while the fold waits, and this
-//! one how the read is done while it does not.
+//! one how the read is done while it does not. The reads whose answer is
+//! not this city's own record - the person's settings file, the
+//! configuration ladder, the first-run guide, the registry, the upstream
+//! check and the search path - are answered in `leaving`, beside the
+//! refusal each of them decides; this module keeps the one list of reads
+//! and routes each of them to the module that does it.
+
+mod leaving;
+
+pub use leaving::LiveAsk;
 
 use std::collections::BTreeSet;
 use std::path::PathBuf;
@@ -25,7 +34,7 @@ use super::document::document_answer;
 use super::finding::find_answer;
 use super::git_status::GitStatusAsk;
 use super::hunks::hunks_answer;
-use super::lines::{buildings_of, config_answer, harnesses_answer};
+use super::lines::buildings_of;
 use super::listing::listing_answer;
 use super::prefix::{PrefixAsk, content_answer};
 use super::skills::{SkillPins, skills_answer};
@@ -51,15 +60,6 @@ pub(super) fn unavailable_because(query: String, stopped: &kernel::AxError) -> w
         query,
         reason: Some(stopped.to_string()),
     }
-}
-
-/// What a read of now - a tool server's handshake, the broker's shelf -
-/// needs from the views, copied out so the read runs with the snapshot
-/// let go.
-pub struct LiveAsk {
-    pub(super) city_root: PathBuf,
-    pub(super) city: Option<Address>,
-    pub(super) vault: Option<Arc<Mutex<gateway::Custodian>>>,
 }
 
 /// A query's answer split at the snapshot: what the views settled while
@@ -283,11 +283,7 @@ impl Prepared {
                 Ok(summary) => wire::Answer::Run(Some(Box::new(summary))),
                 Err(stopped) => unavailable_because(format!("RunView({run})"), &stopped),
             },
-            // An unreadable settings file is not an empty one.
-            Self::Preferences => match crate::person::read() {
-                Ok(settled) => wire::Answer::Preferences(Box::new(settled)),
-                Err(_) => unavailable("Preferences".to_owned()),
-            },
+            Self::Preferences => Self::preferences_answer(),
             Self::Identity { city_root } => super::answering::identity::identity_answer(&city_root),
             Self::Automation { city_root } => {
                 super::answering::automation::automation_answer(&city_root)
@@ -295,30 +291,11 @@ impl Prepared {
             Self::GithubLogin { ask, host } => {
                 super::answering::github::github_answer(ask, host.as_deref())
             }
-            // An unreadable file is not a guide the next write would reset.
-            Self::Guide(city_root) => match crate::guide::read(&city_root) {
-                Ok(progress) => wire::Answer::Guide(progress),
-                Err(_) => unavailable("Guide".to_owned()),
-            },
-            // A ladder that cannot be read is "I could not look", not
-            // figures nothing on disk states.
-            Self::Config { city_root, addr } => match config_answer(&city_root, &addr) {
-                Ok(answer) => wire::Answer::Config(Box::new(answer)),
-                Err(_) => unavailable(format!("Config({})", addr.as_str())),
-            },
-            // Leaves this machine, and only on a press (`crates/wire/Spec.lean` §8-36),
-            // through the registry a served city handed the views.
-            Self::Release(Some(newest)) => wire::Answer::Release(Box::new(newest())),
-            Self::Release(None) => unavailable("NewestRelease".to_owned()),
-            // Read after the views are released, because it walks the
-            // search path (`crates/sprawling/Spec.lean` §8-100).
-            Self::Harnesses(Some(reach)) => harnesses_answer(reach),
-            Self::Harnesses(None) => unavailable("Harnesses".to_owned()),
-            Self::Upstream {
-                ask: Some(newest),
-                item,
-            } => wire::Answer::Upstream(Box::new(newest(&item))),
-            Self::Upstream { ask: None, item } => unavailable(format!("UpstreamVersion({item})")),
+            Self::Guide(city_root) => Self::guide_answer(city_root),
+            Self::Config { city_root, addr } => Self::config_answer(city_root, addr),
+            Self::Release(newest) => Self::release_answer(newest),
+            Self::Harnesses(reach) => Self::harnesses_answer(reach),
+            Self::Upstream { ask, item } => Self::upstream_answer(ask, item),
             Self::Listing { city_root, at } => {
                 wire::Answer::Listing(listing_answer(&city_root, at))
             }
