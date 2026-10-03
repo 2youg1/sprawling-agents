@@ -13,7 +13,7 @@
 
 </div>
 
-> **状态：<!-- xtask:begin maturity:word -->alpha<!-- xtask:end -->，研究与开发中。** 主回路是通的：接上一家 provider 或一个 harness、盖一栋楼、派活，几个 agent 就同时在楼里调用工具、写文件。把真活交给它之前，请先读[现在能做什么，还不能做什么](#现在能做什么还不能做什么)。
+> **状态：<!-- xtask:begin maturity:word -->alpha<!-- xtask:end -->，研究与开发中。** 可以拿来干真活，但数据格式、协议和界面在版本之间仍可能变。主回路是通的：接上一家 provider 或一个 harness、盖一栋楼、派活，几个 agent 就同时在楼里调用工具、写文件。把真活交给它之前，请先读[现在能做什么，还不能做什么](#现在能做什么还不能做什么)。
 >
 > English: [README.md](README.md) · 给从外面驱动一座城的 Agent 看的：[LLM.md](LLM.md) · 想改代码：[AGENTS.md](AGENTS.md)
 

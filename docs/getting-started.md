@@ -127,6 +127,8 @@ A desktop browser, and one model to call: an API key for a provider that speaks 
 
 ## 1 Install
 
+This guide describes sprawling <!-- xtask:begin workspace_version -->0.0.9<!-- xtask:end -->, an <!-- xtask:begin maturity:word -->alpha<!-- xtask:end --> release: usable for real work, with data formats, the wire and the screens still free to change between versions, so keep a city you care about where you can export it ([Moving a city](#moving-a-city)). The install is the same on Windows, macOS and Linux apart from the first command.
+
 macOS or Linux:
 
 ```sh
@@ -213,6 +215,8 @@ You can also skip the Mayor. `/raise lab` raises a building named `lab` from the
 A building's page shows **the plan**, drawn from its `Roadmap.md`, whose rows read **not started**, **ready**, **working**, **stuck**, **awaiting approval** or **done**, and lists its **rooms**, **files**, **commits**, **changes** and **skills**. The box at the top gives the building a standing goal: **set as standing goal** keeps it handing out ready work by itself until nothing is ready and nothing is in flight.
 
 A run has its own page, with seven lenses: **time** (where the time went, turn by turn), **turns**, **monitor** (the terminal, the changed files and the file the run is working on, followed live), **prompt** (exactly what went to the model), **context**, **changes** and **evidence**. In **monitor**, a hunk can be reverted, or commented on, which reaches the run as a steer.
+
+**When residents write to each other.** A resident's message to another room is a **letter**. In the receiving room's conversation a letter is a card on the left that names the room it came from, links that room's session, and gives its kind, time and text; your own words are never drawn as a letter. In the sender's tool rows a send reads "send to @room: …" and says where the letter landed: delivered to a run at work, queued, or knocked for a new run. A run that waits for a reply says which room it waits on and how the wait ended. A letter carries the standing of the resident that wrote it and never yours, even when it quotes you, and every resident's `City.md` tells it to check a decision a letter reports against the hall's `Memo.md` or the plan before acting on it.
 
 **Open a file in your own editor.** Under **settings** → **advanced** → **Open in my editor**, choose the editor this computer has — VS Code, VS Code Insiders, VSCodium, Cursor, Windsurf or Zed — and enter the city's folder as an absolute path. From then on every file the monitor shows is a link that opens it at its line. The browser hands the link to the editor; the city starts nothing.
 
