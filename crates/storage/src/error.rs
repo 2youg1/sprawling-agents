@@ -282,3 +282,26 @@ pub(crate) fn io_err(op: &'static str, path: &Path) -> impl FnOnce(io::Error) ->
     let path = path.to_path_buf();
     move |source| StorageError::Io { op, path, source }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::StorageError;
+
+    /// A recovery the User reads is one sentence: a string continued
+    /// across source lines without its `\` once carried the next line's
+    /// indentation into the snapshot advice.
+    #[test]
+    fn a_snapshot_recovery_reads_as_one_sentence() {
+        let refused = StorageError::Snapshot {
+            op: "write a snapshot",
+            path: "snap".into(),
+            source: std::io::Error::other("disk full"),
+        }
+        .into_ax();
+        assert_eq!(
+            refused.recovery(),
+            "storage failed (disk full); a snapshot is rebuilt from the ledger, so remove snap \
+             and free the disk; the next start folds from genesis"
+        );
+    }
+}
