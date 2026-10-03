@@ -26,6 +26,7 @@ export const HEADING: Record<SetupGroup, Key> = {
   skills: "setup_group_skills",
   tools: "setup_group_tools",
   appearance: "setup_group_appearance",
+  colours: "setup_group_colours",
   keys: "setup_group_keys",
   advanced: "setup_group_advanced",
   about: "release_title",
@@ -45,6 +46,7 @@ export const HINT: Record<SetupGroup, Key | null> = {
   skills: "setup_group_hint_skills",
   tools: "setup_group_hint_tools",
   appearance: "setup_group_hint_appearance",
+  colours: "setup_group_hint_colours",
   keys: "setup_group_hint_keys",
   advanced: "setup_group_hint_advanced",
   about: null,
@@ -66,10 +68,11 @@ export const WIDTH: Record<SetupGroup, string> = {
   skills: "",
   tools: "",
   appearance: "",
+  colours: "",
   keys: "max-w-talk",
   advanced: "",
   about: "max-w-talk",
 };
 
 // The groups whose answers `core/prefs.ts` keeps (client/Spec.lean §4-29).
-export const PREFERRED: readonly SetupGroup[] = ["network", "appearance", "keys"];
+export const PREFERRED: readonly SetupGroup[] = ["network", "appearance", "colours", "keys"];

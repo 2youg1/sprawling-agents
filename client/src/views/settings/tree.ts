@@ -78,7 +78,7 @@ export const TREE: readonly Branch[] = [
   },
   {
     word: "settings_branch_preferences",
-    entries: [group("appearance"), group("keys")],
+    entries: [group("appearance"), group("colours"), group("keys")],
     more: [],
   },
   {

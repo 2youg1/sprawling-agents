@@ -6594,5 +6594,69 @@
   "letter_open": {
     "en": "read the letter",
     "zh": "读这封信"
+  },
+  "setup_group_colours": {
+    "en": "colours",
+    "zh": "配色"
+  },
+  "setup_group_hint_colours": {
+    "en": "Your own colours laid over the built-in theme. They are kept in your preferences, so every browser that opens this city draws them.",
+    "zh": "在内置主题之上换用你自己的颜色。它们存在你的偏好里，打开这座城的每个浏览器都会用上。"
+  },
+  "colours_tokens": {
+    "en": "theme colours",
+    "zh": "主题颜色"
+  },
+  "colours_tokens_note": {
+    "en": "Every colour token the page is drawn with. A change takes effect at once.",
+    "zh": "页面所用的每个颜色 token。改动立即生效。"
+  },
+  "colours_token_default": {
+    "en": "default",
+    "zh": "默认"
+  },
+  "colours_token_default_for": {
+    "en": "use the built-in {token}",
+    "zh": "{token} 改回内置值"
+  },
+  "colours_css": {
+    "en": "override stylesheet",
+    "zh": "覆盖样式表"
+  },
+  "colours_css_note": {
+    "en": "CSS laid after the theme and your colours. Apply it with the button or the save key.",
+    "zh": "排在主题与你的颜色之后的 CSS。用按钮或保存键应用。"
+  },
+  "colours_css_apply": {
+    "en": "apply",
+    "zh": "应用"
+  },
+  "colours_restore": {
+    "en": "restore default",
+    "zh": "恢复默认"
+  },
+  "colours_restore_note": {
+    "en": "Removes every colour and the stylesheet you laid over the theme.",
+    "zh": "删掉你加在主题上的全部颜色与样式表。"
+  },
+  "colours_legibility": {
+    "en": "legibility",
+    "zh": "易读性"
+  },
+  "colours_short": {
+    "en": "{token} reaches Lc {reached} where its text needs {claimed}; it may be hard to read.",
+    "zh": "{token} 只有 Lc {reached}，它的文字需要 {claimed}；可能难以看清。"
+  },
+  "colours_foreign": {
+    "en": "{token} is not a colour of this theme and has no effect.",
+    "zh": "{token} 不是这个主题的颜色，不起作用。"
+  },
+  "colours_unreadable": {
+    "en": "{token}: {value} is not a CSS colour.",
+    "zh": "{token}：{value} 不是 CSS 颜色。"
+  },
+  "colours_fine": {
+    "en": "Every text colour is legible on the brightest surface it sits on.",
+    "zh": "每种文字颜色在它所在的最亮表面上都清晰可读。"
   }
 }

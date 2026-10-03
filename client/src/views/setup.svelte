@@ -35,6 +35,7 @@
   import AdvancedSection from "./setup/advanced.svelte";
   import { saveReceipt } from "./setup/appearance";
   import AppearanceSection from "./setup/appearance.svelte";
+  import ColoursSection from "./setup/colours.svelte";
   import Decided from "./setup/decided.svelte";
   import Kept from "./setup/kept.svelte";
   import KeysSection from "./setup/keys.svelte";
@@ -287,6 +288,8 @@ costs the cards their width (client/Spec.lean §4-30, §4-36). -->
           {@render foot(undefined, "language")}
         </div>
       </div>
+    {:else if shown === "colours"}
+      <ColoursSection />
     {:else if shown === "keys"}
       <KeysSection />
     {:else if shown === "advanced"}
