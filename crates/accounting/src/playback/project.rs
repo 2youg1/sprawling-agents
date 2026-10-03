@@ -17,10 +17,9 @@
 //! the walk's index (`crates/accounting/spec/Playback/Traced.lean` §8-17, §8-25).
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use kernel::event::record::{BuildingCreated, RunStarted};
-use kernel::layout::CityLayout;
 use kernel::{Address, AxCode, AxError, EventKind, EventRecord, RunId, RunPolicy, Seq};
 use storage::LedgerIndex;
 
@@ -28,12 +27,17 @@ use super::document::{
     Billed, Checkpoint, Closed, Costs, Decimal, Document, Event, Holds, KindCount, Phase, Reason,
     Run, Source, Withheld,
 };
-use super::links::{Key, Links, Role, Seen, Visibility};
-use super::reader::{Readership, Sight};
+use super::links::{Key, Links, Role, Seen};
+use super::reader::Readership;
 use super::select::Selection;
 use super::traced::{Evidence, Known, checkpoint_of};
 use super::walk::Walked;
 use crate::lineage::{Lineage, RunLine};
+
+mod fate;
+
+pub(super) use fate::Scanning;
+use fate::{Fate, Scanner};
 
 pub(super) struct Projection<'selection> {
     selection: &'selection Selection,
@@ -59,34 +63,8 @@ pub(super) struct Projection<'selection> {
     /// The `tool_called` lines the reader may not see, which a commit's
     /// trace may name.
     hidden_calls: BTreeSet<Seq>,
-    scanning: Scanning,
-    /// How many times this projection ran `kernel::secret::scan`.
-    scans: u64,
-    /// Where a deferred line's bytes are read back from by offset.
-    ledger: PathBuf,
-}
-
-/// Which lines the projection runs the credential scan on
-/// (`crates/accounting/spec/Playback/Project.lean`, D47).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum Scanning {
-    /// Every line whose buildings all read `Open`: the reference the lazy
-    /// scan is compared against.
-    #[cfg(test)]
-    Full,
-    /// Only the lines whose fate some table reads.
-    Lazy,
-}
-
-/// What becomes of one line: shown, closed by a building, withheld
-/// because the credential scan matched it, or, outside the selection,
-/// open until a table reads it (D47).
-#[derive(Debug, PartialEq, Eq)]
-enum Fate {
-    Shown,
-    Closed(Address, Reason),
-    Credential,
-    Deferred,
+    /// The credential scan, and which lines it reads.
+    scanner: Scanner,
 }
 
 #[derive(Default)]
@@ -120,9 +98,7 @@ impl<'selection> Projection<'selection> {
             evidence: Evidence::new(city_root),
             policies: BTreeMap::new(),
             hidden_calls: BTreeSet::new(),
-            scanning,
-            scans: 0,
-            ledger: CityLayout::new(city_root).ledger(),
+            scanner: Scanner::new(scanning, city_root),
         }
     }
 
@@ -150,23 +126,10 @@ impl<'selection> Projection<'selection> {
         touched.extend(room.iter().cloned());
         self.named_in_payload(&record, &mut touched);
         let in_range = self.selection.admits(&record);
-        let fate = match self.readership.sight(&touched) {
-            Sight::Closed(building, reason) => Fate::Closed(building, reason),
-            Sight::Open if self.scans_now(&record, in_range) => {
-                if carries_credential(&mut self.scans, raw) {
-                    Fate::Credential
-                } else {
-                    Fate::Shown
-                }
-            }
-            Sight::Open => Fate::Deferred,
-        };
+        let now = self.scanner.scans_now(&record, in_range);
+        let fate = self.scanner.fate(self.readership.sight(&touched), raw, now);
         let seen = Seen {
-            visibility: match fate {
-                Fate::Shown => Visibility::Visible,
-                Fate::Closed(..) | Fate::Credential => Visibility::Hidden,
-                Fate::Deferred => Visibility::Deferred,
-            },
+            visibility: fate.visibility(),
             in_range,
         };
         self.remember(&record, fate == Fate::Shown)?;
@@ -201,23 +164,6 @@ impl<'selection> Projection<'selection> {
         Ok(())
     }
 
-    /// Whether a line whose buildings all read `Open` is scanned as it
-    /// is folded: it is selected, or a table reads its fate without
-    /// pairing it to a selected line.
-    fn scans_now(&self, record: &EventRecord, in_range: bool) -> bool {
-        match self.scanning {
-            #[cfg(test)]
-            Scanning::Full => true,
-            Scanning::Lazy => {
-                in_range
-                    || matches!(
-                        record.kind(),
-                        EventKind::RunStarted | EventKind::RunForked | EventKind::ToolCalled
-                    )
-            }
-        }
-    }
-
     /// The document, with `source` as the caller built it, and how many
     /// lines the projection scanned for credentials; a commit's lines
     /// are read through `index`, the one the walk built.
@@ -229,7 +175,8 @@ impl<'selection> Projection<'selection> {
         source: Source,
         index: &LedgerIndex,
     ) -> Result<(Document, u64), AxError> {
-        self.settle_deferred(index)?;
+        self.scanner
+            .settle(&mut self.links, &self.candidates, index)?;
         self.attach_evidence(index);
         let mut outside = BTreeSet::new();
         let moments = self.links.moments(&mut outside);
@@ -292,7 +239,7 @@ impl<'selection> Projection<'selection> {
                 credential: Decimal(self.withheld.credential),
             },
         };
-        Ok((document, self.scans))
+        Ok((document, self.scanner.scans()))
     }
 
     /// A selected line the reader sees: into the events, and into every
@@ -332,25 +279,6 @@ impl<'selection> Projection<'selection> {
             self.hidden_calls.insert(record.seq());
         }
         Ok(())
-    }
-
-    /// Scans the deferred lines a table reads, the far ends of selected
-    /// pairs: from the copy the context already holds, or read back by
-    /// offset through `index`.
-    ///
-    /// # Errors
-    /// A line the index locates and the segment cannot give back.
-    fn settle_deferred(&mut self, index: &LedgerIndex) -> Result<(), AxError> {
-        let mut reader = index.reader(&self.ledger);
-        let candidates = &self.candidates;
-        let scans = &mut self.scans;
-        self.links.resolve(|seq| match candidates.get(&seq) {
-            Some(held) => Ok(carries_credential(scans, held.line.as_bytes())),
-            None => reader
-                .line_at(seq)
-                .map(|raw| carries_credential(scans, &raw))
-                .map_err(storage::StorageError::into_ax),
-        })
     }
 
     /// Reads each committed checkpoint's base, diff and trace: from what
@@ -412,13 +340,6 @@ impl Tally {
         let count = self.kinds.entry(kind).or_insert(0);
         *count = count.saturating_add(1);
     }
-}
-
-/// Whether `raw` carries a credential by `kernel::secret::scan`, counted
-/// in `scans`.
-fn carries_credential(scans: &mut u64, raw: &[u8]) -> bool {
-    *scans = scans.saturating_add(1);
-    !kernel::secret::scan(raw).is_empty()
 }
 
 /// The building an address lies in. An address in the reserved subtree
