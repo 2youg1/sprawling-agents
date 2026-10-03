@@ -44,7 +44,7 @@ pub(crate) trait Vfs {                      // 内缝：不出对外接口，不
   - `worktree`——树由 git2 建、由 git2 prune，落盘不经本 crate；`release` 只解 git 的锁，不删目录；开城的 `sweep_abandoned` 用 `std::fs` 删城自己造的树目录（§8-9）。
     缝拦不住 git2，声称拦得住才是第二个权威。释放顺序与自愈见 §8-9。
   - `checkpoint`、`changes`、`hunks`、`status`、`blob`——同样经 git2 提交、检出与读对象。
-  - `chain_audit`——逐段流式读整条链，只读不写（§8-27）。
+  - `chain_audit`——逐段流式读整条链，只读不写（§8-30）。
   - `jsonl::ledger::WriterLock`——文件锁是操作系统对打开句柄的事实，Vfs 的崩溃语义模型对它无话可说（§8-1）。
   - `alias`——重解析点与链接计数是 `std::fs` 自己的事实（`file_type().is_symlink()` 对 symlink 与 junction 同真，Unix `MetadataExt::nlink` 判硬链接），Vfs 的崩溃语义模型对它们无话可说；它只问元数据、不读不写字节。
   - **`index` 不在例外之列**：`LedgerIndex` 持 `Box<dyn Vfs>`，段列举、段长、整段读（建表）与尾部增量读（刷新）全部经缝，

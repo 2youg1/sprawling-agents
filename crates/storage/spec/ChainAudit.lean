@@ -33,6 +33,7 @@ impl ChainHalt {
 impl JsonlLedger {
     pub fn halt_on(&mut self, halt: ChainHalt);
     pub fn await_verdict(&self);
+    pub fn admits(&self) -> Result<(), StorageError>;   // append_all 组帧前问的同一个 admit；给要在写之前先做一件拒了就留痕的事的调用方
 }
 
 // storage::verified_prefix

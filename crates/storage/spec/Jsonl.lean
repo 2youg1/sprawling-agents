@@ -22,7 +22,7 @@
 // 故 Box<dyn Vfs> 内藏；生产构造子 open(dir, now) 恒用 RealFs，注入点为 pub(crate) open_with（本 crate 测试）
 // 与 feature="fault" 构造子（取具体 FaultFs，trait 不出门）。
 pub struct JsonlLedger { /* Box<dyn Vfs>、dir、当前段路径、段内字节数、next_seq、prev、roll_bytes、写者锁 */ }
-pub struct OpenReport { pub recovered: Option<TailTruncation> }   // 断尾发生与否
+pub struct OpenReport { /* recovered 与 counted，见 8-34 */ }   // 断尾发生与否，尾部恢复读了什么
 pub struct TailTruncation { pub dropped_bytes: u64 }
 
 impl JsonlLedger {
@@ -36,7 +36,7 @@ impl JsonlLedger {
     /// Group commit: one durability barrier for the whole wave.
     /// Ok ⇒ every line of the wave is on its segment and synced.
     /// 一波的写或 sync 失败过，此后每一波都答 `LedgerBroken`，直到 `jsonl::unwind` 把段退回到那一波之前，或者重开。
-    /// 链证明判出断链之后（`chain_audit::ChainHalt`，8-27），每一波都答 `ChainHalted`。
+    /// 链证明判出断链之后（`chain_audit::ChainHalt`，8-30），每一波都答 `ChainHalted`。
     pub fn append_all(&mut self, drafts: Vec<EventDraft>) -> Result<Vec<EventRef>, StorageError>;
     pub fn read_raw_lines(&self) -> Result<Vec<Vec<u8>>, StorageError>;   // 实例读面
     /// 写路径观察者（至多一个，后装者取代前装者）。只在**整波持久化完成后**逐条回调：
@@ -45,12 +45,12 @@ impl JsonlLedger {
     pub fn position(&self) -> Seq;    // 现在写一条会落在哪；只给位置不给内容
 }
 /// 只读读面，给要原始行的读者（分叉、夹具与测试）：不走 open、不触发断尾与任何写——验证恒不修盘（`crates/runtime/Spec.lean` §8-1）。
-/// 只要结论的读者不经它：`sprawling replay` 走 `audit_chain`（8-27），折叠走 `LedgerIndex::folding`（8-4）；两者都一次只持一段字节。
+/// 只要结论的读者不经它：`sprawling replay` 走 `audit_chain`（8-30），折叠走 `LedgerIndex::folding`（8-4）；两者都一次只持一段字节。
 pub fn read_raw_lines_at(dir: &Path) -> Result<Vec<Vec<u8>>, StorageError>;
 /// 目录里的账本段，按应读顺序（`list` 已排序，段名零填充故字典序即时序）。
 /// 空结果的意思是「这里没有账本」，与「账本里没有事件」不是同一件事；
 /// `read_raw_lines_at` 对两者都答 `Ok([])`，故需要区分的调用方问这一面。
-/// 现在只有一个：`sprawling replay`，它的路径是人敲的（sprawling D2）。
+/// 库外的生产调用方是 `sprawling replay`，它的路径是人敲的（sprawling D2）；crate 内 `snapshot::start` 用它按序找段。
 /// 段名规则因此只住 `is_segment` 一处，不被谁再拼一遍。
 pub fn ledger_segments_at(dir: &Path) -> Result<Vec<PathBuf>, StorageError>;
 /// 一段的字节，只读、不走 open；`lines()` 给出该段完整且非空的行（撕裂尾不是行，留给 open 判）。
