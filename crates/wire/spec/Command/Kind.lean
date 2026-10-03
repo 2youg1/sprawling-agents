@@ -121,6 +121,8 @@ inductive Command where
   | Wake
   | Auth
   | PutSecret
+  | NameSession
+  | ChangeRunPolicy
   deriving DecidableEq, Repr
 
 /-- §19-1 的四个取值：城里谁该够得到一个动词。 -/
@@ -212,6 +214,10 @@ def Command.reach : Command → Reach
   | .Auth => .handshake
   -- 唯一没有字节形式的 Command；`Sealed<String>` 在线上不可居留
   | .PutSecret => .sealed
+  -- 给一段 session 起显示名，写 `session_named`（Sessions.lean D27）；控件在 W3 FE-SESS
+  | .NameSession => .client
+  -- 会话中改房间的运行策略，写 `run_policy_changed`（Sessions.lean D27）；控件在 W3 FE-SESS
+  | .ChangeRunPolicy => .client
 
 /-! D6 动词类是 §19-2 的一列，由中继的穷尽匹配实现、门机器对照
 
@@ -262,6 +268,8 @@ def Command.verbClass : Command → VerbClass
   | .Wake => .LocalOnly
   | .Auth => .LocalOnly
   | .PutSecret => .LocalOnly
+  | .NameSession => .Act
+  | .ChangeRunPolicy => .Act
 
 /-- **没有一个 Command 属 `Read`**：读城的是 `Ask` 与 `Monitor` 两种帧，不是命令（§19-3）。一行写成 `Read` 的命令就是一个改东西的动词被当成只读放进了城。 -/
 theorem no_command_is_a_read (c : Command) : c.verbClass ≠ .Read := by
