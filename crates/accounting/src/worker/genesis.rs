@@ -8,7 +8,7 @@
 use std::path::{Path, PathBuf};
 
 use city::{History, has_history};
-use kernel::event::record::AutonomyChanged;
+use kernel::event::record::{AutonomyChanged, ShelvedFrom, SkillShelved};
 use kernel::{Address, AxCode, AxError, EventDraft, EventKind, EventRef};
 use kernel::{Ledger, Payload, RunId};
 use storage::JsonlLedger;
@@ -108,7 +108,7 @@ pub fn form(city_root: &Path, adopt: Adopt, hands: Hands) -> Result<InitReport, 
     // Before line zero, so a forming refused here leaves no history and
     // the next forming finds what already landed as already shelved
     // (`crates/city/spec/Library/Install.lean` section 8-28c).
-    shelve_shipped(city_root)?;
+    let shipped = shelve_shipped(city_root)?;
     let now = crate::Clock::now(&*hands.clock)?;
     let (mut ledger, report) =
         JsonlLedger::open(&dir, now).map_err(storage::StorageError::into_ax)?;
@@ -125,6 +125,7 @@ pub fn form(city_root: &Path, adopt: Adopt, hands: Hands) -> Result<InitReport, 
         data: Payload::of(&kernel::event::record::CityInitialized {})?,
         ig: false,
     })?;
+    record_shelved(&mut ledger, now, &shipped)?;
     // The city's own records stay out of the workspace's git before
     // anything else is laid beside the project's files.
     city::ignore_city_records(city_root)?;
@@ -199,12 +200,43 @@ pub fn form(city_root: &Path, adopt: Adopt, hands: Hands) -> Result<InitReport, 
 
 /// Puts the skills the binary carries on the new city's library shelf,
 /// each registered in the city's store before it lands.
-fn shelve_shipped(city_root: &Path) -> Result<(), AxError> {
+fn shelve_shipped(city_root: &Path) -> Result<Vec<city::Installed>, AxError> {
     let mut cas = storage::Cas::open(&kernel::layout::CityLayout::new(city_root).cas())
         .map_err(storage::StorageError::into_ax)?;
     city::shelve_shipped(city_root, &mut |bytes| {
         cas.put(bytes).map_err(storage::StorageError::into_ax)
-    })?;
+    })
+}
+
+/// One `skill_shelved` per shipped skill that landed, written after line
+/// zero because the ledger does not exist while they land; a skill a
+/// refused forming already left on the shelf is `AlreadyShelved` and
+/// gets no line (kernel D23).
+fn record_shelved(
+    ledger: &mut JsonlLedger,
+    now: kernel::TimeMs,
+    shipped: &[city::Installed],
+) -> Result<(), AxError> {
+    for installed in shipped {
+        match installed.placed {
+            city::Placed::Fresh => {}
+            city::Placed::AlreadyShelved => continue,
+        }
+        let shelved = SkillShelved {
+            skill: installed.holding.name.clone(),
+            digest: installed.hash,
+            source: ShelvedFrom::Shipped,
+        };
+        ledger.append(EventDraft {
+            run: RunId::CITY,
+            t: now,
+            who: "city".to_owned(),
+            addr: None,
+            kind: EventKind::SkillShelved,
+            data: Payload::of(&shelved)?,
+            ig: false,
+        })?;
+    }
     Ok(())
 }
 
