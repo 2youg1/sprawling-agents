@@ -34,6 +34,7 @@ pub enum Interrupt { None, Cancel, Steer { source: String, text: String },
 - **一波之内只有一个策略**：工具读的是格，不是信箱；格只在一波开始之前变。模型在上一回合看到的是旧说明，这一波按新策略判，是取在 `BeforeWave` 的代价，换来的是一波里的几次调用不会一半按旧、一半按新。
 - **合并时的准入读 run 结束时格里的策略**（§8-54）：那是这个 run 最后一次取用的；run 最后一个 `BeforeWave` 之后才到的改动没被它取用，落到下一个 run 的 `run_started.policy`。
 - **平台**：纯内存与账本次序上的判定，Windows、macOS、Linux 行为一致。
+- **现状**：`PolicyCell`、`Interrupt::Policy`、各安全点经 `fold_arrival` 一扇门收下改动、`BeforeWave` 取用并在那一波结果之后追加说明，已在 `crates/runtime/src/mode.rs` 与 `crates/runtime/src/run/lifecycle.rs`；驱动循环的测试 `a_policy_change_is_told_after_the_wave_and_leaves_the_sent_request_untouched` 说已发出的字节是下一次请求的前缀。尚未落地的三处：①记账线程把 `run_policy_changed` 投进正在跑的 run（今天没有一处产出 `Interrupt::Policy`）；②`EditTool` 与 `ExecSetup` 持 `PolicyReader` 而不是 run 开始时的 `WriteLimit`，这要求 run 的格在工具造出之前就有，即由造工具的一方（accounting 的 workbench）造格、交给 `RunPlan`；③工具表取各 mode 常驻核心的并集（§8-60）、`edit` 与 `exec` 的说明去掉写限制那一句，这会改工具说明的字节，前缀与工具哈希的 golden 要按其测试的办法重钉。在②落地之前写门仍按 `run_started.policy` 判，追加的说明因此会说一个写门尚未执行的策略；①不落地，这条路径就不会被走到。
 
 - **派生检查**（Rust，`crates/runtime/src/mode.rs` 的测试 `policy_take_holds_on_every_trace`）：一个 proptest 生成器在 `{change(随机 RunPolicy), wave, call}` 上抽序列，按序列调 `arrive`、`take_at_wave` 与 `PolicyReader::now`，断言两件事——同一 `BeforeWave` 之后到下一个之前的每次读数相同且等于那一波开始时生效的策略；每个 `BeforeWave` 取的是它之前最后一条改动，没有改动就什么也不取。坏的变体：`arrive` 当场写进生效的策略，即工具读信箱里最新的那条（被否①），第一条断言在序列 `[change, call]` 与 `[call, change, call]` 上红。「每次请求的 `tools` 与已发出的字节是上一次请求的前缀」由驱动循环的测试担，见 §3。
 
