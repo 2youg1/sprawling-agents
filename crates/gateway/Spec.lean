@@ -332,6 +332,7 @@ kernel 已有码，语义照 Custody 一节；不新增码。
 - D17 每个端点一个并发上限：可配置，缺省取厂商文档的值，遇 429 收窄、恢复后放宽：本文件 §8-6 之后
 - D20 名额的接线：一个注入的单调时钟，取在门里、按先来后到排队，等待有界：本文件 §8-6 之后
 - D21 `max_in_flight` 进端点的 tuning 与 `endpoint_attached`；排队数与等待时长是每个端点的一份读数：本文件 §8-6 之后
+- D22 探针落到会话内存时，编不出的 `provider_degraded` 通告并进 `custody()` 的拒词，不被丢掉：`crates/gateway/spec/Credential.lean`
 -/
 
 /-! ## 13 依赖选型

@@ -100,17 +100,7 @@ impl Custodian {
     pub fn probe() -> (Custodian, Option<Payload>) {
         let probe_ref = match SecretRef::parse("secret:sprawling/startup-probe") {
             Ok(reference) => reference,
-            Err(_) => {
-                let reason = "probe reference unparsable";
-                return (
-                    Custodian::with_backend(
-                        Box::new(MemoryVault::default()),
-                        Store::SessionMemory,
-                        Some(reason.to_owned()),
-                    ),
-                    degraded_payload(reason),
-                );
-            }
+            Err(_) => return Custodian::fell_back("probe reference unparsable".to_owned()),
         };
         let mut candidate = KeyringVault;
         let round_trip = candidate
@@ -133,25 +123,41 @@ impl Custodian {
                 None,
             ),
             Ok(_) => {
-                let reason = "platform service returned a different value";
-                (
-                    Custodian::with_backend(
-                        Box::new(MemoryVault::default()),
-                        Store::SessionMemory,
-                        Some(reason.to_owned()),
-                    ),
-                    degraded_payload(reason),
-                )
+                Custodian::fell_back("platform service returned a different value".to_owned())
             }
-            Err(err) => (
-                Custodian::with_backend(
-                    Box::new(MemoryVault::default()),
-                    Store::SessionMemory,
-                    Some(err.subject().to_owned()),
-                ),
-                degraded_payload(err.subject()),
-            ),
+            Err(err) => Custodian::fell_back(err.subject().to_owned()),
         }
+    }
+
+    /// The probe's fallback to session memory, with the `provider_degraded`
+    /// notice that discloses it.
+    fn fell_back(reason: String) -> (Custodian, Option<Payload>) {
+        let notice = degraded_payload(&reason);
+        Custodian::in_session_memory(reason, notice)
+    }
+
+    /// Session memory after the platform service failed for `reason`.
+    ///
+    /// A notice that could not be encoded is not dropped: there is no
+    /// ledger line to carry it, so the encoding failure joins the
+    /// refusal that `custody()` reports, and the doctor's report names
+    /// both (gateway D22).
+    fn in_session_memory(
+        reason: String,
+        notice: Result<Payload, AxError>,
+    ) -> (Custodian, Option<Payload>) {
+        let (refusal, notice) = match notice {
+            Ok(payload) => (reason, Some(payload)),
+            Err(_dropped) => (reason, None),
+        };
+        (
+            Custodian::with_backend(
+                Box::new(MemoryVault::default()),
+                Store::SessionMemory,
+                Some(refusal),
+            ),
+            notice,
+        )
     }
 
     /// Session-memory custodian (tests, headless fallback by choice).
@@ -276,14 +282,13 @@ impl Custodian {
 
 /// The `provider_degraded` line the probe hands back when it fell to
 /// session memory, naming what the platform service said.
-fn degraded_payload(reason: &str) -> Option<Payload> {
+fn degraded_payload(reason: &str) -> Result<Payload, AxError> {
     Payload::of(&ProviderDegraded::VaultFellBack(VaultFellBack {
         component: "vault".to_owned(),
         fallback: "session-memory".to_owned(),
         persistence: Persistence::ThisProcess.as_str().to_owned(),
         reason: reason.to_owned(),
     }))
-    .ok()
 }
 
 #[cfg(test)]

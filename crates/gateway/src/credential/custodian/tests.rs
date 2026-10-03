@@ -150,3 +150,32 @@ fn rotation_is_next_operation_effective_because_nothing_caches() {
     // backend, so the rotated value is what the wire test would see.
     assert!(custodian.resolve(&reference).is_ok());
 }
+
+/// A fallback whose `provider_degraded` notice cannot be encoded has no
+/// ledger line to disclose it, so the refusal `custody()` reports
+/// carries the encoding failure beside the platform service's own
+/// words, and the doctor's report names both (gateway D22).
+#[test]
+fn a_fallback_whose_notice_cannot_be_encoded_says_so_in_the_custody_report() {
+    let refused = AxError::failure(
+        AxCode::InvalidArgs,
+        "encode a ledger payload",
+        "a float in the record",
+    )
+    .with_recovery("give the record string keys and integer numbers only");
+    let (custodian, notice) =
+        Custodian::in_session_memory("service unavailable".to_owned(), Err(refused.clone()));
+    assert_eq!(
+        (custodian.custody(), notice),
+        (
+            Custody {
+                store: Store::SessionMemory,
+                persistence: Persistence::ThisProcess,
+                refusal: Some(format!(
+                    "service unavailable; the provider_degraded notice for it could not be encoded: {refused}"
+                )),
+            },
+            None
+        )
+    );
+}

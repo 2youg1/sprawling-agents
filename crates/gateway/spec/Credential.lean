@@ -76,3 +76,8 @@ impl Custodian {
 
 决定见 §8-4。理由：`keyring` 第 4 代的默认 feature 在 Linux 上选 secret service，与静态 musl 发行件矛盾；关掉默认 feature 的 `keyring` 只剩一层转发，上游 README 建议应用直接依赖 `keyring-core` 与所需的 store。被否的备选：停在 `keyring` 3——它是锁里 `security-framework` 2 与 `windows-sys` 0.60 两族的来源之一，也不再是上游维护的那条线。
 -/
+
+/-! D22 探针落到会话内存时，编不出的 `provider_degraded` 通告并进 `custody()` 的拒词，不被丢掉
+
+决定：`degraded_payload` 返回 `Result<Payload, AxError>`；探针三条落到内存的路都经 `Custodian::fell_back`，它把这个结果交给 `in_session_memory`。编码成功时通告照旧交给调用方入账，`refusal` 是平台服务的原话；编码失败时没有一行账能说出这次降级，于是 `refusal` 写成「平台服务的原话; the provider_degraded notice for it could not be encoded: 那个 `AxError`（码、动作、主题）」，通告为 `None`，doctor 的报告（`custody()`）把两件事一起读出。`probe()` 的签名 `(Custodian, Option<Payload>)` 不变。理由：`VaultFellBack` 只有字符串字段，`Payload::of` 今天不会失败，但 `.ok()` 让「这次降级没人知道」在它失败的那一天静默成立，而 §8-4 写的是降级恒不静默。被否：①`probe()` 返回 `Result<Option<Payload>, AxError>`——两个调用方（装配层开金库与 doctor）都只能把它记下或丢掉，而城照样落在会话内存上跑，返回值多一层却不多一个可做的决定；②编码失败时 panic——发行 profile 是 `panic = "abort"`，城因为一句通告写不出而起不来。三个平台：平台服务各不相同（§8-4 的表），落到会话内存之后的这条路与平台无关，三个平台报同一个失败。
+-/
