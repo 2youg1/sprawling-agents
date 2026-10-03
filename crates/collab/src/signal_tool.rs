@@ -75,7 +75,8 @@ impl SignalTool {
         wait.insert(
             "description".to_owned(),
             Value::String(format!(
-                "send only: true when your next step needs their answer; you stop without a model                  call until they reply or {} s pass. Leave it out to go on at once",
+                "send only: true when your next step needs their answer; you stop without a model \
+                 call until they reply or {} s pass. Leave it out to go on at once",
                 PATIENCE_MS / 1000
             )),
         );
