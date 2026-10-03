@@ -196,7 +196,9 @@ impl SessionOrigins {
             | EventKind::ProposalWithdrawn
             | EventKind::RunPolicyChanged
             | EventKind::SessionNamed
-            | EventKind::SkillAudited => Ok(()),
+            | EventKind::SkillAudited
+            | EventKind::SignalWaitStarted
+            | EventKind::SignalWaitEnded => Ok(()),
         }
     }
 

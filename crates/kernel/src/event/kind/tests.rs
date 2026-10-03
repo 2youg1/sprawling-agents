@@ -11,7 +11,7 @@ use crate::error::{AxCode, Carrier};
 use std::collections::BTreeSet;
 
 #[test]
-fn every_kind_spells_itself_once_and_exactly_ten_reach_the_window() {
+fn every_kind_spells_itself_once_and_exactly_twelve_reach_the_window() {
     let names: BTreeSet<String> = EventKind::ALL
         .iter()
         .map(|k| serde_json::to_string(k).unwrap())
@@ -25,7 +25,7 @@ fn every_kind_spells_itself_once_and_exactly_ten_reach_the_window() {
         .into_iter()
         .filter(|k| k.window_class() == WindowClass::InWindow)
         .collect();
-    assert_eq!(in_window.len(), 10);
+    assert_eq!(in_window.len(), 12);
     for k in [
         EventKind::PromptAssembled,
         EventKind::ModelCalled,
@@ -37,6 +37,8 @@ fn every_kind_spells_itself_once_and_exactly_ten_reach_the_window() {
         EventKind::SignalConsumed,
         EventKind::AdviserAnswered,
         EventKind::RunPolicyChanged,
+        EventKind::SignalWaitStarted,
+        EventKind::SignalWaitEnded,
     ] {
         assert_eq!(k.window_class(), WindowClass::InWindow);
     }
@@ -48,14 +50,15 @@ fn every_kind_spells_itself_once_and_exactly_ten_reach_the_window() {
 
 /// The remote door's five kinds, in the order a door's life writes them
 /// (`crates/kernel/spec/Event/Record.lean` §8-81), and then the four document kinds
-/// (section 8-83), and then the three V0.0.9 kinds (D21-D23) close the
-/// table, so the SPEC table and `ALL` keep one order.
+/// (section 8-83), and then the three V0.0.9 kinds (D21-D23) and the
+/// reply wait's two (D32) close the table, so the SPEC table and `ALL`
+/// keep one order.
 #[test]
-fn the_remote_door_the_document_and_the_session_kinds_close_the_table() {
+fn the_remote_door_the_document_the_session_and_the_wait_kinds_close_the_table() {
     let tail: Vec<String> = EventKind::ALL
         .iter()
         .rev()
-        .take(12)
+        .take(14)
         .rev()
         .map(|kind| serde_json::to_string(kind).unwrap())
         .collect();
@@ -74,6 +77,8 @@ fn the_remote_door_the_document_and_the_session_kinds_close_the_table() {
             "\"run_policy_changed\"",
             "\"session_named\"",
             "\"skill_audited\"",
+            "\"signal_wait_started\"",
+            "\"signal_wait_ended\"",
         ]
     );
 }

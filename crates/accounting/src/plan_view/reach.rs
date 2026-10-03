@@ -131,7 +131,10 @@ pub(super) fn may_move_plan(kind: EventKind) -> PlanReach {
         // plan row.
         | EventKind::RunPolicyChanged
         | EventKind::SessionNamed
-        | EventKind::SkillAudited => PlanReach::Untouched,
+        | EventKind::SkillAudited
+        // A run waiting for a reply moves no plan row.
+        | EventKind::SignalWaitStarted
+        | EventKind::SignalWaitEnded => PlanReach::Untouched,
     }
 }
 

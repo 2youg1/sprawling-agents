@@ -125,6 +125,9 @@ inductive EventKind where
   | RunPolicyChanged
   | SessionNamed
   | SkillAudited
+  -- 等回信
+  | SignalWaitStarted
+  | SignalWaitEnded
   deriving DecidableEq, Repr
 
 /-- 一个种类的载荷决不决定模型请求的字节：入窗（`InWindow`）或只入账（`RecordOnly`）。与 `kernel::WindowClass` 逐变体同名。依据唯一，不存在第三类。 -/
@@ -273,6 +276,10 @@ def EventKind.windowClass : EventKind → WindowClass
   | .SessionNamed => .RecordOnly
   /- 一个 skill 上架时的一次审核：载荷携 `skill`、`digest`（被审内容的摘要）、`source`、`scanner`、`verdict`，以及可缺席的 `risk`、`audited_at`、`link`。审核方说了什么不进任何模型请求（`Record.lean` D23） -/
   | .SkillAudited => .RecordOnly
+  /- 一个带 `wait` 发信的 run 停在安全点等回信：载荷携 `on`（等的房间）、`signal`（那封信）与注入时钟上的 `deadline_ms`。模型下一次调用要知道它停过，所以入窗（`Record.lean` D32） -/
+  | .SignalWaitStarted => .InWindow
+  /- 与一行 `signal_wait_started` 配对的结束：载荷携 `signal` 与 `by`（回信到了、过了 deadline、run 离开房间）。模型下一次调用要知道是哪一种叫醒了它（`Record.lean` D32） -/
+  | .SignalWaitEnded => .InWindow
 
 /-- 每个种类，依 `EventKind::ALL` 的次序。 -/
 def EventKind.all : List EventKind := [
@@ -367,7 +374,9 @@ def EventKind.all : List EventKind := [
   .ProposalWithdrawn,
   .RunPolicyChanged,
   .SessionNamed,
-  .SkillAudited
+  .SkillAudited,
+  .SignalWaitStarted,
+  .SignalWaitEnded
 ]
 
 theorem EventKind.all_complete : ∀ kind : EventKind, kind ∈ EventKind.all := by
@@ -377,11 +386,12 @@ theorem EventKind.all_complete : ∀ kind : EventKind, kind ∈ EventKind.all :=
 theorem EventKind.all_nodup : EventKind.all.Nodup := by
   decide
 
-/-- **入窗的种类恰是这十种。** 它们的载荷决定模型请求的字节，所以重放与分叉要读它们；其余每一种都只入账。让一个种类改变窗类，要先改这条定理，而改它就是改模型请求的字节。 -/
+/-- **入窗的种类恰是这十二种。** 它们的载荷决定模型请求的字节，所以重放与分叉要读它们；其余每一种都只入账。让一个种类改变窗类，要先改这条定理，而改它就是改模型请求的字节。 -/
 theorem the_in_window_kinds :
     EventKind.all.filter (fun kind => kind.windowClass == .InWindow) =
       [.PromptAssembled, .ModelCalled, .ModelReturned, .ToolCalled, .ToolResult, .ResultOffloaded,
-        .SteerReceived, .SignalConsumed, .AdviserAnswered, .RunPolicyChanged] := by
+        .SteerReceived, .SignalConsumed, .AdviserAnswered, .RunPolicyChanged, .SignalWaitStarted,
+        .SignalWaitEnded] := by
   decide
 
 end Kernel.Event.Kind

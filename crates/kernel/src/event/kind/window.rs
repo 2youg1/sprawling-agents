@@ -31,7 +31,11 @@ impl EventKind {
             | EventKind::AdviserAnswered
             // The run under way appends one sentence about the new policy
             // to its next message, so the line decides request bytes.
-            | EventKind::RunPolicyChanged => WindowClass::InWindow,
+            | EventKind::RunPolicyChanged
+            // The next call is told whether a reply or the deadline woke
+            // the run, so both lines decide request bytes (kernel D32).
+            | EventKind::SignalWaitStarted
+            | EventKind::SignalWaitEnded => WindowClass::InWindow,
             EventKind::CityInitialized
             | EventKind::BuildingCreated
             | EventKind::BuildingConfigured

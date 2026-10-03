@@ -236,7 +236,11 @@ fn fold_run<'a>(
             | EventKind::RunPolicyChanged
             // A session's name and a skill's audit are the person's page.
             | EventKind::SessionNamed
-            | EventKind::SkillAudited => {}
+            | EventKind::SkillAudited
+            // No run writes a reply wait yet (kernel D32); the line that
+            // tells the next call how the wait ended lands with its writer.
+            | EventKind::SignalWaitStarted
+            | EventKind::SignalWaitEnded => {}
         }
     }
     // A wave the cut landed inside is dropped whole: the assistant

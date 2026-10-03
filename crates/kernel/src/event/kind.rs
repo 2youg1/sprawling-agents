@@ -236,12 +236,20 @@ pub enum EventKind {
     SessionNamed,
     /// One audit of one version of a skill on the shelf (D23).
     SkillAudited,
+
+    // The reply wait (2).
+    /// A run that sent with `wait` stopped at its safe point for a reply
+    /// (`crates/kernel/spec/Event/Record.lean` D32).
+    SignalWaitStarted,
+    /// The one line that ends a `signal_wait_started`: the reply came,
+    /// the deadline passed, or the run left its room (D32).
+    SignalWaitEnded,
 }
 
 impl EventKind {
     /// Every kind, in the order the SPEC table lists them. Data face for counting tests
     /// and `xtask specalign`.
-    pub const ALL: [EventKind; 92] = [
+    pub const ALL: [EventKind; 94] = [
         EventKind::CityInitialized,
         EventKind::BuildingCreated,
         EventKind::BuildingConfigured,
@@ -334,6 +342,8 @@ impl EventKind {
         EventKind::RunPolicyChanged,
         EventKind::SessionNamed,
         EventKind::SkillAudited,
+        EventKind::SignalWaitStarted,
+        EventKind::SignalWaitEnded,
     ];
 }
 
