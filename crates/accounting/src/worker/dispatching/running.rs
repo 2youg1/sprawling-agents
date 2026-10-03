@@ -33,30 +33,10 @@ pub(in crate::worker) enum Continuation {
 
 /// What a model run was lent on the accounting thread.
 pub(in crate::worker) struct Lent {
-    desks: Desks,
+    pub(in crate::worker) desks: Desks,
     job_locator: Locator,
     /// This run's place in the backlog, given back where the run ends.
     member: Option<runtime::BacklogId>,
-}
-
-impl Continuation {
-    /// What the city reads, while this run drives, to start the work it
-    /// hands down at the call (collab D7). A harness run has no desks.
-    pub(in crate::worker) fn handing(
-        &self,
-        at: &Assignment,
-        owing: &crate::worker::Owing,
-    ) -> Option<crate::worker::waking::handing::Handing> {
-        match self {
-            Continuation::Model(lent) => Some(crate::worker::waking::handing::Handing::new(
-                at,
-                std::sync::Arc::clone(&lent.desks.delegates),
-                std::sync::Arc::clone(&lent.desks.workshop),
-                owing,
-            )),
-            Continuation::Harness => None,
-        }
-    }
 }
 
 impl RunWorker {

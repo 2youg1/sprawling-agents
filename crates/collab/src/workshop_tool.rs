@@ -33,7 +33,7 @@ use serde_json::{Map, Value};
 
 use crate::delegate_tool::DelegateDesk;
 use crate::fanin::{Artifact, FanIn, Joined, PrivateQuestion};
-use crate::workshop::{LaidOut, NodeContract, NodeId, Underway, Workshop};
+use crate::workshop::{Laid, LaidOut, NodeContract, NodeId, Underway, Workshop};
 
 /// One run's workshop: the graph it laid out, and what has come back to
 /// the room it works in.
@@ -45,15 +45,6 @@ pub struct WorkshopDesk {
     handed: BTreeSet<NodeId>,
     underway: Laid,
     joined: FanIn,
-}
-
-/// This run's graph: not laid out, held here, or taken by the city at the
-/// call (collab D7), which still counts as the run's one lay-out.
-#[derive(Debug)]
-enum Laid {
-    Nothing,
-    Held(Underway),
-    Taken,
 }
 
 impl WorkshopDesk {
@@ -128,14 +119,7 @@ impl WorkshopDesk {
 
     /// The graph this run laid out, for the city to keep beside the join.
     pub fn take_underway(&mut self) -> Option<Underway> {
-        match std::mem::replace(&mut self.underway, Laid::Taken) {
-            Laid::Held(underway) => Some(underway),
-            Laid::Nothing => {
-                self.underway = Laid::Nothing;
-                None
-            }
-            Laid::Taken => None,
-        }
+        self.underway.take()
     }
 
     /// What the join asks before it will take a verdict.

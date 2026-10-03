@@ -305,10 +305,9 @@ pub(super) struct Desks {
     /// The tree the shelf files in, set once the lane has placed it.
     pub(super) shelf_root: std::sync::Arc<std::sync::OnceLock<PathBuf>>,
     pub(super) pr: std::sync::Arc<std::sync::Mutex<collab::PrDesk>>,
-    /// The room's workshop, holding what it already got back and handed
-    /// down, so a graph laid out again hands nothing down twice.
+    /// The room's workshop (what it got back and handed down, so nothing
+    /// is handed twice) and the run's delegate desk, read at the call.
     pub(super) workshop: std::sync::Arc<std::sync::Mutex<collab::WorkshopDesk>>,
-    /// What this run hands down, which the city starts at the call.
     pub(super) delegates: std::sync::Arc<std::sync::Mutex<collab::DelegateDesk>>,
     /// Where the shared plan lives, so the claims that survive are
     /// written back to the file they were checked against.

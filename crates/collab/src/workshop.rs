@@ -342,6 +342,7 @@ impl Workshop {
 
 mod underway;
 
+pub(crate) use underway::Laid;
 pub use underway::Underway;
 
 #[cfg(test)]

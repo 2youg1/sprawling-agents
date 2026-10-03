@@ -17,7 +17,7 @@ use std::sync::{Arc, Mutex};
 
 use kernel::{Address, AxError, RunId};
 
-use super::super::{Assignment, Owing, RunWorker, held};
+use super::super::{Assignment, Continuation, Owing, RunWorker, held};
 
 const DELEGATE_DESK: &str = "read the delegate desk";
 const WORKSHOP_DESK: &str = "read the workshop desk";
@@ -85,6 +85,22 @@ impl Handing {
             taint: at.taint.clone(),
             owing: owing.child(at.addr.clone()),
             graph: Graph::NotLaidOut,
+        }
+    }
+}
+
+impl Continuation {
+    /// What the city reads, while this run drives, to start the work it
+    /// hands down at the call (collab D7). A harness run has no desks.
+    pub(in crate::worker) fn handing(&self, at: &Assignment, owing: &Owing) -> Option<Handing> {
+        match self {
+            Continuation::Model(lent) => Some(Handing::new(
+                at,
+                std::sync::Arc::clone(&lent.desks.delegates),
+                std::sync::Arc::clone(&lent.desks.workshop),
+                owing,
+            )),
+            Continuation::Harness => None,
         }
     }
 }

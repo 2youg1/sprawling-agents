@@ -76,7 +76,7 @@ theorem withoutHanded_hands_twice :
 /-!
 ## 图在派活那一刻登记（collab D7、D14）
 
-上面三条只看一次 `hand_next`。下面的模型看父房间的一张图从摆出到关掉的整段 trace，规定 W6 要把 `crates/accounting/src/worker/dispatching/handback.rs`（`hand_down_what_is_ready`）与 `crates/accounting/src/worker/settling/landing.rs`（`conclude`）改成的样子；今天的代码与它的差别写在 `crates/collab/Spec.lean` §4。
+上面三条只看一次 `hand_next`。下面的模型看父房间的一张图从摆出到关掉的整段 trace，规定 `crates/accounting/src/worker/waking/handing.rs`（调用时登记与派出，`end_hand_over` 按父 run 的结局关图）与 `crates/accounting/src/worker/dispatching/handback.rs`（`hand_down_what_is_ready`）。
 
 - `layOut`：父 run 调 `workshop lay_out` 的那一刻。图就在这时登记给父房间（状态 `live`），就绪的节点当场派出，不等父 run 落地（D7）。同一个 run 再摆一次，新图取代旧图，已派集照带。构造时重名的图被拒（`Workshop::new`），模型里是一个空操作。
 - `land x back`：在飞的子节点 `x` 落地。它的 handback 投进父房间（`backs`）；`Finished` 才汇入 join（`done`），`Stopped` 只投信不汇合。图还开着，就按新的 `done` 再派一次就绪集；全部汇合就关图。子节点落地与父 run 落地的先后不受约束。
@@ -421,7 +421,7 @@ theorem a_child_landing_first_hands_down (acts : List Act) {x : Nat}
 /-!
 ## 被否决的半步：调用时派出，落地时才登记
 
-W4 找到的危险：节点在调用时经 `DelegateDesk` 派出，`hand_down_what_is_ready` 读的却是父 run 落地时才插进 `collaborating.workshops` 的图。下面把登记推迟到父 run 以 `Done` 或 `Limit` 落地：比父先落地的节点 1 什么也派不下去，父落地后节点 2 就绪而未派，再也没有一次 handback 叫它。
+危险在于：节点在调用时经 `DelegateDesk` 派出，`hand_down_what_is_ready` 读的却是父 run 落地时才插进 `collaborating.workshops` 的图。下面把登记推迟到父 run 以 `Done` 或 `Limit` 落地：比父先落地的节点 1 什么也派不下去，父落地后节点 2 就绪而未派，再也没有一次 handback 叫它。
 -/
 
 def stepRegisteringAtLanding (r : Room) : Act → Room
@@ -439,16 +439,16 @@ theorem withoutCallRegistration_strands :
   decide
 
 /-!
-## W6 的导出检查：轨迹向量与两个故意改坏的实现
+## 导出检查：轨迹向量与两个故意改坏的实现
 
-W6 的 Rust 测试经生产入口（`RunWorker` 的落地与 handback，`crates/accounting/src/worker/dispatching/handback.rs`）逐条重放下面的动作序列，断言派活记录（`handed`，按派出次序）、汇合集、投到父房间的 handback 与关图与否等于这里的值。节点 id 是子房间地址的序号；`Back.finished` 是子 run 以 Done 落地并通过 done check，`Back.stopped` 是它停下；`Ending` 是父 run 的落地结局。每条向量由 `lake build` 经 `#guard` 判定，模型改了而向量没跟上，构建就红。
+Rust 测试经生产入口（`RunWorker::hand_over_at_call`、子 run 的落地与 handback、`end_hand_over`）重放下面的动作序列，断言派活记录（`handed`，按 `run_started` 次序）、汇合集与关图与否等于这里的值：`crates/accounting/src/worker/waking/delegating_tests.rs` 的 `vectors` 重放 `vectorEarly` 与 `vectorCancelled`；`vectorFailed` 与 `vectorCancelled` 在 Rust 里走 `GraphAfter::Closed` 同一臂。节点 id 是子房间地址的序号；`Back.finished` 是子 run 以 Done 落地并通过 done check，`Back.stopped` 是它停下；`Ending` 是父 run 的落地结局。每条向量由 `lake build` 经 `#guard` 判定，模型改了而向量没跟上，构建就红。
 
 两个故意改坏的实现必须各让至少一条向量变红：
 
-- **落地才登记**（`stepRegisteringAtLanding`，即 W4 的半步）：`vectorEarly`、`vectorCancelled`、`vectorFailed` 都变红，节点 2 与 3 不派（最后一条 `#guard` 判这件事）。
+- **落地才登记**（`stepRegisteringAtLanding`，即被否决的半步）：`vectorEarly`、`vectorCancelled`、`vectorFailed` 都变红，节点 2 与 3 不派（最后一条 `#guard` 判这件事）。
 - **关图不挡**（`stepIgnoringEnding`）：`hand_down_what_is_ready` 不看父 run 的结局（`holds`），`vectorCancelled` 与 `vectorFailed` 变红，节点 4 被派出。
 
-`vectorStopped` 记下今天的另一个缺口：停下的子节点投了 handback 却不汇合，图永远开着、节点 4 永远不派；W6 若改这条，先改模型。
+`vectorStopped` 记下 `crates/collab/Spec.lean` §3 那个未定的问题：停下的子节点投了 handback 却不汇合，图永远开着、节点 4 永远不派；要改这条，先改模型。
 -/
 
 /-- 菱形：1 在前，2、3 依赖 1，4 依赖 2 与 3。 -/

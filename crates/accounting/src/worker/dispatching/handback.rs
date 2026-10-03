@@ -10,6 +10,10 @@
 //! else, which is why it reads on its own rather than at the end of the
 //! file that prepares a dispatch and lands it: the reader's question
 //! here is what a parent learns, not what a child did.
+//!
+//! What a graph hands down when a node lands, and when it stops, is
+//! specified by `crates/collab/spec/Workshop.lean`; the parent's ending
+//! closes the graph in `crate::worker::waking::handing`.
 
 use std::collections::BTreeSet;
 
@@ -115,7 +119,8 @@ impl RunWorker {
     /// Hands down the nodes of the parent room's graph that its join has
     /// just made ready, the way the node that handed back was handed
     /// down: under the same parent run, under the same run policy, owing the same
-    /// room. The graph is dropped once every node has joined.
+    /// room. The graph is dropped once every node has joined; a graph its
+    /// parent's ending closed is already gone, so nothing more is handed.
     ///
     /// # Errors
     /// Propagates the delegate desk's refusal and whatever starting a

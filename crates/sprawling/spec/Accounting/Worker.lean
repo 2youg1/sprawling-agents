@@ -629,7 +629,7 @@ impl Freezing<'_> {
 |---|---|---|---|
 | e | 规则／配置／选型／身份／租约（步 3） | ≈70 | `Site` |
 | f | 五张 desk 的构造（步 3–4） | ≈75 | `Desks`（扩 `pr` 与 `waiting`） |
-| g | catalog＋十三件工具＋bench（步 6） | ≈175 | `Workbench`（catalog、bench、delegates） |
+| g | catalog＋十三件工具＋bench（步 6） | ≈175 | `Workbench`（catalog、bench；delegates 与 workshop 两张桌子在 `Desks` 里，记账线程在调用时读它们） |
 | h | prefix＋RunPlan＋handoff（步 5） | ≈90 | `(RunPlan, Handoff)` |
 
 **依赖序即执行序，而且依赖是真的**：工具块读十五个局部（`write_root`／`rules`／`config`／`building`／`who`／`depth`／`model` …），先有 `Site` 才能让 g 收得下参数，而不是把十五个形参排成一列。
@@ -1358,7 +1358,7 @@ citysim 的 `sieving.rs` 改为调它；旧函数删除（迁移做完，不留�
 
 **问题**：§8-42-7 逐字段量过——`Driving` 今天跨不过线程边界，卡住它的是两件不在 `bin` 里的事实：
 `kernel::Tool` 没有 `Send` 上界，于是 `ToolBench.tools: BTreeMap<String, Box<dyn Tool>>` 不是 `Send`；
-五张桌子（signals／goals／plan／shelf／pr，加 delegates 与 workshop 两张只在 workbench 里的）全是 `Rc<RefCell<_>>`，工具持有它们的克隆。
+五张桌子（signals／goals／plan／shelf／pr，加 delegates 与 workshop 两张）全是 `Rc<RefCell<_>>`，工具持有它们的克隆。
 没有这次拆分，池只能写成没有第二实现的空壳。
 
 ### 依据：什么要变、什么不变
@@ -1527,7 +1527,7 @@ fn serve_flight(&mut self, wait: Duration) -> Result<Landed, AxError>;
 | `Command::Dispatch` | `Asked` | 醒来的邻居接着答 |
 | `pursue` 的一行 | `Row { addr, node }` | 该行仍 ready 则追求停下 |
 | `tick`／`wake`／`answer_knocks`／`answer_approval` | `Unasked(_)` | 无人可答，起不来时记一条 `Refuse` 诊断 |
-| 委派子活 | `Child { parent }` | 向提问的房间投 handback 并汇入它的 join，派出那个房间的图因此就绪的节点；房间没有图、或图已汇合删去时为它敲门（`crates/collab/Spec.lean` §8 `collab::handback`、`crates/collab/spec/Workshop.lean`） |
+| 委派子活 | `Child { parent }` | 子活在父 run 调用 `delegate` 或 `workshop lay_out` 时就开，图在同一刻登记给父房间（`accounting::worker::waking::handing`，collab D7），所以子活可能在父 run 落地之前落地；落地时向提问的房间投 handback 并汇入它的 join，派出那个房间的图因此就绪的节点；房间没有图、或图已汇合删去时为它敲门（`crates/collab/Spec.lean` §8 `collab::handback`、`crates/collab/spec/Workshop.lean`） |
 | 继任 | 继承前任的 `Owing` | 义务随活走：链条结束时才兑现 |
 
 **义务跟着活走，不跟着轮次走**：继任者是同一件工作接着做，所以要 handback 或要回信的那一位，

@@ -117,3 +117,28 @@ impl Underway {
         self.workshop.schedule().iter().all(|id| done.contains(id))
     }
 }
+
+/// Where one run's graph is: not laid out, held by the run's desk, or
+/// taken by the city at the call (collab D7). Taken still counts as the
+/// run's one lay-out, so a second `lay_out` is refused after the city
+/// took the first.
+#[derive(Debug)]
+pub(crate) enum Laid {
+    Nothing,
+    Held(Underway),
+    Taken,
+}
+
+impl Laid {
+    /// The held graph, once; `None` before a lay-out and after the take.
+    pub(crate) fn take(&mut self) -> Option<Underway> {
+        match std::mem::replace(self, Laid::Taken) {
+            Laid::Held(underway) => Some(underway),
+            Laid::Nothing => {
+                *self = Laid::Nothing;
+                None
+            }
+            Laid::Taken => None,
+        }
+    }
+}
