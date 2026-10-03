@@ -9,9 +9,9 @@
 import { Schema } from "effect";
 
 /** The wire version both ends compare on connect. */
-export const WIRE_V = 54 as const;
+export const WIRE_V = 55 as const;
 /** The schema hash the server checks: `wire::schema_hash()`. */
-export const WIRE_HASH = "b98b124426ce8fe8927fc5dda4e97d62fd0f022c9ba96c3098d0395a75bde86c" as const;
+export const WIRE_HASH = "7622c050c06af963759f4859c781f770cbccbf18ccc9c891c1f7fba69c6d63a0" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 /** The body sizes a person may ask for: `wire::BODY_PX_MIN` and `BODY_PX_MAX`. */
@@ -81,7 +81,7 @@ export const ClusterKey = Schema.Struct({
 export type ClusterKey = typeof ClusterKey.Type;
 
 /**
- * Where content is: `cas:b3-<hash>` or `file:<address>@<oid>`, each with an              optional `#L<a>-<b>` or `#B<a>-<b>` range, as `kernel::locator` parses it.
+ * Where content is: `cas:b3-<hash>` or `file:<address>@<oid>`, each with an optional `#L<a>-<b>` or `#B<a>-<b>` range, as `kernel::locator` parses it.
  */
 export const Locator = Schema.String.pipe(Schema.brand("Locator"));
 export type Locator = typeof Locator.Type;
@@ -3503,6 +3503,26 @@ export const SessionsAnswer = Schema.Struct({
 export type SessionsAnswer = typeof SessionsAnswer.Type;
 
 /**
+ * One interpreter's shell lines that ended with a code.
+ */
+export const ShellCalls = Schema.Struct({
+  calls: Schema.Int,
+  failures: Schema.Record(Schema.String, Schema.Int),
+  interpreter: Schema.String,
+}).annotate({ identifier: "ShellCalls" });
+export type ShellCalls = typeof ShellCalls.Type;
+
+/**
+ * Every shell interpreter the ledger saw, with how its shell lines
+ * ended (`crates/wire/spec/Reading.lean` D48). The fold is
+ * `runtime::ShellTally`'s; this is its reading on the wire.
+ */
+export const ShellsAnswer = Schema.Struct({
+  interpreters: Schema.Array(ShellCalls),
+}).annotate({ identifier: "ShellsAnswer" });
+export type ShellsAnswer = typeof ShellsAnswer.Type;
+
+/**
  * What the audit concluded.
  */
 export const AuditVerdict = Schema.Union([
@@ -3926,6 +3946,9 @@ export const Answer = Schema.Union([
     usage_export: UsageExportAnswer,
   }),
   Schema.Struct({
+    shells: ShellsAnswer,
+  }),
+  Schema.Struct({
     toolkits: ToolkitsAnswer,
   }),
   Schema.Struct({
@@ -3952,6 +3975,7 @@ export const Answer = Schema.Union([
   Schema.Struct({
     unavailable: Schema.Struct({
       query: Schema.String,
+      reason: Schema.optional(Schema.NullOr(Schema.String)),
     }),
   }),
 ]).annotate({ identifier: "Answer" });
@@ -4218,6 +4242,7 @@ export const Query = Schema.Union([
       what: UsageKind,
     }),
   }),
+  Schema.Literal("shells"),
 ]).annotate({ identifier: "Query" });
 export type Query = typeof Query.Type;
 
