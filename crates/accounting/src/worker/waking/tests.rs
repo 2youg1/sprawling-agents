@@ -102,6 +102,66 @@ fn a_signal_wakes_the_resident_it_was_sent_to_and_says_who_spoke() {
     );
 }
 
+/// D7: a signal takes effect when it is sent. Its `signal_enqueued`
+/// line reaches the history while the sender is still running, before
+/// that run's `run_frozen`, rather than when the sender lands.
+#[test]
+fn a_signal_is_on_the_history_before_the_sender_freezes() {
+    let dir = tempfile::tempdir().unwrap();
+    let report = crate::worker::fixture::init_city(dir.path()).unwrap();
+    city::create_building(
+        dir.path(),
+        &Address::parse("market").unwrap(),
+        city::BuildingTemplate::Minimal,
+    )
+    .unwrap();
+    move_in(dir.path(), "market/ito");
+    move_in(dir.path(), "market/hana");
+    let (base_url, _provider) = fake_openai(
+        &["m-local"],
+        vec![
+            tool_completion(
+                "asking hana",
+                "tu_1",
+                "signal",
+                serde_json::json!({
+                    "action": "send",
+                    "to": "market/hana",
+                    "text": "what is your rate?",
+                }),
+            ),
+            completion("done", None),
+            completion("hana answers", None),
+        ],
+    );
+    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
+    worker
+        .handle(wire::Command::Dispatch {
+            addr: Address::parse("market/ito").unwrap(),
+            task: "ask hana what she charges".to_owned(),
+            goal: "a price".to_owned(),
+            policy: kernel::RunPolicy::of(kernel::Mode::Work),
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
+            session: None,
+            effort: None,
+            model: None,
+        })
+        .unwrap();
+    let kinds: Vec<String> = runtime::replay::verify_ledger_dir(&report.ledger_dir)
+        .unwrap()
+        .raw_lines()
+        .iter()
+        .filter_map(|line| serde_json::from_slice::<serde_json::Value>(line).ok())
+        .map(|line| line["kind"].as_str().unwrap_or_default().to_owned())
+        .collect();
+    let sent = kinds.iter().position(|kind| kind == "signal_enqueued");
+    let frozen = kinds.iter().position(|kind| kind == "run_frozen");
+    assert!(
+        matches!((sent, frozen), (Some(sent), Some(frozen)) if sent < frozen),
+        "the signal is sent while its sender runs: {kinds:?}"
+    );
+}
+
 /// A knock that would carry one conversation past its ceiling starts
 /// nothing: the signal is already in the room's inbox, and the chain
 /// ends here rather than with another run nobody asked for

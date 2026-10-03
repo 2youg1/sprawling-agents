@@ -197,3 +197,40 @@ fn an_unreadable_steer_is_refused_and_still_recorded_as_consumed() {
         other => panic!("taking a signal consumes it, not {other:?}"),
     }
 }
+
+fn steer(id: &str, words: &str) -> Signal {
+    let mut body = Map::new();
+    body.insert("text".to_owned(), Value::String(words.to_owned()));
+    Signal::new(
+        SignalId::parse(id).unwrap(),
+        SignalKind::Steer,
+        "mason@lab.2".to_owned(),
+        Address::parse("lab/room1").unwrap(),
+        Version::FIRST,
+        Payload::new(body).unwrap(),
+        TimeMs::new(10),
+    )
+    .unwrap()
+}
+
+/// F8: a run that took a steer and left before any model answer read it
+/// gives it back. The trace is `withoutRequeue_loses` in
+/// `spec/Delivery.lean`: send, start, take, cancel.
+#[test]
+fn a_steer_taken_and_never_answered_goes_back_when_the_run_leaves() {
+    let shared = desk("lab/room1", "lab");
+    shared
+        .lock()
+        .unwrap()
+        .inbox
+        .deliver(&steer("s1", "stop and read the brief"))
+        .unwrap();
+    let mut borrowed = shared.lock().unwrap();
+    assert!(borrowed.take_steer().unwrap().is_some());
+    let returned = borrowed.take_inbox();
+    assert_eq!(
+        returned.pending(),
+        1,
+        "a signal no recorded answer read is still waiting for the room"
+    );
+}
