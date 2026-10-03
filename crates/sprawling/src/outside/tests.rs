@@ -271,6 +271,59 @@ fn a_restarted_city_keeps_its_key() {
 }
 
 #[test]
+fn replacing_the_key_unpairs_every_device() {
+    let dir = tempfile::tempdir().unwrap();
+    let written = Written::default();
+    let vault = vault();
+    let doorway = started(dir.path(), &written, &vault, 1);
+    doorway.open(local(), lasting("1h")).unwrap();
+    let phone = pair(&doorway, "phone", Authority::Act, 8);
+    pair(&doorway, "tablet", Authority::Watch, 9);
+    doorway
+        .revoke(&Revoking::Named("tablet".to_owned()))
+        .unwrap();
+    let while_open = doorway.replace_key().err().map(|refused| *refused.code());
+    doorway
+        .close(kernel::event::record::RemoteClosing::Console)
+        .unwrap();
+    let unpaired: Vec<String> = doorway
+        .replace_key()
+        .unwrap()
+        .iter()
+        .map(|device| device.name.as_str().to_owned())
+        .collect();
+    drop(doorway);
+    let restarted = started(dir.path(), &Written::default(), &vault, 2_000);
+    let before_pairing = restarted.devices().unwrap().len();
+    restarted.open(local(), lasting("1h")).unwrap();
+    let same_city = restarted
+        .invite("phone", Authority::Act)
+        .ok()
+        .map(|inviting| inviting.invitation.city == handshake::CityFingerprint::of(&phone.city));
+    let revoked_lines = written
+        .kinds()
+        .iter()
+        .filter(|kind| **kind == EventKind::DeviceRevoked)
+        .count();
+    assert_eq!(
+        (
+            while_open,
+            unpaired,
+            before_pairing,
+            same_city,
+            revoked_lines
+        ),
+        (
+            Some(AxCode::Busy),
+            vec!["phone".to_owned()],
+            0,
+            Some(false),
+            2
+        )
+    );
+}
+
+#[test]
 fn a_remote_line_reads_as_the_verb_it_names() {
     assert_eq!(
         (
@@ -281,6 +334,7 @@ fn a_remote_line_reads_as_the_verb_it_names() {
             [
                 parse("pair 客厅的 iPad --watch"),
                 parse("revoke --all"),
+                parse("replace-key"),
                 parse("close now"),
                 parse("open --for 8w"),
             ]
@@ -293,6 +347,7 @@ fn a_remote_line_reads_as_the_verb_it_names() {
                     authority: Authority::Watch,
                 },
                 RemoteLine::Revoke(Revoking::All),
+                RemoteLine::ReplaceKey,
                 RemoteLine::Unreadable,
                 RemoteLine::Unreadable,
             ]

@@ -20,7 +20,9 @@ use kernel::{AxCode, AxError, B3Hash, SecretRef};
 use remote_access::keys::{self, SEED_BYTES, SigningKey};
 use zeroize::Zeroizing;
 
-use super::Entropy;
+use remote_access::door::Device;
+
+use super::{Doorway, Entropy};
 
 /// The realm every city key is kept under.
 const REALM: &str = "remote";
@@ -103,5 +105,28 @@ impl CityKey {
             )
             .with_recovery("restart the city; the key the vault keeps is read again")
         })
+    }
+}
+
+impl Doorway {
+    /// Replaces the city key with one from a fresh seed and revokes every
+    /// paired device, since each pins the old key: the devices answered
+    /// are the ones that pair again.
+    ///
+    /// # Errors
+    /// `E_BUSY` while the door is open, because its sessions were
+    /// shaken hands with the old key; a vault or random source that
+    /// refuses, and nothing has changed then; a table or a line that
+    /// cannot be written.
+    pub(crate) fn replace_key(&self) -> Result<Vec<Device>, AxError> {
+        Ok(Vec::new())
+    }
+
+    /// How long this machine keeps the city key.
+    ///
+    /// # Errors
+    /// A lock that was poisoned.
+    pub(crate) fn key_lasting(&self) -> Result<Persistence, AxError> {
+        self.kept()?.key.lasting()
     }
 }

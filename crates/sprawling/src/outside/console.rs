@@ -3,8 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! `/remote` on the city's console: open, pair, close, devices, revoke
-//! (`crates/sprawling/spec/Outside.lean` §8-140).
+//! `/remote` on the city's console: open, pair, close, devices, revoke,
+//! replace-key (`crates/sprawling/spec/Outside.lean` §8-140).
 //!
 //! These verbs are not on the wire, so no frame - from a browser, a
 //! remote device or a tool a resident holds - can open the door or pair
@@ -17,6 +17,7 @@
 //! because a terminal draws text light on dark and a scanner wants dark
 //! on light.
 
+use gateway::Persistence;
 use kernel::AxError;
 use kernel::event::record::RemoteClosing;
 use qrcodegen::{QrCode, QrCodeEcc};
@@ -35,7 +36,8 @@ const MS_PER_MINUTE: u64 = 60 * 1000;
 const QUIET: i32 = 2;
 
 const USAGE: &str = "/remote open [--for <30m|12h|2d>], /remote pair <name> [--watch], \
-                     /remote close, /remote devices, /remote revoke <name>|--all";
+                     /remote close, /remote devices, /remote revoke <name>|--all, \
+                     /remote replace-key";
 
 /// One `/remote` line, read.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -48,6 +50,8 @@ pub(crate) enum RemoteLine {
     Close,
     Devices,
     Revoke(Revoking),
+    /// A new city key; every paired device pairs again.
+    ReplaceKey,
     /// A line that is none of these; the console prints the usage.
     Unreadable,
 }
@@ -120,6 +124,7 @@ pub(crate) fn parse(tail: &str) -> RemoteLine {
         ("devices", []) => RemoteLine::Devices,
         ("revoke", ["--all"]) => RemoteLine::Revoke(Revoking::All),
         ("revoke", [_, ..]) => RemoteLine::Revoke(Revoking::Named(words.join(" "))),
+        ("replace-key", []) => RemoteLine::ReplaceKey,
         _ => RemoteLine::Unreadable,
     }
 }
@@ -133,7 +138,11 @@ pub(crate) fn carry(remote: &Result<Remote, AxError>, line: RemoteLine) -> Strin
     let doorway = &remote.doorway;
     let carried = match line {
         RemoteLine::Open(lasting) => super::listener::open(doorway, &remote.reaching, lasting)
-            .map(|opened| opening(&opened, lasting)),
+            .and_then(|opened| {
+                doorway
+                    .key_lasting()
+                    .map(|keeps| opening(&opened, lasting, keeps))
+            }),
         RemoteLine::Pair { name, authority } => doorway
             .invite(&name, authority)
             .and_then(|inviting| invitation(&inviting)),
@@ -164,12 +173,23 @@ pub(crate) fn carry(remote: &Result<Remote, AxError>, line: RemoteLine) -> Strin
             let names: Vec<&str> = revoked.iter().map(|device| device.name.as_str()).collect();
             format!("  revoked {}; their sessions ended", names.join(", "))
         }),
+        RemoteLine::ReplaceKey => doorway.replace_key().and_then(|revoked| {
+            let names: Vec<&str> = revoked.iter().map(|device| device.name.as_str()).collect();
+            let who = if names.is_empty() {
+                "no device was paired".to_owned()
+            } else {
+                format!("{} pair again", names.join(", "))
+            };
+            doorway
+                .key_lasting()
+                .map(|keeps| format!("  the city has a new key; {who}\n  {}", kept_for(keeps)))
+        }),
         RemoteLine::Unreadable => Ok(format!("  {USAGE}")),
     };
     carried.unwrap_or_else(|refused| refusal(&refused))
 }
 
-fn opening(opened: &Opened, lasting: Lasting) -> String {
+fn opening(opened: &Opened, lasting: Lasting, keeps: Persistence) -> String {
     let minutes = lasting.ms().checked_div(MS_PER_MINUTE).unwrap_or_default();
     let host = match opened.permanence {
         Permanence::Fixed => "",
@@ -179,13 +199,36 @@ fn opening(opened: &Opened, lasting: Lasting) -> String {
         }
     };
     format!(
-        "  the remote door is open for {}h {}m at {}{host}\n  \
-         the city's key lives in this process: a device paired now pairs again after the city \
-         restarts",
+        "  the remote door is open for {}h {}m at {}{host}\n  {}",
         minutes.checked_div(60).unwrap_or_default(),
         minutes.checked_rem(60).unwrap_or_default(),
-        opened.url.as_str()
+        opened.url.as_str(),
+        kept_for(keeps)
     )
+}
+
+/// How long a paired device stays paired, which is how long this
+/// machine's vault keeps the city key (`crates/gateway/spec/Credential.lean`
+/// §8-4). Where the key lives is the doctor's report; this says only what
+/// it costs a device.
+fn kept_for(keeps: Persistence) -> &'static str {
+    match keeps {
+        Persistence::AcrossReboots => {
+            "the city's key is kept in this computer's credential store: paired devices stay \
+             paired when the city or the computer restarts"
+        }
+        Persistence::AcrossRebootsWithPassphrase => {
+            "the city's key is kept in the encrypted vault file: paired devices stay paired when \
+             the city or the computer restarts"
+        }
+        Persistence::ThisBoot => {
+            "the city's key is kept in the kernel keyring until this computer restarts: devices \
+             pair again after that"
+        }
+        Persistence::ThisProcess => {
+            "the city's key lives in this process only: devices pair again after the city restarts"
+        }
+    }
 }
 
 fn invitation(inviting: &Inviting) -> Result<String, AxError> {

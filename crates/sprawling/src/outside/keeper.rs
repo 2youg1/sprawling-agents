@@ -266,18 +266,7 @@ impl Doorway {
                 named
             }
         };
-        for device in &chosen {
-            kept.door.revoke(device.id)?;
-        }
-        super::devices::write(&kept.devices, kept.door.devices())?;
-        for device in &chosen {
-            let line = DeviceRevoked {
-                device: device.id.text(),
-                name: device.name.as_str().to_owned(),
-            };
-            kept.record(now, Who::Person, EventKind::DeviceRevoked, &line)?;
-        }
-        Ok(chosen)
+        kept.revoked(now, chosen)
     }
 
     fn kept(&self) -> Result<MutexGuard<'_, Kept>, AxError> {
@@ -295,6 +284,23 @@ impl Doorway {
 }
 
 impl Kept {
+    /// Revokes `chosen`, keeps the table, and writes one `device_revoked`
+    /// each.
+    fn revoked(&mut self, now: TimeMs, chosen: Vec<Device>) -> Result<Vec<Device>, AxError> {
+        for device in &chosen {
+            self.door.revoke(device.id)?;
+        }
+        super::devices::write(&self.devices, self.door.devices())?;
+        for device in &chosen {
+            let line = DeviceRevoked {
+                device: device.id.text(),
+                name: device.name.as_str().to_owned(),
+            };
+            self.record(now, Who::Person, EventKind::DeviceRevoked, &line)?;
+        }
+        Ok(chosen)
+    }
+
     /// The city's signing key, or the refusal its seed was read with.
     fn city(&self) -> Result<&SigningKey, AxError> {
         self.city.as_ref().map_err(Clone::clone)
