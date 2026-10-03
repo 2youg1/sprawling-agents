@@ -85,7 +85,7 @@ reading_room = ["tutor", "blast-radius"]
 shelves = ["~/.claude/skills"]
 ```
 
-**设置**里的 **技能** 一组列出每一格书架、每栋楼准入了什么、每件 skill 被多少次 run 用过。本仓库在 [`../skills/`](../skills/) 下附带七件 skill。
+**设置**里的 **技能** 一组列出每一格书架、每栋楼准入了什么、每件 skill 被多少次 run 用过。本仓库在 [`../crates/city/skills/`](../crates/city/skills/) 下附带九件 skill；二进制带着它们，新建的城在自己的书架上就能找到每一件。
 
 **MCP**（Model Context Protocol）是一栋楼通往外部应用——邮件、GitHub、Figma、文档转换器——的路，经由一个工具服务。一个 server 是楼的 `CONFIG.toml` 里的一条：电脑上的程序写 `command`，托管服务写 `url`；**MCP** 页替你写同样的条目。保密楼一个也不起。
 
@@ -161,7 +161,7 @@ gh attestation verify sprawling-<version>-<platform>.zip --repo 2youg1/sprawling
 sprawling up ~/cities/first
 ```
 
-目录里还没有城时，这一条先把城建起来，然后在 `127.0.0.1:8787` 上服务，并用操作系统打开链接的那个浏览器打开页面。这个终端成为城的控制台：`/help` 列出它接受的命令，`/serving` 重报一遍城在哪里监听，`Ctrl-C` 停城。什么参数都不带地跑 `sprawling`，它先给出打算建城的文件夹，按 Enter 就在那里建。
+目录里还没有城时，这一条先把城建起来，然后在 `127.0.0.1:8787` 上服务，并用操作系统打开链接的那个浏览器打开页面。这个终端成为城的控制台：`/help` 列出它接受的命令，`/serving` 重报一遍城在哪里监听，`Ctrl-C` 停城。控制台为城记下的每条记录打一行：它在账本里的位置、事件种类和地址，从不打出你输入的话或模型的回答，因为终端谁站在旁边都看得见；`sprawling up --whole-records` 才把每条记录整条打出来。Windows、macOS、Linux 上打出来的一样。什么参数都不带地跑 `sprawling`，它先给出打算建城的文件夹，按 Enter 就在那里建。
 
 要在已有的项目上干活，就在装着这些项目的文件夹里建城，或者把项目挪进城的文件夹，再用 `sprawling adopt ~/cities/first myproject` 把它收为一栋楼。收编不覆盖任何文件：它在你的工作旁边放下城的表单，并加一条 `.gitignore`，让城的笔记不进你项目的历史。
 

@@ -85,7 +85,7 @@ A name on that list that no shelf holds is left out and reported, rather than pr
 shelves = ["~/.claude/skills"]
 ```
 
-The **skills** group under **settings** shows every shelf, what each building admits, and how many runs used each skill. This repository ships seven skills under [`../skills/`](../skills/).
+The **skills** group under **settings** shows every shelf, what each building admits, and how many runs used each skill. This repository ships nine skills under [`../crates/city/skills/`](../crates/city/skills/); the binary carries them, and a new city finds every one on its library shelf.
 
 **MCP** (Model Context Protocol) is how a building reaches outside applications — mail, GitHub, Figma, a document converter — through a tool server. A server is one entry in the building's `CONFIG.toml`, a `command` for a program on this machine or a `url` for a hosted one, and the **MCP** page writes the same entries for you. A confidential building starts none.
 
@@ -161,7 +161,7 @@ The binaries are not code-signed: on Windows choose *More info*, then *Run anywa
 sprawling up ~/cities/first
 ```
 
-This raises the city if the directory does not hold one, serves it on `127.0.0.1:8787`, and opens the page in the browser your operating system opens links with. The terminal becomes the city's console: `/help` lists what it takes, `/serving` repeats where the city listens, and `Ctrl-C` stops the city. `sprawling` with no arguments shows the folder it would start a city in, and Enter starts it there.
+This raises the city if the directory does not hold one, serves it on `127.0.0.1:8787`, and opens the page in the browser your operating system opens links with. The terminal becomes the city's console: `/help` lists what it takes, `/serving` repeats where the city listens, and `Ctrl-C` stops the city. The console prints one line for each record the city commits — its position, its kind and its address — and never what you typed or what a model answered, because a terminal is seen by whoever stands nearby; `sprawling up --whole-records` prints each record whole. It prints the same on Windows, macOS and Linux. `sprawling` with no arguments shows the folder it would start a city in, and Enter starts it there.
 
 To work on projects you already have, raise the city in the folder that holds them, or move a project into the city's folder, and take it in as a building with `sprawling adopt ~/cities/first myproject`. Adopting overwrites no file; it adds the city's forms beside your work and a `.gitignore` entry that keeps the city's notes out of your project's history.
 

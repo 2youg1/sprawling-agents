@@ -90,18 +90,18 @@ The **official harnesses** group in settings shows the command that starts each 
 | Area | What works |
 |---|---|
 | Residents | Any provider that speaks the OpenAI or the Anthropic format, a local model server, and the five official harnesses over ACP. |
-| Work | Several runs at once, each on its own git worktree and merged after review; a standing goal that drives every ready part of a plan; residents that talk to and wake each other. |
+| Work | Several runs at once, each on its own git worktree and merged after review; a standing goal that drives every ready part of a plan; residents that talk to and wake each other, where a signal or a delegation takes effect when it is sent and a sender can stop and wait for the reply. |
 | Tools | Built-in tools, the skills a building admits, any MCP server over stdio, HTTP or SSE, a browser the city drives, and the Windows desktop behind an allowlist. |
 | Running | New runs wait while memory is tight, and a dispatch is refused before anything is written when the disk is nearly full; a city can be paused, and `up --supervise` brings it back after a crash. |
 | Recovery | The recycle bin, `resume` after a crash, offline chain verification, and export and restore onto another machine. |
-| The page | A conversation with any room, the city, buildings, runs, the record, cost, MCP, a performance monitor, settings, and a document workspace that edits Markdown and text and previews PDF and DOCX, with versions and diffs. |
-| Reach | Machines on the same network with a pairing key, and the remote door through a route you choose. |
+| The page | A conversation with any room, sessions with a name and tags of their own, the city, buildings, runs, the record, cost, MCP, a performance monitor, settings in a tree that folds, a colour page, and a document workspace that edits Markdown and text and previews PDF and DOCX, with versions and diffs. |
+| Reach | Machines on the same network with a pairing key, and the remote door through a route you choose. The city key is kept in the city's vault, in Credential Manager on Windows or the Keychain on macOS, so a paired device stays paired when the city restarts; on Linux the kernel keyring keeps it until the computer reboots, and the encrypted vault file keeps it across reboots. |
 
 | Not yet | Where it stands |
 |---|---|
-| An OS sandbox on Windows and macOS | Commands run in a copy of the working tree: your files are safe, but the network is open. Linux with a namespace wrapper also closes the network and contains the process tree. The promise today is that a deletion can be undone, not that it cannot happen. |
+| An OS sandbox on Windows and macOS | Commands run in a copy of the working tree: your files are safe, but the network is open. Linux with a namespace wrapper also closes the network and contains the process tree. The promise today is that a deletion can be undone, not that it cannot happen. The arm names and each platform's default are decided ([`docs/operating.md`](docs/operating.md), *How `exec` is confined*); the Windows and macOS arms are not built. |
 | Harness residents with the city's tools | A harness gets neither the city's collaboration tools nor the building's MCP servers, a steer sent during its turn is recorded but not delivered, and its permission requests get the first allow-once option, inside its own worktree. |
-| Pairing that survives a restart | The remote key lives only as long as the process, so every device pairs again after the city restarts. |
+| Skill audit and usage | The Ledger has a line for a skill's audit and a skill's audit state is read from it, but nothing asks skills.sh or SkillSpector yet, so every skill shows as unaudited, and no per-skill usage table is folded. |
 | A checked phone layout | Below 768 px the page draws one column, but the render gate checks nothing narrower than 768 px. |
 | Browser end-to-end tests in CI | CI renders every settled screen in a real browser engine on fixtures, but no job drives a live city. |
 | Byte-identical builds across machines | Two builds on one machine match, checked nightly. Across machines the recorded source paths differ until `trim-paths` reaches the stable toolchain this project pins. |
