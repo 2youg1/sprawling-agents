@@ -25,6 +25,9 @@
 #             dispatch (`just acceptance`) with the environment a new
 #             account has, then `sprawling doctor`; the checklist and
 #             logs are the artifact `fresh-<os>-<tree>` (Roadmap G2, G6)
+#   keychain  on macOS: whether the Keychain asks again for the city key
+#             once the binary is replaced; the reading is the artifact
+#             `keychain-<tree>` (crates/remote_access/Spec.lean §3)
 #
 # Ask with `gh workflow run on-demand.yml --ref <branch> -f job=<name>`;
 # `mutants` also takes `-f base=<ref>` (default `main`). An artifact is
@@ -32,7 +35,8 @@
 # a reading taken from a download names the tree it measured.
 #
 # Every job here runs on Windows, the platform a person reproduces a red
-# on, except `fresh`, whose question is asked of all three platforms.
+# on, except `fresh`, whose question is asked of all three platforms, and
+# `keychain`, whose question exists only on macOS.
 # `pgo` runs on Windows, the platform the readings belong to. The same
 # three stages run unchanged on macOS and Linux (the rustc flags and
 # `llvm-profdata` from the `llvm-tools` component are the same there,
@@ -47,7 +51,7 @@ on:
         description: which run
         required: true
         type: choice
-        options: [mutants, sim, shots, release, pgo, fresh]
+        options: [mutants, sim, shots, release, pgo, fresh, keychain]
       base:
         description: the ref `mutants` diffs against
         required: false
@@ -410,4 +414,103 @@ jobs:
             target/acceptance/record.jsonl
             target/acceptance/provider.*
             ${{ runner.temp }}/fresh/logs
+          if-no-files-found: warn
+
+  # Whether the macOS Keychain asks again for the city key after the
+  # binary is replaced (crates/remote_access/Spec.lean §3, item 4 of the
+  # remote door's work list). Every `serve` reads the key kept under the
+  # service `sprawling/remote` and writes one the first time
+  # (`bin::outside::keeper::city_key`). The first build serves a new city
+  # once, so the key is written by it; the second build of the same tree
+  # (a release build where the first was a debug build, so the bytes and
+  # the code signature differ, as they do after an update) is copied over
+  # the first at the same path and serves the same city again.
+  #
+  # The reading has three outcomes. The second serve never takes commands
+  # within a minute: the read is waiting on a Keychain dialog nobody
+  # answers. It takes commands and the item was rewritten (its `mdat`
+  # moved): the Keychain answered "not found" and the city made a new
+  # key, which unpairs every device. It takes commands and the item is
+  # untouched: the read either succeeded silently or was refused with the
+  # platform's words, which the city keeps until the next pairing; the
+  # item's access list, printed beside it, says which of the two the
+  # Keychain was asked to apply. The job always succeeds once both serves
+  # ran: it reports, and the reading is for a person. A hosted runner is
+  # logged in to a desktop session with an unlocked login keychain, which
+  # a person's Mac has too; a dialog it would show nobody sees.
+  keychain:
+    if: inputs.job == 'keychain'
+    runs-on: macos-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+      - name: install pinned toolchain
+        run: rustup show
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: keychain
+          key: ${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+          save-if: false
+      - id: tree
+        shell: bash
+        run: echo "sha=$(git rev-parse 'HEAD^{tree}')" >> "$GITHUB_OUTPUT"
+      - name: two builds of this tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo build -p sprawling --locked
+          cargo build --release -p sprawling --locked
+          mkdir -p target/keychain
+          cp target/debug/sprawling target/keychain/first
+          cp target/release/sprawling target/keychain/second
+          shasum -a 256 target/keychain/first target/keychain/second | tee target/keychain/builds.txt
+          for build in first second; do codesign -dv target/keychain/$build 2>&1 | grep -E '^(CDHash|Signature)' | sed "s/^/$build /"; done | tee -a target/keychain/builds.txt
+      - name: serve with the first build, replace it, serve with the second
+        shell: bash
+        run: |
+          set -uo pipefail
+          out="$PWD/target/keychain"
+          city="$RUNNER_TEMP/keychain/city"
+          bin="$RUNNER_TEMP/keychain/bin/sprawling"
+          mkdir -p "$(dirname "$bin")"
+          at="127.0.0.1:47614"
+          item() { security find-generic-password -s sprawling/remote 2>&1 | grep -E '"(acct|cdat|mdat)"|could not be found' ; }
+          serve() {
+            "$bin" serve "$city" "$at" --no-open > "$out/$1.out" 2> "$out/$1.err" &
+            server=$!
+            taken=no
+            for _ in $(seq 1 600); do
+              grep -q 'commands are taken' "$out/$1.err" && { taken=yes; break; }
+              kill -0 "$server" 2> /dev/null || break
+              sleep 0.1
+            done
+            echo "$1: took commands within a minute: $taken" | tee -a "$out/reading.txt"
+            kill -INT "$server" 2> /dev/null
+            for _ in $(seq 1 100); do kill -0 "$server" 2> /dev/null || break; sleep 0.1; done
+            kill -KILL "$server" 2> /dev/null && echo "$1: did not close in order and was killed" | tee -a "$out/reading.txt"
+            wait "$server" 2> /dev/null
+            echo "$1: the item after it served:" >> "$out/reading.txt"
+            item >> "$out/reading.txt"
+          }
+          cp "$out/first" "$bin"
+          "$bin" init "$city" > "$out/init.out" 2>&1
+          serve first
+          cp "$out/second" "$bin"
+          serve second
+          before=$(sed -n '/^first: the item/,/^second:/p' "$out/reading.txt" | grep mdat)
+          after=$(sed -n '/^second: the item/,$p' "$out/reading.txt" | grep mdat)
+          if [ -z "$after" ]; then verdict="no city key is kept after the second serve"
+          elif grep -q '^second: took commands within a minute: no' "$out/reading.txt"; then verdict="the second build's read waited on the Keychain: a prompt"
+          elif [ "$before" != "$after" ]; then verdict="the second build found no key and wrote a new one"
+          else verdict="the second build left the key as the first wrote it: read silently, or refused with the words its access list implies"
+          fi
+          echo "verdict: $verdict" | tee -a "$out/reading.txt"
+          security dump-keychain -a 2> /dev/null | python3 -c 'import sys; print("".join("keychain: " + b for b in sys.stdin.read().split("keychain: ") if "sprawling/remote" in b))' > "$out/access-list.txt"
+          cat "$out/reading.txt"
+          test -s "$out/first.err" && test -s "$out/second.err"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: keychain-${{ steps.tree.outputs.sha }}
+          path: target/keychain
           if-no-files-found: warn
