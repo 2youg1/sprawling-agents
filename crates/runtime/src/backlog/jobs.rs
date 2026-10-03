@@ -175,7 +175,10 @@ impl RunJob {
                 let job = win32job::Job::create().ok()?;
                 // A job that refuses the weight still follows the run's
                 // processes; the run is read as unshared (D29).
-                self.share = CpuShare::Unset;
+                self.share = match desktop_ffi::cpu::job_share(job.handle(), RUN_CPU_WEIGHT, 0) {
+                    Ok(()) => CpuShare::Weighted,
+                    Err(_refused) => CpuShare::Unset,
+                };
                 job
             }
         };
