@@ -55,7 +55,6 @@ D2 后量子放在三处：TLS、设备认证、帧封装。TLS 负责传输层�
 以下是这个接口今天尚未落地的部分，按阶段写成当前状态；每一段落地时，从这里删掉，写进它所属的 §8 章节。
 
 - **`cloudflare` 通路没有在真的隧道上开过。** 自动测试不跑它（§2）。缺的证据有两件：在一台装了 `cloudflared`、能连上 Cloudflare 边缘的电脑上，按 §8-8 的操作者检查开、关一次；在一台出网受限（经代理、7844 端口被拦）的电脑上，`cloudflared` 在就绪之前退出时，能否给出比「它在就绪之前退出」更具体的一句拒绝。今天的拒绝给出手动跑的那一行命令，人从 `cloudflared` 自己的输出里读原因。
-- **城钥匙的保存已定（D23），尚未落地。** 今天装配层（`crates/sprawling/src/outside/keeper.rs` 的 `Doorway::keep`）在城每次启动时取 32 字节熵派生城的签名密钥，不存下来，所以城一重启，每台设备都要重新配对，`/remote open` 照实说出这一句。落地时要有的四件：`keys::SigningKey` 的 `from_sealed` 构造与它的测试（§8-3）；`xtask secret` 的 `EXPOSE_WHITELIST` 加 `crates/remote_access/src/keys.rs` 一项，单独一个门机制提交，带 `Verdict: user-approved`；装配层第一次需要城钥匙时取熵、经 vault 写进 D23 的引用，之后每次启动取回；设置里的「更换城钥匙」。落地之后这一段从这里删掉。
 -/
 
 /-! ## 4 现状分析
@@ -196,7 +195,7 @@ pub struct Signature(Box<[u8; SIGNATURE_BYTES]>);   // from_bytes／as_bytes
 
 - **城钥匙**（D23）：城自己的 `SigningKey` 由 vault 里的一份种子派生。`written` 把装配层新取的种子写成 vault 收的正文：§8-2 的小写 base32，不带填充，52 个字符，交出时已是 `Zeroizing`。`from_sealed` 读回这份正文；它是本 crate 唯一一处 `.expose(`，明文种子只活在这个函数里，派生完即随 `Zeroizing` 清掉。只认 `written` 写得出的那一种正文（解码后再编码要逐字相同），所以多一个字符、少一个字符、末位多出的位不为零、不在字母表里的字符都读不成 → `E_CONFIG_INVALID`，恢复语是在城的控制台上用 `/remote replace-key` 更换城钥匙、再重新配对设备。
 
-D23 城钥匙的种子存进城已有的 vault，兑现点在本 crate 的 `keys`（定规：采用 §3 当时列出的第一种做法）。引用的 realm 是 `remote`，name 是 `city-key.` 接这座城的创世 id，即 Ledger 创世行的链哈希（wire 的 `Welcome.epoch` 读的同一个值）的小写十六进制，由 `SecretRef::new` 在装配层一处造出，所以两座城不共用一把，`sprawling export` 打的包里没有 vault 条目，也就带不走它。「更换城钥匙」（今天是城的控制台上的 `/remote replace-key`，设置里的按钮随它的 wire 命令到来）生成新种子盖过旧的，再撤销每一台已配对的设备、各写一行 `device_revoked`：设备钉住的是旧钥匙，留在表里的设备既连不上，又占着名字让同名的重新配对被拒，所以每台设备都要重新配对；已撤销的设备不在表里，换钥匙也不把它带回来。门开着时拒绝更换，因为开着的会话是用旧钥匙握的手。每个平台上种子能留多久，就是 vault 在那个平台上能留多久（`crates/gateway/spec/Credential.lean` §8-4 的平台表）：Windows 凭据管理器与 macOS 钥匙串跨重启保留；Linux 的内核 keyutils 只留到这次开机结束，重启电脑后设备要重新配对，除非这座城用加密的 vault 文件（`crates/gateway/Spec.lean` §8-21）；vault 退回进程内时每次城重启都要重新配对，`/remote open` 照实说出这一句。局限：同一个系统用户下运行的程序都能读这个用户的凭据存放处，与 provider key 相同。落选的两种：兑现点放在装配层（`bin::outside::keeper`），明文种子会出现在组装根里，而 `EXPOSE_WHITELIST` 的注释写明它存在就是为了不让明文出现在那里；种子写进保留子树里的一份文件，明文凭据落在 vault 之外，`sprawling export` 也会把它带走，一份拷贝的城就能冒充原来那座。vault 有了跨机同步时重新考虑这一条，因为那时「两座城不共用一把」要由同步来守。
+D23 城钥匙的种子存进城已有的 vault，兑现点在本 crate 的 `keys`（定规）。引用的 realm 是 `remote`，name 是 `city-key.` 接这座城的创世 id，即 Ledger 创世行的链哈希（wire 的 `Welcome.epoch` 读的同一个值）的小写十六进制，由 `SecretRef::new` 在装配层一处造出，所以两座城不共用一把，`sprawling export` 打的包里没有 vault 条目，也就带不走它。「更换城钥匙」（今天是城的控制台上的 `/remote replace-key`，设置里的按钮随它的 wire 命令到来）生成新种子盖过旧的，再撤销每一台已配对的设备、各写一行 `device_revoked`：设备钉住的是旧钥匙，留在表里的设备既连不上，又占着名字让同名的重新配对被拒，所以每台设备都要重新配对；已撤销的设备不在表里，换钥匙也不把它带回来。门开着时拒绝更换，因为开着的会话是用旧钥匙握的手。每个平台上种子能留多久，就是 vault 在那个平台上能留多久（`crates/gateway/spec/Credential.lean` §8-4 的平台表）：Windows 凭据管理器与 macOS 钥匙串跨重启保留；Linux 的内核 keyutils 只留到这次开机结束，重启电脑后设备要重新配对，除非这座城用加密的 vault 文件（`crates/gateway/Spec.lean` §8-21）；vault 退回进程内时每次城重启都要重新配对，`/remote open` 照实说出这一句。局限：同一个系统用户下运行的程序都能读这个用户的凭据存放处，与 provider key 相同。落选的两种：兑现点放在装配层（`bin::outside::keeper`），明文种子会出现在组装根里，而 `EXPOSE_WHITELIST` 的注释写明它存在就是为了不让明文出现在那里；种子写进保留子树里的一份文件，明文凭据落在 vault 之外，`sprawling export` 也会把它带走，一份拷贝的城就能冒充原来那座。vault 有了跨机同步时重新考虑这一条，因为那时「两座城不共用一把」要由同步来守。
 
 D6 设备密钥在设备上生成。城只存公钥，城的存储泄露不让任何人登录；人要保存的恢复种子是设备自己的，城从未见过它。
 
