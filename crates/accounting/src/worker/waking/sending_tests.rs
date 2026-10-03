@@ -138,3 +138,70 @@ fn a_knock_at_a_room_somebody_is_working_in_waits_for_them_to_leave() {
     );
     assert!(started[0].contains("market/hana"), "{}", started[0]);
 }
+
+/// D7: an empty room is knocked when the signal is delivered, not when
+/// its sender lands. The resident's run starts while the sender still
+/// drives, so its `run_started` precedes the sender's `run_frozen`.
+#[test]
+fn a_signal_to_an_empty_room_starts_its_run_before_the_sender_freezes() {
+    let dir = tempfile::tempdir().unwrap();
+    let report = crate::worker::fixture::init_city(dir.path()).unwrap();
+    city::create_building(
+        dir.path(),
+        &Address::parse("market").unwrap(),
+        city::BuildingTemplate::Minimal,
+    )
+    .unwrap();
+    move_in(dir.path(), "market/ito");
+    move_in(dir.path(), "market/hana");
+    let (base_url, _provider) = fake_openai(
+        &["m-local"],
+        vec![
+            tool_completion(
+                "asking hana",
+                "tu_1",
+                "signal",
+                serde_json::json!({
+                    "action": "send",
+                    "to": "market/hana",
+                    "text": "what is your rate?",
+                }),
+            ),
+            completion("done", None),
+            completion("hana answers", None),
+        ],
+    );
+    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
+    worker
+        .handle(wire::Command::Dispatch {
+            addr: Address::parse("market/ito").unwrap(),
+            task: "ask hana what she charges".to_owned(),
+            goal: "a price".to_owned(),
+            policy: kernel::RunPolicy::of(kernel::Mode::Work),
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
+            session: None,
+            effort: None,
+            model: None,
+        })
+        .unwrap();
+    worker.land_the_rest().unwrap();
+    let lines: Vec<serde_json::Value> = runtime::replay::verify_ledger_dir(&report.ledger_dir)
+        .unwrap()
+        .raw_lines()
+        .iter()
+        .filter_map(|line| serde_json::from_slice::<serde_json::Value>(line).ok())
+        .collect();
+    let at = |kind: &str, room: &str| {
+        lines.iter().position(|line| {
+            line["kind"] == kind && line.to_string().contains(&format!("\"{room}\""))
+        })
+    };
+    let (woken, frozen) = (
+        at("run_started", "market/hana"),
+        at("run_frozen", "market/ito"),
+    );
+    assert!(
+        matches!((woken, frozen), (Some(woken), Some(frozen)) if woken < frozen),
+        "the knock goes out at delivery: {woken:?} {frozen:?}"
+    );
+}
