@@ -256,8 +256,7 @@ impl ReadTool {
                 disclosure: "Read a file by its path, or a skill by the name the catalog lists \
                              it under. A truncated answer states the total and the offset to \
                              continue from. A file comes back with its `version`, which `edit` \
-                             takes as `base_version` and `plan finish` as `cas:<version>`. \
-                             Reading a directory or a missing file is refused."
+                             takes as `base_version` and `plan finish` as evidence. Reading a directory or a missing file is refused."
                     .to_owned(),
                 params: Payload::new(params)?,
                 effect: Effect::Read,
@@ -369,9 +368,8 @@ impl Tool for ReadTool {
             Found::Text(text) => text,
             Found::File { at, floor } => {
                 let text = miss::text_at(asked, at, &floor)?;
-                // The whole file's version, whatever interval is cut
-                // below: it is what `edit` guards and `plan finish`
-                // cites, and both name the file, not the lines shown.
+                // The whole file's version, whatever interval is cut below:
+                // `edit` guards and `plan finish` cites the file, not the lines.
                 out.insert(
                     "version".to_owned(),
                     Value::String(super::version_of(text.as_bytes())),

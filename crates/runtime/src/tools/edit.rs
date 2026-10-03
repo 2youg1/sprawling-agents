@@ -36,17 +36,17 @@ pub struct EditTool {
     meta: ToolMeta,
 }
 
-/// The version stamp a caller must present: the whole content hash with
-/// its tag, `b3-<hex64>`. `read` prints the same value, and `plan finish`
-/// takes it as `cas:<version>`, so a model copies one string between
+/// The version stamp a caller must present: the content's whole
+/// `cas:b3-<hex64>` Locator. `read` prints the same value and `plan
+/// finish` takes it as evidence, so a model copies one string between
 /// three tools and never shortens or completes it (kernel
 /// `spec/Locator.lean` D27).
 pub fn version_of(bytes: &[u8]) -> String {
-    B3Hash::digest(bytes).tagged()
+    kernel::Locator::cas(B3Hash::digest(bytes)).to_string()
 }
 
 /// The version word that means "I expect this file to not exist yet".
-/// A tagged digest can never spell it, so it cannot collide with a real
+/// A Locator can never spell it, so it cannot collide with a real
 /// version.
 const CREATES: &str = "new";
 

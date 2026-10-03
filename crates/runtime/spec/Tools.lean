@@ -52,7 +52,7 @@ impl Tool for EditTool { /* meta：name=edit、effect=Write{domain}、render=Dif
 // 斜杠／空段，E_INVALID_ARGS）；WriteDomain::admits 杀域外与
 // reserved prefix（E_OUTSIDE_WRITE_DOMAIN，recovery 报可写前缀清单）。工具静态声明的 Effect 只说它会写，
 // 模型选的 path 要在这里判——判定住权威处，而不是 bench 里的第二份判定。
-// args：{path, base_version, old, new}；version＝内容 B3Hash 带标签的全长 `b3-<hex64>`（`read` 答同一个值，`plan finish` 收 `cas:<version>`，kernel D27）；check_base 拒即 E_VERSION_CONFLICT；
+// args：{path, base_version, old, new}；version＝内容的完整 Locator `cas:b3-<hex64>`（`read` 答同一个值，`plan finish` 原样收作证据，kernel D27）；check_base 拒即 E_VERSION_CONFLICT；
 // old 必唯一命中（零命中／多命中＝E_INVALID_ARGS 携计数）；回显＝unified diff＋new_version（逐次 diff 即回档粒度）
 
 // crates/runtime/src/tools/read.rs —— 一个参数，两条路
@@ -61,7 +61,7 @@ impl ReadTool { pub fn new(city_root: &Path, catalog: Arc<Mutex<Catalog>>, bound
     -> Result<ReadTool, AxError>; }   // bound 见 §8-29-1，block_store 见 §8-29-5
 impl Tool for ReadTool { /* meta：name=read、effect=Read、cost=Light、render=Generic、temporal=Timeless */ }
 // args：{path}。先问 catalog，再当作地址。
-// 创建臂：base_version=="new"（带标签的摘要永拼不出，无碰撞）→ 文件必不存在（存在＝E_VERSION_CONFLICT 报真实版本），
+// 创建臂：base_version=="new"（Locator 永拼不出，无碰撞）→ 文件必不存在（存在＝E_VERSION_CONFLICT 报真实版本），
 // old 必 ""，new＝全文；父目录自动建（域内已证）。缺文件而非创建形的拒词指向创建形；
 // 缺参拒词报四字段契约。理由：没有创建能力的城里，Agent 在空房间里无法开始任何工作；
 // 创建住 edit 而非新工具，因为「文件变更＋乐观并发」已是本工具拥有的唯一权威，“absent”只是版本的一个取值。
