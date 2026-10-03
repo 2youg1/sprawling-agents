@@ -88,7 +88,7 @@ import crates.storage.spec.Worktree.Trees.Stock
 分部里的定理是模型对性质的证明：
 
 - `spec/Jsonl/Verify.lean`：`advance` 收下的一行恰好接上链（`an_accepted_line_extends_the_chain`）；版本超前在一切链检之前答出（`a_line_from_a_newer_writer_is_refused_before_any_chain_check`）；`ig:true` 的未知 kind 照样入链（`an_ignorable_line_joins_the_chain`）；从创世走完而不拒的账本满足 kernel 的 `Chained`（`a_walked_ledger_is_chained`）；`open` 只截掉不带信封的字节，留下的是逐行收下的前缀（`truncation_drops_no_enveloped_line`、`truncation_keeps_a_walked_prefix`）。
-- `spec/Jsonl/Barrier.lean`：句柄答过 `Ok` 的每个 seq 重开后都在（`answered_survives_reopen`），不守屏障有反例（`withoutBarrier`）；从已验证前缀起重开与从头重开相同（`reopenFromVerifiedPrefix`）。
+- `spec/Jsonl/Barrier.lean`：句柄答过 `Ok` 的每个 seq，在任意一串波与退回（`jsonl::unwind`）之后重开都在（`answered_survives_reopen`），不守屏障有反例（`withoutBarrier`）；从已验证前缀起重开与从头重开相同（`reopenFromVerifiedPrefix`）。
 - `spec/Jsonl/Preallocate.lean`：预分配段尾的零不改变尾段扫描的结论（`trailing_zeros_change_no_scan`），撕裂照样被截（`a_tear_before_zeros_is_still_truncated`），夹在中间的零读作撕裂（`zeros_before_a_line_are_not_the_end`）。
 - `spec/Cas.lean`：临时件名对写者单射时，任何交错的 `put` 与崩溃之后已命名的对象恒不腐蚀（`named_objects_never_corrupt`），只按内容哈希命名有反例（`shared_temporary_names_corrupt_an_object`）；一次 `put` 名下恰是它的字节，二次 `put` 不写（`a_put_names_its_bytes`、`a_second_put_of_the_same_bytes_writes_nothing`）。
 - `spec/Cas/Ranges.lean`：短答即越界的实现与区间规格相同（`a_short_answer_is_out_of_bounds`），答出来的不夹取（`never_clamps`）。

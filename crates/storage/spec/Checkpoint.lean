@@ -8,25 +8,26 @@ import crates.storage.spec.Checkpoint.Concurrent
 /-!
 # storage::checkpoint
 
-规定 `checkpoint`、`checkpoint::base`、`checkpoint::commit`、`checkpoint::scan`、`checkpoint::scan::pathspec`、`checkpoint::scan::stage_filter`（`crates/storage/src/` 下同名的文件）。git2 波前 add -A、波后补记、staged diff 的凭证扫描、重启后的比较基准，以及从检查点取回一个文件。本文件是 `crates/storage/Spec.lean` 的一个分部；下面每一节保留它在 storage 规格里的标签 §8-n，别处引作 `crates/storage/Spec.lean §8-n`，决定引作 `storage D<n>`。
+规定 `checkpoint`、`checkpoint::base`、`checkpoint::commit`、`checkpoint::scan`、`checkpoint::scan::pathspec`、`checkpoint::scan::stage_filter`（`crates/storage/src/` 下同名的文件）；`checkpoint::opening` 的写者 index 住 `crates/storage/spec/Checkpoint/Concurrent.lean` §8-39，`checkpoint::provenance` 住 `crates/storage/spec/Checkpoint/Provenance.lean` §8-17、§8-18。git2 波前 add -A、波后补记、staged diff 的凭证扫描、重启后的比较基准，以及从检查点取回一个文件。本文件是 `crates/storage/Spec.lean` 的一个分部；下面每一节保留它在 storage 规格里的标签 §8-n，别处引作 `crates/storage/Spec.lean §8-n`，决定引作 `storage D<n>`。
 -/
 
 /-!
 ### 8-8 storage::checkpoint（形状 4；git2）
 
 ```rust
-pub struct Checkpoint { /* repo: git2::Repository、last: Option<git2::Oid> —— 私有 */ }
+pub struct Checkpoint { /* repo: git2::Repository、last: Option<git2::Oid>、index: IndexOwner（城的 index 或一个写者自己的，§8-39）—— crate 内可见 */ }
 impl Checkpoint {
     pub fn open(city_root: &Path) -> Result<Checkpoint, StorageError>;      // 无仓即 init（创世提交由 ensure_base 产）
     /// Commits once when the repository has no HEAD, and never otherwise.
     /// A worktree branches from a commit, so a city that was never
     /// checkpointed cannot lend a tree; committing on every dispatch instead
     /// would move the trunk under every request already waiting.
-    pub fn ensure_base(&mut self, scope: &str, t: TimeMs, of: &Provenance) -> Result<Option<Payload>, StorageError>;
+    pub fn ensure_base(&mut self, scopes: &[String], t: TimeMs, of: &Provenance) -> Result<Option<Payload>, StorageError>;
     /// Pre-wave checkpoint: add -A within scope, then a **dangling** commit
     /// pointed at by refs/sprawling/runs/<run>/<oid>. HEAD does not move.
     /// Returns the checkpoint_committed payload
-    /// {oid, scope, files, model, effort} (the last two: §8-18).
+    /// {oid, model, effort, predecessor?, scope, files}: `kernel::event::record::Commit`,
+    /// whose `by: CommitAttribution` is flattened into the object (§8-18).
     /// `files` 只列这一次 checkpoint 改动了的路径（新增、修改、删除），按字节序：
     /// 比的是暂存前后两份 index 的 (路径, blob) 对。列全部已跟踪路径会让
     /// 5,000 个文件的楼每一波往账本里写 5,000 条路径，而读者要的是
@@ -111,6 +112,8 @@ impl Checkpoint {
   - 被否：每波走 `diff_tree_to_workdir`。它省的是「每一波付整棵树的钱」，而那棵树是**这次检查点自己的写域**（`wave_pre` 刚逐文件走过一遍），不是全城；sweep 只报 `Deleted`，而 `Deleted` 是存在问题不是内容问题。被否：`Path::exists()`——它跟随软链，一个悬空软链会被当成删除，`symlink_metadata` 不会。
   - 输出仍然在本模块排序而不信 walk 的顺序：**这批行落账的顺序是重放要复现的东西**。
 - `open` 无仓即 `init` 但**不造创世提交**（空仓是合法态；在此臆造历史会使首个 checkpoint 无法归属）。暂存只用一次 `add_all`：libgit2 把 index 与工作区比一遍（按 stat 跳过没变的文件），新增、修改、删除都在这一遍里暂存；再跑一遍 `update_all` 是把同一个写域重走一次，5,000 个文件的写域上稳态 checkpoint 的中位数因此从 104 ms 降到 71–78 ms（未优化构建，16 核、SSD，同一仪表交错测三次）。暂存规则只写在 `wave_pre` 的文档里（点名文件的 scope 走字面 `add_path`/`remove_path`，点名前缀的 scope 走字面 glob 加 `<glob>/*`）；**session 切片永不进 add**（`sessions::is_session_projection`）：它是账务线程在波中持续追加的可弃投影，一旦被暂存，git 下一次就会去读一个自己以为已经知道的文件，而一个还在长的工作区文件会让那一次读把整波拒掉（`E_WORKTREE_BUSY`）。`wave_post` 走 pre 提交树的 `TreeWalk` 比对工作区存在性，输出按路径排序（确定性）。secret 扫描在**提交之前**扫 index blob，命中即拒且只报 `path:start+len`——回显字节本身即泄漏。新增 `StorageError::Checkpoint{op,detail}`（→ `E_WORKTREE_BUSY`）与 `SecretEgress{locations}`（→ `E_SECRET_EGRESS`）。
+- **index 锁的等待有界。** 同一栋楼的两个 run 同时暂存时，`.git/index.lock` 只在一次写的时间里被持有，`checkpoint::scan::write_index` 因此遇到这把锁就隔一小段再试，有上限；上限与间隔只写在那个函数里。到了上限仍被拒，就是一个真卡住的锁（例如持锁的进程已经死了），照常报 `Checkpoint { op: "write index" }`——那才是人能处理的事实。
+- **检查点的持久性弱于账本，三个平台相同。** 检查点的对象、index 与引用经 libgit2 写入，本 crate 不打开它的 fsync 选项，所以「落盘」在这里的意思是交给了操作系统，不是掉电之后仍在：Windows、Linux、macOS 上都不调 `FlushFileBuffers`／`fdatasync`／`F_FULLFSYNC`。掉电可能丢掉最近一道检查点；账本里那一行的 oid 于是指向一个不在的提交，`restore` 答「找不到提交」，而账本本身不受影响（它的屏障见 `crates/storage/spec/Jsonl/Barrier.lean`）。（推断：这依据 libgit2 默认不 fsync 对象目录；本 crate 没有设置它的地方，`rg fsync crates/storage/src` 只命中 jsonl。）
 - `open` 逐次钉仓库局部 `core.autocrlf=false`。城里的文件必须逐字节往返，而运行中的机器的 git 有可能被配成在检出时重写行尾；被重写的文件与 Ledger 里它的哈希不符，而那看起来像损坏不像设置。
 - 提交身份见 8-17（而不是一个固定的 `sprawling <sprawling@local>`）；时间恒入参（git 签名时间＝t，确定性 2）；scope 外文件恒不入 add（WriteDomain 即边界，全树扫描被明拒）。**`scopes` 是一组前缀而非一个**，因为写域是一个集合：楼自己的子树，加上 `RULES.toml` 另外声明的每一条。调用方传房间而门判整栋楼时，两者之间的文件进不了任何检查点——`Changes` 因此恒空，`file_discarded` 也无处恢复；权威在本节。无变化波：wave_pre 产空提交（同树 oid，仍记 payload——链可重建优于省一次提交）。
 - **写域拒绝链接穿透（junction／symlink 字面拒；硬链接臂见 8-25 与 §3.5）。** 暂存回调对每个命中路径问 `storage::alias`：任一链接使**整波拒绝**（`StorageError::Alias`），绝不跳过继续——跳过即部分捕获，`file_discarded` 的恢复地址会指向一份与自己不符的树。git 交回调的是相对仓根的路径，判别名前必须先拼上工作树根（否则问的是进程自己的目录）。保护元数据在检查点侧是**跳过**而非拒绝（`storage::reserved::outside_reserved`）：那些字节另有家（城或楼的治理、git 的对象库），与 `stage_tree` 跳过保留子树同口径；被拒的 run 拿到的 recovery 是「把链接换成普通文件后重试」，故不会卡死在自己的目录上。

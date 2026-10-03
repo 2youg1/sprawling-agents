@@ -33,7 +33,8 @@ impl JsonlLedger {
     pub(crate) fn open_with(vfs: Box<dyn Vfs>, dir: &Path, now: TimeMs) -> …;  // 测试注入点
     /// Group commit: one durability barrier for the whole wave.
     /// Ok ⇒ every line of the wave is on its segment and synced.
-    /// 一波的写或 sync 失败过，此后每一波都答 `LedgerBroken`，直到重开。
+    /// 一波的写或 sync 失败过，此后每一波都答 `LedgerBroken`，直到 `jsonl::unwind` 把段退回到那一波之前，或者重开。
+    /// 链证明判出断链之后（`chain_audit::ChainHalt`，8-27），每一波都答 `ChainHalted`。
     pub fn append_all(&mut self, drafts: Vec<EventDraft>) -> Result<Vec<EventRef>, StorageError>;
     pub fn read_raw_lines(&self) -> Result<Vec<Vec<u8>>, StorageError>;   // 实例读面
     /// 写路径观察者（至多一个，后装者取代前装者）。只在**整波持久化完成后**逐条回调：
@@ -80,7 +81,8 @@ impl kernel::Ledger for JsonlLedger { /* append = append_all(vec![d]) */ }
 /-!
 ### 8-1 storage::jsonl：落盘形态、写者锁、open 与 append_all
 
-**落盘形态**：目录内 `ledger-<first_seq 20 位零填>.jsonl` 若干段；行＝`canonical_line`＋`\n`；链与 seq 跨段连续。滚动：当前段字节数 ≥ `SEGMENT_ROLL_BYTES` 时下一波起新段（新段创建后 `sync_dir`）。
+**落盘形态**：目录内 `ledger-<first_seq 20 位零填>.jsonl` 若干段；行＝`canonical_line`＋`\n`；链与 seq 跨段连续。滚动按行判，不按波判：当前段非空、且再写这一行会让它超过 `SEGMENT_ROLL_BYTES` 时，这一行起新段，所以一波可以跨两段（新段创建后 `sync_dir`）。按波判的写法会让一个大波把段撑过上限任意多；按行判，一段至多比上限多出一行，而首行本身超过上限时它独占一段。
+**各平台的屏障**：`sync_data` 在 Windows 上是 `FlushFileBuffers`，在 Linux 上是 `fdatasync`，在 macOS 上是 `fcntl(F_FULLFSYNC)`（storage D24，`crates/storage/spec/Jsonl/Barrier.lean`）。`sync_dir` 在 Linux 与 macOS 上对目录做 `File::sync_all`；Windows 上是显式的 no-op（`crates/storage/Spec.lean` §3 第 3 条），新段的目录项在那里不经这一步落盘。
 **写者锁：一个账本目录同一时刻只有一个 `JsonlLedger`，跨进程成立。** `open` 在列段之前，对账本目录的同级文件 `<目录名>.lock`（城的账本即 `<city>/.sprawling/ledger.lock`）取 `std::fs::File::try_lock` 独占锁；`JsonlLedger` 持着那个 `File`，锁与账本同寿命，drop 即放。拿不到锁就是别的 `JsonlLedger`（这个进程的或另一个进程的）正持着这座城的账本：`StorageError::LedgerHeld { dir }`，映射装载期码 `E_LEDGER_HELD`。拒绝发生在任何读写之前，所以被拒的一方不修盘，也不写 `log_truncated`。
 
 ```rust
