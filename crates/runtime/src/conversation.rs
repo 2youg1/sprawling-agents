@@ -61,7 +61,16 @@ impl Conversation {
             // user-role message, a resident's goal could spell a `user:`
             // line (`crates/city/spec/SpineFiles.lean` D21).
             Opening::FromJob => format!("The task is in JOB.md above, handed down by {from}."),
-            Opening::Inherited => format!("Task: {task}\nGoal: {goal}"),
+            // A branch's task travels in the message, so it names who
+            // handed it down and holds a resident's words in sections
+            // they cannot close (`crates/runtime/spec/Conversation.lean`
+            // §8-47-2).
+            Opening::Inherited => format!(
+                "Handed down by {}:\n<task>{}</task>\n<goal>{}</goal>",
+                escape_markup(from),
+                escape_markup(task),
+                escape_markup(goal)
+            ),
             // The person's own line, unwrapped. A conversational turn
             // dressed in field labels reads as a form, and a form is
             // answered with a form.
@@ -436,8 +445,7 @@ mod tests {
             let texts = texts(&conversation);
             prop_assert_eq!(texts.len(), 1);
             let text = &texts[0];
-            prop_assert!(text.starts_with("Handed down by @lab/room1, run 7:
-<task>"), "{text}");
+            prop_assert!(text.starts_with("Handed down by @lab/room1, run 7:\n<task>"), "{text}");
             prop_assert!(!text.starts_with("user:"), "{text}");
             prop_assert!(text.ends_with("</goal>"), "{text}");
             prop_assert_eq!(text.matches('<').count(), 4, "{}", text);

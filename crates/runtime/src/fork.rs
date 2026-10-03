@@ -94,7 +94,12 @@ fn fold_run<'a>(
         match record.kind() {
             EventKind::RunStarted => {
                 let started = record.data().read::<RunStarted>()?;
-                conversation.push_task_lines(&started.task, &started.goal, rebuilt(&started), NO_SENDER);
+                conversation.push_task_lines(
+                    &started.task,
+                    &started.goal,
+                    rebuilt(&started),
+                    &handed_down_by(&started),
+                );
                 at = record.seq();
             }
             EventKind::ModelReturned => {
@@ -259,10 +264,20 @@ fn fold_run<'a>(
     })
 }
 
-/// The sender a rebuilt opening names: none, because [`rebuilt`] never
-/// answers `FromJob`, the one opening that names who handed the work
-/// down (`crates/city/spec/SpineFiles.lean` D21).
-const NO_SENDER: &str = "";
+/// Who handed the rebuilt run its work, in the words its opening was
+/// written with live (`kernel::event::Who::handed_down_by`). A record
+/// from before `dispatched_by` was written names no dispatcher, and is
+/// never read as the User's.
+fn handed_down_by(started: &RunStarted) -> String {
+    started.dispatched_by.as_ref().map_or_else(
+        || UNRECORDED_DISPATCHER.to_owned(),
+        |who| who.handed_down_by(started.predecessor, started.parent),
+    )
+}
+
+/// What a rebuilt opening names when its `run_started` predates
+/// `dispatched_by`.
+const UNRECORDED_DISPATCHER: &str = "an unrecorded dispatcher";
 
 /// How a branch writes the first message of a run it rebuilds: the way
 /// the mother wrote it, so a provider's cached prefix holds from the
