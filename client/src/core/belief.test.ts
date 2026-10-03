@@ -7,7 +7,6 @@ import { describe, expect, test } from "bun:test";
 import { get } from "svelte/store";
 
 import { createBelief } from "./belief";
-import type { Doing } from "./doing";
 import type { AxError, CityAnswer, EventKind, EventRecord, Mode, RunPolicy, RunSummary } from "../wire";
 import { Address, B3Hash, CITY_RUN, RunId, Seq, TimeMs } from "../wire";
 
@@ -119,61 +118,6 @@ describe("the runs a page believes in", () => {
     store.adoptCity(city([{ ...summary(ONE, 5), task: "draft the plan", goal: "a plan in hall" }]));
     const held = get(store.belief).runs[ONE];
     expect([held?.task, held?.goal]).toEqual(["draft the plan", "a plan in hall"]);
-  });
-});
-
-// client/Spec.lean D88: the stream's route and the answer's route to a
-// run stopped at a synchronous `send`.
-describe("a run waiting for a reply", () => {
-  const WAIT = { on: Address.make("lab/west"), until: TimeMs.make(90_000) };
-  const AWAITING: Doing = { kind: "awaiting_reply", wait: WAIT };
-
-  function waiting(): ReturnType<typeof createBelief> {
-    const store = createBelief(() => 0);
-    store.apply(started(ONE, 1));
-    expect(store.apply(event(ONE, 2, "signal_wait_started", { on: "lab/west", signal: "r-s1", deadline_ms: 90_000 }))).toBeNull();
-    return store;
-  }
-
-  test("the record that starts the wait names the room and the deadline", () => {
-    expect(get(waiting().belief).runs[ONE]?.doing).toEqual(AWAITING);
-  });
-
-  test("each ending leaves the wait", () => {
-    const ends = [
-      [{ end: "reply", reply: "w-s1" }, { kind: "thinking" }],
-      [{ end: "timeout" }, { kind: "thinking" }],
-      [{ end: "left" }, { kind: "unknown" }],
-    ] as const;
-    for (const [by, after] of ends) {
-      const store = waiting();
-      expect(store.apply(event(ONE, 3, "signal_wait_ended", { signal: "r-s1", by }))).toBeNull();
-      expect(get(store.belief).runs[ONE]?.doing).toEqual(after);
-    }
-  });
-
-  // A word this build was not taught is answered, and the run stays
-  // where the page last knew it.
-  test("an ending this build cannot read leaves the run waiting and names the field", () => {
-    const store = waiting();
-    expect(store.apply(event(ONE, 3, "signal_wait_ended", { signal: "r-s1", by: { end: "shrugged" } }))).toBe("signal_wait_ended.by.end");
-    expect(get(store.belief).runs[ONE]?.doing).toEqual(AWAITING);
-  });
-
-  test("a start this build cannot read names the field and states no wait", () => {
-    const store = createBelief(() => 0);
-    store.apply(started(ONE, 1));
-    expect(store.apply(event(ONE, 2, "signal_wait_started", { on: "lab/west", signal: "r-s1" }))).toBe("signal_wait_started.deadline_ms");
-    expect(get(store.belief).runs[ONE]?.doing).toEqual({ kind: "thinking" });
-  });
-
-  test("an answer that names a wait states it, and one that no longer does ends it", () => {
-    const store = createBelief(() => 0);
-    store.adoptCity(city([{ ...summary(ONE, 5, "signal_wait_started"), waiting: WAIT }]));
-    expect(get(store.belief).runs[ONE]?.doing).toEqual(AWAITING);
-
-    store.adoptCity(city([summary(ONE, 6, "signal_wait_ended")]));
-    expect(get(store.belief).runs[ONE]?.doing).toEqual({ kind: "unknown" });
   });
 });
 

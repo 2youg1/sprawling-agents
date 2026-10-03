@@ -163,7 +163,6 @@
   });
   const tail = $derived.by((): Share | null => {
     switch (shown?.doing.kind) {
-      // A run waiting for a reply is inside its `send` call.
       case "calling":
       case "awaiting_reply":
         return "tool";
