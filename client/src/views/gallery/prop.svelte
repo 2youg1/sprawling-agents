@@ -11,7 +11,8 @@
   // one on the version the plan holds and one on a version it has since
   // left. Each card alone, one opened for editing, both above the
   // document in RefRain, the mailbox's deciding section holding them,
-  // and the mailbox key counting them.
+  // the letter one of them opens on the right side (roadmap A25), and
+  // the mailbox key counting them.
   import { Address, B3Hash, RunId, Seq, TimeMs } from "../../wire";
   import type { Answer, DocumentState, EventRecord, ProposalCard, ProposalsAnswer, Query, Slice } from "../../wire";
 
@@ -110,6 +111,7 @@
   import { ui } from "../../ui";
   import Column from "../mailbox/column.svelte";
   import Mailbox from "../mailbox/mailbox.svelte";
+  import Letter from "../inspect/letter.svelte";
   import Card from "../refrain/proposals_card.svelte";
   import RefRain from "../refrain/refrain.svelte";
   import Case from "./case.svelte";
@@ -148,6 +150,11 @@
   </Case>
   <Case label="mailbox · proposal cards in the deciding section" width={440}>
     <div class="flex h-[960px] flex-col bg-raised"><Column onClose={ignore} /></div>
+  </Case>
+  <Case label="letter · a proposal card opened on the right side, read as its diff" width={600}>
+    <div class="flex h-[640px] flex-col overflow-hidden bg-page">
+      <Letter doc={DOC} card={CURRENT.id} />
+    </div>
   </Case>
   <Case label="mailbox key · two proposal cards waiting">
     <Mailbox asked={0} hint={(words: string) => words} />
