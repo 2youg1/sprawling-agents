@@ -1100,6 +1100,14 @@
 .push {
   animation: push var(--transition-duration-page) var(--ease-arrive) backwards;
 }
+/* The settings panel's second level (the group beside the tree) starts
+ * when the panel's own arrival from the left (`.settings-panel`, a
+ * `panel` transition) is halfway, the way `side-in-then` follows
+ * `side-in` on the right, so the panel and its group read as one
+ * movement in two steps. */
+.slide-then {
+  animation: slide var(--transition-duration-panel) var(--ease-arrive) calc(var(--transition-duration-panel) / 2) backwards;
+}
 /* The four fill backwards only: once arrived, no transform stays on
  * the box, so it does not become the containing block of a fixed menu
  * inside it. */
@@ -1296,6 +1304,7 @@
   :root:not([data-motion="on"]) .shift,
   :root:not([data-motion="on"]) .side-in,
   :root:not([data-motion="on"]) .side-in-then,
+  :root:not([data-motion="on"]) .slide-then,
   :root:not([data-motion="on"]) .push,
   :root:not([data-motion="on"]) .shimmer,
   :root:not([data-motion="on"]) .animate-pulse {
@@ -1322,6 +1331,7 @@
 [data-motion="off"] .shift,
 [data-motion="off"] .side-in,
 [data-motion="off"] .side-in-then,
+[data-motion="off"] .slide-then,
 [data-motion="off"] .push,
 [data-motion="off"] .shimmer,
 [data-motion="off"] .animate-pulse {

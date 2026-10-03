@@ -64,9 +64,11 @@
     </div>
     <Tree {group} {beneath} {onPick} />
   </div>
+  <!-- The group is the panel's second level: it arrives half a panel
+    later than the panel (`slide-then`, docs/frontend-method.md §4-43). -->
   <section
     bind:this={body}
-    class="@container/page flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto @max-lg/sheet:overflow-visible"
+    class="slide-then @container/page flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto @max-lg/sheet:overflow-visible"
     aria-labelledby={titleId}
   >
     <!-- Each group picked arrives with a short shift (docs/frontend-method.md §4-43). -->

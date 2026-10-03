@@ -759,6 +759,15 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
 - **重开参数**：改模型或强度不再开新的一段；或 `Query::Sessions` 让主区画过去的段（`talk/past.svelte`）成为看上一段的主要入口。
 -/
 
+/-! D81 面的第二层在第一层走到一半时开始
+
+- **决策**：一张面进来时，它里面的第二层晚半个时长开始，两层读作一个动作的两步。右侧（`views/right.svelte`）是 `side-in` 与 `side-in-then`（`page` 时长，延迟 `page / 2`）；设置面（`views/settings/panel.svelte` 的 `.settings-panel`，`panel` 时长的平移）里的组一栏（`settings/sheet.svelte` 的 section）是 `slide-then`（`slide` 关键帧，`panel` 时长，延迟 `panel / 2`）。时长、曲线与延迟只写在 `client/src/theme.css`，视图只写类名，`xtask motion` 守住。只在面挂载时走一次：在设置树里换组是 `shift`，不是第二层再进来一次。
+- **平台**：这些是普通的 CSS 动画加 `calc()` 延迟，Windows、macOS 与 Linux 上的 Chromium、Firefox 与 Safari 都支持，画法相同；`prefers-reduced-motion: reduce`（除非 `data-motion="on"`）与 `data-motion="off"` 在每个平台上都把它们关掉，面直接到位。
+- **理由**：两层同时进来时，组的文字与面的边一起滑动，眼睛没有先落的地方；先让面立住一半，再让内容跟上，人先看见面从哪来，再读里面是什么。
+- **被击败的备选**：一，用 JS 定时器在面的 `transitionend` 之后挂载第二层——第二层晚一整个时长才有，键盘焦点与读屏器在空面上停一拍；二，第二层不动——面的边与内容一起平移，与右侧的两步读法不一致。
+- **重开参数**：设置面不再从左边平移进来（例如成为一页），或右侧与设置面的时长令牌合并成一个。
+-/
+
 /-! D82 性能页的柱子按窗口自己的量程画，读数仍与 `sprawling top` 同一规则
 
 - **决策**：性能页（`views/monitor.svelte`）每个计数器画一排柱子（SVG，一个点 3 px），由 `core/monitor.ts` 的 `plot` 定高：窗口里最小的值站在 `FLOOR`（80‰，最低的柱子也看得见），最大的站满 `FULL`（1000‰），中间线性；全部相等时站在一半；柱子后面是窗口 p50 到 p99 的一带，读数旁写出这两个数（最近秩，与 `bin::monitor::spread::Spread` 同一取法）。读数本身（单位、截断、千分比）仍按 `crates/sprawling/spec/Monitor.lean` §8-95 的规则写，`monitor.test.ts` 与 `monitor::top::tests` 用同一组样本对照；终端的八级字符曲线只留在终端。
