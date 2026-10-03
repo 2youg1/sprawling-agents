@@ -120,10 +120,13 @@ pub fn admits(mode: Mode, produced: &Produced) -> Admission;
 // 存它等于给它一条没人要求过的命，而哈希前十六位已足以看出两处是否同一个值。
 pub enum Marker { Plain, Fingerprinted }         // 两个汇只差这一个参数，不差第二份实现
 impl Marker { pub fn spell(self, found: &[u8]) -> String; }
-pub fn redact(payload: &Map<String, Value>) -> (Map<String, Value>, u32);
-// 零命中时 `redact` 仍逐串复制、逐层重建整张 map，扫描之外再付一次整份载荷的拷贝。只拷被打码的那一支、
-// 零命中原样交回，要让它接收并交回载荷的所有权，两个调用者 `turn::ledger::Journal::append_redacted`
-// 与 `transcript` 随之改；这一步还没有做。
+pub fn redact(payload: Map<String, Value>) -> (Map<String, Value>, u32);
+// D37：`redact` 接收并交回载荷的所有权，原地改写命中的字符串。零命中的载荷原样交回：同一块分配、
+// 逐字节相同，扫描之外不付拷贝；有命中时只替换命中的那些 `String`，其余值留在原处、不复制。
+// 两个调用者把载荷交进来：`turn::ledger::Journal::append_redacted` 经 `kernel::Payload::into_map`，
+// `transcript` 交出它刚编码出的 map。落选：借用入参、零命中交回 `Cow::Borrowed`——有命中时仍要克隆
+// 未命中的兄弟分支，而两个调用者交进来之后都不再读原载荷，借用换不来任何东西。纯计算，Windows、
+// macOS、Linux 上同一行为、同一组测试。
 pub fn redact_text(text: &str, marker: Marker) -> (String, u32);
 // 「什么绝不可被打印」在本 crate 只有这一个家：账本走 `Fingerprinted`，诊断行走 `Plain`。
 // 历史被检索与比对，故标记要能分辨两个值；一行日志写一次读一次，哈希后缀在那里只是一个

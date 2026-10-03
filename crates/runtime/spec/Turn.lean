@@ -19,7 +19,7 @@
 - 根重导出：`runtime::Opening` 在根上；`ToolBench` 只经 `runtime::bench`。
 
 ```rust
-pub struct Turn<'h, S> { /* journal（run、who、t、钟、refs、redacted）、state —— 全私有；相内数据在别的相不可表示 */ }
+pub struct Turn<'h, S> { /* journal（借来的 `HeldLines`、t、钟、redacted）、state —— 全私有；相内数据在别的相不可表示 */ }
 pub struct Assembling(/* 私有 */);  pub struct Calling { /* prefix 哈希 */ }
 pub struct ToolWave { /* calls */ }   pub struct Recording { /* refs */ }
 
@@ -227,13 +227,19 @@ pub fn outcome_unknown_draft(call: &EventRecord, t: TimeMs) -> Result<EventDraft
 // turn/ledger.rs —— 本模块通往账本的唯一一道门
 enum Authored { PromptAssembled, ModelCalled, CancelReceived, SteerReceived }  // 回合自己算出的值
 enum Carried  { ModelReturned, ToolCalled, ToolResult }                        // 供应方或工具交回的值
-struct Journal { /* run、who、t、refs、redacted —— 全私有 */ }
-impl Journal {
-    fn append_authored(&mut self, ledger: &mut dyn Ledger, event: Authored, data: Payload)
-        -> Result<EventRef, AxError>;
-    fn append_redacted(&mut self, ledger: &mut dyn Ledger, event: Carried, data: Payload)
-        -> Result<EventRef, AxError>;   // 载荷经 Payload::of 由记录结构构造，扫描在门内做
-    fn append(&mut self, …) -> Result<EventRef, AxError>;   // 本模块唯一的 `Ledger::append` 调用
+enum RunLine  { PromptShapeCompared, CheckpointCommitted }                     // run 写的、带 run 的地址、不扫秘密
+pub struct HeldLines { /* run、who、攒下的 draft、已换出的 ref —— 全私有，归 Run<Active>（D36） */ }
+impl HeldLines {
+    pub fn barrier(&mut self, ledger: &mut dyn Ledger) -> Result<(), AxError>;  // 本模块唯一的 `Ledger::append_all` 调用
+    pub fn durable(&self, entry: Entry) -> Result<EventRef, AxError>;           // 屏障之后才交出 ref
+}
+struct Journal<'h> { /* lines: &'h mut HeldLines、t、钟、redacted —— 全私有 */ }
+impl Journal<'_> {
+    fn append_authored(&mut self, event: Authored, data: Payload) -> Entry;
+    fn append_run_line(&mut self, line: RunLine, addr: Address, data: Payload) -> Entry;
+    fn append_redacted(&mut self, event: Carried, data: Payload)
+        -> Result<Entry, AxError>;   // 载荷经 Payload::of 由记录结构构造，扫描在门内做
+    fn append(&mut self, …) -> Entry;   // 本模块唯一构造 `EventDraft` 之处，draft 攒进 HeldLines
 }
 ```
 
