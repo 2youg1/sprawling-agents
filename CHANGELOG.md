@@ -101,9 +101,9 @@ written by 0.0.8 reads unchanged.
   the millisecond moments the envelope already had. A line written before
   these keys existed has none of them, and a reader falls back to the
   difference of the two moments (`crates/kernel/spec/Event/Record.lean` D20).
-- Six new kinds, 95 in all: `run_policy_changed`, `session_named`,
-  `skill_audited`, `signal_wait_started`, `signal_wait_ended` and
-  `signal_landed`.
+- Seven new kinds, 96 in all: `run_policy_changed`, `session_named`,
+  `skill_audited`, `signal_wait_started`, `signal_wait_ended`,
+  `signal_landed` and `skill_shelved`.
 - A usage record's cache counts say whether the provider reported them, so a
   provider that reports cache hits under another field reads as unknown
   rather than as zero hits (A29).
@@ -346,6 +346,11 @@ digest and machine class. These readings are owed and not stated here:
   Ledger, and export it as JSONL or CSV; the monitor's sampling beat can be
   set per city between 10 ms and 1 s, 100 ms by default, and the city keeps
   it for the next serve (A18).
+- A new city records one `skill_shelved` line for each skill it ships, and
+  each content version in the skill usage record says who put it on the
+  shelf: the city, with where the skill came from; a change made outside the
+  city's doors; or nobody recorded, for a skill shelved before the city kept
+  these lines.
 - The checkpoint scan never stages a document's staging file, and a segment
   can be preallocated behind one configuration value that defaults to off.
 - `NO_PROXY` reads `example.com` as that domain and its subdomains and never
