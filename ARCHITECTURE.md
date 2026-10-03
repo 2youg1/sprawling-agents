@@ -379,8 +379,14 @@ than any diagram of boxes.
     The sender carries on. A signal counts as consumed only when a model
     answer that read it is recorded; a run that leaves before that gives
     it back and the room is knocked again. Work handed down with
-    `delegate` still starts when the parent lands, and a send that waits
-    for its reply (collab D9) is not built yet. Only the person's own
+    `delegate` or laid out with `workshop` starts at the call, while the
+    parent still drives. A `signal send` with `wait: true` stops the
+    sending run at its next `BeforeAssemble` safe point with no model
+    call, until a signal from the room it spoke to arrives in its
+    mailslot, the injected clock reaches the stop's reading plus
+    `collab::signal_tool::PATIENCE_MS` (240 s), or the run is stopped;
+    `signal_wait_started` and `signal_wait_ended` record it, and the end
+    lands in the next request as a steer (collab D9). Only the person's own
     entrance can render as `user`. A knock addresses a resident, never a
     frozen run: history is read, not woken. (collab D7–D11,
     `crates/collab/spec/Delivery.lean`.)
@@ -683,7 +689,7 @@ do not overlap: overlapping verification reads as more coverage than it is.
 |---|---|---|
 | V0 unrepresentable | a whole class of error moved out of what can be written | <!-- xtask:begin compile_fail_cases -->18<!-- xtask:end --> compile-failure counterexamples |
 | V1 types and lints | null, overflow, silent truncation, hidden panics | workspace lints, `-D warnings`, `--all-features` |
-| V2 unit and property | a function wrong across a class of inputs | <!-- xtask:begin test_functions -->3111<!-- xtask:end --> test functions, properties before examples |
+| V2 unit and property | a function wrong across a class of inputs | <!-- xtask:begin test_functions -->3125<!-- xtask:end --> test functions, properties before examples |
 | V3 conformance | a second adapter behaving unlike the first | one suite per port, except `browser::port`, whose suite only ever ran against the replay it was written beside (decision D1 of `crates/browser/Spec.lean`) |
 | V4 fuzz | parsers meeting hostile bytes | <!-- xtask:begin fuzz_targets -->6<!-- xtask:end --> targets under `tools/fuzz/fuzz_targets` |
 | V5 formal | termination, absence of overflow and monotonicity in the code; a design rule false on some input nobody tried | 3 of 3 kani harnesses proved, Linux CI — every proposition in the roster has an unbounded domain and a solvable shape; the Lean specifications under `crates/`, proved by `just models` in every `just check` |
