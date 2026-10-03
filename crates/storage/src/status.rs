@@ -51,8 +51,9 @@ pub struct WorkingStatus {
     /// `None` when the branch tracks no upstream — which is not the
     /// same fact as being level with one.
     pub drift: Option<Drift>,
-    /// Files that differ from the head commit, untracked ones included,
-    /// in path order.
+    /// Files that differ from the named base commit (the head commit
+    /// when the caller names none), untracked ones included, in path
+    /// order.
     pub files: Vec<FileChange>,
 }
 

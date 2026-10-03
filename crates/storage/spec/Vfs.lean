@@ -28,6 +28,7 @@ pub(crate) trait Vfs {                      // 内缝：不出对外接口，不
     fn rename(&mut self, from: &Path, to: &Path) -> io::Result<()>;
     fn sync_dir(&mut self, dir: &Path) -> io::Result<()>;       // Windows no-op（§3-3）
     fn remove_file(&mut self, path: &Path) -> io::Result<()>;
+    fn copy_permissions(&mut self, from: &Path, to: &Path) -> io::Result<()>;  // 落盘抄权限（8-12 的 landing::Bits）
     fn exists(&self, path: &Path) -> bool;                      // cas 去重与重开容忍需要
 }
 ```
