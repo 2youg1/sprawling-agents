@@ -318,6 +318,8 @@ pub fn run_scenario_on(
             };
             let mut hooks = RunHooks {
                 now: &mut now,
+                // A scenario replays byte for byte, so its stopwatch stands still.
+                monotonic_us: &mut || 0,
                 interrupt: &mut interrupt,
                 checkpoint: Some(&mut checkpoint),
                 writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
@@ -330,6 +332,8 @@ pub fn run_scenario_on(
         None => {
             let mut hooks = RunHooks {
                 now: &mut now,
+                // A scenario replays byte for byte, so its stopwatch stands still.
+                monotonic_us: &mut || 0,
                 interrupt: &mut interrupt,
                 checkpoint: None,
                 writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
