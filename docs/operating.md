@@ -156,7 +156,7 @@ The city's key is kept in the city's vault, one key per city, and `sprawling exp
 | Platform | Where the key is kept | A paired device pairs again |
 |---|---|---|
 | Windows | Credential Manager | only after `/remote replace-key` or a revoke; restarts of the city and the computer keep the key |
-| macOS | the Keychain | the same as Windows; after the binary is updated, the Keychain may ask once more whether `sprawling` may read the entry |
+| macOS | the Keychain | the same as Windows; after the binary is updated, the Keychain asks once whether the new `sprawling` may read the entry, because the entry is bound to the signature of the build that wrote it; the city waits on that dialog, so answer it before the city goes on |
 | Linux | the kernel keyring (keyutils) | after the computer reboots, because the keyring keeps the key only until then; with the encrypted vault file, whose passphrase you type when the city starts, the key is kept across reboots |
 | any, when no system store answers | the city's own memory | every time the city restarts |
 
