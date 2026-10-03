@@ -45,6 +45,11 @@ const SINK: &str = "sprawling-shots";
 /// photographing it would not end either.
 const MOST_FOLDS: usize = 200;
 
+/// The most loads the placing script holds a picture with. Each moves the
+/// virtual clock 10 ms as it lands, and the wait took about fifteen on a
+/// four-core Windows machine, so a page that never draws costs a second.
+const MOST_HOLDING_LOADS: u32 = 100;
+
 /// How long one case (one measuring or one picture) may take before its
 /// tree is killed and the case is run again. The slowest case seen on a
 /// four-core Windows machine took 15 s; three times that leaves room for
@@ -275,8 +280,12 @@ fn instrument(body: &str, preloaded: &str) -> String {
 }
 
 /// Once no view is pending, scrolls the main region to the fold the URL
-/// names, and writes its scroll height, its visible height, and where
-/// each top-level labelled section begins.
+/// names, waits one IntersectionObserver round and two animation frames,
+/// and writes its scroll height, its visible height, and where each
+/// top-level labelled section begins. A CodeMirror editor measures itself
+/// only in the frames after it scrolled into view, and the virtual clock
+/// jumps between timers without drawing one, so the wait keeps a load of
+/// the page's own copy in flight, which stops that clock (Spec.lean D25).
 fn script() -> String {
     format!(
         r#"<pre id="{SINK}" hidden></pre>
@@ -294,6 +303,9 @@ fn script() -> String {
       return;
     }}
     main.scrollTop = fold * main.clientHeight;
+    hold(main, read);
+  }}
+  function read(main) {{
     var origin = main.getBoundingClientRect().top - main.scrollTop;
     var lines = [main.scrollHeight + ' ' + main.clientHeight];
     main.querySelectorAll('section[aria-label]').forEach(function (section) {{
@@ -304,6 +316,33 @@ fn script() -> String {
         section.getAttribute('aria-label'));
     }});
     document.getElementById('{SINK}').textContent = lines.join('\n');
+  }}
+  function hold(main, then) {{
+    var loads = 0;
+    var drawn = false;
+    function release() {{
+      if (!drawn) {{
+        drawn = true;
+        then(main);
+      }}
+    }}
+    function load() {{
+      if (drawn || loads >= {MOST_HOLDING_LOADS}) {{
+        return release();
+      }}
+      loads += 1;
+      var image = new Image();
+      image.onload = image.onerror = load;
+      image.src = './{COPY}?hold=' + loads;
+    }}
+    var seen = new IntersectionObserver(function () {{
+      seen.disconnect();
+      requestAnimationFrame(function () {{
+        requestAnimationFrame(release);
+      }});
+    }});
+    seen.observe(main);
+    load();
   }}
   setTimeout(place, {SETTLE_MS});
 }})();
@@ -353,4 +392,71 @@ fn unescape(text: &str) -> String {
         .replace("&gt;", ">")
         .replace("&nbsp;", "\u{a0}")
         .replace("&amp;", "&")
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, reason = "test code")]
+mod tests {
+    use super::*;
+
+    /// A page whose one state labels itself only in a frame after it was
+    /// seen, the way a CodeMirror editor measures itself only once it is
+    /// in view, and which only starts looking when the placing script
+    /// scrolls, so nothing but frames after the scroll can label it.
+    const LATE_STATE: &str = r#"<!doctype html>
+<html><head></head><body>
+<main style="display:block;height:400px;overflow:auto"><div id="view" style="height:2000px"></div></main>
+<script>
+setTimeout(function () {
+  var view = document.getElementById('view');
+  var seen = new IntersectionObserver(function () {
+    seen.disconnect();
+    requestAnimationFrame(function () {
+      var state = document.createElement('section');
+      state.setAttribute('aria-label', 'measured in view');
+      view.appendChild(state);
+    });
+  });
+  seen.observe(view);
+}, SETTLE);
+</script>
+</body></html>
+"#;
+
+    /// The engine on this machine measures the fixture page, and the state
+    /// that appears only in the frames after the scroll is in the reading.
+    /// Where no engine is installed the render gate already fails, so this
+    /// test has nothing to drive and ends.
+    #[test]
+    fn a_fold_is_read_after_the_frames_its_scroll_brings() {
+        let Some(browser) = crate::render::engine::browser() else {
+            return;
+        };
+        let dir = std::env::temp_dir().join(format!("xtask-shots-hold-{}", std::process::id()));
+        let bundle = dir.join("bundle");
+        std::fs::create_dir_all(bundle.join("assets")).unwrap();
+        std::fs::write(
+            bundle.join("index.html"),
+            LATE_STATE.replace("SETTLE", &SETTLE_MS.to_string()),
+        )
+        .unwrap();
+        let camera = Camera::open(&browser, &dir.join("work"), Source::Bundle(&bundle)).unwrap();
+        let read = camera.folds(
+            "fixture",
+            Frame {
+                width: 800,
+                height: 600,
+            },
+        );
+        camera.close().unwrap();
+        std::fs::remove_dir_all(&dir).unwrap();
+        let (folds, _) = read.unwrap();
+        assert!(
+            folds
+                .iter()
+                .flatten()
+                .any(|state| state == "measured in view"),
+            "{folds:?}"
+        );
+    }
 }
