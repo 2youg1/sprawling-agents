@@ -427,6 +427,37 @@ mod tests {
         );
     }
 
+    /// Storage D28, counted: a room placed while the stock is still being
+    /// checked out pays one whole checkout of its own (N files at N, 2N
+    /// and 4N), and the stock being made is not lost - the next room
+    /// takes it over and creates nothing. Waiting for the stock instead
+    /// would save the second room's N files and no checkout overall,
+    /// because the stock it took would have to be made again.
+    #[test]
+    fn a_room_placed_while_the_stock_is_being_made_checks_out_once_and_the_stock_survives() {
+        for files in [8, 16, 32] {
+            let dir = tempfile::tempdir().unwrap();
+            let trees = bulk_city(dir.path(), files);
+            trees.stock().unwrap();
+            let first = trees.claim(&name("node-1"), &[]).unwrap().work().created;
+            let restocked = trees.stock().unwrap().created;
+            let making = git2::Repository::open(dir.path())
+                .unwrap()
+                .find_worktree(super::STOCK)
+                .unwrap();
+            making.lock(Some(super::STOCKING)).unwrap();
+            let during = trees.claim(&name("node-2"), &[]).unwrap().work().created;
+            making.unlock().unwrap();
+            let refreshed = trees.stock().unwrap().created;
+            let after = trees.claim(&name("node-3"), &[]).unwrap().work().created;
+            assert_eq!(
+                (first, restocked, during, refreshed, after),
+                (0, files, files, 0, 0),
+                "files created per step at {files} files"
+            );
+        }
+    }
+
     /// The stock is nobody's tree: no node lists it, the sweep at open
     /// leaves it, and the first placement after that takes it over.
     #[test]

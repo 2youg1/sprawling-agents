@@ -285,6 +285,7 @@ error ◀──使用── 其余模块（StorageError 与 into_ax 的唯一定
 | D25 | 一座城的检查点由多个写者同时做，每个写者一个自己的 index，共享的只有对象库与引用更新 | `crates/storage/spec/Checkpoint/Concurrent.lean` |
 | D26 | 移动 HEAD 的两步在每一座城上都经同一进程里一把只护 HEAD 的锁，不按盘的种类分路 | `crates/storage/spec/Checkpoint/Concurrent.lean` |
 | D27 | 城的第一个提交与收楼的基线同一种写法：对象进 mempack、一个 pack 落盘，之后才写 index、以比较后交换建分支 | `crates/storage/spec/Checkpoint.lean` |
+| D28 | 备树还在检出时来的第二个新房间自己全量检出一次，不等那棵备树，也不多备一棵 | `crates/storage/spec/Worktree/Trees/Stock.lean` |
 -/
 
 /-! ## 13 依赖选型

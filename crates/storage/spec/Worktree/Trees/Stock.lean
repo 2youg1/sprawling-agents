@@ -27,7 +27,7 @@ fn adopt(&self, name: &WorktreeName, city: &Weight) -> Result<Option<WorktreeLea
 - **两份链接文件是 git 写下的布局，本模块只换末尾那一段 id。** git-worktree(1) 的 DETAILS 一节记着这两份：工作树里的 `.git` 文件（`gitdir: <公共 git 目录>/worktrees/<id>/`）与登记目录里的 `gitdir`（`<工作树>/.git`）；`git worktree move` 改的也是它们。接管读出 libgit2 写下的原文，认得出末尾的 `worktrees/+spare/` 与 `/+spare/.git` 才接管，只把这一段换成节点的名字，其余字样（盘符、斜杠方向）原样保留；认不出就不接管，备树留给 `stock` 收回重备。
 - **每一步之后断掉都收得回来。** ②之后：`<home>/<name>` 没有登记，下一次放置先清掉它再放；备树的登记指向一个不存在的目录，下一次 `stock` 收回它重备。④之后：登记 `<name>` 指向不存在的 `<home>/+spare`，`standing` 收回登记（8-9 的「登记在册但目录不存在」），放置清掉目录再放。⑤之后、⑥之前：树与登记已一致，HEAD 仍指 `+spare`；`standing` 答「留着」，再领的 `restore` 先把 HEAD 指到节点分支，所以节点不会在别的分支上工作。
 - **读数。** 同一台机器、debug 构建、512 个 16 KB 文件的城：放置一次全量检出 1.18–1.30 s；`stock` 新备一棵 1.19–1.35 s（就是那次全量检出，挪到了没人等的地方）；放置接管备树 30–37 ms，其中拿走（读备树、建节点分支、两次改名、两份链接文件）约 15 ms，`restore`（打开、改指 HEAD、读索引、整棵检出时对 512 个文件各一次 stat）约 19 ms，称重约 1.5 ms。发行构建的读数由 `just bench` 的 `large_worktree_placement` 给出（`tools/citysim/Spec.lean` §8-12）。
-- **计数（8-31）。** 接管的 `created`、`rewritten`、`removed` 是⑥写下的：干线自备树以来改过的文件，与树里有多少文件无关；`walked` 是城的目录项（上限预检）加新树的目录项（称重）。断言：`a_placement_from_the_stock_creates_no_file_at_either_size` 在 32 与 64 个文件的城上各备一棵、放置一次，整值比较两份 `FileWork`：备树的 `created` 是 N，放置的三个数都是 0；`a_stock_behind_the_trunk_is_placed_at_the_trunk_and_merges` 备树之后干线改一个文件，放置 `rewritten` 为 1、HEAD 在节点分支上、节点献出的改动照常合进干线；`the_stock_is_no_nodes_tree_and_outlives_the_sweep` 开城清扫之后备树还在，下一次放置不新建文件。
+- **计数（8-31）。** 接管的 `created`、`rewritten`、`removed` 是⑥写下的：干线自备树以来改过的文件，与树里有多少文件无关；`walked` 是城的目录项（上限预检）加新树的目录项（称重）。断言：`a_placement_from_the_stock_creates_no_file_at_either_size` 在 32 与 64 个文件的城上各备一棵、放置一次，整值比较两份 `FileWork`：备树的 `created` 是 N，放置的三个数都是 0；`a_stock_behind_the_trunk_is_placed_at_the_trunk_and_merges` 备树之后干线改一个文件，放置 `rewritten` 为 1、HEAD 在节点分支上、节点献出的改动照常合进干线；`the_stock_is_no_nodes_tree_and_outlives_the_sweep` 开城清扫之后备树还在，下一次放置不新建文件；`a_room_placed_while_the_stock_is_being_made_checks_out_once_and_the_stock_survives` 在 8、16、32 个文件的城上数出连续派活时每一步新建的文件（D28）。
 - **谁来调 `stock`。** 它的代价就是一次全量检出，所以它只能放在没人等的地方：一条 lane 在它的 run 落地之后（`crates/sprawling/Spec.lean` §8-145）。本 crate 只提供这扇门，不自己起线程（ARCHITECTURE §10 第 3 条：库 crate 起线程的地方是点名的）。没有调用者时每一次放置都全量检出，与没有这一节时相同。
 - **两个并发的窗口，结局都正确。** 两次放置争一棵备树：改名只成一次（见②）。`stock` 刷新备树与一次放置接管它：接管先看锁再改名，二者之间刷新可能刚加锁；那时刷新的检出写进一个已经改了名的路径而失败，接管的⑥把树补全，下一次 `stock` 清掉刷新留下的残目录重备。
 -/
@@ -130,4 +130,12 @@ end Storage.Worktree.Trees.Stock
 /-! D14 放置接管一棵事先检出好的备树，备树在没人等的时候检出（8-35）
 
 决定：`Worktrees::stock` 在城仓库里留一棵检出在干线上的 worktree；`place` 先把它改名成节点的树、改写 git 的两份链接文件、再按再领那一段补写干线自备树以来的改动，接管不成才全量检出。理由：放置的时间花在实时扫描对每个新建文件的放行上（8-31、8-35 的读数），按新建文件计价；不在领树时新建文件，是让放置随文件数不变的唯一办法，而一次目录改名是毫秒级。被否：①只检出 scope——run 会读 scope 之外的文件，而且 git2 不给安全的检出选项（8-9）；②硬链接——两棵树共享可写字节，`alias` 对链接计数大于 1 的文件一律拒写（8-25），run 在自己的树里就写不了任何文件；③CoW 克隆——NTFS 没有，ReFS／Dev Drive 的块克隆要 `unsafe` 的 FSCTL 调用或一个 Zig 叶子，而且 Dev Drive 要管理员权限建；④压低 libgit2 的检出开销——最好也只到直接写文件的 0.5 s，仍以秒计；⑤在 `release` 里补备树——`release` 在记账线程上（`crates/sprawling/Spec.lean` §8-113），补备树要等一次全量检出。代价：盘上多一棵树（不超过 `WORKTREE_MAX_BYTES`）；两份链接文件按 git 文档里的布局由本模块改写，换的只是末尾的 id。**重开参数**：git2 提供移动或改名 worktree 的接口（届时改用它）；城所在的卷支持块克隆而进程不需要额外权限（届时克隆比备树便宜，也不占一棵树的盘）。
+-/
+
+/-! D28 备树还在检出时来的第二个新房间自己全量检出一次，不等那棵备树，也不多备一棵。
+
+**计数**（`a_room_placed_while_the_stock_is_being_made_checks_out_once_and_the_stock_survives`，城有 N = 8、16、32 个文件）：第一个房间接管备树，新建 0 个文件；补备树新建 N 个；补备树还锁着时第二个房间放置，新建 N 个（一次全量检出）；锁放开后 `stock` 刷新，新建 0 个；第三个房间接管，新建 0 个。所以那棵正在备的树没有白备，留给下一个房间；连续派活多付的是第二个房间那一次检出，前台多等的是一次全量检出（release 下约 1.1–1.3 s）。
+**被否：等正在备的那棵。** 前台最多少等「那次检出还剩的时间」，盘上的总功不变：第二个房间拿走它之后，第三个房间之前还得再备一棵，N 个文件照样要写。要等就要在 storage 与 accounting 之间多一个跨线程的等待（条件变量或轮询锁文件），而收益只落在两次派活间隔短于一次检出的窗口里。
+**被否：常备两棵。** 盘上多一棵树，常驻资源随一次墙钟读数变大（Roadmap 的 P3c 一行明拒这一点）。
+**重开参数。** 终点读数（end-reading runbook）显示连续派活里落进这个窗口的放置占多数，或全量检出的前台时间成了连续派活的主成本。
 -/
