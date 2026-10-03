@@ -123,7 +123,8 @@ impl Permits {
         let streak = self.streak.saturating_add(1);
         if streak < WIDEN_AFTER {
             self.streak = streak;
-        } else if self.limit < self.cap.0.get() {
+        } else if self.hold_until.is_none_or(|until| until <= now) && self.limit < self.cap.0.get()
+        {
             self.limit = self.limit.saturating_add(1);
             self.streak = 0;
         }
