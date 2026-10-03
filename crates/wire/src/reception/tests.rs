@@ -39,6 +39,18 @@ fn only_a_caller_on_this_machine_may_enrol_a_credential() {
     assert!(err.recovery().contains("machine running sprawling"));
 }
 
+/// On Linux and macOS a `[::]` listener takes IPv4 connections too and
+/// reports their peer as an IPv4-mapped address, so a local caller
+/// arrives as `::ffff:127.0.0.1`; it is the same machine, and a mapped
+/// address beyond it is still a stranger.
+#[test]
+fn an_ipv4_mapped_loopback_peer_may_enrol_and_a_mapped_stranger_may_not() {
+    let mapped: SocketAddr = "[::ffff:127.0.0.1]:51000".parse().unwrap();
+    assert!(matches!(decide_enroll(&mapped), EnrollVerdict::Accept));
+    let stranger: SocketAddr = "[::ffff:203.0.113.7]:51000".parse().unwrap();
+    assert!(matches!(decide_enroll(&stranger), EnrollVerdict::Refuse(_)));
+}
+
 #[test]
 fn a_pairing_token_does_not_buy_the_right_to_enrol() {
     // An exposed bind is legal with a token; enrolment still is not.

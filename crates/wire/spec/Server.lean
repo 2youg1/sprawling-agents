@@ -94,7 +94,7 @@ pub fn bundle_routes<S: Clone + Send + Sync + 'static>(client: Arc<ClientAssets>
 
 `decide_bind` 的四格真值表是全部行为：回环×无令牌＝`Serve(Loopback)`；回环×有令牌＝`Serve(Loopback)`；非回环×有令牌＝`Serve(Exposed)`；**非回环×无令牌＝`Refuse(E_CONFIG_INVALID)`**。拒绝发生在**启动时**，不是启动后拒连——它是配置判定。
 
-**三个平台上同一条规则**：「回环」由 `IpAddr::is_loopback` 判（IPv4 的 `127.0.0.0/8` 与 IPv6 的 `::1`），标准库在 Windows、macOS、Linux 上给同一个答案，所以 `decide_bind` 与 `decide_enroll` 不分平台。一个 IPv4 映射地址（`::ffff:127.0.0.1`）不算回环：绑定在这样的地址上按暴露面判，要求配对令牌，比需要的更严而不更松。对端地址不同：监听在 `[::]` 上时，Linux 与 macOS 缺省接收 IPv4 连接并把对端报成映射地址，Windows 缺省不接收（三者 `IPV6_V6ONLY` 的系统缺省值不同，本 crate 不设它）；于是在 Linux 与 macOS 上，同机经 IPv4 连到 `[::]` 监听器的 `/enroll` 会被当作外来者拒绝。规则的本意是「只认同一台机器」，所以这是代码的缺陷，不是本文的口径：`decide_enroll` 应先取 `IpAddr::to_canonical` 再判（`crates/wire/src/reception.rs` 的 `decide_enroll`）。
+**三个平台上同一条规则**：「回环」由 `IpAddr::is_loopback` 判（IPv4 的 `127.0.0.0/8` 与 IPv6 的 `::1`），标准库在 Windows、macOS、Linux 上给同一个答案，所以 `decide_bind` 与 `decide_enroll` 不分平台。一个 IPv4 映射地址（`::ffff:127.0.0.1`）不算回环：绑定在这样的地址上按暴露面判，要求配对令牌，比需要的更严而不更松。对端地址不同：监听在 `[::]` 上时，Linux 与 macOS 缺省接收 IPv4 连接并把对端报成映射地址，Windows 缺省不接收（三者 `IPV6_V6ONLY` 的系统缺省值不同，本 crate 不设它）；于是在 Linux 与 macOS 上，同机经 IPv4 连到 `[::]` 监听器的 `/enroll` 报来的对端是 `::ffff:127.0.0.1`。规则的本意是「只认同一台机器」，所以 `decide_enroll` 先取 `IpAddr::to_canonical` 再判 `is_loopback`（`crates/wire/src/reception.rs` 的 `decide_enroll`）：映射回环被接受，映射的外部地址（`::ffff:203.0.113.7`）仍被拒，三个平台给同一个答案。**被否掉的做法**：在监听器上设 `IPV6_V6ONLY`——那改的是哪些连接进得来，不是谁算同一台机器，且要在每个平台上各设一次。
 
 薄壳的职责恒为三件：静态资源（前端产物，`bundle_routes`）｜WS 升级（`/ws`）｜四条 HTTP 路由（`/enroll`、`/transcribe`、`/drop`、`/acp`）。它不持业务状态，不做策略判断：`/enroll`、`/transcribe`、`/drop` 由 `decide_admission` 在门前判配对，`/acp` 在处理器里经同一个函数判，因为编辑器把令牌放在正文的一个键里而不是请求头里；送页面的两条路由不设配对，因为还没拿到配对码的浏览器也得先载入输入配对码的那张表单。
 
