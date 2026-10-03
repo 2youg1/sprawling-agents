@@ -24,7 +24,8 @@ use super::{Assignment, Seat};
 /// one per run, and nothing in it is shared.
 pub(in crate::worker) enum Continuation {
     /// A model run's desks, lent out on this thread.
-    Model(Lent),
+    /// Boxed because the desks outweigh the empty arm many times over.
+    Model(Box<Lent>),
     /// A harness run borrows nothing on this thread: everything it gives
     /// back comes home with the drive (`crates/sprawling/Spec.lean` §8-124).
     Harness,
@@ -36,6 +37,26 @@ pub(in crate::worker) struct Lent {
     job_locator: Locator,
     /// This run's place in the backlog, given back where the run ends.
     member: Option<runtime::BacklogId>,
+}
+
+impl Continuation {
+    /// What the city reads, while this run drives, to start the work it
+    /// hands down at the call (collab D7). A harness run has no desks.
+    pub(in crate::worker) fn handing(
+        &self,
+        at: &Assignment,
+        owing: &crate::worker::Owing,
+    ) -> Option<crate::worker::waking::handing::Handing> {
+        match self {
+            Continuation::Model(lent) => Some(crate::worker::waking::handing::Handing::new(
+                at,
+                std::sync::Arc::clone(&lent.desks.delegates),
+                std::sync::Arc::clone(&lent.desks.workshop),
+                owing,
+            )),
+            Continuation::Harness => None,
+        }
+    }
 }
 
 impl RunWorker {
@@ -126,7 +147,7 @@ impl RunWorker {
         // The branch is the tree's name, so the desks opened here know it
         // while the lane still places the tree.
         site.name_tree(&at)?;
-        let desks = self.open_desks(&site, &at.addr)?;
+        let desks = self.open_desks(&site, &at.addr, at.depth())?;
         // The conversation this run opens with is rebuilt here, where
         // the ledger's index is held and its lineage line is written.
         let inherited = self.inherited(&at, site.run_id)?;
@@ -164,11 +185,11 @@ impl RunWorker {
         );
         Ok((
             Staged::Model { at, site, lane },
-            Continuation::Model(Lent {
+            Continuation::Model(Box::new(Lent {
                 desks,
                 job_locator,
                 member,
-            }),
+            })),
         ))
     }
 
@@ -225,7 +246,7 @@ impl RunWorker {
             desks,
             job_locator,
             member,
-        } = lent;
+        } = *lent;
         // Read before the obligation moves on: this run's place in the
         // conversation is what a signal it sends carries forward, and
         // `settle_desks` below is where those signals are spoken.
@@ -298,8 +319,6 @@ impl RunWorker {
             Ending {
                 driven,
                 raised,
-                delegates: &workbench.delegates,
-                workshop: &desks.workshop,
                 succession: &workbench.succession,
                 owing,
             },

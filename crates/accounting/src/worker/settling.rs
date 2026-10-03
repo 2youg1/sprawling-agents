@@ -50,8 +50,6 @@ pub(super) struct Settling<'a> {
 pub(super) struct Ending<'a> {
     pub(super) driven: Result<runtime::Run<runtime::run::Frozen>, AxError>,
     pub(super) raised: Vec<kernel::ApprovalItem>,
-    pub(super) delegates: &'a std::sync::Arc<std::sync::Mutex<collab::DelegateDesk>>,
-    pub(super) workshop: &'a std::sync::Arc<std::sync::Mutex<collab::WorkshopDesk>>,
     pub(super) succession: &'a std::sync::Arc<std::sync::Mutex<runtime::SuccessionDesk>>,
     /// What the city owes this run, and where a refusal goes back to.
     /// It arrives here because a successor takes it over: what is owed

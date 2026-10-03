@@ -33,15 +33,7 @@ impl RunWorker {
         owing: Owing,
     ) -> Result<RunId, AxError> {
         let (staged, continuation) = self.stage_dispatch(at, task, goal)?;
-        let context = self.drive_context();
-        self.flight.take(
-            staged,
-            context,
-            InLane {
-                continuation,
-                owing,
-            },
-        )
+        self.enter_lane(staged, continuation, owing)
     }
 
     /// Starts a run the city asked for itself, and says why in the log
@@ -103,14 +95,34 @@ impl RunWorker {
         node: NodeId,
         continuation: Continuation,
     ) -> Result<RunId, AxError> {
+        self.enter_lane(staged, continuation, Owing::row(addr, node))
+    }
+
+    /// The one step every door shares: the run's hand-over desks are kept
+    /// where the city reads them while it drives (collab D7), and the
+    /// run goes into a lane.
+    fn enter_lane(
+        &mut self,
+        staged: Staged,
+        continuation: Continuation,
+        owing: Owing,
+    ) -> Result<RunId, AxError> {
+        let run = staged.run_id();
+        if let Some(handing) = continuation.handing(staged.assignment(), &owing) {
+            self.collaborating.handing.insert(run, handing);
+        }
         let context = self.drive_context();
-        self.flight.take(
+        let taken = self.flight.take(
             staged,
             context,
             InLane {
                 continuation,
-                owing: Owing::row(addr, node),
+                owing,
             },
-        )
+        );
+        if taken.is_err() {
+            self.collaborating.handing.remove(&run);
+        }
+        taken
     }
 }

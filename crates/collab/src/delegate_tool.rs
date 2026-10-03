@@ -12,15 +12,16 @@
 //! kind it asks for.** What
 //! this module adds is the desk that remembers what was asked for, so
 //! the assembly layer - the only thing that can build a run - can start
-//! it when the parent's wave is over.
+//! it at the call (collab D7).
 //!
 //! **A request is not a run.** The tool answers with the room the work
 //! will happen in, not with a result, because starting a run inside a
 //! tool call would mean driving a run from inside another run's tool
-//! bench. The city dispatches what this desk holds after the parent's
-//! turn settles, and the child's own `run_started` carries that room -
-//! which is how a reader connects the two without a second event kind
-//! for a fact the ledger already holds twice.
+//! bench. The city hands over what this desk holds when it shows the
+//! lines the parent's call wrote, while the parent still drives, and the
+//! child's own `run_started` carries that room - which is how a reader
+//! connects the two without a second event kind for a fact the ledger
+//! already holds twice.
 
 use kernel::{
     Address, AxCode, AxError, CostTier, DelegateKind, Depth, Effect, GateOutcome, Payload,
@@ -53,6 +54,10 @@ pub struct DelegateDesk {
     /// delegate may be put.
     building: Address,
     asked: Vec<Delegated>,
+    /// How many of `asked` the city has already been handed. The rest
+    /// are what [`DelegateDesk::hand_over`] gives next, while `asked`
+    /// keeps every request, because `status.children` reports them all.
+    handed_over: usize,
 }
 
 impl DelegateDesk {
@@ -62,12 +67,14 @@ impl DelegateDesk {
             depth,
             building,
             asked: Vec::new(),
+            handed_over: 0,
         }
     }
 
     /// A desk standing where this one stands - the same depth, the same
     /// building - with nothing asked, for work this run's graph hands
-    /// down after the run is over.
+    /// down when a node's handback lands, which may be after the run is
+    /// over.
     #[must_use]
     pub fn beside(&self) -> DelegateDesk {
         DelegateDesk::new(self.depth, self.building.clone())
@@ -117,9 +124,21 @@ impl DelegateDesk {
         &self.asked
     }
 
+    /// Every request asked since the last hand-over, in the order it was
+    /// asked for. The city calls this when it shows the lines a call
+    /// wrote, so a child starts while its parent still drives (D7);
+    /// [`DelegateDesk::asked`] still answers with every request.
+    pub fn hand_over(&mut self) -> Vec<Delegated> {
+        let fresh: Vec<Delegated> = self.asked.iter().skip(self.handed_over).cloned().collect();
+        self.handed_over = self.asked.len();
+        fresh
+    }
+
     /// Everything asked for, in the order it was asked for, leaving the
-    /// desk empty. Called once when the parent's turn settles.
+    /// desk empty. For a desk nobody reports from: a graph's own desk,
+    /// which passes each node through the two doors and hands it on.
     pub fn take(&mut self) -> Vec<Delegated> {
+        self.handed_over = 0;
         std::mem::take(&mut self.asked)
     }
 }

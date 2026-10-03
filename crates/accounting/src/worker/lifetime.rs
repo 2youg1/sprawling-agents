@@ -212,6 +212,7 @@ impl RunWorker {
                 rooms: RoomQueues::folded(collaboration.inboxes),
                 joins: collaboration.joins,
                 workshops: std::collections::BTreeMap::new(),
+                handing: std::collections::BTreeMap::new(),
                 requests: collaboration.requests,
                 goals: collaboration.goals,
             },

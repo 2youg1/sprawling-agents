@@ -31,6 +31,9 @@ pub(in crate::worker) struct Collaborating {
     /// Held in memory only: after a restart a later run lays the graph
     /// out again and the join skips what already came back.
     pub(in crate::worker) workshops: BTreeMap<Address, collab::Underway>,
+    /// What each driving run hands down and lays out, read when the city
+    /// shows the lines the run's calls wrote (collab D7).
+    pub(in crate::worker) handing: BTreeMap<kernel::RunId, super::waking::handing::Handing>,
     /// The requests waiting for someone to check them, folded from the
     /// pull request records.
     pub(in crate::worker) requests: Vec<collab::OpenRequest>,

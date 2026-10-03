@@ -241,6 +241,7 @@ impl RunWorker {
     /// reported: no lane is left to act on the refusal, and the next
     /// line must still be shown (`crates/sprawling/Spec.lean` §8-110).
     pub(super) fn show_relayed(&mut self, written: Vec<EventDraft>) {
+        let runs: Vec<RunId> = written.iter().map(|line| line.run).collect();
         for line in written {
             if let Err(err) = self.absorb(line.kind, line.run, line.addr.as_ref(), &line.data) {
                 self.note(
@@ -254,6 +255,22 @@ impl RunWorker {
                     runtime::diagnostics::Level::Refuse,
                     "collab::inbox",
                     &format!("a signal a lane sent reached no room: {err}"),
+                );
+            }
+        }
+        // What a call handed down starts now, while its run still drives
+        // (collab D7); each run once, in the order its lines arrived.
+        let mut seen = Vec::new();
+        for run in runs {
+            if seen.contains(&run) {
+                continue;
+            }
+            seen.push(run);
+            if let Err(err) = self.hand_over_at_call(run) {
+                self.note(
+                    runtime::diagnostics::Level::Refuse,
+                    "collab::delegate",
+                    &format!("work {run} handed down could not be read: {err}"),
                 );
             }
         }

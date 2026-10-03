@@ -90,13 +90,7 @@ impl Laying {
             city::Neighbourhood::scan(&self.city_root, site.building.addr(), addr, &|room| {
                 self.waiting.get(room).copied().unwrap_or(0)
             })?;
-        // Where this run stands, carried rather than worked out: a run
-        // that inferred its own depth would be one wrong answer away
-        // from a delegate that delegates.
-        let delegates = Arc::new(Mutex::new(collab::DelegateDesk::new(
-            at.depth(),
-            site.building.addr().clone(),
-        )));
+        let delegates = Arc::clone(&desks.delegates);
         let context = runtime::ContextReading::default();
         let status = self.status_tool(
             site,
@@ -235,7 +229,6 @@ impl Laying {
         Ok(Workbench {
             catalog,
             bench: Some(bench),
-            delegates,
             succession,
             context,
         })

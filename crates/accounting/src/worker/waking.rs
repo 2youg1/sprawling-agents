@@ -9,6 +9,8 @@ use kernel::{Address, AxError};
 
 use super::{Assignment, Knock, Owing, RunWorker, Unasked};
 
+pub(super) mod handing;
+
 impl RunWorker {
     /// Something arrived from outside.
     ///

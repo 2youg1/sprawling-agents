@@ -8,14 +8,13 @@
 use kernel::{AxError, Completion, RunId};
 
 use crate::effect;
+use crate::worker::waking::handing::GraphAfter;
 
 use super::super::{Assignment, Dispatched, Ending, Handover, Landed, RunWorker, Site, held};
 
-/// The action an `AxError` names when one of the two hand-down desks
-/// cannot be read. Written here rather than at the call site, where the
+/// The action an `AxError` names when the succession desk cannot be
+/// read. Written here rather than at the call site, where the
 /// arm it sits in has no room for it.
-const DELEGATE_DESK: &str = "read the delegate desk";
-const WORKSHOP_DESK: &str = "read the workshop desk";
 const SUCCESSION_DESK: &str = "read the succession desk";
 
 /// Who raised what, and where. The four travel together because an
@@ -147,8 +146,6 @@ impl RunWorker {
         let Ending {
             driven,
             mut raised,
-            delegates,
-            workshop,
             succession,
             owing,
         } = ending;
@@ -169,6 +166,10 @@ impl RunWorker {
             },
             &mut raised,
         )?;
+        // What this run handed down started at the call; anything the
+        // city has not seen yet starts now, and a graph the run laid out
+        // closes unless it landed Done or Limit (collab D7, D14).
+        self.end_hand_over(run_id, GraphAfter::of(&driven))?;
         let frozen = driven?;
         let ending = frozen.completion().clone();
         // What it actually did, for the person reading afterwards. The
@@ -178,63 +179,6 @@ impl RunWorker {
             "runtime::run",
             &format!("dispatch at {} finished on {}", addr.as_str(), model),
         );
-        // Who this run handed work to. Started here rather than inside
-        // the tool call, because a run is built by this layer and a tool
-        // that drove one would be driving a run from inside another
-        // run's tool bench. Each child is dispatched at `Delegated`, so
-        // the gate refuses the grand-delegate without anybody having to
-        // work out their own depth.
-        //
-        // A cancelled run hands nothing down. The fourth safe point is
-        // what makes that reachable: without it a cancel arriving after
-        // the last wave would have no boundary left to land on, and work
-        // asked for by a turn nobody wanted would start anyway.
-        // The graph this run laid out stays with the room, so a node's
-        // handback hands the next ones down after this run is over. A
-        // cancelled run's graph goes with the nodes it did not hand down.
-        let laid_out = held(workshop, WORKSHOP_DESK)?.take_underway();
-        if let (Some(underway), Completion::Done(_) | Completion::Limit) = (laid_out, &ending) {
-            self.collaborating.workshops.insert(addr.clone(), underway);
-        }
-        let handed = match ending {
-            Completion::Cancelled => Vec::new(),
-            Completion::Done(_) | Completion::Limit => held(delegates, DELEGATE_DESK)?.take(),
-        };
-        for work in handed {
-            self.note(
-                runtime::diagnostics::Level::Effect,
-                "collab::delegate",
-                &format!("{} handed work to {}", addr.as_str(), work.room.as_str()),
-            );
-            // Carried rather than defaulted, for the reason `knock`
-            // states next to its own `budget`: work handed down is the
-            // same piece of work, so it is done under the same ceiling.
-            // Defaulting here told a delegate its budget was zero while
-            // its parent had been told the truth.
-            //
-            // Into a lane, and the handback follows when the child
-            // lands rather than here: a parent that drove each of its
-            // children to the end held this thread, and with it every
-            // other lane's writes, for the depth of the whole tree
-            // (`crates/sprawling/Spec.lean` §8-46-2).
-            self.dispatch_into_lane(
-                Assignment {
-                    addr: work.room,
-                    session: None,
-                    effort: None,
-                    model: None,
-                    policy: at.policy,
-                    origin: None,
-                    parent: Some(run_id),
-                    succession: None,
-                    taint: at.taint.clone(),
-                    dispatched_by: kernel::event::Who::resident(addr.clone())?,
-                },
-                work.task,
-                work.goal,
-                owing.child(addr.clone()),
-            )?;
-        }
         // Who this run asked to replace it: itself, next run. Same
         // address, same work, and the same `parent` - not this run - so
         // the depth is conserved and the successor's table equals this

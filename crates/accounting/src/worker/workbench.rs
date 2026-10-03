@@ -190,7 +190,6 @@ pub(super) struct Workbench {
     /// gives its adapter - because a drive owns everything it runs on
     /// and may leave this thread with it (`crates/sprawling/Spec.lean` §8-46-1).
     bench: Option<ToolBench>,
-    pub(super) delegates: std::sync::Arc<std::sync::Mutex<collab::DelegateDesk>>,
     /// Whether this run asked to be replaced, read when it concludes.
     pub(super) succession: std::sync::Arc<std::sync::Mutex<runtime::SuccessionDesk>>,
     /// Where the run records the provider's count, which `status` reads.
@@ -309,6 +308,8 @@ pub(super) struct Desks {
     /// The room's workshop, holding what it already got back and handed
     /// down, so a graph laid out again hands nothing down twice.
     pub(super) workshop: std::sync::Arc<std::sync::Mutex<collab::WorkshopDesk>>,
+    /// What this run hands down, which the city starts at the call.
+    pub(super) delegates: std::sync::Arc<std::sync::Mutex<collab::DelegateDesk>>,
     /// Where the shared plan lives, so the claims that survive are
     /// written back to the file they were checked against.
     pub(super) plan_path: PathBuf,
@@ -333,6 +334,7 @@ pub(in crate::worker) struct BenchDesks {
     shelf_root: std::sync::Arc<std::sync::OnceLock<PathBuf>>,
     pr: std::sync::Arc<std::sync::Mutex<collab::PrDesk>>,
     workshop: std::sync::Arc<std::sync::Mutex<collab::WorkshopDesk>>,
+    delegates: std::sync::Arc<std::sync::Mutex<collab::DelegateDesk>>,
     waiting: u32,
 }
 
@@ -346,6 +348,7 @@ impl Desks {
             shelf_root: std::sync::Arc::clone(&self.shelf_root),
             pr: std::sync::Arc::clone(&self.pr),
             workshop: std::sync::Arc::clone(&self.workshop),
+            delegates: std::sync::Arc::clone(&self.delegates),
             waiting: self.waiting,
         }
     }

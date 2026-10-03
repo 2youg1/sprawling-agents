@@ -34,6 +34,7 @@ impl RunWorker {
         &mut self,
         site: &Site,
         addr: &Address,
+        depth: kernel::Depth,
     ) -> Result<Desks, AxError> {
         let pr = std::sync::Arc::new(std::sync::Mutex::new(collab::PrDesk::new(
             site.who.clone(),
@@ -144,6 +145,13 @@ impl RunWorker {
             shelf_root,
             pr,
             workshop,
+            // Where this run stands, carried rather than worked out: a
+            // run that inferred its own depth would be one wrong answer
+            // away from a delegate that delegates.
+            delegates: std::sync::Arc::new(std::sync::Mutex::new(collab::DelegateDesk::new(
+                depth,
+                site.building.addr().clone(),
+            ))),
             plan_path,
             waiting,
             tenure: lent.tenure,

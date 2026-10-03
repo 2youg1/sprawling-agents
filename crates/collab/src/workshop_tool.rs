@@ -43,8 +43,17 @@ pub struct WorkshopDesk {
     /// What the room handed down before this run, until a graph is laid
     /// out and takes it over.
     handed: BTreeSet<NodeId>,
-    underway: Option<Underway>,
+    underway: Laid,
     joined: FanIn,
+}
+
+/// This run's graph: not laid out, held here, or taken by the city at the
+/// call (collab D7), which still counts as the run's one lay-out.
+#[derive(Debug)]
+enum Laid {
+    Nothing,
+    Held(Underway),
+    Taken,
 }
 
 impl WorkshopDesk {
@@ -56,7 +65,7 @@ impl WorkshopDesk {
         WorkshopDesk {
             who,
             handed,
-            underway: None,
+            underway: Laid::Nothing,
             joined,
         }
     }
@@ -78,7 +87,7 @@ impl WorkshopDesk {
         contracts: Vec<NodeContract>,
         delegates: &mut DelegateDesk,
     ) -> Result<LaidOut, AxError> {
-        if self.underway.is_some() {
+        if !matches!(self.underway, Laid::Nothing) {
             return Err(AxError::failure(
                 AxCode::InvalidArgs,
                 "lay out a workshop",
@@ -109,7 +118,7 @@ impl WorkshopDesk {
             .filter(|id| !done.contains(id) && !underway.handed().contains(id))
             .cloned()
             .collect();
-        self.underway = Some(underway);
+        self.underway = Laid::Held(underway);
         Ok(LaidOut {
             schedule,
             handed,
@@ -119,7 +128,14 @@ impl WorkshopDesk {
 
     /// The graph this run laid out, for the city to keep beside the join.
     pub fn take_underway(&mut self) -> Option<Underway> {
-        self.underway.take()
+        match std::mem::replace(&mut self.underway, Laid::Taken) {
+            Laid::Held(underway) => Some(underway),
+            Laid::Nothing => {
+                self.underway = Laid::Nothing;
+                None
+            }
+            Laid::Taken => None,
+        }
     }
 
     /// What the join asks before it will take a verdict.
