@@ -40,7 +40,8 @@ impl<'de> Deserialize<'de> for ProviderDegraded {
                     .map(Self::VaultFellBack)
                     .map_err(|as_fallback| {
                         serde::de::Error::custom(format!(
-                            "neither a provider refusal ({as_refusal}) nor a vault fallback                              ({as_fallback})"
+                            "neither a provider refusal ({as_refusal}) nor a vault fallback \
+                             ({as_fallback})"
                         ))
                     })
             })
@@ -90,7 +91,8 @@ mod tests {
             .unwrap_err()
             .to_string();
         assert!(
-            err.contains("missing field `action`") && err.contains("missing field `fallback`"),
+            err.contains("neither a provider refusal (missing field `action`)")
+                && err.contains("nor a vault fallback (missing field `fallback`)"),
             "{err}"
         );
     }
