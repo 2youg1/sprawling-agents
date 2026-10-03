@@ -85,7 +85,10 @@ export function outcomeOf(call: Call): Key | null {
   return null;
 }
 
+// The signal tool's own argument grammar (crates/collab/src/signal_tool.rs).
+// wording-ok: an argument value the tool reads, never shown to a reader
 const Pull = Schema.Struct({ action: Schema.Literal("pull") });
+// wording-ok: an argument value the tool reads, never shown to a reader
 const Asked = Schema.Struct({ action: Schema.Literal("send"), to: Schema.String, text: Schema.String });
 const Handed = Schema.Struct({ room: Schema.String, task: Schema.String });
 const Sent = Schema.Struct({ delivered: Schema.Boolean, waiting: Schema.optional(Schema.String) });
