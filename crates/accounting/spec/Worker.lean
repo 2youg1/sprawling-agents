@@ -28,6 +28,7 @@ pub struct Hands {
     pub recipe_for: fn(&str) -> Result<&'static Recipe, AxError>,
     pub exec_host: ExecHost,
     pub seat_lane: SeatLane,                             // 每条车道在自己的线程上开头调一次，答的东西活到车道结束；生产交 `bin::serving::placement::seat_lane`（`crates/sprawling/spec/Serving/Placement.lean` D46）
+    pub shares: runtime::Shares,                         // 车队的表给每个 run 的份额；生产交 `bin::serving::placement::run_shares` 的答案（同一分部 D47），本 crate 只转交给 `runtime::Backlog::with_shares`
 }
 pub type SeatLane = fn() -> Box<dyn std::any::Any>;
 /// exec 工具取自这台电脑的三件事。

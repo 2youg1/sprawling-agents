@@ -19,8 +19,8 @@ pub fn read() -> Result<PreferencesAnswer, AxError>;       // Query::Preferences
 pub fn put(patch: PreferencePatch) -> Result<(), AxError>; // Command::PutPreferences 的全部
 pub enum CorePriority { Raised, Normal }                   // 人的设置；Normal 即「关掉高优先级」
 pub fn core_priority() -> Result<CorePriority, AxError>;   // ConfigInvalid：priority 既不是 "raised" 也不是 "normal"
-pub enum CorePlacement { Soft, Off }                       // [core] placement：缺省 "soft"，"none" 关掉放置（`crates/sprawling/spec/Serving/Placement.lean` D47）
-pub fn core_placement() -> Result<CorePlacement, AxError>; // ConfigInvalid：placement 既不是 "soft" 也不是 "none"
+pub enum CorePlacement { Off, Soft, SoftShares }           // [core] placement 的 "none"、"soft"（缺省）、"soft_shares"；每一臂开关什么见 `crates/sprawling/spec/Serving/Placement.lean` D47
+pub fn core_placement() -> Result<CorePlacement, AxError>; // ConfigInvalid：placement 不是这三个拼写之一（"pinned" 建成之前也在其中）
 ```
 
 - **文件在每一座城之外**：`<home>/.sprawling/config.toml`，路径由 `accounting::home`（§8-7）给，本模块不拼路径。把城拷到另一台机器，它不跟着走；在同一台机器上换一个浏览器，画出来的仍是这份文件说的样子。

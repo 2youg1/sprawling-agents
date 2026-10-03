@@ -100,11 +100,17 @@ pub(super) fn one_level_down(Command) -> Command;
 **逐 run 的 Job Object（`runtime::backlog::jobs`，形状 4 adapter）**：派出的命令起动之后，谁在吃内存要能归到派出它的 run，而一条 `cargo test` 真正吃内存的是它起的 `rustc` 与测试进程，不是 `cargo` 自己。所以 Windows 上每个 run 一个匿名 Job Object：`Backlog::run` 起动的子进程在登记进表的同一时刻装进它 owner 的 job（第一次装时创建），job 里的进程再起的进程由系统自动装进同一个 job，于是 job 的进程表就是这个 run 的整棵进程树。`Backlog::release(owner)` 丢掉这只 job 的句柄；job 不设 kill-on-close，丢句柄不杀进程，杀进程仍只归 `release` 与 `halt`。macOS 与 Linux 上没有 Job Object：今天两者都只读到命令自己的 pid（下面的 `unfollowed` 计每一条）；按 run 的 CPU 份额在 macOS 上是 `taskpolicy -c utility`，在 Linux 上是 cgroup v2 的 `cpu.weight`，都在 D29，进程组作为读数的对应物尚未接入。
 
 ```rust
-pub struct RunProcesses { pub pids: BTreeSet<u32>, pub unfollowed: u32, pub share: CpuShare }
-pub enum CpuShare { Weighted, Unset }   // 这个 run 的 job 是否带着每个 run 都一样的 CPU 权重（D29）；缺省 Unset
-impl Backlog { pub fn processes(&self) -> Result<BTreeMap<RunId, RunProcesses>, AxError>; }
+pub struct RunProcesses { pub pids: BTreeSet<u32>, pub unfollowed: u32, pub share: Shares }
+pub enum Shares { Unset, Cpu, CpuAndMemory { limit: NonZeroU64 } } // 每个 run 的份额（D29）；缺省 Unset
+impl Backlog {
+    pub fn with_shares(self, shares: Shares) -> Backlog;   // 这张表起动的每个 run 要的份额；不调时 Unset
+    pub fn shares(&self) -> Shares;
+    pub fn processes(&self) -> Result<BTreeMap<RunId, RunProcesses>, AxError>;
+}
 ```
 
+- `Shares` 是人的配置 `[core] placement` 那一臂里属于子进程的一半，由 `bin::serving::placement::run_shares` 定（`crates/sprawling/spec/Serving/Placement.lean` D47），经 `accounting::worker::hands::Hands.shares` 交进车队的表；runtime 不读人的配置。一张没人交过份额的表是 `Unset`：测试与不起 run 命令的地方都是它。
+- `RunProcesses.share` 是这个 run 此刻实际拿到的份额：要了而平台给了，就是要的那一个；要了而平台拒绝（叶子调用失败、cgroup 不可写）或这个平台没有份额，就是 `Unset`。
 - `processes` 按 run 给出它此刻在表里的进程：owner 是这个 run（窗口内或已转后台）的每条命令自己的 pid，并上这个 run 的 job 的进程表（job 只列还活着的进程）。已经结束、还没被 `harvest` 的命令仍列出自己的 pid，读数的一方在它后面读不到计数。已 `release` 的命令（owner 为 nobody）不归任何 run。
 - `unfollowed` 是这个 run 的命令里有几条只读到了命令本身、没读到它起的进程：Windows 上创建 job、装进 job 或读 job 的进程表失败的那几条（这一次读数里整个 run 的命令都算），Unix 上是每一条，因为 Unix 上没有 Job Object（进程组是它的对应物，尚未接入）。装不进 job 不让命令起动失败：job 只服务于读数，为读数让一条构建失败是把代价付错了地方，失败落在 `unfollowed` 里给读数的人看。
 - `share`：Windows 上 job 在创建的同一刻经 `desktop_ffi::cpu::job_share` 设权重 `RUN_CPU_WEIGHT`（5），设上了是 `Weighted`；job 拒了权重时 job 照旧跟进程树，这个 run 读作 `Unset`。macOS 与 Linux 上恒为 `Unset`：macOS 没有按 run 的份额（D29），Linux 的 cgroup 份额还没有接上。作业级内存上限只属四臂对照的 ③ 臂，本构建传 0，即不设。
@@ -190,18 +196,19 @@ pub fn new(setup: ExecSetup, sandbox: Box<dyn Sandbox>, backlog: Backlog) -> Res
 
 **决定**：
 
-- **Windows (d)**：`runtime::backlog::jobs` 创建一个 run 的 job 时，同时给它设两项：CPU 速率控制 `JOBOBJECT_CPU_RATE_CONTROL_INFORMATION { ControlFlags: JOB_OBJECT_CPU_RATE_CONTROL_ENABLE | JOB_OBJECT_CPU_RATE_CONTROL_WEIGHT_BASED, Weight: 5 }`（`SetInformationJobObject`，信息类 `JobObjectCpuRateControlInformation`），与作业级提交上限 `JOB_OBJECT_LIMIT_JOB_MEMORY`（读出 `JOBOBJECT_EXTENDED_LIMIT_INFORMATION`、置上这一位与 `JobMemoryLimit`、再写回，于是别处已经设的位不丢）。接口档位：`win32job` 2.0.3 把扩展限额的结构放在 crate 私有字段里、不设 CPU 速率控制，`process-wrap` 10.0.1 也不设，所以走第二档 Zig 叶子，放在 `crates/desktop/ffi`（与 `crates/sprawling/spec/Serving/Standing.lean` D40 同一个叶子）：job 的句柄由 `win32job::Job::handle` 交出（公开），两项限额作为一个定长记录过 `(ptr, len)` 边界。两项都不要特权（推断：文档都没有要求特权，而工作集上限要不要特权随账户令牌而变，见 §8-13-2；派生的 Rust 检查在未提权的 Windows runner 上设好再读回，先红后绿）。
-  - **权重**：每个 run 一样，取 5（范围 1–9），常量 `RUN_CPU_WEIGHT`。要的是按 run 公平：不设时一条起 16 个进程的构建按线程分到 16 份，对面只有一个进程的 run 分到 1 份；权重相同，每个 run 各得一份，一个 session 的编译饿不死别的 session。harness 不进任何 job，它的热线程本来就站在正常档之上（§8-93）。
-  - **内存上限**：物理内存的一半，常量 `RUN_JOB_MEMORY_SHARE`（1/2）；物理内存由 sprawling 的 `bin::monitor::memory` 在起动时读出、经 `bin::assembly` 交给本 crate，本 crate 不读平台。超过时是这个 run 的进程树里的分配失败（编译器报内存不足），城与别的 run 照常。四臂对照的 ③ 臂才打开它（`crates/sprawling/spec/Serving/Placement.lean`「四臂对照」），默认按读数定。
-  - **退路**：叶子调用失败时 job 照今天的样子（不设份额、不设上限），命令照常起动（与装不进 job 同一条判断：为读数或份额让一条构建失败是把代价付错了地方），doctor 说出「每个 run 的 CPU 份额：未设」与原因。
-- **macOS (d)**：没有 Job Object。派出的命令在 `nice` 外面再包一层 `/usr/sbin/taskpolicy -c utility`，把它与它的后代的 QoS 压到 utility，系统于是先把它们放到效率核上（外部命令，第一档，与 `nice` 同一种做法，§8-13-3）；找不到 `taskpolicy` 时只包 `nice`，并照实说。没有不要特权的内存上限：`setrlimit` 要在 `pre_exec` 里调，`pre_exec` 是 `unsafe`，而且 macOS 不执行 `RLIMIT_AS`；所以 macOS 上这一项不可用，doctor 照实说。按 run 的 CPU 份额同样没有。
+- **哪一臂打开哪一项**：下面每一项都随人的配置 `[core] placement` 那一臂开关，开关表只在 `crates/sprawling/spec/Serving/Placement.lean` D47 一处；本 crate 只收一个值 `Shares`（`Backlog::with_shares`）：`Unset` 什么也不设（`"none"`），`Cpu` 设 CPU 份额（缺省 `"soft"`），`CpuAndMemory { limit }` 再设内存上限（`"soft_shares"`）。
+- **Windows (d)**：`runtime::backlog::jobs` 创建一个 run 的 job 时，按 `Shares` 给它设至多两项：CPU 速率控制 `JOBOBJECT_CPU_RATE_CONTROL_INFORMATION { ControlFlags: JOB_OBJECT_CPU_RATE_CONTROL_ENABLE | JOB_OBJECT_CPU_RATE_CONTROL_WEIGHT_BASED, Weight: 5 }`（`SetInformationJobObject`，信息类 `JobObjectCpuRateControlInformation`），与作业级提交上限 `JOB_OBJECT_LIMIT_JOB_MEMORY`（读出 `JOBOBJECT_EXTENDED_LIMIT_INFORMATION`、置上这一位与 `JobMemoryLimit`、再写回，于是别处已经设的位不丢）。接口档位：`win32job` 2.0.3 把扩展限额的结构放在 crate 私有字段里、不设 CPU 速率控制，`process-wrap` 10.0.1 也不设，所以走第二档 Zig 叶子，放在 `crates/desktop/ffi`（与 `crates/sprawling/spec/Serving/Standing.lean` D40 同一个叶子）：job 的句柄由 `win32job::Job::handle` 交出（公开），两项限额作为一个定长记录过 `(ptr, len)` 边界。两项都不要特权（推断：文档都没有要求特权，而工作集上限要不要特权随账户令牌而变，见 §8-13-2；派生的 Rust 检查在未提权的 Windows runner 上设好再读回，先红后绿）。
+  - **权重**：`Shares` 不是 `Unset` 时设；每个 run 一样，取 5（范围 1–9），常量 `RUN_CPU_WEIGHT`。要的是按 run 公平：不设时一条起 16 个进程的构建按线程分到 16 份，对面只有一个进程的 run 分到 1 份；权重相同，每个 run 各得一份，一个 session 的编译饿不死别的 session。harness 不进任何 job，它的热线程本来就站在正常档之上（§8-93）。
+  - **内存上限**：`Shares::CpuAndMemory { limit }` 时设，`limit` 是物理内存的一半；物理内存由 sprawling 的 `bin::monitor::memory` 读出，`bin::serving::placement::run_shares` 算出上限放进这个值，本 crate 不读平台。超过时是这个 run 的进程树里的分配失败（编译器报内存不足），城与别的 run 照常。只有 `"soft_shares"` 打开它（D47），默认按读数定。
+  - **退路**：叶子调用失败时 job 不设份额、不设上限，命令照常起动（与装不进 job 同一条判断：为读数或份额让一条构建失败是把代价付错了地方），这个 run 的 `RunProcesses.share` 读作 `Unset`。
+- **macOS (d)**：没有 Job Object。派出的命令在 `nice` 外面再包一层 `/usr/sbin/taskpolicy -c utility`，把它与它的后代的 QoS 压到 utility，系统于是先把它们放到效率核上（外部命令，第一档，与 `nice` 同一种做法，§8-13-3）；这一层是 macOS 的 CPU 份额一项，`Shares::Unset` 时不包；找不到 `taskpolicy` 时只包 `nice`。没有不要特权的内存上限：`setrlimit` 要在 `pre_exec` 里调，`pre_exec` 是 `unsafe`，而且 macOS 不执行 `RLIMIT_AS`；所以 macOS 上这一项不可用，`CpuAndMemory` 在 macOS 上只兑现 CPU 一半，doctor 照实说。
 - **Linux (d)**：harness 自己所在的 cgroup（`/proc/self/cgroup` 的 `0::` 行，挂在 `/sys/fs/cgroup` 下）可写时，harness 先把自己移进一个子 cgroup `core`（cgroup v2 规定有进程的 cgroup 不能再往下分资源），在父 cgroup 的 `cgroup.subtree_control` 打开 `cpu` 与 `memory`，每个 run 建一个子 cgroup，写 `cpu.weight`（每个 run 一样，100）与 `memory.max`（同 `RUN_JOB_MEMORY_SHARE`），子进程起动后把 pid 写进那个 cgroup 的 `cgroup.procs`；全是标准库读写文件，第一档。与 Windows 的 job 一样，起动到写进 cgroup 之间有一小段，那一段里起的孙进程留在 `core` 里。不可写时（没有 systemd 的委派，CI 主机与许多桌面都是这样）只靠 `nice 10`，doctor 说「每个 run 的 CPU 份额：只有 nice（cgroup v2 未委派）」。
 - **(e) `WindowsJobObject` 臂**：今天不构造，理由按 `win32job` 2.0.3 今天公开的接口重新判过（§8-13-2），仍是两轴兑现不了。资源一轴由上面的叶子兑现；进程树一轴要「挂起态起动、装进 job、再恢复」：挂起态起动有安全接口（`CommandExt::creation_flags` 加 `CREATE_SUSPENDED`），装 job 有（`win32job::Job::assign_process`），恢复没有——`std::process::Child` 不交出主线程句柄，`ResumeThread` 或 `NtResumeProcess` 都要 FFI，而 `PROC_THREAD_ATTRIBUTE_JOB_LIST` 要的 `CommandExt::raw_attribute` 既是 `unsafe` 又只在 nightly 上。于是同一个叶子再加一个「恢复这个进程」的函数之后，这一臂按原清单构造：文件系统（副本）、进程树、CPU 与内存上限都保，网络与用户不保；那时 Windows 上 `choose` 有了它就选它。
 - **为什么不缩清单**：一只只保文件系统与「起动之后的进程树」的 job 臂，对 Agent 来说与 `CopiedTree` 几乎一样，多出的只是 kill-on-close；多一臂只多一句要读的话，不多一项保证。
 
 **被否**：①`win32job` 的调度级别（`limit_scheduling_class`，安全接口）当作 CPU 份额——它只改同一优先级类里各 job 线程的时间片长短，每个 run 的级别都一样时什么也没分；②工作集上限（`limit_working_memory`）——限的是常驻页，不是提交量，而且要不要特权随账户令牌而变（§8-13-2）；③硬的 CPU 速率上限（`JOB_OBJECT_CPU_RATE_CONTROL_HARD_CAP`）——机器空着时也让核闲着，与「忙了立刻换下一个核」相反；④每条命令一只 job——份额要按 session 分，不是按命令；⑤Linux 上用 `systemd-run --user --scope -p CPUWeight=…` 包每条命令——每条命令多一次 D-Bus 往返与一个 scope 的起动，而且要有用户级 systemd，不是每台机器都有；直接写委派的 cgroup 文件更少依赖。
 
-**重开参数**：四臂对照里 ③ 臂（再加 (d)）的 p99 与 p999 不优于 ② 臂——那就只留 Windows 的权重或整个 (d) 都不做；或者一个对外只给安全接口的 crate 公开 job 的 CPU 速率控制与作业级内存上限（叶子函数换成它）；或者 Rust 稳定版提供 `raw_attribute`（(e) 的恢复函数就不需要了）。
+**重开参数**：四臂对照里 ② 臂（缺省，含 CPU 份额）的 p99 与 p999 不优于 ① 臂，而把份额单独拆出来也无益——那就整个 (d) 都不做；③ 臂（再加内存上限）不比 ② 差、也没有让真实构建失败——那就把内存上限放进缺省；或者一个对外只给安全接口的 crate 公开 job 的 CPU 速率控制与作业级内存上限（叶子函数换成它）；或者 Rust 稳定版提供 `raw_attribute`（(e) 的恢复函数就不需要了）。
 -/
 
 /-! D30 shell 默认仍是平台的 shell；一栋楼可以在 `CONFIG.toml` 里换成 pwsh 7；exec 的失败按 shell 分类，从账本折出（TF5，D88 第 1、7 条，D83 第 10 条，D94）
