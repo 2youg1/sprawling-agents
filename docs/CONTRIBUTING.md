@@ -95,6 +95,16 @@ A gate's violation turns the check red with a message naming the rule, the viola
 
 **`ci` runs on every push to `main` and on every pull request.** Its verdict jobs together are exactly `just check` plus the supply-chain read and the kernel proofs, so a green CI implies at least what a green `just check` implies. Every verdict job is a required check; the small `changes` job beside them is not, because its only work is to let the proof job skip on a change no proof is about. `platforms` and `nightly` answer questions nobody waits on — macOS, the Nix shell, byte-identical rebuilds, fuzzing, advisories — and run on a schedule; `upstream-watch` asks each watched path of [`third-party.md`](third-party.md) §1 whether it moved, daily.
 
+**From a fork, get the run green before you open the pull request.** A contributor without push access to this repository works in a fork, and the pull request's own run then confirms a result instead of meeting the code for the first time:
+
+1. Fork the repository, then open the fork's Actions tab and enable workflows, which GitHub disables in a new fork.
+2. Keep the fork's `main` level with this repository's `main` (*Sync fork* on the fork's page, or `gh repo sync <fork>`). A run started by hand judges commit messages from where the branch left the fork's `main`, so a stale `main` makes the commit check read commits that are not yours.
+3. Push the work to a branch of the fork and start the check on it: `gh workflow run ci.yml --repo <fork> --ref <branch>`.
+4. Read the result with `gh run list --repo <fork> --workflow ci.yml --branch <branch>`, which shows each run's status and conclusion; `gh run watch <run-id> --repo <fork>` follows one run, and `gh run view <run-id> --repo <fork> --log-failed` prints the steps that failed. Fix a red run on the branch, push, and start it again.
+5. Open the pull request once the run is green, and link the run in the description.
+
+`ci.yml` reads no secret, so every one of its jobs runs in a fork; only `main` writes the build caches, so a fork's first run starts cold and takes longer. A check that needs what a fork lacks, such as a workflow that reads a secret, is left to the maintainer's run on the pull request; name that check in the description. The pull request's own run may wait for a maintainer to approve it, which GitHub asks for on a first contribution.
+
 Three things run there and not at your desk: `cargo-deny` when it is not installed locally, the kani proofs (Linux only; `just proof` is a no-op elsewhere), and the nightly fuzz and mutation batches.
 
 ## 5 Comments and documentation
