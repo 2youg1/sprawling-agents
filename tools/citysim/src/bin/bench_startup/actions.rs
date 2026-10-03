@@ -88,12 +88,17 @@ pub fn dominant(steps: &[(&'static str, Samples)]) -> Option<&'static str> {
 /// `install.ps1` perform, the unpack, and the launch that confirms the
 /// unpacked binary answers. The archive is prepared by the caller before
 /// any of this runs: the reading starts at "the archive is in place".
+///
+/// The launch is two steps (citysim D6): `system`, the spawn call, where
+/// process creation and an on-access scanner reading the new image wait,
+/// and `product`, the binary itself running to its exit.
 pub fn install(scratch: &Path, archive_path: &Path) -> Result<Action, AxError> {
     let published = digest_of(archive_path)?;
     let mut totals = Vec::with_capacity(SAMPLES);
     let mut digests = Vec::with_capacity(SAMPLES);
     let mut unpacks = Vec::with_capacity(SAMPLES);
-    let mut launches = Vec::with_capacity(SAMPLES);
+    let mut systems = Vec::with_capacity(SAMPLES);
+    let mut products = Vec::with_capacity(SAMPLES);
     let mut per_sample = PerSample {
         processes: 0,
         files: 0,
@@ -110,9 +115,9 @@ pub fn install(scratch: &Path, archive_path: &Path) -> Result<Action, AxError> {
         let step = stamp();
         let binary = unpack(archive_path, &into)?;
         unpacks.push(step.elapsed());
-        let step = stamp();
-        spawn_version(&binary)?;
-        launches.push(step.elapsed());
+        let (system, product) = spawn_version(&binary)?;
+        systems.push(system);
+        products.push(product);
         totals.push(boundary.elapsed());
         if sample == 0 {
             per_sample = PerSample {
@@ -128,7 +133,8 @@ pub fn install(scratch: &Path, archive_path: &Path) -> Result<Action, AxError> {
         steps: vec![
             ("digest", collected(digests)?),
             ("unpack", collected(unpacks)?),
-            ("launch", collected(launches)?),
+            ("system", collected(systems)?),
+            ("product", collected(products)?),
         ],
         per_sample,
     })
