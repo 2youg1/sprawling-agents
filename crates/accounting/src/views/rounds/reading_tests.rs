@@ -274,49 +274,6 @@ fn a_checkpoint_whose_oid_will_not_parse_leaves_no_row_to_click() {
 }
 
 #[test]
-fn a_word_from_a_person_lands_in_the_turn_it_reached() {
-    let events = [
-        asked(1),
-        record(
-            2,
-            EventKind::SteerReceived,
-            serde_json::json!({ "source": "user", "text": "ignore the cache" }),
-        ),
-    ];
-    assert_eq!(
-        turns(&events)[0].notes,
-        vec![Note::Arrived {
-            from: Some("user".to_owned()),
-            said: Some("ignore the cache".to_owned()),
-            by: wire::Speaker::User,
-            t: TimeMs::new(2),
-            handback: None,
-            at: Seq::new(2),
-        }],
-        "the User's steer says the User spoke, what, and when"
-    );
-}
-
-#[test]
-fn a_steer_of_another_shape_is_unreadable_rather_than_silent() {
-    let events = [
-        asked(1),
-        record(
-            2,
-            EventKind::SteerReceived,
-            serde_json::json!({ "source": "user", "said": "ignore the cache" }),
-        ),
-    ];
-    match turns(&events)[0].notes.as_slice() {
-        [Note::Unreadable { cause, at }] => {
-            assert!(cause.starts_with("SteerReceived"), "{cause}");
-            assert_eq!(*at, Seq::new(2));
-        }
-        other => panic!("somebody spoke, and the failure to read it stays, got {other:?}"),
-    }
-}
-
-#[test]
 fn a_turn_waiting_on_a_person_says_so_without_copying_the_queue() {
     let events = [
         asked(1),

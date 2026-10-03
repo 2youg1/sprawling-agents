@@ -339,13 +339,13 @@ pub enum Note {
 pub enum Speaker { User, Resident }
 ```
 
-**决定**：`signal_consumed` 的载荷只有 `{id, by}`（kernel `SignalConsumed`），话本身在发信那一行 `signal_enqueued` 里，而那一行记在发信者的 run 下，不在收信者的会话里。所以 `wire::note_of` 读到 `signal_consumed` 时只读出 `by: Resident`、`t` 与 `at`，`from` 与 `said` 留 `None`；服务端的 rounds 折叠（`accounting::views::rounds::paired`）按 `SignalId` 在账本里从这一行往前找配对的 `signal_enqueued`，找到了才填 `from`（发信者）与 `said`（载荷的 `text`）。往前找有界：最多 `HISTORY_MAX` 行，界外配不上就留 `None`，页面写「不知道」而不猜。`steer_received` 一行自带 `source` 与 `text`（kernel `SteerReceived`），直接读；读不回这个形状的载荷是一条 `Note::Unreadable`。`by` 是 `User` 当且仅当 steer 的 `source` 是 User 入口写下的 `user`；居民的 steer（`@id`）与每一条 signal 都是 `Resident`，因为 User 只经 steer 说话。
+**决定**：`signal_consumed` 的载荷只有 `{id, by}`（kernel `SignalConsumed`），话本身在发信那一行 `signal_enqueued` 里，而那一行记在发信者的 run 下，不在收信者的会话里。所以 `wire::note_of` 读到 `signal_consumed` 时只读出 `by: Resident`、`t` 与 `at`，`from` 与 `said` 留 `None`；服务端的 rounds 折叠（`accounting::views::rounds::paired`）按 `SignalId` 在账本里从这一行往前找配对的 `signal_enqueued`，找到了才填 `from`（发信者）与 `said`（载荷的 `text`）。往前找有界：整本账里最多 `SENDING_REACH`（4096）行，界外配不上就留 `None`，页面写「不知道」而不猜。`steer_received` 一行自带 `source` 与 `text`（kernel `SteerReceived`），直接读；读不回这个形状的载荷是一条 `Note::Unreadable`。`by` 是 `User` 当且仅当 steer 的 `source` 是 User 入口写下的 `user`；居民的 steer（`@id`）与每一条 signal 都是 `Resident`，因为 User 只经 steer 说话。
 
 **理由**：原来的读法在 `signal_consumed` 上读 `source`／`from`／`text` 三个它根本不带的键，于是 `said` 恒为空、`from` 落到这一行的作者——也就是收信者自己：页面上每一条到达的话都像是收信者对自己说了一句空话。
 
 **被否**：①让 kernel 在 `signal_consumed` 里再抄一遍 `from` 与 `text`：同一句话在账本里存两份，kernel `SignalConsumed` 的文档明说历史不需要它两次；②从 `SignalId` 的字面（`<run>-s<n>`）解析出发信者的 run 再去读那个 run：id 的拼法是 collab 的铸造约定，不是一条文法，交接（`handback-<run>`）与阻塞通知已经用了别的拼法。
 
-**重开参数**：一座城里一条信从发出到被取走之间隔的账本行常常超过 `HISTORY_MAX` 时，给索引加一张按 `SignalId` 的表。
+**重开参数**：一座城里一条信从发出到被取走之间隔的账本行常常超过 `SENDING_REACH` 时，给索引加一张按 `SignalId` 的表。
 
 **三个平台**：只读账本、只折叠，Windows、macOS、Linux 相同。
 -/
@@ -395,7 +395,7 @@ pub enum HandbackNote {
 **三个平台**：相同。
 -/
 
-/-! D39 收件箱的一行带上那条话的第一行
+/-! D39 Inbox的一行带上那条话的第一行
 
 ```rust
 pub struct SignalLine {
@@ -405,7 +405,7 @@ pub struct SignalLine {
 }
 ```
 
-**决定**：`InboxAnswer.waiting` 的每一行带 `first_line`：发信那一行载荷里 `text` 的第一行（按 `\n` 切，去掉行尾 `\r`），载荷没有 `text` 时为 `None`。整段话不上线：收件箱是「有什么在等」，读全文是打开那条信的事。
+**决定**：`InboxAnswer.waiting` 的每一行带 `first_line`：发信那一行载荷里 `text` 的第一行（按 `\n` 切，去掉行尾 `\r`），载荷没有 `text` 时为 `None`。整段话不上线：Inbox是「有什么在等」，读全文是打开那条信的事。
 
 **理由**：只有 id、种类、发信者与时刻的一行，User 看不出要不要先处理它。
 

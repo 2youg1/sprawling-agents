@@ -17,6 +17,8 @@ mod opening;
 mod paired;
 
 #[cfg(test)]
+mod arrival_tests;
+#[cfg(test)]
 mod carried_tests;
 #[cfg(test)]
 mod opening_tests;
