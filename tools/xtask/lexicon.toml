@@ -324,3 +324,11 @@ replacement = "skill audit（审核）"
 [[entry]]
 banned = "调用日志"
 replacement = "usage record（调用记录）"
+
+[[entry]]
+banned = "技能审计"
+replacement = "skill audit（审核）"
+
+[[entry]]
+banned = "使用日志"
+replacement = "usage record（调用记录）"
