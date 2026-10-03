@@ -38,7 +38,7 @@ import crates.collab.spec.Delivery
 
 分部里的定理是模型对性质的证明：信不丢、不被消费两次、同一房间按 seq 到达、没人在的房间只敲一次门、每次同步等待都会结束、被取消的 run 拿过的信重新投递；重复投递不产生第二件、急件 lane 只装 Steer、pull 不超 bandwidth；验证者不是生产者、验不过没有 Artifact、PR 的验证者不是实现者；只派就绪节点、一个节点不派两次；污染件不自己开工、判不出就交给人；分一行要先握着它、桌子答应的效应落在派活那份计划上全部落下、一行被别人动过则本 run 对它的拆分落不下。每个分部各有一条「拿掉守卫即反例」的定理（咬得动的演示）。
 
-Rust 实现对模型的一致性由测试检查，不由证明：每个模块旁的 `tests.rs` 经生产入口断言它在本文件 §8 或分部里的规则；两条判负线（`Artifact` 无公开构造子、未验证的 PR 合不进来）由 `tests/ui/` 的编译失败反例钉住；`tests/pr_flow.rs` 从外面走一遍开 PR、被拒、合并。
+Rust 实现对模型的一致性由测试检查，不由证明：每个模块旁的 `tests.rs` 经生产入口断言它在本文件 §8 或分部里的规则；两条判负线（`Artifact` 无公开构造子、`Pr<Open>` 拿不到验证者的名字）由 `tests/ui/` 的编译失败反例钉住；`tests/pr_flow.rs` 从外面走一遍开 PR、被拒、合并。
 -/
 
 /-! ## 3 假设与歧义
@@ -125,7 +125,7 @@ Signal、Inbox、Steer、Workshop、NodeContract、fan-in、Artifact、arbitrati
 
 **`collab::delegate_tool`**（形状 4 适配器）。`Delegated { room, task, goal, kind }`；`DelegateDesk::new(depth, building)`、`beside`（同一 depth 与 building、未派任何活：图在 run 结束后派的节点过同样两道门）、`ask`（门在这里被叫）、`asked`（`status.children` 的真值，含已交出的）、`hand_over`（装配层在展示调用写下的行时取走上次以来新增的请求）、`take`（图自己的桌子用：清空，没人从它报数）。
 
-- 本模块是 `kernel::gate::spawn` 的生产调用者，一层深不是本模块的判定；拒绝文字是门自己的三段式。判决按 `GateOutcome` 两臂穷尽匹配，门多一种答复时编译器当场找到这里。
+- 本模块是 `kernel::gate::spawn` 的生产调用者，一层深不是本模块的判定；拒绝文字是门自己的三段式。判决按 `GateOutcome` 的三臂（`Allow`、`Deny`、`Ask`）穷尽匹配，门多一种答复时编译器当场找到这里；派生门今天不答 `Ask`，若答，这次请求按待决处理，以门给的那个问题拒绝，而不是放行。
 - 面向模型的那句话不提人：`disclosure` 说「要么给出房间，要么被拒」，`workshop` 的那一句同样。
 - 深度是被携入的，不是推算的：一个自己推算深度的 run，错一次就是一个孙代理。
 - 一次请求不是一个 run：工具答的是在哪个房间开，派活在调用时生效：记账线程展示这次调用写下的行时就为子房间开 run，不等父回合落定（D7）；开的是一个带着 task、goal 与父 run 的派活，而不是敲门，因为敲门开的 run 只读到「有人给你来信」，读不到它要做的事，也不带一层深要的 `parent`；子 run 的 `run_started` 携着那个房间。不新增 EventKind：父的 `tool_called{name:"delegate"}` 与子的 `run_started{addr}` 已经记了两遍。
@@ -133,11 +133,11 @@ Signal、Inbox、Steer、Workshop、NodeContract、fan-in、Artifact、arbitrati
 
 **`collab::handback`**（形状 1 判定）。`Handback::Finished(Artifact)` 与 `Stopped { claim, because }`；`of`、`by`、`node`（即子房间的地址）、`signal`、`from_signal`（`signal` 的唯一逆）。
 
-- 父拿得到子的结果，经房间的 Inbox：回程走 `Signal`，父房间有 run 在读就在它下一个安全点经 steer 那扇门收到；没有，信留在房间队列里，装配层在这个房间的图删去之后才为它敲门（`crates/accounting/src/worker/settling/landing/discharging.rs` 的 `discharge`）：还有节点在外时每个节点各自回程，图汇合时叫醒一次，父 run 读到的是全部结果，而不是每回一个节点就开一跑。父房间没有图（单个 `delegate`）时，每次回程都敲门。`status.signals_pending` 自动报数。
+- 父拿得到子的结果，经房间的 Inbox：回程走一件 `thread` 类的 `Signal`，父房间有 run 在读，信在它下一个安全点进它借来的队列，由 `pull` 读到；没有，信留在房间队列里，装配层在这个房间的图删去之后才为它敲门（`crates/accounting/src/worker/settling/landing/discharging.rs` 的 `discharge`）：还有节点在外时每个节点各自回程，图汇合时叫醒一次，父 run 读到的是全部结果，而不是每回一个节点就开一跑。父房间没有图（单个 `delegate`）时，每次回程都敲门。`status.signals_pending` 自动报数。
 - 城市做验证者，不是子自己：`Claim::verified` 拒生产者自验，而 `Completion::Done(Evidence)` 是城市观察到的事实。
 - 一个拒不是一个错误：`of` 把 `verified` 的 `Err` 收成 `Stopped`，`because` 携拒词原文，因为在这条路上它是一个结果。不新增 EventKind：回程落在 `signal_enqueued` 里。
-- `from_signal`：不是 handback 的信号答 `None`，是 handback 而读不出的答 `E_WIRE_MISMATCH`；两者都答 `None`，「子停了」与「这一行本 build 读不懂」在父那里就是同一种沉默。载荷的键住内部标签枚举 `HandbackBody`，写读两端同经它。
-- 它不叫 `Verified`：本 crate 已有 `pr::Verified`，两个同名项一出现 rustc 就不再剪短路径，`tests/ui/merge_without_verification.stderr` 当场变红，编译器替「一个概念一个名字」执行了一次。
+- `from_signal`：不是 handback 的信号答 `None`，是 handback 而读不出的答 `E_WIRE_MISMATCH`，因为两者若都答 `None`，「子停了」与「这一行本 build 读不懂」在父那里就是同一种沉默；记下的验证者是生产者本人的那一行答 `Claim::verified` 自己的拒绝（`E_EVIDENCE_MISSING`），读回与写出过同一扇门。载荷的键住内部标签枚举 `HandbackBody`，写读两端同经它。
+- 它不叫 `Verified`：本 crate 已有 `pr::Verified`，一个概念一个名字；两个同名项一出现，rustc 的诊断就不再剪短路径，读者从报错里也分不清是哪一个。
 
 **`collab::signal_desk`、`collab::signal_tool`**（形状 4 适配器）。desk 是 run 那一侧，tool 是模型看到的那一面、只路由到 desk。`SignalEffect::{Enqueued, Consumed, WaitStarted, WaitEnded}`，后两臂是同步等待的开始与唯一的结束（D9）；`Post::new(write)` 是调用时写下一行信件账并据此行事的权威（城里是 relay 到记账线程）；`RoomMail { inbox, slot, post }` 三者一起借出；`SignalDesk::new(run, room, who, reach, at, mail)`（`at` 是本 run 的时刻，工具面没有时钟）、`pending`、`take_steer`、`answered`、`take_inbox`、`take_unread`，以及 `collab::reply_wait` 给它加的 `wait_out`、`wait_left`；`SignalTool` 两个 action：`send`（带可选的 `wait`）、`pull`。
 
@@ -206,7 +206,7 @@ D5 三件工具还是一件多臂工具：每个机制一件。被否决的是�
 
 D6 分一行计划要不要握着它：要，由桌子在调用时判，落地不再判。`ClaimDesk::split` 只分本次 drive 握着的那一行，没握着就以 `E_INVALID_ARGS` 拒绝，三段式的主体说这个 run 握着什么，恢复语叫它先认领那一行（`spec/Claim.lean` 的 `split_needs_hold`）；`still_true` 只问认领，不为拆分另判一个期待状态。理由有三条。其一，拆分于是走过认领，而认领在调用时由 `Booking` 对全城判、落地时对盘上那份判，所以从同一份计划派出的两个 run 不会把同一行各分一次（`split_of_moved_row_is_stale`）；不经认领的两次拆分都会落下，`kernel::spine::insert_children` 在已有子行之后接着编号，第二组子行不报错地长出来（`withoutHold_splits_twice`）。其二，拒绝在模型调用的那一刻到达，模型当场拿到下一步，而不是被告知分好了、落地时才被丢掉（`tools/adversary/Spec.lean` §4 第八个发现）。其三，`split` 本来就是一个干着活的 run 发现活更多时说的话（`collab::claim_tool` 的模块注释），握着那一行是它的前提。被否决的是让落地按桌子看到的状态判、允许分一行没人认领的计划：那样的拆分绕过 `Booking`，并发的两次拆分都按 `Not started` 落下；要挡住它就得给拆分另立一种预订，那是「谁在动这一行」的第二个权威。代价是一个只想分计划的 run 多付一次 `claim` 调用。重开参数：出现只分计划、不干那一行活的角色（例如市长把一件事分给几栋楼，G4），而 `Booking` 能为一次拆分预订那一行时，改由预订判，桌子不再要求握着。
 
-D7 信与派活在发出时生效（ruling）。`signal send` 与 `delegate` 在调用时写账（`signal_enqueued`，派活另有父的 `tool_called`），收信房间或子房间有 run 在跑，信在它下一个安全点经 steer 那扇门到达（`runtime::turn` 的同一个 `consume_boundary`，`crates/runtime/spec/Turn.lean`）；没有 run 在跑，装配层当场敲门开 run；发信方接着做自己的事。这是人的 ruling：原本的设计意图就是「发一个 steer 出去」。被否决的是落定后投递：信留在发信方的桌上，发信 run 冻结之后才落账、投递、敲门。它把一段多步的对话变成一串串行的 run，每一步都要等上一个 run 整个跑完；它也让派出的子 run 在父冻结之后才开，父因此看不到自己派出的活在跑。模型证明的是：信不丢（`Collab.Delivery.no_loss`、`sent_grows`）、不被消费两次（`consumed_once`）、一个房间按 seq 取（`take_is_oldest`，同一发信方的信因此按发出次序到达），重放读账本按 seq 得同一次序（`seq_is_send_order`）。workshop 摆出的图同理在调用时登记给父房间，节点与父 run 谁先落地都行（`spec/Workshop.lean` 性质 4–7，父 run 被取消或失败时怎样见 D14）。投递只读注入的时钟与账本次序，与平台无关：Windows、macOS、Linux 上同一段 trace 得同一结果。重开参数：出现一种信，它在发信方的工作落定之前到达会让收信方读到不成立的事实（例如引用一个还没写盘的文件）；那种信另立一个「落定后投递」的 kind，而不是改回全体。
+D7 信与派活在发出时生效（ruling）。`signal send` 与 `delegate` 在调用时写账（`signal_enqueued`，派活另有父的 `tool_called`），收信房间或子房间有 run 在跑，信在它下一个安全点（`runtime::turn` 的同一个 `consume_boundary`，`crates/runtime/spec/Turn.lean`）进它借来的队列：`steer` 类的信经 steer 那扇门落进下一次请求，其余由 `pull` 读到；没有 run 在跑，装配层当场敲门开 run；发信方接着做自己的事。这是人的 ruling：原本的设计意图就是「发一个 steer 出去」。被否决的是落定后投递：信留在发信方的桌上，发信 run 冻结之后才落账、投递、敲门。它把一段多步的对话变成一串串行的 run，每一步都要等上一个 run 整个跑完；它也让派出的子 run 在父冻结之后才开，父因此看不到自己派出的活在跑。模型证明的是：信不丢（`Collab.Delivery.no_loss`、`sent_grows`）、不被消费两次（`consumed_once`）、一个房间按 seq 取（`take_is_oldest`，同一发信方的信因此按发出次序到达），重放读账本按 seq 得同一次序（`seq_is_send_order`）。workshop 摆出的图同理在调用时登记给父房间，节点与父 run 谁先落地都行（`spec/Workshop.lean` 性质 4–7，父 run 被取消或失败时怎样见 D14）。投递只读注入的时钟与账本次序，与平台无关：Windows、macOS、Linux 上同一段 trace 得同一结果。重开参数：出现一种信，它在发信方的工作落定之前到达会让收信方读到不成立的事实（例如引用一个还没写盘的文件）；那种信另立一个「落定后投递」的 kind，而不是改回全体。
 
 D8 取走不等于消费：读过它的那次模型回答落账，才是消费（F8）。安全点取走的信由取走它的 run 拿着；那个 run 下一次模型回答落账（`model_returned`）时，它拿着的每一件各写一行 `signal_consumed`；run 在那之前离开房间（Done、失败、取消一样），它拿着的信回到房间队列，并为房间敲一次门（`Collab.Delivery.leave_requeues`）。已消费的不再回来（`consumed_stays`）。被否决的有两种。其一是「取走即消费」：被取消的 run 取走的信既不在队列里，也没有模型读过它，信就丢了（`withoutRequeue_loses`）。其二是「run 以 Done 结束才算消费」：一个模型已经读过、已经照着做了一半的信，在 run 被取消后会再投一次，副作用发生两次。以模型回答落账为界，被读过的信留在 transcript 里，下一个 run 从 handoff 读到它；没被读过的信重新投递。
 

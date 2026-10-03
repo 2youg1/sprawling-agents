@@ -5,12 +5,12 @@
 
 //! What a run is told about work it handed down.
 //!
-//! **The way back is not the next turn.** Only the assembly layer can
-//! build a run, and it gets control back when the parent is already
-//! frozen, so a child starts after its parent's last turn rather than
-//! between two of them. "The parent's next turn" is therefore the next
-//! run in the parent's room, and the door that already carries a fact
-//! across runs is that room's `Inbox`. A second door would be a second
+//! **The way back is the parent's room, not the parent's run.** A child
+//! starts at the call that asked for it (collab D7) and may outlive the
+//! run that asked, so its account lands wherever the parent's room is
+//! by then: in the parent's run at its next safe point when that run
+//! still drives, or in the room's next run when it does not. The door
+//! that already carries a fact across runs is that room's `Inbox`. A second door would be a second
 //! answer to "what is waiting for this resident", so the way back is an
 //! ordinary [`Signal`] and `status.signals_pending` counts it without
 //! being taught anything new.
@@ -130,9 +130,10 @@ impl Handback {
     /// cannot parse arrive at the parent as the same silence.
     ///
     /// # Errors
-    /// `E_WIRE_MISMATCH` for a handback body this build cannot read,
-    /// an account that is not a CAS locator, and a claim the recorded
-    /// verifier is not allowed to have verified.
+    /// `E_WIRE_MISMATCH` for a handback body this build cannot read and
+    /// an account that is not a CAS locator; [`Claim::verified`]'s own
+    /// refusal, `E_EVIDENCE_MISSING`, for a claim whose recorded
+    /// verifier is its producer.
     pub fn from_signal(signal: &Signal) -> Result<Option<Handback>, AxError> {
         if !signal.payload().as_map().contains_key(HandbackBody::TAG) {
             return Ok(None);
