@@ -371,10 +371,7 @@ impl Prepared {
                 Some(answer) => wire::Answer::Content(Box::new(answer)),
                 None => unavailable(format!("Content({locator})")),
             },
-            Self::Archives { city_root, needle } => match search_archives(&city_root, &needle) {
-                Ok(answer) => wire::Answer::Archive(answer),
-                Err(_unreadable_root) => unavailable(format!("Archives({needle})")),
-            },
+            Self::Archives { city_root, needle } => search_archives(&city_root, &needle),
             Self::Skills {
                 city_root,
                 building,

@@ -12,22 +12,21 @@
 
 use std::path::Path;
 
-use kernel::AxError;
+use super::prepared::unavailable;
 
 use super::lines::buildings_of;
 
 /// Every archive entry whose subject contains `needle`, across every
-/// building, read from the shelves at the moment of asking.
-///
-/// # Errors
-/// Propagates [`buildings_of`]'s refusal to read the city root.
-pub(super) fn search_archives(
-    city_root: &Path,
-    needle: &str,
-) -> Result<wire::ArchiveAnswer, AxError> {
+/// building, read from the shelves at the moment of asking; `Unavailable`
+/// when the city root cannot be read, because that is not a city whose
+/// archives hold nothing.
+pub(super) fn search_archives(city_root: &Path, needle: &str) -> wire::Answer {
+    let Ok(buildings) = buildings_of(city_root) else {
+        return unavailable(format!("Archives({needle})"));
+    };
     let mut hits = Vec::new();
     let wanted = needle.to_lowercase();
-    for building in buildings_of(city_root)? {
+    for building in buildings {
         let Ok(entries) = city::archive_index(city_root, &building) else {
             continue;
         };
@@ -43,7 +42,7 @@ pub(super) fn search_archives(
             });
         }
     }
-    Ok(wire::ArchiveAnswer {
+    wire::Answer::Archive(wire::ArchiveAnswer {
         needle: needle.to_owned(),
         hits,
     })
