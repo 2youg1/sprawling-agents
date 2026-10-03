@@ -86,7 +86,6 @@
   import ByUrl from "./mcp/by_url.svelte";
   import Composio from "./mcp/composio.svelte";
   import DesktopForm from "./desktop.svelte";
-  import ContextRung from "./context_rung.svelte";
   import { reachOf } from "./mcp/reach.svelte";
   import Servers from "./mcp/servers.svelte";
   import { BuildingColumn, HALL, useBuildings } from "./shared/buildings";
@@ -225,7 +224,6 @@ other. -->
         <section class="flex flex-col gap-base border-t border-edge pt-base">
           <h2 class="text-note text-text-faint">{say($lang, "desktop_title")}</h2>
           <DesktopForm addr={chosen} />
-          <ContextRung addr={chosen} />
         </section>
       </div>
     </div>

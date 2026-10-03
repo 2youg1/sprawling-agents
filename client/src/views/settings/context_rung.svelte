@@ -21,26 +21,27 @@
   // memory of a save. The default is one of those layers, so the page
   // draws the city's figure as the empty box's hint rather than keeping
   // a copy of it.
+  //
+  // The card stands in the settings tree's run group and picks its
+  // building itself, the way the rules group does (client 4-66, D78).
 </script>
 
 <script lang="ts">
-  import { configureContext } from "../core/commands";
-  import { fill, say } from "../core/lang";
-  import { ui } from "../ui";
-  import { readAnswer } from "../core/answered";
-  import type { Address, Query, SettledSecond } from "../wire";
-  import Button from "./parts/button.svelte";
-  import Field from "./parts/field.svelte";
-  import Unanswered from "./parts/unanswered.svelte";
+  import { configureContext } from "../../core/commands";
+  import { fill, say } from "../../core/lang";
+  import { ui } from "../../ui";
+  import { readAnswer } from "../../core/answered";
+  import type { Address, Query, SettledSecond } from "../../wire";
+  import Button from "../parts/button.svelte";
+  import Field from "../parts/field.svelte";
+  import Unanswered from "../parts/unanswered.svelte";
+  import { HALL, useBuildings } from "../shared/buildings";
 
-  interface Props {
-    readonly addr: Address;
-  }
-
-  const { addr }: Props = $props();
   const u = ui();
   const lang = u.lang;
+  const buildings = useBuildings();
 
+  let addr = $state<Address>(HALL);
 
   let box = $state("");
   let edited = $state(false);
@@ -85,6 +86,19 @@
 <div class="flex flex-col gap-tight rounded-card bg-raised px-base py-snug">
   <span class="text-label font-label text-text">{say($lang, "context_second")}</span>
   <p class="text-note text-text-faint">{say($lang, "context_second_note")}</p>
+  <select
+    class="h-control w-tree max-w-full rounded-control border border-edge-input bg-page px-base text-body text-text"
+    aria-label={say($lang, "context_second_building")}
+    value={addr}
+    onchange={(event) => {
+      const picked = $buildings.find((each) => each === event.currentTarget.value);
+      if (picked !== undefined) addr = picked;
+    }}
+  >
+    {#each $buildings as each (each)}
+      <option value={each}>{each === HALL ? say($lang, "city_hall") : each}</option>
+    {/each}
+  </select>
   <Field
     label={say($lang, "context_second")}
     labelling="hidden"

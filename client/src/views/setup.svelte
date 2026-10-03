@@ -30,6 +30,7 @@
   import Automation from "./settings/automation.svelte";
   import Remote from "./settings/remote.svelte";
   import CityLayer from "./settings/city_layer.svelte";
+  import ContextRung from "./settings/context_rung.svelte";
   import Rules from "./settings/rules.svelte";
   import You from "./settings/you.svelte";
   import AdvancedSection from "./setup/advanced.svelte";
@@ -251,6 +252,7 @@ costs the cards their width (client/Spec.lean §4-30, §4-36). -->
           {@render foot(undefined, "autonomy")}
           <Decided />
         </div>
+        <ContextRung />
       </div>
     {:else if shown === "rules"}
       <Rules />

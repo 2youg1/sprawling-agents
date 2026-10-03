@@ -6966,5 +6966,9 @@
   "remote_door_closing": {
     "en": "the close was sent; the city's console says when the door closed",
     "zh": "关门已送出；门何时关上，城的控制台上写着"
+  },
+  "context_second_building": {
+    "en": "the building whose second reminder is shown",
+    "zh": "显示哪栋楼的第二级提醒"
   }
 }
