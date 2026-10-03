@@ -196,7 +196,8 @@ impl PolicyReader {
 #[must_use]
 pub(crate) fn policy_note(policy: &RunPolicy) -> String {
     format!(
-        "The User changed this run's policy; from the next tool call on: mode {}, write {},          admission {}, landing {}.",
+        "The User changed this run's policy; from the next tool call on: mode {}, write {}, \
+         admission {}, landing {}.",
         policy.mode.as_str(),
         policy.write.as_str(),
         policy.admit.as_str(),

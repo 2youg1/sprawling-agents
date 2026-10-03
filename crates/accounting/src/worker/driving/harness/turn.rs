@@ -148,7 +148,9 @@ fn cut_now(half: &HarnessHalf, context: &DriveContext, deadline: TimeMs) -> Opti
         .map_or(runtime::Interrupt::None, |ask| ask(half.chartered.run));
     match asked {
         runtime::Interrupt::Cancel => Some(Cut::Halt),
-        runtime::Interrupt::None => None,
+        // A harness's turn has no write gate of its own to re-judge, and
+        // its next run reads the change from `run_started.policy`.
+        runtime::Interrupt::None | runtime::Interrupt::Policy { .. } => None,
         runtime::Interrupt::Steer { source, .. } => {
             half.notes.write(
                 runtime::diagnostics::Level::Refuse,

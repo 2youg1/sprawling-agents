@@ -334,7 +334,7 @@ impl<S> Turn<'_, S> {
         ledger: &mut dyn Ledger,
     ) -> Result<Option<TurnCancelled>, AxError> {
         match interrupt {
-            Interrupt::None => Ok(None),
+            Interrupt::None | Interrupt::Policy { .. } => Ok(None),
             Interrupt::Cancel => Ok(Some(self.cancel_here(ledger)?)),
             Interrupt::Steer { source, text } => {
                 let steer = SteerReceived { source, text };

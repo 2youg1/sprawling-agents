@@ -207,7 +207,9 @@ impl<'h> Turn<'h, ToolWave> {
                     halt = Interrupt::Cancel;
                     break;
                 }
-                standing @ (Interrupt::None | Interrupt::Steer { .. }) => going.push(standing),
+                standing @ (Interrupt::None
+                | Interrupt::Steer { .. }
+                | Interrupt::Policy { .. }) => going.push(standing),
             }
         }
         let leading: Vec<&ToolCall> = calls.iter().take(going.len()).collect();

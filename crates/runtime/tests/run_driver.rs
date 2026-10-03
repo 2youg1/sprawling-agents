@@ -1240,6 +1240,65 @@ fn a_steer_after_assembly_leaves_the_sent_request_untouched() {
     );
 }
 
+/// A policy change that reaches the run before its call is taken at the
+/// wave, and the model reads of it after that wave's results: every byte
+/// the first request sent is the start of the second (runtime §8-62).
+#[test]
+fn a_policy_change_is_told_after_the_wave_and_leaves_the_sent_request_untouched() {
+    let mut ledger = RecordingLedger::new();
+    let seen = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
+    let mut model = ScriptedModel {
+        seen: std::rc::Rc::clone(&seen),
+        waves: vec![vec![call("t-1")]],
+    };
+    let mut now = counter();
+    let tighter = kernel::RunPolicy {
+        write: kernel::WriteLimit::Create,
+        ..kernel::RunPolicy::of(kernel::Mode::Work)
+    };
+    let mut interrupt = |point: SafePoint| match point {
+        SafePoint::BeforeCall { turn: 0 } => Interrupt::Policy { policy: tighter },
+        _ => Interrupt::None,
+    };
+    let mut invoke = |_: &ToolCall, _: TimeMs| {
+        Ok(ToolOutcome {
+            result: Payload::empty(),
+            attachments: Vec::new(),
+        })
+    };
+    let mut hooks = RunHooks {
+        now: &mut now,
+        monotonic_us: &mut || 0,
+        interrupt: &mut interrupt,
+        checkpoint: None,
+        writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
+        invoke: &mut invoke,
+        wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
+        deltas: None,
+    };
+
+    drive(plan(), &mut ledger, &mut model, &mut hooks, &handoff()).unwrap();
+
+    let seen = seen.borrow();
+    let first = seen[0].strip_suffix(']').unwrap();
+    assert!(
+        seen[1].starts_with(first),
+        "the second request extends the first:
+{}
+{}",
+        seen[0],
+        seen[1]
+    );
+    assert!(
+        seen[1].ends_with(
+            "Text { text: \"city: The User changed this run's policy; from the next tool call \
+             on: mode work, write create, admission standing, landing ordinary.\" }] }]"
+        ),
+        "the note lands after the results of the wave it was taken at: {}",
+        seen[1]
+    );
+}
+
 /// How long the generating model writes text after it hands its read
 /// over, and how long that read takes to answer.
 const WRITING: std::time::Duration = std::time::Duration::from_millis(500);

@@ -10,12 +10,17 @@ use kernel::EventRef;
 
 /// Boundary snapshot, supplied by the executor at every phase change.
 /// `Cancel` ends the turn at the boundary; `Steer` records and advances
-/// (the executor folds the text into its `Conversation`).
+/// (the executor folds the text into its `Conversation`); `Policy`
+/// advances too, and the executor holds it in its `PolicyCell` until the
+/// next `SafePoint::BeforeWave` (`crates/runtime/spec/PolicyTake.lean`
+/// §8-62). `Policy` writes nothing: its `run_policy_changed` line is
+/// already on the ledger, which is how it reached this run.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Interrupt {
     None,
     Cancel,
     Steer { source: String, text: String },
+    Policy { policy: kernel::RunPolicy },
 }
 
 /// Whether the wave may start its next call, asked once before each of

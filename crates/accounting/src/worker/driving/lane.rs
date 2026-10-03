@@ -82,8 +82,8 @@ impl Interrupting {
         match self.ask() {
             Interrupt::Cancel => true,
             Interrupt::None => false,
-            steer @ Interrupt::Steer { .. } => {
-                self.held = Some(steer);
+            held @ (Interrupt::Steer { .. } | Interrupt::Policy { .. }) => {
+                self.held = Some(held);
                 false
             }
         }

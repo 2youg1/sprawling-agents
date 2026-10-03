@@ -218,6 +218,8 @@ pub struct Active {
     prompt: crate::turn::PromptRecord,
     /// Whether the next wave needs a checkpoint (§8-45).
     checkpoint: checkpoint::CheckpointPolicy,
+    /// The run policy in force, changed only at `BeforeWave` (§8-62).
+    policy: crate::mode::PolicyCell,
 }
 
 /// A frozen run. There is no method back to [`Active`]: waking an old run
