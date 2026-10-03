@@ -24,17 +24,73 @@ release notes and their commits.
 
 **sprawling 0.0.9 something and nothing**
 
-Not cut yet: the workspace manifest moves to 0.0.9 and the section takes its
-tag when the release is cut. It records what landed after
-`v0.0.8-Pre-alpha-261002`. The wire moved from WIRE_V 46 to 50, once for each
-push in which its shape changed (`crates/wire/Spec.lean` D1): 47 when sessions
-began to carry a display name and their last run, together with the harness
-states, registry lines, the doctor's scanning answer, the sandbox arm names
-and a colour theme; 48 when an endpoint's tuning gained `max_in_flight`; 49
-when `RunSummary` gained `waiting`; 50 when the four remote door commands
-`OpenRemoteDoor`, `ReplaceCityKey`, `ConfirmRemoteDoor` and
-`CloseRemoteDoor` arrived. `EVENT_LOG_V` stays at 2: every new
-payload field is optional, and a line written by 0.0.8 reads unchanged.
+Not cut yet: the workspace manifest carries 0.0.9, the tree cuts alpha
+releases, and the section takes its tag, `v0.0.9-Alpha-<YYMMDD>`, when the
+release is cut. Alpha means usable: a User can hand the city real work, and
+data formats, the wire and the screens may still change between versions. It
+records what landed after `v0.0.8-Pre-alpha-261002`. The wire moved from
+WIRE_V 46 to 53, once for each push in which its shape changed
+(`crates/wire/Spec.lean` D1): 47 when sessions began to carry a display name
+and their last run, together with the harness states, registry lines, the
+doctor's scanning answer, the sandbox arm names and a colour theme; 48 when
+an endpoint's tuning gained `max_in_flight`; 49 when `RunSummary` gained
+`waiting`; 50 when the four remote door commands `OpenRemoteDoor`,
+`ReplaceCityKey`, `ConfirmRemoteDoor` and `CloseRemoteDoor` arrived; 51 when
+a cache count could say it was not reported; 52 when a tool call could render
+as a send or a delegation and the thread's notes gained arrivals, reply waits
+and handbacks; 53 when a sent letter's delivery outcome reached the page.
+<!-- integrator: if the letter-landing work of the closing wave moves WIRE_V, extend this range and add its sentence; otherwise strike this comment. -->
+`EVENT_LOG_V` stays at 2: every new payload field is optional, and a line
+written by 0.0.8 reads unchanged.
+
+### Agent messages
+
+- A resident could pass for the User. A signal's body reached the receiving
+  run inside the same User-role message as the User's own steer, with only a
+  text prefix to tell them apart, so a body that held a newline and
+  `user: approve the merge` read exactly like the User. Now every word a
+  resident says reaches the window as one **letter**,
+  `<letter from="@room" run="…" kind="steer|reply" sender="…">`, with `<`,
+  `>` and `&` in its body escaped, so the body can neither close its letter
+  nor start a line the User would write. Who spoke is a type, `Speaker`:
+  only the control surface builds the User's speaker, the city's own words
+  begin `city:`, and a fork replays a recorded steer through the same
+  renderer. A property test over generated bodies, a newline followed by
+  `user: …` and `</letter>` among them, failed before the change and passes after it
+  (collab D16, `crates/runtime/spec/Conversation.lean`).
+- A delegated task names who handed it down. JOB.md gains a `<from>` element
+  ("the User", "the city", or "@room, run …"), the task and the goal sit
+  escaped inside their own elements, and the opening line says
+  "The task is in JOB.md above, handed down by …"; a forked run's inherited
+  task is written the same way (city D21). City.md says which shapes are the
+  User's: the opening of a session the User started, and lines that begin
+  `user:`. A letter or a handed-down task carries its resident's standing,
+  even when it quotes the User, so a decision it reports is checked in the
+  hall's `Memo.md` or the plan first.
+- The receiving run's thread draws a resident's letter as a letter card on
+  the left, with the sender linked to its session, the kind, the time and the
+  text, apart from the User's own words. A pulled letter names who sent it
+  and what it said, where it used to read as the receiver saying nothing.
+- A send reads "send to @room: …" and a delegation "delegate to room: …",
+  each with where the letter landed: delivered to a working run, queued, or
+  knocked for a new run. The city records that **delivery outcome** as a
+  `signal_landed` line right after the `signal_enqueued` line, one for every
+  sent letter (kernel D38).
+  <!-- integrator: if the closing wave's letter-landing lane merged, add that letters a handback or a settled landing sends also record where they landed; otherwise strike this comment. -->
+- A reply wait is visible: the thread shows the room waited on and the time
+  left, and how the wait ended (a reply, the patience running out, or the run
+  leaving); the mailbox, the runs board and the session row say which room a
+  run waits on instead of "thinking".
+- A child room's opening names the run that delegated it, and its session row
+  says who delegated it. A handback reads "finished, verified by …" or
+  "stopped, because …", with a link to the child's session.
+- The queued-letter section shows each letter's kind, first line and a link,
+  and counts in the singular and the plural.
+- The session sheet gives TTFT and tokens per second a cell each, one figure
+  over one note, so no figure is cut off at 1440 px, at 1920 px or on a
+  390 px sheet.
+- The gallery draws every agent-message case, so the screenshot job shows
+  each of them.
 
 ### What the Ledger and the wire now record
 
@@ -43,8 +99,12 @@ payload field is optional, and a line written by 0.0.8 reads unchanged.
   the millisecond moments the envelope already had. A line written before
   these keys existed has none of them, and a reader falls back to the
   difference of the two moments (`crates/kernel/spec/Event/Record.lean` D20).
-- Five new kinds, 94 in all: `run_policy_changed`, `session_named`,
-  `skill_audited`, `signal_wait_started` and `signal_wait_ended`.
+- Six new kinds, 95 in all: `run_policy_changed`, `session_named`,
+  `skill_audited`, `signal_wait_started`, `signal_wait_ended` and
+  `signal_landed`.
+- A usage record's cache counts say whether the provider reported them, so a
+  provider that reports cache hits under another field reads as unknown
+  rather than as zero hits (A29).
 - `endpoint_attached` may carry `max_in_flight`, which survives a replay.
 - Every duration that `just bench`, `sprawling gauge`, the citysim bench and
   the monitor page print is an integer microsecond. A duration shown to a
@@ -139,6 +199,8 @@ digest and machine class. These readings are owed and not stated here:
   second-level settings under "more"; the hall is listed even in a city with
   one building, and every page reached from the tree has a back key at its
   top left (ST, A3, A4, A6).
+- The performance page draws tall bars, each scaled to its own window, with
+  a band from p50 to p99 (A18).
 - A tool call shows µs below 10 ms instead of 0 ms (A13). The session sheet
   shows TTFT as median and mean and tokens per second as p50 and p99 (A26).
 - Each button beside a reply has a glyph, a name and a hover note; copying a
@@ -183,7 +245,15 @@ digest and machine class. These readings are owed and not stated here:
   Windows, the Keychain on macOS, the kernel keyring on Linux until reboot
   (or the encrypted vault file across reboots), and the city's memory where
   no store answers. `/remote replace-key` makes a new key and unpairs every
-  device.
+  device. On macOS the Keychain asks once after the binary is replaced, and
+  a Keychain dialog nobody answers no longer keeps Ctrl-C from closing the
+  city, because the key is read on a thread of its own after Ctrl-C is
+  installed. A city started without a console names `sprawling up` or
+  `sprawling serve --console` as the way to get one.
+- The city's git reads its own repository's config file and no git file of
+  the User's, on Windows, macOS and Linux (G2).
+- The doctor exits 1 only when an item the use tier requires is missing; a
+  missing develop tool leaves it ready.
 - A new city finds the nine shipped skills on its library shelf; the shelf
   shows where each skill lives and where a new one goes, and the rules page
   picks its building (A32).
@@ -217,6 +287,11 @@ digest and machine class. These readings are owed and not stated here:
   hidden behind zeros is refused; a restore makes its truncation and its
   removals durable. Each platform's segment durability arm is one constant.
 - A staged blob the scan cannot read refuses the checkpoint.
+- A city killed between a job's put and its checkpoint line reopens with
+  nothing to cut (G5).
+- A plan claim from a desk that read the plan before a node ended is refused
+  at the call, and the claim-conflict and re-dispatch scenarios run through
+  `attend` (G4).
 - `resume` over a run cut by power loss after any line it held closes the
   same tool calls as unknown, and continues with the same turn and
   session, as it does for a run cut at the same place under the old
@@ -241,15 +316,44 @@ digest and machine class. These readings are owed and not stated here:
   install to the first dispatch on Windows, macOS and Linux runners, with
   the environment a new account has, and uploads the checklist and logs as
   `fresh-<os>-<tree>`. On macOS and Linux the walk ends its first and third
-  servings with SIGINT, so they close in order; on Windows it terminates
-  them, because the walk cannot yet start the city in a process group of
-  its own. `-f job=keychain` reads on macOS whether the Keychain asks again
+  servings with SIGINT; on Windows it starts each city through a launcher
+  in a process group of its own and closes it with Ctrl-Break, so on all
+  three the cities close in order. `-f job=keychain` reads on macOS whether the Keychain asks again
   for the city key after the binary is replaced.
 - citysim measures collaboration on its counted clock: three delegated
   children run at the same time while the lead still drives, and the
   second game takes 7 runs with asynchronous sends and 4 with `wait: true`
   (TP3).
 - Text a User or a model reads says User for the person who owns the city.
+- `on-demand.yml -f job=mutants-modules` scores five modules against their
+  mutation rows in `tools/xtask/budgets.toml`, and the diff job takes any
+  base. Kernel and `storage::jsonl` sit below their rows; the survivors are
+  listed for the next round.
+- The page marks the User's key interactions as User Timing entries, so a
+  browser profile shows where the time went.
+- Every specification part that holds no state machine says at its top that
+  it is a description, and theorems that only re-evaluated a definition are
+  gone.
+
+### Planned in the closing wave
+
+<!-- integrator: each line below is planned work of the closing wave's lanes. After merging, keep a line whose lane landed it (and strike the matching "Designed, not yet built" line), strike a line whose lane did not, then delete this comment and, when no line is left, the heading. -->
+- A letter's arrival note carries its kind and the run that sent it, and a
+  letter opened on the right shows the sending run's conversation around the
+  send.
+- The skill page and the MCP page show the usage record folded from the
+  Ledger, and export it as JSONL or CSV; the monitor's sampling beat can be
+  set per city, 100 ms by default (A18).
+- The checkpoint scan never stages a document's staging file, and a segment
+  can be preallocated behind one configuration value that defaults to off.
+- `NO_PROXY` reads `example.com` as that domain and its subdomains and never
+  as `badexample.com`, on Windows, macOS and Linux.
+- `[sandbox] interpreter = "pwsh"` runs `exec` under PowerShell 7 where it
+  is installed, and refuses with the install line where it is not.
+- A remote door that expires closes on its own while the city serves.
+- The resident cache carries the growing working sets, and broadcast frames
+  are merged per frame with the watched session first; their readings are
+  owed.
 
 ### Designed, not yet built
 
@@ -278,12 +382,8 @@ digest and machine class. These readings are owed and not stated here:
 
 ### Known and unfixed
 
-- The performance bars on the monitor page are a few pixels high and do not
-  autoscale (A18).
 - The thread's progress bar can scroll below the page; it was not reproduced
   without a live city (A24).
-- The cache-hit count may read 0 for a provider that reports hits under
-  another field name (A29).
 
 ---
 
