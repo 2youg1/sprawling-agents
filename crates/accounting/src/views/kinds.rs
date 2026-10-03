@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! What each event kind is to a question the views ask
-//! (`crates/accounting/spec/Views.lean` D49).
+//! (`crates/accounting/spec/Views.lean` D50).
 //!
 //! One table per question, each naming every kind, so a kind the kernel
 //! adds is a compile error here rather than a record that silently

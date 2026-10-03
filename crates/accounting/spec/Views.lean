@@ -72,7 +72,7 @@ pub fn lineage_of(ledger_dir: &Path) -> Result<Lineage, AxError>;
 理由：页面读到的城就是创世留下的城；测试用真正的 `worker::genesis::form`（带测试的手），市政厅的布局、创世两行与 `City.md` 改了，读面的测试跟着看到。被否决的做法：保留一份只写读面测试读到的东西的第二份创世——worker 搬进本 crate 之前确实这样做过，因为那时本 crate 够不到 `genesis`；它与真正的创世没有东西把两者拴在一起，一旦市政厅的布局变了，读面的测试就在一座不存在的城上判定。
 -/
 
-/-! D49 读面按事件种类作的判定，一个问题一个穷尽的 `match`，住 `accounting::views::kinds`
+/-! D50 读面按事件种类作的判定，一个问题一个穷尽的 `match`，住 `accounting::views::kinds`
 
 ```rust
 pub(super) enum Holding { City, SignalQueued, SignalTaken, Pursuit, Discarded, Restored, Claimed,

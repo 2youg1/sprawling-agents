@@ -307,6 +307,7 @@ workspace 内的依赖由 ARCHITECTURE.md §3 的 `depmap` 定；规格只 impor
 | D47 | `crates/accounting/spec/Playback/Project.lean` |
 | D48 | `crates/accounting/spec/Views/Rounds.lean` |
 | D49 | `crates/accounting/spec/Views/Usage.lean` |
+| D50 | `crates/accounting/spec/Views.lean` |
 -/
 
 /-! ## 13 依赖选型
