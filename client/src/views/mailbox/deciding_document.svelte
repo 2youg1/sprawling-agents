@@ -9,17 +9,20 @@
   // The proposal cards open on one document, in the mailbox's deciding
   // section (client/Spec.lean §4-55): each card leads with the document's path,
   // when its newest card was offered, and the way to it, which opens the
-  // document on the right side with the same cards above its text.
+  // document on the right side with the same cards above its text, and
+  // the way to the letter, which opens this one card on the right side
+  // with the text before and after it (client D73).
   import { readAnswer } from "../../core/answered";
   import { say } from "../../core/lang";
   import { buildingOf } from "../../core/route";
   import { ago } from "../../core/time";
   import type { Address, TimeMs } from "../../wire";
   import { ui } from "../../ui";
-  import { openDocument } from "../inspect/open.svelte";
+  import { openDocument, openLetter } from "../inspect/open.svelte";
   import Button from "../parts/button.svelte";
   import Card from "../refrain/proposals_card.svelte";
   import { WHY } from "./pending";
+  import { returnTo } from "./returning.svelte";
 
   interface Props {
     readonly doc: Address;
@@ -53,6 +56,18 @@
             {#if at !== null}
               <span class="shrink-0 text-note text-text-faint">{ago($lang, at, u.now())}</span>
             {/if}
+            <span data-letter={card.id} class="contents">
+              <Button
+                tone="quiet"
+                label={say($lang, "letter_open")}
+                onPress={() => {
+                  openLetter({ doc, card: card.id }, () => {
+                    returnTo(card.id);
+                  });
+                  onLeave();
+                }}
+              />
+            </span>
             <Button
               tone="quiet"
               label={say($lang, "proposal_open")}

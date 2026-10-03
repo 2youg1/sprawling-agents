@@ -27,6 +27,8 @@
   // and this file only feeds it what happened and where the focus is.
   // What it holds is `column.svelte`, mounted only while it is open, so
   // a closed mailbox asks the city nothing.
+  import { tick } from "svelte";
+
   import { urgencyOf } from "../../core/deferral";
   import { fill, say } from "../../core/lang";
   import { ui } from "../../ui";
@@ -35,9 +37,10 @@
   import Tip from "../parts/tip.svelte";
   import Column from "./column.svelte";
   import { openCards } from "./deciding_proposals";
-  import { stepMail } from "./layer";
+  import { stepLetter, stepMail } from "./layer";
   import type { MailFocus, MailInput } from "./layer";
   import { linkWord } from "./link_word";
+  import { takeRow, wantedRow } from "./returning.svelte";
 
   interface Props {
     // How many times the mailbox chord asked for the column: a count
@@ -89,6 +92,21 @@
 
   // A press anywhere but the column and its own key puts it away; the
   // key's press is its click, which toggles.
+  // A letter closed on the right side: the column comes back with the
+  // focus on the row that opened it (client D73).
+  $effect(() => {
+    const row = wantedRow();
+    if (row === null) return;
+    takeRow();
+    const next = stepLetter({ mail: { shown: open, focus: focusNow() }, opener: row, row: null }, { kind: "close" });
+    open = next.mail.shown;
+    const target = next.row;
+    if (target === null) return;
+    void tick().then(() => {
+      column?.querySelector<HTMLElement>(`[data-letter="${CSS.escape(target)}"] button`)?.focus();
+    });
+  });
+
   function pressed(event: PointerEvent): void {
     const target = event.target;
     if (!(target instanceof Node)) return;

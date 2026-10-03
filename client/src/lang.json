@@ -6566,5 +6566,33 @@
   "world_write_to": {
     "en": "{limit} from the next step",
     "zh": "从下一步起改为{limit}"
+  },
+  "letter_reading": {
+    "en": "How to read this letter",
+    "zh": "这封信的读法"
+  },
+  "letter_diff": {
+    "en": "change",
+    "zh": "改动"
+  },
+  "letter_before": {
+    "en": "before",
+    "zh": "改动前"
+  },
+  "letter_now": {
+    "en": "now",
+    "zh": "现在"
+  },
+  "letter_sender": {
+    "en": "sent by {who}",
+    "zh": "{who} 发来"
+  },
+  "letter_gone": {
+    "en": "This letter is no longer open: it was answered, or the document moved past it.",
+    "zh": "这封信已不再待决：它已被回复，或文稿已越过它。"
+  },
+  "letter_open": {
+    "en": "read the letter",
+    "zh": "读这封信"
   }
 }

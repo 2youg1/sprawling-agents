@@ -38,6 +38,7 @@
   import Changes from "./changes.svelte";
   import { commandOf } from "./monitor/trace";
   import Called from "./inspect/called.svelte";
+  import Letter from "./inspect/letter.svelte";
   import {
     INSPECTOR,
     closeItem,
@@ -111,6 +112,7 @@
   function labelOf(item: RightItem): string {
     if (item.kind === "document") return item.path.slice(item.path.lastIndexOf("/") + 1);
     if (item.kind === "changes") return item.head.slice(0, SHORT);
+    if (item.kind === "letter") return item.doc.slice(item.doc.lastIndexOf("/") + 1);
     const call = callOf(item)?.call ?? null;
     if (call === null) return "…";
     const entry = call.render === "terminal" ? commandOf(call) : null;
@@ -131,6 +133,7 @@
       case "document":
         return toFragment({ kind: "talk", address: talk, item: { kind: "document", building: item.building, path: item.path, version: item.version } });
       case "changes":
+      case "letter":
         return null;
     }
   }
@@ -182,6 +185,8 @@
     <div class="min-h-0 flex-1 overflow-auto bg-page">
       <RefRain building={item.building} path={item.path} version={item.version} />
     </div>
+  {:else if item.kind === "letter"}
+    <Letter doc={item.doc} card={item.card} />
   {:else if item.kind === "changes"}
     <div class="min-h-0 flex-1 overflow-auto bg-page px-wide py-snug">
       <Changes base={item.base} head={item.head} {talk} />

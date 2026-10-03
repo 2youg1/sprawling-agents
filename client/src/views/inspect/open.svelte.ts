@@ -23,7 +23,10 @@
 // **Focus goes back where it came from.** The element that had the focus
 // when an item was opened from outside the inspector is remembered, and
 // closing the inspector while the focus is inside it hands the focus back
-// to that element if it is still on the page (7-7).
+// to that element if it is still on the page (7-7). A letter opened from
+// the mailbox gives a way back of its own instead, because the mailbox
+// stows while the letter is open and the row that opened it is no longer
+// on the page (client D73).
 
 import type { Address, B3Hash, GitOid, RunId, Seq } from "../../wire";
 
@@ -49,10 +52,19 @@ export interface ChangesItem {
   readonly head: GitOid;
 }
 
+// One card offered on a document - a letter, as the mailbox shows it -
+// read with the full text before it and the document as it stands, and
+// the run that sent it (roadmap A25).
+export interface LetterItem {
+  readonly doc: Address;
+  readonly card: B3Hash;
+}
+
 export type RightItem =
   | ({ readonly kind: "call" } & CallItem)
   | ({ readonly kind: "document" } & DocumentItem)
-  | ({ readonly kind: "changes" } & ChangesItem);
+  | ({ readonly kind: "changes" } & ChangesItem)
+  | ({ readonly kind: "letter" } & LetterItem);
 
 // Tabs a person keeps open before the oldest is closed for them: enough
 // for a file, its diff and two commands on each side of a comparison.
@@ -70,6 +82,7 @@ interface Held {
 let held = $state<readonly Held[]>([]);
 let clock = 0;
 let opener: HTMLElement | null = null;
+let back: (() => void) | null = null;
 
 export function sameItem(a: RightItem | null, b: RightItem): boolean {
   if (a === null) return false;
@@ -80,6 +93,8 @@ export function sameItem(a: RightItem | null, b: RightItem): boolean {
       return b.kind === "document" && a.building === b.building && a.path === b.path && a.version === b.version;
     case "changes":
       return b.kind === "changes" && a.base === b.base && a.head === b.head;
+    case "letter":
+      return b.kind === "letter" && a.doc === b.doc && a.card === b.card;
   }
 }
 
@@ -93,6 +108,8 @@ export function itemKey(item: RightItem): string {
       return `document ${item.building} ${item.path} ${item.version ?? ""}`;
     case "changes":
       return `changes ${item.base} ${item.head}`;
+    case "letter":
+      return `letter ${item.doc} ${item.card}`;
   }
 }
 
@@ -126,6 +143,14 @@ export function openChanges(changes: ChangesItem): void {
   showItem({ kind: "changes", base: changes.base, head: changes.head });
 }
 
+// Open a letter; `comeBack` runs when the right side closes with the
+// focus its own, in place of handing the focus to an element.
+export function openLetter(letter: LetterItem, comeBack: () => void): void {
+  opener = null;
+  back = comeBack;
+  showItem({ kind: "letter", doc: letter.doc, card: letter.card });
+}
+
 // Bring an item forward, opening it when it is not open yet.
 export function showItem(item: RightItem): void {
   clock += 1;
@@ -139,7 +164,7 @@ export function showItem(item: RightItem): void {
 
 export function closeItem(item: RightItem): void {
   held = held.filter((each) => !sameItem(each.item, item));
-  if (held.length === 0) giveFocusBack();
+  if (held.length === 0 || (item.kind === "letter" && back !== null)) giveFocusBack();
 }
 
 export function closeRight(): void {
@@ -148,6 +173,7 @@ export function closeRight(): void {
 }
 
 function rememberOpener(): void {
+  back = null;
   if (typeof document === "undefined") return;
   const active = document.activeElement;
   if (active instanceof HTMLElement && active.closest(`[${INSPECTOR}]`) === null) opener = active;
@@ -157,6 +183,9 @@ function giveFocusBack(): void {
   if (typeof document === "undefined") return;
   const active = document.activeElement;
   const ours = active === null || active === document.body || active.closest(`[${INSPECTOR}]`) !== null;
-  if (ours && opener?.isConnected === true) opener.focus();
+  const returning = back;
+  if (ours && returning !== null) returning();
+  else if (ours && opener?.isConnected === true) opener.focus();
   opener = null;
+  back = null;
 }

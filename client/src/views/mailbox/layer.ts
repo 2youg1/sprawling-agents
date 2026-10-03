@@ -67,6 +67,6 @@ export function stepLetter<Row>(side: LetterSide<Row>, input: LetterInput<Row>):
     case "open":
       return { mail: { shown: false, focus: "elsewhere" }, opener: input.row, row: null };
     case "close":
-      return side;
+      return side.opener === null ? side : { mail: { shown: true, focus: "inside" }, opener: null, row: side.opener };
   }
 }
