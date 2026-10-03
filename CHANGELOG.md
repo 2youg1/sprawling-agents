@@ -141,7 +141,10 @@ digest and machine class. These readings are owed and not stated here:
   hint in the conversation can be expanded (A30).
 - A session row shows its display name, model, effort, workspace and last
   reply; its menu renames it and changes its run policy, and tags default to
-  the workspace (A28, A15).
+  the workspace (A28, A15). A policy changed while the room is idle rules
+  the session's next dispatch: the city keeps the session's last
+  `run_policy_changed` as the one authority, and a dispatch frame's policy
+  applies only to a session nobody changed.
 - The mailbox pushes in from the left under the three edge keys; a letter
   opens on the right side with the text before and after, and every card in
   "deciding" says which event or refusal put it there (A19, A25, A27).
@@ -254,8 +257,6 @@ digest and machine class. These readings are owed and not stated here:
   without a live city (A24).
 - The cache-hit count may read 0 for a provider that reports hits under
   another field name (A29).
-- A dispatch takes the run policy the client sends, while `crates/sprawling/spec/Accounting/Worker.lean` says
-  it inherits the room's last changed policy; one of the two will change.
 
 ---
 
