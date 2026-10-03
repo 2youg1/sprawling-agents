@@ -37,6 +37,7 @@ pub use answer::HistoryRangeAnswer;
 pub use answer::PlanRow;
 pub use answer::PursuitLine;
 pub use answer::Used;
+pub use answer::VersionAuthor;
 pub use answer::{Answer, ApprovalsAnswer, ArchiveLine, BlockedLine, BuildingProgress};
 pub use answer::{ArchiveAnswer, ArchiveHit, DiscardAnswer, DiscardLine};
 pub use answer::{AutomationAnswer, Cadence, ScheduledJob, WatchedSource};
@@ -80,7 +81,6 @@ pub use answer::{SESSION_PREVIEW_MAX, SESSIONS_MAX, SessionLine, SessionStart, S
 pub use answer::{SecondDomain, SettledEffort, SettledSecond, TuningDefaults};
 pub use answer::{ShellCalls, ShellsAnswer, UsageExportAnswer, UsageKind, UseOutcome};
 pub use answer::{SkillAudit, SkillUsageAnswer, SkillUsageLine, SkillUse, SkillVersion};
-pub use answer::VersionAuthor;
 pub use answer::{Standing, ToolkitLine, ToolkitsAnswer};
 pub use answer::{VERSIONS_MAX, VersionSource, VersionsAnswer};
 #[cfg(feature = "server")]

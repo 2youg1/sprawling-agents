@@ -108,12 +108,12 @@ pub use scanning::{DoctorDrive, DoctorExclusion, DoctorScanning, DoctorUntold};
 pub use sessions::{SESSION_PREVIEW_MAX, SESSIONS_MAX, SessionLine, SessionStart, SessionsAnswer};
 pub use skills::{SkillLine, SkillShelf, SkillsAnswer};
 pub use toolkits::{Standing, ToolkitLine, ToolkitsAnswer};
+pub use usage::VersionAuthor;
 pub use usage::{
     DayCount, ExportFormat, HeldSkill, McpServerUsage, McpToolUsage, McpUsageAnswer, McpUse,
 };
 pub use usage::{ShellCalls, ShellsAnswer, UsageExportAnswer, UsageKind, UseOutcome};
 pub use usage::{SkillAudit, SkillUsageAnswer, SkillUsageLine, SkillUse, SkillVersion};
-pub use usage::VersionAuthor;
 
 /// What moved between two checkpoints, one row per file, path order.
 ///
