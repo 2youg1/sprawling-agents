@@ -24,7 +24,7 @@ use std::sync::{Mutex, OnceLock, PoisonError};
 use accounting::person::CorePlacement;
 use plan::{Left, Plan, Processor, Shape, Topology};
 use reading::Unread;
-use runtime::Shares;
+use runtime::{PlatformShares, Shares, platform_shares};
 
 /// Who holds a seat: one per hot thread for as long as it lives.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -296,17 +296,26 @@ pub(crate) fn report() -> String {
             format!("{} ({})", describe(&read), pinned::clause(&seats_of(&read)))
         }
     };
-    let runs = runs_share(shares_of(arm, crate::monitor::memory::read().physical));
+    let runs = runs_share(
+        shares_of(arm, crate::monitor::memory::read().physical),
+        platform_shares(),
+    );
     format!("{threads}; {runs}{unread}")
 }
 
-/// What each run's commands share on this platform, given what the arm
-/// asks for: Windows sets both halves on the run's job, macOS has the
-/// CPU half alone (`taskpolicy`), and Linux sets neither yet (D29).
-fn runs_share(asked: Shares) -> String {
+/// What each run's commands share on this machine, given what the arm
+/// asks for and what the platform can set: Windows sets both halves on
+/// the run's job, macOS has the CPU half alone (`taskpolicy`), and
+/// Linux sets both where its cgroup is delegated, nothing where it is
+/// not (D29, D33).
+fn runs_share(asked: Shares, platform: PlatformShares) -> String {
     const ALONE: &str = "runs' commands compete thread by thread";
-    match (asked, PLATFORM_SHARES) {
-        (Shares::Unset, _) | (_, PlatformShares::None) => ALONE.to_owned(),
+    const NOT_DELEGATED: &str = "runs' commands compete thread by thread and run below the core: \
+                                 the cgroup is not delegated";
+    match (asked, platform) {
+        (Shares::Unset, _) => ALONE.to_owned(),
+        (_, PlatformShares::None) if cfg!(target_os = "linux") => NOT_DELEGATED.to_owned(),
+        (_, PlatformShares::None) => ALONE.to_owned(),
         (Shares::Cpu, PlatformShares::Cpu | PlatformShares::CpuAndMemory) => {
             "each run's commands share the processors evenly".to_owned()
         }
@@ -320,22 +329,6 @@ fn runs_share(asked: Shares) -> String {
         ),
     }
 }
-
-/// Which halves of a run's shares this platform can set (D29).
-#[derive(Debug, Clone, Copy)]
-enum PlatformShares {
-    None,
-    Cpu,
-    CpuAndMemory,
-}
-
-const PLATFORM_SHARES: PlatformShares = if cfg!(windows) {
-    PlatformShares::CpuAndMemory
-} else if cfg!(target_os = "macos") {
-    PlatformShares::Cpu
-} else {
-    PlatformShares::None
-};
 
 /// [`report`] for a reading already made.
 pub(crate) fn describe(read: &Result<Topology, Unread>) -> String {

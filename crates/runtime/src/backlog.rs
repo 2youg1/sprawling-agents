@@ -398,12 +398,14 @@ impl Backlog {
 #[cfg(test)]
 mod tests;
 
+mod cgroup;
 mod jobs;
 mod member;
 mod report;
 mod scratch;
 mod tail;
 pub mod waiting;
+pub use cgroup::{PlatformShares, platform_shares};
 pub use jobs::{RunProcesses, Shares};
 use member::{Body, Claim, Member, RunState, collect, storage};
 pub use report::{BacklogKind, Finished, Standing, Started};

@@ -14,7 +14,7 @@
 //! per member of one backlog of one process, and a run's end that
 //! reaches every command the run left running.
 
-use super::{Backlog, Shares};
+use super::{Backlog, PlatformShares, Shares, platform_shares};
 
 /// Two backlogs opened separately must not name one directory.
 ///
@@ -270,8 +270,9 @@ fn a_run_owns_the_processes_its_commands_started() {
 
 /// A run holds the shares its backlog asks for where the platform has
 /// them: on Windows its job takes the CPU weight and, when asked, the
-/// memory limit, and a backlog asked for none sets none; elsewhere this
-/// table sets nothing and the run reads as unshared (D29).
+/// memory limit; on Linux its child cgroup takes them where this
+/// machine's own cgroup is delegated to writing; on macOS, and where
+/// the platform refuses, the run reads as unshared (D29, D33).
 #[test]
 fn a_run_holds_the_shares_its_backlog_asks_for() {
     let limit = std::num::NonZeroU64::new(8 << 30).unwrap();
@@ -280,7 +281,12 @@ fn a_run_holds_the_shares_its_backlog_asks_for() {
         let run = kernel::RunId::from_bytes([5; 16]);
         a_background_command(&backlog, run, 3);
         let held = backlog.processes().unwrap().get(&run).map(|run| run.share);
-        let given = if cfg!(windows) { asked } else { Shares::Unset };
+        let delegated = platform_shares() == PlatformShares::CpuAndMemory;
+        let given = if cfg!(windows) || (cfg!(target_os = "linux") && delegated) {
+            asked
+        } else {
+            Shares::Unset
+        };
         assert_eq!(held, Some(given), "asked {asked:?}");
         backlog.release(run);
     }
