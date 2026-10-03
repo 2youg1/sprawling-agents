@@ -41,14 +41,13 @@ const UNREAD_SHOWN: usize = 16;     // unread 列出的条数上限
 | 保留区子树 | 一跑不读治理自己的东西 | `Address::is_reserved`（kernel） |
 | 读界关上的楼 | 机密楼对楼外全关；规则读不出的楼同样关 | `kernel::address::may_read`（`crates/city/Spec.lean` §8-2） |
 | `.git` 目录（任何深度，不分 ASCII 大小写） | 它是对象库不是文本，扫它只产出乱码命中；它与保留区同属受保护的元数据 | `kernel::address::PROTECTED_METADATA`，经 `Address::is_reserved` |
-| 名字拼不成地址段的项（以点或空白结尾、含反斜杠、冒号或控制字符） | 城里的每个读写都以地址为名，拼不成地址的项不可能作为命中交回；今天它被静默跳过，不计入 `unreadable` | `Address::parse`（kernel），经 `search::descent::admissible` |
 | 非 UTF-8 文件 | 二进制里没有可读的行 | 本节 |
 | `land` 以 `E_GATE_DENIED` 拒绝的链接 | 链接的目标落在城外、保留区或关上的楼 | `chosen_path::land` |
 | 指向目录的链接 | 顺着链接走可能绕回自己走过的地方；要搜目标目录，按它真实的地址去搜 | 本节 |
 
 `land` 以别的码拒绝的链接不在这张表里：真实位置解析不出（`E_STORAGE_FATAL`，比如一个指回自己的链接）是盘没有作答，不是一栋关上的楼，所以它计入 `unreadable`，`unread` 里带上那个错误；`chosen_path::walked` 只把 `E_GATE_DENIED` 当作跳过，其余的错误交给遍历者。
 
-**未决（§3 口径）**：名字拼不成地址段的项是「看不了」而不是「策略不让看」，按本节「找不到与看不了是两个答案」的口径它应计入 `unreadable` 并在 `unread` 里带上 `Address::parse` 的拒因；今天 `admissible` 把它交成 `Passed`。这类名字在 Windows 上大多建不出来（冒号、结尾的点与空白），在 macOS 与 Linux 上建得出来。判定它的证据是一座真实城里出现这样的文件名；改法是 `Entry::Unread` 多收这一种原因。
+名字拼不成地址段的项（以点或空白结尾、含反斜杠、冒号或控制字符）也不在这张表里：城里的每个读写都以地址为名，这样的项不可能作为命中交回，但它是「看不了」而不是「策略不让看」，所以 `search::descent::admissible` 把它计入 `unreadable`，并在 `unread` 里带上 `Address::parse` 的拒因（`its name is not an address: …`）。这类名字在 Windows 上大多建不出来（冒号、结尾的点与空白），在 macOS 与 Linux 上建得出来；`search::tests` 的 `a_name_that_is_no_address_is_named_among_the_unread` 直接问 `admissible`，三个平台上同一个答案。
 
 大于 1 MiB 的文件不读——把一个大对象读进内存找子串是一次停顿——但它不在这张表里：它是「没看」，计入 `unreadable` 并在 `unread` 里说出来。
 

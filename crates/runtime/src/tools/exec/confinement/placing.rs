@@ -306,9 +306,12 @@ fn no_arm(missing: Missing) -> AxError {
     .with_recovery(missing.recovery())
 }
 
-/// The refusal for the one arm no build of this crate can give.
+/// The refusal for the one arm no build of this crate constructs.
 ///
-/// Refused rather than served as the copied tree: the copied tree does
+/// No build constructs it because a job object made through the safe
+/// interface keeps neither a job-wide resource limit nor the processes a
+/// child starts before it joins the job (`crates/runtime/spec/Tools/Exec.lean`
+/// §8-13-2). Refused rather than served as the copied tree: the copied tree does
 /// not isolate the network, and answering for an arm that does would
 /// tell a caller its network was closed while it was open.
 fn no_job_object() -> AxError {

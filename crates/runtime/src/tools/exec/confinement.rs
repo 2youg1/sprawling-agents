@@ -148,12 +148,16 @@ impl Missing {
 
 /// The backends, by platform, each carrying what it promises.
 ///
-/// `WindowsJobObject` is the arm a Windows machine with a job-object
-/// enforcer compiled in would report. No build of this crate constructs
-/// one, because `CreateJobObject` is a foreign call the workspace
-/// forbids outside `crates/desktop/`; a Windows machine therefore reports
-/// [`Confinement::CopiedTree`], whose [`Assurances`] say what it does
-/// not hold (the network, above all) rather than implying it holds
+/// `WindowsJobObject` is the arm whose assurances a job object would
+/// keep. No build of this crate constructs it, although a job object is
+/// reachable through a safe interface (`runtime::backlog::jobs` makes one
+/// with `win32job`), because two of its assurances cannot be kept today:
+/// the job-wide memory and CPU limits are private fields of that crate,
+/// so `resources` would promise a limit that is not there; and a child
+/// joins the job only after it starts, so a grandchild started in that
+/// gap is outside the tree the job ends. A Windows machine therefore
+/// reports [`Confinement::CopiedTree`], whose [`Assurances`] say what it
+/// does not hold (the network, above all) rather than implying it holds
 /// everything a job object would.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Confinement {

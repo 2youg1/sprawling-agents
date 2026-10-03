@@ -154,9 +154,9 @@ impl ToolBench {
     /// 并行波按调用序逐条调它，所以 `seen` 与 `taint` 的写入次序与串行波相同。
     pub fn account(&mut self, ticket: Ticket, answered: Result<ToolOutcome, AxError>)
         -> Result<BenchOutcome, AxError>;
-    // 预编译路由：名字→处理器由 `kernel::tool::route::ToolRoute` 在登记时排序一次，
-    // 每次调用**一次**二分探测即得处理器（meta/subject/invoke 同一把借用）；
-    // 被否：维持 BTreeMap 双探测（一次调用查两次＋每次探测的 String 分配——fx 反例的本仓对应物）。
+    // 路由：名字→处理器住 `Bench` 的 `tools: BTreeMap<ToolName, Box<dyn Tool>>`，
+    // 每次调用经 `tool_named` **一次**探测即得处理器（meta/subject/invoke 同一把借用）；
+    // 被否：一次调用查两次（先查 meta 再查处理器）——每次探测都要再比一遍名字。
     // 上面那句「按 Effect 过门」自己的名字住 `Doors`（domain/taint/sandbox/prior 四件同行值，
     // 自拥门判与失败形）：`None` 即此门已开，工具可跑；`Some` 即门已代这次调用给出答案。
     // 与 route 的同一把借用不相斥（字段级不相交借用），故一次探测服务整条链。

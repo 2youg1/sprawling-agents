@@ -13,11 +13,12 @@ use kernel::{Address, ReadVerdict};
 /// What the walk does with one directory entry.
 pub(super) enum Entry {
     Descend(String),
-    /// Left out by policy: no address, the reserved subtree, or a
-    /// confidential building.
+    /// Left out by policy: the reserved subtree or a confidential
+    /// building.
     Passed,
-    /// A building closed because its rules did not read: a failure a
-    /// person has to fix, so it is named rather than passed over.
+    /// An entry the walk could not look at — a name that is no address,
+    /// or a building closed because its rules did not read — so it is
+    /// named rather than passed over.
     Unread {
         child: String,
         why: String,
@@ -37,7 +38,9 @@ pub(super) enum Step {
 /// Reservedness is asked of `kernel::Address`, the same primitive
 /// `read` reaches through `chosen_path`; a name that cannot be an
 /// address at all — one holding a backslash, a colon, a control
-/// character — is left alone, because this city cannot say where it is.
+/// character — is named among the unread with the reason the parse gave,
+/// because the walk could not look at it, and a silent pass would answer
+/// "nothing here" where the answer is "not looked at".
 /// Git's own metadata is inside that predicate too (`crates/kernel/spec/Address.lean` §8-73),
 /// and scanning an object store yields hits nobody can act on.
 ///
@@ -50,8 +53,14 @@ pub(super) fn admissible(rel: &str, name: &str, bound: &dyn Fn(&Address) -> Read
     } else {
         format!("{rel}/{name}")
     };
-    let Ok(addr) = Address::parse(&child) else {
-        return Entry::Passed;
+    let addr = match Address::parse(&child) {
+        Ok(addr) => addr,
+        Err(refused) => {
+            return Entry::Unread {
+                why: format!("its name is not an address: {}", refused.recovery()),
+                child,
+            };
+        }
     };
     if addr.is_reserved() {
         return Entry::Passed;
