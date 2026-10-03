@@ -13,6 +13,7 @@
 //! themselves. A caller reaches a decision through the module that owns
 //! it, so the module name says which authority answered.
 
+pub mod confirm;
 pub mod door;
 pub mod handshake;
 pub mod keys;
