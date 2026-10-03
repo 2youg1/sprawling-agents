@@ -268,7 +268,7 @@ mod tests {
     }
 
     /// A re-export puts an item on the public surface as surely as
-    /// declaring it does, and `browser::lib` is where the leak was
+    /// declaring it does, and the `browser` crate root is where the leak was
     /// visible.
     #[test]
     fn a_re_export_is_a_declaration_for_this_purpose() {

@@ -12,8 +12,9 @@
 //! Drawing a control the city cannot perform is loud: somebody clicks it
 //! and gets a refusal. v0.0.3 shipped three of those - `Takeover`,
 //! `Rollback` and `CreatePolicy` were on the wire, drawn in the client,
-//! and executable by nothing - and `accounting::worker::not_built` already carried
-//! the rule in its own rustdoc: "A verb answered here must not appear as
+//! and executable by nothing - and
+//! `accounting::worker::naming::not_built` already carried the rule in
+//! its own rustdoc: "A verb answered here must not appear as
 //! a control in the client." Nothing was reading it.
 //!
 //! The other direction is silent, and that is what makes it worse. A
@@ -27,7 +28,8 @@
 //!
 //! **Three sources, no copies.** The variants come from the real `enum
 //! Command` parsed out of whichever `wire` module declares it; whether
-//! the city can perform one comes from `accounting::worker::run_command`'s arms;
+//! the city can perform one comes from the arms of
+//! `accounting::worker::commanding::routing::run_command`;
 //! whether a person can ask for one comes from `client/src`. The
 //! specification contributes the one fact none of the three can state -
 //! which side is *supposed* to reach it - as the arms of
