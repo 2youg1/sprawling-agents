@@ -25,6 +25,7 @@ import crates.storage.spec.Jsonl.Preallocate
 import crates.storage.spec.Jsonl.Verify
 import crates.storage.spec.Queue
 import crates.storage.spec.RealFs
+import crates.storage.spec.Resident
 import crates.storage.spec.Sessions
 import crates.storage.spec.Snapshot
 import crates.storage.spec.Snapshot.Start
@@ -70,6 +71,7 @@ import crates.storage.spec.Worktree.Trees.Stock
 | `changes` | 4 适配器 | 两个 checkpoint 之间动了什么：路径与计数，不含补丁文本 |
 | `hunks` | 4 适配器 | 两个 checkpoint 之间一个文件的补丁文本，凭证形状的行被扣下并点名 |
 | `status` | 4 适配器 | 还没被检查点收走的改动：分支、它与上游的差距、与某次提交不同的文件 |
+| `resident` | 7 projection | 进程里只放工作集：按字节计预算、能从盘上读回的缓存；性质归 `crates/sprawling/spec/Serving/Memory.lean` |
 
 每一行的模块由 `spec/` 下规定它的分部写明（§8 的表）；`reserved` 由 `spec/Worktree.lean` 规定，它是工作树与检查点共用的谓词。
 -/
@@ -220,6 +222,7 @@ error ◀──使用── 其余模块（StorageError 与 into_ax 的唯一定
 | 8-37 | `crates/storage/spec/ChainAudit.lean` |
 | 8-38 | `crates/storage/spec/Index.lean` |
 | 8-39 | `crates/storage/spec/Checkpoint/Concurrent.lean` |
+| 8-40 | `crates/storage/spec/Resident.lean` |
 -/
 
 /-! ## 9 工作流程

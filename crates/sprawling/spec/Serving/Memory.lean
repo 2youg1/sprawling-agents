@@ -6,7 +6,7 @@
 /-!
 # 进程里只放工作集：按字节计预算的缓存
 
-规定城的常驻内存（§8-173）：哪些工作集住在进程里、每一个由谁拥有、什么给它设上界；一个按字节计预算、能从盘上读回的缓存必须守住的性质；私有字节在三个平台上怎样读；从盘上读回时用的定位读；分配器对照与一小时斜率的测量计划。缓存的 Rust 模块还没有建（W6b 先把 storage 的新模块 `resident` 登记进模块图，再建它），建成之后它的 doc comment 链回本分部，本分部的路径表改写成它的路径。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
+规定城的常驻内存（§8-173）：哪些工作集住在进程里、每一个由谁拥有、什么给它设上界；一个按字节计预算、能从盘上读回的缓存必须守住的性质；私有字节在三个平台上怎样读；从盘上读回时用的定位读；分配器对照与一小时斜率的测量计划。缓存的 Rust 模块是 `storage::resident`（`crates/storage/src/resident.rs`，接口在 `crates/storage/spec/Resident.lean` §8-40），它的 doc comment 链回本分部。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
 
 ## 8-173 常驻内存（形状：状态机）
 
@@ -45,9 +45,9 @@
 
 预算按字节计而不按项数计的理由见 D42。
 
-### 从模型导出的 Rust 检查（W6b 实现）
+### 从模型导出的 Rust 检查
 
-storage 的新模块 `resident` 建成时，同一变更集在它旁边加一个 `proptest`：生成器产生 `insert`／`read`／`evict`／`freeze` 的任意序列（run 取 0..4，地址取 0..16，值的长度取 0..2×预算，让「一项超过预算」那条分支被走到），盘是一个按地址给字节的 `BTreeMap`。每一步之后断言：常驻字节不超过预算；每个冻结的 run 名下没有项；每次读答出的字节等于盘上的字节。故意改坏的那一版是按项数修剪（只留最近的 N 项）：同一个 proptest 必须在它上面变红，这一次红要在提交次序里看得见，然后改回按字节修剪。
+`crates/storage/src/resident/tests.rs` 是一个 `proptest`：生成器产生 `insert`／`read`／`evict`／`freeze` 的任意序列（run 取 0..4，地址取 0..16，值的长度取 0..2×预算，让「一项超过预算」那条分支被走到），盘是一个按地址给字节的 `BTreeMap`。每一步之后断言：常驻字节不超过预算；每个冻结的 run 名下没有项；每次读答出的字节等于盘上的字节。按项数修剪（只留最近的 N 项）的那一版在这个 proptest 上变红，提交次序里先是它的红，再是按字节修剪的绿。
 
 ### 私有字节：三个平台各读什么
 
@@ -59,14 +59,14 @@ storage 的新模块 `resident` 建成时，同一变更集在它旁边加一个
 
 ### 预算：每份缓存一个命名的常量
 
-下面是从清点里推出来的提议值，不是读数；W7 的读数出来之后改常量。每一个在 W6b 写成它的拥有者模块里的一个命名常量。
+下面是从清点里推出来的提议值，不是读数；W7 的读数出来之后改常量。`RESIDENT_TOTAL_BYTES` 已是 `storage::resident` 里的命名常量；其余三个在它们的工作集改成经缓存读回时，写成拥有者模块里的命名常量。
 
 | 常量 | 拥有者 | 提议值 | 依据 |
 |---|---|---|---|
 | `VIEWS_RESIDENT_BYTES` | `accounting::views` | 8 MiB | 空城空闲时私有 2.4 MiB，`resident_empty_idle` 的预算 30 MiB，给视图留四分之一 |
 | `CONVERSATION_RESIDENT_BYTES` | `runtime::conversation` | 每个活的 run 4 MiB | 长回合 1000 步时请求窗口 1.2 MiB，留三倍余量；超出的工具结果走 `offload` |
 | `INDEX_RESIDENT_BYTES` | `storage::index::ledger` | 4 MiB | 每项约 40 字节，十万条记录 |
-| `RESIDENT_TOTAL_BYTES` | storage 的新模块 `resident` | 24 MiB | 视图与旁索引的 12 MiB 加 12 MiB 的读回缓存；对话窗口与 OutputRing 按活的 run 另计；空城空闲时总和仍低于 `resident_empty_idle` 的 30 MiB 预算 |
+| `RESIDENT_TOTAL_BYTES` | `storage::resident` | 24 MiB | 视图与旁索引的 12 MiB 加 12 MiB 的读回缓存；对话窗口与 OutputRing 按活的 run 另计；空城空闲时总和仍低于 `resident_empty_idle` 的 30 MiB 预算 |
 
 ### 测量计划（W7 读）
 

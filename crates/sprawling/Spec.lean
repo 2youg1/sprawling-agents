@@ -65,7 +65,7 @@ import crates.sprawling.spec.WireClient
 | `spec/Outside.lean` | `bin::outside` |
 | `spec/Outside/Conduit.lean` | `bin::outside::conduit` |
 | `spec/Serving.lean` | `bin::serving` |
-| `spec/Serving/Memory.lean` | 常驻内存：工作集清点、按字节计预算的缓存（W6b 在 storage 里建新模块 `resident`，登记进模块图之后这里写它的路径）、私有字节的平台读数 |
+| `spec/Serving/Memory.lean` | 常驻内存：工作集清点、按字节计预算的缓存（`storage::resident`，`crates/storage/src/resident.rs`）、私有字节的平台读数 |
 | `spec/Serving/OutputRing.lean` | `bin::serving::output_ring` |
 | `spec/Serving/Placement.lean` | 热线程的理想处理器（W6 建的模块，登记进模块图之后这里写它的路径） |
 | `spec/Serving/Standing.lean` | `bin::serving::standing` |
