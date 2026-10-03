@@ -377,11 +377,49 @@ slack_bytes = 2097152
 measured_by = "just mem long-turn 500 100 (citysim long_turn bin, release): the last pause's peak private"
 status = "measured, not gated: 500 steps peak private 7,487,488 B (7.1 MiB), 1000 steps 13,660,160 B (13.0 MiB); the simulator's own MemLedger holds 1,420,487 B and 2,840,417 B of those, and the last request window is 636,723 B and 1,273,223 B, on windows-x86_64, 16 cores, NVMe (release). Between steps 500 and 1000 of one run private grows 9,945 B a step, of which 2,840 B is the simulator's ledger line and 1,273 B the request window"
 
+# The modules held to a mutation score, one row each. `mutation_files`
+# is the one list of what each row scores: `just mutants-modules` hands
+# every glob to cargo-mutants as `--file`, and `just mutants-score` counts
+# a mutant toward each row whose globs match its file, so a module named
+# in two rows (`kernel::share` lies inside the kernel) is scored in both.
+# The score is (caught + timeout) / (caught + missed + timeout), over every
+# shard's outcomes together. Not in `just check`: the run is hours, and a
+# gate nobody waits for is a gate nobody runs, so it is dispatched
+# (`on-demand.yml`, `-f job=mutants-modules`) and gated there.
 [kernel_mutation]
 what = "the share of kernel mutants the tests kill"
+mutation_files = ["crates/kernel/src/**"]
 minimum_percent = 90
-measured_by = "just mutants"
-status = "gated by just mutants, not by just check: a full mutation run is minutes, and a gate nobody waits for is a gate nobody runs"
+measured_by = "just mutants, or on-demand.yml -f job=mutants-modules (just mutants-modules, then just mutants-score)"
+status = "gated by just mutants-score, not by just check; the score is owed until the first dispatched mutants-modules run reports it"
+
+[storage_jsonl_mutation]
+what = "the share of storage::jsonl mutants the tests kill"
+mutation_files = ["crates/storage/src/jsonl.rs", "crates/storage/src/jsonl/**"]
+minimum_percent = 90
+measured_by = "just mutants, or on-demand.yml -f job=mutants-modules (just mutants-modules, then just mutants-score)"
+status = "gated by just mutants-score, not by just check; the score is owed until the first dispatched mutants-modules run reports it"
+
+[accounting_relay_mutation]
+what = "the share of accounting::worker::relay mutants the tests kill"
+mutation_files = ["crates/accounting/src/worker/relay.rs"]
+minimum_percent = 90
+measured_by = "just mutants, or on-demand.yml -f job=mutants-modules (just mutants-modules, then just mutants-score)"
+status = "gated by just mutants-score, not by just check; the score is owed until the first dispatched mutants-modules run reports it"
+
+[collab_signal_tool_mutation]
+what = "the share of collab::signal_tool mutants the tests kill"
+mutation_files = ["crates/collab/src/signal_tool.rs"]
+minimum_percent = 90
+measured_by = "just mutants, or on-demand.yml -f job=mutants-modules (just mutants-modules, then just mutants-score)"
+status = "gated by just mutants-score, not by just check; the score is owed until the first dispatched mutants-modules run reports it"
+
+[kernel_share_mutation]
+what = "the share of kernel::share mutants the tests kill"
+mutation_files = ["crates/kernel/src/share.rs"]
+minimum_percent = 90
+measured_by = "just mutants, or on-demand.yml -f job=mutants-modules (just mutants-modules, then just mutants-score)"
+status = "gated by just mutants-score, not by just check; the score is owed until the first dispatched mutants-modules run reports it"
 
 [ledger_append]
 what = "append plus fsync, p50 and p99"

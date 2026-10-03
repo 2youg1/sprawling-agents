@@ -463,21 +463,120 @@ spec crate:
 fuzz target:
     cargo fuzz run {{target}} --fuzz-dir tools/fuzz
 
-# Requires cargo-mutants. The threshold lives in
-# tools/xtask/budgets.toml; it is enforced here rather than in `just check` because a
-# full mutation run is minutes, and a gate nobody waits for is a gate nobody runs.
-mutants:
-    cargo mutants --package sprawling-kernel --minimum-test-timeout 60 --error-value 'kernel::AxError::failure(kernel::AxCode::InvalidArgs, "mutant", "mutant")'
+# Requires cargo-mutants. Every module held to a mutation score, run in one
+# shard and scored. The modules, their file globs and their thresholds are the
+# rows of tools/xtask/budgets.toml that carry `mutation_files`; they are
+# enforced here rather than in `just check` because a full mutation run is
+# hours, and a gate nobody waits for is a gate nobody runs. `on-demand.yml`
+# runs the same two recipes in eight shards (`-f job=mutants-modules`).
+mutants: (mutants-modules "0/1") (mutants-score "mutants.out")
+
+# The mutants of every module budgets.toml scores, one `shard` (`k/n`) of
+# them; the report lands in `mutants.out`. cargo-mutants exits 2 when a
+# mutant survives and 3 when one timed out, and both are accepted, because
+# the threshold is `mutants-score`'s decision over all shards together.
+# The error value gives a function returning the kernel's error one more
+# mutant; outside the functions whose error type it names it does not
+# compile, and cargo-mutants counts it unviable, not missed.
+mutants-modules shard:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    py="$(command -v python || command -v python3)"
+    mapfile -t globs < <("$py" -c 'import tomllib; rows = tomllib.load(open("tools/xtask/budgets.toml", "rb")); [print(glob) for row in rows.values() if isinstance(row, dict) for glob in row.get("mutation_files", [])]' | tr -d '\r')
+    if [ "${#globs[@]}" -eq 0 ]; then
+        echo "mutants-modules: no row of tools/xtask/budgets.toml carries mutation_files; add the module's file globs to its row" >&2
+        exit 2
+    fi
+    files=()
+    for glob in "${globs[@]}"; do files+=(--file "$glob"); done
+    status=0
+    cargo mutants --workspace "${files[@]}" --shard '{{shard}}' --test-tool nextest --minimum-test-timeout 60 --error 'kernel::AxError::failure(kernel::AxCode::InvalidArgs, "mutant", "mutant")' || status=$?
+    case "$status" in
+        0|2|3) ;;
+        *) exit "$status" ;;
+    esac
+
+# Each scored module's caught, missed, timeout and unviable mutants and its
+# score, read from every `outcomes.json` under `dir` (one per shard), with
+# every surviving mutant listed; fails when a module scores under its
+# `minimum_percent` or no mutant of it reached a verdict. The score is
+# (caught + timeout) / (caught + missed + timeout): a mutant that hangs the
+# tests is one the tests noticed, and an unviable mutant was never run.
+mutants-score dir="mutants.out":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    py="$(command -v python || command -v python3)"
+    "$py" - '{{dir}}' <<'PY'
+    import fnmatch, json, pathlib, sys, tomllib
+    register = tomllib.loads(pathlib.Path("tools/xtask/budgets.toml").read_text(encoding="utf-8"))
+    rows = {name: row for name, row in register.items() if isinstance(row, dict) and "mutation_files" in row}
+    reports = sorted(pathlib.Path(sys.argv[1]).rglob("outcomes.json"))
+    if not reports:
+        sys.exit(f"mutants-score: no outcomes.json under {sys.argv[1]}; run just mutants-modules first")
+    verdicts = {"CaughtMutant": "caught", "MissedMutant": "missed", "Timeout": "timeout", "Unviable": "unviable"}
+    counts = {name: dict.fromkeys(verdicts.values(), 0) for name in rows}
+    survivors = {name: [] for name in rows}
+    for report in reports:
+        for outcome in json.loads(report.read_text(encoding="utf-8"))["outcomes"]:
+            scenario = outcome["scenario"]
+            if not isinstance(scenario, dict) or "Mutant" not in scenario:
+                continue
+            mutant = scenario["Mutant"]
+            path = str(mutant.get("file") or mutant.get("source_file") or "").replace("\\", "/")
+            verdict = verdicts.get(outcome["summary"])
+            if verdict is None:
+                sys.exit(f"mutants-score: {report} gives a mutant in {path} the verdict {outcome['summary']}, which this recipe does not know; teach it the verdict")
+            for name, row in rows.items():
+                if any(fnmatch.fnmatch(path, glob) for glob in row["mutation_files"]):
+                    counts[name][verdict] += 1
+                    if verdict == "missed":
+                        line = mutant.get("span", {}).get("start", {}).get("line", "?")
+                        survivors[name].append(f"{path}:{line}: {mutant.get('function', {}).get('function_name', '?') if isinstance(mutant.get('function'), dict) else mutant.get('function', '?')}: {mutant.get('replacement', '?')}")
+    failed = []
+    print(f"{'module':<28} {'caught':>7} {'missed':>7} {'timeout':>8} {'unviable':>9} {'score':>7} {'minimum':>8}")
+    for name, row in rows.items():
+        seen = counts[name]
+        judged = seen["caught"] + seen["missed"] + seen["timeout"]
+        killed = seen["caught"] + seen["timeout"]
+        minimum = row["minimum_percent"]
+        score = f"{100 * killed / judged:.1f}%" if judged else "none"
+        print(f"{name:<28} {seen['caught']:>7} {seen['missed']:>7} {seen['timeout']:>8} {seen['unviable']:>9} {score:>7} {minimum:>7}%")
+        if judged == 0 or killed * 100 < minimum * judged:
+            failed.append(name)
+    for name, lines in survivors.items():
+        for line in lines:
+            print(f"survived [{name}] {line}")
+    if failed:
+        sys.exit(f"mutants-score: {', '.join(failed)} under minimum_percent, or no mutant reached a verdict (a glob that names no file, or a shard whose outcomes are missing); kill the survivors listed above with a test, never by lowering the row")
+    PY
 
 # The mutants of the lines changed since `base`, one `shard` (`k/n`) of
 # them, so a wave's change is judged without a whole-workspace run. The
-# report lands in `mutants.out`.
+# report lands in `mutants.out`. `base` is resolved as a branch on origin
+# first, then a tag, then any commit git can name, so a dispatched run can
+# diff against a release tag or a sha as well as a branch.
 mutants-diff base shard:
     #!/usr/bin/env bash
     set -euo pipefail
+    base='{{base}}'
+    if git rev-parse --verify --quiet "refs/remotes/origin/$base^{commit}" >/dev/null; then
+        tip="refs/remotes/origin/$base"
+    elif git rev-parse --verify --quiet "refs/tags/$base^{commit}" >/dev/null; then
+        tip="refs/tags/$base"
+    elif git rev-parse --verify --quiet "$base^{commit}" >/dev/null; then
+        tip="$base"
+    else
+        echo "mutants-diff: '$base' is not a branch on origin, a tag or a commit in this clone; fetch it, or name another base" >&2
+        exit 2
+    fi
     mkdir -p target
-    git diff "$(git merge-base '{{base}}' HEAD)" HEAD -- '*.rs' > target/mutants.diff
-    cargo mutants --workspace --in-diff target/mutants.diff --shard '{{shard}}' --test-tool nextest --minimum-test-timeout 60
+    git diff "$(git merge-base "$tip" HEAD)" HEAD -- '*.rs' > target/mutants.diff
+    status=0
+    cargo mutants --workspace --in-diff target/mutants.diff --shard '{{shard}}' --test-tool nextest --minimum-test-timeout 60 || status=$?
+    case "$status" in
+        0|2|3) ;;
+        *) exit "$status" ;;
+    esac
 
 # The performance register: every budget, what it costs today, and what is gated.
 budget:
