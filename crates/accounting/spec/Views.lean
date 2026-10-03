@@ -30,7 +30,7 @@ impl Views {
     pub fn lend_the_vault(&mut self, vault: Arc<Mutex<gateway::Custodian>>);
     pub fn ask_the_registry_through(&mut self, newest: fn() -> wire::ReleaseAnswer);
     pub fn ask_upstream_through(&mut self, newest: fn(&str) -> wire::DoctorUpstream);
-    pub fn find_programs_through(&mut self, find: fn(&str) -> Option<PathBuf>);
+    pub fn look_for_harnesses_through(&mut self, find: fn(&str) -> Option<PathBuf>, place: fn(&agent_protocols::SetUpDir) -> Option<PathBuf>);
 }
 pub enum Prepared { /* 锁放开之后还要做的那一步 */ }
 impl Prepared { pub fn finish(self) -> wire::Answer; }
