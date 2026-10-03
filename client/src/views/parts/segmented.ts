@@ -29,7 +29,13 @@
 // `alert` survives because a choice that widens what a run may do is
 // not the same kind of fact as a choice of units, and a person has to
 // be able to see which one they are looking at across the room.
-export type Tone = "plain" | "alert";
+//
+// `accent` is for a control that sits on a raised card, where the plain
+// lift is one step up from a surface that is already one step up and
+// the chosen cell all but disappears. There the chosen cell is "the
+// chosen one" the accent answers (docs/frontend-method.md §7A), and the
+// caller spends that budget knowingly.
+export type Tone = "plain" | "alert" | "accent";
 
 // A heading over a run of cells, with the tone that run is painted in.
 // Cells carrying an equal group are drawn as one track, and a change of

@@ -43,6 +43,7 @@
 
   let chroma = $state<Chroma>("full");
   let lighting = $state<Lighting>("system");
+  let raised = $state<Lighting>("dark");
   let motion = $state<Motion>("off");
   let wire = $state<WireApi>("chat");
   let gated = $state<WireApi>("chat");
@@ -98,6 +99,24 @@
       lighting = value;
     }}
   />
+</Case>
+
+<Case label="segmented · accent tone on a raised card">
+  <div class="rounded-card bg-raised px-base py-snug">
+    <Segmented
+      label={say($lang, "appearance_lighting")}
+      tone="accent"
+      options={[
+        { value: "system", label: say($lang, "appearance_lighting_system") },
+        { value: "dark", label: say($lang, "appearance_lighting_dark") },
+        { value: "light", label: say($lang, "appearance_lighting_light") },
+      ]}
+      held={raised}
+      onPick={(value) => {
+        raised = value;
+      }}
+    />
+  </div>
 </Case>
 
 <Case label="segmented · three cells under two group headings">

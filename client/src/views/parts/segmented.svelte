@@ -41,6 +41,7 @@
   const FILL: Record<Tone, string> = {
     plain: "bg-raised-hover",
     alert: "bg-alert",
+    accent: "bg-accent",
   };
 
   const { label, options, held, onPick, tone }: SegmentedProps<V> = $props();
@@ -59,14 +60,20 @@
   // against the fill actually under it.
   const toneOf = (group: Group | undefined): Tone => group?.tone ?? tone ?? "plain";
 
-  // The ink a cell takes. The chosen cell on an `alert` fill is read
-  // against a coloured solid and takes the page's own rung; on the
+  // The ink a cell takes. The chosen cell on an `alert` or `accent`
+  // fill is read against a coloured solid and takes the page's own rung; on the
   // plain fill it is read against a surface one step up, and takes the
   // full text token the rest of the page is set in.
   const ink = (choice: Choice<V>): string => {
     if (choice.why !== undefined) return "aria-disabled:text-text-disabled";
     if (choice.value !== held) return "text-text-quiet hover:text-text";
-    return toneOf(choice.group) === "alert" ? "text-on-accent" : "text-text";
+    switch (toneOf(choice.group)) {
+      case "alert":
+      case "accent":
+        return "text-on-accent";
+      case "plain":
+        return "text-text";
+    }
   };
 
   // The chosen cell's position inside its band, or -1 when the chosen
