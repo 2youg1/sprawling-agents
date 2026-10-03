@@ -12,7 +12,8 @@
 //! reaches it as a `Command` on a desk, one at a time.
 //!
 //! The thread runs `attend::attend`, the loop, until the desk closes;
-//! this file starts it and hands out what it opened.
+//! this file starts it, hands out what it opened, and once it reports
+//! ready starts one warm-up per attached endpoint.
 
 use std::sync::Arc;
 use std::sync::mpsc;
@@ -129,6 +130,9 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
         to_readers,
         kept,
     } = outward;
+    // Taken before the worker takes the book: each shares its endpoint's
+    // client slot with the book the worker calls through.
+    let warm_ups: Vec<gateway::WarmUp> = held.2.book.warm_ups().collect();
     // The views are folded beside the writer rather than on it, so a
     // reader holding them never delays the next record
     // (`crates/sprawling/spec/Assembly/Listening.lean` §8-99).
@@ -254,6 +258,7 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
         // true the moment there are two handles on the same secrets.
         Ok(Ok((vault, health, relay))) => {
             lend(Arc::clone(&vault));
+            start_warm_ups(warm_ups);
             (vault, health, relay)
         }
         Ok(Err(err)) => return Err(err),
@@ -273,4 +278,19 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
         backlog,
         relay,
     })
+}
+
+/// Starts one detached `sprawling-warm-up` thread per attached endpoint,
+/// once the city is open, each ending with its one request
+/// (`crates/gateway/spec/Endpoint/Transport.lean` D26). Nothing waits on
+/// them, and a warm-up that cannot start leaves its endpoint's first
+/// call to pay for the connection, as it would with no warm-up at all.
+fn start_warm_ups(warm_ups: Vec<gateway::WarmUp>) {
+    for warm_up in warm_ups {
+        drop(
+            std::thread::Builder::new()
+                .name("sprawling-warm-up".to_owned())
+                .spawn(move || warm_up.open()),
+        );
+    }
 }
