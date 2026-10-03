@@ -15,7 +15,7 @@ use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 use std::time::Instant;
 
-use kernel::{AxCode, AxError};
+use kernel::{AxCode, AxError, Proxying};
 
 use super::config::{Endpoint, EndpointConfig};
 use super::permit::{Gate, Gated};
@@ -54,15 +54,15 @@ impl Transport {
         }
     }
 
-    /// The shared client, built from `config` if this is the first call.
+    /// The shared client, built from `shape` if this is the first call.
     ///
     /// Two callers racing on an empty slot each build one; the slot keeps
     /// the first and the other is dropped with its thread.
-    fn client(&self, config: &EndpointConfig) -> Result<reqwest::blocking::Client, AxError> {
+    fn client(&self, shape: &ClientShape) -> Result<reqwest::blocking::Client, AxError> {
         if let Some(client) = self.slot.get() {
             return Ok(client.clone());
         }
-        let built = self.build(config)?;
+        let built = self.build(shape)?;
         Ok(self.slot.get_or_init(|| built).clone())
     }
 
@@ -83,9 +83,9 @@ impl Transport {
         }
     }
 
-    fn build(&self, config: &EndpointConfig) -> Result<reqwest::blocking::Client, AxError> {
-        let builder = crate::client_for(config.proxying, &config.base_url)
-            .timeout(Duration::from_millis(config.timeout_ms));
+    fn build(&self, shape: &ClientShape) -> Result<reqwest::blocking::Client, AxError> {
+        let builder = crate::client_for(shape.proxying, &shape.url)
+            .timeout(Duration::from_millis(shape.timeout_ms));
         #[cfg(test)]
         let builder = match &self.detour {
             Some(Detour(step)) => step(builder),
@@ -99,6 +99,55 @@ impl Transport {
                 )
         })
     }
+}
+
+/// What an endpoint's shared client is built from: the fields of an
+/// [`EndpointConfig`] the client reads, and nothing a request carries.
+#[derive(Debug, Clone)]
+pub(crate) struct ClientShape {
+    /// The chat URL: which proxy rule applies is decided from its host.
+    pub(crate) url: String,
+    pub(crate) proxying: Proxying,
+    pub(crate) timeout_ms: u64,
+}
+
+impl ClientShape {
+    fn of(config: &EndpointConfig) -> ClientShape {
+        ClientShape {
+            url: config.base_url.clone(),
+            proxying: config.proxying,
+            timeout_ms: config.timeout_ms,
+        }
+    }
+}
+
+/// One endpoint's connection, opened before its first call so that call
+/// does not pay to resolve, connect and shake hands
+/// (`crates/gateway/spec/Endpoint/Transport.lean` D26).
+///
+/// It holds no credential, no redemption and no header a person
+/// entered, so the one request it sends cannot carry a key.
+#[derive(Debug)]
+pub struct WarmUp {
+    transport: Transport,
+    shape: ClientShape,
+    models_url: String,
+}
+
+impl WarmUp {
+    pub(crate) fn new(transport: Transport, shape: ClientShape, models_url: String) -> WarmUp {
+        WarmUp {
+            transport,
+            shape,
+            models_url,
+        }
+    }
+
+    /// Builds the endpoint's shared client and sends one `GET` to its
+    /// model list, read to the end so the connection goes back to the
+    /// pool. Blocks for that one round trip; start it on a thread of
+    /// its own.
+    pub fn open(self) {}
 }
 
 /// A step after a client's configuration, held so a transport stays
@@ -128,7 +177,7 @@ impl Endpoint {
         redemption: Redemption,
     ) -> Result<Endpoint, AxError> {
         Ok(Endpoint {
-            client: transport.client(&config)?,
+            client: transport.client(&ClientShape::of(&config))?,
             config,
             redemption,
         })
@@ -160,6 +209,7 @@ mod tests {
 
     const HOST: &str = "api.anthropic.com";
     const BASE: &str = "https://api.anthropic.com/v1/messages";
+    const MODELS: &str = "https://api.anthropic.com/v1/models";
 
     /// `crates/gateway/spec/Endpoint/Transport.lean` §8-35: every call to one endpoint goes out
     /// over the connection the endpoint's first call opened, so resolving,
@@ -182,6 +232,27 @@ mod tests {
             (served.len(), served[1] == served[0], served[2] == served[0]),
             (3, true, false),
             "connections that carried the three calls: {served:?}"
+        );
+    }
+
+    /// `crates/gateway/spec/Endpoint/Transport.lean` D26: a warm-up opens the connection the
+    /// endpoint's first call goes out over. The stand-in has heard one
+    /// request once the warm-up returns, and the call that follows comes
+    /// on the same connection.
+    #[test]
+    fn a_warm_up_opens_the_connection_the_first_call_goes_out_over() {
+        let stand_in = KeptOpen::listening(HOST);
+        let transport = Transport::detoured(stand_in.toward());
+        let shape = ClientShape::of(&config(BASE));
+        WarmUp::new(transport.clone(), shape, MODELS.to_owned()).open();
+        let warmed = stand_in.served_on();
+        let mut endpoint = Endpoint::over(&transport, config(BASE), redemption()).unwrap();
+        let refused = endpoint.call(&request()).unwrap_err();
+        assert_eq!(*refused.code(), AxCode::Provider, "{refused}");
+        assert_eq!(
+            (warmed, stand_in.served_on()),
+            (vec![0], vec![0, 0]),
+            "connections that carried the warm-up, then the warm-up and the call"
         );
     }
 

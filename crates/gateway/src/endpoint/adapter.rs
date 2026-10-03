@@ -11,7 +11,7 @@
 
 use kernel::AxError;
 
-use crate::endpoint::{Endpoint, EndpointConfig, HeaderValue, Redemption};
+use crate::endpoint::{ClientShape, Endpoint, EndpointConfig, HeaderValue, Redemption};
 use crate::router::Chosen;
 
 /// The adapter for one chosen model.
@@ -46,22 +46,24 @@ pub fn adapter_for(
         .map(|(name, value)| (name, HeaderValue::Plain(value)))
         .collect();
     extra_headers.extend(tuning.extra_headers.iter().cloned());
+    let ClientShape {
+        url,
+        proxying,
+        timeout_ms,
+    } = endpoint.client_shape();
     let endpoint = Endpoint::over(
         chosen.transport,
         EndpointConfig {
-            base_url: endpoint.chat_url(),
+            base_url: url,
             dialect: endpoint.dialect,
             model: chosen.entry.id.clone(),
             auth: endpoint.auth.clone(),
             extra_headers,
             overrides: tuning.applied_overrides(),
-            // The tuning answers this, because the figure an untuned
-            // endpoint is called with is the tuning's own default and
-            // is stated there.
-            timeout_ms: tuning.call_timeout_ms(),
+            timeout_ms,
             stream_idle_timeout_ms: tuning.idle_timeout_ms(),
             pricing: Some(chosen.entry.clone()),
-            proxying: tuning.proxying,
+            proxying,
         },
         redemption,
     )?;

@@ -35,4 +35,5 @@ pub use config::{AuthSpec, Endpoint, EndpointConfig};
 pub use header::HeaderValue;
 pub use kernel::event::record::ModelFacts;
 pub use redemption::{Redemption, SecretResolver};
-pub(crate) use transport::Transport;
+pub(crate) use transport::{ClientShape, Transport};
+pub use transport::WarmUp;

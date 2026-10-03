@@ -28,7 +28,7 @@ pub use concurrency::MaxInFlight;
 pub use cost::settle;
 pub use credential::{Custodian, Custody, Persistence, Store};
 pub use dialect::{ImageBytes, response_from_wire};
-pub use endpoint::adapter_for;
+pub use endpoint::{WarmUp, adapter_for};
 pub use endpoint::{AuthSpec, Endpoint, EndpointConfig, HeaderValue, SecretResolver};
 pub use endpoint::{ModelFacts, Redemption};
 pub use market::{InputKinds, MarketSnapshot, ModelEntry};
