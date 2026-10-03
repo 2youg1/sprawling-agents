@@ -17,22 +17,9 @@ pub(crate) mod reading;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Mutex, PoisonError};
 
+use accounting::person::CorePlacement;
 use plan::{Left, Plan, Processor, Shape, Topology};
 use reading::Unread;
-
-/// Which placement the hot threads get. A comparison sitting changes
-/// this one value (D47); hard affinity is applied to the whole process
-/// from outside (D41), so it is not an arm here.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Arm {
-    /// No reading, no seat, no platform call: the scheduler alone decides.
-    #[expect(dead_code, reason = "the comparison arm a measuring sitting turns on")]
-    Off,
-    /// Power throttling lifted, and a seat with a soft ideal processor.
-    Soft,
-}
-
-const ARM: Arm = Arm::Soft;
 
 /// Who holds a seat: one per hot thread for as long as it lives.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -114,27 +101,22 @@ impl Drop for Seat {
 /// thread's soft ideal processor. A refusal is told on stderr, here, and
 /// the thread runs where the scheduler puts it.
 pub(crate) fn seat_this_thread(name: &'static str) -> Seat {
-    match ARM {
-        Arm::Off => Seat(None),
-        Arm::Soft => {
-            let holder = Holder(NEXT_HOLDER.fetch_add(1, Ordering::Relaxed));
-            let seat = {
-                let mut table = TABLE.lock().unwrap_or_else(PoisonError::into_inner);
-                let table = table.get_or_insert_with(first_table);
-                table.start(holder);
-                table.seat_of(holder)
-            };
-            if let Some(seat) = seat
-                && let Err(reason) = prefer(seat)
-            {
-                eprintln!(
-                    "thread {name} runs without an ideal processor (processor {}:{}): {reason}",
-                    seat.group, seat.number
-                );
-            }
-            Seat(Some(holder))
-        }
+    let holder = Holder(NEXT_HOLDER.fetch_add(1, Ordering::Relaxed));
+    let seat = {
+        let mut table = TABLE.lock().unwrap_or_else(PoisonError::into_inner);
+        let table = table.get_or_insert_with(first_table);
+        table.start(holder);
+        table.seat_of(holder)
+    };
+    if let Some(seat) = seat
+        && let Err(reason) = prefer(seat)
+    {
+        eprintln!(
+            "thread {name} runs without an ideal processor (processor {}:{}): {reason}",
+            seat.group, seat.number
+        );
     }
+    Seat(Some(holder))
 }
 
 /// A driving lane's seat, through the hook `accounting` calls at the top
@@ -143,10 +125,27 @@ pub(crate) fn seat_lane() -> Box<dyn std::any::Any> {
     Box::new(seat_this_thread("sprawling-drive"))
 }
 
-/// The table of the first seat: power throttling lifted for the whole
-/// process (D40), the topology read, and the plan's seats where the
-/// platform has a soft call to give them to (D41).
+/// The table of the first seat. With placement off it has no seat;
+/// otherwise power throttling is lifted for the whole process (D40), the
+/// topology read, and the plan's seats kept where the platform has a soft
+/// call to give them to (D41).
 fn first_table() -> SeatTable {
+    match setting() {
+        CorePlacement::Off => SeatTable::new(Vec::new()),
+        CorePlacement::Soft => soft_table(),
+    }
+}
+
+/// The person's `[core] placement`. A setting that does not read is told
+/// on stderr once, here, and placement stays on (D47).
+fn setting() -> CorePlacement {
+    accounting::person::core_placement().unwrap_or_else(|err| {
+        eprintln!("CPU placement stays on: {err}");
+        CorePlacement::Soft
+    })
+}
+
+fn soft_table() -> SeatTable {
     if let Err(reason) = full_speed() {
         eprintln!("the city may be power-throttled as background work: {reason}");
     }
@@ -164,9 +163,16 @@ fn first_table() -> SeatTable {
 /// The doctor's line: the topology this machine reports and what the
 /// plan does with it, in the User's words (D47).
 pub(crate) fn report() -> String {
-    match ARM {
-        Arm::Off => "CPU placement is off; the operating system places every thread".to_owned(),
-        Arm::Soft => describe(&reading::read()),
+    match accounting::person::core_placement() {
+        Ok(CorePlacement::Off) => {
+            "CPU: placement is off ([core] placement = \"none\"); the operating system places every thread"
+                .to_owned()
+        }
+        Ok(CorePlacement::Soft) => describe(&reading::read()),
+        Err(err) => format!(
+            "{} ([core] placement does not read, so placement stays on: {err})",
+            describe(&reading::read())
+        ),
     }
 }
 

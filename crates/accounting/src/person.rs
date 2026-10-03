@@ -170,7 +170,24 @@ pub fn core_placement() -> Result<CorePlacement, AxError> {
 }
 
 fn stated_core_placement(file: &Path) -> Result<CorePlacement, AxError> {
-    document(file).map(|_document| CorePlacement::Soft)
+    match document(file)?
+        .get(CORE)
+        .and_then(|core| core.get(PLACEMENT))
+    {
+        None => Ok(CorePlacement::Soft),
+        Some(stated) => match stated.as_str() {
+            Some("soft") => Ok(CorePlacement::Soft),
+            Some("none") => Ok(CorePlacement::Off),
+            Some(_) | None => Err(AxError::failure(
+                AxCode::ConfigInvalid,
+                "read how the core places its threads",
+                format!("{}: [{CORE}] {PLACEMENT} = {stated}", file.display()),
+            )
+            .with_recovery(
+                "write placement = \"soft\" or placement = \"none\" under [core], or delete the line",
+            )),
+        },
+    }
 }
 
 /// Where this person's file is. The home directory is `home::Home`'s
