@@ -142,3 +142,50 @@ fn changing_the_policy_of_a_worked_room_reaches_the_run_working_there() {
         (Some(tighter), None)
     );
 }
+
+/// The defect: a policy the User changed while nobody worked in the room
+/// stayed on the ledger alone, and the next dispatch started under the
+/// policy the page sent with it (`crates/sprawling/spec/Accounting/Worker.lean`
+/// §8-133).
+#[test]
+fn a_policy_changed_while_the_room_is_idle_rules_the_next_dispatch() {
+    use crate::worker::Posted;
+    use crate::worker::fixture::{
+        completion, fake_openai, lay_rules, ordinary_rules, worker_with_provider,
+    };
+
+    let dir = tempfile::tempdir().unwrap();
+    crate::worker::fixture::init_city(dir.path()).unwrap();
+    lay_rules(dir.path(), "lab", &ordinary_rules(""));
+    let (base_url, _provider) = fake_openai(&["m-local"], vec![completion("done", None)]);
+    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
+    let lab = Address::parse("lab").unwrap();
+    let chat = RunPolicy::of(Mode::Chat);
+    worker
+        .handle(wire::Command::ChangeRunPolicy(wire::PolicyChange {
+            room: lab.clone(),
+            policy: chat,
+            idem: key(b"idle change"),
+        }))
+        .unwrap();
+    worker.serve_one(Posted {
+        command: wire::Command::Dispatch {
+            addr: lab,
+            task: "read the plan".to_owned(),
+            goal: "one answer".to_owned(),
+            policy: RunPolicy::of(Mode::Work),
+            idem: key(b"dispatch"),
+            session: None,
+            effort: None,
+            model: None,
+        },
+        reply: wire::Reply::nowhere(),
+    });
+    worker.land_the_rest().unwrap();
+
+    let started: Vec<RunPolicy> = lines::<serde_json::Value>(dir.path(), "run_started")
+        .into_iter()
+        .map(|(_, data)| serde_json::from_value(data["policy"].clone()).unwrap())
+        .collect();
+    assert_eq!(started, vec![chat]);
+}
