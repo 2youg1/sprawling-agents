@@ -70,6 +70,9 @@ payload field is optional, and a line written by 0.0.8 reads unchanged.
   offers the same tool list and the mode is asked at the call, so a policy
   change keeps the prompt cache: `edit` and `exec` in chat mode answer
   `E_GATE_DENIED` with the way to switch.
+- `redact` takes a tool payload by value and gives a clean one back in the
+  allocation it came in, so a payload with no secret in it is not copied;
+  a property test holds it to the copying walk.
 - A read-only tool runs before its intent is durable. The run holds its
   lines across turns, so a turn pays one durability barrier plus one per
   write, rather than one per line, and the run pays one more before it
@@ -112,7 +115,10 @@ digest and machine class. These readings are owed and not stated here:
   208 lines where the full scan read all 1004; the wall clock of a large
   export is owed;
 - the first base of a city and the checkouts of overlapping delegations;
-- private bytes on a 100 ms tick, and their slope over an hour;
+- private bytes on a 100 ms tick, and their slope over an hour. On Linux
+  private bytes are now `Private_Clean` plus `Private_Dirty` from
+  `/proc/self/smaps_rollup`, or `RssAnon` where the rollup is absent;
+  Windows reads `PagefileUsage`;
 - a profile-guided release build against the plain one. `on-demand.yml`
   builds the Windows release in three stages, and the profile is kept only
   when the geometric-mean gain on the held-out load is at least 3 % and
@@ -155,7 +161,9 @@ digest and machine class. These readings are owed and not stated here:
 - The doctor page lists every item with its state, version and install
   line, every harness state, both registries and the drive scan (A9). A
   harness reads Ready only where its vendor's own directory exists, and
-  otherwise NotSetUp with the paths it looked at (A5).
+  otherwise NotSetUp with the paths it looked at (A5). Grok Build is looked
+  for in `GROK_HOME` or `~/.grok`, Kimi Code in `KIMI_CODE_HOME` or
+  `~/.kimi-code`, on Windows, macOS and Linux alike.
 - The update check asks npm and crates.io and gives the update command of the
   channel this binary was installed through (A10).
 - The remote group in settings walks a pairing in numbered steps, says what a
@@ -183,7 +191,10 @@ digest and machine class. These readings are owed and not stated here:
   stylesheet field, legibility warnings and restore default (CT).
 - The key sheet's gallery specimen stays inside its fold, the city bar
   draws nothing until the city answers, and the MCP environment's add-a-row
-  button keeps its label on one line (G7).
+  button keeps its label on one line (G7). The second context reminder is
+  set in the settings tree's run group, after autonomy, with a building
+  picker, instead of under the MCP page's desktop form; the welcome page's
+  back key stands at the top of its one column.
 - Tools (F1–F9): `archive record` files its entry at the call, so `recall`
   in the same run finds it; the Mayor writes an empty plan's first line with
   `plan add`; `rules read` and `city list` are admitted in a run; `read` and
@@ -244,13 +255,20 @@ digest and machine class. These readings are owed and not stated here:
 - Skill audit and the usage record: the `skill_audited` kind and the audit
   state exist; no auditor (the skills.sh partner audits, or SkillSpector when
   installed) runs yet, and the usage table is not folded.
-- Hot-thread placement on the best cores, a CPU weight and memory limit per
-  run's job, `[sandbox] interpreter = "pwsh"` for PowerShell 7 and the
-  byte-budgeted resident cache are specified in Lean and wait for their
-  code.
+- A CPU weight and memory limit per run's job and `[sandbox] interpreter =
+  "pwsh"` for PowerShell 7 are specified in Lean and wait for their code.
+- Hot-thread placement takes seats, but every core has one rank until a
+  leaf reads the efficiency classes, so on Windows it spreads the hot
+  threads and does not yet put them on the faster cores first; a run's
+  lane takes no seat yet. macOS and Linux place nothing.
+- The byte-budgeted resident cache (`storage::resident`) exists and keeps
+  its budget, and nothing reads through it yet. The 100 ms memory beat
+  inside the monitor's one-second beat is specified and not built.
+- macOS reports the process's virtual size where the other platforms
+  report private bytes, until a safe interface reaches its physical
+  footprint.
 - The skill wire: `InstallSkill`, shelving a skill, and the skill, MCP and
   usage exports have no command yet.
-- A clean tool payload is still copied once by the redaction step.
 
 ### Known and unfixed
 
