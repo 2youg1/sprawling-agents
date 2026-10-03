@@ -33,8 +33,8 @@ use crate::report::{Violation, XtaskError};
 use crate::walk;
 
 /// The only files allowed to say `.expose(` under crates/*/src: the
-/// defining module and the redemption point in gateway's endpoint call.
-const EXPOSE_WHITELIST: [&str; 4] = [
+/// defining module and each redemption point, with its reason beside it.
+const EXPOSE_WHITELIST: [&str; 5] = [
     "crates/kernel/src/secret/sealed.rs",
     "crates/gateway/src/endpoint/call.rs",
     // An MCP server's configured header or environment variable may
@@ -52,6 +52,13 @@ const EXPOSE_WHITELIST: [&str; 4] = [
     // alternative was handing the broker a plaintext key from the
     // assembly, which is the thing this list exists to prevent.
     "crates/agent_protocols/src/mcp/broker.rs",
+    // The city's remote signing key is derived from a seed the vault
+    // keeps. The seed is read back to bytes inside the one function that
+    // derives the key from it, and nowhere else. The alternative put the
+    // plaintext seed in the composition root (`bin::outside::keeper`),
+    // which is what this list exists to prevent
+    // (crates/remote_access/Spec.lean D23).
+    "crates/remote_access/src/keys.rs",
 ];
 
 /// Exact literals the detector flags that are not credentials.
