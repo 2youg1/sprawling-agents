@@ -29,6 +29,7 @@ impl ChainSnapshot {
     pub fn fold_version(&self) -> u32;
     pub fn seq(&self) -> Seq;
     pub fn views(&self) -> &[u8];
+    pub fn same_line(&self, other: &ChainSnapshot) -> bool;          // 两份快照是否切在同一条账本的同一行：seq 与 line_hash 都相等，不看各自折了什么
     pub fn fit(&self, line_at_seq: &[u8]) -> SnapshotFit;              // 定位读到的那一行是否就是切点那一行
     pub fn resume(&self) -> Result<LineCheck, AxError>;               // 切点之后的链状态：prev = line_hash，expected = seq + 1；seq 已是最后一个时是 Seq::next 的错误
 }

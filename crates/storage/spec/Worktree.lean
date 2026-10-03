@@ -13,7 +13,11 @@
 ### 8-9 storage::worktree（形状 4 适配器＋形状 2 值类型；git2）
 
 ```rust
-pub struct WorktreeName(String);        // 文件系统安全；无分隔符、无点开头
+pub struct WorktreeName(String);        // 文件系统安全：非空、不以点开头、只含 [A-Za-z0-9._-]（于是没有分隔符）
+impl WorktreeName {
+    pub fn parse(raw: &str) -> Result<WorktreeName, StorageError>;   // 不合上述规则即 Worktree → E_STORAGE_FATAL（D11）
+    pub fn as_str(&self) -> &str;
+}
 pub struct Worktrees { /* repo、home、ceiling —— 私有 */ }
 pub struct WorktreeLease { /* name、path、disk —— 私有 */ }
 impl Worktrees {
