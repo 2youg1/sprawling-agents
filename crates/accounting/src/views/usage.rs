@@ -24,6 +24,15 @@ use kernel::{Address, B3Hash, Effect, EventKind, EventRecord, RunId, Seq, TimeMs
 use super::prepared::LedgerAsk;
 
 mod answers;
+#[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing,
+    reason = "test code"
+)]
+mod audit_tests;
 mod export;
 #[cfg(test)]
 #[allow(
