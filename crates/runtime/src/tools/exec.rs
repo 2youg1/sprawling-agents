@@ -130,8 +130,9 @@ impl ExecTool {
             "Run a program, a Python snippet, or a shell line. A program or shell \
              line runs in this machine's confinement, {}. Ask for `where: host` to \
              run one outside it. Use `read` and `search` for what is already written here; a \
-             command that prints it comes back without the version `edit` guards on.",
-            confinement.statement()
+             command that prints it comes back without the version `edit` guards on.{}",
+            confinement.statement(),
+            setup.shell.statement()
         );
         Ok(ExecTool {
             setup,

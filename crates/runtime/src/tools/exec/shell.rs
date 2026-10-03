@@ -59,6 +59,19 @@ impl Shell {
             }
         }
     }
+
+    /// The sentence the tool's description ends with: which interpreter
+    /// a shell line runs under, in the spelling the result records, or
+    /// nothing when the arm is not usable, whose refusal says why at the
+    /// call. A model writes a different language for each interpreter.
+    pub(super) fn statement(&self) -> String {
+        match self {
+            Shell::Absent | Shell::Missing { .. } => String::new(),
+            Shell::Found { program, .. } => {
+                format!(" A shell line runs under {}.", interpreter_name(program))
+            }
+        }
+    }
 }
 
 /// The arguments that put one line in front of each interpreter.
