@@ -9,8 +9,72 @@
 
 use kernel::{AxCode, AxError, EventRecord, UsdMicros};
 
+use super::super::holding::Views;
 use crate::views::lines::summarize;
-use crate::views::prepared::LedgerAsk;
+use crate::views::prepared::{LedgerAsk, Prepared};
+
+impl Views {
+    /// One run as a page reads it: the hot view's own summary while it
+    /// holds the run, and a recall folded from that run's records once
+    /// it evicted it.
+    ///
+    /// An evicted run always has records in the Ledger, so a recall
+    /// that cannot read them is "I could not look" rather than "no such
+    /// run"; a run this city never had answers nothing at all.
+    pub(in crate::views) fn run_view_ask(&self, run: kernel::RunId) -> Prepared {
+        match self.hot.get(&run) {
+            Some(hot) => Prepared::Held(wire::Answer::Run(Some(Box::new(summarize(run, hot))))),
+            None if self.hot.was_evicted(&run) => Prepared::Recalled {
+                ledger: self.ledger_ask(),
+                run,
+            },
+            None => Prepared::Held(wire::Answer::Run(None)),
+        }
+    }
+
+    /// A bounded slice of the one history, ending just before `before`.
+    pub(in crate::views) fn history_ask(
+        &self,
+        before: Option<kernel::Seq>,
+        limit: u32,
+    ) -> Prepared {
+        Prepared::History {
+            ledger: self.ledger_ask(),
+            before,
+            limit,
+        }
+    }
+
+    /// The records between two sequence numbers, both ends included.
+    pub(in crate::views) fn history_range_ask(
+        &self,
+        from: kernel::Seq,
+        to: kernel::Seq,
+        limit: u32,
+    ) -> Prepared {
+        Prepared::HistoryRange {
+            ledger: self.ledger_ask(),
+            from,
+            to,
+            limit,
+        }
+    }
+
+    /// One run's own records, ending just before `before`.
+    pub(in crate::views) fn run_history_ask(
+        &self,
+        run: kernel::RunId,
+        before: Option<kernel::Seq>,
+        limit: u32,
+    ) -> Prepared {
+        Prepared::RunHistory {
+            ledger: self.ledger_ask(),
+            run,
+            before,
+            limit,
+        }
+    }
+}
 
 impl LedgerAsk {
     /// A bounded slice of the one history, ending just before `before`
