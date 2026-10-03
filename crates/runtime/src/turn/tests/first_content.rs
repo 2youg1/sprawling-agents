@@ -73,7 +73,7 @@ fn readings(generating: Generating<'_, '_>) -> (Option<u64>, Option<u64>, Option
             )
             .unwrap(),
     );
-    drop(advance(
+    let wave = advance(
         turn.call(
             Interrupt::None,
             &mut ledger,
@@ -82,7 +82,23 @@ fn readings(generating: Generating<'_, '_>) -> (Option<u64>, Option<u64>, Option
             generating,
         )
         .unwrap(),
-    ));
+    );
+    // `model_returned` is held until the turn's closing barrier.
+    let recording = advance(
+        wave.execute_concurrent(
+            Interrupt::None,
+            &mut ledger,
+            &mut |_: &ToolCall, _: TimeMs| -> Result<ToolOutcome, AxError> {
+                Ok(ToolOutcome {
+                    result: Payload::empty(),
+                    attachments: Vec::new(),
+                })
+            },
+            &mut |_| Interrupt::None,
+        )
+        .unwrap(),
+    );
+    advance(recording.record(Interrupt::None, &mut ledger).unwrap());
     let line =
         |at: usize| -> serde_json::Value { serde_json::from_slice(&ledger.lines[at]).unwrap() };
     let (called, returned) = (line(1), line(2));

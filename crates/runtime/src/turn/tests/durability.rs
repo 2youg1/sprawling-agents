@@ -13,7 +13,7 @@ use super::super::*;
 use super::helpers::*;
 use crate::bench::{BenchOutcome, Clearance, Ticket, ToolBench};
 use crate::conversation::Opening;
-use kernel::{Effect, EventDraft, IdemKey, Seq, Tool, ToolOutcome};
+use kernel::{Effect, EventDraft, EventRef, IdemKey, Seq, Tool, ToolOutcome};
 
 /// The kinds of the lines a ledger holds, shared with the tools so a
 /// tool can read what is durable at the moment it runs.
@@ -229,7 +229,7 @@ fn tf1_write_intent_is_durable_before_the_write_runs() {
         &mut ledger,
         vec![call("r1", "read"), call("w1", "write"), call("r2", "read")],
     );
-    let opening = ["prompt_assembled", "model_called"];
+    let opening = ["prompt_assembled", "model_called", "model_returned"];
     let at_write = [
         "prompt_assembled",
         "model_called",
@@ -245,7 +245,8 @@ fn tf1_write_intent_is_durable_before_the_write_runs() {
 }
 
 /// `closed_turn_barriers`: a turn pays one barrier for its model call,
-/// one for each write, and one to close, however many reads it makes;
+/// one for the reply, one for each write, and one to close, however many
+/// reads it makes, plus one on a run's first turn for `prompt_assembled`;
 /// the report's refs are every line the turn wrote, all durable.
 #[test]
 fn tf1_turn_barriers() {
@@ -266,6 +267,6 @@ fn tf1_turn_barriers() {
             report.refs().len(),
             ledger.inner.lines.len()
         ),
-        (2 + 2, 13, 13)
+        (1 + 3 + 2, 13, 13)
     );
 }

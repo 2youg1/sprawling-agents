@@ -254,7 +254,7 @@ fn a_steer_inside_the_reads_lands_where_the_serial_wave_writes_it() {
 fn a_call_line_carries_its_tools_registration() {
     let mut ledger = TestLedger::new();
     let turn = wave_of(&mut ledger, vec![call("c1", "read"), call("c2", "unknown")]);
-    advance(
+    let recording = advance(
         turn.execute_concurrent(
             Interrupt::None,
             &mut ledger,
@@ -263,6 +263,7 @@ fn a_call_line_carries_its_tools_registration() {
         )
         .unwrap(),
     );
+    advance(recording.record(Interrupt::None, &mut ledger).unwrap());
     let registered: Vec<(serde_json::Value, serde_json::Value)> = ledger
         .lines
         .iter()
@@ -363,12 +364,13 @@ fn a_stamp_the_face_reads_is_the_moment_its_answer_records() {
             path,
             seen: Vec::new(),
         };
-        advance(
+        let recording = advance(
             turn.execute_concurrent(Interrupt::None, &mut ledger, &mut face, &mut |_| {
                 Interrupt::None
             })
             .unwrap(),
         );
+        advance(recording.record(Interrupt::None, &mut ledger).unwrap());
         let answered: Vec<TimeMs> = ledger
             .lines
             .iter()

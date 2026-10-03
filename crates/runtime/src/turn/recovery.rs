@@ -211,7 +211,10 @@ impl<'a, 'h> ModelCall<'a, 'h> {
     }
 
     /// Appends `model_called` before the effect it announces, at the
-    /// moment the attempt goes out. Every attempt lands on the ledger, so
+    /// moment the attempt goes out, and makes it durable together with
+    /// every line the turn held before it: a model call is an outside
+    /// effect, so this is one of the turn's barriers (runtime D24). Every
+    /// attempt lands on the ledger, so
     /// a repaired resend reads as the second `model_called` in the
     /// history rather than as silence.
     fn record(&mut self) -> Result<(), AxError> {
@@ -221,12 +224,9 @@ impl<'a, 'h> ModelCall<'a, 'h> {
         };
         let sent = self.journal.read_moment()?;
         self.sent_us = sent.us;
-        self.journal.append_authored(
-            self.ledger,
-            Authored::ModelCalled { at: sent.at },
-            Payload::of(&called)?,
-        )?;
-        Ok(())
+        self.journal
+            .append_authored(Authored::ModelCalled { at: sent.at }, Payload::of(&called)?);
+        self.journal.barrier(self.ledger)
     }
 }
 

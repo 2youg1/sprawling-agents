@@ -144,9 +144,13 @@ impl<'h> Turn<'h, Assembling> {
         let payload = prompt.prefix.prompt_payload(&plan)?;
         if !prompt.recorded.holds(&payload) {
             self.journal
-                .append_authored(ledger, Authored::PromptAssembled, payload.clone())?;
+                .append_authored(Authored::PromptAssembled, payload.clone());
             prompt.recorded.remember(payload);
         }
+        // The run writes its own lines between this phase and the next
+        // (`run::lifecycle`), so what this phase holds goes down first and
+        // the ledger keeps the order the lines were appended in.
+        self.journal.barrier(ledger)?;
         let chat = ChatRequest {
             model: shape.model.clone(),
             max_tokens: shape.max_tokens,
@@ -238,10 +242,14 @@ impl<'h> Turn<'h, Calling<'_>> {
             took_us: arrived.since(sent_us),
         };
         let model_returned = self.journal.append_redacted(
-            ledger,
             Carried::ModelReturned { at: arrived.at },
             Payload::of(&returned)?,
         )?;
+        // The run may write a checkpoint before the wave, so the reply goes
+        // down here rather than with the wave, for the same reason as at
+        // the end of `assemble`.
+        self.journal.barrier(ledger)?;
+        let model_returned = self.journal.durable(model_returned)?;
         Ok(PhaseOutcome::Advanced(Turn {
             journal: self.journal,
             state: ToolWave {
@@ -289,7 +297,7 @@ impl Turn<'_, Recording> {
         exchange.compact()?;
         Ok(PhaseOutcome::Advanced(TurnReport {
             redacted: self.journal.redacted(),
-            refs: self.journal.take_refs(),
+            refs: self.journal.close(ledger)?,
             model_returned,
             calls_made,
             assistant: exchange.assistant().to_vec(),
@@ -308,13 +316,10 @@ impl<S> Turn<'_, S> {
     /// halted between two calls, so both endings are one line written in
     /// one place.
     fn cancel_here(&mut self, ledger: &mut dyn Ledger) -> Result<TurnCancelled, AxError> {
-        self.journal.append_authored(
-            ledger,
-            Authored::CancelReceived,
-            Payload::of(&CancelReceived {})?,
-        )?;
+        self.journal
+            .append_authored(Authored::CancelReceived, Payload::of(&CancelReceived {})?);
         Ok(TurnCancelled {
-            refs: self.journal.take_refs(),
+            refs: self.journal.close(ledger)?,
         })
     }
 
@@ -331,11 +336,8 @@ impl<S> Turn<'_, S> {
             Interrupt::Cancel => Ok(Some(self.cancel_here(ledger)?)),
             Interrupt::Steer { source, text } => {
                 let steer = SteerReceived { source, text };
-                self.journal.append_authored(
-                    ledger,
-                    Authored::SteerReceived,
-                    Payload::of(&steer)?,
-                )?;
+                self.journal
+                    .append_authored(Authored::SteerReceived, Payload::of(&steer)?);
                 Ok(None)
             }
         }

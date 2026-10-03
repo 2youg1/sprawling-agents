@@ -15,6 +15,13 @@
 //! the call is admitted and before its tool runs, the answer before the
 //! tool face packages it, so a stamp the face renders is the answer's
 //! moment (runtime D8). The turn reads both; the face holds none.
+//!
+//! A call that only reads runs without waiting for its `tool_called` to
+//! be durable; a call with any other effect waits for its `tool_called`
+//! and everything held before it to be durable before its tool runs, and
+//! its `tool_result` rides the next barrier (runtime D24). Which
+//! properties that order keeps on every crash point is
+//! `crates/runtime/spec/Turn/Durability.lean`.
 
 use kernel::event::record::{ToolAnswer, ToolCalled, ToolResult};
 use kernel::{
@@ -111,33 +118,33 @@ pub(super) fn reads_only(tools: &dyn ConcurrentInvoke, call: &ToolCall) -> bool 
     matches!(tools.meta_of(call), Some(meta) if meta.effect == Effect::Read)
 }
 
-/// A call, the moments it started (after admission, before its tool
-/// ran) and answered (before the tool face packaged the answer), and its
-/// tool's registration, which `tool_called` copies.
-struct Timed<'c> {
+/// A call, the moment it started (after admission, before its tool
+/// ran), and its tool's registration, which `tool_called` copies.
+struct Intent<'c> {
     call: &'c ToolCall,
     started: Moment,
-    answered: Moment,
     effect: Option<Effect>,
     render: Option<RenderIntent>,
 }
 
-impl<'c> Timed<'c> {
-    fn of(
-        call: &'c ToolCall,
-        started: Moment,
-        answered: Moment,
-        tools: &dyn ConcurrentInvoke,
-    ) -> Timed<'c> {
+impl<'c> Intent<'c> {
+    fn of(call: &'c ToolCall, started: Moment, tools: &dyn ConcurrentInvoke) -> Intent<'c> {
         let meta = tools.meta_of(call);
-        Timed {
+        Intent {
             call,
             started,
-            answered,
             effect: meta.map(|registered| registered.effect.clone()),
             render: meta.map(|registered| registered.render.clone()),
         }
     }
+}
+
+/// When one call started and when it answered: its `tool_result` is
+/// stamped with the answer and carries the microseconds between the two.
+#[derive(Clone, Copy)]
+struct Timing {
+    started: Moment,
+    answered: Moment,
 }
 
 impl<'h> Turn<'h, ToolWave> {
@@ -231,8 +238,12 @@ impl<'h> Turn<'h, ToolWave> {
                     tools.account(call, ticket, ran)
                 }
             };
-            let timed = Timed::of(call, at, answered_at, &*tools);
-            self.account(ledger, &mut exchange, timed, answered)?;
+            self.intend(Intent::of(call, at, &*tools))?;
+            let timing = Timing {
+                started: at,
+                answered: answered_at,
+            };
+            self.settle(&mut exchange, call, timing, answered)?;
         }
         if let Some(cancelled) = self.consume_boundary(halt, ledger)? {
             return Ok(PhaseOutcome::Cancelled(cancelled));
@@ -241,8 +252,7 @@ impl<'h> Turn<'h, ToolWave> {
             if let Some(cancelled) = self.consume_boundary(still_going(index), ledger)? {
                 return Ok(PhaseOutcome::Cancelled(cancelled));
             }
-            let (timed, answered) = self.alone(tools, call)?;
-            self.account(ledger, &mut exchange, timed, answered)?;
+            self.alone(ledger, &mut exchange, tools, call)?;
         }
         Ok(self.recorded(calls, exchange))
     }
@@ -255,42 +265,46 @@ impl<'h> Turn<'h, ToolWave> {
 
     /// One call through all three stages on this thread: how every call
     /// after the leading reads runs. The start is read once the call is
-    /// admitted; the answer before the face's `account` packages it.
-    fn alone<'c>(
+    /// admitted; the answer before the face's `account` packages it. A
+    /// cleared call that does not only read is an outside effect, so its
+    /// `tool_called` and everything held before it are made durable before
+    /// its tool runs: the intent is on the ledger first.
+    fn alone(
         &mut self,
+        ledger: &mut dyn Ledger,
+        exchange: &mut Exchange,
         tools: &mut dyn ConcurrentInvoke,
-        call: &'c ToolCall,
-    ) -> Result<(Timed<'c>, Result<ToolOutcome, AxError>), AxError> {
+        call: &ToolCall,
+    ) -> Result<(), AxError> {
         let admission = tools.admit(call, self.journal.stamp());
         let started = self.journal.read_moment()?;
+        self.intend(Intent::of(call, started, &*tools))?;
         let (answered_at, answered) = match admission {
             Admitted::Answered(answered) => (self.journal.read_moment()?, answered),
             Admitted::Cleared(ticket) => {
+                if !reads_only(&*tools, call) {
+                    self.journal.barrier(ledger)?;
+                }
                 let ran = tools.tool(&ticket).and_then(|tool| tool.invoke(call));
                 let answered_at = self.journal.read_moment()?;
                 (answered_at, tools.account(call, ticket, ran))
             }
         };
-        Ok((Timed::of(call, started, answered_at, &*tools), answered))
-    }
-
-    /// Writes one call's `tool_called` and `tool_result` lines and its
-    /// result block: the one place a wave's accounting happens, whichever
-    /// way the call was run.
-    fn account(
-        &mut self,
-        ledger: &mut dyn Ledger,
-        exchange: &mut Exchange,
-        timed: Timed<'_>,
-        answered: Result<ToolOutcome, AxError>,
-    ) -> Result<(), AxError> {
-        let Timed {
-            call,
+        let timing = Timing {
             started,
             answered: answered_at,
+        };
+        self.settle(exchange, call, timing, answered)
+    }
+
+    /// Appends one call's `tool_called` line.
+    fn intend(&mut self, intent: Intent<'_>) -> Result<(), AxError> {
+        let Intent {
+            call,
+            started,
             effect,
             render,
-        } = timed;
+        } = intent;
         let called = ToolCalled {
             id: call.id.clone(),
             name: call.name.clone(),
@@ -300,10 +314,22 @@ impl<'h> Turn<'h, ToolWave> {
             render,
         };
         self.journal.append_redacted(
-            ledger,
             Carried::ToolCalled { at: started.at },
             Payload::of(&called)?,
         )?;
+        Ok(())
+    }
+
+    /// Appends one call's `tool_result` line and pushes its result block:
+    /// the one place a wave's answers are accounted, whichever way the
+    /// call was run.
+    fn settle(
+        &mut self,
+        exchange: &mut Exchange,
+        call: &ToolCall,
+        timing: Timing,
+        answered: Result<ToolOutcome, AxError>,
+    ) -> Result<(), AxError> {
         let mut pictures = Vec::new();
         let (answer, content, is_error) = match answered {
             Ok(ToolOutcome {
@@ -334,7 +360,7 @@ impl<'h> Turn<'h, ToolWave> {
             tool_use_id: call.id.clone(),
             name: call.name.clone(),
             answer,
-            took_us: answered_at.since(started.us),
+            took_us: timing.answered.since(timing.started.us),
         };
         exchange.push_result(ContentBlock::ToolResult {
             tool_use_id: call.id.clone(),
@@ -346,8 +372,9 @@ impl<'h> Turn<'h, ToolWave> {
             attachments: pictures,
         });
         self.journal.append_redacted(
-            ledger,
-            Carried::ToolResult { at: answered_at.at },
+            Carried::ToolResult {
+                at: timing.answered.at,
+            },
             Payload::of(&result)?,
         )?;
         Ok(())
