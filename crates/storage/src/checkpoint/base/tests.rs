@@ -159,3 +159,50 @@ fn a_first_base_writes_one_pack_and_no_loose_object_at_any_file_count() {
         .collect();
     assert_eq!(counts, vec![(true, 0, 1); 3]);
 }
+
+/// Derived from `a_held_base_moves_head_only_from_what_it_read`
+/// (`crates/storage/spec/Checkpoint/Concurrent.lean`): a base that read
+/// "no HEAD" and finds a branch another writer created since is refused,
+/// and HEAD stays the other writer's commit.
+#[test]
+fn a_base_that_read_no_head_is_refused_once_another_writer_made_one() {
+    let tmp = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(tmp.path().join("shop")).unwrap();
+    std::fs::write(tmp.path().join("shop").join("a.md"), "a").unwrap();
+    let stale = Checkpoint::open(tmp.path()).unwrap();
+    Checkpoint::open(tmp.path())
+        .unwrap()
+        .ensure_base(&["other".to_owned()], TimeMs::new(1_000), &resident())
+        .unwrap();
+    let head = || {
+        git2::Repository::open(tmp.path())
+            .unwrap()
+            .head()
+            .unwrap()
+            .target()
+    };
+    let made = head();
+
+    let refused = stale.write_held(
+        &BaseOf {
+            scopes: &["shop".to_owned()],
+            t: TimeMs::new(2_000),
+            of: &resident(),
+        },
+        BaseTarget::Head,
+        &mut |_| {},
+    );
+    assert_eq!(
+        (
+            matches!(
+                refused,
+                Err(StorageError::Checkpoint {
+                    op: "move HEAD",
+                    ..
+                })
+            ),
+            head(),
+        ),
+        (true, made)
+    );
+}

@@ -26,9 +26,10 @@
 //! a person's own folder, so a commit per tool wave on their branch
 //! buries their history under the machine's bookkeeping. The checkpoint is a
 //! dangling commit, filed under `refs/sprawling/runs/<run>/<oid>`, and
-//! everything downstream works from the oid as it always did. Only
-//! `ensure_base` and `land` move HEAD, because a worktree branches from
-//! a commit and offered work has to be on a branch.
+//! everything downstream works from the oid as it always did. Only a
+//! base (`ensure_base`, and `base_checkpoint` on a city with no commit) and
+//! `land` move HEAD, because a worktree branches from a commit and offered
+//! work has to be on a branch.
 //!
 //! Specified by `crates/storage/spec/Checkpoint.lean` §8-8.
 
