@@ -24,6 +24,9 @@ action. -->
   interface Props {
     readonly text: string;
     readonly label: string;
+    // Where the label leads, when it names a resident whose room a
+    // person can open; absent for the User's own words.
+    readonly labelHref?: string | undefined;
     readonly at: number | undefined;
     readonly entry: ForkEntry | null;
     readonly run: RunId;
@@ -31,7 +34,7 @@ action. -->
     readonly onHover: (entry: ForkEntry | null) => void;
   }
 
-  const { text, label, at, entry, run, onFork, onHover }: Props = $props();
+  const { text, label, labelHref, at, entry, run, onFork, onHover }: Props = $props();
 
   const u = ui();
   const { lang } = u;
@@ -47,6 +50,6 @@ action. -->
     {text}
   </div>
   <div class="mt-tight text-note text-text-faint">
-    {label}{#if at !== undefined} · {clock($lang, at)}{/if}
+    {#if labelHref === undefined}{label}{:else}<a href={labelHref} class="text-text-quiet hover:text-text">{label}</a>{/if}{#if at !== undefined} · {clock($lang, at)}{/if}
   </div>
 </div>

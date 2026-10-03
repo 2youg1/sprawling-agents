@@ -7006,5 +7006,13 @@
   "talk_delegate_starts": {
     "en": "starts after this turn",
     "zh": "本回合后开始"
+  },
+  "talk_dispatched_by": {
+    "en": "dispatched by {who}",
+    "zh": "由 {who} 派来"
+  },
+  "talk_dispatched_city": {
+    "en": "dispatched by the city",
+    "zh": "由城派来"
   }
 }

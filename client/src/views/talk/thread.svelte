@@ -36,7 +36,7 @@
   import { heard, landed, lost } from "./arrivals.svelte";
   import { callWord } from "./calls";
   import { frozenSaid } from "./frozen";
-  import { called } from "./naming";
+  import { called, dispatcherOf } from "./naming";
   import { planFork } from "./forking";
   import { cutOff, silentRun } from "./silence";
   import type { Phase } from "./silence";
@@ -138,6 +138,26 @@
   const who = $derived(
     run.addr === null ? say($lang, "talk_resident") : called(run.addr, answer?.opening?.names?.mayor, $lang),
   );
+  // Who the opening task came from (`Opening.dispatched_by`): the User's
+  // own words are "you", a task a resident handed down names that
+  // resident and links to its room, and one the city's desk dispatched
+  // says so. The room and not the session, because the opening names
+  // the dispatching room and not the run it spoke from.
+  const from = $derived.by((): { readonly label: string; readonly href: string | undefined } => {
+    const by = dispatcherOf(answer?.opening?.dispatched_by);
+    if (by === null) return { label: say($lang, "talk_you"), href: undefined };
+    switch (by.kind) {
+      case "person":
+        return { label: say($lang, "talk_you"), href: undefined };
+      case "city":
+        return { label: say($lang, "talk_dispatched_city"), href: undefined };
+      case "resident":
+        return {
+          label: fill(say($lang, "talk_dispatched_by"), { who: called(by.address, answer?.opening?.names?.mayor, $lang) }),
+          href: toFragment({ kind: "talk", address: by.address }),
+        };
+    }
+  });
   // The frozen facts each round's head states: the session's model, its
   // effort and the mode its run was dispatched in on the first head, and
   // the model again only where a round answered with a different one.
@@ -243,7 +263,8 @@
   {#if task !== ""}
     <Person
       text={task}
-      label={say($lang, "talk_you")}
+      label={from.label}
+      labelHref={from.href}
       at={run.started ?? undefined}
       entry={taskEntry}
       run={run.run}

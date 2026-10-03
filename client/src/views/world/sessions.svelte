@@ -16,11 +16,14 @@
   // and says the model, effort and workspace of its last run and the
   // start of its last reply, cut to the width the row has
   // (`crates/wire/spec/Answer/Sessions.lean` D27).
+  // A session a resident handed down says which resident did, under its
+  // title (client D83).
   //
   // The rows are `core/stretches.ts`'s reading of the city's answers
   // (`stretches.svelte.ts`), and the tags are the person's preferences
   // as the city keeps them (`core/tags.ts`).
   import type { Snippet } from "svelte";
+  import { untrack } from "svelte";
 
   import type { RunBelief } from "../../core/belief";
   import { fill, say } from "../../core/lang";
@@ -32,9 +35,10 @@
   import type { Named } from "../../core/tags";
   import { ago, lasted } from "../../core/time";
   import { ui } from "../../ui";
-  import type { Address, Seq, Tag } from "../../wire";
+  import type { Address, RunId, Seq, Tag } from "../../wire";
   import Glyph from "../parts/glyph.svelte";
   import ContextBar from "./context_bar.svelte";
+  import { called, dispatcherOf } from "../talk/naming";
   import { ticker } from "../talk/timing";
   import SessionMenu from "./session_menu.svelte";
   import { askStretches } from "./stretches.svelte";
@@ -149,6 +153,40 @@
     return start.opened.carry === "handoff" ? "mailbox_start_carried" : "mailbox_start_new";
   }
 
+  // Who handed a dispatched session its work, read off the opening of
+  // its first run this page holds (`Opening.dispatched_by`): the session
+  // line says only that it was dispatched, not by whom. Asked once per
+  // such run, and keyed by the joined ids so a record that moves a run
+  // does not ask again.
+  const openers = $derived(
+    stretches.all.flatMap((stretch) => {
+      const first = stretch.runs.at(0);
+      return stretch.line.start === "dispatched" && first !== undefined ? [first.run] : [];
+    }),
+  );
+  const openersKey = $derived(openers.join("\n"));
+  let dispatchedBy = $state.raw<Readonly<Record<string, string | null>>>({});
+  $effect(() => {
+    const stops = (openersKey === "" ? [] : untrack(() => openers)).map((run) =>
+      u.conn.asking.ask({ rounds: { run } }).subscribe((answer) => {
+        if (answer === undefined || !("rounds" in answer)) return;
+        dispatchedBy = { ...untrack(() => dispatchedBy), [run]: answer.rounds.opening?.dispatched_by ?? null };
+      }),
+    );
+    return () => {
+      for (const stop of stops) stop();
+    };
+  });
+
+  // The resident a session's work was handed down by, in the words the
+  // thread's own opening uses; empty for a session the User or the city
+  // began, which the second line already says.
+  function delegatedBy(stretch: Stretch): string {
+    const first: RunId | undefined = stretch.runs.at(0)?.run;
+    const by = first === undefined ? null : dispatcherOf(dispatchedBy[first]);
+    return by?.kind === "resident" ? fill(say($lang, "talk_dispatched_by"), { who: called(by.address, null, $lang) }) : "";
+  }
+
   const DOT: Record<State, string> = {
     run: "bg-accent shadow-[0_0_0_3px_color-mix(in_oklch,var(--color-accent)_14%,transparent)]",
     ask: "bg-alert shadow-[0_0_0_3px_color-mix(in_oklch,var(--color-alert)_12%,transparent)]",
@@ -209,6 +247,9 @@
               </span>
               {#if !narrow}
                 <span class="figure text-note text-text-faint">{when(stretch, state)}</span>
+                {#if delegatedBy(stretch) !== ""}
+                  <span class="col-start-2 col-end-4 truncate text-note text-text-faint">{delegatedBy(stretch)}</span>
+                {/if}
                 <span class="col-start-2 col-end-4 line-clamp-2 text-note text-text-quiet">{about(stretch, last)}</span>
                 {#if ranOn(stretch) !== ""}
                   <span class="col-start-2 col-end-4 truncate text-note text-text-faint">{ranOn(stretch)}</span>
