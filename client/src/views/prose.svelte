@@ -19,6 +19,7 @@
   // inside its own box, which `refrain/laid.svelte` holds.
   import Laid from "./refrain/laid.svelte";
   import { laidReply } from "./reply.svelte";
+  import { copiedSource } from "./talk/copying";
 
   interface Props {
     readonly text: string;
@@ -28,9 +29,22 @@
 
   const laid = laidReply(() => text, "settled");
   const rest = $derived(text.slice(laid.reached));
+
+  // Copying the whole of it hands over its Markdown (talk/copying.ts);
+  // a selection that reaches past it is the page's, not this reply's.
+  function copy(event: ClipboardEvent): void {
+    const drawn = event.currentTarget;
+    const chosen = document.getSelection();
+    if (!(drawn instanceof HTMLElement) || chosen?.rangeCount !== 1) return;
+    if (!drawn.contains(chosen.getRangeAt(0).commonAncestorContainer)) return;
+    const source = copiedSource(chosen.toString(), drawn.textContent, text);
+    if (source === null || event.clipboardData === null) return;
+    event.clipboardData.setData("text/plain", source);
+    event.preventDefault();
+  }
 </script>
 
-<div>
+<div oncopy={copy}>
   <Laid blocks={laid.blocks} />
   {#if rest !== ""}
     <p class="my-snug whitespace-pre-wrap break-words leading-relaxed">{rest}</p>
