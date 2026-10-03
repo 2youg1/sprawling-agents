@@ -367,6 +367,11 @@ pub(super) const VERBS: &[Row] = &[
             ),
             flag("--until", Value("utc"), "only lines before this moment"),
             flag("--runs", Nothing, "one JSON line per run, with its parents"),
+            flag(
+                "--shells",
+                Nothing,
+                "one JSON line per shell interpreter: its calls and failures by class",
+            ),
         ],
         says: "read a city's ledger lines or its run tree, read-only",
         effect: Effect::ReadsOnly,

@@ -220,6 +220,16 @@ impl Family {
 }
 
 impl FailureClass {
+    /// The spelling a reader of the tally sees.
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            FailureClass::CommandNotFound => "command_not_found",
+            FailureClass::Syntax => "syntax",
+            FailureClass::Encoding => "encoding",
+        }
+    }
+
     /// Which class a shell result's failure falls in, or `None` for a
     /// success and for a failure no rule recognises.
     ///

@@ -120,7 +120,7 @@ impl From<std::io::Error> for ViewError {
 /// command line.
 pub(super) fn verb(read: &Arguments) -> ExitCode {
     let Some(city) = read.positional(1) else {
-        eprintln!("usage: sprawling view <city-dir> [--runs | filters]");
+        eprintln!("usage: sprawling view <city-dir> [--runs | --shells | filters]");
         return ExitCode::from(2);
     };
     let chosen = match Selection::read(read) {
@@ -135,6 +135,8 @@ pub(super) fn verb(read: &Arguments) -> ExitCode {
     let mut out = BufWriter::new(std::io::stdout().lock());
     let written = if read.has("--runs") {
         write_runs(&dir, &mut out)
+    } else if read.has("--shells") {
+        shells::write_shells(&dir, &mut out)
     } else if chosen.is_everything() && audience == Audience::Person {
         terminal::show(&dir)
     } else {
@@ -359,6 +361,8 @@ mod keys;
 mod list;
 #[path = "view/rounds.rs"]
 mod rounds;
+#[path = "view/shells.rs"]
+mod shells;
 #[cfg(test)]
 #[path = "view/span_tests.rs"]
 mod span_tests;
