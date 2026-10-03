@@ -105,7 +105,7 @@ fn outside(target: &Address, prefixes: Vec<String>, taint: &TaintSet) -> GateOut
             .with_nearby(prefixes)
             .with_recovery(
                 "a write domain widens in one place only, the building's \
-                 `.sprawling/RULES.toml`, and the `rules` tool is how you propose that edit",
+                 `.sprawling/RULES.toml`, which the User edits; ask the User for that change",
             ),
         ),
     }
@@ -148,7 +148,7 @@ fn not_writable(target: &Address, reason: DocumentReason) -> GateOutcome {
             )
             .with_recovery(
                 "the kinds of file this domain takes are declared in the building's \
-                 `.sprawling/RULES.toml`; propose a change to it through the `rules` tool",
+                 `.sprawling/RULES.toml`, which the User edits; ask the User to change it",
             ),
         ),
     }

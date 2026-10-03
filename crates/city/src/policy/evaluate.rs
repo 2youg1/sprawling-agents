@@ -143,8 +143,8 @@ fn refuse(subject: String) -> AxError {
     AxError::failure(AxCode::ConfigInvalid, "read a building's rules", subject).with_recovery(
         format!(
             "correct {RULES_FILE} in this building's reserved subtree, against the blank form \
-             a new building is laid out with; a resident cannot write it, and proposes a \
-             change through the `rules` tool instead"
+             a new building is laid out with; a resident cannot write it, and asks the \
+             User for the change instead"
         ),
     )
 }
