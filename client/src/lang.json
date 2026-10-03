@@ -7026,5 +7026,9 @@
   "format_docx_objects_one": {
     "en": "1 embedded object, not shown",
     "zh": "1 个嵌入对象，未显示"
+  },
+  "machine_walk_progress": {
+    "en": "install steps run",
+    "zh": "已运行的安装步骤"
   }
 }

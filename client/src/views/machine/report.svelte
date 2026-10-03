@@ -209,7 +209,10 @@ const STEP: Record<StepState, { readonly key: Key; readonly weight: Weight }> = 
 {#snippet steps(each: Walk)}
   {@const done = each.filter((step) => step.state === "done" || step.state === "failed").length}
   <div class="flex min-w-0 flex-col gap-snug border-y border-edge py-snug">
-    <Progress label={say($lang, "machine_progress_label")} {done} total={each.length} />
+    <!-- This bar counts the walk's steps, not the tier's items, so it is
+    named on the page: unnamed, it read as a second copy of the tier's. -->
+    <span class="text-note text-text-quiet">{say($lang, "machine_walk_progress")}</span>
+    <Progress label={say($lang, "machine_walk_progress")} {done} total={each.length} />
     <ol class="flex min-w-0 flex-col gap-tight">
       {#each each as step (step.name)}
         <li class="flex min-w-0 flex-wrap items-baseline gap-snug text-note">
