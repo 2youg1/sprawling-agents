@@ -486,9 +486,10 @@ budget:
 # The wall-clock readings, never gated: citysim's load scenarios, then
 # the two instruments that drive the city's own accounting loop - a relay
 # round trip and the gap a second dispatch leaves in a running one
-# (`crates/sprawling/Spec.lean` §8-84).
+# (`crates/sprawling/Spec.lean` §8-84) - and the phases of each tool,
+# its call and the secret scan of its result (`crates/runtime/Spec.lean`).
 #
-# The instruments are library tests, so `--lib` builds only the two
+# The instruments are library tests, so `--lib` builds only the three
 # library test binaries: an integration test would also link the
 # `sprawling` executable with the dev-dependency features (kernel and
 # agent_protocols `conformance`, storage `fault`), and on Windows and
@@ -496,7 +497,7 @@ budget:
 # next product build relinks it.
 bench:
     cargo run --release -p citysim --bin bench
-    cargo nextest run -p sprawling -p sprawling-accounting --release --lib --run-ignored only -E 'test(/::instrument_/)' --no-capture
+    cargo nextest run -p sprawling -p sprawling-accounting -p sprawling-runtime --release --lib --run-ignored only -E 'test(/::instrument_/)' --no-capture
 
 # The four-action pressure reading (tools/citysim/Spec.lean 8-5) - install,
 # startup, raise a city, open a session - measured, never gated.
