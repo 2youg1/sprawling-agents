@@ -84,11 +84,13 @@ fn a_serve_of_a_held_city_is_refused_and_lets_its_port_go() {
 }
 
 /// The phases of opening a served city, in the order `listen` does them
-/// (`crates/sprawling/spec/Assembly/Listening.lean` §8-121); a city `init` just formed holds three lines.
+/// (`crates/sprawling/spec/Assembly/Listening.lean` §8-121). The fold
+/// names how many lines the city holds, which the test reads off the
+/// ledger `init` wrote: one `skill_shelved` per shipped skill moves it.
 const OPENING_PHASES: [&str; 7] = [
     "bind",
     "open the ledger",
-    "fold 3 lines from genesis",
+    "lines from genesis",
     "cut the standing snapshot",
     "cut the views snapshot",
     "copy the views",
@@ -102,7 +104,11 @@ const OPENING_PHASES: [&str; 7] = [
 #[test]
 fn a_listening_city_says_what_opening_it_cost() {
     let city = tempfile::tempdir().expect("a temporary directory");
-    crate::assembly::init_city(city.path()).expect("a city forms");
+    let formed = crate::assembly::init_city(city.path()).expect("a city forms");
+    let held = runtime::replay::verify_ledger_dir(&formed.ledger_dir)
+        .expect("the formed ledger verifies")
+        .raw_lines()
+        .len();
     let journal = crate::serving::Journal::new(std::sync::Arc::new(crate::assembly::SystemClock));
     let mut heard = journal.lines().subscribe();
     let addr = std::net::TcpListener::bind("127.0.0.1:0")
@@ -150,6 +156,12 @@ fn a_listening_city_says_what_opening_it_cost() {
                 .unwrap_or_default()
         ),
         (1, OPENING_PHASES.to_vec()),
+        "the opening lines heard: {opening:?}"
+    );
+    assert!(
+        opening
+            .iter()
+            .all(|line| line.contains(&format!("fold {held} lines from genesis"))),
         "the opening lines heard: {opening:?}"
     );
     drop(listening);
