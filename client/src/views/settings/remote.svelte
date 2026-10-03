@@ -5,11 +5,13 @@
 
 <script lang="ts">
   // The remote group (client/Spec.lean §4-57): the device's half of the remote
-  // door. The door's own verbs live at the city's console and nowhere
-  // else (`crates/remote_access/Spec.lean` D4), so this group pairs the
-  // browser it runs in when the address bar carries an invitation, locks
-  // the door behind it, and forgets it; on the city's own machine it
-  // says what the door is.
+  // door, and the door's own controls. Pairing and revoking stay at the
+  // city's console (`crates/remote_access/Spec.lean` D4), so this group
+  // pairs the browser it runs in when the address bar carries an
+  // invitation, locks the door behind it, and forgets it; on the city's
+  // own machine it says what the door is. Opening the door and
+  // replacing the city key are on the wire behind a code the console
+  // prints, and closing is on the wire unguarded (`remote_door.svelte`).
   //
   // The seed is drawn once the pairing has landed, never before: a seed
   // shown for a pairing that then failed would be a key nobody pinned.
@@ -27,6 +29,7 @@
   import { toFragment } from "../../core/route";
   import { ui } from "../../ui";
   import type { Lack, Standing } from "./remote";
+  import RemoteDoor from "./remote_door.svelte";
   import RemoteState from "./remote_state.svelte";
 
   const u = ui();
@@ -107,21 +110,26 @@
   }
 </script>
 
-<RemoteState
-  {standing}
-  {keeps}
-  onPair={() => {
-    if (standing.kind === "invited" && !standing.busy) void pair(standing.invitation);
-  }}
-  onSeen={() => {
-    if (standing.kind === "seed") standing = { kind: "paired", device: standing.device, told: null, busy: false };
-  }}
-  onLock={() => {
-    if (standing.kind === "paired" && !standing.busy) void lock(standing.device);
-  }}
-  onForget={() => {
-    void forget().then(() => {
-      standing = { kind: "unpaired" };
-    });
-  }}
-/>
+<div class="flex flex-col gap-wide">
+  <RemoteState
+    {standing}
+    {keeps}
+    onPair={() => {
+      if (standing.kind === "invited" && !standing.busy) void pair(standing.invitation);
+    }}
+    onSeen={() => {
+      if (standing.kind === "seed") standing = { kind: "paired", device: standing.device, told: null, busy: false };
+    }}
+    onLock={() => {
+      if (standing.kind === "paired" && !standing.busy) void lock(standing.device);
+    }}
+    onForget={() => {
+      void forget().then(() => {
+        standing = { kind: "unpaired" };
+      });
+    }}
+  />
+  {#if standing.kind === "unpaired" || standing.kind === "unreadable" || standing.kind === "lacking" || standing.kind === "paired"}
+    <RemoteDoor />
+  {/if}
+</div>

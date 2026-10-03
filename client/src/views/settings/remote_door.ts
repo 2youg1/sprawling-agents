@@ -54,7 +54,30 @@ type Stepped = readonly [Door, DoorSent | null];
 // machine's answer: the page holds one refusal for every command, so a
 // refusal that arrives at any other time belongs to some other control.
 export function step(door: Door, event: DoorEvent): Stepped {
-  return event.kind === "press" ? [door, asked(event.opener)] : [door, null];
+  const phase = door.phase;
+  const same: Stepped = [door, null];
+  switch (event.kind) {
+    case "press":
+      return phase.kind === "idle" || phase.kind === "refused"
+        ? [{ phase: { kind: "requesting", opener: event.opener }, typed: "", focus: { kind: "opener", opener: event.opener } }, asked(event.opener)]
+        : same;
+    case "pending":
+      return phase.kind === "requesting" ? [{ phase: { kind: "awaiting", opener: phase.opener }, typed: "", focus: { kind: "input" } }, null] : same;
+    case "type":
+      return phase.kind === "awaiting" ? [{ ...door, typed: event.text }, null] : same;
+    case "submit":
+      return phase.kind === "awaiting" && door.typed !== ""
+        ? [{ phase: { kind: "confirming", opener: phase.opener }, typed: door.typed, focus: { kind: "input" } }, { kind: "confirm", code: door.typed }]
+        : same;
+    case "escape":
+      return phase.kind === "awaiting" ? [{ phase: { kind: "idle" }, typed: "", focus: { kind: "opener", opener: phase.opener } }, null] : same;
+    case "refusal":
+      return phase.kind === "requesting" || phase.kind === "confirming"
+        ? [{ phase: { kind: "refused", opener: phase.opener, code: event.code }, typed: "", focus: { kind: "opener", opener: phase.opener } }, null]
+        : same;
+    case "settled":
+      return phase.kind === "confirming" ? [{ phase: { kind: "idle" }, typed: "", focus: { kind: "opener", opener: phase.opener } }, null] : same;
+  }
 }
 
 function asked(opener: Opener): DoorSent {
@@ -74,17 +97,14 @@ export function answerOf(code: AxCode): DoorEvent {
 // The sentence a refused press is told in: a wrong or expired code asks
 // for a new press, a city with no console says where to run it, any
 // other code is shown as it came.
+const REFUSED: Partial<Readonly<Record<AxCode, Key>>> = {
+  E_GATE_DENIED: "remote_door_denied",
+  E_TOOL_UNAVAILABLE: "remote_door_no_console",
+  E_WIRE_MISMATCH: "remote_door_unknown",
+};
+
 export function refusedKey(code: AxCode): Key {
-  switch (code) {
-    case "E_GATE_DENIED":
-      return "remote_door_denied";
-    case "E_TOOL_UNAVAILABLE":
-      return "remote_door_no_console";
-    case "E_WIRE_MISMATCH":
-      return "remote_door_unknown";
-    default:
-      return "remote_door_refused";
-  }
+  return REFUSED[code] ?? "remote_door_refused";
 }
 
 // How long the door may stay open, as `/remote open --for` spells it; at

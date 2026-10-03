@@ -6882,5 +6882,89 @@
   "release_refused_registries": {
     "en": "Neither npm nor crates.io could be asked, so nothing here was checked.",
     "zh": "npm 与 crates.io 都没能问到，所以这里什么都没有核对过。"
+  },
+  "remote_door": {
+    "en": "the door",
+    "zh": "门"
+  },
+  "remote_door_about": {
+    "en": "Opening the door and replacing the city key each ask for a one-time code that the city prints on its own console, the terminal where sprawling serve runs; a page or a resident's tool cannot read it. Closing needs no code.",
+    "zh": "开门与更换城钥匙都要一个只用一次的确认码，城把它印在自己的控制台上，也就是跑着 sprawling serve 的那个终端；页面和居民的工具都读不到它。关门不要码。"
+  },
+  "remote_door_lasting": {
+    "en": "open for",
+    "zh": "开多久"
+  },
+  "remote_door_open": {
+    "en": "open the door",
+    "zh": "开门"
+  },
+  "remote_door_open_note": {
+    "en": "asks the city to open the remote door for the time chosen beside it; the city then prints a code on its console",
+    "zh": "请城把远程门开到旁边选的时长；城随后在控制台上印一个确认码"
+  },
+  "remote_door_close": {
+    "en": "close the door",
+    "zh": "关门"
+  },
+  "remote_door_close_note": {
+    "en": "closes the remote door now and ends every remote session; no code is needed",
+    "zh": "现在关上远程门，结束每一个远程会话；不要确认码"
+  },
+  "remote_key_replace": {
+    "en": "replace the city key",
+    "zh": "更换城钥匙"
+  },
+  "remote_key_replace_note": {
+    "en": "makes a new city key; every paired device must pair again, and revoked devices stay revoked",
+    "zh": "换一把新的城钥匙；每台配对过的设备都要重新配对，撤销过的设备仍是撤销的"
+  },
+  "remote_key_where": {
+    "en": "The city key rests in the city's vault: Windows Credential Manager and the macOS Keychain keep it across restarts; on Linux the kernel keyring keeps it until the computer reboots, unless the city uses the encrypted vault file.",
+    "zh": "城钥匙放在城的 vault 里：Windows 凭据管理器与 macOS 钥匙串跨重启保管；Linux 的内核密钥环只保管到这次开机结束，除非城用加密的 vault 文件。"
+  },
+  "remote_door_code": {
+    "en": "code from the city's console",
+    "zh": "控制台上的确认码"
+  },
+  "remote_door_code_help": {
+    "en": "type the eight-character code the city has just printed on its console; Esc cancels",
+    "zh": "输入城刚在控制台上印出的 8 个字符；Esc 取消"
+  },
+  "remote_door_confirm": {
+    "en": "confirm",
+    "zh": "确认"
+  },
+  "remote_door_confirm_note": {
+    "en": "sends the code back to the city, which then does what was pressed",
+    "zh": "把确认码交回城，城随后做按下的那件事"
+  },
+  "remote_door_denied": {
+    "en": "the code was wrong, already used, or expired; press again and type the new code the console prints",
+    "zh": "码不对、已用过或已过期；再按一次，输入控制台上新印的码"
+  },
+  "remote_door_no_console": {
+    "en": "the city has no console to print a code on; run sprawling serve in the city's own terminal",
+    "zh": "城没有可以印码的控制台；在城自己的终端里跑 sprawling serve"
+  },
+  "remote_door_unknown": {
+    "en": "this city does not carry the door commands yet; update the city, or use the console",
+    "zh": "这座城还不认识门的命令；更新城，或在控制台上做"
+  },
+  "remote_door_refused": {
+    "en": "the city refused: {code}",
+    "zh": "城拒绝了：{code}"
+  },
+  "remote_door_done_door": {
+    "en": "the code was sent; the city's console says whether the door opened",
+    "zh": "确认码已送出；门开没开，城的控制台上写着"
+  },
+  "remote_door_done_key": {
+    "en": "the code was sent; the city's console says whether the key was replaced",
+    "zh": "确认码已送出；钥匙换没换，城的控制台上写着"
+  },
+  "remote_door_closing": {
+    "en": "the close was sent; the city's console says when the door closed",
+    "zh": "关门已送出；门何时关上，城的控制台上写着"
   }
 }
