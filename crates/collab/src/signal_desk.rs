@@ -91,7 +91,7 @@ pub struct SignalDesk {
     pub(crate) who: String,
     reach: Address,
     at: TimeMs,
-    inbox: Inbox,
+    pub(crate) inbox: Inbox,
     pub(crate) slot: Mailslot,
     pub(crate) post: Post,
     pub(crate) held: Vec<Signal>,
@@ -217,7 +217,8 @@ impl SignalDesk {
     }
 
     /// Gives the room its inbox back, with every signal this run held
-    /// unread and every one still in the slot put back at the front.
+    /// unread, the reply kept for its wait, and every one still in the
+    /// slot put back at the front.
     /// The caller must do this on both the failing and the succeeding
     /// path — an inbox left in a dropped desk is a queue the city forgot
     /// it had. A slot that cannot be read is left for the room table,
@@ -225,6 +226,7 @@ impl SignalDesk {
     #[must_use]
     pub fn take_inbox(&mut self) -> Inbox {
         let mut unread = std::mem::take(&mut self.held);
+        unread.extend(self.waiting.as_mut().and_then(ReplyWait::unkeep));
         if let Ok(arrived) = self.slot.take() {
             unread.extend(arrived);
         }
@@ -242,9 +244,17 @@ impl SignalDesk {
 
     /// Moves what the city dropped into the slot since the last safe
     /// point into the lent queue.
+    /// While a wait is asked, the first reply from the room waited on
+    /// is kept for it instead (collab D15).
     fn collect(&mut self) -> Result<(), AxError> {
         for signal in self.slot.take()? {
-            self.admit(&signal)?;
+            let queued = match self.waiting.as_mut() {
+                Some(wait) => wait.keep(signal, &self.room),
+                None => Some(signal),
+            };
+            if let Some(signal) = queued {
+                self.admit(&signal)?;
+            }
         }
         Ok(())
     }

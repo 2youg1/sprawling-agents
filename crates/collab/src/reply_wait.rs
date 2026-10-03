@@ -20,6 +20,7 @@ use kernel::event::record::{SignalId, SignalWaitEnded, SignalWaitStarted, WaitEn
 use kernel::{Address, AxCode, AxError, TimeMs};
 use serde_json::{Map, Value};
 
+use crate::inbox::Signal;
 use crate::signal_desk::{SignalDesk, SignalEffect};
 use crate::signal_tool::PATIENCE_MS;
 
@@ -27,11 +28,14 @@ use crate::signal_tool::PATIENCE_MS;
 /// it, and — once the run reached its safe point — the reading of the
 /// injected clock that ends it. The deadline is taken at the stop, not
 /// at the send, as `Collab.Delivery.step`'s `park` takes `clock`.
+/// `kept` is a reply that arrived after the send and before the stop,
+/// held here rather than queued (collab D15, `spec/Delivery.lean` §8).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ReplyWait {
     on: Address,
     signal: SignalId,
     deadline: Option<TimeMs>,
+    kept: Option<Signal>,
 }
 
 impl ReplyWait {
@@ -40,7 +44,29 @@ impl ReplyWait {
             on,
             signal,
             deadline: None,
+            kept: None,
         }
+    }
+
+    /// Keeps `signal` for this wait when it is the first reply to arrive
+    /// (`Collab.Delivery.Early.collect`); hands it back otherwise, for
+    /// the queue.
+    pub(crate) fn keep(&mut self, signal: Signal, room: &Address) -> Option<Signal> {
+        if self.kept.is_none() && self.answers(&signal, room) {
+            self.kept = Some(signal);
+            return None;
+        }
+        Some(signal)
+    }
+
+    /// The reply kept for this wait, taken out of it: what a run that
+    /// leaves before its stop puts back in the queue.
+    pub(crate) fn unkeep(&mut self) -> Option<Signal> {
+        self.kept.take()
+    }
+
+    fn answers(&self, signal: &Signal, room: &Address) -> bool {
+        signal.from() == self.on.as_str() && signal.room() == room
     }
 
     /// The deadline this wait ends at, fixed at its first safe point,
@@ -142,9 +168,9 @@ impl SignalDesk {
             (self.post.0)(&SignalEffect::WaitStarted(started))?;
             self.waiting = Some(wait.clone());
         }
-        let mut reply = None;
+        let mut reply = wait.unkeep();
         for signal in self.slot.take()? {
-            if reply.is_none() && signal.from() == wait.on.as_str() && signal.room() == &self.room {
+            if reply.is_none() && wait.answers(&signal, &self.room) {
                 reply = Some(signal);
             } else {
                 self.admit(&signal)?;
@@ -189,15 +215,22 @@ impl SignalDesk {
     /// Ends this run's wait because the run is leaving its room
     /// (`Collab.Delivery.City.vacate`); nothing when it was not waiting,
     /// and no line when it left before its first safe point, because no
-    /// `signal_wait_started` was written for it.
+    /// `signal_wait_started` was written for it. A reply kept for the
+    /// wait goes back to the front of the queue (`Collab.Delivery.Early.leave`).
     ///
     /// # Errors
     /// Propagates a post that fails; the wait is then still recorded as
     /// open, which the ledger reader reads as a wait the run left.
     pub fn wait_left(&mut self) -> Result<(), AxError> {
-        match self.waiting.take() {
-            Some(wait) if wait.deadline.is_some() => (self.post.0)(&wait.ended(WaitEnd::Left)),
-            Some(_) | None => Ok(()),
+        let Some(mut wait) = self.waiting.take() else {
+            return Ok(());
+        };
+        if let Some(kept) = wait.unkeep() {
+            self.inbox.give_back(vec![kept]);
+        }
+        match wait.deadline {
+            Some(_) => (self.post.0)(&wait.ended(WaitEnd::Left)),
+            None => Ok(()),
         }
     }
 }
