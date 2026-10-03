@@ -37,7 +37,21 @@ fn a_child_is_read_while_it_runs_and_is_gone_once_it_exits() {
     let mut child = sleeper();
     let mut tree = Tree::open(child.id());
 
-    let running = tree.read(Duration::ZERO);
+    // A child just spawned may not be in the table, or not yet hold its
+    // own memory, on a loaded runner; the read is asked again until it is,
+    // and every ask is counted below.
+    let mut asked = 0_u64;
+    let running = std::iter::repeat_with(|| {
+        asked += 1;
+        let reading = tree.read(Duration::ZERO);
+        if reading.is_none_or(|reading| reading.working_set_bytes == 0) {
+            std::thread::sleep(Duration::from_millis(25));
+        }
+        reading
+    })
+    .take(400)
+    .find(|reading| reading.is_some_and(|reading| reading.working_set_bytes > 0))
+    .flatten();
     child.kill().unwrap();
     child.wait().unwrap();
     drop(child);
@@ -61,7 +75,7 @@ fn a_child_is_read_while_it_runs_and_is_gone_once_it_exits() {
             Reads {
                 own: 0,
                 machine: 0,
-                table: 2,
+                table: asked + 1,
             },
             Some(first.working_set_bytes),
         )
