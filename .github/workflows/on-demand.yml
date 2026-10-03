@@ -144,7 +144,10 @@ jobs:
           echo "SPRAWLING_BROWSER=$shell" >> "$GITHUB_ENV"
       - name: every page, both widths, both schemes
         run: just shots
+      # Uploaded on a failed run too: target/shots/engine holds each
+      # case's engine stderr, which is what a stalled case is read from.
       - uses: actions/upload-artifact@v7
+        if: always()
         with:
           name: shots-${{ steps.tree.outputs.sha }}
           path: target/shots
