@@ -400,6 +400,7 @@ ARCHITECTURE.md §3「nothing here is published」是这条判定成立的前提
 | D27 | `read` 与 `edit` 答出的版本就是 `plan finish` 收的那个形式 | `crates/kernel/spec/Locator.lean` |
 | D32 | 同步 `send` 的一次等待是一对种类 `signal_wait_started`／`signal_wait_ended` | `crates/kernel/spec/Event/Record.lean` |
 | D35 | crates.io 的答案只按版本号判，与 npm 的答案在每一对版本号不同的发布上相同 | `crates/kernel/spec/Release.lean` |
+| D36 | 没报的缓存数是「没报」，不是 0 | `crates/kernel/spec/Model.lean` |
 | D37 | 发信与派活各有自己的呈现意图 | `crates/kernel/spec/Tool.lean` |
 -/
 
