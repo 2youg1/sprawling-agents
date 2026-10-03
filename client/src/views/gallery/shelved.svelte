@@ -103,6 +103,14 @@
   export function answered(query: Query): Answer | undefined {
     return typeof query === "object" && "skills" in query ? { skills: SHELVED } : undefined;
   }
+
+  // A new city's shelves: nothing on any of them, which is the state the
+  // empty line has to turn into a next step rather than a dead end.
+  function bare(query: Query): Answer | undefined {
+    return typeof query === "object" && "skills" in query
+      ? { skills: { building: HALL, skills: [], missing: [] } }
+      : undefined;
+  }
 </script>
 
 <script lang="ts">
@@ -113,6 +121,12 @@
 
 <Case label="settings · the shelves one building reads from">
   <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} answers={answered}>
+    <SkillsSection />
+  </Stand>
+</Case>
+
+<Case label="settings · empty shelves say where a skill goes">
+  <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} answers={bare}>
     <SkillsSection />
   </Stand>
 </Case>

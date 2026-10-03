@@ -100,40 +100,54 @@
         {#each answer.skills as skill (skillId(skill))}
           {@const place = placeOf(skill.shelf, $lang)}
           <li class="border-b border-edge">
+            <!-- Two lines: what the skill is (its name and the summary
+                 its SKILL.md opens with), then where it lives - the
+                 shelf, the file on it, and the two qualifiers - so a
+                 User who finds a name twice can see which copy runs
+                 read. -->
             <button
               type="button"
               disabled={place.at === null}
-              class="flex w-full min-w-0 items-baseline gap-base py-snug text-left text-note hover:text-text disabled:cursor-default disabled:hover:text-inherit"
+              class="flex w-full min-w-0 flex-col gap-tight py-snug text-left text-note hover:text-text disabled:cursor-default disabled:hover:text-inherit"
               onclick={() => {
                 open(place.at);
               }}
             >
-              <span class="shrink-0 font-mono text-text-quiet">{skill.name}</span>
-              <span class="shrink-0 text-text-faint">{place.word}</span>
-              <span class="min-w-0 flex-1 truncate text-text-faint">{skill.disclosure}</span>
-              <!-- The two trailing qualifiers shrink; they do not hold
-                  their width against the row. Five cells were `shrink-0`
-                  except the one in the middle, so once the four fixed
-                  ones and their gaps passed the pane's width the last of
-                  them was painted outside the button and over the column
-                  beside it. The name and the shelf keep their width
-                  because they are what identifies the row; whether it is
-                  admitted and who pinned it are qualifiers, and a
-                  qualifier that has to be cut short is still read. -->
-              <span class="min-w-0 truncate text-text-faint">
-                {skill.admitted ? say($lang, "skills_admitted") : say($lang, "skills_not_admitted")}
+              <span class="flex w-full min-w-0 items-baseline gap-base">
+                <span class="shrink-0 font-mono text-text-quiet">{skill.name}</span>
+                <span class="min-w-0 flex-1 truncate text-text-faint">{skill.disclosure}</span>
               </span>
-              <span class="min-w-0 truncate text-text-faint">
-                {skill.pinned_by.length > 0
-                  ? fill(say($lang, "skills_used_by"), { n: String(skill.pinned_by.length) })
-                  : say($lang, "skills_used_never")}
+              <span class="flex w-full min-w-0 items-baseline gap-base">
+                <span class="shrink-0 text-text-faint">{place.word}</span>
+                <span class="min-w-0 flex-1 truncate font-mono text-text-faint">{place.at ?? ""}</span>
+                <!-- The two trailing qualifiers shrink; they do not hold
+                    their width against the row. Five cells were `shrink-0`
+                    except the one in the middle, so once the four fixed
+                    ones and their gaps passed the pane's width the last of
+                    them was painted outside the button and over the column
+                    beside it. The name and the shelf keep their width
+                    because they are what identifies the row; whether it is
+                    admitted and who pinned it are qualifiers, and a
+                    qualifier that has to be cut short is still read. -->
+                <span class="min-w-0 truncate text-text-faint">
+                  {skill.admitted ? say($lang, "skills_admitted") : say($lang, "skills_not_admitted")}
+                </span>
+                <span class="min-w-0 truncate text-text-faint">
+                  {skill.pinned_by.length > 0
+                    ? fill(say($lang, "skills_used_by"), { n: String(skill.pinned_by.length) })
+                    : say($lang, "skills_used_never")}
+                </span>
               </span>
             </button>
           </li>
         {/each}
       </ul>
     {:else}
-      <p class="text-text-faint">{say($lang, "skills_empty")}</p>
+      <!-- An empty shelf says what to do next: where a skill goes and
+           how a building's runs come to read it. The audit and usage
+           panels a skill will carry are not drawn until the city
+           answers for them, so no empty frame passes for data. -->
+      <p class="text-text-faint">{say($lang, "skills_empty_next")}</p>
     {/if}
     {#if answer.missing.length > 0}
       <p class="mt-base text-note text-alert">

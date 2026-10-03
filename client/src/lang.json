@@ -6538,5 +6538,17 @@
   "event_skill_audited": {
     "en": "a skill was audited",
     "zh": "审了一个 skill"
+  },
+  "setup_skills_building": {
+    "en": "this building's own shelf",
+    "zh": "这栋楼自己的书架"
+  },
+  "setup_skills_how": {
+    "en": "put a skill in a section folder on either shelf - a folder with a SKILL.md, such as engineering/review/SKILL.md - then name it in the building's RULES.toml so its runs read it",
+    "zh": "把技能放进任一书架下的分区文件夹：一个带 SKILL.md 的文件夹，例如 engineering/review/SKILL.md；再在楼的 RULES.toml 里写上它的名字，这栋楼的 run 才会读它"
+  },
+  "skills_empty_next": {
+    "en": "no shelf this building reads holds a skill yet: put a folder with a SKILL.md into the city's library or this building's shelf - Settings, Skills shows both folders - and it appears here",
+    "zh": "这栋楼读的书架上还没有技能：把带 SKILL.md 的文件夹放进城的书库或这栋楼的书架（两个文件夹在「设置 → 技能」里），它就会出现在这里"
   }
 }

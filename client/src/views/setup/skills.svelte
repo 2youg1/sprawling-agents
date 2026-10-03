@@ -46,7 +46,7 @@
 </script>
 
 <div class="flex min-w-0 flex-col gap-wide">
-  <Shelves />
+  <Shelves building={chosen} />
   <!-- The two columns are grid columns rather than flex ones because a
        column of prose has a width below which it stops being prose: the
        flex row let the reading pane shrink toward nothing at a narrow
