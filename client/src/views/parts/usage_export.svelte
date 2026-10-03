@@ -55,7 +55,7 @@
   }
 </script>
 
-<div class="flex items-center gap-snug">
+<div class="flex flex-wrap items-center gap-snug">
   <Button label={say($lang, "usage_export_jsonl")} tone="quiet" loading={waiting === "jsonl"} onPress={() => { press("jsonl"); }} />
   <Button label={say($lang, "usage_export_csv")} tone="quiet" loading={waiting === "csv"} onPress={() => { press("csv"); }} />
 </div>

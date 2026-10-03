@@ -65,7 +65,7 @@
 </script>
 
 <section class="flex min-w-0 flex-col gap-base">
-  <div class="flex items-baseline justify-between gap-base">
+  <div class="flex flex-wrap items-baseline justify-between gap-base">
     <h2 class="text-note text-text-faint">{say($lang, "usage_skills_title")}</h2>
     <UsageExport what="skills" />
   </div>
