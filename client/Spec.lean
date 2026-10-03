@@ -54,7 +54,7 @@ import client.spec.Views.Workspace
 | `client/spec/Views/Guide.lean` | 启动时进不进上手指南，跳过之后落在哪 | （§7G、D54） |
 | `client/spec/Views/Door.lean` | 远程组的门开关、「更换城钥匙」与确认码输入框：焦点、Escape 与拒绝 | （4-57） |
 
-其余标签都在本文件：§3-1、§3-2 在 §8，§3-4 在 §3，其余 §4-n 与 §7C、§7G、§7K、§7L、§7N 在 §10，§7-8 在 §4，§7-9 在 §13；决定 D1 至 D48（含 D42a）、D52 至 D55、D72、D78、D80 与 D82 在 §10 之后，D60 与 D73 在 `client/spec/Views/Workspace.lean`。
+其余标签都在本文件：§3-1、§3-2 在 §8，§3-4 在 §3，其余 §4-n 与 §7C、§7G、§7K、§7L、§7N 在 §10，§7-8 在 §4，§7-9 在 §13；决定 D1 至 D48（含 D42a）、D52 至 D55、D72、D78、D80、D81 与 D82 在 §10 之后，D60 与 D73 在 `client/spec/Views/Workspace.lean`。
 -/
 
 /-! ## 2 验收标准
