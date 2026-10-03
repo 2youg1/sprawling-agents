@@ -13,7 +13,7 @@
 use kernel::Address;
 
 use super::family::{GECKO, WEBKIT};
-use super::table::{CHROMEDRIVER, MSEDGEDRIVER, SHELL};
+use super::table::{CHROMEDRIVER, MSEDGEDRIVER, PWSH, SHELL};
 use super::{Finding, Presence};
 
 /// The bits a building declares. One lives in `RULES.toml`, one in the
@@ -24,17 +24,23 @@ use super::{Finding, Presence};
 pub(crate) struct Bits {
     pub(crate) browser: bool,
     pub(crate) shell: bool,
+    /// Which interpreter that shell runs under; only read when `shell`.
+    pub(crate) interpreter: kernel::Interpreter,
 }
 
 /// One thing a building can ask this machine for.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(crate) enum Capability {
     Browser,
+    /// The platform's own shell.
     Shell,
+    /// PowerShell 7, for a building whose shell runs under it.
+    Pwsh,
 }
 
 impl Capability {
-    pub(crate) const ALL: [Capability; 2] = [Capability::Browser, Capability::Shell];
+    pub(crate) const ALL: [Capability; 3] =
+        [Capability::Browser, Capability::Shell, Capability::Pwsh];
 
     /// The items of which any one satisfies this capability, first
     /// choice first. The Gecko family leads because it needs no driver;
@@ -44,6 +50,7 @@ impl Capability {
         match self {
             Capability::Browser => &[GECKO, CHROMEDRIVER, MSEDGEDRIVER, WEBKIT],
             Capability::Shell => &[SHELL],
+            Capability::Pwsh => &[PWSH],
         }
     }
 
@@ -61,13 +68,15 @@ impl Capability {
         match self {
             Capability::Browser => "browser = true",
             Capability::Shell => "sandbox.shell = true",
+            Capability::Pwsh => "sandbox.interpreter = \"pwsh\"",
         }
     }
 
     fn asked_by(self, bits: &Bits) -> bool {
         match self {
             Capability::Browser => bits.browser,
-            Capability::Shell => bits.shell,
+            Capability::Shell => bits.shell && bits.interpreter == kernel::Interpreter::System,
+            Capability::Pwsh => bits.shell && bits.interpreter == kernel::Interpreter::Pwsh,
         }
     }
 }

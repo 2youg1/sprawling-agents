@@ -55,6 +55,7 @@ fn bits_of(city_root: &Path, building: &Address) -> Result<Bits, AxError> {
     Ok(Bits {
         browser: rules.browser(),
         shell: config.sandbox.shell,
+        interpreter: config.sandbox.interpreter,
     })
 }
 

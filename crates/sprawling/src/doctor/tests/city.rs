@@ -35,6 +35,7 @@ fn a_building_that_asks_for_a_browser_is_named_when_this_machine_has_none() {
     let bits = Bits {
         browser: true,
         shell: false,
+        interpreter: kernel::Interpreter::System,
     };
     let lacking = lacks(&lab(), &bits, &findings);
     assert_eq!(lacking.len(), 1);
@@ -58,8 +59,37 @@ fn a_building_that_asks_for_a_browser_is_named_when_this_machine_has_none() {
     let nothing_asked = Bits {
         browser: false,
         shell: false,
+        interpreter: kernel::Interpreter::System,
     };
     assert!(lacks(&lab(), &nothing_asked, &findings).is_empty());
+}
+
+/// A building whose shell runs under PowerShell 7 is judged against
+/// the pwsh row: named when pwsh is missing even though the platform's
+/// shell is here, and not judged against the platform's shell at all.
+#[test]
+fn a_building_that_runs_its_shell_under_pwsh_is_named_when_pwsh_is_missing() {
+    let findings = examine(&ScriptedMachine::missing(&["pwsh"]));
+    let bits = Bits {
+        browser: false,
+        shell: true,
+        interpreter: kernel::Interpreter::Pwsh,
+    };
+    let lacking = lacks(&lab(), &bits, &findings);
+    assert_eq!(
+        lacking
+            .iter()
+            .map(|lack| lack.capability)
+            .collect::<Vec<_>>(),
+        vec![Capability::Pwsh]
+    );
+    let line = lack_line(&lacking[0]);
+    assert!(line.contains("sandbox.interpreter = \"pwsh\""), "{line}");
+    let system = Bits {
+        interpreter: kernel::Interpreter::System,
+        ..bits
+    };
+    assert!(lacks(&lab(), &system, &findings).is_empty());
 }
 
 /// Every capability bit is judged, and each names the items it tries.
@@ -113,6 +143,7 @@ fn a_building_whose_rules_will_not_read_is_reported_not_skipped() {
         Some(Bits {
             browser: true,
             shell: false,
+            interpreter: kernel::Interpreter::System,
         })
     );
     assert!(
