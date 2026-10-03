@@ -372,3 +372,6 @@ mod tests;
 
 #[cfg(test)]
 mod sending_tests;
+
+#[cfg(test)]
+mod delegating_tests;
