@@ -51,18 +51,21 @@
 | `LocalOnly` | 放宽访问、够到凭证或城所在的宿主机、改变治理这座城的东西：接端点、选模型、建楼拆楼、写规则与配置、装东西、开文件管理器 | 恒不带进来，不论权限 |
 
 - **新加的 Command 一律 `LocalOnly`**，除非人决定一台不在电脑旁的设备可以做它。`Act` 与 `Read` 是一次决定，不是默认值；表里一行缺 `class` 格，`xtask wiring` 点名那一行。
-- `class` 只判 Command。`Ask` 与 `Monitor` 两种帧属 `Read`；设备发来的 `Hello` 由中继换成城自己的令牌再发（§8-66）；远程门自己的动词（开门、配对、撤销）不在线上，表里没有它们（remote_access D4）。
+- `class` 只判 Command。`Ask` 与 `Monitor` 两种帧属 `Read`；设备发来的 `Hello` 由中继换成城自己的令牌再发（§8-66）；远程门的配对与撤销不在线上，开门、关门、更换城钥匙与它们的确认在线上的方式见下面四行（remote_access D4）。
 - 这一列是权威，中继按它判，`xtask wiring` 把表与中继的穷尽匹配（`bin::outside::verbs::command_class`）逐行对照（§8-65）。
 
-**远程门的三个动词尚不在线上。** 设置页要开关远程门、更换城钥匙（Roadmap 的 A7），它们上线时是下面三行；在那之前 `inductive Command` 没有它们，`xtask wiring` 与 `specalign` 照旧对照今天的枚举。
+**远程门的四个动词尚不在线上。** 设置页要开关远程门、更换城钥匙（Roadmap 的 A7），remote_access D4 定下它们上线的方式；它们随 `remote_access::confirm`（crates/remote_access/Spec.lean §3）一起进 `inductive Command`，在那之前 `xtask wiring` 与 `specalign` 照旧对照今天的枚举。
 
-| Command | 载荷 | reach | class | 执行者做的事 |
-|---|---|---|---|---|
-| `OpenRemoteDoor` | `lasting_ms: u64`（一分钟到七天，与控制台 `--for` 同一条界） | `client` | `LocalOnly` | `Doorway::open` 与远程监听，同 `/remote open`（`crates/sprawling/spec/Outside.lean` §8-140） |
-| `CloseRemoteDoor` | 无 | `client` | `LocalOnly` | `Doorway::close(Console)`，同 `/remote close` |
-| `ReplaceCityKey` | 无 | `client` | `LocalOnly` | `Doorway::replace_key`，同 `/remote replace-key`；门开着时以 `E_BUSY` 拒 |
+| Command | 载荷 | reach | class | 守卫 | 执行者做的事 |
+|---|---|---|---|---|---|
+| `OpenRemoteDoor` | `lasting_ms: u64`（一分钟到七天，与控制台 `--for` 同一条界） | `client` | `LocalOnly` | 控制台确认 | `Confirm::request`，在控制台印出确认码，答 `E_APPROVAL_PENDING` |
+| `ReplaceCityKey` | 无 | `client` | `LocalOnly` | 控制台确认 | 同上 |
+| `ConfirmRemoteDoor` | `code: String`（控制台印出的确认码，大小写、空白与连字符不论） | `client` | `LocalOnly` | 它自己就是确认 | `Confirm::confirm` 取回动词：开门走 `Doorway::open` 与远程监听，同 `/remote open`；换钥匙走 `Doorway::replace_key`，同 `/remote replace-key`，门开着时以 `E_BUSY` 拒（`crates/sprawling/spec/Outside.lean` §8-140） |
+| `CloseRemoteDoor` | 无 | `client` | `LocalOnly` | 无 | `Doorway::close(Console)`，同 `/remote close` |
 
-三行都是 `LocalOnly`：一台远程设备开不了门、换不了钥匙，不论它的权限，因为门要保护的正是从城外来的那一端。它们上线之前要先改写 remote_access D4：D4 今天说开门、配对、撤销只在控制台，理由是 agent 拿到的浏览器工具能驱动本地页面，一个页面上的开关它也点得到。改写 D4 要回答的就是这一点：本地页面发来的这三条帧，与 agent 的浏览器工具发来的同样三条，执行者如何区分，或者为什么不必区分。配对（发邀请）是同一个问题，A7 要求设置页也能配对时一并回答。
+- **守卫一列说一帧到了执行者之后还要什么**：「控制台确认」的请求本身什么也不做，城取一个确认码、只印在城的控制台上，紧接着的一帧 `ConfirmRemoteDoor` 带回它、且在它到期之前（期限写在 crates/remote_access/Spec.lean §3），城才做那个动词（crates/remote_access/spec/Confirm.lean）。理由：城的回环端口上任何本地客户端都发得出这几帧，包括驱动页面的浏览器工具，而控制台的输出不进任何一帧，所以只有读得到控制台的那一位能确认。关门不要守卫，因为它只减少访问（remote_access D5）。改一个动词的守卫是这一格与执行者里的一臂。
+- **四行都是 `LocalOnly`**：一台远程设备开不了门、换不了钥匙，不论它的权限，因为门要保护的正是从城外来的那一端；远程设备锁门走封装的锁门字节（remote_access D13），不走 `CloseRemoteDoor`。
+- **配对不在这张表里**：邀请是持有即用的秘密，显示在页面上就会被驱动页面的工具读到（remote_access D4），所以配对留在控制台，页面给分步说明与可复制的一行。
 
 **`client` 而尚未落地的三个**（`HandOff`／`PutShelved`／`BatchByBuilding`）今天由 `not_built` 作答，
 所以门对它们要求的是**客户端不画**——`not_built` 的 rustdoc 说的就是这件事，现在有机器看着了。

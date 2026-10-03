@@ -4,15 +4,16 @@
 -- Copyright (c) 2026 2youg1 and the sprawling contributors
 
 import crates.remote_access.spec.Door
+import crates.remote_access.spec.Confirm
 import crates.remote_access.spec.Handshake
 
 /-! # remote_access 的规格
 
 `sprawling-remote-access`（库名 `remote_access`，目录 `crates/remote_access`）是远程接入：一个人离开这台电脑时，从外面够到自己这座城——谁能进、进来能做什么、何时失效、如何一键关上。模块：door（门的状态）／pairing（一次性配对码）／keys（混合签名密钥）／handshake（每次连接的握手，以及设备第一次连接时的配对握手）／seal（帧封装）／route（通路缝与它的三个实现）；尚未落地的部分写在 §3。
 
-本文件是 crate 的规格入口，分部在 `spec/` 下，布局见 ARCHITECTURE.md §11「Specifications in Lean」：`spec/Door.lean` 证明远程门的六条性质，`spec/Handshake.lean` 证明配对握手的三条性质。能写成定理的性质在分部里证明；本文件的十七节记录其余的要求、理由与决定。决定写作 `D<n>`，别处引作 `remote_access D<n>`；D1 到 D21 沿用这份规格在 Markdown 时 §12 的条目号，所以旧的引用改写之后号不变；D22 起是迁移之后的决定。§8 的各条保留 `8-1` 到 `8-12` 的编号，别处引作 `crates/remote_access/Spec.lean` §8-n。
+本文件是 crate 的规格入口，分部在 `spec/` 下，布局见 ARCHITECTURE.md §11「Specifications in Lean」：`spec/Door.lean` 证明远程门的六条性质，`spec/Handshake.lean` 证明配对握手的三条性质，`spec/Confirm.lean` 证明控制台确认的三条性质（D4，模块尚未落地，§3）。能写成定理的性质在分部里证明；本文件的十七节记录其余的要求、理由与决定。决定写作 `D<n>`，别处引作 `remote_access D<n>`；D1 到 D21 沿用这份规格在 Markdown 时 §12 的条目号，所以旧的引用改写之后号不变；D22 起是迁移之后的决定。§8 的各条保留 `8-1` 到 `8-12` 的编号，别处引作 `crates/remote_access/Spec.lean` §8-n。
 
-本文件本身是描述，不是被证明的规格：它不含 Lean 定义与定理，被证明的只有两个分部里的性质；其余每一条由 §16 列出的测试判，`cloudflare` 通路由 §8-8 的操作者检查判。
+本文件本身是描述，不是被证明的规格：它不含 Lean 定义与定理，被证明的只有三个分部里的性质；其余每一条由 §16 列出的测试判，`cloudflare` 通路由 §8-8 的操作者检查判。
 
 **三个平台**：门、配对码、密钥、两种握手与封装零 I/O，只读参数，在 Windows、macOS、Linux 上逐字节相同（§8-12 的向量在三个平台的 CI 上都读回）。各平台不同的只有两处：城钥匙的种子存在哪里、能留多久，由 vault 的平台表决定（`crates/gateway/spec/Credential.lean` §8-4，D23）；通路起的子进程是各平台自己的 `cloudflared` 或人写的命令，结束它用标准库的 `Child::kill`（Windows 上是 `TerminateProcess`，macOS 与 Linux 上是 `SIGKILL`），三处语义相同。
 -/
@@ -47,7 +48,8 @@ D2 后量子放在三处：TLS、设备认证、帧封装。TLS 负责传输层�
 - **与浏览器互通**：按 D11，组件级已知答案向量在 Rust 与 TS 两侧都过；一条由 Rust 城生成的单向夹具，TS 设备解出约定的明文。文件与写法见 §8-12：Rust 一侧的测试读回每一份，确定的三份逐字节等于重算的结果，签名在 Rust 里验过，夹具的第一帧在 Rust 设备一侧用同样固定的临时私钥打开、得出约定的明文；文件不在时测试在断言上失败。
 - **正文写法**：设备 id、公钥与权限各自的正文读回原值；短了的 id 与不认识的权限字被拒（§8-11）。
 - **seal**：帧按封的次序打开；被重放、被丢掉前一帧、被改过、方向不对的帧都打不开。负载按首字节读回原样；未知的首字节、锁门后面多出的字节、不是 UTF-8 的帧、空负载都以 `E_WIRE_MISMATCH` 拒。
-- **Lean**：`just models` 构建 `Spec`；本文件、`crates/remote_access/spec/Door.lean` 与 `crates/remote_access/spec/Handshake.lean` 无 `sorry`、无 `admit`、无 `axiom`。
+- **控制台确认**（D4）：`crates/remote_access/spec/Confirm.lean` 证明三条性质：一个动词只在回答紧挨着它的那次请求时才做，答的是那次请求印出的码、同一个动词、在到期之前；控制台从未印出的回答什么也做不成；按时答回的码做成那个动词。Rust 一侧随模块落地（§3）。
+- **Lean**：`just models` 构建 `Spec`；本文件、`crates/remote_access/spec/Door.lean`、`crates/remote_access/spec/Confirm.lean` 与 `crates/remote_access/spec/Handshake.lean` 无 `sorry`、无 `admit`、无 `axiom`。
 -/
 
 /-! ## 3 假设与歧义
@@ -55,6 +57,8 @@ D2 后量子放在三处：TLS、设备认证、帧封装。TLS 负责传输层�
 以下是这个接口今天尚未落地的部分，按阶段写成当前状态；每一段落地时，从这里删掉，写进它所属的 §8 章节。
 
 - **`cloudflare` 通路没有在真的隧道上开过。** 自动测试不跑它（§2）。缺的证据有两件：在一台装了 `cloudflared`、能连上 Cloudflare 边缘的电脑上，按 §8-8 的操作者检查开、关一次；在一台出网受限（经代理、7844 端口被拦）的电脑上，`cloudflared` 在就绪之前退出时，能否给出比「它在就绪之前退出」更具体的一句拒绝。今天的拒绝给出手动跑的那一行命令，人从 `cloudflared` 自己的输出里读原因。
+- **`remote_access::confirm` 尚未落地，设置页的门开关随它到来**（D4，性质在 `spec/Confirm.lean`）。打算的接口：一个对动词泛型的 `Confirm<V>`，最多持有一个等待中的请求；`request(verb: V, entropy: [u8; CONFIRM_BYTES], expires: TimeMs) -> String` 换下先前的请求，交回印在控制台上的正文，本 crate 之后只存摘要（与 §8-2 的配对码同一个理由）；`confirm(answer: &str, now: TimeMs) -> Result<V, AxError>` 不论对错都结束等待中的请求，答错、没有请求、过期都以 `E_GATE_DENIED` 拒，恢复语是在页面上再按一次、照控制台上新印的码输入。对动词泛型，是因为开门的载荷（开多久）是装配层的类型。确认码 5 字节熵、写成 8 个 base32 符号，两分钟到期：一次请求只给一次猜的机会，40 位够；到期由装配层给出，与配对码的十分钟同一种做法。落地时它要的另外两件：`architecture.toml` 的模块行先登记；从 `spec/Confirm.lean` 的三条性质派生的 Rust 检查（迹向量），先在一个故意不清空等待请求的实现上看它转红。
+- **W6b 的工作单**（设置页的门，Roadmap 的 A7 前一半与 REMOTE2）：①wire：`crates/wire/spec/Command/Kind.lean` 远程门的四行进 `inductive Command`、`reach` 与 `verbClass`，Rust 的 `WireCommand` 同步，集成者重生成 `WIRE_V`、goldens、`client/src/wire.ts` 与 adversary 的 `Door.lean`；②装配层 `bin::outside`：`OpenRemoteDoor` 与 `ReplaceCityKey` 先 `Confirm::request`，在控制台印一行，说出是页面在请求、要做的动词（开门时连同开多久）与分组的确认码，答页面 `E_APPROVAL_PENDING`；`ConfirmRemoteDoor` 经 `Confirm::confirm` 取回动词，再走与 `/remote open`、`/remote replace-key` 同一条路（`Doorway::open`、`Doorway::replace_key`，`crates/sprawling/spec/Outside.lean` §8-140）；`CloseRemoteDoor` 直接 `Doorway::close(Console)`；`bin::outside::verbs::command_class` 给四个新动词各一臂；城没有控制台（stdin 不是终端）时请求以 `E_TOOL_UNAVAILABLE` 拒，恢复语是在城自己的终端里跑 `sprawling serve`；③客户端：设置 → 远程里一个门开关与开多久的选择、一个「更换城钥匙」按钮，按下后都显示一个输入框，说明码印在城的控制台上；配对仍是今天的分步说明与可复制的一行；交互契约写进 `client/Spec.lean` §9 指向的分部；④CI：macOS runner 上一个作业核实二进制更新之后钥匙串是否再问一次读取 `remote` realm 的权限，看到的应是第一次 `/remote pair` 时的钥匙串对话框，或 resolve 以平台服务的原话拒绝。
 -/
 
 /-! ## 4 现状分析
@@ -147,7 +151,7 @@ impl Door {
 - **会话的寿命取 `min(请求的到期, 门的关闭时刻)`**：会话永远不比门活得久。`authority` 在门关着、纪元不符、会话过期或设备已撤销时答 `None`。
 - 失败码：门关着、码不对、设备未配对 → `E_GATE_DENIED`；重用纪元、撤销未知设备、设备名不合 → `E_INVALID_ARGS`。每一条都带一句可执行的恢复语，指向控制台上的哪条命令。
 
-D4 开门、配对、撤销只在控制台，不上线协议。agent 拿到的任何工具（包括驱动本地页面的浏览器工具）都够不到它们。限制：Windows 与 macOS 上 `exec` 尚无操作系统级沙箱，agent 跑的命令拥有这个用户的权限；那个缺口由 exec 沙箱补，不由这扇门补。
+D4 门的动词按它们给出什么分三种走法。**威胁**：城的回环端口上，任何本地客户端都能连 `/ws`、发任何一帧，其中包括居民的两种浏览器工具——`browser` 开的 headless 浏览器能打开回环上的页面（`crates/browser/Spec.lean` 的 `fetch` 一段），`usersbrowser` 经 User 批准后驱动 User 自己的浏览器与 profile（browser D10）——以及居民的 `exec` 跑的命令；所以页面上一个开关能做的，这些工具都能做，执行者从一帧本身分不出发它的是 User 还是工具。**走法**：①**关门**是线上的 `CloseRemoteDoor`，任何本地客户端发来都照做，不要证明，因为关门只减少访问（D5）；远程设备锁门仍走封装的锁门字节（D13）。②**开门与更换城钥匙**是线上的 `OpenRemoteDoor` 与 `ReplaceCityKey`，一帧请求本身什么也不做：城取一个确认码，印在城的控制台上，旁边写明它要做的那个动词，回给页面的只是「有一个码在等」，不带码；只有紧接着的一帧 `ConfirmRemoteDoor` 带回这个码、且在它到期之前，城才做那个动词（`spec/Confirm.lean` 的三条性质）。控制台是 User 自己的终端，它的输出不进任何一帧、不进任何页面，所以一个只能驱动页面或只能说线协议的客户端拿不到码。③**配对与撤销**只在控制台。配对不上线，是因为邀请是持有即用的秘密：它一旦显示在页面上，驱动这个页面的工具就能读到它，替自己配上一台设备，那是一份比 run、比楼的规则都活得久的访问；页面给出配对的分步说明与可复制的 `/remote pair` 一行（client 的 `remote.ts`）。撤销只减少访问，可以上线，今天没有页面需要它，所以留在控制台。**逐平台的保证**（以 `crates/runtime/spec/Tools/Exec.lean` 今天的 exec 臂为准）：三个平台上，两种浏览器工具都开不了门、换不了钥匙、配不了设备，能关门。`exec` 在 Linux 上 `PATH` 里有 `bwrap` 时跑在 `LinuxNamespaces` 臂里，它够不够得到回环与控制台由那一臂给的命名空间决定；Linux 上没有 `bwrap`、以及 Windows 与 macOS 上，`exec` 恒在 `CopiedTree` 臂里，命令带着这个用户的权限与网络，够得到 `/ws`，也读得到这个用户的凭据存放处（城钥匙的种子在那里，D23），推断在 Windows 上与城共用一个控制台的进程还能读控制台的屏幕缓冲区，所以对这一臂的 `exec`，门不构成边界，与上一版 D4 写明的缺口相同；那个缺口由 exec 沙箱补，不由这扇门补。落选的两种：只留控制台、页面只给可复制的命令与状态——对浏览器工具的保证与选中的一样，但 Roadmap 的 A7 要设置页上的开关，而确认只多要 User 看一眼控制台；线上的门动词对任何本地客户端都照做——浏览器工具就能开门。**重开参数**：控制台的输出不再只给 User 看（例如页面镜像控制台，或某个居民工具读得到它），确认码就失去保证，这一条要重写；三个平台都有切断回环与凭据存放处的 exec 沙箱时，把逐平台的保证改写为对 `exec` 也成立；要让设置页也能配对时，重新论证邀请怎样不经过一个工具驱动得到的页面。
 
 D5 关门可以由任何人做，开门只能由人做。关门只会减少访问，所以远程设备自己也可以「锁门离开」。
 
@@ -492,7 +496,7 @@ D21 浏览器一侧的 ML-KEM 与 ML-DSA 用 `@noble/post-quantum`，精确钉�
 /-! ## 15 影响面
 
 - 新增 crate `remote_access`：根 `Cargo.toml` 的 members、`ARCHITECTURE.md` §3 的 depmap、`architecture.toml` 的模块图与 family 表。
-- 本文件与 `spec/` 下的两个分部由根 `lakefile.toml` 的 `Spec` 库按 glob 收进构建，不必登记。
+- 本文件与 `spec/` 下的三个分部由根 `lakefile.toml` 的 `Spec` 库按 glob 收进构建，不必登记。
 - 通路缝登记在 ARCHITECTURE §4 的缝表，`architecture.toml` 的 family 表说本 crate 也持有通路。
 - 装配层（`bin::outside` 与 `bin::assembly::remote_door`，`crates/sprawling/Spec.lean` §8-139、§8-140、§8-151）是唯一调用方；通路的参数从城的 `[remote]` 来（`crates/city/Spec.lean` §8-39，D22），`Tunnel`、`RouteCommand`、`Permanence` 的字段改了，装配层的 `chosen` 与那张表一起改；depmap 的 `sprawling` 一行带着本 crate。二维码的片段写法由装配层印、由客户端读，两边以 §8-6 为准；两条监听路径与上面的消息以 §8-10 为准。
 - `tools/fixtures/remote-handshake/`（§8-12）由本 crate 的测试写、由客户端的 TS 测试读：改 §8-3 的派生、§8-4 的标签与握手记录、§8-5 的 nonce 布局与负载首字节，这些文件随之重生成，客户端的测试须仍过。
@@ -515,7 +519,7 @@ D11 与浏览器的互通只做组件级已知答案向量，加一条从 Rust �
 /-! ## 17 文档关系
 
 - `ARCHITECTURE.md`：§3 的 `depmap` 块（`remote_access: kernel`，`sprawling` 一行带着本 crate）、§4 的缝表（`remote_access::route` 一行）、§10 规则 3（`route::command` 的读线程与 `bin::outside::listener` 的任务）。这些改了，重读本文件 §7 与 §8-7。
-- `architecture.toml`：本 crate 各行与 `[family.remote_access]`，锚点指向本文件或两个分部。新模块先在那里登记。
+- `architecture.toml`：本 crate 各行与 `[family.remote_access]`，锚点指向本文件或它的分部。新模块先在那里登记。
 - `docs/glossary.md`：远程门、纪元、配对码、邀请、设备、通路、远程会话，并写明远程门与 Gate 的 door、远程会话与房间的 Session 不是一物（§6）。§6 的词改了，两处一起改。
 - `crates/kernel/Spec.lean` §8-76（设备表的路径）与 §8-81（远程门的五个事件）、`crates/wire/Spec.lean` §19-2 的 `class` 列与 §8-66（中继与 `Refusal`）、`crates/sprawling/Spec.lean` §8-139 与 §8-140（门的看守、远程监听、控制台的 `/remote`）、`client/Spec.lean` §9（配对页的交互契约落地时写在那里，§3）。§8-1 的动词类、§8-5 的负载、§8-6 的邀请写法或 §8-10 的两条路径改了，重读这几节。
 - `tools/fixtures/remote-handshake/` 与 `tools/README.md` 的 fixtures 一行（§8-12）：客户端的互通测试读这些文件；§8-3 到 §8-5 的任何字节改了，文件重生成，客户端的测试须仍过。
