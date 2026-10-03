@@ -28,12 +28,12 @@ pub enum InstallChannel { Npm, Cargo, Archive, Source }
 pub struct UpdateHint { pub channel: InstallChannel, pub command: Option<String> }
 ```
 
-`verdict` 是本城对 npm 那一行的判定：npm 的 `latest` 是发布流程最后写的那一处，也是口径 2 说的「真正解析的东西」。npm 读不到时整条答 `Refused`（口径 3）；crates.io 那一行今天答 `Unasked`——crates.io 上的版本串与 npm 的 pre 版本串怎么对应还没有一条 `kernel::Release` 的规则，比出来的先后会是猜的，所以如实说没问。`update` 由 `release::channel` 按这份二进制自己的路径判（D24）：源码构建答 `Source`、命令为 `None`；发布版按路径分四种，路径里有 `node_modules`、`.bun` 或 `_npx` 一节是 `Npm`，所在目录等于 cargo 的 bin 目录是 `Cargo`（`cargo binstall` 装在同一目录，路径分不出，答同一条命令），旁边有发行归档的 `skills/` 是 `Archive`，都不是答 `Source`；读不出自己路径的二进制也答 `Source`，宁可不印命令，不印一条错渠道的命令。终端 `status --check` 与页面印同一个 `command`，命令只有这一处。
+`verdict` 是本城对这份二进制安装渠道的那个注册表的判定：`update.channel` 是 `Cargo` 时取 crates.io 那一行，其余取 npm 那一行——npm 的 `latest` 是发布流程最后写的那一处，也是口径 2 说的「真正解析的东西」，而 cargo 装的人只取得到 crates.io 上有的版本。所取的那个注册表读不到时整条答 `Refused`（口径 3）。crates.io 那一行是裸版本号（`0.0.8`），经 kernel 的 `Version::from_crates_version` 读、`stands_on_crates` 判：只比版本号，同一版本号恒答 `Current`，与 npm 的判定在每一对版本号不同的发布上相同（`crates/kernel/Spec.lean` §8-54-1、D35）；它的 `ReleaseLine.released` 是空串，因为注册表的版本串里没有日期，城不替它补一个。`update` 由 `release::channel` 按这份二进制自己的路径判（D24）：源码构建答 `Source`、命令为 `None`；发布版按路径分四种，路径里有 `node_modules`、`.bun` 或 `_npx` 一节是 `Npm`，所在目录等于 cargo 的 bin 目录是 `Cargo`（`cargo binstall` 装在同一目录，路径分不出，答同一条命令），旁边有发行归档的 `skills/` 是 `Archive`，都不是答 `Source`；读不出自己路径的二进制也答 `Source`，宁可不印命令，不印一条错渠道的命令。终端 `status --check` 与页面印同一个 `command`，命令只有这一处。
 
 **五条口径：**
 
 1. **人按下才发生，此外一律不发生。** 不在连上时问，不在定时器上问，也不搭另一个查询的车。`QUICKSTART.md` 的开场承诺是「什么都没装、没注册服务、删掉文件夹就干净」，一座按自己的时间表去够注册表的城，等于拿那句承诺去换一个没人问过的问题；§8-35 口径 6 对外包目录立的是同一条规矩。客户端因此在**按钮的处理函数里**调 `asking.ask`——Solid 在那里不给响应式 owner，于是这条答复没有 watcher，重连与事件都不会替人重问。
-2. **问注册表（npm，crates.io 一行如实答 `Unasked` 直到它有比较规则），不问 GitHub。** 本项目每一次发布都是 pre-release，而 `GET /repos/{owner}/{repo}/releases/latest` 按设计排除 pre-release——它对本仓库答 404。看上去最像的那个端点恰是错的那个；npm 的 `latest` dist-tag 才是 `bunx sprawling` 真正解析的东西。
+2. **问注册表（npm 与 crates.io），不问 GitHub。** 本项目每一次发布都是 pre-release，而 `GET /repos/{owner}/{repo}/releases/latest` 按设计排除 pre-release——它对本仓库答 404。看上去最像的那个端点恰是错的那个；npm 的 `latest` dist-tag 才是 `bunx sprawling` 真正解析的东西。
 3. **三态穷尽，而第三态携拒绝。** 「你跑的是某个发布版，它站在这里」「你自己从源码构建的，没有可比的对象」「注册表读不到」是人接下来要做的三件不同的事。第三态不走 `Answer::Unavailable`：城是可用的、注册表不可用，页面必须能说清是哪一个，而拒绝里带的是 `kernel::reach` 已经定义的分阶段读数——名字没解析、连不上、握手失败、对方答了什么状态。
 4. **判定在 Rust，页面只画字符串。** `ReleaseLine` 携两个已渲染好的串，谁比谁新由 `kernel::Release` 的 `Ord` 判——版本在前、日期在后，与 npm 对同样两个串的排序一致。客户端因此没有第二套排序规则可以漂掉。**败给的方案**：把六个数字发给页面自己比——那是把一条领域规则复制到另一门语言里。
 5. **什么都不更新。** 归档路径归 `sprawling install`，npm 路径归 npm，第三方去覆写其中任何一条，就是「这个二进制住在哪」有了第二个权威（`tools/xtask/src/channel/shim.js` 已立此规）。因此终端与页面都只把该跑的命令印出来就停。

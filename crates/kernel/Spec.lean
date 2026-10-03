@@ -277,6 +277,7 @@ ARCHITECTURE.md §3「nothing here is published」是这条判定成立的前提
 | 8-45 | `crates/kernel/spec/Schema.lean` |
 | 8-50 | `crates/kernel/spec/Reach.lean` |
 | 8-54 | `crates/kernel/spec/Release.lean` |
+| 8-54-1 | `crates/kernel/spec/Release.lean` |
 | 8-56 | `crates/kernel/spec/Layout.lean` |
 | 8-76 | `crates/kernel/spec/Layout.lean` |
 | 8-72 | `crates/kernel/spec/Retries.lean` |
@@ -398,6 +399,7 @@ ARCHITECTURE.md §3「nothing here is published」是这条判定成立的前提
 | D26 | Govern 类工具的只读操作在 run 里放行：效果按一次调用定 | `crates/kernel/spec/Gate.lean` |
 | D27 | `read` 与 `edit` 答出的版本就是 `plan finish` 收的那个形式 | `crates/kernel/spec/Locator.lean` |
 | D32 | 同步 `send` 的一次等待是一对种类 `signal_wait_started`／`signal_wait_ended` | `crates/kernel/spec/Event/Record.lean` |
+| D35 | crates.io 的答案只按版本号判，与 npm 的答案在每一对版本号不同的发布上相同 | `crates/kernel/spec/Release.lean` |
 -/
 
 /-! ## 13 依赖选型

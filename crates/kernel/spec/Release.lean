@@ -37,7 +37,7 @@ pub const MATURITY: Maturity;                   // 这棵树切出的每一次�
 
 **五条口径：**
 
-1. **一次发布有两种拼法，而只有这一处同时认识两种。** git tag 写 `v0.0.5-Pre-alpha-260912`；npm 只收 semver，同一次发布因此发成 `0.0.5-pre.260912`。`xtask channel` 按前者转出后者去发布，运行中的二进制按后者读回注册表——两边转换各写一份，就是「这是哪一次发布」有了两个答案。
+1. **一次发布有三种拼法，而只有这一处同时认识它们。** crates.io 的裸版本号是第三种（§8-54-1）。 git tag 写 `v0.0.5-Pre-alpha-260912`；npm 只收 semver，同一次发布因此发成 `0.0.5-pre.260912`。`xtask channel` 按前者转出后者去发布，运行中的二进制按后者读回注册表——两边转换各写一份，就是「这是哪一次发布」有了两个答案。
 2. **排序是 semver 自己的。** 日期落在 pre-release 段，于是 `0.0.5-pre.260912` 高于 `0.0.5-pre.260911` 而低于裸的 `0.0.5`——semver 对点分数字标识符按数值比。`Ord` 按字段声明顺序派生即复现该规则，本 crate 与注册表因而对同一对发布给出同一个次序。**这正是本类型存在的理由**：二进制拿自己的裸 `0.0.5` 去比注册表的 `0.0.5-pre.260912`，会把最新的那一版读成更旧的那一版，且无声。
 3. **日期必须随版本一起走，不能摆在旁边。** 一个 pre-alpha 的版本号几乎说不出树有多旧，而树有多旧正是它的读者最需要知道的（CHANGELOG.md 开篇）。故 `released()` 是给人读的那一个渲染，`npm_version()` 是给注册表的那一个。
 4. **无钟无套接字。** 注册表此刻给的是什么，归调用方去取；本模块只判它被递到的东西（ARCHITECTURE.md 第 1 段）。
@@ -95,5 +95,177 @@ def witness : Spelling where
 /-- 见证之下，从 pre-alpha 挪到 alpha，tag 的中缀确实变了。 -/
 example : tagInfix witness .PreAlpha ≠ tagInfix witness .Alpha :=
   (moving_the_maturity_moves_every_rendering witness (by decide)).1
+
+/-! ### 8-54-1 crates.io 上的第三种拼法，以及三种拼法给出同一个次序
+
+```rust
+pub struct Version { /* major, minor, patch —— 私有 */ }   // 只有版本号、没有日期的一次发布
+impl Version { pub fn from_crates_version(text: &str) -> Result<Version, AxError>; }
+impl Release { pub fn crates_version(&self) -> String; }    // 0.0.8：工作区的 version，与 version() 同值
+pub fn stands_on_crates(mine: &Release, newest: &Version) -> ReleaseVerdict;
+```
+
+- **crates.io 收的是裸版本号**：工作区的 `[workspace.package] version`（`0.0.8`）原样发上去，日期不在里面；同一次发布在 npm 上是 `0.0.8-pre.261002`。`from_crates_version` 只认三个点分数字，拒法与 `from_npm_version` 的版本那一半是同一套（`assemble` 的前半），所以两种读法不会一个收、一个拒。
+- **只比版本号**：`stands_on_crates` 按 `mine` 的版本号对 `newest` 判，日期不参与。拿注册表的裸 `0.0.8` 去和自己的 npm 拼法 `0.0.8-pre.261002` 按 semver 比，会把同一次发布读成「注册表更新」；下面的 `a_bare_version_outranks_its_own_npm_spelling` 说这个陷阱对每一次发布都成立，所以两种拼法之间永远不直接比。
+- **预发布的「更新」**：在 npm 上，版本号相同、日期更晚的那一次更新，因为日期落在 pre-release 段、按数值比；在 crates.io 上，同一版本号只能发一次，日期更晚的重切发不上去，所以 crates.io 对同一版本号恒答 `Current`。这对用 cargo 装的人是真话：`cargo install sprawling --locked` 本来就取不到一次只改了日期的重切。
+- **平台**：只读字符串，Windows、macOS、Linux 一致；向 crates.io 的那一次 HTTPS GET（带 User-Agent）归调用方（口径 4）。
+- **W6 的派生检查**（`crates/kernel/src/release.rs` 的测试）：proptest 在 `0..=9` 的三个版本数与合法日期上抽两次发布 `a`、`b`，断言：版本号不同时 `stands_on_crates(a, &b_version)` 与 `stands(a, b)` 相等；版本号相同时前者是 `Current`；把两次发布的 `npm_version()` 按 semver 第 11 条（测试里手写的标识比较）排出的次序与 `Release` 的 `Ord` 相同。坏的变体：`stands_on_crates` 把 `newest` 补成日期为零的 `Release` 再交给 `stands`，版本号相同的每一对都红成 `Ahead`。
+-/
+
+/-- 一个版本号：三个点分数字。 -/
+structure Version where
+  major : Nat
+  minor : Nat
+  patch : Nat
+  deriving DecidableEq
+
+/-- 版本号的次序：逐段按数值比。 -/
+def Version.cmp (a b : Version) : Ordering :=
+  (compare a.major b.major).then ((compare a.minor b.minor).then (compare a.patch b.patch))
+
+/-- 一次发布：版本号与日期。`yy` 是 tag 与 npm 拼法里的两位年份；Rust 存四位年份，两者差一个常数，次序相同。三个数各小于 100，正是六位日期的形状。 -/
+structure Release where
+  version : Version
+  yy : Nat
+  month : Nat
+  day : Nat
+  yy_short : yy < 100
+  month_short : month < 100
+  day_short : day < 100
+
+/-- `Release` 的派生 `Ord`：先版本号，再年、月、日。 -/
+def Release.cmp (a b : Release) : Ordering :=
+  (a.version.cmp b.version).then
+    ((compare a.yy b.yy).then ((compare a.month b.month).then (compare a.day b.day)))
+
+/-- semver 的一个预发布标识：数字，或字母数字的词（以它在 ASCII 字典序里的位次记）。 -/
+inductive Ident where
+  | num (value : Nat)
+  | word (rank : Nat)
+
+/-- semver 2.0.0 第 11 条：数字按数值比，词按字典序比，数字低于词。 -/
+def Ident.cmp : Ident → Ident → Ordering
+  | .num a, .num b => compare a b
+  | .num _, .word _ => .lt
+  | .word _, .num _ => .gt
+  | .word a, .word b => compare a b
+
+/-- 预发布段逐个标识比；前面都相等时，短的那一段低。 -/
+def preCmp : List Ident → List Ident → Ordering
+  | [], [] => .eq
+  | [], _ :: _ => .lt
+  | _ :: _, [] => .gt
+  | a :: rest, b :: others => (a.cmp b).then (preCmp rest others)
+
+/-- 一个 semver 串：版本号与预发布段（空表即没有预发布段）。 -/
+structure SemVer where
+  version : Version
+  pre : List Ident
+
+/-- semver 的次序：先版本号；版本号相同时，没有预发布段的高于有的，两边都有则逐标识比。 -/
+def SemVer.cmp (a b : SemVer) : Ordering :=
+  (a.version.cmp b.version).then
+    (match a.pre, b.pre with
+     | [], [] => .eq
+     | [], _ :: _ => .gt
+     | _ :: _, [] => .lt
+     | p :: ps, q :: qs => preCmp (p :: ps) (q :: qs))
+
+/-- npm 那一种拼法：`<version>-pre.<YYMMDD>`。`pre` 这个词的位次是参数，下面的定理对任何位次成立。 -/
+def npm (pre : Nat) (r : Release) : SemVer :=
+  ⟨r.version, [.word pre, .num (r.yy * 10000 + r.month * 100 + r.day)]⟩
+
+/-- crates.io 那一种拼法：裸版本号。 -/
+def crates (r : Release) : SemVer := ⟨r.version, []⟩
+
+theorem then_eq_eq {o p : Ordering} : o.then p = .eq ↔ o = .eq ∧ p = .eq := by
+  cases o <;> cases p <;> simp [Ordering.then]
+
+theorem Version.cmp_eq_iff (a b : Version) : a.cmp b = .eq ↔ a = b := by
+  cases a; cases b
+  simp [Version.cmp]
+
+/-- 六位日期按数值比，等于按年、月、日逐段比：月与日各是两位，所以前一段的差不会被后一段抵掉。 -/
+theorem six_digits_compare_like_the_date {y m d y' m' d' : Nat}
+    (hm : m < 100) (hd : d < 100) (hm' : m' < 100) (hd' : d' < 100) :
+    compare (y * 10000 + m * 100 + d) (y' * 10000 + m' * 100 + d') =
+      (compare y y').then ((compare m m').then (compare d d')) := by
+  rcases Nat.lt_trichotomy y y' with h | rfl | h
+  · rw [Nat.compare_eq_lt.mpr h, Nat.compare_eq_lt.mpr (by omega)]; rfl
+  · rw [Nat.compare_eq_eq.mpr rfl]
+    rcases Nat.lt_trichotomy m m' with h | rfl | h
+    · rw [Nat.compare_eq_lt.mpr h, Nat.compare_eq_lt.mpr (by omega)]; rfl
+    · rw [Nat.compare_eq_eq.mpr rfl]
+      rcases Nat.lt_trichotomy d d' with h | rfl | h
+      · rw [Nat.compare_eq_lt.mpr h, Nat.compare_eq_lt.mpr (by omega)]; rfl
+      · rw [Nat.compare_eq_eq.mpr rfl, Nat.compare_eq_eq.mpr rfl]; rfl
+      · rw [Nat.compare_eq_gt.mpr h, Nat.compare_eq_gt.mpr (by omega)]; rfl
+    · rw [Nat.compare_eq_gt.mpr h, Nat.compare_eq_gt.mpr (by omega)]; rfl
+  · rw [Nat.compare_eq_gt.mpr h, Nat.compare_eq_gt.mpr (by omega)]; rfl
+
+/-- npm 按 semver 排两次发布，与 `Release` 的派生次序逐对相同：这是 `from_npm_version` 读回来之后能直接比的理由。 -/
+theorem npm_orders_like_the_release (pre : Nat) (a b : Release) :
+    (npm pre a).cmp (npm pre b) = a.cmp b := by
+  have dated := six_digits_compare_like_the_date (y := a.yy) (y' := b.yy)
+    a.month_short a.day_short b.month_short b.day_short
+  have word_eq : compare pre pre = .eq := Nat.compare_eq_eq.mpr rfl
+  simp only [SemVer.cmp, npm, Release.cmp, preCmp, Ident.cmp, word_eq, dated]
+  cases (compare a.yy b.yy).then ((compare a.month b.month).then (compare a.day b.day)) <;> rfl
+
+/-- crates.io 按 semver 排两次发布，只看版本号。 -/
+theorem crates_orders_by_version (a b : Release) :
+    (crates a).cmp (crates b) = a.version.cmp b.version := by
+  simp only [SemVer.cmp, crates]
+  cases a.version.cmp b.version <;> rfl
+
+/-- 两个注册表对每一对版本号不同的发布给出同一个次序。 -/
+theorem the_registries_agree_when_the_versions_differ (pre : Nat) (a b : Release)
+    (differ : a.version ≠ b.version) :
+    (npm pre a).cmp (npm pre b) = (crates a).cmp (crates b) := by
+  rw [npm_orders_like_the_release, crates_orders_by_version]
+  have not_eq : a.version.cmp b.version ≠ .eq :=
+    fun same => differ ((Version.cmp_eq_iff _ _).mp same)
+  simp only [Release.cmp]
+  cases h : a.version.cmp b.version with
+  | lt => rfl
+  | eq => exact absurd h not_eq
+  | gt => rfl
+
+/-- 版本号相同时 crates.io 说不出谁新：它的次序是 `eq`，而 npm 的次序是日期的。 -/
+theorem crates_cannot_tell_two_cuts_of_one_version (a b : Release)
+    (same : a.version = b.version) : (crates a).cmp (crates b) = .eq := by
+  rw [crates_orders_by_version, same]
+  exact (Version.cmp_eq_iff _ _).mpr rfl
+
+/-- 陷阱：同一次发布的裸版本号，按 semver 恒高于它自己的 npm 拼法。所以二进制从不拿 crates.io 的串与自己的 npm 拼法直接比。 -/
+theorem a_bare_version_outranks_its_own_npm_spelling (pre : Nat) (r : Release) :
+    (crates r).cmp (npm pre r) = .gt := by
+  have self_eq : r.version.cmp r.version = .eq := (Version.cmp_eq_iff _ _).mpr rfl
+  simp only [SemVer.cmp, crates, npm, self_eq]
+  rfl
+
+/-- 一次发布对注册表上最新的那一次站在哪里，与 `kernel::ReleaseVerdict` 逐变体对应。 -/
+inductive ReleaseVerdict where
+  | Current
+  | Behind
+  | Ahead
+  deriving DecidableEq
+
+/-- `stands` 与 `stands_on_crates` 共用的那一步：一个次序读成一个判词。 -/
+def verdictOf : Ordering → ReleaseVerdict
+  | .eq => .Current
+  | .lt => .Behind
+  | .gt => .Ahead
+
+/-- D35 **crates.io 的答案只按版本号判，与 npm 的答案在每一对版本号不同的发布上相同。**
+`stands_on_crates(mine, newest)` 是 `verdictOf (mine.version.cmp newest)`，`stands(mine, newest)` 是 `verdictOf (mine.cmp newest)`；本定理说两者在版本号不同时逐对相同，`crates_cannot_tell_two_cuts_of_one_version` 说版本号相同时前者恒 `Current`。crates.io 的串经 `Version::from_crates_version` 读成 `Version`，不读成 `Release`：它没有日期，补一个日期就是替注册表编一个它没说的值。
+被否：①把 crates.io 的串读成日期为零的 `Release` 再交给 `stands`——版本号相同时恒答 `Ahead`，一个刚从 crates.io 装上的二进制会说自己比注册表新；②拿 crates.io 的串与自己的 npm 拼法按 semver 比——见 `a_bare_version_outranks_its_own_npm_spelling`，恒答注册表更新；③只问 npm、把 npm 的答案给 cargo 用户——npm 上一次只改日期的重切，cargo 装不到，却会让 cargo 用户被告知落后。
+重开参数：工作区的版本号带上预发布段（例如 `0.0.9-pre.1`），或 crates.io 允许同一版本号重发。 -/
+theorem crates_and_npm_give_one_verdict (pre : Nat) (mine newest : Release)
+    (differ : mine.version ≠ newest.version) :
+    verdictOf (mine.version.cmp newest.version) =
+      verdictOf ((npm pre mine).cmp (npm pre newest)) := by
+  rw [the_registries_agree_when_the_versions_differ pre mine newest differ,
+    crates_orders_by_version]
 
 end Kernel.Release
