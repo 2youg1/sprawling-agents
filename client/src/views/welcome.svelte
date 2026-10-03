@@ -30,7 +30,7 @@
   // the done one folds (client D55); a body arrives with `drop` and goes
   // at once.
 
-  import { tick, untrack } from "svelte";
+  import { tick, untrack, type Snippet } from "svelte";
 
   import { QUERIES } from "../core/asking";
   import { readAnswer } from "../core/answered";
@@ -55,9 +55,13 @@
     readonly rank?: "page" | "section" | undefined;
     // The step a `#/welcome/<step>` link opens (client/Spec.lean §4-63).
     readonly step?: GuideStep | undefined;
+    // The shell's back key, which `pages.svelte` draws and hands over so
+    // it stands on this page's one column rather than at the frame's
+    // left edge, far from the column it leads away from.
+    readonly back?: Snippet | undefined;
   }
 
-  const { rank = "page", step }: Props = $props();
+  const { rank = "page", step, back }: Props = $props();
 
   const u = ui();
   const { lang } = u;
@@ -207,6 +211,7 @@ fields inside them share its two edges, so the page has one right edge
 rather than one per kind of row. -->
 <div class="flex min-w-0 flex-1 flex-col @min-[64rem]:silver-columns">
   <div class="flex min-w-0 flex-1 flex-col @min-[64rem]:col-start-2">
+    {@render back?.()}
     <Page title={say($lang, "welcome_title")} note={say($lang, "welcome_note")} {rank}>
       <div class="@container min-w-0">
         <div class="flex min-w-0 flex-col">

@@ -43,15 +43,22 @@
   aria-label={say($lang, "region_main")}
 >
   <!-- One back key for every page, at the top left of the frame, so no
-       page draws its own (A3, A6). -->
-  {#if back !== null}
-    <a
-      href={toFragment(back)}
-      class="mb-snug flex h-control-sm w-fit items-center gap-tight rounded-control pr-snug text-note text-text-faint hover:wash hover:text-text"
-    >
-      <Glyph name="chevron" size="sm" class="rotate-180" />
-      {say($lang, back.kind === "city" ? "nav_city" : "nav_settings")}
-    </a>
+       page draws its own (A3, A6); the welcome page, one column in the
+       middle of the frame, is handed the key to stand on that column. -->
+  {#snippet backKey()}
+    {#if back !== null}
+      <a
+        href={toFragment(back)}
+        class="mb-snug flex h-control-sm w-fit items-center gap-tight rounded-control pr-snug text-note text-text-faint hover:wash hover:text-text"
+      >
+        <Glyph name="chevron" size="sm" class="rotate-180" />
+        {say($lang, back.kind === "city" ? "nav_city" : "nav_settings")}
+      </a>
+    {/if}
+  {/snippet}
+  {#if view.kind !== "welcome"}
+    <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
+    {@render backKey()}
   {/if}
   {#if view.kind === "city"}
     <City />
@@ -68,7 +75,7 @@
   {:else if view.kind === "registry"}
     <Registry />
   {:else if view.kind === "welcome"}
-    <Welcome step={view.step} />
+    <Welcome step={view.step} back={backKey} />
   {:else if view.kind === "monitor"}
     <Monitor samples={$samples} watch={u.conn.monitor.watch} />
   {:else if view.kind === "gallery"}
