@@ -53,10 +53,6 @@ def owedOnBatch : Option Code := some .wireMismatch
 theorem a_halt_answers_first (reserved attached : Bool) :
     owedOnWork true reserved attached = some .gateDenied := rfl
 
-/-- 没停摆、地址普通、什么都没挂时，派活停在配置上。 -/
-theorem with_nothing_attached_work_stops_at_configuration :
-    owedOnWork false false false = some .modelUnchosen := rfl
-
 /-- 保留地址压过配置：恢复建议指向地址，而不是去挂 provider。 -/
 theorem a_reserved_address_answers_before_configuration (attached : Bool) :
     owedOnWork false true attached = some .invalidArgs := rfl

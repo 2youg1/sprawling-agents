@@ -73,7 +73,7 @@ theorem a_refusal_is_asked_again_exactly_when_the_provider_is_busy (status : Nat
   simp only [retry]
   cases busy status <;> simp
 
-/-- 拒词说窗口满了、状态码是 400 或 413，才是溢出；溢出从不再试，同一请求再发一遍同样放不下。 -/
+/-- 拒词说窗口满了、状态码是 400 或 413，才是溢出；溢出从不再试，同一请求再发一遍同样放不下。被否的「只按 413 判溢出」漏掉最常见的那一种：两家兼容格式都以 400 报窗口溢出，本定理的 `status = 400` 一支覆盖它。 -/
 theorem a_refusal_is_an_overflow_exactly_when_it_names_the_window (status : Nat) (outgrew : Bool) :
     refusal status outgrew = .Overflow status ↔ ((status = 400 ∨ status = 413) ∧ outgrew = true) := by
   unfold refusal
@@ -90,10 +90,6 @@ theorem a_refusal_is_an_overflow_exactly_when_it_names_the_window (status : Nat)
       simp [window code] at said
 
 theorem an_overflow_is_never_asked_again (status : Nat) : retry (.Overflow status) = .No := rfl
-
-/-- 被否的「只按 413 判溢出」漏掉最常见的那一种：两家兼容格式都以 400 报窗口溢出。 -/
-theorem a_window_refused_with_400_is_an_overflow : refusal 400 true = .Overflow 400 := by
-  decide
 
 /-- 流里的报错帧：恰在它的类型或码说「现在忙或坏了」时再问。 -/
 theorem a_reported_error_is_asked_again_exactly_when_it_says_busy (kind : String) :

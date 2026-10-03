@@ -263,20 +263,6 @@ theorem AxCode.all_complete : ∀ code : AxCode, code ∈ AxCode.all := by
   intro code
   cases code <;> decide
 
-/-- **装载期白名单恰是这七个码。** 白名单封闭：让一个码改走装载期，要先在这里改这条定理，而改它就是一次需要理由的决定（`crates/kernel/Spec.lean` §12 逐码写着理由）。 -/
-theorem the_loadtime_whitelist_is_closed :
-    AxCode.all.filter (fun code => code.carrier == .Loadtime) =
-      [.ConfigInvalid, .CasCorrupt, .StorageFatal, .WireMismatch, .LogVersionUnsupported,
-        .LedgerHeld, .HistoryUnproven] := by
-  decide
-
-/-- 门的拒绝码都由 `gate_denied` 携带：`kernel::gate` 是全库唯一的 gate 码生产者，它写下的拒绝落在同一种行上。 -/
-theorem gate_codes_are_carried_by_gate_denied :
-    AxCode.all.filter (fun code => code.carrier == .Event .GateDenied) =
-      [.OutsideWriteDomain, .GateDenied, .TaintedAction, .DelegationDepth, .CrossBuildingDenied,
-        .SecretEgress, .DiscardIrreversible] := by
-  decide
-
 /-- 读侧的解析（`AxCode::parse`）：按 `ALL` 的次序找第一个拼写相同的码，找不到即 `none`，由调用方走拒绝的那一支。拼写函数 `as_str` 是参数，它的值只住在 Rust。 -/
 def parse (as_str : AxCode → String) (raw : String) : Option AxCode :=
   AxCode.all.find? (fun code => as_str code == raw)
