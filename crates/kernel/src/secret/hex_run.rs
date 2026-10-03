@@ -6,7 +6,7 @@
 //! Hex-run detection: a pure-hex run is reported only when it is the
 //! value of a credential name (`crates/kernel/spec/Secret.lean` §8-25).
 
-use super::scan::{entropy_millibits_per_char, names_a_credential};
+use super::scan::{Work, names_a_credential};
 
 /// Shortest hex run reported: 32 hex chars carry 128 bits, the smallest
 /// key size in common use. Moves with `crates/kernel/Spec.lean` §14 only.
@@ -18,21 +18,29 @@ pub(crate) const HEX_SPAN_MIN_BYTES: usize = 32;
 pub(crate) const HEX_ENTROPY_MIN_MILLIBITS: u64 = 3100;
 
 /// Whether the token run `bytes[start..end]` is a hex secret: pure hex,
-/// at least [`HEX_SPAN_MIN_BYTES`] long, at least
-/// [`HEX_ENTROPY_MIN_MILLIBITS`] per char, and the value of a name that
-/// [`names_a_credential`] accepts. The label is what separates a random
-/// key from a blake3 or git oid, whose entropy reads the same.
-pub(super) fn is_labelled_hex_secret(bytes: &[u8], start: usize, end: usize) -> bool {
+/// at least [`HEX_SPAN_MIN_BYTES`] long, the value of a name that
+/// [`names_a_credential`] accepts, and at least
+/// [`HEX_ENTROPY_MIN_MILLIBITS`] per char. The label is what separates a
+/// random key from a blake3 or git oid, whose entropy reads the same; it
+/// is judged before the entropy because the entropy reading is the
+/// costly step and most hex runs in the city's text are unlabelled
+/// hashes.
+pub(super) fn is_labelled_hex_secret(
+    bytes: &[u8],
+    start: usize,
+    end: usize,
+    work: &mut Work,
+) -> bool {
     let Some(run) = bytes.get(start..end) else {
         return false;
     };
     run.len() >= HEX_SPAN_MIN_BYTES
         && run.iter().all(u8::is_ascii_hexdigit)
-        && entropy_millibits_per_char(run) >= HEX_ENTROPY_MIN_MILLIBITS
         && bytes
             .get(..start)
             .and_then(label_before)
             .is_some_and(names_a_credential)
+        && work.entropy_of(run) >= HEX_ENTROPY_MIN_MILLIBITS
 }
 
 /// The name a value follows: the name, optional blanks and quotes, one

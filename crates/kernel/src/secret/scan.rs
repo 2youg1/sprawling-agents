@@ -12,6 +12,7 @@ use crate::consts_policy::SECRET_ENTROPY_MIN;
 
 use super::hex_run::is_labelled_hex_secret;
 use super::span::SecretSpan;
+use std::sync::LazyLock;
 
 fn charset_admits(charset: SecretCharset, byte: u8) -> bool {
     match charset {
@@ -40,10 +41,13 @@ fn token_byte(byte: u8) -> bool {
 /// An all-lowercase secret evades this detector; the shape table stays
 /// the primary net and rotation the last remedy.
 fn mixed_alphabet(bytes: &[u8]) -> bool {
-    let has_upper = bytes.iter().any(u8::is_ascii_uppercase);
-    let has_lower = bytes.iter().any(u8::is_ascii_lowercase);
-    let has_digit = bytes.iter().any(u8::is_ascii_digit);
-    has_upper && has_lower && has_digit
+    let (mut upper, mut lower, mut digit) = (false, false, false);
+    for byte in bytes {
+        upper |= byte.is_ascii_uppercase();
+        lower |= byte.is_ascii_lowercase();
+        digit |= byte.is_ascii_digit();
+    }
+    upper && lower && digit
 }
 
 /// Minimum span for the entropy detector: mainstream API keys start
@@ -108,81 +112,73 @@ pub(super) fn entropy_millibits_per_char(bytes: &[u8]) -> u64 {
         .unwrap_or(0)
 }
 
-fn entropy_passes(bytes: &[u8]) -> bool {
-    let mb = entropy_millibits_per_char(bytes);
+fn entropy_passes(bytes: &[u8], work: &mut Work) -> bool {
+    let mb = work.entropy_of(bytes);
     let num = u64::from(SECRET_ENTROPY_MIN.num);
     let den = u64::from(SECRET_ENTROPY_MIN.den);
     // mb >= (num / den) * 1000  <=>  mb * den >= num * 1000
     mb.saturating_mul(den) >= num.saturating_mul(1000)
 }
 
-fn find_shape_hits(bytes: &[u8]) -> Vec<SecretSpan> {
-    let mut hits = Vec::new();
-    for shape in &SECRET_SHAPES {
-        let prefix = shape.prefix.as_bytes();
-        if prefix.is_empty() || bytes.len() < prefix.len() {
-            continue;
-        }
-        let mut at = 0usize;
-        while let Some(window) = bytes.get(at..) {
-            let Some(rel) = window.windows(prefix.len()).position(|w| w == prefix) else {
-                break;
-            };
-            let start = at.saturating_add(rel);
-            let body_start = start.saturating_add(prefix.len());
-            let mut end = body_start;
-            while bytes
-                .get(end)
-                .is_some_and(|b| charset_admits(shape.charset, *b))
-            {
-                end = end.saturating_add(1);
-            }
-            let total = end.saturating_sub(start);
-            let (min_len, max_len) = (usize::from(shape.len.0), usize::from(shape.len.1));
-            if total >= min_len {
-                hits.push(SecretSpan {
-                    start,
-                    len: total.min(max_len),
-                    provider: Some(shape.provider),
-                });
-            }
-            at = body_start;
-        }
-    }
-    hits.sort_by_key(|h| (h.start, h.len));
-    hits
+/// What one scan did, counted rather than timed, so a test can hold how
+/// the work grows with the input (`crates/kernel/spec/Secret.lean` §8-25).
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub(super) struct Work {
+    /// Bytes a detector loop read, once per loop that read them.
+    pub(super) bytes_read: u64,
+    /// Entropy readings taken: a 256-slot count table each, and one
+    /// fixed-point logarithm per byte value present.
+    pub(super) entropy_readings: u64,
 }
 
-fn overlaps(a: &SecretSpan, start: usize, len: usize) -> bool {
-    let a_end = a.start.saturating_add(a.len);
-    let b_end = start.saturating_add(len);
-    a.start < b_end && start < a_end
+impl Work {
+    fn read(&mut self, bytes: usize) {
+        self.bytes_read = self
+            .bytes_read
+            .saturating_add(u64::try_from(bytes).unwrap_or(u64::MAX));
+    }
+
+    /// The entropy of `run` in millibits per char, counted as one reading.
+    pub(super) fn entropy_of(&mut self, run: &[u8]) -> u64 {
+        self.entropy_readings = self.entropy_readings.saturating_add(1);
+        self.read(run.len());
+        entropy_millibits_per_char(run)
+    }
 }
 
 /// Custody's detection half. Shape table first;
 /// entropy second over token runs of at least [`ENTROPY_SPAN_MIN_BYTES`]
 /// that no shape already claimed. Pure, total, deterministic.
 pub fn scan(bytes: &[u8]) -> Vec<SecretSpan> {
-    let mut hits = find_shape_hits(bytes);
+    scan_counting(bytes).0
+}
+
+/// [`scan`], with the work it did.
+pub(super) fn scan_counting(bytes: &[u8]) -> (Vec<SecretSpan>, Work) {
+    let mut work = Work::default();
+    let mut hits = find_shape_hits(bytes, &mut work);
+    let mut found = Vec::new();
+    let mut claimed = Claimed::new(&hits);
     let mut at = 0usize;
     while at < bytes.len() {
         if !bytes.get(at).copied().is_some_and(token_byte) {
             at = at.saturating_add(1);
             continue;
         }
-        let mut end = at;
-        while bytes.get(end).copied().is_some_and(token_byte) {
-            end = end.saturating_add(1);
-        }
+        let end = bytes
+            .get(at..)
+            .and_then(|rest| rest.iter().position(|b| !token_byte(*b)))
+            .map_or(bytes.len(), |rel| at.saturating_add(rel));
         let len = end.saturating_sub(at);
+        work.read(len);
         if len >= ENTROPY_SPAN_MIN_BYTES
-            && !hits.iter().any(|h| overlaps(h, at, len))
-            && (bytes
-                .get(at..end)
-                .is_some_and(|run| mixed_alphabet(run) && entropy_passes(run))
-                || is_labelled_hex_secret(bytes, at, end))
+            && !claimed.overlaps(at, end)
+            && (bytes.get(at..end).is_some_and(|run| {
+                work.read(run.len());
+                mixed_alphabet(run) && entropy_passes(run, &mut work)
+            }) || is_labelled_hex_secret(bytes, at, end, &mut work))
         {
-            hits.push(SecretSpan {
+            found.push(SecretSpan {
                 start: at,
                 len,
                 provider: None,
@@ -190,8 +186,104 @@ pub fn scan(bytes: &[u8]) -> Vec<SecretSpan> {
         }
         at = end;
     }
+    hits.append(&mut found);
+    hits.sort_by_key(|h| (h.start, h.len));
+    (hits, work)
+}
+
+/// Whether some shape prefix starts with this byte, so the shape pass
+/// compares prefixes only where one can begin.
+static OPENS_A_SHAPE: LazyLock<[bool; 256]> = LazyLock::new(|| {
+    let mut table = [false; 256];
+    for shape in &SECRET_SHAPES {
+        if let Some(slot) = shape
+            .prefix
+            .as_bytes()
+            .first()
+            .and_then(|first| table.get_mut(usize::from(*first)))
+        {
+            *slot = true;
+        }
+    }
+    table
+});
+
+/// The shape hits, sorted by start and length. One pass over the bytes;
+/// each shape resumes after the prefix of its own previous match, which
+/// is the hit set a pass per shape gives.
+fn find_shape_hits(bytes: &[u8], work: &mut Work) -> Vec<SecretSpan> {
+    let mut resume = [0usize; SECRET_SHAPES.len()];
+    let mut hits = Vec::new();
+    let opens: &[bool; 256] = &OPENS_A_SHAPE;
+    work.read(bytes.len());
+    for (start, first) in bytes.iter().enumerate() {
+        if !opens.get(usize::from(*first)).copied().unwrap_or(false) {
+            continue;
+        }
+        let Some(rest) = bytes.get(start..) else {
+            continue;
+        };
+        for (shape, next) in SECRET_SHAPES.iter().zip(resume.iter_mut()) {
+            let prefix = shape.prefix.as_bytes();
+            if start < *next || prefix.is_empty() || !rest.starts_with(prefix) {
+                continue;
+            }
+            let body = rest.get(prefix.len()..).map_or(0, |tail| {
+                tail.iter()
+                    .take_while(|b| charset_admits(shape.charset, **b))
+                    .count()
+            });
+            work.read(body);
+            let total = prefix.len().saturating_add(body);
+            if total >= usize::from(shape.len.0) {
+                hits.push(SecretSpan {
+                    start,
+                    len: total.min(usize::from(shape.len.1)),
+                    provider: Some(shape.provider),
+                });
+            }
+            *next = start.saturating_add(prefix.len());
+        }
+    }
     hits.sort_by_key(|h| (h.start, h.len));
     hits
+}
+
+/// The spans the shape table claimed, asked in rising order of start
+/// whether a token run overlaps one of them. Each span is passed once,
+/// so the questions of one scan cost the number of spans in total.
+struct Claimed<'a> {
+    spans: &'a [SecretSpan],
+    next: usize,
+    /// The furthest end of every span that starts before the last run asked.
+    reach: usize,
+}
+
+impl<'a> Claimed<'a> {
+    fn new(spans: &'a [SecretSpan]) -> Claimed<'a> {
+        Claimed {
+            spans,
+            next: 0,
+            reach: 0,
+        }
+    }
+
+    /// Whether `start..end` overlaps a claimed span; `start` never falls
+    /// between two calls.
+    fn overlaps(&mut self, start: usize, end: usize) -> bool {
+        while let Some(span) = self.spans.get(self.next).filter(|s| s.start < start) {
+            self.reach = self.reach.max(span.start.saturating_add(span.len));
+            self.next = self.next.saturating_add(1);
+        }
+        self.reach > start
+            || self
+                .spans
+                .get(self.next..)
+                .unwrap_or_default()
+                .iter()
+                .take_while(|s| s.start < end)
+                .any(|s| s.start.saturating_add(s.len) > start)
+    }
 }
 
 /// Whether a *name* reads as the name of a credential.
@@ -221,6 +313,9 @@ pub fn names_a_credential(name: &str) -> bool {
     clippy::expect_used,
     clippy::panic,
     clippy::indexing_slicing,
+    clippy::string_slice,
+    clippy::arithmetic_side_effects,
+    clippy::as_conversions,
     reason = "test code"
 )]
 mod tests {
@@ -419,39 +514,72 @@ mod tests {
         ]
     }
 
-    /// Today's scanner, kept verbatim as the judge of every faster one:
-    /// a shape pass per table entry, the overlap test against every hit,
-    /// and the hex run's entropy read before its label.
+    /// Today's scanner, kept as the judge of every faster one: a shape
+    /// pass per table entry, the overlap test against every hit, and the
+    /// hex run's entropy read before its label. It counts its work the
+    /// way [`Work`] does, so the growth test can compare the two.
     mod reference {
         use super::super::{
-            ENTROPY_SPAN_MIN_BYTES, charset_admits, entropy_millibits_per_char, entropy_passes,
-            mixed_alphabet, overlaps, token_byte,
+            ENTROPY_SPAN_MIN_BYTES, SECRET_ENTROPY_MIN, Work, charset_admits,
+            entropy_millibits_per_char, token_byte,
         };
         use crate::consts_external::SECRET_SHAPES;
         use crate::secret::hex_run::{HEX_ENTROPY_MIN_MILLIBITS, HEX_SPAN_MIN_BYTES, label_before};
         use crate::secret::names_a_credential;
         use crate::secret::span::SecretSpan;
 
-        fn is_labelled_hex_secret(bytes: &[u8], start: usize, end: usize) -> bool {
+        fn count(work: &mut Work, bytes: usize) {
+            work.bytes_read += bytes as u64;
+        }
+
+        fn entropy(work: &mut Work, run: &[u8]) -> u64 {
+            work.entropy_readings += 1;
+            count(work, run.len());
+            entropy_millibits_per_char(run)
+        }
+
+        fn mixed_alphabet(work: &mut Work, bytes: &[u8]) -> bool {
+            count(work, 3 * bytes.len());
+            let has_upper = bytes.iter().any(u8::is_ascii_uppercase);
+            let has_lower = bytes.iter().any(u8::is_ascii_lowercase);
+            let has_digit = bytes.iter().any(u8::is_ascii_digit);
+            has_upper && has_lower && has_digit
+        }
+
+        fn entropy_passes(work: &mut Work, bytes: &[u8]) -> bool {
+            let mb = entropy(work, bytes);
+            let num = u64::from(SECRET_ENTROPY_MIN.num);
+            let den = u64::from(SECRET_ENTROPY_MIN.den);
+            mb.saturating_mul(den) >= num.saturating_mul(1000)
+        }
+
+        fn overlaps(a: &SecretSpan, start: usize, len: usize) -> bool {
+            let a_end = a.start.saturating_add(a.len);
+            let b_end = start.saturating_add(len);
+            a.start < b_end && start < a_end
+        }
+
+        fn is_labelled_hex_secret(work: &mut Work, bytes: &[u8], start: usize, end: usize) -> bool {
             let Some(run) = bytes.get(start..end) else {
                 return false;
             };
             run.len() >= HEX_SPAN_MIN_BYTES
                 && run.iter().all(u8::is_ascii_hexdigit)
-                && entropy_millibits_per_char(run) >= HEX_ENTROPY_MIN_MILLIBITS
+                && entropy(work, run) >= HEX_ENTROPY_MIN_MILLIBITS
                 && bytes
                     .get(..start)
                     .and_then(label_before)
                     .is_some_and(names_a_credential)
         }
 
-        fn find_shape_hits(bytes: &[u8]) -> Vec<SecretSpan> {
+        fn find_shape_hits(work: &mut Work, bytes: &[u8]) -> Vec<SecretSpan> {
             let mut hits = Vec::new();
             for shape in &SECRET_SHAPES {
                 let prefix = shape.prefix.as_bytes();
                 if prefix.is_empty() || bytes.len() < prefix.len() {
                     continue;
                 }
+                count(work, bytes.len());
                 let mut at = 0usize;
                 while let Some(window) = bytes.get(at..) {
                     let Some(rel) = window.windows(prefix.len()).position(|w| w == prefix) else {
@@ -466,6 +594,7 @@ mod tests {
                     {
                         end += 1;
                     }
+                    count(work, end - body_start);
                     let total = end - start;
                     let (min_len, max_len) = (usize::from(shape.len.0), usize::from(shape.len.1));
                     if total >= min_len {
@@ -483,7 +612,12 @@ mod tests {
         }
 
         pub(super) fn scan(bytes: &[u8]) -> Vec<SecretSpan> {
-            let mut hits = find_shape_hits(bytes);
+            scan_counting(bytes).0
+        }
+
+        pub(super) fn scan_counting(bytes: &[u8]) -> (Vec<SecretSpan>, Work) {
+            let mut work = Work::default();
+            let mut hits = find_shape_hits(&mut work, bytes);
             let mut at = 0usize;
             while at < bytes.len() {
                 if !bytes.get(at).copied().is_some_and(token_byte) {
@@ -495,12 +629,12 @@ mod tests {
                     end += 1;
                 }
                 let len = end - at;
+                count(&mut work, len);
                 if len >= ENTROPY_SPAN_MIN_BYTES
                     && !hits.iter().any(|h| overlaps(h, at, len))
-                    && (bytes
-                        .get(at..end)
-                        .is_some_and(|run| mixed_alphabet(run) && entropy_passes(run))
-                        || is_labelled_hex_secret(bytes, at, end))
+                    && (bytes.get(at..end).is_some_and(|run| {
+                        mixed_alphabet(&mut work, run) && entropy_passes(&mut work, run)
+                    }) || is_labelled_hex_secret(&mut work, bytes, at, end))
                 {
                     hits.push(SecretSpan {
                         start: at,
@@ -511,7 +645,53 @@ mod tests {
                 at = end;
             }
             hits.sort_by_key(|h| (h.start, h.len));
-            hits
+            (hits, work)
+        }
+    }
+
+    /// Text shaped like history: hashes and oids, a labelled key, a
+    /// provider token, a mixed token, prose, repeated `lines` times.
+    fn history(lines: usize) -> String {
+        let hex64 = "9f3c1a7e5b20d48c6f1ea7b3905d2ce81f64b07a".repeat(2);
+        let token = ["kJ8vQ2xR9m", "W4nZ7pL3sT", "6yB1cD5fG0", "hN8aE2iU4o"].concat();
+        let line = format!(
+            "{{\"prev\":\"{hex64}\",\"oid\":\"{}\",\"HMAC_KEY\":\"{}\",\"note\":\"see sk-ant-{} and {token} for the run\"}}\n",
+            &hex64[..40],
+            &hex64[3..43],
+            "a1B2c3D4e5".repeat(4)
+        );
+        line.repeat(lines)
+    }
+
+    /// The work a scan does grows no faster than its input, and is less
+    /// than the reference's at every size: the growth a slower scanner
+    /// would bring back is seen here as a count, not as a timing.
+    #[test]
+    fn scan_work_is_linear_and_below_the_reference() {
+        let sizes = [64usize, 128, 256];
+        let mut readings = Vec::new();
+        for lines in sizes {
+            let text = history(lines);
+            let (spans, work) = scan_counting(text.as_bytes());
+            let (expected, before) = reference::scan_counting(text.as_bytes());
+            assert_eq!(spans, expected);
+            assert!(
+                work.bytes_read < before.bytes_read,
+                "{lines}: {work:?} {before:?}"
+            );
+            assert!(
+                work.entropy_readings < before.entropy_readings,
+                "{lines}: {work:?} {before:?}"
+            );
+            readings.push(work);
+        }
+        let base = readings[0];
+        for (factor, work) in [(1u64, readings[0]), (2, readings[1]), (4, readings[2])] {
+            assert!(work.bytes_read <= factor * base.bytes_read, "{work:?}");
+            assert!(
+                work.entropy_readings <= factor * base.entropy_readings,
+                "{work:?}"
+            );
         }
     }
 }
