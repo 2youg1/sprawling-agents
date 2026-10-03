@@ -298,7 +298,7 @@ impl Worktrees {
             "{}\n\n{}{}",
             landing.subject,
             landing.of.trailers(),
-            self.reviewer(landing.reviewed_by_person)
+            landing.reviewer(&self.city_root)
         );
         let merge = self
             .repo
@@ -317,29 +317,6 @@ impl Worktrees {
             .reference_matching(trunk, merge, true, ours.id(), landing.subject)
             .map_err(|err| refuse("move the city trunk", err.to_string()))?;
         Ok(())
-    }
-
-    /// The `Reviewed-by:` line, or nothing at all. Both halves have to
-    /// hold: the caller says a person looked, and this machine's git
-    /// config says who that person is. A name the city made up would be
-    /// a false attribution in somebody's own repository.
-    fn reviewer(&self, reviewed_by_person: bool) -> String {
-        if !reviewed_by_person {
-            return String::new();
-        }
-        // The city's own handle reads no User file; who looked is the
-        // machine's answer, so this one read takes the whole chain.
-        let Ok(config) = git2::Repository::open(&self.city_root).and_then(|repo| repo.config())
-        else {
-            return String::new();
-        };
-        match (
-            config.get_string("user.name"),
-            config.get_string("user.email"),
-        ) {
-            (Ok(name), Ok(email)) => format!("Reviewed-by: {name} <{email}>\n"),
-            _ => String::new(),
-        }
     }
 
     /// Gives a tree back and keeps its files for the node's next run:

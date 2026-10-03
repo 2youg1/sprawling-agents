@@ -8,6 +8,8 @@
 //!
 //! Specified by `crates/storage/spec/Worktree.lean` §8-9.
 
+use std::path::Path;
+
 use kernel::TimeMs;
 
 use crate::checkpoint::Provenance;
@@ -27,6 +29,33 @@ pub struct Landing<'a> {
     pub of: &'a Provenance,
     pub subject: &'a str,
     pub reviewed_by_person: bool,
+}
+
+impl Landing<'_> {
+    /// The `Reviewed-by:` line, or nothing at all. Both halves have to
+    /// hold: the caller says a person looked, and this machine's git
+    /// config says who that person is. A name the city made up would be
+    /// a false attribution in somebody's own repository.
+    pub(super) fn reviewer(&self, city_root: &Path) -> String {
+        if !self.reviewed_by_person {
+            return String::new();
+        }
+        // The city's own handles read no User file; who looked is the
+        // machine's answer, so this one read takes the whole chain.
+        let Ok(config) = git2::Repository::open(city_root).and_then(|repo| repo.config()) else {
+            return String::new();
+        };
+        match (
+            config.get_string("user.name"),
+            config.get_string("user.email"),
+        ) {
+            (Ok(name), Ok(email)) => format!(
+                "Reviewed-by: {name} <{email}>
+"
+            ),
+            _ => String::new(),
+        }
+    }
 }
 
 /// A merge that has been decided and not yet made.
