@@ -44,7 +44,7 @@ impl CityAsk { fn read(self) -> wire::Answer; }                     // 放下快
 | `DiscardView` | 折 `file_discarded`／`discard_restored`，按路径归键；本版本读不回的一行整行跳过，不以空路径或空还原顶替 | 每行自带回去的路（`restoration`）；还原是**关掉它开的那一行**，不是另开一行 |
 | `RegistryView` | 折 `asset_archived`；没有房间或本版本读不回的一行整行跳过，`kind` 与 `subject` 不以默认值顶替 | 「这座城认定值得留下的东西」；空表就是空表，与「本版本答不了」在类型上已经不可混淆 |
 | `ArchiveSearch` | 被问的那一刻读盘（同 `BuildingView`） | 文件是权威，另存索引就是第二个权威 |
-| `Metrics` | 上面几份＋`hot`＋`governance.pending`；楼数在锁放开之后由 `Prepared::finish` 经 `lines::buildings_of` 数目录。数不出的计数报成线上能带的最大值（`u64::MAX`），而不是丢掉：饱和的数在页面上看得出不对，缺席的数会被读成零 | **恒不携钱**：钱是 `CostView` 的，一个数字两个主人就是两个数字开始互相矛盾的起点。这里每个数都已被别的视图证明过，它存在只为让画一条读数花一次问答；唯一自有的数是 `events`（本视图折过多少条），因为没有别的答案能推出它 |
+| `Metrics` | 上面几份＋`hot`＋`governance.pending`；楼数在锁放开之后由 `Prepared::finish` 经 `lines::buildings_of` 数目录；城根读不出时整份答 `Unavailable`，因为读不出的城根不是一座没有楼的城（城景与档案检索同此）。数不出的计数报成线上能带的最大值（`u64::MAX`），而不是丢掉：饱和的数在页面上看得出不对，缺席的数会被读成零 | **恒不携钱**：钱是 `CostView` 的，一个数字两个主人就是两个数字开始互相矛盾的起点。这里每个数都已被别的视图证明过，它存在只为让画一条读数花一次问答；唯一自有的数是 `events`（本视图折过多少条），因为没有别的答案能推出它 |
 -/
 
 /-!
@@ -68,7 +68,7 @@ impl CityAsk { fn read(self) -> wire::Answer; }                     // 放下快
 ```rust
 // accounting::views::commits（形状 7 projection）
 pub(crate) struct CommitFacts { /* run、seq、at、actor、chosen: ModelChoice、previous、b3 —— 私有 */ }
-pub(crate) fn commit_facts(record: &EventRecord) -> Option<(GitOid, CommitFacts)>;
+pub(crate) fn commit_facts(record: &EventRecord) -> Result<Option<(GitOid, CommitFacts)>, AxError>;
 impl CommitFacts { pub(super) fn answer(&self, oid: GitOid, lineage: Vec<RunId>, spent: UsdMicros) -> wire::CommitAnswer; }
 ```
 
@@ -79,6 +79,7 @@ impl CommitFacts { pub(super) fn answer(&self, oid: GitOid, lineage: Vec<RunId>,
   `job`，没有 oid。载荷读成 `kernel::event::record::CheckpointCommitted` 这个枚举，
   `JobPinned` 臂不进表、`Committed` 臂进表——问的是「这一行宣告了一个提交吗」，
   而不是「是不是这个 kind」。`pr_merged` 的 `commit` 键还是手写的键名，载荷旁的归因读成 `CommitAttribution`。
+- **读不出的载荷是错误，不是「这一行没宣告提交」**：`checkpoint_committed` 读不成那个枚举、或 `pr_merged` 的归因读不成 `CommitAttribution`，`commit_facts` 返回错误，`Views::apply` 与 playback 的 `absorb`／`checkpoint_of` 把它往上交；跳过它，城造过的一个提交就无声地从 Commit／Commits 视图与回放的证据里消失。`pr_merged` 的 `commit` 键缺席或解析不成 oid、记录不带地址时答 `None`：前者是这一行没说出提交，后者是没有可归属的人。
 - **`run`、`seq`、`at` 与 `actor` 取自记录自己的身份**（`EventRecord::run`／`seq`／`t`／`addr`），
   `b3` 是宣告它的那一行规范字节的摘要，`model` 与 `effort` 取自载荷（`crates/storage/Spec.lean` §8-18）。**没有一个字段是从 git 读的**：
   投影读权威，不读另一份投影。
