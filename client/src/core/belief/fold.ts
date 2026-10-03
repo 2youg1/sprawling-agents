@@ -127,6 +127,7 @@ export function fold(held: RunBelief, record: EventRecord): [RunBelief, string |
     case "device_revoked": case "remote_session_started":
     case "document_written": case "proposal_offered": case "proposal_decided":
     case "proposal_withdrawn":
+    case "session_named": case "run_policy_changed": case "skill_audited":
       return [moved, null];
   }
 }

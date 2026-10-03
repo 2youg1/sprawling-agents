@@ -6526,5 +6526,17 @@
   "mailbox_why_proposal": {
     "en": "Here because of the event proposal_offered: a run offered this change instead of writing the document, and the card stays open until the User accepts or rejects it.",
     "zh": "在这里是因为事件 proposal_offered：run 没有直接改这份文稿，而是提出了这处修改；User 接受或拒绝之前，卡一直开着。"
+  },
+  "event_session_named": {
+    "en": "a session was named",
+    "zh": "给一场对话起了名"
+  },
+  "event_run_policy_changed": {
+    "en": "the room's run policy changed",
+    "zh": "房间的运行策略改了"
+  },
+  "event_skill_audited": {
+    "en": "a skill was audited",
+    "zh": "审了一个 skill"
   }
 }
