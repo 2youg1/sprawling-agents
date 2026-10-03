@@ -6,7 +6,7 @@
 //! A fixture city with a history (`tools/citysim/spec/BenchStartup.lean` §8-5-1).
 //!
 //! Shape: adapter. The city is raised by `init_city` and its history is
-//! written through `storage::JsonlLedger::append_all`, so the segments,
+//! written through `storage::jsonl::append`, so the segments,
 //! the chain and the canonical bytes are the product's and no line is
 //! spelled here. What this file owns is the shape of one run's history,
 //! which is sized like the records of a city that has been working.

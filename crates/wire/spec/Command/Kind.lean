@@ -12,7 +12,7 @@
 /-!
 ## 19 每个动词从哪里够得到（`xtask wiring` 的数据面）
 
-**这张表存在的理由，是一次已经发生过的失效。** v0.0.3 的审计发现 `accounting::worker::run_command` 只匹配 22 个 Command 里的 14 个，
+**这张表存在的理由，是一次已经发生过的失效。** v0.0.3 的审计发现 `accounting::worker::commanding::routing::run_command` 只匹配 22 个 Command 里的 14 个，
 六个动词落进 catch-all——其中 Takeover／Rollback／CreatePolicy **在线上、画在客户端、由任何东西执行不了**，
 而 Cancel 与 Steer 在 run 不处于安全点时失败，恰好是人最需要它们的那一刻。
 `not_built` 的 rustdoc 当时就写着「**在这里被回绝的动词不得作为控件出现在客户端**」——那是一条**没有任何机器在看的规矩**。

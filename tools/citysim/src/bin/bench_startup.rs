@@ -10,7 +10,7 @@
 //! reading alone.
 //!
 //! This is a measuring Main, the third sanctioned sampling point besides
-//! `bin::assembly` and `bin::bench`: every `Instant::now` here carries
+//! `bin::assembly` and `citysim::bench`: every `Instant::now` here carries
 //! the same `#[expect]` the first two carry. It measures and gates
 //! nothing; `tools/xtask/budgets.toml` is where a reading is recorded.
 //!

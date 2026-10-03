@@ -24,8 +24,9 @@ use crate::score::{AssetUse, Score};
 
 /// How long an asset may sit unused before the cycle notices it. Stated
 /// here rather than taken from a caller, so two cities run the same
-/// cycle; `kernel::consts_policy::POLICY_IDLE_DAYS` governs the policy
-/// half and this governs assets.
+/// cycle. The kernel's idle window for policies went with the policy
+/// classes (the removals listed in `crates/kernel/spec/Gate.lean`), so this
+/// is the only idle window the cycle reads.
 pub const ASSET_IDLE_DAYS: u32 = 90;
 
 /// The score below which an asset is not paying for the room it takes.
