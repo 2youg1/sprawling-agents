@@ -116,8 +116,10 @@ impl<R: Ord + Clone, K: Ord + Clone> Resident<R, K> {
         self.trim();
     }
 
+    /// Drops from the oldest end while the cache is over its budget, the
+    /// newest entry included when it alone is larger than the budget.
     fn trim(&mut self) {
-        while self.order.len() > ENTRY_CAP {
+        while self.held > self.budget && !self.order.is_empty() {
             self.evict_oldest();
         }
     }
@@ -128,8 +130,6 @@ impl<R: Ord + Clone, K: Ord + Clone> Resident<R, K> {
         }
     }
 }
-
-const ENTRY_CAP: usize = 4;
 
 #[cfg(test)]
 #[path = "resident/tests.rs"]
