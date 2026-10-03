@@ -110,7 +110,7 @@ pub fn undoable(call: &ConnectorCall<'_>, sandbox: &SandboxLimits, taint: &Taint
 
 /-! D26 Govern 类工具的只读操作在 run 里放行：效果按一次调用定，不按工具定
 
-**决定**：`kernel::Tool` 多一个带默认实现的方法 `effect_of(&self, args: &Payload) -> Result<Effect, AxError>`，默认答登记里的 `ToolMeta.effect`；`rules` 与 `city` 两件治理工具覆写它，`rules read`、`city list` 这类不改规则的操作答 `Effect::Read`，改规则的操作仍答 `Effect::Govern`，在 run 里照旧被拒。`tool_called.effect`（§8-75 (b)）记的是这次调用由 `effect_of` 答出的效果。没有新的事件种类。
+**决定**：`kernel::Tool` 多一个带默认实现的方法 `effect_of(&self, call: &ToolCall) -> Result<Effect, AxError>`（与 `subject`、`writes` 同取整条调用，工具用同一份文法读它），默认答登记里的 `ToolMeta.effect`；`rules` 与 `city` 两件治理工具覆写它，`rules read`、`city list` 这类不改规则的操作答 `Effect::Read`，改规则的操作仍答 `Effect::Govern`，在 run 里照旧被拒。`runtime::bench` 按 `effect_of` 的答案选门，也按它判 taint 与写后 checkpoint；`tool_called.effect`（§8-75 (b)）与并行读波的「只读」判定仍读登记的 `ToolMeta.effect`——治理工具登记为 Govern，于是它的只读操作不进并行读波，账本上也照旧记作 Govern，没有新的写面。`Kernel.Gate.GovernReads` 证明：任何一串治理调用里，被放行的恰是只读操作，改写规则的操作一条也不放行。没有新的事件种类。
 
 **理由**：测试城里 `rules read` 与 `city list` 被拒（E_GATE_DENIED，Govern），而 MAYOR.md 说市长持有 rules。拒 Govern 的理由是「一个 run 不得改写审判它自己的规则」（§8 门册的 Governance 行），读规则不改写什么，拒它只是让模型看不到约束它的东西。按调用定效果是推断（roadmap §7：「F3 在 run 里放行 Govern 类工具的只读操作」）。
 
@@ -118,3 +118,53 @@ pub fn undoable(call: &ConnectorCall<'_>, sandbox: &SandboxLimits, taint: &Taint
 
 **重开参数**：User 选改说明而不放行时，删掉两件工具的覆写，默认实现即回到全拒。
 -/
+
+namespace Kernel.Gate.GovernReads
+
+/-- 治理工具（`rules`、`city`）的一个操作，按它对规则做什么分两类：只读，或改写。
+`rules read`、`city list` 属前者，`rules propose`、`city raise`、`city adopt` 属后者。 -/
+inductive Op where
+  | reads
+  | rewrites
+  deriving DecidableEq, Repr
+
+/-- 效果层看得到的两种效果；其余效果与这一条性质无关。 -/
+inductive Effect where
+  | read
+  | govern
+  deriving DecidableEq, Repr
+
+/-- `Tool::effect_of`（D26）：效果按一次调用的操作定，不按工具定。 -/
+def effectOf : Op → Effect
+  | .reads => .read
+  | .rewrites => .govern
+
+/-- 效果层在 run 里的判定（§8-27 的 `Governance` 行）：Govern 恒拒，Read 无门。 -/
+def admittedInRun : Effect → Bool
+  | .read => true
+  | .govern => false
+
+/-- 一个 run 发出的一串治理调用里，效果层放行的那些。 -/
+def admitted (calls : List Op) : List Op :=
+  calls.filter fun op => admittedInRun (effectOf op)
+
+/-- 任何一串调用里，被放行的恰是其中的只读操作，次序不变。 -/
+theorem admitted_are_exactly_the_reads (calls : List Op) :
+    admitted calls = calls.filter (· = .reads) := by
+  unfold admitted
+  congr 1
+  funext op
+  cases op <;> rfl
+
+/-- 任何一串调用里，没有一条改写规则的操作被放行：一个 run 仍改不了审判它的规则。 -/
+theorem no_rewrite_is_admitted (calls : List Op) : Op.rewrites ∉ admitted calls := by
+  rw [admitted_are_exactly_the_reads]
+  simp
+
+/-- 任何一串调用里，每一条只读操作都被放行：模型看得到约束它的规则。 -/
+theorem every_read_is_admitted (calls : List Op) (seen : Op.reads ∈ calls) :
+    Op.reads ∈ admitted calls := by
+  rw [admitted_are_exactly_the_reads]
+  simp [seen]
+
+end Kernel.Gate.GovernReads

@@ -339,6 +339,22 @@ pub trait Tool: Send + Sync {
         Ok(GateSubject::None)
     }
 
+    /// The effect this one call has, which picks the door it meets.
+    ///
+    /// The default is the registered [`ToolMeta::effect`]. A tool whose
+    /// operations differ in kind overrides it: a governance tool answers
+    /// [`Effect::Read`] for an operation that only reads the rules, so a
+    /// run can see what it is judged by while every operation that
+    /// rewrites them still meets the Govern refusal
+    /// (`crates/kernel/spec/Gate.lean` D26).
+    ///
+    /// # Errors
+    /// Refuses arguments this tool cannot read - the same refusal its
+    /// `invoke` would produce.
+    fn effect_of(&self, _call: &ToolCall) -> Result<Effect, AxError> {
+        Ok(self.meta().effect.clone())
+    }
+
     /// What this call may have written to the city's tree once it ran;
     /// the default reads the declared effect and nothing more.
     fn writes(&self, _call: &ToolCall) -> writes::Writes {

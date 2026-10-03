@@ -328,6 +328,63 @@ mod tests {
         }
     }
 
+    /// A governance tool whose `read` operation only reads: the shape
+    /// of `rules` and `city`, without their files.
+    struct Governs(kernel::ToolMeta);
+
+    impl Governs {
+        fn op(call: &ToolCall) -> Option<&str> {
+            call.args.as_map().get("op").and_then(Value::as_str)
+        }
+    }
+
+    impl Tool for Governs {
+        fn meta(&self) -> &kernel::ToolMeta {
+            &self.0
+        }
+
+        fn invoke(&self, _call: &ToolCall) -> Result<ToolOutcome, AxError> {
+            Ok(ToolOutcome {
+                result: kernel::Payload::empty(),
+                attachments: Vec::new(),
+            })
+        }
+
+        fn subject(&self, _call: &ToolCall) -> Result<GateSubject, AxError> {
+            Ok(GateSubject::Scope("building:lab".to_owned()))
+        }
+
+        fn effect_of(&self, call: &ToolCall) -> Result<Effect, AxError> {
+            Ok(match Self::op(call) {
+                Some("read") => Effect::Read,
+                Some(_) | None => Effect::Govern,
+            })
+        }
+    }
+
+    fn op_call(op: &str) -> ToolCall {
+        let mut args = serde_json::Map::new();
+        args.insert("op".to_owned(), Value::String(op.to_owned()));
+        call("ruler", kernel::Payload::new(args).unwrap())
+    }
+
+    /// The bench routes on the call's effect, not the tool's: a read of
+    /// the rules runs inside a run, a rewrite is still refused
+    /// (`crates/kernel/spec/Gate.lean` D26).
+    #[test]
+    fn a_govern_tool_read_runs_in_a_run_and_its_rewrite_is_still_refused() {
+        let meta = stub("ruler", Effect::Govern, GateSubject::None)
+            .meta()
+            .clone();
+        let mut bench = bench_with(Box::new(Governs(meta)));
+        let read = bench.invoke(&op_call("read"), &key(6), at()).unwrap();
+        assert!(matches!(read, BenchOutcome::Ran { .. }), "{read:?}");
+        let rewrite = bench
+            .invoke(&op_call("propose"), &key(7), at())
+            .unwrap_err();
+        assert_eq!(rewrite.code(), &AxCode::GateDenied);
+    }
+
     fn bench_with(tool: Box<dyn Tool>) -> ToolBench {
         let domain = WriteDomain::new(vec![Address::parse("work").unwrap()]).unwrap();
         let mut bench = ToolBench::new(domain);

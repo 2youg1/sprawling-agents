@@ -333,6 +333,37 @@ mod tests {
         );
     }
 
+    /// Derived from `Kernel.Gate.GovernReads`: over every operation, the
+    /// call's effect is `Read` exactly when the operation leaves the
+    /// rules as they stand, so a run reads them and still cannot rewrite
+    /// them (`crates/kernel/spec/Gate.lean` D26).
+    #[test]
+    fn only_the_operation_that_reads_is_a_read_and_every_rewrite_still_governs() {
+        let dir = tempfile::tempdir().unwrap();
+        let tool = tool(dir.path());
+        let effects: Vec<(&str, Effect)> = [
+            ("read", None),
+            (
+                "propose",
+                Some(
+                    "x = 1
+",
+                ),
+            ),
+        ]
+        .into_iter()
+        .map(|(op, text)| (op, tool.effect_of(&call(op, text)).unwrap()))
+        .collect();
+        assert_eq!(
+            effects,
+            vec![("read", Effect::Read), ("propose", Effect::Govern)]
+        );
+        assert_eq!(
+            tool.effect_of(&call("delete", None)).unwrap_err(),
+            tool.invoke(&call("delete", None)).unwrap_err()
+        );
+    }
+
     #[test]
     fn an_unknown_verb_is_refused_and_the_tool_still_answers() {
         let dir = tempfile::tempdir().unwrap();

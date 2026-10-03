@@ -63,6 +63,7 @@ pub trait Tool: Send + Sync {
     /// must return E_INVALID_ARGS, never route silently.
     fn invoke(&self, call: &ToolCall) -> Result<ToolOutcome, AxError>;
     fn subject(&self, call: &ToolCall) -> Result<GateSubject, AxError>;   // 默认 `GateSubject::None`
+    fn effect_of(&self, call: &ToolCall) -> Result<Effect, AxError>;   // 默认 `meta().effect`；bench 按它选门（Gate.lean D26）
     fn writes(&self, call: &ToolCall) -> Writes;   // 默认按 `meta().effect`：`Read` → `Nothing`，其余 → `Domain`
 }
 pub enum Writes { Nothing, Paths(Vec<Address>), Domain }

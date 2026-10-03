@@ -355,6 +355,37 @@ mod tests {
         assert!(!dir.path().join("kiln").exists());
     }
 
+    /// Derived from `Kernel.Gate.GovernReads`: over every action, the
+    /// call's effect is `Read` exactly when it leaves the city's shape as
+    /// it stands (`crates/kernel/spec/Gate.lean` D26).
+    #[test]
+    fn only_the_list_is_a_read_and_raising_or_adopting_still_governs() {
+        let dir = tempfile::tempdir().unwrap();
+        let tool = CityTool::new(dir.path()).unwrap();
+        let effects: Vec<(&str, kernel::Effect)> = ["list", "raise", "adopt"]
+            .into_iter()
+            .map(|action| {
+                let effect = tool
+                    .effect_of(&call(&[("action", action), ("name", "kiln")]))
+                    .unwrap();
+                (action, effect)
+            })
+            .collect();
+        assert_eq!(
+            effects,
+            vec![
+                ("list", kernel::Effect::Read),
+                ("raise", kernel::Effect::Govern),
+                ("adopt", kernel::Effect::Govern),
+            ]
+        );
+        let unread = &[("action", "demolish")][..];
+        assert_eq!(
+            tool.effect_of(&call(unread)).unwrap_err(),
+            tool.invoke(&call(unread)).unwrap_err()
+        );
+    }
+
     #[test]
     fn an_unknown_action_is_refused_and_says_which_three_exist() {
         let dir = tempfile::tempdir().unwrap();
