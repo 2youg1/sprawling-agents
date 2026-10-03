@@ -142,8 +142,7 @@ mod tests {
 
     /// A5: a launcher on the search path is not a harness set up. With
     /// Claude Code's directory under the home and nothing else, Claude
-    /// Code is ready, Codex and Pi name the paths looked at, and the two
-    /// harnesses with no registered directory say nothing was looked at.
+    /// Code is ready and every other harness names the path looked at.
     #[test]
     fn a_harness_is_set_up_only_where_its_vendor_directory_exists() {
         let home = HOME.get_or_init(|| tempfile::tempdir().unwrap()).path();
@@ -176,11 +175,15 @@ mod tests {
                 ),
                 (
                     "grok_build".to_owned(),
-                    wire::HarnessState::NotSetUp { looked: Vec::new() }
+                    wire::HarnessState::NotSetUp {
+                        looked: vec![shown(home.join(".grok"))]
+                    }
                 ),
                 (
                     "kimi_code".to_owned(),
-                    wire::HarnessState::NotSetUp { looked: Vec::new() }
+                    wire::HarnessState::NotSetUp {
+                        looked: vec![shown(home.join(".kimi-code"))]
+                    }
                 ),
                 (
                     "pi".to_owned(),

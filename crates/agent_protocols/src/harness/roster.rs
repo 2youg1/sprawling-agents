@@ -175,7 +175,16 @@ impl Harness {
                 under_home: &[".pi", "agent"],
                 source: "https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/environment-variables.md",
             }],
-            Harness::GrokBuild | Harness::KimiCode => &[],
+            Harness::GrokBuild => &[SetUpDir {
+                variable: Some("GROK_HOME"),
+                under_home: &[".grok"],
+                source: "https://docs.x.ai/build/settings/reference",
+            }],
+            Harness::KimiCode => &[SetUpDir {
+                variable: Some("KIMI_CODE_HOME"),
+                under_home: &[".kimi-code"],
+                source: "https://moonshotai.github.io/kimi-code/en/configuration/data-locations",
+            }],
         }
     }
 
