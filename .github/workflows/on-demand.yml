@@ -385,7 +385,11 @@ jobs:
       - name: sprawling doctor with nothing else installed
         shell: bash
         run: |
-          set -uo pipefail
+          # `shell: bash` runs the step under `bash -e`, and `set -u` does
+          # not lift it, so `+e` is written out: without it a doctor that
+          # reports a missing tool ends the step before its exit code is
+          # recorded.
+          set +e -uo pipefail
           home="${{ steps.fresh.outputs.dir }}/home"
           ! command -v cygpath > /dev/null 2>&1 || home="$(cygpath -w "$home")"
           env -u CARGO_HOME -u RUSTUP_HOME HOME="$home" USERPROFILE="$home" \
@@ -473,7 +477,10 @@ jobs:
       - name: serve with the first build, replace it, serve with the second
         shell: bash
         run: |
-          set -uo pipefail
+          # `shell: bash` runs the step under `bash -e`; `+e` lifts it, so
+          # the exit status `wait` returns for a closed city is recorded
+          # instead of ending the step after the first serve.
+          set +e -uo pipefail
           out="$PWD/target/keychain"
           city="$RUNNER_TEMP/keychain/city"
           bin="$RUNNER_TEMP/keychain/bin/sprawling"
@@ -494,17 +501,23 @@ jobs:
             for _ in $(seq 1 100); do kill -0 "$server" 2> /dev/null || break; sleep 0.1; done
             kill -KILL "$server" 2> /dev/null && echo "$1: did not close in order and was killed" | tee -a "$out/reading.txt"
             wait "$server" 2> /dev/null
+            echo "$1: exited $?" >> "$out/reading.txt"
             echo "$1: the item after it served:" >> "$out/reading.txt"
             item >> "$out/reading.txt"
           }
           cp "$out/first" "$bin"
           "$bin" init "$city" > "$out/init.out" 2>&1
+          # Which store the vault chose on this runner: a Keychain that
+          # refuses the probe sends every secret to session memory, and
+          # then no item is the expected reading rather than a lost key.
+          "$bin" doctor --no-color > "$out/doctor.txt" 2>&1
+          echo "doctor exited $?" >> "$out/doctor.txt"
           serve first
           cp "$out/second" "$bin"
           serve second
           before=$(sed -n '/^first: the item/,/^second:/p' "$out/reading.txt" | grep mdat)
           after=$(sed -n '/^second: the item/,$p' "$out/reading.txt" | grep mdat)
-          if [ -z "$after" ]; then verdict="no city key is kept after the second serve"
+          if [ -z "$after" ]; then verdict="no city key is kept after the second serve; doctor.txt says which store the vault chose"
           elif grep -q '^second: took commands within a minute: no' "$out/reading.txt"; then verdict="the second build's read waited on the Keychain: a prompt"
           elif [ "$before" != "$after" ]; then verdict="the second build found no key and wrote a new one"
           else verdict="the second build left the key as the first wrote it: read silently, or refused with the words its access list implies"
