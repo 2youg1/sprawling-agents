@@ -15,6 +15,7 @@
 ### 8-13 storage::changes（形状 4 适配器；git2）
 
 ```rust
+// 这三个值类型住在 `kernel::change`（`kernel` 的根重导出它们），因为 wire 的答复也携带它们；本模块只产出它们。
 pub enum Lines { Counted { added: u32, removed: u32 }, Binary }
 pub enum How    { Added, Modified, Deleted, Renamed { from: String } }
 pub struct FileChange { pub path: String, pub how: How, pub lines: Lines }
