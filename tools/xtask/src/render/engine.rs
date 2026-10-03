@@ -201,7 +201,7 @@ pub(super) fn measure(opening: &Opening, pass: &Pass) -> Result<Measured, XtaskE
         },
     );
     let _ = std::fs::remove_file(&instrumented);
-    let dumped = dumped?;
+    let dumped = dumped?.stdout;
     let dom = String::from_utf8_lossy(&dumped);
     if let Some(thrown) = sink(&dom, FAILED).filter(|said| !said.trim().is_empty()) {
         return Err(XtaskError::Cmd {

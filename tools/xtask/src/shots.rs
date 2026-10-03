@@ -70,7 +70,7 @@ pub(crate) fn run(root: &Path, args: &[String]) -> Result<String, XtaskError> {
     })?;
     let camera = Camera::open(&browser, &out, source)?;
     let taken = take(&camera, &routes, &out);
-    camera.close()?;
+    let strays = camera.close()?;
     let (shots, retried) = taken?;
     let index = out.join("index.md");
     std::fs::write(&index, pages::index(&shots)).map_err(|source| XtaskError::Io {
@@ -98,6 +98,11 @@ pub(crate) fn run(root: &Path, args: &[String]) -> Result<String, XtaskError> {
         retried
             .iter()
             .map(|(case, why)| format!("retried once: {case}, after {why}\n"))
+            .chain(
+                strays
+                    .iter()
+                    .map(|why| format!("helper outlived its engine: {why}\n")),
+            )
             .collect::<String>()
     ))
 }

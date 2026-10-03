@@ -18,7 +18,7 @@
 //! once more; the next launch starts only once the tree of this one has
 //! let go of its output.
 
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::Duration;
@@ -26,7 +26,7 @@ use std::time::Duration;
 use browser::survey::probe::SETTLE_MS;
 
 use super::pages::{Frame, Shot};
-use crate::render::engine::launch::{self, AfterExit, Launch, Stderr};
+use crate::render::engine::launch::{self, AfterExit, Launch, Stderr, Tree};
 use crate::render::engine::{BUDGET_MS, preloads, url_of};
 use crate::render::probe::{PENDING, POLL_MS};
 use crate::report::XtaskError;
@@ -53,7 +53,7 @@ pub(super) const CASE_PATIENCE: Duration = Duration::from_secs(45);
 
 /// How long the helpers of a launch may hold its output after the
 /// engine itself exited.
-const TREE_PATIENCE: Duration = Duration::from_secs(10);
+const TREE_PATIENCE: Duration = Duration::from_secs(5);
 
 /// How long a profile directory is given to come free for removal.
 const PROFILE_RELEASE: Duration = Duration::from_secs(5);
@@ -103,6 +103,8 @@ pub(super) struct Camera<'a> {
     profiles: PathBuf,
     launches: Cell<u32>,
     logs: PathBuf,
+    /// Each launch whose helpers outlived it, or whose profile they kept.
+    strays: RefCell<Vec<String>>,
     source: Source<'a>,
 }
 
@@ -144,23 +146,30 @@ impl<'a> Camera<'a> {
             profiles,
             launches: Cell::new(0),
             logs,
+            strays: RefCell::new(Vec::new()),
             source,
         })
     }
 
     /// Removes the profiles and the instrumented copy, so the next
-    /// `just dist` does not package it.
-    pub(super) fn close(self) -> Result<(), XtaskError> {
-        removed(&self.profiles)?;
+    /// `just dist` does not package it, and returns each launch whose
+    /// helpers outlived it. A stray helper does not fail the run: its
+    /// profile was its own, so no later launch met it.
+    pub(super) fn close(self) -> Result<Vec<String>, XtaskError> {
+        let mut strays = self.strays.into_inner();
+        if let Err(err) = released(&self.profiles) {
+            strays.push(format!("the profiles were left behind: {err}"));
+        }
         match self.source {
             Source::Bundle(bundle) => {
                 let copy = bundle.join(COPY);
                 std::fs::remove_file(&copy).map_err(|source| XtaskError::Io {
                     path: copy.display().to_string(),
                     source,
-                })
+                })?;
+                Ok(strays)
             }
-            Source::Origin(_) => Ok(()),
+            Source::Origin(_) => Ok(strays),
         }
     }
 
@@ -232,9 +241,18 @@ impl<'a> Camera<'a> {
                 after_exit: AfterExit::AwaitTree(TREE_PATIENCE),
             },
         );
-        let freed = released(&profile);
-        let out = ran?;
-        freed.map(|()| out)
+        let mut strays = self.strays.borrow_mut();
+        if let Ok(launch::Ran {
+            tree: Tree::Stray(why),
+            ..
+        }) = &ran
+        {
+            strays.push(format!("{case}: {why}"));
+        }
+        if let Err(err) = released(&profile) {
+            strays.push(format!("{case}: {err}"));
+        }
+        ran.map(|ran| ran.stdout)
     }
 
     /// The engine in one window and one colour scheme, with its own

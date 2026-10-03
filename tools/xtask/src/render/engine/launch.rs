@@ -58,8 +58,25 @@ pub(crate) enum AfterExit {
     Drain,
     /// Read until every process holding stdout has closed it, so the
     /// next launch starts with no helper of this one alive; past the
-    /// bound the tree is killed where the platform can still find it.
+    /// bound the tree is killed where the platform can still find it,
+    /// and [`Tree::Stray`] says so.
     AwaitTree(Duration),
+}
+
+/// What one launch wrote to stdout, and whether its process tree let go.
+#[derive(Debug)]
+pub(crate) struct Ran {
+    pub(crate) stdout: Vec<u8>,
+    pub(crate) tree: Tree,
+}
+
+/// Whether every process of a launch closed its output before the run
+/// returned.
+#[derive(Debug)]
+pub(crate) enum Tree {
+    Released,
+    /// A helper still held it; why, in words a report can carry.
+    Stray(String),
 }
 
 /// Runs `command` and returns what it wrote to stdout.
@@ -70,7 +87,7 @@ pub(crate) enum AfterExit {
 /// or when it has not exited within `launch.patience`; in the second
 /// case its whole process tree has been killed first, and the message
 /// says whether the tree let go of the pipe.
-pub(crate) fn run(mut command: Command, launch: &Launch) -> Result<Vec<u8>, XtaskError> {
+pub(crate) fn run(mut command: Command, launch: &Launch) -> Result<Ran, XtaskError> {
     let failed = |msg: String| XtaskError::Cmd {
         cmd: launch.cmd.to_owned(),
         msg,
@@ -118,26 +135,37 @@ pub(crate) fn run(mut command: Command, launch: &Launch) -> Result<Vec<u8>, Xtas
         }
         AfterExit::AwaitTree(bound) => {
             if !drained(&arrived, &mut out, bound) {
-                let killed = kill_tree(&mut child);
-                let released = drained(&arrived, &mut out, AFTER_KILL);
-                return Err(failed(format!(
-                    "the engine exited, but a process it started still held its output after \
-                     {} s, so the tree was killed{}{}; run the same command by hand and list \
-                     the processes it leaves",
-                    bound.as_secs(),
-                    killed
-                        .err()
-                        .map_or_else(String::new, |why| format!(" ({why})")),
-                    if released {
-                        ""
-                    } else {
-                        " and it still holds the output"
-                    },
-                )));
+                return Ok(Ran {
+                    stdout: out,
+                    tree: stray(&mut child, &arrived, bound),
+                });
             }
         }
     }
-    Ok(out)
+    Ok(Ran {
+        stdout: out,
+        tree: Tree::Released,
+    })
+}
+
+/// What happened to a tree that still held the output `bound` after its
+/// leader exited: killed where its process group still finds it (macOS,
+/// Linux), left running where nothing can (Windows, where `taskkill /T`
+/// needs the leader alive). Either way the launch itself succeeded, and
+/// a caller that gave it a profile of its own is not disturbed by it.
+fn stray(child: &mut Child, arrived: &Receiver<Vec<u8>>, bound: Duration) -> Tree {
+    let mut late = Vec::new();
+    match kill_tree(child) {
+        Ok(()) if drained(arrived, &mut late, AFTER_KILL) => Tree::Released,
+        Ok(()) => Tree::Stray(format!(
+            "a process of it held the output {} s after it exited and outlived the kill",
+            bound.as_secs()
+        )),
+        Err(why) => Tree::Stray(format!(
+            "a process of it held the output {} s after it exited and could not be killed: {why}",
+            bound.as_secs()
+        )),
+    }
 }
 
 /// Puts the engine at the head of a process group of its own, so its
@@ -344,7 +372,8 @@ mod tests {
             ),
         )
         .unwrap();
-        let out = String::from_utf8_lossy(&out);
+        assert!(matches!(out.tree, Tree::Released), "{:?}", out.tree);
+        let out = String::from_utf8_lossy(&out.stdout);
         assert!(out.contains("written after the engine exited"), "{out}");
     }
 }
