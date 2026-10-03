@@ -344,3 +344,54 @@ fn an_export_writes_one_row_per_use_in_both_formats() {
         )
     );
 }
+
+/// The usage pass hands every tool result to `runtime::ShellTally`, and
+/// the shell table is its reading line for line (wire D48): shell lines
+/// with a code counted per interpreter, failures by class, other arms
+/// and other kinds passed over.
+#[test]
+fn the_usage_pass_answers_each_interpreters_calls_and_failures_by_class() {
+    let result = |seq: u64, result: serde_json::Value| {
+        record(
+            now(seq, 1),
+            EventKind::ToolResult,
+            json!({ "tool_use_id": format!("c{seq}"), "name": "exec", "result": result }),
+        )
+    };
+    let usage = Usage::fold([
+        started(1, 1, &[]),
+        result(
+            2,
+            json!({"arm": "shell", "interpreter": "pwsh", "exit_code": 1, "stdout": "", "stderr": "ParserError"}),
+        ),
+        result(
+            3,
+            json!({"arm": "shell", "interpreter": "pwsh", "exit_code": 0, "stdout": "ok", "stderr": ""}),
+        ),
+        result(
+            4,
+            json!({"arm": "shell", "exit_code": 9009, "stdout": "", "stderr": ""}),
+        ),
+        result(
+            5,
+            json!({"arm": "program", "exit_code": 2, "stdout": "", "stderr": ""}),
+        ),
+    ]);
+    assert_eq!(
+        usage.shells(),
+        wire::ShellsAnswer {
+            interpreters: vec![
+                wire::ShellCalls {
+                    interpreter: "pwsh".to_owned(),
+                    calls: 2,
+                    failures: [("syntax".to_owned(), 1)].into(),
+                },
+                wire::ShellCalls {
+                    interpreter: "system".to_owned(),
+                    calls: 1,
+                    failures: [("command_not_found".to_owned(), 1)].into(),
+                },
+            ],
+        }
+    );
+}
