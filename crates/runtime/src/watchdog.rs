@@ -195,7 +195,8 @@ impl Watchdog {
                     "Proceed does not fire",
                 )
                 .with_recovery(
-                    "report this against runtime::watchdog: `Proceed` is the verdict                      that records nothing, and the caller asked it for a payload",
+                    "report this against runtime::watchdog: `Proceed` is the verdict \
+                     that records nothing, and the caller asked it for a payload",
                 ));
             }
             Disposal::CorrectiveSteer { text } => FiredAction::Steer { text: text.clone() },
@@ -330,7 +331,14 @@ mod tests {
         let payload = serde_json::to_value(dog.fired_payload(&second).unwrap()).unwrap();
         assert_eq!(payload["action"], "freeze");
         assert_eq!(payload["reason"], "stall");
-        assert!(dog.fired_payload(&Disposal::Proceed).is_err());
+        // The refusal is one sentence: the wrapped source line leaves no
+        // run of spaces in the recovery a person reads.
+        assert_eq!(
+            dog.fired_payload(&Disposal::Proceed)
+                .unwrap_err()
+                .recovery(),
+            "report this against runtime::watchdog: `Proceed` is the verdict that records nothing, and the caller asked it for a payload"
+        );
     }
 
     #[test]

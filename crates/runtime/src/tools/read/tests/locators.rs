@@ -148,3 +148,22 @@ fn a_file_locator_reads_the_bytes_of_its_commit_under_its_address_bound() {
         .unwrap_err();
     assert_eq!(err.code(), &AxCode::GateDenied);
 }
+
+/// A malformed Locator is refused in one sentence: the recovery joins
+/// its two source lines with one space, not their indentation.
+#[test]
+fn a_malformed_locator_is_refused_in_one_sentence() {
+    let dir = tempfile::tempdir().unwrap();
+    let tool = ReadTool::new(
+        dir.path(),
+        Arc::new(Mutex::new(Catalog::new())),
+        only_lab(),
+        Path::new("no-store"),
+    )
+    .unwrap();
+    let refused = tool.invoke(&call("cas:b3-not-a-hash")).unwrap_err();
+    assert_eq!(
+        refused.recovery(),
+        "write a Locator as `cas:b3-<hash>` or `file:<address>@<commit>`, as the ledger spells it"
+    );
+}

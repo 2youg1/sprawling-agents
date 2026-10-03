@@ -335,3 +335,19 @@ fn a_press_reads_its_key_and_modifiers_and_is_one_input_frame() {
         );
     }
 }
+
+/// A refusal reads as one sentence: a source line that wraps must not
+/// leave its indentation in the words a model or a User reads.
+#[test]
+fn a_refusals_sentence_keeps_one_space_at_each_wrapped_join() {
+    let unknown = Verb::read(&args(json!({ "action": "scroll" }))).unwrap_err();
+    assert_eq!(
+        unknown.recovery(),
+        "one of open, snapshot, act, screenshot, measure, survey, fetch, console, viewport, close"
+    );
+    let relative = read::fetched_url(&args(json!({ "url": "/next" }))).unwrap_err();
+    assert_eq!(
+        relative.recovery(),
+        "give the whole address, with http:// or https:// and the host; a relative one would resolve against a base the egress door never sees"
+    );
+}

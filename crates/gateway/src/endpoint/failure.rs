@@ -209,7 +209,9 @@ impl ProviderFailure<'_> {
                  refused by this side before it was sent"
             }
             (ProviderFailure::Overflow { .. }, _) => {
-                "the conversation no longer fits this model's context window, and it would not                  fit on a second try: start a new session that keeps the summary (`/new --carry`),                  or give this duty a model with a larger window"
+                "the conversation no longer fits this model's context window, and it would not \
+                 fit on a second try: start a new session that keeps the summary (`/new --carry`), \
+                 or give this duty a model with a larger window"
             }
             (_, Retry::Yes) => {
                 "the watchdog backs off and sends the same request again, until the run's \
@@ -318,6 +320,14 @@ mod tests {
         assert_eq!(
             ProviderFailure::Cut(&cut).recovery(),
             "the request went out and its answer was lost, so the provider may have run and billed it; the watchdog backs off and sends it again, until the run's retry limit or a Halt"
+        );
+        assert_eq!(
+            ProviderFailure::Overflow {
+                url: "http://house/v1",
+                status: reqwest::StatusCode::BAD_REQUEST,
+            }
+            .recovery(),
+            "the conversation no longer fits this model's context window, and it would not fit on a second try: start a new session that keeps the summary (`/new --carry`), or give this duty a model with a larger window"
         );
     }
 

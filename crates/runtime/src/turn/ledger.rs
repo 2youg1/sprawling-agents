@@ -206,7 +206,8 @@ impl HeldLines {
                 "the line is not durable yet",
             )
             .with_recovery(
-                "report this against runtime::turn::ledger: a ref was asked for                  before the barrier that carries its line",
+                "report this against runtime::turn::ledger: a ref was asked for \
+                 before the barrier that carries its line",
             )
         })
     }
@@ -356,5 +357,24 @@ impl<'h> Journal<'h> {
         data: Payload,
     ) -> Entry {
         self.lines.hold(kind, at, addr, data)
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, reason = "test code")]
+mod a_ref_before_its_barrier {
+    use super::*;
+
+    /// A ref asked for before the barrier names a history that may not
+    /// exist; the refusal is one sentence.
+    #[test]
+    fn is_refused_in_one_sentence() {
+        let refused = HeldLines::open(RunId::from_bytes([7; 16]), "resident@sim.1".to_owned())
+            .durable(Entry(0))
+            .unwrap_err();
+        assert_eq!(
+            refused.recovery(),
+            "report this against runtime::turn::ledger: a ref was asked for before the barrier that carries its line"
+        );
     }
 }

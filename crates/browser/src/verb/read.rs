@@ -49,14 +49,12 @@ pub(super) fn fetched_url(args: &Payload) -> Result<String, AxError> {
     if web && kernel::gate::host_of(&url)?.is_some() {
         return Ok(url);
     }
-    Err(AxError::failure(
-        AxCode::InvalidArgs,
-        "fetch an address from the page",
-        url,
+    Err(
+        AxError::failure(AxCode::InvalidArgs, "fetch an address from the page", url).with_recovery(
+            "give the whole address, with http:// or https:// and the host; a relative one \
+         would resolve against a base the egress door never sees",
+        ),
     )
-    .with_recovery(
-        "give the whole address, with http:// or https:// and the host; a relative one          would resolve against a base the egress door never sees",
-    ))
 }
 
 pub(super) fn number_of(args: &Payload, field: &str) -> Result<u64, AxError> {
