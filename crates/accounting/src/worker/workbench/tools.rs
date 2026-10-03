@@ -81,9 +81,11 @@ impl Laying {
             Arc::clone(&self.vault),
             self.staged_at.value(),
         ));
-        // Who this run can reach, frozen at dispatch: the assembly runs
-        // one run at a time and a signal lands after the drive returns,
-        // so nothing moves under it. It answers `neighbours` and `status`.
+        // Who this run can reach and what waits for each room, read at
+        // dispatch. Several runs drive at once and a signal lands at the
+        // call (collab D7), so the counts are a snapshot of that moment,
+        // as `status` says; `signal pull` reads the run's own queue
+        // live. It answers `neighbours` and `status`.
         let seen =
             city::Neighbourhood::scan(&self.city_root, site.building.addr(), addr, &|room| {
                 self.waiting.get(room).copied().unwrap_or(0)
