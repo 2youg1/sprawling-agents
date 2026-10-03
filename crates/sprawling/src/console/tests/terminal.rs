@@ -14,7 +14,8 @@
     reason = "test code"
 )]
 
-use super::super::terminal::serving;
+use super::super::Records;
+use super::super::terminal::{printed, serving};
 use super::helpers::*;
 
 /// **The defect this card closes.** The console holds the same desk
@@ -161,4 +162,41 @@ fn help_offers_only_what_the_console_can_carry() {
         "auth is refused as a verb: {seen}"
     );
     assert!(seen.contains("the city keeps serving"), "{seen}");
+}
+
+/// A committed dispatch, carrying words the User typed.
+fn dispatched() -> kernel::EventRecord {
+    let draft = kernel::EventDraft {
+        run: kernel::RunId::CITY,
+        t: kernel::TimeMs::new(1_778_749_200_000),
+        who: "tester".to_owned(),
+        addr: Some(room()),
+        kind: kernel::EventKind::SteerReceived,
+        data: kernel::Payload::new(
+            serde_json::json!({"text": "the secret plan"})
+                .as_object()
+                .cloned()
+                .unwrap(),
+        )
+        .unwrap(),
+        ig: false,
+    };
+    kernel::EventRecord::from_draft(draft, kernel::Seq::new(42), kernel::GENESIS_PREV)
+}
+
+/// A14: the console's event stream is read over a shoulder and kept in
+/// scrollback, so by default it says what happened and where, and never
+/// what the User wrote or what a model answered.
+#[test]
+fn the_event_stream_prints_one_line_per_record_and_no_payload() {
+    let line = printed(&dispatched(), Records::Summary).unwrap();
+    assert_eq!(line, "  seq 42  steer_received  lab/room1");
+}
+
+/// The whole record stays one switch away, in the shape `sprawling call`
+/// prints.
+#[test]
+fn the_whole_record_is_printed_only_when_asked_for() {
+    let line = printed(&dispatched(), Records::Whole).unwrap();
+    assert!(line.contains("the secret plan"), "{line}");
 }

@@ -27,7 +27,7 @@
 /// become two lists.
 pub(super) mod language;
 pub(super) mod terminal;
-pub use terminal::Terminal;
 pub(crate) use terminal::{Answering, Inside, start};
+pub use terminal::{Records, Terminal};
 #[cfg(test)]
 mod tests;

@@ -124,6 +124,9 @@ const INCLUDE_CONFIDENTIAL: Flag = flag(
     Nothing,
     "read confidential buildings too; the bundle and stderr say so",
 );
+/// The switch that widens the console's event stream from one line per
+/// record to the record whole; `serve_city` reads it by this name.
+pub(super) const WHOLE_RECORDS: &str = "--whole-records";
 /// `up` forwards its line to the same `serve_city` that `serve` runs, so the
 /// two rows share one flag set and cannot drift apart.
 const SERVED: &[Flag] = &[
@@ -131,6 +134,11 @@ const SERVED: &[Flag] = &[
     NO_OPEN,
     flag("--console", Nothing, "enter the city's console"),
     flag("--no-console", Nothing, "do not enter the console"),
+    flag(
+        WHOLE_RECORDS,
+        Nothing,
+        "print each record whole in the console, message and reply bodies included",
+    ),
     flag(
         "--supervise",
         Nothing,

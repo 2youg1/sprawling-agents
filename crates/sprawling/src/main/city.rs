@@ -33,6 +33,7 @@ use super::exit::Exit;
 use super::grammar::Arguments;
 use super::refusal::{Form, written};
 use super::router::{client_summary, default_city_location, flag_value, log_floor, log_levels};
+use super::verbs::WHOLE_RECORDS;
 use super::{CLIENT_BUNDLE_DIR, CLIENT_COMPLETE, CLIENT_FILES};
 use kernel::consts_policy::DEFAULT_AT;
 use sprawling::{assembly, console, firstrun, serving};
@@ -317,6 +318,11 @@ pub(super) fn serve_city(
         city: city.display().to_string(),
         client: client_line.clone(),
         bind: at,
+        records: if args.iter().any(|arg| arg == WHOLE_RECORDS) {
+            console::Records::Whole
+        } else {
+            console::Records::Summary
+        },
     });
     print_banner(city, &url, &client_line, &keyed);
     if let Some(level) = floor {

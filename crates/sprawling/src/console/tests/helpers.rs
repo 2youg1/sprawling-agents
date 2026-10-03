@@ -37,6 +37,7 @@ pub(super) fn terminal(bind: &str, token: Option<&str>) -> Terminal {
         city: "/tmp/a-city".to_owned(),
         client: "embedded, 3 file(s), 558419 gzipped byte(s)".to_owned(),
         bind: bind.parse().unwrap(),
+        records: Records::Summary,
     }
 }
 pub(super) fn vitals() -> wire::MetricsAnswer {

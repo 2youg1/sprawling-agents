@@ -48,6 +48,22 @@ pub struct Terminal {
     /// `0.0.0.0` is opened at `127.0.0.1` and the difference is exactly
     /// what decides whether strangers can reach it.
     pub bind: SocketAddr,
+    /// How much of each committed record the event stream prints.
+    pub records: Records,
+}
+
+/// How much of each committed record the console prints.
+///
+/// A record carries what the User typed and what a model answered, and a
+/// terminal is read over a shoulder, scrolled into a recording and kept in
+/// a scrollback file, so the default is the line that says what happened
+/// and where, and the payload is shown only when the User asks for it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Records {
+    /// One line per record: its seq, its kind and its address.
+    Summary,
+    /// The record whole, payload included, as `sprawling call` prints it.
+    Whole,
 }
 
 use kernel::Address;
@@ -153,12 +169,10 @@ pub(crate) fn start(
     inside: Inside,
     mut watching: tokio::sync::broadcast::Receiver<wire::Committed>,
 ) {
-    // What happened, printed as it happens, one JSON object per line -
-    // the same shape `sprawling call` prints, because a second rendering
-    // would be a second description of every event kind.
+    let records = terminal.records;
     std::thread::spawn(move || {
         while let Ok(committed) = watching.blocking_recv() {
-            match serde_json::to_string(committed.record()) {
+            match printed(committed.record(), records) {
                 Ok(text) => println!("{text}"),
                 // The record is on the ledger and reached every socket as
                 // its frame; only this printout lacks it, so the gap is
@@ -179,6 +193,21 @@ pub(crate) fn start(
             &mut std::io::stdout(),
         );
     });
+}
+
+/// One committed record, as the event stream prints it.
+///
+/// The kind is spelled by its serde name, the one the ledger and the wire
+/// use, so the summary line names no kind a second way; the whole record
+/// is the shape `sprawling call` prints.
+pub(super) fn printed(
+    record: &kernel::EventRecord,
+    records: Records,
+) -> Result<String, serde_json::Error> {
+    match records {
+        Records::Whole => serde_json::to_string(record),
+        Records::Summary => serde_json::to_string(record),
+    }
 }
 
 /// One line to the console.
