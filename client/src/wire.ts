@@ -9,9 +9,9 @@
 import { Schema } from "effect";
 
 /** The wire version both ends compare on connect. */
-export const WIRE_V = 55 as const;
+export const WIRE_V = 56 as const;
 /** The schema hash the server checks: `wire::schema_hash()`. */
-export const WIRE_HASH = "7622c050c06af963759f4859c781f770cbccbf18ccc9c891c1f7fba69c6d63a0" as const;
+export const WIRE_HASH = "11b5970efbf2cb69c4913a16408df1ce69488c7cb83968e670308ad73972dc72" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 /** The body sizes a person may ask for: `wire::BODY_PX_MIN` and `BODY_PX_MAX`. */
@@ -685,6 +685,7 @@ export const EventKind = Schema.Union([
   Schema.Literal("signal_wait_started"),
   Schema.Literal("signal_wait_ended"),
   Schema.Literal("signal_landed"),
+  Schema.Literal("skill_shelved"),
 ]).annotate({ identifier: "EventKind" });
 export type EventKind = typeof EventKind.Type;
 
@@ -3131,7 +3132,7 @@ export type Opening = typeof Opening.Type;
  * its gate; it is machine input, not documentation.
  */
 export const Effect = Schema.Union([
-  Schema.Literals(["read", "spend"]),
+  Schema.Literal("read"),
   Schema.Struct({
     write: Schema.Struct({
       domain: Address,
@@ -3150,6 +3151,7 @@ export const Effect = Schema.Union([
       address: Schema.optional(Schema.NullOr(Schema.String)),
     }),
   }),
+  Schema.Literal("spend"),
 ]).annotate({ identifier: "Effect" });
 export type Effect = typeof Effect.Type;
 
@@ -3609,10 +3611,55 @@ export const SkillUse = Schema.Struct({
 export type SkillUse = typeof SkillUse.Type;
 
 /**
- * One content of a skill, from the first run frozen with it.
+ * Where a shelved version came from.
+ */
+export const ShelvedFrom = Schema.Union([
+  Schema.Struct({
+    kind: Schema.Literal("path"),
+  }),
+  Schema.Struct({
+    kind: Schema.Literal("git"),
+    rev: Schema.optional(Schema.NullOr(Schema.String)),
+    url: Schema.String,
+  }),
+  Schema.Struct({
+    kind: Schema.Literal("skills_sh"),
+    name: Schema.String,
+  }),
+  Schema.Struct({
+    kind: Schema.Literal("shipped"),
+  }),
+  Schema.Struct({
+    kind: Schema.Literal("page"),
+  }),
+]).annotate({ identifier: "ShelvedFrom" });
+export type ShelvedFrom = typeof ShelvedFrom.Type;
+
+/**
+ * Who put one content of a skill on its shelf, read off the ledger in
+ * ledger order (`crates/wire/spec/Reading.lean` D33).
+ */
+export const VersionAuthor = Schema.Union([
+  Schema.Struct({
+    by: Schema.Literal("shelved"),
+    from: ShelvedFrom,
+    seq: Seq,
+  }),
+  Schema.Struct({
+    by: Schema.Literal("outside_shelf"),
+  }),
+  Schema.Struct({
+    by: Schema.Literal("unrecorded"),
+  }),
+]).annotate({ identifier: "VersionAuthor" });
+export type VersionAuthor = typeof VersionAuthor.Type;
+
+/**
+ * One content of a skill, from the first line that named it.
  */
 export const SkillVersion = Schema.Struct({
   at: TimeMs,
+  author: Schema.optional(VersionAuthor),
   digest: B3Hash,
   run: RunId,
   seq: Seq,

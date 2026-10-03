@@ -89,7 +89,7 @@ fn the_schema_hash_is_stable_across_calls_and_covers_the_wire_version() {
         "schema hash changed - update `crates/wire/spec/Frames.lean` §8-1 in the same commit"
     );
     assert_eq!(
-        WIRE_V, 55,
+        WIRE_V, 56,
         "WIRE_V rises once between two pushes, for a shape change under names that stay (wire D1)"
     );
 }
@@ -113,7 +113,7 @@ fn the_schema_hash_covers_every_event_kind_name() {
 
 /// A function of WIRE_V, the two frame name tables and the event kind
 /// names, so any change to the protocol surface lands here first.
-const WIRE_SCHEMA_GOLDEN: &str = "7622c050c06af963759f4859c781f770cbccbf18ccc9c891c1f7fba69c6d63a0";
+const WIRE_SCHEMA_GOLDEN: &str = "11b5970efbf2cb69c4913a16408df1ce69488c7cb83968e670308ad73972dc72";
 
 /// The schema hash reads names only, so a field added under names that
 /// stay leaves it where it was. This digest reads the whole shape with the
@@ -153,7 +153,7 @@ fn strip_prose(value: &mut serde_json::Value) {
 
 /// The digest of `wire_schema()` with its prose removed.
 #[cfg(feature = "schema")]
-const WIRE_SHAPE_GOLDEN: &str = "7774feec359e5c9ec04af82019e19911e267c3b6738c2f9c6935b2f7e49b1aef";
+const WIRE_SHAPE_GOLDEN: &str = "074e51c19166da75935dc3a31386021bdb248093f1b6300bae0d8822167e2666";
 
 // -------------------------------------------------------------- binding face
 
