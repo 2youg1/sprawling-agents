@@ -35,6 +35,7 @@ pub struct ProposalCard {
     pub baseline: B3Hash,                             // 它所基于的版本；不等于 version 即已过期
     pub span: documents::Span,                        // 那一版里被提议替换的一段
     pub slices: Vec<documents::Slice>,                // 逐句的 diff：卡的正文
+    #[serde(default)] pub offered: Option<Seq>,       // 提出它的那一行，在 run 的会话里（D44）
 }
 pub struct Slice { pub kind: SliceKind, pub text: String, pub lead: String, pub trail: String }   // documents 定义
 pub enum SliceKind { Same, Delete, Insert }           // 线上 "same" | "delete" | "insert"
@@ -64,4 +65,25 @@ pub struct ProposalDecision { pub proposal: B3Hash, pub verdicts: Vec<kernel::ev
 **被否**：①给 `Proposals` 的地址改成可缺——一个参数两种答案形状，页面要按形状分支；②全城一问连正文一起答——每次计数都要为每张卡读文件、切句；③在页面里继续折叠 `proposal_offered`——页面打开之前的卡永远缺。
 
 **重开参数**：开着的卡多到一次答不完（数百张）时，加分页的 `before`。
+-/
+
+/-! D44 一张卡说出提出它的那一行，信件按这一行画发信 run 的相关对话
+
+```rust
+pub struct ProposalCard {
+    // …既有字段…
+    #[serde(default)]
+    pub offered: Option<Seq>,   // 提出它的 `proposal_offered` 那一行的 seq，在 `run` 的会话里
+}
+```
+
+**决定**：`Proposals(doc)` 作答时，读面在每张卡的 `run` 的会话窗口里（`LedgerAsk::records_of`，与 `Rounds` 同一个窗口）找身份等于这张卡的 `proposal_offered`，填它的 `seq`；一个 run 的窗口只读一次，同一个 run 的几张卡共用。找不到（窗口外、行读不回）为 `None`。信件的「对话」读法（client D90）按它只画提出这张卡的那一回合与前后各一回合，并给出整段会话的链接；`None` 时画整段，与以前一样。
+
+**理由**：A25 要的是发信 run「相关的」对话：一段长会话里，这张卡是哪一回合提出的、提出之前读了什么、之后说了什么。整段画出来，人要自己在几十个回合里找那一处。行的 seq 是回合与调用共用的坐标（`Turn.opened`、`Call.at`），页面不需要第二种对齐法。
+
+**被否**：①在 `OfferTimes` 里同时记 seq：那张表随快照编码，改它的形状要动折叠规则的版本，而 seq 只有打开一封信时才用得上；②页面按调用参数里的文档路径去对：同一回合里对同一份文档的两次提案分不开，参数被窗口截断时更对不上。
+
+**重开参数**：一张卡常常在离它的会话窗口（`HISTORY_MAX`）之外被打开时，给索引加一张按提案身份的表。
+
+**三个平台**：只读账本，Windows、macOS、Linux 相同。与本波其他改形同一次 `WIRE_V` 进位（D22）。
 -/
