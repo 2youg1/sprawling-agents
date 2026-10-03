@@ -23,9 +23,11 @@ pub enum StorageError {                      // thiserror；crate 根
     Checkpoint / SecretEgress / Bundle,                      // 各自的模块
     Worktree / WorktreeBusy / MergeStale / MergeWouldDiscard, // worktree
     Alias { op: &'static str, path: PathBuf, kind: alias::AliasKind },  // → E_OUTSIDE_WRITE_DOMAIN（8-25）
+    NameTaken { path: PathBuf },            // 新建时名字上已站着东西（8-32）→ E_VERSION_CONFLICT
     LedgerHeld { dir: PathBuf },            // 另一个 JsonlLedger 持着这座城的账本（8-1）→ E_LEDGER_HELD
     LedgerBroken { dir: PathBuf, at: Seq }, // 一波的写或 sync 失败过，重开前拒绝之后每一波（8-1）→ E_STORAGE_FATAL
-    ChainHalted { source: AxError },        // 全链审计发现断链，写者停止接新行（8-27）；码取审计自己的 source
+    ChainHalted { source: AxError },        // 全链审计发现断链，写者停止接新行（8-30）；码取审计自己的 source
+    Unproven,                               // 开城所依的历史还没证完，写者不接新行（8-30）→ E_HISTORY_UNPROVEN
     Snapshot { op: &'static str, path: PathBuf, source: io::Error },  // 快照读写被盘拒绝（8-26）→ E_STORAGE_FATAL，恢复说的是快照
 }
 impl StorageError { pub fn into_ax(self) -> AxError; }   // 跨 crate 边界的唯一出口
@@ -175,6 +177,11 @@ def code : StorageError → Answer
   | .ChainHalted => .carried
   | .Unproven => .own .HistoryUnproven
   | .Snapshot => .own .StorageFatal
+
+theorem ledger_failures_stop_the_writer :
+    code .Io = .own .StorageFatal ∧ code .LedgerBroken = .own .StorageFatal ∧
+      code .Snapshot = .own .StorageFatal := by
+  decide
 
 theorem only_two_variants_carry (e : StorageError) :
     code e = .carried ↔ e = .Draft ∨ e = .ChainHalted := by

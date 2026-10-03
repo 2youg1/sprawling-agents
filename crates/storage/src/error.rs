@@ -10,7 +10,7 @@
 //! **Why this is a module of its own.** `crates/storage/Spec.lean` §7 recorded
 //! the condition when the type was born: it lived beside the ledger
 //! while fewer than three modules aggregated here, and moved out at
-//! three. Twelve modules import it today, and most of its
+//! three. Most of the crate's modules import it today, and most of its
 //! variants describe failures the ledger cannot produce — a corrupt CAS
 //! object, a bundle that is not a city, a worktree that is behind
 //! the trunk. Executing a decision whose stated condition has arrived
@@ -210,15 +210,16 @@ impl StorageError {
                 AxError::failure(AxCode::InvalidArgs, "read cas range", hash)
                     .with_recovery("range exceeds the object; ask within its size")
             }
-            // An absent seq is the caller asking for a line that was
-            // never written — not damage, so not a storage fault.
             StorageError::Snapshot { op, path, source } => {
                 AxError::failure(AxCode::StorageFatal, op, path.display().to_string())
                     .with_recovery(format!(
-                        "storage failed ({source}); a snapshot is rebuilt from the ledger, so                          remove {} and free the disk; the next start folds from genesis",
+                        "storage failed ({source}); a snapshot is rebuilt from the ledger, so \
+                         remove {} and free the disk; the next start folds from genesis",
                         path.display()
                     ))
             }
+            // An absent seq is the caller asking for a line that was
+            // never written — not damage, so not a storage fault.
             StorageError::SeqMissing { seq } => {
                 AxError::failure(AxCode::InvalidArgs, "read ledger line", seq.to_string())
                     .with_recovery("ask for a seq the ledger actually holds")
