@@ -10,6 +10,10 @@ use std::path::{Path, PathBuf};
 
 use kernel::event::record::{RunStarted, ToolCalled, ToolResult};
 use kernel::{Address, AxError, EventKind, EventRecord, IdemKey, RunId, Seq};
+// The city is formed with an in-memory vault, because these tests are
+// about the worker and must not write to the credential service of the
+// machine that runs them.
+use accounting::worker::genesis::{Adopt, form};
 use sprawling::assembly;
 
 use crate::script::Scripted;
@@ -51,7 +55,12 @@ pub(crate) fn city_with_models(
     dir: &Path,
     models: Box<dyn accounting::ModelFactory + Send>,
 ) -> (accounting::worker::RunWorker, PathBuf) {
-    let founded = assembly::init_city(dir).unwrap();
+    let founded = form(
+        dir,
+        Adopt::Nothing,
+        assembly::hands(gateway::Custodian::in_memory()),
+    )
+    .unwrap();
     let mut worker = open_worker(dir, models);
     let endpoint = wire::ProviderName::parse("dead").unwrap();
     worker

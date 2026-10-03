@@ -24,6 +24,10 @@ use std::sync::{Arc, Mutex};
 use kernel::{
     Address, AxError, ContentBlock, IdemKey, Model, ModelRequest, ModelReturn, RunId, Seq,
 };
+// The city is formed with an in-memory vault, because these tests are
+// about the worker and must not write to the credential service of the
+// machine that runs them.
+use accounting::worker::genesis::{Adopt, form};
 use sprawling::assembly;
 
 const LAB: &str = "lab";
@@ -134,7 +138,12 @@ fn idem(what: &[u8]) -> IdemKey {
 #[test]
 fn a_run_is_offered_the_browser_the_worker_was_handed() {
     let dir = tempfile::tempdir().unwrap();
-    assembly::init_city(dir.path()).unwrap();
+    form(
+        dir.path(),
+        Adopt::Nothing,
+        assembly::hands(gateway::Custodian::in_memory()),
+    )
+    .unwrap();
     let offered = Arc::new(Mutex::new(Vec::new()));
     let mut worker = accounting::worker::RunWorker::new(
         dir.path(),

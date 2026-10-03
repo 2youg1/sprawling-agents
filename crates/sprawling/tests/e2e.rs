@@ -42,6 +42,10 @@ use std::path::Path;
 
 use accounting::worker::RunWorker;
 use kernel::{Address, AxCode, AxError, EventKind, EventRecord, IdemKey, RunId, Seq};
+// The city is formed with an in-memory vault, because these tests are
+// about the worker and must not write to the credential service of the
+// machine that runs them.
+use accounting::worker::genesis::{Adopt, form};
 use sprawling::assembly;
 
 /// The four variables of the pasted endpoint, named once and printed
@@ -305,7 +309,12 @@ fn a_real_endpoint_answers_a_dispatch_and_the_history_says_so() {
 fn answers_a_dispatch(round: &Round) {
     let label = &round.label;
     let dir = tempfile::tempdir().unwrap();
-    let raised = assembly::init_city(dir.path()).unwrap();
+    let raised = form(
+        dir.path(),
+        Adopt::Nothing,
+        assembly::hands(gateway::Custodian::in_memory()),
+    )
+    .unwrap();
     if let Err(err) =
         settled(round, &round.key, dir.path()).and_then(|mut worker| dispatch(&mut worker))
     {
@@ -343,7 +352,12 @@ fn the_history_states_where_the_output_ceiling_came_from() {
 fn states_the_ceilings_source(round: &Round) {
     let label = &round.label;
     let dir = tempfile::tempdir().unwrap();
-    let raised = assembly::init_city(dir.path()).unwrap();
+    let raised = form(
+        dir.path(),
+        Adopt::Nothing,
+        assembly::hands(gateway::Custodian::in_memory()),
+    )
+    .unwrap();
     // The registration alone, without a dispatch: the rung is decided
     // when the model is chosen, so a gate that also required a call to
     // come home would report an endpoint outage as a ceiling nobody
@@ -387,7 +401,12 @@ fn a_wrong_key_is_refused_in_words_a_person_can_act_on() {
 fn refuses_a_wrong_key(round: &Round) {
     let label = &round.label;
     let dir = tempfile::tempdir().unwrap();
-    assembly::init_city(dir.path()).unwrap();
+    form(
+        dir.path(),
+        Adopt::Nothing,
+        assembly::hands(gateway::Custodian::in_memory()),
+    )
+    .unwrap();
 
     let Err(refused) =
         settled(round, WRONG_KEY, dir.path()).and_then(|mut worker| dispatch(&mut worker))

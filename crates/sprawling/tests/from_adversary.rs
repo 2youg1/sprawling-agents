@@ -21,12 +21,21 @@
 )]
 
 use kernel::{Address, AxCode, IdemKey, RunId, Seq};
+// The city is formed with an in-memory vault, because these tests are
+// about the worker and must not write to the credential service of the
+// machine that runs them.
+use accounting::worker::genesis::{Adopt, form};
 use sprawling::assembly;
 
 #[test]
 fn a_halted_city_names_the_halt_and_not_the_configuration() {
     let dir = tempfile::tempdir().unwrap();
-    assembly::init_city(dir.path()).unwrap();
+    form(
+        dir.path(),
+        Adopt::Nothing,
+        assembly::hands(gateway::Custodian::in_memory()),
+    )
+    .unwrap();
 
     // The vault is the in-session one: a test that reached the platform
     // credential service would write to the machine running it.
@@ -90,7 +99,12 @@ fn a_halted_city_names_the_halt_and_not_the_configuration() {
 #[test]
 fn every_spelling_of_one_endpoint_is_registered_as_one_url() {
     let dir = tempfile::tempdir().unwrap();
-    let raised = assembly::init_city(dir.path()).unwrap();
+    let raised = form(
+        dir.path(),
+        Adopt::Nothing,
+        assembly::hands(gateway::Custodian::in_memory()),
+    )
+    .unwrap();
 
     // The vault is the in-session one: a test that reached the platform
     // credential service would write to the machine running it.
@@ -128,7 +142,12 @@ fn every_spelling_of_one_endpoint_is_registered_as_one_url() {
 #[test]
 fn a_model_no_catalogue_prices_is_registered_with_a_ceiling() {
     let dir = tempfile::tempdir().unwrap();
-    let raised = assembly::init_city(dir.path()).unwrap();
+    let raised = form(
+        dir.path(),
+        Adopt::Nothing,
+        assembly::hands(gateway::Custodian::in_memory()),
+    )
+    .unwrap();
 
     // The vault is the in-session one: a test that reached the platform
     // credential service would write to the machine running it.

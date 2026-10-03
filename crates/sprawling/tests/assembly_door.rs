@@ -22,6 +22,10 @@
 )]
 
 use kernel::{Address, EventKind, EventRecord, IdemKey, RunId, Seq};
+// The city is formed with an in-memory vault, because these tests are
+// about the worker and must not write to the credential service of the
+// machine that runs them.
+use accounting::worker::genesis::{Adopt, form};
 use sprawling::assembly;
 
 /// The city this test builds is the one the assertion reads back, so the
@@ -31,7 +35,12 @@ const LAB: &str = "lab";
 #[test]
 fn a_command_reaches_the_ledger_through_the_door_the_wire_uses() {
     let dir = tempfile::tempdir().unwrap();
-    let raised = assembly::init_city(dir.path()).unwrap();
+    let raised = form(
+        dir.path(),
+        Adopt::Nothing,
+        assembly::hands(gateway::Custodian::in_memory()),
+    )
+    .unwrap();
 
     // The vault is the in-session one: a test that reached the platform
     // credential service would be a test that writes to the machine
