@@ -282,3 +282,177 @@ mod tests {
         assert_eq!(redacted, payload);
     }
 }
+
+/// The phase instruments of the tools whose results pass this module:
+/// each times one call through the tool's own face (path resolution, IO
+/// and the envelope as one phase), then the secret scan of its result,
+/// and prints one line per tool in microseconds (`crates/runtime/Spec.lean`
+/// §10, the per-tool phases). They live here because the scan is the
+/// phase every tool shares.
+#[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::disallowed_methods,
+    reason = "test code: an instrument reads the wall clock"
+)]
+mod phases {
+    use std::path::Path;
+    use std::sync::{Arc, Mutex};
+    use std::time::{Duration, Instant};
+
+    use kernel::{Address, Payload, ReadVerdict, Tool, ToolCall, ToolName, ToolOutcome};
+    use serde_json::{Map, Value, json};
+
+    use crate::backlog::{Backlog, PollBudget};
+    use crate::catalog::Catalog;
+    use crate::sandbox::{EchoSandbox, Fuel};
+    use crate::tools::{
+        EditTool, ExecSetup, ExecTool, ReadBound, ReadTool, SearchTool, version_of,
+    };
+
+    #[test]
+    #[ignore = "an instrument: run it by name with --run-ignored only --no-capture"]
+    fn instrument_read_phases() {
+        let city = tempfile::tempdir().unwrap();
+        std::fs::write(city.path().join("history.txt"), history_text()).unwrap();
+        let catalog = Arc::new(Mutex::new(Catalog::new()));
+        let tool =
+            ReadTool::new(city.path(), catalog, everywhere(), Path::new("no-store")).unwrap();
+        let read = call("read", json!({ "path": "history.txt" }));
+        report("read", (0..32).map(|_| timed(&tool, &read)));
+    }
+
+    /// `write` is `edit` with a `base_version` of `new`: it creates the
+    /// file, and its echo is the whole file as a diff.
+    #[test]
+    #[ignore = "an instrument: run it by name with --run-ignored only --no-capture"]
+    fn instrument_write_and_edit_phases() {
+        let city = tempfile::tempdir().unwrap();
+        let work = Address::parse("work").unwrap();
+        let domain = kernel::WriteDomain::new(vec![work.clone()]).unwrap();
+        std::fs::create_dir_all(city.path().join("work")).unwrap();
+        let tool = EditTool::new(city.path(), work, domain, kernel::WriteLimit::Full).unwrap();
+        let text = history_text();
+        let edit = |path: &str, base: &str, old: &str, new: &str| {
+            call(
+                "edit",
+                json!({ "path": path, "base_version": base, "old": old, "new": new }),
+            )
+        };
+        let writes: Vec<_> = (0..32)
+            .map(|at| timed(&tool, &edit(&format!("work/h{at}.txt"), "new", "", &text)))
+            .collect();
+        report("write", writes);
+        let edited = format!("{text}tail\n");
+        let edits: Vec<_> = (0..32)
+            .map(|at| {
+                let path = format!("work/h{at}.txt");
+                std::fs::write(city.path().join(&path), &edited).unwrap();
+                timed(
+                    &tool,
+                    &edit(&path, &version_of(edited.as_bytes()), "tail", "TAIL"),
+                )
+            })
+            .collect();
+        report("edit", edits);
+    }
+
+    /// The host's own shell prints the file (`cmd` on Windows, `sh` on
+    /// macOS and Linux) under `EchoSandbox`, so the reading is the tool's
+    /// cost and not a sandbox arm's.
+    #[test]
+    #[ignore = "an instrument: run it by name with --run-ignored only --no-capture"]
+    fn instrument_exec_phases() {
+        let chamber = tempfile::tempdir().unwrap();
+        std::fs::write(chamber.path().join("history.txt"), history_text()).unwrap();
+        let setup = ExecSetup {
+            workdir: chamber.path().to_path_buf(),
+            mounts: Vec::new(),
+            python_wasm: None,
+            shell: None,
+            fuel: Fuel(1_000_000),
+            env_passthrough: Vec::new(),
+            domain: Address::parse("work").unwrap(),
+            run: kernel::RunId::from_bytes([1; 16]),
+            limit: kernel::WriteLimit::Full,
+        };
+        let patient = Backlog::with_window(PollBudget::new(6_000, 20));
+        let tool = ExecTool::new(setup, Box::new(EchoSandbox::new()), patient).unwrap();
+        let (path, args) = if cfg!(windows) {
+            ("cmd", ["/C", "type history.txt"])
+        } else {
+            ("sh", ["-c", "cat history.txt"])
+        };
+        let exec = call(
+            "exec",
+            json!({ "arm": { "program": { "path": path, "args": args } } }),
+        );
+        report("exec", (0..8).map(|_| timed(&tool, &exec)));
+    }
+
+    #[test]
+    #[ignore = "an instrument: run it by name with --run-ignored only --no-capture"]
+    fn instrument_search_phases() {
+        let city = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(city.path().join("lab")).unwrap();
+        std::fs::write(city.path().join("lab").join("history.txt"), history_text()).unwrap();
+        let tool = SearchTool::new(city.path(), everywhere()).unwrap();
+        let search = call("search", json!({ "text": "HMAC_KEY" }));
+        report("search", (0..32).map(|_| timed(&tool, &search)));
+    }
+
+    fn everywhere() -> ReadBound {
+        Arc::new(|_: &Address| ReadVerdict::Open)
+    }
+
+    fn call(name: &str, args: Value) -> ToolCall {
+        let Value::Object(args) = args else {
+            return call(name, Value::Object(Map::new()));
+        };
+        ToolCall {
+            id: "call-1".to_owned(),
+            name: ToolName::parse(name).unwrap(),
+            args: Payload::new(args).unwrap(),
+        }
+    }
+
+    fn timed(tool: &dyn Tool, call: &ToolCall) -> (Duration, ToolOutcome) {
+        let started = Instant::now();
+        let outcome = tool.invoke(call).unwrap();
+        (started.elapsed(), outcome)
+    }
+
+    /// Text shaped like what a tool hands back from a working city:
+    /// hashes and oids, a labelled key, a mixed token and prose, about
+    /// 64 KiB. Assembled at runtime so this file holds no scannable span.
+    fn history_text() -> String {
+        let hex = "9f3c1a7e5b20d48c6f1ea7b3905d2ce81f64b07a".repeat(2);
+        let token = ["kJ8vQ2xR9m", "W4nZ7pL3sT", "6yB1cD5fG0", "hN8aE2iU4o"].concat();
+        let line = format!(
+            "prev={hex} oid={} HMAC_KEY={} note: see {token} for the run, and nothing else\n",
+            hex.get(..40).unwrap(),
+            hex.get(3..43).unwrap()
+        );
+        line.repeat(400)
+    }
+
+    /// Prints one line per tool: rounds, the spans the scan replaced, the
+    /// summed call time, and the summed time the scan of each result took.
+    fn report(tool: &str, calls: impl IntoIterator<Item = (Duration, ToolOutcome)>) {
+        let (mut rounds, mut found) = (0u32, 0u32);
+        let (mut call, mut scan) = (Duration::ZERO, Duration::ZERO);
+        for (took, outcome) in calls {
+            let started = Instant::now();
+            let (_redacted, hits) = super::redact(outcome.result.as_map());
+            scan = scan.saturating_add(started.elapsed());
+            call = call.saturating_add(took);
+            rounds = rounds.saturating_add(1);
+            found = found.saturating_add(hits);
+        }
+        println!(
+            "instrument_tool_phases tool={tool} rounds={rounds} spans={found} call_us={} secret_scan_us={}",
+            call.as_micros(),
+            scan.as_micros()
+        );
+    }
+}
