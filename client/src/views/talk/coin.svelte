@@ -22,6 +22,11 @@
 
   const { face, sending, onStop }: Props = $props();
   const { lang } = ui();
+  // The faint face says why it does nothing through a description a
+  // screen reader reads with the name, not through the title alone,
+  // which a keyboard never shows (client/spec/Views/Workspace.lean §7-11).
+  const uid = $props.id();
+  const hint = `${uid}-hint`;
 
   const name = $derived(face === "stop" ? STOP : say($lang, SPELLING[sending]));
 </script>
@@ -35,6 +40,7 @@ click lets the submit through. The stop face is a plain button. -->
   data-up={face === "stop" ? "stop" : "send"}
   aria-label={name}
   aria-disabled={face === "idle" ? "true" : undefined}
+  aria-describedby={face === "idle" ? hint : undefined}
   title={face === "idle" ? say($lang, "talk_enter_hint") : undefined}
   onclick={(event) => {
     switch (pressCoin(face)) {
@@ -48,6 +54,7 @@ click lets the submit through. The stop face is a plain button. -->
     }
   }}
 >
+  <span id={hint} hidden>{say($lang, "talk_enter_hint")}</span>
   <span class="coin-faces" aria-hidden="true">
     <span
       class="coin-face bg-page text-text group-aria-disabled:text-text-disabled"
