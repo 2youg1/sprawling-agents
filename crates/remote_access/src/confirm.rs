@@ -80,10 +80,6 @@ impl<V> Confirm<V> {
         let typed = B3Hash::digest(canonical(answer).as_bytes());
         match self.pending.take() {
             Some(pending) if pending.code == typed && now < pending.expires => Ok(pending.verb),
-            Some(pending) if pending.code != typed => {
-                self.pending = Some(pending);
-                Err(denied())
-            }
             Some(_) | None => Err(denied()),
         }
     }
@@ -105,6 +101,7 @@ fn denied() -> AxError {
     clippy::unwrap_used,
     clippy::expect_used,
     clippy::panic,
+    clippy::arithmetic_side_effects,
     reason = "test code"
 )]
 mod tests {

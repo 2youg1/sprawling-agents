@@ -9,9 +9,9 @@ import crates.remote_access.spec.Handshake
 
 /-! # remote_access 的规格
 
-`sprawling-remote-access`（库名 `remote_access`，目录 `crates/remote_access`）是远程接入：一个人离开这台电脑时，从外面够到自己这座城——谁能进、进来能做什么、何时失效、如何一键关上。模块：door（门的状态）／pairing（一次性配对码）／keys（混合签名密钥）／handshake（每次连接的握手，以及设备第一次连接时的配对握手）／seal（帧封装）／route（通路缝与它的三个实现）；尚未落地的部分写在 §3。
+`sprawling-remote-access`（库名 `remote_access`，目录 `crates/remote_access`）是远程接入：一个人离开这台电脑时，从外面够到自己这座城——谁能进、进来能做什么、何时失效、如何一键关上。模块：door（门的状态）／confirm（等控制台确认的那一次请求）／pairing（一次性配对码）／keys（混合签名密钥）／handshake（每次连接的握手，以及设备第一次连接时的配对握手）／seal（帧封装）／route（通路缝与它的三个实现）；尚未落地的部分写在 §3。
 
-本文件是 crate 的规格入口，分部在 `spec/` 下，布局见 ARCHITECTURE.md §11「Specifications in Lean」：`spec/Door.lean` 证明远程门的六条性质，`spec/Handshake.lean` 证明配对握手的三条性质，`spec/Confirm.lean` 证明控制台确认的三条性质（D4，模块尚未落地，§3）。能写成定理的性质在分部里证明；本文件的十七节记录其余的要求、理由与决定。决定写作 `D<n>`，别处引作 `remote_access D<n>`；D1 到 D21 沿用这份规格在 Markdown 时 §12 的条目号，所以旧的引用改写之后号不变；D22 起是迁移之后的决定。§8 的各条保留 `8-1` 到 `8-12` 的编号，别处引作 `crates/remote_access/Spec.lean` §8-n。
+本文件是 crate 的规格入口，分部在 `spec/` 下，布局见 ARCHITECTURE.md §11「Specifications in Lean」：`spec/Door.lean` 证明远程门的六条性质，`spec/Handshake.lean` 证明配对握手的三条性质，`spec/Confirm.lean` 证明控制台确认的三条性质（D4，§8-13）。能写成定理的性质在分部里证明；本文件的十七节记录其余的要求、理由与决定。决定写作 `D<n>`，别处引作 `remote_access D<n>`；D1 到 D21 沿用这份规格在 Markdown 时 §12 的条目号，所以旧的引用改写之后号不变；D22 起是迁移之后的决定。§8 的各条保留 `8-1` 到 `8-12` 的编号，`8-13` 是迁移之后加的，别处引作 `crates/remote_access/Spec.lean` §8-n。
 
 本文件本身是描述，不是被证明的规格：它不含 Lean 定义与定理，被证明的只有三个分部里的性质；其余每一条由 §16 列出的测试判，`cloudflare` 通路由 §8-8 的操作者检查判。
 
@@ -57,8 +57,7 @@ D2 后量子放在三处：TLS、设备认证、帧封装。TLS 负责传输层�
 以下是这个接口今天尚未落地的部分，按阶段写成当前状态；每一段落地时，从这里删掉，写进它所属的 §8 章节。
 
 - **`cloudflare` 通路没有在真的隧道上开过。** 自动测试不跑它（§2）。缺的证据有两件：在一台装了 `cloudflared`、能连上 Cloudflare 边缘的电脑上，按 §8-8 的操作者检查开、关一次；在一台出网受限（经代理、7844 端口被拦）的电脑上，`cloudflared` 在就绪之前退出时，能否给出比「它在就绪之前退出」更具体的一句拒绝。今天的拒绝给出手动跑的那一行命令，人从 `cloudflared` 自己的输出里读原因。
-- **本 crate 的 `confirm` 模块尚未落地，设置页的门开关随它到来**（D4，性质在 `spec/Confirm.lean`）。打算的接口：一个对动词泛型的 `Confirm<V>`，最多持有一个等待中的请求；`request(verb: V, entropy: [u8; CONFIRM_BYTES], expires: TimeMs) -> String` 换下先前的请求，交回印在控制台上的正文，本 crate 之后只存摘要（与 §8-2 的配对码同一个理由）；`confirm(answer: &str, now: TimeMs) -> Result<V, AxError>` 不论对错都结束等待中的请求，答错、没有请求、过期都以 `E_GATE_DENIED` 拒，恢复语是在页面上再按一次、照控制台上新印的码输入。对动词泛型，是因为开门的载荷（开多久）是装配层的类型。确认码 5 字节熵、写成 8 个 base32 符号，两分钟到期：一次请求只给一次猜的机会，40 位够；到期由装配层给出，与配对码的十分钟同一种做法。落地时它要的另外两件：`architecture.toml` 的模块行先登记；从 `spec/Confirm.lean` 的三条性质派生的 Rust 检查（迹向量），先在一个故意不清空等待请求的实现上看它转红。
-- **W6b 的工作单**（设置页的门，Roadmap 的 A7 前一半与 REMOTE2）：①wire：`crates/wire/spec/Command/Kind.lean` 远程门的四行进 `inductive Command`、`reach` 与 `verbClass`，Rust 的 `WireCommand` 同步，集成者重生成 `WIRE_V`、goldens、`client/src/wire.ts` 与 adversary 的 `Door.lean`；②装配层 `bin::outside`：`OpenRemoteDoor` 与 `ReplaceCityKey` 先 `Confirm::request`，在控制台印一行，说出是页面在请求、要做的动词（开门时连同开多久）与分组的确认码，答页面 `E_APPROVAL_PENDING`；`ConfirmRemoteDoor` 经 `Confirm::confirm` 取回动词，再走与 `/remote open`、`/remote replace-key` 同一条路（`Doorway::open`、`Doorway::replace_key`，`crates/sprawling/spec/Outside.lean` §8-140）；`CloseRemoteDoor` 直接 `Doorway::close(Console)`；`bin::outside::verbs::command_class` 给四个新动词各一臂；城没有控制台（stdin 不是终端）时请求以 `E_TOOL_UNAVAILABLE` 拒，恢复语是在城自己的终端里跑 `sprawling serve`；③客户端：设置 → 远程里一个门开关与开多久的选择、一个「更换城钥匙」按钮，按下后都显示一个输入框，说明码印在城的控制台上；配对仍是今天的分步说明与可复制的一行；交互契约写进 `client/Spec.lean` §9 指向的分部；④CI：macOS runner 上一个作业核实二进制更新之后钥匙串是否再问一次读取 `remote` realm 的权限，看到的应是第一次 `/remote pair` 时的钥匙串对话框，或 resolve 以平台服务的原话拒绝。
+- **设置页的门还缺两件**（Roadmap 的 A7 与 REMOTE2；线上的四个命令与装配层的执行者已落地，见 §8-13 与 `crates/sprawling/spec/Outside.lean` §8-140）：③客户端：设置 → 远程里一个门开关与开多久的选择、一个「更换城钥匙」按钮，按下后都显示一个输入框，说明码印在城的控制台上；配对仍是今天的分步说明与可复制的一行；交互契约写进 `client/Spec.lean` §9 指向的分部；④CI：macOS runner 上一个作业核实二进制更新之后钥匙串是否再问一次读取 `remote` realm 的权限，看到的应是第一次 `/remote pair` 时的钥匙串对话框，或 resolve 以平台服务的原话拒绝。
 -/
 
 /-! ## 4 现状分析
@@ -408,6 +407,23 @@ fixture.txt           city_public, hello, x25519_private, ml_kem_private, reply,
 - **浏览器一侧**：`client/src/core/remote/interop.test.ts` 读同一组文件，以页面的实现（WebCrypto 加 `@noble/post-quantum`，D21）重算确定的三份、验 `signature-rust.txt`、用固定的临时私钥打开 `fixture.txt` 的第一帧；它还用 `keys.txt` 的种子签 `signature-rust.txt` 的那条消息，写成 `signature-browser.txt`，Rust 一侧的 `every_signature_vector_verifies` 验它。这一份只在树上那一份在浏览器一侧验不过时由 `GOLDEN_WRITE=1 bun test --conditions=browser src/core/remote/interop.test.ts`（在 `client/` 里跑）重写。
 - **重生成**：`GOLDEN_WRITE=1 cargo nextest run -p sprawling-remote-access -E 'test(/vector|fixture/)'`。确定的三份（`keys.txt`、`session-keys.txt`、`seal.txt`）每次重写，字节不变；`signature-rust.txt` 与 `fixture.txt` 带着随机（ML-DSA 的签名、城的临时密钥、新抽的 ML-KEM 密钥），只在提交入库的那一份在 Rust 一侧验不过或打不开时重写，所以协议没变时重跑一次不改一个字节，而标签、握手记录、派生或封装的任何改动都让它们打不开、随之重写。不带这个变量时，测试只读、只比，不写。
 - **固定的临时密钥只经测试的缝进来**：读写这些文件的是 `#[cfg(test)]` 的 `remote_access::handshake::agreement::interop`，它从两把私钥造出设备的临时密钥；发行二进制里设备的临时密钥只有 `generate` 一个来处，`handshake` 没有可注入随机源的接口（D20）。
+
+
+### 8-13 remote_access::confirm（形状 5 状态）
+
+```rust
+pub const CONFIRM_BYTES: usize = 5;
+pub struct Confirm<V> { /* 至多一个等待中的请求 —— 私有 */ }   // Default：没有请求
+impl<V> Confirm<V> {
+    pub fn request(&mut self, verb: V, entropy: [u8; CONFIRM_BYTES], expires: TimeMs) -> String;
+    pub fn confirm(&mut self, answer: &str, now: TimeMs) -> Result<V, AxError>;
+}
+```
+
+- `request` 换下先前的请求，交回印在控制台上的正文（8 个 base32 符号，四个一组，`abcd-efgh`）；本模块之后只存正文的摘要，与 §8-2 的配对码同一个理由。
+- `confirm` 不论对错都结束等待中的请求：答错、没有请求、`now` 不在到期之前，都以 `E_GATE_DENIED` 拒，恢复语是在页面上再按一次、照控制台上新印的码输入。答案的读法与配对码相同，大小写、空白与连字符不论。
+- 对动词泛型，是因为开门的载荷（开多久）是装配层的类型。确认码 5 字节熵：一次请求只给一次猜的机会，40 位够。两分钟的期限由装配层给出（`bin::outside::asking`），与配对码的十分钟同一种做法。
+- 迹向量：模块里的测试把 `spec/Confirm.lean` 的 `step` 逐字抄成参照，在十七个事件的字母表上穷举四个事件以内的每一条迹，逐条对照 `Confirm` 的结果；三条性质各另有一条具名向量。
 
 D20 互通的证据是 §8-12 的五份文本文件，由 Rust 的测试写、两侧的测试读。写法是一行一个字段的十六进制，而不是 JSON：本 crate 不依赖 JSON 解析器，为测试加一条 `serde_json` 的开发依赖会让锁文件多一条边，手写一个 JSON 读写器又是为测试多一份文法；TS 一侧两种写法都只要一行代码。固定的设备临时密钥经 `#[cfg(test)]` 的缝进来，生产的 `handshake` 不加可注入随机源的接口：§8-4 的城一侧随机性在 aws-lc-rs 内部，加一个注入点也做不出双向固定的整次握手，只会让发行二进制多一条测试才用的路。带随机的两份只在验不过时重写：每次重写都改字节的夹具，会让与协议无关的重跑在评审里看起来像协议改了。落选的做法是跑测试时起 bun 现场比对（D11 已排除）。
 -/

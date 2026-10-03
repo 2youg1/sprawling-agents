@@ -6,11 +6,11 @@
 /-!
 # Console confirmation: a page asks, the console shows a code, the User types it.
 
-Specifies the `confirm` module of remote_access, which is not built yet
-(crates/remote_access/Spec.lean §3 lists it), and the two wire commands that
+Specifies `remote_access::confirm` (crates/remote_access/src/confirm.rs,
+crates/remote_access/Spec.lean §8-13), and the two wire commands that
 reach it (crates/wire/spec/Command/Kind.lean, the rows for the remote door).
-The model is the authority on which properties must hold; the Rust module,
-when it lands, is the authority on how they hold (remote_access D4).
+The model is the authority on which properties must hold; the Rust module
+is the authority on how they hold (remote_access D4).
 
 Two verbs of the remote door widen what reaches the city or cannot be taken
 back: opening the door and replacing the city key. A page on the city's
