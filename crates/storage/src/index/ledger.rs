@@ -5,13 +5,14 @@
 
 //! The side index: seq to (segment, byte offset).
 
+use std::io;
 use std::path::Path;
 use std::sync::{Mutex, MutexGuard, PoisonError};
 
 use kernel::{AxError, RunId, Seq};
 
 use crate::error::{StorageError, io_err};
-use crate::jsonl::segment_names;
+use crate::jsonl::{FIRST_WINDOW_BYTES, records_end, segment_names};
 use crate::real_fs::RealFs;
 use crate::vfs::Vfs;
 
@@ -29,7 +30,10 @@ pub enum Refreshed {
     /// Every segment was exactly the length this index had already
     /// folded, so nothing was opened.
     Unchanged,
-    /// Only the bytes appended since the last look were read.
+    /// A segment was longer than what this index had folded, so the
+    /// bytes past that point were read: up to the segment's end, or up to
+    /// the window that reached a preallocated segment's zero tail
+    /// (storage D32), which a refresh reads even when no record arrived.
     Appended { bytes_read: u64 },
     /// A segment shrank or vanished, so every offset came from a full
     /// scan of the directory.
@@ -186,19 +190,14 @@ impl LedgerIndex {
         Ok(RefreshPlan::Appended { spans })
     }
 
-    /// Reads each appended span and folds it. The read is bounded by the
-    /// length this refresh stat'ed, so a record appended between the
-    /// stat and the read stays for the next refresh rather than being
-    /// folded at an offset this pass never confirmed.
+    /// Reads the records of each appended span and folds them.
     fn fold_spans(&mut self, dir: &Path, spans: Vec<Span>) -> Result<Refreshed, StorageError> {
         let mut bytes_read: u64 = 0;
         for span in spans {
             let path = dir.join(&span.name);
-            let tail = self
-                .seam()
-                .read_at(&path, span.from, span.size.saturating_sub(span.from))
-                .map_err(crate::error::io_err("read segment", &path))?;
-            bytes_read = bytes_read.saturating_add(u64::try_from(tail.len()).unwrap_or(u64::MAX));
+            let (tail, read) = read_records(self.seam().as_ref(), &path, &span)
+                .map_err(io_err("read segment", &path))?;
+            bytes_read = bytes_read.saturating_add(read);
             let indexed = self.folded.fold_segment(&span.name, span.from, &tail);
             // Only complete lines count as scanned: a torn tail is
             // overwritten by the next append, and remembering it as read
@@ -279,6 +278,42 @@ struct Span {
     name: String,
     from: u64,
     size: u64,
+}
+
+/// The records of `span`, read forward one window at a time, with the
+/// count of bytes lifted off the disk to find them.
+///
+/// The read is bounded by the length this refresh stat'ed, so a record
+/// appended between the stat and the read stays for the next refresh
+/// rather than being folded at an offset this pass never confirmed. It
+/// stops at the window whose records end before the window does: past
+/// that point a preallocated segment (storage D31) holds only zeros, so
+/// a refresh of one reads its new records and at most one window of
+/// zeros, never every zero up to the roll size (storage D32). The window
+/// starts at `FIRST_WINDOW_BYTES` and doubles, so a long stretch of new
+/// records costs a number of reads logarithmic in its length.
+fn read_records(vfs: &dyn Vfs, path: &Path, span: &Span) -> io::Result<(Vec<u8>, u64)> {
+    let mut records = Vec::new();
+    let mut read: u64 = 0;
+    let mut window = FIRST_WINDOW_BYTES;
+    loop {
+        let at = span.from.saturating_add(read);
+        let asked = window.min(span.size.saturating_sub(at));
+        if asked == 0 {
+            return Ok((records, read));
+        }
+        let mut chunk = vfs.read_at(path, at, asked)?;
+        let lifted = u64::try_from(chunk.len()).map_err(io::Error::other)?;
+        read = read.saturating_add(lifted);
+        let end = records_end(&chunk);
+        let reached_zeros = end < chunk.len();
+        chunk.truncate(end);
+        records.append(&mut chunk);
+        if reached_zeros || lifted < asked {
+            return Ok((records, read));
+        }
+        window = window.saturating_mul(2);
+    }
 }
 
 /// What a refresh decided before it read anything.

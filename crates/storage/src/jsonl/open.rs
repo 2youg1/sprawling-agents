@@ -17,7 +17,7 @@ use crate::vfs::Vfs;
 
 use super::ledger::{
     JsonlLedger, OpenReport, SEGMENT_PREALLOCATION, SEGMENT_ROLL_BYTES, TailTruncation, WriterLock,
-    complete_lines, is_segment, segment_file_name, u64_count,
+    complete_lines, is_segment, records_end, segment_file_name, u64_count,
 };
 use super::verify::{LineCheck, LineFault};
 
@@ -186,10 +186,7 @@ impl JsonlLedger {
         // Zeros after the last record are preallocated space, not a tear
         // (`crates/storage/spec/Jsonl/Preallocate.lean`): the scan reads the
         // segment without them, and the writer resumes where they begin.
-        let filled = file
-            .iter()
-            .rposition(|byte| *byte != 0)
-            .map_or(0, |at| at.saturating_add(1));
+        let filled = records_end(&file);
         let total = u64_count(file.len()).map_err(io_err("measure segment", last))?;
         let mut bytes = file;
         bytes.truncate(filled);
