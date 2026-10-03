@@ -73,7 +73,6 @@ struct Table {
 }
 
 impl Backlog {
-
     /// Starts a command, waits out the short window, and hands back
     /// either its result or a handle onto it.
     ///

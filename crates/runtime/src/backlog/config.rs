@@ -13,6 +13,7 @@
 
 use super::{Backlog, PollBudget, Scratch, Shares, Sink};
 
+impl Backlog {
     #[must_use]
     pub fn new() -> Backlog {
         Backlog::default()
@@ -53,3 +54,4 @@ use super::{Backlog, PollBudget, Scratch, Shares, Sink};
     pub fn shares(&self) -> Shares {
         self.shares
     }
+}

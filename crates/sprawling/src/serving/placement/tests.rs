@@ -19,10 +19,10 @@
 
 use std::collections::BTreeSet;
 
+use super::describe;
 use super::plan::{Left, Plan, Processor, Topology};
 use super::reading::Unread;
 use super::seats::{Holder, Role, SERIAL_SEATS, Seats};
-use super::describe;
 
 const THREADS: u64 = 4;
 const MOST_SEATS: u32 = 5;

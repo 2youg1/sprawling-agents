@@ -24,11 +24,10 @@ use std::sync::{Mutex, OnceLock, PoisonError};
 
 use accounting::person::CorePlacement;
 use plan::{Left, Plan, Processor, Shape, Topology};
-pub(crate) use seats::Role;
-use seats::Seats;
 use reading::Unread;
 use runtime::{PlatformShares, Shares, platform_shares};
-
+pub(crate) use seats::Role;
+use seats::{Holder, Seats};
 
 /// The one seat table every hot thread of this process sits at, built
 /// from the topology read at the first seat.

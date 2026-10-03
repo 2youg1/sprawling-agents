@@ -15,6 +15,8 @@
 //! properties on the table over every plan of up to five seats and every
 //! sequence of six starts and exits of four threads.
 
+use super::plan::Processor;
+
 /// Who holds a seat: one per hot thread for as long as it lives.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct Holder(pub(crate) u64);

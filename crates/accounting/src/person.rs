@@ -362,9 +362,15 @@ priority = \"fast\"
         let file = dir.path().join("config.toml");
         let absent = stated_core_placement(&file).map_err(|err| *err.code());
         let stated = ["none", "soft", "soft_shares", "pinned", "hard"].map(|arm| {
-            std::fs::write(&file, format!("[core]
+            std::fs::write(
+                &file,
+                format!(
+                    "[core]
 placement = \"{arm}\"
-")).unwrap();
+"
+                ),
+            )
+            .unwrap();
             stated_core_placement(&file).map_err(|err| *err.code())
         });
         assert_eq!(
