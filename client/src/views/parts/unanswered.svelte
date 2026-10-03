@@ -14,6 +14,9 @@ import type { Query } from "../../wire";
 export interface UnansweredProps {
   // The question as the city spelled it back.
   readonly query: string;
+  // Why the city could not look, when it says (`Answer::Unavailable`,
+  // wire D47); `null` where it only names the question.
+  readonly reason?: string | null | undefined;
   // The question this view asked, sent again by the recovery.
   readonly asked: Query;
 }
@@ -24,7 +27,7 @@ export interface UnansweredProps {
   import { ui } from "../../ui";
   import Button from "./button.svelte";
 
-  const { query, asked }: UnansweredProps = $props();
+  const { query, asked, reason }: UnansweredProps = $props();
 
   const u = ui();
   const lang = u.lang;
@@ -32,6 +35,9 @@ export interface UnansweredProps {
 
 <div class="flex flex-col items-start gap-snug text-note">
   <p class="text-text-faint">{fill(say($lang, "answer_unavailable"), { query })}</p>
+  {#if reason !== undefined && reason !== null}
+    <p class="font-mono text-text-faint">{reason}</p>
+  {/if}
   <Button
     label={say($lang, "link_retry")}
     tone="quiet"

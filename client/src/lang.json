@@ -7222,5 +7222,41 @@
   "letter_whole_talk": {
     "en": "the whole conversation, on the run's page",
     "zh": "整段会话在 run 页上"
+  },
+  "shells_title": {
+    "en": "Shell lines by interpreter",
+    "zh": "各解释器的 shell 行"
+  },
+  "shells_interpreter": {
+    "en": "interpreter",
+    "zh": "解释器"
+  },
+  "shells_calls": {
+    "en": "calls",
+    "zh": "调用"
+  },
+  "shells_failures": {
+    "en": "failures",
+    "zh": "失败"
+  },
+  "shells_no_failures": {
+    "en": "no failures",
+    "zh": "没有失败"
+  },
+  "shells_none": {
+    "en": "no shell line has run yet",
+    "zh": "还没有跑过 shell 行"
+  },
+  "shells_command_not_found": {
+    "en": "command not found",
+    "zh": "找不到命令"
+  },
+  "shells_syntax": {
+    "en": "syntax",
+    "zh": "语法"
+  },
+  "shells_encoding": {
+    "en": "encoding",
+    "zh": "编码"
   }
 }

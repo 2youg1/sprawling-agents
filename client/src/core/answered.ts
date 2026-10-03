@@ -14,16 +14,22 @@ export type Answered<T> =
   | { readonly kind: "asking" }
   | { readonly kind: "held"; readonly value: T }
   // `query` is the question as the city spelled it back, so a person
-  // reads which question went unanswered, not only that one did.
-  | { readonly kind: "unavailable"; readonly query: string };
+  // reads which question went unanswered, not only that one did; `reason`
+  // says why the city could not answer, and is `null` where it does not
+  // say (wire D47).
+  | { readonly kind: "unavailable"; readonly query: string; readonly reason: string | null };
 
 // `pick` reads the one variant the view draws and answers `undefined`
 // for every other.
 export function readAnswer<T>(answer: Answer | undefined, pick: (answer: Answer) => T | undefined): Answered<T> {
   if (answer === undefined) return { kind: "asking" };
-  if ("unavailable" in answer) return { kind: "unavailable", query: answer.unavailable.query };
+  if ("unavailable" in answer) {
+    return { kind: "unavailable", query: answer.unavailable.query, reason: answer.unavailable.reason ?? null };
+  }
   const value = pick(answer);
   // A variant nobody asked this slot for is named by its own key: the
   // page then says what arrived instead of drawing an empty result.
-  return value === undefined ? { kind: "unavailable", query: Object.keys(answer)[0] ?? "" } : { kind: "held", value };
+  return value === undefined
+    ? { kind: "unavailable", query: Object.keys(answer)[0] ?? "", reason: null }
+    : { kind: "held", value };
 }
