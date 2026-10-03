@@ -621,8 +621,11 @@ adversary *args:
 # collaboration. The walk is handed the script as well as the record,
 # because one run of it names a branch only the city knows, and the walk
 # appends that run to the script once it has read the branch from the
-# history (tools/adversary/Spec.lean D7). Once every step held, the
-# checklist a person works through by hand is written to
+# history (tools/adversary/Spec.lean D7). The servings that are not the
+# crash end with SIGINT on macOS and Linux and are terminated only when
+# they do not exit within ten seconds; on Windows they are terminated, and
+# the walk prints a `note` line for every such fallback (D8). Once every
+# step held, the checklist a person works through by hand is written to
 # target/acceptance/checklist.md.
 #
 # Never a gate, and not part of `just adversary`: the archive comes from
@@ -699,8 +702,10 @@ acceptance archive:
 # LLVM_PROFILE_FILE must name where the profiles land, with `%p` and
 # `%m` in it, because several instrumented processes run at once and a
 # shared name would let the last one overwrite the rest. A process that
-# is killed writes no profile, so the walk's served city, which the walk
-# ends by terminating it, contributes nothing on Windows; the city of its
+# is killed writes no profile: the walk closes its first and third
+# servings with SIGINT on macOS and Linux, so they write theirs, and
+# terminates them on Windows, where they contribute nothing (the walk's
+# `note` lines say so; tools/adversary/Spec.lean D8); the city of its
 # own is closed in order, and the one-shot verbs exit normally. The held-out load below shares no
 # step with this one, so a gain it shows is not a gain on the training
 # script alone.
