@@ -3109,6 +3109,11 @@ export type Output = typeof Output.Type;
 /**
  * Presentation intent; per-call `locations` are a pure function of args
  * (tool side). Meta-level declarations use an empty list.
+ * 
+ * `Signal` and `Delegate` carry nothing for the same reason: who a
+ * letter goes to and which room takes the work are per call, so a page
+ * reads them from the call's arguments (`crates/kernel/spec/Tool.lean`
+ * D37).
  */
 export const RenderIntent = Schema.Union([
   Schema.Literals(["generic", "terminal"]),
@@ -3117,6 +3122,8 @@ export const RenderIntent = Schema.Union([
       locations: Schema.Array(Address),
     }),
   }),
+  Schema.Literal("signal"),
+  Schema.Literal("delegate"),
 ]).annotate({ identifier: "RenderIntent" });
 export type RenderIntent = typeof RenderIntent.Type;
 

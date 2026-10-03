@@ -142,7 +142,7 @@ pub enum Note {
 pub struct Call {
     // …既有字段…
     pub effect: Option<kernel::Effect>,        // tool_called 记下的登记（`crates/kernel/Spec.lean` §8-75(b)）
-    pub render: Option<kernel::RenderIntent>,  // 同上：Generic、Terminal 或 Diff
+    pub render: Option<kernel::RenderIntent>,  // 同上：Generic、Terminal、Diff、Signal 或 Delegate（kernel D37）
 }
 ```
 
