@@ -378,7 +378,7 @@ fn a_review_dispatch_freezes_the_prefix_it_froze_on_the_accounting_thread() {
     let pinned = [
         (
             "city",
-            "2d54b834bccff77e28aac8a2e7abe8771ca98493beb6f2c3a534f5749d671984",
+            "abadbb252de76ade1cdc761aa6f59e69bd301f459eeee820a946b3793288e01f",
         ),
         (
             "building",

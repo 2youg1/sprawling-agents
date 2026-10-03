@@ -324,22 +324,18 @@ pub fn roadmap(city_root: &Path, building_addr: &Address) -> Result<String, AxEr
 /// The job form with the brief written into it.
 ///
 /// The task and the goal are escaped, whoever wrote them, so neither can
-/// close the element it sits in (`crates/city/spec/SpineFiles.lean`
-/// D21). An escaped value holds no `<`, so it cannot spell a marker
-/// either, and the markers can be filled one after another without a
-/// value being read as a marker it happens to name.
+/// close its element (`crates/city/spec/SpineFiles.lean` D21); holding no
+/// `<`, neither can spell a marker, so the markers fill one after another.
 fn filled(brief: &JobBrief<'_>) -> String {
+    let escaped = |text: &str| {
+        text.replace('&', "&amp;")
+            .replace('<', "&lt;")
+            .replace('>', "&gt;")
+    };
     JOB_TEMPLATE
         .replace(TASK_PLACEHOLDER, &escaped(brief.task))
         .replace(GOAL_PLACEHOLDER, &escaped(brief.goal))
         .replace(FROM_PLACEHOLDER, brief.from)
-}
-
-/// Text made safe to sit inside one of the job form's elements.
-fn escaped(text: &str) -> String {
-    text.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
 }
 
 /// Writes the job file for one run and returns the bytes written, so the
