@@ -175,7 +175,7 @@ not, so a figure is never cut to a few letters. -->
     {#if speed === null}
       <dd class="text-text-faint">{DASH}</dd>
     {:else}
-      <dd class="figure truncate text-text">{fill(say($lang, "world_ttft"), { n: String(speed.ttft) })}</dd>
+      <dd class="figure truncate text-text">{say($lang, "talk_ttft")} {fill(say($lang, "talk_took_ms"), { n: String(speed.ttft) })}</dd>
       <dd class="truncate text-note text-text-faint">
         {fill(say($lang, "world_ttft_note"), { mean: String(speed.ttftMean), n: String(speed.turns) })}
       </dd>

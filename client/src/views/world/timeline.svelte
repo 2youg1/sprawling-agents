@@ -144,7 +144,7 @@
             <span class={AT}>{instant(row.at)}</span>
             <span class="{KIND} font-label">{fill(say($lang, "run_turn_n"), { n: String(row.turn.number) })}</span>
             <span class="{SUBJECT} text-text-quiet">
-              {speed === null ? "" : fill(say($lang, "world_ttft"), { n: String(speed.ttft) })}
+              {speed === null ? "" : `${say($lang, "talk_ttft")} ${fill(say($lang, "talk_took_ms"), { n: String(speed.ttft) })}`}
             </span>
             <span class={MEASURE}>
               {row.turn.used === undefined || row.turn.used === null

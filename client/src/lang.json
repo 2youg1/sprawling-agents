@@ -6375,10 +6375,6 @@
     "en": "could not read",
     "zh": "读不出"
   },
-  "world_ttft": {
-    "en": "TTFT {n} ms",
-    "zh": "TTFT {n} ms"
-  },
   "world_ttft_name": {
     "en": "first token",
     "zh": "首个 token"
