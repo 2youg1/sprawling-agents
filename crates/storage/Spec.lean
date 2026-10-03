@@ -91,7 +91,7 @@ import crates.storage.spec.Worktree.Trees.Stock
 
 - `spec/Jsonl/Verify.lean`：`advance` 收下的一行恰好接上链（`an_accepted_line_extends_the_chain`）；版本超前在一切链检之前答出（`a_line_from_a_newer_writer_is_refused_before_any_chain_check`）；`ig:true` 的未知 kind 照样入链（`an_ignorable_line_joins_the_chain`）；从创世走完而不拒的账本满足 kernel 的 `Chained`（`a_walked_ledger_is_chained`）；`open` 只截掉不带信封的字节，留下的是逐行收下的前缀（`truncation_drops_no_enveloped_line`、`truncation_keeps_a_walked_prefix`）。
 - `spec/Jsonl/Barrier.lean`：句柄答过 `Ok` 的每个 seq，在任意一串波与退回（`jsonl::unwind`）之后重开都在（`answered_survives_reopen`），不守屏障有反例（`withoutBarrier`）；从已验证前缀起重开与从头重开相同（`reopenFromVerifiedPrefix`）。
-- `spec/Jsonl/Preallocate.lean`：预分配段尾的零不改变尾段扫描的结论（`trailing_zeros_change_no_scan`），撕裂照样被截（`a_tear_before_zeros_is_still_truncated`），夹在中间的零读作撕裂（`zeros_before_a_line_are_not_the_end`）。
+- `spec/Jsonl/Preallocate.lean`：预分配段尾的零不改变尾段扫描的结论（`trailing_zeros_change_no_scan`），撕裂照样被截（`a_tear_before_zeros_is_still_truncated`），夹在中间的零读作撕裂（`zeros_before_a_line_are_not_the_end`）；写者的位置是剥零之后的长度（`writer_position_is_the_stripped_end`），在那里写下的一条接续这一段（`a_record_written_at_the_stripped_end_resumes_the_segment`），写在文件长度处的一条落在零之后（`a_record_written_at_the_file_length_sits_behind_the_zeros`）。
 - `spec/Cas.lean`：临时件名对写者单射时，任何交错的 `put` 与崩溃之后已命名的对象恒不腐蚀（`named_objects_never_corrupt`），只按内容哈希命名有反例（`shared_temporary_names_corrupt_an_object`）；一次 `put` 名下恰是它的字节，二次 `put` 不写（`a_put_names_its_bytes`、`a_second_put_of_the_same_bytes_writes_nothing`）。
 - `spec/Cas/Ranges.lean`：短答即越界的实现与区间规格相同（`a_short_answer_is_out_of_bounds`），答出来的不夹取（`never_clamps`）。
 - `spec/Snapshot.lean`：快照加尾部就是全量折叠（`snapshotPlusTailIsWhole`、`resumeIsWhole`、`twoCutsOnePass`）；带记录的证明等于逐行核对（`cachedVerifyIsStrict`），入口与版本缺一不可（`withoutLinkAcceptsSplice`、`withoutVersionAcceptsStale`）；按波先算摘要，判定不变（`wavesAreCached`、`wavesAreStrict`）。
@@ -292,6 +292,7 @@ error ◀──使用── 其余模块（StorageError 与 into_ax 的唯一定
 | D28 | 备树还在检出时来的第二个新房间自己全量检出一次，不等那棵备树，也不多备一棵 | `crates/storage/spec/Worktree/Trees/Stock.lean` |
 | D29 | 热视图的 `waiting` 是这次跑最后一个还没结束的等待 | `crates/storage/spec/Hot.lean` |
 | D30 | 检查点的暂存过滤在 libgit2 打开之前跳过文件写者与落盘门的暂存名 | `crates/storage/spec/Checkpoint.lean` |
+| D31 | 段的预分配是一个可选的臂，默认仍是生长；选它就是改 `SEGMENT_PREALLOCATION` 一个值 | `crates/storage/spec/Jsonl/Preallocate.lean` |
 -/
 
 /-! ## 13 依赖选型
@@ -305,7 +306,7 @@ kernel（workspace 内层）；`thiserror`；`blake3`（经 kernel 的 chain_has
 
 /-! ## 14 硬编码声明
 
-备树的 id `+spare`（8-35；`storage::worktree::trees::stock::STOCK`，私有常量：登记名、目录名、分支名都是它，选 `+` 是因为它不在 `WorktreeName` 的字符集里而 git 容许它；改它只需同时改本规格）；`SEGMENT_ROLL_BYTES = 64 MiB`（内部事务，非 consts_policy——对上层不可见，改它不改任何行为语义，只改文件切法）；`PROOF_WAVE = 8`（`storage::chain_audit`，证明一波读的段数，也是这一波的线程数，调用线程算一条；它与 `SEGMENT_ROLL_BYTES` 的积是证明常驻内存的上限，8 × 64 MiB；改它只改证明的墙钟、常驻内存与 `ProofCount.waves`，判定不变，8-37）；段名前缀 `ledger-`＋20 位零填；CAS 分片取 hex 前 2；tmp 后缀 `.part`。均为 pub(crate) 常量，改动随本规格。
+备树的 id `+spare`（8-35；`storage::worktree::trees::stock::STOCK`，私有常量：登记名、目录名、分支名都是它，选 `+` 是因为它不在 `WorktreeName` 的字符集里而 git 容许它；改它只需同时改本规格）；`SEGMENT_ROLL_BYTES = 64 MiB`（内部事务，非 consts_policy——对上层不可见，改它不改任何行为语义，只改文件切法）；`SEGMENT_PREALLOCATION = Grow`（`jsonl::ledger`，段的预分配那一臂；选 `ToRollSize` 只改屏障的代价与段文件的长度，读出的历史不变，storage D31）；`PROOF_WAVE = 8`（`storage::chain_audit`，证明一波读的段数，也是这一波的线程数，调用线程算一条；它与 `SEGMENT_ROLL_BYTES` 的积是证明常驻内存的上限，8 × 64 MiB；改它只改证明的墙钟、常驻内存与 `ProofCount.waves`，判定不变，8-37）；段名前缀 `ledger-`＋20 位零填；CAS 分片取 hex 前 2；tmp 后缀 `.part`。均为 pub(crate) 常量，改动随本规格。
 -/
 
 /-! ## 15 影响面

@@ -29,7 +29,7 @@ impl FaultFs {
     pub fn power_cut(&self);
     pub fn op_count(&self) -> u64;
 }
-impl Vfs for FaultFs { /* 每 op 自增计数；append 先落 live 再判 cut（撕裂可咬本次写），其余 op 先判；命中即 power_cut 并报 io::Error，plan 消费后后续 op 照常（重开阶段） */ }
+impl Vfs for FaultFs { /* 每 op 自增计数；append 与 write_at 先落 live 再判 cut（撕裂可咬本次写），其余 op 先判；命中即 power_cut 并报 io::Error，plan 消费后后续 op 照常（重开阶段）。断电时每个文件从 live 与 durable 第一处不同的字节算起：追加时那是文件尾，在预分配的段里写时那在文件中间；保留 `TornTail` 给的字节数，其后回到 durable 的字节 */ }
 ```
 
 **模型三则**（比真实平台严格，故纪律跨平台成立）：①`sync_data` 前的字节不存活：durable/live 两平面，断电即 live 回落 durable，撕裂按 `TornTail` 多留未同步增量前缀；②新建文件在 `sync_dir` 前目录项不存活，断电即消失（含已 sync_data 者——比 POSIX 更严，使建段后必 sync_dir 的纪律跨平台成立）；③rename 自身原子——恒不出现半个目标文件。

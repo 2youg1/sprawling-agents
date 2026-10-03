@@ -23,7 +23,8 @@ pub(crate) trait Vfs {                      // 内缝：不出对外接口，不
     fn size(&self, path: &Path) -> io::Result<u64>;             // 段长；index 比长度而不抬字节
     fn read_at(&self, path: &Path, offset: u64, len: u64) -> io::Result<Vec<u8>>;  // 定位读；短答＝文件到头
     fn append(&mut self, path: &Path, bytes: &[u8]) -> io::Result<()>;
-    fn truncate(&mut self, path: &Path, len: u64) -> io::Result<()>;
+    fn write_at(&mut self, path: &Path, offset: u64, bytes: &[u8]) -> io::Result<()>;  // 在 offset 处写，覆盖已有字节、越过文件尾即延长；不在即建。预分配的段在记录末尾写（storage D31）
+    fn truncate(&mut self, path: &Path, len: u64) -> io::Result<()>;                 // 设长度：截短，或以零字节延长（`File::set_len`）
     fn sync_data(&mut self, path: &Path) -> io::Result<()>;
     fn rename(&mut self, from: &Path, to: &Path) -> io::Result<()>;
     fn sync_dir(&mut self, dir: &Path) -> io::Result<()>;       // Windows no-op（§3-3）
