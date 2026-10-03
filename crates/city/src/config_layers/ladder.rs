@@ -14,11 +14,12 @@
 //! added to one concern and forgotten in the next would be a silent
 //! difference in what a run is governed by.
 //!
-//! Here a rung is named twice: as a variant of [`Layer`], and as the
-//! arm of [`Ladder::resolve`] that says which slot of a
-//! `kernel::LayeredValue` it fills. Both are exhaustive matches, so a
-//! rung added later is a compiler error until it is placed, and every
-//! concern picks it up at once.
+//! Here a rung is named twice: once in the list that declares both
+//! [`Layer`] and `Layer::ALL`, so a variant cannot exist without its
+//! place in the reading order, and once as the arm of
+//! [`Ladder::resolve`] that says which slot of a `kernel::LayeredValue`
+//! it fills, an exhaustive match. A rung added later is a compiler
+//! error until it is placed, and every concern picks it up at once.
 //!
 //! Which rung wins is not decided here: `kernel::LayeredValue::resolve`
 //! answers that, and this module only says which rungs there are and
@@ -35,20 +36,30 @@ use super::ConfigLayer;
 use super::refuse::below_city;
 use crate::building::Building;
 
-/// One rung of the City -> Building -> Resident ladder, from the
-/// farthest scope to the nearest.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Layer {
-    City,
-    Building,
-    Resident,
+/// Declares [`Layer`] and `Layer::ALL` from one list, so the order the
+/// ladder is read in names every variant and nothing else
+/// (`crates/city/spec/ConfigLayers/Ladder.lean`, `Layer.ALL_complete`).
+macro_rules! rungs {
+    ($($rung:ident),+ $(,)?) => {
+        /// One rung of the City -> Building -> Resident ladder, from the
+        /// farthest scope to the nearest.
+        #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+        pub enum Layer {
+            $($rung),+
+        }
+
+        impl Layer {
+            /// Every rung there is, farthest first. The order the ladder
+            /// is read in and the order a nearer value overrides a
+            /// farther one.
+            pub(crate) const ALL: [Layer; [$(Layer::$rung),+].len()] = [$(Layer::$rung),+];
+        }
+    };
 }
 
-impl Layer {
-    /// Every rung there is, farthest first. The order the ladder is
-    /// read in and the order a nearer value overrides a farther one.
-    pub(crate) const ALL: [Layer; 3] = [Layer::City, Layer::Building, Layer::Resident];
+rungs!(City, Building, Resident);
 
+impl Layer {
     /// Where this rung's file lives for a run at `addr`.
     ///
     /// One expression for every rung: the scope this rung speaks for,

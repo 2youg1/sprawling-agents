@@ -41,6 +41,10 @@ inductive Layer where
 def Layer.ALL : List Layer :=
   [.City, .Building, .Resident]
 
+/-- `Layer::ALL` 列出每一级：Rust 一侧 `Layer` 与 `ALL` 由同一张表（`rungs!`）声明，所以加一级不会漏在梯子外。 -/
+theorem Layer.ALL_complete (layer : Layer) : layer ∈ Layer.ALL := by
+  cases layer <;> simp [Layer.ALL]
+
 /-- `kernel::LayeredValue`：每一级一格。 -/
 structure LayeredValue (T : Type) where
   city : Option T

@@ -44,7 +44,7 @@ pub fn freeze_naming(city_root: &Path, addr: &Address, version: B3Hash) -> Resul
 
 // config_layers::ladder（crate 内）
 impl Layer {
-    const ALL: [Layer; 3];                                              // 由远及近
+    const ALL: [Layer; 3];                                                // 由远及近；与 Layer 由同一张表 rungs! 声明
     fn file(self, city_root: &Path, addr: &Address) -> Result<PathBuf, AxError>;
 }
 pub(crate) struct Ladder { /* Vec<(Layer, ConfigLayer)> —— 私有，由远及近 */ }
