@@ -125,7 +125,9 @@ pub enum EnrollVerdict {
 /// posted at a route.
 #[must_use]
 pub fn decide_enroll(peer: &SocketAddr) -> EnrollVerdict {
-    if peer.ip().is_loopback() {
+    // A `[::]` listener on Linux and macOS reports a local IPv4 caller as
+    // `::ffff:127.0.0.1`, which is the same machine.
+    if peer.ip().to_canonical().is_loopback() {
         return EnrollVerdict::Accept;
     }
     EnrollVerdict::Refuse(
