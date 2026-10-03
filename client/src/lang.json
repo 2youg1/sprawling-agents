@@ -2507,6 +2507,14 @@
     "en": "a signal was taken up",
     "zh": "一个信号被接走了"
   },
+  "event_signal_wait_started": {
+    "en": "a run began waiting for a reply",
+    "zh": "一个 run 开始等回信"
+  },
+  "event_signal_wait_ended": {
+    "en": "a run stopped waiting for a reply",
+    "zh": "一个 run 不再等回信"
+  },
   "event_draft_held": {
     "en": "a draft was held for review",
     "zh": "一份草稿被扣下待审"
