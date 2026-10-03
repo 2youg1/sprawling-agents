@@ -87,7 +87,7 @@ import crates.gateway.spec.Transcribe.Recording
 - **上游 `/models` 说了 `image` 算不算「收得下什么」的一档，未定。** 探测把每一行的 `input_modalities` 原样记进 `ModelFacts`（§8-16），`AttachedEndpoint.models` 带着它，而 `accepted_input`（§8-37）不读它：那是供应方自己的词（`image`、`audio`），一个中转站可能为一个厂商自己拒图的 id 写上 `image`。若定为一档，它排在人之后、目录之前，与上限梯的 `Upstream` 同位；要定下它，需要一份真实中转站的 `/models` 记录，其中写着 `image` 的模型在那条线上确实收图。
 - **responses 面答 `usage: null` 时算不算「供应方没报用量」，未定。** `openai-openapi` 把 `Response.usage` 写作 `ResponseUsage` 或 `null`。`dialect::responses::reply` 在 `usage` 缺席时报 `E_WIRE_MISMATCH`，为 `null` 时经 `mismatch::tokens_or_zero` 把输入与输出都读成 0 token（缓存两数经 `mismatch::cache_count` 读成 `Unreported`，kernel D36）：两种缺法得到相反的结论，后一种让这次调用的用量从账上静默消失。规格没有说 `status` 为 `completed` 的 response 会不会带 `null`，所以读法暂不改；要定下它，需要一个真实供应方在已完成的 response 里答出 `usage: null` 的记录。
 
-- **开城时预热每个端点的连接，接线未定。** 池已经按端点保持（§8-3：一个 `Transport` 一个客户端，`a_second_call_to_one_endpoint_goes_out_over_the_first_calls_connection` 守住复用）；reqwest 0.13 的缺省在三个平台上给每条连接开 TCP keepalive（15 s 起、每 15 s 一探、3 次），所以池里一条对端已断的空闲连接在约一分钟内被操作系统认出，不必本 crate 再设。没定的是预热：D11 否了派活时预热，开城时预热要在装配层的唯一起任务处为每个已登记端点发一次不带凭据的请求（reqwest 没有只建连接的接口），而接线住在 `crates/sprawling`（`bin::assembly`）。它能藏住的只是开城后 90 s 之内的第一次调用（空闲上限，§8-35），所以定下它要两样证据：开城到第一次调用的间隔分布（多数落在 90 s 之内才值得），与开城时多出的那一批请求在 provider 一侧是否被计数或限流。本 crate 一侧要加的只是 `Transport` 上一个建客户端并发出这一次请求的方法，与它的生产调用者同一次改动加（D8：没有调用者的公开面不留）。
+- **开城时预热值不值，读数未齐。** D26 定下开城时为每个已登记端点发一次不带凭据的 `GET models_url`（§8-35）；它能藏住的只是开城后 90 s 之内的第一次调用（空闲上限），所以它的重开要两样证据：开城到第一次调用的间隔分布（多数落在 90 s 之外时这批请求白发），与这批不带凭据的请求在 provider 一侧是否被计数或限流。池按端点保持（§8-3），reqwest 0.13 的缺省在三个平台上给每条连接开 TCP keepalive（15 s 起、每 15 s 一探、3 次），所以池里一条对端已断的空闲连接在约一分钟内被操作系统认出，不必本 crate 再设。
 - **Responses API 的 WebSocket 模式，未做。** 证据只有一句厂商说法：20 次以上工具调用的长循环上最多快约 40%，与 `store=false` 兼容；本 crate 尚未读到厂商当前文档里这条连接的地址、帧的形状与断线语义，所以形状未定。已知的约束有三条：①本 crate 没有同步的 WebSocket 客户端，锁里的 `tungstenite` 只经 axum 的 `ws` 带进来，作为 gateway 的依赖要改根 `Cargo.toml` 的 workspace 依赖与 `deny.toml` 的审视；②它绕开 `reach::proxy::client_for`，而 §8-15 要求全城的出站连接都在那里造，所以要么为 WebSocket 另写一处代理判定（第二个权威），要么只在 `through` 答「不走代理」时启用；③它是每个端点的一项设置（wire 的 `EndpointTuning` 一个字段、`endpoint_attached` 载荷一个键），HTTP 是它连不上或断线时的退路。要定下它：厂商文档的那一页（地址、帧、断线后怎样续上一次 response），与一次在回环替身上可见的往返。
 - **`prompt_cache_key` 的长度上限，未核。** D25 写进的键是 64 个十六进制字符；若厂商文档给这个字段定了更低的上限，换成摘要的前缀（D25 的重开参数）。
 
@@ -340,6 +340,7 @@ kernel 已有码，语义照 Custody 一节；不新增码。
 - D23 `NO_PROXY` 的读法与匹配规则跟着客户端走：域名按点为界，非 Unicode 的值读作没设：`crates/gateway/spec/Reach.lean`
 - D24 一个凭证环境变量的值不是 Unicode 时，它是一个点名变量的配置错，不是「没配过」：`crates/gateway/spec/Credential.lean`
 - D25 `prompt_cache_key` 是预置表的一列，只写给文档说收它的主机，值是会话标识：`crates/gateway/spec/Provider.lean`
+- D26 开城时为每个已登记端点预热一次连接：一次不带凭据的 `GET models_url`，失败只停这一次预热，谁也不等它（§8-35）：`crates/gateway/spec/Endpoint/Transport.lean`
 -/
 
 /-! ## 13 依赖选型

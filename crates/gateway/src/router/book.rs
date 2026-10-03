@@ -24,7 +24,7 @@ use kernel::event::record::EndpointLost;
 use kernel::{AxCode, AxError, BuildingPolicy, EventKind, EventRecord, ModelTag, Payload};
 
 use crate::concurrency::vendor_in_flight;
-use crate::endpoint::Transport;
+use crate::endpoint::{Transport, WarmUp};
 use crate::market::ModelEntry;
 
 use super::attached::AttachedEndpoint;
@@ -186,6 +186,19 @@ impl EndpointBook {
             endpoint,
             entry: &choice.entry,
             transport: &held.transport,
+        })
+    }
+
+    /// One warm-up for every attached endpoint, each sharing that
+    /// endpoint's client slot, so the connection it opens is the one the
+    /// endpoint's first call takes (`crates/gateway/spec/Endpoint/Transport.lean` D26).
+    pub fn warm_ups(&self) -> impl Iterator<Item = WarmUp> + '_ {
+        self.endpoints.values().map(|held| {
+            WarmUp::new(
+                held.transport.clone(),
+                held.endpoint.client_shape(),
+                held.endpoint.models_url(),
+            )
         })
     }
 

@@ -92,6 +92,21 @@ impl AttachedEndpoint {
         join(&self.base_url, chat_path(self.dialect))
     }
 
+    /// What this endpoint's shared client is built from: the chat URL,
+    /// the proxy rule and the call timeout. A model call and a warm-up
+    /// both read it here, so the client the warm-up leaves in the slot
+    /// is the client a call would have built.
+    pub(crate) fn client_shape(&self) -> crate::endpoint::ClientShape {
+        crate::endpoint::ClientShape {
+            url: self.chat_url(),
+            proxying: self.tuning.proxying,
+            // The tuning answers this, because the figure an untuned
+            // endpoint is called with is the tuning's own default and
+            // is stated there.
+            timeout_ms: self.tuning.call_timeout_ms(),
+        }
+    }
+
     /// Where the model list lives for this dialect.
     #[must_use]
     pub fn models_url(&self) -> String {
