@@ -111,7 +111,9 @@ pub use toolkits::{Standing, ToolkitLine, ToolkitsAnswer};
 pub use usage::{
     DayCount, ExportFormat, HeldSkill, McpServerUsage, McpToolUsage, McpUsageAnswer, McpUse,
 };
-pub use usage::{SkillAudit, SkillUsageAnswer, SkillUsageLine, SkillUse, SkillVersion};
+pub use usage::{
+    SkillAudit, SkillUsageAnswer, SkillUsageLine, SkillUse, SkillVersion, VersionAuthor,
+};
 pub use usage::{UsageExportAnswer, UsageKind, UseOutcome};
 
 /// What moved between two checkpoints, one row per file, path order.

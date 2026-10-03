@@ -228,6 +228,7 @@ impl Usage {
                     seq: record.seq(),
                     at: record.t(),
                     run: record.run(),
+                    author: wire::VersionAuthor::Unrecorded,
                 });
             }
             pins.insert(pin.name, pin.hash);

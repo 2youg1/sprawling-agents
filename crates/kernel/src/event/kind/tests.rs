@@ -52,13 +52,13 @@ fn every_kind_spells_itself_once_and_exactly_twelve_reach_the_window() {
 /// (`crates/kernel/spec/Event/Record.lean` §8-81), and then the four document kinds
 /// (section 8-83), and then the three V0.0.9 kinds (D21-D23) and the
 /// reply wait's two (D32) and where a letter landed (D38) close the table, so the SPEC table and `ALL`
-/// keep one order.
+/// keep one order; who shelved a skill (D23) comes last.
 #[test]
 fn the_remote_door_the_document_the_session_and_the_wait_kinds_close_the_table() {
     let tail: Vec<String> = EventKind::ALL
         .iter()
         .rev()
-        .take(15)
+        .take(16)
         .rev()
         .map(|kind| serde_json::to_string(kind).unwrap())
         .collect();
@@ -80,6 +80,7 @@ fn the_remote_door_the_document_the_session_and_the_wait_kinds_close_the_table()
             "\"signal_wait_started\"",
             "\"signal_wait_ended\"",
             "\"signal_landed\"",
+            "\"skill_shelved\"",
         ]
     );
 }

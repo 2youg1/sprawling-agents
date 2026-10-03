@@ -249,12 +249,17 @@ pub enum EventKind {
     /// Where the accounting thread put one `signal_enqueued`: a running
     /// run's slot, the queue, or a knock (`crates/kernel/spec/Event/Record.lean` D38).
     SignalLanded,
+
+    // The shelf (1).
+    /// One version of a skill landed on a shelf through the city's door,
+    /// and where it came from (`crates/kernel/spec/Event/Record.lean` D23).
+    SkillShelved,
 }
 
 impl EventKind {
     /// Every kind, in the order the SPEC table lists them. Data face for counting tests
     /// and `xtask specalign`.
-    pub const ALL: [EventKind; 95] = [
+    pub const ALL: [EventKind; 96] = [
         EventKind::CityInitialized,
         EventKind::BuildingCreated,
         EventKind::BuildingConfigured,
@@ -350,6 +355,7 @@ impl EventKind {
         EventKind::SignalWaitStarted,
         EventKind::SignalWaitEnded,
         EventKind::SignalLanded,
+        EventKind::SkillShelved,
     ];
 }
 

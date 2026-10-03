@@ -183,6 +183,7 @@ fn a_fixture_ledger_folds_a_usage_table_per_skill_and_server() {
             seq: Seq::new(1),
             at: TimeMs::new(1),
             run: run(1),
+            author: wire::VersionAuthor::Unrecorded,
         }],
         uses: vec![
             used(later(2, 1, 2), "guide", "kiln v1", wire::UseOutcome::Ok),
@@ -274,6 +275,50 @@ fn a_fixture_ledger_folds_a_usage_table_per_skill_and_server() {
                 },
             ],
         }
+    );
+}
+
+fn shelving(at: At, skill: &str, text: &str) -> EventRecord {
+    let data = json!({ "skill": skill, "digest": hash(text).to_string(),
+                       "source": { "kind": "shipped" } });
+    record(at, EventKind::SkillShelved, data)
+}
+
+/// Each version says who put it on the shelf, by ledger order alone
+/// (wire D33): the city's `skill_shelved` line, a content the shelf got
+/// outside the city's doors after the name was shelved, or a content
+/// from before the city recorded shelving.
+#[test]
+fn each_version_says_who_shelved_it() {
+    let ledger = [
+        started(1, 1, &[("old", "old v1")]),
+        shelving(now(2, 0), "kiln", "kiln v1"),
+        started(3, 1, &[("kiln", "kiln v1")]),
+        started(4, 2, &[("kiln", "kiln v2"), ("old", "old v1")]),
+    ];
+    let usage = Usage::fold(&ledger);
+    let versions = |name: &str| usage.skills(&[], Some(name)).skills[0].versions.clone();
+    let version = |seq: u64, by: u8, text: &str, author| wire::SkillVersion {
+        digest: hash(text),
+        seq: Seq::new(seq),
+        at: TimeMs::new(seq),
+        run: run(by),
+        author,
+    };
+    let shipped = wire::VersionAuthor::Shelved {
+        seq: Seq::new(2),
+        from: kernel::event::record::ShelvedFrom::Shipped,
+    };
+    assert_eq!(
+        versions("kiln"),
+        vec![
+            version(2, 0, "kiln v1", shipped),
+            version(4, 2, "kiln v2", wire::VersionAuthor::OutsideShelf),
+        ]
+    );
+    assert_eq!(
+        versions("old"),
+        vec![version(1, 1, "old v1", wire::VersionAuthor::Unrecorded)]
     );
 }
 

@@ -140,6 +140,7 @@ impl Holding {
             | EventKind::RunPolicyChanged
             | EventKind::SessionNamed
             | EventKind::SkillAudited
+            | EventKind::SkillShelved
             | EventKind::SignalWaitStarted
             | EventKind::SignalWaitEnded
             | EventKind::SignalLanded => Holding::Nothing,
@@ -254,6 +255,7 @@ impl Evidence {
             | EventKind::RunPolicyChanged
             | EventKind::SessionNamed
             | EventKind::SkillAudited
+            | EventKind::SkillShelved
             | EventKind::SignalWaitStarted
             | EventKind::SignalWaitEnded
             | EventKind::SignalLanded => Evidence::Nothing,

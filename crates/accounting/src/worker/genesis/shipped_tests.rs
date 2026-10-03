@@ -54,3 +54,38 @@ fn a_formed_city_has_every_shipped_skill_on_its_shelf() {
         .unwrap_err();
     assert_eq!(shelved(dir.path()), expected);
 }
+
+/// Forming writes one `skill_shelved` per shipped skill, after line zero,
+/// whose digest is the whole-package hash the shelf holds and whose
+/// source is `Shipped` (kernel D23, `crates/city/spec/Library/Install.lean` §8-28c).
+#[test]
+fn a_formed_city_records_each_shipped_skill_it_shelved() {
+    use kernel::event::record::{ShelvedFrom, SkillShelved};
+    let dir = tempfile::tempdir().unwrap();
+    let report =
+        crate::worker::genesis::form(dir.path(), Adopt::Nothing, crate::worker::fixture::hands())
+            .unwrap();
+    let recorded: Vec<SkillShelved> = runtime::replay::verify_ledger_dir(&report.ledger_dir)
+        .unwrap()
+        .raw_lines()
+        .iter()
+        .map(|line| kernel::EventRecord::parse_line(line).unwrap())
+        .filter(|record| record.kind() == kernel::EventKind::SkillShelved)
+        .map(|record| record.data().read::<SkillShelved>().unwrap())
+        .collect();
+    let slot = city::Slot::library(city::SHIPPED_SECTION).unwrap();
+    let shelf = kernel::layout::CityLayout::new(dir.path())
+        .library()
+        .join(city::SHIPPED_SECTION);
+    let expected: Vec<SkillShelved> = shipped_names()
+        .into_iter()
+        .map(|(_, name)| SkillShelved {
+            digest: *city::plan_skill_install(dir.path(), &slot, &shelf.join(&name))
+                .unwrap()
+                .hash(),
+            skill: name,
+            source: ShelvedFrom::Shipped,
+        })
+        .collect();
+    assert_eq!(recorded, expected);
+}
