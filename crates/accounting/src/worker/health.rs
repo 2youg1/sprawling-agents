@@ -43,6 +43,10 @@ struct Counts {
     /// Microseconds each relay request waited between its lane queueing
     /// it and the accounting thread taking it, oldest first.
     relay_queue: Mutex<VecDeque<u64>>,
+    /// Microseconds each staged run waited in the driving pool's queue
+    /// before its lane opened, zero for a run that waited for nothing,
+    /// oldest first (Roadmap M2, the pure lane wait).
+    lane_wait: Mutex<VecDeque<u64>>,
 }
 
 impl Health {
@@ -70,15 +74,18 @@ impl Health {
     /// The accounting thread took one relay request `waited` after its
     /// lane queued it.
     pub(crate) fn queue_waited(&self, waited: Duration) {
-        let mut kept = self
-            .0
-            .relay_queue
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner);
-        if kept.len() >= RELAY_QUEUE_KEPT {
-            kept.pop_front();
-        }
-        kept.push_back(micros(waited));
+        keep(&self.0.relay_queue, waited);
+    }
+
+    /// The driving pool opened a staged run's lane `waited` after the
+    /// run was staged.
+    pub(crate) fn lane_waited(&self, waited: Duration) {
+        keep(&self.0.lane_wait, waited);
+    }
+
+    /// The pure lane waits kept, in microseconds, oldest first.
+    pub fn lane_wait_us(&self) -> Vec<u64> {
+        kept(&self.0.lane_wait)
     }
 
     /// The accounting thread slept `slept` on its queue.
@@ -88,13 +95,7 @@ impl Health {
 
     /// The relay queue waits kept, in microseconds, oldest first.
     pub fn relay_queue_us(&self) -> Vec<u64> {
-        self.0
-            .relay_queue
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .iter()
-            .copied()
-            .collect()
+        kept(&self.0.relay_queue)
     }
 
     /// Microseconds the accounting thread has slept on its queue since
@@ -128,4 +129,23 @@ fn lower(count: &AtomicU64, n: u64) {
     }) {
         Ok(_) | Err(_) => {}
     }
+}
+
+/// Keeps one wait, dropping the oldest once [`RELAY_QUEUE_KEPT`] are held.
+fn keep(waits: &Mutex<VecDeque<u64>>, waited: Duration) {
+    let mut kept = waits.lock().unwrap_or_else(PoisonError::into_inner);
+    if kept.len() >= RELAY_QUEUE_KEPT {
+        kept.pop_front();
+    }
+    kept.push_back(micros(waited));
+}
+
+/// The waits kept, oldest first.
+fn kept(waits: &Mutex<VecDeque<u64>>) -> Vec<u64> {
+    waits
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .iter()
+        .copied()
+        .collect()
 }

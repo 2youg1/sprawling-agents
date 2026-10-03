@@ -87,6 +87,8 @@ struct Taken {
     relay: Vec<Duration>,
     /// Relay queue waits and the accounting thread's sleep, µs (§8-98).
     relay_queue: Vec<u64>,
+    /// Pure lane waits: a staged run's wait for its lane, µs (Roadmap M2).
+    lane_wait: Vec<u64>,
     idle_us: u64,
     posted_ms: u64,
     wall: Duration,
@@ -173,6 +175,7 @@ fn scenario(runs: usize, latency: Latency) -> Taken {
     let attending = attending(worker, &desk);
     let before = history(dir.path()).len();
     let queue_before = health.relay_queue_us().len();
+    let lane_before = health.lane_wait_us().len();
     let idle_before = health.idle_us();
     let posted_ms = crate::Clock::now(&WallClock).unwrap().value();
     let started = Instant::now();
@@ -196,6 +199,11 @@ fn scenario(runs: usize, latency: Latency) -> Taken {
         .into_iter()
         .skip(queue_before)
         .collect();
+    let lane_wait = health
+        .lane_wait_us()
+        .into_iter()
+        .skip(lane_before)
+        .collect();
     done.store(true, Ordering::SeqCst);
     let relay = sampler.join().unwrap();
     desk.close(Closing::Chosen);
@@ -205,6 +213,7 @@ fn scenario(runs: usize, latency: Latency) -> Taken {
         lines: lines.into_iter().skip(before).collect(),
         relay,
         relay_queue,
+        lane_wait,
         idle_us,
         posted_ms,
         wall,
@@ -373,6 +382,7 @@ fn waits(taken: &Taken, idle: &[Duration]) -> Vec<(&'static str, Vec<u64>)> {
         ("first_call", to_first_call),
         ("relay_under_load", micros(&taken.relay)),
         ("relay_queue", taken.relay_queue.clone()),
+        ("lane_pure", taken.lane_wait.clone()),
         ("relay_idle", micros(idle)),
     ]
 }

@@ -9,8 +9,12 @@
 //! The instrument drives the fold thread the city runs, `spawn_folding`,
 //! with a writer sending a burst through `observer` and a reader asking
 //! the published views between batches. It is ignored by `just check`,
-//! because it reads the wall clock; `just bench` runs it and prints one
-//! reading line. It asserts nothing about time, since the wall clock
+//! because it reads the wall clock; `just bench` runs it and prints three
+//! reading lines: record to broadcast, then the two halves of that wait
+//! (Roadmap M2): fold lag, from the writer's send to the first answer a
+//! reader gets that has folded the record, and broadcast lag, from that
+//! answer to the record reaching a client's channel. The fold instant is
+//! the one a reader sees, so it is late by at most one query. It asserts nothing about time, since the wall clock
 //! differs by machine.
 //!
 //! The burst is signal lines as `collab` writes them, the same shape the
@@ -28,6 +32,7 @@
     reason = "test code: an instrument reads the wall clock"
 )]
 
+use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
@@ -70,12 +75,17 @@ fn instrument_view_backlog() {
         let (views, reading) = (Arc::clone(&views), Arc::clone(&reading));
         std::thread::spawn(move || {
             let mut asked = 0u64;
+            let mut folded_at = BTreeMap::new();
+            let mut seen = 0u64;
             while reading.load(Ordering::Relaxed) {
-                let (_as_of, answered) = answer_outside_the_lock(&views, &wire::Query::CityView);
+                let (as_of, answered) = answer_outside_the_lock(&views, &wire::Query::CityView);
+                let at = Instant::now();
                 std::hint::black_box(answered.unwrap());
+                folded_at.extend((seen..as_of.value()).map(|seq| (seq, at)));
+                seen = seen.max(as_of.value());
                 asked += 1;
             }
-            asked
+            (asked, folded_at)
         })
     };
     let sent = Arc::new(AtomicUsize::new(0));
@@ -122,7 +132,7 @@ fn instrument_view_backlog() {
     }
     let (sent_at, observer) = writer.join().unwrap();
     reading.store(false, Ordering::Relaxed);
-    let asked = reader.join().unwrap();
+    let (asked, folded_at) = reader.join().unwrap();
     drop((observer, folding.machine, folding.lend, folding.keep_slices));
     folding.thread.join().unwrap();
 
@@ -144,6 +154,48 @@ fn instrument_view_backlog() {
         burst.as_secs_f64() * 1_000.0,
         machine()
     );
+    let halves: Vec<(Duration, Duration)> = records
+        .iter()
+        .zip(sent_at.iter().zip(&heard_at))
+        .filter_map(|(record, (sent, heard))| {
+            let folded = folded_at.get(&record.seq().value())?;
+            Some((
+                folded.saturating_duration_since(*sent),
+                heard.saturating_duration_since(*folded),
+            ))
+        })
+        .collect();
+    let (mut fold_lag, mut broadcast_lag): (Vec<Duration>, Vec<Duration>) =
+        halves.into_iter().unzip();
+    for (name, samples) in [
+        ("instrument_fold_lag", &mut fold_lag),
+        ("instrument_broadcast_lag", &mut broadcast_lag),
+    ] {
+        print_reading(name, samples);
+    }
+}
+
+/// One reading line: the samples' count and their p50, p99, p999 and max.
+fn print_reading(name: &str, samples: &mut [Duration]) {
+    samples.sort_unstable();
+    let Some(max) = samples.last() else {
+        println!("{name} samples=0 {}", machine());
+        return;
+    };
+    println!(
+        "{name} samples={} p50_us={} p99_us={} p999_us={} max_us={} {}",
+        samples.len(),
+        samples[percentile(samples.len(), 50)].as_micros(),
+        samples[percentile(samples.len(), 99)].as_micros(),
+        samples[percentile_tenths(samples.len(), 999)].as_micros(),
+        max.as_micros(),
+        machine()
+    );
+}
+
+/// The nearest-rank index of `per_mille` in a sorted vector of `count`.
+fn percentile_tenths(count: usize, per_mille: usize) -> usize {
+    (count * per_mille / 1_000).min(count - 1)
 }
 
 /// Every line of a city `init` formed with `BURST` signal lines written

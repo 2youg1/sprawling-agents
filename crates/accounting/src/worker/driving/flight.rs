@@ -98,7 +98,7 @@ impl Flight {
     ) -> Flight {
         let gate = RelayGate::open(monotonic);
         Flight {
-            pool: DrivingPool::open(gate.bell(), read_memory),
+            pool: DrivingPool::open(gate.bell(), read_memory, monotonic, gate.health()),
             gate,
             driving: BTreeMap::new(),
             homes: VecDeque::new(),

@@ -421,4 +421,48 @@ mod tests {
             (2, 3, 0)
         );
     }
+
+    /// The provider queue's reading (Roadmap M2): `callers` threads at
+    /// once against a gate of four permits, each holding its permit for
+    /// `HOLD`, and how long each waited from asking to holding. It
+    /// asserts nothing about time, since the wall clock differs by
+    /// machine.
+    #[test]
+    #[ignore = "a wall-clock instrument; just bench runs it"]
+    fn instrument_provider_queue() {
+        const HOLD: Duration = Duration::from_millis(2);
+        for callers in [16usize, 64] {
+            let gate = gate_of(4);
+            let mut waits: Vec<Duration> = (0..callers)
+                .map(|_| {
+                    let gate = Arc::clone(&gate);
+                    std::thread::spawn(move || {
+                        let asked = Instant::now();
+                        let held = gate.admit(crate::endpoint::fakes::monotonic, URL).unwrap();
+                        let waited = asked.elapsed();
+                        std::thread::sleep(HOLD);
+                        drop(held);
+                        waited
+                    })
+                })
+                .collect::<Vec<_>>()
+                .into_iter()
+                .map(|lane| lane.join().unwrap())
+                .collect();
+            waits.sort_unstable();
+            let at =
+                |per_mille: usize| waits[(waits.len() * per_mille / 1_000).min(waits.len() - 1)];
+            println!(
+                "instrument_provider_queue callers={callers} max_in_flight=4 hold_us={} samples={} p50_us={} p99_us={} p999_us={} max_us={} machine={}-{}",
+                HOLD.as_micros(),
+                waits.len(),
+                at(500).as_micros(),
+                at(990).as_micros(),
+                at(999).as_micros(),
+                waits[waits.len() - 1].as_micros(),
+                std::env::consts::OS,
+                std::env::consts::ARCH
+            );
+        }
+    }
 }

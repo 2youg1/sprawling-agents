@@ -26,11 +26,13 @@
 
 use std::collections::VecDeque;
 use std::sync::mpsc;
+use std::time::Instant;
 
 use kernel::{AxCode, AxError, RunId};
 
 use super::DriveContext;
 use super::dispatching::preparing::{Flown, Staged};
+use super::health::Health;
 use super::relay::{Relay, Wake};
 
 /// Physical memory and how much of it the platform could hand out now,
@@ -83,6 +85,10 @@ pub(crate) struct DrivingPool {
     /// in rather than read here, because reading it reaches the host
     /// (`crates/sprawling/Spec.lean` §8-46-3).
     read_memory: fn() -> Memory,
+    /// The clock a run's wait in `waiting` is read off, and where the
+    /// wait is kept (Roadmap M2, the pure lane wait).
+    monotonic: fn() -> Instant,
+    health: Health,
 }
 
 /// One staged dispatch and the two things its lane will be given. It
@@ -91,16 +97,26 @@ struct Waiting {
     staged: Staged,
     ledger: Relay,
     context: DriveContext,
+    staged_at: Instant,
 }
 
 impl DrivingPool {
-    pub fn open(home: mpsc::Sender<Wake>, read_memory: fn() -> Memory) -> DrivingPool {
+    /// `monotonic` times each run's wait for a lane, and `health` keeps
+    /// it beside the relay queue's waits.
+    pub fn open(
+        home: mpsc::Sender<Wake>,
+        read_memory: fn() -> Memory,
+        monotonic: fn() -> Instant,
+        health: Health,
+    ) -> DrivingPool {
         DrivingPool {
             home,
             running: std::collections::BTreeMap::new(),
             trailing: Vec::new(),
             waiting: VecDeque::new(),
             read_memory,
+            monotonic,
+            health,
         }
     }
 
@@ -160,9 +176,11 @@ impl DrivingPool {
                 staged,
                 ledger,
                 context,
+                staged_at: (self.monotonic)(),
             });
             return Ok(());
         }
+        self.health.lane_waited(std::time::Duration::ZERO);
         self.open_lane(staged, ledger, context)
     }
 
@@ -181,10 +199,13 @@ impl DrivingPool {
                 staged,
                 ledger,
                 context,
+                staged_at,
             }) = self.waiting.pop_front()
             else {
                 break;
             };
+            self.health
+                .lane_waited((self.monotonic)().saturating_duration_since(staged_at));
             let run = staged.run_id();
             if let Err(err) = self.open_lane(staged, ledger, context) {
                 refused.push((run, err));
@@ -306,7 +327,12 @@ mod tests {
     #[test]
     fn a_pool_judges_memory_by_the_reader_it_was_handed() {
         let (home, _arrivals) = std::sync::mpsc::channel();
-        let mut pool = DrivingPool::open(home, tight);
+        let mut pool = DrivingPool::open(
+            home,
+            tight,
+            crate::worker::fixture::monotonic,
+            super::Health::default(),
+        );
         pool.running
             .insert(RunId::from_bytes([1u8; 16]), std::thread::spawn(|| {}));
 
