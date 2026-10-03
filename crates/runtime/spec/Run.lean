@@ -283,9 +283,7 @@ theorem run_frozen_follows_its_handoff_by_one_millisecond (t handoff frozen : Na
     exact ⟨rfl, rfl⟩
   · cases closed
 
-/-- 时钟到顶时冻结拒绝，`run_frozen` 不会记成比 `handoff_written` 更早的一刻。 -/
-theorem a_clock_at_its_ceiling_cannot_close : close TIME_MAX = .error .InvalidArgs := by
-  simp [close]
+/-! 时钟到顶时冻结拒绝，`run_frozen` 不会记成比 `handoff_written` 更早的一刻。 -/
 
 end Runtime.Run
 

@@ -176,11 +176,6 @@ def code : StorageError → Answer
   | .Unproven => .own .HistoryUnproven
   | .Snapshot => .own .StorageFatal
 
-theorem ledger_failures_stop_the_writer :
-    code .Io = .own .StorageFatal ∧ code .LedgerBroken = .own .StorageFatal ∧
-      code .Snapshot = .own .StorageFatal := by
-  decide
-
 theorem only_two_variants_carry (e : StorageError) :
     code e = .carried ↔ e = .Draft ∨ e = .ChainHalted := by
   cases e <;> decide

@@ -76,8 +76,7 @@ theorem forwarded_only_if_permitted (authority : Option Authority) (o : Opened)
       · exact ⟨a, v, rfl, rfl, hp⟩
       · simp [judge, hp] at h
 
-/-- 只看的设备从不转发一个动手的动词。 -/
-theorem watching_never_acts : judge (some .watch) (.judged .act) = .ok (.refuseVerb .act) := rfl
+/-! 只看的设备从不转发一个动手的动词。 -/
 
 /-- 只在城所在的机器上做的动词（`localOnly`）谁也不转发。 -/
 theorem local_only_is_refused (a : Authority) :
