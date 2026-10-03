@@ -84,4 +84,27 @@ describe("door step (client/spec/Views/Door.lean)", () => {
   test("a refusal that arrives while nothing is in flight changes nothing", () => {
     expect(run([{ kind: "refusal", code: "E_GATE_DENIED" }])).toEqual({ door: IDLE, sent: [] });
   });
+
+  test("a command that never left the page returns to the opener without a refusal", () => {
+    expect(
+      run([
+        { kind: "press", opener: "key" },
+        { kind: "unsent" },
+      ]),
+    ).toEqual({
+      door: { phase: { kind: "idle" }, typed: "", focus: { kind: "opener", opener: "key" } },
+      sent: [{ kind: "replace" }],
+    });
+    expect(
+      run([{ kind: "press", opener: "door" }, { kind: "pending" }, { kind: "type", text: "ABCD" }, { kind: "submit" }, { kind: "unsent" }]).door,
+    ).toEqual({ phase: { kind: "idle" }, typed: "", focus: { kind: "opener", opener: "door" } });
+  });
+
+  test("an unsent event while nothing is in flight changes nothing", () => {
+    expect(run([{ kind: "press", opener: "door" }, { kind: "pending" }, { kind: "unsent" }]).door).toEqual({
+      phase: { kind: "awaiting", opener: "door" },
+      typed: "",
+      focus: { kind: "input" },
+    });
+  });
 });

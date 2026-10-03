@@ -69,10 +69,9 @@
       patience = undefined;
     }
     if (sent !== null && !send(sent)) {
-      // Nothing left the page, so the request ends as a refusal does,
-      // and the line says why in the page's own words rather than in a
-      // code the city never sent.
-      move({ kind: "refusal", code: "E_WIRE_MISMATCH" });
+      // Nothing left the page: the machine hears `unsent`, not a refusal
+      // the city never sent, and the line says why in the page's words.
+      move({ kind: "unsent" });
       told = { key: "remote_door_unsent", code: "" };
       return;
     }

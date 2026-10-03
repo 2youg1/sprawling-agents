@@ -40,6 +40,7 @@ export type DoorEvent =
   | { readonly kind: "press"; readonly opener: Opener }
   | { readonly kind: "pending" }
   | { readonly kind: "refusal"; readonly code: AxCode }
+  | { readonly kind: "unsent" }
   | { readonly kind: "settled" }
   | { readonly kind: "type"; readonly text: string }
   | { readonly kind: "submit" }
@@ -72,6 +73,12 @@ export function step(door: Door, event: DoorEvent): Stepped {
     case "refusal":
       return phase.kind === "requesting" || phase.kind === "confirming"
         ? [{ phase: { kind: "refused", opener: phase.opener, code: event.code }, typed: "", focus: { kind: "opener", opener: phase.opener } }, null]
+        : same;
+    case "unsent":
+      // The command never left the page: the city said nothing, so the
+      // machine goes back to rest rather than inventing a refusal code.
+      return phase.kind === "requesting" || phase.kind === "confirming"
+        ? [{ phase: { kind: "idle" }, typed: "", focus: { kind: "opener", opener: phase.opener } }, null]
         : same;
     case "settled":
       return phase.kind === "confirming" ? [{ phase: { kind: "idle" }, typed: "", focus: { kind: "opener", opener: phase.opener } }, null] : same;
