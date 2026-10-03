@@ -367,18 +367,20 @@ than any diagram of boxes.
     the event into what it believes. The same fold, on both sides of the
     wire.
 13. **A signal reaches whoever it names, working or not, when it is sent.**
-    `signal send` and `delegate` are recorded at the call (`signal_enqueued`),
-    then delivered into the named room's queue. A run working in that room
-    receives it at its next safe point, through the same door a steer uses,
-    with `@` and the sender's address in front of it and the sender run's
-    state at delivery (running, frozen, cancelled, failed); a room with no
-    run is *knocked*, once — `bin::assembly` starts a run whose brief names
-    the resident who spoke, or waits for the room's current reader to leave.
-    The sender carries on, unless it asked to wait: then it parks at a safe
-    point, calls no model, and resumes on a reply or on the injected clock's
-    deadline, whichever comes first. A signal counts as consumed only when a
-    model answer that read it is recorded; a run that leaves before that
-    gives it back and the room is knocked again. Only the person's own
+    `signal send` is recorded at the call (`signal_enqueued`, through the
+    lane's relay), and the accounting thread delivers it into the named
+    room as it shows that line. A run working in that room receives it at
+    its next safe point, through the same door a steer uses, with `@` and
+    the sender's address in front of it and the sender run's state at
+    delivery (running for a send, frozen or cancelled for a handback); a
+    room with no run is *knocked* at that delivery, once, while the sender
+    still drives — `bin::assembly` starts a run whose brief names the
+    resident who spoke, or waits for the room's current reader to leave.
+    The sender carries on. A signal counts as consumed only when a model
+    answer that read it is recorded; a run that leaves before that gives
+    it back and the room is knocked again. Work handed down with
+    `delegate` still starts when the parent lands, and a send that waits
+    for its reply (collab D9) is not built yet. Only the person's own
     entrance can render as `user`. A knock addresses a resident, never a
     frozen run: history is read, not woken. (collab D7–D11,
     `crates/collab/spec/Delivery.lean`.)
@@ -681,7 +683,7 @@ do not overlap: overlapping verification reads as more coverage than it is.
 |---|---|---|
 | V0 unrepresentable | a whole class of error moved out of what can be written | <!-- xtask:begin compile_fail_cases -->18<!-- xtask:end --> compile-failure counterexamples |
 | V1 types and lints | null, overflow, silent truncation, hidden panics | workspace lints, `-D warnings`, `--all-features` |
-| V2 unit and property | a function wrong across a class of inputs | <!-- xtask:begin test_functions -->3069<!-- xtask:end --> test functions, properties before examples |
+| V2 unit and property | a function wrong across a class of inputs | <!-- xtask:begin test_functions -->3072<!-- xtask:end --> test functions, properties before examples |
 | V3 conformance | a second adapter behaving unlike the first | one suite per port, except `browser::port`, whose suite only ever ran against the replay it was written beside (decision D1 of `crates/browser/Spec.lean`) |
 | V4 fuzz | parsers meeting hostile bytes | <!-- xtask:begin fuzz_targets -->6<!-- xtask:end --> targets under `tools/fuzz/fuzz_targets` |
 | V5 formal | termination, absence of overflow and monotonicity in the code; a design rule false on some input nobody tried | 3 of 3 kani harnesses proved, Linux CI — every proposition in the roster has an unbounded domain and a solvable shape; the Lean specifications under `crates/`, proved by `just models` in every `just check` |
