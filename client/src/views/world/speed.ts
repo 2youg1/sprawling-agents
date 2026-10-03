@@ -3,11 +3,11 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// What the speed cell of the session's sheet says (client/Spec.lean §7K):
-// over the turns that measured a time to first content, its median and
-// its mean and how many turns that is; over the turns that measured an
-// output rate (`tpsOf`), its 50th and 99th percentile and how many turns
-// that is, absent when none did.
+// What the two speed cells of the session's sheet say (client/Spec.lean
+// §7K): over the turns that measured a time to first content, its median
+// and its mean and how many turns that is; over the turns that measured
+// an output rate (`tpsOf`), its 50th and 99th percentile and how many
+// turns that is, absent when none did.
 //
 // The median is the figure a person compares sessions by, because one
 // turn that waited on a cold provider would otherwise move it; the mean

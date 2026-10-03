@@ -167,21 +167,29 @@ not, so a figure is never cut to a few letters. -->
       <dd class="truncate text-note text-text-faint">{city}</dd>
     {/if}
   </div>
+  <!-- Speed is two cells, each one figure on the figure line and the
+  second reading with its turn count on the note line, so the row stays
+  two lines high and no figure shares a line it could be cut on. -->
   <div class="flex min-w-0 flex-col">
-    <dt class="text-note text-text-faint">{say($lang, "world_speed")}</dt>
+    <dt class="text-note text-text-faint">{say($lang, "world_ttft_name")}</dt>
     {#if speed === null}
       <dd class="text-text-faint">{DASH}</dd>
     {:else}
-      <dd class="figure truncate text-text">
-        {fill(say($lang, "world_ttft_spread"), { median: String(speed.ttft), mean: String(speed.ttftMean) })}
+      <dd class="figure truncate text-text">{fill(say($lang, "world_ttft"), { n: String(speed.ttft) })}</dd>
+      <dd class="truncate text-note text-text-faint">
+        {fill(say($lang, "world_ttft_note"), { mean: String(speed.ttftMean), n: String(speed.turns) })}
       </dd>
-      <dd class="truncate text-note text-text-faint">{fill(say($lang, "world_ttft_turns"), { n: String(speed.turns) })}</dd>
-      {#if speed.tps !== null}
-        <dd class="figure truncate text-text">
-          {fill(say($lang, "world_tps_spread"), { p50: String(Math.round(speed.tps.p50)), p99: String(Math.round(speed.tps.p99)) })}
-        </dd>
-        <dd class="truncate text-note text-text-faint">{fill(say($lang, "world_tps_turns"), { n: String(speed.tps.turns) })}</dd>
-      {/if}
+    {/if}
+  </div>
+  <div class="flex min-w-0 flex-col">
+    <dt class="text-note text-text-faint">{say($lang, "world_tps_name")}</dt>
+    {#if speed?.tps === null || speed?.tps === undefined}
+      <dd class="text-text-faint">{DASH}</dd>
+    {:else}
+      <dd class="figure truncate text-text">{fill(say($lang, "world_tps"), { n: String(Math.round(speed.tps.p50)) })}</dd>
+      <dd class="truncate text-note text-text-faint">
+        {fill(say($lang, "world_tps_note"), { p99: String(Math.round(speed.tps.p99)), n: String(speed.tps.turns) })}
+      </dd>
     {/if}
   </div>
   <div class="flex min-w-0 flex-col">

@@ -6375,29 +6375,29 @@
     "en": "could not read",
     "zh": "读不出"
   },
-  "world_speed": {
-    "en": "speed",
-    "zh": "速度"
-  },
   "world_ttft": {
-    "en": "{n} ms TTFT",
+    "en": "TTFT {n} ms",
     "zh": "TTFT {n} ms"
   },
-  "world_ttft_turns": {
-    "en": "TTFT over {n} turns",
-    "zh": "TTFT 取自 {n} 个回合"
+  "world_ttft_name": {
+    "en": "first token",
+    "zh": "首个 token"
   },
-  "world_ttft_spread": {
-    "en": "TTFT median {median} ms · mean {mean} ms",
-    "zh": "TTFT 中位数 {median} ms · 平均 {mean} ms"
+  "world_ttft_note": {
+    "en": "mean {mean} ms · {n} turns",
+    "zh": "平均 {mean} ms · {n} 个回合"
   },
-  "world_tps_spread": {
-    "en": "{p50} t/s p50 · {p99} t/s p99",
-    "zh": "p50 {p50} t/s · p99 {p99} t/s"
+  "world_tps_name": {
+    "en": "output rate",
+    "zh": "输出速度"
   },
-  "world_tps_turns": {
-    "en": "t/s over {n} turns",
-    "zh": "t/s 取自 {n} 个回合"
+  "world_tps": {
+    "en": "{n} t/s",
+    "zh": "{n} t/s"
+  },
+  "world_tps_note": {
+    "en": "p99 {p99} t/s · {n} turns",
+    "zh": "p99 {p99} t/s · {n} 个回合"
   },
   "world_bounds": {
     "en": "bounds",
