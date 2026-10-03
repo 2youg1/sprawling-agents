@@ -80,10 +80,7 @@ fn a_full_turn_appends_the_canonical_event_sequence() {
         ]
     );
     assert_eq!(lines.refs().len(), 5);
-    assert_eq!(
-        lines.durable(report.model_returned()).unwrap().kind(),
-        kernel::EventKind::ModelReturned
-    );
+    assert_eq!(lines.durable(report.model_returned()), Ok(lines.refs()[2]));
     // Conversation-folding material mirrors the ledger content.
     assert_eq!(report.assistant().len(), 1);
     assert_eq!(report.wave_results().len(), 1);
@@ -294,10 +291,8 @@ fn the_ledger_chain_stays_verifiable_after_a_turn() {
 
 /// A halt that arrives during a wave stops the wave where it stands.
 ///
-/// Before the wave asked, a scope stopped while the model's first edit
-/// was running still got the other three: one question per turn meant
-/// the person who stopped the city waited for every effect the model
-/// had asked for in that one reply.
+/// One question per turn would make the person who stopped the city
+/// wait for every effect the model asked for in that one reply.
 #[test]
 fn a_wave_halted_between_two_calls_does_not_make_the_second() {
     let mut ledger = TestLedger::new();
