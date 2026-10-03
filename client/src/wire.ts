@@ -2875,7 +2875,6 @@ export const RegistryReading = Schema.Union([
       refusal: AxError,
     }),
   }),
-  Schema.Literal("unasked"),
 ]).annotate({ identifier: "RegistryReading" });
 export type RegistryReading = typeof RegistryReading.Type;
 

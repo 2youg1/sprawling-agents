@@ -30,7 +30,6 @@ export type RegistryLine =
 export function registryLineOf(line: RegistryNewest): RegistryLine {
   const registry = REGISTRY[line.registry];
   const reading = line.reading;
-  if (typeof reading === "string") return { registry, newest: null, reason: { key: "release_registry_unasked", said: null } };
   return "read" in reading
     ? { registry, newest: reading.read.newest, reason: null }
     : { registry, newest: null, reason: { key: "release_registry_refused", said: reading.refused.refusal.recovery } };
@@ -39,7 +38,7 @@ export function registryLineOf(line: RegistryNewest): RegistryLine {
 // npm's newest release, which the verdict judges.
 export function npmNewest(registries: readonly RegistryNewest[]): ReleaseLine | null {
   for (const line of registries) {
-    if (line.registry === "npm" && typeof line.reading === "object" && "read" in line.reading) {
+    if (line.registry === "npm" && "read" in line.reading) {
       return line.reading.read.newest;
     }
   }

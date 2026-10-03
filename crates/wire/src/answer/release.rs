@@ -90,15 +90,8 @@ pub enum Registry {
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum RegistryReading {
-    Read {
-        newest: ReleaseLine,
-    },
-    Refused {
-        refusal: AxError,
-    },
-    /// Not asked: no rule yet compares this registry's version with
-    /// this binary's, so an answer would be a guess.
-    Unasked,
+    Read { newest: ReleaseLine },
+    Refused { refusal: AxError },
 }
 
 /// How this binary was installed, which decides the command that

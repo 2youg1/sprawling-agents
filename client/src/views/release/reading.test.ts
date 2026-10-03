@@ -19,15 +19,13 @@ const refusal: AxError = {
 };
 
 describe("registryLineOf", () => {
-  test("a reading, a refusal and a registry not asked each say their own line", () => {
+  test("a reading and a refusal each say their own line", () => {
     const lines: RegistryNewest[] = [
       { registry: "npm", reading: { read: { newest: NEWEST } } },
-      { registry: "crates_io", reading: "unasked" },
       { registry: "npm", reading: { refused: { refusal } } },
     ];
     expect(lines.map(registryLineOf)).toEqual([
       { registry: "release_registry_npm", newest: NEWEST, reason: null },
-      { registry: "release_registry_crates_io", newest: null, reason: { key: "release_registry_unasked", said: null } },
       { registry: "release_registry_npm", newest: null, reason: { key: "release_registry_refused", said: "check the network" } },
     ]);
   });
@@ -39,7 +37,7 @@ describe("registryLineOf", () => {
         { registry: "npm", reading: { read: { newest: NEWEST } } },
       ]),
     ).toEqual(NEWEST);
-    expect(npmNewest([{ registry: "npm", reading: "unasked" }])).toBeNull();
+    expect(npmNewest([{ registry: "npm", reading: { refused: { refusal } } }])).toBeNull();
   });
 });
 

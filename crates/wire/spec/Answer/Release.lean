@@ -23,7 +23,7 @@ pub enum ReleaseAnswer {
 }
 pub struct RegistryNewest { pub registry: Registry, pub reading: RegistryReading }
 pub enum Registry { Npm, CratesIo }
-pub enum RegistryReading { Read { newest: ReleaseLine }, Refused { refusal: AxError }, Unasked }
+pub enum RegistryReading { Read { newest: ReleaseLine }, Refused { refusal: AxError } }  // 每个注册表都问，所以只有读到与读不到两臂
 pub enum InstallChannel { Npm, Cargo, Archive, Source }
 pub struct UpdateHint { pub channel: InstallChannel, pub command: Option<String> }
 ```
@@ -58,7 +58,7 @@ pub enum Query { /* … */ NewestRelease }   // 线上拼作 "newest_release"
 
 ```rust
 pub struct RegistryNewest { pub registry: Registry, pub reading: RegistryReading }
-pub enum RegistryReading { Read { newest: ReleaseLine }, Refused { refusal: AxError }, Unasked }
+pub enum RegistryReading { Read { newest: ReleaseLine }, Refused { refusal: AxError } }  // 每个注册表都问，所以只有读到与读不到两臂
 pub enum Registry { Npm, CratesIo }
 pub enum InstallChannel { Npm, Cargo, Archive, Source }
 pub struct UpdateHint { pub channel: InstallChannel, pub command: Option<String> }

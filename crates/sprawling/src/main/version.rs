@@ -80,9 +80,7 @@ pub(super) fn check() -> ExitCode {
         } => {
             let Some(newest) = registries.iter().find_map(|line| match &line.reading {
                 RegistryReading::Read { newest } if line.registry == Registry::Npm => Some(newest),
-                RegistryReading::Read { .. }
-                | RegistryReading::Refused { .. }
-                | RegistryReading::Unasked => None,
+                RegistryReading::Read { .. } | RegistryReading::Refused { .. } => None,
             }) else {
                 eprintln!("could not check: the answer carried no npm reading");
                 return ExitCode::FAILURE;
@@ -136,7 +134,6 @@ fn registry_said(line: &RegistryNewest) -> String {
             newest.version, newest.released
         ),
         RegistryReading::Refused { refusal } => format!("{registry} could not be read: {refusal}"),
-        RegistryReading::Unasked => format!("{registry} was not asked"),
     }
 }
 

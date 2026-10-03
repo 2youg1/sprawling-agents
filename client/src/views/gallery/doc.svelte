@@ -54,7 +54,7 @@
           verdict: "behind",
           registries: [
             { registry: "npm", reading: { read: { newest: NEWEST } } },
-            { registry: "crates_io", reading: "unasked" },
+            { registry: "crates_io", reading: { read: { newest: NEWEST } } },
           ],
           update: { channel: "npm", command: "npm install -g sprawling@latest" },
         },
@@ -80,7 +80,7 @@
         unreleased: {
           registries: [
             { registry: "npm", reading: { refused: { refusal: REFUSAL } } },
-            { registry: "crates_io", reading: "unasked" },
+            { registry: "crates_io", reading: { refused: { refusal: REFUSAL } } },
           ],
           update: { channel: "source" },
         },
