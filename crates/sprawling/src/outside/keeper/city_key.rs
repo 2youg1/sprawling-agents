@@ -119,7 +119,22 @@ impl Doorway {
     /// refuses, and nothing has changed then; a table or a line that
     /// cannot be written.
     pub(crate) fn replace_key(&self) -> Result<Vec<Device>, AxError> {
-        Ok(Vec::new())
+        let now = (self.senses.clock)()?;
+        let mut kept = self.kept()?;
+        if let Some(standing) = &kept.standing {
+            return Err(AxError::failure(
+                AxCode::Busy,
+                "replace the city key",
+                format!(
+                    "the remote door is open at {}",
+                    standing.opened.url.as_str()
+                ),
+            )
+            .with_recovery("close it first with `/remote close`, then replace the key"));
+        }
+        kept.city = Ok(kept.key.replaced(&self.senses.entropy)?);
+        let paired = kept.door.devices().to_vec();
+        kept.revoked(now, paired)
     }
 
     /// How long this machine keeps the city key.
