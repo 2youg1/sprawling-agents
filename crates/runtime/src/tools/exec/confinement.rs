@@ -152,8 +152,9 @@ impl Missing {
 /// keep. No build of this crate constructs it, although a job object is
 /// reachable through a safe interface (`runtime::backlog::jobs` makes one
 /// with `win32job`), because two of its assurances cannot be kept today:
-/// the job-wide memory and CPU limits are private fields of that crate,
-/// so `resources` would promise a limit that is not there; and a child
+/// the job-wide memory limit is a private field of that crate and it
+/// sets no CPU rate control at all, so `resources` would promise a
+/// limit that is not there; and a child
 /// joins the job only after it starts, so a grandchild started in that
 /// gap is outside the tree the job ends. A Windows machine therefore
 /// reports [`Confinement::CopiedTree`], whose [`Assurances`] say what it
