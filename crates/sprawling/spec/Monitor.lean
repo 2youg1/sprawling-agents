@@ -110,7 +110,7 @@ WebUI 的监视页、设置树「性能」条目旁的摘要与 `sprawling gauge
 - `Monitor::history(&self) -> impl Iterator<Item = &Sample>`：从最旧到最新。
 - 没有失败路径：计数是 `AtomicUsize` 的加减，历史的容量在第一次放入时一次预留。
 
-**定下的值。** `CAPACITY = 300`（每秒一点，5 分钟）；`HISTORY_BUDGET = 64 KiB`，`CAPACITY × size_of::<Sample>()` 超过它时编译失败（13 个 `u64`，现为 31 200 字节）。
+**定下的值。** `CAPACITY = 300`（每秒一点，5 分钟）；`HISTORY_BUDGET = 64 KiB`，`CAPACITY × size_of::<Sample>()` 超过它时编译失败（16 个 `u64`，现为 38 400 字节）。
 
 **决定。**
 
@@ -132,9 +132,9 @@ WebUI 的监视页、设置树「性能」条目旁的摘要与 `sprawling gauge
 
 **接口。**
 
-- `json_line(sample: &Sample) -> serde_json::Result<String>`：一个 JSON 对象，键就是 `Sample` 的 13 个字段名，值是整数；不含换行。stdout 不是终端时每秒打印的那一行由 `gauge::lines::city_line` 写出：同样的键，前面多一个 `"line":"city"`（§8-129-4）。agent 按行读，一行一个完整的读数。
+- `json_line(sample: &Sample) -> serde_json::Result<String>`：一个 JSON 对象，键就是 `Sample` 的每一个字段名，值是整数；不含换行。stdout 不是终端时每秒打印的那一行由 `gauge::lines::city_line` 写出：同样的键，前面多一个 `"line":"city"`（§8-129-4）。agent 按行读，一行一个完整的读数。
 - `sparkline(values: impl IntoIterator<Item = u64>, width: usize) -> String`：终端画面里一项计数器的曲线。只取最后 `width` 个值，每个值一个字符，从 `▁` 到 `█` 共 8 级，按这几个值自己的最小值到最大值线性分级（整数运算，最小值画 `▁`，最大值画 `█`）；全部相等时整条画 `▁`。值不足 `width` 个时曲线就短一些，不补空白。
-- 失败：`sparkline` 没有失败路径。`json_line` 只转交 `serde_json` 的错误；13 个整数字段没有可被拒绝的内容，所以它实际上不会出现，调用方把它当作写 stdout 失败处理，而不是在这里用一个隐藏的 `unwrap` 吞掉。
+- 失败：`sparkline` 没有失败路径。`json_line` 只转交 `serde_json` 的错误；整数字段没有可被拒绝的内容，所以它实际上不会出现，调用方把它当作写 stdout 失败处理，而不是在这里用一个隐藏的 `unwrap` 吞掉。
 - `screen(samples: &[Sample], curve_width: usize) -> String`：终端画面的一屏（不含清屏与光标控制，那是调用方的事）。每个计数器一行，共 13 行，以 `
 ` 分隔，顺序与 `Sample` 的字段相同：左对齐 24 列的英文标签，右对齐 10 列的最新读数，两个空格，再是这一项最近 `curve_width` 个点的曲线。没有样本时返回空串，调用方在第一秒什么也不画。
 - `Unit::{Permille, Bytes, Nanos, Count}` 与 `Unit::reading(&self, value: u64) -> String`：一个读数按单位写成文字，是城里单位换算的唯一一处；`gauge::lines` 写给人的行也调它（§8-129-4）。读数的写法按单位定：千分比写成一位小数的百分数（`123` → `12.3%`）；字节按 1024 进位取最大的、读数不小于 1 的单位，写一位小数（`B` 只写整数，其后是 `KiB`、`MiB`、`GiB`、`TiB`）；纳秒按时长的显示规则写：不到 1 µs 写整数 `ns`，不到 10 ms 写整数 `µs`，10 ms 及以上写一位小数的 `ms`，没有更大的单位（`crates/sprawling/spec/Main.lean` §8-129-2 *单位*）；计数原样写。小数一律截断而不是四舍五入，整数运算，没有浮点。
@@ -149,7 +149,7 @@ WebUI 的监视页、设置树「性能」条目旁的摘要与 `sprawling gauge
 4. 单位换算写在这里，不借 `runtime::sieve` 的 `size`：那一个只到 `KiB`、属于另一个 crate 的私有实现，而这里还要换算纳秒。
 5. WebUI 面板在浏览器里按同样的规则自己算读数与曲线（`client/src/core/monitor.ts`），而不是让城把画好的行随帧发过去。曲线取多少个点取决于面板在屏幕上有多宽，只有浏览器知道；标签要从 `lang.json` 取两种语言，终端这一侧只有英文。代价是分级与单位换算在 Rust 与 TypeScript 各写一遍，两边由同一组样本对照：`client/src/core/monitor.test.ts` 用的样本与期望读数和 `monitor::top::tests` 的一屏测试逐项相同，改规则时两份测试的期望一起改；没有机器门把这两份期望绑在一起。重新考虑的条件：监视帧改为携带已画好的行，或者面板改用非字符的画法。
 
-**测试。** `monitor::top::tests`：一行 JSON 解析回来正好是 13 个键、值等于读数、不含换行；0 到 7 画成 `▁▂▃▄▅▆▇█`，宽度不足时只画最新的几个，全部相等时画 `▁`；两份样本的一屏逐行等于预期的 13 行，没有样本时为空。
+**测试。** `monitor::top::tests`：一行 JSON 解析回来正好是 `Sample` 的 16 个键、值等于读数、不含换行；0 到 7 画成 `▁▂▃▄▅▆▇█`，宽度不足时只画最新的几个，全部相等时画 `▁`；两份样本的一屏逐行等于预期的 13 行，没有样本时为空。
 -/
 
 /-!
@@ -164,7 +164,9 @@ WebUI 的监视页、设置树「性能」条目旁的摘要与 `sprawling gauge
 - `counters::Counters::open(volume: PathBuf) -> Counters` 与 `Counters::read(&mut self, watched: Watched, elapsed: Duration) -> Sample`：核心进程的五项取自 `OwnProcess`；`Watched::Everything` 时再读整机 CPU（千分比）、可用内存与城所在卷的剩余空间。城的路径在 `open` 时经 §8-116 的 `volume::resolved` 解析一次，之后每拍用解析过的路径找盘：城以相对路径或 verbatim 拼写起来时，没有一个挂载点是原样路径的前缀，卷的剩余空间就一直读作 0。解析不出时退回原样路径。`sysinfo` 的句柄在第一次 `Everything` 读数时才打开，一次 `Summary` 读数把它们丢掉，所以只有摘要在看时它们不常驻。第一次读数没有上一次可比，两项 CPU 为 0。
 - `counters::own_process::OwnProcess::new() -> OwnProcess` 与 `OwnProcess::read(&mut self, elapsed: Duration) -> OwnReading`：只问本进程、不遍历进程表的读数，`elapsed` 是距上一次读数的墙钟时间。`OwnReading { cpu_permille, private_bytes, working_set_bytes, read_bytes, written_bytes }`：CPU 是两次读数之间本进程累计 CPU 时间的增量除以墙钟增量与核数（千分比，整数运算，截到 `0..=1000`），第一次为 0；private 是私有字节，每个平台读什么见 `crates/sprawling/spec/Serving/Memory.lean` D43：Windows 是 PagefileUsage（即 PrivateUsage），Linux 是 `/proc/self/smaps_rollup` 的 `Private_Clean` 加 `Private_Dirty`（没有它时是 `/proc/self/status` 的 `RssAnon`），macOS 是虚拟大小；工作集是驻留内存；读写字节是本进程累计经存储读写的字节数，Linux 上取自 `/proc/self/io` 的 `read_bytes` 与 `write_bytes`（std 读文件，不需要 unsafe），其他平台读作 0（决定 1）。平台拒绝某一项时这一项读作 0，与尚未接入的项同样处理：`Sample` 是给人看的读数，没有携带失败的位置，而一秒后下一拍会再读一次。`Counters` 只在有人看时存在：`beat` 之后历史为空（没人看）时采样线程丢掉它，平台句柄与进程表不常驻。
 
-**定下的值。** 内存节拍 `MEMORY_BEAT` 100 ms（Memory.lean 的测量计划与 Roadmap M0 第 7 条），一拍是十个内存节拍，即 1 s（§8-94 的「每秒一点」）；两者都是 `bin::monitor::sampler` 里的常量，以后做成设置时只改一个值；线程名 `sprawling-monitor`。
+**定下的值。** 内存节拍默认 `wire::BeatMs::DEFAULT` 100 ms（Memory.lean 的测量计划与 Roadmap M0 第 7 条），可在 `BEAT_MIN_MS`–`BEAT_MAX_MS` 之内由页面调（`crates/wire/spec/Frames/Monitor.lean` §8-47h）；一拍是 `MEMORY_BEATS_PER_BEAT` 个内存节拍，默认即 1 s（§8-94 的「每秒一点」）；线程名 `sprawling-monitor`。
+
+**节拍按城记住**（D44）：`monitor::beat::Beat` 持有当前节拍（一个原子数，采样线程每次醒来读它）与城里记它的文件 `kernel::layout::CityLayout::monitor()`（`.sprawling/MONITOR.toml`，一行 `beat_ms = <n>`）。`Beat::open(city_root)` 在 serve 时读这个文件，文件不在时是默认，读不懂或越界时也是默认并记一条 warn 日志；`Beat::set(b)` 先改原子数、再整份重写文件（`city::document::replace` 之外的保留子树文件照 `GUIDE.toml` 的做法写），写不成记 warn 日志，此刻的节拍仍生效。三个平台上的读写都只经标准库的文件接口。
 
 **决定。**
 
@@ -200,3 +202,15 @@ WebUI 的监视页、设置树「性能」条目旁的摘要与 `sprawling gauge
 
 **本节接口的当前状态。** `Wake` 等不经人的入口尚未接入；性能摘要与 doctor 尚不显示降级；盘慢、内存紧、CPU 被占满三种状态还没有生产的读数（`crates/kernel/spec/Degradation.lean` §8-74）。
 -/
+
+/-! D44 采样节拍按城记在保留子树的一个文件里，由持有监视器的外壳读写
+
+**决定**：`monitor::beat::Beat` 是节拍的唯一持有者：采样线程读它，`MonitorFeed::beat` 写它，`MONITOR.toml` 让它跨 serve 留住。文件在城的保留子树下，没有写域够得到它。
+
+**理由**：节拍是这座城在这台机器上怎样测量的设定，不是这座城的历史，所以不写账本；也不是 User 的偏好，两座城可以不同（wire D44）。原子数让采样线程每次醒来不必加锁。
+
+**被否**：①写进城的 `CONFIG.toml`：那是配置阶梯的城一层，楼与房间会继承或覆盖它，而节拍只对整座城有一个值，要再加一条「只许城一层写」的规则；②写进账本一行：重放与回放都不需要它，而每次拖动控件都会多一行历史。
+
+**重开参数**：节拍开始影响任何决定（不再只是给人看的曲线）时，它要进账本。
+-/
+

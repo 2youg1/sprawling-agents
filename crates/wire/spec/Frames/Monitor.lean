@@ -42,3 +42,37 @@ pub enum ModelTag { /* …既有… */ Ocr }      // 线上 "ocr"
 - `ModelTag::Ocr`：人登记的一个能读图的模型，城的 OCR 工具读这一次选择（`crates/gateway/Spec.lean` §8-34）。二进制里不带任何模型（D18），这个值只是一个登记位。
 - 三项都是名字不变的改形，共用 45。
 -/
+
+/-!
+### 8-47i 采样节拍由页面调，按城记住
+
+```rust
+pub enum Monitoring { Watch, WatchSummary, Release, Beat(BeatMs) }   // 线上 {"beat": 250}
+#[serde(try_from = "u32", into = "u32")]
+pub struct BeatMs(u32);                       // BEAT_MIN_MS ..= BEAT_MAX_MS 之内才造得出
+impl BeatMs { pub const DEFAULT: BeatMs;      // 100 ms（Roadmap M0 第 7 条）
+              pub fn new(ms: u32) -> Result<BeatMs, AxError>; pub fn ms(self) -> u32; }
+pub const BEAT_MIN_MS: u32 = 10;
+pub const BEAT_MAX_MS: u32 = 1_000;
+pub struct Sample { /* …既有 15 项… */ pub beat_ms: u64 }
+pub enum SessionStep { /* …既有… */ Beat(BeatMs) }
+pub struct MonitorFeed { /* …既有… */ pub beat: Arc<dyn Fn(BeatMs) + Send + Sync> }
+```
+
+- `decide_frame` 把已打开会话的 `Monitor(Beat(b))` 答成 `SessionStep::Beat(b)`，外壳调用 `MonitorFeed::beat(b)`；未打开的会话照旧拒绝并关闭。范围之外的数在反序列化时就被拒（`E_INVALID_ARGS`），所以外壳拿到的节拍总在范围之内。
+- 节拍是内存节拍（`crates/sprawling/spec/Monitor.lean` §8-96）：私有字节每拍读一次，`Sample` 每十拍发一次，所以默认 100 ms 时页面仍是每秒一点。`Sample.beat_ms` 报这一点读数时的节拍，页面上的控件从它读出当前的值，不另存一份。
+- 三个平台上相同：节拍只是采样线程 `sleep` 的长度。
+
+-/
+
+/-! D44 采样节拍是 `Monitoring` 的第四个变体，而不是一个 `Command`
+
+**理由**：它与看不看一样只改这座城此刻怎样采样，不写账本、不改城的任何状态，执行者是持有监视器的外壳，而 `Command` 的执行者是记账线程，它够不到采样线程；城记住它（`crates/sprawling/spec/Monitor.lean` D44），是为了下一次 serve 不回到默认。
+
+**被否**：①一个 `Command::SetMonitorBeat`：要过记账线程，再由它转交外壳，多一条只为转交的路；②放进 User 的偏好文件：偏好跟人走，而节拍是这座城这台机器上的测量设定，两座城可以不同。
+
+**定下的值**：范围 10–1000 ms 是推断的选择：低于 10 ms 时读一次私有字节的代价（约 1 µs，§8-96）开始占到节拍的可见比例，高于 1 s 时一点的间隔超过十秒；改范围只改这两个常量。与本版其他改形同一次 `WIRE_V` 进位（D22）。
+
+**重开参数**：节拍要按会话各不相同时（两个人在两台设备上看同一座城、各要各的节拍），它改成会话的状态。
+-/
+
