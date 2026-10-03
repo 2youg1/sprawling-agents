@@ -45,16 +45,37 @@ impl Underway {
     /// Hands down every node that `done` makes ready and that has not
     /// been handed down yet, in id order, and counts them as handed.
     ///
+    /// All or nothing: a refusal hands out nothing and counts nothing as
+    /// handed, because handed means handed out (`spec/Workshop.lean`), and
+    /// a node counted while its request stays in the desk is one no later
+    /// call hands down.
+    ///
     /// # Errors
     /// Propagates the delegate desk's refusal - the depth and building
     /// rules - and names a scheduled node the graph holds no contract
     /// for.
     pub fn hand_next(&mut self, done: &BTreeSet<NodeId>) -> Result<Vec<Delegated>, AxError> {
-        for id in self.workshop.ready(done) {
-            if self.handed.contains(&id) {
-                continue;
+        let fresh: Vec<NodeId> = self
+            .workshop
+            .ready(done)
+            .into_iter()
+            .filter(|id| !self.handed.contains(id))
+            .collect();
+        match self.ask_each(&fresh) {
+            Ok(()) => {
+                self.handed.extend(fresh);
+                Ok(self.desk.take())
             }
-            let contract = self.workshop.contract(&id).ok_or_else(|| {
+            Err(refusal) => {
+                drop(self.desk.take());
+                Err(refusal)
+            }
+        }
+    }
+
+    fn ask_each(&mut self, fresh: &[NodeId]) -> Result<(), AxError> {
+        for id in fresh {
+            let contract = self.workshop.contract(id).ok_or_else(|| {
                 AxError::failure(
                     AxCode::InvalidArgs,
                     "hand down a workshop node",
@@ -72,9 +93,8 @@ impl Underway {
                 goal: contract.done_check().to_owned(),
                 kind: DelegateKind::Ephemeral,
             })?;
-            self.handed.insert(id);
         }
-        Ok(self.desk.take())
+        Ok(())
     }
 
     /// Every node handed down so far, this graph's and the room's before
