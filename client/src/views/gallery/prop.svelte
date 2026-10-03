@@ -14,7 +14,7 @@
   // the letter one of them opens on the right side (roadmap A25), and
   // the mailbox key counting them.
   import { Address, B3Hash, RunId, Seq, TimeMs } from "../../wire";
-  import type { Answer, DocumentState, EventRecord, ProposalCard, ProposalsAnswer, Query, Slice } from "../../wire";
+  import type { Answer, Call, DocumentState, EventRecord, ProposalCard, ProposalsAnswer, Query, RoundsAnswer, Slice } from "../../wire";
 
   const SHOP = Address.make("shop");
   const PATH = "notes/plan.md";
@@ -93,12 +93,32 @@
   // the plan is worth asking about.
   const RECORDS: readonly EventRecord[] = [
     record(1, "run_started", { task: "tighten the plan's wording" }),
-    record(2, "proposal_offered", { doc: DOC, baseline: V0, start: 77, end: 105, before: "", after: "" }),
-    record(3, "proposal_offered", { doc: DOC, baseline: V1, start: 8, end: 75, before: "", after: "" }),
+    record(2, "model_called", { model: "claude-opus-4" }),
+    record(3, "tool_called", { name: "read", subject: PATH }),
+    record(4, "proposal_offered", { doc: DOC, baseline: V0, start: 77, end: 105, before: "", after: "" }),
+    record(5, "proposal_offered", { doc: DOC, baseline: V1, start: 8, end: 75, before: "", after: "" }),
   ];
+
+  // The sender's one round: it read the plan, then offered the two cards.
+  const READ: Call = {
+    tool: "read",
+    subject: PATH,
+    arguments: null,
+    outcome: "answered",
+    at: Seq.make(3),
+    output: null,
+    called: TimeMs.make(NOW - 8 * 60_000),
+    answered: TimeMs.make(NOW - 8 * 60_000 + 40),
+    timing: "measured",
+  };
+  const ROUNDS: RoundsAnswer = {
+    run: RUN,
+    turns: [{ calls: [READ], notes: [], number: 1, opened: Seq.make(2), t: TimeMs.make(NOW - 8 * 60_000), timing: "measured" }],
+  };
 
   function answering(query: Query): Answer | undefined {
     if (typeof query !== "object") return undefined;
+    if ("rounds" in query) return query.rounds.run === RUN ? { rounds: ROUNDS } : undefined;
     if ("proposals" in query) return query.proposals === DOC ? { proposals: PROPOSALS } : undefined;
     if ("document" in query) return query.document.at === DOC ? { document: { at: DOC, state: DOCUMENT } } : undefined;
     if ("sessions" in query) return { sessions: { room: query.sessions.room, sessions: [], earlier: 0 } };
@@ -154,6 +174,11 @@
   <Case label="letter · a proposal card opened on the right side, read as its diff" width={600}>
     <div class="flex h-[640px] flex-col overflow-hidden bg-page">
       <Letter doc={DOC} card={CURRENT.id} />
+    </div>
+  </Case>
+  <Case label="letter · the same card read as the conversation of the run that sent it" width={600}>
+    <div class="flex h-[640px] flex-col overflow-hidden bg-page">
+      <Letter doc={DOC} card={CURRENT.id} opening="talk" />
     </div>
   </Case>
   <Case label="mailbox key · two proposal cards waiting">
