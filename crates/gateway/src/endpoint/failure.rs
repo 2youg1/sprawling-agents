@@ -379,7 +379,7 @@ mod tests {
         use super::super::config::Endpoint;
         use super::super::fakes::{config, fake_provider, request};
         use super::super::redemption::redemption;
-        use kernel::{AxCode, Model};
+        use kernel::AxCode;
         let said = serde_json::json!({
             "type": "error",
             "error": { "type": "invalid_request_error",

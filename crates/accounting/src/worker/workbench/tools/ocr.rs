@@ -57,6 +57,7 @@ impl Laying {
             &chosen,
             crate::held_vault::resolving(Arc::clone(&self.vault)),
             headers,
+            self.monotonic,
         )?;
         OcrTool::new(reader, policy.clone(), recogniser).map(Some)
     }

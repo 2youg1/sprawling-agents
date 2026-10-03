@@ -34,6 +34,7 @@ pub fn recogniser_for(
     chosen: &Chosen<'_>,
     secrets: SecretResolver,
     dialect_headers: Vec<(String, String)>,
+    monotonic: fn() -> std::time::Instant,
 ) -> Result<Recogniser, AxError> {
     let shown: Shown = Arc::default();
     let showing = Arc::clone(&shown);
@@ -50,7 +51,7 @@ pub fn recogniser_for(
                     )
             })
     });
-    let model = crate::adapter_for(chosen, Redemption::new(secrets, images), dialect_headers)?;
+    let model = crate::adapter_for(chosen, Redemption::new(secrets, images), dialect_headers, monotonic)?;
     Ok(Recogniser::attached(Seeing {
         model,
         model_id: chosen.entry.id.clone(),

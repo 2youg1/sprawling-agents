@@ -11,9 +11,11 @@
 //! Credentials resolve at the last moment: the `Sealed` value is exposed
 //! only while the auth header is written, then dropped (zeroized).
 
-//! The Model face: calls the router can hold.
+//! The three model doors of an endpoint. They are this crate's own:
+//! a caller outside it reaches them through `permit::Gated`, which takes
+//! the endpoint's permit first (`crates/gateway/Spec.lean` §8-6).
 
-use kernel::{AxCode, AxError, Model, ModelRequest, ModelReturn, UsdMicros};
+use kernel::{AxCode, AxError, ModelRequest, ModelReturn, UsdMicros};
 use serde_json::Value;
 
 use crate::cost;
@@ -22,8 +24,8 @@ use crate::market::InputKinds;
 
 use super::config::Endpoint;
 use super::failure::{ProviderFailure, provider_err};
-impl Model for Endpoint {
-    fn call_streaming(
+impl Endpoint {
+    pub(crate) fn call_streaming(
         &mut self,
         req: &ModelRequest,
         onto: kernel::Increments<'_>,
@@ -31,7 +33,7 @@ impl Model for Endpoint {
         self.call_speculating(req, onto, &mut |_| {})
     }
 
-    fn call_speculating(
+    pub(crate) fn call_speculating(
         &mut self,
         req: &ModelRequest,
         onto: kernel::Increments<'_>,
@@ -44,7 +46,7 @@ impl Model for Endpoint {
         self.stream(req, onto, early)
     }
 
-    fn call(&mut self, req: &ModelRequest) -> Result<ModelReturn, AxError> {
+    pub(crate) fn call(&mut self, req: &ModelRequest) -> Result<ModelReturn, AxError> {
         // A confidential building's bytes do not leave the machine, and
         // this type is the way off it. The refusal is here rather than
         // only at the routing layer because a backstop that lives where

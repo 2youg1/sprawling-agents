@@ -228,7 +228,7 @@ impl RunWorker {
             flight: Flight::open(read_memory, monotonic),
             index: storage::LedgerIndex::empty(),
             warm: super::keeping_warm::Kept::default(),
-            models: Box::new(GatewayModels),
+            models: Box::new(GatewayModels { monotonic }),
             connectors: std::sync::Arc::new(super::mcp::Residents::default()),
             machine,
             clock,

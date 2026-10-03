@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 40fd1dcf5ecc70c23d414ed072d7ff4ac9f49edd5bb72d30a266dbb4da640d8b # shrinks to cap = 1, trace = [Arrive, Arrive, Arrive, Arrive, Attempt(3), Shed(0), Arrive, Arrive, Shed(0), Shed(0), Arrive, Arrive, Shed(0), Arrive, Arrive, Shed(0), Arrive, Arrive, Arrive, Shed(0), Arrive, Arrive, GiveBack, Shed(0), Shed(0), Shed(0), Attempt(4), Shed(0), Shed(0), Arrive, Arrive, Arrive, Shed(0), Shed(0), Shed(0), Arrive, Shed(0), GiveBack, Arrive, Attempt(2), Arrive, Shed(0), Arrive, Arrive, Shed(1), Shed(1), Shed(1), GiveBack, Arrive, Shed(1), Attempt(0)]

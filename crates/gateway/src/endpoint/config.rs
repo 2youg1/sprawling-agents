@@ -188,7 +188,7 @@ mod tests {
     use super::super::fakes::{config, fake_provider, request, silent_provider};
     use super::super::redemption::redemption;
     use super::*;
-    use kernel::{AxCode, Model};
+    use kernel::AxCode;
     #[test]
     fn the_probe_reads_ids_and_carries_the_same_credential_the_call_does() {
         let body = serde_json::json!({

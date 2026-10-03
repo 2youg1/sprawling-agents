@@ -112,6 +112,7 @@ fn heard(row: &HostPreset, face: &Face) -> Shape {
         &chosen,
         crate::endpoint::redemption::redemption(),
         Vec::new(),
+        crate::endpoint::fakes::monotonic,
     )
     .unwrap();
     // A system prompt, so the three bodies differ where `shape_of`

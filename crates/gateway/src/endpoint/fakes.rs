@@ -25,8 +25,14 @@
     clippy::indexing_slicing,
     clippy::string_slice,
     clippy::arithmetic_side_effects,
+    clippy::disallowed_methods,
     reason = "test helpers"
 )]
+
+/// The monotonic clock a test hands the permit gate.
+pub(crate) fn monotonic() -> std::time::Instant {
+    std::time::Instant::now()
+}
 
 use std::time::Duration;
 

@@ -83,9 +83,10 @@ impl AdviserClient {
         chosen: &Chosen<'_>,
         redemption: Redemption,
         dialect_headers: Vec<(String, String)>,
+        monotonic: fn() -> std::time::Instant,
     ) -> Result<AdviserClient, AxError> {
         let model_id = chosen.entry.id.clone();
-        let model = crate::adapter_for(chosen, redemption, dialect_headers)?;
+        let model = crate::adapter_for(chosen, redemption, dialect_headers, monotonic)?;
         Ok(AdviserClient { model, model_id })
     }
 

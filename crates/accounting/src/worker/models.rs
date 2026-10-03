@@ -13,7 +13,10 @@ use super::credentials::dialect_headers;
 
 /// Reaches a chosen model the way the endpoint book describes it: the
 /// dialect's own headers, then `gateway::adapter_for`.
-pub(crate) struct GatewayModels;
+pub(crate) struct GatewayModels {
+    /// The clock every permit wait is read against (`Hands.monotonic`).
+    pub(crate) monotonic: fn() -> std::time::Instant,
+}
 
 impl crate::ModelFactory for GatewayModels {
     fn build(
@@ -28,6 +31,7 @@ impl crate::ModelFactory for GatewayModels {
                 .into_iter()
                 .map(|(name, value)| (name, value.spelled()))
                 .collect(),
+            self.monotonic,
         )
     }
 }

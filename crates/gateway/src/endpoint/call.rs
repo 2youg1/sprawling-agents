@@ -286,7 +286,7 @@ mod tests {
     use super::super::fakes::{config, fake_provider, request};
     use super::super::redemption::{Redemption, redemption, resolver};
     use super::*;
-    use kernel::{AxCode, Model};
+    use kernel::AxCode;
 
     /// OpenCode asks for one stable id per conversation: every turn of
     /// one conversation carries the same one, and another conversation

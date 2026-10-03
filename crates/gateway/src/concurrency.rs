@@ -12,10 +12,6 @@
 //! Linux. The properties it keeps are proved in
 //! `crates/gateway/spec/Concurrency.lean`; the proptest below checks
 //! this implementation against them over random traces.
-#![expect(
-    dead_code,
-    reason = "no model call takes a permit yet (crates/gateway/Spec.lean §8-6)"
-)]
 
 use std::num::NonZeroU32;
 use std::time::{Duration, Instant};
@@ -135,11 +131,13 @@ impl Permits {
     }
 
     /// How many calls may be in flight now.
+    #[cfg(test)]
     pub(crate) fn limit(&self) -> u32 {
         self.limit
     }
 
     /// How many permits are taken now.
+    #[cfg(test)]
     pub(crate) fn in_use(&self) -> u32 {
         self.in_use
     }

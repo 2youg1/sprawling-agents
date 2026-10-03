@@ -24,6 +24,7 @@ pub fn adapter_for(
     chosen: &Chosen<'_>,
     redemption: Redemption,
     dialect_headers: Vec<(String, String)>,
+    monotonic: fn() -> std::time::Instant,
 ) -> Result<Box<dyn kernel::Model + Send>, AxError> {
     let endpoint = chosen.endpoint;
     let tuning = &endpoint.tuning;
@@ -64,7 +65,7 @@ pub fn adapter_for(
         },
         redemption,
     )?;
-    Ok(Box::new(endpoint))
+    Ok(Box::new(endpoint.gated(chosen.transport, monotonic)))
 }
 
 #[cfg(test)]
@@ -165,6 +166,7 @@ mod tests {
             &chosen,
             crate::endpoint::redemption::redemption(),
             Vec::new(),
+            crate::endpoint::fakes::monotonic,
         )
         .unwrap();
 
@@ -286,6 +288,7 @@ mod tests {
                 &chosen,
                 crate::endpoint::redemption::redemption(),
                 Vec::new(),
+                crate::endpoint::fakes::monotonic,
             )
             .unwrap()
             .call(&crate::endpoint::fakes::request())

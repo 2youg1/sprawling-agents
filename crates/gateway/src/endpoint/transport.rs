@@ -13,10 +13,12 @@
 
 use std::sync::{Arc, OnceLock};
 use std::time::Duration;
+use std::time::Instant;
 
 use kernel::{AxCode, AxError};
 
 use super::config::{Endpoint, EndpointConfig};
+use super::permit::{Gate, Gated};
 use super::redemption::Redemption;
 
 /// One endpoint's client, built the first time a call needs it.
@@ -27,6 +29,9 @@ use super::redemption::Redemption;
 #[derive(Debug, Clone, Default)]
 pub(crate) struct Transport {
     slot: Arc<OnceLock<reqwest::blocking::Client>>,
+    /// The permits every model call to this endpoint waits on
+    /// (`crates/gateway/Spec.lean` §8-6).
+    gate: Arc<Gate>,
     /// The step a test takes after the client is configured and before
     /// it is built (`crates/gateway/spec/Reach/Resolve.lean` §8-32).
     #[cfg(test)]
@@ -58,6 +63,7 @@ impl Transport {
     ) -> Transport {
         Transport {
             slot: Arc::default(),
+            gate: Arc::default(),
             detour: Some(Detour(Arc::new(step))),
         }
     }
@@ -112,6 +118,12 @@ impl Endpoint {
             redemption,
         })
     }
+
+    /// This endpoint as a model whose every call first takes a permit
+    /// at `transport`'s gate, read against `monotonic`.
+    pub(crate) fn gated(self, transport: &Transport, monotonic: fn() -> Instant) -> Gated {
+        Gated::new(self, Arc::clone(&transport.gate), monotonic)
+    }
 }
 
 #[cfg(test)]
@@ -125,8 +137,6 @@ impl Endpoint {
 )]
 mod tests {
     use std::time::{Duration, Instant};
-
-    use kernel::Model as _;
 
     use super::*;
     use crate::endpoint::fakes::{config, request};

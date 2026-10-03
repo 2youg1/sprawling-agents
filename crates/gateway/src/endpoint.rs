@@ -21,6 +21,7 @@ pub(crate) mod fakes;
 mod header;
 mod model;
 mod models;
+mod permit;
 pub(crate) mod redemption;
 mod stream;
 mod transport;
