@@ -14,7 +14,7 @@
 /-!
 ### 8-13 逐字读一次调用（形状 3 适配器）
 
-`Endpoint` 覆盖 `Model::call_streaming`：请求带 `stream: true`，逐行读 `data:`，把每一帧交给 `dialect::increment_of`，最后 `dialect::settled_from_stream` 把收集到的帧重装成**这个 dialect 非流式的那个形状**，再交给同一个 `response_from_wire`。
+`Endpoint::call_streaming`（crate 内固有方法，`permit::Gated` 的 `Model::call_streaming` 过门后调它）：请求带 `stream: true`，逐行读 `data:`，把每一帧交给 `dialect::increment_of`，最后 `dialect::settled_from_stream` 把收集到的帧重装成**这个 dialect 非流式的那个形状**，再交给同一个 `response_from_wire`。
 
 **「逐行」指的是响应体到达的节奏，而不是一个已经读完的字符串的行。** `Response` 当 `std::io::Read` 包进 `BufReader` 逐行读，一帧到达即交一帧；先把整个 body 读完再逐行转发，会让全部增量在模型停下之后的同一毫秒里一起发出。否决「把转发搬到 socket 任务那一层去查锁」：`to_watchers` 是非阻塞广播，帧压根没有到达那里，往下游找只会找到一个不存在的原因。**验收形式**：假供应方先写开头几帧并 flush，**然后等调用方回报「第一条增量已转出」才写剩下的**；读完再回放的实现永远回报不了，服务器自己就是断言，测试侧不读时钟。
 
@@ -22,7 +22,7 @@
 
 **不理会 `stream: true` 的供应方照样作答。** 流式请求的响应头里，`content-type` 的媒体类型是 `application/json` 时，这份 body 就是一个已定答案：`stream` 把它交给阻塞路径同一个 `response_from_wire`，不当帧读，返回的 `ModelReturn` 与 `call` 对同一份 body 的返回相等。不少 OpenAI 兼容的服务端（本地的居多）不理会这个字段，整段作答；当帧读，它一帧也没有，调用便以「流在结算帧前结束」失败，一次已完整到达的回答被当成截断，watchdog 随之退避重试。媒体类型缺席或是 `text/event-stream` 时照帧读，因为请求要的是流。落选的是「嗅探首行是 `{` 还是 `data:`」：HTTP 已经用 content-type 说了 body 是什么，另立一套判定只会与它分歧。
 
-**`increment_of` 只认散文。** 各 dialect 各读各的：Anthropic 读 `delta.type == "text_delta"` 的 `delta.text`；OpenAI 读 `choices[0].delta.content`。**工具参数与 thinking 块一律不报**：半个工具参数不是短一点的工具参数，而 thinking 块是替 provider 转交签名用的、不是拿来发表的。它不返回 `Result`——一个读不出来的增量就是不显示的增量，一个显示细节不得有能力弄失败一次本来正常的调用。
+**`increment_of` 认散文与推理两条流，别的一律不报。** 一帧答 `Increment::Said`（散文）或 `Increment::Thought`（推理），两条流由 `kernel::Increment` 分开，读者不必猜一段字来自哪条。各 dialect 各读各的：Anthropic 读 `delta.type` 为 `text_delta` 的 `delta.text` 与 `thinking_delta` 的 `delta.thinking`；OpenAI chat 读 `choices[0].delta.content`，没有正文时读推理（`reasoning` 或 `reasoning_content`，两种网关两种拼法）；Responses 读 `response.output_text.delta` 与推理那一种事件的 `delta`。**工具参数、signature 与别的帧一律不报**：半个工具参数不是短一点的工具参数，签名是替 provider 转交核验用的、不是拿来读的。它不返回 `Result`——一个读不出来的增量就是不显示的增量，一个显示细节不得有能力弄失败一次本来正常的调用。
 
 **思考块的 signature 与文本走两条 delta，两条都要收。** Anthropic 把一个 thinking 块拆成 `thinking_delta`（正文）与 `signature_delta`（签名）两串增量，而 `content_block_start` 给出的那份 signature 恒为空串。`settled` 因此按 index 累积 signature 并在重装时写回，与 `partial_json` 同形。**空 signature 在 `block_from` 升为 `E_WIRE_MISMATCH`**：provider 拿签名去核验它自己发出的那段推理，空的那份带进下一回合就是一个 400，而这座城此刻还说不出为什么——拒在产生它的那一回合，报的才是「流把签名丢了」。两条往返（settled→`response_from_wire`→`request_wire`）逐字节相等由 `anthropic/stream.rs` 的测试钉住。
 

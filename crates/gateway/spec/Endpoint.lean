@@ -6,7 +6,7 @@
 /-!
 # gateway::endpoint
 
-规定 `endpoint`（`crates/gateway/src/endpoint.rs`）：自写线格式的 provider 客户端，`kernel::Model` 的生产适配器。本文件是 `crates/gateway/Spec.lean` 的一个分部；下面每一节保留它在 gateway 规格里的标签 §8-n，别处引作 `crates/gateway/Spec.lean §8-n`。
+规定 `endpoint`（`crates/gateway/src/endpoint.rs`）：自写线格式的 provider 客户端；包着它的 `permit::Gated` 是 `kernel::Model` 的生产适配器。本文件是 `crates/gateway/Spec.lean` 的一个分部；下面每一节保留它在 gateway 规格里的标签 §8-n，别处引作 `crates/gateway/Spec.lean §8-n`。
 
 这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与 `gateway::endpoint::config`、`gateway::endpoint::auth`、`gateway::endpoint::call`等 旁的测试守住。
 -/
@@ -19,12 +19,13 @@ pub struct EndpointConfig {
     pub base_url: String,                       // 恒 https 或回环 http；尾斜线归一
     pub dialect: DialectKind,
     pub model: String,                          // provider 侧模型名
-    pub max_tokens: u64,
     pub auth: AuthSpec,                         // 认证头模板；SecretRef 兑付在组请求末格
     pub extra_headers: Vec<(String, HeaderValue)>,    // 字面量或金库引用，见 §8-16
     pub overrides: Vec<(String, serde_json::Value)>,  // 逐字段请求覆盖：JSON Pointer→值，最后应用
     pub timeout_ms: u64,                        // 一次已结请求的总期限
     pub stream_idle_timeout_ms: Option<u64>,    // 一次沉默的上限，缺席取 timeout_ms
+    pub pricing: Option<ModelEntry>,            // 结算用的价目行；None 不结算，billed 缺席
+    pub proxying: Proxying,                     // 本端点的调用是否走机器代理，已在装配层解析（§8-15）
 }
 pub enum AuthSpec { Bearer(SecretRef), Header { name: String, value: SecretRef }, None }
 pub struct Endpoint { /* config、reqwest::blocking::Client、redemption —— 三字段 pub(super)，出了 endpoint/ 就取不到 */ }
@@ -33,14 +34,14 @@ impl Endpoint {
     pub(crate) fn model(&self) -> &str;                       // 唯一对外可读的配置项：一个名字
     pub(crate) fn post_bytes(&self, content_type: &str, body: Vec<u8>) -> Result<Value, AxError>;
 }
-impl Endpoint { pub fn new(config: EndpointConfig, resolver: /* 兑付闭包，由 credential 提供 */) -> Result<Endpoint, AxError>; }
-impl kernel::Model for Endpoint { /* call：ChatRequest（req.chat）→dialect→HTTP→ChatResponse→ModelReturn */ }
+impl Endpoint { pub(crate) fn call(&mut self, req: &ModelRequest) -> Result<ModelReturn, AxError>;   // 与 call_streaming、call_speculating 同为 crate 内固有方法
+}  // crate 外拿到的模型是 permit::Gated，它实现 kernel::Model，每次调用先过端点的名额门（§8-6）
 ```
 
-- **组请求五步**：canonical→`request_wire`→逐条应用 overrides（JSON Pointer，后者胜）→认证头兑付（`resolver` 取 `Sealed`，`expose()` 只在写头那一格，写完即 drop 零化）→POST。响应四步：状态码判定（429/5xx→E_PROVIDER 携 retry 语义；4xx→E_PROVIDER 携 provider 错误体摘要）→`response_from_wire`→usage 抽取→`ModelReturn`。
-- **半流中断**：SSE 流截断（连接断／不完整事件）＝`E_PROVIDER`，恒不产部分 ModelReturn；流式读法见 §8-13。
+- **组请求五步**：canonical→`request_wire`→逐条应用 overrides（JSON Pointer，后者胜）→认证头兑付（`resolver` 取 `Sealed`，`expose()` 只在写头那一格，写完即 drop 零化）→POST。响应四步：状态码判定（非 2xx 一律 `E_PROVIDER`，408／429／5xx 标可重试，其余 4xx 不标，400／413 带窗口拒词是 `Overflow`；分类的唯一一处是 `ProviderFailure`，见 `Endpoint/Failure.lean`；对端正文不回显）→`response_from_wire`→usage 抽取→`ModelReturn`。
+- **半流中断**：SSE 流截断（连接断／不完整事件）＝`E_PROVIDER`，retry 为 `Unknown`（请求已发出，回答丢了），恒不产部分 ModelReturn；流式读法见 §8-13。
 - **无暗重试**：重试是 watchdog 的决策（上限的唯一表示是 `Retries`，§8-16），endpoint 一次调用恰一次 HTTP 往返；幂等由调用方 IdemKey dedup 看守。
-- base_url＝完整端点 URL（逐字段哲学，不拼路径）；`EndpointConfig.pricing: Option<ModelEntry>` 让结算在适配器内完成，`ModelReturn` 因此携 usage／stop／billed 入账（`crates/kernel/Spec.lean` §8-24；权威额线上无标准槽位，现行恒 PriceSheet 源）；TLS 取 rustls，加密后端由 `reach::tls` 在造客户端前装好（§8-15）。
+- base_url＝完整端点 URL（逐字段哲学，不拼路径）；`EndpointConfig.pricing` 让结算在适配器内完成，`ModelReturn` 因此携 usage／stop／billed 入账（`crates/kernel/Spec.lean` §8-24；权威额线上无标准槽位，现行恒 PriceSheet 源）；TLS 取 rustls，加密后端由 `reach::tls` 在造客户端前装好（§8-15）。
 - `.expose(` 白名单（`tools/xtask/src/secret.rs` 的 `EXPOSE_WHITELIST`，全表以它为准）：gateway 侧的合法出现点只有 `endpoint/call.rs`（端点调用）。**两种凭证在同一句里写上线**：`authorize` 既写注册带的那条，也写人在自定义头里放的 `HeaderValue::Redeemed`；三个请求写入点（`call`、`stream`、`list_models`）都只调它，谁都不自己遍历 `extra_headers`。
 - **`Endpoint` 的字段不出 `endpoint/`**：`config`／`client`／`redemption` 是 `pub(super)`；`transcribe` 走 `post_bytes` 与 `model()`。于是「一次 POST 如何发出、非 2xx 如何变成 `AxError`、对侧正文如何不被回显」在本 crate 里只有一份答案。转写面仍保留它自己那句恢复语（`rewrite_recovery`）：线上出了什么事是端点的事，人接下来能做什么是设施的事。
 

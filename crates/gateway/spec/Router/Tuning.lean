@@ -27,6 +27,7 @@ pub struct EndpointTuning {
     pub extra_headers: Vec<(String, HeaderValue)>,
     pub overrides: Vec<(String, String)>,   // JSON pointer → 值的文本
     pub proxying: Proxying,
+    pub max_in_flight: Option<MaxInFlight>,   // 缺席取这一类连接的默认（D21，§8-6）
 }
 impl EndpointTuning {
     pub const DEFAULTS: TuningDefaults;                        // 三个默认值的唯一住处

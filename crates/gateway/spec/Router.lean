@@ -16,8 +16,10 @@
 
 ```rust
 pub struct AttachedEndpoint { pub name, pub base_url, pub dialect: DialectKind,
-                              pub auth: AuthSpec, pub models: Vec<String>,
-                              pub probed: bool }   // 这份 models 是问出来的（true）还是人报的（false）
+                              pub connection_kind: ConnectionKind,   // 登记时定下的连接种类（§8-18）
+                              pub auth: AuthSpec, pub models: Vec<ModelFacts>,   // 对端报出的整行事实，不压成 id
+                              pub probed: bool,    // 这份 models 是问出来的（true）还是人报的（false）
+                              pub tuning: EndpointTuning }   // §8-16
 impl AttachedEndpoint {
     pub fn is_local(&self) -> bool;          // 与 client_for 绕开代理同一依据（reach::is_local）
     pub fn has_credential(&self) -> bool;    // 关于凭证，金库外只能回答这一问
@@ -28,6 +30,7 @@ pub struct EndpointBook { /* 私有：endpoints（各带自己的 Transport）�
 pub struct Chosen<'b> { pub endpoint: &'b AttachedEndpoint, pub entry: &'b ModelEntry,
                          pub(crate) transport: &'b Transport }   // 这个 endpoint 共用的客户端（§8-3）
 impl EndpointBook {
+    pub fn new() -> EndpointBook;   pub fn is_empty(&self) -> bool;
     pub fn apply(&mut self, record: &EventRecord) -> Result<(), AxError>;
     pub fn apply_payload(&mut self, kind: EventKind, data: &Payload) -> Result<(), AxError>;
     pub fn select(&self, tag: ModelTag, policy: &BuildingPolicy) -> Result<Chosen<'_>, AxError>;

@@ -42,12 +42,13 @@ impl Recording {
         -> Result<Recording, AxError>;   // §8-33；读到上限多一字节为止，读失败＝E_STORAGE_FATAL
     pub fn read_unlabelled(reader: impl std::io::Read)
         -> Result<Recording, AxError>;   // §8-34；同一个上限，容器由 of_signature 从读到的字节认
-    pub fn kind(&self) -> AudioType;   pub fn len(&self) -> usize;
+    pub fn kind(&self) -> AudioType;   pub fn len(&self) -> usize;   pub fn is_empty(&self) -> bool;
 }
 
 // transcribe/transcriber.rs（形状 4 适配器）
 pub struct TranscriberConfig { pub base_url: String, pub model: String,
-                               pub auth: AuthSpec, pub timeout_ms: u64 }
+                               pub auth: AuthSpec, pub timeout_ms: u64,
+                               pub proxying: kernel::Proxying }   // 取自选中的端点，录音与聊天走同一条路
 pub struct Transcriber { /* attached: Option<Endpoint> —— 私有 */ }
 impl Transcriber {
     pub fn absent() -> Transcriber;                       // 这座城没有这项设施

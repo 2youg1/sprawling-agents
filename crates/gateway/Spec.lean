@@ -192,14 +192,14 @@ market／cost：纯判定与数据面，被 endpoint 与 runtime 回合层消费
 
 现状：名额状态是 `endpoint::permit::Gate`，随端点住 `endpoint::transport::Transport`（所有克隆共享同一个 `Arc`）；`adapter_for` 交出的模型是 `permit::Gated`，它的 `call`、`call_streaming` 与 `call_speculating` 先 `Gate::admit` 取得守卫 `Admitted`，再走 `Endpoint` 自己的往返，结果出来后守卫 `settle`（成功调 `succeeded`，`E_PROVIDER` 且状态 429 调 `rate_limited` 并带上 `retry_after_ms`），守卫丢弃时还名额并唤醒排队者。`Endpoint` 的三扇门因此是本 crate 内的固有方法，不再是 `kernel::Model` 的实现：crate 外拿到的每一个模型都走过门。门的上限是端点 tuning 的 `max_in_flight`，缺席时取 `vendor_in_flight(base_url)`（D21）；路由簿在折叠 `endpoint_attached` 时按它建端点的 `Transport`。
 
-**要接时接在哪**（D20 定接线，D21 定配置与仪表）：名额状态随端点住 `endpoint::transport::Transport`（每个端点一份、所有克隆共享，与 HTTP client 同一个槽），`kernel::Model` 的门（`endpoint/model.rs` 的 `call`、`call_streaming` 与 `call_speculating`）在发出请求前取、得到结果后还，429 时把 `ProviderFailure::retry_after_ms` 交给 `rate_limited`；时刻来自 `bin::assembly` 注入、经路由簿交给 `Transport` 的单调时钟（D20），`max_in_flight` 经端点的 tuning 与 `endpoint_attached` 的载荷到达（D21）。
+**要接时接在哪**（D20 定接线，D21 定配置与仪表）：名额状态随端点住 `endpoint::transport::Transport`（每个端点一份、所有克隆共享，与 HTTP client 同一个槽），`permit::Gated` 的三扇门（`call`、`call_streaming` 与 `call_speculating`，它是 crate 外唯一的 `kernel::Model`）在发出请求前取、得到结果后还，429 时把 `ProviderFailure::retry_after_ms` 交给 `rate_limited`；时刻来自 `bin::assembly` 注入、经路由簿交给 `Transport` 的单调时钟（D20），`max_in_flight` 经端点的 tuning 与 `endpoint_attached` 的载荷到达（D21）。
 
 **代价**：在接上之前，429 的等待仍只由对端的 `retry-after` 提示与 watchdog 的退避表给出（D2），每条 run 各自退避；`provider_degraded` 事件由 `E_PROVIDER` 的 carrier 产出。
 -/
 
 /-! D17 每个端点一个并发上限：可配置，缺省取厂商文档的值，遇 429 收窄、恢复后放宽
 
-**决定**：形状如下；§8-6 写判定之外还没接上的部分。端点的 tuning（`router/tuning.rs`）多一把 `max_in_flight: Option<MaxInFlight>`，配置里拼作 `max_in_flight`，合法域 1 到 `IN_FLIGHT_MAX`（256）；缺席时取这一类连接的厂商文档给出的并发值，厂商不给并发值的连接取 `IN_FLIGHT_DEFAULT`（16）。收窄与放宽是一个纯判定 `gateway::concurrency`：收到 429 或 `Retry-After` 时把当下的名额减半（至少 1），在 `Retry-After` 给出的时刻之前不再放宽；之后每连续 `WIDEN_AFTER`（8）次成功加 1，直到配置的上限。判定答两臂：名额已满（排队并计数）与等到某一刻（带时刻），不让调用方忙等（§8-6「要接时接在哪」）。状态随端点住它的 `Transport`，名额在 `kernel::Model` 的门里每次调用前取、后还（§8-6），所以 runtime 不改一行；排队数与等待时长是仪表的读数之一，页面在 provider 一处显示。
+**决定**：形状如下；§8-6 写判定之外还没接上的部分。端点的 tuning（`router/tuning.rs`）多一把 `max_in_flight: Option<MaxInFlight>`，配置里拼作 `max_in_flight`，合法域 1 到 `IN_FLIGHT_MAX`（256）；缺席时取 `vendor_in_flight(base_url)`：这台电脑上的服务器取 `IN_FLIGHT_LOCAL`（4），其余取 `IN_FLIGHT_DEFAULT`（16），因为今天没有厂商在文档里给出并发数（见下文「缺省」）。收窄与放宽是一个纯判定 `gateway::concurrency`：收到 429 或 `Retry-After` 时把当下的名额减半（至少 1），在 `Retry-After` 给出的时刻之前不再放宽；之后每连续 `WIDEN_AFTER`（8）次成功加 1，直到配置的上限。判定答两臂：名额已满（排队并计数）与等到某一刻（带时刻），不让调用方忙等（§8-6「要接时接在哪」）。状态随端点住它的 `Transport`，名额在 `kernel::Model` 的门里每次调用前取、后还（§8-6），所以 runtime 不改一行；排队数与等待时长是仪表的读数之一，页面在 provider 一处显示。
 
 **理由**：车道不设上限之后（`crates/sprawling/Spec.lean` D34），排队只该发生在 provider 一处，因为那是对方限流与计费的地方；不设闸，429 就由每条 lane 各自撞墙、各自退避。缺省取厂商的值而不是城内一个常数，是因为不同端点的上限差一两个数量级。判定与平台无关，三个平台相同。
 

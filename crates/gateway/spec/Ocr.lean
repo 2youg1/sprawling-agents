@@ -24,7 +24,8 @@ pub use recogniser::Recogniser;
 
 // ocr/chosen.rs（形状 1 装配，`adapter_for` 与 `transcriber_for` 的孪生）
 pub fn recogniser_for(chosen: &Chosen<'_>, secrets: SecretResolver,
-                      dialect_headers: Vec<(String, String)>) -> Result<Recogniser, AxError>;
+                      dialect_headers: Vec<(String, String)>,
+                      monotonic: fn() -> std::time::Instant) -> Result<Recogniser, AxError>;
 
 // ocr/picture.rs（形状 2 值）
 pub struct Picture { /* seen: ImageRef、bytes —— 私有 */ }

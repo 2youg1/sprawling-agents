@@ -20,11 +20,13 @@ pub struct ModelEntry { pub id: String, pub context_tokens: u64, pub input: Inpu
                         pub max_output_tokens: Option<Ceiling>,   // §7、§8-17
                         pub input_price: UsdMicros /* per 1M tokens */, pub output_price: UsdMicros,
                         pub cache_read_price: UsdMicros, pub cache_write_price: UsdMicros }
+impl ModelEntry { pub fn states_a_price(&self) -> bool; }   // 四个价有一个大于零；四个零是「目录不认识」或本地模型，不是量出来的零价
 pub struct MarketSnapshot { /* version: u32、entries: BTreeMap<String, ModelEntry> —— 私有 */ }
 impl MarketSnapshot {
     pub fn builtin() -> Result<MarketSnapshot, AxError>;                 // 内置钉版目录（数据面）
-    pub fn from_entries(version: u32, entries: Vec<ModelEntry>) -> Result<MarketSnapshot, AxError>;
+    pub fn from_entries(version: u32, rows: Vec<ModelEntry>) -> Result<MarketSnapshot, AxError>;
     pub fn lookup(&self, id: &str) -> Option<&ModelEntry>;  pub fn version(&self) -> u32;
+    pub fn len(&self) -> usize;  pub fn is_empty(&self) -> bool;
 }
 ```
 

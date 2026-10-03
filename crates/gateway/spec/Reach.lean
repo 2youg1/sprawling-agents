@@ -28,6 +28,8 @@ pub fn is_local(base_url: &str) -> bool;                                        
 - **默认把打到这台电脑的调用摘出代理，但那是默认而不是定理**（`Proxying::ExceptLocal`）：开了 system-proxy 之后，一台配了代理的机器会把回环也送进代理，本地推理服务器由别人的网关代答 502。但把它写死就是替所有人做了一个只对大多数人成立的决定，而这一类决定失效时没有任何一屏能告诉人到底发生了什么。它是 `EndpointTuning.proxying` 的默认值，另两个值各自对应一类真实的机器（`crates/kernel/Spec.lean` §8-50），而无论哪一个，读数都会把结论写在 `through` 那一格里。
 - **工具服务器用默认值，且是显式地用**（`agent_protocols::mcp::http`、`agent_protocols::mcp::sse`）：它没有一份属于自己的设置可携。**会重新打开这一条的参数**：出现一个必须经代理才能够到的回环 MCP 服务器——到那时 `McpServer` 也要长出这一字段，而不是在这里改常量。
 - **`is_local` 是全城唯一的那一条判断**：`client_for` 的代理豁免（`Through::LocalAddress`）、地址规整时缺省的 scheme 与兼容格式提示、设置页上那个 `local` 标记，读的是同一个函数。回环按 `IpAddr::is_loopback` 判，外加 `localhost` 与 `*.localhost`，所以 `127.0.0.2` 在每一处都算这台电脑；两份判断只会在某一处先被改掉时各说各的。
+- **每个出站请求报出这座城的名字**：`client_for` 给 builder 设 user agent `sprawling/<CARGO_PKG_VERSION>`，一处写给全城。服务端会拒绝不报名字的请求：有的 provider 要求客户端报自己的名字而不是 HTTP 库的名字，CDN 后面的 MCP 服务器对没有 user agent 的请求答 403。
+- **三个平台读代理的方式不同，读数只报本侧看得见的那一部分。** 环境变量（`HTTPS_PROXY`／`HTTP_PROXY`／`ALL_PROXY`，大小写两种，`NO_PROXY` 排除）在 Windows、macOS、Linux 上一样读；reqwest 的 `system-proxy` 另在 Windows 读系统代理设置（注册表里的 WinINet 设置），在 macOS 读 System Configuration，在 Linux 不读别的来源，只剩环境变量。系统设置由 HTTP 客户端自己读，`through` 看不见，所以一格 `direct` 只说「本侧看得见的东西里没有点名代理」，不是说请求一定直连。
 - **5 秒一段**：设置页上有人在等，一个在这个时间里答不出来的主机，人要的是知道，而不是继续等。
 -/
 
