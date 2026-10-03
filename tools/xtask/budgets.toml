@@ -397,35 +397,35 @@ what = "the share of kernel mutants the tests kill"
 mutation_files = ["crates/kernel/src/**"]
 minimum_percent = 90
 measured_by = "just mutants, or on-demand.yml -f job=mutants-modules (just mutants-modules, then just mutants-score)"
-status = "gated by just mutants-score, not by just check; the score is owed: on-demand run 37120210843 (mutants-modules on wave/W11) had not finished when this row was last written, and its mutants-modules-score job prints the score"
+status = "gated by just mutants-score, not by just check; on-demand run 37120210843 (mutants-modules on wave/W11, eight shards on windows-latest; no job scores macOS or Linux) read 640 caught, 251 missed, 0 timed out, 391 unviable: 71.8%, under the minimum; the 251 survivors are listed by that run's mutants-modules-score job and are killed with tests, not by lowering the row"
 
 [storage_jsonl_mutation]
 what = "the share of storage::jsonl mutants the tests kill"
 mutation_files = ["crates/storage/src/jsonl.rs", "crates/storage/src/jsonl/**"]
 minimum_percent = 90
 measured_by = "just mutants, or on-demand.yml -f job=mutants-modules (just mutants-modules, then just mutants-score)"
-status = "gated by just mutants-score, not by just check; the score is owed: on-demand run 37120210843 (mutants-modules on wave/W11) had not finished when this row was last written, and its mutants-modules-score job prints the score"
+status = "gated by just mutants-score, not by just check; on-demand run 37120210843 (mutants-modules on wave/W11, eight shards on windows-latest; no job scores macOS or Linux) read 115 caught, 28 missed, 0 timed out, 79 unviable: 80.4%, under the minimum; the 28 survivors are listed by that run's mutants-modules-score job and are killed with tests, not by lowering the row"
 
 [accounting_relay_mutation]
 what = "the share of accounting::worker::relay mutants the tests kill"
 mutation_files = ["crates/accounting/src/worker/relay.rs"]
 minimum_percent = 90
 measured_by = "just mutants, or on-demand.yml -f job=mutants-modules (just mutants-modules, then just mutants-score)"
-status = "gated by just mutants-score, not by just check; the score is owed: on-demand run 37120210843 (mutants-modules on wave/W11) had not finished when this row was last written, and its mutants-modules-score job prints the score"
+status = "gated by just mutants-score, not by just check; on-demand run 37120210843 (mutants-modules on wave/W11, eight shards on windows-latest; no job scores macOS or Linux) read 3 caught, 0 missed, 0 timed out, 12 unviable: 100.0%"
 
 [collab_signal_tool_mutation]
 what = "the share of collab::signal_tool mutants the tests kill"
 mutation_files = ["crates/collab/src/signal_tool.rs"]
 minimum_percent = 90
 measured_by = "just mutants, or on-demand.yml -f job=mutants-modules (just mutants-modules, then just mutants-score)"
-status = "gated by just mutants-score, not by just check; the score is owed: on-demand run 37120210843 (mutants-modules on wave/W11) had not finished when this row was last written, and its mutants-modules-score job prints the score"
+status = "gated by just mutants-score, not by just check; on-demand run 37120210843 (mutants-modules on wave/W11, eight shards on windows-latest; no job scores macOS or Linux) read 1 caught, 0 missed, 0 timed out, 3 unviable: 100.0%"
 
 [kernel_share_mutation]
 what = "the share of kernel::share mutants the tests kill"
 mutation_files = ["crates/kernel/src/share.rs"]
 minimum_percent = 90
 measured_by = "just mutants, or on-demand.yml -f job=mutants-modules (just mutants-modules, then just mutants-score)"
-status = "gated by just mutants-score, not by just check; the score is owed: on-demand run 37120210843 (mutants-modules on wave/W11) had not finished when this row was last written, and its mutants-modules-score job prints the score"
+status = "gated by just mutants-score, not by just check; on-demand run 37120210843 (mutants-modules on wave/W11, eight shards on windows-latest; no job scores macOS or Linux) read 6 caught, 0 missed, 0 timed out, 3 unviable: 100.0%"
 
 [ledger_append]
 what = "append plus fsync, p50 and p99"
