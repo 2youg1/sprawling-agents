@@ -287,7 +287,7 @@ theorem successes_stop_at_cap (s : Permits) (trace : List Event) (hv : Valid s) 
 /-!
 ## 排队：按号先来后到（D20）
 
-`Full` 时调用拿一张号排队，名额空出时只有队首那张号取到；排得太久的号被拒出队（`QUEUE_WAIT_MAX`）。模型只看号：到达、给队首一个名额、拒掉某张号。下面证明，在任意一条轨迹上，取到名额的号按拿号的次序排列——后到的调用从不先于先到的取到（`grants_follow_arrival`）。派生检查（接线那一次改动写）：proptest 对随机的到达、归还与超时轨迹驱动 `Transport::admit`，断言取到的号严格递增；先对一个用 `notify_one` 任挑醒者的实现看它变红。
+`Full` 时调用拿一张号排队，名额空出时只有队首那张号取到；排得太久的号被拒出队（`QUEUE_WAIT_MAX`）。模型只看号：到达、给队首一个名额、拒掉某张号。下面证明，在任意一条轨迹上，取到名额的号按拿号的次序排列——后到的调用从不先于先到的取到（`grants_follow_arrival`）。派生检查：`crates/gateway/src/endpoint/permit.rs` 的 proptest `grants_follow_arrival` 对随机的到达、任一排队者的尝试、归还与超时轨迹驱动 `Gate` 的号队列（`admit` 的每一步都是它），断言取到的号严格递增；它先对一个把名额给最新那张号的队列变红过。
 -/
 
 /-- 一个端点的排队（`Transport` 里的号与队列）。 -/

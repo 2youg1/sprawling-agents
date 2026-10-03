@@ -186,11 +186,11 @@ market／cost：纯判定与数据面，被 endpoint 与 runtime 回合层消费
 -/
 
 /-!
-### 8-6 provider 侧准入：判定已在，线上调用尚未取名额
+### 8-6 provider 侧准入：每次模型调用先在端点的门前取名额
 
 一个端点的并发名额是纯判定 `gateway::concurrency`（D17，性质在 `spec/Concurrency.lean`）：`Permits::take` 答三臂——取到、名额已满、等到某一刻（那一刻总晚于取的时刻，调用方不会忙等）；`rate_limited` 把名额减半（至少 1）并记下 `Retry-After` 给出的时刻；`succeeded` 连续 `WIDEN_AFTER` 次成功后、且过了那一刻，才把名额加 1，直到配置的上限。判定只读传给它的时刻与每次调用的结果，三个平台相同。
 
-现状：线上每一次模型调用还不问它，模块因此在文件开头带一条 `#![expect(dead_code)]`，接上调用者那一刻这条 `expect` 不再触发、构建失败，抑制随之清走。端点配置也还没有 `max_in_flight`，`MaxInFlight` 的合法域与 `IN_FLIGHT_DEFAULT` 只在本模块里。
+现状：名额状态是 `endpoint::permit::Gate`，随端点住 `endpoint::transport::Transport`（所有克隆共享同一个 `Arc`）；`adapter_for` 交出的模型是 `permit::Gated`，它的 `call`、`call_streaming` 与 `call_speculating` 先 `Gate::admit` 取得守卫 `Admitted`，再走 `Endpoint` 自己的往返，结果出来后守卫 `settle`（成功调 `succeeded`，`E_PROVIDER` 且状态 429 调 `rate_limited` 并带上 `retry_after_ms`），守卫丢弃时还名额并唤醒排队者。`Endpoint` 的三扇门因此是本 crate 内的固有方法，不再是 `kernel::Model` 的实现：crate 外拿到的每一个模型都走过门。端点配置还没有 `max_in_flight`，每个门取 `IN_FLIGHT_DEFAULT`。
 
 **要接时接在哪**（D20 定接线，D21 定配置与仪表）：名额状态随端点住 `endpoint::transport::Transport`（每个端点一份、所有克隆共享，与 HTTP client 同一个槽），`kernel::Model` 的门（`endpoint/model.rs` 的 `call`、`call_streaming` 与 `call_speculating`）在发出请求前取、得到结果后还，429 时把 `ProviderFailure::retry_after_ms` 交给 `rate_limited`；时刻来自 `bin::assembly` 注入、经路由簿交给 `Transport` 的单调时钟（D20），`max_in_flight` 经端点的 tuning 与 `endpoint_attached` 的载荷到达（D21）。
 
@@ -211,9 +211,9 @@ market／cost：纯判定与数据面，被 endpoint 与 runtime 回合层消费
 /-! D20 名额的接线：一个注入的单调时钟，取在门里、按先来后到排队，等待有界
 
 **决定**：
-- **时钟是一个参数**：`EndpointBook::new(monotonic: Monotonic)`，`pub type Monotonic = Arc<dyn Fn() -> Instant + Send + Sync>`，由 `bin::assembly` 给出（生产里是 `Instant::now`，那是全仓唯一采样它的地方），路由簿把同一个值克隆进每个 `Transport`；本 crate 仍不调用 `Instant::now`（clippy 的 `disallowed-methods` 照旧拦它）。测试与 citysim 给一个计数的时钟，这就是这条接缝的第二个实现，所以它是一个闭包类型，不立 trait。
-- **取与还在门里**：`call`、`call_streaming`、`call_speculating` 的第一步是 `Transport::admit()`，它返回一个持有名额的守卫 `Admitted`，守卫被丢弃时 `give_back` 并唤醒排在最前的那一个——于是任何一条返回路径（成功、失败、`?` 提前返回、流读到一半出错）都还名额，不靠每条路径记得还。结果是成功时守卫先调 `succeeded(now)`；结果是 429（`E_PROVIDER` 且 `ProviderFailure` 是限流）时先调 `rate_limited(now, retry_after_ms)`。流式调用在流收齐或放弃时才还，因为在那之前它在对端仍占一个并发。
-- **排队按先来后到**：`Full` 时调用拿一张号（端点上一个单调递增的计数），在 `Condvar` 上等，只有号在队首的那一个在被唤醒时重新 `take`；`WaitUntil(t)` 时队首按 `t - now()` 定时等，其余照排。这样一个端点上的等待按到达次序得到名额，不靠操作系统唤醒谁。
+- **时钟是一个参数**：单调时钟是 `fn() -> Instant`，与 `reach_of` 已收的那一个同型，由 `bin::assembly` 经 `RunWorker` 的 `monotonic` 交给 `adapter_for(chosen, redemption, dialect_headers, monotonic)`，再进 `Gated`；本 crate 仍不调用 `Instant::now`（clippy 的 `disallowed-methods` 照旧拦它）。测试给一个读计数的函数，这就是这条接缝的第二个实现；函数指针而不是闭包或 trait，因为生产与测试的两个实现都不带状态，而 worker 早已用这个型把同一个时钟交给 `reach_of` 与 `Flight`。时钟进模型而不进路由簿，因为簿是从账本重建、可序列化的值，而时钟是进程的。
+- **取与还在门里**：`Gated` 的三扇门的第一步是 `Gate::admit`，它返回一个持有名额的守卫 `Admitted`，守卫被丢弃时 `give_back` 并唤醒排队者——于是任何一条返回路径（成功、失败、`?` 提前返回、流读到一半出错）都还名额，不靠每条路径记得还。结果是成功时守卫先调 `succeeded(now)`；结果是 429（`E_PROVIDER` 且 `ProviderFailureKind::Refused { status: 429 }`）时先调 `rate_limited(now, retry_after_ms)`。流式调用在流收齐或放弃时才还，因为在那之前它在对端仍占一个并发；`call_speculating` 在流收齐之后才返回，守卫覆盖整条流。
+- **排队按先来后到**：每次调用拿一张号（端点上一个单调递增的计数）排到队尾，在 `Condvar` 上等，只有号在队首的那一个重新 `take`，取到即出队并 `notify_all`，让下一张号看自己是否已到队首；`WaitUntil(t)` 时队首按 `t - now()` 定时等，其余照排。这样一个端点上的等待按到达次序得到名额，不靠操作系统唤醒谁。
 - **等待有界**：一次排队至多等 `QUEUE_WAIT_MAX`（10 分钟，从拿号时的单调读数算），超过即以 `E_BACKPRESSURE_SHED` 拒这一次调用，主体是端点名与排了多久，恢复语「这个端点的并发上限比同时想调它的 run 少：在端点设置里调大 `max_in_flight`，或少派几条」；拒后号出队，下一个顶上。排队的时间不计入 `timeout_ms`：那个期限说的是一次请求对端多久答，不是城里排了多久。
 - **取消**：门的签名没有取消信号，一个排着队的 run 在它拿到名额、调用返回之后的那个安全点才看见取消；`QUEUE_WAIT_MAX` 封住这段延迟的上限。
 
