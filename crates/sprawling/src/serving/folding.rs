@@ -117,6 +117,13 @@ pub(crate) fn spawn_folding(
     let thread = std::thread::Builder::new()
         .name("sprawling-views".to_owned())
         .spawn(move || {
+            // Held to the fold's end: this thread is one of the city's
+            // two serial threads, and its seat is the plan's last
+            // (`crates/sprawling/spec/Serving/Placement.lean` D41).
+            let _seat = crate::serving::placement::seat_this_thread(
+                "sprawling-views",
+                crate::serving::placement::Role::Serial,
+            );
             fold_until_closed(copies, &arriving, (&broadcast, &behind), (setting, clock));
         })
         .map_err(|source| {

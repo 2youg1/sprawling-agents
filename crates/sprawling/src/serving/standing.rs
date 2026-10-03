@@ -15,8 +15,6 @@ use std::time::{Duration, Instant};
 
 use accounting::person::CorePriority;
 
-use super::placement::Seat;
-
 /// The monotonic sampling point: how long a thread stayed busy is a span,
 /// and a wall clock that steps would misstate it (`crates/sprawling/spec/Serving/Standing.lean`
 /// §8-93). Here rather than beside the wall clock in `bin::assembly`,
@@ -73,9 +71,6 @@ pub(crate) struct CoreThread {
     /// platform that refuses.
     lower: fn() -> Result<Standing, thread_priority::Error>,
     lowering: Lowering,
-    /// The thread's seat on the processor table, given back when the
-    /// thread, and with it this value, ends.
-    _seat: Seat,
 }
 
 /// Whether the valve may still ask the platform to lower the thread.
@@ -101,7 +96,6 @@ impl CoreThread {
             valve: Valve::new(BUSY_LIMIT, now),
             lower: lower_this_thread,
             lowering: Lowering::Owed,
-            _seat: super::placement::seat_this_thread(name),
         }
     }
 
@@ -114,7 +108,6 @@ impl CoreThread {
             valve: Valve::new(BUSY_LIMIT, now),
             lower,
             lowering: Lowering::Owed,
-            _seat: Seat::none(),
         }
     }
 
