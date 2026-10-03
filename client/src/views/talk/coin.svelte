@@ -9,7 +9,7 @@
   import { STOP } from "../../core/slash";
   import { ui } from "../../ui";
   import Glyph from "../parts/glyph.svelte";
-  import type { Face } from "./coin_face";
+  import { pressCoin, type Face } from "./coin_face";
   import { SPELLING } from "./composer";
 
   interface Props {
@@ -27,7 +27,8 @@
 </script>
 
 <!-- The send face submits the form the key stands in, so Enter in the
-box and a press here are one path; the stop face is a plain button. -->
+box and a press here are one path: `pressCoin` answers `words` and the
+click lets the submit through. The stop face is a plain button. -->
 <button
   type={face === "stop" ? "button" : "submit"}
   class="coin group relative block size-coin shrink-0"
@@ -36,11 +37,15 @@ box and a press here are one path; the stop face is a plain button. -->
   aria-disabled={face === "idle" ? "true" : undefined}
   title={face === "idle" ? say($lang, "talk_enter_hint") : undefined}
   onclick={(event) => {
-    if (face === "idle") {
-      event.preventDefault();
-      return;
+    switch (pressCoin(face)) {
+      case "words":
+        return;
+      case "cancel":
+        onStop();
+        return;
+      case "nothing":
+        event.preventDefault();
     }
-    if (face === "stop") onStop();
   }}
 >
   <span class="coin-faces" aria-hidden="true">

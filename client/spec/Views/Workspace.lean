@@ -90,7 +90,7 @@ import client.spec.Views.Parts
 规定 §7-11 里三个外壳控件的状态机；分隔线在 `client/spec/Core/Workbench.lean`，检视面的页签带在 `client/spec/Views/Inspect/Open.lean`，请决定卡在 `client/spec/Views/Parts/Decide.lean`。
 
 1. **图层键**（`views/edge.svelte`）：按一下按 zen → blend → panorama → zen 循环（三档的名字是 client D17），按三下回到原档（`three_presses_come_home`）；按住超过 300 ms 临时进 blend，松开回到人选定的档，看一眼不改选定的档（`a_peek_keeps_the_chosen_tier`）。每次启动从 zen 开始，存下的档不在启动时读回（`a_launch_opens_in_zen`，client D47）。不论此刻开着设置面还是别的页，按一下都回到对话、换到下一档、焦点落进对话框（`a_press_lands_in_the_conversation`、`a_press_moves_the_tier`，client D48）。
-2. **硬币键**（`views/talk/`，client D18）：做朝上那一面，只有没变淡的发送面发出框里的字：变淡的发送面一按落进空操作，停止面只发 `cancel`（`only_the_lit_send_face_sends_words`）。
+2. **硬币键**（`client/src/views/talk/coin_face.ts` 的 `pressCoin`，client D18）：做朝上那一面，只有没变淡的发送面发出框里的字：变淡的发送面一按落进空操作，停止面只发 `cancel`（`only_the_lit_send_face_sends_words`）。TS 里变淡的发送面叫 `idle`，即这里的 `send true`；`coin_face.test.ts` 在每一面上检查这条定理，`coin.svelte` 的点击只按 `pressCoin` 的回答行事。
 3. **信箱的条目**（`client/src/views/mailbox/entries.ts`）：j／k 与 `RowList` 同一种钳住的走法，到最后一条不再走（`k_stops_at_the_last_entry`）；1–9 只落到前九个、且存在的条目上（`a_digit_reaches_only_a_drawn_entry`）。
 4. **信箱面这一层**（`client/src/views/mailbox/layer.ts`，D60）：不论按什么顺序按键，关上的信箱里不留焦点（`no_focus_stays_in_a_closed_mailbox`）；Escape 总是关上它，焦点在面里时回到信箱键（`escape_closes_and_returns_focus`）；信箱键与 Accel-B 是同一个开关，按两下回到原样（`two_presses_come_home`）；点面外——另两个边缘键也在面外——总是关上它（`a_press_outside_closes`）。
 5. **信件在右侧**（`client/src/views/mailbox/layer.ts` 的 `stepLetter`，D73）：信件关上时信箱重新打开、焦点回到打开它的那一行，中间信箱收到什么输入都不改（`closing_a_letter_returns_to_its_row`）；信件的开合不让焦点留在关上的信箱里（`letters_hold_mail_focus`）。

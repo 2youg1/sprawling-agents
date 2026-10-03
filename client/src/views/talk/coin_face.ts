@@ -30,7 +30,7 @@ export function pressCoin(face: Face): Sent {
     case "send":
       return "words";
     case "idle":
-      return "words";
+      return "nothing";
     case "stop":
       return "cancel";
   }
