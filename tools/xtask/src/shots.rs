@@ -13,11 +13,13 @@
 //! steps that can go red.
 
 mod camera;
+mod case;
 mod pages;
 
 use std::path::Path;
 
-use camera::{Camera, Source, Took};
+use camera::{Camera, Source};
+use case::Took;
 use pages::{FRAMES, Shot};
 
 use crate::report::XtaskError;

@@ -1008,9 +1008,10 @@ pub(super) struct Shot { /* route, fold, folds, frame, lighting, states */ }
 pub(super) fn routes_in(route_ts: &str) -> Vec<String>;   // BARE 的键，去掉空键，按表序
 pub(super) fn missing(dir: &Path, shots: &[Shot]) -> Vec<String>;   // 没写出或写空的文件
 pub(super) fn index(shots: &[Shot]) -> String;
-// xtask::shots::camera —— 形状 4 适配器：开引擎、量页、拍一张；每次开页一个资料目录、一个 stderr 文件，失败的一例重拍一次
+// xtask::shots::camera —— 形状 4 适配器：开引擎、量页、拍一张；每次开页一个资料目录、一个 stderr 文件
 pub(super) const CASE_PATIENCE: Duration;   // 45 s：一例的上限
-fn twice<T>(case: &str, attempt: impl FnMut(Attempt) -> Result<T, XtaskError>) -> Result<(T, Took), XtaskError>;
+// xtask::shots::case —— 形状 1 判定：一例的两次尝试、点名这一例的失败、每次尝试删掉自己的资料目录
+pub(super) fn twice<T>(case: &str, attempt: impl FnMut(Attempt) -> Result<T, XtaskError>) -> Result<(T, Took), XtaskError>;
 // xtask::render::engine::launch —— 形状 4 适配器：起一个引擎进程，等它（与它的进程树）走完
 pub(crate) struct Launch<'a> { cmd: &'a str, stderr: Stderr<'a>, patience: Duration, after_exit: AfterExit }
 pub(crate) enum Stderr<'a> { Discarded, KeptIn(&'a Path) }
@@ -1028,7 +1029,7 @@ pub(crate) fn run(command: Command, launch: &Launch) -> Result<Ran, XtaskError>;
 - **一例超时就杀整棵树，重拍一次，点名这一例。** 一例（量一次屏或拍一张图）超过 `CASE_PATIENCE` 就杀掉引擎的进程树——Windows 用 `taskkill /T /F /PID <pid>`，macOS 与 Linux 把引擎放进自己的进程组（`CommandExt::process_group(0)`）再 `kill -KILL -- -<pid>`——然后同一例重来一次，重拍的 stderr 写进 `<图名>.retry.log`。第二次也失败时整次运行以 `XtaskError::Cmd` 失败，`cmd` 点名这一例，`msg` 给出两次各自的原因；重拍成功的例在输出里逐个列出。
 - **失败**：没有包时 `XtaskError::Doc`，recovery 是 `just build-web`；没有引擎时 `XtaskError::Doc`，recovery 是装一个 Chromium 一族的浏览器或设 `SPRAWLING_BROWSER`；读不出 `BARE` 时 `XtaskError::Doc` 点名 `route.ts`；引擎失败沿用 `render::engine::launch::run` 的 `XtaskError::Cmd`。
 
-**测试**：`shots::pages::tests::every_route_gets_four_pictures_and_a_missing_one_is_named`：一份夹具 `route.ts` 读出的每条路由，在两个宽度、两种光照下各有一张图，夹具目录里缺一张时 `missing` 恰好点名那一张。`shots::camera::tests`：`twice` 第一次失败第二次成功时报 `Took::Retried`，两次都失败时的错误点名这一例。`render::engine::launch::tests` 用测试二进制自己当夹具进程：stderr 进了 `KeptIn` 的文件；一个超时的进程连同它的子进程被杀掉，管道随即关闭；`AwaitTree` 收得到辅助进程在浏览器退出之后才写的输出。真跑要先 `just build-web`，归整合者或前端会话。
+**测试**：`shots::pages::tests::every_route_gets_four_pictures_and_a_missing_one_is_named`：一份夹具 `route.ts` 读出的每条路由，在两个宽度、两种光照下各有一张图，夹具目录里缺一张时 `missing` 恰好点名那一张。`shots::case::tests`：`twice` 第一次失败第二次成功时报 `Took::Retried`，两次都失败时的错误点名这一例。`render::engine::launch::tests` 用测试二进制自己当夹具进程：stderr 进了 `KeptIn` 的文件；一个超时的进程连同它的子进程被杀掉，管道随即关闭；`AwaitTree` 收得到辅助进程在浏览器退出之后才写的输出。真跑要先 `just build-web`，归整合者或前端会话。
 
 **本节属门禁机具，与产品代码分开提交。**
 
