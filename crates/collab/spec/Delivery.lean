@@ -29,7 +29,7 @@
 6. **每次等待都会结束**（`wait_bounded`、`waits_end`）：每个等待的 deadline 至多在此刻之后 `patience` 拍；时钟再走 `patience + 1` 拍后没有等待剩下。两个 run 互等也由此解开。
 7. **F8：被取消的 run 拿过的信重新投递**（`leave_requeues`、`consumed_stays`）：一个 run 无论以 Done、失败还是取消结束，它拿着而没被落账的回答读过的信回到房间队列，并为那个房间敲一次门；已消费的不再回来。
 
-8. **每封信恰一行落点**（`one_landing_per_signal`、`landings_once`、`knocked_is_the_knock`、`delivered_is_running`）：每一行 `signal_enqueued` 恰配一行 `signal_landed`，按 `SignalId` 配；落点是 `knocked` 当且仅当这次 `send` 敲了门，是 `delivered` 当且仅当收信房间有 run 在跑。
+8. **每封信恰一行落点**（`one_landing_per_signal`、`landings_once`、`knocked_is_the_knock`、`delivered_is_running`）：每一行 `signal_enqueued` 恰配一行 `signal_landed`，按 `SignalId` 配；落点是 `knocked` 当且仅当这次 `send` 敲了门，是 `delivered` 当且仅当收信房间有 run 在跑。模型里的 `send` 不分路径：lane 经 relay 发出的信、子房间交接回父房间的信、一次落定里投递的信（kernel `spec/Event/Record.lean` D38）在装配层都经 `accounting::worker::waking::landing` 的同一个判定，所以性质在整座城成立，不只在 relay 一条路上。
 
 `withoutRequeue_loses` 是咬得动的演示：照 D8 否决的「取走即消费」在安全点取走就记消费，被取消的 run 拿走的那件就既不在队列里，也没有人读过。
 

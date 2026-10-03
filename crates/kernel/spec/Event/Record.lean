@@ -567,7 +567,7 @@ pub enum WaitEnd { Reply { reply: SignalId }, Timeout, Left }   // 回信到了�
 
 /-! D38 一封信落在哪里是一行 record-only 的 `signal_landed`，紧跟在它的 `signal_enqueued` 之后
 
-**决定**：一个种类（追加在 `ALL` 末尾，只入账），写方是记账线程的投递处（`accounting::worker::waking` 的 `deliver_sent`），在它把信投进房间、决定敲不敲门的那一刻写；`run` 与 `who` 同那一行 `signal_enqueued`，`addr` 是收信房间：
+**决定**：一个种类（追加在 `ALL` 末尾，只入账），写方是记账线程把信投进房间的每一处，三处读同一个判定（`accounting::worker::waking::landing`）：lane 经 relay 发出的信（`waking` 的 `deliver_sent`），子房间交接回父房间的信（`dispatching::handback` 经 `settling::landing::discharging`），以及一次落定里投递的信（`settling::landing` 的 `Then::Deliver`，例如计划节点变红时的阻塞通知）。它在投递、决定敲不敲门之后写；`run` 与 `who` 同那一行 `signal_enqueued`，`addr` 是收信房间：
 
 ```rust
 pub struct SignalLanded { pub signal: SignalId, pub landing: Landing }
@@ -577,7 +577,8 @@ pub enum Landing { Delivered, Queued, Knocked }   // 进了正在跑的 run 的�
 - 每一行 `signal_enqueued` 恰配一行 `signal_landed`，按 `signal` 配（模型 `Collab.Delivery` 的 `one_landing_per_signal`、`landings_once`）；`Knocked` 当且仅当这次投递为收信房间排了一次敲门（`knocked_is_the_knock`，与 `knock_once` 同一个敲门），`Delivered` 当且仅当收信房间此刻借给了一个 run（`delivered_is_running`）。
 - 敲门之后被推迟或被链长拒绝，落点仍是 `Knocked`：这一行记的是投递那一刻的判定，敲门的去向由 `run_started` 或那一条拒绝说。
 - 这一行之前写下的账本没有它；页面配不上就画工具自己答的东西，不猜。
-- **现状**：lane 经 relay 发出的信（`deliver_sent`）写这一行；子房间的交接（`accounting::worker::dispatching::handback`）与落定时投递的信（`accounting::worker::settling::landing` 的 `Then::Deliver`）还不写，页面对它们画工具自己答的东西；它们接上同一个判定之后，性质 8 的「每封信恰一行」才在整座城成立。
+- 每条路径上的发信 run，就是那一行 `signal_enqueued` 的 `run`：relay 路径是正在跑、调用了 `send` 的那个 run；交接路径是落地的子 run（交接信以它的名义写）；落定路径是正在落定的那个 run（阻塞通知以放下红节点的 run 的名义写）。
+- 三条路径都写这一行，所以性质 8 的「每封信恰一行」在整座城成立（`crates/collab/spec/Delivery.lean` 的 `send` 不分路径）。一次落定投递到一半被房间拒绝时，已写下的落点行留在账本上，敲门按 `settling::landing` 的口径退回标记：那几行记的仍是投递那一刻的判定，与被推迟的敲门同一口径。
 - 判定只读进程里的房间表与敲门队列，Windows、macOS、Linux 上同一段 trace 得同一行。
 
 **理由**：工具答复时还不知道信落在哪里（collab D17），页面要把三种结果画在发信那一行上，就要一行在判定的那一刻把它记下来；只入账，因为发信的模型已经读过工具的答复，落点不改变它下一次请求的字节。
