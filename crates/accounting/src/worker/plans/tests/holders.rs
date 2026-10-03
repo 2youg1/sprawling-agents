@@ -78,6 +78,7 @@ fn a_claim_booked_through_the_gate_reaches_the_live_holders_before_its_run_lands
         run: RunId::from_bytes([7; 16]),
         who: "potter@lab.7".to_owned(),
         clock: std::sync::Arc::new(crate::worker::fixture::WallClock),
+        read: booking::PlanRead::default(),
     };
     let desk = collab::ClaimDesk::new(
         "potter@lab.7".to_owned(),

@@ -18,17 +18,31 @@
 //! to say who held the node; the run's landing is handed the lines that
 //! give its still-booked nodes back, and writes those its plan did not
 //! close, so every claim on the history is closed.
+//!
+//! A desk's copy can also be older than a node's end: a run dispatched
+//! before another run's landing stopped a node reads the node as ready.
+//! The book remembers each stop line it was shown and when, against the
+//! plan read every desk made, so the ledger's stop, not the desk's copy,
+//! answers such a claim.
 
 use std::collections::BTreeMap;
 use std::sync::mpsc;
 
-use kernel::{Address, AxCode, AxError, EventDraft, Ledger, NodeId, RunId};
+use kernel::event::record::RoadmapMoved;
+use kernel::{Address, AxCode, AxError, EventDraft, EventKind, Ledger, NodeId, Payload, RunId};
 
 use super::relay::Wake;
 use crate::effect;
 
+/// How many stop lines the book had been shown when a desk read its
+/// plan: every stop at or below it is in that desk's copy, because a
+/// landing writes the file before its lines and both happen on the
+/// accounting thread the desk is opened on.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default)]
+pub(crate) struct PlanRead(u64);
+
 /// Who a run's claims are made for, and the clock their lines are
-/// stamped by. The five travel together from the run's dispatch to
+/// stamped by. The six travel together from the run's dispatch to
 /// every claim it makes.
 pub(crate) struct Claimant {
     /// The building whose plan the claimed nodes belong to.
@@ -39,6 +53,8 @@ pub(crate) struct Claimant {
     pub who: String,
     /// The worker's own clock (`crates/accounting/spec/Clock.lean` §8-3).
     pub clock: std::sync::Arc<dyn crate::Clock + Send + Sync>,
+    /// The book's mark when this run's desk read the plan.
+    pub read: PlanRead,
 }
 
 /// One claim, its `roadmap_claimed` line, the line that would hand the
@@ -48,6 +64,7 @@ pub(crate) struct ClaimAsk {
     node: NodeId,
     line: EventDraft,
     put_back: effect::Line,
+    read: PlanRead,
     back: mpsc::SyncSender<Result<(), AxError>>,
 }
 
@@ -63,6 +80,12 @@ struct Booked {
 #[derive(Default)]
 pub(crate) struct ClaimBook {
     held: BTreeMap<(Address, NodeId), Booked>,
+    /// Each node a stop line ended since this worker opened, with the
+    /// mark that line set; a hand-back makes the node ready again and
+    /// takes it out.
+    stopped: BTreeMap<(Address, NodeId), PlanRead>,
+    /// How many stop lines the book has been shown.
+    stops: PlanRead,
 }
 
 /// The lines that give back the nodes a run still had booked when it
@@ -102,11 +125,22 @@ impl ClaimBook {
             node,
             line,
             put_back,
+            read,
             back,
         } = ask;
         let run = line.run;
         let key = (building, node);
+        let stopped_since_read = self.stopped.get(&key).is_some_and(|stop| *stop > read);
         let answer = match self.held.get(&key).map(|booked| booked.run) {
+            _ if stopped_since_read => Err(AxError::failure(
+                AxCode::InvalidArgs,
+                "claim a plan node",
+                format!(
+                    "{} ended after this run read the plan; the history holds its end",
+                    key.1
+                ),
+            )
+            .with_recovery("list the plan and claim a node that is ready")),
             Some(holder) if holder != run => Err(AxError::failure(
                 AxCode::InvalidArgs,
                 "claim a plan node",
@@ -125,6 +159,48 @@ impl ClaimBook {
         // home, which is what a lane that heard the answer would do.
         drop(back.send(answer));
         taken
+    }
+
+    /// The mark a desk opened now carries: its plan copy holds every
+    /// stop the book has been shown.
+    pub fn read_mark(&self) -> PlanRead {
+        self.stops
+    }
+
+    /// Shows the book one line the worker wrote. A finish, a split or a
+    /// block ends a node, and a claim from a desk that read the plan
+    /// before that line is refused; a hand-back makes the node ready
+    /// again for every desk.
+    ///
+    /// # Errors
+    /// Refuses a `roadmap_*` payload that does not read as a
+    /// [`RoadmapMoved`], as `PlanHolders::absorb` does.
+    #[expect(
+        clippy::wildcard_enum_match_arm,
+        reason = "four kinds end or reopen a node; the rest of the event vocabulary does not"
+    )]
+    pub fn absorb(
+        &mut self,
+        kind: EventKind,
+        addr: Option<&Address>,
+        data: &Payload,
+    ) -> Result<(), AxError> {
+        let Some(building) = addr.and_then(super::building_of) else {
+            return Ok(());
+        };
+        match kind {
+            EventKind::RoadmapFinished | EventKind::RoadmapSplit | EventKind::RoadmapBlocked => {
+                let node = data.read::<RoadmapMoved>()?.node;
+                self.stops = PlanRead(self.stops.0.saturating_add(1));
+                self.stopped.insert((building, node), self.stops);
+            }
+            EventKind::RoadmapReleased => {
+                let node = data.read::<RoadmapMoved>()?.node;
+                self.stopped.remove(&(building, node));
+            }
+            _ => {}
+        }
+        Ok(())
     }
 
     /// Lets go of every node the run held, once it has come home, and
@@ -183,6 +259,7 @@ pub(crate) fn booking(bell: mpsc::Sender<Wake>, claimant: Claimant) -> collab::B
             node: claim.id().clone(),
             line,
             put_back,
+            read: claimant.read,
             back,
         }))
         .map_err(|_| gone("the accounting thread is no longer taking claims"))?;
@@ -227,6 +304,7 @@ mod tests {
             run: RunId::from_bytes([run; 16]),
             who: format!("potter@lab.{run}"),
             clock: std::sync::Arc::new(crate::worker::fixture::WallClock),
+            read: super::PlanRead::default(),
         }
     }
 
@@ -257,6 +335,7 @@ mod tests {
                 )
                 .unwrap()
                 .unwrap(),
+                read: super::PlanRead::default(),
                 back,
             },
             &mut Kept::default(),

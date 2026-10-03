@@ -97,6 +97,7 @@ impl RunWorker {
                     run: site.run_id,
                     who: site.who.clone(),
                     clock: std::sync::Arc::clone(&self.clock),
+                    read: self.flight.gate.booked.read_mark(),
                 },
             ),
         )));
