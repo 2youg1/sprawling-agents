@@ -45,7 +45,7 @@ impl Checkpoint {
 `root` 是 run 写的那棵树：城自己，或借给房间的 worktree。worktree 本来就有自己的 index，私有 index 放在它自己的 `.sprawling/index/` 下，随 worktree 一起被收走；城的私有 index 由 `sweep_writers` 在开城时收。
 
 - **`wave_pre` 的引用只建不冲突。** 引用名是提交自己的 oid（§8-8），建的时候 `force = true`：名字就是值，覆盖只可能写下同一个值。`force = false` 反而会让同一刻、同一棵树、同一父提交的第二次检查点（同一个 oid）被「引用已在」拒掉。所以检查点引用之间没有冲突，`pins_only_grow` 与 `independent_steps_commute` 说的就是这一点。
-- **HEAD 的改写是比较后交换。** `ensure_base` 与 `land` 以 `Repository::commit(Some("HEAD"), …, parents)` 提交，libgit2 在当前 HEAD 不是第一个父提交时拒绝（无父提交时，HEAD 已在即拒）。`ensure_base` 被拒即重读 HEAD：HEAD 已在就返回 `None`，与赢家先做的串行次序相同（`a_lost_base_race_is_the_serial_order`）。`land` 被拒是 `StorageError::Checkpoint { op: "move HEAD" }`（→ `E_WORKTREE_BUSY`，恢复：重试这一次落地），因为它的树是对旧 HEAD 暂存的，静默重做会把别人刚落下的改动当成这次要退回的。引用的锁文件被别人占着（libgit2 的 `Locked`；Windows 上改名撞上一个开着的文件也报在这里）答的是同一个错误与同一个恢复。
+- **HEAD 的改写是比较后交换。** `land` 以 `Repository::commit(Some("HEAD"), …, parents)` 提交，libgit2 在当前 HEAD 不是第一个父提交时拒绝。基线（`ensure_base`、无 HEAD 时的 `base_checkpoint`）先以不移动引用的提交写进 mempack、落成一个 pack，再以 `Repository::reference(<HEAD 指的分支>, oid, false, …)` 建分支：分支已在即拒（libgit2 的 `Exists`），这就是从「无」出发的交换（`heldBase`，`a_held_base_moves_head_only_from_what_it_read`；pack 之前失败不动任何引用，`a_held_base_that_fails_before_the_pack_moves_no_reference`；storage D27）。`ensure_base` 被拒即重读 HEAD：HEAD 已在就返回 `None`，与赢家先做的串行次序相同（`a_lost_base_race_is_the_serial_order`）。`land` 被拒是 `StorageError::Checkpoint { op: "move HEAD" }`（→ `E_WORKTREE_BUSY`，恢复：重试这一次落地），因为它的树是对旧 HEAD 暂存的，静默重做会把别人刚落下的改动当成这次要退回的。引用的锁文件被别人占着（libgit2 的 `Locked`；Windows 上改名撞上一个开着的文件也报在这里）答的是同一个错误与同一个恢复。
 - **失败不动引用。** 暂存与写对象都不改引用（`before_the_pin_no_reference_moves`），所以在钉引用之前失败的检查点留下的引用与开始时相同；崩溃写下的对象没有引用够得着，`git gc` 收走（`a_crash_reaches_nothing_new`）。私有 index 在崩溃后留在盘上：worker 开城时 `sweep_writers` 删掉它们，与 `sweep_abandoned` 收走崩溃留下的树同一个时机。
 - **增量检查点等于整个写域的检查点。** 只暂存这一波写过的路径由 `crates/runtime/Spec.lean` §8-45 决定（lane 把各调用的 `Writes::Paths` 并起来，`Domain` 与失败的调用暂存整个写域）；它依赖的性质在这里证明：这一波在写域里只碰了这些路径时，两种暂存得到同一棵树（`staging_the_touched_paths_is_staging_the_scope`）。exec 声明 `Domain`，它的检查点暂存整个写域，libgit2 按修改时间与尺寸跳过没变的文件，是同一个定理以「stat 变了的路径」为 `touched` 的实例。
 - **验收**：从本模型导出的 Rust 检查在 `crates/storage/src/checkpoint/opening/tests.rs`——两个写者各开 `open_writer`，在同一座城里的两个线程上交错 `wave_pre`，各自的提交的树等于各自暂存的写域，两条引用都在（`others_never_touch_an_index`、`a_pin_holds_what_its_writer_staged`）；一个写者暂存并写下树对象之后、提交与钉引用之前被丢掉，城的引用集合不变（`before_the_pin_no_reference_moves`、`a_crash_reaches_nothing_new`）；两个写者在两个线程上同时 `ensure_base` 一座没有提交的城，HEAD 恰是其中一个的提交，另一个答 `None`（`a_lost_base_race_is_the_serial_order`）。
@@ -58,7 +58,7 @@ impl Checkpoint {
 **重开参数。** libgit2 不再以内容寻址写对象，或检查点引用的名字不再由 oid 决定。
 -/
 
-/-! D26 移动 HEAD 的两步（`ensure_base`、`land`）在每一座城上都经同一进程里的一把只护 HEAD 的锁（`opening::HEAD_MOVES`），不按城是否在网络盘上分两条路。
+/-! D26 移动 HEAD 的步骤（基线：`ensure_base`、无 HEAD 时的 `base_checkpoint`；`land`）在每一座城上都经同一进程里的一把只护 HEAD 的锁（`opening::HEAD_MOVES`），不按城是否在网络盘上分两条路。
 **为什么。** 认出网络盘要问平台：Windows 是 `GetDriveTypeW`，macOS 与 Linux 是 `statfs` 的文件系统类型，三者都只有 `unsafe` 的 FFI 或一个新依赖，标准库没有安全接口（AGENTS.md 平台调用的次序）。这把锁护的两步一个 run 至多各走一次，从不在写入波的路上：检查点（`wave_pre`）不取它，`ensure_base` 只在城还没有提交时取它，所以它不是被拆掉的那把全城的锁。它罩住这两步的暂存，不只罩提交：`ensure_base` 暂存的是城的那一份 index，四个线程同时在一座没有提交的城上 `ensure_base` 时，Windows 上分别报出 index 被锁、`index.lock` 改名失败与 `write_tree` 找不到对象，`write_index` 的等待挡不住同一进程里的两个句柄改写同一个 index 文件。
 **被否：按盘的种类分路。** 多一个平台调用，少一把几乎不被争用的锁。
 **重开参数。** 移动 HEAD 的步骤进了写入波，或标准库有了认出网络盘的安全接口。
@@ -275,6 +275,34 @@ theorem a_lost_base_race_is_the_serial_order (s : Repo) (w v : Writer)
     ensureBase v ((Step.swap v none).apply ((Step.swap w none).apply s))
       = ensureBase v (ensureBase w s) := by
   simp [ensureBase, Step.apply, unborn, written]
+
+/-- 基线的内存写法（`base_checkpoint`，`ensure_base` 也经它）：暂存与写树都在 mempack 里（`stage`），整包一次落盘（`put`），之后才以比较后交换移动 HEAD（`swap`，`read` 是取得 `HEAD_MOVES` 之后读到的 HEAD）。Rust 里交换是 `Repository::reference(<HEAD 指的分支>, oid, false, …)`：分支已在即拒，即「HEAD 仍是读到的『无』」才成。 -/
+def heldBase (w : Writer) (t : Oid) (read : Option Oid) : List Step :=
+  [.stage w t, .put w, .swap w read]
+
+/-- 暂存与落包都不碰 HEAD，所以内存写法的基线只从它读到的值移动 HEAD。 -/
+theorem a_held_base_moves_head_only_from_what_it_read (s : Repo) (w : Writer) (t : Oid)
+    (read : Option Oid) (moved : (run s (heldBase w t read)).head ≠ s.head) :
+    s.head = read := by
+  have staged : (run s [.stage w t, .put w]).head = s.head := by
+    simp [run, Step.apply, Repo.setIndex]
+  have whole : run s (heldBase w t read) = (Step.swap w read).apply (run s [.stage w t, .put w]) :=
+    rfl
+  rw [whole, ← staged] at moved
+  rw [← staged]
+  exact a_swap_moves_only_what_it_read _ w read moved
+
+/-- 落包之前失败（扫到凭证、pack 被拒、进程死掉）的基线：HEAD 与检查点引用都与开始时相同。 -/
+theorem a_held_base_that_fails_before_the_pack_moves_no_reference (s : Repo) (w : Writer)
+    (t : Oid) :
+    (run s [.stage w t, .crash w]).head = s.head ∧ (run s [.stage w t, .crash w]).pins = s.pins := by
+  simp [run, Step.apply, Repo.setIndex]
+
+/-- 在没有提交的城上，内存写法的基线就是 `ensureBase`：HEAD 恰取它暂存的树。 -/
+theorem a_held_base_on_an_unborn_city_is_ensure_base (s : Repo) (w : Writer) (t : Oid)
+    (unborn : s.head = none) :
+    (run s (heldBase w t none)).head = some t := by
+  simp [heldBase, run, Step.apply, Repo.setIndex, unborn]
 
 /-! ## 失败的检查点不动已有的引用 -/
 

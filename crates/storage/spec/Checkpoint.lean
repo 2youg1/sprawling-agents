@@ -53,6 +53,9 @@ impl Checkpoint {
     /// 把对象写进一个再也不落盘的内存库。index 与 HEAD（或 checkpoint ref）只在
     /// pack 落盘之后才写：之前任何一步失败（staged secret、pack 被拒、崩溃），
     /// 盘上的 index 与引用都保持原样，不会指向从未落盘的对象。
+    /// 无 HEAD 时，判定与建分支都在 `HEAD_MOVES` 之下：先读 `head_commit`，取锁后再读一次，
+    /// 建分支用 `reference(<分支>, oid, force = false)`——分支已在即拒，
+    /// 即 HEAD 只从读到的「无」移动（`Concurrent.lean` 的 `a_held_base_moves_head_only_from_what_it_read`）。
     pub fn base_checkpoint(self, scopes: &[String], t: TimeMs, of: &Provenance, progress: &mut dyn FnMut(BaseProgress)) -> Result<Payload, StorageError>;
     /// Post-wave sweep: deletions since pre_oid, each as a file_discarded
     /// payload with restoration=Tracked(file:<addr>@<pre_oid>).
@@ -100,7 +103,7 @@ impl Checkpoint {
   一个位置穿进拿不到它的闭包，多一条耦合，而名字只需要唯一，不需要有序——顺序由账本给）。
   **翻案条件**：哪一天引用需要表达顺序（例如按先后清理旧检查点），顺序仍应读账本，而不是回到计数器。
 - **基线 checkpoint 在收楼时做，写成一个 pack**：一栋 5,000 个文件的楼，第一次派活的第一道 checkpoint 要给每个文件求哈希并写 5,000 个松散对象，每个都是一次建文件；这笔钱挪到 `sprawling adopt`（以及开城时的 `Adopt::EveryFolder`）付，写法是 mempack：对象库换成「内存库在前、盘上的对象目录作只读备用」，暂存与提交产生的对象全进内存，`Mempack::dump` 出一个 pack，经仓库自己的对象库 `packwriter` 落盘（它同时写 `.idx`）。之后 run 的第一道 checkpoint 面对的是一份暖 index：libgit2 按 stat 跳过没变的文件，只剩一次目录遍历。**被否**：收楼时直接调 `wave_pre`——每个 blob 一个松散对象，在旋转盘上是 5,000 次随机写，而 pack 是一次顺序写。**被否**：把 mempack 长期装在城的 handle 上——装上就卸不掉，之后每道 checkpoint 的对象都会留在一个没人 dump 的内存库里，进程一退就丢。
-- **`ensure_base` 仍然移动 HEAD**：worktree 从一个提交分枝，城必须先有第一个提交。
+- **`ensure_base` 仍然移动 HEAD**：worktree 从一个提交分枝，城必须先有第一个提交。它与 `base_checkpoint` 走同一条 mempack 写法（storage D27）：在同一仓库、同一份 index 上另开一个 handle 装 mempack，写完一个 pack 后先写 index、再建 HEAD 指的分支；调用者自己的 handle 保持盘上的对象库，事后重读 index。
 - **「无 HEAD」只有两种读法**：`head()` 报 `UnbornBranch`（空仓库）或 `NotFound`（HEAD 指向的引用不存在）时才算「这座城还没有提交」，提交无父、扫描全扫。其他任何读不出 HEAD 的情形——引用文件损坏、HEAD 指向一个剥不出提交的对象——都是 `Checkpoint { op: "read HEAD" }` 错误，检查点不立。被否：把一切失败读成「无 HEAD」。那样一次读不出的 HEAD 会让检查点静默地变成一个无父的根提交，账本记下的 oid 与之前的历史断开，而没有人被告知。判定只有一处（`Checkpoint::head_commit`），提交与扫描都问它。
 - **提交时间是注入时刻的整秒**：`TimeMs` 是 `u64` 毫秒，除以 1000 后恒落在 `i64` 内，换算仍走 `i64::try_from` 且失败时报 `Checkpoint { op: "stamp the commit" }`，而不是写成 1970。
 
@@ -119,6 +122,13 @@ impl Checkpoint {
 - `open` 逐次钉仓库局部 `core.autocrlf=false`。城里的文件必须逐字节往返，而运行中的机器的 git 有可能被配成在检出时重写行尾；被重写的文件与 Ledger 里它的哈希不符，而那看起来像损坏不像设置。
 - 提交身份见 8-17（而不是一个固定的 `sprawling <sprawling@local>`）；时间恒入参（git 签名时间＝t，确定性 2）；scope 外文件恒不入 add（WriteDomain 即边界，全树扫描被明拒）。**`scopes` 是一组前缀而非一个**，因为写域是一个集合：楼自己的子树，加上 `RULES.toml` 另外声明的每一条。调用方传房间而门判整栋楼时，两者之间的文件进不了任何检查点——`Changes` 因此恒空，`file_discarded` 也无处恢复；权威在本节。无变化波：wave_pre 产空提交（同树 oid，仍记 payload——链可重建优于省一次提交）。
 - **写域拒绝链接穿透（junction／symlink 字面拒；硬链接臂见 8-25 与 §3.5）。** 暂存回调对每个命中路径问 `storage::alias`：任一链接使**整波拒绝**（`StorageError::Alias`），绝不跳过继续——跳过即部分捕获，`file_discarded` 的恢复地址会指向一份与自己不符的树。git 交回调的是相对仓根的路径，判别名前必须先拼上工作树根（否则问的是进程自己的目录）。保护元数据在检查点侧是**跳过**而非拒绝（`storage::reserved::outside_reserved`）：那些字节另有家（城或楼的治理、git 的对象库），与 `stage_tree` 跳过保留子树同口径；被拒的 run 拿到的 recovery 是「把链接换成普通文件后重试」，故不会卡死在自己的目录上。
+-/
+
+/-! D27 城的第一个提交（`ensure_base`）与收楼的基线（`base_checkpoint`）是同一种写法：对象全进 mempack，一次写成一个 pack，之后才写 index、才以比较后交换建 HEAD 指的分支。
+**为什么。** 逐个松散对象写时，第一次放置的 `ensure_base` 在一座 513 个文件的城上约 2.8 s，其中暂存约 2.2 s，钱花在每个 blob 一次建文件（release，一台 Windows 机器）；松散对象数随文件数线性长（`a_first_base_writes_one_pack_and_no_loose_object_at_any_file_count`：8、16、32 个文件时旧写法各留 11、19、35 个松散对象，新写法都是 0 个、1 个 pack）。暂存仍是同一次 `add_all`（按 stat 走工作区、给每个文件求哈希是这一步必须做的 O(N)），省下的是 N 次建文件。附带的好处：凭证扫描拒掉的第一次提交不再把 index 写到盘上。
+**被否：给 `ensure_base` 自己装 mempack。** 装上就卸不掉（§8-8 那一条），调用者的 handle 之后每一道 checkpoint 都会写进没人 dump 的内存库；另开一个 handle 只多一次 `Repository::open`。
+**被否：并行检出或自己枚举文件写对象。** 前者多一个线程起点（ARCHITECTURE §10 第 3 条），后者重写 libgit2 已有的暂存与 ignore 规则。
+**重开参数。** pack 落盘之后的检出（约 1.2 s）成了第一次放置的主成本，或 libgit2 给出可卸下的 odb 后端。
 -/
 
 /-!
