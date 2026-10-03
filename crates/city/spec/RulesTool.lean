@@ -15,10 +15,10 @@
 ```rust
 pub struct RulesTool { /* city_root、building、meta —— 私有；op ∈ {read, propose} */ }
 impl RulesTool { pub fn new(city_root: &Path, building: Address) -> Result<RulesTool, AxError>; }
-// meta.effect = Effect::Govern
+// meta.effect = Effect::Govern；effect_of：read → Read，propose → Govern（kernel Gate.lean D26）
 ```
 
-- **每一次经工具台的调用都在效果层被拒，这是定规而不是漏接**：一个 run 不改写审判它自己的规则（D1 定规；`crates/kernel/Spec.lean` §8-27 的 `Governance` 行）。`Effect::Govern` 无门、无审批、无 `ApprovalItem`：`runtime::bench::admit` 在 `invoke` 之前就把调用拒掉，拒绝以 tool result 回到模型而回合不终止（`runtime::turn::wave`「A tool Err is not a turn Err」那条）。规则要变只有人改文件这一条路——`RULES.toml` 的唯一写者是人，下一个 run 按改后的字节受审。
+- **`propose` 在效果层被拒，`read` 放行**：`effect_of` 对 `read` 答 `Effect::Read`、对 `propose` 答 `Effect::Govern`（`crates/kernel/spec/Gate.lean` D26），读规则不改写什么，模型因此看得到审判它的规则。改写的那一臂仍在效果层被拒，这是定规而不是漏接：一个 run 不改写审判它自己的规则（D1 定规；`crates/kernel/Spec.lean` §8-27 的 `Governance` 行）。`Effect::Govern` 无门、无审批、无 `ApprovalItem`：`runtime::bench::admit` 在 `invoke` 之前就把调用拒掉，拒绝以 tool result 回到模型而回合不终止（`runtime::turn::wave`「A tool Err is not a turn Err」那条）。规则要变只有人改文件这一条路——`RULES.toml` 的唯一写者是人，下一个 run 按改后的字节受审。
 - **拒词说出被治理的 scope**：本工具的 `subject` 答 `GateSubject::Scope`（§8-36），效果层因此给出 `E_GATE_DENIED` 的「一个 run 不得改写审判它自己的规则」，恢复语指向人改的 `CONFIG.toml` 与 `RULES.toml`。参数读不懂的调用在同一处被拒，拒词与 `invoke` 读到同样参数时给出的相同；两种拒都出自效果层，run 都到不了 `invoke`。
 - **为什么不是 `edit`**：`RULES.toml` 住在楼的保留子树，没有任何写域到得了那里——这不是一个要绕过的障碍，它就是规则本身。写面（`policy::write_rules`）因此只有本工具的 `invoke` 一个调用方，形状是整份提案、先求值后落盘（§8-2 末条）；run 到不了它，人改文件也不经它。
 - **楼是携入的而不是参数**：工具持调用方自己那栋楼的地址，于是一个 Run 无法靠填另一个名字去改别人的规则。

@@ -12,8 +12,9 @@
 //! widen what it is allowed to do. The declaration is `Effect::Govern`,
 //! and that effect is refused at the effect layer
 //! (`crates/city/spec/RulesTool.lean` §8-2b): a run may not change what
-//! governs it, so every call comes back as a refusal and a person edits
-//! the file.
+//! governs it, so a proposal comes back as a refusal and a person edits
+//! the file. Reading the rules changes nothing, so a `read` call answers
+//! `Effect::Read` and a run sees what it is judged by.
 //!
 //! **Whole document, not a patch.** These rules are evaluated as one
 //! text — a confidential building may list no egress domains, so two
@@ -79,8 +80,9 @@ impl RulesTool {
             meta: ToolMeta {
                 name: ToolName::parse("rules")?,
                 disclosure: format!(
-                    "What this building's runs are judged by. No run may change it: every \
-                     call here is refused, and the User edits the {RULES_FILE}."
+                    "What this building's runs are judged by. `read` shows them; no run may \
+                     change them, so `propose` is refused in a run and the User edits the \
+                     {RULES_FILE}."
                 ),
                 params: Payload::new(params)?,
                 effect: Effect::Govern,
@@ -170,6 +172,16 @@ impl Tool for RulesTool {
         Ok(GateSubject::Scope(
             Scope::Building(self.building.clone()).to_string(),
         ))
+    }
+
+    /// Reading the rules changes nothing they govern, so a run may read
+    /// them; a proposal still meets the Govern refusal
+    /// (`crates/kernel/spec/Gate.lean` D26).
+    fn effect_of(&self, call: &ToolCall) -> Result<Effect, AxError> {
+        Ok(match Op::read(call.args.as_map())? {
+            Op::Read => Effect::Read,
+            Op::Propose(_) => Effect::Govern,
+        })
     }
 
     fn invoke(&self, call: &ToolCall) -> Result<ToolOutcome, AxError> {

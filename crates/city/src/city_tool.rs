@@ -17,7 +17,8 @@
 //! not an obstacle to route around: the shape of the city is the
 //! person's decision, and `Effect::Govern` is refused at the effect
 //! layer (`crates/city/spec/RulesTool.lean` §8-2b) exactly as `crate::rules_tool` is —
-//! a run raises nothing; a person does, outside a run.
+//! a run raises nothing; a person does, outside a run. `list` changes
+//! nothing, so its call answers `Effect::Read` and a run may list.
 //!
 //! Only City Hall's residents are given this tool
 //! ([`crate::vocation`]); whatever the address asking, a building is
@@ -88,9 +89,9 @@ impl CityTool {
             meta: ToolMeta {
                 name: ToolName::parse("city")?,
                 disclosure: "This city's buildings: list them, raise a new one, or adopt a \
-                             directory that is already here. Every call here is refused — \
-                             the shape of the city is the User's decision, taken outside \
-                             a run."
+                             directory that is already here. A run may list; raising and \
+                             adopting are refused in a run, because the shape of the city \
+                             is the User's decision, taken outside a run."
                     .to_owned(),
                 params: Payload::new(params)?,
                 effect: Effect::Govern,
@@ -208,6 +209,16 @@ impl Tool for CityTool {
     fn subject(&self, call: &ToolCall) -> Result<GateSubject, AxError> {
         Request::read(call.args.as_map())?;
         Ok(GateSubject::Scope(Scope::City.to_string()))
+    }
+
+    /// Listing the city changes nothing about its shape, so a run may
+    /// list it; raising and adopting still meet the Govern refusal
+    /// (`crates/kernel/spec/Gate.lean` D26).
+    fn effect_of(&self, call: &ToolCall) -> Result<Effect, AxError> {
+        Ok(match Request::read(call.args.as_map())? {
+            Request::List => Effect::Read,
+            Request::Raise { .. } | Request::Adopt { .. } => Effect::Govern,
+        })
     }
 
     fn invoke(&self, call: &ToolCall) -> Result<ToolOutcome, AxError> {
