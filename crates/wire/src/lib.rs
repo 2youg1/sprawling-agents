@@ -63,13 +63,12 @@ pub use answer::{Entry, EntryKind, ListingAnswer, PreviewAnswer, RangeAnswer};
 pub use answer::{EvidenceItem, EvidenceKind, Picture};
 pub use answer::{FIND_MAX, FIND_WALK_MAX, FindAnswer, Walked};
 pub use answer::{GithubLoginAnswer, GithubReading};
-pub use answer::{
-    HarnessLine, HarnessState, HarnessesAnswer, KnownFace, KnownHost, KnownHostsAnswer,
-};
+pub use answer::{HarnessLine, HarnessState, HarnessesAnswer};
 pub use answer::{HunksAnswer, PatchLine, Withheld};
 pub use answer::{IdentityAnswer, StatedIdentity};
 pub use answer::{InboxAnswer, MetricsAnswer, RegistryAnswer, RegistryLine, SignalLine};
 pub use answer::{InstallChannel, Registry, RegistryNewest, RegistryReading};
+pub use answer::{KnownFace, KnownHost, KnownHostsAnswer};
 pub use answer::{McpHealthAnswer, McpServerHealth, McpState, McpToolLine};
 pub use answer::{OfferedCard, OpenProposalsAnswer, ProposalCard, ProposalsAnswer};
 pub use answer::{PrefixSlot, PrefixSource, SkillLine, SkillShelf, SkillsAnswer};
