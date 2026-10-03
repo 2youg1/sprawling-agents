@@ -18,10 +18,10 @@
 //! resident who sent it, which `runtime::conversation` renders inside an
 //! envelope its body cannot close (collab D16).
 
-use kernel::{Address, AxCode, AxError, RunId, TimeMs, Version};
+use kernel::{AxCode, AxError, RunId};
 
 use crate::inbox::{SenderState, Signal};
-use kernel::event::record::{SignalId, SignalKind};
+use kernel::event::record::SignalKind;
 
 /// The User's steer at its landing: what the User said.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -141,74 +141,6 @@ impl Letter {
     }
 }
 
-/// A steer on its way out of one resident and into another's inbox.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct AgentSteer {
-    id: String,
-    text: String,
-}
-
-impl AgentSteer {
-    /// # Errors
-    /// Refuses an unnamed sender and empty text.
-    pub fn new(id: &str, text: &str) -> Result<AgentSteer, AxError> {
-        if id.is_empty() {
-            return Err(AxError::failure(
-                AxCode::InvalidArgs,
-                "build an agent steer",
-                "unnamed sender".to_owned(),
-            )
-            .with_recovery("a steer is read as coming from someone; give the sender's address"));
-        }
-        Ok(AgentSteer {
-            id: id.to_owned(),
-            text: non_empty(text)?,
-        })
-    }
-
-    /// The signal this steer travels as. It carries its text in the
-    /// payload under `text`, which is where [`Letter::from_signal`] reads
-    /// it: one writer, one reader.
-    ///
-    /// # Errors
-    /// Propagates the signal's own refusals.
-    pub fn signal(
-        &self,
-        id: SignalId,
-        room: Address,
-        room_version: Version,
-        at: TimeMs,
-    ) -> Result<Signal, AxError> {
-        let mut body = serde_json::Map::new();
-        body.insert(
-            "text".to_owned(),
-            serde_json::Value::String(self.text.clone()),
-        );
-        Signal::new(
-            id,
-            SignalKind::Steer,
-            self.id.clone(),
-            room,
-            room_version,
-            kernel::Payload::new(body)?,
-            at,
-        )
-    }
-
-    /// What this steer looks like where it lands, before the city
-    /// stamps its delivery.
-    #[must_use]
-    pub fn landing(&self) -> Letter {
-        Letter {
-            from: self.id.clone(),
-            run: None,
-            kind: LetterKind::Steer,
-            sender: None,
-            text: self.text.clone(),
-        }
-    }
-}
-
 /// What a `pull` row says about where the sender stood when the signal
 /// was delivered (collab D10).
 pub(crate) fn sender_note(state: SenderState) -> String {
@@ -241,10 +173,27 @@ fn non_empty(text: &str) -> Result<String, AxError> {
 )]
 mod tests {
     use super::*;
-    use kernel::Payload;
+    use kernel::event::record::SignalId;
+    use kernel::{Address, Payload, TimeMs, Version};
 
-    fn room() -> Address {
-        Address::parse("lab/room2").unwrap()
+    /// A signal from `lab/room1` to `lab/room2` carrying `text`, as
+    /// `SignalDesk::send` writes one.
+    fn signal(kind: SignalKind, text: &str) -> Signal {
+        let mut body = serde_json::Map::new();
+        body.insert(
+            "text".to_owned(),
+            serde_json::Value::String(text.to_owned()),
+        );
+        Signal::new(
+            SignalId::parse("s-1").unwrap(),
+            kind,
+            "lab/room1".to_owned(),
+            Address::parse("lab/room2").unwrap(),
+            Version::new(1),
+            Payload::new(body).unwrap(),
+            TimeMs::new(9),
+        )
+        .unwrap()
     }
 
     /// D10, D16: the landing carries where the sender stood when the
@@ -253,15 +202,7 @@ mod tests {
     #[test]
     fn a_delivered_steer_lands_with_the_stamps_of_its_delivery() {
         let run = RunId::parse("0198f6a2-7c4a-7bbb-9d1e-000000000001").unwrap();
-        let signal = AgentSteer::new("lab/room1", "stop the kiln")
-            .unwrap()
-            .signal(
-                SignalId::parse("s-1").unwrap(),
-                room(),
-                Version::new(1),
-                TimeMs::new(9),
-            )
-            .unwrap()
+        let signal = signal(SignalKind::Steer, " stop the kiln ")
             .delivered(SenderState::Cancelled)
             .sent_by(run);
         let landed = Letter::from_signal(&signal).unwrap();
@@ -278,42 +219,8 @@ mod tests {
     }
 
     #[test]
-    fn an_agent_steer_travels_as_a_signal_and_lands_as_itself() {
-        let agent = AgentSteer::new("lab/room1", "check the units").unwrap();
-        let signal = agent
-            .signal(
-                SignalId::parse("s-1").unwrap(),
-                room(),
-                Version::new(2),
-                TimeMs::new(9),
-            )
-            .unwrap();
-        assert_eq!(signal.kind(), SignalKind::Steer);
-
-        let landed = Letter::from_signal(&signal).unwrap();
-        assert_eq!(landed, agent.landing());
-        assert_eq!(landed.text(), "check the units");
-    }
-
-    #[test]
     fn an_ordinary_mention_does_not_get_to_interrupt() {
-        let mut body = serde_json::Map::new();
-        body.insert(
-            "text".to_owned(),
-            serde_json::Value::String("have a look".to_owned()),
-        );
-        let mention = Signal::new(
-            SignalId::parse("s-2").unwrap(),
-            SignalKind::Mention,
-            "lab/room1".to_owned(),
-            room(),
-            Version::new(1),
-            Payload::new(body).unwrap(),
-            TimeMs::new(9),
-        )
-        .unwrap();
-
-        let err = Letter::from_signal(&mention).unwrap_err();
+        let err = Letter::from_signal(&signal(SignalKind::Mention, "have a look")).unwrap_err();
         assert_eq!(err.code(), &AxCode::InvalidArgs);
         assert!(err.recovery().contains("inbox"));
     }
@@ -321,8 +228,7 @@ mod tests {
     #[test]
     fn a_steer_with_nothing_in_it_is_refused_at_every_entrance() {
         assert!(Steer::from_person("   ").is_err());
-        assert!(AgentSteer::new("lab/room1", "\n").is_err());
-        assert!(AgentSteer::new("", "text").is_err());
+        assert!(Letter::from_signal(&signal(SignalKind::Steer, "\n")).is_err());
     }
 
     #[test]

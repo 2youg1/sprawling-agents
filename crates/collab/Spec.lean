@@ -96,12 +96,12 @@ Signal、Inbox、Steer、Workshop、NodeContract、fan-in、Artifact、arbitrati
 - `Signal::from_payload` 是 `enqueued_payload` 的逆，否则投影重建要长出第二份 Signal 解析器。重建先筛后送：从 Ledger 收齐 `signal_enqueued` 与 `signal_consumed` 两组 id，只把未被消费的按原序 `deliver` 一遍，所以队列不需要「按 id 删除」。
 - 读不回来的载荷在 `take_steer` 这条路上丢弃而不报错：调用点是一次 run 的安全点，除了继续，唯一的替代是为别人的一条损坏条目停掉这一跑；同一条载荷在 `pull`（模型自己那扇门）上仍大声报错，事实不会消失。
 
-**`collab::steer`**（形状 2 值类型）。`Steer::from_person`、`text`：`Steer` 只装 User 说的话；`Letter::from_signal`、`from`、`run`、`kind`、`sender`、`text` 与 `LetterKind::{Steer, Reply}`：`Letter` 装居民说的话和城市盖在它上面的戳（D16）；`AgentSteer::new`、`signal`（居民侧只能走 Inbox）、`landing`（城市盖戳之前的那封 `Letter`）。
+**`collab::steer`**（形状 2 值类型）。`Steer::from_person`、`text`：`Steer` 只装 User 说的话；`Letter::from_signal`、`from`、`run`、`kind`、`sender`、`text` 与 `LetterKind::{Steer, Reply}`：`Letter` 装居民说的话和城市盖在它上面的戳（D16）。居民的 steer 是 `signal send` 带 `kind: steer` 的一件 Signal，由 `SignalDesk::send` 写出，居民侧只能走 Inbox；正文在载荷的 `text` 键下，`Letter::from_signal` 从那里读。
 
 - 两个入口、一个落点：人的 Steer 只从 control surface 进城，恒不走 Inbox；居民的 Steer 是一件插队首的 Signal。两者都追在下一次工具结果末尾，模型只需要认识一种形状。
 - 人与居民是两个类型：`Letter` 的 `from` 是城市投递时盖的发信房间，而不是正文自称的那个，`runtime::conversation` 把它渲染进正文关不上的信封；只有 `Steer` 渲染成 `user:`，一件自称来自人的注入内容拼不出它。入口分立是安全要求，类型把它变成判定。
 - Steer 不打断动作：它在安全点被消费（`runtime::turn`）；同一边界上 Cancel 压过 Steer，因为停是不可撤销的那个。
-- 中断源先问人、再问本屋 Inbox（`SignalDesk::take_steer`），人压过居民；只读人的命令队列的中断源会让 `Letter::from_signal` 与整个 `AgentSteer` 永远不发生。
+- 中断源先问人、再问本屋 Inbox（`SignalDesk::take_steer`），人压过居民；只读人的命令队列的中断源会让 `Letter::from_signal` 与居民的 steer 永远不发生。
 - 属名就是回信地址：模型读到 `<letter from="@market/hana" …>` 时，读到的既是「这句话不是人说的」，也是 `signal` 的 `to` 该填什么。
 
 **`collab::workshop`、`collab::workshop::underway`**（形状 2、形状 1；性质见 `spec/Workshop.lean`）。`NodeContract` 带 id、goal、depends_on、reads、write_domain、owner、done_check、stop 八个字段；`job_text` 落盘即该节点的 JOB.md，契约本身就是任务权威，机制在 prefix 零常驻。goal、owner、done_check、stop 四个字段不许空：空的停止条件是一个不会停的 run。图的权威是 `Roadmap.md`，本模块不另设存储；从路线图行生成契约的那一步没有，因为路线图的表格不携 `depends_on`。
