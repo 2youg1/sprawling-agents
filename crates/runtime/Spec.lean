@@ -17,6 +17,7 @@ import crates.runtime.spec.Handoff
 import crates.runtime.spec.Mode
 import crates.runtime.spec.Offload
 import crates.runtime.spec.Pipeline
+import crates.runtime.spec.PolicyTake
 import crates.runtime.spec.Prefix
 import crates.runtime.spec.Reminder
 import crates.runtime.spec.Replay
@@ -58,7 +59,7 @@ import crates.runtime.spec.Watchdog
 | `handoff` | 五段构造点＋resume 消费 Handoff 产新 Run 种子；形状 2 |
 | 完备化 | prefix 四段全量（封顶＋截断标注＋跨段去重＋跳过入账）＋断点 ≤4＋Steer 边界消费＋窗口组装入 Assembling 相 |
 | `pipeline`＋`offload` | 结果信封三附件＋offload 四不变量（独占有损可还原）＋截断定序 |
-| `clock`＋`catalog`＋`mode` | ISO UTC 的唯一拼法＋ClockStamp 与它的发放规则＋ClockReading（§8-10、§8-53）＋渐进披露三类条目＋截断锁的三档：常驻核心、至多 1 KiB 的休眠索引、`describe` 与 `call` 两扇门（§8-60、§8-61）＋两个 mode 的目录行与合并时的准入（§8-54） |
+| `clock`＋`catalog`＋`mode` | ISO UTC 的唯一拼法＋ClockStamp 与它的发放规则＋ClockReading（§8-10、§8-53）＋渐进披露三类条目＋截断锁的三档：常驻核心、至多 1 KiB 的休眠索引、`describe` 与 `call` 两扇门（§8-60、§8-61）＋两个 mode 的目录行与合并时的准入（§8-54）＋会话中换运行策略的策略格（§8-62） |
 | `watchdog` | 处置面分级（纠正 Steer→停滞→冻结）；依据只从 kernel::stall 来 |
 | `sandbox` | 缝（trait）＋wasmtime fuel 生产适配器＋直通/故障两替身；A10 三断言 |
 | `tools/` | exec 三臂／edit 乐观并发／read 区间读／search／status／succeed，与模型选路的唯一判定 `chosen_path`，以及经它按字节读的 `bound_reader`（§8-14、§8-29–§8-33、§8-59） |
@@ -192,6 +193,7 @@ tools/ ──▶ kernel(tool/version/discard/gate)、sandbox、storage(cas 经 p
 | 8-11 | `crates/runtime/spec/Catalog.lean` |
 | 8-60 | `crates/runtime/spec/Catalog.lean` |
 | 8-61 | `crates/runtime/spec/Catalog.lean` |
+| 8-62 | `crates/runtime/spec/PolicyTake.lean` |
 | 8-12 | `crates/runtime/spec/Mode.lean` |
 | 8-12b | `crates/runtime/spec/Mode.lean` |
 | 8-54 | `crates/runtime/spec/Mode.lean` |
@@ -320,6 +322,7 @@ envelope 探查与全解共用 kernel 的解析（Value 探查仅取五键，不
 | D23 | 命令行程序不另立目录 | `crates/runtime/spec/Catalog.lean` |
 | D24 | 只读工具不在执行前等落盘，写调用的意图先落盘，一波一道屏障 | `crates/runtime/spec/Turn.lean`（§8-3），性质在 `crates/runtime/spec/Turn/Durability.lean` |
 | D25 | 会话中可改运行策略之后，常驻核心是各 mode 核心的并集 | `crates/runtime/spec/Catalog.lean` |
+| D28 | 会话中换运行策略只由驱动循环在 `BeforeWave` 写进策略格，工具只读格 | `crates/runtime/spec/PolicyTake.lean` |
 -/
 
 /-! ## 13 依赖选型

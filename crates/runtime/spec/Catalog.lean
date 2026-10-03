@@ -24,9 +24,9 @@ impl Catalog {
     pub fn admit_tool(&mut self, meta: &ToolMeta) -> Result<(), AxError>;      // disclosure 非空；重名＝E_INVALID_ARGS
     pub fn admit_skill(&mut self, entry: CatalogEntry) -> Result<(), AxError>; // 只收阅览室准入者（装配层按楼的 city::policy 规则求值后直供）；expansion 是城内地址
     pub fn admit_carried_skill(&mut self, entry: CatalogEntry) -> Result<(), AxError>; // 城外书架上的一件：expansion 是扫描读到的那份文档正文（§8-29-6）
-    pub fn set_mode(&mut self, mode: Mode);                                    // 只列本 Run 所处者
+    pub fn set_mode(&mut self, mode: Mode);                                    // Resident 段的 mode 行：run 开始时的 mode；会话中换 mode 不改它（§8-62）
     pub fn render(&self) -> String;              // Resident 段的 catalog 部分：段头一行、mode 行、dev 行，然后休眠索引（§8-60）；BTreeMap 序恒定
-    pub fn tool_defs(&self) -> Vec<ToolDef>;     // ChatRequest.tools 的唯一来源：只有本 mode 的常驻核心（§8-60）
+    pub fn tool_defs(&self) -> Vec<ToolDef>;     // ChatRequest.tools 的唯一来源：各 mode 常驻核心的并集，session 开始时定下（§8-60、D25）
     pub fn expand(&self, name: &str) -> Option<Expansion>;   // 第二级披露（怎么用），§8-6
     pub fn skill_pins(&self) -> Vec<SkillPin>;   // 本 Run 拿到了哪几份，当时各是什么字节
 }
@@ -71,7 +71,7 @@ impl CallTool { pub fn new(catalog: Arc<Mutex<Catalog>>) -> Result<CallTool, AxE
 ```
 
 - **索引的写法**：一行段头，然后先工具后 skill、各按名字的字节序，一件一行：`- <名>: <提示>`，skill 写作 `- skill <名>: <提示>`。提示是披露的第一句（到第一个 `. ` 或行尾），在 `HINT_MAX_BYTES` 处按字符边界截断。逐件贪心：带提示的那行放得下就放，放不下退到只有名字的那行，再放不下就停，剩下的件数写成末行 `+N more`。预算先扣掉 `+N more` 在 N 取全部件数时的长度，所以那一行恒放得下。没有休眠的件时整块不出现。
-- **常驻核心由 `mode::core_tools` 一处回答**：`chat` 是 `read`、`search`、`status`、`describe`、`call`；`work` 再加 `edit` 与 `exec`。表里的名字只有已准入的才常驻：楼没登记 `exec`（市政厅），`exec` 就不在任何一档。
+- **每个 mode 允许执行哪些常驻工具，由 `mode::core_tools` 一处回答**：`chat` 是 `read`、`search`、`status`、`describe`、`call`；`work` 再加 `edit` 与 `exec`。`ChatRequest.tools` 的常驻核心是 `Mode::ALL` 各自 `core_tools` 的并集，在 session 开始时定下（D25），所以会话中换 mode 不改工具表，只改门（§8-62）。表里的名字只有已准入的才常驻：楼没登记 `exec`（市政厅），`exec` 就不在任何一档。
 
 下面的模型是索引装填的长度账与三档的可见性；Rust 的 `catalog::dormant` 按同一贪心拼出字节，`catalog::tests` 对拍上限与三档（§16）。
 -/
