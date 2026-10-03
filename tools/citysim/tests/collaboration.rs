@@ -3,10 +3,12 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The two collaboration scenarios of TP3 (`tools/citysim/Spec.lean`
-//! §16, citysim D25): a coordinator that delegates three rooms, and the
+//! The collaboration scenarios of TP3 (`tools/citysim/Spec.lean` §16,
+//! citysim D25 and D26): a coordinator that delegates three rooms, the
 //! turtle-soup game played between `hall/mayor` and `hall/clerk` under
-//! the asynchronous and the synchronous send.
+//! the asynchronous and the synchronous send, and the plan's
+//! scripts: a claim conflict between two residents
+//! and a re-dispatch after a failed child.
 //!
 //! The city is the product's, served through `attend`, the loop a city
 //! runs: lanes, the workbench, the signal desk, the delegate desk and
@@ -14,8 +16,10 @@
 //! is in memory; only the model is scripted, and each run's model reads
 //! its role from the first message the run was given. Nothing here
 //! reads a platform facility, so Windows, macOS and Linux run the same
-//! trace up to the order in which concurrent lanes reach the ledger,
-//! which no assertion reads.
+//! trace up to the order in which concurrent lanes reach the ledger.
+//! The TP3 scenarios read no such order; the plan scenarios make their
+//! runs wait on each other's marks on a `Board`, so the lines they
+//! compare reach the ledger in one order on every run.
 
 #![allow(
     clippy::unwrap_used,
@@ -67,7 +71,7 @@ fn tp3_three_delegated_children_start_at_the_call_and_run_side_by_side() {
     let lines = serve(
         worker,
         &ledger,
-        dispatch("lab/lead", "three rooms at work"),
+        vec![dispatch("lab/lead", "three rooms at work")],
         |lines| frozen(lines) == 4,
     );
 
@@ -206,7 +210,7 @@ fn play(send: Send) -> Reading {
     let lines = serve(
         worker,
         &ledger,
-        dispatch(MAYOR, "the game is judged"),
+        vec![dispatch(MAYOR, "the game is judged")],
         move |lines| done.verdict.load(Ordering::SeqCst) > 0 && quiet(lines),
     );
     let starts: Vec<&EventRecord> = lines
@@ -500,7 +504,10 @@ fn idem(what: &[u8]) -> IdemKey {
 
 /// A founded city whose main model sits behind a loopback port nothing
 /// listens on, so only the roles answer; with its ledger directory.
-fn city(dir: &Path, factory: Roles) -> (RunWorker, PathBuf) {
+fn city(
+    dir: &Path,
+    factory: impl accounting::ModelFactory + std::marker::Send + 'static,
+) -> (RunWorker, PathBuf) {
     let clock: Arc<dyn accounting::Clock + std::marker::Send + Sync> =
         Arc::new(Counted(AtomicU64::new(0)));
     accounting::worker::genesis::form(
@@ -582,12 +589,12 @@ fn dispatch(addr: &str, goal: &str) -> wire::Command {
 
 type Lines = Vec<(EventRecord, String)>;
 
-/// Serves the city through `attend`, posts `command`, and reads the
+/// Serves the city through `attend`, posts `commands` in order, and reads the
 /// history until `done` holds, in counted looks.
 fn serve(
     mut worker: RunWorker,
     ledger: &Path,
-    command: wire::Command,
+    commands: Vec<wire::Command>,
     done: impl Fn(&Lines) -> bool,
 ) -> Lines {
     let desk = Arc::new(CommandDesk::default());
@@ -595,7 +602,9 @@ fn serve(
         let desk = Arc::clone(&desk);
         std::thread::spawn(move || accounting::worker::attend::attend(&mut worker, &desk))
     };
-    desk.post(command, wire::Reply::nowhere());
+    for command in commands {
+        desk.post(command, wire::Reply::nowhere());
+    }
     for _ in 0..3_000 {
         if done(&read(ledger)) {
             break;
@@ -697,4 +706,372 @@ fn frozen_seq(lines: &Lines, run: RunId) -> u64 {
         .iter()
         .find(|(record, _)| record.kind() == EventKind::RunFrozen && record.run() == run)
         .map_or(u64::MAX, |(record, _)| record.seq().value())
+}
+
+/// The plan both plan scenarios start from: one node, ready.
+const PLAN: &str = "\
+# Roadmap
+
+| # | Item | Weight | Needs | Status | Evidence |
+|---|------|--------|-------|--------|----------|
+| 1 | fire the kiln | 1 |  | Not started |  |
+";
+
+/// Claim conflict (`tools/citysim/Spec.lean` §16, citysim D26): two
+/// residents of one building read node 1 as ready in the same wave,
+/// because each desk holds the plan as it stood at dispatch. The potter
+/// asks first; the glazer asks while the potter still holds the node,
+/// and is refused at the call; the node records one holder, and the
+/// potter's claim is put back when its run comes home without landing.
+#[test]
+fn a_node_two_residents_read_as_ready_in_one_wave_is_held_by_the_first_to_claim() {
+    let dir = tempfile::tempdir().unwrap();
+    let board = Arc::new(Board::default());
+    let (mut worker, ledger) = city(dir.path(), Planners(Arc::clone(&board)));
+    raise(&mut worker, "lab");
+    plan_lab(dir.path());
+    let lines = serve(
+        worker,
+        &ledger,
+        vec![dispatch("lab/kiln", POTTER), dispatch("lab/glaze", GLAZER)],
+        |lines| frozen(lines) == 2 && quiet(lines),
+    );
+    let plan = std::fs::read_to_string(
+        CityLayout::new(dir.path())
+            .scope(&Address::parse("lab").unwrap())
+            .join(kernel::ROADMAP_FILE),
+    )
+    .unwrap();
+    println!("{plan}");
+    assert_eq!(
+        plan_trace(&lines, |line| !matches!(
+            line.0.kind(),
+            EventKind::RunStarted | EventKind::RunFrozen
+        )),
+        [
+            "RoadmapClaimed lab/kiln",
+            "ToolResult lab/kiln plan answered",
+            "ToolResult lab/glaze plan failed",
+            "RoadmapBlocked lab/kiln",
+        ],
+        "one holder, the second claim refused at the call"
+    );
+}
+
+/// Re-dispatch (`tools/citysim/Spec.lean` §16, citysim D26): the lead
+/// delegates `lab/kiln`, whose child claims node 1 and then fails; the
+/// lead, still in the same run, delegates the same room again once the
+/// first child has frozen. The second child starts under the same
+/// parent. The failed child spent its claim on `FrozeWithoutEvidence`
+/// (`crates/kernel/spec/Plan.lean`), so the node is blocked, not put
+/// back, and the second child's claim is refused at the call.
+///
+/// Ignored until the accounting worker holds one answer for a blocked
+/// node: on some runs the second child's desk reads a `Roadmap.md` that
+/// does not yet show the block the ledger already carries and the
+/// booking admits the claim, and on others the lead's second `delegate`
+/// fails on the plan's staging file.
+#[test]
+#[ignore = "red: a blocked node is claimable by a run dispatched after the block; see the doc comment"]
+fn a_room_delegated_again_after_its_child_failed_starts_under_the_same_parent() {
+    let dir = tempfile::tempdir().unwrap();
+    let board = Arc::new(Board::default());
+    let (mut worker, ledger) = city(dir.path(), Planners(Arc::clone(&board)));
+    raise(&mut worker, "lab");
+    plan_lab(dir.path());
+    *board.ledger.lock().unwrap() = Some(ledger.clone());
+    let lines = serve(worker, &ledger, vec![dispatch("lab/lead", REDO)], |lines| {
+        frozen(lines) == 3 && quiet(lines)
+    });
+    let lead = started(&lines, "lab/lead").remove(0).run;
+    let kiln = |line: &(EventRecord, String)| {
+        line.0
+            .addr()
+            .map(Address::as_str)
+            .or_else(|| room_of(&lines, line.0.run()))
+            == Some("lab/kiln")
+    };
+    let parents: Vec<bool> = started(&lines, "lab/kiln")
+        .iter()
+        .map(|start| start.parent == Some(lead))
+        .collect();
+    assert_eq!(
+        (parents, plan_trace(&lines, kiln)),
+        (
+            vec![true, true],
+            [
+                "RunStarted lab/kiln",
+                "RoadmapClaimed lab/kiln",
+                "ToolResult lab/kiln plan answered",
+                "ToolResult lab/kiln run failed",
+                "RunFrozen lab/kiln cancelled",
+                "RoadmapBlocked lab/kiln",
+                "RunStarted lab/kiln",
+                "ToolResult lab/kiln plan failed",
+                "RunFrozen lab/kiln done",
+            ]
+            .map(str::to_owned)
+            .to_vec()
+        ),
+        "the room delegated again starts under the same lead and cannot take the node its failed child blocked"
+    );
+}
+
+const POTTER: &str = "fire the kiln as the potter";
+const GLAZER: &str = "fire the kiln as the glazer";
+const REDO: &str = "the kiln fired, delegated again if it cracks";
+const CHILD_TASK: &str = "claim node 1 and fire it";
+const CHILD_GOAL: &str = "node 1 fired";
+
+/// The marks the plan scenarios' runs wait on, and the ledger the lead
+/// reads to know a child has frozen.
+#[derive(Default)]
+struct Board {
+    marks: Mutex<std::collections::BTreeSet<&'static str>>,
+    moved: Condvar,
+    children: AtomicU32,
+    ledger: Mutex<Option<PathBuf>>,
+}
+
+impl Board {
+    fn mark(&self, mark: &'static str) {
+        self.marks.lock().unwrap().insert(mark);
+        self.moved.notify_all();
+    }
+
+    fn wait(&self, mark: &'static str) {
+        let marks = self.marks.lock().unwrap();
+        let (marks, waited) = self
+            .moved
+            .wait_timeout_while(marks, SIBLINGS, |marks| !marks.contains(mark))
+            .unwrap();
+        drop(marks);
+        assert!(!waited.timed_out(), "nobody marked {mark}");
+    }
+
+    /// Waits until `count` runs in `lab/kiln` have frozen.
+    fn kiln_frozen(&self, count: usize) {
+        let ledger = self.ledger.lock().unwrap().clone().unwrap();
+        for _ in 0..500 {
+            let lines = read(&ledger);
+            if lines
+                .iter()
+                .filter(|(record, _)| {
+                    record.kind() == EventKind::RunFrozen
+                        && room_of(&lines, record.run()) == Some("lab/kiln")
+                })
+                .count()
+                >= count
+            {
+                return;
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        let seen: Vec<String> = read(&ledger)
+            .iter()
+            .map(|(record, raw)| {
+                format!(
+                    "{:?}@{} {}",
+                    record.kind(),
+                    record.addr().map_or("-", Address::as_str),
+                    raw.get(raw.len().saturating_sub(160)..).unwrap_or_default()
+                )
+            })
+            .collect();
+        panic!("{count} kiln runs never froze: {seen:#?}");
+    }
+}
+
+struct Planners(Arc<Board>);
+
+impl accounting::ModelFactory for Planners {
+    fn build(
+        &self,
+        _chosen: &gateway::Chosen<'_>,
+        _redemption: gateway::Redemption,
+    ) -> Result<Box<dyn Model + std::marker::Send>, AxError> {
+        Ok(Box::new(Planner {
+            part: None,
+            turn: 0,
+            child: 0,
+            board: Arc::clone(&self.0),
+        }))
+    }
+}
+
+/// Which part a run plays in the plan scenarios.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Part {
+    Potter,
+    Glazer,
+    Lead,
+    Child,
+}
+
+struct Planner {
+    part: Option<Part>,
+    turn: u32,
+    child: u32,
+    board: Arc<Board>,
+}
+
+impl Model for Planner {
+    fn call(&mut self, req: &ModelRequest) -> Result<ModelReturn, AxError> {
+        if req.chat.tools.is_empty() {
+            return says("done");
+        }
+        let part = *self.part.get_or_insert_with(|| part_of(req));
+        self.turn = self.turn.saturating_add(1);
+        match (part, self.turn) {
+            (Part::Potter, 1) => {
+                self.board.mark("potter here");
+                self.board.wait("glazer here");
+                claim_node_one()
+            }
+            (Part::Potter, 2) => {
+                self.board.mark("potter claimed");
+                self.board.wait("glazer tried");
+                says("held")
+            }
+            (Part::Glazer, 1) => {
+                self.board.mark("glazer here");
+                self.board.wait("potter claimed");
+                claim_node_one()
+            }
+            (Part::Glazer, 2) => {
+                self.board.mark("glazer tried");
+                says("taken by someone else")
+            }
+            (Part::Lead, 1) => delegate_kiln(),
+            (Part::Lead, 2) => {
+                self.board.kiln_frozen(1);
+                delegate_kiln()
+            }
+            (Part::Lead, 3) => {
+                self.board.kiln_frozen(2);
+                says("the kiln is fired")
+            }
+            (Part::Child, 1) => {
+                self.child = self.board.children.fetch_add(1, Ordering::SeqCst);
+                claim_node_one()
+            }
+            (Part::Child, 2) if self.child == 0 => Err(AxError::failure(
+                kernel::AxCode::InvalidArgs,
+                "fire the kiln",
+                "the kiln cracked",
+            )
+            .with_recovery("delegate the room again")),
+            (Part::Potter | Part::Glazer | Part::Lead | Part::Child, _) => says("fired"),
+        }
+    }
+}
+
+fn part_of(req: &ModelRequest) -> Part {
+    let text = first_text(req);
+    if text.contains(POTTER) {
+        Part::Potter
+    } else if text.contains(GLAZER) {
+        Part::Glazer
+    } else if text.contains(CHILD_GOAL) {
+        Part::Child
+    } else {
+        Part::Lead
+    }
+}
+
+fn first_text(req: &ModelRequest) -> String {
+    req.chat
+        .messages
+        .first()
+        .into_iter()
+        .flat_map(|message| &message.content)
+        .filter_map(|block| match block {
+            ContentBlock::Text { text, .. } => Some(text.as_str()),
+            ContentBlock::ToolResult { .. }
+            | ContentBlock::Thinking { .. }
+            | ContentBlock::RedactedThinking { .. }
+            | ContentBlock::ToolUse { .. }
+            | ContentBlock::Image(_) => None,
+        })
+        .chain(req.chat.system.iter().map(|block| block.text.as_str()))
+        .collect()
+}
+
+fn claim_node_one() -> Result<ModelReturn, AxError> {
+    calls("plan", json!({ "action": "claim", "node": "1" }))
+}
+
+fn delegate_kiln() -> Result<ModelReturn, AxError> {
+    calls(
+        "delegate",
+        json!({ "room": "lab/kiln", "task": CHILD_TASK, "goal": CHILD_GOAL }),
+    )
+}
+
+/// Writes the one-node plan into `lab`, where the plan tool reads it.
+fn plan_lab(dir: &Path) {
+    std::fs::write(
+        CityLayout::new(dir)
+            .scope(&Address::parse("lab").unwrap())
+            .join(kernel::ROADMAP_FILE),
+        PLAN,
+    )
+    .unwrap();
+}
+
+/// The plan's lines, the runs' starts and freezes, and the answers to
+/// `plan` calls, in ledger order, for the lines `keep` admits: kind,
+/// room, and the one word that decides the scenario.
+fn plan_trace(lines: &Lines, keep: impl Fn(&(EventRecord, String)) -> bool) -> Vec<String> {
+    lines
+        .iter()
+        .filter(|line| keep(line))
+        .filter_map(|(record, _)| {
+            let room = record
+                .addr()
+                .map(Address::as_str)
+                .or_else(|| room_of(lines, record.run()))
+                .unwrap_or("-");
+            let kind = record.kind();
+            let word = if kind == EventKind::ToolResult {
+                // A run's own failure is written on a `tool_result` line
+                // whose payload is the error alone, with no call it
+                // answers.
+                match record.data().read::<kernel::event::record::ToolResult>() {
+                    Ok(data) if data.name.as_str() != "plan" => return None,
+                    Ok(data) => match data.answer {
+                        kernel::event::record::ToolAnswer::Answered { .. } => " plan answered",
+                        kernel::event::record::ToolAnswer::Failed { .. } => " plan failed",
+                    }
+                    .to_owned(),
+                    Err(_) => " run failed".to_owned(),
+                }
+            } else if kind == EventKind::RunFrozen {
+                let data: kernel::event::record::RunFrozen = record.data().read().unwrap();
+                format!(" {}", data.completion)
+            } else if PLAN_KINDS.contains(&kind) {
+                String::new()
+            } else {
+                return None;
+            };
+            Some(format!("{:?} {room}{word}", record.kind()))
+        })
+        .collect()
+}
+
+/// The lines a plan trace names with no word beside the kind.
+const PLAN_KINDS: [EventKind; 5] = [
+    EventKind::RoadmapClaimed,
+    EventKind::RoadmapReleased,
+    EventKind::RoadmapFinished,
+    EventKind::RoadmapBlocked,
+    EventKind::RunStarted,
+];
+
+/// The room a run was started in.
+fn room_of(lines: &Lines, run: RunId) -> Option<&str> {
+    lines
+        .iter()
+        .find(|(record, _)| record.kind() == EventKind::RunStarted && record.run() == run)
+        .and_then(|(record, _)| record.addr().map(Address::as_str))
 }
