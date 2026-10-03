@@ -30,7 +30,7 @@ bar and the thread cannot disagree about where a round is. -->
   import { cutOff, silentTurn } from "./silence";
   import type { Phase as Live } from "./silence";
   import type { ForkEntry, ForkPlan } from "./forking";
-  import { tpsOf, ttftOf } from "./timing";
+  import { tpsOf, ttftTookOf } from "./timing";
 
   interface Props {
     readonly turn: Turn;
@@ -82,7 +82,7 @@ bar and the thread cannot disagree about where a round is. -->
       {who}
       at={turn.t}
       {model}
-      ttft={said === "" ? null : ttftOf(turn)}
+      ttft={said === "" ? null : ttftTookOf(turn)}
       tps={said === "" ? null : tpsOf(turn)}
       {rhythm}
     />

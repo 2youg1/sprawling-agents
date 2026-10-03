@@ -72,9 +72,34 @@ export function tpsOf(turn: Turn): number | null {
   return span <= 0 ? null : (output * 1_000) / span;
 }
 
+// A landed duration in the finest unit the Ledger recorded it in: whole
+// microseconds where the line carries a monotonic `took_us`/`first_us`
+// (kernel D20), whole milliseconds where only the two moments exist (a
+// line written before the key did, `crates/wire/spec/Reading.lean` D28).
+// The unit travels with the number because a 0 from two millisecond
+// moments means "under a millisecond", never "0 µs".
+export type Took = { readonly unit: "us"; readonly n: number } | { readonly unit: "ms"; readonly n: number };
+
+// How long a call took, for the screens that write it: its own
+// microseconds when the Ledger has them, else `lastedOf`'s milliseconds.
+export function tookOf(call: Call): Took | null {
+  const us = call.took_us ?? null;
+  if (us !== null && us >= 0 && call.outcome !== "waiting") return { unit: "us", n: us };
+  const ms = lastedOf(call);
+  return ms === null ? null : { unit: "ms", n: ms };
+}
+
+// A turn's time to first content, in the same two units as `tookOf`.
+export function ttftTookOf(turn: Turn): Took | null {
+  const us = turn.used?.first_us ?? null;
+  if (us !== null && us >= 0) return { unit: "us", n: us };
+  const ms = ttftOf(turn);
+  return ms === null ? null : { unit: "ms", n: ms };
+}
+
 // What a call's time cell says now.
 export type CallTime =
-  | { readonly kind: "landed"; readonly ms: number }
+  | { readonly kind: "landed"; readonly took: Took }
   | { readonly kind: "running"; readonly ms: number }
   // Running for less than `COUNTED_AFTER_MS`, or for a time this page's
   // clock cannot place (the call's moment lies ahead of it).
@@ -89,17 +114,34 @@ export function callTime(call: Call, now: number): CallTime {
     }
     case "answered":
     case "failed": {
-      const ms = lastedOf(call);
-      return ms === null ? { kind: "unmeasured" } : { kind: "landed", ms };
+      const took = tookOf(call);
+      return took === null ? { kind: "unmeasured" } : { kind: "landed", took };
     }
   }
 }
 
-// A landed figure: whole milliseconds under a second, and seconds to the
-// millisecond above it, because the Ledger's unit is the millisecond and
-// a reader comparing `31 ms` with `3.412 s` should not convert. The one
-// pair of units every landed duration is written in (client/Spec.lean §4-59).
-export function landedWords(ms: number, lang: Lang): string {
+// Under this a measured duration is written in microseconds (Roadmap M0
+// item 1, A13): a tool call that the Ledger once wrote as `0 ms` reads as
+// what it was. One constant, so a later change of the threshold is here.
+const MICROS_UNDER_US = 10_000;
+
+// A landed figure: microseconds under ten milliseconds when the Ledger
+// measured them, whole milliseconds under a second, and seconds to the
+// millisecond above it, so a reader comparing `31 ms` with `3.412 s`
+// does not convert. The one writer of every landed duration
+// (client/Spec.lean §4-59).
+export function tookWords(took: Took, lang: Lang): string {
+  switch (took.unit) {
+    case "us":
+      return took.n < MICROS_UNDER_US
+        ? fill(say(lang, "talk_took_us"), { n: String(Math.round(took.n)) })
+        : msWords(took.n / 1_000, lang);
+    case "ms":
+      return msWords(took.n, lang);
+  }
+}
+
+function msWords(ms: number, lang: Lang): string {
   return ms < 1_000
     ? fill(say(lang, "talk_took_ms"), { n: String(Math.round(ms)) })
     : fill(say(lang, "talk_took_s"), { n: (ms / 1_000).toFixed(3) });

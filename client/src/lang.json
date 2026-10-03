@@ -4387,6 +4387,10 @@
     "en": "{n} s",
     "zh": "{n} s"
   },
+  "talk_took_us": {
+    "en": "{n} µs",
+    "zh": "{n} µs"
+  },
   "talk_unread": {
     "en": "{n} new",
     "zh": "{n} 条新内容"

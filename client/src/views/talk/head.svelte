@@ -22,7 +22,8 @@ it lives. -->
   import { hhmmss, isoInstant } from "../../core/time";
   import { ui } from "../../ui";
   import Sparkline from "./sparkline.svelte";
-  import { landedWords } from "./timing";
+  import { tookWords } from "./timing";
+  import type { Took } from "./timing";
 
   interface Props {
     readonly who: string;
@@ -32,7 +33,7 @@ it lives. -->
     // one that states them; `null` elsewhere.
     readonly model: string | null;
     // Time to first content, once the Ledger holds a measured one.
-    readonly ttft: number | null;
+    readonly ttft: Took | null;
     // Output tokens a second, once the Ledger holds both moments.
     readonly tps: number | null;
     // The rhythm this page watched the reply arrive in, if it watched.
@@ -51,7 +52,7 @@ it lives. -->
   {/if}
   <time class="figure shrink-0" datetime={isoInstant(at)}>{hhmmss(at)}</time>
   {#if ttft !== null}
-    <span class="figure shrink-0">{say($lang, "talk_ttft")} {landedWords(ttft, $lang)}</span>
+    <span class="figure shrink-0">{say($lang, "talk_ttft")} {tookWords(ttft, $lang)}</span>
   {/if}
   {#if tps !== null}
     <span class="figure shrink-0">{fill(say($lang, "talk_tps"), { n: String(Math.round(tps)) })}</span>

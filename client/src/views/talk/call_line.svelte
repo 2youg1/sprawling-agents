@@ -34,7 +34,7 @@ third layer). -->
   import Tip from "../parts/tip.svelte";
   import { closeRight, openCall, rightItem } from "../inspect/open.svelte";
   import { kindOf } from "./call_kind";
-  import { NAMED_AFTER_MS, callTime, landedWords, runningWords, ticker } from "./timing";
+  import { NAMED_AFTER_MS, callTime, runningWords, tookWords, ticker } from "./timing";
 
   interface Props {
     readonly call: Call;
@@ -139,7 +139,7 @@ third layer). -->
           <span class="inline-block size-dot shrink-0 animate-pulse rounded-pill bg-accent" aria-hidden="true"></span>
         {/if}
         {#if time.kind === "landed"}
-          {landedWords(time.ms, $lang)}
+          {tookWords(time.took, $lang)}
         {:else if time.kind === "running"}
           <span class="text-text">{runningWords(time.ms)}</span>
         {/if}

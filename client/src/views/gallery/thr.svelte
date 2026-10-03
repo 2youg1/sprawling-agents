@@ -97,8 +97,8 @@
       [EARLIER]: [turn(1, now - 598_000, "Documents are saved through `edit_against`, which compares the version you read with the one on disk.", [], 512)],
       [GOING]: [
         turn(1, going, "I'll read the specification first, then change where the save compares versions.", [
-          call(101, going + 2_000, 31, { tool: "read", subject: "crates/city/city-SPEC.md", effect: "read", render: "generic" }),
-          call(102, going + 2_100, 140, { tool: "search", subject: "edit_against", effect: "read", render: "generic" }),
+          call(101, going + 2_000, 0, { tool: "read", subject: "crates/city/city-SPEC.md", effect: "read", render: "generic", took_us: 300 }),
+          call(102, going + 2_100, 12, { took_us: 12_204, tool: "search", subject: "edit_against", effect: "read", render: "generic" }),
           call(103, going + 2_400, 3_412, { tool: "exec", subject: "cargo nextest -p city", effect: "read", render: "terminal" }),
           call(104, going + 6_000, 87, {
             tool: "edit",
@@ -169,7 +169,7 @@
 </Case>
 
 <Case label="thread · a head with the time to first content and the rhythm the reply arrived in" width={760}>
-  <Head who="Cat" at={now} model={null} ttft={412} tps={58} rhythm={RHYTHM} />
+  <Head who="Cat" at={now} model={null} ttft={{ unit: "us", n: 411_870 }} tps={58} rhythm={RHYTHM} />
 </Case>
 
 <Case label="thread · words just sent: held, pending, accepted, unknown" width={760}>

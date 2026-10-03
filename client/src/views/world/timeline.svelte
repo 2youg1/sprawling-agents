@@ -30,7 +30,7 @@
   import Produced from "../talk/produced.svelte";
   import { pickCommit } from "./chosen.svelte";
   import { speedOf } from "./speed";
-  import { landedWords, lastedOf } from "../talk/timing";
+  import { tookOf, tookWords } from "../talk/timing";
 
   interface Props {
     readonly run: RunId | null;
@@ -99,8 +99,8 @@
   // How long a call took, read and written the way the thread's tool
   // line reads and writes it (client/Spec.lean §4-59).
   function took(call: Call): string {
-    const ms = lastedOf(call);
-    return ms === null ? "" : landedWords(ms, $lang);
+    const lasted = tookOf(call);
+    return lasted === null ? "" : tookWords(lasted, $lang);
   }
 
   const OUTCOME: Record<Call["outcome"], Key | null> = { waiting: "world_running", answered: null, failed: "results_failed" };
