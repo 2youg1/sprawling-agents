@@ -73,7 +73,7 @@ fn a_reporter_writes_the_day_and_an_editor_checks_it_against_the_city() {
         tool: "playback",
         args: json!({"action": "check", "file": "day-1.html"}),
     }]);
-    let mut worker = city::open_worker(dir.path(), editor);
+    let mut worker = city::open_worker(dir.path(), Box::new(editor));
     let checked = dispatch(&mut worker, "newsroom/editor");
     drop(worker);
 

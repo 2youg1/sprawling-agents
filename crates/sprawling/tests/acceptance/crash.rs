@@ -67,7 +67,7 @@ fn a_city_killed_while_writing_an_answer_reopens_with_the_torn_line_cut_and_the_
 
     let torn = die_while_answering(&ledger, &call_id(1));
 
-    let mut reopened = city::open_worker(dir.path(), script::scripted(Vec::new()).0);
+    let mut reopened = city::open_worker(dir.path(), Box::new(script::scripted(Vec::new()).0));
     let scan = reopened.startup_scan().unwrap();
     let view = city_view(dir.path());
     city::dispatch(&mut reopened, "lab/lead").unwrap();

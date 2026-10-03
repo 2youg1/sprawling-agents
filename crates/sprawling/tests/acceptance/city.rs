@@ -22,14 +22,17 @@ const MODEL: &str = "scripted";
 ///
 /// The one place in this binary that constructs a worker, so a change
 /// to the constructor changes this function and nothing else.
-pub(crate) fn open_worker(dir: &Path, factory: Scripted) -> accounting::worker::RunWorker {
+pub(crate) fn open_worker(
+    dir: &Path,
+    models: Box<dyn accounting::ModelFactory + Send>,
+) -> accounting::worker::RunWorker {
     accounting::worker::RunWorker::new(
         dir,
         runtime::diagnostics::Diagnostics::off(),
         assembly::hands(gateway::Custodian::in_memory()),
     )
     .unwrap()
-    .with_models(Box::new(factory))
+    .with_models(models)
 }
 
 /// A founded city whose main model sits on an endpoint that refuses
@@ -39,8 +42,17 @@ pub(crate) fn city_with_a_model(
     dir: &Path,
     factory: Scripted,
 ) -> (accounting::worker::RunWorker, PathBuf) {
+    city_with_models(dir, Box::new(factory))
+}
+
+/// [`city_with_a_model`] for any factory, such as one that hands each
+/// run it builds a model of its own.
+pub(crate) fn city_with_models(
+    dir: &Path,
+    models: Box<dyn accounting::ModelFactory + Send>,
+) -> (accounting::worker::RunWorker, PathBuf) {
     let founded = assembly::init_city(dir).unwrap();
-    let mut worker = open_worker(dir, factory);
+    let mut worker = open_worker(dir, models);
     let endpoint = wire::ProviderName::parse("dead").unwrap();
     worker
         .handle(wire::Command::AttachEndpoint {

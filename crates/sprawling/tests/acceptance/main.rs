@@ -26,6 +26,7 @@ mod catalogue;
 mod city;
 mod crash;
 mod episodes;
+mod held_reply;
 mod ocr;
 mod playback;
 mod script;
