@@ -119,7 +119,7 @@ impl SessionOrigins {
             EventKind::RunPolicyChanged => {
                 if let Some(addr) = addr {
                     let changed = data.read::<kernel::event::record::RunPolicyChanged>()?;
-                    self.policy_changed(addr, changed.policy);
+                    self.policies.insert(addr.clone(), changed.policy);
                 }
                 Ok(())
             }
@@ -227,15 +227,6 @@ impl SessionOrigins {
     /// The run policy this room's session was last changed to, if it was.
     pub(in crate::worker) fn policy(&self, addr: &Address) -> Option<kernel::RunPolicy> {
         self.policies.get(addr).copied()
-    }
-
-    /// Records `policy` as the room's session policy.
-    ///
-    /// Called by the fold on `run_policy_changed` and directly by the
-    /// command that writes it, because a worker is not shown its own
-    /// appends by the fold that reads the history back.
-    pub(in crate::worker) fn policy_changed(&mut self, addr: &Address, policy: kernel::RunPolicy) {
-        self.policies.insert(addr.clone(), policy);
     }
 
     /// The run whose transcript this room's carried session has not yet

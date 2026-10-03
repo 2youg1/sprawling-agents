@@ -489,7 +489,7 @@ pub struct ProposalWithdrawn { pub proposal: B3Hash }
 
 /-! D21 会话中改运行策略是一个入窗的种类 `run_policy_changed`，在下一个 `SafePoint::BeforeWave` 生效
 
-**决定**：加一个种类 `run_policy_changed`（`EventKind::RunPolicyChanged`，追加在 `ALL` 末尾，不写 `ig`），载荷 `RunPolicyChanged { policy: RunPolicy, by: Who }`，`addr` 是房间，`run` 恒为 `RunId::CITY`：这一行是人经城做的事，由 accounting 的 `record_at` 这一扇城自己的门写下；正在跑的 run 按 `addr` 认出它，不按 `run`。写方是城：收到线上的 `Command::ChangeRunPolicy { room, policy, idem }` 时写这一行；正在跑的 run 经 `Interrupt::Policy` 在任一安全点收到它（与 Steer 同一扇门），在下一个 `SafePoint::BeforeWave` 生效（runtime D28，`crates/runtime/spec/PolicyTake.lean`）：从那一波起按新策略过门，并在那一波工具结果之后追加一句说明，冻结的前缀不动。下一次 run 的 `run_started.policy` 取房间最后一次改过的策略。窗类：入窗，因为那一句说明决定下一次模型请求的字节。模型与思考强度在会话中不变（roadmap A15）。
+**决定**：加一个种类 `run_policy_changed`（`EventKind::RunPolicyChanged`，追加在 `ALL` 末尾，不写 `ig`），载荷 `RunPolicyChanged { policy: RunPolicy, by: Who }`，`addr` 是房间，`run` 恒为 `RunId::CITY`：这一行是人经城做的事，由 accounting 的 `record_at` 这一扇城自己的门写下；正在跑的 run 按 `addr` 认出它，不按 `run`。写方是城：收到线上的 `Command::ChangeRunPolicy { room, policy, idem }` 时写这一行；正在跑的 run 经 `Interrupt::Policy` 在任一安全点收到它（与 Steer 同一扇门），在下一个 `SafePoint::BeforeWave` 生效（runtime D28，`crates/runtime/spec/PolicyTake.lean`）：从那一波起按新策略过门，并在那一波工具结果之后追加一句说明，冻结的前缀不动。此后人派进这个房间的 run，`run_started.policy` 取房间这一 session 里最后一次改过的策略，帧里带的策略只管没有改过的 session；新的 `session_opened` 让房间回到帧里的策略，因为会话菜单只把 session 开始之后的改动当作房间的状态（`crates/sprawling/spec/Accounting/Worker.lean` §8-133）。窗类：入窗，因为那一句说明决定下一次模型请求的字节。模型与思考强度在会话中不变（roadmap A15）。
 
 **理由**：改策略是城里发生过的事，重放要能说出某一步是在哪个策略下过的门；把它记在 `run_started` 里只够说一次 run 开头的策略。生效点放在安全点而不是立即，是因为一个工具波已经按旧策略过了门，半途换门会让同一波的两次调用被不同的规则判。工具定义不随策略变：会话开始时工具清单定成各模式的并集（`crates/runtime/spec/Catalog.lean` D25），所以改策略只动门与那一句说明，提示缓存不失效。
 

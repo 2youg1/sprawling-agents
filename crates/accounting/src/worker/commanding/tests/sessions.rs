@@ -143,12 +143,9 @@ fn changing_the_policy_of_a_worked_room_reaches_the_run_working_there() {
     );
 }
 
-/// The defect: a policy the User changed while nobody worked in the room
-/// stayed on the ledger alone, and the next dispatch started under the
-/// policy the page sent with it (`crates/sprawling/spec/Accounting/Worker.lean`
-/// §8-133).
-#[test]
-fn a_policy_changed_while_the_room_is_idle_rules_the_next_dispatch() {
+/// The policy every run started in `lab` ran under, after `before` was
+/// handled and one dispatch that carried the Work policy landed.
+fn started_after(before: Vec<wire::Command>) -> Vec<RunPolicy> {
     use crate::worker::Posted;
     use crate::worker::fixture::{
         completion, fake_openai, lay_rules, ordinary_rules, worker_with_provider,
@@ -159,18 +156,12 @@ fn a_policy_changed_while_the_room_is_idle_rules_the_next_dispatch() {
     lay_rules(dir.path(), "lab", &ordinary_rules(""));
     let (base_url, _provider) = fake_openai(&["m-local"], vec![completion("done", None)]);
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
-    let lab = Address::parse("lab").unwrap();
-    let chat = RunPolicy::of(Mode::Chat);
-    worker
-        .handle(wire::Command::ChangeRunPolicy(wire::PolicyChange {
-            room: lab.clone(),
-            policy: chat,
-            idem: key(b"idle change"),
-        }))
-        .unwrap();
+    for command in before {
+        worker.handle(command).unwrap();
+    }
     worker.serve_one(Posted {
         command: wire::Command::Dispatch {
-            addr: lab,
+            addr: lab(),
             task: "read the plan".to_owned(),
             goal: "one answer".to_owned(),
             policy: RunPolicy::of(Mode::Work),
@@ -182,10 +173,48 @@ fn a_policy_changed_while_the_room_is_idle_rules_the_next_dispatch() {
         reply: wire::Reply::nowhere(),
     });
     worker.land_the_rest().unwrap();
-
-    let started: Vec<RunPolicy> = lines::<serde_json::Value>(dir.path(), "run_started")
+    lines::<serde_json::Value>(dir.path(), "run_started")
         .into_iter()
         .map(|(_, data)| serde_json::from_value(data["policy"].clone()).unwrap())
-        .collect();
-    assert_eq!(started, vec![chat]);
+        .collect()
+}
+
+fn lab() -> Address {
+    Address::parse("lab").unwrap()
+}
+
+fn to_chat() -> wire::Command {
+    wire::Command::ChangeRunPolicy(wire::PolicyChange {
+        room: lab(),
+        policy: RunPolicy::of(Mode::Chat),
+        idem: key(b"idle change"),
+    })
+}
+
+/// The defect: a policy the User changed while nobody worked in the room
+/// stayed on the ledger alone, and the next dispatch started under the
+/// policy the page sent with it (`crates/sprawling/spec/Accounting/Worker.lean`
+/// §8-133).
+#[test]
+fn a_policy_changed_while_the_room_is_idle_rules_the_next_dispatch() {
+    assert_eq!(
+        started_after(vec![to_chat()]),
+        vec![RunPolicy::of(Mode::Chat)]
+    );
+}
+
+/// A change belongs to the session it was made in: after a new session
+/// opens, the dispatch's own policy rules again.
+#[test]
+fn a_new_session_drops_the_policy_the_last_one_was_changed_to() {
+    let opened = wire::Command::OpenSession {
+        addr: lab(),
+        carry: wire::Carry::Nothing,
+        from: None,
+        idem: key(b"new session"),
+    };
+    assert_eq!(
+        started_after(vec![to_chat(), opened]),
+        vec![RunPolicy::of(Mode::Work)]
+    );
 }

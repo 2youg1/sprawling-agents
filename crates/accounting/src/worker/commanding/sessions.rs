@@ -148,7 +148,6 @@ impl RunWorker {
                 by: Who::Person,
             })?,
         )?;
-        self.origins.policy_changed(room, policy);
         self.collaborating.rooms.post_policy(room, policy);
         Ok(())
     }
