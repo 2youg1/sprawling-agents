@@ -3,9 +3,10 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The notes whose other half sits on another line
+//! The notes and calls whose other half sits on another line
 //! (`crates/accounting/spec/Views/Rounds.lean` D48): an answer to a
-//! wait, a pulled signal and its sending, a reply wait and its end.
+//! wait, a pulled signal and its sending, a reply wait and its end, a
+//! `send` call and where its letter landed.
 //!
 //! `turns` stays a pure fold over one session's records; these passes
 //! run after it, and the one that reads other runs goes through the
@@ -14,7 +15,9 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use kernel::event::record::{ApprovalResolved, SignalConsumed, SignalWaitEnded, WaitEnd};
+use kernel::event::record::{
+    ApprovalResolved, Landing, SignalConsumed, SignalKind, SignalLanded, SignalWaitEnded, WaitEnd,
+};
 use wire::{EventKind, EventRecord};
 
 use crate::views::prepared::LedgerAsk;
@@ -28,13 +31,17 @@ const SENDING_REACH: usize = 4096;
 struct Sending {
     from: String,
     said: Option<String>,
+    kind: SignalKind,
+    /// The run the sending line was written under (wire D43).
+    session: kernel::RunId,
     handback: Option<wire::HandbackNote>,
 }
 
 impl LedgerAsk {
     /// Writes onto each arrival in `turns` who sent it, what it said, and
     /// whether it handed work back, from its `signal_enqueued` line
-    /// under the sender's run (wire D36, D38).
+    /// under the sender's run, with the kind it was sent as and that run
+    /// (wire D36, D38, D43).
     pub(super) fn pair_arrivals(&self, turns: &mut [wire::Turn], records: &[EventRecord]) {
         let taken: BTreeMap<kernel::Seq, String> = records
             .iter()
@@ -54,6 +61,8 @@ impl LedgerAsk {
                 from,
                 said,
                 handback,
+                kind,
+                session,
                 ..
             } = note
                 && let Some(sending) = taken.get(at).and_then(|id| sent.get(id))
@@ -61,6 +70,8 @@ impl LedgerAsk {
                 *from = Some(sending.from.clone());
                 said.clone_from(&sending.said);
                 handback.clone_from(&sending.handback);
+                *kind = Some(sending.kind);
+                *session = Some(sending.session);
             }
         }
     }
@@ -129,9 +140,79 @@ fn sending_of(record: &EventRecord) -> Option<(String, Sending)> {
         Sending {
             from: signal.from().to_owned(),
             said: wire::text(signal.payload().as_map().get("text")),
+            kind: signal.kind(),
+            session: record.run(),
             handback,
         },
     ))
+}
+
+/// Writes onto each `send` call in `turns` where its letter landed
+/// (wire D42, kernel D38).
+///
+/// All three lines sit in the sending session: the call, the
+/// `signal_enqueued` its desk wrote before the call answered, and the
+/// `signal_landed` every delivery path writes under the sending run. A
+/// letter is paired to the earliest call still open that names its
+/// room, so two sends in flight at once are told apart by where they
+/// went, not by the order their lines arrived. A call left unpaired
+/// keeps `None`, which a page draws as the tool's own answer.
+pub(super) fn land_sends(turns: &mut [wire::Turn], records: &[EventRecord]) {
+    // Calls that named a room and have not answered: their tool-use id,
+    // their seq, and the room.
+    let mut open: Vec<(String, kernel::Seq, String)> = Vec::new();
+    let mut letters: BTreeMap<String, kernel::Seq> = BTreeMap::new();
+    let mut landed: BTreeMap<kernel::Seq, Landing> = BTreeMap::new();
+    for record in records {
+        let map = record.data().as_map();
+        if record.kind() == EventKind::ToolCalled {
+            if let Some(sent) = sending_call(map) {
+                open.push((sent.0, record.seq(), sent.1));
+            }
+        } else if record.kind() == EventKind::ToolResult {
+            if let Some(id) = wire::text(map.get("tool_use_id")) {
+                open.retain(|(held, _, _)| held != &id);
+            }
+        } else if record.kind() == EventKind::SignalEnqueued {
+            let Ok(signal) = collab::Signal::from_payload(record.data()) else {
+                continue;
+            };
+            if let Some(at) = open
+                .iter()
+                .position(|(_, _, room)| room == signal.room().as_str())
+            {
+                let (_, call, _) = open.remove(at);
+                letters.insert(signal.id().as_str().to_owned(), call);
+            }
+        } else if record.kind() == EventKind::SignalLanded
+            && let Ok(line) = record.data().read::<SignalLanded>()
+            && let Some(call) = letters.get(line.signal.as_str())
+        {
+            landed.insert(*call, line.landing);
+        }
+    }
+    for call in turns.iter_mut().flat_map(|turn| turn.calls.iter_mut()) {
+        call.landing = landed.get(&call.at).copied();
+    }
+}
+
+/// The tool-use id and the room of a `tool_called` line that is a
+/// `signal` call naming an address to send to; `None` for every other
+/// call. The registered render intent says it is the signal tool, so the
+/// tool's name is not spelled again here.
+fn sending_call(map: &serde_json::Map<String, serde_json::Value>) -> Option<(String, String)> {
+    let render = map
+        .get("render")
+        .and_then(|value| <kernel::RenderIntent as serde::Deserialize>::deserialize(value).ok());
+    if render != Some(kernel::RenderIntent::Signal) {
+        return None;
+    }
+    let to = map
+        .get("args")
+        .and_then(serde_json::Value::as_object)
+        .and_then(|args| wire::text(args.get("to")))
+        .and_then(|to| kernel::Address::parse(&to).ok())?;
+    Some((wire::text(map.get("id"))?, to.as_str().to_owned()))
 }
 
 /// Writes onto each reply wait in `turns` how and when it ended, from

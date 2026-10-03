@@ -21,6 +21,8 @@ mod arrival_tests;
 #[cfg(test)]
 mod carried_tests;
 #[cfg(test)]
+mod landing_tests;
+#[cfg(test)]
 mod opening_tests;
 #[cfg(test)]
 mod reading_tests;
@@ -80,6 +82,7 @@ impl LedgerAsk {
         }
         self.pair_arrivals(&mut turns, &records);
         paired::end_reply_waits(&mut turns, &records);
+        paired::land_sends(&mut turns, &records);
         Ok(wire::RoundsAnswer {
             opened_at: opened_at(&turns),
             closing: closing(&records)?,

@@ -9,9 +9,9 @@
 import { Schema } from "effect";
 
 /** The wire version both ends compare on connect. */
-export const WIRE_V = 53 as const;
+export const WIRE_V = 54 as const;
 /** The schema hash the server checks: `wire::schema_hash()`. */
-export const WIRE_HASH = "17022b0cfb4c30f619ec49ce299a3ae762a64f5557699fb9ca5cbbdac00e338b" as const;
+export const WIRE_HASH = "20bfbea9859e6ad9665663f0a3c6a92b94d5c7e4e717fbc660124001fb08d437" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 /** The body sizes a person may ask for: `wire::BODY_PX_MIN` and `BODY_PX_MAX`. */
@@ -3153,6 +3153,17 @@ export const Effect = Schema.Union([
 export type Effect = typeof Effect.Type;
 
 /**
+ * Where one signal landed. Three arms and no fourth: the model's
+ * `one_landing_per_signal` gives every signal exactly one of them.
+ */
+export const Landing = Schema.Union([
+  Schema.Literal("delivered"),
+  Schema.Literal("queued"),
+  Schema.Literal("knocked"),
+]).annotate({ identifier: "Landing" });
+export type Landing = typeof Landing.Type;
+
+/**
  * What a tool call has come to so far.
  * 
  * Three states rather than a `bool` and an `Option`: a call still
@@ -3226,6 +3237,7 @@ export const Call = Schema.Struct({
   called: TimeMs,
   effect: Schema.optional(Schema.NullOr(Effect)),
   exit_code: Schema.optional(Schema.NullOr(Schema.Int)),
+  landing: Schema.optional(Schema.NullOr(Landing)),
   outcome: Outcome,
   output: Schema.optional(Schema.NullOr(Output)),
   render: Schema.optional(Schema.NullOr(RenderIntent)),
@@ -3238,19 +3250,18 @@ export type Call = typeof Call.Type;
 
 /**
  * How a child session's handed-back work ended, read through
- * `collab::Handback::from_signal`, and which session it was (D38).
+ * `collab::Handback::from_signal`; which session it was is
+ * [`Note::Arrived`]'s `session` (D38, D43).
  */
 export const HandbackNote = Schema.Union([
   Schema.Struct({
     finished: Schema.Struct({
-      session: RunId,
       verified_by: Schema.String,
     }),
   }),
   Schema.Struct({
     stopped: Schema.Struct({
       because: Schema.String,
-      session: RunId,
     }),
   }),
 ]).annotate({ identifier: "HandbackNote" });
@@ -3315,7 +3326,9 @@ export const Note = Schema.Union([
       by: Speaker,
       from: Schema.optional(Schema.NullOr(Schema.String)),
       handback: Schema.optional(Schema.NullOr(HandbackNote)),
+      kind: Schema.optional(Schema.NullOr(Schema.String)),
       said: Schema.optional(Schema.NullOr(Schema.String)),
+      session: Schema.optional(Schema.NullOr(RunId)),
       t: TimeMs,
     }),
   }),
