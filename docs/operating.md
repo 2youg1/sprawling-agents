@@ -297,4 +297,4 @@ Three limits apply today, and each is a fact about the code rather than a choice
 | execution sandbox | `runtime::sandbox` | implement the trait, pass its conformance suite; the shipped adapter is wasmtime with fuel |
 | the client | the `sprawling-wire` crate | the wire is the whole API; a second client writes against it |
 | the browser driver | `browser::port` | frames in, replies out; the shipped adapter speaks WebDriver BiDi |
-| where views are stored | `bin::sprawling::views` | delete the process and they rebuild from the Ledger, byte-identical |
+| where views are stored | `accounting::views`, folded on `bin::serving::folding` and held in memory | delete the process and they rebuild from the Ledger, byte-identical |
