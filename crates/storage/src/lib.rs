@@ -101,6 +101,11 @@ pub use snapshot::start_from_snapshot;
 pub use snapshot::tail_after;
 pub use snapshot::write_snapshot;
 
+mod resident;
+
+pub use resident::RESIDENT_TOTAL_BYTES;
+pub use resident::Resident;
+
 mod digest_cache;
 
 pub use digest_cache::DigestCache;

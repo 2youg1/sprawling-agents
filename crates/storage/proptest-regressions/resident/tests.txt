@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 6061f45ac0ae12fe2ea037fe6b4bfc0b8a90e8a95fb849bea43016639bcff70a # shrinks to disk = {0: [], 1: [], 2: [], 3: [], 4: [], 5: [], 6: [], 7: [], 8: [], 9: [], 10: [], 11: [], 12: [], 13: [], 14: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 41, 28, 159, 123, 53, 118, 211, 64, 170, 136, 106, 38, 247, 163, 86, 251, 82, 217, 10, 232, 197, 196, 197, 120, 222, 253, 239, 89, 235, 141, 73, 122, 58, 66, 49, 191, 140, 247, 115, 60, 175, 48, 28, 148], 15: [216, 70, 28, 38, 147, 76, 216, 189, 24, 172, 167, 89, 131, 113, 187, 27, 44, 196, 103, 30, 251, 154, 134, 47, 212, 132, 153, 12, 188, 7, 101, 210, 173, 107, 129, 171, 123, 175, 50, 195, 209, 56, 44, 203, 41, 179, 175, 187, 176, 54, 80, 212, 55, 151, 61, 242, 49, 5, 140, 232, 164, 207, 99, 109, 102, 32, 23, 37, 176, 193, 65, 143, 21, 205, 177, 121, 70, 86, 198, 150, 25, 44, 58, 219, 176, 44, 234, 224, 34, 49, 244, 136, 4, 67]}, ops = [Insert(3, 10), Insert(2, 7), Freeze(2), Read(0, 14), Insert(2, 14), Evict, Read(3, 4), Insert(3, 5), Insert(0, 7), Freeze(3), Evict, Read(0, 5), Read(0, 7), Read(0, 10), Read(3, 11), Insert(2, 2), Read(0, 5), Read(2, 3), Insert(2, 7), Read(1, 14), Read(1, 5), Read(3, 9), Insert(3, 7), Read(2, 7), Insert(2, 0)]
