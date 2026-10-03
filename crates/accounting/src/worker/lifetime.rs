@@ -275,9 +275,8 @@ impl RunWorker {
         );
     }
 
-    /// Makes the city's checkpoint repository once, before any lane asks
-    /// for a writer's index, and takes back the private indexes a crash
-    /// left: no run is live yet (`crates/sprawling/spec/Accounting/Views.lean` §8-46-13).
+    /// Makes the checkpoint repository before a lane asks for a writer's index, and takes back
+    /// the indexes a crash left: no run is live yet (`crates/sprawling/spec/Accounting/Views.lean` §8-46-13).
     fn open_checkpoints(&mut self) {
         let opened = storage::Checkpoint::open(&self.city_root)
             .and_then(|_| storage::Checkpoint::sweep_writers(&self.city_root));
@@ -288,11 +287,8 @@ impl RunWorker {
                 "could not open the checkpoint repository or take back the indexes a crash left; the next open tries again: {err}"
             ),
         };
-        self.note(
-            runtime::diagnostics::Level::Effect,
-            "accounting::worker",
-            &told,
-        );
+        let level = runtime::diagnostics::Level::Effect;
+        self.note(level, "accounting::worker", &told);
     }
 
     /// What opening this worker's ledger repaired.

@@ -13,6 +13,7 @@ use kernel::secret::scan;
 use crate::error::StorageError;
 
 use super::commit::{Checkpoint, git_err};
+use super::opening::{HeadMove, commit_refused};
 use super::provenance::Provenance;
 
 pub(crate) mod pathspec;
@@ -30,20 +31,6 @@ pub(crate) struct CommitPlan<'a> {
     pub(crate) of: &'a Provenance,
     pub(crate) subject: &'a str,
     pub(crate) head: HeadMove,
-}
-
-/// What a commit does to HEAD. A wave checkpoint leaves it: it is filed
-/// under its own reference so a person's `git log` does not grow a line per
-/// tool wave. A base commit and a landing move it, because a worktree
-/// branches from a branch and offered work has to be on one.
-pub(crate) enum HeadMove {
-    Leave,
-    /// From where HEAD stands when the commit is made: a landing.
-    Advance,
-    /// Only where the city has no HEAD: the base commit. A writer that finds
-    /// HEAD made by another between its read and its swap is refused, so a
-    /// city gets one base however many writers race for it (storage §8-39).
-    Found,
 }
 
 impl Checkpoint {
@@ -301,25 +288,7 @@ impl Checkpoint {
                 &tree,
                 &parent_refs,
             )
-            .map_err(|err| {
-                // HEAD moved since it was read, or its lock file is held (on
-                // Windows, also a rename onto a file someone has open): the
-                // compare-and-swap refused, and a silent redo would treat the
-                // other writer's work as this commit's to undo (storage §8-39).
-                let lost = update.is_some()
-                    && matches!(
-                        err.code(),
-                        git2::ErrorCode::Modified | git2::ErrorCode::Locked
-                    );
-                if lost {
-                    StorageError::Checkpoint {
-                        op: "move HEAD",
-                        detail: format!("another writer moved or holds HEAD: {}", err.message()),
-                    }
-                } else {
-                    git_err("commit checkpoint")(err)
-                }
-            })?;
+            .map_err(|err| commit_refused(update, err))?;
         self.last = Some(oid);
         Ok(oid)
     }

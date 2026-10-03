@@ -149,7 +149,7 @@ fn a_wave_pays_for_what_it_changed_rather_than_for_the_whole_tree() {
             t: TimeMs::new(1_000),
             of: &resident(),
             subject: "past the checkpoint",
-            head: crate::checkpoint::scan::HeadMove::Advance,
+            head: crate::checkpoint::opening::HeadMove::Advance,
         })
         .unwrap();
 

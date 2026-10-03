@@ -12,8 +12,9 @@ use kernel::{Payload, TimeMs};
 use crate::error::StorageError;
 
 use super::commit::{Checkpoint, checkpoint_ref, committed, git_err, subject_of};
+use super::opening::HeadMove;
 use super::provenance::Provenance;
-use super::scan::{CommitPlan, HeadMove};
+use super::scan::CommitPlan;
 
 /// How far a base checkpoint has got, reported as each step lands.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -16,8 +16,9 @@ use crate::bundle::landing::{Bits, land};
 use crate::error::StorageError;
 use crate::real_fs::RealFs;
 
+use super::opening::HeadMove;
 use super::provenance::Provenance;
-use super::scan::{CommitPlan, HeadMove};
+use super::scan::CommitPlan;
 
 /// How a checkpoint names itself in a commit subject. The whole set, because
 /// a checkpoint that showed one of several prefixes would read like a checkpoint
