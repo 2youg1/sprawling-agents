@@ -205,6 +205,75 @@ fn an_unanswered_wait_ends_at_the_deadline() {
     ));
 }
 
+/// The send's `wait` input: a boolean, or the words `true` and `false`
+/// a model sometimes writes for one; anything else, and a second wait
+/// while one is open, is refused.
+#[test]
+fn the_wait_input_is_a_yes_or_a_no_and_one_at_a_time() {
+    let read = |wait: Value, already: bool| {
+        let mut args = serde_json::Map::new();
+        args.insert("wait".to_owned(), wait);
+        wanted(&args, already).map_err(|err| *err.code())
+    };
+    let invalid = Err(kernel::AxCode::InvalidArgs);
+    assert_eq!(
+        [
+            read(json!(true), false),
+            read(json!(false), false),
+            read(json!("true"), false),
+            read(json!("false"), false),
+            read(json!(null), false),
+            read(json!("yes"), false),
+            read(json!(1), false),
+            read(json!("true"), true),
+            read(json!("false"), true),
+        ],
+        [
+            Ok(true),
+            Ok(false),
+            Ok(true),
+            Ok(false),
+            Ok(false),
+            invalid,
+            invalid,
+            invalid,
+            Ok(false),
+        ]
+    );
+}
+
+/// A letter from a third room that lands before the stop is not kept
+/// for the wait, even when it is the first to arrive: the wait is kept
+/// for the room it spoke to, and the third room's letter queues
+/// (`spec/Delivery.lean` §8 `kept_is_first_reply`).
+#[test]
+fn a_third_room_landing_first_is_not_kept_for_the_wait() {
+    let (a, b) = (room("lab/a"), room("lab/b"));
+    a.send("lab/b", "is the kiln free?", true);
+    a.slot.drop_in(letter("lab/c", "lab/a", 1), 64).unwrap();
+    b.send("lab/a", "free now", false);
+    b.deliver_to(&a);
+    assert_eq!(a.desk.lock().unwrap().take_steer().unwrap(), None);
+    assert_eq!(
+        (replied(a.turn(START + 1)), a.desk.lock().unwrap().pending()),
+        (("lab/b".to_owned(), "free now".to_owned()), 1)
+    );
+}
+
+/// At the stop, a letter from a third room in the slot does not end the
+/// wait: the safe point still answers `Waiting` and the letter queues.
+#[test]
+fn a_third_room_at_the_stop_does_not_end_the_wait() {
+    let a = room("lab/a");
+    a.send("lab/b", "anyone?", true);
+    assert_eq!(a.turn(START + 1), WaitTurn::Waiting);
+    a.slot.drop_in(letter("lab/c", "lab/a", 1), 64).unwrap();
+    assert_eq!(
+        (a.turn(START + 2), a.desk.lock().unwrap().pending()),
+        (WaitTurn::Waiting, 1)
+    );
+}
+
 /// One step of `Collab.Delivery.Act` as one waiting room sees it: a
 /// send (with or without `wait`) to `lab/b`, a reply from `lab/b`, a
 /// letter from someone else, a tick of the injected clock, a leave.
