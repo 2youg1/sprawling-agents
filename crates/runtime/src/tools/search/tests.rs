@@ -223,25 +223,33 @@ fn a_file_past_the_byte_cap_is_reported_with_its_reason() {
     );
 }
 
-/// One hit whose own line is wider than the byte budget is cut to the
-/// budget and marked, instead of travelling whole: a single line of a
-/// generated file would otherwise spend the window by itself.
+/// One hit whose own line is wider than the window is cut to the window
+/// and marked, instead of travelling whole: a single line of a generated
+/// file would otherwise spend the answer's budget by itself.
 #[test]
-fn a_first_hit_wider_than_the_budget_is_cut_to_it() {
+fn a_hit_on_a_line_wider_than_the_window_is_cut_to_it() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::create_dir_all(dir.path().join("lab")).unwrap();
     let cap = kernel::consts_policy::INTERVAL_CAP_BYTES;
-    let wide = format!("the ledger {}\n", "x".repeat(cap.saturating_mul(2)));
+    let wide = format!(
+        "the ledger {}
+",
+        "x".repeat(cap.saturating_mul(2))
+    );
     std::fs::write(dir.path().join("lab").join("Wide.md"), wide).unwrap();
     let tool = SearchTool::new(dir.path(), everywhere()).unwrap();
 
     let outcome = tool.invoke(&text("the ledger")).unwrap();
     let map = outcome.result.as_map();
     let hit = map["matches"][0]["text"].as_str().unwrap();
-    assert!(hit.len() <= cap, "{} bytes came back", hit.len());
+    assert!(
+        hit.len() <= 2 * hit::LINE_CAP,
+        "{} bytes came back",
+        hit.len()
+    );
     assert!(hit.starts_with("the ledger"));
     assert!(hit.ends_with(" bytes]"), "the cut is marked");
-    assert_eq!(map["truncated"], Value::Bool(true));
+    assert_eq!(map["truncated"], Value::Bool(false));
 }
 
 #[cfg(feature = "conformance")]

@@ -29,10 +29,12 @@ use kernel::{
 use serde_json::{Map, Value};
 
 mod descent;
+mod hit;
 
 use super::chosen_path::{self, ReadBound, Walked};
 use crate::elision::{self, Elided};
 use descent::{Entry, Step, admissible};
+use hit::{Limit, context_block};
 
 /// How many hits one call may bring back. A search that filled the
 /// window would be a search nobody can afford to run twice.
@@ -68,7 +70,8 @@ struct Findings {
     unreadable: u64,
     /// The first [`UNREAD_SHOWN`] of those, each with its reason.
     unread: Vec<Value>,
-    truncated: bool,
+    /// The limit the walk stopped at, or `None` when it looked everywhere.
+    stopped: Option<Limit>,
 }
 
 impl Findings {
@@ -205,11 +208,11 @@ impl SearchTool {
             spent: 0,
             unreadable: 0,
             unread: Vec::new(),
-            truncated: false,
+            stopped: None,
         };
         let mut pending = vec![Step::Visit(from.0, from.1)];
         while let Some(step) = pending.pop() {
-            if found.truncated {
+            if found.stopped.is_some() {
                 break;
             }
             let (path, rel) = match step {
@@ -285,7 +288,7 @@ impl SearchTool {
                 continue;
             }
             if found.hits.len() >= MATCH_CAP {
-                found.truncated = true;
+                found.stopped = Some(Limit::Hits);
                 return;
             }
             // Sixty-four hits is a bound on how many answers travel, not
@@ -294,11 +297,11 @@ impl SearchTool {
             // on a line. The byte budget is the same ceiling `read`
             // keeps, and for the same reason - one result may not spend
             // the window a caller still has to think in.
-            let block = context_block(&lines, at, looking.context);
+            let block = context_block(&lines, at, looking);
             let budget = kernel::consts_policy::INTERVAL_CAP_BYTES;
             let fits = found.spent.saturating_add(block.len()) <= budget;
             if !fits && !found.hits.is_empty() {
-                found.truncated = true;
+                found.stopped = Some(Limit::Bytes);
                 return;
             }
             // The first hit is held to the budget as well, cut at its
@@ -307,7 +310,7 @@ impl SearchTool {
             let text = if fits {
                 block
             } else {
-                found.truncated = true;
+                found.stopped = Some(Limit::Bytes);
                 let keep = budget.saturating_sub(elision::marker_room(block.len()));
                 elision::splice(&block, keep, block.len(), Elided::Tail).text
             };
@@ -315,20 +318,11 @@ impl SearchTool {
             found
                 .hits
                 .push(serde_json::json!({ "path": rel, "line": at, "text": text }));
-            if found.truncated {
+            if found.stopped.is_some() {
                 return;
             }
         }
     }
-}
-
-/// The lines around a hit, joined as they were read.
-fn context_block(lines: &[&str], at: usize, context: usize) -> String {
-    let first = at.saturating_sub(context);
-    let last = at
-        .saturating_add(context)
-        .min(lines.len().saturating_sub(1));
-    lines.get(first..=last).unwrap_or_default().join("\n")
 }
 
 /// One directory's entries by name, or why it will not open.
@@ -362,7 +356,10 @@ impl Tool for SearchTool {
         let found = self.walk(self.start(call)?, &looking);
         let mut out = Map::new();
         out.insert("count".to_owned(), Value::Number(found.hits.len().into()));
-        out.insert("truncated".to_owned(), Value::Bool(found.truncated));
+        out.insert("truncated".to_owned(), Value::Bool(found.stopped.is_some()));
+        if let Some(limit) = found.stopped {
+            out.insert("stopped".to_owned(), Value::String(limit.said()));
+        }
         // What the walk could not open, rather than silence about it: a
         // search that reports nothing is a different answer from a
         // search that could not look.
