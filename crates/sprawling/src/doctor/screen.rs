@@ -108,8 +108,9 @@ pub fn verb(args: &[String], unnamed: fn() -> PathBuf) -> ExitCode {
 }
 
 /// Reports this machine, and - when asked - offers each absent item one
-/// at a time. Answers whether every required item is present at the
-/// end, and every named building has what it asked for, which is what
+/// at a time. Answers whether every required item of the use tier is
+/// present at the end, and every named building has what it asked for
+/// (a missing develop-tier item is reported, not counted), which is what
 /// the caller turns into an exit code. An explanation always answers
 /// true: it is an explanation, not a verdict.
 ///
@@ -159,7 +160,12 @@ pub(crate) fn run<R: BufRead, W: Write>(
     let mut ready = true;
     for tier in Tier::ALL {
         let verdict = verdict(&findings, tier);
-        ready = ready && verdict == Verdict::Ready;
+        // The exit code answers whether a User can use this machine; the
+        // develop tier is reported for contributors and gates nothing.
+        ready = match tier {
+            Tier::Use => ready && verdict == Verdict::Ready,
+            Tier::Develop => ready,
+        };
         writeln!(out, "{}", verdict_line(tier, &verdict))?;
     }
     for line in summary(&findings, asked.ink) {

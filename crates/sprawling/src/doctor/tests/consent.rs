@@ -36,7 +36,7 @@ fn nothing_is_installed_without_a_yes_to_that_one_item() {
         &mut screen,
     )
     .unwrap();
-    assert!(!ready, "a missing required item is not ready");
+    assert!(ready, "a missing develop tool is reported, not counted");
     let shown = String::from_utf8(screen).unwrap();
     let command = REQUIREMENTS
         .iter()

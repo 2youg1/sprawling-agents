@@ -57,7 +57,7 @@ pub(crate) const WASM_BINDGEN_VERSION: &str;                  // 与工作区 Ca
 pub(crate) struct Asked { install: bool }
 pub(crate) fn asked(args: &[String]) -> Asked;
 pub(crate) fn run<R: BufRead, W: Write>(asked: &Asked, machine: &dyn Machine, input: &mut R, out: &mut W) -> io::Result<bool>;
-pub(crate) fn verb(args: &[String]) -> ExitCode;              // 必需项有缺则退 1
+pub(crate) fn verb(args: &[String]) -> ExitCode;              // Use 层必需项有缺则退 1；Develop 层只报告
 
 // bin::doctor::probe（形状 4 adapter：运行中的机器）
 pub(crate) trait Machine: accounting::Machine { fn look(&self, r: &Requirement) -> Presence; }   // 安装经父 trait 的 install（`crates/accounting/Spec.lean` §8-4）
@@ -83,7 +83,9 @@ pub(super) fn names_of(program: &str) -> Vec<String>;         // Windows 上 .ex
 
 **本章测试**：表的完整性（每一项都有探测方法，且三个平台各自要么给出命令要么明说 `manual`；每一个 `Optional` 项都说出它开启什么）；`verdict` 对「全在」「缺一个必需项」「只缺一个可选项」三类输入给出正确的穷尽枚举（可选项缺失不拖垮该层）；`finding_line` 的三种写法；`--install` 在答 `n` 时**一件也不装**、答 `y` 时只装被问的那一件（由 `ScriptedMachine` 记账）。
 
-**本章验收**：`cargo run -p sprawling -- doctor`，输出逐项与两句判定，必需项有缺则退 1。
+**本章验收**：`cargo run -p sprawling -- doctor`，输出逐项与两句判定，Use 层必需项有缺则退 1。
+
+- **退出码只看 Use 层。** 退出码回答「一个 User 能不能在这台机器上用这座城」；Develop 层回答「能不能改这份代码」，它的判定行照样印出，但缺一样不改退出码。三个平台同一条规则。原因：新机器上 Use 层齐全时 doctor 印着「ready to use」却因为缺 zig、lean、just 退 1，脚本与 fresh 作业读到的是一个与屏幕相反的答案。被否：给 Develop 层一个开关（`--develop`）让它也进退出码——今天没有调用方要它；`just prereqs` 读的是 `prereqs.tsv`，不经 doctor 的退出码。钉住它的测试是 `doctor::tests::city::only_a_missing_required_use_item_makes_the_doctor_not_ready`。
 -/
 
 /-!
