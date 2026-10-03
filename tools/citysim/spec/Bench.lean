@@ -8,7 +8,7 @@
 
 规定 `just bench` 的测量 Main `bin/bench`（`tools/citysim/src/bin/bench/main.rs`）、它的读数 `bench::reading`（`tools/citysim/src/bin/bench/reading.rs`）与场景 `bench::scenarios`（`tools/citysim/src/bin/bench/scenarios.rs`），以及两族 bench 共用的夹具摘要 `citysim::fixture_digest`（`tools/citysim/src/fixture_digest.rs`）。本文件是 `tools/citysim/Spec.lean` 的一个分部；下面各节保留它们在 citysim 规格里的标签 §8-6、§8-12，别处引作 `tools/citysim/Spec.lean §8-6`。
 
-能写成定理的是夹具的钉子（D8）：bench 在量任何东西之前先算一遍登记夹具的摘要，与钉住的值不等就拒绝测量，所以它印出的每一条读数都是在钉住的那份字节上量的（`every_reading_is_taken_under_the_pinned_fixture`）。摘要怎样从账本的字节算出、读数行的文法与分位怎样取，由 `fixture_digest`、`Reading::line` 与 sprawling 的 `Spread` 持有，各自的测试按字节对拍（§16）；挂钟读数本身不是任何定理的对象。
+本分部是描述，不是形式规格：这里没有状态机，夹具的钉子（D8）是一个判断的两臂——bench 在量任何东西之前先算一遍登记夹具的摘要，与钉住的值不等就拒绝测量——把它写成定理只会重述那个 `if`。摘要怎样从账本的字节算出、读数行的文法与分位怎样取，由 `fixture_digest`、`Reading::line` 与 sprawling 的 `Spread` 持有，各自的测试按字节对拍（§16）；挂钟读数本身不是任何定理的对象。
 -/
 
 /-!
@@ -19,6 +19,7 @@
 读数形（`bench::reading`，shape 2 value，一次构造点）：
 
 ```rust
+// bench 是二进制，下面的项都是 `pub(crate)`
 pub enum MachineClass { General }   // 参照类属：盘、内存、CPU 均为一般水平
 pub enum Load { LargeLedgerFold, LargeWorktreePlacement, KeptWorktreeReclaim, LongSessionForwarding }
 pub enum SubMetric { Harness, Whole }
@@ -85,6 +86,8 @@ bench Main 在第一项读数之前算 `REGISTERED.digest`：与 `pinned` 不等
 | `kept_worktree_reclaim` | 同一座城里同一个节点的第二次及以后的 `Worktrees::claim`，其间干线不动（`crates/storage/Spec.lean` §8-9 的再领） | `whole` |
 | `long_session_forwarding` | `wire::ServerFrame::Event` 装帧＋序列化，即 socket 之前的本地半段 | `harness` |
 
+平台：读数文法、夹具摘要与钉子在 Windows、macOS、Linux 上相同（`golden-s1` 同理，账本字节不随平台变）。被量的路径不同：worktree 的放置与再领是 git 与文件系统的改名，耐久屏障是 storage 在各平台上的那一个，所以读数按 `std::env::consts::OS` 与 `machine_class` 登记，不跨平台比较。
+
 失败出口：域错误按其 `AxError`（动作/主体/稳定码/恢复语）格式化成一行；bench 自身的失败（零样本）构造 `AxError::failure(AxCode::InvalidArgs, …)`＋`with_recovery`，不新增码（§12 的口径）；Main 打 `bench failed: …` 且退出非零（既有形）。
 
 D17 **读数行一个文法、机器类属进字段，基线读数（含机器类属）记在 `tools/xtask/budgets.toml` 各场景的行里，棘轮纪律挂 `[local_latency]` 行——只降不升、放宽需单独提交。** 理由：register 的既有定规是「只有机器能两次同样测量的量才设门」（budgets.toml 头注），wall-clock 记录不设门；机器类属字段使异类机器的读数天然不进同一张表。被否：像体积那样把延迟读数设门（超标即 CI 红）——同一处定规写着「gating them would make a busy runner look like a defect」（budgets.toml 头注与 ARCHITECTURE §11 同句）；读数回归由棘轮纪律与单独提交的放宽手续治理，不由 CI 红绿治理。
@@ -93,7 +96,7 @@ D18 **多 run 并行不在本 crate 里量。** relay、`serve_flight` 与 desk 
 
 D9 **被量的产品 feature 集就是 `sprawling` 包的默认 feature，只写在 `crates/sprawling/Cargo.toml` 的 `[features] default` 一处。** 人下载的二进制带执行引擎（`sandbox` feature），而 `sandbox` 是默认 feature，所以 `dist`、`bench`、`bench-startup`、`mem` 四个 recipe 不写 `--features` 就构建出人下载的那个二进制；citysim 经工作区依赖带着 `sprawling` 的默认 feature，`bench` 里的场景与仪表也在同一套 feature 下编译。于是 install 解包的、startup 拉起的、首字节服务的、内存读数量到的，与人下载的是同一个二进制。被否：①justfile 再留一个变量写 `sprawling/sandbox`——它重述清单的默认 feature，两处可以只改一处，而读数看不出它们已经分开；②每个 recipe 自己写 `--features`——漏写的那个 recipe 量的是一个没人下载的二进制。**重开参数**：人下载的二进制要带一个不是默认的 feature，那时这套 feature 回到 justfile 的一个变量里，由每个构建与测量的 recipe 读。
 
-**红**：`a_reading_line_is_stable_and_carries_its_machine_class`——一行读数按字节对拍既有文法且带 `machine_class` 与 `fixture` 字段；`a_reading_line_carries_its_floor_beside_the_middle`——同一文法下 floor 与 p50 并列；`every_load_scenario_reruns_and_emits_the_stable_format`——本 crate 的每个场景各跑两遍，每行键序恒为文法键序（可复跑、格式稳定）；`the_registered_fixture_writes_the_bytes_its_digest_pins`——`REGISTERED.digest` 等于 `REGISTERED.pinned`（D8）。
+Rust 检查：`a_reading_line_is_stable_and_carries_its_machine_class`——一行读数按字节对拍既有文法且带 `machine_class` 与 `fixture` 字段；`a_reading_line_carries_its_floor_beside_the_middle`——同一文法下 floor 与 p50 并列；`every_load_scenario_reruns_and_emits_the_stable_format`——本 crate 的每个场景各跑两遍，每行键序恒为文法键序（可复跑、格式稳定）；`the_registered_fixture_writes_the_bytes_its_digest_pins`——`REGISTERED.digest` 等于 `REGISTERED.pinned`（D8）。
 -/
 
 /-!
@@ -101,43 +104,16 @@ D9 **被量的产品 feature 集就是 `sprawling` 包的默认 feature，只写
 
 每轮：`Worktrees::stock`（把备树检出或带到干线，不计时）→ `bench::stamp` → `Worktrees::claim(node-<i>, &[])` → 读时钟 → `release`。四个节点名各不相同，所以每一轮都是一次放置而不是再领；每一轮的备树都是上一轮被接管之后新检出的，干线不动，所以 `claim` 接管时不写文件（`crates/storage/Spec.lean` §8-35 的计数）。夹具不变：512 个 16 KB 文件、4 轮，`REGISTERED.pinned` 不动。读数是 `sub=whole`，因为接管仍是盘上的改名与 git 的元数据写入，缝口不拆。
 
-前后的读数（同一台机器、debug 构建、同一夹具的放置一段，四轮）：改动之前 `claim` 一次 1.18–1.30 s；改动之后 `claim` 接管备树一次 30–37 ms，`stock` 一次 1.19–1.35 s（那次全量检出，不计时）。`budgets.toml` 的 `[large_worktree_placement]` 行由 `just bench` 的发行构建读数登记。
+`budgets.toml` 的 `[large_worktree_placement]` 行由 `just bench` 的发行构建读数登记。
 
 D13 **`large_worktree_placement` 量的是领树，备树在计时之外。** 放置分成两段（`crates/storage/Spec.lean` §8-35）：`Worktrees::stock` 在没人等的时候检出一棵备树，`claim` 在 run 等着的时候接管它。场景在每次计时的 `claim` 之前调一次 `stock`，计时只包住 `claim`，因为人等的是这一段；`stock` 的代价就是改动之前的那个读数（一次全量检出），它不随这次改动变，由 storage 的计数断言守着它新建多少文件，而不是由墙钟。被否：①把 `stock` 也算进同一个样本——读数就成了两段之和，看不出领树这一段降没降；②给备树另开一行读数——要在 `bench::reading` 加一个 `Load`，那一份是读数文法的唯一权威，本决定不为一行读数改它；需要那一行时在那里加。**重开参数**：产品里有了 `stock` 的调用者之后（`crates/sprawling/Spec.lean` §8-145），如果它的位置仍让某个人等它，把它的读数加进来。
 -/
 
-namespace Citysim.Bench
-
-variable {Digest Reading : Type}
-
-/-- D8 **读数带着它所量字节的摘要，登记的夹具钉住这个摘要。** 两条读数只在量的是同一份字节时可比。bench 共用的 `draft` 是写在代码里的负载形状，`Fixture` 的字段说不出它：改了 `draft`，同一张登记表里前后两条读数量的就是两份负载，而读数行本身看不出差别。所以登记的夹具有一个摘要：`draft` 的前 `PINNED_DRAFTS`（1,000）行经 `storage::JsonlLedger` 写成一本账，取这本账的 `ledger_digest`，再把这 32 字节与 `Fixture` 各数值字段的小端字节拼在一起取一次摘要。这个值钉在 `REGISTERED.pinned`。bench 在量任何东西之前先算一遍，与钉住的值不等就拒绝测量；`scenarios/tests.rs` 的 `the_registered_fixture_writes_the_bytes_its_digest_pins` 在 `just check` 里做同一件事。改 `draft` 或改一个字段的提交因此必须同时改钉住的值，并且单独成一个提交，与 `[local_latency]` 行「加胖夹具单独提交」是同一条纪律。每条 `perf` 读数行带 `fixture=<摘要的前 16 位十六进制>`，这 16 位只由 `citysim::fixture_label` 拼出。
+/-! D8 **读数带着它所量字节的摘要，登记的夹具钉住这个摘要。** 两条读数只在量的是同一份字节时可比。bench 共用的 `draft` 是写在代码里的负载形状，`Fixture` 的字段说不出它：改了 `draft`，同一张登记表里前后两条读数量的就是两份负载，而读数行本身看不出差别。所以登记的夹具有一个摘要：`draft` 的前 `PINNED_DRAFTS`（1,000）行经 `storage::JsonlLedger` 写成一本账，取这本账的 `ledger_digest`，再把这 32 字节与 `Fixture` 各数值字段的小端字节拼在一起取一次摘要。这个值钉在 `REGISTERED.pinned`。bench 在量任何东西之前先算一遍，与钉住的值不等就拒绝测量；`scenarios/tests.rs` 的 `the_registered_fixture_writes_the_bytes_its_digest_pins` 在 `just check` 里做同一件事。改 `draft` 或改一个字段的提交因此必须同时改钉住的值，并且单独成一个提交，与 `[local_latency]` 行「加胖夹具单独提交」是同一条纪律。每条 `perf` 读数行带 `fixture=<摘要的前 16 位十六进制>`，这 16 位只由 `citysim::fixture_label` 拼出。
 
 `bench_startup` 的夹具城不钉：`init_city` 用真实时钟写创世行，每次生成的字节都不同，而后面每一行的 `prev` 都接着它。它的读数照样带那座城账本的 `ledger_digest`，两条首字节读数只在摘要相等时可比；夹具城在构建档目录旁复用，所以同一台机器上前后两次读数通常量的是同一份字节。
 
 被否：摘要只打印、不钉。打印出来的值要靠人去比，而在 `just check` 里变红的测试不需要谁记得去比。被否：给 `init_city` 加一个时钟参数，好让夹具城也能钉住。那是为 bench 给产品的创城入口开一个参数，而复用同一座夹具城已经让同一台机器上的读数可比。**重开参数**：需要跨机器比较首字节读数时，夹具城改为从一份检入的账本复制，而不是在量它的主机上生成。
 
-bench Main 的一次运行（`main` 与 `pinned_fixture`）：算出的摘要等于钉住的值才量，量出的每条读数都带着它；否则一条读数都不量，以算出的摘要拒绝。摘要的类型 `Digest` 与读数的类型都是参数。 -/
-def bench [DecidableEq Digest] (digest pinned : Digest) (measure : Digest → List Reading) :
-    Except Digest (List Reading) :=
-  if digest = pinned then .ok (measure digest) else .error digest
-
-/-- bench 印出的每一条读数都是在钉住的那份字节上量的。 -/
-theorem every_reading_is_taken_under_the_pinned_fixture [DecidableEq Digest]
-    (digest pinned : Digest) (measure : Digest → List Reading) (readings : List Reading)
-    (measured : bench digest pinned measure = .ok readings) :
-    digest = pinned ∧ readings = measure pinned := by
-  unfold bench at measured
-  split at measured
-  · rename_i same
-    subst same
-    simp only [Except.ok.injEq] at measured
-    exact ⟨rfl, measured.symm⟩
-  · simp at measured
-
-/-- 字节离开了钉子时，bench 在量任何东西之前就以算出的摘要拒绝：一条在别的字节上量的读数不会进登记表。 -/
-theorem a_moved_fixture_is_refused_before_any_reading [DecidableEq Digest]
-    (digest pinned : Digest) (measure : Digest → List Reading) (moved : digest ≠ pinned) :
-    bench digest pinned measure = .error digest := by
-  simp [bench, moved]
-
-end Citysim.Bench
+bench Main 的一次运行（`main` 与 `pinned_fixture`）：算出的摘要等于钉住的值才量，量出的每条读数都带着它；否则一条读数都不量，以算出的摘要拒绝。这是一个判断的两臂，不写成定理；守它的是 `the_registered_fixture_writes_the_bytes_its_digest_pins` 与 bench Main 自己的拒绝。
+-/

@@ -23,6 +23,7 @@ pub fn worst_first<T: Clone>(assets: &[(T, Score)]) -> Vec<(T, Score)>;
 pub const ASSET_IDLE_DAYS: u32 = 90;
 pub const ASSET_FLOOR_PER_MILLE: u32 = 1_000;
 pub enum Disposal { Keep, Warn { because: String }, Retire { because: String } }
+impl Disposal { pub fn because(&self) -> &str; }   // Keep 也有一句理由
 pub fn dispose(usage: &AssetUse, score: Score, warned_already: bool) -> Disposal;
 pub fn sweep<T: Clone>(assets: &[(T, AssetUse, Score, bool)]) -> Vec<(T, Disposal)>;
 ```
@@ -32,11 +33,13 @@ pub fn sweep<T: Clone>(assets: &[(T, AssetUse, Score, bool)]) -> Vec<(T, Disposa
 - **最重的处置是 `Retire`，不是删除**：退场＝不再被披露，字节仍在盘上与历史里。
 - **先警告后退场，理由随处置同行**：没有任何东西在第一次被注意到的同一轮里停止被提供——那一轮正是人说「它重要」的机会。
 - `worst_first` 先比分数（升），平手时闲置更久的在前，再平手保持调用方的次序：同一份登记两次列出同一张表。`sweep` 按调用方的次序交回处置，不写任何东西：资产的地位只在 `kernel::registry` 改变。
+- 平台：Windows、macOS、Linux 上相同，纯计算。
+- Rust 检查：`metabolism` 的测试（`a_full_cycle_warns_first_and_retires_second` 对应先警告后退场，`an_asset_that_pays_for_its_room_is_left_alone` 与 `a_heavy_asset_that_is_barely_used_is_noticed_even_while_it_is_fresh` 对应留下的条件）。
 -/
 
 namespace Citysim.Metabolism
 
-/-- 一个资产在一段时间里的使用（`score::AssetUse`），常驻字节已折进分数，模型只留处置要读的两样。 -/
+/-- 一个资产在一段时间里的使用（`score::AssetUse`）：使用次数与常驻字节已折进分数，模型只留处置要读的 `idle_days`。 -/
 structure AssetUse where
   idle_days : Nat
   deriving DecidableEq, Repr

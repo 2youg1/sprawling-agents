@@ -31,7 +31,9 @@ pub fn compare(cases: &[Case]) -> Comparison
 - 结论质量＝留下的结论里忠实者的千分比（`precision_per_mille`）；一条都没留下时为 `None`，因为零分之零不是质量。另两格（误删的忠实结论、放行的缺陷）照实计数，使验证 run 的代价与收益在同一张表上。
 - 无失败出口：一条不成立的引文是验证 run 要报的结果，不是故障（与 `collab::Reading` 同一口径）。
 
-**红**：`the_verified_arm_keeps_only_faithful_conclusions`——同一剧本下，验证臂的千分比为 1000、放行缺陷为 0，未验证臂低于它；`every_planted_defect_is_dropped_by_its_own_reading`——三种埋下的缺陷各自被验证臂删掉，忠实结论一条不误删。
+- 平台：Windows、macOS、Linux 上相同，纯计算。
+
+Rust 检查（`red_team::tests`）：`the_verified_arm_keeps_only_faithful_conclusions`——同一剧本下，验证臂的千分比为 1000、放行缺陷为 0，未验证臂低于它；`every_planted_defect_is_dropped_by_its_own_reading`——三种埋下的缺陷各自被验证臂删掉，忠实结论一条不误删。
 -/
 
 namespace Citysim.RedTeam

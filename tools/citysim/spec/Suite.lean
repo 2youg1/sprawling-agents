@@ -8,7 +8,7 @@
 
 规定 `citysim::suite`（`tools/citysim/src/suite.rs`），以及 §8-8 五件仪器共有的规矩。`score`、`metabolism` 在 `spec/Metabolism.lean`，`nesting` 在 `spec/Nesting.lean`，`ablation` 在 `spec/Ablation.lean`。本文件是 `tools/citysim/Spec.lean` 的一个分部；下面各节保留它们在 citysim 规格里的标签 §8-8、§8-8-1，别处引作 `tools/citysim/Spec.lean §8-8`。
 
-能写成定理的是一份报告的计数：每个 outcome 恰好记一次，记进它那一半的 `tried`，或记进 `unknown`（`every_outcome_is_counted_once`）；不认识的 outcome 不进任何一半的分母（`an_outcome_nobody_asked_for_is_unknown`）。「同一个 id 两次即拒」由 Rust 的 `Suite::new` 持有，模型把建好的 suite 当作 id 到一半的函数，于是一个 id 在模型里只能属于一半。
+能写成定理的是一份报告的计数：每个 outcome 恰好记一次，记进它那一半的 `tried`，或记进 `unknown`（`every_outcome_is_counted_once`）；不认识的 outcome 不进任何一半的分母，那是 `Report.record` 的 `none` 一臂，不另写定理。模型的计数是 `Nat`，Rust 的是 `u32` 且饱和相加：一份 suite 的 outcome 不到 2³² 条，所以模型不写饱和那一档。「同一个 id 两次即拒」由 Rust 的 `Suite::new` 持有，模型把建好的 suite 当作 id 到一半的函数，于是一个 id 在模型里只能属于一半。
 -/
 
 /-!
@@ -39,16 +39,20 @@ pub struct Tally { pub tried: u32, pub passed: u32 }   // per_mille() 整数千�
 pub struct Report { pub held_in: Tally, pub held_out: Tally, pub unknown: u32 }
 pub struct Suite { /* BTreeMap<String, Task> —— 私有 */ }
 impl Suite {
-    pub fn new(tasks: Vec<Task>) -> Result<Suite, AxError>;   // 空 id 与同一 id 两次即拒（泄漏在构造点）
+    pub fn new(tasks: Vec<Task>) -> Result<Suite, AxError>;   // 空白 id 与同一 id 两次即拒（泄漏在构造点），E_CONFIG_INVALID
     pub fn half(&self, half: Half) -> Vec<&Task>;             // id 序＝执行序
+    pub fn len(&self) -> usize;  pub fn is_empty(&self) -> bool;
     pub fn report(&self, outcomes: &[Outcome]) -> Report;
 }
+impl Half { pub fn as_str(self) -> &'static str; }            // "held_in"、"held_out"，拒绝的 subject 里用
+impl Tally { pub fn per_mille(&self) -> u32; }
 ```
 
-- **泄漏是构造点的拒绝，不是事后的告警**：同一个 id 出现两次即拒，无论落在同半还是异半。一份被看过的 held-out 集在它被看过之后就不值钱了。没有 id 的任务同样在构造点被拒：结果按 id 对。
+- **泄漏是构造点的拒绝，不是事后的告警**：同一个 id 出现两次即拒，无论落在同半还是异半。一份被看过的 held-out 集在它被看过之后就不值钱了。id 为空或只有空白的任务同样在构造点被拒：结果按 id 对。
 - **任务只携 Locator 不携正文**：抄一份正文进来就会与它来自的那件活漂开。
 - **不认识的 outcome 计入 `unknown` 而非计入分母**：一次回答了没人问过的问题的运行，不是这份 suite 的运行。
 - 一半里没有一个任务被试过时，千分比是 0 而不是一次除零（`Tally::per_mille`）。
+- 平台：Windows、macOS、Linux 上相同，纯计算。
 -/
 
 namespace Citysim.Suite
@@ -109,11 +113,5 @@ theorem every_outcome_is_counted_once (suite : Suite) (outcomes : List Outcome) 
     rw [this]
     simp only [Report.record, List.length_cons]
     split <;> simp [Tally.record] <;> omega
-
-/-- 一个不在 suite 里的 outcome 只记进 `unknown`，不动任何一半的分母。 -/
-theorem an_outcome_nobody_asked_for_is_unknown (suite : Suite) (report : Report) (outcome : Outcome)
-    (stranger : suite outcome.id = none) :
-    Report.record suite report outcome = { report with unknown := report.unknown + 1 } := by
-  simp [Report.record, stranger]
 
 end Citysim.Suite

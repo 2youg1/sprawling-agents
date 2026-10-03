@@ -23,7 +23,7 @@ import tools.citysim.spec.WireScript.Exchange
 
 本文件是规格的入口，分部在 `spec/` 下，布局见 ARCHITECTURE.md §11「Specifications in Lean」，命名空间是 `Citysim.<Path>`。接口一节一节写在规定它的那个模块的分部里，每一节保留它的标签 §8-n，别处引作 `tools/citysim/Spec.lean §8-n`；本文件 §8 列出每个标签住在哪个分部。决定写作 `D<n>`，放在它所管的声明正上方，或它所管主题的那一节注释里，别处引作 `citysim D<n>`。D1 到 D15 沿用这份规格在 Markdown 时 §3 里「决定」条目的号，D12、D14 空着不复用；D16 起是那时散在 §8 各节里、没有编号的决定；§12 列出每条住在哪里。
 
-能写成定理的规则在分部里证明，Lean 模型是「必须守住哪些性质」的权威，Rust 代码是「怎样守住」的权威：计数时钟、场景只在回合边界说话与一次工具调用的键（`spec/Executor.lean`）、内存 Ledger 的接法（`spec/MemLedger.lean`）、替身按 run 作答（`spec/WireScript.lean`）与它怎样接上后写的 run、凭据怎样不落盘（`spec/WireScript/Exchange.lean`）、长回合的门为什么咬得住（`spec/LongTurn.lean`）、红队两臂（`spec/RedTeam.lean`）、suite 的计数（`spec/Suite.lean`）、资产的处置次序（`spec/Metabolism.lean`）、夹具的钉子（`spec/Bench.lean`）与读数不说假话的两件（`spec/BenchStartup.lean`）。`spec/Nesting.lean` 与 `spec/Ablation.lean` 只有节注释：它们的规则由 Rust 的穷尽枚举与各自的测试守住（§16）。
+能写成定理的规则在分部里证明，Lean 模型是「必须守住哪些性质」的权威，Rust 代码是「怎样守住」的权威：计数时钟、场景只在回合边界说话与一次工具调用的键（`spec/Executor.lean`）、内存 Ledger 的接法（`spec/MemLedger.lean`）、替身按 run 作答（`spec/WireScript.lean`）与它怎样接上后写的 run、什么时候再读脚本文件（`spec/WireScript/Exchange.lean`）、长回合的门为什么咬得住（`spec/LongTurn.lean`）、红队两臂（`spec/RedTeam.lean`）、suite 的计数（`spec/Suite.lean`）、资产的处置次序（`spec/Metabolism.lean`）与读数不说假话的两件（`spec/BenchStartup.lean`）。`spec/Nesting.lean`、`spec/Ablation.lean` 与 `spec/Bench.lean` 只有节注释，是描述而不是形式规格：前两件的规则由 Rust 的穷尽枚举与各自的测试守住，夹具的钉子是一个判断的两臂，由 `the_registered_fixture_writes_the_bytes_its_digest_pins` 守住（§16）。
 -/
 
 /-! ## 1 需求分解
@@ -57,17 +57,16 @@ import tools.citysim.spec.WireScript.Exchange
 
 分部里的定理是模型对性质的证明：
 
-- `spec/Executor.lean`：计数时钟交出的读数只取决于被问了几次（`the_clock_hands_out_its_count`），相邻读数差一（`each_reading_is_one_past_the_last`）；场景在回合内的两个边界上什么都不说（`inside_a_turn_the_scenario_says_nothing`），每个取消点都在它的边界上被答成取消（`every_cancel_point_is_reached`），取消压过 steer（`cancel_wins_over_steer`），steer 只在它那一回合的波边界上递到（`a_steer_is_heard_only_at_its_wave`）；同一 run 里没有两次调用的键输入相同（`no_two_calls_of_a_run_share_a_key`），按一波的时刻取键会把两次同名调用并成一次（`keying_by_the_instant_merges_two_calls_of_one_wave`）；剧本按序作答（`the_script_is_answered_in_order`），用尽之后恒作结（`an_exhausted_script_concludes`）。
+- `spec/Executor.lean`：计数时钟交出的读数只取决于被问了几次（`the_clock_hands_out_its_count`），相邻读数差一（`each_reading_is_one_past_the_last`）；每个取消点都在它的边界上被答成取消、写了 steer 也一样，所以取消压过 steer（`every_cancel_point_is_reached`），steer 只在它那一回合的波边界上递到（`a_steer_is_heard_only_at_its_wave`）；同一 run 里没有两次调用的键输入相同（`no_two_calls_of_a_run_share_a_key`）；剧本按序作答（`the_script_is_answered_in_order`），用尽之后恒作结（`an_exhausted_script_concludes`）。
 - `spec/MemLedger.lean`：一本空账写下一串 draft，seq 连续（`a_fresh_ledger_holds_what_was_written`），每一行接在上一行的摘要上（`every_line_follows_the_one_before`）。
-- `spec/WireScript.lean`：合法脚本里一个 id 认出写下它的那一条（`an_id_names_the_reply_that_wrote_it`）；一个续轮的回答与开启过几个 run 无关（`a_continuation_is_answered_whatever_was_opened`），得到它那个 run 的下一条（`every_run_is_answered_from_its_own_replies`）；用尽、交叉被拒（`an_exhausted_run_is_refused`、`a_crossed_request_is_refused`）；第一轮按次序开启（`an_opening_takes_the_next_run`、`no_run_left_changes_nothing`）；接上的脚本不改动握着的 run（`a_grown_replay_answers_every_held_run_alike`、`a_script_that_rewrote_a_held_run_is_refused`）；替身的拒绝都不是城会重发的状态码（`no_refusal_is_one_the_city_sends_again`）。
-- `spec/WireScript/Exchange.lean`：凭据头的值不进记录（`a_credential_never_reaches_the_record`）；文件只在 `no_run_left` 时再读（`the_file_is_read_again_only_for_a_run_none_is_left_for`），接不上时什么都不变（`a_reread_that_is_not_taken_changes_nothing`），追加的 run 被下一个第一轮开启（`a_run_appended_after_the_script_ran_out_is_opened`）。
+- `spec/WireScript.lean`：合法脚本里一个 id 认出写下它的那一条（`an_id_names_the_reply_that_wrote_it`）；一个续轮的回答与开启过几个 run 无关（`a_continuation_is_answered_whatever_was_opened`），得到它那个 run 的下一条（`every_run_is_answered_from_its_own_replies`）；用尽、交叉被拒（`an_exhausted_run_is_refused`、`a_crossed_request_is_refused`）；第一轮按次序开启（`an_opening_takes_the_next_run`、`no_run_left_changes_nothing`）；接上的脚本不改动握着的 run（`a_grown_replay_answers_every_held_run_alike`）。
+- `spec/WireScript/Exchange.lean`：文件只在 `no_run_left` 时再读（`the_file_is_read_again_only_for_a_run_none_is_left_for`），接不上时什么都不变（`a_reread_that_is_not_taken_changes_nothing`），追加的 run 被下一个第一轮开启（`a_run_appended_after_the_script_ran_out_is_opened`）。
 - `spec/LongTurn.lean`：窗口的增量恰是每一步加进去的字节（`the_increments_are_what_each_step_added`），有一步加得不一样多就看得见（`a_step_that_adds_more_shows_as_an_uneven_increment`）。
 - `spec/RedTeam.lean`：未验证臂什么都不删（`the_unverified_arm_drops_nothing`）；判定忠实时验证臂不放行缺陷、不误删忠实结论（`the_verified_arm_keeps_exactly_the_faithful`）。
-- `spec/Suite.lean`：每个 outcome 恰好记一次（`every_outcome_is_counted_once`），不认识的只进 `unknown`（`an_outcome_nobody_asked_for_is_unknown`）。
+- `spec/Suite.lean`：每个 outcome 恰好记一次，不认识的只进 `unknown`（`every_outcome_is_counted_once`）。
 - `spec/Metabolism.lean`：没有资产在第一次被注意到的那一轮退场（`nothing_retires_the_round_it_is_first_noticed`），留下当且仅当用得上又付得起（`an_asset_is_kept_exactly_when_it_is_used_and_pays`），警告过仍未改善的下一轮退场（`a_warned_asset_that_did_not_recover_retires`）。
-- `spec/Bench.lean`：bench 印出的每条读数都在钉住的字节上量（`every_reading_is_taken_under_the_pinned_fixture`），字节离开钉子就在量之前拒绝（`a_moved_fixture_is_refused_before_any_reading`）。
 - `spec/Throughput.lean`：p999 只在样本够多时印出（`a_p999_is_printed_only_over_enough_samples`），不够时印 max（`under_the_floor_the_max_is_printed`），印出的尾部总是一个真实样本（`the_printed_tail_is_a_sample`）。
-- `spec/BenchStartup.lean`：每个样本都留在读数里、按中位的倍数标注（`every_sample_is_kept_and_marked_by_the_cut`）；主导子步是中位最大的那一个（`the_dominant_step_has_the_largest_middle`），没有子步时没有主导（`no_steps_have_no_dominant`）。
+- `spec/BenchStartup.lean`：每个样本都留在读数里、按中位的倍数标注（`every_sample_is_kept_and_marked_by_the_cut`）；主导子步是中位最大的那一个（`the_dominant_step_has_the_largest_middle`）。
 
 每个模型都带一个可实现的正常路径（`every_cancel_point_is_reached`、`an_opening_takes_the_next_run`、`a_run_appended_after_the_script_ran_out_is_opened`、`spec/WireScript.lean` 里两个 run 交错作答的 `example`），所以这些保证不是从一个无法满足的前提推出来的。生产实现与模型的对应由 §16 列出的 Rust 测试检查；一条 Lean 定理证明的是模型，不是 Rust。
 -/
@@ -83,7 +82,7 @@ D1 **没有种子，而不是造一个吃种子的生成器。** 种子此刻没
 1. **时钟不溢出**：模型的 `Clock` 是 `Nat`，Rust 的是 `u64`，到顶时以 `E_INVALID_ARGS` 拒（`clock_overflow`）；一条剧本走不到 2⁶⁴ 毫秒，所以模型不写那一档。
 2. **摘要单射**：`KeyInput` 是 `IdemKey::derive` 的输入；两把键相同只在输入相同时，这是对 kernel 摘要函数的假设（`crates/kernel/spec/Ledger.lean` 以同样的方式陈述链），模型证的是输入两两不同。内存 Ledger 的行与链摘要也以 kernel 的函数为参数。
 3. **判定忠实**：红队验证臂的结论以 `FaithfulJudge` 为假设，那是 `collab::Citation::against` 的性质。
-4. **正文里的 id**：`Replay.collect` 怎样在请求的 JSON 里找出字符串值不进模型，模型从找出的字符串起；gateway 的「可重试」状态码集合不进模型，`no_refusal_is_one_the_city_sends_again` 把它写成结论里的三个不等式。
+4. **正文里的 id**：`Replay.collect` 怎样在请求的 JSON 里找出字符串值不进模型，模型从找出的字符串起；gateway 的「可重试」状态码集合不进模型，替身的拒绝码不在其中是 `spec/WireScript.lean` §8-10 陈述的常数事实。
 
 未决：
 
@@ -95,7 +94,7 @@ D1 **没有种子，而不是造一个吃种子的生成器。** 种子此刻没
 
 `just sim` 跑全部场景测试，单线程、无 I/O 等待，耗时由编译主导。测量二进制（§8-5、§8-6）的读数写在 `tools/xtask/budgets.toml` 各自的行里，只入册不入门。
 
-实现与本规格的出入，迁移时对过：`Replay` 只持脚本与开启过几个 run，调用 id 的表住在 `WireScript` 里（§8-10 的接口照代码写）；`Suite::new` 除了同一 id 两次，也拒一个没有 id 的任务（§8-8-1 照代码写）；`bench_startup::samples` 的 `Share` 是 sprawling 的那一个，可疑的倍数是 sprawling 的 `SUSPICIOUS_TIMES`（§8-5 照代码写）。三处都是代码先于文档，接口一节已按代码改，行为没有变。
+平台：剧本、内存 Ledger、检查器、替身与仪器在 Windows、macOS、Linux 上行为相同，账本字节逐字节相同（§2 的跨 OS 夹具）。随平台变的只有三处：两个测量二进制量到的时间与内存（`spec/BenchStartup.lean`、`spec/Bench.lean`、`spec/LongTurn.lean` 各写了怎样变），与只在 Windows 上起作用的 `bin/serve_grouped`（§1）。
 -/
 
 /-! ## 5 权威信源
@@ -117,7 +116,7 @@ Lean 里的名字与 Rust 的对应：
 - `Citysim.Executor.Clock`、`Clock.now` ↔ `run_scenario_on` 里的 `tick` 与 `now` 闭包；`answer_at` ↔ `executor::answer_at`；`SafePoint` ↔ `runtime::run::SafePoint`；`KeyInput` ↔ `IdemKey::derive` 的三个参数，`keyed` ↔ `invoke` 闭包里的 `placed` 计数器；`call`、`answers` ↔ `ScriptModel` 的 `Model::call`。
 - `Citysim.MemLedger.MemLedger`、`append` ↔ `mem_ledger::MemLedger` 与 `Ledger::append`；`written` 是模型里写出的行，Rust 没有对应。
 - `Citysim.WireScript` 的 `Turn`、`WireScript`、`call_ids`、`Replay`、`Asked`、`Refusal`、`Answer`、`Carried` 与 Rust 同名；`located` ↔ `Replay::collect`，`carriedOf` ↔ `Replay::carried`，`Parsed` ↔ `WireScript::parse` 收下的脚本；`Body` 是读成或读不成 JSON 的正文。
-- `Citysim.WireScript.Exchange.is_credential`、`answered`、`wants_more_runs` ↔ `exchange::is_credential`、`ScriptedProvider::answered`、`Answer::wants_more_runs`。
+- `Citysim.WireScript.Exchange.answered`、`wants_more_runs` ↔ `ScriptedProvider::answered`、`Answer::wants_more_runs`。
 - `Citysim.LongTurn.windows` ↔ `TurnReading::windows`；`increments` ↔ 测试里相邻窗口之差。
 - `Citysim.RedTeam`、`Citysim.Suite`、`Citysim.Metabolism`、`Citysim.BenchStartup` 里的类型与 Rust 同名；`Metabolism.Limits` 是两个阈值常量合成的参数。
 -/
@@ -195,7 +194,7 @@ MemLedger 的 append 是 from_draft→canonical_line→chain_hash 推进；无�
 
 /-! ## 12 错误处理
 
-透传 kernel、replay 与产品公面的 `AxError`，不新增码。本 crate 自己的失败用既有码走三段式：时钟溢出与 bench 的零样本是 `E_INVALID_ARGS`；读不懂的替身脚本、接不上的重读是 `E_CONFIG_INVALID`（subject 是键路径）；替身的套接字失败是 `E_TOOL_UNAVAILABLE`；记录写不进去是 `E_STORAGE_FATAL`。替身对城的拒绝不是 `AxError`，是带稳定码的 HTTP 回答（§8-10、§8-13），状态码都不在城会重发的那一集里（`no_refusal_is_one_the_city_sends_again`）。
+透传 kernel、replay 与产品公面的 `AxError`，不新增码。本 crate 自己的失败用既有码走三段式：时钟溢出与 bench 的零样本是 `E_INVALID_ARGS`；读不懂的替身脚本、接不上的重读是 `E_CONFIG_INVALID`（subject 是键路径）；替身的套接字失败是 `E_TOOL_UNAVAILABLE`；记录写不进去是 `E_STORAGE_FATAL`。替身对城的拒绝不是 `AxError`，是带稳定码的 HTTP 回答（§8-10、§8-13），状态码都不在城会重发的那一集里（`spec/WireScript.lean` §8-10）。
 
 决定的条目与它们住的地方：
 
@@ -208,7 +207,7 @@ MemLedger 的 append 是 from_draft→canonical_line→chain_hash 推进；无�
 | D5 | 被测可执行文件的名字在本 crate 只重述一处，注释点名它的权威 | `tools/citysim/spec/BenchStartup.lean` §8-5 |
 | D6 | 评估仪器住在 citysim，不另立 crate | 本文件 §7 |
 | D7 | 场景只在回合边界取消 | `tools/citysim/spec/Executor.lean`，`answer_at` 之上 |
-| D8 | 读数带着它所量字节的摘要，登记的夹具钉住这个摘要 | `tools/citysim/spec/Bench.lean`，`bench` 之上 |
+| D8 | 读数带着它所量字节的摘要，登记的夹具钉住这个摘要 | `tools/citysim/spec/Bench.lean`，§8-12 之后 |
 | D9 | 被量的产品 feature 集就是 `sprawling` 包的默认 feature | `tools/citysim/spec/Bench.lean` §8-6 |
 | D10 | 长回合的门是请求窗口的逐步增量，RSS 只作读数 | `tools/citysim/spec/LongTurn.lean` |
 | D11 | 进程外的替身 provider 是 citysim 的一个二进制，脚本就是 `ScriptModel` 的那种线上 JSON，按 run 分开作答 | `tools/citysim/spec/WireScript.lean`，`Replay` 之上 |
@@ -228,7 +227,7 @@ MemLedger 的 append 是 from_draft→canonical_line→chain_hash 推进；无�
 
 /-! ## 13 依赖选型
 
-kernel（features=["conformance"]）、storage（对拍与夹具）、runtime（驱动器与 verify）、gateway（dialect 翻译面）、collab（引文判定）、wire（帧，feature `server`）、sprawling 与 accounting（测量二进制驱动的产品公面）、serde_json、toml（nesting 读它评分的 TOML 形状）、sha2 与 zip（安装动作读发行档）；dev：tempfile、zeroize。版本以 `tools/citysim/Cargo.toml` 与 workspace 清单为准。
+kernel（features=["conformance"]）、storage（对拍与夹具）、runtime（驱动器与 verify）、gateway（dialect 翻译面）、collab（引文判定）、wire（帧，feature `server`）、sprawling 与 accounting（测量二进制驱动的产品公面）、serde_json、toml（nesting 读它评分的 TOML 形状）、sha2 与 zip（安装动作读发行档）；只在 Windows 上：win32job（`bin/serve_grouped` 把城放进随启动器结束的 job，`tools/adversary/Spec.lean` D8）；dev：tempfile、zeroize。版本以 `tools/citysim/Cargo.toml` 与 workspace 清单为准。
 
 规格不加 Lean 依赖：仓库根 `lake-manifest.json` 的包表是空的（adversary D2），分部只用工具链自带的库。
 -/
@@ -254,12 +253,12 @@ kernel（features=["conformance"]）、storage（对拍与夹具）、runtime（
 - 驱动一座真城的场景：`tests/proposal_baseline.rs`（`a_proposal_made_on_a_version_the_document_left_is_refused_when_decided`，D22）。
 - TP3 的协作场景：`tests/collaboration.rs`（D25）。计划上的协作剧本也在这个文件里（D26），经 `attend` 驱动，跑在计数时钟上：认领冲突——两个居民在同一波读到同一个就绪节点，第二个 `claim` 在调用时被拒，节点只记一个持有者，持有者不带证据冻结后节点转 Blocked（`a_node_two_residents_read_as_ready_in_one_wave_is_held_by_the_first_to_claim`）；重派——一个子 run 以失败冻结，协调者在同一个 run 里再 `delegate` 同一房间，第二个子 run 以同一 parent 开始；失败的子 run 把认领花在 `FrozeWithoutEvidence` 上（`crates/kernel/spec/Plan.lean`），节点转 Blocked 而不是放回，所以第二个 `claim` 被拒（`a_room_delegated_again_after_its_child_failed_starts_under_the_same_parent`）。第二个子 run 的 desk 可能在第一个子 run 落地之前读 `Roadmap.md`，那份副本里节点仍是就绪；拒绝来自 booking 记下的账本停止行（`crates/sprawling/spec/Accounting/Worker.lean` §8-42-8），不来自那份副本。验证失败——验证 run 判结论不忠实，判结论不落、计划节点不转完成——还没有建：要经 `pr` 工具的拒绝一臂，场景得先开一个带分支的 request。
 - 崩溃点（G5，不在本 crate）：`crates/sprawling/tests/acceptance/crash.rs` 判两个——写回答的行写到一半（`a_city_killed_while_writing_an_answer_reopens_with_the_torn_line_cut_and_the_call_unknown`），与派活的 job 已进内容存储、引它的 `checkpoint_committed` 行还没写（`a_city_killed_between_a_job_put_and_its_checkpoint_line_reopens_with_nothing_to_cut`）。还没有判的：回合里 git 检查点的 CAS 移动了 ref、带 `oid` 的那行还没写（需要一座会取 git 检查点的城），与屏障中途、写与同步之间的切点（`crates/runtime/spec/Turn/Durability.lean` 的 `cutsOf`）。
-- 替身：`wire_script::tests` 的七条（同一请求逐字节同录、用尽、两个 run 交错、追加的 run 被开启、改写了已在答的 run 的脚本被拒、读不懂的回复与分不清或到不了的 run 在解析时拒）。
+- 替身：`wire_script::tests` 的七条（同一请求逐字节同录且记录里没有凭据、用尽、两个 run 交错、追加的 run 被开启、改写了已在答的 run 的脚本被拒、读不懂的回复与分不清或到不了的 run 在解析时拒）。
 - 长回合：`long_turn::tests` 的 `a_long_turn_grows_its_window_by_one_step_at_a_time`。
 - 仪器：`red_team::tests`、`suite` 与 `tests/evaluation.rs`、`metabolism`、`score`、`nesting::tests`、`ablation::tests`。
 - bench：`bench::reading::tests`、`bench::scenarios::tests`（含 `the_registered_fixture_writes_the_bytes_its_digest_pins`）、`bench_startup::samples` 与 `footprint`、`actions` 的测试。
 
-只有节注释的分部（`spec/Nesting.lean`、`spec/Ablation.lean`）由穷尽枚举与各自的测试守住。挂钟读数不是任何断言的对象：它们入册不入门（D17）。
+只有节注释的分部（`spec/Nesting.lean`、`spec/Ablation.lean`、`spec/Bench.lean`）由穷尽枚举与各自的测试守住。挂钟读数不是任何断言的对象：它们入册不入门（D17）。
 
 D25 **TP3 的协作场景经 `attend` 驱动一座真城，模型按 run 收到的任务认角色。** 三条场景：(1) `tp3_three_delegated_children_start_at_the_call_and_run_side_by_side`：`lab/lead` 在三个回合里各调一次 `delegate`（`lab/kiln`、`lab/glaze`、`lab/clay`），判每个子 run 以 lead 为 parent、`run_started` 的 seq 在它那次 `tool_called` 之后，且三个子 run 同时在跑（每个子 run 的第一次模型调用等另两个到齐，等不到 20 s 就记为没到齐）；子 run 的 `run_started` 可以落在 lead 冻结之后，因为「在调用时生效」说的是调用时派出，子 lane 写下第一行的时刻不归调用方。(2)(3) 测试城第二局海龟汤的形状，三轮：`hall/mayor` 主持、`hall/clerk` 猜，每个 run 开头读一次城里 hall 楼的手册 soup.md。异步：主持第一个 run 发问后给自己发一次 mention（测试城里「等一会儿再看」的绕行），期望 7 个 run、开头读 7 次、21 次模型调用；一个回答到时主持的上一个 run 还在跑，它就落在那个 run 的下一个安全点、不开新 run（TP3 的 B），所以少一个 run 也是 lane 可能走的次序，断言收的是 6 或 7 个 run、run 数等于开头读的次数、至多 21 次调用；同步（`wait: true`）：期望 4 个 run、开头读 4 次、14 次模型调用。读数还印出计数时钟从第一个 `run_started` 到最后一个 `run_frozen` 被读了几次与 seq 跨度，这两个不进断言。理由：要判的事跨发信方、收信方与 lane 三个写者，只在 worker 里会合（同 D22）。并发 lane 写进账本的先后不固定，所以断言只读计数与每个 run 自己的先后，不读整本账的字节。被否决的做法：按 factory 被调用的次序分角色——并发的 lane 让这个次序不固定。重开参数：替身 provider 能按房间作答时，角色改由脚本给出。
 

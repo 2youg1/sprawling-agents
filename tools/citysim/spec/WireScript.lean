@@ -8,7 +8,7 @@
 
 规定 `citysim::wire_script`（`tools/citysim/src/wire_script.rs`）：替身 provider 回放的那份脚本，`parse` 收下哪些脚本，以及 `Replay` 把一个请求放进哪个 run 的哪一条。套接字、记录文件与把脚本文件再读一遍在 `wire_script::exchange`，由 `spec/WireScript/Exchange.lean` 规定。本文件是 `tools/citysim/Spec.lean` 的一个分部；下面每一节保留它在 citysim 规格里的标签 §8-n，别处引作 `tools/citysim/Spec.lean §8-n`。
 
-能写成定理的是放置规则：一个续轮的位置只取决于它带回来的调用 id，与此前开启过几个 run、别的 run 怎么交错无关；一个合法脚本里每个 id 认出写下它的那一条回复；带回两个 run 的 id、用尽的 run、没有剩下的 run 都被拒，而不是重复最后一条；第一轮按次序开启下一个 run；接上的脚本不改动已经握着的 run；替身的每一种拒绝都不在城会重发的状态码里。回复本身的线上 JSON 怎样读是 gateway 的事（`gateway::response_from_wire`），模型只留下放置要用的那一样：一条回复调用了哪些 id。正文里哪些字符串是 id、怎样从 JSON 里收集它们，是 Rust 的 `Replay::collect`，由 `wire_script::tests` 守着。
+能写成定理的是放置规则：一个续轮的位置只取决于它带回来的调用 id，与此前开启过几个 run、别的 run 怎么交错无关；一个合法脚本里每个 id 认出写下它的那一条回复；带回两个 run 的 id、用尽的 run、没有剩下的 run 都被拒，而不是重复最后一条；第一轮按次序开启下一个 run；接上的脚本不改动已经握着的 run。替身的每一种拒绝都不在城会重发的状态码里，这是 `Refusal.status` 那张常数表的事实，不写成定理（见 §8-10）。回复本身的线上 JSON 怎样读是 gateway 的事（`gateway::response_from_wire`），模型只留下放置要用的那一样：一条回复调用了哪些 id。正文里哪些字符串是 id、怎样从 JSON 里收集它们，是 Rust 的 `Replay::collect`，由 `wire_script::tests` 守着。
 -/
 
 /-!
@@ -43,7 +43,7 @@ impl ScriptedProvider {
 | `POST` | 按 run 作答，见 §8-13；回复以 200 送出，`content-type: application/json`——城要的是流时也照读（gateway 按媒体类型认出整段回复） |
 | 其他方法 | 405，码 `method_unanswered` |
 
-拒绝的正文是 `{"error":{"type":"<码>","message":"<一句话>"}}`，OpenAI 与 Anthropic 两种兼容格式的错误都是这个形状。替身的每一种拒绝都不在 gateway 的「可重试」之列（`no_refusal_is_one_the_city_sends_again`），所以城把用尽读成一次不会自己好的拒绝，而不是一直重发。**用尽要拒，不重复最后一条**：黑盒检查要看得见城比脚本多调了一次（`an_exhausted_run_is_refused`）。
+拒绝的正文是 `{"error":{"type":"<码>","message":"<一句话>"}}`，OpenAI 与 Anthropic 两种兼容格式的错误都是这个形状。替身的每一种拒绝都不在 gateway 的「可重试」之列：状态码只有 400、404、405、409、410，而 gateway 重发的是 408、429 与 5xx（那一集合的权威是 `crates/gateway/src/endpoint/failure.rs` 的 `ProviderFailure::retry`），所以城把用尽读成一次不会自己好的拒绝，而不是一直重发。**用尽要拒，不重复最后一条**：黑盒检查要看得见城比脚本多调了一次（`an_exhausted_run_is_refused`）。
 
 **什么算一个请求、记录写什么、凭据头怎样落盘**，是 `wire_script::exchange` 的事，见 `spec/WireScript/Exchange.lean` 的 §8-10 续。
 
@@ -51,7 +51,9 @@ impl ScriptedProvider {
 
 **失败**：`parse` 以 `E_CONFIG_INVALID` 拒一份读不懂的脚本（subject 是键路径，如 `runs[1][2]`，recovery 指回那一条）；套接字的失败是 `E_TOOL_UNAVAILABLE`；记录文件写不进去是 `E_STORAGE_FATAL`。
 
-**红**：`wire_script::tests::the_same_request_twice_is_recorded_byte_for_byte_alike`——两个替身各回放同一份脚本，各收一次同样的模型列表请求与对话请求，两份记录逐字节相同且各有两行；`wire_script::tests::an_exhausted_script_is_refused_with_its_code`——一条回复的脚本，同一个 run 再来一轮，回答是 410 与码 `script_exhausted`。
+平台：替身只绑回环地址上的 TCP 端口，读写的是 HTTP/1.1 的字节与 JSON，在 Windows、macOS、Linux 上行为相同；记录文件按 LF 分行。
+
+Rust 检查：`wire_script::tests::the_same_request_twice_is_recorded_byte_for_byte_alike`——两个替身各回放同一份脚本，各收一次同样的模型列表请求与对话请求，两份记录逐字节相同且各有两行；`wire_script::tests::an_exhausted_script_is_refused_with_its_code`——一条回复的脚本，同一个 run 再来一轮，回答是 410 与码 `script_exhausted`。
 -/
 
 /-!
@@ -87,7 +89,7 @@ impl Replay {
 
 **`parse` 另外拒的三种脚本**，都在城开口之前、以 `E_CONFIG_INVALID` 拒，subject 是键路径：一个空的 run（`runs[r]`：它开启之后什么都答不出）；一个调用 id 在脚本里出现第二次（`runs[r][k]`，说出它第一次出现在哪里：两个 run 共用一个 id，替身就分不清是谁的续轮）；一个 run 里不是最后一条、却一个工具都不调的回复（`runs[r][k]`：一句话就让 run 结束，它后面的回复永远答不到，而且之后的请求认不出它）。这三条是下面的 `Parsed`。
 
-**红**：`wire_script::tests::two_interleaved_runs_are_each_answered_from_their_own_replies`——两个 run 各两条回复，第一轮按 run 0、run 1 的次序到，续轮按 run 1、run 0 的次序到，每个 run 拿到的是它自己的第二条，记录里四行的 `run` 依次是 0、1、1、0；`wire_script::tests::a_run_written_after_the_script_ran_out_is_opened`——一个 run 的脚本答完之后，把第二个 run 追加进脚本文件，下一个新开的 run 拿到它的第一条。
+Rust 检查：`wire_script::tests::two_interleaved_runs_are_each_answered_from_their_own_replies`——两个 run 各两条回复，第一轮按 run 0、run 1 的次序到，续轮按 run 1、run 0 的次序到，每个 run 拿到的是它自己的第二条，记录里四行的 `run` 依次是 0、1、1、0；`wire_script::tests::a_run_written_after_the_script_ran_out_is_opened`——一个 run 的脚本答完之后，把第二个 run 追加进脚本文件，下一个新开的 run 拿到它的第一条；`a_script_read_again_that_rewrote_a_played_run_is_refused`——重读到的脚本改写了已在答的 run，`grow` 拒它。
 -/
 
 namespace Citysim.WireScript
@@ -252,7 +254,7 @@ def starts_with [DecidableEq α] : List α → List α → Bool
   | _ :: _, [] => false
   | a :: held, b :: full => decide (a = b) && starts_with held full
 
-/-- 接上再读一遍的脚本：兼容格式、模型列表相同，且以已握着的 run 开头时收下，否则拒（`Replay::grow`，D15）。开启过几个 run 不变。 -/
+/-- 接上再读一遍的脚本：兼容格式、模型列表相同，且以已握着的 run 开头时收下，否则拒（`Replay::grow`，D15）。开启过几个 run 不变。不以已握着的 run 开头的脚本被拒是这里的 `else` 一臂，不另写定理。 -/
 def Replay.grow [DecidableEq Face] (replay : Replay Face) (script : WireScript Face) :
     Option (Replay Face) :=
   if script.face = replay.script.face ∧ script.models = replay.script.models
@@ -387,19 +389,6 @@ theorem a_grown_replay_answers_every_held_run_alike [DecidableEq Face] (replay g
     refine ⟨?_, rfl⟩
     simp [WireScript.reply, extended, List.getElem?_append_left held]
   · simp at took
-
-/-- 一份不以已握着的 run 开头的脚本被拒：一个已经开启的 run 不会在它脚下被换掉（D15）。 -/
-theorem a_script_that_rewrote_a_held_run_is_refused [DecidableEq Face] (replay : Replay Face)
-    (script : WireScript Face) (rewrote : starts_with replay.script.runs script.runs = false) :
-    replay.grow script = none := by
-  simp [Replay.grow, rewrote]
-
-/-! #### 拒绝不会被城重发 -/
-
-/-- 替身的每一种拒绝都不是 408、429 或 5xx，即不在 gateway 判为可重试的状态码里（那一集合的权威是 `crates/gateway/src/endpoint/failure.rs` 的 `ProviderFailure::retry`，这里把它写成定理的结论而不是一份定义）：城把一次拒绝读成不会自己好的失败，而不是一直重发。 -/
-theorem no_refusal_is_one_the_city_sends_again (refusal : Refusal) :
-    refusal.status ≠ 408 ∧ refusal.status ≠ 429 ∧ refusal.status < 500 := by
-  cases refusal <;> simp [Refusal.status]
 
 /-- 一份两个 run、各两条回复的脚本：第一轮依次开启 run 0 与 run 1，续轮按 run 1、run 0 的次序到，各拿到自己的第二条（`two_interleaved_runs_are_each_answered_from_their_own_replies` 那一跑的形状）。 -/
 example :

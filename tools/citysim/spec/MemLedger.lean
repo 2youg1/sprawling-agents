@@ -17,6 +17,7 @@
 ```rust
 pub struct MemLedger { /* lines: Vec<Vec<u8>>, next_seq, prev */ }
 impl MemLedger { pub fn new() -> Self;  pub fn raw_lines(&self) -> &[Vec<u8>]; }
+impl Default for MemLedger { … }   // 等于 new()
 impl kernel::Ledger for MemLedger { … }
 impl kernel::conformance::LedgerInspect for MemLedger { … }   // citysim 恒开 conformance feature
 
@@ -24,7 +25,9 @@ impl kernel::conformance::LedgerInspect for MemLedger { … }   // citysim 恒�
 pub fn check_chain(lines: Vec<Vec<u8>>) -> Result<(), AxError>;   // replay::verify_lines 薄封
 ```
 
-`MemLedger` 的 append 是 from_draft→canonical_line→chain_hash 推进，没有别的逻辑；它不落盘，也不采时钟（t 由执行器的计数时钟给出）。`raw_lines` 是它固有的读面：执行器的报告与字节对拍从这里读，`LedgerInspect` 的实现留给 conformance 套件。
+`MemLedger` 的 append 是 from_draft→canonical_line→chain_hash 推进，没有别的逻辑；它不落盘，也不采时钟（t 由执行器的计数时钟给出）。`raw_lines` 是它固有的读面：执行器的报告与字节对拍从这里读，`LedgerInspect` 的实现留给 conformance 套件。模型的 seq 是 `Nat`；Rust 的 `Seq::next` 到顶时返回错误，那一档模型不写（一本内存账走不到 2⁶⁴ 行）。
+
+平台：Windows、macOS、Linux 上逐字节相同，`golden_fixture_pins_cross_os_bytes` 在三个平台上判同一份夹具。
 
 D16 **检查器复用 `runtime::replay`，不自写链验证。** `check_chain` 是 `replay::verify_lines` 的薄封：验证语义只有一处，citysim 只加「检查器」这个角色名。被否：检查器自写链验证——citysim 独立性更强（不依赖 runtime），但即刻成为第二验证权威，与 replay 漂移时两边都对不上夹具。「重放与分叉共用重建器」的同一论证在此适用；citysim 依赖任何产品 crate 本就合法（第二 Main）。
 -/

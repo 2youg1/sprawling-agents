@@ -8,7 +8,7 @@
 
 规定 `just bench-startup` 的测量 Main `bin/bench_startup`（`tools/citysim/src/bin/bench_startup.rs`）与它的模块：`samples`、`actions`，以及 `actions` 下的 `archive`、`first_byte`、`footprint`、`history`（都在 `tools/citysim/src/bin/bench_startup/` 下）。本文件是 `tools/citysim/Spec.lean` 的一个分部；下面各节保留它们在 citysim 规格里的标签 §8-5、§8-5-1，别处引作 `tools/citysim/Spec.lean §8-5`。
 
-能写成定理的是读数本身不说假话的两件：可疑样本只标注不剔除，每个样本都留在读数里，标注只看它是否超过中位的倍数（`every_sample_is_kept_and_marked_by_the_cut`）；主导子步是中位最大的那一个，没有子步切分时答 `None`（`the_dominant_step_has_the_largest_middle`、`no_steps_have_no_dominant`）。分位怎样取是 sprawling 的 `Spread`（`crates/sprawling/Spec.lean` §8-129-2），倍数 `SUSPICIOUS_TIMES` 也住那里，模型把中位与倍数之积当参数；计时与文件计数由 `samples`、`footprint`、`actions` 的测试守着（§16）。
+能写成定理的是读数本身不说假话的两件：可疑样本只标注不剔除，每个样本都留在读数里，标注只看它是否超过中位的倍数（`every_sample_is_kept_and_marked_by_the_cut`）；主导子步是中位最大的那一个（`the_dominant_step_has_the_largest_middle`）；没有子步切分时答 `None` 是 `dominant` 的空表一臂，不另写定理。分位怎样取是 sprawling 的 `Spread`（`crates/sprawling/Spec.lean` §8-129-2），倍数 `SUSPICIOUS_TIMES` 也住那里，模型把中位与倍数之积当参数；计时与文件计数由 `samples`、`footprint`、`actions` 的测试守着（§16）。
 -/
 
 /-!
@@ -27,12 +27,12 @@ impl Samples {
     pub fn of(head: Duration, tail: Vec<Duration>) -> Samples;
     pub fn p(&self, Share) -> Duration;     // nearest-rank
     pub fn floor(&self) -> Duration;  pub fn peak(&self) -> Duration;
-    pub fn kind_at(&self, usize) -> SampleKind;
+    pub fn kind_at(&self, usize) -> SampleKind;   // 越界的下标读 Plain：那里没有量过
     pub fn suspicious(&self) -> usize;
     pub fn tier(&self) -> Tier;
 }
 // tools/citysim/src/bin/bench_startup/actions.rs —— shape: adapter（薄驱动产品公面，口径即边界；两处跨进程动作走的都是产品自己的路径）
-pub const SAMPLES: usize;
+pub(crate) const SAMPLES: usize;   // 200
 pub struct PerSample { pub processes: u64, pub files: u64, pub barriers: u64 }
 pub struct Action { pub total: Samples, pub steps: Vec<(&'static str, Samples)>, pub per_sample: PerSample }
 pub fn install(scratch: &Path, archive_path: &Path) -> Result<Action, AxError>;
@@ -55,9 +55,13 @@ pub fn dominant(steps: &[(&'static str, Samples)]) -> Option<&'static str>;
 
 **子指标拆分（各自计数，先行）**：进程创建（①1／样、②1／样、③0、④0，时间取子步）；文件创建（`PerSample.files`：①＝解包写出的文件数，③＝创世城市树的文件数，④＝首样本前后 city 文件数之差；②自身不落盘，记 0 而不是把它被指向的那棵树算进来）与耐久屏障（`PerSample.barriers`，一账一屏障，地板引用 `just bench` 的 `durability_barrier` 行，不另起第二仪表）；验签哈希＝0（签名动作未接，记 0 并注明，见 D3）；Defender 实时扫描干扰＝可疑样本数与下标（`SampleKind`），①③ 每样本全新首触（必扫），② 复用同一映像（首样本后转热）。
 
+**命令行**：`bench_startup` 不带参数量四个动作与首字节；`bench_startup first-byte` 只量首字节；别的参数以 `E_INVALID_ARGS` 拒。
+
+**平台**：计时口径在三个平台上相同，被量的东西不同。「`CreateProcess` 发出」在 macOS、Linux 上是 `std::process::Command::spawn` 发出（fork/exec），子步「进程创建」量的是 `spawn` 返回所花的时间，这在三个平台上代价不同；可执行文件名带本平台后缀（`std::env::consts::EXE_SUFFIX`，Windows 上是 `.exe`）；Defender 实时扫描只在 Windows 上有，其余平台的可疑样本标的是别的外扰；耐久屏障是 storage 在各平台上的那一个（`crates/storage/Spec.lean`）。所以读数按 `std::env::consts::OS` 与机器类属登记，两个平台的读数不互相比较。
+
 **失败**：产品公面的失败原样抛 `AxError`，不新增码；测量自体的失败（被测二进制不在构建档目录等）用既有码走三段式（动作/主体/`AxCode`/recovery）。
 
-**红**：`samples.rs` 的 nearest-rank 分位、可疑标注、第二档判定三个测试先行，跑一次见红再实现。`footprint` 三条（计数只数文件不数目录、按名找文件不论深度且不认目录、账行按行数而非按文件数）与 `actions` 一条（主导子步取中位最大者，无子步切分答 `None`）守的是**读数本身**：数错一个文件或指错一个主导件，报告就在说假话。
+Rust 检查：`samples.rs` 的三个测试判 nearest-rank 分位、可疑标注与第二档，是 `every_sample_is_kept_and_marked_by_the_cut` 的 Rust 一侧。`footprint` 三条（计数只数文件不数目录、按名找文件不论深度且不认目录、账行按行数而非按文件数）与 `actions` 一条（主导子步取中位最大者，无子步切分答 `None`）守的是**读数本身**：数错一个文件或指错一个主导件，报告就在说假话。
 
 D2 **计时边界取「动作的可观察端点」，进程动作以退出为端点。** 四动作里两个跨进程（安装的落位确认、启动）：端点是被拉起进程**退出被观察到**，因为「可接受命令」在产品外部可观察的最短证据就是一条轻命令被应答完毕。落盘动作（建城、开 session）以公面调用**返回**为端点，因为返回即账本已带自身屏障落盘（落账先于效果）。被击败的备选：以进程内部时点（参数解析完成、监听就绪）为端点——那要在产品里插桩，为测量加一条不发货的分支，改写被测路径。
 
@@ -65,7 +69,7 @@ D3 **安装边界含归档摘要校验、不含 PATH 写入。** 摘要校验（
 
 D4 **计量主语是 Rust measuring Main，不是 tools/adversary/ 也不是 criterion。** 四动作零行为断言，只计时；`tools/adversary/` 量化行为轨迹，Lean 侧不为墙钟定价。criterion 会是第二套仪表：本族挂 `just bench` 族，同一 wall-clock 口径（测而不门）。它拉起产品二进制——被测动作本身即进程边界；boundary 门判的是**检查**站哪一侧，其越过面 token（`CARGO_BIN_EXE`／`SPRAWLING_BIN` 等）本族一个不写，被测二进制取自构建档目录（`cargo build` 同时放置两个产物的地方），`just bench-startup` 先构建后测量，故不接手工路径也不会测到旧产物。被击败的备选：把四动作写进 `tools/adversary/`——那里没有秒表也没有本仓词汇，量出来的东西无法与 `just bench` 对表。
 
-D5 **被测可执行文件的名字在本 crate 只重述一处，注释点名它的权威。** `executable_name()` 拼的是 `install.rs` 装出来的那个名字：`INSTALLED_STEM` 加本平台后缀。该事实的权威是 `tools/xtask/src/platform.rs` 每平台的 `binary` 字段，`cargo xtask artifact` 把发行侧的四种拼法（工作流矩阵、两个安装脚本、npm shim）钉在它上面；citysim 这一处不在那四种之内，它是唯一需要这个名字的**测量**读者。够不到权威的原因是位置而非取舍：`install` 模块住在 `crates/sprawling/src/main.rs`，二进制的模块不可 import，而 `xtask` 是工具不是依赖。本 crate 内只留这一处拼写——`shipped_binary` 找的路径名与 `archive_of` 写出的 zip 成员名都读它。**重开参数**：这个名字若移进 `sprawling` lib 成为公共面，本函数改为读它，重述随之删除。
+D5 **被测可执行文件的名字在本 crate 只重述一处，注释点名它的权威。** `executable_name()` 拼的是 `install.rs` 装出来的那个名字：`INSTALLED_STEM` 的值 `sprawling` 加本平台后缀。该事实的权威是 `tools/xtask/src/platform.rs` 每平台的 `binary` 字段，`cargo xtask artifact` 把发行侧的四种拼法（工作流矩阵、两个安装脚本、npm shim）钉在它上面；citysim 这一处不在那四种之内，它是唯一需要这个名字的**测量**读者。够不到权威的原因是位置而非取舍：`install` 模块（`crates/sprawling/src/install.rs`）由 `crates/sprawling/src/main.rs` 声明，是二进制的模块，不可 import，而 `xtask` 是工具不是依赖。本 crate 内只留这一处拼写——`shipped_binary` 找的路径名与 `archive_of` 写出的 zip 成员名都读它。**重开参数**：这个名字若移进 `sprawling` lib 成为公共面，本函数改为读它，重述随之删除。
 -/
 
 /-!
@@ -83,7 +87,7 @@ D5 **被测可执行文件的名字在本 crate 只重述一处，注释点名�
 
 一个 run 是 `run_started`、八个回合（`prompt_assembled`、`model_called`、`model_returned`、`tool_called`、`tool_result`、`checkpoint_committed`）与 `run_frozen`，正文长度与实测城市的记录相近。这是每回合一条 `prompt_assembled` 的账本形状：产品写的是每 run 一条 `prompt_assembled` 加每回合一条 `prompt_shape_compared`（`crates/runtime/Spec.lean` §8-39 第 5 条），而每回合一条的账本仍被读入，故夹具是合法输入，其折叠代价与一座真正工作过的城同量级，但不逐条同形。账本经 `storage::jsonl::append` 的 `JsonlLedger::append_all` 按每批 10,000 条写入：分段、链与字节规范都是产品自己的，本族不拼一行账。
 
-**夹具城留在 `<构建档目录>/../bench-cities/<名>`**，下次复用：40 万条是 376 MB，每次重写要付的时间比量它还多。复用只看那座城在不在；`xtask mem --city` 读的就是同一座城（`tools/xtask/Spec.lean` §8-30），于是首字节与启动峰值出自同一份历史。
+**夹具城留在 `<构建档目录>/../bench-cities/<名>`**，下次复用：40 万条是 376 MB，每次重写要付的时间比量它还多。复用只看那座城的目录在不在；生成先写进 `<名>.partial`，写完才改名成 `<名>`，所以一次中断的生成留下的是下次先清掉的 `.partial`，不是一座半截的城；`xtask mem --city` 读的就是同一座城（`tools/xtask/Spec.lean` §8-30），于是首字节与启动峰值出自同一份历史。
 
 **每座夹具城的读数旁打印它账本的摘要**（`citysim::ledger_digest`，D8），两条首字节读数只在摘要相等时可比。每个样本那次 `serve` 的标准错误写进 `<构建档目录>/../bench-cities/<名>.serve.log`（后一个样本覆盖前一个），报告里打印这个路径。其中以 `opened the city in` 开头的那一行是产品自己拆出的开城各段耗时（`crates/sprawling/Spec.lean` §8-121），以 `the history is proved` 开头的那一行是后台证明走完、写者开始接受命令的时刻（就绪时刻 M3，`crates/sprawling/Spec.lean` §8-122）：本族不解析它们，只把它们和首字节读数放在同一次开城旁边给人读。所以一个样本量完首字节之后并不立刻停掉 `serve`，而是等日志里出现证明的结局（`the history is proved` 或 `the ledger stopped taking writes`），至多 300 s；首字节读数在这之前已经取下，不受这段等待影响。
 
@@ -166,10 +170,5 @@ theorem the_dominant_step_has_the_largest_middle (first : String × Nat) (rest :
       ∧ ∀ step ∈ first :: rest, step.2 ≤ chosen.2 :=
   ⟨rest.foldl pick first, the_fold_is_one_of_the_steps rest first, rfl,
     the_fold_is_at_least_every_step rest first⟩
-
-/-- 没有子步切分的动作（建城、开 session）没有主导子步，报告不编一个出来。 -/
-theorem no_steps_have_no_dominant (steps : List (String × Nat)) :
-    dominant steps = none ↔ steps = [] := by
-  cases steps <;> simp [dominant]
 
 end Citysim.BenchStartup

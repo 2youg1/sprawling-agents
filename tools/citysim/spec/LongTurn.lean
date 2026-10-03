@@ -25,7 +25,8 @@ pub fn long_turn(steps: u32, pauses: Pauses) -> Result<TurnReading, AxError>;
 - `windows` 是每次模型调用的 `upper_bound`，按调用序；`completion` 是冻结时的结局名；`ledger_bytes` 是模拟账本此刻的字节数。
 - `Pauses::Every` 在第 `steps` 的每个整数倍次 `read` 之后调 `at(k)`：`bin/long_turn` 在那里打印一行并等一行输入（D10），测试传 `Pauses::Never`。
 - `bin/long_turn <steps> [every]`：缺省每 100 步停一次；跑完打印 `done <completion> steps <n> window <bytes> ledger <bytes>`。
-- 测试：`long_turn::tests` 的 `a_long_turn_grows_its_window_by_one_step_at_a_time` 在 40 步与 80 步上断言结局、调用次数与增量处处相同。
+- 测试：`long_turn::tests` 的 `a_long_turn_grows_its_window_by_one_step_at_a_time` 在 40 步与 80 步上断言结局、调用次数与增量处处相同；它是 `the_increments_are_what_each_step_added` 在每步加一样多时的 Rust 检查。
+- 平台：窗口与增量在 Windows、macOS、Linux 上相同（计数的字节，不读进程）。内存读数不同：`cargo xtask mem` 在 Windows 读 private commit 与 peak commit，在 Linux 读 `smaps_rollup` 的 private 与 `VmHWM`，在 macOS 读 `ps` 的 rss（共享页整页计入），所以 `budgets.toml` 里的峰值上限按读数的机器类属登记（`tools/xtask/Spec.lean` §8-30）。
 -/
 
 namespace Citysim.LongTurn
@@ -53,11 +54,6 @@ theorem the_increments_are_what_each_step_added (first : Nat) (added : List Nat)
       simp only [windows] at this ⊢
       simp only [increments, Nat.add_sub_cancel_left]
       rw [← this]
-
-/-- 每一步加的一样多时，窗口的增量处处相同：这一跑是绿的。 -/
-theorem alike_steps_grow_the_window_evenly (first step count : Nat) :
-    increments (windows first (List.replicate count step)) = List.replicate count step :=
-  the_increments_are_what_each_step_added first _
 
 /-- D10 **长回合的门是请求窗口的逐步增量，RSS 只作读数。** 一步把更早的内容再加一遍，或者请求里多留了每一步的副本，那一步加进去的就比别的步多，增量不再处处相同，测试变红，不依赖机器，也不依赖扫描器的噪声。
 

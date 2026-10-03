@@ -10,15 +10,17 @@ import tools.citysim.spec.WireScript
 
 规定 `citysim::wire_script::exchange`（`tools/citysim/src/wire_script/exchange.rs`）：从一条回环连接上读一个请求、把脚本给它的回答写回去、把这次交换追加进记录，以及第一轮找不到还没开启的 run 时把脚本文件再读一遍。哪一个请求得到哪一个回答由 `spec/WireScript.lean` 的 `Replay` 判；本文件是 `tools/citysim/Spec.lean` 的一个分部，接着那里的 §8-10 写这一半。
 
-能写成定理的有两条：凭据头的值不落盘；脚本文件只在一个第一轮被 `no_run_left` 拒时再读，再读读不成或接不上时那次拒绝照旧、回放的状态不变，接得上时那个第一轮开启追加的 run。请求怎样从字节里读出来（`read_request`）由 Rust 守着，见 §16。
+能写成定理的是重读：脚本文件只在一个第一轮被 `no_run_left` 拒时再读，再读读不成或接不上时那次拒绝照旧、回放的状态不变，接得上时那个第一轮开启追加的 run。凭据头的值不落盘是一个判断的两臂，不写成定理，由 `the_same_request_twice_is_recorded_byte_for_byte_alike` 判记录里没有那个 key；请求怎样从字节里读出来（`read_request`）同样由 Rust 守着，见 §16。
 -/
 
 /-!
 ### 8-10（续）一次交换：什么算一个请求，记录写什么
 
-**什么算一个请求，只在读的那一处定**：头读到空行，再按 `content-length`（缺省为 0）读完正文，才是一个请求；连接在那之前断了，不回答、不记录、不花掉脚本里的一条，否则之后的每一轮都在答前一轮的问题。一条连接一个请求，回答带 `connection: close`；连接一条接一条地答，顺序就是到达顺序。
+**什么算一个请求，只在读的那一处定**：头读到空行，再按 `content-length`（缺省为 0）读完正文，才是一个请求；连接在那之前断了、静了 30 s（`QUIET`）、读过的字节超过 64 MiB（`LARGEST`），或 `content-length` 读不成数，都不算一个请求：不回答、不记录、不花掉脚本里的一条，否则之后的每一轮都在答前一轮的问题。正文按 UTF-8 读，读不成的字节换成替换字符。一条连接一个请求，回答带 `connection: close`；连接一条接一条地答，顺序就是到达顺序。
 
-**记录**：每次交换一行 JSON，追加进 `record`：`seq`（从 1 起）、`run` 与 `reply`（这次回答出自第几个 run 的第几条，都从 0 起；没有放进任何 run 的请求两者都是 `null`，§8-13）、`method`、`target`、`headers`（到达顺序，名字小写，值原样）、`body`（请求正文的文字）、`status`、`answer`（回答的正文）。所以一份记录按 `run` 筛出来，就是那个 run 自己的对话。同一份脚本收到同样的请求字节，记录逐字节相同。**凭据头的值不落盘**：名字是 `authorization`、`proxy-authorization` 或以 `api-key` 结尾的头，值写成 `redacted`。检查要的是「带了凭据」，不是凭据本身，而人在测试时填的 key 不能出现在任何文件里（`a_credential_never_reaches_the_record`）。
+**记录**：每次交换一行 JSON，追加进 `record`：`seq`（从 1 起）、`run` 与 `reply`（这次回答出自第几个 run 的第几条，都从 0 起；没有放进任何 run 的请求两者都是 `null`，§8-13）、`method`、`target`、`headers`（到达顺序，名字小写，值去掉两端空白）、`body`（请求正文的文字）、`status`、`answer`（回答的正文）。所以一份记录按 `run` 筛出来，就是那个 run 自己的对话。同一份脚本收到同样的请求字节，记录逐字节相同。**凭据头的值不落盘**：名字是 `authorization`、`proxy-authorization` 或以 `api-key` 结尾的头，值写成 `redacted`（`exchange::REDACTED`）。检查要的是「带了凭据」，不是凭据本身，而人在测试时填的 key 不能出现在任何文件里；`exchange::is_credential` 是这条规则唯一的一处。
+
+一次交换先记录、再写回答：回答写不出去时这次交换已经记下，脚本的那一条也已花掉，`answer_one` 以 `E_TOOL_UNAVAILABLE` 报它，`bin/provider` 写到标准错误后接着答下一条。重读接不上时 `answer_one` 先把 `no_run_left` 答完、记下，再以 `E_CONFIG_INVALID` 报接不上，`bin/provider` 同样只写到标准错误。
 -/
 
 namespace Citysim.WireScript.Exchange
@@ -26,26 +28,6 @@ namespace Citysim.WireScript.Exchange
 open Citysim.WireScript
 
 variable {Face : Type}
-
-/-- 一个头带不带凭据，名字已经小写（`exchange::is_credential`）。 -/
-def is_credential (name : String) : Bool :=
-  name == "authorization" || name == "proxy-authorization" || name.endsWith "api-key"
-
-/-- 一个头写进记录的值：凭据头写成 `redacted`（`exchange::REDACTED`，在这里是参数），其余照原样。 -/
-def recorded (redacted name value : String) : String :=
-  if is_credential name then redacted else value
-
-/-- 凭据头的值从不进记录，无论人填的是什么。 -/
-theorem a_credential_never_reaches_the_record (redacted name value : String)
-    (credential : is_credential name = true) :
-    recorded redacted name value = redacted := by
-  simp [recorded, credential]
-
-/-- 不带凭据的头照原样写进记录：一条检查能读到城送出的每一个头。 -/
-theorem every_other_header_is_recorded_as_sent (redacted name value : String)
-    (plain : is_credential name = false) :
-    recorded redacted name value = value := by
-  simp [recorded, plain]
 
 /-- 再读一遍脚本文件的结果：读成一份脚本，或读不成（`E_CONFIG_INVALID`）。 -/
 inductive Reread (Face : Type) where

@@ -8,7 +8,7 @@
 
 规定 `citysim::executor`（`tools/citysim/src/executor.rs`），以及它交给 `runtime::run::drive` 的两个剧本适配器 `citysim::script_model`、`citysim::script_tools` 与筛子的世界 `citysim::sieving`。本文件是 `tools/citysim/Spec.lean` 的一个分部；下面每一节保留它在 citysim 规格里的标签 §8-n，别处引作 `tools/citysim/Spec.lean §8-n`。
 
-确定性是这里的事（D1）：一次剧本执行重放时逐字节相同，因为剧本是写死的、时钟是一个按问询计数的计数器、执行是单线程，三者都不读外界。能写成定理的是其中三件：计数时钟交出的读数只取决于被问了几次（`the_clock_hands_out_its_count`）；场景只在回合边界说话，取消压过 steer（D7）；一次工具调用的键取每 run 一个的位次，所以同一 run 里两次调用的键永远不同，而按一波的时刻取键会把两次同名调用并成一次（D20）。剧本模型按序作答、用尽之后恒以空调用作结（`the_script_is_answered_in_order`）。回合本身怎样走是 runtime 的模型（`crates/runtime/spec/Turn.lean`、`crates/runtime/spec/Run.lean`），本文件不重述。
+确定性是这里的事（D1）：一次剧本执行重放时逐字节相同，因为剧本是写死的、时钟是一个按问询计数的计数器、执行是单线程，三者都不读外界。能写成定理的是其中三件：计数时钟交出的读数只取决于被问了几次（`the_clock_hands_out_its_count`）；场景只在回合边界说话，取消压过 steer（D7）；一次工具调用的键取每 run 一个的位次，所以同一 run 里两次调用的键永远不同（D20）。剧本模型按序作答、用尽之后恒以空调用作结（`the_script_is_answered_in_order`）。回合本身怎样走是 runtime 的模型（`crates/runtime/spec/Turn.lean`、`crates/runtime/spec/Run.lean`），本文件不重述。
 -/
 
 /-!
@@ -16,12 +16,23 @@
 
 ```rust
 pub struct ScriptModel { /* VecDeque<ModelReturn> */ }
-impl ScriptModel { pub fn new(script: Vec<ModelReturn>) -> Self; }
-impl kernel::Model for ScriptModel { /* 逐次弹出；耗尽后恒回空 calls（自然收束） */ }
+impl ScriptModel {
+    pub fn new(script: Vec<ModelReturn>) -> Self;
+    pub fn from_wire(kind: DialectKind, script: Vec<Value>) -> Result<Self, AxError>;   // 每条经 gateway::response_from_wire
+    pub fn silent() -> Self;                                                          // 空剧本
+}
+pub fn concluding(said: &str) -> Result<ModelReturn, AxError>;   // 说一句话、不调用工具的最后一条回复
+impl kernel::Model for ScriptModel { /* 逐次弹出；耗尽后恒回空正文、空 calls */ }
 
-pub struct ScriptTool { /* meta、outcomes: VecDeque<Result<ToolOutcome, AxError>> */ }   // impl kernel::Tool
+pub struct ScriptTool { /* meta、outcomes: Mutex<VecDeque<Result<ToolOutcome, AxError>>> */ }
+impl ScriptTool { pub fn new(meta: ToolMeta, outcomes: Vec<Result<ToolOutcome, AxError>>) -> Self; }
+impl kernel::Tool for ScriptTool { … }
+                     // 名字不是自己的 → E_INVALID_ARGS＋nearby＝自己的名字；脚本耗尽或锁中毒 → E_TOOL_UNAVAILABLE
 pub struct ScriptToolSet { /* BTreeMap<String, ScriptTool> */ }
-                     // 未知工具名 → E_TOOL_UNKNOWN＋nearby＝已注册名；耗尽脚本 → E_TOOL_UNAVAILABLE
+impl ScriptToolSet { pub fn new(tools: Vec<ScriptTool>) -> Self; pub fn empty() -> Self;
+                     pub fn meta_of(&self, name: &str) -> Option<&ToolMeta>;
+                     pub fn invoke(&mut self, call: &ToolCall) -> Result<ToolOutcome, AxError>; }
+                     // 未知工具名 → E_TOOL_UNKNOWN＋nearby＝已注册名
 
 pub enum CancelPoint { BeforeAssemble { turn: u32 }, BeforeCall { turn: u32 }, BeforeWave { turn: u32 } }
 pub struct Scenario { pub run: RunId, pub who: String, pub addr: Address, pub task: String,
@@ -40,9 +51,11 @@ pub fn run_scenario_on(ledger: &mut MemLedger, scenario: Scenario) -> Result<Sce
 
 - 事件序（无取消正常收束）：`checkpoint_committed`（JOB.md 先落）→ `run_started` → `prompt_assembled`（每 run 一条，`crates/runtime/Spec.lean` §8-39 第 5 条）→ 每回合 `prompt_shape_compared→model_called→model_returned[→tool_called→tool_result]*` → 空 calls 回合后 `handoff_written` → `run_frozen{completion:done, evidence:[末 model_returned]}`。
 - 取消在指定边界注入 `Interrupt::Cancel`（D7）：事件序断言是 `cancel_received` 后无新 `model_called`／`tool_called`，且 `handoff_written` 恒先于 `run_frozen`，三个边界各一条剧本。
-- `steer` 在给定回合的波边界递一句人话：它追加到下一个结果里，不打断正在进行的动作，故剧本断言循环照常继续。同一边界上取消压过 steer（`cancel_wins_over_steer`）。
+- `steer` 在给定回合的波边界递一句人话（`Interrupt::Steer`，说话者是 `Speaker::Person`）：它追加到下一个结果里，不打断正在进行的动作，故剧本断言循环照常继续。同一边界上取消压过 steer（`every_cancel_point_is_reached` 对任意 steer 成立）。
 - 回合数没有上限：驱动器跑到模型回空 calls 或被取消为止（`runtime::run::drive`）。
 - 一个空的剧本模型在第一次调用就什么也不说（`ScriptModel::silent`），run 以 `Completion::Limit` 冻结；一个要走到工作结尾的剧本用 `concluding` 写下它最后那句话，而不是让剧本用尽。
+- `ScriptToolSet` 今天只有它自己的测试调用：场景把 `ScriptTool` 一个一个注册进真 `ToolBench`（§8-3），按名分发归 bench。
+- 平台：本节与 §8-3、§8-4 的行为在 Windows、macOS、Linux 上相同；单线程、计数时钟、无 I/O 等待，字节由 kernel 的规范行决定，`golden-s1` 夹具在三个平台上判同一份字节（§2）。
 -/
 
 /-!
@@ -54,10 +67,10 @@ pub fn run_scenario_on(ledger: &mut MemLedger, scenario: Scenario) -> Result<Sce
 |---|---|
 | Ledger | MemLedger（真 jsonl 对拍已在 conformance；换盘不增新证据） |
 | 工具面 | 真 `ToolBench`（edit、status、exec 的 Program 臂）对 tempdir 城根；门路由在回合层 |
-| 模型 | `ScriptModel` 登录 wire 形：剧本写 Anthropic wire JSON，经 `gateway::dialect::response_from_wire` 解成 canonical 再出 ModelReturn（翻译面进链路） |
+| 模型 | `ScriptModel` 登录 wire 形：剧本写某一兼容格式的 wire JSON（`ScriptModel::from_wire` 取 `DialectKind`），经 `gateway::response_from_wire` 解成 canonical 再出 ModelReturn（翻译面进链路） |
 | 时钟／配置 | 逐步 +1ms，加 `FrozenConfig` 求值（clock_stamp 三层覆盖）接入 `StampGate` |
 
-门路由归 `ToolBench`，写域住 bench 内，executor 不手写 domain 门。`ScriptToolSet` 是 `kernel::tool` 缝的第二适配器（已登记的 conformance 证据），**注册进真 ToolBench**，于是脚本工具与真 L0 工具走同一条门路由。波前的检查点是**每波一次**而非只在 exec forecast 命中时：`ToolBench` 内的 forecast 检查点是它在 exec 臂上的加强，两者不互相替代。空波仍提交（同树 oid），因为链可重建优于省一次提交。tool_result 的信封由 executor 挂（`pipeline::package` 加 `StampGate`），与 serve 同位；场景把 `exec` 的结果交给筛子时（`sieve` 为 `Some`），信封由 `sieving::package_exec` 经城自己的筛子挂。
+门路由归 `ToolBench`，写域住 bench 内，executor 不手写 domain 门。`ScriptTool` 是 `kernel::Tool` 缝的第二适配器，**注册进真 ToolBench**，于是脚本工具与真 L0 工具走同一条门路由。波前的检查点是**每波一次**而非只在 exec forecast 命中时：`ToolBench` 内的 forecast 检查点是它在 exec 臂上的加强，两者不互相替代。空波仍提交（同树 oid），因为链可重建优于省一次提交。tool_result 的信封由 executor 挂（`pipeline::package` 加 `StampGate`），与 serve 同位；场景把 `exec` 的结果交给筛子时（`sieve` 为 `Some`），信封由 `sieving::package_exec` 经城自己的筛子挂。
 
 事件序断言：edit 成功的波携 `checkpoint_committed`（波前，断言形：每个 `tool_called` 之前最近的 `checkpoint_committed` 晚于最近的 `model_returned`）；tool_result 信封可携 ClockStamp（非 Off 时）；越域写被 domain 门拒且 refusal 以 tool_result 回流；链恒可验；双跑字节对拍。gateway 进 sim 的只有 dialect 翻译面（纯函数，确定性保持）；endpoint 的 HTTP 面不入 sim（网络即非确定），其验证住 gateway 自身的回环假服务测试（`crates/gateway/Spec.lean` §2）。
 -/
@@ -157,25 +170,13 @@ def answer_at (point : SafePoint) (cancel : Option CancelPoint) (steer : Option 
       | .BeforeWave _, some (at_, text) => if at_ = turn then .Steer text else .None
       | _, _ => .None
 
-/-- 一个回合里被问很多次的两个边界上，场景什么都不说。 -/
-theorem inside_a_turn_the_scenario_says_nothing (turn call : Nat) (cancel : Option CancelPoint)
-    (steer : Option (Nat × String)) :
-    answer_at (.BeforeToolCall turn call) cancel steer = .None
-      ∧ answer_at (.BeforeSpawn turn) cancel steer = .None := by
-  simp [answer_at]
-
-/-- 剧本写下的每一个取消点都在它那个边界上被答成取消，steer 写在哪里都一样：三个边界各一条剧本是可写的。 -/
+/-- 剧本写下的每一个取消点都在它那个边界上被答成取消，steer 写在哪里都一样，所以同一边界上取消压过 steer：三个边界各一条剧本是可写的。回合内被问很多次的 `BeforeToolCall`、`BeforeSpawn` 上场景什么都不说，那是 `answer_at` 的两条臂，不另写定理。 -/
 theorem every_cancel_point_is_reached (cancel : CancelPoint) (steer : Option (Nat × String)) :
     ∃ point, answer_at point (some cancel) steer = .Cancel := by
   cases cancel with
   | BeforeAssemble turn => exact ⟨.BeforeAssemble turn, by simp [answer_at]⟩
   | BeforeCall turn => exact ⟨.BeforeCall turn, by simp [answer_at]⟩
   | BeforeWave turn => exact ⟨.BeforeWave turn, by simp [answer_at]⟩
-
-/-- 同一边界上取消压过 steer。 -/
-theorem cancel_wins_over_steer (turn : Nat) (text : String) :
-    answer_at (.BeforeWave turn) (some (.BeforeWave turn)) (some (turn, text)) = .Cancel := by
-  simp [answer_at]
 
 /-- steer 只在它那一回合的波边界上递到，别处都听不到。 -/
 theorem a_steer_is_heard_only_at_its_wave (point : SafePoint) (cancel : Option CancelPoint)
@@ -226,7 +227,7 @@ theorem keyed_places_from (run next : Nat) (actions : List String) :
     · exact Nat.le_refl _
     · exact Nat.le_of_succ_le (ih (next + 1) key later)
 
-/-- D20 **一次工具调用的键：每跑一个的位次，加上整个动作的字节。** 动作字节取 `ToolCall::action`（`crates/kernel/Spec.lean` §8-23，全库唯一一份），位次取每跑一个的计数器，与 `accounting::worker` 同形，故两个驱动器对「一次工具调用的键怎么算」只有一份读法。被击败的读法：位次取回合时钟 `t`、动作字节只取工具名（`byInstant`）。`runtime::run` 给一波里的每次调用同一个 `t`（一波是一个瞬间），于是一波之内两次同名调用拿到相同的 `IdemKey`，`ToolBench::invoke` 的去重把第二次判成重复，参数不同也不救；而且那个 `Seq` 是钟读数换了个类型，违反确定性规则「位次不从时钟来」（ARCHITECTURE.md §10 第 7 条）。
+/-- D20 **一次工具调用的键：每跑一个的位次，加上整个动作的字节。** 动作字节取 `ToolCall::action`（`crates/kernel/Spec.lean` §8-23，全库唯一一份），位次取每跑一个的计数器，与 `accounting::worker` 同形，故两个驱动器对「一次工具调用的键怎么算」只有一份读法。被击败的读法：位次取回合时钟 `t`、动作字节只取工具名。`runtime::run` 给一波里的每次调用同一个 `t`（一波是一个瞬间），于是一波之内两次同名调用拿到相同的 `IdemKey`，`ToolBench::invoke` 的去重把第二次判成重复，参数不同也不救；而且那个 `Seq` 是钟读数换了个类型，违反确定性规则「位次不从时钟来」（ARCHITECTURE.md §10 第 7 条）。
 
 同一个 run 里，没有两次调用的键输入相同，无论它们的动作是什么、落在哪一波。 -/
 theorem no_two_calls_of_a_run_share_a_key (run next : Nat) (actions : List String) :
@@ -238,22 +239,6 @@ theorem no_two_calls_of_a_run_share_a_key (run next : Nat) (actions : List Strin
     refine ⟨?_, ih (next + 1)⟩
     intro member
     exact absurd (keyed_places_from run (next + 1) rest _ member) (Nat.not_succ_le_self next)
-
-/-- 一次工具调用：工具名与参数。 -/
-structure Call where
-  name : String
-  args : String
-  deriving DecidableEq, Repr
-
-/-- 被击败的读法：位次取一波的时刻 `instant`，动作只取工具名。 -/
-def byInstant (run instant : Nat) (call : Call) : KeyInput :=
-  ⟨run, instant, call.name⟩
-
-/-- 那种读法下，一波之内两次同名的调用拿到同一把键，无论参数怎样不同，第二次会被判成重复。 -/
-theorem keying_by_the_instant_merges_two_calls_of_one_wave (run instant : Nat) (one other : Call)
-    (same_name : one.name = other.name) :
-    byInstant run instant one = byInstant run instant other := by
-  simp [byInstant, same_name]
 
 /-! #### 剧本模型 -/
 
