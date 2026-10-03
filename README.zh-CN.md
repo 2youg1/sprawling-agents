@@ -83,7 +83,7 @@ harness = "claude_code"   # 或 "codex"、"grok_build"、"kimi_code"、"pi"
 - 你的 git 历史保持原样。检查点放在 `refs/sprawling/runs/` 下，只有空仓库的第一个提交和审过的活合并进来才会移动分支。`Sprawling-*` trailer 写明每个提交出自哪次 run、哪位居民、哪个模型，`sprawling whose <city> <commit>` 从 Ledger 回答某个提交是哪次 run 写的。
 - 成本可以按 run、居民、prefix 段、工具和 skill 分开看，取 provider 的账单，没有账单就按价目表算。根本没有价格时（比如订阅），页面直接说没有价格，而不是打印 `$0.00`。
 - 浏览器通知只为需要你做的决定而弹。
-- 有些错误写不出来：把凭证发上线路、删除却不留退路、没有证据就宣称完成、给计划的一部分比父节点更多的权重、自己验收自己的活，这些在类型里都无法表示，<!-- xtask:begin compile_fail_cases -->18<!-- xtask:end --> 个编译失败用例证明了这一点。
+- 有些错误写不出来：把凭证发上线路、删除却不留退路、没有证据就宣称完成、给计划的一部分比父节点更多的权重、自己验收自己的活，这些在类型里都无法表示，<!-- xtask:begin compile_fail_cases -->19<!-- xtask:end --> 个编译失败用例证明了这一点。
 
 ## 现在能做什么，还不能做什么
 

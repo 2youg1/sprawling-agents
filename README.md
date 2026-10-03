@@ -83,7 +83,7 @@ The **official harnesses** group in settings shows the command that starts each 
 - Your git history keeps its shape. Checkpoints live under `refs/sprawling/runs/`, and a branch moves only for the first commit of an empty repository or the merge of reviewed work. `Sprawling-*` trailers name each commit's run, resident and model, and `sprawling whose <city> <commit>` answers from the Ledger which run wrote it.
 - Cost is cut by run, resident, prefix segment, tool and skill, from the provider's bill or else the price sheet. With no price at all, as with a subscription, the page says so instead of printing `$0.00`.
 - A browser notification is raised only for a decision that needs you.
-- Some mistakes cannot be written: sending a credential over the wire, a deletion with no way back, finishing without evidence, giving part of a plan more weight than its parent and verifying your own work are unrepresentable in the types, as <!-- xtask:begin compile_fail_cases -->18<!-- xtask:end --> compile-fail tests prove.
+- Some mistakes cannot be written: sending a credential over the wire, a deletion with no way back, finishing without evidence, giving part of a plan more weight than its parent and verifying your own work are unrepresentable in the types, as <!-- xtask:begin compile_fail_cases -->19<!-- xtask:end --> compile-fail tests prove.
 
 ## What works today, and what does not
 
