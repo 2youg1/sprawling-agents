@@ -8,7 +8,7 @@ import crates.storage.spec.Jsonl.Verify
 /-!
 # 预分配的段：段尾的零字节不是撕裂
 
-规定段文件预分配（`File::set_len` 把段先撑到一个容量）之后，`open` 的尾段扫描（`crates/storage/src/jsonl/open.rs`）怎样读段尾（`crates/storage/Spec.lean` §8-1，屏障的各平台臂见 `crates/storage/spec/Jsonl/Barrier.lean` storage D24）。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。今天的代码不预分配；本文件是 TF2 的那一臂被选中之前必须守住的不变式。
+规定段文件预分配（`File::set_len` 把段先撑到一个容量）之后，`open` 的尾段扫描（`crates/storage/src/jsonl/open.rs`）怎样读段尾（`crates/storage/Spec.lean` §8-1，屏障的各平台臂见 `crates/storage/spec/Jsonl/Barrier.lean` storage D24）。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。今天的代码不预分配，但 `open` 的读者已经守着这三条性质（`crates/storage/src/jsonl/open/preallocated.rs` 在真实的段上逐条检查），所以预分配那一臂被选中时读路径不必再改。
 
 预分配之后，最后一条记录之后不再是文件末尾，而是一串零字节。一段于是是一列槽：一个槽要么是今天的一项 `Raw`（一行，或读不出信封的字节），要么是零。读者先剥掉段尾连续的零，再把剩下的交给今天的 `scan`；剥不掉的零（后面还跟着非零字节）读作 `notALine`，与撕裂同一种处置。
 

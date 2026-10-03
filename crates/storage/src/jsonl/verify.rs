@@ -93,8 +93,14 @@ impl LineCheck {
 
     /// Whether `raw` carries a ledger envelope at all: a torn write never
     /// does, so a line that does is history, whatever else is wrong with it.
+    /// A run of zero bytes is preallocated space a write had not reached,
+    /// not part of a line, so the bytes after the last zero are judged on
+    /// their own (`crates/storage/spec/Jsonl/Preallocate.lean`,
+    /// `zeros_before_a_line_are_not_the_end`).
     pub(crate) fn carries_envelope(raw: &[u8]) -> bool {
-        serde_json::from_slice::<Envelope>(raw).is_ok()
+        raw.rsplit(|byte| *byte == 0)
+            .next()
+            .is_some_and(|after| serde_json::from_slice::<Envelope>(after).is_ok())
     }
 
     /// Judge one line (without its `\n`) and, when it passes, advance the

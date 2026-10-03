@@ -222,10 +222,18 @@ impl JsonlLedger {
     ) -> Result<(u64, ProofCount), StorageError> {
         let boundary = self.boundary(segments, last)?;
         let prior = boundary.prior;
-        let bytes = self.vfs.read(last).map_err(io_err("read segment", last))?;
+        let file = self.vfs.read(last).map_err(io_err("read segment", last))?;
+        // Zeros after the last record are preallocated space, not a tear
+        // (`crates/storage/spec/Jsonl/Preallocate.lean`): the scan reads the
+        // segment without them, and the writer resumes where they begin.
+        let filled = file
+            .iter()
+            .rposition(|byte| *byte != 0)
+            .map_or(0, |at| at.saturating_add(1));
+        let bytes = file.get(..filled).unwrap_or_default();
         let start = proof.start(
             last,
-            &bytes,
+            bytes,
             LineCheck::after(boundary.prev, boundary.next_seq),
         );
         let mut check = start.check;
@@ -254,10 +262,12 @@ impl JsonlLedger {
             // breaking line carries an envelope (a fork: a second writer
             // continued the same prev) or intact records still follow it
             // (non-tail damage). Newline-bearing garbage is no record.
+            // The breaking line itself counts: a record behind a run of
+            // zeros still carries its envelope.
             let later_intact = || {
                 lines
                     .iter()
-                    .skip(index.saturating_add(1))
+                    .skip(index)
                     .any(|l| LineCheck::carries_envelope(l))
             };
             let source = match fault {
@@ -294,10 +304,10 @@ impl JsonlLedger {
         let run_prev = check.prev();
         let run_seq = check.expected();
 
-        let total = bytes.len();
-        let dropped = u64::try_from(total.saturating_sub(valid_len)).unwrap_or(u64::MAX);
+        let total = file.len();
+        let dropped = u64::try_from(filled.saturating_sub(valid_len)).unwrap_or(u64::MAX);
 
-        if dropped > 0 {
+        if total > valid_len {
             if valid_len == 0 {
                 // Whole last segment is torn. Remove it; the tail falls
                 // back to the prior segment (or to an empty city when this
