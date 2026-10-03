@@ -73,37 +73,61 @@ impl Marker {
 ///
 /// Returns the payload and how many spans were replaced, because a count
 /// is what a diagnostic line can say without saying what it found.
+///
+/// The payload is rewritten where it lies (runtime D37): a payload with
+/// no hit comes back as the same allocation, byte for byte, and a hit
+/// replaces the string it hit and moves nothing else.
 #[must_use]
-pub fn redact(payload: Map<String, Value>) -> (Map<String, Value>, u32) {
-    copied(&payload)
-}
-
-fn copied(payload: &Map<String, Value>) -> (Map<String, Value>, u32) {
+pub fn redact(mut payload: Map<String, Value>) -> (Map<String, Value>, u32) {
     let mut hits = 0;
-    let mut out = Map::new();
-    for (key, value) in payload {
-        out.insert(key.clone(), walk(value, &mut hits));
+    for value in payload.values_mut() {
+        walk(value, &mut hits);
     }
-    (out, hits)
+    (payload, hits)
 }
 
-fn walk(value: &Value, hits: &mut u32) -> Value {
+fn walk(value: &mut Value, hits: &mut u32) {
     match value {
         Value::String(text) => {
-            let (replaced, found) = redact_text(text, Marker::Fingerprinted);
-            *hits = hits.saturating_add(found);
-            Value::String(replaced)
-        }
-        Value::Array(items) => Value::Array(items.iter().map(|item| walk(item, hits)).collect()),
-        Value::Object(map) => {
-            let mut out = Map::new();
-            for (key, item) in map {
-                out.insert(key.clone(), walk(item, hits));
+            if let Some((replaced, found)) = replaced(text, Marker::Fingerprinted) {
+                *hits = hits.saturating_add(found);
+                *text = replaced;
             }
-            Value::Object(out)
         }
-        Value::Null | Value::Bool(_) | Value::Number(_) => value.clone(),
+        Value::Array(items) => items.iter_mut().for_each(|item| walk(item, hits)),
+        Value::Object(map) => map.values_mut().for_each(|item| walk(item, hits)),
+        Value::Null | Value::Bool(_) | Value::Number(_) => {}
     }
+}
+
+/// The copying walk the owned one replaced, kept as the reference the
+/// equivalence proptest holds it to.
+#[cfg(test)]
+fn copied(payload: &Map<String, Value>) -> (Map<String, Value>, u32) {
+    fn walk(value: &Value, hits: &mut u32) -> Value {
+        match value {
+            Value::String(text) => {
+                let (replaced, found) = redact_text(text, Marker::Fingerprinted);
+                *hits = hits.saturating_add(found);
+                Value::String(replaced)
+            }
+            Value::Array(items) => {
+                Value::Array(items.iter().map(|item| walk(item, hits)).collect())
+            }
+            Value::Object(map) => Value::Object(
+                map.iter()
+                    .map(|(key, item)| (key.clone(), walk(item, hits)))
+                    .collect(),
+            ),
+            Value::Null | Value::Bool(_) | Value::Number(_) => value.clone(),
+        }
+    }
+    let mut hits = 0;
+    let out = payload
+        .iter()
+        .map(|(key, value)| (key.clone(), walk(value, &mut hits)))
+        .collect();
+    (out, hits)
 }
 
 /// One string, with every secret shape in it replaced in place.
@@ -113,10 +137,17 @@ fn walk(value: &Value, hits: &mut u32) -> Value {
 /// after a replacement.
 #[must_use]
 pub fn redact_text(text: &str, marker: Marker) -> (String, u32) {
+    replaced(text, marker).unwrap_or_else(|| (text.to_owned(), 0))
+}
+
+/// The text with its secret shapes replaced and how many there were, or
+/// nothing when no span was replaced, so a caller that owns the text
+/// keeps it instead of taking a copy.
+fn replaced(text: &str, marker: Marker) -> Option<(String, u32)> {
     let bytes = text.as_bytes();
     let spans = kernel::secret::scan(bytes);
     if spans.is_empty() {
-        return (text.to_owned(), 0);
+        return None;
     }
     let mut out = String::with_capacity(text.len());
     let mut at = 0usize;
@@ -146,7 +177,7 @@ pub fn redact_text(text: &str, marker: Marker) -> (String, u32) {
     if let Some(rest) = bytes.get(at..).and_then(|b| std::str::from_utf8(b).ok()) {
         out.push_str(rest);
     }
-    (out, hits)
+    (hits > 0).then_some((out, hits))
 }
 
 /// How many hex characters of a value's hash stand for the value.
