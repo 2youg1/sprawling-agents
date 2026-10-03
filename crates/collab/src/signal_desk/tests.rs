@@ -70,7 +70,9 @@ fn sending_posts_the_signal_at_the_call() {
             assert_eq!(signal.room().as_str(), "lab/room2");
             assert_eq!(signal.from(), "potter@lab.1");
         }
-        other => panic!("a send posts an enqueue, not {other:?}"),
+        other @ (SignalEffect::Consumed { .. }
+        | SignalEffect::WaitStarted(_)
+        | SignalEffect::WaitEnded(_)) => panic!("a send posts an enqueue, not {other:?}"),
     }
 }
 
@@ -218,7 +220,9 @@ fn an_unreadable_steer_is_refused_and_still_recorded_as_consumed() {
             assert_eq!(signal.id().as_str(), "s1");
             assert_eq!(by, "potter@lab.1");
         }
-        other => panic!("taking a signal consumes it, not {other:?}"),
+        other @ (SignalEffect::Enqueued(_)
+        | SignalEffect::WaitStarted(_)
+        | SignalEffect::WaitEnded(_)) => panic!("taking a signal consumes it, not {other:?}"),
     }
 }
 

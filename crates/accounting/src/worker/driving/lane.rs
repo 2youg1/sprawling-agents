@@ -112,6 +112,56 @@ impl Interrupting {
         }
     }
 
+    /// Holds the run at its `BeforeAssemble` safe point while it waits for
+    /// a reply (collab D9), making no model call, and answers how the
+    /// wait ended: the reply or the timeout as a steer from the room
+    /// waited on, or `Cancel` when the run is stopped meanwhile, which
+    /// ends the wait as left. `None` when the run is not waiting.
+    ///
+    /// Only the person and the scope are asked while it waits, not the
+    /// desk's steers: taking a steer moves the slot into the queue, and
+    /// the reply must stay in the slot for the desk to see it. A clock,
+    /// desk or post that fails lets the run go on rather than stopping
+    /// it at a safe point; the wait is kept, and the drive's own clock
+    /// and ledger reads report the failure.
+    fn wait_for_reply(&mut self, clock: &dyn crate::Clock) -> Option<Interrupt> {
+        loop {
+            let at = clock.now().ok()?;
+            let turn = self.steers.lock().ok()?.wait_out(at).ok()?;
+            match turn {
+                collab::WaitTurn::Idle => return None,
+                collab::WaitTurn::Ended { source, text } => {
+                    return Some(Interrupt::Steer { source, text });
+                }
+                collab::WaitTurn::Waiting => {}
+            }
+            if self.stopped_while_waiting() {
+                let mut desk = self.steers.lock().ok()?;
+                return Some(match desk.wait_left() {
+                    Ok(()) | Err(_) => Interrupt::Cancel,
+                });
+            }
+            std::thread::sleep(std::time::Duration::from_millis(HALT_SLICE_MS));
+        }
+    }
+
+    fn stopped_while_waiting(&mut self) -> bool {
+        if self.scope_stopping() {
+            return true;
+        }
+        if self.held.is_some() {
+            return false;
+        }
+        match self.person.as_ref().map(|ask| ask(self.run_id)) {
+            Some(Interrupt::Cancel) => true,
+            Some(steer @ Interrupt::Steer { .. }) => {
+                self.held = Some(steer);
+                false
+            }
+            Some(Interrupt::None) | None => false,
+        }
+    }
+
     fn ask(&mut self) -> Interrupt {
         if self.scope_stopping() {
             return Interrupt::Cancel;
@@ -157,6 +207,11 @@ impl Interrupting {
 /// scope is still open, and a run that carried on would be running
 /// inside a scope a person may already have shut (`crates/sprawling/Spec.lean`
 /// §8-73).
+/// How late a halt may land while a run waits out a provider or a
+/// reply. It is the scale a person notices, not a reading of this
+/// machine.
+const HALT_SLICE_MS: u64 = 50;
+
 pub(super) fn scope_stopping(
     backlog: &runtime::Backlog,
     member: Option<runtime::BacklogId>,
@@ -245,14 +300,22 @@ pub(crate) fn drive_run<L: Ledger>(
     let (driven, ran) = {
         let mut interrupt = |point: SafePoint| {
             let mut asking = asking.borrow_mut();
-            if let SafePoint::BeforeWave { .. } = point {
-                asking.answered();
+            match point {
+                SafePoint::BeforeWave { .. } => asking.answered(),
+                // The one point before a request is put together, so a
+                // waiting run makes no model call and the reply joins
+                // the very request it goes on with (collab D9).
+                SafePoint::BeforeAssemble { .. } => {
+                    if let Some(ended) = asking.wait_for_reply(clock.as_ref()) {
+                        return ended;
+                    }
+                }
+                SafePoint::BeforeCall { .. }
+                | SafePoint::BeforeToolCall { .. }
+                | SafePoint::BeforeSpawn { .. } => {}
             }
             asking.ask()
         };
-        // How late a halt may land while a run waits out a provider. It
-        // is the scale a person notices, not a reading of this machine.
-        const HALT_SLICE_MS: u64 = 50;
         let mut wait = |until: TimeMs| loop {
             if asking.borrow_mut().halted() {
                 return NextCall::Halted;
@@ -327,3 +390,12 @@ pub(crate) fn drive_run<L: Ledger>(
         workbench,
     })
 }
+
+#[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::panic,
+    clippy::indexing_slicing,
+    reason = "test code"
+)]
+mod wait_tests;

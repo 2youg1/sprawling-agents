@@ -120,8 +120,8 @@ pub enum WaitTurn {
     /// Still waiting: ask again after a slice of the clock.
     Waiting,
     /// The wait ended; `text` is what the model reads when it goes on,
-    /// as from `from`.
-    Ended { from: String, text: String },
+    /// landed as a steer from `source` (`@<the room waited on>`).
+    Ended { source: String, text: String },
 }
 
 impl SignalDesk {
@@ -167,7 +167,7 @@ impl SignalDesk {
             );
             self.held.push(reply);
             return Ok(WaitTurn::Ended {
-                from: wait.on.as_str().to_owned(),
+                source: crate::steer::agent_source(wait.on.as_str()),
                 text,
             });
         }
@@ -177,7 +177,7 @@ impl SignalDesk {
         (self.post.0)(&wait.ended(WaitEnd::Timeout))?;
         self.waiting = None;
         Ok(WaitTurn::Ended {
-            from: wait.on.as_str().to_owned(),
+            source: crate::steer::agent_source(wait.on.as_str()),
             text: format!(
                 "no reply came from {} within {} s; go on without it",
                 wait.on.as_str(),
@@ -203,4 +203,12 @@ impl SignalDesk {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::panic,
+    clippy::indexing_slicing,
+    clippy::arithmetic_side_effects,
+    clippy::wildcard_enum_match_arm,
+    reason = "test code"
+)]
 mod tests;

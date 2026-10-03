@@ -7,8 +7,6 @@
 //! `waits_end`) and the two-room reply and timeout, through the tool and
 //! the desk's safe-point door.
 
-#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
-
 use std::sync::{Arc, Mutex};
 
 use kernel::event::record::{SignalKind, WaitEnd};
@@ -136,7 +134,7 @@ fn a_waiting_send_resumes_with_the_reply() {
     assert_eq!(
         a.turn(START + 2),
         WaitTurn::Ended {
-            from: "lab/b".to_owned(),
+            source: "@lab/b".to_owned(),
             text: "lab/b replied: free now".to_owned(),
         }
     );
@@ -165,7 +163,7 @@ fn an_unanswered_wait_ends_at_the_deadline() {
     assert_eq!(
         a.turn(START + PATIENCE_MS),
         WaitTurn::Ended {
-            from: "lab/b".to_owned(),
+            source: "@lab/b".to_owned(),
             text: format!(
                 "no reply came from lab/b within {} s; go on without it",
                 PATIENCE_MS / 1000

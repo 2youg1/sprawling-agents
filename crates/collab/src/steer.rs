@@ -162,7 +162,7 @@ pub(crate) fn sender_note(state: crate::inbox::SenderState) -> String {
     )
 }
 
-fn agent_source(id: &str) -> String {
+pub(crate) fn agent_source(id: &str) -> String {
     format!("@{id}")
 }
 
