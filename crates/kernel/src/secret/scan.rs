@@ -354,6 +354,26 @@ mod tests {
         }
     }
 
+    /// A prefix that overlaps itself opens one key, not two: `AKIA`
+    /// ends with the letter it starts with, and the second `AKIA` inside
+    /// `AKIAKIA` lies within the first key's prefix.
+    #[test]
+    fn a_self_overlapping_prefix_opens_one_key() {
+        let text = format!(
+            "{}{}",
+            "AKIA".repeat(2).replacen("AA", "A", 1),
+            "B2C3D4E5F6G7H8"
+        );
+        let hits = scan(text.as_bytes());
+        assert_eq!(hits, reference::scan(text.as_bytes()));
+        assert_eq!(
+            hits.iter()
+                .map(|hit| (hit.start, hit.provider))
+                .collect::<Vec<_>>(),
+            [(0, Some("aws"))]
+        );
+    }
+
     /// A scan looks at every byte it is given at least once, and counts
     /// that it did: the work the growth test compares is work done.
     #[test]
