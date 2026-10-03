@@ -78,12 +78,25 @@ impl Outdoors {
         }
     }
 
+    /// Keeps the door on a thread of its own and hands it to `then`
+    /// there: the city key it reads can wait on a Keychain dialog nobody
+    /// answers, and the serve that called this listens for Ctrl-C at
+    /// once (`crates/sprawling/spec/Console.lean`).
+    pub(super) fn keep_aside(self, then: impl FnOnce(Result<Remote, AxError>) + Send + 'static) {
+        let runtime = tokio::runtime::Handle::try_current();
+        std::thread::spawn(move || {
+            // Outside a runtime `keep` refuses with its own reason.
+            let _inside_the_runtime = runtime.as_ref().map(tokio::runtime::Handle::enter);
+            then(self.keep());
+        });
+    }
+
     /// The door this serve keeps, closed, with the devices paired before.
     ///
     /// # Errors
     /// A ledger with no genesis line to name the city key by; an
     /// unreadable device table; a vault or a random source that refuses.
-    pub(super) fn keep(self) -> Result<Remote, AxError> {
+    fn keep(self) -> Result<Remote, AxError> {
         let Outdoors {
             city_root,
             relay,

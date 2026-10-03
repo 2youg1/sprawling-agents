@@ -338,15 +338,16 @@ impl Listening {
         // the first one, reached from the keyboard that started the city.
         if let Some(terminal) = console {
             let watching = config.events.subscribe();
-            let remote = outdoors.keep();
-            front.attend(&remote, Arc::new(|line: &str| println!("{line}")));
-            // The same answering function the socket was given.
-            let inside = crate::console::Inside {
-                desk: Arc::clone(&desk),
-                answering: Arc::clone(&answering),
-                remote,
-            };
-            crate::console::start(terminal, inside, watching);
+            let (desk, answering) = (Arc::clone(&desk), Arc::clone(&answering));
+            outdoors.keep_aside(move |remote| {
+                front.attend(&remote, Arc::new(|line: &str| println!("{line}")));
+                let inside = crate::console::Inside {
+                    desk,
+                    answering,
+                    remote,
+                };
+                crate::console::start(terminal, inside, watching);
+            });
         }
         // Ctrl-C is an orderly close, so a stop somebody chose and a stop
         // that was a crash do not leave the same silence in the record.
