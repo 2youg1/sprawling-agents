@@ -24,6 +24,8 @@ just check-client            # lint, typecheck, the client's own tests
 
 `cargo xtask render --width <px>` narrows a run to one of the widths the gate knows, which is the fast loop while one layout is being settled. A screen is finished when `cargo xtask render` is green against `#/gallery`, `just check-client` passes, and a person has walked it as the last section describes.
 
+One test file runs as `bun run test src/<path>.test.ts` from `client/`. The script passes `--conditions=browser`, so svelte resolves the browser build the page runs, where `$effect` runs; Bun reads that condition only from the command line, and `client/scripts/runes.ts`, the test preload, stops a plain `bun test` with this command rather than let it test svelte's server build.
+
 ## Building a screen, in order
 
 1. **Place it on the grid.** The shell is one CSS grid of twelve columns with 32 px margins, 24 px gutters and an 8 px baseline (§4-33 below). A region is placed by the column lines it starts and ends on, a panel of the world layer takes the shell's columns through `subgrid`, and no page container is centred with `mx-auto`, so two edges that should line up do so because they are the same line rather than because somebody measured them.

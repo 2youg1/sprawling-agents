@@ -12,6 +12,20 @@
 import { plugin } from "bun";
 import { compileModule } from "svelte/compiler";
 
+// The page runs svelte's browser build, and so must a test: under the
+// server build `$effect` never runs and a test of an effect fails on an
+// assertion that says nothing about why. Bun takes the `browser`
+// condition only as the `--conditions` flag - `bunfig.toml` has no key
+// for it - so a run without the flag stops here and names the command
+// that carries it, instead of testing the server build.
+if (!Bun.resolveSync("svelte", import.meta.dir).replaceAll("\\", "/").endsWith("/index-client.js")) {
+  console.error(
+    "bun test resolved svelte's server build: run the tests through `bun run test [file...]`, " +
+      "which passes `--conditions=browser`",
+  );
+  process.exit(1);
+}
+
 plugin({
   name: "svelte runes",
   setup(build) {
