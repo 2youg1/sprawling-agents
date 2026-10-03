@@ -101,6 +101,8 @@ impl WorktreeLease {
 - **`Reviewed-by:` 只在两件事同时成立时出现**：调用方传了 `reviewed_by_person: true`，
   且运行中的机器的仓库 git config 里同时有 `user.name` 与 `user.email`。人的名字是人的，
   城不替人编一个。
+  这一处是本模块唯一读整条 config 链（仓库、global、XDG、system）的地方：它为此另开一次仓库，读不到即不写这一行。
+- **城的 git 只读仓库自己的 config 文件。** `Worktrees::open`、清扫打开城仓库、以及打开任一棵树的仓库（`trees::open_city` 与 `trees::open_tree`）都在打开之后经 `Repository::set_config` 换上只含 `<commondir>/config`（`ConfigLevel::Local`）的 config。原因：libgit2 先看 User 的 global、XDG、system 文件在不在，之后每次读值再 stat 一遍；文件在两步之间消失（新机器、runner 上别的进程改写 `~/.gitconfig`）时 stat 报 `could not find '…/.gitconfig' to stat`，备树的 `find_worktree` 因此答 `E_STORAGE_FATAL`，而城从不拥有那个文件。三个平台相同：Windows 的 `%USERPROFILE%\.gitconfig` 与 Git for Windows 的 system 文件，macOS 与 Linux 的 `$HOME/.gitconfig`、`$XDG_CONFIG_HOME/git/config`、`/etc/gitconfig`。随之而来：检出不再受 User 的 `core.autocrlf` 等设置左右，树里的字节由仓库自己的 config 与 `.gitattributes` 决定。打开那一刻 libgit2 仍读一次整条链，没有安全接口能免掉它（`git2::opts::set_search_path` 是 `unsafe`，而本 crate `forbid(unsafe_code)`）。被否：在进程启动时把搜索路径清空（同样要 `unsafe`）；读不到 User 文件时重试（把别人的文件当成城的依赖）。`trees::tests` 的 `the_citys_git_reads_its_repository_config_and_no_file_of_the_users` 钉住它。
 - **空仓即拒并说出原因**：worktree 从一个提交分枝，而新城在首次 checkpoint 之前没有提交；本模块恒不自建创世提交（那是 `checkpoint` 的职责，两个写入者就是两个权威）。
 
 **合并拆成决定与动作**：

@@ -18,7 +18,7 @@ use std::path::{Path, PathBuf};
 use crate::error::StorageError;
 
 use super::name::WorktreeName;
-use super::trees::Worktrees;
+use super::trees::{Worktrees, open_city};
 
 impl Worktrees {
     /// Takes back every tree under `<city>/.sprawling/worktrees/` that
@@ -34,7 +34,7 @@ impl Worktrees {
     ) -> Result<Vec<WorktreeName>, StorageError> {
         // A city that has never checkpointed has no repository, and so
         // no tree to leave behind.
-        let repo = match git2::Repository::open(city_root) {
+        let repo = match open_city(city_root) {
             Ok(repo) => repo,
             Err(err) if err.code() == git2::ErrorCode::NotFound => return Ok(Vec::new()),
             Err(err) => {

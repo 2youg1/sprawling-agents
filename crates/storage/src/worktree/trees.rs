@@ -54,7 +54,7 @@ impl Worktrees {
     /// Refuses a city with no repository. Initialising one here would
     /// make two modules able to create the city's history.
     pub fn open(city_root: &Path) -> Result<Worktrees, StorageError> {
-        let repo = git2::Repository::open(city_root).map_err(|err| StorageError::Worktree {
+        let repo = open_city(city_root).map_err(|err| StorageError::Worktree {
             op: "open the city repository",
             detail: format!("{}: {err}", city_root.display()),
         })?;
@@ -327,7 +327,10 @@ impl Worktrees {
         if !reviewed_by_person {
             return String::new();
         }
-        let Ok(config) = self.repo.config() else {
+        // The city's own handle reads no User file; who looked is the
+        // machine's answer, so this one read takes the whole chain.
+        let Ok(config) = git2::Repository::open(&self.city_root).and_then(|repo| repo.config())
+        else {
             return String::new();
         };
         match (
@@ -382,9 +385,28 @@ impl Worktrees {
     }
 }
 
-/// Opens the repository of one of the city's trees.
+/// Opens the city's repository with only its own config file read.
+pub(super) fn open_city(city_root: &Path) -> Result<git2::Repository, git2::Error> {
+    own_config(git2::Repository::open(city_root)?)
+}
+
+/// Opens the repository of one of the city's trees the same way.
 pub(super) fn open_tree(tree: &git2::Worktree) -> Result<git2::Repository, git2::Error> {
-    git2::Repository::open_from_worktree(tree)
+    own_config(git2::Repository::open_from_worktree(tree)?)
+}
+
+// A User's global, XDG or system file can vanish between libgit2's look and
+// its stat (`crates/storage/spec/Worktree.lean` §8-9), so no later call
+// reads them.
+fn own_config(repo: git2::Repository) -> Result<git2::Repository, git2::Error> {
+    let mut config = git2::Config::new()?;
+    config.add_file(
+        &repo.commondir().join("config"),
+        git2::ConfigLevel::Local,
+        false,
+    )?;
+    repo.set_config(&config)?;
+    Ok(repo)
 }
 
 #[cfg(test)]
