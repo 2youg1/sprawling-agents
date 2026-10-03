@@ -27,7 +27,7 @@ pub(crate) fn input_for(base_url: &str, id: &str) -> Option<InputKinds>;
 - **不记是哪一档答的。** `model_selected` 记 `input`，不记它的来处：读它的只有端点发图前的那道检查，那道检查不因来处而异；上限要记来处（`ceiling_from`），是因为一次被截断的跑要读得出原因。
 - **唯一的生产调用者是选型点**（`accounting::worker::credentials::endpoints::choosing` 的 `select_model`）：登记行的 `input` 就是本函数的答案。
 - **平台**：纯判定，三个平台相同。
-- **派生检查**：`every_answer_is_a_stated_fact_or_text` 在 Rust 一侧只有 `the_first_rung_that_states_a_fact_answers` 那张表的几行，没有走遍人、目录、预置表三档各三种取值的检查，记为债。
+- **派生检查**：`every_answer_is_a_stated_fact_or_text` 在 Rust 一侧由 `every_answer_is_a_stated_fact_or_text_on_every_combination` 检查：梯子本身是私有的 `first_stated(stated, pinned, preset)`，与模型的 `accepted_input` 同样把预置表的答案当作给定的值，测试走遍三档各三种取值（沉默、`Text`、`TextImage`）的 27 种组合，每一种都断言定理的四臂之一成立。`accepted_input` 只多一步 `preset::input_for(base_url, id)`。
 - **验收**：`provider::input` 的测试比一张表——人说了的那一档胜过目录与预置表（两个方向各一次）、目录说 `Text` 而预置表说 `TextImage` 时答 `Text`、目录沉默而预置表说 `TextImage` 时答 `TextImage`（厂商主机上与中转站上各一次）、这台电脑上的服务与两表都不认识的 id 答 `Text`；`accounting` 的 `a_preset_model_that_reads_pictures_is_registered_as_reading_them`：一个目录没有、预置表写着 `text_image` 的模型选为 `Ocr` 之后，端点账本里那一次选择的 `input` 是 `TextImage`；`a_model_the_person_says_reads_pictures_is_registered_as_reading_them`：一个目录写着 `text` 的模型，`SelectModel` 带 `input: TextImage` 选为 `Ocr`，登记的 `input` 是 `TextImage`。
 -/
 
@@ -53,7 +53,7 @@ inductive InputKinds where
 def accepted_input (stated pinned preset : Option InputKinds) : InputKinds :=
   ((stated.or pinned).or preset).getD .Text
 
-/-- 每一档压过下一档是 `accepted_input` 的定义本身（`Option.or` 的次序），不另写定理；谁都不说时答 `Text`：猜小了是一句拒绝，猜大了是 provider 的 400。Rust 用 `unwrap_or_default`，`InputKinds` 的 `#[default]` 是 `Text`。
+/-- 每一档压过下一档是 `accepted_input` 的定义本身（`Option.or` 的次序），不另写定理；谁都不说时答 `Text`：猜小了是一句拒绝，猜大了是 provider 的 400。Rust 写作 `.unwrap_or(InputKinds::Text)`，把这一档点名，而不是藏在 `InputKinds` 的 `#[default]` 里：那个 derive 是 kernel 为别的读者定的，它改了，这里的退路不该跟着变。
 
 梯子不发明事实：答案要么是人说的，要么是人沉默时目录的，要么是两者都沉默时预置表的，要么是三者都沉默时的 `Text`。 -/
 theorem every_answer_is_a_stated_fact_or_text (stated pinned preset : Option InputKinds) :

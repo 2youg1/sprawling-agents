@@ -35,10 +35,19 @@ pub fn accepted_input(
     base_url: &str,
     id: &str,
 ) -> InputKinds {
-    stated
-        .or(pinned)
-        .or_else(|| super::preset::input_for(base_url, id))
-        .unwrap_or_default()
+    first_stated(stated, pinned, super::preset::input_for(base_url, id))
+}
+
+/// The ladder itself, with the preset table's answer already read:
+/// `Gateway.Provider.Input.accepted_input` over the same three rungs.
+/// The preset lookup stays in the caller, so a check can walk every
+/// combination the model admits without a host to look up.
+fn first_stated(
+    stated: Option<InputKinds>,
+    pinned: Option<InputKinds>,
+    preset: Option<InputKinds>,
+) -> InputKinds {
+    stated.or(pinned).or(preset).unwrap_or(InputKinds::Text)
 }
 
 #[cfg(test)]
@@ -95,5 +104,35 @@ mod tests {
                 InputKinds::Text,
             ]
         );
+    }
+
+    /// `every_answer_is_a_stated_fact_or_text`, checked on all 27
+    /// combinations of the three rungs, each silent or stating one of the
+    /// two kinds: the answer is the first rung that spoke, or `Text`
+    /// when none did.
+    #[test]
+    fn every_answer_is_a_stated_fact_or_text_on_every_combination() {
+        let said = [None, Some(InputKinds::Text), Some(InputKinds::TextImage)];
+        let mut walked = 0_u32;
+        for stated in said {
+            for pinned in said {
+                for preset in said {
+                    let answer = first_stated(stated, pinned, preset);
+                    let holds = stated == Some(answer)
+                        || (stated.is_none() && pinned == Some(answer))
+                        || (stated.is_none() && pinned.is_none() && preset == Some(answer))
+                        || (stated.is_none()
+                            && pinned.is_none()
+                            && preset.is_none()
+                            && answer == InputKinds::Text);
+                    assert!(
+                        holds,
+                        "{stated:?} {pinned:?} {preset:?} answered {answer:?}"
+                    );
+                    walked += 1;
+                }
+            }
+        }
+        assert_eq!(walked, 27);
     }
 }
