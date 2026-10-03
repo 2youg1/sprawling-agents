@@ -42,8 +42,10 @@ const SINK: &str = "sprawling-shots";
 
 /// The most folds one page is photographed in. A main region taller
 /// than this many windows is a page that does not stop growing, and
-/// photographing it would not end either.
-const MOST_FOLDS: usize = 200;
+/// photographing it would not end either. The gallery carries every
+/// fixture and measures 372 folds at 1440x900 and 251 at 1920x1080, so
+/// the cap sits above it with room for the next fixture (D26).
+const MOST_FOLDS: usize = 512;
 
 /// The most loads the placing script holds a picture with. Each moves the
 /// virtual clock 10 ms as it lands, and the wait took about fifteen on a
