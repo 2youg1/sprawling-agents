@@ -8,9 +8,9 @@
 //! The losing line of the whole design sits behind this one interface —
 //! the resident who wrote the work does not decide whether it is good.
 //! Three things enforce it, and none of them is a rule someone has to
-//! remember: `Pr<Open>` has no `merged`, `Artifact` has no public
-//! constructor, and this tool refuses a verification whose caller is the
-//! implementer.
+//! remember: `Pr<Open>` has no verifier to name, `Artifact` has no
+//! public constructor (`tests/ui` pins both), and this tool refuses a
+//! verification whose caller is the implementer.
 //!
 //! Verifying and merging are one action rather than two. A `Verified`
 //! request nobody merged would be a third state for a person to chase,
