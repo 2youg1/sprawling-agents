@@ -277,6 +277,10 @@ impl RunWorker {
             // is what the refusal says, instead of naming the verb.
             wire::Command::Cancel { run, .. } => Err(Unanswered::Cancel.refusal(run)),
             wire::Command::Steer { run, .. } => Err(Unanswered::Steer.refusal(run)),
+            wire::Command::OpenRemoteDoor { .. }
+            | wire::Command::ReplaceCityKey { .. }
+            | wire::Command::ConfirmRemoteDoor { .. }
+            | wire::Command::CloseRemoteDoor { .. } => Err(the_door_is_held_elsewhere()),
             // Verbs the wire spells and this city cannot perform, one arm each and no
             // catch-all, so a Command added without an executor stops the build here.
             wire::Command::BatchByBuilding { addr, .. } => {
@@ -287,10 +291,6 @@ impl RunWorker {
             // before any command is read. A second door for the same
             // question would be a second authority on it.
             wire::Command::Auth { .. } => Err(Unbuilt::Auth.not_built()),
-            wire::Command::OpenRemoteDoor { .. }
-            | wire::Command::ReplaceCityKey { .. }
-            | wire::Command::ConfirmRemoteDoor { .. }
-            | wire::Command::CloseRemoteDoor { .. } => Err(the_door_is_held_elsewhere()),
         }
     }
 
