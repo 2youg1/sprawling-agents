@@ -30,7 +30,7 @@ use serde::{Deserialize, Serialize};
 /// Wire format version. Rises by one between two pushes, in the first commit
 /// that changes a frame's shape while every frame and kind name stays
 /// (wire D1); a changed name moves [`schema_hash`] on its own.
-pub const WIRE_V: u32 = 47;
+pub const WIRE_V: u32 = 48;
 mod ask;
 mod monitor;
 /// Queries read state. They are cacheable and free of side effects, so
