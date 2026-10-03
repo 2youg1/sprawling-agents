@@ -124,7 +124,7 @@ export function reachOf(name: string, kind: EventKind): Reach {
     // The usage tables fold the whole ledger, so they are asked again when
     // a run ends with its uses complete and when an audit lands, not on
     // every call; an export is asked on each press.
-    case "skill_usage": case "mcp_usage":
+    case "skill_usage": case "mcp_usage": case "shells":
       return reached(kind === "run_frozen" || kind === "skill_audited");
     default:
       return "none";

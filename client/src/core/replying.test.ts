@@ -93,7 +93,7 @@ describe("either state", () => {
   });
 
   test("a refused stretch stays raw and is never asked again", () => {
-    const refused = answered(UNLAID, "a\u0000b\n\n", { kind: "unavailable", query: "Reply" }, "streaming");
+    const refused = answered(UNLAID, "a\u0000b\n\n", { kind: "unavailable", query: "Reply", reason: null }, "streaming");
     expect({
       refused,
       streaming: question("a\u0000b\n\nmore\n\n", refused, "streaming"),

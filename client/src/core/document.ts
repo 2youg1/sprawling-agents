@@ -29,8 +29,12 @@ export function readDocument(answer: Answer | undefined): Answered<DocumentText>
 // an empty file is a file with no text.
 function documentText(document: DocumentAnswer): Answered<DocumentText> {
   const state = document.state;
-  if (state === "missing" || "unreadable" in state) {
-    return { kind: "unavailable", query: `Document(${document.at})` };
+  const asked = `Document(${document.at})`;
+  if (state === "missing") {
+    return { kind: "unavailable", query: asked, reason: null };
+  }
+  if ("unreadable" in state) {
+    return { kind: "unavailable", query: asked, reason: state.unreadable.reason };
   }
   if ("empty" in state) {
     return { kind: "held", value: { text: "", bytes: 0, binary: false, truncated: false } };

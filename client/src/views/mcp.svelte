@@ -88,6 +88,7 @@
   import DesktopForm from "./desktop.svelte";
   import { reachOf } from "./mcp/reach.svelte";
   import Servers from "./mcp/servers.svelte";
+  import Shells from "./mcp/shells.svelte";
   import McpUsage from "./mcp/usage.svelte";
   import { BuildingColumn, HALL, useBuildings } from "./shared/buildings";
 
@@ -228,6 +229,9 @@ other. -->
         </section>
         <div class="border-t border-edge pt-base">
           <McpUsage />
+        </div>
+        <div class="border-t border-edge pt-base">
+          <Shells />
         </div>
       </div>
     </div>

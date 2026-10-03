@@ -42,10 +42,10 @@ describe("a zero total is read by whether any call went unpriced", () => {
 
 describe("the facts row reads a run's spend only when a run is moving", () => {
   test("no run moving says nothing, even when the cost answer is unavailable", () => {
-    expect(runSpend({ kind: "unavailable", query: "cost" }, null)).toEqual({ kind: "none" });
+    expect(runSpend({ kind: "unavailable", query: "cost", reason: null }, null)).toEqual({ kind: "none" });
   });
 
   test("a moving run with an unreadable cost answer says so", () => {
-    expect(runSpend({ kind: "unavailable", query: "cost" }, RunId.make("00000000-0000-4000-8000-000000000001"))).toEqual({ kind: "unreadable" });
+    expect(runSpend({ kind: "unavailable", query: "cost", reason: null }, RunId.make("00000000-0000-4000-8000-000000000001"))).toEqual({ kind: "unreadable" });
   });
 });
