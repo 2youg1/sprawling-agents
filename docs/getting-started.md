@@ -151,7 +151,7 @@ Where the binary finally lives, and what happens to `PATH`, is decided by `spraw
 
 With bun or node already installed, `bunx sprawling help` or `npx sprawling help` fetches the same binary from npm, byte for byte what the archive holds, and writes nothing outside the package directory. With [cargo-binstall](https://github.com/cargo-bins/cargo-binstall) installed, `cargo binstall sprawling` downloads the release archive for your system and places the binary in cargo's bin directory, without compiling anything.
 
-Nothing updates itself. `sprawling version` prints which release this is; `sprawling status --check`, or the button under **settings**, asks npm whether a newer one exists; replacing the binary stays your command to run.
+Nothing updates itself. `sprawling version` prints which release this is; `sprawling status --check`, or the button under **settings**, asks npm and crates.io whether a newer one exists and judges this binary against the registry it came from: crates.io for a binary `cargo install` built, npm for every other one, with the update command of that channel; replacing the binary stays your command to run.
 
 The binaries are not code-signed: on Windows choose *More info*, then *Run anyway*; on macOS open the binary once from Finder's right-click menu. With a Rust toolchain of 1.97 or later, `cargo install sprawling --locked` builds the same program from crates.io, because the published package carries the page already built; a plain `cargo build` of a git checkout yields a blank page until `just build-web` has built the page.
 

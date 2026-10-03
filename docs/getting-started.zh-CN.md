@@ -151,7 +151,7 @@ gh attestation verify sprawling-<version>-<platform>.zip --repo 2youg1/sprawling
 
 已经装了 bun 或 node 的话，`bunx sprawling help` 或 `npx sprawling help` 从 npm 取来同一个二进制，与归档里的逐字节相同，包目录之外一字不写。装了 [cargo-binstall](https://github.com/cargo-bins/cargo-binstall) 的话，`cargo binstall sprawling` 下载你系统的发行归档，把二进制放进 cargo 的 bin 目录，什么都不编译。
 
-没有东西会自己更新。`sprawling version` 印出这是哪一版；`sprawling status --check`，或 **设置** 里的那个按钮，去 npm 问有没有更新的一版；替换二进制始终由你来做。
+没有东西会自己更新。`sprawling version` 印出这是哪一版；`sprawling status --check`，或 **设置** 里的那个按钮，去 npm 和 crates.io 问有没有更新的一版，并按这个二进制的来处判断：`cargo install` 编出来的看 crates.io，其余的看 npm，给出那条渠道的更新命令；替换二进制始终由你来做。
 
 这些二进制没有代码签名：Windows 上点 *More info*，再点 *Run anyway*；macOS 上在 Finder 里右键打开一次。装了 1.97 或更新的 Rust 工具链，也可以用 `cargo install sprawling --locked` 从 crates.io 编出同一个程序，因为发布的包里已经带着构建好的页面；从 git 检出直接跑 `cargo build`，在 `just build-web` 构建页面之前得到的页面一片空白。
 
