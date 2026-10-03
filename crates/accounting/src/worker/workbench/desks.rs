@@ -115,6 +115,7 @@ impl RunWorker {
         let shelf = std::sync::Arc::new(std::sync::Mutex::new(collab::ArchiveDesk::new(
             addr.clone(),
             held,
+            self.filer(site, addr),
         )));
         // Copied rather than lent: the join and the graph stay with the
         // worker, which answers a handback while this run is still going.
@@ -168,6 +169,59 @@ impl RunWorker {
                 crate::effect::Then::Deliver(_) | crate::effect::Then::Nothing => Ok(()),
                 crate::effect::Then::Roadmap { .. } | crate::effect::Then::Shelf(_) => Ok(()),
             }
+        })
+    }
+
+    /// The filer a run's archive desk writes through: each record's
+    /// `asset_archived` line crosses the relay at the call, then the
+    /// entry is filed in the tree this run writes, so the run's own
+    /// recall reads it back and the history has it before the tool
+    /// answers (kernel `spec/Event/Record.lean` D24).
+    fn filer(&self, site: &Site, room: &Address) -> collab::Filer {
+        let mut relay = self.flight.gate.issue();
+        let clock = std::sync::Arc::clone(&self.clock);
+        let (run, write_root, building) = (
+            site.run_id,
+            site.write_root.clone(),
+            site.building.addr().clone(),
+        );
+        let (room, who) = (room.clone(), site.who.clone());
+        collab::Filer::new(move |record: &collab::ArchiveEffect| {
+            let landing = crate::effect::Landing::shelf(
+                vec![record.clone()],
+                &write_root,
+                &building,
+                clock.now()?,
+                &room,
+                &who,
+            )?;
+            let mut stamping = crate::worker::recording::Stamping {
+                ledger: &mut relay,
+                command: None,
+                clock: clock.as_ref(),
+            };
+            let filings = match landing.record(&mut |line| stamping.record_for(run, line))? {
+                crate::effect::Then::Shelf(filings) => filings,
+                crate::effect::Then::Deliver(_)
+                | crate::effect::Then::Nothing
+                | crate::effect::Then::Roadmap { .. } => Vec::new(),
+            };
+            let mut filed = None;
+            for filing in filings {
+                city::file_archive(&filing.entry, &filing.body)?;
+                filed = Some(collab::Held {
+                    kind: filing.entry.kind.as_str().to_owned(),
+                    text: filing.entry.subject,
+                });
+            }
+            filed.ok_or_else(|| {
+                AxError::failure(
+                    kernel::AxCode::StorageFatal,
+                    "archive something",
+                    "the record was not turned into a shelf entry",
+                )
+                .with_recovery("report this against accounting::effect: a shelf landing files one entry per record")
+            })
         })
     }
 

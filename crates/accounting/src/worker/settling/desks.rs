@@ -41,7 +41,7 @@ impl RunWorker {
             open_claims,
         } = settling;
         let (addr, who, run_id) = (&at.addr, site.who.as_str(), site.run_id);
-        let (write_root, building) = (site.write_root.as_path(), &site.building);
+        let building = &site.building;
         // What the run said is already on the ledger, in its rooms, and
         // knocked on where nobody was working: each line crossed the
         // relay at the call and was delivered there (collab D7). What is
@@ -147,21 +147,6 @@ impl RunWorker {
                 }
             }
         }
-        // What the run asked the building to remember, filed after the
-        // drive like every other effect - and inside the checkpoint. A
-        // building under review is not the owner of what a run decided
-        // until somebody checks it, and a shelf entry is exactly the
-        // kind of thing a later run reads as the building's settled
-        // knowledge.
-        let remembered = effect::Landing::shelf(
-            held(&desks.shelf, "settle the shelf")?.take_effects(),
-            write_root,
-            building.addr(),
-            self.clock.now()?,
-            addr,
-            who,
-        )?;
-        self.settle(at, run_id, remembered, &chain)?;
         Ok(())
     }
 }

@@ -171,7 +171,7 @@ Signal、Inbox、Steer、Workshop、NodeContract、fan-in、Artifact、arbitrati
 - 效应怎么改文本只有 `ClaimEffect::apply` 一个定义：桌子在调用时用它改副本，工人落地时用它把同一组效应重放到盘上；`Split` 因此带着子节点的 weight。`PutDown` 携 `PlanExit` 而不是一个动词，把出口的两条臂抄进第二个枚举，就是对「一个节点可以怎么离开」的第二份意见。`still_true` 问的是记录答不了的那个问题：盘上的文档现在是否仍然容得下这条效应。只有认领会答「不」——它要那一行仍是 `Not started`；放下与拆分只作用于本 run 握着的那一行，它们的新鲜由握持之前的那条认领担保（D6），`still_true` 不为它们另判一个期待状态。
 - 并发口径：工人写盘前重读文件，把效应按次序重放上去，每条在前面几条留下的文本上问 `still_true`（`spec/Claim.lean` 的 `land`；`crates/accounting/Spec.lean` §8-27）：本 run 拆出又认领的子行因此在那里；一条认领的行若已不是 `Not started` 则整组丢弃并留一条诊断，而不是覆盖；都对得上时只有本轮碰过的行改变。桌子答应的效应落在派活那份计划上全部落下（`admitted_lands`），工具答成功而落地一字不写只在别的写者动过那一行时发生，并且有那条诊断。
 
-**`collab::archive_tool`**（形状 4 适配器）。`ARCHIVE_KINDS` 是封闭的四类（§14）。回忆是读，不是记：索引由 worker 从书架算出后交给桌子，桌子不留副本，盘上的文件才是真的。`ArchiveEffect::Recorded` 是桌子交回的值，落盘与记账归装配层。
+**`collab::archive_tool`**（形状 4 适配器）。`ARCHIVE_KINDS` 是封闭的四类（§14）。回忆是读，不是记：索引由 worker 在派活时从书架算出后交给桌子，盘上的文件才是真的。`record` 在调用时经装配层交来的 `Filer` 先写 `asset_archived`、再把条目落进这轮活写的树（kernel D24），`Filer` 答回落下的那一条，桌子把它并进自己读的那份书架，于是同一个 run 的 `recall` 读得到它；`searched` 是这次比对过的条目数。`Filer` 拒绝时它的拒词原样到模型，书架不多一条。落盘与记账归装配层，桌子只判定什么值得记。
 
 **`collab::citation`**（形状 1 判定）。`Citation::new(quote, at: Locator)`、`quote`、`at`、`against(pinned, bytes) -> Reading`（纯函数）；`Reading::{Holds, OtherVersion, OutOfRange, Differs { found }}`。
 
@@ -183,7 +183,7 @@ Signal、Inbox、Steer、Workshop、NodeContract、fan-in、Artifact、arbitrati
 
 /-! ## 9 工作流程
 
-装配层为一轮活造桌子（`SignalDesk`、`GoalDesk`、`PrDesk`、`ClaimDesk`、`DelegateDesk`、`WorkshopDesk`、`ArchiveDesk`），把 `Arc<Mutex<..>>` 句柄交给对应工具注册进 bench；模型调工具，桌子判定并排效应（登记与认领在调用时问记账线程的 `GoalBooking` 与 `Booking`）；这轮活落地时工人取走效应，先写账再改投影；派出的代理在父回合落定后开 run，结束时经 `Handback::signal` 回到父房间的 Inbox，并汇入那个房间的 `FanIn` 与 `Underway`。
+装配层为一轮活造桌子（`SignalDesk`、`GoalDesk`、`PrDesk`、`ClaimDesk`、`DelegateDesk`、`WorkshopDesk`、`ArchiveDesk`），把 `Arc<Mutex<..>>` 句柄交给对应工具注册进 bench；模型调工具，桌子判定并排效应（登记与认领在调用时问记账线程的 `GoalBooking` 与 `Booking`，归档在调用时经 `Filer` 落账落盘）；这轮活落地时工人取走效应，先写账再改投影；派出的代理在父回合落定后开 run，结束时经 `Handback::signal` 回到父房间的 Inbox，并汇入那个房间的 `FanIn` 与 `Underway`。
 -/
 
 /-! ## 10 实现逻辑

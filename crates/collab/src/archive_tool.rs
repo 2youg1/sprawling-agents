@@ -40,27 +40,49 @@ pub struct Held {
     pub text: String,
 }
 
+/// Where a record is written down at the moment a model makes it: its
+/// `asset_archived` line first, then the file on the shelf (kernel
+/// `spec/Event/Record.lean` D24).
+///
+/// The desk only decides what is worth recording; the ledger and the
+/// disk belong to the assembly, which hands the desk this filer. It
+/// answers the entry as it was filed, which is what the desk's own
+/// recall reads from then on.
+pub struct Filer(Box<File>);
+
+type File = dyn FnMut(&ArchiveEffect) -> Result<Held, AxError> + Send;
+
+impl Filer {
+    /// `file` writes the line and the entry, or refuses; its refusal
+    /// reaches the model unchanged and nothing is added to the shelf.
+    #[must_use]
+    pub fn new(
+        file: impl FnMut(&ArchiveEffect) -> Result<Held, AxError> + Send + 'static,
+    ) -> Filer {
+        Filer(Box::new(file))
+    }
+}
+
+impl std::fmt::Debug for Filer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Filer")
+    }
+}
+
 /// The run's side of the building's memory.
 #[derive(Debug)]
 pub struct ArchiveDesk {
     room: Address,
     held: Vec<Held>,
-    effects: Vec<ArchiveEffect>,
+    filer: Filer,
 }
 
 impl ArchiveDesk {
+    /// `held` is the shelf as it stood at dispatch; every entry `filer`
+    /// files during the run joins it.
     #[must_use]
-    pub fn new(room: Address, held: Vec<Held>) -> ArchiveDesk {
-        ArchiveDesk {
-            room,
-            held,
-            effects: Vec::new(),
-        }
-    }
-
-    /// What the worker has to write, drained so it cannot run twice.
-    pub fn take_effects(&mut self) -> Vec<ArchiveEffect> {
-        std::mem::take(&mut self.effects)
+    pub fn new(room: Address, held: Vec<Held>, filer: Filer) -> ArchiveDesk {
+        ArchiveDesk { room, held, filer }
     }
 
     fn record(&mut self, kind: &str, text: &str) -> Result<Payload, AxError> {
@@ -82,10 +104,11 @@ impl ArchiveDesk {
                     .with_recovery("say the thing itself, in one sentence a stranger could act on"),
             );
         }
-        self.effects.push(ArchiveEffect::Recorded {
+        let filed = (self.filer.0)(&ArchiveEffect::Recorded {
             kind: kind.to_owned(),
             text: text.to_owned(),
-        });
+        })?;
+        self.held.push(filed);
         let mut result = Map::new();
         result.insert("kind".to_owned(), Value::String(kind.to_owned()));
         result.insert("recorded".to_owned(), Value::Bool(true));
@@ -258,10 +281,27 @@ impl Tool for ArchiveTool {
 mod tests {
     use super::*;
 
+    /// A filer that keeps what it was handed, standing in for the
+    /// ledger and the shelf.
+    fn kept() -> (Filer, Arc<Mutex<Vec<ArchiveEffect>>>) {
+        let filed = Arc::new(Mutex::new(Vec::new()));
+        let keeping = Arc::clone(&filed);
+        let filer = Filer::new(move |effect: &ArchiveEffect| {
+            keeping.lock().unwrap().push(effect.clone());
+            let ArchiveEffect::Recorded { kind, text } = effect;
+            Ok(Held {
+                kind: kind.clone(),
+                text: text.trim().to_owned(),
+            })
+        });
+        (filer, filed)
+    }
+
     fn desk(held: Vec<Held>) -> Arc<Mutex<ArchiveDesk>> {
         Arc::new(Mutex::new(ArchiveDesk::new(
             Address::parse("lab/room1").unwrap(),
             held,
+            kept().0,
         )))
     }
 
@@ -274,21 +314,26 @@ mod tests {
     }
 
     #[test]
-    fn recording_queues_one_effect_and_writes_nothing_yet() {
-        let shared = desk(Vec::new());
-        let tool = ArchiveTool::new(Arc::clone(&shared)).unwrap();
+    fn recording_files_once_at_the_call() {
+        let (filer, filed) = kept();
+        let tool = ArchiveTool::new(Arc::new(Mutex::new(ArchiveDesk::new(
+            Address::parse("lab/room1").unwrap(),
+            Vec::new(),
+            filer,
+        ))))
+        .unwrap();
         tool.invoke(&call(serde_json::json!({
             "action": "record",
             "kind": "decision",
             "text": "the kiln is fired at 1240 degrees",
         })))
         .unwrap();
-        let mut borrowed = shared.lock().unwrap();
-        let effects = borrowed.take_effects();
-        assert_eq!(effects.len(), 1);
-        assert!(
-            borrowed.take_effects().is_empty(),
-            "an effect read twice would be a line written twice"
+        assert_eq!(
+            *filed.lock().unwrap(),
+            vec![ArchiveEffect::Recorded {
+                kind: "decision".to_owned(),
+                text: "the kiln is fired at 1240 degrees".to_owned(),
+            }]
         );
     }
 
