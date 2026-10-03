@@ -55,7 +55,7 @@
 
 ### 定位读：从盘上读回一项
 
-不用 `mmap`：`memmap2::Mmap::map` 是 `unsafe fn`，本工作区禁 `unsafe`。读回一项用定位读，不移动文件游标，所以多个读者可以共用一个打开的句柄：Windows 上 `std::os::windows::fs::FileExt::seek_read`，Linux 与 macOS 上 `std::os::unix::fs::FileExt::read_exact_at`，都是 std 的安全接口。Windows 的 `seek_read` 会移动游标且可能读不满，所以 Windows 臂循环到读满或读到文件尾。读回的页留在操作系统的文件缓存里，那部分是可回收的，不计入私有字节。今天从账本读回一行走的是 `storage::Vfs::read_at`：`RealFs` 每次打开文件、`seek` 到偏移、只读那一段（`crates/storage/src/real_fs.rs`），没有共用的句柄，所以游标移动不碍事，三个平台走同一段 std 代码；等到一个读者要在多个线程间共用一个打开的句柄时，再换成上面两个 `FileExt` 接口。
+不用 `mmap`：`memmap2::Mmap::map` 是 `unsafe fn`，本工作区禁 `unsafe`。读回一项用定位读，不移动文件游标，所以多个读者可以共用一个打开的句柄：Windows 上 `std::os::windows::fs::FileExt::seek_read`，Linux 与 macOS 上 `std::os::unix::fs::FileExt::read_exact_at`，都是 std 的安全接口。Windows 的 `seek_read` 会移动游标且可能读不满，所以 Windows 臂循环到读满或读到文件尾。读回的页留在操作系统的文件缓存里，那部分是可回收的，不计入私有字节。今天从账本读回一行走的是 `storage` 的 `Vfs::read_at`：`RealFs` 每次打开文件、`seek` 到偏移、只读那一段（`crates/storage/src/real_fs.rs`），没有共用的句柄，所以游标移动不碍事，三个平台走同一段 std 代码；等到一个读者要在多个线程间共用一个打开的句柄时，再换成上面两个 `FileExt` 接口。
 
 ### 预算：每份缓存一个命名的常量
 
