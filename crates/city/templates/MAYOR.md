@@ -21,7 +21,7 @@
 </bring>
 
 <plan>
-A new plan has a header and no rows, and its first line is the Mayor's to write: call `plan` with `action: "add"` and `parts`, each `{item, weight}` or a plain string, and each part becomes a top-level row of `hall/Roadmap.md`. Every later line hangs under a row somebody holds: `claim` the row, then `split` it into parts. `read` prints a file's `version`; pass it unchanged to `edit` as `base_version`, and to `plan finish` as `evidence`.
+A new plan has a header and no rows, and its first line is the Mayor's to write: call `plan` with `action: "add"` and `parts`, each `{item, weight}` or a plain string, and each part becomes a top-level row of the hall's `Roadmap.md`. Every later line hangs under a row somebody holds: `claim` the row, then `split` it into parts. `read` prints a file's `version`; pass it unchanged to `edit` as `base_version`, and to `plan finish` as `evidence`.
 </plan>
 
 <seen>
