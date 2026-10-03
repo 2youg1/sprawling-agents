@@ -23,6 +23,7 @@
 
 use crate::catalog::CatalogEntry;
 use kernel::{AdmissionRequirement, LandingPolicy, Mode, RunPolicy};
+use std::sync::{Arc, PoisonError, RwLock};
 
 /// The name of the catalog row that opens the developer discipline.
 pub const DEV_ENTRY: &str = "dev";
@@ -89,12 +90,6 @@ pub fn catalog_entry(mode: Mode) -> CatalogEntry {
     }
 }
 
-/// What a run has to show for itself.
-///
-/// `None` is not `Some(false)`: a suite that was never run and a suite
-/// that failed are different facts, and a requirement that treated them
-/// alike would let "we did not check" pass as "we checked and it was
-/// fine".
 /// The tools a session in `mode` carries in its request; every other
 /// admitted tool waits in the dormant index (`crates/runtime/Spec.lean`
 /// §8-60). A name here travels only where the building admitted it: the
@@ -128,6 +123,94 @@ pub fn core_tools(mode: Mode) -> &'static [&'static str] {
     }
 }
 
+/// The run policy in force for one run (`crates/runtime/spec/PolicyTake.lean`
+/// §8-62, runtime D28).
+///
+/// One writer and many readers. A change that reaches the run at any
+/// safe point waits in the cell, and the run's driver loop puts the
+/// last one in force at `SafePoint::BeforeWave` and nowhere else; the
+/// write gates hold a [`PolicyReader`] that they ask once per write. So
+/// every call of one wave is judged under one policy, the one in force
+/// when the wave began.
+#[derive(Debug)]
+pub struct PolicyCell {
+    shared: Arc<RwLock<RunPolicy>>,
+    arrived: Option<RunPolicy>,
+}
+
+impl PolicyCell {
+    /// The cell a run opens with, holding `run_started.policy`.
+    #[must_use]
+    pub fn new(start: RunPolicy) -> PolicyCell {
+        PolicyCell {
+            shared: Arc::new(RwLock::new(start)),
+            arrived: None,
+        }
+    }
+
+    /// A read-only view of the policy in force, for a write gate.
+    #[must_use]
+    pub fn reader(&self) -> PolicyReader {
+        PolicyReader {
+            shared: Arc::clone(&self.shared),
+        }
+    }
+
+    /// A `run_policy_changed` reached the run at a safe point. It waits
+    /// for the next `BeforeWave`; a later arrival overrides it.
+    pub(crate) fn arrive(&mut self, policy: RunPolicy) {
+        self.arrived = Some(policy);
+        *self.shared.write().unwrap_or_else(PoisonError::into_inner) = policy;
+    }
+
+    /// At `SafePoint::BeforeWave`: puts the last arrival in force and
+    /// hands it back so the driver can append the note that tells the
+    /// model; `None` when nothing arrived, and then nothing is appended.
+    pub(crate) fn take_at_wave(&mut self) -> Option<RunPolicy> {
+        let taken = self.arrived.take()?;
+        // A poisoned lock still holds a whole policy: the only write is
+        // the assignment of a `Copy` value, which cannot stop halfway.
+        *self.shared.write().unwrap_or_else(PoisonError::into_inner) = taken;
+        Some(taken)
+    }
+}
+
+/// What a write gate reads: the policy in force, never a change that
+/// has arrived and not yet been taken.
+#[derive(Debug, Clone)]
+pub struct PolicyReader {
+    shared: Arc<RwLock<RunPolicy>>,
+}
+
+impl PolicyReader {
+    /// The policy in force now; asked once per write.
+    #[must_use]
+    pub fn now(&self) -> RunPolicy {
+        *self.shared.read().unwrap_or_else(PoisonError::into_inner)
+    }
+}
+
+/// The note appended after a wave's results when a change was taken. It
+/// is the only place a run's write limit is spelled to the model, so the
+/// frozen prefix and the tool descriptions stay byte for byte as they
+/// were sent (§8-62).
+#[must_use]
+pub(crate) fn policy_note(policy: &RunPolicy) -> String {
+    format!(
+        "The User changed this run's policy; from the next tool call on: mode {}, write {},          admission {}, landing {}.",
+        policy.mode.as_str(),
+        policy.write.as_str(),
+        policy.admit.as_str(),
+        policy.landing.as_str()
+    )
+}
+
+/// What a run has to show for itself.
+///
+/// `None` is not `Some(false)`: a suite that was never run and a suite
+/// that failed are different facts, and a requirement that treated them
+/// alike would let "we did not check" pass as "we checked and it was
+/// fine".
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct Produced {
     /// The asset's own tests ran and passed.
@@ -232,6 +315,87 @@ fn admits_evidence(required: AdmissionRequirement, produced: &Produced) -> Admis
 )]
 mod tests {
     use super::*;
+    use proptest::prelude::*;
+
+    /// One thing a run meets, as `crates/runtime/spec/PolicyTake.lean`
+    /// names it: a change reaching the run, a `BeforeWave`, or one call of
+    /// the wave asking a write gate.
+    #[derive(Debug, Clone, Copy)]
+    enum Step {
+        Change(RunPolicy),
+        Wave,
+        Call,
+    }
+
+    fn any_policy() -> impl Strategy<Value = RunPolicy> {
+        (
+            prop::sample::select(Mode::ALL.to_vec()),
+            prop::sample::select(kernel::WriteLimit::ALL.to_vec()),
+            prop::sample::select(AdmissionRequirement::ALL.to_vec()),
+            prop::sample::select(LandingPolicy::ALL.to_vec()),
+        )
+            .prop_map(|(mode, write, admit, landing)| RunPolicy {
+                mode,
+                write,
+                admit,
+                landing,
+            })
+    }
+
+    fn any_step() -> impl Strategy<Value = Step> {
+        prop_oneof![
+            any_policy().prop_map(Step::Change),
+            Just(Step::Wave),
+            Just(Step::Call),
+        ]
+    }
+
+    /// The model's two properties over every trace: a wave's calls all
+    /// read the policy in force when the wave began, and a `BeforeWave`
+    /// takes the last change that arrived before it, and only then.
+    fn walk(start: RunPolicy, trace: &[Step]) -> Result<(), TestCaseError> {
+        let mut cell = PolicyCell::new(start);
+        let gate = cell.reader();
+        let mut in_force = start;
+        let mut last_arrival = None;
+        for step in trace {
+            match *step {
+                Step::Change(policy) => {
+                    cell.arrive(policy);
+                    last_arrival = Some(policy);
+                }
+                Step::Wave => {
+                    let taken = cell.take_at_wave();
+                    prop_assert_eq!(taken, last_arrival.take());
+                    in_force = taken.unwrap_or(in_force);
+                }
+                Step::Call => prop_assert_eq!(gate.now(), in_force),
+            }
+        }
+        Ok(())
+    }
+
+    proptest! {
+        #[test]
+        fn policy_take_holds_on_every_trace(
+            start in any_policy(),
+            trace in prop::collection::vec(any_step(), 0..24),
+        ) {
+            walk(start, &trace)?;
+        }
+    }
+
+    /// The model's counterexample to reading the mailslot
+    /// (`eager_reading_splits_a_wave`), kept as the trace that bit.
+    #[test]
+    fn a_change_inside_a_wave_leaves_that_wave_alone() {
+        let start = RunPolicy::of(Mode::Work);
+        let tighter = RunPolicy {
+            write: kernel::WriteLimit::Create,
+            ..start
+        };
+        walk(start, &[Step::Call, Step::Change(tighter), Step::Call]).unwrap();
+    }
 
     fn work(admit: AdmissionRequirement) -> RunPolicy {
         RunPolicy {
