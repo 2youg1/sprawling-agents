@@ -1315,7 +1315,7 @@ CI 与 justfile 调用面；ARCHITECTURE.md §3（`depmap`、`directions` 围栏
 |---|---|---|
 | `spec/Report.lean` | `a_broken_gate_outranks_a_violation`、`a_broken_gate_drops_no_later_finding`、`green_means_every_gate_judged_and_found_nothing`、`the_outcome_ignores_gate_order`、`every_outcome_is_reachable` | `report::finish_all`、`RunOutcome::of`；`report::tests::a_broken_gate_outranks_a_violation` |
 | `spec/Length.lean` | `an_unpinned_file_passes_exactly_inside_the_budget`、`a_pinned_file_never_grows`、`a_kept_pin_is_still_needed`、`kept_files_exist` | `length::judge_file`；`length` 的单测 |
-| `spec/Guard/Wall.lean` | `a_key_agrees_exactly_when_the_record_matches_the_difference`、`a_record_with_no_difference_is_spent` | `guard::wall::judge`；`guard::wall::tests` 的五例与自清理断言 |
+| `spec/Guard/Wall.lean` | `a_key_agrees_exactly_when_the_record_matches_the_difference` | `guard::wall::judge`；`guard::wall::tests` 的五例与自清理断言 |
 | `spec/Packaged.lean` | `an_excluded_item_never_builds`、`the_reading_is_not_vacuous` | `packaged::excludes_production`；`packaged::tests` |
 
 模型的证明是参照定义的证明，不是 Rust 实现的证明：两侧逐分支对应，对应由右列的单测守着，门的

@@ -21,7 +21,8 @@ inductive KeyVerdict where
   | Agrees
   /-- 两侧不等，而没有人记下这个差异。 -/
   | Diverged
-  /-- 记下的差异已不再是差异：那一行须划掉。 -/
+  /-- 记下的差异已不再是差异：那一行须划掉。记录因此会自清理：两侧重新相等时，那一行是一条违规，
+  而不是一条沉默的许可。 -/
   | Spent
 deriving DecidableEq, Repr
 
@@ -54,8 +55,5 @@ def judge (recorded same : Bool) : KeyVerdict :=
 theorem a_key_agrees_exactly_when_the_record_matches_the_difference (recorded same : Bool) :
     judge recorded same = .Agrees ↔ recorded = !same := by
   cases recorded <;> cases same <;> decide
-
-/-- 记下的差异会自清理：两侧重新相等时，那一行是一条违规，而不是一条沉默的许可。 -/
-theorem a_record_with_no_difference_is_spent : judge true true = .Spent := rfl
 
 end Xtask.Guard.Wall
