@@ -10,7 +10,7 @@
 
 这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它要守住的性质证在 `crates/accounting/spec/Playback/Select.lean` 与 `crates/accounting/spec/Playback/Project.lean`，其余由 Rust 的类型与 `accounting::playback::tests` 守住（`crates/accounting/Spec.lean` §16）。
 
-**平台**：时间条件只读每行信封的 `t`，不读本机时钟；提交的证据只读 git 对象。下面每一句在 Windows、macOS 与 Linux 上相同。
+**平台**：时间条件只读每行信封的 `t`，不读墙钟；提交的证据只读 git 对象。下面每一句在 Windows、macOS 与 Linux 上相同。
 -/
 
 /-!
