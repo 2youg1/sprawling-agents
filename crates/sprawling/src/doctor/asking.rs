@@ -117,6 +117,10 @@ fn drain(stdout: ChildStdout, keep: impl FnMut(&str) -> bool + Send + 'static) -
 
 /// What the reader collected, waiting at most `patience` for a pipe a
 /// grandchild may still hold open after the program itself exited.
+#[expect(
+    clippy::manual_unwrap_or_default,
+    reason = "the arm names why nothing is the answer: late or gone, every caller reads it the same"
+)]
 fn collected(printed: &Receiver<String>, patience: Duration) -> String {
     match printed.recv_timeout(patience) {
         Ok(kept) => kept,
@@ -126,9 +130,49 @@ fn collected(printed: &Receiver<String>, patience: Duration) -> String {
 
 /// The lines of `from` that `keep` chooses, joined by `\n`, each cut to
 /// [`LINE_MAX_BYTES`]; a read that fails yields nothing.
-fn kept_lines(_from: impl BufRead, _keep: impl FnMut(&str) -> bool) -> String {
-    let _unread = ErrorKind::Interrupted;
-    String::new()
+fn kept_lines(mut from: impl BufRead, mut keep: impl FnMut(&str) -> bool) -> String {
+    let mut kept = String::new();
+    let mut line = Vec::with_capacity(LINE_MAX_BYTES);
+    loop {
+        let available = match from.fill_buf() {
+            Ok(available) => available,
+            Err(interrupted) if interrupted.kind() == ErrorKind::Interrupted => continue,
+            Err(_unreadable) => return String::new(),
+        };
+        if available.is_empty() {
+            break;
+        }
+        let piece = available.iter().take_while(|byte| **byte != b'\n').count();
+        let room = LINE_MAX_BYTES.saturating_sub(line.len());
+        line.extend(available.iter().take(piece.min(room)));
+        let ended = piece < available.len();
+        from.consume(if ended {
+            piece.saturating_add(1)
+        } else {
+            piece
+        });
+        if ended {
+            offer(&mut line, &mut keep, &mut kept);
+        }
+    }
+    if !line.is_empty() {
+        offer(&mut line, &mut keep, &mut kept);
+    }
+    kept
+}
+
+/// Offers one read line to `keep`, appends it to `kept` when chosen, and
+/// empties `line` for the next one.
+fn offer(line: &mut Vec<u8>, keep: &mut impl FnMut(&str) -> bool, kept: &mut String) {
+    let text = String::from_utf8_lossy(line);
+    let text = text.strip_suffix('\r').unwrap_or(&text);
+    if keep(text) {
+        if !kept.is_empty() {
+            kept.push('\n');
+        }
+        kept.push_str(text);
+    }
+    line.clear();
 }
 
 #[cfg(test)]
