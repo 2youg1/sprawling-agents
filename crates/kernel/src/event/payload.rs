@@ -94,6 +94,13 @@ impl Payload {
     pub fn as_map(&self) -> &serde_json::Map<String, serde_json::Value> {
         &self.0
     }
+
+    /// The map itself, for a reader that rewrites it in place and builds
+    /// a new payload from the result, so no second copy is made on the
+    /// way through.
+    pub fn into_map(self) -> serde_json::Map<String, serde_json::Value> {
+        self.0
+    }
 }
 
 impl<'de> Deserialize<'de> for Payload {

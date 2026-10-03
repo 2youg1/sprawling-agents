@@ -84,7 +84,7 @@ impl Transcript {
                      as a JSON object and this one encoded as something else",
                 ));
             };
-            let (scanned, hits) = redact::redact(&map);
+            let (scanned, hits) = redact::redact(map);
             redacted = redacted.saturating_add(hits);
             let line = serde_json::to_string(&Value::Object(scanned)).map_err(|err| {
                 AxError::failure(

@@ -74,7 +74,11 @@ impl Marker {
 /// Returns the payload and how many spans were replaced, because a count
 /// is what a diagnostic line can say without saying what it found.
 #[must_use]
-pub fn redact(payload: &Map<String, Value>) -> (Map<String, Value>, u32) {
+pub fn redact(payload: Map<String, Value>) -> (Map<String, Value>, u32) {
+    copied(&payload)
+}
+
+fn copied(payload: &Map<String, Value>) -> (Map<String, Value>, u32) {
     let mut hits = 0;
     let mut out = Map::new();
     for (key, value) in payload {
@@ -189,7 +193,7 @@ mod tests {
             "message".to_owned(),
             Value::String(format!("the token is {key} and it works")),
         );
-        let (redacted, hits) = redact(&payload);
+        let (redacted, hits) = redact(payload);
         assert_eq!(hits, 1);
         let text = redacted
             .get("message")
@@ -227,7 +231,7 @@ mod tests {
             Value::String("nothing here looks like a key at all".to_owned()),
         );
         payload.insert("count".to_owned(), Value::Number(3.into()));
-        let (redacted, hits) = redact(&payload);
+        let (redacted, hits) = redact(payload);
         assert_eq!(hits, 1);
         assert_eq!(
             redacted.get("prose").and_then(Value::as_str),
@@ -277,9 +281,71 @@ mod tests {
             "message".to_owned(),
             Value::String("measured in metres".to_owned()),
         );
-        let (redacted, hits) = redact(&payload);
+        let (redacted, hits) = redact(payload.clone());
         assert_eq!(hits, 0);
         assert_eq!(redacted, payload);
+    }
+
+    fn text_at<'v>(payload: &'v Map<String, Value>, key: &str) -> &'v str {
+        payload.get(key).and_then(Value::as_str).unwrap()
+    }
+
+    /// D37: a clean payload costs the scan and nothing else, and a hit
+    /// costs the string it hit and nothing else. The address of a
+    /// string's bytes is the observation: a copy would move them.
+    #[test]
+    fn a_clean_string_comes_back_in_the_allocation_it_went_in_with() {
+        let key = key_shaped();
+        let mut payload = Map::new();
+        payload.insert(
+            "prose".to_owned(),
+            Value::String("measured in metres".to_owned()),
+        );
+        payload.insert("token".to_owned(), Value::String(format!("use {key}")));
+        let before = text_at(&payload, "prose").as_ptr();
+        let (redacted, hits) = redact(payload);
+        assert_eq!(hits, 1);
+        assert_eq!(
+            text_at(&redacted, "prose").as_ptr(),
+            before,
+            "the clean string was copied"
+        );
+        assert!(!text_at(&redacted, "token").contains(&key));
+    }
+
+    /// Strings of prose with a key-shaped value spliced in at random,
+    /// under objects and arrays nested to a few levels.
+    fn payloads() -> impl proptest::strategy::Strategy<Value = Map<String, Value>> {
+        use proptest::prelude::*;
+        let text =
+            ("[a-z =:]{0,12}", any::<bool>(), "[a-z ]{0,6}").prop_map(|(head, keyed, tail)| {
+                let middle = if keyed { key_shaped() } else { String::new() };
+                Value::String(format!("{head}{middle}{tail}"))
+            });
+        let leaf = prop_oneof![
+            Just(Value::Null),
+            any::<bool>().prop_map(Value::Bool),
+            any::<i64>().prop_map(|n| Value::Number(n.into())),
+            text,
+        ];
+        let tree = leaf.prop_recursive(3, 24, 4, |inner| {
+            prop_oneof![
+                proptest::collection::vec(inner.clone(), 0..4).prop_map(Value::Array),
+                proptest::collection::btree_map("[a-c]{1,2}", inner, 0..4)
+                    .prop_map(|map| Value::Object(map.into_iter().collect())),
+            ]
+        });
+        proptest::collection::btree_map("[a-d]{1,2}", tree, 0..5)
+            .prop_map(|map| map.into_iter().collect())
+    }
+
+    proptest::proptest! {
+        /// The owned walk replaces exactly what the copying walk it
+        /// replaced did, and counts the same.
+        #[test]
+        fn the_owned_walk_agrees_with_the_copying_one(payload in payloads()) {
+            proptest::prop_assert_eq!(redact(payload.clone()), copied(&payload));
+        }
     }
 }
 
@@ -449,7 +515,7 @@ mod phases {
         let (mut call, mut scan) = (Duration::ZERO, Duration::ZERO);
         for (took, outcome) in calls {
             let started = Instant::now();
-            let (_redacted, hits) = super::redact(outcome.result.as_map());
+            let (_redacted, hits) = super::redact(outcome.result.into_map());
             scan = scan.saturating_add(started.elapsed());
             call = call.saturating_add(took);
             rounds = rounds.saturating_add(1);

@@ -325,7 +325,7 @@ impl<'h> Journal<'h> {
         event: Carried,
         data: Payload,
     ) -> Result<Entry, AxError> {
-        let (scanned, hits) = crate::redact::redact(data.as_map());
+        let (scanned, hits) = crate::redact::redact(data.into_map());
         self.redacted = self.redacted.saturating_add(hits);
         Ok(self.append(event.kind(), event.at(), None, Payload::new(scanned)?))
     }
