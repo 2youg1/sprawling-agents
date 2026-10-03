@@ -126,12 +126,15 @@ impl RunWorker {
         )
     }
 
-    /// Records the room's new run policy (kernel D21). The run under way
-    /// reads the line at its next safe point; the next dispatch into the
-    /// room starts under it.
+    /// Records the room's new run policy (kernel D21) and hands it to the
+    /// run working in the room, which takes it at its next
+    /// `SafePoint::BeforeWave` (runtime D28); the next dispatch into the
+    /// room starts under it. The line goes first, so a run never acts on
+    /// a change the ledger does not hold.
     ///
     /// # Errors
-    /// Propagates a ledger that refuses the record.
+    /// Propagates a ledger that refuses the record; nothing is handed
+    /// to the run then.
     pub(in crate::worker) fn change_run_policy(
         &mut self,
         room: &Address,
@@ -144,7 +147,9 @@ impl RunWorker {
                 policy,
                 by: Who::Person,
             })?,
-        )
+        )?;
+        self.collaborating.rooms.post_policy(room, policy);
+        Ok(())
     }
 }
 
