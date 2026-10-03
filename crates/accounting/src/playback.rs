@@ -112,18 +112,24 @@ pub fn export(city_root: &Path, request: &Request) -> Result<Bundle, AxError> {
 enum Projected {
     /// The whole document, and how many lines the projection scanned for
     /// credentials on the way.
-    Whole { document: Box<Document>, scans: u64 },
+    Whole {
+        document: Box<Document>,
+        #[cfg_attr(
+            not(test),
+            expect(
+                dead_code,
+                reason = "the lazy-scan tests read the count; an export does not report it"
+            )
+        )]
+        scans: u64,
+    },
     /// The ledger ended before the pinned cutoff, at this seq.
     EndsAt(Option<Seq>),
 }
 
 /// The projection `request` asks of the city at `city_root`, scanning
 /// for credentials as `scanning` says.
-fn project(
-    city_root: &Path,
-    request: &Request,
-    scanning: Scanning,
-) -> Result<Projected, AxError> {
+fn project(city_root: &Path, request: &Request, scanning: Scanning) -> Result<Projected, AxError> {
     let ledger = CityLayout::new(city_root).ledger();
     let city = storage::Provenance::city_of(&ledger).map_err(storage::StorageError::into_ax)?;
     let readership = Readership::new(city_root, request.reader.clone());

@@ -61,8 +61,31 @@ pub(super) struct Touch {
 /// Whether the reader saw a line, and whether the selection holds it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) struct Seen {
-    pub(super) visible: bool,
+    pub(super) visibility: Visibility,
     pub(super) in_range: bool,
+}
+
+/// What the fold knows of whether the reader sees a line.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum Visibility {
+    Visible,
+    Hidden,
+    /// Its buildings all read `Open`, and its credential scan waits until
+    /// a table reads its fate: until then it gives what a visible line
+    /// gives, and [`Links::resolve`] takes that back if the scan matches
+    /// (`crates/accounting/spec/Playback/Project.lean`, D47).
+    Deferred,
+}
+
+impl Visibility {
+    /// Whether the line may give its pair a name, a sender or a time
+    /// while its fate is open.
+    fn may_show(self) -> bool {
+        match self {
+            Visibility::Visible | Visibility::Deferred => true,
+            Visibility::Hidden => false,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -234,18 +257,20 @@ impl Links {
                     } else {
                         touched.clone()
                     };
-                    if is_message && seen.visible {
+                    if is_message && seen.visibility.may_show() {
                         let sent = record.data().read::<SignalEnqueued>()?;
                         link.sent_by = Some((sent.from, sent.room));
                     }
-                    if let (Some(field), true) = (named, seen.visible) {
+                    if let (Some(field), true) = (named, seen.visibility.may_show()) {
                         let name = wire::text(record.data().as_map().get(field));
                         link.asked = Some((name, record.t(), timing_of(record)));
                     }
                 }
                 Role::Closes if link.closed.is_none() => {
                     link.closed = Some(seat);
-                    if let (true, Some((_, at, asked))) = (is_call && seen.visible, &link.asked) {
+                    if let (true, Some((_, at, asked))) =
+                        (is_call && seen.visibility.may_show(), &link.asked)
+                    {
                         link.took = match answered_timing(*asked, record) {
                             wire::Timing::Measured => record.t().value().checked_sub(at.value()),
                             wire::Timing::Unmeasured => None,
@@ -254,8 +279,36 @@ impl Links {
                 }
                 Role::Opens | Role::Closes | Role::Member => {}
             }
-            if seen.visible && seen.in_range {
+            if seen.visibility == Visibility::Visible && seen.in_range {
                 link.members.push(seat.seq);
+            }
+        }
+        Ok(())
+    }
+
+    /// Settles every deferred end of a pair with a line the reader sees
+    /// in range, before any table reads it: `credential` answers whether
+    /// the line at a seq carries one. An end that does turns hidden and
+    /// takes back the name, the sender and the time it gave its pair.
+    ///
+    /// # Errors
+    /// The first error `credential` returns.
+    pub(super) fn resolve(
+        &mut self,
+        mut credential: impl FnMut(Seq) -> Result<bool, AxError>,
+    ) -> Result<(), AxError> {
+        for link in self
+            .links
+            .values_mut()
+            .filter(|link| !link.members.is_empty())
+        {
+            if settle(link.opened.as_mut(), &mut credential)? == Visibility::Hidden {
+                link.sent_by = None;
+                link.asked = None;
+                link.took = None;
+            }
+            if settle(link.closed.as_mut(), &mut credential)? == Visibility::Hidden {
+                link.took = None;
             }
         }
         Ok(())
@@ -348,8 +401,10 @@ impl Links {
             .get(&Key::Moment(Family::Run, run.to_string()))
             .and_then(|link| link.opened)
         {
-            Some(seat) if seat.seen.visible => Related::Run(run),
-            Some(_) => Related::Withheld,
+            Some(seat) => match seat.seen.visibility {
+                Visibility::Visible => Related::Run(run),
+                Visibility::Hidden | Visibility::Deferred => Related::Withheld,
+            },
             None => Related::Missing,
         }
     }
@@ -364,6 +419,25 @@ impl Links {
             .unwrap_or_else(|| format!("{branch}@missing"));
         Key::Moment(Family::Pr, key)
     }
+}
+
+/// Scans the end at `seat` if its fate was deferred, and answers what
+/// the reader now knows of it; a missing end is visible to nobody.
+fn settle(
+    seat: Option<&mut Seat>,
+    credential: &mut impl FnMut(Seq) -> Result<bool, AxError>,
+) -> Result<Visibility, AxError> {
+    let Some(seat) = seat else {
+        return Ok(Visibility::Hidden);
+    };
+    if seat.seen.visibility == Visibility::Deferred {
+        seat.seen.visibility = if credential(seat.seq)? {
+            Visibility::Hidden
+        } else {
+            Visibility::Visible
+        };
+    }
+    Ok(seat.seen.visibility)
 }
 
 /// What a call called, by what its two lines are paired by.
@@ -388,7 +462,7 @@ fn request_key(branch: &str, opened: Seq) -> String {
 fn end(seat: Option<Seat>, absent: End, outside: &mut BTreeSet<Seq>) -> End {
     match seat {
         None => absent,
-        Some(seat) if !seat.seen.visible => End::Withheld,
+        Some(seat) if seat.seen.visibility != Visibility::Visible => End::Withheld,
         Some(seat) if seat.seen.in_range => End::At(Decimal(seat.seq.value())),
         Some(seat) => {
             outside.insert(seat.seq);

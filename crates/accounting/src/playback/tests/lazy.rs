@@ -45,7 +45,7 @@ enum Op {
 
 /// One generated line: its run, what it is, the key its call pairs by,
 /// and whether its payload carries a credential.
-type Step = (u8, Op, u8, bool);
+type Step = (u8, Op, u16, bool);
 
 fn line_of((which, op, key, secret): Step) -> Line {
     let note = if secret {
@@ -102,7 +102,9 @@ fn exported(steps: &[Step], selection: &Selection, scanning: Scanning) -> (Vec<u
         ..person()
     };
     match project(dir.path(), &request, scanning).unwrap() {
-        Projected::Whole { document, scans } => (encode(&document).unwrap().bytes().to_vec(), scans),
+        Projected::Whole { document, scans } => {
+            (encode(&document).unwrap().bytes().to_vec(), scans)
+        }
         Projected::EndsAt(reached) => panic!("the ledger ended at {reached:?}"),
     }
 }
@@ -118,13 +120,13 @@ fn op() -> impl Strategy<Value = Op> {
 }
 
 fn step() -> impl Strategy<Value = Step> {
-    (1u8..=2, op(), 0u8..3, prop::bool::weighted(0.3))
+    (1u8..=2, op(), 0u16..3, prop::bool::weighted(0.3))
 }
 
 /// A history, and a selection of a seq range in it, perhaps of one run.
 fn history() -> impl Strategy<Value = (Vec<Step>, Selection)> {
     prop::collection::vec(step(), 1..24).prop_flat_map(|steps| {
-        let last = u64::try_from(steps.len() + 3).unwrap();
+        let last = u64::try_from(steps.len()).unwrap().saturating_add(3);
         (Just(steps), 0..=last, 0..=last, prop::option::of(1u8..=2)).prop_map(
             |(steps, a, b, which)| {
                 let selection = Selection::new(
@@ -187,13 +189,12 @@ fn a_selected_credential_line_is_counted_not_shown() {
 fn a_narrow_export_scans_only_what_its_tables_read() {
     let steps: Vec<Step> = (0..200u16)
         .flat_map(|round| {
-            let key = u8::try_from(round % 3).unwrap();
             [
-                (1, Op::ModelCalled, key, false),
-                (1, Op::ModelReturned, key, false),
-                (1, Op::ToolCalled, key, false),
-                (1, Op::ToolResult, key, false),
-                (1, Op::Member, key, false),
+                (1, Op::ModelCalled, round, false),
+                (1, Op::ModelReturned, round, false),
+                (1, Op::ToolCalled, round, false),
+                (1, Op::ToolResult, round, false),
+                (1, Op::Member, round, false),
             ]
         })
         .collect();
