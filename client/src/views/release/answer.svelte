@@ -70,7 +70,7 @@
 <div class="flex min-w-0 flex-col gap-snug">
   {#if refused !== null}
     <p class="text-note text-alert">
-      {say($lang, "release_refused")}
+      {say($lang, "release_refused_registries")}
       <code class="font-mono text-note text-text-quiet">{refused.refusal.recovery}</code>
     </p>
   {/if}

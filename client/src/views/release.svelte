@@ -76,7 +76,7 @@ heading and rule, rather than lifted onto a card (docs/frontend-method.md §7A-4
 client/Spec.lean §4-50). -->
 <section class="flex min-w-0 flex-col gap-snug">
   <div class="flex flex-wrap items-center gap-snug">
-    <Button label={say($lang, "release_check")} tone="secondary" loading={asking} onPress={check} />
+    <Button label={say($lang, "release_check_registries")} tone="secondary" loading={asking} onPress={check} />
     <a class="text-note text-accent underline" href={RELEASES} target="_blank" rel="noreferrer">
       {RELEASES}
     </a>
