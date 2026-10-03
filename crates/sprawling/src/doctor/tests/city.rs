@@ -302,3 +302,35 @@ fn the_page_carries_the_scanning_reading_the_doctor_took() {
         }
     );
 }
+
+/// The exit code answers whether a User can use this machine: a missing
+/// develop-tier tool is reported and leaves the answer ready, while a
+/// missing required use-tier item makes it not ready on every platform.
+#[test]
+fn only_a_missing_required_use_item_makes_the_doctor_not_ready() {
+    let asked = Asked {
+        install: false,
+        city: None,
+        scanned: std::env::temp_dir(),
+        explain: None,
+        ink: Ink::Plain,
+    };
+    let answer = |absent: &[&'static str]| {
+        let mut screen: Vec<u8> = Vec::new();
+        let machine = ScriptedMachine::missing(absent);
+        run(
+            &asked,
+            &machine,
+            &mut std::io::Cursor::new(Vec::new()),
+            &mut screen,
+        )
+        .unwrap()
+    };
+    assert_eq!(
+        [
+            answer(&["zig", "lean", "just"]),
+            answer(&["gecko", "chromedriver", "msedgedriver", "webkit"]),
+        ],
+        [true, false]
+    );
+}
