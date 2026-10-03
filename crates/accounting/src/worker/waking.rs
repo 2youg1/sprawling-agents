@@ -214,7 +214,10 @@ impl RunWorker {
         if !matches!(line.kind, kernel::EventKind::SignalEnqueued) {
             return Ok(());
         }
-        let signal = collab::Signal::from_payload(&line.data)?;
+        // A line a lane relayed comes from a run that is driving; the
+        // state is stamped now and never revised (collab D10).
+        let signal =
+            collab::Signal::from_payload(&line.data)?.delivered(collab::SenderState::Running);
         self.collaborating.rooms.deliver(&signal)?;
         let Some(speaker) = self.flight.speaker(line.run) else {
             return Ok(());

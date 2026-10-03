@@ -90,6 +90,12 @@ impl RunWorker {
         // Through the room table rather than into a queue of its own:
         // the parent room may have another run reading in it, and a
         // handback delivered beside that reader is one nobody collects.
+        // The child has landed: the parent reads how it ended beside the
+        // child's address (collab D10).
+        let signal = signal.delivered(match child.completion {
+            kernel::Completion::Done(_) | kernel::Completion::Limit => collab::SenderState::Frozen,
+            kernel::Completion::Cancelled => collab::SenderState::Cancelled,
+        });
         self.collaborating.rooms.deliver(&signal)?;
         // And into the room's join, by the same reading a restart would
         // do: `Handback::from_signal` is the one inverse of the writer

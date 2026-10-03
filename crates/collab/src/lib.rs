@@ -34,7 +34,7 @@ pub use delegate_tool::{DelegateDesk, DelegateTool, Delegated};
 pub use fanin::{Artifact, Claim, FanIn, Joined, PrivateQuestion};
 pub use goal_tool::{GoalBooking, GoalDesk, GoalTool, conflict_refusal};
 pub use handback::Handback;
-pub use inbox::{Inbox, Mailslot, Signal};
+pub use inbox::{Inbox, Mailslot, SenderState, Signal};
 pub use pr::{Open, Pr, Verified};
 pub use pr_tool::{MergedRequest, OpenRequest, PrDesk, PrEffect, PrTool, RejectedRequest};
 pub use signal_desk::{Post, RoomMail, SignalDesk, SignalEffect};

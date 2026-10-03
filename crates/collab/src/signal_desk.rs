@@ -324,6 +324,12 @@ impl SignalDesk {
                     .cloned()
                     .unwrap_or(Value::String(String::new())),
             );
+            if let Some(state) = signal.sender() {
+                row.insert(
+                    "sender".to_owned(),
+                    Value::String(crate::steer::sender_note(state)),
+                );
+            }
             rows.push(Value::Object(row));
             self.held.push(signal);
         }

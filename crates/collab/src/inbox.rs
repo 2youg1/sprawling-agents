@@ -22,6 +22,32 @@ use kernel::event::record::{Lane, SignalConsumed, SignalEnqueued, SignalId, Sign
 use kernel::{Address, Admission, AxCode, AxError, IdemKey, Payload, RunId, Seq, TimeMs, Version};
 use storage::{EventQueue, QueueLane};
 
+/// Where the run that sent a signal stood when the city delivered it,
+/// stamped at delivery and never revised: a signal is history once it
+/// is sent, and the reader decides from this whether it still applies
+/// (collab D10).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SenderState {
+    /// The sender was still driving: an ordinary send.
+    Running,
+    /// The sender had frozen with its work done or at its limit.
+    Frozen,
+    /// The sender had been cancelled.
+    Cancelled,
+}
+
+impl SenderState {
+    /// The word the reader is shown after the sender's `@address`.
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            SenderState::Running => "running",
+            SenderState::Frozen => "frozen",
+            SenderState::Cancelled => "cancelled",
+        }
+    }
+}
+
 /// One communication between residents.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Signal {
@@ -32,6 +58,10 @@ pub struct Signal {
     room_version: Version,
     payload: Payload,
     at: TimeMs,
+    /// Stamped by the city when it delivers the signal; absent on a
+    /// signal rebuilt from the history, whose sender's state at delivery
+    /// the history does not carry.
+    sender: Option<SenderState>,
 }
 
 impl Signal {
@@ -65,7 +95,24 @@ impl Signal {
             room_version,
             payload,
             at,
+            sender: None,
         })
+    }
+
+    /// This signal as the city delivers it, with where its sender stood
+    /// at that moment (collab D10).
+    #[must_use]
+    pub fn delivered(self, sender: SenderState) -> Signal {
+        Signal {
+            sender: Some(sender),
+            ..self
+        }
+    }
+
+    /// Where the sender stood when the city delivered this signal.
+    #[must_use]
+    pub fn sender(&self) -> Option<SenderState> {
+        self.sender
     }
 
     #[must_use]

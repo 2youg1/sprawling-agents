@@ -67,9 +67,13 @@ impl Steer {
             .get("text")
             .and_then(serde_json::Value::as_str)
             .unwrap_or_default();
+        let text = non_empty(text)?;
         Ok(Steer {
             source: agent_source(signal.from()),
-            text: non_empty(text)?,
+            text: match signal.sender() {
+                Some(state) => format!("{} {text}", sender_note(state)),
+                None => text,
+            },
         })
     }
 
@@ -149,6 +153,15 @@ impl AgentSteer {
     }
 }
 
+/// What a reader is told after the sender's `@address` about where the
+/// sender stood when the signal was delivered (collab D10).
+pub(crate) fn sender_note(state: crate::inbox::SenderState) -> String {
+    format!(
+        "(the sender's run was {} when this arrived)",
+        state.as_str()
+    )
+}
+
 fn agent_source(id: &str) -> String {
     format!("@{id}")
 }
@@ -190,6 +203,30 @@ mod tests {
         let agent = AgentSteer::new("lab/room1", "wrap up").unwrap();
         assert_eq!(agent.landing().source(), "@lab/room1");
         assert_ne!(agent.landing().source(), "user");
+    }
+
+    /// D10: the landing names where the sender stood when the city
+    /// delivered the signal, after the sender's address.
+    #[test]
+    fn a_delivered_steer_lands_with_the_senders_state_at_delivery() {
+        let signal = AgentSteer::new("lab/room1", "stop the kiln")
+            .unwrap()
+            .signal(
+                SignalId::parse("s-1").unwrap(),
+                room(),
+                Version::new(1),
+                TimeMs::new(9),
+            )
+            .unwrap()
+            .delivered(crate::inbox::SenderState::Cancelled);
+        let landed = Steer::from_signal(&signal).unwrap();
+        assert_eq!(
+            (landed.source(), landed.text()),
+            (
+                "@lab/room1",
+                "(the sender's run was cancelled when this arrived) stop the kiln"
+            )
+        );
     }
 
     #[test]
