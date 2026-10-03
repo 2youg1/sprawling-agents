@@ -24,12 +24,13 @@ impl Bound {
 pub async fn serve(bound: Bound, config: ServeConfig) -> Result<(), AxError>;
 ```
 
-- **次序是装配层要的**：一座城先占住它的端口，然后才打开写者、写下第一行（`crates/sprawling/Spec.lean` §8-88）。`ServeConfig` 里的 sink 要等写者线程开好才造得出来（转写 sink 借的是写者打开的那个金库），所以「绑定」必须能在 sink 存在之前单独做完。原先的单个 `serve(config)` 把两件事绑在一起，装配层只能先开写者、再在 `serve` 里发现端口已被占用。
+- **次序是装配层要的**：一座城先占住它的端口，然后才打开写者、写下第一行（`crates/sprawling/Spec.lean` §8-88）。`ServeConfig` 里的 sink 要等写者线程开好才造得出来（转写 sink 借的是写者打开的那个金库），所以「绑定」必须能在 sink 存在之前单独做完；若两件事合在一个 `serve(config)` 里，装配层只能先开写者、再在 `serve` 里发现端口已被占用。
 - **`addr` 与 `token_digest` 离开 `ServeConfig`**，成为 `bind` 的两个入参。它们只被绑定判定读过；留在 `ServeConfig` 里，同一个地址就会有 `bind` 的入参和配置字段两个家。
-- **失败码不变**：判定拒绝仍是 `decide_bind` 的 `E_CONFIG_INVALID`；操作系统拒绝绑定仍是 `E_CONFIG_INVALID`，recovery 仍是「换一个空闲端口，或者停掉占着它的进程」。读不出绑定之后的地址同样是 `E_CONFIG_INVALID`，recovery 相同：那个监听器已经不可用。
+- **失败码**：判定拒绝是 `decide_bind` 的 `E_CONFIG_INVALID`；操作系统拒绝绑定也是 `E_CONFIG_INVALID`，recovery 是「换一个空闲端口，或者停掉占着它的进程」。读不出绑定之后的地址同样是 `E_CONFIG_INVALID`，recovery 相同：那个监听器已经不可用。`serve` 在 accept 循环失败时答 `E_STORAGE_FATAL`，recovery 是「重启进程，监听器已经没了」。
+- **三个平台**：监听器是 tokio 的 `TcpListener`。端口被另一个进程占着时，Windows、macOS、Linux 都拒绝绑定，`bind` 都答上面那个 `E_CONFIG_INVALID`；在 macOS 与 Linux 上 mio 给监听器设 `SO_REUSEADDR`，只让重启的城能立刻重新绑上一个还处于 `TIME_WAIT` 的端口，不让两个进程同时监听一个端口；Windows 上不设它。端口 0 在三个平台上都由系统给一个临时端口，`local_addr` 读出的就是它。
 - **绑定之后的地址由 `Bound` 说出**（D16）：`serve` 被给的地址可以是 `:0`，那时只有监听器知道系统给了哪个端口；装配层要把城的地址交给别处（远程中继连回城的 `/ws`、启动横幅、控制台的 `/serving`、打开浏览器之前的探测），每一处都读 `local_addr`，不读 `serve` 被给的那个。
 - **被否：先试绑一次再放掉，然后在 `serve` 里真绑**。试绑与真绑之间，别的进程可以把端口拿走，那样原来的缺陷只是窗口变窄了，并没有消失。
-- **两者住 `server::listener`**，不住 `server::socket`：它们管的是监听器本身，先占、再服务；`server::socket` 管的是连上之后的会话、资产与上传。`Bound` 带 `#[must_use]`：占住端口而不服务，得到的是一个谁也不应答的端口。
+- **两者住 `server::listener`**，不住 `server::socket`：它们管的是监听器本身，先占、再服务；`server::socket` 管的是连上之后的一条 WS 会话；资产与上传各住 `server::bundle` 与 `server::uploads`。`Bound` 带 `#[must_use]`：占住端口而不服务，得到的是一个谁也不应答的端口。
 -/
 
 /-! D16 `Bound` 在绑定时读下监听器的地址，`local_addr` 只是读出它
