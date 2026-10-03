@@ -294,7 +294,7 @@ fn signal(setup: &Setup) -> Episode {
         holds: |seen| {
             let result = answered(seen.answer)?;
             ensure(
-                result.get("queued") == Some(&json!(true))
+                result.get("delivered") == Some(&json!(true))
                     && result.get("to") == Some(&json!(seen.setup.neighbour)),
                 format!("the send answered {result:?}"),
             )?;
