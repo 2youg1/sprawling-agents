@@ -354,7 +354,7 @@ proptest::proptest! {
         let mut view = HotView::new();
         view.apply(&record(run, 0, EventKind::RunStarted)).unwrap();
         for (at, line) in trace.iter().enumerate() {
-            view.apply(&written(run, u64::try_from(at).unwrap() + 1, *line)).unwrap();
+            view.apply(&written(run, u64::try_from(at).unwrap().checked_add(1).unwrap(), *line)).unwrap();
         }
         let hot = view.get(&run).unwrap();
         proptest::prop_assert_eq!(&hot.waiting, &model(&trace));

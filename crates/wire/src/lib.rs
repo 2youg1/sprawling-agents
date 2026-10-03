@@ -36,7 +36,6 @@ pub use answer::HistoryAnswer;
 pub use answer::HistoryRangeAnswer;
 pub use answer::PlanRow;
 pub use answer::PursuitLine;
-pub use answer::RunSummary;
 pub use answer::Used;
 pub use answer::{Answer, ApprovalsAnswer, ArchiveLine, BlockedLine, BuildingProgress};
 pub use answer::{ArchiveAnswer, ArchiveHit, DiscardAnswer, DiscardLine};
@@ -74,6 +73,7 @@ pub use answer::{OfferedCard, OpenProposalsAnswer, ProposalCard, ProposalsAnswer
 pub use answer::{PrefixSlot, PrefixSource, SkillLine, SkillShelf, SkillsAnswer};
 pub use answer::{ReleaseAnswer, ReleaseLine, UpdateHint};
 pub use answer::{RoundsAnswer, Timing, Turn};
+pub use answer::{RunSummary, Waiting};
 pub use answer::{SESSION_PREVIEW_MAX, SESSIONS_MAX, SessionLine, SessionStart, SessionsAnswer};
 pub use answer::{SecondDomain, SettledEffort, SettledSecond, TuningDefaults};
 pub use answer::{Standing, ToolkitLine, ToolkitsAnswer};

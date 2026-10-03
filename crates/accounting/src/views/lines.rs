@@ -318,6 +318,10 @@ pub(crate) fn summarize(run: RunId, hot: &storage::RunHot) -> wire::RunSummary {
         ask: hot.ask.clone(),
         task: hot.task.clone(),
         goal: hot.goal.clone(),
+        waiting: hot.waiting.as_ref().map(|waiting| wire::Waiting {
+            on: waiting.on.clone(),
+            until: waiting.until,
+        }),
     }
 }
 

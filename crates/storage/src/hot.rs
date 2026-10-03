@@ -73,6 +73,24 @@ pub struct RunWaiting {
     pub until: TimeMs,
 }
 
+impl RunWaiting {
+    /// The wait a `signal_wait_started` record states, read by key like
+    /// the rest of the fold; `None` when either field is missing or does
+    /// not read, because the view does not guess what it cannot see.
+    fn stated_by(record: &EventRecord) -> Option<RunWaiting> {
+        let data = record.data().as_map();
+        let on = data
+            .get("on")
+            .and_then(serde_json::Value::as_str)
+            .and_then(|on| Address::parse(on).ok())?;
+        let until = data
+            .get("deadline_ms")
+            .and_then(serde_json::Value::as_u64)
+            .map(TimeMs::new)?;
+        Some(RunWaiting { on, until })
+    }
+}
+
 impl RunHot {
     fn first_seen(record: &EventRecord) -> RunHot {
         RunHot {
@@ -125,6 +143,12 @@ impl RunHot {
         self.ask = (kind == EventKind::ApprovalRequested)
             .then(|| stated("action_desc"))
             .flatten();
+        if kind == EventKind::SignalWaitStarted && self.phase == RunPhase::Active {
+            self.waiting = RunWaiting::stated_by(record);
+        }
+        if kind == EventKind::SignalWaitEnded || kind == EventKind::RunFrozen {
+            self.waiting = None;
+        }
     }
 }
 

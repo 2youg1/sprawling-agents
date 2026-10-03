@@ -299,7 +299,7 @@ pub struct FrozenNames {
 
 /-! D34 一个停在同步 `send` 上的 run，在 `RunSummary` 上多一个 `waiting`；`send` 的 `wait` 是工具参数，不是线上帧
 
-**决定**：`RunSummary` 多一件 `#[serde(default)] waiting: Option<Waiting>`，`Waiting { on: Address, until: TimeMs }`：这个 run 最近一行 `signal_wait_started`（kernel D32）还没有配对的 `signal_wait_ended` 时，`on` 是它等的房间，`until` 是那一行的 deadline 换成的墙钟时刻；配对行到了就缺席。直播的页面从事件流里自己折同一对种类，查询答的是没看过流的读者。`send` 的同步开关是 `send` 工具的输入 `wait: bool`（缺省 `false`，collab D9），走模型的工具调用，不经过线上的任何一帧；线上只多这一件字段，与本版其他改形同一次 `WIRE_V` 进位（D22）。
+**决定**：`RunSummary` 多一件 `#[serde(default)] waiting: Option<Waiting>`，`Waiting { on: Address, until: TimeMs }`：这个 run 最近一行 `signal_wait_started`（kernel D32）还没有配对的 `signal_wait_ended` 时，`on` 是它等的房间，`until` 是那一行的 `deadline_ms`——城的注入时钟读出的 epoch 毫秒，本来就是墙钟时刻，所以不必换算；配对行到了、或这次跑冻结了，就缺席。这一折是 `storage::hot` 的（storage D29，`frozen_run_never_waits`），`accounting` 的 `summarize` 只搬运。`RunSummary` 自 `answer.rs` 分出到 `answer/run_summary.rs`，`Answer::Run` 装的是 `Box<RunSummary>`：线上的形状不变（serde 对 `Box` 透明），只是这一臂不再把整个 `Answer` 撑大。直播的页面从事件流里自己折同一对种类，查询答的是没看过流的读者。`send` 的同步开关是 `send` 工具的输入 `wait: bool`（缺省 `false`，collab D9），走模型的工具调用，不经过线上的任何一帧；线上只多这一件字段，与本版其他改形同一次 `WIRE_V` 进位（D22）。
 
 **理由**：一个停着等回信的 run 与一个卡住的 run 在 `last_kind` 上看起来一样，页面与 watchdog 都要能把两者分开，所以等待要成为 run 的状态的一部分；它从账本的两行读出，重放与远程设备看到的是同一个状态。`until` 用墙钟时刻而不是剩余毫秒，是因为答复会被缓存与转发，剩余时间一离开城就不对了。
 

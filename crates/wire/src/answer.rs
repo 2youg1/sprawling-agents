@@ -14,8 +14,8 @@
 //! returning an empty result a reader would mistake for an empty city.
 
 use kernel::{
-    Address, ApprovalItem, Autonomy, ClusterKey, EventKind, FileChange, GitOid, Restoration,
-    Ruling, RunId, Seq, TimeMs,
+    Address, ApprovalItem, Autonomy, ClusterKey, FileChange, GitOid, Restoration, Ruling, Seq,
+    TimeMs,
 };
 use serde::{Deserialize, Serialize};
 
@@ -53,6 +53,7 @@ mod proposals;
 mod range;
 mod release;
 mod rounds;
+mod run_summary;
 mod scanning;
 mod sessions;
 mod skills;
@@ -99,6 +100,7 @@ pub use release::{ReleaseAnswer, ReleaseLine, UpdateHint};
 pub use rounds::{
     Call, Closing, FrozenNames, Note, Opening, Outcome, Output, RoundsAnswer, Timing, Turn, Used,
 };
+pub use run_summary::{RunSummary, Waiting};
 pub use scanning::{DoctorDrive, DoctorExclusion, DoctorScanning, DoctorUntold};
 pub use sessions::{SESSION_PREVIEW_MAX, SESSIONS_MAX, SessionLine, SessionStart, SessionsAnswer};
 pub use skills::{SkillLine, SkillShelf, SkillsAnswer};
@@ -123,39 +125,6 @@ pub struct ChangesAnswer {
 /// socket, and a limit the caller cannot exceed is one fewer way for a
 /// client to make the server do unbounded work.
 pub const HISTORY_MAX: u32 = 500;
-
-/// One run, as a reader needs it. The client folds the live stream for
-/// itself; this shape is what a query answers about runs it never saw,
-/// which is why it carries the position rather than the whole history.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-pub struct RunSummary {
-    pub run: RunId,
-    pub who: String,
-    pub frozen: bool,
-    pub last_seq: Seq,
-    pub last_kind: EventKind,
-    /// The room the run works in, from its `run_started` record. `who`
-    /// cannot say it: that is the author of the first record, which is
-    /// the city. Absent when the view saw no opening for this run.
-    pub addr: Option<Address>,
-    /// When the run began, from the same record.
-    pub started: Option<TimeMs>,
-    /// How the run ended, as its `run_frozen` record says. Absent while
-    /// it runs, and when the view never saw the freeze.
-    pub completion: Option<String>,
-    /// The branch of the last pull request the run opened; a pull
-    /// request in the city is named by its branch and has no number.
-    pub pr: Option<String>,
-    /// What the run waits for the person to allow. Present exactly when
-    /// `last_kind` is `approval_requested`.
-    pub ask: Option<String>,
-    /// What the person asked for, as the run's `run_started` record says.
-    /// Absent when the view never saw the opening or the task was empty.
-    pub task: Option<String>,
-    /// What finishing looks like, from the same record, read the same way.
-    pub goal: Option<String>,
-}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
@@ -216,7 +185,7 @@ pub enum Answer {
     Changes(ChangesAnswer),
     Commit(Box<CommitAnswer>),
     City(CityAnswer),
-    Run(Option<RunSummary>),
+    Run(Option<Box<RunSummary>>),
     Approvals(ApprovalsAnswer),
     Cost(Box<CostAnswer>),
     Endpoints(EndpointsAnswer),

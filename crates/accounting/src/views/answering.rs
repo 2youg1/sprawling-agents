@@ -131,7 +131,7 @@ impl Views {
             // recall that cannot read them is "I could not look"; the
             // Ledger is read after the snapshot is let go.
             wire::Query::RunView { run } => match self.hot.get(run) {
-                Some(hot) => wire::Answer::Run(Some(summarize(*run, hot))),
+                Some(hot) => wire::Answer::Run(Some(Box::new(summarize(*run, hot)))),
                 None if self.hot.was_evicted(run) => {
                     return Prepared::Recalled {
                         ledger: self.ledger_ask(),

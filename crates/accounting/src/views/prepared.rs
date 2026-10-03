@@ -263,7 +263,7 @@ impl Prepared {
             // An evicted run always has records in the Ledger, so a
             // recall that cannot read them is "I could not look".
             Self::Recalled { ledger, run } => match ledger.recalled(run) {
-                Some(summary) => wire::Answer::Run(Some(summary)),
+                Some(summary) => wire::Answer::Run(Some(Box::new(summary))),
                 None => unavailable(format!("RunView({run})")),
             },
             // A settings file that cannot be read is "I could not
