@@ -3,6 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
+use super::contrast::{apca_lc, bronze_tier};
+use super::tables::{parse_text_tokens, parse_type_scale, text_surface_ceiling};
 use super::*;
 
 /// `Violation` has no `Debug` on purpose (it is rendered, not dumped),
