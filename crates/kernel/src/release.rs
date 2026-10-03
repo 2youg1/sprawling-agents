@@ -371,13 +371,7 @@ pub fn stands(mine: &Release, newest: &Release) -> ReleaseVerdict {
 /// current.
 #[must_use]
 pub fn stands_on_crates(mine: &Release, newest: &Version) -> ReleaseVerdict {
-    let padded = Release {
-        version: *newest,
-        year: 0,
-        month: 0,
-        day: 0,
-    };
-    stands(mine, &padded)
+    verdict_of(mine.version.cmp(newest))
 }
 
 /// The step `stands` and `stands_on_crates` share: an order read as a
