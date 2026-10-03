@@ -244,12 +244,17 @@ pub enum EventKind {
     /// The one line that ends a `signal_wait_started`: the reply came,
     /// the deadline passed, or the run left its room (D32).
     SignalWaitEnded,
+
+    // Where a letter landed (1).
+    /// Where the accounting thread put one `signal_enqueued`: a running
+    /// run's slot, the queue, or a knock (`crates/kernel/spec/Event/Record.lean` D38).
+    SignalLanded,
 }
 
 impl EventKind {
     /// Every kind, in the order the SPEC table lists them. Data face for counting tests
     /// and `xtask specalign`.
-    pub const ALL: [EventKind; 94] = [
+    pub const ALL: [EventKind; 95] = [
         EventKind::CityInitialized,
         EventKind::BuildingCreated,
         EventKind::BuildingConfigured,
@@ -344,6 +349,7 @@ impl EventKind {
         EventKind::SkillAudited,
         EventKind::SignalWaitStarted,
         EventKind::SignalWaitEnded,
+        EventKind::SignalLanded,
     ];
 }
 

@@ -120,7 +120,7 @@ kernel 是纯判定函数层：只吃入参吐 verdict，零内部 crate 依赖�
 7. **存储写失败码**：装载期码 `E_STORAGE_FATAL` 承载 Ledger append 等存储写失败；与 `E_CAS_CORRUPT`（读到的对象不可信）分立，recovery 相反。
 8. **深度上限在构造点**：读侧 `parse_line` 走 serde_json，递归上限 128 在第 128 层容器处拒绝，故一行最多 127 层，其中信封（`EventRecord` 这个对象）占 1 层；于是 `Payload::new` 与其 `Deserialize` 双侧拒绝嵌套超过 `PAYLOAD_DEPTH_MAX`＝126 层的载荷（载荷自身的对象算第 1 层），码 `E_INVALID_ARGS`，recovery 是把正文存进 CAS、载荷只带它的 locator。模型给的工具参数（`ToolCalled.args`）与工具结果（`ToolAnswer`）原样进 `data`，所以写得进却读不回的一行会让整条链重放失败；拒在写侧，读侧永远读得动自己写下的东西。浮点与深度在同一趟迭代遍历里判，只用一个 `(值, 层数)` 栈：不递归，所以敌意载荷耗不掉写方的栈；一个载荷只分配这一次，落选的是两趟分开的遍历（深度一趟、浮点一趟递归），它每层、每个节点各分配一个 `Vec`，在 dev 构建上对同一份两百来个节点的载荷交错计时，慢三倍多（每次约 58 µs 对 17 µs）。
 9. **没有写方的 kind 不定型**：`credential_lent`、`backpressure_shed`、`digest_invalidated` 在 `EventKind` 里有名字，但本树没有任何写方。结构体要以写方的字节为准（record 模块规则 1），没有写方就没有可对齐的字节，故它们留在 `record` 之外；哪天出现写方，它的第一版就经 `Payload::of` 写，结构体随之落在 `record` 下。
-10. **V0.0.9 留着位置的四项**：信号与派活发出即生效（roadmap TP3，含同步发信的等待回信动作）、只读工具不在执行前等落盘（TF1）、检查点不再全城排队（TF4）、账本线程只做账（TP4）；它们若要新种类或新键，写成 `spec/Event/Record.lean` 的下一条决定。`run_policy_changed` 有两个读者：正在跑的 run 在安全点读它、追加那一句说明、按新策略过门，下一次人派的活从 accounting 的 session fold 取它（D21）；`skill_audited` 已入枚举而没有写方，写方是 skill 上架时的审核（D23）。`signal_wait_started`／`signal_wait_ended` 已入枚举而没有写方，写方是带 `wait` 的 `send`（D32，collab D9）。
+10. **V0.0.9 留着位置的四项**：信号与派活发出即生效（roadmap TP3，含同步发信的等待回信动作）、只读工具不在执行前等落盘（TF1）、检查点不再全城排队（TF4）、账本线程只做账（TP4）；它们若要新种类或新键，写成 `spec/Event/Record.lean` 的下一条决定。`run_policy_changed` 有两个读者：正在跑的 run 在安全点读它、追加那一句说明、按新策略过门，下一次人派的活从 accounting 的 session fold 取它（D21）；`skill_audited` 已入枚举而没有写方，写方是 skill 上架时的审核（D23）。`signal_wait_started`／`signal_wait_ended` 已入枚举而没有写方，写方是带 `wait` 的 `send`（D32，collab D9）。`signal_landed` 的写方是记账线程的投递处（D38）。
 
 模型自己的假设写在各分部的定理假设里，不写成公理：拼写函数（`spec/Error.lean`）、受保护的段名与 ASCII 折叠（`spec/Address.lean`）、布局的目录名与文件名（`spec/Layout.lean`）、`EVENT_LOG_V` 与首版本（`spec/ConstsExternal.lean`）、`u64` 的上界（`spec/Event.lean`、`spec/Backpressure.lean`）都是参数，它们的值只住 Rust；摘要函数是单射这一条写在 `spec/Ledger.lean` 的定理假设里。
 -/
@@ -402,6 +402,7 @@ ARCHITECTURE.md §3「nothing here is published」是这条判定成立的前提
 | D35 | crates.io 的答案只按版本号判，与 npm 的答案在每一对版本号不同的发布上相同 | `crates/kernel/spec/Release.lean` |
 | D36 | 没报的缓存数是「没报」，不是 0 | `crates/kernel/spec/Model.lean` |
 | D37 | 发信与派活各有自己的呈现意图 | `crates/kernel/spec/Tool.lean` |
+| D38 | 一封信落在哪里是一行 record-only 的 `signal_landed` | `crates/kernel/spec/Event/Record.lean` |
 -/
 
 /-! ## 13 依赖选型

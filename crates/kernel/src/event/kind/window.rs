@@ -143,7 +143,10 @@ impl EventKind {
             // A session's name is what a page shows, and an audit is what
             // an auditor said about a skill; neither reaches a request.
             | EventKind::SessionNamed
-            | EventKind::SkillAudited => WindowClass::RecordOnly,
+            | EventKind::SkillAudited
+            // The sender already read its tool's answer; where the letter
+            // landed is what a page draws (kernel D38).
+            | EventKind::SignalLanded => WindowClass::RecordOnly,
         }
     }
 }

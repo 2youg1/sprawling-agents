@@ -149,6 +149,29 @@ pub enum WaitEnd {
     Left,
 }
 
+/// `signal_landed`: where the accounting thread put the signal
+/// `signal` at the moment it delivered it, written right after its
+/// `signal_enqueued` (`crates/kernel/spec/Event/Record.lean` D38).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SignalLanded {
+    pub signal: SignalId,
+    pub landing: Landing,
+}
+
+/// Where one signal landed. Three arms and no fourth: the model's
+/// `one_landing_per_signal` gives every signal exactly one of them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Landing {
+    /// A run was working in the room and reads it at its next safe point.
+    Delivered,
+    /// Nobody was working there and no new run was knocked for it: a
+    /// knock was already waiting, or the room has no resident.
+    Queued,
+    /// Nobody was working there, and the delivery knocked for a new run.
+    Knocked,
+}
+
 /// `worktree_opened`: the tree a resident was given to work a claimed
 /// node in, by name and measured size. It carries no path: an absolute
 /// path is a fact about one machine, and a history that holds one does

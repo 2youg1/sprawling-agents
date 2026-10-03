@@ -66,8 +66,9 @@ pub use adviser::{
 };
 pub use checkpoint::{CheckpointCommitted, Commit, CommitAttribution};
 pub use collaboration::{
-    ConflictLevel, GoalConflict, Lane, PursuitChanged, PursuitMove, SignalConsumed, SignalEnqueued,
-    SignalId, SignalKind, SignalWaitEnded, SignalWaitStarted, WaitEnd, WorktreeOpened,
+    ConflictLevel, GoalConflict, Landing, Lane, PursuitChanged, PursuitMove, SignalConsumed,
+    SignalEnqueued, SignalId, SignalKind, SignalLanded, SignalWaitEnded, SignalWaitStarted,
+    WaitEnd, WorktreeOpened,
 };
 pub use control::{
     BuildingConfigured, BuildingCreated, CancelReceived, CityInitialized, FiredAction, GateChecked,

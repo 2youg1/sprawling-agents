@@ -29,6 +29,8 @@
 6. **每次等待都会结束**（`wait_bounded`、`waits_end`）：每个等待的 deadline 至多在此刻之后 `patience` 拍；时钟再走 `patience + 1` 拍后没有等待剩下。两个 run 互等也由此解开。
 7. **F8：被取消的 run 拿过的信重新投递**（`leave_requeues`、`consumed_stays`）：一个 run 无论以 Done、失败还是取消结束，它拿着而没被落账的回答读过的信回到房间队列，并为那个房间敲一次门；已消费的不再回来。
 
+8. **每封信恰一行落点**（`one_landing_per_signal`、`landings_once`、`knocked_is_the_knock`、`delivered_is_running`）：每一行 `signal_enqueued` 恰配一行 `signal_landed`，按 `SignalId` 配；落点是 `knocked` 当且仅当这次 `send` 敲了门，是 `delivered` 当且仅当收信房间有 run 在跑。
+
 `withoutRequeue_loses` 是咬得动的演示：照 D8 否决的「取走即消费」在安全点取走就记消费，被取消的 run 拿走的那件就既不在队列里，也没有人读过。
 
 模型与平台无关：时间由注入的时钟一拍一拍走（`tick`），Windows、macOS、Linux 上同一段 trace 得同一个结果。
@@ -577,5 +579,107 @@ theorem kept_is_first_reply (o : Nat) (q : List Sig) (ss : List Sig) :
       simpa [hs] using this
 
 end Early
+
+/-! ## 8 每封信恰一行落点 -/
+
+/-- 一封信落在哪里：收信房间有 run 在跑，进它的信槽（`delivered`）；房间没人、已有一次敲门在等，进队列等那次敲门（`queued`）；房间没人、也没有敲门在等，为它敲门开一个新 run（`knocked`）。与 `kernel::event::record::Landing` 逐臂对应。 -/
+inductive Landing where
+  | delivered
+  | queued
+  | knocked
+  deriving DecidableEq, Repr
+
+/-- `send a r` 那一刻的判定，只读发出之前的城；与 `City.knock` 读同两个集合。 -/
+def City.landing (c : City) (r : Nat) : Landing :=
+  if r ∈ c.running then .delivered else if r ∈ c.knocks then .queued else .knocked
+
+/-- 带落点行的一步：只有 `send` 写一行 `signal_landed`，行里的 seq 就是这封信的 seq。 -/
+def stepL (patience : Nat) (cl : City × List (Nat × Landing)) : Act → City × List (Nat × Landing)
+  | .send a r => (step patience cl.1 (.send a r), cl.2 ++ [(cl.1.next, cl.1.landing r)])
+  | a => (step patience cl.1 a, cl.2)
+
+/-- 一段 trace 之后的城与它写下的落点行。 -/
+def runL (patience : Nat) (as : List Act) : City × List (Nat × Landing) :=
+  as.foldl (stepL patience) (City.empty, [])
+
+theorem stepL_city (patience : Nat) (cl : City × List (Nat × Landing)) (a : Act) :
+    (stepL patience cl a).1 = step patience cl.1 a := by
+  cases a <;> rfl
+
+/-- 除了 `send`，没有一步改动 `sent`。 -/
+theorem step_sent_keeps {patience : Nat} (c : City) (a : Act) (h : ∀ s r, a ≠ .send s r) :
+    (step patience c a).sent = c.sent := by
+  cases a with
+  | send s r => exact absurd rfl (h s r)
+  | start r => simp only [step]; split <;> rfl
+  | take r =>
+    simp only [step]
+    split
+    · split <;> rfl
+    · rfl
+  | ack s => simp only [step]; split <;> rfl
+  | leave r =>
+    simp only [step]
+    split
+    · split <;> rfl
+    · rfl
+  | park r o => simp only [step]; split <;> rfl
+  | tick => rfl
+
+theorem stepL_lines (patience : Nat) (cl : City × List (Nat × Landing)) (a : Act)
+    (h : cl.2.map Prod.fst = cl.1.sent.map Signal.seq) :
+    (stepL patience cl a).2.map Prod.fst = (stepL patience cl a).1.sent.map Signal.seq := by
+  cases a with
+  | send s r => simp [stepL, step, h]
+  | start r => simp only [stepL]; rw [step_sent_keeps _ _ (by simp)]; exact h
+  | take r => simp only [stepL]; rw [step_sent_keeps _ _ (by simp)]; exact h
+  | ack t => simp only [stepL]; rw [step_sent_keeps _ _ (by simp)]; exact h
+  | leave r => simp only [stepL]; rw [step_sent_keeps _ _ (by simp)]; exact h
+  | park r o => simp only [stepL]; rw [step_sent_keeps _ _ (by simp)]; exact h
+  | tick => simp only [stepL]; rw [step_sent_keeps _ _ (by simp)]; exact h
+
+theorem foldL (patience : Nat) (as : List Act) (cl : City × List (Nat × Landing))
+    (h : cl.2.map Prod.fst = cl.1.sent.map Signal.seq) :
+    (as.foldl (stepL patience) cl).1 = as.foldl (step patience) cl.1 ∧
+      (as.foldl (stepL patience) cl).2.map Prod.fst =
+        (as.foldl (stepL patience) cl).1.sent.map Signal.seq := by
+  induction as generalizing cl with
+  | nil => exact ⟨rfl, h⟩
+  | cons a rest ih =>
+    have := ih (stepL patience cl a) (stepL_lines patience cl a h)
+    simp only [List.foldl_cons, stepL_city] at *
+    exact this
+
+/-- 落点行不改变城：带不带这一行，同一段 trace 得同一个城。 -/
+theorem runL_city (patience : Nat) (as : List Act) : (runL patience as).1 = run patience as :=
+  (foldL patience as (City.empty, []) rfl).1
+
+/-- **每封发出的信恰有一行落点**：落点行的 seq 依次恰是 `sent` 的 seq，所以没有一封信缺落点，也没有一封信有两行。 -/
+theorem one_landing_per_signal (patience : Nat) (as : List Act) :
+    (runL patience as).2.map Prod.fst = (run patience as).sent.map Signal.seq := by
+  rw [← runL_city]
+  exact (foldL patience as (City.empty, []) rfl).2
+
+theorem landings_once (patience : Nat) (as : List Act) :
+    ((runL patience as).2.map Prod.fst).Nodup := by
+  rw [one_landing_per_signal, seq_is_send_order]
+  exact List.nodup_range
+
+/-- **`knocked` 与敲门同义**：一封信的落点是 `knocked`，当且仅当它的 `send` 把收信房间加进了 `knocks`（`knock_once` 说那至多一次）。 -/
+theorem knocked_is_the_knock (patience : Nat) (c : City) (a r : Nat) :
+    c.landing r = .knocked ↔ (step patience c (.send a r)).knocks = c.knocks ++ [r] := by
+  simp only [City.landing, step, City.knock]
+  by_cases hr : r ∈ c.running
+  · simp [hr]
+  · by_cases hk : r ∈ c.knocks
+    · simp [hr, hk]
+    · simp [hr, hk]
+
+/-- `delivered` 当且仅当收信房间此刻有 run 在跑。 -/
+theorem delivered_is_running (c : City) (r : Nat) : c.landing r = .delivered ↔ r ∈ c.running := by
+  unfold City.landing
+  by_cases hr : r ∈ c.running
+  · simp [hr]
+  · by_cases hk : r ∈ c.knocks <;> simp [hr, hk]
 
 end Collab.Delivery

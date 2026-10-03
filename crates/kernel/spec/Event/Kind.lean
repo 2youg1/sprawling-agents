@@ -128,6 +128,8 @@ inductive EventKind where
   -- 等回信
   | SignalWaitStarted
   | SignalWaitEnded
+  -- 信的落点
+  | SignalLanded
   deriving DecidableEq, Repr
 
 /-- 一个种类的载荷决不决定模型请求的字节：入窗（`InWindow`）或只入账（`RecordOnly`）。与 `kernel::WindowClass` 逐变体同名。依据唯一，不存在第三类。 -/
@@ -280,6 +282,8 @@ def EventKind.windowClass : EventKind → WindowClass
   | .SignalWaitStarted => .InWindow
   /- 与一行 `signal_wait_started` 配对的结束：载荷携 `signal` 与 `by`（回信到了、过了 deadline、run 离开房间）。模型下一次调用要知道是哪一种叫醒了它（`Record.lean` D32） -/
   | .SignalWaitEnded => .InWindow
+  /- 一封信落在哪里：载荷携 `signal`（那一行 `signal_enqueued` 的 id）与 `landing`（`delivered`／`queued`／`knocked`）。它是页面画在发信那一行上的结果，不进任何模型请求（`Record.lean` D38） -/
+  | .SignalLanded => .RecordOnly
 
 /-- 每个种类，依 `EventKind::ALL` 的次序。 -/
 def EventKind.all : List EventKind := [
@@ -376,7 +380,8 @@ def EventKind.all : List EventKind := [
   .SessionNamed,
   .SkillAudited,
   .SignalWaitStarted,
-  .SignalWaitEnded
+  .SignalWaitEnded,
+  .SignalLanded
 ]
 
 theorem EventKind.all_complete : ∀ kind : EventKind, kind ∈ EventKind.all := by

@@ -148,6 +148,7 @@ impl SessionOrigins {
             | EventKind::RunFrozen
             | EventKind::LogTruncated
             | EventKind::SignalEnqueued
+            | EventKind::SignalLanded
             | EventKind::SignalConsumed
             | EventKind::DraftHeld
             | EventKind::DraftResolved

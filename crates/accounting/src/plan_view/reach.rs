@@ -64,6 +64,7 @@ pub(super) fn may_move_plan(kind: EventKind) -> PlanReach {
         | EventKind::BudgetLimit
         | EventKind::LogTruncated
         | EventKind::SignalEnqueued
+        | EventKind::SignalLanded
         | EventKind::SignalConsumed
         | EventKind::DraftHeld
         | EventKind::DraftResolved

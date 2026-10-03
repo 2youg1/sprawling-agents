@@ -565,6 +565,27 @@ pub enum WaitEnd { Reply { reply: SignalId }, Timeout, Left }   // 回信到了�
 **重开参数**：一个 run 可以同时等两封回信时，重议「至多一个未配对的 `started`」。
 -/
 
+/-! D38 一封信落在哪里是一行 record-only 的 `signal_landed`，紧跟在它的 `signal_enqueued` 之后
+
+**决定**：一个种类（追加在 `ALL` 末尾，只入账），写方是记账线程的投递处（`accounting::worker::waking` 的 `deliver_sent`），在它把信投进房间、决定敲不敲门的那一刻写；`run` 与 `addr` 同那一行 `signal_enqueued`：
+
+```rust
+pub struct SignalLanded { pub signal: SignalId, pub landing: Landing }
+pub enum Landing { Delivered, Queued, Knocked }   // 进了正在跑的 run 的信槽｜进队列等一次已在等的敲门或等人派活｜为它敲门开一个新 run
+```
+
+- 每一行 `signal_enqueued` 恰配一行 `signal_landed`，按 `signal` 配（模型 `Collab.Delivery` 的 `one_landing_per_signal`、`landings_once`）；`Knocked` 当且仅当这次投递为收信房间排了一次敲门（`knocked_is_the_knock`，与 `knock_once` 同一个敲门），`Delivered` 当且仅当收信房间此刻借给了一个 run（`delivered_is_running`）。
+- 敲门之后被推迟或被链长拒绝，落点仍是 `Knocked`：这一行记的是投递那一刻的判定，敲门的去向由 `run_started` 或那一条拒绝说。
+- 这一行之前写下的账本没有它；页面配不上就画工具自己答的东西，不猜。
+- 判定只读进程里的房间表与敲门队列，Windows、macOS、Linux 上同一段 trace 得同一行。
+
+**理由**：工具答复时还不知道信落在哪里（collab D17），页面要把三种结果画在发信那一行上，就要一行在判定的那一刻把它记下来；只入账，因为发信的模型已经读过工具的答复，落点不改变它下一次请求的字节。
+
+**被否**：①在 `signal_enqueued` 的载荷上加 `landing`：那一行在投递之前已由发信 run 经 relay 写下，判定还没发生；②由页面从 `run_started` 的 `dispatched_by` 反推：推迟的敲门与链长拒绝让反推在投递之后很久才成立或永不成立；③每次敲门再写一行：一封信两行落点，页面又要决定读哪一行。
+
+**重开参数**：一封信可以同时落进两个房间（广播）时，重议「每封信恰一行」。
+-/
+
 /-! D24 `asset_archived` 在 `archive record` 被调用时写，不等 run 冻结
 
 **决定**：`asset_archived` 的写方从 run 收尾挪到工具波：`archive record` 执行时在同一个波里写这一行，同一个 run 的 `archive recall` 就读得到它。载荷与种类不变。`recall` 答复里的 `searched` 是这次真正比对过的条目数。
