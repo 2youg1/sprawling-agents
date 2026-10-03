@@ -118,7 +118,7 @@ fn answer_at(
     let wave = matches!(point, SafePoint::BeforeWave { .. });
     match steer {
         Some((at, text)) if wave && *at == index => Interrupt::Steer {
-            source: "user".to_owned(),
+            speaker: runtime::conversation::Speaker::Person,
             text: text.clone(),
         },
         _ => Interrupt::None,
