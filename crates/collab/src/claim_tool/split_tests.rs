@@ -116,3 +116,91 @@ fn a_split_of_a_row_this_run_does_not_hold_is_refused_at_the_call() {
         "a split the desk cannot land is refused before anything is queued"
     );
 }
+
+/// A plan with a header and no rows: what a building starts with.
+const EMPTY_PLAN: &str = "\
+# Roadmap
+
+| # | Item | Weight | Needs | Status | Evidence |
+|---|------|--------|-------|--------|----------|
+";
+
+fn empty_desk(room: &str) -> Arc<Mutex<ClaimDesk>> {
+    Arc::new(Mutex::new(ClaimDesk::new(
+        "mayor@hall.1".to_owned(),
+        Address::parse(room).unwrap(),
+        EMPTY_PLAN.to_owned(),
+        Booking::new(|_| Ok(())),
+    )))
+}
+
+/// Roadmap F2: an empty plan had no first line, because every action
+/// named a node and the root's share was given to nobody. The root is
+/// the building's Mayor's (kernel `Share.lean` D25), so its `add` with
+/// no node writes a top-level row, and the leaves still gather to the
+/// whole plan.
+#[test]
+fn the_mayor_writes_the_first_line_of_an_empty_plan() {
+    let shared = empty_desk(kernel::consts_policy::HALL_MAYOR);
+    let tool = ClaimTool::new(Arc::clone(&shared)).unwrap();
+    let added = tool
+        .invoke(&call(serde_json::json!({
+            "action": "add", "item": "survey the river", "weight": 2
+        })))
+        .ok()
+        .map(|outcome| outcome.result.as_map().get("node").cloned());
+    let text = shared.lock().unwrap().roadmap().map(str::to_owned);
+    let whole = text.as_deref().and_then(|text| {
+        let RoadmapShape::WellFormed { rows } = check_roadmap_shape(text) else {
+            return None;
+        };
+        let tree = PlanTree::build(rows).ok()?;
+        let leaves: Vec<kernel::Share> = tree
+            .nodes()
+            .filter(|node| node.is_leaf())
+            .map(|node| node.share)
+            .collect();
+        Some(kernel::share::gather(&leaves))
+    });
+    assert_eq!(
+        (added, text, whole),
+        (
+            Some(Some(Value::String("1".to_owned()))),
+            Some(format!(
+                "{EMPTY_PLAN}| 1 | survey the river | 2 |  | Not started |  |\n"
+            )),
+            Some(kernel::Share::WHOLE)
+        ),
+        "the first line is a top-level row, and it holds the whole plan"
+    );
+}
+
+/// Only the root's holder adds under the root: a run anywhere else adds
+/// under the branch it holds, which is what `split` already does.
+#[test]
+fn a_run_that_is_not_the_mayor_cannot_add_under_the_root() {
+    let shared = empty_desk("lab/room1");
+    let refused = ClaimTool::new(Arc::clone(&shared))
+        .unwrap()
+        .invoke(&call(
+            serde_json::json!({ "action": "add", "item": "survey the river" }),
+        ))
+        .err();
+    assert_eq!(
+        (refused, shared.lock().unwrap().roadmap().map(str::to_owned)),
+        (
+            Some(
+                AxError::failure(
+                    AxCode::InvalidArgs,
+                    "add a plan row",
+                    "the plan's root belongs to the building's Mayor, and this run is lab/room1",
+                )
+                .with_recovery(
+                    "claim a row and split it to add work under it, or signal hall/mayor to add \
+                     a top-level row"
+                )
+            ),
+            None
+        )
+    );
+}
