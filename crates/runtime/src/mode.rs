@@ -160,7 +160,6 @@ impl PolicyCell {
     /// for the next `BeforeWave`; a later arrival overrides it.
     pub(crate) fn arrive(&mut self, policy: RunPolicy) {
         self.arrived = Some(policy);
-        *self.shared.write().unwrap_or_else(PoisonError::into_inner) = policy;
     }
 
     /// At `SafePoint::BeforeWave`: puts the last arrival in force and
