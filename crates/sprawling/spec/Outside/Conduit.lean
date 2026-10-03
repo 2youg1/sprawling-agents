@@ -167,4 +167,6 @@ pub(super) struct Outdoors { city_root, relay, port, key }   // keep(self) -> Re
 - **门的看守取不起来时城照常服务**：设备表读不成、熵取不到，`/remote` 每一个子动词都打印那一句拒绝，其余控制台与页面不受影响。
 
 **测试**：`outside::tests` 用一台 Rust 写的设备、一条脚本化通路、计数的时钟与计数的熵走门：`the_door_writes_its_five_lines_in_the_order_they_happen`（开、配对、会话开始、撤销、关，五行按此次序入账）、`a_local_only_frame_is_refused_and_reaches_no_city`（`Act` 设备发 `Reveal`，答一帧 `E_GATE_DENIED` 的 `Refusal`，没有一个字节放行）、`a_watching_device_is_refused_a_verb_that_acts_and_may_still_ask`（`Watch` 设备的 `Cancel` 被拒、`Ask` 原文放行）、`the_device_table_survives_a_reopen`（两台设备，含一个中文名，重开后设备表相等）、`a_restarted_city_keeps_its_key`（同一个 vault 上两次 `keep`，邀请里的城指纹相同）、`replacing_the_key_unpairs_every_device`（换钥匙之后指纹变了、设备表空了、每台设备一行 `device_revoked`，门开着时拒绝）。
+
+**到时关门的端到端检查**：`outside::tests::expiry` 走生产的那一段——`listener::open` 绑端口、开门、起接收任务，任务里每秒一次的 `keep_time` 问 `Doorway::tick`——只把两样换成测试的：`Senses.clock` 是测试拨动的时钟（时间的接缝本来就在这里，`bin::assembly` 交真钟），通路是记下本地端口与关闭次数的替身。测试先确认门开着、监听的端口连得上，再把时钟拨过 `closes_at`，等下一次 tick：账上恰有 `remote_opened` 与 `why = Expired` 的 `remote_closed`，通路关了一次，端口不再接受连接，之后的邀请以门关着拒绝。`TICK` 仍是一秒的真时间，所以这条测试要等一到两秒；把节拍也做成接缝只会多一个参数而不多查出什么。三个平台走同一段代码：回环端口、tokio 的计时器与阻塞线程池在三处行为相同。
 -/
