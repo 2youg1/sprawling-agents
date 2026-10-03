@@ -55,26 +55,39 @@ Calling a face this city did not invent requires knowing the shape of the reques
 
 ## 2 The outsourced service: outside applications
 
-A user may want the city connected to dozens of outside applications — mail, GitHub, Figma, Discord. Writing an integration for each means following each of their APIs, which is a weekly chore unrelated to the problem this repository solves. So that whole class of work is outsourced, and the first choice is [Composio](https://composio.dev) (SDK monorepo [ComposioHQ/composio](https://github.com/ComposioHQ/composio), MIT).
+The User may want the city connected to dozens of outside applications — mail, GitHub, Figma, Discord. Writing an integration for each means following each of their APIs, which is a weekly chore unrelated to the problem this repository solves. So that whole class of work is outsourced, and the first choice is [Composio](https://composio.dev) (SDK monorepo [ComposioHQ/composio](https://github.com/ComposioHQ/composio), MIT).
 
 | It does | This code only does |
 |---|---|
 | each application's OAuth and connection management | read the tool table it offers |
 | tool discovery and call execution | write every call into the Ledger, so it replays offline |
 
-The connection is **MCP**, not their SDK: a Composio session opened with its `mcp` option yields an MCP endpoint URL that any MCP client can reach. That choice has a direct consequence: **the MCP transports — `agent_protocols::mcp::stdio` and `agent_protocols::mcp::http` — never know what Composio is.** They reach any MCP server, and Composio is one URL among them. A user who does not trust it points at another, or runs their own, and not one line of the protocol changes.
+The connection is **MCP**, not their SDK: a Composio session opened with its `mcp` option yields an MCP endpoint URL that any MCP client can reach. That choice has a direct consequence: **the MCP transports — `agent_protocols::mcp::stdio` and `agent_protocols::mcp::http` — never know what Composio is.** They reach any MCP server, and Composio is one URL among them. A User who does not trust it points at another, or runs their own, and not one line of the protocol changes.
 
 **Where the knowledge is allowed to live.** Composio is an OAuth broker standing in front of MCP, so the server module that knows about it, `agent_protocols::mcp::broker`, brokers OAuth and does nothing else. It makes four calls: `GET /api/v3/toolkits` for the directory, `GET /api/v3/auth_configs` to reuse an auth config the project already holds, `POST /api/v3/auth_configs` to create a Composio-managed one when it holds none, and `POST /api/v3/connected_accounts/link` for the consent redirect. It hands back a server URL and a connection to wait on. How its calls leave this machine is decided by `gateway::client_for`, like every other outbound call. There is one broker and therefore no trait; a second outsourced service is what would earn one. The client's MCP page also spells the broker's MCP base URL and its key header, in `client/src/views/mcp/composio.svelte`.
 
-**One-click connect is built on that module, for three reasons.** A Composio-managed auth config is created by one call, with no dashboard visit and no OAuth client of the user's own, so `auth_config_id` is a value this code obtains rather than one a person fetches. The consent redirect goes through `connected_accounts/link`, which is Composio's named replacement for the endpoint it is retiring for managed OAuth, so this code is written against the survivor. And the consent screen the redirect opens is Composio's own, so the person grants access to a third party knowingly, which is the guarantee the `link` flow exists to enforce. A connect request is recorded as `toolkit_link_opened`; where the application stands afterwards is asked of the broker each time, because a recorded standing would still read "connected" after the person revoked it.
+**One-click connect is built on that module, for three reasons.** A Composio-managed auth config is created by one call, with no dashboard visit and no OAuth client of the User's own, so `auth_config_id` is a value this code obtains rather than one a person fetches. The consent redirect goes through `connected_accounts/link`, which is Composio's named replacement for the endpoint it is retiring for managed OAuth, so this code is written against the survivor. And the consent screen the redirect opens is Composio's own, so the person grants access to a third party knowingly, which is the guarantee the `link` flow exists to enforce. A connect request is recorded as `toolkit_link_opened`; where the application stands afterwards is asked of the broker each time, because a recorded standing would still read "connected" after the person revoked it.
 
-**The project key stays the user's.** It is held in `gateway::credential::vault` beside every other credential, is never bundled and never proxied.
+**The project key stays the User's.** It is held in `gateway::credential::vault` beside every other credential, is never bundled and never proxied.
 
 Three boundaries hold, each part of what the product promises:
 
-1. **The account is the user's.** No key is bundled, nothing is paid on their behalf, nothing is proxied.
+1. **The account is the User's.** No key is bundled, nothing is paid on their behalf, nothing is proxied.
 2. **Nothing polls from here.** An outside event — new mail, a new pull request — is something a service pushes to the city. This build has no receiver for pushed events, and it does not poll in place of one: a city that asked "anything new?" on a timer would generate traffic nobody reads, and would be a second authority on what arrived first.
 3. **Everything an outside tool brings back joins the taint set** — outside content is data, never instructions — because those tools cross the same seam as the built-in ones. A confidential building constructs no outside tool at all.
+
+### Programs and services a city uses when they are there
+
+Some outside work is neither bundled nor outsourced: the city calls a program the User installed, or one public endpoint, and works without it. Each one is the same call on Windows, macOS and Linux unless the row says otherwise.
+
+| What | Used for | When it is absent |
+|---|---|---|
+| the skills.sh partner audits, `GET https://skills.sh/api/v1/skills/audit/<owner>/<repo>/<skill>`, asked without a token | the default skill audit of a skill whose source skills.sh recognises (city D19, in `crates/city/spec/Library/Audit.lean`) | the audit is recorded as unreachable and the skill is shelved anyway |
+| SkillSpector (NVIDIA, Apache-2.0, Python 3.12 or later), found on the PATH and never installed by the city | a skill audit run on this machine, through its stable exit codes | no audit line is written for that auditor |
+| `bwrap`, the namespace wrapper, on Linux | the `native` sandbox arm on Linux | `exec` resolves to the copied tree and says so |
+| Docker or Podman | the `container` sandbox arm | the arm answers that it is unavailable |
+
+The audit design is decided and its ledger kind exists; the code that asks either auditor is not built yet, so today every shelved skill shows as unaudited. An audit is advice and never a gate: what a building admits is still the User's `reading_room` in `RULES.toml`.
 
 ## 3 The code this binary is built from
 
@@ -207,4 +220,4 @@ What is followed instead is the same kind of thing section 1 follows for provide
 
 **Credential custody is not delegated.** Plaintext reaches only the credential service on the machine the city runs on, and redemption happens in the last slot before the wire. That is part of what the product promises rather than an organisational convenience.
 
-**No outside service's key is bundled, nothing is paid, nothing is proxied.** Which service to connect and whose account to use is the user's decision.
+**No outside service's key is bundled, nothing is paid, nothing is proxied.** Which service to connect and whose account to use is the User's decision.

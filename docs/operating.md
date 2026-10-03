@@ -220,6 +220,22 @@ The terminal a city runs in prints one line for each record the city commits: it
 
 `SPRAWLING_BROWSER` is a different setting. It names the browser engine this city drives — the one the **browser** tool starts and `sprawling doctor` reports — and it takes precedence over every engine the doctor finds. It has no effect on which browser shows you the page.
 
+## How `exec` is confined
+
+A run's `exec` call runs in a sandbox arm, and the tool's own description tells the model which arm it got and what that arm does not hold, across five guarantees: files, network, process tree, user and resources. The dependencies page shows the same arm. The arm names are the same on every platform; what fills them differs:
+
+| Arm | Windows | macOS | Linux |
+|---|---|---|---|
+| `none` | the host itself | the host itself | the host itself |
+| `copied_tree` | a copy of the worktree | a copy of the worktree | a copy of the worktree |
+| `native` | a Job Object with AppContainer | a Seatbelt profile, not verified yet, so it answers unavailable | the `bwrap` namespace wrapper |
+| `container` | Docker or Podman Desktop, installed apart | Docker or Podman Desktop, installed apart | rootless Podman or Docker, installed apart |
+| `python` | Python inside wasip1 | Python inside wasip1 | Python inside wasip1 |
+
+The default is decided per platform in one place, `crates/wire/spec/Answer/Doctor.lean` D26: `native` on Windows and Linux and `copied_tree` on macOS. A default whose mechanism this machine lacks falls back to `copied_tree` and says so; an arm a building names explicitly refuses instead. Choosing an arm in a building's `CONFIG.toml` is not built yet, and today every platform runs `copied_tree`, except Linux, which runs `native` where `bwrap` is installed.
+
+The shell arm is off until a building's `CONFIG.toml` sets `[sandbox] shell = true`. It runs the interpreter `COMSPEC` names on Windows (`cmd.exe` when it is unset) with `/C`, and the one `SHELL` names on macOS and Linux (`/bin/sh` when it is unset) with `-c`; when no interpreter is found the call is refused and names the program arm instead. Python calls never reach the host. PowerShell 7 as a building's choice, `[sandbox] interpreter = "pwsh"`, is specified in `crates/runtime/spec/Tools/Exec.lean` and not built.
+
 ## Parts you can replace
 
 This repository bundles nobody's key, pays for nothing, and proxies nothing. Everything that reaches outside is therefore an adapter you can swap, and this section says where each one lives.

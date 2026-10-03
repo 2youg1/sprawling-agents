@@ -25,7 +25,7 @@ This is the most expensive distinction in the design to get wrong.
 | Disposable | no | yes, at any moment |
 | Enters replay | yes | no |
 | Cost of losing it | the city is gone | this debugging session is harder |
-| Timestamps | integer milliseconds, passed in | none in the line; a sink may add one |
+| Timestamps | integer milliseconds, passed in; a tool call's and a model reply's durations also as integer microseconds off the turn's monotonic clock | none in the line; a sink may add one |
 | Floats | none | as you like |
 
 **The test**: delete every log and the behaviour, the replay result, and the reconciliation totals stay byte-identical. When they do not, something has been written in the wrong place.
