@@ -113,14 +113,67 @@ private def waits (door : Door) (port : Port) (serving : Serving) : Nat → IO B
       | .accepted _ => return true
       | _ => waits door port serving tries
 
+/-- How a served city leaves once the action against it is done
+(tools/adversary/Spec.lean D8). -/
+inductive Leaving where
+  /-- Terminated, with no handoff: the crash the acceptance walk takes, and
+  every ground of the tree, which reads nothing a handoff would write. -/
+  | killed
+  /-- Closed the way a person at the keyboard closes it, waited for, and
+  terminated only where that cannot be asked or is not answered in time. -/
+  | closedInOrder
+
+/-- How long a city asked to close in order is given before it is terminated. -/
+private def closingTries : Nat := 100
+
+/-- Ends a served city the way `leaving` names, and waits for it to be gone.
+
+Every fallback from an orderly close to a termination prints one `note` line
+naming why, so a reading of the walk says which servings wrote a handoff. -/
+def Serving.leave (serving : Serving) : Leaving → IO Unit
+  | .killed => serving.hangUp
+  | .closedInOrder => do
+    match ← interrupt with
+    | .error why => fallBack why
+    | .ok () =>
+      if ← exited closingTries then
+        return ()
+      else
+        fallBack s!"it was still running {closingTries / 10} s after SIGINT"
+where
+  /-- Asks the process to close in order, or says why that cannot be asked. -/
+  interrupt : IO (Except String Unit) := do
+    if System.Platform.isWindows then
+      return .error <| "on Windows the city closes in order only on a Ctrl-Break of its own console, "
+        ++ "and a Ctrl-Break on the console it shares with this walk would close the walk too"
+    let sent ← IO.Process.output
+      { cmd := "kill", args := #["-s", "INT", toString serving.child.pid] }
+    if sent.exitCode == 0 then
+      return .ok ()
+    else
+      return .error s!"kill -s INT refused: {sent.stderr.trimAscii.toString}"
+  exited : Nat → IO Bool
+    | 0 => return false
+    | tries + 1 => do
+      match ← serving.child.tryWait with
+      | some _ => return true
+      | none =>
+        IO.sleep 100
+        exited tries
+  fallBack (why : String) : IO Unit := do
+    IO.println s!"  note  the served city was terminated, not closed in order: {why}"
+    serving.hangUp
+
 /-- Serves a city that is already raised, on a port nobody else in this process
-holds, runs an action against it, and kills the process on every path out.
+holds, runs an action against it, and ends the process on every path out, the
+way `leaving` names.
 
 `withGround` is this behind a throwaway directory. The acceptance world calls it
 on its own because it serves one directory more than once: killing a city in the
 middle of a run and serving what it left behind is a step it walks
 (`Sprawling.Acceptance.Walk`). -/
-def servingAt (door : Door) (city home : System.FilePath) (act : Ground → IO α) : IO α :=
+def servingAt (door : Door) (city home : System.FilePath) (leaving : Leaving)
+    (act : Ground → IO α) : IO α :=
   attempt 4
 where
   /-- One city on one port: `none` when that port was held by something outside
@@ -139,7 +192,7 @@ where
         else
           throw <| IO.userError s!"a city would not serve: {complained}"
     finally
-      serving.hangUp
+      serving.leave leaving
   attempt : Nat → IO α
     | 0 =>
       throw <| IO.userError
@@ -175,7 +228,7 @@ def withGround (door : Door) (act : Ground → IO α) : IO α := do
     let home := root / "home"
     IO.FS.createDirAll home
     door.raise city
-    servingAt door city home act
+    servingAt door city home .killed act
   finally
     try IO.FS.removeDirAll root catch _ => pure ()
 

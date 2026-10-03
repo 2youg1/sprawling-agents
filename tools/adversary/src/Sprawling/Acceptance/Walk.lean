@@ -242,7 +242,7 @@ serving is what kills the process — `Serving.hangUp` terminates it — so the
 kill lands between two of the run's writes rather than after its last one. -/
 def interrupted (setting : Setting) (stage : Stage) : IO Unit := do
   let started ← IO.monoMsNow
-  let (ground, sending) ← stage.serving setting.door fun ground => do
+  let (ground, sending) ← stage.serving setting.door .killed fun ground => do
     let sending ← IO.asTask (setting.door.ask ground.port (dispatching "two" 404)) .dedicated
     match (← ground.runsStarted 2)[1]? with
     | some doomed => waitInFlight ground doomed recordTries

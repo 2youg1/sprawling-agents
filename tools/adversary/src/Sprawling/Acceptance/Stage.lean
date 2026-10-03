@@ -18,7 +18,8 @@ first row of its plan (`crates/city/templates/RULES.toml`,
 `crates/city/templates/Roadmap.md`).
 
 Unlike `withGround`, the directory outlives one served process: the walk serves
-it, kills it in the middle of a run, and serves it again.
+it, kills it in the middle of a run, and serves it again; the servings that
+are not the crash end in order (tools/adversary/Spec.lean D8).
 -/
 
 namespace Sprawling.Acceptance
@@ -43,9 +44,11 @@ def Stage.raise (door : Door) : IO Stage := do
 def Stage.discard (stage : Stage) : IO Unit :=
   try IO.FS.removeDirAll stage.root catch _ => pure ()
 
-/-- Serves this folder's city for as long as `act` runs, and kills it after. -/
-def Stage.serving (stage : Stage) (door : Door) (act : Ground → IO α) : IO α :=
-  servingAt door stage.city stage.home act
+/-- Serves this folder's city for as long as `act` runs, and ends it after the
+way `leaving` names. -/
+def Stage.serving (stage : Stage) (door : Door) (leaving : Leaving)
+    (act : Ground → IO α) : IO α :=
+  servingAt door stage.city stage.home leaving act
 
 /-- The skills a release ships: every directory on the shelf holding a
 `SKILL.md`, by its directory name, sorted.

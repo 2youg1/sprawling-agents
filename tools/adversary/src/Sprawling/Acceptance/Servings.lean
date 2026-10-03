@@ -36,9 +36,9 @@ def walk (setting : Setting) (atLast : Ground → IO α) : IO α := do
   let stage ← Stage.raise setting.door
   try
     mountShelf stage.city setting.shelf
-    stage.serving setting.door fun ground => Step.runAll ground (firstDay setting)
+    stage.serving setting.door .closedInOrder fun ground => Step.runAll ground (firstDay setting)
     interrupted setting stage
-    stage.serving setting.door fun ground => do
+    stage.serving setting.door .closedInOrder fun ground => do
       Step.runAll ground (thirdServing setting)
       atLast ground
   finally
