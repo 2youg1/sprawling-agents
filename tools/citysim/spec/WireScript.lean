@@ -43,7 +43,7 @@ impl ScriptedProvider {
 | `POST` | 按 run 作答，见 §8-13；回复以 200 送出，`content-type: application/json`——城要的是流时也照读（gateway 按媒体类型认出整段回复） |
 | 其他方法 | 405，码 `method_unanswered` |
 
-拒绝的正文是 `{"error":{"type":"<码>","message":"<一句话>"}}`，OpenAI 与 Anthropic 两种兼容格式的错误都是这个形状。替身的每一种拒绝都不在 gateway 的「可重试」之列：状态码只有 400、404、405、409、410，而 gateway 重发的是 408、429 与 5xx（那一集合的权威是 `crates/gateway/src/endpoint/failure.rs` 的 `ProviderFailure::retry`），所以城把用尽读成一次不会自己好的拒绝，而不是一直重发。**用尽要拒，不重复最后一条**：黑盒检查要看得见城比脚本多调了一次（`an_exhausted_run_is_refused`）。
+拒绝的正文是 `{"error":{"type":"<码>","message":"<一句话>"}}`，OpenAI 与 Anthropic 两种兼容格式的错误都是这个形状。替身的每一种拒绝都不在 gateway 的「可重试」之列：状态码只有 400、404、405、409、410，而 gateway 重发的是 408、429 与 5xx（那一集合的权威是 `crates/gateway/src/endpoint/failure.rs` 的 `ProviderFailure::retry`），所以城把用尽读成一次不会自己好的拒绝，而不是一直重发。`no_refusal_of_the_stand_in_is_retried_by_the_city` 把每一种拒绝照替身的写法在回环上答给 `gateway::Endpoint::list_models`，断言错误的 `retry()` 是 `Retry::No`：读的是 gateway 自己的 `ProviderFailure::retry`，不抄它的状态码集合。**用尽要拒，不重复最后一条**：黑盒检查要看得见城比脚本多调了一次（`an_exhausted_run_is_refused`）。
 
 **什么算一个请求、记录写什么、凭据头怎样落盘**，是 `wire_script::exchange` 的事，见 `spec/WireScript/Exchange.lean` 的 §8-10 续。
 

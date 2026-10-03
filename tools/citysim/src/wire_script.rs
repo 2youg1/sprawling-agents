@@ -256,7 +256,7 @@ impl Answer {
     }
 
     /// Whether this is a first turn that found no run left, which is
-    /// the one refusal reading the script again can change (§3-15).
+    /// the one refusal reading the script again can change (citysim D15).
     pub(crate) fn wants_more_runs(&self) -> bool {
         matches!(self, Answer::Refused(Refusal::NoRunLeft))
     }

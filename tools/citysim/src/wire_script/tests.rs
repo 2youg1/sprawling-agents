@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 use kernel::AxCode;
 use serde_json::{Value, json};
 
-use super::{ScriptedProvider, WireScript};
+use super::{Answer, Refusal, ScriptedProvider, WireScript};
 
 /// A reply in the OpenAI chat format that calls `status` under `id`.
 fn calling(id: &str) -> Value {
@@ -290,4 +290,87 @@ fn a_script_whose_runs_cannot_be_told_apart_or_reached_is_refused() {
             Some((AxCode::ConfigInvalid, "runs[0]".to_owned())),
         ]
     );
+}
+
+/// The refusal after `refusal` in a walk that reaches every one; a new
+/// refusal cannot compile until it is given a place in the walk.
+fn after_refusal(refusal: Refusal) -> Option<Refusal> {
+    match refusal {
+        Refusal::NoModelList => Some(Refusal::ScriptExhausted),
+        Refusal::ScriptExhausted => Some(Refusal::NoRunLeft),
+        Refusal::NoRunLeft => Some(Refusal::RunsCrossed),
+        Refusal::RunsCrossed => Some(Refusal::BodyUnreadable),
+        Refusal::BodyUnreadable => Some(Refusal::MethodUnanswered),
+        Refusal::MethodUnanswered => None,
+    }
+}
+
+/// Answers one request on a loopback port with `refusal`, as the
+/// stand-in writes it, and returns the URL the request was sent to.
+fn refusing_once(refusal: Refusal) -> (String, std::thread::JoinHandle<()>) {
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let url = format!("http://{}/v1/models", listener.local_addr().unwrap());
+    let served = std::thread::spawn(move || {
+        let (mut stream, _) = listener.accept().unwrap();
+        let mut head = Vec::new();
+        let mut byte = [0u8; 1];
+        while !head.ends_with(b"\r\n\r\n") {
+            stream.read_exact(&mut byte).unwrap();
+            head.push(byte[0]);
+        }
+        let answer = Answer::Refused(refusal);
+        let (code, phrase) = answer.status();
+        let body = answer.body().to_string();
+        let len = body.len();
+        write!(
+            stream,
+            "HTTP/1.1 {code} {phrase}\r\ncontent-type: application/json\r\n\
+             content-length: {len}\r\nconnection: close\r\n\r\n{body}"
+        )
+        .unwrap();
+    });
+    (url, served)
+}
+
+/// citysim D15 and the Exchange part: every refusal the stand-in gives
+/// is one the city does not retry, read through the gateway's own
+/// `ProviderFailure::retry` on a real exchange rather than a copy of
+/// its status set.
+#[test]
+fn no_refusal_of_the_stand_in_is_retried_by_the_city() {
+    let endpoint = gateway::Endpoint::new(
+        gateway::EndpointConfig {
+            base_url: "http://127.0.0.1:1/v1/chat/completions".to_owned(),
+            dialect: kernel::DialectKind::OpenAi,
+            model: "script".to_owned(),
+            auth: gateway::AuthSpec::None,
+            extra_headers: Vec::new(),
+            overrides: Vec::new(),
+            timeout_ms: 5_000,
+            stream_idle_timeout_ms: None,
+            pricing: None,
+            proxying: kernel::Proxying::Never,
+        },
+        gateway::Redemption::without_images(Box::new(|_reference: &kernel::SecretRef| {
+            Err(kernel::AxError::failure(
+                AxCode::ConfigInvalid,
+                "resolve a credential",
+                "none configured",
+            )
+            .with_recovery("this stand-in authenticates with nothing"))
+        })),
+    )
+    .unwrap();
+    let mut next = Some(Refusal::NoModelList);
+    while let Some(refusal) = next {
+        let (url, served) = refusing_once(refusal);
+        let err = endpoint.list_models(&url).unwrap_err();
+        served.join().unwrap();
+        assert_eq!(
+            (refusal.code(), err.retry()),
+            (refusal.code(), kernel::Retry::No),
+            "{err}"
+        );
+        next = after_refusal(refusal);
+    }
 }
