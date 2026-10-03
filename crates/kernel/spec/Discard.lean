@@ -39,7 +39,7 @@ pub fn forecast(arm: &ExecArm) -> DiscardForecast;
 
 - **decide 表**：Unplanned → Deny{NoRestoration}（无还原不可构造，使 Planned 恒有 plan）；Planned 且 taint 非空 → Deny{Tainted}（恒，无视规模）；余 Allow。判序固定，确定可重放。
 - **规模与归属不改答（D1「默认 YOLO」）**：一次 Planned 删除恒带 `Restoration`，因此恒可回滚；文件数、字节数、别人登记过的 asset 都不让删除停下来问人。删除的上界另有家：write domain 决定一个 resident 够得到哪些文件，registry 保存把 asset 放回去所需的凭据。
-- **forecast 三臂预判力递减**：Program 读 `(path, args)` 整体——basename ∈ {rm, rmdir, del} 或 git 携 reset --hard/clean 或 find 携 -delete；Python/Shell 子串表（rm 、rmdir、-delete、git reset --hard、git clean、os.remove、shutil.rmtree、os.unlink；Shell 另含 `>` 截断重定向）——可被混淆绕过，恒保守；git 检查点兜底（`storage::checkpoint`）。子串表是 pub(crate) 数据面。
+- **forecast 三臂预判力递减**：Program 读 `(path, args)` 整体——取 path 的末段并去掉 `.exe` 后缀，basename ∈ {rm, rmdir, del}，或 git 的参数里有 `reset --hard` 或 `clean`，或 find 的参数里有 `-delete`；Python 与 Shell 只能查子串，可被混淆绕过，恒保守：两臂共用文本表（`rm `、`rmdir`、`-delete`、`git reset --hard`、`git clean`），Python 另查 `os.remove`、`shutil.rmtree`、`os.unlink` 与以写模式打开文件（`open(` 与 `'w'` 或 `"w"` 同在），Shell 另查截断重定向（含 `>` 而全文不含 `>>`）。git 检查点兜底（`storage::checkpoint`）。两张子串表是 pub(crate) 数据面。
 - 同文件 `#[test]` 守 Discard 门 fail-closed：Unplanned 恒 Deny；Tainted 恒 Deny（kani 不接手，理由见 `crates/kernel/Spec.lean` §2）。
 -/
 

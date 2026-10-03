@@ -41,6 +41,7 @@ impl Held {
 pub enum PlanExit { Finished { id, evidence }, Stopped { id, why } }
 
 pub struct PlanNode { pub row: RoadmapRow, pub share: Share, pub children: Vec<NodeId> }
+impl PlanNode { pub fn is_leaf(&self) -> bool; }   // 没有子节点
 pub struct PlanTree { /* BTreeMap<NodeId, PlanNode> 私有 */ }
 impl PlanTree {
     pub fn build(rows: Vec<RoadmapRow>) -> Result<PlanTree, AxError>;

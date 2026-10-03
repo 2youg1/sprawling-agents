@@ -96,7 +96,7 @@ pub use model::{Increment, Increments, MessageBreakpoint, Model};
 pub use model::{SystemBlock, ToolDef};
 pub use node_id::{NODE_DEPTH_MAX, NodeId};
 pub use origin::Origin;
-pub use plan::{Held, PLAN_WHOLE_PPB, PlanExit, PlanNode, PlanTree, StopCause};
+pub use plan::{Held, PlanExit, PlanNode, PlanTree, StopCause};
 pub use pursuit::{Pursuit, PursuitState, PursuitVerdict};
 pub use reach::{Answered, Connected, Named, Proxying, Reach, Through};
 pub use registry::{Artifact, Claim, RegisterVerdict, Registry, ResidentId};

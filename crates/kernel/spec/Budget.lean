@@ -16,7 +16,7 @@
 
 ```rust
 pub struct UsdMicros(u64);  pub struct Tokens(u64);  pub struct ByteLen(u64);   // 钱与量整数化，三新型同家
-// 各：pub const fn new(u64) / pub const fn get() / pub fn checked_add(self, o) -> Option<Self>
+// 各：pub const fn new(value: u64) / pub const fn get(self) -> u64 / pub fn checked_add(self, other) -> Option<Self>
 // checked_add 取 Option 而非 Result：溢出怎么算归调用点定（读作 E_INVALID_ARGS），
 // 在原语层预先选一个错误故事会迫使调用方反封 AxError。
 
@@ -29,5 +29,5 @@ pub struct BudgetUse { pub usd: UsdMicros, pub tokens: Tokens }    // serde（Pr
 - **留下的是记账而不是闸**：`BudgetUse` 与 `storage::attribution` 的五路归因、成本页原样保留。**报告花了多少**与**事前不许花**是两件事，kernel 只做前者。
 - **不在此列**：`tools/xtask/budgets.toml`（门的价目册，同名异物）与 `Fuel`（wasm 客的停机保证）。
 - `BudgetUse` 保留 serde，因为它是 `Progress::Unplanned` 与 `Completion::Evidence` 的载荷字段，账本里已有历史行读得回去。
-- kani：`admit_spend` 的 harness 随函数删除；`crates/kernel` 的 harness 总数与 CI 所证条数因此各少一条，被证的 `budget` 一条随函数一起消失（ARCHITECTURE §11 的数字同集更新）。**这里记的是那次变更当时的读数，不是今天的基数**；今天树上有几条、CI 证哪几条，以 `cargo xtask proof --list` 为准。
+- 本模块没有 kani harness：三个新型只有构造、取值与 `checked_add`，没有判定可证；树上有几条 harness、CI 证哪几条，以 `cargo xtask proof --list` 为准。
 -/

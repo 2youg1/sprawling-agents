@@ -17,12 +17,15 @@
 ```rust
 pub struct ToolName(String);        // 非空；ascii 小写/数字/下划线（进 catalog 与事件的名）
 impl ToolName {
+    pub fn parse(raw: &str) -> Result<Self, AxError>;      // 唯一构造点，serde 读也经它；文法不合即 E_INVALID_ARGS
+    pub fn as_str(&self) -> &str;
     pub const BROWSER: &'static str = "browser";            // 内建浏览器工具的名：ToolMeta、楼的准入规则与账本夹具共用的唯一拼写
     pub const USER_BROWSER: &'static str = "usersbrowser";  // 驱使人自己开着的浏览器的工具
     pub const EXEC: &'static str = "exec";                  // 三臂执行工具的名：discard 预报、命令计数与 sieve 三处按名路由，拼写只此一家
 }
 pub struct ServerLabel(String);     // 非空；ascii 小写/数字，恒不含下划线（见下）
-pub struct TimeoutMs(u64);          // 声明即承诺可协作取消
+impl ServerLabel { pub fn parse(raw: &str) -> Result<ServerLabel, AxError>; pub fn as_str(&self) -> &str; }
+pub struct TimeoutMs(pub u64);      // 声明即承诺可协作取消；缺席＝无截止
 pub enum Effect { Read, Write { domain: Address }, Egress,
                                     Connector { label: ServerLabel }, Spawn, Govern,
                                     AttachUserBrowser { address: Option<String> }, Spend }   // 决定过哪道门
@@ -32,6 +35,7 @@ pub enum Effect { Read, Write { domain: Address }, Egress,
 // 而它拒的理由是「一个 run 不得改写审判它自己的规则」，故效果层对这一臂恒拒，规则由人改 TOML。
 // AttachUserBrowser：附着到人自己开着的浏览器。地址由登记固定而不是每次调用命名（同 Connector 的理由）；
 // `None` 是人启用了工具却没说地址，`gate::attach` 据此答 Ask 而不是猜。
+// Spend：动钱。本构建没有声明它的工具；bench 以 E_TOOL_UNAVAILABLE 拒，第一件声明它的工具因此碰到的是一扇门而不是一个缺口。
 pub enum GateSubject { Area(Address), Room(Address), Scope(String), Host(String), None }
 // Tool::subject 的返回：一条调用说的是什么，由工具自己的文法读出来。
 // `None` 是文法读完成参数后的答案「这条调用没有主体」，不是遗漏：Egress 与
@@ -70,6 +74,7 @@ pub trait Tool: Send + Sync {
     fn writes(&self, call: &ToolCall) -> Writes;   // 默认按 `meta().effect`：`Read` → `Nothing`，其余 → `Domain`
 }
 pub enum Writes { Nothing, Paths(Vec<Address>), Domain }
+impl Writes { pub fn of(effect: &Effect) -> Self;  pub fn and(self, other: Self) -> Self; }   // of 即 trait 默认的那一读
 // Tool::writes 的返回：一条跑完的调用可能写了城里树上的哪些路径，由工具自己的文法读出来。
 // `Paths` 只给确知自己写了哪些文件的工具（`edit` 答它的 `path`）；说不清的（`exec`、协作桌、改规则）答 `Domain`，
 // checkpoint 于是扫整个写域。默认实现不猜：只有声明 `Effect::Read` 的工具答 `Nothing`。

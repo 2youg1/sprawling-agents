@@ -8,7 +8,7 @@
 
 规定 `kernel::secret`（`crates/kernel/src/secret.rs` 与 `crates/kernel/src/secret/` 下的 `span`、`scan`、`hex_run`、`sealed`）：密钥引用、扫描与封存。本文件是 `crates/kernel/Spec.lean` 的一个分部；下面每一节保留它在 kernel 规格里的标签 §8-n，别处引作 `crates/kernel/Spec.lean §8-n`。
 
-这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与 `kernel::secret::span`、`kernel::secret::scan`、`kernel::secret::hex_run`等 旁的测试守住。
+这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与 `kernel::secret::span`、`kernel::secret::scan`、`kernel::secret::hex_run` 等模块旁的测试守住。
 -/
 
 /-!
@@ -27,6 +27,9 @@ pub struct SecretSpan { pub start: usize, pub len: usize, pub provider: Option<&
 /// entropy second. Pure, no regex, no backtracking; kani-provable
 /// termination. Replacement/vaulting is the effect layer's.
 pub fn scan(bytes: &[u8]) -> Vec<SecretSpan>;
+/// The label half: whether a name (an environment variable, a config key)
+/// reads as a credential's. Case-insensitive substring of CREDENTIAL_NAME_MARKERS.
+pub fn names_a_credential(name: &str) -> bool;
 
 pub struct Sealed<T: zeroize::Zeroize>(/* secrecy::SecretBox<T> */);
 impl<T: zeroize::Zeroize> Sealed<T> {
@@ -36,6 +39,10 @@ impl<T: zeroize::Zeroize> Sealed<T> {
     /// sealed value cannot reach any sink even by accident.
     pub fn expose(&self) -> &T;
 }
+impl Sealed<String> {
+    /// The one exit besides redemption: consuming, into the vault that holds it.
+    pub fn into_vault_value(self) -> Zeroizing<String>;
+}
 ```
 
 - **`SecretRef` 只有一个构造点**。`secret:<realm>/<name>` 是一段文法，故拼接只在 `SecretRef::new` 里发生一次：`parse` 拆出两段后也交给它，两半因此共用同一个拒词；段允许的字符集（字母、数字、`-`、`_`、`.`）也只写在 `new` 里，名字里的 `/` 由它拒绝而不另立一条规则。`wire` 的录入口、`sprawling` 的签入面与到期表、以及客户端的表单曾各自拼出这段文本再交给 `parse` 读回——一段文法多处拼，改一次就分岔，且拼出来的文本本城可能解析不回来。
@@ -44,5 +51,7 @@ impl<T: zeroize::Zeroize> Sealed<T> {
 - **hex 段是第三侦测器 `secret::hex_run`**：纯 hex 字母表的段过不了②的混合字母表门，而随机 hex 密钥（HMAC key、以 hex 打印的 token）与本城的 blake3 hex64、git hex40 oid 同为均匀分布，**熵读数分不开二者**——只看熵的阈值要么漏掉 hex 密钥，要么把每行 `git log` 与每个 ledger 哈希都报成密钥。故 hex 段只在它是一个凭据名的值时才报：段前紧邻 `<名字>` + 可选空白与引号 + `=` 或 `:` + 可选空白与引号，且名字过 `names_a_credential`；此外段长 ≥ `HEX_SPAN_MIN_BYTES`（32）且每字符熵 ≥ `HEX_ENTROPY_MIN_MILLIBITS`（3100 millibit）。取舍：放弃了「hex 字母表单独一道熵阈、不看标签」——它在长度 40 上要么阈值高到漏报（均值 3.69 bit），要么把全部哈希报出。重开条件：本城的哈希或 oid 改为不以裸 hex 出现在文本里。
 - **熵的整数化**：kernel 禁浮点——香农熵以 millibit（1/1000 bit）计：定点 log2（shift-and-square，10 位小数位，循环界常数）；判式 `mb·den ≥ num·1000`（checked）。kani 证定点 log2 对任意 `u64` 终止、无 panic；整段扫描的全函数性由 proptest（任意字节、区间在界内）把守——对 256 格计数表逐格调用 log2 的证明给求解器约 2560 次符号非线性乘法，得不出结论。
 - **Sealed 取 secrecy::SecretBox**（`secrecy`＋`zeroize`）：drop 即零化；无 Debug/Display/Serialize/Clone；trybuild 反例＝Sealed 值入 EventRecord/format! 编译不过。`PutSecret` 的命令面（S4）直用本类型。
+- **「像不像凭据」只有一个权威**：字节一面是 `scan`，名字一面是 `names_a_credential`（`consts_policy::CREDENTIAL_NAME_MARKERS`，子串命中、大小写不敏感、宁滥勿缺）；`config::EnvVarName::parse` 与 `hex_run` 的标签判定都读它，而不另写一张标记表。
+- **明文离开 `Sealed` 只有两条路**：`expose`（调用处受 `xtask secret` 白名单约束）与 `into_vault_value`（消耗本值，交出的仍是 drop 即零化的 `Zeroizing<String>`）。后者定义在本模块而不在录入处，录入处因此不必上白名单。
 - 误报是既知常态（入口无损可逆，出口才拒）；`E_SECRET_EGRESS` 的 subject 恒不回显命中字节（塑形在 gate::egress）。
 -/

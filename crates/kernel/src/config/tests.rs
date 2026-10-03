@@ -112,7 +112,7 @@ fn the_sandbox_resolves_as_one_value_so_a_thin_layer_only_narrows() {
     assert_eq!(frozen.sandbox.fuel, 20);
     assert!(
         !frozen.sandbox.shell,
-        "a layer that speaks about the sandbox speaks about all of it, and silence is the              closed answer"
+        "a layer that speaks about the sandbox speaks about all of it, and silence is the closed answer"
     );
     assert!(frozen.sandbox.mounts.is_empty());
     assert_eq!(frozen.sandbox.interpreter, Interpreter::System);

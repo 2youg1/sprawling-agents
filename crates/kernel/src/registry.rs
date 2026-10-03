@@ -149,13 +149,14 @@ impl Registry {
         self.artifacts.get(&locator.to_string())
     }
 
-    /// The Discard door's query face (7.2: hitting a registry asset
-    /// escalates).
+    /// Whether this locator was promoted. The Discard door does not ask:
+    /// a planned discard of an asset is as reversible as any other
+    /// (`crates/kernel/spec/Discard.lean` §8-26).
     pub fn is_asset(&self, locator: &Locator) -> bool {
         self.assets.contains(&locator.to_string())
     }
 
-    /// Address-level asset membership for the Discard door: a path is an
+    /// Address-level asset membership: a path is an
     /// asset when any registered asset is a `file:` locator at exactly
     /// this address (content pins differ, the place is the same).
     pub fn is_asset_at(&self, addr: &crate::address::Address) -> bool {

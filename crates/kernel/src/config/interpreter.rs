@@ -48,7 +48,8 @@ impl Interpreter {
                 format!("[sandbox] {}: {raw}", Interpreter::KEY),
             )
             .with_recovery(
-                "write `interpreter = \"system\"` for this platform's shell or                  `interpreter = \"pwsh\"` for PowerShell 7",
+                "write `interpreter = \"system\"` for this platform's shell or \
+                 `interpreter = \"pwsh\"` for PowerShell 7",
             )),
         }
     }
@@ -82,6 +83,9 @@ mod tests {
         let err = Interpreter::parse("bash").unwrap_err();
         assert_eq!(err.code(), &AxCode::ConfigInvalid);
         assert!(err.subject().contains("interpreter") && err.subject().contains("bash"));
-        assert!(err.recovery().contains("\"system\"") && err.recovery().contains("\"pwsh\""));
+        assert_eq!(
+            err.recovery(),
+            "write `interpreter = \"system\"` for this platform's shell or `interpreter = \"pwsh\"` for PowerShell 7"
+        );
     }
 }

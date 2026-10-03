@@ -16,24 +16,24 @@
 
 ```rust
 pub struct BuildingPolicy { pub confidential: bool }      // 构造子 new(confidential)
-pub struct ModelRequest { pub policy: BuildingPolicy, pub segments: [B3Hash; 4] }
-                                    // segments＝冻结 prefix 分段哈希（与 prompt_assembled 同源）
-pub struct ModelReturn { pub message: Payload, pub calls: Vec<ToolCall> }
+pub struct ModelReturn { pub message: Payload, pub calls: Vec<ToolCall>,
+                         pub usage: Option<ModelUsage>, pub stop: Option<StopReason>,
+                         pub billed_usd_micros: Option<UsdMicros> }
                                     // message＝助手内容（入窗载荷）；calls＝请求的工具波（空＝本回合无工具，回合层据此收束）
 pub trait Model {
     /// One provider call; adapters never sample clocks or read globals.
     fn call(&mut self, req: &ModelRequest) -> Result<ModelReturn, AxError>;
 }
 #[cfg(feature = "conformance")]
-pub fn assert_model_conformance<M: Model>(model: &mut M);
+pub fn assert_model_conformance<M: Model>(model: &mut M, benign: &ModelRequest);
 ```
 
 **canonical 会话类型族**（城内规范 Dialect 的缝上定义；gateway::dialect 只做翻译，两适配器与剧本模型消费同一形）：
 
 ```rust
-pub enum Role { User, Assistant }                      // wire 枚举，开放
+pub enum Role { User, Assistant }                      // wire 枚举，封闭：认不出的词在反序列化处即拒
 pub enum StopReason { EndTurn, ToolUse, MaxTokens }
-pub enum ModelTag { Main, Digest, Transcribe }         // ALL: [ModelTag; 3]
+pub enum ModelTag { Main, Digest, Transcribe, Ocr }    // ALL: [ModelTag; 4]（Ocr 见 §8-80）
 pub struct SystemBlock { pub text: String, pub cache: bool }             // cache＝显式断点标记
 pub enum ContentBlock { Text{text} | Thinking{thinking, signature}
                                         | RedactedThinking{data}
@@ -45,9 +45,10 @@ pub struct Ceiling(NonZeroU64);  // 零不可表达：new(0) 即 None
 pub enum MessageBreakpoint { Unmarked, Tail }        // 请求侧注记，不进 serde；缺省 Unmarked
 pub struct ChatRequest<'a> { pub model: String, pub max_tokens: Option<Ceiling>, pub system: Vec<SystemBlock>,
                          pub messages: Cow<'a, [ChatMessage]>, pub tools: Cow<'a, [ToolDef]>,
-                         pub breakpoint: MessageBreakpoint }
+                         pub breakpoint: MessageBreakpoint, pub effort: Option<Effort> }
 impl ChatRequest<'_> { pub fn carries_breakpoint(&self, index: usize) -> bool; }  // 该下标的消息是否带断点：Tail 且为末条
 pub struct ModelRequest<'a> { pub policy: BuildingPolicy, pub segments: [B3Hash; 4], pub chat: ChatRequest<'a> }
+                                    // segments＝冻结 prefix 分段哈希（与 prompt_assembled 同源）
 pub enum CacheCount { Reported(Tokens), Unreported }  // 缓存读／写的一个数：报了多少，或没报（D36）
 impl CacheCount { pub fn reported(self) -> Option<Tokens>; pub fn or_zero(self) -> Tokens; }
 pub struct ModelUsage { pub input_tokens: Tokens, pub output_tokens: Tokens,
@@ -68,14 +69,13 @@ pub fn message_payload(content: &[ContentBlock]) -> Result<Payload, AxError>;  /
 - ModelRequest 携 chat 字段（turn 的 Assembling 相组 ChatRequest 入请求）；ModelReturn 携 usage/stop/billed 三字段，另有 `bare()`（脚本最小构造）与 `from_response(resp, billed)`（tool_use 块→波，全量入账）两构造面；turn 的 model_returned 载荷随之增 usage／stop／billed_usd_micros（在场才写）。
 - BuildingPolicy 住本缝而非 city：kernel 不能依赖外层，city::policy（P1）是它的**求值器**不是定义处（依赖反转，同 ledger 缝）。
 - **一种活一个标签，不是一种活一个存储**：`ModelTag` 答的是「哪个端点、哪个模型接这类活」，而这件事已有一套机制——人登记一个 endpoint，再为一个标签选一个模型。因此转写进的是 `Transcribe` 这个 variant，而不是第二张表单与第二个凭据入口；多一个存储就是给同一个问题立第二个答案。`ALL` 是界面枚举标签时走的那条路，新增一个 variant 即改它的长度。
-- conformance 两断言：①良性请求得 Ok 且 message/calls 形状合法（类型已保大半）；②Err 后适配器不中毒（再调仍得应答）。确定性不入 conformance（真 model 非确定），剑本适配器的确定性由 citysim 自证。
+- conformance 两断言，都用调用方递进来的良性请求 `benign`：①连调两次都返回（Ok 或带码的 Err），不 panic；②Err 后适配器不中毒（再调仍得应答）。确定性不入 conformance（真 model 非确定），剑本适配器的确定性由 citysim 自证。
 
 **思考记录与思考强度**（思考记录原样保留，消息往返恒按 provider 官方规定处理）
 
 ```rust
 pub enum Effort { None, Low, Medium, High, XHigh, Max }   // 全序；Ord 按声明序
 pub fn content_from_message(message: &Payload) -> Result<Vec<ContentBlock>, AxError>;  // 契约变更，见下
-pub struct ChatRequest { /* …既有五字段… */ pub effort: Option<Effort> }
 ```
 
 - **两个思考块，逐字保留**。provider 官方规定：「During tool use, you must pass thinking blocks back to the API for the last assistant message. Include the complete unmodified block back」；改动即 400 `invalid_request_error`，报文为「`thinking` or `redacted_thinking` blocks in the latest assistant message cannot be modified」。故 canonical 侧两个变体缺一不可，字段名与线上同名（`thinking`／`signature`／`data`），使翻译无重命名、使 Ledger 载荷可直接对照官方文档校读。`signature` 是「an encrypted copy of the full reasoning」，由 provider 验签，城内恒不解析、不截断、不重排。
@@ -230,7 +230,7 @@ pub enum ModelTag { Main, Digest, Transcribe, Ocr }   // 线上 "main" | "digest
 
 /-! D6 定规：请求借用会话与工具表，断点是请求的注记
 
-**决定**：`ChatRequest<'a>` 的 `messages` 与 `tools` 是 `Cow<'a, [_]>`；回合组请求时借用 `Conversation` 与 catalog 的工具表，不复制。消息断点从 `ChatMessage` 挪到请求上的 `MessageBreakpoint`，兼容格式经 `ChatRequest::carries_breakpoint(index)` 问某条消息是否带断点。要跨调用留住请求的地方（保温续约）持 `ModelRequest<'static>`，自己付一次拷贝。
+**决定**：`ChatRequest<'a>` 的 `messages` 与 `tools` 是 `Cow<'a, [_]>`；回合组请求时借用 `Conversation` 与 catalog 的工具表，不复制。消息断点从 `ChatMessage` 挪到请求上的 `MessageBreakpoint`，兼容格式经 `ChatRequest::carries_breakpoint(index)` 问某条消息是否带断点。要跨调用留住请求的地方（保温续约）持 `ModelRequest<'static>`，经 `ModelRequest::into_owned`（它调 `ChatRequest::into_owned`）自己付一次拷贝。
 
 **理由**：请求若持有会话与工具表，每一回合就把整段会话与整张工具表各复制一次，会话越长复制越多，而请求活不过这一次调用。断点标在消息上时，标记就得先拿到一份可写的拷贝；标在请求上，借用才成立。计划只锚尾消息，所以一个两值枚举就够，也写不出越界的下标。
 

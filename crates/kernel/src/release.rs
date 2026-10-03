@@ -7,7 +7,7 @@
 //! The part `crates/kernel/spec/Release.lean` specifies this module.
 //!
 //! **One release is spelled two ways, and this is the only place that
-//! knows both.** A git tag reads `v0.0.5-Pre-alpha-260912`; npm accepts
+//! knows both.** A pre-alpha git tag reads `v0.0.5-Pre-alpha-260912`; npm accepts
 //! semver and nothing else, so the same release reaches the registry as
 //! `0.0.5-pre.260912`. `xtask channel` converts in order to publish, and
 //! a running binary converts in order to ask the registry which release
@@ -60,7 +60,7 @@ pub enum Maturity {
 pub const MATURITY: Maturity = Maturity::Alpha;
 
 impl Maturity {
-    /// `pre-alpha`, the word as a sentence writes it.
+    /// `pre-alpha` or `alpha`, the word as a sentence writes it.
     #[must_use]
     pub const fn word(self) -> &'static str {
         match self {
@@ -69,7 +69,7 @@ impl Maturity {
         }
     }
 
-    /// `Pre-alpha`, the word as a tag and a heading write it.
+    /// `Pre-alpha` or `Alpha`, the word as a tag and a heading write it.
     #[must_use]
     pub const fn titled(self) -> &'static str {
         match self {
