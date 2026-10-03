@@ -197,7 +197,11 @@ impl Vault for MemoryVault {
 /// Reads the read-only source (process environment). Injected so tests
 /// can shade without touching the real environment (set_var is unsafe in
 /// edition 2024, and tests never mutate shared process state).
-pub type EnvReader = Box<dyn Fn(&str) -> Option<String> + Send>;
+///
+/// The answer is `std::env::var`'s own, so a variable that is set to a
+/// value that is not Unicode stays apart from one that is not set
+/// (gateway D24).
+pub type EnvReader = Box<dyn Fn(&str) -> Result<String, std::env::VarError> + Send>;
 
 pub(crate) fn env_key(reference: &SecretRef) -> String {
     let sanitize = |s: &str| -> String {

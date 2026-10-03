@@ -189,7 +189,7 @@ impl Custodian {
             backend,
             store,
             refusal,
-            env: Box::new(|key| std::env::var(key).ok()),
+            env: Box::new(|key| std::env::var(key)),
         }
     }
 
@@ -218,7 +218,7 @@ impl Custodian {
             ));
         }
         let key = env_key(reference);
-        if (self.env)(&key).is_some_and(|v| !v.is_empty()) {
+        if (self.env)(&key).is_ok_and(|v| !v.is_empty()) {
             return Err(AxError::failure(
                 AxCode::ConfigInvalid,
                 "store credential",
@@ -233,7 +233,7 @@ impl Custodian {
     /// second copy survives between operations.
     pub fn resolve(&self, reference: &SecretRef) -> Result<Sealed<String>, AxError> {
         let key = env_key(reference);
-        if let Some(value) = (self.env)(&key)
+        if let Ok(value) = (self.env)(&key)
             && !value.is_empty()
         {
             return Ok(Sealed::new(Box::new(value)));
@@ -261,7 +261,7 @@ impl Custodian {
     /// State you can render; the value stays unreachable.
     pub fn describe(&self, reference: &SecretRef) -> Described {
         let key = env_key(reference);
-        if (self.env)(&key).is_some_and(|v| !v.is_empty()) {
+        if (self.env)(&key).is_ok_and(|v| !v.is_empty()) {
             return Described {
                 configured: true,
                 source: format!("environment ({key})"),

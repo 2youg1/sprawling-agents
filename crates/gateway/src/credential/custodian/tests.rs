@@ -66,7 +66,9 @@ fn missing_and_empty_read_as_not_configured() {
 #[test]
 fn the_environment_shades_and_set_refuses_naming_the_shader() {
     let mut custodian = Custodian::in_memory().with_env_reader(Box::new(|key| {
-        (key == "SPRAWLING_SECRET_ACME_KEY").then(|| "from-env".to_owned())
+        (key == "SPRAWLING_SECRET_ACME_KEY")
+            .then(|| "from-env".to_owned())
+            .ok_or(std::env::VarError::NotPresent)
     }));
     let reference = SecretRef::parse("secret:acme/key").unwrap();
     // Resolve serves the read-only source (sealed).
@@ -111,7 +113,9 @@ fn the_two_read_ports_agree_about_whether_a_reference_is_configured() {
     // A name the machine sets is not a store this city can write to,
     // and both ports have to say the same thing about it.
     let shaded = Custodian::in_memory().with_env_reader(Box::new(|key| {
-        (key == "SPRAWLING_SECRET_ACME_AGREEMENT").then(String::new)
+        (key == "SPRAWLING_SECRET_ACME_AGREEMENT")
+            .then(String::new)
+            .ok_or(std::env::VarError::NotPresent)
     }));
     assert!(
         !agreed(&shaded, &reference),
@@ -119,7 +123,9 @@ fn the_two_read_ports_agree_about_whether_a_reference_is_configured() {
     );
 
     let from_env = Custodian::in_memory().with_env_reader(Box::new(|key| {
-        (key == "SPRAWLING_SECRET_ACME_AGREEMENT").then(|| "from-env".to_owned())
+        (key == "SPRAWLING_SECRET_ACME_AGREEMENT")
+            .then(|| "from-env".to_owned())
+            .ok_or(std::env::VarError::NotPresent)
     }));
     assert!(agreed(&from_env, &reference), "the environment carries it");
 }
@@ -178,4 +184,35 @@ fn a_fallback_whose_notice_cannot_be_encoded_says_so_in_the_custody_report() {
             None
         )
     );
+}
+
+/// A credential variable set to a value that is not Unicode (invalid
+/// UTF-8 on macOS and Linux, an unpaired surrogate on Windows) is a
+/// configuration fault named by its variable, not a credential that was
+/// never configured; it still shades the store, so `set` refuses, and
+/// the two read ports agree that nothing is configured (gateway D24).
+#[test]
+fn a_credential_variable_that_is_not_unicode_is_refused_by_its_name() {
+    let mut custodian = Custodian::in_memory().with_env_reader(Box::new(|key| {
+        if key == "SPRAWLING_SECRET_ACME_KEY" {
+            Err(std::env::VarError::NotUnicode(std::ffi::OsString::from(
+                "x",
+            )))
+        } else {
+            Err(std::env::VarError::NotPresent)
+        }
+    }));
+    let reference = SecretRef::parse("secret:acme/key").unwrap();
+    custodian
+        .set(&reference, Zeroizing::new("stored".to_owned()))
+        .unwrap_err();
+    let refused = custodian.resolve(&reference).map(|_| ()).unwrap_err();
+    assert_eq!(
+        (refused.code().clone(), refused.subject().to_owned()),
+        (
+            AxCode::ConfigInvalid,
+            "SPRAWLING_SECRET_ACME_KEY is set to a value that is not Unicode".to_owned()
+        )
+    );
+    assert!(!agreed(&custodian, &reference));
 }
