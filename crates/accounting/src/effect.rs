@@ -131,6 +131,18 @@ impl Landing {
                         data,
                     });
                 }
+                collab::SignalEffect::WaitStarted(started) => lines.push(Line {
+                    who: who.to_owned(),
+                    addr: room.clone(),
+                    kind: EventKind::SignalWaitStarted,
+                    data: Payload::of(&started)?,
+                }),
+                collab::SignalEffect::WaitEnded(ended) => lines.push(Line {
+                    who: who.to_owned(),
+                    addr: room.clone(),
+                    kind: EventKind::SignalWaitEnded,
+                    data: Payload::of(&ended)?,
+                }),
             }
         }
         Ok(Landing {

@@ -17,6 +17,12 @@ use serde_json::{Map, Value};
 
 use crate::signal_desk::{SignalDesk, text};
 
+/// How long a send with `wait` stops its run at most, in milliseconds
+/// of the injected clock (collab D9): shorter than the providers'
+/// prompt-cache lifetime, so the call after a reply still reads the
+/// cached prefix. A city setting that replaces it replaces this value.
+pub const PATIENCE_MS: u64 = 240_000;
+
 /// The tool itself: a thin router onto the desk, which is shared with
 /// the worker because a registered tool is behind a `Box<dyn Tool>` and
 /// nothing can reach into it afterwards.
@@ -64,6 +70,16 @@ impl SignalTool {
             );
             properties.insert(field.to_owned(), Value::Object(spec));
         }
+        let mut wait = Map::new();
+        wait.insert("type".to_owned(), Value::String("boolean".to_owned()));
+        wait.insert(
+            "description".to_owned(),
+            Value::String(format!(
+                "send only: true when your next step needs their answer; you stop without a model                  call until they reply or {} s pass. Leave it out to go on at once",
+                PATIENCE_MS / 1000
+            )),
+        );
+        properties.insert("wait".to_owned(), Value::Object(wait));
         let mut params = Map::new();
         params.insert("type".to_owned(), Value::String("object".to_owned()));
         params.insert("properties".to_owned(), Value::Object(properties));

@@ -48,7 +48,9 @@ fn consumed(posted: &Posted) -> Vec<String> {
         .iter()
         .filter_map(|line| match line {
             SignalEffect::Consumed { signal, .. } => Some(signal.id().as_str().to_owned()),
-            SignalEffect::Enqueued(_) => None,
+            SignalEffect::Enqueued(_)
+            | SignalEffect::WaitStarted(_)
+            | SignalEffect::WaitEnded(_) => None,
         })
         .collect()
 }

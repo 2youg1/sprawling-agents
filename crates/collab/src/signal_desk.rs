@@ -27,7 +27,9 @@ use kernel::{Address, AxCode, AxError, Payload, RunId, TimeMs, Version};
 use serde_json::{Map, Value};
 
 use crate::inbox::{Inbox, Mailslot, Signal};
-use kernel::event::record::{SignalId, SignalKind};
+use kernel::event::record::{SignalId, SignalKind, SignalWaitEnded, SignalWaitStarted};
+
+use crate::reply_wait::ReplyWait;
 
 /// One line of the city's signal traffic, handed to the [`Post`] at the
 /// moment it happens.
@@ -42,12 +44,18 @@ pub enum SignalEffect {
     Enqueued(Signal),
     /// Read by a recorded model answer, or taken and unreadable.
     Consumed { signal: Signal, by: String },
+    /// A send with `wait` stopped the run until a reply or the deadline
+    /// (collab D9, kernel D32).
+    WaitStarted(SignalWaitStarted),
+    /// The one end of a [`SignalEffect::WaitStarted`]: the reply, the
+    /// deadline, or the run leaving its room.
+    WaitEnded(SignalWaitEnded),
 }
 
 /// The authority that records a signal line at the call and acts on it:
 /// in the city, the relay to the accounting thread, which appends the
 /// line and delivers what was sent. Its refusal reaches the model.
-pub struct Post(Box<Write>);
+pub struct Post(pub(crate) Box<Write>);
 
 type Write = dyn FnMut(&SignalEffect) -> Result<(), AxError> + Send;
 
@@ -80,13 +88,14 @@ pub struct RoomMail {
 pub struct SignalDesk {
     run: RunId,
     pub(crate) room: Address,
-    who: String,
+    pub(crate) who: String,
     reach: Address,
     at: TimeMs,
     inbox: Inbox,
-    slot: Mailslot,
-    post: Post,
-    held: Vec<Signal>,
+    pub(crate) slot: Mailslot,
+    pub(crate) post: Post,
+    pub(crate) held: Vec<Signal>,
+    pub(crate) waiting: Option<ReplyWait>,
     unread: Vec<Signal>,
     minted: u32,
 }
@@ -125,6 +134,7 @@ impl SignalDesk {
             slot,
             post,
             held: Vec::new(),
+            waiting: None,
             unread: Vec::new(),
             minted: 0,
         }
@@ -234,16 +244,22 @@ impl SignalDesk {
     /// point into the lent queue.
     fn collect(&mut self) -> Result<(), AxError> {
         for signal in self.slot.take()? {
-            if let kernel::Admission::Shed { .. } = self.inbox.deliver(&signal)? {
-                return Err(AxError::failure(
-                    AxCode::BackpressureShed,
-                    "deliver a signal to a running room",
-                    format!("room {} shed signal {}", self.room, signal.id().as_str()),
-                )
-                .with_recovery("the queue is full; pull what is waiting, then ask again"));
-            }
+            self.admit(&signal)?;
         }
         Ok(())
+    }
+
+    /// Puts one signal out of the slot into the lent queue.
+    pub(crate) fn admit(&mut self, signal: &Signal) -> Result<(), AxError> {
+        match self.inbox.deliver(signal)? {
+            kernel::Admission::Shed { .. } => Err(AxError::failure(
+                AxCode::BackpressureShed,
+                "deliver a signal to a running room",
+                format!("room {} shed signal {}", self.room, signal.id().as_str()),
+            )
+            .with_recovery("the queue is full; pull what is waiting, then ask again")),
+            kernel::Admission::Admit => Ok(()),
+        }
     }
 
     fn mint(&mut self) -> Result<SignalId, AxError> {
@@ -299,8 +315,14 @@ impl SignalDesk {
             "kind".to_owned(),
             Value::String(signal.kind().as_str().to_owned()),
         );
+        let wait = crate::reply_wait::wanted(args, self.waiting.is_some())?
+            .then(|| ReplyWait::asked(to, signal.id().clone()));
         (self.post.0)(&SignalEffect::Enqueued(signal))?;
         result.insert("delivered".to_owned(), Value::Bool(true));
+        if let Some(wait) = wait {
+            result.insert("waiting".to_owned(), Value::String(wait.promise()));
+            self.waiting = Some(wait);
+        }
         Payload::new(result)
     }
 

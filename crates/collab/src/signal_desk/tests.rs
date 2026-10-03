@@ -280,6 +280,9 @@ fn an_answered_steer_is_consumed_and_a_later_one_is_held() {
         .map(|line| match line {
             SignalEffect::Consumed { signal, .. } => signal.id().as_str().to_owned(),
             SignalEffect::Enqueued(signal) => panic!("nothing was sent: {signal:?}"),
+            SignalEffect::WaitStarted(_) | SignalEffect::WaitEnded(_) => {
+                panic!("nothing waited: {line:?}")
+            }
         })
         .collect();
     assert_eq!(consumed, vec!["s1".to_owned()]);
