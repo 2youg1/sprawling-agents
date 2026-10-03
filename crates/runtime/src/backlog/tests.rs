@@ -14,7 +14,7 @@
 //! per member of one backlog of one process, and a run's end that
 //! reaches every command the run left running.
 
-use super::Backlog;
+use super::{Backlog, Shares};
 
 /// Two backlogs opened separately must not name one directory.
 ///
@@ -264,15 +264,24 @@ fn a_run_owns_the_processes_its_commands_started() {
         std::thread::sleep(std::time::Duration::from_millis(20));
     }
     assert!(followed(&seen), "read {seen:?}");
-    // On Windows the run's job holds the weight every run's job holds;
-    // elsewhere there is no job to hold one (D29).
-    let share = backlog.processes().unwrap().get(&mine).map(|run| run.share);
-    let weighted = if cfg!(windows) {
-        crate::CpuShare::Weighted
-    } else {
-        crate::CpuShare::Unset
-    };
-    assert_eq!(share, Some(weighted));
     backlog.release(mine);
     assert!(!backlog.processes().unwrap().contains_key(&mine));
+}
+
+/// A run holds the shares its backlog asks for where the platform has
+/// them: on Windows its job takes the CPU weight and, when asked, the
+/// memory limit, and a backlog asked for none sets none; elsewhere this
+/// table sets nothing and the run reads as unshared (D29).
+#[test]
+fn a_run_holds_the_shares_its_backlog_asks_for() {
+    let limit = std::num::NonZeroU64::new(8 << 30).unwrap();
+    for asked in [Shares::Unset, Shares::Cpu, Shares::CpuAndMemory { limit }] {
+        let backlog = Backlog::with_window(crate::PollBudget::new(1, 1)).with_shares(asked);
+        let run = kernel::RunId::from_bytes([5; 16]);
+        a_background_command(&backlog, run, 3);
+        let held = backlog.processes().unwrap().get(&run).map(|run| run.share);
+        let given = if cfg!(windows) { asked } else { Shares::Unset };
+        assert_eq!(held, Some(given), "asked {asked:?}");
+        backlog.release(run);
+    }
 }

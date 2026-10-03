@@ -42,6 +42,7 @@ pub(crate) fn hands() -> Hands {
             engine: absent_engine,
         },
         seat_lane: no_seat,
+        shares: runtime::Shares::Unset,
     }
 }
 

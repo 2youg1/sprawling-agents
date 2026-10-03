@@ -8,9 +8,9 @@ import crates.sprawling.spec.Serving.Placement.Plan
 /-!
 # 热线程的座位：计划里的处理器，一个座位一条线程，坐下就不换
 
-规定 `crates/sprawling/src/serving/placement.rs`（`bin::serving::placement`，形状：状态机）里核心热线程的软放置（§8-93 的放置一半，AF1 的 (b) 与 (c)）。座位从哪里来是放置计划（`crates/sprawling/spec/Serving/Placement/Plan.lean`，`bin::serving::placement::plan`）：一个纯函数，从读到的拓扑给出最快一档每个物理核一个逻辑处理器；只有一档、拓扑不自洽、平台读不到时计划是空的。本模型只管座位表：计划给出 `n` 个座位，热线程起动时拿一个空座位，没有空座位就不拿——那条线程由操作系统放；座位表从不让两条热线程共用一个座位，于是坐着的线程数永不超过最快一档的物理核数。`crates/sprawling/src/serving/placement/tests.rs` 在 Rust 的座位表上逐条检查下面的性质：至多四个座位、三条线程六次起动与退出的每一条轨迹，穷举而不抽样。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
+规定 `crates/sprawling/src/serving/placement.rs`（`bin::serving::placement`，形状：状态机）里核心热线程的软放置（§8-93 的放置一半，AF1 的 (b) 与 (c)）。座位从哪里来是放置计划（`crates/sprawling/spec/Serving/Placement/Plan.lean`，`bin::serving::placement::plan`）：一个纯函数，从读到的拓扑给出最快一档每个物理核一个逻辑处理器；只有一档、拓扑不自洽、平台读不到时计划是空的。本模型只管座位表：计划给出 `n` 个座位，按要座位的线程是哪一种分成两池（末尾一节「两池」），热线程起动时在自己那一池里拿一个空座位，没有空座位就不拿——那条线程由操作系统放；座位表从不让两条热线程共用一个座位，于是坐着的线程数永不超过最快一档的物理核数。`crates/sprawling/src/serving/placement/tests.rs` 在 Rust 的座位表上逐条检查下面的性质：至多四个座位、三条线程六次起动与退出的每一条轨迹，穷举而不抽样。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
 
-热线程是：账本线程 `sprawling-runs`（`bin::assembly::attending`）、视图折叠线程 `sprawling-views`（`bin::serving::folding`）、socket 服务的 tokio worker（`serving_runtime`），以及每个 run 的 lane（`accounting::worker::pool` 起的 OS 线程）。座位随 `Seat` 析构交还。lane 要座位的那一处见 D47。
+要座位的热线程有两种：串行线程——账本线程 `sprawling-runs`（`bin::assembly::attending`）与视图折叠线程 `sprawling-views`（`bin::serving::folding`），全城各一条，每一次 relay 与每一次广播都要等它们；lane——每个 run 一条（`accounting::worker::pool` 起的 OS 线程），经 D46 的钩子要座位。socket 服务的 tokio worker 也是热线程，但不要座位（D41）。座位随 `Seat` 析构交还。
 
 性质，都对任意的起动与退出序列成立：
 
@@ -257,6 +257,42 @@ example : run 2 [] [.start 1, .start 2, .exit 1, .start 3] = [(3, 0), (2, 1)] :=
 /-- 计划是空的（一档、不自洽、读不到）：谁也不拿座位。 -/
 example : run 0 [] [.start 1, .start 2] = [] := by decide
 
+/-! ### 两池：串行线程坐计划末尾，lane 坐其余
+
+座位按要座位的线程是哪一种分成两池，每一池是上面那张座位表（性质逐条照搬）。串行线程是全城只有一条、一慢全城都等的线程：账本线程与视图折叠；计划末尾的 `reserved` 个座位只给它们，所以 lane 再多也挤不掉它们。lane 坐计划开头其余的座位，run 结束时交还，座位就在 run 之间轮转。tokio worker 不要座位（D41）。下面三条说两池是计划的一个划分：池里的座位都在计划里，两池不共用一个座位，合起来就是整个计划。 -/
+
+/-- 要座位的线程是哪一种。 -/
+inductive Role where
+  | serial
+  | lane
+  deriving Repr, DecidableEq
+
+/-- 计划有 `n` 个座位时一池的座位数：串行池至多 `reserved` 个，lane 池是其余的。 -/
+def poolSize (reserved n : Nat) : Role → Nat
+  | .serial => min reserved n
+  | .lane => n - min reserved n
+
+/-- 一池里第 `i` 个座位在计划里的下标：lane 池从计划开头起，串行池占计划末尾。 -/
+def planIndex (reserved n : Nat) : Role → Nat → Nat
+  | .lane, i => i
+  | .serial, i => n - min reserved n + i
+
+/-- 两池合起来就是整个计划，一个座位也不空着不分。 -/
+theorem the_pools_cover_the_plan (reserved n : Nat) :
+    poolSize reserved n .lane + poolSize reserved n .serial = n := by
+  simp only [poolSize]; omega
+
+/-- 池里的座位都在计划里。 -/
+theorem a_pool_seat_is_in_the_plan (reserved n : Nat) (r : Role) (i : Nat)
+    (h : i < poolSize reserved n r) : planIndex reserved n r i < n := by
+  cases r <;> simp only [poolSize, planIndex] at * <;> omega
+
+/-- 两池不共用一个座位：lane 坐不到串行线程的座位，反过来也一样。 -/
+theorem the_pools_never_share_a_seat (reserved n i j : Nat)
+    (hi : i < poolSize reserved n .lane) :
+    planIndex reserved n .lane i ≠ planIndex reserved n .serial j := by
+  simp only [poolSize, planIndex] at *; omega
+
 end Sprawling.Serving.Placement
 
 /-! D41 操作系统的调度器做主：harness 只给软的理想处理器，一步计算不跨线程，硬亲和只作对照臂
@@ -273,18 +309,23 @@ impl SeatTable {
     pub(crate) fn exit(&mut self, holder: Holder);     // 交还座位，别的座位不动
     pub(crate) fn seat_of(&self, holder: Holder) -> Option<Processor>;
 }
+pub(crate) enum Role { Serial, Lane }           // 模型的 Role：账本线程与视图折叠，或一个 run 的 lane
+pub(crate) struct Seats;                        // 模型的两池：计划末尾 SERIAL_SEATS 个给串行线程，其余给 lane
+impl Seats { pub(crate) fn new(plan: Vec<Processor>) -> Self; pub(crate) fn start(&mut self, holder: Holder, role: Role); pub(crate) fn exit(&mut self, holder: Holder); pub(crate) fn seat_of(&self, holder: Holder) -> Option<Processor>; }
+pub(crate) const SERIAL_SEATS: usize = 2;       // 模型的 reserved：串行线程的条数
 pub(crate) struct Seat;                         // 析构即交还
-pub(crate) fn seat_this_thread(name: &'static str) -> Seat; // 要座位并设理想处理器；平台拒绝时向标准错误说一次
+pub(crate) fn seat_this_thread(name: &'static str, role: Role) -> Seat; // 在自己那一池要座位并设理想处理器；平台拒绝时向标准错误说一次
 pub(crate) fn seat_lane() -> Box<dyn std::any::Any>; // lane 经 `Hands::seat_lane` 要座位（D46）
 pub(crate) fn report() -> String;               // doctor 的一行：读设置与拓扑，说出计划做了什么（D47）
 pub(crate) fn describe(read: &Result<Topology, Unread>) -> String; // 同一行，对一次已有的读数
 ```
 
-全进程一张座位表，放在一个 `Mutex` 后面，第一次要座位时读设置与拓扑、算计划、建表：只在线程起动与退出时取锁，不在热路径上。哪一臂由人的配置 `[core] placement` 定，见 D47。
+全进程一份两池的座位表，放在一个 `Mutex` 后面，第一次要座位时读设置与拓扑、算计划、建表：只在线程起动与退出时取锁，不在热路径上。哪一臂由人的配置 `[core] placement` 定，见 D47。
 
 **决定**（AF1 的 (b) 与 (c)，D88 第 3 条）：
 
 - **调度器做主。** harness 只给提示与软偏好：理想处理器是软的，那个核忙时 Windows 立刻把线程放到别的核上；默认从不设硬亲和。座位只从放置计划里来（D45），计划空时谁也不拿座位，线程全由操作系统放。座位比热线程少时，多出来的线程不拿座位（模型的「一座一人」），由操作系统放，而不是两条热线程挤在同一个首选核上。
+- **谁坐哪里。** 计划末尾的 `SERIAL_SEATS` 个座位只给串行线程（账本线程与视图折叠），其余给 lane（模型的「两池」）：串行线程全城各一条，每一次 relay 与广播都等它们，一慢全城都慢，所以它们的座位不让先起动的线程占去；lane 坐其余的，run 结束时交还，座位在 run 之间轮转。串行线程坐计划末尾而不是开头，因为 0 号处理器在 Windows 上通常收更多的中断与 DPC（推断，四臂对照里按处理器号分开计中途换核就能读出）。tokio worker 不要座位：它们是一池可以互相偷任务的线程，一个任务落在哪一条 worker 上不定，给先醒来的几条设偏好只是让这几条永久占着座位，而不是让 socket 的活落在快核上。
 - **(b) 理想处理器，三个平台。**
   - Windows：热线程起动时向座位表要座位，再调 `thread_priority::windows::set_current_thread_ideal_processor`（`thread-priority` 3.1.1，对外是安全接口，内部是 `SetThreadIdealProcessor`；第一档），退出时交还。理想处理器是线程所在处理器组里的下标，所以计划只含读拓扑那条线程所在组里的处理器（D45）；起动的线程不在那个组里时不设理想处理器，照实向标准错误说一次。
   - macOS：没有理想处理器的接口（`THREAD_AFFINITY_POLICY` 在 Apple 芯片上不受支持），座位表不建；性能核由 D40 与 `crates/runtime/spec/Tools/Exec.lean` D29 的 QoS 分工争取，拓扑只读给 doctor（D45）。
@@ -292,7 +333,7 @@ pub(crate) fn describe(read: &Result<Topology, Unread>) -> String; // 同一行�
 - **(c) 一步计算从头到尾在一条线程上。** 一步就是 §8-93 的一轮：热线程从一次醒来到下一次阻塞做完的一件事（折叠一条记录、执行一次工具调用、落一次 relay）。一步之内不把工作交给另一条线程：不经 channel 转手、不 spawn 后再 join、async 任务不在一步中途转去阻塞池。lane 本来各是一条 OS 线程；tokio worker 的一步是一次任务轮询，tokio 的偷任务只发生在两次轮询之间。这是代码的写法，不要平台接口，三个平台同一条。它守住了没有，由下面四臂对照的「中途换核次数」读出。
 - **硬亲和只作对照臂。** Windows：harness 进程经 `win32job` 2.0.3 的 `Job::assign_current_process` 装进一只 job，再以 `ExtendedLimitInfo::limit_affinity` 设成计划里处理器的掩码；每个 run 的 job 设成其余处理器的掩码（同一 crate 的安全接口，第一档）。Linux：整个二进制在 `taskset -c` 下起动，子进程同样包一层 `taskset`（外部命令，第一档；`sched_setaffinity` 本身要 `unsafe`）。macOS：没有硬亲和，这一臂不跑，照实说。
 
-**被否**：①硬亲和作默认（每个 session 一个核）——核忙时宁可排队也不换核，正与 D88 第 3 条「算不过来就立即下一个核」相反；②座位不够时两条热线程共用最空的座位——两条都首选同一个核，那个核一忙两条一起被挪，等于没有偏好，还把座位数抬到最快一档的物理核数之上；③按负载随时改理想处理器——活着的线程偏好一变，就是「计算中途跳来跳去」，模型的「坐下不换」排除了它。
+**被否**：①硬亲和作默认（每个 session 一个核）——核忙时宁可排队也不换核，正与 D88 第 3 条「算不过来就立即下一个核」相反；②座位不够时两条热线程共用最空的座位——两条都首选同一个核，那个核一忙两条一起被挪，等于没有偏好，还把座位数抬到最快一档的物理核数之上；③按负载随时改理想处理器——活着的线程偏好一变，就是「计算中途跳来跳去」，模型的「坐下不换」排除了它；④一张表先到先得、tokio worker 也要座位——worker 在第一次醒来时就坐下且永不退出，四个座位的机器上账本、折叠与最先醒的两条 worker 坐满，lane 永远拿不到座位，谁得到偏好由起动次序定而不是由谁要紧定；⑤每次醒来要座位、停放时交还——每次停放与醒来都要取锁，锁就进了热路径。
 
 **重开参数**：四臂对照里 (a)+(b)+(c) 臂的工具调用与 relay 等待 p99 不优于「不做」臂（在噪声以内）——那就删掉 (b)，只留 (a) 与 (c)；或者硬亲和臂的 p99 与 p999 都明显更好。
 -/
@@ -335,29 +376,51 @@ pub(crate) struct Unread(String);                   // 为什么没读到，写�
 
 /-! D46 每个 run 的 lane 在 lane 起动的那一处要座位
 
-**决定**：lane 是 `accounting::worker::pool` 起的 OS 线程，`accounting` 不依赖本 crate；座位经 `accounting::worker::hands::Hands` 交进去的一个起动钩子要，像 `Hands.monotonic` 交进单调钟那样：`bin::assembly` 把 `placement::seat_this_thread` 包成钩子交进去，lane 线程在闭包开头调它一次，拿到的 `Seat` 活到线程结束。这是 lane 要座位的唯一一处。
+**决定**：lane 是 `accounting::worker::pool` 起的 OS 线程，`accounting` 不依赖本 crate；座位经 `accounting::worker::hands::Hands` 交进去的一个起动钩子要，像 `Hands.monotonic` 交进单调钟那样：`bin::assembly` 把 `placement::seat_lane`（在 lane 那一池调 `seat_this_thread`）作钩子交进去，lane 线程在闭包开头调它一次，拿到的 `Seat` 活到线程结束，run 结束时座位回到 lane 池给下一个 run。这是 lane 要座位的唯一一处。
 
 **被否**：`accounting` 直接依赖 `thread-priority` 自己设理想处理器——座位表就有了两份，一座一人守不住。
 
-**重开参数**：lane 不再是一条 OS 线程（例如改成 tokio 任务），那时它的座位就是它所在 worker 的座位，钩子删去。
+**重开参数**：lane 不再是一条 OS 线程（例如改成 tokio 任务），那时它像 tokio worker 一样不要座位（D41），钩子删去，计划的座位全给串行线程。
 -/
 
-/-! D47 一个设置关掉放置；doctor 用 User 读得懂的话说出读到的拓扑与计划
+/-! D47 一个设置决定哪一臂，放置的每一项都随它开关；doctor 用 User 读得懂的话说出拓扑、计划与每个 run 的份额
+
+**接口**
+
+```rust
+// accounting::person —— 读人的配置（`crates/accounting/spec/Person.lean`）
+pub enum CorePlacement { Off, Soft, SoftShares }   // [core] placement 的 "none"、"soft"（缺省）、"soft_shares"
+// bin::serving::placement —— 每一臂打开哪几项，只在这里定
+pub(crate) fn run_shares() -> runtime::Shares;     // 读设置与物理内存，答每个 run 的份额
+```
 
 **决定**：
 
-- 关掉放置的是人的配置 `[core] placement`，由 `accounting::person::core_placement` 读：缺省 `"soft"`（关掉节能限流、热线程与 lane 要座位），`"none"` 是四臂对照的「不做」臂（不读拓扑、不要座位、不调平台）。另外两臂 `"soft_shares"` 与 `"pinned"` 还没有建成：前者要把物理内存交进 `runtime` 才能设作业级内存上限，后者在进程之外设（D41）；它们的拼写今天按读不懂的值拒绝（`E_CONFIG_INVALID`），而不是默默当作 `"soft"`。设置读不懂时，起动照常、放置按 `"soft"` 做，并向标准错误说一次；doctor 那一行说出读不懂。读数定下默认之后只改缺省这一个值。
-- doctor 一行，例：「CPU: 2 classes — 4 performance cores (8 threads), 8 efficiency cores; hot threads prefer the 4 performance cores」；「CPU: one class, 8 cores; left to the operating system」；「CPU: one class, 16 cores in 2 cache groups; left to the operating system and its cache steering」；读不到时「CPU: topology unread (<原因>); left to the operating system」；macOS 与 Linux 上计划有座位时，句末写「this platform has no placement call; its scheduler places threads」。措辞只在 `placement::report` 一处。
+- 哪一臂由人的配置 `[core] placement` 定，由 `accounting::person::core_placement` 读。每一臂打开哪几项只在本模块定，别处只拿结果：
 
-**被否**：doctor 打出原始的记录表——User 要的是机器被怎样对待，不是 `EfficiencyClass` 的数。
+  | 取值 | 节能限流（D40） | 座位（D41、D46） | 每个 run 的 CPU 份额（`crates/runtime/spec/Tools/Exec.lean` D29） | 每个 run 的内存上限（同 D29） |
+  |---|---|---|---|---|
+  | `"none"` | 不关 | 不读拓扑、不要座位 | 不设 | 不设 |
+  | `"soft"`（缺省） | 关 | 要 | 设 | 不设 |
+  | `"soft_shares"` | 关 | 要 | 设 | 物理内存的一半 |
+
+  `"pinned"`（硬亲和，D41 的对照臂）还没有建成，它的拼写按读不懂的值拒绝（`E_CONFIG_INVALID`），而不是默默当作 `"soft"`。子进程比核心低一档（Windows 的 below-normal 优先级类、Unix 的 `nice 10`、Linux 的 `ionice`）属于 §8-13-3，不归这个设置；macOS 的 `taskpolicy -c utility` 是 D29 的 CPU 份额一项，随这一臂开关。
+- 缺省带上 CPU 份额，因为份额按权重分：核被抢时每个 run 各得一份，机器空着时什么也不改；它防的正是本节要防的事——一个 run 的构建起几十个编译进程，把别的 run 与核心都挤到后面。内存上限会让超过它的构建因内存不足失败，所以读数出来之前只在 `"soft_shares"` 打开。
+- 份额是一个值 `runtime::Shares`：`bin::assembly` 造 `accounting::worker::hands::Hands` 时调 `run_shares` 一次，`accounting` 打开车队时把它交给 `runtime::Backlog::with_shares`；runtime 不读人的配置，所以一臂开关什么只有这一处定义。物理内存读出来是零时，`"soft_shares"` 按 `"soft"` 做，并向标准错误说一次。
+- 设置读不懂时，起动照常、按 `"soft"` 做，并向标准错误说一次；doctor 那一行说出读不懂。读数定下默认之后只改缺省这一个值。
+- doctor 一行，先说拓扑与计划，例：「CPU: 2 classes — 4 performance cores (8 threads), 8 efficiency cores; hot threads prefer the 4 performance cores」；「CPU: one class, 8 cores; left to the operating system」；「CPU: one class, 16 cores in 2 cache groups; left to the operating system and its cache steering」；读不到时「CPU: topology unread (<原因>); left to the operating system」；macOS 与 Linux 上计划有座位时写「this platform has no placement call; its scheduler places threads」。再说每个 run 的份额：「each run's commands share the processors by weight」，`"soft_shares"` 再加「and commit at most <n> MiB each」，`"none"` 或平台给不了份额时「runs' commands compete thread by thread」。措辞只在 `placement::report` 一处。
+
+**被否**：①CPU 份额也只在 `"soft_shares"` 打开——缺省就留着一个 run 的构建占满全部核的情形，而份额在机器空着时没有代价；②两个独立的设置，线程放置一个、子进程份额一个——关掉全部要改两处，对照从四格变成九格，而每一臂本来就是一组一起开关的机制；③runtime 自己读人的配置——设置就有了两个读者，一臂开关什么就有了两处定义；④doctor 打出原始的记录表——User 要的是机器被怎样对待，不是 `EfficiencyClass` 的数。
+
+**重开参数**：四臂对照里 `"soft"` 的 p99 不优于 `"none"`，而且把份额单独拆出来也无益——那时份额移到 `"soft_shares"`；或读数表明内存上限不让任何真实构建失败——那时它进缺省。
 -/
 
 /-! ## 四臂对照（AF1 的完成条件，测量计划）
 
 测量归波后的 mid 读数（Roadmap §0 第 7 条），这里只写计划，实现照它留出开关与采样点。
 
-- **开关是一个配置值**：人的配置文件 `[core]` 一节的 `placement`，与 `priority` 同处（`accounting::person`，`crates/accounting/Spec.lean` §8-8），取 `"none"`、`"soft"`、`"soft_shares"`、`"pinned"`，分别是下面四臂；今天读得懂的是 `"none"` 与 `"soft"`，另两臂建成之前按读不懂拒绝（D47）。读数出来之前的默认是 `"soft"`；读数定下默认之后只改这一个默认值。
-- **四臂**：①不做——不关 EcoQoS、不设理想处理器、run 的 job 不设份额；②(a)+(b)+(c)；③再加 (d)，即 `crates/runtime/spec/Tools/Exec.lean` D29 的按 run CPU 权重与作业级内存上限；④硬亲和（D41 的对照臂）。不做那一臂就是 `[core] placement = "none"`。
+- **开关是一个配置值**：人的配置文件 `[core]` 一节的 `placement`，与 `priority` 同处（`accounting::person`，`crates/accounting/spec/Person.lean`），取 `"none"`、`"soft"`、`"soft_shares"`、`"pinned"`，分别是下面四臂（D47 的表）；`"pinned"` 建成之前按读不懂拒绝。读数出来之前的默认是 `"soft"`；读数定下默认之后只改这一个默认值。
+- **四臂**：①不做——不关 EcoQoS、不设理想处理器、run 不设份额；②(a)+(b)+(c)，加上 `crates/runtime/spec/Tools/Exec.lean` D29 的按 run CPU 份额；③再加 D29 的作业级内存上限；④硬亲和（D41 的对照臂）。不做那一臂就是 `[core] placement = "none"`。CPU 份额与 (a)+(b)+(c) 同在 ②，所以对照读不出份额单独的贡献；要读它时，在 ① 上只打开份额加一格。
 - **负载**：TP1 吞吐台的同一个 citysim 场景，并发 run 数 4 与 16，另在后台跑 N ∈ {0, 4, 16} 个 `cargo build`，每个都经一个 run 的 exec 起动（于是它们落在各自 run 的 job 里，与真实城一样）。每臂每格重复 5 次，报中位数，写明机器类别（核数与 P/E 之分）。
 - **读数**：工具调用的 harness 开销（`tool_called` 到 `tool_result`）与 relay 往返，各自的 p50、p99、p999；每步计算中途换核的次数——在 M2 的阶段边界（醒来、工具执行前、工具执行后、再次阻塞）各采一次当前处理器号，一步里前后不同就计一次，按热线程的种类分开计。
 - **处理器号怎么采**：Windows 是 `GetCurrentProcessorNumberEx`，没有安全接口，放进 D41 的同一个 Zig 叶子；Linux 读 `/proc/thread-self/stat` 的第 39 个字段（标准库读文件，第一档；`sched_getcpu` 要 `unsafe`），只在测量构建里读，因为每次一个系统调用；macOS 没有读当前处理器的接口，只报延迟，换核次数写「不可测」。

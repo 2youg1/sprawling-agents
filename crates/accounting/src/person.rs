@@ -146,25 +146,31 @@ fn stated_core_priority(file: &Path) -> Result<CorePriority, AxError> {
     }
 }
 
-/// How the core places its hot threads on the processors.
+/// Which arm of CPU placement the core takes: what each arm turns on is
+/// decided in one place, `bin::serving::placement`
+/// (`crates/sprawling/spec/Serving/Placement.lean` D47).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CorePlacement {
-    /// Power throttling lifted, and each hot thread a soft ideal
-    /// processor from the placement plan.
-    Soft,
     /// Nothing read, nothing asked of the platform: the scheduler alone.
     Off,
+    /// Power throttling lifted, each hot thread a soft ideal processor
+    /// from the placement plan, and each run's commands an even CPU
+    /// share.
+    Soft,
+    /// `Soft`, and each run's commands held to a memory limit.
+    SoftShares,
 }
 
-/// How the core places its hot threads: `placement` in the `[core]`
-/// section, `"soft"` when absent and `"none"` to turn placement off
+/// Which arm of CPU placement the core takes: `placement` in the
+/// `[core]` section, `"soft"` when absent, `"soft_shares"` to hold each
+/// run to a memory limit as well, `"none"` to turn placement off
 /// (`crates/sprawling/spec/Serving/Placement.lean` D47).
 ///
 /// # Errors
 ///
 /// As [`read`] for a file that cannot be read or parsed, and
-/// `ConfigInvalid` for a `placement` that is neither `"soft"` nor
-/// `"none"`, including the two comparison arms not yet built.
+/// `ConfigInvalid` for a `placement` that is none of those three,
+/// including the comparison arm `"pinned"`, not yet built.
 pub fn core_placement() -> Result<CorePlacement, AxError> {
     stated_core_placement(&file()?)
 }
@@ -177,6 +183,7 @@ fn stated_core_placement(file: &Path) -> Result<CorePlacement, AxError> {
         None => Ok(CorePlacement::Soft),
         Some(stated) => match stated.as_str() {
             Some("soft") => Ok(CorePlacement::Soft),
+            Some("soft_shares") => Ok(CorePlacement::SoftShares),
             Some("none") => Ok(CorePlacement::Off),
             Some(_) | None => Err(AxError::failure(
                 AxCode::ConfigInvalid,
@@ -184,7 +191,7 @@ fn stated_core_placement(file: &Path) -> Result<CorePlacement, AxError> {
                 format!("{}: [{CORE}] {PLACEMENT} = {stated}", file.display()),
             )
             .with_recovery(
-                "write placement = \"soft\" or placement = \"none\" under [core], or delete the line",
+                "write placement = \"soft\", \"soft_shares\" or \"none\" under [core], or delete the line",
             )),
         },
     }
@@ -341,23 +348,27 @@ priority = \"fast\"
         );
     }
 
-    /// The one setting that turns CPU placement off; an absent line, and
-    /// an arm this build has not built, are told apart.
+    /// Each spelling of `[core] placement` reads as its arm; an absent
+    /// line, and an arm this build has not built, are told apart.
     #[test]
-    fn a_person_who_turns_placement_off_gets_no_placement() {
+    fn each_placement_spelling_reads_as_its_arm() {
         let dir = tempfile::tempdir().unwrap();
         let file = dir.path().join("config.toml");
-        let absent = stated_core_placement(&file).unwrap();
-        std::fs::write(&file, "[core]\nplacement = \"none\"\n").unwrap();
-        let off = stated_core_placement(&file).unwrap();
-        std::fs::write(&file, "[core]\nplacement = \"pinned\"\n").unwrap();
-        let unbuilt = stated_core_placement(&file).map_err(|err| *err.code());
+        let absent = stated_core_placement(&file).map_err(|err| *err.code());
+        let stated = ["none", "soft", "soft_shares", "pinned"].map(|arm| {
+            std::fs::write(&file, format!("[core]\nplacement = \"{arm}\"\n")).unwrap();
+            stated_core_placement(&file).map_err(|err| *err.code())
+        });
         assert_eq!(
-            (absent, off, unbuilt),
+            (absent, stated),
             (
-                CorePlacement::Soft,
-                CorePlacement::Off,
-                Err(AxCode::ConfigInvalid)
+                Ok(CorePlacement::Soft),
+                [
+                    Ok(CorePlacement::Off),
+                    Ok(CorePlacement::Soft),
+                    Ok(CorePlacement::SoftShares),
+                    Err(AxCode::ConfigInvalid),
+                ]
             )
         );
     }

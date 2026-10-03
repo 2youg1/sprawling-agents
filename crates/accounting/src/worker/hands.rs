@@ -65,6 +65,11 @@ pub struct Hands {
     /// gives the lane a seat on the placement plan, a soft ideal
     /// processor (`crates/sprawling/spec/Serving/Placement.lean` D46).
     pub seat_lane: SeatLane,
+    /// The shares the flight's backlog asks for each run's commands.
+    /// Production gives the answer of `bin::serving::placement::run_shares`
+    /// (`crates/sprawling/spec/Serving/Placement.lean` D47); this crate
+    /// only hands it to `runtime::Backlog::with_shares`.
+    pub shares: runtime::Shares,
 }
 
 /// The hook a lane takes its seat through; the answer is the seat, and

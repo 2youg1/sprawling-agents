@@ -56,6 +56,7 @@ pub struct Backlog {
     scratch: Scratch,
     window: PollBudget,
     sink: Option<Sink>,
+    shares: Shares,
 }
 
 impl Default for Backlog {
@@ -86,6 +87,7 @@ impl Backlog {
             scratch: Scratch::open(),
             window,
             sink: None,
+            shares: Shares::Unset,
         }
     }
 
@@ -97,6 +99,19 @@ impl Backlog {
             sink: Some(sink),
             ..self
         }
+    }
+
+    /// The same table, asking these shares for every run whose command
+    /// it starts (`crates/runtime/spec/Tools/Exec.lean` D29).
+    #[must_use]
+    pub fn with_shares(self, shares: Shares) -> Backlog {
+        Backlog { shares, ..self }
+    }
+
+    /// The shares this table asks for each run.
+    #[must_use]
+    pub fn shares(&self) -> Shares {
+        self.shares
     }
 
     /// Starts a command, waits out the short window, and hands back
@@ -389,7 +404,7 @@ mod report;
 mod scratch;
 mod tail;
 pub mod waiting;
-pub use jobs::{CpuShare, RunProcesses};
+pub use jobs::{RunProcesses, Shares};
 use member::{Body, Claim, Member, RunState, collect, storage};
 pub use report::{BacklogKind, Finished, Standing, Started};
 use scratch::Scratch;

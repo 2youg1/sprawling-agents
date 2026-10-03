@@ -10,81 +10,127 @@
 //! core is busy (`crates/sprawling/spec/Serving/Placement.lean`, D41 and
 //! D45-D47). The seats are the plan `plan` makes of the topology
 //! `reading` reports; `tests` checks this table against the seat model.
+//! This module is also the one place that decides what each arm of the
+//! person's `[core] placement` turns on (D47), the runs' shares included.
 
 pub(crate) mod plan;
 pub(crate) mod reading;
 
+use std::num::NonZeroU64;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Mutex, PoisonError};
+use std::sync::{Mutex, OnceLock, PoisonError};
 
 use accounting::person::CorePlacement;
 use plan::{Left, Plan, Processor, Shape, Topology};
 use reading::Unread;
+use runtime::Shares;
 
 /// Who holds a seat: one per hot thread for as long as it lives.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct Holder(pub(crate) u64);
 
-/// The seats of one plan (the model's `Seats` and `step`): one holder per
-/// seat at most, so seated threads never outnumber the plan.
-#[derive(Debug)]
-pub(crate) struct SeatTable {
-    seats: Vec<(Processor, Option<Holder>)>,
+/// Which kind of hot thread wants a seat. A serial thread is one of the
+/// city's one-per-city threads, which every relay and every broadcast
+/// waits for; a lane is one run's own thread.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Role {
+    Serial,
+    Lane,
 }
 
-impl SeatTable {
-    pub(crate) fn new(seats: Vec<Processor>) -> Self {
+/// One seat: where it is, and who sits there now.
+#[derive(Debug)]
+struct Sitting {
+    seat: Processor,
+    held_by: Option<Holder>,
+}
+
+/// The seats of one plan in the model's two pools (`Seats` and `step`,
+/// one pool per role): the plan's last [`SERIAL_SEATS`] processors are
+/// the serial threads' pool, the rest are the lanes'. A lane cannot take
+/// a seat a serial thread needs, and no seat holds two threads, so the
+/// seated threads never outnumber the plan.
+#[derive(Debug)]
+pub(crate) struct Seats {
+    serial: Vec<Sitting>,
+    lanes: Vec<Sitting>,
+}
+
+impl Seats {
+    /// The plan's seats in the two pools: lanes take the plan's
+    /// processors from the front, serial threads its last
+    /// [`SERIAL_SEATS`]. A plan with fewer seats than that is all serial
+    /// pool, because those are the threads every other thread waits for.
+    pub(crate) fn new(plan: Vec<Processor>) -> Self {
+        let mut lanes = plan;
+        let serial = lanes.split_off(lanes.len().saturating_sub(SERIAL_SEATS));
+        let free = |seat: Processor| Sitting {
+            seat,
+            held_by: None,
+        };
         Self {
-            seats: seats.into_iter().map(|seat| (seat, None)).collect(),
+            serial: serial.into_iter().map(free).collect(),
+            lanes: lanes.into_iter().map(free).collect(),
         }
     }
 
-    /// Seats `holder` on the first free seat. A holder already seated
-    /// keeps its seat; with no free seat the holder gets none.
-    pub(crate) fn start(&mut self, holder: Holder) {
+    fn pool_mut(&mut self, role: Role) -> &mut [Sitting] {
+        match role {
+            Role::Serial => &mut self.serial,
+            Role::Lane => &mut self.lanes,
+        }
+    }
+
+    /// Seats `holder` on the first free seat of its own pool. A holder
+    /// already seated keeps its seat; with no free seat in its pool the
+    /// holder gets none, and the scheduler places it.
+    pub(crate) fn start(&mut self, holder: Holder, role: Role) {
         if self.seat_of(holder).is_some() {
             return;
         }
-        if let Some((_, taken)) = self.seats.iter_mut().find(|(_, taken)| taken.is_none()) {
-            *taken = Some(holder);
+        if let Some(free) = self
+            .pool_mut(role)
+            .iter_mut()
+            .find(|sitting| sitting.held_by.is_none())
+        {
+            free.held_by = Some(holder);
         }
     }
 
     /// Gives `holder`'s seat back; no other seat moves.
     pub(crate) fn exit(&mut self, holder: Holder) {
-        for (_, taken) in &mut self.seats {
-            if *taken == Some(holder) {
-                *taken = None;
+        for pool in [&mut self.serial, &mut self.lanes] {
+            for sitting in pool {
+                if sitting.held_by == Some(holder) {
+                    sitting.held_by = None;
+                }
             }
         }
     }
 
     /// The processor `holder` sits at.
     pub(crate) fn seat_of(&self, holder: Holder) -> Option<Processor> {
-        self.seats
-            .iter()
-            .find(|(_, taken)| *taken == Some(holder))
-            .map(|(seat, _)| *seat)
+        [&self.serial, &self.lanes]
+            .into_iter()
+            .flatten()
+            .find(|sitting| sitting.held_by == Some(holder))
+            .map(|sitting| sitting.seat)
     }
 }
 
-/// The one table every hot thread of this process sits at, built from
-/// the topology read at the first seat.
-static TABLE: Mutex<Option<SeatTable>> = Mutex::new(None);
+/// How many seats of a plan belong to the serial threads: the ledger
+/// thread and the view fold, the city's two one-per-city hot threads.
+pub(crate) const SERIAL_SEATS: usize = 2;
+
+/// The one seat table every hot thread of this process sits at, built
+/// from the topology read at the first seat.
+static TABLE: Mutex<Option<Seats>> = Mutex::new(None);
 static NEXT_HOLDER: AtomicU64 = AtomicU64::new(0);
 
 /// A hot thread's seat; dropping it, which a thread does as it exits,
 /// gives the seat back.
 #[derive(Debug)]
 pub(crate) struct Seat(Option<Holder>);
-
-impl Seat {
-    /// A seat that holds nothing, for a thread built in a test.
-    #[cfg(test)]
-    pub(crate) fn none() -> Self {
-        Self(None)
-    }
-}
 
 impl Drop for Seat {
     fn drop(&mut self) {
@@ -97,15 +143,15 @@ impl Drop for Seat {
     }
 }
 
-/// Takes a seat for the calling thread and makes its processor the
-/// thread's soft ideal processor. A refusal is told on stderr, here, and
-/// the thread runs where the scheduler puts it.
-pub(crate) fn seat_this_thread(name: &'static str) -> Seat {
+/// Takes a seat of `role`'s pool for the calling thread and makes its
+/// processor the thread's soft ideal processor. A refusal is told on
+/// stderr, here, and the thread runs where the scheduler puts it.
+pub(crate) fn seat_this_thread(name: &'static str, role: Role) -> Seat {
     let holder = Holder(NEXT_HOLDER.fetch_add(1, Ordering::Relaxed));
     let seat = {
         let mut table = TABLE.lock().unwrap_or_else(PoisonError::into_inner);
         let table = table.get_or_insert_with(first_table);
-        table.start(holder);
+        table.start(holder, role);
         table.seat_of(holder)
     };
     if let Some(seat) = seat
@@ -120,32 +166,67 @@ pub(crate) fn seat_this_thread(name: &'static str) -> Seat {
 }
 
 /// A driving lane's seat, through the hook `accounting` calls at the top
-/// of every lane (D46); the seat goes back when the lane drops it.
+/// of every lane (D46); the seat goes back when the lane drops it, so
+/// the lane pool turns over from one run to the next.
 pub(crate) fn seat_lane() -> Box<dyn std::any::Any> {
-    Box::new(seat_this_thread("sprawling-drive"))
+    Box::new(seat_this_thread("sprawling-drive", Role::Lane))
 }
 
 /// The table of the first seat. With placement off it has no seat;
 /// otherwise power throttling is lifted for the whole process (D40), the
 /// topology read, and the plan's seats kept where the platform has a soft
 /// call to give them to (D41).
-fn first_table() -> SeatTable {
+fn first_table() -> Seats {
     match setting() {
-        CorePlacement::Off => SeatTable::new(Vec::new()),
-        CorePlacement::Soft => soft_table(),
+        CorePlacement::Off => Seats::new(Vec::new()),
+        CorePlacement::Soft | CorePlacement::SoftShares => soft_table(),
     }
 }
 
-/// The person's `[core] placement`. A setting that does not read is told
-/// on stderr once, here, and placement stays on (D47).
+/// The person's `[core] placement`, read once for the process. A setting
+/// that does not read is told on stderr once, here, and placement stays
+/// on (D47).
 fn setting() -> CorePlacement {
-    accounting::person::core_placement().unwrap_or_else(|err| {
-        eprintln!("CPU placement stays on: {err}");
-        CorePlacement::Soft
+    static ARM: OnceLock<CorePlacement> = OnceLock::new();
+    *ARM.get_or_init(|| {
+        accounting::person::core_placement().unwrap_or_else(|err| {
+            eprintln!("CPU placement stays on: {err}");
+            CorePlacement::Soft
+        })
     })
 }
 
-fn soft_table() -> SeatTable {
+/// The shares each run's commands ask for under the person's arm (D47),
+/// handed to the runtime through `Hands`.
+pub(crate) fn run_shares() -> Shares {
+    shares_of(setting(), crate::monitor::memory::read().physical)
+}
+
+/// What one arm asks for each run: nothing with placement off, an even
+/// CPU share by default, and with `"soft_shares"` a memory limit of half
+/// the physical memory as well. A physical memory read as zero leaves the
+/// limit out, and says so on stderr.
+fn shares_of(arm: CorePlacement, physical: u64) -> Shares {
+    match arm {
+        CorePlacement::Off => Shares::Unset,
+        CorePlacement::Soft => Shares::Cpu,
+        CorePlacement::SoftShares => match NonZeroU64::new(physical / RUN_MEMORY_PARTS) {
+            Some(limit) => Shares::CpuAndMemory { limit },
+            None => {
+                eprintln!(
+                    "each run keeps no memory limit: this machine's memory reads as {physical} bytes"
+                );
+                Shares::Cpu
+            }
+        },
+    }
+}
+
+/// A run under `"soft_shares"` may commit one part in this many of the
+/// physical memory (`crates/runtime/spec/Tools/Exec.lean` D29).
+const RUN_MEMORY_PARTS: u64 = 2;
+
+fn soft_table() -> Seats {
     if let Err(reason) = full_speed() {
         eprintln!("the city may be power-throttled as background work: {reason}");
     }
@@ -157,24 +238,67 @@ fn soft_table() -> SeatTable {
         Ok(Plan::Seats(seats)) if SOFT_CALL => seats,
         Ok(Plan::Seats(_) | Plan::LeftToOs(_)) | Err(_) => Vec::new(),
     };
-    SeatTable::new(seats)
+    Seats::new(seats)
 }
 
-/// The doctor's line: the topology this machine reports and what the
-/// plan does with it, in the User's words (D47).
+/// The doctor's line: the topology this machine reports, what the plan
+/// does with it, and what each run's commands share, in the User's words
+/// (D47).
 pub(crate) fn report() -> String {
-    match accounting::person::core_placement() {
-        Ok(CorePlacement::Off) => {
+    let (arm, unread) = match accounting::person::core_placement() {
+        Ok(arm) => (arm, String::new()),
+        Err(err) => (
+            CorePlacement::Soft,
+            format!(" ([core] placement does not read, so placement stays on: {err})"),
+        ),
+    };
+    let threads = match arm {
+        CorePlacement::Off => {
             "CPU: placement is off ([core] placement = \"none\"); the operating system places every thread"
                 .to_owned()
         }
-        Ok(CorePlacement::Soft) => describe(&reading::read()),
-        Err(err) => format!(
-            "{} ([core] placement does not read, so placement stays on: {err})",
-            describe(&reading::read())
+        CorePlacement::Soft | CorePlacement::SoftShares => describe(&reading::read()),
+    };
+    let runs = runs_share(shares_of(arm, crate::monitor::memory::read().physical));
+    format!("{threads}; {runs}{unread}")
+}
+
+/// What each run's commands share on this platform, given what the arm
+/// asks for: Windows sets both halves on the run's job, macOS has the
+/// CPU half alone (`taskpolicy`), and Linux sets neither yet (D29).
+fn runs_share(asked: Shares) -> String {
+    const ALONE: &str = "runs' commands compete thread by thread";
+    match (asked, PLATFORM_SHARES) {
+        (Shares::Unset, _) | (_, PlatformShares::None) => ALONE.to_owned(),
+        (Shares::Cpu, PlatformShares::Cpu | PlatformShares::CpuAndMemory) => {
+            "each run's commands share the processors evenly".to_owned()
+        }
+        (Shares::CpuAndMemory { .. }, PlatformShares::Cpu) => {
+            "each run's commands share the processors evenly; this platform sets no memory limit"
+                .to_owned()
+        }
+        (Shares::CpuAndMemory { limit }, PlatformShares::CpuAndMemory) => format!(
+            "each run's commands share the processors evenly and commit at most {} MiB",
+            limit.get() / (1 << 20)
         ),
     }
 }
+
+/// Which halves of a run's shares this platform can set (D29).
+#[derive(Debug, Clone, Copy)]
+enum PlatformShares {
+    None,
+    Cpu,
+    CpuAndMemory,
+}
+
+const PLATFORM_SHARES: PlatformShares = if cfg!(windows) {
+    PlatformShares::CpuAndMemory
+} else if cfg!(target_os = "macos") {
+    PlatformShares::Cpu
+} else {
+    PlatformShares::None
+};
 
 /// [`report`] for a reading already made.
 pub(crate) fn describe(read: &Result<Topology, Unread>) -> String {

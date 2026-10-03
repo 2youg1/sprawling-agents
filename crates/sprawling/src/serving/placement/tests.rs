@@ -4,10 +4,11 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The seat model of `crates/sprawling/spec/Serving/Placement.lean`,
-//! checked on the Rust seat table over every plan of up to four seats and
-//! every sequence of six starts and exits of three threads. Bounded and
-//! exhaustive rather than sampled: the space is small enough to walk
-//! whole, so a defect in it cannot hide behind a seed.
+//! checked on the Rust seat table over every plan of up to five seats and
+//! every sequence of six starts and exits of four threads, the two
+//! serial ones and the two lanes. Bounded and exhaustive rather than
+//! sampled: the space is small enough to walk whole, so a defect in it
+//! cannot hide behind a seed.
 
 #![allow(
     clippy::unwrap_used,
@@ -20,11 +21,20 @@ use std::collections::BTreeSet;
 
 use super::plan::{Left, Plan, Processor, Topology};
 use super::reading::Unread;
-use super::{Holder, SeatTable, describe};
+use super::{Holder, Role, SERIAL_SEATS, Seats, describe};
 
-const THREADS: u64 = 3;
-const MOST_SEATS: u32 = 4;
+const THREADS: u64 = 4;
+const MOST_SEATS: u32 = 5;
 const EVENTS: usize = 6;
+
+/// The role of the thread `holder` names: the city has `SERIAL_SEATS`
+/// serial threads, and every thread after them is a run's lane.
+fn role(holder: Holder) -> Role {
+    match usize::try_from(holder.0).unwrap_or(usize::MAX) < SERIAL_SEATS {
+        true => Role::Serial,
+        false => Role::Lane,
+    }
+}
 
 #[derive(Debug, Clone, Copy)]
 enum Event {
@@ -48,12 +58,12 @@ fn the_seat_table_keeps_every_property_on_every_trace() {
 }
 
 fn check_trace(plan: &[Processor], trace: &[Event]) {
-    let mut table = SeatTable::new(plan.to_vec());
+    let mut table = Seats::new(plan.to_vec());
     for &event in trace {
         let before: Vec<Option<Processor>> = holders().map(|h| table.seat_of(h)).collect();
         match event {
             Event::Start(holder) => {
-                table.start(holder);
+                table.start(holder, role(holder));
                 check_start(&table, plan, &before, holder);
             }
             Event::Exit(holder) => {
@@ -89,26 +99,66 @@ fn check_trace(plan: &[Processor], trace: &[Event]) {
 }
 
 /// a_start_takes_the_first_free_seat, and
-/// a_start_is_left_to_the_os_only_when_every_seat_is_taken.
-fn check_start(
-    table: &SeatTable,
-    plan: &[Processor],
-    before: &[Option<Processor>],
-    holder: Holder,
-) {
+/// a_start_is_left_to_the_os_only_when_every_seat_is_taken: the seat
+/// comes from the holder's own pool, and the first free one there.
+fn check_start(table: &Seats, plan: &[Processor], before: &[Option<Processor>], holder: Holder) {
     let index = usize::try_from(holder.0).unwrap();
     if before[index].is_some() {
         return;
     }
-    let first_free = plan
+    let pool = pool_of(plan, role(holder));
+    let first_free = pool
         .iter()
         .find(|seat| !before.contains(&Some(**seat)))
         .copied();
     assert_eq!(
         table.seat_of(holder),
         first_free,
-        "the first free seat or none: {plan:?} {before:?}"
+        "the first free seat of its own pool or none: {plan:?} {before:?}"
     );
+}
+
+/// The seats of `role`'s pool, in the order the table holds them: lanes
+/// take the plan's processors from the front, serial threads its last
+/// `SERIAL_SEATS`.
+fn pool_of(plan: &[Processor], role: Role) -> Vec<Processor> {
+    let split = plan.len().saturating_sub(SERIAL_SEATS);
+    match role {
+        Role::Serial => plan.get(split..).unwrap_or_default().to_vec(),
+        Role::Lane => plan.get(..split).unwrap_or_default().to_vec(),
+    }
+}
+
+/// The property the pools exist for: lanes cannot take the seats the
+/// city's serial threads need, however many lanes start first.
+#[test]
+fn lanes_never_take_the_seats_the_serial_threads_need() {
+    for count in 0..=MOST_SEATS {
+        let plan: Vec<Processor> = (0..count)
+            .map(|number| Processor {
+                group: 0,
+                number: number * 2,
+            })
+            .collect();
+        let mut table = Seats::new(plan.clone());
+        // Every lane starts first, in order, twice over.
+        for holder in holders().filter(|h| role(*h) == Role::Lane) {
+            for _ in 0..2 {
+                table.start(holder, Role::Lane);
+            }
+        }
+        for holder in holders().filter(|h| role(*h) == Role::Serial) {
+            table.start(holder, Role::Serial);
+            let wanted = usize::try_from(holder.0).unwrap_or(usize::MAX);
+            let seated = table.seat_of(holder).is_some();
+            let seats = usize::try_from(count).unwrap_or(usize::MAX);
+            assert_eq!(
+                seated,
+                wanted < seats,
+                "every serial thread up to the plan's size is seated: {plan:?}"
+            );
+        }
+    }
 }
 
 fn holders() -> impl Iterator<Item = Holder> {
