@@ -7218,5 +7218,9 @@
   "talk_letter_session": {
     "en": "sending session",
     "zh": "发信的会话"
+  },
+  "letter_whole_talk": {
+    "en": "the whole conversation, on the run's page",
+    "zh": "整段会话在 run 页上"
   }
 }

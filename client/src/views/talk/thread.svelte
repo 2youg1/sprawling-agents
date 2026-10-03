@@ -38,6 +38,7 @@
   import { frozenSaid } from "./frozen";
   import { called, dispatcherOf } from "./naming";
   import { planFork } from "./forking";
+  import { turnsAround } from "./around";
   import { cutOff, silentRun } from "./silence";
   import type { Phase } from "./silence";
   import type { ForkEntry, ForkPlan } from "./forking";
@@ -54,9 +55,13 @@
     // first head states the model the session froze (docs/frontend-method.md §7D).
     // A later run of the same session leaves that to the first.
     readonly opens?: boolean;
+    // A letter's line in this run: only the turns around it are drawn,
+    // with a link to the whole session (client D90). Absent everywhere
+    // else, where the thread is the whole session.
+    readonly around?: Seq | null;
   }
 
-  const { run, onFork, onRetry, opens = true }: Props = $props();
+  const { run, onFork, onRetry, opens = true, around = null }: Props = $props();
 
   const u = ui();
   const { lang } = u;
@@ -80,6 +85,7 @@
   const read = $derived(readAnswer($rounds, (held) => ("rounds" in held ? held.rounds : undefined)));
   const answer = $derived(read.kind === "held" ? read.value : undefined);
   const turns = $derived(answer?.turns ?? []);
+  const drawn = $derived(turnsAround(turns, around));
   const task = $derived(answer?.opening?.task ?? run.task ?? "");
   // The opening task is a person's words like any other, and rides the
   // first turn - its turn's parent - because the wire gives it no line
@@ -277,7 +283,8 @@
   {#if read.kind === "unavailable"}
     <Unanswered query={read.query} asked={question} />
   {/if}
-  {#each turns as turn, at (turn.opened)}
+  {#each turns.slice(drawn.from, drawn.to) as turn, shown (turn.opened)}
+    {@const at = shown + drawn.from}
     <TurnView
       {turn}
       run={run.run}
@@ -293,6 +300,11 @@
       onHover={hoverFork}
     />
   {/each}
+  {#if drawn.cut}
+    <p class="my-snug text-note text-text-faint">
+      <a class="underline hover:text-text" href={toFragment({ kind: "run", run: run.run })}>{say($lang, "letter_whole_talk")}</a>
+    </p>
+  {/if}
   <!-- No `aria-live` on the growing text: a screen reader told every
        token hears noise (ux B2). The frozen line below is what speaks,
        and it speaks once. -->

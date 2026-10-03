@@ -51,6 +51,9 @@
       slice("delete", "It saves the bytes.", ""),
       slice("insert", "It saves the bytes of the version it was made on.", ""),
     ],
+    // Offered in the run's third turn: the letter's conversation draws
+    // that turn with one either side (client D90).
+    offered: Seq.make(9),
   };
 
   // The card on a version the plan has left.
@@ -99,7 +102,8 @@
     record(5, "proposal_offered", { doc: DOC, baseline: V1, start: 8, end: 75, before: "", after: "" }),
   ];
 
-  // The sender's one round: it read the plan, then offered the two cards.
+  // The sender's four rounds: it read the plan, weighed it, offered the
+  // current card in the third round and said so in the fourth.
   const READ: Call = {
     tool: "read",
     subject: PATH,
@@ -111,9 +115,17 @@
     answered: TimeMs.make(NOW - 8 * 60_000 + 40),
     timing: "measured",
   };
+  function round(number: number, opened: number, said: string, calls: readonly Call[]): RoundsAnswer["turns"][number] {
+    return { calls, notes: [], number, opened: Seq.make(opened), said, t: TimeMs.make(NOW - (10 - number) * 60_000), timing: "measured" };
+  }
   const ROUNDS: RoundsAnswer = {
     run: RUN,
-    turns: [{ calls: [READ], notes: [], number: 1, opened: Seq.make(2), t: TimeMs.make(NOW - 8 * 60_000), timing: "measured" }],
+    turns: [
+      round(1, 2, "I read the plan before changing anything.", [READ]),
+      round(2, 6, "The reader section says nothing about drafts; that is the gap.", []),
+      round(3, 8, "I offered one card on the reader's three sentences.", []),
+      round(4, 12, "The card is waiting for the User; nothing else in the plan needs a change.", []),
+    ],
   };
 
   // Every card open in the city, newest first, so the mailbox's deciding
@@ -184,9 +196,14 @@
       <Letter doc={DOC} card={CURRENT.id} />
     </div>
   </Case>
-  <Case label="letter · the same card read as the conversation of the run that sent it" width={600}>
+  <Case label="letter · the same card read as the turns around the one that offered it" width={600}>
     <div class="flex h-[640px] flex-col overflow-hidden bg-page">
       <Letter doc={DOC} card={CURRENT.id} opening="talk" />
+    </div>
+  </Case>
+  <Case label="letter · a card whose offering line was not found, read as the whole conversation" width={600}>
+    <div class="flex h-[640px] flex-col overflow-hidden bg-page">
+      <Letter doc={DOC} card={STALE.id} opening="talk" />
     </div>
   </Case>
   <Case label="letter · the same card read as the whole text it was written against" width={600}>

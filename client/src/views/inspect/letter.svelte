@@ -15,7 +15,9 @@
   // stretch read without the text around it, or without what the run
   // was asked and said, does not say what it changes or why. The
   // conversation is the run page's own thread, drawn with no fork and
-  // no retry, so it is read-only here as it is there.
+  // no retry, so it is read-only here as it is there, and only the turns
+  // around the line that offered the card, with a link to the whole
+  // session (client D90).
   //
   // The heading takes the focus when the letter opens, so the mailbox
   // that stowed for it does not hand the focus to its key, and Escape
@@ -111,7 +113,7 @@
       {#if sent === undefined}
         <p class="text-note text-text-faint">…</p>
       {:else}
-        <Thread run={sent} />
+        <Thread run={sent} around={held.offered ?? null} />
       {/if}
     </div>
   {:else}
