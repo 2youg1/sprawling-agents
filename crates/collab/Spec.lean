@@ -58,7 +58,7 @@ Rust 实现对模型的一致性由测试检查，不由证明：每个模块旁
 
 workshop 与 `spec/Workshop.lean` 的整段 trace 模型（性质 4–7，D14）在 Rust 里的样子：`lay_out` 那一刻摆出的图，记账线程在展示这次调用的行时经 `WorkshopDesk::take_underway` 收走、登记进 `Collaborating.workshops`，就绪的节点经同一张 `DelegateDesk` 当场派出；节点与父 run 谁先落地都行。父 run 落地时 `GraphAfter::of` 读它的结局：`Cancelled` 或失败关图（从 `workshops` 删去），在飞的节点照跑完、照回程，回程各自为父房间敲门。`take_underway` 只交出一次，交出之后同一个 run 的第二次 `lay_out` 仍被拒。`Underway::hand_next` 全有或全无：中途一个节点被桌子拒绝时，这一次调用不交出任何节点，也不把任何节点记为已派，桌子不留请求，因为模型里「已派」就是「已派出」（`workshop::tests` 的 `a_refused_ask_in_the_middle_of_hand_next_counts_nothing_as_handed`）。
 
-本 crate 消费 kernel 的判定面：`kernel::gate::spawn`（经 `delegate_tool`）、`kernel::goal::detect_conflict`（经 `arbiter`）、`kernel::delegation`、`kernel::PlanTree`（经 `claim_tool`）。生产消费者是 `crates/sprawling` 的装配层：`accounting::worker::collaborating` 按房间保存 join、图与目标表，工人把各张桌子借给工具，在一轮活落地时取走效应并写账。
+本 crate 消费 kernel 的判定面：`kernel::gate::spawn`（经 `delegate_tool`）、`kernel::goal::detect_conflict`（经 `arbiter`）、`kernel::delegation`、`kernel::PlanTree`（经 `claim_tool`）。生产消费者是 `crates/accounting` 的装配层：`accounting::worker::collaborating` 按房间保存 join、图与目标表，工人把各张桌子借给工具，在一轮活落地时取走效应并写账。
 -/
 
 /-! ## 5 权威信源
@@ -257,7 +257,7 @@ D2 没有草稿退回机制。房间没有版本，发言不带「作者所见�
 
 /-! ## 15 影响面
 
-改一张桌子或一件工具的构造签名，波及 `crates/sprawling` 装配层造这张桌子的地方；改记录的形状（`Signal`、`OpenRequest` 一族、`ClaimEffect::payload`）波及读 Ledger 的折叠与视图。改 `still_true` 或桌子对哪些动作要求握持（D6），波及落地的那一处 `accounting::effect::Claims::of`（`crates/accounting/Spec.lean` §8-27），两边与 `spec/Claim.lean` 一起改。改分部里的模型，先改本文件对应的要求，再改 Rust 与它的测试。
+改一张桌子或一件工具的构造签名，波及 `crates/accounting` 装配层造这张桌子的地方（`accounting::worker::workbench::desks`）；改记录的形状（`Signal`、`OpenRequest` 一族、`ClaimEffect::payload`）波及读 Ledger 的折叠与视图。改 `still_true` 或桌子对哪些动作要求握持（D6），波及落地的那一处 `accounting::effect::Claims::of`（`crates/accounting/Spec.lean` §8-27），两边与 `spec/Claim.lean` 一起改。改分部里的模型，先改本文件对应的要求，再改 Rust 与它的测试。
 -/
 
 /-! ## 16 测试与约束

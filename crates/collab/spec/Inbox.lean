@@ -8,7 +8,7 @@
 
 规定 `crates/collab/src/inbox.rs`（`collab::inbox`）与 `crates/collab/src/steer.rs`（`collab::steer`）交给 Inbox 的那一半。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
 
-一个房间的 Inbox 是两条队列：急件 lane 与普通 lane。一件 Signal 由 `id` 与 `kind` 构成；lane 由 kind 推出，调用方给不了。去重由 `storage::EventQueue` 的 `seen` 给（IdemKey 由 `SignalId` 派生），本模块不另建第二张表，这里把两条队列的 `seen` 合写成一个集合：同一个 id 恒落同一条 lane，所以两种写法说的是同一件事。
+一个房间的 Inbox 是两条队列：急件 lane 与普通 lane。一件 Signal 由 `id` 与 `kind` 构成；lane 由 kind 推出，调用方给不了。去重由 `storage::EventQueue` 的 `seen` 给（IdemKey 由 `SignalId` 派生），本模块不另建第二张表，这里把两条队列的 `seen` 合写成一个集合：同一个 id 恒落同一条 lane，所以两种写法说的是同一件事。Rust 的 `Inbox` 还有第三列 `returned`：离开房间的 run 交回、没被读过的信（collab D8），它们比两条队列里的一切都早，`pull` 与 `take_steer` 都先取它，且不经 `seen`，因为同一个 id 第二次进队会被当作重复丢掉。这一列不在本模型里，它的性质是 `spec/Delivery.lean` 的 `leave_requeues`；下面「急件先出」说的是两条队列之间的次序。
 
 四条性质：
 
