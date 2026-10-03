@@ -51,6 +51,7 @@
   import { clock } from "../../core/time";
   import { ui } from "../../ui";
   import type { Query } from "../../wire";
+  import EmptyState from "../parts/empty.svelte";
   import Unanswered from "../parts/unanswered.svelte";
   import UsageExport from "../parts/usage_export.svelte";
   import UsageUses from "../parts/usage_uses.svelte";
@@ -73,6 +74,8 @@
     <Unanswered query={read.query} asked={question} />
   {:else if read.kind === "asking"}
     <p class="text-text-faint">…</p>
+  {:else if used.length === 0 && unused.length === 0}
+    <EmptyState missing="usage_skills_none" seat="region" />
   {:else}
     <ul class="flex flex-col">
       {#each [...used, ...unused] as skill (skill.name)}
