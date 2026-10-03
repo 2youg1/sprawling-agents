@@ -113,7 +113,7 @@ fn the_schema_hash_covers_every_event_kind_name() {
 
 /// A function of WIRE_V, the two frame name tables and the event kind
 /// names, so any change to the protocol surface lands here first.
-const WIRE_SCHEMA_GOLDEN: &str = "7f868c8331157f5fd2e90e62f012433f99699cd40cfda2620c3ee4ee6aa24bf8";
+const WIRE_SCHEMA_GOLDEN: &str = "cdd0eed88c053c3933534938ae9cf43373362edea25a36a480d45cc6f602516d";
 
 /// The schema hash reads names only, so a field added under names that
 /// stay leaves it where it was. This digest reads the whole shape with the
