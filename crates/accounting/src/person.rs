@@ -42,6 +42,8 @@ const UI: &str = "ui";
 /// The section and key of the one core setting (`crates/sprawling/Spec.lean` §8-93).
 const CORE: &str = "core";
 const PRIORITY: &str = "priority";
+/// The key that turns CPU placement off (`crates/sprawling/spec/Serving/Placement.lean` D47).
+const PLACEMENT: &str = "placement";
 
 /// Everything this person settled, as their file states it.
 ///
@@ -142,6 +144,33 @@ fn stated_core_priority(file: &Path) -> Result<CorePriority, AxError> {
             )
         }),
     }
+}
+
+/// How the core places its hot threads on the processors.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CorePlacement {
+    /// Power throttling lifted, and each hot thread a soft ideal
+    /// processor from the placement plan.
+    Soft,
+    /// Nothing read, nothing asked of the platform: the scheduler alone.
+    Off,
+}
+
+/// How the core places its hot threads: `placement` in the `[core]`
+/// section, `"soft"` when absent and `"none"` to turn placement off
+/// (`crates/sprawling/spec/Serving/Placement.lean` D47).
+///
+/// # Errors
+///
+/// As [`read`] for a file that cannot be read or parsed, and
+/// `ConfigInvalid` for a `placement` that is neither `"soft"` nor
+/// `"none"`, including the two comparison arms not yet built.
+pub fn core_placement() -> Result<CorePlacement, AxError> {
+    stated_core_placement(&file()?)
+}
+
+fn stated_core_placement(file: &Path) -> Result<CorePlacement, AxError> {
+    document(file).map(|_document| CorePlacement::Soft)
 }
 
 /// Where this person's file is. The home directory is `home::Home`'s
@@ -290,6 +319,27 @@ priority = \"fast\"
             (
                 CorePriority::Raised,
                 CorePriority::Normal,
+                Err(AxCode::ConfigInvalid)
+            )
+        );
+    }
+
+    /// The one setting that turns CPU placement off; an absent line, and
+    /// an arm this build has not built, are told apart.
+    #[test]
+    fn a_person_who_turns_placement_off_gets_no_placement() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("config.toml");
+        let absent = stated_core_placement(&file).unwrap();
+        std::fs::write(&file, "[core]\nplacement = \"none\"\n").unwrap();
+        let off = stated_core_placement(&file).unwrap();
+        std::fs::write(&file, "[core]\nplacement = \"pinned\"\n").unwrap();
+        let unbuilt = stated_core_placement(&file).map_err(|err| *err.code());
+        assert_eq!(
+            (absent, off, unbuilt),
+            (
+                CorePlacement::Soft,
+                CorePlacement::Off,
                 Err(AxCode::ConfigInvalid)
             )
         );
