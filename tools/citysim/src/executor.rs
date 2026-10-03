@@ -137,6 +137,13 @@ fn clock_overflow() -> AxError {
     )
 }
 
+/// The place of the next tool call in this run (citysim D20).
+fn next_place(placed: &Cell<u64>) -> Result<Seq, AxError> {
+    let at = placed.get();
+    placed.set(at.saturating_add(1));
+    Ok(Seq::new(at))
+}
+
 /// Runs one scenario to its frozen end, on a ledger of its own. Every
 /// path out of here has passed through handoff_written + run_frozen;
 /// the report names which ending.
@@ -244,10 +251,8 @@ pub fn run_scenario_on(
     let placed = Cell::new(0u64);
     let mut invoke = |call: &kernel::ToolCall, t: TimeMs| {
         // Every door the call must pass is the bench's to route; the
-        // simulator stays thin (Handoff verdict 10).
-        let at = placed.get();
-        placed.set(at.saturating_add(1));
-        let key = IdemKey::derive(&run, Seq::new(at), &call.action()?);
+        // simulator stays thin (`spec/Executor.lean` §8-3).
+        let key = IdemKey::derive(&run, next_place(&placed)?, &call.action()?);
         let temporal = bench
             .meta_of(&call.name)
             .map_or(Temporal::Timeless, |meta| meta.temporal);
@@ -349,4 +354,24 @@ pub fn run_scenario_on(
         lines: ledger.raw_lines().to_vec(),
         completion: frozen.completion().name(),
     })
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::panic, reason = "test code")]
+mod tests {
+    use super::*;
+
+    /// citysim D20: two calls of one run never share a place, so the last
+    /// place a u64 holds is handed out once and the call after it is
+    /// refused rather than keyed like the one before.
+    #[test]
+    fn the_call_after_the_last_place_is_refused() {
+        let placed = Cell::new(u64::MAX);
+        assert_eq!(next_place(&placed).unwrap(), Seq::new(u64::MAX));
+        let err = next_place(&placed).unwrap_err();
+        assert_eq!(
+            (err.code(), err.action()),
+            (&AxCode::InvalidArgs, "place a tool call")
+        );
+    }
 }

@@ -58,3 +58,33 @@ impl LedgerInspect for MemLedger {
         Ok(self.lines.clone())
     }
 }
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::panic, reason = "test code")]
+mod tests {
+    use super::*;
+
+    /// A ledger whose next seq is the last one a u64 holds has no seq to
+    /// advance to, so it refuses the draft and is left as the refusal
+    /// found it: no line, no seq and no chain digest moved.
+    #[test]
+    fn an_append_past_the_last_seq_leaves_the_ledger_unchanged() {
+        let draft = EventDraft {
+            run: kernel::RunId::CITY,
+            t: kernel::TimeMs::new(1),
+            who: "city".to_owned(),
+            addr: None,
+            kind: kernel::EventKind::CityInitialized,
+            data: kernel::Payload::empty(),
+            ig: false,
+        };
+        let mut ledger = MemLedger {
+            lines: Vec::new(),
+            next_seq: Seq::new(u64::MAX),
+            prev: GENESIS_PREV,
+        };
+        let before = (ledger.lines.clone(), ledger.next_seq, ledger.prev);
+        assert!(ledger.append(draft).is_err());
+        assert_eq!((ledger.lines.clone(), ledger.next_seq, ledger.prev), before);
+    }
+}
