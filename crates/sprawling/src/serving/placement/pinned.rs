@@ -22,6 +22,13 @@ use super::plan::Processor;
 pub(crate) enum Did {
     /// This process is in a Job Object whose affinity limit is this
     /// mask of this processor group.
+    #[cfg_attr(
+        not(windows),
+        expect(
+            dead_code,
+            reason = "only Windows takes the process into a job whose affinity limit this is"
+        )
+    )]
     Pinned { group: u16, mask: u64 },
     /// The call is external here: the whole binary is started under this
     /// `taskset -c` list by whoever runs the measurement.
