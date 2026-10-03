@@ -242,6 +242,7 @@ fn a_drive_that_failed_still_gives_the_room_its_queue_back() {
                 at,
                 site,
                 driven: Err(failed),
+                swept: None,
             },
             Owing::unasked(crate::worker::Unasked::Knock),
             &mut open_claims,

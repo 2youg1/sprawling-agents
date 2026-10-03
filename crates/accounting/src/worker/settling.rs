@@ -11,14 +11,16 @@ use kernel::Locator;
 /// What the sweep after a drive works on.
 ///
 /// The three arrive together because they answer one question - what a
-/// wave left in the tree that the history has not accounted for yet: the
-/// commits to restore a discarded file from, the escalations a gate
+/// wave left in the tree that the history has not accounted for yet: what
+/// the lane's sweep found and the commit to restore it from, the escalations a gate
 /// raised while the driver held the ledger, and the pin of the work an
 /// escalation interrupted. `raised` is borrowed mutably because the
 /// sweep adds to it: a discard a person has to answer is raised here
 /// rather than during the drive.
 pub(super) struct Sweep<'a> {
-    pub(super) checkpointed: &'a [String],
+    /// Read on the lane before the run came home
+    /// (`crates/sprawling/spec/Accounting/Landing.lean` D37).
+    pub(super) swept: Option<super::dispatching::heavy_landing::Swept>,
     pub(super) raised: &'a mut Vec<kernel::ApprovalItem>,
     pub(super) job_locator: &'a Locator,
 }

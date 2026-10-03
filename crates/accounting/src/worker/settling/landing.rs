@@ -171,7 +171,6 @@ impl RunWorker {
         )?;
         let frozen = driven?;
         let ending = frozen.completion().clone();
-        self.keep_transcript(&frozen, &addr);
         // What it actually did, for the person reading afterwards. The
         // ledger holds the detail; this line is the pointer into it.
         self.note(
@@ -327,35 +326,5 @@ impl RunWorker {
                 completion: ending,
             },
         )
-    }
-
-    /// Writes what the model saw beside the room it worked in. The freeze
-    /// is already on the ledger, so a room that will not take the file is
-    /// noted rather than turned into a failed run: the transcript is the
-    /// run's copy, not its record.
-    fn keep_transcript(
-        &mut self,
-        frozen: &runtime::Run<runtime::run::Frozen>,
-        addr: &kernel::Address,
-    ) {
-        match frozen
-            .transcript()
-            .and_then(|transcript| transcript.materialise(&mut self.cas, &self.city_root, addr))
-        {
-            Ok(record) => self.note(
-                runtime::diagnostics::Level::Effect,
-                "runtime::transcript",
-                &format!(
-                    "{} written, {} spans redacted",
-                    record.address.as_str(),
-                    record.redacted
-                ),
-            ),
-            Err(err) => self.note(
-                runtime::diagnostics::Level::Refuse,
-                "runtime::transcript",
-                &format!("transcript not written: {err}"),
-            ),
-        }
     }
 }

@@ -54,12 +54,12 @@ impl RunWorker {
         // working tree cannot be talked out of. The base is the first
         // checkpoint of this drive, so everything the whole drive deleted is
         // reported once rather than once per wave.
-        let sweep_base = sweep.checkpointed.first().cloned();
-        if let Some(base) = sweep_base {
-            let discarded = storage::Checkpoint::open(write_root)
-                .map_err(storage::StorageError::into_ax)?
-                .wave_post(&base)
-                .map_err(storage::StorageError::into_ax)?;
+        // The diff itself was read on the lane before the run came home
+        // (`crates/sprawling/spec/Accounting/Landing.lean` D37); only its
+        // lines are written here.
+        if let Some(swept) = sweep.swept {
+            let base = swept.base;
+            let discarded = swept.discarded?;
             let swept = discarded.len();
             let lost = effect::Landing::discards(discarded, addr, who);
             self.settle(at, run_id, lost, &chain)?;

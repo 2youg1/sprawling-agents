@@ -199,10 +199,16 @@ impl RunWorker {
         owing: Owing,
         open_claims: &mut crate::worker::booking::OpenClaims,
     ) -> Result<Landed, AxError> {
-        let (lent, at, mut site, driven) = match (continuation, flown) {
-            (Continuation::Model(lent), Flown::Model { at, site, driven }) => {
-                (lent, at, site, driven)
-            }
+        let (lent, at, mut site, driven, swept) = match (continuation, flown) {
+            (
+                Continuation::Model(lent),
+                Flown::Model {
+                    at,
+                    site,
+                    driven,
+                    swept,
+                },
+            ) => (lent, at, site, driven, swept),
             (Continuation::Harness, Flown::Harness { at, driven }) => {
                 return self.land_harness(at, driven, owing);
             }
@@ -245,7 +251,7 @@ impl RunWorker {
         let Driven {
             outcome: driven,
             adapter: home,
-            checkpointed,
+            checkpointed: _,
             ran,
             mut raised,
             workbench,
@@ -257,7 +263,7 @@ impl RunWorker {
             &desks,
             Settling {
                 sweep: Sweep {
-                    checkpointed: &checkpointed,
+                    swept,
                     raised: &mut raised,
                     job_locator: &job_locator,
                 },

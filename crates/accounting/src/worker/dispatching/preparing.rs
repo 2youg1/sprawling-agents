@@ -23,6 +23,7 @@ use super::super::driving::harness::{HarnessDriven, HarnessHalf, drive_harness};
 use super::super::recording::Notes;
 use super::super::workbench::{BenchDesks, Laying, Placing, held};
 use super::super::{Assignment, DriveContext, Driven, Driving, Given, Site, Stamping, drive_run};
+use super::heavy_landing::{HeavyLanding, Swept};
 
 /// One dispatch the accounting thread has decided, on its way to a
 /// lane: what was asked, and everything the lane reads, owned so the
@@ -71,6 +72,9 @@ pub(crate) enum Flown {
         at: Assignment,
         site: Site,
         driven: Result<Driven, AxError>,
+        /// What the sweep found, read on the lane; `None` for a drive
+        /// that failed or never checkpointed.
+        swept: Option<Swept>,
     },
     Harness {
         at: Assignment,
@@ -109,11 +113,26 @@ impl Staged {
                     notes: lane.laying.notes.clone(),
                     staged_at: lane.laying.staged_at,
                 };
+                let heavy = HeavyLanding {
+                    city_root: lane.laying.city_root.clone(),
+                    store: std::sync::Arc::clone(&lane.laying.store),
+                    notes: lane.laying.notes.clone(),
+                    staged_at: lane.laying.staged_at,
+                };
                 let driven = lane
                     .prepare(&at, &mut site, ledger, &context)
                     .and_then(|driving| drive_run(driving, ledger, context));
+                let swept = heavy.carry_out(&at, &site, &driven);
                 let restock = restock.owed_by(site.lease.as_ref());
-                (Flown::Model { at, site, driven }, restock)
+                (
+                    Flown::Model {
+                        at,
+                        site,
+                        driven,
+                        swept,
+                    },
+                    restock,
+                )
             }
             Staged::Harness { at, half } => {
                 let restock = Restock {
