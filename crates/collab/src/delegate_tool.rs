@@ -323,6 +323,14 @@ mod tests {
         }
     }
 
+    /// kernel D37, collab D17: a page draws a delegation as the room and
+    /// the task, which it can only do when the line says it is one.
+    #[test]
+    fn the_delegate_tool_declares_the_delegate_render_intent() {
+        let tool = DelegateTool::new(desk(Depth::Root)).unwrap();
+        assert_eq!(tool.meta().render, RenderIntent::Delegate);
+    }
+
     #[test]
     fn a_root_run_may_hand_work_down_and_is_told_where_it_will_happen() {
         let desk = desk(Depth::Root);

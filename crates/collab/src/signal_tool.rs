@@ -150,3 +150,32 @@ impl Tool for SignalTool {
         })
     }
 }
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, reason = "test code")]
+mod tests {
+    use super::*;
+    use crate::inbox::{Inbox, Mailslot};
+    use crate::signal_desk::{Post, RoomMail};
+    use kernel::{Address, RunId, TimeMs};
+
+    /// kernel D37, collab D17: a page draws a send as who it went to and
+    /// what it said, which it can only do when the line says it is one.
+    #[test]
+    fn the_signal_tool_declares_the_signal_render_intent() {
+        let desk = SignalDesk::new(
+            RunId::CITY,
+            Address::parse("lab/potter").unwrap(),
+            "potter@lab.1".to_owned(),
+            Address::parse("lab").unwrap(),
+            TimeMs::new(1_700_000_000_000),
+            RoomMail {
+                inbox: Inbox::new(64, 4),
+                slot: Mailslot::default(),
+                post: Post::new(|_| Ok(())),
+            },
+        );
+        let tool = SignalTool::new(Arc::new(Mutex::new(desk))).unwrap();
+        assert_eq!(tool.meta().render, RenderIntent::Signal);
+    }
+}

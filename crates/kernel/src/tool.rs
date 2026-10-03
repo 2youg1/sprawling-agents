@@ -209,13 +209,24 @@ pub enum CostTier {
 
 /// Presentation intent; per-call `locations` are a pure function of args
 /// (tool side). Meta-level declarations use an empty list.
+///
+/// `Signal` and `Delegate` carry nothing for the same reason: who a
+/// letter goes to and which room takes the work are per call, so a page
+/// reads them from the call's arguments (`crates/kernel/spec/Tool.lean`
+/// D37).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum RenderIntent {
     Generic,
     Terminal,
-    Diff { locations: Vec<Address> },
+    Diff {
+        locations: Vec<Address>,
+    },
+    /// Speaking to another resident, or taking what waits for this one.
+    Signal,
+    /// Handing one piece of work to another room, one level down.
+    Delegate,
 }
 
 /// The eight-field registration, none optional in spirit: `timeout: None`
