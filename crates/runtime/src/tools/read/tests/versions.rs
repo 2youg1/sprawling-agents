@@ -32,7 +32,7 @@ fn the_version_read_prints_is_the_one_edit_and_plan_finish_take() {
         dir.path(),
         work.clone(),
         kernel::WriteDomain::new(vec![work]).unwrap(),
-        kernel::WriteLimit::Full,
+        crate::PolicyCell::new(kernel::RunPolicy::of(kernel::Mode::Work)).reader(),
     )
     .unwrap();
     let edit = |base: &str| {

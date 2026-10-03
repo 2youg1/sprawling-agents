@@ -31,8 +31,10 @@ pub struct EditTool {
     /// The run's write domain. Every model-chosen path is judged against
     /// it before the filesystem is touched.
     writable: kernel::WriteDomain,
-    /// What the run may do to a file that already exists (`crates/runtime/spec/Tools.lean` §8-55).
-    limit: kernel::WriteLimit,
+    /// The run's policy cell, asked at each write for what the run may do
+    /// to a file that already exists (`crates/runtime/spec/Tools.lean`
+    /// §8-55, `crates/runtime/spec/PolicyTake.lean` §8-62).
+    policy: crate::mode::PolicyReader,
     meta: ToolMeta,
 }
 
@@ -58,7 +60,7 @@ impl EditTool {
         city_root: &Path,
         domain: kernel::Address,
         writable: kernel::WriteDomain,
-        limit: kernel::WriteLimit,
+        policy: crate::mode::PolicyReader,
     ) -> Result<EditTool, AxError> {
         let params = Payload::of(&serde_json::json!({
             "type": "object",
@@ -77,16 +79,17 @@ impl EditTool {
         Ok(EditTool {
             city_root: city_root.to_path_buf(),
             writable,
-            limit,
+            policy,
             meta: ToolMeta {
                 name: ToolName::parse(Self::NAME)?,
-                disclosure: format!(
-                    "Replace an exact string in a file, guarded by the version you last saw: \
-                     `old` must match exactly once or the call fails. A file that moved under \
-                     you is refused and not overwritten; read it again and retry. A \
-                     `base_version` of `new` creates the file.{}",
-                    limited_by(limit)
-                ),
+                // The write limit is not spelled here: it can change
+                // while the run goes, and these bytes are frozen with the
+                // tool list (§8-62); the note a change appends spells it.
+                disclosure: "Replace an exact string in a file, guarded by the version you \
+                             last saw: `old` must match exactly once or the call fails. A file \
+                             that moved under you is refused and not overwritten; read it \
+                             again and retry. A `base_version` of `new` creates the file."
+                    .to_owned(),
                 params,
                 effect: Effect::Write { domain },
                 cost_tier: CostTier::Light,
@@ -97,17 +100,6 @@ impl EditTool {
                 temporal: Temporal::Timeless,
             },
         })
-    }
-}
-
-/// What the description adds under a write limit, read before the first call.
-fn limited_by(limit: kernel::WriteLimit) -> &'static str {
-    match limit {
-        kernel::WriteLimit::Full => "",
-        kernel::WriteLimit::Create => {
-            " This run creates new files and changes none: only a `base_version` of `new` \
-             is accepted, on a path where no file stands yet."
-        }
     }
 }
 
@@ -188,7 +180,7 @@ impl Tool for EditTool {
             return self.create(rel, &path, old, new);
         }
         // Every arm below changes a file that is already there.
-        match kernel::gate::replacing(self.limit, &target) {
+        match kernel::gate::replacing(self.policy.now().write, &target) {
             kernel::GateOutcome::Allow => {}
             kernel::GateOutcome::Deny { refusal } => return Err(*refusal),
             kernel::GateOutcome::Ask { question } => return Err(*question),

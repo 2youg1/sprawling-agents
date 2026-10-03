@@ -67,11 +67,14 @@ pub struct RunPlan {
     /// knows whether the person, the city or a resident sent it.
     pub dispatched_by: kernel::event::Who,
     /// The run policy this run was dispatched under, written into
-    /// `run_started` as it was chosen (`crates/kernel/Spec.lean` §8-77). Named apart
-    /// from `policy`, which is the building's, because the two answer
-    /// different questions: what the building allows, and what this
-    /// dispatch asked for inside that.
-    pub run_policy: kernel::RunPolicy,
+    /// `run_started` as it was chosen (`crates/kernel/Spec.lean` §8-77), and
+    /// the cell that holds it while the run goes: the one value here
+    /// that changes, and only at `SafePoint::BeforeWave` (§8-62). Whoever
+    /// builds the tools builds the cell first and hands each write gate
+    /// its reader. Named apart from `policy`, which is the building's,
+    /// because the two answer different questions: what the building
+    /// allows, and what this dispatch asked for inside that.
+    pub run_policy: crate::mode::PolicyCell,
     /// The conversation this run starts from, when it is the first run of
     /// a session that branched off another. Empty for every other run.
     ///
@@ -218,8 +221,6 @@ pub struct Active {
     prompt: crate::turn::PromptRecord,
     /// Whether the next wave needs a checkpoint (§8-45).
     checkpoint: checkpoint::CheckpointPolicy,
-    /// The run policy in force, changed only at `BeforeWave` (§8-62).
-    policy: crate::mode::PolicyCell,
 }
 
 /// A frozen run. There is no method back to [`Active`]: waking an old run

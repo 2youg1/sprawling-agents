@@ -47,7 +47,7 @@ fn setup(workdir: &std::path::Path, python: Option<PathBuf>, shell: Option<PathB
         env_passthrough: Vec::new(),
         domain: Address::parse("work").unwrap(),
         run: kernel::RunId::from_bytes([1; 16]),
-        limit: kernel::WriteLimit::Full,
+        policy: crate::PolicyCell::new(kernel::RunPolicy::of(kernel::Mode::Work)).reader(),
     }
 }
 

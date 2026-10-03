@@ -186,7 +186,7 @@ fn plan() -> RunPlan {
         parent: None,
         predecessor: None,
         dispatched_by: kernel::event::Who::Person,
-        run_policy: kernel::RunPolicy::of(kernel::Mode::Work),
+        run_policy: runtime::PolicyCell::new(kernel::RunPolicy::of(kernel::Mode::Work)),
         naming: None,
         inherited: Vec::new(),
         shape: CallShape {
@@ -1315,11 +1315,12 @@ fn a_policy_changed_mid_run_gates_the_next_waves_edit() {
 ",
     )
     .unwrap();
+    let plan = plan();
     let edit = runtime::EditTool::new(
         root,
         room.clone(),
         kernel::WriteDomain::new(vec![room]).unwrap(),
-        kernel::WriteLimit::Full,
+        plan.run_policy.reader(),
     )
     .unwrap();
     let mut args = serde_json::Map::new();
@@ -1368,7 +1369,7 @@ fn a_policy_changed_mid_run_gates_the_next_waves_edit() {
         deltas: None,
     };
 
-    drive(plan(), &mut ledger, &mut model, &mut hooks, &handoff()).unwrap();
+    drive(plan, &mut ledger, &mut model, &mut hooks, &handoff()).unwrap();
 
     assert_eq!(
         std::fs::read_to_string(&kept).unwrap(),

@@ -90,7 +90,7 @@ fn plan(window: u64) -> RunPlan {
         parent: None,
         predecessor: None,
         dispatched_by: kernel::event::Who::Person,
-        run_policy: kernel::RunPolicy::of(kernel::Mode::Work),
+        run_policy: runtime::PolicyCell::new(kernel::RunPolicy::of(kernel::Mode::Work)),
         naming: None,
         inherited: Vec::new(),
         shape: CallShape {

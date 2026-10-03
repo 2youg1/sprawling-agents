@@ -67,13 +67,17 @@ impl Laying {
         // The mode a run sits in is a capability like any other: until
         // it was set here the mode's own catalog entry reached no model.
         held(&catalog, "lay out the catalog")?.set_mode(at.policy.mode);
-        // The building's domain is the ceiling and the dispatch's write
+        // The run's policy cell opens with the dispatch's policy, and the
+        // write gates read it at each write, so a change the run takes
+        // mid-way reaches them (`crates/runtime/spec/PolicyTake.lean` §8-62).
+        let policy = runtime::PolicyCell::new(at.policy);
+        // The building's domain is the ceiling and the run's write
         // limit narrows it; both are asked at every write (`crates/city/Spec.lean` §8-32).
         let edit = EditTool::new(
             &site.write_root,
             addr.clone(),
             site.rules.write_domain()?,
-            at.policy.write,
+            policy.reader(),
         )?;
         // Every tool shares one keeper, so no two of them keep two keys
         // under one name (`crates/sprawling/Spec.lean` §8-87).
@@ -198,7 +202,7 @@ impl Laying {
         // an invariant (`crates/city/Spec.lean` §8-22).
         match city::vocation_of(site.building.addr()) {
             city::Vocation::Builds => {
-                admitted.push(Box::new(self.exec_tool(site, at)?));
+                admitted.push(Box::new(self.exec_tool(site, at, policy.reader())?));
                 admitted.push(Box::new(collab::DelegateTool::new(Arc::clone(&delegates))?));
                 admitted.push(Box::new(collab::WorkshopTool::new(
                     Arc::clone(&desks.workshop),
@@ -229,6 +233,7 @@ impl Laying {
         Ok(Workbench {
             catalog,
             bench: Some(bench),
+            policy: Some(policy),
             succession,
             context,
         })
@@ -300,7 +305,12 @@ impl Laying {
     /// # Errors
     /// Propagates a build with no execution engine and whatever the
     /// tool says about its own construction.
-    fn exec_tool(&self, site: &Site, at: &Assignment) -> Result<ExecTool, AxError> {
+    fn exec_tool(
+        &self,
+        site: &Site,
+        at: &Assignment,
+        policy: runtime::PolicyReader,
+    ) -> Result<ExecTool, AxError> {
         let machine = machine_half(&site.config.sandbox, &self.exec_host)?;
         let addr = &at.addr;
         ExecTool::new(
@@ -316,9 +326,9 @@ impl Laying {
                 env_passthrough: site.config.sandbox.env_passthrough.clone(),
                 domain: addr.clone(),
                 run: site.run_id,
-                // The dispatch's write limit: under `Create` a command
-                // runs only in the copy (`crates/runtime/Spec.lean` §8-55).
-                limit: at.policy.write,
+                // The run's write limit, read at each command: under
+                // `Create` a command runs only in the copy (`crates/runtime/Spec.lean` §8-55).
+                policy,
             },
             machine.engine,
             self.backlog.clone(),

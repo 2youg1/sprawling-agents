@@ -23,11 +23,14 @@ impl PolicyCell {
 }
 pub struct PolicyReader { /* 同一个格 —— 私有 */ }
 impl PolicyReader { pub fn now(&self) -> kernel::RunPolicy; }  // 每次写时问一次
+// runtime::run
+pub struct RunPlan { /* … */ pub run_policy: PolicyCell, /* … */ }  // 开头的策略写进 run_started；驱动循环在 BeforeWave 取用
 // runtime::turn::boundary
 pub enum Interrupt { None, Cancel, Steer { source: String, text: String },
                      Policy { policy: kernel::RunPolicy } }  // 一条 run_policy_changed 到了这个 run 的房间
 ```
 
+- **格由造工具的一方造**：accounting 的 workbench 在造工具之前用 `PolicyCell::new(at.policy)` 造格，把 `reader()` 交给 `EditTool::new` 与 `ExecSetup.policy`，格本身随 `RunPlan.run_policy` 交给 run；`run_started.policy` 读的是格在开头时的值。格不 `Clone`：写方只有 run 的驱动循环一个。
 - **改动从哪来**：人经 `Command::ChangeRunPolicy` 让城写一行 `run_policy_changed`（`crates/kernel/Spec.lean` D21）；记账线程把这一行投进那个房间正在跑的 run 的 `Mailslot`，与 steer 同一扇门（`crates/sprawling/Spec.lean` §8-133）。run 在任一安全点都可能读到它，但只在 `SafePoint::BeforeWave` 取用：取之前到的那几条，最后一条算数，其余被它盖过。
 - **取用做三件事，次序固定**：把格里的策略换成新的；在本回合要发给模型的下一段消息（这一波的工具结果之后）末尾追加一句说明——新的 mode、写的限制、落地方式，用词取自 `kernel::RunPolicy` 的渲染；从这一波的第一次调用起，写门按新策略判。
 - **冻结的前缀一个字节不动**：`ChatRequest.tools` 从会话开始就是各 mode 常驻核心的并集（§8-60），`edit` 与 `exec` 的工具说明不带写限制的那一句（写限制只出现在追加的说明里），Resident 段的 mode 行写的是 run 开始时的 mode。所以换策略只在窗口末尾加字节，provider 的前缀缓存不失效。

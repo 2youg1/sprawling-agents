@@ -190,6 +190,11 @@ pub(super) struct Workbench {
     /// gives its adapter - because a drive owns everything it runs on
     /// and may leave this thread with it (`crates/sprawling/Spec.lean` §8-46-1).
     bench: Option<ToolBench>,
+    /// The run's policy cell, until the plan takes it: built here,
+    /// before the tools, because `edit` and `exec` hold its reader and
+    /// the run's driver is its one writer (`crates/runtime/spec/PolicyTake.lean`
+    /// §8-62). `Option` for the reason `bench` is one.
+    policy: Option<runtime::PolicyCell>,
     /// Whether this run asked to be replaced, read when it concludes.
     pub(super) succession: std::sync::Arc<std::sync::Mutex<runtime::SuccessionDesk>>,
     /// Where the run records the provider's count, which `status` reads.
@@ -243,6 +248,21 @@ impl Workbench {
                 "this workbench has already been driven",
             )
             .with_recovery("report this: one dispatch lays out one bench and drives it once")
+        })
+    }
+
+    /// Hands the run's policy cell to the plan, once.
+    ///
+    /// # Errors
+    /// Refuses a second ask, as [`Workbench::take_bench`] does.
+    pub(super) fn take_policy(&mut self) -> Result<runtime::PolicyCell, AxError> {
+        self.policy.take().ok_or_else(|| {
+            AxError::failure(
+                AxCode::ConfigInvalid,
+                "carry the run policy into the plan",
+                "this workbench's policy cell was already taken",
+            )
+            .with_recovery("report this: one dispatch freezes one plan")
         })
     }
 }

@@ -52,7 +52,7 @@ const ENV_ALLOWLIST: [&str; 4] = ["PATH", "LANG", "LC_ALL", "TZ"];
 /// Values that always travel together and are never chosen apart: read
 /// out of one frozen configuration, one machine and one dispatch, they
 /// reach this tool as one thing rather than as a parameter list nobody
-/// can call correctly from memory. `limit` is the dispatch's (8-55).
+/// can call correctly from memory. `policy` is the run's cell (§8-55, §8-62).
 pub struct ExecSetup {
     pub workdir: PathBuf,
     pub mounts: Vec<Mount>,
@@ -66,7 +66,9 @@ pub struct ExecSetup {
     /// The run this tool serves: a command it hands to the background
     /// is owed to this run, and its output reaches no other.
     pub run: RunId,
-    pub limit: kernel::WriteLimit,
+    /// The run's policy cell, asked at each host placement for the
+    /// write limit in force.
+    pub policy: crate::mode::PolicyReader,
 }
 
 pub struct ExecTool {
@@ -122,14 +124,14 @@ impl ExecTool {
         // The arm and what it does not hold are in front of the caller,
         // because a tool that said only "sandboxed" would let a command
         // that needs a closed network be launched in a box whose network
-        // is open.
+        // is open. The write limit is not: it can change while the run
+        // goes, and the note a change appends spells it (§8-62).
         let disclosure = format!(
             "Run a program, a Python snippet, or a shell line. A program or shell \
              line runs in this machine's confinement, {}. Ask for `where: host` to \
              run one outside it. Use `read` and `search` for what is already written here; a \
-             command that prints it comes back without the version `edit` guards on.{}",
-            confinement.statement(),
-            Placement::told_under(setup.limit)
+             command that prints it comes back without the version `edit` guards on.",
+            confinement.statement()
         );
         Ok(ExecTool {
             setup,

@@ -89,7 +89,7 @@ fn a_building_that_declares_the_names_can_build_a_rust_program() {
         env_passthrough: declared,
         domain: Address::parse("lab").unwrap(),
         run,
-        limit: kernel::WriteLimit::Full,
+        policy: runtime::PolicyCell::new(kernel::RunPolicy::of(kernel::Mode::Work)).reader(),
     };
     // The table is shared, so this handle reaches what the tool started:
     // whatever settles after the short window is collected here rather

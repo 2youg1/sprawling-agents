@@ -266,7 +266,7 @@ impl Freezing<'_> {
     pub(super) fn freeze_plan(
         mut self,
         site: &Site,
-        workbench: &Workbench,
+        workbench: &mut Workbench,
         at: &Assignment,
         given: Given,
     ) -> Result<(RunPlan, runtime::handoff::Handoff), AxError> {
@@ -319,7 +319,7 @@ impl Freezing<'_> {
             parent: at.parent,
             predecessor: at.predecessor(),
             dispatched_by: at.dispatched_by.clone(),
-            run_policy: at.policy,
+            run_policy: workbench.take_policy()?,
             inherited: std::mem::take(&mut self.inherited),
             shape: runtime::turn::CallShape {
                 model: site.model.id.clone(),

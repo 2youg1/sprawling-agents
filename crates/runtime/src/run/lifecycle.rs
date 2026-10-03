@@ -44,9 +44,9 @@ fn hold_policy(cell: &mut PolicyCell, interrupt: &Interrupt) {
 /// What a safe point hands the driver: a steer joins the window, a policy
 /// change waits in the cell. One door for both, so no safe point can
 /// forget either.
-fn fold_arrival(state: &mut Active, interrupt: &Interrupt) {
+fn fold_arrival(state: &mut Active, policy: &mut PolicyCell, interrupt: &Interrupt) {
     fold_steer(&mut state.conversation, interrupt);
-    hold_policy(&mut state.policy, interrupt);
+    hold_policy(policy, interrupt);
 }
 
 /// How a turn that called no tool ends the run.
@@ -95,7 +95,6 @@ impl Run<Active> {
             kernel::Tokens::new(plan.shape.context_tokens),
             plan.second_threshold,
         );
-        let policy = PolicyCell::new(plan.run_policy);
         Ok(Run {
             plan,
             state: Active {
@@ -106,7 +105,6 @@ impl Run<Active> {
                 prior_shape: None,
                 prompt: crate::turn::PromptRecord::default(),
                 checkpoint: CheckpointPolicy::opening(),
-                policy,
             },
         })
     }
@@ -131,7 +129,7 @@ impl Run<Active> {
         let turn = Turn::begin(self.plan.run, self.plan.who.clone(), t, &mut *hooks.now)
             .timed(&mut *hooks.monotonic_us);
         let opening = (hooks.interrupt)(SafePoint::BeforeAssemble { turn: index });
-        fold_arrival(&mut self.state, &opening);
+        fold_arrival(&mut self.state, &mut self.plan.run_policy, &opening);
         let mut turn = match turn.assemble(
             opening,
             ledger,
@@ -180,7 +178,7 @@ impl Run<Active> {
         // the wire, and a steer that arrived before the call joins the
         // next request, whatever the call answered.
         self.state.conversation.mark_sent();
-        fold_arrival(&mut self.state, &calling);
+        fold_arrival(&mut self.state, &mut self.plan.run_policy, &calling);
         let mut turn = match called? {
             PhaseOutcome::Advanced(next) => next,
             PhaseOutcome::Cancelled(_) => return Ok(Advance::Concluded(Completion::Cancelled)),
@@ -206,10 +204,10 @@ impl Run<Active> {
         self.state.checkpoint.record_wave(decided, touches);
 
         let wave = (hooks.interrupt)(SafePoint::BeforeWave { turn: index });
-        fold_arrival(&mut self.state, &wave);
+        fold_arrival(&mut self.state, &mut self.plan.run_policy, &wave);
         // The one place the policy in force changes: every call of the
         // wave below is judged under what the cell holds now.
-        let taken = self.state.policy.take_at_wave();
+        let taken = self.plan.run_policy.take_at_wave();
         // The same question the three phase boundaries ask, asked again
         // before each call of the wave. A cancel ends the wave there; a
         // steer is recorded by the turn and folded into the window, and
@@ -218,9 +216,10 @@ impl Run<Active> {
         // instruction that can be carried out between two calls.
         let asking = &mut hooks.interrupt;
         let state = &mut self.state;
+        let cell = &mut self.plan.run_policy;
         let mut still_going = |call: u32| {
             let arrived = asking(SafePoint::BeforeToolCall { turn: index, call });
-            fold_arrival(state, &arrived);
+            fold_arrival(state, cell, &arrived);
             arrived
         };
         let turn =
@@ -230,7 +229,7 @@ impl Run<Active> {
             };
 
         let settling = (hooks.interrupt)(SafePoint::BeforeSpawn { turn: index });
-        fold_arrival(&mut self.state, &settling);
+        fold_arrival(&mut self.state, &mut self.plan.run_policy, &settling);
         let report = match turn.record(settling, ledger)? {
             PhaseOutcome::Advanced(report) => report,
             PhaseOutcome::Cancelled(_) => return Ok(Advance::Concluded(Completion::Cancelled)),

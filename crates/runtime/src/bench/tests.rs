@@ -26,7 +26,7 @@ fn bench(root: &std::path::Path) -> ToolBench {
                 root,
                 Address::parse("work").unwrap(),
                 domain,
-                kernel::WriteLimit::Full,
+                crate::PolicyCell::new(kernel::RunPolicy::of(kernel::Mode::Work)).reader(),
             )
             .unwrap(),
         ))
@@ -98,7 +98,7 @@ fn a_write_outside_the_domain_flows_back_as_a_refusal_not_a_dead_turn() {
                 tmp.path(),
                 Address::parse("elsewhere").unwrap(),
                 elsewhere,
-                kernel::WriteLimit::Full,
+                crate::PolicyCell::new(kernel::RunPolicy::of(kernel::Mode::Work)).reader(),
             )
             .unwrap(),
         ))
@@ -145,7 +145,8 @@ fn a_suspected_discard_without_a_net_is_refused_and_with_one_is_checkpointed() {
                     env_passthrough: Vec::new(),
                     domain: Address::parse("work").unwrap(),
                     run: RunId::from_bytes([1u8; 16]),
-                    limit: kernel::WriteLimit::Full,
+                    policy: crate::PolicyCell::new(kernel::RunPolicy::of(kernel::Mode::Work))
+                        .reader(),
                 },
                 Box::new(EchoSandbox::new()),
                 crate::Backlog::new(),
@@ -223,7 +224,7 @@ fn a_second_tool_claiming_a_taken_name_is_refused() {
             tmp.path(),
             Address::parse("work").unwrap(),
             WriteDomain::new(vec![Address::parse("work").unwrap()]).unwrap(),
-            kernel::WriteLimit::Full,
+            crate::PolicyCell::new(kernel::RunPolicy::of(kernel::Mode::Work)).reader(),
         )
         .unwrap(),
     )) {
@@ -262,7 +263,7 @@ fn a_documents_bench_lets_its_own_room_through_the_door() {
                 tmp.path(),
                 Address::parse("hall/mayor").unwrap(),
                 domain,
-                kernel::WriteLimit::Full,
+                crate::PolicyCell::new(kernel::RunPolicy::of(kernel::Mode::Work)).reader(),
             )
             .unwrap(),
         ))
@@ -304,7 +305,8 @@ fn exec_bench(root: &std::path::Path) -> ToolBench {
                     env_passthrough: Vec::new(),
                     domain: Address::parse("work").unwrap(),
                     run: RunId::from_bytes([1u8; 16]),
-                    limit: kernel::WriteLimit::Full,
+                    policy: crate::PolicyCell::new(kernel::RunPolicy::of(kernel::Mode::Work))
+                        .reader(),
                 },
                 Box::new(EchoSandbox::new()),
                 crate::Backlog::new(),

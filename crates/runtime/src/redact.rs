@@ -331,7 +331,13 @@ mod phases {
         let work = Address::parse("work").unwrap();
         let domain = kernel::WriteDomain::new(vec![work.clone()]).unwrap();
         std::fs::create_dir_all(city.path().join("work")).unwrap();
-        let tool = EditTool::new(city.path(), work, domain, kernel::WriteLimit::Full).unwrap();
+        let tool = EditTool::new(
+            city.path(),
+            work,
+            domain,
+            crate::PolicyCell::new(kernel::RunPolicy::of(kernel::Mode::Work)).reader(),
+        )
+        .unwrap();
         let text = history_text();
         let edit = |path: &str, base: &str, old: &str, new: &str| {
             call(
@@ -374,7 +380,7 @@ mod phases {
             env_passthrough: Vec::new(),
             domain: Address::parse("work").unwrap(),
             run: kernel::RunId::from_bytes([1; 16]),
-            limit: kernel::WriteLimit::Full,
+            policy: crate::PolicyCell::new(kernel::RunPolicy::of(kernel::Mode::Work)).reader(),
         };
         let patient = Backlog::with_window(PollBudget::new(6_000, 20));
         let tool = ExecTool::new(setup, Box::new(EchoSandbox::new()), patient).unwrap();

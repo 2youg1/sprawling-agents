@@ -68,7 +68,7 @@ impl RunPlan {
             predecessor: self.predecessor,
             dispatched_by: &self.dispatched_by,
             skills: &self.skills,
-            policy: self.run_policy,
+            policy: self.run_policy.reader().now(),
             naming: self.naming,
             opening: Some(self.opening),
             effort: self.shape.effort,

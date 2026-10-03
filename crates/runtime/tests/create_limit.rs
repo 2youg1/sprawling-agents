@@ -53,7 +53,11 @@ fn an_existing_file_is_unchanged_under_create_by_edit_exec_and_link() {
         root,
         work.clone(),
         kernel::WriteDomain::new(vec![work.clone()]).unwrap(),
-        kernel::WriteLimit::Create,
+        runtime::PolicyCell::new(kernel::RunPolicy {
+            write: kernel::WriteLimit::Create,
+            ..kernel::RunPolicy::of(kernel::Mode::Work)
+        })
+        .reader(),
     )
     .unwrap();
     let seen = runtime::version_of(b"the person's own\n");
@@ -88,7 +92,11 @@ fn an_existing_file_is_unchanged_under_create_by_edit_exec_and_link() {
             env_passthrough: Vec::new(),
             domain: work,
             run: kernel::RunId::from_bytes([1; 16]),
-            limit: kernel::WriteLimit::Create,
+            policy: runtime::PolicyCell::new(kernel::RunPolicy {
+                write: kernel::WriteLimit::Create,
+                ..kernel::RunPolicy::of(kernel::Mode::Work)
+            })
+            .reader(),
         },
         Box::new(runtime::EchoSandbox::new()),
         runtime::Backlog::with_window(runtime::PollBudget::new(6_000, 20)),

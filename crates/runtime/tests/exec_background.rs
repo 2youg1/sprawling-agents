@@ -40,7 +40,7 @@ fn a_run_at(backlog: &Backlog, building: &str, run: u8, workdir: &std::path::Pat
         env_passthrough: Vec::new(),
         domain: Address::parse(building).unwrap(),
         run: RunId::from_bytes([run; 16]),
-        limit: kernel::WriteLimit::Full,
+        policy: runtime::PolicyCell::new(kernel::RunPolicy::of(kernel::Mode::Work)).reader(),
     };
     ExecTool::new(setup, Box::new(EchoSandbox::new()), backlog.clone()).unwrap()
 }

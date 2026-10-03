@@ -298,7 +298,7 @@ impl LaneHalf {
                 inherited,
                 carried_from,
             }
-            .freeze_plan(site, &workbench, at, given)?
+            .freeze_plan(site, &mut workbench, at, given)?
         };
         if let Some(handed) = at.succession.as_ref() {
             site.probe_after(

@@ -364,7 +364,7 @@ fn s3_14_one_resident_closes_the_loop_through_the_real_adapters() {
                 city.path(),
                 Address::parse("sim/lobby/room1").unwrap(),
                 domain,
-                kernel::WriteLimit::Full,
+                runtime::PolicyCell::new(kernel::RunPolicy::of(kernel::Mode::Work)).reader(),
             )
             .unwrap(),
         ))

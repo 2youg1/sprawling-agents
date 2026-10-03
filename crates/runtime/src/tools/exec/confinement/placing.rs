@@ -71,23 +71,12 @@ impl Placement {
     pub fn opened_by(self, setup: &crate::tools::ExecSetup) -> Result<Placement, AxError> {
         match self {
             Placement::Sandbox => Ok(self),
-            Placement::Host => match kernel::gate::replacing(setup.limit, &setup.domain) {
-                kernel::GateOutcome::Allow => Ok(self),
-                kernel::GateOutcome::Deny { refusal } => Err(*refusal),
-                kernel::GateOutcome::Ask { question } => Err(*question),
-            },
-        }
-    }
-
-    /// What the exec tool's description adds under a write limit, so
-    /// the model reads the limit before its first call rather than at
-    /// its first refusal.
-    pub fn told_under(limit: kernel::WriteLimit) -> &'static str {
-        match limit {
-            kernel::WriteLimit::Full => "",
-            kernel::WriteLimit::Create => {
-                " This run creates files and changes none, so `where: host` is refused; \
-                 what a command writes stays in the copy."
+            Placement::Host => {
+                match kernel::gate::replacing(setup.policy.now().write, &setup.domain) {
+                    kernel::GateOutcome::Allow => Ok(self),
+                    kernel::GateOutcome::Deny { refusal } => Err(*refusal),
+                    kernel::GateOutcome::Ask { question } => Err(*question),
+                }
             }
         }
     }

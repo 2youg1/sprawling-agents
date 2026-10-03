@@ -10,7 +10,13 @@ fn tool(root: &Path) -> EditTool {
     let work = Address::parse("work").unwrap();
     let domain = kernel::WriteDomain::new(vec![work.clone()]).unwrap();
     std::fs::create_dir_all(root.join("work")).unwrap();
-    EditTool::new(root, work, domain, kernel::WriteLimit::Full).unwrap()
+    EditTool::new(
+        root,
+        work,
+        domain,
+        crate::PolicyCell::new(kernel::RunPolicy::of(kernel::Mode::Work)).reader(),
+    )
+    .unwrap()
 }
 
 fn call(path: &str, base: &str, old: &str, new: &str) -> ToolCall {
@@ -224,7 +230,7 @@ fn a_documents_tool_writes_markdown_and_refuses_code_by_name() {
         tmp.path(),
         Address::parse("hall/mayor").unwrap(),
         domain,
-        kernel::WriteLimit::Full,
+        crate::PolicyCell::new(kernel::RunPolicy::of(kernel::Mode::Work)).reader(),
     )
     .unwrap();
     tool.invoke(&call(
