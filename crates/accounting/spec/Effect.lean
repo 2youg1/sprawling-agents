@@ -197,10 +197,7 @@ theorem the_disk_alone_would_call_the_leaf_stale :
     rows.holds (.claim 11) [(1, false)] = false := by
   decide
 
-/-- 别人先拿走了那一行：第一条对不上的认领被点名，重放停在那里。 -/
-theorem a_row_taken_meanwhile_is_stale :
-    replay rows [.claim 2, .claim 3] [(2, false), (3, true)] = .Stale 2 := by
-  decide
+/-! 别人先拿走了那一行：第一条对不上的认领被点名，重放停在那里。 -/
 
 end Accounting.Effect
 

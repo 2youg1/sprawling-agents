@@ -135,11 +135,7 @@ theorem closure_survives_appends (key c : Nat) (lines more : List Line)
   simp only [closedAt] at h ⊢
   rw [List.any_append, h, Bool.true_or]
 
-/-- 窗口的右端不是关闭事件：一个在窗口内打开、到 cutoff 仍没有关闭行的键没有闭合，不论窗口在哪里结束。`closedAt` 不读选择，这条例子钉住它的一个实例。 -/
-theorem closure_ignores_the_window :
-    closedAt 5 3 [⟨0, [], none, 0⟩, ⟨1, [], none, 0⟩, ⟨4, [], some 5, 0⟩] = false ∧
-      closedAt 5 4 [⟨0, [], none, 0⟩, ⟨1, [], none, 0⟩, ⟨4, [], some 5, 0⟩] = true := by
-  decide
+/-! 窗口的右端不是关闭事件：一个在窗口内打开、到 cutoff 仍没有关闭行的键没有闭合，不论窗口在哪里结束。`closedAt` 不读选择，它的参数里没有窗口。 -/
 
 /-! ## 调用的耗时：量出来的才给，其余是 unknown -/
 

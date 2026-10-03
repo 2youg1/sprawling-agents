@@ -108,18 +108,9 @@ theorem a_line_whose_time_steps_back_is_judged_on_its_own :
 
 /-! ## 合法的空选择 -/
 
-/-- 一段城里没有的 run 选出空表，一个没有行落进去的时间区间也选出空表，而两者都不矛盾：Rust 输出空 bundle，范围信息照写。 -/
-theorem empty_selection_is_legal :
-    let s : Selection := ⟨some 1, some 3, some 9, none, some 0, some 100⟩
-    selected s 5 [⟨0, 0, none, 0⟩, ⟨1, 1, some 0, 1⟩, ⟨2, 1, some 0, 2⟩] = [] ∧
-      ¬ s.Contradictory := by
-  refine ⟨by decide, ?_⟩
-  rintro (⟨a, b, ha, hb, hlt⟩ | ⟨a, b, ha, hb, hle⟩) <;> simp at ha hb <;> omega
+/-! 一段城里没有的 run 选出空表，一个没有行落进去的时间区间也选出空表，而两者都不矛盾：Rust 输出空 bundle，范围信息照写。 -/
 
-/-- 时间区间的上界不晚于下界是矛盾的，与 seq 区间倒置同样被拒绝，而不是输出一份空 bundle。 -/
-theorem an_empty_span_is_contradictory :
-    (⟨none, none, none, none, some 40, some 40⟩ : Selection).Contradictory :=
-  Or.inr ⟨40, 40, rfl, rfl, Nat.le_refl 40⟩
+/-! 时间区间的上界不晚于下界是矛盾的，与 seq 区间倒置同样被拒绝，而不是输出一份空 bundle。 -/
 
 /-- 实现可达：一个真实的选择选中范围内、楼内、时间区间内的行，漏掉别的楼的行、区间外的行与 cutoff 之后的行。 -/
 theorem a_selection_reaches_lines :

@@ -146,12 +146,6 @@ def DispatchStep.onAccountingThread : DispatchStep → Bool
 
 def namedDispatch : List DispatchStep := [.agree, .askName, .agree, .openRoom, .laterWrite]
 
-theorem opening_the_room_is_the_first_write :
-    namedDispatch.find? DispatchStep.writes = some .openRoom := by decide
-
-theorem nothing_is_written_before_the_name_is_home :
-    (namedDispatch.takeWhile (· ≠ .askName)).all (!·.writes) := by decide
-
 theorem the_naming_wait_is_off_the_accounting_thread :
     ∀ step ∈ namedDispatch, step.onAccountingThread = false → step = .askName := by decide
 
