@@ -115,6 +115,48 @@ mod tests {
     fn tracked() -> Restoration {
         Restoration::Tracked(Locator::parse(&format!("file:b/x.md@{}", "ab".repeat(20))).unwrap())
     }
+    /// A planned discard reads back the paths, the plan, the provenance and
+    /// the size it was made with, which is what the door and the ledger
+    /// line are built from.
+    #[test]
+    fn a_planned_discard_reads_back_what_it_was_made_with() {
+        let paths = vec![addr("b/x.md"), addr("b/y.md")];
+        let taint = TaintSet::of(TaintSource::new("web:example.com").unwrap());
+        let made =
+            Discard::new(paths.clone(), tracked(), taint.clone(), ByteLen::new(4096)).unwrap();
+        assert_eq!(
+            (made.paths(), made.plan(), made.taint(), made.total_bytes()),
+            (paths.as_slice(), &tracked(), &taint, ByteLen::new(4096))
+        );
+    }
+
+    /// Each of git's two discarding commands is suspected on its own, and
+    /// the same words given to another program are not git's.
+    #[test]
+    fn git_discards_by_either_command_and_only_git_does() {
+        let arm = |path: &str, args: &[&str]| ExecArm::Program {
+            path: path.into(),
+            args: args.iter().map(|arg| (*arg).to_owned()).collect(),
+        };
+        assert_eq!(
+            forecast(&arm("git", &["clean", "-fd"])),
+            DiscardForecast::Suspected {
+                pattern: "git clean -fd".to_owned()
+            }
+        );
+        assert_eq!(
+            forecast(&arm("git", &["reset", "--hard"])),
+            DiscardForecast::Suspected {
+                pattern: "git reset --hard".to_owned()
+            }
+        );
+        assert_eq!(
+            forecast(&arm("echo", &["reset", "--hard"])),
+            DiscardForecast::Clear
+        );
+        assert_eq!(forecast(&arm("echo", &["clean"])), DiscardForecast::Clear);
+    }
+
     #[test]
     fn program_forecast_reads_path_and_args_whole() {
         let rm = ExecArm::Program {

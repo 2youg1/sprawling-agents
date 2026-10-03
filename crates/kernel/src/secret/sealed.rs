@@ -52,6 +52,13 @@ impl Sealed<String> {
 )]
 mod tests {
     use super::*;
+    /// What the vault receives is the secret that was sealed, whole.
+    #[test]
+    fn the_vault_receives_the_sealed_secret() {
+        let sealed = Sealed::new(Box::new("hunter2".to_owned()));
+        assert_eq!(sealed.into_vault_value().as_str(), "hunter2");
+    }
+
     #[test]
     fn sealed_exposes_by_borrow_and_nothing_else() {
         let sealed = Sealed::new(Box::new("hunter2".to_owned()));

@@ -466,6 +466,19 @@ mod tests {
         }
     }
 
+    /// A version part of several digits reads as its number; only a part
+    /// that opens with a zero and goes on is refused.
+    #[test]
+    fn a_version_part_of_several_digits_reads_as_its_number() {
+        assert_eq!(
+            Version::from_crates_version("10.12.30")
+                .unwrap()
+                .to_string(),
+            "10.12.30"
+        );
+        assert!(Version::from_crates_version("0.012.0").is_err());
+    }
+
     /// The check that keeps one release from having two version numbers.
     #[test]
     fn a_tag_disagreeing_with_the_build_is_refused() {

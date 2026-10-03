@@ -177,9 +177,20 @@ fn an_unversioned_usage_row_reads_in_the_one_meaning() {
         "input_tokens": 10, "output_tokens": 1,
         "cache_read_tokens": 90, "cache_write_tokens": 5, "v": 1,
     });
+    // Cache parts that only reach the input count fit inside it, which
+    // is the other meaning's row: only exceeding it is evidence.
+    let all_cached_row = serde_json::json!({
+        "input_tokens": 10, "output_tokens": 1,
+        "cache_read_tokens": 6, "cache_write_tokens": 4,
+    });
     assert_eq!(
-        [read(anthropic_row), read(uncached_row), read(versioned_row)],
-        [105, 10, 10]
+        [
+            read(anthropic_row),
+            read(uncached_row),
+            read(versioned_row),
+            read(all_cached_row)
+        ],
+        [105, 10, 10, 10]
     );
 }
 

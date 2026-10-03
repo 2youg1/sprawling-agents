@@ -143,3 +143,33 @@ impl Reach {
         matches!(self.answered, Answered::Status(_))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Any status is an answer, a refusing one included; every other
+    /// last stage is a provider that did not answer at all.
+    #[test]
+    fn any_status_is_an_answer_and_nothing_else_is() {
+        let reading = |answered: Answered| Reach {
+            host: "api.example.test".to_owned(),
+            named: Named::Resolved(1),
+            connected: Connected::Open,
+            answered,
+            through: Through::Direct,
+            elapsed_ms: 40,
+        };
+        let verdicts: Vec<bool> = [
+            Answered::Status(200),
+            Answered::Status(401),
+            Answered::NameNotUsable("a_b".to_owned()),
+            Answered::HandshakeFailed("certificate".to_owned()),
+            Answered::Unreachable("timed out".to_owned()),
+        ]
+        .into_iter()
+        .map(|answered| reading(answered).answered_at_all())
+        .collect();
+        assert_eq!(verdicts, [true, true, false, false, false]);
+    }
+}

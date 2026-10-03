@@ -119,3 +119,23 @@ fn an_allowlist_is_empty_only_when_nothing_was_entered() {
     assert!(EgressAllowlist::new(Vec::new()).is_empty());
     assert!(!EgressAllowlist::new(vec!["example.com".to_owned()]).is_empty());
 }
+
+/// A refused attachment names the far end in the terms the address was
+/// classified with, never the declared address itself.
+#[test]
+fn a_refused_attachment_names_the_far_end_by_its_class() {
+    for (target, subject) in [
+        (EgressTarget::Private, "a host on the same private network"),
+        (
+            EgressTarget::Public {
+                host: "browser.example.test".to_owned(),
+            },
+            "browser.example.test",
+        ),
+    ] {
+        let GateOutcome::Deny { refusal } = attach(Some(&target)) else {
+            panic!("{target:?}: a non-loopback browser address is refused");
+        };
+        assert_eq!(refusal.subject(), subject);
+    }
+}
