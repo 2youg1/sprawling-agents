@@ -81,7 +81,7 @@ fn a_steer_from_a_resident_lands_in_the_window_as_that_resident() {
     let asked = provider.bodies().join("\n");
     assert!(
         asked.contains(r#"<letter from=\"@market/ito\""#)
-            && asked.contains("drop the glaze order</letter>"),
+            && asked.contains("drop the glaze order, the kiln comes first</letter>"),
         "the steer lands at the end of a tool result, in a letter from the resident who sent it"
     );
     assert!(
