@@ -20,6 +20,11 @@
 #             commands, so a reading against `release-<tree>` names both
 #             arms. Dispatch-only: release.yml gains nothing until a
 #             reading judges it (END-READING.md, Roadmap P2).
+#   fresh     on Windows, macOS and Linux: this tree's archive unpacked
+#             into a new directory and walked from install to the first
+#             dispatch (`just acceptance`) with the environment a new
+#             account has, then `sprawling doctor`; the checklist and
+#             logs are the artifact `fresh-<os>-<tree>` (Roadmap G2, G6)
 #
 # Ask with `gh workflow run on-demand.yml --ref <branch> -f job=<name>`;
 # `mutants` also takes `-f base=<ref>` (default `main`). An artifact is
@@ -27,7 +32,7 @@
 # a reading taken from a download names the tree it measured.
 #
 # Every job here runs on Windows, the platform a person reproduces a red
-# on, except that nothing stops a later job from naming another runner.
+# on, except `fresh`, whose question is asked of all three platforms.
 # `pgo` runs on Windows, the platform the readings belong to. The same
 # three stages run unchanged on macOS and Linux (the rustc flags and
 # `llvm-profdata` from the `llvm-tools` component are the same there,
@@ -42,7 +47,7 @@ on:
         description: which run
         required: true
         type: choice
-        options: [mutants, sim, shots, release, pgo]
+        options: [mutants, sim, shots, release, pgo, fresh]
       base:
         description: the ref `mutants` diffs against
         required: false
@@ -266,3 +271,143 @@ jobs:
             target/package/*
             target/pgo-out/*
           if-no-files-found: error
+
+  # A fresh account walks from the archive to the first dispatch (Roadmap
+  # G2, and G6 on its Windows row): the archive of this tree is built, then
+  # unpacked into a directory nothing else has written, and run with the
+  # environment a new machine has - no CARGO_HOME, no RUSTUP_HOME, and a
+  # PATH holding only the system directories and the unpacked binary's
+  # directory. `sprawling doctor` runs under exactly that environment and
+  # a home directory created empty, so its report is what a person who
+  # has installed nothing else would read. The walk (`just acceptance`)
+  # additionally has just, lake, cargo and, on Windows, Git Bash's
+  # /usr/bin on its PATH, because those run the checker and the stand-in
+  # provider, which are built before the environment narrows; the city it
+  # serves is the archive's binary and nothing from the checkout.
+  #
+  # What a hosted runner cannot show: its account is an administrator on
+  # Windows and has passwordless sudo on macOS and Linux, so "without
+  # administrator rights" (D20) is the environment here, not the account;
+  # the Windows row prints whether the account is elevated so the reading
+  # says which it was. Nor does a runner have a desktop session, so the
+  # first-run browser a person sees is not opened (the walk serves with
+  # --no-console and reads the city through the wire). The checklist and
+  # every log are uploaded on a failed run too.
+  fresh:
+    if: inputs.job == 'fresh'
+    name: fresh (${{ matrix.os }})
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: ""
+          - os: macos-latest
+            target: ""
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+    runs-on: ${{ matrix.os }}
+    # The same musl compiler release.yml's archive job names, for the same
+    # reason: the Linux archive a person downloads is the static one.
+    env:
+      CC_x86_64_unknown_linux_musl: musl-gcc
+    steps:
+      - uses: actions/checkout@v7
+      - name: install pinned toolchain
+        run: rustup show
+      - uses: ./.github/actions/zig
+      - name: the musl target and a C compiler that targets musl
+        if: matrix.target == 'x86_64-unknown-linux-musl'
+        run: |
+          set -euo pipefail
+          rustup target add x86_64-unknown-linux-musl
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends musl-tools
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: fresh
+          key: ${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+          save-if: false
+      - uses: ./.github/actions/client-artifacts
+      - uses: ./.github/actions/lean
+      - id: tree
+        shell: bash
+        run: echo "sha=$(git rev-parse 'HEAD^{tree}')" >> "$GITHUB_OUTPUT"
+      - name: the archive a person downloads
+        shell: bash
+        run: just package "${{ matrix.target }}"
+      - name: the checker and the stand-in, built before the environment narrows
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo build --package citysim --bin provider --locked
+          lake build Sprawling acceptance
+      - name: unpack the archive into a directory nothing else has written
+        id: fresh
+        shell: bash
+        run: |
+          set -euo pipefail
+          fresh="$RUNNER_TEMP/fresh"
+          rm -rf "$fresh"
+          mkdir -p "$fresh/unpacked" "$fresh/home" "$fresh/logs"
+          archive="$(ls "$PWD"/target/package/*.zip)"
+          test "$(echo "$archive" | wc -l)" -eq 1
+          unzip -q "$archive" -d "$fresh/unpacked"
+          binary="$(find "$fresh/unpacked" -type f \( -name sprawling.exe -o -name sprawling \) | head -n 1)"
+          test -n "$binary"
+          case "$RUNNER_OS" in
+            Windows) system="/c/Windows/System32:/c/Windows:/c/Windows/System32/Wbem:/c/Windows/System32/WindowsPowerShell/v1.0" ;;
+            macOS) system="/usr/bin:/bin:/usr/sbin:/sbin" ;;
+            Linux) system="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" ;;
+          esac
+          {
+            echo "dir=$fresh"
+            echo "archive=$archive"
+            echo "binary=$binary"
+            echo "path=$system:$(dirname "$binary")"
+          } >> "$GITHUB_OUTPUT"
+      - name: whether this account is an administrator
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          if net session > /dev/null 2>&1; then elevated=yes; else elevated=no; fi
+          echo "the account running this row is elevated: $elevated" | tee "${{ steps.fresh.outputs.dir }}/logs/elevation.txt"
+      - name: sprawling doctor with nothing else installed
+        shell: bash
+        run: |
+          set -uo pipefail
+          home="${{ steps.fresh.outputs.dir }}/home"
+          ! command -v cygpath > /dev/null 2>&1 || home="$(cygpath -w "$home")"
+          env -u CARGO_HOME -u RUSTUP_HOME HOME="$home" USERPROFILE="$home" \
+            PATH="${{ steps.fresh.outputs.path }}" \
+            "${{ steps.fresh.outputs.binary }}" doctor --no-color \
+            > "${{ steps.fresh.outputs.dir }}/logs/doctor.out" 2> "${{ steps.fresh.outputs.dir }}/logs/doctor.err"
+          status=$?
+          cat "${{ steps.fresh.outputs.dir }}/logs/doctor.out" "${{ steps.fresh.outputs.dir }}/logs/doctor.err"
+          echo "doctor exited $status" | tee "${{ steps.fresh.outputs.dir }}/logs/doctor.exit"
+          # A missing develop tool is the report's subject on this PATH, so
+          # the exit code is recorded rather than judged; a report that says
+          # nothing is the failure.
+          test -s "${{ steps.fresh.outputs.dir }}/logs/doctor.out"
+      - name: the walk from the archive to the first dispatch
+        shell: bash
+        run: |
+          set -euo pipefail
+          tools=""
+          for tool in just lake cargo unzip; do tools="$tools:$(dirname "$(command -v "$tool")")"; done
+          walk="${{ steps.fresh.outputs.path }}$tools"
+          [ "$RUNNER_OS" != Windows ] || walk="/usr/bin:$walk"
+          env -u CARGO_HOME -u RUSTUP_HOME PATH="$walk" \
+            just acceptance "${{ steps.fresh.outputs.archive }}" 2>&1 | tee "${{ steps.fresh.outputs.dir }}/logs/acceptance.log"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: fresh-${{ matrix.os }}-${{ steps.tree.outputs.sha }}
+          path: |
+            target/acceptance/checklist.md
+            target/acceptance/script.json
+            target/acceptance/record.jsonl
+            target/acceptance/provider.*
+            ${{ runner.temp }}/fresh/logs
+          if-no-files-found: warn
