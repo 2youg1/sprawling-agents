@@ -101,14 +101,14 @@ example : tagInfix witness .PreAlpha ≠ tagInfix witness .Alpha :=
 ```rust
 pub struct Version { /* major, minor, patch —— 私有 */ }   // 只有版本号、没有日期的一次发布
 impl Version { pub fn from_crates_version(text: &str) -> Result<Version, AxError>; }
-impl Release { pub fn crates_version(&self) -> String; }    // 0.0.8：工作区的 version，与 version() 同值
 pub fn stands_on_crates(mine: &Release, newest: &Version) -> ReleaseVerdict;
 ```
 
 - **crates.io 收的是裸版本号**：工作区的 `[workspace.package] version`（`0.0.8`）原样发上去，日期不在里面；同一次发布在 npm 上是 `0.0.8-pre.261002`。`from_crates_version` 只认三个点分数字，拒法与 `from_npm_version` 的版本那一半是同一套（`assemble` 的前半），所以两种读法不会一个收、一个拒。
 - **只比版本号**：`stands_on_crates` 按 `mine` 的版本号对 `newest` 判，日期不参与。拿注册表的裸 `0.0.8` 去和自己的 npm 拼法 `0.0.8-pre.261002` 按 semver 比，会把同一次发布读成「注册表更新」；下面的 `a_bare_version_outranks_its_own_npm_spelling` 说这个陷阱对每一次发布都成立，所以两种拼法之间永远不直接比。
 - **预发布的「更新」**：在 npm 上，版本号相同、日期更晚的那一次更新，因为日期落在 pre-release 段、按数值比；在 crates.io 上，同一版本号只能发一次，日期更晚的重切发不上去，所以 crates.io 对同一版本号恒答 `Current`。这对用 cargo 装的人是真话：`cargo install sprawling --locked` 本来就取不到一次只改了日期的重切。
-- **平台**：只读字符串，Windows、macOS、Linux 一致；向 crates.io 的那一次 HTTPS GET（带 User-Agent）归调用方（口径 4）。
+- **拼回去**：crates.io 的拼法就是 `Release::version()`（`0.0.8`），不另设一个返回同值的函数；`Version` 不在 kernel 根上导出，因为根上的 `kernel::Version` 是另一个概念，调用方写 `kernel::release::Version`。
+- **平台**：只读字符串，Windows、macOS、Linux 一致；向 crates.io 的那一次 HTTPS GET（带 User-Agent）归调用方（口径 4），与问 npm 用同一个 reqwest 客户端。打印的更新命令随安装方式（npm、cargo、压缩包、源码）而变，不随平台变。
 - **W6 的派生检查**（`crates/kernel/src/release.rs` 的测试）：proptest 在 `0..=9` 的三个版本数与合法日期上抽两次发布 `a`、`b`，断言：版本号不同时 `stands_on_crates(a, &b_version)` 与 `stands(a, b)` 相等；版本号相同时前者是 `Current`；把两次发布的 `npm_version()` 按 semver 第 11 条（测试里手写的标识比较）排出的次序与 `Release` 的 `Ord` 相同。坏的变体：`stands_on_crates` 把 `newest` 补成日期为零的 `Release` 再交给 `stands`，版本号相同的每一对都红成 `Ahead`。
 -/
 
