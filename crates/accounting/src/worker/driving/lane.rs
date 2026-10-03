@@ -154,8 +154,8 @@ impl Interrupting {
         }
         match self.person.as_ref().map(|ask| ask(self.run_id)) {
             Some(Interrupt::Cancel) => true,
-            Some(steer @ Interrupt::Steer { .. }) => {
-                self.held = Some(steer);
+            Some(held @ (Interrupt::Steer { .. } | Interrupt::Policy { .. })) => {
+                self.held = Some(held);
                 false
             }
             Some(Interrupt::None) | None => false,
