@@ -16,7 +16,7 @@ name = "wire"
 # The listener. Off for the crates that need this crate's vocabulary and
 # not a TCP stack (accounting, xtask, fuzz).
 default = ["server"]
-server = ["dep:tokio", "dep:axum"]
+server = ["dep:tokio", "dep:axum", "dep:futures-util"]
 # The JSON Schema of the whole envelope, which `cargo xtask wire-ts` turns
 # into the TypeScript client's types (`crates/wire/spec/Frames.lean` §8-16). Off
 # for the product binary: it does not ask what its frames look like, and
@@ -32,9 +32,13 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true, optional = true }
 axum = { workspace = true, features = ["ws"], optional = true }
+# `feed` and `flush` on the socket, so a frame of records is flushed once
+# (`crates/wire/spec/Server/Socket.lean` §8-47h).
+futures-util = { workspace = true, optional = true }
 schemars = { workspace = true, optional = true }
 
 [dev-dependencies]
+proptest = { workspace = true }
 trybuild = { workspace = true }
 tower = { workspace = true }
 

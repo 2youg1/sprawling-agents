@@ -3039,6 +3039,8 @@ name = "sprawling-wire"
 version = "0.0.9"
 dependencies = [
  "axum",
+ "futures-util",
+ "proptest",
  "schemars",
  "serde",
  "serde_json",
