@@ -181,7 +181,7 @@ pub fn ask(city_root: &Path, query: &wire::Query) -> Result<wire::Answer, AxErro
 
 **两道保险各管一个对手，理由写在各自的位置**：同一个进程里两条 lane 之间，由各自的 index 隔开；`storage::checkpoint::scan::write_index` 的等待管**城的那一份 index 上的另一个进程**——人自己的 git，或误开在同一座城上的另一个 sprawling——那是任何进程内的机制都看不见的对手。
 
-**被否：保留 `checkpoint_gate`（一个仓一次检查点）。** 锁的宽度只是一次检查点（stage＋commit＋读回），可它是全城的：测试城里一个 run 独占这把锁时，写入波前的检查点 p50 18 ms、最大 64 ms，N 条 lane 同时有写入波时，排在最后的一条要多等 N−1 次检查点：并发的 run 越多，写入波在锁上等得越久。
+**被否：保留一把全城的检查点锁（一个仓一次检查点）。** 锁的宽度只是一次检查点（stage＋commit＋读回），可它是全城的：测试城里一个 run 独占这把锁时，写入波前的检查点 p50 18 ms、最大 64 ms，N 条 lane 同时有写入波时，排在最后的一条要多等 N−1 次检查点：并发的 run 越多，写入波在锁上等得越久。
 
 **一个 run 的写者句柄。** `driving::lane::drive_run` 为这个 run 开一个写者句柄，驾驶结束后 `close_writer`；bench 的检查点网（`workbench::Laying::open_checkpoint`）是同一个 run 的第二个句柄，在同一条 lane、同一个线程上，与 lane 的句柄共用这个 run 的 index 文件，两者从不同时暂存；harness run 的提交开它自己的写者句柄，提交后关掉。整个进程里没有一把护检查点的锁，N 个 run 同时有写入波时检查点的等锁时间为 0。
 

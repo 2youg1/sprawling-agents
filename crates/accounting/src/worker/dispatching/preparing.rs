@@ -256,7 +256,6 @@ impl LaneHalf {
                 city_root: &laying.city_root,
                 city: laying.city,
                 clock,
-                checkpoint_gate: &laying.checkpoint_gate,
             },
             &mut Stamping {
                 ledger,

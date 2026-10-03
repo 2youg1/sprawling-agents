@@ -41,22 +41,6 @@ pub(crate) struct DriveContext {
     /// What is still running while the runs go on, so a halt on a scope
     /// reaches a run inside it.
     pub backlog: runtime::Backlog,
-    /// One checkpoint at a time per city.
-    ///
-    /// **A repository has one index, and a checkpoint stages and commits it.**
-    /// Two nodes of one ready set drive at once by design
-    /// (`crate::worker::plans::pursuing`), so their checkpoints can overlap, and
-    /// libgit2's `.git/index.lock` refuses the second one: a run that lost
-    /// that race ended as cancelled and its node was handed back as
-    /// though its own done check had failed. The gate is the width of the
-    /// act, not of the run - a lane waits out the few milliseconds
-    /// another lane's commit takes, and nothing else about two runs is
-    /// serialized.
-    ///
-    /// `storage::checkpoint::scan::write_index` still waits out a lock,
-    /// and that is a different contender: another sprawling process on
-    /// the same city, which no mutex here can see.
-    pub checkpoint_gate: std::sync::Arc<std::sync::Mutex<()>>,
     /// The worker's own clock, so a run's lines and the worker's are
     /// read from one time (`crates/accounting/spec/Clock.lean` §8-3).
     pub clock: std::sync::Arc<dyn crate::Clock + Send + Sync>,
@@ -163,21 +147,6 @@ pub(super) fn scope_stopping(
     member.is_some_and(|id| backlog.stopping(id).unwrap_or(true))
 }
 
-/// A lock nobody can take, as a refusal rather than a panic.
-///
-/// The gate is held for one commit's length and by a lane that cannot
-/// panic while holding it (its own failures are values), so this arm is
-/// unreachable; inventing a panic for it would cost the whole city for a
-/// fact it can report instead.
-fn poison(what: &str) -> AxError {
-    AxError::failure(
-        kernel::AxCode::StorageFatal,
-        "take the checkpoint gate",
-        what.to_owned(),
-    )
-    .with_recovery("restart this city: a lock left by a dead thread cannot be trusted")
-}
-
 /// Runs the plan, and hands back what the drive left behind.
 ///
 /// The three hooks live here because they are the only code that
@@ -224,7 +193,6 @@ pub(crate) fn drive_run<L: Ledger>(
         watching,
         person,
         backlog,
-        checkpoint_gate,
         clock,
         monotonic,
     } = context;
@@ -239,8 +207,11 @@ pub(crate) fn drive_run<L: Ledger>(
         u64::try_from(monotonic().saturating_duration_since(origin).as_micros()).unwrap_or(u64::MAX)
     };
     let declared = bench.declared_writes();
-    let mut checkpoint_handle =
-        storage::Checkpoint::open(&write_root).map_err(storage::StorageError::into_ax)?;
+    // This run's own index: two nodes of one ready set drive at once by
+    // design, and on one shared index libgit2's `.git/index.lock` refused
+    // the second checkpoint (`crates/sprawling/spec/Accounting/Views.lean` §8-46-13).
+    let mut checkpoint_handle = storage::Checkpoint::open_writer(&write_root, run_id)
+        .map_err(storage::StorageError::into_ax)?;
     // What the wave checkpoint and the bench checkpointed, in the order they went
     // up, so the sweep afterwards knows which commit a deleted file can
     // be restored from; and what the calls since the last checkpoint said they
@@ -277,11 +248,6 @@ pub(crate) fn drive_run<L: Ledger>(
         let mut placing = Placing::new(bench, sieving, run_id, &checkpointing)
             .resolving(std::sync::Arc::clone(&workbench.catalog));
         let mut checkpoint = |t: TimeMs| {
-            // Held for the whole of `wave_pre`: staging, committing and
-            // reading back are one act over one index.
-            let _one_at_a_time = checkpoint_gate
-                .lock()
-                .map_err(|_| poison("this city's checkpoint gate"))?;
             let scope = checkpointing.take_scope(&checkpoint_scope);
             let payload = checkpoint_handle
                 .wave_pre(&scope, t, &of)
@@ -321,6 +287,11 @@ pub(crate) fn drive_run<L: Ledger>(
         let driven = drive(plan, ledger, &mut adapter, &mut hooks, &handoff);
         (driven, placing.ran())
     };
+    // The run writes nothing more here. A crash that skips this leaves the
+    // index for `Checkpoint::sweep_writers` when the city next opens.
+    checkpoint_handle
+        .close_writer()
+        .map_err(storage::StorageError::into_ax)?;
     Ok(Driven {
         outcome: driven,
         adapter,

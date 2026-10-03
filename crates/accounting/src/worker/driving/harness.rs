@@ -24,7 +24,7 @@ use kernel::{Address, AxError, Completion, Ledger, Locator, Payload, RunId, Time
 use runtime::run::{Charter, Conclusion, HarnessRun};
 
 use super::lane::DriveContext;
-use crate::worker::workbench::{Lending, Placing, held, lend_tree, tree_scope};
+use crate::worker::workbench::{Lending, Placing, lend_tree, tree_scope};
 use crate::worker::{Stamping, recording::Notes};
 
 mod turn;
@@ -232,7 +232,6 @@ fn drive_turn<L: Ledger>(
             city_root: &half.city_root,
             city: half.city,
             clock,
-            checkpoint_gate: &context.checkpoint_gate,
         },
         &mut Stamping {
             ledger: &mut *ledger,
@@ -283,17 +282,19 @@ fn drive_turn<L: Ledger>(
     Err(failure)
 }
 
-/// Commits the tree as the harness left it, under the city's one
-/// checkpoint at a time.
+/// Commits the tree as the harness left it, on this run's own index
+/// (`crates/sprawling/spec/Accounting/Views.lean` §8-46-13).
 fn commit(
     root: &Path,
     scope: &[String],
     of: &storage::Provenance,
     context: &DriveContext,
 ) -> Result<Payload, AxError> {
-    let _one_at_a_time = held(&context.checkpoint_gate, "take the checkpoint gate")?;
-    storage::Checkpoint::open(root)
-        .map_err(storage::StorageError::into_ax)?
+    let mut own =
+        storage::Checkpoint::open_writer(root, of.run()).map_err(storage::StorageError::into_ax)?;
+    let committed = own
         .wave_pre(scope, context.clock.now()?, of)
-        .map_err(storage::StorageError::into_ax)
+        .map_err(storage::StorageError::into_ax)?;
+    own.close_writer().map_err(storage::StorageError::into_ax)?;
+    Ok(committed)
 }

@@ -225,7 +225,6 @@ impl RunWorker {
                 .serving
                 .as_ref()
                 .map(|at| std::sync::Arc::clone(&at.interrupts)),
-            checkpoint_gate: std::sync::Arc::clone(&self.flight.checkpoint_gate),
             backlog: self.flight.backlog.clone(),
             clock: std::sync::Arc::clone(&self.clock),
             monotonic: self.monotonic,

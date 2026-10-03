@@ -100,10 +100,6 @@ pub(in crate::worker) struct Placing<'a> {
     pub(in crate::worker) city: kernel::B3Hash,
     /// What time it is, for the base commit a first placement makes.
     pub(in crate::worker) clock: &'a (dyn crate::Clock + Send + Sync),
-    /// The city's one checkpoint at a time: a first placement commits the
-    /// city's index, which every checkpoint also stages and commits
-    /// (`crates/sprawling/Spec.lean` §8-46-13).
-    pub(in crate::worker) checkpoint_gate: &'a std::sync::Mutex<()>,
 }
 
 impl Site {
@@ -201,7 +197,6 @@ pub(in crate::worker) fn lend_tree<L: kernel::Ledger>(
     placing: &Placing<'_>,
     lines: &mut Stamping<'_, L>,
 ) -> Result<storage::WorktreeLease, AxError> {
-    let turn = super::held(placing.checkpoint_gate, "take the checkpoint gate")?;
     storage::Checkpoint::open(placing.city_root)
         .map_err(storage::StorageError::into_ax)?
         .ensure_base(
@@ -210,7 +205,6 @@ pub(in crate::worker) fn lend_tree<L: kernel::Ledger>(
             lending.of,
         )
         .map_err(storage::StorageError::into_ax)?;
-    drop(turn);
     let claimed = storage::Worktrees::open(placing.city_root)
         .map_err(storage::StorageError::into_ax)?
         .claim(

@@ -59,7 +59,7 @@ impl Checkpoint {
 -/
 
 /-! D26 移动 HEAD 的两步（`ensure_base`、`land`）在每一座城上都经同一进程里的一把只护 HEAD 的锁（`opening::HEAD_MOVES`），不按城是否在网络盘上分两条路。
-**为什么。** 认出网络盘要问平台：Windows 是 `GetDriveTypeW`，macOS 与 Linux 是 `statfs` 的文件系统类型，三者都只有 `unsafe` 的 FFI 或一个新依赖，标准库没有安全接口（AGENTS.md 平台调用的次序）。这把锁护的两步一个 run 至多各走一次，从不在写入波的路上：检查点（`wave_pre`）不取它，所以它不是被拆掉的那把全城的锁。本地盘上它多余而无害，网络盘上它是同一进程里唯一的保证。
+**为什么。** 认出网络盘要问平台：Windows 是 `GetDriveTypeW`，macOS 与 Linux 是 `statfs` 的文件系统类型，三者都只有 `unsafe` 的 FFI 或一个新依赖，标准库没有安全接口（AGENTS.md 平台调用的次序）。这把锁护的两步一个 run 至多各走一次，从不在写入波的路上：检查点（`wave_pre`）不取它，`ensure_base` 只在城还没有提交时取它，所以它不是被拆掉的那把全城的锁。它罩住这两步的暂存，不只罩提交：`ensure_base` 暂存的是城的那一份 index，四个线程同时在一座没有提交的城上 `ensure_base` 时，Windows 上分别报出 index 被锁、`index.lock` 改名失败与 `write_tree` 找不到对象，`write_index` 的等待挡不住同一进程里的两个句柄改写同一个 index 文件。
 **被否：按盘的种类分路。** 多一个平台调用，少一把几乎不被争用的锁。
 **重开参数。** 移动 HEAD 的步骤进了写入波，或标准库有了认出网络盘的安全接口。
 -/

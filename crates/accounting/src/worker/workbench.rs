@@ -49,8 +49,6 @@ pub(in crate::worker) struct Laying {
     desktop_program: super::DesktopProgram,
     exec_host: super::hands::ExecHost,
     backlog: runtime::Backlog,
-    /// The city's one checkpoint at a time (`driving::lane::DriveContext`).
-    pub(in crate::worker) checkpoint_gate: std::sync::Arc<std::sync::Mutex<()>>,
     /// The store the lanes share (`RunWorker::lane_store`).
     pub(in crate::worker) store: std::sync::Arc<std::sync::Mutex<storage::Cas>>,
     pub(in crate::worker) notes: super::recording::Notes,
@@ -78,20 +76,19 @@ impl Laying {
         self.notes.write(level, self.staged_at, module, message);
     }
 
-    /// Opens the checkpoint a run's writes are checkpointed in.
-    ///
-    /// The first open in a city creates its repository, and two lanes
-    /// creating one race on its config lock, so the open takes the gate
-    /// a checkpoint takes (`crates/sprawling/Spec.lean` §8-46-13).
+    /// Opens the bench's checkpoint net on `writer`'s own index. The
+    /// repository was made when the city opened, so no lane creates one
+    /// or writes its configuration (`crates/sprawling/spec/Accounting/Views.lean` §8-46-13).
     ///
     /// # Errors
-    /// Propagates a gate a dead thread left, and a repository that will
-    /// not open.
-    fn open_checkpoint(&self, root: &std::path::Path) -> Result<storage::Checkpoint, AxError> {
-        let turn = held(&self.checkpoint_gate, "take the checkpoint gate")?;
-        let opened = storage::Checkpoint::open(root).map_err(storage::StorageError::into_ax);
-        drop(turn);
-        opened
+    /// Propagates a repository that will not open and an index that cannot
+    /// be seeded.
+    fn open_checkpoint(
+        &self,
+        root: &std::path::Path,
+        writer: kernel::RunId,
+    ) -> Result<storage::Checkpoint, AxError> {
+        storage::Checkpoint::open_writer(root, writer).map_err(storage::StorageError::into_ax)
     }
 }
 
@@ -111,7 +108,6 @@ impl super::RunWorker {
             desktop_program: self.desktop_program,
             exec_host: self.exec_host,
             backlog: self.flight.backlog.clone(),
-            checkpoint_gate: std::sync::Arc::clone(&self.flight.checkpoint_gate),
             store: std::sync::Arc::clone(&self.lane_store),
             notes: self.log.clone(),
             monotonic: self.monotonic,

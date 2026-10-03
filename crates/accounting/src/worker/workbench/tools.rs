@@ -161,11 +161,12 @@ impl Laying {
         // one call is what keeps them that way.
         let domain = site.rules.write_domain()?;
         let scope: Vec<String> = domain.prefixes().map(|p| p.as_str().to_owned()).collect();
+        let of = site.provenance(self.city, addr);
         let mut bench = ToolBench::new(domain)
             .with_checkpoint(runtime::bench::CheckpointNet {
-                checkpoint: self.open_checkpoint(&site.write_root)?,
+                checkpoint: self.open_checkpoint(&site.write_root, of.run())?,
                 scope,
-                of: site.provenance(self.city, addr),
+                of,
             })
             .for_job(addr.clone(), job_locator.clone());
         *bench.taint_mut() = at.taint.clone();

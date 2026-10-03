@@ -63,9 +63,6 @@ pub(in crate::worker) struct Flight {
     /// arrival order. Kept rather than re-queued, so arrival order is
     /// landing order.
     homes: VecDeque<Arrival>,
-    /// One checkpoint at a time per city: a repository has one index, and
-    /// every lane stages and commits it (`driving::lane`).
-    pub(in crate::worker) checkpoint_gate: std::sync::Arc<std::sync::Mutex<()>>,
     /// What is still running while the runs go on. One table per city,
     /// and every `exec` gets a handle onto it, so `halt` reaches a
     /// command without knowing which tool started it.
@@ -82,7 +79,6 @@ impl Flight {
             gate,
             driving: BTreeMap::new(),
             homes: VecDeque::new(),
-            checkpoint_gate: std::sync::Arc::new(std::sync::Mutex::new(())),
             backlog: runtime::Backlog::new(),
         }
     }
