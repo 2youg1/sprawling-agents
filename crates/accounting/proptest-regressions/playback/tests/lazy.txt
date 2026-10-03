@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 0a1da0043049409aa933d4e857dc545d18aad4232b1614d8614a7c9074117a74 # shrinks to (steps, selection) = ([(2, ModelCalled, 2, true), (2, ModelReturned, 1, false), (1, ToolCalled, 1, false), (2, ToolResult, 2, true), (1, ModelCalled, 1, false), (1, ModelReturned, 0, false), (2, ModelReturned, 2, true), (1, ToolCalled, 1, true)], Selection { first: Some(Seq(5)), last: Some(Seq(9)), run: Some(RunId(0198f6a2-7c4a-7bbb-9d1e-000000000002)), building: None, span: UtcSpan { since: None, until: None } })

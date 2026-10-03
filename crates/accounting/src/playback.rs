@@ -21,7 +21,7 @@ use kernel::layout::CityLayout;
 use kernel::{AxCode, AxError, Seq};
 
 use document::{CutoffLine, Decimal, Document, Source};
-use project::Projection;
+use project::{Projection, Scanning};
 use reader::Readership;
 
 mod check;
@@ -94,8 +94,8 @@ pub struct Request {
 /// a pinned cutoff; a payload the projection must read and cannot; a
 /// bundle over [`BUNDLE_MAX_BYTES`]. No partial bundle is ever returned.
 pub fn export(city_root: &Path, request: &Request) -> Result<Bundle, AxError> {
-    match project(city_root, request)? {
-        Projected::Whole(document) => encode::encode(&document),
+    match project(city_root, request, Scanning::Lazy)? {
+        Projected::Whole { document, .. } => encode::encode(&document),
         Projected::EndsAt(reached) => Err(AxError::failure(
             AxCode::InvalidArgs,
             "export a playback bundle",
@@ -110,16 +110,24 @@ pub fn export(city_root: &Path, request: &Request) -> Result<Bundle, AxError> {
 
 /// What one projection reached.
 enum Projected {
-    Whole(Box<Document>),
+    /// The whole document, and how many lines the projection scanned for
+    /// credentials on the way.
+    Whole { document: Box<Document>, scans: u64 },
     /// The ledger ended before the pinned cutoff, at this seq.
     EndsAt(Option<Seq>),
 }
 
-fn project(city_root: &Path, request: &Request) -> Result<Projected, AxError> {
+/// The projection `request` asks of the city at `city_root`, scanning
+/// for credentials as `scanning` says.
+fn project(
+    city_root: &Path,
+    request: &Request,
+    scanning: Scanning,
+) -> Result<Projected, AxError> {
     let ledger = CityLayout::new(city_root).ledger();
     let city = storage::Provenance::city_of(&ledger).map_err(storage::StorageError::into_ax)?;
     let readership = Readership::new(city_root, request.reader.clone());
-    let mut projection = Projection::new(&request.selection, readership, city_root);
+    let mut projection = Projection::new(&request.selection, readership, city_root, scanning);
     let walked = walk::walk(&ledger, request.cutoff, |raw, walked| {
         projection.apply(raw, walked)
     })?;
@@ -142,7 +150,10 @@ fn project(city_root: &Path, request: &Request) -> Result<Projected, AxError> {
     };
     projection
         .finish(source, &walked.index)
-        .map(|document| Projected::Whole(Box::new(document)))
+        .map(|(document, scans)| Projected::Whole {
+            document: Box::new(document),
+            scans,
+        })
 }
 
 #[cfg(test)]

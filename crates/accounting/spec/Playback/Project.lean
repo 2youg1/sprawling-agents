@@ -10,7 +10,7 @@
 
 **读界。** 一行碰到的每一栋楼都由读者判一次，答案复用 `kernel::ReadVerdict` 的三臂：`Open`、`Confidential`、`RulesUnreadable`。只有碰到的楼全是 `Open` 的行可见；另外两臂一律关闭，所以规则读不了不会朝宽的一侧失败。一行「碰到」哪些楼，Rust 从信封地址、它所在 run 的房间、它关闭的那一对的打开行、以及载荷里以已知楼开头的地址求出；本模型把这个集合当作行的一个字段。
 
-**凭据扫描。** Rust 里碰到的楼全是 `Open` 的行，还要过 `kernel::secret::scan`：扫出凭据的行同样隐去，只记一条 `credential` 计数（`playback::project` 的 `Fate::Credential`）。这一条读的是行的内容，而前几节的 `readable` 只读 `touches`，所以 `hidden_content_never_reaches_the_bundle` 说的是「关闭的楼」这一半；凭据那一半在末节「导出的懒扫描」里：扫描是一个函数，一行的三种命运 `Fate` 都在模型里，范围内带凭据的行记作 `Credential`（`a_credential_line_is_withheld`），懒扫描与全扫描交出的命运逐条相同（`lazy_scan_equals_full_scan`）。「什么像凭据」的权威是 `kernel::secret::scan`。
+**凭据扫描。** Rust 里碰到的楼全是 `Open`、且命运会被某张表读到的行，还要过 `kernel::secret::scan`：扫出凭据的行同样隐去，只记一条 `credential` 计数（`playback::project` 的 `Fate::Credential`）。这一条读的是行的内容，而前几节的 `readable` 只读 `touches`，所以 `hidden_content_never_reaches_the_bundle` 说的是「关闭的楼」这一半；凭据那一半在末节「导出的懒扫描」里：扫描是一个函数，一行的三种命运 `Fate` 都在模型里，范围内带凭据的行记作 `Credential`（`a_credential_line_is_withheld`），懒扫描与全扫描交出的命运逐条相同（`lazy_scan_equals_full_scan`）。「什么像凭据」的权威是 `kernel::secret::scan`。
 
 **派生表只读可见行。** 事件表、run 表、关键时刻、消息、费用与 checkpoint 表都是 `derive` 在可见行上的值；被隐去的行只留下条数（以及 Rust 里列明的楼名与种类计数，这些是明示的元数据披露）。`hidden_content_never_reaches_the_bundle` 陈述的是：把被隐去的行改成任何别的内容（只要它仍被隐去、seq 不变），bundle 一字不变——所以被隐去的内容没有任何一条路流进 bundle。
 
@@ -208,15 +208,15 @@ theorem evidence_ignores_lines_after_the_cutoff {α : Type} (fold : List Line �
 
 /-! ## 导出的懒扫描：范围外的行只在有人要它的命运时才扫（D47）
 
-`playback::project::apply` 今天对每一条碰到的楼全是 `Open` 的行跑 `kernel::secret::scan`，范围内外都扫，因为一行的命运（`Fate`：`Shown`、`Closed`、`Credential`）不止决定它自己进不进 bundle，还流进三处：`remember()`（可见的 `run_started` 给出 run 的 policy；不可见的 `tool_called` 记进 `hidden_calls`，一个提交的 trace 可能点它的名），`links.note` 的配对（一对的另一端是否可见，决定 bundle 写 `Withheld` 还是 `Outside`，以及调用的名字与耗时），以及范围外但配了对的行进 `context`。40 万行的城上，导出于是不论选几行都付约 25 s 的全史扫描（`crates/accounting/Spec.lean` §8-25 的读数）。
+全扫描对每一条碰到的楼全是 `Open` 的行跑 `kernel::secret::scan`，范围内外都扫，因为一行的命运（`Fate`：`Shown`、`Closed`、`Credential`）不止决定它自己进不进 bundle，还流进三处：`remember()`（可见的 `run_started` 给出 run 的 policy；不可见的 `tool_called` 记进 `hidden_calls`，一个提交的 trace 可能点它的名），`links.note` 的配对（一对的另一端是否可见，决定 bundle 写 `Withheld` 还是 `Outside`，以及调用的名字与耗时），以及范围外但配了对的行进 `context`。40 万行的城上，全扫描的导出于是不论选几行都付约 25 s 的全史扫描（`crates/accounting/Spec.lean` §8-25 的读数）。
 
-**D47：懒扫描。** 范围外、楼全 `Open` 的行先只记下它在段文件里的位置，不扫；只有三种情况才读回它的字节去扫：它在范围内；它的种类要 `remember()`（`run_started`、`tool_called`）；有一条范围内的行与它同属一个配对键（同一次调用、同一个关键时刻、同一封信），不论那条范围内的行在它之前还是之后。楼不全 `Open` 的行不必扫：它的命运已是 `Closed`。本节证明，对任意历史、任意扫描函数，懒扫描交出的三样东西——范围内每行的命运（也就是 bundle 的 events、withheld 的楼与 credential 计数）、`remember()` 读到的命运、配对两端的命运——与全扫描逐条相同（`lazy_scan_equals_full_scan`），而且懒扫描从不读一条它没选去扫的行（`lazy_scan_reads_only_scanned`），扫的行数不多于全扫描（`lazy_scans_no_more`）。
+**D47：懒扫描。** 范围外、楼全 `Open` 的行先不扫，它的命运记作待定（`links::Visibility::Deferred`）；只有三种情况才扫它的字节：它在范围内；它的种类有一张表不经配对就读它的命运（`remember()` 读的 `run_started`、`tool_called`，以及 `Links::related` 读的 run 的打开行 `run_started`、`run_forked`——一个 run 指向的父 run 或前任 run 可能在范围内没有一行，它的打开行仍要判可见性），这三种在 `apply` 里当场扫；有一条范围内的行与它同属一个配对键（同一次调用、同一个关键时刻、同一封信），不论那条范围内的行在它之前还是之后。楼不全 `Open` 的行不必扫：它的命运已是 `Closed`。本节证明，对任意历史、任意扫描函数，懒扫描交出的三样东西——范围内每行的命运（也就是 bundle 的 events、withheld 的楼与 credential 计数）、`remember()` 读到的命运、配对两端的命运——与全扫描逐条相同（`lazy_scan_equals_full_scan`），而且懒扫描从不读一条它没选去扫的行（`lazy_scan_reads_only_scanned`），扫的行数不多于全扫描（`lazy_scans_no_more`）。
 
-本模型把「这一行与哪一行配对」压成一个键（`Line.key`），一行最多一个；Rust 里一行可以碰到几个键（`links::Touch`），这时只要其中一个键有范围内的成员就得扫，模型的论证逐键照搬。次序不在模型里：配对键是全史上的关系，而 Rust 是按 seq 单遍走的，所以范围外的行先于与它配对的范围内行出现时，Rust 要在后者到来时按记下的位置读回前者去扫，并补上 `links.note` 当时因为不知道可见性而没有写的字段（`asked` 的名字与时刻、信的发信人）——这是实现要守的，派生检查专门造这种次序。
+本模型把「这一行与哪一行配对」压成一个键（`Line.key`），一行最多一个；Rust 里一行可以碰到几个键（`links::Touch`），这时只要其中一个键有范围内的成员就得扫，模型的论证逐键照搬。次序不在模型里：配对键是全史上的关系，而 Rust 是按 seq 单遍走的，所以 Rust 不在走的途中判配对，而在 `finish` 里、任何一张表读之前判：`links.note` 对待定的一端照「可见」写下 `asked` 的名字与时刻、信的发信人、调用的耗时，`Links::resolve` 再对每个有范围内可见成员的键，把它待定的打开端与关闭端扫掉——字节取自 `candidates` 里已经留着的那一份，没有就经 `storage::LineReader::line_at` 按段内偏移读回——扫出凭据的一端改记 `Hidden`，并抹掉它带来的名字、发信人与耗时。于是范围外的行不论先于还是后于与它配对的范围内行出现，交出的都与全扫描相同；派生检查专门造这两种次序。
 
 落选：给扫描器提速而照旧全扫（例如 `hex_run::is_labelled_hex_secret` 把字段名判定提前到熵计算之前）——它同样要做，却只把 25 s 按常数缩小，小选择仍付全史的代价；直接跳过范围外的行——一条配了对的范围外凭据行会被当作 `Shown`，它的调用名字与耗时漏进 bundle，见 `forgetting_a_pairing_leaks`。重新打开的参数：一条行的命运开始取决于它与范围内行配对之外的关系（例如 policy 要读范围外每条 `run_policy_changed`），那时那种关系要加进 `scanned`。三个平台相同：模型只用 seq 与段内偏移（整数），读回一行是 `storage` 的按偏移读，在 Windows、macOS、Linux 上同一个接口。
 
-**派生检查的规格（待实现，`accounting::playback::tests`）。** proptest 生成历史：每行随机取种类（`tool_called`、`tool_result`、`run_started`、其他）、配对键（三个里取一个或没有）、碰到的楼是否全 `Open`、载荷里是否带一个凭据形状的值；再随机取一个 seq 区间作选择。用今天的全扫描实现（在 `#[cfg(test)]` 里保留为参照）与懒扫描各导出一次，比较整份 `Document` 相等；另数懒扫描调了几次 `kernel::secret::scan`，不多于全扫描。生成器必须覆盖「范围外的凭据行先于与它配对的范围内行」这一种次序。H10 的那条：范围内一条带凭据的行被隐去、`withheld.credential = "1"`，是 `a_credential_line_is_withheld` 的 Rust 版，作为一条固定向量。**必须变红的坏实现**：`forgetfulScanned`，只扫范围内与要 `remember()` 的行、忘了配对——上面的整份比较在 `forgetting_a_pairing_leaks` 那段历史上变红。 -/
+**派生检查（`accounting::playback::tests::lazy`）。** proptest 生成历史：每行随机取种类（`tool_called`、`tool_result`、`run_started`、其他）、配对键（三个里取一个或没有）、碰到的楼是否全 `Open`、载荷里是否带一个凭据形状的值；再随机取一个 seq 区间作选择。用全扫描实现（`project::Scanning::Full`，只在 `#[cfg(test)]` 里存在，作参照）与懒扫描各导出一次，比较整份 bundle 的字节相等；另数懒扫描调了几次 `kernel::secret::scan`，不多于全扫描。生成器必须覆盖「范围外的凭据行先于与它配对的范围内行」这一种次序。H10 的那条：范围内一条带凭据的行被隐去、`withheld.credential = "1"`，是 `a_credential_line_is_withheld` 的 Rust 版，作为一条固定向量。**必须变红的坏实现**：`forgetfulScanned`，只扫范围内与要 `remember()` 的行、忘了配对——上面的整份比较在 `forgetting_a_pairing_leaks` 那段历史上变红。 -/
 
 /-- 懒扫描模型里的一行：seq、在不在选择里、碰到的楼是否全 `Open`（`readable`）、配对键、种类是否要 `remember()`。凭据扫描是行之外的一个函数（`kernel::secret::scan` 读行的字节），所以「读没读一行」是「调没调这个函数」。 -/
 structure Scanned where

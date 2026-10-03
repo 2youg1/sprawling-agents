@@ -2845,6 +2845,7 @@ dependencies = [
  "git2",
  "html5ever",
  "postcard",
+ "proptest",
  "serde",
  "serde_json",
  "sprawling-agent-protocols",

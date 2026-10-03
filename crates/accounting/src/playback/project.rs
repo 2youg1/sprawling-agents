@@ -58,6 +58,21 @@ pub(super) struct Projection<'selection> {
     /// The `tool_called` lines the reader may not see, which a commit's
     /// trace may name.
     hidden_calls: BTreeSet<Seq>,
+    scanning: Scanning,
+    /// How many times this projection ran `kernel::secret::scan`.
+    scans: u64,
+}
+
+/// Which lines the projection runs the credential scan on
+/// (`crates/accounting/spec/Playback/Project.lean`, D47).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum Scanning {
+    /// Every line whose buildings all read `Open`: the reference the lazy
+    /// scan is compared against.
+    #[cfg(test)]
+    Full,
+    /// Only the lines whose fate some table reads.
+    Lazy,
 }
 
 /// What becomes of one line: shown, closed by a building, or withheld
@@ -82,6 +97,7 @@ impl<'selection> Projection<'selection> {
         selection: &'selection Selection,
         readership: Readership,
         city_root: &Path,
+        scanning: Scanning,
     ) -> Self {
         Projection {
             selection,
@@ -99,6 +115,8 @@ impl<'selection> Projection<'selection> {
             evidence: Evidence::new(city_root),
             policies: BTreeMap::new(),
             hidden_calls: BTreeSet::new(),
+            scanning,
+            scans: 0,
         }
     }
 
@@ -125,14 +143,15 @@ impl<'selection> Projection<'selection> {
         let mut touched = self.links.inherited(&touches);
         touched.extend(room.iter().cloned());
         self.named_in_payload(&record, &mut touched);
+        let in_range = self.selection.admits(&record);
         let fate = match self.readership.sight(&touched) {
             Sight::Closed(building, reason) => Fate::Closed(building, reason),
-            Sight::Open if kernel::secret::scan(raw).is_empty() => Fate::Shown,
-            Sight::Open => Fate::Credential,
+            Sight::Open if self.scans_now(&record, in_range) => self.scan(raw),
+            Sight::Open => Fate::Shown,
         };
         let seen = Seen {
             visible: fate == Fate::Shown,
-            in_range: self.selection.admits(&record),
+            in_range,
         };
         self.remember(&record, seen.visible)?;
         let pairs_something = touches.iter().any(|touch| touch.role != Role::Member);
@@ -164,8 +183,37 @@ impl<'selection> Projection<'selection> {
         Ok(())
     }
 
-    /// The document, with `source` as the caller built it; a commit's
-    /// lines are read through `index`, the one the walk built.
+    /// Whether a line whose buildings all read `Open` is scanned as it
+    /// is folded: it is selected, or a table reads its fate without
+    /// pairing it to a selected line.
+    fn scans_now(&self, record: &EventRecord, in_range: bool) -> bool {
+        match self.scanning {
+            #[cfg(test)]
+            Scanning::Full => true,
+            Scanning::Lazy => {
+                in_range
+                    || matches!(
+                        record.kind(),
+                        EventKind::RunStarted | EventKind::RunForked | EventKind::ToolCalled
+                    )
+            }
+        }
+    }
+
+    /// The fate of a line whose buildings all read `Open`, by the
+    /// credential scan of its bytes.
+    fn scan(&mut self, raw: &[u8]) -> Fate {
+        self.scans = self.scans.saturating_add(1);
+        if kernel::secret::scan(raw).is_empty() {
+            Fate::Shown
+        } else {
+            Fate::Credential
+        }
+    }
+
+    /// The document, with `source` as the caller built it, and how many
+    /// lines the projection scanned for credentials; a commit's lines
+    /// are read through `index`, the one the walk built.
     ///
     /// # Errors
     /// A run's count of unanswered questions past what the bundle writes.
@@ -173,7 +221,7 @@ impl<'selection> Projection<'selection> {
         mut self,
         source: Source,
         index: &LedgerIndex,
-    ) -> Result<Document, AxError> {
+    ) -> Result<(Document, u64), AxError> {
         self.attach_evidence(index);
         let mut outside = BTreeSet::new();
         let moments = self.links.moments(&mut outside);
@@ -192,7 +240,7 @@ impl<'selection> Projection<'selection> {
             .map(|line| run_row(&line, &self.links, self.policies.get(&line.run).copied()))
             .collect::<Result<Vec<_>, _>>()?;
         let report = self.attribution.report();
-        Ok(Document {
+        let document = Document {
             schema: super::SCHEMA.to_owned(),
             source,
             events: self.events,
@@ -235,7 +283,8 @@ impl<'selection> Projection<'selection> {
                     .collect(),
                 credential: Decimal(self.withheld.credential),
             },
-        })
+        };
+        Ok((document, self.scans))
     }
 
     /// A selected line the reader sees: into the events, and into every

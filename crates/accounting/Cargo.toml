@@ -47,6 +47,8 @@ cssparser = { workspace = true }
 git2 = { workspace = true }
 
 [dev-dependencies]
+# The lazy credential scan held to the full scan on random histories.
+proptest.workspace = true
 tempfile.workspace = true
 # The deterministic power-loss model, so a test above the ledger can lose
 # one named line and assert the city did not move. Kept to dev only.

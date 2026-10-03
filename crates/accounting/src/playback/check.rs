@@ -27,6 +27,7 @@ use super::encode::{Bundle, decode};
 use super::page::Page;
 use super::reader::Reader;
 use super::select::Selection;
+use super::project::Scanning;
 use super::{Cutoff, PROJECTION_RULES, Projected, Request, observed, offline, project};
 
 /// The city a bundle is recomputed from, and who reads it there.
@@ -305,8 +306,8 @@ fn recomputed(document: &Document, root: &Path, reader: Reader) -> Result<Recomp
         reader,
         cutoff: Cutoff::At(Seq::new(source.cutoff.seq.0)),
     };
-    Ok(match project(root, &request)? {
-        Projected::Whole(again) => match first_difference(document, &again) {
+    Ok(match project(root, &request, Scanning::Lazy)? {
+        Projected::Whole { document: again, .. } => match first_difference(document, &again) {
             None => Recomputed::Same,
             Some(section) => Recomputed::Differs(section),
         },

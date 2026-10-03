@@ -383,6 +383,7 @@ fn a_contradictory_range_is_refused_and_an_empty_one_is_a_bundle() {
 mod checking;
 mod evidence;
 mod landing;
+mod lazy;
 mod model;
 mod page;
 mod span;
