@@ -26,6 +26,7 @@
 //! npm's `latest` dist-tag is what `bunx sprawling` resolves, so asking
 //! it is asking the question a person actually has.
 
+use kernel::release::Version;
 use kernel::{AxCode, AxError, Proxying, Reach, Release};
 use wire::{InstallChannel, Registry, RegistryNewest, RegistryReading};
 use wire::{ReleaseAnswer, ReleaseLine, UpdateHint};
@@ -35,6 +36,19 @@ use wire::{ReleaseAnswer, ReleaseLine, UpdateHint};
 /// definition, because the publish step passes `--tag latest` for every
 /// release this project makes.
 const LATEST_URL: &str = "https://registry.npmjs.org/sprawling/latest";
+
+/// The crate `release.yml` publishes to crates.io, the one `cargo
+/// install sprawling` resolves.
+const CRATES_URL: &str = "https://crates.io/api/v1/crates/sprawling";
+
+/// The client both registries are asked as. crates.io refuses a request
+/// whose User-Agent does not name the program making it, and npm reads
+/// the same header without requiring it.
+const USER_AGENT: &str = concat!(
+    "sprawling/",
+    env!("CARGO_PKG_VERSION"),
+    " (https://github.com/2youg1/sprawling-agents)"
+);
 
 /// Where every archive is, whether or not npm could be reached. The one
 /// answer that is useful when this command cannot give its own.
@@ -97,7 +111,7 @@ pub fn built() -> Result<Built, AxError> {
     }
 }
 
-/// The newest release the registry offers.
+/// The newest release npm offers.
 ///
 /// # Errors
 /// When the registry cannot be reached, answers something other than a
@@ -105,33 +119,50 @@ pub fn built() -> Result<Built, AxError> {
 /// The recovery carries the staged reading, so a person behind a proxy
 /// is told where the call stopped rather than that it "failed".
 pub fn newest() -> Result<Release, AxError> {
-    let client = gateway::client_for(Proxying::ExceptLocal, LATEST_URL)
+    npm_newest(LATEST_URL)
+}
+
+/// npm's `latest` manifest at `url`, read as a release.
+fn npm_newest(url: &str) -> Result<Release, AxError> {
+    Release::from_npm_version(&manifest_field(url, &["version"])?)
+}
+
+/// The newest version crates.io offers at `url`. `max_version` is the
+/// highest version the crate carries, and every version this project
+/// uploads is a bare `x.y.z`, so it is the newest release
+/// (`crates/kernel/spec/Release.lean` §8-54-1).
+fn crates_newest(url: &str) -> Result<Version, AxError> {
+    Version::from_crates_version(&manifest_field(url, &["crate", "max_version"])?)
+}
+
+/// One string out of the JSON document at `url`, found by walking
+/// `path`. One field rather than a shape that would have to be revised
+/// whenever a registry adds another: this asks which version is newest
+/// and nothing else.
+fn manifest_field(url: &str, path: &[&str]) -> Result<String, AxError> {
+    let client = gateway::client_for(Proxying::ExceptLocal, url)
         .timeout(PATIENCE)
+        .user_agent(USER_AGENT)
         .build()
         .map_err(|err| {
             AxError::failure(AxCode::ToolUnavailable, "ask the registry", err.to_string())
                 .with_recovery("this machine refused to build an HTTP client")
         })?;
     let response = client
-        .get(LATEST_URL)
+        .get(url)
         .header("accept", "application/json")
         .send()
-        .map_err(|_| stopped(&client))?;
+        .map_err(|_| stopped(&client, url))?;
     let status = response.status();
     if !status.is_success() {
-        return Err(AxError::failure(
-            AxCode::ToolUnavailable,
-            "ask the registry",
-            LATEST_URL.to_owned(),
-        )
-        .with_recovery(format!(
-            "the registry answered {status}; the release page carries every \
+        return Err(
+            AxError::failure(AxCode::ToolUnavailable, "ask the registry", url.to_owned())
+                .with_recovery(format!(
+                    "the registry answered {status}; the release page carries every \
              archive either way: {RELEASES}"
-        )));
+                )),
+        );
     }
-    // One field out of the manifest, rather than a shape that would have
-    // to be revised whenever npm adds another: this asks which version is
-    // newest and nothing else.
     let body: serde_json::Value = response.json().map_err(|err| {
         AxError::failure(
             AxCode::ToolUnavailable,
@@ -143,25 +174,25 @@ pub fn newest() -> Result<Release, AxError> {
              a proxy that returns a login page does this",
         )
     })?;
-    let version = body
-        .get("version")
+    path.iter()
+        .try_fold(&body, |at, key| at.get(key))
         .and_then(serde_json::Value::as_str)
+        .map(str::to_owned)
         .ok_or_else(|| {
             AxError::failure(
                 AxCode::ToolUnavailable,
                 "read the registry's answer",
-                LATEST_URL.to_owned(),
+                url.to_owned(),
             )
-            .with_recovery("the manifest carried no `version`")
-        })?;
-    Release::from_npm_version(version)
+            .with_recovery(format!("the manifest carried no `{}`", path.join(".")))
+        })
 }
 
 /// Where the call stopped, as the vocabulary the endpoint page already
 /// uses. Costs a second request and only on the failure path, which is
 /// the path where "it did not work" is not an answer a person can act
 /// on.
-fn stopped(client: &reqwest::blocking::Client) -> AxError {
+fn stopped(client: &reqwest::blocking::Client, url: &str) -> AxError {
     let Reach {
         host,
         named,
@@ -169,7 +200,7 @@ fn stopped(client: &reqwest::blocking::Client) -> AxError {
         answered,
         through,
         ..
-    } = gateway::reach(client, Proxying::ExceptLocal, LATEST_URL, 0);
+    } = gateway::reach(client, Proxying::ExceptLocal, url, 0);
     AxError::failure(AxCode::ToolUnavailable, "ask the registry", host).with_recovery(format!(
         "the call stopped there: name {named:?}, socket {connected:?}, \
          request {answered:?}, through {through:?}"
@@ -182,6 +213,23 @@ fn line(release: &Release) -> ReleaseLine {
         version: release.npm_version(),
         released: release.released(),
     }
+}
+
+/// crates.io's version as a line. `released` is empty because the
+/// registry's version carries no date, and the city does not make one up
+/// (`crates/wire/spec/Answer/Release.lean`).
+fn crates_line(version: &Version) -> ReleaseLine {
+    ReleaseLine {
+        version: version.to_string(),
+        released: String::new(),
+    }
+}
+
+/// Where each registry is asked. Production asks the two public ones; a
+/// test points both at a loopback stand-in.
+struct Registries<'a> {
+    npm: &'a str,
+    crates: &'a str,
 }
 
 /// Both readings, taken and judged.
@@ -197,39 +245,70 @@ fn line(release: &Release) -> ReleaseLine {
 /// mislabelled build is reported without a request nobody can use.
 #[must_use]
 pub fn answer() -> ReleaseAnswer {
-    let mine = match built() {
-        Ok(found) => found,
-        Err(refusal) => return ReleaseAnswer::Refused { refusal },
-    };
-    let newest = match newest() {
-        Ok(found) => found,
-        Err(refusal) => return ReleaseAnswer::Refused { refusal },
-    };
+    match built() {
+        Ok(mine) => judged(
+            mine,
+            this_channel(),
+            &Registries {
+                npm: LATEST_URL,
+                crates: CRATES_URL,
+            },
+        ),
+        Err(refusal) => ReleaseAnswer::Refused { refusal },
+    }
+}
+
+/// Asks both registries and judges `mine` against the one its install
+/// channel updates from (`crates/wire/spec/Answer/Release.lean`): a binary
+/// cargo installed against crates.io, every other one against npm. When
+/// that registry cannot be read the whole answer is that refusal.
+fn judged(mine: Built, installed: InstallChannel, at: &Registries<'_>) -> ReleaseAnswer {
+    let npm = npm_newest(at.npm);
+    let crates = crates_newest(at.crates);
     let registries = vec![
         RegistryNewest {
             registry: Registry::Npm,
-            reading: RegistryReading::Read {
-                newest: line(&newest),
-            },
+            reading: reading(npm.as_ref().map(line)),
         },
         RegistryNewest {
             registry: Registry::CratesIo,
-            reading: RegistryReading::Unasked,
+            reading: reading(crates.as_ref().map(crates_line)),
         },
     ];
-    match mine {
-        Built::FromSource => ReleaseAnswer::Unreleased {
-            registries,
-            update: UpdateHint {
-                channel: InstallChannel::Source,
-                command: None,
-            },
-        },
-        Built::Released(mine) => ReleaseAnswer::Stands {
-            verdict: kernel::release::stands(&mine, &newest),
+    let mine = match mine {
+        Built::FromSource => {
+            return ReleaseAnswer::Unreleased {
+                registries,
+                update: hint(InstallChannel::Source),
+            };
+        }
+        Built::Released(mine) => mine,
+    };
+    let verdict = match installed {
+        InstallChannel::Cargo => {
+            crates.map(|newest| kernel::release::stands_on_crates(&mine, &newest))
+        }
+        InstallChannel::Npm | InstallChannel::Archive | InstallChannel::Source => {
+            npm.map(|newest| kernel::release::stands(&mine, &newest))
+        }
+    };
+    match verdict {
+        Ok(verdict) => ReleaseAnswer::Stands {
+            verdict,
             mine: line(&mine),
             registries,
-            update: hint(this_channel()),
+            update: hint(installed),
+        },
+        Err(refusal) => ReleaseAnswer::Refused { refusal },
+    }
+}
+
+/// One registry's answer as the page shows it.
+fn reading(read: Result<ReleaseLine, &AxError>) -> RegistryReading {
+    match read {
+        Ok(newest) => RegistryReading::Read { newest },
+        Err(refusal) => RegistryReading::Refused {
+            refusal: refusal.clone(),
         },
     }
 }
@@ -301,11 +380,101 @@ fn hint(channel: InstallChannel) -> UpdateHint {
     clippy::unwrap_used,
     clippy::expect_used,
     clippy::panic,
+    clippy::indexing_slicing,
+    clippy::wildcard_enum_match_arm,
     reason = "test code"
 )]
 mod tests {
-    use super::{Built, built, channel};
-    use wire::InstallChannel;
+    use super::{Built, Registries, built, channel, judged};
+    use kernel::ReleaseVerdict;
+    use std::io::{BufRead, BufReader, Write};
+    use wire::{InstallChannel, ReleaseAnswer};
+
+    /// A loopback stand-in for both registries: `/npm` answers npm's
+    /// manifest, `/crates` crates.io's, every request closes its
+    /// connection, and the User-Agent of each request is sent back to the
+    /// test.
+    fn registries(
+        npm: &'static str,
+        crates: &'static str,
+    ) -> (String, std::sync::mpsc::Receiver<String>) {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let base = format!("http://{}", listener.local_addr().unwrap());
+        let (agents, seen) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            for stream in listener.incoming() {
+                let mut stream = stream.unwrap();
+                let mut reader = BufReader::new(stream.try_clone().unwrap());
+                let mut head = Vec::new();
+                loop {
+                    let mut line = String::new();
+                    reader.read_line(&mut line).unwrap();
+                    if line.trim().is_empty() {
+                        break;
+                    }
+                    head.push(line);
+                }
+                let body = if head[0].contains("/crates") {
+                    crates
+                } else {
+                    npm
+                };
+                let agent = head
+                    .iter()
+                    .find_map(|line| {
+                        line.to_ascii_lowercase()
+                            .strip_prefix("user-agent:")
+                            .map(|it| it.trim().to_owned())
+                    })
+                    .unwrap_or_default();
+                agents.send(agent).unwrap();
+                write!(
+                    stream,
+                    "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{body}",
+                    body.len()
+                )
+                .unwrap();
+            }
+        });
+        (base, seen)
+    }
+
+    /// npm carries a re-cut of 0.0.8 with a later date, which crates.io
+    /// cannot carry: a binary cargo installed is current against the
+    /// crates.io answer of its own release, and one npm installed is told
+    /// it is behind.
+    #[test]
+    fn a_crates_answer_of_the_same_release_reads_as_current() {
+        let (base, seen) = registries(
+            r#"{"version":"0.0.8-pre.261005"}"#,
+            r#"{"crate":{"max_version":"0.0.8"}}"#,
+        );
+        let npm = format!("{base}/npm");
+        let crates = format!("{base}/crates");
+        let at = Registries {
+            npm: &npm,
+            crates: &crates,
+        };
+        let mine =
+            || Built::Released(kernel::Release::from_npm_version("0.0.8-pre.261002").unwrap());
+        let verdict = |answer: ReleaseAnswer| match answer {
+            ReleaseAnswer::Stands { verdict, .. } => verdict,
+            other => panic!("not judged: {other:?}"),
+        };
+        assert_eq!(
+            [
+                verdict(judged(mine(), InstallChannel::Cargo, &at)),
+                verdict(judged(mine(), InstallChannel::Npm, &at)),
+            ],
+            [ReleaseVerdict::Current, ReleaseVerdict::Behind]
+        );
+        let agents: Vec<String> = seen.try_iter().collect();
+        assert_eq!(agents.len(), 4);
+        assert!(
+            agents.iter().all(|agent| agent.starts_with("sprawling/")),
+            "{agents:?}"
+        );
+    }
 
     /// The four channels, read from fixture paths rather than from where
     /// this test binary happens to run. Each OS spells its paths its own
