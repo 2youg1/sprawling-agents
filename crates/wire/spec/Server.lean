@@ -100,7 +100,7 @@ pub fn bundle_routes<S: Clone + Send + Sync + 'static>(client: Arc<ClientAssets>
 
 薄壳的职责恒为三件：静态资源（前端产物，`bundle_routes`）｜WS 升级（`/ws`）｜四条 HTTP 路由（`/enroll`、`/transcribe`、`/drop`、`/acp`）。它不持业务状态，不做策略判断：`/enroll`、`/transcribe`、`/drop` 由 `decide_admission` 在门前判配对，`/acp` 在处理器里经同一个函数判，因为编辑器把令牌放在正文的一个键里而不是请求头里；送页面的两条路由不设配对，因为还没拿到配对码的浏览器也得先载入输入配对码的那张表单。
 
-**WS 路由与两条沿途缝**。升级后的会话只做三件事：先收 `Hello` 并交 `decide_handshake` 判（拒即关，不降级）；收到 `ClientFrame::Command` 交给 sink；把订阅到的 `EventRecord` 以 `ServerFrame::Event` 推给客户端。
+**WS 路由与两条沿途缝**。升级后的会话只做三件事：先收 `Hello` 并交 `decide_handshake` 判（拒即关，不降级）；收到 `ClientFrame::Command` 交给 sink；把订阅到的 `EventRecord` 以 `ServerFrame::Event` 推给客户端，醒来时已经到了的记录作为一帧写出、刷写一次（`crates/wire/spec/Server/Socket.lean` §8-47h）。
 
 ```rust
 // ServeConfig 的两项（全表见上）：

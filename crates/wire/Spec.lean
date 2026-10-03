@@ -48,6 +48,7 @@ import crates.wire.spec.Reply
 import crates.wire.spec.Server
 import crates.wire.spec.Server.Committed
 import crates.wire.spec.Server.Listener
+import crates.wire.spec.Server.Socket
 
 /-! # wire 的规格
 
@@ -55,7 +56,7 @@ import crates.wire.spec.Server.Listener
 
 本文件是 crate 的规格入口，分部在 `spec/` 下，布局见 ARCHITECTURE.md §11「Specifications in Lean」。接口一节一节写在规定它的那个模块的分部里，每一节保留它的标签 §8-n，别处引作 `crates/wire/Spec.lean §8-n`；本文件 §8 列出每个标签住在哪个分部。标签被模块图的旧锚点与别的规格里的引用锚住，所以不重排，也不补空号。「每个动词从哪里够得到」那一节保留它的标签 §19 与 §19-1 到 §19-3，住在 `spec/Command/Kind.lean`，`xtask wiring` 读它。决定写作 `D<n>`，放在它所管的声明正上方，或它所管主题的那个分部里，别处引作 `wire D<n>`；D1 到 D12 沿用这份规格在 Markdown 时 §12 的条目号，§12 末尾列出每条住在哪里。
 
-能写成定理的规则在分部里证明，Lean 模型是「必须守住哪些性质」的权威，Rust 代码是「怎样守住」的权威：握手与 `WIRE_V` 的进位（`spec/Frames.lean`）、绑定面与丢帧之后的区间（`spec/Reception.lean`）、HTTP 门的配对判定（`spec/Reception/Admission.lean`）、套接字拼不出 `PutSecret`（`spec/Command.lean`）、reach 与 class 两张表的性质（`spec/Command/Kind.lean`）、带基线的保存（`spec/Command/Step.lean`）、干预欠不欠 Handoff（`spec/Control.lean`）、携带的名字只拒空与控制字符（`spec/CarriedName.lean`）、答复反映到哪一条（`spec/Frames/Ask.lean`）。其余分部只有节注释：它们写的是线上的形状、取舍与被否的备选，由 Rust 的类型、trybuild 反例、`tests/wire_contract.rs` 的 golden 与各模块旁的测试守住（§16）。
+能写成定理的规则在分部里证明，Lean 模型是「必须守住哪些性质」的权威，Rust 代码是「怎样守住」的权威：握手与 `WIRE_V` 的进位（`spec/Frames.lean`）、绑定面与丢帧之后的区间（`spec/Reception.lean`）、HTTP 门的配对判定（`spec/Reception/Admission.lean`）、套接字拼不出 `PutSecret`（`spec/Command.lean`）、reach 与 class 两张表的性质（`spec/Command/Kind.lean`）、带基线的保存（`spec/Command/Step.lean`）、干预欠不欠 Handoff（`spec/Control.lean`）、携带的名字只拒空与控制字符（`spec/CarriedName.lean`）、答复反映到哪一条（`spec/Frames/Ask.lean`）、事件按帧写出时每条记录按 seq 次序到达且不重复、没说到的都被 `Lagged` 点名（`spec/Server/Socket.lean`）。其余分部只有节注释：它们写的是线上的形状、取舍与被否的备选，由 Rust 的类型、trybuild 反例、`tests/wire_contract.rs` 的 golden 与各模块旁的测试守住（§16）。
 -/
 
 /-! ## 1 需求分解
@@ -225,6 +226,7 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 | 8-47e | `crates/wire/spec/Answer/Config.lean` |
 | 8-47f | `crates/wire/spec/Answer/Release.lean` |
 | 8-47g | `crates/wire/spec/Frames/Monitor.lean` |
+| 8-47h | `crates/wire/spec/Server/Socket.lean` |
 | 8-48 | `crates/wire/spec/Reading.lean` |
 | 8-48b | `crates/wire/spec/Answer.lean` |
 | 8-48c | `crates/wire/spec/Command.lean` |
@@ -351,6 +353,7 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 | D33 | skill 与 MCP 的使用各从哪一行折出、按天怎么数、怎样导出 | `crates/wire/spec/Reading.lean` |
 | D34 | 停在同步 `send` 上的 run 在 `RunSummary` 上多一个 `waiting`；`wait` 是工具参数 | `crates/wire/spec/Reading.lean` |
 | D35 | `Used` 的两个缓存数在 provider 没报时缺席，页面写「未知」 | `crates/wire/spec/Reading.lean` |
+| D45 | 视图广播按帧合并只合并刷写，不改帧的形状，也不按 session 重排 | `crates/wire/spec/Server/Socket.lean` |
 -/
 
 /-! ## 13 依赖选型
@@ -394,6 +397,7 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 - 握手与 `WIRE_V`：`tests/wire_contract.rs` 的 schema 哈希 golden 与 `the_wire_shape_is_pinned_so_a_change_meets_the_version_rule`。
 - 绑定面与丢帧区间：`tests/wire_contract.rs` 的 `the_binding_face_has_exactly_one_refusing_cell`；`reception::tests` 里 `decide_lag` 与 `Stream` 的测试。
 - HTTP 门：`reception::admission` 旁的测试与 `tests/enrolment.rs`。
+- 按帧写出：`server::socket::tests` 的 proptest `framing_tells_every_record_once_in_order`，生成器覆盖 `spec/Server/Socket.lean` 的到达序列与切帧方式。
 - `PutSecret`：`tests/trybuild.rs` 的两个反例与 `put_secret_has_no_byte_form_in_either_direction`。
 - reach 与 class：`cargo xtask gates wiring` 把 `Command.reach`、`Command.verbClass` 的臂与 `enum Command`、`run_command`、`client/src`、`command_class` 逐个动词对照；Lean 侧的 `def` 漏一个构造子即编不过。
 - 带基线的保存：accounting 的 `worker::commanding::tests::saving`。

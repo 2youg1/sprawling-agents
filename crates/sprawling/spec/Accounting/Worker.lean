@@ -1193,10 +1193,11 @@ Approval Inbox，人的待答队列。
 `swept` 回家，于是 `land` 在记账线程上只把结果折成记录追加，并做改写折叠的那些步骤。切线与每一步留在哪一边的理由是
 `crates/sprawling/spec/Accounting/Landing.lean` 的 D37。三张嘴的次序与 ARCHITECTURE §13.4 一致（relay 先、再至多一个回家、
 再 desk）。模型证明 relay 请求在账本里的位置与重活多重无关、记录仍只有一个追加者与一个全局次序、run 被看见冻结时它
-落 run 的记录已在账上、视图广播按帧取走全部未发记录且正在看的 session 先走。由模型导出的 Rust 检查是
+落 run 的记录已在账上。由模型导出的 Rust 检查是
 `dispatching::preparing::tests::tp4_a_lane_keeps_the_transcript_before_its_run_comes_home`：run 回家的那一刻它的
-transcript 已经在盘上，所以记账线程的 `land` 里没有这一步。视图广播的按帧合并与「正在看的 session 先走」今天还没有
-实现：`serving::folding` 每一批折叠发一帧，服务端不知道 User 在看哪个 session；后者要一个 wire 字段，留给改得了帧的那一版。
+transcript 已经在盘上，所以记账线程的 `land` 里没有这一步。视图广播的按帧合并在每个会话的事件臂上做：醒来时已经到了的
+记录逐条成为各自的 `Event` 帧，刷写一次，模型与理由在 `crates/wire/spec/Server/Socket.lean` §8-47h（wire D45）；那里也说明
+为什么不让正在看的 session 先走：服务端不知道 User 在看哪个 session，按 session 重排又会让 `decide_lag` 发出假的 `Lagged`。
 
 ### 8-42-5 被否决的备选
 
