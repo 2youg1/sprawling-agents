@@ -162,6 +162,7 @@ pub struct SignalLanded {
 /// `one_landing_per_signal` gives every signal exactly one of them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum Landing {
     /// A run was working in the room and reads it at its next safe point.
     Delivered,

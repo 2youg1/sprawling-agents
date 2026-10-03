@@ -118,12 +118,10 @@ fn sending_of(record: &EventRecord) -> Option<(String, Sending)> {
     let handback = match collab::Handback::from_signal(&signal) {
         Ok(Some(collab::Handback::Finished(artifact))) => Some(wire::HandbackNote::Finished {
             verified_by: artifact.verified_by().to_owned(),
-            session: record.run(),
         }),
-        Ok(Some(collab::Handback::Stopped { because, .. })) => Some(wire::HandbackNote::Stopped {
-            because,
-            session: record.run(),
-        }),
+        Ok(Some(collab::Handback::Stopped { because, .. })) => {
+            Some(wire::HandbackNote::Stopped { because })
+        }
         Ok(None) | Err(_) => None,
     };
     Some((

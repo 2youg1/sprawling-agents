@@ -181,6 +181,14 @@ pub struct Call {
     /// `answered - called` in milliseconds (`crates/wire/spec/Reading.lean` D28).
     #[serde(default)]
     pub took_us: Option<u64>,
+    /// Where the letter a `send` call sent landed, paired by `SignalId`
+    /// from the `signal_landed` its delivery wrote under the sending run
+    /// (`crates/wire/spec/Reading.lean` D42, kernel D38). `None` for every
+    /// other tool, for a call whose letter is not yet delivered, and for
+    /// a Ledger written before the line existed: a page then draws what
+    /// the tool itself answered.
+    #[serde(default)]
+    pub landing: Option<kernel::event::record::Landing>,
 }
 
 /// One turn: the model was asked, and this is what came of it.

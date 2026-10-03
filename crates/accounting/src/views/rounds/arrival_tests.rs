@@ -57,6 +57,8 @@ fn a_word_from_a_person_lands_in_the_turn_it_reached() {
             by: wire::Speaker::User,
             t: TimeMs::new(2),
             handback: None,
+            kind: None,
+            session: None,
             at: Seq::new(2),
         }],
         "the User's steer says the User spoke, what, and when"
@@ -164,14 +166,16 @@ fn a_signal_pulled_from_another_session_says_who_sent_it_and_what() {
             by: wire::Speaker::Resident,
             t: TimeMs::new(9),
             handback: None,
+            kind: Some(SignalKind::Mention),
+            session: Some(RunId::from_bytes([1u8; 16])),
             at: notes[0].at(),
         }],
-        "the sender and its words, not the receiver and nothing"
+        "the sender, its words, the kind it sent and the session it sent from (wire D43)"
     );
 }
 
 /// A child session hands its work back; the parent's arrival says it
-/// finished, who verified it, and which session it was (wire D38).
+/// finished, who verified it, and which session it was (wire D38, D43).
 #[test]
 fn a_handback_says_whether_the_child_finished() {
     let child = RunId::from_bytes([3u8; 16]);
@@ -190,15 +194,22 @@ fn a_handback_says_whether_the_child_finished() {
         .unwrap();
     let notes = pulled_in_another_session(&signal, child, "lab/child");
     match notes.as_slice() {
-        [wire::Note::Arrived { from, handback, .. }] => {
+        [
+            wire::Note::Arrived {
+                from,
+                handback,
+                session,
+                ..
+            },
+        ] => {
             assert_eq!(from.as_deref(), Some("lab/child"));
             assert_eq!(
                 *handback,
                 Some(wire::HandbackNote::Finished {
                     verified_by: "city".to_owned(),
-                    session: child,
                 })
             );
+            assert_eq!(*session, Some(child), "the child's session (wire D43)");
         }
         other => panic!("one arrival on the turn, got {other:?}"),
     }

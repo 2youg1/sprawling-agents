@@ -6,6 +6,7 @@
 //! What a turn came to besides its calls (`crates/wire/spec/Reading.lean`
 //! §8-21, D36-D38).
 
+use kernel::event::record::SignalKind;
 use kernel::{Address, AxError, GitOid, RunId, Seq, TimeMs};
 use serde::{Deserialize, Serialize};
 
@@ -52,6 +53,15 @@ pub enum Note {
         /// Present when the signal is a child session handing its work
         /// back (D38).
         handback: Option<HandbackNote>,
+        /// The kind the letter was sent as, from its sending line; `None`
+        /// for a steer, which is no letter, and when the sending was not
+        /// paired (D43).
+        #[cfg_attr(feature = "schema", schemars(with = "Option<String>"))]
+        kind: Option<SignalKind>,
+        /// The session that sent the letter: the run its sending line was
+        /// written under, which for a handback is the child's. `None` in
+        /// the same cases as `kind` (D43).
+        session: Option<RunId>,
         at: Seq,
     },
     /// This turn sent with `wait` and stopped until a reply from `on`
@@ -104,13 +114,14 @@ pub enum Speaker {
 }
 
 /// How a child session's handed-back work ended, read through
-/// `collab::Handback::from_signal`, and which session it was (D38).
+/// `collab::Handback::from_signal`; which session it was is
+/// [`Note::Arrived`]'s `session` (D38, D43).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum HandbackNote {
-    Finished { verified_by: String, session: RunId },
-    Stopped { because: String, session: RunId },
+    Finished { verified_by: String },
+    Stopped { because: String },
 }
 
 /// The end of a reply wait, and when the Ledger recorded it (D37).

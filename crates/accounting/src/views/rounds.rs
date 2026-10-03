@@ -219,6 +219,7 @@ pub fn turns<'a>(records: impl IntoIterator<Item = &'a EventRecord>) -> Vec<wire
                     }),
                     exit_code: None,
                     took_us: None,
+                    landing: None,
                 };
                 let Some(turn) = folded.get_mut(turn_at) else {
                     continue;
