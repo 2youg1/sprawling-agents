@@ -49,7 +49,7 @@ impl ReplyWait {
         if let Some(deadline) = self.deadline {
             return (deadline, None);
         }
-        let deadline = TimeMs::new(u64::MAX.max(now.value()));
+        let deadline = TimeMs::new(now.value().saturating_add(PATIENCE_MS));
         self.deadline = Some(deadline);
         (
             deadline,
