@@ -495,4 +495,87 @@ theorem withoutRequeue_loses :
     c.queue 1 = [] ∧ c.held = [] ∧ c.knocks = [] := by
   decide
 
+/-!
+## 8 等待问出之后、停下之前到的回信被留着（collab D15）
+
+`send` 带 `wait` 之后，run 要到下一个 `BeforeAssemble` 才停下；同一波里更晚的安全点（`BeforeToolCall`、`BeforeSpawn`）照样把 `Mailslot` 倒进队列。下面这个模型只管一个 run 的桌子在这段窗口里怎样收信：`on` 是问出的等待在等谁，`kept` 是留给它的回信，`queue` 是借来的队列。等待问出之后，第一件来自 `on` 的信不进队列，留在等待里（`collect`）；别的照常进队列。停下时（`park`）留着的那件结束等待，被 run 拿着，按 D8 在读过它的回答落账时消费；run 先离开（`leave`），它回到队列。
+
+性质：每一件到达的信恰在 `kept` 与 `queue` 合起来的那一列里出现一次（`arrive_perm`，所以不丢、也不会既被等待拿着又被 `pull` 取走而消费两次）；留下的恰是到达次序里第一件来自 `on` 的（`kept_is_first_reply`）。模型只读到达次序，次序取自账本 seq，与平台无关。
+-/
+namespace Early
+
+structure Sig where
+  seq : Nat
+  sender : Nat
+  deriving DecidableEq, Repr
+
+structure Desk where
+  on : Option Nat
+  kept : Option Sig
+  queue : List Sig
+  deriving DecidableEq, Repr
+
+/-- 一件信从 `Mailslot` 进桌子。 -/
+def collect (d : Desk) (s : Sig) : Desk :=
+  match d.on, d.kept with
+  | some o, none => if s.sender = o then { d with kept := some s } else { d with queue := d.queue ++ [s] }
+  | _, _ => { d with queue := d.queue ++ [s] }
+
+def arrive (d : Desk) (ss : List Sig) : Desk := ss.foldl collect d
+
+/-- 桌子手里的全部：留给等待的那件，和队列。 -/
+def Desk.contents (d : Desk) : List Sig := d.kept.toList ++ d.queue
+
+/-- run 离开：留着的那件放回队列最前。 -/
+def leave (d : Desk) : List Sig := d.contents
+
+theorem collect_perm (d : Desk) (s : Sig) :
+    (collect d s).contents.Perm (d.contents ++ [s]) := by
+  unfold collect
+  cases ho : d.on with
+  | none => simp [Desk.contents, List.append_assoc]
+  | some o =>
+    cases hk : d.kept with
+    | some k => simp [Desk.contents, hk]
+    | none =>
+      by_cases hs : s.sender = o
+      · simp [Desk.contents, hs, hk]
+        exact List.perm_append_comm (l₁ := [s]) (l₂ := d.queue)
+      · simp [Desk.contents, hs, hk]
+
+theorem arrive_perm (d : Desk) (ss : List Sig) :
+    (arrive d ss).contents.Perm (d.contents ++ ss) := by
+  induction ss generalizing d with
+  | nil => simp [arrive]
+  | cons s rest ih =>
+    have h1 := ih (collect d s)
+    have h2 := (collect_perm d s).append_right rest
+    simp only [arrive, List.foldl_cons] at *
+    exact h1.trans (by simpa [List.append_assoc] using h2)
+
+/-- 留下了一件之后，后来的信都不动它。 -/
+theorem kept_stays (o : Nat) (s : Sig) (rest : List Sig) (d : Desk)
+    (hon : d.on = some o) (hk : d.kept = some s) : (rest.foldl collect d).kept = some s := by
+  induction rest generalizing d with
+  | nil => exact hk
+  | cons t more ih =>
+    simp only [List.foldl_cons]
+    apply ih
+    · unfold collect; simp [hon, hk]
+    · unfold collect; simp [hon, hk]
+
+theorem kept_is_first_reply (o : Nat) (q : List Sig) (ss : List Sig) :
+    (arrive ⟨some o, none, q⟩ ss).kept = ss.find? (·.sender = o) := by
+  induction ss generalizing q with
+  | nil => rfl
+  | cons s rest ih =>
+    by_cases hs : s.sender = o
+    · simp only [arrive, List.foldl_cons, collect, hs, if_true, List.find?_cons, decide_true]
+      exact kept_stays o s rest _ rfl rfl
+    · have := ih (q ++ [s])
+      simp only [arrive, List.foldl_cons, collect, hs, if_false, List.find?_cons] at *
+      simpa [hs] using this
+
+end Early
+
 end Collab.Delivery
