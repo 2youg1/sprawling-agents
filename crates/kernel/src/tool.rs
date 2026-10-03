@@ -187,6 +187,9 @@ pub enum Effect {
     AttachUserBrowser {
         address: Option<String>,
     },
+    /// Moves money. No tool in this build declares it; the bench refuses
+    /// it with `E_TOOL_UNAVAILABLE`, so the first tool that does meets a
+    /// door rather than a gap (`crates/runtime/spec/Tools.lean`).
     Spend,
 }
 
