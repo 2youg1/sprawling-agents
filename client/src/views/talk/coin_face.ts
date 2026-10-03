@@ -18,3 +18,20 @@ export function faceOf(words: string, running: boolean): Face {
   if (words.trim() !== "") return "send";
   return running ? "stop" : "idle";
 }
+
+// What one press of the key (Enter or Space on it, or a click) sends:
+// the words in the box, a `cancel` of the run in front of the person, or
+// nothing. The model is `pressCoin` in `client/spec/Views/Workspace.lean`,
+// where the faint send face this file calls `idle` is `send true`.
+export type Sent = "words" | "cancel" | "nothing";
+
+export function pressCoin(face: Face): Sent {
+  switch (face) {
+    case "send":
+      return "words";
+    case "idle":
+      return "words";
+    case "stop":
+      return "cancel";
+  }
+}
