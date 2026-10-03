@@ -7,6 +7,8 @@
 # accounting::views 与 accounting::lineage
 
 规定 `crates/accounting/src/views.rs` 的公开面与 `crates/accounting/src/lineage.rs`。本文件是 `crates/accounting/Spec.lean` 的一个分部；下面每一节保留它在 accounting 规格里的标签 §8-n，别处引作 `crates/accounting/Spec.lean §8-n`，决定引作 `accounting D<n>`。
+
+这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与 `accounting::views::answering::stored::tests`、`accounting::views::versions::tests`、`accounting::views::tests`等 守住。
 -/
 
 /-!

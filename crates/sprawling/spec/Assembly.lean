@@ -9,6 +9,8 @@
 规定 `crates/sprawling/src/assembly.rs` 与 `crates/sprawling/src/assembly/`：装配根，造生产的手、接上端口、起线程、开城（`bin::assembly`）；开城的次序在 `spec/Assembly/Listening.lean`，审计线程的结局在 `spec/Assembly/ChainWatch.lean`。本文件是 `crates/sprawling/Spec.lean` 的一个分部；下面每一节保留它的标签 §8-n，别处引作 `crates/sprawling/Spec.lean §8-n`，决定引作 `sprawling D<n>`。
 
 本文件是描述，不是被证明的规格：它不含 Lean 定义与定理，它说的每一条由各节点名的测试判。城的唯一写者 `RunWorker` 住 `accounting` crate（`crates/accounting/src/worker/`），§8-7、§8-39、§8-51、§8-102、§8-165 与 D16 说的是那个写者被装配层用到的那一面；`accounting::worker::…` 这样的路径指的就是那个 crate。
+
+这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与 `bin::assembly::dropping`、`bin::assembly::remote_door` 旁的测试守住。
 -/
 
 /-!

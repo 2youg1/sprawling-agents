@@ -7,6 +7,8 @@
 # runtime::compaction
 
 规定 `compaction`、`compaction::exchange`（`crates/runtime/src/` 下同名的文件）。按内容分类的缩短判定，以及回合边界的压缩。本文件是 `crates/runtime/Spec.lean` 的一个分部；下面每一节保留它在 runtime 规格里的标签 §8-n，别处引作 `crates/runtime/Spec.lean §8-n`。
+
+这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与 `runtime::turn::tests::compaction`、`runtime::compaction::exchange::tests`、`runtime::compaction::tests` 守住。
 -/
 
 /-!

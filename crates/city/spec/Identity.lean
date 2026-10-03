@@ -7,6 +7,8 @@
 # city::identity
 
 规定 `identity`、`identity::area`（`crates/city/src/` 下同名的文件）。两份治理文档的身份区：城怎么称呼人与主 Agent，一个 session 冻下哪一版。本文件是 `crates/city/Spec.lean` 的一个分部；下面每一节保留它在 city 规格里的标签 §8-n，别处引作 `crates/city/Spec.lean §8-n`，决定引作 `city D<n>`。
+
+这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与 `city::identity` 旁的测试守住。
 -/
 
 /-!

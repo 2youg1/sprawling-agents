@@ -7,6 +7,8 @@
 # bin::browser_bidi
 
 规定 `crates/sprawling/src/browser_bidi.rs` 与 `crates/sprawling/src/browser_tool.rs`：居民经 BiDi 驱动的浏览器，与按楼的规则交给 run 的浏览器工具（`bin::browser_bidi`、`bin::browser_tool`）。本文件是 `crates/sprawling/Spec.lean` 的一个分部；下面每一节保留它的标签 §8-n，别处引作 `crates/sprawling/Spec.lean §8-n`，决定引作 `sprawling D<n>`。
+
+这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与 `bin::browser_tool::tests`、`bin::browser_tool::tests::recordings` 守住。
 -/
 
 /-!

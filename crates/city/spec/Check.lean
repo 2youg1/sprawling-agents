@@ -7,6 +7,8 @@
 # city::check
 
 规定 `check`（`crates/city/src/` 下同名的文件）。一座城的每份 TOML，错处落到行列。本文件是 `crates/city/Spec.lean` 的一个分部；下面每一节保留它在 city 规格里的标签 §8-n，别处引作 `crates/city/Spec.lean §8-n`，决定引作 `city D<n>`。
+
+这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与 `city::check::tests` 守住。
 -/
 
 /-!

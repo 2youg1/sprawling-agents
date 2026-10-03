@@ -7,6 +7,8 @@
 # bin::doctor
 
 规定 `crates/sprawling/src/doctor.rs` 与 `crates/sprawling/src/doctor/`：运行中的机器有什么、这座城要什么，以及 CLI 自己的样子（`bin::doctor`）。本文件是 `crates/sprawling/Spec.lean` 的一个分部；下面每一节保留它的标签 §8-n，别处引作 `crates/sprawling/Spec.lean §8-n`，决定引作 `sprawling D<n>`。
+
+这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与 `bin::doctor::tests`、`bin::doctor::tests::consent`、`bin::doctor::tests::faults`等 守住。
 -/
 
 /-!

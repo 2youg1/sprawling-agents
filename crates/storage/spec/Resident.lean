@@ -9,6 +9,8 @@
 规定 `resident`（`crates/storage/src/resident.rs`）。进程里只放工作集：一份按字节计预算、能从盘上读回的缓存。本文件是 `crates/storage/Spec.lean` 的一个分部；下面一节保留它在 storage 规格里的标签 §8-40，别处引作 `crates/storage/Spec.lean §8-40`。
 
 这一分部只写接口的形状。缓存必须守住的性质（常驻字节从不超过预算、冻结的 run 不留任何东西、每次读答出盘上的字节）只住在一个模型里：`crates/sprawling/spec/Serving/Memory.lean` §8-173，那里证明它们，并给出按项数计的被否设计的反例（sprawling D42）。本模块旁的 `proptest`（`crates/storage/src/resident/tests.rs`）从那三条性质导出。
+
+这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与 `storage::resident::tests` 守住。
 -/
 
 /-!

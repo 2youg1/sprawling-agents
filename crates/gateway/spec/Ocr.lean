@@ -7,6 +7,8 @@
 # gateway::ocr
 
 规定 `ocr`（`crates/gateway/src/ocr.rs`）：把一张图变成一行字的可选设施；没有名字的录音从开头的字节认容器。本文件是 `crates/gateway/Spec.lean` 的一个分部；下面每一节保留它在 gateway 规格里的标签 §8-n，别处引作 `crates/gateway/Spec.lean §8-n`。
+
+这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与 `gateway::ocr::picture`、`gateway::ocr::recogniser` 旁的测试守住。
 -/
 
 /-!

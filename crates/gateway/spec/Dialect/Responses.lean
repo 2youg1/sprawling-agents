@@ -7,6 +7,8 @@
 # gateway::dialect::responses
 
 规定 `dialect::responses`（`crates/gateway/src/dialect/responses.rs`）：第三支笔：OpenAI responses 面。本文件是 `crates/gateway/Spec.lean` 的一个分部；下面每一节保留它在 gateway 规格里的标签 §8-n，别处引作 `crates/gateway/Spec.lean §8-n`。
+
+这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与 `gateway::dialect::responses::reply`、`gateway::dialect::responses::request`、`gateway::dialect::responses::stream` 旁的测试守住。
 -/
 
 /-!

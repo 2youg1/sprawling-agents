@@ -9,6 +9,8 @@
 规定 `credential::vault::file`（`crates/gateway/src/credential/vault/file.rs`）：口令解开的加密金库文件。本文件是 `crates/gateway/Spec.lean` 的一个分部；下面每一节保留它在 gateway 规格里的标签 §8-n，别处引作 `crates/gateway/Spec.lean §8-n`。
 
 本文件是描述，不是被证明的规格：它不含 Lean 定义与定理，它说的每一条由 `crates/gateway/src/credential/vault/file/tests.rs` 里的测试判。
+
+这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与 `gateway::credential::vault::file::tests` 守住。
 -/
 
 /-!

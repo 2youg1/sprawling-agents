@@ -7,6 +7,8 @@
 # bin::firstrun
 
 规定 `crates/sprawling/src/firstrun.rs`：首次运行与交付形态（`bin::firstrun`）。本文件是 `crates/sprawling/Spec.lean` 的一个分部；下面每一节保留它的标签 §8-n，别处引作 `crates/sprawling/Spec.lean §8-n`，决定引作 `sprawling D<n>`。
+
+这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与 `bin::firstrun` 旁的测试守住。
 -/
 
 /-!

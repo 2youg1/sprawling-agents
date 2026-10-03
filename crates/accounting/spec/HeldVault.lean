@@ -7,6 +7,8 @@
 # accounting::held_vault 与 accounting::toolkit_broker
 
 规定 `crates/accounting/src/held_vault.rs` 与 `crates/accounting/src/toolkit_broker.rs`。本文件是 `crates/accounting/Spec.lean` 的一个分部；下面每一节保留它在 accounting 规格里的标签 §8-n，别处引作 `crates/accounting/Spec.lean §8-n`，决定引作 `accounting D<n>`。
+
+这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状由 Rust 的类型守住，`accounting::held_vault`、`accounting::toolkit_broker`、`accounting::views::toolkits`等 旁还没有测试。
 -/
 
 /-!

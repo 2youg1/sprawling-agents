@@ -7,6 +7,8 @@
 # bin::serving
 
 规定 `crates/sprawling/src/serving.rs` 与 `crates/sprawling/src/serving/`：serve 时的服务面，门、进程日志与视图的折叠线程（`bin::serving`）；核心线程的档位在 `spec/Serving/Standing.lean`，输出环在 `spec/Serving/OutputRing.lean`。本文件是 `crates/sprawling/Spec.lean` 的一个分部；下面每一节保留它的标签 §8-n，别处引作 `crates/sprawling/Spec.lean §8-n`，决定引作 `sprawling D<n>`。
+
+这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与 `bin::serving::folding::tests`、`bin::serving::folding::tests::instruments`、`bin::serving::tests` 守住。
 -/
 
 /-!

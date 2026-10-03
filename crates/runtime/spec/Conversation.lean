@@ -7,6 +7,8 @@
 # runtime::conversation
 
 规定 `conversation`（`crates/runtime/src/` 下同名的文件）。会话历史：已发出的消息不再被改写。本文件是 `crates/runtime/Spec.lean` 的一个分部；下面每一节保留它在 runtime 规格里的标签 §8-n，别处引作 `crates/runtime/Spec.lean §8-n`。
+
+这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状由 Rust 的类型守住，`runtime::conversation` 旁还没有测试。
 -/
 
 /-!

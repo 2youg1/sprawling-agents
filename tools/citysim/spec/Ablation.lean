@@ -8,7 +8,7 @@
 
 规定 `citysim::ablation`（`tools/citysim/src/ablation.rs`）与它的语料 `citysim::ablation::capabilities`（`tools/citysim/src/ablation/capabilities.rs`），一件只在测试构型里编译的仪器（D21）。本文件是 `tools/citysim/Spec.lean` 的一个分部；下面一节保留它在 citysim 规格里的标签 §8-8-4，别处引作 `tools/citysim/Spec.lean §8-8-4`。
 
-本分部只有节注释：切段规则、三值的代价与排序由 `ablation::tests` 守着（§16）；被量的文档是 `crates/city/templates/City.md`，它的每一句由人写，模型不重述它。
+这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；切段规则、三值的代价与排序由 `ablation::tests` 守着（§16）；被量的文档是 `crates/city/templates/City.md`，它的每一句由人写，模型不重述它。
 -/
 
 /-!

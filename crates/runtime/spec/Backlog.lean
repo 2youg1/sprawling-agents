@@ -7,6 +7,8 @@
 # runtime::backlog
 
 规定 `backlog`、`backlog::report`、`backlog::waiting`、`backlog::jobs`、`backlog::member`、`backlog::scratch`、`backlog::tail`（`crates/runtime/src/` 下同名的文件）。一个 run 进行时仍在跑的活：后台命令与委派下去的 run。本文件是 `crates/runtime/Spec.lean` 的一个分部；下面每一节保留它在 runtime 规格里的标签 §8-n，别处引作 `crates/runtime/Spec.lean §8-n`。
+
+这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与 `runtime::backlog::tests` 守住。
 -/
 
 /-!

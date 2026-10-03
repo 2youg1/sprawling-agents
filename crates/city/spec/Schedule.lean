@@ -7,6 +7,8 @@
 # city::schedule
 
 规定 `schedule`（`crates/city/src/` 下同名的文件）。到点发车：谁在什么节奏上自己开始。本文件是 `crates/city/Spec.lean` 的一个分部；下面每一节保留它在 city 规格里的标签 §8-n，别处引作 `crates/city/Spec.lean §8-n`，决定引作 `city D<n>`。
+
+这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与 `city::schedule::tests` 守住。
 -/
 
 /-!

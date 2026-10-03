@@ -7,6 +7,8 @@
 # runtime::watchdog
 
 规定 `watchdog`（`crates/runtime/src/` 下同名的文件）。处置分级：纠正、退避、冻结，以及重试上限住在哪里。本文件是 `crates/runtime/Spec.lean` 的一个分部；下面每一节保留它在 runtime 规格里的标签 §8-n，别处引作 `crates/runtime/Spec.lean §8-n`。
+
+这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与 `runtime::watchdog` 旁的测试守住。
 -/
 
 /-!

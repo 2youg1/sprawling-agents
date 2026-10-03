@@ -7,6 +7,8 @@
 # kernel::node_id
 
 规定 `kernel::node_id`（`crates/kernel/src/node_id.rs`）：计划节点的地址。本文件是 `crates/kernel/Spec.lean` 的一个分部；下面每一节保留它在 kernel 规格里的标签 §8-n，别处引作 `crates/kernel/Spec.lean §8-n`。
+
+这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状由 Rust 的类型守住，`kernel::node_id` 旁还没有测试。
 -/
 
 /-!

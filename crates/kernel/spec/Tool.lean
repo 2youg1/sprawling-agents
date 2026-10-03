@@ -7,6 +7,8 @@
 # kernel::tool
 
 规定 `kernel::tool`（`crates/kernel/src/tool.rs` 与 `crates/kernel/src/tool/` 下的 `writes`、`conformance`）：工具端口、效果与工具的元数据。本文件是 `crates/kernel/Spec.lean` 的一个分部；下面每一节保留它在 kernel 规格里的标签 §8-n，别处引作 `crates/kernel/Spec.lean §8-n`。
+
+这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与 `kernel::tool::tests` 守住。
 -/
 
 /-!

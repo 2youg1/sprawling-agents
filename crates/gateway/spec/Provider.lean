@@ -7,6 +7,8 @@
 # gateway::provider
 
 规定 `provider`（`crates/gateway/src/provider/mod.rs`）：本城在问一个 provider 之前就知道的事：厂商文档写下来一次，与输出上限的事实梯。本文件是 `crates/gateway/Spec.lean` 的一个分部；下面每一节保留它在 gateway 规格里的标签 §8-n，别处引作 `crates/gateway/Spec.lean §8-n`。
+
+这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状由 Rust 的类型守住，`gateway::provider` 旁还没有测试。
 -/
 
 /-!

@@ -7,6 +7,8 @@
 # wire::server::committed
 
 规定 `server::committed`（`crates/wire/src/` 下同名的文件）。一条已提交的记录与它在线上的那一帧。本文件是 `crates/wire/Spec.lean` 的一个分部；下面每一节保留它在 wire 规格里的标签 §8-n，别处引作 `crates/wire/Spec.lean §8-n`，决定引作 `wire D<n>`。
+
+这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与 `wire::server::committed` 旁的测试守住。
 -/
 
 /-!

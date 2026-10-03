@@ -7,6 +7,8 @@
 # kernel::budget
 
 规定 `kernel::budget`（`crates/kernel/src/budget.rs`）：钱与量的整数化。本文件是 `crates/kernel/Spec.lean` 的一个分部；下面每一节保留它在 kernel 规格里的标签 §8-n，别处引作 `crates/kernel/Spec.lean §8-n`。
+
+这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状由 Rust 的类型守住，`kernel::budget` 旁还没有测试。
 -/
 
 /-!

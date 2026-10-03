@@ -7,6 +7,8 @@
 # kernel::spine
 
 规定 `kernel::spine`（`crates/kernel/src/spine.rs` 与 `crates/kernel/src/spine/` 下的 `row`、`grammar`、`rewrite`、`memo`）：六列 roadmap 的文法与它仅有的两个编辑入口。本文件是 `crates/kernel/Spec.lean` 的一个分部；下面每一节保留它在 kernel 规格里的标签 §8-n，别处引作 `crates/kernel/Spec.lean §8-n`。
+
+这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与 `kernel::spine::rewrite::tests` 守住。
 -/
 
 /-!
