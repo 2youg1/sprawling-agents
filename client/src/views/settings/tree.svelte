@@ -159,7 +159,7 @@
     class={[ENTRY, here(page.view) && "text-text"]}
     aria-current={here(page.view) ? "page" : undefined}
   >
-    <span class="min-w-0 flex-1 truncate">{wordOf(page)}</span>
+    <span class="min-w-0 flex-1 truncate ps-pane">{wordOf(page)}</span>
     {#if page.view.kind === "monitor" && reading !== null}
       <span class="shrink-0 font-mono text-note text-text-faint">{reading}</span>
     {/if}
@@ -185,7 +185,7 @@
         onPick(entry.group);
       }}
     >
-      <span class="min-w-0 flex-1 truncate">{say($lang, HEADING[entry.group])}</span>
+      <span class="min-w-0 flex-1 truncate ps-pane">{say($lang, HEADING[entry.group])}</span>
       <span class={MARK} aria-hidden="true">
         <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression, @typescript-eslint/no-unsafe-call (a snippet call is the render itself; typescript-eslint does not resolve exports of another .svelte module) -->
         {@render Kbd({ initial: initial(entry.group) })}

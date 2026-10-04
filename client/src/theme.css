@@ -353,6 +353,16 @@
   /* The few fixed sizes a shell needs: the bar, a status dot, the
    * building glyphs, and the pane a tree takes beside a file. */
   --spacing-bar: 44px;
+  /* One row of the performance panel's plot (`views/monitor.svelte`).
+   * A numeric utility would be shorter to write and does nothing here:
+   * this file clears Tailwind's counted scale, so `h-10` emits no rule
+   * at all and the plot took its height from the SVG's own aspect
+   * ratio - three thousand pixels a row. */
+  --spacing-plot: 40px;
+  /* The field a pairing code is typed into (`settings/remote_door.svelte`):
+   * a code is four groups of five readable characters, so the whole of
+   * it stays visible while it is transcribed. */
+  --spacing-code: 256px;
   /* The column a list of files or groups takes beside what it opens:
    * the monitor's file list, wide enough for a path's last two parts. */
   --spacing-index: 232px;

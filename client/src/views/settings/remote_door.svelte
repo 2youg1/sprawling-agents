@@ -192,7 +192,7 @@
         <input
           id={`${uid}-code`}
           bind:this={input}
-          class="h-control w-64 min-w-0 rounded-control border border-edge-input bg-raised px-base font-mono text-body text-text"
+          class="h-control w-code min-w-0 rounded-control border border-edge-input bg-raised px-base font-mono text-body text-text"
           autocomplete="off"
           spellcheck="false"
           aria-describedby={`${uid}-code-help`}

@@ -87,7 +87,7 @@
   const held = $derived(beatOf(samples.at(-1)));
   const beats = $derived(BEATS.map((value) => ({ value, label: fill(say($lang, "monitor_beat_ms"), { n: value }) })));
 
-  const PLOT = "col-span-full block h-10 w-full min-w-0 pt-tight @min-[40rem]:col-span-1 @min-[40rem]:pt-0";
+  const PLOT = "col-span-full block h-plot w-full min-w-0 pt-tight @min-[40rem]:col-span-1 @min-[40rem]:pt-0";
 </script>
 
 {#snippet beatControl()}
