@@ -45,8 +45,15 @@ pub enum AuditFetchError {
     Unreachable(String),
 }
 
+/// Applicability is known before checking or executing the landed content.
+pub enum LocalScanner<'a> {
+    Absent,
+    Available(&'a mut dyn FnMut(&Path) -> Result<ScannerAudit, AuditFetchError>),
+}
+
 /// Fetch failures are advisory records plus actionable diagnostics.
 #[derive(Default)]
+#[must_use]
 pub struct AuditReport {
     pub records: Vec<SkillAudited>,
     pub failures: Vec<AxError>,
@@ -59,11 +66,15 @@ pub struct AuditReport {
 pub fn audit_skill(
     request: &AuditRequest,
     fetch: &mut dyn FnMut(&str) -> Result<HttpAudit, AuditFetchError>,
-    scan: &mut dyn FnMut(&Path) -> Option<Result<ScannerAudit, AuditFetchError>>,
+    scan: LocalScanner<'_>,
 ) -> AuditReport {
     let mut report = AuditReport::default();
+    let remote = remote_name(request);
+    if remote.is_none() && matches!(&scan, LocalScanner::Absent) {
+        return report;
+    }
     let before = unchanged(request);
-    if let Some(name) = remote_name(request) {
+    if let Some(name) = remote {
         let link = format!("https://skills.sh/{name}");
         let result = if let Err(err) = &before {
             Err(err.clone())
@@ -77,20 +88,24 @@ pub fn audit_skill(
             Err(err) => report.failed(request, AuditSource::SkillsSh, Some(link), err),
         }
     }
-    if before.is_ok() {
-        if let Some(result) = scan(&request.path) {
-            match result
-                .map_err(|err| fetch_error("scan a shelved skill", &request.skill, err))
-                .and_then(|response| scanner(request, response))
-            {
+    match scan {
+        LocalScanner::Absent => {}
+        LocalScanner::Available(scan) => {
+            let result = before.and_then(|()| {
+                scan(&request.path)
+                    .map_err(|err| fetch_error("scan a shelved skill", &request.skill, err))
+                    .and_then(|response| scanner(request, response))
+            });
+            match result {
                 Ok(record) => report.records.push(record),
                 Err(err) => report.failed(request, AuditSource::SkillSpector, None, err),
             }
         }
-    } else if let Err(err) = before {
-        report.failures.push(err);
     }
-    if !report.records.is_empty()
+    if report
+        .records
+        .iter()
+        .any(|record| super::is_an_audit(record.verdict))
         && let Err(err) = unchanged(request)
     {
         for record in &mut report.records {

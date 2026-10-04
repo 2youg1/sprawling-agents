@@ -11,8 +11,8 @@
 
 mod execution;
 pub use execution::{
-    AuditFetchError, AuditReport, AuditRequest, HttpAudit, SKILLS_SH_TIMEOUT, SKILLSPECTOR_TIMEOUT,
-    ScannerAudit, audit_skill,
+    AuditFetchError, AuditReport, AuditRequest, HttpAudit, LocalScanner, SKILLS_SH_TIMEOUT,
+    SKILLSPECTOR_TIMEOUT, ScannerAudit, audit_skill,
 };
 
 use kernel::event::record::AuditVerdict;

@@ -35,8 +35,8 @@ mod shelf;
 mod shipped;
 
 pub use audit::{
-    AuditFetchError, AuditReport, AuditRequest, AuditState, HttpAudit, SKILLS_SH_TIMEOUT,
-    SKILLSPECTOR_TIMEOUT, ScannerAudit, audit_skill, audit_state,
+    AuditFetchError, AuditReport, AuditRequest, AuditState, HttpAudit, LocalScanner,
+    SKILLS_SH_TIMEOUT, SKILLSPECTOR_TIMEOUT, ScannerAudit, audit_skill, audit_state,
 };
 pub use install::{Installed, Placed, PlannedInstall, Slot, install, plan_install, skill_digest};
 pub use shelf::{Holding, Shelf};

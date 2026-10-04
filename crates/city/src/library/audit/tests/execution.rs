@@ -33,7 +33,7 @@ fn audit_fetch_records_every_partner_and_preserves_its_metadata() {
             urls.push(url.to_owned());
             Ok(audit::HttpAudit { status: 200, body: br#"{"audits":{"a":{"status":"pass","riskLevel":"low","auditedAt":"2026-01-01"},"b":{"status":"warn"},"c":{"status":"fail"}}}"#.to_vec() })
         },
-        &mut |_| None,
+        audit::LocalScanner::Absent,
     );
     let records = [
         (
@@ -114,7 +114,11 @@ fn audit_failures_are_unreachable_without_changing_shelved_bytes() {
         let dir = tempfile::tempdir().unwrap();
         let request = request(&dir);
         let mut answer = Some(answer);
-        let report = audit::audit_skill(&request, &mut |_| answer.take().unwrap(), &mut |_| None);
+        let report = audit::audit_skill(
+            &request,
+            &mut |_| answer.take().unwrap(),
+            audit::LocalScanner::Absent,
+        );
         assert_eq!(report.failures.len(), 1);
         assert_eq!(report.failures.first().unwrap().code(), &code);
         assert_eq!(report.records.len(), 1);
@@ -151,7 +155,7 @@ fn audit_of_content_changed_during_fetch_is_not_a_successful_audit() {
                 body: br#"{"audits":{"socket":{"status":"pass"}}}"#.to_vec(),
             })
         },
-        &mut |_| None,
+        audit::LocalScanner::Absent,
     );
     assert_eq!(
         report.records.first().unwrap().verdict,
@@ -184,14 +188,14 @@ fn audit_local_scanner_runs_after_remote_failure_and_absence_writes_nothing() {
         let report = audit::audit_skill(
             &request,
             &mut |_| Err(audit::AuditFetchError::Timeout),
-            &mut |path| {
+            audit::LocalScanner::Available(&mut |path| {
                 assert_eq!(path, request.path);
-                Some(Ok(audit::ScannerAudit {
+                Ok(audit::ScannerAudit {
                     version: "skillspector 1".to_owned(),
                     code: exit,
                     body: br#"{"risk_level":"high"}"#.to_vec(),
-                }))
-            },
+                })
+            }),
         );
         assert_eq!(
             report.records.iter().map(|r| r.verdict).collect::<Vec<_>>(),
@@ -202,7 +206,7 @@ fn audit_local_scanner_runs_after_remote_failure_and_absence_writes_nothing() {
     let report = audit::audit_skill(
         &request,
         &mut |_| panic!("local content has no remote auditor"),
-        &mut |_| None,
+        audit::LocalScanner::Absent,
     );
     assert!(report.records.is_empty());
     assert!(report.failures.is_empty());
@@ -244,19 +248,19 @@ fn audit_uses_the_installed_package_digest_when_only_a_script_changes() {
     let report = audit::audit_skill(
         &request,
         &mut |_| panic!("no remote auditor"),
-        &mut |path| {
+        audit::LocalScanner::Available(&mut |path| {
             std::fs::write(
                 path.join("run.py"),
                 "print(2)
 ",
             )
             .unwrap();
-            Some(Ok(audit::ScannerAudit {
+            Ok(audit::ScannerAudit {
                 version: "skillspector 1".to_owned(),
                 code: Some(0),
                 body: b"{}".to_vec(),
-            }))
-        },
+            })
+        }),
     );
     assert_eq!(
         report.records.first().unwrap().verdict,
@@ -280,9 +284,11 @@ fn audit_stale_before_a_local_scan_records_unreachable_without_running_it() {
     let mut request = request(&dir);
     request.source = kernel::event::record::ShelvedFrom::Path;
     std::fs::write(&request.path, "# changed\n").unwrap();
-    let report = audit::audit_skill(&request, &mut |_| panic!("no remote auditor"), &mut |_| {
-        panic!("stale content must not be scanned")
-    });
+    let report = audit::audit_skill(
+        &request,
+        &mut |_| panic!("no remote auditor"),
+        audit::LocalScanner::Available(&mut |_| panic!("stale content must not be scanned")),
+    );
     assert_eq!(report.records.len(), 1);
     assert_eq!(
         report.records.first().unwrap().verdict,
