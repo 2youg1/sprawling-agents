@@ -226,9 +226,8 @@ fn remaining(available: u64, core: u64) -> runtime::backlog::RunAffinity {
 mod tests {
     use super::*;
 
-    /// The job's affinity limit is the mask the arm asked for: the
-    /// thread's own group mask is that limit read back, because a job's
-    /// affinity is what `GetThreadGroupAffinity` reports.
+    /// The core reads back its planned mask, and a run child reports the
+    /// remaining mask after enrolment, independently of the run window.
     #[cfg(windows)]
     #[test]
     fn the_job_reports_the_mask_the_arm_asked_for() {
@@ -251,32 +250,72 @@ mod tests {
         let runtime::backlog::RunAffinity::Mask(run_mask) = runs else {
             panic!("this machine lends processors outside the two core seats");
         };
-        let backlog = runtime::Backlog::new().with_affinity(runs);
+        let backlog =
+            runtime::Backlog::with_window(runtime::PollBudget::new(1, 1)).with_affinity(runs);
+        let scratch = tempfile::tempdir().unwrap();
+        let gate = scratch.path().join("gate");
+        let report = scratch.path().join("affinity");
         let mut child = std::process::Command::new("powershell.exe");
-        child.args(["-NoProfile", "-NonInteractive", "-Command",
-            "Start-Sleep -Milliseconds 200; [Diagnostics.Process]::GetCurrentProcess().ProcessorAffinity.ToInt64()"]);
-        child.current_dir(std::env::temp_dir());
+        child.args([
+            "-NoProfile",
+            "-NonInteractive",
+            "-Command",
+            "while (-not (Test-Path -LiteralPath $env:R05_GATE)) { Start-Sleep -Milliseconds 20 }; \
+             [IO.File]::WriteAllText($env:R05_REPORT + '.pending', \
+             [Diagnostics.Process]::GetCurrentProcess().ProcessorAffinity.ToInt64().ToString()); \
+             [IO.File]::Move($env:R05_REPORT + '.pending', $env:R05_REPORT)",
+        ]);
+        child
+            .env("R05_GATE", &gate)
+            .env("R05_REPORT", &report)
+            .current_dir(std::env::temp_dir());
         let owner = kernel::RunId::from_bytes([10; 16]);
-        let started = backlog
-            .run(
-                owner,
-                &kernel::Address::parse("vault/room1").unwrap(),
-                "remaining processors".to_owned(),
-                child,
-            )
-            .unwrap();
-        let runtime::Started::Settled {
-            exit,
-            stdout,
-            stderr,
-        } = started
-        else {
-            backlog.release(owner);
-            panic!("the child did not finish in its window");
-        };
+        let scope = kernel::Address::parse("vault/room1").unwrap();
+        let started = backlog.run(owner, &scope, "remaining processors".to_owned(), child);
+        let polls = 3000;
+        let interval = std::time::Duration::from_millis(20);
+        let observed = (|| -> std::io::Result<String> {
+            if let Err(err) = &started {
+                return Err(std::io::Error::other(format!(
+                    "start affinity reader: {err}"
+                )));
+            }
+            std::fs::write(&gate, b"ready")?;
+            for _ in 0..polls {
+                match std::fs::read_to_string(&report) {
+                    Ok(value) => return Ok(value),
+                    Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
+                    Err(err) => return Err(err),
+                }
+                std::thread::sleep(interval);
+            }
+            Err(std::io::Error::new(
+                std::io::ErrorKind::TimedOut,
+                format!("affinity reader published no report after {polls} polls: {started:?}"),
+            ))
+        })();
         backlog.release(owner);
-        assert_eq!(exit, runtime::Exit::Ended { code: 0 }, "{stderr}");
-        assert_eq!(stdout.trim().parse::<usize>().unwrap(), run_mask.get());
+        let reaped = (|| -> Result<(), String> {
+            for _ in 0..polls {
+                backlog.harvest(owner).map_err(|err| err.to_string())?;
+                if backlog
+                    .standing(&scope)
+                    .map_err(|err| err.to_string())?
+                    .is_empty()
+                {
+                    return Ok(());
+                }
+                std::thread::sleep(interval);
+            }
+            Err(format!(
+                "released affinity reader remains in the backlog after {polls} polls"
+            ))
+        })();
+        let removed = scratch.close();
+        reaped.expect("release and harvest the affinity reader");
+        removed.expect("remove the affinity reader's gate and report files");
+        let observed = observed.expect("read the child process's affinity report");
+        assert_eq!(observed.trim().parse::<usize>().unwrap(), run_mask.get());
         assert_eq!(u64::try_from(run_mask.get()).unwrap() & mask, 0);
     }
 
