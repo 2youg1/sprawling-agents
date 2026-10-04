@@ -274,24 +274,45 @@ mod tests {
         let started = backlog.run(owner, &scope, "remaining processors".to_owned(), child);
         let polls = 3000;
         let interval = std::time::Duration::from_millis(20);
-        let observed = (|| -> std::io::Result<String> {
+        let observed = (|| -> std::io::Result<(String, runtime::Finished)> {
             if let Err(err) = &started {
                 return Err(std::io::Error::other(format!(
                     "start affinity reader: {err}"
                 )));
             }
             std::fs::write(&gate, b"ready")?;
+            let mut observed = None;
             for _ in 0..polls {
                 match std::fs::read_to_string(&report) {
-                    Ok(value) => return Ok(value),
+                    Ok(value) => {
+                        observed = Some(value);
+                        break;
+                    }
                     Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
                     Err(err) => return Err(err),
                 }
                 std::thread::sleep(interval);
             }
+            let observed = observed.ok_or_else(|| {
+                std::io::Error::new(
+                    std::io::ErrorKind::TimedOut,
+                    format!("affinity reader published no report after {polls} polls: {started:?}"),
+                )
+            })?;
+            for _ in 0..polls {
+                if let Some(finished) = backlog
+                    .harvest(owner)
+                    .map_err(|err| std::io::Error::other(err.to_string()))?
+                    .into_iter()
+                    .next()
+                {
+                    return Ok((observed, finished));
+                }
+                std::thread::sleep(interval);
+            }
             Err(std::io::Error::new(
                 std::io::ErrorKind::TimedOut,
-                format!("affinity reader published no report after {polls} polls: {started:?}"),
+                format!("affinity reader did not exit after {polls} polls"),
             ))
         })();
         backlog.release(owner);
@@ -314,7 +335,14 @@ mod tests {
         let removed = scratch.close();
         reaped.expect("release and harvest the affinity reader");
         removed.expect("remove the affinity reader's gate and report files");
-        let observed = observed.expect("read the child process's affinity report");
+        let (observed, finished) =
+            observed.expect("read the child process's affinity report and exit");
+        assert_eq!(
+            finished.exit,
+            runtime::Exit::Ended { code: 0 },
+            "{}",
+            finished.stderr
+        );
         assert_eq!(observed.trim().parse::<usize>().unwrap(), run_mask.get());
         assert_eq!(u64::try_from(run_mask.get()).unwrap() & mask, 0);
     }
