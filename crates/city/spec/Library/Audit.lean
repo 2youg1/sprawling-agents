@@ -58,9 +58,9 @@ pub fn skill_digest(path: &Path) -> Result<B3Hash, AxError>;
 ```
 HTTP 来源三段只收 ASCII 字母、数字、`-`、`_`、`.`，拒绝空段、`.`、`..`，Git 只认 HTTPS github.com 的两段仓库路径（可带 `.git`），不让来源拼进另一个 URL。回复是 `audits` 下按合作方名索引的对象，每个对象必须有 `status`（`pass`、`warn`、`fail`，也接受 `passed`、`warning`、`failed`），`riskLevel` 与 `auditedAt` 是可选字符串；未知状态、空审核对象、结构错误与非 JSON 一律不能变成 Pass，整个回复记 Unreachable。这是接口形状假设，实站改变结构时须凭官方回复更新解析与离线夹具，不能从未知状态猜结论。SkillSpector 的 JSON 总风险取 `risk_level`，只有 0／1 配合法 JSON 对象才是有效审核。
 
-超时为 `E_TIMEOUT`，不可达、非 200、解析失败、程序异常为 `E_TOOL_UNAVAILABLE`，每条失败带动作、主体与打开安全页或检查扫描器的恢复语；失败同时产生对应源的 Unreachable，不吞掉另一审核源。没有适用源不产行。`LocalScanner` 在调用之前表达 doctor 所判的适用性：程序缺席与程序执行失败是两种状态，摘要在调用前已过期时仍为适用的源记 Unreachable，但不执行任何外呼。请求前后都用 `skill_digest`（复用 install 的预检）复查落下的摘要，任何字节变化或读失败都把本次结论降为 Unreachable，并报告 `E_VERSION_CONFLICT` 或原读错误；不把对迟到版本的结论绑定新内容。远端报告没有可核对的内容摘要，报告与来源匹配是环境假设，不是本地扫描证明。
+超时为 `E_TIMEOUT`，不可达、非 200、解析失败、程序异常为 `E_TOOL_UNAVAILABLE`，每条失败带动作、主体与打开安全页或检查扫描器的恢复语；失败同时产生对应源的 Unreachable，不吞掉另一审核源。没有适用源不产行。`LocalScanner` 在调用之前表达 doctor 所判的适用性：程序缺席与程序执行失败是两种状态，摘要在调用前已过期时仍为适用的源记 Unreachable，但不执行任何外呼。请求前后都用 `skill_digest`（复用 install 的预检）复查落下的摘要，本地扫描在远端请求返回之后、执行之前再复查一次，因为远端等待期间内容也可能改变；任何字节变化或读失败都把本次结论降为 Unreachable，并报告 `E_VERSION_CONFLICT` 或原读错误；不把对迟到版本的结论绑定新内容。远端报告没有可核对的内容摘要，报告与来源匹配是环境假设，不是本地扫描证明。
 
-HTTP 适配器经 `gateway::client_for` 复用 TLS、代理与 User-Agent 权威，请求期限只有 `SKILLS_SH_TIMEOUT`，不作重试或第二次诊断请求。可选程序只由 doctor 的 `find_program` 找，程序问答复用 doctor 的有界 `asking::ask`；版本问答用 doctor 的 PATIENCE，scan 上限 `SKILLSPECTOR_TIMEOUT`（60 s，推断值，可按扫描耗时重议），输出上限复用 asking 的逐行上限。后台对同一 `(skill, digest)` 在一个进程内去重，成功历史不用重审，失败历史在新进程可重试，当前进程不重试。Ledger 失败报告后结束后台线程，保持单写者；不能起线程只报告，开城与上架继续。
+HTTP 适配器经 `gateway::client_for` 复用 TLS、代理与 User-Agent 权威，请求期限只有 `SKILLS_SH_TIMEOUT`，不作重试或第二次诊断请求。可选程序只由 doctor 的 `find_program` 找，程序问答复用 doctor 的有界 `asking::ask`；版本问答用 doctor 的 PATIENCE，只有退出码 0 才采用版本串，版本问答异常时不执行 scan；scan 上限 `SKILLSPECTOR_TIMEOUT`（60 s，推断值，可按扫描耗时重议），输出上限复用 asking 的逐行上限。后台对同一 `(skill, digest)` 在一个进程内去重，成功历史不用重审，失败历史在新进程可重试，当前进程不重试。Ledger 失败报告后结束后台线程，保持单写者；不能起线程只报告，开城与上架继续。
 
 **派生检查补充**：注入桩覆盖三种有效结论、超时、不可达、非 200、坏 JSON、未知状态、可选本地扫描器与执行中内容变更；整包脚本变化必须改变 `skill_digest`；同摘要重复发起由后台的集合持有；本地扫描前摘要已过期的回归检查必须产一行 Unreachable，且客户端零调用。
 

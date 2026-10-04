@@ -91,7 +91,7 @@ pub fn audit_skill(
     match scan {
         LocalScanner::Absent => {}
         LocalScanner::Available(scan) => {
-            let result = before.and_then(|()| {
+            let result = before.and_then(|()| unchanged(request)).and_then(|()| {
                 scan(&request.path)
                     .map_err(|err| fetch_error("scan a shelved skill", &request.skill, err))
                     .and_then(|response| scanner(request, response))

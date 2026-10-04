@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 
 use accounting::{Clock as _, worker::Relay};
-use kernel::event::record::{AuditVerdict, ShelvedFrom, SkillAudited, SkillShelved};
+use kernel::event::record::{ShelvedFrom, SkillAudited, SkillShelved};
 use kernel::{
     AxCode, AxError, B3Hash, EventDraft, EventKind, EventRecord, Ledger as _, Payload, RunId, Seq,
 };
@@ -68,11 +68,14 @@ impl History {
             self.sources.insert(shelved.skill, shelved.source);
         } else if record.kind() == EventKind::SkillAudited {
             let audited: SkillAudited = record.data().read()?;
-            match audited.verdict {
-                AuditVerdict::Pass | AuditVerdict::Warn | AuditVerdict::Fail => {
-                    self.audited.insert((audited.skill, audited.digest));
-                }
-                AuditVerdict::Unreachable => {}
+            if matches!(
+                city::audit_state(
+                    &audited.digest,
+                    &[(audited.digest, audited.verdict, record.seq())],
+                ),
+                city::AuditState::Audited { .. }
+            ) {
+                self.audited.insert((audited.skill, audited.digest));
             }
         }
         Ok(())

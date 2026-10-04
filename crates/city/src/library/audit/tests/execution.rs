@@ -299,3 +299,45 @@ fn audit_stale_before_a_local_scan_records_unreachable_without_running_it() {
         &kernel::AxCode::VersionConflict
     );
 }
+
+#[test]
+fn audit_content_changed_during_fetch_is_not_sent_to_the_local_scanner() {
+    let dir = tempfile::tempdir().unwrap();
+    let request = request(&dir);
+    let mut scans = 0;
+    let report = audit::audit_skill(
+        &request,
+        &mut |_| {
+            std::fs::write(
+                &request.path,
+                "# changed
+",
+            )
+            .unwrap();
+            Err(audit::AuditFetchError::Timeout)
+        },
+        audit::LocalScanner::Available(&mut |_| {
+            scans += 1;
+            Ok(audit::ScannerAudit {
+                version: "skillspector 1".to_owned(),
+                code: Some(0),
+                body: b"{}".to_vec(),
+            })
+        }),
+    );
+    assert_eq!(scans, 0);
+    assert_eq!(
+        report
+            .records
+            .iter()
+            .map(|record| record.verdict)
+            .collect::<Vec<_>>(),
+        vec![AuditVerdict::Unreachable, AuditVerdict::Unreachable]
+    );
+    assert!(
+        report
+            .failures
+            .iter()
+            .any(|error| error.code() == &kernel::AxCode::VersionConflict)
+    );
+}

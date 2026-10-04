@@ -51,11 +51,15 @@ pub(super) fn audit(request: &city::AuditRequest) -> city::AuditReport {
 }
 
 fn scan(program: &Path, path: &Path) -> Result<ScannerAudit, AuditFetchError> {
-    let version = answered(
+    let (version_code, version) = answered(
         Command::new(program).arg("--version"),
         crate::doctor::PATIENCE,
-    )?
-    .1;
+    )?;
+    if version_code != Some(0) {
+        return Err(AuditFetchError::Unreachable(format!(
+            "skillspector --version exited {version_code:?}"
+        )));
+    }
     let (code, body) = answered(
         Command::new(program)
             .arg("scan")
