@@ -456,7 +456,10 @@ setTimeout(function () {
     /// fails, so this test has nothing to drive and ends.
     #[test]
     fn the_reading_carries_a_state_written_late_in_the_budget() {
-        reads_the_state(TIMER_LATE.replace("LATE", &LATE_MS.to_string()), "written late");
+        reads_the_state(
+            TIMER_LATE.replace("LATE", &LATE_MS.to_string()),
+            "written late",
+        );
     }
 
     /// The frame after the scroll writes a state the reading carries.
