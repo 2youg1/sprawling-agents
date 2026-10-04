@@ -9,7 +9,7 @@
 use std::collections::BTreeSet;
 use std::path::Path;
 
-use kernel::B3Hash;
+use kernel::{AxError, B3Hash};
 
 use crate::views::lines::buildings_of;
 use crate::views::skills::shelf_of;
@@ -25,24 +25,29 @@ pub(crate) struct Shelved {
 /// Every shelf the city keeps or mounts: its stock and the external
 /// shelves once, then each building's own shelf.
 ///
-/// `None` when a shelf will not scan or the buildings will not list, for
-/// the reason `skills_answer` gives: a broken installation is not an
-/// empty one.
-pub(crate) fn shelved(city_root: &Path) -> Option<Vec<Shelved>> {
-    let home = crate::home::Home::detect().ok()?;
-    let copy = |holding: &city::Holding| Shelved {
-        name: holding.name.clone(),
-        shelf: shelf_of(&holding.shelf),
-        digest: holding.hash,
+/// # Errors
+/// Propagates unreadable shelves, buildings and package content. A
+/// package's digest is the whole install precheck hash (city D19).
+pub(crate) fn shelved(city_root: &Path) -> Result<Vec<Shelved>, AxError> {
+    let home = crate::home::Home::detect()?;
+    let copy = |holding: &city::Holding| {
+        let digest = match &holding.package {
+            Some(package) => city::skill_digest(&city_root.join(package.as_str()))?,
+            None => holding.hash,
+        };
+        Ok(Shelved {
+            name: holding.name.clone(),
+            shelf: shelf_of(&holding.shelf),
+            digest,
+        })
     };
-    let mut found: Vec<Shelved> = city::Library::scan(city_root, None, home.path())
-        .ok()?
+    let mut found = city::Library::scan(city_root, None, home.path())?
         .all()
         .into_iter()
         .map(copy)
-        .collect();
-    for building in buildings_of(city_root).ok()? {
-        let library = city::Library::scan(city_root, Some(&building), home.path()).ok()?;
+        .collect::<Result<Vec<_>, AxError>>()?;
+    for building in buildings_of(city_root)? {
+        let library = city::Library::scan(city_root, Some(&building), home.path())?;
         found.extend(
             library
                 .all()
@@ -51,10 +56,11 @@ pub(crate) fn shelved(city_root: &Path) -> Option<Vec<Shelved>> {
                     city::Shelf::Building(_) => true,
                     city::Shelf::Library(_) | city::Shelf::External { .. } => false,
                 })
-                .map(copy),
+                .map(copy)
+                .collect::<Result<Vec<_>, AxError>>()?,
         );
     }
-    Some(found)
+    Ok(found)
 }
 
 /// The label of every tool server some building's configuration names.

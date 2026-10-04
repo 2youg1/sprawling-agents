@@ -139,10 +139,12 @@ impl UsageAsk {
         let city_root = &self.ledger.city_root;
         match self.question {
             UsageQuestion::Skills(only) => match shelves::shelved(city_root) {
-                Some(shelved) => {
+                Ok(shelved) => {
                     wire::Answer::SkillUsage(Box::new(usage.skills(&shelved, only.as_deref())))
                 }
-                None => super::prepared::unavailable("SkillUsage".to_owned()),
+                Err(stopped) => {
+                    super::prepared::unavailable_because("SkillUsage".to_owned(), &stopped)
+                }
             },
             UsageQuestion::Shells => wire::Answer::Shells(Box::new(usage.shells())),
             UsageQuestion::Mcp(only) => wire::Answer::McpUsage(Box::new(
@@ -151,8 +153,13 @@ impl UsageAsk {
             UsageQuestion::Export(what, format) => {
                 let rows = match what {
                     wire::UsageKind::Skills => match shelves::shelved(city_root) {
-                        Some(shelved) => export::skill_rows(&usage.skills(&shelved, None)),
-                        None => return super::prepared::unavailable("UsageExport".to_owned()),
+                        Ok(shelved) => export::skill_rows(&usage.skills(&shelved, None)),
+                        Err(stopped) => {
+                            return super::prepared::unavailable_because(
+                                "UsageExport".to_owned(),
+                                &stopped,
+                            );
+                        }
                     },
                     wire::UsageKind::Mcp => {
                         export::mcp_rows(&usage.mcp(&shelves::configured(city_root), None))
