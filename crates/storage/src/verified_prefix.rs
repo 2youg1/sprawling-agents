@@ -127,56 +127,69 @@ pub(crate) struct TailStart {
 }
 
 impl TailStart {
-    /// From the first byte of `bytes`, the whole segment read, at `entry`.
-    pub(crate) fn strict(bytes: &[u8], entry: LineCheck) -> TailStart {
+    /// At the segment entrance, before any bytes have been read.
+    pub(crate) fn strict(entry: LineCheck) -> TailStart {
         TailStart {
             from: 0,
             lines: 0,
             check: entry,
-            counted: ProofCount {
-                bytes_read: u64::try_from(bytes.len()).unwrap_or(u64::MAX),
-                ..ProofCount::default()
-            },
+            counted: ProofCount::default(),
         }
     }
 }
 
 impl ProofRecords {
-    /// Where checking `bytes`, the last segment `segment` entered at
-    /// `entry`, begins: after the prefix its record proves when the record
-    /// stands for it (`SegmentRecord::prefix`, `SegmentRecord::stands`),
-    /// and at the first byte otherwise. The bytes hashed are the bytes
-    /// then checked: one read.
-    pub(crate) fn tail_start(&self, segment: &str, bytes: &[u8], entry: LineCheck) -> TailStart {
-        let strict = TailStart::strict(bytes, entry);
-        let Some(record) = self.read(segment) else {
-            return strict;
+    /// Hashes the recorded prefix through bounded windows. A mismatch
+    /// starts a fresh strict scan; a match consumes the hashed prefix's
+    /// exit state. The caller holds the writer lock throughout both reads.
+    pub(crate) fn tail_start(
+        &self,
+        vfs: &dyn Vfs,
+        path: &Path,
+        entry: LineCheck,
+    ) -> io::Result<TailStart> {
+        let mut start = TailStart::strict(entry);
+        let Some(record) = path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .and_then(|name| self.read(name))
+        else {
+            return Ok(start);
         };
-        let Some(prefix) = record.prefix(bytes, line_check_version()) else {
-            return strict;
-        };
-        let mut hasher = blake3::Hasher::new();
-        hasher.update(prefix);
-        let hashed = u64::try_from(prefix.len()).unwrap_or(u64::MAX);
-        match record.stands(entry, &hasher) {
-            None => TailStart {
-                counted: ProofCount {
-                    bytes_hashed: hashed,
-                    ..strict.counted
-                },
-                ..strict
-            },
-            Some((lines, exit)) => TailStart {
-                from: prefix.len(),
-                lines,
-                check: exit,
-                counted: ProofCount {
-                    segments_by_digest: 1,
-                    bytes_hashed: hashed,
-                    ..strict.counted
-                },
-            },
+        if record.version != line_check_version()
+            || record.len > vfs.size(path)?
+            || record.entry != entry
+        {
+            return Ok(start);
         }
+        let mut hasher = blake3::Hasher::new();
+        let mut offset = 0u64;
+        while offset < record.len {
+            let chunk = vfs.read_at(
+                path,
+                offset,
+                crate::jsonl::SCAN_WINDOW_BYTES.min(record.len.saturating_sub(offset)),
+            )?;
+            if chunk.is_empty() {
+                return Ok(start);
+            }
+            #[cfg(test)]
+            crate::jsonl::measure_scan(chunk.capacity(), 0);
+            hasher.update(&chunk);
+            let read = u64::try_from(chunk.len()).map_err(io::Error::other)?;
+            offset = offset
+                .checked_add(read)
+                .ok_or_else(|| io::Error::other("prefix offset overflow"))?;
+            start.counted.bytes_read = start.counted.bytes_read.saturating_add(read);
+            start.counted.bytes_hashed = start.counted.bytes_hashed.saturating_add(read);
+        }
+        if let Some((lines, exit)) = record.stands(entry, &hasher) {
+            start.from = usize::try_from(record.len).map_err(io::Error::other)?;
+            start.lines = lines;
+            start.check = exit;
+            start.counted.segments_by_digest = 1;
+        }
+        Ok(start)
     }
 }
 

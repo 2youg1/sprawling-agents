@@ -117,7 +117,7 @@ proptest! {
     /// zeros makes the zeros damage inside the segment, and open refuses
     /// instead of truncating that record away.
     #[test]
-    fn zeros_before_a_line_are_not_the_end(count in 1u64..5, zeros in 1usize..9000) {
+    fn zeros_before_a_line_are_not_the_end(count in 1u64..5, zeros in 1usize..200_000) {
         let (lines, name) = written(count.saturating_add(1));
         let root = tempfile::tempdir().unwrap();
         let (kept, last) = lines.split_at(lines.len().saturating_sub(1));

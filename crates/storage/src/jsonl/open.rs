@@ -17,7 +17,7 @@ use crate::vfs::Vfs;
 
 use super::ledger::{
     JsonlLedger, OpenReport, SEGMENT_PREALLOCATION, SEGMENT_ROLL_BYTES, TailTruncation, WriterLock,
-    complete_lines, is_segment, records_end, segment_file_name, u64_count,
+    is_segment, segment_file_name, u64_count,
 };
 use super::verify::{LineCheck, LineFault};
 
@@ -182,54 +182,34 @@ impl JsonlLedger {
     ) -> Result<(u64, ProofCount), StorageError> {
         let boundary = self.boundary(segments, last)?;
         let prior = boundary.prior;
-        let file = self.vfs.read(last).map_err(io_err("read segment", last))?;
-        // Zeros after the last record are preallocated space, not a tear
-        // (`crates/storage/spec/Jsonl/Preallocate.lean`): the scan reads the
-        // segment without them, and the writer resumes where they begin.
-        #[cfg(test)]
-        super::reading::measure(file.capacity(), file.len());
-        let filled = records_end(&file);
-        let total = u64_count(file.len()).map_err(io_err("measure segment", last))?;
-        let mut bytes = file;
-        bytes.truncate(filled);
-        let start = proof.start(
-            last,
-            &bytes,
-            LineCheck::after(boundary.prev, boundary.next_seq),
-        );
+        let start = proof
+            .start(
+                self.vfs.as_ref(),
+                last,
+                LineCheck::after(boundary.prev, boundary.next_seq),
+            )
+            .map_err(io_err("read segment", last))?;
         let mut check = start.check;
         let mut counted = start.counted;
-        let (lines, _terminated_len) = complete_lines(bytes.get(start.from..).unwrap_or_default());
-
-        let mut valid_len = start.from;
-        for (index, line) in lines.iter().enumerate() {
-            let at = u64_count(index)
-                .map_err(io_err("number a segment line", last))?
-                .saturating_add(1)
-                .saturating_add(start.lines);
+        let from = u64_count(start.from).map_err(io_err("measure segment", last))?;
+        let mut valid_len = from;
+        let mut at = start.lines;
+        let mut damaged = None;
+        let end = super::reading::scan(self.vfs.as_ref(), last, from, |line, end| {
+            at = at.saturating_add(1);
+            if let Some(first_fault) = damaged {
+                if LineCheck::carries_envelope(line) {
+                    return Err(chain_refusal(last, first_fault));
+                }
+                return Ok(());
+            }
             counted.lines_checked = counted.lines_checked.saturating_add(1);
             let fault = match check.advance(line) {
                 Ok(_) => {
-                    valid_len = valid_len.saturating_add(line.len()).saturating_add(1);
-                    continue;
+                    valid_len = end;
+                    return Ok(());
                 }
                 Err(fault) => fault,
-            };
-            // What a version refuses, it refuses by name: a line this
-            // build cannot read is not tail damage, and truncating it
-            // would delete a newer build's history (`crates/storage/spec/Jsonl.lean` §8-1).
-            // A tear only ever damages the tail and never leaves a record
-            // behind, so a break is refused - not truncated - when the
-            // breaking line carries an envelope (a fork: a second writer
-            // continued the same prev) or intact records still follow it
-            // (non-tail damage). Newline-bearing garbage is no record.
-            // The breaking line itself counts: a record behind a run of
-            // zeros still carries its envelope.
-            let later_intact = || {
-                lines
-                    .iter()
-                    .skip(index)
-                    .any(|l| LineCheck::carries_envelope(l))
             };
             let source = match fault {
                 LineFault::VersionAhead(v) => {
@@ -239,35 +219,35 @@ impl JsonlLedger {
                     });
                 }
                 LineFault::NotAVersion(v) => unversioned(v),
-                LineFault::NotALine(_) if !later_intact() => break,
-                LineFault::ChainBreak | LineFault::SeqGap { .. } | LineFault::NotALine(_) => {
-                    AxError::failure(
-                        AxCode::InvalidArgs,
-                        "verify chain",
-                        "a line does not continue the chain",
-                    )
-                    .with_recovery(
-                        "run `sprawling replay <ledger-dir>` to see the first line \
-                     that breaks, then restore that segment from its \
-                     checkpoint commit",
-                    )
+                LineFault::NotALine(_) => {
+                    if LineCheck::carries_envelope(line) {
+                        return Err(chain_refusal(last, at));
+                    }
+                    damaged = Some(at);
+                    return Ok(());
+                }
+                LineFault::ChainBreak | LineFault::SeqGap { .. } => {
+                    return Err(chain_refusal(last, at));
                 }
                 other @ (LineFault::UnknownKind(_)
                 | LineFault::NotCanonical(_)
                 | LineFault::SeqExhausted(_)) => other.into_ax(at),
             };
-            return Err(StorageError::Envelope {
+            Err(StorageError::Envelope {
                 path: last.to_path_buf(),
                 line: at,
                 source,
-            });
-        }
+            })
+        })?;
+        counted.bytes_read = counted
+            .bytes_read
+            .saturating_add(end.total.saturating_sub(from));
+        let total = end.total;
         let run_prev = check.prev();
         let run_seq = check.expected();
 
-        let measure = |count: usize| u64_count(count).map_err(io_err("measure segment", last));
-        let dropped = measure(filled.saturating_sub(valid_len))?;
-        let keep = measure(valid_len)?;
+        let dropped = end.filled.saturating_sub(valid_len);
+        let keep = valid_len;
 
         if self.preallocation.length_after_open(keep, dropped, total) < total {
             if valid_len == 0 {
@@ -327,15 +307,21 @@ enum TailProof<'a> {
 }
 
 impl TailProof<'_> {
-    /// Where checking `bytes`, the last segment at `last`, begins when
+    /// Where checking the last segment at `last` begins when
     /// the chain state entering it is `entry`.
-    fn start(self, last: &Path, bytes: &[u8], entry: LineCheck) -> TailStart {
-        match (self, last.file_name().and_then(|name| name.to_str())) {
-            (TailProof::Records(records), Some(name)) => records.tail_start(name, bytes, entry),
-            (TailProof::Records(_), None) | (TailProof::Strict, _) => {
-                TailStart::strict(bytes, entry)
-            }
+    fn start(self, vfs: &dyn Vfs, last: &Path, entry: LineCheck) -> std::io::Result<TailStart> {
+        match self {
+            TailProof::Strict => Ok(TailStart::strict(entry)),
+            TailProof::Records(records) => records.tail_start(vfs, last, entry),
         }
+    }
+}
+
+fn chain_refusal(last: &Path, line: u64) -> StorageError {
+    StorageError::Envelope {
+        path: last.to_path_buf(), line,
+        source: AxError::failure(AxCode::InvalidArgs, "verify chain", "a line does not continue the chain")
+            .with_recovery("run `sprawling replay <ledger-dir>` to see the first line that breaks, then restore that segment from its checkpoint commit"),
     }
 }
 

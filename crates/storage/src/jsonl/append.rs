@@ -15,9 +15,7 @@ use kernel::{
 use crate::error::{StorageError, io_err};
 
 use super::barrier::Barrier;
-use super::ledger::{
-    JsonlLedger, WriteObserver, complete_lines, is_segment, segment_file_name, u64_count,
-};
+use super::ledger::{JsonlLedger, WriteObserver, is_segment, segment_file_name, u64_count};
 
 impl JsonlLedger {
     pub(crate) fn append_log_truncated(
@@ -165,15 +163,7 @@ impl JsonlLedger {
             .filter(|p| is_segment(p))
             .collect();
         for seg in segments {
-            let bytes = self.vfs.read(&seg).map_err(io_err("read segment", &seg))?;
-            #[cfg(test)]
-            super::reading::measure(bytes.capacity(), bytes.len());
-            let (lines, _) = complete_lines(&bytes);
-            for line in lines {
-                if !line.is_empty() {
-                    out.push(line.to_vec());
-                }
-            }
+            out.extend(super::reading::read_lines(self.vfs.as_ref(), &seg)?);
         }
         Ok(out)
     }
