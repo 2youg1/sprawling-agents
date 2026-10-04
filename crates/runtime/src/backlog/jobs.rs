@@ -284,6 +284,7 @@ fn weigh(job: &win32job::Job, memory: usize, held: Shares) -> Shares {
 )]
 mod tests {
     use super::super::Backlog;
+    #[cfg(windows)]
     use super::Shares;
 
     /// The child reads its own affinity after enrolment, so the assertion
