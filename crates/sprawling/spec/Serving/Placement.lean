@@ -445,3 +445,23 @@ pub(crate) fn run_shares() -> runtime::Shares;     // 读设置与物理内存�
 - **处理器号怎么采**：Windows 是 `GetCurrentProcessorNumberEx`，没有安全接口，放进 D41 的同一个 Zig 叶子；Linux 读 `/proc/thread-self/stat` 的第 39 个字段（标准库读文件，第一档；`sched_getcpu` 要 `unsafe`），只在测量构建里读，因为每次一个系统调用；macOS 没有读当前处理器的接口，只报延迟，换核次数写「不可测」。
 - **按读数定默认**：p99 最低、且 p999 不比「不做」差的一臂；相差在噪声以内时取机制最少的一臂。读数与选择写进 `tools/xtask/budgets.toml` 的新行，由做测量的那一道写。
 -/
+
+namespace Sprawling.Serving.Placement
+
+/-- 掩码的逐位解释：run 取得可用处理器中核心未占的那些。 -/
+def remainingProcessors (available core : List Nat) : List Nat :=
+  available.filter (fun processor => processor ∉ core)
+
+/-- 任意集合上的分割性质；Rust 的小掩码穷举与此逐位对应。 -/
+theorem run_processors_are_available_and_outside_core (available core : List Nat)
+    (processor : Nat) (h : processor ∈ remainingProcessors available core) :
+    processor ∈ available ∧ processor ∉ core := by
+  simpa [remainingProcessors] using h
+
+theorem core_and_runs_cover_available (available core : List Nat) (processor : Nat) :
+    processor ∈ available ↔
+      (processor ∈ available ∧ processor ∈ core) ∨
+      processor ∈ remainingProcessors available core := by
+  by_cases h : processor ∈ core <;> simp [remainingProcessors, h]
+
+end Sprawling.Serving.Placement

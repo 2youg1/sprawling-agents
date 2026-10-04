@@ -21,7 +21,7 @@
 //! processes commit together.
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::num::NonZeroU64;
+use std::num::{NonZeroU64, NonZeroUsize};
 
 use kernel::{AxError, RunId};
 
@@ -43,6 +43,20 @@ pub struct RunProcesses {
     /// The shares the run's processes hold right now: the ones the
     /// backlog asked for when the platform gave them, otherwise `Unset`.
     pub share: Shares,
+    /// The affinity accepted for the job; `Os` when none was requested,
+    /// the request was refused, or this platform has no job.
+    pub affinity: RunAffinity,
+}
+
+/// A group-local affinity supplied by placement (D49), never calculated
+/// from configuration inside the runtime.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum RunAffinity {
+    /// Leave placement to the operating system.
+    #[default]
+    Os,
+    /// Hold the run's job to these processors in the current group.
+    Mask(NonZeroUsize),
 }
 
 /// How a run's processes share this machine with the other runs'
@@ -105,7 +119,7 @@ impl Backlog {
     /// Enters a member into the table, and a command into its run's job.
     pub(super) fn enrol(&self, id: BacklogId, member: Member) -> Result<(), AxError> {
         let mut table = self.hold()?;
-        table.jobs.enter(&member, self.shares);
+        table.jobs.enter(&member, self.shares, self.affinity);
         table.members.insert(id, member);
         Ok(())
     }
@@ -124,7 +138,7 @@ impl Jobs {
     }
 
     #[cfg(windows)]
-    fn enter(&mut self, member: &Member, shares: Shares) {
+    fn enter(&mut self, member: &Member, shares: Shares, affinity: RunAffinity) {
         let Body::Command {
             child,
             claim: Claim::Window(owner) | Claim::Run(owner),
@@ -134,13 +148,13 @@ impl Jobs {
             return;
         };
         let run = self.runs.entry(*owner).or_default();
-        if run.join(child, shares).is_none() {
+        if run.join(child, shares, affinity).is_none() {
             run.unjoined = run.unjoined.saturating_add(1);
         }
     }
 
     #[cfg(not(windows))]
-    fn enter(&mut self, member: &Member, shares: Shares) {
+    fn enter(&mut self, member: &Member, shares: Shares, _affinity: RunAffinity) {
         let Body::Command {
             child,
             claim: Claim::Window(owner) | Claim::Run(owner),
@@ -164,6 +178,7 @@ impl Jobs {
                     .extend(pids.into_iter().filter_map(|pid| u32::try_from(pid).ok()));
                 reading.unfollowed = reading.unfollowed.saturating_add(run.unjoined);
                 reading.share = run.share;
+                reading.affinity = run.affinity;
             } else {
                 reading.unfollowed = u32::try_from(reading.pids.len()).unwrap_or(u32::MAX);
             }
@@ -191,6 +206,7 @@ struct RunJob {
     job: Option<win32job::Job>,
     unjoined: u32,
     share: Shares,
+    affinity: RunAffinity,
 }
 
 #[cfg(windows)]
@@ -198,7 +214,12 @@ impl RunJob {
     /// Puts `child` into this run's job, creating the job on first use
     /// with the shares asked for. `None` when the job cannot be made or
     /// the process cannot join it.
-    fn join(&mut self, child: &std::process::Child, shares: Shares) -> Option<()> {
+    fn join(
+        &mut self,
+        child: &std::process::Child,
+        shares: Shares,
+        affinity: RunAffinity,
+    ) -> Option<()> {
         use std::os::windows::io::AsRawHandle;
         let handle = isize::try_from(child.as_raw_handle().addr()).ok()?;
         let job = match self.job.take() {
@@ -206,6 +227,18 @@ impl RunJob {
             None => {
                 let job = win32job::Job::create().ok()?;
                 self.share = given(&job, shares);
+                if let RunAffinity::Mask(mask) = affinity {
+                    // Read after the memory limit was set: an empty
+                    // record here would erase that limit.
+                    let applied = job.query_extended_limit_info().and_then(|mut info| {
+                        info.limit_affinity(mask.get());
+                        job.set_extended_limit_info(&info)
+                    });
+                    self.affinity = match applied {
+                        Ok(()) => affinity,
+                        Err(_refused) => RunAffinity::Os,
+                    };
+                }
                 job
             }
         };
@@ -239,5 +272,165 @@ fn weigh(job: &win32job::Job, memory: usize, held: Shares) -> Shares {
     match desktop_ffi::cpu::job_share(job.handle(), RUN_CPU_WEIGHT, memory) {
         Ok(()) => held,
         Err(_refused) => Shares::Unset,
+    }
+}
+
+#[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    reason = "test code"
+)]
+mod tests {
+    use super::super::Backlog;
+    use super::Shares;
+
+    /// The child reads its own affinity after enrolment, so the assertion
+    /// observes the running process rather than just a job's limit record.
+    #[cfg(windows)]
+    #[test]
+    fn a_run_child_reads_the_requested_affinity() {
+        let available = desktop_ffi::cpu::thread_group().unwrap().mask;
+        let mask = std::num::NonZeroUsize::new(
+            usize::try_from(1_u64 << available.trailing_zeros()).unwrap(),
+        )
+        .unwrap();
+        let backlog = Backlog::with_window(crate::PollBudget::new(1, 1))
+            .with_shares(Shares::CpuAndMemory {
+                limit: std::num::NonZeroU64::new(8 << 30).unwrap(),
+            })
+            .with_affinity(super::RunAffinity::Mask(mask));
+        let owner = kernel::RunId::from_bytes([9; 16]);
+        let addr = kernel::Address::parse("vault/room1").unwrap();
+        for table in [
+            backlog.clone(),
+            backlog.clone().with_affinity(super::RunAffinity::Os),
+        ] {
+            let backlog = &table;
+            let gate = backlog
+                .scratch
+                .dir(backlog.mint().unwrap())
+                .with_extension("gate");
+            let mut child = std::process::Command::new("powershell.exe");
+            child.args([
+        "-NoProfile",
+        "-NonInteractive",
+        "-Command",
+        "while (-not (Test-Path -LiteralPath $env:R05_GATE)) { Start-Sleep -Milliseconds 20 }; [Diagnostics.Process]::GetCurrentProcess().ProcessorAffinity.ToInt64(); exit 23",
+    ]);
+            child
+                .env("R05_GATE", &gate)
+                .current_dir(std::env::temp_dir());
+            let started = backlog
+                .run(owner, &addr, "affinity reader".to_owned(), child)
+                .unwrap();
+            assert!(matches!(started, crate::Started::Backgrounded { .. }));
+            let reading = backlog.processes().unwrap().remove(&owner).unwrap();
+            assert_eq!(reading.affinity, super::RunAffinity::Mask(mask));
+            assert_eq!(reading.unfollowed, 0);
+            assert_eq!(reading.share, backlog.shares());
+            std::fs::write(&gate, b"ready").unwrap();
+            let mut finished = None;
+            for _ in 0..500 {
+                if let Some(done) = backlog.harvest(owner).unwrap().into_iter().next() {
+                    finished = Some(done);
+                    break;
+                }
+                std::thread::sleep(std::time::Duration::from_millis(20));
+            }
+            std::fs::remove_file(gate).unwrap();
+            let finished = finished.expect("the affinity reader finishes");
+            assert_eq!(
+                finished.exit,
+                crate::Exit::Ended { code: 23 },
+                "{}",
+                finished.stderr
+            );
+            assert_eq!(finished.stdout.trim().parse::<usize>().unwrap(), mask.get());
+        }
+        backlog.release(owner);
+    }
+
+    /// The same value seam compiles elsewhere without claiming affinity.
+    #[cfg(not(windows))]
+    #[test]
+    fn a_run_affinity_request_elsewhere_keeps_the_command_result() {
+        let backlog = Backlog::with_window(crate::PollBudget::new(1, 1)).with_affinity(
+            super::RunAffinity::Mask(std::num::NonZeroUsize::new(1).unwrap()),
+        );
+        let owner = kernel::RunId::from_bytes([9; 16]);
+        let addr = kernel::Address::parse("vault/room1").unwrap();
+        let mut child = std::process::Command::new("sh");
+        child.args(["-c", "sleep 1; echo affinity; exit 23"]);
+        child.current_dir(std::env::temp_dir());
+        assert!(matches!(
+            backlog
+                .run(owner, &addr, "reader".to_owned(), child)
+                .unwrap(),
+            crate::Started::Backgrounded { .. }
+        ));
+        assert_eq!(
+            backlog.processes().unwrap().get(&owner).unwrap().affinity,
+            super::RunAffinity::Os
+        );
+        for _ in 0..250 {
+            if let Some(done) = backlog.harvest(owner).unwrap().into_iter().next() {
+                assert_eq!(
+                    (done.exit, done.stdout.trim()),
+                    (crate::Exit::Ended { code: 23 }, "affinity")
+                );
+                backlog.release(owner);
+                return;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+        backlog.release(owner);
+        panic!("the command finishes");
+    }
+
+    /// A refused limit stays visible without turning the command into a
+    /// failed start or dropping the independently accepted CPU share.
+    #[cfg(windows)]
+    #[test]
+    fn a_refused_run_affinity_keeps_the_command_result_and_share() {
+        let available = usize::try_from(desktop_ffi::cpu::thread_group().unwrap().mask).unwrap();
+        if available == usize::MAX {
+            return; // This group has no invalid affinity bit to ask for.
+        }
+        let backlog = Backlog::with_window(crate::PollBudget::new(1, 1))
+            .with_shares(Shares::Cpu)
+            .with_affinity(super::RunAffinity::Mask(std::num::NonZeroUsize::MAX));
+        let owner = kernel::RunId::from_bytes([11; 16]);
+        let addr = kernel::Address::parse("vault/room1").unwrap();
+        let mut child = std::process::Command::new("powershell.exe");
+        child.args(["-NoProfile", "-NonInteractive", "-Command", "exit 23"]);
+        child.current_dir(std::env::temp_dir());
+        assert!(matches!(
+            backlog
+                .run(owner, &addr, "refused mask".to_owned(), child)
+                .unwrap(),
+            crate::Started::Backgrounded { .. }
+        ));
+        let reading = backlog.processes().unwrap().remove(&owner).unwrap();
+        assert_eq!(
+            (reading.affinity, reading.share, reading.unfollowed),
+            (super::RunAffinity::Os, Shares::Cpu, 0)
+        );
+        for _ in 0..500 {
+            if let Some(done) = backlog.harvest(owner).unwrap().into_iter().next() {
+                assert_eq!(
+                    done.exit,
+                    crate::Exit::Ended { code: 23 },
+                    "{}",
+                    done.stderr
+                );
+                backlog.release(owner);
+                return;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+        backlog.release(owner);
+        panic!("the command finishes despite refusal");
     }
 }

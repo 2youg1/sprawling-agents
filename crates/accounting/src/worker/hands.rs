@@ -70,6 +70,9 @@ pub struct Hands {
     /// (`crates/sprawling/spec/Serving/Placement.lean` D47); this crate
     /// only hands it to `runtime::Backlog::with_shares`.
     pub shares: runtime::Shares,
+    /// Placement's run mask (D49), passed unchanged into the backlog.
+    /// This crate reads no placement configuration and computes no mask.
+    pub affinity: runtime::backlog::RunAffinity,
 }
 
 /// The hook a lane takes its seat through; the answer is the seat, and

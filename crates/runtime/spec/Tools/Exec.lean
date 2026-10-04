@@ -341,7 +341,7 @@ WindowsSandbox.exe present: False
 
 namespace Runtime.Tools.Exec
 
-/-- 环境申请结果独立于命令执行。 -/
+/-- 有效的申请值；平台拒绝与不申请均没有实际掩码。 -/
 inductive AffinityAttempt where
   | unrequested
   | accepted (mask : Nat) (nonzero : mask > 0)
@@ -353,19 +353,32 @@ def heldAffinity : AffinityAttempt → Option Nat
   | .accepted mask _ => some mask
   | .refused => none
 
-def reportedExit (exit : Int) (_attempt : AffinityAttempt) : Int := exit
+/-- 未建 job 与已建 job 分开：首条命令之后不重新申请限额。 -/
+inductive RunJobState where
+  | absent
+  | created (affinity : Option Nat)
+  deriving Repr
 
-theorem affinity_never_changes_exit (exit : Int) (attempt : AffinityAttempt) :
-    reportedExit exit attempt = exit := by rfl
+/-- 每条命令尝试入表；建 job 失败则下一条仍可重试。 -/
+inductive JobEntry where
+  | creationRefused
+  | created (attempt : AffinityAttempt)
+  deriving Repr
 
-theorem reported_mask_is_nonzero (attempt : AffinityAttempt) (mask : Nat)
-    (h : heldAffinity attempt = some mask) : mask > 0 := by
-  cases attempt with
-  | unrequested => simp [heldAffinity] at h
-  | refused => simp [heldAffinity] at h
-  | accepted value nonzero =>
-    simp [heldAffinity] at h
-    subst mask
-    exact nonzero
+def enterJob : RunJobState → JobEntry → RunJobState
+  | .created mask, _ => .created mask
+  | .absent, .creationRefused => .absent
+  | .absent, .created attempt => .created (heldAffinity attempt)
+
+def enterTrace (state : RunJobState) (entries : List JobEntry) : RunJobState :=
+  entries.foldl enterJob state
+
+/-- 无论后续命令申请什么，run 都保留首次建成的 job 限额。 -/
+theorem created_job_keeps_affinity_on_every_trace (mask : Option Nat)
+    (entries : List JobEntry) : enterTrace (.created mask) entries = .created mask := by
+  induction entries with
+  | nil => rfl
+  | cons entry rest ih =>
+    simpa [enterTrace, List.foldl, enterJob] using ih
 
 end Runtime.Tools.Exec

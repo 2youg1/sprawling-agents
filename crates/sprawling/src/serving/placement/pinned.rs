@@ -29,7 +29,11 @@ pub(crate) enum Did {
             reason = "only Windows takes the process into a job whose affinity limit this is"
         )
     )]
-    Pinned { group: u16, mask: u64 },
+    Pinned {
+        group: u16,
+        mask: u64,
+        runs: runtime::backlog::RunAffinity,
+    },
     /// The call is external here: the whole binary is started under this
     /// `taskset -c` list by whoever runs the measurement.
     #[cfg_attr(
@@ -66,6 +70,16 @@ pub(crate) fn take(seats: &[Processor]) -> Did {
     did
 }
 
+/// The run request saved before this process's affinity was narrowed.
+pub(crate) fn run_affinity() -> runtime::backlog::RunAffinity {
+    match TAKEN.get() {
+        Some(Did::Pinned { runs, .. }) => *runs,
+        Some(Did::External { .. } | Did::Nothing { .. }) | None => {
+            runtime::backlog::RunAffinity::Os
+        }
+    }
+}
+
 /// The arm's clause for the doctor's line (D47): what was done, or what
 /// would be done now.
 pub(crate) fn clause(seats: &[Processor]) -> String {
@@ -92,8 +106,8 @@ fn words(did: &Did, cores: usize) -> String {
 /// there is nothing to take.
 #[cfg(windows)]
 fn acted(seats: &[Processor]) -> Did {
-    let (group, mask) = match would(seats) {
-        Did::Pinned { group, mask } => (group, mask),
+    let (group, mask, runs) = match would(seats) {
+        Did::Pinned { group, mask, runs } => (group, mask, runs),
         external @ Did::External { .. } | external @ Did::Nothing { .. } => return external,
     };
     let Ok(wide) = usize::try_from(mask) else {
@@ -121,7 +135,10 @@ fn acted(seats: &[Processor]) -> Did {
             reason: "the process was already taken".to_owned(),
         };
     }
-    Did::Pinned { group, mask }
+    if runs == runtime::backlog::RunAffinity::Os {
+        eprintln!("[core] placement = \"pinned\": no remaining processors for run affinity");
+    }
+    Did::Pinned { group, mask, runs }
 }
 
 /// Nothing to take: the platform call is external (`taskset`) or absent.
@@ -165,6 +182,7 @@ fn would(seats: &[Processor]) -> Did {
         Did::Pinned {
             group: group.group,
             mask,
+            runs: remaining(group.mask, mask),
         }
     }
     #[cfg(target_os = "linux")]
@@ -182,6 +200,19 @@ fn would(seats: &[Processor]) -> Did {
         Did::Nothing {
             reason: "this platform has no hard-affinity call".to_owned(),
         }
+    }
+}
+
+/// The available processors outside the core plan; an empty or
+/// unrepresentable remainder asks for no affinity (D49).
+#[cfg(any(windows, test))]
+fn remaining(available: u64, core: u64) -> runtime::backlog::RunAffinity {
+    match usize::try_from(available & !core) {
+        Ok(mask) => match std::num::NonZeroUsize::new(mask) {
+            Some(mask) => runtime::backlog::RunAffinity::Mask(mask),
+            None => runtime::backlog::RunAffinity::Os,
+        },
+        Err(_beyond) => runtime::backlog::RunAffinity::Os,
     }
 }
 
@@ -212,10 +243,41 @@ mod tests {
             .collect();
         assert_eq!(seats.len(), 2, "this machine lends two processors");
         let did = take(&seats);
-        let Did::Pinned { mask, .. } = did else {
+        let Did::Pinned { mask, runs, .. } = did else {
             panic!("the arm pinned nothing: {did:?}");
         };
         assert_eq!(desktop_ffi::cpu::thread_group().unwrap().mask, mask);
+        assert_eq!(run_affinity(), runs);
+        let runtime::backlog::RunAffinity::Mask(run_mask) = runs else {
+            panic!("this machine lends processors outside the two core seats");
+        };
+        let backlog = runtime::Backlog::new().with_affinity(runs);
+        let mut child = std::process::Command::new("powershell.exe");
+        child.args(["-NoProfile", "-NonInteractive", "-Command",
+            "Start-Sleep -Milliseconds 200; [Diagnostics.Process]::GetCurrentProcess().ProcessorAffinity.ToInt64()"]);
+        child.current_dir(std::env::temp_dir());
+        let owner = kernel::RunId::from_bytes([10; 16]);
+        let started = backlog
+            .run(
+                owner,
+                &kernel::Address::parse("vault/room1").unwrap(),
+                "remaining processors".to_owned(),
+                child,
+            )
+            .unwrap();
+        let runtime::Started::Settled {
+            exit,
+            stdout,
+            stderr,
+        } = started
+        else {
+            backlog.release(owner);
+            panic!("the child did not finish in its window");
+        };
+        backlog.release(owner);
+        assert_eq!(exit, runtime::Exit::Ended { code: 0 }, "{stderr}");
+        assert_eq!(stdout.trim().parse::<usize>().unwrap(), run_mask.get());
+        assert_eq!(u64::try_from(run_mask.get()).unwrap() & mask, 0);
     }
 
     /// Linux has the call but not through a safe interface, so the arm
@@ -256,6 +318,25 @@ mod tests {
         };
         assert!(reason.contains("no hard-affinity call"), "{reason}");
         assert!(clause(&seats).contains("nothing is pinned"));
+    }
+
+    /// The mask partitions every small available set, including an
+    /// empty remainder and planned bits outside the available set.
+    #[test]
+    fn run_processors_are_available_and_outside_the_core_plan() {
+        for available in 0_u64..256 {
+            for core in 0_u64..256 {
+                match remaining(available, core) {
+                    runtime::backlog::RunAffinity::Os => assert_eq!(available & !core, 0),
+                    runtime::backlog::RunAffinity::Mask(mask) => {
+                        let runs = u64::try_from(mask.get()).unwrap();
+                        assert_eq!(runs & core, 0);
+                        assert_eq!(runs & !available, 0);
+                        assert_eq!(runs | (available & core), available);
+                    }
+                }
+            }
+        }
     }
 
     /// No plan means nothing to pin, said rather than hidden.

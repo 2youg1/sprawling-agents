@@ -110,6 +110,20 @@ pub(crate) fn run_shares() -> Shares {
     shares_of(setting(), crate::monitor::memory::read().physical)
 }
 
+/// The pinned arm's remaining processors, saved before the core joins
+/// its job. Initialise the same table the first seat uses, so assembly
+/// before that seat still receives the saved mask.
+pub(crate) fn run_affinity() -> runtime::backlog::RunAffinity {
+    if setting() != CorePlacement::Pinned {
+        return runtime::backlog::RunAffinity::Os;
+    }
+    TABLE
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .get_or_insert_with(first_table);
+    pinned::run_affinity()
+}
+
 /// What one arm asks for each run: nothing with placement off, an even
 /// CPU share for the other three, and with `"soft_shares"` a memory limit
 /// of half the physical memory as well. A physical memory read as zero

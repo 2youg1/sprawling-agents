@@ -43,6 +43,7 @@ pub(crate) fn hands() -> Hands {
         },
         seat_lane: no_seat,
         shares: runtime::Shares::Unset,
+        affinity: runtime::backlog::RunAffinity::Os,
     }
 }
 

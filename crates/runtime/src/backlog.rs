@@ -57,6 +57,7 @@ pub struct Backlog {
     window: PollBudget,
     sink: Option<Sink>,
     shares: Shares,
+    affinity: RunAffinity,
 }
 
 impl Default for Backlog {
@@ -379,7 +380,7 @@ mod scratch;
 mod tail;
 pub mod waiting;
 pub use cgroup::{PlatformShares, platform_shares};
-pub use jobs::{RunProcesses, Shares};
+pub use jobs::{RunAffinity, RunProcesses, Shares};
 use member::{Body, Claim, Member, RunState, collect, storage};
 pub use report::{BacklogKind, Finished, Standing, Started};
 use scratch::Scratch;
