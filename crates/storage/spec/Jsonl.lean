@@ -154,7 +154,7 @@ pub struct OpenReport {
 最后非零偏移减最后有效行的结束偏移。失败仍为 `StorageError::Io`，链与版本拒词、磁盘格式与截尾规则不变。
 
 `open_reusing` 的唯一直接 helper `verified_prefix::ProofRecords::tail_start(vfs, path, entry) -> io::Result<TailStart>` 不再接整段切片：
-先逐窗哈希记录声明的前缀并调用已有 `SegmentRecord::stands`，命中后从前缀末尾扫描；
+先经已有 `SegmentRecord::prefix_length` 判版本与段长，逐窗哈希记录声明的前缀并调用 `SegmentRecord::stands`，命中后从前缀末尾扫描；
 缺失、版本失配、长度不足或摘要失配时从头扫描，摘要失配的额外读量计入 `ProofCount`。
 `jsonl::reading` 的测试计量扫描工作缓冲的峰值容量、写入行缓冲的字节数与结果行复制次数，
 与同一夹具的整段保留／逐行复制参考实现比较，断言预分配零尾的峰值下降，原始行所有权移交消除结果行复制，测试比较来源与结果的缓冲地址并断言复制次数从整段参考实现的每行一次降到零；字节计量只计转入扫描工作缓冲与结果的字节，不计 VFS／操作系统的 I/O 复制。

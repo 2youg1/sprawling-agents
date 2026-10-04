@@ -156,19 +156,19 @@ impl ProofRecords {
         else {
             return Ok(start);
         };
-        if record.version != line_check_version()
-            || record.len > vfs.size(path)?
-            || record.entry != entry
-        {
+        let Some(length) = record.prefix_length(vfs.size(path)?, line_check_version()) else {
+            return Ok(start);
+        };
+        if record.entry != entry {
             return Ok(start);
         }
         let mut hasher = blake3::Hasher::new();
         let mut offset = 0u64;
-        while offset < record.len {
+        while offset < length {
             let chunk = vfs.read_at(
                 path,
                 offset,
-                crate::jsonl::SCAN_WINDOW_BYTES.min(record.len.saturating_sub(offset)),
+                crate::jsonl::SCAN_WINDOW_BYTES.min(length.saturating_sub(offset)),
             )?;
             if chunk.is_empty() {
                 return Ok(start);
@@ -184,7 +184,7 @@ impl ProofRecords {
             start.counted.bytes_hashed = start.counted.bytes_hashed.saturating_add(read);
         }
         if let Some((lines, exit)) = record.stands(entry, &hasher) {
-            start.from = usize::try_from(record.len).map_err(io::Error::other)?;
+            start.from = usize::try_from(length).map_err(io::Error::other)?;
             start.lines = lines;
             start.check = exit;
             start.counted.segments_by_digest = 1;
@@ -274,15 +274,18 @@ impl SegmentRecord {
 /// `crates/storage/spec/Snapshot.lean`, whose `cachedVerifyIsStrict`
 /// says a record that stands gives the strict verdict.
 impl SegmentRecord {
+    /// The recorded prefix length when its rule version and the
+    /// segment's current length permit reuse, for both read strategies.
+    pub(crate) fn prefix_length(&self, total: u64, version: u32) -> Option<u64> {
+        (self.version == version && self.len <= total).then_some(self.len)
+    }
+
     /// The first `len` bytes of `bytes` this record names, when it was
     /// written under rule version `version` and the segment still holds
     /// that much; `None` otherwise, and nothing is to be hashed.
     pub(crate) fn prefix<'a>(&self, bytes: &'a [u8], version: u32) -> Option<&'a [u8]> {
-        if self.version != version {
-            return None;
-        }
-        usize::try_from(self.len)
-            .ok()
+        self.prefix_length(u64::try_from(bytes.len()).ok()?, version)
+            .and_then(|len| usize::try_from(len).ok())
             .and_then(|len| bytes.get(..len))
     }
 

@@ -295,6 +295,7 @@ error ◀──使用── 其余模块（StorageError 与 into_ax 的唯一定
 | D31 | 段的预分配是一个可选的臂，默认仍是生长；选它就是改 `SEGMENT_PREALLOCATION` 一个值 | `crates/storage/spec/Jsonl/Preallocate.lean` |
 | D32 | 索引的刷新逐窗向前读，在预分配段的零尾那一窗停 | `crates/storage/spec/Index.lean` |
 | D33 | 建表的那一遍扫描与刷新共用同一支窗读，在预分配段的零尾那一窗停 | `crates/storage/spec/Index.lean` |
+| D34 | JSONL 的三条整段读路径使用有界内存的流式扫描 | `crates/storage/spec/Jsonl.lean` |
 -/
 
 /-! ## 13 依赖选型
