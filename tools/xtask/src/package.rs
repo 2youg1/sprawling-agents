@@ -208,6 +208,7 @@ fn write_archive(archive: &Path, stem: &str, entries: &[Entry]) -> Result<(), Xt
         let bytes = std::fs::read(&entry.source).map_err(|err| io(&entry.source, err))?;
         let options = zip::write::SimpleFileOptions::default()
             .compression_method(zip::CompressionMethod::Deflated)
+            .compression_level(Some(9))
             .last_modified_time(zip::DateTime::default())
             .unix_permissions(entry.mode);
         zip.start_file(format!("{stem}/{}", entry.name), options)
