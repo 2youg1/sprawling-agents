@@ -56,8 +56,8 @@
 # wave/<name>`); nothing below assumes the ref is `main` except the cache
 # writes, which only `main` makes.
 #
-# Every Rust cache is keyed on `Cargo.lock` and `rust-toolchain.toml` (the
-# two files that decide what a build produces), every bun cache on
+# Rust cache hashes the installed toolchains, Cargo/Rust environment and
+# dependency files; shared-key separates each compilation use. Bun keys on
 # `client/bun.lock`, and only the branch everyone builds on writes a cache:
 # a pull request's save is readable by that pull request alone, and it
 # pushes the shared entry out of the repository's cache budget by age.
@@ -72,6 +72,12 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      release-validation:
+        description: Preserve the release blocking scope; omit core and conditional kani.
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -86,8 +92,9 @@ env:
 # A second push supersedes the first: nobody reads the verdict on a commit
 # that has already been replaced.
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  # A release invocation must not cancel another release or a main CI run.
+  group: ci-${{ inputs.release-validation && github.run_id || github.ref }}
+  cancel-in-progress: ${{ !inputs.release-validation }}
 
 jobs:
   # Which of this change's paths a proof could possibly be about.
@@ -97,6 +104,7 @@ jobs:
   # runs only when a path it judges moved: the kernel it proves over, this
   # workflow, the xtask that owns the harness roster, and the kani pin.
   changes:
+    if: ${{ !inputs.release-validation }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
@@ -133,7 +141,6 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: fast
-          key: ${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: taiki-e/install-action@v2
         with:
@@ -213,7 +220,6 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: clippy
-          key: ${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: taiki-e/install-action@v2
         with:
@@ -248,7 +254,6 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: test
-          key: ${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: taiki-e/install-action@v2
         with:
@@ -312,21 +317,24 @@ jobs:
           key: trybuild-${{ runner.os }}-${{ matrix.slice }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml', 'crates/*/tests/**') }}
 
   # The one verdict of the suite, under the name branch protection
-  # requires. It reads the four slices and nothing else, so a slice that
+  # requires. It reads the build and all four slices, so a slice that
   # failed, or never started because the build failed, fails it.
   test:
-    needs: test-slice
-    if: ${{ !cancelled() }}
+    needs: [test-build, test-slice]
+    if: ${{ always() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - name: every slice passed
-        run: test "${{ needs.test-slice.result }}" = success
+        run: |
+          test "${{ needs.test-build.result }}" = success
+          test "${{ needs.test-slice.result }}" = success
 
   # The packages a person on macOS or Linux runs, linted and tested
   # where they run. Not a required check: a red here is read and fixed
   # forward, and the required set stays the one a Windows desk reproduces.
   core:
+    if: ${{ !inputs.release-validation }}
     name: core (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 40
@@ -341,7 +349,6 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: core
-          key: ${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: taiki-e/install-action@v2
         with:
@@ -368,7 +375,6 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: gates
-          key: ${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: ./.github/actions/client-artifacts
       - name: the gates that judge the client bundle
@@ -440,8 +446,8 @@ jobs:
     needs: changes
     # A change that touches nothing a proof is about skips this job, and
     # a skipped job reports success to a required check. Asking for the
-    # run by hand always proves, because that is what asking means.
-    if: needs.changes.outputs.proof == 'true' || github.event_name == 'workflow_dispatch'
+    # ordinary CI run by hand always proves. Release keeps its existing scope.
+    if: ${{ !inputs.release-validation && (needs.changes.outputs.proof == 'true' || github.event_name == 'workflow_dispatch') }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -451,7 +457,6 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: proof
-          key: ${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
           save-if: ${{ github.ref == 'refs/heads/main' }}
       # kani's own toolchain is hundreds of megabytes and changes when the
       # pin changes and at no other time, so the pin file is the whole key.
@@ -482,3 +487,16 @@ jobs:
       # command (tools/xtask/src/proof.rs).
       - name: the proofs
         run: cargo xtask proof
+
+  # D27 in tools/xtask/Spec.lean: skipped required work is not a green tree.
+  # This is the shared verdict, so release has no second list of checks.
+  validation:
+    needs: [fast, models, clippy, test, gates, supply, client, desktop]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: every required job passed
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: jq -e 'all(.[]; .result == "success")' <<<"$RESULTS"

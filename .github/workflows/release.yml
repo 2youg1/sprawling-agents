@@ -21,89 +21,33 @@ on:
 permissions:
   contents: read
 
-# Word for word what ci.yml sets, and it has to be: `Swatinem/rust-cache`
-# hashes every `CARGO*` and `RUST*` variable into its key, so a release
-# that left these unset could not restore what a push to main saved, no
-# matter how well the rest of the key matched.
 env:
   CARGO_INCREMENTAL: "0"
   CARGO_TERM_COLOR: always
 
 jobs:
-  # Nothing is built for release out of a tree that has not passed.
-  #
-  # Windows, and only Windows: this job runs the same check the person
-  # develops against, so a red release verify is a red local `just check`
-  # reproduced exactly. It is the gate on the tree, not a per-platform
-  # build - the three archives the matrix below produces (Windows, macOS
-  # and static Linux) all come out of the tree this job passed.
-  # The ceilings in this file are backstops against a hung runner, not
-  # budgets: ci.yml's twenty minutes measures jobs that split the work
-  # three ways and start warm, while this job runs their union and the
-  # matrix below links a fat-LTO binary with one codegen unit. A release
-  # that takes an hour is slow; a release still going at six hours has
-  # stopped.
+  # Same-commit validation, including the cache environment, belongs to CI.
+  # D27 in tools/xtask/Spec.lean preserves the existing release blocking scope.
   verify:
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+    with:
+      release-validation: true
+
+  # Advisories can change without a source change, so every release reads them.
+  advisories:
     runs-on: windows-latest
-    timeout-minutes: 60
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
       - name: install pinned toolchain
         run: rustup show
-      # The Zig the desktop's leaf is built with; every Windows build of
-      # `sprawling` compiles it (`crates/desktop/Spec.lean` section 8-12).
-      - uses: ./.github/actions/zig
-      # `test` rather than a key of its own, and that is the whole of the
-      # change: this job used to have a key no other run could fill, so
-      # every tag compiled 494 packages from zero. The `test` entry holds
-      # real rlibs, which is what the slower half of this job needs -
-      # rust-cache prunes the workspace's own artefacts before saving, so
-      # what arrives is the dependency graph and nothing that could be
-      # stale about this tree.
-      #
-      # `save-if: false` because a cache written under a tag ref is
-      # restorable by that tag alone, and a tag is cut once: the save
-      # would be pure cost. The key matches `ci.yml`'s `test` job.
-      - uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: test
-          key: ${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
-          save-if: false
       - uses: taiki-e/install-action@v2
         with:
-          tool: cargo-nextest,cargo-deny,just
-      # See ci.yml: the trybuild suites are cold rather than slow. Same
-      # cache, same key, so a release reuses whatever main last filled.
-      - uses: actions/cache/restore@v6
-        with:
-          path: target/tests
-          key: trybuild-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml', 'crates/*/tests/**') }}
-          restore-keys: trybuild-${{ runner.os }}-
-      # bun and its cache for the client recipes, and the bundle the npm
-      # and render gates judge.
-      - uses: ./.github/actions/client-artifacts
-      # Lean, which `just prereqs` requires and `just models` builds with.
-      - uses: ./.github/actions/lean
-      # The command itself rather than a list of its steps: a release
-      # verify that spelled them out once lost the client install and cut
-      # v0.0.6 on gates that had never judged it.
-      - name: just check
-        run: just check
-      # The one read `just check` leaves to the nightly: an advisory is
-      # news about a dependency, and a release is where it must be read.
+          tool: cargo-deny
       - name: advisories
         run: cargo deny check advisories
-      # See ci.yml: the cache's save step cannot walk trybuild's scratch,
-      # and a job whose every gate was green reported failure because of
-      # it. It bites again whenever the step runs in PowerShell, where
-      # `rm -rf` is not a legal invocation - so the shell is named, as it
-      # already is in platforms.yml.
-      - name: clear the trybuild scratch before the cache is saved
-        if: always()
-        shell: bash
-        run: rm -rf target/tests
 
   # Three platforms, and the third is static on purpose.
   #
@@ -126,8 +70,8 @@ jobs:
   # `Persistence::ThisBoot` because a reboot empties it (`crates/gateway/Spec.lean`
   # §8-4). `libdbus-sys` is out of the lockfile entirely.
   #
-  # Archive does not wait for verify: the two are independent, publish
-  # waits for both, and the wall clock is the slower one instead of the sum.
+  # Archive runs beside validation and advisories; publish waits for all
+  # three, so their wall clock is the slowest branch rather than their sum.
   archive:
     timeout-minutes: 90
     strategy:
@@ -205,12 +149,12 @@ jobs:
         run: sh .github/install-loopback.sh target/package
       - uses: actions/upload-artifact@v7
         with:
-          name: archive-${{ matrix.os }}${{ matrix.target && format('-{0}', matrix.target) || '' }}
+          name: archive-${{ runner.os }}${{ matrix.target && format('-{0}', matrix.target) || '' }}
           path: target/package/*.zip
           if-no-files-found: error
 
   publish:
-    needs: [verify, archive]
+    needs: [verify, advisories, archive]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     # `id-token: write` lets the attestation step mint the OIDC token that
@@ -226,6 +170,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/download-artifact@v8
         with:
+          pattern: &release-archives archive-*
           path: assets
           merge-multiple: true
       # Before the archives are attached, never after: a failure here then
@@ -338,6 +283,7 @@ jobs:
         run: rustup show
       - uses: actions/download-artifact@v8
         with:
+          pattern: *release-archives
           path: assets
           merge-multiple: true
       - uses: actions/setup-node@v7
