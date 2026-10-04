@@ -136,9 +136,20 @@ impl Worktrees {
 
     /// Where the stock stands, read from git and the disk.
     fn stock_standing(&self) -> Result<Stock, StorageError> {
+        let admin = self.repo.commondir().join(super::WORKTREE_DIR).join(STOCK);
         let tree = match self.repo.find_worktree(STOCK) {
             Ok(tree) => tree,
             Err(err) if err.code() == git2::ErrorCode::NotFound => return Ok(Stock::Absent),
+            // A registration git will not read is one a cut takeover left
+            // behind - the tree renamed out from under it, or the write of
+            // its link torn - and `Broken` is the state for it: `forget`
+            // takes the registration back and the placement after it makes
+            // the stock whole (`crates/storage/spec/Worktree/Trees/Stock.lean`
+            // §8-35: 接管的步骤…进程可能在任何一步之后死掉，而 standing
+            // 收回指向不存在目录的登记; `every_cut_is_recovered`). Where no
+            // registration stands at all, the repository itself refused and
+            // the reason is carried.
+            Err(_) if admin.is_dir() => return Ok(Stock::Broken),
             Err(err) => return Err(git("find the stock", STOCK, &err)),
         };
         let lock = tree
@@ -147,7 +158,6 @@ impl Worktrees {
         if let git2::WorktreeLockStatus::Locked(_) = lock {
             return Ok(Stock::Busy);
         }
-        let admin = self.repo.commondir().join("worktrees").join(STOCK);
         let read = |path: &Path| match std::fs::read_to_string(path) {
             Ok(text) => Ok(Some(text)),
             Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(None),
@@ -325,10 +335,45 @@ mod tests {
     use super::super::Landing;
     use super::super::Worktrees;
     use super::super::tests::{bulk_city, entries, name, owner};
+    use super::STOCK;
     use crate::checkpoint::Checkpoint;
 
     fn files_under(dir: &Path) -> u64 {
         u64::try_from(std::fs::read_dir(dir).unwrap().count()).unwrap()
+    }
+
+    /// A cut takeover leaves the spare's registration pointing at a tree
+    /// that is gone, and the next `stock` takes that registration back and
+    /// makes the spare whole (`crates/storage/spec/Worktree/Trees/Stock.lean`
+    /// §8-35: 接管的步骤…进程可能在任何一步之后死掉，而 `standing` 收回指向
+    /// 不存在目录的登记; `every_cut_is_recovered`).
+    ///
+    /// The cut drawn here is a torn write of the registration's link, the
+    /// state libgit2 refuses to read outright: the lookup answers an error
+    /// that is not `NotFound`, so a `standing` that propagated it turned a
+    /// cut takeover into `E_STORAGE_FATAL` where the model promises a
+    /// stocking.
+    #[test]
+    fn a_registration_git_will_not_read_is_stocked_again() {
+        let dir = tempfile::tempdir().unwrap();
+        let trees = bulk_city(dir.path(), 8);
+        trees.stock().unwrap();
+        let registration = trees
+            .repo
+            .commondir()
+            .join(super::super::WORKTREE_DIR)
+            .join(STOCK);
+        std::fs::remove_file(registration.join("gitdir")).unwrap();
+
+        trees.stock().unwrap();
+        let placed = trees.claim(&name("node-1"), &["bulk".to_owned()]).unwrap();
+        assert_eq!(
+            std::fs::read_dir(placed.path().join("bulk"))
+                .unwrap()
+                .count(),
+            8,
+            "the stock is whole again after the cut registration was taken back"
+        );
     }
 
     /// `crates/storage/spec/Worktree/Trees/Stock.lean` §8-35: a placement from the stock creates no file,

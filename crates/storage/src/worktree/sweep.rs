@@ -18,7 +18,7 @@ use std::path::{Path, PathBuf};
 use crate::error::StorageError;
 
 use super::name::WorktreeName;
-use super::trees::{Worktrees, open_city};
+use super::trees::{WORKTREE_DIR, Worktrees, open_city};
 
 impl Worktrees {
     /// Takes back every tree under `<city>/.sprawling/worktrees/` that
@@ -130,9 +130,23 @@ impl Worktrees {
     /// A repository that has already forgotten the tree is the end
     /// state this asks for, so it is not a failure.
     pub(super) fn forget(&self, id: &str) -> Result<(), StorageError> {
+        let admin = self.repo.commondir().join(WORKTREE_DIR).join(id);
         let tree = match self.repo.find_worktree(id) {
             Ok(tree) => tree,
             Err(err) if err.code() == git2::ErrorCode::NotFound => return Ok(()),
+            // A registration git will not read still holds the name, and the
+            // end state this asks for is the registration gone. git prunes
+            // only what it can open, so the directory goes by hand: that is
+            // what `git worktree prune` removes for a tree whose directory
+            // is gone, and the tree it pointed at is not one to keep
+            // (`crates/storage/spec/Worktree/Trees/Stock.lean` §8-35, the
+            // same state `Stock::Broken` names).
+            Err(_) if admin.is_dir() => {
+                return std::fs::remove_dir_all(&admin).map_err(|source| StorageError::Worktree {
+                    op: "take back a registration git will not read",
+                    detail: format!("{id}: {source}"),
+                });
+            }
             Err(err) => {
                 return Err(StorageError::Worktree {
                     op: "find a worktree",
