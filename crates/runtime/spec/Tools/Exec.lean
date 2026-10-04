@@ -19,7 +19,7 @@
 
 | 臂 | 保 | 不保 |
 |---|---|---|
-| `LinuxNamespaces { wrapper }` | 文件系统、网络、进程树、用户（见下文 `--unshare-all` 一条） | CPU／内存上限；整机对命令只读可见（`--ro-bind / /`），读不受限 |
+| `LinuxNamespaces { wrapper }` | 文件系统、网络、进程树、用户（强制 user namespace） | CPU／内存上限；整机对命令只读可见（`--ro-bind / /`），读不受限 |
 | `WindowsJobObject` | 文件系统（工作目录为副本）、进程树、CPU／内存上限 | **网络**（作业对象不隔离网络）、用户 |
 | `CopiedTree` | 文件系统（写入只落副本、源树只读） | 网络、进程树、用户、CPU／内存上限 |
 | `Unavailable { missing }` | —— | 一切；`missing` 指名缺的是什么 |
@@ -52,7 +52,8 @@ pub fn parse_placement(&Map<String, Value>) -> Result<Placement, AxError>;
 ```
 
 - **保证清单在类型上**：`Assurances` 逐轴五字段，每一臂的 `assurances()` 必须写满五轴，故新增一轴即四臂同时编译红——任何一臂都不会留下一个没人问过它的旧答案。`statement()` 由 `Assurances` 与 `Guarantee::phrase()`／`unkept()` 派生而非另写一段话，句子与类型因此不可能分家。
-- **`LinuxNamespaces` 的「用户」一轴今天是有条件的**：`namespaced()` 给 `bwrap` 的是 `--unshare-all`，而 bubblewrap 的手册写明它等于 `--unshare-user-try --unshare-ipc --unshare-pid --unshare-net --unshare-uts --unshare-cgroup-try`：内核不让未提权的进程建 user namespace、`bwrap` 又以 setuid 方式装着时（bubblewrap README 说它历史上支持这种方式），user namespace 静默不建，清单上的 `user: Yes` 就是对一个与 harness 同一身份的盒子说「有自己的身份」。规格的意图是清单只写兑现得了的轴，所以这是代码的缺陷，修法列在下文「SB1 未落地的工作」第 1 条。`--ro-bind / /` 让整机对命令只读可见：「文件系统」一轴的含义是写入只落副本（`Guarantee::Filesystem` 的文档），不是读不到别处，这一点 `statement()` 的句子与本表都照实写。
+- **`LinuxNamespaces` 的用户隔离是起动条件**：`namespaced()` 在 `--unshare-all` 之后显式加 `--unshare-user`；bubblewrap 手册（https://github.com/containers/bubblewrap/blob/main/bwrap.xml ）规定前者包含可跳过的 `--unshare-user-try`，后者要求创建 user namespace。`place()` 在同步副本之前用同一包装参数运行 `/bin/true`，绑定的是工作目录自身；探测没有写入，成功后才构造目标命令。探测起动失败或退出非零时返回 `E_SANDBOX_DENIED`，主语说明这一臂需要未提权的 user namespace，并保留系统错误或 wrapper 的 stderr；恢复语给出换到允许未提权 user namespace 的 Linux 主机或由人选择 `where: host`。探测不缓存，因为内核与 LSM 的许可可能在两条命令之间变化；目标命令仍带强制参数，所以探测之后许可被撤回时也不会少一轴运行。`statement()` 保证文件系统、网络、进程树与用户，资源上限不保，并说明未提权 user namespace 是必需条件。`--ro-bind / /` 让整机对命令只读可见：文件系统保证写入只落副本，不限制读取。
+- **SB1 第 1 条的取舍**：选强制参数与放置前探测，因为 `place()` 返回的是尚未起动的命令，无法直接把目标 wrapper 的退出码变成类型化拒绝；被否的是仅加参数而让缺能力落成普通命令退出、以及许可不足时静默退到 `CopiedTree`。代价是每次 Linux 放置多起一个短命 wrapper；重开参数是 backlog 提供能区分 wrapper 起动失败与目标命令失败的起动协议，届时可在同一次起动里报拒绝。
 - **选择是纯函数**：`choose` 取 `Offerings`——有 wrapper 即 `LinuxNamespaces`，否则 `CopiedTree`；scratch 根不可用即 `Unavailable { missing: ScratchDirectory }`。采样只有 `Offerings::this_machine()` 一处（`PATH`＋`std::env::temp_dir()`），两个 `detect()` 都只读它；测试用 `Offerings` 陈述一台机器而不是借一台。wrapper 是按确切名字 `bwrap` 在 `PATH` 上找到的程序，只在 Linux 上找（`cfg!(target_os = "linux")`），别的平台 `namespace_tool` 恒为 `None`。
 - **逐平台的臂**：Linux 上 `PATH` 里有 `bwrap` 得 `LinuxNamespaces`（副本加 wrapper 给的命名空间），没有得 `CopiedTree`；Windows 上恒得 `CopiedTree`（`WindowsJobObject` 不构造，见下条）；macOS 上今天没有任何平台隔离接入，恒得 `CopiedTree`。三个平台上 temp 目录不可用都得 `Unavailable { missing: ScratchDirectory }`，`place()` 拒。缺的是哪一轴，User 与 Agent 都从同一句 `statement()` 读到：它进 exec 工具的 disclosure 与 doctor 的回报，`CopiedTree` 的那一句逐字写出网络、进程树、用户与资源上限都不保。
 - **`WindowsJobObject` 本构建不构造，且拒而不降级**：Job Object 本身已经可以不写 `unsafe` 地取得——`runtime::backlog::jobs` 经 `win32job` 2.0.3 的安全接口创建 job、装进进程、读进程表（下文「job 的取法」）。不构造的理由是这一臂的保证清单今天兑现不了两轴：①**资源**——`win32job` 2.0.3 的 `ExtendedLimitInfo` 对外只给按进程的工作集上限（`limit_working_memory`；经 `win32job` 设它在一台未提权账户上被系统以 os error 1314 拒绝，而 D32 的探测在另一台未提权的 Windows 11 上直接调 `SetInformationJobObject` 设 `JOB_OBJECT_LIMIT_WORKINGSET` 得到成功——要不要特权随账户令牌而变，推断是 `SeIncreaseWorkingSetPrivilege` 在不在令牌里；无论哪种，它限的是常驻页而不是提交量，不兑现「资源」一轴）、优先级档位（`limit_priority_class`）、调度级别（`limit_scheduling_class`）、亲和性（`limit_affinity`）与 kill-on-close、breakaway 两组开关，作业级提交上限的字段在 crate 私有的结构里，CPU 速率控制它根本不设（D29 说这两项改走哪一档），清单写 `resources: Yes` 就是对一个没有上限的盒子说「有上限」；②**进程树**——子进程起动之后才装进 job，中间一小段里起的孙进程不在 job 里（下文「job 的取法」的代价），`limit_kill_on_job_close` 收不到它。以 `CopiedTree` 冒充这一臂会对着一个开着网络的盒子回答「网络已关」的同类错误，故 `place()` 对它返 `E_SANDBOX_DENIED` 并给「改用 copied tree 且让命令离开网络」的 recovery。Windows 上 `detect()` 因此答 `CopiedTree`，其清单逐字写出网络未隔离——这一句就是 Agent 必须看见的那一句。
@@ -60,13 +61,12 @@ pub fn parse_placement(&Map<String, Value>) -> Result<Placement, AxError>;
 - **`Mount`／`Fuel` 不沿用**：`Fuel` 是 wasmtime 指令计量、`Mount.guest` 是 guest 路径别名，二者 wasip1 专属。本模块保留的是**判断**（能力面＝能到达的路径集）而不是词形。宿主环境照旧不继承（exec 的 env allowlist 未动）；`SandboxJob.env` 的显式注入属 guest 面。
 - **placement**：调用参数 `where: sandbox|host`，缺省 `sandbox`。`host` 是「在原地跑」——它才是碰得到人那棵树的那一臂，故必须由调用方按名说出，也正是与 A-8 同一条纪律（默认引导先在沙箱里做，出沙箱才需要审批）里「需要审批」的那个动作。python 臂无 host 形（它是 wasip1 guest）：要宿主解释器走 program 臂。
 - **公开路径经 `runtime::tools`**：`confinement` 住 `tools/exec/`，doctor 的依赖回报与工具自己的 disclosure 都从 `runtime::tools::{Confinement, Guarantee, Kept, Missing}` 读这一份定义。
-- 证据：`crates/runtime/src/tools/exec/tests.rs` 的 `a_sandboxed_command_writes_in_a_copy_and_leaves_the_source_tree_alone`（真命令、真树：沙箱里写得到、人那棵树不动；同一命令 `where: host` 则写进原树——此对拍使「没动」是能力判定而非命令没写）；`crates/runtime/src/tools/exec/confinement/tests.rs` 的 `the_sandbox_arm_a_machine_gets_is_chosen_from_what_it_has`、`every_sandbox_arm_states_what_it_does_not_hold`、`a_sandbox_refuses_a_tree_deeper_than_its_walk_can_end`、`a_sandbox_copy_is_synced_rather_than_made_again`、`a_sandbox_copy_goes_with_the_tool`。
+- 证据：`crates/runtime/src/tools/exec/tests.rs` 的 `a_sandboxed_command_writes_in_a_copy_and_leaves_the_source_tree_alone`（真命令、真树：沙箱里写得到、人那棵树不动；同一命令 `where: host` 则写进原树——此对拍使「没动」是能力判定而非命令没写）；`crates/runtime/src/tools/exec/confinement/tests.rs` 的 `the_sandbox_arm_a_machine_gets_is_chosen_from_what_it_has`、`every_sandbox_arm_states_what_it_does_not_hold`、`a_sandbox_refuses_a_tree_deeper_than_its_walk_can_end`、`a_sandbox_copy_is_synced_rather_than_made_again`、`a_sandbox_copy_goes_with_the_tool`；Linux 的 `a_namespaced_command_requires_a_user_namespace` 只构造命令，断言强制参数紧跟 `--unshare-all`，`a_namespace_setup_failure_refuses_before_copying` 以失败和缺席的 wrapper 验证拒绝与未创建副本。
 
 这一臂何时构造、构造时清单写什么，见 D29 的 (e)：资源一轴由 D29 的 job 限额兑现，进程树一轴要挂起态起动，两者都落在同一个 Zig 叶子上之后按原清单构造，不缩成一个只保一部分的臂。
 
-**SB1 未落地的工作**（D32 选定的臂；W6b 的 SB1 实现，按这里的顺序）：
+**SB1 未落地的工作**（D32 选定的臂；以下保留各项原编号）：
 
-1. **`LinuxNamespaces` 的用户一轴改成强制**：`namespaced()` 在 `--unshare-all` 之后显式加 `--unshare-user`（bubblewrap 对同一命名空间的「try」与强制形取强制形；推断，需在 Linux runner 上以 `bwrap --unshare-all --unshare-user -- true` 核实组合被接受），建不成 user namespace 时 `bwrap` 失败，`place()` 把它报成 `E_SANDBOX_DENIED` 并说出缺的是未提权的 user namespace，而不是静默少一轴。有的发行版以 LSM 策略限制未提权的 user namespace（推断，本调研没有读到发行版的文档），GitHub 的 ubuntu runner 上这一臂能不能起是 CI 要读的第一件事。
 2. **`[sandbox] arm` 的解析与解出**：键与五个拼写已由 `crates/wire/spec/Answer/Doctor.lean` D26 定，缺省按平台取那里的表；`kernel::config::SandboxLimits` 加 `arm`（规格的所有者 `crates/kernel/spec/Config.lean` §8-22），未知拼写 `E_CONFIG_INVALID`。`Offerings` 加各机制的采样（Linux 的 `bwrap`、Landlock ABI；Windows 的 AppContainer 与 job 叶子是否在本构建里；三个平台上 `docker`／`podman` 是否在 `PATH` 上且 `version` 应答），`choose` 改为取（名字，`Offerings`）给出 `Confinement`：缺省名字的机制缺席时退到 `CopiedTree`，并在 `statement()` 与 doctor 行里说出「缺省的 native 不可用：缺 X」；User 明写的名字的机制缺席时答 `Unavailable { missing }`，`place()` 拒。`Missing` 随之加各机制的缺项（`NamespaceWrapper`、`UserNamespace`、`JobLeaf`、`ContainerRuntime`），每一项一句 `phrase` 与一句 `recovery`，要另装的给安装指引。
 3. **Windows 的 `native`**：D29 (e) 的挂起态起动与恢复落在 `crates/desktop/ffi` 的同一个 Zig 叶子上之后构造 `WindowsJobObject`；同一个叶子再加「以 AppContainer 身份起动」（`CreateProcessW` 带 `PROC_THREAD_ATTRIBUTE_SECURITY_CAPABILITIES`，零个 capability 即无网络），副本目录给这个容器的 SID 加上读写的 ACL。exec 的命令在两者之下：文件系统、网络、进程树、用户、资源五轴都保；harness 居民只进 job、不进 AppContainer（它要连 provider，网络必须开），清单照实写网络与用户不保。叶子的边界性质在 Lean 里证、与 Rust 参照做等价性质测试并两侧 fuzz（AGENTS.md 的平台调用档位）。
 4. **`container` 臂**：`docker`／`podman` 二者取先应答的一个，`run --rm --network none --user <非零> --cpus --memory -v <副本>:<工作目录>`，镜像名由城配置给出、缺省不预拉；五轴都保。要另装 Docker Desktop、Podman Desktop 或 rootless Podman，安装指引指向 D32 引的安装页。
@@ -74,7 +74,6 @@ pub fn parse_placement(&Map<String, Value>) -> Result<Placement, AxError>;
 6. **doctor 每臂一行**：`crates/sprawling/spec/Doctor.lean` 的 doctor 表为 `native`、`container`、`python` 各加一行，读 `Offerings` 的同一次采样。
 7. **每条保证的测试**：每个构造得出的臂，五轴各一个真命令的对拍——写工作目录（副本里有、源树没有）、连回环上一个监听的端口（开网的臂连得上、关网的臂连不上）、起一个比命令活得久的孙进程（进程树轴保时命令结束后它不在）、读自己的身份（用户轴保时与 harness 不同）、分配超过上限的内存（资源轴保时失败）；与 `every_sandbox_arm_states_what_it_does_not_hold` 并列，清单与对拍不一致即红。
 8. **要另装的臂实跑一次**：`container` 在 GitHub 的 ubuntu runner（自带 Docker）上跑第 7 条的对拍；Linux 的 Landlock 回退与 macOS 的 Seatbelt 在 D32 的未决解开之前不构造。
-9. 本模块文档的链接 `[placing::copy](crate::tools::Confinement)` 指向了枚举而不是副本所在的模块，随第 2 条一起改正。
 
 **未决（§3 口径）**：同步仍按命令读两侧的每个目录项，并逐字节比较同长的文件，代价随工作树的大小长；一棵带大构建缓存的工作树每条命令要读两遍缓存。判定它的证据是一棵真实 room 的每条命令同步耗时（毫秒）与其文件数的读数；若读数显示读取成了主项，再比较「按 mtime 与长度跳过、只对同一时间戳刻度里的文件逐字节比较」。
 -/
@@ -286,7 +285,7 @@ pub enum Shell {                                    // runtime::tools::exec::she
 | `container` | Docker Desktop（WSL 2 后端） | Windows、macOS | Windows：安装与更新不要管理员（官方页），但 WSL 2 功能要先打开，打开它要管理员；超过 250 人或 1000 万美元年收入的企业商用要付费订阅 | 保（只挂副本） | 保（`--network none`） | 保 | 保（`--user`） | 保（`--cpus`、`--memory`） | 能 | 外部运行时、镜像要拉取与更新；macOS 上支持当前与前两个大版本 |
 | `container` | Podman Desktop | Windows、macOS | Windows：「只为我」安装不要管理员；打开 WSL 或 Hyper-V 功能要管理员（官方页） | 保 | 保 | 保 | 保 | 保 | 能 | 外部运行时与镜像 |
 | （经 `container`） | WSL 2 | Windows | 是：`wsl --install` 要以管理员身份运行（官方页）；探测机上 WSL 与虚拟机平台两项功能已开、没有发行版 | —— | —— | —— | —— | —— | —— | 它本身不是一个臂：是 Windows 上两个 Desktop 容器运行时的后端，也是在 Windows 上得到 Linux 各臂的途径 |
-| `native` | 命名空间包装程序 `bwrap`（今天的臂） | Linux | 否，要内核允许未提权的 user namespace；否则 `bwrap` 只能以 setuid 装 | 保（整机只读可见） | 保 | 保（`--die-with-parent`） | 条件：今天是 `--unshare-user-try`，见 §8-13-2 与 SB1 第 1 条 | 不保（D29 的 cgroup 另给 CPU 与内存） | 能，但居民要开网，开网时网络一轴不保 | 发行版的 `bubblewrap` 包 |
+| `native` | 命名空间包装程序 `bwrap`（今天的臂） | Linux | 否，要内核允许未提权的 user namespace；不可创建时拒绝，即使 `bwrap` 以 setuid 装着 | 保（整机只读可见） | 保 | 保（`--die-with-parent`） | 保（强制 `--unshare-user`；不可创建时拒绝，§8-13-2） | 不保（D29 的 cgroup 另给 CPU 与内存） | 能，但居民要开网，开网时网络一轴不保 | 发行版的 `bubblewrap` 包 |
 | `native` | Landlock 加 seccomp | Linux | 否：Landlock 让任何进程、包括未提权的进程限制自己；内核 5.13 起，且要编进内核并在启动时启用；TCP 规则从 ABI v4 起，UDP 从 v10 起；seccomp 过滤要先 `PR_SET_NO_NEW_PRIVS` | 保（还能限读） | 条件：按 ABI，只管 TCP（与 v10 起的 UDP） | 不保 | 不保 | 不保 | 能 | 要在子进程里自限：`pre_exec` 是 `unsafe`，所以只能由 harness 以自己的一个子命令重新起动、自限之后再 `exec` 目标命令；这一做法未核实，进未决 |
 | `container` | rootless Podman／Docker | Linux | 装要包管理器；运行要 `newuidmap`、`newgidmap` 与 `/etc/subuid`、`/etc/subgid` 里至少 65536 个从属 id（官方页） | 保 | 保 | 保 | 保 | 保（cgroup v2 委派时） | 能 | 外部运行时与镜像；rootless Podman 的网络走 pasta |
 | （`container` 的运行时） | gVisor `runsc` | Linux | 经 Docker、Kubernetes 或直接用 `runsc`（官方页） | 保 | 保 | 保 | 保 | 保 | 能 | 一个 OCI 运行时，在已有的容器臂下作为可选项，不另起名字 |

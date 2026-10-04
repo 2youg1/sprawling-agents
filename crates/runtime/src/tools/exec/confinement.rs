@@ -23,7 +23,7 @@
 //! A placement is a copy of the working tree, synced to it before each
 //! command, so a command that ruins it ruins nothing of the person's and
 //! nothing the next command sees. The copy is bounded and lives in
-//! [`placing::copy`](crate::tools::Confinement); a tree over the bound is
+//! [`placing::copy`]; a tree over the bound is
 //! refused by name rather than half-copied, because a sandbox that
 //! silently answers for files it did not carry is the failure this
 //! module exists to prevent.
@@ -268,12 +268,19 @@ impl Confinement {
                     .filter(|axis| kept.of(**axis) == Kept::No)
                     .map(|axis| axis.unkept())
                     .collect();
-                format!(
+                let statement = format!(
                     "{}: it guarantees that {}; it does not guarantee: {}.",
                     self.name(),
                     listed(&holds),
                     listed(&misses)
-                )
+                );
+                #[cfg(target_os = "linux")]
+                if matches!(self, Confinement::LinuxNamespaces { .. }) {
+                    return format!(
+                        "{statement} An unprivileged user namespace is required; \n                         namespace setup failure refuses the placement."
+                    );
+                }
+                statement
             }
         }
     }
