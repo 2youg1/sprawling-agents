@@ -11,9 +11,18 @@
 //! (`crates/runtime/spec/Tools/Exec.lean` D29). The table itself, what it
 //! carries and how it ends, is the module above.
 
-use super::{Backlog, PollBudget, Scratch, Shares, Sink};
+use super::{Backlog, PollBudget, RunAffinity, Scratch, Shares, Sink};
 
 impl Backlog {
+    /// Requests this affinity for each run's job. Configure before the
+    /// first command: a run keeps its first job's limits (D49).
+    /// Unsupported platforms and refused requests report `Os` and keep
+    /// the command's own exit result.
+    #[must_use]
+    pub fn with_affinity(self, affinity: RunAffinity) -> Backlog {
+        Backlog { affinity, ..self }
+    }
+
     #[must_use]
     pub fn new() -> Backlog {
         Backlog::default()
@@ -29,6 +38,7 @@ impl Backlog {
             window,
             sink: None,
             shares: Shares::Unset,
+            affinity: RunAffinity::Os,
         }
     }
 

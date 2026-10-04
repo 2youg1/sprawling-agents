@@ -331,7 +331,7 @@ pub(crate) fn describe(read: &Result<Topology, Unread>) -> String; // 同一行�
   - macOS：没有理想处理器的接口（`THREAD_AFFINITY_POLICY` 在 Apple 芯片上不受支持），座位表不建；性能核由 D40 与 `crates/runtime/spec/Tools/Exec.lean` D29 的 QoS 分工争取，拓扑只读给 doctor（D45）。
   - Linux：没有软的理想处理器调用，`sched_setaffinity` 是硬亲和（下面的对照臂）；座位表不建。内核调度器在 Intel 混合架构（ITMT）与 ARM（EAS）上本来就把忙线程放到大核上；拓扑只读给 doctor（D45）。
 - **(c) 一步计算从头到尾在一条线程上。** 一步就是 §8-93 的一轮：热线程从一次醒来到下一次阻塞做完的一件事（折叠一条记录、执行一次工具调用、落一次 relay）。一步之内不把工作交给另一条线程：不经 channel 转手、不 spawn 后再 join、async 任务不在一步中途转去阻塞池。lane 本来各是一条 OS 线程；tokio worker 的一步是一次任务轮询，tokio 的偷任务只发生在两次轮询之间。这是代码的写法，不要平台接口，三个平台同一条。它守住了没有，由下面四臂对照的「中途换核次数」读出。
-- **硬亲和只作对照臂。** Windows：harness 进程经 `win32job` 2.0.3 的安全接口装进一只 job，以 `ExtendedLimitInfo::limit_affinity` 设成计划里处理器的掩码，并置 `limit_silent_breakaway_ok`，让子进程不继承这只 job，run 自己的 job 才有余下的处理器可拿；每个 run 的 job 取余下处理器的掩码这一步还没接上（`runtime::backlog` 建 run 的 job 时不带亲和，D49 记下这一笔）。Linux：硬亲和是外部的 `taskset -c`，整个二进制由做测量的人起动在它下面，进程内不设，本臂给出要用的列表。macOS：没有硬亲和，这一臂不跑，照实说。三个平台都只读一次拓扑、算一次计划，座位表与掩码出自同一份计划。
+- **硬亲和只作对照臂。** Windows：harness 进程经 `win32job` 2.0.3 的安全接口装进一只 job，以 `ExtendedLimitInfo::limit_affinity` 设成计划里处理器的掩码，并置 `limit_silent_breakaway_ok`，让子进程不继承这只 job，run 自己的 job 才有余下的处理器可拿；每个 run 的 job 经 `Backlog::with_affinity` 取余下处理器掩码（D49）。Linux：硬亲和是外部的 `taskset -c`，整个二进制由做测量的人起动在它下面，进程内不设，本臂给出要用的列表。macOS：没有硬亲和，这一臂不跑，照实说。三个平台都只读一次拓扑、算一次计划，座位表与掩码出自同一份计划。
 
 **被否**：①硬亲和作默认（每个 session 一个核）——核忙时宁可排队也不换核，正与 D88 第 3 条「算不过来就立即下一个核」相反；②座位不够时两条热线程共用最空的座位——两条都首选同一个核，那个核一忙两条一起被挪，等于没有偏好，还把座位数抬到最快一档的物理核数之上；③按负载随时改理想处理器——活着的线程偏好一变，就是「计算中途跳来跳去」，模型的「坐下不换」排除了它；④一张表先到先得、tokio worker 也要座位——worker 在第一次醒来时就坐下且永不退出，四个座位的机器上账本、折叠与最先醒的两条 worker 坐满，lane 永远拿不到座位，谁得到偏好由起动次序定而不是由谁要紧定；⑤每次醒来要座位、停放时交还——每次停放与醒来都要取锁，锁就进了热路径。
 
@@ -350,7 +350,9 @@ pub(crate) fn describe(read: &Result<Topology, Unread>) -> String; // 同一行�
 
 **被否**：①在 `runtime` 里写第二个掩码权威——座位与掩码就会各说一个处理器，而且 `runtime` 不知道放置计划；②在 `pinned` 里自己再读一次拓扑——两次读数之间机器可以变，座位与掩码就会分开；③让 run 的 job 继承 harness 的亲和限额——那样每个 run 的进程都被按在最快的几个核上，与「run 拿其余处理器」相反。
 
-**没接上的一步**：Windows 每个 run 的 job 取「余下处理器」掩码要由建 job 的那一处（`runtime::backlog::jobs`）设，而 `runtime` 不能依赖本 crate；要给 `Backlog` 添一条交进掩码的缝，或者把这一步定在别处。今天 run 的进程不在 harness 的 job 里（静默脱离），落在操作系统手里，不比 `"soft"` 差，但不构成完整的第四臂；四臂对照开跑之前这项必须接上。
+**run 掩码的权威与传递**：`pinned::would` 在核心入 job 前，用同一次处理器组读数求 `available & !core_mask`，把非零且能转为 `usize` 的结果放进 `Did::Pinned.runs: runtime::backlog::RunAffinity`，`TAKEN` 保存这个结果；空补集不申请 run 亲和，并向标准错误说明。核心 job 创建或加入失败时也不给 run 掩码。`placement::run_affinity` 在 pinned 臂初始化同一座位表，再读这个结果，经 `assembly::production::hands` 的 `Hands.affinity`、accounting 的车队，交进 `Backlog::with_affinity`；其他臂与其他平台交 `Os`。runtime 不读配置、不重读拓扑、不求补集。runtime §8-13-3 规定申请与报告：拒绝记 `affinity: Os`，创建或加入失败计 `unfollowed`，命令照常运行。空补集、平台拒绝或起动窗口漏出的后代使第四臂的树级约束不完整，测量须读实际报告。
+
+**重开参数**：跨处理器组的放置进入计划时，单组掩码接口须替换为组与掩码的集合；Windows 有安全的起动前 job 接口时消除起动窗口。
 -/
 
 /-! D45 拓扑是读出来的，从不假设；放置计划是拓扑上的纯函数
@@ -437,9 +439,29 @@ pub(crate) fn run_shares() -> runtime::Shares;     // 读设置与物理内存�
 测量归波后的 mid 读数（Roadmap §0 第 7 条），这里只写计划，实现照它留出开关与采样点。
 
 - **开关是一个配置值**：人的配置文件 `[core]` 一节的 `placement`，与 `priority` 同处（`accounting::person`，`crates/accounting/spec/Person.lean`），取 `"none"`、`"soft"`、`"soft_shares"`、`"pinned"`，分别是下面四臂（D47 的表），四个拼写今天都读得懂。读数出来之前的默认是 `"soft"`；读数定下默认之后只改这一个默认值。
-- **四臂**：①不做——不关 EcoQoS、不设理想处理器、run 不设份额；②(a)+(b)+(c)，加上 `crates/runtime/spec/Tools/Exec.lean` D29 的按 run CPU 份额；③再加 D29 的作业级内存上限；④硬亲和（D41、D49）。不做那一臂就是 `[core] placement = "none"`。CPU 份额与 (a)+(b)+(c) 同在 ②，所以对照读不出份额单独的贡献；要读它时，在 ① 上只打开份额加一格。④ 还差一步才完整：每个 run 的 job 取「余下处理器」掩码要由 `runtime::backlog::jobs` 设，而 `runtime` 不能依赖本 crate（D49 的最后一段）——这一项接上之前，第四臂的读数只说明 harness 自己坐在哪里。
+- **四臂**：①不做——不关 EcoQoS、不设理想处理器、run 不设份额；②(a)+(b)+(c)，加上 `crates/runtime/spec/Tools/Exec.lean` D29 的按 run CPU 份额；③再加 D29 的作业级内存上限；④硬亲和（D41、D49）。不做那一臂就是 `[core] placement = "none"`。CPU 份额与 (a)+(b)+(c) 同在 ②，所以对照读不出份额单独的贡献；要读它时，在 ① 上只打开份额加一格。④ 的 run job 经 D49 的值接口申请余下处理器掩码，读数须检查实际亲和与 `unfollowed`；拒绝或空补集不能计作完整约束。
 - **负载**：TP1 吞吐台的同一个 citysim 场景，并发 run 数 4 与 16，另在后台跑 N ∈ {0, 4, 16} 个 `cargo build`，每个都经一个 run 的 exec 起动（于是它们落在各自 run 的 job 里，与真实城一样）。每臂每格重复 5 次，报中位数，写明机器类别（核数与 P/E 之分）。
 - **读数**：工具调用的 harness 开销（`tool_called` 到 `tool_result`）与 relay 往返，各自的 p50、p99、p999；每步计算中途换核的次数——在 M2 的阶段边界（醒来、工具执行前、工具执行后、再次阻塞）各采一次当前处理器号，一步里前后不同就计一次，按热线程的种类分开计。
 - **处理器号怎么采**：Windows 是 `GetCurrentProcessorNumberEx`，没有安全接口，放进 D41 的同一个 Zig 叶子；Linux 读 `/proc/thread-self/stat` 的第 39 个字段（标准库读文件，第一档；`sched_getcpu` 要 `unsafe`），只在测量构建里读，因为每次一个系统调用；macOS 没有读当前处理器的接口，只报延迟，换核次数写「不可测」。
 - **按读数定默认**：p99 最低、且 p999 不比「不做」差的一臂；相差在噪声以内时取机制最少的一臂。读数与选择写进 `tools/xtask/budgets.toml` 的新行，由做测量的那一道写。
 -/
+
+namespace Sprawling.Serving.Placement
+
+/-- 掩码的逐位解释：run 取得可用处理器中核心未占的那些。 -/
+def remainingProcessors (available core : List Nat) : List Nat :=
+  available.filter (fun processor => processor ∉ core)
+
+/-- 任意集合上的分割性质；Rust 的小掩码穷举与此逐位对应。 -/
+theorem run_processors_are_available_and_outside_core (available core : List Nat)
+    (processor : Nat) (h : processor ∈ remainingProcessors available core) :
+    processor ∈ available ∧ processor ∉ core := by
+  simpa [remainingProcessors] using h
+
+theorem core_and_runs_cover_available (available core : List Nat) (processor : Nat) :
+    processor ∈ available ↔
+      (processor ∈ available ∧ processor ∈ core) ∨
+      processor ∈ remainingProcessors available core := by
+  by_cases h : processor ∈ core <;> simp [remainingProcessors, h]
+
+end Sprawling.Serving.Placement

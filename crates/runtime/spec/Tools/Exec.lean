@@ -8,7 +8,7 @@
 
 规定 `tools::exec`、`tools::exec::outcome`、`tools::exec::shell`、`tools::exec::confinement`、`tools::exec::yielding`（`crates/runtime/src/` 下同名的文件）。exec 的三臂、宿主进程沙箱、派出的命令降一级与环境声明。本文件是 `crates/runtime/Spec.lean` 的一个分部；下面每一节保留它在 runtime 规格里的标签 §8-n，别处引作 `crates/runtime/Spec.lean §8-n`。
 
-这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与 `tools::exec`、`backlog` 旁的测试守住（`crates/runtime/Spec.lean` §16）。
+除末尾的亲和申请模型外，这一分部是说明文档，不是形式规格；它写下的接口形状与取舍由 Rust 的类型与 `tools::exec`、`backlog` 旁的测试守住（`crates/runtime/Spec.lean` §16）。
 -/
 
 /-!
@@ -100,16 +100,19 @@ pub(super) fn one_level_down(Command) -> Command;
 **逐 run 的 Job Object（`runtime::backlog::jobs`，形状 4 adapter）**：派出的命令起动之后，谁在吃内存要能归到派出它的 run，而一条 `cargo test` 真正吃内存的是它起的 `rustc` 与测试进程，不是 `cargo` 自己。所以 Windows 上每个 run 一个匿名 Job Object：`Backlog::run` 起动的子进程在登记进表的同一时刻装进它 owner 的 job（第一次装时创建），job 里的进程再起的进程由系统自动装进同一个 job，于是 job 的进程表就是这个 run 的整棵进程树。`Backlog::release(owner)` 丢掉这只 job 的句柄；job 不设 kill-on-close，丢句柄不杀进程，杀进程仍只归 `release` 与 `halt`。macOS 与 Linux 上没有 Job Object：两者都只读到命令自己的 pid（下面的 `unfollowed` 计每一条），因为进程组与 cgroup 的进程表都还没有接成读数；按 run 的 CPU 份额在 macOS 上是 `taskpolicy -c utility`，在 Linux 上是 cgroup v2 的 `cpu.weight`（没有委派时只有 `nice` 一档），分别在 D29 与 D33。
 
 ```rust
-pub struct RunProcesses { pub pids: BTreeSet<u32>, pub unfollowed: u32, pub share: Shares }
+pub enum RunAffinity { Os, Mask(NonZeroUsize) } // 同一处理器组内非零掩码；缺省 Os
+pub struct RunProcesses { pub pids: BTreeSet<u32>, pub unfollowed: u32, pub share: Shares, pub affinity: RunAffinity }
 pub enum Shares { Unset, Cpu, CpuAndMemory { limit: NonZeroU64 } } // 每个 run 的份额（D29）；缺省 Unset
 impl Backlog {
     pub fn with_shares(self, shares: Shares) -> Backlog;   // 这张表起动的每个 run 要的份额；不调时 Unset
     pub fn shares(&self) -> Shares;
+    pub fn with_affinity(self, affinity: RunAffinity) -> Backlog;
     pub fn processes(&self) -> Result<BTreeMap<RunId, RunProcesses>, AxError>;
 }
 ```
 
 - `Shares` 是人的配置 `[core] placement` 那一臂里属于子进程的一半，由 `bin::serving::placement::run_shares` 定（`crates/sprawling/spec/Serving/Placement.lean` D47），经 `accounting::worker::hands::Hands.shares` 交进车队的表；runtime 不读人的配置。一张没人交过份额的表是 `Unset`：测试与不起 run 命令的地方都是它。
+- `RunAffinity` 只收值：placement D49 在 pin 核心前取可用掩码减计划掩码，经 `Hands.affinity` 与车队交给 `Backlog::with_affinity`，runtime 不读配置、不算补集。Windows 创建 run 的 job 后先设置份额，再查询现有扩展限额、用 `win32job` 2.0.3 的 `limit_affinity` 加亲和、写回，保留已有内存限额。成功时 `RunProcesses.affinity` 为请求掩码；拒绝、未请求或非 Windows 时为 `Os`，份额报告仍只说明成功的份额。创建或加入 job 失败仍计 `unfollowed`，申请失败不改命令退出结果；后续命令复用第一条命令的 job 与限额。接口只约束当前组，未覆盖跨组调度与起动到加入 job 的窗口。
 - `RunProcesses.share` 是这个 run 此刻实际拿到的份额：要了而平台给了，就是要的那一个；要了而平台拒绝（叶子调用失败、cgroup 不可写）或这个平台没有份额，就是 `Unset`。
 - `processes` 按 run 给出它此刻在表里的进程：owner 是这个 run（窗口内或已转后台）的每条命令自己的 pid，并上这个 run 的 job 的进程表（job 只列还活着的进程）。已经结束、还没被 `harvest` 的命令仍列出自己的 pid，读数的一方在它后面读不到计数。已 `release` 的命令（owner 为 nobody）不归任何 run。
 - `unfollowed` 是这个 run 的命令里有几条只读到了命令本身、没读到它起的进程：Windows 上创建 job、装进 job 或读 job 的进程表失败的那几条（这一次读数里整个 run 的命令都算），Unix 上是每一条，因为 Unix 上没有 Job Object（进程组是它的对应物，尚未接入）。装不进 job 不让命令起动失败：job 只服务于读数，为读数让一条构建失败是把代价付错了地方，失败落在 `unfollowed` 里给读数的人看。
@@ -201,7 +204,9 @@ pub fn new(setup: ExecSetup, sandbox: Box<dyn Sandbox>, backlog: Backlog) -> Res
   - **权重**：`Shares` 不是 `Unset` 时设；每个 run 一样，取 5（范围 1–9），常量 `RUN_CPU_WEIGHT`。要的是按 run 公平：不设时一条起 16 个进程的构建按线程分到 16 份，对面只有一个进程的 run 分到 1 份；权重相同，每个 run 各得一份，一个 session 的编译饿不死别的 session。harness 不进任何 job，它的热线程本来就站在正常档之上（§8-93）。
   - **内存上限**：`Shares::CpuAndMemory { limit }` 时设，`limit` 是物理内存的一半；物理内存由 sprawling 的 `bin::monitor::memory` 读出，`bin::serving::placement::run_shares` 算出上限放进这个值，本 crate 不读平台。超过时是这个 run 的进程树里的分配失败（编译器报内存不足），城与别的 run 照常。只有 `"soft_shares"` 打开它（D47），默认按读数定。
   - **退路**：叶子调用失败时 job 不设份额、不设上限，命令照常起动（与装不进 job 同一条判断：为读数或份额让一条构建失败是把代价付错了地方），这个 run 的 `RunProcesses.share` 读作 `Unset`。
-- **macOS (d)**：没有 Job Object。派出的命令在 `nice` 外面再包一层 `/usr/sbin/taskpolicy -c utility`，把它与它的后代的 QoS 压到 utility，系统于是先把它们放到效率核上（外部命令，第一档，与 `nice` 同一种做法，§8-13-3）；这一层是 macOS 的 CPU 份额一项，`Shares::Unset` 时不包；找不到 `taskpolicy` 时只包 `nice`。没有不要特权的内存上限：`setrlimit` 要在 `pre_exec` 里调，`pre_exec` 是 `unsafe`，而且 macOS 不执行 `RLIMIT_AS`；所以 macOS 上这一项不可用，`CpuAndMemory` 在 macOS 上只兑现 CPU 一半，doctor 照实说。
+- **macOS (d)**：没有 Job Object。派出的命令在 `nice` 外面再包一层 `/usr/sbin/taskpolicy -c utility`，把它与它的后代的 QoS 压到 utility，系统于是先把它们放到效率核上（外部命令，第一档，与 `nice` 同一种做法，§8-13-3）；这一层是 macOS 的 CPU 份额一项，`Shares::Unset` 时不包；找不到 `taskpolicy` 时只包 `nice`。本实现没有按 run 整棵进程树汇总的内存上限，`CpuAndMemory` 在 macOS 上只兑现 CPU 一半，`RunProcesses.share` 为 `Unset`，doctor 照实说。
+  - **机制与强制范围**：Apple 的 [XNU `bsd/kern/kern_resource.c`](https://github.com/apple-oss-distributions/xnu/blob/main/bsd/kern/kern_resource.c) 在 `dosetrlimit` 的 `RLIMIT_AS` 分支调用 `vm_map_set_size_limit(current_map(), newrlim->rlim_cur)`，因此不能笼统说 macOS 不执行地址空间限额；支持情况须按目标系统核实。shell 的 `ulimit` 包装可以绕过 Rust 的 `pre_exec`，所以 `unsafe` 也不是排除包装的理由。但 `current_map()` 限的是单个进程的虚拟地址空间，不是同一 run 的所有进程合计提交量；后代即使继承相同额度，N 个进程仍能各用一份，一个 run 的多条命令也不共享额度。它既不是 job 的提交量口径，也不是 cgroup 的树级口径。
+  - **决定与未决**：不以逐进程 `ulimit` 冒充按 run 的总内存上限，不为本 crate 新增改变命令起动语义的 shell 包装。尚缺可安全调用、无需额外权限、按 run 汇总整棵进程树、后代不能退出额度的 macOS 机制及真实树级超限验证；找到满足这些条件的接口或允许外部受控执行服务时重开。申请路径未接入，所以没有虚构的设置失败处理；当前明确退到 CPU 包装、内存不强制，命令按原来的退出结果返回。
 - **Linux (d)**：harness 自己所在的 cgroup 是 `/proc/self/cgroup` 的 `0::` 行所指的那一个，挂在 `/sys/fs/cgroup` 下（`runtime::backlog::cgroup`，D33）。它可写时，harness 先把自己移进一个子 cgroup `core`（cgroup v2 规定有进程的 cgroup 不能再往下分资源，`core` 把父 cgroup 空出来），在父 cgroup 的 `cgroup.subtree_control` 打开 `cpu` 与 `memory`，然后每个 run 建一个子 cgroup `run-<RunId>`：`cpu.weight` 写 100（每个 run 一样），`memory.max` 只在 `Shares::CpuAndMemory { limit }` 时写 `limit`（D47 的 `"soft_shares"` 臂给的是物理内存的一半），命令起动后把它的 pid 写进这个子 cgroup 的 `cgroup.procs`（同一 run 的后续命令只写自己的 pid，份额在建 cgroup 时已经写下）。全是标准库读写文件，第一档。与 Windows 的 job 一样，起动到写进 cgroup 之间有一小段，那一段里起的孙进程留在 `core` 里。不可写时（没有 systemd 的委派，CI 主机与许多桌面都是这样）只靠 `nice 10`，doctor 说「runs' commands compete thread by thread and run below the core: the cgroup is not delegated」。cgroup 收不下一个 run 时（建目录或写文件失败）这个 run 读作 `Unset`，命令照常起动：与 Windows 的叶子失败同一条判断。委派与否由 `runtime::platform_shares` 一处读出，doctor 与接线读同一个答案。
 - **(e) `WindowsJobObject` 臂**：今天不构造，理由按 `win32job` 2.0.3 今天公开的接口重新判过（§8-13-2），仍是两轴兑现不了。资源一轴由上面的叶子兑现；进程树一轴要「挂起态起动、装进 job、再恢复」：挂起态起动有安全接口（`CommandExt::creation_flags` 加 `CREATE_SUSPENDED`），装 job 有（`win32job::Job::assign_process`），恢复没有——`std::process::Child` 不交出主线程句柄，`ResumeThread` 或 `NtResumeProcess` 都要 FFI，而 `PROC_THREAD_ATTRIBUTE_JOB_LIST` 要的 `CommandExt::raw_attribute` 既是 `unsafe` 又只在 nightly 上。于是同一个叶子再加一个「恢复这个进程」的函数之后，这一臂按原清单构造：文件系统（副本）、进程树、CPU 与内存上限都保，网络与用户不保；那时 Windows 上 `choose` 有了它就选它。
 - **为什么不缩清单**：一只只保文件系统与「起动之后的进程树」的 job 臂，对 Agent 来说与 `CopiedTree` 几乎一样，多出的只是 kill-on-close；多一臂只多一句要读的话，不多一项保证。
@@ -333,3 +338,47 @@ WindowsSandbox.exe present: False
 
 **未决（§3 口径）**：①macOS 的 Seatbelt：判定它的证据是 GitHub 的 macOS runner 上 `man sandbox-exec` 的原文（是否标为已弃用）、一个 `(version 1)(deny default)` 起头、只放开副本目录写入并 `(deny network*)` 的配置下跑写文件、连回环端口与起孙进程三条命令的结果，以及 Apple 的一页可取的官方文档；②Linux 的 Landlock 回退：判定它的证据是一个不写 `unsafe` 的起动方式（harness 以自己的子命令自限后 `exec`）在 Linux runner 上跑通，并读出 runner 内核的 Landlock ABI。
 -/
+
+namespace Runtime.Tools.Exec
+
+/-- 有效的申请值；平台拒绝与不申请均没有实际掩码。 -/
+inductive AffinityAttempt where
+  | unrequested
+  | accepted (mask : Nat) (nonzero : mask > 0)
+  | refused
+  deriving Repr
+
+def heldAffinity : AffinityAttempt → Option Nat
+  | .unrequested => none
+  | .accepted mask _ => some mask
+  | .refused => none
+
+/-- 未建 job 与已建 job 分开：首条命令之后不重新申请限额。 -/
+inductive RunJobState where
+  | absent
+  | created (affinity : Option Nat)
+  deriving Repr
+
+/-- 每条命令尝试入表；建 job 失败则下一条仍可重试。 -/
+inductive JobEntry where
+  | creationRefused
+  | created (attempt : AffinityAttempt)
+  deriving Repr
+
+def enterJob : RunJobState → JobEntry → RunJobState
+  | .created mask, _ => .created mask
+  | .absent, .creationRefused => .absent
+  | .absent, .created attempt => .created (heldAffinity attempt)
+
+def enterTrace (state : RunJobState) (entries : List JobEntry) : RunJobState :=
+  entries.foldl enterJob state
+
+/-- 无论后续命令申请什么，run 都保留首次建成的 job 限额。 -/
+theorem created_job_keeps_affinity_on_every_trace (mask : Option Nat)
+    (entries : List JobEntry) : enterTrace (.created mask) entries = .created mask := by
+  induction entries with
+  | nil => rfl
+  | cons entry rest ih =>
+    simpa [enterTrace, List.foldl, enterJob] using ih
+
+end Runtime.Tools.Exec

@@ -82,6 +82,7 @@ pub fn hands(vault: gateway::Custodian) -> Hands {
         },
         seat_lane: crate::serving::placement::seat_lane,
         shares: crate::serving::placement::run_shares(),
+        affinity: crate::serving::placement::run_affinity(),
     }
 }
 
