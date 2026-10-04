@@ -24,6 +24,7 @@ V0.0.9是第一个离开pre-alpha的版本，按照我对于成熟度的判定�
 - 第四臂 `pinned` 还差一步：Windows 上每个 run 的 job 取「余下处理器」掩码要由建 job 的那一处（`runtime::backlog::jobs`）设，而 `runtime` 不能依赖 `sprawling`，所以要先加一条把掩码交进 `Backlog` 的缝。今天 run 的进程因此离开 harness 的 job，落在操作系统手里，不比 `"soft"` 差，但不是完整的第四臂。
 - 存储里还有几处整段读：`jsonl/open.rs` 的 `recover_tail` 与另外两条读路径会把预分配段的零尾一起读进来，打开一座预分配过的城要多读几十 MiB。
 - 沙箱的 `native` 臂（Windows 的 Job Object + AppContainer、Linux 的 bwrap、macOS 的 Seatbelt）、skill audit 的实际执行者、按 run 的内存上限在 macOS 上的对应物，都还只是名字与规格。
+- Rust 还停在当前钉住的工具链上，依赖版本也只在需要时才动：下个版本升到 1.99.0，此后按固定节奏把各依赖项跟到上游。发版节奏从这一版起也要变快——每次的变更更少、小版本更频繁，不再像 pre-alpha 那样攒一批再发。
 
 ---
 
@@ -47,6 +48,7 @@ What this version has not finished:
 - The fourth arm, `pinned`, is one step short: on Windows each run's job has to take the mask of the remaining processors, and the place that makes a run's job (`runtime::backlog::jobs`) is in `runtime`, which may not depend on `sprawling`. So a seam handing the mask into `Backlog` comes first. Today a run's processes therefore leave the harness's job and land in the operating system's hands — no worse than `"soft"`, but not the whole fourth arm.
 - Storage still reads whole segments in a few places: `recover_tail` in `jsonl/open.rs` and two other read paths bring a preallocated segment's zero tail in with the records, so opening a city that was preallocated reads tens of MiB more than it needs.
 - The sandbox's `native` arm (Windows' Job Object with AppContainer, Linux's bwrap, macOS' Seatbelt), the auditor that actually runs a skill audit, and the macOS counterpart of the per-run memory limit are names and specifications only.
+- Rust stays where the tree pins it, and a dependency moves only when something needs it to: the next version moves to 1.99.0, the newest, and the dependencies are brought up to date on a regular cadence after that. The release cadence speeds up from this version too — fewer changes in each release, minor releases more often, rather than the pre-alpha habit of collecting a batch and cutting it.
 ---
 
 **Maturity ladder / 成熟度阶梯**
