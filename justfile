@@ -455,6 +455,14 @@ provider script record *listen:
 shots *args: build-web
     cargo xtask shots {{args}}
 
+# The half of the shots camera's check that needs an engine that draws
+# frames: a page whose state is written by the frame after the scroll
+# (tools/xtask/Spec.lean §8-44, D25). It is `#[ignore]`d for `just check`,
+# because a hosted runner's engine draws no frame at all inside a dump
+# run and the check was red on every CI run for it.
+shots-frames:
+    cargo nextest run -p xtask --locked --run-ignored only -E 'test(a_frame_after_the_scroll)'
+
 # Create a crate's Spec.lean skeleton (tools/xtask/Spec.lean §8-41).
 spec crate:
     cargo xtask spec {{crate}}
