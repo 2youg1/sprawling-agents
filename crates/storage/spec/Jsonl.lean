@@ -53,11 +53,11 @@ pub fn read_raw_lines_at(dir: &Path) -> Result<Vec<Vec<u8>>, StorageError>;
 /// 库外的生产调用方是 `sprawling replay`，它的路径是人敲的（sprawling D2）；crate 内 `snapshot::start` 用它按序找段。
 /// 段名规则因此只住 `is_segment` 一处，不被谁再拼一遍。
 pub fn ledger_segments_at(dir: &Path) -> Result<Vec<PathBuf>, StorageError>;
-/// 一段的字节，只读、不走 open；`lines()` 给出该段完整且非空的行（撕裂尾不是行，留给 open 判）。
-/// crate 内的面：`read_raw_lines_at` 是它唯一的调用者，完整行的规则因此只住 `complete_lines` 一处。
+/// 一段的完整且非空的行，只读、不走 open（撕裂尾不是行，留给 open 判）。
+/// crate 内的面：返回完整且非空的行，调用者接走所有权，不再复制一次；完整行的规则住 `jsonl::reading::scan`。
 /// 库外的流式读者不逐段读，走 `LedgerIndex::folding`（8-4），那一遍同时建索引。三者住 `jsonl::reading`。
-pub(crate) fn read_segment(segment: &Path) -> Result<SegmentBytes, StorageError>;
-impl SegmentBytes { pub(crate) fn lines(&self) -> impl Iterator<Item = &[u8]>; }
+pub(crate) fn read_segment(segment: &Path) -> Result<Vec<Vec<u8>>, StorageError>;
+// scan(vfs, path, from, visit) 逐行借给 visit 可移出的 Vec，回调错误直接传播。
 /// 从账本尾部倒着读：最新的一行先出，逐段往前，段内从段尾往回按窗口读（窗口从一页起倍增，
 /// 与 `first_line` 同一条规则，故一行无论多长，读到的字节至多是它自身的两倍）。
 /// 只要最后 N 条的读者（`sprawling view` 的首屏）因此只付这 N 条的字节，而不是整本账本。
@@ -65,7 +65,7 @@ impl SegmentBytes { pub(crate) fn lines(&self) -> impl Iterator<Item = &[u8]>; }
 /// 这些住 `LineCheck::judge` 一处；链改成倒着接：这一行的 `chain_hash` 必须等于较新那行的 `prev`，
 /// 它的 `seq.next()` 必须等于较新那行的 `seq`，seq 为 `FIRST` 的行的 `prev` 必须是 `GENESIS_PREV`。
 /// 不合格的行以 `StorageError::Envelope` 报出，行号是链给它的位置（较新那行的 seq 值，即 1 起的行号；最新一行没有较新者，记作第 0 行），之后迭代结束。撕裂尾（最后一个 `\n` 之后的字节）
-/// 不是行，跳过，与 `lines()` 同一规则。住 `jsonl::tail`。
+/// 不是行，跳过，与正向扫描同一规则。住 `jsonl::tail`。
 /// 被否掉的：先 `read_raw_lines_at` 再取末尾——首屏要付整本账本的读取，正是这个读者要去掉的。
 pub struct TailLines { /* 段路径（倒序）、当前段的未读偏移与缓冲、较新一行的 seq 与 prev */ }
 pub struct TailLine { pub raw: Vec<u8>, pub checked: CheckedLine }
@@ -104,7 +104,7 @@ impl WriterLock {
 - **被否：把 PID 写进锁文件。** Windows 上别的进程读不了被锁住的文件，拒词因此报不出 PID；recovery 改为说明怎样停下持锁的那个进程。
 - **重开参数**：出现不经 `JsonlLedger::open` 写账本的生产路径；或者 `std` 的 `try_lock` 改为按进程而不是按句柄判定。
 
-**open 六步**：①列段排序；②空目录＝新 Ledger（next_seq=FIRST、prev=GENESIS_PREV）；③读首段首行验 `v`（只读这一行：`jsonl::first_line` 用 `Vfs::read_at` 从 4 KiB 的窗口读起、每次加倍，见到第一个 `\n` 或文件尽头即停；不见 `\n` 的首行是撕裂行，答「无行」，交给尾部恢复。整段读进来再切第一行，会让单段账本在 open 时被读两遍）——判定一律经 `kernel::consts_external::readable_log_v`：`Ahead` 即 `VersionAhead`（先于一切链检，恒不部分解读），`NotAVersion`（低于任何构建写过的首版本，含 v0）即 `Envelope` 且拒词说版本，`Current` 与 `Older` 放行；④校验最后一段：逐行 parse＋段内链续（服务中的城经 `open_reusing` 开账本，末段的已验证前缀按摘要证明、只逐行核对记录之后的行，8-34），本段任一可解析行的 `v` 同样经 `readable_log_v` 判定——`Ahead` 与 `NotAVersion` 在此**拒**而不作尾损截断（截掉它等于删掉更新构建的历史），首个非法字节起截断（`truncate`＋`sync_data`）；段尾连续的零字节是预分配的空间，不是撕裂（`crates/storage/spec/Jsonl/Preallocate.lean`）：扫描前先剥掉，不计入截掉的字节、不写 `log_truncated`；写者的位置是剥零之后的长度。生长那一臂（今天的默认，`SEGMENT_PREALLOCATION = Grow`）同样截去这串零，因为下一波 `Vfs::append` 写在文件末尾；预分配那一臂在没有撕裂时留着它们，下一波 `Vfs::write_at` 写在记录末尾（storage D31）；零之后还有带信封的字节时那串零是段内的损伤，拒开而不截；末段的入口取自前段末行（`jsonl::boundary`）：从前段末尾按 `BOUNDARY_WINDOW`（16 KiB）一块向前读，见到这一行之前的换行（或段首）即停，所以读量与这一行同阶，不与段长同阶；这一行过 `LineCheck::judge`，与正向检查同一条规则——已知 kind 类型解析并比对规范回显，`ig:true` 的未知 kind 只读信封——入口的 `prev` 是它的 `chain_hash`，下一个 seq 是它的 seq 加一；判不过即拒，`VersionAhead` 按版本拒，其余为 `Envelope`，行号是它在前段里的行号；⑤若截掉字节>0（含「截空整段即删段文件」的退化情形），append 一条 `log_truncated`（run=CITY、who=`Who::City`——开账本是城自己的活，"system" 这第四种写法已删、data 由 `kernel::event::record::LogTruncated` 拼写为 `{"dropped_bytes":n}`）；⑥恢复 next_seq/prev 内存态。
+**open 六步**：①列段排序；②空目录＝新 Ledger（next_seq=FIRST、prev=GENESIS_PREV）；③读首段首行验 `v`（只读这一行：`jsonl::first_line` 用 `Vfs::read_at` 从 4 KiB 的窗口读起、每次加倍，见到第一个 `\n` 或文件尽头即停；不见 `\n` 的首行是撕裂行，答「无行」，交给尾部恢复。整段读进来再切第一行，会让单段账本在 open 时被读两遍）——判定一律经 `kernel::consts_external::readable_log_v`：`Ahead` 即 `VersionAhead`（先于一切链检，恒不部分解读），`NotAVersion`（低于任何构建写过的首版本，含 v0）即 `Envelope` 且拒词说版本，`Current` 与 `Older` 放行；④校验最后一段：逐行 parse＋段内链续（服务中的城经 `open_reusing` 开账本，末段的已验证前缀按摘要证明、只逐行核对记录之后的行，8-34），本段任一可解析行的 `v` 同样经 `readable_log_v` 判定——`Ahead` 与 `NotAVersion` 在此**拒**而不作尾损截断（截掉它等于删掉更新构建的历史），首个非法字节起截断（`truncate`＋`sync_data`）；段尾连续的零字节是预分配的空间，不是撕裂（`crates/storage/spec/Jsonl/Preallocate.lean`）：扫描时暂存为计数，到文件尽头才确认零尾，不计入截掉的字节、不写 `log_truncated`；写者的位置是剥零之后的长度。生长那一臂（今天的默认，`SEGMENT_PREALLOCATION = Grow`）同样截去这串零，因为下一波 `Vfs::append` 写在文件末尾；预分配那一臂在没有撕裂时留着它们，下一波 `Vfs::write_at` 写在记录末尾（storage D31）；零之后还有带信封的字节时那串零是段内的损伤，拒开而不截；末段的入口取自前段末行（`jsonl::boundary`）：从前段末尾按 `BOUNDARY_WINDOW`（16 KiB）一块向前读，见到这一行之前的换行（或段首）即停，所以读量与这一行同阶，不与段长同阶；这一行过 `LineCheck::judge`，与正向检查同一条规则——已知 kind 类型解析并比对规范回显，`ig:true` 的未知 kind 只读信封——入口的 `prev` 是它的 `chain_hash`，下一个 seq 是它的 seq 加一；判不过即拒，`VersionAhead` 按版本拒，其余为 `Envelope`，行号是它在前段里的行号；⑤若截掉字节>0（含「截空整段即删段文件」的退化情形），append 一条 `log_truncated`（run=CITY、who=`Who::City`——开账本是城自己的活，"system" 这第四种写法已删、data 由 `kernel::event::record::LogTruncated` 拼写为 `{"dropped_bytes":n}`）；⑥恢复 next_seq/prev 内存态。
 **append_all 五步**：逐 draft：seq=next、`EventRecord::from_draft`、`canonical_line`、必要时滚段；写段；单次 `sync_data`（跨段波对每个触及段各一次）；更新 prev/next_seq；铸 refs。任何 Io 错误⇒整波失败，内存态不前进，盘上的段也退回本波之前（`jsonl::unwind`，形状：adapter）：当前段截回 `seg_len` 并 `sync_data`，本波新建的段删去并对目录 `sync_dir`。退回因此和一波一样落盘：退回之后、下一波之前掉电，删掉的段不会回来，截掉的字节也不会回来（`unwind/tests.rs` 的 `a_restored_tail_survives_a_power_cut`）。Windows 上截断之后是 `FlushFileBuffers`，删段之后的 `sync_dir` 是 no-op（那里没有对目录句柄的同步原语，`crates/storage/Spec.lean` §3 第 3 条）；Linux 与 macOS 上是 `sync_data` 与对目录的 `sync_all`。退回本身失败时留作待办，下一波写之前先完成它；完成不了，那一波以退回的 Io 错误失败而不写一个字节。于是写失败留下的半行永远不会成为下一波的前缀，进程活着也好、重启也好，账本都是一条不断的链；open 的断尾只剩掉电一种来源。
 - 被否：写失败后把账本置为只读、直到重启。它同样不写坏账本，但盘满时腾出空间以后城仍要重启才能继续记账；退回只多一次 `truncate`，而且只发生在失败的那一波。重新考虑的条件：出现一个 `truncate` 不可靠、而 open 的断尾可靠的平台。
 -/
@@ -124,10 +124,10 @@ pub struct OpenReport {
 ```
 
 - **为什么。** 尾部恢复（8-1 第 ④ 步）逐行核对整个末段，末段至多 64 MiB。40 万行夹具城的末段 40,843,081 B，逐行核对它是开城的 `open the ledger` 那一段的几乎全部（`crates/sprawling/Spec.lean` §8-144 的读数）；同一段读一遍、BLAKE3 一遍加起来不到它的十分之一。末段的前缀已经被后台的证明逐行核对过，并写下了记录（8-30）。
-- **四个条件，与证明相同。** `open_reusing` 照 `open` 取锁、探版本、从前一段的末行取入口状态，再把末段读进内存一次。`records` 里有末段的记录，且版本等于 `line_check_version()`、段长不短于记录的 `L`、记录的入口等于前一段末行给出的链状态、前 `L` 字节的 BLAKE3 等于记录的摘要时，链状态取记录的出口，从第 `L` 字节起逐行核对；四个条件有一个不成立，整段逐行核对，与 `open` 相同。被哈希的字节与之后被核对的字节出自同一次读（8-30 第一条）。判定 `chain_audit` 的 `Walked::reuse` 已经写过一次，`open_reusing` 调同一个判定，不写第二份。
+- **四个条件，与证明相同。** `open_reusing` 照 `open` 取锁、探版本、从前一段的末行取入口状态，以有界窗口扫描末段。`records` 里有末段的记录，且版本等于 `line_check_version()`、段长不短于记录的 `L`、记录的入口等于前一段末行给出的链状态、前 `L` 字节的 BLAKE3 等于记录的摘要时，链状态取记录的出口，从第 `L` 字节起逐行核对；四个条件有一个不成立，整段逐行核对，与 `open` 相同。摘要命中时，前缀是这一遍窗口读实际哈希的字节，出口判定经 `SegmentRecord::stands`，不再逐行检查同一前缀；摘要不命中时，从段首重新流式检查，以该遍实际读取的字节为准。写者锁覆盖这些读取；不遵守锁的外部并发改写不在一致性保证内。
 - **截断与拒开的判定不变。** 记录只覆盖证明时逐行核对过的完整行，所以前 `L` 字节里没有撕裂与断链，截断只可能落在 `L` 之后；`crates/storage/spec/Jsonl/Barrier.lean` 的 `reopenFromVerifiedPrefix` 陈述从这样一个前缀起重开与从头重开相同，`crates/storage/spec/Snapshot.lean` 的 `cachedVerifyIsStrict` 陈述出口状态与逐行核对相同（末段看作「记录覆盖的前缀」与「之后的字节」两段）。截断之后段比 `L` 短，记录就不再适用。
 - **开账本只读记录。** `open_reusing` 不写记录、不删记录；记录只由持锁的证明写（8-30）。`records` 由调用方给出：记录目录的唯一拼法是 `accounting::views::snapshot::start::proof_dir`（`crates/sprawling/Spec.lean` §8-122），本 crate 不从城布局再推一次。服务中的城经 `open_reusing` 开账本（`crates/sprawling/Spec.lean` §8-144）；其余打开者照旧走 `open`。
-- **读数是计数。** `OpenReport.counted` 与证明的 `ProofCount` 同形：逐行核对的行数、按摘要复用的段数（0 或 1）、尾部恢复读过的字节（末段的长度）、哈希过的字节。记录命中时逐行核对的行数等于证明之后写下的行数，与历史长度无关；`jsonl::open::tests` 在两种规模上断言它。
+- **读数是计数。** `OpenReport.counted` 与证明的 `ProofCount` 同形：逐行核对的行数、按摘要复用的段数（0 或 1）、尾部恢复读过的字节（含零尾；摘要失配后重扫的字节也计入）、哈希过的字节。记录命中时逐行核对的行数等于证明之后写下的行数，与历史长度无关；`jsonl::open::tests` 在两种规模上断言它。
 - **被否：命中记录时不哈希，只比段长。** 段在两次开城之间被截短再接着写、或被外部改写同样长度时，段长照样相符；不哈希就接受了 8-30 要挡的那种意外。
 -/
 
@@ -141,4 +141,26 @@ pub struct OpenReport {
 /-! D22 开账本借用证明写下的记录，不另起一种记录
 
 尾部恢复要的事实——末段某个前缀已逐行核对、走完它的链状态是什么——正是证明为每一段写下的那一条（8-30），所以开账本读同一条记录、用同一个判定（8-34）。**被否：开账本时为末段另写一条「已恢复到此」的记录。** 那是第二个回答「这段字节核对过没有」的地方，两处的版本与失效规则要各自维护；而且开账本的进程在证明之前写它，会让一条没有被证明线程看过的前缀被当成证明过的。**重开参数**：服务之外的打开者（`resume`、`fork`、`adopt`）也要毫秒级开账本时，它们同样经 `open_reusing`，记录照旧只读。
+-/
+
+/-! D34 JSONL 的三条整段读路径使用有界内存的流式扫描（裁决）。
+
+`jsonl::open::recover_tail`、实例 `read_raw_lines` 与 `jsonl::reading::read_segment`
+经既有 `Vfs::read_at` 逐窗读取；窗口大小只有 `jsonl::reading::SCAN_WINDOW_BYTES` 一个定义。
+扫描器只持一窗与当前未结束的一行，连续零字节暂存为计数，后面出现非零字节时才写入行缓冲，
+到文件尽头仍未结束的零尾不复制进缓冲；因此扫描工作内存随最长实际行而变，不随记录数或预分配零尾增长。
+返回所有原始行的接口仍需持有结果字节，这是返回类型本身要求的空间。完整行包括空行供 `open` 判断，
+原始行读面过滤空行；未终止尾不是行。扫描返回物理结束偏移与最后非零字节偏移，截尾字节仍为
+最后非零偏移减最后有效行的结束偏移。失败仍为 `StorageError::Io`，链与版本拒词、磁盘格式与截尾规则不变。
+
+`open_reusing` 的唯一直接 helper `verified_prefix::ProofRecords::tail_start(vfs, path, entry) -> io::Result<TailStart>` 不再接整段切片：
+先经已有 `SegmentRecord::prefix_length` 判版本与段长，逐窗哈希记录声明的前缀并调用 `SegmentRecord::stands`，命中后从前缀末尾扫描；
+缺失、版本失配、长度不足或摘要失配时从头扫描，摘要失配的额外读量计入 `ProofCount`。
+`jsonl::reading` 的测试计量扫描工作缓冲的峰值容量、写入行缓冲的字节数与结果行复制次数，
+与同一夹具的整段保留／逐行复制参考实现比较，断言预分配零尾的峰值下降，原始行所有权移交消除结果行复制，测试比较来源与结果的缓冲地址并断言复制次数从整段参考实现的每行一次降到零；字节计量只计转入扫描工作缓冲与结果的字节，不计 VFS／操作系统的 I/O 复制。
+预分配边界性质沿用 `Jsonl/Preallocate.lean` 的证明与其 Rust proptest。
+
+被否：在第一片零区提前停读。零区之后仍可能有带信封的行，提前停读会把应拒开的历史截掉。
+已知缺口：零尾仍必须扫描，I/O 不承诺减少；现有接口只给字节，不能证明未读区域自写入后未被改动。
+重开条件：读接口提供这份证明，例如平台 valid-data-length 或符合该保证的洞探测，再消除残余零尾扫描。
 -/

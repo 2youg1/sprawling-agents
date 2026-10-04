@@ -70,7 +70,9 @@ pub struct ProofCount {
 const PROOF_WAVE: usize = 8;       // 一波的段数，也是一波的线程数（调用线程算一条）
 // storage::verified_prefix
 impl SegmentRecord {
-    /// 记录的版本等于 `version`、`bytes` 不短于记录的 L 时，`bytes` 的前 L 字节。
+    /// 记录的版本等于 `version`、段长不短于记录的 L 时，给出 L；切片与流式读者共用此判定。
+    pub(crate) fn prefix_length(&self, total: u64, version: u32) -> Option<u64>;
+    /// 经 `prefix_length` 判定后，给出 `bytes` 的前 L 字节。
     pub(crate) fn prefix<'a>(&self, bytes: &'a [u8], version: u32) -> Option<&'a [u8]>;
     /// 入口等于 `entry`、`hashed` 恰好哈希过那段前缀且摘要等于记录的摘要时，前缀里的行数与出口。
     pub(crate) fn stands(&self, entry: LineCheck, hashed: &blake3::Hasher) -> Option<(u64, LineCheck)>;
@@ -79,7 +81,7 @@ impl SegmentRecord {
 
 - **为什么。** 40 万行夹具城（376,383,853 B，6 段）上，后台证明 6 段全按记录命中、一行不逐行核对，仍要 390 ms：读一遍与 BLAKE3 一遍都在 `chain_watch` 的那一条线程上，接受命令（M3）因此落在开城起点之后 650 ms（`crates/sprawling/Spec.lean` §8-154）。各段的读与哈希互不依赖：一段前缀的摘要只取决于这一段的字节。
 - **两步。** 一波取段序上接下来的至多 `PROOF_WAVE` 段。第一步并行：每段读进整段字节、读它的记录；`prefix` 给出前缀时，把它哈希进一个 `blake3::Hasher`。第一段在调用线程上做，其余各段在 `std::thread::scope` 里各一条线程上做，一波全部 join 之后才走第二步。第二步按段序串行，与 8-30 的走法相同：`stands` 给出行数与出口时取出口，用同一个 hasher 接着哈希前缀之后的字节并逐行核对；不给就整段逐行核对、从头哈希。一段坏只让这一段退回逐行核对。
-- **判定不变。** 第一步算的只是前缀的摘要，它是段字节的纯函数；版本、段长、入口、摘要四个条件仍由 `prefix` 与 `stands` 两个方法定，开账本（8-34）也经这两个方法判末段，判定只写一次。`crates/storage/spec/Snapshot.lean` 的 `wavesAreCached` 陈述：先把每段的摘要判定算好、再按段序走，与边走边算的 `cachedRun` 是同一个判定，所以经 `cachedVerifyIsStrict` 等于逐行核对。
+- **判定不变。** 第一步算的只是前缀的摘要，它是段字节的纯函数；版本与段长由 `SegmentRecord::prefix_length` 判定，入口与摘要由 `SegmentRecord::stands` 判定；切片读者的 `prefix` 与开账本（8-34）的窗口哈希共用前者，判定只写一次。`crates/storage/spec/Snapshot.lean` 的 `wavesAreCached` 陈述：先把每段的摘要判定算好、再按段序走，与边走边算的 `cachedRun` 是同一个判定，所以经 `cachedVerifyIsStrict` 等于逐行核对。
 - **核对与哈希仍是同一次读。** 每段只读一次，第二步核对的字节就是第一步哈希的那一份。
 - **计数是确定的。** `waves` 只取决于段数，不取决于核数或线程完成的次序；`bytes_read` 等于各段长度之和；`bytes_hashed` 在 `prefix` 给出前缀时总含这段前缀，入口接不上时也含，因为第一步已经哈希过它。`chain_audit::tests` 在 N 与 2N 段上断言全部五个计数。
 - **常驻内存。** 一波的段字节同时在内存里，至多 `PROOF_WAVE × SEGMENT_ROLL_BYTES`（8 × 64 MiB）；历史短于一波时就是整条账本。

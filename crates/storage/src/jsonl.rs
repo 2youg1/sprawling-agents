@@ -43,6 +43,9 @@ pub(crate) use first_line::{FIRST_WINDOW_BYTES, first_line};
 pub(crate) use ledger::segment_file_name;
 pub use ledger::{JsonlLedger, OpenReport, TailTruncation, WriteObserver};
 pub(crate) use ledger::{complete_lines, records_end, segment_first_seq, segment_names};
+pub(crate) use reading::SCAN_WINDOW_BYTES;
+#[cfg(test)]
+pub(crate) use reading::measure as measure_scan;
 pub use reading::{ledger_segments_at, read_raw_lines_at};
 pub use tail::{TailLine, TailLines};
 pub(crate) use verify::claimed_seq;
