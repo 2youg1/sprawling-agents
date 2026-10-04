@@ -127,6 +127,7 @@ impl AuditReport {
         error: AxError,
     ) {
         self.records.push(SkillAudited {
+            local_only_reason: None,
             skill: request.skill.clone(),
             digest: request.digest,
             source,
@@ -227,6 +228,7 @@ fn partners(request: &AuditRequest, response: HttpAudit) -> Result<Vec<SkillAudi
         .audits
         .into_iter()
         .map(|(name, partner)| SkillAudited {
+            local_only_reason: None,
             skill: request.skill.clone(),
             digest: request.digest,
             source: AuditSource::SkillsSh,
@@ -272,6 +274,7 @@ fn scanner(request: &AuditRequest, response: ScannerAudit) -> Result<SkillAudite
         ));
     }
     Ok(SkillAudited {
+        local_only_reason: None,
         skill: request.skill.clone(),
         digest: request.digest,
         source: AuditSource::SkillSpector,

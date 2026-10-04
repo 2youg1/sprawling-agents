@@ -22,6 +22,9 @@ use crate::B3Hash;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct SkillAudited {
+    /// Why this content has no registered source to request a remote audit.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub local_only_reason: Option<String>,
     pub skill: String,
     pub digest: B3Hash,
     pub source: AuditSource,

@@ -12,9 +12,7 @@ use std::sync::mpsc;
 
 use accounting::{Clock as _, worker::Relay};
 use kernel::event::record::{ShelvedFrom, SkillAudited, SkillShelved};
-use kernel::{
-    AxCode, AxError, B3Hash, EventDraft, EventKind, EventRecord, Ledger as _, Payload, RunId, Seq,
-};
+use kernel::{AxCode, AxError, B3Hash, EventDraft, EventKind, EventRecord, Payload, RunId, Seq};
 
 mod clients;
 
@@ -49,9 +47,13 @@ pub(super) fn start(
     Ok(send)
 }
 
+/// Why no remote source can be asserted for content edited outside shelving.
+const UNREGISTERED_CONTENT: &str =
+    "no SkillShelved source for this content digest; remote audit skipped";
+
 #[derive(Default)]
 struct History {
-    sources: BTreeMap<String, ShelvedFrom>,
+    sources: BTreeMap<B3Hash, ShelvedFrom>,
     audited: BTreeSet<(String, B3Hash)>,
     attempted: BTreeSet<(String, B3Hash)>,
     through: Option<Seq>,
@@ -65,7 +67,7 @@ impl History {
         self.through = Some(record.seq());
         if record.kind() == EventKind::SkillShelved {
             let shelved: SkillShelved = record.data().read()?;
-            self.sources.insert(shelved.skill, shelved.source);
+            self.sources.entry(shelved.digest).or_insert(shelved.source);
         } else if record.kind() == EventKind::SkillAudited {
             let audited: SkillAudited = record.data().read()?;
             if matches!(
@@ -126,18 +128,21 @@ impl History {
                 if self.audited.contains(&key) || !self.attempted.insert(key) {
                     continue;
                 }
-                let source = self
-                    .sources
-                    .get(&holding.name)
-                    .cloned()
-                    .unwrap_or(ShelvedFrom::Path);
+                let source = self.sources.get(&digest);
+                let local_only_reason = source.is_none().then_some(UNREGISTERED_CONTENT);
+                if let Some(reason) = local_only_reason {
+                    eprintln!("skill audit {}: {reason}", holding.name);
+                }
                 let request = city::AuditRequest {
                     skill: holding.name.clone(),
                     digest,
                     path,
-                    source,
+                    source: source.cloned().unwrap_or(ShelvedFrom::Path),
                 };
-                let report = audit(&request);
+                let mut report = audit(&request);
+                for record in &mut report.records {
+                    record.local_only_reason = local_only_reason.map(str::to_owned);
+                }
                 for err in report.failures {
                     eprintln!("skill audit: {err}; {}", err.recovery());
                 }

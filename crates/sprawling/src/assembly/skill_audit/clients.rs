@@ -50,7 +50,7 @@ pub(super) fn audit(request: &city::AuditRequest) -> city::AuditReport {
     }
 }
 
-fn scan(program: &Path, path: &Path) -> Result<ScannerAudit, AuditFetchError> {
+pub(super) fn scan(program: &Path, path: &Path) -> Result<ScannerAudit, AuditFetchError> {
     let (version_code, version) = answered(
         Command::new(program).arg("--version"),
         crate::doctor::PATIENCE,

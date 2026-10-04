@@ -47,6 +47,7 @@ fn audit_fetch_records_every_partner_and_preserves_its_metadata() {
     ]
     .into_iter()
     .map(|(name, verdict, risk, at)| SkillAudited {
+        local_only_reason: None,
         skill: request.skill.clone(),
         digest: request.digest,
         source: AuditSource::SkillsSh,
