@@ -237,3 +237,11 @@ fn chosen(city_root: &Path) -> Result<Box<dyn Route + Send>, AxError>;
 
 黑盒检查按 `xtask boundary` 归 `tools/adversary/` 的 Lean，可设备那一半的配对握手、会话握手与封装（ML-KEM、ML-DSA、AES-GCM）只在 `remote_access` 里有实现，Lean 那一侧今天说不了远程门的话；在 Lean 里再实现一遍，就是第二份密码学。所以 `crates/sprawling/tests/remote_door.rs` 起 `sprawling serve`，以 `remote_access` 的设备一侧走真套接字，起二进制与开 WebSocket 的几行各带 `boundary-ok`。**被否**：在进程内驱动 `bin::outside`（`outside` 不是库的公开面，而且那样测不到控制台读 `/remote open`、装配层读 `[remote]`、命令通路起子进程这三段生产路径）。**重开参数**：`tools/adversary/` 有了一个能做混合签名与封装的设备，这条测试就搬过去，`boundary-ok` 随之删掉。
 -/
+
+/-!
+## 技能审核后台（city D19；`bin::assembly::skill_audit`，adapter）
+
+`attending` 在接观察者前启动审核线程，将新提交的 `skill_shelved` 与 `run_started` 送到该线程；观察者只投递，不等 HTTP、程序或落账。线程启动时用 `runtime::replay::fold_ledger_dir` 读来源和有效审核历史，扫城库与各楼架；随后每个通知更新来源，再扫一次。读楼架沿 `city::Neighbourhood::scan` 的建筑列表，home 沿 `accounting::home::Home`。后台摘要沿 city 的 `skill_digest`，不使用 SKILL.md 的单文件哈希代替包哈希。去重集合在后台线程内持有，按名字与摘要去重，寿命等于本次开城。关闭观察者即关闭通知通道，线程在当前审核结束后退出。
+
+HTTP 调用用 gateway 的 client_for，期限用 city 的 SKILLS_SH_TIMEOUT，不带令牌、不重试；可选程序用 doctor 的 find_program 与 asking::ask。所有载荷用 Payload::of 编码，CITY run、City actor，时间用 SystemClock，经 Relay 写回唯一写者。取审核失败在载荷中记 Unreachable、原因报告到 stderr；读架失败报告并保留下一次通知的重扫机会；写账失败结束线程。启动线程失败报告后仍开城，审核不准改变上架或 Reading Room。
+-/

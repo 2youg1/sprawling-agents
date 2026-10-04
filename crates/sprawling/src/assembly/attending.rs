@@ -157,6 +157,7 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
     // The one sanctioned thread besides the runtime's own. The ledger was
     // opened, its writer lock taken, before the history was folded; it
     // moves into this thread and never leaves: a city has one writer.
+    let audit_proof = halt.clone();
     let worker_thread = std::thread::Builder::new()
         .name("sprawling-runs".to_owned())
         .spawn(move || {
@@ -231,8 +232,24 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
             }
             // The tail is emptied on this thread, right after the result
             // is written, so no piece of that call can arrive after it.
+            let audits =
+                match super::skill_audit::start(worker_root.clone(), worker.relay(), audit_proof) {
+                    Ok(sender) => Some(sender),
+                    Err(err) => {
+                        eprintln!("skill audits unavailable: {err}");
+                        None
+                    }
+                };
             let mut folding = observer;
             worker.observe(Box::new(move |record: &EventRecord| {
+                if matches!(
+                    record.kind(),
+                    kernel::EventKind::SkillShelved | kernel::EventKind::RunStarted
+                ) && let Some(sender) = &audits
+                    && let Err(err) = sender.send(record.clone())
+                {
+                    eprintln!("skill audit notification failed: {err}");
+                }
                 kept.settle(record);
                 folding(record);
             }));
