@@ -8,7 +8,7 @@
 
 规定 `tools::exec`、`tools::exec::outcome`、`tools::exec::shell`、`tools::exec::confinement`、`tools::exec::yielding`（`crates/runtime/src/` 下同名的文件）。exec 的三臂、宿主进程沙箱、派出的命令降一级与环境声明。本文件是 `crates/runtime/Spec.lean` 的一个分部；下面每一节保留它在 runtime 规格里的标签 §8-n，别处引作 `crates/runtime/Spec.lean §8-n`。
 
-这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与 `tools::exec`、`backlog` 旁的测试守住（`crates/runtime/Spec.lean` §16）。
+除末尾的亲和申请模型外，这一分部是说明文档，不是形式规格；它写下的接口形状与取舍由 Rust 的类型与 `tools::exec`、`backlog` 旁的测试守住（`crates/runtime/Spec.lean` §16）。
 -/
 
 /-!
@@ -100,16 +100,19 @@ pub(super) fn one_level_down(Command) -> Command;
 **逐 run 的 Job Object（`runtime::backlog::jobs`，形状 4 adapter）**：派出的命令起动之后，谁在吃内存要能归到派出它的 run，而一条 `cargo test` 真正吃内存的是它起的 `rustc` 与测试进程，不是 `cargo` 自己。所以 Windows 上每个 run 一个匿名 Job Object：`Backlog::run` 起动的子进程在登记进表的同一时刻装进它 owner 的 job（第一次装时创建），job 里的进程再起的进程由系统自动装进同一个 job，于是 job 的进程表就是这个 run 的整棵进程树。`Backlog::release(owner)` 丢掉这只 job 的句柄；job 不设 kill-on-close，丢句柄不杀进程，杀进程仍只归 `release` 与 `halt`。macOS 与 Linux 上没有 Job Object：两者都只读到命令自己的 pid（下面的 `unfollowed` 计每一条），因为进程组与 cgroup 的进程表都还没有接成读数；按 run 的 CPU 份额在 macOS 上是 `taskpolicy -c utility`，在 Linux 上是 cgroup v2 的 `cpu.weight`（没有委派时只有 `nice` 一档），分别在 D29 与 D33。
 
 ```rust
-pub struct RunProcesses { pub pids: BTreeSet<u32>, pub unfollowed: u32, pub share: Shares }
+pub enum RunAffinity { Os, Mask(NonZeroUsize) } // 同一处理器组内非零掩码；缺省 Os
+pub struct RunProcesses { pub pids: BTreeSet<u32>, pub unfollowed: u32, pub share: Shares, pub affinity: RunAffinity }
 pub enum Shares { Unset, Cpu, CpuAndMemory { limit: NonZeroU64 } } // 每个 run 的份额（D29）；缺省 Unset
 impl Backlog {
     pub fn with_shares(self, shares: Shares) -> Backlog;   // 这张表起动的每个 run 要的份额；不调时 Unset
     pub fn shares(&self) -> Shares;
+    pub fn with_affinity(self, affinity: RunAffinity) -> Backlog;
     pub fn processes(&self) -> Result<BTreeMap<RunId, RunProcesses>, AxError>;
 }
 ```
 
 - `Shares` 是人的配置 `[core] placement` 那一臂里属于子进程的一半，由 `bin::serving::placement::run_shares` 定（`crates/sprawling/spec/Serving/Placement.lean` D47），经 `accounting::worker::hands::Hands.shares` 交进车队的表；runtime 不读人的配置。一张没人交过份额的表是 `Unset`：测试与不起 run 命令的地方都是它。
+- `RunAffinity` 只收值：placement D49 在 pin 核心前取可用掩码减计划掩码，经 `Hands.affinity` 与车队交给 `Backlog::with_affinity`，runtime 不读配置、不算补集。Windows 创建 run 的 job 后先设置份额，再查询现有扩展限额、用 `win32job` 2.0.3 的 `limit_affinity` 加亲和、写回，保留已有内存限额。成功时 `RunProcesses.affinity` 为请求掩码；拒绝、未请求或非 Windows 时为 `Os`，份额报告仍只说明成功的份额。创建或加入 job 失败仍计 `unfollowed`，申请失败不改命令退出结果；后续命令复用第一条命令的 job 与限额。接口只约束当前组，未覆盖跨组调度与起动到加入 job 的窗口。
 - `RunProcesses.share` 是这个 run 此刻实际拿到的份额：要了而平台给了，就是要的那一个；要了而平台拒绝（叶子调用失败、cgroup 不可写）或这个平台没有份额，就是 `Unset`。
 - `processes` 按 run 给出它此刻在表里的进程：owner 是这个 run（窗口内或已转后台）的每条命令自己的 pid，并上这个 run 的 job 的进程表（job 只列还活着的进程）。已经结束、还没被 `harvest` 的命令仍列出自己的 pid，读数的一方在它后面读不到计数。已 `release` 的命令（owner 为 nobody）不归任何 run。
 - `unfollowed` 是这个 run 的命令里有几条只读到了命令本身、没读到它起的进程：Windows 上创建 job、装进 job 或读 job 的进程表失败的那几条（这一次读数里整个 run 的命令都算），Unix 上是每一条，因为 Unix 上没有 Job Object（进程组是它的对应物，尚未接入）。装不进 job 不让命令起动失败：job 只服务于读数，为读数让一条构建失败是把代价付错了地方，失败落在 `unfollowed` 里给读数的人看。
@@ -333,3 +336,34 @@ WindowsSandbox.exe present: False
 
 **未决（§3 口径）**：①macOS 的 Seatbelt：判定它的证据是 GitHub 的 macOS runner 上 `man sandbox-exec` 的原文（是否标为已弃用）、一个 `(version 1)(deny default)` 起头、只放开副本目录写入并 `(deny network*)` 的配置下跑写文件、连回环端口与起孙进程三条命令的结果，以及 Apple 的一页可取的官方文档；②Linux 的 Landlock 回退：判定它的证据是一个不写 `unsafe` 的起动方式（harness 以自己的子命令自限后 `exec`）在 Linux runner 上跑通，并读出 runner 内核的 Landlock ABI。
 -/
+
+namespace Runtime.Tools.Exec
+
+/-- 环境申请结果独立于命令执行。 -/
+inductive AffinityAttempt where
+  | unrequested
+  | accepted (mask : Nat) (nonzero : mask > 0)
+  | refused
+  deriving Repr
+
+def heldAffinity : AffinityAttempt → Option Nat
+  | .unrequested => none
+  | .accepted mask _ => some mask
+  | .refused => none
+
+def reportedExit (exit : Int) (_attempt : AffinityAttempt) : Int := exit
+
+theorem affinity_never_changes_exit (exit : Int) (attempt : AffinityAttempt) :
+    reportedExit exit attempt = exit := by rfl
+
+theorem reported_mask_is_nonzero (attempt : AffinityAttempt) (mask : Nat)
+    (h : heldAffinity attempt = some mask) : mask > 0 := by
+  cases attempt with
+  | unrequested => simp [heldAffinity] at h
+  | refused => simp [heldAffinity] at h
+  | accepted value nonzero =>
+    simp [heldAffinity] at h
+    subst mask
+    exact nonzero
+
+end Runtime.Tools.Exec
