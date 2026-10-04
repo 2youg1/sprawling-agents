@@ -281,6 +281,14 @@ pub fn plan_install(
     })
 }
 
+/// Reads the whole shelved content using the install precheck's canonical hash.
+///
+/// # Errors
+/// Propagates the precheck's unreadable, oversized or linked content refusal.
+pub fn skill_digest(path: &Path) -> Result<B3Hash, AxError> {
+    Ok(inspect(path)?.hash)
+}
+
 /// The one entry point: decides, then lands.
 ///
 /// # Errors

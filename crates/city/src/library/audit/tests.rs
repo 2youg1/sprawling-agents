@@ -173,3 +173,5 @@ fn a_failed_fetch_never_blocks_an_install() {
         assert_ne!(shown(&trace), Shown::Absent, "{trace:?}");
     }
 }
+
+mod execution;

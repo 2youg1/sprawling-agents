@@ -9,6 +9,12 @@
 //!
 //! Specified by `crates/city/spec/Library/Audit.lean` §8-28b (city D19).
 
+mod execution;
+pub use execution::{
+    AuditFetchError, AuditReport, AuditRequest, HttpAudit, SKILLS_SH_TIMEOUT, SKILLSPECTOR_TIMEOUT,
+    ScannerAudit, audit_skill,
+};
+
 use kernel::event::record::AuditVerdict;
 use kernel::{B3Hash, Seq};
 

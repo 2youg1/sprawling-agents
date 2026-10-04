@@ -34,8 +34,11 @@ mod reading;
 mod shelf;
 mod shipped;
 
-pub use audit::{AuditState, audit_state};
-pub use install::{Installed, Placed, PlannedInstall, Slot, install, plan_install};
+pub use audit::{
+    AuditFetchError, AuditReport, AuditRequest, AuditState, HttpAudit, SKILLS_SH_TIMEOUT,
+    SKILLSPECTOR_TIMEOUT, ScannerAudit, audit_skill, audit_state,
+};
+pub use install::{Installed, Placed, PlannedInstall, Slot, install, plan_install, skill_digest};
 pub use shelf::{Holding, Shelf};
 pub use shipped::{SHIPPED_SECTION, shelve_shipped};
 
