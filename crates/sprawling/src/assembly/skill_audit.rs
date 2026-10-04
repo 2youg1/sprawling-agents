@@ -34,7 +34,7 @@ pub(super) fn start(
                 eprintln!("skill audits stopped: {err}");
                 return;
             }
-            if let Err(err) = serve(&root, relay, &receive) {
+            if let Err(err) = serve(&root, relay, &receive, &mut clients::audit) {
                 eprintln!("skill audits stopped: {err}; {}", err.recovery());
             }
         })
@@ -81,7 +81,12 @@ impl History {
         Ok(())
     }
 
-    fn scan(&mut self, root: &Path, relay: &mut Relay) -> Result<(), AxError> {
+    fn scan(
+        &mut self,
+        root: &Path,
+        relay: &mut impl kernel::Ledger,
+        audit: &mut impl FnMut(&city::AuditRequest) -> city::AuditReport,
+    ) -> Result<(), AxError> {
         let home = match accounting::home::Home::detect() {
             Ok(home) => home,
             Err(err) => {
@@ -132,7 +137,7 @@ impl History {
                     path,
                     source,
                 };
-                let report = clients::audit(&request);
+                let report = audit(&request);
                 for err in report.failures {
                     eprintln!("skill audit: {err}; {}", err.recovery());
                 }
@@ -160,17 +165,28 @@ impl History {
 
 fn serve(
     root: &Path,
-    mut relay: Relay,
+    mut relay: impl kernel::Ledger,
     receive: &mpsc::Receiver<EventRecord>,
+    audit: &mut impl FnMut(&city::AuditRequest) -> city::AuditReport,
 ) -> Result<(), AxError> {
     let mut history = History::default();
     runtime::replay::fold_ledger_dir(&kernel::layout::CityLayout::new(root).ledger(), |record| {
         history.absorb(record)
     })?;
-    history.scan(root, &mut relay)?;
+    history.scan(root, &mut relay, audit)?;
     while let Ok(record) = receive.recv() {
         history.absorb(&record)?;
-        history.scan(root, &mut relay)?;
+        history.scan(root, &mut relay, audit)?;
     }
     Ok(())
 }
+
+#[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing,
+    reason = "test code"
+)]
+mod tests;

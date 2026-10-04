@@ -39,6 +39,7 @@ pub fn audit_state(content: &B3Hash, audits: &[(B3Hash, AuditVerdict, Seq)]) -> 
 **决定**：
 - **何时审**：一件 skill 每一次落位（`InstallSkill`，wire D32；`PutShelved` 落地之后同一条路）之后，以及城在扫架（`Library::scan`，开城与每次落位后）时看见一件持有的摘要在 `audit_state` 下是 `Unaudited` 或 `Stale` 时，各发起一次；同一 `(skill, digest)` 在一个城进程里只发起一次，于是一份取不到的内容不会在每次扫架时再写一行。发起点在城的后台任务（唯一的 spawn 点），run 的工具波从不等审核：`describe` 读一件 `Stale` 的 skill 照常答。
 - **审什么**：被审的是书架上落下的那份字节——包审整包规范串的摘要（§8-28），文档审正文的摘要；`skill_audited.digest` 就是 `audit_state` 比对的那个值，即 §8-28 的 `Installed::hash`，而不是 `Holding::hash`：包的 `Holding::hash` 只是 `SKILL.md` 的摘要，改了包里一份脚本它不变，而注入正可以藏在脚本里。扫架不为此读包里每个文件（§8-8）：比对在后台的审核任务里做，它用 §8-28 预检的同一个读（`precheck`，上限 `PACKAGE_BYTES_LIMIT`）算出架上此刻的整包摘要。审的不是来源：来源在落位之后可能已经变了。
+- **来源关联**：后台以 `SkillShelved.digest` 为键登记来源，以被审内容的摘要查找，保留同一摘要首次登记的来源；同名不同摘要互不覆盖，因为 kernel D23 规定版本、上架与审核在 digest 上相遇。未登记摘要没有可追溯的远端来源，只调用适用的本地扫描器；本地审核载荷附 `local_only_reason`，说明当前内容摘要没有 SkillShelved 来源，因而跳过远端请求。没有本地扫描器时仍不产审核行，理由报告到 stderr。被否：按名字取最后来源，会把另一版本的远端结论绑到当前字节；把未知摘要声明为已登记的 Path，会丢掉无法追溯的原因。重开参数：来源记录提供可核对的内容绑定之外的追溯机制。
 - **谁来审，按序都试**：①skills.sh 的合作方审核（缺省，D89 第 3 条）：只在这件 skill 有一个 skills.sh 能认的来源时——来源是 skills.sh 名，或指向 `github.com/<owner>/<repo>` 的 git 地址——请求 `GET https://skills.sh/api/v1/skills/audit/<owner>/<repo>/<skill>`，不带令牌；每个合作方一行 `skill_audited`（`source = SkillsSh`，`scanner` 是合作方名，`verdict`／`risk`／`audited_at` 照录 `status`／`riskLevel`／`auditedAt`）；答 401、403、网络不通、超时（`SKILLS_SH_TIMEOUT`，5 s）或答复读不出时写一行 `verdict = Unreachable`，`link` 是 `https://skills.sh/<owner>/<repo>/<skill>` 这一页。②SkillSpector（可选）：doctor 在 PATH 上找到 `skillspector` 时，对落下的那份目录跑 `skillspector scan <path> --no-llm --format json`，退出码 0 读作 `Pass`、1 读作 `Fail`（它承诺稳定的只有这两个码与 JSON），其余退出码与读不出的输出读作 `Unreachable`；`scanner` 是它 `--version` 报出的串，`risk` 取 JSON 里的总风险等级原词。两者都不适用（本地路径或自带的 skill，且没有 SkillSpector）时不写行，状态就是 `Unaudited`：没人审过就不该有一行说审过。
 - **结论只显示，不判准入**：`Fail` 在书架页与 skill 页上标红并给出链接；进不进阅览室仍由 User 写在 `RULES.toml` 的 `reading_room` 里（§8-8）。
 
@@ -62,7 +63,7 @@ HTTP 来源三段只收 ASCII 字母、数字、`-`、`_`、`.`，拒绝空段�
 
 HTTP 适配器经 `gateway::client_for` 复用 TLS、代理与 User-Agent 权威，请求期限只有 `SKILLS_SH_TIMEOUT`，不作重试或第二次诊断请求。可选程序只由 doctor 的 `find_program` 找，程序问答复用 doctor 的有界 `asking::ask`；版本问答用 doctor 的 PATIENCE，只有退出码 0 才采用版本串，版本问答异常时不执行 scan；scan 上限 `SKILLSPECTOR_TIMEOUT`（60 s，推断值，可按扫描耗时重议），输出上限复用 asking 的逐行上限。后台对同一 `(skill, digest)` 在一个进程内去重，成功历史不用重审，失败历史在新进程可重试，当前进程不重试。Ledger 失败报告后结束后台线程，保持单写者；不能起线程只报告，开城与上架继续。
 
-**派生检查补充**：注入桩覆盖三种有效结论、超时、不可达、非 200、坏 JSON、未知状态、可选本地扫描器与执行中内容变更；整包脚本变化必须改变 `skill_digest`；同摘要重复发起由后台的集合持有；本地扫描前摘要已过期的回归检查必须产一行 Unreachable，且客户端零调用。
+**派生检查补充**：注入桩覆盖三种有效结论、超时、不可达、非 200、坏 JSON、未知状态、可选本地扫描器与执行中内容变更；整包脚本变化必须改变 `skill_digest`；后台的第二 Ledger 与审核调用适配器运行生产 `serve` 循环，覆盖启动扫描、通知扫描、同摘要重复发起、成功历史跳过、Unreachable 新进程重试及写账失败停止；程序问答的第二适配器覆盖版本失败不执行 scan；本地扫描前摘要已过期的回归检查必须产一行 Unreachable，且客户端零调用。
 
 **理由**：「已审」要和它审的那份字节绑在一起，才能在内容变了之后自己失效，所以状态从摘要读出，不存标志位（模型的 `changed_content_is_never_shown_audited`）。skills.sh 的无令牌接口今天对 audit 路径答 200、对同站的详情路径答 401，它随时可能关；把上架挂在它上面，书架会在某一天整个不能用，所以取不到只记一行 `Unreachable` 与安全页链接（`a_failed_fetch_never_blocks_an_install`）。审核在落位之后而不在之前，是因为被审的必须是书架上那份字节，而 §8-28 的 TOCTOU 复查保证落下的就是规划时读到的那份。
 
@@ -295,5 +296,27 @@ theorem claims_keep_nodup (trace : List Key) (attempted : List Key)
   induction trace generalizing attempted with
   | nil => exact h
   | cons key rest ih => exact ih _ (claim_keeps_nodup attempted key h)
+
+/-- 登记轨迹按内容摘要查来源；先登记的同摘要来源保持权威。 -/
+def sourceFor (registrations : List (Digest × Nat)) (digest : Digest) : Option Nat :=
+  (registrations.find? (fun entry => entry.1 == digest)).map (·.2)
+
+/-- 任意登记轨迹里，查出的来源确实为被审摘要登记过。 -/
+theorem source_belongs_to_content (registrations : List (Digest × Nat))
+    (digest source : Nat) (h : sourceFor registrations digest = some source) :
+    (digest, source) ∈ registrations := by
+  unfold sourceFor at h
+  cases hf : registrations.find? (fun entry => entry.1 == digest) with
+  | none => simp [hf] at h
+  | some entry =>
+    simp [hf] at h
+    have hm := List.mem_of_find?_eq_some hf
+    have hd := List.find?_some hf
+    simp at hd
+    have he : entry = (digest, source) := by
+      cases entry with
+      | mk a b => simp_all
+    rw [← he]
+    exact hm
 
 end City.Library.Audit

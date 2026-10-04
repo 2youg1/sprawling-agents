@@ -245,3 +245,10 @@ fn chosen(city_root: &Path) -> Result<Box<dyn Route + Send>, AxError>;
 
 HTTP 调用用 gateway 的 client_for，期限用 city 的 SKILLS_SH_TIMEOUT，不带令牌、不重试；可选程序用 doctor 的 find_program 与 asking::ask。所有载荷用 Payload::of 编码，CITY run、City actor，时间用 SystemClock，经 Relay 写回唯一写者。取审核失败在载荷中记 Unreachable、原因报告到 stderr；读架失败报告并保留下一次通知的重扫机会；写账失败结束线程。启动线程失败报告后仍开城，审核不准改变上架或 Reading Room。
 -/
+
+/-!
+审核后台的 `serve(root, ledger, receive, audit)` 保留生产重放与扫描循环，写入接缝是既有 `kernel::Ledger`（生产 Relay、测试持久 JSONL 与失败适配器），审核接缝是 `FnMut(&city::AuditRequest) -> city::AuditReport`（生产 clients::audit、离线脚本）。接口留在模块内，因为没有跨 crate 的调用者，不引入公开 trait。
+来源表按 digest 保存首次来源，未知摘要用 Path 表达远端不适用，载荷编码由 `RecordedAudit` 携带展平的 SkillAudited 与可选 `local_only_reason`；该字段只说明本次后台为何跳过远端，既有审核字段保持各自语义，不改变 wire 帧。理由常量只有后台一处定义。
+`clients::scan` 接收程序问答 `FnMut(&mut Command, Duration)`，生产使用 answered，第二适配器回放退出码与输出；版本非零、信号、超时、起不来均返回 Unreachable，scan 不调用。
+验收由 `skill_audit::tests` 经同一 serve 入口覆盖 city D19 的去重性质、启动与通知扫描、成功不重审、Unreachable 跨进程重试、失败 Ledger 停止，以及同名不同摘要与未知摘要的来源回归；`clients` 的版本问答检查将程序失败送进 city::audit_skill，核对 Unreachable 载荷。
+-/
