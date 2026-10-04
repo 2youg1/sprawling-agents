@@ -47,11 +47,6 @@ const SINK: &str = "sprawling-shots";
 /// the cap sits above it with room for the next fixture (D26).
 const MOST_FOLDS: usize = 512;
 
-/// The most loads the placing script holds a picture with. Each moves the
-/// virtual clock 10 ms as it lands, and the wait took about fifteen on a
-/// four-core Windows machine, so a page that never draws costs a second.
-const MOST_HOLDING_LOADS: u32 = 100;
-
 /// How long one case (one measuring or one picture) may take before its
 /// tree is killed and the case is run again. The slowest case seen on a
 /// four-core Windows machine took 15 s; three times that leaves room for
@@ -283,11 +278,13 @@ fn instrument(body: &str, preloaded: &str) -> String {
 
 /// Once no view is pending, scrolls the main region to the fold the URL
 /// names, waits one IntersectionObserver round and two animation frames,
-/// and writes its scroll height, its visible height, and where each
-/// top-level labelled section begins. A CodeMirror editor measures itself
-/// only in the frames after it scrolled into view, and the virtual clock
-/// jumps between timers without drawing one, so the wait keeps a load of
-/// the page's own copy in flight, which stops that clock (Spec.lean D25).
+/// and keeps writing its reading until the budget is nearly spent, so the
+/// engine's own output carries the last reading the page has to give. A
+/// CodeMirror editor measures itself only in the frames after it scrolled
+/// into view, and the virtual clock jumps between timers without drawing
+/// one, so the wait keeps a load of the page's own copy in flight: the
+/// loads are its clock, running until the frames arrive, and a page that
+/// never draws pays the budget (Spec.lean D25).
 fn script() -> String {
     format!(
         r#"<pre id="{SINK}" hidden></pre>
@@ -322,29 +319,33 @@ fn script() -> String {
   function hold(main, then) {{
     var loads = 0;
     var drawn = false;
-    function release() {{
-      if (!drawn) {{
-        drawn = true;
-        then(main);
-      }}
-    }}
     function load() {{
-      if (drawn || loads >= {MOST_HOLDING_LOADS}) {{
-        return release();
-      }}
+      if (drawn) {{ return; }}
       loads += 1;
       var image = new Image();
       image.onload = image.onerror = load;
       image.src = './{COPY}?hold=' + loads;
     }}
+    function settle() {{
+      if (waited + {twice} >= {BUDGET_MS}) {{ return; }}
+      waited += {POLL_MS};
+      setTimeout(function () {{
+        then(main);
+        settle();
+      }}, {POLL_MS});
+    }}
     var seen = new IntersectionObserver(function () {{
       seen.disconnect();
       requestAnimationFrame(function () {{
-        requestAnimationFrame(release);
+        requestAnimationFrame(function () {{
+          drawn = true;
+          then(main);
+        }});
       }});
     }});
     seen.observe(main);
     load();
+    settle();
   }}
   setTimeout(place, {SETTLE_MS});
 }})();
@@ -405,7 +406,7 @@ mod tests {
     /// seen, the way a CodeMirror editor measures itself only once it is
     /// in view, and which only starts looking when the placing script
     /// scrolls, so nothing but frames after the scroll can label it.
-    const LATE_STATE: &str = r#"<!doctype html>
+    const FRAME_LATE: &str = r#"<!doctype html>
 <html><head></head><body>
 <main style="display:block;height:400px;overflow:auto"><div id="view" style="height:2000px"></div></main>
 <script>
@@ -425,23 +426,56 @@ setTimeout(function () {
 </body></html>
 "#;
 
-    /// The engine on this machine measures the fixture page, and the state
-    /// that appears only in the frames after the scroll is in the reading.
-    /// Where no engine is installed the render gate already fails, so this
-    /// test has nothing to drive and ends.
+    /// A page whose one state is written by a timer `LATE_MS` in, long
+    /// after the single reading an opening used to write about a second
+    /// in, so only a reading that keeps up with the engine carries it. It
+    /// takes no frame to appear, which is what separates it from
+    /// `FRAME_LATE`: that one asks whether the frames after the scroll
+    /// were waited for, this one where the reading was taken at all.
+    const TIMER_LATE: &str = r#"<!doctype html>
+<html><head></head><body>
+<main style="display:block;height:400px;overflow:auto"><div id="view" style="height:2000px"></div></main>
+<script>
+setTimeout(function () {
+  var state = document.createElement('section');
+  state.setAttribute('aria-label', 'written late');
+  document.getElementById('view').appendChild(state);
+}, LATE);
+</script>
+</body></html>
+"#;
+
+    /// How long the timer fixture waits before it writes its state: past
+    /// the reading the camera used to stop at, early enough inside
+    /// `BUDGET_MS` that a reading which keeps up reaches it.
+    const LATE_MS: u32 = 3000;
+
+    /// The engine on this machine reads the fixture pages, and every state
+    /// a page has by the time the engine takes its output is in that
+    /// reading. Where no engine is installed the render gate already
+    /// fails, so this test has nothing to drive and ends.
     #[test]
-    fn a_fold_is_read_after_the_frames_its_scroll_brings() {
+    fn the_reading_carries_every_state_the_page_has_when_the_budget_is_spent() {
+        reads_the_state(
+            FRAME_LATE.replace("SETTLE", &SETTLE_MS.to_string()),
+            "measured in view",
+        );
+        reads_the_state(
+            TIMER_LATE.replace("LATE", &LATE_MS.to_string()),
+            "written late",
+        );
+    }
+
+    /// One opening of `page`, asserted to read `wanted` as one of the
+    /// states it places in a fold.
+    fn reads_the_state(page: String, wanted: &str) {
         let Some(browser) = crate::render::engine::browser() else {
             return;
         };
         let dir = std::env::temp_dir().join(format!("xtask-shots-hold-{}", std::process::id()));
         let bundle = dir.join("bundle");
         std::fs::create_dir_all(bundle.join("assets")).unwrap();
-        std::fs::write(
-            bundle.join("index.html"),
-            LATE_STATE.replace("SETTLE", &SETTLE_MS.to_string()),
-        )
-        .unwrap();
+        std::fs::write(bundle.join("index.html"), page).unwrap();
         let camera = Camera::open(&browser, &dir.join("work"), Source::Bundle(&bundle)).unwrap();
         let read = camera.folds(
             "fixture",
@@ -454,11 +488,8 @@ setTimeout(function () {
         std::fs::remove_dir_all(&dir).unwrap();
         let (folds, _) = read.unwrap();
         assert!(
-            folds
-                .iter()
-                .flatten()
-                .any(|state| state == "measured in view"),
-            "{folds:?}"
+            folds.iter().flatten().any(|state| state == wanted),
+            "{wanted} is not in {folds:?}"
         );
     }
 }
