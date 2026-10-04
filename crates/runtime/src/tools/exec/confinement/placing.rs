@@ -176,11 +176,13 @@ impl Confined {
                             AxCode::SandboxDenied,
                             "create the Linux confinement",
                             format!(
-                                "this arm requires an unprivileged user namespace; \n                                 namespace setup failed: {detail}"
+                                "this arm requires an unprivileged user namespace; \
+                                 namespace setup failed: {detail}"
                             ),
                         )
                         .with_recovery(
-                            "use a Linux machine that permits unprivileged user namespaces, \n                             or ask the User to choose `where: host`",
+                            "use a Linux machine that permits unprivileged user namespaces, \
+                             or ask the User to choose `where: host`",
                         )
                     };
                     let probe = namespaced(wrapper, workdir, workdir, &Command::new("/bin/true"))
@@ -352,12 +354,7 @@ use copy::{Budget, Stage, fresh, mirror, remove};
 /// The command as the platform's wrapper runs it: the whole machine
 /// readable, the copy bound over the working directory, and every
 /// namespace the wrapper knows how to separate.
-pub(super) fn namespaced(
-    wrapper: &Path,
-    copy: &Path,
-    workdir: &Path,
-    command: &Command,
-) -> Command {
+fn namespaced(wrapper: &Path, copy: &Path, workdir: &Path, command: &Command) -> Command {
     let mut wrapped = Command::new(wrapper);
     wrapped
         .current_dir(workdir)

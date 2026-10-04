@@ -287,12 +287,18 @@ fn a_read_only_file_is_synced_like_any_other() {
 #[cfg(target_os = "linux")]
 #[test]
 fn a_namespaced_command_requires_a_user_namespace() {
-    let command = placing::namespaced(
-        std::path::Path::new("/usr/bin/bwrap"),
-        std::path::Path::new("/scratch/copy"),
-        std::path::Path::new("/room"),
-        &std::process::Command::new("/bin/true"),
+    let source = tempfile::tempdir().unwrap();
+    let scratch = tempfile::tempdir().unwrap();
+    let mut confined = Confined::with_arm(
+        Confinement::LinuxNamespaces {
+            wrapper: PathBuf::from("/bin/true"),
+        },
+        Some(scratch.path().to_path_buf()),
     );
+    let (command, placed) = confined
+        .place(std::process::Command::new("/bin/true"), source.path())
+        .unwrap();
+    confined.settled(placed);
     let args: Vec<_> = command.get_args().collect();
     assert!(
         args.windows(2)

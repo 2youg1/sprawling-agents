@@ -53,7 +53,6 @@ pub fn parse_placement(&Map<String, Value>) -> Result<Placement, AxError>;
 
 - **保证清单在类型上**：`Assurances` 逐轴五字段，每一臂的 `assurances()` 必须写满五轴，故新增一轴即四臂同时编译红——任何一臂都不会留下一个没人问过它的旧答案。`statement()` 由 `Assurances` 与 `Guarantee::phrase()`／`unkept()` 派生而非另写一段话，句子与类型因此不可能分家。
 - **`LinuxNamespaces` 的用户隔离是起动条件**：`namespaced()` 在 `--unshare-all` 之后显式加 `--unshare-user`；bubblewrap 手册（https://github.com/containers/bubblewrap/blob/main/bwrap.xml ）规定前者包含可跳过的 `--unshare-user-try`，后者要求创建 user namespace。`place()` 在同步副本之前用同一包装参数运行 `/bin/true`，绑定的是工作目录自身；探测没有写入，成功后才构造目标命令。探测起动失败或退出非零时返回 `E_SANDBOX_DENIED`，主语说明这一臂需要未提权的 user namespace，并保留系统错误或 wrapper 的 stderr；恢复语给出换到允许未提权 user namespace 的 Linux 主机或由人选择 `where: host`。探测不缓存，因为内核与 LSM 的许可可能在两条命令之间变化；目标命令仍带强制参数，所以探测之后许可被撤回时也不会少一轴运行。`statement()` 保证文件系统、网络、进程树与用户，资源上限不保，并说明未提权 user namespace 是必需条件。`--ro-bind / /` 让整机对命令只读可见：文件系统保证写入只落副本，不限制读取。
-- **SB1 第 1 条的取舍**：选强制参数与放置前探测，因为 `place()` 返回的是尚未起动的命令，无法直接把目标 wrapper 的退出码变成类型化拒绝；被否的是仅加参数而让缺能力落成普通命令退出、以及许可不足时静默退到 `CopiedTree`。代价是每次 Linux 放置多起一个短命 wrapper；重开参数是 backlog 提供能区分 wrapper 起动失败与目标命令失败的起动协议，届时可在同一次起动里报拒绝。
 - **选择是纯函数**：`choose` 取 `Offerings`——有 wrapper 即 `LinuxNamespaces`，否则 `CopiedTree`；scratch 根不可用即 `Unavailable { missing: ScratchDirectory }`。采样只有 `Offerings::this_machine()` 一处（`PATH`＋`std::env::temp_dir()`），两个 `detect()` 都只读它；测试用 `Offerings` 陈述一台机器而不是借一台。wrapper 是按确切名字 `bwrap` 在 `PATH` 上找到的程序，只在 Linux 上找（`cfg!(target_os = "linux")`），别的平台 `namespace_tool` 恒为 `None`。
 - **逐平台的臂**：Linux 上 `PATH` 里有 `bwrap` 得 `LinuxNamespaces`（副本加 wrapper 给的命名空间），没有得 `CopiedTree`；Windows 上恒得 `CopiedTree`（`WindowsJobObject` 不构造，见下条）；macOS 上今天没有任何平台隔离接入，恒得 `CopiedTree`。三个平台上 temp 目录不可用都得 `Unavailable { missing: ScratchDirectory }`，`place()` 拒。缺的是哪一轴，User 与 Agent 都从同一句 `statement()` 读到：它进 exec 工具的 disclosure 与 doctor 的回报，`CopiedTree` 的那一句逐字写出网络、进程树、用户与资源上限都不保。
 - **`WindowsJobObject` 本构建不构造，且拒而不降级**：Job Object 本身已经可以不写 `unsafe` 地取得——`runtime::backlog::jobs` 经 `win32job` 2.0.3 的安全接口创建 job、装进进程、读进程表（下文「job 的取法」）。不构造的理由是这一臂的保证清单今天兑现不了两轴：①**资源**——`win32job` 2.0.3 的 `ExtendedLimitInfo` 对外只给按进程的工作集上限（`limit_working_memory`；经 `win32job` 设它在一台未提权账户上被系统以 os error 1314 拒绝，而 D32 的探测在另一台未提权的 Windows 11 上直接调 `SetInformationJobObject` 设 `JOB_OBJECT_LIMIT_WORKINGSET` 得到成功——要不要特权随账户令牌而变，推断是 `SeIncreaseWorkingSetPrivilege` 在不在令牌里；无论哪种，它限的是常驻页而不是提交量，不兑现「资源」一轴）、优先级档位（`limit_priority_class`）、调度级别（`limit_scheduling_class`）、亲和性（`limit_affinity`）与 kill-on-close、breakaway 两组开关，作业级提交上限的字段在 crate 私有的结构里，CPU 速率控制它根本不设（D29 说这两项改走哪一档），清单写 `resources: Yes` 就是对一个没有上限的盒子说「有上限」；②**进程树**——子进程起动之后才装进 job，中间一小段里起的孙进程不在 job 里（下文「job 的取法」的代价），`limit_kill_on_job_close` 收不到它。以 `CopiedTree` 冒充这一臂会对着一个开着网络的盒子回答「网络已关」的同类错误，故 `place()` 对它返 `E_SANDBOX_DENIED` 并给「改用 copied tree 且让命令离开网络」的 recovery。Windows 上 `detect()` 因此答 `CopiedTree`，其清单逐字写出网络未隔离——这一句就是 Agent 必须看见的那一句。
@@ -61,7 +60,7 @@ pub fn parse_placement(&Map<String, Value>) -> Result<Placement, AxError>;
 - **`Mount`／`Fuel` 不沿用**：`Fuel` 是 wasmtime 指令计量、`Mount.guest` 是 guest 路径别名，二者 wasip1 专属。本模块保留的是**判断**（能力面＝能到达的路径集）而不是词形。宿主环境照旧不继承（exec 的 env allowlist 未动）；`SandboxJob.env` 的显式注入属 guest 面。
 - **placement**：调用参数 `where: sandbox|host`，缺省 `sandbox`。`host` 是「在原地跑」——它才是碰得到人那棵树的那一臂，故必须由调用方按名说出，也正是与 A-8 同一条纪律（默认引导先在沙箱里做，出沙箱才需要审批）里「需要审批」的那个动作。python 臂无 host 形（它是 wasip1 guest）：要宿主解释器走 program 臂。
 - **公开路径经 `runtime::tools`**：`confinement` 住 `tools/exec/`，doctor 的依赖回报与工具自己的 disclosure 都从 `runtime::tools::{Confinement, Guarantee, Kept, Missing}` 读这一份定义。
-- 证据：`crates/runtime/src/tools/exec/tests.rs` 的 `a_sandboxed_command_writes_in_a_copy_and_leaves_the_source_tree_alone`（真命令、真树：沙箱里写得到、人那棵树不动；同一命令 `where: host` 则写进原树——此对拍使「没动」是能力判定而非命令没写）；`crates/runtime/src/tools/exec/confinement/tests.rs` 的 `the_sandbox_arm_a_machine_gets_is_chosen_from_what_it_has`、`every_sandbox_arm_states_what_it_does_not_hold`、`a_sandbox_refuses_a_tree_deeper_than_its_walk_can_end`、`a_sandbox_copy_is_synced_rather_than_made_again`、`a_sandbox_copy_goes_with_the_tool`；Linux 的 `a_namespaced_command_requires_a_user_namespace` 只构造命令，断言强制参数紧跟 `--unshare-all`，`a_namespace_setup_failure_refuses_before_copying` 以失败和缺席的 wrapper 验证拒绝与未创建副本。
+- 证据：`crates/runtime/src/tools/exec/tests.rs` 的 `a_sandboxed_command_writes_in_a_copy_and_leaves_the_source_tree_alone`（真命令、真树：沙箱里写得到、人那棵树不动；同一命令 `where: host` 则写进原树——此对拍使「没动」是能力判定而非命令没写）；`crates/runtime/src/tools/exec/confinement/tests.rs` 的 `the_sandbox_arm_a_machine_gets_is_chosen_from_what_it_has`、`every_sandbox_arm_states_what_it_does_not_hold`、`a_sandbox_refuses_a_tree_deeper_than_its_walk_can_end`、`a_sandbox_copy_is_synced_rather_than_made_again`、`a_sandbox_copy_goes_with_the_tool`；Linux 的 `a_namespaced_command_requires_a_user_namespace` 经 `Confined::place()` 放置命令，以成功的 wrapper 替身通过探测，断言返回命令的强制参数紧跟 `--unshare-all`，`a_namespace_setup_failure_refuses_before_copying` 以失败和缺席的 wrapper 验证拒绝与未创建副本。
 
 这一臂何时构造、构造时清单写什么，见 D29 的 (e)：资源一轴由 D29 的 job 限额兑现，进程树一轴要挂起态起动，两者都落在同一个 Zig 叶子上之后按原清单构造，不缩成一个只保一部分的臂。
 
@@ -76,6 +75,17 @@ pub fn parse_placement(&Map<String, Value>) -> Result<Placement, AxError>;
 8. **要另装的臂实跑一次**：`container` 在 GitHub 的 ubuntu runner（自带 Docker）上跑第 7 条的对拍；Linux 的 Landlock 回退与 macOS 的 Seatbelt 在 D32 的未决解开之前不构造。
 
 **未决（§3 口径）**：同步仍按命令读两侧的每个目录项，并逐字节比较同长的文件，代价随工作树的大小长；一棵带大构建缓存的工作树每条命令要读两遍缓存。判定它的证据是一棵真实 room 的每条命令同步耗时（毫秒）与其文件数的读数；若读数显示读取成了主项，再比较「按 mtime 与长度跳过、只对同一时间戳刻度里的文件逐字节比较」。
+-/
+
+/-! D38 Linux 放置前探测强制 user namespace（§8-13-2）
+
+**决定**：强制参数与放置前探测由 `namespaced()` 的同一命令构造器提供；探测成功后才同步副本，探测失败以 `E_SANDBOX_DENIED` 拒绝。
+
+**理由**：`place()` 返回的是尚未起动的命令，无法直接把目标 wrapper 的退出码变成类型化拒绝。每次探测避免两条命令之间内核或 LSM 的许可变化被缓存掩盖，目标命令仍带强制参数。
+
+**被否**：仅加参数而让缺能力落成普通命令退出；许可不足时静默退到 `CopiedTree`。
+
+**代价与重开参数**：每次 Linux 放置多起一个短命 wrapper；backlog 提供能区分 wrapper 起动失败与目标命令失败的起动协议时，可在同一次起动里报拒绝。
 -/
 
 /-!

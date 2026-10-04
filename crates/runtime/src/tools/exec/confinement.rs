@@ -277,7 +277,8 @@ impl Confinement {
                 #[cfg(target_os = "linux")]
                 if matches!(self, Confinement::LinuxNamespaces { .. }) {
                     return format!(
-                        "{statement} An unprivileged user namespace is required; \n                         namespace setup failure refuses the placement."
+                        "{statement} An unprivileged user namespace is required; \
+                         namespace setup failure refuses the placement."
                     );
                 }
                 statement
