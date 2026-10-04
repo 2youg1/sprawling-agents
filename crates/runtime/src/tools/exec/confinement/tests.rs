@@ -283,3 +283,52 @@ fn a_read_only_file_is_synced_like_any_other() {
         (1, b"sixteen bytes !!".to_vec())
     );
 }
+
+#[cfg(target_os = "linux")]
+#[test]
+fn a_namespaced_command_requires_a_user_namespace() {
+    let source = tempfile::tempdir().unwrap();
+    let scratch = tempfile::tempdir().unwrap();
+    let mut confined = Confined::with_arm(
+        Confinement::LinuxNamespaces {
+            wrapper: PathBuf::from("/bin/true"),
+        },
+        Some(scratch.path().to_path_buf()),
+    );
+    let (command, placed) = confined
+        .place(std::process::Command::new("/bin/true"), source.path())
+        .unwrap();
+    confined.settled(placed);
+    let args: Vec<_> = command.get_args().collect();
+    assert!(
+        args.windows(2)
+            .any(|pair| { pair == ["--unshare-all", "--unshare-user"] })
+    );
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn a_namespace_setup_failure_refuses_before_copying() {
+    let source = tempfile::tempdir().unwrap();
+    let scratch = tempfile::tempdir().unwrap();
+    for wrapper in [
+        PathBuf::from("/bin/false"),
+        source.path().join("missing-wrapper"),
+    ] {
+        let mut confined = Confined::with_arm(
+            Confinement::LinuxNamespaces { wrapper },
+            Some(scratch.path().to_path_buf()),
+        );
+        let err = match confined.place(std::process::Command::new("/bin/true"), source.path()) {
+            Err(err) => err,
+            Ok(_) => panic!("a failed namespace setup must refuse the placement"),
+        };
+        assert_eq!(*err.code(), AxCode::SandboxDenied);
+        assert!(
+            err.subject().contains("unprivileged user namespace"),
+            "{err}"
+        );
+        assert!(err.recovery().contains("where: host"), "{err}");
+        assert_eq!(std::fs::read_dir(scratch.path()).unwrap().count(), 0);
+    }
+}

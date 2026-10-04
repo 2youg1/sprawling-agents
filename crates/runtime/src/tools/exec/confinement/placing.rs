@@ -157,7 +157,9 @@ impl Confined {
     /// # Errors
     /// `E_SANDBOX_DENIED` when this machine has no arm, when the arm
     /// cannot be given by any build of this crate, or when the working
-    /// tree is too large or too deep to copy.
+    /// tree is too large or too deep to copy. On Linux, namespace setup
+    /// must succeed with a required unprivileged user namespace before
+    /// the working tree is copied.
     pub fn place(
         &mut self,
         mut command: Command,
@@ -166,7 +168,36 @@ impl Confined {
         let wrapper = match &self.arm {
             Confinement::Unavailable { missing } => return Err(no_arm(*missing)),
             Confinement::WindowsJobObject => return Err(no_job_object()),
-            Confinement::LinuxNamespaces { wrapper } => Some(wrapper.clone()),
+            Confinement::LinuxNamespaces { wrapper } => {
+                #[cfg(target_os = "linux")]
+                {
+                    let denied = |detail| {
+                        AxError::failure(
+                            AxCode::SandboxDenied,
+                            "create the Linux confinement",
+                            format!(
+                                "this arm requires an unprivileged user namespace; \
+                                 namespace setup failed: {detail}"
+                            ),
+                        )
+                        .with_recovery(
+                            "use a Linux machine that permits unprivileged user namespaces, \
+                             or ask the User to choose `where: host`",
+                        )
+                    };
+                    let probe = namespaced(wrapper, workdir, workdir, &Command::new("/bin/true"))
+                        .output()
+                        .map_err(|err| denied(err.to_string()))?;
+                    if !probe.status.success() {
+                        return Err(denied(format!(
+                            "{}: {}",
+                            probe.status,
+                            String::from_utf8_lossy(&probe.stderr).trim()
+                        )));
+                    }
+                }
+                Some(wrapper.clone())
+            }
             Confinement::CopiedTree => None,
         };
         let (copy, work) = self.synced(workdir)?;
@@ -316,7 +347,7 @@ fn no_job_object() -> AxError {
     )
 }
 
-mod copy;
+pub(super) mod copy;
 
 use copy::{Budget, Stage, fresh, mirror, remove};
 
@@ -339,7 +370,10 @@ fn namespaced(wrapper: &Path, copy: &Path, workdir: &Path, command: &Command) ->
         .arg("/proc")
         .arg("--dev")
         .arg("/dev")
-        .arg("--unshare-all")
+        .arg("--unshare-all");
+    #[cfg(target_os = "linux")]
+    wrapped.arg("--unshare-user");
+    wrapped
         .arg("--die-with-parent")
         .arg("--")
         .arg(command.get_program());
