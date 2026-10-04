@@ -314,17 +314,23 @@ fn fly_here(worker: &mut RunWorker, room: &str) -> (Flown, bool) {
 
 /// Whether the city holds a stock the next placement can take over:
 /// registered, its directory in place, and no stocking under way.
+///
+/// **A reading, not a claim.** A lane puts the stock back on another
+/// thread while this asks (8-161), so the registration can go away
+/// between the two questions - and a registration that went away is a
+/// stock the next placement cannot take over. An earlier version
+/// unwrapped both answers, and the release's verify job, where one
+/// machine runs the whole suite at once, met
+/// `could not find '…/.git/worktrees/+spare/locked' to open` between
+/// them while this machine never did.
 fn stock_is_ready(city_root: &Path) -> bool {
-    git2::Repository::open(city_root)
-        .unwrap()
-        .find_worktree("+spare")
-        .is_ok_and(|tree| {
-            tree.validate().is_ok()
-                && matches!(
-                    tree.is_locked().unwrap(),
-                    git2::WorktreeLockStatus::Unlocked
-                )
-        })
+    let Ok(repo) = git2::Repository::open(city_root) else {
+        return false;
+    };
+    let Ok(tree) = repo.find_worktree("+spare") else {
+        return false;
+    };
+    tree.validate().is_ok() && matches!(tree.is_locked(), Ok(git2::WorktreeLockStatus::Unlocked))
 }
 
 /// `crates/sprawling/spec/Accounting/Landing.lean` D37, derived from

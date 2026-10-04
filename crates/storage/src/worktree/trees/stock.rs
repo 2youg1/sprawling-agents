@@ -152,9 +152,16 @@ impl Worktrees {
             Err(_) if admin.is_dir() => return Ok(Stock::Broken),
             Err(err) => return Err(git("find the stock", STOCK, &err)),
         };
-        let lock = tree
-            .is_locked()
-            .map_err(|err| git("read the stock's lock", STOCK, &err))?;
+        let lock = match tree.is_locked() {
+            Ok(lock) => lock,
+            // The registration went away between the lookup and this read:
+            // a lane putting the stock back, or a `forget` taking back one
+            // git would not read. No registration is the state the next
+            // placement wants, so it is asked for rather than carried as a
+            // failure of the repository.
+            Err(err) if err.code() == git2::ErrorCode::NotFound => return Ok(Stock::Absent),
+            Err(err) => return Err(git("read the stock's lock", STOCK, &err)),
+        };
         if let git2::WorktreeLockStatus::Locked(_) = lock {
             return Ok(Stock::Busy);
         }
