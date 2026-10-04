@@ -1305,6 +1305,10 @@ serde 与 serde_json（cargo metadata 解析；工作区已钉）；toml（`lexi
 
 **syn 与 proc-macro2**（`syn` 开 `full`，`proc-macro2` 开 `span-locations`）：**量一个 Rust 函数从哪行到哪行是一个解析问题，不是一个数括号问题**。按行数括号的量法有三处必然的计数错误，每一处都产出一张错的违规名单：`#[cfg(test)]` 被当成文件截断点，其后的生产函数全部隐形；`'{'` 这样的字符字面量被当成开括号；跨行字符串同理。一道量错的门比没有门更坏：它会把人送去拆一个不需要拆的函数。被击败的备选是手写一个状态扫描器（行注释、可嵌套块注释、转义与跨行字符串、raw string 的 `#` 计数、以及 `'a` 生命期与 `'x'` 字符的区分）——八十行代码养第四个计数错误的地方。`syn` 是编译器旁的那个解析器，且已因每一个 derive 宏而在 `Cargo.lock` 里。维护成本：仅工作区工具链，恒不入产品二进制（同 flate2／zip）。
 
+D27 **发行 ZIP 使用 Deflate level 9，级别只在 `package::write_archive` 的 options 链上设置。** 复用 §13 的 zip／flate2 后端，保留 `CompressionMethod::Deflated`、固定 `DateTime`、`unix_permissions`、目录前缀与成员顺序，接口与失败传播不变。对同一份 v0.0.9 Windows 发行输入（18 个成员，明文 31,097,274 字节），在 i5-1340P、16 GB 内存的 Windows 机器上用 zip 8.6.0／flate2（miniz_oxide）交错运行各两次，level 6 与 level 9 的归档分别为 14,584,335 与 14,529,867 字节，压缩中位耗时分别为 8.94 s 与 16.58 s；两档各自重复输出一致，解压中位均约 0.23 s。采用 level 9 以增加一次发行压缩的耗时换取 54,468 字节（0.37%）下载节省；这些读数不代表其他输入或 release runner 的耗时。
+
+**被否的替代方案是 7z LZMA2。** 其体积收益不能抵消 cargo-binstall 不支持 7z、PowerShell `Expand-Archive` 只解 ZIP、SignPath artifact configuration 未列 7z，以及三平台新增解码器与 provenance 的维护成本。**重开条件须同时满足**：cargo-binstall 官方支持 7z 容器；SignPath artifact configuration 明确支持 7z 或能签名其内部 PE；三平台默认解码能力有据可查；用当时的发行产物复测，收益仍显著。
+
 **zip**（`default-features = false, features = ["deflate-flate2"]`，净增两个包）：复用 xtask 已有的 flate2 做压缩后端。被击败的备选是在 justfile 与 CI 里按平台分支调 `Compress-Archive`／`zip`／`tar`：git-bash 携的是 GNU tar，不产 zip，三个平台因此需三段 shell，且一台开发机与 CI 的产物不同源——那正是这里要关掉的那类差异。维护成本：仅工作区工具链，恒不入产品二进制。
 
 分部只用 Lean 工具链自带的库，不 import 任何别的规格：xtask 不在 ARCHITECTURE.md §3 的 `depmap`
