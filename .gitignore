@@ -9,6 +9,11 @@
 # workspace root.
 /mutants.out/
 /mutants.out.old/
+# `mlugg/setup-zig` points Zig's global cache at the workspace root, and
+# the leaf's build fills it with the system libraries it resolves. Build
+# output, like `target/`, and the same row `walk::SKIP_DIRS` carries so no
+# gate reads it (tools/xtask/Spec.lean §8).
+/.zig-cache/
 # svelte-check's generated transpiled project (its --tsgo lane and editor
 # tooling write it); it is build output, and ESLint's flat config lints
 # dot directories unless they are ignored (client/eslint.config.ts).

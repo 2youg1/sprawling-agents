@@ -27,16 +27,26 @@ use crate::report::XtaskError;
 /// `sprawling` package, where its build script and its crates.io archive
 /// find it (tools/xtask/Spec.lean §8-18): Vite's output, minified.
 ///
+/// `.zig-cache` is where `mlugg/setup-zig` points Zig's global cache,
+/// `$GITHUB_WORKSPACE/.zig-cache`, and the leaf's build fills it: a
+/// `zig build-lib` overrides only the local cache, so the system
+/// libraries it resolves land here. It is walked where CI's `fast` job
+/// is green and the release's `verify` job is red for it, because
+/// `verify` runs `just check`, whose first step builds the workspace and
+/// whose third then reads the binary contents of the cache: twenty-odd
+/// high-entropy findings about a `gdi32.lib` nobody will ever receive.
+///
 /// This list is a second authority for "what is in the tree", and git is
 /// the first. It stays a list rather than a `.gitignore` reader because
-/// five names cost five tokens and a parser costs a parser - but that is
+/// six names cost six tokens and a parser costs a parser - but that is
 /// the parameter: **the day this list needs an entry that is not a build
 /// directory, read the ignore file instead of adding a row.**
-const SKIP_DIRS: [&str; 5] = [
+const SKIP_DIRS: [&str; 6] = [
     "target",
     "node_modules",
     ".lake",
     ".svelte-check",
+    ".zig-cache",
     "web-dist",
 ];
 

@@ -173,7 +173,7 @@ pub(crate) struct Violation {
 
 /-! ### 扫描面：构建目录不在里面
 
-`walk::SKIP_DIRS` 持五个名字：`target`、`node_modules`、`.lake`、`.svelte-check`、`web-dist`。
+`walk::SKIP_DIRS` 持六个名字：`target`、`node_modules`、`.lake`、`.svelte-check`、`.zig-cache`、`web-dist`。
 `web-dist` 是 `just build-web` 写进 `crates/sprawling/` 的客户端包（§8-18），bun 的产物，同样被 `.gitignore` 点名。
 **一道门为已提交的对象作证**，而构建目录里一个都没有；`.gitignore` 逐个点过它们的名。
 对抗性检查器就地编译，一次构建就在源码旁边留下几十个生成文件；
@@ -1237,7 +1237,7 @@ D3 **判的是哪棵树。** 仓库根取「当前目录往上第一个含 `Carg
 
 /-! ## 10 实现逻辑
 
-1. **walk**：手写递归（不引 walkdir），跳过 `walk::SKIP_DIRS` 的五个构建目录名（`target`、`node_modules`、`.lake`、`.svelte-check`、`web-dist`），也不进根以下自带 `.git` 条目的目录（另一份检出）；名为 `.git` 的条目按结构跳过，不在表里。输出按路径字符串排序——报告顺序确定，diff 可比。路径统一正斜杠（Windows 反斜杠归一），因为模块表以正斜杠书写。理由见 §8「扫描面」一节。**隔离区**：仓库根 `local/`（gitignore，恒不入库）存一台机器自己的工作记录；从仓库根扫描的四门（header／lexicon／secret／color）排除它——门只对入库对象作证。modmap 扫除本门所在包之外每个包的目录，depmap 扫产品包的目录（§8-39），包目录里嵌套的 `local/` 仍被封闭清单咬住。
+1. **walk**：手写递归（不引 walkdir），跳过 `walk::SKIP_DIRS` 的六个构建目录名（`target`、`node_modules`、`.lake`、`.svelte-check`、`.zig-cache`、`web-dist`），也不进根以下自带 `.git` 条目的目录（另一份检出）；名为 `.git` 的条目按结构跳过，不在表里。输出按路径字符串排序——报告顺序确定，diff 可比。路径统一正斜杠（Windows 反斜杠归一），因为模块表以正斜杠书写。理由见 §8「扫描面」一节。**隔离区**：仓库根 `local/`（gitignore，恒不入库）存一台机器自己的工作记录；从仓库根扫描的四门（header／lexicon／secret／color）排除它——门只对入库对象作证。modmap 扫除本门所在包之外每个包的目录，depmap 扫产品包的目录（§8-39），包目录里嵌套的 `local/` 仍被封闭清单咬住。
 2. **modmap**：读 `architecture.toml` 的 `module` 条目；只判 `name` 含 `::`、`file` 落在某个受判包的目录（§8-39 的全部包减去本门所在的包，D9）之下且以 `.rs` 或 `.zig` 结尾的条目，磁盘一侧遍历同一组目录里 `src/` 下的 `.rs` 与任何位置的 `.zig`（§8-48），嵌套包的文件只判一次，状态取 `planned`／`building`／`built`／`frozen` 之一。双向对账：表有文件无（状态不是 `planned` 才要求在盘）；盘有表无（lib.rs 与索引文件豁免）；盘有而状态仍是 `planned` →「状态未翻转」。同一文件两个条目即红。索引文件的依据：文件名去 `.rs` 后与同目录某子目录同名，且该子目录内有表内文件。
 3. **depmap**：ARCHITECTURE §3 的 `depmap` 围栏块是 crate 边的机器权威；包与它的依赖取自 `members`（§8-39），块里的键是包的 lib 名，一条依赖边以被依赖包的 lib 名比对，工具包不进产品图；只查 normal 与 build 依赖（dev 依赖留给测试自由）。断言是子集而不是相等：文档可以先写下一条尚未使用的边。`directions` 块判一个 crate 之内的模块方向（§8-33）。
 4. **guard**：`wall` 把叶子的 `[lints]` 与根 `[workspace.lints]` 逐键比对，再判其余成员都继承根表（`spec/Guard/Wall.lean`）；`version` 判工作区自己的包在 `[workspace.dependencies]` 里各钉 `=` 加 `[workspace.package] version`，且没有成员绕过那张表按路径点名一个工作区包（§8-49）；只读工作树，不调 git。
