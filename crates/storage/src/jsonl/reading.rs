@@ -37,7 +37,11 @@ impl SegmentBytes {
 pub(crate) fn read_segment(segment: &Path) -> Result<SegmentBytes, StorageError> {
     RealFs::new()
         .read(segment)
-        .map(|bytes| SegmentBytes { bytes })
+        .map(|bytes| {
+            #[cfg(test)]
+            measure(bytes.capacity(), bytes.len());
+            SegmentBytes { bytes }
+        })
         .map_err(io_err("read segment", segment))
 }
 
@@ -68,4 +72,84 @@ pub fn ledger_segments_at(dir: &Path) -> Result<Vec<PathBuf>, StorageError> {
         .into_iter()
         .filter(|p| is_segment(p))
         .collect())
+}
+
+#[cfg(test)]
+std::thread_local! {
+    static MEASURED: std::cell::Cell<(usize, usize)> = const { std::cell::Cell::new((0, 0)) };
+}
+
+#[cfg(test)]
+pub(super) fn measure(held: usize, copied: usize) {
+    MEASURED.with(|measured| {
+        let (peak, copies) = measured.get();
+        measured.set((peak.max(held), copies.saturating_add(copied)));
+    });
+}
+
+#[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    reason = "test code"
+)]
+mod tests {
+    use super::*;
+    use crate::jsonl::JsonlLedger;
+    use kernel::{EventDraft, EventKind, Payload, RunId, TimeMs};
+
+    #[test]
+    fn three_read_paths_hold_less_than_the_preallocated_segment() {
+        let root = tempfile::tempdir().unwrap();
+        let dir = root.path().join("ledger");
+        let (mut ledger, _) = JsonlLedger::open(&dir, TimeMs::new(0)).unwrap();
+        ledger
+            .append_all(vec![EventDraft {
+                run: RunId::CITY,
+                t: TimeMs::new(0),
+                who: "city".into(),
+                addr: None,
+                kind: EventKind::GateChecked,
+                data: Payload::empty(),
+                ig: false,
+            }])
+            .unwrap();
+        let expected = ledger.read_raw_lines().unwrap();
+        let segment = ledger_segments_at(&dir).unwrap().remove(0);
+        let total = 2 * 1024 * 1024;
+        std::fs::OpenOptions::new()
+            .write(true)
+            .open(&segment)
+            .unwrap()
+            .set_len(total)
+            .unwrap();
+        MEASURED.with(|m| m.set((0, 0)));
+        assert_eq!(ledger.read_raw_lines().unwrap(), expected);
+        let instance = MEASURED.with(std::cell::Cell::get);
+        MEASURED.with(|m| m.set((0, 0)));
+        assert_eq!(read_raw_lines_at(&dir).unwrap(), expected);
+        let readonly = MEASURED.with(std::cell::Cell::get);
+        drop(ledger);
+        MEASURED.with(|m| m.set((0, 0)));
+        let (reopened, report) = JsonlLedger::open(&dir, TimeMs::new(1)).unwrap();
+        assert!(report.recovered.is_none());
+        assert_eq!(reopened.position().value(), 1);
+        let opening = MEASURED.with(std::cell::Cell::get);
+        for (name, (peak, copied)) in [
+            ("instance", instance),
+            ("readonly", readonly),
+            ("open", opening),
+        ] {
+            eprintln!("{name}: peak={peak} copied_into_scan={copied} segment={total}");
+            assert!(
+                peak < usize::try_from(total / 8).unwrap(),
+                "{name}: retained {peak}"
+            );
+            assert!(
+                copied < usize::try_from(total / 8).unwrap(),
+                "{name}: copied {copied}"
+            );
+        }
+    }
 }

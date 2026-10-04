@@ -166,6 +166,8 @@ impl JsonlLedger {
             .collect();
         for seg in segments {
             let bytes = self.vfs.read(&seg).map_err(io_err("read segment", &seg))?;
+            #[cfg(test)]
+            super::reading::measure(bytes.capacity(), bytes.len());
             let (lines, _) = complete_lines(&bytes);
             for line in lines {
                 if !line.is_empty() {

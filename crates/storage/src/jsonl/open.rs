@@ -186,6 +186,8 @@ impl JsonlLedger {
         // Zeros after the last record are preallocated space, not a tear
         // (`crates/storage/spec/Jsonl/Preallocate.lean`): the scan reads the
         // segment without them, and the writer resumes where they begin.
+        #[cfg(test)]
+        super::reading::measure(file.capacity(), file.len());
         let filled = records_end(&file);
         let total = u64_count(file.len()).map_err(io_err("measure segment", last))?;
         let mut bytes = file;
