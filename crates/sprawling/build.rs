@@ -6,7 +6,8 @@
 //! Single embed point: gzips the web client bundle into OUT_DIR and
 //! generates `client_embed.rs`, the file table main.rs includes; writes
 //! the dependency list the lockfile names, and the toolchain pins the
-//! doctor reports, beside it.
+//! doctor reports, beside it. Windows targets also link product resources
+//! derived from Cargo's package metadata (`crates/sprawling/Spec.lean` §8-157).
 //!
 //! The bundle is whatever `just build-web` left at [`BUNDLE_DIR`] in this
 //! package's directory: the client's own `index.html` and the hashed
@@ -81,11 +82,23 @@ fn main() {
     if let Err(msg) = embed() {
         // cargo >= 1.84: `cargo::error` fails the build loudly instead of
         // leaving a stale or missing asset for include_bytes! to trip on.
-        println!("cargo::error=web asset embed failed: {msg}");
+        println!("cargo::error=binary resource generation failed: {msg}");
     }
 }
 
 fn embed() -> Result<(), String> {
+    if std::env::var("CARGO_CFG_TARGET_OS")
+        .map_err(|err| format!("read resource target OS: {err}"))?
+        == "windows"
+    {
+        winresource::WindowsResource::new()
+            .compile()
+            .map_err(|err| {
+                format!(
+                    "compile Windows product resources: {err}; check the target resource toolchain"
+                )
+            })?;
+    }
     let manifest = std::env::var("CARGO_MANIFEST_DIR").map_err(|e| e.to_string())?;
     let out_dir = std::env::var("OUT_DIR").map_err(|e| e.to_string())?;
     let dist = BUNDLE_DIR

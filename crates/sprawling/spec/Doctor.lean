@@ -783,10 +783,13 @@ pub(crate) fn pinned(pin: Pin) -> Option<String>;   // 文件为空即 None，�
 - **`packaged` 门守这条线**（tools/xtask/Spec.lean §8-49）：可发布的包的生产代码里，`include!`、`include_str!`、`include_bytes!` 只指向包目录之内或 `OUT_DIR`。
 - **清单**：`[workspace.package]` 写 `repository`、`homepage`，`publish = true`；每个包写自己的 `description`，本包另写 `readme`、`keywords`、`categories` 与 `include`；`xtask` 与 `citysim` 写 `publish = false`。工作区自己的包在 `[workspace.dependencies]` 里各钉 `version = "=<工作区版本>"`，`guard` 判它们等于 `[workspace.package] version`（tools/xtask/Spec.lean §8-49）。`sprawling-remote-access` 被二进制链接，随之可发布。`sprawling-desktop-ffi` 也可发布：`sprawling-desktop` 在 Windows 上依赖它，而 crates.io 要求依赖的每个包都在 registry 上；它的包里带着 Zig 叶子的源码与 `zig-version`，构建脚本只读包内的文件，所以从 crates.io 在 Windows 上装这个二进制要先装钉住的那一版 Zig（§8-146），别的平台不编叶子。
 - **`sandbox` 是默认 feature。** `cargo install sprawling` 不写 `--features` 时也带执行引擎，与归档一致；不要引擎的构建写 `--no-default-features`，`just features` 编译这一份，因为别的命令都不再编它。
+- **Windows 的产品资源由 Cargo 包信息生成。** `build.rs` 是形状 4 adapter，以 `CARGO_CFG_TARGET_OS` 判断目标平台；目标为 Windows 时调用 `winresource::WindowsResource::new().compile()`，生成物留在 `OUT_DIR` 并交给链接器，其他目标不调用资源编译器。`ProductName` 读 `CARGO_PKG_NAME`，`ProductVersion` 与 `FileVersion` 读 `CARGO_PKG_VERSION`，数字版本也由 Cargo 的版本分量生成；包版本仍只有工作区清单这一处权威。`winresource` 关闭默认的 `toml` feature，不读取 `[package.metadata.winresource]` 中的覆盖项。所需工具是 MSVC 的 Windows SDK `rc.exe`，或 GNU 目标的 MinGW resource toolchain；非 Windows 主机交叉编译 MSVC 时使用 `llvm-rc` 与 `llvm-cvtres`。资源生成失败经 `cargo::error` 使构建失败，错误说明目标资源编译失败并要求检查对应工具链，不能发布一份悄悄缺失产品资源的 Windows 二进制。这些资源描述产品身份，不构成 Authenticode 签名，也不保证 Defender 的分类结果。
 - **发布次序**：`release.yml` 的 `crates` job 在 `channel`（npm）之后跑，也就排在 GitHub release 之后。它用 `rust-lang/crates-io-auth-action` 把这次运行的 OIDC 令牌换成 crates.io 的短期令牌（Trusted Publishing，每个可发布的包在 crates.io 上登记了仓库 `2youg1/sprawling-agents` 与工作流 `release.yml`），然后 `cargo publish --workspace --locked --no-verify --allow-dirty`；cargo 按依赖次序逐个发布，desktop 与它的叶子都是工作区成员，不再单独发。仓库里不存长期令牌。crates.io 的版本不能覆盖，而 `release.yml` 允许同一个 tag 重新发版，所以 crates.io 排在最后；本包这个版本已在 sparse index 上时，job 不再发布、只留一行说明。`--no-verify`：同一棵树已经过 `verify` 与 `packaged` 门（D10），验证构建只是重编一遍，还会耗掉短期令牌的时效。`--allow-dirty`：job 改写了 binstall 的下载地址（D32）。
 - **`cargo binstall sprawling` 取发行归档**：本包清单的 `[package.metadata.binstall]` 按目标三元组各写一条 `pkg-url` 与 `bin-dir`，指向 `release.yml` 打出的三份归档（`x86_64-pc-windows-msvc` → `-windows-x86_64.zip`，`aarch64-apple-darwin` → `-macos-aarch64.zip`，`x86_64-unknown-linux-musl` → `-x86_64-unknown-linux-musl.zip`，归档名的后缀表在 `tools/xtask/src/platform.rs`），`pkg-fmt = "zip"`，可执行文件在归档里的 `sprawling-<版本>-<后缀>/` 目录下。glibc 的 Linux 上 binstall 自己退到 musl 那一份；没有归档的目标，binstall 退回从 `.crate` 编译。仓库里的地址用 `v{ version }` 作 tag，`crates` job 发布前把它换成这次的 tag（D32）。
 
 **本节接口的当前状态**：从 crates.io 构建的二进制仍有两处与归档不同。`[profile.release]` 写在工作区清单里，`cargo package` 不把它带进包，`cargo install` 按 cargo 的默认 release profile 编（`opt-level = 3`，不做 fat LTO，不剥符号）；`SPRAWLING_RELEASE_TAG` 只有 `release.yml` 设，所以 `status` 如实自称 built from source，成熟度照样从 `kernel::release::MATURITY` 读（§8-162）。工具链钉子不在包里时，develop 层的 `lean` 与 `zig` 两行装不钉的版本（§8-162）。
+
+**本章验收**：Windows 上构建后，文件版本 API 读出的 `ProductName` 等于 Cargo metadata 的包名，`ProductVersion` 与 `FileVersion` 等于 Cargo metadata 的包版本，PE 的资源目录非空；这项检查读取真实链接产物，资源编译器的行为属于环境假设，不由本文件证明。非 Windows 目标的构建不要求 Windows resource toolchain。
 
 **本章测试**：`doctor::pin::tests` 读出的钉子与检出里的文件相等，空文件读成不钉；`cargo package -p sprawling --list --allow-dirty` 的列表里有包体的 `index.html`（在 `web-dist` 下）与 `Cargo.lock`；`cargo xtask gates packaged guard` 为绿；`cargo publish --workspace --dry-run --locked` 走完打包与验证构建；把清单里的 `v{ version }` 换成一个已发布的 tag 之后，`cargo binstall --dry-run --manifest-path crates/sprawling/Cargo.toml sprawling` 解析到那个 tag 下真实存在的归档地址。
 
@@ -985,6 +988,11 @@ crates.io 上的 `.crate` 只是一个包目录，所以一个构建要读的每
 /-! D32 binstall 的下载地址在发布时填入 tag（§8-157）
 
 发行的 tag 是 `v<版本>-<成熟度>-<YYMMDD>`，binstall 的模板只认得 `{ version }`、`{ target }` 这类变量，拼不出日期，所以仓库里的 `pkg-url` 写 `releases/download/v{ version }/`，`crates` job 在 `cargo publish` 之前把这一段换成 `${GITHUB_REF_NAME}`，并核对三条地址都换到了。tag 只有一个权威，就是这次运行的 ref。这是 D10 的一个例外：改的只是 cargo 构建时不读的 `[package.metadata]`，包里的源码与清单的其余部分仍与提交一致，`.cargo_vcs_info.json` 照实记下 `dirty`。**被否**：①把整个 tag 写进清单——每次发版要在打 tag 之前猜出日期，清单与 tag 成了同一个事实的两份；②发版时另推一个 `v<版本>` 的 tag 并挂同一组归档——一份归档挂在两个 release 上，`gh release delete` 重发时还要收拾两处；③指向 `releases/latest/download`——本项目的每个 release 都是 pre-release，GitHub 的 latest 不指向它们。**重开参数**：tag 改成 `v<版本>`，那时删掉这一步改写，模板原样可用。
+-/
+
+/-! D49 产品资源在每次 Windows 构建中生成，包名与版本由 Cargo 提供（§8-157）
+
+产品资源是供文件属性与签名服务核对的输入，所以由拥有二进制的包在构建时写入，检出、打包验证和 registry 安装都经过同一个 `build.rs`。选择 `winresource` 的安全接口并关闭 `toml` feature：它从 Cargo 环境读包名与版本，生成和链接资源，包内不再存一份版本文字或可覆盖它的 metadata。被否决的方案是在 release job 中写入资源，因为本地与 crates.io 构建会缺失这些字段，而且写入资源改变待签名字节，放在签名之后还会破坏签名。重开条件是二进制由另一种统一打包机制构建，且所有渠道都经过它。资源编译器的成功返回是环境假设，验收读取实际 PE 的版本信息来检查该边界；SignPath 的服务配置与证书不属于此构建接口。
 -/
 
 /-! D33 城目录前的扫描经随系统发行的工具读，读不出就说读不出，且只是建议（§8-166 之一）
