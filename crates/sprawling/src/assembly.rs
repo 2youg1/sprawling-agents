@@ -21,6 +21,7 @@ mod dropping;
 mod listening;
 mod production;
 mod remote_door;
+mod skill_audit;
 
 pub use listening::{Listening, listen};
 pub use production::{SystemClock, form_city, hands, init_city};

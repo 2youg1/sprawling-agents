@@ -519,6 +519,7 @@ pub struct ProposalWithdrawn { pub proposal: B3Hash }
 
 ```rust
 pub struct SkillAudited {
+    pub local_only_reason: Option<String>, // 缺省缺席；当前摘要未登记来源时说明跳过远端的理由
     pub skill: String,                 // skill 名
     pub digest: B3Hash,                // 被审的那份内容的摘要；内容变了摘要就变，旧审核不再算数
     pub source: AuditSource,           // SkillsSh | SkillSpector

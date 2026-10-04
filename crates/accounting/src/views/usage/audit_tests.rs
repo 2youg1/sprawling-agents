@@ -87,3 +87,50 @@ fn a_skill_whose_content_changed_is_asked_to_re_audit() {
         }
     );
 }
+
+#[test]
+fn a_package_audit_uses_whole_content_and_a_script_edit_makes_it_stale() {
+    let dir = tempfile::tempdir().unwrap();
+    let package = dir.path().join("kiln");
+    std::fs::create_dir(&package).unwrap();
+    std::fs::write(package.join("SKILL.md"), "# kiln\n").unwrap();
+    std::fs::write(package.join("run.py"), "print(1)\n").unwrap();
+    let installed = city::install_skill(
+        dir.path(),
+        &city::Slot::library("tools").unwrap(),
+        &package,
+        &mut |bytes| Ok(kernel::B3Hash::digest(bytes)),
+    )
+    .unwrap();
+    let usage = Usage::fold([record(
+        now(1, 0),
+        EventKind::SkillAudited,
+        json!({ "skill": "kiln", "digest": installed.hash.to_string(),
+            "source": "skill_spector", "scanner": "skillspector 1", "verdict": "pass" }),
+    )]);
+    let read = || {
+        let shelves = super::shelves::shelved(dir.path()).unwrap();
+        usage
+            .skills(&shelves, Some("kiln"))
+            .skills
+            .first()
+            .unwrap()
+            .held
+            .clone()
+    };
+    let held = read();
+    assert!(held.iter().any(|copy| copy.digest == installed.hash
+        && copy.audit
+            == wire::SkillAudit::Audited {
+                verdict: kernel::event::record::AuditVerdict::Pass,
+                at: Seq::new(1)
+            }));
+    let landed = dir.path().join(installed.holding.package.unwrap().as_str());
+    std::fs::write(landed.join("run.py"), "print(2)\n").unwrap();
+    let current = city::skill_digest(&landed).unwrap();
+    assert!(read().iter().any(|copy| copy.digest == current
+        && copy.audit
+            == wire::SkillAudit::Stale {
+                audited: installed.hash
+            }));
+}

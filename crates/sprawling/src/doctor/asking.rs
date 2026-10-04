@@ -30,7 +30,7 @@ use std::sync::mpsc::Receiver;
 use std::time::Duration;
 
 /// How long this city waits between two knocks.
-pub(super) const TICK: Duration = Duration::from_millis(50);
+pub(crate) const TICK: Duration = Duration::from_millis(50);
 
 /// The most bytes of one stdout line that are kept; the rest of a longer
 /// line is read and dropped, so a program that prints no newline cannot
@@ -38,7 +38,7 @@ pub(super) const TICK: Duration = Duration::from_millis(50);
 pub(super) const LINE_MAX_BYTES: usize = 4096;
 
 /// How one call ended.
-pub(super) enum Ended {
+pub(crate) enum Ended {
     /// It exited; `code` is absent when a signal ended it. `kept` is the
     /// lines of what it wrote that `keep` chose, in order and joined by
     /// `\n`, a byte that is not UTF-8 replaced rather than the line
@@ -54,7 +54,7 @@ pub(super) enum Ended {
 /// Starts `command` with stdin empty, stdout read and stderr dropped,
 /// and waits for it, `knocks` knocks at most; each stdout line, its
 /// line ending removed, is offered to `keep` once.
-pub(super) fn ask(
+pub(crate) fn ask(
     command: &mut Command,
     knocks: u32,
     keep: impl FnMut(&str) -> bool + Send + 'static,
