@@ -626,6 +626,12 @@ D17 **成熟度以一个带参数的事实进文档，两种拼法由 kernel 给
 
 **败给的方案**：在 `ci.yml` 里照抄那两条命令，附一句「与 `justfile` 保持一致」。那正是分叉发生时的写法，而没有任何东西会注意到它们不再一致。
 
+D27 **验证编排只住 `.github/workflows/ci.yml`，release 经 `workflow_call` 调同一提交的入口。** 本段描述 GitHub Actions 的调用契约，不是 Lean 证明；job 状态与矩阵完整性由 Actions 引擎提供。输入 `release-validation` 是默认 false 的 boolean，true 保持发行原有的阻塞范围：跳过 `changes`、Linux/macOS `core` 与条件 `proof`，其余 job 与普通 CI 共用 recipes、矩阵和准备步骤。普通 CI 的路径条件与手动 proof 不变；扩大 core/proof 的发布阻塞范围须另有明确决定。`validation` 经 `needs` 汇合必需 job，只有每项为 success 才成功；failure、cancelled、skipped 与因构建失败而未运行的分片都拒绝。四分片共用本轮 `test-build` 的 archive，矩阵与分区继续由 CI 定义，release 不另写检查清单。
+
+`test-build` 的两项 Cargo debug 环境覆盖只在共享入口定义，main 与 tag 因而读同一种 test 缓存身份；fast/clippy/test 的用途仍各自独立，Rust cache 保持默认 workspace 产物清理，只有 main 写入。缓存恢复不是验证证据。release 调用的 concurrency 以 run id 隔离且不替代取消，普通 CI 仍按 ref 替代旧运行；调用权限只有 contents read，不传 secrets。release 的 advisories 是本轮新读，发行 archive 仍并行构建，publish 等待 verify、advisories 与 archive 成功，发行消费者只下载 archive-*。verify/archive job 名与 Windows 签名输出 archive-Windows 的位置保留。
+
+被否：release 另抄 jobs 或 Cargo 命令，会再次分叉；缓存 composite action 在只有一个 test-build 定义时增加无用的接口；接受历史 CI 绿结果需要本方案没有的来源、时效与完整性协议。重开参数：发行要求 core/proof 阻塞，或确有跨运行结果复用需求。验证以两个 YAML 的解析、inputs/权限/needs、缓存环境唯一性与四分片对照为本地边界；真实 cache hit、失败传播与耗时由 Actions 运行确认。
+
 **只有一份**：`features` 不是门。`just check` 已经调这条 recipe，再在 `gates` 里跑同一条工作区检查就是同一次编译每轮跑两遍；只留 recipe 是一条裁决。
 -/
 
