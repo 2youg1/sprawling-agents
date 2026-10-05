@@ -72,6 +72,7 @@ pub use budget::{BudgetUse, ByteLen, Tokens, UsdMicros};
 pub use change::{FileChange, How, Lines};
 pub use completion::{Completion, Evidence, PlannedProgress, Progress, UnplannedProgress};
 pub use config::{ClockStampGranularity, ClockZone, FrozenConfig};
+pub use config::{ContainerImage, ContainerLimits};
 pub use config::{EnvVarName, Interpreter, LayeredValue, LiveConfig, SandboxLimits};
 pub use config::{McpServer, McpTransport, SecondThreshold};
 pub use delegation::{Delegate, DelegateKind, DelegationVerdict, Delegator, Depth};

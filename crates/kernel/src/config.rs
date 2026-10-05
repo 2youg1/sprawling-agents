@@ -3,9 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Three-layer config resolution and the frozen/live split. `FrozenConfig` and `LiveConfig` share no field: the freeze
-//! line is a machine-checkable property, not a review note.
-//! The part `crates/kernel/spec/Config.lean` specifies this module.
+//! Three-layer config resolution, specified by `crates/kernel/spec/Config.lean`.
+//! `FrozenConfig` and `LiveConfig` share no field; tests check this property.
 
 use serde::{Deserialize, Serialize};
 
@@ -15,7 +14,9 @@ use crate::error::{AxCode, AxError};
 use crate::model::Effort;
 use crate::tool::ServerLabel;
 
+mod container;
 mod interpreter;
+pub use container::{ContainerImage, ContainerLimits};
 pub use interpreter::Interpreter;
 
 /// One environment variable name a scope declares its runs may inherit.
