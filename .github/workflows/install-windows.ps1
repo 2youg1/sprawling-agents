@@ -58,7 +58,7 @@ try {
     if ($originalHash -cne $installedHash) { throw 'PowerShell installed different executable bytes.' }
     $status = & $installed[0].FullName status
     if ($LASTEXITCODE -ne 0) { throw 'The installed executable cannot answer status.' }
-    & $installed[0].FullName uninstall *> (Join-Path $Evidence 'powershell-uninstall.log')
+    & $installed[0].FullName install --uninstall *> (Join-Path $Evidence 'powershell-uninstall.log')
     if ($LASTEXITCODE -ne 0 -or (Test-Path -LiteralPath $installed[0].FullName)) { throw 'Uninstall failed to remove its executable.' }
     $release[0].assets[0].digest = 'sha256:' + ('0' * 64)
     $release | ConvertTo-Json -Depth 5 -AsArray | Set-Content -LiteralPath (Join-Path $www 'releases.json') -Encoding utf8
