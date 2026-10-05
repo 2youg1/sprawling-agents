@@ -85,6 +85,9 @@ struct Record {
     cleanup: usize,
     cleanup_error: usize,
     parent_job: usize,
+    run_assigned: usize,
+    command_assigned: usize,
+    identity_verified: usize,
 }
 
 #[expect(unsafe_code, reason = "native confinement leaf declarations")]
@@ -103,6 +106,8 @@ unsafe extern "C" {
         profile: *const u16,
         units: usize,
     ) -> u32;
+    #[cfg(test)]
+    fn sprawling_native_may_resume(record: *const Record, bytes: usize) -> u32;
     fn sprawling_native_packet_valid(text: *const u16, units: usize) -> u32;
 }
 
@@ -279,6 +284,20 @@ fn checked(action: Action, code: u32) -> Result<(), Failure> {
 mod tests {
     use super::*;
     use proptest::prelude::*;
+
+    proptest! {
+        #[test]
+        fn native_resume_guard_matches_every_readiness_state(
+            run in prop_oneof![Just(0_usize), Just(1_usize), any::<usize>()],
+            command in prop_oneof![Just(0_usize), Just(1_usize), any::<usize>()],
+            identity in prop_oneof![Just(0_usize), Just(1_usize), any::<usize>()],
+        ) {
+            let record = Record { run_assigned: run, command_assigned: command, identity_verified: identity, ..Record::default() };
+            // SAFETY: the fully initialized record is lent with its exact size.
+            let found = unsafe { sprawling_native_may_resume(&raw const record, std::mem::size_of::<Record>()) };
+            prop_assert_eq!(found != 0, run == 1 && command == 1 && identity == 1);
+        }
+    }
 
     proptest! {
         #[test]

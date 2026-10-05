@@ -123,6 +123,11 @@ fn membership(process: api.HANDLE, job: api.HANDLE) u32 {
     return 0;
 }
 
+export fn sprawling_native_may_resume(record: *const api.Record, bytes: usize) u32 {
+    if (bytes != @sizeOf(api.Record)) return 0;
+    return @intFromBool(record.run_assigned == 1 and record.command_assigned == 1 and record.identity_verified == 1);
+}
+
 fn start(parts: Packet, sid: *anyopaque, record: *api.Record) u32 {
     const command = allocator.dupeZ(u16, parts.strings[1]) catch return 8;
     defer allocator.free(command);
@@ -154,10 +159,14 @@ fn start(parts: Packet, sid: *anyopaque, record: *api.Record) u32 {
     if (api.AssignProcessToJobObject(handle(record.job), process.process) == .FALSE) return lastError();
     const token = identity(process.process, sid, record);
     if (token != 0) return token;
+    record.identity_verified = 1;
     const parent = membership(process.process, handle(record.parent_job));
     if (parent != 0) return parent;
+    record.run_assigned = 1;
     const child = membership(process.process, handle(record.job));
     if (child != 0) return child;
+    record.command_assigned = 1;
+    if (sprawling_native_may_resume(record, @sizeOf(api.Record)) == 0) return 5;
     if (api.ResumeThread(process.thread) == std.math.maxInt(u32)) return lastError();
     return 0;
 }
@@ -279,5 +288,17 @@ test "native packet parser fuzzes both rejection and bounded spans" {
             for (found.strings) |part| try std.testing.expect(part.len <= len);
             try std.testing.expect(found.environment.len <= len);
         }
+    }
+}
+
+test "resume readiness fuzz matches the Rust reference contract" {
+    var rng = std.Random.DefaultPrng.init(0xbaca4821);
+    var record: api.Record = std.mem.zeroes(api.Record);
+    for (0..20_000) |_| {
+        record.run_assigned = @intFromBool(rng.random().boolean());
+        record.command_assigned = @intFromBool(rng.random().boolean());
+        record.identity_verified = @intFromBool(rng.random().boolean());
+        const expected = record.run_assigned == 1 and record.command_assigned == 1 and record.identity_verified == 1;
+        try std.testing.expectEqual(expected, sprawling_native_may_resume(&record, @sizeOf(api.Record)) != 0);
     }
 }

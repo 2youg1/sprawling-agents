@@ -18,6 +18,9 @@ pub const Record = extern struct {
     cleanup: usize,
     cleanup_error: usize,
     parent_job: usize,
+    run_assigned: usize,
+    command_assigned: usize,
+    identity_verified: usize,
 };
 pub const Security = extern struct { length: u32 = @sizeOf(Security), descriptor: ?*anyopaque = null, inherit: BOOL = BOOL.TRUE };
 pub const Capabilities = extern struct { sid: *anyopaque, capabilities: ?*anyopaque = null, count: u32 = 0, reserved: u32 = 0 };
