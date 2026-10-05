@@ -147,3 +147,40 @@ fn compiled(here: &Path, out: &Path, triple: &str, file: &str) -> Result<(), Str
         String::from_utf8_lossy(&built.stderr)
     ))
 }
+
+fn record_matches(_rust: &str, _zig: &str) -> Result<(), String> {
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::record_matches;
+
+    #[test]
+    fn swapped_same_width_handles_are_rejected() {
+        let rust = "#[repr(C)]
+struct Record {
+    job: usize,
+    process: usize,
+}";
+        let zig = "pub const Record = extern struct {
+    process: usize,
+    job: usize,
+};";
+        assert!(record_matches(rust, zig).is_err());
+    }
+
+    #[test]
+    fn matching_field_order_and_types_are_accepted() {
+        let rust = "#[repr(C)]
+struct Record {
+    job: usize,
+    phase: [u8; 32],
+}";
+        let zig = "pub const Record = extern struct {
+    job: usize,
+    phase: [32]u8,
+};";
+        assert_eq!(record_matches(rust, zig), Ok(()));
+    }
+}
