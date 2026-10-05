@@ -66,7 +66,7 @@ for name, flags in [("resource", 0), ("jetsam", 16)]:
 report["coalition_logical_writes_setter_present"] = getattr(libc, "coalition_ledger_set_logical_writes_limit", None) is not None
 
 for candidate, command in [
-    ("taskpolicy_two_children_96MiB", ["/usr/sbin/taskpolicy", "-m", "96", sys.executable, __file__, "--tree-fixture"]),
+    ("taskpolicy_children", ["/usr/sbin/taskpolicy", "-m", "96", sys.executable, __file__, "--tree-fixture"]),
     ("host_two_children_control", [sys.executable, __file__, "--tree-fixture"]),
 ]:
     try:
