@@ -537,6 +537,38 @@ jobs:
           [ "$RUNNER_OS" != Windows ] || walk="/usr/bin:$walk:$(dirname "$(command -v zig)")"
           env -u CARGO_HOME -u RUSTUP_HOME PATH="$walk" \
             just acceptance "${{ steps.fresh.outputs.archive }}" 2>&1 | tee "${{ steps.fresh.outputs.dir }}/logs/acceptance.log"
+      - name: a binary serving HTML as JavaScript is rejected by the same client step
+        shell: bash
+        env:
+          ARCHIVE_TARGET: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+          bundle="$PWD/crates/sprawling/web-dist"
+          backup="$RUNNER_TEMP/client-regression-bundle"
+          cp -R "$bundle" "$backup"
+          trap 'cp -R "$backup/." "$bundle/"' EXIT
+          python3 - <<'PYTHON'
+          from pathlib import Path
+          bundle = Path("crates/sprawling/web-dist")
+          scripts = list(bundle.rglob("*.js"))
+          if not scripts:
+              raise SystemExit("the production bundle has no script to corrupt")
+          for script in scripts:
+              script.write_text("<!doctype html><html><body>broken asset</body></html>", encoding="utf-8")
+          PYTHON
+          build_args=()
+          [ -z "$ARCHIVE_TARGET" ] || build_args=(--target "$ARCHIVE_TARGET")
+          cargo build --release -p sprawling --locked "${build_args[@]}"
+          binary="$PWD/target/${ARCHIVE_TARGET:+$ARCHIVE_TARGET/}release/sprawling"
+          [ "$RUNNER_OS" != Windows ] || binary="$binary.exe"
+          ! command -v cygpath > /dev/null 2>&1 || binary="$(cygpath -m "$binary")"
+          set +e
+          SPRAWLING_BIN="$binary" lake exe acceptance client > "${{ steps.fresh.outputs.dir }}/logs/client-html-rejection.log" 2>&1
+          result=$?
+          set -e
+          cat "${{ steps.fresh.outputs.dir }}/logs/client-html-rejection.log"
+          [ "$result" -eq 1 ] || { echo "HTML served as JavaScript was not rejected (exit $result)"; exit 1; }
+          grep -q 'client asset.*HTML' "${{ steps.fresh.outputs.dir }}/logs/client-html-rejection.log"
       - uses: actions/upload-artifact@v7
         if: always()
         with:
