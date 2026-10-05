@@ -1,0 +1,54 @@
+name: native-windows-acceptance
+on:
+  push:
+    branches: [s10/deadline-b1-native-windows]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: native-windows-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  native:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    env:
+      CARGO_INCREMENTAL: "0"
+      SPRAWLING_DISPOSABLE_NATIVE: "1"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/zig
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: windows-native-runtime
+          save-if: false
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
+      - name: Record exact source
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force native-evidence | Out-Null
+          git rev-parse HEAD | Out-File -Encoding utf8 native-evidence/head.txt
+          git rev-parse 'HEAD^{tree}' | Out-File -Encoding utf8 native-evidence/tree.txt
+      - name: Native foreign boundary conformance
+        shell: pwsh
+        run: |
+          cargo nextest run -p sprawling-desktop-ffi -E 'test(native_)' 2>&1 | Tee-Object native-evidence/boundary.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Native production axes and cancellation
+        shell: pwsh
+        run: |
+          cargo nextest run -p sprawling-runtime --run-ignored ignored-only -E 'test(native_windows_disposable)' 2>&1 | Tee-Object native-evidence/production.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Hash the actual probe binaries
+        if: always()
+        shell: pwsh
+        run: |
+          Get-ChildItem target/debug/deps/runtime-*.exe | Get-FileHash -Algorithm SHA256 | Select-Object Hash,Path | ConvertTo-Json | Out-File -Encoding utf8 native-evidence/binaries.json
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: native-windows-${{ github.sha }}
+          path: native-evidence
+          if-no-files-found: error
