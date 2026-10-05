@@ -8,13 +8,13 @@
 规定 `crates/runtime/src/tools/exec/native_windows.rs` 与
 `crates/desktop/ffi/src/confinement.rs`、`crates/desktop/ffi/zig/confinement.zig`。
 
-D40：Windows native 使用无 capability 的 AppContainer 与匿名 Job Object；
+D53：Windows native 使用无 capability 的 AppContainer 与匿名 Job Object；
 CreateProcessW 以 CREATE_SUSPENDED 创建，设置 Job 的 aggregate committed-memory
 上限、CPU hard cap 与 kill-on-close，AssignProcessToJobObject 成功之后才 ResumeThread。
 没有准入安全 API 的平台调用进入既有 Zig leaf；win32job 与 winsafe 的现有安全
 CreateProcess 面没有 SECURITY_CAPABILITIES / STARTUPINFOEX，不能承担此契约。
 
-D41：native 的 CPU hard cap 默认 50% 整机份额，未设置 run memory 时默认
+D54：native 的 CPU hard cap 默认 50% 整机份额，未设置 run memory 时默认
 256 MiB aggregate committed-memory；配置的 Shares::CpuAndMemory 覆盖这个默认值。
 这两个默认数只在 native_windows.rs 定义。run job 在 table lock 内先创建并设同一
 memory 上限，native command 同时加入 command job 与 run job，再恢复；多个命令的
@@ -96,6 +96,10 @@ theorem closing_cannot_resume (answers : List Answer) :
 theorem failure_cannot_fall_back (state : Phase) (rest : List Answer) :
     run state (.failure :: rest) ≠ .running := by
   have stopped := closing_cannot_resume rest
+  have neverRunning : run .closing rest ≠ .running := by
+    rcases stopped with retained | removed
+    · simp [retained]
+    · simp [removed]
   cases state <;> simp_all [run, step, closed_is_terminal]
 
 structure Readiness where
