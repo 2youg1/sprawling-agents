@@ -27,12 +27,29 @@ CPU 上限、唯一 profile 名及 output files；叶子只执行平台操作。
 scratch 的继承 mandatory-integrity label 为 Low，避免 medium 默认标签即使
 DACL 已授权仍因 write-up 禁止而拒绝 AppContainer 写入；只修改这次复制目录，
 使用 LABEL_SECURITY_INFORMATION，不索取 SeSecurityPrivilege。
+叶子保留 GetNamedSecurityInfo 分配的原 security descriptor，跨调用保留的只有
+OS 自己分配的资源，Rust 借出的 packet 地址不保留；command 结束后恢复副本根的
+原 DACL 与 mandatory label，再释放 descriptor，避免复用副本时积累旧 SID 的 ACE。
+原目录已被命令删除时视为权限资源已经不存在，不尝试改动它的父目录。
+环境继续从 Command 的显式 allowlist 取值，Windows native loader 的 OS 根目录
+变量由安全 GetSystemDirectory API 的父目录提供，并通过 Command 的 Windows
+case-insensitive key 规则替换别名；它们是平台启动信息，不从 host environment 继承，
+也不携带用户或 provider 凭据。USERPROFILE、APPDATA、LOCALAPPDATA、TEMP 与 TMP
+由 disposable working directory 提供，不继承 host 路径；Microsoft 的
+Implementing an AppContainer「Creating the Profile」规定启动时会重定向
+LOCALAPPDATA/TEMP/TMP 到 profile。显式环境缺失这些初始化字段时，平台可能
+以 ERROR_ENVVAR_NOT_FOUND 拒绝；实际 disposable test 验证该启动条件。
+错误携带真实失败阶段，避免把 loader 拒绝记作 guard 通过。
 profile 的私有存储也是这次执行拥有的资源。harness/provider 不进入 AppContainer。
 
 失败拒绝，不再起动普通子进程；cleanup 拒绝时保留错误及未释放资源的 owner，
-模型的 closing 只表示不能恢复执行，closed 才表示 cleanup 已成功。创建后任何失败均终止挂起进程、关闭句柄和
+模型的 closing 只表示不能恢复执行，closed 才表示 cleanup 已成功。
+launch failure 的未释放资源随 typed Failure 返回，由 run Job 保留，后续 native
+准入先重试清理；release 时仍由这个 owner 执行最后的 teardown，并报告拒绝。创建后任何失败均终止挂起进程、关闭句柄和
 删除 profile；正常结束、取消与 owner 释放均先终止 Job 中剩余进程，再删除 profile。
-读取退出状态或清理失败保留操作与 OS code，并由 runtime 转成 E_SANDBOX_DENIED。
+读取退出状态或清理失败保留操作与 OS code，并由 runtime 转成 E_SANDBOX_DENIED；
+Backlog 的 settle/harvest 遇 native poll/cleanup 拒绝时返回该错误并保留 member，
+下一次 harvest 由同一 owner 重试，不能借用 host 的 Unknown ending 删除资源。
 
 下面模型量化所有平台回答组成的 trace；Win32 按文档实现悬挂、job 继承、ACL
 与 capability 检查属于环境假设，定理不证明操作系统。Rust-reference/leaf packet

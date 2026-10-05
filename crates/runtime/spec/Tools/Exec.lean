@@ -73,7 +73,7 @@ Windows native 的资源与起动顺序由 `NativeWindows.lean` D53/D54 规定�
 5. **设置的「沙箱」控件**：列出这座城所在的电脑解得出的每个名字与它的五轴清单（读 doctor 的同一份 `DoctorSandbox`，不另算），缺的给 `Missing` 的那一句与安装指引；选中写 `[sandbox] arm`（经设置的那扇门）。
 6. **doctor 每臂一行**：`crates/sprawling/spec/Doctor.lean` 的 doctor 表为 `native`、`container`、`python` 各加一行，读 `Offerings` 的同一次采样。
 7. **每条保证的测试**：每个构造得出的臂，五轴各一个真命令的对拍——写工作目录（副本里有、源树没有）、连回环上一个监听的端口（开网的臂连得上、关网的臂连不上）、起一个比命令活得久的孙进程（进程树轴保时命令结束后它不在）、读自己的身份（用户轴保时与 harness 不同）、分配超过上限的内存（资源轴保时失败）；与 `every_sandbox_arm_states_what_it_does_not_hold` 并列，清单与对拍不一致即红。
-8. **要另装的臂实跑一次**：`container` 在 GitHub 的 ubuntu runner（自带 Docker）上跑第 7 条的对拍；Linux 的 Landlock 回退在 D32 的未决解开之前不构造；macOS 的 Seatbelt 以 `Tools/Exec/NativeMacos.lean` D40 为接口与策略权威，实际 runner 的 deprecated 手册和有限平台结果不证明其它系统支持。
+8. **要另装的臂实跑一次**：`container` 在 GitHub 的 ubuntu runner（自带 Docker）上跑第 7 条的对拍；Linux 的 Landlock 回退在 D32 的未决解开之前不构造；macOS 的 Seatbelt 以 `Tools/Exec/NativeMacos.lean` D40 为接口与策略权威，已测生产文件与网络拒绝、初始化拒绝与直接主进程生命周期，有限平台结果不证明其它系统支持或同 RunId 聚合硬内存。
 
 **未决（§3 口径）**：同步仍按命令读两侧的每个目录项，并逐字节比较同长的文件，代价随工作树的大小长；一棵带大构建缓存的工作树每条命令要读两遍缓存。判定它的证据是一棵真实 room 的每条命令同步耗时（毫秒）与其文件数的读数；若读数显示读取成了主项，再比较「按 mtime 与长度跳过、只对同一时间戳刻度里的文件逐字节比较」。
 -/
@@ -96,12 +96,14 @@ Windows native 的资源与起动顺序由 `NativeWindows.lean` D53/D54 规定�
 agent 派出去的构建、测试与 sprawling 的记账、视图、socket 服务抢同一批核；控制面必须赢，所以 exec 派出的每一条宿主命令都以低于核心的优先级起动，而不是继承核心的优先级。本模块只做「把一条 `Command` 改成降一级起动」这一件事，不决定哪条命令要降——凡经 `through_the_backlog` 的命令一律降，那是全部宿主子进程的唯一产地（§8-14），故降级只有这一处权威。
 
 ```rust
-pub(super) fn one_level_down(Command) -> Command;
+pub(super) fn one_level_down(Command, Shares) -> Result<Command, AxError>;
+#[cfg(unix)] pub(super) fn require_executable(&Command) -> Result<(), AxError>;
+pub(super) fn Confined::prepare(&mut self, Command, &Path, Shares) -> Result<(Command, Placed), AxError>;
 ```
 
 - **Windows**：`BELOW_NORMAL_PRIORITY_CLASS`（`0x0000_4000`，`WinBase.h`），经标准库的安全接口 `std::os::windows::process::CommandExt::creation_flags` 在创建时给出，不需要管理员，也不需要 `unsafe`。是绝对档位而非相对档位：核心在正常档时，子进程低一档。
 - **Unix**：包一层 `nice -n 10 -- <program> <args>`（`--` 结束 `nice` 的选项，名字以连字符开头的程序才不会被读成选项），工作目录与环境变量逐项搬到外层命令上。`nice` 是 POSIX 规定的工具；增量是相对的，所以子进程总比核心低 10 个 nice 单位，不需要 `CAP_SYS_NICE`（降优先级从不需要特权）。Linux 上核心的 `PATH` 里有 `ionice` 时，再在外面包一层 `ionice -c 2 -n 7`：IO 优先级取 best-effort 类里最低的一级，而不是 idle 类——idle 类在磁盘忙时可以让一条构建一个字节也读不到，best-effort 最低级只是排在核心之后。没有 `ionice`（例如不带 util-linux 的系统）时只包 `nice`：IO 这一半是两半里较轻的一半，缺了它不该让每条命令都起动失败。macOS 上 `/usr/sbin/taskpolicy` 在时，再在外面包一层 `taskpolicy -c utility`，把命令与它的后代的 QoS 压到 utility，系统先把它们放到效率核上（D29）；不在时只包 `nice`，理由同 `ionice`。
-- **次序**：降级在清环境与放置之前做，于是 `env_clear` 与环境白名单落在最外层命令上，沙箱的包装（`LinuxNamespaces` 的 wrapper）再包住降过级的命令；优先级沿进程树继承，所以 wrapper 下的真命令同样低一档。
+- **次序**：Confined::prepare 统一选择放置与降级的顺序：MacosSeatbelt 在 nice/taskpolicy 降级之后进入策略，避免策略拒绝调度调用；其他臂的沙箱包装仍包住降过级的命令。`env_clear` 与环境白名单在所有包装完成后落在实际起动的最外层命令上；优先级沿进程树继承，所以 wrapper 下的真命令同样低一档。
 - 失败：Unix 上 `nice` 自己总能起动，找不到的程序只会变成退出码 127 与 stderr 里的一行字，所以本模块在包 `nice` 之前先按 `execvp` 的找法（带分隔符的名字相对工作目录，裸名字沿核心的 `PATH`）确认程序是一个可执行文件，不是就返回 `E_TOOL_UNAVAILABLE`，动作与恢复同 backlog 的 spawn 失败（「check the program name, or use the shell arm」）。找不到 `nice` 本身时，spawn 在 backlog 里以同一个码报出。Windows 上不包外层，找不到程序仍在 spawn 处失败。Sandbox 放置下这一查找发生在宿主上，沙箱里看见的 `PATH` 若不同，结果以沙箱里的起动为准。
 - 证据：`crates/runtime/src/tools/exec/tests/yielding.rs` 的 `a_dispatched_command_runs_below_the_core`——同一条读自身优先级的命令，直接起动一次、经 exec 起动一次，断言后者的档位严格低于前者；Linux 臂 `a_dispatched_command_reads_and_writes_at_the_lowest_best_effort_io_level`——经 exec 起动的 `ionice` 读回自己的 IO 档位是 `best-effort: prio 7`。这一条只在 Linux 上编译与运行，先红与转绿都在合并火车的 Linux 任务里看到。
 
@@ -306,7 +308,7 @@ pub enum Shell {                                    // runtime::tools::exec::she
 | `container` | rootless Podman／Docker | Linux | 装要包管理器；运行要 `newuidmap`、`newgidmap` 与 `/etc/subuid`、`/etc/subgid` 里至少 65536 个从属 id（官方页） | 保 | 保 | 保 | 保 | 保（cgroup v2 委派时） | 能 | 外部运行时与镜像；rootless Podman 的网络走 pasta |
 | （`container` 的运行时） | gVisor `runsc` | Linux | 经 Docker、Kubernetes 或直接用 `runsc`（官方页） | 保 | 保 | 保 | 保 | 保 | 能 | 一个 OCI 运行时，在已有的容器臂下作为可选项，不另起名字 |
 | （不收） | microVM（Firecracker） | Linux | 要 KVM（`/dev/kvm`） | 保 | 保 | 保 | 保 | 保 | 能 | 要内核镜像与根文件系统的供给；桌面与 CI 主机常没有 `/dev/kvm` |
-| `native` | Seatbelt（`sandbox-exec` 配置） | macOS | 未核实 | 未核实 | 未核实 | 未核实 | 未核实 | 未核实 | 未核实 | 未核实：本调研没有取到 Apple 关于 `sandbox-exec` 的官方页（App Sandbox 的文档页靠脚本渲染，取回的正文是空的） |
+| `native` | Seatbelt（`sandbox-exec` 配置） | macOS | macOS 26.6.2 runner 上无需提权；缺席或策略拒绝时拒开 | 保（写入只落副本；读取不受限） | 保（TCP／UDP，fork／exec 后代同受策略约束） | 不保 | 不保 | 不保 | 不适用：当前只放 exec，关网不能直接装要连 provider 的居民 | 系统 `sandbox-exec(1)` 已标 DEPRECATED；平台继承假设与支持边界见 `crates/runtime/spec/Tools/Exec/NativeMacos.lean` |
 | （不收） | NVIDIA OpenShell | 三个平台 | Roadmap §6 SB 记下的 Support Matrix：沙箱靠 Landlock 与 seccomp，网络按策略放行，要一个跑在 Docker、Podman、Kubernetes 或 MicroVM 上的 gateway；Windows 上只在 WSL 2 加 Docker Desktop 下，标为 Experimental | —— | —— | —— | —— | —— | —— | 它的隔离来自上面已经各成一行的机制，再加一个 gateway 进程与它自己的策略层；本调研没有重新取它的页面 |
 | `python` | wasip1 里的 Python（§8-13） | 三个平台 | 否 | 保（只够得到 preopen） | 保（wasip1 没有获得 socket 的途径） | 保（wasip1 没有起进程的接口） | 不保 | 条件：CPU 由 fuel 限，内存没有另设上限 | 不能：只跑 Python | `wasm` feature 里的 wasmtime 48 |
 
