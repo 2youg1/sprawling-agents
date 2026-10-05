@@ -31,6 +31,7 @@ import crates.runtime.spec.Tools.ChosenPath
 import crates.runtime.spec.Tools.Exec
 import crates.runtime.spec.Tools.Exec.Container
 import crates.runtime.spec.Tools.Exec.NativeMacos
+import crates.runtime.spec.Tools.Exec.NativeWindows
 import crates.runtime.spec.Tools.Read
 import crates.runtime.spec.Tools.Search
 import crates.runtime.spec.Tools.Succeed
