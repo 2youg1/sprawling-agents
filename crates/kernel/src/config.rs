@@ -198,6 +198,18 @@ pub struct ClockZone {
     pub offset_min: i32,
 }
 
+/// One sandbox mechanism family, shared by configuration and doctor reports.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub enum SandboxArm {
+    None,
+    CopiedTree,
+    Native,
+    Container,
+    Python,
+}
+
 /// What a run's execution boundary allows. Resolved as one value rather
 /// than field by field: a layer that speaks about the sandbox speaks
 /// about all of it, so an under-specified layer can only ever reduce
@@ -210,6 +222,9 @@ pub struct ClockZone {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct SandboxLimits {
+    /// A named arm refuses when unavailable; absence preserves the platform default.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub arm: Option<SandboxArm>,
     /// Explicit container policy; absence uses the existing platform confinement.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub container: Option<ContainerLimits>,
@@ -246,6 +261,38 @@ pub struct SandboxLimits {
 }
 
 impl SandboxLimits {
+    /// Resolves the explicit sandbox choice, rejecting contradictory input.
+    ///
+    /// # Errors
+    /// Refuses a selected container without limits or limits on another explicit arm.
+    pub fn selected_arm(&self) -> Result<Option<SandboxArm>, AxError> {
+        match (self.arm, self.container.as_ref()) {
+            (Some(SandboxArm::Container), None) => Err(AxError::failure(
+                AxCode::ConfigInvalid,
+                "choose the container arm",
+                "container limits are missing",
+            )
+            .with_recovery("declare every limit in [sandbox.container]")),
+            (
+                Some(
+                    SandboxArm::None
+                    | SandboxArm::CopiedTree
+                    | SandboxArm::Native
+                    | SandboxArm::Python,
+                ),
+                Some(_),
+            ) => Err(AxError::failure(
+                AxCode::ConfigInvalid,
+                "choose the sandbox arm",
+                "container limits conflict with the explicit arm",
+            )
+            .with_recovery("select container or remove the container limits")),
+            (Some(arm), _) => Ok(Some(arm)),
+            (None, Some(_)) => Ok(Some(SandboxArm::Container)),
+            (None, None) => Ok(None),
+        }
+    }
+
     /// Whether this floor lets `label` reach what nothing here can
     /// undo. The one reader of the trusted list, so the answer cannot
     /// be spelled two ways.
@@ -259,6 +306,7 @@ impl Default for SandboxLimits {
     fn default() -> Self {
         SandboxLimits {
             container: None,
+            arm: None,
             shell: false,
             interpreter: Interpreter::System,
             fuel: crate::consts_policy::SANDBOX_FUEL_DEFAULT,

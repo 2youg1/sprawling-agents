@@ -141,7 +141,8 @@ impl ConfigLayer {
                     .interpreter
                     .as_deref()
                     .map_or(Ok(kernel::Interpreter::System), kernel::Interpreter::parse)?;
-                Some(SandboxLimits {
+                let limits = SandboxLimits {
+                    arm: section.arm,
                     container: section.container,
                     shell: section.shell,
                     interpreter,
@@ -151,7 +152,9 @@ impl ConfigLayer {
                     mounts,
                     env_passthrough,
                     trusted,
-                })
+                };
+                limits.selected_arm()?;
+                Some(limits)
             }
         };
         let mcp = file.mcp.map(mcp::servers).transpose()?;
@@ -322,6 +325,8 @@ struct SkillsSection {
 #[derive(Debug, Default, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct SandboxSection {
+    #[serde(default)]
+    arm: Option<kernel::SandboxArm>,
     #[serde(default)]
     container: Option<kernel::ContainerLimits>,
     #[serde(default)]

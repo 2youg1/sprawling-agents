@@ -38,7 +38,7 @@ harvest 重试并返回 typed failure，release 的 Drop 调用只记录待清�
 ## 4 现状分析
 
 SandboxLimits.container 由 city 的整值解析冻结，accounting 从 ExecHost 的 doctor 探测取得
-ContainerRuntime，再交给 ExecTool::with_container。未声明 container 保留既有平台默认；
+ContainerRuntime，再交给 ExecTool::with_container。未声明显式 arm 或 container 保留既有平台默认；
 声明但不可给则拒绝，不退回宿主。container 目标 argv 不经过宿主 nice 或宿主路径判定，
 因为目标文件属于镜像；CLI 客户端照样通过 Backlog。doctor 默认臂不因此变成 container。
 D51 container 的 shell System 指 Linux 镜像里的 /bin/sh -c，Pwsh 指镜像里的 pwsh

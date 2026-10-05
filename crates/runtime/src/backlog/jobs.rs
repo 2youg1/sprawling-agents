@@ -108,10 +108,9 @@ impl Backlog {
                 claim: Claim::Window(owner) | Claim::Run(owner),
                 ..
             } = &member.body
+                && let Some(child) = child.client()
             {
-                if let Some(child) = child.client() {
-                    runs.entry(*owner).or_default().pids.insert(child.id());
-                }
+                runs.entry(*owner).or_default().pids.insert(child.id());
             }
         }
         table.jobs.follow(&mut runs);

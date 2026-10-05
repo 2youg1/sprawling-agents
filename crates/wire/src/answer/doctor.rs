@@ -296,23 +296,7 @@ pub enum DoctorSandboxArm {
     Unavailable { missing: DoctorSandboxMissing },
 }
 
-/// The names a sandbox arm is chosen by, one per mechanism family, so
-/// that every name has an arm to fill on Windows, macOS and Linux
-/// (`crates/wire/spec/Answer/Doctor.lean` D26).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-pub enum SandboxArm {
-    /// The host itself: no axis is held.
-    None,
-    CopiedTree,
-    /// The platform's own mechanism: namespaces on Linux, Seatbelt on
-    /// macOS, a job object on Windows.
-    Native,
-    Container,
-    /// Python inside a WebAssembly sandbox.
-    Python,
-}
+pub use kernel::SandboxArm;
 
 /// What a machine lacks when it can give no confinement at all.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

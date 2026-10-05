@@ -31,7 +31,14 @@ impl Backlog {
             .copy
             .file_name()
             .and_then(std::ffi::OsStr::to_str)
-            .ok_or_else(|| super::container_name_error())?
+            .ok_or_else(|| {
+                kernel::AxError::failure(
+                    kernel::AxCode::SandboxDenied,
+                    "name the owned container",
+                    "the copy has no portable identity",
+                )
+                .with_recovery("choose a system temporary directory with a UTF-8 path")
+            })?
             .to_owned();
         let lease = ContainerLease::registered(request.runtime, name, request.copy, request.limits);
         // The same table lock covers registration and start, so Halt cannot remove and then race a start.
