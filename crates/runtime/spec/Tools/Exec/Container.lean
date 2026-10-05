@@ -27,18 +27,22 @@ info 的内容是 daemon 的自述，不是已执行的隔离验收；daemon、O
 实际起动仍须 inspect 验证限额与挂载，然后用同一容器跑 cgroup 与网络对拍。
 镜像、daemon 接口或 OCI runtime 更新时应重跑实测。
 
-生命周期接线尚缺可观察的清理失败面：现有 Backlog::release 从 Drop 调用，返回计数而非
-Result，不能把这个接口的 Child 语义推广为 daemon 删除一定成功。完成接线需要证明 create
-应答丢失时仍保留预先登记的唯一名字，start／inspect／attach 失败时仍能按该名字清理，
-以及移除失败时不会丢掉成员或复用副本；只有 daemon 确认移除或确认该身份不存在，才能
-释放它占用的副本。判定证据是经真实 Backlog／ExecTool 的故障注入检查与 daemon inventory。
-CLI 的退出码不构成 State 的结局证据，不能交给现有 Exit::polled 当作目标程序结果。
+D50 Backlog 在 create 之前登记唯一名字、副本与 owner，成员的进程值同时拥有 daemon 身份
+与可选的 attach 子进程。start／inspect／attach／create 应答丢失均按登记身份清理。
+停止时先置 stopping，再请求 rm --force --volumes；删除失败保留成员与副本，下一次
+harvest 重试并返回 typed failure，release 的 Drop 调用只记录待清理责任，不能声称删除成功。
+只有成功的删除应答或成功 inventory 确认身份缺席才释放副本。CLI 结束后 inspect State.ExitCode
+才决定目标程序结果；CLI 提前结束而 daemon 仍 Running 为失败并清理。每次控制命令有界，
+失败后成员不得重新 start。操作系统直接终止进程不执行 Rust Drop，故本模型不能证明断电后删除。
 
 ## 4 现状分析
 
-本模块提供 admission 与 create 的命令面。SandboxLimits 尚无 container 字段，city 的整值解析
-与 accounting 的唯一 ExecSetup 调用点尚未递交此值。Backlog 只拥有 CLI 的 Child，不能终止 daemon
-中的容器。因此本模块不加入 Confinement 的保证清单，ExecTool 仍走既有默认选择。
+SandboxLimits.container 由 city 的整值解析冻结，accounting 从 ExecHost 的 doctor 探测取得
+ContainerRuntime，再交给 ExecTool::with_container。未声明 container 保留既有平台默认；
+声明但不可给则拒绝，不退回宿主。container 目标 argv 不经过宿主 nice 或宿主路径判定，
+因为目标文件属于镜像；CLI 客户端照样通过 Backlog。doctor 默认臂不因此变成 container。
+D51 container 的 shell System 指 Linux 镜像里的 /bin/sh -c，Pwsh 指镜像里的 pwsh
+及既有非交互 flags；主机缺该解释器不证明镜像缺席。shell=false 仍拒绝 shell 臂。
 
 ## 5 权威信源
 
@@ -57,8 +61,8 @@ ContainerLimits 的整数限额与 ContainerImage 的固定 ID 只由 kernel 定
 
 ## 7 模块边界
 
-本模块是 decision：输入已采样的 info 字节与路径，输出 typed refusal 或命令，不读 PATH，
-不采样时钟，不起进程，不管理副本。doctor 应从既有主机探测面递交路径与 info。
+container.rs 是 decision，lifetime 是 adapter，control 拥有有界 CLI 控制调用，inspection
+拥有 daemon JSON 契约。只有 doctor 读 PATH；Backlog 管理起动、停止、结果与副本释放。
 
 ## 8 接口先行
 
@@ -66,6 +70,7 @@ ContainerLimits 的整数限额与 ContainerImage 的固定 ID 只由 kernel 定
 `ContainerRuntime::info_command(engine, path) -> Command` 供 doctor 的有界探测调用。
 `create_command(&self, limits, launch) -> Result<Command, AxError>`，其中 ContainerLaunch
 持有唯一容器名、副本路径与目标 Command 的借用。参数与环境取自 Command 的公开 API。
+`ExecTool::with_container` 接收冻结限额及 doctor admitted runtime；已有 ExecSetup 构造不变。
 
 ## 9 工作流程
 
@@ -148,5 +153,53 @@ theorem missing_control_refuses (checks : List Bool) (missing : false ∈ checks
     cases first <;> simp_all [controls]
 
 example : controls [true, true, true, true, true] = true := rfl
+
+/-- 清理责任从登记开始，未知应答不能撤销责任。 -/
+inductive ResourceState where
+  | registered
+  | running
+  | stopping
+  | removed
+  deriving DecidableEq, Repr
+
+inductive ResourceEvent where
+  | started
+  | stop
+  | uncertain
+  | removalConfirmed
+  deriving DecidableEq, Repr
+
+def advance : ResourceState → ResourceEvent → ResourceState
+  | .removed, _ => .removed
+  | _, .removalConfirmed => .removed
+  | .registered, .started => .running
+  | .running, .started => .running
+  | .stopping, .started => .stopping
+  | _, .stop => .stopping
+  | state, .uncertain => state
+
+def applyTrace (state : ResourceState) (events : List ResourceEvent) : ResourceState :=
+  events.foldl advance state
+
+/-- 任意不含删除确认的轨迹均保留清理责任。 -/
+theorem responsibility_survives_uncertain_trace (state : ResourceState)
+    (owned : state ≠ .removed) (events : List ResourceEvent)
+    (unconfirmed : ResourceEvent.removalConfirmed ∉ events) :
+    applyTrace state events ≠ .removed := by
+  induction events generalizing state with
+  | nil => simpa [applyTrace] using owned
+  | cons event rest ih =>
+    have noHead : event ≠ .removalConfirmed := by
+      intro h
+      exact unconfirmed (by simp [h])
+    have noTail : ResourceEvent.removalConfirmed ∉ rest := by
+      intro h
+      exact unconfirmed (by simp [h])
+    have retained : advance state event ≠ .removed := by
+      cases state <;> cases event <;> simp_all [advance]
+    simpa [applyTrace, List.foldl] using ih (advance state event) retained noTail
+
+/-- 已请求停止的成员不能由迟到的起动应答重新起动。 -/
+theorem stop_cannot_restart : advance .stopping .started = .stopping := rfl
 
 end Runtime.Tools.Exec.Container
