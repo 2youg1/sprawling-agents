@@ -127,7 +127,7 @@ shelves = ["~/.claude/skills"]
 
 ## 1 安装
 
-本指南讲的是 sprawling <!-- xtask:begin workspace_version -->0.0.9<!-- xtask:end -->，一个 <!-- xtask:begin maturity:word -->alpha<!-- xtask:end --> 版本：可以拿来干真活，但数据格式、协议和界面在版本之间仍可能变，所以在意的城请放在能导出的地方（见[搬一座城](#搬一座城)）。除第一条命令外，Windows、macOS 和 Linux 上的安装步骤相同。
+本指南讲的是 sprawling <!-- xtask:begin workspace_version -->0.0.10<!-- xtask:end -->，一个 <!-- xtask:begin maturity:word -->alpha<!-- xtask:end --> 版本：可以拿来干真活，但数据格式、协议和界面在版本之间仍可能变，所以在意的城请放在能导出的地方（见[搬一座城](#搬一座城)）。除第一条命令外，Windows、macOS 和 Linux 上的安装步骤相同。
 
 macOS 或 Linux：
 

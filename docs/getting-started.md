@@ -127,7 +127,7 @@ A desktop browser, and one model to call: an API key for a provider that speaks 
 
 ## 1 Install
 
-This guide describes sprawling <!-- xtask:begin workspace_version -->0.0.9<!-- xtask:end -->, an <!-- xtask:begin maturity:word -->alpha<!-- xtask:end --> release: usable for real work, with data formats, the wire and the screens still free to change between versions, so keep a city you care about where you can export it ([Moving a city](#moving-a-city)). The install is the same on Windows, macOS and Linux apart from the first command.
+This guide describes sprawling <!-- xtask:begin workspace_version -->0.0.10<!-- xtask:end -->, an <!-- xtask:begin maturity:word -->alpha<!-- xtask:end --> release: usable for real work, with data formats, the wire and the screens still free to change between versions, so keep a city you care about where you can export it ([Moving a city](#moving-a-city)). The install is the same on Windows, macOS and Linux apart from the first command.
 
 macOS or Linux:
 
