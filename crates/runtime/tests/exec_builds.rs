@@ -49,11 +49,7 @@ const DECLARED: [&str; 2] = ["HOME", "USER"];
 
 #[test]
 fn a_building_that_declares_the_names_can_build_a_rust_program() {
-    let Ok(cargo) = which_cargo() else {
-        // No toolchain on this machine: there is nothing to demonstrate
-        // and nothing to claim.
-        return;
-    };
+    let cargo = which_cargo().expect("the Rust build regression requires cargo on PATH");
     let work = tempfile::tempdir().unwrap();
     let crate_dir = work.path().join("hello");
     std::fs::create_dir_all(crate_dir.join("src")).unwrap();
@@ -121,18 +117,20 @@ fn a_building_that_declares_the_names_can_build_a_rust_program() {
     // window closing and the call's own harvest is answered in this same
     // call, as its `background` row, and the table is then empty.
     if result.get("exit_code").is_none()
-        && let Some(code) = result["background"]
+        && let Some(finished) = result["background"]
             .as_array()
             .and_then(|rows| rows.first())
-            .and_then(|row| row.get("exit_code"))
             .cloned()
     {
-        result["exit_code"] = code;
+        result = finished;
     }
-    if result.get("exit_code").is_none() {
+    if result.get("outcome").and_then(serde_json::Value::as_str) == Some("backgrounded") {
         for _ in 0..1_500 {
             let done = backlog.harvest(run).unwrap();
             if let Some(finished) = done.first() {
+                eprintln!("exec build harvest: {finished:?}");
+                result["stdout"] = serde_json::json!(finished.stdout);
+                result["stderr"] = serde_json::json!(finished.stderr);
                 result["exit_code"] = match finished.exit {
                     runtime::Exit::Ended { code } => serde_json::json!(code),
                     other @ (runtime::Exit::Signalled | runtime::Exit::Unknown { .. }) => {
@@ -144,6 +142,7 @@ fn a_building_that_declares_the_names_can_build_a_rust_program() {
             std::thread::sleep(std::time::Duration::from_millis(100));
         }
     }
+    eprintln!("exec build result: {result}");
     assert_eq!(
         result["exit_code"], 0,
         "a declared building builds Rust: {result}"
