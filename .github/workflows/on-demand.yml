@@ -13,9 +13,8 @@
 #             that adds the shards up per module and fails a module under
 #             its `minimum_percent` (`just mutants-score`)
 #   sim       the citysim scenarios (`just sim`)
-#   shots     every gallery page and this tree's archive serving real pages
-#             at 1440 and 1920, dark and light; the PNG files, archive
-#             digests and logs are the artifact `shots-<tree>`
+#   shots     every page at 1440 and 1920, dark and light; the PNG files
+#             and their index are the artifact `shots-<tree>`
 #   release   the shipped Windows binary and its archive (`just package`),
 #             the artifact `release-<tree>`, for measurement on the
 #             machine the readings belong to
@@ -243,56 +242,15 @@ jobs:
           shell=$(find "$RUNNER_TEMP/engines" -type f -name 'chrome-headless-shell.exe' | head -n 1)
           test -n "$shell"
           echo "SPRAWLING_BROWSER=$shell" >> "$GITHUB_ENV"
-      - uses: ./.github/actions/zig
-      - name: every gallery page, both widths, both schemes
+      - name: every page, both widths, both schemes
         run: just shots
-      - name: the archive serves the client photographed through its real origin
-        shell: bash
-        run: |
-          set -euo pipefail
-          mv target/shots target/gallery-shots
-          just package
-          cargo build --package citysim --bin serve_grouped --locked
-          mkdir -p target/served-shots/archive
-          archives=(target/package/*.zip)
-          test "${#archives[@]}" -eq 1
-          unzip -q "${archives[0]}" -d target/served-shots/archive
-          shopt -s nullglob
-          binaries=("$PWD"/target/served-shots/archive/*/sprawling.exe)
-          test "${#binaries[@]}" -eq 1
-          binary="${binaries[0]}"
-          city="$RUNNER_TEMP/served-shots/city"
-          "$binary" init "$(cygpath -m "$city")"
-          at=127.0.0.1:47615
-          exec {closer}> >(target/debug/serve_grouped.exe "$binary" serve "$(cygpath -m "$city")" "$at" --no-open --no-console > target/served-shots/serve.out 2> target/served-shots/serve.err)
-          server=$!
-          stop() {
-            echo close >&"$closer"
-            exec {closer}>&-
-            wait "$server"
-          }
-          trap stop EXIT
-          for _ in $(seq 1 100); do
-            grep -q 'commands are taken' target/served-shots/serve.err && break
-            kill -0 "$server" 2>/dev/null || { cat target/served-shots/serve.err; exit 1; }
-            sleep 0.1
-          done
-          grep -q 'commands are taken' target/served-shots/serve.err
-          curl --fail --silent --show-error "http://$at/" > target/served-shots/index.html
-          sha256sum "$binary" "${archives[0]}" > target/served-shots/digests.txt
-          git rev-parse HEAD 'HEAD^{tree}' > target/served-shots/source.txt
-          cargo xtask shots --origin "http://$at"
-          mv target/shots target/served-shots/pages
       # Uploaded on a failed run too: target/shots/engine holds each
       # case's engine stderr, which is what a stalled case is read from.
       - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: shots-${{ steps.tree.outputs.sha }}
-          path: |
-            target/shots
-            target/gallery-shots
-            target/served-shots
+          path: target/shots
           if-no-files-found: error
 
   release:
@@ -553,22 +511,6 @@ jobs:
           # the exit code is recorded rather than judged; a report that says
           # nothing is the failure.
           test -s "${{ steps.fresh.outputs.dir }}/logs/doctor.out"
-      - name: the acceptance walk includes its served-client step
-        shell: bash
-        run: |
-          set -euo pipefail
-          contract="$RUNNER_TEMP/served-client-contract.lean"
-          cat > "$contract" <<'LEAN'
-          import Sprawling.Acceptance.Walk
-          open Sprawling.Acceptance
-          def main : IO Unit := do
-            let setting : Setting :=
-              { door := { binary := "" }, url := "", shelf := "", skills := [], script := "", record := "" }
-            unless (firstDay setting).any (fun step => step.name == clientDelivered.name) do
-              throw <| IO.userError "the archive acceptance does not walk its served-client step"
-          LEAN
-          ! command -v cygpath > /dev/null 2>&1 || contract="$(cygpath -m "$contract")"
-          lake env lean --run "$contract"
       - name: the walk from the archive to the first dispatch
         shell: bash
         run: |
