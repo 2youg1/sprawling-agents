@@ -98,9 +98,23 @@
         # Generated in the store on every lock change, never maintained as
         # another lock in the source tree. npm hashes come from bun.lock.
         bunNix = pkgs.runCommand "sprawling-bun-dependencies.nix"
-          { nativeBuildInputs = [ bunBuilder ]; }
+          { nativeBuildInputs = [ bunBuilder pkgs.bun ]; }
           ''
-            bun2nix --lock-file ${./client/bun.lock} --output-file "$out"
+            cat > project-lock.js <<'JS'
+            const lock = Bun.JSONC.parse(await Bun.file(Bun.argv.at(-1)).text());
+            if (lock.lockfileVersion !== 2 || lock.configVersion !== 1 ||
+                !lock.packages || !Object.values(lock.packages).every(pkg =>
+                  Array.isArray(pkg) && pkg.length === 4 &&
+                  typeof pkg[0] === "string" && typeof pkg[1] === "string" &&
+                  pkg[2] !== null && typeof pkg[2] === "object" &&
+                  typeof pkg[3] === "string" && pkg[3].startsWith("sha512-"))) {
+              console.error("Unsupported Bun lock shape; update the Nix conversion adapter");
+              process.exit(1);
+            }
+            console.log(JSON.stringify({ lockfileVersion: 1, packages: lock.packages }));
+            JS
+            bun project-lock.js ${./client/bun.lock} > converter.lock
+            bun2nix --lock-file converter.lock --output-file "$out"
           '';
         bunDeps = bunBuilder.fetchBunDeps { inherit bunNix; };
         # These readers fail if the authoritative declarations move, so a
