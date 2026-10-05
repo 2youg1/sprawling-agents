@@ -530,22 +530,25 @@ impl GitStatusAsk { fn read(self) -> wire::Answer; } // 锁外：读工作树（
 4. **`git_status_ask` 的比较基准取自历史而不是 HEAD。** 该楼最近一条 `checkpoint_committed`／`pr_merged` 就是基准，它由 `commits_answer(Some(building), None, 1)` 给出——变更栏旁边显示的那一行，正是提交列表打开时的第一行。
 5. **仓库句柄按次打开。** 这是投影里唯一一处伸向它不拥有的目录的读；跨重建留着的句柄会活得比开它的那座城还长。
 
-### 8-68 `bin::release`：这是哪一版，以及唯一一次去问注册表（形状 4 适配器）
+### 8-68 `bin::release`：构建身份与按安装来源查询（形状 4 适配器）
 
 ```rust
 pub enum Built { Released(Release), FromSource }
-pub fn built() -> Result<Built, AxError>;      // option_env!("SPRAWLING_RELEASE_TAG")
-pub fn newest() -> Result<Release, AxError>;   // GET registry.npmjs.org/sprawling/latest
-pub fn answer() -> ReleaseAnswer;              // 两读合判，恒不失败
+pub fn built() -> Result<Built, AxError>;
+pub fn answer() -> ReleaseAnswer;
 ```
 
-**五条口径：**
+`release.rs` 识别构建与安装来源，选择比较版本和手动更新命令；帧与选择契约由
+`crates/wire/spec/Answer/Release.lean` D24 定义。未带发行 tag 的 Cargo 安装按编译版本
+比较 crates.io，开发构建保留 FromSource，不能从缺席 tag 推出安装来源。
+`SPRAWLING_RELEASE_TAG` 由构建脚本声明重跑条件，存在时必须与 Cargo 版本及成熟度一致。
 
-1. **人问才发生。** 没有定时器，没有首次运行时的探测，也不搭另一条命令的车：`status` 只读编译进来的东西、一个套接字都不碰，只有 `status --check` 会出网。`QUICKSTART.md` 的开场承诺是「什么都没装、没注册服务、删掉文件夹就干净」，一个按自己时间表去够注册表的二进制，是在拿那句承诺换一个没人问过的问题。
-2. **什么都不更新。** 二进制住在哪，归当初装它的人管——归档路径归 `sprawling install`，npm 路径归 npm（`tools/xtask/src/channel/shim.js` 已立此规）。故本模块只报告然后停下，答案里印的是该跑的命令，选哪条仍由选了安装渠道的那个人决定。
-3. **`Built` 两态而不是 `Option<Release>`。** 缺席不是一个缺失的值，而是关于这次构建的一个事实：从工作树构建出来的二进制没有可比的对象，把它报成「过期」是在回答另一个二进制的问题。tag 由 `release.yml` 经 `SPRAWLING_RELEASE_TAG` 传入，`build.rs` 声明该变量（`cargo::rerun-if-env-changed`），否则 cargo 会拿上一个 tag 编出来的二进制顶数，而它的每一份都会报错版本。
-4. **问 npm，不问 GitHub。** 本项目每一次发布都是 pre-release，而 `GET /repos/{owner}/{repo}/releases/latest` 按设计排除 pre-release，对本仓库答 404。npm 的 `latest` dist-tag 才是 `bunx sprawling` 真正解析的东西，问它才是问人真正有的那个问题。
-5. **失败说清停在哪一阶段。** 只在失败路径上多发一次 `gateway::reach`，把 `kernel::reach` 已定义的分阶段读数——名字没解析、连不上、握手失败、对方答了什么状态——放进 recovery。「它没成功」不是一个人能据以行动的答案，而这条路径上多一次请求换一句能行动的话是划算的。退出码报的是问题有没有被回答，而不是答案是什么：版本过期是消息不是故障，而读不到注册表会让人以为自己查过了。
+`release::registry`（`crates/sprawling/src/release/registry.rs`）拥有注册表 HTTP 读取与
+npm、crates.io 和 GitHub 发布列表的解码，沿用 gateway 的代理规则、请求耐心与
+分阶段网络拒绝；父模块拥有来源判定，适配器不切换注册表。GitHub API 和归档页面的
+repository 身份来自 Cargo 继承的根清单，不另写 owner/repo。
+只有 `status --check` 或人的检查按钮调用 `answer` 才出网，成功读数与拒绝一起返回；
+查询与手动命令选择不下载、不安装、不覆写二进制。
 
 ### 8-69 真端点验收闸 `just e2e`（`crates/sprawling/tests/e2e.rs`）
 
