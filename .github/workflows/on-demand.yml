@@ -498,6 +498,18 @@ jobs:
           unzip -q "$archive" -d "$fresh/unpacked"
           binary="$(find "$fresh/unpacked" -type f \( -name sprawling.exe -o -name sprawling \) | head -n 1)"
           test -n "$binary"
+          git rev-parse HEAD 'HEAD^{tree}' > "$fresh/logs/source.txt"
+          {
+            echo "run=$GITHUB_RUN_ID"
+            echo "attempt=$GITHUB_RUN_ATTEMPT"
+          } > "$fresh/logs/run.txt"
+          {
+            if [ "$RUNNER_OS" = macOS ]; then
+              shasum -a 256 "$archive" "$binary"
+            else
+              sha256sum "$archive" "$binary"
+            fi
+          } > "$fresh/logs/archive-binary.sha256"
           case "$RUNNER_OS" in
             Windows)
               root=/c/Windows
@@ -541,6 +553,22 @@ jobs:
           # the exit code is recorded rather than judged; a report that says
           # nothing is the failure.
           test -s "${{ steps.fresh.outputs.dir }}/logs/doctor.out"
+      - name: the acceptance walk includes its served-client step
+        shell: bash
+        run: |
+          set -euo pipefail
+          contract="$RUNNER_TEMP/served-client-contract.lean"
+          cat > "$contract" <<'LEAN'
+          import Sprawling.Acceptance.Walk
+          open Sprawling.Acceptance
+          def main : IO Unit := do
+            let setting : Setting :=
+              { door := { binary := "" }, url := "", shelf := "", skills := [], script := "", record := "" }
+            unless (firstDay setting).any (fun step => step.name == clientDelivered.name) do
+              throw <| IO.userError "the archive acceptance does not walk its served-client step"
+          LEAN
+          ! command -v cygpath > /dev/null 2>&1 || contract="$(cygpath -m "$contract")"
+          lake env lean --run "$contract"
       - name: the walk from the archive to the first dispatch
         shell: bash
         run: |
@@ -551,58 +579,6 @@ jobs:
           [ "$RUNNER_OS" != Windows ] || walk="/usr/bin:$walk:$(dirname "$(command -v zig)")"
           env -u CARGO_HOME -u RUSTUP_HOME PATH="$walk" \
             just acceptance "${{ steps.fresh.outputs.archive }}" 2>&1 | tee "${{ steps.fresh.outputs.dir }}/logs/acceptance.log"
-      - name: the archive serves its embedded client on this platform
-        shell: bash
-        env:
-          ARCHIVE_BINARY: ${{ steps.fresh.outputs.binary }}
-          FRESH_DIRECTORY: ${{ steps.fresh.outputs.dir }}
-        run: |
-          set -euo pipefail
-          if [ "$RUNNER_OS" = Windows ]; then
-            export ARCHIVE_BINARY="$(cygpath -m "$ARCHIVE_BINARY")"
-            export FRESH_DIRECTORY="$(cygpath -m "$FRESH_DIRECTORY")"
-          fi
-          python3 - <<'PYTHON'
-          import hashlib, json, os, pathlib, re, socket, subprocess, time, urllib.parse, urllib.request
-          binary = pathlib.Path(os.environ["ARCHIVE_BINARY"])
-          out = pathlib.Path(os.environ["FRESH_DIRECTORY"]) / "logs"
-          city = out.parent / "served-city"
-          subprocess.run([str(binary), "init", str(city)], check=True, timeout=30)
-          launcher = pathlib.Path("target/debug/serve_grouped" + (".exe" if os.name == "nt" else ""))
-          with socket.socket() as reserved:
-              reserved.bind(("127.0.0.1", 0))
-              port = reserved.getsockname()[1]
-          origin = f"http://127.0.0.1:{port}"
-          with (out / "serve.out").open("wb") as stdout, (out / "serve.err").open("wb") as stderr:
-              server = subprocess.Popen([str(launcher), str(binary), "serve", str(city), f"127.0.0.1:{port}", "--no-open", "--no-console"], stdin=subprocess.PIPE, stdout=stdout, stderr=stderr)
-              try:
-                  deadline = time.monotonic() + 30
-                  while True:
-                      if server.poll() is not None:
-                          raise RuntimeError("the archive exited before serving the client")
-                      try:
-                          with urllib.request.urlopen(origin, timeout=1) as response:
-                              page = response.read()
-                          break
-                      except OSError:
-                          if time.monotonic() >= deadline:
-                              raise
-                          time.sleep(0.1)
-                  (out / "served-index.html").write_bytes(page)
-                  assets = sorted(set(re.findall(r'(?:src|href)="([^" ]*/assets/[^" ]+)"', page.decode())))
-                  assert assets, "the served page holds no embedded client assets"
-                  evidence = {"binary_sha256": hashlib.sha256(binary.read_bytes()).hexdigest(), "assets": {}}
-                  for asset in assets:
-                      with urllib.request.urlopen(urllib.parse.urljoin(origin + "/", asset), timeout=10) as response:
-                          body = response.read()
-                      assert body and b"<!doctype html" not in body[:100].lower(), "asset request returned the page shell"
-                      evidence["assets"][asset] = hashlib.sha256(body).hexdigest()
-                  (out / "served-client.json").write_text(json.dumps(evidence, indent=2), encoding="utf-8")
-              finally:
-                  server.communicate(input=b"close" + bytes([10]), timeout=30)
-                  if server.returncode != 0:
-                      raise RuntimeError(f"the archive did not close in order: {server.returncode}")
-          PYTHON
       - uses: actions/upload-artifact@v7
         if: always()
         with:
