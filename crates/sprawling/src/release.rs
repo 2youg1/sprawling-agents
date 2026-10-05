@@ -5,22 +5,19 @@
 //! Manual checks: install origin selects the registry, comparison operand and updater.
 //! Specified by `crates/wire/spec/Answer/Release.lean` and `crates/sprawling/spec/Install.lean`.
 use kernel::release::Version;
-use kernel::{AxCode, AxError, Proxying, Reach, Release};
+use kernel::{AxError, Release};
 use wire::{InstallChannel, Registry, RegistryNewest, RegistryReading};
 use wire::{ReleaseAnswer, ReleaseLine, UpdateHint};
 const LATEST_URL: &str = "https://registry.npmjs.org/sprawling/latest";
 const CRATES_URL: &str = "https://crates.io/api/v1/crates/sprawling";
 /// The marker the archive installer places beside its binary.
 pub const ARCHIVE_ORIGIN_FILE: &str = ".sprawling-archive-origin";
-const USER_AGENT: &str = concat!("sprawling/", env!("CARGO_PKG_VERSION"));
 const RELEASES: &str = concat!(env!("CARGO_PKG_REPOSITORY"), "/releases");
 const NPM_UPDATE: &str = "npm install -g sprawling@latest";
 const BUN_UPDATE: &str = "bun install -g sprawling@latest";
 const BINSTALL_UPDATE: &str = "cargo binstall sprawling";
 const CARGO_UPDATE: &str = "cargo install sprawling --locked";
 const ARCHIVE_SIBLING: &str = "skills";
-const RELEASE_PAGE_SIZE: usize = 100;
-const PATIENCE: std::time::Duration = std::time::Duration::from_secs(10);
 /// Build identity; source builds carry no invented release tag.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Built {
@@ -39,116 +36,6 @@ pub fn built() -> Result<Built, AxError> {
         Some("") => Ok(Built::FromSource),
         Some(tag) => Release::from_tag(tag, env!("CARGO_PKG_VERSION")).map(Built::Released),
     }
-}
-
-fn npm_newest(url: &str) -> Result<Release, AxError> {
-    Release::from_npm_version(&manifest_field(url, &["version"])?)
-}
-
-fn crates_newest(url: &str) -> Result<Version, AxError> {
-    Version::from_crates_version(&manifest_field(url, &["crate", "max_version"])?)
-}
-
-fn manifest(url: &str) -> Result<serde_json::Value, AxError> {
-    let client = gateway::client_for(Proxying::ExceptLocal, url)
-        .timeout(PATIENCE)
-        .user_agent(USER_AGENT)
-        .build()
-        .map_err(|err| {
-            AxError::failure(AxCode::ToolUnavailable, "ask the registry", err.to_string())
-                .with_recovery("this machine refused to build an HTTP client")
-        })?;
-    let response = client
-        .get(url)
-        .header("accept", "application/json")
-        .send()
-        .map_err(|_| stopped(&client, url))?;
-    let status = response.status();
-    if !status.is_success() {
-        return Err(
-            AxError::failure(AxCode::ToolUnavailable, "ask the registry", url.to_owned())
-                .with_recovery(format!(
-                    "the registry answered {status}; the release page carries every \
-             archive either way: {RELEASES}"
-                )),
-        );
-    }
-    response.json().map_err(|err| {
-        AxError::failure(
-            AxCode::ToolUnavailable,
-            "read the registry's answer",
-            err.to_string(),
-        )
-        .with_recovery(
-            "the registry answered something other than a version manifest; \
-             a proxy that returns a login page does this",
-        )
-    })
-}
-
-fn manifest_field(url: &str, path: &[&str]) -> Result<String, AxError> {
-    let body = manifest(url)?;
-    path.iter()
-        .try_fold(&body, |at, key| at.get(key))
-        .and_then(serde_json::Value::as_str)
-        .map(str::to_owned)
-        .ok_or_else(|| {
-            AxError::failure(
-                AxCode::ToolUnavailable,
-                "read the registry's answer",
-                url.to_owned(),
-            )
-            .with_recovery(format!("the manifest carried no `{}`", path.join(".")))
-        })
-}
-
-struct GithubRelease {
-    cut: Release,
-    tag: String,
-}
-
-fn github_newest(url: &str) -> Result<GithubRelease, AxError> {
-    let body = manifest(&format!("{url}?per_page={RELEASE_PAGE_SIZE}"))?;
-    let releases = body
-        .as_array()
-        .ok_or_else(|| registry_refused(url, "expected a release list"))?;
-    for release in releases {
-        if release.get("draft").and_then(serde_json::Value::as_bool) == Some(true) {
-            continue;
-        }
-        let tag = release
-            .get("tag_name")
-            .and_then(serde_json::Value::as_str)
-            .ok_or_else(|| registry_refused(url, "a published release has no tag_name"))?;
-        return Release::from_published_tag(tag).map(|cut| GithubRelease {
-            cut,
-            tag: tag.to_owned(),
-        });
-    }
-    Err(registry_refused(
-        url,
-        "no published release is available; select a fixed tag from the release page",
-    ))
-}
-
-fn registry_refused(url: &str, recovery: &str) -> AxError {
-    AxError::failure(AxCode::ToolUnavailable, "read the release registry", url)
-        .with_recovery(recovery)
-}
-
-fn stopped(client: &reqwest::blocking::Client, url: &str) -> AxError {
-    let Reach {
-        host,
-        named,
-        connected,
-        answered,
-        through,
-        ..
-    } = gateway::reach(client, Proxying::ExceptLocal, url, 0);
-    AxError::failure(AxCode::ToolUnavailable, "ask the registry", host).with_recovery(format!(
-        "the call stopped there: name {named:?}, socket {connected:?}, \
-         request {answered:?}, through {through:?}"
-    ))
 }
 
 fn line(release: &Release) -> ReleaseLine {
@@ -194,10 +81,12 @@ pub fn answer() -> ReleaseAnswer {
     }
 }
 
+mod registry;
+
 fn judged(mine: Built, installed: InstallChannel, at: &Registries<'_>) -> ReleaseAnswer {
-    let npm = npm_newest(at.npm);
-    let crates = crates_newest(at.crates);
-    let github = github_newest(at.github);
+    let npm = registry::npm_newest(at.npm);
+    let crates = registry::crates_newest(at.crates);
+    let github = registry::github_newest(at.github);
     let registries = vec![
         RegistryNewest {
             registry: Registry::Npm,
