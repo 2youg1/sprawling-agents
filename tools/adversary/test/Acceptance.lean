@@ -30,6 +30,9 @@ open Lean (Json)
 private def usage : String :=
   "usage: acceptance script <shelf> <script.json>\n" ++
   "       acceptance walk <shelf> <script.json> <record.jsonl> <checklist.md>\n" ++
+  "       acceptance client\n" ++
+  "       acceptance client-ui <script> <output>\n" ++
+  "       acceptance gauge <output>\n" ++
   "SPRAWLING_BIN names the binary to walk, SPRAWLING_PROVIDER the stand-in's URL,
 " ++
   "SPRAWLING_LAUNCHER, where set, the launcher that closes each city in order on Windows."
