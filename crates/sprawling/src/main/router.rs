@@ -54,6 +54,18 @@ pub(super) fn main() -> ExitCode {
         Ok(Invocation::Version) => status(&args),
         Ok(Invocation::Run(verb, read)) => run(verb, &read, &args),
         Err(refused) => {
+            if let Some(result) = runtime::tools::run_container_guard(&args) {
+                return match result {
+                    Ok(()) => ExitCode::SUCCESS,
+                    Err(error) => {
+                        eprint!(
+                            "{}",
+                            super::refusal::written(&error, super::refusal::Form::Human)
+                        );
+                        ExitCode::FAILURE
+                    }
+                };
+            }
             eprintln!("sprawling: {refused}");
             ExitCode::from(2)
         }

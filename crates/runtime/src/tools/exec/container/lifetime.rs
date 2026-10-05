@@ -12,6 +12,8 @@ use kernel::{AxError, ContainerLimits};
 
 use crate::backlog::{Exit, Unseen};
 
+use super::cleanup::Cleanup;
+use super::guardian::Guard;
 use super::{ContainerLaunch, ContainerRuntime, control, denied, inspection};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -24,8 +26,8 @@ enum State {
 
 pub(crate) struct ContainerLease {
     runtime: ContainerRuntime,
-    name: String,
-    copy: PathBuf,
+    cleanup: Cleanup,
+    guardian: Option<Guard>,
     limits: ContainerLimits,
     state: State,
     attach: Option<Child>,
@@ -40,9 +42,9 @@ impl ContainerLease {
         limits: ContainerLimits,
     ) -> Self {
         Self {
+            cleanup: Cleanup::registered(&runtime, name, copy),
             runtime,
-            name,
-            copy,
+            guardian: None,
             limits,
             state: State::Registered,
             attach: None,
@@ -55,6 +57,7 @@ impl ContainerLease {
         target: &Command,
         out: std::fs::File,
         err: std::fs::File,
+        ready: &std::path::Path,
     ) -> Result<(), AxError> {
         if self.state != State::Registered {
             return Err(denied(
@@ -62,14 +65,23 @@ impl ContainerLease {
                 "this member already started or was stopped",
             ));
         }
+        if let Some(harness) = &self.runtime.guardian {
+            self.guardian = Some(Guard::spawn(
+                harness,
+                &self.cleanup,
+                ready,
+                err.try_clone()
+                    .map_err(|err| denied("share guardian failure output", err))?,
+            )?);
+        }
         let mut image = self.runtime.command();
         image.args(["image", "inspect", self.limits.image.as_str()]);
         inspection::image(&control::checked(&mut image)?, &self.limits)?;
         let mut create = self.runtime.create_command(
             &self.limits,
             &ContainerLaunch {
-                name: &self.name,
-                copy: &self.copy,
+                name: &self.cleanup.name,
+                copy: &self.cleanup.copy,
                 command: target,
             },
         )?;
@@ -79,11 +91,11 @@ impl ContainerLease {
             &control::checked(&mut inspect)?,
             &self.limits,
             self.runtime.engine,
-            &self.copy,
+            &self.cleanup.copy,
         )?;
         let mut attach = self.runtime.command();
         attach
-            .args(["start", "--attach", &self.name])
+            .args(["start", "--attach", &self.cleanup.name])
             .stdin(std::process::Stdio::null())
             .stdout(out)
             .stderr(err);
@@ -158,33 +170,13 @@ impl ContainerLease {
 
     fn inspect_command(&self) -> Command {
         let mut command = self.runtime.command();
-        command.args(["container", "inspect", &self.name]);
+        command.args(["container", "inspect", &self.cleanup.name]);
         command
     }
 
     fn remove(&mut self) -> Result<(), AxError> {
         self.state = State::Stopping;
-        let mut remove = self.runtime.command();
-        remove.args(["rm", "--force", "--volumes", &self.name]);
-        let removed = control::output(&mut remove)?;
-        if !removed.status.success() {
-            // A successful inventory distinguishes an absent identity from a daemon outage.
-            let mut inventory = self.runtime.command();
-            inventory.args(["container", "ls", "--all", "--format", "{{.Names}}"]);
-            let names = control::checked(&mut inventory)?;
-            let names = std::str::from_utf8(&names)
-                .map_err(|err| denied("confirm container removal", err.to_string()))?;
-            if names.lines().any(|name| name.trim() == self.name) {
-                return Err(denied(
-                    "remove the owned container",
-                    format!(
-                        "{}: {}",
-                        self.name,
-                        String::from_utf8_lossy(&removed.stderr).trim()
-                    ),
-                ));
-            }
-        }
+        self.cleanup.remove()?;
         if let Some(child) = &mut self.attach {
             match child.try_wait() {
                 Ok(Some(_)) => {}
@@ -199,12 +191,11 @@ impl ContainerLease {
                 Err(err) => return Err(denied("reap the attach client", err.to_string())),
             }
         }
-        match std::fs::remove_dir_all(&self.copy) {
-            Ok(()) => {}
-            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
-            Err(err) => return Err(denied("release the container copy", err.to_string())),
-        }
+        self.cleanup.release_copy()?;
         self.state = State::Removed;
+        if let Some(guardian) = &mut self.guardian {
+            guardian.disarm()?;
+        }
         Ok(())
     }
 }
@@ -217,8 +208,8 @@ impl Drop for ContainerLease {
             // No caller survives the city's final drop; preserve the recovery identity on stderr.
             eprintln!(
                 "{err}; container {} retains its copy {}",
-                self.name,
-                self.copy.display()
+                self.cleanup.name,
+                self.cleanup.copy.display()
             );
         }
     }

@@ -15,6 +15,9 @@ use std::process::Command;
 use kernel::{AxCode, AxError, ContainerLimits};
 use serde_json::Value;
 
+mod cleanup;
+mod guardian;
+pub use guardian::run_container_guard;
 mod control;
 mod inspection;
 mod lifetime;
@@ -32,6 +35,7 @@ pub enum ContainerEngine {
 pub struct ContainerRuntime {
     program: PathBuf,
     engine: ContainerEngine,
+    guardian: Option<PathBuf>,
 }
 
 /// The values that must remain paired for one container create.
@@ -46,6 +50,13 @@ const WORKDIR: &str = "/work";
 const MILLICPU_PER_CPU: u32 = 1000;
 
 impl ContainerRuntime {
+    /// Binds the harness whose private protocol retains cleanup after parent termination.
+    #[must_use]
+    pub fn guarded(mut self, harness: PathBuf) -> Self {
+        self.guardian = Some(harness);
+        self
+    }
+
     /// Contacts the daemon under the bounded control-request budget.
     ///
     /// # Errors
@@ -113,7 +124,11 @@ impl ContainerRuntime {
                 "the daemon does not report Linux cgroup v2 with CPU, memory and process controllers",
             ));
         }
-        Ok(Self { program, engine })
+        Ok(Self {
+            program,
+            engine,
+            guardian: None,
+        })
     }
 
     /// Builds a stopped container. No shell interprets the target argv.

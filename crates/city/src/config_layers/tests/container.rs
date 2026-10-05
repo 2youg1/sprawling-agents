@@ -7,14 +7,41 @@ use super::*;
 
 #[test]
 fn a_container_declaration_reaches_the_frozen_sandbox_whole() {
+    let dir = tempfile::tempdir().unwrap();
+    let room = addr("lab/room1");
     let image = format!("sha256:{}", "a".repeat(64));
-    let parsed = ConfigLayer::parse(&format!(
-        "[sandbox]\nshell = false\n[sandbox.container]\nimage = '{image}'\nuser = 1000\ncpu_millis = 1250\nmemory_bytes = 67108864\npids = 64\n"
-    ));
-    assert!(
-        parsed.is_ok(),
-        "an explicit container must reach the frozen exec configuration: {parsed:?}"
+    write(
+        &path(dir.path(), &room, Layer::Building).unwrap(),
+        &format!(
+            "[sandbox]
+shell = false
+fuel = 4000
+[sandbox.container]
+image = '{image}'
+user = 1000
+cpu_millis = 1250
+memory_bytes = 67108864
+pids = 64
+"
+        ),
     );
-    let sandbox = serde_json::to_value(parsed.unwrap().sandbox().unwrap()).unwrap();
-    assert_eq!(sandbox["container"]["image"], serde_json::json!(image));
+    let frozen = load(dir.path(), &room);
+    assert!(
+        frozen.is_ok(),
+        "an explicit container must reach the frozen exec configuration: {frozen:?}"
+    );
+    assert_eq!(
+        frozen.unwrap().sandbox,
+        SandboxLimits {
+            fuel: 4000,
+            container: Some(kernel::ContainerLimits {
+                image: kernel::ContainerImage::parse(&image).unwrap(),
+                user: std::num::NonZeroU32::new(1000).unwrap(),
+                cpu_millis: std::num::NonZeroU32::new(1250).unwrap(),
+                memory_bytes: std::num::NonZeroU64::new(67_108_864).unwrap(),
+                pids: std::num::NonZeroU32::new(64).unwrap(),
+            }),
+            ..SandboxLimits::default()
+        }
+    );
 }

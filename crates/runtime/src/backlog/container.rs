@@ -59,7 +59,8 @@ impl Backlog {
                 claim,
                 ..
             } = &mut member.body
-                && let Err(fault) = lease.start(&request.target, out, err)
+                && let Err(fault) =
+                    lease.start(&request.target, out, err, &dir.join("guardian-ready"))
             {
                 *claim = Claim::Nobody;
                 // If removal fails the member remains owned and harvest retries it.

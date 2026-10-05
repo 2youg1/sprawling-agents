@@ -1,0 +1,63 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+// Copyright (c) 2026 2youg1 and the sprawling contributors
+
+//! Confirmed resource deletion (`crates/runtime/spec/Tools/Exec/Container.lean`, D52).
+
+use std::path::PathBuf;
+use std::process::Command;
+
+use kernel::AxError;
+use serde::{Deserialize, Serialize};
+
+use super::{ContainerRuntime, control, denied};
+
+#[derive(Serialize, Deserialize)]
+pub(super) struct Cleanup {
+    pub(super) program: PathBuf,
+    pub(super) name: String,
+    pub(super) copy: PathBuf,
+}
+
+impl Cleanup {
+    pub(super) fn registered(runtime: &ContainerRuntime, name: String, copy: PathBuf) -> Self {
+        Self {
+            program: runtime.program.clone(),
+            name,
+            copy,
+        }
+    }
+
+    pub(super) fn remove(&self) -> Result<(), AxError> {
+        let mut remove = Command::new(&self.program);
+        remove.args(["rm", "--force", "--volumes", &self.name]);
+        let removed = control::output(&mut remove)?;
+        if !removed.status.success() {
+            let mut inventory = Command::new(&self.program);
+            inventory.args(["container", "ls", "--all", "--format", "{{.Names}}"]);
+            let names = control::checked(&mut inventory)?;
+            let names = std::str::from_utf8(&names)
+                .map_err(|err| denied("confirm container removal", err))?;
+            if names.lines().any(|name| name.trim() == self.name) {
+                return Err(denied(
+                    "remove the owned container",
+                    format!(
+                        "{}: {}",
+                        self.name,
+                        String::from_utf8_lossy(&removed.stderr).trim()
+                    ),
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    pub(super) fn release_copy(&self) -> Result<(), AxError> {
+        match std::fs::remove_dir_all(&self.copy) {
+            Ok(()) => Ok(()),
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            Err(err) => Err(denied("release the container copy", err)),
+        }
+    }
+}

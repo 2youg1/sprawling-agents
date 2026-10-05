@@ -269,7 +269,12 @@ pub(crate) fn container() -> Result<runtime::tools::ContainerRuntime, AxError> {
     ] {
         if let Some(program) = find_program(name) {
             match runtime::tools::ContainerRuntime::probe(engine, program) {
-                Ok(runtime) => return Ok(runtime),
+                Ok(runtime) => {
+                    let harness = std::env::current_exe().map_err(|err| AxError::failure(
+                        kernel::AxCode::SandboxDenied, "locate the container guardian", err.to_string()
+                    ).with_recovery("start the installed harness executable so its cleanup helper can be launched"))?;
+                    return Ok(runtime.guarded(harness));
+                }
                 Err(err) => failures.push(err.to_string()),
             }
         }

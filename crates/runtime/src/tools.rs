@@ -27,6 +27,7 @@ pub use describe::DescribeTool;
 pub use edit::EditTool;
 pub use edit::version_of;
 pub(crate) use exec::container::ContainerLease;
+pub use exec::container::run_container_guard;
 pub use exec::parse_arm;
 pub use exec::parse_placement;
 pub use exec::{ContainerEngine, ContainerLaunch, ContainerRuntime};
