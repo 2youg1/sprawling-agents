@@ -36,6 +36,8 @@ use crate::sandbox::{Fuel, Mount, Sandbox, SandboxExit, SandboxJob};
 
 mod confinement;
 mod container;
+#[cfg(any(target_os = "macos", test))]
+mod native_macos;
 pub use container::{ContainerEngine, ContainerLaunch, ContainerRuntime};
 mod shell;
 mod yielding;
