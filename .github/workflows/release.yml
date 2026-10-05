@@ -158,7 +158,11 @@ jobs:
           fi
           just package "$ARCHIVE_TARGET"
           echo "package_seconds=$((SECONDS - start))" > target/release-evidence/timing.txt
-          sha256sum target/package/*.zip > target/release-evidence/archives.sha256
+          if [ "$RUNNER_OS" = macOS ]; then
+            shasum -a 256 target/package/*.zip > target/release-evidence/archives.sha256
+          else
+            sha256sum target/package/*.zip > target/release-evidence/archives.sha256
+          fi
       - name: record the archive cache and run identity
         if: always()
         shell: bash
