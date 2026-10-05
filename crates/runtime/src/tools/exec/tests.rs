@@ -10,6 +10,7 @@ use kernel::Address;
 #[cfg(target_os = "macos")]
 #[path = "native_macos/production_tests.rs"]
 mod native_macos;
+mod container;
 mod shell;
 mod yielding;
 
