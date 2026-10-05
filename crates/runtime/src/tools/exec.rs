@@ -8,8 +8,7 @@
 //! Program runs a host process with a pinned working directory and an
 //! environment allowlist — secrets are never passed through, because a
 //! child process inherits whatever it is given and cannot be asked to
-//! forget. It runs in the sandbox this machine's confinement gives it
-//! unless the call names `where: host`; the tool's own description states
+//! forget. Its chosen confinement applies unless the call names `where: host`; disclosure states
 //! which arm that is and what the arm does not hold. Python runs inside
 //! the wasip1 sandbox, where the capability surface is the mount list and
 //! there is no network at all. Shell probes for an interpreter and
@@ -78,8 +77,7 @@ pub struct ExecSetup {
 
 pub struct ExecTool {
     setup: ExecSetup,
-    /// Locked because `Sandbox::run` takes `&mut self` while `invoke`
-    /// takes `&self`; exec writes, so no second call waits on it.
+    /// `Sandbox::run` mutates the guest; `invoke` borrows the tool.
     sandbox: Mutex<Box<dyn Sandbox>>,
     backlog: Backlog,
     confinement: Mutex<Confined>,
@@ -126,10 +124,6 @@ impl ExecTool {
         );
         let domain = setup.domain.clone();
         let confinement = Confined::detect();
-        // The arm and what it does not hold are in front of the caller,
-        // because a tool that said only "sandboxed" would let a command
-        // that needs a closed network be launched in a box whose network
-        // is open.
         let disclosure = disclosure(&setup, &confinement);
         Ok(ExecTool {
             setup,
@@ -307,9 +301,7 @@ fn disclosure(setup: &ExecSetup, confinement: &Confined) -> String {
     )
 }
 
-/// Every result payload this tool can return has its own file: the
-/// arms above decide what happened, and `outcome` decides how it is
-/// written down.
+/// The result shape is owned by `outcome`.
 mod outcome;
 
 use outcome::{
@@ -399,10 +391,7 @@ fn held<T>(lock: &Mutex<T>) -> Result<MutexGuard<'_, T>, AxError> {
     })
 }
 
-/// The tool is dropped when its run's bench is, which is when the run
-/// can no longer be handed anything: what it left in the background is
-/// terminated and released so the table does not keep it for the life of
-/// the city.
+/// Releases background commands when the run drops its tool bench.
 impl Drop for ExecTool {
     fn drop(&mut self) {
         self.backlog.release(self.setup.run);

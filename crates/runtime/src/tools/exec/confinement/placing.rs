@@ -3,14 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The adapter that places a command: a copy of the working tree synced
-//! to it, the platform's wrapper where the arm has one, and the budget
-//! that keeps a copy from growing without a bound.
-//!
-//! Where a command runs is the caller's choice and one of two words
-//! ([`Placement`]); what runs there is the arm's, and the arm's promises
-//! are [`super::Confinement`]'s. This file holds no policy about which
-//! arm a machine should get.
+//! Places commands in bounded, synchronized copies and probes their platform wrapper.
+//! Selection belongs to `Confinement`; copy lifetime belongs to this adapter.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -82,13 +76,7 @@ impl Placement {
     }
 }
 
-/// The arm in use, the copy kept for the next command, and the copies
-/// commands still hold.
-///
-/// The copy of a command that settled is kept for the next command,
-/// which syncs it rather than making another (runtime D10). A
-/// command handed to the backlog keeps its copy until the member reports
-/// its ending, because the process is still in it.
+/// Owns reusable copies and holds background copies until their member ends (D10).
 pub struct Confined {
     arm: Confinement,
     scratch: Option<PathBuf>,
@@ -102,8 +90,7 @@ struct Mirror {
     at: PathBuf,
 }
 
-/// Where one command was put, so that whoever ends the wait can hand
-/// the copy back.
+/// A command's copy claim, returned after its execution ends.
 pub struct Placed {
     copy: Option<Mirror>,
     work: storage::FileWork,
@@ -250,24 +237,21 @@ impl Confined {
         ))
     }
 
-    /// The wait ended and the command is over: its copy is kept for the
-    /// next command, or goes when one is kept already.
+    /// Retains a settled command's copy for reuse.
     pub fn settled(&mut self, placed: Placed) {
         if let Some(copy) = placed.copy {
             self.keep(copy);
         }
     }
 
-    /// The command is still going: its copy is kept against the member
-    /// that will report the ending.
+    /// Holds a background command's copy until its member reports.
     pub fn handed(&mut self, id: BacklogId, placed: Placed) {
         if let Some(copy) = placed.copy {
             self.outstanding.insert(id, copy);
         }
     }
 
-    /// Copies whose member has reported are kept for the next command,
-    /// or go.
+    /// Releases copies whose background members have ended.
     pub fn reaped(&mut self, finished: &[Finished]) {
         for member in finished {
             if let Some(copy) = self.outstanding.remove(&member.id) {
@@ -359,14 +343,7 @@ fn no_arm(missing: Missing) -> AxError {
     .with_recovery(missing.recovery())
 }
 
-/// The refusal for the one arm no build of this crate constructs.
-///
-/// No build constructs it because a job object made through the safe
-/// interface keeps neither a job-wide resource limit nor the processes a
-/// child starts before it joins the job (`crates/runtime/spec/Tools/Exec.lean`
-/// §8-13-2). Refused rather than served as the copied tree: the copied tree does
-/// not isolate the network, and answering for an arm that does would
-/// tell a caller its network was closed while it was open.
+/// Refuses the unavailable job-object arm instead of silently weakening it.
 fn no_job_object() -> AxError {
     AxError::failure(
         AxCode::SandboxDenied,
