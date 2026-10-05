@@ -158,6 +158,12 @@ fn compiled(here: &Path, out: &Path, triple: &str, file: &str) -> Result<(), Str
 fn record_matches(rust: &str, zig: &str) -> Result<(), String> {
     let body = rust
         .split_once("struct Record {")
+        .filter(|(prefix, _)| {
+            prefix
+                .rsplit("\n\n")
+                .next()
+                .is_some_and(|attributes| attributes.trim().starts_with("#[repr(C)]"))
+        })
         .and_then(|(_, tail)| tail.split_once('}'))
         .map(|(body, _)| body)
         .ok_or_else(|| {

@@ -153,7 +153,7 @@ fn strip_prose(value: &mut serde_json::Value) {
 
 /// The digest of `wire_schema()` with its prose removed.
 #[cfg(feature = "schema")]
-const WIRE_SHAPE_GOLDEN: &str = "7384d350d749d69e3433c7d25c6362547e6bb421e1d6f8e75daacf86cab58a51";
+const WIRE_SHAPE_GOLDEN: &str = "e4d238158d3070a423b6c18f3f3a62b75d3d634148349804d61f9c79f0325deb";
 
 // -------------------------------------------------------------- binding face
 

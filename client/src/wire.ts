@@ -90,7 +90,7 @@ export type Locator = typeof Locator.Type;
  * UTC milliseconds as an integer (determinism rule 6). Always a
  * parameter, never sampled inside kernel or memory.
  */
-export const TimeMs = Schema.Int.pipe(Schema.brand("TimeMs"));
+export const TimeMs = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)).pipe(Schema.brand("TimeMs"));
 export type TimeMs = typeof TimeMs.Type;
 
 export const ApprovalItem = Schema.Struct({
@@ -121,7 +121,7 @@ export type ApprovalsAnswer = typeof ApprovalsAnswer.Type;
 
 export const ArchiveHit = Schema.Struct({
   building: Address,
-  day: Schema.Int,
+  day: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   kind: Schema.String,
   subject: Schema.String,
 }).annotate({ identifier: "ArchiveHit" });
@@ -144,17 +144,17 @@ export type ArchiveAnswer = typeof ArchiveAnswer.Type;
 export const Cadence = Schema.Union([
   Schema.Struct({
     every_minutes: Schema.Struct({
-      minutes: Schema.Int,
+      minutes: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
     }),
   }),
   Schema.Struct({
     daily_at: Schema.Struct({
-      minute: Schema.Int,
+      minute: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
     }),
   }),
   Schema.Struct({
     weekly_at: Schema.Struct({
-      minute: Schema.Int,
+      minute: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
     }),
   }),
 ]).annotate({ identifier: "Cadence" });
@@ -199,7 +199,7 @@ export type AutomationAnswer = typeof AutomationAnswer.Type;
  * One line of a building's archive index.
  */
 export const ArchiveLine = Schema.Struct({
-  day: Schema.Int,
+  day: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   kind: Schema.String,
   subject: Schema.String,
 }).annotate({ identifier: "ArchiveLine" });
@@ -222,7 +222,7 @@ export type NodeId = typeof NodeId.Type;
 export const BlockedLine = Schema.Struct({
   line: Schema.String,
   source: NodeId,
-  waiting: Schema.Int,
+  waiting: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
 }).annotate({ identifier: "BlockedLine" });
 export type BlockedLine = typeof BlockedLine.Type;
 
@@ -235,7 +235,7 @@ export type BlockedLine = typeof BlockedLine.Type;
  * silence about a cut is the difference between a view and a lie.
  */
 export const BuildingDoc = Schema.Struct({
-  bytes: Schema.Int,
+  bytes: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   name: Schema.String,
   text: Schema.String,
   truncated: Schema.Boolean,
@@ -326,7 +326,7 @@ export const PlanRow = Schema.Struct({
   needs: Schema.Array(NodeId),
   node: NodeId,
   ready: Schema.Boolean,
-  share_ppb: Schema.Int,
+  share_ppb: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   status: RoadmapStatus,
 }).annotate({ identifier: "PlanRow" });
 export type PlanRow = typeof PlanRow.Type;
@@ -346,25 +346,25 @@ export type PlanRow = typeof PlanRow.Type;
  * reader seeing one number cannot.
  */
 export const PlannedProgress = Schema.Struct({
-  blocked: Schema.Int,
-  blocked_ppb: Schema.Int,
-  done: Schema.Int,
-  done_ppb: Schema.Int,
-  total: Schema.Int,
+  blocked: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  blocked_ppb: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  done: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  done_ppb: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  total: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
 }).annotate({ identifier: "PlannedProgress" });
 export type PlannedProgress = typeof PlannedProgress.Type;
 
 /**
  * Whole tokens.
  */
-export const Tokens = Schema.Int.pipe(Schema.brand("Tokens"));
+export const Tokens = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)).pipe(Schema.brand("Tokens"));
 export type Tokens = typeof Tokens.Type;
 
 /**
  * One micro-USD. Decimal price lists convert at the single accounting
  * entry point (gateway::cost); decisions never touch floats.
  */
-export const UsdMicros = Schema.Int.pipe(Schema.brand("UsdMicros"));
+export const UsdMicros = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)).pipe(Schema.brand("UsdMicros"));
 export type UsdMicros = typeof UsdMicros.Type;
 
 export const BudgetUse = Schema.Struct({
@@ -380,7 +380,7 @@ export type BudgetUse = typeof BudgetUse.Type;
  */
 export const UnplannedProgress = Schema.Struct({
   budget: BudgetUse,
-  steps: Schema.Int,
+  steps: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
 }).annotate({ identifier: "UnplannedProgress" });
 export type UnplannedProgress = typeof UnplannedProgress.Type;
 
@@ -398,10 +398,9 @@ export const Progress = Schema.Union([
 export type Progress = typeof Progress.Type;
 
 /**
- * A locally installed image ID. Registry references and mutable tags
- * cannot reach an execution request through this type.
+ * A full local immutable image ID admitted by ContainerImage::parse.
  */
-export const ContainerImage = Schema.String.pipe(Schema.brand("ContainerImage"));
+export const ContainerImage = Schema.String.check(Schema.isPattern(new RegExp("^sha256:[0123456789abcdef]{64}(?![\\s\\S])", "u"))).pipe(Schema.brand("ContainerImage"));
 export type ContainerImage = typeof ContainerImage.Type;
 
 /**
@@ -409,11 +408,11 @@ export type ContainerImage = typeof ContainerImage.Type;
  * in bytes, and the process count bounds descendants as well as PID 1.
  */
 export const ContainerLimits = Schema.Struct({
-  cpu_millis: Schema.Int,
+  cpu_millis: Schema.Int.check(Schema.isGreaterThanOrEqualTo(1)),
   image: ContainerImage,
-  memory_bytes: Schema.Int,
-  pids: Schema.Int,
-  user: Schema.Int,
+  memory_bytes: Schema.Int.check(Schema.isGreaterThanOrEqualTo(1)),
+  pids: Schema.Int.check(Schema.isGreaterThanOrEqualTo(1)),
+  user: Schema.Int.check(Schema.isGreaterThanOrEqualTo(1)),
 }).annotate({ identifier: "ContainerLimits" });
 export type ContainerLimits = typeof ContainerLimits.Type;
 
@@ -464,7 +463,7 @@ export const SandboxLimits = Schema.Struct({
   arm: Schema.optional(Schema.NullOr(SandboxArm)),
   container: Schema.optional(Schema.NullOr(ContainerLimits)),
   env_passthrough: Schema.optional(Schema.Array(EnvVarName)),
-  fuel: Schema.Int,
+  fuel: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   interpreter: Schema.optional(Interpreter),
   mounts: Schema.Array(Address),
   shell: Schema.Boolean,
@@ -507,8 +506,8 @@ export type B3Hash = typeof B3Hash.Type;
  * is never held.
  */
 export const Span = Schema.Struct({
-  end: Schema.Int,
-  start: Schema.Int,
+  end: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  start: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
 }).annotate({ identifier: "Span" });
 export type Span = typeof Span.Type;
 
@@ -517,7 +516,7 @@ export type Span = typeof Span.Type;
  */
 export const BytesAnswer = Schema.Struct({
   base64: Schema.String,
-  size: Schema.Int,
+  size: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   span: Span,
   version: B3Hash,
 }).annotate({ identifier: "BytesAnswer" });
@@ -552,8 +551,8 @@ export const Lines = Schema.Union([
   Schema.Literal("binary"),
   Schema.Struct({
     counted: Schema.Struct({
-      added: Schema.Int,
-      removed: Schema.Int,
+      added: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+      removed: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
     }),
   }),
 ]).annotate({ identifier: "Lines" });
@@ -603,7 +602,7 @@ export const BuildingProgress = Schema.Struct({
   blocked: Schema.Array(BlockedLine),
   problems: Schema.Array(Schema.String),
   progress: Progress,
-  ready: Schema.Int,
+  ready: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
 }).annotate({ identifier: "BuildingProgress" });
 export type BuildingProgress = typeof BuildingProgress.Type;
 
@@ -645,7 +644,7 @@ export const PursuitVerdict = Schema.Union([
     next: NodeId,
   }),
   Schema.Struct({
-    in_flight: Schema.Int,
+    in_flight: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
     kind: Schema.Literal("waiting"),
   }),
   Schema.Struct({
@@ -726,7 +725,7 @@ export type RunId = typeof RunId.Type;
 /**
  * Event sequence number; contiguous from [`Seq::FIRST`], checked arithmetic.
  */
-export const Seq = Schema.Int.pipe(Schema.brand("Seq"));
+export const Seq = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)).pipe(Schema.brand("Seq"));
 export type Seq = typeof Seq.Type;
 
 /**
@@ -764,9 +763,9 @@ export const RunSummary = Schema.Struct({
 export type RunSummary = typeof RunSummary.Type;
 
 export const CityAnswer = Schema.Struct({
-  active: Schema.Int,
+  active: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   buildings: Schema.Array(BuildingProgress),
-  frozen: Schema.Int,
+  frozen: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   halted: Schema.Array(HaltScope),
   proved: Schema.optional(Schema.NullOr(Seq)),
   pursuits: Schema.Array(PursuitLine),
@@ -890,8 +889,8 @@ export type SettledEffort = typeof SettledEffort.Type;
  * does not spell it a second time.
  */
 export const SecondDomain = Schema.Struct({
-  max: Schema.Int,
-  min: Schema.Int,
+  max: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  min: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
 }).annotate({ identifier: "SecondDomain" });
 export type SecondDomain = typeof SecondDomain.Type;
 
@@ -901,7 +900,7 @@ export type SecondDomain = typeof SecondDomain.Type;
 export const SettledSecond = Schema.Struct({
   domain: SecondDomain,
   from: ConfigLayer,
-  percent: Schema.Int,
+  percent: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
 }).annotate({ identifier: "SettledSecond" });
 export type SettledSecond = typeof SettledSecond.Type;
 
@@ -938,9 +937,9 @@ export type Proxying = typeof Proxying.Type;
 export const TuningDefaults = Schema.Struct({
   from: ConfigLayer,
   proxying: Proxying,
-  request_max_retries: Schema.optional(Schema.NullOr(Schema.Int)),
-  stream_idle_timeout_ms: Schema.optional(Schema.NullOr(Schema.Int)),
-  timeout_ms: Schema.Int,
+  request_max_retries: Schema.optional(Schema.NullOr(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)))),
+  stream_idle_timeout_ms: Schema.optional(Schema.NullOr(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)))),
+  timeout_ms: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
 }).annotate({ identifier: "TuningDefaults" });
 export type TuningDefaults = typeof TuningDefaults.Type;
 
@@ -956,7 +955,7 @@ export type TuningDefaults = typeof TuningDefaults.Type;
 export const ConfigAnswer = Schema.Struct({
   addr: Address,
   effort: Schema.optional(Schema.NullOr(SettledEffort)),
-  first: Schema.optional(Schema.NullOr(Schema.Int)),
+  first: Schema.optional(Schema.NullOr(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)))),
   second: SettledSecond,
   tuning: TuningDefaults,
 }).annotate({ identifier: "ConfigAnswer" });
@@ -972,7 +971,7 @@ export type ConfigAnswer = typeof ConfigAnswer.Type;
  */
 export const ContentAnswer = Schema.Struct({
   binary: Schema.Boolean,
-  bytes: Schema.Int,
+  bytes: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   locator: Locator,
   text: Schema.String,
   truncated: Schema.Boolean,
@@ -986,8 +985,8 @@ export type ContentAnswer = typeof ContentAnswer.Type;
  * apart from one where nothing ran.
  */
 export const UnpricedCalls = Schema.Struct({
-  calls: Schema.Int,
-  tokens: Schema.Int,
+  calls: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  tokens: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
 }).annotate({ identifier: "UnpricedCalls" });
 export type UnpricedCalls = typeof UnpricedCalls.Type;
 
@@ -1525,7 +1524,7 @@ export type DocumentBody = typeof DocumentBody.Type;
  */
 export const HeldDocument = Schema.Struct({
   body: DocumentBody,
-  bytes: Schema.Int,
+  bytes: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   format: Format,
   version: B3Hash,
 }).annotate({ identifier: "HeldDocument" });
@@ -1572,7 +1571,7 @@ export type DocumentAnswer = typeof DocumentAnswer.Type;
  * dialect that cannot write the request without one refuses the call
  * instead of inventing a number.
  */
-export const Ceiling = Schema.Int.pipe(Schema.brand("Ceiling"));
+export const Ceiling = Schema.Int.check(Schema.isGreaterThanOrEqualTo(1)).pipe(Schema.brand("Ceiling"));
 export type Ceiling = typeof Ceiling.Type;
 
 /**
@@ -1632,7 +1631,7 @@ export type DialectKind = typeof DialectKind.Type;
  * other bounds what it may write, and a call that swapped them would
  * compile.
  */
-export const Window = Schema.Int.pipe(Schema.brand("Window"));
+export const Window = Schema.Int.check(Schema.isGreaterThanOrEqualTo(1)).pipe(Schema.brand("Window"));
 export type Window = typeof Window.Type;
 
 /**
@@ -1706,9 +1705,9 @@ export type EvidenceKind = typeof EvidenceKind.Type;
  * which is a row worth showing and not a size worth inventing.
  */
 export const Picture = Schema.Struct({
-  height: Schema.Int,
+  height: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   media_type: Schema.String,
-  width: Schema.Int,
+  width: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
 }).annotate({ identifier: "Picture" });
 export type Picture = typeof Picture.Type;
 
@@ -1772,8 +1771,8 @@ export type FindAnswer = typeof FindAnswer.Type;
  * is pushed.
  */
 export const Drift = Schema.Struct({
-  ahead: Schema.Int,
-  behind: Schema.Int,
+  ahead: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  behind: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
 }).annotate({ identifier: "Drift" });
 export type Drift = typeof Drift.Type;
 
@@ -1988,7 +1987,7 @@ export const EventRecord = Schema.Struct({
   run: RunId,
   seq: Seq,
   t: TimeMs,
-  v: Schema.Int,
+  v: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   who: Schema.String,
 }).annotate({ identifier: "EventRecord" });
 export type EventRecord = typeof EventRecord.Type;
@@ -2030,7 +2029,7 @@ export type HistoryRangeAnswer = typeof HistoryRangeAnswer.Type;
  * withheld line and the lines around it read as one list.
  */
 export const PatchLine = Schema.Struct({
-  number: Schema.Int,
+  number: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   text: Schema.String,
 }).annotate({ identifier: "PatchLine" });
 export type PatchLine = typeof PatchLine.Type;
@@ -2039,7 +2038,7 @@ export type PatchLine = typeof PatchLine.Type;
  * One line that was not echoed, and what matched it.
  */
 export const Withheld = Schema.Struct({
-  number: Schema.Int,
+  number: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   reason: Schema.String,
 }).annotate({ identifier: "Withheld" });
 export type Withheld = typeof Withheld.Type;
@@ -2107,7 +2106,7 @@ export const IdentityAnswer = Schema.Union([
   Schema.Struct({
     unreadable: Schema.Struct({
       document: GovernedDocument,
-      line: Schema.Int,
+      line: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
       why: Schema.String,
     }),
   }),
@@ -2251,7 +2250,7 @@ export const Order = Schema.Union([
   Schema.Literal("bullet"),
   Schema.Struct({
     ordered: Schema.Struct({
-      start: Schema.Int,
+      start: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
     }),
   }),
 ]).annotate({ identifier: "Order" });
@@ -2281,7 +2280,7 @@ export const Block: Schema.Codec<Block, BlockEncoded> = Schema.Union([
   Schema.Struct({
     heading: Schema.Struct({
       inline: Schema.Array(Schema.suspend((): Schema.Codec<Inline, InlineEncoded> => Inline)),
-      level: Schema.Int,
+      level: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)).check(Schema.isLessThanOrEqualTo(255)),
       span: Span,
     }),
   }),
@@ -2360,7 +2359,7 @@ export const EntryKind = Schema.Union([
   Schema.Literal("directory"),
   Schema.Struct({
     file: Schema.Struct({
-      bytes: Schema.Int,
+      bytes: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
     }),
   }),
 ]).annotate({ identifier: "EntryKind" });
@@ -2420,11 +2419,11 @@ export const ProviderFailureKind = Schema.Union([
   }),
   Schema.Struct({
     kind: Schema.Literal("refused"),
-    status: Schema.Int,
+    status: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   }),
   Schema.Struct({
     kind: Schema.Literal("overflow"),
-    status: Schema.Int,
+    status: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   }),
   Schema.Struct({
     kind: Schema.Literal("unreadable"),
@@ -2469,7 +2468,7 @@ export const AxError = Schema.Struct({
   provider: Schema.optional(Schema.NullOr(ProviderFailureKind)),
   recovery: Schema.String,
   retry: Retry,
-  retry_after_ms: Schema.optional(Schema.NullOr(Schema.Int)),
+  retry_after_ms: Schema.optional(Schema.NullOr(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)))),
   subject: Schema.String,
 }).annotate({ identifier: "AxError" });
 export type AxError = typeof AxError.Type;
@@ -2544,7 +2543,7 @@ export type McpHealthAnswer = typeof McpHealthAnswer.Type;
  * How many uses one UTC calendar day holds.
  */
 export const DayCount = Schema.Struct({
-  count: Schema.Int,
+  count: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   day: Schema.String,
 }).annotate({ identifier: "DayCount" });
 export type DayCount = typeof DayCount.Type;
@@ -2609,13 +2608,13 @@ export type McpUsageAnswer = typeof McpUsageAnswer.Type;
  * two figures start disagreeing.
  */
 export const MetricsAnswer = Schema.Struct({
-  approvals_waiting: Schema.Int,
-  buildings: Schema.Int,
-  discards_outstanding: Schema.Int,
-  events: Schema.Int,
-  runs_active: Schema.Int,
-  runs_frozen: Schema.Int,
-  signals_waiting: Schema.Int,
+  approvals_waiting: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  buildings: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  discards_outstanding: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  events: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  runs_active: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  runs_frozen: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  signals_waiting: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
 }).annotate({ identifier: "MetricsAnswer" });
 export type MetricsAnswer = typeof MetricsAnswer.Type;
 
@@ -2697,8 +2696,8 @@ export type Motion = typeof Motion.Type;
  * How the pages look.
  */
 export const Appearance = Schema.Struct({
-  blend_percent: Schema.optional(Schema.NullOr(Schema.Int)),
-  body_px: Schema.optional(Schema.NullOr(Schema.Int)),
+  blend_percent: Schema.optional(Schema.NullOr(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)))),
+  body_px: Schema.optional(Schema.NullOr(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)))),
   chroma: Chroma,
   density: Density,
   glass: Schema.optional(Schema.NullOr(Glass)),
@@ -2822,8 +2821,8 @@ export type PrefixSlot = typeof PrefixSlot.Type;
  */
 export const PrefixSource = Schema.Struct({
   addr: Address,
-  dropped: Schema.Int,
-  kept: Schema.Int,
+  dropped: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  kept: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
 }).annotate({ identifier: "PrefixSource" });
 export type PrefixSource = typeof PrefixSource.Type;
 
@@ -2836,7 +2835,7 @@ export type PrefixSource = typeof PrefixSource.Type;
  * empty because nothing could be read, not because the segment was.
  */
 export const PrefixSegment = Schema.Struct({
-  bytes: Schema.Int,
+  bytes: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   hash: B3Hash,
   slot: PrefixSlot,
   sources: Schema.Array(PrefixSource),
@@ -3206,7 +3205,7 @@ export type Outcome = typeof Outcome.Type;
  * and that substitute carries its own line naming the `Locator`.
  */
 export const Output = Schema.Struct({
-  cut: Schema.Int,
+  cut: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   head: Schema.String,
   pinned: Schema.optional(Schema.NullOr(Schema.String)),
 }).annotate({ identifier: "Output" });
@@ -3262,7 +3261,7 @@ export const Call = Schema.Struct({
   render: Schema.optional(Schema.NullOr(RenderIntent)),
   subject: Schema.optional(Schema.NullOr(Schema.String)),
   timing: Timing,
-  took_us: Schema.optional(Schema.NullOr(Schema.Int)),
+  took_us: Schema.optional(Schema.NullOr(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)))),
   tool: Schema.String,
 }).annotate({ identifier: "Call" });
 export type Call = typeof Call.Type;
@@ -3363,7 +3362,7 @@ export const Note = Schema.Union([
   Schema.Struct({
     discarded: Schema.Struct({
       at: Seq,
-      count: Schema.Int,
+      count: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
     }),
   }),
   Schema.Struct({
@@ -3386,10 +3385,10 @@ export type Note = typeof Note.Type;
 export const Used = Schema.Struct({
   cache_write: Schema.optional(Schema.NullOr(Tokens)),
   cached: Schema.optional(Schema.NullOr(Tokens)),
-  first_us: Schema.optional(Schema.NullOr(Schema.Int)),
+  first_us: Schema.optional(Schema.NullOr(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)))),
   input: Tokens,
   output: Tokens,
-  took_us: Schema.optional(Schema.NullOr(Schema.Int)),
+  took_us: Schema.optional(Schema.NullOr(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)))),
 }).annotate({ identifier: "Used" });
 export type Used = typeof Used.Type;
 
@@ -3401,7 +3400,7 @@ export const Turn = Schema.Struct({
   first_at: Schema.optional(Schema.NullOr(TimeMs)),
   model: Schema.optional(Schema.NullOr(Schema.String)),
   notes: Schema.Array(Note),
-  number: Schema.Int,
+  number: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   opened: Seq,
   returned: Schema.optional(Schema.NullOr(TimeMs)),
   said: Schema.optional(Schema.NullOr(Schema.String)),
@@ -3502,7 +3501,7 @@ export const SessionLine = Schema.Struct({
   model: Schema.optional(Schema.NullOr(Schema.String)),
   name: Schema.optional(Schema.NullOr(Schema.String)),
   preview: Schema.optional(Schema.NullOr(Schema.String)),
-  runs: Schema.Int,
+  runs: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   start: SessionStart,
   workspace: Schema.optional(Schema.NullOr(Schema.String)),
 }).annotate({ identifier: "SessionLine" });
@@ -3514,7 +3513,7 @@ export type SessionLine = typeof SessionLine.Type;
  * for.
  */
 export const SessionsAnswer = Schema.Struct({
-  earlier: Schema.Int,
+  earlier: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   room: Address,
   sessions: Schema.Array(SessionLine),
 }).annotate({ identifier: "SessionsAnswer" });
@@ -3524,8 +3523,8 @@ export type SessionsAnswer = typeof SessionsAnswer.Type;
  * One interpreter's shell lines that ended with a code.
  */
 export const ShellCalls = Schema.Struct({
-  calls: Schema.Int,
-  failures: Schema.Record(Schema.String, Schema.Int),
+  calls: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  failures: Schema.Record(Schema.String, Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))),
   interpreter: Schema.String,
 }).annotate({ identifier: "ShellCalls" });
 export type ShellCalls = typeof ShellCalls.Type;
@@ -3595,7 +3594,7 @@ export const SkillShelf = Schema.Union([
   }),
   Schema.Struct({
     external: Schema.Struct({
-      index: Schema.Int,
+      index: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
       path: Schema.String,
     }),
   }),
@@ -3843,7 +3842,7 @@ export type VersionSource = typeof VersionSource.Type;
  * One version, and where the city learnt of it.
  */
 export const DocumentVersion = Schema.Struct({
-  bytes: Schema.optional(Schema.NullOr(Schema.Int)),
+  bytes: Schema.optional(Schema.NullOr(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)))),
   kept: Schema.Boolean,
   source: VersionSource,
   version: B3Hash,
@@ -4048,7 +4047,7 @@ export type Answer = typeof Answer.Type;
  * The asking side's own number for one question, minted monotonically
  * per connection and echoed on the answer.
  */
-export const AskId = Schema.Int.pipe(Schema.brand("AskId"));
+export const AskId = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)).pipe(Schema.brand("AskId"));
 export type AskId = typeof AskId.Type;
 
 /**
@@ -4098,20 +4097,20 @@ export const Query = Schema.Union([
   Schema.Struct({
     history: Schema.Struct({
       before: Schema.optional(Schema.NullOr(Seq)),
-      limit: Schema.Int,
+      limit: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
     }),
   }),
   Schema.Struct({
     run_history: Schema.Struct({
       before: Schema.optional(Schema.NullOr(Seq)),
-      limit: Schema.Int,
+      limit: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
       run: RunId,
     }),
   }),
   Schema.Struct({
     history_range: Schema.Struct({
       from: Seq,
-      limit: Schema.Int,
+      limit: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
       to: Seq,
     }),
   }),
@@ -4242,7 +4241,7 @@ export const Query = Schema.Union([
     commits: Schema.Struct({
       before: Schema.optional(Schema.NullOr(Seq)),
       building: Schema.optional(Schema.NullOr(Address)),
-      limit: Schema.Int,
+      limit: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
     }),
   }),
   Schema.Literal("doctor"),
@@ -4323,7 +4322,7 @@ export type Ask = typeof Ask.Type;
  * of how often it sends a reading (§8-47i). Only a beat inside
  * [`BEAT_MIN_MS`]`..=`[`BEAT_MAX_MS`] can be made, on the wire as off it.
  */
-export const BeatMs = Schema.Int.pipe(Schema.brand("BeatMs"));
+export const BeatMs = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)).pipe(Schema.brand("BeatMs"));
 export type BeatMs = typeof BeatMs.Type;
 
 /**
@@ -4385,7 +4384,7 @@ export type DoorAnswer = typeof DoorAnswer.Type;
  */
 export const DoorOpening = Schema.Struct({
   idem: IdemKey,
-  lasting_ms: Schema.Int,
+  lasting_ms: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
 }).annotate({ identifier: "DoorOpening" });
 export type DoorOpening = typeof DoorOpening.Type;
 
@@ -4422,12 +4421,12 @@ export type HeaderPair = typeof HeaderPair.Type;
 export const EndpointTuning = Schema.Struct({
   headers: Schema.Array(HeaderPair),
   label: Schema.optional(Schema.NullOr(Schema.String)),
-  max_in_flight: Schema.optional(Schema.NullOr(Schema.Int)),
+  max_in_flight: Schema.optional(Schema.NullOr(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)))),
   overrides: Schema.Array(BodyOverride),
   proxying: Schema.optional(Schema.NullOr(Proxying)),
-  request_max_retries: Schema.optional(Schema.NullOr(Schema.Int)),
-  stream_idle_timeout_ms: Schema.optional(Schema.NullOr(Schema.Int)),
-  timeout_ms: Schema.optional(Schema.NullOr(Schema.Int)),
+  request_max_retries: Schema.optional(Schema.NullOr(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)))),
+  stream_idle_timeout_ms: Schema.optional(Schema.NullOr(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)))),
+  timeout_ms: Schema.optional(Schema.NullOr(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)))),
 }).annotate({ identifier: "EndpointTuning" });
 export type EndpointTuning = typeof EndpointTuning.Type;
 
@@ -4548,7 +4547,7 @@ export type Verdict = typeof Verdict.Type;
  * card counted from zero.
  */
 export const SliceVerdict = Schema.Struct({
-  slice: Schema.Int,
+  slice: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   verdict: Verdict,
 }).annotate({ identifier: "SliceVerdict" });
 export type SliceVerdict = typeof SliceVerdict.Type;
@@ -4719,7 +4718,7 @@ export const Command = Schema.Union([
   Schema.Struct({
     configure_building: Schema.Struct({
       addr: Address,
-      context_second_threshold: Schema.optional(Schema.NullOr(Schema.Int)),
+      context_second_threshold: Schema.optional(Schema.NullOr(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)))),
       desktop: Schema.optional(Schema.NullOr(Schema.String)),
       idem: IdemKey,
       mcp: Schema.optional(Schema.NullOr(Schema.Array(McpServer))),
@@ -4968,7 +4967,7 @@ export type Command = typeof Command.Type;
 export const Hello = Schema.Struct({
   schema: B3Hash,
   token: Schema.optional(Schema.NullOr(Schema.String)),
-  wire_v: Schema.Int,
+  wire_v: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
 }).annotate({ identifier: "Hello" });
 export type Hello = typeof Hello.Type;
 
@@ -5103,22 +5102,22 @@ export type LogLine = typeof LogLine.Type;
  * it travels on the wire (`crates/sprawling/Spec.lean` §8-94, §8-129-6).
  */
 export const Sample = Schema.Struct({
-  beat_ms: Schema.Int,
-  core_cpu_permille: Schema.Int,
-  core_private_bytes: Schema.Int,
-  core_read_bytes: Schema.Int,
-  core_working_set_bytes: Schema.Int,
-  core_written_bytes: Schema.Int,
-  durable_lag: Schema.Int,
-  event_to_screen_p50_nanos: Schema.Int,
-  ledger_queue_depth: Schema.Int,
-  machine_available_bytes: Schema.Int,
-  machine_cpu_permille: Schema.Int,
-  queued_runs: Schema.Int,
-  read_nanos: Schema.Int,
-  relay_p50_nanos: Schema.Int,
-  view_backlog: Schema.Int,
-  volume_free_bytes: Schema.Int,
+  beat_ms: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  core_cpu_permille: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  core_private_bytes: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  core_read_bytes: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  core_working_set_bytes: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  core_written_bytes: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  durable_lag: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  event_to_screen_p50_nanos: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  ledger_queue_depth: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  machine_available_bytes: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  machine_cpu_permille: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  queued_runs: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  read_nanos: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  relay_p50_nanos: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  view_backlog: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  volume_free_bytes: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
 }).annotate({ identifier: "Sample" });
 export type Sample = typeof Sample.Type;
 
@@ -5130,7 +5129,7 @@ export const Welcome = Schema.Struct({
   epoch: Schema.optional(Schema.NullOr(B3Hash)),
   resume_from: Schema.optional(Schema.NullOr(Seq)),
   schema: B3Hash,
-  wire_v: Schema.Int,
+  wire_v: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
 }).annotate({ identifier: "Welcome" });
 export type Welcome = typeof Welcome.Type;
 

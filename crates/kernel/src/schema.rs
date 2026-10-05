@@ -24,9 +24,9 @@ use std::borrow::Cow;
 use schemars::{JsonSchema, Schema, SchemaGenerator};
 use serde_json::Value;
 
+use crate::ContainerImage;
 use crate::address::{Address, SESSION_NAME_MAX, SessionName};
 use crate::error::AxCode;
-use crate::ContainerImage;
 use crate::idem::IdemKey;
 use crate::locator::{B3Hash, GitOid, Locator};
 use crate::tool::ServerLabel;
