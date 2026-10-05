@@ -511,6 +511,22 @@ jobs:
           # the exit code is recorded rather than judged; a report that says
           # nothing is the failure.
           test -s "${{ steps.fresh.outputs.dir }}/logs/doctor.out"
+      - name: the acceptance walk includes its served-client step
+        shell: bash
+        run: |
+          set -euo pipefail
+          contract="$RUNNER_TEMP/served-client-contract.lean"
+          cat > "$contract" <<'LEAN'
+          import Sprawling.Acceptance.Walk
+          open Sprawling.Acceptance
+          def main : IO Unit := do
+            let setting : Setting :=
+              { door := { binary := "" }, url := "", shelf := "", skills := [], script := "", record := "" }
+            unless (firstDay setting).any (fun step => step.name == clientDelivered.name) do
+              throw <| IO.userError "the archive acceptance does not walk its served-client step"
+          LEAN
+          ! command -v cygpath > /dev/null 2>&1 || contract="$(cygpath -m "$contract")"
+          lake env lean --run "$contract"
       - name: the walk from the archive to the first dispatch
         shell: bash
         run: |
