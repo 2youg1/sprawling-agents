@@ -51,7 +51,7 @@ It is built for small teams who want agents to keep running fixed work, and for 
 
 A git checkout builds with `just dist`, because a plain `cargo build` embeds a blank page until `just build-web` has built it. [`docs/getting-started.md`](docs/getting-started.md) ([中文](docs/getting-started.zh-CN.md)) is the full guide, from an empty directory to a reviewed merge on your branch.
 
-On Linux x86-64 with Nix, enable `nix-command` and `flakes`, then run from a checkout of the tag or commit you want:
+On Linux x86-64 with Nix, enable `nix-command` and `flakes`, then run from a checkout whose flake provides the application output (`packages.default`):
 
 ```bash
 nix build .#default --no-update-lock-file

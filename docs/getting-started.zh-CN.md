@@ -159,7 +159,7 @@ gh attestation verify sprawling-<version>-<platform>.zip --repo 2youg1/sprawling
 
 ### 用 Nix
 
-Linux x86-64 上可以用 Nix 从本仓库构建完整应用。启用 Nix 的 `nix-command` 和 `flakes`，先检出你要运行的已发布 tag 或 commit，再构建：
+Linux x86-64 上可以用 Nix 从本仓库构建完整应用。启用 Nix 的 `nix-command` 和 `flakes`，先检出 flake 已提供应用输出（`packages.default`）的 tag 或 commit，再构建：
 
 ```bash
 nix build .#default --no-update-lock-file
