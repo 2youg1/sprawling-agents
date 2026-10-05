@@ -18,7 +18,7 @@
   import { ui } from "../../ui";
   import type { RegistryNewest, ReleaseAnswer, UpdateHint } from "../../wire";
   import Copy from "../machine/copy.svelte";
-  import { registryLineOf, updateOf } from "./reading";
+  import { confirmedCommand, registryLineOf, updateOf } from "./reading";
 
   interface Props {
     readonly answer: ReleaseAnswer;
@@ -58,11 +58,11 @@
 
 {#snippet update(hint: UpdateHint)}
   {@const how = updateOf(hint)}
-  {@const command = how.command ?? (selection.answer === answer ? hint.alternatives.find((each) => each === selection.command) ?? null : null)}
+  {@const command = how.command ?? (selection.answer === answer ? confirmedCommand(hint, selection.command) : null)}
   <div class="flex min-w-0 flex-col gap-tight">
     <span class="text-note text-text-quiet">{say($lang, how.channel)}</span>
     {#if hint.alternatives.length > 0}
-      <select aria-label={say($lang, "release_channel_confirm")} class="h-control min-w-0 rounded-control bg-raised px-snug text-note text-text" value={selection.answer === answer ? selection.command ?? "" : ""} onchange={(event) => { selection = { answer, command: hint.alternatives.find((each) => each === event.currentTarget.value) ?? null }; }}>
+      <select aria-label={say($lang, "release_channel_confirm")} class="h-control min-w-0 rounded-control bg-raised px-snug text-note text-text" value={selection.answer === answer ? selection.command ?? "" : ""} onchange={(event) => { selection = { answer, command: confirmedCommand(hint, event.currentTarget.value) }; }}>
         <option value="">{say($lang, "release_channel_confirm")}</option>
         {#each hint.alternatives as choice (choice)}<option value={choice}>{choice}</option>{/each}
       </select>

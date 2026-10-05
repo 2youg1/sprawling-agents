@@ -57,3 +57,7 @@ export interface Update {
 export function updateOf(hint: UpdateHint): Update {
   return { channel: CHANNEL[hint.channel], command: hint.command ?? null };
 }
+
+export function confirmedCommand(hint: UpdateHint, requested: string | null): string | null {
+  return hint.alternatives.find((command) => command === requested) ?? null;
+}
