@@ -304,14 +304,12 @@ fn disclosure(setup: &ExecSetup, confinement: &Confined) -> String {
     )
 }
 
-/// The result shape is owned by `outcome`.
 mod outcome;
 
 use outcome::{
     backgrounded, exceptional, settled, with_backlog, with_environment, with_interpreter,
 };
 
-/// The refusal the Python arm gives when asked for a host interpreter.
 fn no_host_python() -> AxError {
     AxError::failure(
         AxCode::SandboxDenied,
