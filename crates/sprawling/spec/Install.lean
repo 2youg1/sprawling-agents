@@ -219,7 +219,10 @@ pub(crate) fn install(uninstall: bool) -> Result<Report, AxError>;
 不声明第二个目录。Cargo 用同一钉住的 Rust 的 `makeRustPlatform.buildRustPackage`，默认 features
 包含 sandbox。`just` 仅执行显式客户端命令，其 nixpkgs setup hook 不选择
 默认构建、检查或安装阶段，三个阶段由 Rust builder 的 Cargo hooks 持有。打包前要求生成的嵌入表声明 `CLIENT_COMPLETE = true`，否则构建退出非零并要求恢复
-客户端构建步骤。安装后的 skills 与许可证在包的 share 目录，skills 来源与目录名读既有归档权威
+客户端构建步骤。应用名称与 Cargo 选包参数读应用 Cargo 清单，主程序读其 bin 声明（没有声明时用 Cargo 的包名默认）。
+安装资源与许可文档的相对目录在包定义各声明一次，由 passthru 暴露给验收归档组装；
+Nix 许可由工作区 Cargo 的 SPDX 声明解析，未知标识或复合表达式必须拒绝求值。
+安装后的 skills 与许可证在包的 share 目录，skills 来源与目录名读既有归档权威
 `tools/xtask/src/package/contents.rs`，首次起城的模板与 skills 仍由 city 的构建脚本嵌入。
 下载 integrity 不符、锁解析失败、客户端构建失败或 Rust 编译失败均让 derivation 失败，不能交出
 占位页作为完整包；修复原锁、源文件或构建依赖后重建，不改变依赖版本来掩盖失败。
@@ -227,7 +230,8 @@ pub(crate) fn install(uninstall: bool) -> Result<Report, AxError>;
 验收：`nix build .#default --print-build-logs` 在网络沙箱内构建完整包；`nix flake check`
 保留工具链与 devshell 检查。`platforms.yml` 的 Nix 作业用包内二进制及 skills 驱动既有 Lean
 acceptance，检查首次起城、真实客户端 HTTP 与其脚本和样式、skill 读取、派活、历史恢复。
-`status` 核对清单版本，仅帮助文字或文件存在不构成应用验收。缺客户端的编译嵌入表必须被打包步骤拒绝。
+Lean acceptance 的 version 命令通过 Door 运行 `status`，核对调用者从 Cargo 读取的名称与版本；
+workflow 只组装归档、读取期望值和调用检查器，不自行断言产品输出。仅帮助文字或文件存在不构成应用验收。缺客户端的编译嵌入表必须被打包步骤拒绝。
 
 被否：继续只交出占位页的开发运行；另写 Bun 下载器或手工维护 Nix 依赖锁；每次 release 自建
 跨仓库更新机器人。自有 flake 随 tag 可取用不等于 nixpkgs 已收录，上游更新允许延迟并复用其通用

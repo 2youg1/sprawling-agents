@@ -31,6 +31,14 @@ id 怎样从正文里读出来——那一半在 citysim 的 Rust 里，由它�
 恢复是补齐验收环境或重建完整应用。现有首次起城、skills 与历史恢复步骤继续走同一 acceptance。
 -/
 
+/-! ## 安装后版本的验收接口
+
+本段是环境接口说明，不是证明。`acceptance version <name> <version>` 经 Door 运行
+调用者指定的二进制 `status`，要求退出零且输出首行以 `<name> <version> (` 开头。
+名称与版本由调用者读取待验源码的 Cargo 清单，不在检查器定义发行版本或成熟度。
+缺二进制、命令失败、输出不符均退出非零并说明失败，后续 walk 不运行。
+-/
+
 namespace Adversary.Acceptance
 
 /-- 一个请求带回来的东西：一个脚本 id 都没带，或它最近拿到的是第 `run` 个 run 的第 `reply` 条。 -/
