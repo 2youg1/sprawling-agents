@@ -3169,7 +3169,7 @@
   },
   "sandbox_arm_python": {
       "en": "Python WASI",
-      "zh": "Python WASI"
+      "zh": "Python WASI 沙箱"
   },
   "sandbox_arm": {
     "en": "Execution boundary",

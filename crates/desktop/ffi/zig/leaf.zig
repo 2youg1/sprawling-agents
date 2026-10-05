@@ -370,4 +370,6 @@ test "a null window is refused before any context is taken" {
     try std.testing.expectEqual(Step.NoWindow, capture(null, 2, 2, &into).step);
 }
 
-comptime { _ = @import("confinement.zig"); }
+comptime {
+    _ = @import("confinement.zig");
+}

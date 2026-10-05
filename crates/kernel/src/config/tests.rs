@@ -88,7 +88,7 @@ fn the_sandbox_resolves_as_one_value_so_a_thin_layer_only_narrows() {
         shell: true,
         interpreter: Interpreter::Pwsh,
         fuel: 10,
-        mounts: vec![Address::parse("lab/docs").unwrap()],
+        mounts: vec![crate::Address::parse("lab/docs").unwrap()],
         env_passthrough: vec![EnvVarName::parse("ProgramFiles").unwrap()],
         trusted: Vec::new(),
         container: None,
