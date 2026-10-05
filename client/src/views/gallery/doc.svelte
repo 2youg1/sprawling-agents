@@ -51,12 +51,28 @@
       {
         stands: {
           mine: MINE,
+          newest: NEWEST,
           verdict: "behind",
           registries: [
             { registry: "npm", reading: { read: { newest: NEWEST } } },
             { registry: "crates_io", reading: { read: { newest: NEWEST } } },
           ],
-          update: { channel: "npm", command: "npm install -g sprawling@latest" },
+          update: { alternatives: [], channel: "npm", command: "npm install -g sprawling@latest" },
+        },
+      },
+    ],
+    [
+      "behind · Cargo operand differs from npm",
+      {
+        stands: {
+          mine: MINE,
+          newest: { version: "1.0.0", released: "" },
+          verdict: "behind",
+          registries: [
+            { registry: "npm", reading: { read: { newest: NEWEST } } },
+            { registry: "crates_io", reading: { read: { newest: { version: "1.0.0", released: "" } } } },
+          ],
+          update: { alternatives: ["cargo install sprawling --locked", "cargo binstall sprawling --locked"], channel: "cargo_or_binstall", command: null },
         },
       },
     ],
@@ -65,12 +81,13 @@
       {
         stands: {
           mine: NEWEST,
+          newest: NEWEST,
           verdict: "current",
           registries: [
             { registry: "npm", reading: { read: { newest: NEWEST } } },
             { registry: "crates_io", reading: { read: { newest: NEWEST } } },
           ],
-          update: { channel: "cargo", command: "cargo install sprawling --locked" },
+          update: { alternatives: [], channel: "cargo", command: "cargo install sprawling --locked" },
         },
       },
     ],
@@ -82,7 +99,7 @@
             { registry: "npm", reading: { refused: { refusal: REFUSAL } } },
             { registry: "crates_io", reading: { refused: { refusal: REFUSAL } } },
           ],
-          update: { channel: "source" },
+          update: { alternatives: [], channel: "source" },
         },
       },
     ],

@@ -5,7 +5,7 @@
 
 import { describe, expect, test } from "bun:test";
 import type { AxError, InstallChannel, RegistryNewest } from "../../wire";
-import { npmNewest, registryLineOf, updateOf } from "./reading";
+import { registryLineOf, updateOf } from "./reading";
 
 const NEWEST = { version: "0.0.9", released: "2026-10-02" };
 
@@ -30,26 +30,18 @@ describe("registryLineOf", () => {
     ]);
   });
 
-  test("the verdict's version is npm's, whatever crates.io read", () => {
-    expect(
-      npmNewest([
-        { registry: "crates_io", reading: { read: { newest: { version: "9.9.9", released: "x" } } } },
-        { registry: "npm", reading: { read: { newest: NEWEST } } },
-      ]),
-    ).toEqual(NEWEST);
-    expect(npmNewest([{ registry: "npm", reading: { refused: { refusal } } }])).toBeNull();
-  });
+
 });
 
 describe("updateOf", () => {
   test("every channel has its sentence, and the command is the city's", () => {
     const channels: InstallChannel[] = ["npm", "cargo", "archive", "source"];
-    expect(channels.map((channel) => updateOf({ channel, command: channel === "source" ? null : `update ${channel}` }))).toEqual([
+    expect(channels.map((channel) => updateOf({ alternatives: [], channel, command: channel === "source" ? null : `update ${channel}` }))).toEqual([
       { channel: "release_channel_npm", command: "update npm" },
       { channel: "release_channel_cargo", command: "update cargo" },
       { channel: "release_channel_archive", command: "update archive" },
       { channel: "release_channel_source", command: null },
     ]);
-    expect(updateOf({ channel: "npm" })).toEqual({ channel: "release_channel_npm", command: null });
+    expect(updateOf({ alternatives: [], channel: "npm" })).toEqual({ channel: "release_channel_npm", command: null });
   });
 });

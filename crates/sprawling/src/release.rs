@@ -2,144 +2,54 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
-
-//! Which release this binary is, and which release the registry offers.
-//!
-//! **Nothing here runs unless a person asks.** No timer, no first-run
-//! probe, no check folded into another command: `status` reads what is
-//! compiled in and touches no socket, and only `status --check` calls
-//! out. `QUICKSTART.md` opens by promising that nothing was installed
-//! and nothing outside the folder was written, and a binary that phoned
-//! a registry on its own schedule would be breaking that sentence for a
-//! question nobody asked.
-//!
-//! **Nothing here updates anything either.** Where a binary lives
-//! belongs to whoever installed it - `sprawling install` owns the
-//! archive path, npm and bun own theirs (`tools/xtask/src/channel/shim.js`) - so this
-//! reports and stops. The answer names the command to run, which keeps
-//! the person who chose an install channel in charge of it.
-//!
-//! **The registry is the source, not GitHub.** Every release of this
-//! project is a pre-release, and `GET /repos/{owner}/{repo}/releases/latest`
-//! excludes pre-releases by design: it answers 404 for this repository
-//! today and would answer with a stale release the day one is promoted.
-//! npm's `latest` dist-tag is what `bunx sprawling` resolves, so asking
-//! it is asking the question a person actually has.
-
+//! Manual checks: install origin selects the registry, comparison operand and updater.
+//! Specified by `crates/wire/spec/Answer/Release.lean` and `crates/sprawling/spec/Install.lean`.
 use kernel::release::Version;
 use kernel::{AxCode, AxError, Proxying, Reach, Release};
 use wire::{InstallChannel, Registry, RegistryNewest, RegistryReading};
 use wire::{ReleaseAnswer, ReleaseLine, UpdateHint};
-
-/// The root package `release.yml` publishes, and the name `bunx
-/// sprawling` resolves. Its `latest` dist-tag is the newest release by
-/// definition, because the publish step passes `--tag latest` for every
-/// release this project makes.
 const LATEST_URL: &str = "https://registry.npmjs.org/sprawling/latest";
-
-/// The crate `release.yml` publishes to crates.io, the one `cargo
-/// install sprawling` resolves.
 const CRATES_URL: &str = "https://crates.io/api/v1/crates/sprawling";
-
-/// The client both registries are asked as. crates.io refuses a request
-/// whose User-Agent does not name the program making it, and npm reads
-/// the same header without requiring it.
-const USER_AGENT: &str = concat!(
-    "sprawling/",
-    env!("CARGO_PKG_VERSION"),
-    " (https://github.com/2youg1/sprawling-agents)"
-);
-
-/// Where every archive is, whether or not npm could be reached. The one
-/// answer that is useful when this command cannot give its own.
-const RELEASES: &str = "https://github.com/2youg1/sprawling-agents/releases";
-
-/// The command that updates a binary npm or bun installed, printed and
-/// never run (`crates/wire/spec/Answer/Release.lean` D24).
+/// The marker the archive installer places beside its binary.
+pub const ARCHIVE_ORIGIN_FILE: &str = ".sprawling-archive-origin";
+const USER_AGENT: &str = concat!("sprawling/", env!("CARGO_PKG_VERSION"));
+const RELEASES: &str = concat!(env!("CARGO_PKG_REPOSITORY"), "/releases");
 const NPM_UPDATE: &str = "npm install -g sprawling@latest";
-
-/// The command that updates a binary cargo installed. `cargo binstall`
-/// puts its binary in the same directory and is answered the same way,
-/// because the path cannot tell the two apart and this command updates
-/// either.
+const BUN_UPDATE: &str = "bun install -g sprawling@latest";
+const BINSTALL_UPDATE: &str = "cargo binstall sprawling";
 const CARGO_UPDATE: &str = "cargo install sprawling --locked";
-
-/// A directory a release archive carries beside the binary, and no
-/// other install channel does (`tools/xtask/src/package/contents.rs`).
 const ARCHIVE_SIBLING: &str = "skills";
-
-/// One version manifest is a few hundred bytes, so a reader waiting on
-/// it has either been answered or is not going to be. Long enough for a
-/// slow link, short enough that a blocked network is a pause rather than
-/// something a person kills.
+const RELEASE_PAGE_SIZE: usize = 100;
 const PATIENCE: std::time::Duration = std::time::Duration::from_secs(10);
-
-/// Whether this binary came out of a release, and which one.
-///
-/// Two states rather than an `Option<Release>`, because the absent case
-/// is a fact about the build rather than a missing value: a binary built
-/// from a working tree has no release to compare, and reporting it as
-/// out of date would be answering a question about a different binary.
+/// Build identity; source builds carry no invented release tag.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Built {
     /// Built by the release workflow, from this tag.
     Released(Release),
-    /// Built from a working tree. `cargo build` sets no tag, and this is
-    /// what that absence means.
+    /// Compiled without a release tag, including Cargo source installations.
     FromSource,
 }
 
-/// What this binary was built as.
-///
-/// The tag arrives through `SPRAWLING_RELEASE_TAG`, which only
-/// `release.yml` sets; `build.rs` declares the variable so cargo rebuilds
-/// when it changes rather than serving a cached binary that names the
-/// previous release.
-///
+/// Reads the build tag.
 /// # Errors
-/// When a tag was set and does not name a release of this version. That
-/// is a mislabelled build, and it fails here rather than telling every
-/// reader the wrong thing about what they are running.
+/// Refuses a tag that disagrees with the Cargo version or maturity.
 pub fn built() -> Result<Built, AxError> {
     match option_env!("SPRAWLING_RELEASE_TAG") {
         None => Ok(Built::FromSource),
-        // An empty value is what a workflow sets when the variable is
-        // referenced in a context that has no tag, and it means the same
-        // as never having set it.
         Some("") => Ok(Built::FromSource),
         Some(tag) => Release::from_tag(tag, env!("CARGO_PKG_VERSION")).map(Built::Released),
     }
 }
 
-/// The newest release npm offers.
-///
-/// # Errors
-/// When the registry cannot be reached, answers something other than a
-/// version manifest, or names a version this project did not publish.
-/// The recovery carries the staged reading, so a person behind a proxy
-/// is told where the call stopped rather than that it "failed".
-pub fn newest() -> Result<Release, AxError> {
-    npm_newest(LATEST_URL)
-}
-
-/// npm's `latest` manifest at `url`, read as a release.
 fn npm_newest(url: &str) -> Result<Release, AxError> {
     Release::from_npm_version(&manifest_field(url, &["version"])?)
 }
 
-/// The newest version crates.io offers at `url`. `max_version` is the
-/// highest version the crate carries, and every version this project
-/// uploads is a bare `x.y.z`, so it is the newest release
-/// (`crates/kernel/spec/Release.lean` §8-54-1).
 fn crates_newest(url: &str) -> Result<Version, AxError> {
     Version::from_crates_version(&manifest_field(url, &["crate", "max_version"])?)
 }
 
-/// One string out of the JSON document at `url`, found by walking
-/// `path`. One field rather than a shape that would have to be revised
-/// whenever a registry adds another: this asks which version is newest
-/// and nothing else.
-fn manifest_field(url: &str, path: &[&str]) -> Result<String, AxError> {
+fn manifest(url: &str) -> Result<serde_json::Value, AxError> {
     let client = gateway::client_for(Proxying::ExceptLocal, url)
         .timeout(PATIENCE)
         .user_agent(USER_AGENT)
@@ -163,7 +73,7 @@ fn manifest_field(url: &str, path: &[&str]) -> Result<String, AxError> {
                 )),
         );
     }
-    let body: serde_json::Value = response.json().map_err(|err| {
+    response.json().map_err(|err| {
         AxError::failure(
             AxCode::ToolUnavailable,
             "read the registry's answer",
@@ -173,7 +83,11 @@ fn manifest_field(url: &str, path: &[&str]) -> Result<String, AxError> {
             "the registry answered something other than a version manifest; \
              a proxy that returns a login page does this",
         )
-    })?;
+    })
+}
+
+fn manifest_field(url: &str, path: &[&str]) -> Result<String, AxError> {
+    let body = manifest(url)?;
     path.iter()
         .try_fold(&body, |at, key| at.get(key))
         .and_then(serde_json::Value::as_str)
@@ -188,10 +102,40 @@ fn manifest_field(url: &str, path: &[&str]) -> Result<String, AxError> {
         })
 }
 
-/// Where the call stopped, as the vocabulary the endpoint page already
-/// uses. Costs a second request and only on the failure path, which is
-/// the path where "it did not work" is not an answer a person can act
-/// on.
+struct GithubRelease {
+    cut: Release,
+    tag: String,
+}
+
+fn github_newest(url: &str) -> Result<GithubRelease, AxError> {
+    let body = manifest(&format!("{url}?per_page={RELEASE_PAGE_SIZE}"))?;
+    let releases = body
+        .as_array()
+        .ok_or_else(|| registry_refused(url, "expected a release list"))?;
+    for release in releases {
+        if release.get("draft").and_then(serde_json::Value::as_bool) == Some(true) {
+            continue;
+        }
+        let tag = release
+            .get("tag_name")
+            .and_then(serde_json::Value::as_str)
+            .ok_or_else(|| registry_refused(url, "a published release has no tag_name"))?;
+        return Release::from_published_tag(tag).map(|cut| GithubRelease {
+            cut,
+            tag: tag.to_owned(),
+        });
+    }
+    Err(registry_refused(
+        url,
+        "no published release is available; select a fixed tag from the release page",
+    ))
+}
+
+fn registry_refused(url: &str, recovery: &str) -> AxError {
+    AxError::failure(AxCode::ToolUnavailable, "read the release registry", url)
+        .with_recovery(recovery)
+}
+
 fn stopped(client: &reqwest::blocking::Client, url: &str) -> AxError {
     let Reach {
         host,
@@ -207,7 +151,6 @@ fn stopped(client: &reqwest::blocking::Client, url: &str) -> AxError {
     ))
 }
 
-/// One release, as the two strings a page and a terminal both print.
 fn line(release: &Release) -> ReleaseLine {
     ReleaseLine {
         version: release.npm_version(),
@@ -215,9 +158,6 @@ fn line(release: &Release) -> ReleaseLine {
     }
 }
 
-/// crates.io's version as a line. `released` is empty because the
-/// registry's version carries no date, and the city does not make one up
-/// (`crates/wire/spec/Answer/Release.lean`).
 fn crates_line(version: &Version) -> ReleaseLine {
     ReleaseLine {
         version: version.to_string(),
@@ -225,26 +165,21 @@ fn crates_line(version: &Version) -> ReleaseLine {
     }
 }
 
-/// Where each registry is asked. Production asks the two public ones; a
-/// test points both at a loopback stand-in.
 struct Registries<'a> {
     npm: &'a str,
     crates: &'a str,
+    github: &'a str,
 }
 
-/// Both readings, taken and judged.
-///
-/// **One authority for the whole check.** `status --check` and
-/// [`Query::NewestRelease`](wire::Query::NewestRelease) render the same value,
-/// so the terminal and the page cannot come to different conclusions
-/// about one binary.
-///
-/// Never fails: a check that could not be made is an answer a person
-/// has to see, and returning it as an error would let a caller drop it
-/// and draw nothing. What this binary is, is read first, so a
-/// mislabelled build is reported without a request nobody can use.
+/// Reads registries only on request; returns the selected comparison or a refusal.
 #[must_use]
 pub fn answer() -> ReleaseAnswer {
+    let github = format!(
+        "https://api.github.com/repos/{}/releases",
+        env!("CARGO_PKG_REPOSITORY")
+            .trim_start_matches("https://github.com/")
+            .trim_end_matches('/')
+    );
     match built() {
         Ok(mine) => judged(
             mine,
@@ -252,19 +187,17 @@ pub fn answer() -> ReleaseAnswer {
             &Registries {
                 npm: LATEST_URL,
                 crates: CRATES_URL,
+                github: &github,
             },
         ),
         Err(refusal) => ReleaseAnswer::Refused { refusal },
     }
 }
 
-/// Asks both registries and judges `mine` against the one its install
-/// channel updates from (`crates/wire/spec/Answer/Release.lean`): a binary
-/// cargo installed against crates.io, every other one against npm. When
-/// that registry cannot be read the whole answer is that refusal.
 fn judged(mine: Built, installed: InstallChannel, at: &Registries<'_>) -> ReleaseAnswer {
     let npm = npm_newest(at.npm);
     let crates = crates_newest(at.crates);
+    let github = github_newest(at.github);
     let registries = vec![
         RegistryNewest {
             registry: Registry::Npm,
@@ -274,36 +207,85 @@ fn judged(mine: Built, installed: InstallChannel, at: &Registries<'_>) -> Releas
             registry: Registry::CratesIo,
             reading: reading(crates.as_ref().map(crates_line)),
         },
+        RegistryNewest {
+            registry: Registry::Github,
+            reading: reading(github.as_ref().map(|release| line(&release.cut))),
+        },
     ];
     let mine = match mine {
+        Built::FromSource
+            if matches!(
+                installed,
+                InstallChannel::Cargo | InstallChannel::Binstall | InstallChannel::CargoOrBinstall
+            ) =>
+        {
+            return match Version::from_crates_version(env!("CARGO_PKG_VERSION"))
+                .and_then(|mine| crates.map(|newest| (mine, newest)))
+            {
+                Ok((mine, newest)) => ReleaseAnswer::Stands {
+                    verdict: kernel::release::stands_on_versions(&mine, &newest),
+                    mine: crates_line(&mine),
+                    newest: crates_line(&newest),
+                    registries,
+                    update: hint(installed),
+                },
+                Err(refusal) => ReleaseAnswer::Refused { refusal },
+            };
+        }
         Built::FromSource => {
             return ReleaseAnswer::Unreleased {
                 registries,
-                update: hint(InstallChannel::Source),
+                update: hint(installed),
             };
         }
         Built::Released(mine) => mine,
     };
     let verdict = match installed {
-        InstallChannel::Cargo => {
-            crates.map(|newest| kernel::release::stands_on_crates(&mine, &newest))
+        InstallChannel::Cargo | InstallChannel::Binstall | InstallChannel::CargoOrBinstall => {
+            crates.map(|newest| {
+                (
+                    kernel::release::stands_on_crates(&mine, &newest),
+                    crates_line(&newest),
+                    hint(installed),
+                )
+            })
         }
-        InstallChannel::Npm | InstallChannel::Archive | InstallChannel::Source => {
-            npm.map(|newest| kernel::release::stands(&mine, &newest))
+        InstallChannel::Npm | InstallChannel::Bun | InstallChannel::Package => npm.map(|newest| {
+            (
+                kernel::release::stands(&mine, &newest),
+                line(&newest),
+                hint(installed),
+            )
+        }),
+        InstallChannel::Archive => github.map(|newest| {
+            let mut update = hint(installed);
+            update.command = Some(archive_command(ArchiveVersion::Tag(&newest.tag)));
+            (
+                kernel::release::stands(&mine, &newest.cut),
+                line(&newest.cut),
+                update,
+            )
+        }),
+        InstallChannel::Unknown | InstallChannel::Source => {
+            return ReleaseAnswer::Unconfirmed {
+                mine: line(&mine),
+                registries,
+                update: hint(InstallChannel::Unknown),
+            };
         }
     };
     match verdict {
-        Ok(verdict) => ReleaseAnswer::Stands {
+        Ok((verdict, newest, update)) => ReleaseAnswer::Stands {
+            newest,
             verdict,
             mine: line(&mine),
             registries,
-            update: hint(installed),
+            update,
         },
         Err(refusal) => ReleaseAnswer::Refused { refusal },
     }
 }
 
-/// One registry's answer as the page shows it.
 fn reading(read: Result<ReleaseLine, &AxError>) -> RegistryReading {
     match read {
         Ok(newest) => RegistryReading::Read { newest },
@@ -313,14 +295,16 @@ fn reading(read: Result<ReleaseLine, &AxError>) -> RegistryReading {
     }
 }
 
-/// How the running binary was installed, read from its own path.
-///
-/// A binary that cannot name its own path cannot say how it got there,
-/// so it is answered as one built from source: no command is printed
-/// rather than one for a channel this binary did not come through.
 fn this_channel() -> InstallChannel {
-    // cargo's own rule: `CARGO_HOME` when set, else `.cargo` under the
-    // home directory, whose reading `accounting::home` owns.
+    match std::env::var("SPRAWLING_INSTALL_CHANNEL").as_deref() {
+        Ok("npm") => return InstallChannel::Npm,
+        Ok("bun") => return InstallChannel::Bun,
+        Ok("cargo") => return InstallChannel::Cargo,
+        Ok("binstall") => return InstallChannel::Binstall,
+        Ok("archive") => return InstallChannel::Archive,
+        Ok("package") => return InstallChannel::Package,
+        Ok(_) | Err(_) => {}
+    }
     let cargo_home = match std::env::var_os("CARGO_HOME") {
         Some(set) => Some(std::path::PathBuf::from(set)),
         None => match accounting::home::Home::detect() {
@@ -335,11 +319,6 @@ fn this_channel() -> InstallChannel {
     }
 }
 
-/// The channel a binary at `exe` came through, on every platform by the
-/// same rule (`crates/wire/spec/Answer/Release.lean` D24): under a
-/// `node_modules`, bun's or npx's package cache is npm; in cargo's bin
-/// directory is cargo; beside the archive's `skills/` is the archive;
-/// anywhere else is a build nobody published.
 pub(crate) fn channel(
     exe: &std::path::Path,
     cargo_bin: Option<&std::path::Path>,
@@ -352,27 +331,75 @@ pub(crate) fn channel(
     });
     let dir = exe.parent();
     if packaged {
-        InstallChannel::Npm
+        InstallChannel::Package
     } else if cargo_bin.is_some() && dir == cargo_bin {
-        InstallChannel::Cargo
-    } else if dir.is_some_and(|dir| dir.join(ARCHIVE_SIBLING).is_dir()) {
+        InstallChannel::CargoOrBinstall
+    } else if dir.is_some_and(|dir| {
+        dir.join(ARCHIVE_SIBLING).is_dir() || dir.join(ARCHIVE_ORIGIN_FILE).is_file()
+    }) {
         InstallChannel::Archive
     } else {
         InstallChannel::Source
     }
 }
 
-/// The command a User runs to update a binary from `channel`.
-fn hint(channel: InstallChannel) -> UpdateHint {
-    let command = match channel {
-        InstallChannel::Npm => Some(NPM_UPDATE.to_owned()),
-        InstallChannel::Cargo => Some(CARGO_UPDATE.to_owned()),
-        InstallChannel::Archive => Some(format!(
-            "download the newest archive from {RELEASES}, then run `sprawling install` from it"
-        )),
-        InstallChannel::Source => None,
+enum ArchiveVersion<'a> {
+    Latest,
+    Tag(&'a str),
+}
+
+fn archive_command(version: ArchiveVersion<'_>) -> String {
+    let repo = RELEASES
+        .trim_start_matches("https://github.com/")
+        .trim_end_matches("/releases");
+    let (reference, set_sh, set_ps) = match version {
+        ArchiveVersion::Latest => ("main", String::new(), String::new()),
+        ArchiveVersion::Tag(tag) => (
+            tag,
+            format!("SPRAWLING_VERSION='{tag}' "),
+            format!("$env:SPRAWLING_VERSION='{tag}'; "),
+        ),
     };
-    UpdateHint { channel, command }
+    if cfg!(windows) {
+        format!(
+            "powershell -NoProfile -Command \"{set_ps}irm https://raw.githubusercontent.com/{repo}/{reference}/install.ps1 | iex\""
+        )
+    } else {
+        format!(
+            "curl -fsSL https://raw.githubusercontent.com/{repo}/{reference}/install.sh | {set_sh}sh"
+        )
+    }
+}
+
+fn hint(channel: InstallChannel) -> UpdateHint {
+    let (command, alternatives) = match channel {
+        InstallChannel::Npm => (Some(NPM_UPDATE.to_owned()), Vec::new()),
+        InstallChannel::Package => (None, vec![NPM_UPDATE.to_owned(), BUN_UPDATE.to_owned()]),
+        InstallChannel::Bun => (Some(BUN_UPDATE.to_owned()), Vec::new()),
+        InstallChannel::Cargo => (Some(CARGO_UPDATE.to_owned()), Vec::new()),
+        InstallChannel::CargoOrBinstall => (
+            None,
+            vec![CARGO_UPDATE.to_owned(), BINSTALL_UPDATE.to_owned()],
+        ),
+        InstallChannel::Binstall => (Some(BINSTALL_UPDATE.to_owned()), Vec::new()),
+        InstallChannel::Archive => (Some(archive_command(ArchiveVersion::Latest)), Vec::new()),
+        InstallChannel::Source => (None, Vec::new()),
+        InstallChannel::Unknown => (
+            None,
+            vec![
+                NPM_UPDATE.to_owned(),
+                BUN_UPDATE.to_owned(),
+                CARGO_UPDATE.to_owned(),
+                BINSTALL_UPDATE.to_owned(),
+                archive_command(ArchiveVersion::Latest),
+            ],
+        ),
+    };
+    UpdateHint {
+        channel,
+        command,
+        alternatives,
+    }
 }
 
 #[cfg(test)]
@@ -389,7 +416,6 @@ mod tests {
     use kernel::ReleaseVerdict;
     use std::io::{BufRead, BufReader, Write};
     use wire::{InstallChannel, ReleaseAnswer};
-
     /// A loopback stand-in for both registries: `/npm` answers npm's
     /// manifest, `/crates` crates.io's, every request closes its
     /// connection, and the User-Agent of each request is sent back to the
@@ -414,7 +440,9 @@ mod tests {
                     }
                     head.push(line);
                 }
-                let body = if head[0].contains("/crates") {
+                let body = if head[0].contains("/github") {
+                    r#"[{"tag_name":"v0.0.8-Alpha-261006","draft":false}]"#
+                } else if head[0].contains("/crates") {
                     crates
                 } else {
                     npm
@@ -454,11 +482,17 @@ mod tests {
         let at = Registries {
             npm: &npm,
             crates: &crates,
+            github: &format!("{base}/github"),
         };
         let mine =
             || Built::Released(kernel::Release::from_npm_version("0.0.8-pre.261002").unwrap());
         let verdict = |answer: ReleaseAnswer| match answer {
-            ReleaseAnswer::Stands { verdict, .. } => verdict,
+            ReleaseAnswer::Stands {
+                verdict,
+                newest,
+                update,
+                ..
+            } => (verdict, newest.version, update.command),
             other => panic!("not judged: {other:?}"),
         };
         assert_eq!(
@@ -466,13 +500,103 @@ mod tests {
                 verdict(judged(mine(), InstallChannel::Cargo, &at)),
                 verdict(judged(mine(), InstallChannel::Npm, &at)),
             ],
-            [ReleaseVerdict::Current, ReleaseVerdict::Behind]
+            [
+                (
+                    ReleaseVerdict::Current,
+                    "0.0.8".to_owned(),
+                    Some(super::CARGO_UPDATE.to_owned())
+                ),
+                (
+                    ReleaseVerdict::Behind,
+                    "0.0.8-pre.261005".to_owned(),
+                    Some(super::NPM_UPDATE.to_owned())
+                ),
+            ]
         );
         let agents: Vec<String> = seen.try_iter().collect();
-        assert_eq!(agents.len(), 4);
+        assert_eq!(agents.len(), 6);
         assert!(
             agents.iter().all(|agent| agent.starts_with("sprawling/")),
             "{agents:?}"
+        );
+    }
+
+    #[test]
+    fn each_origin_selects_its_own_registry_and_never_switches_updaters() {
+        let (base, _seen) = registries(
+            r#"{"version":"0.0.9-pre.261005"}"#,
+            r#"{"crate":{"max_version":"1.0.0"}}"#,
+        );
+        let at = Registries {
+            npm: &format!("{base}/npm"),
+            crates: &format!("{base}/crates"),
+            github: &format!("{base}/github"),
+        };
+        let mine =
+            || Built::Released(kernel::Release::from_npm_version("0.0.8-pre.261002").unwrap());
+        let read = |origin| match judged(mine(), origin, &at) {
+            ReleaseAnswer::Stands { newest, update, .. } => {
+                (newest.version, update.command, update.alternatives)
+            }
+            other => panic!("not judged: {other:?}"),
+        };
+        assert_eq!(
+            [
+                InstallChannel::Npm,
+                InstallChannel::Bun,
+                InstallChannel::Binstall,
+                InstallChannel::Archive,
+                InstallChannel::CargoOrBinstall,
+                InstallChannel::Package
+            ]
+            .map(read),
+            [
+                (
+                    "0.0.9-pre.261005".to_owned(),
+                    Some(super::NPM_UPDATE.to_owned()),
+                    vec![]
+                ),
+                (
+                    "0.0.9-pre.261005".to_owned(),
+                    Some(super::BUN_UPDATE.to_owned()),
+                    vec![]
+                ),
+                (
+                    "1.0.0".to_owned(),
+                    Some(super::BINSTALL_UPDATE.to_owned()),
+                    vec![]
+                ),
+                (
+                    "0.0.8-pre.261006".to_owned(),
+                    Some(super::archive_command(super::ArchiveVersion::Tag(
+                        "v0.0.8-Alpha-261006"
+                    ))),
+                    vec![]
+                ),
+                (
+                    "1.0.0".to_owned(),
+                    None,
+                    vec![
+                        super::CARGO_UPDATE.to_owned(),
+                        super::BINSTALL_UPDATE.to_owned()
+                    ]
+                ),
+                (
+                    "0.0.9-pre.261005".to_owned(),
+                    None,
+                    vec![super::NPM_UPDATE.to_owned(), super::BUN_UPDATE.to_owned()]
+                ),
+            ]
+        );
+        assert!(matches!(
+            judged(mine(), InstallChannel::Unknown, &at),
+            ReleaseAnswer::Unconfirmed {
+                update: wire::UpdateHint { command: None, .. },
+                ..
+            }
+        ));
+        assert!(
+            matches!(judged(Built::FromSource, InstallChannel::CargoOrBinstall, &at), ReleaseAnswer::Stands { newest, mine, .. } if newest.version == "1.0.0" && mine.released.is_empty())
         );
     }
 
@@ -503,9 +627,9 @@ mod tests {
                 channel(&exe(&cargo_bin), None),
             ],
             [
-                InstallChannel::Npm,
-                InstallChannel::Npm,
-                InstallChannel::Cargo,
+                InstallChannel::Package,
+                InstallChannel::Package,
+                InstallChannel::CargoOrBinstall,
                 InstallChannel::Archive,
                 InstallChannel::Source,
                 InstallChannel::Source,

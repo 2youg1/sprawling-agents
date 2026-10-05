@@ -65,26 +65,36 @@ pub(super) fn check() -> ExitCode {
             eprintln!("recovery: {}", refusal.recovery());
             ExitCode::FAILURE
         }
-        ReleaseAnswer::Unreleased { registries, .. } => {
+        ReleaseAnswer::Unconfirmed {
+            mine,
+            registries,
+            update,
+        } => {
+            println!(
+                "{}: confirm the original installer before updating.",
+                mine.version
+            );
+            for line in &registries {
+                println!("{}", registry_said(line));
+            }
+            print_update(&update);
+            ExitCode::SUCCESS
+        }
+        ReleaseAnswer::Unreleased { registries, update } => {
             println!("this binary was built from source, so it is none of the published releases.");
             for line in &registries {
                 println!("{}", registry_said(line));
             }
+            print_update(&update);
             ExitCode::SUCCESS
         }
         ReleaseAnswer::Stands {
             mine,
-            registries,
+            newest,
+            registries: _,
             verdict,
             update,
         } => {
-            let Some(newest) = registries.iter().find_map(|line| match &line.reading {
-                RegistryReading::Read { newest } if line.registry == Registry::Npm => Some(newest),
-                RegistryReading::Read { .. } | RegistryReading::Refused { .. } => None,
-            }) else {
-                eprintln!("could not check: the answer carried no npm reading");
-                return ExitCode::FAILURE;
-            };
             match verdict {
                 kernel::ReleaseVerdict::Current => println!(
                     "{} is the newest release published. Nothing to do.",
@@ -92,16 +102,13 @@ pub(super) fn check() -> ExitCode {
                 ),
                 kernel::ReleaseVerdict::Behind => {
                     println!(
-                        "a newer release is published: {}, cut {} (this binary is {}).",
-                        newest.version, newest.released, mine.version
+                        "a newer release is published: {}{} (this binary is {}).",
+                        newest.version,
+                        date_suffix(&newest),
+                        mine.version
                     );
                     println!();
-                    match &update.command {
-                        Some(command) => println!("  update   {command}"),
-                        None => println!(
-                            "  update   this binary's install channel is not one this city can name;                              every archive is at https://github.com/2youg1/sprawling-agents/releases"
-                        ),
-                    }
+                    print_update(&update);
                     println!();
                     println!(
                         "Nothing was downloaded and nothing was changed. \
@@ -118,16 +125,35 @@ pub(super) fn check() -> ExitCode {
     }
 }
 
+fn print_update(update: &wire::UpdateHint) {
+    if let Some(command) = &update.command {
+        println!("  update  {command}");
+    }
+    for command in &update.alternatives {
+        println!("  choose  {command}");
+    }
+}
+
+fn date_suffix(line: &wire::ReleaseLine) -> String {
+    if line.released.is_empty() {
+        String::new()
+    } else {
+        format!(", cut {}", line.released)
+    }
+}
+
 /// One registry's line, as the terminal prints it.
 fn registry_said(line: &RegistryNewest) -> String {
     let registry = match line.registry {
         Registry::Npm => "npm",
         Registry::CratesIo => "crates.io",
+        Registry::Github => "GitHub releases",
     };
     match &line.reading {
         RegistryReading::Read { newest } => format!(
-            "newest on {registry}: {}, cut {}",
-            newest.version, newest.released
+            "newest on {registry}: {}{}",
+            newest.version,
+            date_suffix(newest)
         ),
         RegistryReading::Refused { refusal } => format!("{registry} could not be read: {refusal}"),
     }

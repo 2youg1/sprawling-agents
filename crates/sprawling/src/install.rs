@@ -190,6 +190,14 @@ fn place(dir: &Path) -> Result<PathBuf, AxError> {
             .with_recovery("close any running sprawling and try again")
         })?;
     }
+    std::fs::write(dir.join(sprawling::release::ARCHIVE_ORIGIN_FILE), b"").map_err(|err| {
+        AxError::failure(
+            AxCode::StorageFatal,
+            "record the archive install origin",
+            err.to_string(),
+        )
+        .with_recovery("check write access in the program directory and repeat sprawling install")
+    })?;
     Ok(target)
 }
 
@@ -248,6 +256,20 @@ pub(crate) fn install(direction: Direction) -> Result<Report, AxError> {
     let shown = dir.display().to_string();
     if direction == Direction::Uninstall {
         let removed = displace(&dir)?;
+        match std::fs::remove_file(dir.join(sprawling::release::ARCHIVE_ORIGIN_FILE)) {
+            Ok(()) => {}
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
+            Err(err) => {
+                return Err(AxError::failure(
+                    AxCode::StorageFatal,
+                    "remove the archive install origin",
+                    err.to_string(),
+                )
+                .with_recovery(
+                    "check write access in the program directory and repeat sprawling uninstall",
+                ));
+            }
+        }
         let path = retract(&shown)?;
         return Ok(Report {
             binary: dir.join(installed_name()),

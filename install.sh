@@ -198,7 +198,7 @@ fi
 url=$(field "$chunk" 'browser_download_url' '\([^"]*\)')
 digest=$(field "$chunk" 'digest' 'sha256:\([0-9a-f]*\)')
 [ -n "$url" ] || die "the asset came back without a download URL; see ${RELEASES}"
-[ -n "$digest" ] || die "\
+[ "${#digest}" -eq 64 ] || die "\
 ${tag} publishes no sha256 for that archive, so the bytes cannot be checked. \
 Download it yourself from ${RELEASES} if you accept that."
 

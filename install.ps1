@@ -153,6 +153,7 @@ try {
     Die "cannot reach $api ($($_.Exception.Message)); download from $releases instead"
 }
 if (-not $release) { Die "no release found; see $releases" }
+if ($release.draft) { Die 'the selected release is a draft; choose a published fixed tag' }
 
 $asset = $release.assets | Where-Object { $_.name.EndsWith($suffix) } | Select-Object -First 1
 if (-not $asset) {
@@ -164,7 +165,7 @@ if (-not $asset) {
 # The digest the release publishes, in the form `sha256:<hex>`. Absent
 # means the bytes cannot be checked, and an unverified download is not
 # installed here.
-if (-not $asset.digest -or -not $asset.digest.StartsWith('sha256:')) {
+if (-not $asset.digest -or $asset.digest -cnotmatch '^sha256:[0-9a-f]{64}$') {
     Die ("$($release.tag_name) publishes no sha256 for $($asset.name), so the bytes " +
          "cannot be checked. Download it yourself from $releases if you accept that.")
 }

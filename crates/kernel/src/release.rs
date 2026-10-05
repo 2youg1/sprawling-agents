@@ -183,6 +183,25 @@ impl Release {
         Release::assemble(version, date, tag, "read a release tag")
     }
 
+    /// A published tag, including releases cut before the current maturity.
+    ///
+    /// # Errors
+    /// When neither supported maturity decodes the tag's version and date.
+    pub fn from_published_tag(tag: &str) -> Result<Release, AxError> {
+        for maturity in [Maturity::Alpha, Maturity::PreAlpha] {
+            if let Some((version, _)) = tag
+                .strip_prefix('v')
+                .and_then(|body| body.split_once(maturity.tag_infix().as_str()))
+            {
+                return Self::decode_tag(tag, version, maturity);
+            }
+        }
+        Err(
+            AxError::failure(AxCode::ConfigInvalid, "read a published tag", tag)
+                .with_recovery("use a published Alpha or Pre-alpha release tag"),
+        )
+    }
+
     /// The release an npm version string names.
     ///
     /// # Errors
@@ -308,7 +327,13 @@ pub fn stands(mine: &Release, newest: &Release) -> ReleaseVerdict {
 /// current.
 #[must_use]
 pub fn stands_on_crates(mine: &Release, newest: &Version) -> ReleaseVerdict {
-    verdict_of(mine.version.cmp(newest))
+    stands_on_versions(&mine.version, newest)
+}
+
+/// Compares Cargo versions when a registry install was compiled without a release tag.
+#[must_use]
+pub fn stands_on_versions(mine: &Version, newest: &Version) -> ReleaseVerdict {
+    verdict_of(mine.cmp(newest))
 }
 
 /// The step `stands` and `stands_on_crates` share: an order read as a

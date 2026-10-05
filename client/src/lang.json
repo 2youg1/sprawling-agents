@@ -6864,12 +6864,12 @@
     "zh": "读不到："
   },
   "release_channel_npm": {
-    "en": "Installed through npm. To update, run:",
-    "zh": "经 npm 安装。要更新，运行："
+    "en": "Installed through npm",
+    "zh": "通过 npm 安装"
   },
   "release_channel_cargo": {
-    "en": "Installed through cargo. To update, run:",
-    "zh": "经 cargo 安装。要更新，运行："
+    "en": "Installed through cargo install",
+    "zh": "通过 cargo install 安装"
   },
   "release_channel_archive": {
     "en": "Installed from the release archive. To update, run:",
@@ -7330,5 +7330,45 @@
   "shells_encoding": {
     "en": "encoding",
     "zh": "编码"
+  },
+  "release_registry_github": {
+    "en": "GitHub release archives",
+    "zh": "GitHub 发行归档"
+  },
+  "release_channel_bun": {
+    "en": "Installed through Bun",
+    "zh": "通过 Bun 安装"
+  },
+  "release_channel_binstall": {
+    "en": "Installed through cargo-binstall",
+    "zh": "通过 cargo-binstall 安装"
+  },
+  "release_channel_unknown": {
+    "en": "Confirm the original installer before choosing an update command.",
+    "zh": "选择更新命令前，请确认原安装方式。"
+  },
+  "release_channel_package": {
+    "en": "Package directory: choose the original npm or Bun installer.",
+    "zh": "包目录：请选择原来使用的 npm 或 Bun 安装器。"
+  },
+  "release_channel_cargo_or_binstall": {
+    "en": "Cargo directory: choose cargo install or cargo-binstall.",
+    "zh": "Cargo 目录：请选择原来使用的 cargo install 或 cargo-binstall。"
+  },
+  "release_channel_confirm": {
+    "en": "Choose the original installer",
+    "zh": "选择原安装方式"
+  },
+  "release_origin_unconfirmed": {
+    "en": "The install origin is not confirmed; no newest version is selected.",
+    "zh": "安装来源尚未确认，因此未选定用于比较的最新版本。"
+  },
+  "release_mine_undated": {
+    "en": "Running {version}.",
+    "zh": "正在运行 {version}。"
+  },
+  "release_behind_undated": {
+    "en": "A newer version is available: {version}.",
+    "zh": "有更新版本可用：{version}。"
   }
 }

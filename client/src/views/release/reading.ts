@@ -8,9 +8,7 @@
 // city asked, and the command that updates this binary through the
 // channel that installed it.
 //
-// The verdict stays the city's: it judges npm's line, and the page does
-// not compare the crates.io version against this one, because the city
-// has no rule yet for how the two registries spell a pre-release.
+// The city carries the exact comparison version beside its verdict.
 
 import type { Key } from "../../core/lang";
 import type { Reason } from "../setup/dependencies";
@@ -19,6 +17,7 @@ import type { InstallChannel, Registry, RegistryNewest, ReleaseLine, UpdateHint 
 const REGISTRY: Readonly<Record<Registry, Key>> = {
   npm: "release_registry_npm",
   crates_io: "release_registry_crates_io",
+  github: "release_registry_github",
 };
 
 // The newest release a registry read, or why it has none: exactly one
@@ -35,18 +34,13 @@ export function registryLineOf(line: RegistryNewest): RegistryLine {
     : { registry, newest: null, reason: { key: "release_registry_refused", said: reading.refused.refusal.recovery } };
 }
 
-// npm's newest release, which the verdict judges.
-export function npmNewest(registries: readonly RegistryNewest[]): ReleaseLine | null {
-  for (const line of registries) {
-    if (line.registry === "npm" && "read" in line.reading) {
-      return line.reading.read.newest;
-    }
-  }
-  return null;
-}
-
 const CHANNEL: Readonly<Record<InstallChannel, Key>> = {
   npm: "release_channel_npm",
+  bun: "release_channel_bun",
+  binstall: "release_channel_binstall",
+  unknown: "release_channel_unknown",
+  package: "release_channel_package",
+  cargo_or_binstall: "release_channel_cargo_or_binstall",
   cargo: "release_channel_cargo",
   archive: "release_channel_archive",
   source: "release_channel_source",

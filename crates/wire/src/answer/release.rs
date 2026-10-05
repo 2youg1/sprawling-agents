@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Which release this city is running, and which one npm offers.
+//! Which version this city runs, and what each installation registry offers.
 //!
 //! **A reading of right now, never folded from the Ledger**, on the
 //! same grounds as `McpHealth` and `Toolkits` (`crates/wire/spec/Answer/McpHealth.lean`
@@ -26,31 +26,26 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ReleaseLine {
-    /// `0.0.5-pre.260912` - the version npm carries, which is also what
-    /// `bunx sprawling@<version>` takes.
+    /// The registry's version spelling: dated npm semver or a bare crates.io version.
     pub version: String,
-    /// `2026-09-12`. A pre-alpha version number says almost nothing
-    /// about how old a tree is, and how old it is, is what its reader
-    /// most needs to know (CHANGELOG.md, opening note).
+    /// The release date when the registry's spelling carries one; empty when unknown.
     pub released: String,
 }
 
 /// Where this city stands against the release channel.
 ///
-/// Exhaustive rather than a pair of optional fields: "you are running a
-/// release and here is where it stands", "you built this yourself, so
-/// there is nothing to compare" and "the registry could not be read"
-/// are three different things for a person to do next, and only the
-/// first of them is a version number.
+/// A comparison, an unreleased build, an origin requiring confirmation, or a refusal.
+/// The selected registry supplies both the displayed version and the comparison.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum ReleaseAnswer {
-    /// This binary came out of a release, and here is where it stands.
-    /// `verdict` judges `mine` against npm's line, which is what
-    /// `bunx sprawling` resolves.
+    /// This binary can be compared with its installation registry.
+    /// `newest` and `verdict` come from the registry this channel updates from.
     Stands {
         mine: ReleaseLine,
+        /// The exact registry version used for `verdict`, selected by the server.
+        newest: ReleaseLine,
         registries: Vec<RegistryNewest>,
         verdict: ReleaseVerdict,
         update: UpdateHint,
@@ -59,6 +54,12 @@ pub enum ReleaseAnswer {
     /// published releases. Reporting it as out of date would be
     /// answering about a binary the person is not running.
     Unreleased {
+        registries: Vec<RegistryNewest>,
+        update: UpdateHint,
+    },
+    /// A published binary whose installation origin needs the person to confirm it.
+    Unconfirmed {
+        mine: ReleaseLine,
         registries: Vec<RegistryNewest>,
         update: UpdateHint,
     },
@@ -83,6 +84,7 @@ pub struct RegistryNewest {
 pub enum Registry {
     Npm,
     CratesIo,
+    Github,
 }
 
 /// What one registry answered.
@@ -101,6 +103,11 @@ pub enum RegistryReading {
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum InstallChannel {
     Npm,
+    Bun,
+    Binstall,
+    Unknown,
+    Package,
+    CargoOrBinstall,
     Cargo,
     Archive,
     Source,
@@ -114,4 +121,6 @@ pub struct UpdateHint {
     pub channel: InstallChannel,
     /// `None` for a binary built from source, which nothing updates.
     pub command: Option<String>,
+    /// Exact commands requiring explicit choice when the path cannot identify an installer.
+    pub alternatives: Vec<String>,
 }
