@@ -35,6 +35,8 @@ use crate::backlog::{Backlog, Exit, Started};
 use crate::sandbox::{Fuel, Mount, Sandbox, SandboxExit, SandboxJob};
 
 mod confinement;
+mod container;
+pub use container::{ContainerEngine, ContainerLaunch, ContainerRuntime};
 mod shell;
 mod yielding;
 

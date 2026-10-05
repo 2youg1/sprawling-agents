@@ -26,6 +26,7 @@ pub use edit::EditTool;
 pub use edit::version_of;
 pub use exec::parse_arm;
 pub use exec::parse_placement;
+pub use exec::{ContainerEngine, ContainerLaunch, ContainerRuntime};
 pub use exec::{ExecSetup, ExecTool};
 pub use exec::{FailureClass, Shell, ShellCount, ShellTally};
 pub use exec::{Placed, Placement};
