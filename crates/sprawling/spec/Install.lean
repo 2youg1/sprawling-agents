@@ -207,7 +207,12 @@ pub(crate) fn install(uninstall: bool) -> Result<Report, AxError>;
 参数与理由：应用交付要求浏览器能打开真实客户端，因而占位页不满足 Nix 包接口。
 `bun2nix` 的转换器在构建中从原 Bun 锁派生 Nix 表达式，其 `fetchBunDeps` 使用锁中的 integrity
 下载并生成离线缓存；不在仓库维护第二份依赖表。nixpkgs 本身没有对应的通用 Bun 锁构建器，
-因此转换器作为 flake 构建依赖加入，版本由 flake 锁持有。代价是求值需要先构建转换结果
+因此转换器作为 flake 构建依赖加入，版本由 flake 锁持有。现有锁为 version 2，转换器仅接受 version 1，
+但 npm 包的四元组仍为名称版本、下载地址、元数据与 integrity；转换输入只投影 packages，
+保留每个四元组不变，并以转换器接受的 schema 标记生成临时输入，原锁仍交给 Bun 安装。
+投影只接受 version 2、configVersion 1 与全部带 sha512 integrity 的 npm 四元组，其他形状
+必须失败并要求更新转换适配，不能猜测新锁格式。临时投影和 Nix 表达式均在 store 构建，
+不维护第二份依赖清单。代价是求值需要先构建转换结果
 （import from derivation），首次求值可能编译转换器；它不进入应用运行闭包。
 
 客户端经 `just build-web` 构建后由现有 `build.rs` 嵌入；Nix 从该文件的 `BUNDLE_DIR` 读取位置，
