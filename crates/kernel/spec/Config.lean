@@ -84,3 +84,17 @@ pub fn freeze(clock_stamp: &LayeredValue<ClockStampGranularity>, clock_zones: &L
 
 **重开参数**：人改第一道的值时，第二道的下端随之移动，无须另改；要让两道之间隔开不止一格，重开的是本定规。
 -/
+
+/-!
+### container 的输入值（config）
+
+`crates/kernel/src/config/container.rs` 定义 `ContainerLimits { image: ContainerImage,
+user: NonZeroU32, cpu_millis: NonZeroU32, memory_bytes: NonZeroU64, pids: NonZeroU32 }`。
+没有默认镜像或默认额度，整份值由 User 指定，限额只容许非零整数。
+`ContainerImage::parse` 只收本地 image ID `sha256:` 后接 64 位小写十六进制；serde 也只过
+同一构造点，标签、仓库名、空白与 CLI 选项以 E_CONFIG_INVALID 拒绝。这个值不保存主机路径。
+
+此类型是 container 后端的输入契约，尚不是 SandboxLimits 的字段；SandboxLimits 的整值
+解析与冻结传递仍需接入此值，不能在 runtime 另读环境变量作为第四层配置。
+后端契约与接线边界见 `crates/runtime/spec/Tools/Exec/Container.lean`。
+-/
