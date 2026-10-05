@@ -98,6 +98,21 @@ theorem failure_cannot_fall_back (state : Phase) (rest : List Answer) :
   have stopped := closing_cannot_resume rest
   cases state <;> simp_all [run, step, closed_is_terminal]
 
+structure Readiness where
+  runAssigned : Bool
+  commandAssigned : Bool
+  identityVerified : Bool
+
+def mayResume (ready : Readiness) : Bool :=
+  ready.runAssigned && ready.commandAssigned && ready.identityVerified
+
+/-- 恢复前的实际叶子守卫要求两次 job membership 与独立 AppContainer 身份皆已读回。 -/
+theorem resume_requires_all_guards (ready : Readiness) (accepted : mayResume ready = true) :
+    ready.runAssigned = true ∧ ready.commandAssigned = true ∧ ready.identityVerified = true := by
+  cases ready with
+  | mk run command identity =>
+    cases run <;> cases command <;> cases identity <;> simp_all [mayResume]
+
 /-- 每个 string span 必须在借来的 packet 内，尾部 NUL 不进入其内容。 -/
 def terminated (units : List Nat) : Bool := !units.isEmpty && units.getLast? == some 0
 
