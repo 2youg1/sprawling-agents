@@ -27,6 +27,13 @@ info 的内容是 daemon 的自述，不是已执行的隔离验收；daemon、O
 实际起动仍须 inspect 验证限额与挂载，然后用同一容器跑 cgroup 与网络对拍。
 镜像、daemon 接口或 OCI runtime 更新时应重跑实测。
 
+生命周期接线尚缺可观察的清理失败面：现有 Backlog::release 从 Drop 调用，返回计数而非
+Result，不能把这个接口的 Child 语义推广为 daemon 删除一定成功。完成接线需要证明 create
+应答丢失时仍保留预先登记的唯一名字，start／inspect／attach 失败时仍能按该名字清理，
+以及移除失败时不会丢掉成员或复用副本；只有 daemon 确认移除或确认该身份不存在，才能
+释放它占用的副本。判定证据是经真实 Backlog／ExecTool 的故障注入检查与 daemon inventory。
+CLI 的退出码不构成 State 的结局证据，不能交给现有 Exit::polled 当作目标程序结果。
+
 ## 4 现状分析
 
 本模块提供 admission 与 create 的命令面。SandboxLimits 尚无 container 字段，city 的整值解析
@@ -114,7 +121,9 @@ spawn/enrol 失败必须走同一清理权威。容器收下限额之前不得�
 
 `lake build crates.runtime.spec.Tools.Exec.Container` 证明任意能力列表中缺一项即拒。
 Rust 的公开 admission／argv 测试检查实际实现，entrypoint 回归覆盖两个后端、JSON 数组形状、
-空 JSON 数组、null、引号与普通路径；真实隔离验收必须运行 docker/podman。
+空 JSON 数组、null、引号与普通路径，以及 Unix 下不可编码的 OsStr program；
+非 UTF-8 输入直接经公开 create_command 检查 typed refusal，不经过有损字符串转换。
+真实隔离验收必须运行 docker/podman。
 五轴声明须等真实挂载、回环联网、孙进程、身份与超额分配测试，不能从本模型推出。
 
 ## 17 文档关系
