@@ -69,12 +69,15 @@ try {
         await page.keyboard.press("Enter");
         await page.waitForFunction((fragment) => location.hash === fragment, toFragment({ kind: "setup", group }));
         await dialog.getByRole("heading", { name: english(HEADING[group]), exact: true }).waitFor();
+        await page.evaluate(async () => {
+          await Promise.allSettled(document.getAnimations().filter((animation) => animation.effect?.getComputedTiming().iterations !== Infinity).map((animation) => animation.finished));
+        });
         const focus = [];
         for (let index = 0; index < 12; index += 1) {
           await page.keyboard.press("Tab");
           focus.push(await page.evaluate(() => {
             const active = document.activeElement;
-            return { tag: active?.tagName, role: active?.getAttribute("role"), name: active?.getAttribute("aria-label") ?? active?.textContent?.trim(), inside: Boolean(active?.closest("dialog[open]")) };
+            return { tag: active?.tagName, role: active?.getAttribute("role"), name: active?.getAttribute("aria-label") ?? active?.textContent?.trim(), inside: Boolean(active?.closest("dialog[open]")), documentHasFocus: document.hasFocus(), modalOpen: Boolean(document.querySelector("dialog:modal")), bodyActive: active === document.body };
           }));
         }
         const screenshot = `${group}-${width}-${colorScheme}.png`;
