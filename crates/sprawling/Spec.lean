@@ -21,6 +21,11 @@ import crates.sprawling.spec.Main.Exit
 import crates.sprawling.spec.Main.Grammar
 import crates.sprawling.spec.Monitor
 import crates.sprawling.spec.Privacy
+import crates.sprawling.spec.Privacy.State
+import crates.sprawling.spec.Privacy.Journal
+import crates.sprawling.spec.Privacy.Cli
+import crates.sprawling.spec.Privacy.Windows
+import crates.sprawling.spec.Privacy.Confirmation
 import crates.sprawling.spec.Outside
 import crates.sprawling.spec.Outside.Conduit
 import crates.sprawling.spec.Serving

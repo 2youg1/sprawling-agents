@@ -25,8 +25,9 @@ OS 写入无 compare-and-swap；writeStarted 保存调用前最后一次读数�
 模型 owner 是真实 OS identity 的抽象，生产不得由 USERNAME 环境字符串代替。
 
 ## 4 现状分析
-当前 CLI 没有 privacy 动词，也没有 journal、coordinator 或平台适配器。
-本契约先确定顺序与恢复规则；派生 Rust 检查与生产接线属于接口缺口。
+CLI 的 privacy status 通过 Home 读取独立 history 的只读投影；磁盘语法与读取
+契约见 Privacy.State、Privacy.Journal、Privacy.Cli。耐久 writer、coordinator、
+确认和平台适配器尚未接入；inspect→confirm→apply→restore 仍是接口缺口。
 
 ## 5 权威信源
 Microsoft RegQueryValueExW/RegSetValueExW 规定原始类型/字节及缺值和访问失败；
