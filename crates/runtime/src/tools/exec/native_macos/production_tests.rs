@@ -37,11 +37,10 @@ fn native_macos_exec_writes_only_the_copy_and_preserves_output_and_exit() {
     let source = tempfile::tempdir().unwrap();
     let scratch = tempfile::tempdir().unwrap();
     let tool = native_tool(source.path(), scratch.path());
-    let result = invoke_python(
-        &tool,
-        "import pathlib,sys; pathlib.Path('written').write_text('copy'); print('target-output'); print('target-error',file=sys.stderr); sys.exit(23)",
-        &[],
-    );
+    let outcome = tool.invoke(&call(serde_json::json!({
+        "program": {"path": "/bin/sh", "args": ["-c", "printf copy > written; printf 'target-output\n'; printf 'target-error\n' >&2; exit 23"]}
+    }))).unwrap();
+    let result = serde_json::to_value(outcome.result).unwrap();
     assert_eq!(
         (
             result["exit_code"].as_i64(),

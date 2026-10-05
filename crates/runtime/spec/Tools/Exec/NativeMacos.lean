@@ -28,6 +28,8 @@ macOS host 的同 RunId 多命令聚合硬内存机制尚未成立；RLIMIT、ta
 Apple App Sandbox： https://developer.apple.com/documentation/security/app-sandbox 。
 macOS 26.6.2（25G83）的 sandbox-exec(1) 自带手册写明 “execute within a sandbox (DEPRECATED)”
 与 “Set the profile parameter key to value.”，CI 的 macOS mechanism artifact 保存原文；
+Chromium 的 sandbox/policy/mac/renderer.sb 使用 (allow process-info-setcontrol (target self))，
+这是对拍前采用的 SBPL 操作依据，不代替目标 macOS 的执行证据。
 弃用状态不等于已移除，但不保证未来系统继续提供此程序，缺席或拒绝必须拒开。
 App Sandbox entitlement 文档不能证明命令行 profile 的行为；sandbox_init(3) 与真实拒绝
 实验仍须分别核实，支持范围只随已运行的系统证据扩大。
@@ -50,7 +52,9 @@ probe(wrapper: &Path, copy: &Path) -> Result<(), AxError> 通过同构造器执�
 
 ## 10 实现逻辑
 D40 Seatbelt 的写路径经 -D 参数递交，profile 是内联常量，以 deny default 开始。
-允许读取、执行、fork、sysctl-read 和必要 Mach lookup；网络默认拒且显式 deny network*。
+允许读取、执行、fork、sysctl-read 和必要 Mach lookup；process-info-setcontrol 仅允许
+(target self)，使 nice 能在自身降优先级，真实 runner 的 setpriority 拒绝回归规定这项权限。
+网络默认拒且显式 deny network*。
 仅 subpath WORKDIR 可写，/dev/null 只放行数据写入，不放行设备创建或任意临时目录。
 被否：把路径插进 SBPL 源码、放开整个 TMPDIR、探测失败执行裸命令。
 路径参数保留引号／反斜杠而不产生新的 profile 表达式；非 UTF-8 路径拒绝。
