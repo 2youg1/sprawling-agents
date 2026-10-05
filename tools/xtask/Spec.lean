@@ -130,6 +130,8 @@ gate／Violation／rule／violation／alternative（三段式拒绝的施工侧�
 
 三个不判只做的模块：`main`（分发）｜`report`（Violation 与渲染）｜`walk`（确定性文件遍历）。其余各文件各自被某一道门调用而不自成一门：`architecture`（这份文档的名字与按 `## N 标题` 切节这一个读法，被 `depmap` 与 `proof` 调用，§8-22）｜`vocabulary`（`lexicon` 用它让退役词指向被定义的词；`proof` 用它的数词表读 `kani harness` 前的数）｜`members`（包在哪、叫什么、是产品还是工具，`cargo metadata` 的唯一读者，被每一道按包取目录的门调用，§8-39）｜`spec`（一个 crate 的 Lean 规格：命令新建骨架，同名的门判树，§8-41、§8-42）｜`lean`（把一份 `.lean` 当文本读出门要的几种受限形状，被 `spec`、`specalign`、`wiring` 调用，§8-43）｜`mem`／`sbom`／`repro`／`package`（`just` 的量具与交付物，恒不入 `gates`）｜`survey`（一页画出来之后才有的那些事实的判定，被 `render` 调用，§8-26）｜`bundle`（客户端落点这一个事实的读法，被 `render`、`budget` 与 `artifact` 调用，§8-18）｜`platform`（平台与归档命名这一张表，被 `channel` 与 `artifact` 调用，§8-19）｜`attestation`（挂到 tag 上的归档先有构件证明，被 `artifact` 调用，§8-34）。
 
+`secret::nix`（`src/secret/nix.rs`，形状 value）拥有 `NarHashes::classify(rel, bytes) -> NarHashes` 与 `NarHashes::admits(&SecretSpan) -> bool`；私有 span 集只经 canonical JSON 属性分类构造，provider 与整段匹配规则也由它决定，`secret::check` 只询问分类结果（§8-9）。关联缺陷回归在 `src/secret/nix_tests.rs`，经真实 `secret::check` 验证。
+
 **length 门的形状属于 modmap 而不属于自己**：形状列的解析只住 `modmap::shapes`，因为模块表只应有一个读者——字段一变，只有一处要改。同理，`[family.<键>]` 的 `duty` 也只由 `modmap::duties` 读，`docnum` 的 `crate_table` 经它取每个 crate 拥有什么（§8-40）。
 
 **本模块不做什么（否定式两条）**：判定路径不改任何文件；写盘只发生在带 `--write` 的命令上，且每条只重写它自己生成的那一面——`spec` 只新建不覆盖，`wire-ts` 只写 `client/src/wire.ts`，`docnum` 只写受管区段两个标记之间的字节。不缓存扫描结果（每次全量重扫——确定性优于速度）。
@@ -273,6 +275,8 @@ D19（人的定规）：彩色令牌照旧只落在主轴与它的补色上，�
 | 记录的快照 | `crates/**/snapshots/*.snap` | insta 快照是测试**输出**的留影，它的输入住在被扫的源文件里；一个凭证要出现在快照里，得先出现在那个源文件里，而那一份仍被扫 |
 
 - **一句话的权威**：门扫**人写的**文件；一份**派生**文件的字节来自门已经扫过的输入，所以它不是凭证第一次进树的地方。两类各是这一句的实例，不是两条独立的例外。
+- **Nix NAR 字段分类**（`secret::nix`，形状 value）：只对根 `flake.lock` 的 version 7 对象分类，root 必须命名 nodes 的一个对象；原文须逐字节等于现有 `serde_json::to_vec_pretty(Value)` 的输出加一个 LF。重序、重复键、转义、compact、额外空白、损坏 JSON 与陌生 version 均不分类，继续完整扫描。只认 `nodes.<input>.locked` 中 type 为 github、owner/repo 为非空 ASCII 字母数字或连字符/下划线/点、rev 为 40 位小写 hex 的对象，其 narHash 须为 canonical SHA256 SRI（32 字节标准 Base64、单个 padding、零末位填充 bit）。临时把这一实际属性换为空字符串并重新序列化，首个不同字节即该属性值的起点；只豁免与该原文摘要 token（末尾 padding 除外）的偏移和长度完全相同、provider 为 None 的 scanner finding。同值在任何其他属性仍照扫，provider、URL、源码、Ledger 与 expose 规则不变。
+- **D29 分类边界与取舍（人的裁定）**：kernel::secret::scan 仍是检测权威，本模块只拥有提交树的 NAR 分类；不增加锁文件类别、摘要白名单、凭据扫描器或 JSON parser。序列化相等约束以保守误报换取无歧义原文位置；每个候选属性一次 JSON clone/序列化，代价 O(候选数 × 文件字节数)，限于根锁。格式不证明远端内容，revision 与 NAR 内容的对应仍由 Nix fetch/check 验证；伪装成摘要的凭据不能从格式获得来源证明。拒绝的备选是整份 flake.lock 豁免及同值行匹配，因为它们能隐藏其他字段。
 - **`.expose(` 白名单那一半不动**：它只看产品包（§8-39）的 `src/**.rs`，锁文件与 `.snap` 本就不在其面上。
 - **已知的限**（写在明处，不静默）：一个从环境变量读真凭证、再把它录进快照的测试，能从这条豁免下走过去。今天树上没有这样的测试，且写出这样的测试本身就是缺陷；真要堵它，堵的地方是「测试不得读真凭证」，那是另一道门的题目。
 - **整词 PascalCase 名不是密钥**（`is_pascal_case_identifier`）：命中字节若整段是「大写开头的小写词」相接、末尾可带一串数字（如 Win32 字段名 `PeakPagedMemorySize64`），门不报。判的是命中字节自身的形状而非所在文件或上下文：每个大写字母后必跟小写、数字只在末尾，随机的 base64／hex 串几个字节内就破坏这一形状，所以 base64 长串与已知 provider 前缀照报。备选是往 `NOT_CREDENTIALS` 逐个补名——每个新 API 字段都要一次评审，而这类名字的共同点是可判定的形状。
