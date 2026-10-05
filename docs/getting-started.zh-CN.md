@@ -157,6 +157,20 @@ gh attestation verify sprawling-<version>-<platform>.zip --repo 2youg1/sprawling
 
 这些二进制没有代码签名：Windows 上点 *More info*，再点 *Run anyway*；macOS 上在 Finder 里右键打开一次。装了 1.97 或更新的 Rust 工具链，也可以用 `cargo install sprawling --locked` 从 crates.io 编出同一个程序，因为发布的包里已经带着构建好的页面；从 git 检出直接跑 `cargo build`，在 `just build-web` 构建页面之前得到的页面一片空白。
 
+### 用 Nix
+
+Linux x86-64 上可以用 Nix 从本仓库构建完整应用。启用 Nix 的 `nix-command` 和 `flakes`，先检出 `flake.nix` 先构建客户端再构建 Rust、且已提交 `flake.lock` 的 tag 或 commit，再构建：
+
+```bash
+nix build .#default --no-update-lock-file
+nix run .#default --no-update-lock-file -- status
+nix run .#default --no-update-lock-file -- up ~/cities/first
+```
+
+[flake](../flake.nix) 从 `rust-toolchain.toml` 读取固定的编译器，从 `Cargo.lock` 读取 Rust 依赖，从 `client/bun.lock` 读取客户端依赖；Nix 构建工具由 `flake.lock` 固定。Nix 先获取锁定的依赖，再在网络沙箱中构建应用。构建会调用既有客户端命令并嵌入产物，所以应用带着页面、随附的 skills、模板和许可。首次构建可能需要先编译依赖。
+
+版本行由二进制报告。没有发布来源信息的 checkout 构建会显示 `built from source`，单凭版本号不能确定某个已发布 Git tag。更新时，选择另一个实际 tag 或 commit，再运行上述命令。`nix develop` 打开开发环境，不会启动城。
+
 ## 2 建一座城，并把它打开
 
 ```bash

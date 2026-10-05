@@ -1,25 +1,5 @@
-# A devshell and `nix run`, and deliberately nothing else.
-#
-# NixOS has no `/lib64/ld-linux-x86-64.so.2`, so it cannot start a
-# dynamically linked artifact and cannot use rustup's downloaded
-# toolchains either. This flake exists so that a person on NixOS can enter
-# a shell where `just check` works, and can run the binary once without
-# installing anything. It does NOT take over the Windows or macOS release
-# paths: those are `release.yml`, they are what a person downloads, and a
-# second way to produce them would be a second authority for one artifact.
-#
-# THE LOAD-BEARING RULE: the Rust version lives in `rust-toolchain.toml`
-# and nowhere else. `fromRustupToolchainFile` reads that file, so nothing
-# here restates a version; `checks.toolchain-version-is-derived` then makes
-# a flake that wants a version the file does not name turn the build red,
-# rather than letting it drift quietly.
-#
-# `nix run` builds without the WebAssembly client bundle, so the binary it
-# produces serves the page shell alone (`crates/sprawling/build.rs` says so
-# at build time and `CLIENT_COMPLETE` is false). That is a development run.
-# The archive `xtask package` assembles is refused unless it carries the
-# real client, which is the check that keeps an empty browser window out of
-# a release.
+# The devshell and complete application share the repository toolchain.
+# Packaging contract: sprawling D50 in crates/sprawling/spec/Install.lean.
 {
   description = "sprawling - a locally deployed agent-city harness";
 
@@ -34,10 +14,16 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     flake-utils.url = "github:numtide/flake-utils";
+    # nixpkgs has no Bun lock builder; this consumes the existing lock's
+    # integrity hashes and keeps dependency fetching outside the sandbox.
+    bun2nix = {
+      url = "github:nix-community/bun2nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs =
-    { self, nixpkgs, rust-overlay, flake-utils }:
+    { self, nixpkgs, rust-overlay, flake-utils, bun2nix }:
     flake-utils.lib.eachDefaultSystem (
       system:
       let
@@ -108,19 +94,98 @@
           pkgs.pkg-config
         ];
 
-        sprawling = pkgs.rustPlatform.buildRustPackage {
-          pname = "sprawling";
-          version = (builtins.fromTOML (builtins.readFile ./Cargo.toml)).workspace.package.version;
+        bunBuilder = bun2nix.packages.${system}.default;
+        # Generated in the store on every lock change, never maintained as
+        # another lock in the source tree. npm hashes come from bun.lock.
+        bunNix = pkgs.runCommand "sprawling-bun-dependencies.nix"
+          { nativeBuildInputs = [ bunBuilder pkgs.bun ]; }
+          ''
+            cat > project-lock.js <<'JS'
+            const lock = Bun.JSONC.parse(await Bun.file(Bun.argv.at(-1)).text());
+            if (lock.lockfileVersion !== 2 || lock.configVersion !== 1 ||
+                !lock.packages || !Object.values(lock.packages).every(pkg =>
+                  Array.isArray(pkg) && pkg.length === 4 &&
+                  typeof pkg[0] === "string" && typeof pkg[1] === "string" &&
+                  pkg[2] !== null && typeof pkg[2] === "object" &&
+                  typeof pkg[3] === "string" && pkg[3].startsWith("sha512-"))) {
+              console.error("Unsupported Bun lock shape; update the Nix conversion adapter");
+              process.exit(1);
+            }
+            console.log(JSON.stringify({ lockfileVersion: 1, packages: lock.packages }));
+            JS
+            bun project-lock.js ${./client/bun.lock} > converter.lock
+            bun2nix --lock-file converter.lock --output-file "$out"
+          '';
+        bunDeps = bunBuilder.fetchBunDeps { inherit bunNix; };
+        # These readers fail if the authoritative declarations move, so a
+        # packaging build cannot silently fall back to an obsolete path.
+        bundleDir = builtins.elemAt
+          (builtins.match ''.*const BUNDLE_DIR: &str = "([^"]+)";.*''
+            (builtins.readFile ./crates/sprawling/build.rs)) 0;
+        skillSource = builtins.elemAt
+          (builtins.match ''.*const SKILLS_DIR: &str = "([^"]+)";.*''
+            (builtins.readFile ./tools/xtask/src/package/contents.rs)) 0;
+        skillEntry = builtins.elemAt
+          (builtins.match ''.*const SKILLS_ENTRY: &str = "([^"]+)";.*''
+            (builtins.readFile ./tools/xtask/src/package/contents.rs)) 0;
+        applicationManifest = builtins.fromTOML (builtins.readFile ./crates/sprawling/Cargo.toml);
+        workspacePackage = (builtins.fromTOML (builtins.readFile ./Cargo.toml)).workspace.package;
+        applicationName = applicationManifest.package.name;
+        mainProgram = (builtins.head (applicationManifest.bin or [ { name = applicationName; } ])).name;
+        resourceDir = "share/${applicationName}";
+        documentationDir = "share/doc/${applicationName}";
+        rustPlatform = pkgs.makeRustPlatform { cargo = toolchain; rustc = toolchain; };
+
+        sprawling = rustPlatform.buildRustPackage {
+          pname = applicationName;
+          version = workspacePackage.version;
           src = self;
           cargoLock = {
             lockFile = ./Cargo.lock;
           };
-          nativeBuildInputs = nativeDeps ++ [ toolchain ];
-          cargoBuildFlags = [ "-p" "sprawling" ];
+          nativeBuildInputs = nativeDeps ++ [ pkgs.bun pkgs.just ];
+          # just is a command used by preBuild, not this package's builder.
+          dontUseJustBuild = true;
+          dontUseJustCheck = true;
+          dontUseJustInstall = true;
+          preBuild = ''
+            export HOME="$TMPDIR/home"
+            mkdir -p "$HOME"
+            # Native addons are loaded into Bun; only the build needs GCC's
+            # runtime libraries, not the installed Rust application.
+            export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath [ pkgs.stdenv.cc.cc.lib ]}"
+            export BUN_INSTALL_CACHE_DIR="$TMPDIR/bun-cache"
+            cp -R ${bunDeps}/share/bun-cache "$BUN_INSTALL_CACHE_DIR"
+            chmod -R u+w "$BUN_INSTALL_CACHE_DIR"
+            just build-web
+            test -s crates/sprawling/${bundleDir}/index.html
+          '';
+          postBuild = ''
+            # Judge what build.rs embedded, not just what Vite left on disk.
+            find "''${CARGO_TARGET_DIR:-target}" -name client_embed.rs -print0               | xargs -0 grep -l '^pub const CLIENT_COMPLETE: bool = true;' > complete-client
+            if ! test -s complete-client; then
+              echo "Nix application has no embedded client; restore just build-web" >&2
+              exit 1
+            fi
+          '';
+          postInstall = ''
+            mkdir -p "$out/${resourceDir}"
+            cp -R ${skillSource} "$out/${resourceDir}/${skillEntry}"
+            install -Dm644 LICENSE "$out/${documentationDir}/LICENSE"
+          '';
+          passthru = { inherit bundleDir skillEntry resourceDir documentationDir; };
+          cargoBuildFlags = [ "-p" applicationName ];
           # The suite belongs to `just check` and to CI, which run it with
           # `--all-features` against a warm cache. Repeating it inside a
           # `nix build` buys no new verdict and costs a cold compile.
           doCheck = false;
+          meta = {
+            description = (builtins.fromTOML (builtins.readFile ./crates/sprawling/Cargo.toml)).package.description;
+            homepage = (builtins.fromTOML (builtins.readFile ./Cargo.toml)).workspace.package.homepage;
+            license = pkgs.lib.meta.getLicenseFromSpdxIdOr workspacePackage.license
+              (throw "Unsupported Cargo SPDX license: ${workspacePackage.license}");
+            inherit mainProgram;
+          };
         };
       in
       {
@@ -136,7 +201,7 @@
 
         apps.default = {
           type = "app";
-          program = "${sprawling}/bin/sprawling";
+          program = pkgs.lib.getExe sprawling;
         };
 
         # A flake wanting a Rust version `rust-toolchain.toml` does not

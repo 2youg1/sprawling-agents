@@ -28,6 +28,19 @@ on:
   schedule:
     - cron: "23 4 * * *"
   workflow_dispatch:
+    inputs:
+      job:
+        description: Platform checks to run
+        type: choice
+        default: all
+        options:
+          - all
+          - nix
+
+      candidate:
+        description: Optional base64 JSON of local Nix candidate files; no external publication
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -75,7 +88,7 @@ jobs:
   # to be shown to.
   macos:
     needs: moved
-    if: needs.moved.outputs.verdict == 'run'
+    if: needs.moved.outputs.verdict == 'run' && (github.event_name != 'workflow_dispatch' || inputs.job == 'all')
     runs-on: macos-latest
     timeout-minutes: 40
     steps:
@@ -135,7 +148,7 @@ jobs:
   # shell a bundle-less build embeds.
   repro:
     needs: moved
-    if: needs.moved.outputs.verdict == 'run'
+    if: needs.moved.outputs.verdict == 'run' && (github.event_name != 'workflow_dispatch' || inputs.job == 'all')
     runs-on: windows-latest
     timeout-minutes: 60
     steps:
@@ -187,7 +200,84 @@ jobs:
         with:
           extra_nix_config: |
             experimental-features = nix-command flakes
-      - name: the version is derived, not restated
-        run: nix flake check --print-build-logs
-      - name: the binary this flake's toolchain builds
-        run: nix build .#default --print-build-logs
+      - name: the committed builder lock is present and unchanged
+        run: |
+          test -f flake.lock
+          nix flake metadata --no-update-lock-file
+          git diff --exit-code -- flake.lock
+      - name: the complete application in the network sandbox
+        if: inputs.candidate == ''
+        run: nix build .#default --no-update-lock-file --print-build-logs
+      - name: the version and devshell still obey their authorities
+        if: inputs.candidate == ''
+        run: nix flake check --no-update-lock-file --print-build-logs
+      - name: an independent candidate with IFD disabled
+        if: inputs.candidate != ''
+        env:
+          NIX_CANDIDATE: ${{ inputs.candidate }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          directory="$RUNNER_TEMP/nix-candidate"
+          mkdir -p "$directory"
+          export CANDIDATE_DIRECTORY="$directory"
+          python3 - <<'PY'
+          import base64, json, os, pathlib
+          directory = pathlib.Path(os.environ['CANDIDATE_DIRECTORY'])
+          for name, text in json.loads(base64.b64decode(os.environ['NIX_CANDIDATE'], validate=True)).items():
+              if pathlib.PurePosixPath(name).name != name or name in ('', '.', '..', 'default.nix'):
+                  raise ValueError('Candidate inputs must be plain filenames; default.nix belongs to CI')
+              (directory / name).write_text(text)
+          PY
+          nixpkgs=$(nix flake archive --no-update-lock-file --json | jq -r .inputs.nixpkgs.path)
+          echo "let pkgs = import $nixpkgs {}; in pkgs.callPackage ./package.nix {}" > "$directory/default.nix"
+          nix build --file "$directory/default.nix" --option allow-import-from-derivation false --print-build-logs
+          nix eval --file "$directory/default.nix" --option allow-import-from-derivation false --json             --apply 'p: { inherit (p) pname resourceDir applicationVersion; inherit (p.meta) mainProgram; version = p.applicationVersion; }'             > "$RUNNER_TEMP/nix-layout.json"
+          echo "NIX_CANDIDATE_DIRECTORY=$directory" >> "$GITHUB_ENV"
+          echo "NIX_LAYOUT=$RUNNER_TEMP/nix-layout.json" >> "$GITHUB_ENV"
+          if [ -f "$directory/probe.sh" ]; then
+            bash "$directory/probe.sh" "$nixpkgs" "$directory"
+          fi
+      - name: read the flake's installation layout
+        if: inputs.candidate == ''
+        shell: bash
+        run: |
+          nix eval --json .#packages.x86_64-linux.default --apply 'p: {
+            inherit (p) pname version resourceDir;
+            inherit (p.meta) mainProgram;
+          }' > "$RUNNER_TEMP/nix-layout.json"
+          echo "NIX_LAYOUT=$RUNNER_TEMP/nix-layout.json" >> "$GITHUB_ENV"
+      - name: the installed application and its resources
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os, pathlib, zipfile
+          root = pathlib.Path.cwd()
+          package = root / 'result'
+          layout = json.loads(pathlib.Path(os.environ['NIX_LAYOUT']).read_text())
+          archive = root / 'target/nix-acceptance.zip'
+          archive.parent.mkdir(exist_ok=True)
+          with zipfile.ZipFile(archive, 'w', strict_timestamps=False) as output:
+              output.write(package / 'bin' / layout['mainProgram'], 'application/' + layout['mainProgram'])
+              for resource in (package / layout['resourceDir']).rglob('*'):
+                  if resource.is_file():
+                      output.write(resource, 'application/' + str(resource.relative_to(package / layout['resourceDir'])))
+          PY
+          name=$(jq -r .pname "$NIX_LAYOUT")
+          version=$(jq -r .version "$NIX_LAYOUT")
+          program=$(jq -r .mainProgram "$NIX_LAYOUT")
+          SPRAWLING_BIN="$PWD/result/bin/$program" nix develop --command lake exe acceptance version "$name" "$version"
+          nix develop --command just acceptance target/nix-acceptance.zip
+      - uses: actions/upload-artifact@v7
+        if: always() && inputs.candidate != ''
+        with:
+          name: nix-candidate
+          path: ${{ runner.temp }}/nix-candidate
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: nix-acceptance
+          path: |
+            target/acceptance/checklist.md
+            target/acceptance/provider.err

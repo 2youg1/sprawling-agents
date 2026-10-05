@@ -51,6 +51,15 @@ Claude Code、Codex CLI 这类终端 agent 一次给你一个 agent：一个模�
 
 从 git 检出构建请用 `just dist`：直接 `cargo build` 时还没有跑过 `just build-web`，嵌进二进制的只是一张空白页。完整指南是 [`docs/getting-started.zh-CN.md`](docs/getting-started.zh-CN.md)（[English](docs/getting-started.md)），从空目录一直讲到一次审过、落在你分支上的合并。
 
+Linux x86-64 上装有 Nix 时，启用 `nix-command` 和 `flakes`，在 `flake.nix` 先构建客户端再构建 Rust、且已提交 `flake.lock` 的 checkout 中运行：
+
+```bash
+nix build .#default --no-update-lock-file
+nix run .#default --no-update-lock-file -- up ~/cities/first
+```
+
+flake 会构建并嵌入客户端，保留随附的 skills 与许可，并读取仓库固定的 Rust 工具链和依赖锁；`nix develop` 仍用于进入开发环境。源码的选择与更新见[用 Nix](docs/getting-started.zh-CN.md#用-nix)。
+
 ## 五个词
 
 | 词 | 是什么 |

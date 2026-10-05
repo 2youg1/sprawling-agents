@@ -157,6 +157,20 @@ Nothing updates itself. `sprawling version` prints which release this is; `spraw
 
 The binaries are not code-signed: on Windows choose *More info*, then *Run anyway*; on macOS open the binary once from Finder's right-click menu. With a Rust toolchain of 1.97 or later, `cargo install sprawling --locked` builds the same program from crates.io, because the published package carries the page already built; a plain `cargo build` of a git checkout yields a blank page until `just build-web` has built the page.
 
+### With Nix
+
+On Linux x86-64, Nix can build the complete application from this repository. Enable the Nix features `nix-command` and `flakes`, and check out a tag or commit whose `flake.nix` builds the client before Rust and includes a committed `flake.lock` before building:
+
+```bash
+nix build .#default --no-update-lock-file
+nix run .#default --no-update-lock-file -- status
+nix run .#default --no-update-lock-file -- up ~/cities/first
+```
+
+[The flake](../flake.nix) reads the pinned compiler from `rust-toolchain.toml`, Rust dependencies from `Cargo.lock`, and client dependencies from `client/bun.lock`; `flake.lock` fixes the Nix builders. Nix fetches the locked dependencies before the application build runs in its network sandbox. The build runs the existing client command and embeds its output, so the application carries the page as well as the shipped skills, templates and licences. The first build may compile dependencies before it builds the application.
+
+The version line comes from the binary. A checkout built without release provenance reports `built from source`; a version number alone does not identify a published Git tag. To update, choose another actual tag or commit and run the commands again. `nix develop` opens the development shell; it does not start a city.
+
 ## 2 Raise a city, and open it
 
 ```bash

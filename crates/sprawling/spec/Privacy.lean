@@ -129,7 +129,7 @@ structure State where
 request 保存确认时的读数；answer 消耗一次请求；prepare 成功才产生持久
 工作项；writeStarted 才表示发生一次 OS 调用；durableReceipt 后才答成功。
 -/
-/-! D50 恢复只选最新仍拥有的操作，不能凭成员关系越过后来操作；
+/-! D51 恢复只选最新仍拥有的操作，不能凭成员关系越过后来操作；
 恢复终态只弹出这一层，早先原值继续作为不可变历史保留。
 拒绝按 id 搜索任意旧操作，因为外部改变后再次 apply 会产生不同 original。
 -/
