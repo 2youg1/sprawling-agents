@@ -21,6 +21,7 @@
 |---|---|---|
 | `LinuxNamespaces { wrapper }` | 文件系统、网络、进程树、用户（强制 user namespace） | CPU／内存上限；整机对命令只读可见（`--ro-bind / /`），读不受限 |
 | `WindowsJobObject` | 文件系统（工作目录为副本）、进程树、CPU／内存上限 | **网络**（作业对象不隔离网络）、用户 |
+| `MacosSeatbelt { wrapper }` | 文件写入只落副本、网络拒绝；读取不受限 | 进程树终止、独立用户、CPU／聚合内存硬上限；边界见 `Tools/Exec/NativeMacos.lean` D40 |
 | `CopiedTree` | 文件系统（写入只落副本、源树只读） | 网络、进程树、用户、CPU／内存上限 |
 | `Unavailable { missing }` | —— | 一切；`missing` 指名缺的是什么 |
 
@@ -29,7 +30,7 @@ pub enum Guarantee { Filesystem, Network, ProcessTree, User, Resources }
 pub enum Kept { Yes, No }
 pub struct Assurances { pub filesystem: Kept, pub network: Kept, pub process_tree: Kept, pub user: Kept, pub resources: Kept }
 pub enum Missing { ScratchDirectory }
-pub enum Confinement { LinuxNamespaces { wrapper: PathBuf }, WindowsJobObject, CopiedTree, Unavailable { missing: Missing } }
+pub enum Confinement { LinuxNamespaces { wrapper: PathBuf }, WindowsJobObject, MacosSeatbelt { wrapper: PathBuf }, CopiedTree, Unavailable { missing: Missing } }
 pub struct Offerings { pub namespace_tool: Option<PathBuf>, pub scratch: Option<PathBuf> }
 impl Guarantee { pub const ALL: [Guarantee; 5]; pub fn phrase(self) -> &'static str; pub fn unkept(self) -> &'static str; }
 impl Missing { pub fn phrase(self) -> &'static str; pub fn recovery(self) -> &'static str; }
@@ -54,7 +55,7 @@ pub fn parse_placement(&Map<String, Value>) -> Result<Placement, AxError>;
 - **保证清单在类型上**：`Assurances` 逐轴五字段，每一臂的 `assurances()` 必须写满五轴，故新增一轴即四臂同时编译红——任何一臂都不会留下一个没人问过它的旧答案。`statement()` 由 `Assurances` 与 `Guarantee::phrase()`／`unkept()` 派生而非另写一段话，句子与类型因此不可能分家。
 - **`LinuxNamespaces` 的用户隔离是起动条件**：`namespaced()` 在 `--unshare-all` 之后显式加 `--unshare-user`；bubblewrap 手册（https://github.com/containers/bubblewrap/blob/main/bwrap.xml ）规定前者包含可跳过的 `--unshare-user-try`，后者要求创建 user namespace。`place()` 在同步副本之前用同一包装参数运行 `/bin/true`，绑定的是工作目录自身；探测没有写入，成功后才构造目标命令。探测起动失败或退出非零时返回 `E_SANDBOX_DENIED`，主语说明这一臂需要未提权的 user namespace，并保留系统错误或 wrapper 的 stderr；恢复语给出换到允许未提权 user namespace 的 Linux 主机或由人选择 `where: host`。探测不缓存，因为内核与 LSM 的许可可能在两条命令之间变化；目标命令仍带强制参数，所以探测之后许可被撤回时也不会少一轴运行。`statement()` 保证文件系统、网络、进程树与用户，资源上限不保，并说明未提权 user namespace 是必需条件。`--ro-bind / /` 让整机对命令只读可见：文件系统保证写入只落副本，不限制读取。
 - **选择是纯函数**：`choose` 取 `Offerings`——有 wrapper 即 `LinuxNamespaces`，否则 `CopiedTree`；scratch 根不可用即 `Unavailable { missing: ScratchDirectory }`。采样只有 `Offerings::this_machine()` 一处（`PATH`＋`std::env::temp_dir()`），两个 `detect()` 都只读它；测试用 `Offerings` 陈述一台机器而不是借一台。wrapper 是按确切名字 `bwrap` 在 `PATH` 上找到的程序，只在 Linux 上找（`cfg!(target_os = "linux")`），别的平台 `namespace_tool` 恒为 `None`。
-- **逐平台的臂**：Linux 上 `PATH` 里有 `bwrap` 得 `LinuxNamespaces`（副本加 wrapper 给的命名空间），没有得 `CopiedTree`；Windows 上恒得 `CopiedTree`（`WindowsJobObject` 不构造，见下条）；macOS 上今天没有任何平台隔离接入，恒得 `CopiedTree`。三个平台上 temp 目录不可用都得 `Unavailable { missing: ScratchDirectory }`，`place()` 拒。缺的是哪一轴，User 与 Agent 都从同一句 `statement()` 读到：它进 exec 工具的 disclosure 与 doctor 的回报，`CopiedTree` 的那一句逐字写出网络、进程树、用户与资源上限都不保。
+- **逐平台的臂**：Linux 上 `PATH` 里有 `bwrap` 得 `LinuxNamespaces`（副本加 wrapper 给的命名空间），没有得 `CopiedTree`；Windows 上恒得 `CopiedTree`（`WindowsJobObject` 不构造，见下条）；macOS 的缺省仍为 `CopiedTree`，显式 `MacosSeatbelt` 以 D40 的固定策略构造并探测，缺席或拒绝时返回 `E_SANDBOX_DENIED`，不执行裸目标。三个平台上 temp 目录不可用都得 `Unavailable { missing: ScratchDirectory }`，`place()` 拒。缺的是哪一轴，User 与 Agent 都从同一句 `statement()` 读到：它进 exec 工具的 disclosure 与 doctor 的回报，`CopiedTree` 的那一句逐字写出网络、进程树、用户与资源上限都不保。
 - **`WindowsJobObject` 本构建不构造，且拒而不降级**：Job Object 本身已经可以不写 `unsafe` 地取得——`runtime::backlog::jobs` 经 `win32job` 2.0.3 的安全接口创建 job、装进进程、读进程表（下文「job 的取法」）。不构造的理由是这一臂的保证清单今天兑现不了两轴：①**资源**——`win32job` 2.0.3 的 `ExtendedLimitInfo` 对外只给按进程的工作集上限（`limit_working_memory`；经 `win32job` 设它在一台未提权账户上被系统以 os error 1314 拒绝，而 D32 的探测在另一台未提权的 Windows 11 上直接调 `SetInformationJobObject` 设 `JOB_OBJECT_LIMIT_WORKINGSET` 得到成功——要不要特权随账户令牌而变，推断是 `SeIncreaseWorkingSetPrivilege` 在不在令牌里；无论哪种，它限的是常驻页而不是提交量，不兑现「资源」一轴）、优先级档位（`limit_priority_class`）、调度级别（`limit_scheduling_class`）、亲和性（`limit_affinity`）与 kill-on-close、breakaway 两组开关，作业级提交上限的字段在 crate 私有的结构里，CPU 速率控制它根本不设（D29 说这两项改走哪一档），清单写 `resources: Yes` 就是对一个没有上限的盒子说「有上限」；②**进程树**——子进程起动之后才装进 job，中间一小段里起的孙进程不在 job 里（下文「job 的取法」的代价），`limit_kill_on_job_close` 收不到它。以 `CopiedTree` 冒充这一臂会对着一个开着网络的盒子回答「网络已关」的同类错误，故 `place()` 对它返 `E_SANDBOX_DENIED` 并给「改用 copied tree 且让命令离开网络」的 recovery。Windows 上 `detect()` 因此答 `CopiedTree`，其清单逐字写出网络未隔离——这一句就是 Agent 必须看见的那一句。
 - **副本按工具一份，每条命令之前同步成工作目录此刻的样子，有界。** `place()` 取这个 `Confined` 留着的副本（没有，或留着的那份抄的是别的目录，就在 scratch 根下新建一个），把它同步成 `workdir` 此刻的样子，命令在副本里跑；`settled()` 在等待结束时把副本留给下一条命令（已留着一份时删掉这份）；交给 backlog 的后台命令由 `handed(id, …)` 记名，其成员报结时 `reaped(&[Finished])` 同样把副本留下或删掉；`Drop` 删掉留着的与未报结的副本。同步的规则：源侧跟随链接（指向树外的链接带进来的是内容，而不是通向人那棵树的入口）；副本侧不跟随链接，因为副本里的东西是上一条命令写的。副本里的一项与源不同类（命令把文件换成了链接、把目录换成了文件），或同名文件内容不同，就先删掉这一项再从源复制，落成一个新的目录项——命令可能在副本里造了指向别处的硬链接，就地改写会写穿到那一头；同名同类同长的文件逐字节比较，相同就不动；副本里源没有的项删掉。于是每条命令开始时，副本与工作目录逐文件相同，上一条命令写下的东西不会留给下一条。逐字节比较而不比 mtime 与长度：同一个时间戳刻度里的等长改写比不出来，副本就会为一个它没有带上的版本担保；比较只读两边的文件，不新建，而实时扫描等的是新建的文件。`Placed::work()` 报这次同步的 `storage::FileWork`（`crates/storage/Spec.lean` §8-31）：第一次放置 `created` 是树里的文件数，一次什么都没变的再放置 `created`、`rewritten`、`removed` 都是 0，`walked` 是两侧读过的目录项；`confinement::tests` 的 `a_sandbox_copy_is_synced_rather_than_made_again` 在 N 与 2N 个文件的树上断言这些数。**删不掉不把命令判成失败**（与 `backlog/member.rs`、`collect()` 同一条判断：命令的收场是调用方应得的事实，一个临时目录只值磁盘）。界：`MAX_FILES = 100_000`、`MAX_BYTES = 256 MiB`、`MAX_DEPTH = 64`，按源侧计；越界**拒**并报出越过的那一对数字，已同步一半的副本随之删掉——半份副本会为一堆没带上的文件担保，而本模块的全部理由是防这个。`MAX_DEPTH` 同时终结自指链接造成的无底走查。
 - **`Mount`／`Fuel` 不沿用**：`Fuel` 是 wasmtime 指令计量、`Mount.guest` 是 guest 路径别名，二者 wasip1 专属。本模块保留的是**判断**（能力面＝能到达的路径集）而不是词形。宿主环境照旧不继承（exec 的 env allowlist 未动）；`SandboxJob.env` 的显式注入属 guest 面。
@@ -72,7 +73,7 @@ pub fn parse_placement(&Map<String, Value>) -> Result<Placement, AxError>;
 5. **设置的「沙箱」控件**：列出这座城所在的电脑解得出的每个名字与它的五轴清单（读 doctor 的同一份 `DoctorSandbox`，不另算），缺的给 `Missing` 的那一句与安装指引；选中写 `[sandbox] arm`（经设置的那扇门）。
 6. **doctor 每臂一行**：`crates/sprawling/spec/Doctor.lean` 的 doctor 表为 `native`、`container`、`python` 各加一行，读 `Offerings` 的同一次采样。
 7. **每条保证的测试**：每个构造得出的臂，五轴各一个真命令的对拍——写工作目录（副本里有、源树没有）、连回环上一个监听的端口（开网的臂连得上、关网的臂连不上）、起一个比命令活得久的孙进程（进程树轴保时命令结束后它不在）、读自己的身份（用户轴保时与 harness 不同）、分配超过上限的内存（资源轴保时失败）；与 `every_sandbox_arm_states_what_it_does_not_hold` 并列，清单与对拍不一致即红。
-8. **要另装的臂实跑一次**：`container` 在 GitHub 的 ubuntu runner（自带 Docker）上跑第 7 条的对拍；Linux 的 Landlock 回退与 macOS 的 Seatbelt 在 D32 的未决解开之前不构造。
+8. **要另装的臂实跑一次**：`container` 在 GitHub 的 ubuntu runner（自带 Docker）上跑第 7 条的对拍；Linux 的 Landlock 回退在 D32 的未决解开之前不构造；macOS 的 Seatbelt 以 `Tools/Exec/NativeMacos.lean` D40 为接口与策略权威，实际 runner 的 deprecated 手册和有限平台结果不证明其它系统支持。
 
 **未决（§3 口径）**：同步仍按命令读两侧的每个目录项，并逐字节比较同长的文件，代价随工作树的大小长；一棵带大构建缓存的工作树每条命令要读两遍缓存。判定它的证据是一棵真实 room 的每条命令同步耗时（毫秒）与其文件数的读数；若读数显示读取成了主项，再比较「按 mtime 与长度跳过、只对同一时间戳刻度里的文件逐字节比较」。
 -/
@@ -334,18 +335,18 @@ WindowsSandbox.exe present: False
 | 平台 | 缺省 | 可选 |
 |---|---|---|
 | Windows | `native`：Job Object 加 AppContainer（exec），Job Object（居民）；SB1 第 3 条落地之前解出 `copied_tree` 并照实说 | `copied_tree`、`container`（Docker Desktop 或 Podman Desktop，要另装）、`python`、`none` |
-| macOS | `copied_tree`：Seatbelt 的未决解开之前，`native` 在 macOS 上答 `Unavailable` | `container`（Docker Desktop 或 Podman Desktop，要另装）、`python`、`none` |
+| macOS | `copied_tree`，缺省读取 wire D26 | `native`（Seatbelt，文件写入与网络；其余三轴不保，见 D40）、`container`（Docker Desktop 或 Podman Desktop，要另装）、`python`、`none` |
 | Linux | `native`：`bwrap`；没有 `bwrap` 时解出 `copied_tree` 并照实说 | `copied_tree`、`container`（rootless Podman 或 Docker，要另装；gVisor 作为它的运行时）、`python`、`none` |
 
 安装指引：Docker Desktop（https://docs.docker.com/desktop/setup/install/windows-install/ 、https://docs.docker.com/desktop/setup/install/mac-install/）、Podman Desktop（https://podman-desktop.io/docs/installation/windows-install）、rootless Podman（https://github.com/containers/podman/blob/main/docs/tutorials/rootless_tutorial.md）、rootless Docker（https://docs.docker.com/engine/security/rootless/）、bubblewrap（https://github.com/containers/bubblewrap）。
 
-**理由**：按 Roadmap §6 SB 列出的六项依次比较。①方便：缺省的臂不要另装，一台新机器开城就有；`container` 要装一个运行时与镜像，只作可选。②不要管理员（D20）：Windows 上探测过的不要管理员的三种机制里，Job Object 与 AppContainer 合起来保五轴（AppContainer 给网络与用户，job 给进程树与资源，副本给文件），受限令牌给的被 AppContainer 覆盖；Windows Sandbox 要专业版以上加管理员，WSL 2 的安装要管理员。③五轴：Windows 的 `native` 保五轴，Linux 的 `bwrap` 保四轴（资源由 D29 的 cgroup 另给），都多于 `copied_tree` 的一轴。④居民：job 装得下居民；关网的机制装居民时网络一轴不保，这一点写进清单而不是挑一个能关居民网络的臂——没有这样的臂。⑤依赖（D23）：缺省的臂只依赖平台本身与已有的 Zig 叶子（Windows）或发行版的一个小包（Linux）；容器运行时、gVisor、microVM 与 OpenShell 各是一个大的外部系统。⑥三个平台（D94）：三个平台都有 `copied_tree`、`container` 与 `python`，`native` 在 macOS 上缺的是证据而不是名字，答 `Unavailable` 并说明缺什么。缺省的 `native` 缺机制时退到 `copied_tree` 而不是拒：缺省是城替 User 选的，一条拒绝会让一台没装 `bwrap` 的机器上 exec 整个不能用；退的时候 `statement()` 与 doctor 说出退了、缺什么，所以不是静默变弱。User 明写的名字缺机制时拒，因为那是 User 要的那种盒子。
+**理由**：按 Roadmap §6 SB 列出的六项依次比较。①方便：缺省的臂不要另装，一台新机器开城就有；`container` 要装一个运行时与镜像，只作可选。②不要管理员（D20）：Windows 上探测过的不要管理员的三种机制里，Job Object 与 AppContainer 合起来保五轴（AppContainer 给网络与用户，job 给进程树与资源，副本给文件），受限令牌给的被 AppContainer 覆盖；Windows Sandbox 要专业版以上加管理员，WSL 2 的安装要管理员。③五轴：Windows 的 `native` 保五轴，Linux 的 `bwrap` 保四轴（资源由 D29 的 cgroup 另给），都多于 `copied_tree` 的一轴。④居民：job 装得下居民；关网的机制装居民时网络一轴不保，这一点写进清单而不是挑一个能关居民网络的臂——没有这样的臂。⑤依赖（D23）：缺省的臂只依赖平台本身与已有的 Zig 叶子（Windows）或发行版的一个小包（Linux）；容器运行时、gVisor、microVM 与 OpenShell 各是一个大的外部系统。⑥三个平台（D94）：三个平台都有 `copied_tree`、`container` 与 `python`，`native` 在 macOS 上的显式臂由 D40 给出文件写入与网络两项保证，初始化失败照实拒绝；其余三轴不保，不以此关闭聚合内存的未决。缺省的 `native` 缺机制时退到 `copied_tree` 而不是拒：缺省是城替 User 选的，一条拒绝会让一台没装 `bwrap` 的机器上 exec 整个不能用；退的时候 `statement()` 与 doctor 说出退了、缺什么，所以不是静默变弱。User 明写的名字缺机制时拒，因为那是 User 要的那种盒子。
 
 **被否**：①Windows 缺省 `copied_tree` 不变：它对 Agent 只保文件一轴，而不要管理员的机制能保五轴；②Windows Sandbox 作 Windows 的 `native`：要专业版以上与管理员，探测机就没有；③缺省 `container`：每台机器先要装一个运行时、拉一个镜像，与「方便」与 D23 都相反；④OpenShell 作缺省：它的隔离是 Landlock、seccomp 与容器，已各成一行，多出的是一个 gateway 与一套自己的策略层，Windows 上只是实验性的；⑤Linux 缺省换成 Landlock 加 seccomp：不保进程树与用户，网络只管 TCP，而且起动方式未核实；它留作 `bwrap` 缺席时 `native` 的第二种机制，等未决解开；⑥按产品给每个机制一个名字：D26 已否。
 
-**重开参数**：Seatbelt 的未决解开（macOS 的 `native` 有了臂，macOS 缺省改 `native`）；Windows 的 Zig 叶子在 SB1 里证明做不出 AppContainer 起动（Windows 的 `native` 缩成 Job Object，清单照实写网络与用户不保）；User 按这张表另定缺省。
+**重开参数**：macOS 的已弃用接口在拟支持的系统范围中仍能稳定保持 D40 策略，并完成真实前后台生命周期检查时，重新论证缺省选择并修改唯一权威 wire D26；Windows 的 Zig 叶子证明做不出 AppContainer 起动时，缩小实际保证而不保留错误清单；User 按有效接口另定缺省时，更新该权威。
 
-**未决（§3 口径）**：①macOS 的 Seatbelt：判定它的证据是 GitHub 的 macOS runner 上 `man sandbox-exec` 的原文（是否标为已弃用）、一个 `(version 1)(deny default)` 起头、只放开副本目录写入并 `(deny network*)` 的配置下跑写文件、连回环端口与起孙进程三条命令的结果，以及 Apple 的一页可取的官方文档；②Linux 的 Landlock 回退：判定它的证据是一个不写 `unsafe` 的起动方式（harness 以自己的子命令自限后 `exec`）在 Linux runner 上跑通，并读出 runner 内核的 Landlock ABI。
+**未决（§3 口径）**：①macOS 的受支持系统范围、已弃用 Seatbelt 的维护边界与后台生命周期：D40 的显式臂保持文件写入与网络策略，真实 runner 手册标为 deprecated，有限命令对拍不证明其它系统或整棵后台进程树的终止；判定证据是每个拟支持系统的手册、固定 deny-default 策略下的生产 ExecTool 行为，以及后台/halt/release 的实际结果；聚合硬内存仍由 D29 定义，D40 不提供它；②Linux 的 Landlock 回退：判定它的证据是一个不写 `unsafe` 的起动方式（harness 以自己的子命令自限后 `exec`）在 Linux runner 上跑通，并读出 runner 内核的 Landlock ABI。
 -/
 
 namespace Runtime.Tools.Exec
