@@ -138,6 +138,10 @@
             lockFile = ./Cargo.lock;
           };
           nativeBuildInputs = nativeDeps ++ [ pkgs.bun pkgs.just ];
+          # just is a command used by preBuild, not this package's builder.
+          dontUseJustBuild = true;
+          dontUseJustCheck = true;
+          dontUseJustInstall = true;
           preBuild = ''
             export HOME="$TMPDIR/home"
             mkdir -p "$HOME"
