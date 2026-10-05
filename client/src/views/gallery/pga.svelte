@@ -16,7 +16,7 @@
   // The moments are fixed rather than read off the clock, so a picture
   // of this route compares with yesterday's.
   import type { Answer, BuildingAnswer, CommitAnswer, Entry, GitStatusAnswer, Query, SandboxLimits } from "../../wire";
-  import { Address, EnvVarName, GitOid, NodeId, RunId, Seq, ServerLabel, SessionName, TimeMs, UsdMicros } from "../../wire";
+  import { Address, ContainerImage, EnvVarName, GitOid, NodeId, RunId, Seq, ServerLabel, SessionName, TimeMs, UsdMicros } from "../../wire";
 
   const LAB = Address.make("lab");
   const AT = 1_790_000_000_000;
@@ -76,6 +76,18 @@
     mounts: [Address.make("lab/shared"), Address.make("docs")],
     env_passthrough: [EnvVarName.make("CC"), EnvVarName.make("LIB")],
     trusted: [ServerLabel.make("desktop")],
+  };
+
+  const CONTAINER_SANDBOX: SandboxLimits = {
+    ...SANDBOX,
+    arm: "container",
+    container: {
+      image: ContainerImage.make(`sha256:${"a".repeat(64)}`),
+      user: 1000,
+      cpu_millis: 1250,
+      memory_bytes: 67_108_864,
+      pids: 64,
+    },
   };
 
   const BUILDING: BuildingAnswer = {
@@ -178,6 +190,12 @@
   </Case>
   <Case label="building · its own sandbox" width={MIDDLE_WIDTH}>
     <Sandbox address={LAB} held={SANDBOX} known />
+  </Case>
+  <Case label="building · an explicit container boundary" width={MIDDLE_WIDTH}>
+    <Sandbox address={LAB} held={CONTAINER_SANDBOX} known />
+  </Case>
+  <Case label="building · container limits in a narrow column" width={390}>
+    <Sandbox address={LAB} held={CONTAINER_SANDBOX} known />
   </Case>
   <Case label="building · the city's sandbox holds" width={MIDDLE_WIDTH}>
     <Sandbox address={LAB} held={null} known />

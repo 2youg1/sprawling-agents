@@ -208,16 +208,29 @@
       <p class="text-note text-text-faint">{say($lang, "sandbox_shell_help")}</p>
     </div>
     <div class="flex min-w-0 flex-col gap-snug">
-      <span class="text-note text-text-quiet">{say($lang, "sandbox_container")}</span>
-      <Segmented label={say($lang, "sandbox_container")}
-        options={ARMS.map((value) => ({ value, label: say($lang, `sandbox_arm_${value}`) }))}
-        held={draft.arm}
-        onPick={(arm: ArmChoice) => { edit({ arm }); }} />
-      <p class="text-note text-text-faint">{say($lang, "sandbox_container_help")}</p>
+      <span class="text-note text-text-quiet">{say($lang, "sandbox_arm")}</span>
+      <select
+        class="h-control w-full rounded-control border border-edge-input bg-raised px-base text-note text-text"
+        aria-label={say($lang, "sandbox_arm")}
+        value={draft.arm}
+        onchange={(event) => {
+          const arm = ARMS.find((each) => each === event.currentTarget.value);
+          if (arm !== undefined) edit({ arm });
+        }}
+      >
+        {#each ARMS as arm (arm)}
+          <option value={arm}>{say($lang, `sandbox_arm_${arm}`)}</option>
+        {/each}
+      </select>
+      <p class="text-note text-text-faint">{say($lang, "sandbox_arm_help")}</p>
+      {#if draft.arm === "container"}
+        <p class="text-note text-text-faint">{say($lang, "sandbox_container_help")}</p>
+      {/if}
     </div>
     {#if draft.arm === "container"}
       {#each CONTAINER_FIELDS as field (field)}
         <Field label={say($lang, `sandbox_container_${field}`)} mono
+          kind={field === "image" ? "text" : "number"} step={1}
           value={draft.containerFields[field]}
           onInput={(value) => { edit({ containerFields: { ...draft.containerFields, [field]: value } }); }} />
       {/each}

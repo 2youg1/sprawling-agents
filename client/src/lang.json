@@ -3171,9 +3171,13 @@
       "en": "Python WASI",
       "zh": "Python WASI"
   },
-  "sandbox_container": {
-      "en": "Linux container",
-      "zh": "Linux 容器"
+  "sandbox_arm": {
+    "en": "Execution boundary",
+    "zh": "执行边界"
+  },
+  "sandbox_arm_help": {
+    "en": "A named boundary must be available. Platform default keeps this machine’s existing choice.",
+    "zh": "指定的边界必须可用；选择平台默认时沿用这台机器的既有机制。"
   },
   "sandbox_container_help": {
       "en": "Uses Docker or Podman with a prepared local immutable image. Runtime never pulls images. Each start checks network, user, mounts and resource limits; unavailable or refused boundaries fail closed.",
