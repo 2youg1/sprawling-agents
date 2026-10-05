@@ -26,6 +26,7 @@ pub enum ContainerEngine {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ContainerRuntime {
     program: PathBuf,
+    engine: ContainerEngine,
 }
 
 /// The values that must remain paired for one container create.
@@ -94,7 +95,7 @@ impl ContainerRuntime {
                 "the daemon does not report Linux cgroup v2 with CPU, memory and process controllers",
             ));
         }
-        Ok(Self { program })
+        Ok(Self { program, engine })
     }
 
     /// Builds a stopped container. No shell interprets the target argv.
@@ -169,8 +170,23 @@ impl ContainerRuntime {
             .arg(format!("type=bind,src={copy},dst={WORKDIR}"))
             .arg("--workdir")
             .arg(WORKDIR)
-            .arg("--entrypoint")
-            .arg(launch.command.get_program());
+            .arg("--entrypoint");
+        match self.engine {
+            ContainerEngine::Docker => command.arg(launch.command.get_program()),
+            ContainerEngine::Podman => {
+                let program = launch.command.get_program().to_str().ok_or_else(|| {
+                    denied(
+                        "encode the Podman entrypoint",
+                        "a non-UTF-8 program cannot be represented without changing its identity",
+                    )
+                })?;
+                command.arg(
+                    serde_json::to_string(&[program]).map_err(|source| {
+                        denied("encode the Podman entrypoint", source.to_string())
+                    })?,
+                )
+            }
+        };
         for (name, value) in launch.command.get_envs() {
             let value = value.ok_or_else(|| {
                 denied(
