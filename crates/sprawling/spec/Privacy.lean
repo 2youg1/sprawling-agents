@@ -166,14 +166,15 @@ inductive Step : State → State → Prop where
       Step s {s with pending := some r, confirmed := none}
   | answer (s) (r) (code now owner : Nat)
       (pending : s.pending = some r)
-      (matches : code = r.code ∧ now < r.expires ∧ owner = s.owner ∧ r.owner = owner) :
+      (bound : code = r.code ∧ now < r.expires ∧ owner = s.owner ∧ r.owner = owner) :
       Step s {s with pending := none, confirmed := some r}
   | rejectedAnswer (s) : Step s {s with pending := none, confirmed := none}
   | durablePrepared (s) (r) (keyExisted : Bool)
       (idle : s.phase = .idle) (confirmed : s.confirmed = some r)
       (valid : planValid s r) (now : Nat) (unexpired : now < r.expires)
       (fresh : ∀ old ∈ s.journal, old.operation ≠ r.operation) :
-      Step s {s with confirmed := none, pending := none, phase := .prepared,
+      Step s {s with
+        confirmed := none, pending := none, phase := .prepared,
         work := some (preparedIntent s r keyExisted),
         journal := preparedIntent s r keyExisted :: s.journal}
   | failedPrepare (s) : Step s {s with pending := none, confirmed := none}
@@ -188,16 +189,16 @@ inductive Step : State → State → Prop where
         | .applied => s.live = i.modified ∧ i.restoreOf = none
         | .notApplied => s.live = i.original
         | .restored => s.live = i.modified ∧ i.restoreOf ≠ none) :
-      Step s {s with phase := .idle, work := none,
-        receipts := ⟨i, outcome⟩ :: s.receipts,
+      Step s {s with
+        phase := .idle, work := none, receipts := ⟨i, outcome⟩ :: s.receipts,
         owned := match outcome with
           | .applied => i :: s.owned
           | .notApplied => s.owned
           | .restored => s.owned.tail}
   | qualification (s) (value) : Step s {s with qualification := value}
   | external (s) (value) : Step s {s with live := value}
-  | crash (s) : Step s {s with pending := none, confirmed := none,
-      phase := if s.work.isSome then .unknown else s.phase}
+  | crash (s) : Step s {s with
+      pending := none, confirmed := none, phase := if s.work.isSome then .unknown else s.phase}
   | malformed (s) : Step s {s with pending := none, confirmed := none, phase := .unknown}
 
 /-! ## 10 实现逻辑
@@ -216,7 +217,7 @@ theorem step_durable {s t : State} (h : Durable s) (move : Step s t) : Durable t
   | request => exact ⟨writes, work⟩
   | answer => exact ⟨writes, work⟩
   | rejectedAnswer => exact ⟨writes, work⟩
-  | durablePrepared s r keyExisted idle confirmed valid now unexpired fresh =>
+  | durablePrepared r keyExisted idle confirmed valid now unexpired fresh =>
       constructor
       · intro i hi
         exact List.mem_cons_of_mem _ (writes i hi)
@@ -225,7 +226,7 @@ theorem step_durable {s t : State} (h : Durable s) (move : Step s t) : Durable t
         subst i
         exact List.mem_cons_self
   | failedPrepare => exact ⟨writes, work⟩
-  | writeStarted s i prepared hi fresh readback now unexpired qualified =>
+  | writeStarted i prepared hi fresh readback now unexpired qualified =>
       constructor
       · intro j hj
         rcases List.mem_cons.mp hj with equal | previous
@@ -256,17 +257,17 @@ theorem step_ready {s t : State} (ready : Ready s) (move : Step s t) : Ready t :
   | request => exact ready
   | answer => exact ready
   | rejectedAnswer => exact ready
-  | durablePrepared s r keyExisted idle confirmed valid now unexpired fresh =>
+  | durablePrepared r keyExisted idle confirmed valid now unexpired fresh =>
       intro i hi
       simp only [Option.some.injEq] at hi
       subst i
       cases action : r.action with
       | apply => simp [restoresLatest, preparedIntent, action]
       | restore old =>
-          refine ⟨old, ?_, rfl⟩
+          simp only [restoresLatest, preparedIntent, action]
           have validRestore := valid.2.2.2.2.2.2
           simp only [action] at validRestore
-          exact validRestore.1
+          exact ⟨old, validRestore.1, rfl⟩
   | failedPrepare => exact ready
   | writeStarted => exact ready
   | durableReceipt => intro i hi; cases hi
@@ -278,7 +279,7 @@ theorem step_ready {s t : State} (ready : Ready s) (move : Step s t) : Ready t :
 theorem step_ordered {s t : State} (h : Ordered s) (move : Step s t) : Ordered t := by
   constructor
   · cases move with
-    | writeStarted s i prepared work fresh readback now unexpired qualified =>
+    | writeStarted i prepared work fresh readback now unexpired qualified =>
         intro entry present
         rcases List.mem_cons.mp present with equal | previous
         · subst entry
@@ -300,7 +301,8 @@ theorem step_ordered {s t : State} (h : Ordered s) (move : Step s t) : Ordered t
 inductive Reachable (owner control definition : Nat) (qualification : Qualification)
     (initial recommendation : RawValue) : State → Prop where
   | initial : Reachable owner control definition qualification initial recommendation
-      ⟨owner, control, definition, qualification, initial, recommendation⟩
+      { owner := owner, control := control, definition := definition,
+        qualification := qualification, live := initial, recommendation := recommendation }
   | next {s t} : Reachable owner control definition qualification initial recommendation s → Step s t →
       Reachable owner control definition qualification initial recommendation t
 
@@ -354,8 +356,8 @@ def restoreVectors : List (State × Request) :=
         live := second.modified, recommendation := first.modified,
         journal := [second, first], owned := [second, first] }
     [first, second].map fun old =>
-      (state, { action := .restore old, control := 1, definition := 1,
-        operation := 3, owner := 7, expected := state.live, target := old.original,
+      (state, {
+        action := .restore old, control := 1, definition := 1, operation := 3, owner := 7, expected := state.live, target := old.original,
         expires := 100, code := 11 })
 
 #eval restoreVectors.map fun (s, r) => (s.live, r.target, decide (planValid s r))
