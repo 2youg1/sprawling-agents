@@ -353,6 +353,22 @@ jobs:
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-nextest,just
+      - name: the macOS sandbox mechanism supplied by this runner
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p target/platform-evidence
+          sw_vers > target/platform-evidence/sw-vers.txt
+          command -v sandbox-exec > target/platform-evidence/sandbox-exec-path.txt
+          MANPAGER=cat PAGER=cat man sandbox-exec | col -b > target/platform-evidence/sandbox-exec.txt
+          test -s target/platform-evidence/sandbox-exec.txt
+      - uses: actions/upload-artifact@v7
+        if: always() && runner.os == 'macOS'
+        with:
+          name: macos-mechanism-${{ github.sha }}-${{ github.run_attempt }}
+          path: target/platform-evidence
+          if-no-files-found: error
       - name: clippy and the suite of the core packages
         run: just check-core
       # See the test slices: the cache's save step cannot walk trybuild's
