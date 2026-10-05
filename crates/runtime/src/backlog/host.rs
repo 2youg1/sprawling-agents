@@ -5,7 +5,7 @@
 
 //! Host command ownership at the Backlog spawn boundary.
 
-use super::{Backlog, Body, Claim, Member, Started, Tail, collect, process, storage};
+use super::{Backlog, Body, Claim, Member, Started, Tail, process, storage};
 use kernel::{Address, AxCode, AxError, RunId};
 use std::process::{Command, Stdio};
 
@@ -59,22 +59,6 @@ impl Backlog {
                 },
             },
         )?;
-        let mut tail = Tail::default();
-        for _ in 0..self.window.polls() {
-            if let Some(exit) = self.settle(id)? {
-                let (stdout, stderr) = collect(&dir);
-                return Ok(Started::Settled {
-                    exit,
-                    stdout,
-                    stderr,
-                });
-            }
-            if let Some(sink) = &self.sink {
-                sink.deliver(tail.take(&dir, (owner, id), self.window.read_per_poll()));
-            }
-            std::thread::sleep(self.window.interval());
-        }
-        self.hand_over(id, tail)?;
-        Ok(Started::Backgrounded { id, what })
+        self.watch(id, owner, what, dir)
     }
 }

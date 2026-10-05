@@ -150,11 +150,22 @@ impl ExecTool {
             (Placement::Sandbox, None) => {
                 let (command, placed) =
                     held(&self.confinement)?.place(command, &self.setup.workdir)?;
-                (
+                #[cfg(windows)]
+                let started = if matches!(
+                    held(&self.confinement)?.arm(),
+                    Confinement::WindowsJobObject
+                ) {
                     self.backlog
-                        .run(self.setup.run, &self.setup.domain, what, command)?,
-                    Some(placed),
-                )
+                        .run_native(self.setup.run, &self.setup.domain, what, command)?
+                } else {
+                    self.backlog
+                        .run(self.setup.run, &self.setup.domain, what, command)?
+                };
+                #[cfg(not(windows))]
+                let started =
+                    self.backlog
+                        .run(self.setup.run, &self.setup.domain, what, command)?;
+                (started, Some(placed))
             }
             (Placement::Host, _) => (
                 self.backlog

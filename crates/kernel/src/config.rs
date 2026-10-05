@@ -8,7 +8,6 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::address::Address;
 use crate::consts_policy::CLOCK_STAMP_DEFAULT;
 use crate::error::{AxCode, AxError};
 use crate::model::Effort;
