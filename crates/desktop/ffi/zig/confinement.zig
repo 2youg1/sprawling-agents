@@ -337,6 +337,7 @@ fn cleanup(record: *api.Record, context: CleanupContext, comptime effects: anyty
     }
     const tree_waited = effects.tree(record);
     if (result == 0) result = tree_waited;
+    if (result != 0) return result;
     const process_closed = effects.close(&record.process);
     if (result == 0) result = process_closed;
     const job_closed = effects.close(&record.job);

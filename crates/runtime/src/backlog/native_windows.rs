@@ -77,29 +77,18 @@ pub(super) struct RetiringNative {
 
 impl RetiringNative {
     pub(super) fn cleanup(&mut self) -> Result<(), AxError> {
-        let process = match &mut self.process {
-            Some(process) => process
+        if let Some(process) = &mut self.process {
+            process
                 .retry_cleanup()
-                .map_err(|error| native_windows::denied("clean failed native launch", error)),
-            None => Ok(()),
-        };
-        let output = match std::fs::remove_dir_all(&self.output) {
+                .map_err(|error| native_windows::denied("clean failed native launch", error))?;
+        }
+        self.process = None;
+        match std::fs::remove_dir_all(&self.output) {
             Ok(()) => Ok(()),
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
             Err(error) => Err(native_windows::denied(
                 "remove native output directory",
                 error,
-            )),
-        };
-        match (process, output) {
-            (Ok(()), output) => {
-                self.process = None;
-                output
-            }
-            (Err(error), Ok(())) => Err(error),
-            (Err(process), Err(output)) => Err(native_windows::denied(
-                "clean failed native resources",
-                format!("process: {process}; output: {output}"),
             )),
         }
     }
