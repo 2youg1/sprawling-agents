@@ -64,6 +64,14 @@ fn a_dispatched_command_runs_below_the_core() {
         }
     }
     let core = direct.stdin(std::process::Stdio::null()).output().unwrap();
+    assert!(
+        core.status.success(),
+        "the direct priority probe must succeed: {core:?}"
+    );
+    assert!(
+        !core.stdout.is_empty(),
+        "the direct priority probe must report a priority: {core:?}"
+    );
     let core = String::from_utf8_lossy(&core.stdout).into_owned();
 
     let chamber = tempfile::tempdir().unwrap();
@@ -82,6 +90,14 @@ fn a_dispatched_command_runs_below_the_core() {
         .unwrap();
     let result = serde_json::to_value(&outcome.result).unwrap();
     let dispatched = result["stdout"].as_str().unwrap();
+    assert_eq!(
+        result["exit_code"], 0,
+        "the dispatched priority probe must succeed: {result}"
+    );
+    assert!(
+        !dispatched.trim().is_empty(),
+        "the dispatched priority probe must report a priority: {result}"
+    );
 
     // Windows sets an absolute class, so a core that a CI runner already
     // starts at BelowNormal leaves its commands beside it, not beneath it.
