@@ -123,39 +123,76 @@ shelves = ["~/.claude/skills"]
 
 ## 你需要什么
 
-一个桌面浏览器，以及一个能调用的模型：一个说 OpenAI 或 Anthropic 兼容格式的 provider 的 API key，或者一个说 OpenAI 兼容格式的本地服务。别的都不需要：不装 npm，不装 node，不装语言运行时，不装数据库。
+需要桌面浏览器和一个能调用的模型：兼容的 provider 或本地模型服务。独立发行二进制不需要 JavaScript 运行时或数据库；npm 需要 Node.js，Bun 渠道使用 Bun。从 crates.io 编译还需要发布包要求的编译器和平台原生构建工具。
 
 ## 1 安装
 
-本指南讲的是 sprawling <!-- xtask:begin workspace_version -->0.0.10<!-- xtask:end -->，一个 <!-- xtask:begin maturity:word -->alpha<!-- xtask:end --> 版本：可以拿来干真活，但数据格式、协议和界面在版本之间仍可能变，所以在意的城请放在能导出的地方（见[搬一座城](#搬一座城)）。除第一条命令外，Windows、macOS 和 Linux 上的安装步骤相同。
+本指南讲的是 sprawling <!-- xtask:begin workspace_version -->0.0.10<!-- xtask:end -->，处于 <!-- xtask:begin maturity:word -->alpha<!-- xtask:end --> 阶段。数据格式、配置、wire 和界面在版本之间仍可能改变；更新前保留可恢复的备份。下列命令安装该渠道实际提供的版本，可能与本指南描述的源码版本不同。
 
-macOS 或 Linux：
+选择一种渠道：
+
+| 渠道 | 安装 | 前提与结果 |
+|---|---|---|
+| npm | `npm install --global sprawling@latest` | Node.js 与 npm；下载预编译二进制。 |
+| Bun | `bun install --global sprawling@latest` | Bun；下载预编译二进制。用 `bun pm bin --global` 找到全局 bin 目录，将它加入 PATH。 |
+| crates.io | `cargo install sprawling --locked` | 发布包支持的 Rust 和平台原生构建工具；在本地编译，包内包含构建好的浏览器客户端。 |
+| cargo-binstall | `cargo binstall sprawling` | [cargo-binstall](https://github.com/cargo-bins/cargo-binstall)；按已发布 crate 的元数据下载发行归档。 |
+| 手动归档 | 在[发行列表](https://github.com/2youg1/sprawling-agents/releases)选择平台 | Windows x86-64、Apple 芯片的 macOS 或 Linux x86-64；解开归档并运行其中的二进制。 |
+
+shell 安装器下载归档，不需要 JavaScript 或 Rust 工具链。macOS/Linux：
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/2youg1/sprawling/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/2youg1/sprawling-agents/main/install.sh | sh
 ```
 
 Windows PowerShell：
 
 ```powershell
-irm https://raw.githubusercontent.com/2youg1/sprawling/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/2youg1/sprawling-agents/main/install.ps1 | iex
 ```
 
-脚本向发布列表要适配你这个平台的最新归档，下载下来，再拿发布方公布的 sha256 核对；对不上就不解压。下载之前它打印发布 tag、平台和归档大小，核对之后打印二进制自报的版本。发布没有构建的平台，它连同这一版实际带的归档清单一起报出来。
-
-sha256 对得上，说明下载完整无损，不说明归档是谁构建的。每份归档还带一份由发布流水线经 Sigstore 签出的构件来源证明，用 [GitHub CLI](https://cli.github.com) 验：
+脚本打印所选 tag、平台与下载大小，将归档 SHA256 与发行公布的摘要比较，不一致就拒绝。最后调用 `sprawling install`，把二进制复制到你的程序目录并把目录加入 PATH；`sprawling install --uninstall` 撤销这次安装。npm/Bun 和 Cargo 各自管理 bin 目录。PATH 变更尚未进入当前终端时，打开新终端，再检查：
 
 ```sh
-gh attestation verify sprawling-<version>-<platform>.zip --repo 2youg1/sprawling
+sprawling version
+sprawling help
 ```
 
-二进制最终装在哪、`PATH` 怎么改，由脚本最后调用的 `sprawling install` 决定；`sprawling install --uninstall` 把它从 `PATH` 上撤下。把 `SPRAWLING_VERSION` 设成某个发布 tag，装的就是那一版。
+### 选择与验证版本
 
-已经装了 bun 或 node 的话，`bunx sprawling help` 或 `npx sprawling help` 从 npm 取来同一个二进制，与归档里的逐字节相同，包目录之外一字不写。装了 [cargo-binstall](https://github.com/cargo-bins/cargo-binstall) 的话，`cargo binstall sprawling` 下载你系统的发行归档，把二进制放进 cargo 的 bin 目录，什么都不编译。
+[发行列表](https://github.com/2youg1/sprawling-agents/releases)包含预发布版本；GitHub 的 `releases/latest` 入口排除它们。选择实际发布的 tag，使用该版的资产名、CHANGELOG 和校验摘要。运行前须替换下文的 `<release-tag>`、`<npm-version>`、`<crate-version>`、`<archive.zip>` 等占位符。Git tag、npm 版本与 crate 版本采用不同拼法，发布流水线通过 [kernel::Release](../crates/kernel/src/release.rs) 派生它们。
 
-没有东西会自己更新。`sprawling version` 印出这是哪一版；`sprawling status --check`，或 **设置** 里的那个按钮，去 npm 和 crates.io 问有没有更新的一版，并按这个二进制的来处判断：`cargo install` 编出来的看 crates.io，其余的看 npm，给出那条渠道的更新命令；替换二进制始终由你来做。
+npm/Bun 用 `sprawling@<npm-version>` 固定版本；Cargo 用 `cargo install sprawling --locked --version <crate-version>`；binstall 用 `cargo binstall sprawling --version <crate-version>`。shell 安装器仅为本次调用设置完整 tag：
 
-这些二进制没有代码签名：Windows 上点 *More info*，再点 *Run anyway*；macOS 上在 Finder 里右键打开一次。装了 1.97 或更新的 Rust 工具链，也可以用 `cargo install sprawling --locked` 从 crates.io 编出同一个程序，因为发布的包里已经带着构建好的页面；从 git 检出直接跑 `cargo build`，在 `just build-web` 构建页面之前得到的页面一片空白。
+```sh
+SPRAWLING_VERSION='<release-tag>' sh -c 'curl -fsSL https://raw.githubusercontent.com/2youg1/sprawling-agents/main/install.sh | sh'
+```
+
+PowerShell 保留已有设置：
+
+```powershell
+$previousVersion = $env:SPRAWLING_VERSION
+try {
+    $env:SPRAWLING_VERSION = '<release-tag>'
+    irm https://raw.githubusercontent.com/2youg1/sprawling-agents/main/install.ps1 | iex
+} finally {
+    if ($null -eq $previousVersion) {
+        Remove-Item Env:SPRAWLING_VERSION -ErrorAction SilentlyContinue
+    } else {
+        $env:SPRAWLING_VERSION = $previousVersion
+    }
+}
+```
+
+手动下载时，将 SHA256 与该资产公布的摘要比较。SHA256 核对字节与摘要是否一致，不确认构建者。发布流水线还提供 Sigstore 构件来源证明，可用 [GitHub CLI](https://cli.github.com) 检查：
+
+```sh
+gh attestation verify <archive.zip> --repo 2youg1/sprawling-agents
+```
+
+操作系统代码签名与这两项检查分别成立。签名申请或流水线配置不能证明下载的二进制已有签名；检查所选资产的签名与发行说明。这些检查均不保证杀毒产品接受文件。操作系统发出警告时，先核对来源，再决定是否运行。
+
+从 checkout 构建完整交付物使用 `just dist`；运行 `just build-web` 之前直接 `cargo build`，嵌入的页面只说明客户端 bundle 缺失。源码构建前提见[贡献指南](CONTRIBUTING.md)。
 
 ### 用 Nix
 
@@ -164,22 +201,57 @@ Linux x86-64 上可以用 Nix 从本仓库构建完整应用。启用 Nix 的 `n
 ```bash
 nix build .#default --no-update-lock-file
 nix run .#default --no-update-lock-file -- status
-nix run .#default --no-update-lock-file -- up ~/cities/first
+nix run .#default --no-update-lock-file -- up ./cities/first
 ```
 
 [flake](../flake.nix) 从 `rust-toolchain.toml` 读取固定的编译器，从 `Cargo.lock` 读取 Rust 依赖，从 `client/bun.lock` 读取客户端依赖；Nix 构建工具由 `flake.lock` 固定。Nix 先获取锁定的依赖，再在网络沙箱中构建应用。构建会调用既有客户端命令并嵌入产物，所以应用带着页面、随附的 skills、模板和许可。首次构建可能需要先编译依赖。
 
 版本行由二进制报告。没有发布来源信息的 checkout 构建会显示 `built from source`，单凭版本号不能确定某个已发布 Git tag。更新时，选择另一个实际 tag 或 commit，再运行上述命令。`nix develop` 打开开发环境，不会启动城。
 
+## 更新
+
+更新由你手动执行。在设置中或用 `sprawling status --check` 检查版本，使用最初安装这份程序的渠道。照提示运行前，先核对它识别的渠道；复制过的二进制或含义不明确的 bin 目录可能无法确定安装器。阅读所选发行 tag 或发行页的 CHANGELOG，重点检查数据格式、配置与 wire 变化。主分支准备中的 CHANGELOG 不证明该版本已经发布。
+
+替换二进制前，完成或取消正在执行的工作，在控制台按 `Ctrl-C` 停城。保留旧二进制或足够重新安装的包版本信息，记下 `sprawling version`。用旧版导出到城外的新目录，再恢复到另一处未使用的目录：
+
+```sh
+sprawling version
+sprawling export ./cities/first ./backups/before-update.bundle
+sprawling restore ./backups/before-update.bundle ./cities/restore-check
+sprawling replay ./cities/restore-check/.sprawling/ledger
+```
+
+每条命令都成功后再更新。bundle 是目录，仅确认目录存在不能证明备份有效。restore 核对链、清单计数、链头和随行 git 历史；replay 再独立验证恢复后的 Ledger。也要检查恢复副本中的重要项目文件与历史。后续备份和验证使用新的目标目录，导出期间保持原城停止。
+
+导出带走 Ledger、内容对象、城与项目文件及支持的 git 历史；不带凭证明文、派生视图、git hooks/configuration 和城根层的保留配置。用自己的受保护备份流程另存主机配置和城外的项目仓库。凭证仍在主机 vault 中，换主机需要重新登记；远程配对也依赖主机持有的城钥匙。备份包含项目内容和对话历史，应保持私密。确切内容与验证规则见 [Bundle](../crates/storage/spec/Bundle.lean)。
+
+通过原渠道更新：
+
+| 原安装渠道 | 更新 | 重装选定版本 |
+|---|---|---|
+| npm | `npm install --global sprawling@latest` | `npm install --global sprawling@<npm-version>` |
+| Bun | `bun install --global sprawling@latest` | `bun install --global sprawling@<npm-version>` |
+| Cargo | `cargo install sprawling --locked` | `cargo install sprawling --locked --version <crate-version>` |
+| cargo-binstall | `cargo binstall sprawling` | `cargo binstall sprawling --version <crate-version>` |
+| shell/PowerShell 安装器 | 停城后重跑原安装器。 | 按前文将 `SPRAWLING_VERSION` 设为实际发布的完整 tag。 |
+| 手动归档 | 下载并验证所选归档；此前安装过时，运行该归档内二进制的 `install` 命令。 | 保留或下载所选 tag 的归档。 |
+| 仓库 Nix flake | 检出所选 tag 或 commit，再运行 [Nix 命令](#用-nix)。 | 使用原固定 checkout 和 lockfile；固定 commit 不会跟随新版。 |
+
+更新后运行 `sprawling version` 与 `sprawling help`，确认 PATH 上解析到预期的二进制，再用 `sprawling up ./cities/first` 打开城。核对页面能连接、配置能读取、项目文件和历史仍在，并执行一件小任务。验证成功之前保留旧版和备份。
+
+### 安全回退
+
+停下更新后的城，通过原渠道恢复旧二进制并检查版本；用旧二进制把更新前的 bundle 恢复到新的城目录，再对它的 Ledger 运行 `replay`。按需恢复另存的主机配置、重新登记凭证，然后启动恢复的城。除非所选发行明确说明兼容，否则不要让旧二进制读取已由新版迁移的城。单独保留更新后的城供检查；回退到备份不会保留备份之后完成的工作。
+
 ## 2 建一座城，并把它打开
 
 ```bash
-sprawling up ~/cities/first
+sprawling up ./cities/first
 ```
 
 目录里还没有城时，这一条先把城建起来，然后在 `127.0.0.1:8787` 上服务，并用操作系统打开链接的那个浏览器打开页面。这个终端成为城的控制台：`/help` 列出它接受的命令，`/serving` 重报一遍城在哪里监听，`Ctrl-C` 停城。控制台为城记下的每条记录打一行：它在账本里的位置、事件种类和地址，从不打出你输入的话或模型的回答，因为终端谁站在旁边都看得见；`sprawling up --whole-records` 才把每条记录整条打出来。Windows、macOS、Linux 上打出来的一样。什么参数都不带地跑 `sprawling`，它先给出打算建城的文件夹，按 Enter 就在那里建。
 
-要在已有的项目上干活，就在装着这些项目的文件夹里建城，或者把项目挪进城的文件夹，再用 `sprawling adopt ~/cities/first myproject` 把它收为一栋楼。收编不覆盖任何文件：它在你的工作旁边放下城的表单，并加一条 `.gitignore`，让城的笔记不进你项目的历史。
+要在已有的项目上干活，就在装着这些项目的文件夹里建城，或者把项目挪进城的文件夹，再用 `sprawling adopt ./cities/first myproject` 把它收为一栋楼。收编不覆盖任何文件：它在你的工作旁边放下城的表单，并加一条 `.gitignore`，让城的笔记不进你项目的历史。
 
 `sprawling doctor` 分两层检查运行它的电脑。第一层是城要用的东西，比如浏览器工具要的浏览器引擎。第二层是改这份代码要的工具，`just prereqs` 读的就是这一层：一台没有管理员权限的新机器，这一层的必需项全部就位，开发环境就算装齐。Windows 上其中一项是 bash，`just` 的每一个配方都在 bash 里跑。请在 Git Bash 里运行 `just`，因为别的终端先找到的 `bash` 可能是 `C:\Windows\System32\bash.exe`，它启动的是 WSL，不是 shell。贡献者不用新机器也能核这一趟：`gh workflow run on-demand.yml -f job=fresh` 在 Windows、macOS、Linux 的 runner 上解开这棵树的发布归档，用新账户的环境跑 `sprawling doctor`，从安装走到第一次派活，把清单与日志上传为 `fresh-<os>-<tree>`。runner 的账户是管理员，所以这个作业核的是新账户的环境，不是没有管理员权限的账户。
 
@@ -247,7 +319,7 @@ Mayor 先读每一栋楼的 `Roadmap.md`、`Memo.md`、`Handoff.md`。它用 `pl
 1. run 的 **改动** 视图：动过的文件一行一个，点开一行给出那个文件的补丁。被凭证扫描命中的行只报行号与理由，不回显原文。
 2. 那栋楼里的 `git log`。城在每一波工具调用前写的检查点，是没有任何 `HEAD` 指向的提交，挂在 `refs/sprawling/runs/` 下，所以你的历史仍是你离开时的形状。
 3. 合并提交的 trailer——`Sprawling-Run`、`Sprawling-Actor`、`Sprawling-Model`、`Sprawling-Effort`、`Sprawling-City`，接替另一次 run 的还多一条 `Sprawling-Predecessor`。你复核过的合并另带 `Reviewed-by`，前提是这个仓库的 git config 里有 `user.name` 与 `user.email`。
-4. `sprawling whose ~/cities/first <commit>` 从账本反过来回答同一个问题，要给完整的四十位提交 id。退出码 1 表示这座城没有写过那个提交的记录。加上 `--trace`，会列出那次 run 从上一个提交以来做过的调用，每条带时间、工具与结局；同一栋楼里在这一段调用过工具的别的 run 作为候选，只给出调用次数。
+4. `sprawling whose ./cities/first <commit>` 从账本反过来回答同一个问题，要给完整的四十位提交 id。退出码 1 表示这座城没有写过那个提交的记录。加上 `--trace`，会列出那次 run 从上一个提交以来做过的调用，每条带时间、工具与结局；同一栋楼里在这一段调用过工具的别的 run 作为候选，只给出调用次数。
 
 没有页面替你合并，也没有页面推翻已经合并的活。你的退路是 git 和 **回收站**，那里每个被丢弃的文件都写着怎么取回；你的刹车是 `/halt --all`。
 
@@ -255,14 +327,14 @@ Mayor 先读每一栋楼的 `Roadmap.md`、`Memo.md`、`Handoff.md`。它用 `pl
 
 **成本** 是钱与 token，按 run、按居民、按 prefix 段、按 skill、按工具各切一刀，每一刀加起来都等于同一个总数。provider 没报价格的（比如本地模型），页面数出调用次数和 token，而不是打印 `$0.00`。
 
-**记录** 是同一段历史的四个视图：**账本**（每一条事件，筛选时会说藏了几行）、**归档**（在你问的那一刻，搜遍每一栋楼保存的东西）、**回收站**，以及 **日志**（这个进程的诊断日志）。在终端里，`sprawling view ~/cities/first` 不需要城在服务就能读同一本账，`--runs` 打印 run 树。`--since 2026-05-14T09:00:00Z --until 2026-05-14T10:00:00Z` 只留自身时间落在那一小时里的行：UTC，到秒，以 `Z` 结尾，不含终点。
+**记录** 是同一段历史的四个视图：**账本**（每一条事件，筛选时会说藏了几行）、**归档**（在你问的那一刻，搜遍每一栋楼保存的东西）、**回收站**，以及 **日志**（这个进程的诊断日志）。在终端里，`sprawling view ./cities/first` 不需要城在服务就能读同一本账，`--runs` 打印 run 树。`--since 2026-05-14T09:00:00Z --until 2026-05-14T10:00:00Z` 只留自身时间落在那一小时里的行：UTC，到秒，以 `Z` 结尾，不含终点。
 
 ## 9 停下，再开始
 
 在控制台按 `Ctrl-C` 停城。`/halt --all` 停下所有活，城照常服务。崩溃之后：
 
 ```bash
-sprawling resume ~/cities/first
+sprawling resume ./cities/first
 ```
 
 这一步验链，关掉结果已丢失的工具调用，报出谁在等你。`sprawling up --supervise` 在每次崩溃后替你做这一步，直到崩溃挨得太近。
@@ -306,7 +378,7 @@ egress = ["api.github.com"]    # 这里的活可以访问的域名
 browser = true                 # 浏览器工具
 ```
 
-`sprawling check ~/cities/first` 读城里的每个 TOML 文件，把每个错误打印成 `path:line:column`。
+`sprawling check ./cities/first` 读城里的每个 TOML 文件，把每个错误打印成 `path:line:column`。
 
 **保密楼**（`/raise vault confidential`）用于不能外流的数据：在那里，run 在任何一次远程 provider 调用之前就被停下，不起任何 MCP server，往别的楼写会被拒绝。配本地模型用。
 
@@ -336,7 +408,7 @@ sprawling call '{"ask":{"ask_id":1,"query":"city_view"}}'    # 发一帧线协�
 ## 同一网络里的另一台机器
 
 ```bash
-sprawling serve ~/cities/first 0.0.0.0:8787
+sprawling serve ./cities/first 0.0.0.0:8787
 ```
 
 伸出这台电脑的地址需要一把配对钥匙。设了 `SPRAWLING_PAIRING_TOKEN`，城就采用它，并且从不打印；没设，城为这一次服务现铸一把，只在启动横幅里印一次，旁边附一个带着它的地址。下一次启动换一把新的。从你的网络之外，设备经远程门与一条你选的通路够到这座城。设置 → 远程可以按你选的时长开门、关门、换城钥匙；开门与换钥匙会在跑 `sprawling serve` 的终端上印一个码，你在两分钟之内把它输进页面，Windows、macOS、Linux 上都一样。配对设备仍在控制台上做：[operating.md](operating.md) 的 *Reaching the city from another device* 一节写了怎么做，以及通路被托付了什么。
@@ -344,9 +416,9 @@ sprawling serve ~/cities/first 0.0.0.0:8787
 ## 搬一座城
 
 ```bash
-sprawling export ~/cities/first city.bundle
-sprawling restore city.bundle ~/cities/copy
-sprawling replay ~/cities/copy/.sprawling/ledger
+sprawling export ./cities/first city.bundle
+sprawling restore city.bundle ./cities/copy
+sprawling replay ./cities/copy/.sprawling/ledger
 ```
 
 还原在报告成功之前拿账本链对照包里的清单，`replay` 离线、只读地验链。

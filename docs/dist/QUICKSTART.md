@@ -7,7 +7,7 @@ You have unpacked a folder. Nothing was installed and no service was registered.
 - **Windows** — double-click `sprawling.exe`.
 - **macOS and Linux** — run `./sprawling` from a terminal.
 
-The first time on Windows you will see **"Windows protected your PC"**, because this program carries no code-signing certificate. Choose **More info**, then **Run anyway**.
+An operating-system warning is not proof of a safe or unsafe download. Verify the selected release's checksum and build provenance, and inspect its code-signing status before deciding whether to run it. The [installation guide](https://github.com/2youg1/sprawling-agents/blob/main/docs/getting-started.md#select-and-verify-a-version) explains these separate checks.
 
 Started with no command, it asks one question before it creates anything, and shows you the folder it is about to create. Answer it and a console window opens and stays open. **That window is the city**: closing it, or pressing `Ctrl-C` in it, stops the city. Your browser opens at <http://127.0.0.1:8787>; if it does not, open that address yourself.
 
@@ -18,12 +18,12 @@ To make `sprawling` a word your shell resolves from anywhere, run `sprawling ins
 This program schedules agents, records what they do, and shows it to you. **It does not think by itself**, so before it can do anything you need one of:
 
 - an API key from a provider that speaks the OpenAI dialect or the Anthropic dialect,
-- an Anthropic subscription you can sign in to, or
+- a supported official harness you sign in to with your own subscription, or
 - a local server that speaks the OpenAI dialect.
 
 ## 3 Three steps in the page
 
-1. **connect a provider**, on the welcome page, opens **settings** → **accounts and providers**. Fill in the provider's `base_url`, which face it answers in (`wire_api`), and the key, then **list models** and **attach**. The key goes straight into your operating system's credential service; the page only ever shows a `secret:realm/name` reference afterwards. With a subscription, choose **with a subscription** instead.
+1. **connect a provider**, on the welcome page, opens **settings** → **accounts and providers**. Fill in the provider's `base_url`, which face it answers in (`wire_api`), and the key, then **list models** and **attach**. The key goes straight into your operating system's credential service; the page only ever shows a `secret:realm/name` reference afterwards. For a subscription, use **official harnesses** and follow the vendor's sign-in instructions; the city itself does not sign in.
 2. Under **which model thinks**, choose the model for **main · thinks**. **digest · reads**, which reads long documents on `main`'s behalf, follows it until you choose another.
 3. **the Mayor**, the page the city opens on, is the conversation with the city's planner. Write what you want done and press Enter. The Mayor plans the work, raises the buildings it needs, and hands each one its part.
 
@@ -35,7 +35,7 @@ In `city/`, beside this file, unless this folder cannot be written to; then the 
 
 ## Is there a newer one?
 
-Nothing here updates itself, and nothing asks npm anything until you do. `sprawling version` says which release this is and the day it was cut; `sprawling status --check` asks whether a newer one is published, and **settings** → **which release this is** has the same check behind a button. Either way you are told what to run, and nothing is replaced for you.
+Nothing here updates itself, and update checks run only when you ask. `sprawling version` says which release this is and the day it was cut; `sprawling status --check` asks whether a newer one is published, and **settings** → **which release this is** has the same check behind a button. Verify that the reported channel matches your installation, then follow the [update and rollback guide](https://github.com/2youg1/sprawling-agents/blob/main/docs/getting-started.md#updating). Stop the city and verify a restorable backup before replacing anything.
 
 ## Everything else
 

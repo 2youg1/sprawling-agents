@@ -20,6 +20,34 @@ release notes and their commits.
 
 ---
 
+## <!-- xtask:begin workspace_version -->0.0.10<!-- xtask:end --> INNOCENT
+
+Prepared for Alpha 261005; this section describes source changes and is not a published tag. The workspace manifest owns the package version, `kernel::release::MATURITY` owns maturity, and the release workflow supplies the actual tag to a released binary. A checkout without that provenance continues to report `built from source`.
+
+### Execution and recovery
+
+Linux host-command confinement explicitly requests a user namespace and refuses a failed namespace setup. A copied working tree remains a placement mechanism; it does not isolate other host paths or the network. Sandbox guarantees are reported by axis rather than inferred from a platform name.
+
+Windows run jobs apply the selected processor affinity. JSONL preallocation reads scan the zero tail with bounded memory while preserving rejection of nonzero bytes after the tail; they do not skip that verification I/O. Skill audit execution binds results to the installed content digest, records unreachable services without claiming a successful audit, and observes shelves through the serving assembly.
+
+The existing container command path preserves the configured engine, encodes a single Podman entrypoint and refuses non-UTF8 arguments instead of changing them silently. Configuration, native-platform mechanisms and lifecycle guarantees are described in [operating](docs/operating.md#how-exec-is-confined) according to the shipped implementation.
+
+### Distribution and verification
+
+Release archives keep ZIP with Deflate level 9, with archive suffixes and platform names taken from the shared platform table. Release validation uses the existing parallel CI entry point and its cache configuration. Manual release-workflow dispatch builds and checks artifacts without publishing GitHub releases, npm packages or crates, and does not invent release provenance.
+
+The repository Nix flake builds the browser client before Rust and includes the shipped skills and licences. A source flake and a package accepted into nixpkgs are distinct distribution paths; using the former does not establish availability in a nixpkgs channel. Windows resource generation reads Cargo package metadata for the product and file version. Build provenance, archive checksums and OS code signing are separate facts.
+
+### Documentation and contribution rules
+
+README now introduces the city, documents that carry work across Sessions, five capabilities and a complete reading index in matching English and Chinese. The paired getting-started guides distinguish prebuilt and locally compiled channels and explain version selection, provenance checks, stopped-city export, verified restore, updating and rollback from the pre-update backup. Root host configuration and vault credentials require separate handling; an exported directory alone is not proof of recoverability.
+
+[LLM.md](LLM.md) introduces the project for another model; [wire](docs/wire.md) owns the protocol reference, [integrations](docs/integrations.md) owns ACP/MCP/CLI setup and [performance](docs/performance.md) owns monitoring and reproducible evaluation. Onboarding objectives and historical readings are not presented as measurements of this release.
+
+Contribution policy uses AGENTS as its single authority, distinguishes negative fixtures, fixed regressions and opt-in experiments, and requires matching English and Chinese issue/PR descriptions. The security policy states actual trust boundaries, private reporting, no bounty, optional credit by consent and next-release fixes without backports.
+
+---
+
 ## v0.0.9-Alpha-261004
 
 **sprawling 0.0.9 something and nothing**

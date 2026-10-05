@@ -123,39 +123,76 @@ The largest difference is that nothing here is one conversation. The Mayor plans
 
 ## What you need
 
-A desktop browser, and one model to call: an API key for a provider that speaks the OpenAI or the Anthropic format, or a local server that speaks the OpenAI format. Nothing else: no npm, no node, no language runtime, no database.
+You need a desktop browser and a callable model: a compatible provider or a local model server. The standalone release binary needs no JavaScript runtime or database. npm needs Node.js; the Bun channel uses Bun. Building from crates.io also needs the compiler and native build tools required by the published package.
 
 ## 1 Install
 
-This guide describes sprawling <!-- xtask:begin workspace_version -->0.0.10<!-- xtask:end -->, an <!-- xtask:begin maturity:word -->alpha<!-- xtask:end --> release: usable for real work, with data formats, the wire and the screens still free to change between versions, so keep a city you care about where you can export it ([Moving a city](#moving-a-city)). The install is the same on Windows, macOS and Linux apart from the first command.
+This guide describes sprawling <!-- xtask:begin workspace_version -->0.0.10<!-- xtask:end -->, in <!-- xtask:begin maturity:word -->alpha<!-- xtask:end -->. Data formats, configuration, the wire and the interface may change between versions; keep a recoverable backup before an update. Commands below install the version actually available through that channel, which may differ from the source version described here.
 
-macOS or Linux:
+Choose one channel:
+
+| Channel | Install | Prerequisites and result |
+|---|---|---|
+| npm | `npm install --global sprawling@latest` | Node.js and npm; downloads a prebuilt binary. |
+| Bun | `bun install --global sprawling@latest` | Bun; downloads a prebuilt binary. Put Bun's global bin directory, reported by `bun pm bin --global`, on PATH. |
+| crates.io | `cargo install sprawling --locked` | Rust supported by the published package and native build tools for the platform; compiles locally. The package includes the built browser client. |
+| cargo-binstall | `cargo binstall sprawling` | [cargo-binstall](https://github.com/cargo-bins/cargo-binstall); downloads the release archive using the published crate's metadata. |
+| Manual archive | Select your platform in the [release list](https://github.com/2youg1/sprawling-agents/releases) | Windows x86-64, macOS on Apple silicon or Linux x86-64; unpack and run the included binary. |
+
+The shell installers download an archive without needing a JavaScript or Rust toolchain. macOS/Linux:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/2youg1/sprawling/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/2youg1/sprawling-agents/main/install.sh | sh
 ```
 
 Windows PowerShell:
 
 ```powershell
-irm https://raw.githubusercontent.com/2youg1/sprawling/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/2youg1/sprawling-agents/main/install.ps1 | iex
 ```
 
-The script asks the release list for the newest archive built for your platform, downloads it, and checks it against the sha256 the release publishes; an archive that does not match is not unpacked. It prints the release tag, the platform and the archive's size before the download, and the version the binary reports about itself after the check. A platform the release does not build is reported with the list of archives the release does carry.
-
-The sha256 check shows that the download arrived whole; it does not show who built the archive. Each archive also carries a build-provenance attestation signed through Sigstore by the release workflow, and the [GitHub CLI](https://cli.github.com) checks it:
+The scripts print the selected tag, platform and download size, check the archive's SHA256 against the release's published digest and refuse a mismatch. Their last step, `sprawling install`, copies the binary to your program directory and adds that directory to PATH; `sprawling install --uninstall` reverses that installation. npm/Bun and Cargo manage their own bin directories. Open a new terminal if a PATH change has not reached the current one, then check:
 
 ```sh
-gh attestation verify sprawling-<version>-<platform>.zip --repo 2youg1/sprawling
+sprawling version
+sprawling help
 ```
 
-Where the binary finally lives, and what happens to `PATH`, is decided by `sprawling install`, which the script runs last; `sprawling install --uninstall` takes it back off `PATH`. Set `SPRAWLING_VERSION` to a release tag to install that release instead of the newest.
+### Select and verify a version
 
-With bun or node already installed, `bunx sprawling help` or `npx sprawling help` fetches the same binary from npm, byte for byte what the archive holds, and writes nothing outside the package directory. With [cargo-binstall](https://github.com/cargo-bins/cargo-binstall) installed, `cargo binstall sprawling` downloads the release archive for your system and places the binary in cargo's bin directory, without compiling anything.
+The [release list](https://github.com/2youg1/sprawling-agents/releases) includes prereleases; GitHub's `releases/latest` endpoint excludes them. Choose an actual published tag and use its asset names, changelog and checksums. Placeholders such as `<release-tag>`, `<npm-version>`, `<crate-version>` and `<archive.zip>` below must be replaced before running a command. A Git tag, npm version and crate version have different spellings: the release workflow derives them through [kernel::Release](../crates/kernel/src/release.rs).
 
-Nothing updates itself. `sprawling version` prints which release this is; `sprawling status --check`, or the button under **settings**, asks npm and crates.io whether a newer one exists and judges this binary against the registry it came from: crates.io for a binary `cargo install` built, npm for every other one, with the update command of that channel; replacing the binary stays your command to run.
+Pin npm/Bun with `sprawling@<npm-version>`, Cargo with `cargo install sprawling --locked --version <crate-version>`, or binstall with `cargo binstall sprawling --version <crate-version>`. For a shell installer, set the full tag only for this invocation:
 
-The binaries are not code-signed: on Windows choose *More info*, then *Run anyway*; on macOS open the binary once from Finder's right-click menu. With a Rust toolchain of 1.97 or later, `cargo install sprawling --locked` builds the same program from crates.io, because the published package carries the page already built; a plain `cargo build` of a git checkout yields a blank page until `just build-web` has built the page.
+```sh
+SPRAWLING_VERSION='<release-tag>' sh -c 'curl -fsSL https://raw.githubusercontent.com/2youg1/sprawling-agents/main/install.sh | sh'
+```
+
+In PowerShell, preserve any existing setting:
+
+```powershell
+$previousVersion = $env:SPRAWLING_VERSION
+try {
+    $env:SPRAWLING_VERSION = '<release-tag>'
+    irm https://raw.githubusercontent.com/2youg1/sprawling-agents/main/install.ps1 | iex
+} finally {
+    if ($null -eq $previousVersion) {
+        Remove-Item Env:SPRAWLING_VERSION -ErrorAction SilentlyContinue
+    } else {
+        $env:SPRAWLING_VERSION = $previousVersion
+    }
+}
+```
+
+For a manual download, compare SHA256 with the digest published for that exact asset. SHA256 verifies bytes against that digest; it does not identify the builder. The release workflow also supplies a Sigstore build-provenance attestation, checked with [GitHub CLI](https://cli.github.com):
+
+```sh
+gh attestation verify <archive.zip> --repo 2youg1/sprawling-agents
+```
+
+Operating-system code signing is separate from both checks. A signing application or workflow configuration does not establish that a downloaded binary is signed; inspect the selected asset's signature and release notes. None of these checks guarantees that an antivirus product will accept the file. Treat an OS warning as a reason to verify provenance before deciding whether to run it.
+
+A checkout builds the complete deliverable with `just dist`. A plain `cargo build` before `just build-web` embeds a page explaining that the client bundle is missing. Follow the [contribution prerequisites](CONTRIBUTING.md) for source builds.
 
 ### With Nix
 
@@ -164,22 +201,57 @@ On Linux x86-64, Nix can build the complete application from this repository. En
 ```bash
 nix build .#default --no-update-lock-file
 nix run .#default --no-update-lock-file -- status
-nix run .#default --no-update-lock-file -- up ~/cities/first
+nix run .#default --no-update-lock-file -- up ./cities/first
 ```
 
 [The flake](../flake.nix) reads the pinned compiler from `rust-toolchain.toml`, Rust dependencies from `Cargo.lock`, and client dependencies from `client/bun.lock`; `flake.lock` fixes the Nix builders. Nix fetches the locked dependencies before the application build runs in its network sandbox. The build runs the existing client command and embeds its output, so the application carries the page as well as the shipped skills, templates and licences. The first build may compile dependencies before it builds the application.
 
 The version line comes from the binary. A checkout built without release provenance reports `built from source`; a version number alone does not identify a published Git tag. To update, choose another actual tag or commit and run the commands again. `nix develop` opens the development shell; it does not start a city.
 
+## Updating
+
+Updates are manual. Check in Settings or with `sprawling status --check`, and use the channel that installed this copy. Verify the reported channel before following its command; a copied binary or ambiguous bin directory may not identify the installer. Read the selected release's CHANGELOG on its tag or release page, especially changes to data formats, configuration and the wire. The main branch's prepared changelog is not evidence that that version has been published.
+
+Before replacing the binary, finish or cancel active work and stop the city with `Ctrl-C` in its console. Keep the old binary or enough package-version information to reinstall it, and write down `sprawling version`. Export with that old version, into a new directory outside the city, then restore into a separate unused directory:
+
+```sh
+sprawling version
+sprawling export ./cities/first ./backups/before-update.bundle
+sprawling restore ./backups/before-update.bundle ./cities/restore-check
+sprawling replay ./cities/restore-check/.sprawling/ledger
+```
+
+Each command must succeed before updating. A bundle is a directory; the existence of that directory alone proves nothing. Restore verifies the chain, manifest counts and head, plus carried git history; replay independently verifies the restored Ledger. Inspect important project files and history in the restored copy as well. Use new destination names for subsequent backups and checks, and keep the original city stopped during export.
+
+Export carries the Ledger, content objects, city/project files and supported git history; it omits credential plaintext, derived views, git hooks/configuration and the city root's reserved configuration. Preserve host configuration and any external project repositories separately through your own protected backup process. Credentials remain in the host vault; on another host you must enroll them again. Remote pairing also depends on the host's city key. Keep backups private because they contain project work and conversation history. [Bundle](../crates/storage/spec/Bundle.lean) defines the exact contents and verification.
+
+Update through the original channel:
+
+| Installed through | Update | Reinstall a selected version |
+|---|---|---|
+| npm | `npm install --global sprawling@latest` | `npm install --global sprawling@<npm-version>` |
+| Bun | `bun install --global sprawling@latest` | `bun install --global sprawling@<npm-version>` |
+| Cargo | `cargo install sprawling --locked` | `cargo install sprawling --locked --version <crate-version>` |
+| cargo-binstall | `cargo binstall sprawling` | `cargo binstall sprawling --version <crate-version>` |
+| shell/PowerShell installer | Run that installer again after stopping the city. | Set `SPRAWLING_VERSION` to the exact published tag as described above. |
+| Manual archive | Download and verify the selected archive, then run its binary's `install` command if you previously installed it. | Keep or download the archive from the selected tag. |
+| Repository Nix flake | Check out the selected tag or commit, then run the [Nix commands](#with-nix). | Use the original pinned checkout and lockfile. A fixed commit does not follow newer releases. |
+
+After updating, run `sprawling version` and `sprawling help`, check the intended executable is the one on PATH, then reopen the city with `sprawling up ./cities/first`. Confirm the page connects, configuration loads, project files and history are present and a small task works. Keep the old version and backup until this check succeeds.
+
+### Roll back safely
+
+Stop the updated city. Restore the previous binary through its original channel, verify its version, then use that previous binary to restore the pre-update bundle into a fresh city directory and run `replay` on its Ledger. Reapply any separately backed-up host configuration, enroll credentials where needed, and start this restored city. Do not ask an older binary to read a city that the newer version migrated unless the selected release explicitly documents that compatibility. Preserve the updated city separately for inspection; rollback to the backup does not retain work performed after it was taken.
+
 ## 2 Raise a city, and open it
 
 ```bash
-sprawling up ~/cities/first
+sprawling up ./cities/first
 ```
 
 This raises the city if the directory does not hold one, serves it on `127.0.0.1:8787`, and opens the page in the browser your operating system opens links with. The terminal becomes the city's console: `/help` lists what it takes, `/serving` repeats where the city listens, and `Ctrl-C` stops the city. The console prints one line for each record the city commits — its position, its kind and its address — and never what you typed or what a model answered, because a terminal is seen by whoever stands nearby; `sprawling up --whole-records` prints each record whole. It prints the same on Windows, macOS and Linux. `sprawling` with no arguments shows the folder it would start a city in, and Enter starts it there.
 
-To work on projects you already have, raise the city in the folder that holds them, or move a project into the city's folder, and take it in as a building with `sprawling adopt ~/cities/first myproject`. Adopting overwrites no file; it adds the city's forms beside your work and a `.gitignore` entry that keeps the city's notes out of your project's history.
+To work on projects you already have, raise the city in the folder that holds them, or move a project into the city's folder, and take it in as a building with `sprawling adopt ./cities/first myproject`. Adopting overwrites no file; it adds the city's forms beside your work and a `.gitignore` entry that keeps the city's notes out of your project's history.
 
 `sprawling doctor` checks this machine in two tiers. The first is what a city uses, such as a browser engine for the browser tool. The second is what changing this code takes, and it is the list `just prereqs` reads: on a new machine without administrator rights, the development setup is complete when every required row of that tier answers. On Windows one of those rows is bash, which every `just` recipe runs in. Run `just` from Git Bash, because the `bash` another terminal finds first can be `C:\Windows\System32\bash.exe`, which starts WSL rather than a shell. A contributor can check that walk without a new machine: `gh workflow run on-demand.yml -f job=fresh` unpacks this tree's release archive on Windows, macOS and Linux runners, runs `sprawling doctor` with the environment a new account has, walks from install to the first dispatch, and uploads the checklist and logs as `fresh-<os>-<tree>`. A runner's account is an administrator, so the job checks the environment a new account has, not an account without administrator rights.
 
@@ -247,7 +319,7 @@ Work that is meant to land goes through a pull request inside the city, and the 
 1. The run's **changes** lens: one row per file that moved, and the patch of a file when you open its row. A line the credential scan matched is reported by its line number and reason, never echoed.
 2. `git log` in the building. The checkpoints the city writes before each wave of tool calls are commits no `HEAD` points at, kept under `refs/sprawling/runs/`, so your history keeps the shape you left it.
 3. The merge commit's trailers — `Sprawling-Run`, `Sprawling-Actor`, `Sprawling-Model`, `Sprawling-Effort`, `Sprawling-City`, and `Sprawling-Predecessor` for a run that replaced another. A merge you reviewed also carries `Reviewed-by`, when this repository's git config holds `user.name` and `user.email`.
-4. `sprawling whose ~/cities/first <commit>` answers the same question backwards from the Ledger, given the full forty-digit commit id. Exit code 1 means this city has no record of writing that commit. Add `--trace` to list the calls the run made since its previous commit, each with its time, tool and outcome; other runs that called tools in the same building in that span are counted beside them as candidates.
+4. `sprawling whose ./cities/first <commit>` answers the same question backwards from the Ledger, given the full forty-digit commit id. Exit code 1 means this city has no record of writing that commit. Add `--trace` to list the calls the run made since its previous commit, each with its time, tool and outcome; other runs that called tools in the same building in that span are counted beside them as candidates.
 
 No page merges for you, and none rejects work already merged. Your recourse is git and **the recycle bin**, where every discarded file states the way back; your brake is `/halt --all`.
 
@@ -255,14 +327,14 @@ No page merges for you, and none rejects work already merged. Your recourse is g
 
 **cost** is money and tokens cut by run, by resident, by prefix segment, by skill and by tool, each cut summing to the same total. Where a provider reported no price, as with a local model, the page counts the calls and tokens instead of printing `$0.00`.
 
-**the record** is the one history read through four lenses: **the ledger** (every event, with filters that say how many rows they hid), **the archive** (a search across what every building keeps, at the moment you ask), **the recycle bin** and **the log** (this process's diagnostic log). From a terminal, `sprawling view ~/cities/first` reads the same Ledger without a served city, and `--runs` prints the run tree. `--since 2026-05-14T09:00:00Z --until 2026-05-14T10:00:00Z` keeps the lines whose own time falls in that hour: UTC, to the second, ending in `Z`, the end left out.
+**the record** is the one history read through four lenses: **the ledger** (every event, with filters that say how many rows they hid), **the archive** (a search across what every building keeps, at the moment you ask), **the recycle bin** and **the log** (this process's diagnostic log). From a terminal, `sprawling view ./cities/first` reads the same Ledger without a served city, and `--runs` prints the run tree. `--since 2026-05-14T09:00:00Z --until 2026-05-14T10:00:00Z` keeps the lines whose own time falls in that hour: UTC, to the second, ending in `Z`, the end left out.
 
 ## 9 Stop, and start again
 
 `Ctrl-C` in the console stops the city. `/halt --all` stops the work and leaves the city serving. After a crash:
 
 ```bash
-sprawling resume ~/cities/first
+sprawling resume ./cities/first
 ```
 
 This verifies the chain, closes the tool calls whose outcome was lost, and reports what waits for you. `sprawling up --supervise` does it for you after every crash, until crashes come too close together.
@@ -306,7 +378,7 @@ egress = ["api.github.com"]    # domains work here may reach
 browser = true                 # the browser tool
 ```
 
-`sprawling check ~/cities/first` reads every TOML file in the city and prints each error as `path:line:column`.
+`sprawling check ./cities/first` reads every TOML file in the city and prints each error as `path:line:column`.
 
 **A confidential building** (`/raise vault confidential`) is for data that must not leave: a run there is stopped before any call to a remote provider, it starts no MCP server, and writes to other buildings are refused. Pair it with a local model.
 
@@ -336,7 +408,7 @@ sprawling call '{"ask":{"ask_id":1,"query":"city_view"}}'          # one frame o
 ## Another machine on your network
 
 ```bash
-sprawling serve ~/cities/first 0.0.0.0:8787
+sprawling serve ./cities/first 0.0.0.0:8787
 ```
 
 An address that reaches past this machine needs a pairing key. If `SPRAWLING_PAIRING_TOKEN` is set, the city adopts it and never prints it; otherwise the city mints a key for this serve alone and prints it once in the banner, with an address that carries it. The next start replaces it. From outside your network, a device reaches the city through the remote door and a route you choose. Settings > Remote opens the door for a time you pick, closes it, and replaces the city key; opening and replacing the key print a code on the terminal that runs `sprawling serve`, which you type into the page within two minutes, the same on Windows, macOS and Linux. Pairing a device stays at the console: [operating.md](operating.md), *Reaching the city from another device*, says how, and what the route is trusted with.
@@ -344,9 +416,9 @@ An address that reaches past this machine needs a pairing key. If `SPRAWLING_PAI
 ## Moving a city
 
 ```bash
-sprawling export ~/cities/first city.bundle
-sprawling restore city.bundle ~/cities/copy
-sprawling replay ~/cities/copy/.sprawling/ledger
+sprawling export ./cities/first city.bundle
+sprawling restore city.bundle ./cities/copy
+sprawling replay ./cities/copy/.sprawling/ledger
 ```
 
 Restore compares the chain with the bundle's manifest before it reports success, and `replay` verifies the chain offline, read-only.
