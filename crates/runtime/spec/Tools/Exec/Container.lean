@@ -44,7 +44,8 @@ Docker 的 info 字段来自 https://docs.docker.com/reference/api/engine/ 。
 
 ## 6 命名统一
 
-ContainerEngine 是 Docker 或 Podman；ContainerRuntime 持有已通过 info admission 的 CLI 路径。
+ContainerEngine 是 Docker 或 Podman；ContainerRuntime 持有已通过 info admission 的 CLI 路径与
+ContainerEngine，后续 argv 文法按该值选择，不能从 CLI 文件名重新猜测后端。
 ContainerLimits 的整数限额与 ContainerImage 的固定 ID 只由 kernel 定义。
 
 ## 7 模块边界
@@ -61,8 +62,8 @@ ContainerLimits 的整数限额与 ContainerImage 的固定 ID 只由 kernel 定
 
 ## 9 工作流程
 
-下面的模型要求拒绝吸收其后全部探测结果；一条缺证据的路径永不通过后续成功而降级起动。
-Rust 的 admission 先判 JSON 形状，再判 Linux／cgroup／控制器，最后才构造值。
+Rust 的 admission 是一次性能力合取，没有多步探测状态：先判 JSON 形状，再判 Linux／cgroup／
+控制器，最后才构造值。下面的模型只规定这个合取；daemon 命令失败的清理与取消属于 backlog。
 
 ## 10 实现逻辑
 
@@ -71,7 +72,10 @@ D39 container 的镜像与 argv 契约
 镜像只能是本地不可变 image ID，由 User 自行准备；不推断默认镜像，不下载。
 工作目录固定为容器里的 /work，只 bind 副本，根文件系统只读，关闭网络，去掉全部 capabilities，
 禁止新特权，非零 UID，CPU 用整数 millicpu 转十进制字符串，内存与 swap 总额相同，
-进程数有界。entrypoint 是目标 program，args 逐项递交；拒空 program、移除环境变量的 Command
+进程数有界。entrypoint 必须解成仅含目标 program 的单元素列表：Docker CLI 收原始 program；
+Podman CLI 收由 serde_json 编码的单元素字符串数组，因为 Podman 优先将 entrypoint 当 JSON 数组解码。
+Podman 的非 UTF-8 program 在创建前以 E_SANDBOX_DENIED 拒绝，不能有损转换改变程序身份。
+args 逐项递交；拒空 program、移除环境变量的 Command
 与含 mount 文法分隔符的副本路径，避免部分转译。
 镜像必须没有声明 VOLUME，否则创建时会产生额外可写卷，起动前的 image inspect 必须拒绝它。
 固定 /work 是容器路径的唯一权威，宿主路径绝不被当成容器可执行文件路径。
@@ -108,8 +112,9 @@ spawn/enrol 失败必须走同一清理权威。容器收下限额之前不得�
 
 ## 16 测试与约束
 
-`lake build crates.runtime.spec.Tools.Exec.Container` 证明拒绝在每条探测 trace 上吸收后续结果。
-Rust 的公开 admission／argv 测试检查实际实现，真实隔离验收必须运行 docker/podman。
+`lake build crates.runtime.spec.Tools.Exec.Container` 证明任意能力列表中缺一项即拒。
+Rust 的公开 admission／argv 测试检查实际实现，entrypoint 回归覆盖两个后端、JSON 数组形状、
+空 JSON 数组、null、引号与普通路径；真实隔离验收必须运行 docker/podman。
 五轴声明须等真实挂载、回环联网、孙进程、身份与超额分配测试，不能从本模型推出。
 
 ## 17 文档关系
@@ -119,31 +124,6 @@ kernel Config 分部拥有 ContainerLimits；模块图登记 Rust 文件与本�
 -/
 
 namespace Runtime.Tools.Exec.Container
-
-inductive AdmissionState where
-  | checking
-  | refused
-  deriving DecidableEq, Repr
-
-inductive ProbeResult where
-  | accepted
-  | rejected
-  deriving DecidableEq, Repr
-
-def observe : AdmissionState → ProbeResult → AdmissionState
-  | .checking, .accepted => .checking
-  | .checking, .rejected => .refused
-  | .refused, _ => .refused
-
-def observeTrace (state : AdmissionState) (trace : List ProbeResult) : AdmissionState :=
-  trace.foldl observe state
-
-/-- 任意后续 trace 都不能让已经拒绝的 admission 变为可继续检查。 -/
-theorem refusal_absorbs_every_trace (trace : List ProbeResult) :
-    observeTrace .refused trace = .refused := by
-  induction trace with
-  | nil => rfl
-  | cons probe rest ih => simpa [observeTrace, List.foldl, observe] using ih
 
 /-- daemon 的全部必需能力都必须明确报告，缺一项即拒。 -/
 def controls : List Bool → Bool
