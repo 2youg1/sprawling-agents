@@ -70,7 +70,25 @@ private def walkWith (shelf script record checklist : System.FilePath) : IO UInt
     IO.println s!"  FAIL  {error}"
     return 1
 
+/-- Checks the installed binary against the caller's Cargo identity. -/
+private def installedVersion (name version : String) : IO UInt32 := do
+  let door : Door := { binary := ← required "SPRAWLING_BIN" }
+  let said ← door.status
+  match said.splitOn "
+" with
+  | headline :: _ =>
+    if headline.startsWith s!"{name} {version} (" then
+      IO.println headline
+      return 0
+    else
+      IO.eprintln s!"expected {name} {version}; status said: {headline}"
+      return 1
+  | [] =>
+    IO.eprintln "status printed no version line"
+    return 1
+
 def main : List String → IO UInt32
+  | ["version", name, version] => installedVersion name version
   | ["script", shelf, out] => writeScript shelf out
   | ["walk", shelf, script, record, checklist] => walkWith shelf script record checklist
   | _ => do

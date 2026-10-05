@@ -373,6 +373,13 @@ where
       else
         pick rest
 
+/-- The installed binary's status text; a failed command is a failed check. -/
+def Door.status (door : Door) : IO String := do
+  let said ← capture door.binary #["status"]
+  if said.exitCode != 0 then
+    throw <| IO.userError s!"status failed (exit {said.exitCode}): {said.err}"
+  return said.out
+
 /-- Raises a city in a directory that does not have one. -/
 def Door.raise (door : Door) (city : System.FilePath) : IO Unit := do
   let said ← capture door.binary #["init", city.toString]
