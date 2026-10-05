@@ -38,6 +38,7 @@ use crate::report::{Violation, XtaskError};
 use crate::walk;
 
 pub(crate) mod facts;
+mod installers;
 
 /// What opens a managed span, up to the fact's key.
 const BEGIN: &str = "<!-- xtask:begin ";
@@ -82,6 +83,7 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
             }
         }
     }
+    violations.extend(installers::check(root)?);
     Ok(violations)
 }
 
@@ -111,6 +113,7 @@ pub(crate) fn write(root: &Path) -> Result<String, XtaskError> {
         changed = changed.saturating_add(1);
         println!("written: {rel}");
     }
+    changed = changed.saturating_add(installers::write(root)?);
     Ok(format!("docnum: {changed} document(s) rewritten\n"))
 }
 

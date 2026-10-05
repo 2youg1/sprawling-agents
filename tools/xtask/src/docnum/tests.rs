@@ -146,19 +146,41 @@ fn a_span_in_a_lean_specification_is_judged() {
 #[test]
 fn a_repository_change_refuses_stale_standalone_installer_defaults() {
     let root = crate::root::fixture::relocated("installer-repository");
-    crate::root::fixture::write(&root, "Cargo.toml", "[workspace.package]
+    crate::root::fixture::write(
+        &root,
+        "Cargo.toml",
+        "[workspace.package]
 repository = \"https://github.com/new-owner/new-repo\"
-");
-    crate::root::fixture::write(&root, "install.sh", "REPO=\"${SPRAWLING_REPO:-old-owner/old-repo}\"
-");
-    crate::root::fixture::write(&root, "install.ps1", "$repo = if ($env:SPRAWLING_REPO) { $env:SPRAWLING_REPO } else { 'old-owner/old-repo' }
-");
+",
+    );
+    crate::root::fixture::write(
+        &root,
+        "install.sh",
+        "REPO=\"${SPRAWLING_REPO:-old-owner/old-repo}\"
+",
+    );
+    crate::root::fixture::write(
+        &root,
+        "install.ps1",
+        "$repo = if ($env:SPRAWLING_REPO) { $env:SPRAWLING_REPO } else { 'old-owner/old-repo' }
+",
+    );
     let found = check(&root).unwrap();
-    assert_eq!(found.iter().map(|v| v.location.as_str()).collect::<Vec<_>>(), vec!["install.sh", "install.ps1"]);
+    assert_eq!(
+        found
+            .iter()
+            .map(|v| v.location.as_str())
+            .collect::<Vec<_>>(),
+        vec!["install.sh", "install.ps1"]
+    );
     write(&root).unwrap();
     assert!(check(&root).unwrap().is_empty());
     let shell = std::fs::read_to_string(root.join("install.sh")).unwrap();
     assert!(shell.contains("${SPRAWLING_REPO:-new-owner/new-repo}"));
-    assert!(std::fs::read_to_string(root.join("install.ps1")).unwrap().contains("'new-owner/new-repo'"));
+    assert!(
+        std::fs::read_to_string(root.join("install.ps1"))
+            .unwrap()
+            .contains("'new-owner/new-repo'")
+    );
     std::fs::remove_dir_all(root).unwrap();
 }
