@@ -1,70 +1,119 @@
 name: Bug report / 缺陷报告
-description: Something is broken or behaves wrongly. 报告一个坏行为或缺陷。
-title: "简述现象 / what is broken"
-labels: []
+description: Report incorrect behavior, a crash, or a regression. 报告错误行为、崩溃或回归。
+labels: [bug]
 body:
   - type: markdown
     attributes:
       value: |
-        一份好报告回答三个问题：做了什么、发生了什么、为什么这是缺陷而不是偏好。
-        本仓库的既定形状是 **现象 / 定位 / 影响 / 可能的方向 / 环境**（CONTRIBUTING §2、§6）。
-        语言自由（CONTRIBUTING §4），但概念名用仓库词汇（docs/glossary.md）。
+        Describe the problem so a maintainer can reproduce or investigate it. Provide matching English and Chinese text in narrative fields, including the same scope, uncertainty, and observed results. Share commands, error codes, logs, and attachments once, preserving their original text.
+        在叙述字段中提供含义一致的中英文，保留相同的范围、不确定性与观察结果，以便维护者复现或调查。命令、错误码、日志和附件只提供一次，保留原文。
 
-        **贴之前先删。** 没有任何门扫得到 issue 正文——key、token、绝对家目录路径、机器名与账号名要由你自己删掉（AGENTS.md *Privacy*）。
-        Nothing scans an issue body: strip keys, tokens, home paths, machine and account names yourself before pasting.
+        Review text and attachments before submitting: redact credentials and personal or machine details, use repository-relative paths or `<city>/…`, and crop screenshots to the application. Report vulnerabilities through [SECURITY.md](https://github.com/2youg1/sprawling-agents/security/policy).
+        提交前检查正文与附件：删去凭据、个人信息和机器信息，路径使用仓库相对路径或 `<city>/…`，截图裁到应用范围。漏洞按 [SECURITY.md](https://github.com/2youg1/sprawling-agents/security/policy) 私密报告。
 
   - type: textarea
-    id: behavior
+    id: summary
     attributes:
-      label: 现象 — what happened
-      description: 你运行了什么、输出了什么、你期望什么。粘贴精确的命令与输出；确定性失败请给 seed。贴之前把 key、token 与绝对家目录路径替换掉——路径写成仓库相对路径或 `<city>/…`，如下例。
+      label: Problem summary / 问题概述
+      description: What fails, and during which task? 什么出了错，当时在做什么？
       placeholder: |
-        $ sprawling replay "D:/.../city"
-        chain verified: 0 line(s), tail seq none      # 期望：报 E_PATH_NOT_FOUND
+        English:
+
+        中文：
     validations:
       required: true
 
   - type: textarea
-    id: location
+    id: reproduction
     attributes:
-      label: 定位 — where it lives (optional)
-      description: 找不到没关系；找到了就把 `file:line` 与机制写出来。这一节决定修复是被接走还是被重查。
-      placeholder: crates/runtime/src/replay.rs:163 的 verify_ledger_dir …
-    validations:
-      required: false
+      label: Reproduction steps / 复现步骤
+      description: Include the smallest steps, relevant configuration, and input. For intermittent failures, state the known conditions, frequency, and what you could not reproduce. 提供最少步骤、相关配置与输入；偶发问题说明已知触发条件、频率和无法复现的部分。
+      placeholder: |
+        English:
+        1.
+        2.
 
-  - type: textarea
-    id: impact
-    attributes:
-      label: 影响 — why this is a defect
-      description: 谁、在什么场景下被它伤到：数据完整性？脚本化检查被误判为通过？合法启动变红？只写主观不悦的，不是缺陷报告。
+        中文：
+        1.
+        2.
     validations:
       required: true
 
   - type: textarea
-    id: directions
+    id: expected
     attributes:
-      label: 可能的方向 (optional)
-      description: 2–3 个候选，各一句话。取舍权在维护者；给出方向的人不必是给出答案的人。
+      label: Expected behavior / 预期行为
+      description: What should happen? Cite the relevant documented behavior if known. 应当发生什么？知道相关文档约定时请附链接。
       placeholder: |
-        1. 在 X 处报错并以非零退出
-        2. 接受城目录，自行向下定位 ledger
+        English:
+
+        中文：
     validations:
-      required: false
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior / 实际行为
+      description: What happened instead? Include the relevant error or output once, verbatim. 实际发生了什么？相关错误或输出保留原文，只贴一次。
+      placeholder: |
+        English:
+
+        中文：
+
+        Error or output / 错误或输出：
+    validations:
+      required: true
 
   - type: input
-    id: environment
+    id: version
     attributes:
-      label: 环境
-      description: OS / 工具链版本 / release tag 或 commit SHA——足以复现的那部分。
-      placeholder: Windows 11 / rustc 1.97.1 / sprawling v0.0.3-Pre-alpha-260903
+      label: sprawling version or commit / sprawling 版本或提交
+      description: Use sprawling --version or the commit SHA for a source build. If unavailable, explain why. 填 sprawling --version 的版本或源码构建的 commit SHA；无法取得时说明原因。
     validations:
       required: true
 
   - type: textarea
-    id: fixtures
+    id: environment
     attributes:
-      label: 复现夹具 (optional)
-      description: 能单独复现的最小输入：seed、日志文件、目录布局。一个夹具胜过三段描述。账本与日志里可能带着端点配置与凭据形状的值——先读一遍再贴，或只给 seed。
+      label: Environment / 运行环境
+      description: Include OS version, CPU architecture, and installation method. Add browser, provider/model, harness, MCP server, sandbox, or toolchain details only when relevant; redact private identifiers. 填操作系统版本、CPU 架构与安装方式；浏览器、provider/model、harness、MCP server、sandbox 或工具链信息按问题需要填写，并删去私密标识。
+      placeholder: |
+        OS / 操作系统：
+        CPU architecture / CPU 架构：
+        Installation method / 安装方式：
+        Relevant components / 相关组件：
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Logs, screenshots, or minimal input / 日志、截图或最小输入
+      description: Attach redacted evidence needed to investigate. Prefer relevant excerpts or a minimal fixture; provide commands and logs once without translation. 附上调查所需且已脱敏的证据，优先提供相关片段或最小夹具；命令与日志只提供一次，无需翻译。
     validations:
       required: false
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Impact and additional context / 影响与补充信息
+      description: If known, describe affected work, a workaround, the last working version, related issues, or a suspected cause. Code location and a proposed fix are optional. 如已知，可说明受影响的工作、临时绕过方法、最后正常版本、相关 Issue 或怀疑原因；代码定位与修复建议均为选填。
+      placeholder: |
+        English:
+
+        中文：
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting / 提交前确认
+      options:
+        - label: I searched existing open and closed issues for this problem. 我已搜索现有的开放及已关闭 Issue。
+          required: true
+        - label: My English and Chinese descriptions match, including uncertainty and observed results. 我的中英文描述含义一致，包括不确定性与观察结果。
+          required: true
+        - label: I reviewed the text and attachments for private information. 我已检查正文与附件中的私密信息。
+          required: true

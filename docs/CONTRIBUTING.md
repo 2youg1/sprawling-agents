@@ -12,7 +12,7 @@ Before editing, follow [AGENTS.md's reading requirements](../AGENTS.md#read-befo
 
 Read the official documentation of the tools you use and load the vendor's agent guide or skill when one exists, as the same reading requirements specify. Before changing a client screen, read [the frontend method](frontend-method.md); the client's SPEC-first and red-stage exemptions are defined in [The view layer](../AGENTS.md#the-view-layer).
 
-For a new feature, use the core-feature criteria in [Read before you write](../AGENTS.md#read-before-you-write) before choosing an implementation, and follow its requirement for one prose justification in the commit body and feature issue or pull request. That section also defines the bug-fix exemption and the extension, separate-repository and issue paths; no five-part form is needed.
+For a new feature, apply the [core-feature criteria](../AGENTS.md#read-before-you-write) before choosing an implementation and follow that section's commit-body requirement. Use the applicable submission template when opening an issue or pull request.
 
 ## 2 The five steps of one change
 
@@ -38,7 +38,7 @@ Use [SPECs and Markdown](../AGENTS.md#specs-and-markdown) for current-state spec
 
 ### Languages
 
-Issue and pull request descriptions must provide matching English and Chinese versions under [the language rules](../AGENTS.md#language), which define how to preserve scope, uncertainty, verification results and literal diagnostics; review comments keep the optional translation policy. The same rules explain why a semantic mismatch can cause closure and recommend agent translation followed by comparison, without treating that comparison as a guarantee.
+For issues, use the [Bug report](../.github/ISSUE_TEMPLATE/bug_report.yml) or [Feature request](../.github/ISSUE_TEMPLATE/feature_request.yml) form. For pull requests and review comments, follow [Language](../AGENTS.md#language).
 
 Before committing or submitting text or attachments, apply [Privacy](../AGENTS.md#privacy) to establish their public necessity and inspect what readers will receive. Use [the private security channel](../SECURITY.md) for vulnerabilities.
 

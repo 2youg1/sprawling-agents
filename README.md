@@ -187,7 +187,7 @@ just prereqs        # every other tool the loop needs, with the install line for
 just check          # a change is finished when this is green
 ```
 
-Issue and pull request descriptions require matching English and Chinese versions; see [the language rules](AGENTS.md#language) before publishing. Review comments may use your own language. [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) explains preparation and submission.
+Report bugs or request features through the [issue forms](https://github.com/2youg1/sprawling-agents/issues/new/choose). For code changes, follow [AGENTS.md](AGENTS.md) and [CONTRIBUTING](docs/CONTRIBUTING.md).
 
 ## Credits
 

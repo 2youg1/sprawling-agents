@@ -24,7 +24,7 @@ Before implementation, state the problem, the required result and the constraint
 
 Before designing or implementing a new core feature, establish that the need exceeds what a skill can meet, that a hook plugin should not own the behavior, that MCP, CLI or ACP integration cannot reasonably satisfy the requirement and its guarantees, that the feature serves most users, and that it is neither a theme nor a workflow tailored to one deployment. Add the feature to the core only when all five criteria hold; otherwise prefer an extension or a separate repository and bring the result back in an issue to discuss integration. If the existing seams are insufficient, an issue can discuss the smallest interface needed without requiring a completed separate implementation first. A hook plugin is an alternative architecture to consider, not a claim that this project offers a Hook API.
 
-For a feature contribution, explain the need, the alternatives and why the core should own it in one prose paragraph in the commit body, then reuse that explanation in the feature issue or pull request description; use concrete scenarios and evidence for the claim about most users, without inventing adoption figures or adding a five-part form. Bug fixes are exempt; apply the reasoning only to any new feature bundled with a fix.
+For a feature contribution, explain the need, the alternatives and why the core should own it in one prose paragraph in the commit body, using concrete scenarios and evidence for the claim about most users. Follow the [Feature request](.github/ISSUE_TEMPLATE/feature_request.yml) or [pull request template](.github/PULL_REQUEST_TEMPLATE.md) for submission content. Bug fixes are exempt; apply the reasoning only to any new feature bundled with a fix.
 
 </reading>
 
@@ -177,10 +177,11 @@ Read [`docs/frontend-method.md`](docs/frontend-method.md) before you change a sc
 | Identifiers, event names, error codes, rustdoc, commit subjects | English |
 | `README.md`, `AGENTS.md`, `ARCHITECTURE.md`, `docs/` | English, except `README.zh-CN.md` and `docs/getting-started.zh-CN.md`, which change in the same commit as their English pair |
 | Crate SPECs — the Markdown ones, and the comments of `Spec.lean` and its parts — and design discussion | Chinese, with concept names kept in their English form; Lean declaration names are English, from the glossary |
-| Pull requests and issues | Matching English and Chinese descriptions; write the primary version in the language you think in |
+| Issues | Follow the [Bug report](.github/ISSUE_TEMPLATE/bug_report.yml) or [Feature request](.github/ISSUE_TEMPLATE/feature_request.yml) form |
+| Pull requests | Matching English and Chinese descriptions; write the primary version in the language you think in |
 | Review comments | Your own language; a parallel translation is welcome |
 
-Provide both English and Chinese versions of every issue and pull request description, with matching scope, claims, uncertainty and verification results; preserve identifiers, error codes, commands, paths and quoted diagnostics unchanged, and share identical logs or attachments once. A submission whose versions differ in meaning may be closed for that reason even when its technical content is acceptable. We recommend having an agent translate the description and compare both versions before publication; that check does not guarantee an error-free translation. Security reports follow the private reporting channel in [SECURITY.md](SECURITY.md), and translation does not authorize public disclosure.
+Provide both English and Chinese versions of every pull request description, with matching scope, claims, uncertainty and verification results; preserve identifiers, error codes, commands, paths and quoted diagnostics unchanged, and share identical logs or attachments once. A submission whose versions differ in meaning may be closed for that reason even when its technical content is acceptable. We recommend having an agent translate the description and compare both versions before publication; that check does not guarantee an error-free translation. Security reports follow the private reporting channel in [SECURITY.md](SECURITY.md), and translation does not authorize public disclosure.
 
 - A comment is one of four kinds: the MPL notice, public interface documentation, a warning about consequences, or a statement of intent the code cannot carry. Any other comment marks code that should say more itself.
 - In rustdoc, write what the signature cannot say: invariants, failure modes, call ordering, ownership.

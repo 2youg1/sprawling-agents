@@ -189,7 +189,7 @@ just prereqs        # 这个回路需要的其余工具，缺哪个就给出哪�
 just check          # 绿了，一次改动就算完成
 ```
 
-Issue 与 PR 描述须提供含义一致的中英文对照，发布前见[语言规则](AGENTS.md#language)；评审意见可以使用你自己的语言。贡献准备与提交流程见 [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md)。
+报告缺陷或提出功能请求，请使用 [Issue 表单](https://github.com/2youg1/sprawling-agents/issues/new/choose)。修改代码请按 [AGENTS.md](AGENTS.md) 与 [CONTRIBUTING](docs/CONTRIBUTING.md) 进行。
 
 ## 致谢
 

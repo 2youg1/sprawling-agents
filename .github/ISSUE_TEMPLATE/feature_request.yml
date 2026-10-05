@@ -1,64 +1,105 @@
-name: Feature request / 功能或改进
-description: A capability that does not exist, or an existing one that should work differently. 提出新能力或改进。
-title: "简述目标 / what you want to be true"
-labels: []
+name: Feature request / 功能请求
+description: Propose a new capability or a change to existing behavior. 提出新能力或现有行为的改进。
+labels: [enhancement]
 body:
   - type: markdown
     attributes:
       value: |
-        本仓库的施工节奏是「一件有界的工作」——一个 session 能完成、有可检验的完成定义
-        （CONTRIBUTING §2 五步；ARCHITECTURE.md「deep modules」）。这份表单问的就是
-        那三件事：给谁、改什么、怎么算是完了。语言自由（CONTRIBUTING §4）。
+        Describe a concrete use case and the result you need. Provide matching English and Chinese text in narrative fields, including the same scope, uncertainty, and evidence. Share commands, identifiers, and attachments once, preserving their original text.
+        说明具体使用场景与所需结果。叙述字段提供含义一致的中英文，保留相同的范围、不确定性与证据；命令、标识和附件只提供一次，保留原文。
+
+        Review text and attachments for credentials and personal or machine details before submitting. Use repository-relative paths or `<city>/…` and crop screenshots to the application. Report vulnerabilities through [SECURITY.md](https://github.com/2youg1/sprawling-agents/security/policy).
+        提交前检查正文与附件中的凭据、个人信息和机器信息，路径使用仓库相对路径或 `<city>/…`，截图裁到应用范围。漏洞按 [SECURITY.md](https://github.com/2youg1/sprawling-agents/security/policy) 私密报告。
 
   - type: textarea
-    id: goal
+    id: problem
     attributes:
-      label: 目标 — what this is for
-      description: 谁在什么场景下得到什么。写需求，不写实现；「我想要 X API」是需求，X 的具体签名是实现。
+      label: Use case and current limitation / 使用场景与当前限制
+      description: Who is trying to do what, and how does the current behavior prevent or complicate it? 谁要完成什么任务，当前行为怎样妨碍或增加了这项工作的困难？
+      placeholder: |
+        English:
+
+        中文：
     validations:
       required: true
 
   - type: textarea
-    id: current_vs_expected
+    id: outcome
     attributes:
-      label: 现状与期望
-      description: 现在是什么行为、期望是什么行为。差异要小到能一句话写清；写不清的差异通常意味着请求本身还没成形。
+      label: Requested behavior / 期望行为
+      description: Describe the behavior the User should observe after the change, with an example if useful. 说明改动后 User 应当观察到的行为；必要时给出例子。
+      placeholder: |
+        English:
+
+        中文：
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives and where the feature belongs / 替代方案与功能归属
+      description: In one paragraph, describe alternatives tried or considered, such as a skill, plugin, or MCP/CLI/ACP integration, and why the proposed placement fits. For a core change, name the guarantee existing approaches cannot provide and give concrete scenarios or evidence supporting wider use. State unknowns; an external solution or a missing extension interface is also a valid request. 用一段话说明尝试或考虑过的替代方案，例如 skill、plugin、MCP/CLI/ACP 集成，以及建议的归属为什么适合该需求。若要改动核心，说明现有方式无法提供的保证，并用具体场景或证据说明更广泛的用途；不确定时如实说明，也可以请求外部方案或缺少的扩展接口。
+      placeholder: |
+        English:
+
+        中文：
     validations:
       required: true
 
   - type: textarea
     id: acceptance
     attributes:
-      label: 验收标准 (optional)
-      description: 可观察、可检验的完成定义——「改动后，运行 X 得到 Y」。验收写得出来，工作边界就清楚了。
-      placeholder: 对一个含 3 行账本的城，replay 每行都报告 tail_seq=2 …
-    validations:
-      required: false
+      label: Acceptance criteria / 验收条件
+      description: >-
+        Give at least one observable example of success: starting conditions, the User's action, and the resulting behavior. No implementation plan or test code is required. 至少给出一个可以观察的成功例子：起始条件、User 的操作与结果行为；无需实现计划或测试代码。
+      placeholder: |
+        English:
 
-  - type: textarea
-    id: blast_radius
-    attributes:
-      label: 影响面 (optional)
-      description: 会波及哪些 crate / 数据面 / 文档。写不出不必勉强——这正是 SPEC 节「影响面」先问的问题。
-    validations:
-      required: false
-
-  - type: dropdown
-    id: size
-    attributes:
-      label: 规模判断
-      description: 你感觉它多大。这是给编排者的第一手信息，不是承诺。
-      options:
-        - 一个 session（推荐起点）
-        - 跨多个 session
-        - 不确定，需要先读代码
+        中文：
     validations:
       required: true
 
   - type: textarea
-    id: references
+    id: implementation
     attributes:
-      label: 参考 (optional)
-      description: 相关文档、上游、已知的类似实现——把指路的信息放这里，而不是另起一帖。
+      label: Implementation suggestion / 实现建议
+      description: Describe a possible approach and its trade-offs if you have one. 如有思路，可说明一种实现方向及其取舍。
+      placeholder: |
+        English:
+
+        中文：
     validations:
       required: false
+
+  - type: textarea
+    id: compatibility
+    attributes:
+      label: Scope and compatibility / 范围与兼容性
+      description: Note known effects on existing workflows, configuration, saved data, the wire, or clients, and any behavior that must be preserved. 说明已知的工作流、配置、保存数据、wire 或客户端影响，以及需要保留的行为。
+      placeholder: |
+        English:
+
+        中文：
+    validations:
+      required: false
+
+  - type: textarea
+    id: references
+    attributes:
+      label: References and examples / 参考与例子
+      description: Link related issues, documents, or comparable tools, and attach redacted mockups or examples. Provide each source or attachment once. 链接相关 Issue、文档或类似工具，可附脱敏后的示意图或例子；每份来源或附件只提供一次。
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting / 提交前确认
+      options:
+        - label: I searched existing open and closed issues for this request. 我已搜索现有的开放及已关闭 Issue。
+          required: true
+        - label: My English and Chinese descriptions match, including uncertainty and evidence. 我的中英文描述含义一致，包括不确定性与证据。
+          required: true
+        - label: I reviewed the text and attachments for private information. 我已检查正文与附件中的私密信息。
+          required: true
