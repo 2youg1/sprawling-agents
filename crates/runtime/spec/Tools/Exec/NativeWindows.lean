@@ -47,6 +47,8 @@ profile 的私有存储也是这次执行拥有的资源。harness/provider 不�
 launch failure 的未释放资源随 typed Failure 返回，由 run Job 保留，后续 native
 准入先重试清理；release 时仍由这个 owner 执行最后的 teardown，并报告拒绝。创建后任何失败均终止挂起进程、关闭句柄和
 删除 profile；正常结束、取消与 owner 释放均先终止 Job 中剩余进程，再删除 profile。
+终止、root wait 或 Job tree wait 拒绝时，process/job 句柄、security descriptor 与 profile
+保持在同一 owner，后续重试重新验证；只有肯定退出后才关闭句柄、恢复权限与删除 profile。
 读取退出状态或清理失败保留操作与 OS code，并由 runtime 转成 E_SANDBOX_DENIED；
 Backlog 的 settle/harvest 遇 native poll/cleanup 拒绝时返回该错误并保留 member，
 下一次 harvest 由同一 owner 重试，不能借用 host 的 Unknown ending 删除资源。
@@ -144,5 +146,36 @@ theorem accepted_packet_has_two_terminators (units : List Nat)
     (accepted : packetValid units = true) :
     terminated units = true ∧ terminated units.dropLast = true := by
   simpa [packetValid, Bool.and_eq_true] using accepted
+
+/-- 清理的每一轮必须重新得到终止与整棵 Job 退出的肯定回答；失败不消耗资源所有权。 -/
+structure CleanupOwner where
+  process : Bool
+  job : Bool
+  security : Bool
+  profile : Bool
+  deriving DecidableEq, Repr
+
+inductive CleanupAnswer where
+  | refused | timedOut | stopped
+  deriving DecidableEq, Repr
+
+def retainUntilStopped (owner : CleanupOwner) : CleanupAnswer → CleanupOwner
+  | .refused => owner
+  | .timedOut => owner
+  | .stopped => ⟨false, false, false, false⟩
+
+/-- 任意次拒绝或超时的 trace 都保留同一 owner；重试不能因丢失句柄伪报成功。 -/
+theorem cleanup_failure_trace_preserves_owner (owner : CleanupOwner)
+    (answers : List CleanupAnswer)
+    (failed : ∀ answer ∈ answers, answer ≠ .stopped) :
+    answers.foldl retainUntilStopped owner = owner := by
+  induction answers generalizing owner with
+  | nil => rfl
+  | cons answer rest ih =>
+    have notStopped := failed answer (by simp)
+    have remaining : ∀ answer ∈ rest, answer ≠ .stopped := by
+      intro answer member
+      exact failed answer (by simp [member])
+    cases answer <;> simp_all [retainUntilStopped]
 
 end Runtime.NativeWindows
