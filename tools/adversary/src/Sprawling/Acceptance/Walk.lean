@@ -140,7 +140,8 @@ rather than by a source checkout or a developer's asset directory. -/
 def clientDelivered : Step :=
   { name := "the embedded client and its scripts and styles are served"
   , walk := fun ground => do
-      let page ← read ground.port "/"
+      let (page, pageType) ← read ground.port "/"
+      ensure (pageType == "text/html") "the client page is not served as HTML"
       let assets := (page.splitOn "\"").filter fun path =>
         (path.startsWith "./" || path.startsWith "/") &&
           (path.endsWith ".js" || path.endsWith ".css")
@@ -148,16 +149,29 @@ def clientDelivered : Step :=
         "the served page names no complete client; rebuild with just build-web"
       for path in assets do
         let path := if path.startsWith "./" then (path.drop 1).toString else path
-        let body ← read ground.port path
+        let (body, contentType) ← read ground.port path
         ensure (body != page && !body.trimAscii.toString.isEmpty)
-          s!"the client asset {path} is absent or falls back to the page" }
+          s!"the client asset {path} is absent or falls back to the page"
+        let beginning := body.trimAscii.toString.toLower
+        ensure (!(beginning.startsWith "<!doctype html" || beginning.startsWith "<html"))
+          s!"the client asset {path} delivers HTML instead of executable client content"
+        let expected := if path.endsWith ".css" then ["text/css"]
+          else ["text/javascript", "application/javascript"]
+        ensure (expected.contains contentType)
+          s!"the client asset {path} has Content-Type {contentType}, expected {expected}" }
 where
-  read (port : Port) (path : String) : IO String := do
+  read (port : Port) (path : String) : IO (String × String) := do
     let response ← IO.Process.output
       { cmd := "curl", args := #["--fail", "--silent", "--show-error", "--max-time", "10",
-          "--compressed", s!"http://127.0.0.1:{port}{path}"] }
+          "--compressed", "--write-out", "
+%{content_type}",
+          s!"http://127.0.0.1:{port}{path}"] }
     ensure (response.exitCode == 0) s!"client HTTP request {path} failed: {response.stderr}"
-    return response.stdout
+    let lines := response.stdout.splitOn "
+"
+    let contentType := ((lines.getLast?.getD "").splitOn ";").head?.getD ""
+    return ("
+".intercalate lines.dropLast, contentType.trimAscii.toString.toLower)
 
 /-- The stand-in is attached the way the settings page attaches an endpoint, and
 the city stores the URL it was given. -/

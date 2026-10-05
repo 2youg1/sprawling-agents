@@ -8,7 +8,7 @@ import Sprawling
 /-!
 # The acceptance world's commands.
 
-`just acceptance <archive>` is the only caller, and it calls them in this
+`just acceptance <archive>` calls the archive commands in this
 order: `script` writes what the stand-in provider will play, the recipe starts
 the stand-in on it, and `walk` drives the archive's binary through the city a
 stranger raises. The recipe holds the order because it holds the processes:
@@ -18,9 +18,14 @@ own (`tools/adversary/Spec.lean` section 13).
 Unlike `adversary`, nothing here is skipped. The person asked for this run by
 naming an archive, so a binary or a provider that is missing is a failure that
 says which, rather than a green run that walked nothing.
+
+The fresh/runtime matrix also calls client admission, the browser audit,
+version admission and gauge against the archive binary; client-ui uses the
+same Stage.serving as the walk and never starts a second app server.
 -/
 
 open Sprawling Sprawling.Acceptance
+open Lean (Json)
 
 private def usage : String :=
   "usage: acceptance script <shelf> <script.json>\n" ++
@@ -70,18 +75,63 @@ private def walkWith (shelf script record checklist : System.FilePath) : IO UInt
     IO.println s!"  FAIL  {error}"
     return 1
 
-/-- Checks the embedded client through the same step and serving lifecycle as firstDay. -/
-private def deliveredClient : IO UInt32 := do
+/-- Serves one temporary city for client admission, closes it on every result. -/
+private def deliveredClient (after : Ground → IO Unit) : IO UInt32 := do
   let door : Door := { binary := ← required "SPRAWLING_BIN", launcher := ← launcher }
   let stage ← Stage.raise door
   try
-    stage.serving door .closedInOrder fun ground => Step.runAll ground [clientDelivered]
+    stage.serving door .closedInOrder fun ground => do
+      Step.runAll ground [clientDelivered]
+      after ground
     return 0
   catch error =>
     IO.eprintln s!"  FAIL  {error}"
     return 1
   finally
     stage.discard
+
+/-- The browser receives this serving's port; it does not start another server. -/
+private def clientPixels (script out : String) (ground : Ground) : IO Unit := do
+  let result ← IO.Process.output
+    { cmd := "bun", args := #[script, s!"{ground.port}", out] }
+  IO.print result.stdout
+  IO.eprint result.stderr
+  ensure (result.exitCode == 0) s!"the production client browser audit failed ({result.exitCode})"
+
+/-- Measures actual successful, failed and cancelled children and keeps the raw readings. -/
+private def gaugeCases (out : System.FilePath) : IO UInt32 := do
+  let binary ← required "SPRAWLING_BIN"
+  IO.FS.createDirAll out
+  let samples := 20
+  let cancelled ← match ← IO.getEnv "RUNNER_OS" with
+    | some "Windows" => pure #["powershell", "-NoProfile", "-Command", "Stop-Process -Id $PID -Force"]
+    | _ => pure #["sh", "-c", "kill -TERM $$"]
+  for (name, args, failed) in
+      [("success", #[binary, "status"], 0), ("failure", #[binary, "call", "not-json"], samples),
+       ("cancelled-child", cancelled, samples)] do
+    let command := #["gauge", "--samples", s!"{samples}", "--"] ++ args
+    let result ← IO.Process.output { cmd := binary, args := command }
+    IO.FS.writeFile (out / s!"{name}.jsonl") result.stdout
+    IO.FS.writeFile (out / s!"{name}.stderr") result.stderr
+    IO.FS.writeFile (out / s!"{name}.command.json")
+      (Json.arr (command.map Json.str)).compress
+    ensure (result.exitCode == 0) s!"gauge did not complete {name}: {result.stderr}"
+    let lines ← (result.stdout.splitOn "
+" |>.filter (!·.trimAscii.toString.isEmpty)).mapM fun line =>
+      match Json.parse line with
+      | .ok reading => pure reading
+      | .error why => throw <| IO.userError s!"gauge {name} returned invalid JSON: {why}"
+    let runs := lines.filter fun line => (line.getObjValAs? String "line").toOption == some "run"
+    ensure (runs.length == samples) s!"gauge {name} omitted workload samples"
+    let failures := runs.filter fun run => (run.getObjValAs? Nat "exit").toOption != some 0
+    ensure (failures.length == failed) s!"gauge {name} reported unexpected child outcomes"
+    match lines.find? (fun line => (line.getObjValAs? String "line").toOption == some "spread") with
+    | none => throw <| IO.userError s!"gauge {name} omitted spread"
+    | some spread =>
+      ensureEq (some samples) (spread.getObjValAs? Nat "samples").toOption "spread omitted samples"
+      ensureEq (some failed) (spread.getObjValAs? Nat "failed").toOption "spread erased failed samples"
+    IO.println s!"  ok    gauge {name}: {samples} samples, {failed} failed"
+  return 0
 
 /-- Checks the installed binary against the caller's Cargo identity. -/
 private def installedVersion (name version : String) : IO UInt32 := do
@@ -101,7 +151,9 @@ private def installedVersion (name version : String) : IO UInt32 := do
     return 1
 
 def main : List String → IO UInt32
-  | ["client"] => deliveredClient
+  | ["client"] => deliveredClient (fun _ => pure ())
+  | ["client-ui", script, out] => deliveredClient (clientPixels script out)
+  | ["gauge", out] => gaugeCases out
   | ["version", name, version] => installedVersion name version
   | ["script", shelf, out] => writeScript shelf out
   | ["walk", shelf, script, record, checklist] => walkWith shelf script record checklist

@@ -28,7 +28,16 @@ id 怎样从正文里读出来——那一半在 citysim 的 Rust 里，由它�
 要求首页引用同源的 JavaScript 与 CSS，并逐一获取这些引用，拒绝空内容、回退首页和伪装为脚本或样式的 HTML；资源的 Content-Type 须与引用类型相符。
 地址从 Ground 的实际端口读，资源地址从首页读，不另声明 bundle 路径或文件名。
 占位页、只有 index.html、缺脚本或样式的应用均须失败；curl 不存在、HTTP 拒绝、超时同样失败，
-恢复是补齐验收环境或重建完整应用。`acceptance client` 用同一 Stage.serving 与 clientDelivered 单独检查调用者指定的二进制，成功退零、拒绝退一，并在所有路径清理临时城与服务进程；firstDay 仍在 provider 注册前调用这一步。fresh 作业把 HTML 写入已构建 bundle 的脚本后重建二进制，以真实 HTTP 返回验证拒绝，之后原始归档仍用于完整 walk。现有首次起城、skills 与历史恢复步骤继续走同一 acceptance。
+恢复是补齐验收环境或重建完整应用。`acceptance client` 用同一 Stage.serving 与 clientDelivered 单独检查调用者指定的二进制，成功退零、拒绝退一，并在所有路径清理临时城与服务进程；firstDay 仍在 provider 注册前调用这一步。fresh 作业把 HTML 写入已构建 bundle 的脚本后重建二进制，以真实 HTTP 返回验证拒绝，之后原始归档仍用于完整 walk。`acceptance client-ui <script> <output>` 在同一次 Stage.serving 中先执行 clientDelivered，再把实际端口和证据目录交给调用者指定的 browser 脚本；脚本失败使验收失败，截图及结果由脚本写入 output，服务进程在所有路径结束。browser 连接这次服务的 loopback 地址，Settings 的地址与文字读 client 的 route/tree/groups/lang 权威，截图从实际运行页面获取。runtime 选择 fresh 同一矩阵与归档生命周期并附加此步骤，不替代完整 walk。OS 写入只允许可丢弃 runner。现有首次起城、skills 与历史恢复步骤继续走同一 acceptance。
+-/
+
+/-! ## gauge 的进程边界验收
+
+本段是环境接口说明，不是证明。`acceptance gauge <output>` 对 SPRAWLING_BIN 指定的真实归档二进制
+测量相同样本数的 status、无效 call 与自行终止的 shell 子进程，分别要求所有 run 成功、失败、取消；
+gauge 自己必须完成测量并报告 spread，run 行与 spread 的 failed 必须一致。样本、主机类别、单位由 gauge
+输出，不重算 percentile；stdout、stderr 与命令保存到 output。取消只作用于测量的可丢弃 shell 子进程，
+不终止构建或 gauge。本检查不声称覆盖人中断 gauge 自身后的清理。
 -/
 
 /-! ## 安装后版本的验收接口
@@ -40,6 +49,30 @@ id 怎样从正文里读出来——那一半在 citysim 的 Rust 里，由它�
 -/
 
 namespace Adversary.Acceptance
+
+/-- 一份已从 HTTP 获取的资源；字段是浏览器可执行内容的环境观察，不描述 JS 语法。 -/
+structure DeliveredAsset where
+  nonempty : Bool
+  html : Bool
+  mimeMatches : Bool
+
+/-- 每个首页引用都须通过内容准入，任一坏响应使整组拒绝。 -/
+def admittedAssets (assets : List DeliveredAsset) : Bool :=
+  assets.all fun asset => asset.nonempty && !asset.html && asset.mimeMatches
+
+/-- 任意长度响应序列被准入后，每个成员都非空、不是 HTML，且 MIME 与引用类型相符。 -/
+theorem admitted_assets_are_executable_content (assets : List DeliveredAsset)
+    (asset : DeliveredAsset) (member : asset ∈ assets) (held : admittedAssets assets = true) :
+    (asset.nonempty = true ∧ asset.html = false) ∧ asset.mimeMatches = true := by
+  have checked := List.all_eq_true.mp held asset member
+  cases h : asset.html <;> simp_all [Bool.and_eq_true]
+
+/-- 坏响应前后追加任何响应不能把拒绝变成准入。 -/
+theorem a_bad_asset_is_rejected_in_every_surrounding_sequence
+    (before after : List DeliveredAsset) (asset : DeliveredAsset)
+    (bad : (asset.nonempty && !asset.html && asset.mimeMatches) = false) :
+    admittedAssets (before ++ asset :: after) = false := by
+  simp [admittedAssets, List.all_append, List.all_cons, bad]
 
 /-- 一个请求带回来的东西：一个脚本 id 都没带，或它最近拿到的是第 `run` 个 run 的第 `reply` 条。 -/
 inductive Ask where

@@ -219,7 +219,7 @@ src/Sprawling/Acceptance/Collaboration.lean 协作那一串：分计划、两次
 src/Sprawling/Acceptance/Servings.lean 一个目录的三次服务，按序：走哪几段、步名的次序
 src/Sprawling/Acceptance/Checklist.lean 人手测的清单：每一节从决定它的那一处读出
 test/Main.lean               入口与检查树
-test/Acceptance.lean         `acceptance` 可执行文件的两个命令：写脚本、走一遍
+test/Acceptance.lean         `acceptance`：归档 walk、版本核对、客户端准入、browser 与 gauge 检查
 Spec.lean                    本规格的入口：十七节与决定
 spec/Answer.lean             门说了什么：接受、拒绝、静默
 spec/Model.lean              欠哪一种拒绝：守序，以及被拒的命令也花掉它的键
@@ -334,6 +334,7 @@ def layPlan    : System.FilePath → String → String → IO Unit       -- 在�
 structure Setting where door : Door; url : String; shelf : System.FilePath
                         skills : List String; script record : System.FilePath
 structure Step where name : String; walk : Ground → IO Unit
+def clientDelivered : Step                       -- 首页及其实际 HTTP 资源准入
 def firstDay     : Setting → List Step
 def interrupted  : Setting → Stage → IO Unit
 def morningAfter : Setting → List Step
