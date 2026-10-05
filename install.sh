@@ -37,6 +37,7 @@
 
 set -eu
 
+# Generated from Cargo.toml workspace.package.repository by cargo xtask docnum --write.
 REPO="${SPRAWLING_REPO:-2youg1/sprawling-agents}"
 API="${SPRAWLING_API:-https://api.github.com/repos/${REPO}/releases}"
 RELEASES="https://github.com/${REPO}/releases"

@@ -32,6 +32,7 @@
 
 $ErrorActionPreference = 'Stop'
 
+# Generated from Cargo.toml workspace.package.repository by cargo xtask docnum --write.
 $repo = if ($env:SPRAWLING_REPO) { $env:SPRAWLING_REPO } else { '2youg1/sprawling-agents' }
 $api = "https://api.github.com/repos/$repo/releases"
 $releases = "https://github.com/$repo/releases"
