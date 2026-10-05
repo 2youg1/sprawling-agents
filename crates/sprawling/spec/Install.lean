@@ -177,16 +177,16 @@ pub(crate) fn install(uninstall: bool) -> Result<Report, AxError>;
 -/
 
 /-!
-## 8-118 发布前在回环地址上跑一遍 `install.sh`（`install.sh`、`.github/install-loopback.sh`、`release.yml` 的 `archive`）
+## 8-118 发布前在回环地址上跑一遍归档安装器（`install.sh`、`.github/install-loopback.sh`、`release.yml` 的 `archive`）
 
 **形状：适配器的验收。** `install.sh` 是 `curl | sh` 那条通道：它向发布 API 要最新一版，按平台后缀挑归档，下载、比对 sha256、解包、问一句 `status`，再把二进制交给 `sprawling install` 落位。这一串里每一步都只在真的发布之后才被执行，所以它坏了，第一个知道的是下载的人。
 
 **接口。**
-- `install.sh` 读 `SPRAWLING_API`：发布列表的地址，缺省是 `https://api.github.com/repos/${SPRAWLING_REPO}/releases`。设了它，列表（`?per_page=1`）与单个 tag（`/tags/<tag>`）都从这个地址问；归档的下载地址仍然取自列表里每个资产的 `browser_download_url`，不由脚本拼。这个变量同样服务镜像与 GitHub Enterprise，它不是只为测试开的口子。
+- `install.sh` 与 `install.ps1` 读 `SPRAWLING_API`：发布列表的地址，缺省是 `https://api.github.com/repos/${SPRAWLING_REPO}/releases`。设了它，列表（`?per_page=1`）与单个 tag（`/tags/<tag>`）都从这个地址问；归档的下载地址仍然取自列表里每个资产的 `browser_download_url`，不由脚本拼。这个变量同样服务镜像与 GitHub Enterprise，它不是只为测试开的口子。
 - `.github/install-loopback.sh <archive-dir>`：`<archive-dir>` 里恰好一份 `.zip`（`just package` 在一个 matrix 行上产出的那份）。脚本在 `127.0.0.1` 上起 `python3 -m http.server`（端口取 0，由内核分配，从服务的第一行读出），写一份与 GitHub 同形的发布列表（`tag_name`；每个资产的 `name`、`size`、`digest: sha256:<hex>`、`browser_download_url`），然后以沙箱 `HOME` 跑 `install.sh`，最后执行 `sprawling install` 放进沙箱 `HOME` 的 `.local` 下 `bin` 里的那个文件的 `status`，打印第一行。
 - 判定，三条都成立才绿：`install.sh` 退出 0；落位的文件与归档里的 `sprawling` 逐字节相同（`cmp`）；落位的二进制的 `status` 第一行以 `sprawling ` 开头。任何一条不成立，脚本以非 0 退出并说出是哪一条。
 - 离机的请求一律失败：脚本给 `install.sh` 设 `https_proxy`／`http_proxy` 指向 `127.0.0.1:9`，`no_proxy=127.0.0.1`。所以一个不认 `SPRAWLING_API` 的 `install.sh` 不会偷偷装上 GitHub 上已发布的那一版，而是在第一次请求就红。
-- `release.yml` 的 `archive` job 在 `just package` 之后、上传之前对 macOS 与 Linux 两行调它；Windows 那一行走 `install.ps1`，不在本节。
+- `release.yml` 的 `archive` job 在 `just package` 之后、上传之前对 macOS 与 Linux 两行调它；Windows 那一行调用 `.github/workflows/install-windows.ps1 -Archives <archive-dir> -Evidence <output>`：只准在可丢弃 Windows Actions runner 执行，走 install.ps1 的同一个 HTTP 接口，比对归档与落位 EXE 的 SHA256，要求 status 成功、uninstall 删除二进制，并要求不匹配 digest 的安装退非零且不落位。测试恢复 HKCU Path 的原存在性、类型和值，安装目录位于 RUNNER_TEMP 下独立 LOCALAPPDATA，stdout 与请求记录保留在 output。Windows 共享同一镜像接口，使三平台都能验本次归档，而不是另造一条跳过下载校验的安装入口。
 
 **决定。**
 1. **比字节，不比版本行。** 版本行只说版本与发布日，两次构建同一个 tag 的二进制说同一句话，GitHub 上已发布的那一版也可能说同一句话；落位的文件与本次归档逐字节相同，才证明装上的是本次构建的这一份。败给的方案：断言版本行含 tag——`status` 的第一行根本不印 tag。
