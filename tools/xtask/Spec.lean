@@ -630,6 +630,8 @@ D27 **验证编排只住 `.github/workflows/ci.yml`，release 经 `workflow_call
 
 `test-build` 的两项 Cargo debug 环境覆盖只在共享入口定义，main 与 tag 因而读同一种 test 缓存身份；fast/clippy/test 的用途仍各自独立，Rust cache 保持默认 workspace 产物清理，只有 main 写入。缓存恢复不是验证证据。release 调用的 concurrency 以 run id 隔离且不替代取消，普通 CI 仍按 ref 替代旧运行；调用权限只有 contents read，不传 secrets。release 的 advisories 是本轮新读，发行 archive 仍并行构建，publish 等待 verify、advisories 与 archive 成功，发行消费者只下载 archive-*。verify/archive job 名与 Windows 签名输出 archive-Windows 的位置保留。
 
+`release.yml` 的手动 `workflow_dispatch` 恒为只构建验证，必填 boolean 输入 `build-only` 缺省为 true；即使输入 false 或选择 tag，手动事件也不能执行 publish、channel、crates 或取得这些发布 job 的 OIDC 权限。三处发布 job 都要求 push 事件且 ref 以 `refs/tags/v` 开头；tag push 保持既有发布政策。手动运行复用 verify、advisories 与 archive，不设 `SPRAWLING_RELEASE_TAG`，产物标识为源码构建；保留准确 commit/tree、归档摘要、耗时与缓存读数作为验证证据。本契约不改变 D27 的必需 job 集合、矩阵或失败／取消／缺席拒绝，不调用未配置的 SignPath。手动运行是否只构建由事件边界决定，输入值不授予发布能力。
+
 被否：release 另抄 jobs 或 Cargo 命令，会再次分叉；缓存 composite action 在只有一个 test-build 定义时增加无用的接口；接受历史 CI 绿结果需要本方案没有的来源、时效与完整性协议。重开参数：发行要求 core/proof 阻塞，或确有跨运行结果复用需求。验证以两个 YAML 的解析、inputs/权限/needs、缓存环境唯一性与四分片对照为本地边界；真实 cache hit、失败传播与耗时由 Actions 运行确认。
 
 **只有一份**：`features` 不是门。`just check` 已经调这条 recipe，再在 `gates` 里跑同一条工作区检查就是同一次编译每轮跑两遍；只留 recipe 是一条裁决。
