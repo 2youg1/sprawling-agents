@@ -141,3 +141,15 @@ fn first(bytes: &[u8]) -> Result<Value, AxError> {
             )
         })
 }
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn a_created_container_with_zero_exit_has_no_target_result() {
+        let bytes = br#"[{"State":{"Status":"created","Running":false,"ExitCode":0}}]"#;
+        assert!(
+            super::state(bytes).is_err(),
+            "a target that the daemon never started cannot be a successful exit zero"
+        );
+    }
+}

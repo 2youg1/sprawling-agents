@@ -12,7 +12,6 @@
 //! the `exec` result says happened. Neither may be spelled twice, so
 //! both live here (`crates/runtime/spec/Backlog.lean` §8-28-1).
 
-use super::process::Process;
 use std::process::ExitStatus;
 use std::time::Duration;
 
@@ -105,7 +104,7 @@ impl Exit {
     /// A host that will not answer is not a child that is still
     /// running: the ending is reported as unread, so the member stops
     /// being polled for ever.
-    pub(super) fn polled(child: &mut Process) -> Option<Exit> {
+    pub(super) fn polled(child: &mut std::process::Child) -> Option<Exit> {
         match child.try_wait() {
             Ok(Some(status)) => Some(Exit::of(&status)),
             Ok(None) => None,

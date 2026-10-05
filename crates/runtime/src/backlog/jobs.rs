@@ -259,7 +259,7 @@ impl RunJob {
     /// the process cannot join it.
     fn join(
         &mut self,
-        child: &super::process::Process,
+        child: &std::process::Child,
         shares: Shares,
         affinity: RunAffinity,
     ) -> Option<()> {
