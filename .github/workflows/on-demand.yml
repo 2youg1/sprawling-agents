@@ -537,6 +537,30 @@ jobs:
           [ "$RUNNER_OS" != Windows ] || walk="/usr/bin:$walk:$(dirname "$(command -v zig)")"
           env -u CARGO_HOME -u RUSTUP_HOME PATH="$walk" \
             just acceptance "${{ steps.fresh.outputs.archive }}" 2>&1 | tee "${{ steps.fresh.outputs.dir }}/logs/acceptance.log"
+      - name: archive identity and command measurement outcomes
+        if: inputs.job == 'runtime'
+        shell: bash
+        run: |
+          set -euo pipefail
+          logs="${{ steps.fresh.outputs.dir }}/logs"
+          git rev-parse HEAD 'HEAD^{tree}' > "$logs/source.txt"
+          rustc --version --verbose > "$logs/toolchain.txt"
+          python3 - <<'PYTHON'
+          import hashlib, json, os, platform
+          from pathlib import Path
+          out = Path(os.environ["RUNNER_TEMP"]) / "fresh" / "logs"
+          archives = list(Path("target/package").glob("*.zip"))
+          if len(archives) != 1:
+              raise SystemExit("expected exactly one archive for this platform")
+          identity = {"archive": archives[0].name, "sha256": hashlib.sha256(archives[0].read_bytes()).hexdigest(),
+                      "os": platform.system(), "osVersion": platform.release(), "machine": platform.machine(),
+                      "cores": os.cpu_count(), "run": os.environ["GITHUB_RUN_ID"], "attempt": os.environ["GITHUB_RUN_ATTEMPT"],
+                      "profile": "release", "features": "product defaults"}
+          (out / "archive-identity.json").write_text(json.dumps(identity, indent=2), encoding="utf-8")
+          PYTHON
+          binary="$(find "${{ steps.fresh.outputs.dir }}/unpacked" -type f \( -name sprawling -o -name sprawling.exe \))"
+          ! command -v cygpath > /dev/null 2>&1 || binary="$(cygpath -m "$binary")"
+          SPRAWLING_BIN="$binary" lake exe acceptance gauge "$logs/gauge"
       - name: browser for the served production client
         if: inputs.job == 'runtime'
         shell: bash
@@ -593,6 +617,7 @@ jobs:
         with:
           name: fresh-${{ matrix.os }}-${{ steps.tree.outputs.sha }}
           path: |
+            target/package/*.zip
             target/acceptance/checklist.md
             target/acceptance/script.json
             target/acceptance/record.jsonl
