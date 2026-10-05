@@ -33,7 +33,14 @@ D50 Backlog 在 create 之前登记唯一名字、副本与 owner，成员的进
 harvest 重试并返回 typed failure，release 的 Drop 调用只记录待清理责任，不能声称删除成功。
 只有成功的删除应答或成功 inventory 确认身份缺席才释放副本。CLI 结束后 inspect State.ExitCode
 才决定目标程序结果；CLI 提前结束而 daemon 仍 Running 为失败并清理。每次控制命令有界，
-失败后成员不得重新 start。操作系统直接终止进程不执行 Rust Drop，故本模型不能证明断电后删除。
+失败后成员不得重新 start。
+D52 生产 doctor 给 runtime 绑定当前 harness executable；Backlog 在 create 前起动独立 guardian，
+它读过唯一 cleanup record 后通过 file-backed stdout 报 ready，再守住只由父进程持有的 stdin。
+父进程确认 daemon 删除与副本释放后发 done；EOF、父进程异常终止或读失败都转为独立清理，
+复用同一个有界 rm／inventory 规则并保留责任重试，直到确认删除。未取得 ready 时不能 create。
+普通库测试可只用进程内 owner；它不声称异常终止保证。假设 guardian 与 daemon 仍存活，
+本模型不声称断电或 guardian 自身被外部终止后删除。独立进程而非父线程是所选方案，
+因为父进程的 abort 不执行 Drop，也不会留下线程。
 
 ## 4 现状分析
 
@@ -62,7 +69,8 @@ ContainerLimits 的整数限额与 ContainerImage 的固定 ID 只由 kernel 定
 ## 7 模块边界
 
 container.rs 是 decision，lifetime 是 adapter，control 拥有有界 CLI 控制调用，inspection
-拥有 daemon JSON 契约。只有 doctor 读 PATH；Backlog 管理起动、停止、结果与副本释放。
+拥有 daemon JSON 契约；cleanup 独家定义 daemon 删除／缺席确认与副本释放，guardian
+拥有独立进程的 stdin 生命周期和 ready／done 协议。只有 doctor 读 PATH；Backlog 管理起动、停止、结果与副本释放。
 
 ## 8 接口先行
 
@@ -71,6 +79,9 @@ container.rs 是 decision，lifetime 是 adapter，control 拥有有界 CLI 控�
 `create_command(&self, limits, launch) -> Result<Command, AxError>`，其中 ContainerLaunch
 持有唯一容器名、副本路径与目标 Command 的借用。参数与环境取自 Command 的公开 API。
 `ExecTool::with_container` 接收冻结限额及 doctor admitted runtime；已有 ExecSetup 构造不变。
+`ContainerRuntime::guarded(harness: PathBuf) -> ContainerRuntime` 绑定可信的执行文件。
+`run_container_guard(args: &[String]) -> Option<Result<(), AxError>>` 仅在主 CLI grammar
+拒绝其内部 argv 后承接 cleanup record，正常 help／version 优先级不变。
 
 ## 9 工作流程
 
@@ -166,6 +177,7 @@ inductive ResourceEvent where
   | started
   | stop
   | uncertain
+  | parentExited
   | removalConfirmed
   deriving DecidableEq, Repr
 
@@ -176,6 +188,7 @@ def advance : ResourceState → ResourceEvent → ResourceState
   | .running, .started => .running
   | .stopping, .started => .stopping
   | _, .stop => .stopping
+  | _, .parentExited => .stopping
   | state, .uncertain => state
 
 def applyTrace (state : ResourceState) (events : List ResourceEvent) : ResourceState :=
