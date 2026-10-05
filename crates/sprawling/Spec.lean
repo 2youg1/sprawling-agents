@@ -148,7 +148,7 @@ bin 子命令面；装配层是 Main；ARCHITECTURE.md §2（客户端嵌入链�
 `main`：CLI 分发与呈现；`assembly`：唯一知情点，句柄/时钟/种子/spawn 注入处。
 城市的可回放判定住 kernel；账本与内容仓库的写盘住 storage。
 主机 privacy 的顺序与恢复契约住 `spec/Privacy.lean`：它约束城市之外的
-本机效果，不进入 kernel、Ledger 或城市配置梯子，平台事实不参与城市重放。
+主机效果，不进入 kernel、Ledger 或城市配置梯子，平台事实不参与城市重放。
 -/
 
 /-! ## 8 接口先行

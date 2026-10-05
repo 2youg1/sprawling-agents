@@ -4,7 +4,7 @@
 -- Copyright (c) 2026 2youg1 and the sprawling contributors
 
 /-!
-# 本机隐私协调契约
+# 主机隐私协调契约
 
 ## 1 需求分解
 每次修改保留紧邻原值；先持久 Prepared 再发系统写入；读取不落盘；
@@ -34,7 +34,7 @@ Microsoft RegQueryValueExW/RegSetValueExW 规定原始类型/字节及缺值和�
 about_Telemetry 与 about_Environment_Variables 规定消费者和启动时环境继承。
 目标是否进入可写目录取决于平台资格，不由模型假定。
 正式消费者来源：
-https://github.com/PowerShell/PowerShell/blob/v7.5.7/src/System.Management.Automation/utils/Telemetry.cs
+https://learn.microsoft.com/powershell/module/microsoft.powershell.core/about/about_telemetry
 用户持久环境的位置与继承：
 https://learn.microsoft.com/en-us/dotnet/api/system.environment.setenvironmentvariable
 原始读取与写入：
