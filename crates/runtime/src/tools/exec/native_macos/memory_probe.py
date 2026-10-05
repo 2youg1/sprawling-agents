@@ -59,7 +59,7 @@ for name, flags in [("resource", 0), ("jetsam", 16)]:
         cleanup = []
         for operation in [2, 3]:
             ctypes.set_errno(0)
-            status = libc.syscall(ctypes.c_long(458), ctypes.c_uint32(operation), ctypes.byref(cid), ctypes.c_uint32(flags))
+            status = libc.syscall(ctypes.c_long(458), ctypes.c_uint32(operation), ctypes.byref(cid), ctypes.c_uint32(0))
             cleanup.append({"operation": operation, "result": status, "errno": ctypes.get_errno()})
         row["owned_empty_coalition_cleanup"] = cleanup
     report["coalition_attempts"].append(row)
