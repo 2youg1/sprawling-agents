@@ -122,4 +122,3 @@ fn stopped(client: &reqwest::blocking::Client, url: &str) -> AxError {
          request {answered:?}, through {through:?}"
     ))
 }
-

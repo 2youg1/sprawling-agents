@@ -2942,7 +2942,7 @@ export type RegistryAnswer = typeof RegistryAnswer.Type;
 /**
  * A registry this project publishes to.
  */
-export const Registry = Schema.Literals(["npm", "crates_io"]).annotate({ identifier: "Registry" });
+export const Registry = Schema.Literals(["npm", "crates_io", "github"]).annotate({ identifier: "Registry" });
 export type Registry = typeof Registry.Type;
 
 /**
@@ -3004,7 +3004,7 @@ export type ReleaseVerdict = typeof ReleaseVerdict.Type;
  * How this binary was installed, which decides the command that
  * updates it.
  */
-export const InstallChannel = Schema.Literals(["npm", "cargo", "archive", "source"]).annotate({ identifier: "InstallChannel" });
+export const InstallChannel = Schema.Literals(["npm", "bun", "binstall", "unknown", "package", "cargo_or_binstall", "cargo", "archive", "source"]).annotate({ identifier: "InstallChannel" });
 export type InstallChannel = typeof InstallChannel.Type;
 
 /**
@@ -3012,6 +3012,7 @@ export type InstallChannel = typeof InstallChannel.Type;
  * channel that installed the binary owns updating it.
  */
 export const UpdateHint = Schema.Struct({
+  alternatives: Schema.Array(Schema.String),
   channel: InstallChannel,
   command: Schema.optional(Schema.NullOr(Schema.String)),
 }).annotate({ identifier: "UpdateHint" });
@@ -3020,16 +3021,14 @@ export type UpdateHint = typeof UpdateHint.Type;
 /**
  * Where this city stands against the release channel.
  * 
- * Exhaustive rather than a pair of optional fields: "you are running a
- * release and here is where it stands", "you built this yourself, so
- * there is nothing to compare" and "the registry could not be read"
- * are three different things for a person to do next, and only the
- * first of them is a version number.
+ * A comparison, an unreleased build, an origin requiring confirmation, or a refusal.
+ * The selected registry supplies both the displayed version and the comparison.
  */
 export const ReleaseAnswer = Schema.Union([
   Schema.Struct({
     stands: Schema.Struct({
       mine: ReleaseLine,
+      newest: ReleaseLine,
       registries: Schema.Array(RegistryNewest),
       update: UpdateHint,
       verdict: ReleaseVerdict,
@@ -3037,6 +3036,13 @@ export const ReleaseAnswer = Schema.Union([
   }),
   Schema.Struct({
     unreleased: Schema.Struct({
+      registries: Schema.Array(RegistryNewest),
+      update: UpdateHint,
+    }),
+  }),
+  Schema.Struct({
+    unconfirmed: Schema.Struct({
+      mine: ReleaseLine,
       registries: Schema.Array(RegistryNewest),
       update: UpdateHint,
     }),
