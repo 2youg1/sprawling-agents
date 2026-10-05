@@ -34,7 +34,7 @@ impl Backlog {
                     scope: scope.clone(),
                     what: what.clone(),
                     body: Body::Command {
-                        child: Process::Native(child),
+                        child: Process::Native(Box::new(child)),
                         dir: dir.clone(),
                         claim: Claim::Window(owner),
                         tail: Tail::default(),

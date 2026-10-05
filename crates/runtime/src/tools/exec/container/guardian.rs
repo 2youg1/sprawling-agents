@@ -141,11 +141,8 @@ fn run(args: &[String]) -> Result<(), AxError> {
         .take(length)
         .read_to_end(&mut answer);
     match read {
-        Ok(_) => {
-            if answer == DONE {
-                return Ok(());
-            }
-        }
+        Ok(_) if answer == DONE => return Ok(()),
+        Ok(_) => {}
         Err(err) => {
             eprintln!("{err}; parent channel failed, guardian takes cleanup responsibility")
         }

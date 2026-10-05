@@ -248,8 +248,8 @@ impl ContainerRuntime {
     }
 }
 
-fn denied(action: &str, subject: impl Into<String>) -> AxError {
-    AxError::failure(AxCode::SandboxDenied, action, subject).with_recovery(
+fn denied(action: &str, subject: impl std::fmt::Display) -> AxError {
+    AxError::failure(AxCode::SandboxDenied, action, subject.to_string()).with_recovery(
         "make the Linux container daemon accessible with cgroup v2 CPU, memory and process controllers, or explicitly choose an existing sandbox arm",
     )
 }
