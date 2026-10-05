@@ -17,8 +17,14 @@ Read this file to the end before the first edit, and then read what the change t
 - [`ARCHITECTURE.md`](ARCHITECTURE.md) — the crate topology, the seams, the module map, the seven shapes and the determinism rules. Its `depmap` block and its module map are machine authorities.
 - A crate's SPEC — `crates/<dir>/Spec.lean` with its parts under `spec/` once the crate has migrated, `crates/<dir>/<lib>-SPEC.md` until then — holds the crate's interfaces and decisions, written before its code; [`ARCHITECTURE.md`](ARCHITECTURE.md) §11, *Specifications in Lean*, says where each part lives.
 - [`docs/glossary.md`](docs/glossary.md) — one name for each concept, enforced by the `lexicon` gate through `tools/xtask/lexicon.toml`.
-- The tests beside the code you are about to change, and the neighbouring modules.
+- The source and tests that implement the affected specification, the neighbouring modules and the callers of the interfaces you change; read the relevant Lean parts and identify the properties the implementation must preserve.
 - The official documentation of each tool you use, and the vendor's agent guide or skill when one exists.
+
+Before implementation, state the problem, the required result and the constraints, then trace callers, data flow, invariants and failure paths to the existing authority. Choose the smallest coherent change that achieves the result, record interface and policy decisions in the affected specification first, and change only the source, tests and documents the result needs; prefer a design the next maintainer can understand over a local shortcut. The client exemptions in *The view layer* still apply.
+
+Before designing or implementing a new core feature, establish that the need exceeds what a skill can meet, that a hook plugin should not own the behavior, that MCP, CLI or ACP integration cannot reasonably satisfy the requirement and its guarantees, that the feature serves most users, and that it is neither a theme nor a workflow tailored to one deployment. Add the feature to the core only when all five criteria hold; otherwise prefer an extension or a separate repository and bring the result back in an issue to discuss integration. If the existing seams are insufficient, an issue can discuss the smallest interface needed without requiring a completed separate implementation first. A hook plugin is an alternative architecture to consider, not a claim that this project offers a Hook API.
+
+For a feature contribution, explain the need, the alternatives and why the core should own it in one prose paragraph in the commit body, then reuse that explanation in the feature issue or pull request description; use concrete scenarios and evidence for the claim about most users, without inventing adoption figures or adding a five-part form. Bug fixes are exempt; apply the reasoning only to any new feature bundled with a fix.
 
 </reading>
 
@@ -108,6 +114,8 @@ just check                    # the whole check: fmt, source gates, Lean specifi
 
 ## Tests
 
+- Keep negative fixtures, regression tests and deliberate failure experiments distinct: a negative fixture belongs inside a passing outer test that asserts its rejection and remains in the default required suite; a regression test written red must pass with its fix before the change merges; deliberate failure demonstrations and experiments requiring a special environment use an explicit opt-in entry outside the default required suite, with prerequisites, the reason for isolation and the condition for returning to required checks. Use the test runner's selection mechanism rather than gitignore to isolate experiments, keep their source tracked, and record unresolved defects in the affected SPEC; isolation cannot turn an unresolved defect into a successful verification result.
+
 - Tests use the same doors as production code. To exercise something internal, put a seam on that face and give it a second adapter, or drive it from outside through citysim.
 - Test modules may relax lints locally with `#[allow]` on the test module; production code carries them as written.
 - Compare whole objects rather than fields one at a time.
@@ -169,7 +177,10 @@ Read [`docs/frontend-method.md`](docs/frontend-method.md) before you change a sc
 | Identifiers, event names, error codes, rustdoc, commit subjects | English |
 | `README.md`, `AGENTS.md`, `ARCHITECTURE.md`, `docs/` | English, except `README.zh-CN.md` and `docs/getting-started.zh-CN.md`, which change in the same commit as their English pair |
 | Crate SPECs — the Markdown ones, and the comments of `Spec.lean` and its parts — and design discussion | Chinese, with concept names kept in their English form; Lean declaration names are English, from the glossary |
-| Pull requests, issues, review comments | your own language; a parallel translation is welcome, because side by side a reader is faster and a mistranslation is visible instead of silent |
+| Pull requests and issues | Matching English and Chinese descriptions; write the primary version in the language you think in |
+| Review comments | Your own language; a parallel translation is welcome |
+
+Provide both English and Chinese versions of every issue and pull request description, with matching scope, claims, uncertainty and verification results; preserve identifiers, error codes, commands, paths and quoted diagnostics unchanged, and share identical logs or attachments once. A submission whose versions differ in meaning may be closed for that reason even when its technical content is acceptable. We recommend having an agent translate the description and compare both versions before publication; that check does not guarantee an error-free translation. Security reports follow the private reporting channel in [SECURITY.md](SECURITY.md), and translation does not authorize public disclosure.
 
 - A comment is one of four kinds: the MPL notice, public interface documentation, a warning about consequences, or a statement of intent the code cannot carry. Any other comment marks code that should say more itself.
 - In rustdoc, write what the signature cannot say: invariants, failure modes, call ordering, ownership.
@@ -180,6 +191,7 @@ A working record is noise to a contributor and to a model, and signal to an atta
 
 `xtask secret` and `xtask release` scan the files in the tree for shapes — a credential's prefix, the spelling of a home directory. Working context written as prose has no shape, so it passes: *"only a third could be verified on this machine"* is a fact about somebody's hardware that every gate reads as a sentence. A pull request description, a commit body, an issue and a review comment are not files in the tree, and no gate reaches them, so they are yours to hold.
 
+- Keep information in the existing gitignored `local/` directory until you have established that public readers need it to use, understand, reproduce, review or maintain the project, then publish only the necessary, checked content in the appropriate tracked document, commit, issue or pull request. Required production source, specifications and tests enter the tracked change once their public purpose is clear; working notes and incidental information stay local, and public artifacts depend only on material their readers can open. Before committing or publishing, inspect the staged diff, submission text and attachments, because `.gitignore` does not protect files already tracked by Git or content sent to an external service.
 - Ship the decision, not the occasion: the decision, the reason it beat the alternative, and the parameter that would re-open it, without who said it, when, on whose machine, or in what words.
 - Keep your own working record — a session diary, a round-by-round acceptance log, a dated ruling, a quotation of the person's words — in the gitignored `local/`, because it is about a person and ships to strangers inside whatever file carries it. `xtask release` refuses a published document that sends a reader there.
 - Cite only what a reader can open; a cited log they cannot open tells them it exists and leaves the document unreadable.
