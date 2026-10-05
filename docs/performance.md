@@ -6,7 +6,7 @@ The [performance register](../tools/xtask/budgets.toml) is the authority for pro
 
 ## Watch a city
 
-Open Settings → Diagnosis → Performance, or the client's `#/monitor` route. The settings summary watches the core process alone; the full performance page also reads machine CPU, available memory and free space on the city's volume. The page's sampling control changes the city's beat and keeps it for the next serve. [BeatMs](../crates/wire/src/frames/monitor.rs) owns the default and allowed range; [the sampler](../crates/sprawling/src/monitor/sampler.rs) owns the relation between memory sampling and emitted readings.
+Open Settings → Diagnosis → Performance, or the client's `#/monitor` route. The settings summary watches the core process alone; the full performance page also reads machine CPU, available memory and free space on the city's volume. The page's sampling control changes the city's beat. [Beat](../crates/sprawling/src/monitor/beat.rs) applies it immediately and saves it for the next serve; if saving fails, the console reports the failure and the change lasts only for this process. A missing saved value uses the default; an unreadable or invalid value also uses the default and reports the failure. [BeatMs](../crates/wire/src/frames/monitor.rs) owns the default and allowed range; [the sampler](../crates/sprawling/src/monitor/sampler.rs) owns the relation between memory sampling and emitted readings.
 
 Private memory is sampled at the configured memory beat, and monitor readings are emitted after the sampler's `MEMORY_BEATS_PER_BEAT` memory beats. A reading's `core_private_bytes` is the largest memory value observed since the previous emitted reading, not its mean or an instantaneous value. Changing the memory beat also changes the emission interval; use `beat_ms` and the linked sampler's emission multiplier to interpret a saved stream. Scheduling and counter-read costs can lengthen real intervals, so this is a sampling cadence, not a deadline guarantee.
 
@@ -24,7 +24,7 @@ Use the address printed by `serve`; `top` is an alias for `gauge`. Redirect stdo
 sprawling gauge --at <address> > city.jsonl
 ```
 
-Stop the watcher when the workload ends. A city watcher also ends normally after a sustained absence of readings, as specified in [Main §8-129-4](../crates/sprawling/spec/Main.lean). `--every` and `--samples` belong to process and command measurements, so do not add them to the city form. Change the city's cadence through the performance page instead. Measurement files are disposable observations and do not enter the Ledger; [logging](logging.md) explains the distinction between history and diagnostics.
+Stop the watcher when the workload ends. A city watcher also ends normally after transport silence reaches [the watcher's `SILENCE` limit](../crates/sprawling/src/wire_client/watching.rs), or the socket closes. This does not prove that the city stopped: a long configured emission interval can exceed that limit in an otherwise idle city. For a continuous terminal capture, choose a cadence whose emission interval stays below the limit with room for scheduling delays, and check that the recording covers the whole workload. `--every` and `--samples` belong to process and command measurements, so do not add them to the city form. Change the city's cadence through the performance page instead. Measurement files are disposable observations and do not enter the Ledger; [logging](logging.md) explains the distinction between history and diagnostics.
 
 ## Interpret the fields
 
@@ -102,15 +102,17 @@ Pin input digests and build settings, change one thing, then alternate before/af
 
 ## Reproduce repository workloads
 
-These are contributor commands from [justfile](../justfile). Run prerequisites first with `just prereqs`; the recipes build what they measure. Save build output separately from timed output, and use the product feature set and [release profile](../Cargo.toml). A debug build, a build with test-only features, or a binary without the real client is not the release workload. Record any `RUSTFLAGS`, target CPU setting or PGO profile rather than assuming the host's flags.
+These are contributor commands from [justfile](../justfile). Run prerequisites first with `just prereqs`; the recipes build what they measure. Before `just mem` serves a city, run `just web-bundle` to prepare the real client: the memory recipe builds the binary but does not build its client. `just bench-startup` includes that prerequisite. Save build output separately from timed output, and use the product feature set and [release profile](../Cargo.toml). A debug build, a build with test-only features, or a binary without the real client is not the release workload. Record any `RUSTFLAGS`, target CPU setting or PGO profile rather than assuming the host's flags.
 
 | Command | Work and timing boundary |
 |---|---|
 | `just bench` | Release citysim bench, followed by ignored production instruments. Ledger append/barriers, prefix assembly, run-history reads, large-ledger fold, new and kept worktree placement, local forwarding, and the registered instrument tests. The relay and throughput instruments drive production accounting rather than a copied loop. |
 | `just bench-startup` | Builds the client and release binary, then measures install with the archive already present, process startup, raising a city, opening a session and first-byte startup. The harness prints sample counts, substeps and per-action process/file/barrier counts. It does not time network download. |
-| `just mem` | Builds the release binary and measures an empty served city through the platform memory adapter. `just mem <pid>` measures an existing process. Read the adapter limitations before comparing platforms. |
+| `just mem` | Builds the release binary and reads an empty served city after it accepts a connection and settles. `just mem <pid>` reads an existing process. This is one observation through xtask's adapter, not a sampled distribution; its counter names travel with the output. |
 | `just mem long-turn 500 100` | Builds the release long-turn instrument, reads memory at its synchronised pauses, and continues it after each reading. The arguments are workload steps and pause frequency, not a city monitor beat. |
 | `just sim` | Deterministic scripted scenarios on a counted clock. This verifies behaviour and replay; virtual scenario time is not a wall-clock benchmark. |
+
+[The xtask memory adapter](../tools/xtask/src/mem.rs) differs from both the city and process-tree adapters above. On Windows it reads `PrivateMemorySize64`, `PeakPagedMemorySize64` and `WorkingSet64`. On Linux its private value is the smaps private sum, its working set is `VmRSS`, and its field labelled peak private is `VmHWM`, a peak resident value that includes shared pages. On macOS it uses one current `ps rss` reading for all three values; it does not measure a private or historical peak value. Keep these source names with the result. For a served fixture, the adapter attempts to stop the process and clear its temporary city even when acceptance or measurement fails; an existing city supplied with `--city` is retained. A missing counter or failed platform command returns an error, so keep stderr and the command's exit code.
 
 For first-byte startup on the harness's empty and historical cities, the recipe takes no argument; use the command sequence recorded in the register's `[first_byte].measured_by`:
 
