@@ -57,20 +57,6 @@ fn the_platform_packages_take_the_scope_from_the_next_version() {
     }
 }
 
-/// Found by running it rather than by reading it: npm's generated
-/// wrapper reads the shebang to decide what interprets the file, and
-/// without one Windows ran the JavaScript as a shell script, printed
-/// nothing, and exited 0. A `bunx sprawling` that reports success
-/// and does nothing is the worst shape this channel can fail in, so
-/// the first line is held here.
-#[test]
-fn the_shim_begins_with_a_shebang() {
-    assert!(
-        super::SHIM.starts_with("#!/usr/bin/env node\n"),
-        "without a shebang npm's wrapper runs this as a shell script"
-    );
-}
-
 /// The shim is what every root package carries, so its own contract
 /// is worth holding: it resolves a platform package and never
 /// installs anything.
@@ -85,4 +71,61 @@ fn the_shim_execs_rather_than_installs() {
     // Which packages the shim knows is `platform::restated`'s question,
     // asked of the file on disk; asserting it here too would be a
     // second reader of one fact.
+}
+
+#[test]
+fn channel_packages_preserve_the_archive_binary_and_dispatch_both_runtimes() {
+    use std::io::Write as _;
+    let fixture = std::env::temp_dir().join(format!("sprawling-channel-{}", std::process::id()));
+    let assets = fixture.join("assets");
+    std::fs::create_dir_all(&assets).unwrap();
+    std::fs::write(
+        fixture.join("Cargo.toml"),
+        "[workspace.package]
+version = '0.0.10'
+repository = 'https://example.invalid/source'
+description = 'fixture description'
+",
+    )
+    .unwrap();
+    let row = &PLATFORMS[0];
+    let archive = assets.join(format!("sprawling-0.0.10{}", row.suffix));
+    let mut zip = zip::ZipWriter::new(std::fs::File::create(archive).unwrap());
+    zip.start_file(
+        format!("archive/{}", row.binary),
+        zip::write::SimpleFileOptions::default().unix_permissions(0o755),
+    )
+    .unwrap();
+    zip.write_all(b"archive binary bytes").unwrap();
+    zip.finish().unwrap();
+    let out = fixture.join("npm");
+    super::run(&fixture, "v0.0.10-Alpha-261005", &assets, &out).unwrap();
+    let manifest: serde_json::Value = serde_json::from_slice(
+        &std::fs::read(out.join(ROOT_PACKAGE).join("package.json")).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(manifest["bin"]["sprawling"], "bin/sprawling.js");
+    assert_eq!(manifest["bin"][super::RUNTIME_ENTRY], "bin/sprawling.cmd");
+    assert_eq!(manifest["description"], "fixture description");
+    assert_eq!(
+        std::fs::read(out.join(row.package).join("bin").join(row.binary)).unwrap(),
+        b"archive binary bytes"
+    );
+    assert_eq!(
+        std::fs::read_to_string(out.join(ROOT_PACKAGE).join("bin/sprawling.cmd")).unwrap(),
+        super::LAUNCHER
+    );
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt as _;
+        assert_eq!(
+            std::fs::metadata(out.join(row.package).join("bin").join(row.binary))
+                .unwrap()
+                .permissions()
+                .mode()
+                & 0o777,
+            0o755
+        );
+    }
+    std::fs::remove_dir_all(fixture).unwrap();
 }

@@ -45,9 +45,16 @@ use crate::report::XtaskError;
 /// package carries are the same bytes — the rule `crates/city/templates/`
 /// already follows for the documents a city writes.
 const SHIM: &str = include_str!("channel/shim.js");
+const RUNTIME_ENTRY: &str = "sprawling-runtime";
+const LAUNCHER: &str = include_str!("channel/launcher.cmd");
 
 /// One file's bytes, out of a zip that holds it at any depth.
-fn extract(archive: &Path, wanted: &str) -> Result<Vec<u8>, XtaskError> {
+struct ArchiveBinary {
+    bytes: Vec<u8>,
+    mode: u32,
+}
+
+fn extract(archive: &Path, wanted: &str) -> Result<ArchiveBinary, XtaskError> {
     let file = std::fs::File::open(archive).map_err(|source| XtaskError::Io {
         path: archive.display().to_string(),
         source,
@@ -73,7 +80,11 @@ fn extract(archive: &Path, wanted: &str) -> Result<Vec<u8>, XtaskError> {
                     path: archive.display().to_string(),
                     source,
                 })?;
-            return Ok(bytes);
+            let mode = entry.unix_mode().ok_or_else(|| XtaskError::Cmd {
+                cmd: format!("read {}", archive.display()),
+                msg: format!("{wanted} carries no executable permissions"),
+            })?;
+            return Ok(ArchiveBinary { bytes, mode });
         }
     }
     Err(XtaskError::Cmd {
@@ -132,6 +143,7 @@ fn manifest(stem: &Stem<'_>, name: &str, description: &str, extra: &str) -> Stri
 pub(crate) fn run(root: &Path, tag: &str, assets: &Path, out: &Path) -> Result<String, XtaskError> {
     let workspace = crate::package::workspace_package(root, "version")?;
     let repository = crate::package::workspace_package(root, "repository")?;
+    let description = crate::package::workspace_package(root, "description")?;
     // `kernel::Release` owns both spellings of one release, because the
     // binary this channel packages has to recognise on the registry the
     // same release this job publishes there.
@@ -185,7 +197,24 @@ pub(crate) fn run(root: &Path, tag: &str, assets: &Path, out: &Path) -> Result<S
         // one, which is why the publish step enumerates
         // `target/npm/@sprawling/*/` rather than every child of `target/npm`.
         let dir = out.join(row.package);
-        write(&dir.join("bin").join(row.binary), &binary)?;
+        let path = dir.join("bin").join(row.binary);
+        if binary.mode & 0o111 == 0 {
+            return Err(XtaskError::Cmd {
+                cmd: "npm channel".to_owned(),
+                msg: format!("{} has no executable permission bits", archive.display()),
+            });
+        }
+        write(&path, &binary.bytes)?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt as _;
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(binary.mode)).map_err(
+                |source| XtaskError::Io {
+                    path: path.display().to_string(),
+                    source,
+                },
+            )?;
+        }
         let extra = format!(
             "  \"os\": [\"{}\"],\n  \"cpu\": [\"{}\"],\n  \"files\": [\"bin\"]\n",
             row.os, row.cpu
@@ -211,22 +240,24 @@ pub(crate) fn run(root: &Path, tag: &str, assets: &Path, out: &Path) -> Result<S
         .collect::<Vec<_>>()
         .join(",\n");
     let extra = format!(
-        "  \"bin\": {{ \"sprawling\": \"bin/sprawling.js\" }},\n  \
+        "  \"bin\": {{ \"{ROOT_PACKAGE}\": \"bin/sprawling.js\", \"{RUNTIME_ENTRY}\": \"bin/sprawling.cmd\" }},\n  \
          \"files\": [\"bin\"],\n  \
          \"optionalDependencies\": {{\n{optional}\n  }}\n"
     );
     let dir = out.join(ROOT_PACKAGE);
     write(
         &dir.join("package.json"),
-        manifest(
-            &stem,
-            ROOT_PACKAGE,
-            "Raise a city of agents that work on your repository.",
-            &extra,
+        manifest(&stem, ROOT_PACKAGE, &description, &extra).as_bytes(),
+    )?;
+    write(
+        &dir.join("bin").join("sprawling.js"),
+        format!(
+            "#!/usr/bin/env {RUNTIME_ENTRY}
+{SHIM}"
         )
         .as_bytes(),
     )?;
-    write(&dir.join("bin").join("sprawling.js"), SHIM.as_bytes())?;
+    write(&dir.join("bin").join("sprawling.cmd"), LAUNCHER.as_bytes())?;
 
     let names = carried
         .iter()

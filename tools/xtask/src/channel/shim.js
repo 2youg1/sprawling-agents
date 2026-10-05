@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 // This Source Code Form is subject to the terms of the Mozilla Public
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
@@ -6,13 +5,6 @@
 //
 // The npm channel's entry point: find the binary for this machine and
 // become it.
-//
-// **The first line is load-bearing.** npm writes a shell wrapper for
-// every `bin`, and that wrapper reads the shebang to decide what runs
-// the file; without one it executes the JavaScript as a shell script,
-// which on a Unix shell fails on line 1 and on Windows fails silently
-// with exit 0 - a `bunx sprawling` that prints nothing and reports
-// success.
 //
 // **This script never installs anything.** Where a downloaded archive
 // puts the binary, and what happens to PATH, belongs to `sprawling
@@ -26,7 +18,7 @@
 
 "use strict";
 
-const { spawnSync } = require("node:child_process");
+const { spawn } = require("node:child_process");
 
 // The platforms the release builds, keyed the way node spells them.
 // A machine outside this table is told what is built rather than handed
@@ -88,10 +80,26 @@ try {
 
 // `inherit`, so the city's console is this console: the process serves
 // until Ctrl-C, and its output is not something to collect and reprint.
-const finished = spawnSync(binary, process.argv.slice(2), { stdio: "inherit" });
-if (finished.error !== undefined && finished.error !== null) {
-  die(`could not run ${binary}: ${finished.error.message}`);
-}
-// A process killed by a signal has no status. Reporting that as success
-// would tell a script that a city shut down cleanly when it was killed.
-process.exit(finished.status === null ? 1 : finished.status);
+const child = spawn(binary, process.argv.slice(2), {
+  stdio: "inherit",
+  env: {
+    ...process.env,
+    SPRAWLING_INSTALL_CHANNEL: ["npm", "bun"].includes(process.env.SPRAWLING_INSTALL_CHANNEL)
+      ? process.env.SPRAWLING_INSTALL_CHANNEL
+      : __dirname.split(/[\\/]/).includes(".bun")
+        ? "bun"
+        : __dirname.split(/[\\/]/).includes("_npx") ? "npm" : "package",
+  },
+});
+const signals = ["SIGINT", "SIGTERM", "SIGHUP"];
+const forwards = new Map(signals.map((signal) => [signal, () => child.kill(signal)]));
+for (const [signal, forward] of forwards) process.on(signal, forward);
+child.on("error", (error) => die(`could not run ${binary}: ${error.message}`));
+child.on("exit", (status, signal) => {
+  for (const [name, forward] of forwards) process.removeListener(name, forward);
+  if (signal !== null && process.platform !== "win32") {
+    process.kill(process.pid, signal);
+  } else {
+    process.exit(status === null ? 1 : status);
+  }
+});
