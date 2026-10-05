@@ -203,6 +203,34 @@ impl super::Backlog {
     }
 }
 
+impl super::Backlog {
+    pub(super) fn watch(
+        &self,
+        id: BacklogId,
+        owner: kernel::RunId,
+        what: String,
+        dir: std::path::PathBuf,
+    ) -> Result<super::Started, AxError> {
+        let mut tail = Tail::default();
+        for _ in 0..self.window.polls() {
+            if let Some(exit) = self.settle(id)? {
+                let (stdout, stderr) = super::collect(&dir);
+                return Ok(super::Started::Settled {
+                    exit,
+                    stdout,
+                    stderr,
+                });
+            }
+            if let Some(sink) = &self.sink {
+                sink.deliver(tail.take(&dir, (owner, id), self.window.read_per_poll()));
+            }
+            std::thread::sleep(self.window.interval());
+        }
+        self.hand_over(id, tail)?;
+        Ok(super::Started::Backgrounded { id, what })
+    }
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used, reason = "test code")]
 mod tests {
@@ -234,33 +262,5 @@ mod tests {
         let budget = PollBudget::DEFAULT;
         assert_eq!(budget.polls(), 500);
         assert_eq!(budget.interval(), Duration::from_millis(20));
-    }
-}
-
-impl super::Backlog {
-    pub(super) fn watch(
-        &self,
-        id: BacklogId,
-        owner: kernel::RunId,
-        what: String,
-        dir: std::path::PathBuf,
-    ) -> Result<super::Started, AxError> {
-        let mut tail = Tail::default();
-        for _ in 0..self.window.polls() {
-            if let Some(exit) = self.settle(id)? {
-                let (stdout, stderr) = super::collect(&dir);
-                return Ok(super::Started::Settled {
-                    exit,
-                    stdout,
-                    stderr,
-                });
-            }
-            if let Some(sink) = &self.sink {
-                sink.deliver(tail.take(&dir, (owner, id), self.window.read_per_poll()));
-            }
-            std::thread::sleep(self.window.interval());
-        }
-        self.hand_over(id, tail)?;
-        Ok(super::Started::Backgrounded { id, what })
     }
 }
