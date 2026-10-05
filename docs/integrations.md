@@ -150,7 +150,7 @@ Open the MCP page for the chosen address, or ask for its live health:
 sprawling call '{"ask":{"ask_id":2,"query":{"mcp_health":{"addr":"lab/room1"}}}}' --at 127.0.0.1:3333 --quiet-ms 20000
 ```
 
-This read opens connections, initializes MCP, sends the initialized notification and lists tools; it can start a stdio process and contact a service even though it writes no Ledger event. It is an explicit probe, not a background timer. The reply includes transport, target, negotiated revision, remote tool name, city tool name and input schema. The client revision requested has one definition in [handshake](../crates/agent_protocols/src/mcp/handshake.rs); use the reply to see what the server negotiated.
+This read opens connections, initializes MCP, sends the initialized notification and lists tools; it can start a stdio process and contact a service even though it writes no Ledger event. It is an explicit probe, not a background timer. Unlike a confidential run, this probe does not check the building's confidentiality before connecting; request it only when you intend to reach those servers. An empty server list can also mean the configuration could not be read. Run `sprawling check <city-directory>` to diagnose configuration errors rather than treating an empty health answer as validation. The reply includes transport, target, negotiated revision, remote tool name, city tool name and input schema. The client revision requested has one definition in [handshake](../crates/agent_protocols/src/mcp/handshake.rs); use the reply to see what the server negotiated. [The live probe](../crates/accounting/src/views/mcp_health.rs) defines these diagnostic outcomes.
 
 The city prefixes each discovered tool with its server label and sanitizes the remote name, while keeping the original name for `tools/call`. For this example, `convert_to_markdown` is offered as `markitdown_convert_to_markdown`. Ask a native resident to use it on `data:text/plain,Integration%20check`; a successful result should contain “Integration check”. Use the discovered schema rather than inventing arguments. There is no separate CLI `mcp call` verb: native residents invoke discovered tools through the normal run.
 
@@ -196,6 +196,8 @@ Detached success prints the run identifier when the run starts; it does not cert
 | 2 | Unreadable arguments or frame | Fix the grammar before sending again |
 | 3 | Silence or an unfinished wait | Inspect history and run state; it may still be working |
 | 4 | No city completed the greeting | Check the served address and release/schema compatibility |
+
+Stopping the CLI's wait or closing its terminal sends no cancellation command to the city. To stop the work, use the city's stop control for that run, or send the wire `Cancel` command through `call -` using the observed run identifier and an idempotency key in the wire reference's format. The [command type](../crates/wire/src/command/kind.rs) owns those fields; cancellation is not a `dispatch` flag. Observe that run's `run_frozen` event and completion before deciding what to do next. Native runs hear cancellation at safe points; a harness turn sends `session/cancel` when it observes the stop. Cancellation cannot undo external effects already performed, and a lost answer still needs inspection before retrying.
 
 The [wire client specification](../crates/sprawling/spec/WireClient.lean) and [CLI grammar](../crates/sprawling/src/main/verbs.rs) define these outcomes and flags. Do not infer a safe retry from a timeout or a nonzero exit alone.
 
