@@ -33,6 +33,8 @@ use serde_json::{Map, Value};
 use crate::backlog::{Backlog, Exit, Started};
 use crate::sandbox::{Fuel, Mount, Sandbox, SandboxExit, SandboxJob};
 
+#[cfg(windows)]
+mod native_windows;
 mod confinement;
 mod container;
 #[cfg(any(target_os = "macos", test))]
