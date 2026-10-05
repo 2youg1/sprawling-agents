@@ -6,7 +6,7 @@
 import Sprawling
 
 /-!
-# The acceptance world's two commands.
+# The acceptance world's commands.
 
 `just acceptance <archive>` is the only caller, and it calls them in this
 order: `script` writes what the stand-in provider will play, the recipe starts
@@ -70,6 +70,19 @@ private def walkWith (shelf script record checklist : System.FilePath) : IO UInt
     IO.println s!"  FAIL  {error}"
     return 1
 
+/-- Checks the embedded client through the same step and serving lifecycle as firstDay. -/
+private def deliveredClient : IO UInt32 := do
+  let door : Door := { binary := ← required "SPRAWLING_BIN", launcher := ← launcher }
+  let stage ← Stage.raise door
+  try
+    stage.serving door .closedInOrder fun ground => Step.runAll ground [clientDelivered]
+    return 0
+  catch error =>
+    IO.eprintln s!"  FAIL  {error}"
+    return 1
+  finally
+    stage.discard
+
 /-- Checks the installed binary against the caller's Cargo identity. -/
 private def installedVersion (name version : String) : IO UInt32 := do
   let door : Door := { binary := ← required "SPRAWLING_BIN" }
@@ -88,6 +101,7 @@ private def installedVersion (name version : String) : IO UInt32 := do
     return 1
 
 def main : List String → IO UInt32
+  | ["client"] => deliveredClient
   | ["version", name, version] => installedVersion name version
   | ["script", shelf, out] => writeScript shelf out
   | ["walk", shelf, script, record, checklist] => walkWith shelf script record checklist

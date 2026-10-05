@@ -25,10 +25,10 @@ id 怎样从正文里读出来——那一半在 citysim 的 Rust 里，由它�
 /-! ## 完整客户端的 HTTP 验收接口
 
 本段是环境接口说明，不是证明。验收世界 firstDay 在注册 provider 前从正在服务的二进制获取首页，
-要求首页引用同源的 JavaScript 与 CSS，并逐一获取这些引用，拒绝空内容及回退首页。
+要求首页引用同源的 JavaScript 与 CSS，并逐一获取这些引用，拒绝空内容、回退首页和伪装为脚本或样式的 HTML；资源的 Content-Type 须与引用类型相符。
 地址从 Ground 的实际端口读，资源地址从首页读，不另声明 bundle 路径或文件名。
 占位页、只有 index.html、缺脚本或样式的应用均须失败；curl 不存在、HTTP 拒绝、超时同样失败，
-恢复是补齐验收环境或重建完整应用。现有首次起城、skills 与历史恢复步骤继续走同一 acceptance。
+恢复是补齐验收环境或重建完整应用。`acceptance client` 用同一 Stage.serving 与 clientDelivered 单独检查调用者指定的二进制，成功退零、拒绝退一，并在所有路径清理临时城与服务进程；firstDay 仍在 provider 注册前调用这一步。fresh 作业把 HTML 写入已构建 bundle 的脚本后重建二进制，以真实 HTTP 返回验证拒绝，之后原始归档仍用于完整 walk。现有首次起城、skills 与历史恢复步骤继续走同一 acceptance。
 -/
 
 /-! ## 安装后版本的验收接口
