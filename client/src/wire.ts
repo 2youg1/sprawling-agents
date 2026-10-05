@@ -9,9 +9,9 @@
 import { Schema } from "effect";
 
 /** The wire version both ends compare on connect. */
-export const WIRE_V = 56 as const;
+export const WIRE_V = 57 as const;
 /** The schema hash the server checks: `wire::schema_hash()`. */
-export const WIRE_HASH = "11b5970efbf2cb69c4913a16408df1ce69488c7cb83968e670308ad73972dc72" as const;
+export const WIRE_HASH = "4f1661f862af58ee66ffad0df9261453c7660717800c2a4e5ff523218d04168d" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 /** The body sizes a person may ask for: `wire::BODY_PX_MIN` and `BODY_PX_MAX`. */
@@ -398,6 +398,26 @@ export const Progress = Schema.Union([
 export type Progress = typeof Progress.Type;
 
 /**
+ * A locally installed image ID. Registry references and mutable tags
+ * cannot reach an execution request through this type.
+ */
+export const ContainerImage = Schema.String.pipe(Schema.brand("ContainerImage"));
+export type ContainerImage = typeof ContainerImage.Type;
+
+/**
+ * Every limit is explicit and nonzero. CPU is in millicpu, memory is
+ * in bytes, and the process count bounds descendants as well as PID 1.
+ */
+export const ContainerLimits = Schema.Struct({
+  cpu_millis: Schema.Int,
+  image: ContainerImage,
+  memory_bytes: Schema.Int,
+  pids: Schema.Int,
+  user: Schema.Int,
+}).annotate({ identifier: "ContainerLimits" });
+export type ContainerLimits = typeof ContainerLimits.Type;
+
+/**
  * One environment variable name a scope declares its runs may inherit.
  * 
  * A `String` would put the judgement in whichever caller remembered it.
@@ -424,6 +444,12 @@ export const Interpreter = Schema.Literals(["system", "pwsh"]).annotate({ identi
 export type Interpreter = typeof Interpreter.Type;
 
 /**
+ * One sandbox mechanism family, shared by configuration and doctor reports.
+ */
+export const SandboxArm = Schema.Literals(["none", "copied_tree", "native", "container", "python"]).annotate({ identifier: "SandboxArm" });
+export type SandboxArm = typeof SandboxArm.Type;
+
+/**
  * What a run's execution boundary allows. Resolved as one value rather
  * than field by field: a layer that speaks about the sandbox speaks
  * about all of it, so an under-specified layer can only ever reduce
@@ -434,25 +460,6 @@ export type Interpreter = typeof Interpreter.Type;
  * and which shell binary exists belong to the machine, not to the city,
  * and a city carried to another machine must not carry its paths.
  */
-export const SandboxArm = Schema.Union([
-  Schema.Literals(["copied_tree", "container"]),
-  Schema.Literal("none"),
-  Schema.Literal("native"),
-  Schema.Literal("python"),
-]).annotate({ identifier: "SandboxArm" });
-export type SandboxArm = typeof SandboxArm.Type;
-
-export const ContainerImage = Schema.String.annotate({ identifier: "ContainerImage" });
-export type ContainerImage = typeof ContainerImage.Type;
-export const ContainerLimits = Schema.Struct({
-  image: ContainerImage,
-  user: Schema.Int,
-  cpu_millis: Schema.Int,
-  memory_bytes: Schema.Int,
-  pids: Schema.Int,
-}).annotate({ identifier: "ContainerLimits" });
-export type ContainerLimits = typeof ContainerLimits.Type;
-
 export const SandboxLimits = Schema.Struct({
   arm: Schema.optional(Schema.NullOr(SandboxArm)),
   container: Schema.optional(Schema.NullOr(ContainerLimits)),
@@ -1276,6 +1283,7 @@ export type DoctorSandboxMissing = typeof DoctorSandboxMissing.Type;
 export const DoctorSandboxArm = Schema.Union([
   Schema.Literal("linux_namespaces"),
   Schema.Literal("windows_job_object"),
+  Schema.Literal("macos_seatbelt"),
   Schema.Literal("copied_tree"),
   Schema.Struct({
     unavailable: Schema.Struct({
@@ -1284,13 +1292,6 @@ export const DoctorSandboxArm = Schema.Union([
   }),
 ]).annotate({ identifier: "DoctorSandboxArm" });
 export type DoctorSandboxArm = typeof DoctorSandboxArm.Type;
-
-/**
- * The names a sandbox arm is chosen by, one per mechanism family, so
- * that every name has an arm to fill on Windows, macOS and Linux
- * (`crates/wire/spec/Answer/Doctor.lean` D26).
- */
-
 
 /**
  * Which backend a host command runs under on this machine, and what

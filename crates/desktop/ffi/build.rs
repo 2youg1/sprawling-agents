@@ -160,7 +160,9 @@ fn record_matches(rust: &str, zig: &str) -> Result<(), String> {
         .split_once("struct Record {")
         .and_then(|(_, tail)| tail.split_once('}'))
         .map(|(body, _)| body)
-        .ok_or_else(|| "read native Record: src/confinement.rs has no Record declaration".to_owned())?;
+        .ok_or_else(|| {
+            "read native Record: src/confinement.rs has no Record declaration".to_owned()
+        })?;
     let mut fields = String::new();
     for field in body.lines().map(str::trim).filter(|line| !line.is_empty()) {
         let (name, ty) = field
@@ -173,10 +175,14 @@ fn record_matches(rust: &str, zig: &str) -> Result<(), String> {
                 let length = array
                     .strip_prefix("[u8;")
                     .and_then(|array| array.strip_suffix(']'))
-                    .ok_or_else(|| format!("render native Record field `{name}`: unsupported type `{array}`"))?
+                    .ok_or_else(|| {
+                        format!("render native Record field `{name}`: unsupported type `{array}`")
+                    })?
                     .trim()
                     .parse::<usize>()
-                    .map_err(|err| format!("render native Record field `{name}` array length: {err}"))?;
+                    .map_err(|err| {
+                        format!("render native Record field `{name}` array length: {err}")
+                    })?;
                 format!("[{length}]u8")
             }
         };
