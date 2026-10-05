@@ -74,11 +74,11 @@ fn acl(directory: [*:0]const u16, sid: *anyopaque, record: *api.Record) u32 {
 }
 fn integrity(directory: [*:0]const u16, record: *api.Record) u32 {
     phase(record, @src().fn_name);
-    const label = "S:(ML;OICI;NW;;;LW)";
+    const sddl = "S:(ML;OICI;NW;;;LW)";
     const low = comptime block: {
-        var units: [label.len:0]u16 = undefined;
-        _ = std.unicode.utf8ToUtf16Le(&units, label) catch @compileError("invalid integrity label");
-        units[label.len] = 0;
+        var units: [sddl.len:0]u16 = undefined;
+        _ = std.unicode.utf8ToUtf16Le(&units, sddl) catch @compileError("invalid integrity label");
+        units[sddl.len] = 0;
         break :block units;
     };
     var descriptor: ?*anyopaque = null;
@@ -308,29 +308,43 @@ export fn sprawling_native_cleanup(record: *api.Record, bytes: usize, context: [
     if (end == 0 or end + 1 >= units) return api.invalid_parameter;
     const directory = context[0..end :0];
     const profile = context[end + 1 .. units - 1 :0];
+    return cleanup(record, .{ .directory = directory, .profile = profile }, .{
+        .root = api.TerminateProcess,
+        .wait = api.WaitForSingleObject,
+        .terminate = sprawling_native_terminate,
+        .tree = waitTree,
+        .close = close,
+        .restore = restore,
+        .delete = api.DeleteAppContainerProfile,
+    });
+}
+
+const CleanupContext = struct { directory: [:0]const u16, profile: [:0]const u16 };
+
+fn cleanup(record: *api.Record, context: CleanupContext, comptime effects: anytype) u32 {
     record.cleanup_error = 0;
     var result: u32 = 0;
     if (record.process != 0) {
         // Assignment failure leaves a suspended root outside the Job.
-        if (api.TerminateProcess(handle(record.process), 1) == .FALSE and api.WaitForSingleObject(handle(record.process), 0) != 0) result = lastError();
+        if (effects.root(handle(record.process), 1) == .FALSE and effects.wait(handle(record.process), 0) != 0) result = lastError();
     }
-    const terminated = sprawling_native_terminate(record, bytes);
+    const terminated = effects.terminate(record, @sizeOf(api.Record));
     if (result == 0) result = terminated;
     if (record.process != 0) {
-        const wait = api.WaitForSingleObject(handle(record.process), api.cleanup_wait_ms);
+        const wait = effects.wait(handle(record.process), api.cleanup_wait_ms);
         if (result == 0 and wait == api.wait_timeout) result = api.wait_timeout;
         if (result == 0 and wait != 0) result = lastError();
     }
-    const tree_waited = waitTree(record);
+    const tree_waited = effects.tree(record);
     if (result == 0) result = tree_waited;
-    const process_closed = close(&record.process);
+    const process_closed = effects.close(&record.process);
     if (result == 0) result = process_closed;
-    const job_closed = close(&record.job);
+    const job_closed = effects.close(&record.job);
     if (result == 0) result = job_closed;
-    const restored = restore(directory.ptr, record);
+    const restored = effects.restore(context.directory.ptr, record);
     if (result == 0) result = restored;
     if (record.profile_created != 0) {
-        const deleted = api.DeleteAppContainerProfile(profile.ptr);
+        const deleted = effects.delete(context.profile.ptr);
         if (deleted >= 0) record.profile_created = 0;
         if (result == 0 and deleted < 0) result = @bitCast(deleted);
     }
@@ -375,4 +389,60 @@ test "short native launch record is rejected before any write" {
     const before = record.failure_phase;
     try std.testing.expectEqual(api.invalid_parameter, sprawling_native_launch(&.{}, 0, &record, 0));
     try std.testing.expectEqualSlices(u8, &before, &record.failure_phase);
+}
+
+test "native cleanup retains every owner through repeated timeout or refusal" {
+    const Refusal = enum { root_wait, tree_wait, termination, none };
+    const Double = struct {
+        fn replies(comptime refusal: Refusal) type {
+            return struct {
+                fn root(_: api.HANDLE, _: u32) api.BOOL {
+                    return .TRUE;
+                }
+                fn wait(_: api.HANDLE, _: u32) u32 {
+                    return if (refusal == .root_wait) api.wait_timeout else 0;
+                }
+                fn terminate(_: *api.Record, _: usize) u32 {
+                    return if (refusal == .termination) 5 else 0;
+                }
+                fn tree(_: *api.Record) u32 {
+                    return if (refusal == .tree_wait) api.wait_timeout else 0;
+                }
+                fn close(raw: *usize) u32 {
+                    raw.* = 0;
+                    return 0;
+                }
+                fn restore(_: [*:0]const u16, record: *api.Record) u32 {
+                    record.root_security = 0;
+                    return 0;
+                }
+                fn delete(_: [*:0]const u16) i32 {
+                    return 0;
+                }
+            };
+        }
+    };
+    const context: CleanupContext = .{ .directory = &.{'d'}, .profile = &.{'p'} };
+    inline for (.{ Refusal.root_wait, Refusal.tree_wait, Refusal.termination }) |refusal| {
+        var record = std.mem.zeroes(api.Record);
+        record.process = 1;
+        record.job = 2;
+        record.root_security = 3;
+        record.profile_created = 1;
+        const expected: u32 = if (refusal == .termination) 5 else api.wait_timeout;
+        for (0..2) |_| {
+            try std.testing.expectEqual(expected, cleanup(&record, context, Double.replies(refusal)));
+            try std.testing.expectEqual(@as(usize, 1), record.process);
+            try std.testing.expectEqual(@as(usize, 2), record.job);
+            try std.testing.expectEqual(@as(usize, 3), record.root_security);
+            try std.testing.expectEqual(@as(usize, 1), record.profile_created);
+            try std.testing.expectEqual(@as(usize, 0), record.cleanup);
+        }
+        try std.testing.expectEqual(@as(u32, 0), cleanup(&record, context, Double.replies(.none)));
+        try std.testing.expectEqual(@as(usize, 1), record.cleanup);
+        try std.testing.expectEqual(@as(usize, 0), record.process);
+        try std.testing.expectEqual(@as(usize, 0), record.job);
+        try std.testing.expectEqual(@as(usize, 0), record.root_security);
+        try std.testing.expectEqual(@as(usize, 0), record.profile_created);
+    }
 }
