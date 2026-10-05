@@ -110,6 +110,9 @@ long-running work as unlimited execution or guaranteed completion.
 
 <references>
 
+Use [integrations](docs/integrations.md) for ACP harnesses, MCP tool servers and CLI control.
+Use [performance](docs/performance.md) for monitoring, reproducible workloads and measurements tied to a version and machine class.
+
 Use [getting started](docs/getting-started.md) for installation, first work,
 Sessions, skills and model setup; use [operating](docs/operating.md) for control,
 MCP, remote access and failure recovery. The [wire reference](docs/wire.md)

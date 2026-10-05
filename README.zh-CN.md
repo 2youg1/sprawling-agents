@@ -16,7 +16,7 @@
 
 > **状态：<!-- xtask:begin maturity:word -->alpha<!-- xtask:end -->，研究与开发中。** 可以拿来干真活，但数据格式、协议和界面在版本之间仍可能变。主回路是通的：接上一家 provider 或一个 harness、盖一栋楼、派活，几个 agent 就同时在楼里调用工具、写文件。把真活交给它之前，请先读[现在能做什么，还不能做什么](#现在能做什么还不能做什么)。
 >
-> English: [README.md](README.md) · 给从外面驱动一座城的 Agent 看的：[LLM.md](LLM.md) · 想改代码：[AGENTS.md](AGENTS.md)
+> English: [README.md](README.md) · 介绍项目：[LLM.md](LLM.md) · 从外面驱动一座城：[docs/wire.md](docs/wire.md) · 想改代码：[AGENTS.md](AGENTS.md)
 
 ## 它是什么
 
@@ -122,7 +122,7 @@ sprawling export <city> <bundle-dir>  # 打包整座城；`restore` 在另一台
 sprawling help [<verb>]               # 全部命令，或解释其中一个
 ```
 
-没有东西会自动更新：`sprawling status --check`，或设置里的那个按钮，告诉你有没有新版本发布，替换二进制始终由你来做。[`LLM.md`](LLM.md) 为脚本或另一个 agent 写明了这套线协议。
+没有东西会自动更新：`sprawling status --check`，或设置里的那个按钮，告诉你有没有新版本发布，替换二进制始终由你来做。[`docs/wire.md`](docs/wire.md) 为脚本或另一个 agent 写明了这套线协议。
 
 ## 安全与隐私
 
@@ -154,10 +154,13 @@ Agent 越强，User 的注意力就越贵，sprawling 不打算成为又一个�
 | [`docs/getting-started.zh-CN.md`](docs/getting-started.zh-CN.md)（[English](docs/getting-started.md)） | 新手指南：从安装到一次审过的合并，路上遇到的每个概念 |
 | [`docs/operating.md`](docs/operating.md) | 日常使用：引导和停下工作、回答居民、换 provider 与 MCP server、远程访问、出了问题怎么办 |
 | [`docs/glossary.md`](docs/glossary.md) | 代码、页面与文档所用的每个词，各只有一个意思 |
-| [`LLM.md`](LLM.md) | 线协议与命令行，写给从外面驱动一座城的 agent 或脚本 |
+| [`LLM.md`](LLM.md) | 供模型介绍 sprawling 的能力、边界与阅读路径 |
+| [`docs/wire.md`](docs/wire.md) | 程序控制所用的 CLI、帧、回答与退出码 |
+| [`docs/integrations.md`](docs/integrations.md) | ACP harness、MCP 工具服务与已有 Agent 的 CLI 接入 |
+| [`docs/performance.md`](docs/performance.md) | 监视读数、可复现负载与测量来源 |
 | [`ARCHITECTURE.md`](ARCHITECTURE.md) | 各个 crate 与依赖规则、缝、一次派活从头到尾、磁盘上有什么、怎样验证、每类改动该去哪里 |
 | [`AGENTS.md`](AGENTS.md) | 每次改动要守的规则与检查它们的命令，人和 agent 都先读它 |
-| [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) | `AGENTS.md` 的长版：每条规则和守住它的门 |
+| [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) | 贡献准备、功能准入与提交流程，以及仓库规则入口 |
 | [`docs/frontend-method.md`](docs/frontend-method.md) | 一个屏怎样搭建与验收，以及已批准的视觉设计 |
 | [`crates/README.md`](crates/README.md) | 每个 crate 管什么、规格在哪；规格 `crates/<dir>/Spec.lean` 写着该 crate 的接口、决定与证明，注释用中文 |
 | [`crates/city/templates/`](crates/city/templates/) | 城写进每栋楼的文档，agent 读它们，你也可以读 |
@@ -177,7 +180,7 @@ just prereqs        # 这个回路需要的其余工具，缺哪个就给出哪�
 just check          # 绿了，一次改动就算完成
 ```
 
-PR 描述、issue、评审意见都可以用你自己的语言写。附一份对照译文更好，母语不是英文就附英文，是英文就附中文：两种语言并排，人和 Agent 都读得更快，误译也藏不住。其余见 [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md)。
+Issue 与 PR 描述须提供含义一致的中英文对照，发布前见[语言规则](AGENTS.md#language)；评审意见可以使用你自己的语言。贡献准备与提交流程见 [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md)。
 
 ## 致谢
 

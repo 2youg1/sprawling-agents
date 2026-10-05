@@ -16,7 +16,7 @@
 
 > **Status: <!-- xtask:begin maturity:word -->alpha<!-- xtask:end -->, research and development.** Usable for real work, and data formats, the wire and the screens may still change between versions. The main loop works: connect a provider or a harness, raise a building, dispatch work, and several agents call tools and write files there at once. Read [What works today, and what does not](#what-works-today-and-what-does-not) before you hand it real work.
 >
-> 中文：[README.zh-CN.md](README.zh-CN.md) · For an agent driving a city from outside: [LLM.md](LLM.md) · To change the code: [AGENTS.md](AGENTS.md)
+> 中文：[README.zh-CN.md](README.zh-CN.md) · For a project introduction: [LLM.md](LLM.md) · To drive a city: [docs/wire.md](docs/wire.md) · To change the code: [AGENTS.md](AGENTS.md)
 
 ## What it is
 
@@ -122,7 +122,7 @@ sprawling export <city> <bundle-dir>  # pack a whole city; `restore` unpacks it 
 sprawling help [<verb>]               # every verb, or one explained
 ```
 
-Nothing updates itself: `sprawling status --check`, or the button in settings, tells you whether a newer release is published, and replacing the binary stays your command to run. [`LLM.md`](LLM.md) documents the wire for a script or another agent.
+Nothing updates itself: `sprawling status --check`, or the button in settings, tells you whether a newer release is published, and replacing the binary stays your command to run. [`docs/wire.md`](docs/wire.md) documents the wire for a script or another agent.
 
 ## Security and privacy
 
@@ -152,10 +152,13 @@ Two sister projects are on hold. [RefRain](https://github.com/2youg1/RefRain), a
 | [`docs/getting-started.md`](docs/getting-started.md) ([中文](docs/getting-started.zh-CN.md)) | The guide for a newcomer: every concept met on the way, from installing to a reviewed merge |
 | [`docs/operating.md`](docs/operating.md) | Daily use: steering and stopping work, answering residents, swapping providers and MCP servers, remote access, recovering from failures |
 | [`docs/glossary.md`](docs/glossary.md) | One meaning for each word the code, the page and the documents use |
-| [`LLM.md`](LLM.md) | The wire and the command line, written for an agent or a script that drives a city from outside |
+| [`LLM.md`](LLM.md) | Project capabilities, boundaries and reading paths for a model introducing sprawling |
+| [`docs/wire.md`](docs/wire.md) | CLI, frames, answers and exit codes for programmatic control |
+| [`docs/integrations.md`](docs/integrations.md) | ACP harnesses, MCP tool servers and CLI control from an existing agent |
+| [`docs/performance.md`](docs/performance.md) | Monitor readings, reproducible workloads and measurement provenance |
 | [`ARCHITECTURE.md`](ARCHITECTURE.md) | The crates and their dependency rules, the seams, one dispatch end to end, what is on disk, how it is verified, and where each kind of change goes |
 | [`AGENTS.md`](AGENTS.md) | The rules every change follows and the commands that check them, read first by people and agents alike |
-| [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) | The longer form of `AGENTS.md`: each rule with the gate that holds it |
+| [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) | Contribution preparation, feature admission and submission, with links to the repository rules |
 | [`docs/frontend-method.md`](docs/frontend-method.md) | How a screen is built and accepted, and the approved visual design |
 | [`crates/README.md`](crates/README.md) | Every crate, what it owns and where its specification is; each specification, `crates/<dir>/Spec.lean`, holds that crate's interfaces, decisions and proofs, with comments in Chinese |
 | [`crates/city/templates/`](crates/city/templates/) | The documents the city writes into each building, which agents read and so can you |
@@ -175,7 +178,7 @@ just prereqs        # every other tool the loop needs, with the install line for
 just check          # a change is finished when this is green
 ```
 
-Pull request descriptions, issues and review comments may be written in your own language. A parallel translation, English if your language is not English and Chinese if it is, lets people and agents read faster and makes a mistranslation visible. [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) has the rest.
+Issue and pull request descriptions require matching English and Chinese versions; see [the language rules](AGENTS.md#language) before publishing. Review comments may use your own language. [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) explains preparation and submission.
 
 ## Credits
 

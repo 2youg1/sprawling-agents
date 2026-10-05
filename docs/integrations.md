@@ -17,7 +17,7 @@ sprawling help call
 sprawling help dispatch
 ```
 
-[LLM.md](../LLM.md) describes the wire for an agent writing frames. Use the installed binary's help and frame roster when its release differs from the document. [Third-party projects](third-party.md) records the upstreams followed by this implementation.
+[the wire reference](wire.md) describes the wire for an agent writing frames. Use the installed binary's help and frame roster when its release differs from the document. [Third-party projects](third-party.md) records the upstreams followed by this implementation.
 
 ## Run an external agent as a resident through ACP
 
@@ -167,7 +167,7 @@ The run records tool invocation and result in the Ledger, and outside content en
 
 ## Drive a city from an existing agent through the CLI
 
-Give the existing agent access to the installed executable and a working directory where it can read [LLM.md](../LLM.md). Native provider credentials remain the city's responsibility; the driving agent needs neither those keys nor an MCP plugin to send a task. Loopback access is admitted locally. For access from outside loopback, obtain the city's pairing token from Settings and supply `--token` to `call` or `dispatch`; a provider key or vendor login token is not a pairing token. Keep it out of shared transcripts and command recordings.
+Give the existing agent access to the installed executable and a working directory where it can read [the wire reference](wire.md). Native provider credentials remain the city's responsibility; the driving agent needs neither those keys nor an MCP plugin to send a task. Loopback access is admitted locally. For access from outside loopback, obtain the city's pairing token from Settings and supply `--token` to `call` or `dispatch`; a provider key or vendor login token is not a pairing token. Keep it out of shared transcripts and command recordings.
 
 `call` sends one UTF-8 JSON `ClientFrame`, then prints received frames as JSON lines. It supplies the release's greeting, wire version and schema hash itself; do not manufacture a `hello` frame. A frame can be passed as one argument or read in full from stdin with `-`:
 
@@ -185,7 +185,7 @@ sprawling dispatch lab/room1 "Read the project and report the verification comma
 sprawling dispatch lab/room1 "Report the current project status; do not change files." --at 127.0.0.1:3333 --detach
 ```
 
-Detached success prints the run identifier when the run starts; it does not certify completed work. Attached output is the received JSONL frames. The convenience verb supplies an empty `goal`; use the ordinary wire Dispatch described in LLM.md when you need a separate goal or other fields. A native resident may take `--model`; a harness resident rejects that override.
+Detached success prints the run identifier when the run starts; it does not certify completed work. Attached output is the received JSONL frames. The convenience verb supplies an empty `goal`; use the ordinary wire Dispatch described in `docs/wire.md` when you need a separate goal or other fields. A native resident may take `--model`; a harness resident rejects that override.
 
 `call` also accepts `--until <kind>` to wait for a serialized EventKind and `--json` to print a refusal in machine-readable form. `--quiet-ms` bounds silence, not total run duration. A larger value changes waiting, not whether a command was accepted. Do not put an automatic retry around a dispatch: a new invocation creates a new idempotency key and may start the work twice.
 
@@ -205,7 +205,7 @@ The [wire client specification](../crates/sprawling/spec/WireClient.lean) and [C
 
 Replace the three angle-bracket values with your installed executable, directory and served address before giving this prompt to an agent:
 
-> Use `<executable>` from working directory `<directory>` to drive the served sprawling city at `<host:port>`. Read `LLM.md` for the wire and run `help call` and `help dispatch` on that executable before sending work. Start with a `city_view` query and use an existing room chosen by me. Send one task through `dispatch`, or one UTF-8 JSON frame through `call -` when a separate goal is needed. Read exit codes and refusals; after silence or a broken exchange, inspect run state and history before retrying. Request pairing only if the city requires it, keep credentials out of files and transcripts, and report the run identifier and observed result.
+> Use `<executable>` from working directory `<directory>` to drive the served sprawling city at `<host:port>`. Read `docs/wire.md` from a repository checkout, or the matching release's wire reference, and run `help call` and `help dispatch` on that executable before sending work. Start with a `city_view` query and use an existing room chosen by me. Send one task through `dispatch`, or one UTF-8 JSON frame through `call -` when a separate goal is needed. Read exit codes and refusals; after silence or a broken exchange, inspect run state and history before retrying. Request pairing only if the city requires it, keep credentials out of files and transcripts, and report the run identifier and observed result.
 
 ### The incoming `/acp` request endpoint
 
