@@ -43,7 +43,7 @@ async function observeSettingsFocus(page, dialog, focus) {
       return descendants.filter((node) => {
         if (!(node instanceof HTMLElement) || node.matches(":disabled") || node.closest("[inert]")) return false;
         const style = getComputedStyle(node);
-        if (style.visibility !== "visible" || node.getClientRects().length === 0) return false;
+        if (style.visibility !== "visible" || !node.checkVisibility() || node.getClientRects().length === 0) return false;
         return node.tabIndex >= 0 || (node.isContentEditable && !node.hasAttribute("tabindex") && !node.parentElement?.isContentEditable);
       });
     };
