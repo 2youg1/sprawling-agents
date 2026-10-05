@@ -178,6 +178,10 @@ jobs:
             echo "cache_hit=$CACHE_HIT"
           } > target/release-evidence/run.txt
           cat target/release-evidence/run.txt >> "$GITHUB_STEP_SUMMARY"
+      - name: install and uninstall the archive through the Windows production installer
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: .github/workflows/install-windows.ps1 -Archives target/package -Evidence target/release-evidence
       - uses: actions/upload-artifact@v7
         if: always()
         with:

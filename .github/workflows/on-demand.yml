@@ -561,6 +561,10 @@ jobs:
           binary="$(find "${{ steps.fresh.outputs.dir }}/unpacked" -type f \( -name sprawling -o -name sprawling.exe \))"
           ! command -v cygpath > /dev/null 2>&1 || binary="$(cygpath -m "$binary")"
           SPRAWLING_BIN="$binary" lake exe acceptance gauge "$logs/gauge"
+      - name: Windows archive installation and exact executable equality
+        if: inputs.job == 'runtime' && runner.os == 'Windows'
+        shell: pwsh
+        run: .github/workflows/install-windows.ps1 -Archives target/package -Evidence "${{ steps.fresh.outputs.dir }}/logs/install"
       - name: browser for the served production client
         if: inputs.job == 'runtime'
         shell: bash
