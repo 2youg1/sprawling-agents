@@ -128,11 +128,17 @@
         skillEntry = builtins.elemAt
           (builtins.match ''.*const SKILLS_ENTRY: &str = "([^"]+)";.*''
             (builtins.readFile ./tools/xtask/src/package/contents.rs)) 0;
+        applicationManifest = builtins.fromTOML (builtins.readFile ./crates/sprawling/Cargo.toml);
+        workspacePackage = (builtins.fromTOML (builtins.readFile ./Cargo.toml)).workspace.package;
+        applicationName = applicationManifest.package.name;
+        mainProgram = (builtins.head (applicationManifest.bin or [ { name = applicationName; } ])).name;
+        resourceDir = "share/${applicationName}";
+        documentationDir = "share/doc/${applicationName}";
         rustPlatform = pkgs.makeRustPlatform { cargo = toolchain; rustc = toolchain; };
 
         sprawling = rustPlatform.buildRustPackage {
-          pname = (builtins.fromTOML (builtins.readFile ./crates/sprawling/Cargo.toml)).package.name;
-          version = (builtins.fromTOML (builtins.readFile ./Cargo.toml)).workspace.package.version;
+          pname = applicationName;
+          version = workspacePackage.version;
           src = self;
           cargoLock = {
             lockFile = ./Cargo.lock;
@@ -163,12 +169,12 @@
             fi
           '';
           postInstall = ''
-            mkdir -p "$out/share/sprawling"
-            cp -R ${skillSource} "$out/share/sprawling/${skillEntry}"
-            install -Dm644 LICENSE "$out/share/doc/sprawling/LICENSE"
+            mkdir -p "$out/${resourceDir}"
+            cp -R ${skillSource} "$out/${resourceDir}/${skillEntry}"
+            install -Dm644 LICENSE "$out/${documentationDir}/LICENSE"
           '';
-          passthru = { inherit bundleDir skillEntry; };
-          cargoBuildFlags = [ "-p" "sprawling" ];
+          passthru = { inherit bundleDir skillEntry resourceDir documentationDir; };
+          cargoBuildFlags = [ "-p" applicationName ];
           # The suite belongs to `just check` and to CI, which run it with
           # `--all-features` against a warm cache. Repeating it inside a
           # `nix build` buys no new verdict and costs a cold compile.
@@ -176,8 +182,9 @@
           meta = {
             description = (builtins.fromTOML (builtins.readFile ./crates/sprawling/Cargo.toml)).package.description;
             homepage = (builtins.fromTOML (builtins.readFile ./Cargo.toml)).workspace.package.homepage;
-            license = pkgs.lib.licenses.mpl20;
-            mainProgram = (builtins.fromTOML (builtins.readFile ./crates/sprawling/Cargo.toml)).package.name;
+            license = pkgs.lib.meta.getLicenseFromSpdxIdOr workspacePackage.license
+              (throw "Unsupported Cargo SPDX license: ${workspacePackage.license}");
+            inherit mainProgram;
           };
         };
       in

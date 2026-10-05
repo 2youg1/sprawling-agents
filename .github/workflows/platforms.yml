@@ -208,22 +208,28 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          nix eval --json .#packages.x86_64-linux.default --apply 'p: {
+            inherit (p) pname version resourceDir;
+            inherit (p.meta) mainProgram;
+          }' > "$RUNNER_TEMP/nix-layout.json"
+          export NIX_LAYOUT="$RUNNER_TEMP/nix-layout.json"
           python3 - <<'PY'
-          import pathlib, subprocess, tomllib, zipfile
+          import json, os, pathlib, zipfile
           root = pathlib.Path.cwd()
           package = root / 'result'
-          version = tomllib.loads((root / 'Cargo.toml').read_text())['workspace']['package']['version']
-          headline = subprocess.check_output([str(package / 'bin/sprawling'), 'status'], text=True).splitlines()[0]
-          assert headline.startswith(f'sprawling {version} ('), headline
-          print(headline)
+          layout = json.loads(pathlib.Path(os.environ['NIX_LAYOUT']).read_text())
           archive = root / 'target/nix-acceptance.zip'
           archive.parent.mkdir(exist_ok=True)
           with zipfile.ZipFile(archive, 'w', strict_timestamps=False) as output:
-              output.write(package / 'bin/sprawling', 'application/sprawling')
-              for resource in (package / 'share/sprawling').rglob('*'):
+              output.write(package / 'bin' / layout['mainProgram'], 'application/' + layout['mainProgram'])
+              for resource in (package / layout['resourceDir']).rglob('*'):
                   if resource.is_file():
-                      output.write(resource, 'application/' + str(resource.relative_to(package / 'share/sprawling')))
+                      output.write(resource, 'application/' + str(resource.relative_to(package / layout['resourceDir'])))
           PY
+          name=$(jq -r .pname "$NIX_LAYOUT")
+          version=$(jq -r .version "$NIX_LAYOUT")
+          program=$(jq -r .mainProgram "$NIX_LAYOUT")
+          SPRAWLING_BIN="$PWD/result/bin/$program" nix develop --command lake exe acceptance version "$name" "$version"
           nix develop --command just acceptance target/nix-acceptance.zip
       - uses: actions/upload-artifact@v7
         if: always()
