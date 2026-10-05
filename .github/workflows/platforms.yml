@@ -235,6 +235,9 @@ jobs:
           nix eval --file "$directory/default.nix" --option allow-import-from-derivation false --json             --apply 'p: { inherit (p) pname resourceDir applicationVersion; inherit (p.meta) mainProgram; version = p.applicationVersion; }'             > "$RUNNER_TEMP/nix-layout.json"
           echo "NIX_CANDIDATE_DIRECTORY=$directory" >> "$GITHUB_ENV"
           echo "NIX_LAYOUT=$RUNNER_TEMP/nix-layout.json" >> "$GITHUB_ENV"
+          if [ -f "$directory/probe.sh" ]; then
+            bash "$directory/probe.sh" "$nixpkgs" "$directory"
+          fi
       - name: read the flake's installation layout
         if: inputs.candidate == ''
         shell: bash
