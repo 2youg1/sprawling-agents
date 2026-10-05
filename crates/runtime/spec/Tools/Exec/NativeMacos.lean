@@ -26,8 +26,11 @@ macOS host 的同 RunId 多命令聚合硬内存机制尚未成立；RLIMIT、ta
 
 ## 5 权威信源
 Apple App Sandbox： https://developer.apple.com/documentation/security/app-sandbox 。
-目标系统 sandbox-exec(1)、sandbox_init(3) 的实际手册与拒绝实验界定支持范围，
-App Sandbox entitlement 文档不能证明命令行 profile 的行为。
+macOS 26.6.2（25G83）的 sandbox-exec(1) 自带手册写明 “execute within a sandbox (DEPRECATED)”
+与 “Set the profile parameter key to value.”，CI 的 macOS mechanism artifact 保存原文；
+弃用状态不等于已移除，但不保证未来系统继续提供此程序，缺席或拒绝必须拒开。
+App Sandbox entitlement 文档不能证明命令行 profile 的行为；sandbox_init(3) 与真实拒绝
+实验仍须分别核实，支持范围只随已运行的系统证据扩大。
 
 ## 6 命名统一
 wrapper 是 sandbox-exec 程序；copy 是唯一可写工作树；profile 是固定 SBPL 策略。
@@ -73,7 +76,10 @@ Confinement::MacosSeatbelt 的 assurances 为文件／网络保，其余不保�
 
 ## 16 测试与约束
 Rust argv 回归覆盖路径注入、环境移除与空 program；macOS 实际 ExecTool 对拍不跳过拒绝。
-Lean 量化任意 fork／exec／退出序列，证明约束不随操作丢失；Rust 构造器测试负责实现对应。
+Lean 量化任意 fork／exec／退出序列，证明模型里的策略身份不随操作丢失；
+这是假定内核继承正确后的平台义务，不是 Rust 实现的 refinement 证明。Rust 参数 proptest
+验证任意目标 argv 都使用同一固定策略与独立路径参数，并不作为 fork 继承的 derived 证据。
+真实 macOS ExecTool 后代网络测试检查已运行的继承轨迹，不能推广为任意系统轨迹证明。
 完整平台验收需运行目标系统，不以 Windows 上的字符串断言替代。
 
 ## 17 文档关系
@@ -112,7 +118,5 @@ theorem every_descendant_trace_keeps_profile (process : ConfinedProcess)
     change (trace (step process operation) rest).profile = process.profile
     rw [ih]
     cases operation <;> rfl
-
-example : (trace ⟨7, true⟩ [.forkChild, .execProgram, .finish]).profile = 7 := rfl
 
 end Runtime.Tools.Exec.NativeMacos
