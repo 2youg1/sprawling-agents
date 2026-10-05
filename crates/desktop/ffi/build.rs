@@ -7,10 +7,11 @@
 //! into this package's `OUT_DIR`, linked as a static library, on a
 //! Windows target and nowhere else (`crates/desktop/Spec.lean` D12).
 //!
-//! Two checks run before anything is compiled, because both are cheaper
+//! Three checks run before anything is compiled, because they are cheaper
 //! to read here than as a link error: the leaf's step vocabulary in
 //! `zig/step.zig` is the one `src/step.rs` defines, and the `zig` on
-//! the search path is the version `zig-version` pins.
+//! the search path is the version `zig-version` pins; the native Record
+//! fields, order and types also match the Rust declaration (desktop_ffi D5).
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -32,10 +33,16 @@ const SYSTEM: [&str; 6] = [
 fn main() -> Result<(), String> {
     println!("cargo::rerun-if-changed=zig");
     println!("cargo::rerun-if-changed=src/step.rs");
+    println!("cargo::rerun-if-changed=src/confinement.rs");
     println!("cargo::rerun-if-changed={PIN}");
     println!("cargo::rerun-if-env-changed=PATH");
     let here = PathBuf::from(variable("CARGO_MANIFEST_DIR")?);
     spelled_alike(&here)?;
+    let rust_record = std::fs::read_to_string(here.join("src/confinement.rs"))
+        .map_err(|err| format!("read native Rust record: {err}"))?;
+    let zig_record = std::fs::read_to_string(here.join("zig/confinement_api.zig"))
+        .map_err(|err| format!("read native Zig record: {err}"))?;
+    record_matches(&rust_record, &zig_record)?;
     if variable("CARGO_CFG_TARGET_OS")? != "windows" {
         return Ok(());
     }
@@ -148,8 +155,40 @@ fn compiled(here: &Path, out: &Path, triple: &str, file: &str) -> Result<(), Str
     ))
 }
 
-fn record_matches(_rust: &str, _zig: &str) -> Result<(), String> {
-    Ok(())
+fn record_matches(rust: &str, zig: &str) -> Result<(), String> {
+    let body = rust
+        .split_once("struct Record {")
+        .and_then(|(_, tail)| tail.split_once('}'))
+        .map(|(body, _)| body)
+        .ok_or_else(|| "read native Record: src/confinement.rs has no Record declaration".to_owned())?;
+    let mut fields = String::new();
+    for field in body.lines().map(str::trim).filter(|line| !line.is_empty()) {
+        let (name, ty) = field
+            .strip_suffix(',')
+            .and_then(|field| field.split_once(':'))
+            .ok_or_else(|| format!("read native Record field `{field}`: expected name: type,"))?;
+        let ty = match ty.trim() {
+            "usize" => "usize".to_owned(),
+            array => {
+                let length = array
+                    .strip_prefix("[u8;")
+                    .and_then(|array| array.strip_suffix(']'))
+                    .ok_or_else(|| format!("render native Record field `{name}`: unsupported type `{array}`"))?
+                    .trim()
+                    .parse::<usize>()
+                    .map_err(|err| format!("render native Record field `{name}` array length: {err}"))?;
+                format!("[{length}]u8")
+            }
+        };
+        fields.push_str(&format!("    {}: {ty},\n", name.trim()));
+    }
+    let wanted = format!("pub const Record = extern struct {{\n{fields}}};");
+    if zig.replace("\r\n", "\n").contains(&wanted) {
+        return Ok(());
+    }
+    Err(format!(
+        "native Record layout differs from src/confinement.rs; replace zig/confinement_api.zig's Record with:\n{wanted}"
+    ))
 }
 
 #[cfg(test)]
