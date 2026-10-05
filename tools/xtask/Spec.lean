@@ -341,6 +341,7 @@ D19（人的定规）：彩色令牌照旧只落在主轴与它的补色上，�
 | 文件 | 它回答什么 |
 |---|---|
 | `tools/xtask/src/npm.rs` | 门本身：扫哪里（`MANIFEST`、`LOCKFILE`、`MODULES`、`PERMITTED`）、运行时白名单（`RUNTIME`）、三条断言（`check`、`judge_lockfile`、`judge_runtime`、`judge_licences`）与它们的拒词 |
+| `tools/xtask/src/docnum/installers.rs` | 从根 repository 生成并核验 standalone installer 的默认赋值；既有 docnum check/write 共用同一读数与文件描述 |
 | `tools/xtask/src/npm/lockfile.rs` | 两份清单怎么读成同一种形状：`bun.lock` 是带尾逗号与注释的 JSONC，故先归一再交给 `serde_json`（`read_jsonc`、`Manifest`、`manifest_of`、`lock_of`）；`deny.toml` 的准许表怎么读（`permitted`） |
 | `tools/xtask/src/npm/tests.rs` | 尾逗号与注释被归一掉；清单与锁文件不同即报；运行时依赖多一个或少一个各报一条；不在准许表上的许可证被点名；`node_modules` 缺席时第三条不产出违规 |
 
@@ -435,6 +436,8 @@ D19（人的定规）：彩色令牌照旧只落在主轴与它的补色上，�
 D17 **成熟度以一个带参数的事实进文档，两种拼法由 kernel 给。** README 两份的状态句、CHANGELOG 的开篇与未切的那一节、`.github/release-notes.md` 的提醒，都圈在 `maturity:word` 或 `maturity:titled` 的区段里，值取自 `kernel::release::MATURITY`（kernel D18）。于是进 alpha 只改那一个常量，再跑一次 `--write`，漏掉的一处由本门判红。理由：tag 与标题写 `Pre-alpha`、句子写 `pre-alpha`，大小写由 kernel 的两个方法各给一次，本门只搬字符串。被否：①一个不带参数的 `maturity` 只出小写——CHANGELOG 未切那一节的标题就是 tag，`release.yml` 由 tag 推出的锚点要对上它，标题里只能写大写的那一种；②两个事实各占一行——同一个常量的两种写法成了两行可以分别改的生成器。重开参数：成熟度多出第三种写法（例如进了 npm 的版本串）。
 
 **称重只属 `budget`，引用属 `docnum`**：`budget` 称重并守住预算，`docnum` 把读数搬进散文与表格；二者读同一行 `budgets.toml`，故读数只有一个家。同理 `dep_version` 并不与 `depmap` 争权——`depmap` 判依赖边，版本号住清单，本门只负责把清单里的那个字符串搬进文档。
+
+D30 **standalone installer 的仓库默认由根清单生成并核验。** `docnum::installers` 读取 package::workspace_package 的 repository，要求可直接映射 GitHub owner/repo 的安全身份，生成 install.sh 与 install.ps1 的默认赋值；SPRAWLING_REPO 仍是每次运行的显式覆盖。check 在源默认与清单不同、缺失或重复赋值时拒绝，write 只改该赋值并保留其余源码。两个脚本在待检树均不存在时没有此类消费者；只缺其中一份是读盘失败。错误继续走 XtaskError 的 Doc/Io，恢复是修正根 repository 或运行 cargo xtask docnum --write。接口为 check(root)->Result<Vec<Violation>,XtaskError> 和 write(root)->Result<usize,XtaskError>，只由既有 docnum 命令/门消费。被否是给两个脚本各手写相同字符串，因为后续改名不能机械保持一致；生成与判定属于同一个模块，未新增独立门或另一份仓库身份。
 
 **扫描面＝仓内全部 `.md` 与 `.lean`，排除隔离区 `local/`**：受管区段是给读者的承诺，而隔离区从不入库；Lean 规格也是给读者的文档，一对标记放进它的块注释里照样成立（§8-43）。
 
