@@ -22,6 +22,15 @@ id 怎样从正文里读出来——那一半在 citysim 的 Rust 里，由它�
 报出来的是第一步失败的那一步，它之前的每一步都通过了。
 -/
 
+/-! ## 完整客户端的 HTTP 验收接口
+
+本段是环境接口说明，不是证明。验收世界 firstDay 在注册 provider 前从正在服务的二进制获取首页，
+要求首页引用同源的 JavaScript 与 CSS，并逐一获取这些引用，拒绝空内容及回退首页。
+地址从 Ground 的实际端口读，资源地址从首页读，不另声明 bundle 路径或文件名。
+占位页、只有 index.html、缺脚本或样式的应用均须失败；curl 不存在、HTTP 拒绝、超时同样失败，
+恢复是补齐验收环境或重建完整应用。现有首次起城、skills 与历史恢复步骤继续走同一 acceptance。
+-/
+
 namespace Adversary.Acceptance
 
 /-- 一个请求带回来的东西：一个脚本 id 都没带，或它最近拿到的是第 `run` 个 run 的第 `reply` 条。 -/
