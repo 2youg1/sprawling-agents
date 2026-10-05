@@ -9,7 +9,7 @@
 use std::collections::BTreeMap;
 use std::ffi::OsString;
 use std::num::{NonZeroU16, NonZeroUsize};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 mod packet;
 
@@ -41,20 +41,23 @@ pub enum Action {
 }
 
 /// The failed action and Windows/HRESULT code are preserved without fallback.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug)]
 pub struct Failure {
     pub action: Action,
     pub code: u32,
+    pub phase: String,
     pub cleanup_code: Option<u32>,
+    /// A failed launch still owns resources whose cleanup the OS refused.
+    pub resources: Option<Box<OwnedProcess>>,
 }
 
 impl std::fmt::Display for Failure {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "{}: {:?}, Windows code {}, cleanup {:?}; {}",
-            self.stable_code(),
+            "Windows native confinement: {:?} at {}, code {}, cleanup {:?}; {}",
             self.action,
+            self.phase,
             self.code,
             self.cleanup_code,
             self.recovery()
@@ -64,16 +67,13 @@ impl std::fmt::Display for Failure {
 impl std::error::Error for Failure {}
 
 impl Failure {
-    pub const fn stable_code(self) -> &'static str {
-        "E_SANDBOX_DENIED"
-    }
-    pub const fn recovery(self) -> &'static str {
+    pub const fn recovery(&self) -> &'static str {
         "check Windows AppContainer and Job support and disposable directory permissions; retry the sandbox command"
     }
 }
 
 #[repr(C)]
-#[derive(Default)]
+#[derive(Debug, Default)]
 struct Record {
     memory: usize,
     cpu: usize,
@@ -88,6 +88,9 @@ struct Record {
     run_assigned: usize,
     command_assigned: usize,
     identity_verified: usize,
+    root_security: usize,
+    profile_created: usize,
+    failure_phase: [u8; 32],
 }
 
 #[expect(unsafe_code, reason = "native confinement leaf declarations")]
@@ -114,15 +117,39 @@ unsafe extern "C" {
 /// Owns both the Job and process handles and the per-command profile.
 /// Call `close` to observe cleanup failures; Drop is the emergency teardown
 /// after a caller abandons the command and reports any cleanup error to stderr.
+#[derive(Debug)]
 pub struct OwnedProcess {
     record: Record,
-    profile: Vec<u16>,
+    context: Vec<u16>,
     pid: u32,
+}
+
+/// Reads the Windows installation root through the existing safe SDK adapter.
+/// A failed OS query remains an observed native launch refusal.
+pub fn windows_root() -> Result<PathBuf, Failure> {
+    let system = PathBuf::from(winsafe::GetSystemDirectory().map_err(|error| Failure {
+        action: Action::Launch,
+        code: error.raw(),
+        phase: "Windows root".to_owned(),
+        cleanup_code: None,
+        resources: None,
+    })?);
+    system
+        .parent()
+        .map(Path::to_path_buf)
+        .ok_or_else(|| Failure {
+            action: Action::Launch,
+            code: 87,
+            phase: "Windows root has no parent".to_owned(),
+            cleanup_code: None,
+            resources: None,
+        })
 }
 
 pub fn launch(launch: &Launch) -> Result<OwnedProcess, Failure> {
     let text = packet::encode(launch)?;
-    let profile = packet::terminated(launch.profile.as_ref())?;
+    let mut context = packet::terminated(launch.directory.as_os_str())?;
+    context.extend(packet::terminated(launch.profile.as_ref())?);
     // SAFETY: text is a live UTF16 buffer with the exact length passed, and
     // packet validation borrows it without retaining pointers or changing OS state.
     #[expect(
@@ -134,7 +161,9 @@ pub fn launch(launch: &Launch) -> Result<OwnedProcess, Failure> {
         return Err(Failure {
             action: Action::Encode,
             code: 87,
+            phase: String::new(),
             cleanup_code: None,
+            resources: None,
         });
     }
     let mut record = Record {
@@ -144,7 +173,7 @@ pub fn launch(launch: &Launch) -> Result<OwnedProcess, Failure> {
         ..Record::default()
     };
     // SAFETY: text and record are live, exclusively borrowed buffers with the
-    // exact lengths passed; the leaf retains only owned OS handles, no pointers.
+    // exact lengths passed; the leaf retains owned OS allocations and handles, no borrowed pointers.
     #[expect(unsafe_code, reason = "the confined Windows launch leaf")]
     let code = unsafe {
         sprawling_native_launch(
@@ -160,24 +189,49 @@ pub fn launch(launch: &Launch) -> Result<OwnedProcess, Failure> {
             value => Some(u32::try_from(value).map_err(|_| Failure {
                 action: Action::Cleanup,
                 code: 87,
+                phase: String::new(),
                 cleanup_code: None,
+                resources: None,
             })?),
+        };
+        let phase = record
+            .failure_phase
+            .iter()
+            .copied()
+            .take_while(|unit| *unit != 0)
+            .collect::<Vec<_>>();
+        let resources = if record.job != 0
+            || record.process != 0
+            || record.root_security != 0
+            || record.profile_created != 0
+        {
+            Some(Box::new(OwnedProcess {
+                record,
+                context,
+                pid: 0,
+            }))
+        } else {
+            None
         };
         return Err(Failure {
             action: Action::Launch,
             code,
+            phase: String::from_utf8_lossy(&phase).into_owned(),
             cleanup_code,
+            resources,
         });
     }
     let mut process = OwnedProcess {
         record,
-        profile,
+        context,
         pid: 0,
     };
     process.pid = u32::try_from(process.record.pid).map_err(|_| Failure {
         action: Action::Launch,
         code: 87,
+        phase: String::new(),
         cleanup_code: None,
+        resources: None,
     })?;
     Ok(process)
 }
@@ -211,7 +265,9 @@ impl OwnedProcess {
             .map_err(|_| Failure {
                 action: Action::Poll,
                 code: 87,
+                phase: String::new(),
                 cleanup_code: None,
+                resources: None,
             })
     }
 
@@ -225,6 +281,14 @@ impl OwnedProcess {
     }
 
     pub fn close(mut self) -> Result<(), Failure> {
+        if let Err(mut failure) = self.cleanup() {
+            failure.resources = Some(Box::new(self));
+            return Err(failure);
+        }
+        Ok(())
+    }
+
+    pub fn retry_cleanup(&mut self) -> Result<(), Failure> {
         self.cleanup()
     }
 
@@ -239,8 +303,8 @@ impl OwnedProcess {
             sprawling_native_cleanup(
                 &raw mut self.record,
                 std::mem::size_of::<Record>(),
-                self.profile.as_ptr(),
-                self.profile.len(),
+                self.context.as_ptr(),
+                self.context.len(),
             )
         };
         checked(Action::Cleanup, code)
@@ -251,9 +315,9 @@ impl Drop for OwnedProcess {
     fn drop(&mut self) {
         if let Err(failure) = self.cleanup() {
             eprintln!(
-                "{}: {:?}, Windows code {}, cleanup {:?}; {}",
-                failure.stable_code(),
+                "Windows native confinement: {:?} at {}, code {}, cleanup {:?}; {}",
                 failure.action,
+                failure.phase,
                 failure.code,
                 failure.cleanup_code,
                 failure.recovery()
@@ -269,7 +333,9 @@ fn checked(action: Action, code: u32) -> Result<(), Failure> {
         Err(Failure {
             action,
             code,
+            phase: String::new(),
             cleanup_code: None,
+            resources: None,
         })
     }
 }

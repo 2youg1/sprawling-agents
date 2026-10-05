@@ -346,6 +346,29 @@ mod placing;
 pub use placement::{Placement, parse_placement};
 pub use placing::{Confined, Placed};
 
+impl Confined {
+    pub(super) fn prepare(
+        &mut self,
+        command: std::process::Command,
+        workdir: &std::path::Path,
+        shares: crate::backlog::Shares,
+    ) -> Result<(std::process::Command, Placed), kernel::AxError> {
+        #[cfg(target_os = "macos")]
+        if matches!(self.arm(), Confinement::MacosSeatbelt { .. }) {
+            super::yielding::require_executable(&command)?;
+            let (command, placed) = self.place(command, workdir)?;
+            return match super::yielding::one_level_down(command, shares) {
+                Ok(command) => Ok((command, placed)),
+                Err(fault) => {
+                    self.settled(placed);
+                    Err(fault)
+                }
+            };
+        }
+        self.place(super::yielding::one_level_down(command, shares)?, workdir)
+    }
+}
+
 #[cfg(test)]
 #[allow(
     clippy::unwrap_used,

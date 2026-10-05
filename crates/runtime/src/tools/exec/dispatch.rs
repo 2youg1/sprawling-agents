@@ -62,7 +62,7 @@ impl ExecTool {
     pub fn confined(mut self, confinement: Confined) -> Self {
         self.program_route = ProgramRoute::Confined;
         self.container = None;
-        self.meta.disclosure = super::disclosure(&self.setup, &confinement);
+        self.meta.disclosure = super::disclosure::describe(&self.setup, &confinement);
         self.confinement = Mutex::new(confinement);
         self
     }
@@ -116,10 +116,8 @@ impl ExecTool {
             (Placement::Sandbox, ProgramRoute::Confined) | (Placement::Host, _) => placement,
         };
         let mut command = match (placement, &self.container) {
-            (Placement::Sandbox, Some(_)) => command,
-            (Placement::Host, _) | (Placement::Sandbox, None) => {
-                yielding::one_level_down(command, self.backlog.shares())?
-            }
+            (Placement::Sandbox, _) => command,
+            (Placement::Host, _) => yielding::one_level_down(command, self.backlog.shares())?,
         };
         let inherited = self.inherited_environment();
         command.env_clear();
@@ -148,8 +146,15 @@ impl ExecTool {
                 )
             }
             (Placement::Sandbox, None) => {
-                let (command, placed) =
-                    held(&self.confinement)?.place(command, &self.setup.workdir)?;
+                let (mut command, placed) = held(&self.confinement)?.prepare(
+                    command,
+                    &self.setup.workdir,
+                    self.backlog.shares(),
+                )?;
+                command.env_clear();
+                for (key, value) in &inherited {
+                    command.env(key, value);
+                }
                 #[cfg(windows)]
                 let started = if matches!(
                     held(&self.confinement)?.arm(),

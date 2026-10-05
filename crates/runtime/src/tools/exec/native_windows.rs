@@ -42,16 +42,39 @@ pub(crate) fn limits(shares: Shares) -> Result<Limits, AxError> {
 
 /// The caller holds the backlog table lock and therefore the parent Job until
 /// the new process has been placed into the same table.
+pub(crate) struct LaunchFailure {
+    pub(crate) error: AxError,
+    pub(crate) resources: Option<Box<OwnedProcess>>,
+}
+
+impl From<AxError> for LaunchFailure {
+    fn from(error: AxError) -> Self {
+        Self {
+            error,
+            resources: None,
+        }
+    }
+}
+
 pub(crate) fn launch(
-    command: &Command,
+    mut command: Command,
     output: &Path,
     limits: &Limits,
     parent_job: NonZeroUsize,
-) -> Result<OwnedProcess, AxError> {
+) -> Result<OwnedProcess, LaunchFailure> {
     let directory = command
         .get_current_dir()
-        .ok_or_else(|| denied("start native command", "no disposable working directory"))?;
-    let program = resolved(command, directory)?;
+        .ok_or_else(|| denied("start native command", "no disposable working directory"))?
+        .to_path_buf();
+    let program = resolved(&command, &directory)?;
+    let root = desktop_ffi::confinement::windows_root()
+        .map_err(|error| denied("read Windows root", error))?;
+    for name in ["SystemRoot", "windir"] {
+        command.env(name, &root);
+    }
+    for name in ["USERPROFILE", "APPDATA", "LOCALAPPDATA", "TEMP", "TMP"] {
+        command.env(name, &directory);
+    }
     let environment: BTreeMap<OsString, OsString> = command
         .get_envs()
         .filter_map(|(name, value)| value.map(|value| (name.to_os_string(), value.to_os_string())))
@@ -65,7 +88,7 @@ pub(crate) fn launch(
             .get_args()
             .map(std::ffi::OsStr::to_os_string)
             .collect(),
-        directory: directory.to_path_buf(),
+        directory,
         environment,
         memory_bytes: limits.memory,
         cpu_rate: limits.cpu_rate,
@@ -78,8 +101,10 @@ pub(crate) fn launch(
         stdout: output.join("out"),
         stderr: output.join("err"),
     };
-    desktop_ffi::confinement::launch(&request)
-        .map_err(|error| denied("start native command", error))
+    desktop_ffi::confinement::launch(&request).map_err(|mut failure| LaunchFailure {
+        error: denied("start native command", &failure),
+        resources: failure.resources.take(),
+    })
 }
 
 fn resolved(command: &Command, directory: &Path) -> Result<PathBuf, AxError> {

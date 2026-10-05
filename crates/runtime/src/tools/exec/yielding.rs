@@ -62,18 +62,8 @@ pub(super) fn one_level_down(mut command: Command, _shares: Shares) -> Result<Co
 /// with the reason in stderr.
 #[cfg(unix)]
 pub(super) fn one_level_down(command: Command, shares: Shares) -> Result<Command, AxError> {
+    require_executable(&command)?;
     let program = command.get_program();
-    if !is_executable_on_path(program, command.get_current_dir()) {
-        return Err(AxError::failure(
-            AxCode::ToolUnavailable,
-            "start a command",
-            format!(
-                "{}: no executable file of that name on PATH",
-                std::path::Path::new(program).display()
-            ),
-        )
-        .with_recovery("check the program name, or use the shell arm"));
-    }
     let mut lowered = start_below_the_core(shares);
     lowered.arg(program).args(command.get_args());
     if let Some(dir) = command.get_current_dir() {
@@ -86,6 +76,23 @@ pub(super) fn one_level_down(command: Command, shares: Shares) -> Result<Command
         };
     }
     Ok(lowered)
+}
+
+#[cfg(unix)]
+pub(super) fn require_executable(command: &Command) -> Result<(), AxError> {
+    let program = command.get_program();
+    if !is_executable_on_path(program, command.get_current_dir()) {
+        return Err(AxError::failure(
+            AxCode::ToolUnavailable,
+            "start a command",
+            format!(
+                "{}: no executable file of that name on PATH",
+                std::path::Path::new(program).display()
+            ),
+        )
+        .with_recovery("check the program name, or use the shell arm"));
+    }
+    Ok(())
 }
 
 /// The wrapper a dispatched program starts under: `nice`, and on Linux

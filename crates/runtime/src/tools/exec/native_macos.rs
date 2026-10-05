@@ -11,13 +11,22 @@ use std::process::Command;
 
 use kernel::{AxCode, AxError};
 
-const PROFILE: &str = "(version 1)\n(deny default)\n\
-    (allow file-read*)\n\
-    (allow process-exec process-fork sysctl-read mach-lookup)\n\
-    (allow process-info-setcontrol (target self))\n\
-    (allow file-write* (subpath (param \"WORKDIR\")))\n\
-    (allow file-write-data (literal \"/dev/null\"))\n\
-    (deny network*)\n";
+macro_rules! workdir_parameter {
+    () => {
+        "WORKDIR"
+    };
+}
+
+const PROFILE: &str = concat!(
+    "(version 1)\n(deny default)\n",
+    "(allow file-read*)\n",
+    "(allow process-exec process-fork sysctl-read mach-lookup)\n",
+    "(allow file-write* (subpath (param \"",
+    workdir_parameter!(),
+    "\")))\n",
+    "(allow file-write-data (literal \"/dev/null\"))\n",
+    "(deny network*)\n",
+);
 
 /// Preserves argv and the cleared environment while placing writes in `copy`.
 /// The copy must be a real, non-root directory with a UTF-8 canonical path.
@@ -44,7 +53,7 @@ pub(super) fn wrap(wrapper: &Path, copy: &Path, command: &Command) -> Result<Com
         .arg("-p")
         .arg(PROFILE)
         .arg("-D")
-        .arg(format!("WORKDIR={copy}"))
+        .arg(format!("{}={copy}", workdir_parameter!()))
         .arg("--")
         .arg(command.get_program())
         .args(command.get_args());

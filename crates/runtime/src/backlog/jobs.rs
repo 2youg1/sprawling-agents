@@ -136,6 +136,10 @@ impl Jobs {
     ) -> Result<NonZeroUsize, AxError> {
         use crate::tools::native_windows::denied;
         let run = self.runs.entry(owner).or_default();
+        for retiring in &mut run.retiring {
+            retiring.cleanup()?;
+        }
+        run.retiring.clear();
         if run.job.is_none() {
             run.job = Some(win32job::Job::create().map_err(|err| denied("create run Job", err))?);
         }
@@ -162,6 +166,15 @@ impl Jobs {
         run.affinity = affinity;
         NonZeroUsize::new(usize::try_from(job.handle()).map_err(|err| denied("lend run Job", err))?)
             .ok_or_else(|| denied("lend run Job", "invalid Job handle"))
+    }
+
+    #[cfg(windows)]
+    pub(super) fn keep_failed_native(
+        &mut self,
+        owner: RunId,
+        resources: super::native_windows::RetiringNative,
+    ) {
+        self.runs.entry(owner).or_default().retiring.push(resources);
     }
 
     /// Lets the run's job go; its processes keep running.
@@ -246,6 +259,7 @@ const RUN_CPU_WEIGHT: u32 = 5;
 #[cfg(windows)]
 #[derive(Default)]
 struct RunJob {
+    retiring: Vec<super::native_windows::RetiringNative>,
     job: Option<win32job::Job>,
     unjoined: u32,
     share: Shares,

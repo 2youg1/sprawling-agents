@@ -43,6 +43,11 @@ fn native_windows_disposable_production_axes_and_cleanup() {
         .unwrap(),
     )
     .unwrap();
+    let mut host_allocation = Vec::<u8>::new();
+    host_allocation
+        .try_reserve_exact(DEFAULT_MEMORY_BYTES)
+        .unwrap();
+    drop(host_allocation);
     let owner = RunId::from_bytes([0x71; 16]);
     let backlog = crate::Backlog::with_window(crate::PollBudget::new(3_000, 5));
     let tool = ExecTool::new(
@@ -125,9 +130,9 @@ fn native_windows_child_axes() {
             "tools::exec::native_windows::tests::native_windows_child_waits",
             "--ignored",
         ])
-        .stdin(std::process::Stdio::null())
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
+        .stdin(std::process::Stdio::inherit())
+        .stdout(std::process::Stdio::inherit())
+        .stderr(std::process::Stdio::inherit())
         .spawn()
         .unwrap();
     assert!(descendant.try_wait().unwrap().is_none());

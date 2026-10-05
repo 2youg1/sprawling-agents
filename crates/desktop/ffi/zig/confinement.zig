@@ -52,12 +52,19 @@ fn close(raw: *usize) u32 {
     raw.* = 0;
     return 0;
 }
+fn phase(record: *api.Record, name: []const u8) void {
+    @memset(&record.failure_phase, 0);
+    const count = @min(name.len, record.failure_phase.len);
+    @memcpy(record.failure_phase[0..count], name[0..count]);
+}
+
 fn acl(directory: [*:0]const u16, sid: *anyopaque, record: *api.Record) u32 {
+    phase(record, @src().fn_name);
     var old: ?*anyopaque = null;
     var descriptor: ?*anyopaque = null;
-    const read = api.GetNamedSecurityInfoW(directory, api.object_file, api.dacl_information, null, null, &old, null, &descriptor);
+    const read = api.GetNamedSecurityInfoW(directory, api.object_file, api.dacl_information | api.label_information, null, null, &old, null, &descriptor);
     if (read != 0) return read;
-    defer remember(record, if (api.LocalFree(descriptor) == null) 0 else lastError());
+    record.root_security = @intFromPtr(descriptor orelse return api.invalid_parameter);
     const entry: api.Entry = .{ .trustee = .{ .name = sid } };
     var changed: ?*anyopaque = null;
     const set = api.SetEntriesInAclW(1, &entry, old, &changed);
@@ -66,9 +73,16 @@ fn acl(directory: [*:0]const u16, sid: *anyopaque, record: *api.Record) u32 {
     return api.SetNamedSecurityInfoW(directory, api.object_file, api.dacl_information, null, null, changed, null);
 }
 fn integrity(directory: [*:0]const u16, record: *api.Record) u32 {
-    const low = std.unicode.utf8ToUtf16LeStringLiteral("S:(ML;OICI;NW;;;LW)");
+    phase(record, @src().fn_name);
+    const label = "S:(ML;OICI;NW;;;LW)";
+    const low = comptime block: {
+        var units: [label.len:0]u16 = undefined;
+        _ = std.unicode.utf8ToUtf16Le(&units, label) catch @compileError("invalid integrity label");
+        units[label.len] = 0;
+        break :block units;
+    };
     var descriptor: ?*anyopaque = null;
-    if (api.ConvertStringSecurityDescriptorToSecurityDescriptorW(low, 1, &descriptor, null) == .FALSE) return lastError();
+    if (api.ConvertStringSecurityDescriptorToSecurityDescriptorW(&low, 1, &descriptor, null) == .FALSE) return lastError();
     defer remember(record, if (api.LocalFree(descriptor) == null) 0 else lastError());
     var present: api.BOOL = .FALSE;
     var defaulted: api.BOOL = .FALSE;
@@ -79,6 +93,7 @@ fn integrity(directory: [*:0]const u16, record: *api.Record) u32 {
 }
 
 fn limits(record: *api.Record) u32 {
+    phase(record, @src().fn_name);
     const job = api.CreateJobObjectW(null, null) orelse return lastError();
     record.job = @intFromPtr(job);
     var memory: cpu.JOBOBJECT_EXTENDED_LIMIT_INFORMATION = .{};
@@ -90,6 +105,12 @@ fn limits(record: *api.Record) u32 {
         .Weight = @intCast(record.cpu),
     };
     if (cpu.SetInformationJobObject(job, cpu.JOB_OBJECT_CPU_RATE_CONTROL_INFORMATION, &rate, @sizeOf(@TypeOf(rate))) == .FALSE) return lastError();
+    var actual_memory: cpu.JOBOBJECT_EXTENDED_LIMIT_INFORMATION = .{};
+    if (api.QueryInformationJobObject(job, cpu.JOB_OBJECT_EXTENDED_LIMIT_INFORMATION, &actual_memory, @sizeOf(@TypeOf(actual_memory)), null) == .FALSE) return lastError();
+    if (actual_memory.BasicLimitInformation.LimitFlags & memory.BasicLimitInformation.LimitFlags != memory.BasicLimitInformation.LimitFlags or actual_memory.JobMemoryLimit != record.memory) return 5;
+    var actual_rate = std.mem.zeroes(cpu.JOBOBJECT_CPU_RATE_CONTROL_INFORMATION);
+    if (api.QueryInformationJobObject(job, cpu.JOB_OBJECT_CPU_RATE_CONTROL_INFORMATION, &actual_rate, @sizeOf(@TypeOf(actual_rate)), null) == .FALSE) return lastError();
+    if (actual_rate.ControlFlags != rate.ControlFlags or actual_rate.Weight != rate.Weight) return 5;
     return 0;
 }
 fn file(path: [*:0]const u16, access: u32, creation: u32) ?api.HANDLE {
@@ -99,6 +120,7 @@ fn file(path: [*:0]const u16, access: u32, creation: u32) ?api.HANDLE {
     return opened;
 }
 fn identity(process: api.HANDLE, sid: *anyopaque, record: *api.Record) u32 {
+    phase(record, @src().fn_name);
     var token: api.HANDLE = undefined;
     if (api.OpenProcessToken(process, api.token_query, &token) == .FALSE) return lastError();
     defer remember(record, if (api.CloseHandle(token) != .FALSE) 0 else lastError());
@@ -129,33 +151,44 @@ export fn sprawling_native_may_resume(record: *const api.Record, bytes: usize) u
 }
 
 fn start(parts: Packet, sid: *anyopaque, record: *api.Record) u32 {
+    phase(record, @src().fn_name);
     const command = allocator.dupeZ(u16, parts.strings[1]) catch return 8;
     defer allocator.free(command);
+    phase(record, "stdin");
     const input = file(api.nul, api.file_read, api.open_existing) orelse return lastError();
     defer remember(record, if (api.CloseHandle(input) != .FALSE) 0 else lastError());
+    phase(record, "stdout");
     const output = file(parts.strings[4].ptr, api.file_write, api.create_always) orelse return lastError();
     defer remember(record, if (api.CloseHandle(output) != .FALSE) 0 else lastError());
+    phase(record, "stderr");
     const errors = file(parts.strings[5].ptr, api.file_write, api.create_always) orelse return lastError();
     defer remember(record, if (api.CloseHandle(errors) != .FALSE) 0 else lastError());
     var size: usize = 0;
+    phase(record, "measure attributes");
     const measured = api.InitializeProcThreadAttributeList(null, 2, 0, &size);
     if (measured != .FALSE or lastError() != 122 or size == 0) return api.invalid_parameter;
     const storage = allocator.alignedAlloc(u8, .of(usize), size) catch return 8;
     defer allocator.free(storage);
     const attributes: *anyopaque = @ptrCast(storage.ptr);
+    phase(record, "initialize attributes");
     if (api.InitializeProcThreadAttributeList(attributes, 2, 0, &size) == .FALSE) return lastError();
     defer api.DeleteProcThreadAttributeList(attributes);
     var capabilities: api.Capabilities = .{ .sid = sid };
+    phase(record, "security capabilities");
     if (api.UpdateProcThreadAttribute(attributes, 0, api.security_capabilities, &capabilities, @sizeOf(api.Capabilities), null, null) == .FALSE) return lastError();
     var inherited = [_]api.HANDLE{ input, output, errors };
+    phase(record, "inherited handles");
     if (api.UpdateProcThreadAttribute(attributes, 0, api.handle_list, &inherited, @sizeOf(@TypeOf(inherited)), null, null) == .FALSE) return lastError();
     var startup: api.Startup = .{ .stdin = input, .stdout = output, .stderr = errors, .attributes = attributes };
     var process: api.Process = undefined;
+    phase(record, "CreateProcessW");
     if (api.CreateProcessW(parts.strings[0].ptr, command.ptr, null, null, api.BOOL.TRUE, api.suspended | api.unicode_environment | api.extended_startup | api.no_window | api.below_normal, @ptrCast(@constCast(parts.environment.ptr)), parts.strings[2].ptr, &startup, &process) == .FALSE) return lastError();
     record.process = @intFromPtr(process.process);
     record.pid = process.pid;
     defer remember(record, if (api.CloseHandle(process.thread) != .FALSE) 0 else lastError());
+    phase(record, "assign run Job");
     if (api.AssignProcessToJobObject(handle(record.parent_job), process.process) == .FALSE) return lastError();
+    phase(record, "assign command Job");
     if (api.AssignProcessToJobObject(handle(record.job), process.process) == .FALSE) return lastError();
     const token = identity(process.process, sid, record);
     if (token != 0) return token;
@@ -167,18 +200,21 @@ fn start(parts: Packet, sid: *anyopaque, record: *api.Record) u32 {
     if (child != 0) return child;
     record.command_assigned = 1;
     if (sprawling_native_may_resume(record, @sizeOf(api.Record)) == 0) return 5;
+    phase(record, "ResumeThread");
     if (api.ResumeThread(process.thread) == std.math.maxInt(u32)) return lastError();
     return 0;
 }
 export fn sprawling_native_launch(text: [*]const u16, units: usize, record: *api.Record, bytes: usize) u32 {
     if (bytes != @sizeOf(api.Record)) return api.invalid_parameter;
+    phase(record, @src().fn_name);
     if (record.memory == 0 or record.cpu == 0 or record.cpu > 10_000 or record.parent_job == 0 or record.job != 0 or record.process != 0) return api.invalid_parameter;
     const parts = packet(text[0..units]) orelse return api.invalid_parameter;
     var sid: ?*anyopaque = null;
     const profile = api.CreateAppContainerProfile(parts.strings[3].ptr, parts.strings[3].ptr, parts.strings[3].ptr, null, 0, &sid);
     if (profile < 0) return @bitCast(profile);
+    record.profile_created = 1;
     const named = sid orelse {
-        record.cleanup_error = sprawling_native_cleanup(record, bytes, parts.strings[3].ptr, parts.strings[3].len + 1);
+        record.cleanup_error = sprawling_native_cleanup(record, bytes, parts.strings[2].ptr, parts.strings[2].len + parts.strings[3].len + 2);
         return api.invalid_parameter;
     };
     defer remember(record, if (api.FreeSid(named) == null) 0 else lastError());
@@ -187,7 +223,11 @@ export fn sprawling_native_launch(text: [*]const u16, units: usize, record: *api
     if (result == 0) result = integrity(parts.strings[2].ptr, record);
     if (result == 0) result = start(parts, named, record);
     if (result == 0 and record.cleanup_error != 0) result = @intCast(record.cleanup_error);
-    if (result != 0) remember(record, sprawling_native_cleanup(record, bytes, parts.strings[3].ptr, parts.strings[3].len + 1));
+    if (result != 0) {
+        const failed_phase = record.failure_phase;
+        remember(record, sprawling_native_cleanup(record, bytes, parts.strings[2].ptr, parts.strings[2].len + parts.strings[3].len + 2));
+        record.failure_phase = failed_phase;
+    }
     return result;
 }
 export fn sprawling_native_poll(record: *api.Record, bytes: usize) u32 {
@@ -245,8 +285,29 @@ fn waitTree(record: *api.Record) u32 {
     return api.more_data;
 }
 
-export fn sprawling_native_cleanup(record: *api.Record, bytes: usize, profile: [*]const u16, units: usize) u32 {
-    if (bytes != @sizeOf(api.Record) or units == 0 or profile[units - 1] != 0) return api.invalid_parameter;
+fn restore(directory: [*:0]const u16, record: *api.Record) u32 {
+    phase(record, @src().fn_name);
+    if (record.root_security == 0) return 0;
+    const descriptor: *anyopaque = @ptrFromInt(record.root_security);
+    var present: api.BOOL = .FALSE;
+    var defaulted: api.BOOL = .FALSE;
+    var dacl: ?*anyopaque = null;
+    var label: ?*anyopaque = null;
+    if (api.GetSecurityDescriptorDacl(descriptor, &present, &dacl, &defaulted) == .FALSE) return lastError();
+    if (api.GetSecurityDescriptorSacl(descriptor, &present, &label, &defaulted) == .FALSE) return lastError();
+    const restored = api.SetNamedSecurityInfoW(directory, api.object_file, api.dacl_information | api.label_information, null, null, dacl, label);
+    if (restored != 0 and restored != 2 and restored != 3) return restored;
+    if (api.LocalFree(descriptor) != null) return lastError();
+    record.root_security = 0;
+    return 0;
+}
+
+export fn sprawling_native_cleanup(record: *api.Record, bytes: usize, context: [*]const u16, units: usize) u32 {
+    if (bytes != @sizeOf(api.Record) or units == 0 or context[units - 1] != 0) return api.invalid_parameter;
+    const end = std.mem.indexOfScalar(u16, context[0..units], 0) orelse return api.invalid_parameter;
+    if (end == 0 or end + 1 >= units) return api.invalid_parameter;
+    const directory = context[0..end :0];
+    const profile = context[end + 1 .. units - 1 :0];
     record.cleanup_error = 0;
     var result: u32 = 0;
     if (record.process != 0) {
@@ -266,8 +327,13 @@ export fn sprawling_native_cleanup(record: *api.Record, bytes: usize, profile: [
     if (result == 0) result = process_closed;
     const job_closed = close(&record.job);
     if (result == 0) result = job_closed;
-    const deleted = api.DeleteAppContainerProfile(profile[0 .. units - 1 :0].ptr);
-    if (result == 0 and deleted < 0) result = @bitCast(deleted);
+    const restored = restore(directory.ptr, record);
+    if (result == 0) result = restored;
+    if (record.profile_created != 0) {
+        const deleted = api.DeleteAppContainerProfile(profile.ptr);
+        if (deleted >= 0) record.profile_created = 0;
+        if (result == 0 and deleted < 0) result = @bitCast(deleted);
+    }
     if (result == 0 and record.cleanup_error != 0) result = @intCast(record.cleanup_error);
     if (result == 0) record.cleanup = 1;
     return result;
@@ -301,4 +367,12 @@ test "resume readiness fuzz matches the Rust reference contract" {
         const expected = record.run_assigned == 1 and record.command_assigned == 1 and record.identity_verified == 1;
         try std.testing.expectEqual(expected, sprawling_native_may_resume(&record, @sizeOf(api.Record)) != 0);
     }
+}
+
+test "short native launch record is rejected before any write" {
+    var record = std.mem.zeroes(api.Record);
+    @memset(&record.failure_phase, 0x7f);
+    const before = record.failure_phase;
+    try std.testing.expectEqual(api.invalid_parameter, sprawling_native_launch(&.{}, 0, &record, 0));
+    try std.testing.expectEqualSlices(u8, &before, &record.failure_phase);
 }

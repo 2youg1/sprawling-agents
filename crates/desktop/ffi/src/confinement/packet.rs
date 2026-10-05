@@ -112,7 +112,9 @@ fn invalid() -> Failure {
     Failure {
         action: Action::Encode,
         code: INVALID_PARAMETER,
+        phase: String::new(),
         cleanup_code: None,
+        resources: None,
     }
 }
 

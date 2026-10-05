@@ -6,11 +6,11 @@
 use super::*;
 use std::process::Command;
 
-fn native_tool(source: &std::path::Path, scratch: &std::path::Path) -> ExecTool {
+fn native_tool(source: &std::path::Path, scratch: &std::path::Path, backlog: Backlog) -> ExecTool {
     ExecTool::new(
         setup(source, None, Some(PathBuf::from("/bin/sh"))),
         Box::new(EchoSandbox::new()),
-        patient(),
+        backlog,
     )
     .unwrap()
     .confined(Confined::with_arm(
@@ -36,7 +36,7 @@ fn invoke_python(tool: &ExecTool, script: &str, args: &[String]) -> Value {
 fn native_macos_exec_writes_only_the_copy_and_preserves_output_and_exit() {
     let source = tempfile::tempdir().unwrap();
     let scratch = tempfile::tempdir().unwrap();
-    let tool = native_tool(source.path(), scratch.path());
+    let tool = native_tool(source.path(), scratch.path(), patient());
     let outcome = tool.invoke(&call(serde_json::json!({
         "program": {"path": "/bin/sh", "args": ["-c", "printf copy > written; printf 'target-output\n'; printf 'target-error\n' >&2; exit 23"]}
     }))).unwrap();
@@ -72,7 +72,7 @@ fn native_macos_exec_rejects_absolute_and_new_symlink_escape_writes() {
     let scratch = tempfile::tempdir().unwrap();
     let protected = outside.path().join("protected");
     std::fs::write(&protected, "before").unwrap();
-    let tool = native_tool(source.path(), scratch.path());
+    let tool = native_tool(source.path(), scratch.path(), patient());
     let script = "import pathlib,sys,os; p=pathlib.Path(sys.argv[1]); os.symlink(str(p),'escape'); pathlib.Path('escape').write_text('after')";
     let control = Command::new("/usr/bin/python3")
         .args([
@@ -107,7 +107,7 @@ fn native_macos_exec_rejects_absolute_and_new_symlink_escape_writes() {
 fn native_macos_exec_denies_tcp_udp_and_descendant_network_with_successful_controls() {
     let source = tempfile::tempdir().unwrap();
     let scratch = tempfile::tempdir().unwrap();
-    let tool = native_tool(source.path(), scratch.path());
+    let tool = native_tool(source.path(), scratch.path(), patient());
     let tcp4 = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
     let tcp6 = std::net::TcpListener::bind("[::1]:0").unwrap();
     let udp = std::net::UdpSocket::bind("127.0.0.1:0").unwrap();
@@ -186,4 +186,101 @@ fn native_macos_initialization_failure_never_runs_target_or_retains_copy() {
     assert_eq!(*error.code(), AxCode::SandboxDenied);
     assert!(!source.path().join("side-effect").exists());
     assert_eq!(std::fs::read_dir(scratch.path()).unwrap().count(), 0);
+}
+
+#[test]
+fn native_macos_background_keeps_its_copy_and_reports_one_terminal_result() {
+    let source = tempfile::tempdir().unwrap();
+    let scratch = tempfile::tempdir().unwrap();
+    let tool = native_tool(
+        source.path(),
+        scratch.path(),
+        Backlog::with_window(crate::backlog::PollBudget::new(1, 1)),
+    );
+    let result = tool.invoke(&call(serde_json::json!({
+        "program": {"path": "/bin/sh", "args": ["-c", "sleep 1; printf late > late; printf 'later-out
+'; printf 'later-err
+' >&2; exit 7"]}
+    }))).unwrap();
+    let result = serde_json::to_value(result.result).unwrap();
+    assert_eq!(result["outcome"], "backgrounded");
+    let handle = result["handle"].clone();
+    assert_eq!(std::fs::read_dir(scratch.path()).unwrap().count(), 1);
+    let finished = (0..100)
+        .find_map(|_| {
+            let result = tool
+                .invoke(&call(serde_json::json!({
+                    "program": {"path": "/usr/bin/true", "args": []}
+                })))
+                .unwrap();
+            let result = serde_json::to_value(result.result).unwrap();
+            result["background"].as_array().and_then(|members| {
+                members
+                    .iter()
+                    .find(|member| member["handle"] == handle)
+                    .cloned()
+            })
+        })
+        .expect("native background did not finish within bounded actual invocations");
+    assert_eq!(
+        (
+            finished["exit_code"].as_i64(),
+            finished["stdout"].as_str(),
+            finished["stderr"].as_str()
+        ),
+        (
+            Some(7),
+            Some(
+                "later-out
+"
+            ),
+            Some(
+                "later-err
+"
+            )
+        )
+    );
+    assert!(!source.path().join("late").exists());
+    drop(tool);
+    assert_eq!(std::fs::read_dir(scratch.path()).unwrap().count(), 0);
+}
+
+#[test]
+fn native_macos_halt_and_tool_release_reap_the_owned_primary_and_copy() {
+    for halt in [true, false] {
+        let source = tempfile::tempdir().unwrap();
+        let scratch = tempfile::tempdir().unwrap();
+        let backlog = Backlog::with_window(crate::backlog::PollBudget::new(1, 1));
+        let tool = native_tool(source.path(), scratch.path(), backlog.clone());
+        let result = tool
+            .invoke(&call(serde_json::json!({
+                "program": {"path": "/bin/sh", "args": ["-c", "while :; do :; done"]}
+            })))
+            .unwrap();
+        let result = serde_json::to_value(result.result).unwrap();
+        assert_eq!(result["outcome"], "backgrounded");
+        assert_eq!(std::fs::read_dir(scratch.path()).unwrap().count(), 1);
+        if halt {
+            assert_eq!(
+                backlog
+                    .halt(Some(&Address::parse("work").unwrap()))
+                    .unwrap(),
+                1
+            );
+        }
+        drop(tool);
+        let domain = Address::parse("work").unwrap();
+        for _ in 0..1_000_000 {
+            backlog.harvest(kernel::RunId::from_bytes([1; 16])).unwrap();
+            if backlog.standing(&domain).unwrap().is_empty() {
+                break;
+            }
+            std::thread::yield_now();
+        }
+        assert!(
+            backlog.standing(&domain).unwrap().is_empty(),
+            "owned native primary did not stop"
+        );
+        assert_eq!(std::fs::read_dir(scratch.path()).unwrap().count(), 0);
+    }
 }

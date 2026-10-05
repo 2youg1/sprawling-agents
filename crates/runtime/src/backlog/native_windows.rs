@@ -26,8 +26,32 @@ impl Backlog {
         let limits = native_windows::limits(self.shares)?;
         {
             let mut table = self.hold()?;
-            let job = table.jobs.native_job(owner, limits.memory, self.affinity)?;
-            let child = native_windows::launch(&command, &dir, &limits, job)?;
+            let job = match table.jobs.native_job(owner, limits.memory, self.affinity) {
+                Ok(job) => job,
+                Err(error) => {
+                    table.jobs.keep_failed_native(
+                        owner,
+                        RetiringNative {
+                            process: None,
+                            output: dir.clone(),
+                        },
+                    );
+                    return Err(error);
+                }
+            };
+            let child = match native_windows::launch(command, &dir, &limits, job) {
+                Ok(child) => child,
+                Err(failure) => {
+                    table.jobs.keep_failed_native(
+                        owner,
+                        RetiringNative {
+                            process: failure.resources.map(|process| *process),
+                            output: dir.clone(),
+                        },
+                    );
+                    return Err(failure.error);
+                }
+            };
             table.members.insert(
                 id,
                 Member {
@@ -43,5 +67,48 @@ impl Backlog {
             );
         }
         self.watch(id, owner, what, dir)
+    }
+}
+
+pub(super) struct RetiringNative {
+    process: Option<desktop_ffi::confinement::OwnedProcess>,
+    output: std::path::PathBuf,
+}
+
+impl RetiringNative {
+    pub(super) fn cleanup(&mut self) -> Result<(), AxError> {
+        let process = match &mut self.process {
+            Some(process) => process
+                .retry_cleanup()
+                .map_err(|error| native_windows::denied("clean failed native launch", error)),
+            None => Ok(()),
+        };
+        let output = match std::fs::remove_dir_all(&self.output) {
+            Ok(()) => Ok(()),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            Err(error) => Err(native_windows::denied(
+                "remove native output directory",
+                error,
+            )),
+        };
+        match (process, output) {
+            (Ok(()), output) => {
+                self.process = None;
+                output
+            }
+            (Err(error), Ok(())) => Err(error),
+            (Err(process), Err(output)) => Err(native_windows::denied(
+                "clean failed native resources",
+                format!("process: {process}; output: {output}"),
+            )),
+        }
+    }
+}
+
+impl Drop for RetiringNative {
+    fn drop(&mut self) {
+        if let Err(error) = self.cleanup() {
+            eprintln!("{error}");
+        }
     }
 }

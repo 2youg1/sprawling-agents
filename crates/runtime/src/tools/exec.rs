@@ -128,7 +128,7 @@ impl ExecTool {
         );
         let domain = setup.domain.clone();
         let confinement = Confined::detect();
-        let disclosure = disclosure(&setup, &confinement);
+        let disclosure = disclosure::describe(&setup, &confinement);
         Ok(ExecTool {
             setup,
             container: None,
@@ -220,20 +220,12 @@ impl ExecTool {
         with_interpreter(answer, &interpreter)
     }
 }
-fn disclosure(setup: &ExecSetup, confinement: &Confined) -> String {
-    format!(
-        "Run a program, a Python snippet, or a shell line. A program or shell          line runs in this machine's confinement, {}. Ask for `where: host` to          run one outside it. Use `read` and `search` for what is already written here; a          command that prints it comes back without the version `edit` guards on.{}",
-        confinement.statement(),
-        setup.shell.statement()
-    )
-}
 
-/// The result shape is owned by `outcome`.
+mod disclosure;
 mod outcome;
 
 use outcome::{exceptional, settled, with_backlog, with_interpreter};
 
-/// The refusal the Python arm gives when asked for a host interpreter.
 fn no_host_python() -> AxError {
     AxError::failure(
         AxCode::SandboxDenied,

@@ -21,6 +21,9 @@ pub const Record = extern struct {
     run_assigned: usize,
     command_assigned: usize,
     identity_verified: usize,
+    root_security: usize,
+    profile_created: usize,
+    failure_phase: [32]u8,
 };
 pub const Security = extern struct { length: u32 = @sizeOf(Security), descriptor: ?*anyopaque = null, inherit: BOOL = BOOL.TRUE };
 pub const Capabilities = extern struct { sid: *anyopaque, capabilities: ?*anyopaque = null, count: u32 = 0, reserved: u32 = 0 };
@@ -60,6 +63,7 @@ pub extern "kernel32" fn IsProcessInJob(process: HANDLE, job: HANDLE, member: *B
 pub extern "advapi32" fn FreeSid(sid: *anyopaque) callconv(.winapi) ?*anyopaque;
 pub extern "advapi32" fn GetNamedSecurityInfoW(name: [*:0]const u16, kind: u32, info: u32, owner: ?*?*anyopaque, group: ?*?*anyopaque, dacl: *?*anyopaque, sacl: ?*?*anyopaque, descriptor: *?*anyopaque) callconv(.winapi) u32;
 pub extern "advapi32" fn ConvertStringSecurityDescriptorToSecurityDescriptorW(text: [*:0]const u16, revision: u32, descriptor: *?*anyopaque, size: ?*u32) callconv(.winapi) BOOL;
+pub extern "advapi32" fn GetSecurityDescriptorDacl(descriptor: *anyopaque, present: *BOOL, acl: *?*anyopaque, defaulted: *BOOL) callconv(.winapi) BOOL;
 pub extern "advapi32" fn GetSecurityDescriptorSacl(descriptor: *anyopaque, present: *BOOL, acl: *?*anyopaque, defaulted: *BOOL) callconv(.winapi) BOOL;
 pub extern "advapi32" fn SetEntriesInAclW(count: u32, entries: *const Entry, old: ?*anyopaque, result: *?*anyopaque) callconv(.winapi) u32;
 pub extern "advapi32" fn SetNamedSecurityInfoW(name: [*:0]const u16, kind: u32, info: u32, owner: ?*anyopaque, group: ?*anyopaque, dacl: ?*anyopaque, sacl: ?*anyopaque) callconv(.winapi) u32;
