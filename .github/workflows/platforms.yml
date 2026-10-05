@@ -37,6 +37,11 @@ on:
           - all
           - nix
 
+      candidate:
+        description: Optional base64 JSON of local Nix candidate files; no external publication
+        type: string
+        default: ""
+
 permissions:
   contents: read
 
@@ -201,18 +206,48 @@ jobs:
           nix flake metadata --no-update-lock-file
           git diff --exit-code -- flake.lock
       - name: the complete application in the network sandbox
+        if: inputs.candidate == ''
         run: nix build .#default --no-update-lock-file --print-build-logs
       - name: the version and devshell still obey their authorities
+        if: inputs.candidate == ''
         run: nix flake check --no-update-lock-file --print-build-logs
-      - name: the installed application and its resources
+      - name: an independent candidate with IFD disabled
+        if: inputs.candidate != ''
+        env:
+          NIX_CANDIDATE: ${{ inputs.candidate }}
         shell: bash
         run: |
           set -euo pipefail
+          directory="$RUNNER_TEMP/nix-candidate"
+          mkdir -p "$directory"
+          export CANDIDATE_DIRECTORY="$directory"
+          python3 - <<'PY'
+          import base64, json, os, pathlib
+          directory = pathlib.Path(os.environ['CANDIDATE_DIRECTORY'])
+          for name, text in json.loads(base64.b64decode(os.environ['NIX_CANDIDATE'], validate=True)).items():
+              if pathlib.PurePosixPath(name).name != name or name in ('', '.', '..', 'default.nix'):
+                  raise ValueError('Candidate inputs must be plain filenames; default.nix belongs to CI')
+              (directory / name).write_text(text)
+          PY
+          nixpkgs=$(nix flake archive --no-update-lock-file --json | jq -r .inputs.nixpkgs.path)
+          echo "let pkgs = import $nixpkgs {}; in pkgs.callPackage ./package.nix {}" > "$directory/default.nix"
+          nix build --file "$directory/default.nix" --option allow-import-from-derivation false --print-build-logs
+          nix eval --file "$directory/default.nix" --option allow-import-from-derivation false --json             --apply 'p: { inherit (p) pname resourceDir applicationVersion; inherit (p.meta) mainProgram; version = p.applicationVersion; }'             > "$RUNNER_TEMP/nix-layout.json"
+          echo "NIX_CANDIDATE_DIRECTORY=$directory" >> "$GITHUB_ENV"
+          echo "NIX_LAYOUT=$RUNNER_TEMP/nix-layout.json" >> "$GITHUB_ENV"
+      - name: read the flake's installation layout
+        if: inputs.candidate == ''
+        shell: bash
+        run: |
           nix eval --json .#packages.x86_64-linux.default --apply 'p: {
             inherit (p) pname version resourceDir;
             inherit (p.meta) mainProgram;
           }' > "$RUNNER_TEMP/nix-layout.json"
-          export NIX_LAYOUT="$RUNNER_TEMP/nix-layout.json"
+          echo "NIX_LAYOUT=$RUNNER_TEMP/nix-layout.json" >> "$GITHUB_ENV"
+      - name: the installed application and its resources
+        shell: bash
+        run: |
+          set -euo pipefail
           python3 - <<'PY'
           import json, os, pathlib, zipfile
           root = pathlib.Path.cwd()
@@ -231,6 +266,11 @@ jobs:
           program=$(jq -r .mainProgram "$NIX_LAYOUT")
           SPRAWLING_BIN="$PWD/result/bin/$program" nix develop --command lake exe acceptance version "$name" "$version"
           nix develop --command just acceptance target/nix-acceptance.zip
+      - uses: actions/upload-artifact@v7
+        if: always() && inputs.candidate != ''
+        with:
+          name: nix-candidate
+          path: ${{ runner.temp }}/nix-candidate
       - uses: actions/upload-artifact@v7
         if: always()
         with:
