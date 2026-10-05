@@ -39,7 +39,7 @@ sprawling call '{"ask":{"ask_id":1,"query":"harnesses"}}' --at 127.0.0.1:3333
 
 Run the vendor's interactive setup in its own terminal before dispatching. A setup directory detected by the city is evidence of installation or setup, not a test that an account is authenticated or has quota. The city does not sign in to a subscription, read its tokens into the Vault, or turn subscription access into a native provider API key. For Pi, configure Pi's provider separately; upstream pi-acp documents `pi-acp --terminal-login` for terminal authentication. Follow the adapter's prerequisites rather than assuming its package includes Pi.
 
-Configuration layers are city, building, then resident, with the nearer stated value winning. Their paths, relative to the city directory, are `.sprawling/CONFIG.toml`, `lab/.sprawling/CONFIG.toml`, and `lab/room1/.sprawling/CONFIG.toml` in this example. Edit the resident layer to limit the choice to one room, preserving the file's other settings and any existing `[resident]` table:
+Configuration layers are city, building, then resident, with the nearer stated value winning. Each layer uses `.sprawling/CONFIG.toml` relative to its own directory: the city root, a building directory, or a room directory. Edit the resident layer to limit the choice to one room, preserving the file's other settings and any existing `[resident]` table:
 
 ```toml
 [resident]
