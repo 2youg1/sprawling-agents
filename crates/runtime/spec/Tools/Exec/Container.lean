@@ -32,7 +32,9 @@ D50 Backlog 在 create 之前登记唯一名字、副本与 owner，成员的进
 停止时先置 stopping，再请求 rm --force --volumes；删除失败保留成员与副本，下一次
 harvest 重试并返回 typed failure，release 的 Drop 调用只记录待清理责任，不能声称删除成功。
 只有成功的删除应答或成功 inventory 确认身份缺席才释放副本。CLI 结束后 inspect State.ExitCode
-才决定目标程序结果；CLI 提前结束而 daemon 仍 Running 为失败并清理。每次控制命令有界，
+才决定目标程序结果；只有 Status 为 exited／dead 且 Running=false 才是终止结果，
+created、缺少 Status 或与 Running 不一致都以 E_SANDBOX_DENIED 拒绝并保留清理责任，
+因为未起动目标的默认 ExitCode=0 不代表执行成功。CLI 提前结束而 daemon 仍 Running 为失败并清理。每次控制命令有界，
 失败后成员不得重新 start。
 D52 生产 doctor 给 runtime 绑定当前 harness executable；Backlog 在 create 前起动独立 guardian，
 它读过唯一 cleanup record 后通过 file-backed stdout 报 ready，再守住只由父进程持有的 stdin。

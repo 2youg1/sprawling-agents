@@ -117,6 +117,16 @@ pub(super) fn state(bytes: &[u8]) -> Result<(bool, i32), AxError> {
         .pointer("/State/Running")
         .and_then(Value::as_bool)
         .ok_or_else(|| denied("read the container state", "missing running state"))?;
+    let status = value.pointer("/State/Status").and_then(Value::as_str);
+    if !matches!(
+        (running, status),
+        (true, Some("running" | "paused" | "restarting")) | (false, Some("exited" | "dead"))
+    ) {
+        return Err(denied(
+            "read the container result",
+            "the daemon has not confirmed a running or terminal target",
+        ));
+    }
     let code = value
         .pointer("/State/ExitCode")
         .and_then(Value::as_i64)

@@ -48,12 +48,14 @@ container)
   case "$2" in
     inspect)
       running=false
-      if [ -f running ]; then running=true; fi
-      printf '[{"Config":{"User":"1000","WorkingDir":"/work"},"HostConfig":{"NanoCpus":1250000000,"Memory":67108864,"MemorySwap":67108864,"PidsLimit":64,"NetworkMode":"none","ReadonlyRootfs":true,"CapDrop":["ALL"],"SecurityOpt":["no-new-privileges"]},"Mounts":[{"Source":"%s","Destination":"/work","Type":"bind"}],"State":{"Running":%s,"ExitCode":23}}]\n' "$(cat copy)" "$running" ;;
+      status=created
+      if [ -f started ]; then status=exited; fi
+      if [ -f running ]; then running=true; status=running; fi
+      printf '[{"Config":{"User":"1000","WorkingDir":"/work"},"HostConfig":{"NanoCpus":1250000000,"Memory":67108864,"MemorySwap":67108864,"PidsLimit":64,"NetworkMode":"none","ReadonlyRootfs":true,"CapDrop":["ALL"],"SecurityOpt":["no-new-privileges"]},"Mounts":[{"Source":"%s","Destination":"/work","Type":"bind"}],"State":{"Status":"%s","Running":%s,"ExitCode":23}}]\n' "$(cat copy)" "$status" "$running" ;;
     ls) if [ -f owned ]; then cat name; fi ;;
   esac ;;
 start)
-  touch running
+  touch started running
   if [ -f background ]; then
     while [ -f running ]; do read -r unused <fifo; done
   fi
