@@ -195,15 +195,11 @@ jobs:
         with:
           extra_nix_config: |
             experimental-features = nix-command flakes
-      # A checkout without the initial lock needs a runner to produce its
-      # real narHashes. The artifact is reviewed and committed; it is never
-      # a substitute for the lock that subsequent builds must keep unchanged.
-      - name: resolve the initial flake lock
-        run: nix flake lock
-      - uses: actions/upload-artifact@v7
-        with:
-          name: nix-flake-lock
-          path: flake.lock
+      - name: the committed builder lock is present and unchanged
+        run: |
+          test -f flake.lock
+          nix flake metadata --no-update-lock-file
+          git diff --exit-code -- flake.lock
       - name: the complete application in the network sandbox
         run: nix build .#default --no-update-lock-file --print-build-logs
       - name: the version and devshell still obey their authorities

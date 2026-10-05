@@ -117,7 +117,7 @@
         rustPlatform = pkgs.makeRustPlatform { cargo = toolchain; rustc = toolchain; };
 
         sprawling = rustPlatform.buildRustPackage {
-          pname = "sprawling";
+          pname = (builtins.fromTOML (builtins.readFile ./crates/sprawling/Cargo.toml)).package.name;
           version = (builtins.fromTOML (builtins.readFile ./Cargo.toml)).workspace.package.version;
           src = self;
           cargoLock = {
@@ -127,6 +127,9 @@
           preBuild = ''
             export HOME="$TMPDIR/home"
             mkdir -p "$HOME"
+            # Native addons are loaded into Bun; only the build needs GCC's
+            # runtime libraries, not the installed Rust application.
+            export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath [ pkgs.stdenv.cc.cc.lib ]}"
             export BUN_INSTALL_CACHE_DIR="$TMPDIR/bun-cache"
             cp -R ${bunDeps}/share/bun-cache "$BUN_INSTALL_CACHE_DIR"
             chmod -R u+w "$BUN_INSTALL_CACHE_DIR"
@@ -152,6 +155,12 @@
           # `--all-features` against a warm cache. Repeating it inside a
           # `nix build` buys no new verdict and costs a cold compile.
           doCheck = false;
+          meta = {
+            description = (builtins.fromTOML (builtins.readFile ./crates/sprawling/Cargo.toml)).package.description;
+            homepage = (builtins.fromTOML (builtins.readFile ./Cargo.toml)).workspace.package.homepage;
+            license = pkgs.lib.licenses.mpl20;
+            mainProgram = (builtins.fromTOML (builtins.readFile ./crates/sprawling/Cargo.toml)).package.name;
+          };
         };
       in
       {
@@ -167,7 +176,7 @@
 
         apps.default = {
           type = "app";
-          program = "${sprawling}/bin/sprawling";
+          program = pkgs.lib.getExe sprawling;
         };
 
         # A flake wanting a Rust version `rust-toolchain.toml` does not
