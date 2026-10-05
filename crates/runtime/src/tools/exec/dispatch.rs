@@ -6,13 +6,15 @@
 //! Frozen program placement (`crates/runtime/spec/Tools/Exec/Container.lean`).
 
 use std::collections::BTreeMap;
+use std::sync::Mutex;
 
 use super::outcome::{backgrounded, settled, with_environment};
 use super::{
-    Confined, Confinement, ContainerRuntime, ENV_ALLOWLIST, ExecTool, Placement, held, yielding,
+    Confined, Confinement, ContainerRuntime, ENV_ALLOWLIST, ExecTool, Placement, Shell, held,
+    yielding,
 };
 use crate::backlog::Started;
-use kernel::{AxCode, AxError, ToolOutcome};
+use kernel::{AxCode, AxError, EnvVarName, ToolOutcome};
 
 #[derive(Clone, Copy)]
 pub(super) enum ProgramRoute {

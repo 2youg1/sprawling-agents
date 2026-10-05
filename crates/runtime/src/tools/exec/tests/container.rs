@@ -221,6 +221,78 @@ print('five axes checked')
         serde_json::to_value(failure.result).unwrap()["exit_code"],
         json!(23)
     );
+    let memory = tool
+        .invoke(&call(json!({"program":{"path":"python3","args":["-c",
+        "import sys; allocation=bytearray(256*1024*1024); sys.exit(0)"]}})))
+        .unwrap();
+    let memory = serde_json::to_value(memory.result).unwrap();
+    assert_ne!(
+        memory["exit_code"],
+        json!(0),
+        "the hard memory ceiling must reject actual allocation: {memory}"
+    );
+    let pids = r#"import errno,os,signal
+children=[]
+try:
+ for i in range(128):
+  try:
+   pid=os.fork()
+  except OSError as e:
+   assert e.errno==errno.EAGAIN
+   break
+  if pid==0:
+   signal.pause();os._exit(0)
+  children.append(pid)
+ assert 0<len(children)<64
+ print('pids enforced',len(children))
+finally:
+ for pid in children: os.kill(pid,signal.SIGKILL)
+ for pid in children: os.waitpid(pid,0)
+"#;
+    let checked = tool
+        .invoke(&call(
+            json!({"program":{"path":"python3","args":["-c",pids]}}),
+        ))
+        .unwrap();
+    let checked = serde_json::to_value(checked.result).unwrap();
+    assert_eq!(checked["exit_code"], json!(0), "{checked}");
+    let cpu = r#"import os,resource,time
+start=time.monotonic();children=[]
+for i in range(4):
+ pid=os.fork()
+ if pid==0:
+  until=time.monotonic()+3
+  while time.monotonic()<until: pass
+  os._exit(0)
+ children.append(pid)
+for pid in children: os.waitpid(pid,0)
+elapsed=time.monotonic()-start
+used=resource.getrusage(resource.RUSAGE_CHILDREN)
+ratio=(used.ru_utime+used.ru_stime)/elapsed
+assert ratio<1.8,ratio
+print('cpu seconds per wall second',ratio)
+"#;
+    let checked = tool
+        .invoke(&call(
+            json!({"program":{"path":"python3","args":["-c",cpu]}}),
+        ))
+        .unwrap();
+    let checked = serde_json::to_value(checked.result).unwrap();
+    assert_eq!(checked["exit_code"], json!(0), "{checked}");
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let network = format!(
+        "import socket; s=socket.socket(); s.settimeout(.2); assert s.connect_ex(('127.0.0.1',{port})) != 0"
+    );
+    let checked = tool
+        .invoke(&call(
+            json!({"program":{"path":"python3","args":["-c",network]}}),
+        ))
+        .unwrap();
+    assert_eq!(
+        serde_json::to_value(checked.result).unwrap()["exit_code"],
+        json!(0)
+    );
     drop(tool);
     assert!(
         backlog
@@ -228,6 +300,28 @@ print('five axes checked')
             .unwrap()
             .is_empty()
     );
+    for halt in [true, false] {
+        let short = Backlog::with_window(crate::PollBudget::new(1, 1));
+        let owner = setup(work.path(), None, None);
+        let run = owner.run;
+        let scope = owner.domain.clone();
+        let background = ExecTool::new(owner, Box::new(EchoSandbox::new()), short.clone())
+            .unwrap()
+            .with_container(limits.clone(), runtime.clone());
+        let started = background.invoke(&call(json!({"program":{"path":"python3","args":["-c",
+            "import subprocess,time; subprocess.Popen(['python3','-c','import time; time.sleep(600)']); time.sleep(600)"]}}))).unwrap();
+        assert_eq!(
+            serde_json::to_value(started.result).unwrap()["outcome"],
+            json!("backgrounded")
+        );
+        assert_eq!(short.standing(&scope).unwrap().len(), 1);
+        if halt {
+            short.halt(Some(&scope)).unwrap();
+        }
+        drop(background);
+        short.harvest(run).unwrap();
+        assert!(short.standing(&scope).unwrap().is_empty());
+    }
     let inventory = std::process::Command::new(program)
         .args(["container", "ls", "--all", "--format", "{{.Names}}"])
         .output()
