@@ -108,12 +108,8 @@ pub(super) fn check() -> ExitCode {
                          Updating is yours to run."
                     );
                 }
-                // The release page is published before the npm packages,
-                // so this is what a download looks like for as long as
-                // that job takes rather than a state to worry about.
                 kernel::ReleaseVerdict::Ahead => println!(
-                    "this binary ({}) is newer than the newest on npm ({}); \
-                     the packages are published after the release page.",
+                    "this binary ({}) is newer than the newest available through its install channel ({}).",
                     mine.version, newest.version
                 ),
             }

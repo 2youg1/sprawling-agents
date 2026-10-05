@@ -2828,8 +2828,8 @@
     "zh": "所属楼"
   },
   "release_ahead": {
-    "en": "newer than anything on npm ({version}). The packages are published after the release page, so this settles itself.",
-    "zh": "比 npm 上任何一版都新（npm 最新为 {version}）。npm 包在发布页之后才推送，等一会儿就一致了。"
+    "en": "newer than the newest available through this install channel ({version}).",
+    "zh": "比当前安装渠道提供的最新版本（{version}）更新。"
   },
   "release_behind": {
     "en": "a newer release is published: {version}, cut {released}.",
