@@ -55,7 +55,7 @@ D40 Seatbelt 的写路径经 -D 参数递交，profile 是内联常量，以 den
 
 ## 11 边界枚举
 缺席 wrapper、坏 profile／权限拒绝、副本不存在／非目录／根目录、非 UTF-8 路径、
-空 program 均拒。cwd 改为规范副本，目标 args 保持独立参数，包括以连字符开头的参数。
+空 program 均拒。cwd 改为规范副本，目标 program 前有 -- 终结 wrapper 选项，args 保持独立参数，包括以连字符开头的参数。
 
 ## 12 错误处理
 E_SANDBOX_DENIED 保留失败动作、路径或原始 stderr 与恢复：修复 native 或明确选择其他臂。
@@ -109,7 +109,7 @@ theorem every_descendant_trace_keeps_profile (process : ConfinedProcess)
   induction operations generalizing process with
   | nil => rfl
   | cons operation rest ih =>
-    simp only [trace, List.foldl_cons]
+    change (trace (step process operation) rest).profile = process.profile
     rw [ih]
     cases operation <;> rfl
 

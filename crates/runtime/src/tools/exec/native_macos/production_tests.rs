@@ -88,6 +88,8 @@ fn native_macos_exec_rejects_absolute_and_new_symlink_escape_writes() {
     for script in [
         script,
         "import pathlib,sys; pathlib.Path(sys.argv[1]).write_text('after')",
+        "import pathlib,sys,os; os.link(sys.argv[1],'hard-escape'); pathlib.Path('hard-escape').write_text('after')",
+        "import os,sys; os.rename(sys.argv[1],'moved-in')",
     ] {
         let result = invoke_python(&tool, script, &[protected.display().to_string()]);
         assert_ne!(result["exit_code"], 0, "{result}");

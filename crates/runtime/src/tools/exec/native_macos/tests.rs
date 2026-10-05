@@ -36,6 +36,7 @@ fn native_macos_path_and_target_arguments_cannot_become_profile_source() {
     assert_eq!(
         &args[4..],
         &[
+            OsString::from("--"),
             OsString::from("target-program"),
             OsString::from("-p"),
             OsString::from("(allow default)"),
@@ -70,9 +71,20 @@ proptest::proptest! {
         let mut target = Command::new("target");
         target.args(&arguments).env_clear().env("LANG", "C");
         let wrapped = wrap(std::path::Path::new("sandbox-exec"), copy.path(), &target).unwrap();
-        let actual: Vec<_> = wrapped.get_args().skip(5).map(OsString::from).collect();
+        let actual: Vec<_> = wrapped.get_args().skip(6).map(OsString::from).collect();
         let expected: Vec<_> = arguments.into_iter().map(OsString::from).collect();
         proptest::prop_assert_eq!(actual, expected);
         proptest::prop_assert_eq!(wrapped.get_envs().collect::<Vec<_>>(), target.get_envs().collect::<Vec<_>>());
     }
+}
+
+#[test]
+fn native_macos_program_named_like_an_option_remains_the_target() {
+    let copy = tempfile::tempdir().unwrap();
+    let target = Command::new("-p");
+    let actual = wrap(std::path::Path::new("sandbox-exec"), copy.path(), &target).unwrap();
+    assert_eq!(
+        actual.get_args().skip(4).collect::<Vec<_>>(),
+        [std::ffi::OsStr::new("--"), std::ffi::OsStr::new("-p")]
+    );
 }

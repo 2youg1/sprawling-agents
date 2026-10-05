@@ -44,6 +44,7 @@ pub(super) fn wrap(wrapper: &Path, copy: &Path, command: &Command) -> Result<Com
         .arg(PROFILE)
         .arg("-D")
         .arg(format!("WORKDIR={copy}"))
+        .arg("--")
         .arg(command.get_program())
         .args(command.get_args());
     for (name, value) in command.get_envs() {
