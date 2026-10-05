@@ -520,6 +520,26 @@ D30 **standalone installer 的仓库默认由根清单生成并核验。** `docn
 **本节属门禁机具，与产品代码分开提交。**
 -/
 
+/-! D31 `channel` 的主入口与运行时入口
+
+本节描述 `tools/xtask/src/channel.rs`、`tools/xtask/src/channel/shim.js`、
+`tools/xtask/src/channel/launcher.cmd` 的包接口，不是形式证明。
+`channel::run(root, tag, assets, out) -> Result<String, XtaskError>` 读取平台表与归档，
+将实际二进制字节交给平台包；Unix 的执行权限来自该 ZIP 成员，缺少执行位拒绝打包。
+根包描述读取工作区 description，不在打包器重写产品文案。
+
+根包主 bin 指向 `bin/sprawling.js`。同一 `channel::RUNTIME_ENTRY` 常量生成内部运行时
+bin 名和主脚本 shebang；运行时入口在已有 Bun 与 Node 中选择，不安装工具，缺少两者
+或缺少主脚本参数时退出失败。选择器是 shell/batch 混合脚本，Unix exec 所选运行时，
+Windows 传入完整参数并返回其退出码。主脚本只定位已装平台包，启动子进程，传递参数、
+退出状态和 Unix 终止信号。安装来源只由已有明确元数据与缓存目录辨认，运行时不是安装器。
+
+参数与理由：Bun 与 npm 的 bin 链接行为不同，Node shebang 会在 JavaScript 回退执行之前
+先要求 Node，而无 shebang 的脚本不能直接供 `bunx` exec。内部运行时入口保留合法主
+shebang 和现有运行时选择，不要求二者同时安装。被否：只在 JavaScript 中检测 Bun；
+推断执行 JavaScript 的运行时就是安装器。若包管理器提供可移植的条件 bin，此二入口可重议。
+-/
+
 /-! ### 8-20 `argument_count` 的豁免表自清理，与一个地址上的两个函数
 
 **参数登记表与文件登记表一样自清理。** `file_length.predating`（§10 第 7 条）与 `boundary.predating` 都会把修好的行报出来；参数表若只用于跳过，一条签名修到预算以内、或者那个函数被删掉之后，豁免行会永远留着，并在任何人重造同名函数时静默重新授权。故 `length::check` 有第三条回收路径 `spent_signatures`，拒词三段与另两处逐字相同。
@@ -1167,7 +1187,7 @@ pub(crate) fn package_field<'a>(manifest: &'a toml::Value, key: &str) -> Option<
 
 **`guard::version` 判什么**：根清单 `[workspace.dependencies]` 里每一个带 `path` 的项，`version` 恰是 `=` 加 `[workspace.package] version`；没有、或写成别的，红在 `Cargo.toml [workspace.dependencies] <键>` 上，替代给出应写的那一行。成员清单的任何依赖表（`dependencies`、`dev-dependencies`、`build-dependencies`，以及 `target.<cfg>` 下的同名表）里带 `path` 的项都红在 `<目录>/Cargo.toml <表> <键>` 上，替代写「改成 `<键> = { workspace = true }`」：路径与版本只在根清单写一次。版本的唯一权威仍是 `[workspace.package] version`，guard 不另抄一份，只判那十几行 `=` 钉子与它相等；cargo 的依赖表不能写 `version.workspace`，所以钉子必然是抄件，这道判定就是它们的持有者。
 
-**`xtask::package` 的 `workspace_package`**：`[workspace.package]` 的字段只经它读。`package` 与 `channel` 取 `version`，`channel` 取 `repository` 写进每个 npm 包的 `repository` 与 `homepage`（原先是 `channel.rs` 里的常量 `REPOSITORY`，与根清单是同一个事实的两个家）；guard 经 `package_field` 读已解析的根清单。
+**`xtask::package` 的 `workspace_package`**：`[workspace.package]` 的字段只经它读。`package` 与 `channel` 取 `version`，`channel` 取 `description` 写根包描述，并取 `repository` 写进每个 npm 包的 `repository` 与 `homepage`（原先是 `channel.rs` 里的常量 `REPOSITORY`，与根清单是同一个事实的两个家）；guard 经 `package_field` 读已解析的根清单。
 
 **测试**：`packaged::tests` 在 `root::fixture` 上建一个小工作区：一个可发布的包的 `lib.rs` 写 `include_str!("../../x.txt")` 必须报一条违规并点名那一行；包内的 `include_str!`、`concat!(env!("OUT_DIR"), …)`、`#[cfg(test)] mod tests;` 声明的文件里的包外 `include_str!`、`#[path]` 载入的文件里的包外 `include_bytes!` 各一例，只有最后一例报；`publish = false` 的包里的包外 `include_str!` 不报。`guard::version::tests` 在夹具清单上判：工作区 `0.0.8` 而某项写 `=0.0.7` 报一条；缺 `version` 报一条；一个成员按路径点名工作区包报一条；全都对时无违规。
 
