@@ -390,16 +390,4 @@ fn every_transport_the_writer_emits_is_read_back_as_the_same_transport() {
     assert_eq!(load(dir.path(), &room).unwrap().mcp, servers);
 }
 
-#[test]
-fn a_container_declaration_reaches_the_frozen_sandbox_whole() {
-    let image = format!("sha256:{}", "a".repeat(64));
-    let parsed = ConfigLayer::parse(&format!(
-        "[sandbox]\nshell = false\n[sandbox.container]\nimage = '{image}'\nuser = 1000\ncpu_millis = 1250\nmemory_bytes = 67108864\npids = 64\n"
-    ));
-    assert!(
-        parsed.is_ok(),
-        "an explicit container must reach the frozen exec configuration: {parsed:?}"
-    );
-    let sandbox = serde_json::to_value(parsed.unwrap().sandbox().unwrap()).unwrap();
-    assert_eq!(sandbox["container"]["image"], serde_json::json!(image));
-}
+mod container;

@@ -349,9 +349,11 @@ fn listed(parts: &[&str]) -> String {
     }
 }
 
+mod placement;
 mod placing;
 
-pub use placing::{Confined, Placed, Placement, parse_placement};
+pub use placement::{Placement, parse_placement};
+pub use placing::{Confined, Placed};
 
 #[cfg(test)]
 #[allow(
