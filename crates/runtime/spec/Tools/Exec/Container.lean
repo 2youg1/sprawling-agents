@@ -27,7 +27,8 @@ info 的内容是 daemon 的自述，不是已执行的隔离验收；daemon、O
 实际起动仍须 inspect 验证限额与挂载，然后用同一容器跑 cgroup 与网络对拍。
 镜像、daemon 接口或 OCI runtime 更新时应重跑实测。
 
-D50 Backlog 在 create 之前登记唯一名字、副本与 owner，成员的进程值同时拥有 daemon 身份
+D50 Backlog 在分配输出文件之前取得唯一名字与副本的清理 owner，然后在 create 之前登记成员；
+计数、表锁或输出文件失败同样不能丢失副本的清理责任，成员的进程值同时拥有 daemon 身份
 与可选的 attach 子进程。start／inspect／attach／create 应答丢失均按登记身份清理。
 停止时先置 stopping，再请求 rm --force --volumes；删除失败保留成员与副本，下一次
 harvest 重试并返回 typed failure，release 的 Drop 调用只记录待清理责任，不能声称删除成功。

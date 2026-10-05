@@ -22,11 +22,6 @@ impl Backlog {
         what: String,
         request: ContainerRequest,
     ) -> Result<Started, AxError> {
-        let id = self.mint()?;
-        let dir = self.scratch.dir(id);
-        std::fs::create_dir_all(&dir).map_err(|err| storage(&dir, &err))?;
-        let out = std::fs::File::create(dir.join("out")).map_err(|err| storage(&dir, &err))?;
-        let err = std::fs::File::create(dir.join("err")).map_err(|err| storage(&dir, &err))?;
         let name = request
             .copy
             .file_name()
@@ -41,6 +36,11 @@ impl Backlog {
             })?
             .to_owned();
         let lease = ContainerLease::registered(request.runtime, name, request.copy, request.limits);
+        let id = self.mint()?;
+        let dir = self.scratch.dir(id);
+        std::fs::create_dir_all(&dir).map_err(|err| storage(&dir, &err))?;
+        let out = std::fs::File::create(dir.join("out")).map_err(|err| storage(&dir, &err))?;
+        let err = std::fs::File::create(dir.join("err")).map_err(|err| storage(&dir, &err))?;
         // The same table lock covers registration and start, so Halt cannot remove and then race a start.
         {
             let mut table = self.hold()?;
