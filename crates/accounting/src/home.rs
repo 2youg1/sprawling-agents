@@ -106,6 +106,13 @@ impl Home {
         self.product_dir().join(COMPONENTS_DIR)
     }
 
+    /// Local privacy recovery history, outside every city and its exports.
+    /// This derives a path only; reading it must not create or settle history.
+    #[must_use]
+    pub fn privacy_history(&self) -> PathBuf {
+        self.product_dir().join("privacy").join("changes.jsonl")
+    }
+
     /// Where this person declares what every city they run inherits.
     ///
     /// This module states the path only. Reading the file, and where

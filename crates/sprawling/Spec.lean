@@ -20,6 +20,12 @@ import crates.sprawling.spec.Main
 import crates.sprawling.spec.Main.Exit
 import crates.sprawling.spec.Main.Grammar
 import crates.sprawling.spec.Monitor
+import crates.sprawling.spec.Privacy
+import crates.sprawling.spec.Privacy.State
+import crates.sprawling.spec.Privacy.Journal
+import crates.sprawling.spec.Privacy.Cli
+import crates.sprawling.spec.Privacy.Windows
+import crates.sprawling.spec.Privacy.Confirmation
 import crates.sprawling.spec.Outside
 import crates.sprawling.spec.Outside.Conduit
 import crates.sprawling.spec.Serving
@@ -63,6 +69,7 @@ import crates.sprawling.spec.WireClient
 | `spec/Main/Exit.lean` | `bin::main::exit` |
 | `spec/Main/Grammar.lean` | `bin::main::grammar` |
 | `spec/Monitor.lean` | `bin::monitor` |
+| `spec/Privacy.lean` | 主机 privacy 的顺序与恢复契约，生产接口缺口见该分部 §4/§16 |
 | `spec/Outside.lean` | `bin::outside` |
 | `spec/Outside/Conduit.lean` | `bin::outside::conduit` |
 | `spec/Serving.lean` | `bin::serving` |
@@ -139,7 +146,9 @@ bin 子命令面；装配层是 Main；ARCHITECTURE.md §2（客户端嵌入链�
 /-! ## 7 模块边界
 
 `main`：CLI 分发与呈现；`assembly`：唯一知情点，句柄/时钟/种子/spawn 注入处。
-**本 crate 不做什么**：不含任何判定（判定住 kernel）；账本与内容仓库的写盘住 storage。
+城市的可回放判定住 kernel；账本与内容仓库的写盘住 storage。
+主机 privacy 的顺序与恢复契约住 `spec/Privacy.lean`：它约束城市之外的
+本机效果，不进入 kernel、Ledger 或城市配置梯子，平台事实不参与城市重放。
 -/
 
 /-! ## 8 接口先行
@@ -426,6 +435,7 @@ pub struct SystemClock;   // 墙钟的唯一采样点（clippy.toml 的 disallow
 | D47 | `crates/sprawling/spec/Serving/Placement.lean` |
 | D48 | `crates/sprawling/spec/Monitor.lean` |
 | D49 | `crates/sprawling/spec/Doctor.lean` |
+| D50 | `crates/sprawling/spec/Privacy.lean` |
 -/
 
 /-! D15 不从别的工具的配置里读 provider 表（人的决定）

@@ -23,6 +23,7 @@ pub mod console;
 pub mod doctor;
 pub mod firstrun;
 pub mod monitor;
+pub mod privacy;
 pub mod release;
 mod revealing;
 pub mod serving;

@@ -36,6 +36,7 @@ pub(super) enum Verb {
     Desktop,
     Install,
     Status,
+    PrivacyStatus,
 }
 
 /// Whether running a verb can change a city or this machine. `--help`
@@ -191,6 +192,16 @@ pub(super) fn forwarded(args: &[String]) -> Vec<String> {
 
 /// The table. Its order is the order the overview prints.
 pub(super) const VERBS: &[Row] = &[
+    Row {
+        verb: Verb::PrivacyStatus,
+        name: "privacy status",
+        aliases: &[],
+        positionals: &[],
+        flags: &[],
+        says: "read local privacy operation receipts without changing history or the OS",
+        effect: Effect::ReadsOnly,
+        after_dashes: AfterDashes::Refused,
+    },
     Row {
         verb: Verb::Up,
         name: "up",

@@ -66,6 +66,19 @@ fn run(verb: Verb, read: &Arguments, args: &[String]) -> ExitCode {
     let nth = |n| read.positional(n);
     match verb {
         Verb::Status => status(args),
+        Verb::PrivacyStatus => match sprawling::privacy::cli::status() {
+            Ok(answer) => {
+                println!("{answer}");
+                ExitCode::SUCCESS
+            }
+            Err(error) => {
+                eprint!(
+                    "{}",
+                    super::refusal::written(&error, super::refusal::Form::Human)
+                );
+                ExitCode::FAILURE
+            }
+        },
         Verb::Replay => replay(nth(1)),
         Verb::Whose => super::whose::verb(read),
         Verb::Check => super::check::verb(nth(1)),
