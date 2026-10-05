@@ -56,7 +56,7 @@ jobs:
           $filter = 'test(a_dispatched_command_runs_below_the_core) | binary(exec_builds)'
           cargo nextest list -p sprawling-runtime -E $filter --message-format json > native-evidence/regressions.json 2> native-evidence/regressions-list.stderr
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          $suites = (Get-Content native-evidence/regressions.json -Raw | ConvertFrom-Json).'rust-test-suites'.PSObject.Properties.Value
+          $suites = (Get-Content native-evidence/regressions.json -Raw | ConvertFrom-Json).'rust-suites'.PSObject.Properties.Value
           $priority = @($suites | ForEach-Object { $_.testcases.PSObject.Properties } | Where-Object { $_.Name -ceq 'tools::exec::tests::yielding::a_dispatched_command_runs_below_the_core' -and $_.Value.'filter-match'.status -eq 'matches' -and -not $_.Value.ignored })
           $build = @($suites | Where-Object { $_.'binary-name' -ceq 'exec_builds' } | ForEach-Object { $_.testcases.PSObject.Properties } | Where-Object { $_.Value.'filter-match'.status -eq 'matches' -and -not $_.Value.ignored })
           if ($priority.Count -ne 1 -or $build.Count -eq 0) { throw 'Both native regressions must be selected and runnable.' }
