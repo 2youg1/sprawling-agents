@@ -81,14 +81,15 @@ impl McpLink {
         }
     }
 
-    /// Whether the server behind this link is gone for good: a stdio
-    /// child that exited. A url is reached again on each call, so it
-    /// never ends here.
+    /// Whether the holder must open a new connection and handshake: a
+    /// stdio child exited, or an HTTP server ended its session. Clones
+    /// share this state; SSE keeps its existing stream lifetime.
     #[must_use]
     pub fn has_ended(&self) -> bool {
         match self.0 {
             Reach::Stdio(ref held) => held.has_ended(),
-            Reach::Http(_) | Reach::Sse(_) => false,
+            Reach::Http(ref held) => held.has_ended(),
+            Reach::Sse(_) => false,
         }
     }
 }

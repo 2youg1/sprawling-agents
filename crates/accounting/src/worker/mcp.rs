@@ -59,9 +59,9 @@ impl Residents {
     /// The tools `server` offers, over the connection an earlier run left
     /// when its child still runs, and over a new one otherwise.
     ///
-    /// A child that has ended is dropped from the table and started
-    /// again here, which is how a server that died between two runs
-    /// comes back.
+    /// An ended child or HTTP session is dropped from the table. Its
+    /// replacement opens, handshakes and lists tools through the same
+    /// path; the failed call itself is never replayed here.
     ///
     /// Takes `&self`, so lanes preparing dispatches at once can share
     /// one table; the port's `connect` reaches the same door.

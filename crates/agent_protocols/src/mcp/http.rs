@@ -22,7 +22,7 @@
 //! `initialize` with an `Mcp-Session-Id`, and a client that receives one
 //! MUST send it back on every later request. A 404 means the server
 //! ended the session, and the answer to that is a new handshake rather
-//! than a refusal.
+//! than continuing with the old connection.
 
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -39,6 +39,14 @@ struct Session {
     id: Option<String>,
     /// The negotiated revision, learned from the answer that carried it.
     protocol_version: Option<String>,
+    lifetime: Lifetime,
+}
+
+#[derive(Debug, Default, PartialEq, Eq)]
+enum Lifetime {
+    #[default]
+    Live,
+    Ended,
 }
 
 /// A connection to one HTTP server.
@@ -109,7 +117,19 @@ impl HttpServer {
             request = request.header(header.name(), header.plaintext());
         }
         let mut carried = None;
-        if let Ok(session) = self.session.lock() {
+        {
+            let session = self.session.lock().map_err(|_| {
+                AxError::failure(AxCode::ToolUnavailable, "call an mcp server", &self.url)
+                    .with_recovery("the session lock was poisoned; dispatch again to reconnect")
+            })?;
+            if session.lifetime == Lifetime::Ended {
+                return Err(AxError::failure(
+                    AxCode::ToolUnavailable,
+                    "call an mcp server",
+                    &self.url,
+                )
+                .with_recovery("this session ended; dispatch again to open a new connection"));
+            }
             if let Some(id) = &session.id {
                 request = request.header("mcp-session-id", id);
                 carried = Some(id.clone());
@@ -155,6 +175,9 @@ impl HttpServer {
         let Ok(mut session) = self.session.lock() else {
             return;
         };
+        if session.lifetime == Lifetime::Ended {
+            return;
+        }
         if let Some(id) = &exchange.handed {
             session.id = Some(id.clone());
         }
@@ -176,6 +199,16 @@ impl HttpServer {
     fn forget(&self) {
         if let Ok(mut session) = self.session.lock() {
             session.id = None;
+            session.protocol_version = None;
+            session.lifetime = Lifetime::Ended;
+        }
+    }
+
+    /// A server-ended session or a poisoned lock cannot be reused by Residents.
+    pub(crate) fn has_ended(&self) -> bool {
+        match self.session.lock() {
+            Ok(session) => session.lifetime == Lifetime::Ended,
+            Err(_poisoned) => true,
         }
     }
 

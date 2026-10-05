@@ -189,10 +189,17 @@ fn a_session_the_server_ended_is_forgotten_rather_than_kept() {
     let mut held = HttpServer::open(&url, &[], &vault()).unwrap();
     if let Ok(mut session) = held.session.lock() {
         session.id = Some("stale".to_owned());
+        session.protocol_version = Some("2025-03-26".to_owned());
     }
+    let clone = held.clone();
     let err = held
         .call("{\"id\":1}", crate::EXTERNAL_CALL_PATIENCE)
         .unwrap_err();
+    assert!(held.has_ended());
+    assert!(
+        clone.has_ended(),
+        "all handles must stop reusing this session"
+    );
     assert!(err.subject().contains("ended this session"));
     assert_eq!(err.retry(), kernel::Retry::Yes, "the call never ran");
     assert_eq!(
@@ -200,7 +207,28 @@ fn a_session_the_server_ended_is_forgotten_rather_than_kept() {
         None,
         "a session the server disowned is not sent back to it"
     );
-    let _ = server.join();
+    assert_eq!(held.session.lock().unwrap().protocol_version, None);
+    let forgotten = Exchange {
+        status: 200,
+        carried: None,
+        handed: Some("late".to_owned()),
+        body: "{}".to_owned(),
+    };
+    held.learn(&forgotten);
+    assert!(
+        clone.has_ended(),
+        "a late response must not revive an ended connection"
+    );
+    let mut clone = clone;
+    assert_eq!(
+        clone
+            .call("{}", crate::EXTERNAL_CALL_PATIENCE)
+            .unwrap_err()
+            .retry(),
+        kernel::Retry::No,
+        "an old tool handle must not send again"
+    );
+    server.join().unwrap();
 }
 
 /// A 404 on a request that carried no session id says the address is
@@ -217,6 +245,10 @@ fn a_404_without_a_session_is_a_wrong_address_and_is_not_asked_again() {
 
     drop(server.join());
     assert_eq!(err.retry(), kernel::Retry::No);
+    assert!(
+        !held.has_ended(),
+        "a stateless URL refusal is not a session end"
+    );
 }
 
 /// A paid server's key belongs in the vault, not in a building's
