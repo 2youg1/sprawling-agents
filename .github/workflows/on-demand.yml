@@ -76,7 +76,7 @@ on:
         description: which run
         required: true
         type: choice
-        options: [mutants, mutants-modules, sim, shots, release, pgo, fresh, keychain]
+        options: [mutants, mutants-modules, sim, shots, release, pgo, fresh, runtime, keychain]
       base:
         description: the ref `mutants` diffs against (a branch on origin, a tag, or a commit)
         required: false
@@ -394,7 +394,7 @@ jobs:
   # --no-console and reads the city through the wire). The checklist and
   # every log are uploaded on a failed run too.
   fresh:
-    if: inputs.job == 'fresh'
+    if: inputs.job == 'fresh' || inputs.job == 'runtime'
     name: fresh (${{ matrix.os }})
     timeout-minutes: 120
     strategy:
@@ -537,6 +537,25 @@ jobs:
           [ "$RUNNER_OS" != Windows ] || walk="/usr/bin:$walk:$(dirname "$(command -v zig)")"
           env -u CARGO_HOME -u RUSTUP_HOME PATH="$walk" \
             just acceptance "${{ steps.fresh.outputs.archive }}" 2>&1 | tee "${{ steps.fresh.outputs.dir }}/logs/acceptance.log"
+      - name: browser for the served production client
+        if: inputs.job == 'runtime'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/acceptance-browser"
+          bun add --cwd "$RUNNER_TEMP/acceptance-browser" playwright@1.58.2
+          "$RUNNER_TEMP/acceptance-browser/node_modules/.bin/playwright" install chromium
+          module="$RUNNER_TEMP/acceptance-browser/node_modules/playwright/index.mjs"
+          ! command -v cygpath > /dev/null 2>&1 || module="$(cygpath -m "$module")"
+          echo "PLAYWRIGHT_MODULE=$module" >> "$GITHUB_ENV"
+      - name: real settings routes, keyboard focus and cropped pixels
+        if: inputs.job == 'runtime'
+        shell: bash
+        run: |
+          set -euo pipefail
+          binary="$(find "${{ steps.fresh.outputs.dir }}/unpacked" -type f \( -name sprawling -o -name sprawling.exe \))"
+          ! command -v cygpath > /dev/null 2>&1 || binary="$(cygpath -m "$binary")"
+          SPRAWLING_BIN="$binary" lake exe acceptance client-ui .github/workflows/acceptance-ui.mjs "${{ steps.fresh.outputs.dir }}/logs/ui"
       - name: a binary serving HTML as JavaScript is rejected by the same client step
         shell: bash
         env:
@@ -546,7 +565,7 @@ jobs:
           bundle="$PWD/crates/sprawling/web-dist"
           backup="$RUNNER_TEMP/client-regression-bundle"
           cp -R "$bundle" "$backup"
-          trap 'cp -R "$backup/." "$bundle/"' EXIT
+          trap 'result=$?; cp -R "$backup/." "$bundle/"; exit "$result"' EXIT
           python3 - <<'PYTHON'
           from pathlib import Path
           bundle = Path("crates/sprawling/web-dist")
@@ -556,9 +575,9 @@ jobs:
           for script in scripts:
               script.write_text("<!doctype html><html><body>broken asset</body></html>", encoding="utf-8")
           PYTHON
-          build_args=()
-          [ -z "$ARCHIVE_TARGET" ] || build_args=(--target "$ARCHIVE_TARGET")
-          cargo build --release -p sprawling --locked "${build_args[@]}"
+          build_args=(--release -p sprawling --locked)
+          [ -z "$ARCHIVE_TARGET" ] || build_args+=(--target "$ARCHIVE_TARGET")
+          cargo build "${build_args[@]}"
           binary="$PWD/target/${ARCHIVE_TARGET:+$ARCHIVE_TARGET/}release/sprawling"
           [ "$RUNNER_OS" != Windows ] || binary="$binary.exe"
           ! command -v cygpath > /dev/null 2>&1 || binary="$(cygpath -m "$binary")"
