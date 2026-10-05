@@ -478,10 +478,7 @@ mod tests {
                 loop {
                     let mut line = String::new();
                     reader.read_line(&mut line).unwrap();
-                    if line
-                        == "
-"
-                    {
+                    if line == "\r\n" {
                         break;
                     }
                     if let Some(value) = line.to_ascii_lowercase().strip_prefix("content-length:") {
@@ -493,10 +490,7 @@ mod tests {
                 reader.read_exact(&mut request).unwrap();
                 let request: serde_json::Value = serde_json::from_slice(&request).unwrap();
                 assert_eq!(request["method"], method);
-                seen.push(format!(
-                    "{headers}
-{request}"
-                ));
+                seen.push(format!("{headers}\r\n{request}"));
                 let body = if seen.len() == 8 {
                     vec![0xff]
                 } else if status == 202 {
@@ -510,18 +504,10 @@ mod tests {
                 let handed = if session.is_empty() {
                     String::new()
                 } else {
-                    format!(
-                        "mcp-session-id: {session}
-"
-                    )
+                    format!("mcp-session-id: {session}\r\n")
                 };
                 let response = format!(
-                    "HTTP/1.1 {status} X
-{handed}content-type: application/json
-content-length: {}
-connection: close
-
-",
+                    "HTTP/1.1 {status} X\r\n{handed}content-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n",
                     body.len()
                 );
                 reader.get_mut().write_all(response.as_bytes()).unwrap();
