@@ -590,6 +590,8 @@ Drop 是 caller 放弃所有权时的 emergency teardown，仍尝试每项资源
 
 **D2 step 的定义在 Rust，Zig 是检查过的拼写。** `src/step.rs` 是名字与编号的唯一定义，`build.rs` 以 `include!` 读它，要求 `zig/step.zig` 含有逐字的渲染结果，不同即拒绝构建并印出应有的文本。被否：构建时把 `step.zig` 生成进 `OUT_DIR`——那样 `zig test zig/leaf.zig` 不经 cargo 就跑不起来。
 
+**D5 native Record 的字段、顺序和类型由 `src/confinement.rs` 的 `#[repr(C)] Record` 定义。** `build.rs` 在每个平台上读取该声明，逐字段渲染对应的 Zig `extern struct` 并检查 `zig/confinement_api.zig`；只接受 `usize` 与 `[u8; N]`，未知类型、缺失声明或不同拼写都拒绝构建。两侧面向同一目标，C 布局与同宽基础类型决定偏移及对齐。检查不以总字节数代替字段顺序，因此两个同宽句柄互换仍被拒绝；回归夹具确认这一拒绝。被否：只比较结构大小会漏掉 `job` 和 `process` 互换；在 `OUT_DIR` 生成 Zig 声明会让不经 Cargo 的 `zig test` 失去入口。
+
 **D3 Zig 的版本只写在 `crates/desktop/ffi/zig-version`。** `build.rs` 要求 `zig version` 与它相等；doctor 的 `zig` 一行以 `include_str!` 读它；CI 的安装步骤读它。被否：`build.zig.zon` 的 `minimum_zig_version`（这里没有 `build.zig`，而且它说的是下限不是钉子）。
 
 缓冲的起始大小与重试次数（`top_level` 1024 个句柄、加 64、四次；`clipboard` 4096 个单元、四次）是我们的选择：一台桌面的顶层窗口数是几百，绝大多数剪贴板文本在四千单元以内；改它们只改一次调用的往返次数，不改结果。
