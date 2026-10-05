@@ -32,6 +32,10 @@ use std::path::Path;
 use crate::report::{Violation, XtaskError};
 use crate::walk;
 
+#[cfg(test)]
+#[allow(clippy::unwrap_used, reason = "test code")]
+mod nix_tests;
+
 /// The only files allowed to say `.expose(` under crates/*/src: the
 /// defining module and each redemption point, with its reason beside it.
 const EXPOSE_WHITELIST: [&str; 5] = [
