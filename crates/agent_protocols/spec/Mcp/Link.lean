@@ -66,4 +66,59 @@ def retryOfEager : Failure → Retry
 
 theorem eagerRetry_performs_twice : performed true (retryOfEager .afterHandover) = 2 := by decide
 
+/-! HTTP 会话的寿命由传输持有，Residents 只消费失效状态；这里不表示 HTTP 字节、
+Mutex 或线程交错。Rust 回归从 Residents.tools 与 McpTool.invoke 进入，验证真实握手次序、
+重新 listing、原调用不重发、Unknown 不重开与克隆共享失效。 -/
+
+/-- 没有会话 id 的连接仍可用，不能把「没有 id」当成「已经失效」。 -/
+inductive Lifetime where
+  | live
+  | ended
+  deriving DecidableEq, Repr
+
+/-- 一次 HTTP 失败后，只有带会话 id 的 404 使原连接失效。 -/
+def afterFailure (held : Lifetime) : Failure → Lifetime
+  | .sessionEnded => .ended
+  | .beforeHandover => held
+  | .afterHandover => held
+
+/-- 居民表下一次派活复用连接或重新打开、握手和 listing。 -/
+inductive Dispatch where
+  | resident
+  | connect
+  deriving DecidableEq, Repr
+
+def nextDispatch : Lifetime → Dispatch
+  | .live => .resident
+  | .ended => .connect
+
+/-- 对任意失败序列，旧连接一旦失效就不复活；重新握手必须打开新连接。 -/
+def afterFailures : Lifetime → List Failure → Lifetime
+  | held, [] => held
+  | held, failure :: rest => afterFailures (afterFailure held failure) rest
+
+theorem ended_remains_ended (failures : List Failure) :
+    afterFailures .ended failures = .ended := by
+  induction failures with
+  | nil => rfl
+  | cons failure rest ih => cases failure <;> simpa [afterFailures, afterFailure] using ih
+
+/-- sessionEnded 之后的任意失败序列都要求下一 dispatch 重连。 -/
+theorem session_ended_requires_connection (held : Lifetime) (failures : List Failure) :
+    nextDispatch (afterFailures held (.sessionEnded :: failures)) = .connect := by
+  simp [afterFailures, afterFailure, ended_remains_ended, nextDispatch]
+
+/-- 没有 sessionEnded 的失败序列保持原寿命，效果未知不触发重握手。 -/
+theorem other_failures_preserve_lifetime (held : Lifetime) (failures : List Failure)
+    (noEnded : ∀ failure ∈ failures, failure ≠ .sessionEnded) :
+    afterFailures held failures = held := by
+  induction failures generalizing held with
+  | nil => rfl
+  | cons failure rest ih =>
+      have tail : ∀ f ∈ rest, f ≠ .sessionEnded := by
+        intro f member
+        exact noEnded f (List.mem_cons_of_mem failure member)
+      have head := noEnded failure (List.mem_cons_self)
+      cases failure <;> simp_all [afterFailures, afterFailure]
+
 end AgentProtocols.Mcp.Link

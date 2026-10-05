@@ -45,7 +45,7 @@ impl RunWorker {
 
 - **失败**：原样传 `McpLink::open`、`agent_protocols::handshake` 与 `agent_protocols::tools_from` 的 `AxError`。worker 把失败写进 diagnostics、把这个 server 留在外面，run 照常开始；端口不另造错误码。
 - **`confidential` 原样传给 `McpTool::new`**：那是工具层的权威。worker 在机密楼里一个 server 都不启动，所以生产路径上它总是 `false`；它仍在签名里，是为了任何实现都不能造出一个绕过工具层拒绝的工具。
-- **端口有状态，可被几条线程同时问**：生产适配器把连上的 server 按声明与 run root 留在表里，下一次 dispatch 直接拿它的工具；子进程已经退出的那一行在这里被丢掉、重新启动。`connect` 取 `&self`、实现是 `Sync`，因为准备派活的 lane 各自问同一张表（`crates/sprawling/Spec.lean` §8-113），表自己按键上锁（`crates/sprawling/Spec.lean` §8-4）。
+- **端口有状态，可被几条线程同时问**：生产适配器把连上的 server 按声明与 run root 留在表里，下一次 dispatch 直接拿它的工具；`McpLink::has_ended` 判定子进程已退出或 HTTP 会话已失效的那一行在这里被丢掉，经 `McpLink::open`、唯一 `handshake` 与 `tools/list` 重连，原调用不在这里重发；HTTP 失效共享于工具与表持有的链接克隆，无 session id 的 404 与效果未知的答复不因此重连。`connect` 取 `&self`、实现是 `Sync`，因为准备派活的 lane 各自问同一张表（`crates/sprawling/Spec.lean` §8-113），表自己按键上锁（`crates/sprawling/Spec.lean` §8-4）。
 - **固定值**：`RunWorker::new` 与 `over` 装上 `Residents::default()`；`with_connectors` 是唯一换掉它的门。
 - **依赖**：本 crate 因此依赖 `agent_protocols`（ARCHITECTURE.md §3 的 `depmap`）。
 -/

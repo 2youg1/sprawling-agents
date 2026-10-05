@@ -34,7 +34,7 @@ import crates.agent_protocols.spec.Mcp.Tools
 |---|---|
 | mcp | 请求恒是单行且不含换行；两台 server 的同名工具恒是两个工具；浮点入参拒该次调用并报出位置；confidential 楼恒不构造该工具；录制的调用重放得同一答案 |
 | mcp::reading | 恰在上限内的消息照常读，超限的整条拒且拒词报出上限与是哪台 server；拒绝之后不再从同一个 source 读；HTTP 答复的 body 受同一个上限 |
-| 传输 | 请求交出之后丢了答，效果未知、不自动再发；交出之前的失败不可重试；带会话 id 的 404 可重试 |
+| 传输 | 请求交出之后丢了答，效果未知、不自动再发；交出之前的失败不可重试；带会话 id 的 404 返回可重试拒词但不自动重发，下一次派活完整重握手与 listing，克隆共享失效；无 id 的 404 不重开 |
 | acp | 已配对请求变成 Dispatch 三字段；`Incoming::parse` 是入站文法的唯一入口（字段私有，本 crate 之外无第二种造法）；配对令牌恒不进入 `Incoming`；持有效令牌也够不到 reserved prefix；回给编辑器的只有 progress 三字段 |
 | harness | 停摆先变成一次 `session/cancel`，第二次什么也不发；停止原因之后不再读；读到输入结束而没有答，效果未知 |
 
@@ -184,7 +184,7 @@ pub struct Progress { pub run: String, pub turns: u32, pub finished: bool }
 - **已知的向前变化**：更新的修订正在把会话去掉（SEP-2575）。本客户端协商的是 `2025-06-18` 并按那一版行事；一台忽略该头的 server 不会因此变得不可用。
 - **HTTP 传输带自己的 User-Agent**：CDN 后面的托管 server 可能对不报名的客户端回 403 `browser_signature_banned`，早于任何 MCP 消息。
 
-D2 会话住传输层，不住本 crate 的协议层，因为规范把它写在 Transports 而不是 Lifecycle：server 可选在 `initialize` 应答的头里发 `Mcp-Session-Id`；一旦发了，客户端 MUST 在此后每一次请求带回。404 意味着 server 结束了会话，MUST 重开一个，故 `mcp::http` 遇 404 丢掉 id，而不是拿一个已死的 id 永远碰下去。带着会话 id 的 404 标 `retriable`：按规范 server 对已结束会话的请求一律答 404，调用没有被执行，下一次派遣先重开会话；不带会话 id 的 404 标不可重试，它说的是地址不对，再问只得到同一个答（`spec/Mcp/Link.lean` 的 `sessionEnded`）。被否：把会话放进 `handshake` 与 `Rpc`，那样 stdio 与 SSE 要为一个它们没有的头背一份状态。
+D2 会话住传输层，不住本 crate 的协议层，因为规范把它写在 Transports 而不是 Lifecycle：server 可选在 `initialize` 应答的头里发 `Mcp-Session-Id`；一旦发了，客户端 MUST 在此后每一次请求带回。404 意味着 server 结束了会话，MUST 重开一个，故 `mcp::http` 遇带 id 的 404 清除会话与版本并记录失效，`McpLink::has_ended` 把这个共享状态交给唯一 Residents 持有者，由下一次派遣新开链接、完整握手与 listing，而不是拿一个已死的 id 永远碰下去。带着会话 id 的 404 标 `retriable`：按规范 server 对已结束会话的请求一律答 404，调用没有被执行，下一次派遣先重开会话；不带会话 id 的 404 标不可重试，它说的是地址不对，再问只得到同一个答（`spec/Mcp/Link.lean` 的 `sessionEnded`）。被否：把会话放进 `handshake` 与 `Rpc`，那样 stdio 与 SSE 要为一个它们没有的头背一份状态。
 
 ### 8-4 入向浮点：治我们发的，适应我们收的
 
@@ -202,7 +202,7 @@ D7 一个读端，两条连接：stdio 与 harness 的读端是同一个 `mcp::r
 
 一次连接的开销是每台 server 两次有应答的请求（`initialize`、`tools/list`）加一条通知（`notifications/initialized`），由 `mcp::handshake` 的 `opening_one_connection_costs_two_round_trips_and_one_notification` 用一个计数 `Outbound` 钉住。断言的是条数而不是时间：条数在每台机器上相同。本 crate 为这三条消息花的 CPU 远小于子进程启动与两次往返，而后两者属于传输。
 
-D9 本 crate 不持连接表：`McpLink` 可 clone，寿命由持有者决定。持有者是装配层的 `accounting::worker::mcp::Residents`，它把一台 server 的连接与工具表留给后来的派活，子进程退出（`McpLink::has_ended`）时才重开。派活在这一步花的时间记在 `tools/xtask/budgets.toml` 的 `[prepare_dispatch]`。被否：本 crate 自持一张按配置索引的连接表，那样同一台 server 的寿命有两个主人，装配层重开时本 crate 还握着旧的那条。
+D9 本 crate 不持连接表：`McpLink` 可 clone，寿命由持有者决定。持有者是装配层的 `accounting::worker::mcp::Residents`，它把一台 server 的连接与工具表留给后来的派活，子进程退出或 HTTP 带会话 id 的 404 使连接失效（`McpLink::has_ended`）时重开并重取工具表。派活在这一步花的时间记在 `tools/xtask/budgets.toml` 的 `[prepare_dispatch]`。HTTP 会话失效不在传输内重发：原调用的失败仍归调用者，下一 dispatch 的恢复与工具表更新归 Residents，模型与派生回归在 `spec/Mcp/Link.lean` 与 `accounting::worker::mcp::tests`。被否：本 crate 自持一张按配置索引的连接表，那样同一台 server 的寿命有两个主人，装配层重开时本 crate 还握着旧的那条。
 
 ### 8-17 三种传输与 `McpLink`（形状 4 适配器；实现 `Outbound`）
 
@@ -214,7 +214,7 @@ impl McpLink {
     pub fn open(transport: &kernel::McpTransport, write_root: &Path,
                 resolve: &gateway::SecretResolver) -> Result<McpLink, AxError>;
     pub fn site(transport: &kernel::McpTransport) -> &'static str; // 出事时该打开的模块
-    pub fn has_ended(&self) -> bool; // 子进程已退出：持有者据此重开
+    pub fn has_ended(&self) -> bool; // 子进程已退出或 HTTP 会话已失效：持有者据此重开
 }
 impl Outbound for McpLink { /* 逐传输转发 call／notify */ }
 // mcp::stdio::StdioServer、mcp::http::HttpServer、mcp::sse::SseServer：pub(crate)
@@ -330,7 +330,7 @@ D14 本城不向 harness 提供文件与终端：`initialize` 声明 `fs.readTex
 
 /-! ## 9 工作流程
 
-**出站**：装配层按楼的配置取一条 `McpLink`（先找常驻的，子进程已退出时 `McpLink::open` 新开）→ `handshake`（`initialize` → `notifications/initialized`）→ `Rpc::list_tools` → `tools_from` → catalog 与 bench 各注册一次（工具表随 Run 冻结）→ 模型调用 → `McpTool::invoke` → `call_tool`（浮点检查）→ `Outbound::call` → `Rpc::read` → `ToolOutcome`（污染态）→ 装配层落 `tool_called`／`tool_result`。
+**出站**：装配层按楼的配置取一条 `McpLink`（先找常驻的，子进程已退出或 HTTP 会话已失效时 `McpLink::open` 新开）→ `handshake`（`initialize` → `notifications/initialized`）→ `Rpc::list_tools` → `tools_from` → catalog 与 bench 各注册一次（工具表随 Run 冻结）→ 模型调用 → `McpTool::invoke` → `call_tool`（浮点检查）→ `Outbound::call` → `Rpc::read` → `ToolOutcome`（污染态）→ 装配层落 `tool_called`／`tool_result`。
 
 **入站**：`wire` 的入站中间件先与这座城的配对令牌常数时间比对（`wire::auth`，未配对即在路由层被拒）→ 装配层收 HTTP／stdio 请求 → `Incoming::parse` → `admit` → `Admitted::Dispatch` → 走与人相同的 `Command::Dispatch` 路径 → 期间回 `Progress`。
 
@@ -375,7 +375,7 @@ D15 请求行与 id 是本 crate 的契约，不是序列化器的：行由 `for
 | `E_CONFIG_INVALID` | HTTP 客户端构造不成；一个头或环境变量没有名字 | 能：在打开连接时拒，早于任何请求 |
 | `E_PROVIDER` | broker 的失败（§8-18）；harness 拒了请求、写不进、在作答前关了输出 | 不能：外部世界的事实 |
 
-一个拒绝是三段式的 `AxError`：动作、主体、恢复。失败之后的状态是契约的一部分：读端拒了一条消息就不再读那个 source（D6 (c)），stdio 随即回收子进程、`has_ended` 为真；HTTP 遇带会话 id 的 404 丢掉 id，下一次握手重开会话；构造被拒的工具从未存在；`admit` 拒绝时没有 Dispatch。请求交出之后的失败一律 `Retry::Unknown`（`spec/Mcp/Link.lean`）。
+一个拒绝是三段式的 `AxError`：动作、主体、恢复。失败之后的状态是契约的一部分：读端拒了一条消息就不再读那个 source（D6 (c)），stdio 随即回收子进程、`has_ended` 为真；HTTP 遇带会话 id 的 404 清除 id 与协商版本，并使所有克隆共享的连接失效；原调用返回拒词且不自动重发，旧工具句柄不再发请求，下一次派活由 Residents 新开连接、握手并重取工具表；构造被拒的工具从未存在；`admit` 拒绝时没有 Dispatch。请求交出之后的失败一律 `Retry::Unknown`（`spec/Mcp/Link.lean`）。
 -/
 
 /-! ## 13 依赖选型
