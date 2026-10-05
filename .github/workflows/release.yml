@@ -17,6 +17,12 @@ on:
   push:
     tags: ["v*"]
   workflow_dispatch:
+    inputs:
+      build-only:
+        description: Build and verify without publishing (manual runs always remain build-only)
+        required: true
+        default: true
+        type: boolean
 
 permissions:
   contents: read
@@ -98,13 +104,6 @@ jobs:
     # `aws-lc-rs` and all three archives keep one crypto implementation.
     env:
       CC_x86_64_unknown_linux_musl: musl-gcc
-      # Which release these binaries are. `build.rs` declares the
-      # variable and `kernel::Release` decodes it, so `sprawling status`
-      # names the release it came from and `status --check` has something
-      # to compare the registry against. A build that does not set it -
-      # every `cargo build` anybody runs - reports itself as built from
-      # source rather than guessing at a version it does not have.
-      SPRAWLING_RELEASE_TAG: ${{ github.ref_name }}
     steps:
       - uses: actions/checkout@v7
       - name: install pinned toolchain
@@ -134,9 +133,57 @@ jobs:
       # reads `target/<triple>/release` and puts the triple in the archive
       # name (tools/xtask/Spec.lean §8-11). An empty triple is the host
       # build, whose two archive names are what they always were.
+      - uses: Swatinem/rust-cache@v2
+        id: archive-cache
+        with:
+          shared-key: release
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: build the client, the binary, and the archive
         shell: bash
-        run: just package "${{ matrix.target }}"
+        env:
+          RELEASE_EVENT: ${{ github.event_name }}
+          RELEASE_REF: ${{ github.ref_name }}
+          ARCHIVE_TARGET: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+          mkdir -p target/release-evidence
+          git rev-parse HEAD 'HEAD^{tree}' > target/release-evidence/source.txt
+          rustc --version --verbose > target/release-evidence/toolchain.txt
+          start=$SECONDS
+          # Only a tag push identifies an actual release; dispatch builds source.
+          if [ "$RELEASE_EVENT" = push ]; then
+            export SPRAWLING_RELEASE_TAG="$RELEASE_REF"
+          else
+            unset SPRAWLING_RELEASE_TAG
+          fi
+          just package "$ARCHIVE_TARGET"
+          echo "package_seconds=$((SECONDS - start))" > target/release-evidence/timing.txt
+          if [ "$RUNNER_OS" = macOS ]; then
+            shasum -a 256 target/package/*.zip > target/release-evidence/archives.sha256
+          else
+            sha256sum target/package/*.zip > target/release-evidence/archives.sha256
+          fi
+      - name: record the archive cache and run identity
+        if: always()
+        shell: bash
+        env:
+          CACHE_HIT: ${{ steps.archive-cache.outputs.cache-hit }}
+        run: |
+          set -euo pipefail
+          mkdir -p target/release-evidence
+          {
+            echo "commit=$GITHUB_SHA"
+            echo "run=$GITHUB_RUN_ID"
+            echo "attempt=$GITHUB_RUN_ATTEMPT"
+            echo "cache_hit=$CACHE_HIT"
+          } > target/release-evidence/run.txt
+          cat target/release-evidence/run.txt >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: release-evidence-${{ runner.os }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: target/release-evidence
+          if-no-files-found: error
       # The archive goes through the door a person uses before it is
       # uploaded: install.sh asks a release list served from 127.0.0.1,
       # downloads, verifies and places the binary, and the placed file is
@@ -154,6 +201,7 @@ jobs:
           if-no-files-found: error
 
   publish:
+    if: &tag-publication github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') && !inputs.build-only
     needs: [verify, advisories, archive]
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -267,6 +315,7 @@ jobs:
   # this run just made, so a failure here leaves the download channel
   # already standing rather than half a release.
   channel:
+    if: *tag-publication
     needs: publish
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -360,7 +409,7 @@ jobs:
   # a dispatch from a branch has none.
   crates:
     needs: channel
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: *tag-publication
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
