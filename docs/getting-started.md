@@ -317,7 +317,7 @@ sprawling top                                                      # the monitor
 sprawling call '{"ask":{"ask_id":1,"query":"city_view"}}'          # one frame of the wire
 ```
 
-`sprawling call` with no frame lists every command and query the wire carries. Its exit code is the answer — 0 answered, 1 refused, 2 your command line, 3 nothing came back in time, 4 no city at that address — so a script branches on it without parsing JSON. [`../LLM.md`](../LLM.md) is the whole wire, written for an agent that drives a city from outside.
+`sprawling call` with no frame lists every command and query the wire carries. Its exit code is the answer — 0 answered, 1 refused, 2 your command line, 3 nothing came back in time, 4 no city at that address — so a script branches on it without parsing JSON. [`wire.md`](wire.md) is the whole wire, written for an agent that drives a city from outside.
 
 ## Another machine on your network
 
