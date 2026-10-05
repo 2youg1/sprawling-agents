@@ -145,9 +145,19 @@ theorem refusal_absorbs_every_trace (trace : List ProbeResult) :
   | nil => rfl
   | cons probe rest ih => simpa [observeTrace, List.foldl, observe] using ih
 
-/-- 任一检查拒绝后，其余证据的顺序与长度都不改变拒绝。 -/
-theorem rejected_probe_cannot_be_recovered_by_successes (rest : List ProbeResult) :
-    observeTrace (observe .checking .rejected) rest = .refused := by
-  exact refusal_absorbs_every_trace rest
+/-- daemon 的全部必需能力都必须明确报告，缺一项即拒。 -/
+def controls : List Bool → Bool
+  | [] => true
+  | first :: rest => first && controls rest
+
+/-- 任意数量、任意顺序的能力证据中有拒绝项，合取就不能批准。 -/
+theorem missing_control_refuses (checks : List Bool) (missing : false ∈ checks) :
+    controls checks = false := by
+  induction checks with
+  | nil => simp at missing
+  | cons first rest ih =>
+    cases first <;> simp_all [controls]
+
+example : controls [true, true, true, true, true] = true := rfl
 
 end Runtime.Tools.Exec.Container
