@@ -36,8 +36,12 @@ fn the_sandbox_arm_a_machine_gets_is_chosen_from_what_it_has() {
             namespace_tool: None,
             scratch: scratch.clone(),
         }),
-        Confinement::CopiedTree,
-        "the floor arm is what a machine with no wrapper gets"
+        if cfg!(windows) {
+            Confinement::WindowsJobObject
+        } else {
+            Confinement::CopiedTree
+        },
+        "a Windows build has its native leaf; other platforms need a wrapper"
     );
     let wrapper = PathBuf::from("/usr/bin/bwrap");
     assert_eq!(

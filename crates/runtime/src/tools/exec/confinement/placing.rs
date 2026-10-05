@@ -100,7 +100,14 @@ impl Confined {
     ) -> Result<(Command, Placed), AxError> {
         let wrapper = match &self.arm {
             Confinement::Unavailable { missing } => return Err(no_arm(*missing)),
-            Confinement::WindowsJobObject => return Err(no_job_object()),
+            Confinement::WindowsJobObject => {
+                #[cfg(not(windows))]
+                return Err(no_job_object());
+                #[cfg(windows)]
+                {
+                    None
+                }
+            }
             Confinement::MacosSeatbelt { .. } => {
                 #[cfg(target_os = "macos")]
                 {
@@ -290,6 +297,7 @@ fn no_arm(missing: Missing) -> AxError {
 }
 
 /// Refuses the unavailable job-object arm instead of silently weakening it.
+#[cfg(not(windows))]
 fn no_job_object() -> AxError {
     AxError::failure(
         AxCode::SandboxDenied,

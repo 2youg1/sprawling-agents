@@ -12,7 +12,8 @@
 //! the `exec` result says happened. Neither may be spelled twice, so
 //! both live here (`crates/runtime/spec/Backlog.lean` §8-28-1).
 
-use std::process::{Child, ExitStatus};
+use super::process::Process;
+use std::process::ExitStatus;
 use std::time::Duration;
 
 use kernel::AxError;
@@ -104,7 +105,7 @@ impl Exit {
     /// A host that will not answer is not a child that is still
     /// running: the ending is reported as unread, so the member stops
     /// being polled for ever.
-    pub(super) fn polled(child: &mut Child) -> Option<Exit> {
+    pub(super) fn polled(child: &mut Process) -> Option<Exit> {
         match child.try_wait() {
             Ok(Some(status)) => Some(Exit::of(&status)),
             Ok(None) => None,
@@ -233,5 +234,33 @@ mod tests {
         let budget = PollBudget::DEFAULT;
         assert_eq!(budget.polls(), 500);
         assert_eq!(budget.interval(), Duration::from_millis(20));
+    }
+}
+
+impl super::Backlog {
+    pub(super) fn watch(
+        &self,
+        id: BacklogId,
+        owner: kernel::RunId,
+        what: String,
+        dir: std::path::PathBuf,
+    ) -> Result<super::Started, AxError> {
+        let mut tail = Tail::default();
+        for _ in 0..self.window.polls() {
+            if let Some(exit) = self.settle(id)? {
+                let (stdout, stderr) = super::collect(&dir);
+                return Ok(super::Started::Settled {
+                    exit,
+                    stdout,
+                    stderr,
+                });
+            }
+            if let Some(sink) = &self.sink {
+                sink.deliver(tail.take(&dir, (owner, id), self.window.read_per_poll()));
+            }
+            std::thread::sleep(self.window.interval());
+        }
+        self.hand_over(id, tail)?;
+        Ok(super::Started::Backgrounded { id, what })
     }
 }

@@ -20,7 +20,7 @@ extern "kernel32" fn GetSystemCpuSetInformation(info: ?*anyopaque, len: u32, ret
 extern "kernel32" fn GetThreadGroupAffinity(thread: HANDLE, affinity: *GROUP_AFFINITY) callconv(.winapi) BOOL;
 extern "kernel32" fn SetProcessInformation(process: HANDLE, class: u32, info: *const anyopaque, size: u32) callconv(.winapi) BOOL;
 extern "kernel32" fn QueryInformationJobObject(job: HANDLE, class: u32, info: *anyopaque, size: u32, returned: ?*u32) callconv(.winapi) BOOL;
-extern "kernel32" fn SetInformationJobObject(job: HANDLE, class: u32, info: *const anyopaque, size: u32) callconv(.winapi) BOOL;
+pub extern "kernel32" fn SetInformationJobObject(job: HANDLE, class: u32, info: *const anyopaque, size: u32) callconv(.winapi) BOOL;
 
 // The SDK's values for the processor and job calls, each written once,
 // here (`crates/desktop/ffi/Spec.lean` D4).
@@ -28,10 +28,10 @@ const ERROR_INSUFFICIENT_BUFFER: u32 = 122;
 const PROCESS_POWER_THROTTLING: u32 = 4;
 const PROCESS_POWER_THROTTLING_CURRENT_VERSION: u32 = 1;
 const PROCESS_POWER_THROTTLING_EXECUTION_SPEED: u32 = 0x1;
-const JOB_OBJECT_EXTENDED_LIMIT_INFORMATION: u32 = 9;
-const JOB_OBJECT_CPU_RATE_CONTROL_INFORMATION: u32 = 15;
-const JOB_OBJECT_LIMIT_JOB_MEMORY: u32 = 0x200;
-const JOB_OBJECT_CPU_RATE_CONTROL_ENABLE: u32 = 0x1;
+pub const JOB_OBJECT_EXTENDED_LIMIT_INFORMATION: u32 = 9;
+pub const JOB_OBJECT_CPU_RATE_CONTROL_INFORMATION: u32 = 15;
+pub const JOB_OBJECT_LIMIT_JOB_MEMORY: u32 = 0x200;
+pub const JOB_OBJECT_CPU_RATE_CONTROL_ENABLE: u32 = 0x1;
 const JOB_OBJECT_CPU_RATE_CONTROL_WEIGHT_BASED: u32 = 0x2;
 
 const GROUP_AFFINITY = extern struct {
@@ -46,7 +46,7 @@ const PROCESS_POWER_THROTTLING_STATE = extern struct {
     StateMask: u32,
 };
 
-const JOBOBJECT_CPU_RATE_CONTROL_INFORMATION = extern struct {
+pub const JOBOBJECT_CPU_RATE_CONTROL_INFORMATION = extern struct {
     ControlFlags: u32,
     Weight: u32,
 };
@@ -72,7 +72,7 @@ const IO_COUNTERS = extern struct {
     OtherTransferCount: u64 = 0,
 };
 
-const JOBOBJECT_EXTENDED_LIMIT_INFORMATION = extern struct {
+pub const JOBOBJECT_EXTENDED_LIMIT_INFORMATION = extern struct {
     BasicLimitInformation: JOBOBJECT_BASIC_LIMIT_INFORMATION = .{},
     IoInfo: IO_COUNTERS = .{},
     ProcessMemoryLimit: usize = 0,

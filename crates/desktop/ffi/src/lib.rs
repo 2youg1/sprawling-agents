@@ -15,6 +15,8 @@
 //! refusal, what a black picture means — stays on the Rust side; the
 //! leaf owns no wording and no policy.
 
+#[cfg(windows)]
+pub mod confinement;
 pub mod cpu_set;
 pub mod step;
 

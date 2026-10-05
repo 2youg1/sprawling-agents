@@ -15,6 +15,8 @@ use super::Exit;
 
 pub(super) enum Process {
     Host(Child),
+    #[cfg(windows)]
+    Native(Box<desktop_ffi::confinement::OwnedProcess>),
     Container(Box<ContainerLease>),
 }
 
@@ -22,6 +24,8 @@ impl Process {
     pub(super) fn client(&self) -> Option<&Child> {
         match self {
             Self::Host(child) => Some(child),
+            #[cfg(windows)]
+            Self::Native(_) => None,
             Self::Container(lease) => lease.client(),
         }
     }
@@ -29,6 +33,17 @@ impl Process {
     pub(super) fn poll(&mut self) -> Result<Option<Exit>, AxError> {
         match self {
             Self::Host(child) => Ok(Exit::polled(child)),
+            #[cfg(windows)]
+            Self::Native(child) => child
+                .try_wait()
+                .map(|exit| {
+                    exit.map(|code| Exit::Ended {
+                        code: i32::from_ne_bytes(code.to_ne_bytes()),
+                    })
+                })
+                .map_err(|err| {
+                    crate::tools::native_windows::denied("poll the native process", err)
+                }),
             Self::Container(lease) => lease.poll(),
         }
     }
@@ -42,6 +57,10 @@ impl Process {
                     err.to_string(),
                 )
                 .with_recovery("retry Halt; the backlog retains this process")
+            }),
+            #[cfg(windows)]
+            Self::Native(child) => child.kill().map_err(|err| {
+                crate::tools::native_windows::denied("stop the native process tree", err)
             }),
             Self::Container(lease) => lease.stop(),
         }

@@ -25,7 +25,7 @@ const PIN: &str = "zig-version";
 const LIBRARY: &str = "sprawling_desktop_leaf";
 
 /// The Windows libraries the leaf's `extern` declarations name.
-const SYSTEM: [&str; 4] = ["user32", "gdi32", "kernel32", "shcore"];
+const SYSTEM: [&str; 6] = ["user32", "gdi32", "kernel32", "shcore", "advapi32", "userenv"];
 
 fn main() -> Result<(), String> {
     println!("cargo::rerun-if-changed=zig");

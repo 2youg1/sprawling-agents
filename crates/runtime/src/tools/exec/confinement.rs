@@ -63,7 +63,7 @@ impl Guarantee {
             Guarantee::Filesystem => "writes through the working directory land on a copy",
             Guarantee::Network => "the network is closed",
             Guarantee::ProcessTree => "the whole process tree ends with the command",
-            Guarantee::User => "the command runs as a user of its own",
+            Guarantee::User => "the command has an isolated security identity",
             Guarantee::Resources => "CPU and memory ceilings are enforced",
         }
     }
@@ -76,7 +76,7 @@ impl Guarantee {
             Guarantee::Filesystem => "that writes land on a copy",
             Guarantee::Network => "network isolation",
             Guarantee::ProcessTree => "process-tree containment",
-            Guarantee::User => "a user of its own",
+            Guarantee::User => "an isolated security identity",
             Guarantee::Resources => "CPU and memory ceilings",
         }
     }
@@ -148,25 +148,15 @@ impl Missing {
 
 /// The backends, by platform, each carrying what it promises.
 ///
-/// `WindowsJobObject` is the arm whose assurances a job object would
-/// keep. No build of this crate constructs it, although a job object is
-/// reachable through a safe interface (`runtime::backlog::jobs` makes one
-/// with `win32job`), because two of its assurances cannot be kept today:
-/// the job-wide memory limit is a private field of that crate and it
-/// sets no CPU rate control at all, so `resources` would promise a
-/// limit that is not there; and a child
-/// joins the job only after it starts, so a grandchild started in that
-/// gap is outside the tree the job ends. A Windows machine therefore
-/// reports [`Confinement::CopiedTree`], whose [`Assurances`] say what it
-/// does not hold (the network, above all) rather than implying it holds
-/// everything a job object would.
+/// On Windows the native arm is an AppContainer with no capabilities and a
+/// Job tree admitted while the child is suspended. Limits and resource
+/// ownership are specified by `Tools/Exec/NativeWindows.lean`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Confinement {
     /// Namespaces of its own — mount, network, process, user — made by a
     /// wrapper program on this machine.
     LinuxNamespaces { wrapper: PathBuf },
-    /// A Windows job object: the tree ends together, the limits hold,
-    /// and the network is not isolated.
+    /// A capability-free AppContainer and Job, assigned before execution.
     WindowsJobObject,
     /// Seatbelt permits writes only in the copy and refuses network operations.
     /// It does not provide a new identity, tree termination or aggregate resource limits.
@@ -197,6 +187,7 @@ impl Confinement {
             Some(wrapper) => Confinement::LinuxNamespaces {
                 wrapper: wrapper.clone(),
             },
+            None if cfg!(windows) => Confinement::WindowsJobObject,
             None => Confinement::CopiedTree,
         }
     }
@@ -223,9 +214,9 @@ impl Confinement {
             },
             Confinement::WindowsJobObject => Assurances {
                 filesystem: all,
-                network: none,
+                network: all,
                 process_tree: all,
-                user: none,
+                user: all,
                 resources: all,
             },
             Confinement::CopiedTree => Assurances {

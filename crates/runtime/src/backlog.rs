@@ -323,6 +323,8 @@ mod config;
 mod host;
 mod jobs;
 mod member;
+#[cfg(windows)]
+mod native_windows;
 mod report;
 mod scratch;
 mod tail;

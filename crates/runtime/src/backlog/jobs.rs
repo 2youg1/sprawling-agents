@@ -127,6 +127,43 @@ impl Backlog {
 }
 
 impl Jobs {
+    #[cfg(windows)]
+    pub(super) fn native_job(
+        &mut self,
+        owner: RunId,
+        memory: NonZeroUsize,
+        affinity: RunAffinity,
+    ) -> Result<NonZeroUsize, AxError> {
+        use crate::tools::native_windows::denied;
+        let run = self.runs.entry(owner).or_default();
+        if run.job.is_none() {
+            run.job = Some(win32job::Job::create().map_err(|err| denied("create run Job", err))?);
+        }
+        let job = run
+            .job
+            .as_ref()
+            .ok_or_else(|| denied("create run Job", "Job owner disappeared"))?;
+        desktop_ffi::cpu::job_share(job.handle(), RUN_CPU_WEIGHT, memory.get())
+            .map_err(|err| denied("set run memory ceiling", format!("{err:?}")))?;
+        if let RunAffinity::Mask(mask) = affinity {
+            let mut info = job
+                .query_extended_limit_info()
+                .map_err(|err| denied("read run Job affinity", err))?;
+            info.limit_affinity(mask.get());
+            job.set_extended_limit_info(&info)
+                .map_err(|err| denied("set run Job affinity", err))?;
+        }
+        run.share = Shares::CpuAndMemory {
+            limit: NonZeroU64::new(
+                u64::try_from(memory.get()).map_err(|err| denied("read run Job memory", err))?,
+            )
+            .ok_or_else(|| denied("read run Job memory", "zero memory"))?,
+        };
+        run.affinity = affinity;
+        NonZeroUsize::new(usize::try_from(job.handle()).map_err(|err| denied("lend run Job", err))?)
+            .ok_or_else(|| denied("lend run Job", "invalid Job handle"))
+    }
+
     /// Lets the run's job go; its processes keep running.
     #[cfg(windows)]
     pub(super) fn forget(&mut self, owner: RunId) {
@@ -222,7 +259,7 @@ impl RunJob {
     /// the process cannot join it.
     fn join(
         &mut self,
-        child: &std::process::Child,
+        child: &super::process::Process,
         shares: Shares,
         affinity: RunAffinity,
     ) -> Option<()> {

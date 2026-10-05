@@ -11,6 +11,8 @@ mod chosen_path;
 mod describe;
 mod edit;
 mod exec;
+#[cfg(windows)]
+pub(crate) use exec::native_windows;
 mod read;
 mod search;
 mod status;
