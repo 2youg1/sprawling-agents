@@ -218,7 +218,7 @@ jobs:
           print(headline)
           archive = root / 'target/nix-acceptance.zip'
           archive.parent.mkdir(exist_ok=True)
-          with zipfile.ZipFile(archive, 'w') as output:
+          with zipfile.ZipFile(archive, 'w', strict_timestamps=False) as output:
               output.write(package / 'bin/sprawling', 'application/sprawling')
               for resource in (package / 'share/sprawling').rglob('*'):
                   if resource.is_file():
