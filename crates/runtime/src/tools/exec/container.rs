@@ -378,7 +378,7 @@ mod tests {
             }
             Ok(serde_json::from_slice(&inspected.stdout)?)
         })();
-        // Remove by the owned name even when create timed out or inspect failed.
+        // Remove by the owned name before checking any daemon response.
         let cleanup = Command::new(&program)
             .args(["rm", "--force", "--volumes", &name])
             .output()
@@ -389,6 +389,32 @@ mod tests {
         );
         let observed = observed.unwrap();
         let first = observed.as_array().unwrap().first().unwrap();
+        match engine {
+            ContainerEngine::Docker => assert_eq!(
+                first["HostConfig"]["NanoCpus"],
+                json!(
+                    u64::from(limits.cpu_millis.get())
+                        .checked_mul(1_000_000)
+                        .unwrap()
+                ),
+            ),
+            ContainerEngine::Podman => {
+                let quota = first["HostConfig"]["CpuQuota"].as_u64().unwrap();
+                let period = first["HostConfig"]["CpuPeriod"].as_u64().unwrap();
+                assert!(period > 0);
+                assert_eq!(
+                    quota.checked_mul(u64::from(MILLICPU_PER_CPU)).unwrap(),
+                    period
+                        .checked_mul(u64::from(limits.cpu_millis.get()))
+                        .unwrap()
+                );
+            }
+        }
+        assert_eq!(
+            first["Mounts"].as_array().unwrap().len(),
+            1,
+            "the prepared image must not declare anonymous volumes"
+        );
         assert_eq!(first["State"]["Running"], json!(false));
         assert_eq!(first["Config"]["User"], json!(limits.user.to_string()));
         assert_eq!(first["HostConfig"]["NetworkMode"], json!("none"));
