@@ -6,7 +6,8 @@
 /-!
 # privacy::state 的磁盘投影接口
 规定 `crates/sprawling/src/privacy/state.rs`。这是磁盘编码与投影说明，
-trace 性质由 crates.sprawling.spec.Privacy 保持，不另定义执行授权。
+执行 trace 性质由 crates.sprawling.spec.Privacy 保持，不另定义执行授权；
+磁盘事件 fold 的任意 trace 对应证明尚未提供，不能把 reader 算作 coordinator 验收。
 
 Line 是 schema 和 Event；Prepared 保存不可变 Intent，Finished 只引用 operation
 和 Outcome。Intent 保存闭集 Control、definition、真实 owner、original、modified、

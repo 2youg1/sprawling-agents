@@ -11,7 +11,7 @@ use kernel::{AxCode, AxError};
 use serde::{Deserialize, Serialize};
 
 pub(super) const SCHEMA: u32 = 1;
-const DEFINITION: u32 = 1;
+pub(super) const DEFINITION: u32 = 1;
 
 #[derive(Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(tag = "state", rename_all = "snake_case", deny_unknown_fields)]

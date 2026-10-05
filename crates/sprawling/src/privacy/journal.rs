@@ -63,7 +63,7 @@ fn decode(bytes: &[u8]) -> Result<History, HistoryFault> {
     reason = "test code"
 )]
 mod tests {
-    use super::super::state::{Control, Event, Intent, Outcome, RawValue, SCHEMA};
+    use super::super::state::{Control, DEFINITION, Event, Intent, Outcome, RawValue, SCHEMA};
     use super::*;
     use std::num::NonZeroU64;
 
@@ -75,7 +75,7 @@ mod tests {
         Intent {
             operation: NonZeroU64::new(operation).unwrap(),
             control: Control::WindowsUserPowershellTelemetry,
-            definition: 1,
+            definition: DEFINITION,
             owner: "fixture-owner".to_owned(),
             original,
             modified: modified.clone(),
