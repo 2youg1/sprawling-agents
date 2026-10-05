@@ -16,6 +16,7 @@
 pub struct Release { /* major, minor, patch, year, month, day —— 私有 */ }
 impl Release {
     pub fn from_tag(tag: &str, expected_version: &str) -> Result<Release, AxError>;
+    pub fn from_published_tag(tag: &str) -> Result<Release, AxError>;
     pub fn from_npm_version(text: &str) -> Result<Release, AxError>;
     pub fn version(&self) -> String;      // 0.0.5
     pub fn tag(&self) -> String;          // v0.0.9-Alpha-261004
@@ -33,7 +34,7 @@ impl Maturity {
 pub const MATURITY: Maturity;                   // 这棵树切出的每一次发布的成熟度，现为 Alpha
 ```
 
-`from_tag` 只认中缀为 `-<MATURITY.titled()>-` 的 tag，`tag()` 写的也是这一个中缀；`Maturity` 经 `kernel::Maturity` 重导出。
+`from_published_tag` 读取发布列表中 Alpha 与 PreAlpha 两种历史中缀，仍调用同一 `decode_tag` 验证版本与日期；这不改变构建身份检查，`from_tag` 只认中缀为 `-<MATURITY.titled()>-` 的 tag，`tag()` 写的也是这一个中缀；`Maturity` 经 `kernel::Maturity` 重导出。
 
 **五条口径：**
 
@@ -101,11 +102,12 @@ example : tagInfix witness .PreAlpha ≠ tagInfix witness .Alpha :=
 ```rust
 pub struct Version { /* major, minor, patch —— 私有 */ }   // 只有版本号、没有日期的一次发布
 impl Version { pub fn from_crates_version(text: &str) -> Result<Version, AxError>; }
+pub fn stands_on_versions(mine: &Version, newest: &Version) -> ReleaseVerdict;
 pub fn stands_on_crates(mine: &Release, newest: &Version) -> ReleaseVerdict;
 ```
 
 - **crates.io 收的是裸版本号**：工作区的 `[workspace.package] version`（`0.0.9`）原样发上去，日期不在里面；同一次发布在 npm 上是 `0.0.9-pre.261004`。`from_crates_version` 只认三个点分数字，拒法与 `from_npm_version` 的版本那一半是同一套（`assemble` 的前半），所以两种读法不会一个收、一个拒。
-- **只比版本号**：`stands_on_crates` 按 `mine` 的版本号对 `newest` 判，日期不参与。拿注册表的裸 `0.0.9` 去和自己的 npm 拼法 `0.0.9-pre.261004` 按 semver 比，会把同一次发布读成「注册表更新」；下面的 `a_bare_version_outranks_its_own_npm_spelling` 说这个陷阱对每一次发布都成立，所以两种拼法之间永远不直接比。
+- **只比版本号**：没有发行 tag 的 Cargo 源码安装经 `stands_on_versions` 比较编译版本与注册表版本，日期为空；没有安装身份的开发构建仍然不比较。`stands_on_crates` 按 `mine` 的版本号对 `newest` 判，日期不参与。拿注册表的裸 `0.0.9` 去和自己的 npm 拼法 `0.0.9-pre.261004` 按 semver 比，会把同一次发布读成「注册表更新」；下面的 `a_bare_version_outranks_its_own_npm_spelling` 说这个陷阱对每一次发布都成立，所以两种拼法之间永远不直接比。
 - **预发布的「更新」**：在 npm 上，版本号相同、日期更晚的那一次更新，因为日期落在 pre-release 段、按数值比；在 crates.io 上，同一版本号只能发一次，日期更晚的重切发不上去，所以 crates.io 对同一版本号恒答 `Current`。这对用 cargo 装的人是真话：`cargo install sprawling --locked` 本来就取不到一次只改了日期的重切。
 - **拼回去**：crates.io 的拼法就是 `Release::version()`（`0.0.9`），不另设一个返回同值的函数；`Version` 不在 kernel 根上导出，因为根上的 `kernel::Version` 是另一个概念，调用方写 `kernel::release::Version`。
 - **平台**：只读字符串，Windows、macOS、Linux 一致；向 crates.io 的那一次 HTTPS GET（带 User-Agent）归调用方（口径 4），与问 npm 用同一个 reqwest 客户端。打印的更新命令随安装方式（npm、cargo、压缩包、源码）而变，不随平台变。
