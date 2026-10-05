@@ -1,7 +1,14 @@
 name: native-windows-acceptance
 on:
   push:
-    branches: [s10/deadline-b1-native-windows]
+    branches: [main, "s10/**"]
+    paths:
+      - crates/runtime/**
+      - crates/desktop/ffi/**
+      - crates/kernel/**
+      - Cargo.toml
+      - Cargo.lock
+      - .github/workflows/native-windows-acceptance.yml
   workflow_dispatch:
 permissions:
   contents: read
