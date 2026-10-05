@@ -18,13 +18,12 @@ A city works alone for as long as it can and stops
 at the exact points where a person's answer is required, and it tells you
 which points those were.
 
-What it does **not** do: share anything between two cities (there is no such
-thing as a link between them), keep a secret you can read back (a credential
-goes in once, by reference, and is redeemed only at the wire), or let a run's
-own tools reach a public host that the building's rules do not allow. A host
-command a run starts is confined by what the platform offers, and the exec
-tool's description names that arm and what it does not hold, the network
-included.
+Cities do not share a history, and credentials cannot be read back through the
+wire: they enter the vault locally and configuration carries references.
+Built-in network tools check the building's rules before reaching a public
+host. Host commands use the selected platform's confinement, whose guarantees
+and network limits the exec tool describes; an external harness controls its
+own tools and model calls.
 
 ## Two ways in
 
@@ -66,9 +65,11 @@ each line is led by its chain hash and two spaces.
 ## The frames
 
 A frame is one JSON object with exactly one of four keys: `hello`, `command`,
-`ask`, `monitor`. A command changes the city and carries an `idem` key;
-sending the same key twice does the thing once and answers twice. An ask
-changes nothing.
+`ask`, `monitor`. State-changing commands on the wire carry an `idem` key;
+`auth` authenticates the connection instead. When the city recognises a
+repeated key, it does not execute the command
+again. A successful repeat does not replay the original events; a repeat
+whose refusal is still remembered returns that refusal. An ask changes nothing.
 
 Commands, every one the city accepts, generated from the wire schema by
 `cargo xtask docnum` (<!-- xtask:begin command_frames -->42<!-- xtask:end --> in all):
@@ -104,9 +105,18 @@ The ones whose arguments need saying:
 | `close_remote_door {idem}` | close the remote door; no code, because closing only takes access away |
 | `wake {source, subject, body, idem}` | something happened outside; the city's own routing decides which room hears it, and what it carries arrives as data from outside |
 
+`select_model` also accepts `input`, an optional statement of the model's
+accepted input kinds. Omit it to use the catalogue and preset fallback;
+[the command definition](../crates/wire/src/command/kind.rs) and
+[InputKinds](../crates/kernel/src/event/record/endpoint.rs) define the field
+and its values.
+
 An `idem` is `idem1-` followed by 32 lowercase hexadecimal characters. Mint
-one per intended action and keep it; if your connection drops, send the same
-frame with the same key and read the answer you missed.
+one per intended action and keep it. If your connection drops, reuse the same
+key when retrying that action, and query the city's state or history to recover
+its outcome. Do not wait for a successful repeat to replay the answer you
+missed. The city rebuilds seen keys from Ledger records after a restart;
+refusals without a record or retained snapshot are not a durable reply cache.
 
 An ask carries your own number for the question, and the answer comes back
 under it:
@@ -126,9 +136,14 @@ A bounded answer says how many rows it left out. `city_view` and `cost_view`
 name the active runs and a recent or top-billed few; `run_view` and
 `run_costs` answer for an older run from the Ledger.
 
-`{"monitor":"watch"}` asks for one reading of the city's counters a second,
-`{"monitor":"watch_summary"}` for the summary alone, and
-`{"monitor":"release"}` stops them.
+`{"monitor":"watch"}` watches the city's counters;
+`{"monitor":"watch_summary"}` watches the summary alone. Readings follow the
+city's current sampling beat, as defined by
+[the sampler](../crates/sprawling/src/monitor/sampler.rs).
+`{"monitor":{"beat":250}}` sets and remembers the city's sampling interval
+in milliseconds; [BeatMs](../crates/wire/src/frames/monitor.rs) defines its
+valid range and initial default. `{"monitor":"release"}` or closing the
+connection stops that connection's watch.
 
 ## The answer contract
 
@@ -146,12 +161,14 @@ Every frame back is one object with exactly one key:
 | `lagged` | your connection fell behind and skipped the events from `from` to `to`; ask `history_range` for them |
 | `monitor` | one reading of the counters you asked to watch |
 
-A refusal is an answer, not an error: the call happened and this is what it
-said. `sprawling call` exits `0` when the city answered, `1` when the city
-refused, `3` when nothing arrived inside the quiet window (`--quiet-ms`), or
-the event `--until <kind>` waits for did not; `2` is the binary refusing your
-command line or a frame the wire cannot carry, before any city was reached,
-and `4` is no city answering at `--at`.
+A refusal frame carries the city's reason and recovery. `sprawling call`
+exits `0` when the city answered, `1` on a refusal, a local failure or a broken
+connection after the handshake, `3` when nothing arrived inside the quiet
+window (`--quiet-ms`) or the event `--until <kind>` waits for did not; `2` is
+the binary refusing your command line or a frame the wire cannot carry,
+before any city was reached, and `4` is no city answering at `--at`.
+A broken connection or a quiet window does not establish whether the city
+accepted the action; query its state or history before choosing a new action.
 
 Payloads hold integers. Money is in micro-dollars (`usd_micros`), never a
 float, and a call no provider priced reports no price rather than zero.
