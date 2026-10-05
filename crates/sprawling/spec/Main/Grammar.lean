@@ -119,7 +119,7 @@ pub(super) enum LineError {
 
 **命令行错误。** 每个 `LineError` 在 stderr 上写一行 `sprawling: <哪个参数、错在哪>. Did you mean '<最近的合法写法>'?`，退出码 2，不再倾倒整张表。恢复语就是那条「最近的写法」：`nearest` 取与所敲的词共享最长前缀（至多四个字符）的已知名字，所以 `stauts` 得 `["status"]`。
 
-**本节接口的当前状态。** `call`、`enrol`、`install`、`fork`、`status`、`serve` 的标志值与 `doctor` 的全部参数，仍由各自的函数从原始 argv 读（`router::flag_value`、`args.iter().any`），解析器只替它们校验；改为只读 `Arguments` 之后 `flag_value` 删除。README、README.zh-CN、LLM.md、`docs/operating.md` 里的命令语法块还是手写的，改由 `cargo xtask docnum` 从这张表生成（一个名为 `cli_verbs` 的受管区块）是下一步；`nearest` 与 `console::language` 里找近似动词的那一份是同一条规则的两份，合并到一处也是下一步。
+**本节接口的当前状态。** `call`、`enrol`、`install`、`fork`、`status`、`serve` 的标志值与 `doctor` 的全部参数，仍由各自的函数从原始 argv 读（`router::flag_value`、`args.iter().any`），解析器只替它们校验；改为只读 `Arguments` 之后 `flag_value` 删除。README、README.zh-CN、`docs/wire.md`、`docs/operating.md` 里的命令语法块还是手写的，改由 `cargo xtask docnum` 从这张表生成（一个名为 `cli_verbs` 的受管区块）是下一步；`nearest` 与 `console::language` 里找近似动词的那一份是同一条规则的两份，合并到一处也是下一步。
 
 **决定。**
 
