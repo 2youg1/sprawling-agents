@@ -5,6 +5,7 @@
 
 param([Parameter(Mandatory)][string]$Archives, [Parameter(Mandatory)][string]$Evidence)
 $ErrorActionPreference = 'Stop'
+$PSNativeCommandUseErrorActionPreference = $false
 if ($env:GITHUB_ACTIONS -ne 'true' -or $env:RUNNER_OS -ne 'Windows') {
     throw 'This installer check writes the disposable Windows runner profile only.'
 }
@@ -30,17 +31,20 @@ try {
     $port = $null
     while ([DateTime]::UtcNow -lt $deadline) {
         if (Test-Path -LiteralPath $log) {
-            $match = [regex]::Match((Get-Content -LiteralPath $log -Raw), 'Serving HTTP on 127\.0\.0\.1 port ([0-9]+)')
-            if ($match.Success) { $port = $match.Groups[1].Value; break }
+            $serverOutput = Get-Content -LiteralPath $log -Raw
+            if ($serverOutput) {
+                $match = [regex]::Match($serverOutput, 'Serving HTTP on 127\.0\.0\.1 port ([0-9]+)')
+                if ($match.Success) { $port = $match.Groups[1].Value; break }
+            }
         }
         if ($server.WaitForExit(100)) { throw 'The loopback asset server exited before readiness.' }
     }
     if (-not $port) { throw 'The loopback asset server did not report its port.' }
     $hash = (Get-FileHash -LiteralPath $assets[0].FullName -Algorithm SHA256).Hash.ToLowerInvariant()
     $release = @(@{ tag_name = 'loopback'; assets = @(@{ name = $assets[0].Name; size = $assets[0].Length; digest = "sha256:$hash"; browser_download_url = "http://127.0.0.1:$port/$($assets[0].Name)" }) })
-    $release | ConvertTo-Json -Depth 5 -AsArray | Set-Content -LiteralPath (Join-Path $www 'releases') -Encoding utf8
+    $release | ConvertTo-Json -Depth 5 -AsArray | Set-Content -LiteralPath (Join-Path $www 'releases.json') -Encoding utf8
     $env:LOCALAPPDATA = Join-Path $root 'profile'
-    $env:SPRAWLING_API = "http://127.0.0.1:$port/releases"
+    $env:SPRAWLING_API = "http://127.0.0.1:$port/releases.json"
     $env:SPRAWLING_VERSION = $null
     $installer = (Resolve-Path install.ps1).Path
     & pwsh -NoProfile -File $installer *> (Join-Path $Evidence 'powershell-install.log')
@@ -56,6 +60,12 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'The installed executable cannot answer status.' }
     & $installed[0].FullName uninstall *> (Join-Path $Evidence 'powershell-uninstall.log')
     if ($LASTEXITCODE -ne 0 -or (Test-Path -LiteralPath $installed[0].FullName)) { throw 'Uninstall failed to remove its executable.' }
+    $release[0].assets[0].digest = 'sha256:' + ('0' * 64)
+    $release | ConvertTo-Json -Depth 5 -AsArray | Set-Content -LiteralPath (Join-Path $www 'releases.json') -Encoding utf8
+    & pwsh -NoProfile -File $installer *> (Join-Path $Evidence 'powershell-bad-digest.log')
+    if ($LASTEXITCODE -eq 0 -or (Test-Path -LiteralPath $installed[0].FullName)) { throw 'A mismatched archive digest must refuse installation.' }
+    Copy-Item -LiteralPath $err -Destination (Join-Path $Evidence 'loopback-requests.log')
+    if ((Get-Content -LiteralPath $err -Raw) -notmatch '/releases\.json') { throw 'The installer never requested the loopback release list.' }
     @{ archive = $assets[0].Name; archiveSha256 = $hash; binarySha256 = $installedHash.ToLowerInvariant(); status = $status; result = 'success'; isolatedTarget = 'disposable hosted runner profile'; run = $env:GITHUB_RUN_ID; attempt = $env:GITHUB_RUN_ATTEMPT } |
         ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $Evidence 'powershell-install.json') -Encoding utf8
 } finally {
