@@ -19,13 +19,8 @@ pub fn read() -> Result<PreferencesAnswer, AxError>;       // Query::Preferences
 pub fn put(patch: PreferencePatch) -> Result<(), AxError>; // Command::PutPreferences 的全部
 pub enum CorePriority { Raised, Normal }                   // 人的设置；Normal 即「关掉高优先级」
 pub fn core_priority() -> Result<CorePriority, AxError>;   // ConfigInvalid：priority 既不是 "raised" 也不是 "normal"
-<<<<<<< HEAD
-pub enum CorePlacement { Off, Soft, SoftShares }           // [core] placement 的 "none"、"soft"（缺省）、"soft_shares"；每一臂开关什么见 `crates/sprawling/spec/Serving/Placement.lean` D47
-pub fn core_placement() -> Result<CorePlacement, AxError>; // ConfigInvalid：placement 不是这三个拼写之一（"pinned" 建成之前也在其中）
-=======
-pub enum CorePlacement { Soft, Off, Pinned }               // [core] placement：缺省 "soft"，"none" 关掉放置，"pinned" 是硬亲和的对照臂（`crates/sprawling/spec/Serving/Placement.lean` D41、D47）
-pub fn core_placement() -> Result<CorePlacement, AxError>; // ConfigInvalid：placement 不是 "soft"、"pinned"、"none" 之一（"soft_shares" 仍是读不懂的值）
->>>>>>> post/PINN
+pub enum CorePlacement { Off, Soft, SoftShares, Pinned }    // [core] placement 的四个解析结果；各臂行为归 `crates/sprawling/spec/Serving/Placement.lean` D41、D47、D49
+pub fn core_placement() -> Result<CorePlacement, AxError>; // 缺省 Soft；不认识的拼写或非字符串值报 ConfigInvalid
 ```
 
 - **文件在每一座城之外**：`<home>/.sprawling/config.toml`，路径由 `accounting::home`（§8-7）给，本模块不拼路径。把城拷到另一台机器，它不跟着走；在同一台机器上换一个浏览器，画出来的仍是这份文件说的样子。
@@ -35,7 +30,7 @@ pub fn core_placement() -> Result<CorePlacement, AxError>; // ConfigInvalid：pl
 - **不入账**：偏好不属于城的历史，任何 run 都观测不到它。因此这条命令被接受时城无话可播，`adversary` 第四世界据此把「静默」读作接受，而它真正的关门条件是读回来那一组断言（`tools/adversary/src/Sprawling/Person.lean`，叶子 5.6）。
 - **文件缺席不是失败**：那是一个什么都还没定的人，答案是本 build 画的那几档（`PreferencesAnswer::default`）。`lang` 缺席就是缺席，不填 `en`——没人选过之前，只有浏览器自己的语言标签是证据。
 
-**本章测试**：`what_the_file_states_and_what_the_answer_states_are_one_record`、`a_section_this_build_does_not_read_survives_a_write`、`a_file_that_does_not_parse_is_refused_rather_than_replaced`（`accounting::person::tests`）。
-- **D51 三个拼写读得懂，其余照旧拒绝**：`core_placement` 把 `[core] placement` 读成 `"soft"`、`"none"`、`"pinned"` 三个值之一，缺省是 `"soft"`，其余拼写（含尚未建成的 `"soft_shares"`）仍报 `E_CONFIG_INVALID`，恢复语不变。这一臂在哪个平台做什么由 `crates/sprawling/spec/Serving/Placement.lean` D41 与 D49 规定；本模块只回答设置读出来是哪一个值。被否决的做法：等机制建好再放开拼写——那样四臂对照的第四臂在测量台上无法被选中，测量计划里的一格永远取不到数。重开参数：测量选出默认之后，取值集合随默认值一起收窄。
+**本章测试**：`what_the_file_states_and_what_the_answer_states_are_one_record`、`a_section_this_build_does_not_read_survives_a_write`、`a_file_that_does_not_parse_is_refused_rather_than_replaced`、`each_placement_spelling_reads_as_its_arm`（`accounting::person::tests`）。
+- **D51 四种 placement 解析结果由人层读者给出，平台行为由 serving 决定**：`core_placement` 把 `[core] placement` 的 `"none"`、`"soft"`、`"soft_shares"`、`"pinned"` 分别读成 `Off`、`Soft`、`SoftShares`、`Pinned`，缺席答 `Soft`；其余拼写与非字符串值报 `E_CONFIG_INVALID`，恢复语指向可接受的设置。`soft_shares` 表示选择请求内存份额的臂，不表示所在平台已经兑现该限额；各臂请求什么归 `crates/sprawling/spec/Serving/Placement.lean` D47，实际兑现归 `crates/runtime/spec/Tools/Exec.lean` D29、D33，硬亲和归 Placement D41、D49。人层读者只解释设置，因而不会因平台能力不同改变同一文件的语义。被否决的做法：按当前机器是否支持机制来收窄配置拼写——这样同一份设置换机器便读不回，设置解析还要重建平台能力判定。重开参数：四臂对照选出默认并明确退役某臂时，读者与消费者在同一次改动里收窄取值集合。
 - **`CorePriority` 住在这里而不在 `bin::serving::standing`**：它是这份文件里 `[core] priority` 读出来的值；真去抬高一条线程的做法归 `serving::standing`（`crates/sprawling/Spec.lean` §8-93），它从这里取值。
 -/
