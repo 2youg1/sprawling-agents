@@ -142,6 +142,7 @@ impl ConfigLayer {
                     .as_deref()
                     .map_or(Ok(kernel::Interpreter::System), kernel::Interpreter::parse)?;
                 Some(SandboxLimits {
+                    container: section.container,
                     shell: section.shell,
                     interpreter,
                     fuel: section
@@ -321,6 +322,8 @@ struct SkillsSection {
 #[derive(Debug, Default, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct SandboxSection {
+    #[serde(default)]
+    container: Option<kernel::ContainerLimits>,
     #[serde(default)]
     shell: bool,
     /// Read as text and judged by `kernel::Interpreter::parse`, so the

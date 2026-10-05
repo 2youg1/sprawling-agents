@@ -130,6 +130,7 @@ fn a_building_can_be_told_what_its_runs_may_reach() {
                 mounts: vec![Address::parse("lab/shared").unwrap()],
                 env_passthrough: Vec::new(),
                 trusted: Vec::new(),
+                container: None,
             }),
             mcp: Some(vec![kernel::McpServer {
                 label: kernel::ServerLabel::parse("docs").unwrap(),

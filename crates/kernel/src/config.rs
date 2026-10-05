@@ -210,6 +210,9 @@ pub struct ClockZone {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct SandboxLimits {
+    /// Explicit container policy; absence uses the existing platform confinement.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub container: Option<ContainerLimits>,
     /// Whether the shell arm may be offered at all. Off by default: a
     /// shell line is the one arm whose reach cannot be read off its
     /// arguments.
@@ -255,6 +258,7 @@ impl SandboxLimits {
 impl Default for SandboxLimits {
     fn default() -> Self {
         SandboxLimits {
+            container: None,
             shell: false,
             interpreter: Interpreter::System,
             fuel: crate::consts_policy::SANDBOX_FUEL_DEFAULT,

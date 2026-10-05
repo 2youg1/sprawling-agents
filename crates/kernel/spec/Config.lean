@@ -37,7 +37,7 @@ pub fn freeze(clock_stamp: &LayeredValue<ClockStampGranularity>, clock_zones: &L
 
 **思考强度（config）**：`FrozenConfig.effort: Option<Effort>`（类型住 §8-24），缺省 `None`＝不写该字段、由 provider 自行决定。
 
-**沙箱限额（config）**：`SandboxLimits { shell: bool, interpreter: Interpreter, fuel: u64, mounts: Vec<Address>, env_passthrough: Vec<EnvVarName>, trusted: Vec<ServerLabel> }`，即 `FrozenConfig.sandbox`。三条口径：①**整值解析而非逐字段合并**——一层说到 sandbox 就说全部，于是欠说的层只会收窄而恒不会悄悄放开上层没提过的能力；②**主机事实不入城**（CPython 工件路径、shell 可执行文件位置走环境变量）——一座城被搬到另一台机器时不该带着运行中的机器的路径；③冻结的理由与工具表相同：**能改变可达范围的东西恒不在回合中变宽**，否则变宽的那一刻没有人审过。缺省 `fuel = SANDBOX_FUEL_DEFAULT`（`consts_policy`，2×10⁸），`shell = false`——shell 是唯一一条从参数读不出可达范围的臂。
+**沙箱限额（config）**：`SandboxLimits { shell: bool, interpreter: Interpreter, fuel: u64, mounts: Vec<Address>, env_passthrough: Vec<EnvVarName>, trusted: Vec<ServerLabel>, container: Option<ContainerLimits> }`，即 `FrozenConfig.sandbox`。三条口径：①**整值解析而非逐字段合并**——一层说到 sandbox 就说全部，于是欠说的层只会收窄而恒不会悄悄放开上层没提过的能力；②**主机事实不入城**（CPython 工件路径、shell 可执行文件位置走环境变量）——一座城被搬到另一台机器时不该带着运行中的机器的路径；③冻结的理由与工具表相同：**能改变可达范围的东西恒不在回合中变宽**，否则变宽的那一刻没有人审过。缺省 `fuel = SANDBOX_FUEL_DEFAULT`（`consts_policy`，2×10⁸），`shell = false`——shell 是唯一一条从参数读不出可达范围的臂。
 
 **shell 臂的解释器（config）**：`pub enum Interpreter { System, Pwsh }`，`SandboxLimits.interpreter`，缺省 `System`，文件里写作 `[sandbox] interpreter = "system"` 或 `"pwsh"`（serde 小写，`#[serde(default)]`，所以没写这个键的层与线上旧帧读作 `System`）。配置文件里的值只经 `Interpreter::parse` 构造（`city::config_layers` 把这个键读成文本再交给它；serde 只读线上帧与冻结配置）：别的拼写以 `E_CONFIG_INVALID` 拒，主语是这个键与写下的值，恢复语给出两种拼法；不猜，也不当作缺省。它与 `shell` 是两件事：`shell` 决定 shell 臂给不给，`interpreter` 决定给的时候是哪一个；写的是名字而不是路径，理由同「主机事实不入城」。口径与 `mounts` 同形：整值上梯、Run 起点冻结、解析点拒。为什么要它、在主机上怎么解析、缺席时怎么拒，住 `crates/runtime/Spec.lean` §8-13-2 D30。
 
@@ -94,7 +94,9 @@ user: NonZeroU32, cpu_millis: NonZeroU32, memory_bytes: NonZeroU64, pids: NonZer
 `ContainerImage::parse` 只收本地 image ID `sha256:` 后接 64 位小写十六进制；serde 也只过
 同一构造点，标签、仓库名、空白与 CLI 选项以 E_CONFIG_INVALID 拒绝。这个值不保存主机路径。
 
-此类型是 container 后端的输入契约，尚不是 SandboxLimits 的字段；SandboxLimits 的整值
-解析与冻结传递仍需接入此值，不能在 runtime 另读环境变量作为第四层配置。
+D50 `SandboxLimits.container: Option<ContainerLimits>` 缺省缺席，serde 省略缺席值以兼容原来的
+冻结记录与配置写回。`[sandbox.container]` 声明整份显式输入即选择 container；缺一个值或
+零额度即拒。更近的 `[sandbox]` 没有 container 即取消远层 container，与既有整值覆盖一致。
+拒绝另一条 runtime 环境变量配置，因为那会在冻结配置之外改变执行边界。
 后端契约与接线边界见 `crates/runtime/spec/Tools/Exec/Container.lean`。
 -/

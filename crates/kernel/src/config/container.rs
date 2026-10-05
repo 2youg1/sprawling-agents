@@ -67,6 +67,7 @@ impl From<ContainerImage> for String {
 /// in bytes, and the process count bounds descendants as well as PID 1.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct ContainerLimits {
     pub image: ContainerImage,
     pub user: NonZeroU32,
