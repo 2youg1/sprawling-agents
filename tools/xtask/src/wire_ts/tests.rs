@@ -46,7 +46,7 @@ fn a_named_bare_string_is_a_branded_string_and_an_integer_a_branded_int() {
         text.contains("export const Address = Schema.String.pipe(Schema.brand(\"Address\"));\n")
     );
     assert!(text.contains("export type Address = typeof Address.Type;\n"));
-    assert!(text.contains("export const Seq = Schema.Int.pipe(Schema.brand(\"Seq\"));\n"));
+    assert!(text.contains("export const Seq = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)).pipe(Schema.brand(\"Seq\"));\n"));
     assert!(text.contains("export const WIRE_V = 13 as const;\n"));
     assert!(text.contains("export const WIRE_HASH = \"ab12\" as const;\n"));
     // The city's own run, generated rather than written out by a
