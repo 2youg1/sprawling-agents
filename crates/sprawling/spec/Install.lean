@@ -239,7 +239,7 @@ workflow 只组装归档、读取期望值和调用检查器，不自行断言�
 重新评估客户端步骤。README 与上手文档的 Nix 段只陈述实际验收所支持的平台。
 -/
 
-/-! D51 npm/Bun 包入口选择本机已有运行时
+/-! D51 npm/Bun 包入口选择已安装的运行时
 
 根包入口与内部运行时入口的打包契约只由 `tools/xtask/Spec.lean` D31 规定，
 `tools/xtask/src/channel.rs` 生成它们；本节规定安装与启动之间的边界。
