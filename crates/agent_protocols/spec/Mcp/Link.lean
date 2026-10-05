@@ -68,7 +68,19 @@ theorem eagerRetry_performs_twice : performed true (retryOfEager .afterHandover)
 
 /-! HTTP 会话的寿命由传输持有，Residents 只消费失效状态；这里不表示 HTTP 字节、
 Mutex 或线程交错。Rust 回归从 Residents.tools 与 McpTool.invoke 进入，验证真实握手次序、
-重新 listing、原调用不重发、Unknown 不重开与克隆共享失效。 -/
+重新 listing、原调用不重发、Unknown 不重开与克隆共享失效。
+
+`crates/accounting/src/worker/mcp.rs` 的
+`failure_traces_keep_shared_lifetime_and_choose_the_next_dispatch` 从本模型派生 proptest：
+初态 live 由真实 handshake 建立，初态 ended 由带 id 的 404 前缀建立；生成器覆盖
+Failure 三个构造子、空序列及不含 sessionEnded 的序列，并在每步选择两个工具克隆之一。
+HTTP fixture 在收到请求后不回 HTTP response 表示 beforeHandover，2xx 的非 UTF-8 body
+表示 afterHandover，带 id 的 404 表示 sessionEnded；无 id 的 404 是模型之外的边界，
+另检查它保持 live。ended 之后的候选失败不再交给网络：旧句柄须拒绝且不发送，
+因此这些候选输入代表 ended 的吸收后缀，不宣称 server 实际执行过这些失败。
+期望值取下面三个定理的前提与结论：含 sessionEnded 或初态 ended 时必须 connect，
+其余保持 resident；检查实际请求序列、两份工具句柄、重握手与新 listing，
+不另写一份 Rust afterFailures 状态机。有限生成检查不是对 Rust 的全 trace 证明。 -/
 
 /-- 没有会话 id 的连接仍可用，不能把「没有 id」当成「已经失效」。 -/
 inductive Lifetime where
