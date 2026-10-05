@@ -60,6 +60,24 @@ impl Shell {
         }
     }
 
+    pub(super) fn container_command(&self, text: &str) -> Result<(Command, String), AxError> {
+        match self {
+            Shell::Absent => self.command(text),
+            Shell::Missing { asked }
+            | Shell::Found {
+                interpreter: asked, ..
+            } => {
+                let (program, arguments) = match asked {
+                    Interpreter::System => ("/bin/sh", &["-c"][..]),
+                    Interpreter::Pwsh => ("pwsh", flags(Interpreter::Pwsh)),
+                };
+                let mut command = Command::new(program);
+                command.args(arguments).arg(text);
+                Ok((command, interpreter_name(Path::new(program))))
+            }
+        }
+    }
+
     /// The sentence the tool's description ends with: which interpreter
     /// a shell line runs under, in the spelling the result records, or
     /// nothing when the arm is not usable, whose refusal says why at the

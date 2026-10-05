@@ -6,8 +6,8 @@
 //! What one member of the backlog is made of, and where a child's
 //! output goes while nobody is reading it.
 
+use super::process::Process;
 use std::path::PathBuf;
-use std::process::Child;
 
 use kernel::{Address, AxCode, AxError, RunId};
 
@@ -24,7 +24,7 @@ pub(super) struct Member {
 /// a run this table can only ask to stop.
 pub(super) enum Body {
     Command {
-        child: Child,
+        child: Process,
         dir: PathBuf,
         claim: Claim,
         tail: Tail,

@@ -79,6 +79,7 @@ pub fn hands(vault: gateway::Custodian) -> Hands {
             shell: crate::doctor::host::usable_shell,
             pwsh: crate::doctor::host::usable_pwsh,
             engine: crate::doctor::host::execution_engine,
+            container: crate::doctor::host::container,
         },
         seat_lane: crate::serving::placement::seat_lane,
         shares: crate::serving::placement::run_shares(),

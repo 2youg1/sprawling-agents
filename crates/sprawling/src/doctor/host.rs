@@ -256,3 +256,25 @@ fn look(name: &str) -> Presence {
             machine.look(requirement)
         })
 }
+
+/// Finds a usable Linux daemon and retains its CLI grammar and capability evidence.
+///
+/// # Errors
+/// Refuses when neither installed backend supplies the required cgroup v2 controllers.
+pub(crate) fn container() -> Result<runtime::tools::ContainerRuntime, AxError> {
+    let mut failures = Vec::new();
+    for (name, engine) in [
+        ("docker", runtime::tools::ContainerEngine::Docker),
+        ("podman", runtime::tools::ContainerEngine::Podman),
+    ] {
+        if let Some(program) = find_program(name) {
+            match runtime::tools::ContainerRuntime::probe(engine, program) {
+                Ok(runtime) => return Ok(runtime),
+                Err(err) => failures.push(err.to_string()),
+            }
+        }
+    }
+    Err(AxError::failure(kernel::AxCode::SandboxDenied, "probe the container daemon",
+        format!("no accessible Linux cgroup v2 container daemon: {}", failures.join("; ")))
+        .with_recovery("install and start Docker or Podman with CPU, memory and pids controllers; prepare a local immutable image"))
+}

@@ -109,7 +109,9 @@ impl Backlog {
                 ..
             } = &member.body
             {
-                runs.entry(*owner).or_default().pids.insert(child.id());
+                if let Some(child) = child.client() {
+                    runs.entry(*owner).or_default().pids.insert(child.id());
+                }
             }
         }
         table.jobs.follow(&mut runs);
@@ -147,6 +149,9 @@ impl Jobs {
         else {
             return;
         };
+        let Some(child) = child.client() else {
+            return;
+        };
         let run = self.runs.entry(*owner).or_default();
         if run.join(child, shares, affinity).is_none() {
             run.unjoined = run.unjoined.saturating_add(1);
@@ -163,7 +168,9 @@ impl Jobs {
         else {
             return;
         };
-        self.cgroups.enter(*owner, child.id(), shares);
+        if let Some(child) = child.client() {
+            self.cgroups.enter(*owner, child.id(), shares);
+        }
     }
 
     #[cfg(windows)]

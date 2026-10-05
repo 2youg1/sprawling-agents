@@ -36,7 +36,7 @@ use crate::sandbox::{Fuel, Mount, Sandbox, SandboxExit, SandboxJob};
 #[cfg(windows)]
 mod native_windows;
 mod confinement;
-mod container;
+pub(crate) mod container;
 #[cfg(any(target_os = "macos", test))]
 mod native_macos;
 pub use container::{ContainerEngine, ContainerLaunch, ContainerRuntime};
@@ -84,6 +84,7 @@ pub struct ExecTool {
     backlog: Backlog,
     confinement: Mutex<Confined>,
     meta: ToolMeta,
+    container: Option<(kernel::ContainerLimits, ContainerRuntime)>,
 }
 
 impl ExecTool {
@@ -129,6 +130,7 @@ impl ExecTool {
         let disclosure = disclosure(&setup, &confinement);
         Ok(ExecTool {
             setup,
+            container: None,
             sandbox: Mutex::new(sandbox),
             backlog,
             confinement: Mutex::new(confinement),
@@ -150,6 +152,38 @@ impl ExecTool {
     pub fn confined(mut self, confinement: Confined) -> Self {
         self.meta.disclosure = disclosure(&self.setup, &confinement);
         self.confinement = Mutex::new(confinement);
+        self
+    }
+
+    /// Uses an explicitly admitted daemon and frozen limits for program and shell calls.
+    /// The daemon must be discovered by the host, rather than by a second configuration path.
+    #[must_use]
+    pub fn with_container(
+        mut self,
+        limits: kernel::ContainerLimits,
+        runtime: ContainerRuntime,
+    ) -> Self {
+        self.container = Some((limits, runtime));
+        self.meta.disclosure = format!(
+            "Run a program, Python snippet, or shell line. Program and shell sandbox calls use              an explicitly configured Linux container: writes land on a copy, network is closed,              a non-root user and CPU/memory/process limits are inspected before start.              Daemon cleanup failures are reported and retained for retry. `where: host` asks              for host execution.{}",
+            match self.setup.shell {
+                Shell::Absent => "",
+                Shell::Missing {
+                    asked: kernel::Interpreter::Pwsh,
+                }
+                | Shell::Found {
+                    interpreter: kernel::Interpreter::Pwsh,
+                    ..
+                } => " Container shell lines use pwsh.",
+                Shell::Missing {
+                    asked: kernel::Interpreter::System,
+                }
+                | Shell::Found {
+                    interpreter: kernel::Interpreter::System,
+                    ..
+                } => " Container shell lines use /bin/sh.",
+            }
+        );
         self
     }
 
@@ -182,23 +216,53 @@ impl ExecTool {
         arm: &str,
         placement: Placement,
     ) -> Result<ToolOutcome, AxError> {
-        let mut command = yielding::one_level_down(command, self.backlog.shares())?;
+        let mut command = match (placement, &self.container) {
+            (Placement::Sandbox, Some(_)) => command,
+            (Placement::Host, _) | (Placement::Sandbox, None) => {
+                yielding::one_level_down(command, self.backlog.shares())?
+            }
+        };
         let inherited = self.inherited_environment();
         command.env_clear();
         for (key, value) in &inherited {
             command.env(key, value);
         }
-        let (command, placed) = match placement {
-            Placement::Host => (command, None),
-            Placement::Sandbox => {
+        let (started, placed) = match (placement, &self.container) {
+            (Placement::Sandbox, Some((limits, runtime))) => {
+                let mut copy =
+                    Confined::with_arm(Confinement::CopiedTree, Some(std::env::temp_dir()));
+                let (target, placed) = copy.place(command, &self.setup.workdir)?;
+                let copy = placed.into_container_copy()?;
+                (
+                    self.backlog.run_container(
+                        self.setup.run,
+                        &self.setup.domain,
+                        what,
+                        crate::backlog::ContainerRequest {
+                            runtime: runtime.clone(),
+                            limits: limits.clone(),
+                            copy,
+                            target,
+                        },
+                    )?,
+                    None,
+                )
+            }
+            (Placement::Sandbox, None) => {
                 let (command, placed) =
                     held(&self.confinement)?.place(command, &self.setup.workdir)?;
-                (command, Some(placed))
+                (
+                    self.backlog
+                        .run(self.setup.run, &self.setup.domain, what, command)?,
+                    Some(placed),
+                )
             }
+            (Placement::Host, _) => (
+                self.backlog
+                    .run(self.setup.run, &self.setup.domain, what, command)?,
+                None,
+            ),
         };
-        let started = self
-            .backlog
-            .run(self.setup.run, &self.setup.domain, what, command)?;
         let result = match started {
             Started::Settled {
                 exit,
@@ -289,7 +353,10 @@ impl ExecTool {
     }
 
     fn run_shell(&self, text: &str, placement: Placement) -> Result<ToolOutcome, AxError> {
-        let (mut command, interpreter) = self.setup.shell.command(text)?;
+        let (mut command, interpreter) = match (placement, &self.container) {
+            (Placement::Sandbox, Some(_)) => self.setup.shell.container_command(text)?,
+            (Placement::Host, _) | (Placement::Sandbox, None) => self.setup.shell.command(text)?,
+        };
         command.current_dir(&self.setup.workdir);
         let answer = self.through_the_backlog(command, text.to_owned(), "shell", placement)?;
         with_interpreter(answer, &interpreter)

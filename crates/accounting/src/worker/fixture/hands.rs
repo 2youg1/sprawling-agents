@@ -40,6 +40,14 @@ pub(crate) fn hands() -> Hands {
             shell: absent_path,
             pwsh: absent_path,
             engine: absent_engine,
+            container: || {
+                Err(kernel::AxError::failure(
+                    kernel::AxCode::SandboxDenied,
+                    "probe a container daemon",
+                    "the fixture has no daemon",
+                )
+                .with_recovery("supply a scripted daemon fixture"))
+            },
         },
         seat_lane: no_seat,
         shares: runtime::Shares::Unset,

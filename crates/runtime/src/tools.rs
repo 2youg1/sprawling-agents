@@ -10,7 +10,7 @@ mod call;
 mod chosen_path;
 mod describe;
 mod edit;
-mod exec;
+pub(crate) mod exec;
 mod read;
 mod search;
 mod status;

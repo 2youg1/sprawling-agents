@@ -97,6 +97,12 @@ pub struct Placed {
 }
 
 impl Placed {
+    pub(in crate::tools::exec) fn into_container_copy(self) -> Result<PathBuf, AxError> {
+        self.copy
+            .map(|copy| copy.at)
+            .ok_or_else(|| no_arm(Missing::ScratchDirectory))
+    }
+
     /// What putting the copy in place cost the filesystem (`crates/storage/Spec.lean`
     /// §8-31).
     pub fn work(&self) -> storage::FileWork {

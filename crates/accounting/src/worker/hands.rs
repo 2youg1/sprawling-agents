@@ -106,4 +106,6 @@ pub struct ExecHost {
     /// `pwsh`; a pwsh older than 7 arrives as `None`.
     pub pwsh: fn() -> Option<PathBuf>,
     pub engine: fn() -> Result<Box<dyn runtime::Sandbox>, AxError>,
+    /// Admitted daemon capability evidence from the same host the doctor reports.
+    pub container: fn() -> Result<runtime::tools::ContainerRuntime, AxError>,
 }

@@ -15,6 +15,11 @@ use std::process::Command;
 use kernel::{AxCode, AxError, ContainerLimits};
 use serde_json::Value;
 
+mod control;
+mod inspection;
+mod lifetime;
+pub(crate) use lifetime::ContainerLease;
+
 /// The CLI grammar and info schema to use for one daemon.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ContainerEngine {
@@ -41,6 +46,19 @@ const WORKDIR: &str = "/work";
 const MILLICPU_PER_CPU: u32 = 1000;
 
 impl ContainerRuntime {
+    /// Contacts the daemon under the bounded control-request budget.
+    ///
+    /// # Errors
+    /// Refuses unavailable, unsupported, or unreadable daemon capabilities.
+    pub fn probe(engine: ContainerEngine, program: PathBuf) -> Result<Self, AxError> {
+        let bytes = control::checked(&mut Self::info_command(engine, &program))?;
+        Self::admit(engine, program, &bytes)
+    }
+
+    fn command(&self) -> Command {
+        Command::new(&self.program)
+    }
+
     /// Builds the daemon question for the host's bounded probe runner.
     /// Unlike `--version`, `info` contacts the server and tests access.
     #[must_use]

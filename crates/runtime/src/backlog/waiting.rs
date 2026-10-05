@@ -162,7 +162,7 @@ impl super::Backlog {
     pub(super) fn settle(&self, id: BacklogId) -> Result<Option<Exit>, AxError> {
         let mut table = self.hold()?;
         let Some(Member {
-            body: Body::Command { child, .. },
+            body: Body::Command { child, claim, .. },
             ..
         }) = table.members.get_mut(&id)
         else {
@@ -170,7 +170,15 @@ impl super::Backlog {
                 why: Unseen::LeftTheTable,
             }));
         };
-        let stopped = Exit::polled(child);
+        let stopped = match child.poll() {
+            Ok(stopped) => stopped,
+            Err(err) => {
+                if let Claim::Window(owner) = *claim {
+                    *claim = Claim::Run(owner);
+                }
+                return Err(err);
+            }
+        };
         if stopped.is_some() {
             table.members.remove(&id);
         }

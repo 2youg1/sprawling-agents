@@ -313,7 +313,7 @@ impl Laying {
     ) -> Result<ExecTool, AxError> {
         let machine = machine_half(&site.config.sandbox, &self.exec_host)?;
         let addr = &at.addr;
-        ExecTool::new(
+        let tool = ExecTool::new(
             runtime::ExecSetup {
                 workdir: site.write_root.join(addr.as_str()),
                 mounts: mounts_under(&site.write_root, &site.config.sandbox.mounts),
@@ -332,7 +332,11 @@ impl Laying {
             },
             machine.engine,
             self.backlog.clone(),
-        )
+        )?;
+        match &site.config.sandbox.container {
+            Some(limits) => Ok(tool.with_container(limits.clone(), (self.exec_host.container)()?)),
+            None => Ok(tool),
+        }
     }
 
     /// Builds the one tool that answers what this run is, to itself.

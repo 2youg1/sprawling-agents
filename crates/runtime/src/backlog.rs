@@ -129,7 +129,7 @@ impl Backlog {
                 scope: scope.clone(),
                 what: what.clone(),
                 body: Body::Command {
-                    child,
+                    child: process::Process::Host(child),
                     dir: dir.clone(),
                     claim: Claim::Window(owner),
                     tail: Tail::default(),
@@ -213,13 +213,20 @@ impl Backlog {
     pub fn halt(&self, scope: Option<&Address>) -> Result<usize, AxError> {
         let mut table = self.hold()?;
         let mut reached = 0usize;
+        let mut failure = None;
         for member in table.members.values_mut() {
             let covered = scope.is_none_or(|within| member.scope.is_within(within));
             if !covered {
                 continue;
             }
             let stopped = match &mut member.body {
-                Body::Command { child, .. } => child.kill().is_ok(),
+                Body::Command { child, .. } => match child.stop() {
+                    Ok(()) => true,
+                    Err(err) => {
+                        failure = Some(err);
+                        false
+                    }
+                },
                 Body::Run(state) => {
                     *state = RunState::Stopping;
                     true
@@ -229,7 +236,10 @@ impl Backlog {
                 reached = reached.saturating_add(1);
             }
         }
-        Ok(reached)
+        match failure {
+            Some(err) => Err(err),
+            None => Ok(reached),
+        }
     }
 
     /// Takes every background member of `owner` that has stopped, in
@@ -264,7 +274,7 @@ impl Backlog {
                 Claim::Nobody => {}
                 Claim::Window(_) | Claim::Run(_) => continue,
             }
-            let Some(exit) = Exit::polled(child) else {
+            let Some(exit) = child.poll()? else {
                 if let (Claim::Run(_), Some(_)) = (claim, &self.sink) {
                     live.extend(tail.take(dir, (owner, *id), self.window.read_per_poll()));
                 }
@@ -316,7 +326,7 @@ impl Backlog {
         let mut released = 0usize;
         for member in table.members.values_mut() {
             if let Body::Command { claim, child, .. } = &mut member.body
-                && *claim == Claim::Run(owner)
+                && matches!(*claim, Claim::Window(run) | Claim::Run(run) if run == owner)
             {
                 *claim = Claim::Nobody;
                 // `Child::kill` answers `Ok` for a child that already
@@ -324,7 +334,9 @@ impl Backlog {
                 // The member is still owed to nobody and the next harvest
                 // reaps it once it stops; the caller is a drop with
                 // nobody to hand the refusal to.
-                drop(child.kill());
+                if let Err(err) = child.stop() {
+                    eprintln!("backlog cleanup retained for retry: {err}");
+                }
                 released = released.saturating_add(1);
             }
         }
@@ -370,6 +382,19 @@ impl Backlog {
 
 #[cfg(test)]
 mod tests;
+
+mod container;
+mod process;
+pub(crate) use container::ContainerRequest;
+
+fn container_name_error() -> AxError {
+    AxError::failure(
+        AxCode::SandboxDenied,
+        "name the owned container",
+        "the copy has no portable identity",
+    )
+    .with_recovery("choose a system temporary directory with a UTF-8 path")
+}
 
 mod cgroup;
 mod config;
