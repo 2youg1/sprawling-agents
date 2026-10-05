@@ -30,8 +30,8 @@
   import { fill, say } from "../../core/lang";
   import type { Key } from "../../core/lang";
   import { ui } from "../../ui";
-  import { Address, EnvVarName, ServerLabel } from "../../wire";
-  import type { Interpreter, SandboxLimits } from "../../wire";
+  import { Address, ContainerLimits, EnvVarName, ServerLabel } from "../../wire";
+  import type { Interpreter, SandboxArm, SandboxLimits } from "../../wire";
   import Button from "../parts/button.svelte";
   import Field from "../parts/field.svelte";
   import Segmented from "../parts/segmented.svelte";
@@ -51,6 +51,10 @@
   const lang = u.lang;
 
   const SHELL = ["off", "on"] as const;
+  const ARMS = ["default", "none", "copied_tree", "native", "container", "python"] as const;
+  type ArmChoice = "default" | SandboxArm;
+  const CONTAINER_FIELDS = ["image", "user", "cpu_millis", "memory_bytes", "pids"] as const;
+  type ContainerField = (typeof CONTAINER_FIELDS)[number];
 
   // The three faces written one entry per line.
   type ListKey = "mounts" | "env" | "trusted";
@@ -60,6 +64,8 @@
     // Carried, not shown: a building chooses pwsh in its CONFIG.toml
     // (runtime D30), and saving the card must not undo that choice.
     readonly interpreter: Interpreter;
+    readonly arm: ArmChoice;
+    readonly containerFields: Readonly<Record<ContainerField, string>>;
     readonly fuel: string;
     readonly lists: Readonly<Record<ListKey, string>>;
   }
@@ -68,6 +74,14 @@
     return {
       shell: limits?.shell === true ? "on" : "off",
       interpreter: limits?.interpreter ?? "system",
+      arm: limits?.arm ?? (limits?.container == null ? "default" : "container"),
+      containerFields: {
+        image: limits?.container?.image ?? "",
+        user: limits?.container == null ? "" : String(limits.container.user),
+        cpu_millis: limits?.container == null ? "" : String(limits.container.cpu_millis),
+        memory_bytes: limits?.container == null ? "" : String(limits.container.memory_bytes),
+        pids: limits?.container == null ? "" : String(limits.container.pids),
+      },
       fuel: limits === null ? "" : String(limits.fuel),
       lists: {
         mounts: (limits?.mounts ?? []).join("\n"),
@@ -112,12 +126,23 @@
   const trusted = $derived(decoded(draft.lists.trusted, ServerLabel));
   const fuel = $derived(/^[1-9][0-9]*$/.test(draft.fuel.trim()) ? Number(draft.fuel.trim()) : null);
 
+  const container = $derived(Schema.decodeOption(ContainerLimits)({
+    image: draft.containerFields.image.trim(),
+    user: Number(draft.containerFields.user),
+    cpu_millis: Number(draft.containerFields.cpu_millis),
+    memory_bytes: Number(draft.containerFields.memory_bytes),
+    pids: Number(draft.containerFields.pids),
+  }));
+  const containerReady = $derived(draft.arm !== "container" || Option.isSome(container));
+
   const limits = $derived.by((): SandboxLimits | null =>
-    fuel === null || !("ok" in mounts) || !("ok" in trusted)
+    fuel === null || !("ok" in mounts) || !("ok" in trusted) || !containerReady
       ? null
       : {
           shell: draft.shell === "on",
           interpreter: draft.interpreter,
+          ...draft.arm === "default" ? {} : { arm: draft.arm },
+          ...draft.arm === "container" && Option.isSome(container) ? { container: container.value } : {},
           fuel,
           mounts: mounts.ok,
           env_passthrough: lines(draft.lists.env).map((name) => EnvVarName.make(name)),
@@ -135,6 +160,7 @@
   const why = $derived.by((): string | undefined => {
     if (!known) return say($lang, "sandbox_unknown");
     if (fuel === null) return say($lang, "sandbox_fuel_needed");
+    if (!containerReady) return say($lang, "sandbox_container_needed");
     if (!edited) return say($lang, "sandbox_unchanged");
     return undefined;
   });
@@ -181,6 +207,21 @@
       />
       <p class="text-note text-text-faint">{say($lang, "sandbox_shell_help")}</p>
     </div>
+    <div class="flex min-w-0 flex-col gap-snug">
+      <span class="text-note text-text-quiet">{say($lang, "sandbox_container")}</span>
+      <Segmented label={say($lang, "sandbox_container")}
+        options={ARMS.map((value) => ({ value, label: say($lang, `sandbox_arm_${value}`) }))}
+        held={draft.arm}
+        onPick={(arm: ArmChoice) => { edit({ arm }); }} />
+      <p class="text-note text-text-faint">{say($lang, "sandbox_container_help")}</p>
+    </div>
+    {#if draft.arm === "container"}
+      {#each CONTAINER_FIELDS as field (field)}
+        <Field label={say($lang, `sandbox_container_${field}`)} mono
+          value={draft.containerFields[field]}
+          onInput={(value) => { edit({ containerFields: { ...draft.containerFields, [field]: value } }); }} />
+      {/each}
+    {/if}
     <Field
       label={say($lang, "sandbox_fuel")}
       help={say($lang, "sandbox_fuel_help")}

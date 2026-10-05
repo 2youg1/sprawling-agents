@@ -434,7 +434,28 @@ export type Interpreter = typeof Interpreter.Type;
  * and which shell binary exists belong to the machine, not to the city,
  * and a city carried to another machine must not carry its paths.
  */
+export const SandboxArm = Schema.Union([
+  Schema.Literals(["copied_tree", "container"]),
+  Schema.Literal("none"),
+  Schema.Literal("native"),
+  Schema.Literal("python"),
+]).annotate({ identifier: "SandboxArm" });
+export type SandboxArm = typeof SandboxArm.Type;
+
+export const ContainerImage = Schema.String.annotate({ identifier: "ContainerImage" });
+export type ContainerImage = typeof ContainerImage.Type;
+export const ContainerLimits = Schema.Struct({
+  image: ContainerImage,
+  user: Schema.Int,
+  cpu_millis: Schema.Int,
+  memory_bytes: Schema.Int,
+  pids: Schema.Int,
+}).annotate({ identifier: "ContainerLimits" });
+export type ContainerLimits = typeof ContainerLimits.Type;
+
 export const SandboxLimits = Schema.Struct({
+  arm: Schema.optional(Schema.NullOr(SandboxArm)),
+  container: Schema.optional(Schema.NullOr(ContainerLimits)),
   env_passthrough: Schema.optional(Schema.Array(EnvVarName)),
   fuel: Schema.Int,
   interpreter: Schema.optional(Interpreter),
@@ -1269,13 +1290,7 @@ export type DoctorSandboxArm = typeof DoctorSandboxArm.Type;
  * that every name has an arm to fill on Windows, macOS and Linux
  * (`crates/wire/spec/Answer/Doctor.lean` D26).
  */
-export const SandboxArm = Schema.Union([
-  Schema.Literals(["copied_tree", "container"]),
-  Schema.Literal("none"),
-  Schema.Literal("native"),
-  Schema.Literal("python"),
-]).annotate({ identifier: "SandboxArm" });
-export type SandboxArm = typeof SandboxArm.Type;
+
 
 /**
  * Which backend a host command runs under on this machine, and what
