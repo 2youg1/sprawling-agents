@@ -135,6 +135,30 @@ def answers (setting : Setting) : Step :=
   , walk := fun ground => do
       ensureEq [hall] (← listed setting.door ground) "the city stood up with other buildings" }
 
+/-- The page and the scripts and styles it names are served by the binary,
+rather than by a source checkout or a developer's asset directory. -/
+def clientDelivered : Step :=
+  { name := "the embedded client and its scripts and styles are served"
+  , walk := fun ground => do
+      let page ← read ground.port "/"
+      let assets := (page.splitOn "\"").filter fun path =>
+        (path.startsWith "./" || path.startsWith "/") &&
+          (path.endsWith ".js" || path.endsWith ".css")
+      ensure (assets.any (·.endsWith ".js") && assets.any (·.endsWith ".css"))
+        "the served page names no complete client; rebuild with just build-web"
+      for path in assets do
+        let path := if path.startsWith "./" then (path.drop 1).toString else path
+        let body ← read ground.port path
+        ensure (body != page && !body.trimAscii.toString.isEmpty)
+          s!"the client asset {path} is absent or falls back to the page" }
+where
+  read (port : Port) (path : String) : IO String := do
+    let response ← IO.Process.output
+      { cmd := "curl", args := #["--fail", "--silent", "--show-error", "--max-time", "10",
+          "--compressed", s!"http://127.0.0.1:{port}{path}"] }
+    ensure (response.exitCode == 0) s!"client HTTP request {path} failed: {response.stderr}"
+    return response.stdout
+
 /-- The stand-in is attached the way the settings page attaches an endpoint, and
 the city stores the URL it was given. -/
 def attached (setting : Setting) : Step :=
@@ -221,7 +245,7 @@ def verified (setting : Setting) (when : String) : Step :=
       | .error why => ensure false s!"the history did not verify: {why}" }
 
 def firstDay (setting : Setting) : List Step :=
-  [ answers setting, attached setting, raised setting, admitted setting, worked setting
+  [ answers setting, clientDelivered, attached setting, raised setting, admitted setting, worked setting
   , pinned setting, catalogued setting, agreed setting, verified setting "after the first day" ]
 
 /-! ## The crash -/
