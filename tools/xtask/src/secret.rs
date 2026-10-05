@@ -32,6 +32,8 @@ use std::path::Path;
 use crate::report::{Violation, XtaskError};
 use crate::walk;
 
+mod nix;
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used, reason = "test code")]
 mod nix_tests;
@@ -200,7 +202,11 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
         if records && std::str::from_utf8(&bytes).is_err() {
             continue;
         }
+        let nar_hashes = nix::NarHashes::classify(&rel, &bytes);
         for span in kernel::secret::scan(&bytes) {
+            if nar_hashes.admits(&span) {
+                continue;
+            }
             let end = span.start.saturating_add(span.len);
             if bytes
                 .get(span.start..end)

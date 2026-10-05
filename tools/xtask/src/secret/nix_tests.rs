@@ -6,7 +6,7 @@
 use super::*;
 
 #[test]
-fn an_identical_digest_outside_locked_remains_a_complete_finding() {
+fn an_identical_digest_outside_the_pinned_property_remains_a_complete_finding() {
     let root = std::env::temp_dir().join(format!("secret-nix-location-{}", std::process::id()));
     crate::root::fixture::write(
         &root,
