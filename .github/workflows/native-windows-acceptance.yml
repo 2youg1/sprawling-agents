@@ -41,18 +41,32 @@ jobs:
       - name: Native foreign boundary conformance
         shell: pwsh
         run: |
-          cargo nextest run -p sprawling-desktop-ffi -E 'test(native_)' 2>&1 | Tee-Object native-evidence/boundary.log
+          cargo nextest run -p sprawling-desktop-ffi --no-tests fail --no-fail-fast --failure-output immediate-final -E 'test(native_)' 2>&1 | Tee-Object native-evidence/boundary.log
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Native production axes and cancellation
+        if: ${{ !cancelled() }}
         shell: pwsh
         run: |
-          cargo nextest run -p sprawling-runtime --run-ignored ignored-only -E 'test(native_windows_disposable)' 2>&1 | Tee-Object native-evidence/production.log
+          cargo nextest run -p sprawling-runtime --run-ignored ignored-only --no-tests fail --no-fail-fast --failure-output immediate-final -E 'test(native_windows_disposable)' 2>&1 | Tee-Object native-evidence/production.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Native priority and declared Rust build regressions
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        run: |
+          $filter = 'test(a_dispatched_command_runs_below_the_core) | binary(exec_builds)'
+          cargo nextest list -p sprawling-runtime -E $filter --message-format json > native-evidence/regressions.json 2> native-evidence/regressions-list.stderr
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $suites = (Get-Content native-evidence/regressions.json -Raw | ConvertFrom-Json).'rust-test-suites'.PSObject.Properties.Value
+          $priority = @($suites | ForEach-Object { $_.testcases.PSObject.Properties } | Where-Object { $_.Name -ceq 'tools::exec::tests::yielding::a_dispatched_command_runs_below_the_core' -and $_.Value.'filter-match'.status -eq 'matches' -and -not $_.Value.ignored })
+          $build = @($suites | Where-Object { $_.'binary-name' -ceq 'exec_builds' } | ForEach-Object { $_.testcases.PSObject.Properties } | Where-Object { $_.Value.'filter-match'.status -eq 'matches' -and -not $_.Value.ignored })
+          if ($priority.Count -ne 1 -or $build.Count -eq 0) { throw 'Both native regressions must be selected and runnable.' }
+          cargo nextest run -p sprawling-runtime --no-tests fail --no-fail-fast --failure-output immediate-final --success-output immediate -E $filter 2>&1 | Tee-Object native-evidence/regressions.log
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Hash the actual probe binaries
         if: always()
         shell: pwsh
         run: |
-          Get-ChildItem target/debug/deps/runtime-*.exe | Get-FileHash -Algorithm SHA256 | Select-Object Hash,Path | ConvertTo-Json | Out-File -Encoding utf8 native-evidence/binaries.json
+          Get-ChildItem target/debug/deps/runtime-*.exe,target/debug/deps/exec_builds-*.exe | Get-FileHash -Algorithm SHA256 | Select-Object Hash,Path | ConvertTo-Json | Out-File -Encoding utf8 native-evidence/binaries.json
       - uses: actions/upload-artifact@v7
         if: always()
         with:
