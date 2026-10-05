@@ -30,6 +30,7 @@ const evidence = {
   errors: [],
 };
 const browser = await chromium.launch({ headless: true });
+let activePage;
 evidence.browser = browser.version();
 const english = (key) => {
   const text = words[key]?.en;
@@ -41,8 +42,13 @@ try {
     for (const colorScheme of ["dark", "light"]) {
       const context = await browser.newContext({ viewport: { width, height: 1080 }, colorScheme, locale: "en-US" });
       const page = await context.newPage();
+      activePage = page;
       page.on("pageerror", (error) => evidence.errors.push(error.message));
-      await page.goto(`http://127.0.0.1:${port}/${toFragment(DEFAULT_VIEW)}`);
+      await page.goto(`http://127.0.0.1:${port}/${toFragment({ kind: "welcome" })}`);
+      const putOff = page.getByRole("button", { name: english("guide_put_off_rest"), exact: true });
+      await putOff.waitFor();
+      await putOff.click();
+      await page.waitForFunction((fragment) => location.hash === fragment, toFragment(DEFAULT_VIEW));
       const opener = page.getByRole("link", { name: english("nav_settings"), exact: true });
       await opener.waitFor();
       await opener.focus();
@@ -85,6 +91,7 @@ try {
       await dialog.waitFor({ state: "hidden" });
       if (!(await opener.evaluate((element) => element === document.activeElement))) throw new Error("Escape did not return focus to the settings opener");
       await context.close();
+      activePage = undefined;
     }
   }
   if (evidence.errors.length) throw new Error("the served client reported runtime JavaScript errors");
@@ -92,6 +99,11 @@ try {
 } catch (error) {
   evidence.result = "failure";
   evidence.failure = error.message;
+  if (activePage && !activePage.isClosed()) {
+    evidence.failureRoute = new URL(activePage.url()).hash;
+    await activePage.screenshot({ path: join(output, "failure.png") });
+    await writeFile(join(output, "failure.html"), await activePage.content());
+  }
   throw error;
 } finally {
   await writeFile(join(output, "production-ui.json"), JSON.stringify(evidence, null, 2));
