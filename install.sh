@@ -6,7 +6,7 @@
 #
 # One command that leaves `sprawling` on your PATH:
 #
-#     curl -fsSL https://raw.githubusercontent.com/2youg1/sprawling/main/install.sh | sh
+#     curl -fsSL https://raw.githubusercontent.com/2youg1/sprawling-agents/main/install.sh | sh
 #
 # This script fetches and unpacks. **Where the binary goes, and what
 # happens to PATH, is decided by `sprawling install`** - the binary's own
@@ -28,9 +28,8 @@
 #     platform with no archive is reported with the list the release does
 #     carry, rather than guessed at.
 #
-# `sprawling` is the short name GitHub still resolves to this repository,
-# whose canonical path is `2youg1/sprawling-agents`. Set SPRAWLING_REPO if
-# that ever stops being true.
+# SPRAWLING_REPO overrides the canonical release repository for a fork
+# or mirror.
 #
 # SPRAWLING_API replaces the whole release-list address, for a mirror or
 # for the release workflow, which serves this run's archive from
@@ -38,7 +37,7 @@
 
 set -eu
 
-REPO="${SPRAWLING_REPO:-2youg1/sprawling}"
+REPO="${SPRAWLING_REPO:-2youg1/sprawling-agents}"
 API="${SPRAWLING_API:-https://api.github.com/repos/${REPO}/releases}"
 RELEASES="https://github.com/${REPO}/releases"
 

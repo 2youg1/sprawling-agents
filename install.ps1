@@ -5,7 +5,7 @@
 #
 # One command that leaves `sprawling` on your PATH:
 #
-#     irm https://raw.githubusercontent.com/2youg1/sprawling/main/install.ps1 | iex
+#     irm https://raw.githubusercontent.com/2youg1/sprawling-agents/main/install.ps1 | iex
 #
 # This script fetches and unpacks. **Where the binary goes, and what
 # happens to PATH, is decided by `sprawling install`** - the binary's own
@@ -27,13 +27,12 @@
 #     platform with no archive is reported with the list the release does
 #     carry, rather than guessed at.
 #
-# `sprawling` is the short name GitHub still resolves to this repository,
-# whose canonical path is `2youg1/sprawling-agents`. Set SPRAWLING_REPO if
-# that ever stops being true.
+# SPRAWLING_REPO overrides the canonical release repository for a fork
+# or mirror.
 
 $ErrorActionPreference = 'Stop'
 
-$repo = if ($env:SPRAWLING_REPO) { $env:SPRAWLING_REPO } else { '2youg1/sprawling' }
+$repo = if ($env:SPRAWLING_REPO) { $env:SPRAWLING_REPO } else { '2youg1/sprawling-agents' }
 $api = "https://api.github.com/repos/$repo/releases"
 $releases = "https://github.com/$repo/releases"
 
