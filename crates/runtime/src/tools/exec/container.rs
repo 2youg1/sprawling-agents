@@ -338,6 +338,36 @@ mod tests {
         }
     }
 
+    #[cfg(unix)]
+    #[test]
+    fn podman_non_utf8_program_refuses_before_create() {
+        use std::ffi::OsString;
+        use std::os::unix::ffi::OsStringExt;
+
+        let runtime = admit(
+            ContainerEngine::Podman,
+            &json!({"host":{"os":"linux", "cgroupVersion":"v2",
+                "cgroupControllers":["cpu","memory","pids"]}}),
+        )
+        .unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let mut program = b"/bin/program-".to_vec();
+        program.push(0xff);
+        let target = Command::new(OsString::from_vec(program));
+        let err = runtime
+            .create_command(
+                &limits(),
+                &ContainerLaunch {
+                    name: "owned-non-utf8",
+                    copy: dir.path(),
+                    command: &target,
+                },
+            )
+            .unwrap_err();
+        assert_eq!(err.code(), &AxCode::SandboxDenied);
+        assert!(!err.recovery().is_empty());
+    }
+
     #[test]
     fn ambiguous_mount_and_removed_environment_are_refused_before_create() {
         let runtime = admit(ContainerEngine::Docker, &docker_info()).unwrap();
