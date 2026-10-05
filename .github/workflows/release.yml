@@ -186,7 +186,9 @@ jobs:
         if: always()
         with:
           name: release-evidence-${{ runner.os }}-${{ github.sha }}-${{ github.run_attempt }}
-          path: target/release-evidence
+          path: |
+            target/release-evidence
+            target/package/*.zip
           if-no-files-found: error
       # The archive goes through the door a person uses before it is
       # uploaded: install.sh asks a release list served from 127.0.0.1,

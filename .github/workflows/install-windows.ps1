@@ -56,6 +56,13 @@ try {
     $originalHash = (Get-FileHash -LiteralPath $original[0].FullName -Algorithm SHA256).Hash
     $installedHash = (Get-FileHash -LiteralPath $installed[0].FullName -Algorithm SHA256).Hash
     if ($originalHash -cne $installedHash) { throw 'PowerShell installed different executable bytes.' }
+    $metadata = $installed[0].VersionInfo
+    $signature = Get-AuthenticodeSignature -LiteralPath $installed[0].FullName
+    @{ archive = $assets[0].Name; archiveSha256 = $hash; binarySha256 = $installedHash.ToLowerInvariant();
+       productName = $metadata.ProductName; productVersion = $metadata.ProductVersion; fileVersion = $metadata.FileVersion;
+       signatureStatus = $signature.Status.ToString(); hasTimestamp = $null -ne $signature.TimeStamperCertificate;
+       run = $env:GITHUB_RUN_ID; attempt = $env:GITHUB_RUN_ATTEMPT } |
+        ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $Evidence 'windows-binary.json') -Encoding utf8
     $status = & $installed[0].FullName status
     if ($LASTEXITCODE -ne 0) { throw 'The installed executable cannot answer status.' }
     & $installed[0].FullName install --uninstall *> (Join-Path $Evidence 'powershell-uninstall.log')
