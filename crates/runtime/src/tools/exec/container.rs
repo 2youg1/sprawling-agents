@@ -292,6 +292,53 @@ mod tests {
     }
 
     #[test]
+    fn container_entrypoint_keeps_exactly_the_requested_program() {
+        let dir = tempfile::tempdir().unwrap();
+        for engine in [ContainerEngine::Docker, ContainerEngine::Podman] {
+            let info = match engine {
+                ContainerEngine::Docker => docker_info(),
+                ContainerEngine::Podman => json!({"host":{"os":"linux",
+                    "cgroupVersion":"v2", "cgroupControllers":["cpu","memory","pids"]}}),
+            };
+            let runtime = admit(engine, &info).unwrap();
+            for program in [
+                "[\"/bin/sh\",\"-c\"]",
+                "[]",
+                "null",
+                "/bin/with\"quote",
+                "/bin/true",
+            ] {
+                let target = Command::new(program);
+                let command = runtime
+                    .create_command(
+                        &limits(),
+                        &ContainerLaunch {
+                            name: "owned-entrypoint",
+                            copy: dir.path(),
+                            command: &target,
+                        },
+                    )
+                    .unwrap();
+                let entrypoint = command
+                    .get_args()
+                    .collect::<Vec<_>>()
+                    .windows(2)
+                    .find(|pair| pair[0] == "--entrypoint")
+                    .unwrap()[1]
+                    .to_str()
+                    .unwrap()
+                    .to_owned();
+                let decoded = match engine {
+                    ContainerEngine::Docker => vec![entrypoint],
+                    ContainerEngine::Podman => serde_json::from_str::<Vec<String>>(&entrypoint)
+                        .unwrap_or_else(|_| vec![entrypoint]),
+                };
+                assert_eq!(decoded, vec![program.to_owned()], "{engine:?}: {program}");
+            }
+        }
+    }
+
+    #[test]
     fn ambiguous_mount_and_removed_environment_are_refused_before_create() {
         let runtime = admit(ContainerEngine::Docker, &docker_info()).unwrap();
         let dir = tempfile::tempdir().unwrap();
