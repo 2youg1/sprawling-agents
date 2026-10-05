@@ -278,3 +278,43 @@ pub(crate) fn container() -> Result<runtime::tools::ContainerRuntime, AxError> {
         format!("no accessible Linux cgroup v2 container daemon: {}", failures.join("; ")))
         .with_recovery("install and start Docker or Podman with CPU, memory and pids controllers; prepare a local immutable image"))
 }
+
+/// Constructs a named platform boundary without falling back to a weaker arm.
+///
+/// # Errors
+/// Refuses a missing native mechanism; the caller supplies the other named arms directly.
+pub(crate) fn confinement(arm: kernel::SandboxArm) -> Result<runtime::tools::Confined, AxError> {
+    use runtime::tools::{Confined, Confinement};
+    let scratch = std::env::temp_dir();
+    let selected = match arm {
+        kernel::SandboxArm::CopiedTree => Confinement::CopiedTree,
+        kernel::SandboxArm::Native => {
+            #[cfg(windows)]
+            {
+                Confinement::WindowsJobObject
+            }
+            #[cfg(target_os = "macos")]
+            {
+                Confinement::MacosSeatbelt {
+                    wrapper: PathBuf::from("/usr/bin/sandbox-exec"),
+                }
+            }
+            #[cfg(not(any(windows, target_os = "macos")))]
+            {
+                let wrapper = find_program("bwrap").ok_or_else(|| AxError::failure(kernel::AxCode::SandboxDenied,
+                    "select the native sandbox", "bubblewrap is missing")
+                    .with_recovery("install bubblewrap with unprivileged user namespaces or select another arm"))?;
+                Confinement::LinuxNamespaces { wrapper }
+            }
+        }
+        kernel::SandboxArm::None | kernel::SandboxArm::Container | kernel::SandboxArm::Python => {
+            return Err(AxError::failure(
+                kernel::AxCode::ConfigInvalid,
+                "construct platform confinement",
+                "this arm has a different execution path",
+            )
+            .with_recovery("use the selected arm's execution constructor"));
+        }
+    };
+    Ok(Confined::with_arm(selected, Some(scratch)))
+}

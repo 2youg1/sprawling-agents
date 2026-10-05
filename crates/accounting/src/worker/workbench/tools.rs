@@ -333,8 +333,23 @@ impl Laying {
             machine.engine,
             self.backlog.clone(),
         )?;
-        match &site.config.sandbox.container {
-            Some(limits) => Ok(tool.with_container(limits.clone(), (self.exec_host.container)()?)),
+        match site.config.sandbox.selected_arm()? {
+            Some(kernel::SandboxArm::Container) => match &site.config.sandbox.container {
+                Some(limits) => {
+                    Ok(tool.with_container(limits.clone(), (self.exec_host.container)()?))
+                }
+                None => Err(kernel::AxError::failure(
+                    kernel::AxCode::ConfigInvalid,
+                    "construct container execution",
+                    "limits are absent",
+                )
+                .with_recovery("provide sandbox.container limits")),
+            },
+            Some(arm @ (kernel::SandboxArm::Native | kernel::SandboxArm::CopiedTree)) => {
+                Ok(tool.confined((self.exec_host.confinement)(arm)?))
+            }
+            Some(kernel::SandboxArm::None) => Ok(tool.on_host()),
+            Some(kernel::SandboxArm::Python) => Ok(tool.python_only()),
             None => Ok(tool),
         }
     }

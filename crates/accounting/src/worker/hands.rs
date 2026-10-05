@@ -107,5 +107,6 @@ pub struct ExecHost {
     pub pwsh: fn() -> Option<PathBuf>,
     pub engine: fn() -> Result<Box<dyn runtime::Sandbox>, AxError>,
     /// Admitted daemon capability evidence from the same host the doctor reports.
+    pub confinement: fn(kernel::SandboxArm) -> Result<runtime::tools::Confined, AxError>,
     pub container: fn() -> Result<runtime::tools::ContainerRuntime, AxError>,
 }

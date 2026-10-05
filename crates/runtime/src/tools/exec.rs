@@ -20,7 +20,6 @@
 //! A missing component is `E_TOOL_UNAVAILABLE` carrying the alternative
 //! that would work, so the caller redirects instead of guessing.
 
-use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::sync::{Mutex, MutexGuard};
 
@@ -30,13 +29,14 @@ use kernel::{
 };
 use serde_json::{Map, Value};
 
-use crate::backlog::{Backlog, Exit, Started};
+use crate::backlog::{Backlog, Exit};
 use crate::sandbox::{Fuel, Mount, Sandbox, SandboxExit, SandboxJob};
 
 #[cfg(windows)]
 mod native_windows;
 mod confinement;
 pub(crate) mod container;
+mod dispatch;
 #[cfg(any(target_os = "macos", test))]
 mod native_macos;
 pub use container::{ContainerEngine, ContainerLaunch, ContainerRuntime};
@@ -85,6 +85,7 @@ pub struct ExecTool {
     confinement: Mutex<Confined>,
     meta: ToolMeta,
     container: Option<(kernel::ContainerLimits, ContainerRuntime)>,
+    program_route: dispatch::ProgramRoute,
 }
 
 impl ExecTool {
@@ -131,6 +132,7 @@ impl ExecTool {
         Ok(ExecTool {
             setup,
             container: None,
+            program_route: dispatch::ProgramRoute::Confined,
             sandbox: Mutex::new(sandbox),
             backlog,
             confinement: Mutex::new(confinement),
@@ -147,46 +149,6 @@ impl ExecTool {
         })
     }
 
-    /// Chooses an execution boundary before the tool is admitted to a run.
-    /// The disclosure and actual placement always read the same confinement.
-    pub fn confined(mut self, confinement: Confined) -> Self {
-        self.meta.disclosure = disclosure(&self.setup, &confinement);
-        self.confinement = Mutex::new(confinement);
-        self
-    }
-
-    /// Uses an explicitly admitted daemon and frozen limits for program and shell calls.
-    /// The daemon must be discovered by the host, rather than by a second configuration path.
-    #[must_use]
-    pub fn with_container(
-        mut self,
-        limits: kernel::ContainerLimits,
-        runtime: ContainerRuntime,
-    ) -> Self {
-        self.container = Some((limits, runtime));
-        self.meta.disclosure = format!(
-            "Run a program, Python snippet, or shell line. Program and shell sandbox calls use              an explicitly configured Linux container: writes land on a copy, network is closed,              a non-root user and CPU/memory/process limits are inspected before start.              Daemon cleanup failures are reported and retained for retry. `where: host` asks              for host execution.{}",
-            match self.setup.shell {
-                Shell::Absent => "",
-                Shell::Missing {
-                    asked: kernel::Interpreter::Pwsh,
-                }
-                | Shell::Found {
-                    interpreter: kernel::Interpreter::Pwsh,
-                    ..
-                } => " Container shell lines use pwsh.",
-                Shell::Missing {
-                    asked: kernel::Interpreter::System,
-                }
-                | Shell::Found {
-                    interpreter: kernel::Interpreter::System,
-                    ..
-                } => " Container shell lines use /bin/sh.",
-            }
-        );
-        self
-    }
-
     fn run_program(
         &self,
         path: &str,
@@ -201,110 +163,6 @@ impl ExecTool {
             format!("{path} {}", args.join(" "))
         };
         self.through_the_backlog(command, what, "program", placement)
-    }
-
-    /// Every host command goes through the table, whichever arm asked
-    /// for it: there is no `background` argument, because two paths would
-    /// be two authorities and the one with the hole in it would always be
-    /// the one nobody remembered. The command is lowered before its
-    /// environment is cleared, so the clearing lands on whatever process
-    /// is actually spawned.
-    fn through_the_backlog(
-        &self,
-        command: std::process::Command,
-        what: String,
-        arm: &str,
-        placement: Placement,
-    ) -> Result<ToolOutcome, AxError> {
-        let mut command = match (placement, &self.container) {
-            (Placement::Sandbox, Some(_)) => command,
-            (Placement::Host, _) | (Placement::Sandbox, None) => {
-                yielding::one_level_down(command, self.backlog.shares())?
-            }
-        };
-        let inherited = self.inherited_environment();
-        command.env_clear();
-        for (key, value) in &inherited {
-            command.env(key, value);
-        }
-        let (started, placed) = match (placement, &self.container) {
-            (Placement::Sandbox, Some((limits, runtime))) => {
-                let mut copy =
-                    Confined::with_arm(Confinement::CopiedTree, Some(std::env::temp_dir()));
-                let (target, placed) = copy.place(command, &self.setup.workdir)?;
-                let copy = placed.into_container_copy()?;
-                (
-                    self.backlog.run_container(
-                        self.setup.run,
-                        &self.setup.domain,
-                        what,
-                        crate::backlog::ContainerRequest {
-                            runtime: runtime.clone(),
-                            limits: limits.clone(),
-                            copy,
-                            target,
-                        },
-                    )?,
-                    None,
-                )
-            }
-            (Placement::Sandbox, None) => {
-                let (command, placed) =
-                    held(&self.confinement)?.place(command, &self.setup.workdir)?;
-                (
-                    self.backlog
-                        .run(self.setup.run, &self.setup.domain, what, command)?,
-                    Some(placed),
-                )
-            }
-            (Placement::Host, _) => (
-                self.backlog
-                    .run(self.setup.run, &self.setup.domain, what, command)?,
-                None,
-            ),
-        };
-        let result = match started {
-            Started::Settled {
-                exit,
-                stdout,
-                stderr,
-            } => {
-                if let Some(placed) = placed {
-                    held(&self.confinement)?.settled(placed);
-                }
-                settled(&stdout, &stderr, exit, arm)?
-            }
-            Started::Backgrounded { id, what } => {
-                if let Some(placed) = placed {
-                    held(&self.confinement)?.handed(id, placed);
-                }
-                backgrounded(&id, &what, arm)?
-            }
-        };
-        with_environment(result, &inherited)
-    }
-
-    /// The variables this run's children actually get: the floor every
-    /// city grants, plus the names this building declared, minus every
-    /// name this machine does not set.
-    ///
-    /// A name with no value on this machine is left out rather than set
-    /// empty, because an empty variable and an absent one are two
-    /// different things to the programs that read them.
-    fn inherited_environment(&self) -> BTreeMap<String, String> {
-        let mut chosen = BTreeMap::new();
-        let declared = self
-            .setup
-            .env_passthrough
-            .iter()
-            .map(EnvVarName::as_str)
-            .chain(ENV_ALLOWLIST);
-        for key in declared {
-            if let Ok(value) = std::env::var(key) {
-                chosen.insert(key.to_owned(), value);
-            }
-        }
-        chosen
     }
 
     fn run_python(&self, code: &str) -> Result<ToolOutcome, AxError> {
@@ -375,9 +233,7 @@ fn disclosure(setup: &ExecSetup, confinement: &Confined) -> String {
 
 mod outcome;
 
-use outcome::{
-    backgrounded, exceptional, settled, with_backlog, with_environment, with_interpreter,
-};
+use outcome::{exceptional, settled, with_backlog, with_interpreter};
 
 fn no_host_python() -> AxError {
     AxError::failure(

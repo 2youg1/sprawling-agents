@@ -40,6 +40,18 @@ pub(crate) fn hands() -> Hands {
             shell: absent_path,
             pwsh: absent_path,
             engine: absent_engine,
+            confinement: |arm| {
+                Ok(runtime::tools::Confined::with_arm(
+                    match arm {
+                        kernel::SandboxArm::CopiedTree => runtime::tools::Confinement::CopiedTree,
+                        kernel::SandboxArm::Native => runtime::tools::Confinement::WindowsJobObject,
+                        kernel::SandboxArm::None
+                        | kernel::SandboxArm::Container
+                        | kernel::SandboxArm::Python => runtime::tools::Confinement::CopiedTree,
+                    },
+                    Some(std::env::temp_dir()),
+                ))
+            },
             container: || {
                 Err(kernel::AxError::failure(
                     kernel::AxCode::SandboxDenied,
