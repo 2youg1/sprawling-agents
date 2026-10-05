@@ -16,20 +16,22 @@ use crate::{AxCode, AxError};
 /// cannot reach an execution request through this type.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(try_from = "String", into = "String")]
-#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ContainerImage(String);
 
 impl ContainerImage {
+    pub(crate) const PREFIX: &str = "sha256:";
+    pub(crate) const DIGEST_LENGTH: usize = 64;
+    pub(crate) const HEX_DIGITS: &str = "0123456789abcdef";
     /// Parses an immutable image ID without consulting a registry.
     ///
     /// # Errors
     /// `E_CONFIG_INVALID` for anything except a full lowercase sha256 ID.
     pub fn parse(image: &str) -> Result<Self, AxError> {
-        if image.strip_prefix("sha256:").is_some_and(|digest| {
-            digest.len() == 64
+        if image.strip_prefix(Self::PREFIX).is_some_and(|digest| {
+            digest.len() == Self::DIGEST_LENGTH
                 && digest
                     .bytes()
-                    .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+                    .all(|byte| Self::HEX_DIGITS.as_bytes().contains(&byte))
         }) {
             return Ok(Self(image.to_owned()));
         }

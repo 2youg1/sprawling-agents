@@ -26,6 +26,7 @@ use serde_json::Value;
 
 use crate::address::{Address, SESSION_NAME_MAX, SessionName};
 use crate::error::AxCode;
+use crate::ContainerImage;
 use crate::idem::IdemKey;
 use crate::locator::{B3Hash, GitOid, Locator};
 use crate::tool::ServerLabel;
@@ -88,6 +89,24 @@ fn session_name_pattern() -> String {
     let middle = format!(r"[^/\\:\p{{Cc}}]{{0,{longest}}}");
     let tail = r"[^/\\:\p{Cc}.\p{White_Space}])\p{White_Space}*$";
     format!("{head}{middle}{tail}")
+}
+
+impl JsonSchema for ContainerImage {
+    fn schema_name() -> Cow<'static, str> {
+        Cow::Borrowed("ContainerImage")
+    }
+
+    fn json_schema(_generator: &mut SchemaGenerator) -> Schema {
+        string_schema(
+            "A full local immutable image ID admitted by ContainerImage::parse.",
+            Some(&format!(
+                r"^{}[{}]{{{}}}(?![\s\S])",
+                Self::PREFIX,
+                Self::HEX_DIGITS,
+                Self::DIGEST_LENGTH
+            )),
+        )
+    }
 }
 
 impl JsonSchema for AxCode {
