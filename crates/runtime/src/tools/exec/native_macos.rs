@@ -14,6 +14,7 @@ use kernel::{AxCode, AxError};
 const PROFILE: &str = "(version 1)\n(deny default)\n\
     (allow file-read*)\n\
     (allow process-exec process-fork sysctl-read mach-lookup)\n\
+    (allow process-info-setcontrol (target self))\n\
     (allow file-write* (subpath (param \"WORKDIR\")))\n\
     (allow file-write-data (literal \"/dev/null\"))\n\
     (deny network*)\n";
