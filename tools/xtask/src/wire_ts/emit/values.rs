@@ -165,8 +165,8 @@ impl Values<'_> {
                     return Err(refuse(at, format!("`pattern` {other} is not a string")));
                 }
             },
-            "integer" => "Schema.Int".to_owned(),
-            "number" => "Schema.Number".to_owned(),
+            "integer" => numeric_bounds("Schema.Int", map, at)?,
+            "number" => numeric_bounds("Schema.Number", map, at)?,
             "boolean" => "Schema.Boolean".to_owned(),
             "null" => "Schema.Null".to_owned(),
             "array" => self.array(map, at, indent)?,
@@ -249,6 +249,22 @@ impl Values<'_> {
         let _ = write!(out, "{}}})", pad(indent));
         Ok(out)
     }
+}
+
+fn numeric_bounds(base: &str, map: &Map<String, Value>, at: &str) -> Result<String, Refused> {
+    let mut expression = base.to_owned();
+    for (keyword, filter) in [
+        ("minimum", "isGreaterThanOrEqualTo"),
+        ("maximum", "isLessThanOrEqualTo"),
+    ] {
+        if let Some(bound) = map.get(keyword) {
+            if !bound.is_number() {
+                return Err(refuse(at, format!("`{keyword}` {bound} is not a number")));
+            }
+            expression.push_str(&format!(".check(Schema.{filter}({bound}))"));
+        }
+    }
+    Ok(expression)
 }
 
 fn literals(values: &Value, at: &str) -> Result<String, Refused> {
