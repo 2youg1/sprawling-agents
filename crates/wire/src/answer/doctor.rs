@@ -287,6 +287,8 @@ pub enum DoctorSandboxArm {
     /// A Windows job object: the process tree ends together and the
     /// limits hold, and the network is not isolated.
     WindowsJobObject,
+    /// macOS Seatbelt: file writes confined to a copy and networking denied.
+    MacosSeatbelt,
     /// The floor every platform has: the command runs in a copy of the
     /// working tree.
     CopiedTree,

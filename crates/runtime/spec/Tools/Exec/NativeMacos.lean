@@ -36,6 +36,8 @@ wrapper 是 sandbox-exec 程序；copy 是唯一可写工作树；profile 是固
 adapter：标准库 Command 的直接 argv，不调用 unsafe，不增加 shell，不管理 run 生命周期。
 
 ## 8 接口先行
+ExecTool::confined(self, confinement: Confined) -> Self 在构造后、首次调用前替换执行边界，
+并从同一 statement 重新生成 disclosure。
 wrap(wrapper: &Path, copy: &Path, command: &Command) -> Result<Command, AxError>；
 probe(wrapper: &Path, copy: &Path) -> Result<(), AxError> 通过同构造器执行 /usr/bin/true。
 

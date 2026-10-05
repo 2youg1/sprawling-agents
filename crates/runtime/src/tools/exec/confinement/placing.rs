@@ -168,6 +168,21 @@ impl Confined {
         let wrapper = match &self.arm {
             Confinement::Unavailable { missing } => return Err(no_arm(*missing)),
             Confinement::WindowsJobObject => return Err(no_job_object()),
+            Confinement::MacosSeatbelt { .. } => {
+                #[cfg(target_os = "macos")]
+                {
+                    None
+                }
+                #[cfg(not(target_os = "macos"))]
+                {
+                    return Err(AxError::failure(
+                        AxCode::SandboxDenied,
+                        "initialize macOS Seatbelt confinement",
+                        "this host is not macOS",
+                    )
+                    .with_recovery("select a native sandbox for this host platform"));
+                }
+            }
             Confinement::LinuxNamespaces { wrapper } => {
                 #[cfg(target_os = "linux")]
                 {
@@ -201,6 +216,24 @@ impl Confined {
             Confinement::CopiedTree => None,
         };
         let (copy, work) = self.synced(workdir)?;
+        #[cfg(target_os = "macos")]
+        if let Confinement::MacosSeatbelt { wrapper } = &self.arm {
+            let native = super::super::native_macos::probe(wrapper, &copy.at)
+                .and_then(|()| super::super::native_macos::wrap(wrapper, &copy.at, &command));
+            return match native {
+                Ok(command) => Ok((
+                    command,
+                    Placed {
+                        copy: Some(copy),
+                        work,
+                    },
+                )),
+                Err(error) => {
+                    remove(&copy.at);
+                    Err(error)
+                }
+            };
+        }
         let command = match wrapper {
             Some(wrapper) => namespaced(&wrapper, &copy.at, workdir, &command),
             None => {

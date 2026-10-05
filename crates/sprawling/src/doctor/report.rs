@@ -201,6 +201,7 @@ fn arm_name(arm: &runtime::tools::Confinement) -> wire::DoctorSandboxArm {
             wire::DoctorSandboxArm::LinuxNamespaces
         }
         runtime::tools::Confinement::WindowsJobObject => wire::DoctorSandboxArm::WindowsJobObject,
+        runtime::tools::Confinement::MacosSeatbelt { .. } => wire::DoctorSandboxArm::MacosSeatbelt,
         runtime::tools::Confinement::CopiedTree => wire::DoctorSandboxArm::CopiedTree,
         runtime::tools::Confinement::Unavailable { missing } => {
             wire::DoctorSandboxArm::Unavailable {
@@ -219,7 +220,8 @@ fn arm_name(arm: &runtime::tools::Confinement) -> wire::DoctorSandboxArm {
 fn chosen_name(arm: &runtime::tools::Confinement) -> wire::SandboxArm {
     match arm {
         runtime::tools::Confinement::LinuxNamespaces { .. }
-        | runtime::tools::Confinement::WindowsJobObject => wire::SandboxArm::Native,
+        | runtime::tools::Confinement::WindowsJobObject
+        | runtime::tools::Confinement::MacosSeatbelt { .. } => wire::SandboxArm::Native,
         runtime::tools::Confinement::CopiedTree => wire::SandboxArm::CopiedTree,
         runtime::tools::Confinement::Unavailable { .. } => wire::SandboxArm::None,
     }

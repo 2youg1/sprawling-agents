@@ -130,14 +130,7 @@ impl ExecTool {
         // because a tool that said only "sandboxed" would let a command
         // that needs a closed network be launched in a box whose network
         // is open.
-        let disclosure = format!(
-            "Run a program, a Python snippet, or a shell line. A program or shell \
-             line runs in this machine's confinement, {}. Ask for `where: host` to \
-             run one outside it. Use `read` and `search` for what is already written here; a \
-             command that prints it comes back without the version `edit` guards on.{}",
-            confinement.statement(),
-            setup.shell.statement()
-        );
+        let disclosure = disclosure(&setup, &confinement);
         Ok(ExecTool {
             setup,
             sandbox: Mutex::new(sandbox),
@@ -154,6 +147,14 @@ impl ExecTool {
                 temporal: Temporal::Timestamped,
             },
         })
+    }
+
+    /// Chooses an execution boundary before the tool is admitted to a run.
+    /// The disclosure and actual placement always read the same confinement.
+    pub fn confined(mut self, confinement: Confined) -> Self {
+        self.meta.disclosure = disclosure(&self.setup, &confinement);
+        self.confinement = Mutex::new(confinement);
+        self
     }
 
     fn run_program(
@@ -298,6 +299,14 @@ impl ExecTool {
         with_interpreter(answer, &interpreter)
     }
 }
+fn disclosure(setup: &ExecSetup, confinement: &Confined) -> String {
+    format!(
+        "Run a program, a Python snippet, or a shell line. A program or shell          line runs in this machine's confinement, {}. Ask for `where: host` to          run one outside it. Use `read` and `search` for what is already written here; a          command that prints it comes back without the version `edit` guards on.{}",
+        confinement.statement(),
+        setup.shell.statement()
+    )
+}
+
 /// Every result payload this tool can return has its own file: the
 /// arms above decide what happened, and `outcome` decides how it is
 /// written down.

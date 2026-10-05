@@ -168,6 +168,9 @@ pub enum Confinement {
     /// A Windows job object: the tree ends together, the limits hold,
     /// and the network is not isolated.
     WindowsJobObject,
+    /// Seatbelt permits writes only in the copy and refuses network operations.
+    /// It does not provide a new identity, tree termination or aggregate resource limits.
+    MacosSeatbelt { wrapper: PathBuf },
     /// The floor every platform has: the command runs in a copy of the
     /// working tree, and the tree itself is not what it writes to.
     CopiedTree,
@@ -211,6 +214,13 @@ impl Confinement {
                 user: all,
                 resources: none,
             },
+            Confinement::MacosSeatbelt { .. } => Assurances {
+                filesystem: all,
+                network: all,
+                process_tree: none,
+                user: none,
+                resources: none,
+            },
             Confinement::WindowsJobObject => Assurances {
                 filesystem: all,
                 network: none,
@@ -241,6 +251,7 @@ impl Confinement {
         match self {
             Confinement::LinuxNamespaces { .. } => "linux_namespaces",
             Confinement::WindowsJobObject => "windows_job_object",
+            Confinement::MacosSeatbelt { .. } => "macos_seatbelt",
             Confinement::CopiedTree => "copied_tree",
             Confinement::Unavailable { .. } => "unavailable",
         }
@@ -256,6 +267,7 @@ impl Confinement {
             }
             Confinement::LinuxNamespaces { .. }
             | Confinement::WindowsJobObject
+            | Confinement::MacosSeatbelt { .. }
             | Confinement::CopiedTree => {
                 let kept = self.assurances();
                 let holds: Vec<&str> = Guarantee::ALL

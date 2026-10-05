@@ -37,7 +37,7 @@ pub struct DoctorVerdict { pub tier: DoctorTier, pub missing: Vec<String> }
 // 与逐件的 items 并列的两道整机读数：命令跑在什么盒子里、凭据住在哪里。
 pub struct DoctorSandbox { pub arm: DoctorSandboxArm, pub named: SandboxArm, pub coverage: Vec<DoctorGuarantee> }
 pub enum SandboxArm { None, CopiedTree, Native, Container, Python }   // D26
-pub enum DoctorSandboxArm { LinuxNamespaces, WindowsJobObject, CopiedTree,
+pub enum DoctorSandboxArm { LinuxNamespaces, WindowsJobObject, MacosSeatbelt, CopiedTree,
                             Unavailable { missing: DoctorSandboxMissing } }
 pub enum DoctorSandboxMissing { ScratchDirectory }
 pub struct DoctorGuarantee { pub axis: DoctorGuaranteeAxis, pub kept: DoctorCoverage }
