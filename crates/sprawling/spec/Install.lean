@@ -217,7 +217,8 @@ pub(crate) fn install(uninstall: bool) -> Result<Report, AxError>;
 
 客户端经 `just build-web` 构建后由现有 `build.rs` 嵌入；Nix 从该文件的 `BUNDLE_DIR` 读取位置，
 不声明第二个目录。Cargo 用同一钉住的 Rust 的 `makeRustPlatform.buildRustPackage`，默认 features
-包含 sandbox。打包前要求生成的嵌入表声明 `CLIENT_COMPLETE = true`，否则构建退出非零并要求恢复
+包含 sandbox。`just` 仅执行显式客户端命令，其 nixpkgs setup hook 不选择
+默认构建、检查或安装阶段，三个阶段由 Rust builder 的 Cargo hooks 持有。打包前要求生成的嵌入表声明 `CLIENT_COMPLETE = true`，否则构建退出非零并要求恢复
 客户端构建步骤。安装后的 skills 与许可证在包的 share 目录，skills 来源与目录名读既有归档权威
 `tools/xtask/src/package/contents.rs`，首次起城的模板与 skills 仍由 city 的构建脚本嵌入。
 下载 integrity 不符、锁解析失败、客户端构建失败或 Rust 编译失败均让 derivation 失败，不能交出
