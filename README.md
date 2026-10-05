@@ -51,6 +51,15 @@ It is built for small teams who want agents to keep running fixed work, and for 
 
 A git checkout builds with `just dist`, because a plain `cargo build` embeds a blank page until `just build-web` has built it. [`docs/getting-started.md`](docs/getting-started.md) ([中文](docs/getting-started.zh-CN.md)) is the full guide, from an empty directory to a reviewed merge on your branch.
 
+On Linux x86-64 with Nix, enable `nix-command` and `flakes`, then run from a checkout of the tag or commit you want:
+
+```bash
+nix build .#default --no-update-lock-file
+nix run .#default --no-update-lock-file -- up ~/cities/first
+```
+
+The flake builds and embeds the client and carries the shipped skills and licences. It reads the repository's pinned Rust toolchain and dependency locks; `nix develop` remains the development shell. See the [Nix instructions](docs/getting-started.md#with-nix) for choosing and updating the source.
+
 ## Five words
 
 | Word | What it is |
