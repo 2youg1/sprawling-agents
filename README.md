@@ -109,6 +109,7 @@ Provider interfaces and harness launch commands follow the ACP registry and vend
 
 The shipped `sdd`, `tutor` and `translation` are English adaptations of the author's Chinese skills. `why`, `how` and `blast-radius` adapt Lauren Tan (poteto)'s [pstack](https://github.com/cursor/plugins/tree/main/pstack), and `authority-review` adapts Thermos from the same repository; all four keep MIT. [skills/LICENSES.md](crates/city/skills/LICENSES.md) carries each skill's terms and credit.
 
-Contributions start with [AGENTS.md](AGENTS.md) and [CONTRIBUTING](docs/CONTRIBUTING.md); issue and pull request descriptions require matching English and Chinese versions. Use the private reporting channel in [SECURITY.md](SECURITY.md) for vulnerabilities.
+Report bugs or request features through the [issue forms](https://github.com/2youg1/sprawling-agents/issues/new/choose). For code changes, follow [AGENTS.md](AGENTS.md) and [CONTRIBUTING](docs/CONTRIBUTING.md). Use the private reporting channel in [SECURITY.md](SECURITY.md) for vulnerabilities.
+
 
 The project is [MPL-2.0](LICENSE); shipped skills carry their individual licences with their files.

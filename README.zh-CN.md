@@ -111,6 +111,7 @@ sprawling 不会自动更新；需要时在设置中检查版本，并按[更新
 
 随附的 `sdd`、`tutor`、`translation` 是作者中文 skills 的英文改编；`why`、`how`、`blast-radius` 改编自 Lauren Tan（poteto）的 [pstack](https://github.com/cursor/plugins/tree/main/pstack)，`authority-review` 改编自同一仓库的 Thermos，四者保留 MIT。每个 skill 的署名与许可见 [skills/LICENSES.md](crates/city/skills/LICENSES.md)。
 
-贡献从 [AGENTS.md](AGENTS.md) 与 [CONTRIBUTING](docs/CONTRIBUTING.md) 开始；Issue 和 PR 描述须有含义一致的中英文版本，漏洞使用 [SECURITY.md](SECURITY.md) 的私密报告入口。
+报告缺陷或提出功能请求，请使用 [Issue 表单](https://github.com/2youg1/sprawling-agents/issues/new/choose)。修改代码请按 [AGENTS.md](AGENTS.md) 与 [CONTRIBUTING](docs/CONTRIBUTING.md) 进行。漏洞使用 [SECURITY.md](SECURITY.md) 的私密报告入口。
+
 
 本项目采用 [MPL-2.0](LICENSE)；随附 skills 各自的许可随文件分发。

@@ -2,8 +2,9 @@
   A pull request is judged by one question: does this change hold?
   The checklist below is the evidence a reviewer needs; the diff shows
   what you did, so the description should say what you found and why.
-  Describe in your own language (CONTRIBUTING §4); a parallel translation
-  in the other language is welcome.
+  Provide matching English and Chinese versions of the description,
+  following AGENTS.md's Language section; share literal diagnostics,
+  logs and attachments once.
 -->
 
 **What this is** — one sentence: the problem it closes or the capability it adds.
