@@ -33,6 +33,13 @@ pub(super) enum Passage {
 pub(super) fn passage(frame: wire::ClientFrame) -> Passage {
     match frame {
         wire::ClientFrame::Hello(said) => Passage::Greeting(said),
+        // The privacy page answers with the host's settings and the values
+        // this app found before it changed them, which are the host's and
+        // not the city's (`crates/wire/Spec.lean` §8-86).
+        wire::ClientFrame::Ask(wire::Ask {
+            query: wire::Query::Privacy,
+            ..
+        }) => Passage::Judged(VerbClass::LocalOnly),
         // Asking and watching read the city and change nothing.
         wire::ClientFrame::Ask(_) | wire::ClientFrame::Monitor(_) => {
             Passage::Judged(VerbClass::Read)
