@@ -7388,24 +7388,24 @@
     "zh": "不放置"
   },
   "performance_none_note": {
-    "en": "Leave threads and run CPU shares to the operating system.",
-    "zh": "线程和 run CPU 份额交给操作系统。"
+    "en": "Do not request CPU placement or per-run CPU weight. Thread priority is set separately.",
+    "zh": "不请求 CPU 放置或 run CPU 权重；线程优先级另设。"
   },
   "performance_normal": {
     "en": "normal",
     "zh": "正常"
   },
   "performance_normal_note": {
-    "en": "Use normal priority for core threads; child commands still run below the core.",
-    "zh": "核心线程用正常优先级；子命令仍低于核心。"
+    "en": "Keep core threads at normal priority. Placement and sandbox limits are separate settings.",
+    "zh": "核心线程用正常优先级；放置与沙箱限制另行设置。"
   },
   "performance_pinned": {
     "en": "pinned",
     "zh": "硬亲和"
   },
   "performance_pinned_note": {
-    "en": "Request hard affinity to the placement plan, with run CPU shares. Windows also requests the remaining processors for run jobs. Unsupported platforms report the fallback.",
-    "zh": "请求放置计划的硬亲和及 run CPU 份额；Windows 还为 run job 请求余下处理器。不支持的平台报告退路。"
+    "en": "Windows requests hard affinity to the placement plan and the remaining processors for run jobs. Linux reports a taskset command to use at startup; macOS does not pin.",
+    "zh": "Windows 为核心请求放置计划的硬亲和，并为 run job 请求余下处理器；Linux 报告需在启动时使用的 taskset 命令，macOS 不固定处理器。"
   },
   "performance_placement": {
     "en": "CPU placement",
@@ -7420,8 +7420,8 @@
     "zh": "提高"
   },
   "performance_raised_note": {
-    "en": "Raise hot core threads above normal so command trees do not delay city responses.",
-    "zh": "提高核心热线程优先级，避免命令进程树延迟城的响应。"
+    "en": "Request above-normal priority for hot core threads. The operating system may refuse the request.",
+    "zh": "请求提高核心热线程优先级；操作系统可能拒绝。"
   },
   "performance_restart": {
     "en": "Restart the city server to apply these settings.",
