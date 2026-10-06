@@ -45,6 +45,7 @@ impl Endpoint { pub fn list_models(&self, url: &str) -> Result<Vec<ModelFacts>, 
 ```
 
 - **人填的设置接的是 `EndpointConfig` 既有的 `extra_headers` 与 `overrides`**，不是第二套：「人填的那份设置」与「一周以后发出的那次调用」之间的存放处在 `AttachedEndpoint` 上，随 `endpoint_attached` 进账本、随重放回到书里。
+- **快照中的账号字段保留 Option 标记**：`EndpointTuning.accounts` 为 None 时仍编码该字段，postcard 按字段顺序读取；账本的缺席由 `AttachedTuning` 保持，记录的旧 JSON 形状不变。
 - **覆盖以文本入账**：账本不收浮点。`applied_overrides` 是文本变 JSON 的唯一一处，规则为「解析得出即那个 JSON，否则即它看上去的字符串」。
 - **人写的头顶掉兼容格式自己的同名头**（按 ASCII 大小写不敏感比较），不是并列两行：两条 `anthropic-version` 是一条没有供应方承诺按谁的意思读的请求。
 - **`stream_idle_timeout_ms` 是一次沉默的上限，不是整次应答的期限**。三层一个名字：线上、本 crate 与文案都叫 `stream_idle_timeout_ms`，装配层不翻译它。**实现与名字一致**：`reqwest::blocking` 把一个请求的 timeout 当整体期限执行（异步层的 total timeout 覆盖整个 body），所以流式请求发出前把 `timeout` 清成 `None`，正文在一条自己的线程上逐行读，调用侧用 `recv_timeout(idle)` 计时，每收到一行重置。缺席则取 `timeout_ms`：一条没单独设过界的流也不允许永远安静。**代价写在这里而不是藏着**：对侧不说话又不断连时，那条读线程阻到对侧断连为止；结束这次调用是人要的，结束那条连接是对侧的。拒词报出越过的那个界（`no byte arrived for N ms`）而不是传输的原句。**败给的方案**：把线上字段改名 `stream_deadline_ms`——那会让一段写了六分钟的长回答在五分钟整被切，而那正是人抱怨的那件事。
