@@ -13,18 +13,24 @@
 ## 2 验收标准
 经 Confined::place 与 ExecTool::invoke 的实际 macOS 对拍检查副本写入成功、绝对路径
 与逃逸链接写入失败、TCP／UDP／后代网络失败、初始化失败不执行目标。
-本模型证明每一步子进程操作都携带策略；不证明 XNU 执行策略。
+后台命令用副本内的就绪文件与放行文件协调，确认后台持有副本、只交 owner 一次完整
+stdout／stderr／退出码；halt 与工具 drop 经生产 Backlog 回收已起动的主进程，
+另一 owner 的后台命令不被 release 终止。主进程 pid 回收与副本清理分别检查，
+不把主进程回收称为整棵进程树终止。本模型证明每一步子进程操作都携带策略；不证明 XNU 执行策略。
 
 ## 3 假设与歧义
 内核是策略执行者。探测成功不保证之后的包装起动成功，真实目标仍必须携带同一策略。
 包装初始化失败与目标退出码的区别尚无起动握手；非零结果保留原 stderr，不宣称已区分。
-macOS host 的同 RunId 多命令聚合硬内存机制尚未成立；RLIMIT、taskpolicy 与采样不满足。
+macOS native 不强制同 RunId 多命令与任意后代的聚合硬内存上限，resources 为不保。
+已核实的无特权 host 入口中没有满足 D29 的机制；这不是所有未来 macOS 接口的不存在证明。
+RLIMIT 与 taskpolicy 是逐进程额度，采样后终止存在超限窗口且不能保证追踪脱离的后代。
 resource／jetsam coalition 的创建在已运行的 macOS 26.6.2 上均被普通账户与 root 以 EPERM
 拒绝；这只限定这些入口与该系统，不证明所有 macOS 聚合机制均不可行。taskpolicy -m 96
 之下两名子进程同时写入各 64 MiB（其中一名 setsid）并存活，成功的宿主对照也存活；
 因此此候选没有兑现 96 MiB 的树级聚合上限。没有创建成功的 coalition 就没有其清理对象。
 受控执行服务只有在同一 run 的所有命令与任意后代共享一个硬额度且不能逃离时才满足
-D29；独立命令各得一个完整额度的容器不满足，不以未实现的替代方案关闭此未决。
+D29；独立命令各得一个完整额度的容器不满足。只有新增符合这些条件的接口与真实
+共享额度反例对拍，才重开 native 的资源保证；当前接口不申请此额度，不产生虚构的申请失败。
 
 ## 4 现状分析
 副本同步与后台持有归 confinement::placing；叶子不建立第二张 run／副本表。
@@ -46,6 +52,12 @@ Apple system_cmds 固定提交 408bba7453608006b89772db185defbac8fe2fd0 的
 https://github.com/apple-oss-distributions/system_cmds/blob/408bba7453608006b89772db185defbac8fe2fd0/taskpolicy/taskpolicy.c#L266
 把 memory limit 交给单个 posix_spawn 的 active／inactive jetsam 限额；不能从其参数名
 推导同 run 的共享额度。runner 的 launchd.plist(5) 也把 ResourceLimits 定为 setrlimit(2)。
+同一 XNU 固定提交的
+https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/bsd/kern/kern_resource.c#L1647
+以 current_map() 设置 RLIMIT_AS，限制的是当前进程地址空间；继承额度不把额度变成共享池。
+https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/bsd/kern/kern_memorystatus.c#L9192
+要求 root 或 MEMORYSTATUS_ENTITLEMENT（少数明写的例外另判），
+SET_MEMLIMIT_PROPERTIES 在 L9241 仍以 pid 为对象，不提供任意命令树共享额度。
 
 ## 6 命名统一
 wrapper 是 sandbox-exec 程序；copy 是唯一可写工作树；profile 是固定 SBPL 策略。
@@ -100,7 +112,9 @@ Lean 量化任意 fork／exec／退出序列，证明模型里的策略身份不
 完整平台验收需运行目标系统，不以 Windows 上的字符串断言替代。
 `crates/runtime/src/tools/exec/native_macos/memory_probe.py` 仅在可丢弃的 GitHub macOS
 runner 执行，不是生产依赖或默认 Rust 检查；它实际尝试 coalition 的创建与成功后的清理，
-并对拍 taskpolicy 与宿主双子进程。失败尝试与反例是候选证据，不是聚合强制实现。
+并对拍 taskpolicy、继承 RLIMIT_AS／RLIMIT_RSS 与宿主双子进程；报告保留每个孩子
+实际继承的额度与同时存活检查。memorystatus 只对探测自己的 pid 设置逐进程限额。
+失败尝试与反例是候选证据，不是聚合强制实现。
 
 ## 17 文档关系
 父分部 D32、§8-13-2 定选择与副本；D29 定 Shares 与聚合内存要求；本分部不复制这些定义。

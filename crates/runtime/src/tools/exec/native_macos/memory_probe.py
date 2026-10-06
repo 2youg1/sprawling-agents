@@ -3,6 +3,7 @@ import ctypes
 import json
 import os
 import platform
+import resource
 import subprocess
 import sys
 
@@ -10,23 +11,31 @@ if platform.system() != "Darwin" or os.environ.get("GITHUB_ACTIONS") != "true":
     raise SystemExit("run only inside a disposable GitHub macOS runner")
 
 if "--tree-fixture" in sys.argv:
+    allocation_mib = 64
+    if "--rlimit-as" in sys.argv:
+        resource.setrlimit(resource.RLIMIT_AS, (512 * 1024 * 1024,) * 2)
+        allocation_mib = 320
+    if "--rlimit-rss" in sys.argv:
+        resource.setrlimit(resource.RLIMIT_RSS, (96 * 1024 * 1024,) * 2)
     child = """import json,os,resource,sys
 if sys.argv[1] == 'detached': os.setsid()
-pages=bytearray(64*1024*1024)
+pages=bytearray(int(sys.argv[2])*1024*1024)
 for offset in range(0,len(pages),4096): pages[offset]=1
-print(json.dumps({'ready':True,'allocated_bytes':len(pages),'maxrss':resource.getrusage(resource.RUSAGE_SELF).ru_maxrss,'detached':sys.argv[1]=='detached'}),flush=True)
+print(json.dumps({'ready':True,'allocated_bytes':len(pages),'maxrss':resource.getrusage(resource.RUSAGE_SELF).ru_maxrss,'detached':sys.argv[1]=='detached','rlimit_as':resource.getrlimit(resource.RLIMIT_AS),'rlimit_rss':resource.getrlimit(resource.RLIMIT_RSS)}),flush=True)
 sys.stdin.read(1)
 """
     children = []
     records = []
     try:
         for mode in ["ordinary", "detached"]:
-            process = subprocess.Popen([sys.executable, "-c", child, mode], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            process = subprocess.Popen([sys.executable, "-c", child, mode, str(allocation_mib)], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
             children.append(process)
             line = process.stdout.readline()
             if not line:
                 raise RuntimeError("child allocation failed: " + process.stderr.read())
             records.append(json.loads(line))
+        if any(process.poll() is not None for process in children):
+            raise RuntimeError("a child stopped before simultaneous liveness was checked")
         print(json.dumps({"two_children_survived_simultaneously": True, "allocated_total_bytes": sum(row["allocated_bytes"] for row in records), "children": records}), flush=True)
     finally:
         for process in children:
@@ -65,8 +74,26 @@ for name, flags in [("resource", 0), ("jetsam", 16)]:
     report["coalition_attempts"].append(row)
 report["coalition_logical_writes_setter_present"] = getattr(libc, "coalition_ledger_set_logical_writes_limit", None) is not None
 
+class MemlimitProperties(ctypes.Structure):
+    _fields_ = [("active_mb", ctypes.c_int32), ("active_attr", ctypes.c_uint32),
+                ("inactive_mb", ctypes.c_int32), ("inactive_attr", ctypes.c_uint32)]
+
+# XNU kern_memorystatus.h: SET_MEMLIMIT_PROPERTIES = 7; only this probe pid.
+setter = getattr(libc, "memorystatus_control", None)
+if setter is None:
+    report["memorystatus_self_limit"] = {"entry_present": False}
+else:
+    setter.argtypes = [ctypes.c_uint32, ctypes.c_int32, ctypes.c_uint32, ctypes.c_void_p, ctypes.c_size_t]
+    setter.restype = ctypes.c_int
+    properties = MemlimitProperties(96, 0, 96, 0)
+    ctypes.set_errno(0)
+    result = setter(7, os.getpid(), 0, ctypes.byref(properties), ctypes.sizeof(properties))
+    report["memorystatus_self_limit"] = {"result": result, "errno": ctypes.get_errno()}
+
 for candidate, command in [
     ("taskpolicy_children", ["/usr/sbin/taskpolicy", "-m", "96", sys.executable, __file__, "--tree-fixture"]),
+    ("rlimit_as_children", [sys.executable, __file__, "--tree-fixture", "--rlimit-as"]),
+    ("rlimit_rss_children", [sys.executable, __file__, "--tree-fixture", "--rlimit-rss"]),
     ("host_two_children_control", [sys.executable, __file__, "--tree-fixture"]),
 ]:
     try:

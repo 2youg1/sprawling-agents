@@ -52,6 +52,11 @@ fn native_macos_exec_writes_only_the_copy_and_preserves_output_and_exit() {
     );
     assert!(!source.path().join("written").exists());
     assert!(tool.meta().disclosure.contains("macos_seatbelt"));
+    assert!(
+        tool.meta()
+            .disclosure
+            .contains(crate::tools::Guarantee::Resources.unkept())
+    );
     let entries: Vec<_> = std::fs::read_dir(scratch.path())
         .unwrap()
         .map(|entry| entry.unwrap().path())
@@ -188,40 +193,65 @@ fn native_macos_initialization_failure_never_runs_target_or_retains_copy() {
     assert_eq!(std::fs::read_dir(scratch.path()).unwrap().count(), 0);
 }
 
+fn await_condition(mut condition: impl FnMut() -> bool) {
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(60);
+    while !condition() {
+        assert!(
+            std::time::Instant::now() < deadline,
+            "native lifecycle condition timed out"
+        );
+        std::thread::park_timeout(std::time::Duration::from_millis(5));
+    }
+}
+
+fn gated_command(tool: &ExecTool, scratch: &std::path::Path) -> (Value, PathBuf, u32) {
+    let result = invoke_python(tool,
+        "import os,pathlib,time; pathlib.Path('ready').write_text(str(os.getpid()))
+while not pathlib.Path('continue').exists(): time.sleep(0.01)
+pathlib.Path('late').write_text('copy'); print('later-out'); print('later-err',file=__import__('sys').stderr); raise SystemExit(7)", &[]);
+    assert_eq!(result["outcome"], "backgrounded", "{result}");
+    let copies: Vec<_> = std::fs::read_dir(scratch)
+        .unwrap()
+        .map(|entry| entry.unwrap().path())
+        .collect();
+    assert_eq!(copies.len(), 1);
+    let copy = copies[0].clone();
+    await_condition(|| {
+        std::fs::read_to_string(copy.join("ready")).is_ok_and(|text| text.parse::<u32>().is_ok())
+    });
+    let pid = std::fs::read_to_string(copy.join("ready"))
+        .unwrap()
+        .parse()
+        .unwrap();
+    (result["handle"].clone(), copy, pid)
+}
+
 #[test]
 fn native_macos_background_keeps_its_copy_and_reports_one_terminal_result() {
     let source = tempfile::tempdir().unwrap();
     let scratch = tempfile::tempdir().unwrap();
-    let tool = native_tool(
-        source.path(),
-        scratch.path(),
-        Backlog::with_window(crate::backlog::PollBudget::new(1, 1)),
-    );
-    let result = tool.invoke(&call(serde_json::json!({
-        "program": {"path": "/bin/sh", "args": ["-c", "sleep 1; printf late > late; printf 'later-out
-'; printf 'later-err
-' >&2; exit 7"]}
-    }))).unwrap();
-    let result = serde_json::to_value(result.result).unwrap();
-    assert_eq!(result["outcome"], "backgrounded");
-    let handle = result["handle"].clone();
-    assert_eq!(std::fs::read_dir(scratch.path()).unwrap().count(), 1);
-    let finished = (0..100)
-        .find_map(|_| {
-            let result = tool
-                .invoke(&call(serde_json::json!({
-                    "program": {"path": "/usr/bin/true", "args": []}
-                })))
-                .unwrap();
-            let result = serde_json::to_value(result.result).unwrap();
-            result["background"].as_array().and_then(|members| {
-                members
-                    .iter()
-                    .find(|member| member["handle"] == handle)
-                    .cloned()
-            })
-        })
-        .expect("native background did not finish within bounded actual invocations");
+    let backlog = Backlog::with_window(crate::backlog::PollBudget::new(1, 1));
+    let tool = native_tool(source.path(), scratch.path(), backlog.clone());
+    let (handle, copy, _) = gated_command(&tool, scratch.path());
+    let owner = tool.setup.run;
+    let stranger = kernel::RunId::from_bytes([2; 16]);
+    assert!(backlog.harvest(stranger).unwrap().is_empty());
+    assert!(backlog.harvest(owner).unwrap().is_empty());
+    assert!(copy.is_dir());
+    std::fs::write(copy.join("continue"), "go").unwrap();
+    let mut finished = None;
+    await_condition(|| {
+        assert!(backlog.harvest(stranger).unwrap().is_empty());
+        let result = invoke_python(&tool, "pass", &[]);
+        finished = result["background"].as_array().and_then(|members| {
+            members
+                .iter()
+                .find(|member| member["handle"] == handle)
+                .cloned()
+        });
+        finished.is_some()
+    });
+    let finished = finished.unwrap();
     assert_eq!(
         (
             finished["exit_code"].as_i64(),
@@ -238,10 +268,25 @@ fn native_macos_background_keeps_its_copy_and_reports_one_terminal_result() {
                 "later-err
 "
             )
-        )
+        ),
+        "{finished}"
+    );
+    assert!(
+        backlog
+            .harvest(owner)
+            .unwrap()
+            .iter()
+            .all(|member| member.id.to_string() != handle.as_str().unwrap())
     );
     assert!(!source.path().join("late").exists());
     drop(tool);
+    await_condition(|| {
+        backlog.harvest(stranger).unwrap();
+        backlog
+            .standing(&Address::parse("work").unwrap())
+            .unwrap()
+            .is_empty()
+    });
     assert_eq!(std::fs::read_dir(scratch.path()).unwrap().count(), 0);
 }
 
@@ -252,14 +297,7 @@ fn native_macos_halt_and_tool_release_reap_the_owned_primary_and_copy() {
         let scratch = tempfile::tempdir().unwrap();
         let backlog = Backlog::with_window(crate::backlog::PollBudget::new(1, 1));
         let tool = native_tool(source.path(), scratch.path(), backlog.clone());
-        let result = tool
-            .invoke(&call(serde_json::json!({
-                "program": {"path": "/bin/sh", "args": ["-c", "while :; do :; done"]}
-            })))
-            .unwrap();
-        let result = serde_json::to_value(result.result).unwrap();
-        assert_eq!(result["outcome"], "backgrounded");
-        assert_eq!(std::fs::read_dir(scratch.path()).unwrap().count(), 1);
+        let (_, copy, pid) = gated_command(&tool, scratch.path());
         if halt {
             assert_eq!(
                 backlog
@@ -269,18 +307,71 @@ fn native_macos_halt_and_tool_release_reap_the_owned_primary_and_copy() {
             );
         }
         drop(tool);
-        let domain = Address::parse("work").unwrap();
-        for _ in 0..1_000_000 {
-            backlog.harvest(kernel::RunId::from_bytes([1; 16])).unwrap();
-            if backlog.standing(&domain).unwrap().is_empty() {
-                break;
-            }
-            std::thread::yield_now();
-        }
+        await_condition(|| {
+            backlog.harvest(kernel::RunId::from_bytes([2; 16])).unwrap();
+            backlog
+                .standing(&Address::parse("work").unwrap())
+                .unwrap()
+                .is_empty()
+        });
         assert!(
-            backlog.standing(&domain).unwrap().is_empty(),
-            "owned native primary did not stop"
+            !Command::new("/bin/kill")
+                .args(["-0", &pid.to_string()])
+                .output()
+                .unwrap()
+                .status
+                .success(),
+            "owned primary still exists"
         );
+        assert!(!copy.exists());
         assert_eq!(std::fs::read_dir(scratch.path()).unwrap().count(), 0);
     }
+}
+
+#[test]
+fn native_macos_release_leaves_another_owners_background_command_alive() {
+    let source = tempfile::tempdir().unwrap();
+    let scratch = tempfile::tempdir().unwrap();
+    let other_scratch = tempfile::tempdir().unwrap();
+    let backlog = Backlog::with_window(crate::backlog::PollBudget::new(1, 1));
+    let tool = native_tool(source.path(), scratch.path(), backlog.clone());
+    let mut other_setup = setup(source.path(), None, Some(PathBuf::from("/bin/sh")));
+    other_setup.run = kernel::RunId::from_bytes([2; 16]);
+    let other = ExecTool::new(other_setup, Box::new(EchoSandbox::new()), backlog.clone())
+        .unwrap()
+        .confined(Confined::with_arm(
+            Confinement::MacosSeatbelt {
+                wrapper: PathBuf::from("/usr/bin/sandbox-exec"),
+            },
+            Some(other_scratch.path().to_path_buf()),
+        ));
+    gated_command(&tool, scratch.path());
+    let (_, other_copy, other_pid) = gated_command(&other, other_scratch.path());
+    drop(tool);
+    await_condition(|| {
+        backlog.harvest(kernel::RunId::from_bytes([3; 16])).unwrap();
+        backlog
+            .standing(&Address::parse("work").unwrap())
+            .unwrap()
+            .len()
+            == 1
+    });
+    assert!(
+        Command::new("/bin/kill")
+            .args(["-0", &other_pid.to_string()])
+            .output()
+            .unwrap()
+            .status
+            .success()
+    );
+    assert!(other_copy.is_dir());
+    drop(other);
+    await_condition(|| {
+        backlog.harvest(kernel::RunId::from_bytes([3; 16])).unwrap();
+        backlog
+            .standing(&Address::parse("work").unwrap())
+            .unwrap()
+            .is_empty()
+    });
+    assert!(!other_copy.exists());
 }
