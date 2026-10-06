@@ -222,7 +222,7 @@ pub(crate) struct Violation {
 
 /-! ### 8-8 color：一个客户端，一处颜色产地（形状 6 数据面）
 
-**权威是一句话**：颜色在每个客户端里恰好被命名一次。浏览器客户端的那一处是 `client/src/theme.css` 的 `@theme` 块，`THEME` 常量即它，七条令牌断言只读它。产地表（`color/scan.rs` 的 `PRODUCTION_POINTS`）有两行：`THEME`，以及 playback 技能的参考页 `skills/playback/template.html`——城交给人的一个单文件页面，载不进客户端的样式表，所以它的颜色在自己的 `:root` 块里各命名一次。「断言读哪份表」与「扫描放过谁」从此是两个答案。
+**权威是一句话**：颜色在每个客户端里恰好被命名一次。浏览器客户端的那一处是 `client/src/theme.css` 的 `@theme` 块，`THEME` 常量即它，七条令牌断言只读它。产地表（`color/scan.rs` 的 `PRODUCTION_POINTS`）有两行：`THEME`，以及 playback 技能的样式源文件 `skills/playback/src/style.css`——离线页面载不进客户端的样式表，所以它的颜色在自己的 `:root` 块里各命名一次。`skills/playback/template.html` 是该样式的组装输出，只在带有生成横幅时跳过字面量扫描；共享 Bun 检查逐字节比对它与源片段，未标记的页面仍受扫描。「断言读哪份表」与「扫描放过谁」从此是两个答案。
 
 **七条令牌断言读 CSS 自定义属性，不读 Rust 表**。解析面因此是 `--color-*`／`--text-*`／`--font-weight-*` 这一类声明，值取 `oklch(L C H)` 的三个分量。灰阶的 `L` 以千分之一为单位比较（`0.145` 读作 145），与断言里的 `L_FLOOR`／`L_CEILING` 同刻度。
 
@@ -653,13 +653,15 @@ shebang 和现有运行时选择，不要求二者同时安装。被否：只在
 
 **败给的方案**：在 `ci.yml` 里照抄那两条命令，附一句「与 `justfile` 保持一致」。那正是分叉发生时的写法，而没有任何东西会注意到它们不再一致。
 
-D27 **验证编排只住 `.github/workflows/ci.yml`，release 经 `workflow_call` 调同一提交的入口。** 本段描述 GitHub Actions 的调用契约，不是 Lean 证明；job 状态与矩阵完整性由 Actions 引擎提供。输入 `release-validation` 是默认 false 的 boolean，true 保持发行原有的阻塞范围：跳过 `changes`、Linux/macOS `core` 与条件 `proof`，其余 job 与普通 CI 共用 recipes、矩阵和准备步骤。普通 CI 的路径条件与手动 proof 不变；扩大 core/proof 的发布阻塞范围须另有明确决定。`validation` 经 `needs` 汇合必需 job，只有每项为 success 才成功；failure、cancelled、skipped 与因构建失败而未运行的分片都拒绝。四分片共用本轮 `test-build` 的 archive，矩阵与分区继续由 CI 定义，release 不另写检查清单。
+D27 **验证编排只住 `.github/workflows/ci.yml`，release 经 `workflow_call` 调同一提交的入口。** 本段描述 GitHub Actions 的调用契约，不是 Lean 证明；job 状态与矩阵完整性由 Actions 引擎提供。输入 `release-validation` 是默认 false 的 boolean，true 保持发行原有的阻塞范围：跳过 `changes`、Linux/macOS `core` 与条件 `proof`，其余 job 与普通 CI 共用 recipes、矩阵和准备步骤。普通 CI 的路径条件与手动 proof 不变；扩大 core/proof 的发布阻塞范围须另有明确决定。`validation` 经 `needs` 汇合必需 job，只有每项为 success 才成功；failure、cancelled、skipped 与因构建失败而未运行的分片都拒绝。类型分片共用本轮 `test-build` 的 archive；`justfile` 的 `test-slice-plan` 是分片名称与 nextest filterset 的唯一权威，CI 使用该 recipe 输出的矩阵，release 不另写检查清单。构建作业用 archive 的完整 nextest JSON 清单与每个 filterset 的清单比较 `(binary-id, test name)`，包括 ignored 项；未分配、重复分配或清单外的项都失败，只有覆盖验证成功才输出矩阵。trybuild 按 package 分开，citysim 独立，其余 unit 按 crate 分组、integration 按 package 分组，其他 kind 归入兜底分片；accounting 的 unit 场景按执行、协作及补集三个模块域分开，因为其文件写入与 worker 场景集中在一个 runner 会成为执行热点，域的 module 名称只在 `test-slice-plan` 的 predicates 定义，补集从这些 predicates 生成。新测试必须仍恰好落入一个分片。
 
 `test-build` 的两项 Cargo debug 环境覆盖只在共享入口定义，main 与 tag 因而读同一种 test 缓存身份；fast/clippy/test 的用途仍各自独立，Rust cache 保持默认 workspace 产物清理，只有 main 写入。缓存恢复不是验证证据。release 调用的 concurrency 以 run id 隔离且不替代取消，普通 CI 仍按 ref 替代旧运行；调用权限只有 contents read，不传 secrets。release 的 advisories 是本轮新读，发行 archive 仍并行构建，publish 等待 verify、advisories 与 archive 成功，发行消费者只下载 archive-*。verify/archive job 名与 Windows 签名输出 archive-Windows 的位置保留。
 
+`test-timings` 读取两份 `gh run view --json conclusion,headSha,startedAt,updatedAt,jobs` 的完整成功结果，对照全 CI、从 test build 启动到 test 汇总结束的测试链、构建与最长分片的 wall time，并逐片列出读数；排队计入全 CI 与测试链，不能从该差额推断分片算法的净收益。未成功或缺少构建、分片、test 汇总的输入不产生测量结论。
+
 `release.yml` 的手动 `workflow_dispatch` 恒为只构建验证，必填 boolean 输入 `build-only` 缺省为 true；即使输入 false 或选择 tag，手动事件也不能执行 publish、channel、crates 或取得这些发布 job 的 OIDC 权限。三处发布 job 都要求 push 事件且 ref 以 `refs/tags/v` 开头；tag push 保持既有发布政策。手动运行复用 verify、advisories 与 archive，不设 `SPRAWLING_RELEASE_TAG`，产物标识为源码构建；保留准确 commit/tree、归档摘要、耗时与缓存读数作为验证证据。本契约不改变 D27 的必需 job 集合、矩阵或失败／取消／缺席拒绝，不调用未配置的 SignPath。手动运行是否只构建由事件边界决定，输入值不授予发布能力。
 
-被否：release 另抄 jobs 或 Cargo 命令，会再次分叉；缓存 composite action 在只有一个 test-build 定义时增加无用的接口；接受历史 CI 绿结果需要本方案没有的来源、时效与完整性协议。重开参数：发行要求 core/proof 阻塞，或确有跨运行结果复用需求。验证以两个 YAML 的解析、inputs/权限/needs、缓存环境唯一性与四分片对照为本地边界；真实 cache hit、失败传播与耗时由 Actions 运行确认。
+被否：release 另抄 jobs 或 Cargo 命令，会再次分叉；缓存 composite action 在只有一个 test-build 定义时增加无用的接口；接受历史 CI 绿结果需要本方案没有的来源、时效与完整性协议。重开参数：发行要求 core/proof 阻塞，或确有跨运行结果复用需求。验证以两个 YAML 的解析、inputs/权限/needs、缓存环境唯一性与类型分片覆盖对照为本地边界；真实 cache hit、失败传播与耗时由 Actions 运行确认。
 
 **只有一份**：`features` 不是门。`just check` 已经调这条 recipe，再在 `gates` 里跑同一条工作区检查就是同一次编译每轮跑两遍；只留 recipe 是一条裁决。
 -/
@@ -1293,7 +1295,7 @@ D3 **判的是哪棵树。** 仓库根取「当前目录往上第一个含 `Carg
 7. **length**：尺寸有**两个单位**，因为两者的失效方式不同——长函数藏起一条控制流，长文件藏起「东西在哪」。
    **文件面带一张先于规则存在的文件登记表**（`[file_length.predating]`），每个文件钉在划线时的行数上。**这张表只会变短**：表上没有的文件直接按预算拒绝，所以它不会变长；表上的文件不得超过自己的钉子，所以没有一个欠债会长大；而一个回到预算之内的文件必须从表上划掉，所以豁免会自己消失，不需要谁记得它（三件事是 `spec/Length.lean` 的 `an_unpinned_file_passes_exactly_inside_the_budget`、`a_pinned_file_never_grows`、`a_kept_pin_is_still_needed`）。**删一行的办法是把文件拆了，不是把数字改大。** 重开参数：在一个超长文件上迭代的代价低于拆分一次的代价时，文件面的预算才值得放宽。
    **参数面**：一条参数表长过预算就是一个 data clump——总是一起走的那几个值，是一个还没被命名的值。本仓库已经写下过这个修法：`Reporter` 的 doc 说「四个值总是一起走、从不被单独选择，所以它们作为一个走」。预算比 Clean Code 的 3 宽一格，因为三字段值的构造函数正当地需要三个，门不该跟它们吵。接收者不算：`&self` 是这个函数之所以是方法的原因，不是谁决定要穿过去的值。豁免表是一张名字数组（`文件路径::函数名`），**表上没有的名字直接拒绝**，划掉一个名字的办法是给那几个值起个名字，不是把预算调大。一条断言核对表上每个名字仍然存在且仍然超标，所以一个已经修好的豁免不会留在那里等下一个人花掉。**一个参数很多的私有方法，就是策略没有对象可住时的样子**，故参数超标的地方往往也是文件超标的地方。
-   **文件面只数生产行**：顶层 `#[cfg(test)]` 项（内联 `mod tests`、测试专用函数）所跨的行从文件总行数里减去。文件预算要限制的是一个模块持有多少生产策略；把内联测试也算进去，逼人为了挪测试而拆模块，拆出来的是一次与接口无关的移动。**扫描面**：每个包（§8-39）的 `src/`、每个包目录下的 `.zig`（§8-48、D15）与 `client/src`；`tests/` 与 `benches/` 不在内，因为测试代码本就允许放松约束（AGENTS.md）。**客户端只受文件面，不受函数面**：量一个函数要解析它写成的那门语言，`syn` 解析 Rust，而为一道门往工作区清单里加一个 TypeScript 解析器不成立；数括号的量法会量错（§13），故客户端的函数长度是**未量且明说未量**，而不是量错。**生成物两面都不量**：`client/src/wire.ts` 是 `cargo xtask wire-ts` 从 Rust 线面写出来的，拆它就是拆生成器的输出；豁免的依据是生成器自己写在文件头上的那一行横幅，不是门里的一条路径。**两类不量**：① 带 `#[cfg(test)]` 的项（它标的是**一个项**而不是文件剩下的部分）；② 模块表形状列为 `data` 的文件（ARCHITECTURE §9 形状 6：数据而无分支）。**两类豁免都取自已有权威**（属性、模块表），而不是新建一张名单——一张名单就是一个可以悄悄变长的豁免口。形状列由 `modmap::shapes` 交出，与 modmap 共用同一个解析器。
+   **文件面只数生产行**：顶层 `#[cfg(test)]` 项（内联 `mod tests`、测试专用函数）所跨的行从文件总行数里减去。文件预算要限制的是一个模块持有多少生产策略；把内联测试也算进去，逼人为了挪测试而拆模块，拆出来的是一次与接口无关的移动。**扫描面**：每个包（§8-39）的 `src/`、每个包目录下的 `.zig`（§8-48、D15）与 `client/src`；`tests/` 与 `benches/` 不在内，因为测试代码本就允许放松约束（AGENTS.md）。**客户端只受文件面，不受函数面**：量一个函数要解析它写成的那门语言，`syn` 解析 Rust，而为一道门往工作区清单里加一个 TypeScript 解析器不成立；数括号的量法会量错（§13），故客户端的函数长度是**未量且明说未量**，而不是量错。**生成物两面都不量**：文件前十行中带有 `Generated by` 加反引号命令的横幅即为生成物，命令不限定为 `cargo xtask`，因为随 skill 发出的离线页面也由 Bun 组装；生成页的 CI 字节比对持住它与源片段的对应关系。`client/src/wire.ts` 是 `cargo xtask wire-ts` 从 Rust 线面写出来的，拆它就是拆生成器的输出；豁免的依据是生成器自己写在文件头上的那一行横幅，不是门里的一条路径。**两类不量**：① 带 `#[cfg(test)]` 的项（它标的是**一个项**而不是文件剩下的部分）；② 模块表形状列为 `data` 的文件（ARCHITECTURE §9 形状 6：数据而无分支）。**两类豁免都取自已有权威**（属性、模块表），而不是新建一张名单——一张名单就是一个可以悄悄变长的豁免口。形状列由 `modmap::shapes` 交出，与 modmap 共用同一个解析器。
 8. **报告**：三段式渲染，与产品的 Gate 拒绝同构——施工者被拒时拿到的也是「规则｜违反点｜替代」，不是一句 fail。
 
 ### 两个设计

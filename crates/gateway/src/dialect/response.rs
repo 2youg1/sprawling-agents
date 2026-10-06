@@ -3,22 +3,13 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Which dialect answers a question, and nothing about how it answers.
+//! Response translation and stream retention for the three provider dialects.
 //!
-//! Five entrances, one `match` each, and a closed set of two: a third
-//! dialect is a compile error at all five entrances, which is how it is
-//! kept from being approximated with the nearer of the two we already
-//! write. What each dialect does with a request
-//! is `gateway::anthropic`'s and `gateway::openai`'s; what they share is
-//! `gateway::mismatch`'s.
+//! `StreamFrames` buffers frames until EOF, then routes settlement to each
+//! dialect.
+//! Final parsing remains `response_from_wire` on both call paths.
 //!
-//! The canonical conversation is Anthropic-shaped, so the losses are all
-//! on the other path and each is documented where it is taken.
-//!
-//! No I/O, no state, no clock: byte-for-byte explainable requests are
-//! the whole point of writing the wire format ourselves.
-
-//! Response dialects: frames back to ChatResponse.
+//! Spec: `crates/gateway/spec/Endpoint/Stream.lean` §8-13.
 
 use kernel::{AxError, ChatResponse, DialectKind, Increment, ToolCall};
 use serde_json::Value;
@@ -38,43 +29,43 @@ pub fn increment_of(kind: DialectKind, frame: &Value) -> Option<Increment> {
     })
 }
 
-/// The tool call the last of `frames` completes, in a dialect whose
-/// stream says when a call is complete before the answer settles.
-///
-/// Only the Anthropic stream closes each block with a frame of its own;
-/// the OpenAI dialects answer `None` and their calls arrive settled.
-///
-/// # Errors
-/// `E_PROVIDER` when the arguments stop in the middle of a value.
-pub(crate) fn call_completed_by(
+/// Frames retained until EOF; transport failures are decided before settlement.
+/// Spec: `crates/gateway/spec/Endpoint/Stream.lean` §8-13.
+pub(crate) struct StreamFrames {
     kind: DialectKind,
-    frames: &[Value],
-) -> Result<Option<ToolCall>, AxError> {
-    match kind {
-        DialectKind::Anthropic => anthropic::call_completed_by(frames),
-        DialectKind::OpenAi | DialectKind::OpenAiResponses => Ok(None),
-    }
+    frames: Vec<Value>,
 }
 
-/// The settled answer a stream ends with, in the shape a non-streaming
-/// call would have returned.
-///
-/// **One parser for the answer.** Reassembling here rather than reading
-/// the stream into a `ChatResponse` directly is what stops a second
-/// authority forming: `response_from_wire` remains the only code that
-/// decides what a provider said, so a streamed call and a blocking call
-/// cannot come to different conclusions about the same reply.
-///
-/// # Errors
-/// `Provider` when the stream ended without the frames that carry the
-/// answer. That is the same failure a truncated body is, and it is
-/// deliberately not recoverable by keeping the increments: a partial
-/// reply presented as a whole one is the one outcome this must not have.
-pub fn settled_from_stream(kind: DialectKind, frames: &[Value]) -> Result<Value, AxError> {
-    match kind {
-        DialectKind::Anthropic => anthropic::settled(frames),
-        DialectKind::OpenAi => openai::settled(frames),
-        DialectKind::OpenAiResponses => responses::settled(frames),
+impl StreamFrames {
+    pub(crate) fn new(kind: DialectKind) -> Self {
+        Self {
+            kind,
+            frames: Vec::new(),
+        }
+    }
+
+    pub(crate) fn retain_and_complete(
+        &mut self,
+        frame: Value,
+    ) -> Result<Option<ToolCall>, AxError> {
+        self.frames.push(frame);
+        match self.kind {
+            DialectKind::Anthropic => anthropic::call_completed_by(&self.frames),
+            DialectKind::OpenAi | DialectKind::OpenAiResponses => Ok(None),
+        }
+    }
+
+    pub(crate) fn finish(self) -> Result<Value, AxError> {
+        match self.kind {
+            DialectKind::Anthropic => anthropic::settled(&self.frames),
+            DialectKind::OpenAi => openai::settled(&self.frames),
+            DialectKind::OpenAiResponses => responses::settled(&self.frames),
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn retained_frames(&self) -> usize {
+        self.frames.len()
     }
 }
 
