@@ -74,6 +74,8 @@ zeroize = { workspace = true }
 # after it exits and before its handle closes (`crates/sprawling/Spec.lean` §8-129-4).
 [target.'cfg(windows)'.dependencies]
 win32job = { workspace = true }
+# Windows self-uninstall releases the installed name before exit (Install.lean D52).
+self-replace = "=1.5.0"
 
 [features]
 # The execution engine is on by default, so `cargo install sprawling`
