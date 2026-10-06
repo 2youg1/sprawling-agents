@@ -217,6 +217,18 @@ fn main() {
         assert_eq!(std::fs::read_to_string(root.join("protected/input")).unwrap(), "read only");
         assert!(std::fs::write(root.join("forbidden"), "write").is_err());
         println!("read only");
+    } else if std::env::args_os().nth(1).as_deref() == Some(std::ffi::OsStr::new("pipes")) {
+        use std::process::{Command, Stdio};
+        let program = std::path::PathBuf::from(std::env::var_os("SystemRoot").unwrap()).join("System32/cmd.exe");
+        let inherited = Command::new(&program).args(["/D", "/C", "exit 0"]).status().unwrap();
+        assert!(inherited.success());
+        println!("INHERITED_STDIO_EXIT=0");
+        let captured = Command::new(&program).args(["/D", "/C", "exit 0"])
+            .stdin(Stdio::inherit()).stderr(Stdio::inherit()).stdout(Stdio::piped()).spawn();
+        match captured {
+            Ok(mut child) => println!("PIPED_STDIO_EXIT={:?}", child.wait().unwrap().code()),
+            Err(error) => println!("PIPED_STDIO_ERROR={:?}", error.raw_os_error()),
+        }
     } else if std::env::args_os().nth(1).as_deref() == Some(std::ffi::OsStr::new("allocate")) {
         let mut bytes = Vec::<u8>::new();
         bytes.try_reserve_exact(320 * 1024 * 1024).unwrap();
@@ -370,4 +382,26 @@ fn main() {
             }
         );
     }
+    let backlog = crate::Backlog::with_window(crate::PollBudget::new(10_000, 5));
+    let mut command = Command::new(&exe);
+    command.env_clear().current_dir(&directory).arg("pipes");
+    let result = backlog
+        .run_native(
+            RunId::from_bytes([0x90; 16]),
+            &scope,
+            "child stdio diagnostic".to_owned(),
+            command,
+        )
+        .unwrap();
+    let crate::Started::Settled {
+        exit,
+        stdout,
+        stderr,
+    } = result
+    else {
+        panic!("stdio diagnostic settles: {result:?}");
+    };
+    assert_eq!(exit, crate::Exit::Ended { code: 0 }, "{stderr}");
+    assert!(stdout.contains("INHERITED_STDIO_EXIT=0"), "{stdout}");
+    eprintln!("NATIVE_STDIO_DIAGNOSTIC={stdout}");
 }
