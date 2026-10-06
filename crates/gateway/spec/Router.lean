@@ -96,3 +96,68 @@ theorem updates_preserve_explicit {Account : Type} (held : List Account) (update
     | none => exact ih held
     | some accounts => exact ih accounts
 end Gateway.Router.Accounts
+
+/-! D29 显式账号列表生效时拒绝旧凭据字段
+
+`accounting::worker::credentials::endpoints::endpoint_of` 先保留缺席的 accounts，
+再调用 `gateway::AttachedEndpoint::validate_legacy_fields` 判定旧 credential；
+该纯准入方法是 router、RunWorker 与 Doctor §8-81 描述共用的唯一拒绝权威。
+有效 accounts 存在时，`secret` 或 `auth_header` 在场均返回
+`E_CONFIG_INVALID`，action 为 `configure provider accounts`，subject 含 Provider 名及固定原因文字，不含 secret、header 或 reference，
+recovery 引导编辑具名账号的 reference/header 并省略旧字段。ProbeEndpoint 与
+AttachEndpoint 共用这个判定，拒绝发生在 probe、诊断成功和 Ledger 写入之前。
+旧字段与显式新列表同时出现也拒绝，避免一次提交宣称两种凭据权威。
+校验只读字段的存在性，空字符串也算在场，拒绝先于 SecretRef 解析；
+旧 Ledger 中已经归档的 auth 不是本次提交字段，不在重放时重新拒绝。
+
+缺席旧字段允许保留或原子替换账号列表；没有显式列表的旧登记仍允许更新 auth。
+不根据 reference 是否碰巧等于某账号推断目标，也不清除账号表，因为这两种做法
+会使旧写者依赖列表内容，或破坏已有 Session 的健康亲和。Vault 同引用换密仍由
+PutSecret 独立完成；此判定只决定登记命令是否有明确目标，不回滚先前的 Vault 操作。
+
+下面 submit 对应 endpoint_of 的准入；trace 以原状态继续处理被拒的提交。
+派生回归在 `crates/accounting/src/worker/credentials/endpoints.rs`：从 RunWorker.handle
+登记 legacy、迁移 A/B、提交 C，检查错误、无外发、账本不变、实际 probe header，
+并检查重启后的完整账号列表；提交轨迹的投影检查在 router::book 旁。
+-/
+namespace Gateway.Router.Accounts
+structure Update (Account : Type) where
+  accounts : Option (List Account)
+  legacyCredential : Bool
+
+def submit {Account : Type} (held : Option (List Account)) (update : Update Account) :
+    Except Unit (Option (List Account)) :=
+  let settled := replace held update.accounts
+  if settled.isSome && update.legacyCredential then .error () else .ok settled
+
+def apply {Account : Type} (held : Option (List Account)) (update : Update Account) :
+    Option (List Account) :=
+  match submit held update with
+  | .error () => held
+  | .ok settled => settled
+
+theorem submissions_preserve_explicit {Account : Type} (held : List Account)
+    (updates : List (Update Account)) :
+    (updates.foldl apply (some held)).isSome = true := by
+  induction updates generalizing held with
+  | nil => rfl
+  | cons update rest ih =>
+    cases update with
+    | mk accounts legacy =>
+      cases accounts with
+      | none =>
+        cases legacy <;> simpa [apply, submit, replace] using ih held
+      | some accounts =>
+        cases legacy
+        · simpa [apply, submit, replace] using ih accounts
+        · simpa [apply, submit, replace] using ih held
+/-- 任意多次旧字段提交都不改变已迁移账号，包括同时声明替换列表的提交。 -/
+theorem legacy_submissions_preserve_accounts {Account : Type} (held : List Account)
+    (updates : List (Option (List Account))) :
+    (updates.foldl (fun state accounts => apply state ⟨accounts, true⟩) (some held)) =
+      some held := by
+  induction updates with
+  | nil => rfl
+  | cons accounts rest ih =>
+    cases accounts <;> simpa [apply, submit, replace] using ih
+end Gateway.Router.Accounts

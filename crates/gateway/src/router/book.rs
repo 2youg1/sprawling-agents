@@ -462,4 +462,17 @@ mod tests {
             .unwrap_err();
         assert_eq!(*err.code(), AxCode::WireMismatch);
     }
+    #[test]
+    fn malformed_provider_accounts_are_refused_during_replay() {
+        let mut payload = attached_payload(&attached("house", "https://api.example.test/v1"))
+            .unwrap().as_map().clone();
+        payload.insert("tuning".to_owned(), serde_json::json!({
+            "accounts": [{"id": "first", "reference": "plain"}]
+        }));
+        let mut book = EndpointBook::new();
+        assert!(book.apply_payload(EventKind::EndpointAttached, &Payload::new(payload).unwrap()).is_err(),
+            "an invalid explicit account must not silently fall back to legacy auth");
+        assert!(book.is_empty());
+    }
+
 }

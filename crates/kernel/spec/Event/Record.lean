@@ -601,3 +601,10 @@ pub enum Landing { Delivered, Queued, Knocked }   // 进了正在跑的 run 的�
 
 **重开参数**：归档要与工作树检查点同进退（例如一次被回滚的 run 不该留下归档）时，重议写入时刻。
 -/
+
+/-! Provider accounts 的声明由 `ProviderAccount` 持有：id 为 ServerLabel，reference
+为可缺席 SecretRef，header 为可缺席字符串；引用缺席代表匿名账号。
+`validate_provider_accounts` 是非空、id/reference 唯一及 header 合法性的唯一判定。
+AttachedTuning.accounts 缺席保留旧登记；显式列表解析失败必须拒绝，不能抹掉整张
+tuning 后回退 auth。顺序与准入模型见 `crates/gateway/spec/Router.lean`。
+-/
