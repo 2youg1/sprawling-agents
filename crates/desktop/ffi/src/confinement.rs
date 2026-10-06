@@ -480,8 +480,13 @@ mod tests {
         #[test]
         fn native_encoded_arguments_preserve_units_and_order(
             args in proptest::collection::vec(argv_units(), 0..16),
-            program in argv_units().prop_filter("nonempty program without quotes or terminal backslash",
-                |units| !units.is_empty() && !units.contains(&34) && units.last() != Some(&92)),
+            program in proptest::collection::vec(
+                prop_oneof![
+                    4 => proptest::sample::select(vec![9_u16, 32, 92]),
+                    1 => (1_u16..=u16::MAX).prop_filter("program has no quotes", |unit| *unit != 34),
+                ],
+                1..128,
+            ).prop_filter("file path has no terminal backslash", |units| units.last() != Some(&92)),
         ) {
             let mut request = argv_launch(args.iter().map(|units| OsString::from_wide(units)).collect());
             request.program = PathBuf::from(OsString::from_wide(&program));

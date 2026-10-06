@@ -292,7 +292,7 @@ theorem encoded_arguments_preserve_order (args : List (List Nat))
     · simpa using encoded_tail_preserves_units units 0
         (if rest.isEmpty then [] else 32 :: encodeArguments rest)
         (valid units (by simp)) (by
-          cases empty : rest.isEmpty <;> simp [empty, argumentBoundary])
+          cases rest.isEmpty <;> simp [argumentBoundary])
     · exact ih (by
         intro units member
         exact valid units (List.mem_cons_of_mem _ member))
@@ -306,12 +306,12 @@ theorem nul_is_exactly_the_content_refusal (units : List Nat) :
   simp [quoteChecked]
 
 /-- 无引号的文件路径使用 CRT 独立的程序名规则；末尾反斜杠是目录，不在该支持域。 -/
-theorem program_body_preserves_path (prefix : List Nat) (last slashes : Nat)
-    (suffix : List Nat) (noQuotes : 34 ∉ prefix)
+theorem program_body_preserves_path (pathFront : List Nat) (last slashes : Nat)
+    (suffix : List Nat) (noQuotes : 34 ∉ pathFront)
     (lastNotQuote : last ≠ 34) (lastNotSlash : last ≠ 92) :
-    encodeTail slashes (prefix ++ [last]) suffix =
-      List.replicate slashes 92 ++ prefix ++ last :: 34 :: suffix := by
-  induction prefix generalizing slashes with
+    encodeTail slashes (pathFront ++ [last]) suffix =
+      List.replicate slashes 92 ++ pathFront ++ last :: 34 :: suffix := by
+  induction pathFront generalizing slashes with
   | nil => simp [encodeTail, lastNotQuote, lastNotSlash]
   | cons unit rest ih =>
     have unitNotQuote : unit ≠ 34 := by
@@ -331,15 +331,15 @@ inductive CrtProgram : List Nat → List Nat → List Nat → Prop where
       (boundary : argumentBoundary suffix) :
       CrtProgram (34 :: (program ++ 34 :: suffix)) program suffix
 
-theorem encoded_program_preserves_path (prefix : List Nat) (last : Nat)
-    (suffix : List Nat) (noQuotes : 34 ∉ prefix)
+theorem encoded_program_preserves_path (pathFront : List Nat) (last : Nat)
+    (suffix : List Nat) (noQuotes : 34 ∉ pathFront)
     (lastNotQuote : last ≠ 34) (lastNotSlash : last ≠ 92)
     (boundary : argumentBoundary suffix) :
-    CrtProgram (34 :: encodeTail 0 (prefix ++ [last]) suffix)
-      (prefix ++ [last]) suffix := by
-  rw [program_body_preserves_path prefix last 0 suffix noQuotes lastNotQuote lastNotSlash]
+    CrtProgram (34 :: encodeTail 0 (pathFront ++ [last]) suffix)
+      (pathFront ++ [last]) suffix := by
+  rw [program_body_preserves_path pathFront last 0 suffix noQuotes lastNotQuote lastNotSlash]
   simpa [List.append_assoc] using
-    CrtProgram.quoted (prefix ++ [last]) suffix (by simp [noQuotes, lastNotQuote]) boundary
+    CrtProgram.quoted (pathFront ++ [last]) suffix (by simp [noQuotes, lastNotQuote]) boundary
 
 end Argv
 
