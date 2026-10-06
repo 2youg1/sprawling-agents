@@ -18,6 +18,7 @@ read(path: &Path) -> Result<History, HistoryFault> 只以 File::open 打开既�
 结束；空白行、坏 JSON、未知 schema/字段、无效 UTF-8、损坏末行均拒绝，不跳过、
 不截断。容量是本应用恢复日志的操作界，不能宣称注册表本身受此上限约束。
 只读拒绝不抹除原字节；metadata 和内容由真实临时文件检查。
+拒绝诊断不复述 JSON 内容，只报告解码位置和类别，保密契约见 Privacy.State D52。
 
 当前没有 append_durable/first-create barrier，也没有写入 coordinator；它们
 必须满足 Privacy.durablePrepared 的环境假设后才可向本接口追加真实修改。
