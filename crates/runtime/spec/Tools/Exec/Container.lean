@@ -40,6 +40,14 @@ info 的内容是 daemon 的自述，不是已执行的隔离验收；daemon、O
 用户轴的非 root 身份不等于独立宿主安全主体：rootful daemon 可让相同数值 UID
 出现在宿主和容器中。若要求两者必不同或要求 user namespace，当前臂没有该保证。
 
+Docker 的 CapDrop 必须明确含 ALL；Podman 的 CapDrop 是相对默认集合的差值，
+因此起动前改核对其 EffectiveCaps 与 BoundingCaps 两个实际集合，二者均须明确为空。
+Podman 的这两个不省略字段来自 OCI spec 的切片，空切片可输出 null 或 []，二者都表示空集合；
+缺字段、非数组的其它值或任一非空集合都拒绝，不能把非 root 用户的空 EffectiveCaps
+误当成全部 capabilities 已移除。字段来源为 Podman 的
+https://github.com/containers/podman/blob/v4.9.3/libpod/define/container_inspect.go 与
+https://github.com/containers/podman/blob/v4.9.3/libpod/container_inspect.go 。
+
 Podman 的 stopped-container inspect 兼容范围尚有未决：能力准入通过后仍可能在起动前的
 边界核对中拒绝配置，须将被拒的真实 JSON 与冻结限额、挂载、capabilities 及 security options
 逐项比较，确认应拒的配置与需要支持的合法字段表示；`.github/workflows/on-demand.yml`

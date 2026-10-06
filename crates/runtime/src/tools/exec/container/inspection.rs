@@ -158,7 +158,7 @@ fn first(bytes: &[u8]) -> Result<Value, AxError> {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, reason = "test code")]
+#[allow(clippy::unwrap_used, clippy::indexing_slicing, reason = "test code")]
 mod tests {
     #[test]
     fn podman_image_metadata_accepts_only_the_pinned_digest_without_volumes() {
@@ -190,6 +190,68 @@ mod tests {
             assert!(super::image(&bytes, &limits).is_err());
         }
         assert!(super::image(br#"[{"Id":"wrong","Config":{}}]"#, &limits).is_err());
+    }
+
+    #[test]
+    fn podman_empty_capability_sets_are_not_missing_evidence() {
+        let limits: kernel::ContainerLimits = serde_json::from_value(serde_json::json!({
+            "image": format!("sha256:{}", "a".repeat(64)), "user":1000,
+            "cpu_millis":1250, "memory_bytes":67108864, "pids":64
+        }))
+        .unwrap();
+        let copy = tempfile::tempdir().unwrap();
+        let mut value = serde_json::json!({
+            "Config":{"User":"1000","WorkingDir":"/work"},
+            "HostConfig":{"CpuQuota":125000,"CpuPeriod":100000,"Memory":67108864,
+                "MemorySwap":67108864,"PidsLimit":64,"NetworkMode":"none",
+                "ReadonlyRootfs":true,"CapDrop":["CAP_CHOWN"],
+                "SecurityOpt":["no-new-privileges"]},
+            "Mounts":[{"Source":copy.path(),"Destination":"/work","Type":"bind"}],
+            "State":{"Running":false},"EffectiveCaps":null,"BoundingCaps":null
+        });
+        for empty in [serde_json::json!(null), serde_json::json!([])] {
+            value["EffectiveCaps"] = empty.clone();
+            value["BoundingCaps"] = empty;
+            assert!(
+                super::stopped(
+                    &serde_json::to_vec(&[&value]).unwrap(),
+                    &limits,
+                    super::ContainerEngine::Podman,
+                    copy.path()
+                )
+                .is_ok()
+            );
+        }
+        for field in ["EffectiveCaps", "BoundingCaps"] {
+            for invalid in [
+                serde_json::json!(""),
+                serde_json::json!({}),
+                serde_json::json!(["CAP_CHOWN"]),
+            ] {
+                let mut unsafe_value = value.clone();
+                unsafe_value[field] = invalid;
+                assert!(
+                    super::stopped(
+                        &serde_json::to_vec(&[unsafe_value]).unwrap(),
+                        &limits,
+                        super::ContainerEngine::Podman,
+                        copy.path()
+                    )
+                    .is_err()
+                );
+            }
+            let mut missing = value.clone();
+            missing.as_object_mut().unwrap().remove(field);
+            assert!(
+                super::stopped(
+                    &serde_json::to_vec(&[missing]).unwrap(),
+                    &limits,
+                    super::ContainerEngine::Podman,
+                    copy.path()
+                )
+                .is_err()
+            );
+        }
     }
 
     #[test]
