@@ -30,6 +30,8 @@ Linux host-command confinement explicitly requests a user namespace and refuses 
 
 Windows run jobs apply the selected processor affinity. JSONL preallocation reads scan the zero tail with bounded memory while preserving rejection of nonzero bytes after the tail; they do not skip that verification I/O. Skill audit execution binds results to the installed content digest, records unreachable services without claiming a successful audit, and observes shelves through the serving assembly.
 
+A provider refusal with status 429 whose structured error code (or, when the code is absent, its error type) is `insufficient_quota` is now its own failure kind, `quota`. It is no longer backed off and sent again until a Halt, because waiting does not restore a used-up quota: the run stops with the refusal, and the page says to add credit to the account or add another account. A 429 without that code is still a busy provider and is asked again. Each provider error also records whether the account it was sent on can still take the request (a rejected key, a used-up quota or a missing account credential cannot); the record omits this field when the answer is yes, so earlier Ledger lines are unchanged.
+
 The existing container command path preserves the configured engine, encodes a single Podman entrypoint and refuses non-UTF8 arguments instead of changing them silently. Configuration, native-platform mechanisms and lifecycle guarantees are described in [operating](docs/operating.md#how-exec-is-confined) according to the shipped implementation.
 
 ### Distribution and verification
