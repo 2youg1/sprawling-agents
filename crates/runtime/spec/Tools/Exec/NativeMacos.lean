@@ -27,17 +27,6 @@ release 用独立测试先 drop 工具，再由另一 owner harvest 确认无主
 内核是策略执行者。探测成功不保证之后的包装起动成功，真实目标仍必须携带同一策略。
 包装初始化失败与目标退出码的区别尚无起动握手；非零结果保留原 stderr，不宣称已区分。
 macOS native 不强制同 RunId 多命令与任意后代的聚合硬内存上限，resources 为不保。
-已核实的无特权 host 入口中没有满足 D29 的机制；这不是所有未来 macOS 接口的不存在证明。
-RLIMIT 与 taskpolicy 是逐进程额度，采样后终止存在超限窗口且不能保证追踪脱离的后代。
-resource／jetsam coalition 的创建在已运行的 macOS 26.6.2 上均被普通账户与 root 以 EPERM
-拒绝；memorystatus SET_MEMLIMIT_PROPERTIES 对探测自己的 pid 在普通账户下返回
-EPERM、root 下成功，但它的对象仍是单个 pid；这只限定这些入口与该系统，
-不证明所有 macOS 聚合机制均不可行。taskpolicy -m 96
-之下两名子进程同时写入各 64 MiB（其中一名 setsid）并存活，成功的宿主对照也存活；
-因此此候选没有兑现 96 MiB 的树级聚合上限。没有创建成功的 coalition 就没有其清理对象。
-受控执行服务只有在同一 run 的所有命令与任意后代共享一个硬额度且不能逃离时才满足
-D29；独立命令各得一个完整额度的容器不满足。只有新增符合这些条件的接口与真实
-共享额度反例对拍，才重开 native 的资源保证；当前接口不申请此额度，不产生虚构的申请失败。
 
 ## 4 现状分析
 副本同步与后台持有归 confinement::placing；叶子不建立第二张 run／副本表。
@@ -50,25 +39,6 @@ macOS 26.6.2（25G83）的 sandbox-exec(1) 自带手册写明 “execute within 
 弃用状态不等于已移除，但不保证未来系统继续提供此程序，缺席或拒绝必须拒开。
 App Sandbox entitlement 文档不能证明命令行 profile 的行为；sandbox_init(3) 与真实拒绝
 实验仍须分别核实，支持范围只随已运行的系统证据扩大。
-Apple XNU 固定提交 f6217f891ac0bb64f3d375211650a4c1ff8ca1ea 的
-https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/bsd/kern/sys_coalition.c#L232
-检查 task_is_in_privileged_coalition，root 身份不替代此条件；
-https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/bsd/kern/kern_exec.c#L4078
-的指定 coalition 起动检查 privileged coalition 或 COALITION_SPAWN_ENTITLEMENT。
-Apple system_cmds 固定提交 408bba7453608006b89772db185defbac8fe2fd0 的
-https://github.com/apple-oss-distributions/system_cmds/blob/408bba7453608006b89772db185defbac8fe2fd0/taskpolicy/taskpolicy.c#L266
-把 memory limit 交给单个 posix_spawn 的 active／inactive jetsam 限额；不能从其参数名
-推导同 run 的共享额度。runner 的 launchd.plist(5) 也把 ResourceLimits 定为 setrlimit(2)。
-同一 XNU 固定提交的
-https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/bsd/kern/kern_resource.c#L1647
-以 current_map() 设置 RLIMIT_AS，限制的是当前进程地址空间；继承额度不把额度变成共享池。
-同一提交的 bsd/sys/resource.h L509–511 定义 RLIMIT_RSS 为 RLIMIT_AS 的别名，
-不是第二种独立的树级机制。vm_map_set_size_limit（osfmk/vm/vm_map.c L22094）
-拒绝低于当前 map->size 的额度；runner 中 Python 设置 512 MiB AS 与 96 MiB RSS
-均被拒绝，报告保留失败，不把它们称为成功的分配超限对拍。
-https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/bsd/kern/kern_memorystatus.c#L9192
-要求 root 或 MEMORYSTATUS_ENTITLEMENT（少数明写的例外另判），
-SET_MEMLIMIT_PROPERTIES 在 L9241 仍以 pid 为对象，不提供任意命令树共享额度。
 
 ## 6 命名统一
 wrapper 是 sandbox-exec 程序；copy 是唯一可写工作树；profile 是固定 SBPL 策略。
@@ -121,11 +91,6 @@ Lean 量化任意 fork／exec／退出序列，证明模型里的策略身份不
 验证任意目标 argv 都使用同一固定策略与独立路径参数，并不作为 fork 继承的 derived 证据。
 真实 macOS ExecTool 后代网络测试检查已运行的继承轨迹，不能推广为任意系统轨迹证明。
 完整平台验收需运行目标系统，不以 Windows 上的字符串断言替代。
-`crates/runtime/src/tools/exec/native_macos/memory_probe.py` 仅在可丢弃的 GitHub macOS
-runner 执行，不是生产依赖或默认 Rust 检查；它实际尝试 coalition 的创建与成功后的清理，
-并对拍 taskpolicy 与宿主双子进程，另尝试 RLIMIT_AS／RLIMIT_RSS；
-只有设置成功才起双子进程并报告实际继承额度与同时存活检查。memorystatus 只对探测自己的 pid 设置逐进程限额。
-失败尝试与反例是候选证据，不是聚合强制实现。
 
 ## 17 文档关系
 父分部 D32、§8-13-2 定选择与副本；D29 定 Shares 与聚合内存要求；本分部不复制这些定义。
