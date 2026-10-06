@@ -159,14 +159,8 @@ description = 'fixture'
     }
     let out = fixture.join("out");
     super::run(&fixture, "v0.0.10-Alpha-261005", &assets, &out).unwrap();
-    assert!(
-        out.join("homebrew/sprawling.rb").is_file(),
-        "the Homebrew formula must be generated"
-    );
-    let formula = std::fs::read_to_string(out.join("homebrew/sprawling.rb")).unwrap();
     let pkgbuild = std::fs::read_to_string(out.join("aur/PKGBUILD")).unwrap();
     let srcinfo = std::fs::read_to_string(out.join("aur/.SRCINFO")).unwrap();
-    assert!(formula.contains("on_macos") && formula.contains("on_linux"));
     assert!(pkgbuild.contains("pkgver=0.0.10_pre.261005"));
     let executable = pkgbuild
         .lines()
@@ -191,7 +185,7 @@ description = 'fixture'
         .lines()
         .find_map(|line| line.trim().strip_prefix("sha256sums = "))
         .unwrap();
-    assert!(formula.contains(digest) && pkgbuild.contains(digest));
-    assert!(formula.contains("/releases/download/v0.0.10-Alpha-261005/"));
+    assert!(pkgbuild.contains(digest));
+    assert!(pkgbuild.contains("/releases/download/v0.0.10-Alpha-261005/"));
     std::fs::remove_dir_all(fixture).unwrap();
 }

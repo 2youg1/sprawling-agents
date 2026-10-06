@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Homebrew and AUR projections of the release archives (xtask D32).
+//! AUR projections of the release archives (xtask D32).
 
 use std::path::Path;
 
@@ -22,50 +22,14 @@ pub(super) fn write(
     archives: &[Archive<'_>],
     out: &Path,
 ) -> Result<(), XtaskError> {
-    let mut branches = String::new();
     for archive in archives {
-        let row = archive.platform;
-        let url = format!(
-            "{}/releases/download/{tag}/{}",
-            stem.repository, archive.name
-        );
-        let sha256 = &archive.sha256;
-        if row.os == "darwin" && row.cpu == "arm64" {
-            branches.push_str(&format!(
-                "  on_macos do\n    on_arm do\n      url \"{url}\"\n      sha256 \"{sha256}\"\n    end\n  end\n"
-            ));
-        } else if row.os == "linux" && row.cpu == "x64" {
-            branches.push_str(&format!(
-                "  on_linux do\n    on_intel do\n      url \"{url}\"\n      sha256 \"{sha256}\"\n    end\n  end\n"
-            ));
+        if archive.platform.os == "linux" && archive.platform.cpu == "x64" {
+            let url = format!(
+                "{}/releases/download/{tag}/{}",
+                stem.repository, archive.name
+            );
             aur(stem, &url, archive, out)?;
         }
-    }
-    if !branches.is_empty() {
-        let version = stem.version;
-        let repository = stem.repository;
-        super::write(
-            &out.join("homebrew/sprawling.rb"),
-            format!(
-                r#"class Sprawling < Formula
-  desc "Local agent harness"
-  homepage "{repository}"
-  version "{version}"
-  license "MPL-2.0"
-{branches}
-  def install
-    bin.install "sprawling"
-    libexec.install Dir["*"]
-  end
-
-  test do
-    system bin/"sprawling", "--version"
-  end
-end
-"#
-            )
-            .as_bytes(),
-        )?;
     }
     Ok(())
 }

@@ -26,7 +26,7 @@ try:
     with tempfile.TemporaryDirectory() as temporary:
         local = pathlib.Path(temporary)
         shutil.copytree(channels, local / "channels")
-        for relative in ("homebrew/sprawling.rb", "aur/PKGBUILD", "aur/.SRCINFO"):
+        for relative in ("aur/PKGBUILD", "aur/.SRCINFO"):
             definition = local / "channels" / relative
             if definition.is_file():
                 definition.write_text(
@@ -37,19 +37,6 @@ try:
                     ),
                     encoding="utf-8",
                 )
-        run("brew", "tap-new", "--no-git", "local/channels")
-        tap = subprocess.check_output(
-            ["brew", "--repository", "local/channels"], text=True
-        ).strip()
-        shutil.copyfile(
-            local / "channels/homebrew/sprawling.rb",
-            pathlib.Path(tap) / "Formula/sprawling.rb",
-        )
-        run("brew", "install", "--formula", "local/channels/sprawling")
-        prefix = subprocess.check_output(["brew", "--prefix", "sprawling"], text=True).strip()
-        run(str(pathlib.Path(prefix) / "bin/sprawling"), "--version")
-        run("brew", "test", "sprawling")
-        run("brew", "uninstall", "sprawling")
         if (local / "channels/aur").is_dir():
             run(
                 "docker", "run", "--rm", "--network=host",

@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Release archives projected into npm, Homebrew and AUR packages (xtask D32).
+//! Release archives projected into npm and AUR packages (xtask D32).
 //!
 //! **The archives are the artefact, and this repackages them.** It reads
 //! the zips a tag published, takes the binary out of each, and writes
