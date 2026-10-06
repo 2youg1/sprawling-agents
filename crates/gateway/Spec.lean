@@ -347,6 +347,7 @@ kernel 已有码，语义照 Custody 一节；不新增码。
 - D30 当前 Session 成员的成功 model_returned 是唯一绑定提交点；使用原 Ledger 投影而不保存第二份：`crates/gateway/spec/Router.lean`
 - D31 隐私 owner 的只读核对在 Vault 内完成，不交出原值、不运行 probe：`crates/gateway/spec/Credential.lean`
 - D32 「这个账号还能不能接这个请求」与「能否再试」同住 `endpoint::failure`：`crates/gateway/spec/Endpoint/Failure.lean`，在 `account_disposition` 正上方
+- D33 删一把 Key 只删库里那一份，环境变量提供的 Key 拒删；端点用哪些 Key 由 `AttachedEndpoint::references` 一处回答：`crates/gateway/spec/Credential.lean`
 -/
 
 /-! ## 13 依赖选型

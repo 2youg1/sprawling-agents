@@ -226,6 +226,7 @@ workspace 内的依赖由 ARCHITECTURE.md §3 的 `depmap` 定；规格只 impor
 | 8-34 | `crates/accounting/spec/Views/Usage.lean` |
 | 8-35 | `crates/accounting/spec/Connectors.lean` |
 | 8-36 | `crates/accounting/spec/Views.lean` |
+| 8-37 | `crates/accounting/spec/Worker.lean` |
 
 §8-18 分成三小节，各住规定它的那个模块的分部：§8-18-1、§8-18-2、§8-18-3。`spec/Playback/Select.lean`、`spec/Playback/Project.lean` 与 `spec/Worker/Attend.lean` 没有标签：前两个是 §8-12、§8-17、§8-25 的性质，后一个是记账线程循环的模型。
 -/
