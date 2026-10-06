@@ -251,13 +251,13 @@ settings-control McpSection.transport client/src/views/mcp/by_url.svelte
 settings-reason ConfigFile.model `[model] name` 是城在会话第一次 run 时写下的会话记录（`write_session`），模型由会话里的模型选择决定，`/new` 拿掉它；改它会让一段会话中途换居民，所以设置里没有控件。
 settings-reason ModelSection.name `[model] name` 是城在会话第一次 run 时写下的会话记录（`write_session`），模型由会话里的模型选择决定，`/new` 拿掉它；改它会让一段会话中途换居民，所以设置里没有控件。
 settings-control ModelSection.effort client/src/views/settings/city_layer.svelte
-settings-reason ConfigFile.remote 通路点名城所在机器上要执行的程序与参数；一个经远程门连进来的设备若能写它，就能让城在这台机器上执行任意程序，所以只在城的 CONFIG.toml 里手写，楼与房间写它即拒。
-settings-reason RemoteRoute.Cloudflare.command 通路点名城所在机器上要执行的程序与参数；一个经远程门连进来的设备若能写它，就能让城在这台机器上执行任意程序，所以只在城的 CONFIG.toml 里手写。
-settings-reason RemoteRoute.Cloudflare.tunnel 通路点名城所在机器上要执行的程序与参数；一个经远程门连进来的设备若能写它，就能让城在这台机器上执行任意程序，所以只在城的 CONFIG.toml 里手写。
-settings-reason RemoteRoute.Cloudflare.url 通路点名城所在机器上要执行的程序与参数；一个经远程门连进来的设备若能写它，就能让城在这台机器上执行任意程序，所以只在城的 CONFIG.toml 里手写。
-settings-reason RemoteRoute.Command.args 通路点名城所在机器上要执行的程序与参数；一个经远程门连进来的设备若能写它，就能让城在这台机器上执行任意程序，所以只在城的 CONFIG.toml 里手写。
-settings-reason RemoteRoute.Command.command 通路点名城所在机器上要执行的程序与参数；一个经远程门连进来的设备若能写它，就能让城在这台机器上执行任意程序，所以只在城的 CONFIG.toml 里手写。
-settings-reason RemoteRoute.Command.permanence 通路点名城所在机器上要执行的程序与参数；一个经远程门连进来的设备若能写它，就能让城在这台机器上执行任意程序，所以只在城的 CONFIG.toml 里手写。
+settings-reason ConfigFile.remote 通路点名城所在机器上要执行的程序与参数；一个经远程门连进来的设备若能写它，就能让城在它所在的机器上执行任意程序，所以只在城的 CONFIG.toml 里手写，楼与房间写它即拒。
+settings-reason RemoteRoute.Cloudflare.command 通路点名城所在机器上要执行的程序与参数；一个经远程门连进来的设备若能写它，就能让城在它所在的机器上执行任意程序，所以只在城的 CONFIG.toml 里手写。
+settings-reason RemoteRoute.Cloudflare.tunnel 通路点名城所在机器上要执行的程序与参数；一个经远程门连进来的设备若能写它，就能让城在它所在的机器上执行任意程序，所以只在城的 CONFIG.toml 里手写。
+settings-reason RemoteRoute.Cloudflare.url 通路点名城所在机器上要执行的程序与参数；一个经远程门连进来的设备若能写它，就能让城在它所在的机器上执行任意程序，所以只在城的 CONFIG.toml 里手写。
+settings-reason RemoteRoute.Command.args 通路点名城所在机器上要执行的程序与参数；一个经远程门连进来的设备若能写它，就能让城在它所在的机器上执行任意程序，所以只在城的 CONFIG.toml 里手写。
+settings-reason RemoteRoute.Command.command 通路点名城所在机器上要执行的程序与参数；一个经远程门连进来的设备若能写它，就能让城在它所在的机器上执行任意程序，所以只在城的 CONFIG.toml 里手写。
+settings-reason RemoteRoute.Command.permanence 通路点名城所在机器上要执行的程序与参数；一个经远程门连进来的设备若能写它，就能让城在它所在的机器上执行任意程序，所以只在城的 CONFIG.toml 里手写。
 settings-reason ConfigFile.resident 选 harness 就是把房间的内容交给厂商的外部进程（confidential 楼因此拒 harness 派活）；这一步由 User 在 CONFIG.toml 里有意写下，设置页的 harness 组只说明安装与登录。
 settings-reason ResidentSection.harness 选 harness 就是把房间的内容交给厂商的外部进程（confidential 楼因此拒 harness 派活）；这一步由 User 在 CONFIG.toml 里有意写下，设置页的 harness 组只说明安装与登录。
 settings-control ConfigFile.sandbox client/src/views/building/sandbox.svelte
@@ -269,6 +269,6 @@ settings-control SandboxSection.interpreter client/src/views/building/sandbox.sv
 settings-control SandboxSection.mounts client/src/views/building/sandbox.svelte
 settings-control SandboxSection.shell client/src/views/building/sandbox.svelte
 settings-control SandboxSection.trusted client/src/views/building/sandbox.svelte
-settings-reason ConfigFile.skills 书架是城外的机器目录，挂进来后每栋楼都读得到；一个经远程门连进来的设备若能写它，就能把这台机器上的任意目录交给 Agent 读，所以只在城的 CONFIG.toml 里手写，楼与房间写它即拒。
-settings-reason SkillsSection.shelves 书架是城外的机器目录，挂进来后每栋楼都读得到；一个经远程门连进来的设备若能写它，就能把这台机器上的任意目录交给 Agent 读，所以只在城的 CONFIG.toml 里手写，楼与房间写它即拒。
+settings-reason ConfigFile.skills 书架是城外的机器目录，挂进来后每栋楼都读得到；一个经远程门连进来的设备若能写它，就能把城所在机器上的任意目录交给 Agent 读，所以只在城的 CONFIG.toml 里手写，楼与房间写它即拒。
+settings-reason SkillsSection.shelves 书架是城外的机器目录，挂进来后每栋楼都读得到；一个经远程门连进来的设备若能写它，就能把城所在机器上的任意目录交给 Agent 读，所以只在城的 CONFIG.toml 里手写，楼与房间写它即拒。
 -/

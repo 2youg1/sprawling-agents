@@ -231,7 +231,7 @@ pub fn new(setup: ExecSetup, sandbox: Box<dyn Sandbox>, backlog: Backlog) -> Res
 
 /-! D95 一条命令的结果说出 User 的内存上限在它运行期间落到哪一种（设置覆盖；`runtime::backlog::ceiling`、`runtime::backlog::jobs`、`runtime::backlog::cgroup`、`runtime::tools::exec::outcome`）
 
-**来源**：User 裁决“没有缺省上限；撞到上限时命令和界面都要给出明确报错”，并要求审核整条执行路径中失败却不报错的地方。上限只在 `[core] placement = "soft_shares"` 且填了 `[core] memory_bytes` 时被要求（`crates/sprawling/spec/Serving/Placement.lean` D47），本决定只管被要求之后。
+**来源**：这是一条 ruling：run 的内存没有缺省上限，只有 User 填的上限；撞到它时，命令结果与界面都给出明确的错误；执行路径上失败而不报错的地方都要报出来。上限只在 `[core] placement = "soft_shares"` 且填了 `[core] memory_bytes` 时被要求（`crates/sprawling/spec/Serving/Placement.lean` D47），本决定只管被要求之后。
 
 **接口**：
 
