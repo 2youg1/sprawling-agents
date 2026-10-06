@@ -433,6 +433,8 @@ jobs:
           path: ~/.bun/install/cache
           key: bun-${{ runner.os }}-${{ hashFiles('client/bun.lock') }}
           restore-keys: bun-${{ runner.os }}-
+      - name: playback template matches its sources
+        run: bun crates/city/skills/playback/assemble.js --check
       - name: lint, typecheck and test the client
         run: just check-client
 
