@@ -54,6 +54,8 @@ pub struct EndpointBook {
     affinity: BTreeMap<kernel::Address, BTreeMap<String, kernel::ServerLabel>>,
     #[serde(default)]
     attempts: BTreeMap<kernel::RunId, kernel::event::record::ProviderAccountBinding>,
+    #[serde(default)]
+    active_rooms: BTreeMap<kernel::RunId, kernel::Address>,
 }
 
 /// One attached endpoint and the client its calls share. A second
@@ -125,7 +127,11 @@ impl EndpointBook {
         data: &Payload,
     ) -> Result<(), AxError> {
         self.apply_payload(kind, data)?;
-        if kind == EventKind::ModelCalled {
+        if kind == EventKind::RunStarted {
+            if let Some(addr) = addr {
+                self.active_rooms.insert(run, addr.clone());
+            }
+        } else if kind == EventKind::ModelCalled {
             let called: kernel::event::record::ModelCalled = data.read()?;
             if let Some(binding) = called.provider_account {
                 self.attempts.insert(run, binding);
@@ -134,7 +140,7 @@ impl EndpointBook {
             }
         } else if kind == EventKind::ModelReturned {
             if let Some(binding) = self.attempts.remove(&run)
-                && let Some(addr) = addr
+                && let Some(addr) = addr.or_else(|| self.active_rooms.get(&run))
             {
                 self.affinity
                     .entry(addr.clone())
@@ -147,6 +153,7 @@ impl EndpointBook {
             }
         } else if kind == EventKind::RunFrozen {
             self.attempts.remove(&run);
+            self.active_rooms.remove(&run);
         }
         Ok(())
     }
@@ -624,6 +631,8 @@ mod tests {
         let mut book = EndpointBook::new();
         let addr = kernel::Address::parse("lab/session").unwrap();
         let run = RunId::from_bytes([9; 16]);
+        book.absorb(EventKind::RunStarted, run, Some(&addr), &Payload::empty())
+            .unwrap();
         let called = |account: &str| {
             Payload::of(&kernel::event::record::ModelCalled {
                 model: "model".to_owned(),
@@ -638,13 +647,8 @@ mod tests {
         book.absorb(EventKind::ModelCalled, run, Some(&addr), &called("first"))
             .unwrap();
         assert!(book.session_account(&addr, "house").is_none());
-        book.absorb(
-            EventKind::ModelReturned,
-            run,
-            Some(&addr),
-            &Payload::empty(),
-        )
-        .unwrap();
+        book.absorb(EventKind::ModelReturned, run, None, &Payload::empty())
+            .unwrap();
         book.absorb(EventKind::ModelCalled, run, Some(&addr), &called("second"))
             .unwrap();
         book.absorb(EventKind::RunFrozen, run, Some(&addr), &Payload::empty())
@@ -653,15 +657,13 @@ mod tests {
             book.session_account(&addr, "house").unwrap().as_str(),
             "first"
         );
+        let run = RunId::from_bytes([10; 16]);
+        book.absorb(EventKind::RunStarted, run, Some(&addr), &Payload::empty())
+            .unwrap();
         book.absorb(EventKind::ModelCalled, run, Some(&addr), &called("second"))
             .unwrap();
-        book.absorb(
-            EventKind::ModelReturned,
-            run,
-            Some(&addr),
-            &Payload::empty(),
-        )
-        .unwrap();
+        book.absorb(EventKind::ModelReturned, run, None, &Payload::empty())
+            .unwrap();
         assert_eq!(
             book.session_account(&addr, "house").unwrap().as_str(),
             "second"
@@ -683,6 +685,7 @@ mod tests {
             let mut book = EndpointBook::new();
             let addr = kernel::Address::parse("lab/session").unwrap();
             let run = RunId::from_bytes([9; 16]);
+            book.absorb(EventKind::RunStarted, run, Some(&addr), &Payload::empty()).unwrap();
             let called = |id: &str| Payload::of(&kernel::event::record::ModelCalled {
                 model: "fixture".to_owned(), segments: Vec::new(),
                 provider_account: Some(kernel::event::record::ProviderAccountBinding {
@@ -690,7 +693,7 @@ mod tests {
                 }),
             }).unwrap();
             book.absorb(EventKind::ModelCalled, run, Some(&addr), &called("bound")).unwrap();
-            book.absorb(EventKind::ModelReturned, run, Some(&addr), &Payload::empty()).unwrap();
+            book.absorb(EventKind::ModelReturned, run, None, &Payload::empty()).unwrap();
             for id in attempted {
                 book.absorb(EventKind::ModelCalled, run, Some(&addr), &called(&format!("account{id}"))).unwrap();
                 proptest::prop_assert_eq!(book.session_account(&addr, "house").unwrap().as_str(), "bound");

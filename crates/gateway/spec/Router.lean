@@ -174,8 +174,9 @@ theorem legacy_submissions_preserve_accounts {Account : Type} (held : List Accou
 end Gateway.Router.Accounts
 
 /-! EndpointBook::absorb(kind,run,addr,data) 是实时与重放共用入口；model_called
-保存每个 Run 的最后一次非秘密账号尝试，model_returned 将它提交到该房间的亲和。
-RunFrozen 删除未成功尝试，SessionOpened 清该房间的亲和；snapshot 保存这些投影，
+run_started 保存活动 Run 的房间，model_called 保存每个 Run 的最后一次非秘密账号尝试，
+model_returned 将它提交到该房间的亲和；回合记录不带 addr 时使用 run_started 的房间。
+RunFrozen 删除未成功尝试与活动房间，SessionOpened 清该房间的亲和；snapshot 保存这些投影，
 不含 Key。派活在 room_for 后将成功亲和传给 adapter，不把未定房间当 Session。
 重排不挪健康账号；被移除的绑定按新表的首账号选择。
 模型假设同一房间只有一个活动 Run，生产 open_session 在房间忙时返回 E_BUSY，
