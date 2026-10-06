@@ -659,7 +659,7 @@ D27 **验证编排只住 `.github/workflows/ci.yml`，release 经 `workflow_call
 
 `test-timings` 读取两份 `gh run view --json conclusion,headSha,startedAt,updatedAt,jobs` 的完整成功结果，对照全 CI、从 test build 启动到 test 汇总结束的测试链、构建与最长分片的 wall time，并逐片列出读数；排队计入全 CI 与测试链，不能从该差额推断分片算法的净收益。未成功或缺少构建、分片、test 汇总的输入不产生测量结论。
 
-`release.yml` 的手动 `workflow_dispatch` 恒为只构建验证，必填 boolean 输入 `build-only` 缺省为 true；即使输入 false 或选择 tag，手动事件也不能执行 publish、channel、crates 或取得这些发布 job 的 OIDC 权限。三处发布 job 都要求 push 事件且 ref 以 `refs/tags/v` 开头；tag push 保持既有发布政策。手动运行复用 verify、advisories 与 archive，不设 `SPRAWLING_RELEASE_TAG`，产物标识为源码构建；保留准确 commit/tree、归档摘要、耗时与缓存读数作为验证证据。本契约不改变 D27 的必需 job 集合、矩阵或失败／取消／缺席拒绝，不调用未配置的 SignPath。手动运行是否只构建由事件边界决定，输入值不授予发布能力。
+`release.yml` 的手动 `workflow_dispatch` 恒为只构建验证，必填 boolean 输入 `build-only` 缺省为 true；即使输入 false 或选择 tag，手动事件也不能执行 publish、channel、system-channels、crates 或取得这些发布 job 的 OIDC 权限。四处发布 job 都要求 push 事件且 ref 以 `refs/tags/v` 开头；tag push 保持既有发布政策。手动运行复用 verify、advisories 与 archive，不设 `SPRAWLING_RELEASE_TAG`，产物标识为源码构建；保留准确 commit/tree、归档摘要、耗时与缓存读数作为验证证据。本契约不改变 D27 的必需 job 集合、矩阵或失败／取消／缺席拒绝，不调用未配置的 SignPath。手动运行是否只构建由事件边界决定，输入值不授予发布能力。
 
 被否：release 另抄 jobs 或 Cargo 命令，会再次分叉；缓存 composite action 在只有一个 test-build 定义时增加无用的接口；接受历史 CI 绿结果需要本方案没有的来源、时效与完整性协议。重开参数：发行要求 core/proof 阻塞，或确有跨运行结果复用需求。验证以两个 YAML 的解析、inputs/权限/needs、缓存环境唯一性与类型分片覆盖对照为本地边界；真实 cache hit、失败传播与耗时由 Actions 运行确认。
 
@@ -1405,4 +1405,21 @@ CI 与 justfile 调用面；ARCHITECTURE.md §3（`depmap`、`directions` 围栏
 记录字段名而不再声明 TOML 拼写；控制路径必须存在，理由不能空。新增可设字段没有
 记录时 wiring 变红；无字段的枚举由其承载字段覆盖。该检查确认覆盖决策，控件行为
 由客户端类型检查、interaction contracts 与 render 判断。
+-/
+
+/-! D32 归档派生 AUR
+
+本节描述 tools/xtask/src/channel/system.rs 的包管理器接口，不是形式证明。
+channel::run 从 platform::PLATFORMS 读取平台，计算归档 SHA256 后交给生成器。
+Linux x86-64 归档生成 PKGBUILD 与 .SRCINFO，两者共享摘要、URL 与版本；没有该
+平台时不生成 AUR，未知平台仍拒绝。URL 从 repository、已验证 tag 和归档名派生。
+版本用 kernel::Release 的 npm_version，将连字符转换为下划线。
+包名取 kernel::release::AUR_PACKAGE_NAME，安装目录取 aur_install_directory()，
+二进制链接至 /usr/bin/sprawling，许可另到 share/licenses。
+包不调用 sprawling install，不修改用户登录配置。
+release.yml 在 Linux 的 Arch 容器以非 root 执行 makepkg，安装并运行 --version。
+validate.py 只替换 aur/PKGBUILD 与 aur/.SRCINFO 的下载基址为回环 HTTP，
+其他文件按字节保留；validate_test.py 用 ELF/Mach-O 非 UTF-8 字节验证同一入口。
+发布仅限 tag push，AUR_SSH_KEY 缺失以 notice 跳过发布，生成与验证仍执行。
+验收：channel 摘要与共享布局 fixture、makepkg --printsrcinfo 对拍与 --version。
 -/

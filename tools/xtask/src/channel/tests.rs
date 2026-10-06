@@ -129,3 +129,63 @@ description = 'fixture description'
     }
     std::fs::remove_dir_all(fixture).unwrap();
 }
+
+#[test]
+fn system_channels_share_the_archive_digest_and_release_identity() {
+    use std::io::Write as _;
+    let fixture =
+        std::env::temp_dir().join(format!("sprawling-system-channel-{}", std::process::id()));
+    let assets = fixture.join("assets");
+    std::fs::create_dir_all(&assets).unwrap();
+    std::fs::write(
+        fixture.join("Cargo.toml"),
+        "[workspace.package]
+version = '0.0.10'
+repository = 'https://example.invalid/source'
+description = 'fixture'
+",
+    )
+    .unwrap();
+    for row in PLATFORMS.iter().filter(|row| row.os != "win32") {
+        let archive = assets.join(format!("sprawling-0.0.10{}", row.suffix));
+        let mut zip = zip::ZipWriter::new(std::fs::File::create(archive).unwrap());
+        zip.start_file(
+            format!("application/{}", row.binary),
+            zip::write::SimpleFileOptions::default().unix_permissions(0o755),
+        )
+        .unwrap();
+        zip.write_all(b"binary").unwrap();
+        zip.finish().unwrap();
+    }
+    let out = fixture.join("out");
+    super::run(&fixture, "v0.0.10-Alpha-261005", &assets, &out).unwrap();
+    let pkgbuild = std::fs::read_to_string(out.join("aur/PKGBUILD")).unwrap();
+    let srcinfo = std::fs::read_to_string(out.join("aur/.SRCINFO")).unwrap();
+    assert!(pkgbuild.contains("pkgver=0.0.10_pre.261005"));
+    let executable = pkgbuild
+        .lines()
+        .find_map(|line| line.strip_prefix("  ln -s \""))
+        .unwrap()
+        .split('"')
+        .next()
+        .unwrap();
+    assert!(kernel::release::is_aur_install(std::path::Path::new(
+        executable
+    )));
+    let package = pkgbuild
+        .lines()
+        .find_map(|line| line.strip_prefix("pkgname="))
+        .unwrap();
+    assert!(
+        srcinfo
+            .lines()
+            .any(|line| line == format!("pkgname = {package}"))
+    );
+    let digest = srcinfo
+        .lines()
+        .find_map(|line| line.trim().strip_prefix("sha256sums = "))
+        .unwrap();
+    assert!(pkgbuild.contains(digest));
+    assert!(pkgbuild.contains("/releases/download/v0.0.10-Alpha-261005/"));
+    std::fs::remove_dir_all(fixture).unwrap();
+}

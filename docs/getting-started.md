@@ -194,6 +194,20 @@ Operating-system code signing is separate from both checks. A signing applicatio
 
 A checkout builds the complete deliverable with `just dist`. A plain `cargo build` before `just build-web` embeds a page explaining that the client bundle is missing. Follow the [contribution prerequisites](CONTRIBUTING.md) for source builds.
 
+### With AUR
+
+The AUR package is not published yet. Release builds generate and validate the package on Arch Linux; publishing requires an AUR account and the `AUR_SSH_KEY` secret. Missing credentials skip publication with a notice.
+
+Once published, Arch Linux x86-64 users with `base-devel`, Git and unzip can inspect the PKGBUILD and build it as an ordinary user:
+
+```sh
+git clone https://aur.archlinux.org/sprawling-bin.git
+cd sprawling-bin
+makepkg -si
+```
+
+The package verifies the release archive's SHA256 and installs its binary, resources and licences, without calling `sprawling install` or changing shell configuration. The generated PKGBUILD defines the installation directory and links the binary into `/usr/bin`. Remove the package with `sudo pacman -R sprawling-bin`. The version check identifies the package's layout and displays its update command; a newer GitHub archive can precede its AUR update, so check the package version before updating.
+
 ### With Nix
 
 On Linux x86-64, Nix can build the complete application from this repository. sprawling is not packaged in nixpkgs, so the repository flake is the Nix path. Enable the Nix features `nix-command` and `flakes`, and check out a tag or commit whose `flake.nix` builds the client before Rust and includes a committed `flake.lock` before building:
@@ -235,6 +249,7 @@ Update through the original channel:
 | cargo-binstall | `cargo binstall sprawling` | `cargo binstall sprawling --version <crate-version>` |
 | shell/PowerShell installer | Run that installer again after stopping the city. | Set `SPRAWLING_VERSION` to the exact published tag as described above. |
 | Manual archive | Download and verify the selected archive, then run its binary's `install` command if you previously installed it. | Keep or download the archive from the selected tag. |
+| AUR sprawling-bin | In the original checkout: `git pull --ff-only && makepkg -si` | Inspect and build the PKGBUILD revision for the selected release. |
 | Repository Nix flake | Check out the selected tag or commit, then run the [Nix commands](#with-nix). | Use the original pinned checkout and lockfile. A fixed commit does not follow newer releases. |
 
 After updating, run `sprawling version` and `sprawling help`, check the intended executable is the one on PATH, then reopen the city with `sprawling up ./cities/first`. Confirm the page connects, configuration loads, project files and history are present and a small task works. Keep the old version and backup until this check succeeds.

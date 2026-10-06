@@ -35,7 +35,8 @@ impl Command {
 }
 impl Query { pub fn name(&self) -> &'static str; }
 
-// sandbox frozen container fields and named arms move the shape version; no new frame name.
+// The person's [core] preferences and Aur installation origins extend the answer shape; no new frame name.
+// Increment WIRE_V so a cached client cannot accept an origin it cannot render.
 pub const WIRE_V: u32;
 pub const COMMAND_NAMES: [&str; /* 长度由变体数生成 */];   // 形状 6 数据面：名字权威，计数断言见 §2
 pub const QUERY_NAMES:   [&str; /* 长度由变体数生成 */];   // 同上（§8-38）

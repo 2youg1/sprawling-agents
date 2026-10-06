@@ -300,3 +300,16 @@ helper 在原进程退出后删除移走的运行映像，再启动 `cmd.exe` �
 核对归档/落位字节、同渠道重新安装、退出后的 EXE/来源标记缺席及 PATH 仅删除对应项。
 该检查及独立 Session 验收通过之前，不把 Windows 自卸载登记为已完成。
 -/
+
+/-! D56 AUR 交付发行归档（人的决定）
+
+本节描述外部包管理器接口，不是形式证明。Arch Linux x86-64 的 AUR 包名由
+kernel::release::AUR_PACKAGE_NAME 决定，生成与识别安装目录都读取
+kernel::release::aur_install_directory()。包安装发行二进制、资源与许可，
+不调用 sprawling install，不修改用户登录配置。
+AUR 包尚未发布；release.yml 保留生成、Arch 容器内 makepkg 验证与推送代码，
+只在 tag push 且 AUR_SSH_KEY 存在时推送，缺少凭据时以 notice 跳过发布。
+AUR 更新在原 PKGBUILD checkout 运行 git pull --ff-only && makepkg -si。
+来源识别先解析 exe 链接，再读取共享安装目录；明确环境选择也可指定 aur。
+GitHub 发布比较表示有新归档，不保证 AUR 已同步，执行前仍需检查包版本。
+-/

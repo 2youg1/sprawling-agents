@@ -43,6 +43,7 @@ const CHANNEL: Readonly<Record<InstallChannel, Key>> = {
   cargo_or_binstall: "release_channel_cargo_or_binstall",
   cargo: "release_channel_cargo",
   archive: "release_channel_archive",
+  aur: "release_channel_aur",
   source: "release_channel_source",
 };
 

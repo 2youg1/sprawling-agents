@@ -194,6 +194,20 @@ gh attestation verify <archive.zip> --repo 2youg1/sprawling-agents
 
 从 checkout 构建完整交付物使用 `just dist`；运行 `just build-web` 之前直接 `cargo build`，嵌入的页面只说明客户端 bundle 缺失。源码构建前提见[贡献指南](CONTRIBUTING.md)。
 
+### 用 AUR
+
+AUR 包尚未发布。发行构建在 Arch Linux 上生成并验证包；发布需要 AUR 账号与 `AUR_SSH_KEY` secret，缺少凭据时以 notice 跳过发布。
+
+发布后，Arch Linux x86-64 用户装好 `base-devel`、Git 与 unzip，可先检查 PKGBUILD，再以普通用户构建：
+
+```sh
+git clone https://aur.archlinux.org/sprawling-bin.git
+cd sprawling-bin
+makepkg -si
+```
+
+包验证发行归档 SHA256 并安装二进制、资源与许可，不调用 `sprawling install`，不改 shell 配置。生成的 PKGBUILD 决定安装目录，并将二进制链接到 `/usr/bin`；卸载用 `sudo pacman -R sprawling-bin`。版本检查辨认包的安装布局并显示更新命令；GitHub 新归档可能早于 AUR 同步，更新前仍需检查包版本。
+
 ### 用 Nix
 
 Linux x86-64 上可以用 Nix 从本仓库构建完整应用。sprawling 不在 nixpkgs 中打包，Nix 用户使用本仓库的 flake。启用 Nix 的 `nix-command` 和 `flakes`，先检出 `flake.nix` 先构建客户端再构建 Rust、且已提交 `flake.lock` 的 tag 或 commit，再构建：
@@ -235,6 +249,7 @@ sprawling replay ./cities/restore-check/.sprawling/ledger
 | cargo-binstall | `cargo binstall sprawling` | `cargo binstall sprawling --version <crate-version>` |
 | shell/PowerShell 安装器 | 停城后重跑原安装器。 | 按前文将 `SPRAWLING_VERSION` 设为实际发布的完整 tag。 |
 | 手动归档 | 下载并验证所选归档；此前安装过时，运行该归档内二进制的 `install` 命令。 | 保留或下载所选 tag 的归档。 |
+| AUR sprawling-bin | 在原 checkout 中运行 `git pull --ff-only && makepkg -si` | 检查并构建所选发行对应的 PKGBUILD 修订。 |
 | 仓库 Nix flake | 检出所选 tag 或 commit，再运行 [Nix 命令](#用-nix)。 | 使用原固定 checkout 和 lockfile；固定 commit 不会跟随新版。 |
 
 更新后运行 `sprawling version` 与 `sprawling help`，确认 PATH 上解析到预期的二进制，再用 `sprawling up ./cities/first` 打开城。核对页面能连接、配置能读取、项目文件和历史仍在，并执行一件小任务。验证成功之前保留旧版和备份。
