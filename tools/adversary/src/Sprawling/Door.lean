@@ -13,7 +13,7 @@ runs, with the arguments an agent types, and reading the two streams an agent
 reads. There is no linking, no FFI, and no shared type: what cannot be reached
 through this module cannot be tested here, which is the point.
 
-Release answers carry Homebrew and AUR installation origins as opaque JSON;
+Release answers carry AUR installation origins as opaque JSON;
 this door does not choose an updater or decode installation channels.
 
 ARCHITECTURE section 8 says the wire is the whole API and that a second client

@@ -33,7 +33,7 @@ rustfmt rather than merely producing valid Rust.
 -/
 
 /-! Release installation origins remain opaque to regression rendering;
-Homebrew and AUR add no request shape or trace action. -/
+AUR add no request shape or trace action. -/
 
 namespace Sprawling
 
