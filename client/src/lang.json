@@ -659,17 +659,9 @@
     "en": "door",
     "zh": "门"
   },
-  "facts_sandbox": {
-    "en": "sandbox",
-    "zh": "沙箱"
-  },
-  "facts_sandbox_mounts": {
-    "en": "{n} mounted",
-    "zh": "挂载 {n} 处"
-  },
-  "facts_sandbox_open": {
-    "en": "none: the machine itself",
-    "zh": "无：宿主机本身"
+  "facts_sandbox_said": {
+    "en": "sandbox, {n} mounted",
+    "zh": "沙箱：挂载 {n} 处"
   },
   "facts_unreadable": {
     "en": "could not read",
@@ -4211,10 +4203,6 @@
     "en": "skip to the page",
     "zh": "跳到页面内容"
   },
-  "slash_clear": {
-    "en": "drop this conversation and start a new session here",
-    "zh": "丢掉这段对话，在此地址开一个新对话"
-  },
   "slash_dispatch": {
     "en": "open a run with these words",
     "zh": "用这些话开一次 run"
@@ -5531,9 +5519,25 @@
     "en": "this session",
     "zh": "本会话"
   },
-  "talk_model_locked": {
-    "en": "model, kept by this session: another model opens a new session",
-    "zh": "模型，本会话固定：换模型会开一个新会话"
+  "talk_find_model": {
+    "en": "filter models",
+    "zh": "筛选模型"
+  },
+  "talk_column_provider": {
+    "en": "provider",
+    "zh": "provider"
+  },
+  "talk_permissions": {
+    "en": "permissions",
+    "zh": "权限设置"
+  },
+  "talk_work_switch": {
+    "en": "work instead of chat",
+    "zh": "工作（关闭时为对话）"
+  },
+  "talk_write_switch": {
+    "en": "full write instead of create only",
+    "zh": "常规写入（关闭时只读可新建）"
   },
   "talk_policy": {
     "en": "what bounds the run",

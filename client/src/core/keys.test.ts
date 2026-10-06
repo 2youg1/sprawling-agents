@@ -27,6 +27,12 @@ describe("the shell's own keys", () => {
     expect(keys.acting(press("j", { ctrlKey: true }))).toBe("inspect");
   });
 
+  // The chord was once dropped with the fork button; branching is its
+  // own feature and keeps its key (client/Spec.lean D44).
+  test("f branches from the entry under the hand on the page and is typed inside a text box", () => {
+    expect([keys.acting(press("f")), keys.acting(press("f", { target: "field" }))]).toEqual(["fork.here", null]);
+  });
+
   test("no two actions ship on one chord", () => {
     expect(conflictsOf(DEFAULTS)).toEqual([]);
   });

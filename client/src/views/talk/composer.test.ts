@@ -7,11 +7,11 @@ import { describe, expect, test } from "bun:test";
 
 import type { RunBelief } from "../../core/belief";
 import { Address, RunId, Seq, TimeMs } from "../../wire";
-import { menuColumns, modelMove, pills, sessionModel } from "./composer";
+import { menuColumns, modelMove, picksFor, pills, sessionModel } from "./composer";
 import type { Around, Picks } from "./composer";
 
 const ignore = (): void => undefined;
-const picks: Picks = { model: ignore, workspace: ignore, effort: ignore, mode: ignore };
+const picks: Picks = { model: ignore, workspace: ignore, effort: ignore };
 
 const around: Around = {
   served: [
@@ -23,7 +23,6 @@ const around: Around = {
   rooms: [],
   here: null,
   effort: null,
-  mode: "work",
 };
 
 describe("the `/` menu", () => {
@@ -82,10 +81,20 @@ describe("the session's model", () => {
 });
 
 describe("picking a model", () => {
-  test("opens a new session only when a session already answers with another model", () => {
+  test("never changes the model of an existing session", () => {
     const names = { endpoint: "local", model: "fake-chat" };
     expect(modelMove("local\u0000fake-chat", null)).toEqual({ kind: "select", names });
-    expect(modelMove("local\u0000fake-chat", "fake-small")).toEqual({ kind: "reopen", names });
+    expect(modelMove("local\u0000fake-chat", "fake-small")).toEqual({ kind: "stay" });
     expect(modelMove("local\u0000fake-chat", "fake-chat")).toEqual({ kind: "stay" });
   });
+});
+
+test("a model pick sends selection alone, never a session command", () => {
+  const sent: unknown[] = [];
+  const hands = { send: (command: unknown) => { sent.push(command); return true; }, go: ignore, chooseEffort: ignore };
+  picksFor(hands, null).model("local\u0000fake-chat");
+  expect(sent).toHaveLength(1);
+  expect(sent).toMatchObject([{ select_model: { endpoint: "local", model: "fake-chat", tag: "main" } }]);
+  picksFor(hands, "fake-small").model("local\u0000fake-chat");
+  expect(sent).toHaveLength(1);
 });

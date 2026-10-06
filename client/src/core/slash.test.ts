@@ -255,13 +255,6 @@ describe("new and fork", () => {
     expect({ sent: held.sent, written: held.written }).toEqual({ sent: [], written: [] });
   });
 
-  test("/clear drops the conversation the way /new does", () => {
-    const room = Address.make("hall/mayor");
-    const held = hands(room, () => null);
-    verb("/clear").run(held.filled, called("/clear"));
-    expect(opened(held.sent)).toEqual({ addr: room, carry: "nothing", from: null });
-  });
-
   test("/steer takes only the sentence", () => {
     expect(find("/steer")?.grammar).toBe("<text>");
   });

@@ -54,16 +54,15 @@
         rooms: ["hall/mayor", "atlas/api", "atlas/web"],
         here: HERE,
         effort: EFFORTS[2] ?? null,
-        mode: "chat",
       },
-      { model: ignore, workspace: ignore, effort: ignore, mode: ignore },
+      { model: ignore, workspace: ignore, effort: ignore },
     ),
   );
-  const NAMES = ["model", "workspace", "effort", "mode"] as const;
+  const NAMES = ["workspace"] as const;
 </script>
 
 {#each NAMES as name, index (name)}
-  {@const spec = specs[index]}
+  {@const spec = specs[index + 1]}
   {#if spec !== undefined}
     <Case label={`composer pill · the ${name} menu open`}>
       <div class="flex min-h-[36rem] items-end">
