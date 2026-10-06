@@ -5531,9 +5531,21 @@
     "en": "this session",
     "zh": "本会话"
   },
-  "talk_model_locked": {
-    "en": "model, kept by this session: another model opens a new session",
-    "zh": "模型，本会话固定：换模型会开一个新会话"
+  "talk_column_provider": {
+    "en": "provider",
+    "zh": "provider"
+  },
+  "talk_permissions": {
+    "en": "permissions",
+    "zh": "权限设置"
+  },
+  "talk_work_switch": {
+    "en": "work instead of chat",
+    "zh": "工作（关闭时为对话）"
+  },
+  "talk_write_switch": {
+    "en": "full write instead of create only",
+    "zh": "常规写入（关闭时只读可新建）"
   },
   "talk_policy": {
     "en": "what bounds the run",

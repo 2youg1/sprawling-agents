@@ -4,9 +4,9 @@ file, You can obtain one at https://mozilla.org/MPL/2.0/.
 Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <!-- One compact control under the box: which model answers, which room
-hears it, how hard the model thinks, which mode the run works in.
+hears it, and how hard the model thinks.
 `composer.ts` owns what a pill offers and what a pick means; this is the
-shape all four are drawn in.
+shape the workspace chip is drawn in.
 
 The trigger shows the value alone, the way the settings row shows every
 fact under the composer's line; its name is the first half of the

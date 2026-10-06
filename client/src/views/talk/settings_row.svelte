@@ -4,30 +4,16 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts" module>
-  // How much of the row a composer draws (docs/frontend-method.md §7D, §7I): every
-  // fact and choice before a session begins; the room, gate and sandbox
-  // once it has, because the model, effort and mode are then the frozen
-  // facts of its first message head; and in the panorama tier's band
-  // none of them, because the chosen session's sheet says all of them.
-  // A message the link would not take is said in every case.
-  export type RowDraws = "everything" | "facts" | "notice";
+  export type RowDraws = "everything" | "notice";
 </script>
 
 <script lang="ts">
-  // The row under the composer's line (docs/frontend-method.md §7I): the room, the gate
-  // and the sandbox on the left, and - only before a session begins - the
-  // model, the effort, the mode and the write limit on the right; the
-  // write limit's menu also holds the admission requirement and the
-  // landing (refrain roadmap 4-2). Once a session begins all of these are
-  // frozen facts of the run, and the row stops offering them. The room
-  // chip's menu reads who is listening above the rooms it offers.
   import { untrack } from "svelte";
-
   import { say } from "../../core/lang";
   import { ui } from "../../ui";
   import type { Address } from "../../wire";
-  import Bounds from "./bounds.svelte";
   import type { Pill } from "./composer";
+  import { splitModel } from "./composer";
   import Listening from "./listening.svelte";
   import { Popover } from "../parts/popover";
   import type { PopoverColumn, PopoverRow } from "../parts/popover";
@@ -35,26 +21,52 @@
   import { picked, policyColumns, policyFace } from "./policy";
 
   interface Props {
-    // The four pills `composer.ts` builds: model, room, effort, mode.
-    readonly specs: readonly [Pill, Pill, Pill, Pill];
+    readonly specs: readonly [Pill, Pill, Pill];
     readonly room: Address | null;
     readonly draws: RowDraws;
-    // Whether the last message stayed in the box because the link would
-    // not take it.
     readonly kept: boolean;
-    // The gallery draws the run policy's menu open so it is measured;
-    // every composer starts with it closed.
-    readonly menu?: "open" | "closed";
+    readonly menu?: "open" | "closed" | "model";
   }
 
   const { specs, room, draws, kept, menu: starts = "closed" }: Props = $props();
   const u = ui();
   const { lang } = u;
   const policy = u.policy;
-  let menu = $state(untrack(() => starts) === "open");
+  let menu = $state<"policy" | "model" | null>(untrack(() => starts) === "open" ? "policy" : untrack(() => starts) === "model" ? "model" : null);
+  let provider = $state<string | null>(null);
+  let permission = $state<HTMLButtonElement | undefined>(undefined);
+  let first = $state<HTMLInputElement | undefined>(undefined);
+  let panel = $state<HTMLDivElement | undefined>(undefined);
+  let preview = untrack(() => starts) === "open";
 
-  function apply(column: PopoverColumn, row: PopoverRow): void {
-    u.choosePolicy(picked($policy, column.id, row.id));
+  const providers = $derived(specs[0].choices.flatMap((row) => {
+    const model = splitModel(row.value);
+    return model === null ? [] : [{ id: model.endpoint, label: row.note ?? model.endpoint }];
+  }).filter((row, index, all) => all.findIndex((each) => each.id === row.id) === index));
+  const parent = $derived(provider ?? splitModel(specs[0].value ?? "")?.endpoint ?? providers.at(0)?.id);
+  const columns = $derived<readonly PopoverColumn[]>([
+    { id: "provider", label: "talk_column_provider", rows: providers.map((row) => ({ ...row, chosen: row.id === parent })) },
+    { id: "model", label: "talk_column_model", rows: specs[0].choices.filter((row) => splitModel(row.value)?.endpoint === parent).map((row) => ({ id: row.value, label: row.label, chosen: row.value === specs[0].value })) },
+    { id: "effort", label: "talk_column_effort", rows: specs[2].choices.map((row) => ({ id: row.value, label: row.label, secondary: row.note, chosen: row.value === specs[2].value })) },
+  ]);
+  const modelFace = $derived(specs[0].choices.find((row) => row.value === specs[0].value)?.label ?? specs[0].placeholder);
+  const effortFace = $derived(specs[2].choices.find((row) => row.value === specs[2].value)?.label ?? specs[2].placeholder);
+
+  $effect(() => {
+    if (menu !== "policy" || first === undefined) return;
+    if (preview) { preview = false; return; }
+    first.focus();
+  });
+
+  function modelPick(column: PopoverColumn, row: PopoverRow): void {
+    if (column.id === "provider") provider = row.id;
+    if (column.id === "model") specs[0].pick(row.id);
+    if (column.id === "effort") specs[2].pick(row.id);
+  }
+
+  function closePermission(): void {
+    menu = null;
+    permission?.focus();
   }
 </script>
 
@@ -62,49 +74,69 @@
   {#if room !== null}<Listening {room} />{/if}
 {/snippet}
 
-{#if draws !== "notice" || kept}
-<!-- The run policy's menu hangs from the whole row, so its three columns
-have the row's width. It stays open while the person picks in more than
-one column, and Escape or its control closes it. -->
+{#if draws === "everything" || kept}
 <div class="relative mt-tight flex flex-wrap items-center justify-between gap-tight">
-  {#if menu && draws === "everything"}
-    <Popover
-      label="talk_policy"
-      columns={policyColumns($lang, $policy)}
-      onApply={apply}
-      onClose={() => {
-        menu = false;
-      }}
-    />
-  {/if}
-  <!-- On one column the edge keys stand at the start of this group, and
-  its chips flow beside them (`edge-slot`, client/Spec.lean §4-52). -->
   <div class="edge-slot -ml-snug flex min-w-0 flex-wrap items-center narrow:ml-0">
-    {#if draws !== "notice"}
+    {#if draws === "everything" && specs[1].choices.length > 0}
       <PillView spec={specs[1]} told={room === null ? undefined : listening} />
-      <Bounds {room} />
     {/if}
-    {#if kept}
-      <span class="px-snug text-note text-alert">{say($lang, "talk_not_live")}</span>
-    {/if}
+    {#if kept}<span class="px-snug text-note text-alert">{say($lang, "talk_not_live")}</span>{/if}
   </div>
   {#if draws === "everything"}
+    {#if menu === "model" && providers.length > 0}
+      <Popover label="talk_column_model" {columns} onApply={modelPick} onClose={() => { menu = null; }} />
+    {/if}
     <div class="-mr-snug ml-auto flex min-w-0 flex-wrap items-center narrow:mr-0">
-      <PillView spec={specs[0]} />
-      <PillView spec={specs[2]} />
-      <PillView spec={specs[3]} />
-      <button
-        type="button"
-        class="{FACT} hover:wash hover:text-text aria-expanded:wash aria-expanded:text-text"
-        aria-label={`${say($lang, "talk_policy")}: ${policyFace($lang, $policy)}`}
-        aria-haspopup="dialog"
-        aria-expanded={menu}
-        onclick={() => {
-          menu = !menu;
-        }}
-      >
-        <span class="truncate">{policyFace($lang, $policy)}</span>
-      </button>
+      {#if providers.length > 0}
+        <button type="button" class="{FACT} hover:wash hover:text-text aria-expanded:wash aria-expanded:text-text"
+          aria-label={`${specs[0].label}: ${modelFace} | ${effortFace}`} aria-haspopup="dialog" aria-expanded={menu === "model"}
+          onclick={() => { menu = menu === "model" ? null : "model"; }}>
+          <span class="truncate">{modelFace} <span aria-hidden="true">│</span> {effortFace}</span>
+        </button>
+      {/if}
+      <div bind:this={panel} onfocusout={(event) => {
+        if (menu !== "policy") return;
+        const next = event.relatedTarget;
+        if (next instanceof Node && panel?.contains(next)) return;
+        menu = null;
+      }}>
+        <button bind:this={permission} type="button" class="{FACT} hover:wash hover:text-text aria-expanded:wash aria-expanded:text-text"
+          aria-label={`${say($lang, "talk_permissions")}: ${say($lang, `mode_${$policy.mode}`)} · ${policyFace($lang, $policy)}`}
+          aria-haspopup="dialog" aria-expanded={menu === "policy"}
+          onclick={() => { menu = menu === "policy" ? null : "policy"; }}>
+          <span class="truncate">{say($lang, `mode_${$policy.mode}`)} · {policyFace($lang, $policy)}</span>
+        </button>
+        {#if menu === "policy"}
+          <div role="dialog" tabindex="-1" aria-label={say($lang, "talk_permissions")}
+            class="rise absolute bottom-full left-0 mb-snug flex w-full flex-col gap-base rounded-panel border border-edge-panel bg-raised p-base shadow-float"
+            onkeydown={(event) => {
+              if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); closePermission(); }
+            }}>
+            <label class="flex items-center justify-between gap-base text-body text-text">
+              {say($lang, "talk_work_switch")}
+              <input bind:this={first} type="checkbox" role="switch" checked={$policy.mode === "work"}
+                onchange={(event) => { u.choosePolicy({ ...$policy, mode: event.currentTarget.checked ? "work" : "chat" }); }} />
+            </label>
+            <label class="flex items-center justify-between gap-base text-body text-text">
+              {say($lang, "talk_write_switch")}
+              <input type="checkbox" role="switch" checked={$policy.write === "full"}
+                onchange={(event) => { u.choosePolicy({ ...$policy, write: event.currentTarget.checked ? "full" : "create" }); }} />
+            </label>
+            <div class="flex flex-wrap gap-base">
+              {#each policyColumns($lang, $policy).filter((column) => column.id !== "write") as column (column.id)}
+                <label class="flex min-w-0 flex-1 flex-col gap-tight text-note text-text-quiet">
+                  {say($lang, column.label)}
+                  <select class="h-control w-full min-w-0 rounded-control bg-page px-snug text-body text-text"
+                    value={column.rows.find((row) => row.chosen)?.id}
+                    onchange={(event) => { u.choosePolicy(picked($policy, column.id, event.currentTarget.value)); }}>
+                    {#each column.rows as row (row.id)}<option value={row.id}>{row.label}</option>{/each}
+                  </select>
+                </label>
+              {/each}
+            </div>
+          </div>
+        {/if}
+      </div>
     </div>
   {/if}
 </div>

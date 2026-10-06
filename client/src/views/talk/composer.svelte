@@ -63,6 +63,8 @@
 
   interface ComposerProps {
     readonly placeholder: string;
+    readonly recipient?: string | undefined;
+    readonly started?: boolean;
     readonly sending: Sending;
     // Where the unsent words are kept, when they are kept at all: the
     // room or the run this box speaks to.
@@ -82,12 +84,11 @@
     readonly room?: Address | undefined;
   }
 
-  const { placeholder, sending, draft, onSend, onStop, hearing, band, room }: ComposerProps = $props();
+  const { placeholder, sending, draft, onSend, onStop, hearing, band, room, recipient, started = false }: ComposerProps = $props();
 
   const u = ui();
   const { lang } = u;
   const effort = u.effort;
-  const mode = u.mode;
   const belief = u.conn.belief;
 
   // The words in the box, and where they are kept while unsent: the
@@ -228,9 +229,10 @@
   // The run in front of the person: what a typed `/stop` and `/steer` reach.
   const live = $derived(shown === null ? undefined : runInFront($belief, shown));
 
+  const startedHere = $derived(here !== null && heldIn($belief, here).some((run) => run.lastSeq > ($belief.sessions[here] ?? 0)));
   const session = $derived(here === null ? null : sessionModel(heldIn($belief, here), $belief.sessions[here] ?? null));
-  const offered = $derived({ served: models, chosen: main, session, rooms, here, effort: $effort, mode: $mode });
-  const specs = $derived(pills($lang, offered, picksFor(u, here, session)));
+  const offered = $derived({ served: models, chosen: main, session, rooms, here, effort: $effort });
+  const specs = $derived(pills($lang, offered, picksFor(u, session)));
 
   // ------------------------------------------------------- the `/` menu
 
@@ -351,6 +353,11 @@ strength, and a drag over the box by the wash it takes. -->
       }}
     />
   {/if}
+  {#if recipient !== undefined && text === ""}
+    <div class="absolute inset-x-0 bottom-full mb-wide text-center">
+      <p class="text-title font-title text-text">{recipient}</p>
+    </div>
+  {/if}
   {#if band !== undefined}{@render band()}{/if}
   <div class="relative pb-snug">
     <div class="flex min-h-key items-end gap-base">
@@ -394,5 +401,5 @@ strength, and a drag over the box by the wash it takes. -->
     <Unkept words={() => text} />
   {/if}
   <DropRefused refused={zone.refused} />
-  <SettingsRow {specs} room={here} draws={band !== undefined ? "notice" : session === null ? "everything" : "facts"} {kept} />
+  <SettingsRow {specs} room={here} draws={band !== undefined || started || startedHere ? "notice" : "everything"} {kept} />
 </form>

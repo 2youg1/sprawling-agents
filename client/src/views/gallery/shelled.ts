@@ -73,9 +73,9 @@ const COMMITS: readonly CommitAnswer[] = [
 // run has done anything a right pane would open on.
 export function answering(calling: boolean): (query: Query) => Answer | undefined {
   return (query) => {
+    if (query === "endpoint_view") return { endpoints: ENDPOINTS };
     if (typeof query !== "object") return undefined;
     if ("rounds" in query) return { rounds: { run: query.rounds.run, turns: turnsOf(calling) } };
-    if ("endpoint_view" in query) return { endpoints: ENDPOINTS };
     if ("commits" in query) return { commits: { building: null, before: null, commits: COMMITS, more: false } };
     if ("config" in query) {
       return {

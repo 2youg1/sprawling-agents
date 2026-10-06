@@ -145,10 +145,9 @@ centring it: two thousand pixels of white under a composer in a room
 with one round in it reads as a page that broke. -->
 <Case label="composer · an empty room lifts the box">
   <div class="flex flex-col items-center gap-base pt-[18vh] text-center">
-    <p class="text-heading font-heading text-text-faint">{say($lang, "talk_empty_mayor")}</p>
-    <p class="text-note text-text-faint">{say($lang, "talk_opening_mayor")}</p>
     <div class="w-full">
       <Composer
+        recipient={say($lang, "talk_empty_mayor")}
         placeholder={say($lang, "talk_placeholder_mayor")}
         sending="dispatch"
         onSend={() => false}
@@ -160,7 +159,7 @@ with one round in it reads as a page that broke. -->
 
 <Case label="composer · docked once the room has a thread">
   <div class="px-pane pb-pane">
-    <Composer
+    <Composer started
       placeholder={say($lang, "talk_placeholder_mayor")}
       sending="dispatch"
       hearing
