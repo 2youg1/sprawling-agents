@@ -86,3 +86,13 @@ impl Custodian {
 
 决定：`EnvReader` 答 `std::env::var` 自己的 `Result<String, VarError>`。值不是 Unicode 的变量照样算设了：它遮住金库，所以 `set` 照遮蔽拒绝；`resolve` 以 `E_CONFIG_INVALID` 拒，主题是「`<变量名>` is set to a value that is not Unicode」，恢复语叫人把这个变量设成 key 的文本，或取消它让金库作答；`describe` 报来源是这个环境变量、`configured` 为假、不可写，与 `resolve` 的答案一致。空值与没设照旧让金库作答。理由：读取器原来是 `std::env::var(key).ok()`，把「设了却读不出」与「没设」并成一个 `None`，于是金库里的旧 key 静默作答，或者人读到「请存这个凭证」，而他明明设了变量。被否：①读不出时当没设——就是旧的读法；②有损地转成字符串再用——发给 provider 的就不是人给的 key。三个平台：不是 Unicode 的值在 macOS 与 Linux 上是不合法的 UTF-8 字节，在 Windows 上是落单的代理项，`std::env::var` 在三处都答 `VarError::NotUnicode`，所以三处拒得一样。
 -/
+
+/-! D25 隐私 owner 的只读核对在 Vault 内完成
+`credential::identity::verify_platform_identity(reference, observed)` 只读取
+平台 Vault，并在模块内部比较 stored 与 observed；返回 Result<(), AxError>，
+不返回原值，不调用 Sealed::expose，不使用 provider 的环境遮蔽，不运行 probe。
+缺失返回 CredentialMissing，不匹配返回 ConfigInvalid，平台拒绝保留错误码但
+移除可能包含私密输入的诊断文字；任何失败都不写、删除或重建引用。
+此入口核对真实身份与既有引用，不建立 journal 的随机身份绑定，不授予写权限。
+测试复用 Vault 的 MemoryVault 与拒绝适配器，检查缺失、不匹配、服务失败和零写。
+-/

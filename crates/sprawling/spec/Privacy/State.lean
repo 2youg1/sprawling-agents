@@ -42,3 +42,37 @@ Decode 在构造时移除输入文字，内部 Debug 与公开 AxError 都遵守
 验收：明文 owner 拒绝且文件不变，旧 schema 拒绝，合法引用 roundtrip，
 畸形身份/字段/enum 的诊断不泄露输入；注册表原字节的既有检查保持。
 -/
+
+/-! D53 status 的历史摘要也属于身份披露；先取得真实 Windows 身份，再读历史，
+通过平台 Vault 中 owner 引用的值核对身份后才序列化摘要。身份读取失败不读日志；
+缺失、锁定或不匹配的 Vault 绑定拒绝，不从环境变量授权，不创建或覆盖绑定。
+此边界只核对 owner，不证明 journal 与引用的随机身份绑定；后续 writer 必须
+同时建立 journal identity 绑定，不能以本查询接口授权 apply/restore。
+下面的任意快照轨迹性质复用已确认的 HistoryQuery 契约。
+-/
+namespace Sprawling.Privacy.HistoryQuery
+
+/-- owner 是平台真实身份的抽象；缺失读数不能授权历史披露。 -/
+def disclose {α : Type} (owner observed : Option Nat) (values : List α) : List α :=
+  match owner, observed with
+  | some stored, some current => if stored = current then values else []
+  | none, _ => []
+  | some _, none => []
+
+/-- 任意历史快照及任意长度查询序列都不能向另一身份返回历史值。 -/
+theorem foreign_trace_discloses_nothing {α : Type} (snapshots : List (List α))
+    (owner observed : Nat) (different : owner ≠ observed) :
+    snapshots.map (disclose (some owner) (some observed)) =
+      snapshots.map (fun _ => []) := by
+  induction snapshots with
+  | nil => rfl
+  | cons snapshot remaining ih => simp [disclose, different, ih]
+
+/-- 读取身份失败时，任意历史查询序列均不返回历史值。 -/
+theorem failed_identity_trace_discloses_nothing {α : Type}
+    (snapshots : List (List α)) (owner : Option Nat) :
+    snapshots.map (disclose owner none) = snapshots.map (fun _ => []) := by
+  cases owner <;> simp [disclose]
+
+end Sprawling.Privacy.HistoryQuery
+
