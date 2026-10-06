@@ -60,6 +60,35 @@ pub struct AttachedEndpoint {
 }
 
 impl AttachedEndpoint {
+    /// Validates submitted legacy fields against the settled account list.
+    ///
+    /// Account retention is settled by the caller before this check. Only
+    /// submitted fields count: archived legacy auth remains readable during
+    /// replay. Presence includes empty text and does not parse a reference.
+    /// See `crates/gateway/spec/Router.lean` D29.
+    ///
+    /// # Errors
+    /// Returns `E_CONFIG_INVALID` when an explicit list has no account target
+    /// for a submitted legacy secret or header, before any external effect.
+    pub fn validate_legacy_fields(
+        name: &str,
+        accounts: Option<&[kernel::event::record::ProviderAccount]>,
+        secret: Option<&str>,
+        auth_header: Option<&str>,
+    ) -> Result<(), kernel::AxError> {
+        if accounts.is_some() && (secret.is_some() || auth_header.is_some()) {
+            return Err(kernel::AxError::failure(
+                kernel::AxCode::ConfigInvalid,
+                "configure provider accounts",
+                format!("{name} uses explicit accounts; a legacy credential has no account target"),
+            )
+            .with_recovery(
+                "edit the named account's reference/header in accounts; omit legacy secret and auth_header fields",
+            ));
+        }
+        Ok(())
+    }
+
     /// Whether calls to this endpoint stay on this machine. The answer
     /// comes from the same test the local adapter applies and the proxy
     /// decision takes, so "local" means one thing city-wide.
@@ -73,7 +102,32 @@ impl AttachedEndpoint {
     /// a settings page needs.
     #[must_use]
     pub fn has_credential(&self) -> bool {
-        auth_reference(&self.auth).is_some()
+        match &self.tuning.accounts {
+            Some(accounts) => accounts.iter().any(|account| account.reference.is_some()),
+            None => auth_reference(&self.auth).is_some(),
+        }
+    }
+
+    /// The first declared account, or the legacy credential before migration.
+    ///
+    /// # Errors
+    /// Refuses an invalid explicit account list rather than using the old key.
+    pub fn first_auth(&self) -> Result<AuthSpec, kernel::AxError> {
+        super::tuning::validate_accounts(self.tuning.accounts.as_deref())?;
+        match self
+            .tuning
+            .accounts
+            .as_ref()
+            .and_then(|accounts| accounts.first())
+        {
+            Some(account) => Ok(match &account.reference {
+                Some(reference) => {
+                    AuthSpec::for_dialect(self.dialect, reference.clone(), account.header.clone())
+                }
+                None => AuthSpec::None,
+            }),
+            None => Ok(self.auth.clone()),
+        }
     }
 
     /// What to call this endpoint on screen: the label the person gave

@@ -301,3 +301,7 @@ end Wire.Frames
 
 **重开参数**：本版之后的下一版若只有一两处线上改动，按 D1 照常各自进位即可，不必再集中。
 -/
+
+/-! 有序账号登记在 EndpointTuning 中增加可缺席的 accounts，列表元素由 kernel 的
+ProviderAccount 持有，旧帧缺席仍可读；名字不变的形状变化按 D1 进位，并重生
+wire shape golden 与客户端协议。-/

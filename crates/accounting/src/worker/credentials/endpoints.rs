@@ -55,8 +55,22 @@ impl RunWorker {
             base_url,
             dialect,
             credential,
-            tuning,
+            mut tuning,
         } = entered;
+        tuning.accounts = self
+            .credentials
+            .book
+            .accounts_for_attachment(&name, tuning.accounts);
+        let (secret, header) = match &credential {
+            Credential::Absent { header } => (None, header.as_deref()),
+            Credential::Key { reference, header } => (Some(reference.as_str()), header.as_deref()),
+        };
+        gateway::AttachedEndpoint::validate_legacy_fields(
+            &name,
+            tuning.accounts.as_deref(),
+            secret,
+            header,
+        )?;
         let auth = match credential {
             Credential::Absent { header } => self.kept_credential(&name, dialect, header),
             Credential::Key { reference, header } => gateway::AuthSpec::for_dialect(
@@ -144,7 +158,35 @@ impl RunWorker {
         admit: &[String],
     ) -> Result<(), AxError> {
         let entered = entered.resolved()?;
+        let explicit_accounts = entered.tuning.accounts.is_some();
         let mut endpoint = self.endpoint_of(entered)?;
+        let kept = self
+            .credentials
+            .book
+            .endpoints()
+            .find(|kept| kept.name == endpoint.name)
+            .cloned();
+        if explicit_accounts && let Some(kept) = kept {
+            let mut comparing = endpoint.tuning.clone();
+            comparing.accounts = kept.tuning.accounts.clone();
+            if endpoint.base_url == kept.base_url
+                && endpoint.dialect == kept.dialect
+                && comparing == kept.tuning
+                && admit
+                    == kept
+                        .models
+                        .iter()
+                        .map(|model| model.id.clone())
+                        .collect::<Vec<_>>()
+            {
+                endpoint.models = kept.models.clone();
+                endpoint.probed = kept.probed;
+                return self.record(
+                    EventKind::EndpointAttached,
+                    gateway::attached_payload(&endpoint)?,
+                );
+            }
+        }
         let unprobed = match self.probe(&endpoint) {
             Ok(served) => {
                 endpoint.probed = true;
@@ -228,7 +270,7 @@ impl RunWorker {
                 base_url: endpoint.chat_url(),
                 dialect: endpoint.dialect,
                 model: String::new(),
-                auth: endpoint.auth.clone(),
+                auth: endpoint.first_auth()?,
                 extra_headers,
                 overrides: Vec::new(),
                 timeout_ms: tuning.timeout_ms.unwrap_or(PROBE_TIMEOUT_MS),
@@ -314,6 +356,190 @@ impl RunWorker {
 )]
 mod tests {
     use crate::worker::fixture::{fake_openai, worker_with_provider};
+
+    proptest::proptest! {
+        #![proptest_config(proptest::test_runner::Config::with_cases(32))]
+        #[test]
+        fn account_submission_traces_preserve_explicit_authority(
+            updates in proptest::collection::vec(
+                (proptest::option::of(1usize..5), proptest::bool::ANY, proptest::bool::ANY),
+                0..12,
+            ),
+        ) {
+            use kernel::{IdemKey, RunId, Seq, ServerLabel};
+            let dir = tempfile::tempdir().unwrap();
+            let report = crate::worker::fixture::init_city(dir.path()).unwrap();
+            let (base_url, provider) = fake_openai(&["m-1"], vec![]);
+            let mut worker = worker_with_provider(dir.path(), &base_url, "m-1").unwrap();
+            let accounts = |count: usize| (0..count).map(|index| {
+                kernel::event::record::ProviderAccount {
+                    id: ServerLabel::parse(&format!("account{index}")).unwrap(),
+                    reference: None,
+                    header: None,
+                }
+            }).collect::<Vec<_>>();
+            let mut held = Some(accounts(1));
+            let command = |incoming, secret, header, marker: &[u8]| wire::Command::AttachEndpoint {
+                name: wire::ProviderName::parse("house").unwrap(),
+                base_url: base_url.clone(),
+                dialect: kernel::DialectKind::OpenAi,
+                secret,
+                auth_header: header,
+                admit: vec!["m-1".to_owned()],
+                tuning: wire::EndpointTuning { accounts: incoming, ..Default::default() },
+                idem: IdemKey::derive(&RunId::CITY, Seq::FIRST, marker),
+            };
+            worker.handle(command(held.clone(), None, None, b"migrate")).unwrap();
+            for (index, (incoming, secret, header)) in updates.into_iter().enumerate() {
+                let incoming = incoming.map(accounts);
+                let before = serde_json::to_value(&worker.credentials.book).unwrap();
+                let calls = provider.exchanges().len();
+                let ledger = runtime::replay::verify_ledger_dir(&report.ledger_dir).unwrap();
+                let result = worker.handle(command(
+                    incoming.clone(),
+                    secret.then(|| "secret:fixture/c".to_owned()),
+                    header.then(|| "X-Legacy".to_owned()),
+                    format!("update-{index}").as_bytes(),
+                ));
+                if secret || header {
+                    proptest::prop_assert_eq!(*result.unwrap_err().code(), kernel::AxCode::ConfigInvalid);
+                    proptest::prop_assert_eq!(serde_json::to_value(&worker.credentials.book).unwrap(), before);
+                    proptest::prop_assert_eq!(provider.exchanges().len(), calls);
+                    proptest::prop_assert_eq!(
+                        runtime::replay::verify_ledger_dir(&report.ledger_dir).unwrap().raw_lines().to_vec(),
+                        ledger.raw_lines(),
+                    );
+                } else {
+                    result.unwrap();
+                    held = incoming.or(held);
+                }
+                let actual = worker.credentials.book.endpoints().find(|endpoint| endpoint.name == "house")
+                    .unwrap().tuning.accounts.clone();
+                proptest::prop_assert_eq!(&actual, &held);
+                proptest::prop_assert!(actual.is_some());
+            }
+        }
+    }
+
+    #[test]
+    fn explicit_accounts_refuse_legacy_probe_fields_before_effects() {
+        let dir = tempfile::tempdir().unwrap();
+        let report = crate::worker::fixture::init_city(dir.path()).unwrap();
+        let (base_url, provider) = fake_openai(&["m-1"], vec![]);
+        let mut worker = worker_with_provider(dir.path(), &base_url, "m-1").unwrap();
+        for id in ["a", "b"] {
+            worker
+                .handle(wire::Command::PutSecret {
+                    realm: "fixture".to_owned(),
+                    name: id.to_owned(),
+                    value: kernel::Sealed::new(Box::new(format!("fixture-{id}"))),
+                })
+                .unwrap();
+        }
+        worker
+            .handle(wire::Command::AttachEndpoint {
+                name: wire::ProviderName::parse("house").unwrap(),
+                base_url: base_url.clone(),
+                dialect: kernel::DialectKind::OpenAi,
+                secret: None,
+                auth_header: None,
+                admit: vec!["m-1".to_owned()],
+                tuning: wire::EndpointTuning {
+                    accounts: Some(
+                        ["a", "b"]
+                            .map(|id| kernel::event::record::ProviderAccount {
+                                id: kernel::ServerLabel::parse(id).unwrap(),
+                                reference: Some(kernel::SecretRef::new("fixture", id).unwrap()),
+                                header: Some("X-Account".to_owned()),
+                            })
+                            .to_vec(),
+                    ),
+                    ..Default::default()
+                },
+                idem: kernel::IdemKey::derive(&kernel::RunId::CITY, kernel::Seq::FIRST, b"migrate"),
+            })
+            .unwrap();
+        worker
+            .handle(wire::Command::ProbeEndpoint {
+                name: wire::ProviderName::parse("house").unwrap(),
+                base_url: base_url.clone(),
+                dialect: kernel::DialectKind::OpenAi,
+                secret: None,
+                auth_header: None,
+                tuning: wire::EndpointTuning::default(),
+                idem: kernel::IdemKey::derive(
+                    &kernel::RunId::CITY,
+                    kernel::Seq::FIRST,
+                    b"probe-migrated",
+                ),
+            })
+            .unwrap();
+        assert!(
+            provider
+                .exchanges()
+                .last()
+                .unwrap()
+                .to_ascii_lowercase()
+                .contains("x-account: fixture-a")
+        );
+        let before = serde_json::to_value(&worker.credentials.book).unwrap();
+        let calls = provider.exchanges();
+        let ledger = runtime::replay::verify_ledger_dir(&report.ledger_dir)
+            .unwrap()
+            .raw_lines()
+            .to_vec();
+        for (index, (secret, header)) in [
+            (Some("secret:fixture/old"), None),
+            (None, Some("X-Legacy")),
+            (Some(""), None),
+            (None, Some("")),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let result = worker.handle(wire::Command::ProbeEndpoint {
+                name: wire::ProviderName::parse("house").unwrap(),
+                base_url: base_url.clone(),
+                dialect: kernel::DialectKind::OpenAi,
+                secret: secret.map(str::to_owned),
+                auth_header: header.map(str::to_owned),
+                tuning: wire::EndpointTuning::default(),
+                idem: kernel::IdemKey::derive(
+                    &kernel::RunId::CITY,
+                    kernel::Seq::FIRST,
+                    format!("legacy-probe-{index}").as_bytes(),
+                ),
+            });
+            assert_eq!(
+                *result
+                    .expect_err("legacy fields have no account target")
+                    .code(),
+                kernel::AxCode::ConfigInvalid
+            );
+            assert_eq!(
+                serde_json::to_value(&worker.credentials.book).unwrap(),
+                before
+            );
+            assert_eq!(provider.exchanges(), calls);
+            assert_eq!(
+                runtime::replay::verify_ledger_dir(&report.ledger_dir)
+                    .unwrap()
+                    .raw_lines(),
+                ledger.as_slice()
+            );
+        }
+        drop(worker);
+        let resumed = super::RunWorker::new(
+            dir.path(),
+            runtime::diagnostics::Diagnostics::off(),
+            crate::worker::fixture::hands(),
+        )
+        .unwrap();
+        assert_eq!(
+            serde_json::to_value(&resumed.credentials.book).unwrap(),
+            before
+        );
+    }
 
     /// The two rungs this layer owns: what the person sends now, and
     /// what the book already holds for the same model. The rungs above

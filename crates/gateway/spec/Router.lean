@@ -8,7 +8,7 @@
 
 规定 `router`（`crates/gateway/src/router.rs`）：已登记端点的簿与每个标签的选择；一次取模型只答一问。本文件是 `crates/gateway/Spec.lean` 的一个分部；下面每一节保留它在 gateway 规格里的标签 §8-n，别处引作 `crates/gateway/Spec.lean §8-n`。
 
-这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与 `gateway::router::normalise::tests` 守住。
+本分部的 Accounts 模型证明显式账号在提交轨迹上保持存在，其他接口由 Rust 类型与 router 旁的回归检查守住。
 -/
 
 /-!
@@ -22,6 +22,7 @@ pub struct AttachedEndpoint { pub name, pub base_url, pub dialect: DialectKind,
                               pub tuning: EndpointTuning }   // §8-16
 impl AttachedEndpoint {
     pub fn is_local(&self) -> bool;          // 与 client_for 绕开代理同一依据（reach::is_local）
+    pub fn first_auth(&self) -> Result<AuthSpec, AxError>; // 原登记或显式列表首账号
     pub fn has_credential(&self) -> bool;    // 关于凭证，金库外只能回答这一问
     pub fn chat_url(&self) -> String;        // base_url ＋ 该兼容格式自己的路径
     pub fn models_url(&self) -> String;
@@ -34,6 +35,8 @@ impl EndpointBook {
     pub fn apply(&mut self, record: &EventRecord) -> Result<(), AxError>;
     pub fn apply_payload(&mut self, kind: EventKind, data: &Payload) -> Result<(), AxError>;
     pub fn select(&self, tag: ModelTag, policy: &BuildingPolicy) -> Result<Chosen<'_>, AxError>;
+    pub fn accounts_for_attachment(&self, name: &str, incoming: Option<Vec<ProviderAccount>>)
+        -> Option<Vec<ProviderAccount>>; // 登记与重放共用的缺席保留规则
     pub fn endpoints(&self) -> impl Iterator<Item = &AttachedEndpoint>;
     pub fn choices(&self) -> impl Iterator<Item = (ModelTag, &str, &ModelEntry)>;
 }
@@ -59,3 +62,110 @@ pub fn selected_payload(ModelTag, &str, &ModelEntry, Option<CeilingSource>) -> R
 
 **重开的参数**：设置面上有人能为一个标签指定备用端点与备用模型，且 `runtime` 侧有一处在失败时读它。那时备用端点与 §8-6 的准入一起设计，因为何时改投备用端点只能由退避节奏回答。
 -/
+
+/-!
+## 有序 Provider accounts
+
+`kernel::event::record::ProviderAccount` 为账号声明，只含 ServerLabel id、可缺席的
+SecretRef reference 与可缺席的 header；无 reference 为显式匿名账号。
+EndpointTuning.accounts 缺席表示保留已有显式列表，尚未迁移的登记仍读原 auth。
+显式列表必须非空、id/reference 不重复，匿名账号不得带 header。
+endpoint_attached.tuning.accounts 为同一列表的 Ledger 形状，旧记录缺席仍可读。
+列表内账号的增加、替换、移除和重排用完整非空列表走原 AttachEndpoint，
+不创建第二个 Provider 数据库；缺席列表不移除已迁移声明。
+保留规则只由 EndpointBook::accounts_for_attachment 决定，登记面与重放均调用它。
+校验住 kernel::event::record::validate_provider_accounts；probe 与 adapter
+从 AttachedEndpoint::first_auth 取得凭据，snapshot 保留同一账号列表，
+显式列表不回退原 auth。每次构造 Model adapter 都采用当时列表的首账号；
+Session 没有成功账号绑定，重排后的新 adapter 与重启后构造的 adapter
+仍按列表顺序选取首账号。账号声明影响凭据解析与登记，失败处理由 runtime
+既有的 Provider 策略决定。Accounts 模型以通过账号校验的提交为输入；
+空表、重复引用和非法 header 由 Rust 账户校验回归判断。
+-/
+
+/-! D28 保持原登记事件与 Vault 格式，以完整有序列表为一次原子替换，避免逐账号命令
+产生半个登记；拒绝空列表以免误作匿名或回退。此登记接口只规定账号声明与首次凭据解析，不承诺 Session 亲和或失败恢复。
+-/
+namespace Gateway.Router.Accounts
+/-- 列表缺席才使用旧登记；显式空表不是旧登记。 -/
+def effective {Account : Type} (legacy : Account) (stated : Option (List Account)) : List Account :=
+  match stated with
+  | none => [legacy]
+  | some accounts => accounts
+/-- 整次重排替换列表，缺席的更新保留已迁移列表。 -/
+def replace {Account : Type} (held incoming : Option (List Account)) : Option (List Account) :=
+  incoming.or held
+theorem updates_preserve_explicit {Account : Type} (held : List Account) (updates : List (Option (List Account))) :
+    (updates.foldl replace (some held)).isSome = true := by
+  induction updates generalizing held with
+  | nil => rfl
+  | cons update rest ih =>
+    cases update with
+    | none => exact ih held
+    | some accounts => exact ih accounts
+end Gateway.Router.Accounts
+
+/-! D29 显式账号列表生效时拒绝旧凭据字段
+
+`accounting::worker::credentials::endpoints::endpoint_of` 先保留缺席的 accounts，
+再调用 `gateway::AttachedEndpoint::validate_legacy_fields` 判定旧 credential；
+该纯准入方法是登记命令拒绝旧字段的唯一权威。
+有效 accounts 存在时，`secret` 或 `auth_header` 在场均返回
+`E_CONFIG_INVALID`，action 为 `configure provider accounts`，subject 含 Provider 名及固定原因文字，不含 secret、header 或 reference，
+recovery 引导修改具名账号的 reference/header 并省略旧字段。ProbeEndpoint 与
+AttachEndpoint 共用这个判定，拒绝发生在 probe、诊断成功和 Ledger 写入之前。
+旧字段与显式新列表同时出现也拒绝，避免一次提交宣称两种凭据权威。
+校验只读字段的存在性，空字符串也算在场，拒绝先于 SecretRef 解析；
+旧 Ledger 中已经归档的 auth 不是本次提交字段，不在重放时重新拒绝。
+
+缺席旧字段允许保留或原子替换账号列表；没有显式列表的旧登记仍允许更新 auth。
+不根据 reference 是否碰巧等于某账号推断目标，也不清除账号表，因为这两种做法
+会使旧写者依赖列表内容，或破坏已有 Session 的健康亲和。Vault 同引用换密仍由
+PutSecret 独立完成；此判定只决定登记命令是否有明确目标，不回滚先前的 Vault 操作。
+
+下面 submit 对应 endpoint_of 的准入；trace 以原状态继续处理被拒的提交。
+派生回归在 `crates/accounting/src/worker/credentials/endpoints.rs`：从 RunWorker.handle
+登记 legacy、迁移 A/B、提交 C，检查错误、无外发、账本不变、实际 probe header，
+并检查重启后的完整账号列表；提交轨迹的投影检查在 router::book 旁。
+-/
+namespace Gateway.Router.Accounts
+structure Update (Account : Type) where
+  accounts : Option (List Account)
+  legacyCredential : Bool
+
+def submit {Account : Type} (held : Option (List Account)) (update : Update Account) :
+    Except Unit (Option (List Account)) :=
+  let settled := replace held update.accounts
+  if settled.isSome && update.legacyCredential then .error () else .ok settled
+
+def apply {Account : Type} (held : Option (List Account)) (update : Update Account) :
+    Option (List Account) :=
+  match submit held update with
+  | .error () => held
+  | .ok settled => settled
+
+theorem submissions_preserve_explicit {Account : Type} (held : List Account)
+    (updates : List (Update Account)) :
+    (updates.foldl apply (some held)).isSome = true := by
+  induction updates generalizing held with
+  | nil => rfl
+  | cons update rest ih =>
+    cases update with
+    | mk accounts legacy =>
+      cases accounts with
+      | none =>
+        cases legacy <;> simpa [apply, submit, replace] using ih held
+      | some accounts =>
+        cases legacy
+        · simpa [apply, submit, replace] using ih accounts
+        · simpa [apply, submit, replace] using ih held
+/-- 任意多次旧字段提交都不改变已迁移账号，包括同时声明替换列表的提交。 -/
+theorem legacy_submissions_preserve_accounts {Account : Type} (held : List Account)
+    (updates : List (Option (List Account))) :
+    (updates.foldl (fun state accounts => apply state ⟨accounts, true⟩) (some held)) =
+      some held := by
+  induction updates with
+  | nil => rfl
+  | cons accounts rest ih =>
+    cases accounts <;> simpa [apply, submit, replace] using ih
+end Gateway.Router.Accounts

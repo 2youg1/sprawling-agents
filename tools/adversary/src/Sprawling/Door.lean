@@ -308,7 +308,8 @@ where
     , ("secret", Json.null)
     , ("auth_header", Json.null)
     , ("tuning", Json.mkObj
-        [ ("label", Json.null)
+        [ ("accounts", Json.null)
+        , ("label", Json.null)
         , ("timeout_ms", Json.null)
         , ("request_max_retries", Json.null)
         , ("stream_idle_timeout_ms", Json.null)

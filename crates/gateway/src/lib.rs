@@ -43,5 +43,5 @@ pub use provider::registry::{ConnectionKind, resolve as resolve_connection};
 pub use reach::{client_for, is_local, reach, through};
 pub use router::{AttachedEndpoint, Chosen, EndpointBook, EndpointTuning};
 pub use router::{DialectHint, normalise_entered};
-pub use router::{TuningDefaults, attached_payload, selected_payload};
+pub use router::{TuningDefaults, attached_payload, selected_payload, validate_accounts};
 pub use transcribe::{AudioType, Recording, Transcriber, transcriber_for};

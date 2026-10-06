@@ -24,7 +24,7 @@ use start::SnapshotFold;
 /// anyway, because `views_fold_version` hashes the version in with this.
 /// The suffix is the digest of a fixed fixture's encoding, which the
 /// tests beside this file hold, so the encoding cannot move alone.
-const VIEWS_FOLD_RULES: &str = "views-fold-b4f9aba4e4a286bf";
+const VIEWS_FOLD_RULES: &str = "views-fold-09d4e3c14e0f75bb";
 
 /// The `fold_version` a views snapshot is cut and accepted under.
 pub(crate) fn views_fold_version() -> u32 {

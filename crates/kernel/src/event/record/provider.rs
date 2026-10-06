@@ -97,3 +97,60 @@ mod tests {
         );
     }
 }
+
+/// One ordered account declaration; plaintext credentials stay in the vault.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct ProviderAccount {
+    pub id: crate::ServerLabel,
+    #[serde(default)]
+    #[cfg_attr(feature = "schema", schemars(with = "Option<String>"))]
+    pub reference: Option<crate::SecretRef>,
+    #[serde(default)]
+    pub header: Option<String>,
+}
+
+/// Validates the ordered account authority before registration or replay.
+///
+/// # Errors
+/// Refuses an empty list, repeated id/reference, or an anonymous header.
+pub fn validate_provider_accounts(
+    accounts: Option<&[ProviderAccount]>,
+) -> Result<(), crate::AxError> {
+    let Some(accounts) = accounts else {
+        return Ok(());
+    };
+    let refuse = |subject: &str| {
+        crate::AxError::failure(
+        crate::AxCode::ConfigInvalid, "register provider accounts", subject,
+    ).with_recovery("give each account a distinct id and vault reference; use an explicit anonymous account for an unkeyed provider")
+    };
+    if accounts.is_empty() {
+        return Err(refuse("the account list is empty"));
+    }
+    let mut ids = std::collections::BTreeSet::new();
+    let mut references = std::collections::BTreeSet::new();
+    for account in accounts {
+        if !ids.insert(account.id.as_str()) {
+            return Err(refuse("an account id is repeated"));
+        }
+        if let Some(reference) = &account.reference {
+            if !references.insert(reference) {
+                return Err(refuse("a vault reference is repeated"));
+            }
+        } else if account.header.is_some() {
+            return Err(refuse(
+                "an anonymous account cannot carry a credential header",
+            ));
+        }
+        if let Some(header) = &account.header
+            && (header.is_empty()
+                || !header
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || b"!#$%&'*+-.^_`|~".contains(&byte)))
+        {
+            return Err(refuse("an account header name is invalid"));
+        }
+    }
+    Ok(())
+}

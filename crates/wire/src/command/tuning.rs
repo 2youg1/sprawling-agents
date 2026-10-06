@@ -60,6 +60,9 @@ pub struct BodyOverride {
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct EndpointTuning {
+    /// Explicit ordered accounts; absence leaves the existing accounts intact.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub accounts: Option<Vec<kernel::event::record::ProviderAccount>>,
     /// What to call this endpoint on screen. Absent means the id it was
     /// filed under, which is what a person who named it once meant.
     pub label: Option<String>,

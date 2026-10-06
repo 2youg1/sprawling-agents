@@ -49,7 +49,7 @@ fn fixture(city_root: &Path) -> Views {
         ),
         (EventKind::RulesChanged, rules_changed()),
     ];
-    for (seq, (kind, data)) in (1..).zip(records) {
+    for (seq, (kind, data)) in (1..).zip(records.into_iter().chain(provider_registrations())) {
         let serde_json::Value::Object(data) = data else {
             panic!("each fixture payload is an object");
         };
@@ -58,6 +58,45 @@ fn fixture(city_root: &Path) -> Views {
             .unwrap();
     }
     views
+}
+
+pub(crate) fn provider_registrations() -> [(EventKind, serde_json::Value); 2] {
+    [
+        (
+            EventKind::EndpointAttached,
+            serde_json::json!({
+                "name": "legacy", "base_url": "https://api.example.test/v1",
+                "dialect": kernel::DialectKind::OpenAi, "models": [], "auth": "secret:providers/legacy"
+            }),
+        ),
+        (
+            EventKind::EndpointAttached,
+            serde_json::json!({
+                "name": "explicit", "base_url": "https://api.example.test/v1",
+                "dialect": kernel::DialectKind::OpenAi, "models": [], "tuning": {"accounts": [
+                    {"id": "first", "reference": "secret:providers/first"},
+                    {"id": "anonymous"}
+                ]}
+            }),
+        ),
+    ]
+}
+
+#[test]
+fn legacy_and_explicit_accounts_decode_from_the_actual_views_snapshot() {
+    let dir = tempfile::tempdir().unwrap();
+    let views = fixture(dir.path());
+    let encoded = views.encode().unwrap();
+    let decoded = Views::decode(dir.path(), &encoded);
+    assert!(
+        decoded.is_ok(),
+        "the production snapshot must decode: {:?}",
+        decoded.as_ref().err()
+    );
+    assert_eq!(
+        serde_json::to_value(&decoded.unwrap().book).unwrap(),
+        serde_json::to_value(&views.book).unwrap()
+    );
 }
 
 /// The city's configuration booked as the digest of five bytes: the

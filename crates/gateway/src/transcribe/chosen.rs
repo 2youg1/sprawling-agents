@@ -44,7 +44,7 @@ pub fn transcriber_for(
             // with an audio path joined onto it names nothing.
             base_url: chosen.endpoint.base_url.clone(),
             model: chosen.entry.id.clone(),
-            auth: chosen.endpoint.auth.clone(),
+            auth: chosen.endpoint.first_auth()?,
             timeout_ms: TRANSCRIBE_TIMEOUT_MS,
             proxying: chosen.endpoint.tuning.proxying,
         },
