@@ -401,7 +401,9 @@ print('cpu seconds per wall second',ratio)
         }
         assert!(pids.len() >= 2, "the target must have a live descendant");
         match ending {
-            Ending::Halt => short.halt(Some(&scope)).unwrap(),
+            Ending::Halt => {
+                short.halt(Some(&scope)).unwrap();
+            }
             Ending::Release => {}
             Ending::Natural => {
                 for _ in 0..1000 {
