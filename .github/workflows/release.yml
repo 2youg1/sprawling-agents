@@ -210,7 +210,7 @@ jobs:
             tag="v${version}-$(sed -n 's/.*pub const MATURITY: Maturity = Maturity::\([A-Za-z]*\);/\1/p' crates/kernel/src/release.rs)-$(date -u +%y%m%d)"
           fi
           cargo xtask channel --tag "$tag" --assets target/package --out target/channels
-      - uses: Homebrew/actions/setup-homebrew@master
+      - uses: Homebrew/actions/setup-homebrew@main
         if: runner.os != 'Windows'
       - name: install the generated local formula and Arch package
         if: runner.os != 'Windows'
