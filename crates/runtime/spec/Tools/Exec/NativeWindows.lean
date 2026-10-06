@@ -58,6 +58,16 @@ LOCALAPPDATA/TEMP/TMP 到 profile。显式环境缺失这些初始化字段时�
 错误携带真实失败阶段，避免把 loader 拒绝记作 guard 通过。
 profile 的私有存储也是这次执行拥有的资源。harness/provider 不进入 AppContainer。
 
+D58：Rust canonicalize 的 verbatim DOS/UNC prefix 在 native loader 边界转换为
+普通 DOS/UNC prefix，剩余 UTF16 units 原样保留，argv 不参与该转换。
+.NET Framework 的 FileIOPermission.CheckIllegalCharacters 拒绝 verbatim prefix 的
+问号；AppDomainSetup.VerifyDir 因此可能在 PowerShell 的配置初始化中抛出，
+不能把 ServicePointManager 的外层异常归因于缺少网络 capability。
+仅承认磁盘与 UNC 的 verbatim 形；其它 device namespace 拒绝启动并给恢复语。
+Microsoft 的 Naming Files, Paths, and Names 规定这两类 prefix，.NET reference
+source 的 FileIOPermission 规定非法字符检查；disposable Framework probe 与
+两种 PowerShell 初始化回归确认环境前提，网络 capability 仍为空。
+
 失败拒绝，不再起动普通子进程；cleanup 拒绝时保留错误及未释放资源的 owner，
 模型的 closing 只表示不能恢复执行，closed 才表示 cleanup 已成功。
 launch failure 的未释放资源随 typed Failure 返回，由 run Job 保留，后续 native

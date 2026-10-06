@@ -214,7 +214,7 @@ fn main() {
     if std::env::args_os().nth(1).as_deref() == Some(std::ffi::OsStr::new("grant")) {
         let root = std::path::PathBuf::from(std::env::var_os("CARGO_HOME").unwrap());
         while !root.join(std::env::args_os().nth(2).unwrap()).exists() { std::thread::sleep(std::time::Duration::from_millis(5)); }
-        assert_eq!(std::fs::read_to_string(root.join("input")).unwrap(), "read only");
+        assert_eq!(std::fs::read_to_string(root.join("protected/input")).unwrap(), "read only");
         assert!(std::fs::write(root.join("forbidden"), "write").is_err());
         println!("read only");
     } else if std::env::args_os().nth(1).as_deref() == Some(std::ffi::OsStr::new("allocate")) {
@@ -271,7 +271,13 @@ fn main() {
         args
     );
     let home = tempfile::tempdir().unwrap();
-    std::fs::write(home.path().join("input"), "read only").unwrap();
+    let protected = home.path().join("protected");
+    std::fs::create_dir(&protected).unwrap();
+    std::fs::write(protected.join("input"), "read only").unwrap();
+    let prepared = Command::new("pwsh").env("NATIVE_ACL_FIXTURE", &protected)
+        .args(["-NoProfile", "-NonInteractive", "-Command", "$acl=Get-Acl -LiteralPath $env:NATIVE_ACL_FIXTURE; $acl.SetAccessRuleProtection($true,$true); Set-Acl -LiteralPath $env:NATIVE_ACL_FIXTURE -AclObject $acl"])
+        .output().unwrap();
+    assert!(prepared.status.success(), "{prepared:?}");
     let before = Command::new("pwsh")
         .env("NATIVE_ACL_FIXTURE", home.path())
         .args([

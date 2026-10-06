@@ -9,6 +9,7 @@
 use std::collections::BTreeMap;
 use std::ffi::OsString;
 use std::num::{NonZeroU16, NonZeroUsize};
+use std::os::windows::ffi::{OsStrExt, OsStringExt};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -93,6 +94,7 @@ pub(crate) fn launch(
             PathBuf::from(value)
                 .canonicalize()
                 .map_err(|err| denied("resolve declared toolchain home", err))
+                .and_then(ordinary_path)
         })
         .collect::<Result<Vec<_>, _>>()?;
     let declared_roots = toolchain_roots.len();
@@ -146,13 +148,15 @@ fn resolved(command: &Command, directory: &Path) -> Result<PathBuf, AxError> {
     if program.is_absolute() {
         return program
             .canonicalize()
-            .map_err(|err| denied("resolve native program", err));
+            .map_err(|err| denied("resolve native program", err))
+            .and_then(ordinary_path);
     }
     if program.components().count() > 1 {
         return directory
             .join(program)
             .canonicalize()
-            .map_err(|err| denied("resolve native program", err));
+            .map_err(|err| denied("resolve native program", err))
+            .and_then(ordinary_path);
     }
     let path = command.get_envs().find_map(|(name, value)| {
         if name.eq_ignore_ascii_case("PATH") {
@@ -173,7 +177,8 @@ fn resolved(command: &Command, directory: &Path) -> Result<PathBuf, AxError> {
             if candidate.is_file() {
                 return candidate
                     .canonicalize()
-                    .map_err(|err| denied("resolve native program", err));
+                    .map_err(|err| denied("resolve native program", err))
+                    .and_then(ordinary_path);
             }
         }
     }
@@ -181,6 +186,33 @@ fn resolved(command: &Command, directory: &Path) -> Result<PathBuf, AxError> {
         "resolve native program",
         format!("{} is absent from the admitted PATH", program.display()),
     ))
+}
+
+fn ordinary_path(path: PathBuf) -> Result<PathBuf, AxError> {
+    let units: Vec<u16> = path.as_os_str().encode_wide().collect();
+    if units.get(..4) != Some(&[92, 92, 63, 92]) {
+        return Ok(path);
+    }
+    let units = if units.get(5) == Some(&58) {
+        units
+            .get(4..)
+            .ok_or_else(|| denied("normalize native path", "missing DOS path"))?
+            .to_vec()
+    } else if units.get(4..8) == Some(&[85, 78, 67, 92]) {
+        let mut ordinary = vec![92, 92];
+        ordinary.extend(
+            units
+                .get(8..)
+                .ok_or_else(|| denied("normalize native path", "missing UNC path"))?,
+        );
+        ordinary
+    } else {
+        return Err(denied(
+            "normalize native path",
+            "unsupported device namespace; use a DOS or UNC file path",
+        ));
+    };
+    Ok(PathBuf::from(OsString::from_wide(&units)))
 }
 
 pub(crate) fn denied(action: &str, detail: impl std::fmt::Display) -> AxError {
