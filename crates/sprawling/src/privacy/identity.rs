@@ -3,59 +3,41 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Read-only principal sampling (`crates/sprawling/spec/Privacy/Cli.lean`).
+//! Read-only principal sampling (`crates/sprawling/spec/Privacy/Cli.lean` D54).
 
 use kernel::{AxCode, AxError};
 use zeroize::Zeroizing;
 
+/// How many knocks the principal query gets: `PATIENCE * asking::TICK`
+/// is fifteen seconds, because a cold Windows PowerShell takes seconds
+/// to start before it answers.
+#[cfg(windows)]
+const PATIENCE: u32 = 300;
+
+/// The current Windows user's SID, asked of the PowerShell under the
+/// protected installation path.
+///
+/// # Errors
+/// `ToolUnavailable` when the installation path, the query or its answer
+/// fails; the refusal never repeats the answer.
 #[cfg(windows)]
 pub(super) fn read() -> Result<Zeroizing<String>, AxError> {
     use crate::doctor::asking::{self, Ended};
-    use winreg::RegKey;
-    use winreg::enums::{HKEY_LOCAL_MACHINE, KEY_QUERY_VALUE, KEY_WOW64_64KEY};
 
-    let installation = RegKey::predef(HKEY_LOCAL_MACHINE)
-        .open_subkey_with_flags(
-            r"SOFTWARE\Microsoft\Windows NT\CurrentVersion",
-            KEY_QUERY_VALUE | KEY_WOW64_64KEY,
-        )
-        .and_then(|key| key.get_value::<std::ffi::OsString, _>("SystemRoot"))
-        .map_err(|_| refused("protected Windows installation path unavailable"))?;
-    let executable = std::path::PathBuf::from(installation)
-        .join(r"System32\WindowsPowerShell\v1.0\powershell.exe");
-    if !executable.is_absolute() {
-        return Err(refused("Windows installation path is not absolute"));
-    }
-    let mut command = std::process::Command::new(executable);
+    let mut command = std::process::Command::new(powershell()?);
     command.args([
-        "-NoLogo", "-NoProfile", "-NonInteractive", "-Command",
-        "$ErrorActionPreference = 'Stop'; [Console]::OutputEncoding = [Text.Encoding]::UTF8; [Security.Principal.WindowsIdentity]::GetCurrent().User.Value",
+        "-NoLogo",
+        "-NoProfile",
+        "-NonInteractive",
+        "-Command",
+        "$ErrorActionPreference = 'Stop'; [Security.Principal.WindowsIdentity]::GetCurrent().User.Value",
     ]);
-    let knocks = u32::try_from(
-        crate::doctor::PATIENCE
-            .as_millis()
-            .checked_div(asking::TICK.as_millis())
-            .ok_or_else(|| refused("identity query tick is zero"))?,
-    )
-    .map_err(|_| refused("identity query patience cannot be represented"))?;
     let mut first = true;
-    match asking::ask(&mut command, knocks, move |_| std::mem::take(&mut first)) {
+    match asking::ask(&mut command, PATIENCE, move |_| std::mem::take(&mut first)) {
         Ended::Exited {
             code: Some(0),
             kept,
-        } => {
-            let value = Zeroizing::new(kept);
-            if !value.starts_with("S-1-")
-                || !value
-                    .bytes()
-                    .all(|byte| byte == b'S' || byte == b'-' || byte.is_ascii_digit())
-            {
-                return Err(refused(
-                    "Windows principal query returned no valid identity",
-                ));
-            }
-            Ok(value)
-        }
+        } => principal(Zeroizing::new(kept)),
         Ended::Exited {
             code: Some(_) | None,
             ..
@@ -72,8 +54,79 @@ pub(super) fn read() -> Result<Zeroizing<String>, AxError> {
     ))
 }
 
+/// Windows PowerShell under `SystemRoot` as HKLM records it, which only
+/// an administrator can change, rather than as PATH or the environment
+/// of this user says.
+#[cfg(windows)]
+fn powershell() -> Result<std::path::PathBuf, AxError> {
+    use winreg::RegKey;
+    use winreg::enums::{HKEY_LOCAL_MACHINE, KEY_QUERY_VALUE, KEY_WOW64_64KEY};
+
+    let installation = RegKey::predef(HKEY_LOCAL_MACHINE)
+        .open_subkey_with_flags(
+            r"SOFTWARE\Microsoft\Windows NT\CurrentVersion",
+            KEY_QUERY_VALUE | KEY_WOW64_64KEY,
+        )
+        .and_then(|key| key.get_value::<std::ffi::OsString, _>("SystemRoot"))
+        .map_err(|_| refused("protected Windows installation path unavailable"))?;
+    let executable = std::path::PathBuf::from(installation)
+        .join(r"System32\WindowsPowerShell\v1.0\powershell.exe");
+    if executable.is_absolute() {
+        Ok(executable)
+    } else {
+        Err(refused("Windows installation path is not absolute"))
+    }
+}
+
+/// The answer, kept only when it is a SID.
+#[cfg(windows)]
+fn principal(answer: Zeroizing<String>) -> Result<Zeroizing<String>, AxError> {
+    if answer.starts_with("S-1-")
+        && answer
+            .bytes()
+            .all(|byte| byte == b'S' || byte == b'-' || byte.is_ascii_digit())
+    {
+        Ok(answer)
+    } else {
+        Err(refused(
+            "Windows principal query returned no valid identity",
+        ))
+    }
+}
+
 fn refused(subject: &str) -> AxError {
     AxError::failure(AxCode::ToolUnavailable, "read privacy principal", subject).with_recovery(
         "run on Windows with a readable system installation; leave privacy history unchanged",
     )
+}
+
+#[cfg(all(test, windows))]
+#[allow(clippy::unwrap_used, reason = "test code")]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn only_a_sid_is_kept_and_a_refusal_never_repeats_the_answer() {
+        for sid in ["S-1-5-18", "S-1-5-21-1004336348-1177238915-682003330-1001"] {
+            assert_eq!(
+                principal(Zeroizing::new(sid.to_owned())).unwrap().as_str(),
+                sid
+            );
+        }
+        for answer in [
+            "",
+            "S-1-",
+            "S-1-5",
+            "S-1-5-",
+            "S-1-5--18",
+            "S-1-S-18",
+            "S-2-5-18",
+        ] {
+            let refusal = principal(Zeroizing::new(answer.to_owned())).unwrap_err();
+            assert_eq!(
+                refusal,
+                refused("Windows principal query returned no valid identity")
+            );
+        }
+    }
 }
