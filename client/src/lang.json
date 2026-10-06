@@ -6347,14 +6347,6 @@
     "en": "An earlier session of {room}. It is read-only: the city goes on with the room's current session.",
     "zh": "{room} 较早的一段对话，只读：城只接着这个房间当前的一段说下去。"
   },
-  "talk_continue": {
-    "en": "Continue from its end",
-    "zh": "从它的末尾接着说"
-  },
-  "talk_continue_unheld": {
-    "en": "This page holds none of its runs, so it has no end to branch from",
-    "zh": "本页没有它的 run，找不到可以分叉的末尾"
-  },
   "talk_current": {
     "en": "Back to the current session",
     "zh": "回到当前对话"

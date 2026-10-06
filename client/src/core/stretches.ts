@@ -11,8 +11,9 @@
 // **A room has one current session, its newest stretch**: the city only
 // goes on with that one (`docs/glossary.md`, Session), and opening a new
 // one ends it, so at most one session of the Mayor is ever current. An
-// older stretch is a record, and going on from it is a branch from its
-// tail (`tailOf`), which is what `/fork` sends.
+// older stretch is a record, and going on from it is a branch from one
+// of its entries; the mailbox's fork entry branches from its tail
+// (`tailOf`).
 
 import type { RunBelief } from "./belief";
 import { MAYOR, buildingOf } from "./route";
