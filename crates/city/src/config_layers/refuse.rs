@@ -13,8 +13,10 @@ use std::path::Path;
 use kernel::layout::CONFIG_FILE;
 use kernel::{AxCode, AxError, RESERVED_PREFIX};
 
+use super::ladder::Layer;
 use super::remote::REMOTE_KEY;
 use super::resident::{HARNESS_KEY, MODEL_NAME_KEY};
+use super::search::SEARCH_KEY;
 use super::shelves::SHELVES_KEY;
 
 /// What a person does when a key or a value is not one this build reads.
@@ -49,9 +51,9 @@ pub(super) fn unreadable(text: &str, err: &toml::de::Error) -> AxError {
         .with_recovery(recovery)
 }
 
-/// A table only the city's own layer may state.
+/// A table that may be stated only on the farther rungs of the ladder.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum CityOnly {
+pub(super) enum Confined {
     /// A shelf is mounted for every building at once, so a building or
     /// a room that names one would admit a directory nobody who keeps
     /// this city chose (`crates/city/spec/Library.lean` §8-8).
@@ -60,37 +62,62 @@ pub(super) enum CityOnly {
     /// room that chose its route would decide for every other one how
     /// the outside comes in (`crates/city/spec/ConfigLayers/Remote.lean` §8-39).
     Remote,
+    /// The settings page edits the city's choice and lists each
+    /// building's, so a room's choice would govern runs without
+    /// appearing anywhere a person looks (`crates/city/spec/ConfigLayers.lean` §8-4c).
+    Search,
 }
 
-impl CityOnly {
+impl Confined {
+    /// The nearest rung this table may be stated on.
+    pub(super) fn nearest(self) -> Layer {
+        match self {
+            Confined::Shelves | Confined::Remote => Layer::City,
+            Confined::Search => Layer::Building,
+        }
+    }
+
+    /// Whether `rung` may state this table: it is no nearer than
+    /// [`Confined::nearest`]. `Layer` orders farthest first.
+    pub(super) fn reached_from(self, rung: Layer) -> bool {
+        rung <= self.nearest()
+    }
+
     fn key(self) -> &'static str {
         match self {
-            CityOnly::Shelves => SHELVES_KEY,
-            CityOnly::Remote => REMOTE_KEY,
+            Confined::Shelves => SHELVES_KEY,
+            Confined::Remote => REMOTE_KEY,
+            Confined::Search => SEARCH_KEY,
         }
     }
 
     fn because(self) -> &'static str {
         match self {
-            CityOnly::Shelves => "a shelf is mounted for every building at once",
-            CityOnly::Remote => "the remote door opens onto the whole city",
+            Confined::Shelves => "a shelf is mounted for every building at once",
+            Confined::Remote => "the remote door opens onto the whole city",
+            Confined::Search => {
+                "the settings page shows the city's and each building's choice, and a room's                  would govern runs it never shows"
+            }
         }
     }
 }
 
-/// The refusal for a city-only table written below the city layer,
-/// refused where it was written rather than parsed and dropped.
-pub(super) fn below_city(file: &Path, table: CityOnly) -> AxError {
+/// The refusal for a confined table written on a rung nearer than it
+/// may be, refused where it was written rather than parsed and dropped.
+pub(super) fn too_near(file: &Path, table: Confined) -> AxError {
     let key = table.key();
+    let into = match table.nearest() {
+        Layer::City => format!("the city root's `{RESERVED_PREFIX}/{CONFIG_FILE}`"),
+        Layer::Building | Layer::Resident => {
+            format!("the building's or the city root's `{RESERVED_PREFIX}/{CONFIG_FILE}`")
+        }
+    };
     AxError::failure(
         AxCode::ConfigInvalid,
         "read a configuration layer",
         format!("{}: `{key}`", file.display()),
     )
-    .with_recovery(format!(
-        "move `{key}` into the city root's `{RESERVED_PREFIX}/{CONFIG_FILE}`: {}",
-        table.because()
-    ))
+    .with_recovery(format!("move `{key}` into {into}: {}", table.because()))
 }
 
 /// The refusal for one layer that names a model and a harness.

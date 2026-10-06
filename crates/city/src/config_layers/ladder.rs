@@ -33,7 +33,7 @@ use kernel::layout::CityLayout;
 use kernel::{Address, AxCode, AxError, LayeredValue};
 
 use super::ConfigLayer;
-use super::refuse::below_city;
+use super::refuse::too_near;
 use crate::building::Building;
 
 /// Declares [`Layer`] and `Layer::ALL` from one list, so the order the
@@ -42,8 +42,8 @@ use crate::building::Building;
 macro_rules! rungs {
     ($($rung:ident),+ $(,)?) => {
         /// One rung of the City -> Building -> Resident ladder, from the
-        /// farthest scope to the nearest.
-        #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+        /// farthest scope to the nearest; a farther rung orders first.
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
         pub enum Layer {
             $($rung),+
         }
@@ -163,11 +163,10 @@ impl Ladder {
 /// how most rungs stay: a value is written where somebody meant to
 /// depart from the default.
 ///
-/// A rung below the city that states `[skills]` or `[remote]` is
-/// refused here rather than read and dropped: a shelf is mounted for
-/// every building at once and the remote door opens onto the whole city,
-/// so only the city's own file may name either (`crates/city/spec/Library.lean`
-/// §8-8 and `crates/city/spec/ConfigLayers/Remote.lean` §8-39).
+/// A rung nearer than a confined table may be stated on is refused here
+/// rather than read and dropped: `[skills]` and `[remote]` only on the
+/// city's own rung, `[search]` on the city's or a building's
+/// (`crates/city/spec/ConfigLayers/Ladder.lean`, `Confined`).
 ///
 /// Crate-internal because the city's own rung is read without an address
 /// by [`super::city_shelves`]: the missing-file rule is stated once here
@@ -186,12 +185,14 @@ pub(crate) fn stated(file: &Path, rung: Layer) -> Result<ConfigLayer, AxError> {
             .with_recovery("fix the file's permissions; a configuration that exists is read"));
         }
     };
-    if rung != Layer::City
-        && let Some(table) = stated.city_only()
+    match stated
+        .confined()
+        .into_iter()
+        .find(|table| !table.reached_from(rung))
     {
-        return Err(below_city(file, table));
+        Some(table) => Err(too_near(file, table)),
+        None => Ok(stated),
     }
-    Ok(stated)
 }
 
 /// A parse refusal as the ladder reports it: the file it was read from

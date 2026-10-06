@@ -48,6 +48,7 @@ fn quiet_config() -> FrozenConfig {
         mcp: Vec::new(),
         effort: None,
         second_threshold: None,
+        search: kernel::config::SearchConfiguration::Default,
     }
 }
 

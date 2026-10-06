@@ -19,7 +19,7 @@
 
 use std::path::Path;
 
-use kernel::config::SecondThreshold;
+use kernel::config::{SearchConfiguration, SecondThreshold};
 use kernel::{
     Address, AxCode, AxError, B3Hash, Effort, KeepWarm, McpServer, McpTransport, SandboxLimits,
 };
@@ -117,6 +117,9 @@ pub(super) enum Change<'a> {
     /// session that does not choose. Only the city's own layer is written
     /// this way: a room's `[model]` is a session's record (8-14).
     Effort(Effort),
+    /// Which supplier `web_search` reaches (§8-4c), already judged by the
+    /// reader's own check.
+    Search(&'a SearchConfiguration),
 }
 
 impl Change<'_> {
@@ -160,6 +163,12 @@ impl Change<'_> {
                 let spelled = toml::Value::try_from(*limits)
                     .map_err(|err| refuse_file(file, &err.to_string()))?;
                 document.insert("sandbox".to_owned(), spelled);
+            }
+            Change::Search(configuration) => {
+                document.insert(
+                    "search".to_owned(),
+                    super::search::spelled(configuration, file)?,
+                );
             }
             Change::Mcp(servers) => {
                 document.insert("mcp".to_owned(), toml::Value::Array(rows(servers)));

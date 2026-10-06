@@ -118,6 +118,7 @@ fn scenario(root: &std::path::Path) -> Scenario {
             mcp: Vec::new(),
             effort: None,
             second_threshold: None,
+            search: kernel::config::SearchConfiguration::Default,
         },
         checkpoint: None,
         cancel: None,
