@@ -266,7 +266,7 @@ time somebody sends, so both landings are on this page. -->
       {/each}
     </div>
     <div class="px-pane pb-pane">
-      <Composer
+      <Composer started
         placeholder={say($lang, "talk_placeholder_mayor")}
         sending="dispatch"
         onSend={() => false}

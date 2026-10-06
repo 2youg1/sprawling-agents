@@ -9,6 +9,7 @@
 // and a page of commits.
 import type { Answer, Call, CommitAnswer, Query, Turn } from "../../wire";
 import { Address, GitOid, RunId, Seq, TimeMs, Tokens, UsdMicros } from "../../wire";
+import { FIRST_POLICY } from "../../core/commands";
 import { ENDPOINTS } from "./served";
 
 // The room the conversation is in: it has a run waiting, one finished
@@ -75,7 +76,7 @@ export function answering(calling: boolean): (query: Query) => Answer | undefine
   return (query) => {
     if (query === "endpoint_view") return { endpoints: ENDPOINTS };
     if (typeof query !== "object") return undefined;
-    if ("rounds" in query) return { rounds: { run: query.rounds.run, turns: turnsOf(calling) } };
+    if ("rounds" in query) return { rounds: { run: query.rounds.run, turns: turnsOf(calling), opening: { at: TimeMs.make(START), task: "Review the document", goal: "", policy: FIRST_POLICY, effort: "high" } } };
     if ("commits" in query) return { commits: { building: null, before: null, commits: COMMITS, more: false } };
     if ("config" in query) {
       return {

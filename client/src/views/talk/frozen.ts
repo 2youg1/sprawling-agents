@@ -5,7 +5,7 @@
 
 // The frozen facts a session states beside its model, in the words the
 // first message head and the panorama's model cell both write: the
-// effort its requests froze, then the mode it was dispatched in
+// effort its requests froze, then its mode and policy bounds
 // (client/Spec.lean §4-44, §4-58). Each is read from the run's opening; a fact
 // the opening does not carry is left out rather than taken from the
 // room's current setting.
@@ -13,11 +13,12 @@
 import { say } from "../../core/lang";
 import type { Lang } from "../../core/lang";
 import type { Opening } from "../../wire";
+import { policyFace } from "./policy";
 
 export function frozenSaid(opening: Opening | null | undefined, lang: Lang): string {
   const effort = opening?.effort ?? null;
   const mode = opening?.policy?.mode ?? null;
-  return [effort === null ? "" : say(lang, `effort_${effort}`), mode === null ? "" : say(lang, `mode_${mode}`)]
+  return [effort === null ? "" : say(lang, `effort_${effort}`), mode === null ? "" : say(lang, `mode_${mode}`), opening?.policy == null ? "" : policyFace(lang, opening.policy)]
     .filter((part) => part !== "")
     .join(" · ");
 }
