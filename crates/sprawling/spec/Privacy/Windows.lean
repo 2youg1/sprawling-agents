@@ -24,9 +24,18 @@
   的 SHA-256；写入只用 Disable-ScheduledTask 与 Enable-ScheduledTask，从不删除或注册任务。
   脚本输出是一行 JSON，未知字段或状态拒绝。
 
-机器作用域（HKLM 与计划任务）的写入经 `bin::privacy::elevation`（D57）；用户作用域在本进程写入。
-主机信息：答案带该主机 EditionID（只读 HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion）与本进程
-是否已提升。非 Windows 主机没有这些适配器：所有条目只读，页面说明仅 Windows。
+注册表目标的根不限于 SOFTWARE\Policies：控制表里还有 SOFTWARE\Microsoft\Windows\CurrentVersion\Policies
+下的值、SOFTWARE\Microsoft\OneDrive 下的值与 HKCU 的 Control Panel 下的值，适配器按控制表给出的
+路径读写，不按前缀筛选。ERROR_ACCESS_DENIED 读作访问拒绝，与其他 IO 失败分开报告。
+
+机器作用域（HKLM 与计划任务）的写入经 `bin::privacy::elevation`（D57）；用户作用域在本进程写入，
+从不提升（D63）。
+主机信息：答案带该主机的 EditionID（原样）、它映射到的版本、CurrentBuild 与 UBR 组成的 build、
+DisplayVersion，全部只读 HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion，以及本进程是否已提升。
+EditionID 按前缀映射，规则在 `bin::privacy::windows` 一处定义：Core 为 home，Professional 为 pro，
+Education 为 education，Enterprise 为 enterprise，IoTEnterprise 为 iot_enterprise，Server 为 server，
+其他为无映射（页面显示原样的 EditionID，每个控制的版本适用都是 NotStated，Privacy.Controls D64）。
+非 Windows 主机没有这些适配器：所有条目只读，页面说明仅 Windows。
 
 验收：只读用例在任何 Windows 上运行且不写注册表（不存在的随机键读作缺席且父键不存在；类型表往返）；
 真实写入只在一次性 GitHub Actions Windows runner 上，按 Privacy §16 执行，绝不改人的主机设置。
@@ -43,4 +52,14 @@
 拥有者会与人的身份分离，Vault 绑定（Privacy.State D52）无从核对，且需要一个常驻的提升进程。
 重开参数：若某个机器作用域目标在提升子进程中写入后，非提升的父进程读不到（权限或视图不同），
 该目标的读回也要移入子进程，并重新论证「父进程读回是唯一判定」。
+-/
+
+/-! D63 HKCU 的写入从不提升；访问拒绝以 NotApplied 结束
+HKCU\Software\Policies 下的值（以及其他 HKCU 目标）在本进程写入。标准账户能否写 Software\Policies
+没有来源说明；写入被拒时目标读回原值，按现有判定以 NotApplied 结束，错误带稳定码 access_denied，
+说明这个账户不能写这个策略键、什么都没有改变。不新增状态。
+被否：把 HKCU 写入也交给提升子进程——在「越肩」UAC（输入另一个管理员账户的凭据）下，提升子进程的
+HKCU 是那个管理员账户的配置单元，写入会落到另一个人的设置上，而父进程读回的仍是本人的值。
+重开参数：若需要在标准账户下写 HKCU 策略，只能经能代表本人写入的机制（例如本人账户的计划任务），
+而不是提升。
 -/

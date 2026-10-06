@@ -26,7 +26,8 @@ Finished 或 Reconciled、对已结束操作的第二个结论、有未结操作
 modified，modified 等于被撤销项的 original；Applied 与 apply 匹配后压栈，Restored 与 restore
 匹配后弹栈，NotApplied、RolledBack、Abandoned 不改变拥有栈。fold 不查控制表（D59）。
 Prepared 之后没有结论、或结论是 Unknown 时，该操作 unresolved：status 报告 unresolved，
-coordinator 拒绝所有控制的新写入，只有 Reconciled 能结束它。
+coordinator 拒绝所有控制的新写入，只有 Reconciled 能结束它；结论为 Unknown 的操作不再接受
+第二个 Finished。status 对每个操作报告 unresolved、finished(outcome) 或 reconciled(settlement)。
 本投影只报告磁盘事实，不证明当前 OS 值或授权；调用者不能据此执行写入。
 
 History::disclose(authorize) 是摘要唯一的出口：非空历史先把 owner 引用交给 authorize，

@@ -447,6 +447,11 @@ pub struct SystemClock;   // 墙钟的唯一采样点（clippy.toml 的 disallow
 | D58 | `crates/sprawling/spec/Privacy/State.lean` |
 | D59 | `crates/sprawling/spec/Privacy/State.lean` |
 | D60 | `crates/sprawling/spec/Privacy.lean` |
+| D61 | `crates/sprawling/spec/Privacy/Controls.lean` |
+| D62 | `crates/sprawling/spec/Privacy/Controls.lean` |
+| D63 | `crates/sprawling/spec/Privacy/Windows.lean` |
+| D64 | `crates/sprawling/spec/Privacy/Controls.lean` |
+| D65 | `crates/sprawling/spec/Privacy/Controls.lean` |
 -/
 
 /-! D15 不从别的工具的配置里读 provider 表（人的决定）

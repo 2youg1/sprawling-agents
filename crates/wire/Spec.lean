@@ -40,6 +40,7 @@ import crates.wire.spec.Frames.Monitor
 import crates.wire.spec.Guide
 import crates.wire.spec.NamedFrames
 import crates.wire.spec.Preference
+import crates.wire.spec.Privacy
 import crates.wire.spec.Reading
 import crates.wire.spec.Reception
 import crates.wire.spec.Reception.Admission
@@ -52,7 +53,7 @@ import crates.wire.spec.Server.Socket
 
 /-! # wire 的规格
 
-`sprawling-wire`（库名 `wire`，目录 `crates/wire`，依赖 kernel）是人与城之间的那条线：Command／Query／Event 三分的帧与它们的编码、版本与 schema 哈希的握手、绑定面、干预动词、多座城一个界面，以及 Autonomy 应答者与三队列在线上的形状。本规格先于代码存在；实现不多不少地遵守本文。模块：`frames`（含 `command`／`answer`／`carried_name`／`named_frames`）、`server`（含 `reception`／`assets`）、`control`、`auth`、`aggregate`、`preference`、`reading`。
+`sprawling-wire`（库名 `wire`，目录 `crates/wire`，依赖 kernel）是人与城之间的那条线：Command／Query／Event 三分的帧与它们的编码、版本与 schema 哈希的握手、绑定面、干预动词、多座城一个界面，以及 Autonomy 应答者与三队列在线上的形状。本规格先于代码存在；实现不多不少地遵守本文。模块：`frames`（含 `command`／`answer`／`carried_name`／`named_frames`）、`server`（含 `reception`／`assets`）、`control`、`auth`、`aggregate`、`preference`、`privacy`、`reading`。
 
 本文件是 crate 的规格入口，分部在 `spec/` 下，布局见 ARCHITECTURE.md §11「Specifications in Lean」。接口一节一节写在规定它的那个模块的分部里，每一节保留它的标签 §8-n，别处引作 `crates/wire/Spec.lean §8-n`；本文件 §8 列出每个标签住在哪个分部。标签被模块图的旧锚点与别的规格里的引用锚住，所以不重排，也不补空号。「每个动词从哪里够得到」那一节保留它的标签 §19 与 §19-1 到 §19-3，住在 `spec/Command/Kind.lean`，`xtask wiring` 读它。决定写作 `D<n>`，放在它所管的声明正上方，或它所管主题的那个分部里，别处引作 `wire D<n>`；D1 到 D12 沿用这份规格在 Markdown 时 §12 的条目号，§12 末尾列出每条住在哪里。
 
@@ -70,6 +71,7 @@ import crates.wire.spec.Server.Socket
 | `aggregate` | 多 City 只读聚合：只转发 Query 与 Event，恒不转发 Command |
 | `reception` | 一帧进来之后的判定：读不出的帧、会动作的门先问配对（§8-37、§8-40） |
 | `preference` | 客户端读的那几张偏好枚举，值集在这里生成 |
+| `privacy` | 主机隐私页与城共享的名字闭集：控制、原项、不写原因、类别、版本、build effect、版本适用（§8-85） |
 | `reading` | 一次回合的读法回到服务端（§8-21） |
 
 **本 crate 是进程外边界的唯一守卫**。它不实现任何业务判定：Command 的执行、Query 的求值、Event 的产生全在上游（runtime／storage／city），本 crate 只负责「让非法的帧在类型层或握手层就不存在」。
@@ -268,6 +270,7 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 | 8-81 | `crates/wire/spec/Answer/DocumentBytes.lean` |
 | 8-82 | `crates/wire/spec/Answer/Find.lean` |
 | 8-84 | `crates/wire/spec/Preference.lean` |
+| 8-85 | `crates/wire/spec/Privacy.lean` |
 | 19 | `crates/wire/spec/Command/Kind.lean` |
 | 19-1 | `crates/wire/spec/Command/Kind.lean` |
 | 19-2 | `crates/wire/spec/Command/Kind.lean` |

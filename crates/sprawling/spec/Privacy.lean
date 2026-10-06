@@ -44,8 +44,9 @@ OS 写入没有 compare-and-swap：writeStarted 要求调用前最后一次读�
 是本应用之外的操作，页面只报告拒绝与恢复路径。
 
 ## 4 现状分析
-`bin::privacy::state` 与 `bin::privacy::journal` 只读 schema 2；`bin::privacy::cli` 只有 status。
-控制表、plan、coordinator、writer、平台适配器、确认与 wire 尚未实现；各自的接口写在
+控制表（`bin::privacy::controls`、`bin::privacy::originals`、`bin::privacy::target`）、schema 3 的
+磁盘投影与 journal 的写入器已实现；`bin::privacy::cli` 只有 status。
+plan、coordinator、平台适配器、确认与 wire 帧尚未实现；各自的接口写在
 Privacy.Controls、Privacy.State、Privacy.Journal、Privacy.Windows、Privacy.Confirmation、
 Privacy.Cli，由后续阶段按本模型实现。
 
@@ -81,11 +82,13 @@ inductive Snapshot where
   | task (state : TaskState)
   deriving DecidableEq, Repr
 
-/-- 不写的原因是闭集；研究给出的每个不写结论落在其中一个（Privacy.Controls D56）。 -/
+/-- 不写的原因是闭集；研究给出的每个不写结论落在其中一个（Privacy.Controls D56）。
+needsOperationKind：写它需要本版本没有的 operation kind（例如一次启用写多个值，Privacy.Controls D62）。 -/
 inductive Reason where
   | absent
   | obsolete
   | undeterminable
+  | needsOperationKind
   deriving DecidableEq, Repr
 
 /-- 推荐值：注册表与用户环境变量是固定的原始值；计划任务是「停用，定义不变」，
