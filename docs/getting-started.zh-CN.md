@@ -194,6 +194,24 @@ gh attestation verify <archive.zip> --repo 2youg1/sprawling-agents
 
 从 checkout 构建完整交付物使用 `just dist`；运行 `just build-web` 之前直接 `cargo build`，嵌入的页面只说明客户端 bundle 缺失。源码构建前提见[贡献指南](CONTRIBUTING.md)。
 
+### 用 Homebrew 或 AUR
+
+这两个渠道只有在项目所有者创建 `2youg1/homebrew-sprawling` tap 仓库与 AUR 账号，并配置发布凭据后才可用。Homebrew 支持 macOS arm64 与 Linux x86-64；装好 Homebrew 后运行：
+
+```sh
+brew install 2youg1/sprawling/sprawling
+```
+
+Arch Linux x86-64 用户先安装 `base-devel`、Git 与 unzip，检查生成的 PKGBUILD，再以普通用户构建：
+
+```sh
+git clone https://aur.archlinux.org/sprawling-bin.git
+cd sprawling-bin
+makepkg -si
+```
+
+两个包都验证发行归档 SHA256，安装其中的二进制、资源与许可，不调用 `sprawling install`，也不改 shell 配置。Homebrew 使用自己的 keg；AUR 将应用放在 `/usr/lib/sprawling-bin`，并链接到 `/usr/bin/sprawling`。卸载用 `brew uninstall sprawling` 或 `sudo pacman -R sprawling-bin`。版本检查辨认这些安装布局，显示对应更新命令；比较来源为 GitHub 发行，新归档可能早于 tap/AUR 同步，因此更新前还要检查包版本。
+
 ### 用 Nix
 
 Linux x86-64 上可以用 Nix 从本仓库构建完整应用。sprawling 不在 nixpkgs 中打包，Nix 用户使用本仓库的 flake。启用 Nix 的 `nix-command` 和 `flakes`，先检出 `flake.nix` 先构建客户端再构建 Rust、且已提交 `flake.lock` 的 tag 或 commit，再构建：
@@ -235,6 +253,8 @@ sprawling replay ./cities/restore-check/.sprawling/ledger
 | cargo-binstall | `cargo binstall sprawling` | `cargo binstall sprawling --version <crate-version>` |
 | shell/PowerShell 安装器 | 停城后重跑原安装器。 | 按前文将 `SPRAWLING_VERSION` 设为实际发布的完整 tag。 |
 | 手动归档 | 下载并验证所选归档；此前安装过时，运行该归档内二进制的 `install` 命令。 | 保留或下载所选 tag 的归档。 |
+| Homebrew tap | `brew update && brew upgrade sprawling` | 安装前检查所选 tap formula 修订；默认跟随当前发行。 |
+| AUR sprawling-bin | 在原 checkout 中运行 `git pull --ff-only && makepkg -si` | 检查并构建所选发行对应的 PKGBUILD 修订。 |
 | 仓库 Nix flake | 检出所选 tag 或 commit，再运行 [Nix 命令](#用-nix)。 | 使用原固定 checkout 和 lockfile；固定 commit 不会跟随新版。 |
 
 更新后运行 `sprawling version` 与 `sprawling help`，确认 PATH 上解析到预期的二进制，再用 `sprawling up ./cities/first` 打开城。核对页面能连接、配置能读取、项目文件和历史仍在，并执行一件小任务。验证成功之前保留旧版和备份。

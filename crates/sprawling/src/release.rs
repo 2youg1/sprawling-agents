@@ -17,6 +17,8 @@ const NPM_UPDATE: &str = "npm install -g sprawling@latest";
 const BUN_UPDATE: &str = "bun install -g sprawling@latest";
 const BINSTALL_UPDATE: &str = "cargo binstall sprawling";
 const CARGO_UPDATE: &str = "cargo install sprawling --locked";
+const HOMEBREW_UPDATE: &str = "brew update && brew upgrade sprawling";
+const AUR_UPDATE: &str = "git pull --ff-only && makepkg -si";
 const ARCHIVE_SIBLING: &str = "skills";
 /// Build identity; source builds carry no invented release tag.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -146,6 +148,13 @@ fn judged(mine: Built, installed: InstallChannel, at: &Registries<'_>) -> Releas
                 hint(installed),
             )
         }),
+        InstallChannel::Homebrew | InstallChannel::Aur => github.map(|newest| {
+            (
+                kernel::release::stands(&mine, &newest.cut),
+                line(&newest.cut),
+                hint(installed),
+            )
+        }),
         InstallChannel::Archive => github.map(|newest| {
             let mut update = hint(installed);
             update.command = Some(archive_command(ArchiveVersion::Tag(&newest.tag)));
@@ -192,6 +201,8 @@ fn this_channel() -> InstallChannel {
         Ok("binstall") => return InstallChannel::Binstall,
         Ok("archive") => return InstallChannel::Archive,
         Ok("package") => return InstallChannel::Package,
+        Ok("homebrew") => return InstallChannel::Homebrew,
+        Ok("aur") => return InstallChannel::Aur,
         Ok(_) | Err(_) => {}
     }
     let cargo_home = match std::env::var_os("CARGO_HOME") {
@@ -219,7 +230,15 @@ pub(crate) fn channel(
         )
     });
     let dir = exe.parent();
-    if packaged {
+    let homebrew = exe
+        .components()
+        .zip(exe.components().skip(1))
+        .any(|(parent, child)| parent.as_os_str() == "Cellar" && child.as_os_str() == "sprawling");
+    if homebrew {
+        InstallChannel::Homebrew
+    } else if dir.is_some_and(|dir| dir.ends_with("usr/lib/sprawling-bin")) {
+        InstallChannel::Aur
+    } else if packaged {
         InstallChannel::Package
     } else if cargo_bin.is_some() && dir == cargo_bin {
         InstallChannel::CargoOrBinstall
@@ -272,6 +291,8 @@ fn hint(channel: InstallChannel) -> UpdateHint {
         ),
         InstallChannel::Binstall => (Some(BINSTALL_UPDATE.to_owned()), Vec::new()),
         InstallChannel::Archive => (Some(archive_command(ArchiveVersion::Latest)), Vec::new()),
+        InstallChannel::Homebrew => (Some(HOMEBREW_UPDATE.to_owned()), Vec::new()),
+        InstallChannel::Aur => (Some(AUR_UPDATE.to_owned()), Vec::new()),
         InstallChannel::Source => (None, Vec::new()),
         InstallChannel::Unknown => (
             None,
@@ -281,6 +302,8 @@ fn hint(channel: InstallChannel) -> UpdateHint {
                 CARGO_UPDATE.to_owned(),
                 BINSTALL_UPDATE.to_owned(),
                 archive_command(ArchiveVersion::Latest),
+                HOMEBREW_UPDATE.to_owned(),
+                AUR_UPDATE.to_owned(),
             ],
         ),
     };
@@ -436,7 +459,9 @@ mod tests {
                 InstallChannel::Binstall,
                 InstallChannel::Archive,
                 InstallChannel::CargoOrBinstall,
-                InstallChannel::Package
+                InstallChannel::Package,
+                InstallChannel::Homebrew,
+                InstallChannel::Aur
             ]
             .map(read),
             [
@@ -474,6 +499,16 @@ mod tests {
                     "0.0.9-pre.261005".to_owned(),
                     None,
                     vec![super::NPM_UPDATE.to_owned(), super::BUN_UPDATE.to_owned()]
+                ),
+                (
+                    "0.0.8-pre.261006".to_owned(),
+                    Some(super::HOMEBREW_UPDATE.to_owned()),
+                    vec![]
+                ),
+                (
+                    "0.0.8-pre.261006".to_owned(),
+                    Some(super::AUR_UPDATE.to_owned()),
+                    vec![]
                 ),
             ]
         );
@@ -531,8 +566,10 @@ mod tests {
         let root = tempfile::tempdir().unwrap();
         let brew = root.path().join("Cellar/sprawling/0.0.10/bin/sprawling");
         let aur = root.path().join("usr/lib/sprawling-bin/sprawling");
-        assert_ne!(channel(&brew, None), InstallChannel::Source);
-        assert_ne!(channel(&aur, None), InstallChannel::Source);
+        assert_eq!(
+            [channel(&brew, None), channel(&aur, None)],
+            [InstallChannel::Homebrew, InstallChannel::Aur]
+        );
     }
 
     /// The check this test exists for is not which state a test binary

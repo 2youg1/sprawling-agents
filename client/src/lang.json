@@ -7347,6 +7347,10 @@
     "en": "Confirm the original installer before choosing an update command.",
     "zh": "选择更新命令前，请确认原安装方式。"
   },
+  "release_channel_aur": {
+    "en": "installed through AUR (sprawling-bin)",
+    "zh": "经 AUR 安装（sprawling-bin）"
+  },
   "release_channel_package": {
     "en": "Package directory: choose the original npm or Bun installer.",
     "zh": "包目录：请选择原来使用的 npm 或 Bun 安装器。"

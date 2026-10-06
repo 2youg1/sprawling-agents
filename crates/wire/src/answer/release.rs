@@ -110,6 +110,8 @@ pub enum InstallChannel {
     CargoOrBinstall,
     Cargo,
     Archive,
+    Homebrew,
+    Aur,
     Source,
 }
 

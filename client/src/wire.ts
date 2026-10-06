@@ -3004,7 +3004,7 @@ export type ReleaseVerdict = typeof ReleaseVerdict.Type;
  * How this binary was installed, which decides the command that
  * updates it.
  */
-export const InstallChannel = Schema.Literals(["npm", "bun", "binstall", "unknown", "package", "cargo_or_binstall", "cargo", "archive", "source"]).annotate({ identifier: "InstallChannel" });
+export const InstallChannel = Schema.Literals(["npm", "bun", "binstall", "unknown", "package", "cargo_or_binstall", "cargo", "archive", "homebrew", "aur", "source"]).annotate({ identifier: "InstallChannel" });
 export type InstallChannel = typeof InstallChannel.Type;
 
 /**

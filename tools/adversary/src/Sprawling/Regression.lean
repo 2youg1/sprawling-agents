@@ -32,6 +32,9 @@ The output has to survive `cargo fmt --check`, so this module agrees with
 rustfmt rather than merely producing valid Rust.
 -/
 
+/-! Release installation origins remain opaque to regression rendering;
+Homebrew and AUR add no request shape or trace action. -/
+
 namespace Sprawling
 
 /-- Each step with its position and the world it was asked in.
