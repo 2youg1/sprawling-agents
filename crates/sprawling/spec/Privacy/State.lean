@@ -28,7 +28,7 @@ History::statuses 返回 operation 与 Outcome 摘要，不输出 raw bytes 或 
 验收：未知字段/坏版本、重复 id、非法 phase、越层恢复和原始字节 roundtrip。
 -/
 
-/-! D52 恢复日志只保存身份凭据引用（人的保密裁决）
+/-! D52 恢复日志只保存身份凭据引用（人的决定）
 注册表原值及当前值可明文保存；SID 与其他非注册表值交给现有
 `gateway::credential` Vault，日志只保存 `kernel::SecretRef`。owner 使用该类型，
 不重新实现其语法，也不把身份编码在引用名称中；引用相等只能验证日志一致性，
