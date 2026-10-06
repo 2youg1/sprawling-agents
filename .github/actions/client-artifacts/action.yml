@@ -21,9 +21,19 @@ runs:
   using: composite
   steps:
     - uses: oven-sh/setup-bun@v2
+    # On Windows bun downloads into the work drive that holds the checkout
+    # and restores no cache. Unpacking the 88 MB cache entry into the user
+    # profile on the system drive took 30 s; on the work drive it took
+    # 6-7 s, and a `bun install` with no cache at all took 7 s, so the
+    # entry bought nothing there (`tools/xtask/Spec.lean` D27).
+    - name: bun's download directory on the work drive
+      if: runner.os == 'Windows'
+      shell: pwsh
+      run: '"BUN_INSTALL_CACHE_DIR=$(Join-Path $env:RUNNER_TEMP bun-cache)" >> $env:GITHUB_ENV'
     # bun's global download directory, keyed by the lockfile: the same
     # lockfile wants the same bytes, so an exact hit skips the registry.
     - uses: actions/cache@v6
+      if: runner.os != 'Windows'
       with:
         path: ~/.bun/install/cache
         key: bun-${{ runner.os }}-${{ hashFiles('client/bun.lock') }}

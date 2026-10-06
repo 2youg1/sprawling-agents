@@ -1,0 +1,49 @@
+# The Rust toolchain `rust-toolchain.toml` pins, installed into a rustup
+# home that holds nothing else, and on Windows a Cargo home on the
+# runner's work drive. `ci.yml` is the one reader; `tools/xtask/Spec.lean`
+# D27 records the measurements behind both moves.
+#
+# A home of its own because `Swatinem/rust-cache` hashes every toolchain
+# rustup has installed into its key. The image's preinstalled `stable` was
+# therefore part of every Rust cache key, and when a runner image moved
+# that `stable` from 1.98.1 to 1.99.0 the `core` job on ubuntu missed the
+# cache `main` had written an hour earlier and compiled cold. With only
+# the pinned toolchain installed, the key moves when `rust-toolchain.toml`
+# moves and at no other time. The pinned toolchain is also made the
+# default, because tests run `cargo` in temporary directories that no
+# `rust-toolchain.toml` governs.
+#
+# The Cargo home moves on Windows because a hosted Windows runner's
+# system drive (C:) writes small files several times slower than the work
+# drive (D:) that holds the checkout. Cargo unpacks every crate the build
+# reads into `registry/src` before it compiles, and Rust cache does not
+# keep that directory. From "Updating crates.io index" to the first
+# compiled crate took 25 s in the test build and 35 s in clippy with the
+# home on C:, and 9 s in both on D:; trybuild's `cargo fetch`, which
+# downloads as well, fell from 49 s to 14 s.
+name: rust toolchain
+description: >-
+  Install the Rust toolchain rust-toolchain.toml pins into a rustup home
+  of its own, as the default, with Cargo's home on the work drive on
+  Windows.
+runs:
+  using: composite
+  steps:
+    - name: a Cargo home on the work drive
+      if: runner.os == 'Windows'
+      shell: pwsh
+      run: |
+        $cargo = Join-Path $env:RUNNER_TEMP cargo
+        $bin = Join-Path $cargo bin
+        New-Item -ItemType Directory -Force $bin | Out-Null
+        "CARGO_HOME=$cargo" >> $env:GITHUB_ENV
+        $bin >> $env:GITHUB_PATH
+    - name: the pinned toolchain, alone in its rustup home
+      shell: bash
+      env:
+        RUSTUP_HOME: ${{ runner.temp }}/rustup
+      run: |
+        set -euo pipefail
+        echo "RUSTUP_HOME=$RUSTUP_HOME" >> "$GITHUB_ENV"
+        rustup toolchain install
+        rustup default "$(rustup show active-toolchain | cut -d' ' -f1)"
