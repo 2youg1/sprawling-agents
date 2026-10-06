@@ -22,6 +22,8 @@ pub const Record = extern struct {
     identity_verified: usize,
     root_security: usize,
     profile_created: usize,
+    grant_paths: usize,
+    grant_units: usize,
     failure_phase: [32]u8,
 };
 pub const Security = extern struct { length: u32 = @sizeOf(Security), descriptor: ?*anyopaque = null, inherit: BOOL = BOOL.TRUE };

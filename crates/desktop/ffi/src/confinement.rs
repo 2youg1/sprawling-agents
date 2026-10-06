@@ -20,6 +20,8 @@ pub struct Launch {
     pub args: Vec<OsString>,
     pub directory: PathBuf,
     pub environment: BTreeMap<OsString, OsString>,
+    /// Explicitly declared homes; only this profile receives read/execute.
+    pub toolchain_roots: Vec<PathBuf>,
     /// The run Job is owned by the backlog; assignment occurs before resume.
     pub parent_job: NonZeroUsize,
     /// Hundredths of a percent of the machine's CPU, from 1 to 10,000.
@@ -88,6 +90,8 @@ struct Record {
     identity_verified: usize,
     root_security: usize,
     profile_created: usize,
+    grant_paths: usize,
+    grant_units: usize,
     failure_phase: [u8; 32],
 }
 
@@ -201,6 +205,7 @@ pub fn launch(launch: &Launch) -> Result<OwnedProcess, Failure> {
             || record.process != 0
             || record.root_security != 0
             || record.profile_created != 0
+            || record.grant_paths != 0
         {
             Some(Box::new(OwnedProcess {
                 record,
@@ -366,7 +371,7 @@ mod tests {
     proptest! {
         #[test]
         fn native_packets_accept_real_fields_and_reject_corruption(
-            fields in proptest::collection::vec(proptest::collection::vec(1_u16..=u16::MAX, 1..64), 6),
+            fields in proptest::collection::vec(proptest::collection::vec(1_u16..=u16::MAX, 1..64), 7),
             key in "[A-Za-z_][A-Za-z0-9_]{0,24}",
             value in proptest::collection::vec(1_u16..=u16::MAX, 0..64),
             offset in 0_usize..512,
@@ -408,6 +413,7 @@ mod tests {
             stdout: PathBuf::from("out"),
             stderr: PathBuf::from("err"),
             environment: BTreeMap::new(),
+            toolchain_roots: Vec::new(),
             cpu_rate: NonZeroU16::MIN,
             parent_job: NonZeroUsize::MIN,
         }

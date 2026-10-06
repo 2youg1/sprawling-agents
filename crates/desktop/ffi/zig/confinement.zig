@@ -8,15 +8,16 @@ const std = @import("std");
 const w = std.os.windows;
 const api = @import("confinement_api.zig");
 const cpu = @import("cpu.zig");
+const grants = @import("confinement_grants.zig");
 const allocator = std.heap.page_allocator;
-const Packet = struct { strings: [6][:0]const u16, environment: []const u16 };
+const Packet = struct { strings: [7][:0]const u16, environment: []const u16 };
 
 fn packet(units: []const u16) ?Packet {
     var remaining = units;
-    var strings: [6][:0]const u16 = undefined;
-    for (&strings) |*part| {
+    var strings: [7][:0]const u16 = undefined;
+    for (&strings, 0..) |*part, index| {
         const end = std.mem.indexOfScalar(u16, remaining, 0) orelse return null;
-        if (end == 0) return null;
+        if (end == 0 and index != 6) return null;
         part.* = remaining[0..end :0];
         remaining = remaining[end + 1 ..];
     }
@@ -222,6 +223,10 @@ export fn sprawling_native_launch(text: [*]const u16, units: usize, record: *api
     var result = limits(record);
     if (result == 0) result = acl(parts.strings[2].ptr, named, record);
     if (result == 0) result = integrity(parts.strings[2].ptr, record);
+    if (result == 0) {
+        phase(record, "toolchain grants");
+        result = grants.grant(parts.strings[6], named, record);
+    }
     if (result == 0) result = start(parts, named, record);
     if (result == 0 and record.cleanup_error != 0) result = @intCast(record.cleanup_error);
     if (result != 0) {
@@ -310,6 +315,7 @@ export fn sprawling_native_cleanup(record: *api.Record, bytes: usize, context: [
     const directory = context[0..end :0];
     const profile = context[end + 1 .. units - 1 :0];
     return cleanup(record, .{ .directory = directory, .profile = profile }, .{
+        .revoke = grants.revoke,
         .root = api.TerminateProcess,
         .wait = api.WaitForSingleObject,
         .terminate = sprawling_native_terminate,
@@ -343,6 +349,8 @@ fn cleanup(record: *api.Record, context: CleanupContext, comptime effects: anyty
     if (result == 0) result = process_closed;
     const job_closed = effects.close(&record.job);
     if (result == 0) result = job_closed;
+    const revoked = effects.revoke(context.profile.ptr, record);
+    if (revoked != 0) return revoked;
     const restored = effects.restore(context.directory.ptr, record);
     if (result == 0) result = restored;
     if (record.profile_created != 0) {
@@ -356,7 +364,7 @@ fn cleanup(record: *api.Record, context: CleanupContext, comptime effects: anyty
 }
 test "native packet validation rejects missing strings and environment terminators" {
     try std.testing.expectEqual(@as(u32, 0), sprawling_native_packet_valid(&.{}, 0));
-    const valid = [_]u16{ 'p', 0, 'c', 0, 'd', 0, 'n', 0, 'o', 0, 'e', 0, 0, 0 };
+    const valid = [_]u16{ 'p', 0, 'c', 0, 'd', 0, 'n', 0, 'o', 0, 'e', 0, 0, 0, 0 };
     try std.testing.expectEqual(@as(u32, 1), sprawling_native_packet_valid(&valid, valid.len));
     for (0..valid.len) |len| try std.testing.expectEqual(@as(u32, 0), sprawling_native_packet_valid(&valid, len));
 }
@@ -412,6 +420,9 @@ test "native cleanup retains every owner through repeated timeout or refusal" {
                 }
                 fn close(raw: *usize) u32 {
                     raw.* = 0;
+                    return 0;
+                }
+                fn revoke(_: [*:0]const u16, _: *api.Record) u32 {
                     return 0;
                 }
                 fn restore(_: [*:0]const u16, record: *api.Record) u32 {

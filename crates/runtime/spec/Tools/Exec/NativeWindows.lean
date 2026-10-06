@@ -26,11 +26,13 @@ command job 不另设同值上限：两只同值 job 嵌套时撞限消息落到
 唯一 profile 名及 output files；叶子只执行平台操作。AppContainer SID
 只获这次副本的继承读写 ACL，不获源树 ACL，无网络 capability 与 loopback exemption。
 D57：显式环境声明的 CARGO_HOME 与 RUSTUP_HOME 可获得该 profile SID 的继承
-read/execute ACE，不授 write、delete 或 ACL 修改权限。程序所在目录同样只读执行。
+read/execute ACE，不授 write、delete 或 ACL 修改权限。未声明的工具目录不自动授权。
 授予与撤销在跨 harness 的命名 mutex 内读取并改写当前 DACL；撤销只移除本次
 唯一 SID，不恢复旧 snapshot，因此另一个仍运行的 SID 授权不会丢失。
 cleanup 等待整棵 job 退出后才撤销，撤销失败保留拥有 SID 与路径的资源并重试。
 权限变更只涉及声明的根；目录不存在表示资源已消失，不能改其父目录。
+FFI packet 的第七个字段为用 LF 分隔的声明根，空字段表示无额外授权；
+Rust 拒绝路径中的 NUL 与 LF，叶子复制该字段，借出的 packet 地址不跨调用。
 平台的 SetNamedSecurityInfo 继承传播与 mutex 排他属于环境假设，以下模型
 证明在该假设下撤销一个 SID 保留其余 SID；disposable fixtures 验证实际并发清理。
 scratch 的继承 mandatory-integrity label 为 Low，避免 medium 默认标签即使

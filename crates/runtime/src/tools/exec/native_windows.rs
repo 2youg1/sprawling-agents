@@ -84,7 +84,19 @@ pub(crate) fn launch(
     let profile = output
         .file_name()
         .ok_or_else(|| denied("name native profile", "output directory has no name"))?;
+    let toolchain_roots = environment
+        .iter()
+        .filter(|(name, _)| {
+            name.eq_ignore_ascii_case("CARGO_HOME") || name.eq_ignore_ascii_case("RUSTUP_HOME")
+        })
+        .map(|(_, value)| {
+            PathBuf::from(value)
+                .canonicalize()
+                .map_err(|err| denied("resolve declared toolchain home", err))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
     let request = Launch {
+        toolchain_roots,
         program,
         args: command
             .get_args()
