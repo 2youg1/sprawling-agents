@@ -22,6 +22,7 @@ pub struct AttachedEndpoint { pub name, pub base_url, pub dialect: DialectKind,
                               pub tuning: EndpointTuning }   // §8-16
 impl AttachedEndpoint {
     pub fn is_local(&self) -> bool;          // 与 client_for 绕开代理同一依据（reach::is_local）
+    pub fn effective_accounts(&self) -> Result<Vec<ProviderAccount>, AxError>;
     pub fn first_auth(&self) -> Result<AuthSpec, AxError>; // 原登记或显式列表首账号
     pub fn has_credential(&self) -> bool;    // 关于凭证，金库外只能回答这一问
     pub fn chat_url(&self) -> String;        // base_url ＋ 该兼容格式自己的路径
@@ -33,6 +34,8 @@ pub struct Chosen<'b> { pub endpoint: &'b AttachedEndpoint, pub entry: &'b Model
 impl EndpointBook {
     pub fn new() -> EndpointBook;   pub fn is_empty(&self) -> bool;
     pub fn apply(&mut self, record: &EventRecord) -> Result<(), AxError>;
+    pub fn session_account(&self, addr: &Address, provider: &str) -> Option<&ServerLabel>;
+    pub fn absorb(&mut self, kind: EventKind, run: RunId, addr: Option<&Address>, data: &Payload) -> Result<(), AxError>;
     pub fn apply_payload(&mut self, kind: EventKind, data: &Payload) -> Result<(), AxError>;
     pub fn select(&self, tag: ModelTag, policy: &BuildingPolicy) -> Result<Chosen<'_>, AxError>;
     pub fn accounts_for_attachment(&self, name: &str, incoming: Option<Vec<ProviderAccount>>)
@@ -76,10 +79,10 @@ endpoint_attached.tuning.accounts 为同一列表的 Ledger 形状，旧记录�
 保留规则只由 EndpointBook::accounts_for_attachment 决定，登记面与重放均调用它。
 校验住 kernel::event::record::validate_provider_accounts；probe 与 adapter
 从 AttachedEndpoint::first_auth 取得凭据，snapshot 保留同一账号列表，
-显式列表不回退原 auth。每次构造 Model adapter 都采用当时列表的首账号；
-Session 没有成功账号绑定，重排后的新 adapter 与重启后构造的 adapter
-仍按列表顺序选取首账号。账号声明影响凭据解析与登记，失败处理由 runtime
-既有的 Provider 策略决定。Accounts 模型以通过账号校验的提交为输入；
+显式列表不回退原 auth。成功回答将非秘密账号 ID 绑定到房间的 Session，
+重排与重启不改变仍在列表中的绑定；新 Session 清除绑定，被移除的绑定回到首账号。
+失败处理仍由 runtime 既有的 Provider 策略决定，账号故障转移不在本接口内。
+Accounts 模型以通过账号校验的提交为输入；
 空表、重复引用和非法 header 由 Rust 账户校验回归判断。
 -/
 
@@ -169,3 +172,36 @@ theorem legacy_submissions_preserve_accounts {Account : Type} (held : List Accou
   | cons accounts rest ih =>
     cases accounts <;> simpa [apply, submit, replace] using ih
 end Gateway.Router.Accounts
+
+/-! EndpointBook::absorb(kind,run,addr,data) 是实时与重放共用入口；model_called
+保存每个 Run 的最后一次非秘密账号尝试，model_returned 将它提交到该房间的亲和。
+RunFrozen 删除未成功尝试，SessionOpened 清该房间的亲和；snapshot 保存这些投影，
+不含 Key。派活在 room_for 后将成功亲和传给 adapter，不把未定房间当 Session。
+重排不挪健康账号；被移除的绑定按新表的首账号选择。 -/
+namespace Gateway.Router.Affinity
+inductive Step (Account : Type) where
+  | attempt (account : Account)
+  | answered
+  | frozen
+  | opened
+structure State (Account : Type) where
+  pending : Option Account := none
+  bound : Option Account := none
+def apply {Account : Type} (state : State Account) : Step Account → State Account
+  | .attempt account => { state with pending := some account }
+  | .answered => { pending := none, bound := state.pending.or state.bound }
+  | .frozen => { state with pending := none }
+  | .opened => {}
+theorem attempts_preserve_binding {Account : Type} (state : State Account) (attempts : List Account) :
+    (attempts.foldl (fun held account => apply held (.attempt account)) state).bound = state.bound := by
+  induction attempts generalizing state with
+  | nil => rfl
+  | cons account rest ih => exact ih (apply state (.attempt account))
+end Gateway.Router.Affinity
+
+
+/-! D30 成功的 model_returned 是唯一绑定提交点；使用原 Ledger 投影而不保存第二份
+账号文件，保证实时、全重放和 snapshot+tail 读同一规则。账号撤销后按首账号选择，
+不会在无错误请求之间轮换。Rust 的生产回归驱动 HTTP、重排和进程重建，投影检查
+覆盖任意失败尝试序列；这些检查是实现符合性证据，不是 Rust 精化证明。
+未覆盖的恢复分类、有限换账号预算、搜索设置与账号登记 UI 仍由各自接口后续规定。 -/

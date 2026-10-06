@@ -249,3 +249,8 @@ pub enum ModelTag { Main, Digest, Transcribe, Ocr }   // 线上 "main" | "digest
 
 **重开参数**：出现第三种落地方式（例如合并到别的分支）时，`LandingPolicy` 加一臂；出现一种 mode 需要自己的证据规则时，重议「mode 不参与准入」。
 -/
+
+/-! Model 的账号面：provider_account 返回非秘密 Provider/account 身份；
+select_account 在房间确定后选择成功绑定，缺席或被移除的 ID 选首账号；
+无账号适配器保持原行为。ModelCalled 记录尝试，ModelReturned 才提交绑定。
+本接口不规定账号故障转移；失败继续由 runtime 原重试策略处理。 -/
