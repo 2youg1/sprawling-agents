@@ -65,7 +65,21 @@ fn a_tool(
     sandbox: Box<dyn Sandbox>,
     shell: Option<PathBuf>,
 ) -> ExecTool {
-    ExecTool::new(setup(workdir, python, shell), sandbox, patient()).unwrap()
+    regression_boundary(ExecTool::new(setup(workdir, python, shell), sandbox, patient()).unwrap())
+}
+
+fn regression_boundary(tool: ExecTool) -> ExecTool {
+    #[cfg(windows)]
+    if std::env::var("SPRAWLING_DISPOSABLE_NATIVE").as_deref() == Ok("1") {
+        let tool = tool.confined(Confined::with_arm(
+            Confinement::WindowsJobObject,
+            Some(std::env::temp_dir()),
+        ));
+        assert!(tool.meta().disclosure.contains("windows_job_object"));
+        eprintln!("NATIVE_REGRESSION_ARM=windows_job_object");
+        return tool;
+    }
+    tool
 }
 
 /// A table whose callers wait for the command to settle rather than for
@@ -128,7 +142,9 @@ fn a_child_sees_the_names_its_building_declared_and_no_others() {
         env_passthrough: vec![kernel::EnvVarName::parse(&name).unwrap()],
         ..setup(chamber.path(), None, None)
     };
-    let tool = ExecTool::new(declared, Box::new(EchoSandbox::new()), patient()).unwrap();
+    let tool = regression_boundary(
+        ExecTool::new(declared, Box::new(EchoSandbox::new()), patient()).unwrap(),
+    );
     let outcome = tool
         .invoke(&call(serde_json::json!({
             "program": { "path": path.clone(), "args": args.clone() }

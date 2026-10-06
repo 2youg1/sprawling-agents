@@ -173,3 +173,43 @@ fn native_windows_disposable_cancellation_owns_the_tree() {
     }
     panic!("native cancellation must reap its owned Job");
 }
+
+#[test]
+#[ignore = "writes AppContainer profiles and disposable ACLs; explicit Windows Actions acceptance only"]
+fn native_windows_disposable_pwsh_initializes_network_types() {
+    assert_eq!(std::env::var("SPRAWLING_DISPOSABLE_NATIVE").unwrap(), "1");
+    let copy = tempfile::tempdir().unwrap();
+    let backlog = crate::Backlog::with_window(crate::PollBudget::new(6_000, 20));
+    let mut command = Command::new("pwsh");
+    command.env_clear().env("PATH", std::env::var_os("PATH").unwrap())
+        .current_dir(copy.path()).args(["-NoLogo", "-NoProfile", "-NonInteractive", "-Command",
+            "$ErrorActionPreference='Stop'; [System.Net.ServicePointManager]::SecurityProtocol | Out-Null; [System.Diagnostics.Process]::GetCurrentProcess().PriorityClass"]);
+    let result = backlog
+        .run_native(
+            RunId::from_bytes([0x73; 16]),
+            &Address::parse("work").unwrap(),
+            "pwsh initialization".to_owned(),
+            command,
+        )
+        .unwrap();
+    let result = match result {
+        crate::Started::Settled {
+            exit,
+            stdout,
+            stderr,
+        } => crate::Started::Settled {
+            exit,
+            stdout: stdout.trim().to_owned(),
+            stderr,
+        },
+        background @ crate::Started::Backgrounded { .. } => background,
+    };
+    assert_eq!(
+        result,
+        crate::Started::Settled {
+            exit: crate::Exit::Ended { code: 0 },
+            stdout: "BelowNormal".to_owned(),
+            stderr: String::new(),
+        }
+    );
+}

@@ -64,9 +64,6 @@ fn a_building_that_declares_the_names_can_build_a_rust_program() {
         .iter()
         .map(|name| EnvVarName::parse(name).unwrap())
         .collect();
-    // Where the build's own output goes, so it never touches this
-    // workspace's target directory or its lock.
-    declared.push(EnvVarName::parse("CARGO_TARGET_DIR").unwrap());
     // Also a host fact: rustup's shim reads these, and defaults them
     // from the profile directory when they are absent.
     for optional in ["CARGO_HOME", "RUSTUP_HOME", "USERPROFILE"] {
@@ -92,12 +89,24 @@ fn a_building_that_declares_the_names_can_build_a_rust_program() {
     // than read back out of the call that outlived it.
     let backlog = Backlog::new();
     let tool = ExecTool::new(setup, Box::new(EchoSandbox::new()), backlog.clone()).unwrap();
+    #[cfg(windows)]
+    let tool = if std::env::var("SPRAWLING_DISPOSABLE_NATIVE").as_deref() == Ok("1") {
+        let tool = tool.confined(runtime::tools::Confined::with_arm(
+            runtime::tools::Confinement::WindowsJobObject,
+            Some(std::env::temp_dir()),
+        ));
+        assert!(tool.meta().disclosure.contains("windows_job_object"));
+        eprintln!("NATIVE_REGRESSION_ARM=windows_job_object");
+        tool
+    } else {
+        tool
+    };
 
     let mut args = serde_json::Map::new();
     args.insert(
         "arm".to_owned(),
         serde_json::json!({
-            "program": { "path": cargo, "args": ["build", "--offline"] }
+            "program": { "path": cargo, "args": ["build", "--offline", "--target-dir", "target"] }
         }),
     );
     let outcome = tool

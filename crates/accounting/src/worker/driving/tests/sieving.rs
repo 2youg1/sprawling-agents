@@ -36,6 +36,17 @@ fn print_command(name: &str) -> (String, Vec<String>) {
 fn a_command_output_over_the_floor_reaches_the_model_sieved_with_the_way_back() {
     let dir = tempfile::tempdir().unwrap();
     let report = crate::worker::fixture::init_city(dir.path()).unwrap();
+    #[cfg(windows)]
+    if std::env::var("SPRAWLING_DISPOSABLE_NATIVE").as_deref() == Ok("1") {
+        std::fs::create_dir_all(dir.path().join("lab/.sprawling")).unwrap();
+        std::fs::write(
+            dir.path().join("lab/.sprawling/CONFIG.toml"),
+            "[sandbox]
+arm = \"native\"
+",
+        )
+        .unwrap();
+    }
     let room = dir.path().join("lab").join("room1");
     std::fs::create_dir_all(&room).unwrap();
     let mut noise = String::new();
@@ -71,6 +82,17 @@ fn a_command_output_over_the_floor_reaches_the_model_sieved_with_the_way_back() 
         .unwrap();
     let bodies = provider.bodies();
     drop(provider);
+
+    #[cfg(windows)]
+    if std::env::var("SPRAWLING_DISPOSABLE_NATIVE").as_deref() == Ok("1") {
+        assert!(
+            bodies
+                .iter()
+                .any(|body| body.contains("windows_job_object")),
+            "the worker must advertise its explicit native boundary"
+        );
+        eprintln!("NATIVE_REGRESSION_ARM=windows_job_object");
+    }
 
     let with_result = bodies
         .iter()

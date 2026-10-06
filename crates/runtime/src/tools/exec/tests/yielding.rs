@@ -82,7 +82,9 @@ fn a_dispatched_command_runs_below_the_core() {
             .collect(),
         ..setup(chamber.path(), None, None)
     };
-    let tool = ExecTool::new(declared, Box::new(EchoSandbox::new()), patient()).unwrap();
+    let tool = regression_boundary(
+        ExecTool::new(declared, Box::new(EchoSandbox::new()), patient()).unwrap(),
+    );
     let outcome = tool
         .invoke(&call(serde_json::json!({
             "program": { "path": path, "args": args }

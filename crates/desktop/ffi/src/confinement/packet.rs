@@ -5,9 +5,11 @@
 
 //! UTF16 launch packet; six terminated strings followed by an explicit
 //! double-terminated environment. No process environment is inherited.
+//! Argument preservation follows `Runtime.NativeWindows.Argv` in
+//! `crates/runtime/spec/Tools/Exec/NativeWindows.lean`; this is the sole encoder.
 
 use super::{Action, Failure, Launch};
-use std::ffi::{OsStr, OsString};
+use std::ffi::OsStr;
 use std::os::windows::ffi::OsStrExt;
 
 const BACKSLASH: u16 = 92;
@@ -24,14 +26,40 @@ pub(super) fn encode(launch: &Launch) -> Result<Vec<u16>, Failure> {
     {
         return Err(invalid());
     }
-    let mut command = Vec::new();
-    for part in std::iter::once(launch.program.as_os_str())
-        .chain(launch.args.iter().map(OsString::as_os_str))
+    let mut command = quoted(launch.program.as_os_str())?;
+    if launch
+        .program
+        .file_name()
+        .and_then(OsStr::to_str)
+        .is_some_and(|name| {
+            name.eq_ignore_ascii_case("cmd.exe") || name.eq_ignore_ascii_case("cmd")
+        })
     {
-        if !command.is_empty() {
-            command.push(u16::from(b' '));
+        let boundary = launch.args.iter().position(|arg| {
+            arg.to_str()
+                .is_some_and(|arg| arg.eq_ignore_ascii_case("/c") || arg.eq_ignore_ascii_case("/k"))
+        });
+        if boundary.is_some() {
+            command.extend(" /D /S".encode_utf16());
         }
-        command.extend(quoted(part)?);
+        for (index, part) in launch.args.iter().enumerate() {
+            command.push(u16::from(b' '));
+            if boundary.is_some_and(|boundary| index == boundary.saturating_add(1)) {
+                command.push(u16::from(b'"'));
+            }
+            command.extend(terminated(part)?.into_iter().take_while(|unit| *unit != 0));
+        }
+        if let Some(boundary) = boundary {
+            if launch.args.len() == boundary.saturating_add(1) {
+                command.extend(" \"".encode_utf16());
+            }
+            command.push(u16::from(b'"'));
+        }
+    } else {
+        for part in &launch.args {
+            command.push(u16::from(b' '));
+            command.extend(quoted(part)?);
+        }
     }
     if command.len() >= 32_767 {
         return Err(invalid());

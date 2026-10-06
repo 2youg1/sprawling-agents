@@ -345,6 +345,7 @@ fn checked(action: Action, code: u32) -> Result<(), Failure> {
     unsafe_code,
     clippy::unwrap_used,
     clippy::indexing_slicing,
+    clippy::arithmetic_side_effects,
     reason = "test code"
 )]
 mod tests {
@@ -394,6 +395,168 @@ mod tests {
             // SAFETY: the generated vector is live for this call, with its exact length.
             let found = unsafe { sprawling_native_packet_valid(units.as_ptr(), units.len()) };
             prop_assert_eq!(found != 0, packet::valid(&units));
+        }
+    }
+
+    use std::os::windows::ffi::OsStringExt;
+
+    const ARGV_SEED: u64 = 20_261_006;
+
+    fn argv_launch(args: Vec<OsString>) -> Launch {
+        Launch {
+            program: PathBuf::from(r"C:\argv probe\argv child.exe"),
+            args,
+            directory: PathBuf::from(r"C:\argv probe"),
+            profile: "sprawling.argv".to_owned(),
+            stdout: PathBuf::from("out"),
+            stderr: PathBuf::from("err"),
+            environment: BTreeMap::new(),
+            memory_bytes: NonZeroUsize::MIN,
+            cpu_rate: NonZeroU16::MIN,
+            parent_job: NonZeroUsize::MIN,
+        }
+    }
+
+    #[test]
+    fn native_cmd_script_uses_source_instead_of_crt_arguments() {
+        for args in [
+            vec!["/C", "exit 3"],
+            vec!["/C", "type", "build.log"],
+            vec!["/C", "echo written> made.txt && type made.txt"],
+            vec!["/C", "echo \"quoted text\" & echo %PATH%"],
+            vec!["/d", "/s", "/c", "echo tail\\"],
+        ] {
+            let mut request = argv_launch(args.iter().map(OsString::from).collect());
+            request.program = PathBuf::from(r"C:\Windows\System32\cmd.exe");
+            let encoded = packet::encode(&request).unwrap();
+            let command = encoded.split(|unit| *unit == 0).nth(1).unwrap();
+            let boundary = args
+                .iter()
+                .position(|arg| arg.eq_ignore_ascii_case("/c"))
+                .unwrap();
+            let expected = format!(
+                "\"{}\" /D /S {} \"{}\"",
+                request.program.display(),
+                args[..=boundary].join(" "),
+                args[boundary + 1..].join(" ")
+            );
+            assert_eq!(OsString::from_wide(command), OsString::from(expected));
+        }
+    }
+
+    fn argv_units() -> impl Strategy<Value = Vec<u16>> {
+        proptest::collection::vec(
+            prop_oneof![
+                4 => proptest::sample::select(vec![9_u16, 32, 34, 92]),
+                1 => 1_u16..=u16::MAX,
+            ],
+            0..128,
+        )
+    }
+
+    fn crt_arguments(command: &[u16]) -> Vec<Vec<u16>> {
+        let mut at = 0;
+        let mut quoted = false;
+        let mut program = Vec::new();
+        while at < command.len() {
+            match command[at] {
+                34 => quoted = !quoted,
+                9 | 32 if !quoted => break,
+                unit => program.push(unit),
+            }
+            at += 1;
+        }
+        let mut args = vec![program];
+        loop {
+            while at < command.len() && matches!(command[at], 9 | 32) {
+                at += 1;
+            }
+            if at == command.len() {
+                return args;
+            }
+            quoted = false;
+            let mut argument = Vec::new();
+            while at < command.len() && (quoted || !matches!(command[at], 9 | 32)) {
+                let mut slashes = 0;
+                while at < command.len() && command[at] == 92 {
+                    slashes += 1;
+                    at += 1;
+                }
+                if at < command.len() && command[at] == 34 {
+                    argument.extend(std::iter::repeat_n(92, slashes / 2));
+                    if slashes % 2 == 1 {
+                        argument.push(34);
+                    } else if quoted && command.get(at + 1) == Some(&34) {
+                        argument.push(34);
+                        at += 1;
+                    } else {
+                        quoted = !quoted;
+                    }
+                    at += 1;
+                } else {
+                    argument.extend(std::iter::repeat_n(92, slashes));
+                    if at < command.len() && (quoted || !matches!(command[at], 9 | 32)) {
+                        argument.push(command[at]);
+                        at += 1;
+                    }
+                }
+            }
+            args.push(argument);
+        }
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig {
+            cases: 256,
+            rng_seed: proptest::test_runner::RngSeed::Fixed(ARGV_SEED),
+            ..ProptestConfig::default()
+        })]
+
+        #[test]
+        fn native_encoded_arguments_preserve_units_and_order(
+            args in proptest::collection::vec(argv_units(), 0..16),
+            program in proptest::collection::vec(
+                prop_oneof![
+                    4 => proptest::sample::select(vec![9_u16, 32, 92]),
+                    1 => (1_u16..=u16::MAX).prop_filter("program has no quotes", |unit| *unit != 34),
+                ],
+                1..128,
+            ).prop_filter("file path has no terminal backslash", |units| units.last() != Some(&92)),
+        ) {
+            for args in [args, ["/D", "/S", "/C"].into_iter().map(|arg| arg.encode_utf16().collect()).collect()] {
+                let mut request = argv_launch(args.iter().map(|units| OsString::from_wide(units)).collect());
+                request.program = PathBuf::from(OsString::from_wide(&program));
+                let encoded = packet::encode(&request).unwrap();
+                let command = encoded.split(|unit| *unit == 0).nth(1).unwrap();
+                let mut expected = vec![program.clone()];
+                expected.extend(args);
+                prop_assert_eq!(crt_arguments(command), expected);
+            }
+        }
+
+        #[test]
+        fn native_cmd_source_preserves_utf16_units(source in argv_units()) {
+            let mut request = argv_launch(vec![OsString::from("/C"), OsString::from_wide(&source)]);
+            request.program = PathBuf::from(r"C:\Windows\System32\cmd.exe");
+            let encoded = packet::encode(&request).unwrap();
+            let command = encoded.split(|unit| *unit == 0).nth(1).unwrap();
+            let prefix: Vec<u16> = r#""C:\Windows\System32\cmd.exe" /D /S /C ""#.encode_utf16().collect();
+            let decoded = command.strip_prefix(prefix.as_slice()).unwrap().strip_suffix(&[34]).unwrap();
+            prop_assert_eq!(decoded, source);
+        }
+
+        #[test]
+        fn native_nul_argument_is_rejected_before_launch(
+            mut units in argv_units(), position in 0_usize..129,
+        ) {
+            let at = position % (units.len() + 1);
+            units.insert(at, 0);
+            let failure = packet::encode(&argv_launch(vec![OsString::from_wide(&units)])).unwrap_err();
+            prop_assert_eq!(failure.action, Action::Encode);
+            prop_assert_eq!(failure.code, 87);
+            prop_assert!(failure.phase.is_empty());
+            prop_assert_eq!(failure.cleanup_code, None);
+            prop_assert!(failure.resources.is_none());
         }
     }
 }

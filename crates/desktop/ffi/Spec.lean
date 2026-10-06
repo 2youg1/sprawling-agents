@@ -573,8 +573,14 @@ harness 网络不进入 AppContainer。Rust 负责 argv/env/限额与 typed fail
 `win32job` 不提供 AppContainer 起动，所以采用既有 FFI seam，而非再建 unsafe crate；
 Microsoft `UpdateProcThreadAttribute`、`CreateAppContainerProfile` 与 Job Objects 文档
 规定平台前提。生命周期与 packet 定理的 authority 在
-`crates/runtime/spec/Tools/Exec/NativeWindows.lean`；Rust-reference equivalence、两侧 fuzz
-和 disposable Windows production 五轴对拍分别验证边界、输入空间与系统行为。
+`crates/runtime/spec/Tools/Exec/NativeWindows.lean`；其中 `Argv` 规定 `packet::quoted`
+的普通参数保全、程序名支持域、NUL 内容拒绝与 cmd 脚本边界，本文件不复制
+该编码或 parser 定义，也不沿逆向 crate dependency 导入 runtime 的规格。
+`confinement::tests` 从 packet 的生产入口检验 `Argv` 量化的输入空间；
+微软 CRT 独立 decoder 的纯检查验证 UTF16 argv 保全；cmd 的脚本形成由
+该规格 D56 规定，执行结果由 runtime 与 accounting 的真实回归另验。
+Rust-reference equivalence、两侧 fuzz 和 disposable Windows production 五轴对拍
+分别验证各自的边界、输入空间与系统行为，argv 通过不代表这些范围全部通过。
 D1 的重开条件已满足：后台命令跨越多次工具调用。cleanup 的显式失败抵达调用者，
 Drop 是 caller 放弃所有权时的 emergency teardown，仍尝试每项资源并报告失败。
 
