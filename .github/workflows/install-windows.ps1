@@ -65,8 +65,29 @@ try {
         ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $Evidence 'windows-binary.json') -Encoding utf8
     $status = & $installed[0].FullName status
     if ($LASTEXITCODE -ne 0) { throw 'The installed executable cannot answer status.' }
+    & pwsh -NoProfile -File $installer *> (Join-Path $Evidence 'powershell-reinstall.log')
+    if ($LASTEXITCODE -ne 0) { throw 'Same-channel reinstall refused the archive.' }
+    if ((Get-FileHash -LiteralPath $installed[0].FullName -Algorithm SHA256).Hash -cne $originalHash) {
+        throw 'Same-channel reinstall changed the expected executable bytes.'
+    }
+    $installedDir = $installed[0].DirectoryName
+    $pathBeforeUninstall = $key.GetValue('Path', '', [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
+    $pathKindBeforeUninstall = $key.GetValueKind('Path')
+    $kept = @($pathBeforeUninstall.Split(';') | Where-Object {
+        -not $_.Trim().TrimEnd([char[]]'\/').Equals($installedDir.TrimEnd([char[]]'\/'), [StringComparison]::OrdinalIgnoreCase)
+    })
+    if ($kept.Count -eq $pathBeforeUninstall.Split(';').Count) { throw 'Installation never added its PATH entry.' }
     & $installed[0].FullName install --uninstall *> (Join-Path $Evidence 'powershell-uninstall.log')
     if ($LASTEXITCODE -ne 0 -or (Test-Path -LiteralPath $installed[0].FullName)) { throw 'Uninstall failed to remove its executable.' }
+    $pathAfterUninstall = $key.GetValue('Path', '', [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
+    if ($pathAfterUninstall -cne ($kept -join ';') -or $key.GetValueKind('Path') -ne $pathKindBeforeUninstall) {
+        throw 'Uninstall must remove only its PATH entry and preserve the value type.'
+    }
+    $originDefinition = [regex]::Match((Get-Content -LiteralPath 'crates/sprawling/src/release.rs' -Raw), 'pub const ARCHIVE_ORIGIN_FILE: &str = "([^"]+)";')
+    if (-not $originDefinition.Success) { throw 'Archive origin authority was not found.' }
+    $origin = Join-Path $installedDir $originDefinition.Groups[1].Value
+    if (Test-Path -LiteralPath $origin) { throw 'Uninstall left the archive origin marker.' }
+
     $release[0].assets[0].digest = 'sha256:' + ('0' * 64)
     $release | ConvertTo-Json -Depth 5 -AsArray | Set-Content -LiteralPath (Join-Path $www 'releases.json') -Encoding utf8
     & pwsh -NoProfile -File $installer *> (Join-Path $Evidence 'powershell-bad-digest.log')
