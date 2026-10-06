@@ -76,7 +76,7 @@ on:
         description: which run
         required: true
         type: choice
-        options: [mutants, mutants-modules, sim, shots, release, pgo, fresh, runtime, keychain]
+        options: [mutants, mutants-modules, sim, shots, release, pgo, fresh, runtime, keychain, container]
       base:
         description: the ref `mutants` diffs against (a branch on origin, a tag, or a commit)
         required: false
@@ -752,4 +752,60 @@ jobs:
         with:
           name: keychain-${{ steps.tree.outputs.sha }}
           path: target/keychain
+          if-no-files-found: warn
+
+  container:
+    if: inputs.job == 'container'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        engine: [docker, podman]
+    env:
+      CARGO_INCREMENTAL: "0"
+      SPRAWLING_CONTAINER_TEST_ENGINE: ${{ matrix.engine }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: pinned toolchain
+        run: rustup show
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: core
+          save-if: false
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
+      - name: prepare the disposable daemon and immutable local image
+        shell: bash
+        run: |
+          set -euo pipefail
+          engine="${{ matrix.engine }}"
+          if [ "$engine" = podman ]; then
+            sudo apt-get update
+            sudo apt-get install --yes --no-install-recommends podman
+          fi
+          program="$RUNNER_TEMP/container-cli"
+          mkdir -p target/container-evidence
+          printf '#!/bin/bash\nset -eu -o pipefail\nif [ "$1" = inspect ] || { [ "$1" = container ] && [ "${2:-}" = inspect ]; }; then\n  sudo %s "$@" | tee "%s/stopped.json"\nelse\n  exec sudo %s "$@"\nfi\n' "$engine" "$PWD/target/container-evidence" "$engine" > "$program"
+          chmod +x "$program"
+          "$program" pull docker.io/library/python:3.13-slim
+          image=$("$program" image inspect docker.io/library/python:3.13-slim --format '{{.Id}}')
+          case "$image" in sha256:*) ;; *) image="sha256:$image" ;; esac
+          echo "SPRAWLING_CONTAINER_TEST_PROGRAM=$program" >> "$GITHUB_ENV"
+          echo "SPRAWLING_CONTAINER_TEST_IMAGE=$image" >> "$GITHUB_ENV"
+          mkdir -p target/container-evidence
+          "$program" image inspect "$image" | python3 -c 'import json,sys; i=json.load(sys.stdin)[0]; c=i.get("Config",{}); print(json.dumps({"Id":i.get("Id"),"Config":c}))' > target/container-evidence/image.json
+      - name: production execution, five axes and process cleanup
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p target/container-evidence
+          git rev-parse HEAD 'HEAD^{tree}' > target/container-evidence/source.txt
+          cargo nextest run -p sprawling-runtime --test-threads 1 --run-ignored only -E 'test(a_real_daemon)' 2>&1 | tee target/container-evidence/isolation.log
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: container-${{ matrix.engine }}-${{ github.sha }}
+          path: target/container-evidence
           if-no-files-found: warn

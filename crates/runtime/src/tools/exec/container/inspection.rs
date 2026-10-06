@@ -12,9 +12,14 @@ use super::{ContainerEngine, WORKDIR, denied};
 
 pub(super) fn image(bytes: &[u8], limits: &ContainerLimits) -> Result<(), AxError> {
     let value = first(bytes)?;
-    let volumes = value.pointer("/Config/Volumes");
-    if value.get("Id").and_then(Value::as_str) != Some(limits.image.as_str())
-        || !matches!(volumes, Some(Value::Null))
+    let pinned = value.get("Id").and_then(Value::as_str).is_some_and(|id| {
+        id == limits.image.as_str() || limits.image.as_str().strip_prefix("sha256:") == Some(id)
+    });
+    let config = value.get("Config").and_then(Value::as_object);
+    let volumes = config.and_then(|config| config.get("Volumes"));
+    if !pinned
+        || config.is_none()
+        || !matches!(volumes, None | Some(Value::Null))
             && !volumes
                 .is_some_and(|value| value.as_object().is_some_and(serde_json::Map::is_empty))
     {
@@ -64,16 +69,19 @@ pub(super) fn stopped(
     });
     let caps = host.get("CapDrop").and_then(Value::as_array);
     let security = host.get("SecurityOpt").and_then(Value::as_array);
-    let caps_dropped = caps.is_some_and(|caps| {
-        caps.iter().any(|cap| {
-            cap.as_str()
-                .is_some_and(|cap| cap.eq_ignore_ascii_case("ALL"))
-        })
-    }) || matches!(engine, ContainerEngine::Podman)
-        && value
-            .get("EffectiveCaps")
-            .and_then(Value::as_array)
-            .is_some_and(Vec::is_empty);
+    let caps_dropped = match engine {
+        ContainerEngine::Docker => caps.is_some_and(|caps| {
+            caps.iter().any(|cap| {
+                cap.as_str()
+                    .is_some_and(|cap| cap.eq_ignore_ascii_case("ALL"))
+            })
+        }),
+        ContainerEngine::Podman => ["EffectiveCaps", "BoundingCaps"].iter().all(|field| {
+            value
+                .get(field)
+                .is_some_and(|caps| caps.is_null() || caps.as_array().is_some_and(Vec::is_empty))
+        }),
+    };
     if !cpu
         || host.get("Memory") != Some(&json!(limits.memory_bytes.get()))
         || host.get("MemorySwap") != Some(&json!(limits.memory_bytes.get()))
@@ -153,7 +161,102 @@ fn first(bytes: &[u8]) -> Result<Value, AxError> {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::indexing_slicing, reason = "test code")]
 mod tests {
+    #[test]
+    fn podman_image_metadata_accepts_only_the_pinned_digest_without_volumes() {
+        let limits: kernel::ContainerLimits = serde_json::from_value(serde_json::json!({
+            "image": format!("sha256:{}", "a".repeat(64)), "user":1000,
+            "cpu_millis":1250, "memory_bytes":67108864, "pids":64
+        }))
+        .unwrap();
+        for config in [
+            serde_json::json!({}),
+            serde_json::json!({"Volumes":null}),
+            serde_json::json!({"Volumes":{}}),
+        ] {
+            let bytes = serde_json::to_vec(&serde_json::json!([{
+                "Id":"a".repeat(64), "Config":config
+            }]))
+            .unwrap();
+            assert!(super::image(&bytes, &limits).is_ok());
+        }
+        for config in [
+            serde_json::json!(null),
+            serde_json::json!({"Volumes":[]}),
+            serde_json::json!({"Volumes":{"/extra":{}}}),
+        ] {
+            let bytes = serde_json::to_vec(&serde_json::json!([{
+                "Id":limits.image.as_str(), "Config":config
+            }]))
+            .unwrap();
+            assert!(super::image(&bytes, &limits).is_err());
+        }
+        assert!(super::image(br#"[{"Id":"wrong","Config":{}}]"#, &limits).is_err());
+    }
+
+    #[test]
+    fn podman_empty_capability_sets_are_not_missing_evidence() {
+        let limits: kernel::ContainerLimits = serde_json::from_value(serde_json::json!({
+            "image": format!("sha256:{}", "a".repeat(64)), "user":1000,
+            "cpu_millis":1250, "memory_bytes":67108864, "pids":64
+        }))
+        .unwrap();
+        let copy = tempfile::tempdir().unwrap();
+        let mut value = serde_json::json!({
+            "Config":{"User":"1000","WorkingDir":"/work"},
+            "HostConfig":{"CpuQuota":125000,"CpuPeriod":100000,"Memory":67108864,
+                "MemorySwap":67108864,"PidsLimit":64,"NetworkMode":"none",
+                "ReadonlyRootfs":true,"CapDrop":["CAP_CHOWN"],
+                "SecurityOpt":["no-new-privileges"]},
+            "Mounts":[{"Source":copy.path(),"Destination":"/work","Type":"bind"}],
+            "State":{"Running":false},"EffectiveCaps":null,"BoundingCaps":null
+        });
+        for empty in [serde_json::json!(null), serde_json::json!([])] {
+            value["EffectiveCaps"] = empty.clone();
+            value["BoundingCaps"] = empty;
+            assert!(
+                super::stopped(
+                    &serde_json::to_vec(&[&value]).unwrap(),
+                    &limits,
+                    super::ContainerEngine::Podman,
+                    copy.path()
+                )
+                .is_ok()
+            );
+        }
+        for field in ["EffectiveCaps", "BoundingCaps"] {
+            for invalid in [
+                serde_json::json!(""),
+                serde_json::json!({}),
+                serde_json::json!(["CAP_CHOWN"]),
+            ] {
+                let mut unsafe_value = value.clone();
+                unsafe_value[field] = invalid;
+                assert!(
+                    super::stopped(
+                        &serde_json::to_vec(&[unsafe_value]).unwrap(),
+                        &limits,
+                        super::ContainerEngine::Podman,
+                        copy.path()
+                    )
+                    .is_err()
+                );
+            }
+            let mut missing = value.clone();
+            missing.as_object_mut().unwrap().remove(field);
+            assert!(
+                super::stopped(
+                    &serde_json::to_vec(&[missing]).unwrap(),
+                    &limits,
+                    super::ContainerEngine::Podman,
+                    copy.path()
+                )
+                .is_err()
+            );
+        }
+    }
+
     #[test]
     fn a_created_container_with_zero_exit_has_no_target_result() {
         let bytes = br#"[{"State":{"Status":"created","Running":false,"ExitCode":0}}]"#;

@@ -11,11 +11,18 @@ use std::process::Command;
 use kernel::AxError;
 use serde::{Deserialize, Serialize};
 
-use super::{ContainerRuntime, control, denied};
+use super::{ContainerEngine, ContainerRuntime, control, denied};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Copy)]
+pub(super) enum Confirmation {
+    Absence,
+    Deletion,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
 pub(super) struct Cleanup {
     pub(super) program: PathBuf,
+    engine: ContainerEngine,
     pub(super) name: String,
     pub(super) copy: PathBuf,
 }
@@ -24,16 +31,30 @@ impl Cleanup {
     pub(super) fn registered(runtime: &ContainerRuntime, name: String, copy: PathBuf) -> Self {
         Self {
             program: runtime.program.clone(),
+            engine: runtime.engine,
             name,
             copy,
         }
     }
 
-    pub(super) fn remove(&self) -> Result<(), AxError> {
+    pub(super) fn remove(&self, confirmation: Confirmation) -> Result<(), AxError> {
         let mut remove = Command::new(&self.program);
-        remove.args(["rm", "--force", "--volumes", &self.name]);
-        let removed = control::output(&mut remove)?;
+        remove.args(["rm", "--force", "--volumes"]);
+        match self.engine {
+            ContainerEngine::Docker => {}
+            ContainerEngine::Podman => {
+                remove.args(["--time", "0"]);
+            }
+        }
+        remove.arg(&self.name);
+        let removed = control::output(&mut remove, control::Wait::Bounded)?;
         if !removed.status.success() {
+            if matches!(confirmation, Confirmation::Deletion) {
+                return Err(denied(
+                    "remove a possibly late-created container",
+                    &self.name,
+                ));
+            }
             let mut inventory = Command::new(&self.program);
             inventory.args(["container", "ls", "--all", "--format", "{{.Names}}"]);
             let names = control::checked(&mut inventory)?;

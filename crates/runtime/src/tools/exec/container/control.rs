@@ -12,12 +12,17 @@ use kernel::AxError;
 
 use super::denied;
 
-const POLLS: u32 = 250;
-const INTERVAL: std::time::Duration = std::time::Duration::from_millis(20);
+pub(super) const POLLS: u32 = 250;
+pub(super) const INTERVAL: std::time::Duration = std::time::Duration::from_millis(20);
 const MAX_OUTPUT: u64 = 1 << 20;
 static REQUESTS: AtomicU64 = AtomicU64::new(0);
 
-pub(super) fn output(command: &mut Command) -> Result<Output, AxError> {
+pub(super) enum Wait {
+    Bounded,
+    Creation,
+}
+
+pub(super) fn output(command: &mut Command, wait: Wait) -> Result<Output, AxError> {
     let files = Files::open()?;
     command
         .stdin(Stdio::null())
@@ -32,7 +37,8 @@ pub(super) fn output(command: &mut Command) -> Result<Output, AxError> {
     let mut child = command
         .spawn()
         .map_err(|err| denied("contact the container daemon", err.to_string()))?;
-    for _ in 0..POLLS {
+    let mut polls = 0_u32;
+    loop {
         match child.try_wait() {
             Ok(Some(status)) => {
                 return Ok(Output {
@@ -42,21 +48,31 @@ pub(super) fn output(command: &mut Command) -> Result<Output, AxError> {
                 });
             }
             Ok(None) => std::thread::sleep(INTERVAL),
-            Err(err) => {
-                stop(&mut child)?;
-                return Err(denied("wait for the container daemon", err.to_string()));
-            }
+            Err(err) => match wait {
+                Wait::Bounded => {
+                    stop(&mut child)?;
+                    return Err(denied("wait for the container daemon", err.to_string()));
+                }
+                Wait::Creation => {
+                    // EOF cannot cancel a daemon request that may still create its resource.
+                    eprintln!("{err}; guardian retains the create client until it can be reaped");
+                    std::thread::sleep(INTERVAL);
+                }
+            },
+        }
+        polls = polls.saturating_add(1);
+        if matches!(wait, Wait::Bounded) && polls >= POLLS {
+            stop(&mut child)?;
+            return Err(denied(
+                "contact the container daemon",
+                "the bounded daemon request timed out",
+            ));
         }
     }
-    stop(&mut child)?;
-    Err(denied(
-        "contact the container daemon",
-        "the bounded daemon request timed out",
-    ))
 }
 
 pub(super) fn checked(command: &mut Command) -> Result<Vec<u8>, AxError> {
-    let answer = output(command)?;
+    let answer = output(command, Wait::Bounded)?;
     if !answer.status.success() {
         return Err(denied(
             "contact the container daemon",

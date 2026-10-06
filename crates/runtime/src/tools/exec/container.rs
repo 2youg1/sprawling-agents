@@ -24,7 +24,7 @@ mod lifetime;
 pub(crate) use lifetime::ContainerLease;
 
 /// The CLI grammar and info schema to use for one daemon.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum ContainerEngine {
     Docker,
     Podman,
@@ -553,7 +553,13 @@ mod tests {
             json!(limits.memory_bytes.get())
         );
         assert_eq!(first["HostConfig"]["PidsLimit"], json!(limits.pids.get()));
-        assert_eq!(first["Config"]["Entrypoint"], json!(["/bin/true"]));
+        assert_eq!(
+            first["Config"]["Entrypoint"],
+            match engine {
+                ContainerEngine::Docker => json!(["/bin/true"]),
+                ContainerEngine::Podman => json!("/bin/true"),
+            }
+        );
         assert_eq!(first["Config"]["WorkingDir"], json!(WORKDIR));
     }
 
