@@ -287,12 +287,19 @@ test-slice-plan file out:
     unit = '(kind(lib) | kind(bin) | kind(proc-macro)) & !package(=citysim)'
     groups = {
         'runtime': 'package(=sprawling-runtime)',
-        'accounting': 'package(=sprawling-accounting)',
         'sprawling': 'package(=sprawling)',
         'xtask': 'package(=xtask)',
         'kernel-storage': '(package(=sprawling-kernel) | package(=sprawling-storage))',
         'gateway-protocols': '(package(=sprawling-gateway) | package(=sprawling-agent-protocols))',
     }
+    accounting = 'package(=sprawling-accounting)'
+    accounting_domains = {
+        'execution': 'test(/^worker::(driving|dispatching|freezing|mcp|workbench)::/)',
+        'collaboration': 'test(/^worker::(waking|plans|reviewing|settling|commanding)::/)',
+    }
+    for domain, predicate in accounting_domains.items():
+        groups['accounting-' + domain] = f'({accounting} & {predicate})'
+    groups['accounting-other'] = f'({accounting} & !(' + ' | '.join(accounting_domains.values()) + '))'
     for name, packages in groups.items():
         slices.append({'name': 'unit-' + name, 'filter': f'{unit} & {packages}'})
     slices.append({'name': 'unit-other', 'filter': unit + ' & !(' + ' | '.join(groups.values()) + ')'})
