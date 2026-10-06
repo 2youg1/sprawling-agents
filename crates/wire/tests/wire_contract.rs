@@ -498,6 +498,7 @@ title = \"a window\"
                 }],
                 proxying: Some(kernel::Proxying::Always),
                 max_in_flight: None,
+                account_retries: Some(kernel::account_recovery::AccountRetries::One),
             },
             idem,
         },

@@ -80,6 +80,7 @@ fn settled(tuning: &EndpointTuning) -> Option<AttachedTuning> {
             .collect(),
         overrides: tuning.overrides.clone(),
         max_in_flight: tuning.max_in_flight.map(MaxInFlight::get),
+        account_retries: None,
     };
     (kept != AttachedTuning::default()).then_some(kept)
 }

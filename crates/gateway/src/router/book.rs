@@ -438,6 +438,59 @@ mod tests {
         assert_eq!((limits(&book), limits(&restored)), ([3, 16, 4], [3, 16, 4]));
     }
 
+    /// The per-account retry figure rides the endpoint_attached line as
+    /// the word the person chose; a line without it, as every line
+    /// written before it existed, and a line holding a word this build
+    /// cannot read both take the one default `DEFAULTS` states, and
+    /// neither refuses the line.
+    #[test]
+    fn account_retries_survive_a_replay_and_an_unset_line_takes_the_default() {
+        use kernel::account_recovery::AccountRetries;
+        let mut chosen = attached("chosen", "https://api.example.test/v1");
+        chosen.tuning.account_retries = Some(AccountRetries::One);
+        let written = attached_payload(&chosen).unwrap();
+        assert_eq!(
+            written
+                .as_map()
+                .get("tuning")
+                .and_then(|tuning| tuning.get("account_retries")),
+            Some(&Value::String("one".to_owned()))
+        );
+        let mut unreadable = attached_payload(&attached("odd", "https://api.example.test/v1"))
+            .unwrap()
+            .as_map()
+            .clone();
+        unreadable.insert(
+            "tuning".to_owned(),
+            serde_json::json!({"account_retries": "three"}),
+        );
+        let mut book = EndpointBook::new();
+        for line in [
+            written,
+            attached_payload(&attached("unset", "https://api.example.test/v1")).unwrap(),
+            Payload::new(unreadable).unwrap(),
+        ] {
+            book.apply(&record(EventKind::EndpointAttached, line))
+                .unwrap();
+        }
+        let read = ["chosen", "unset", "odd"].map(|name| {
+            let tuning = &book.endpoints[name].endpoint.tuning;
+            (tuning.account_retries, tuning.account_retries())
+        });
+        assert_eq!(
+            read,
+            [
+                (Some(AccountRetries::One), AccountRetries::One),
+                (None, EndpointTuning::DEFAULTS.account_retries),
+                (None, EndpointTuning::DEFAULTS.account_retries),
+            ]
+        );
+        assert_eq!(
+            EndpointTuning::DEFAULTS.account_retries,
+            AccountRetries::Two
+        );
+    }
+
     /// A record written while this build carried a retreat arm names
     /// two keys nothing ever wrote a value into. Reading it must still
     /// produce the choice it states.

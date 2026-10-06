@@ -98,6 +98,9 @@ pub struct TuningDefaults {
     pub stream_idle_timeout_ms: Option<u64>,
     /// Which calls go through the machine's proxy.
     pub proxying: Proxying,
+    /// How many more times one account is asked the same request before
+    /// the next account takes it, where an endpoint lists two or more.
+    pub account_retries: kernel::account_recovery::AccountRetries,
 }
 
 /// What one address is governed by, value by value, with the file each

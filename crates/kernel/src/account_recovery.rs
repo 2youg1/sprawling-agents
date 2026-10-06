@@ -27,8 +27,12 @@ use crate::tool::ServerLabel;
 
 /// How many more times one account is asked the same request before the
 /// round moves on. A person picks one or two on the provider's advanced
-/// form; it is read only where the roster has two accounts or more.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// form; it is read only where the roster has two accounts or more. On
+/// the wire and in the ledger `"one"` or `"two"`; the default lives in
+/// gateway's `EndpointTuning::DEFAULTS` alone.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum AccountRetries {
     One,
     Two,

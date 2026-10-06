@@ -91,4 +91,10 @@ pub struct EndpointTuning {
     /// and zero both mean nobody settled it, and the city takes the
     /// default for this kind of connection.
     pub max_in_flight: Option<u32>,
+    /// How many more times one account is asked the same request before
+    /// the next account takes it. Absent means the city's own figure,
+    /// which the configuration query reads back; read only where the
+    /// endpoint lists two accounts or more.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub account_retries: Option<kernel::account_recovery::AccountRetries>,
 }

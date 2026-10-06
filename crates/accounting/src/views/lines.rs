@@ -77,6 +77,7 @@ pub(crate) fn config_answer(
             request_max_retries: defaults.retries.stated(),
             stream_idle_timeout_ms: defaults.stream_idle_timeout_ms,
             proxying: kernel::Proxying::default(),
+            account_retries: defaults.account_retries,
         },
     })
 }

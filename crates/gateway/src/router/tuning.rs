@@ -25,6 +25,7 @@ use serde_json::Value;
 use crate::endpoint::HeaderValue;
 
 use kernel::Retries;
+use kernel::account_recovery::AccountRetries;
 
 /// What every endpoint is called with until a person says otherwise.
 ///
@@ -43,6 +44,9 @@ pub struct TuningDefaults {
     /// is held to the same bound as a settled call, which is the only
     /// figure this city can state without inventing one.
     pub stream_idle_timeout_ms: Option<u64>,
+    /// How many more times one account is asked the same request before
+    /// the next account takes it; read only with two accounts or more.
+    pub account_retries: AccountRetries,
 }
 
 /// How a person set one endpoint up.
@@ -82,6 +86,10 @@ pub struct EndpointTuning {
     /// How many calls may be in flight at once; absent means the
     /// default for this kind of connection (`crates/gateway/Spec.lean` D21).
     pub max_in_flight: Option<MaxInFlight>,
+    /// How many more times one account is asked before the next account
+    /// takes the request; absent means [`EndpointTuning::DEFAULTS`].
+    #[serde(default)]
+    pub account_retries: Option<AccountRetries>,
 }
 
 impl EndpointTuning {
@@ -91,12 +99,22 @@ impl EndpointTuning {
     /// question is not a stalled one; the retry ceiling is absent
     /// because `Halt` is this city's brake; the idle bound is absent
     /// because no figure this city could write down would be the
-    /// provider's.
+    /// provider's; two sends more on one account outlast a short rate
+    /// limit, and past that the next account is the better ask.
     pub const DEFAULTS: TuningDefaults = TuningDefaults {
         timeout_ms: 120_000,
         retries: Retries::UntilHalted,
         stream_idle_timeout_ms: None,
+        account_retries: AccountRetries::Two,
     };
+
+    /// How many more times one account of this endpoint is asked the
+    /// same request before the next account takes it.
+    #[must_use]
+    pub fn account_retries(&self) -> AccountRetries {
+        self.account_retries
+            .unwrap_or(Self::DEFAULTS.account_retries)
+    }
 
     /// How long one settled call to this endpoint may take.
     #[must_use]
