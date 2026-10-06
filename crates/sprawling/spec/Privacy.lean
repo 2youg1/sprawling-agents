@@ -48,9 +48,10 @@ OS 写入没有 compare-and-swap：writeStarted 要求调用前最后一次读�
 ## 4 现状分析
 控制表（`bin::privacy::controls`、`bin::privacy::originals`、`bin::privacy::target`）、schema 3 的
 磁盘投影、journal 的写入器、`bin::privacy::plan` 与 `bin::privacy::coordinator` 已实现；
-coordinator 经两个端口（Host 与 Journal，§7）运行，生产的 Host 与 CLI 写入动词尚未接上，
-所以 `bin::privacy::cli` 只有 status。平台适配器、确认与 wire 帧尚未实现；各自的接口写在
-Privacy.Windows、Privacy.Confirmation、Privacy.Cli，由后续阶段按本模型实现。
+coordinator 经两个端口（Host 与 Journal，§7）运行。页面的服务与 wire 帧已接上（Privacy.Service）；
+生产的 Host（`bin::privacy::system`）只有身份、owner 核对与时钟，目标读写要等平台适配器接入
+（Privacy.Service D68），CLI 写入动词尚未接上，所以 `bin::privacy::cli` 只有 status。平台适配器与
+CLI 的接口写在 Privacy.Windows、Privacy.Cli，由后续阶段按本模型实现。
 
 ## 5 权威信源
 原始读写：RegQueryValueExW/RegSetValueExW 规定原始类型与字节、缺值和访问失败
@@ -830,7 +831,7 @@ fold、fresh read（计划任务经 Windows PowerShell 读取，冷启动要几�
 
 ## 15 影响面
 调用者：`bin::privacy::cli`（本地 CLI，一次性 runner 的验收经它进入）与 `bin::privacy::service`
-（装配层为页面服务）走同一个 coordinator。Home 只给 journal 路径。
+（装配层为页面服务，Privacy.Service）走同一个 coordinator。Home 只给 journal 路径。
 
 ## 16 测试与约束
 模型由 `lake build crates.sprawling.spec.Privacy` 验收，无 sorry/admit/axiom。
