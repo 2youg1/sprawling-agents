@@ -17,7 +17,9 @@ Python 夹具在宿主以 xcrun --find python3 找到实际解释器后进入 Se
 避免 /usr/bin/python3 的开发工具 launcher 在副本外写缓存；生产策略仍拒绝这些写入，
 生产结果仍保留 launcher 的原始诊断，不把它们抹掉以满足测试。
 后台命令用副本内的就绪文件与放行文件协调，确认后台持有副本、只交 owner 一次完整
-stdout／stderr／退出码；halt 与工具 drop 经生产 Backlog 回收已起动的主进程，
+stdout／stderr／退出码；halt 的验收保持工具存活，经 owner harvest 取得唯一 Signalled
+结局并检查主进程 pid 已被回收、副本仍在，之后才 drop 工具检查副本清理。
+release 用独立测试先 drop 工具，再由另一 owner harvest 确认无主成员已被回收；
 另一 owner 的后台命令不被 release 终止。主进程 pid 回收与副本清理分别检查，
 不把主进程回收称为整棵进程树终止。本模型证明每一步子进程操作都携带策略；不证明 XNU 执行策略。
 

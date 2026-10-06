@@ -302,41 +302,75 @@ fn native_macos_background_keeps_its_copy_and_reports_one_terminal_result() {
 }
 
 #[test]
-fn native_macos_halt_and_tool_release_reap_the_owned_primary_and_copy() {
-    for halt in [true, false] {
-        let source = tempfile::tempdir().unwrap();
-        let scratch = tempfile::tempdir().unwrap();
-        let backlog = Backlog::with_window(crate::backlog::PollBudget::new(1, 1));
-        let tool = native_tool(source.path(), scratch.path(), backlog.clone());
-        let (_, copy, pid) = gated_command(&tool, scratch.path());
-        if halt {
-            assert_eq!(
-                backlog
-                    .halt(Some(&Address::parse("work").unwrap()))
-                    .unwrap(),
-                1
-            );
-        }
-        drop(tool);
-        await_condition(|| {
-            backlog.harvest(kernel::RunId::from_bytes([2; 16])).unwrap();
+fn native_macos_halt_reaps_the_owned_primary_before_tool_release() {
+    let source = tempfile::tempdir().unwrap();
+    let scratch = tempfile::tempdir().unwrap();
+    let backlog = Backlog::with_window(crate::backlog::PollBudget::new(1, 1));
+    let tool = native_tool(source.path(), scratch.path(), backlog.clone());
+    let (handle, copy, pid) = gated_command(&tool, scratch.path());
+    let domain = Address::parse("work").unwrap();
+    assert_eq!(backlog.halt(Some(&domain)).unwrap(), 1);
+    let mut finished = Vec::new();
+    await_condition(|| {
+        finished.extend(backlog.harvest(tool.setup.run).unwrap());
+        backlog.standing(&domain).unwrap().is_empty()
+    });
+    assert_eq!(
+        finished
+            .into_iter()
+            .map(|member| (member.id.to_string(), member.exit))
+            .collect::<Vec<_>>(),
+        vec![(
+            handle.as_str().unwrap().to_owned(),
+            crate::backlog::Exit::Signalled
+        )]
+    );
+    assert!(backlog.harvest(tool.setup.run).unwrap().is_empty());
+    assert_primary_reaped(pid);
+    assert!(
+        copy.is_dir(),
+        "halt must not depend on tool release or copy removal"
+    );
+    drop(tool);
+    assert!(!copy.exists());
+    assert_eq!(std::fs::read_dir(scratch.path()).unwrap().count(), 0);
+}
+
+#[test]
+fn native_macos_tool_release_reaps_the_owned_primary_and_copy() {
+    let source = tempfile::tempdir().unwrap();
+    let scratch = tempfile::tempdir().unwrap();
+    let backlog = Backlog::with_window(crate::backlog::PollBudget::new(1, 1));
+    let tool = native_tool(source.path(), scratch.path(), backlog.clone());
+    let (_, copy, pid) = gated_command(&tool, scratch.path());
+    drop(tool);
+    await_condition(|| {
+        assert!(
             backlog
-                .standing(&Address::parse("work").unwrap())
+                .harvest(kernel::RunId::from_bytes([2; 16]))
                 .unwrap()
                 .is_empty()
-        });
-        assert!(
-            !Command::new("/bin/kill")
-                .args(["-0", &pid.to_string()])
-                .output()
-                .unwrap()
-                .status
-                .success(),
-            "owned primary still exists"
         );
-        assert!(!copy.exists());
-        assert_eq!(std::fs::read_dir(scratch.path()).unwrap().count(), 0);
-    }
+        backlog
+            .standing(&Address::parse("work").unwrap())
+            .unwrap()
+            .is_empty()
+    });
+    assert_primary_reaped(pid);
+    assert!(!copy.exists());
+    assert_eq!(std::fs::read_dir(scratch.path()).unwrap().count(), 0);
+}
+
+fn assert_primary_reaped(pid: u32) {
+    assert!(
+        !Command::new("/bin/kill")
+            .args(["-0", &pid.to_string()])
+            .output()
+            .unwrap()
+            .status
+            .success(),
+        "owned primary still exists"
+    );
 }
 
 #[test]
