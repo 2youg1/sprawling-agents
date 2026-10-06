@@ -129,3 +129,35 @@ description = 'fixture description'
     }
     std::fs::remove_dir_all(fixture).unwrap();
 }
+
+#[test]
+fn system_channels_share_the_archive_digest_and_release_identity() {
+    use std::io::Write as _;
+    let fixture = std::env::temp_dir().join(format!("sprawling-system-channel-{}", std::process::id()));
+    let assets = fixture.join("assets");
+    std::fs::create_dir_all(&assets).unwrap();
+    std::fs::write(fixture.join("Cargo.toml"), "[workspace.package]
+version = '0.0.10'
+repository = 'https://example.invalid/source'
+description = 'fixture'
+").unwrap();
+    for row in PLATFORMS.iter().filter(|row| row.os != "win32") {
+        let archive = assets.join(format!("sprawling-0.0.10{}", row.suffix));
+        let mut zip = zip::ZipWriter::new(std::fs::File::create(archive).unwrap());
+        zip.start_file(format!("application/{}", row.binary), zip::write::SimpleFileOptions::default().unix_permissions(0o755)).unwrap();
+        zip.write_all(b"binary").unwrap();
+        zip.finish().unwrap();
+    }
+    let out = fixture.join("out");
+    super::run(&fixture, "v0.0.10-Alpha-261005", &assets, &out).unwrap();
+    assert!(out.join("homebrew/sprawling.rb").is_file(), "the Homebrew formula must be generated");
+    let formula = std::fs::read_to_string(out.join("homebrew/sprawling.rb")).unwrap();
+    let pkgbuild = std::fs::read_to_string(out.join("aur/PKGBUILD")).unwrap();
+    let srcinfo = std::fs::read_to_string(out.join("aur/.SRCINFO")).unwrap();
+    assert!(formula.contains("on_macos") && formula.contains("on_linux"));
+    assert!(pkgbuild.contains("pkgver=0.0.10_pre.261005"));
+    let digest = srcinfo.lines().find_map(|line| line.trim().strip_prefix("sha256sums = ")).unwrap();
+    assert!(formula.contains(digest) && pkgbuild.contains(digest));
+    assert!(formula.contains("/releases/download/v0.0.10-Alpha-261005/"));
+    std::fs::remove_dir_all(fixture).unwrap();
+}
