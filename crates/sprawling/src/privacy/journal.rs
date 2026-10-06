@@ -269,7 +269,7 @@ mod tests {
     #[test]
     fn decoding_refusal_never_repeats_private_input() {
         let prepared = prepared(intent(1, RawValue::Absent { key_existed: true }));
-        for field in ["owner", "control", "unexpected"] {
+        for field in ["control", "unexpected", "owner"] {
             let mut line = serde_json::to_value(&prepared).unwrap();
             if field == "unexpected" {
                 line["event"]["intent"]["fixture-private-principal"] = serde_json::json!(true);
