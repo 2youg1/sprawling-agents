@@ -35,7 +35,10 @@
 //! archive returns, this says so instead of publishing a channel that
 //! quietly lacks it.
 
+use sha2::{Digest as _, Sha256};
 use std::io::Read as _;
+
+mod system;
 use std::path::{Path, PathBuf};
 
 use crate::platform::{PLATFORMS, Platform, ROOT_PACKAGE};
@@ -176,6 +179,7 @@ pub(crate) fn run(root: &Path, tag: &str, assets: &Path, out: &Path) -> Result<S
     archives.sort();
 
     let mut carried: Vec<&Platform> = Vec::new();
+    let mut system_archives = Vec::new();
     for archive in &archives {
         let name = archive
             .file_name()
@@ -192,6 +196,19 @@ pub(crate) fn run(root: &Path, tag: &str, assets: &Path, out: &Path) -> Result<S
                 ),
             });
         };
+        let sha256 = Sha256::digest(std::fs::read(archive).map_err(|source| XtaskError::Io {
+            path: archive.display().to_string(),
+            source,
+        })?)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<Vec<_>>()
+        .concat();
+        system_archives.push(system::Archive {
+            platform: row,
+            name,
+            sha256,
+        });
         let binary = extract(archive, row.binary)?;
         // A scoped npm name writes one directory level more than a bare
         // one, which is why the publish step enumerates
@@ -233,6 +250,8 @@ pub(crate) fn run(root: &Path, tag: &str, assets: &Path, out: &Path) -> Result<S
             msg: format!("{} holds no release archive", assets.display()),
         });
     }
+
+    system::write(&stem, tag, &system_archives, out)?;
 
     let optional = carried
         .iter()
