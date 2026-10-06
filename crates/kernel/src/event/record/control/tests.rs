@@ -85,6 +85,18 @@ fn run_control_lines_keep_their_bytes() {
     );
     golden(
         &WatchdogFired {
+            action: FiredAction::Switch {
+                to: crate::ServerLabel::parse("b").unwrap(),
+                code: "E_PROVIDER".to_owned(),
+                subject: "401 Unauthorized".to_owned(),
+            },
+            corrections: 0,
+            provider_failures: 1,
+        },
+        r#"{"action":"switch","code":"E_PROVIDER","corrections":0,"provider_failures":1,"subject":"401 Unauthorized","to":"b"}"#,
+    );
+    golden(
+        &WatchdogFired {
             action: FiredAction::Freeze {
                 reason: "stall".to_owned(),
             },

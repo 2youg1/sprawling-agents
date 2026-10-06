@@ -159,8 +159,7 @@ impl Watchdog {
         &mut self,
         roster: Option<AccountRoster>,
     ) -> Result<Option<ServerLabel>, AxError> {
-        drop(roster);
-        let round = Round::open(None, self.retries)?;
+        let round = Round::open(roster, self.retries)?;
         let current = round.accounts.current().cloned();
         self.round = Some(round);
         Ok(current)
