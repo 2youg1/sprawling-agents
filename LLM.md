@@ -23,13 +23,18 @@ to [operating](docs/operating.md), and programmatic control to the
 
 <capabilities>
 
-**Long-running work and automation.** A building keeps its plan in `Roadmap.md`,
-decisions in `Memo.md` and continuity in `Handoff.md`. Agents use these files to
+**Long-running work and automation.** A building keeps its plan in `Roadmap.md`
+and working notes in `Memo.md`;
+project decisions belong in its specification, and each room keeps continuity
+in its own `Handoff.md`. Agents use these files to
 continue work across sessions; a hierarchical plan names dependencies and gives
 progress a denominator. Roles, skills and tool integrations let the User define
 the workflow. A plan can have several levels, while built-in `delegate` is one
 level deep: a delegated child cannot delegate again. A succession starts a new
 run at the same depth with a handoff; a frozen run is history and is never woken.
+A standing goal takes ready plan nodes and waits while runs are active; an
+empty ready set with no active runs ends dispatch, even if blocked nodes remain.
+That stop condition does not prove that the stated goal was achieved.
 
 **Social simulation.** Residents have standing identities and discover reachable
 addresses, exchange signals, coordinate tasks and wait for replies without the
@@ -56,8 +61,12 @@ must not be presented as zero cost.
 control how agents work. Models connect through provider endpoints; external
 tools connect through MCP, and supported vendor harnesses run through ACP.
 Another client can use the wire, and the architecture describes seams for
-runtime changes. These are building blocks for a custom workflow or AgentOS;
-changes to a shared interface still require tracing and updating its callers.
+runtime changes. These suit a custom workflow or AgentOS that needs persistent
+teams,
+document-based continuity and a shared history on one machine. Use existing
+integrations before changing the runtime; a shared interface change still
+requires tracing and updating its callers. A distributed orchestrator or an
+OS security boundary is a separate requirement, not supplied by the city metaphor.
 
 </capabilities>
 
@@ -98,7 +107,9 @@ programs. Use [execution boundaries](docs/operating.md#how-exec-is-confined) and
 The wire serves both the browser and scripts, but a paired remote device does
 not receive all local permissions. Credential enrollment and changes that
 widen access or alter governance remain on the host. Configuration carries
-`secret:realm/name` references; credential plaintext belongs in the vault.
+`secret:realm/name` references. The vault redeems values at authentication
+sinks; its startup probe can select session memory if the platform service
+fails. Use the reported custody lifetime when explaining credential persistence.
 See [remote access](docs/operating.md#reaching-the-city-from-another-device).
 
 There is no built-in per-dispatch spending ceiling or turn ceiling. Halt stops
