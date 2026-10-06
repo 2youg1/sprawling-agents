@@ -5,8 +5,8 @@
 
 //! Response translation and stream retention for the three provider dialects.
 //!
-//! `StreamFrames` routes retention to each dialect. Responses discard delta
-//! frames; the other dialects retain fragments needed to rebuild their reply.
+//! `StreamFrames` buffers frames until EOF, then routes settlement to each
+//! dialect.
 //! Final parsing remains `response_from_wire` on both call paths.
 //!
 //! Spec: `crates/gateway/spec/Endpoint/Stream.lean` §8-13.
@@ -31,18 +31,16 @@ pub fn increment_of(kind: DialectKind, frame: &Value) -> Option<Increment> {
 
 /// Frames retained until EOF; transport failures are decided before settlement.
 /// Spec: `crates/gateway/spec/Endpoint/Stream.lean` §8-13.
-pub(crate) enum StreamFrames {
-    Anthropic(Vec<Value>),
-    OpenAi(Vec<Value>),
-    Responses(responses::Stream),
+pub(crate) struct StreamFrames {
+    kind: DialectKind,
+    frames: Vec<Value>,
 }
 
 impl StreamFrames {
     pub(crate) fn new(kind: DialectKind) -> Self {
-        match kind {
-            DialectKind::Anthropic => Self::Anthropic(Vec::new()),
-            DialectKind::OpenAi => Self::OpenAi(Vec::new()),
-            DialectKind::OpenAiResponses => Self::Responses(responses::Stream::default()),
+        Self {
+            kind,
+            frames: Vec::new(),
         }
     }
 
@@ -50,36 +48,24 @@ impl StreamFrames {
         &mut self,
         frame: Value,
     ) -> Result<Option<ToolCall>, AxError> {
-        match self {
-            Self::Anthropic(frames) => {
-                frames.push(frame);
-                anthropic::call_completed_by(frames)
-            }
-            Self::OpenAi(frames) => {
-                frames.push(frame);
-                Ok(None)
-            }
-            Self::Responses(held) => {
-                held.retain(frame);
-                Ok(None)
-            }
+        self.frames.push(frame);
+        match self.kind {
+            DialectKind::Anthropic => anthropic::call_completed_by(&self.frames),
+            DialectKind::OpenAi | DialectKind::OpenAiResponses => Ok(None),
         }
     }
 
     pub(crate) fn finish(self) -> Result<Value, AxError> {
-        match self {
-            Self::Anthropic(frames) => anthropic::settled(&frames),
-            Self::OpenAi(frames) => openai::settled(&frames),
-            Self::Responses(held) => held.finish(),
+        match self.kind {
+            DialectKind::Anthropic => anthropic::settled(&self.frames),
+            DialectKind::OpenAi => openai::settled(&self.frames),
+            DialectKind::OpenAiResponses => responses::settled(&self.frames),
         }
     }
 
     #[cfg(test)]
     pub(crate) fn retained_frames(&self) -> usize {
-        match self {
-            Self::Anthropic(frames) | Self::OpenAi(frames) => frames.len(),
-            Self::Responses(held) => held.retained_frames(),
-        }
+        self.frames.len()
     }
 }
 
@@ -120,20 +106,6 @@ mod tests {
     use kernel::{Payload, Tokens, ToolName};
     use proptest::prelude::*;
     use serde_json::{Map, json};
-    #[test]
-    fn responses_retention_is_bounded_after_any_number_of_deltas() {
-        let mut frames = StreamFrames::new(DialectKind::OpenAiResponses);
-        for _ in 0..100 {
-            frames
-                .retain_and_complete(json!({"type": "response.output_text.delta", "delta": "text"}))
-                .unwrap();
-            assert!(
-                frames.retained_frames() <= 2,
-                "Responses keeps only terminal and first error"
-            );
-        }
-    }
-
     #[test]
     fn anthropic_returns_thinking_blocks_exactly_as_it_issued_them() {
         // Official rule: "Include the complete unmodified block back to

@@ -80,58 +80,42 @@ pub(crate) fn increment_of(map: &serde_json::Map<String, Value>) -> Option<Incre
     }
 }
 
-/// The terminal response and first reported error, retained until EOF.
-/// Spec: `crates/gateway/spec/Dialect/Responses.lean`, D27.
-#[derive(Default)]
-pub(crate) struct Stream {
-    terminal: Option<Value>,
-    reported: Option<serde_json::Map<String, Value>>,
-}
-
-impl Stream {
-    pub(crate) fn retain(&mut self, frame: Value) {
-        let Value::Object(mut map) = frame else {
-            return;
+/// The response object the stream ended with.
+///
+/// The last terminal event wins, which matters for a provider that
+/// revises: what a page drew from the deltas is discardable, and the
+/// settled object is the record.
+pub(crate) fn settled(frames: &[Value]) -> Result<Value, AxError> {
+    let mut answer = None;
+    for frame in frames {
+        let Some(map) = frame.as_object() else {
+            continue;
         };
         let Some(word) = map.get("type").and_then(Value::as_str) else {
-            return;
+            continue;
         };
         match Event::of(word) {
             Event::Settled => {
-                if let Some(response) = map.remove("response") {
-                    self.terminal = Some(response);
+                if let Some(held) = map.get("response") {
+                    answer = Some(held.clone());
                 }
             }
             Event::Reported => {
-                if self.reported.is_none() {
-                    self.reported = Some(map);
-                }
+                let kind = map
+                    .get("code")
+                    .and_then(Value::as_str)
+                    .unwrap_or("an error without a code");
+                return Err(provider_err(
+                    "read a streamed answer",
+                    &ProviderFailure::Reported { kind },
+                ));
             }
             Event::TextDelta | Event::ReasoningDelta | Event::Unread => {}
         }
     }
-
-    pub(crate) fn finish(self) -> Result<Value, AxError> {
-        match self.reported {
-            Some(map) => Err(provider_err(
-                "read a streamed answer",
-                &ProviderFailure::Reported {
-                    kind: map
-                        .get("code")
-                        .and_then(Value::as_str)
-                        .unwrap_or("an error without a code"),
-                },
-            )),
-            None => self.terminal.ok_or_else(|| {
-                stream_cut("the stream ended without the event that carries the settled answer")
-            }),
-        }
-    }
-
-    #[cfg(test)]
-    pub(crate) fn retained_frames(&self) -> usize {
-        usize::from(self.terminal.is_some()).saturating_add(usize::from(self.reported.is_some()))
-    }
+    answer.ok_or_else(|| {
+        stream_cut("the stream ended without the event that carries the settled answer")
+    })
 }
 
 #[cfg(test)]
@@ -201,7 +185,6 @@ mod tests {
             for frame in frames {
                 if let Some(delta) = crate::dialect::increment_of(kernel::DialectKind::OpenAiResponses, &frame) { forwarded.push(delta); }
                 held.retain_and_complete(frame).unwrap();
-                proptest::prop_assert!(held.retained_frames() <= 2);
             }
             proptest::prop_assert_eq!(forwarded, increments);
         }

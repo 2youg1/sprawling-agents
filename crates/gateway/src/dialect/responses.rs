@@ -47,4 +47,4 @@ pub(crate) use reply::response_from;
 #[cfg(test)]
 pub(crate) use reply::response_wire;
 pub(crate) use request::request;
-pub(crate) use stream::{Stream, increment_of};
+pub(crate) use stream::{increment_of, settled};
