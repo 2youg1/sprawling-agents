@@ -80,7 +80,9 @@ HTTP fixture 在收到请求后不回 HTTP response 表示 beforeHandover，2xx 
 因此这些候选输入代表 ended 的吸收后缀，不宣称 server 实际执行过这些失败。
 期望值取下面三个定理的前提与结论：含 sessionEnded 或初态 ended 时必须 connect，
 其余保持 resident；检查实际请求序列、两份工具句柄、重握手与新 listing，
-不另写一份 Rust afterFailures 状态机。有限生成检查不是对 Rust 的全 trace 证明。 -/
+不另写一份 Rust afterFailures 状态机。固定用例另走同一个 trace driver：
+ended 初态与空后缀必须重连，live session 的单个 NotFound 必须使两个旧句柄失效，
+且从任意一个克隆发起都得到相同结果。有限生成检查不是对 Rust 的全 trace 证明。 -/
 
 /-- 没有会话 id 的连接仍可用，不能把「没有 id」当成「已经失效」。 -/
 inductive Lifetime where

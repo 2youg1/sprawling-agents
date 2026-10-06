@@ -7,6 +7,7 @@ use super::*;
 
 mod framing;
 mod reconnect;
+mod trace;
 
 use framing::read_http_request;
 
