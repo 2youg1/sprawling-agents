@@ -101,11 +101,11 @@ impl LockedJournal {
         if exceeds_capacity(&extended)? {
             return Err(HistoryFault::Capacity);
         }
+        let history = decode(&extended)?;
         (&self.file)
             .write_all(&encoded)
             .and_then(|()| self.file.sync_all())
             .map_err(HistoryFault::Io)?;
-        let history = decode(&extended)?;
         self.bytes = extended;
         self.history = history;
         Ok(())
