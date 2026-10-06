@@ -18,7 +18,7 @@ D54：native 的 CPU hard cap 默认 50% 整机份额，未设置 run memory 时
 aggregate committed-memory 上限。CPU 默认数只在 native_windows.rs 定义。run job 在 table lock 内先创建并设同一
 memory 上限，native command 同时加入 command job 与 run job，再恢复；多个命令的
 aggregate 内存不能通过每条命令分别领限额来扩大。拒绝设置限额时停止启动。
-内存不设缺省值是 User 的裁定：没有填写上限的命令不能被隐式限额拒绝。
+内存不设缺省值是产品约束：没有填写上限的命令不能被隐式限额拒绝。
 
 输入由 Rust 决定：已复制工作目录、明确程序和 argv、允许的环境、可缺席的非零内存与
 CPU 上限、唯一 profile 名及 output files；叶子只执行平台操作。AppContainer SID
