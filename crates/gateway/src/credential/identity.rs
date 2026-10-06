@@ -44,76 +44,62 @@ fn refused(code: AxCode, subject: &str) -> AxError {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::panic, reason = "test code")]
+#[allow(clippy::unwrap_used, reason = "test code")]
 mod tests {
     use super::super::vault::MemoryVault;
     use super::*;
-    use std::cell::Cell;
+
+    fn refusal(code: AxCode, subject: &str, recovery: &str) -> Result<(), AxError> {
+        Err(AxError::failure(code, "verify privacy owner", subject).with_recovery(recovery))
+    }
 
     #[test]
     fn binding_comparison_refuses_missing_foreign_and_empty_identities() {
         let reference = SecretRef::new("privacy", "fixture-owner").unwrap();
         let mut vault = MemoryVault::default();
+        let verify = |vault: &MemoryVault, observed: &str| {
+            verify_identity_binding(&reference, observed, |reference| vault.get(reference))
+        };
         assert_eq!(
-            verify_identity_binding(&reference, "fixture-owner", |reference| vault
-                .get(reference))
-            .unwrap_err()
-            .code(),
-            &AxCode::CredentialMissing
+            verify(&vault, "fixture-owner"),
+            refusal(
+                AxCode::CredentialMissing,
+                "privacy owner binding missing",
+                "sign in to the account whose credential store holds the owner binding; the history stays unchanged",
+            )
         );
         vault
             .put(&reference, Zeroizing::new("fixture-owner".to_owned()))
             .unwrap();
-        assert!(
-            verify_identity_binding(&reference, "fixture-owner", |reference| vault
-                .get(reference))
-            .is_ok()
-        );
-        for observed in ["fixture-foreign", ""] {
+        assert_eq!(verify(&vault, "fixture-owner"), Ok(()));
+        for observed in ["fixture-foreign", "fixture-owner ", ""] {
             assert_eq!(
-                verify_identity_binding(&reference, observed, |reference| vault.get(reference))
-                    .unwrap_err()
-                    .code(),
-                &AxCode::ConfigInvalid
+                verify(&vault, observed),
+                refusal(
+                    AxCode::ConfigInvalid,
+                    "privacy history belongs to another identity",
+                    "run as the Windows account that owns this history; the binding and history stay unchanged",
+                )
             );
-        }
-        assert_eq!(
-            vault.get(&reference).unwrap().unwrap().as_str(),
-            "fixture-owner"
-        );
-    }
-
-    struct RefusingVault {
-        reads: Cell<u32>,
-    }
-    impl Vault for RefusingVault {
-        fn get(&self, _: &SecretRef) -> Result<Option<Zeroizing<String>>, AxError> {
-            self.reads.set(self.reads.get().checked_add(1).unwrap());
-            Err(
-                AxError::failure(AxCode::ConfigInvalid, "fixture", "private-fixture-input")
-                    .with_recovery("private-fixture-input"),
-            )
-        }
-        fn put(&mut self, _: &SecretRef, _: Zeroizing<String>) -> Result<(), AxError> {
-            panic!("must not write")
-        }
-        fn delete(&mut self, _: &SecretRef) -> Result<(), AxError> {
-            panic!("must not delete")
         }
     }
 
     #[test]
-    fn platform_refusal_preserves_code_but_never_private_diagnostics_or_writes() {
-        let vault = RefusingVault {
-            reads: Cell::new(0),
-        };
+    fn a_source_refusal_keeps_its_code_and_drops_its_words() {
         let reference = SecretRef::new("privacy", "fixture-owner").unwrap();
-        let error = verify_identity_binding(&reference, "private-fixture-input", |reference| {
-            vault.get(reference)
-        })
-        .unwrap_err();
-        assert_eq!(error.code(), &AxCode::ConfigInvalid);
-        assert!(!format!("{error:?}").contains("private-fixture-input"));
-        assert_eq!(vault.reads.get(), 1);
+        let refused = verify_identity_binding(&reference, "private-fixture-input", |_| {
+            Err(
+                AxError::failure(AxCode::StorageFatal, "fixture", "private-fixture-input")
+                    .with_recovery("private-fixture-input"),
+            )
+        });
+        assert_eq!(
+            refused,
+            refusal(
+                AxCode::StorageFatal,
+                "platform identity binding unavailable",
+                "unlock the platform credential service and ask again; the binding and history stay unchanged",
+            )
+        );
     }
 }
