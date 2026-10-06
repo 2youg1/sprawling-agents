@@ -153,7 +153,40 @@ fn first(bytes: &[u8]) -> Result<Value, AxError> {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, reason = "test code")]
 mod tests {
+    #[test]
+    fn podman_image_metadata_accepts_only_the_pinned_digest_without_volumes() {
+        let limits: kernel::ContainerLimits = serde_json::from_value(serde_json::json!({
+            "image": format!("sha256:{}", "a".repeat(64)), "user":1000,
+            "cpu_millis":1250, "memory_bytes":67108864, "pids":64
+        }))
+        .unwrap();
+        for config in [
+            serde_json::json!({}),
+            serde_json::json!({"Volumes":null}),
+            serde_json::json!({"Volumes":{}}),
+        ] {
+            let bytes = serde_json::to_vec(&serde_json::json!([{
+                "Id":"a".repeat(64), "Config":config
+            }]))
+            .unwrap();
+            assert!(super::image(&bytes, &limits).is_ok());
+        }
+        for config in [
+            serde_json::json!(null),
+            serde_json::json!({"Volumes":[]}),
+            serde_json::json!({"Volumes":{"/extra":{}}}),
+        ] {
+            let bytes = serde_json::to_vec(&serde_json::json!([{
+                "Id":limits.image.as_str(), "Config":config
+            }]))
+            .unwrap();
+            assert!(super::image(&bytes, &limits).is_err());
+        }
+        assert!(super::image(br#"[{"Id":"wrong","Config":{}}]"#, &limits).is_err());
+    }
+
     #[test]
     fn a_created_container_with_zero_exit_has_no_target_result() {
         let bytes = br#"[{"State":{"Status":"created","Running":false,"ExitCode":0}}]"#;

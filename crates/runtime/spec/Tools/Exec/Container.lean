@@ -126,6 +126,10 @@ Podman 的非 UTF-8 program 在创建前以 E_SANDBOX_DENIED 拒绝，不能有�
 args 逐项递交；拒空 program、移除环境变量的 Command
 与含 mount 文法分隔符的副本路径，避免部分转译。
 镜像必须没有声明 VOLUME，否则创建时会产生额外可写卷，起动前的 image inspect 必须拒绝它。
+image inspect 的 Id 必须与 kernel 的固定 ID 相同，或等于其省略 sha256: 前缀的 digest，
+因为 Podman 输出后者；Config 必须是对象，Volumes 可省略、为 null 或为空对象，
+这些是未声明卷的合法格式，其余形状与非空卷表均拒绝。Podman 的容器 inspect
+把单元素 entrypoint 报为字符串，Docker 报为数组；验收按后端 schema 核对同一 program。
 固定 /work 是容器路径的唯一权威，宿主路径绝不被当成容器可执行文件路径。
 
 被否：拼成 shell 文本、继承镜像 entrypoint、隐式 pull、只看 CLI version 即声明五轴已保。
