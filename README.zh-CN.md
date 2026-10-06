@@ -58,7 +58,7 @@ irm https://raw.githubusercontent.com/2youg1/sprawling-agents/main/install.ps1 |
 
 预编译归档支持 Windows x86-64、Apple 芯片的 macOS 与 Linux x86-64；手动下载见[发行列表](https://github.com/2youg1/sprawling-agents/releases)，版本选择、验证与 Nix 源码构建见[安装指南](docs/getting-started.zh-CN.md#1-安装)。
 
-macOS arm64 或 Linux x86-64 的 Homebrew 用户可用 `brew install 2youg1/sprawling/sprawling`；Arch Linux x86-64 用户克隆 `https://aur.archlinux.org/sprawling-bin.git` 后，在该目录运行 `makepkg -si`。这两个渠道只有在项目所有者创建 `2youg1/homebrew-sprawling` tap 仓库与 AUR 账号，并配置发布凭据后才可用。它们安装发行二进制与随附资源；Homebrew 更新用 `brew update && brew upgrade sprawling`，AUR 更新在原 checkout 中运行 `git pull --ff-only && makepkg -si`。
+AUR 包尚未发布。发行构建生成并验证 PKGBUILD 与 .SRCINFO，发布需要 `AUR_SSH_KEY`。发布后，Arch Linux x86-64 用户可在包的 checkout 中检查定义并运行 `makepkg -si`，更新用 `git pull --ff-only && makepkg -si`。
 
 所有渠道安装后使用同一条命令：
 

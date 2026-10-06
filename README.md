@@ -58,7 +58,7 @@ irm https://raw.githubusercontent.com/2youg1/sprawling-agents/main/install.ps1 |
 
 Prebuilt archives support Windows x86-64, macOS on Apple silicon and Linux x86-64. Use the [release list](https://github.com/2youg1/sprawling-agents/releases) for manual downloads and the [installation guide](docs/getting-started.md#1-install) for version selection, verification and source builds with Nix.
 
-Homebrew on macOS arm64 or Linux x86-64: `brew install 2youg1/sprawling/sprawling`. Arch Linux x86-64: clone `https://aur.archlinux.org/sprawling-bin.git`, then run `makepkg -si` in that checkout. These channels become available only after the project owner creates the `2youg1/homebrew-sprawling` tap repository and an AUR account and configures publication credentials. Both install the release binary and its resources; update with `brew update && brew upgrade sprawling`, or `git pull --ff-only && makepkg -si` in the AUR checkout.
+The AUR package is not published yet. Release builds generate and validate its PKGBUILD and .SRCINFO; publication requires `AUR_SSH_KEY`. Once published, Arch Linux x86-64 users can inspect the package and run `makepkg -si` in its checkout, then update with `git pull --ff-only && makepkg -si`.
 
 After installation, all channels use the same command:
 

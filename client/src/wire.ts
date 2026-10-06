@@ -9,9 +9,9 @@
 import { Schema } from "effect";
 
 /** The wire version both ends compare on connect. */
-export const WIRE_V = 58 as const;
+export const WIRE_V = 59 as const;
 /** The schema hash the server checks: `wire::schema_hash()`. */
-export const WIRE_HASH = "6baf4fb62c3b1cd13aa11d50015423f94b56128e1e4f1f06292c1c23e8fc0205" as const;
+export const WIRE_HASH = "16ae067ba128afe3e02a2ce2681a0e6e551ab4efcfb1bc5f6ebbeff24aee4c8e" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 /** The body sizes a person may ask for: `wire::BODY_PX_MIN` and `BODY_PX_MAX`. */
@@ -3004,7 +3004,7 @@ export type ReleaseVerdict = typeof ReleaseVerdict.Type;
  * How this binary was installed, which decides the command that
  * updates it.
  */
-export const InstallChannel = Schema.Literals(["npm", "bun", "binstall", "unknown", "package", "cargo_or_binstall", "cargo", "archive", "homebrew", "aur", "source"]).annotate({ identifier: "InstallChannel" });
+export const InstallChannel = Schema.Literals(["npm", "bun", "binstall", "unknown", "package", "cargo_or_binstall", "cargo", "archive", "aur", "source"]).annotate({ identifier: "InstallChannel" });
 export type InstallChannel = typeof InstallChannel.Type;
 
 /**

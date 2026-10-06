@@ -194,15 +194,11 @@ Operating-system code signing is separate from both checks. A signing applicatio
 
 A checkout builds the complete deliverable with `just dist`. A plain `cargo build` before `just build-web` embeds a page explaining that the client bundle is missing. Follow the [contribution prerequisites](CONTRIBUTING.md) for source builds.
 
-### With Homebrew or AUR
+### With AUR
 
-These channels become available only after the project owner creates the `2youg1/homebrew-sprawling` tap repository and an AUR account and configures publication credentials. Homebrew supports macOS arm64 and Linux x86-64; with Homebrew installed, run:
+The AUR package is not published yet. Release builds generate and validate the package on Arch Linux; publishing requires an AUR account and the `AUR_SSH_KEY` secret. Missing credentials skip publication with a notice.
 
-```sh
-brew install 2youg1/sprawling/sprawling
-```
-
-On Arch Linux x86-64, with `base-devel`, Git and unzip installed, inspect the generated PKGBUILD before building it as an ordinary user:
+Once published, Arch Linux x86-64 users with `base-devel`, Git and unzip can inspect the PKGBUILD and build it as an ordinary user:
 
 ```sh
 git clone https://aur.archlinux.org/sprawling-bin.git
@@ -210,7 +206,7 @@ cd sprawling-bin
 makepkg -si
 ```
 
-Both packages verify the release archive's SHA256 and install its binary, resources and licences. They do not call `sprawling install` or change shell configuration. Homebrew uses its keg; AUR places the application under `/usr/lib/sprawling-bin` and links `/usr/bin/sprawling`. Use `brew uninstall sprawling` or `sudo pacman -R sprawling-bin` to remove the package. The version check identifies these installation layouts and displays the channel's update command. It compares GitHub releases; a newer archive can precede its tap/AUR update, so check the package version before updating.
+The package verifies the release archive's SHA256 and installs its binary, resources and licences, without calling `sprawling install` or changing shell configuration. The generated PKGBUILD defines the installation directory and links the binary into `/usr/bin`. Remove the package with `sudo pacman -R sprawling-bin`. The version check identifies the package's layout and displays its update command; a newer GitHub archive can precede its AUR update, so check the package version before updating.
 
 ### With Nix
 
@@ -253,7 +249,6 @@ Update through the original channel:
 | cargo-binstall | `cargo binstall sprawling` | `cargo binstall sprawling --version <crate-version>` |
 | shell/PowerShell installer | Run that installer again after stopping the city. | Set `SPRAWLING_VERSION` to the exact published tag as described above. |
 | Manual archive | Download and verify the selected archive, then run its binary's `install` command if you previously installed it. | Keep or download the archive from the selected tag. |
-| Homebrew tap | `brew update && brew upgrade sprawling` | Inspect a selected revision of the tap formula before installing it; the default follows the current release. |
 | AUR sprawling-bin | In the original checkout: `git pull --ff-only && makepkg -si` | Inspect and build the PKGBUILD revision for the selected release. |
 | Repository Nix flake | Check out the selected tag or commit, then run the [Nix commands](#with-nix). | Use the original pinned checkout and lockfile. A fixed commit does not follow newer releases. |
 
