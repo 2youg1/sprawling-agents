@@ -190,7 +190,7 @@ impl PrivacyFault {
                     ReadFault::AccessDenied => AxCode::SandboxDenied,
                     ReadFault::Failed(_) => AxCode::ToolUnavailable,
                 },
-                format!("{code}: {control:?} could not be read ({fault:?})"),
+                format!("{code}: {control:?} could not be read: {fault}"),
                 "nothing was written; check that this account may read the setting and ask again",
             ),
             Self::Unresolved => (
@@ -223,20 +223,36 @@ impl PrivacyFault {
                 format!("{code}: no privacy operation waits for a check"),
                 "nothing to reconcile; read the page again",
             ),
-            Self::Expired { control, .. } => (
+            Self::Expired { control, operation } => (
                 AxCode::Timeout,
-                format!("{code}: the write of {control:?} did not start in time"),
+                match operation {
+                    None => format!("{code}: the write of {control:?} did not start in time"),
+                    Some(operation) => format!(
+                        "{code}: the write of {control:?} did not start in time; operation {operation} is recorded as not applied"
+                    ),
+                },
                 "nothing was written; read the page again and confirm once more",
             ),
-            Self::NotApplied { control, cause, .. } => (
+            Self::NotApplied {
+                control,
+                operation,
+                cause,
+            } => (
                 match cause {
                     Some(WriteFault::AccessDenied | WriteFault::Declined) => AxCode::SandboxDenied,
                     Some(WriteFault::Failed(_)) | None => AxCode::ToolUnavailable,
                 },
-                format!("{code}: {control:?} still reads its original value ({cause:?})"),
+                match &cause {
+                    Some(fault) => format!(
+                        "{code}: {control:?} still reads its original value after operation {operation}; the write reported: {fault}"
+                    ),
+                    None => format!(
+                        "{code}: {control:?} still reads its original value after operation {operation}"
+                    ),
+                },
                 match cause {
                     Some(WriteFault::AccessDenied) => {
-                        "this account may not write this setting; nothing changed"
+                        "this account may not write this policy key; nothing changed"
                     }
                     Some(WriteFault::Declined) => {
                         "administrator approval was declined; nothing changed, approve the prompt to apply"
@@ -246,22 +262,76 @@ impl PrivacyFault {
                     }
                 },
             ),
-            Self::RolledBack { control, .. } => (
+            Self::RolledBack { control, operation } => (
                 AxCode::EvidenceMissing,
-                format!("{code}: {control:?} read back a value nobody asked for"),
+                format!(
+                    "{code}: {control:?} read back a value nobody asked for in operation {operation}"
+                ),
                 "the original value was written back and checked; read the page before trying again",
             ),
-            Self::Unknown { control, why, .. } => (
+            Self::Unknown {
+                control,
+                operation,
+                why,
+            } => (
                 AxCode::ToolOutcomeUnknown,
-                format!("{code}: {control:?} could not be confirmed ({why:?})"),
+                format!(
+                    "{code}: operation {operation} on {control:?} could not be confirmed: {why}"
+                ),
                 "check the setting and reconcile the operation on the page; nothing is written until then",
             ),
-            Self::ReceiptLost { control, fault, .. } => (
+            Self::ReceiptLost {
+                control,
+                operation,
+                fault,
+            } => (
                 AxCode::ToolOutcomeUnknown,
-                format!("{code}: the outcome for {control:?} is not recorded ({fault:?})"),
+                format!(
+                    "{code}: the outcome of operation {operation} on {control:?} is not recorded: {}",
+                    fault.into_ax(action).subject()
+                ),
                 "the setting may have changed; read the page and reconcile the operation",
             ),
         };
         AxError::failure(ax, action, subject).with_recovery(recovery)
+    }
+}
+
+impl std::fmt::Display for ReadFault {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::AccessDenied => f.write_str("access denied"),
+            Self::Failed(error) => write!(f, "{error}"),
+        }
+    }
+}
+
+impl std::fmt::Display for WriteFault {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::AccessDenied => f.write_str("access denied"),
+            Self::Declined => f.write_str("administrator approval declined"),
+            Self::Failed(error) => write!(f, "{error}"),
+        }
+    }
+}
+
+impl std::fmt::Display for Unconfirmed {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::ReadbackUnreadable(fault) => write!(f, "the readback failed: {fault}"),
+            Self::RollbackMissed(None) => {
+                f.write_str("the original was written back but does not read back")
+            }
+            Self::RollbackMissed(Some(fault)) => {
+                write!(f, "writing the original back failed: {fault}")
+            }
+            Self::RollbackUnreadable(fault) => {
+                write!(
+                    f,
+                    "the read after writing the original back failed: {fault}"
+                )
+            }
+        }
     }
 }

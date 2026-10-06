@@ -228,7 +228,7 @@ impl<H: Host, J: Journal> Session<'_, H, J> {
             Verdict::Restored => self
                 .record(intent, Outcome::Restored)
                 .map(|()| Done::Restored { operation }),
-            Verdict::NotApplied | Verdict::RollBack => {
+            Verdict::NotApplied => {
                 self.record(intent, Outcome::NotApplied)?;
                 Err(PrivacyFault::NotApplied {
                     control,
@@ -236,6 +236,7 @@ impl<H: Host, J: Journal> Session<'_, H, J> {
                     cause: written,
                 })
             }
+            Verdict::RollBack => self.roll_back(intent),
         }
     }
 
@@ -417,6 +418,7 @@ mod tests {
     #[derive(Debug, Clone, Copy)]
     enum ReadEffect {
         Reads,
+        Denied,
         Fails,
     }
 
@@ -512,6 +514,7 @@ mod tests {
                     value: world.values[&control].clone(),
                     key_existed: true,
                 }),
+                ReadEffect::Denied => Err(ReadFault::AccessDenied),
                 ReadEffect::Fails => Err(ReadFault::Failed(failed("read"))),
             }
         }
@@ -757,7 +760,11 @@ mod tests {
     }
 
     fn turns() -> impl Strategy<Value = Turn> {
-        let read = prop_oneof![4 => Just(ReadEffect::Reads), 1 => Just(ReadEffect::Fails)];
+        let read = prop_oneof![
+            8 => Just(ReadEffect::Reads),
+            1 => Just(ReadEffect::Denied),
+            1 => Just(ReadEffect::Fails),
+        ];
         let write = prop_oneof![
             4 => Just(WriteEffect::Lands),
             1 => Just(WriteEffect::LandsReportingFailure),
