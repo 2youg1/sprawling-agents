@@ -85,6 +85,7 @@ pub fn shelve_shipped(city_root: &Path,
 
 - **字节从哪来**：city 的构建脚本（`crates/city/build.rs`）走包目录里的 `skills/`，为其中每一个含 `SKILL.md` 的子目录的每个文件生成一行 `(相对路径, include_bytes!(…))`，写进 `OUT_DIR` 下的一张表，`library::shipped` 经 `include!` 读它。`skills/` 根上的文件（`README.md`、`LICENSES.md`）不是 skill，不进表；它们随发行归档走（D20）。表按相对路径排序，同一棵树在三个平台上生成同一张表；路径段在表里以 `/` 分隔，落盘时逐段 `join`，于是 Windows 上不出现 `/` 与 `\` 混写。
 - **只经 §8-28 一扇门**：`shelve_shipped` 在 `<library>/.shipped/` 这个点开头的暂存目录里按表写出每件 skill 的目录（扫描跳过点开头的项，读者看不见它），再对每件调用 `install(city_root, Slot::library(SHIPPED_SECTION), <暂存>/<name>, register)`；预检、原子落位与 CAS 登记都不在这里另写。暂存目录先删再写，成败之后都删：它从未被换入。
+- **playback 页面组装**：`skills/playback/src/skeleton.html` 按内联标记的顺序声明 CSS 与脚本片段，`skills/playback/assemble.js` 将它们逐字节组装成带生成标记的 `template.html`；脚本片段共用同一个内联脚本作用域，不增加浏览器模块加载或网络依赖。生成页仍由上述表原样内嵌，发行归档也携带同一份页；CI 用生成器的 `--check` 比对整份字节，既有 playback 验收经生产工具导出后检查 structure、source 与 offline。渲染片段持有时间线绘制，将来的 Three.js 或 WebGPU 实现也在此处维护并内联组装。
 - **字节照原样**：表里是源树里的字节，写出与登记都不改行尾——仓库的 `.gitattributes` 让它们在三个平台的检出里都是 LF，书架上的那一份就是二进制里的那一份。
 - **一件自带 skill 的「版本」就是它的内容哈希**：没有另记的版本号。§8-28 的整包哈希回答「装下的是哪一份」；新的二进制带来不同的字节时，已有的城不被改动（D20），新城得到新的那份。
 - **何时调用**：只在新城成形时一次（`form`，它对已有历史的目录恒拒，所以对一座城至多一次）。开城不调用：书架上缺一件自带 skill，可能是 User 拿下了它（D20 被否的③）。
