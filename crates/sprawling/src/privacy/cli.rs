@@ -17,7 +17,7 @@ pub fn status() -> Result<String, AxError> {
     status_at(
         &Home::detect()?.privacy_history(),
         super::identity::read,
-        gateway::credential::identity::verify_platform_identity,
+        gateway::verify_platform_identity,
     )
 }
 

@@ -88,7 +88,8 @@ impl Custodian {
 -/
 
 /-! D25 隐私 owner 的只读核对在 Vault 内完成
-`credential::identity::verify_platform_identity(reference, observed)` 只读取
+`credential::identity::verify_platform_identity(reference, observed)` 由 gateway 根接口
+重导出为 `gateway::verify_platform_identity`，只读取
 平台 Vault，并在模块内部比较 stored 与 observed；返回 Result<(), AxError>，
 不返回原值，不调用 Sealed::expose，不使用 provider 的环境遮蔽，不运行 probe。
 缺失返回 CredentialMissing，不匹配返回 ConfigInvalid，平台拒绝保留错误码但
