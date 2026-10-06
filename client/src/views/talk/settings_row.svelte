@@ -56,10 +56,15 @@
   const parent = $derived(provider ?? splitModel(specs[0].value ?? "")?.endpoint ?? providers.at(0)?.id);
   const children = $derived(modelsFor(parent));
   const needsFilter = $derived(children.length > FILTER_AFTER);
+  // The model entry's menu: provider and model are two steps of one
+  // table, so its lists stack as rows - provider first, then the models
+  // that provider serves, which grow the second row as the first is
+  // chosen. Thinking is not a step of that table: it is its own choice,
+  // listed apart under a rule (the person's design).
   const columns = $derived<readonly PopoverColumn[]>([
     { id: PROVIDER_COLUMN, label: "talk_column_provider", rows: providers.map((row) => ({ ...row, chosen: row.id === parent })) },
     { id: MODEL_COLUMN, label: "talk_column_model", rows: children.filter((row) => row.label.toLowerCase().includes(modelQuery.trim().toLowerCase())).map((row) => ({ id: row.value, label: row.label, chosen: row.value === specs[0].value })) },
-    { id: EFFORT_COLUMN, label: "talk_column_effort", rows: specs[2].choices.map((row) => ({ id: row.value, label: row.label, secondary: row.note, chosen: row.value === specs[2].value })) },
+    { id: EFFORT_COLUMN, label: "talk_column_effort", apart: true, rows: specs[2].choices.map((row) => ({ id: row.value, label: row.label, secondary: row.note, chosen: row.value === specs[2].value })) },
   ]);
   const modelFace = $derived(specs[0].choices.find((row) => row.value === specs[0].value)?.label ?? specs[0].placeholder);
   const effortFace = $derived(specs[2].choices.find((row) => row.value === specs[2].value)?.label ?? specs[2].placeholder);
@@ -142,7 +147,7 @@
   </div>
   {#if draws === "everything"}
     {#if menu === "model" && providers.length > 0}
-      <Popover label="talk_column_model" {columns} layout="equal" row={modelRow} onApply={modelPick} onClose={closeModel}
+      <Popover label="talk_column_model" {columns} layout="rows" row={modelRow} onApply={modelPick} onClose={closeModel}
         header={needsFilter ? modelSearch : undefined}
         bind={needsFilter ? (binding: PopoverBinding) => {
           const initial = untrack(() => modelBinding?.controls.at(0) !== binding.controls.at(0));

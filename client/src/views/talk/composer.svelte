@@ -54,7 +54,6 @@
 
   interface ComposerProps {
     readonly placeholder: string;
-    readonly recipient?: string | undefined;
     readonly started?: boolean;
     readonly sending: Sending;
     // Where the unsent words are kept, when they are kept at all: the
@@ -75,7 +74,7 @@
     readonly room?: Address | undefined;
   }
 
-  const { placeholder, sending, draft, onSend, onStop, hearing, band, room, recipient, started = false }: ComposerProps = $props();
+  const { placeholder, sending, draft, onSend, onStop, hearing, band, room, started = false }: ComposerProps = $props();
 
   const u = ui();
   const { lang } = u;
@@ -339,11 +338,6 @@ strength, and a drag over the box by the wash it takes. -->
         pointed = row?.id;
       }}
     />
-  {/if}
-  {#if recipient !== undefined && text === ""}
-    <div class="absolute inset-x-0 bottom-full mb-wide text-center">
-      <p class="text-title font-title text-text">{recipient}</p>
-    </div>
   {/if}
   {#if band !== undefined}{@render band()}{/if}
   <div class="relative pb-snug">

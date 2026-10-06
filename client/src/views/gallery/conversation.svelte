@@ -147,7 +147,6 @@ with one round in it reads as a page that broke. -->
   <div class="flex flex-col items-center gap-base pt-[18vh] text-center">
     <div class="w-full">
       <Composer
-        recipient={say($lang, "talk_empty_mayor")}
         placeholder={say($lang, "talk_placeholder_mayor")}
         sending="dispatch"
         onSend={() => false}

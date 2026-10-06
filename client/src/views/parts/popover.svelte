@@ -9,6 +9,14 @@
   // to close. The combined selector beside the composer and the `/`
   // menu are the same list with different rows.
   //
+  // Two layouts, one key table each. `content` and `equal` lay their
+  // lists side by side, so the arrows walk one list and Tab changes it.
+  // `rows` stacks them as a table - each list is one row, its label the
+  // leading cell - so the left and right arrows walk one row and the up
+  // and down arrows change it, exactly as Tab does. Left and right are
+  // claimed only where there is a row to walk; elsewhere they are left
+  // to a caller's caret.
+  //
   // Two triggers want two different things from the keyboard, and that
   // is the only fork in here. A button hands the keyboard over: the
   // popover takes focus and gives it back when it closes. A text box
@@ -28,7 +36,7 @@
     // The accessible name of the dialog, a lang.json key.
     readonly label: Key;
     readonly columns: readonly PopoverColumn[];
-    readonly layout?: "content" | "equal";
+    readonly layout?: "content" | "equal" | "rows";
     readonly onApply: (column: PopoverColumn, row: PopoverRow) => void;
     readonly onClose: () => void;
     // Bind mode: the caller's text box keeps the focus and forwards the
@@ -125,12 +133,25 @@
   // inside this dialog, and a caller that wants Tab for something else
   // takes it before forwarding, as the composer's completion does.
   const press = (event: KeyboardEvent): boolean => {
-    if (event.key === "ArrowDown") {
+    const asRow = layout === "rows";
+    if (event.key === "ArrowRight") {
+      if (!asRow) return false;
       move(1);
       return true;
     }
-    if (event.key === "ArrowUp") {
+    if (event.key === "ArrowLeft") {
+      if (!asRow) return false;
       move(-1);
+      return true;
+    }
+    if (event.key === "ArrowDown") {
+      if (asRow) step(1);
+      else move(1);
+      return true;
+    }
+    if (event.key === "ArrowUp") {
+      if (asRow) step(-1);
+      else move(-1);
       return true;
     }
     if (event.key === "Home") {
@@ -218,21 +239,55 @@
      through the theme's one entrance for a popover, which falls back to
      a cut under `prefers-reduced-motion`. -->
 <div
-  class="absolute bottom-full left-0 mb-snug w-max min-w-full max-w-full rounded-panel border border-edge-panel bg-raised p-snug shadow-float rise"
+  class={[
+    "absolute bottom-full left-0 mb-snug w-max min-w-full max-w-full rounded-panel border border-edge-panel bg-raised p-snug shadow-float rise",
+    // The table is one surface, so it is the surface that scrolls: a
+    // row that wraps to more lines than a narrow window holds moves the
+    // whole table rather than trapping the pointer in a second
+    // scroller. Laid beside their names the lists keep their own cap.
+    layout === "rows" ? "max-h-palette overflow-y-auto" : "",
+  ]}
   role="dialog"
   aria-label={say($lang, label)}
 >
   {#if header !== undefined}{@render header()}{/if}
-  <div class={["gap-snug", layout === "equal" ? "grid auto-cols-fr grid-flow-col" : "flex"]}>
+  <div
+    class={[
+      "gap-snug",
+      layout === "equal"
+        ? "grid auto-cols-fr grid-flow-col"
+        : layout === "rows"
+          ? "flex flex-col"
+          : "flex",
+    ]}
+  >
     {#each columns as pane, at (pane.id)}
-      <div class="flex min-w-0 flex-col">
-        <div class="mb-tight px-snug text-note text-text-faint">
-          {say($lang, pane.label)}
-        </div>
+      <!-- One list, either a column of pickable rows or the cell row of
+           the table: what changes with the layout is where its name
+           stands and whether its rows stack or wrap. -->
+      <div
+        class={[
+          layout === "rows"
+            ? "grid min-w-0 grid-cols-[auto_1fr] items-baseline gap-snug"
+            : "flex min-w-0 flex-col",
+          layout === "rows" && pane.apart === true
+            ? "border-t border-edge-panel pt-snug"
+            : "",
+        ]}
+      >
+        {#if layout === "rows"}
+          <div class="text-note text-text-faint">{say($lang, pane.label)}</div>
+        {:else}
+          <div class="mb-tight px-snug text-note text-text-faint">
+            {say($lang, pane.label)}
+          </div>
+        {/if}
         <ul
           id={listSeat(at)}
           bind:this={lists[at]}
-          class="max-h-palette overflow-y-auto"
+          class={layout === "rows"
+            ? "flex min-w-0 flex-wrap content-start gap-tight"
+            : "max-h-palette overflow-y-auto"}
           role="listbox"
           aria-label={say($lang, pane.label)}
           tabindex={bind === undefined && at === heldColumn ? 0 : -1}
@@ -248,9 +303,19 @@
               role="option"
               aria-selected={item.chosen === true}
               class={[
-                "flex cursor-pointer items-center justify-between gap-snug rounded-control px-snug py-tight text-body",
-                at === heldColumn && index === heldRow ? "bg-raised-hover" : "",
-                item.chosen === true ? "text-text" : "text-text-quiet",
+                "cursor-pointer rounded-control px-snug py-tight text-body",
+                layout === "rows"
+                  ? "flex min-w-0 items-center gap-tight"
+                  : "flex items-center justify-between gap-snug",
+                // What is applied reads as the deeper wash; the cursor
+                // takes the rung only where nothing is applied, so the
+                // two never paint over each other.
+                item.chosen === true
+                  ? "wash-strong text-text"
+                  : at === heldColumn && index === heldRow
+                    ? "bg-raised-hover"
+                    : "",
+                item.chosen === true ? "" : "text-text-quiet",
               ]}
               onmouseenter={() => {
                 column = at;
@@ -268,12 +333,14 @@
                      against the other, so a one-word hint beside a long
                      label survives whole, and letting the long secondary
                      cell take the row's width is what used to paint
-                     `high` as `hi…`. -->
-                <span class="min-w-0 max-w-[24ch] truncate">
-                  {#if item.chosen === true}<span
-                      class="mr-tight inline-block size-dot rounded-pill bg-accent align-middle"
-                      aria-hidden="true"
-                    ></span>{/if}
+                     `high` as `hi…`. A cell of the table wraps instead
+                     of truncating, because a column is as wide as its
+                     own name and a row as wide as the dialog. -->
+                <span
+                  class={layout === "rows"
+                    ? "min-w-0 max-w-[24ch] wrap-anywhere"
+                    : "min-w-0 max-w-[24ch] truncate"}
+                >
                   {item.label}
                 </span>
                 {#if item.secondary !== undefined}

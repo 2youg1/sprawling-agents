@@ -317,7 +317,6 @@
   {/if}
   <Composer
     {placeholder}
-    recipient={!band && blank ? who : undefined}
     started={echo !== null}
     sending={sendingInto(live?.doing)}
     draft={address}
