@@ -33,8 +33,12 @@ coordinator 拒绝所有控制的新写入，只有 Reconciled 能结束它；�
 History::disclose(authorize) 是摘要唯一的出口：非空历史先把 owner 引用交给 authorize，
 接受后才返回 operation 与结论摘要；空历史没有 owner，不询问 authorize，返回空摘要。
 摘要与 owner 引用存在同一个值里，没有 owner 的非空摘要不可表示。摘要不输出 owner；
-status 的 authorize 见 Privacy.Cli D53。coordinator 需要的拥有栈与未结操作经同一 authorize
-之后才交出，所以身份不符时不披露任何历史值。
+status 的 authorize 见 Privacy.Cli D53。
+History::holdings(authorize) 是 coordinator 的出口：authorize 收到记录的 owner 引用（空历史为无），
+返回此后写入 Intent 的 owner 引用——非空历史核对后原样返回，空历史由 Host 为实时身份建立绑定；
+接受后才交出 Holdings：每个控制的拥有栈栈顶、未结操作（Prepared 之后没有结论或结论为 Unknown）
+与下一个操作编号（最新编号加一，越界即拒绝）。所以身份不符时 coordinator 不看到任何历史值
+（Privacy D66）。
 数据编码是 serde 的带标签闭集 enum 与 JSON byte array，未知字段拒绝；schema 与容量上界由 Rust
 一处定义，writer 在系统写入前通过同一 decoder。
 验收：未知字段/坏版本、重复 id、非法结论、越层恢复、跨控制恢复被拒、同控制栈顶恢复、

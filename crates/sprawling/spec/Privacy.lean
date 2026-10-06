@@ -6,7 +6,7 @@
 /-!
 # 主机隐私协调契约
 
-本分部规定 `bin::privacy::coordinator` 与 `bin::privacy::plan` 必须保持的性质：
+本分部规定 `bin::privacy::coordinator`、`bin::privacy::plan` 与 `bin::privacy::fault` 必须保持的性质：
 每次系统写入之前有不可变的持久原值，读回不符从不取得拥有，读回不符时把原值写回，
 写回也失败就进入只有人核对才能离开的 unknown。
 
@@ -40,15 +40,17 @@ OS 写入没有 compare-and-swap：writeStarted 要求调用前最后一次读�
 写入的结果在模型里是任意读回值：机器作用域经提升子进程写入（Privacy.Windows D57），UAC 被拒、
 子进程失败或访问拒绝都表现为某个读回值，由同一判定处理。
 模型 owner 是真实 OS 身份的抽象；生产以 Vault 中绑定的 SecretRef 核对（Privacy.State D52）。
+模型的 owner 从初始状态起固定；生产的空 history 没有 owner，第一次写入前为实时身份建立绑定。
+两者等价，因为第一次写入之前没有任何拥有可以保护。读目标失败不在模型里：模型的 live 总能读到。
 损坏的 journal（malformed）进入没有 work 的 unknown，Reconcile 不能离开它；修复损坏日志
 是本应用之外的操作，页面只报告拒绝与恢复路径。
 
 ## 4 现状分析
 控制表（`bin::privacy::controls`、`bin::privacy::originals`、`bin::privacy::target`）、schema 3 的
-磁盘投影与 journal 的写入器已实现；`bin::privacy::cli` 只有 status。
-plan、coordinator、平台适配器、确认与 wire 帧尚未实现；各自的接口写在
-Privacy.Controls、Privacy.State、Privacy.Journal、Privacy.Windows、Privacy.Confirmation、
-Privacy.Cli，由后续阶段按本模型实现。
+磁盘投影、journal 的写入器、`bin::privacy::plan` 与 `bin::privacy::coordinator` 已实现；
+coordinator 经两个端口（Host 与 Journal，§7）运行，生产的 Host 与 CLI 写入动词尚未接上，
+所以 `bin::privacy::cli` 只有 status。平台适配器、确认与 wire 帧尚未实现；各自的接口写在
+Privacy.Windows、Privacy.Confirmation、Privacy.Cli，由后续阶段按本模型实现。
 
 ## 5 权威信源
 原始读写：RegQueryValueExW/RegSetValueExW 规定原始类型与字节、缺值和访问失败
@@ -161,10 +163,16 @@ structure Receipt where
   deriving DecidableEq, Repr
 
 /-! ## 7 模块边界
-`bin::privacy::plan` 只做判定（本节的 planApply、planRestore、judgeReadback、settle），
-无 IO、无时钟；`bin::privacy::coordinator` 拥有跨存储的次序（Step）；journal 只追加；
-平台适配器只读写控制表给出的目标；确认不保存服务端挂起状态（Privacy.Confirmation D55）。
-城的 Ledger 不出现在模型里：主机隐私不进入城市重放。
+`bin::privacy::plan` 只做判定（本节的 planApply、planRestore、judgeReadback、settle、reconciled，
+以及回滚后的读回判定），无 IO、无时钟；`bin::privacy::fault` 是失败的闭集与它到 AxError 的映射；
+`bin::privacy::coordinator` 拥有跨存储的次序（Step），经两个端口运行：
+- Host：时钟（accounting 的 Clock）、实时 OS 身份的取样、按身份核对或建立 owner 引用、
+  按控制读与写目标。读返回快照与父键是否存在，或访问拒绝、其他失败；写只报告访问拒绝、
+  UAC 被拒或其他失败，从不报告结论。第二实现是测试的 FaultHost。
+- Journal：持锁 fold 出的 history 与 append_durable；生产实现是 `bin::privacy::journal` 的
+  LockedJournal，第二实现是测试的内存 journal，它经同一个 History::fold 判定每一行。
+journal 只追加；平台适配器只读写控制表给出的目标；确认不保存服务端挂起状态
+（Privacy.Confirmation D55）。城的 Ledger 不出现在模型里：主机隐私不进入城市重放。
 -/
 
 def setAt {α : Type} (f : Nat → α) (c : Nat) (v : α) : Nat → α :=
@@ -182,9 +190,23 @@ structure State where
   owned : Nat → List Intent := fun _ => []
 
 /-! ## 8 接口先行
-planApply 与 planRestore 的拒绝次序就是生产判定的次序：控制表在读系统之前（不可写的控制
-不读系统），身份在披露任何历史之前，未结操作在 fresh read 之前。两者返回穷尽枚举，
-只有 write 带出 Intent。
+planApply 与 planRestore 的拒绝次序就是生产判定的次序：控制表、身份、未结操作、页面过期，
+然后才是目标本身的判定。两者返回穷尽枚举，只有 write 带出 Intent。
+-/
+
+/-! D66 Rust 的判定只接受已核对身份的 history，不写的原项不是控制
+模型的 planApply 先查控制表、再比身份；Rust 用类型持有这两支，判定函数里没有它们：
+- 请求只能命名 PrivacyControl，而控制表的每一行都有写入值（Privacy.Controls），不写的原项
+  只是 PrivacyOriginal，没有控制，所以 notWritable 在 Rust 中写不出来，reachable_catalogued 由类型成立。
+- History 的拥有栈、未结操作与 owner 只经 History::holdings(authorize) 交出（Privacy.State），
+  authorize 是 Host 按实时身份核对 owner 引用；不符即返回身份拒绝，判定看不到任何历史值。
+  notOwner 因此是 authorize 的拒绝，不是判定的一支。
+fresh read 在判定之前由 coordinator 取得，判定无 IO；读失败（访问拒绝或其他）在判定之前拒绝，
+所以它与未结操作同时成立时报告读失败。两者都不写系统，次序只影响报告哪一个。
+回放：applyVectors 不含 notWritable 行；notOwner 行经 History::holdings 的拒绝回放。
+被否：把 owner 与控制表作为判定的输入——判定会在核对身份之前拿到拥有栈，
+「身份在披露任何历史之前」就只靠调用者的自律；而 notWritable 一支只能用测试专用的伪控制触发。
+重开参数：若控制表出现「已列出但不写」的控制（而不是原项），notWritable 回到判定。
 -/
 inductive ApplyPlan where
   | write (intent : Intent)
@@ -281,7 +303,9 @@ def reconciled (i : Intent) (value : Snapshot) : Outcome :=
 /-! ## 9 工作流程
 durablePrepared 是成功 sync 的观察，不是写文件前的意图。writeStarted 表示发生了一次 OS 写入，
 readback 是本进程随后读到的值。rollbackStarted 是第二次 OS 写入（把 original 写回），
-不检查期限，因为回滚必须发生。崩溃时有 work 即 unknown。
+不检查期限，因为回滚必须发生。lapsed：Prepared 已持久而期限已过，不写系统，以 notApplied 结束。
+崩溃时有 work 即 unknown；写入后读不到目标（读回失败）与崩溃同样处理，进入 unknown，
+因为没有读数就既不能判定，也不能确认回滚是否需要。
 -/
 /-! D60 同一时刻至多一个未结操作；「恢复全部」是逐个控制的单项恢复
 协调者一次只持有一个 work：Prepared、写、读回、Finished 走完才开始下一个控制。
@@ -298,6 +322,9 @@ inductive Step : State → State → Prop where
       (plan : planned s r keyExisted = some i) (unexpired : now < r.expires)
       (fresh : ∀ old ∈ s.journal, old.operation ≠ r.operation) :
       Step s {s with phase := .prepared, work := some i, journal := i :: s.journal}
+  | lapsed (s) (i) (prepared : s.phase = .prepared) (work : s.work = some i)
+      (now : Nat) (expired : i.expires ≤ now) :
+      Step s {s with phase := .idle, work := none, receipts := ⟨i, .notApplied⟩ :: s.receipts}
   | writeStarted (s) (i) (prepared : s.phase = .prepared) (work : s.work = some i)
       (fresh : s.live i.control = i.original) (readback : Snapshot)
       (now : Nat) (unexpired : now < i.expires) :
@@ -451,6 +478,7 @@ theorem move_durable {s t : State} (h : Durable s) (move : Move s t) : Durable t
             · exact writes entry previous
           · exact work
       | durableReceipt => exact ⟨writes, fun _ hi => by cases hi⟩
+      | lapsed => exact ⟨writes, fun _ hi => by cases hi⟩
       | rollbackStarted i _ hi =>
           constructor
           · intro entry hentry
@@ -501,6 +529,7 @@ theorem move_ordered {s t : State} (h : Ordered s) (move : Move s t) : Ordered t
             exact ready i hi
           · exact writes entry previous
       | durableReceipt => exact ⟨writes, fun _ hi => by cases hi⟩
+      | lapsed => exact ⟨writes, fun _ hi => by cases hi⟩
       | rollbackStarted i _ hi =>
           refine ⟨?_, ready⟩
           intro entry hentry
@@ -539,6 +568,7 @@ theorem move_catalogued {s t : State} (h : Catalogued s) (move : Move s t) : Cat
       | read => exact h
       | writeStarted => exact h
       | durableReceipt => exact h
+      | lapsed => exact h
       | rollbackStarted => exact h
       | rolledBack => exact h
       | rollbackLost => exact h
@@ -619,6 +649,7 @@ theorem move_owns_only_matched {s t : State} (move : Move s t) {c : Nat} {j : In
           exact ⟨work, settle_applied verified⟩
       | read => exact absurd now before
       | durablePrepared => exact absurd now before
+      | lapsed => exact absurd now before
       | writeStarted => exact absurd now before
       | rollbackStarted => exact absurd now before
       | rolledBack => exact absurd now before
@@ -666,6 +697,7 @@ theorem step_rollback_ends {s t : State} (move : Step s t) (rolling : s.phase = 
   | durablePrepared r i keyExisted now plan =>
       have idle := planned_idle plan
       simp [rolling] at idle
+  | lapsed _ prepared => simp [rolling] at prepared
   | writeStarted _ prepared => simp [rolling] at prepared
   | durableReceipt _ _ attempted => simp [rolling] at attempted
   | rollbackStarted _ attempted => simp [rolling] at attempted
@@ -735,10 +767,10 @@ def applied : Intent :=
 def request (action : Action) (control owner : Nat) (expected : Snapshot) : Request :=
   { action, control, operation := 2, owner, expected, expires := 100 }
 
-/-- apply 判定：每行是（控制、阶段、当前值、请求的 expected、身份），以及判定结果。 -/
+/-- apply 判定：每行是（控制、阶段、当前值、请求的 expected、身份），以及判定结果。
+不含 notWritable 行：Rust 中它由类型排除（D66）。 -/
 def applyVectors : List ApplyPlan :=
-  [ planApply (vectorState .idle (.registry .absent) (.task .absent) []) (request .apply 2 7 (.registry .absent)) false,
-    planApply (vectorState .idle (.registry .absent) (.task .absent) []) (request .apply 1 8 (.registry .absent)) false,
+  [ planApply (vectorState .idle (.registry .absent) (.task .absent) []) (request .apply 1 8 (.registry .absent)) false,
     planApply (vectorState .unknown (.registry .absent) (.task .absent) []) (request .apply 1 7 (.registry .absent)) false,
     planApply (vectorState .idle (.registry zero) (.task .absent) []) (request .apply 1 7 (.registry .absent)) false,
     planApply (vectorState .idle (.registry one) (.task .absent) []) (request .apply 1 7 (.registry one)) false,
@@ -777,15 +809,23 @@ def readbackVectors : List (Readback × Option Outcome × Outcome) :=
 NotApplied（读回原值，报错，含 UAC 被拒与访问拒绝）、RolledBack（读回第三值并已写回原值，
 报错 readback_mismatch）、unknown（写回后仍不是原值，或崩溃）。unknown 拒绝所有新写入，
 只经 Reconcile 离开；读取不自动补终态。恢复冲突要求重新读取，不能强制覆盖。
-每个拒绝在 `bin::privacy::coordinator` 一处映射到 AxError，带失败的动作、对象、稳定码与恢复，
-不共用一个码。
+lapsed 以 NotApplied 结束并报错 expired；写入后读不到目标、或回滚后读不到原值，都以 unknown 结束。
+Finished 未能持久时，系统可能已被写入，操作在磁盘上仍未结，下次读取报告 unresolved。
+每个失败在 `bin::privacy::fault` 一处映射到 AxError，带失败的动作、对象、稳定码与恢复，
+不共用一个码。稳定码是闭集：identity、clock、history、unreadable、unresolved、changed、
+target_absent、nothing_owned、conflict、nothing_unresolved、history_full、expired、access_denied、
+elevation_declined、not_applied、readback_mismatch、unknown、receipt_lost。
+写入报告的失败（访问拒绝、UAC 被拒、其他）只决定读回原值时报告哪个码，从不决定结论。
 
 ## 13 依赖选型
 journal 使用标准库 File::lock/write_all/sync_all（Privacy.Journal）；注册表使用 winreg 的安全
 原始值接口，计划任务使用受保护路径下 Windows PowerShell 的 ScheduledTasks 模块（Privacy.Windows）。
 
 ## 14 硬编码声明
-期限 TTL 由 `bin::privacy::coordinator` 一处定义；控制表、推荐值、作用域由 `bin::privacy::controls`
+期限 TTL 由 `bin::privacy::coordinator` 一处定义，为 60 秒，从协调者接受命令时算起：它覆盖取得锁、
+fold、fresh read（计划任务经 Windows PowerShell 读取，冷启动要几秒）与 Prepared，期间进程若被挂起
+（休眠、调试暂停）超过它，fresh read 证明的「当前值就是人看到的值」已经过时，就不再写；
+改变它只改变人需要重试的频率，不改变任何性质。控制表、推荐值、作用域由 `bin::privacy::controls`
 一处定义；模型中 owner、operation、control、definition 的 Nat 是抽象。
 
 ## 15 影响面
@@ -795,9 +835,12 @@ journal 使用标准库 File::lock/write_all/sync_all（Privacy.Journal）；注
 ## 16 测试与约束
 模型由 `lake build crates.sprawling.spec.Privacy` 验收，无 sorry/admit/axiom。
 派生检查：`bin::privacy::plan` 的测试逐条回放 applyVectors、restoreVectors、readbackVectors；
-`bin::privacy::coordinator` 的 proptest 用 FaultHost 生成任意故障序列（写失败、读回第三值、
-Prepared 持久失败、回滚失败、崩溃），断言 reachable_durable、move_owns_only_matched、
-step_rollback_ends 与 trace_unknown 对应的性质。证明只覆盖模型，不证明 IO 适配器。
+`bin::privacy::coordinator` 的 proptest 用 FaultHost 与内存 journal 生成任意命令与故障序列
+（写失败、写入第三值、读回失败、Prepared 持久失败、Finished 持久失败、回滚失败、外部改值、期限已过），
+断言 reachable_durable（每次系统写入之前 journal 的最后一行是同一控制的 Prepared，写入值是它的
+修改值或回滚时的原值）、move_owns_only_matched（Applied 与 Restored 只在目标真实值等于修改值时记录）、
+step_rollback_ends（RolledBack 只在目标真实值等于原值时记录）与 trace_unknown（unknown 之后、
+核对之前没有系统写入）对应的性质；另有一条经真实 LockedJournal 的 apply 与 restore。证明只覆盖模型，不证明 IO 适配器。
 真实 Windows 行为只在一次性 GitHub Actions runner 上验收：每种 operation kind 各一次 apply 与
 restore，并逐个扫过全部可写控制；测试永不写人的主机。
 

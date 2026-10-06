@@ -70,7 +70,7 @@ import crates.sprawling.spec.WireClient
 | `spec/Main/Exit.lean` | `bin::main::exit` |
 | `spec/Main/Grammar.lean` | `bin::main::grammar` |
 | `spec/Monitor.lean` | `bin::monitor` |
-| `spec/Privacy.lean` | `bin::privacy::coordinator` 与 `bin::privacy::plan`：主机 privacy 的写入次序、读回与恢复；目录、确认、磁盘投影、日志、平台与 CLI 各在 `spec/Privacy/` 下一个分部 |
+| `spec/Privacy.lean` | `bin::privacy::coordinator`、`bin::privacy::plan` 与 `bin::privacy::fault`：主机 privacy 的写入次序、读回与恢复；目录、确认、磁盘投影、日志、平台与 CLI 各在 `spec/Privacy/` 下一个分部 |
 | `spec/Outside.lean` | `bin::outside` |
 | `spec/Outside/Conduit.lean` | `bin::outside::conduit` |
 | `spec/Serving.lean` | `bin::serving` |
@@ -452,6 +452,7 @@ pub struct SystemClock;   // 墙钟的唯一采样点（clippy.toml 的 disallow
 | D63 | `crates/sprawling/spec/Privacy/Windows.lean` |
 | D64 | `crates/sprawling/spec/Privacy/Controls.lean` |
 | D65 | `crates/sprawling/spec/Privacy/Controls.lean` |
+| D66 | `crates/sprawling/spec/Privacy.lean` |
 -/
 
 /-! D15 不从别的工具的配置里读 provider 表（人的决定）
