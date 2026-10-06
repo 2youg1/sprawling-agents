@@ -14,7 +14,7 @@
 /-!
 ### 8-1 gateway::dialect（形状 1 判定函数族）＋anthropic／openai／mismatch
 
-城内规范会话类型住 `kernel::model`（缝上类型）；本模块只做 canonical↔wire 翻译，纯函数、无 I/O、无状态。
+城内规范会话类型住 `kernel::model`（缝上类型）；canonical↔wire 翻译入口是纯函数，无 I/O。crate 内的 `StreamFrames` 持有流帧，保留与 EOF 结算契约由 `crates/gateway/spec/Endpoint/Stream.lean` §8-13 规定。
 
 **两家 provider 的字段知识各住各家。** 切缝是**变化的理由**：一家 provider 改了它的形状，只有它那一个文件动；而本模块顶上那句「改之前先读 provider 自己的文档」只有跟它指的那堆字段同居一处才真的被读到，所以两张文档链接表各自跟着它的 dialect 走。
 - `dialect` 的每个入口是一条 `match kind`，对 `DialectKind` 穷尽；不认得的 dialect 恒拒而不拿较近的那一家近似。跨 dialect 的断言（两向往返、两种强度拼写、float 拒收）留在这里，因为它们测的就是路由的契约。
@@ -34,7 +34,6 @@ pub fn request_wire(kind: DialectKind, req: &ChatRequest, images: &ImageBytes, s
                                     // spelling 只有 chat 面读；另两面各只有一种拼法（§8-17 厂商拼法列）
 pub fn response_from_wire(kind: DialectKind, wire: &serde_json::Value) -> Result<ChatResponse, AxError>;
 pub fn increment_of(kind: DialectKind, frame: &serde_json::Value) -> Option<Increment>;          // §8-13
-pub fn settled_from_stream(kind: DialectKind, frames: &[serde_json::Value]) -> Result<serde_json::Value, AxError>;   // §8-13
 #[cfg(test)]
 pub(crate) fn response_wire(kind: DialectKind, resp: &ChatResponse) -> Result<serde_json::Value, AxError>;
                                     // 响应侧的反方向只供测试：造 provider 回复、证往返（wire→canonical→wire 等值）；生产里没有调用者，所以不编进发行的二进制
