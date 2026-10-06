@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The npm channel: the archives' own binaries, reachable by `bunx`.
+//! Release archives projected into npm, Homebrew and AUR packages (xtask D32).
 //!
 //! **The archives are the artefact, and this repackages them.** It reads
 //! the zips a tag published, takes the binary out of each, and writes
@@ -38,11 +38,12 @@
 use sha2::{Digest as _, Sha256};
 use std::io::Read as _;
 
-mod system;
 use std::path::{Path, PathBuf};
 
 use crate::platform::{PLATFORMS, Platform, ROOT_PACKAGE};
 use crate::report::XtaskError;
+
+mod system;
 
 /// The shim, compiled in so the file a reader opens and the file a
 /// package carries are the same bytes — the rule `crates/city/templates/`
