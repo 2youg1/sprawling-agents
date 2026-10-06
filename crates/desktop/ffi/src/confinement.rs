@@ -496,13 +496,15 @@ mod tests {
                 1..128,
             ).prop_filter("file path has no terminal backslash", |units| units.last() != Some(&92)),
         ) {
-            let mut request = argv_launch(args.iter().map(|units| OsString::from_wide(units)).collect());
-            request.program = PathBuf::from(OsString::from_wide(&program));
-            let encoded = packet::encode(&request).unwrap();
-            let command = encoded.split(|unit| *unit == 0).nth(1).unwrap();
-            let mut expected = vec![program];
-            expected.extend(args);
-            prop_assert_eq!(crt_arguments(command), expected);
+            for args in [args, ["/D", "/S", "/C"].into_iter().map(|arg| arg.encode_utf16().collect()).collect()] {
+                let mut request = argv_launch(args.iter().map(|units| OsString::from_wide(units)).collect());
+                request.program = PathBuf::from(OsString::from_wide(&program));
+                let encoded = packet::encode(&request).unwrap();
+                let command = encoded.split(|unit| *unit == 0).nth(1).unwrap();
+                let mut expected = vec![program.clone()];
+                expected.extend(args);
+                prop_assert_eq!(crt_arguments(command), expected);
+            }
         }
 
         #[test]
