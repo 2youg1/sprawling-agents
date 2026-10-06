@@ -28,9 +28,10 @@ it lives. -->
   interface Props {
     readonly who: string;
     readonly at: number;
-    // The frozen facts this message was said under - the model, and on a
-    // session's first head its effort and mode - where the head is the
-    // one that states them; `null` elsewhere.
+    // The session facts this message was said under - the model, and on
+    // a session's first head its effort, policy and any sandbox that
+    // restricts it - where the head is the one that states them; `null`
+    // elsewhere.
     readonly model: string | null;
     // Time to first content, once the Ledger holds a measured one.
     readonly ttft: Took | null;
@@ -45,17 +46,22 @@ it lives. -->
   const { lang } = ui();
 </script>
 
-<div class="flex min-w-0 items-baseline gap-base overflow-hidden text-note whitespace-nowrap text-text-faint">
-  <span class="shrink-0 font-label text-label text-text">{who}</span>
+<!-- Inline flow rather than one clipped row: the first head carries the
+session's frozen facts, which can outrun the column, and a fact cut off
+by an ellipsis is a fact the head no longer states. A space and the
+tight margin make the gap the row had; short figures keep their words
+together, and the facts wrap where the column ends. -->
+<div class="min-w-0 text-note text-text-faint">
+  <span class="me-tight font-label text-label whitespace-nowrap text-text">{who}</span>
   {#if model !== null}
-    <span class="min-w-0 truncate">{model}</span>
+    <span class="me-tight wrap-anywhere">{model}</span>
   {/if}
-  <time class="figure shrink-0" datetime={isoInstant(at)}>{hhmmss(at)}</time>
+  <time class="figure me-tight whitespace-nowrap" datetime={isoInstant(at)}>{hhmmss(at)}</time>
   {#if ttft !== null}
-    <span class="figure shrink-0">{say($lang, "talk_ttft")} {tookWords(ttft, $lang)}</span>
+    <span class="figure me-tight whitespace-nowrap">{say($lang, "talk_ttft")} {tookWords(ttft, $lang)}</span>
   {/if}
   {#if tps !== null}
-    <span class="figure shrink-0">{fill(say($lang, "talk_tps"), { n: String(Math.round(tps)) })}</span>
+    <span class="figure me-tight whitespace-nowrap">{fill(say($lang, "talk_tps"), { n: String(Math.round(tps)) })}</span>
   {/if}
   {#if rhythm !== null}
     <Sparkline {rhythm} />

@@ -14,7 +14,7 @@
   // Both read the same `Call` values, so the calls are written once at
   // the top of this file and each fixture names the ones it wants.
 
-  import type { Call, Output, Turn } from "../../wire";
+  import type { Call, Output } from "../../wire";
   import { Address, RunId, Seq, TimeMs } from "../../wire";
 
   // The run every fixture here speaks for. One id, because the link a
@@ -51,14 +51,6 @@
   ): Call {
     const t = TimeMs.make(at);
     return { at: Seq.make(at), outcome: "answered", output, subject, tool, called: t, answered: t, timing: "measured", ...REGISTERED[tool] };
-  }
-
-  // The turn one fixture's calls live in, carrying those same calls:
-  // a fork affordance names the turn around the call it points at, and
-  // a turn describing different work would be a second answer to what
-  // this run did.
-  function turnOf(number: number, calls: readonly Call[]): Turn {
-    return { calls, notes: [], number, opened: Seq.make(number), t: TimeMs.make(number), timing: "measured" };
   }
 
   // One command and nothing else, which is the shortest sentence the
@@ -158,19 +150,19 @@ const HIDDEN: usize = 0;
 {/snippet}
 
 <Case label="calls · one command">
-  <Calls calls={ONE_COMMAND} run={RUN} turn={turnOf(3, ONE_COMMAND)} onFork={() => undefined} />
+  <Calls calls={ONE_COMMAND} run={RUN} />
 </Case>
 
 <Case label="calls · a write and what it was given">
-  <Calls calls={GIVEN} run={RUN} turn={turnOf(3, GIVEN)} onFork={() => undefined} />
+  <Calls calls={GIVEN} run={RUN} />
 </Case>
 
 <Case label="calls · explored, wrote and ran">
-  <Calls calls={A_WAVE} run={RUN} turn={turnOf(3, A_WAVE)} onFork={() => undefined} />
+  <Calls calls={A_WAVE} run={RUN} />
 </Case>
 
 <Case label="calls · a class of work the fold has no verb for">
-  <Calls calls={NO_VERB} run={RUN} turn={turnOf(3, NO_VERB)} onFork={() => undefined} />
+  <Calls calls={NO_VERB} run={RUN} />
 </Case>
 
 <Case label="code · line numbers and a trail that wraps">

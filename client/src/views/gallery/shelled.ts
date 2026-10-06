@@ -16,6 +16,7 @@ import { ENDPOINTS } from "./served";
 // and one going (`resulted.svelte` deals its rooms out in turn).
 export const ROOM = Address.make("release/ledger");
 export const EMPTY_ROOM = Address.make("lab/fresh");
+const SANDBOXED = Address.make("release");
 const START = 1_790_000_000_000;
 const MODEL = "anthropic/claude-fable-5.1";
 
@@ -77,6 +78,25 @@ export function answering(calling: boolean): (query: Query) => Answer | undefine
     if (query === "endpoint_view") return { endpoints: ENDPOINTS };
     if (typeof query !== "object") return undefined;
     if ("rounds" in query) return { rounds: { run: query.rounds.run, turns: turnsOf(calling), opening: { at: TimeMs.make(START), task: "Review the document", goal: "", policy: FIRST_POLICY, effort: "high" } } };
+    // The working room's building boxes a run in a copied tree, so its
+    // sandbox is a fact the first message head states; the empty room's
+    // building has none, so nothing about a sandbox is drawn there.
+    if ("building_view" in query && query.building_view.addr === SANDBOXED) {
+      return {
+        building: {
+          addr: SANDBOXED,
+          archive: [],
+          blocked: [],
+          docs: [],
+          mcp: [],
+          plan: [],
+          problems: [],
+          progress: { unplanned: { budget: { tokens: Tokens.make(0), usd: UsdMicros.make(0) }, steps: 0 } },
+          rooms: [ROOM],
+          sandbox: { arm: "copied_tree", fuel: 0, mounts: [SANDBOXED], shell: true },
+        },
+      };
+    }
     if ("commits" in query) return { commits: { building: null, before: null, commits: COMMITS, more: false } };
     if ("config" in query) {
       return {

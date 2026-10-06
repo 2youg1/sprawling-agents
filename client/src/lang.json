@@ -659,17 +659,9 @@
     "en": "door",
     "zh": "门"
   },
-  "facts_sandbox": {
-    "en": "sandbox",
-    "zh": "沙箱"
-  },
-  "facts_sandbox_mounts": {
-    "en": "{n} mounted",
-    "zh": "挂载 {n} 处"
-  },
-  "facts_sandbox_open": {
-    "en": "none: the machine itself",
-    "zh": "无：宿主机本身"
+  "facts_sandbox_said": {
+    "en": "sandbox, {n} mounted",
+    "zh": "沙箱：挂载 {n} 处"
   },
   "facts_unreadable": {
     "en": "could not read",
@@ -4931,14 +4923,6 @@
     "en": "turn {turn}",
     "zh": "第 {turn} 轮"
   },
-  "fork_here": {
-    "en": "fork from here",
-    "zh": "从这里分叉"
-  },
-  "fork_here_hint": {
-    "en": "Fork from here: a new session that keeps the conversation up to this point",
-    "zh": "从这里分叉：开一个新会话，保留到这里为止的对话"
-  },
   "fork_pick_title": {
     "en": "choose a point to fork from",
     "zh": "选择分叉点"
@@ -6326,14 +6310,6 @@
   "talk_past": {
     "en": "An earlier session of {room}. It is read-only: the city goes on with the room's current session.",
     "zh": "{room} 较早的一段对话，只读：城只接着这个房间当前的一段说下去。"
-  },
-  "talk_continue": {
-    "en": "Continue from its end",
-    "zh": "从它的末尾接着说"
-  },
-  "talk_continue_unheld": {
-    "en": "This page holds none of its runs, so it has no end to branch from",
-    "zh": "本页没有它的 run，找不到可以分叉的末尾"
   },
   "talk_current": {
     "en": "Back to the current session",

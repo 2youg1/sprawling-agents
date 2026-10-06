@@ -22,14 +22,12 @@ bar and the thread cannot disagree about where a round is. -->
   import type { Phase } from "../runs/lineage";
   import { arrivalsOf } from "./arrivals.svelte";
   import Calls from "./calls.svelte";
-  import ForkButton from "./fork_button.svelte";
   import Head from "./head.svelte";
   import NoteLine from "./note_line.svelte";
   import { noteAt } from "./note_line";
   import { rhythmOf } from "./rhythm";
   import { cutOff, silentTurn } from "./silence";
   import type { Phase as Live } from "./silence";
-  import type { ForkEntry, ForkPlan } from "./forking";
   import { tpsOf, ttftTookOf } from "./timing";
 
   interface Props {
@@ -50,12 +48,9 @@ bar and the thread cannot disagree about where a round is. -->
     // Whether the calls and the reasoning are drawn at all (`results`
     // draws neither).
     readonly whole: boolean;
-    readonly onFork?: ((plan: ForkPlan) => void) | undefined;
-    readonly onCall?: ((entry: ForkEntry) => void) | undefined;
-    readonly onHover: (entry: ForkEntry | null) => void;
   }
 
-  const { turn, run, who, model, live, doing, showEmpty, ceiling, whole, onFork, onCall, onHover }: Props = $props();
+  const { turn, run, who, model, live, doing, showEmpty, ceiling, whole }: Props = $props();
 
   const { lang } = ui();
 
@@ -70,12 +65,9 @@ bar and the thread cannot disagree about where a round is. -->
   const rhythm = $derived(arrivals === null ? null : rhythmOf(arrivals));
 </script>
 
-<div class="group relative flex flex-col gap-snug pb-section last:pb-0" data-wear={phase}>
-  {#if onFork !== undefined}
-    <ForkButton entry={{ kind: "turn", turn }} {run} {onFork} {onHover} />
-  {/if}
+<div class="flex flex-col gap-snug pb-section last:pb-0" data-wear={phase}>
   {#each turn.notes.filter((note) => "arrived" in note) as note (noteAt(note))}
-    <NoteLine {note} {turn} {run} {onFork} {onHover} />
+    <NoteLine {note} />
   {/each}
   {#if said !== "" || model !== null}
     <Head
@@ -100,7 +92,7 @@ bar and the thread cannot disagree about where a round is. -->
     <div class="text-body"><Prose text={said} /></div>
   {/if}
   {#if turn.calls.length > 0 && whole}
-    <Calls calls={turn.calls} {run} {turn} {doing} onFork={onCall} />
+    <Calls calls={turn.calls} {run} {doing} />
   {/if}
   {#if empty && showEmpty}
     <div class="rounded-card border border-alert/40 px-base py-snug text-note text-alert">
@@ -113,6 +105,6 @@ bar and the thread cannot disagree about where a round is. -->
     <div class="text-note text-alert">{fill(say($lang, "talk_cut_off"), { why: cut })}</div>
   {/if}
   {#each turn.notes.filter((note) => !("arrived" in note)) as note (noteAt(note))}
-    <NoteLine {note} {turn} {run} {onFork} {onHover} />
+    <NoteLine {note} />
   {/each}
 </div>

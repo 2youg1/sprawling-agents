@@ -10,8 +10,9 @@
   // model is still saying, the two lists that open over that box, and
   // the questions the city is holding for them - plus the session and
   // fork shapes a thread gains when one room runs more than once: one
-  // round, the divider that folds a previous segment away, the fork
-  // affordance over a message, and the picker a bare `/fork` opens.
+  // round, the divider that folds a previous segment away, and the
+  // picker a bare `/fork` opens. No control in a thread branches it:
+  // a typed verb is the only way (docs/frontend-method.md §7I).
   //
   // Two of these need room the page gives them and a fixture does not.
   // The list that opens over the composer opens *upward*, so the
@@ -19,8 +20,8 @@
   // questions sit in is drawn where the page draws it.
   //
   // The session and fork shapes are drawn here rather than through
-  // `talk/` because those modules do not exist yet: the divider and
-  // the affordance are what they will draw, frozen at the state worth
+  // `talk/` because those modules do not exist yet: the divider is
+  // what they will draw, frozen at the state worth
   // looking at, and the picker is the real multi-column `parts`
   // popover they are specified to walk (roadmap S2).
 
@@ -96,20 +97,6 @@
   </div>
 {/snippet}
 
-{#snippet forkHere(shown: boolean)}
-  <button
-    type="button"
-    class={[
-      "absolute end-0 top-0 rounded-control px-tight text-note text-text-faint hover:bg-chrome hover:text-text-quiet",
-      shown ? "" : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100",
-    ]}
-    onclick={() => undefined}
-  >
-    <!-- wording-ok: a branch mark, not a word -->
-    <span aria-hidden="true">⑂</span>
-    {say($lang, "fork_here")}
-  </button>
-{/snippet}
 
 {#each POSTURES as doing (doing.kind)}
   <Case label={`${doing.kind} · ${sendingInto(doing)}`}>
@@ -257,10 +244,6 @@ time somebody sends, so both landings are on this page. -->
         <div class="relative">
           <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
           {@render utterance(line)}
-          {#if line.speaker === "person"}
-            <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
-            {@render forkHere(false)}
-          {/if}
         </div>
       {/each}
     </div>
@@ -323,10 +306,6 @@ came from. -->
     <div class="relative">
       <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
       {@render utterance(line)}
-      {#if line.speaker === "person"}
-        <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
-        {@render forkHere(false)}
-      {/if}
     </div>
   {/each}
   <p class="mb-tight text-note text-text-faint" role="status">
@@ -334,24 +313,6 @@ came from. -->
   </p>
 </Case>
 
-<!-- The affordance in its revealed state, because a state that only
-appears under a pointer is a state nobody judges: over any message it
-arrives on hover or when anything inside the message holds focus, and
-the keyboard reaches it in the message's own tab stop. -->
-<Case label="message · fork from here, revealed over the message">
-  <div>
-    {#each ROUND as line (line.text)}
-      <div class="relative">
-        <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
-        {@render utterance(line)}
-        {#if line.speaker === "person"}
-          <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
-          {@render forkHere(true)}
-        {/if}
-      </div>
-    {/each}
-  </div>
-</Case>
 
 <!-- A bare `/fork` opens the picker: turns of this run down the left,
 what the marked turn did down the right. The columns are the real

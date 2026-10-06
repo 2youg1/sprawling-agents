@@ -269,14 +269,11 @@
         else u.send(cancel(going.run));
         return;
       }
-      case "fork.here":
       case "decide.yes":
       case "decide.edit":
       case "decide.no":
-        // Each is answered where its subject is - the entry under the hand
-        // by the thread (`talk/thread.svelte`), an answer by the decide
-        // card holding the focus (`parts/decide.svelte`) - and the shell
-        // holds neither.
+        // Each is answered by the decide card holding the focus
+        // (`parts/decide.svelte`), and the shell holds no card.
         return;
     }
   }

@@ -18,6 +18,7 @@
   import { Popover } from "../parts/popover";
   import type { PopoverBinding, PopoverColumn, PopoverRow } from "../parts/popover";
   import PillView, { FACT } from "./pill.svelte";
+  import Sandbox from "./sandbox.svelte";
   import { picked, policyColumns, policyFace, POLICY_SWITCHES } from "./policy";
 
   interface Props {
@@ -143,6 +144,7 @@
     {#if draws === "everything" && specs[1].choices.length > 0}
       <PillView spec={specs[1]} told={room === null ? undefined : listening} />
     {/if}
+    {#if draws === "everything"}<Sandbox {room} />{/if}
     {#if kept}<span class="px-snug text-note text-alert">{say($lang, "talk_not_live")}</span>{/if}
   </div>
   {#if draws === "everything"}

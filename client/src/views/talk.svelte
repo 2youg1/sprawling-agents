@@ -239,11 +239,12 @@
   });
   $effect(() => () => { u.conversing.set(NOT_CONVERSING); });
 
-  // One branch, from wherever a person pointed: the words a message
-  // carries go back to the box through the draft door - the composer
-  // reads that door when it mounts and this page remounts it below - and
-  // the line it cut at travels in the one frame `/fork` sends (roadmap
-  // S2-3).
+  // The branch `/fork` asks for, from the line its picker names: the
+  // words a message carries go back to the box through the draft door -
+  // the composer reads that door when it mounts and this page remounts
+  // it below - and the line it cut at travels in the one frame `/fork`
+  // sends. A typed verb is the only way a conversation branches: no
+  // control in the thread opens a session (docs/frontend-method.md §7I).
   function doFork(plan: ForkPlan): void {
     if (!u.send(openSession(address, "nothing", plan.origin))) return;
     if (plan.draft !== null) u.prefs.setDraft(address, plan.draft);
@@ -342,12 +343,12 @@ composition is rebuilt on the way. -->
       {#if runs.length > 0}
         <div class="mb-base flex justify-end"><Showing /></div>
         {#if drawsCalls($held.showing)}
-          <Divider {earlier} shown={shown.length} boundary={story} onFork={doFork} onRetry={send} />
+          <Divider {earlier} shown={shown.length} boundary={story} onRetry={send} />
           {#each shown as run, at (run.run)}
             {#if policyLine !== null && policyAt === at}
               <p class="my-snug text-center text-note text-text-faint">{policyLine}</p>
             {/if}
-            <Thread {run} opens={at === 0} onFork={doFork} onRetry={send} />
+            <Thread {run} opens={at === 0} onRetry={send} />
           {/each}
           {#if policyLine !== null && policyAt === -1}
             <p class="my-snug text-center text-note text-text-faint">{policyLine}</p>

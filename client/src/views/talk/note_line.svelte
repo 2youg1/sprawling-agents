@@ -18,18 +18,13 @@ question is what this turn did or waits on. -->
   import Person from "./person.svelte";
   import ReplyWaitNote from "./reply_wait_note.svelte";
   import RefusedNote from "./refused_note.svelte";
-  import type { ForkEntry, ForkPlan } from "./forking";
-  import type { Note, RunId, Turn } from "../../wire";
+  import type { Note } from "../../wire";
 
   interface Props {
     readonly note: Note;
-    readonly turn: Turn;
-    readonly run: RunId;
-    readonly onFork?: ((plan: ForkPlan) => void) | undefined;
-    readonly onHover: (entry: ForkEntry | null) => void;
   }
 
-  const { note, turn, run, onFork, onHover }: Props = $props();
+  const { note }: Props = $props();
 
   const u = ui();
   const { lang } = u;
@@ -51,10 +46,6 @@ question is what this turn did or waits on. -->
       text={note.arrived.said ?? ""}
       label={say($lang, "talk_you")}
       at={note.arrived.t}
-      entry={{ kind: "message", turn, text: note.arrived.said ?? "" }}
-      {run}
-      {onFork}
-      {onHover}
     />
   {/if}
 {:else if "awaiting_reply" in note}
