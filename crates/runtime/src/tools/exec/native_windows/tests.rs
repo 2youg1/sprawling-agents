@@ -211,7 +211,9 @@ fn native_windows_disposable_argv_and_unrequested_memory() {
     std::fs::write(&source, r#"
 use std::os::windows::ffi::OsStrExt;
 fn main() {
-    if std::env::args_os().nth(1).as_deref() == Some(std::ffi::OsStr::new("grant")) {
+    if std::env::args_os().nth(1).as_deref() == Some(std::ffi::OsStr::new("exit")) {
+        return;
+    } else if std::env::args_os().nth(1).as_deref() == Some(std::ffi::OsStr::new("grant")) {
         let root = std::path::PathBuf::from(std::env::var_os("CARGO_HOME").unwrap());
         while !root.join(std::env::args_os().nth(2).unwrap()).exists() { std::thread::sleep(std::time::Duration::from_millis(5)); }
         assert_eq!(std::fs::read_to_string(root.join("protected/input")).unwrap(), "read only");
@@ -219,11 +221,11 @@ fn main() {
         println!("read only");
     } else if std::env::args_os().nth(1).as_deref() == Some(std::ffi::OsStr::new("pipes")) {
         use std::process::{Command, Stdio};
-        let program = std::path::PathBuf::from(std::env::var_os("SystemRoot").unwrap()).join("System32/cmd.exe");
-        let inherited = Command::new(&program).args(["/D", "/C", "exit 0"]).status().unwrap();
+        let program = std::env::current_exe().unwrap();
+        let inherited = Command::new(&program).arg("exit").status().unwrap();
         assert!(inherited.success());
         println!("INHERITED_STDIO_EXIT=0");
-        let captured = Command::new(&program).args(["/D", "/C", "exit 0"])
+        let captured = Command::new(&program).arg("exit")
             .stdin(Stdio::inherit()).stderr(Stdio::inherit()).stdout(Stdio::piped()).spawn();
         match captured {
             Ok(mut child) => println!("PIPED_STDIO_EXIT={:?}", child.wait().unwrap().code()),
