@@ -71,7 +71,8 @@ SecretRef reference 与可缺席的 header；无 reference 为显式匿名账号
 EndpointTuning.accounts 缺席表示保留已有显式列表，尚未迁移的登记仍读原 auth。
 显式列表必须非空、id/reference 不重复，匿名账号不得带 header。
 endpoint_attached.tuning.accounts 为同一列表的 Ledger 形状，旧记录缺席仍可读。
-账号列表的创建、替换、移除和重排走原 AttachEndpoint，不创建第二个 Provider 数据库。
+列表内账号的增加、替换、移除和重排用完整非空列表走原 AttachEndpoint，
+不创建第二个 Provider 数据库；缺席列表不移除已迁移声明。
 保留规则只由 EndpointBook::accounts_for_attachment 决定，登记面与重放均调用它。
 校验住 kernel::event::record::validate_provider_accounts；probe、adapter 与 snapshot
 都读 AttachedEndpoint::first_auth，显式列表不回退原 auth。

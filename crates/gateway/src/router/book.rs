@@ -124,12 +124,8 @@ impl EndpointBook {
         match kind {
             EventKind::EndpointAttached => {
                 let mut attached = read_attached(data)?;
-                if attached.tuning.accounts.is_none() {
-                    attached.tuning.accounts = self
-                        .endpoints
-                        .get(&attached.name)
-                        .and_then(|held| held.endpoint.tuning.accounts.clone());
-                }
+                attached.tuning.accounts =
+                    self.accounts_for_attachment(&attached.name, attached.tuning.accounts);
                 self.endpoints.insert(
                     attached.name.clone(),
                     Held::from(Kept { endpoint: attached }),
@@ -206,6 +202,22 @@ impl EndpointBook {
                 held.endpoint.client_shape(),
                 held.endpoint.models_url(),
             )
+        })
+    }
+
+    /// Resolves one attachment's account list before effects or replay folding.
+    /// An omitted list preserves the existing declaration; an explicit list
+    /// replaces it atomically. See `crates/gateway/spec/Router.lean` Accounts.
+    #[must_use]
+    pub fn accounts_for_attachment(
+        &self,
+        name: &str,
+        incoming: Option<Vec<kernel::event::record::ProviderAccount>>,
+    ) -> Option<Vec<kernel::event::record::ProviderAccount>> {
+        incoming.or_else(|| {
+            self.endpoints
+                .get(name)
+                .and_then(|held| held.endpoint.tuning.accounts.clone())
         })
     }
 

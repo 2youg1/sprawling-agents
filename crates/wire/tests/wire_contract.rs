@@ -483,6 +483,7 @@ title = \"a window\"
             auth_header: None,
             admit: vec!["gpt-x".to_owned()],
             tuning: wire::EndpointTuning {
+                accounts: None,
                 label: Some("House".to_owned()),
                 timeout_ms: Some(60_000),
                 request_max_retries: Some(4),

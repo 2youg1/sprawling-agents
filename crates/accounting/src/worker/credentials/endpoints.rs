@@ -57,14 +57,20 @@ impl RunWorker {
             credential,
             mut tuning,
         } = entered;
-        if tuning.accounts.is_none() {
-            tuning.accounts = self
-                .credentials
-                .book
-                .endpoints()
-                .find(|endpoint| endpoint.name == name)
-                .and_then(|endpoint| endpoint.tuning.accounts.clone());
-        }
+        tuning.accounts = self
+            .credentials
+            .book
+            .accounts_for_attachment(&name, tuning.accounts);
+        let (secret, header) = match &credential {
+            Credential::Absent { header } => (None, header.as_deref()),
+            Credential::Key { reference, header } => (Some(reference.as_str()), header.as_deref()),
+        };
+        gateway::AttachedEndpoint::validate_legacy_fields(
+            &name,
+            tuning.accounts.as_deref(),
+            secret,
+            header,
+        )?;
         let auth = match credential {
             Credential::Absent { header } => self.kept_credential(&name, dialect, header),
             Credential::Key { reference, header } => gateway::AuthSpec::for_dialect(
@@ -422,48 +428,75 @@ mod tests {
         let (base_url, provider) = fake_openai(&["m-1"], vec![]);
         let mut worker = worker_with_provider(dir.path(), &base_url, "m-1").unwrap();
         for id in ["a", "b"] {
-            worker.handle(wire::Command::PutSecret {
-                realm: "fixture".to_owned(),
-                name: id.to_owned(),
-                value: kernel::Sealed::new(Box::new(format!("fixture-{id}"))),
-            }).unwrap();
+            worker
+                .handle(wire::Command::PutSecret {
+                    realm: "fixture".to_owned(),
+                    name: id.to_owned(),
+                    value: kernel::Sealed::new(Box::new(format!("fixture-{id}"))),
+                })
+                .unwrap();
         }
-        worker.handle(wire::Command::AttachEndpoint {
-            name: wire::ProviderName::parse("house").unwrap(),
-            base_url: base_url.clone(),
-            dialect: kernel::DialectKind::OpenAi,
-            secret: None,
-            auth_header: None,
-            admit: vec!["m-1".to_owned()],
-            tuning: wire::EndpointTuning {
-                accounts: Some(["a", "b"].map(|id| kernel::event::record::ProviderAccount {
-                    id: kernel::ServerLabel::parse(id).unwrap(),
-                    reference: Some(kernel::SecretRef::new("fixture", id).unwrap()),
-                    header: Some("X-Account".to_owned()),
-                }).to_vec()),
-                ..Default::default()
-            },
-            idem: kernel::IdemKey::derive(&kernel::RunId::CITY, kernel::Seq::FIRST, b"migrate"),
-        }).unwrap();
-        worker.handle(wire::Command::ProbeEndpoint {
-            name: wire::ProviderName::parse("house").unwrap(),
-            base_url: base_url.clone(),
-            dialect: kernel::DialectKind::OpenAi,
-            secret: None,
-            auth_header: None,
-            tuning: wire::EndpointTuning::default(),
-            idem: kernel::IdemKey::derive(&kernel::RunId::CITY, kernel::Seq::FIRST, b"probe-migrated"),
-        }).unwrap();
-        assert!(provider.exchanges().last().unwrap().to_ascii_lowercase().contains("x-account: fixture-a"));
+        worker
+            .handle(wire::Command::AttachEndpoint {
+                name: wire::ProviderName::parse("house").unwrap(),
+                base_url: base_url.clone(),
+                dialect: kernel::DialectKind::OpenAi,
+                secret: None,
+                auth_header: None,
+                admit: vec!["m-1".to_owned()],
+                tuning: wire::EndpointTuning {
+                    accounts: Some(
+                        ["a", "b"]
+                            .map(|id| kernel::event::record::ProviderAccount {
+                                id: kernel::ServerLabel::parse(id).unwrap(),
+                                reference: Some(kernel::SecretRef::new("fixture", id).unwrap()),
+                                header: Some("X-Account".to_owned()),
+                            })
+                            .to_vec(),
+                    ),
+                    ..Default::default()
+                },
+                idem: kernel::IdemKey::derive(&kernel::RunId::CITY, kernel::Seq::FIRST, b"migrate"),
+            })
+            .unwrap();
+        worker
+            .handle(wire::Command::ProbeEndpoint {
+                name: wire::ProviderName::parse("house").unwrap(),
+                base_url: base_url.clone(),
+                dialect: kernel::DialectKind::OpenAi,
+                secret: None,
+                auth_header: None,
+                tuning: wire::EndpointTuning::default(),
+                idem: kernel::IdemKey::derive(
+                    &kernel::RunId::CITY,
+                    kernel::Seq::FIRST,
+                    b"probe-migrated",
+                ),
+            })
+            .unwrap();
+        assert!(
+            provider
+                .exchanges()
+                .last()
+                .unwrap()
+                .to_ascii_lowercase()
+                .contains("x-account: fixture-a")
+        );
         let before = serde_json::to_value(&worker.credentials.book).unwrap();
         let calls = provider.exchanges();
-        let ledger = runtime::replay::verify_ledger_dir(&report.ledger_dir).unwrap().raw_lines().to_vec();
+        let ledger = runtime::replay::verify_ledger_dir(&report.ledger_dir)
+            .unwrap()
+            .raw_lines()
+            .to_vec();
         for (index, (secret, header)) in [
             (Some("secret:fixture/old"), None),
             (None, Some("X-Legacy")),
             (Some(""), None),
             (None, Some("")),
-        ].into_iter().enumerate() {
+        ]
+        .into_iter()
+        .enumerate()
+        {
             let result = worker.handle(wire::Command::ProbeEndpoint {
                 name: wire::ProviderName::parse("house").unwrap(),
                 base_url: base_url.clone(),
@@ -471,18 +504,41 @@ mod tests {
                 secret: secret.map(str::to_owned),
                 auth_header: header.map(str::to_owned),
                 tuning: wire::EndpointTuning::default(),
-                idem: kernel::IdemKey::derive(&kernel::RunId::CITY, kernel::Seq::FIRST,
-                    format!("legacy-probe-{index}").as_bytes()),
+                idem: kernel::IdemKey::derive(
+                    &kernel::RunId::CITY,
+                    kernel::Seq::FIRST,
+                    format!("legacy-probe-{index}").as_bytes(),
+                ),
             });
-            assert_eq!(*result.expect_err("legacy fields have no account target").code(), kernel::AxCode::ConfigInvalid);
-            assert_eq!(serde_json::to_value(&worker.credentials.book).unwrap(), before);
+            assert_eq!(
+                *result
+                    .expect_err("legacy fields have no account target")
+                    .code(),
+                kernel::AxCode::ConfigInvalid
+            );
+            assert_eq!(
+                serde_json::to_value(&worker.credentials.book).unwrap(),
+                before
+            );
             assert_eq!(provider.exchanges(), calls);
-            assert_eq!(runtime::replay::verify_ledger_dir(&report.ledger_dir).unwrap().raw_lines(), ledger.as_slice());
+            assert_eq!(
+                runtime::replay::verify_ledger_dir(&report.ledger_dir)
+                    .unwrap()
+                    .raw_lines(),
+                ledger.as_slice()
+            );
         }
         drop(worker);
-        let resumed = super::RunWorker::new(dir.path(), runtime::diagnostics::Diagnostics::off(),
-            crate::worker::fixture::hands()).unwrap();
-        assert_eq!(serde_json::to_value(&resumed.credentials.book).unwrap(), before);
+        let resumed = super::RunWorker::new(
+            dir.path(),
+            runtime::diagnostics::Diagnostics::off(),
+            crate::worker::fixture::hands(),
+        )
+        .unwrap();
+        assert_eq!(
+            serde_json::to_value(&resumed.credentials.book).unwrap(),
+            before
+        );
     }
 
     /// The two rungs this layer owns: what the person sends now, and

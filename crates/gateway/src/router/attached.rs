@@ -60,6 +60,35 @@ pub struct AttachedEndpoint {
 }
 
 impl AttachedEndpoint {
+    /// Validates submitted legacy fields against the settled account list.
+    ///
+    /// Account retention is settled by the caller before this check. Only
+    /// submitted fields count: archived legacy auth remains readable during
+    /// replay. Presence includes empty text and does not parse a reference.
+    /// See `crates/gateway/spec/Router.lean` D29.
+    ///
+    /// # Errors
+    /// Returns `E_CONFIG_INVALID` when an explicit list has no account target
+    /// for a submitted legacy secret or header, before any external effect.
+    pub fn validate_legacy_fields(
+        name: &str,
+        accounts: Option<&[kernel::event::record::ProviderAccount]>,
+        secret: Option<&str>,
+        auth_header: Option<&str>,
+    ) -> Result<(), kernel::AxError> {
+        if accounts.is_some() && (secret.is_some() || auth_header.is_some()) {
+            return Err(kernel::AxError::failure(
+                kernel::AxCode::ConfigInvalid,
+                "configure provider accounts",
+                format!("{name} uses explicit accounts; a legacy credential has no account target"),
+            )
+            .with_recovery(
+                "edit the named account's reference/header in accounts; omit legacy secret and auth_header fields",
+            ));
+        }
+        Ok(())
+    }
+
     /// Whether calls to this endpoint stay on this machine. The answer
     /// comes from the same test the local adapter applies and the proxy
     /// decision takes, so "local" means one thing city-wide.

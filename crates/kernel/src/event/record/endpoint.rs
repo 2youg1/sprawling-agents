@@ -126,13 +126,12 @@ fn readable_tuning<'de, D: Deserializer<'de>>(
     deserializer: D,
 ) -> Result<Option<AttachedTuning>, D::Error> {
     let value = Value::deserialize(deserializer)?;
-    if value.get("accounts").is_some() {
-        AttachedTuning::deserialize(value)
-            .map(Some)
-            .map_err(serde::de::Error::custom)
-    } else {
-        readable(value).map_err(serde::de::Error::custom)
+    if !value.is_object() {
+        return Ok(None);
     }
+    AttachedTuning::deserialize(value)
+        .map(Some)
+        .map_err(serde::de::Error::custom)
 }
 
 const fn probed_by_default() -> bool {
