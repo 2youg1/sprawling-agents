@@ -16,12 +16,10 @@ class ArchiveValidation(unittest.TestCase):
             channels = root / "generated"
             assets = root / "assets"
             local = root / "validation"
-            tap = root / "tap"
-            prefix = root / "prefix"
-            for directory in (assets, local, tap / "Formula", prefix / "bin"):
+            for directory in (assets, local):
                 directory.mkdir(parents=True)
             url = "https://example.invalid/releases/download/v1/archive.zip"
-            definitions = ("homebrew/sprawling.rb", "aur/PKGBUILD", "aur/.SRCINFO")
+            definitions = ("aur/PKGBUILD", "aur/.SRCINFO")
             for relative in definitions:
                 definition = channels / relative
                 definition.parent.mkdir(parents=True, exist_ok=True)
@@ -39,6 +37,7 @@ class ArchiveValidation(unittest.TestCase):
             commands = []
 
             def run(arguments, **kwargs):
+                self.assertEqual(arguments[0], "docker", "validation must only install AUR")
                 self.assertTrue(kwargs["check"])
                 commands.append(arguments)
                 for relative, payload in payloads.items():
@@ -48,25 +47,17 @@ class ArchiveValidation(unittest.TestCase):
                     self.assertIn("http://127.0.0.1:", text)
                     self.assertNotIn("/releases/download/", text)
 
-            def output(arguments, **kwargs):
-                self.assertTrue(kwargs["text"])
-                return str(tap if "--repository" in arguments else prefix) + "\n"
-
             script = pathlib.Path(__file__).with_name("validate.py")
             with (
                 mock.patch.object(sys, "argv", [str(script), str(channels), str(assets)]),
                 mock.patch("tempfile.TemporaryDirectory", return_value=contextlib.nullcontext(str(local))),
                 mock.patch("subprocess.run", side_effect=run),
-                mock.patch("subprocess.check_output", side_effect=output),
             ):
                 try:
                     runpy.run_path(str(script), run_name="__main__")
                 except UnicodeError as failure:
                     self.fail(f"validator decoded a native payload: {failure}")
             self.assertTrue(any(arguments[0] == "docker" for arguments in commands))
-            self.assertIn(("brew", "test", "sprawling"), commands)
-            self.assertEqual((tap / "Formula/sprawling.rb").read_bytes(),
-                             (local / "channels/homebrew/sprawling.rb").read_bytes())
             for relative, payload in payloads.items():
                 self.assertEqual((channels / relative).read_bytes(), payload)
 
