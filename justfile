@@ -276,7 +276,7 @@ test-slice-plan file out:
     #!/usr/bin/env bash
     set -euo pipefail
     mkdir -p '{{out}}'
-    cargo nextest list --archive-file '{{file}}' --workspace-remap . --extract-to . --extract-overwrite --message-format json > '{{out}}/full.json'
+    cargo nextest list --archive-file '{{file}}' --workspace-remap . --extract-to . --extract-overwrite --run-ignored all --message-format json > '{{out}}/full.json'
     python - '{{out}}' <<'PY'
     import json, pathlib, subprocess, sys
     out = pathlib.Path(sys.argv[1])
@@ -307,7 +307,7 @@ test-slice-plan file out:
         with (out / (row['name'] + '.json')).open('w', encoding='utf-8') as output:
             subprocess.run(['cargo', 'nextest', 'list', '--cargo-metadata', 'target/nextest/cargo-metadata.json',
                             '--binaries-metadata', 'target/nextest/binaries-metadata.json', '--workspace-remap', '.',
-                            '--message-format', 'json', '-E', row['filter']], stdout=output, check=True)
+                            '--run-ignored', 'all', '--message-format', 'json', '-E', row['filter']], stdout=output, check=True)
         listing = json.loads((out / (row['name'] + '.json')).read_text(encoding='utf-8'))
         if any(case['filter-match']['status'] == 'matches' for suite in listing['rust-suites'].values()
                for case in suite.get('testcases', {}).values()):
