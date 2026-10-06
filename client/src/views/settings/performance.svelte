@@ -111,7 +111,7 @@
 </script>
 
 {#if core !== undefined && placement !== undefined && priority !== undefined}
-  <Card title="setup_group_performance" note="setup_group_hint_performance" {saving} settled="performance_restart" onSave={save}>
+  <Card title="performance_core" note="performance_core_note" {saving} settled="performance_restart" onSave={save}>
     <Segmented
       label={say($lang, "performance_placement")}
       held={placement}

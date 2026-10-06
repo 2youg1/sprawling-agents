@@ -7403,6 +7403,14 @@
     "en": "A newer version is available: {version}.",
     "zh": "有更新版本可用：{version}。"
   },
+  "performance_core": {
+    "en": "core threads and run commands",
+    "zh": "核心线程与 run 的命令"
+  },
+  "performance_core_note": {
+    "en": "kept in [core] of ~/.sprawling/config.toml",
+    "zh": "存于 ~/.sprawling/config.toml 的 [core]"
+  },
   "performance_memory": {
     "en": "Per-run memory ceiling (bytes)",
     "zh": "每个 run 的内存上限（字节）"
