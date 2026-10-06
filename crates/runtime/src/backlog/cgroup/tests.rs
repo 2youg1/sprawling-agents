@@ -138,3 +138,21 @@ fn two_runs_hold_the_same_weight_and_the_limit_the_arm_asked_for() {
     cgroups.forget(first);
     assert_eq!(cgroups.held(first), Shares::Unset);
 }
+
+/// A restarted harness can reuse a run directory after its user clears the ceiling.
+#[test]
+fn cpu_only_clears_a_previous_ceiling_when_a_run_directory_is_reused() {
+    let root = FakeRoot::delegated();
+    let run = kernel::RunId::from_bytes([9; 16]);
+    let mut first = Cgroups::adopt(root.path(), 4242);
+    let capped = Shares::CpuAndMemory {
+        limit: NonZeroU64::new(64 << 20).unwrap(),
+    };
+    assert_eq!(first.enter(run, 111, capped), capped);
+    let mut restarted = Cgroups::adopt(root.path(), 4242);
+    let held = restarted.enter(run, 222, Shares::Cpu);
+    assert_eq!(
+        (held, root.read(&format!("run-{run}/memory.max"))),
+        (Shares::Cpu, "max".to_owned())
+    );
+}
