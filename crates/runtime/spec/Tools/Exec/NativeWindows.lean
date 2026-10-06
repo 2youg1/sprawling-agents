@@ -29,13 +29,14 @@ D57：显式环境声明的 CARGO_HOME 与 RUSTUP_HOME 可获得该 profile SID 
 read/execute ACE，不授 write、delete 或 ACL 修改权限。未声明的工具目录不自动授权。
 授予与撤销在跨 Windows session 的 Global 命名 mutex 内读取并改写当前 DACL；
 mutex 的 DACL 只给 Authenticated Users synchronize/modify-state，不给 WRITE_DAC，
-因此其它账户的授权操作也使用同一排他机制，而文件的 WRITE_DAC 仍由 OS 单独检查。声明根内的普通目录与文件先由 Rust 枚举，不跟随子 reparse point；
+因此其它账户的授权操作也使用同一排他机制，而文件的 WRITE_DAC 仍由 OS 单独检查。
+声明根内的普通目录与文件先由 Rust 枚举，不跟随子 reparse point；
 叶子只在声明根和启用 DACL protection 的后代授予 ACE，避免保护位阻止继承。
-撤销只移除本次
-唯一 SID，不恢复旧 snapshot，因此另一个仍运行的 SID 授权不会丢失。
+撤销只移除本次唯一 SID，不恢复旧 snapshot，因此另一个仍运行的 SID 授权不会丢失。
 cleanup 等待整棵 job 退出后才撤销，撤销失败保留拥有 SID 与路径的资源并重试。
-权限变更只涉及声明的根；目录不存在表示资源已消失，不能改其父目录。
-FFI packet 的第七个字段为用 LF 分隔的声明根，空字段表示无额外授权；
+权限变更只涉及声明根及其后代；目录不存在表示资源已消失，不能改其父目录。
+FFI packet 的第七个字段用 LF 分隔声明根与枚举出的后代；
+`declared_roots` 标记字段开头有多少个声明根，空字段表示无额外授权；
 Rust 拒绝路径中的 NUL 与 LF，叶子复制该字段，借出的 packet 地址不跨调用。
 平台的 SetNamedSecurityInfo 继承传播与 mutex 排他属于环境假设，以下模型
 证明在该假设下撤销一个 SID 保留其余 SID；disposable fixtures 验证实际并发清理。SetNamedSecurityInfo 可设置
@@ -45,8 +46,8 @@ Microsoft SECURITY_DESCRIPTOR_CONTROL 定义该标志的含义。
 scratch 的继承 mandatory-integrity label 为 Low，避免 medium 默认标签即使
 DACL 已授权仍因 write-up 禁止而拒绝 AppContainer 写入；只修改这次复制目录，
 使用 LABEL_SECURITY_INFORMATION，不索取 SeSecurityPrivilege。
-叶子保留 GetNamedSecurityInfo 分配的原 security descriptor，跨调用保留的只有
-OS 自己分配的资源，Rust 借出的 packet 地址不保留；command 结束后恢复副本根的
+叶子保留 GetNamedSecurityInfo 分配的原 security descriptor 与授权路径的自有副本，
+Rust 借出的 packet 地址不保留；command 结束后恢复副本根的
 原 DACL 与 mandatory label，再释放 descriptor，避免复用副本时积累旧 SID 的 ACE。
 原目录已被命令删除时视为权限资源已经不存在，不尝试改动它的父目录。
 环境继续从 Command 的显式 allowlist 取值，Windows native loader 的 OS 根目录
