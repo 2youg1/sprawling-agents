@@ -354,6 +354,51 @@ test-slice file filter:
     cargo fetch --locked
     cargo nextest run --archive-file '{{file}}' --workspace-remap . --extract-to . --extract-overwrite -E '{{filter}}' --no-fail-fast --no-tests=warn
 
+# Compare completed successful Actions inventories, exported with:
+# gh run view <id> --json conclusion,headSha,startedAt,updatedAt,jobs
+# Queueing stays in run and test-chain wall time; job durations are
+# reported separately rather than presented as the algorithm's gain.
+test-timings baseline current:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    python - '{{baseline}}' '{{current}}' <<'PY'
+    import datetime, json, pathlib, sys
+    def instant(value):
+        return datetime.datetime.fromisoformat(value.replace('Z', '+00:00'))
+    def seconds(start, end):
+        elapsed = (instant(end) - instant(start)).total_seconds()
+        if elapsed < 0:
+            sys.exit('test-timings: end precedes start')
+        return elapsed
+    def inventory(path):
+        run = json.loads(pathlib.Path(path).read_text(encoding='utf-8'))
+        if run['conclusion'] != 'success':
+            sys.exit(f'test-timings: {path} is not a successful completed run')
+        jobs = {job['name']: job for job in run['jobs']}
+        slices = [job for job in run['jobs'] if job['name'].startswith('test (')]
+        if len(jobs) != len(run['jobs']) or not slices or 'test build' not in jobs or 'test' not in jobs:
+            sys.exit('test-timings: duplicate job names or missing test build, slices or verdict')
+        for job in [jobs['test build'], jobs['test'], *slices]:
+            if job['conclusion'] != 'success' or not job['completedAt']:
+                sys.exit(f"test-timings: {job['name']} did not finish successfully")
+        duration = lambda job: seconds(job['startedAt'], job['completedAt'])
+        return run, slices, {
+            'ci-wall-seconds': seconds(run['startedAt'], run['updatedAt']),
+            'test-chain-wall-seconds': seconds(jobs['test build']['startedAt'], jobs['test']['completedAt']),
+            'test-build-seconds': duration(jobs['test build']),
+            'longest-slice-job-seconds': max(map(duration, slices)),
+        }
+    before, before_slices, baseline = inventory(sys.argv[1])
+    after, after_slices, current = inventory(sys.argv[2])
+    print('metric	baseline	current	delta-seconds')
+    for metric in baseline:
+        print(f'{metric}	{baseline[metric]:g}	{current[metric]:g}	{current[metric] - baseline[metric]:+g}')
+    for label, run, slices in [('baseline', before, before_slices), ('current', after, after_slices)]:
+        print(f"{label} HEAD: {run['headSha']}")
+        for job in sorted(slices, key=lambda job: job['name']):
+            print(f"{label} {job['name']}: {seconds(job['startedAt'], job['completedAt']):g}s")
+    PY
+
 # The packages every platform builds and tests. The desktop server
 # and its FFI seam serve a Windows desktop only, and xtask judges the
 # repository rather than shipping in it, so `ci.yml` lints and tests
