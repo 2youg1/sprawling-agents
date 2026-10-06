@@ -23,6 +23,7 @@ mod ocr;
 mod playback;
 pub(super) mod proposal;
 mod reading_room;
+mod search;
 mod transcribe;
 
 impl Laying {

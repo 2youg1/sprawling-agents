@@ -124,7 +124,7 @@ impl Watchdog {
     /// provider rejected on its shape buys the same rejection again.
     /// `Yes` and `Unknown` back off (a model call's only effect is an
     /// answer the city never received) from `now` by the
-    /// schedule [`Watchdog::backoff_ms`] owns, or by the provider's own
+    /// schedule [`backoff_ms`] holds, or by the provider's own
     /// `retry_after_ms` when that is longer: asking before the time it
     /// named buys one more refusal.
     ///
@@ -137,8 +137,7 @@ impl Watchdog {
     pub fn on_provider_failure(&mut self, failure: &AxError, now: TimeMs) -> Disposal {
         self.provider_failures = self.provider_failures.saturating_add(1);
         self.streak = self.streak.saturating_add(1);
-        let own = self.backoff_ms();
-        let wait = failure.retry_after_ms().map_or(own, |told| own.max(told));
+        let wait = wait_ms(self.jitter_seed, self.streak, failure);
         let not_before = TimeMs::new(now.value().saturating_add(wait));
         let refused = Disposal::Freeze {
             reason: FreezeReason::ProviderRefused,
@@ -160,24 +159,6 @@ impl Watchdog {
     /// The provider answered, which ends the streak of failures.
     pub fn on_provider_answered(&mut self) {
         self.streak = 0;
-    }
-
-    /// How long the failure just counted waits: a base of 500 ms doubled
-    /// for each failure in a row before it, capped at a minute, plus up
-    /// to half the base again. Both numbers are the provider's scale,
-    /// the time an overloaded service takes to recover, so no reading of
-    /// this machine moves them. The jitter only adds, so the base stays
-    /// the floor; it is drawn from the run's seed and the streak, so
-    /// runs cut by one outage spread out and each replays its own.
-    fn backoff_ms(&self) -> u64 {
-        const FIRST_MS: u64 = 500;
-        const CEILING_MS: u64 = 60_000;
-        let doublings = self.streak.saturating_sub(1).min(16);
-        let base = FIRST_MS
-            .checked_shl(doublings)
-            .map_or(CEILING_MS, |wait| wait.min(CEILING_MS));
-        let spread = NonZeroU64::MIN.saturating_add(base >> 1);
-        base.saturating_add(mixed(self.jitter_seed ^ u64::from(self.streak)) % spread)
     }
 
     /// The `watchdog_fired` payload (E_LOOP_SUSPECTED's carrier when the
@@ -219,6 +200,39 @@ impl Watchdog {
             provider_failures: self.provider_failures,
         })
     }
+}
+
+/// How long `run` waits before asking again after `failure`, the
+/// `failures_in_a_row`-th since its provider last answered: the longer of
+/// the schedule below and the provider's own `retry-after`.
+///
+/// The one back-off table. [`Watchdog`] reads it for a model call, and
+/// the `web_search` tool reads it for a search it sends again
+/// (`crates/accounting/spec/Connectors.lean` §8-35), so the two kinds of
+/// outside request wait alike.
+#[must_use]
+pub fn backoff_ms(run: RunId, failures_in_a_row: u32, failure: &AxError) -> u64 {
+    wait_ms(seed_of(run), failures_in_a_row, failure)
+}
+
+/// The schedule behind [`backoff_ms`], over a seed already folded: a
+/// base of 500 ms doubled for each failure in a row before this one,
+/// capped at a minute, plus up to half the base again. Both numbers are
+/// the provider's scale, the time an overloaded service takes to
+/// recover, so no reading of this machine moves them. The jitter only
+/// adds, so the base stays the floor; it is drawn from the run's seed
+/// and the streak, so runs cut by one outage spread out and each
+/// replays its own.
+fn wait_ms(seed: u64, streak: u32, failure: &AxError) -> u64 {
+    const FIRST_MS: u64 = 500;
+    const CEILING_MS: u64 = 60_000;
+    let doublings = streak.saturating_sub(1).min(16);
+    let base = FIRST_MS
+        .checked_shl(doublings)
+        .map_or(CEILING_MS, |wait| wait.min(CEILING_MS));
+    let spread = NonZeroU64::MIN.saturating_add(base >> 1);
+    let own = base.saturating_add(mixed(seed ^ u64::from(streak)) % spread);
+    failure.retry_after_ms().map_or(own, |told| own.max(told))
 }
 
 /// FNV-1a over the id's sixteen bytes. A uuid v7 keeps its random bits

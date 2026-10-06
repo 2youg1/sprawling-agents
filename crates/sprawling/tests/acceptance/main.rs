@@ -32,3 +32,4 @@ mod playback;
 mod script;
 mod shelf_outside;
 mod skills;
+mod web_search;
