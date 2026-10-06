@@ -190,15 +190,7 @@ mod tests {
                 }
             }
             let reference = match reported {
-                Some(map) => Err(provider_err(
-                "read a streamed answer",
-                &ProviderFailure::Reported {
-                    kind: map
-                        .get("code")
-                        .and_then(Value::as_str)
-                        .unwrap_or("an error without a code"),
-                },
-            )),
+                Some(error) => Err(error),
                 None => terminal.ok_or_else(|| stream_cut("the stream ended without the event that carries the settled answer")),
             };
             let normalize = |result: Result<Value, AxError>| result.and_then(|wire| super::super::reply::response_from(&wire))
