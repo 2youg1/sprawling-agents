@@ -854,12 +854,14 @@ jobs:
           }, indent=2), encoding="utf-8")
           PYTHON
       - name: compile the repository harness before measurement
+        if: inputs.responses_base == ''
         shell: bash
         run: |
           set -euo pipefail
           cargo build --release -p citysim --bin bench --locked
           cargo nextest run -p sprawling -p sprawling-accounting -p sprawling-gateway -p sprawling-runtime --release --lib --run-ignored only -E 'test(/::instrument_/)' --no-run
       - name: repository benchmark harness
+        if: inputs.responses_base == ''
         shell: bash
         run: |
           set -euo pipefail
