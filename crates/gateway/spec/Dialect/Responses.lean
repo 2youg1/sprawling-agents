@@ -41,6 +41,7 @@
 /-! D27 stream 是 projection：只持有最后带 `response` 字段的 terminal 与首个 reported error。
 「有效」指可读的事件名且 `response` 字段存在，不提前验证 response 内容，最终仍由
 `response_from` 决定；缺字段的 terminal 不覆盖已有答案，存在的 null 仍交给原解析器拒绝。
+首个 reported error 以原始 map 持有，EOF 后经原 `provider_err` 解析，不预先构造 `AxError`；
 读到 EOF 才 settle，error 不阻断后续 delta；读失败或 silence 先于已持有的 error 与 terminal。
 落选：保留全部帧再扫描，长流的存储随 delta 数增长；提前返回 error 则改变 EOF 与错误优先级。
 模型的 Nat 是不透明 response、error、delta 身份，不解释其内容；解析器不是模型的第二份。

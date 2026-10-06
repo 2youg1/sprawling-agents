@@ -85,12 +85,12 @@ pub(crate) fn increment_of(map: &serde_json::Map<String, Value>) -> Option<Incre
 #[derive(Default)]
 pub(crate) struct Stream {
     terminal: Option<Value>,
-    reported: Option<AxError>,
+    reported: Option<serde_json::Map<String, Value>>,
 }
 
 impl Stream {
-    pub(crate) fn retain(&mut self, mut frame: Value) {
-        let Some(map) = frame.as_object_mut() else {
+    pub(crate) fn retain(&mut self, frame: Value) {
+        let Value::Object(mut map) = frame else {
             return;
         };
         let Some(word) = map.get("type").and_then(Value::as_str) else {
@@ -104,15 +104,7 @@ impl Stream {
             }
             Event::Reported => {
                 if self.reported.is_none() {
-                    self.reported = Some(provider_err(
-                        "read a streamed answer",
-                        &ProviderFailure::Reported {
-                            kind: map
-                                .get("code")
-                                .and_then(Value::as_str)
-                                .unwrap_or("an error without a code"),
-                        },
-                    ));
+                    self.reported = Some(map);
                 }
             }
             Event::TextDelta | Event::ReasoningDelta | Event::Unread => {}
@@ -121,7 +113,15 @@ impl Stream {
 
     pub(crate) fn finish(self) -> Result<Value, AxError> {
         match self.reported {
-            Some(error) => Err(error),
+            Some(map) => Err(provider_err(
+                "read a streamed answer",
+                &ProviderFailure::Reported {
+                    kind: map
+                        .get("code")
+                        .and_then(Value::as_str)
+                        .unwrap_or("an error without a code"),
+                },
+            )),
             None => self.terminal.ok_or_else(|| {
                 stream_cut("the stream ended without the event that carries the settled answer")
             }),
@@ -190,7 +190,15 @@ mod tests {
                 }
             }
             let reference = match reported {
-                Some(error) => Err(error),
+                Some(map) => Err(provider_err(
+                "read a streamed answer",
+                &ProviderFailure::Reported {
+                    kind: map
+                        .get("code")
+                        .and_then(Value::as_str)
+                        .unwrap_or("an error without a code"),
+                },
+            )),
                 None => terminal.ok_or_else(|| stream_cut("the stream ended without the event that carries the settled answer")),
             };
             let normalize = |result: Result<Value, AxError>| result.and_then(|wire| super::super::reply::response_from(&wire))
