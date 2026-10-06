@@ -54,11 +54,19 @@ Rust 借出的 packet 地址不保留；command 结束后恢复副本根的
 环境继续从 Command 的显式 allowlist 取值，Windows native loader 的 OS 根目录
 变量由安全 GetSystemDirectory API 的父目录提供，并通过 Command 的 Windows
 case-insensitive key 规则替换别名；它们是平台启动信息，不从 host environment 继承，
-也不携带用户或 provider 凭据。USERPROFILE、APPDATA、LOCALAPPDATA、TEMP 与 TMP
-由 disposable working directory 提供，不继承 host 路径；Microsoft 的
-Implementing an AppContainer「Creating the Profile」规定启动时会重定向
-LOCALAPPDATA/TEMP/TMP 到 profile。显式环境缺失这些初始化字段时，平台可能
-以 ERROR_ENVVAR_NOT_FOUND 拒绝；实际 disposable test 验证该启动条件。
+也不携带用户或 provider 凭据。USERPROFILE、APPDATA、TEMP 与 TMP 由 disposable
+working directory 提供，不继承 host 路径。Microsoft 的 Implementing an AppContainer
+「Creating the Profile」规定启动时把 LOCALAPPDATA/TEMP/TMP 重定向到 profile；
+平台拼这条路径时取的是子进程环境块里的 LOCALAPPDATA，得
+`<LOCALAPPDATA>\Packages\<profile>\AC` 与其下的 `Temp`，而
+CreateAppContainerProfile 只在创建它的账户的 LocalAppData 下建这个目录并授本次 SID。
+LOCALAPPDATA 因此取 serving 进程自己的 LOCALAPPDATA（profile 由同一账户创建），
+重定向后的 TEMP 落在 profile 的私有存储里，随 profile 删除；LOCALAPPDATA 若给成
+副本，TEMP 指向副本下不存在的 `Packages` 路径，windows-latest 上 link.exe 因此以
+LNK1104 打不开临时文件。被否的备选是在副本里预建该路径：临时文件会混进
+resident 看见的工作树，且不随 profile 删除。serving 进程没有 LOCALAPPDATA 时拒绝
+起动并给恢复语。显式环境缺失这些初始化字段时，平台可能以 ERROR_ENVVAR_NOT_FOUND
+拒绝；disposable production axes 的 child 写入自己的 TEMP，验证该启动条件。
 错误携带真实失败阶段，避免把 loader 拒绝记作 guard 通过。
 profile 的私有存储也是这次执行拥有的资源。harness/provider 不进入 AppContainer。
 
