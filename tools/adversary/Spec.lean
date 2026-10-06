@@ -64,7 +64,7 @@ import tools.adversary.spec.Model
 |---|---|---|
 | 门的形状 | `sprawling call <frame> --at <addr> --quiet-ms <n>`：stdout 每行一枚 JSON 帧，stderr 一行计数，退出码 0／1／2／3 | 线格式换传输时门变成它的 schema，改 `Door.lean` 一处 |
 | 城是什么 | 一个本地目录，`init` 造它，`serve` 端起来，账本在 `.sprawling/ledger/` 下按段分文件 | 布局改变时 `Ground.lean` 的敌意动作报错，属预期 |
-| 静默 | 门的第三种回答。**不是接受**——见 §10「静默不是接受」 | 若将来 `call` 改为「命令被受理才返回」，`quiet` 这一支变成异常而不是取值 |
+| 静默 | 门的第三种回答。**不是接受**——见 §10「静默不是接受」 | 若将来 `call` 对每一条命令都在受理时返回，`quiet` 这一支变成异常而不是取值（D9） |
 | provider | `Model` 的世界一个都不挂，于是每一次派活在配置这道门上被拒，而模型知道这一点；`Provider` 的世界挂一个**这台电脑上没人听的地址**，于是每一次调用停在 socket 上；U9 挂 `just acceptance` 起的替身，调用成功，替身不在本目录里（§13） | 检查树里的世界要一个会应答的 endpoint 时，它们照 U9 的样子从 justfile 接收一个 URL，而不是在本目录里起一个 |
 | 替身怎样分 run | 替身按请求带回来的调用 id 认出 run 与它走到哪一条，一个 id 都没带的第一轮按到达次序开启脚本里下一个 run（citysim D11、`tools/citysim/Spec.lean` §8-13；`spec/Acceptance.lean`）。所以 U9 只在第一轮可能同时到达的地方——两个同时派出的认领——把那几个 run 写成一样，其余的活都等前一个 run 冻结再派，第一轮的次序就是脚本的次序（D6） | 两个同时开启、要拿不同回复的 run 进 U9 时，替身要能认第一轮（citysim D11 的重开参数） |
 | 杀进程 | `Serving.hangUp` 结束被服务的进程（Lean 的 `IO.Process.Child.kill`：Windows 上是 `TerminateProcess`，Unix 上是 `SIGTERM`；城只把 Ctrl-C、Ctrl-Break 与 `SIGINT` 当作有序关闭，所以 `SIGTERM` 同样不留交接；城经启动器起时，结束的是启动器，城随它的 job 一起结束，同样不留交接，D8），等被杀的 run 写下 `inFlight` 条 `tool_result` 之后才杀，所以刀落在两次写之间，而不是在最后一次写之后；被杀的 run 若已冻结，那一步报红并说明替身给的调用太少 | 城回来之后怎么处理那个死掉的 run，不是 U9 断言的事：它断言的是历史自证、城再服务、新的活跑到它自己的结尾 |
@@ -254,6 +254,8 @@ def cityBuildings : Json → Option (List String)
 structure Door where binary : System.FilePath; launcher : Option System.FilePath := none  -- 启动器只在 Windows 的 U9 里给（D8）
 inductive Closing | interrupt | launcher         -- 怎样请一个被服务的进程有序关闭（D8）
 inductive Answer | accepted (frames : List Frame) | denied (complaint : Complaint) | quiet
+inductive Ending | reply | record (kind : String) | silence  -- 一次 `call` 在什么到达时结束（D9）
+def Verb.ending  : Verb → Ending
 def discover     : IO (Option Door)
 def Door.raise   : Door → System.FilePath → IO Unit
 def Door.serve   : Door → System.FilePath → Port → System.FilePath → IO Serving  -- 城、端口、给城的 home；有 launcher 时经它起城
@@ -436,7 +438,9 @@ def writtenReadsBack  : Door → List Nat → IO Verdict
 
 **静默不是接受。** `ask` 在拿到 `welcome` 之后若一个帧都没再来，返回 `quiet`。模型对每个动作声明它期待哪一种回答，**`quiet` 从不满足任何期待**。`log` 与 `welcome` 同样不算回答：城在那条通道上**也**叙述它的拒绝，把叙述算成回答就会把一条城根本没受理的命令报成受理了。
 
-静默窗口取 250 ms。`sprawling call` **要等满静默窗口才返回**，于是窗口是每一个动作都要付满的价钱。短窗口在这里是诚实的，理由在模型而不在计时：它一个 endpoint 都不挂，每条命令都在本地磁盘与回环上答完，实测均在 1 ms 以内。慢路径自身的危险由「模型里没有一个动作走它」来保证，而不是靠等。
+一次 `call` 什么时候结束，由 `Verb.ending` 一处决定（D9）。查询在答复到达时结束（`reply`）；一条受理时恰好写下一种记录的命令带 `--until <kind>`，在那条记录或一条拒绝到达时结束（`record`）；这两种都只把窗口当上限，取答复窗口 5000 ms，只有城一句话都不说时才付满。其余的命令——派活、批量、探测、挂 endpoint、选模型、写偏好——受理时写下几条记录、写不写记录都不是固定的，客户端只能等城安静，窗口取静默窗口 250 ms，每次都付满。短窗口对它们是诚实的，理由在模型而不在计时：模型一个 endpoint 都不挂，这些命令都在本地磁盘与回环上答完，慢路径自身的危险由「模型里没有一个动作走它」来保证，而不是靠等。
+
+D9 **能说出自己在等哪一帧的动作，等那一帧，而不是等城安静。** 起因是实测：同一座城上「起一栋楼」与「写一次预算」在一台忙着编译的机器上不止一次超过 250 ms 才答，一次托管 runner 上的定时跑也在「起一栋楼」上撞到静默；那时城并没有沉默，只是答得比窗口慢，而 `quiet` 把它报成了产品缺陷。窗口变成上限之后，它的长短只在城真的不答时才花钱，所以可以取一个与机器快慢无关的值；被否：把静默窗口整体调大——每一条只能等安静的命令都要付满它，检查树每一跑都慢上几十倍；在本目录里重试静默的动作——一次被重试的命令可能已经受理，重试读不出城第一次做了什么。`record` 的种类取 `EventKind` 的 snake_case 拼写，与 `--until` 由 serde 读的拼写是同一个，本目录不另立名表；一次被城认出的重放（`a key the city has seen does not do the work again` 的第二次 `Halt`）不写记录，于是那一次付满答复窗口，这是那条检查要看的事本身的代价。
 
 **模型**：`World` 只记一个用户记得住的东西——哪些楼立着、哪些范围停摆着、以及有没有挂过 provider。它**不记** `seq`、哈希、时间戳；`seq` 只作为 U6 里「逐行读账本」时的相邻关系间接出现。
 
@@ -537,7 +541,8 @@ D3 **一个会应答的 provider 从 justfile 接收，不在本目录里起。*
 |---|---|---|
 | 账本布局 `.sprawling/ledger/*.jsonl` | 敌意动作要按它找到文件 | 该布局改变时本目录报错，属预期 |
 | 端口 47100–47115 | 避开常用段，又不需要网络库依赖；整棵树串行跑，十六个是给外部占用留的余地 | 冲突时报环境问题 |
-| 静默窗口 250 ms | 模型驱动的每个动词都答在 1 ms 内（实测），250 ms 是三个数量级的余量 | 模型开始走慢路径（挂 endpoint）时必须同步改 |
+| 静默窗口 250 ms | 只给结束于城安静的命令（D9）：它们在本地磁盘与回环上答完，空闲机器上实测在 1 ms 内 | 模型开始走慢路径（挂 endpoint）时必须同步改 |
+| 答复窗口 5000 ms | 查询与结束于一条记录的命令（D9）的上限，只在城一句话都不说时付满；忙着编译的机器上实测超过 250 ms 的答复，它仍有二十倍的余量 | 有一次答复在忙机器上超过它时，先量那一次答复花在哪里 |
 | 种子 `<!-- xtask:begin adversary_seed -->20260912<!-- xtask:end -->` | 本地运行必须可复现：一次反例只有在它能被重跑时才值得渲染成 Rust 测试。**`SPRAWLING_SEED` 读成三态**：给了且能解成数、没给、给了但解不成。第三态以退码 `2` 在起城之前停住，而不是静默换成默认值：拼错的种子不是关于产品的证据，而报告里那句复现命令必须是这一跑真用过的那一个（B-81）。每一跑开头打印 `seed <值>` | 定时任务经 `SPRAWLING_SEED` 用会变的种子，于是「每晚探索新轨迹」与「本地可复现」各得其所。**这一格的数是受管区段**：`cargo xtask docnum` 每次都去 `test/Main.lean` 的 `defaultSeed` 重读一遍，两处不同即红，改法只有 `cargo xtask docnum --write` |
 | 人那一层的路径 `<home>/.sprawling/config.toml` | 第四种世界要按它找到那份磁盘上的读数，而它不在任何一座城里，`document` 查询读不到 | 布局改变时本目录报错，属预期 |
 | 环境变量 `USERPROFILE` 与 `HOME` | 被服务的城按这两个变量找家目录，两个都指向一次性目录；**只覆写其中一个就把答案交给了平台**，而一跑对抗不得动跑它的人自己的偏好 | 产品改读家目录的方式时同步改 `Door.serve` |
