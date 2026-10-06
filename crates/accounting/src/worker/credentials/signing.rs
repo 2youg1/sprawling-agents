@@ -61,6 +61,10 @@ impl RunWorker {
                 .map_err(|_| poisoned_vault())?;
             vault.set(reference, value.into_vault_value())?;
         }
+        // Before the record, so a refused append still leaves no
+        // connection sending the value this one replaced
+        // (`crates/accounting/spec/Connectors.lean` §8-2).
+        self.connectors.invalidate(reference);
         let captured = SecretCaptured {
             reference: reference.clone(),
             origin: arrival.spelling().to_owned(),
