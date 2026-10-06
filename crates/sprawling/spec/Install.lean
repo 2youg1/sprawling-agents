@@ -6,7 +6,7 @@
 /-!
 # 让二进制成为一个词：搜索路径的两个判定
 
-规定 `crates/sprawling/src/install.rs` 里的 `plan_append` 与 `plan_remove`（`bin::install`，形状 4 adapter：决定纯，落地薄）。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威（§8-9）。拷贝、注册表读写与广播是适配器的事，这里不建模。
+规定 `crates/sprawling/src/install.rs` 里的 `plan_append` 与 `plan_remove`（`bin::install`，形状 4 adapter：决定纯，落地薄）。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威（§8-9）。拷贝、可执行文件删除、注册表读写与广播是适配器的事，这里不建模；Windows 自卸载的环境契约与实际检查见 D52。
 
 一条搜索路径在模型里是它按分隔符切开的各段，按原来的次序。段的类型 `α` 是参数，因为判定只需要两件事：两段是不是同一个目录（`same`，Rust 里是 `same_directory`：去掉首尾空白与尾随的斜杠，Windows 上再不分大小写），以及一段是不是空段（`blank`）。空白的整串在模型里是空表，于是「空串变成那一个目录」不是一个特例。
 
@@ -156,7 +156,8 @@ pub(crate) fn program_dir(local_app_data: Option<&Path>, home: Option<&Path>) ->
 pub(crate) fn installed_name() -> String;                    // 恒为 sprawling + EXE_SUFFIX
 #[cfg(target_os = "windows")] pub(crate) fn plan_append(current: &str, dir: &str) -> PathEdit;
 #[cfg(target_os = "windows")] pub(crate) fn plan_remove(current: &str, dir: &str) -> PathRemoval;
-pub(crate) fn install(uninstall: bool) -> Result<Report, AxError>;
+pub(crate) enum Direction { Install, Uninstall }
+pub(crate) fn install(direction: Direction) -> Result<Report, AxError>;
 ```
 
 - **一次安装做两件事，撤销就撤销这两件**：把正在运行的这个二进制拷进用户级程序目录，并把该目录写进用户级搜索路径。`--uninstall` 删掉它拷过去的那个文件、删掉它追加过的那一段，别的一概不碰。**恒不要管理员权限**，因为这两件事都在用户自己的 profile 里。
@@ -254,4 +255,43 @@ Nix 用户的唯一渠道是本仓库的 flake（人的决定）：项目不向 
 包来源只从明确的 npm/Bun 元数据或缓存目录辨认，路径组件接受 Windows 与 Unix 分隔符，
 运行时不是安装器，无法辨认时必须保留 Package 的候选确认。
 三平台隔离安装、up、参数与信号验收检验这些环境条件，模型证明不覆盖包管理器行为。
+-/
+
+/-! D52 Windows 自卸载使用安全 Rust API 释放安装路径
+
+本节是文件系统适配器的契约说明，不是 OS 或依赖实现的形式证明；上面的搜索路径模型与证明继续约束 PATH 判定。
+`bin::install::displace` 只删除 `program_dir` 下的 `installed_name`，目标不存在返回 false；
+Windows 上先以 `symlink_metadata` 读取安装目录 entry；文件 symlink（含 dangling link）
+直接 `remove_file`，不跟随 referent，不移动或删除外部目标。只有非 symlink entry
+才规范化目标和当前 EXE 的路径，二者相同才调用 `self_replace::self_delete_outside_path`，
+保护安装目录，先将运行映像移走，再安排 helper 在原进程退出后删除临时映像。
+成功返回意味着安装名称已释放，随后 `install(Direction::Uninstall)` 删除归档来源标记并通过原 `retract` 清理 PATH；
+`bin::main::data::install` 写完现有 Report 后立即退出。目标不是当前 EXE 时直接 `remove_file`，
+不能把其他进程的占用解释为本进程可延后的删除。非 Windows 的直接删除保持不变。
+选择不跟随链接的 entry 读取，是因为 referent 相同不代表两个目录项相同；
+目标缺席由 entry 的 NotFound 决定，不能用 canonicalize 的 NotFound 遗留 dangling link。
+这些读取与删除之间未锁定目录项，不承诺并发替换路径的事务隔离。
+
+依赖取 `crates/sprawling/Cargo.toml` 的 Windows 专用 `self-replace`，使用其公开安全接口，
+选择依据是 ARCHITECTURE.md §2 的平台调用次序；本 crate 不引入 unsafe 或自己的 helper 协议。
+官方接口与算法见 https://docs.rs/self-replace/1.5.0/self_replace/fn.self_delete_outside_path.html
+和 https://docs.rs/self-replace/1.5.0/src/self_replace/windows.rs.html 。
+被否：直接删除运行 EXE（Windows 拒绝）；固定延迟的 PowerShell/batch 删除（时间不证明进程已经退出）；
+等待重启删除（需要管理员权限，且卸载后名称仍被占用）。重开条件是标准库提供同等安全的自卸载接口。
+
+查找、规范化、移动、复制 helper 或启动 helper 失败均以 `E_STORAGE_FATAL` 返回，保留 OS 错误与目标路径；
+移动之后的失败可能已释放安装名称，恢复要求从原归档重复 install，不承诺事务回滚。
+原进程退出后 OS 删除临时文件的成功属于环境验收，断电或其他进程继续占用临时映像可能留下临时文件，
+不能把 helper 已安排当成物理删除的证明。
+
+派生检查 `bin::install::tests::windows_uninstall_removes_its_running_executable` 在独立临时目录运行
+测试 EXE 的副本，调用同一个 `displace`，要求子进程成功、安装 EXE 缺席、隔离 TEMP 内无残留；
+`displacing_an_external_copy_never_removes_the_running_binary` 核对外部副本删除与重复卸载。
+`windows_uninstall_removes_only_the_link_to_an_external_running_executable` 复用同一子进程入口，
+要求安装链接 entry 缺席、外部运行 EXE 字节不变；
+`windows_uninstall_removes_a_dangling_file_link` 要求 dangling entry 删除与重复卸载。
+链接创建失败是 fixture 失败，不允许跳过后称通过；缺席断言取不跟随链接的 metadata。
+发行验收通过 `.github/workflows/install-windows.ps1` 的真实 install.ps1 入口，在可丢弃 Windows runner
+核对归档/落位字节、同渠道重新安装、退出后的 EXE/来源标记缺席及 PATH 仅删除对应项。
+该检查及独立 Session 验收通过之前，不把 Windows 自卸载登记为已完成。
 -/
