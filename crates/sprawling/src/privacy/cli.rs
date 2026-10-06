@@ -24,3 +24,72 @@ pub fn status() -> Result<String, AxError> {
         .with_recovery("keep the history unchanged and report the encoding failure")
     })
 }
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::panic, reason = "test code")]
+mod tests {
+    use super::*;
+    use kernel::SecretRef;
+    use std::path::Path;
+    use zeroize::Zeroizing;
+
+    fn refused() -> AxError {
+        AxError::failure(AxCode::ConfigInvalid, "verify privacy owner", "identity unavailable")
+            .with_recovery("leave history unchanged")
+    }
+
+    fn fixture(path: &Path) -> Vec<u8> {
+        let bytes = br#"{"schema":2,"event":{"phase":"prepared","intent":{"operation":1,"control":"windows_user_powershell_telemetry","definition":1,"owner":"secret:privacy/fixture-owner","original":{"state":"absent","key_existed":false},"modified":{"state":"present","kind":1,"bytes":[49,0,0,0]},"recommendation":{"state":"present","kind":1,"bytes":[49,0,0,0]},"restore_of":null}}}
+"#.to_vec();
+        std::fs::write(path, &bytes).unwrap();
+        bytes
+    }
+
+    #[test]
+    fn foreign_owner_never_receives_history_summary() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("history.jsonl");
+        let before = fixture(&path);
+        assert!(status_at(&path, || Ok(Zeroizing::new("current-fixture".to_owned())), |_, _| Err(refused())).is_err());
+        assert_eq!(std::fs::read(path).unwrap(), before);
+    }
+
+    #[test]
+    fn identity_failure_precedes_even_a_malformed_history_read() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("history.jsonl");
+        std::fs::write(&path, b"not JSON").unwrap();
+        assert_eq!(status_at(&path, || Err(refused()), |_, _| panic!("vault must not be queried")), Err(refused()));
+    }
+
+    #[test]
+    fn authorized_summary_omits_values_and_empty_history_skips_vault() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("history.jsonl");
+        assert_eq!(status_at(&path, || Ok(Zeroizing::new("fixture".to_owned())), |_, _| panic!("empty history must not query vault")).unwrap(), "[]");
+        let before = fixture(&path);
+        let mut calls = 0;
+        let summary = status_at(&path, || Ok(Zeroizing::new("fixture".to_owned())), |reference, observed| {
+            assert_eq!(reference, &SecretRef::new("privacy", "fixture-owner").unwrap());
+            assert_eq!(observed, "fixture");
+            calls += 1;
+            Ok(())
+        }).unwrap();
+        assert_eq!(calls, 1);
+        assert_eq!(summary, r#"[{"operation":1,"outcome":"unresolved"}]"#);
+        assert_eq!(std::fs::read(path).unwrap(), before);
+    }
+}
+
+#[cfg(test)]
+fn status_at(
+    path: &std::path::Path,
+    _identity: impl FnOnce() -> Result<zeroize::Zeroizing<String>, AxError>,
+    _verify: impl FnMut(&kernel::SecretRef, &str) -> Result<(), AxError>,
+) -> Result<String, AxError> {
+    let history = super::journal::read(path).map_err(super::state::HistoryFault::into_ax)?;
+    serde_json::to_string(history.statuses()).map_err(|_| {
+        AxError::failure(AxCode::InvalidArgs, "encode privacy status", "encoding failed")
+            .with_recovery("leave history unchanged")
+    })
+}
