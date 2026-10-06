@@ -5,38 +5,20 @@
 
 //! Local privacy history modules (`crates/sprawling/spec/Privacy.lean`).
 
+mod answer;
 pub mod cli;
 mod controls;
-#[cfg_attr(
-    not(any(test, windows)),
-    expect(
-        dead_code,
-        reason = "the privacy write verbs run the coordinator on Windows only"
-    )
-)]
 mod coordinator;
 #[cfg(windows)]
 mod elevation;
-#[cfg_attr(
-    not(any(test, windows)),
-    expect(
-        dead_code,
-        reason = "the privacy write verbs run the coordinator on Windows only"
-    )
-)]
 mod fault;
 mod identity;
 mod journal;
 mod originals;
-#[cfg_attr(
-    not(any(test, windows)),
-    expect(
-        dead_code,
-        reason = "the privacy write verbs run the coordinator on Windows only"
-    )
-)]
 mod plan;
+pub(crate) mod service;
 mod state;
+pub(crate) mod system;
 mod target;
 #[cfg(windows)]
 pub(crate) mod windows;

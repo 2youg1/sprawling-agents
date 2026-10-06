@@ -74,13 +74,6 @@ pub(super) struct HostFacts {
 /// # Errors
 /// `ToolUnavailable` when the record or its `EditionID` or `CurrentBuild`
 /// is unreadable.
-#[cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "the privacy answer is the caller; until it exists only tests read the host facts"
-    )
-)]
 pub(super) fn host_facts() -> Result<HostFacts, AxError> {
     let record =
         current_version().map_err(|_| unavailable("Windows version record unavailable"))?;

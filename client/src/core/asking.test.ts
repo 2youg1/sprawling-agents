@@ -156,6 +156,24 @@ describe("asking", () => {
     expect(driver.reports[0]?.[1].subject).toBe(keyOf(QUERIES.doctor));
   });
 
+  // The defect: the privacy answer reads every control on the host and
+  // took longer than the common patience, so every visit to the page
+  // reported the city late and asked the whole read a second time. A
+  // fast question asked behind it is still judged at its own deadline.
+  test("a question that reads the host gets its own patience, and a fast one behind it keeps the common one", () => {
+    const driver = driven();
+    driver.ask.ask(QUERIES.privacy);
+    driver.pass(1_000);
+    driver.ask.ask(QUERIES.doctor);
+
+    driver.pass(16_000);
+    expect(driver.reports.map(([, error]) => error.subject), "only the fast question is late").toEqual([keyOf(QUERIES.doctor)]);
+    expect(driver.sent, "the host is not asked to read again").toHaveLength(2);
+
+    driver.pass(110_000);
+    expect(driver.reports.map(([, error]) => error.subject)).toEqual([keyOf(QUERIES.doctor), keyOf(QUERIES.privacy)]);
+  });
+
   // The late answer is still the answer: a question whose patience ran
   // out has left the queue, so the answer lands on the slot that asked
   // for it rather than being reported a second time as unplaceable.

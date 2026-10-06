@@ -49,7 +49,7 @@ pub fn inspect(clock: impl accounting::Clock, control: Option<&str>) -> Result<S
     #[cfg(not(windows))]
     {
         drop((clock, only));
-        Err(windows_only("inspect privacy controls"))
+        Err(super::system::windows_only("inspect privacy controls"))
     }
 }
 
@@ -120,7 +120,7 @@ pub fn restore_all(clock: impl accounting::Clock, emit: impl FnMut(String)) -> R
     #[cfg(not(windows))]
     {
         drop((clock, emit));
-        Err(windows_only(RESTORE_ALL))
+        Err(super::system::windows_only(RESTORE_ALL))
     }
 }
 
@@ -300,7 +300,7 @@ fn run(clock: impl accounting::Clock, command: &Command) -> Result<String, AxErr
     #[cfg(not(windows))]
     {
         drop(clock);
-        Err(windows_only(command.action()))
+        Err(super::system::windows_only(command.action()))
     }
 }
 
@@ -356,16 +356,6 @@ fn encoded(value: &impl Serialize) -> Result<String, AxError> {
         )
         .with_recovery("keep the history unchanged and report the encoding failure")
     })
-}
-
-#[cfg(not(windows))]
-fn windows_only(action: &'static str) -> AxError {
-    AxError::failure(
-        AxCode::ToolUnavailable,
-        action,
-        "privacy controls are Windows settings",
-    )
-    .with_recovery("nothing was written; privacy controls are written on Windows only")
 }
 
 /// The identity is sampled before the history is opened, so a failed

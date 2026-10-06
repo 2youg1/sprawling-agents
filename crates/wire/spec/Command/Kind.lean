@@ -51,7 +51,7 @@
 | `LocalOnly` | 放宽访问、够到凭证或城所在的宿主机、改变治理这座城的东西：接端点、选模型、建楼拆楼、写规则与配置、装东西、开文件管理器 | 恒不带进来，不论权限 |
 
 - **新加的 Command 一律 `LocalOnly`**，除非人决定一台不在电脑旁的设备可以做它。`Act` 与 `Read` 是一次决定，不是默认值；表里一行缺 `class` 格，`xtask wiring` 点名那一行。
-- `class` 只判 Command。`Ask` 与 `Monitor` 两种帧属 `Read`；设备发来的 `Hello` 由中继换成城自己的令牌再发（§8-66）；远程门的配对与撤销不在线上，开门、关门、更换城钥匙与它们的确认在线上的方式见下面四行（remote_access D4）。
+- `class` 只判 Command。`Ask` 与 `Monitor` 两种帧属 `Read`，只有 `Ask { query: Privacy }` 属 `LocalOnly`：它答的是城所在主机的设置与本应用改过它们的记录，不是城的状态（crates/wire/spec/Privacy.lean §8-86）；设备发来的 `Hello` 由中继换成城自己的令牌再发（§8-66）；远程门的配对与撤销不在线上，开门、关门、更换城钥匙与它们的确认在线上的方式见下面四行（remote_access D4）。
 - 这一列是权威，中继按它判，`xtask wiring` 把表与中继的穷尽匹配（`bin::outside::verbs::command_class`）逐行对照（§8-65）。
 
 **远程门的四个动词**：设置页开关远程门、更换城钥匙（Roadmap 的 A7），上线的方式由 remote_access D4 定下；四行在下方 `inductive Command`、`reach` 与 `verbClass` 里各有一臂，等控制台确认的那一次请求是 `remote_access::confirm`（crates/remote_access/Spec.lean §8-13）。四个命令都带 `idem`，与其余改东西的命令同一条类型不变量，Rust 一侧的载荷是 `wire::DoorOpening`、`wire::DoorStep`（换钥匙与关门共用）与 `wire::DoorAnswer`；执行者不在 worker 的队列上，而在装配层 `bin::outside::asking`，因为远程门由它持有（`crates/sprawling/spec/Outside.lean` §8-140）。
@@ -140,6 +140,7 @@ inductive Command where
   | ReplaceCityKey
   | ConfirmRemoteDoor
   | CloseRemoteDoor
+  | PrivacyOperation
   deriving DecidableEq, Repr
 
 /-- §19-1 的四个取值：城里谁该够得到一个动词。 -/
@@ -243,6 +244,8 @@ def Command.reach : Command → Reach
   | .ConfirmRemoteDoor => .client
   -- 立刻关远程门，结束每一个远程会话；不要守卫，因为关门只减少访问（remote_access D5）
   | .CloseRemoteDoor => .client
+  -- 改主机的一个隐私控制，或核对没有结论的那一次操作；执行者是城的监听（crates/wire/spec/Privacy.lean §8-87）
+  | .PrivacyOperation => .client
 
 /-! D6 动词类是 §19-2 的一列，由中继的穷尽匹配实现、门机器对照
 
@@ -299,6 +302,7 @@ def Command.verbClass : Command → VerbClass
   | .ReplaceCityKey => .LocalOnly
   | .ConfirmRemoteDoor => .LocalOnly
   | .CloseRemoteDoor => .LocalOnly
+  | .PrivacyOperation => .LocalOnly
 
 /-- **没有一个 Command 属 `Read`**：读城的是 `Ask` 与 `Monitor` 两种帧，不是命令（§19-3）。一行写成 `Read` 的命令就是一个改东西的动词被当成只读放进了城。 -/
 theorem no_command_is_a_read (c : Command) : c.verbClass ≠ .Read := by

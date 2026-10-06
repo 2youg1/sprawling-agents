@@ -34,6 +34,7 @@
   import Rules from "./settings/rules.svelte";
   import You from "./settings/you.svelte";
   import AdvancedSection from "./setup/advanced.svelte";
+  import PrivacySection from "./setup/privacy/privacy.svelte";
   import { saveReceipt } from "./setup/appearance";
   import AppearanceSection from "./setup/appearance.svelte";
   import ColoursSection from "./setup/colours.svelte";
@@ -296,6 +297,8 @@ costs the cards their width (client/Spec.lean §4-30, §4-36). -->
       <KeysSection />
     {:else if shown === "advanced"}
       <AdvancedSection />
+    {:else if shown === "privacy"}
+      <PrivacySection />
     {:else if shown === "about"}
       <Release />
     {/if}

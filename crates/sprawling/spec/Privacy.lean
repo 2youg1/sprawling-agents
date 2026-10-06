@@ -49,9 +49,8 @@ OS 写入没有 compare-and-swap：writeStarted 要求调用前最后一次读�
 控制表（`bin::privacy::controls`、`bin::privacy::originals`、`bin::privacy::target`）、schema 3 的
 磁盘投影、journal 的写入器、`bin::privacy::plan` 与 `bin::privacy::coordinator` 已实现；
 coordinator 经两个端口（Host 与 Journal，§7）运行；平台适配器（Privacy.Windows）与生产 Host
-`bin::privacy::windows::host` 已实现，`bin::privacy::cli` 的写入动词经它们进入 coordinator
-（Privacy.Cli）。确认的 typestate 与 wire 帧、页面服务尚未实现；各自的接口写在
-Privacy.Confirmation 与 wire 的 Privacy 分部，由后续阶段按本模型实现。
+`bin::privacy::windows::host` 已实现，`bin::privacy::cli` 的写入动词（Privacy.Cli）与页面的服务
+（Privacy.Service）经它们进入 coordinator；wire 帧见 wire 的 Privacy 分部。
 尚未实现的拒绝：原值无法经它的写入路径原样写回时（机器作用域的原值超过提升子进程的 1024 字节上界，
 或注册表原值没有无损的原始编码），apply 应在 Prepared 之前拒绝（Privacy.Windows D57）；现在这样的
 apply 照常写入，之后的恢复或回滚由子进程或适配器拒绝写回，以 NotApplied 或 unknown 如实结束。
@@ -836,7 +835,7 @@ fold、fresh read（计划任务经 Windows PowerShell 读取，冷启动要几�
 
 ## 15 影响面
 调用者：`bin::privacy::cli`（本地 CLI，一次性 runner 的验收经它进入）与 `bin::privacy::service`
-（装配层为页面服务）走同一个 coordinator。Home 只给 journal 路径。
+（装配层为页面服务，Privacy.Service）走同一个 coordinator。Home 只给 journal 路径。
 
 ## 16 测试与约束
 模型由 `lake build crates.sprawling.spec.Privacy` 验收，无 sorry/admit/axiom。

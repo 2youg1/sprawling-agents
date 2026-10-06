@@ -29,12 +29,12 @@ const OWNER_REALM: &str = "privacy";
 
 /// This machine as a privacy operation sees it, with the clock the
 /// caller hands in (the one sampling point stays in `bin::assembly`).
-pub(in crate::privacy) struct WindowsHost<C> {
+pub(crate) struct WindowsHost<C> {
     clock: C,
 }
 
 impl<C: accounting::Clock> WindowsHost<C> {
-    pub(in crate::privacy) const fn new(clock: C) -> Self {
+    pub(crate) const fn new(clock: C) -> Self {
         Self { clock }
     }
 }

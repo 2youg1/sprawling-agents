@@ -80,6 +80,18 @@
     />
   </div>
   <Admission />
+  <!-- The way to the privacy group: a link, because it moves the address
+      bar like the tree's own entry does. -->
+  <div class="flex flex-col gap-tight rounded-card bg-raised px-base py-snug">
+    <span class="text-label font-label text-text">{say($lang, "privacy_open")}</span>
+    <p class="text-note text-text-faint">{say($lang, "privacy_open_note")}</p>
+    <a
+      href={toFragment({ kind: "setup", group: "privacy" })}
+      class="inline-flex h-control w-fit items-center rounded-control bg-raised px-base text-label hover:bg-raised-hover"
+    >
+      {say($lang, "setup_group_privacy")}
+    </a>
+  </div>
   <!-- The door back into the welcome walk: a link, because it moves the
       address bar like every other way off this page. -->
   <a

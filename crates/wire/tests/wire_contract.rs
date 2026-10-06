@@ -45,18 +45,18 @@ fn exposed() -> SocketAddr {
 #[test]
 fn the_command_and_query_tables_hold_their_declared_counts() {
     // The counts are the wire's closed surface, not a style choice.
-    assert_eq!(COMMAND_NAMES.len(), 42, "command table");
-    assert_eq!(QUERY_NAMES.len(), 56, "query table");
+    assert_eq!(COMMAND_NAMES.len(), 43, "command table");
+    assert_eq!(QUERY_NAMES.len(), 57, "query table");
 
     let mut sorted = COMMAND_NAMES.to_vec();
     sorted.sort_unstable();
     sorted.dedup();
-    assert_eq!(sorted.len(), 42, "command names are distinct");
+    assert_eq!(sorted.len(), 43, "command names are distinct");
 
     let mut sorted = QUERY_NAMES.to_vec();
     sorted.sort_unstable();
     sorted.dedup();
-    assert_eq!(sorted.len(), 56, "query names are distinct");
+    assert_eq!(sorted.len(), 57, "query names are distinct");
 }
 
 #[test]
@@ -89,7 +89,7 @@ fn the_schema_hash_is_stable_across_calls_and_covers_the_wire_version() {
         "schema hash changed - update `crates/wire/spec/Frames.lean` §8-1 in the same commit"
     );
     assert_eq!(
-        WIRE_V, 58,
+        WIRE_V, 59,
         "WIRE_V rises once between two pushes, for a shape change under names that stay (wire D1)"
     );
 }
@@ -113,7 +113,7 @@ fn the_schema_hash_covers_every_event_kind_name() {
 
 /// A function of WIRE_V, the two frame name tables and the event kind
 /// names, so any change to the protocol surface lands here first.
-const WIRE_SCHEMA_GOLDEN: &str = "6baf4fb62c3b1cd13aa11d50015423f94b56128e1e4f1f06292c1c23e8fc0205";
+const WIRE_SCHEMA_GOLDEN: &str = "004ddb391041d23e6b67554aef5875ed98f87b7deaebddc6c4c1940555783c65";
 
 /// The schema hash reads names only, so a field added under names that
 /// stay leaves it where it was. This digest reads the whole shape with the
@@ -153,7 +153,7 @@ fn strip_prose(value: &mut serde_json::Value) {
 
 /// The digest of `wire_schema()` with its prose removed.
 #[cfg(feature = "schema")]
-const WIRE_SHAPE_GOLDEN: &str = "9f43bc9592fc4272794486f1ad9deab91d30a3a0c9c197ceb768dddcba4b1d6e";
+const WIRE_SHAPE_GOLDEN: &str = "052dae47b97079ecabfbb116f1dfff2d2a371110456416cc6a1028ac284e4217";
 
 // -------------------------------------------------------------- binding face
 
@@ -626,6 +626,13 @@ title = \"a window\"
             idem,
         }),
         Command::CloseRemoteDoor(wire::DoorStep { idem }),
+        Command::PrivacyOperation(wire::PrivacyRequest {
+            action: wire::PrivacyAction::Apply {
+                control: wire::PrivacyControl::StartLaunchTracking,
+                expected: wire::PrivacyValue::Dword { number: 1 },
+            },
+            idem,
+        }),
     ]
 }
 

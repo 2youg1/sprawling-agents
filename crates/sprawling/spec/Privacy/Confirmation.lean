@@ -7,8 +7,11 @@ import crates.sprawling.spec.Privacy
 
 /-!
 # privacy 的确认：页面逐项确认，命令绑定确认时的当前快照
-规定 `bin::privacy::confirmation`。确认行为复用 crates.sprawling.spec.Privacy 的
-Request、planned 与 Step，本分部不定义第二份确认状态；它证明三件事：
+规定确认在生产中由谁守住：expected 由 `bin::privacy::target` 换回快照（换不回即拒绝，wire D49），
+由 `bin::privacy::plan` 与 fresh read 比较（不同即 `Changed`），由 `bin::privacy::service` 按 idem
+只执行一次（Privacy.Service D67）；没有单独的确认模块，因为绑定只是这一次比较，不需要服务端状态。
+确认行为复用 crates.sprawling.spec.Privacy 的 Request、planned 与 Step，本分部不定义第二份确认状态；
+它证明三件事：
 写入的原值就是人确认时看到的值，unknown 之后不产生新的写入，核对不写系统。
 时间由 assembly 的 SystemClock 取得；期限在协调者接受命令时确定（Privacy §14）。
 -/

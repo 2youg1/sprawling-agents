@@ -386,6 +386,7 @@ pub enum Command<Secret = Sealed<String>> {
     ReplaceCityKey(DoorStep),
     ConfirmRemoteDoor(DoorAnswer),
     CloseRemoteDoor(DoorStep),
+    PrivacyOperation(crate::PrivacyRequest),
     /// Presenting a pairing token. Read-only, hence no `IdemKey`; the token is plain here because a
     /// token that must cross a wire has, by definition, no secrecy left to protect in transit - it
     /// is sealed the moment it lands (see `server::decide_handshake`).
@@ -394,7 +395,6 @@ pub enum Command<Secret = Sealed<String>> {
     },
 }
 
-/// The Command surface, in declaration order — the order the handshake
-/// hash mixes these names in.
+/// The Command surface, in declaration order — the order the handshake hash mixes these names in.
 pub const COMMAND_NAMES;
 }

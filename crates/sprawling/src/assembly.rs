@@ -19,6 +19,7 @@ mod attending;
 mod chain_watch;
 mod dropping;
 mod listening;
+mod privacy;
 mod production;
 mod remote_door;
 mod skill_audit;
