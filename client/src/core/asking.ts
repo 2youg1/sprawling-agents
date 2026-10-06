@@ -37,7 +37,8 @@ export const HELD_CAP = 128;
 
 // How long one question may go unanswered before the page stops
 // drawing a skeleton over it. One home for the deadline: the sweep
-// judges every question against it, and no phrase names a number.
+// judges every question against `patienceOf`, and no phrase names a
+// number.
 const PATIENCE_MS = 15_000;
 
 // Every question that needs nothing said after its name, under the
@@ -66,6 +67,19 @@ export const QUERIES = {
   shells: "shells",
   privacy: "privacy",
 } as const satisfies Readonly<Record<string, Extract<Query, string>>>;
+
+// The questions the city answers by reading its host rather than its
+// own memory, with the patience that read needs. The privacy answer
+// reads every control, four of them scheduled tasks read through
+// Windows PowerShell, and one such call took more than fifteen seconds
+// on a busy workstation (`crates/sprawling/src/privacy/windows.rs`
+// `PATIENCE`); held to the common patience, the page would report the
+// city late and ask the whole read again on every visit.
+const SLOW_MS: Readonly<Partial<Record<string, number>>> = { [QUERIES.privacy]: 120_000 };
+
+function patienceOf(query: Query): number {
+  return SLOW_MS[nameOf(query)] ?? PATIENCE_MS;
+}
 
 // One page of a building's commits. The answer carries the building
 // and the bound back but not the page size, so every page asks for the
@@ -110,8 +124,8 @@ interface Held {
 interface Pending {
   readonly key: string;
   readonly query: Query;
-  // When it went out, by the clock handed to `createAsking`.
-  readonly sentAt: number;
+  // When its patience runs out, by the clock handed to `createAsking`.
+  readonly due: number;
 }
 
 // A refusal this page minted about its own asking. The recovery is a
@@ -167,7 +181,8 @@ export function createAsking(
   noticed: (phrase: Key, error: Reported) => void,
 ): Asking {
   const held = new Map<string, Held>();
-  // Insertion order is send order, so the first entry is the oldest.
+  // Insertion order is send order; patience differs by question, so the
+  // oldest entry is not always the first one due.
   const pending = new Map<AskId, Pending>();
   // Questions whose patience ran out, kept so a late answer still lands
   // on the slot that asked; bounded like the held answers.
@@ -176,15 +191,18 @@ export function createAsking(
   // The keys held under each question name: a record is judged once per
   // name rather than once per held answer.
   const byName = new Map<string, Set<string>>();
-  // One patience timer for the whole queue: the clock says which
-  // questions are late, so a timer each would only be one more thing
-  // to cancel.
-  let patience: ReturnType<typeof setTimeout> | null = null;
+  // One patience timer for the whole queue, set for the first question
+  // due: the clock says which questions are late, so a timer each would
+  // only be one more thing to cancel.
+  let patience: { readonly timer: ReturnType<typeof setTimeout>; readonly due: number } | null = null;
 
+  // A question due before the timer set for a slower one moves the timer
+  // forward, so a fast question is never judged at a slow one's deadline.
   function watch(): void {
-    const oldest = pending.values().next().value;
-    if (patience !== null || oldest === undefined) return;
-    patience = setTimeout(sweep, Math.max(0, oldest.sentAt + PATIENCE_MS - now()));
+    const due = Math.min(...[...pending.values()].map((entry) => entry.due));
+    if (due === Number.POSITIVE_INFINITY || (patience !== null && patience.due <= due)) return;
+    if (patience !== null) clearTimeout(patience.timer);
+    patience = { timer: setTimeout(sweep, Math.max(0, due - now())), due };
   }
 
   // Every question whose patience has run out: out of the queue, and
@@ -194,9 +212,9 @@ export function createAsking(
   // waits for ever in silence is the defect this is here for.
   function sweep(): void {
     patience = null;
-    const deadline = now() - PATIENCE_MS;
+    const at = now();
     for (const [askId, entry] of pending) {
-      if (entry.sentAt > deadline) break;
+      if (entry.due > at) continue;
       pending.delete(askId);
       late.set(askId, entry.key);
       if (late.size > HELD_CAP) late.delete(late.keys().next().value ?? askId);
@@ -224,7 +242,7 @@ export function createAsking(
     slot.inflight = true;
     slot.stale = false;
     slot.staleAt = -1;
-    pending.set(askId, { key, query, sentAt: now() });
+    pending.set(askId, { key, query, due: now() + patienceOf(query) });
     watch();
   }
 
@@ -358,7 +376,7 @@ export function createAsking(
   function resumed(): void {
     pending.clear();
     late.clear();
-    if (patience !== null) clearTimeout(patience);
+    if (patience !== null) clearTimeout(patience.timer);
     patience = null;
     for (const [key, slot] of held) {
       if (slot.inflight) slot.stale = true;
