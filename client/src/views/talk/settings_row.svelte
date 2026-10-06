@@ -75,7 +75,7 @@
 {/snippet}
 
 {#if draws === "everything" || kept}
-<div class="relative mt-tight flex flex-wrap items-center justify-between gap-tight">
+<div class="relative mt-tight flex items-center justify-between gap-tight">
   <div class="edge-slot -ml-snug flex min-w-0 flex-wrap items-center narrow:ml-0">
     {#if draws === "everything" && specs[1].choices.length > 0}
       <PillView spec={specs[1]} told={room === null ? undefined : listening} />
@@ -86,12 +86,14 @@
     {#if menu === "model" && providers.length > 0}
       <Popover label="talk_column_model" {columns} onApply={modelPick} onClose={() => { menu = null; }} />
     {/if}
-    <div class="-mr-snug ml-auto flex min-w-0 flex-wrap items-center narrow:mr-0">
+    <div class="-mr-snug ml-auto flex min-w-0 items-center narrow:mr-0">
       {#if providers.length > 0}
         <button type="button" class="{FACT} hover:wash hover:text-text aria-expanded:wash aria-expanded:text-text"
           aria-label={`${specs[0].label}: ${modelFace} | ${effortFace}`} aria-haspopup="dialog" aria-expanded={menu === "model"}
           onclick={() => { menu = menu === "model" ? null : "model"; }}>
-          <span class="truncate">{modelFace} <span aria-hidden="true">│</span> {effortFace}</span>
+          <span class="min-w-0 truncate">{modelFace}</span>
+          <span aria-hidden="true" class="shrink-0">│</span>
+          <span class="shrink-0">{effortFace}</span>
         </button>
       {/if}
       <div bind:this={panel} onfocusout={(event) => {

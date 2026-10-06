@@ -223,7 +223,7 @@
   const rooms = $derived(
     roomsKnown(
       $cityAnswer !== undefined && "city" in $cityAnswer ? $cityAnswer.city.buildings : [],
-      $belief.rooms.keys(),
+      [...$belief.rooms.keys(), ...(here === null ? [] : [here])],
     ),
   );
   // The run in front of the person: what a typed `/stop` and `/steer` reach.
