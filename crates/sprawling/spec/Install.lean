@@ -313,7 +313,8 @@ Nix 用户仍使用 D50 的仓库 flake，不向 nixpkgs 提交包。
 release.yml 的 tag 发布将生成定义推送至对应仓库；缺凭据只跳过推送并明确说明。
 Homebrew 用户 brew update 后 brew upgrade sprawling；AUR 用户在原 PKGBUILD
 checkout 中 git pull --ff-only 后 makepkg -si。程序只显示更新命令，不能替包管理器更新。
-Homebrew 的 Cellar/sprawling 路径与 AUR 的 /usr/lib/sprawling-bin 路径辨认来源；
+先解析 current_exe 的符号链接，再以 Homebrew 的 Cellar/sprawling 路径与 AUR 的
+/usr/lib/sprawling-bin 路径辨认来源；链接解析失败保留未知来源，不猜包管理器。
 明确环境选择也可指定 homebrew/aur，复制到其他位置后按未知来源要求确认。
 GitHub 发布比较表示有新归档，不保证 tap/AUR 已同步；执行前仍需检查包管理器版本。
 重开参数：新增平台需有对应发行归档；进入稳定阶段且满足 nixpkgs 条件时重新评估

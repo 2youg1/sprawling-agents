@@ -213,7 +213,7 @@ fn this_channel() -> InstallChannel {
         },
     };
     let cargo_bin = cargo_home.map(|cargo_home| cargo_home.join("bin"));
-    match std::env::current_exe() {
+    match std::env::current_exe().and_then(std::fs::canonicalize) {
         Ok(exe) => channel(&exe, cargo_bin.as_deref()),
         Err(_unnamed) => InstallChannel::Source,
     }
