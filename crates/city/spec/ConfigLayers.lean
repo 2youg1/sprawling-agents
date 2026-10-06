@@ -208,11 +208,11 @@ stamp = "minute"   # "off" | "minute" | "five_minute" | "hour"
 
 **决定**：`SearchConfiguration` 是 `Default`／`Custom { selected, suppliers }`／`Off` 三臂；`Custom` 只接 `selected` 点名的那一家，这一家连不上、`tools/list` 里没有它的远端工具或调用失败时，`web_search` 交回失败的工具结果，不换到缺省那一家，也不换到列表里的另一家。缺省那一家（Exa）的地址、远端工具名与参数映射只在 `default_search_supplier` 写一次，设置页经 `Query::Config` 读它。
 
-**理由**：一次搜索把 run 写下的查询文字交给一个城外的服务。人选了一家，换到另一家就是悄悄换掉了数据的接收方，而且没有一行记录告诉人这件事。`selected` 加 `Off` 让三种意图各有一个拼写：要缺省、要这一家、不要。缺省那一家的参数名照实测写：对 `https://mcp.exa.ai/mcp` 做只读的 `initialize` 与 `tools/list`，服务自报 `exa-search-server` 3.2.1、协议版本 `2025-06-18`；`web_search_exa` 的 `inputSchema` 必填 `query`（string，至少 1 字符）与 `objective`（string，1–4096 字符），可选 `numResults`（number），`additionalProperties` 为 false。所以缺省映射带 `objective`，`web_search` 对这一家把 `objective` 列为必填参数（§8-35）。
+**理由**：一次搜索把 run 写下的查询文字交给一个城外的服务。人选了一家，换到另一家就是悄悄换掉了数据的接收方，而且没有一行记录告诉人这件事。`selected` 加 `Off` 让三种意图各有一个拼写：要缺省、要这一家、不要。缺省那一家的参数名照实测写：对 `https://mcp.exa.ai/mcp` 做只读的 `initialize` 与 `tools/list`，服务自报 `exa-search-server` 3.2.1、协议版本 `2025-06-18`；`web_search_exa` 的 `inputSchema` 必填 `query`（string，至少 1 字符）与 `objective`（string，1–4096 字符），可选 `numResults`（number），`additionalProperties` 为 false。所以缺省映射带 `objective`，`web_search` 对这一家把 `objective` 列为必填参数（§8-35）。服务现在也收下不带 `objective` 的 `tools/call` 并给出结果，但这只是它眼下的宽容，不是它写下的契约；映射照 `inputSchema` 写，因为 `judge_mapping` 每次调用前对照的正是它。`accounting` 里按名字运行的 `web_search_reaches_the_default_supplier_live` 走生产的 `web_search` 把这三个参数发给真实的服务，并断言答复是非空且不带 `isError` 的结果；它要外网，所以不在必跑的套件里。
 
 **被否**：①每家一个 `enabled` 开关、取第一个启用的：两家都启用时谁说了算要读者去猜，全都关掉与 `Off` 又是同一件事的两种拼法；②`Custom` 失败时回落到 Exa：见理由，数据接收方被换掉；③把缺省地址写进 kernel 常量或页面：同一个事实两个家，页面那份会在服务地址变化时与实际调用分叉。
 
-**重开参数**：缺省那一家的 `tools/list` 不再列出 `web_search_exa` 或改了这几个参数，`web_search` 的映射校验会在调用前拒（§8-35），那时改 `default_search_supplier` 一处；人要求在多家之间按顺序回落时，重开的是本决定的第一条。
+**重开参数**：缺省那一家的 `tools/list` 不再列出 `web_search_exa` 或改了这几个参数，`web_search` 的映射校验会在调用前拒（§8-35），上面那条按名字运行的测试也会变红，那时改 `default_search_supplier` 一处；人要求在多家之间按顺序回落时，重开的是本决定的第一条。
 -/
 
 /-! D25 MCP url 用 `url::Url` 解析，凭据的名字与值仍由 `kernel::secret` 判
