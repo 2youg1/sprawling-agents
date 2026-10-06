@@ -122,13 +122,13 @@ pub enum DoctorUntold { NoDisk, AdminOnly, Unread { command: String }, Failed { 
 
 /-! D26 沙箱臂按机制族命名，每个名字在三个平台上都有可填的臂
 
-**决定**：设置与线上用来选沙箱臂的名字是一个闭集 `SandboxArm { None, CopiedTree, Native, Container, Python }`，线上拼作 `none｜copied_tree｜native｜container｜python`；`CONFIG.toml` 的键是 `[sandbox] arm = "<名字>"`。缺省按平台取下表的「缺省」一列，这一列是缺省的唯一定义处：调研表与取舍的理由在 `crates/runtime/spec/Tools/Exec.lean` D32，这一列是那里推断出的选择，User 另定时只改这一列的一个值（Roadmap §7 第 1 条）。SB1 落地之前，代码里每个平台照旧解出 `copied_tree`（Linux 上有 `bwrap` 时是 `native`），doctor 照实报。各名字在三个平台上的臂：
+**决定**：设置与线上用来选沙箱臂的名字是一个闭集 `SandboxArm { None, CopiedTree, Native, Container, Python }`，线上拼作 `none｜copied_tree｜native｜container｜python`；`CONFIG.toml` 的键是 `[sandbox] arm = "<名字>"`。缺省按平台取下表的「缺省」一列，这一列是缺省的唯一定义处：调研表与取舍的理由在 `crates/runtime/spec/Tools/Exec.lean` D32，这一列是那里推断出的选择，User 另定时只改这一列的一个值（Roadmap §7 第 1 条）。Windows 的 SB1 第 3 条六项 native 回归通过且 `crates/runtime/spec/Tools/Exec/NativeWindows.lean` D59 的未决解开之前，缺省为 `copied_tree`；macOS 缺省为 `copied_tree`，显式 Seatbelt 的文件写入与网络保证不改变缺省；Linux 有 `bwrap` 时缺省为 `native`，否则为 `copied_tree`。doctor 照实报。各名字在三个平台上的臂：
 
 | 名字 | Windows | macOS | Linux |
 |---|---|---|---|
 | `none` | 宿主机本身 | 宿主机本身 | 宿主机本身 |
-| `copied_tree` | 复制工作树 | 复制工作树（**缺省**） | 复制工作树 |
-| `native` | Job Object 加 AppContainer（**缺省**） | Seatbelt 配置；未核实之前答 `Unavailable` | 命名空间包装程序 `bwrap`（**缺省**；今天的臂），Landlock 加 seccomp 待核实 |
+| `copied_tree` | 复制工作树（**缺省**） | 复制工作树（**缺省**） | 复制工作树 |
+| `native` | Job Object 加 AppContainer；显式 native | Seatbelt 配置；显式 native，保证见 runtime D40 | 命名空间包装程序 `bwrap`（**缺省**；今天的臂），Landlock 加 seccomp 待核实 |
 | `container` | Docker／Podman Desktop（要另装） | Docker／Podman Desktop（要另装） | rootless Podman／Docker（要另装） |
 | `python` | wasip1 里的 Python | wasip1 里的 Python | wasip1 里的 Python |
 

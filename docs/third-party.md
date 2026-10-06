@@ -110,6 +110,7 @@ Two lists exist and they answer different questions, so both are kept and neithe
 | [comrak](https://crates.io/crates/comrak) | BSD-2-Clause |
 | [cpu-time](https://crates.io/crates/cpu-time) | MIT OR Apache-2.0 |
 | [crossterm](https://crates.io/crates/crossterm) | MIT |
+| [find-msvc-tools](https://crates.io/crates/find-msvc-tools) | MIT OR Apache-2.0 |
 | [flate2](https://crates.io/crates/flate2) | MIT OR Apache-2.0 |
 | [futures-util](https://crates.io/crates/futures-util) | MIT OR Apache-2.0 |
 | [getrandom](https://crates.io/crates/getrandom) | MIT OR Apache-2.0 |

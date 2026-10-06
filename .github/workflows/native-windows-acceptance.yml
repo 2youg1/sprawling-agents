@@ -39,6 +39,63 @@ jobs:
           New-Item -ItemType Directory -Force native-evidence | Out-Null
           git rev-parse HEAD | Out-File -Encoding utf8 native-evidence/head.txt
           git rev-parse 'HEAD^{tree}' | Out-File -Encoding utf8 native-evidence/tree.txt
+      - name: Admit AppContainers to the null device as Windows client does
+        shell: pwsh
+        run: |
+          # NativeWindows.lean D59: the Server image's NUL DACL lacks the two AppContainer ACEs Windows 11 client ships.
+          Add-Type -TypeDefinition @"
+          using System;
+          using System.ComponentModel;
+          using System.Runtime.InteropServices;
+          public static class NullDevice {
+            [DllImport("kernel32.dll", SetLastError=true, CharSet=CharSet.Unicode)] static extern IntPtr CreateFileW(string name, uint access, uint share, IntPtr sa, uint creation, uint flags, IntPtr template);
+            [DllImport("kernel32.dll")] static extern bool CloseHandle(IntPtr handle);
+            [DllImport("kernel32.dll")] static extern IntPtr LocalFree(IntPtr memory);
+            [DllImport("advapi32.dll")] static extern uint GetSecurityInfo(IntPtr handle, int type, uint info, IntPtr owner, IntPtr group, out IntPtr dacl, IntPtr sacl, out IntPtr descriptor);
+            [DllImport("advapi32.dll")] static extern uint SetSecurityInfo(IntPtr handle, int type, uint info, IntPtr owner, IntPtr group, IntPtr dacl, IntPtr sacl);
+            [DllImport("advapi32.dll", CharSet=CharSet.Unicode, SetLastError=true)] static extern bool ConvertSecurityDescriptorToStringSecurityDescriptorW(IntPtr descriptor, uint revision, uint info, out IntPtr text, IntPtr length);
+            [DllImport("advapi32.dll", CharSet=CharSet.Unicode, SetLastError=true)] static extern bool ConvertStringSecurityDescriptorToSecurityDescriptorW(string text, uint revision, out IntPtr descriptor, IntPtr length);
+            [DllImport("advapi32.dll", SetLastError=true)] static extern bool GetSecurityDescriptorDacl(IntPtr descriptor, out bool present, out IntPtr dacl, out bool defaulted);
+            const uint DaclInformation = 4;
+            const int KernelObject = 6;
+            static IntPtr Open(uint access) {
+              IntPtr handle = CreateFileW(@"\\.\NUL", access, 3, IntPtr.Zero, 3, 0x80, IntPtr.Zero);
+              if (handle == new IntPtr(-1)) throw new Win32Exception();
+              return handle;
+            }
+            public static string Read() {
+              IntPtr handle = Open(0x00020000);
+              try {
+                IntPtr dacl, descriptor, text;
+                uint status = GetSecurityInfo(handle, KernelObject, DaclInformation, IntPtr.Zero, IntPtr.Zero, out dacl, IntPtr.Zero, out descriptor);
+                if (status != 0) throw new Win32Exception((int)status);
+                try {
+                  if (!ConvertSecurityDescriptorToStringSecurityDescriptorW(descriptor, 1, DaclInformation, out text, IntPtr.Zero)) throw new Win32Exception();
+                  try { return Marshal.PtrToStringUni(text); } finally { LocalFree(text); }
+                } finally { LocalFree(descriptor); }
+              } finally { CloseHandle(handle); }
+            }
+            public static void Write(string sddl) {
+              IntPtr descriptor, dacl;
+              bool present, defaulted;
+              if (!ConvertStringSecurityDescriptorToSecurityDescriptorW(sddl, 1, out descriptor, IntPtr.Zero)) throw new Win32Exception();
+              try {
+                if (!GetSecurityDescriptorDacl(descriptor, out present, out dacl, out defaulted) || !present) throw new Win32Exception();
+                IntPtr handle = Open(0x00040000);
+                try {
+                  uint status = SetSecurityInfo(handle, KernelObject, DaclInformation, IntPtr.Zero, IntPtr.Zero, dacl, IntPtr.Zero);
+                  if (status != 0) throw new Win32Exception((int)status);
+                } finally { CloseHandle(handle); }
+              } finally { LocalFree(descriptor); }
+            }
+          }
+          "@
+          $before = [NullDevice]::Read()
+          "before: $before" | Tee-Object native-evidence/null-device.txt
+          if ($before -notmatch ';;;AC\)') { [NullDevice]::Write($before + '(A;;0x1201bf;;;AC)(A;;0x1201bf;;;S-1-15-2-2)') }
+          $after = [NullDevice]::Read()
+          "after: $after" | Tee-Object -Append native-evidence/null-device.txt
+          if ($after -notmatch ';;;AC\)') { throw 'The null device still refuses AppContainer processes.' }
       - name: Native foreign boundary conformance
         shell: pwsh
         run: |
@@ -48,7 +105,7 @@ jobs:
         if: ${{ !cancelled() }}
         shell: pwsh
         run: |
-          cargo nextest run -p sprawling-runtime --run-ignored ignored-only --no-tests fail --no-fail-fast --failure-output immediate-final -E 'test(native_windows_disposable)' 2>&1 | Tee-Object native-evidence/production.log
+          cargo nextest run -p sprawling-runtime --run-ignored ignored-only --no-tests fail --no-fail-fast --failure-output immediate-final --success-output immediate -E 'test(native_windows_disposable)' 2>&1 | Tee-Object native-evidence/production.log
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Six regressions under explicitly selected native confinement
         if: ${{ !cancelled() }}
