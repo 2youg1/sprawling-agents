@@ -48,7 +48,7 @@ jobs:
         if: ${{ !cancelled() }}
         shell: pwsh
         run: |
-          cargo nextest run -p sprawling-runtime --run-ignored ignored-only --no-tests fail --no-fail-fast --failure-output immediate-final -E 'test(native_windows_disposable)' 2>&1 | Tee-Object native-evidence/production.log
+          cargo nextest run -p sprawling-runtime --run-ignored ignored-only --no-tests fail --no-fail-fast --failure-output immediate-final --success-output immediate -E 'test(native_windows_disposable)' 2>&1 | Tee-Object native-evidence/production.log
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Six regressions under explicitly selected native confinement
         if: ${{ !cancelled() }}
