@@ -42,8 +42,11 @@ jobs:
       release-validation: true
 
   # Advisories can change without a source change, so every release reads them.
+  # On ubuntu for the reason `supply` is (D27): `deny.toml` names no target,
+  # so cargo-deny reads every platform's dependency graph whichever host it
+  # runs on, and it compiles nothing; a Windows runner is the scarce one.
   advisories:
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
@@ -106,8 +109,20 @@ jobs:
       CC_x86_64_unknown_linux_musl: musl-gcc
     steps:
       - uses: actions/checkout@v7
+      # A rustup home of its own, holding only the toolchain
+      # `rust-toolchain.toml` pins. rust-cache hashes every installed
+      # toolchain into the archive cache key, and the image's own stable
+      # moves whenever GitHub rolls a new image out, which takes days and
+      # mixes old and new runners; with it in the key, the tag run could miss
+      # the cache a build-only run on main saved an hour earlier. The path
+      # is under the runner's temp directory, which is the same on every run
+      # of a row, so the key stays a function of the tree.
       - name: install pinned toolchain
-        run: rustup show
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "RUSTUP_HOME=$RUNNER_TEMP/rustup" >> "$GITHUB_ENV"
+          RUSTUP_HOME="$RUNNER_TEMP/rustup" rustup show
       # The Zig the desktop's leaf is built with, on the Windows row; the
       # action installs nothing on the other two (`crates/desktop/Spec.lean` 8-12).
       - uses: ./.github/actions/zig
@@ -133,6 +148,20 @@ jobs:
       # reads `target/<triple>/release` and puts the triple in the archive
       # name (tools/xtask/Spec.lean §8-11). An empty triple is the host
       # build, whose two archive names are what they always were.
+      # Only main saves, and a tag push never runs on main, so the tag run
+      # is warm only when a build-only dispatch of this workflow on main ran
+      # first on the commit about to be tagged: a tag ref restores caches its
+      # default branch saved. The key is the shared key, the runner OS and
+      # architecture, a hash of the installed toolchains and of the job's
+      # CARGO*/CC*/CFLAGS*/CXX*/CMAKE*/RUST* variables (the step above makes
+      # the first a function of the tree), and a hash of the manifests,
+      # Cargo.lock, `.cargo/config.toml` and `rust-toolchain.toml` - not the
+      # event, the ref or the matrix target, so the dispatch and the tag
+      # compute the same key. A manifest change between them still restores
+      # through the prefix without the lock hash, and `cache_hit` below then
+      # reads false, because it reports an exact key only. Only what cargo
+      # would build identically is reused: workspace crates are cleaned
+      # before the save, and the fat-LTO link of the binary always runs here.
       - uses: Swatinem/rust-cache@v2
         id: archive-cache
         with:
@@ -156,7 +185,16 @@ jobs:
           else
             unset SPRAWLING_RELEASE_TAG
           fi
+          # xtask (dev profile, target/debug) compiles beside the release
+          # build (target/release), which ends in one fat-LTO codegen unit
+          # on one core: cargo locks each profile directory on its own, so
+          # neither waits, and `cargo xtask sbom` after the build finds it
+          # fresh instead of compiling it then. A failure here fails that
+          # same command, and `wait` reports it too.
+          cargo build --locked -p xtask > target/release-evidence/xtask-build.log 2>&1 &
+          xtask_build=$!
           just package "$ARCHIVE_TARGET"
+          wait "$xtask_build"
           echo "package_seconds=$((SECONDS - start))" > target/release-evidence/timing.txt
           if [ "$RUNNER_OS" = macOS ]; then
             shasum -a 256 target/package/*.zip > target/release-evidence/archives.sha256
@@ -186,9 +224,12 @@ jobs:
         if: always()
         with:
           name: release-evidence-${{ runner.os }}-${{ github.sha }}-${{ github.run_attempt }}
+          # `cargo-timing.html` is `just dist`'s `--timings` report: where
+          # the archive build's minutes went, crate by crate.
           path: |
             target/release-evidence
             target/package/*.zip
+            target/cargo-timings/cargo-timing.html
           if-no-files-found: error
       # The archive goes through the door a person uses before it is
       # uploaded: install.sh asks a release list served from 127.0.0.1,
