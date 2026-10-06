@@ -7,7 +7,7 @@
 //! (`crates/sprawling/spec/Privacy/Controls.lean`).
 //!
 //! A target names a place on the host; its operation kind and its scope
-//! follow from the place and are not stored beside it (Privacy D65).
+//! follow from the place and are not stored beside it (Privacy D67).
 
 use kernel::{AxCode, AxError};
 use serde::{Deserialize, Serialize};
@@ -68,7 +68,7 @@ impl Target {
 impl OperationKind {
     /// Whose settings a write of this kind changes. Machine scope is
     /// written through an elevated child, which needs administrator
-    /// approval (Privacy.Windows D57).
+    /// approval (Privacy.Windows D59).
     pub(crate) const fn scope(self) -> PrivacyScope {
         match self {
             Self::RegistryValueHklm | Self::ScheduledTaskEnabled => PrivacyScope::Machine,
@@ -108,7 +108,7 @@ impl From<&Target> for PrivacyTarget {
 
 /// A registry value exactly as the host holds it: absent, or a type code
 /// and the raw bytes. Nothing is expanded, trimmed or decoded, so a value
-/// written back is the value that was read (Privacy.State D58: whether the
+/// written back is the value that was read (Privacy.State D60: whether the
 /// parent key existed is recorded beside the value, not inside it).
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(tag = "state", rename_all = "snake_case", deny_unknown_fields)]
@@ -138,7 +138,7 @@ pub(crate) enum Snapshot {
 
 /// One successful read of a control's target: its snapshot, and whether a
 /// registry value's parent key exists, which is recorded beside the value
-/// and never compared as part of it (Privacy.State D58).
+/// and never compared as part of it (Privacy.State D60).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Reading {
     pub(crate) value: Snapshot,

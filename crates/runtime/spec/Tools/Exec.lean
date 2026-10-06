@@ -8,7 +8,7 @@
 
 规定 `tools::exec`、`tools::exec::outcome`、`tools::exec::shell`、`tools::exec::confinement`、`tools::exec::yielding`（`crates/runtime/src/` 下同名的文件）。exec 的三臂、宿主进程沙箱、派出的命令降一级与环境声明。本文件是 `crates/runtime/Spec.lean` 的一个分部；下面每一节保留它在 runtime 规格里的标签 §8-n，别处引作 `crates/runtime/Spec.lean §8-n`。
 
-除末尾的亲和申请模型外，这一分部是说明文档，不是形式规格；它写下的接口形状与取舍由 Rust 的类型与 `tools::exec`、`backlog` 旁的测试守住（`crates/runtime/Spec.lean` §16）。
+除末尾的亲和申请模型与 D95 的上限判定外，这一分部是说明文档，不是形式规格；它写下的接口形状与取舍由 Rust 的类型与 `tools::exec`、`backlog` 旁的测试守住（`crates/runtime/Spec.lean` §16）。
 -/
 
 /-!
@@ -68,7 +68,7 @@ Windows native 的资源与起动顺序由 `NativeWindows.lean` D53/D54 规定�
 **SB1 未落地的工作**（D32 选定的臂；以下保留各项原编号）：
 
 2. **`[sandbox] arm` 的解析与解出**：键与五个拼写已由 `crates/wire/spec/Answer/Doctor.lean` D26 定，缺省按平台取那里的表；`kernel::config::SandboxLimits` 加 `arm`（规格的所有者 `crates/kernel/spec/Config.lean` §8-22），未知拼写 `E_CONFIG_INVALID`。`Offerings` 加各机制的采样（Linux 的 `bwrap`、Landlock ABI；Windows 的 AppContainer 与 job 叶子是否在本构建里；三个平台上的容器能力由 `crates/runtime/spec/Tools/Exec/Container.lean` 的 daemon admission 契约决定，CLI version 或 PATH 可见性不构成准入证据），`choose` 改为取（名字，`Offerings`）给出 `Confinement`：缺省名字的机制缺席时退到 `CopiedTree`，并在 `statement()` 与 doctor 行里说出「缺省的 native 不可用：缺 X」；User 明写的名字的机制缺席时答 `Unavailable { missing }`，`place()` 拒。`Missing` 随之加各机制的缺项（`NamespaceWrapper`、`UserNamespace`、`JobLeaf`、`ContainerRuntime`），每一项一句 `phrase` 与一句 `recovery`，要另装的给安装指引。
-3. **Windows 的 `native`**：接口与性质统一由 `NativeWindows.lean` 规定；其 conformance 在该模块的 Rust tests 与 disposable Windows acceptance 中验证。缺省改为 `native` 之前，下列 Windows 回归必须在明写 `native` 的臂里通过，它们在 windows-latest 上实际失败过：`cmd /C` 的参数经 packet 编码后被 cmd 读成未闭合的引号（`the_program_arm_runs_a_real_child_with_a_scrubbed_environment`、`a_sandboxed_command_writes_in_a_copy_and_leaves_the_source_tree_alone`、`a_child_sees_the_names_its_building_declared_and_no_others`、accounting 的 `a_command_output_over_the_floor_reaches_the_model_sieved_with_the_way_back`）；Windows PowerShell (`powershell.exe`) 在容器内初始化失败（`System.Net.ServicePointManager` 的类型初始化抛出，`a_dispatched_command_runs_below_the_core`）；建筑声明的 `RUSTUP_HOME`/`CARGO_HOME` 在用户目录下，容器 SID 读不到（os error 183，`exec_builds` 的 `a_building_that_declares_the_names_can_build_a_rust_program`），D32 调研表已预计这些目录要授 ACL。`native-windows-acceptance.yml` 通过 `SPRAWLING_DISPOSABLE_NATIVE=1` 在 disposable runner 上运行这六项，测试 fixture 调用 `ExecTool::confined(Confined::with_arm(WindowsJobObject, …))`，accounting fixture 在临时建筑配置明写 `arm = "native"`；普通测试和生产选择不读取这个变量。步骤检查 runtime 恰好选中五项、accounting 恰好选中一项，并在失败后继续记录其余结果。`exec_builds` 用 `cargo build --offline --target-dir target` 把子构建输出限定在 disposable copy，不继承 harness 的 `CARGO_TARGET_DIR`，避免争用 harness 的构建锁。priority 回归的现有 probe 是 Windows PowerShell (`powershell.exe`)，不能以它代证 PowerShell 7 (`pwsh.exe`) 的初始化；`native_windows_disposable_pwsh_initializes_network_types` 另经 native backlog 检查 `ServicePointManager` 类型初始化与 BelowNormal priority，不替换旧回归。cmd source 的形成权威在 `NativeWindows.lean` D56；PowerShell 初始化与声明工具链目录的最小只读授权及清理仍须由真实 native acceptance 判定，六项通过之前保持 `copied_tree` 缺省。
+3. **Windows 的 `native`**：接口与性质统一由 `NativeWindows.lean` 规定；其 conformance 在该模块的 Rust tests 与 disposable Windows acceptance 中验证。缺省改为 `native` 之前，下列 Windows 回归必须在明写 `native` 的臂里通过，它们在 windows-latest 上实际失败过：`cmd /C` 的参数经 packet 编码后被 cmd 读成未闭合的引号（`the_program_arm_runs_a_real_child_with_a_scrubbed_environment`、`a_sandboxed_command_writes_in_a_copy_and_leaves_the_source_tree_alone`、`a_child_sees_the_names_its_building_declared_and_no_others`、accounting 的 `a_command_output_over_the_floor_reaches_the_model_sieved_with_the_way_back`）；Windows PowerShell (`powershell.exe`) 在容器内初始化失败（`System.Net.ServicePointManager` 的类型初始化抛出，`a_dispatched_command_runs_below_the_core`）；建筑声明的 `RUSTUP_HOME`/`CARGO_HOME` 在用户目录下，容器 SID 读不到（os error 183，`exec_builds` 的 `a_building_that_declares_the_names_can_build_a_rust_program`），D32 调研表已预计这些目录要授 ACL。`native-windows-acceptance.yml` 通过 `SPRAWLING_DISPOSABLE_NATIVE=1` 在 disposable runner 上运行这六项，测试 fixture 调用 `ExecTool::confined(Confined::with_arm(WindowsJobObject, …))`，accounting fixture 在临时建筑配置明写 `arm = "native"`；普通测试和生产选择不读取这个变量。步骤检查 runtime 恰好选中五项、accounting 恰好选中一项，并在失败后继续记录其余结果。`exec_builds` 用 `cargo build --offline --target-dir target` 把子构建输出限定在 disposable copy，不继承 harness 的 `CARGO_TARGET_DIR`，避免争用 harness 的构建锁。priority 回归的现有 probe 是 Windows PowerShell (`powershell.exe`)，不能以它代证 PowerShell 7 (`pwsh.exe`) 的初始化；`native_windows_disposable_pwsh_initializes_network_types` 另经 native backlog 检查 `ServicePointManager` 类型初始化与 BelowNormal priority，不替换旧回归。cmd source 的形成权威在 `NativeWindows.lean` D56；子进程自开 NUL 设备的平台前提与 acceptance runner 的对齐由 `NativeWindows.lean` D59 规定；`exec_builds` 的 rustc 在容器里发现不了 MSVC、退回 PATH 上 Git 的 `link.exe`，容器外代为发现并前置搜索目录由 `NativeWindows.lean` D60 规定，profile 重定向的 TEMP 取 serving 进程的 LOCALAPPDATA 由 D57 规定。`native-windows-acceptance.yml` 在明写 `native` 下判定这六项、PowerShell 初始化与声明工具链目录的只读授权及清理。缺省仍为 `copied_tree`：D59 的未决（缺 NUL ACE 的主机上明写 native 时子进程自开 NUL 失败，起动前拒绝还是由 doctor 报告）解开之前不改缺省。
 4. **`container` 臂**：admission 与直接 create argv 由 `crates/runtime/spec/Tools/Exec/Container.lean` D39 规定，输入值由 kernel Config 的 container 契约规定。冻结配置经 `ExecTool::with_container` 传到 exec，daemon 身份与取消归 Backlog，起动前 inspect 核对限额与挂载；guardian 处理父进程 EOF 与迟到 create，五轴的实际范围与实测入口由同一分部 §3／§16 规定，不能将非 root UID 声称为独立宿主安全主体。`docker`／`podman` 二者取先通过 daemon admission 的一个；镜像必须是 User 自行准备的本地固定 ID，无默认镜像且不隐式拉取。安装指引指向 D32 引的安装页。
 5. **设置的「沙箱」控件**：列出这座城所在的电脑解得出的每个名字与它的五轴清单（读 doctor 的同一份 `DoctorSandbox`，不另算），缺的给 `Missing` 的那一句与安装指引；选中写 `[sandbox] arm`（经设置的那扇门）。
 6. **doctor 每臂一行**：`crates/sprawling/spec/Doctor.lean` 的 doctor 表为 `native`、`container`、`python` 各加一行，读 `Offerings` 的同一次采样。
@@ -214,18 +214,51 @@ pub fn new(setup: ExecSetup, sandbox: Box<dyn Sandbox>, backlog: Backlog) -> Res
 - **哪一臂打开哪一项**：下面每一项都随人的配置 `[core] placement` 那一臂开关，开关表只在 `crates/sprawling/spec/Serving/Placement.lean` D47 一处；本 crate 只收一个值 `Shares`（`Backlog::with_shares`）：`Unset` 什么也不设（`"none"`），`Cpu` 设 CPU 份额（缺省 `"soft"`），`CpuAndMemory { limit }` 再设内存上限（`"soft_shares"`）。
 - **Windows (d)**：`runtime::backlog::jobs` 创建一个 run 的 job 时，按 `Shares` 给它设至多两项：CPU 速率控制 `JOBOBJECT_CPU_RATE_CONTROL_INFORMATION { ControlFlags: JOB_OBJECT_CPU_RATE_CONTROL_ENABLE | JOB_OBJECT_CPU_RATE_CONTROL_WEIGHT_BASED, Weight: 5 }`（`SetInformationJobObject`，信息类 `JobObjectCpuRateControlInformation`），与作业级提交上限 `JOB_OBJECT_LIMIT_JOB_MEMORY`（读出 `JOBOBJECT_EXTENDED_LIMIT_INFORMATION`、置上这一位与 `JobMemoryLimit`、再写回，于是别处已经设的位不丢）。接口档位：`win32job` 2.0.3 把扩展限额的结构放在 crate 私有字段里、不设 CPU 速率控制，`process-wrap` 10.0.1 也不设，所以走第二档 Zig 叶子，放在 `crates/desktop/ffi`（与 `crates/sprawling/spec/Serving/Standing.lean` D40 同一个叶子）：job 的句柄由 `win32job::Job::handle` 交出（公开），两项限额作为一个定长记录过 `(ptr, len)` 边界。两项都不要特权（推断：文档都没有要求特权，而工作集上限要不要特权随账户令牌而变，见 §8-13-2；派生的 Rust 检查在未提权的 Windows runner 上设好再读回，先红后绿）。
   - **权重**：`Shares` 不是 `Unset` 时设；每个 run 一样，取 5（范围 1–9），常量 `RUN_CPU_WEIGHT`。要的是按 run 公平：不设时一条起 16 个进程的构建按线程分到 16 份，对面只有一个进程的 run 分到 1 份；权重相同，每个 run 各得一份，一个 session 的编译饿不死别的 session。harness 不进任何 job，它的热线程本来就站在正常档之上（§8-93）。
-  - **内存上限**：`Shares::CpuAndMemory { limit }` 时设，`limit` 是物理内存的一半；物理内存由 sprawling 的 `bin::monitor::memory` 读出，`bin::serving::placement::run_shares` 算出上限放进这个值，本 crate 不读平台。超过时是这个 run 的进程树里的分配失败（编译器报内存不足），城与别的 run 照常。只有 `"soft_shares"` 打开它（D47），默认按读数定。
-  - **退路**：叶子调用失败时 job 不设份额、不设上限，命令照常起动（与装不进 job 同一条判断：为读数或份额让一条构建失败是把代价付错了地方），这个 run 的 `RunProcesses.share` 读作 `Unset`。
+  - **内存上限**：`Shares::CpuAndMemory { limit }` 时设，`limit` 是 User 在 `[core] memory_bytes` 明确填写的非零字节数；`bin::serving::placement::run_shares` 把该值放进份额，本 crate 不读平台。超过时是这个 run 的进程树里的分配失败（编译器报内存不足），城与别的 run 照常。只有 `"soft_shares"` 打开它（D47），缺席即不设，没有自动计算的缺省值。
+  - **撞到上限与没落地的上限**：每条命令的结果带上这条上限在它运行期间落到哪一种，见 D95；单凭非零退出码不把失败归给上限。
+  - **退路**：叶子调用失败时 job 不设份额、不设上限，命令照常起动（与装不进 job 同一条判断：为读数或份额让一条构建失败是把代价付错了地方），这个 run 的 `RunProcesses.share` 读作 `Unset`；User 填了上限时，这个 run 的每条命令的结果说上限没有落地（D95），而不是静默地不设。
 - **macOS (d)**：没有 Job Object。派出的命令在 `nice` 外面再包一层 `/usr/sbin/taskpolicy -c utility`，把它与它的后代的 QoS 压到 utility，系统于是先把它们放到效率核上（外部命令，第一档，与 `nice` 同一种做法，§8-13-3）；这一层是 macOS 的 CPU 份额一项，`Shares::Unset` 时不包；找不到 `taskpolicy` 时只包 `nice`。本实现没有按 run 整棵进程树汇总的内存上限，`CpuAndMemory` 在 macOS 上只兑现 CPU 一半，`RunProcesses.share` 为 `Unset`，doctor 照实说。
-  - **机制与强制范围**：Apple 的 [XNU `bsd/kern/kern_resource.c`](https://github.com/apple-oss-distributions/xnu/blob/main/bsd/kern/kern_resource.c) 在 `dosetrlimit` 的 `RLIMIT_AS` 分支调用 `vm_map_set_size_limit(current_map(), newrlim->rlim_cur)`，因此不能笼统说 macOS 不执行地址空间限额；支持情况须按目标系统核实。shell 的 `ulimit` 包装可以绕过 Rust 的 `pre_exec`，所以 `unsafe` 也不是排除包装的理由。但 `current_map()` 限的是单个进程的虚拟地址空间，不是同一 run 的所有进程合计提交量；后代即使继承相同额度，N 个进程仍能各用一份，一个 run 的多条命令也不共享额度。它既不是 job 的提交量口径，也不是 cgroup 的树级口径。
-  - **决定与未决**：不以逐进程 `ulimit` 冒充按 run 的总内存上限，不为本 crate 新增改变命令起动语义的 shell 包装。尚缺可安全调用、无需额外权限、按 run 汇总整棵进程树、后代不能退出额度的 macOS 机制及真实树级超限验证；找到满足这些条件的接口或允许外部受控执行服务时重开。申请路径未接入，所以没有虚构的设置失败处理；当前明确退到 CPU 包装、内存不强制，命令按原来的退出结果返回。
-- **Linux (d)**：harness 自己所在的 cgroup 是 `/proc/self/cgroup` 的 `0::` 行所指的那一个，挂在 `/sys/fs/cgroup` 下（`runtime::backlog::cgroup`，D33）。它可写时，harness 先把自己移进一个子 cgroup `core`（cgroup v2 规定有进程的 cgroup 不能再往下分资源，`core` 把父 cgroup 空出来），在父 cgroup 的 `cgroup.subtree_control` 打开 `cpu` 与 `memory`，然后每个 run 建一个子 cgroup `run-<RunId>`：`cpu.weight` 写 100（每个 run 一样），`memory.max` 只在 `Shares::CpuAndMemory { limit }` 时写 `limit`（D47 的 `"soft_shares"` 臂给的是物理内存的一半），命令起动后把它的 pid 写进这个子 cgroup 的 `cgroup.procs`（同一 run 的后续命令只写自己的 pid，份额在建 cgroup 时已经写下）。全是标准库读写文件，第一档。与 Windows 的 job 一样，起动到写进 cgroup 之间有一小段，那一段里起的孙进程留在 `core` 里。不可写时（没有 systemd 的委派，CI 主机与许多桌面都是这样）只靠 `nice 10`，doctor 说「runs' commands compete thread by thread and run below the core: the cgroup is not delegated」。cgroup 收不下一个 run 时（建目录或写文件失败）这个 run 读作 `Unset`，命令照常起动：与 Windows 的叶子失败同一条判断。委派与否由 `runtime::platform_shares` 一处读出，doctor 与接线读同一个答案。
+- **Linux (d)**：harness 自己所在的 cgroup 是 `/proc/self/cgroup` 的 `0::` 行所指的那一个，挂在 `/sys/fs/cgroup` 下（`runtime::backlog::cgroup`，D33）。它可写时，harness 先把自己移进一个子 cgroup `core`（cgroup v2 规定有进程的 cgroup 不能再往下分资源，`core` 把父 cgroup 空出来），在父 cgroup 的 `cgroup.subtree_control` 打开 `cpu` 与 `memory`，然后每个 run 建一个子 cgroup `run-<RunId>`：`cpu.weight` 写 100（每个 run 一样），`memory.max` 在 `Shares::CpuAndMemory { limit }` 时写 `limit`，CPU-only 时写 `max` 以清除重用目录的旧上限（D47 的 `"soft_shares"` 臂给的是 User 明确填写的字节上限），命令起动后把它的 pid 写进这个子 cgroup 的 `cgroup.procs`（同一 run 的后续命令只写自己的 pid，份额在建 cgroup 时已经写下）。全是标准库读写文件，第一档。与 Windows 的 job 一样，起动到写进 cgroup 之间有一小段，那一段里起的孙进程留在 `core` 里。不可写时（没有 systemd 的委派，CI 主机与许多桌面都是这样）只靠 `nice 10`，doctor 说「runs' commands compete thread by thread and run below the core: the cgroup is not delegated」。cgroup 收不下一个 run 时（建目录或写文件失败）这个 run 读作 `Unset`，命令照常起动：与 Windows 的叶子失败同一条判断；一条命令的 pid 写不进 `cgroup.procs` 时它不在上限之内。两种情形下 User 填了上限，结果都说上限没有落地（D95）。委派与否由 `runtime::platform_shares` 一处读出，doctor 与接线读同一个答案。
 - **(e) `WindowsJobObject` 臂**：`NativeWindows.lean` D53/D54 规定无 capability AppContainer 与两层 job；叶子拥有主线程句柄并在两个 job 的 assignment 成功之后恢复，不用 `std::process::Child` 先起动再装 native job。
 - **为什么不缩清单**：一只只保文件系统与「起动之后的进程树」的 job 臂，对 Agent 来说与 `CopiedTree` 几乎一样，多出的只是 kill-on-close；多一臂只多一句要读的话，不多一项保证。
 
 **被否**：①`win32job` 的调度级别（`limit_scheduling_class`，安全接口）当作 CPU 份额——它只改同一优先级类里各 job 线程的时间片长短，每个 run 的级别都一样时什么也没分；②工作集上限（`limit_working_memory`）——限的是常驻页，不是提交量，而且要不要特权随账户令牌而变（§8-13-2）；③硬的 CPU 速率上限（`JOB_OBJECT_CPU_RATE_CONTROL_HARD_CAP`）——机器空着时也让核闲着，与「忙了立刻换下一个核」相反；④每条命令一只 job——份额要按 session 分，不是按命令；⑤Linux 上用 `systemd-run --user --scope -p CPUWeight=…` 包每条命令——每条命令多一次 D-Bus 往返与一个 scope 的起动，而且要有用户级 systemd，不是每台机器都有；直接写委派的 cgroup 文件更少依赖。
 
-**重开参数**：四臂对照里 ② 臂（缺省，含 CPU 份额）的 p99 与 p999 不优于 ① 臂，而把份额单独拆出来也无益——那就整个 (d) 都不做；③ 臂（再加内存上限）不比 ② 差、也没有让真实构建失败——那就把内存上限放进缺省；或者一个对外只给安全接口的 crate 公开 job 的 CPU 速率控制与作业级内存上限（叶子函数换成它）；或者 Rust 稳定版提供 `raw_attribute`（(e) 的恢复函数就不需要了）。
+**重开参数**：四臂对照里 ② 臂（缺省，含 CPU 份额）的 p99 与 p999 不优于 ① 臂，而把份额单独拆出来也无益——那就整个 (d) 都不做；内存上限只由显式用户配置决定，不由四臂对照决定；或者一个对外只给安全接口的 crate 公开 job 的 CPU 速率控制与作业级内存上限（叶子函数换成它）；或者 Rust 稳定版提供 `raw_attribute`（(e) 的恢复函数就不需要了）。
+-/
+
+/-! D95 一条命令的结果说出 User 的内存上限在它运行期间落到哪一种（设置覆盖；`runtime::backlog::ceiling`、`runtime::backlog::jobs`、`runtime::backlog::cgroup`、`runtime::tools::exec::outcome`）
+
+**来源**：这是一条 ruling：run 的内存没有缺省上限，只有 User 填的上限；撞到它时，命令结果与界面都给出明确的错误；执行路径上失败而不报错的地方都要报出来。上限只在 `[core] placement = "soft_shares"` 且填了 `[core] memory_bytes` 时被要求（`crates/sprawling/spec/Serving/Placement.lean` D47），本决定只管被要求之后。
+
+**接口**：
+
+```rust
+pub enum Ceiling {                                   // runtime 根上导出
+    Hit { limit: NonZeroU64 },                       // 这条命令运行期间，这个 run 的分配在上限处被拒
+    Unapplied { limit: NonZeroU64, why: Unapplied }, // 要了上限，这条命令却不在上限之内运行
+    Unread { limit: NonZeroU64 },                    // 上限在，撞没撞读不出来
+}
+pub enum Unapplied { Platform, NotDelegated, Refused, Unjoined }
+// Started::Settled 与 Finished 各多一个 ceiling: Option<Ceiling>；None 即没有要上限，或上限在而没撞到
+```
+
+命令入表时记下一个 `ceiling::Mark`（下面 `CeilingMark` 的 Rust 面），收走时由 `ceiling::verdict` 用那一刻读到的计数给出 `Option<Ceiling>`；这两者与「哪种情形算没落地」只在 `runtime::backlog::ceiling` 一处，`jobs` 与 `cgroup` 只读平台的计数。
+
+exec 结果多一个键 `memory_ceiling`，形如 `{"state": "hit" | "unapplied" | "unread", "limit_bytes": N, "detail": "…"}`；`unapplied` 另带 `"why": "platform" | "not_delegated" | "refused" | "unjoined"`。后台命令在 `background` 行里带同一个键。键名与拼写只在 `tools::exec::outcome` 一处；客户端从结果读它（`client/src/views/monitor/trace.ts` 的 `commandOf`），在终端行下面画出错误。
+
+**证据**：撞到上限按命令运行期间这个 run 的撞限计数有没有增加来判，计数在命令入表时记一次、在命令被收走时再读一次（`settle` 与 `harvest` 是收走命令的两处）。入表时就读不出计数，记下的是 `unread`，收走时报 `Unread`。同一 run 的上限是所有命令共用的，所以计数增加时，这期间还在跑的每条命令都报 `Hit`：上限说的是这个 run，而不是哪一个进程超了。
+
+- **Windows**：run 的 job 建成时先挂一个 I/O completion port（`desktop_ffi::cpu::JobWatch`，`crates/desktop/ffi/Spec.lean` D6），读的是 `JOB_OBJECT_MSG_JOB_MEMORY_LIMIT` 消息的条数；读一次就把消息从 port 上取走，所以 run 累计这些条数，一次读失败之后取走的条数已经丢了，这个 run 此后的读数一律是读不出；挂不上就不设内存上限，这个 run 的命令报 `Unapplied::Refused`，于是一个设下的上限总是读得到的上限。native 臂的 command job 不再另设同值的内存上限：它嵌在 run job 里，run job 的上限已经管住整棵树，而两只同值的 job 嵌套时，撞限消息落到内层 job 的 port，外层的 port 一条也收不到（在一台 Windows 11 机器上以两只各挂 port 的嵌套 job 实测：内层设同值上限时内层计 1、外层计 0，内层不设时外层计 1），只设外层就只有一个读处。Microsoft 文档说 job 消息的投递不保证；一条没投递的消息漏报一次撞限，这一缺口按文档原样承认。
+- **Linux**：读 `run-<RunId>/memory.events` 的 `oom` 一行（cgroup v2：用量到了 `memory.max`、分配将要失败时加一）。不用 `max` 一行：它在回收成功、分配并未失败时也加，会把一次正常的回收报成撞限。读不出这个文件时报 `Unread`，而不是当作没撞。
+- **macOS**：没有按 run 的上限（D29），要了上限的每条命令报 `Unapplied::Platform`。
+- **container 臂**：命令跑在容器运行时的进程里，不在 run 的 job 或 cgroup 里，它的内存由 building 的 `[sandbox.container] memory_bytes` 管（`Container.lean`）；要了上限时报 `Unapplied::Unjoined`。
+
+**没落地即报**：要了上限、这条命令却不在上限之内运行时，结果报 `Unapplied`：平台没有这一项（`Platform`）、Linux 的 cgroup 没有委派（`NotDelegated`）、job 或 cgroup 拒了上限或 port（`Refused`）、命令没进 run 的 job 或 cgroup（`Unjoined`）。这些情形下命令照常起动（D29 的退路），但 User 填下的上限没有生效不再是静默的。
+
+**被否**：①按非零退出码与 stderr 里的 “out of memory” 字样归因：编译器与运行时的措辞各不相同，而且一条因别的原因失败的命令会被报成撞限；②读 job 的 `PeakJobMemoryUsed`：一次被拒的大分配不会把峰值推到上限，峰值说明不了撞没撞；③撞限时让命令失败或杀掉 run：分配被拒的进程自己决定怎么收场，城只报告；④只在第一条命令报一次 `Unapplied`：每条结果都是模型单独读的，后来的结果不报就等于说上限在。
+
+**重开参数**：Windows 给出按 job 读出撞限次数的查询（不经 completion port）；Linux 的 cgroup 接口改了 `memory.events` 的语义；macOS 出现 D29 所说的按 run 汇总的机制。
 -/
 
 /-! D33 每个 Linux run 的 cgroup 由 `runtime::backlog::cgroup` 一个模块建，根是参数（D29）
@@ -336,19 +369,19 @@ WindowsSandbox.exe present: False
 
 | 平台 | 缺省 | 可选 |
 |---|---|---|
-| Windows | `native`：Job Object 加 AppContainer（exec），Job Object（居民）；SB1 第 3 条落地之前解出 `copied_tree` 并照实说 | `copied_tree`、`container`（Docker Desktop 或 Podman Desktop，要另装）、`python`、`none` |
+| Windows | `copied_tree`；缺省读取 wire D26，SB1 第 3 条六项 native 回归通过且 `NativeWindows.lean` D59 的未决解开之前保持这一选择 | `native`（Job Object 加 AppContainer 的 exec，Job Object 的居民）、`container`（Docker Desktop 或 Podman Desktop，要另装）、`python`、`none` |
 | macOS | `copied_tree`，缺省读取 wire D26 | `native`（Seatbelt，文件写入与网络；其余三轴不保，见 D40）、`container`（Docker Desktop 或 Podman Desktop，要另装）、`python`、`none` |
 | Linux | `native`：`bwrap`；没有 `bwrap` 时解出 `copied_tree` 并照实说 | `copied_tree`、`container`（rootless Podman 或 Docker，要另装；gVisor 作为它的运行时）、`python`、`none` |
 
 安装指引：Docker Desktop（https://docs.docker.com/desktop/setup/install/windows-install/ 、https://docs.docker.com/desktop/setup/install/mac-install/）、Podman Desktop（https://podman-desktop.io/docs/installation/windows-install）、rootless Podman（https://github.com/containers/podman/blob/main/docs/tutorials/rootless_tutorial.md）、rootless Docker（https://docs.docker.com/engine/security/rootless/）、bubblewrap（https://github.com/containers/bubblewrap）。
 
-**理由**：按 Roadmap §6 SB 列出的六项依次比较。①方便：缺省的臂不要另装，一台新机器开城就有；`container` 要装一个运行时与镜像，只作可选。②不要管理员（D20）：Windows 上探测过的不要管理员的三种机制里，Job Object 与 AppContainer 合起来保五轴（AppContainer 给网络与用户，job 给进程树与资源，副本给文件），受限令牌给的被 AppContainer 覆盖；Windows Sandbox 要专业版以上加管理员，WSL 2 的安装要管理员。③五轴：Windows 的 `native` 保五轴，Linux 的 `bwrap` 保四轴（资源由 D29 的 cgroup 另给），都多于 `copied_tree` 的一轴。④居民：job 装得下居民；关网的机制装居民时网络一轴不保，这一点写进清单而不是挑一个能关居民网络的臂——没有这样的臂。⑤依赖（D23）：缺省的臂只依赖平台本身与已有的 Zig 叶子（Windows）或发行版的一个小包（Linux）；容器运行时、gVisor、microVM 与 OpenShell 各是一个大的外部系统。⑥三个平台（D94）：三个平台都有 `copied_tree`、`container` 与 `python`，`native` 在 macOS 上的显式臂由 D40 给出文件写入与网络两项保证，初始化失败照实拒绝；其余三轴不保，不以此关闭聚合内存的未决。缺省的 `native` 缺机制时退到 `copied_tree` 而不是拒：缺省是城替 User 选的，一条拒绝会让一台没装 `bwrap` 的机器上 exec 整个不能用；退的时候 `statement()` 与 doctor 说出退了、缺什么，所以不是静默变弱。User 明写的名字缺机制时拒，因为那是 User 要的那种盒子。
+**理由**：按 Roadmap §6 SB 列出的六项依次比较。①方便：缺省的臂不要另装，一台新机器开城就有；`container` 要装一个运行时与镜像，只作可选。②不要管理员（D20）：Windows 上探测过的不要管理员的三种机制里，Job Object 与 AppContainer 合起来保五轴（AppContainer 给网络与用户，job 给进程树与资源，副本给文件），受限令牌给的被 AppContainer 覆盖；Windows Sandbox 要专业版以上加管理员，WSL 2 的安装要管理员。③五轴：Windows 的 `native` 保五轴，Linux 的 `bwrap` 保四轴（资源由 D29 的 cgroup 另给），都多于 `copied_tree` 的一轴。④居民：job 装得下居民；关网的机制装居民时网络一轴不保，这一点写进清单而不是挑一个能关居民网络的臂——没有这样的臂。⑤依赖（D23）：缺省的臂只依赖平台本身与已有的 Zig 叶子（Windows）或发行版的一个小包（Linux）；容器运行时、gVisor、microVM 与 OpenShell 各是一个大的外部系统。⑥三个平台（D94）：三个平台都有 `copied_tree`、`container` 与 `python`，`native` 在 macOS 上的显式臂由 D40 给出文件写入与网络两项保证，初始化失败照实拒绝；其余三轴不保，聚合内存的支持边界见 D29。缺省的 `native` 缺机制时退到 `copied_tree` 而不是拒：缺省是城替 User 选的，一条拒绝会让一台没装 `bwrap` 的机器上 exec 整个不能用；退的时候 `statement()` 与 doctor 说出退了、缺什么，所以不是静默变弱。User 明写的名字缺机制时拒，因为那是 User 要的那种盒子。
 
 **被否**：①Windows 缺省 `copied_tree` 不变：它对 Agent 只保文件一轴，而不要管理员的机制能保五轴；②Windows Sandbox 作 Windows 的 `native`：要专业版以上与管理员，探测机就没有；③缺省 `container`：每台机器先要装一个运行时、拉一个镜像，与「方便」与 D23 都相反；④OpenShell 作缺省：它的隔离是 Landlock、seccomp 与容器，已各成一行，多出的是一个 gateway 与一套自己的策略层，Windows 上只是实验性的；⑤Linux 缺省换成 Landlock 加 seccomp：不保进程树与用户，网络只管 TCP，而且起动方式未核实；它留作 `bwrap` 缺席时 `native` 的第二种机制，等未决解开；⑥按产品给每个机制一个名字：D26 已否。
 
 **重开参数**：macOS 的已弃用接口在拟支持的系统范围中仍能稳定保持 D40 策略，并完成真实前后台生命周期检查时，重新论证缺省选择并修改唯一权威 wire D26；Windows 的 Zig 叶子证明做不出 AppContainer 起动时，缩小实际保证而不保留错误清单；User 按有效接口另定缺省时，更新该权威。
 
-**未决（§3 口径）**：①macOS 的受支持系统范围、已弃用 Seatbelt 的维护边界与后台生命周期：D40 的显式臂保持文件写入与网络策略，真实 runner 手册标为 deprecated，有限命令对拍不证明其它系统或整棵后台进程树的终止；判定证据是每个拟支持系统的手册、固定 deny-default 策略下的生产 ExecTool 行为，以及后台/halt/release 的实际结果；聚合硬内存仍由 D29 定义，D40 不提供它；②Linux 的 Landlock 回退：判定它的证据是一个不写 `unsafe` 的起动方式（harness 以自己的子命令自限后 `exec`）在 Linux runner 上跑通，并读出 runner 内核的 Landlock ABI。
+**未决（§3 口径）**：①macOS 的受支持系统范围、已弃用 Seatbelt 的维护边界：D40 的显式臂保持文件写入与网络策略，真实 runner 手册标为 deprecated，有限命令对拍不证明其它系统或整棵后台进程树的终止；判定证据是每个拟支持系统的手册、固定 deny-default 策略下的生产 ExecTool 行为，以及后台/halt/release 的实际结果；后台完成与 owned 主进程取消由 D40 的就绪／放行夹具经生产 backlog 验收，不宣称树级终止；聚合硬内存仍由 D29 定义，D40 不提供它；②Linux 的 Landlock 回退：判定它的证据是一个不写 `unsafe` 的起动方式（harness 以自己的子命令自限后 `exec`）在 Linux runner 上跑通，并读出 runner 内核的 Landlock ABI。
 -/
 
 namespace Runtime.Tools.Exec
@@ -392,5 +425,61 @@ theorem created_job_keeps_affinity_on_every_trace (mask : Option Nat)
   | nil => rfl
   | cons entry rest ih =>
     simpa [enterTrace, List.foldl, enterJob] using ih
+
+/-! ### D95 的判定：一条命令收走时报哪一种
+
+`CeilingMark` 是命令入表时记下的：没要上限、要了却没落地、入表时计数就读不出、或上限在并记下当时的撞限计数。
+`ceilingAt` 用收走时读到的计数（读不出是 `none`）给出报告。Rust 的 `ceiling::verdict` 是同一个
+函数，`ceiling::tests` 的 proptest 在全部输入上检查下面两条定理所说的性质。 -/
+
+inductive CeilingMark where
+  | notAsked
+  | unapplied
+  | unread
+  | watching (before : Nat)
+  deriving Repr, DecidableEq
+
+inductive CeilingReport where
+  | silent
+  | hit
+  | unapplied
+  | unread
+  deriving Repr, DecidableEq
+
+def ceilingAt : CeilingMark → Option Nat → CeilingReport
+  | .notAsked, _ => .silent
+  | .unapplied, _ => .unapplied
+  | .unread, _ => .unread
+  | .watching _, none => .unread
+  | .watching before, some after => if before < after then .hit else .silent
+
+/-- 撞限只在上限在、计数读得出且增加时报。 -/
+theorem hit_only_when_the_count_moved (mark : CeilingMark) (read : Option Nat) :
+    ceilingAt mark read = .hit ↔ ∃ before after, mark = .watching before ∧ read = some after ∧ before < after := by
+  cases mark with
+  | notAsked => simp [ceilingAt]
+  | unapplied => simp [ceilingAt]
+  | unread => simp [ceilingAt]
+  | watching before =>
+    cases read with
+    | none => simp [ceilingAt]
+    | some after =>
+      by_cases moved : before < after <;> simp [ceilingAt, moved]
+
+/-- 要了上限的命令只有在上限在、计数读得出且没动时才不报：没落地与读不出都说出来。 -/
+theorem an_asked_ceiling_is_silent_only_when_held_and_unhit (mark : CeilingMark) (read : Option Nat)
+    (asked : mark ≠ .notAsked) (silent : ceilingAt mark read = .silent) :
+    ∃ before after, mark = .watching before ∧ read = some after ∧ after ≤ before := by
+  cases mark with
+  | notAsked => exact absurd rfl asked
+  | unapplied => simp [ceilingAt] at silent
+  | unread => simp [ceilingAt] at silent
+  | watching before =>
+    cases read with
+    | none => simp [ceilingAt] at silent
+    | some after =>
+      by_cases moved : before < after
+      · simp [ceilingAt, moved] at silent
+      · exact ⟨before, after, rfl, rfl, Nat.le_of_not_lt moved⟩
 
 end Runtime.Tools.Exec

@@ -26,7 +26,7 @@ pub enum ReleaseAnswer {
 pub struct RegistryNewest { pub registry: Registry, pub reading: RegistryReading }
 pub enum Registry { Npm, CratesIo, Github }
 pub enum RegistryReading { Read { newest: ReleaseLine }, Refused { refusal: AxError } }
-pub enum InstallChannel { Npm, Bun, Binstall, Unknown, Package, CargoOrBinstall, Cargo, Archive, Source }
+pub enum InstallChannel { Npm, Bun, Binstall, Unknown, Package, CargoOrBinstall, Cargo, Archive, Aur, Source }
 pub struct UpdateHint { pub channel: InstallChannel, pub command: Option<String>, pub alternatives: Vec<String> }
 ```
 
@@ -49,7 +49,7 @@ Cargo 的裸版本号由 `Version` 判，不与 npm 的预发布串直接比较�
 
 /-! D24 来源、比较版本与更新命令由服务端一处决定
 
-npm/Bun/Package 读 npm latest；Cargo/Binstall/CargoOrBinstall 读 crates.io；Archive
+npm/Bun/Package 读 npm latest；Cargo/Binstall/CargoOrBinstall 读 crates.io；Archive/Aur
 读 GitHub 发布列表首个非 draft 的发布，与脚本安装器的列表来源一致，包含 prerelease。
 GitHub 的 latest 排除 prerelease，不能用于本项目归档检查；没有可用发布时拒绝判定。
 两种历史成熟度的 tag 通过 `Release::from_published_tag` 的同一 tag 解码器读取。
@@ -61,7 +61,8 @@ GitHub API、归档脚本与发行页面的 repository 身份取自根清单并�
 Cargo bin 目录答 CargoOrBinstall，需要在 Cargo 编译与 binstall 下载中选择。
 归档安装器复制二进制后写来源标记，卸载移除标记；标记名只由
 `sprawling::release::ARCHIVE_ORIGIN_FILE` 定义，旁边仍有 skills 的解压归档同属 Archive。
-明确的 `SPRAWLING_INSTALL_CHANNEL` 手动选择接受 npm/bun/cargo/binstall/archive。
+明确的 `SPRAWLING_INSTALL_CHANNEL` 手动选择接受 npm/bun/cargo/binstall/archive/aur。
+Aur 的识别与安装布局由 sprawling Install D56 规定；GitHub 比较不保证外部包定义已同步。
 
 `command` 只有来源明确时才给出；`alternatives` 给出不明确来源允许的精确命令。
 页面选择必须是候选之一，清空或收到新答复后没有默认选择，Copy 只接收明确命令

@@ -23,7 +23,8 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use super::{Cgroups, RUN_CPU_WEIGHT};
-use crate::Shares;
+use crate::backlog::ceiling::{Mark, Unapplied, verdict};
+use crate::{Ceiling, Shares};
 
 /// How many fake roots this process has made.
 static ROOTS: AtomicU64 = AtomicU64::new(0);
@@ -82,17 +83,25 @@ impl Drop for FakeRoot {
     }
 }
 
-/// Where the cgroup may not be written, a run reads as unshared and
-/// nothing is made.
+/// Where the cgroup may not be written, a run reads as unshared, nothing
+/// is made, and an asked ceiling is reported as not applied.
 #[test]
 fn a_run_reads_unshared_where_the_root_cannot_be_written() {
     let root = FakeRoot::plain();
     let run = kernel::RunId::from_bytes([7; 16]);
-    let asked = Shares::CpuAndMemory {
-        limit: NonZeroU64::new(8 << 30).unwrap(),
-    };
+    let limit = NonZeroU64::new(8 << 30).unwrap();
+    let asked = Shares::CpuAndMemory { limit };
     let mut cgroups = Cgroups::adopt(root.path(), 4242);
-    assert_eq!(cgroups.enter(run, 111, asked), Shares::Unset);
+    let why = if cfg!(target_os = "macos") {
+        Unapplied::Platform
+    } else {
+        Unapplied::NotDelegated
+    };
+    assert_eq!(
+        cgroups.enter(run, 111, asked),
+        Mark::Unapplied { limit, why }
+    );
+    assert_eq!(cgroups.enter(run, 112, Shares::Cpu), Mark::NotAsked);
     assert_eq!(cgroups.held(run), Shares::Unset);
     assert!(!root.has("core"), "the harness must not be moved");
     assert!(
@@ -101,8 +110,8 @@ fn a_run_reads_unshared_where_the_root_cannot_be_written() {
     );
 }
 
-/// Two runs get the same weight, `memory.max` only where the arm asked
-/// for a limit, and each command's pid joins its own run's cgroup.
+/// Two runs get the same weight, only the requested memory ceiling,
+/// and each command's pid joins its own run's cgroup.
 #[test]
 fn two_runs_hold_the_same_weight_and_the_limit_the_arm_asked_for() {
     let root = FakeRoot::delegated();
@@ -112,8 +121,8 @@ fn two_runs_hold_the_same_weight_and_the_limit_the_arm_asked_for() {
     let second = kernel::RunId::from_bytes([8; 16]);
     let mut cgroups = Cgroups::adopt(root.path(), 4242);
 
-    assert_eq!(cgroups.enter(first, 111, asked), asked);
-    assert_eq!(cgroups.enter(second, 222, Shares::Cpu), Shares::Cpu);
+    assert_eq!(cgroups.enter(first, 111, asked), Mark::Unread { limit });
+    assert_eq!(cgroups.enter(second, 222, Shares::Cpu), Mark::NotAsked);
     assert_eq!(cgroups.held(first), asked);
     assert_eq!(cgroups.held(second), Shares::Cpu);
 
@@ -131,10 +140,96 @@ fn two_runs_hold_the_same_weight_and_the_limit_the_arm_asked_for() {
         root.read(&format!("run-{first}/memory.max")),
         limit.get().to_string()
     );
-    assert!(!root.has(&format!("run-{second}/memory.max")));
+    assert_eq!(root.read(&format!("run-{second}/memory.max")), "max");
     assert_eq!(root.read(&format!("run-{first}/cgroup.procs")), "111");
     assert_eq!(root.read(&format!("run-{second}/cgroup.procs")), "222");
 
     cgroups.forget(first);
     assert_eq!(cgroups.held(first), Shares::Unset);
+}
+
+/// A restarted harness can reuse a run directory after its user clears the ceiling.
+#[test]
+fn cpu_only_clears_a_previous_ceiling_when_a_run_directory_is_reused() {
+    let root = FakeRoot::delegated();
+    let run = kernel::RunId::from_bytes([9; 16]);
+    let mut first = Cgroups::adopt(root.path(), 4242);
+    let capped = Shares::CpuAndMemory {
+        limit: NonZeroU64::new(64 << 20).unwrap(),
+    };
+    assert!(matches!(first.enter(run, 111, capped), Mark::Unread { .. }));
+    drop(first);
+    let mut restarted = Cgroups::adopt(root.path(), 4242);
+    let held = restarted.enter(run, 222, Shares::Cpu);
+    assert_eq!(
+        (
+            held,
+            restarted.held(run),
+            root.read(&format!("run-{run}/memory.max"))
+        ),
+        (Mark::NotAsked, Shares::Cpu, "max".to_owned())
+    );
+}
+
+/// The `oom` line of `memory.events` is the run's refusal count: a
+/// command collected after it moved reports the hit, one collected after
+/// only the `max` line moved (a reclaim that succeeded) reports nothing,
+/// and a count that stops reading is reported as unread (Exec.lean D95).
+#[test]
+fn the_oom_line_alone_tells_a_hit_from_a_reclaim() {
+    let root = FakeRoot::delegated();
+    let run = kernel::RunId::from_bytes([10; 16]);
+    let limit = NonZeroU64::new(64 << 20).unwrap();
+    let events = root.path().join(format!("run-{run}/memory.events"));
+    std::fs::create_dir_all(events.parent().unwrap()).unwrap();
+    std::fs::write(&events, "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\n").unwrap();
+    let mut cgroups = Cgroups::adopt(root.path(), 4242);
+    let mark = cgroups.enter(run, 111, Shares::CpuAndMemory { limit });
+    assert_eq!(mark, Mark::Watching { limit, before: 0 });
+
+    std::fs::write(&events, "low 0\nhigh 0\nmax 4\noom 0\noom_kill 0\n").unwrap();
+    assert_eq!(verdict(mark, cgroups.refusals(run)), None);
+
+    std::fs::write(&events, "low 0\nhigh 0\nmax 5\noom 1\noom_kill 1\n").unwrap();
+    assert_eq!(
+        verdict(mark, cgroups.refusals(run)),
+        Some(Ceiling::Hit { limit })
+    );
+
+    std::fs::remove_file(&events).unwrap();
+    assert_eq!(
+        verdict(mark, cgroups.refusals(run)),
+        Some(Ceiling::Unread { limit })
+    );
+}
+
+/// A run cgroup that cannot be made, and a pid that cannot join it, both
+/// leave the command running outside the ceiling, and its mark says
+/// which (Exec.lean D95).
+#[test]
+fn a_command_outside_its_run_cgroup_says_why() {
+    let root = FakeRoot::delegated();
+    let limit = NonZeroU64::new(64 << 20).unwrap();
+    let asked = Shares::CpuAndMemory { limit };
+    let mut cgroups = Cgroups::adopt(root.path(), 4242);
+
+    let blocked = kernel::RunId::from_bytes([11; 16]);
+    std::fs::write(root.path().join(format!("run-{blocked}")), "a file").unwrap();
+    assert_eq!(
+        cgroups.enter(blocked, 111, asked),
+        Mark::Unapplied {
+            limit,
+            why: Unapplied::Refused
+        }
+    );
+
+    let unjoined = kernel::RunId::from_bytes([12; 16]);
+    std::fs::create_dir_all(root.path().join(format!("run-{unjoined}/cgroup.procs"))).unwrap();
+    assert_eq!(
+        cgroups.enter(unjoined, 222, asked),
+        Mark::Unapplied {
+            limit,
+            why: Unapplied::Unjoined
+        }
+    );
 }

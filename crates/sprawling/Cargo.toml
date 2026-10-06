@@ -74,6 +74,8 @@ zeroize = { workspace = true }
 # after it exits and before its handle closes (`crates/sprawling/Spec.lean` §8-129-4).
 [target.'cfg(windows)'.dependencies]
 win32job = { workspace = true }
+# Windows self-uninstall releases the installed name before exit (Install.lean D53).
+self-replace = "=1.5.0"
 # Protected Windows installation path for the read-only privacy identity query.
 winreg = { workspace = true }
 

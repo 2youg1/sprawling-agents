@@ -9,9 +9,9 @@
 import { Schema } from "effect";
 
 /** The wire version both ends compare on connect. */
-export const WIRE_V = 59 as const;
+export const WIRE_V = 60 as const;
 /** The schema hash the server checks: `wire::schema_hash()`. */
-export const WIRE_HASH = "004ddb391041d23e6b67554aef5875ed98f87b7deaebddc6c4c1940555783c65" as const;
+export const WIRE_HASH = "70e13128b9d59dc36c85e75b0ea2948a313e216592deab8e2a94c149e17f1442" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 /** The body sizes a person may ask for: `wire::BODY_PX_MIN` and `BODY_PX_MAX`. */
@@ -2724,6 +2724,28 @@ export const Chord = Schema.Struct({
 export type Chord = typeof Chord.Type;
 
 /**
+ * The placement arm; platform policy belongs to serving::placement.
+ */
+export const CorePlacement = Schema.Literals(["none", "soft", "soft_shares", "pinned"]).annotate({ identifier: "CorePlacement" });
+export type CorePlacement = typeof CorePlacement.Type;
+
+/**
+ * Whether the core's hot threads stand above normal.
+ */
+export const CorePriority = Schema.Literals(["raised", "normal"]).annotate({ identifier: "CorePriority" });
+export type CorePriority = typeof CorePriority.Type;
+
+/**
+ * The person's `[core]` section, read at serving startup.
+ */
+export const CorePreferences = Schema.Struct({
+  memory_bytes: Schema.optional(Schema.NullOr(Schema.Int.check(Schema.isGreaterThanOrEqualTo(1)))),
+  placement: Schema.optional(CorePlacement),
+  priority: Schema.optional(CorePriority),
+}).annotate({ identifier: "CorePreferences" });
+export type CorePreferences = typeof CorePreferences.Type;
+
+/**
  * Which language a person reads the interface in.
  */
 export const Lang = Schema.Literals(["en", "zh"]).annotate({ identifier: "Lang" });
@@ -2790,6 +2812,7 @@ export type Tier = typeof Tier.Type;
 export const PreferencesAnswer = Schema.Struct({
   appearance: Schema.optional(Appearance),
   chords: Schema.optional(Schema.Array(Chord)),
+  core: Schema.optional(CorePreferences),
   lang: Schema.optional(Schema.NullOr(Lang)),
   panel: Schema.optional(Schema.Boolean),
   proxying: Schema.optional(Proxying),
@@ -3147,7 +3170,7 @@ export type IdemKey = typeof IdemKey.Type;
  * One change the person confirmed on the page. `expected` is the value
  * the page showed when the person confirmed; the host writes nothing when
  * its fresh read differs (`crates/sprawling/spec/Privacy/Confirmation.lean`
- * D55).
+ * D57).
  */
 export const PrivacyAction = Schema.Union([
   Schema.Struct({
@@ -3374,7 +3397,7 @@ export type ReleaseVerdict = typeof ReleaseVerdict.Type;
  * How this binary was installed, which decides the command that
  * updates it.
  */
-export const InstallChannel = Schema.Literals(["npm", "bun", "binstall", "unknown", "package", "cargo_or_binstall", "cargo", "archive", "source"]).annotate({ identifier: "InstallChannel" });
+export const InstallChannel = Schema.Literals(["npm", "bun", "binstall", "unknown", "package", "cargo_or_binstall", "cargo", "archive", "aur", "source"]).annotate({ identifier: "InstallChannel" });
 export type InstallChannel = typeof InstallChannel.Type;
 
 /**
@@ -4864,14 +4887,6 @@ export const PolicyChange = Schema.Struct({
 export type PolicyChange = typeof PolicyChange.Type;
 
 /**
- * Whether the core's threads stand above normal (`crates/sprawling/Spec.lean`
- * §8-93): the setting a person turns off. Spelled here once, for the
- * frame and for the `[core] priority` key the person's file holds.
- */
-export const CorePriority = Schema.Literals(["raised", "normal"]).annotate({ identifier: "CorePriority" });
-export type CorePriority = typeof CorePriority.Type;
-
-/**
  * One named change to [`PreferencesAnswer`].
  * 
  * A closed set of named changes rather than a whole record, so two
@@ -4903,6 +4918,12 @@ export const PreferencePatch = Schema.Union([
   }),
   Schema.Struct({
     core_priority: CorePriority,
+  }),
+  Schema.Struct({
+    core_placement: CorePlacement,
+  }),
+  Schema.Struct({
+    run_memory: Schema.NullOr(Schema.Int.check(Schema.isGreaterThanOrEqualTo(1))),
   }),
   Schema.Struct({
     tags: SessionTags,

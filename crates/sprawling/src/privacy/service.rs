@@ -7,7 +7,7 @@
 //! the answer to `Query::Privacy`, read off the host with the history
 //! disclosed only to the account it belongs to, and the operations
 //! `Command::PrivacyOperation` asks for, carried out one at a time with
-//! their results kept under the page's `idem` (Privacy D67).
+//! their results kept under the page's `idem` (Privacy D69).
 
 use std::collections::{BTreeSet, VecDeque};
 use std::path::PathBuf;
@@ -22,7 +22,7 @@ use super::coordinator::{self, Command, Done, Host};
 use super::journal::{self, LockedJournal};
 use super::target::Snapshot;
 
-/// How many results an answer carries; older ones give way (Privacy D67).
+/// How many results an answer carries; older ones give way (Privacy D69).
 const KEPT: usize = 64;
 
 /// The machine the page reads: the coordinator's port, and the facts its
@@ -185,7 +185,7 @@ impl<M: Machine + 'static> Service<M> {
         self.kept().settle(operation.idem, result);
     }
 
-    /// The history as this account may see it (Privacy.Cli D53): read
+    /// The history as this account may see it (Privacy.Cli D54): read
     /// without a lock, and released only once the identity check passed.
     fn disclosed(&self, machine: &mut M) -> PrivacyHistory {
         let history = match journal::read(&self.history) {

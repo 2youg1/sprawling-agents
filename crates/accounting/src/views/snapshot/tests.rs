@@ -6,7 +6,7 @@
 //! `VIEWS_FOLD_RULES` moves whenever the encoding of `Views` does
 //! (`crates/sprawling/Spec.lean` §8-91).
 
-use kernel::{Address, EventKind, RunId};
+use kernel::{Address, EventKind, Payload, RunId};
 
 use super::*;
 use crate::views::tests::{Place, view_record};
@@ -49,7 +49,12 @@ fn fixture(city_root: &Path) -> Views {
         ),
         (EventKind::RulesChanged, rules_changed()),
     ];
-    for (seq, (kind, data)) in (1..).zip(records.into_iter().chain(provider_registrations())) {
+    for (seq, (run, kind, data)) in (1..).zip(
+        records
+            .into_iter()
+            .map(|(kind, data)| (run, kind, data))
+            .chain(provider_registrations()),
+    ) {
         let serde_json::Value::Object(data) = data else {
             panic!("each fixture payload is an object");
         };
@@ -60,9 +65,12 @@ fn fixture(city_root: &Path) -> Views {
     views
 }
 
-pub(crate) fn provider_registrations() -> [(EventKind, serde_json::Value); 2] {
+pub(crate) fn provider_registrations() -> [(RunId, EventKind, serde_json::Value); 12] {
+    let old = RunId::from_bytes([7; 16]);
+    let fresh = RunId::from_bytes([8; 16]);
     [
         (
+            old,
             EventKind::EndpointAttached,
             serde_json::json!({
                 "name": "legacy", "base_url": "https://api.example.test/v1",
@@ -70,6 +78,7 @@ pub(crate) fn provider_registrations() -> [(EventKind, serde_json::Value); 2] {
             }),
         ),
         (
+            old,
             EventKind::EndpointAttached,
             serde_json::json!({
                 "name": "explicit", "base_url": "https://api.example.test/v1",
@@ -78,6 +87,56 @@ pub(crate) fn provider_registrations() -> [(EventKind, serde_json::Value); 2] {
                     {"id": "anonymous"}
                 ]}
             }),
+        ),
+        (
+            old,
+            EventKind::RunStarted,
+            serde_json::json!({"task": "fixture"}),
+        ),
+        (
+            old,
+            EventKind::ModelCalled,
+            serde_json::json!({"provider_account": {"provider": "explicit", "account": "first"}, "model": "fixture", "segments": []}),
+        ),
+        (
+            old,
+            EventKind::ModelReturned,
+            serde_json::json!({"message": {"content": []}, "calls": 0}),
+        ),
+        (
+            old,
+            EventKind::ModelCalled,
+            serde_json::json!({"provider_account": {"provider": "explicit", "account": "anonymous"}, "model": "fixture", "segments": []}),
+        ),
+        (
+            RunId::CITY,
+            EventKind::SessionOpened,
+            serde_json::json!({"carried": false}),
+        ),
+        (
+            old,
+            EventKind::ModelReturned,
+            serde_json::json!({"message": {"content": []}, "calls": 0}),
+        ),
+        (
+            fresh,
+            EventKind::RunStarted,
+            serde_json::json!({"task": "fixture"}),
+        ),
+        (
+            fresh,
+            EventKind::ModelCalled,
+            serde_json::json!({"provider_account": {"provider": "explicit", "account": "first"}, "model": "fixture", "segments": []}),
+        ),
+        (
+            fresh,
+            EventKind::ModelReturned,
+            serde_json::json!({"message": {"content": []}, "calls": 0}),
+        ),
+        (
+            fresh,
+            EventKind::ModelCalled,
+            serde_json::json!({"provider_account": {"provider": "explicit", "account": "anonymous"}, "model": "fixture", "segments": []}),
         ),
     ]
 }
@@ -168,4 +227,92 @@ fn a_digest_is_its_bytes_in_the_snapshot_and_its_hex_in_json() {
             ),
         )
     );
+}
+
+proptest::proptest! {
+    #[test]
+    fn closed_session_traces_preserve_current_bindings_across_replay_and_snapshot(
+        late in proptest::collection::vec(0u8..12, 0..24),
+        cut in 0usize..64,
+    ) {
+        let dir = tempfile::tempdir().unwrap();
+        let room = Address::parse("lab/room1").unwrap();
+        let neighbour = Address::parse("lab/room2").unwrap();
+        let old = RunId::from_bytes([2; 16]);
+        let spare = RunId::from_bytes([3; 16]);
+        let other = RunId::from_bytes([4; 16]);
+        let current = RunId::from_bytes([5; 16]);
+        let called = |account: &str| Payload::of(&kernel::event::record::ModelCalled {
+            model: "fixture".to_owned(), segments: Vec::new(),
+            provider_account: Some(kernel::event::record::ProviderAccountBinding {
+                provider: "house".to_owned(), account: kernel::ServerLabel::parse(account).unwrap(),
+            }),
+        }).unwrap();
+        let returned = Payload::new(serde_json::json!({"message": {"content": []}, "calls": 0}).as_object().unwrap().clone()).unwrap();
+        let mut events = vec![
+            (EventKind::RunStarted, old, Some(room.clone()), Payload::empty()),
+            (EventKind::RunStarted, spare, Some(room.clone()), Payload::empty()),
+            (EventKind::RunStarted, other, Some(neighbour.clone()), Payload::empty()),
+            (EventKind::ModelCalled, old, None, called("old")),
+            (EventKind::ModelCalled, spare, None, called("spare")),
+            (EventKind::ModelCalled, other, None, called("neighbour")),
+            (EventKind::ModelReturned, other, None, returned.clone()),
+            (EventKind::SessionOpened, RunId::CITY, Some(room.clone()), Payload::of(&kernel::event::record::SessionOpened { carried: false, from: None }).unwrap()),
+        ];
+        let mut live = gateway::EndpointBook::new();
+        for (kind, run, addr, data) in &events {
+            live.absorb(*kind, *run, addr.as_ref(), data).unwrap();
+        }
+        proptest::prop_assert_eq!(live.session_account(&room, "house"), None);
+        let opened = serde_json::to_value(&live).unwrap();
+        events.push((EventKind::ModelReturned, old, None, returned.clone()));
+        live.absorb(EventKind::ModelReturned, old, None, &returned).unwrap();
+        proptest::prop_assert_eq!(serde_json::to_value(&live).unwrap(), opened);
+        let fresh = [
+            (EventKind::RunStarted, current, Some(room.clone()), Payload::empty()),
+            (EventKind::ModelCalled, current, None, called("current")),
+            (EventKind::ModelReturned, current, None, returned.clone()),
+        ];
+        for (kind, run, addr, data) in &fresh {
+            live.absorb(*kind, *run, addr.as_ref(), data).unwrap();
+        }
+        events.extend(fresh);
+        let expected = serde_json::to_value(&live).unwrap();
+        events.extend([
+            (EventKind::ModelReturned, spare, Some(room.clone()), returned.clone()),
+            (EventKind::ModelCalled, old, Some(room.clone()), called("old")),
+            (EventKind::ModelReturned, old, Some(room.clone()), returned.clone()),
+        ]);
+        for step in late {
+            let run = if step % 2 == 0 { old } else { spare };
+            let (kind, data) = match step % 3 {
+                0 => (EventKind::ModelCalled, called("late")),
+                1 => (EventKind::ModelReturned, returned.clone()),
+                2.. => (EventKind::RunFrozen, Payload::empty()),
+            };
+            let addr = if step < 6 { None } else { Some(room.clone()) };
+            events.push((kind, run, addr, data));
+        }
+        let records: Vec<_> = (1..).zip(events).map(|(seq, (kind, run, addr, data))| {
+            kernel::EventRecord::from_draft(kernel::EventDraft {
+                run, t: kernel::TimeMs::new(1_000), who: "lab/room1".to_owned(), addr, kind, data, ig: false,
+            }, kernel::Seq::new(seq), kernel::B3Hash::digest(b"prev"))
+        }).collect();
+        let mut live = gateway::EndpointBook::new();
+        let mut replay = Views::new(dir.path());
+        let mut restored = Views::new(dir.path());
+        let cut = cut.min(records.len());
+        for (index, record) in records.iter().enumerate() {
+            live.absorb(record.kind(), record.run(), record.addr(), record.data()).unwrap();
+            replay.apply(record).unwrap();
+            if index == cut {
+                restored = Views::decode(dir.path(), &restored.encode().unwrap()).unwrap();
+            }
+            restored.apply(record).unwrap();
+        }
+        restored = Views::decode(dir.path(), &restored.encode().unwrap()).unwrap();
+        proptest::prop_assert_eq!(serde_json::to_value(&live).unwrap(), expected.clone());
+        proptest::prop_assert_eq!(serde_json::to_value(&replay.book).unwrap(), expected.clone());
+        proptest::prop_assert_eq!(serde_json::to_value(&restored.book).unwrap(), expected);
+    }
 }

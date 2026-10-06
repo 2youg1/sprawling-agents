@@ -27,6 +27,9 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
+mod core;
+pub use core::{CorePlacement, CorePreferences, CorePriority};
+
 mod tag;
 pub use tag::{SessionTags, TAG_MAX, Tag};
 
@@ -204,6 +207,8 @@ pub struct PreferencesAnswer {
     /// first choice, and a stated `en` here would overrule it on every
     /// machine whose owner simply never opened the setting.
     pub lang: Option<Lang>,
+    /// Performance settings read from `[core]`, never stored in `[ui]`.
+    pub core: CorePreferences,
     /// Whether this person has walked through the welcome once. The
     /// city decides whether setting up is *needed*; this only decides
     /// whether somebody who skipped it is asked again.
@@ -258,6 +263,7 @@ impl Default for PreferencesAnswer {
     fn default() -> Self {
         PreferencesAnswer {
             lang: None,
+            core: CorePreferences::default(),
             welcomed: false,
             panel: true,
             tier: None,
@@ -303,9 +309,10 @@ impl PreferencesAnswer {
             PreferencePatch::Tier(tier) => self.tier = Some(tier),
             PreferencePatch::Appearance(appearance) => self.appearance = appearance,
             PreferencePatch::Proxying(proxying) => self.proxying = proxying,
-            // Not a fact of this record: it lives in the file's `[core]`
-            // section, which `accounting::person` writes beside `[ui]`.
-            PreferencePatch::CorePriority(_) => {}
+            // The writer stores these separately from `[ui]`.
+            PreferencePatch::CorePriority(priority) => self.core.priority = priority,
+            PreferencePatch::CorePlacement(placement) => self.core.placement = placement,
+            PreferencePatch::RunMemory(memory) => self.core.memory_bytes = memory,
             PreferencePatch::Tags(next) => tag::retagged(&mut self.tags, next),
             PreferencePatch::Theme(theme) => self.theme = theme,
             PreferencePatch::Chord(chord) => {
@@ -347,23 +354,14 @@ pub enum PreferencePatch {
     /// Whether the core's threads stand above normal. Lands in the
     /// file's `[core]` section, not in `[ui]` (`crates/wire/spec/Command/Step.lean` §8-61).
     CorePriority(CorePriority),
+    CorePlacement(CorePlacement),
+    RunMemory(Option<std::num::NonZeroU64>),
     /// Replace one session's tags with these; an empty set removes them
     /// (`crates/wire/spec/Preference.lean` §8-84).
     Tags(SessionTags),
     /// Replace the colour override; the empty value returns to the
     /// built-in theme (`crates/wire/spec/Preference.lean` D29).
     Theme(ThemeOverride),
-}
-
-/// Whether the core's threads stand above normal (`crates/sprawling/Spec.lean`
-/// §8-93): the setting a person turns off. Spelled here once, for the
-/// frame and for the `[core] priority` key the person's file holds.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-pub enum CorePriority {
-    Raised,
-    Normal,
 }
 
 #[cfg(test)]

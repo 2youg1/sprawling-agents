@@ -201,18 +201,50 @@ fn place(dir: &Path) -> Result<PathBuf, AxError> {
     Ok(target)
 }
 
-/// Removes the copy this put there, and says whether there was one.
+/// Releases the installed name, and says whether there was a copy.
+///
+/// On Windows the running image survives under a temporary name until
+/// process exit; D53 in the Install specification owns that contract.
 fn displace(dir: &Path) -> Result<bool, AxError> {
     let target = dir.join(installed_name());
-    match std::fs::remove_file(&target) {
-        Ok(()) => Ok(true),
-        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(false),
-        Err(err) => Err(AxError::failure(
+    remove_installed_entry(&target).map_err(|err| {
+        AxError::failure(
             AxCode::StorageFatal,
             "remove the installed binary",
             format!("{}: {err}", target.display()),
         )
-        .with_recovery("close any running sprawling and try again")),
+        .with_recovery(
+            "close any other running sprawling and try again; if the installed name was already moved, repeat install from the original archive",
+        )
+    })
+}
+
+fn remove_installed_entry(target: &Path) -> std::io::Result<bool> {
+    #[cfg(target_os = "windows")]
+    {
+        let entry = match std::fs::symlink_metadata(target) {
+            Ok(entry) => entry,
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+            Err(err) => return Err(err),
+        };
+        // A link owns only its installed entry, even when its referent is this image.
+        if !entry.is_symlink()
+            && target.canonicalize()? == std::env::current_exe()?.canonicalize()?
+        {
+            let dir = target.parent().ok_or_else(|| {
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    "the installed binary has no parent directory",
+                )
+            })?;
+            self_replace::self_delete_outside_path(dir)?;
+            return Ok(true);
+        }
+    }
+    match std::fs::remove_file(target) {
+        Ok(()) => Ok(true),
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(false),
+        Err(err) => Err(err),
     }
 }
 

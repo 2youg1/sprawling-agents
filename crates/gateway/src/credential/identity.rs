@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Privacy owner verification and binding (`crates/gateway/spec/Credential.lean`
-//! D27, D30).
+//! D31, D32).
 
 use super::vault::{KeyringVault, Vault};
 use kernel::{AxCode, AxError, SecretRef};

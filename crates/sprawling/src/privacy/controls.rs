@@ -184,7 +184,7 @@ impl Written {
 
 impl Editions {
     /// How these lists read for a host of `edition`; a host whose edition
-    /// is not one of the named editions reads as not stated (Privacy D64).
+    /// is not one of the named editions reads as not stated (Privacy D66).
     pub(crate) fn fit(&self, edition: Option<PrivacyEdition>) -> PrivacyEditionFit {
         match edition {
             Some(edition) if self.honoured.contains(&edition) => PrivacyEditionFit::Honoured,

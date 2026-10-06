@@ -87,7 +87,7 @@ pub struct PrivacyIntent { operation: u64, control, original: PrivacyValue, modi
   按原项次序，带研究定下的原因与最接近的控制。原项原文随答复走（`PrivacyOriginalLine.text`），
   因为它是人自己写下的句子，不是界面文字，`lang.json` 里没有它。
 - **版本适用由主机判定。** `host_fit` 由控制的版本清单与主机 `EditionID` 的前缀规则一处算出
-  （crates/sprawling/spec/Privacy/Controls.lean D64），页面不重算；主机不是 Windows 或版本记录读不成时，
+  （crates/sprawling/spec/Privacy/Controls.lean D66），页面不重算；主机不是 Windows 或版本记录读不成时，
   每个控制都是 `NotStated`。
 - **`written` 是 apply 在 `current` 之上会留下的值**，由控制表的写入值算出；`current` 没读成或主机
   没有该任务时缺席。
@@ -130,7 +130,7 @@ pub enum PrivacyResult { Running, Applied { operation }, Restored { operation },
 的 `REG_SZ` 写作 `Text`，其余注册表值写作 `Raw`（类型码与小写十六进制字节），任务带定义摘要的十六进制。
 所以页面显示的值可以直接读，送回时主机把它换回字节、与 fresh read 逐字节比较；换回之后再换出不等于
 原拼写的（例如一个本该写作 `Dword` 的 `Raw`）拒绝。
-**理由**：确认绑定的是人看到的值（crates/sprawling/spec/Privacy/Confirmation.lean D55），绑定必须是
+**理由**：确认绑定的是人看到的值（crates/sprawling/spec/Privacy/Confirmation.lean D57），绑定必须是
 精确的；同时页面要把值显示给人看，一份只给字节的值让每个读者各写一遍解码。
 **被否**：①只送显示用的有损形式（DWORD 数字、文字、任务启用与否）并在主机比较显示形式——任务摘要与
 不规范的字符串会丢，两个不同的快照显示相同时，确认就绑不住；②值与显示形式各送一份——同一事实两份，
@@ -140,11 +140,11 @@ pub enum PrivacyResult { Running, Applied { operation }, Restored { operation },
 
 /-! D50 没有「全部恢复」的帧：页面为每个仍拥有的控制各发一次 Restore
 
-restore-all 是逐个控制的单次恢复（crates/sprawling/spec/Privacy.lean D60），每次机器作用域的写入各要一次
+restore-all 是逐个控制的单次恢复（crates/sprawling/spec/Privacy.lean D62），每次机器作用域的写入各要一次
 管理员批准；页面按 `PrivacyHistory::Disclosed.owned` 为每一条发一次 `Restore`，各带自己的 idem 与它显示的
 当前值，主机按到达次序一个接一个执行，每个结果各自可读。
 **被否**：`RestoreAll { expected: Vec<…> }` 一帧——要再定义一种「一批结果」的形状，表达的仍是同样的
 一串单次恢复，UAC 次数也不变。
-**重开参数**：若机器作用域的写入可以合成一次提升而不违反「一次只有一个未结操作」（D60 的被否方案），
+**重开参数**：若机器作用域的写入可以合成一次提升而不违反「一次只有一个未结操作」（D62 的被否方案），
 再考虑一帧批量。
 -/

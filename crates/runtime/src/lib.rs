@@ -28,8 +28,8 @@ pub mod tools;
 pub mod transcript;
 
 pub use backlog::{Backlog, BacklogId, BacklogKind, Finished, Standing, Started};
+pub use backlog::{Ceiling, Unapplied, Unseen, platform_shares};
 pub use backlog::{Chunk, Exit, PlatformShares, PollBudget, RunProcesses, Shares, Sink, Stream};
-pub use backlog::{Unseen, platform_shares};
 pub use tools::BoundReader;
 pub use tools::CallTool;
 pub use tools::ChildStatus;

@@ -28,7 +28,7 @@ import { go } from "./core/route";
 import type { Connection } from "./core/socket";
 import { keepTags } from "./core/tags";
 import type { Tagging } from "./core/tags";
-import type { Answer, ApprovalItem, Command, Effort, Mode, RunPolicy } from "./wire";
+import type { Answer, ApprovalItem, Command, Effort, RunPolicy } from "./wire";
 import { NOT_CONVERSING } from "./views/talk/handing";
 import type { Conversing } from "./views/talk/handing";
 
@@ -53,10 +53,8 @@ export interface Ui {
   readonly effort: Readable<Effort | null>;
   // The run policy the next dispatch runs under - its mode, write
   // limit, admission requirement and landing - held for this page the
-  // way effort is; it starts at the first each control offers. `mode` is
-  // its first value, read on its own by the mode pill.
+  // way effort is; it starts at the first each control offers.
   readonly policy: Readable<RunPolicy>;
-  readonly mode: Readable<Mode>;
   // What the open conversation waits on, so the corner leaves the
   // refusal the conversation draws to the conversation
   // (`views/talk/handing.ts`). Written by the talk page alone.
@@ -80,7 +78,6 @@ export interface Ui {
   // Milliseconds now, read where a view needs a relative time.
   readonly now: () => number;
   readonly chooseEffort: (level: Effort | null) => void;
-  readonly chooseMode: (mode: Mode) => void;
   readonly choosePolicy: (policy: RunPolicy) => void;
   readonly go: (view: View) => void;
   // Sends a command, and says so when it could not be sent.
@@ -116,7 +113,6 @@ function readied(value: Opening): Ui {
     lang: derived(value.prefs.held, (held) => held.lang),
     effort,
     policy,
-    mode: derived(policy, (held) => held.mode),
     conversing: writable<Conversing>(NOT_CONVERSING),
     tags: keepTags(value.conn),
     approvals: derived(
@@ -124,9 +120,6 @@ function readied(value: Opening): Ui {
       (answer) => (answer !== undefined && "approvals" in answer ? answer.approvals.items : undefined),
     ),
     chooseEffort: effort.set,
-    chooseMode: (mode) => {
-      policy.update((held) => ({ ...held, mode }));
-    },
     choosePolicy: policy.set,
     go: (view) => {
       go(value.bar, view);

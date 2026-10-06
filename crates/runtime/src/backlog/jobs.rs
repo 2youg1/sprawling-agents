@@ -25,6 +25,9 @@ use std::num::{NonZeroU64, NonZeroUsize};
 
 use kernel::{AxError, RunId};
 
+use super::ceiling::{Ceiling, Mark, Unapplied};
+#[cfg(windows)]
+use super::run_job::{RUN_CPU_WEIGHT, RunJob};
 use super::{Backlog, BacklogId, Body, Claim, Member};
 
 /// The processes one run has in the backlog right now.
@@ -80,6 +83,16 @@ pub enum Shares {
     },
 }
 
+impl Shares {
+    /// The memory ceiling these shares ask for, if any.
+    pub(super) fn memory(self) -> Option<NonZeroU64> {
+        match self {
+            Shares::Unset | Shares::Cpu => None,
+            Shares::CpuAndMemory { limit } => Some(limit),
+        }
+    }
+}
+
 /// Each run's job, and how many of its commands did not get into it.
 ///
 /// On Linux the same work is done by a child cgroup per run
@@ -117,23 +130,53 @@ impl Backlog {
         Ok(runs)
     }
 
-    /// Enters a member into the table, and a command into its run's job.
-    pub(super) fn enrol(&self, id: BacklogId, member: Member) -> Result<(), AxError> {
+    /// Enters a member into the table, and a command into its run's job,
+    /// marking how the run's memory ceiling holds for it (D95).
+    pub(super) fn enrol(&self, id: BacklogId, mut member: Member) -> Result<(), AxError> {
         let mut table = self.hold()?;
-        table.jobs.enter(&member, self.shares, self.affinity);
+        let mark = table.jobs.enter(&member, self.shares, self.affinity);
+        if let Body::Command { ceiling, .. } = &mut member.body {
+            *ceiling = mark;
+        }
         table.members.insert(id, member);
         Ok(())
     }
 }
 
 impl Jobs {
+    /// How the memory ceiling fared for a command of `owner` that entered
+    /// with `mark` and is collected now (D95). The run's refusal count is
+    /// read only for a mark that watches it.
+    pub(super) fn ceiling(&mut self, owner: RunId, mark: Mark) -> Option<Ceiling> {
+        let count = if mark.watching() {
+            self.refusals(owner)
+        } else {
+            None
+        };
+        super::ceiling::verdict(mark, count)
+    }
+
+    #[cfg(windows)]
+    fn refusals(&mut self, owner: RunId) -> Option<u64> {
+        self.runs.get_mut(&owner)?.refusals()
+    }
+
+    #[cfg(not(windows))]
+    fn refusals(&mut self, owner: RunId) -> Option<u64> {
+        self.cgroups.refusals(owner)
+    }
+
+    /// The run's job for a native command, with the shares and the
+    /// ceiling's watch set, and the command's ceiling mark read before it
+    /// starts. A job that refuses the ceiling or its watch stops the
+    /// launch (`NativeWindows.lean` D54).
     #[cfg(windows)]
     pub(super) fn native_job(
         &mut self,
         owner: RunId,
-        memory: NonZeroUsize,
+        memory: Option<NonZeroUsize>,
         affinity: RunAffinity,
-    ) -> Result<NonZeroUsize, AxError> {
+    ) -> Result<(NonZeroUsize, Mark), AxError> {
         use crate::tools::native_windows::denied;
         let run = self.runs.entry(owner).or_default();
         for retiring in &mut run.retiring {
@@ -147,8 +190,18 @@ impl Jobs {
             .job
             .as_ref()
             .ok_or_else(|| denied("create run Job", "Job owner disappeared"))?;
-        desktop_ffi::cpu::job_share(job.handle(), RUN_CPU_WEIGHT, memory.get())
-            .map_err(|err| denied("set run memory ceiling", format!("{err:?}")))?;
+        desktop_ffi::cpu::job_share(
+            job.handle(),
+            RUN_CPU_WEIGHT,
+            memory.map_or(0, NonZeroUsize::get),
+        )
+        .map_err(|err| denied("set run memory ceiling", format!("{err:?}")))?;
+        if memory.is_some() && run.watch.is_none() {
+            run.watch = Some(
+                desktop_ffi::cpu::JobWatch::attach(job.handle())
+                    .map_err(|err| denied("watch run memory ceiling", format!("{err:?}")))?,
+            );
+        }
         if let RunAffinity::Mask(mask) = affinity {
             let mut info = job
                 .query_extended_limit_info()
@@ -157,15 +210,23 @@ impl Jobs {
             job.set_extended_limit_info(&info)
                 .map_err(|err| denied("set run Job affinity", err))?;
         }
-        run.share = Shares::CpuAndMemory {
-            limit: NonZeroU64::new(
-                u64::try_from(memory.get()).map_err(|err| denied("read run Job memory", err))?,
-            )
-            .ok_or_else(|| denied("read run Job memory", "zero memory"))?,
+        run.share = match memory {
+            None => Shares::Cpu,
+            Some(memory) => Shares::CpuAndMemory {
+                limit: NonZeroU64::new(
+                    u64::try_from(memory.get())
+                        .map_err(|err| denied("read run Job memory", err))?,
+                )
+                .ok_or_else(|| denied("read run Job memory", "zero memory"))?,
+            },
         };
         run.affinity = affinity;
-        NonZeroUsize::new(usize::try_from(job.handle()).map_err(|err| denied("lend run Job", err))?)
-            .ok_or_else(|| denied("lend run Job", "invalid Job handle"))
+        let lent = NonZeroUsize::new(
+            usize::try_from(job.handle()).map_err(|err| denied("lend run Job", err))?,
+        )
+        .ok_or_else(|| denied("lend run Job", "invalid Job handle"))?;
+        let asked = run.share.memory();
+        Ok((lent, run.mark(asked)))
     }
 
     #[cfg(windows)]
@@ -189,36 +250,41 @@ impl Jobs {
     }
 
     #[cfg(windows)]
-    fn enter(&mut self, member: &Member, shares: Shares, affinity: RunAffinity) {
+    fn enter(&mut self, member: &Member, shares: Shares, affinity: RunAffinity) -> Mark {
         let Body::Command {
             child,
             claim: Claim::Window(owner) | Claim::Run(owner),
             ..
         } = &member.body
         else {
-            return;
+            return Mark::NotAsked;
         };
         let Some(child) = child.client() else {
-            return;
+            return Mark::outside(shares.memory(), Unapplied::Unjoined);
         };
         let run = self.runs.entry(*owner).or_default();
-        if run.join(child, shares, affinity).is_none() {
-            run.unjoined = run.unjoined.saturating_add(1);
+        match run.join(child, shares, affinity) {
+            Ok(()) => run.mark(shares.memory()),
+            Err(why) => {
+                run.unjoined = run.unjoined.saturating_add(1);
+                Mark::outside(shares.memory(), why)
+            }
         }
     }
 
     #[cfg(not(windows))]
-    fn enter(&mut self, member: &Member, shares: Shares, _affinity: RunAffinity) {
+    fn enter(&mut self, member: &Member, shares: Shares, _affinity: RunAffinity) -> Mark {
         let Body::Command {
             child,
             claim: Claim::Window(owner) | Claim::Run(owner),
             ..
         } = &member.body
         else {
-            return;
+            return Mark::NotAsked;
         };
-        if let Some(child) = child.client() {
-            self.cgroups.enter(*owner, child.id(), shares);
+        match child.client() {
+            Some(child) => self.cgroups.enter(*owner, child.id(), shares),
+            None => Mark::outside(shares.memory(), Unapplied::Unjoined),
         }
     }
 
@@ -247,88 +313,6 @@ impl Jobs {
             reading.unfollowed = u32::try_from(reading.pids.len()).unwrap_or(u32::MAX);
             reading.share = self.cgroups.held(*owner);
         }
-    }
-}
-
-/// The weight every run's job holds, from 1 to 9: the same for every
-/// run, so the runs share the processors evenly among themselves.
-#[cfg(windows)]
-const RUN_CPU_WEIGHT: u32 = 5;
-
-/// One run's job, created when its first command joins.
-#[cfg(windows)]
-#[derive(Default)]
-struct RunJob {
-    retiring: Vec<super::native_windows::RetiringNative>,
-    job: Option<win32job::Job>,
-    unjoined: u32,
-    share: Shares,
-    affinity: RunAffinity,
-}
-
-#[cfg(windows)]
-impl RunJob {
-    /// Puts `child` into this run's job, creating the job on first use
-    /// with the shares asked for. `None` when the job cannot be made or
-    /// the process cannot join it.
-    fn join(
-        &mut self,
-        child: &std::process::Child,
-        shares: Shares,
-        affinity: RunAffinity,
-    ) -> Option<()> {
-        use std::os::windows::io::AsRawHandle;
-        let handle = isize::try_from(child.as_raw_handle().addr()).ok()?;
-        let job = match self.job.take() {
-            Some(job) => job,
-            None => {
-                let job = win32job::Job::create().ok()?;
-                self.share = given(&job, shares);
-                if let RunAffinity::Mask(mask) = affinity {
-                    // Read after the memory limit was set: an empty
-                    // record here would erase that limit.
-                    let applied = job.query_extended_limit_info().and_then(|mut info| {
-                        info.limit_affinity(mask.get());
-                        job.set_extended_limit_info(&info)
-                    });
-                    self.affinity = match applied {
-                        Ok(()) => affinity,
-                        Err(_refused) => RunAffinity::Os,
-                    };
-                }
-                job
-            }
-        };
-        let joined = job.assign_process(handle).ok();
-        self.job = Some(job);
-        joined
-    }
-}
-
-/// The shares `job` takes of those `asked`. A job that refuses them still
-/// follows the run's processes, and the run is read as unshared; a limit
-/// past this process's address space limits nothing, so the job takes
-/// the weight alone (D29).
-#[cfg(windows)]
-fn given(job: &win32job::Job, asked: Shares) -> Shares {
-    let memory = match asked {
-        Shares::Unset => return Shares::Unset,
-        Shares::Cpu => 0,
-        Shares::CpuAndMemory { limit } => match usize::try_from(limit.get()) {
-            Ok(bytes) => bytes,
-            Err(_beyond) => return weigh(job, 0, Shares::Cpu),
-        },
-    };
-    weigh(job, memory, asked)
-}
-
-/// Sets the run weight and `memory` (none when zero) on `job`: `held`
-/// when the platform takes them, `Unset` when it refuses.
-#[cfg(windows)]
-fn weigh(job: &win32job::Job, memory: usize, held: Shares) -> Shares {
-    match desktop_ffi::cpu::job_share(job.handle(), RUN_CPU_WEIGHT, memory) {
-        Ok(()) => held,
-        Err(_refused) => Shares::Unset,
     }
 }
 
@@ -407,6 +391,83 @@ mod tests {
             );
             assert_eq!(finished.stdout.trim().parse::<usize>().unwrap(), mask.get());
         }
+        backlog.release(owner);
+    }
+
+    /// A run's command that asks for more than the person's ceiling is
+    /// refused there, and its result says the ceiling was hit; a command
+    /// of the same run that stays under it says nothing (Exec.lean D95).
+    /// The child waits for the gate file, so it allocates only after it
+    /// joined the run's job.
+    #[cfg(windows)]
+    #[test]
+    fn a_command_refused_at_the_ceiling_reports_the_hit() {
+        let limit = std::num::NonZeroU64::new(512 << 20).unwrap();
+        let owner = kernel::RunId::from_bytes([13; 16]);
+        let addr = kernel::Address::parse("vault/room1").unwrap();
+        let quick = Backlog::with_window(crate::PollBudget::new(1_500, 20))
+            .with_shares(Shares::CpuAndMemory { limit });
+        let mut small = std::process::Command::new("powershell.exe");
+        small.args(["-NoProfile", "-NonInteractive", "-Command", "exit 0"]);
+        small.current_dir(std::env::temp_dir());
+        let settled = quick
+            .run(owner, &addr, "under the ceiling".to_owned(), small)
+            .unwrap();
+        assert!(
+            matches!(
+                settled,
+                crate::Started::Settled {
+                    exit: crate::Exit::Ended { code: 0 },
+                    ceiling: None,
+                    ..
+                }
+            ),
+            "{settled:?}"
+        );
+        quick.release(owner);
+
+        let backlog = Backlog::with_window(crate::PollBudget::new(1, 1))
+            .with_shares(Shares::CpuAndMemory { limit });
+        let gate = backlog
+            .scratch
+            .dir(backlog.mint().unwrap())
+            .with_extension("gate");
+        let mut large = std::process::Command::new("powershell.exe");
+        large.args([
+            "-NoProfile",
+            "-NonInteractive",
+            "-Command",
+            "while (-not (Test-Path -LiteralPath $env:D95_GATE)) { Start-Sleep -Milliseconds 20 }; try { $b = New-Object byte[] 1073741824; exit 0 } catch { exit 7 }",
+        ]);
+        large
+            .env("D95_GATE", &gate)
+            .current_dir(std::env::temp_dir());
+        assert!(matches!(
+            backlog
+                .run(owner, &addr, "over the ceiling".to_owned(), large)
+                .unwrap(),
+            crate::Started::Backgrounded { .. }
+        ));
+        std::fs::write(&gate, b"ready").unwrap();
+        let mut finished = None;
+        for _ in 0..1_500 {
+            if let Some(done) = backlog.harvest(owner).unwrap().into_iter().next() {
+                finished = Some(done);
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+        std::fs::remove_file(gate).unwrap();
+        let finished = finished.expect("the allocating command finishes");
+        assert_eq!(
+            (finished.exit, finished.ceiling),
+            (
+                crate::Exit::Ended { code: 7 },
+                Some(crate::Ceiling::Hit { limit })
+            ),
+            "{}",
+            finished.stderr
+        );
         backlog.release(owner);
     }
 

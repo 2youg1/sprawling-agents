@@ -35,7 +35,8 @@ impl Command {
 }
 impl Query { pub fn name(&self) -> &'static str; }
 
-// sandbox frozen container fields and named arms move the shape version; no new frame name.
+// The person's [core] preferences and Aur installation origins extend the answer shape; no new frame name.
+// Increment WIRE_V so a cached client cannot accept an origin it cannot render.
 pub const WIRE_V: u32;
 pub const COMMAND_NAMES: [&str; /* 长度由变体数生成 */];   // 形状 6 数据面：名字权威，计数断言见 §2
 pub const QUERY_NAMES:   [&str; /* 长度由变体数生成 */];   // 同上（§8-38）
@@ -105,7 +106,7 @@ pub struct Delta { pub run: RunId, pub increment: kernel::Increment }
 
 **一条增量说清自己来自哪一路**（`kernel::Increment`，WIRE_V 28→29）。推理与散文是两路而不是一路：一个把八成以上输出花在推理上的模型几乎不往散文那一路发东西，而把两路并进一个缓冲区的页面，要么把模型的草稿当答案给人看，要么让人对着空线程等三分钟。**败给的方案**：帧上加一个布尔——那要求每一个读者自己记住 true 是哪一路。
 
-**服务端半边在 `gateway`：** `kernel::Model` 多一个 `call_streaming(req, onto)`，默认实现就是 `call` 并且不报告任何增量——一个没有流的适配器因此是诚实的而不是坏的。`gateway::endpoint` 覆盖它：请求带 `stream: true`，逐行读 SSE，`dialect::increment_of` 认两路——助手散文与推理各自的那个字段，工具参数一律不报（半个工具参数不是短一点的工具参数），最后 `dialect::settled_from_stream` 把帧重装成**非流式的那个形状**，交给同一个 `response_from_wire`。**结算答案因此只有一个解析器**：流式调用与阻塞调用不可能对同一个回复得出两个结论。流被切断仍然表现为读取错误，永不表现为一个变短的回答。
+**服务端半边在 `gateway`：** `kernel::Model` 多一个 `call_streaming(req, onto)`，默认实现就是 `call` 并且不报告任何增量——一个没有流的适配器因此是诚实的而不是坏的。`gateway::endpoint` 覆盖它：请求带 `stream: true`，逐行读 SSE，`dialect::increment_of` 认两路——助手散文与推理各自的那个字段，工具参数一律不报（半个工具参数不是短一点的工具参数），帧保留与 EOF 后结算遵循 `crates/gateway/spec/Endpoint/Stream.lean` §8-13 的 `StreamFrames` 契约，结算结果交给同一个 `response_from_wire`。**结算答案因此只有一个解析器**：流式调用与阻塞调用不可能对同一个回复得出两个结论。流被切断仍然表现为读取错误，永不表现为一个变短的回答。
 -/
 
 /-!

@@ -42,6 +42,22 @@ use crate::error::{AxCode, AxError};
 mod number;
 pub use number::Version;
 
+/// The package identity shared by the AUR definition and installed-origin reader.
+pub const AUR_PACKAGE_NAME: &str = "sprawling-bin";
+
+/// The POSIX directory relative to the installation root, including bundled resources.
+#[must_use]
+pub fn aur_install_directory() -> String {
+    format!("usr/lib/{AUR_PACKAGE_NAME}")
+}
+
+/// Whether the executable occupies the directory emitted by the AUR packager.
+#[must_use]
+pub fn is_aur_install(exe: &std::path::Path) -> bool {
+    exe.parent()
+        .is_some_and(|directory| directory.ends_with(aur_install_directory()))
+}
+
 /// How far this project stands, as every release it cuts names it
 /// (kernel D18).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

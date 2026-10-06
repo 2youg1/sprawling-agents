@@ -21,6 +21,9 @@ extern "kernel32" fn GetThreadGroupAffinity(thread: HANDLE, affinity: *GROUP_AFF
 extern "kernel32" fn SetProcessInformation(process: HANDLE, class: u32, info: *const anyopaque, size: u32) callconv(.winapi) BOOL;
 extern "kernel32" fn QueryInformationJobObject(job: HANDLE, class: u32, info: *anyopaque, size: u32, returned: ?*u32) callconv(.winapi) BOOL;
 pub extern "kernel32" fn SetInformationJobObject(job: HANDLE, class: u32, info: *const anyopaque, size: u32) callconv(.winapi) BOOL;
+extern "kernel32" fn CreateIoCompletionPort(file: HANDLE, existing: ?HANDLE, key: usize, threads: u32) callconv(.winapi) ?HANDLE;
+extern "kernel32" fn GetQueuedCompletionStatus(port: HANDLE, bytes: *u32, key: *usize, overlapped: *?*anyopaque, wait_ms: u32) callconv(.winapi) BOOL;
+extern "kernel32" fn CloseHandle(handle: HANDLE) callconv(.winapi) BOOL;
 
 // The SDK's values for the processor and job calls, each written once,
 // here (`crates/desktop/ffi/Spec.lean` D4).
@@ -33,6 +36,18 @@ pub const JOB_OBJECT_CPU_RATE_CONTROL_INFORMATION: u32 = 15;
 pub const JOB_OBJECT_LIMIT_JOB_MEMORY: u32 = 0x200;
 pub const JOB_OBJECT_CPU_RATE_CONTROL_ENABLE: u32 = 0x1;
 const JOB_OBJECT_CPU_RATE_CONTROL_WEIGHT_BASED: u32 = 0x2;
+const JOB_OBJECT_ASSOCIATE_COMPLETION_PORT_INFORMATION: u32 = 7;
+const JOB_OBJECT_MSG_JOB_MEMORY_LIMIT: u32 = 10;
+const WAIT_TIMEOUT: u32 = 258;
+const INVALID_HANDLE_VALUE = windows.INVALID_HANDLE_VALUE;
+/// The most messages one read takes off a port; the rest wait for the
+/// next read, so one read is bounded however busy the job was.
+const DRAIN_LIMIT: u32 = 65_536;
+
+const JOBOBJECT_ASSOCIATE_COMPLETION_PORT = extern struct {
+    CompletionKey: ?*anyopaque,
+    CompletionPort: HANDLE,
+};
 
 const GROUP_AFFINITY = extern struct {
     Mask: usize = 0,
@@ -142,13 +157,70 @@ export fn sprawling_desktop_job_share(job: ?HANDLE, weight: u32, memory: usize, 
     return Ended.finished.answer(code);
 }
 
+/// A completion port attached to `job`, so the job's messages queue on it;
+/// `port` receives the port's handle. A port that cannot be attached is
+/// closed again, and nothing is left behind.
+export fn sprawling_desktop_job_watch(job: ?HANDLE, port: *usize, code: *u32) u32 {
+    const named = job orelse return (Ended{ .step = .JobWatch }).answer(code);
+    const made = CreateIoCompletionPort(INVALID_HANDLE_VALUE, null, 0, 1) orelse return Ended.failed(.JobWatch).answer(code);
+    const association: JOBOBJECT_ASSOCIATE_COMPLETION_PORT = .{ .CompletionKey = named, .CompletionPort = made };
+    if (SetInformationJobObject(named, JOB_OBJECT_ASSOCIATE_COMPLETION_PORT_INFORMATION, &association, @sizeOf(JOBOBJECT_ASSOCIATE_COMPLETION_PORT)) == .FALSE) {
+        const ended = Ended.failed(.JobWatch);
+        _ = CloseHandle(made);
+        return ended.answer(code);
+    }
+    port.* = @intFromPtr(made);
+    return Ended.finished.answer(code);
+}
+
+/// Takes the messages queued on `port` without waiting, at most
+/// `DRAIN_LIMIT` of them, and counts in `hits` those saying a process
+/// of the job was refused at the job's memory limit.
+export fn sprawling_desktop_job_memory_hits(port: usize, hits: *u32, code: *u32) u32 {
+    if (port == 0) return (Ended{ .step = .JobWatch }).answer(code);
+    const named: HANDLE = @ptrFromInt(port);
+    var counted: u32 = 0;
+    var taken: u32 = 0;
+    while (taken < DRAIN_LIMIT) : (taken += 1) {
+        var message: u32 = 0;
+        var key: usize = 0;
+        var overlapped: ?*anyopaque = null;
+        if (GetQueuedCompletionStatus(named, &message, &key, &overlapped, 0) == .FALSE) {
+            const ended = Ended.failed(.JobWatch);
+            if (overlapped == null and ended.code == WAIT_TIMEOUT) break;
+            hits.* = counted;
+            return ended.answer(code);
+        }
+        if (message == JOB_OBJECT_MSG_JOB_MEMORY_LIMIT) counted += 1;
+    }
+    hits.* = counted;
+    return Ended.finished.answer(code);
+}
+
+/// Closes a port `sprawling_desktop_job_watch` made.
+export fn sprawling_desktop_job_unwatch(port: usize, code: *u32) u32 {
+    if (port == 0) return (Ended{ .step = .JobWatch }).answer(code);
+    if (CloseHandle(@ptrFromInt(port)) == .FALSE) return Ended.failed(.JobWatch).answer(code);
+    return Ended.finished.answer(code);
+}
+
 test "the layouts the processor and job calls lend match the SDK's sizes" {
     try std.testing.expectEqual(@as(usize, 16), @sizeOf(GROUP_AFFINITY));
     try std.testing.expectEqual(@as(usize, 12), @sizeOf(PROCESS_POWER_THROTTLING_STATE));
     try std.testing.expectEqual(@as(usize, 144), @sizeOf(JOBOBJECT_EXTENDED_LIMIT_INFORMATION));
+    try std.testing.expectEqual(@as(usize, 16), @sizeOf(JOBOBJECT_ASSOCIATE_COMPLETION_PORT));
 }
 
 test "a job share without a job is refused before any call" {
     var code: u32 = 0;
     try std.testing.expectEqual(@intFromEnum(Step.JobShare), sprawling_desktop_job_share(null, 5, 0, &code));
+}
+
+test "a watch without a job or a port is refused before any call" {
+    var code: u32 = 0;
+    var port: usize = 0;
+    var hits: u32 = 0;
+    try std.testing.expectEqual(@intFromEnum(Step.JobWatch), sprawling_desktop_job_watch(null, &port, &code));
+    try std.testing.expectEqual(@intFromEnum(Step.JobWatch), sprawling_desktop_job_memory_hits(0, &hits, &code));
+    try std.testing.expectEqual(@intFromEnum(Step.JobWatch), sprawling_desktop_job_unwatch(0, &code));
 }

@@ -317,6 +317,7 @@
   {/if}
   <Composer
     {placeholder}
+    started={echo !== null}
     sending={sendingInto(live?.doing)}
     draft={address}
     hearing={u.hearing()}
@@ -369,12 +370,6 @@ composition is rebuilt on the way. -->
     class="relative shrink-0 transition-transform duration-page"
     style:transform={!band && blank ? "translateY(calc(-50cqh + 50% + var(--spacing-margin)))" : undefined}
   >
-    {#if !band && blank}
-      <div class="absolute inset-x-0 bottom-full mb-wide text-center">
-        <p class="text-title font-title text-text">{who}</p>
-        <p class="text-note text-text-faint">{address}</p>
-      </div>
-    {/if}
     {#if story?.kind === "forked" && shown.length === 0}
       <p class="mb-tight text-note text-text-faint" role="status">
         {fill(say($lang, "fork_pending"), { turn: String(story.turn) })}

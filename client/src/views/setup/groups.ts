@@ -16,6 +16,7 @@ import type { SetupGroup } from "../../core/route";
 // What each group is called (client/Spec.lean §4-36).
 export const HEADING: Record<SetupGroup, Key> = {
   you: "setup_group_you",
+  performance: "setup_group_performance",
   accounts: "setup_group_accounts",
   harnesses: "setup_group_harnesses",
   network: "setup_group_network",
@@ -37,6 +38,7 @@ export const HEADING: Record<SetupGroup, Key> = {
 // kind of sentence this panel is allowed (client/Spec.lean §4-10).
 export const HINT: Record<SetupGroup, Key | null> = {
   you: "setup_group_hint_you",
+  performance: "setup_group_hint_performance",
   accounts: "setup_group_hint_accounts",
   harnesses: "setup_group_hint_harnesses",
   network: "setup_group_hint_network",
@@ -60,6 +62,7 @@ export const HINT: Record<SetupGroup, Key | null> = {
 // and stops at the conversation's width.
 export const WIDTH: Record<SetupGroup, string> = {
   you: "",
+  performance: "max-w-talk",
   accounts: "",
   harnesses: "max-w-talk",
   network: "max-w-talk",

@@ -4,16 +4,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 -->
-<script lang="ts" module>
-  // The box a person writes in (docs/frontend-method.md §7I): the words, a line
-  // under them, the settings row under the line, and the coin key in its context
-  // ring beside the words. Nothing here decides where a message goes; the page
-  // does. `composer.ts` owns what the pills offer, `dropping.ts` a dropped file.
-  //
-  // A line that begins with `/` is a command rather than a message, and
-  // the menu over the box is the same list the Ctrl-K palette reads.
-</script>
-
 <script lang="ts">
   import { Option } from "effect";
   import { onDestroy, onMount, untrack } from "svelte";
@@ -41,6 +31,7 @@
   import Record from "./record.svelte";
   import TypedLine from "./typed_line.svelte";
   import Popover from "../parts/popover.svelte";
+  import type { PopoverBinding } from "../parts/popover";
   import Unkept from "../parts/unkept.svelte";
   import {
     draftAt,
@@ -63,6 +54,7 @@
 
   interface ComposerProps {
     readonly placeholder: string;
+    readonly started?: boolean;
     readonly sending: Sending;
     // Where the unsent words are kept, when they are kept at all: the
     // room or the run this box speaks to.
@@ -82,12 +74,11 @@
     readonly room?: Address | undefined;
   }
 
-  const { placeholder, sending, draft, onSend, onStop, hearing, band, room }: ComposerProps = $props();
+  const { placeholder, sending, draft, onSend, onStop, hearing, band, room, started = false }: ComposerProps = $props();
 
   const u = ui();
   const { lang } = u;
   const effort = u.effort;
-  const mode = u.mode;
   const belief = u.conn.belief;
 
   // The words in the box, and where they are kept while unsent: the
@@ -111,7 +102,7 @@
   // The verb that row spells, which a Tab that cannot lengthen the typed
   // prefix takes into the box.
   let pointed = $state<string | undefined>(undefined);
-  let menuKeys: ((event: KeyboardEvent) => boolean) | null = null;
+  let menuBinding = $state<PopoverBinding | null>(null);
 
   $effect(() => {
     const next = draft;
@@ -222,23 +213,20 @@
   const rooms = $derived(
     roomsKnown(
       $cityAnswer !== undefined && "city" in $cityAnswer ? $cityAnswer.city.buildings : [],
-      $belief.rooms.keys(),
+      [...$belief.rooms.keys(), ...(here === null ? [] : [here])],
     ),
   );
   // The run in front of the person: what a typed `/stop` and `/steer` reach.
   const live = $derived(shown === null ? undefined : runInFront($belief, shown));
 
+  const startedHere = $derived(here !== null && heldIn($belief, here).some((run) => run.lastSeq > ($belief.sessions[here] ?? 0)));
   const session = $derived(here === null ? null : sessionModel(heldIn($belief, here), $belief.sessions[here] ?? null));
-  const offered = $derived({ served: models, chosen: main, session, rooms, here, effort: $effort, mode: $mode });
-  const specs = $derived(pills($lang, offered, picksFor(u, here, session)));
+  const offered = $derived({ served: models, chosen: main, session, rooms, here, effort: $effort });
+  const specs = $derived(pills($lang, offered, picksFor(u, session)));
 
   // ------------------------------------------------------- the `/` menu
 
   const showing = $derived(open ? menuColumns($lang, text) : []);
-
-  function holdKeys(keys: (event: KeyboardEvent) => boolean): void {
-    menuKeys = keys;
-  }
 
   function closeMenu(): void {
     open = false;
@@ -279,7 +267,7 @@
         write(completed(text, pointed));
         return;
       }
-      if (menuKeys?.(event) === true) {
+      if (menuBinding?.keys(event) === true) {
         event.preventDefault();
         return;
       }
@@ -342,7 +330,7 @@ strength, and a drag over the box by the wash it takes. -->
         if (chosen !== undefined) pick(chosen);
       }}
       onClose={closeMenu}
-      bind={holdKeys}
+      bind={(binding: PopoverBinding) => { menuBinding = binding; }}
       onCursorChange={(rowId) => {
         activeId = rowId;
       }}
@@ -362,7 +350,8 @@ strength, and a drag over the box by the wash it takes. -->
         rows={1}
         {placeholder}
         aria-label={placeholder}
-        aria-activedescendant={activeId}
+        aria-activedescendant={showing.length > 0 ? activeId : null}
+        aria-controls={showing.length > 0 ? menuBinding?.controls.join(" ") : undefined}
         autofocus
         onkeydown={onKeydown}
         oninput={onInput}
@@ -394,5 +383,5 @@ strength, and a drag over the box by the wash it takes. -->
     <Unkept words={() => text} />
   {/if}
   <DropRefused refused={zone.refused} />
-  <SettingsRow {specs} room={here} draws={band !== undefined ? "notice" : session === null ? "everything" : "facts"} {kept} />
+  <SettingsRow {specs} room={here} draws={band !== undefined || started || startedHere ? "notice" : "everything"} {kept} />
 </form>

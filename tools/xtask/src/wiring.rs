@@ -97,6 +97,7 @@ impl Reach {
 
 mod class;
 mod reading;
+mod settings;
 
 use reading::{declared, variants};
 
@@ -221,6 +222,7 @@ fn emitted(root: &Path, all: &[String]) -> Result<BTreeSet<String>, XtaskError> 
 }
 
 pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
+    let mut settings = settings::check(root)?;
     let all = variants(root, "Command")?;
     let table = declared(root)?;
     let at = table.path.as_str();
@@ -289,7 +291,8 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
             "delete the arm and its constructor: they survived the verb they described".to_owned(),
         ));
     }
-    Ok(violations)
+    settings.extend(violations);
+    Ok(settings)
 }
 
 #[cfg(test)]

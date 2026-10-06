@@ -225,6 +225,11 @@ pub(crate) struct Gated {
     endpoint: Endpoint,
     gate: Arc<Gate>,
     monotonic: fn() -> Instant,
+    /// The Provider the accounts belong to; empty while `accounts` is.
+    provider: String,
+    /// The declared accounts in priority order, each with its credential.
+    accounts: Vec<(kernel::ServerLabel, super::AuthSpec)>,
+    active: usize,
 }
 
 impl Gated {
@@ -233,7 +238,20 @@ impl Gated {
             endpoint,
             gate,
             monotonic,
+            provider: String::new(),
+            accounts: Vec::new(),
+            active: 0,
         }
+    }
+
+    pub(super) fn with_accounts(
+        mut self,
+        provider: String,
+        accounts: Vec<(kernel::ServerLabel, super::AuthSpec)>,
+    ) -> Gated {
+        self.provider = provider;
+        self.accounts = accounts;
+        self
     }
 
     fn through(
@@ -250,6 +268,29 @@ impl Gated {
 }
 
 impl kernel::Model for Gated {
+    fn provider_account(&self) -> Option<kernel::event::record::ProviderAccountBinding> {
+        self.accounts.get(self.active).map(|(account, _)| {
+            kernel::event::record::ProviderAccountBinding {
+                provider: self.provider.clone(),
+                account: account.clone(),
+            }
+        })
+    }
+
+    fn select_account(&mut self, selection: kernel::model::AccountSelection) {
+        self.active = match selection {
+            kernel::model::AccountSelection::First => 0,
+            kernel::model::AccountSelection::Preferred(id) => self
+                .accounts
+                .iter()
+                .position(|(account, _)| *account == id)
+                .unwrap_or(0),
+        };
+        if let Some((_, auth)) = self.accounts.get(self.active) {
+            self.endpoint.config.auth = auth.clone();
+        }
+    }
+
     fn call(&mut self, req: &ModelRequest) -> Result<ModelReturn, AxError> {
         self.through(|endpoint| endpoint.call(req))
     }

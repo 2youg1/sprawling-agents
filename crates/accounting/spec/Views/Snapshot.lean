@@ -57,6 +57,7 @@ const STANDING_FOLD_RULES: &str = "standing-fold-<16 位十六进制>"; // Stand
 
 - **门只看得见夹具里有的类型。** 两个常量的后缀是一份固定夹具经快照编码之后的 blake3 前缀，编码一变，`the_fold_rules_name_carries_the_digest_of_the_views_encoding` 与 Standing 的同名测试给出新值并失败（`crates/sprawling/Spec.lean` §8-91）。夹具里没有 `GitOid`，摘要的编码从十六进制改成字节时摘要不动，旧快照就会以同一个 `fold_version` 交给新的解码：postcard 把一个长度前缀加 40 个十六进制字符当成 20 个字节读，读错的视图可能照样解得开。
 - **所以夹具折进每一种出现在快照里的摘要。** 视图的夹具多折一条 `checkpoint_committed`（`commits`、`commit_seqs`、`last_commit` 各存一个 `GitOid`）与一条 `rules_changed`（`governance.rules` 存一个 `B3Hash`）；Standing 的夹具多折同一条 `rules_changed`（它的 `governance` 是同一个类型）。kernel 里摘要的编码再变，两道门都变红，旧快照按 `WholeFold::OtherFoldVersion` 从创世折一次。
+- **EndpointBook 同时保存成功 Session 亲和与未成功调用的非秘密账号身份**，实时与重放共用 `crates/gateway/spec/Router.lean` 的绑定规则与当前 Session 的 Run 成员资格，旧 Session 的 Run 不能在恢复后重新绑定；格式与成员资格折叠规则更改必须重取两个 fold rules 摘要，旧投影从 genesis 重建。
 - **两个格式夹具都登记 Provider**：旧凭据登记与显式有序账号一起进入 EndpointBook，夹具编码覆盖缺席的账号字段与带账号的字段；实际 Views 快照往返比较完整端点簿，检测字段省略造成的 postcard 解码错位。
 - **摘要在快照里是字节。** `views::snapshot::tests` 断言一个 `GitOid` 与一个 `B3Hash` 的快照编码就是它们的 20 与 32 个字节、读回相等，JSON 拼写仍是十六进制（`crates/kernel/Spec.lean` §8-84）。
 - **被否：夹具不动，改编码的人记得改常量。** 这正是两个常量带摘要后缀要免掉的那种记忆；而这次的改动在 kernel，改它的人看不见 accounting 的常量。

@@ -107,7 +107,7 @@ fn setting() -> CorePlacement {
 /// The shares each run's commands ask for under the person's arm (D47),
 /// handed to the runtime through `Hands`.
 pub(crate) fn run_shares() -> Shares {
-    shares_of(setting(), crate::monitor::memory::read().physical)
+    shares_of(setting(), memory_ceiling())
 }
 
 /// The pinned arm's remaining processors, saved before the core joins
@@ -124,29 +124,47 @@ pub(crate) fn run_affinity() -> runtime::backlog::RunAffinity {
     pinned::run_affinity()
 }
 
-/// What one arm asks for each run: nothing with placement off, an even
-/// CPU share for the other three, and with `"soft_shares"` a memory limit
-/// of half the physical memory as well. A physical memory read as zero
-/// leaves the limit out, and says so on stderr.
-fn shares_of(arm: CorePlacement, physical: u64) -> Shares {
-    match arm {
-        CorePlacement::Off => Shares::Unset,
-        CorePlacement::Soft | CorePlacement::Pinned => Shares::Cpu,
-        CorePlacement::SoftShares => match NonZeroU64::new(physical / RUN_MEMORY_PARTS) {
-            Some(limit) => Shares::CpuAndMemory { limit },
-            None => {
-                eprintln!(
-                    "each run keeps no memory limit: this machine's memory reads as {physical} bytes"
-                );
-                Shares::Cpu
-            }
-        },
+/// Reads only a User-entered ceiling; invalid settings are reported.
+fn memory_ceiling() -> Option<NonZeroU64> {
+    entered_ceiling().unwrap_or_else(|err| {
+        eprintln!("run memory ceiling cannot be read: {err}");
+        None
+    })
+}
+
+/// The ceiling the person entered, or why their file does not read.
+fn entered_ceiling() -> Result<Option<NonZeroU64>, String> {
+    accounting::person::read()
+        .map(|answer| answer.core.memory_bytes)
+        .map_err(|err| err.to_string())
+}
+
+/// What the doctor adds when an entered ceiling does not apply: the arm
+/// is not `"soft_shares"`, or the person's file does not read (D47).
+fn ceiling_note(arm: CorePlacement, entered: &Result<Option<NonZeroU64>, String>) -> String {
+    match (arm, entered) {
+        (_, Err(err)) => format!("; the memory ceiling does not read, so none applies: {err}"),
+        (CorePlacement::SoftShares, Ok(_)) | (_, Ok(None)) => String::new(),
+        (CorePlacement::Off | CorePlacement::Soft | CorePlacement::Pinned, Ok(Some(limit))) => {
+            format!(
+                "; the entered memory ceiling of {} bytes is not applied: [core] placement is \
+                 not \"soft_shares\"",
+                limit.get()
+            )
+        }
     }
 }
 
-/// A run under `"soft_shares"` may commit one part in this many of the
-/// physical memory (`crates/runtime/spec/Tools/Exec.lean` D29).
-const RUN_MEMORY_PARTS: u64 = 2;
+/// Only soft_shares requests the explicitly entered memory ceiling.
+fn shares_of(arm: CorePlacement, limit: Option<NonZeroU64>) -> Shares {
+    match (arm, limit) {
+        (CorePlacement::Off, _) => Shares::Unset,
+        (CorePlacement::Soft | CorePlacement::Pinned, _) | (CorePlacement::SoftShares, None) => {
+            Shares::Cpu
+        }
+        (CorePlacement::SoftShares, Some(limit)) => Shares::CpuAndMemory { limit },
+    }
+}
 
 /// Lifts this process out of the throttling background work gets,
 /// telling the reason once when the platform refuses (D40).
@@ -216,11 +234,11 @@ pub(crate) fn report() -> String {
             format!("{} ({})", describe(&read), pinned::clause(&seats_of(&read)))
         }
     };
-    let runs = runs_share(
-        shares_of(arm, crate::monitor::memory::read().physical),
-        platform_shares(),
-    );
-    format!("{threads}; {runs}{unread}")
+    let entered = entered_ceiling();
+    let limit = entered.as_ref().ok().copied().flatten();
+    let runs = runs_share(shares_of(arm, limit), platform_shares());
+    let ceiling = ceiling_note(arm, &entered);
+    format!("{threads}; {runs}{ceiling}{unread}")
 }
 
 /// What each run's commands share on this machine, given what the arm
@@ -244,8 +262,8 @@ fn runs_share(asked: Shares, platform: PlatformShares) -> String {
                 .to_owned()
         }
         (Shares::CpuAndMemory { limit }, PlatformShares::CpuAndMemory) => format!(
-            "each run's commands share the processors evenly and commit at most {} MiB",
-            limit.get() / (1 << 20)
+            "each run's commands share the processors evenly and commit at most {} bytes",
+            limit.get()
         ),
     }
 }

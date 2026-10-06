@@ -129,6 +129,67 @@ mod tests {
     use super::*;
     use serde_json::json;
 
+    fn settled(frames: &[Value]) -> Result<Value, AxError> {
+        let mut held = crate::dialect::StreamFrames::new(kernel::DialectKind::OpenAiResponses);
+        for frame in frames {
+            held.retain_and_complete(frame.clone())?;
+        }
+        held.finish()
+    }
+
+    proptest::proptest! {
+        #[test]
+        fn responses_keep_the_lean_trace_properties(events in proptest::collection::vec(0u8..12, 0..80)) {
+            let frames: Vec<Value> = events.into_iter().enumerate().map(|(at, event)| match event {
+                0 => json!({"type": "response.completed", "response": {"status": "completed", "output": [], "usage": {"input_tokens": at, "output_tokens": 1}}}),
+                1 => json!({"type": "response.incomplete", "response": {"status": "incomplete", "incomplete_details": {"reason": "max_output_tokens"}, "output": [], "usage": {"input_tokens": 1, "output_tokens": at}}}),
+                2 => json!({"type": "response.failed", "response": {"status": "failed", "output": [], "usage": {}}}),
+                3 => json!({"type": "response.completed"}),
+                4 => json!({"type": "response.completed", "response": null}),
+                5 => json!({"type": "error", "code": "server_error"}),
+                6 => json!({"type": "error", "code": "invalid_prompt"}),
+                7 => json!({"type": "error"}),
+                8 => json!({"type": "response.output_text.delta", "delta": format!("{at}")}),
+                9 => json!({"type": "response.reasoning_summary_text.delta", "delta": format!("{at}")}),
+                10 => json!({"type": "response.created", "response": {"status": "in_progress"}}),
+                _ => json!(["not an event"]),
+            }).collect();
+            let mut terminal = None;
+            let mut reported = None;
+            let mut increments = Vec::new();
+            for frame in &frames {
+                if let Some(held) = crate::dialect::increment_of(kernel::DialectKind::OpenAiResponses, frame) {
+                    increments.push(held);
+                }
+                match frame.get("type").and_then(Value::as_str) {
+                    Some("response.completed" | "response.incomplete" | "response.failed") => {
+                        if let Some(response) = frame.get("response") { terminal = Some(response.clone()); }
+                    }
+                    Some("error") if reported.is_none() => {
+                        reported = Some(provider_err("read a streamed answer", &ProviderFailure::Reported {
+                            kind: frame.get("code").and_then(Value::as_str).unwrap_or("an error without a code"),
+                        }));
+                    }
+                    _ => {}
+                }
+            }
+            let reference = match reported {
+                Some(error) => Err(error),
+                None => terminal.ok_or_else(|| stream_cut("the stream ended without the event that carries the settled answer")),
+            };
+            let normalize = |result: Result<Value, AxError>| result.and_then(|wire| super::super::reply::response_from(&wire))
+                .map_err(|error| serde_json::to_value(error).unwrap());
+            proptest::prop_assert_eq!(normalize(settled(&frames)), normalize(reference));
+            let mut held = crate::dialect::StreamFrames::new(kernel::DialectKind::OpenAiResponses);
+            let mut forwarded = Vec::new();
+            for frame in frames {
+                if let Some(delta) = crate::dialect::increment_of(kernel::DialectKind::OpenAiResponses, &frame) { forwarded.push(delta); }
+                held.retain_and_complete(frame).unwrap();
+            }
+            proptest::prop_assert_eq!(forwarded, increments);
+        }
+    }
+
     /// The two streams a page draws differently, told apart by the
     /// event name rather than by which field happens to be set.
     #[test]

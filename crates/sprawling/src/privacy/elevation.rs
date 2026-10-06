@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Machine-scope writes through a short-lived UAC-elevated child that
-//! writes and never judges (`crates/sprawling/spec/Privacy/Windows.lean` D57).
+//! writes and never judges (`crates/sprawling/spec/Privacy/Windows.lean` D59).
 //!
 //! The parent starts this same executable as `privacy elevated-write
 //! <write>` under the `runas` verb and waits for it; the child checks the
@@ -23,7 +23,7 @@ use super::windows::{registry, task};
 
 /// The most bytes a registry value may carry through the command line;
 /// every value the control table writes is four bytes, so only an
-/// original can be longer (Privacy.Windows D57).
+/// original can be longer (Privacy.Windows D59).
 const VALUE_BYTES_MAX: usize = 1024;
 
 /// `ERROR_CANCELLED`: the person declined the UAC prompt.

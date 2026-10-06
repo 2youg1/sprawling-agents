@@ -13,7 +13,7 @@ import { Option, Schema } from "effect";
 
 import type { Belief, RunBelief } from "../../core/belief";
 import { heldIn } from "../../core/belief/rooms";
-import { EFFORTS, MODES, openSession, selectModel } from "../../core/commands";
+import { EFFORTS, selectModel } from "../../core/commands";
 import type { PreferenceDoor } from "../../core/prefs";
 import type { Key, Lang } from "../../core/lang";
 import { fill, say } from "../../core/lang";
@@ -23,7 +23,7 @@ import { reached } from "../../core/slash_hands";
 import type { SessionHands, Slash, SlashHands } from "../../core/slash_hands";
 import type { Sending } from "../../core/doing";
 import { Address } from "../../wire";
-import type { Command, Effort, Mode, RunPolicy, Seq } from "../../wire";
+import type { Command, Effort, RunPolicy, Seq } from "../../wire";
 import type { View } from "../../core/route";
 import type { PopoverColumn } from "../parts/popover";
 
@@ -93,7 +93,7 @@ export function draftAt(door: PreferenceDoor, at: string | undefined): Draft {
   };
 }
 
-// -------------------------------------------------------- the four pills
+// -------------------------------------------------------- the three pills
 
 // One model the city could point the `main` face at: the endpoint that
 // serves it and its id.
@@ -112,6 +112,9 @@ export interface Served extends Names {
 // together, so the chooser and the command cannot disagree about where
 // the seam is.
 const MID = "\u0000";
+
+/** The list size after which a chooser offers filtering. */
+export const FILTER_AFTER = 8;
 
 export function modelValue(chosen: Names | undefined): string | null {
   return chosen === undefined ? null : `${chosen.endpoint}${MID}${chosen.model}`;
@@ -133,21 +136,14 @@ export function sessionModel(held: readonly RunBelief[], began: Seq | null): str
   return held.filter((run) => (began === null || run.lastSeq > began) && run.model !== null).at(-1)?.model ?? null;
 }
 
-// What picking a row of the model pill means. With no session model the
-// pick points `main` at it; with one, the session cannot change model,
-// so a different pick points `main` at it and opens a new session in
-// the room, which answers with it. The ledger's `model_called` records
-// the model's name and not its endpoint, so the name alone identifies
-// the session's model: two endpoints serving one name read as one here.
+// A model pick changes the next main selection and never opens a session.
 export type ModelMove =
   | { readonly kind: "select"; readonly names: Names }
-  | { readonly kind: "reopen"; readonly names: Names }
   | { readonly kind: "stay" };
 
 export function modelMove(value: string, session: string | null): ModelMove {
   const names = splitModel(value);
-  if (names === null || names.model === session) return { kind: "stay" };
-  return session === null ? { kind: "select", names } : { kind: "reopen", names };
+  return names === null || session !== null ? { kind: "stay" } : { kind: "select", names };
 }
 
 // The rows and the value of the model pill. While a session model is
@@ -231,7 +227,6 @@ export interface Picks {
   readonly model: (value: string) => void;
   readonly workspace: (value: string) => void;
   readonly effort: (value: string) => void;
-  readonly mode: (value: string) => void;
 }
 
 // The page's hands a pick reaches for.
@@ -239,18 +234,15 @@ export interface PickHands {
   readonly send: (command: Command) => boolean;
   readonly go: (view: View) => void;
   readonly chooseEffort: (effort: Effort | null) => void;
-  readonly chooseMode: (mode: Mode) => void;
 }
 
-// What a pick of each pill does. A new session takes the model `main`
-// names when it opens, so the select goes before the open.
-export function picksFor(hands: PickHands, here: Address | null, session: string | null): Picks {
+// Picks configure the next dispatch; session creation belongs to slash commands.
+export function picksFor(hands: PickHands, session: string | null): Picks {
   return {
     model: (value) => {
       const move = modelMove(value, session);
-      if (move.kind === "stay" || (move.kind === "reopen" && here === null)) return;
+      if (move.kind === "stay") return;
       hands.send(selectModel(move.names.endpoint, move.names.model, "main"));
-      if (move.kind === "reopen" && here !== null) hands.send(openSession(here, "nothing", null));
     },
     workspace: (value) => {
       const address = decodeRoom(value);
@@ -259,15 +251,11 @@ export function picksFor(hands: PickHands, here: Address | null, session: string
     effort: (value) => {
       hands.chooseEffort(effortLevel(value));
     },
-    mode: (value) => {
-      const chosen = MODES.find((each) => each === value);
-      if (chosen !== undefined) hands.chooseMode(chosen);
-    },
   };
 }
 
 // Everything the pills read off the page and the city, gathered so the
-// four rows are built in one place.
+// three rows are built in one place.
 export interface Around {
   readonly served: readonly Served[];
   readonly chosen: Names | undefined;
@@ -276,18 +264,16 @@ export interface Around {
   readonly rooms: readonly string[];
   readonly here: Address | null;
   readonly effort: Effort | null;
-  readonly mode: Mode;
 }
 
-// The four pills - model, workspace, effort, mode - in the order they stand
+// The three pill values - model, workspace, effort - shared by the entries
 // in the row. The effort rows carry what a level costs beside the level
 // itself, because this is where a person decides (client/Spec.lean §4-28).
-export function pills(lang: Lang, around: Around, picks: Picks): readonly [Pill, Pill, Pill, Pill] {
+export function pills(lang: Lang, around: Around, picks: Picks): readonly [Pill, Pill, Pill] {
   const levels: readonly (typeof UNSTATED | Effort)[] = [UNSTATED, ...EFFORTS];
   return [
     {
       label: say(lang, "talk_column_model"),
-      ...(around.session === null ? {} : { about: say(lang, "talk_model_locked") }),
       placeholder: say(lang, "talk_no_model"),
       ...modelRows(lang, around),
       pick: picks.model,
@@ -309,13 +295,6 @@ export function pills(lang: Lang, around: Around, picks: Picks): readonly [Pill,
       })),
       value: around.effort ?? UNSTATED,
       pick: picks.effort,
-    },
-    {
-      label: say(lang, "talk_column_mode"),
-      placeholder: say(lang, "talk_column_mode"),
-      choices: MODES.map((each) => ({ value: each, label: say(lang, `mode_${each}`), note: say(lang, `mode_note_${each}`) })),
-      value: around.mode,
-      pick: picks.mode,
     },
   ];
 }

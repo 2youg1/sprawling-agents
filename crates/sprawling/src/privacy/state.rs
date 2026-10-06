@@ -28,7 +28,7 @@ pub(super) struct Intent {
     pub(super) original: Snapshot,
     pub(super) modified: Snapshot,
     /// Whether the parent key existed when `original` was read; reported
-    /// as a residual empty key, never compared as part of a value (D58).
+    /// as a residual empty key, never compared as part of a value (D60).
     pub(super) key_existed: bool,
     pub(super) restore_of: Option<NonZeroU64>,
 }
@@ -98,7 +98,7 @@ struct Summary {
 pub(super) struct History(Fold);
 
 /// What a history holds, released once its owner reference passed the
-/// identity check (Privacy D66). `O` is what the check returned: the
+/// identity check (Privacy D68). `O` is what the check returned: the
 /// owner reference new intents are prepared under, or `()` for a reader
 /// that will not write (Privacy.State).
 #[derive(Debug)]

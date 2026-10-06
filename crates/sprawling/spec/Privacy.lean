@@ -12,14 +12,14 @@
 
 ## 1 需求分解
 - 每个 privacy control 有自己的拥有栈；恢复只撤销该控制最近仍拥有的操作（D51）。
-- apply 的目标只来自控制表（`bin::privacy::controls`）：控制表说不写的控制没有写入路径（Privacy.Controls D56）。
-- 确认绑定页面显示的当前快照（expected）：fresh read 与它不同即拒绝（Privacy.Confirmation D55）。
+- apply 的目标只来自控制表（`bin::privacy::controls`）：控制表说不写的控制没有写入路径（Privacy.Controls D58）。
+- 确认绑定页面显示的当前快照（expected）：fresh read 与它不同即拒绝（Privacy.Confirmation D57）。
 - 先持久 Prepared，再发系统写入；写入后由本进程读回判定，不信写入者的自述。
 - 读回等于修改值 → Applied/Restored；等于原值 → NotApplied；都不是 → 写回原值并再读：
   等于原值 → RolledBack，否则 unknown。
 - 任一未结操作（prepared、attempted、rollingBack、unknown）阻止所有控制的新写入；
   unknown 只经人核对（Reconcile）离开，核对不写系统。
-来源：人的决定——不逐项取得生产写入资格，运行时读回、不符即报错并恢复（Privacy.Controls D56）；
+来源：人的决定——不逐项取得生产写入资格，运行时读回、不符即报错并恢复（Privacy.Controls D58）；
 隐私需求——页面显示当前值，改过的显示原值，记录并可恢复，每项由人手动开启，没有一键开启。
 
 ## 2 验收标准
@@ -37,7 +37,7 @@
 一次成功的 durablePrepared 表示文件与新建父目录在平台契约下已经持久（Privacy.Journal）。
 OS 写入没有 compare-and-swap：writeStarted 要求调用前最后一次读数等于 original，不证明外部程序
 不能在随后的 OS 调用前改值；相同值的外部 ABA 不可辨识。
-写入的结果在模型里是任意读回值：机器作用域经提升子进程写入（Privacy.Windows D57），UAC 被拒、
+写入的结果在模型里是任意读回值：机器作用域经提升子进程写入（Privacy.Windows D59），UAC 被拒、
 子进程失败或访问拒绝都表现为某个读回值，由同一判定处理。
 模型 owner 是真实 OS 身份的抽象；生产以 Vault 中绑定的 SecretRef 核对（Privacy.State D52）。
 模型的 owner 从初始状态起固定；生产的空 history 没有 owner，第一次写入前为实时身份建立绑定。
@@ -52,7 +52,7 @@ coordinator 经两个端口（Host 与 Journal，§7）运行；平台适配器�
 `bin::privacy::windows::host` 已实现，`bin::privacy::cli` 的写入动词（Privacy.Cli）与页面的服务
 （Privacy.Service）经它们进入 coordinator；wire 帧见 wire 的 Privacy 分部。
 尚未实现的拒绝：原值无法经它的写入路径原样写回时（机器作用域的原值超过提升子进程的 1024 字节上界，
-或注册表原值没有无损的原始编码），apply 应在 Prepared 之前拒绝（Privacy.Windows D57）；现在这样的
+或注册表原值没有无损的原始编码），apply 应在 Prepared 之前拒绝（Privacy.Windows D59）；现在这样的
 apply 照常写入，之后的恢复或回滚由子进程或适配器拒绝写回，以 NotApplied 或 unknown 如实结束。
 控制表写入的值都是 4 字节，只有人的主机上已有的异常原值会走到这里；补上它需要在 planApply 增加
 一个拒绝分支并重新证明 §2 的性质。
@@ -68,7 +68,7 @@ https://learn.microsoft.com/en-us/powershell/module/scheduledtasks/disable-sched
 ## 6 命名
 privacy control（PrivacyControl）是一个可写目标及其推荐值；original item（PrivacyOriginal）
 是需求清单里的一行原文；operation kind 是四种写法之一（docs/glossary.md）。
-RawValue 保留值的存在性、类型与原始字节；keyExisted 单独记录键是否存在（D58）。
+RawValue 保留值的存在性、类型与原始字节；keyExisted 单独记录键是否存在（D60）。
 Snapshot 是一个控制的当前读数：注册表值或计划任务状态。
 -/
 namespace Sprawling.Privacy
@@ -89,8 +89,8 @@ inductive Snapshot where
   | task (state : TaskState)
   deriving DecidableEq, Repr
 
-/-- 不写的原因是闭集；研究给出的每个不写结论落在其中一个（Privacy.Controls D56）。
-needsOperationKind：写它需要本版本没有的 operation kind（例如一次启用写多个值，Privacy.Controls D62）。 -/
+/-- 不写的原因是闭集；研究给出的每个不写结论落在其中一个（Privacy.Controls D58）。
+needsOperationKind：写它需要本版本没有的 operation kind（例如一次启用写多个值，Privacy.Controls D64）。 -/
 inductive Reason where
   | absent
   | obsolete
@@ -177,7 +177,7 @@ structure Receipt where
 - Journal：持锁 fold 出的 history 与 append_durable；生产实现是 `bin::privacy::journal` 的
   LockedJournal，第二实现是测试的内存 journal，它经同一个 History::fold 判定每一行。
 journal 只追加；平台适配器只读写控制表给出的目标；确认不保存服务端挂起状态
-（Privacy.Confirmation D55）。城的 Ledger 不出现在模型里：主机隐私不进入城市重放。
+（Privacy.Confirmation D57）。城的 Ledger 不出现在模型里：主机隐私不进入城市重放。
 -/
 
 def setAt {α : Type} (f : Nat → α) (c : Nat) (v : α) : Nat → α :=
@@ -199,7 +199,7 @@ planApply 与 planRestore 的拒绝次序就是生产判定的次序：控制表
 然后才是目标本身的判定。两者返回穷尽枚举，只有 write 带出 Intent。
 -/
 
-/-! D66 Rust 的判定只接受已核对身份的 history，不写的原项不是控制
+/-! D68 Rust 的判定只接受已核对身份的 history，不写的原项不是控制
 模型的 planApply 先查控制表、再比身份；Rust 用类型持有这两支，判定函数里没有它们：
 - 请求只能命名 PrivacyControl，而控制表的每一行都有写入值（Privacy.Controls），不写的原项
   只是 PrivacyOriginal，没有控制，所以 notWritable 在 Rust 中写不出来，reachable_catalogued 由类型成立。
@@ -312,7 +312,7 @@ readback 是本进程随后读到的值。rollbackStarted 是第二次 OS 写入
 崩溃时有 work 即 unknown；写入后读不到目标（读回失败）与崩溃同样处理，进入 unknown，
 因为没有读数就既不能判定，也不能确认回滚是否需要。
 -/
-/-! D60 同一时刻至多一个未结操作；「恢复全部」是逐个控制的单项恢复
+/-! D62 同一时刻至多一个未结操作；「恢复全部」是逐个控制的单项恢复
 协调者一次只持有一个 work：Prepared、写、读回、Finished 走完才开始下一个控制。
 「恢复全部」按控制逐个执行这个次序，每个控制各自读回、各自记录，部分成功如实返回；
 机器作用域的每次写入各经一次提升（一次 UAC）。
@@ -773,7 +773,7 @@ def request (action : Action) (control owner : Nat) (expected : Snapshot) : Requ
   { action, control, operation := 2, owner, expected, expires := 100 }
 
 /-- apply 判定：每行是（控制、阶段、当前值、请求的 expected、身份），以及判定结果。
-不含 notWritable 行：Rust 中它由类型排除（D66）。 -/
+不含 notWritable 行：Rust 中它由类型排除（D68）。 -/
 def applyVectors : List ApplyPlan :=
   [ planApply (vectorState .idle (.registry .absent) (.task .absent) []) (request .apply 1 8 (.registry .absent)) false,
     planApply (vectorState .unknown (.registry .absent) (.task .absent) []) (request .apply 1 7 (.registry .absent)) false,

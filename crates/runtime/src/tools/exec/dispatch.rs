@@ -8,7 +8,7 @@
 use std::collections::BTreeMap;
 use std::sync::Mutex;
 
-use super::outcome::{backgrounded, settled, with_environment};
+use super::outcome::{backgrounded, settled, with_ceiling, with_environment};
 use super::{
     Confined, Confinement, ContainerRuntime, ENV_ALLOWLIST, ExecTool, Placement, Shell, held,
     yielding,
@@ -183,11 +183,12 @@ impl ExecTool {
                 exit,
                 stdout,
                 stderr,
+                ceiling,
             } => {
                 if let Some(placed) = placed {
                     held(&self.confinement)?.settled(placed);
                 }
-                settled(&stdout, &stderr, exit, arm)?
+                with_ceiling(settled(&stdout, &stderr, exit, arm)?, ceiling)?
             }
             Started::Backgrounded { id, what } => {
                 if let Some(placed) = placed {

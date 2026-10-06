@@ -87,7 +87,7 @@ impl Custodian {
 决定：`EnvReader` 答 `std::env::var` 自己的 `Result<String, VarError>`。值不是 Unicode 的变量照样算设了：它遮住金库，所以 `set` 照遮蔽拒绝；`resolve` 以 `E_CONFIG_INVALID` 拒，主题是「`<变量名>` is set to a value that is not Unicode」，恢复语叫人把这个变量设成 key 的文本，或取消它让金库作答；`describe` 报来源是这个环境变量、`configured` 为假、不可写，与 `resolve` 的答案一致。空值与没设照旧让金库作答。理由：读取器原来是 `std::env::var(key).ok()`，把「设了却读不出」与「没设」并成一个 `None`，于是金库里的旧 key 静默作答，或者人读到「请存这个凭证」，而他明明设了变量。被否：①读不出时当没设——就是旧的读法；②有损地转成字符串再用——发给 provider 的就不是人给的 key。三个平台：不是 Unicode 的值在 macOS 与 Linux 上是不合法的 UTF-8 字节，在 Windows 上是落单的代理项，`std::env::var` 在三处都答 `VarError::NotUnicode`，所以三处拒得一样。
 -/
 
-/-! D27 隐私 owner 的只读核对在 Vault 内完成
+/-! D31 隐私 owner 的只读核对在 Vault 内完成
 `credential::identity::verify_platform_identity(reference, observed)` 由 gateway 根接口
 重导出为 `gateway::verify_platform_identity`，只读取
 平台 Vault，并在模块内部比较 stored 与 observed；返回 Result<(), AxError>，
@@ -109,16 +109,16 @@ Windows 账户运行）。任何失败都不写、删除或重建引用；读取
 被否：三种拒绝共用一句 recovery——不匹配时叫人「解锁凭据服务」，读者照做也无用。
 -/
 
-/-! D30 隐私 owner 的绑定只写一个新引用，写入与核对共用同一个平台 Vault
+/-! D32 隐私 owner 的绑定只写一个新引用，写入与核对共用同一个平台 Vault
 `credential::identity::bind_platform_identity(reference, observed)` 由 gateway 根接口重导出为
 `gateway::bind_platform_identity`：privacy 的写入者在一个空历史的第一次写入之前调用它，
 reference 是调用方新抽取的随机名字（Privacy.State D52）。它先 get：引用已有任何值即拒绝
 （ConfigInvalid，recovery 叫人重试，下一次会抽取新名字），从不覆盖或删除既有条目，因为
 一个被占用的名字可能属于另一份历史；引用为空时把 observed put 进 KeyringVault，
-之后 D27 的核对读的就是这一条。observed 为空与 D27 一样拒绝（ConfigInvalid）。
-读取或写入被拒时保留来源的错误码、移除诊断文字，与 D27 的 Unavailable 同一种拒绝。
+之后 D31 的核对读的就是这一条。observed 为空与 D31 一样拒绝（ConfigInvalid）。
+读取或写入被拒时保留来源的错误码、移除诊断文字，与 D31 的 Unavailable 同一种拒绝。
 比较与写入的唯一实现是 crate 内的 `bind_identity(reference, observed, vault)`，vault 是
-crate 内的 Vault 缝：生产传 KeyringVault，派生检查传 MemoryVault（空引用写入后 D27 的核对通过、
+crate 内的 Vault 缝：生产传 KeyringVault，派生检查传 MemoryVault（空引用写入后 D31 的核对通过、
 占用的引用拒绝且原值不变、空身份拒绝、来源拒绝保留错误码而不带诊断文字）。
 不经 Custodian：Custodian 在平台服务不可用时落到会话内存，那样写下的绑定在进程结束时消失，
 而核对只读平台 Vault，下一次就会读到「缺失」。

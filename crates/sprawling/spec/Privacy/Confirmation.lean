@@ -9,21 +9,21 @@ import crates.sprawling.spec.Privacy
 # privacy 的确认：页面逐项确认，命令绑定确认时的当前快照
 规定确认在生产中由谁守住：expected 由 `bin::privacy::target` 换回快照（换不回即拒绝，wire D49），
 由 `bin::privacy::plan` 与 fresh read 比较（不同即 `Changed`），由 `bin::privacy::service` 按 idem
-只执行一次（Privacy.Service D67）；没有单独的确认模块，因为绑定只是这一次比较，不需要服务端状态。
+只执行一次（Privacy.Service D69）；没有单独的确认模块，因为绑定只是这一次比较，不需要服务端状态。
 确认行为复用 crates.sprawling.spec.Privacy 的 Request、planned 与 Step，本分部不定义第二份确认状态；
 它证明三件事：
 写入的原值就是人确认时看到的值，unknown 之后不产生新的写入，核对不写系统。
 时间由 assembly 的 SystemClock 取得；期限在协调者接受命令时确定（Privacy §14）。
 -/
 
-/-! D55 确认是页面上的逐项明确操作，命令携带确认时的当前快照；机器作用域另经 UAC
+/-! D57 确认是页面上的逐项明确操作，命令携带确认时的当前快照；机器作用域另经 UAC
 人在页面上对一个控制点「应用」或「恢复」，确认框显示当前值、写入值、作用域、是否需要管理员，
 以及该控制容易忽略之处与恢复说明（会删除不可找回的数据或需要重启的控制在点下之前说明这一点）；
 确认后发送的命令带 expected（页面显示的当前快照）、control 与 action。协调者 fresh read 与
 expected 不同即拒绝（ApplyPlan.changed／RestorePlan.changed），所以写入的原值必定是人看到的值，
 不需要服务端保存挂起的确认。一次性由 operation 的新鲜性与 IdemKey 的结果保留共同保证：
 同一 idem 的重放取回已有结果，不再执行。
-机器作用域（HKLM 与计划任务）经 Windows UAC 提升子进程写入（Privacy.Windows D57）；UAC 在安全
+机器作用域（HKLM 与计划任务）经 Windows UAC 提升子进程写入（Privacy.Windows D59）；UAC 在安全
 桌面上要求本人操作，Agent 驱动页面不能替人通过。用户作用域（HKCU 与用户环境变量）没有 UAC：
 同一用户的 Agent 本来就能直接写 HKCU，这一剩余威胁如实保留。
 命令只从本地页面与本地 CLI 进入：wire 上的操作命令归 LocalOnly，工具目录、MCP、ACP 没有入口。

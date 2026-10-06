@@ -5,42 +5,126 @@
 
 /-!
 # Windows native execution
-规定 `crates/runtime/src/tools/exec/native_windows.rs` 与
+规定 `crates/runtime/src/tools/exec/native_windows.rs`、
+`crates/runtime/src/tools/exec/native_windows/msvc.rs` 与
 `crates/desktop/ffi/src/confinement.rs`、`crates/desktop/ffi/zig/confinement.zig`。
 
 D53：Windows native 使用无 capability 的 AppContainer 与匿名 Job Object；
-CreateProcessW 以 CREATE_SUSPENDED 创建，设置 Job 的 aggregate committed-memory
-上限、CPU hard cap 与 kill-on-close，AssignProcessToJobObject 成功之后才 ResumeThread。
+CreateProcessW 以 CREATE_SUSPENDED 创建，设置 command Job 的 CPU hard cap 与 kill-on-close
+（User 填写的 aggregate committed-memory 上限在 run Job 上，D54），AssignProcessToJobObject 成功之后才 ResumeThread。
 没有准入安全 API 的平台调用进入既有 Zig leaf；win32job 与 winsafe 的现有安全
 CreateProcess 面没有 SECURITY_CAPABILITIES / STARTUPINFOEX，不能承担此契约。
 
-D54：native 的 CPU hard cap 默认 50% 整机份额，未设置 run memory 时默认
-256 MiB aggregate committed-memory；配置的 Shares::CpuAndMemory 覆盖这个默认值。
-这两个默认数只在 native_windows.rs 定义。run job 在 table lock 内先创建并设同一
-memory 上限，native command 同时加入 command job 与 run job，再恢复；多个命令的
-aggregate 内存不能通过每条命令分别领限额来扩大。拒绝设置限额时停止启动。
-默认值的理由是没有配置的 native 仍需有界；它们是保守初值，不宣称性能最优。
+D54：native 的 CPU hard cap 默认 50% 整机份额，未设置 run memory 时不设置内存上限；仅配置的 Shares::CpuAndMemory 请求
+aggregate committed-memory 上限，且只设在 run job 上。CPU 默认数只在 native_windows.rs 定义。run job 在 table lock 内先创建、
+设上限并挂上撞限的 watch（`crates/runtime/spec/Tools/Exec.lean` D95），native command 同时加入 command job 与 run job，再恢复；
+command job 嵌在 run job 里，run job 的上限管住整棵树，多个命令的 aggregate 内存不能通过每条命令分别领限额来扩大。
+command job 不另设同值上限：两只同值 job 嵌套时撞限消息落到内层 command job，run job 的 watch 读不到（实测见 Exec.lean D95），一个读处才说得清撞没撞。
+拒绝设置限额或 watch 时停止启动。
+内存不设缺省值是产品约束：没有填写上限的命令不能被隐式限额拒绝。
 
-输入由 Rust 决定：已复制工作目录、明确程序和 argv、允许的环境、非零内存与
-CPU 上限、唯一 profile 名及 output files；叶子只执行平台操作。AppContainer SID
+输入由 Rust 决定：已复制工作目录、明确程序和 argv、允许的环境、CPU 上限、
+唯一 profile 名及 output files；叶子只执行平台操作。AppContainer SID
 只获这次副本的继承读写 ACL，不获源树 ACL，无网络 capability 与 loopback exemption。
+D57：显式环境声明的 CARGO_HOME 与 RUSTUP_HOME 可获得该 profile SID 的继承
+read/execute ACE，不授 write、delete 或 ACL 修改权限。未声明的工具目录不自动授权。
+授予与撤销在跨 Windows session 的 Global 命名 mutex 内读取并改写当前 DACL；
+mutex 的 DACL 只给 Authenticated Users synchronize/modify-state，不给 WRITE_DAC，
+因此其它账户的授权操作也使用同一排他机制，而文件的 WRITE_DAC 仍由 OS 单独检查。
+声明根内的普通目录与文件先由 Rust 枚举，不跟随子 reparse point；
+叶子只在声明根和启用 DACL protection 的后代授予 ACE，避免保护位阻止继承。
+撤销只移除本次唯一 SID，不恢复旧 snapshot，因此另一个仍运行的 SID 授权不会丢失。
+cleanup 等待整棵 job 退出后才撤销，撤销失败保留拥有 SID 与路径的资源并重试。
+权限变更只涉及声明根及其后代；目录不存在表示资源已消失，不能改其父目录。
+FFI packet 的第七个字段用 LF 分隔声明根与枚举出的后代；
+`declared_roots` 标记字段开头有多少个声明根，空字段表示无额外授权；
+Rust 拒绝路径中的 NUL 与 LF，叶子复制该字段，借出的 packet 地址不跨调用。
+平台的 SetNamedSecurityInfo 继承传播与 mutex 排他属于环境假设，以下模型
+证明在该假设下撤销一个 SID 保留其余 SID；disposable fixtures 验证实际并发清理。SetNamedSecurityInfo 可设置
+SE_DACL_AUTO_INHERITED 标志，这只是继承已处理的记录，不改变权限；清理对拍
+比较除该 bookkeeping 标志外的 SDDL，DACL protection 与全部 ACE 仍须一致。
+Microsoft SECURITY_DESCRIPTOR_CONTROL 定义该标志的含义。
 scratch 的继承 mandatory-integrity label 为 Low，避免 medium 默认标签即使
 DACL 已授权仍因 write-up 禁止而拒绝 AppContainer 写入；只修改这次复制目录，
 使用 LABEL_SECURITY_INFORMATION，不索取 SeSecurityPrivilege。
-叶子保留 GetNamedSecurityInfo 分配的原 security descriptor，跨调用保留的只有
-OS 自己分配的资源，Rust 借出的 packet 地址不保留；command 结束后恢复副本根的
+叶子保留 GetNamedSecurityInfo 分配的原 security descriptor 与授权路径的自有副本，
+Rust 借出的 packet 地址不保留；command 结束后恢复副本根的
 原 DACL 与 mandatory label，再释放 descriptor，避免复用副本时积累旧 SID 的 ACE。
 原目录已被命令删除时视为权限资源已经不存在，不尝试改动它的父目录。
 环境继续从 Command 的显式 allowlist 取值，Windows native loader 的 OS 根目录
 变量由安全 GetSystemDirectory API 的父目录提供，并通过 Command 的 Windows
 case-insensitive key 规则替换别名；它们是平台启动信息，不从 host environment 继承，
-也不携带用户或 provider 凭据。USERPROFILE、APPDATA、LOCALAPPDATA、TEMP 与 TMP
-由 disposable working directory 提供，不继承 host 路径；Microsoft 的
-Implementing an AppContainer「Creating the Profile」规定启动时会重定向
-LOCALAPPDATA/TEMP/TMP 到 profile。显式环境缺失这些初始化字段时，平台可能
-以 ERROR_ENVVAR_NOT_FOUND 拒绝；实际 disposable test 验证该启动条件。
+也不携带用户或 provider 凭据。USERPROFILE、APPDATA、TEMP 与 TMP 由 disposable
+working directory 提供，不继承 host 路径。Microsoft 的 Implementing an AppContainer
+「Creating the Profile」规定启动时把 LOCALAPPDATA/TEMP/TMP 重定向到 profile；
+平台拼这条路径时取的是子进程环境块里的 LOCALAPPDATA，得
+`<LOCALAPPDATA>\Packages\<profile>\AC` 与其下的 `Temp`，而
+CreateAppContainerProfile 只在创建它的账户的 LocalAppData 下建这个目录并授本次 SID。
+LOCALAPPDATA 因此取 serving 进程自己的 LOCALAPPDATA（profile 由同一账户创建），
+重定向后的 TEMP 落在 profile 的私有存储里，随 profile 删除；LOCALAPPDATA 若给成
+副本，TEMP 指向副本下不存在的 `Packages` 路径，windows-latest 上 link.exe 因此以
+LNK1104 打不开临时文件。被否的备选是在副本里预建该路径：临时文件会混进
+resident 看见的工作树，且不随 profile 删除。serving 进程没有 LOCALAPPDATA 时拒绝
+起动并给恢复语。显式环境缺失这些初始化字段时，平台可能以 ERROR_ENVVAR_NOT_FOUND
+拒绝；disposable production axes 的 child 写入自己的 TEMP，验证该启动条件。
 错误携带真实失败阶段，避免把 loader 拒绝记作 guard 通过。
 profile 的私有存储也是这次执行拥有的资源。harness/provider 不进入 AppContainer。
+
+D58：Rust canonicalize 的 verbatim DOS/UNC prefix 在 native loader 边界转换为
+普通 DOS/UNC prefix，剩余 UTF16 units 原样保留，argv 不参与该转换。
+.NET Framework 的 FileIOPermission.CheckIllegalCharacters 拒绝 verbatim prefix 的
+问号；AppDomainSetup.VerifyDir 因此可能在 PowerShell 的配置初始化中抛出，
+不能把 ServicePointManager 的外层异常归因于缺少网络 capability。
+仅承认磁盘与 UNC 的 verbatim 形；其它 device namespace 拒绝启动并给恢复语。
+Microsoft 的 Naming Files, Paths, and Names 规定这两类 prefix，.NET reference
+source 的 FileIOPermission 规定非法字符检查；disposable Framework probe 与
+两种 PowerShell 初始化回归确认环境前提，网络 capability 仍为空。
+
+D59：子进程自己打开 NUL 设备时（Rust std 的 `Stdio::null`，即 `Command::output`
+与 `status` 的缺省 stdin；cmd 的 `>nul`），平台按 `\Device\Null` 的 DACL 判定，
+而 AppContainer 的访问检查只认 package SID、capability SID 与
+ALL APPLICATION PACKAGES (AC)，不认 Everyone。Windows 11 client 的 NUL DACL
+带 `(A;;0x1201bf;;;AC)` 与 `(A;;0x1201bf;;;S-1-15-2-2)`；GitHub windows-latest 的
+Windows Server 2025 镜像只有 WD、SY、BA、RC 四条 ACE，于是 cargo 起
+`rustc -vV` 时被拒（os error 5，cargo 报 never executed）。叶子给子进程的 stdin
+是父进程打开、经 handle list 继承的 NUL handle，不受此前提影响。
+harness 不改设备 DACL，因为它对整台机器的所有进程生效、要管理员的 WRITE_DAC，
+且重启后复原；被否的备选是叶子在声明根授权的同一 Global mutex 内给本次 SID
+加 NUL ACE，它在未提权的进程里必然失败，并把平台缺省的差异藏进每次起动。
+disposable acceptance 先把 runner 的 NUL DACL 补上 client 的这两条 ACE，再运行
+回归；`native_windows_disposable_argv_and_unrequested_memory` 的 `nul` child 经
+Rust std 的缺省 capture 与直接打开 NUL 判定该前提。
+未决：缺这两条 ACE 的主机（Windows Server）上明写 native 时，子进程自开 NUL
+的失败只出现在命令的输出里。可选做法是起动前以挂起子进程的 token 对 NUL 的
+security descriptor 做 AccessCheck 并拒绝起动，或由 doctor 的 native 行报告；
+判定证据是 Windows Server 上真实工具链（cargo、cmd）在缺 ACE 时的命令结果，
+缺省改为 native 之前须定。
+
+D60：AppContainer 子进程自己找不到 MSVC。rustc 找 `link.exe`、cc 找 `cl.exe` 用的是
+find-msvc-tools：先经 Visual Studio Setup Configuration 的 COM 枚举实例，再试
+vswhere，二者读的 InprocServer32 DLL 与实例状态都在 `%ProgramData%\Microsoft\VisualStudio`
+下，那里的 DACL 只给 Users 与 Everyone 读，没有 ALL APPLICATION PACKAGES。发现失败后
+rustc 退回 PATH 上的裸 `link.exe`；GitHub windows-latest 的 PATH 上 Git 的
+`usr\bin\link.exe`（msys coreutils）排在前面，它在容器里建不了 msys 的命名对象
+（0xC0000022），以 0xc0000142 退出，`exec_builds` 的 Rust 构建因此失败。
+launch 因此在容器外、以子进程已声明的环境为输入调用 find-msvc-tools 的
+`find_tool_with_env`，求 host 架构的 `link.exe`，把它给出的 PATH、LIB、INCLUDE 目录
+前置于子进程已声明的同名值（未声明时只含这些目录），与 vcvars 相同；子进程内的
+rustc 退回裸 `link.exe` 时便落到 MSVC，cc 的 `cl.exe` 也同样。getter 不交出
+PATH、LIB、INCLUDE 的原值，拼接由 runtime 用 `;` 完成，所以子进程原值里的字符
+不会让该 crate 的 `join_paths` 在 harness 内 panic。建筑声明了 `VCINSTALLDIR`
+即已是 developer prompt 环境，不再添加；主机没有 MSVC 时什么也不加。这些目录都在
+Program Files 下，平台已给 ALL APPLICATION PACKAGES 读与执行，无须 ACL 授权，
+名字与值也不含凭据。用 find-msvc-tools 而非自写发现，是因为它就是不受限的 rustc
+会用的那一份逻辑，于是两种臂找到同一个实例；它已作为 cc 的依赖在 lockfile 里。
+被否：①给本次 SID 授 `%ProgramData%\Microsoft\VisualStudio` 的读 ACE——要该目录的
+WRITE_DAC，普通账户没有，且与 D59 一样把主机差异藏进每次起动；②要求建筑声明
+vcvars 的变量——harness 进程通常不在 developer prompt 里，声明的名字取不到值；
+③设 `CARGO_TARGET_<triple>_LINKER`——只覆盖 cargo 的链接，cc 的 `cl.exe` 仍找不到。
+限制：前置的是 host 架构的目录，子进程交叉编译到别的架构时须自己声明 developer
+prompt 变量。重开条件：VS 的实例状态对 AppContainer 可读，或 find-msvc-tools 在
+AppContainer 内能发现实例。`msvc` 模块的测试在装有 MSVC 的 Windows runner 上检查
+别名合并与前置顺序；`exec_builds` 的 native acceptance 检查实际构建。
 
 失败拒绝，不再起动普通子进程；cleanup 拒绝时保留错误及未释放资源的 owner，
 模型的 closing 只表示不能恢复执行，closed 才表示 cleanup 已成功。
@@ -178,6 +262,21 @@ theorem cleanup_failure_trace_preserves_owner (owner : CleanupOwner)
       exact failed answer (by simp [member])
     cases answer <;> simp_all [retainUntilStopped]
 
+/-- 每次 profile 的 SID 是唯一授权键；集合模型独立于 Win32 ACL 的布局。 -/
+def revokeGrant (sid : Nat) (grants : List Nat) : List Nat :=
+  grants.filter (· != sid)
+
+/-- 清理不再授予自己的 SID，任意重复项都被移除。 -/
+theorem revoked_sid_is_absent (sid : Nat) (grants : List Nat) :
+    sid ∉ revokeGrant sid grants := by
+  simp [revokeGrant]
+
+/-- 并发 owner 的授权在另一 owner 的清理后仍存在。 -/
+theorem revoke_preserves_other_owner (sid other : Nat) (grants : List Nat)
+    (different : other ≠ sid) :
+    other ∈ revokeGrant sid grants ↔ other ∈ grants := by
+  simp [revokeGrant, different]
+
 /-! ## argv 保全（D55）
 
 D55：`crates/desktop/ffi/src/confinement/packet.rs` 的 `quoted` 是唯一生产编码器；
@@ -195,9 +294,12 @@ command line 或 environment 长度、profile 与限额验证而答 `Action::Enc
 `encoded_tail_preserves_units` 与 `encoded_arguments_preserve_order` 量化所有
 admitted 输入；它们证明 parser relation 接受编码结果，未证明 parser 的
 确定性。当前 Rust 派生检查调用生产 `packet::encode`，再用独立 CRT decoder
-检查 UTF16 units 与参数顺序；它不启动子进程，不能证明实际 CRT 按该 relation
-解析。disposable child 的真实 `args_os` 对拍尚未实现，native acceptance workflow
-也未执行该检查；需补齐探针及执行证据，才能确认模型与实际 CRT 的对应。
+检查 UTF16 units 与参数顺序；disposable acceptance 的
+native_windows_disposable_argv_and_unrequested_memory 另编译独立 Rust child，
+由 native Backlog 经过生产 packet 起动，让 child 以 args_os/encode_wide 读回
+包含空参数、引号、空格、尾反斜杠与孤立 surrogate 的实际 argv。
+同一 child 在 Shares::Unset 与 Shares::Cpu 下分配并写入 320 MiB 内存；资源轴对拍另明确给定 Shares::CpuAndMemory，不能依赖默认额度。
+有限 child 对拍验证实现与模型之间的环境假设，不构成对 CRT 的形式证明。
 
 D56：packet 按已解析程序的文件名区分 cmd.exe/cmd 与 CRT 程序，比较不分 ASCII 大小写。
 cmd 的开关不加 CRT 引号，/C 或 /K 后的各项按单个空格拼成脚本文本；

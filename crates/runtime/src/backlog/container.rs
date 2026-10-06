@@ -11,6 +11,7 @@ use kernel::{Address, AxError, ContainerLimits, RunId};
 
 use crate::tools::{ContainerLease, ContainerRuntime};
 
+use super::ceiling::{Mark, Unapplied};
 use super::process::Process;
 use super::{Backlog, Body, Claim, Member, Started, Tail, storage};
 
@@ -52,6 +53,10 @@ impl Backlog {
                     dir: dir.clone(),
                     claim: Claim::Window(owner),
                     tail: Tail::default(),
+                    // The container runtime's processes are in no run job
+                    // or cgroup; the building's own container limit holds
+                    // them (Exec.lean D95).
+                    ceiling: Mark::outside(self.shares.memory(), Unapplied::Unjoined),
                 },
             });
             if let Body::Command {

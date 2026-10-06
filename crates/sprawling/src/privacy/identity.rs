@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Read-only principal sampling (`crates/sprawling/spec/Privacy/Cli.lean` D54).
+//! Read-only principal sampling (`crates/sprawling/spec/Privacy/Cli.lean` D55).
 
 use kernel::{AxCode, AxError};
 use zeroize::Zeroizing;

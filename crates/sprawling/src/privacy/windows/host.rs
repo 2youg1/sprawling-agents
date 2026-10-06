@@ -53,7 +53,7 @@ impl<C: accounting::Clock> Host for WindowsHost<C> {
     }
 
     /// A recorded reference is verified and kept; an empty history gets a
-    /// fresh reference with the identity bound under it (gateway D30).
+    /// fresh reference with the identity bound under it (gateway D32).
     fn owner(
         &mut self,
         recorded: Option<&SecretRef>,

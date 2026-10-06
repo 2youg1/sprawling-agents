@@ -32,6 +32,7 @@
   import CityLayer from "./settings/city_layer.svelte";
   import ContextRung from "./settings/context_rung.svelte";
   import Rules from "./settings/rules.svelte";
+  import Performance from "./settings/performance.svelte";
   import You from "./settings/you.svelte";
   import AdvancedSection from "./setup/advanced.svelte";
   import PrivacySection from "./setup/privacy/privacy.svelte";
@@ -257,6 +258,8 @@ costs the cards their width (client/Spec.lean §4-30, §4-36). -->
       </div>
     {:else if shown === "rules"}
       <Rules />
+    {:else if shown === "performance"}
+      <Performance />
     {:else if shown === "automation"}
       <Automation />
     {:else if shown === "network"}

@@ -29,12 +29,12 @@ const CURRENT_VERSION: &str = r"SOFTWARE\Microsoft\Windows NT\CurrentVersion";
 /// to run an empty command on a workstation running other builds, the
 /// identity query 13.9 seconds and a task query more than 15 beside the
 /// whole test suite; a minute is four times the slowest answer seen, and
-/// a query only waits while a person waits (Privacy.Cli D54).
+/// a query only waits while a person waits (Privacy.Cli D55).
 pub(crate) const PATIENCE: u32 = 1200;
 
 /// Windows PowerShell under `SystemRoot` as HKLM records it, rather than
 /// as PATH, the `SystemRoot` variable or the current directory say, all
-/// of which any process of this user can change (Privacy.Cli D54).
+/// of which any process of this user can change (Privacy.Cli D55).
 ///
 /// # Errors
 /// `ToolUnavailable` when the record is unreadable or names a relative
@@ -101,7 +101,7 @@ pub(super) fn host_facts() -> Result<HostFacts, AxError> {
 }
 
 /// The edition an `EditionID` names, by its prefix: the one rule the
-/// page's edition fit is decided from (Privacy.Controls D64). Variants
+/// page's edition fit is decided from (Privacy.Controls D66). Variants
 /// such as `CoreCountrySpecific`, `EnterpriseS` or `ServerDatacenter`
 /// keep their family; anything else names no edition, and every control
 /// then shows its edition as not stated.

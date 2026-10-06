@@ -608,3 +608,8 @@ pub enum Landing { Delivered, Queued, Knocked }   // 进了正在跑的 run 的�
 AttachedTuning.accounts 缺席保留旧登记；显式列表解析失败必须拒绝，不能抹掉整张
 tuning 后回退 auth。顺序与准入模型见 `crates/gateway/spec/Router.lean`。
 -/
+
+/-! ModelCalled.provider_account 是可缺席的 ProviderAccountBinding，含 provider 与
+ServerLabel account，不含凭据或 reference；旧记录缺席时不会建立亲和。
+ModelCalled 的 model 与 segments 在旧的不完整调用记录中可缺席，读为空；
+此兼容性只允许重放记录，生产写者仍写完整请求身份。 -/

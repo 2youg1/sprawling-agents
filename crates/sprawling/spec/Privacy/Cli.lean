@@ -9,7 +9,7 @@
 `crates/sprawling/src/privacy/identity.rs`，以及写入动词交给 coordinator 的生产 Host
 `bin::privacy::windows::host`。本文件是接口说明，不是形式证明：写入动词的次序与性质由
 crates.sprawling.spec.Privacy 证明，CLI 只把参数交给同一个 `bin::privacy::coordinator`；
-status 与 inspect 是无状态查询，披露性质由类型持有（见 D53）。
+status 与 inspect 是无状态查询，披露性质由类型持有（见 D54）。
 
 动词（main::verbs 各登记一次，main::router 直接调用；时钟由 router 交入 assembly 的 SystemClock，
 不在 privacy 里取样）：
@@ -21,17 +21,17 @@ status 与 inspect 是无状态查询，披露性质由类型持有（见 D53）
   control、reading（读到的快照，即 apply 与 restore 的 expected）与 key_existed，或读失败时的
   unreadable（access_denied 或 failed）；owned（本应用仍拥有的最近操作的 operation、original、
   modified，否则为 null）；unresolved（该控制是否有未结操作）。所有控制都可写
-  （Privacy D66），不写的原项不是控制，所以不出现在这里。
+  （Privacy D68），不写的原项不是控制，所以不出现在这里。
 - privacy apply <control> <expected> 与 privacy restore <control> <expected>（Changes）：
-  expected 是 inspect 为该控制打印的 reading JSON，原样传回；它就是 Privacy.Confirmation D55 的绑定，
+  expected 是 inspect 为该控制打印的 reading JSON，原样传回；它就是 Privacy.Confirmation D57 的绑定，
   缺少或不符即拒绝。
-- privacy restore-all（Changes）：按控制逐个恢复本应用仍拥有的修改（Privacy D60），每个控制
+- privacy restore-all（Changes）：按控制逐个恢复本应用仍拥有的修改（Privacy D62），每个控制
   用恢复前刚读到的值作 expected，输出每个控制各自的结果；第一个失败之后不再继续，
   已完成的结果照样输出，退出失败。
 - privacy reconcile <expected>（Changes）：对未结操作执行人的核对（Privacy 的 Reconcile），
   expected 是 inspect 为该操作的控制打印的 reading；不写系统。
 - privacy elevated-write <write>（Changes）：只供 `bin::privacy::elevation` 的提升子进程使用，
-  write 是一次机器作用域写入的十六进制 JSON，见 Privacy.Windows D57；它不经 coordinator、不读日志、
+  write 是一次机器作用域写入的十六进制 JSON，见 Privacy.Windows D59；它不经 coordinator、不读日志、
   不读系统、不输出读数，校验失败或写入失败时以 AxError 退出失败。
 apply、restore、reconcile 成功时输出一行 JSON：{"done":"applied"|"restored","operation":n}、
 {"done":"already_written"} 或 {"done":"reconciled","operation":n,"settlement":…}；restore-all 每个
@@ -45,7 +45,7 @@ HistoryFault 的稳定 code 与 recovery 映射归 `bin::privacy::fault`，调�
 - identity 是 `bin::privacy::identity` 读到的 SID；owner(recorded, identity)：有记录的引用时经
   gateway::verify_platform_identity 核对后原样返回；空历史时抽取 64 位随机数，作名字
   owner-<16 位小写十六进制> 在 realm privacy 下建一个新引用，经 gateway::bind_platform_identity
-  把 SID 写进平台 Vault（gateway D30），返回这个引用。空历史第一次写入之前的失败（例如 changed）
+  把 SID 写进平台 Vault（gateway D32），返回这个引用。空历史第一次写入之前的失败（例如 changed）
   会留下一条没有历史引用的绑定，它只在本人的凭据库里保存本人的 SID。
 - read 与 write 按控制表的目标交给适配器（Privacy.Windows）：HKCU 值与用户环境在本进程，
   HKLM 值与计划任务经 `bin::privacy::elevation`；适配器的访问拒绝映射为 Privacy §12 的
@@ -55,7 +55,7 @@ HistoryFault 的稳定 code 与 recovery 映射归 `bin::privacy::fault`，调�
   读回决定（值已写下即 Applied），广播失败只影响已运行的程序何时读到它。
 -/
 
-/-! D53 status 的摘要也是身份披露，只交给 owner 引用在平台 Vault 中绑定的身份
+/-! D54 status 的摘要也是身份披露，只交给 owner 引用在平台 Vault 中绑定的身份
 History::fold 已核对所有 Prepared 的 owner 引用一致；History::disclose(authorize)
 是摘要唯一的出口，非空摘要与它的 owner 引用存在同一个值里，所以
 「有摘要而没有 owner」不可表示，调用者也无法绕过 authorize 序列化摘要。
@@ -76,7 +76,7 @@ gateway::verify_identity_binding 的读取缝重放；同账号得到全部摘�
 跨账号无摘要，空历史不读 Vault，日志字节不变。
 -/
 
-/-! D54 身份由受保护安装目录下的 PowerShell 读取，不从 PATH 选可执行文件
+/-! D55 身份由受保护安装目录下的 PowerShell 读取，不从 PATH 选可执行文件
 Windows 安装路径通过 winreg 的安全接口，只读 HKLM 的
 SOFTWARE\Microsoft\Windows NT\CurrentVersion/SystemRoot，再拼接
 System32\WindowsPowerShell\v1.0\powershell.exe；不从 PATH、SystemRoot

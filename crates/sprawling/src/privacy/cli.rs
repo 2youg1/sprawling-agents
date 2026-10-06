@@ -106,7 +106,7 @@ pub fn reconcile(clock: impl accounting::Clock, expected: Option<&str>) -> Resul
 }
 
 /// Restores, control by control, every change this app still owns, each
-/// against what its target reads just before (Privacy D60). `emit`
+/// against what its target reads just before (Privacy D62). `emit`
 /// receives one line per control as it ends; the first failure stops the
 /// rest.
 ///
@@ -125,7 +125,7 @@ pub fn restore_all(clock: impl accounting::Clock, emit: impl FnMut(String)) -> R
 }
 
 /// Carries out one machine-scope write as the elevated child the privacy
-/// page starts (`crates/sprawling/spec/Privacy/Windows.lean` D57): checks
+/// page starts (`crates/sprawling/spec/Privacy/Windows.lean` D59): checks
 /// it against the control table and writes, reading nothing back and
 /// recording nothing.
 ///
