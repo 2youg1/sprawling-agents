@@ -78,6 +78,11 @@
     const mine = sent(JSON.stringify(core));
     saving = mine;
     u.conn.asking.refresh(QUERIES.preferences);
+    setTimeout(function recheck() {
+      if (saving !== mine) return;
+      u.conn.asking.refresh(QUERIES.preferences);
+      setTimeout(recheck, 1_000);
+    }, 1_000);
     setTimeout(() => {
       if (saving === mine) saving = waited(mine);
     }, RECEIPT_MS);
