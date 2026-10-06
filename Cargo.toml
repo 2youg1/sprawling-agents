@@ -71,6 +71,11 @@ postcard = { version = "1.1", default-features = false, features = ["alloc"] }
 # terminal; no colour, clipboard or paste features, so it links the least.
 crossterm = { version = "0.29", default-features = false, features = ["events", "windows"] }
 toml = "1.1"
+# A configured MCP or search address is read by the WHATWG URL rules, so a
+# credential hidden in userinfo or in a percent-encoded query parameter is
+# seen (`crates/city/spec/ConfigLayers.lean` D25). Already in the lock
+# beneath reqwest; MIT OR Apache-2.0.
+url = "2.5"
 # Stage 1 pins: blake3 is the library-wide sole hash;
 # uuid v7 is human-readable identity only (parse/format; no generation in kernel).
 blake3 = "1.8"
