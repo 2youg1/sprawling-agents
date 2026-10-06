@@ -116,6 +116,9 @@ fn native_windows_child_axes() {
     let input: Value =
         serde_json::from_slice(&std::fs::read("native-input.json").unwrap()).unwrap();
     std::fs::write("native-copy-marker", "copy write permitted").unwrap();
+    let temp = std::env::temp_dir();
+    std::fs::write(temp.join("native-temp-probe"), "temp write permitted")
+        .unwrap_or_else(|err| panic!("the redirected TEMP {} is writable: {err}", temp.display()));
     assert!(std::fs::write(input["outside"].as_str().unwrap(), "escape").is_err());
     let address = input["address"].as_str().unwrap().parse().unwrap();
     assert!(
