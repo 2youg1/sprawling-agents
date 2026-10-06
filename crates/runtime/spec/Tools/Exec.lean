@@ -8,7 +8,7 @@
 
 规定 `tools::exec`、`tools::exec::outcome`、`tools::exec::shell`、`tools::exec::confinement`、`tools::exec::yielding`（`crates/runtime/src/` 下同名的文件）。exec 的三臂、宿主进程沙箱、派出的命令降一级与环境声明。本文件是 `crates/runtime/Spec.lean` 的一个分部；下面每一节保留它在 runtime 规格里的标签 §8-n，别处引作 `crates/runtime/Spec.lean §8-n`。
 
-除末尾的亲和申请模型外，这一分部是说明文档，不是形式规格；它写下的接口形状与取舍由 Rust 的类型与 `tools::exec`、`backlog` 旁的测试守住（`crates/runtime/Spec.lean` §16）。
+除末尾的亲和申请模型与 D95 的上限判定外，这一分部是说明文档，不是形式规格；它写下的接口形状与取舍由 Rust 的类型与 `tools::exec`、`backlog` 旁的测试守住（`crates/runtime/Spec.lean` §16）。
 -/
 
 /-!
@@ -214,16 +214,51 @@ pub fn new(setup: ExecSetup, sandbox: Box<dyn Sandbox>, backlog: Backlog) -> Res
 - **哪一臂打开哪一项**：下面每一项都随人的配置 `[core] placement` 那一臂开关，开关表只在 `crates/sprawling/spec/Serving/Placement.lean` D47 一处；本 crate 只收一个值 `Shares`（`Backlog::with_shares`）：`Unset` 什么也不设（`"none"`），`Cpu` 设 CPU 份额（缺省 `"soft"`），`CpuAndMemory { limit }` 再设内存上限（`"soft_shares"`）。
 - **Windows (d)**：`runtime::backlog::jobs` 创建一个 run 的 job 时，按 `Shares` 给它设至多两项：CPU 速率控制 `JOBOBJECT_CPU_RATE_CONTROL_INFORMATION { ControlFlags: JOB_OBJECT_CPU_RATE_CONTROL_ENABLE | JOB_OBJECT_CPU_RATE_CONTROL_WEIGHT_BASED, Weight: 5 }`（`SetInformationJobObject`，信息类 `JobObjectCpuRateControlInformation`），与作业级提交上限 `JOB_OBJECT_LIMIT_JOB_MEMORY`（读出 `JOBOBJECT_EXTENDED_LIMIT_INFORMATION`、置上这一位与 `JobMemoryLimit`、再写回，于是别处已经设的位不丢）。接口档位：`win32job` 2.0.3 把扩展限额的结构放在 crate 私有字段里、不设 CPU 速率控制，`process-wrap` 10.0.1 也不设，所以走第二档 Zig 叶子，放在 `crates/desktop/ffi`（与 `crates/sprawling/spec/Serving/Standing.lean` D40 同一个叶子）：job 的句柄由 `win32job::Job::handle` 交出（公开），两项限额作为一个定长记录过 `(ptr, len)` 边界。两项都不要特权（推断：文档都没有要求特权，而工作集上限要不要特权随账户令牌而变，见 §8-13-2；派生的 Rust 检查在未提权的 Windows runner 上设好再读回，先红后绿）。
   - **权重**：`Shares` 不是 `Unset` 时设；每个 run 一样，取 5（范围 1–9），常量 `RUN_CPU_WEIGHT`。要的是按 run 公平：不设时一条起 16 个进程的构建按线程分到 16 份，对面只有一个进程的 run 分到 1 份；权重相同，每个 run 各得一份，一个 session 的编译饿不死别的 session。harness 不进任何 job，它的热线程本来就站在正常档之上（§8-93）。
-  - **内存上限**：`Shares::CpuAndMemory { limit }` 时设，`limit` 是物理内存的一半；物理内存由 sprawling 的 `bin::monitor::memory` 读出，`bin::serving::placement::run_shares` 算出上限放进这个值，本 crate 不读平台。超过时是这个 run 的进程树里的分配失败（编译器报内存不足），城与别的 run 照常。只有 `"soft_shares"` 打开它（D47），默认按读数定。
-  - **退路**：叶子调用失败时 job 不设份额、不设上限，命令照常起动（与装不进 job 同一条判断：为读数或份额让一条构建失败是把代价付错了地方），这个 run 的 `RunProcesses.share` 读作 `Unset`。
+  - **内存上限**：`Shares::CpuAndMemory { limit }` 时设，`limit` 是 User 在 `[core] memory_bytes` 明确填写的非零字节数；`bin::serving::placement::run_shares` 把该值放进份额，本 crate 不读平台。超过时是这个 run 的进程树里的分配失败（编译器报内存不足），城与别的 run 照常。只有 `"soft_shares"` 打开它（D47），缺席即不设，没有自动计算的缺省值。
+  - **撞到上限与没落地的上限**：每条命令的结果带上这条上限在它运行期间落到哪一种，见 D95；单凭非零退出码不把失败归给上限。
+  - **退路**：叶子调用失败时 job 不设份额、不设上限，命令照常起动（与装不进 job 同一条判断：为读数或份额让一条构建失败是把代价付错了地方），这个 run 的 `RunProcesses.share` 读作 `Unset`；User 填了上限时，这个 run 的每条命令的结果说上限没有落地（D95），而不是静默地不设。
 - **macOS (d)**：没有 Job Object。派出的命令在 `nice` 外面再包一层 `/usr/sbin/taskpolicy -c utility`，把它与它的后代的 QoS 压到 utility，系统于是先把它们放到效率核上（外部命令，第一档，与 `nice` 同一种做法，§8-13-3）；这一层是 macOS 的 CPU 份额一项，`Shares::Unset` 时不包；找不到 `taskpolicy` 时只包 `nice`。本实现没有按 run 整棵进程树汇总的内存上限，`CpuAndMemory` 在 macOS 上只兑现 CPU 一半，`RunProcesses.share` 为 `Unset`，doctor 照实说。
-- **Linux (d)**：harness 自己所在的 cgroup 是 `/proc/self/cgroup` 的 `0::` 行所指的那一个，挂在 `/sys/fs/cgroup` 下（`runtime::backlog::cgroup`，D33）。它可写时，harness 先把自己移进一个子 cgroup `core`（cgroup v2 规定有进程的 cgroup 不能再往下分资源，`core` 把父 cgroup 空出来），在父 cgroup 的 `cgroup.subtree_control` 打开 `cpu` 与 `memory`，然后每个 run 建一个子 cgroup `run-<RunId>`：`cpu.weight` 写 100（每个 run 一样），`memory.max` 只在 `Shares::CpuAndMemory { limit }` 时写 `limit`（D47 的 `"soft_shares"` 臂给的是物理内存的一半），命令起动后把它的 pid 写进这个子 cgroup 的 `cgroup.procs`（同一 run 的后续命令只写自己的 pid，份额在建 cgroup 时已经写下）。全是标准库读写文件，第一档。与 Windows 的 job 一样，起动到写进 cgroup 之间有一小段，那一段里起的孙进程留在 `core` 里。不可写时（没有 systemd 的委派，CI 主机与许多桌面都是这样）只靠 `nice 10`，doctor 说「runs' commands compete thread by thread and run below the core: the cgroup is not delegated」。cgroup 收不下一个 run 时（建目录或写文件失败）这个 run 读作 `Unset`，命令照常起动：与 Windows 的叶子失败同一条判断。委派与否由 `runtime::platform_shares` 一处读出，doctor 与接线读同一个答案。
+- **Linux (d)**：harness 自己所在的 cgroup 是 `/proc/self/cgroup` 的 `0::` 行所指的那一个，挂在 `/sys/fs/cgroup` 下（`runtime::backlog::cgroup`，D33）。它可写时，harness 先把自己移进一个子 cgroup `core`（cgroup v2 规定有进程的 cgroup 不能再往下分资源，`core` 把父 cgroup 空出来），在父 cgroup 的 `cgroup.subtree_control` 打开 `cpu` 与 `memory`，然后每个 run 建一个子 cgroup `run-<RunId>`：`cpu.weight` 写 100（每个 run 一样），`memory.max` 在 `Shares::CpuAndMemory { limit }` 时写 `limit`，CPU-only 时写 `max` 以清除重用目录的旧上限（D47 的 `"soft_shares"` 臂给的是 User 明确填写的字节上限），命令起动后把它的 pid 写进这个子 cgroup 的 `cgroup.procs`（同一 run 的后续命令只写自己的 pid，份额在建 cgroup 时已经写下）。全是标准库读写文件，第一档。与 Windows 的 job 一样，起动到写进 cgroup 之间有一小段，那一段里起的孙进程留在 `core` 里。不可写时（没有 systemd 的委派，CI 主机与许多桌面都是这样）只靠 `nice 10`，doctor 说「runs' commands compete thread by thread and run below the core: the cgroup is not delegated」。cgroup 收不下一个 run 时（建目录或写文件失败）这个 run 读作 `Unset`，命令照常起动：与 Windows 的叶子失败同一条判断；一条命令的 pid 写不进 `cgroup.procs` 时它不在上限之内。两种情形下 User 填了上限，结果都说上限没有落地（D95）。委派与否由 `runtime::platform_shares` 一处读出，doctor 与接线读同一个答案。
 - **(e) `WindowsJobObject` 臂**：`NativeWindows.lean` D53/D54 规定无 capability AppContainer 与两层 job；叶子拥有主线程句柄并在两个 job 的 assignment 成功之后恢复，不用 `std::process::Child` 先起动再装 native job。
 - **为什么不缩清单**：一只只保文件系统与「起动之后的进程树」的 job 臂，对 Agent 来说与 `CopiedTree` 几乎一样，多出的只是 kill-on-close；多一臂只多一句要读的话，不多一项保证。
 
 **被否**：①`win32job` 的调度级别（`limit_scheduling_class`，安全接口）当作 CPU 份额——它只改同一优先级类里各 job 线程的时间片长短，每个 run 的级别都一样时什么也没分；②工作集上限（`limit_working_memory`）——限的是常驻页，不是提交量，而且要不要特权随账户令牌而变（§8-13-2）；③硬的 CPU 速率上限（`JOB_OBJECT_CPU_RATE_CONTROL_HARD_CAP`）——机器空着时也让核闲着，与「忙了立刻换下一个核」相反；④每条命令一只 job——份额要按 session 分，不是按命令；⑤Linux 上用 `systemd-run --user --scope -p CPUWeight=…` 包每条命令——每条命令多一次 D-Bus 往返与一个 scope 的起动，而且要有用户级 systemd，不是每台机器都有；直接写委派的 cgroup 文件更少依赖。
 
-**重开参数**：四臂对照里 ② 臂（缺省，含 CPU 份额）的 p99 与 p999 不优于 ① 臂，而把份额单独拆出来也无益——那就整个 (d) 都不做；③ 臂（再加内存上限）不比 ② 差、也没有让真实构建失败——那就把内存上限放进缺省；或者一个对外只给安全接口的 crate 公开 job 的 CPU 速率控制与作业级内存上限（叶子函数换成它）；或者 Rust 稳定版提供 `raw_attribute`（(e) 的恢复函数就不需要了）。
+**重开参数**：四臂对照里 ② 臂（缺省，含 CPU 份额）的 p99 与 p999 不优于 ① 臂，而把份额单独拆出来也无益——那就整个 (d) 都不做；内存上限只由显式用户配置决定，不由四臂对照决定；或者一个对外只给安全接口的 crate 公开 job 的 CPU 速率控制与作业级内存上限（叶子函数换成它）；或者 Rust 稳定版提供 `raw_attribute`（(e) 的恢复函数就不需要了）。
+-/
+
+/-! D95 一条命令的结果说出 User 的内存上限在它运行期间落到哪一种（设置覆盖；`runtime::backlog::ceiling`、`runtime::backlog::jobs`、`runtime::backlog::cgroup`、`runtime::tools::exec::outcome`）
+
+**来源**：这是一条 ruling：run 的内存没有缺省上限，只有 User 填的上限；撞到它时，命令结果与界面都给出明确的错误；执行路径上失败而不报错的地方都要报出来。上限只在 `[core] placement = "soft_shares"` 且填了 `[core] memory_bytes` 时被要求（`crates/sprawling/spec/Serving/Placement.lean` D47），本决定只管被要求之后。
+
+**接口**：
+
+```rust
+pub enum Ceiling {                                   // runtime 根上导出
+    Hit { limit: NonZeroU64 },                       // 这条命令运行期间，这个 run 的分配在上限处被拒
+    Unapplied { limit: NonZeroU64, why: Unapplied }, // 要了上限，这条命令却不在上限之内运行
+    Unread { limit: NonZeroU64 },                    // 上限在，撞没撞读不出来
+}
+pub enum Unapplied { Platform, NotDelegated, Refused, Unjoined }
+// Started::Settled 与 Finished 各多一个 ceiling: Option<Ceiling>；None 即没有要上限，或上限在而没撞到
+```
+
+命令入表时记下一个 `ceiling::Mark`（下面 `CeilingMark` 的 Rust 面），收走时由 `ceiling::verdict` 用那一刻读到的计数给出 `Option<Ceiling>`；这两者与「哪种情形算没落地」只在 `runtime::backlog::ceiling` 一处，`jobs` 与 `cgroup` 只读平台的计数。
+
+exec 结果多一个键 `memory_ceiling`，形如 `{"state": "hit" | "unapplied" | "unread", "limit_bytes": N, "detail": "…"}`；`unapplied` 另带 `"why": "platform" | "not_delegated" | "refused" | "unjoined"`。后台命令在 `background` 行里带同一个键。键名与拼写只在 `tools::exec::outcome` 一处；客户端从结果读它（`client/src/views/monitor/trace.ts` 的 `commandOf`），在终端行下面画出错误。
+
+**证据**：撞到上限按命令运行期间这个 run 的撞限计数有没有增加来判，计数在命令入表时记一次、在命令被收走时再读一次（`settle` 与 `harvest` 是收走命令的两处）。入表时就读不出计数，记下的是 `unread`，收走时报 `Unread`。同一 run 的上限是所有命令共用的，所以计数增加时，这期间还在跑的每条命令都报 `Hit`：上限说的是这个 run，而不是哪一个进程超了。
+
+- **Windows**：run 的 job 建成时先挂一个 I/O completion port（`desktop_ffi::cpu::JobWatch`，`crates/desktop/ffi/Spec.lean` D6），读的是 `JOB_OBJECT_MSG_JOB_MEMORY_LIMIT` 消息的条数；读一次就把消息从 port 上取走，所以 run 累计这些条数，一次读失败之后取走的条数已经丢了，这个 run 此后的读数一律是读不出；挂不上就不设内存上限，这个 run 的命令报 `Unapplied::Refused`，于是一个设下的上限总是读得到的上限。native 臂的 command job 不再另设同值的内存上限：它嵌在 run job 里，run job 的上限已经管住整棵树，而两只同值的 job 嵌套时，撞限消息落到内层 job 的 port，外层的 port 一条也收不到（在一台 Windows 11 机器上以两只各挂 port 的嵌套 job 实测：内层设同值上限时内层计 1、外层计 0，内层不设时外层计 1），只设外层就只有一个读处。Microsoft 文档说 job 消息的投递不保证；一条没投递的消息漏报一次撞限，这一缺口按文档原样承认。
+- **Linux**：读 `run-<RunId>/memory.events` 的 `oom` 一行（cgroup v2：用量到了 `memory.max`、分配将要失败时加一）。不用 `max` 一行：它在回收成功、分配并未失败时也加，会把一次正常的回收报成撞限。读不出这个文件时报 `Unread`，而不是当作没撞。
+- **macOS**：没有按 run 的上限（D29），要了上限的每条命令报 `Unapplied::Platform`。
+- **container 臂**：命令跑在容器运行时的进程里，不在 run 的 job 或 cgroup 里，它的内存由 building 的 `[sandbox.container] memory_bytes` 管（`Container.lean`）；要了上限时报 `Unapplied::Unjoined`。
+
+**没落地即报**：要了上限、这条命令却不在上限之内运行时，结果报 `Unapplied`：平台没有这一项（`Platform`）、Linux 的 cgroup 没有委派（`NotDelegated`）、job 或 cgroup 拒了上限或 port（`Refused`）、命令没进 run 的 job 或 cgroup（`Unjoined`）。这些情形下命令照常起动（D29 的退路），但 User 填下的上限没有生效不再是静默的。
+
+**被否**：①按非零退出码与 stderr 里的 “out of memory” 字样归因：编译器与运行时的措辞各不相同，而且一条因别的原因失败的命令会被报成撞限；②读 job 的 `PeakJobMemoryUsed`：一次被拒的大分配不会把峰值推到上限，峰值说明不了撞没撞；③撞限时让命令失败或杀掉 run：分配被拒的进程自己决定怎么收场，城只报告；④只在第一条命令报一次 `Unapplied`：每条结果都是模型单独读的，后来的结果不报就等于说上限在。
+
+**重开参数**：Windows 给出按 job 读出撞限次数的查询（不经 completion port）；Linux 的 cgroup 接口改了 `memory.events` 的语义；macOS 出现 D29 所说的按 run 汇总的机制。
 -/
 
 /-! D33 每个 Linux run 的 cgroup 由 `runtime::backlog::cgroup` 一个模块建，根是参数（D29）
@@ -390,5 +425,61 @@ theorem created_job_keeps_affinity_on_every_trace (mask : Option Nat)
   | nil => rfl
   | cons entry rest ih =>
     simpa [enterTrace, List.foldl, enterJob] using ih
+
+/-! ### D95 的判定：一条命令收走时报哪一种
+
+`CeilingMark` 是命令入表时记下的：没要上限、要了却没落地、入表时计数就读不出、或上限在并记下当时的撞限计数。
+`ceilingAt` 用收走时读到的计数（读不出是 `none`）给出报告。Rust 的 `ceiling::verdict` 是同一个
+函数，`ceiling::tests` 的 proptest 在全部输入上检查下面两条定理所说的性质。 -/
+
+inductive CeilingMark where
+  | notAsked
+  | unapplied
+  | unread
+  | watching (before : Nat)
+  deriving Repr, DecidableEq
+
+inductive CeilingReport where
+  | silent
+  | hit
+  | unapplied
+  | unread
+  deriving Repr, DecidableEq
+
+def ceilingAt : CeilingMark → Option Nat → CeilingReport
+  | .notAsked, _ => .silent
+  | .unapplied, _ => .unapplied
+  | .unread, _ => .unread
+  | .watching _, none => .unread
+  | .watching before, some after => if before < after then .hit else .silent
+
+/-- 撞限只在上限在、计数读得出且增加时报。 -/
+theorem hit_only_when_the_count_moved (mark : CeilingMark) (read : Option Nat) :
+    ceilingAt mark read = .hit ↔ ∃ before after, mark = .watching before ∧ read = some after ∧ before < after := by
+  cases mark with
+  | notAsked => simp [ceilingAt]
+  | unapplied => simp [ceilingAt]
+  | unread => simp [ceilingAt]
+  | watching before =>
+    cases read with
+    | none => simp [ceilingAt]
+    | some after =>
+      by_cases moved : before < after <;> simp [ceilingAt, moved]
+
+/-- 要了上限的命令只有在上限在、计数读得出且没动时才不报：没落地与读不出都说出来。 -/
+theorem an_asked_ceiling_is_silent_only_when_held_and_unhit (mark : CeilingMark) (read : Option Nat)
+    (asked : mark ≠ .notAsked) (silent : ceilingAt mark read = .silent) :
+    ∃ before after, mark = .watching before ∧ read = some after ∧ after ≤ before := by
+  cases mark with
+  | notAsked => exact absurd rfl asked
+  | unapplied => simp [ceilingAt] at silent
+  | unread => simp [ceilingAt] at silent
+  | watching before =>
+    cases read with
+    | none => simp [ceilingAt] at silent
+    | some after =>
+      by_cases moved : before < after
+      · simp [ceilingAt, moved] at silent
+      · exact ⟨before, after, rfl, rfl, Nat.le_of_not_lt moved⟩
 
 end Runtime.Tools.Exec

@@ -234,3 +234,32 @@ fn the_doctor_line_names_the_classes_and_what_the_plan_did() {
     );
     assert_ne!(super::plan::plan(&hybrid), Plan::LeftToOs(Left::OneClass));
 }
+
+/// An entered ceiling that does not apply is said on the doctor line,
+/// not only on standard error (D47).
+#[test]
+fn the_doctor_line_says_when_an_entered_ceiling_does_not_apply() {
+    use accounting::person::CorePlacement;
+    let limit = std::num::NonZeroU64::new(1 << 30).unwrap();
+    let notes: Vec<String> = [
+        (CorePlacement::SoftShares, Ok(Some(limit))),
+        (CorePlacement::Soft, Ok(None)),
+        (CorePlacement::Pinned, Ok(Some(limit))),
+        (
+            CorePlacement::SoftShares,
+            Err("line 2: not a number".to_owned()),
+        ),
+    ]
+    .iter()
+    .map(|(arm, entered)| super::ceiling_note(*arm, entered))
+    .collect();
+    assert_eq!(
+        notes,
+        [
+            String::new(),
+            String::new(),
+            "; the entered memory ceiling of 1073741824 bytes is not applied: [core] placement is not \"soft_shares\"".to_owned(),
+            "; the memory ceiling does not read, so none applies: line 2: not a number".to_owned(),
+        ]
+    );
+}

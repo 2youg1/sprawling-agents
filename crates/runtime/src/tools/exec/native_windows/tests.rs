@@ -11,6 +11,8 @@ use crate::tools::exec::{ExecSetup, ExecTool, Shell};
 use kernel::{Address, Payload, RunId, Tool, ToolCall, ToolName};
 use serde_json::Value;
 
+const TEST_MEMORY_BYTES: usize = 0x1000_0000;
+
 #[test]
 #[ignore = "writes AppContainer profiles and disposable ACLs; explicit Windows Actions acceptance only"]
 fn native_windows_disposable_production_axes_and_cleanup() {
@@ -29,18 +31,22 @@ fn native_windows_disposable_production_axes_and_cleanup() {
         work.path().join("native-input.json"),
         serde_json::to_vec(&serde_json::json!({
             "outside": host.path().join("escape"), "address": address.to_string(),
-            "memory": DEFAULT_MEMORY_BYTES,
+            "memory": TEST_MEMORY_BYTES,
         }))
         .unwrap(),
     )
     .unwrap();
     let mut host_allocation = Vec::<u8>::new();
     host_allocation
-        .try_reserve_exact(DEFAULT_MEMORY_BYTES)
+        .try_reserve_exact(TEST_MEMORY_BYTES)
         .unwrap();
     drop(host_allocation);
     let owner = RunId::from_bytes([0x71; 16]);
-    let backlog = crate::Backlog::with_window(crate::PollBudget::new(3_000, 5));
+    let backlog = crate::Backlog::with_window(crate::PollBudget::new(3_000, 5)).with_shares(
+        Shares::CpuAndMemory {
+            limit: std::num::NonZeroU64::new(u64::try_from(TEST_MEMORY_BYTES).unwrap()).unwrap(),
+        },
+    );
     let tool = ExecTool::new(
         ExecSetup {
             workdir: work.path().to_path_buf(),
@@ -70,6 +76,17 @@ fn native_windows_disposable_production_axes_and_cleanup() {
     let outcome = tool.invoke(&call).unwrap();
     let result = serde_json::to_value(outcome.result).unwrap();
     assert_eq!(result["exit_code"], 0, "{result}");
+    assert_eq!(
+        (
+            &result["memory_ceiling"]["state"],
+            &result["memory_ceiling"]["limit_bytes"]
+        ),
+        (
+            &Value::from("hit"),
+            &Value::from(u64::try_from(TEST_MEMORY_BYTES).unwrap())
+        ),
+        "the probe's refused allocation is reported as reaching the ceiling: {result}"
+    );
     assert!(
         result["stdout"]
             .as_str()
@@ -197,10 +214,12 @@ fn native_windows_disposable_pwsh_initializes_network_types() {
             exit,
             stdout,
             stderr,
+            ceiling,
         } => crate::Started::Settled {
             exit,
             stdout: stdout.trim().to_owned(),
             stderr,
+            ceiling,
         },
         background @ crate::Started::Backgrounded { .. } => background,
     };
@@ -210,6 +229,7 @@ fn native_windows_disposable_pwsh_initializes_network_types() {
             exit: crate::Exit::Ended { code: 0 },
             stdout: "BelowNormal".to_owned(),
             stderr: String::new(),
+            ceiling: None,
         }
     );
 }

@@ -103,4 +103,18 @@ unsafe extern "C" {
         memory: usize,
         code: *mut co::ERROR,
     ) -> u32;
+
+    pub(crate) fn sprawling_desktop_job_watch(
+        job: *mut c_void,
+        port: *mut usize,
+        code: *mut co::ERROR,
+    ) -> u32;
+
+    pub(crate) fn sprawling_desktop_job_memory_hits(
+        port: usize,
+        hits: *mut u32,
+        code: *mut co::ERROR,
+    ) -> u32;
+
+    pub(crate) fn sprawling_desktop_job_unwatch(port: usize, code: *mut co::ERROR) -> u32;
 }

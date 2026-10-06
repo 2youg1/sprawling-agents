@@ -1127,3 +1127,15 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
 - `crates/wire/Spec.lean`：线上的帧与回答，`client/src/wire.ts` 由它生成。
 - `tools/xtask/Spec.lean`：判客户端的门（`render`、`color`、`motion`、`wording`、`npm`、`budget`）。
 -/
+
+/-! 性能组的交互契约
+
+设置树的 performance 叶子绘制 core 的 placement、priority 与可缺席 memory_bytes，
+只以 Preferences 查询答复为读回 authority。placement 与 priority 复用 Segmented
+的 Radio Group 键表；内存复用 Field 的 label/help/error 契约，空值发送 None，
+正整数字节才可提交。保存只发送相对读取基线已编辑的字段，收到新的回答且读回的已发送字段全部符合目标才报告 saved，
+以免一张卡的未编辑字段覆写另一张卡的变化；在等待回执时继续编辑也保留新草稿，
+拒绝保留草稿，
+超出 receipt patience 时报告 unverified。保存后提醒重启 serving；运行中的 Shares
+不被改写。gallery/settings 的 820 与 390 两种宽度绘制真实控件，无真实配置写入。
+-/

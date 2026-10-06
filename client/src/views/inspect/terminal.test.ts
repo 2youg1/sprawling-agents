@@ -40,6 +40,7 @@ describe("the inspector's terminal", () => {
       finished: null,
       pinned: null,
       live: true,
+      ceilings: [],
     });
   });
 
@@ -58,6 +59,7 @@ describe("the inspector's terminal", () => {
       finished: TimeMs.make(4_412),
       pinned: Locator.make(pinned),
       live: false,
+      ceilings: [],
     });
   });
 
@@ -79,6 +81,7 @@ describe("the inspector's terminal", () => {
       finished: TimeMs.make(1_020),
       pinned: null,
       live: false,
+      ceilings: [],
     });
   });
 });

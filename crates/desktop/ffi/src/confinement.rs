@@ -20,7 +20,6 @@ pub struct Launch {
     pub args: Vec<OsString>,
     pub directory: PathBuf,
     pub environment: BTreeMap<OsString, OsString>,
-    pub memory_bytes: NonZeroUsize,
     /// The run Job is owned by the backlog; assignment occurs before resume.
     pub parent_job: NonZeroUsize,
     /// Hundredths of a percent of the machine's CPU, from 1 to 10,000.
@@ -75,7 +74,6 @@ impl Failure {
 #[repr(C)]
 #[derive(Debug, Default)]
 struct Record {
-    memory: usize,
     cpu: usize,
     job: usize,
     process: usize,
@@ -167,7 +165,6 @@ pub fn launch(launch: &Launch) -> Result<OwnedProcess, Failure> {
         });
     }
     let mut record = Record {
-        memory: launch.memory_bytes.get(),
         cpu: usize::from(launch.cpu_rate.get()),
         parent_job: launch.parent_job.get(),
         ..Record::default()
@@ -411,7 +408,6 @@ mod tests {
             stdout: PathBuf::from("out"),
             stderr: PathBuf::from("err"),
             environment: BTreeMap::new(),
-            memory_bytes: NonZeroUsize::MIN,
             cpu_rate: NonZeroU16::MIN,
             parent_job: NonZeroUsize::MIN,
         }

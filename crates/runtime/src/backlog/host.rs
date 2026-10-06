@@ -5,6 +5,7 @@
 
 //! Host command ownership at the Backlog spawn boundary.
 
+use super::ceiling::Mark;
 use super::{Backlog, Body, Claim, Member, Started, Tail, process, storage};
 use kernel::{Address, AxCode, AxError, RunId};
 use std::process::{Command, Stdio};
@@ -56,6 +57,7 @@ impl Backlog {
                     dir: dir.clone(),
                     claim: Claim::Window(owner),
                     tail: Tail::default(),
+                    ceiling: Mark::NotAsked,
                 },
             },
         )?;

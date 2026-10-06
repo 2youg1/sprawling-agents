@@ -68,11 +68,14 @@ pub enum Step {
     /// A job refused its CPU weight, or the reading or writing of its
     /// memory limit; with no reason of the machine's, no job was named.
     JobShare,
+    /// A job's completion port was not made, attached or read; with no
+    /// reason of the machine's, no job or port was named.
+    JobWatch,
 }
 
 impl Step {
     /// Every step, in the order of its number.
-    pub const ALL: [Step; 24] = [
+    pub const ALL: [Step; 25] = [
         Step::Finished,
         Step::Absent,
         Step::NoRoom,
@@ -97,6 +100,7 @@ impl Step {
         Step::Affinity,
         Step::Throttling,
         Step::JobShare,
+        Step::JobWatch,
     ];
 
     /// The number this step crosses the boundary as.
@@ -126,6 +130,7 @@ impl Step {
             Step::Affinity => 21,
             Step::Throttling => 22,
             Step::JobShare => 23,
+            Step::JobWatch => 24,
         }
     }
 }

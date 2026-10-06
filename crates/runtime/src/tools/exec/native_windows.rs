@@ -16,25 +16,27 @@ use crate::backlog::Shares;
 use desktop_ffi::confinement::{Launch, OwnedProcess};
 use kernel::{AxCode, AxError};
 
-/// Native defaults are bounded even when placement supplied no run ceiling.
-const DEFAULT_MEMORY_BYTES: usize = 0x1000_0000;
+/// Native CPU cap is independent of the optional User memory ceiling.
 const DEFAULT_CPU_RATE: u16 = 5_000;
 
 pub(crate) struct Limits {
-    pub(crate) memory: NonZeroUsize,
+    pub(crate) memory: Option<NonZeroUsize>,
     pub(crate) cpu_rate: NonZeroU16,
 }
 
 pub(crate) fn limits(shares: Shares) -> Result<Limits, AxError> {
     let memory = match shares {
-        Shares::Unset | Shares::Cpu => DEFAULT_MEMORY_BYTES,
-        Shares::CpuAndMemory { limit } => {
-            usize::try_from(limit.get()).map_err(|err| denied("read native memory limit", err))?
-        }
+        Shares::Unset | Shares::Cpu => None,
+        Shares::CpuAndMemory { limit } => Some(
+            NonZeroUsize::new(
+                usize::try_from(limit.get())
+                    .map_err(|err| denied("read native memory limit", err))?,
+            )
+            .ok_or_else(|| denied("read native memory limit", "zero bytes"))?,
+        ),
     };
     Ok(Limits {
-        memory: NonZeroUsize::new(memory)
-            .ok_or_else(|| denied("read native memory limit", "zero bytes"))?,
+        memory,
         cpu_rate: NonZeroU16::new(DEFAULT_CPU_RATE)
             .ok_or_else(|| denied("read native CPU limit", "zero rate"))?,
     })
@@ -90,7 +92,6 @@ pub(crate) fn launch(
             .collect(),
         directory,
         environment,
-        memory_bytes: limits.memory,
         cpu_rate: limits.cpu_rate,
         parent_job,
         profile: format!(

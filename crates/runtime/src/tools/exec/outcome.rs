@@ -8,7 +8,7 @@
 //!
 //! One file owns the key names — `arm`, `stdout`, `stderr`,
 //! `exit_code`, `outcome`, `handle`, `what`, `detail`, `background`,
-//! `env`, `interpreter` — so an arm cannot spell a result differently
+//! `env`, `interpreter`, `memory_ceiling` — so an arm cannot spell a result differently
 //! from its neighbour, and the tally that reads shell results back out
 //! of the ledger reads them under the same spellings
 //! (`crates/runtime/Spec.lean` §8-13-2 D30).
@@ -19,6 +19,10 @@ use kernel::{AxError, Payload, ToolOutcome};
 use serde_json::{Map, Value};
 
 use crate::backlog::{BacklogId, Exit, Finished};
+
+mod ceiling;
+use ceiling::memory_ceiling;
+pub(super) use ceiling::with_ceiling;
 
 /// Writes how a child stopped into a result, in the one spelling this
 /// file owns.
@@ -113,6 +117,7 @@ pub(super) fn with_backlog(
             row.insert("handle".to_owned(), Value::String(member.id.to_string()));
             row.insert("what".to_owned(), Value::String(member.what));
             ending(&mut row, member.exit);
+            memory_ceiling(&mut row, member.ceiling);
             row.insert("stdout".to_owned(), Value::String(member.stdout));
             row.insert("stderr".to_owned(), Value::String(member.stderr));
             Value::Object(row)

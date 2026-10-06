@@ -122,7 +122,8 @@ fn refused(failure: Failure) -> Refusal {
         | Step::CpuSets
         | Step::Affinity
         | Step::Throttling
-        | Step::JobShare => fault::stray(DOING, step),
+        | Step::JobShare
+        | Step::JobWatch => fault::stray(DOING, step),
     }
 }
 

@@ -552,7 +552,7 @@ branch's work is its children.
 
 One WebSocket, three kinds of frame, and a schema hash that both ends check
 on connect: a page from a different build refuses rather than misreads.
-`WIRE_V` is <!-- xtask:begin wire_v -->58<!-- xtask:end -->.
+`WIRE_V` is <!-- xtask:begin wire_v -->59<!-- xtask:end -->.
 
 | Frame | Count | What it is |
 |---|---|---|

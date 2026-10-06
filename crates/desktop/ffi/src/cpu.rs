@@ -4,8 +4,8 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! This machine's CPU sets, the calling thread's processor group, this
-//! process at full speed, and a job's CPU weight and memory limit,
-//! through the leaf (`crates/desktop/ffi/Spec.lean` D4). Nothing here
+//! process at full speed, a job's CPU weight and memory limit, and the
+//! completion port that reads when the job refused memory, through the leaf (`crates/desktop/ffi/Spec.lean` D4). Nothing here
 //! decides what to do with them: the placement plan and the job policy
 //! live with their callers.
 
@@ -147,6 +147,71 @@ pub fn job_share(job: isize, weight: u32, memory: usize) -> Result<(), Failure> 
     ended::finished(raw, code)
 }
 
+/// A completion port attached to one job, read for the times a process
+/// of the job was refused memory at the job's limit
+/// (`crates/desktop/ffi/Spec.lean` D6). The port lives as long as this
+/// value; dropping it closes the port.
+#[derive(Debug)]
+pub struct JobWatch {
+    port: usize,
+}
+
+impl JobWatch {
+    /// Attaches a new completion port to the job behind `job`.
+    ///
+    /// # Errors
+    /// [`Failure::At`] `JobWatch` with the operating system's reason, or
+    /// with none when `job` is zero; nothing is left open either way.
+    pub fn attach(job: isize) -> Result<JobWatch, Failure> {
+        let mut port = 0;
+        let mut code = co::ERROR::SUCCESS;
+        let handle = std::ptr::without_provenance_mut::<std::ffi::c_void>(job.cast_unsigned());
+        // SAFETY: `job` is a job handle its owner keeps open for the length
+        // of this call (`win32job::Job::handle`), or zero, which the leaf
+        // refuses before any call; `port` and `code` are live locals the
+        // leaf writes once each.
+        #[expect(unsafe_code, reason = "the one call that attaches a job's port")]
+        let raw =
+            unsafe { leaf::sprawling_desktop_job_watch(handle, &raw mut port, &raw mut code) };
+        ended::finished(raw, code)?;
+        Ok(JobWatch { port })
+    }
+
+    /// How many refusals at the memory limit arrived since the last read.
+    /// Each message is counted once: a read takes what it counts off the
+    /// port.
+    ///
+    /// # Errors
+    /// [`Failure::At`] `JobWatch` with the operating system's reason when
+    /// the port could not be read.
+    pub fn memory_hits(&self) -> Result<u32, Failure> {
+        let mut hits = 0;
+        let mut code = co::ERROR::SUCCESS;
+        // SAFETY: `self.port` is the port `attach` received and this value
+        // still owns, so it stays open for the call; `hits` and `code` are
+        // live locals the leaf writes once each.
+        #[expect(unsafe_code, reason = "the one call that reads a job's port")]
+        let raw = unsafe {
+            leaf::sprawling_desktop_job_memory_hits(self.port, &raw mut hits, &raw mut code)
+        };
+        ended::finished(raw, code)?;
+        Ok(hits)
+    }
+}
+
+impl Drop for JobWatch {
+    fn drop(&mut self) {
+        let mut code = co::ERROR::SUCCESS;
+        // SAFETY: `self.port` is the port `attach` received; this drop is
+        // its owner's last use, so no read can follow the close.
+        #[expect(unsafe_code, reason = "the one call that closes a job's port")]
+        let raw = unsafe { leaf::sprawling_desktop_job_unwatch(self.port, &raw mut code) };
+        if let Err(failure) = ended::finished(raw, code) {
+            eprintln!("a job's completion port did not close: {failure:?}");
+        }
+    }
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used, reason = "test code")]
 mod tests {
@@ -166,6 +231,44 @@ mod tests {
     #[test]
     fn this_process_may_lift_its_own_power_throttling() {
         full_speed().unwrap();
+    }
+
+    /// A process of the job asks for more than the limit, and the port
+    /// counts that refusal once. The child waits for the gate file, so
+    /// it allocates only after it joined the job.
+    #[test]
+    fn a_watched_job_counts_a_refusal_at_its_memory_limit() {
+        use std::os::windows::io::AsRawHandle;
+        let job = win32job::Job::create().unwrap();
+        job_share(job.handle(), 5, 512 << 20).unwrap();
+        let watch = JobWatch::attach(job.handle()).unwrap();
+        assert_eq!(watch.memory_hits().unwrap(), 0);
+        let open = std::env::temp_dir().join(format!("sprawling-job-watch-{}", std::process::id()));
+        let mut child = std::process::Command::new("powershell.exe")
+            .args([
+                "-NoProfile",
+                "-NonInteractive",
+                "-Command",
+                "while (-not (Test-Path -LiteralPath $env:GATE)) { Start-Sleep -Milliseconds 20 };                  try { $b = New-Object byte[] 1073741824; exit 0 } catch { exit 7 }",
+            ])
+            .env("GATE", &open)
+            .spawn()
+            .unwrap();
+        job.assign_process(isize::try_from(child.as_raw_handle().addr()).unwrap())
+            .unwrap();
+        std::fs::write(&open, b"").unwrap();
+        let status = child.wait().unwrap();
+        std::fs::remove_file(&open).unwrap();
+        assert_eq!(status.code(), Some(7));
+        assert!(watch.memory_hits().unwrap() >= 1);
+        assert_eq!(watch.memory_hits().unwrap(), 0);
+        assert!(matches!(
+            JobWatch::attach(0),
+            Err(Failure::At {
+                step: Step::JobWatch,
+                code: co::ERROR::SUCCESS
+            })
+        ));
     }
 
     #[test]

@@ -187,7 +187,8 @@
   import { MachineReport, MachineUnchecked } from "../machine.svelte";
   import Setup from "../setup.svelte";
   import Decided from "../setup/decided.svelte";
-  import { TimeMs, type Decision } from "../../wire";
+  import { TimeMs, type Decision, type Answer, type Query } from "../../wire";
+  import { QUERIES } from "../../core/asking";
   import { ENDPOINTS } from "./served";
   import Case from "./case.svelte";
   import { answered } from "./shelved.svelte";
@@ -198,6 +199,18 @@
   function ruled(item: string, detail: string, at: number, verdict: Decision["verdict"]): Decision {
     return { at: TimeMs.make(at), cluster: { class: "question", detail }, item, verdict };
   }
+  function performanceAnswer(query: Query): Answer | undefined {
+    return query === QUERIES.preferences
+      ? { preferences: { core: { placement: "soft_shares", priority: "normal", memory_bytes: null } } }
+      : undefined;
+  }
+  // The same group after the person entered an 8 GiB ceiling.
+  function cappedAnswer(query: Query): Answer | undefined {
+    return query === QUERIES.preferences
+      ? { preferences: { core: { placement: "soft_shares", priority: "raised", memory_bytes: 8_589_934_592 } } }
+      : undefined;
+  }
+
   const CLERK: readonly Decision[] = [
     ruled("ap-1", "keep the ledger schema at v3 for this release", 1_767_225_600_000, "allow"),
     ruled("ap-2", "split the gate module before adding the dedup rule", 1_767_229_200_000, "allow"),
@@ -338,5 +351,23 @@ turns into a row across the top and every grid is down to one column. -->
 <Case label="setup · answered for you, three by the clerk" width={820}>
   <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} answers={answered}>
     <Decided decided={CLERK} />
+  </Stand>
+</Case>
+
+<Case label="settings · performance, no memory ceiling" width={820}>
+  <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} answers={performanceAnswer}>
+    <Setup group="performance" />
+  </Stand>
+</Case>
+
+<Case label="settings · performance, an entered memory ceiling" width={820}>
+  <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} answers={cappedAnswer}>
+    <Setup group="performance" />
+  </Stand>
+</Case>
+
+<Case label="settings · performance on one column" width={390}>
+  <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} answers={performanceAnswer}>
+    <Setup group="performance" />
   </Stand>
 </Case>
