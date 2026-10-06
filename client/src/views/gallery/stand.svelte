@@ -150,7 +150,7 @@
       ask: (query: Query) => held(() => answer(query)),
       refresh: () => undefined,
     },
-    command: () => undefined,
+    command: () => true,
     retry: () => undefined,
     markNoticesSeen: () => undefined,
   };
