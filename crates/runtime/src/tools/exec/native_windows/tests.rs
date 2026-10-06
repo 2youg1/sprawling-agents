@@ -233,3 +233,63 @@ fn native_windows_disposable_pwsh_initializes_network_types() {
         }
     );
 }
+
+#[test]
+fn native_memory_is_unrequested_without_a_user_ceiling() {
+    for shares in [Shares::Unset, Shares::Cpu] {
+        assert_eq!(format!("{:?}", limits(shares).unwrap().memory), "None");
+    }
+}
+
+
+#[test]
+#[ignore = "writes AppContainer profiles and disposable ACLs; explicit Windows Actions acceptance only"]
+fn native_windows_disposable_argv_and_unrequested_memory() {
+    use std::os::windows::ffi::OsStringExt;
+    assert_eq!(std::env::var("SPRAWLING_DISPOSABLE_NATIVE").unwrap(), "1");
+    let copy = tempfile::tempdir().unwrap();
+    let directory = copy.path().join("path with spaces");
+    std::fs::create_dir(&directory).unwrap();
+    let source = directory.join("probe.rs");
+    let exe = directory.join("probe.exe");
+    std::fs::write(&source, r#"
+use std::os::windows::ffi::OsStrExt;
+fn main() {
+    if std::env::args_os().nth(1).as_deref() == Some(std::ffi::OsStr::new("allocate")) {
+        let mut bytes = Vec::<u8>::new();
+        bytes.try_reserve_exact(320 * 1024 * 1024).unwrap();
+        bytes.resize(320 * 1024 * 1024, 7);
+        println!("{}", bytes.iter().map(|v| usize::from(*v)).sum::<usize>());
+    } else {
+        println!("{:?}", std::env::args_os().skip(1).map(|arg| arg.encode_wide().collect::<Vec<_>>()).collect::<Vec<_>>());
+    }
+}
+"#).unwrap();
+    let built = Command::new("rustc").arg(&source).arg("-o").arg(&exe).output().unwrap();
+    assert!(built.status.success(), "{built:?}");
+    let args = vec![vec![], vec![32, 9], vec![34, 92, 34], vec![92, 92],
+        vec![0xd800, 32, 0xdc00], vec![97, 92, 34, 98, 92]];
+    let backlog = crate::Backlog::with_window(crate::PollBudget::new(10_000, 5));
+    let scope = Address::parse("work").unwrap();
+    let mut command = Command::new(&exe);
+    command.env_clear().current_dir(&directory)
+        .args(args.iter().map(|units| OsString::from_wide(units)));
+    let result = backlog.run_native(RunId::from_bytes([0x74; 16]), &scope,
+        "argv round trip".to_owned(), command).unwrap();
+    let crate::Started::Settled { exit, stdout, stderr } = result else {
+        panic!("argv child must settle: {result:?}");
+    };
+    assert_eq!(exit, crate::Exit::Ended { code: 0 }, "{stderr}");
+    assert_eq!(serde_json::from_str::<Vec<Vec<u16>>>(&stdout).unwrap(), args);
+    for (index, shares) in [Shares::Unset, Shares::Cpu].into_iter().enumerate() {
+        let backlog = crate::Backlog::with_window(crate::PollBudget::new(10_000, 5))
+            .with_shares(shares);
+        let mut command = Command::new(&exe);
+        command.env_clear().current_dir(&directory).arg("allocate");
+        let result = backlog.run_native(RunId::from_bytes([u8::try_from(index).unwrap(); 16]),
+            &scope, "unrequested memory".to_owned(), command).unwrap();
+        assert_eq!(result, crate::Started::Settled {
+            exit: crate::Exit::Ended { code: 0 }, stdout: "2348810240\n".to_owned(), stderr: String::new(),
+        });
+    }
+}

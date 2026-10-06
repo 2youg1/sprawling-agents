@@ -25,6 +25,14 @@ command job 不另设同值上限：两只同值 job 嵌套时撞限消息落到
 输入由 Rust 决定：已复制工作目录、明确程序和 argv、允许的环境、CPU 上限、
 唯一 profile 名及 output files；叶子只执行平台操作。AppContainer SID
 只获这次副本的继承读写 ACL，不获源树 ACL，无网络 capability 与 loopback exemption。
+D57：显式环境声明的 CARGO_HOME 与 RUSTUP_HOME 可获得该 profile SID 的继承
+read/execute ACE，不授 write、delete 或 ACL 修改权限。程序所在目录同样只读执行。
+授予与撤销在跨 harness 的命名 mutex 内读取并改写当前 DACL；撤销只移除本次
+唯一 SID，不恢复旧 snapshot，因此另一个仍运行的 SID 授权不会丢失。
+cleanup 等待整棵 job 退出后才撤销，撤销失败保留拥有 SID 与路径的资源并重试。
+权限变更只涉及声明的根；目录不存在表示资源已消失，不能改其父目录。
+平台的 SetNamedSecurityInfo 继承传播与 mutex 排他属于环境假设，以下模型
+证明在该假设下撤销一个 SID 保留其余 SID；disposable fixtures 验证实际并发清理。
 scratch 的继承 mandatory-integrity label 为 Low，避免 medium 默认标签即使
 DACL 已授权仍因 write-up 禁止而拒绝 AppContainer 写入；只修改这次复制目录，
 使用 LABEL_SECURITY_INFORMATION，不索取 SeSecurityPrivilege。
@@ -179,6 +187,21 @@ theorem cleanup_failure_trace_preserves_owner (owner : CleanupOwner)
       exact failed answer (by simp [member])
     cases answer <;> simp_all [retainUntilStopped]
 
+/-- 每次 profile 的 SID 是唯一授权键；集合模型独立于 Win32 ACL 的布局。 -/
+def revokeGrant (sid : Nat) (grants : List Nat) : List Nat :=
+  grants.filter (· != sid)
+
+/-- 清理不再授予自己的 SID，任意重复项都被移除。 -/
+theorem revoked_sid_is_absent (sid : Nat) (grants : List Nat) :
+    sid ∉ revokeGrant sid grants := by
+  simp [revokeGrant]
+
+/-- 并发 owner 的授权在另一 owner 的清理后仍存在。 -/
+theorem revoke_preserves_other_owner (sid other : Nat) (grants : List Nat)
+    (different : other ≠ sid) :
+    other ∈ revokeGrant sid grants ↔ other ∈ grants := by
+  simp [revokeGrant, different]
+
 /-! ## argv 保全（D55）
 
 D55：`crates/desktop/ffi/src/confinement/packet.rs` 的 `quoted` 是唯一生产编码器；
@@ -196,9 +219,13 @@ command line 或 environment 长度、profile 与限额验证而答 `Action::Enc
 `encoded_tail_preserves_units` 与 `encoded_arguments_preserve_order` 量化所有
 admitted 输入；它们证明 parser relation 接受编码结果，未证明 parser 的
 确定性。当前 Rust 派生检查调用生产 `packet::encode`，再用独立 CRT decoder
-检查 UTF16 units 与参数顺序；它不启动子进程，不能证明实际 CRT 按该 relation
-解析。disposable child 的真实 `args_os` 对拍尚未实现，native acceptance workflow
-也未执行该检查；需补齐探针及执行证据，才能确认模型与实际 CRT 的对应。
+检查 UTF16 units 与参数顺序；disposable acceptance 的
+native_windows_disposable_argv_and_unrequested_memory 另编译独立 Rust child，
+由 native Backlog 经过生产 packet 起动，让 child 以 args_os/encode_wide 读回
+包含空参数、引号、空格、尾反斜杠与孤立 surrogate 的实际 argv。
+同一 child 在 Shares::Unset 与 Shares::Cpu 下分配并写入超过旧默认上限的
+内存；资源轴对拍另明确给定 Shares::CpuAndMemory，不能依赖默认额度。
+有限 child 对拍验证实现与模型之间的环境假设，不构成对 CRT 的形式证明。
 
 D56：packet 按已解析程序的文件名区分 cmd.exe/cmd 与 CRT 程序，比较不分 ASCII 大小写。
 cmd 的开关不加 CRT 引号，/C 或 /K 后的各项按单个空格拼成脚本文本；
