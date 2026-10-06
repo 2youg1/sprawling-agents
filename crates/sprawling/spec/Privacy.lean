@@ -858,6 +858,16 @@ restore 返回 conflict 且值不变）；已是写入值时 already_written 且
 readback_mismatch 即失败，apply 以 not_applied 结束只记录不失败。工作流在测试前后导出受影响的
 注册表键并逐字节比较，扫描新建的空键单列为残留键；runner 账户已提升，所以它不能说明标准账户
 能否写 HKCU\Software\Policies，产物如实写明这一点。测试永不写人的主机。
+同一工作流的 page 作业在 windows-2025 上打出发布归档，解开后由 `lake exe acceptance client-ui`
+服务，把端口交给 `.github/workflows/privacy-ui.mjs`：浏览器从设置的 Advanced 组里的链接进入隐私页，
+页面应画出的内容取自页面自己的 socket 收到的 `Answer::Privacy`，不读源码里的表——每个控制恰好一项、
+每项写出主机算出的版本适配、每条不写的原项连同原因；然后经页面的按钮对 `start_launch_tracking`
+（本账户，无提升）与 `feedback_notifications`（整机，经提升子进程）各做一次 apply 与 restore，
+每次确认框都写出容易被忽略的事与怎样撤销，Esc 取消时不发送命令且焦点回到按下的按钮，
+确认后 reg.exe 读回等于写入值，restore 后读回与 apply 前逐字相同（缺席也算）。1440 与 1920 宽、
+明暗两种主题各走一遍，每个状态按元素裁剪截图；产物带 HEAD、tree、归档与二进制的 sha256、
+页面收到的答复与每一步的读回。脚本同样要求 GITHUB_ACTIONS=true、RUNNER_OS=Windows 与
+SPRAWLING_DISPOSABLE_PRIVACY=1，否则不启动浏览器。
 
 ## 17 文档关系
 本契约与 ARCHITECTURE.md §9/§11、Privacy.Controls（控制表）、Privacy.Confirmation（确认）、
