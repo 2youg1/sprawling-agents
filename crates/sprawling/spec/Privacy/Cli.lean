@@ -18,6 +18,13 @@ HistoryFault 的稳定 code/action/recovery 映射归 state，不在路由器重
 
 身份查询使用受保护的 Windows 安装目录下 PowerShell，关闭 profile、非交互，
 复用 doctor::asking 的时间和行长度界，只保留第一行；拒绝诊断不回显 SID。
+D54 Windows 安装路径通过 winreg 的安全接口，只读 HKLM 的
+SOFTWARE\Microsoft\Windows NT\CurrentVersion/SystemRoot；不从 PATH、
+SystemRoot 环境变量或当前目录选可执行文件。winreg 的版本由 workspace 决定；
+这是 read-only adapter，不创建 registry key。路径读失败即拒绝，身份必须是
+WindowsIdentity.GetCurrent().User.Value 给出的非空 ASCII SID 文本。
+时间界复用 doctor::PATIENCE，经 asking::TICK 换算 knocks；超时及非零退出
+均拒绝，不保留 stopping 诊断中的路径或身份。
 非 Windows 无对应 control，返回 ToolUnavailable，不伪造身份。
 Vault 查询只 get，不运行写读删除的启动 probe，也不使用环境遮蔽。
 当前入口只检查实时身份，不查询当前 registry 值，也不产生确认或修改。inspect/confirm/apply/restore 尚未
