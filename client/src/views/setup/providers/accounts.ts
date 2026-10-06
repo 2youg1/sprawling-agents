@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// What one endpoint's account editor gives its look: every word
+// What one account editor gives its look: every word
 // translated, every press wired to `./account_editor`, every control
 // that cannot be used now with the reason why. This value is the whole
 // contract between the wiring and a look, so another look - one built
@@ -14,9 +14,9 @@ import type { Attachment } from "svelte/attachments";
 
 import { fill, say } from "../../../core/lang";
 import type { Key } from "../../../core/lang";
-import type { AxError, EndpointSummary, KeyState } from "../../../wire";
-import { cancel, edit, input, move, remove, save, shown, unsaveable } from "./account_editor";
-import type { Editor, Hands, Step } from "./account_editor";
+import type { AccountRetries, AxError, KeyState } from "../../../wire";
+import { cancel, edit, input, move, pickRetries, remove, save, shown, shownRetries, unsaveable } from "./account_editor";
+import type { Editor, Hands, Roster, Step } from "./account_editor";
 
 export type Control = "up" | "down" | "edit" | "remove";
 
@@ -56,12 +56,25 @@ export interface FieldLook {
   readonly input: (value: string) => void;
 }
 
+// The per-account retry count: one choice of two, with the city's own
+// figure said beside it while nothing is chosen.
+export interface RetriesLook {
+  readonly label: string;
+  readonly options: readonly { readonly value: AccountRetries; readonly label: string; readonly why?: string }[];
+  readonly held: AccountRetries | null;
+  readonly fallback: string | undefined;
+  readonly pick: (retries: AccountRetries) => void;
+}
+
 export interface AccountsLook {
   readonly heading: string;
   readonly holdHeading: Attachment<HTMLElement>;
   readonly order: string;
   readonly legacy: string | undefined;
   readonly rows: readonly RowLook[];
+  // Present only for an owner that has the count and lists two or more
+  // accounts, because with one account the count is never read.
+  readonly retries: RetriesLook | undefined;
   readonly title: string;
   readonly fields: readonly FieldLook[];
   readonly more: string;
@@ -96,16 +109,21 @@ const WANTING: Record<KeyState, boolean> = {
   unread: false,
 };
 
+const RETRY_WORDS: Record<AccountRetries, Key> = {
+  one: "setup_account_retries_one",
+  two: "setup_account_retries_two",
+};
+
 // What the city said about one account's key. An account the answer
 // does not list yet - one just sent - has not been looked at.
-function keyOf(endpoint: EndpointSummary, id: string): KeyState {
-  return endpoint.account_status.find((status) => status.id === id)?.key ?? "unread";
+function keyOf(roster: Roster, id: string): KeyState {
+  return roster.keys.find((status) => status.id === id)?.key ?? "unread";
 }
 
 export function lookOf(editor: Editor, hands: Hands, holds: Holds): AccountsLook {
-  const endpoint = hands.endpoint();
+  const roster = hands.roster();
   const lang = hands.lang();
-  const rows = shown(editor, endpoint);
+  const rows = shown(editor, roster);
   const busy = editor.pending === null ? undefined : say(lang, "setup_account_busy");
   const control = (key: Control, why: Key | null, press: () => void, hold?: Attachment<HTMLElement>): ControlLook => ({
     key,
@@ -114,7 +132,7 @@ export function lookOf(editor: Editor, hands: Hands, holds: Holds): AccountsLook
     press,
     hold,
   });
-  const environmental = editor.editing !== null && keyOf(endpoint, editor.editing).startsWith("environment");
+  const environmental = editor.editing !== null && keyOf(roster, editor.editing).startsWith("environment");
   const unsaved = unsaveable(editor, rows);
   const field = (name: FieldName, label: Key, more: Partial<FieldLook> = {}): FieldLook => ({
     name,
@@ -131,13 +149,14 @@ export function lookOf(editor: Editor, hands: Hands, holds: Holds): AccountsLook
     ...more,
   });
   const keyHelp = environmental ? "setup_account_key_environment_help" : editor.editing === null ? null : "setup_account_key_kept";
+  const counted = roster.retries;
   return {
     heading: say(lang, "setup_accounts"),
     holdHeading: holds.heading,
-    order: say(lang, "setup_accounts_order"),
-    legacy: (endpoint.tuning.accounts ?? null) === null && endpoint.has_credential ? say(lang, "setup_accounts_legacy") : undefined,
+    order: say(lang, roster.kind === "provider" ? "setup_accounts_order" : "setup_accounts_order_search"),
+    legacy: roster.legacy ? say(lang, "setup_accounts_legacy") : undefined,
     rows: rows.map((row, index) => {
-      const key = keyOf(endpoint, row.id);
+      const key = keyOf(roster, row.id);
       return {
         id: row.id,
         place: index + 1,
@@ -151,6 +170,25 @@ export function lookOf(editor: Editor, hands: Hands, holds: Holds): AccountsLook
         ],
       };
     }),
+    retries:
+      counted === undefined || rows.length < 2
+        ? undefined
+        : {
+            label: say(lang, "setup_account_retries"),
+            options: (["one", "two"] as const).map((value) => ({
+              value,
+              label: say(lang, RETRY_WORDS[value]),
+              ...(busy === undefined ? {} : { why: busy }),
+            })),
+            held: shownRetries(editor, roster),
+            fallback:
+              counted.fallback === undefined || shownRetries(editor, roster) !== null
+                ? undefined
+                : fill(say(lang, "setup_account_retries_fallback"), { n: say(lang, RETRY_WORDS[counted.fallback]) }),
+            pick: (retries) => {
+              pickRetries(editor, hands, retries);
+            },
+          },
     title: editor.editing === null ? say(lang, "setup_account_add") : fill(say(lang, "setup_account_editing"), { id: editor.editing }),
     fields: [
       field("id", "setup_account_id", { disabled: editor.pending !== null || editor.editing !== null }),
@@ -160,7 +198,9 @@ export function lookOf(editor: Editor, hands: Hands, holds: Holds): AccountsLook
         help: keyHelp === null ? undefined : say(lang, keyHelp),
       }),
       field("reference", "setup_account_reference", { folded: true }),
-      field("header", "setup_account_header", { folded: true }),
+      // A search supplier's key reaches the service only as the value of
+      // the header its account names, so there the name stands.
+      field("header", "setup_account_header", { folded: roster.kind === "provider" }),
     ],
     more: say(lang, "setup_account_more"),
     route: say(lang, "setup_account_key_route"),

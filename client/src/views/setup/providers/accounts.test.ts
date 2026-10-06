@@ -20,6 +20,7 @@ import * as wiring from "./account_editor";
 import { freshEditor, refuse, save, settle, shown } from "./account_editor";
 import type { Editor, Hands, Step } from "./account_editor";
 import { lookOf } from "./accounts";
+import { endpointRoster } from "./rosters";
 
 const account = (id: string, reference: string | null = `secret:providers/house.${id}`): ProviderAccount => ({
   id: ServerLabel.make(id),
@@ -69,7 +70,7 @@ function rig(endpoint: EndpointSummary = ENDPOINT) {
   };
   const editor: Editor = freshEditor();
   const hands: Hands = {
-    endpoint: () => world.endpoint,
+    roster: () => endpointRoster(world.endpoint, "two"),
     lang: () => "en",
     reach: () => ({ origin: world.origin, token: world.token }),
     send: (command) => {
@@ -245,7 +246,7 @@ describe("the order of the accounts", () => {
           secret: null,
           auth_header: null,
           admit: ["fable"],
-          tuning: { ...ENDPOINT.tuning, accounts: [account("spare"), account("main")] },
+          tuning: { ...ENDPOINT.tuning, accounts: [account("spare"), account("main")], account_retries: null },
           idem: "-",
         },
       },
@@ -262,8 +263,8 @@ describe("the order of the accounts", () => {
       [account("c"), account("a"), account("b")],
     ]);
     world.endpoint = { ...world.endpoint, tuning: { ...world.endpoint.tuning, accounts: [account("b"), account("a")] } };
-    settle(editor, world.endpoint);
-    expect(shown(editor, world.endpoint)).toEqual([account("b"), account("a")]);
+    settle(editor, endpointRoster(world.endpoint, "two"));
+    expect(shown(editor, endpointRoster(world.endpoint, "two"))).toEqual([account("b"), account("a")]);
   });
 
   test("a refusal draws the city's list again", () => {
@@ -271,13 +272,48 @@ describe("the order of the accounts", () => {
     wiring.move(editor, hands, "spare", "up");
     const refusal: AxError = { action: "attach", code: "E_CONFIG_INVALID", subject: "house", recovery: "fix it", retry: "no", nearby: [] };
     refuse(editor, refusal);
-    expect(shown(editor, ENDPOINT)).toEqual([account("main"), account("spare")]);
+    expect(shown(editor, endpointRoster(ENDPOINT, "two"))).toEqual([account("main"), account("spare")]);
   });
 
   test("a removal sends the list without the account and puts focus on the heading", () => {
     const { editor, hands, lists, focus } = rig();
     wiring.remove(editor, hands, "main");
     expect({ lists: lists(), focus }).toEqual({ lists: [[account("spare")]], focus: ["heading"] });
+  });
+});
+
+describe("the retry count on one account", () => {
+  const holds = { heading: () => undefined, control: () => () => undefined };
+
+  test("is offered with two accounts, says the city's figure while none is chosen, and goes out with the list as drawn", () => {
+    const { editor, hands, sent } = rig();
+    wiring.move(editor, hands, "spare", "up");
+    const offered = lookOf(editor, hands, holds).retries;
+    expect({ held: offered?.held, fallback: offered?.fallback, options: offered?.options.map((option) => option.value) }).toEqual({
+      held: null,
+      fallback: say("en", "setup_account_retries_fallback").replace("{n}", say("en", "setup_account_retries_two")),
+      options: ["one", "two"],
+    });
+    offered?.pick("one");
+    const last = sent.at(-1);
+    expect(last !== undefined && "attach_endpoint" in last ? last.attach_endpoint.tuning : null).toEqual({
+      ...ENDPOINT.tuning,
+      accounts: [account("spare"), account("main")],
+      account_retries: "one",
+    });
+    expect(lookOf(editor, hands, holds).retries?.held).toBe("one");
+  });
+
+  test("keeps the chosen count when the list moves", () => {
+    const { editor, hands, sent } = rig({ ...ENDPOINT, tuning: { ...ENDPOINT.tuning, account_retries: "one" } });
+    wiring.move(editor, hands, "spare", "up");
+    const last = sent.at(-1);
+    expect(last !== undefined && "attach_endpoint" in last ? last.attach_endpoint.tuning.account_retries : null).toBe("one");
+  });
+
+  test("is not offered while one account is listed, because one account never reads it", () => {
+    const { editor, hands } = rig({ ...ENDPOINT, tuning: { ...ENDPOINT.tuning, accounts: [account("main")] } });
+    expect(lookOf(editor, hands, holds).retries).toBeUndefined();
   });
 });
 

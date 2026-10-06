@@ -11,14 +11,15 @@
   // report, and a provider attached with one key and no list yet.
 
   import Accounts from "../setup/providers/accounts.svelte";
+  import { endpointRoster } from "../setup/providers/rosters";
   import Case from "./case.svelte";
   import { ACCOUNTED, UNLISTED } from "./configured";
 </script>
 
 <Case label="provider · accounts in order, each with its key">
-  <Accounts endpoint={ACCOUNTED} />
+  <Accounts roster={endpointRoster(ACCOUNTED, "two")} />
 </Case>
 
 <Case label="provider · attached with one key, no accounts yet">
-  <Accounts endpoint={UNLISTED} />
+  <Accounts roster={endpointRoster(UNLISTED, "two")} />
 </Case>

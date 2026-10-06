@@ -84,6 +84,28 @@
       {/each}
     </ol>
   {/if}
+  {#if look.retries !== undefined}
+    <fieldset class="retries">
+      <legend>{look.retries.label}</legend>
+      {#each look.retries.options as option (option.value)}
+        <label>
+          <input
+            type="radio"
+            name={`${uid}-retries`}
+            checked={look.retries.held === option.value}
+            disabled={option.why !== undefined}
+            onchange={() => {
+              look.retries?.pick(option.value);
+            }}
+          />
+          {option.label}
+        </label>
+      {/each}
+      {#if look.retries.fallback !== undefined}
+        <small>{look.retries.fallback}</small>
+      {/if}
+    </fieldset>
+  {/if}
   <form
     onsubmit={(event) => {
       event.preventDefault();
@@ -138,6 +160,13 @@
   .editor {
     color: var(--color-text);
     font-size: var(--text-note);
+  }
+  .retries {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-snug);
+    border: 0;
+    padding: 0;
   }
   .rows {
     display: flex;

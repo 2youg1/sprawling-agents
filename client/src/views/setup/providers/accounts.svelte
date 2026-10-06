@@ -6,7 +6,8 @@
 -->
 
 <script lang="ts" module>
-  // The seat of one endpoint's account editor: it holds the editor's
+  // The seat of one account editor - a provider's or a search
+  // supplier's, as the roster it is handed says: it holds the editor's
   // state, lends the wiring (`./account_editor`, `./accounts`) the page's doors - the
   // socket, the vault route, the language - and the two elements focus
   // returns to, and draws whatever `./accounts.look.svelte` is. What a
@@ -16,10 +17,10 @@
   // show, beside the list, for the same reason the attach form keeps
   // its own: the corner is for refusals no open page is responsible for.
 
-  import type { EndpointSummary } from "../../../wire";
+  import type { Roster } from "./account_editor";
 
   export interface AccountsProps {
-    readonly endpoint: EndpointSummary;
+    readonly roster: Roster;
   }
 </script>
 
@@ -35,7 +36,7 @@
   import type { Holds } from "./accounts";
   import Look from "./accounts.look.svelte";
 
-  const { endpoint }: AccountsProps = $props();
+  const { roster }: AccountsProps = $props();
   const u = ui();
   const lang = u.lang;
   const belief = u.conn.belief;
@@ -50,7 +51,7 @@
   const attachments: Record<string, Attachment<HTMLElement> | undefined> = {};
 
   const hands: Hands = {
-    endpoint: () => endpoint,
+    roster: () => roster,
     lang: () => $lang,
     reach: () => ({ origin: u.origin, token: u.pairing }),
     send: (command) => u.send(command),
@@ -88,7 +89,7 @@
   };
 
   $effect(() => {
-    settle(editor, endpoint);
+    settle(editor, roster);
   });
   $effect(() => {
     const refused = $belief.refusal;

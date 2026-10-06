@@ -73,6 +73,10 @@ export interface SecretAt {
 // form shows and the command that carries the reference have to mean
 // the same place.
 const PROVIDERS = "providers";
+// The realm a web search supplier's account keys are filed under, apart
+// from the providers', so a supplier and a provider that share an id
+// never share a key.
+const SEARCH = "search";
 
 // The realm and name a provider's key is filed under, so the reference
 // reads as what it is: `<provider>` for the one key an endpoint was
@@ -80,7 +84,17 @@ const PROVIDERS = "providers";
 // account id is a `ServerLabel`, which has no `.`, so the last `.` of
 // the name always splits it back into the two ids.
 export function referenceFor(provider: string, account?: string): SecretAt {
-  return { realm: PROVIDERS, name: account === undefined ? provider : `${provider}.${account}` };
+  return { realm: PROVIDERS, name: account === undefined ? provider : accountName(provider, account) };
+}
+
+// The realm and name one account of a search supplier files its key
+// under: `<supplier>.<account>`, by the same rule as a provider's.
+export function searchReferenceFor(supplier: string, account: string): SecretAt {
+  return { realm: SEARCH, name: accountName(supplier, account) };
+}
+
+function accountName(owner: string, account: string): string {
+  return `${owner}.${account}`;
 }
 
 // How a place in the vault is spelled, in the one grammar

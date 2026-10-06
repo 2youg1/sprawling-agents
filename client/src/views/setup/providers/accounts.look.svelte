@@ -16,6 +16,7 @@
   import Button from "../../parts/button.svelte";
   import Field from "../../parts/field.svelte";
   import Notice from "../../parts/notice.svelte";
+  import Segmented from "../../parts/segmented.svelte";
   import type { AccountsLook, FieldLook } from "./accounts";
 
   const look: AccountsLook = $props();
@@ -63,6 +64,15 @@
         </li>
       {/each}
     </ol>
+  {/if}
+  {#if look.retries !== undefined}
+    <div class="flex flex-col gap-tight">
+      <span class="text-note text-text-quiet">{look.retries.label}</span>
+      <Segmented label={look.retries.label} options={look.retries.options} held={look.retries.held} onPick={look.retries.pick} />
+      {#if look.retries.fallback !== undefined}
+        <p class="text-note text-text-faint">{look.retries.fallback}</p>
+      {/if}
+    </div>
   {/if}
   <form
     class="flex flex-col gap-snug"

@@ -41,10 +41,20 @@
   import { ui } from "../../ui";
   import Badge from "../parts/badge.svelte";
   import EmptyState from "../parts/empty.svelte";
+  import { HALL } from "../shared/buildings";
   import Accounts from "./providers/accounts.svelte";
+  import { endpointRoster } from "./providers/rosters";
 
   const { answer }: EndpointListProps = $props();
-  const { lang } = ui();
+  const u = ui();
+  const { lang } = u;
+  // The retry count an endpoint calls with when none is chosen is the
+  // same at every address, and the hall is the one every city has.
+  const config = u.conn.asking.ask({ config: { addr: HALL } });
+  const fallback = $derived.by(() => {
+    const held = $config;
+    return held !== undefined && "config" in held ? held.config.tuning.account_retries : undefined;
+  });
 </script>
 
 {#if answer.endpoints.length > 0}
@@ -76,7 +86,7 @@
             {fill(say($lang, "setup_accounts_toggle"), { n: String(endpoint.tuning.accounts?.length ?? 0) })}
           </summary>
           <div class="pt-snug">
-            <Accounts {endpoint} />
+            <Accounts roster={endpointRoster(endpoint, fallback)} />
           </div>
         </details>
       </li>
