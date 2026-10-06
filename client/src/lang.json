@@ -3751,6 +3751,294 @@
     "en": "App permission policies bind Windows (packaged) apps only; ordinary desktop programs such as browsers, meeting software and sprawling are not bound by them.",
     "zh": "应用权限类策略只约束 Windows 应用（打包应用）；浏览器、会议软件、sprawling 等普通桌面程序不受这些策略约束。"
   },
+  "privacy_host_title": {
+    "en": "The machine these entries belong to: the one running this city",
+    "zh": "这些条目属于运行这座城的那台机器"
+  },
+  "privacy_host_version": {
+    "en": "Windows version",
+    "zh": "Windows 版本"
+  },
+  "privacy_host_edition": {
+    "en": "edition",
+    "zh": "版本类型"
+  },
+  "privacy_host_build": {
+    "en": "build",
+    "zh": "内部版本号"
+  },
+  "privacy_host_unrecorded": {
+    "en": "not recorded",
+    "zh": "没有记录"
+  },
+  "privacy_host_edition_unlisted": {
+    "en": "{id}, not an edition the documentation lists",
+    "zh": "{id}，不在文档列出的版本里"
+  },
+  "privacy_host_unreadable": {
+    "en": "The Windows version record could not be read, so every entry's edition fit reads as not stated.",
+    "zh": "读不到 Windows 的版本记录，所以每一项的版本适用都按“未说明”显示。"
+  },
+  "privacy_host_not_windows": {
+    "en": "These controls exist only on Windows. This city runs on another system, so nothing is read or written.",
+    "zh": "这些控制只在 Windows 上存在。这座城运行在别的系统上，所以什么都不读、不写。"
+  },
+  "privacy_history_withheld": {
+    "en": "This app's earlier changes are not shown: the account running the city is not the one that made them. Nothing can be applied or restored until that account runs the city.",
+    "zh": "不显示本应用以前的改动：运行这座城的账户不是做出改动的那个账户。在那个账户运行这座城之前，什么都不能应用或恢复。"
+  },
+  "privacy_history_unreadable": {
+    "en": "This app's record of its changes could not be read: another operation holds it, or it is damaged. Nothing can be written until it can be read.",
+    "zh": "读不到本应用的改动记录：另一个操作正占用它，或者它已损坏。读到之前什么都不能写。"
+  },
+  "privacy_unresolved": {
+    "en": "One change has no confirmed result. Every new write waits until you check that entry.",
+    "zh": "有一个改动没有确认的结果。在你核对那一项之前，所有新的写入都会等待。"
+  },
+  "privacy_reading": {
+    "en": "reading every entry on this machine",
+    "zh": "正在读取这台电脑的每一项"
+  },
+  "privacy_refresh": {
+    "en": "read again",
+    "zh": "重新读取"
+  },
+  "privacy_cancel": {
+    "en": "cancel",
+    "zh": "取消"
+  },
+  "privacy_restore_all": {
+    "en": "restore every change this app made",
+    "zh": "恢复本应用做过的全部改动"
+  },
+  "privacy_restore_all_title": {
+    "en": "Restore {count} entries?",
+    "zh": "恢复 {count} 项？"
+  },
+  "privacy_restore_all_detail": {
+    "en": "Each entry this app changed, and whose value is still the one it wrote, gets back the value it had before. Entries for the whole machine each ask Windows for administrator approval.",
+    "zh": "本应用改过、且值仍是它写入的那些条目，各自写回原来的值。作用于整台机器的条目，每一项都会请 Windows 要求管理员批准。"
+  },
+  "privacy_not_written_title": {
+    "en": "Lines not written",
+    "zh": "没有写入的行"
+  },
+  "privacy_not_written_hint": {
+    "en": "Lines from the original list that no entry writes, and why. Where an entry comes close, it is linked.",
+    "zh": "原始清单里没有任何条目写入的行，以及原因。有相近条目时附上链接。"
+  },
+  "privacy_see": {
+    "en": "see {title}",
+    "zh": "参见 {title}"
+  },
+  "privacy_none_close": {
+    "en": "no entry comes close",
+    "zh": "没有相近的条目"
+  },
+  "privacy_open": {
+    "en": "Windows privacy controls",
+    "zh": "Windows 隐私控制"
+  },
+  "privacy_open_note": {
+    "en": "Settings on the machine running this city that decide what data Windows and apps may collect. Each entry states its cost and is changed only when you press it.",
+    "zh": "运行这座城的机器上的设置，决定 Windows 与应用能收集哪些数据。每一项都写明代价，只有你按下才会改动。"
+  },
+  "privacy_lines": {
+    "en": "your lines",
+    "zh": "你的原文"
+  },
+  "privacy_added": {
+    "en": "added beyond the original list",
+    "zh": "原始清单之外增加的条目"
+  },
+  "privacy_does": {
+    "en": "what it does",
+    "zh": "做什么"
+  },
+  "privacy_benefit": {
+    "en": "what stays private",
+    "zh": "隐私上的作用"
+  },
+  "privacy_affects": {
+    "en": "what it affects",
+    "zh": "影响什么"
+  },
+  "privacy_overlooked": {
+    "en": "easy to overlook",
+    "zh": "容易忽略"
+  },
+  "privacy_undo": {
+    "en": "how it is undone",
+    "zh": "如何撤销"
+  },
+  "privacy_editions": {
+    "en": "Windows editions",
+    "zh": "Windows 版本"
+  },
+  "privacy_editions_lists": {
+    "en": "honoured on: {honoured}; ignored on: {ignored}",
+    "zh": "执行：{honoured}；忽略：{ignored}"
+  },
+  "privacy_none_listed": {
+    "en": "none listed",
+    "zh": "未列出"
+  },
+  "privacy_current": {
+    "en": "current value",
+    "zh": "当前值"
+  },
+  "privacy_written": {
+    "en": "value written",
+    "zh": "写入值"
+  },
+  "privacy_written_unknown": {
+    "en": "not known until the target is read",
+    "zh": "读到目标之前不知道"
+  },
+  "privacy_original": {
+    "en": "before this app wrote it",
+    "zh": "本应用写入之前"
+  },
+  "privacy_not_changed": {
+    "en": "not changed by this app",
+    "zh": "未由本应用修改"
+  },
+  "privacy_scope": {
+    "en": "whose settings",
+    "zh": "作用范围"
+  },
+  "privacy_scope_user": {
+    "en": "this account; no administrator approval",
+    "zh": "当前账户；不需要管理员批准"
+  },
+  "privacy_scope_machine": {
+    "en": "the whole machine; Windows asks for administrator approval",
+    "zh": "整台机器；Windows 会要求管理员批准"
+  },
+  "privacy_target": {
+    "en": "where it is written",
+    "zh": "写在哪里"
+  },
+  "privacy_value_absent": {
+    "en": "not set",
+    "zh": "未设置"
+  },
+  "privacy_value_raw": {
+    "en": "registry type {kind}: {hex}",
+    "zh": "注册表类型 {kind}：{hex}"
+  },
+  "privacy_value_task_absent": {
+    "en": "no such task on this machine",
+    "zh": "这台电脑没有此任务"
+  },
+  "privacy_value_task_enabled": {
+    "en": "task enabled",
+    "zh": "任务已启用"
+  },
+  "privacy_value_task_disabled": {
+    "en": "task disabled",
+    "zh": "任务已停用"
+  },
+  "privacy_current_access_denied": {
+    "en": "this account may not read it",
+    "zh": "当前账户无权读取"
+  },
+  "privacy_current_not_read": {
+    "en": "not read",
+    "zh": "未读取"
+  },
+  "privacy_current_failed": {
+    "en": "could not be read: {why}",
+    "zh": "读取失败：{why}"
+  },
+  "privacy_apply": {
+    "en": "apply",
+    "zh": "应用"
+  },
+  "privacy_restore": {
+    "en": "restore",
+    "zh": "恢复"
+  },
+  "privacy_reconcile": {
+    "en": "check",
+    "zh": "核对"
+  },
+  "privacy_confirm_apply": {
+    "en": "Apply {title}?",
+    "zh": "应用“{title}”？"
+  },
+  "privacy_confirm_restore": {
+    "en": "Restore {title}?",
+    "zh": "恢复“{title}”？"
+  },
+  "privacy_confirm_reconcile": {
+    "en": "Check {title}?",
+    "zh": "核对“{title}”？"
+  },
+  "privacy_after": {
+    "en": "after",
+    "zh": "之后"
+  },
+  "privacy_recorded": {
+    "en": "recorded as the result",
+    "zh": "记为结果"
+  },
+  "privacy_reconcile_label": {
+    "en": "what the check does",
+    "zh": "核对做什么"
+  },
+  "privacy_reconcile_detail": {
+    "en": "It writes nothing. It records what the target holds now as the end of the change that has no confirmed result, and new writes may go again.",
+    "zh": "它不写任何东西。它把目标此刻的值记为那个没有确认结果的改动的结局，之后新的写入可以继续。"
+  },
+  "privacy_waiting": {
+    "en": "waiting for the host",
+    "zh": "等待主机"
+  },
+  "privacy_waiting_machine": {
+    "en": "waiting for the host; Windows may be asking for administrator approval",
+    "zh": "等待主机；Windows 可能正在要求管理员批准"
+  },
+  "privacy_unsent": {
+    "en": "not sent: the link to the city is down; press again when it is back",
+    "zh": "没有发出：与城的连接断了；恢复后再按一次"
+  },
+  "privacy_result_applied": {
+    "en": "applied, and the value read back matches",
+    "zh": "已应用，读回的值相符"
+  },
+  "privacy_result_restored": {
+    "en": "restored, and the value read back matches",
+    "zh": "已恢复，读回的值相符"
+  },
+  "privacy_result_already": {
+    "en": "already held the value written; nothing changed",
+    "zh": "本来就是写入值；没有改动"
+  },
+  "privacy_result_reconciled": {
+    "en": "checked: {settlement}",
+    "zh": "已核对：{settlement}"
+  },
+  "privacy_result_refused": {
+    "en": "not changed: {why}",
+    "zh": "没有改动：{why}"
+  },
+  "privacy_settlement_applied": {
+    "en": "the change took effect",
+    "zh": "改动已生效"
+  },
+  "privacy_settlement_not_applied": {
+    "en": "the change did not take effect",
+    "zh": "改动没有生效"
+  },
+  "privacy_settlement_restored": {
+    "en": "the original value is back",
+    "zh": "原值已回来"
+  },
+  "privacy_settlement_abandoned": {
+    "en": "the target holds a third value; this app no longer owns it",
+    "zh": "目标是第三个值；本应用不再拥有它"
+  },
   "proposal_from": {
     "en": "{who} proposes a change",
     "zh": "{who} 提议修改"
@@ -5995,6 +6283,10 @@
     "en": "advanced",
     "zh": "高级"
   },
+  "setup_group_privacy": {
+    "en": "privacy",
+    "zh": "隐私"
+  },
   "setup_group_appearance": {
     "en": "appearance",
     "zh": "外观"
@@ -6030,6 +6322,10 @@
   "setup_group_hint_advanced": {
     "en": "the welcome walk, from its first step",
     "zh": "从第一步重走欢迎页"
+  },
+  "setup_group_hint_privacy": {
+    "en": "Windows settings on the machine running this city that decide what data Windows and apps may collect, upload or read. Nothing is preselected; an entry changes only when you press it, and the value it wrote can be put back; what an entry says Windows deletes on apply does not come back.",
+    "zh": "运行这座城的机器上、决定 Windows 与应用能收集、上传或读取哪些数据的设置。没有任何预选；只有你按下某一项才会改动，它写入的值可以恢复；条目注明 Windows 在应用时删除的数据不会回来。"
   },
   "setup_group_hint_accounts": {
     "en": "who the city may call, and with which key",
