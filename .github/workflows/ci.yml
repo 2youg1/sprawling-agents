@@ -385,10 +385,6 @@ jobs:
           command -v sandbox-exec > target/platform-evidence/sandbox-exec-path.txt
           MANPAGER=cat PAGER=cat man sandbox-exec | col -b > target/platform-evidence/sandbox-exec.txt
           test -s target/platform-evidence/sandbox-exec.txt
-          MANPAGER=cat PAGER=cat man taskpolicy | col -b > target/platform-evidence/taskpolicy.txt
-          MANPAGER=cat PAGER=cat man launchd.plist | col -b > target/platform-evidence/launchd-plist.txt
-          python3 crates/runtime/src/tools/exec/native_macos/memory_probe.py > target/platform-evidence/memory-ordinary.json 2> target/platform-evidence/memory-ordinary.err
-          sudo env GITHUB_ACTIONS=true /usr/bin/python3 crates/runtime/src/tools/exec/native_macos/memory_probe.py > target/platform-evidence/memory-root.json 2> target/platform-evidence/memory-root.err
       - uses: actions/upload-artifact@v7
         if: always() && runner.os == 'macOS'
         with:

@@ -22,11 +22,23 @@ fn native_tool(source: &std::path::Path, scratch: &std::path::Path, backlog: Bac
 }
 
 fn invoke_python(tool: &ExecTool, script: &str, args: &[String]) -> Value {
+    let python = Command::new("/usr/bin/xcrun")
+        .args(["--find", "python3"])
+        .output()
+        .unwrap();
+    assert!(python.status.success(), "{python:?}");
+    let python = String::from_utf8(python.stdout).unwrap();
+    let python = python.trim();
+    assert!(std::path::Path::new(python).is_absolute());
+    assert_ne!(
+        python, "/usr/bin/python3",
+        "fixture must bypass the launcher"
+    );
     let mut arguments = vec!["-c".to_owned(), script.to_owned()];
     arguments.extend_from_slice(args);
     let result = tool
         .invoke(&call(serde_json::json!({
-            "program": {"path": "/usr/bin/python3", "args": arguments}
+            "program": {"path": python, "args": arguments}
         })))
         .unwrap();
     serde_json::to_value(result.result).unwrap()
@@ -52,6 +64,11 @@ fn native_macos_exec_writes_only_the_copy_and_preserves_output_and_exit() {
     );
     assert!(!source.path().join("written").exists());
     assert!(tool.meta().disclosure.contains("macos_seatbelt"));
+    assert!(
+        tool.meta()
+            .disclosure
+            .contains(crate::tools::Guarantee::Resources.unkept())
+    );
     let entries: Vec<_> = std::fs::read_dir(scratch.path())
         .unwrap()
         .map(|entry| entry.unwrap().path())
@@ -188,99 +205,5 @@ fn native_macos_initialization_failure_never_runs_target_or_retains_copy() {
     assert_eq!(std::fs::read_dir(scratch.path()).unwrap().count(), 0);
 }
 
-#[test]
-fn native_macos_background_keeps_its_copy_and_reports_one_terminal_result() {
-    let source = tempfile::tempdir().unwrap();
-    let scratch = tempfile::tempdir().unwrap();
-    let tool = native_tool(
-        source.path(),
-        scratch.path(),
-        Backlog::with_window(crate::backlog::PollBudget::new(1, 1)),
-    );
-    let result = tool.invoke(&call(serde_json::json!({
-        "program": {"path": "/bin/sh", "args": ["-c", "sleep 1; printf late > late; printf 'later-out
-'; printf 'later-err
-' >&2; exit 7"]}
-    }))).unwrap();
-    let result = serde_json::to_value(result.result).unwrap();
-    assert_eq!(result["outcome"], "backgrounded");
-    let handle = result["handle"].clone();
-    assert_eq!(std::fs::read_dir(scratch.path()).unwrap().count(), 1);
-    let finished = (0..100)
-        .find_map(|_| {
-            let result = tool
-                .invoke(&call(serde_json::json!({
-                    "program": {"path": "/usr/bin/true", "args": []}
-                })))
-                .unwrap();
-            let result = serde_json::to_value(result.result).unwrap();
-            result["background"].as_array().and_then(|members| {
-                members
-                    .iter()
-                    .find(|member| member["handle"] == handle)
-                    .cloned()
-            })
-        })
-        .expect("native background did not finish within bounded actual invocations");
-    assert_eq!(
-        (
-            finished["exit_code"].as_i64(),
-            finished["stdout"].as_str(),
-            finished["stderr"].as_str()
-        ),
-        (
-            Some(7),
-            Some(
-                "later-out
-"
-            ),
-            Some(
-                "later-err
-"
-            )
-        )
-    );
-    assert!(!source.path().join("late").exists());
-    drop(tool);
-    assert_eq!(std::fs::read_dir(scratch.path()).unwrap().count(), 0);
-}
-
-#[test]
-fn native_macos_halt_and_tool_release_reap_the_owned_primary_and_copy() {
-    for halt in [true, false] {
-        let source = tempfile::tempdir().unwrap();
-        let scratch = tempfile::tempdir().unwrap();
-        let backlog = Backlog::with_window(crate::backlog::PollBudget::new(1, 1));
-        let tool = native_tool(source.path(), scratch.path(), backlog.clone());
-        let result = tool
-            .invoke(&call(serde_json::json!({
-                "program": {"path": "/bin/sh", "args": ["-c", "while :; do :; done"]}
-            })))
-            .unwrap();
-        let result = serde_json::to_value(result.result).unwrap();
-        assert_eq!(result["outcome"], "backgrounded");
-        assert_eq!(std::fs::read_dir(scratch.path()).unwrap().count(), 1);
-        if halt {
-            assert_eq!(
-                backlog
-                    .halt(Some(&Address::parse("work").unwrap()))
-                    .unwrap(),
-                1
-            );
-        }
-        drop(tool);
-        let domain = Address::parse("work").unwrap();
-        for _ in 0..1_000_000 {
-            backlog.harvest(kernel::RunId::from_bytes([1; 16])).unwrap();
-            if backlog.standing(&domain).unwrap().is_empty() {
-                break;
-            }
-            std::thread::yield_now();
-        }
-        assert!(
-            backlog.standing(&domain).unwrap().is_empty(),
-            "owned native primary did not stop"
-        );
-        assert_eq!(std::fs::read_dir(scratch.path()).unwrap().count(), 0);
-    }
-}
+#[path = "lifecycle_tests.rs"]
+mod lifecycle_tests;
