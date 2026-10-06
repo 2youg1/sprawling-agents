@@ -210,10 +210,11 @@ jobs:
             tag="v${version}-$(sed -n 's/.*pub const MATURITY: Maturity = Maturity::\([A-Za-z]*\);/\1/p' crates/kernel/src/release.rs)-$(date -u +%y%m%d)"
           fi
           cargo xtask channel --tag "$tag" --assets target/package --out target/channels
-      - uses: Homebrew/actions/setup-homebrew@main
-        if: runner.os != 'Windows'
-      - name: install the generated local formula and Arch package
-        if: runner.os != 'Windows'
+      - name: validate native payloads without decoding binaries
+        if: runner.os == 'Linux'
+        run: python3 tools/xtask/src/channel/validate_test.py
+      - name: install the generated Arch package
+        if: runner.os == 'Linux'
         run: python3 tools/xtask/src/channel/validate.py target/channels target/package
       - uses: actions/upload-artifact@v7
         with:
@@ -418,7 +419,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
       AUR_SSH_KEY: ${{ secrets.AUR_SSH_KEY }}
     steps:
       - uses: actions/checkout@v7
@@ -429,27 +429,6 @@ jobs:
           merge-multiple: true
       - name: generate definitions from the published archives
         run: cargo xtask channel --tag "$GITHUB_REF_NAME" --assets assets --out target/channels
-      - name: publish the Homebrew formula
-        if: env.HOMEBREW_TAP_TOKEN != ''
-        env:
-          GH_TOKEN: ${{ env.HOMEBREW_TAP_TOKEN }}
-        run: |
-          set -euo pipefail
-          gh auth setup-git
-          git clone https://github.com/2youg1/homebrew-sprawling.git "$RUNNER_TEMP/tap"
-          mkdir -p "$RUNNER_TEMP/tap/Formula"
-          cp target/channels/homebrew/sprawling.rb "$RUNNER_TEMP/tap/Formula/"
-          cd "$RUNNER_TEMP/tap"
-          git config user.name github-actions
-          git config user.email github-actions@users.noreply.github.com
-          git add Formula/sprawling.rb
-          if ! git diff --cached --quiet; then
-            git commit -m "Update sprawling to $GITHUB_REF_NAME"
-            git push origin HEAD
-          fi
-      - name: Homebrew publication prerequisite
-        if: env.HOMEBREW_TAP_TOKEN == ''
-        run: echo "::notice::Homebrew publication skipped; create the tap repository and configure HOMEBREW_TAP_TOKEN."
       - name: publish the AUR package
         if: env.AUR_SSH_KEY != ''
         run: |
@@ -465,7 +444,9 @@ jobs:
           test -n "$fingerprint"
           grep -F "<code>$fingerprint</code>" "$RUNNER_TEMP/aur-ssh/host.html"
           export GIT_SSH_COMMAND="ssh -i $RUNNER_TEMP/aur-ssh/key -o IdentitiesOnly=yes -o UserKnownHostsFile=$RUNNER_TEMP/aur-ssh/known_hosts -o StrictHostKeyChecking=yes"
-          git clone ssh://aur@aur.archlinux.org/sprawling-bin.git "$RUNNER_TEMP/aur"
+          package=$(sed -n 's/^pkgname=//p' target/channels/aur/PKGBUILD)
+          test -n "$package"
+          git clone "ssh://aur@aur.archlinux.org/$package.git" "$RUNNER_TEMP/aur"
           cp target/channels/aur/PKGBUILD target/channels/aur/.SRCINFO "$RUNNER_TEMP/aur/"
           cd "$RUNNER_TEMP/aur"
           git config user.name github-actions
