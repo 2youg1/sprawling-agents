@@ -34,3 +34,18 @@ pub fn core_placement() -> Result<CorePlacement, AxError>; // 缺省 Soft；不�
 - **D51 四种 placement 解析结果由人层读者给出，平台行为由 serving 决定**：`core_placement` 把 `[core] placement` 的 `"none"`、`"soft"`、`"soft_shares"`、`"pinned"` 分别读成 `Off`、`Soft`、`SoftShares`、`Pinned`，缺席答 `Soft`；其余拼写与非字符串值报 `E_CONFIG_INVALID`，恢复语指向可接受的设置。`soft_shares` 表示选择请求内存份额的臂，不表示所在平台已经兑现该限额；各臂请求什么归 `crates/sprawling/spec/Serving/Placement.lean` D47，实际兑现归 `crates/runtime/spec/Tools/Exec.lean` D29、D33，硬亲和归 Placement D41、D49。人层读者只解释设置，因而不会因平台能力不同改变同一文件的语义。被否决的做法：按当前机器是否支持机制来收窄配置拼写——这样同一份设置换机器便读不回，设置解析还要重建平台能力判定。重开参数：四臂对照选出默认并明确退役某臂时，读者与消费者在同一次改动里收窄取值集合。
 - **`CorePriority` 住在这里而不在 `bin::serving::standing`**：它是这份文件里 `[core] priority` 读出来的值；真去抬高一条线程的做法归 `serving::standing`（`crates/sprawling/Spec.lean` §8-93），它从这里取值。
 -/
+
+/-! D52 性能设置读写 `[core]`，wire 的 `CorePreferences` 是唯一文法
+
+`CorePreferences { placement, priority, memory_bytes: Option<NonZeroU64> }` 同时供
+文件读者、PreferencesAnswer 的 `core` 字段和性能组使用；没有 memory_bytes 即不限。
+`CorePlacement` 的 serde 拼写归 wire；accounting 重导出该类型，不再自己解释四个字符串。
+`CorePriority`、`CorePlacement` 与 `RunMemory` 补丁各改一个键，空 RunMemory 删除该键，
+其余节与 core 的其余键保持不变。`[ui]` 写出前移除答案的 `core` 字段，
+所以 UI 不复制性能设置的权威。零与无法解析的配置报 E_CONFIG_INVALID，不覆写文件。
+配置读回由 disposable tempfile 回归检查，真实 User 的文件不进入测试。
+设置在下一次 serving 起动采用；当前 run 的 Shares 不因 UI 修改而改变。
+
+尚未完成的执行契约：命令撞到限额时，exec 的结构化结果须携上限与修改入口，
+UI 须显示该错误；当前操作系统分配拒绝仍只由子进程的退出与输出报告。
+-/

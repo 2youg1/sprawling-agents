@@ -408,7 +408,7 @@ pub(crate) struct Unread(String);                   // 为什么没读到，写�
 // accounting::person —— 读人的配置（`crates/accounting/spec/Person.lean`）
 pub enum CorePlacement { Off, Soft, SoftShares }   // [core] placement 的 "none"、"soft"（缺省）、"soft_shares"
 // bin::serving::placement —— 每一臂打开哪几项，只在这里定
-pub(crate) fn run_shares() -> runtime::Shares;     // 读设置与物理内存，答每个 run 的份额
+pub(crate) fn run_shares() -> runtime::Shares;     // 读设置与 User 填写的上限，答每个 run 的份额
 ```
 
 **决定**：
@@ -419,19 +419,19 @@ pub(crate) fn run_shares() -> runtime::Shares;     // 读设置与物理内存�
   |---|---|---|---|---|
   | `"none"` | 不关 | 不读拓扑、不要座位 | 不设 | 不设 |
   | `"soft"`（缺省） | 关 | 要 | 设 | 不设 |
-  | `"soft_shares"` | 关 | 要 | 设 | 物理内存的一半 |
+  | `"soft_shares"` | 关 | 要 | 设 | User 填写的非零字节上限；缺席即不设 |
   | `"pinned"` | 关 | 要（硬亲和，D41、D49） | 设 | 不设 |
 
   `"pinned"` 是第四臂：除了 `"soft"` 那几项，它把 harness 进程按在计划里的处理器上（Windows 的 job 亲和限额、Linux 的 `taskset -c` 列表、macOS 说没有这一臂，D41 与 D49）；`"soft_shares"` 与 `"pinned"` 今天都读得懂，四个拼写以外的值按读不懂拒绝（`E_CONFIG_INVALID`），而不是默默当作 `"soft"`。子进程比核心低一档（Windows 的 below-normal 优先级类、Unix 的 `nice 10`、Linux 的 `ionice`）属于 §8-13-3，不归这个设置；macOS 的 `taskpolicy -c utility` 是 D29 的 CPU 份额一项，随这一臂开关。
 - 份额要的那一半能不能落地按平台与运行中的机器分：Windows 的 job 两半都设；macOS 只有 CPU 一半（`taskpolicy` 是命令外面的一层包装，`RunProcesses.share` 在 macOS 上读作 `Unset`）；Linux 上两半都要 harness 自己的 cgroup 可写（D33），不可写时只剩 `nice 10` 一档。哪一状态由 `runtime::platform_shares` 一处读（`crates/runtime/spec/Tools/Exec.lean` D33）：`backlog` 的接线用这个答案决定建不建 cgroup，doctor 那一行用同一个答案说人话。
-- 缺省带上 CPU 份额，因为份额按权重分：核被抢时每个 run 各得一份，机器空着时什么也不改；它防的正是本节要防的事——一个 run 的构建起几十个编译进程，把别的 run 与核心都挤到后面。内存上限会让超过它的构建因内存不足失败，所以读数出来之前只在 `"soft_shares"` 打开。
-- 份额是一个值 `runtime::Shares`：`bin::assembly` 造 `accounting::worker::hands::Hands` 时调 `run_shares` 一次，`accounting` 打开车队时把它交给 `runtime::Backlog::with_shares`；runtime 不读人的配置，所以一臂开关什么只有这一处定义。物理内存读出来是零时，`"soft_shares"` 按 `"soft"` 做，并向标准错误说一次。
-- 设置读不懂时，起动照常、按 `"soft"` 做，并向标准错误说一次；doctor 那一行说出读不懂。读数定下默认之后只改缺省这一个值。
+- 缺省带上 CPU 份额，因为份额按权重分：核被抢时每个 run 各得一份，机器空着时什么也不改；它防的正是本节要防的事——一个 run 的构建起几十个编译进程，把别的 run 与核心都挤到后面。内存上限会让超过它的构建因内存不足失败，因此只有 User 选择 `"soft_shares"` 且填写 `[core] memory_bytes` 时才请求。User 裁定没有缺省 run 内存上限，不能从物理内存推导。
+- 份额是一个值 `runtime::Shares`：`bin::assembly` 造 `accounting::worker::hands::Hands` 时调 `run_shares` 一次，`accounting` 打开车队时把它交给 `runtime::Backlog::with_shares`；runtime 不读人的配置，所以一臂开关什么只有这一处定义。`memory_bytes` 缺席时 `"soft_shares"` 只给 CPU 份额；零、负数与非整数在配置读取处拒绝。
+- 设置读不懂时，起动照常、按 `"soft"` 做，并向标准错误说一次；doctor 那一行说出读不懂。内存上限始终只由 User 输入，不随测量改变。
 - doctor 一行，先说拓扑与计划，例：「CPU: 2 classes — 4 performance cores (8 threads), 8 efficiency cores; hot threads prefer the 4 performance cores」；「CPU: one class, 8 cores; left to the operating system」；「CPU: one class, 16 cores in 2 cache groups; left to the operating system and its cache steering」；读不到时「CPU: topology unread (<原因>); left to the operating system」；macOS 与 Linux 上计划有座位时写「this platform has no placement call; its scheduler places threads」。再说每个 run 的份额：「each run's commands share the processors by weight」，`"soft_shares"` 再加「and commit at most <n> MiB each」，Linux 上没有委派时写「runs' commands compete thread by thread and run below the core: the cgroup is not delegated」，`"none"` 或别的平台给不了份额时写「runs' commands compete thread by thread」。措辞只在 `placement::report` 一处。
 
 **被否**：①CPU 份额也只在 `"soft_shares"` 打开——缺省就留着一个 run 的构建占满全部核的情形，而份额在机器空着时没有代价；②两个独立的设置，线程放置一个、子进程份额一个——关掉全部要改两处，对照从四格变成九格，而每一臂本来就是一组一起开关的机制；③runtime 自己读人的配置——设置就有了两个读者，一臂开关什么就有了两处定义；④doctor 打出原始的记录表——User 要的是机器被怎样对待，不是 `EfficiencyClass` 的数。
 
-**重开参数**：四臂对照里 `"soft"` 的 p99 不优于 `"none"`，而且把份额单独拆出来也无益——那时份额移到 `"soft_shares"`；或读数表明内存上限不让任何真实构建失败——那时它进缺省。
+**重开参数**：四臂对照里 `"soft"` 的 p99 不优于 `"none"`，而且把份额单独拆出来也无益——那时份额移到 `"soft_shares"`；内存上限没有缺省值；改变这一规则须重新取得 User 裁定。
 -/
 
 /-! ## 四臂对照（AF1 的完成条件，测量计划）

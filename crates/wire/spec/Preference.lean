@@ -103,3 +103,13 @@ pub struct ThemeOverride { pub tokens: BTreeMap<String, String>, pub css: Option
 
 **重开参数**：要按楼或按设备分主题时，重议覆盖的作用域。
 -/
+
+/-! D30 性能读回携带 core，而不在 ui 中再保存
+
+`PreferencesAnswer.core: CorePreferences` 答 `[core]` 的 placement、priority 与
+可缺席非零 memory_bytes；该类型的默认值为 Soft、Raised、None。
+`PreferencePatch::CorePlacement(CorePlacement)` 与 `RunMemory(Option<NonZeroU64>)`
+同现有 CorePriority 一样逐键写入 `[core]`。CorePlacement 四个 serde 拼写是
+none、soft、soft_shares、pinned；配置读者与客户端 schema 共用此声明。
+新字段及补丁改变线形，WIRE_V 升一并重生 wire.ts。
+-/

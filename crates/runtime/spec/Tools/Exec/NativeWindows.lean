@@ -14,14 +14,13 @@ CreateProcessW 以 CREATE_SUSPENDED 创建，设置 Job 的 aggregate committed-
 没有准入安全 API 的平台调用进入既有 Zig leaf；win32job 与 winsafe 的现有安全
 CreateProcess 面没有 SECURITY_CAPABILITIES / STARTUPINFOEX，不能承担此契约。
 
-D54：native 的 CPU hard cap 默认 50% 整机份额，未设置 run memory 时默认
-256 MiB aggregate committed-memory；配置的 Shares::CpuAndMemory 覆盖这个默认值。
-这两个默认数只在 native_windows.rs 定义。run job 在 table lock 内先创建并设同一
+D54：native 的 CPU hard cap 默认 50% 整机份额，未设置 run memory 时不设置内存上限；仅配置的 Shares::CpuAndMemory 请求
+aggregate committed-memory 上限。CPU 默认数只在 native_windows.rs 定义。run job 在 table lock 内先创建并设同一
 memory 上限，native command 同时加入 command job 与 run job，再恢复；多个命令的
 aggregate 内存不能通过每条命令分别领限额来扩大。拒绝设置限额时停止启动。
-默认值的理由是没有配置的 native 仍需有界；它们是保守初值，不宣称性能最优。
+内存不设缺省值是 User 的裁定：没有填写上限的命令不能被隐式限额拒绝。
 
-输入由 Rust 决定：已复制工作目录、明确程序和 argv、允许的环境、非零内存与
+输入由 Rust 决定：已复制工作目录、明确程序和 argv、允许的环境、可缺席的非零内存与
 CPU 上限、唯一 profile 名及 output files；叶子只执行平台操作。AppContainer SID
 只获这次副本的继承读写 ACL，不获源树 ACL，无网络 capability 与 loopback exemption。
 scratch 的继承 mandatory-integrity label 为 Low，避免 medium 默认标签即使
