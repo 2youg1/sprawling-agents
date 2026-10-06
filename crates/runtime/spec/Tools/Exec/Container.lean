@@ -164,7 +164,7 @@ spawn/enrol 失败必须走同一清理权威。容器收下限额之前不得�
 Rust 的公开 admission／argv 测试检查实际实现，entrypoint 回归覆盖两个后端、JSON 数组形状、
 空 JSON 数组、null、引号与普通路径，以及 Unix 下不可编码的 OsStr program；
 非 UTF-8 输入直接经公开 create_command 检查 typed refusal，不经过有损字符串转换。
-真实隔离验收由 `.github/workflows/container.yml` 在 disposable Linux runner 上运行 docker/podman，
+真实隔离验收由 `.github/workflows/on-demand.yml` 的 container job 在 disposable Linux runner 上运行 docker/podman，
 先显式准备带 python3 与 /bin/sh 的镜像，再将不可变本地 image ID 交给生产 create；
 测试检查副本写入、宿主回环拒绝、非 root UID、超额内存／进程分配、CPU 配额与清理后的后代缺席。
 它不证明 rootless 委派、Desktop VM 或任意 OCI runtime 的行为，替换这些环境时须重跑。
