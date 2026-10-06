@@ -151,16 +151,21 @@ fn windows_uninstall_removes_its_running_executable() {
     let target = dir.join(super::installed_name());
     std::fs::copy(std::env::current_exe().unwrap(), &target).unwrap();
     run_removal_fixture(&target, &dir, &scratch);
-    assert!(!target.exists(), "the installed name remains after exit");
-    while std::fs::read_dir(&scratch)
-        .unwrap()
-        .next()
-        .transpose()
-        .unwrap()
-        .is_some()
-    {
-        std::thread::yield_now();
-    }
+    // The helper and the `cmd.exe` it starts inherit the fixture's output,
+    // so here the helper has deleted the moved image and closed its
+    // handles. Whether Windows deletes the helper's own copy depends on
+    // the helper's image being unmapped before its last handle closes,
+    // an order no event marks (Install.lean D53), so only that copy may
+    // remain.
+    let names = |dir: &Path| {
+        std::fs::read_dir(dir)
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name().into_string().unwrap())
+            .collect::<Vec<_>>()
+    };
+    let mut left = names(&scratch);
+    left.retain(|name| !name.ends_with(".__selfdelete__.exe"));
+    assert_eq!((names(&dir), left), (Vec::new(), Vec::new()));
 }
 
 #[cfg(target_os = "windows")]

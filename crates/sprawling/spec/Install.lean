@@ -281,11 +281,16 @@ Windows 上先以 `symlink_metadata` 读取安装目录 entry；文件 symlink�
 
 查找、规范化、移动、复制 helper 或启动 helper 失败均以 `E_STORAGE_FATAL` 返回，保留 OS 错误与目标路径；
 移动之后的失败可能已释放安装名称，恢复要求从原归档重复 install，不承诺事务回滚。
-原进程退出后 OS 删除临时文件的成功属于环境验收，断电或其他进程继续占用临时映像可能留下临时文件，
-不能把 helper 已安排当成物理删除的证明。 临时映像必须实际消失才算检查完成，等待终止由 `.config/nextest.toml` 的默认 profile 管理，fixture 不另定义清理时限。
+helper 在原进程退出后删除移走的运行映像，再启动 `cmd.exe` 继承它自身副本的 `FILE_FLAG_DELETE_ON_CLOSE` 句柄后退出。
+关闭最后一个句柄时若 helper 映像仍映射在 helper 进程里，OS 不能删除这份副本；self-replace 只靠 `cmd.exe` 比 helper 活得久来排这个次序，
+而 helper 退出时先关句柄表、后释放地址空间，`cmd.exe /c exit` 又可能先于 helper 退出，没有任何可等待的事件保证副本被删除。
+所以 helper 副本的物理删除属于环境验收，它可能在 helper 链退出后仍留在用户 TEMP 中，留多久不由本程序决定；断电或其他进程继续占用临时映像也可能留下临时文件，
+不能把 helper 已安排当成物理删除的证明。
 
 派生检查 `bin::install::tests::windows_uninstall_removes_its_running_executable` 在独立临时目录运行
-测试 EXE 的副本，调用同一个 `displace`，要求子进程成功、安装 EXE 缺席、隔离 TEMP 内无残留；
+测试 EXE 的副本，调用同一个 `displace`。fixture 子进程、helper 与它启动的 `cmd.exe` 都继承子进程的输出管道，
+所以读完输出时 helper 已删除移走的运行映像、关闭了句柄表；检查在这一刻要求子进程成功、安装 EXE 缺席、安装目录为空、
+隔离 TEMP 内除 helper 副本（self-replace 1.5.0 的 `.__selfdelete__.exe` 后缀）外无残留，不等待 helper 副本消失；
 `displacing_an_external_copy_never_removes_the_running_binary` 核对外部副本删除与重复卸载。
 `windows_uninstall_removes_only_the_link_to_an_external_running_executable` 复用同一子进程入口，
 要求安装链接 entry 缺席、外部运行 EXE 字节不变；
