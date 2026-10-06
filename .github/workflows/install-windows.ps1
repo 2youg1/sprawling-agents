@@ -105,3 +105,4 @@ try {
     if ($server -and -not $server.HasExited) { Stop-Process -Id $server.Id; $server.WaitForExit() }
     Remove-Item -LiteralPath $root -Recurse -Force
 }
+exit 0
