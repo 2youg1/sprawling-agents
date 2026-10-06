@@ -194,14 +194,13 @@ fn native_macos_initialization_failure_never_runs_target_or_retains_copy() {
 }
 
 fn await_condition(mut condition: impl FnMut() -> bool) {
-    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(60);
-    while !condition() {
-        assert!(
-            std::time::Instant::now() < deadline,
-            "native lifecycle condition timed out"
-        );
+    for _ in 0..12_000 {
+        if condition() {
+            return;
+        }
         std::thread::park_timeout(std::time::Duration::from_millis(5));
     }
+    panic!("native lifecycle condition exhausted its poll budget");
 }
 
 fn gated_command(tool: &ExecTool, scratch: &std::path::Path) -> (Value, PathBuf, u32) {

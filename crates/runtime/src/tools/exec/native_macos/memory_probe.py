@@ -65,7 +65,7 @@ if "--memorystatus-fixture" in sys.argv:
     print(json.dumps(result_row))
     raise SystemExit(0)
 
-report = {"os": platform.mac_ver()[0], "machine": platform.machine(), "euid": os.geteuid(), "source_commit": os.environ.get("GITHUB_SHA"), "candidate_state": "evidence_only_not_aggregate_enforcement"}
+report = {"os": platform.mac_ver()[0], "machine": platform.machine(), "euid": os.geteuid(), "source_commit": os.environ.get("GITHUB_SHA"), "candidate_state": "evidence_only_not_aggregate_enforcement", "rlimit_resource_ids": {"AS": resource.RLIMIT_AS, "RSS": resource.RLIMIT_RSS}}
 libc = ctypes.CDLL("/usr/lib/libSystem.B.dylib", use_errno=True)
 # apple-oss-distributions/xnu f6217f...: osfmk/mach/coalition.h lines 43-54,
 # 79-80, 162-164 and bsd/kern/syscalls.master lines 703-705.

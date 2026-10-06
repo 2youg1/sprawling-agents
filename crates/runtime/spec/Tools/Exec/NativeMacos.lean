@@ -25,7 +25,9 @@ macOS native 不强制同 RunId 多命令与任意后代的聚合硬内存上限
 已核实的无特权 host 入口中没有满足 D29 的机制；这不是所有未来 macOS 接口的不存在证明。
 RLIMIT 与 taskpolicy 是逐进程额度，采样后终止存在超限窗口且不能保证追踪脱离的后代。
 resource／jetsam coalition 的创建在已运行的 macOS 26.6.2 上均被普通账户与 root 以 EPERM
-拒绝；这只限定这些入口与该系统，不证明所有 macOS 聚合机制均不可行。taskpolicy -m 96
+拒绝；memorystatus SET_MEMLIMIT_PROPERTIES 对探测自己的 pid 在普通账户下返回
+EPERM、root 下成功，但它的对象仍是单个 pid；这只限定这些入口与该系统，
+不证明所有 macOS 聚合机制均不可行。taskpolicy -m 96
 之下两名子进程同时写入各 64 MiB（其中一名 setsid）并存活，成功的宿主对照也存活；
 因此此候选没有兑现 96 MiB 的树级聚合上限。没有创建成功的 coalition 就没有其清理对象。
 受控执行服务只有在同一 run 的所有命令与任意后代共享一个硬额度且不能逃离时才满足
@@ -55,6 +57,10 @@ https://github.com/apple-oss-distributions/system_cmds/blob/408bba7453608006b897
 同一 XNU 固定提交的
 https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/bsd/kern/kern_resource.c#L1647
 以 current_map() 设置 RLIMIT_AS，限制的是当前进程地址空间；继承额度不把额度变成共享池。
+同一提交的 bsd/sys/resource.h L147 定义 RLIMIT_AS 为 RLIMIT_RSS 的别名，
+不是第二种独立的树级机制。vm_map_set_size_limit（osfmk/vm/vm_map.c L22094）
+拒绝低于当前 map->size 的额度；runner 中 Python 设置 512 MiB AS 与 96 MiB RSS
+均被拒绝，报告保留失败，不把它们称为成功的分配超限对拍。
 https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/bsd/kern/kern_memorystatus.c#L9192
 要求 root 或 MEMORYSTATUS_ENTITLEMENT（少数明写的例外另判），
 SET_MEMLIMIT_PROPERTIES 在 L9241 仍以 pid 为对象，不提供任意命令树共享额度。
@@ -112,8 +118,8 @@ Lean 量化任意 fork／exec／退出序列，证明模型里的策略身份不
 完整平台验收需运行目标系统，不以 Windows 上的字符串断言替代。
 `crates/runtime/src/tools/exec/native_macos/memory_probe.py` 仅在可丢弃的 GitHub macOS
 runner 执行，不是生产依赖或默认 Rust 检查；它实际尝试 coalition 的创建与成功后的清理，
-并对拍 taskpolicy、继承 RLIMIT_AS／RLIMIT_RSS 与宿主双子进程；报告保留每个孩子
-实际继承的额度与同时存活检查。memorystatus 只对探测自己的 pid 设置逐进程限额。
+并对拍 taskpolicy 与宿主双子进程，另尝试 RLIMIT_AS／RLIMIT_RSS；
+只有设置成功才起双子进程并报告实际继承额度与同时存活检查。memorystatus 只对探测自己的 pid 设置逐进程限额。
 失败尝试与反例是候选证据，不是聚合强制实现。
 
 ## 17 文档关系
