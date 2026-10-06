@@ -399,6 +399,14 @@ fn main() {
             Ok(mut child) => println!("PIPED_STDIO_EXIT={:?}", child.wait().unwrap().code()),
             Err(error) => println!("PIPED_STDIO_ERROR={:?}", error.raw_os_error()),
         }
+        match Command::new(&program).arg("exit").output() {
+            Ok(output) => println!("DEFAULT_CAPTURE_EXIT={:?}", output.status.code()),
+            Err(error) => println!("DEFAULT_CAPTURE_ERROR={:?}", error.raw_os_error()),
+        }
+        match std::fs::OpenOptions::new().read(true).write(true).open("NUL") {
+            Ok(file) => { drop(file); println!("NUL_DEVICE_OPEN=OK"); }
+            Err(error) => println!("NUL_DEVICE_ERROR={:?}", error.raw_os_error()),
+        }
     } else if std::env::args_os().nth(1).as_deref() == Some(std::ffi::OsStr::new("allocate")) {
         let mut bytes = Vec::<u8>::new();
         bytes.try_reserve_exact(320 * 1024 * 1024).unwrap();
