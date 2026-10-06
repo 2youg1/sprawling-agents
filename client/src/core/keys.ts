@@ -62,6 +62,7 @@ export const ACTIONS = [
   "help",
   "composer.focus",
   "run.stop",
+  "fork.here",
   "decide.yes",
   "decide.edit",
   "decide.no",
@@ -136,6 +137,10 @@ export const DEFAULTS: Readonly<Record<Action, Chord>> = {
   help: plain("?"),
   "composer.focus": plain("/"),
   "run.stop": accel("."),
+  // Branch the conversation from the entry under the hand. One letter
+  // with no modifier, because it is read only outside a text box and
+  // only where a thread entry is hovered or focused (roadmap 4.5).
+  "fork.here": plain("f"),
   // Answer the decide card that holds the focus, as `git add -p` answers
   // a hunk. Read only outside a text box and only by the card itself
   // (`parts/decide.svelte`), so the letters mean nothing elsewhere.
@@ -165,6 +170,7 @@ export const LABELS: Readonly<Record<Action, Key>> = {
   help: "keys_help",
   "composer.focus": "keys_composer",
   "run.stop": "slash_stop",
+  "fork.here": "fork_here",
   "decide.yes": "keys_decide_yes",
   "decide.edit": "keys_decide_edit",
   "decide.no": "keys_decide_no",

@@ -104,7 +104,7 @@ To stop work, you have three verbs. **`/steer <text>`** adds an instruction to a
 | the terminal session | a page in your browser, served by the binary; the terminal becomes the city's console |
 | the working folder | a room in a building; its address sets where the agent may write |
 | `CLAUDE.md` | a building's `SPEC.md` and `RULES.toml`, a resident's `URBANITE.md`, and a project's own `AGENTS.md`, which the city hands to agents working in that project |
-| `/clear`, `/compact` | `/clear` and `/new` start a fresh session; `/new --carry` carries the room's `Handoff.md` across |
+| `/clear`, `/compact` | `/new` starts a fresh session; `/compact`, the same as `/new --carry`, carries the room's `Handoff.md` across |
 | `/model` | `/model <id>`, the **model** pill under the box, or the model table in settings |
 | thinking budget | the **effort** pill, from `none` to `max` |
 | plan mode | asking the Mayor, whose job is planning |
@@ -354,7 +354,7 @@ A line that begins with `/` is a command, and the menu above the box lists them:
 | `/stop` | cancels the run in front of you |
 | `/halt [addr\|--all]`, `/release [addr\|--all]` | stop a building or the city, and let it go on |
 | `/raise <addr> [minimal\|confidential\|hall]` | raises a building from a template |
-| `/new [--carry]`, `/clear` | start a fresh session in this room; `--carry` brings the room's `Handoff.md` |
+| `/new [--carry]` | start a fresh session in this room; `--carry` brings the room's `Handoff.md` |
 | `/fork [addr]` | starts a second line of conversation from the newest run in a room |
 | `/model <id>`, `/effort <level>` | point `main` at another model; set the effort |
 | `/diff`, `/go <page>`, `/mcp`, `/doctor`, `/help` | open changes, a page, the MCP page, the machine check, the list |

@@ -22,12 +22,14 @@ bar and the thread cannot disagree about where a round is. -->
   import type { Phase } from "../runs/lineage";
   import { arrivalsOf } from "./arrivals.svelte";
   import Calls from "./calls.svelte";
+  import ForkButton from "./fork_button.svelte";
   import Head from "./head.svelte";
   import NoteLine from "./note_line.svelte";
   import { noteAt } from "./note_line";
   import { rhythmOf } from "./rhythm";
   import { cutOff, silentTurn } from "./silence";
   import type { Phase as Live } from "./silence";
+  import type { ForkEntry, ForkPlan } from "./forking";
   import { tpsOf, ttftTookOf } from "./timing";
 
   interface Props {
@@ -48,9 +50,12 @@ bar and the thread cannot disagree about where a round is. -->
     // Whether the calls and the reasoning are drawn at all (`results`
     // draws neither).
     readonly whole: boolean;
+    readonly onFork?: ((plan: ForkPlan) => void) | undefined;
+    readonly onCall?: ((entry: ForkEntry) => void) | undefined;
+    readonly onHover: (entry: ForkEntry | null) => void;
   }
 
-  const { turn, run, who, model, live, doing, showEmpty, ceiling, whole }: Props = $props();
+  const { turn, run, who, model, live, doing, showEmpty, ceiling, whole, onFork, onCall, onHover }: Props = $props();
 
   const { lang } = ui();
 
@@ -67,32 +72,45 @@ bar and the thread cannot disagree about where a round is. -->
 
 <div class="flex flex-col gap-snug pb-section last:pb-0" data-wear={phase}>
   {#each turn.notes.filter((note) => "arrived" in note) as note (noteAt(note))}
-    <NoteLine {note} />
+    <NoteLine {note} {turn} {run} {onFork} {onHover} />
   {/each}
-  {#if said !== "" || model !== null}
-    <Head
-      {who}
-      at={turn.t}
-      {model}
-      ttft={said === "" ? null : ttftTookOf(turn)}
-      tps={said === "" ? null : tpsOf(turn)}
-      {rhythm}
-    />
-  {/if}
-  {#if turn.thought && whole}
-    <details class="text-note text-text-faint">
-      <summary class="cursor-pointer rounded-control px-tight marker:text-text-faint hover:bg-chrome hover:text-text-quiet">
-        <span class="text-text-faint">{say($lang, "talk_reasoning")}</span>
-        {fill(say($lang, "talk_reasoning_length"), { n: count(turn.thought.length) })}
-      </summary>
-      <div class="mt-tight border-l border-edge-panel pl-base whitespace-pre-wrap break-words">{turn.thought}</div>
-    </details>
-  {/if}
-  {#if said !== ""}
-    <div class="text-body"><Prose text={said} /></div>
+  <!-- The reply is one entry to branch from: its head, its reasoning and
+  its words reveal the fork button at the end of the head's line. The
+  person's words above and the calls below are entries of their own, so
+  they stay outside this group. -->
+  {#if said !== "" || model !== null || (turn.thought && whole)}
+    <div class="group flex flex-col gap-snug">
+      {#if said !== "" || model !== null}
+        <div class="flex items-start justify-between gap-snug">
+          <Head
+            {who}
+            at={turn.t}
+            {model}
+            ttft={said === "" ? null : ttftTookOf(turn)}
+            tps={said === "" ? null : tpsOf(turn)}
+            {rhythm}
+          />
+          {#if onFork !== undefined}
+            <ForkButton entry={{ kind: "turn", turn }} {run} {onFork} {onHover} />
+          {/if}
+        </div>
+      {/if}
+      {#if turn.thought && whole}
+        <details class="text-note text-text-faint">
+          <summary class="cursor-pointer rounded-control px-tight marker:text-text-faint hover:bg-chrome hover:text-text-quiet">
+            <span class="text-text-faint">{say($lang, "talk_reasoning")}</span>
+            {fill(say($lang, "talk_reasoning_length"), { n: count(turn.thought.length) })}
+          </summary>
+          <div class="mt-tight border-l border-edge-panel pl-base whitespace-pre-wrap break-words">{turn.thought}</div>
+        </details>
+      {/if}
+      {#if said !== ""}
+        <div class="text-body"><Prose text={said} /></div>
+      {/if}
+    </div>
   {/if}
   {#if turn.calls.length > 0 && whole}
-    <Calls calls={turn.calls} {run} {doing} />
+    <Calls calls={turn.calls} {run} {turn} {doing} onFork={onCall} />
   {/if}
   {#if empty && showEmpty}
     <div class="rounded-card border border-alert/40 px-base py-snug text-note text-alert">
@@ -105,6 +123,6 @@ bar and the thread cannot disagree about where a round is. -->
     <div class="text-note text-alert">{fill(say($lang, "talk_cut_off"), { why: cut })}</div>
   {/if}
   {#each turn.notes.filter((note) => !("arrived" in note)) as note (noteAt(note))}
-    <NoteLine {note} />
+    <NoteLine {note} {turn} {run} {onFork} {onHover} />
   {/each}
 </div>

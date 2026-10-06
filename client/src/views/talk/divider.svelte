@@ -10,7 +10,7 @@
   import type { RunBelief } from "../../core/belief";
   import { ui } from "../../ui";
   import { motherName } from "./forking";
-  import type { Boundary } from "./forking";
+  import type { Boundary, ForkPlan } from "./forking";
   import { earlierDrawn } from "./earlier";
   import Thread from "./thread.svelte";
 
@@ -24,10 +24,11 @@
     // the earlier stretch starts open (client D80).
     readonly shown: number;
     readonly boundary: Boundary | null;
+    readonly onFork: (plan: ForkPlan) => void;
     readonly onRetry: (task: string) => void;
   }
 
-  const { earlier, shown, boundary, onRetry }: Props = $props();
+  const { earlier, shown, boundary, onFork, onRetry }: Props = $props();
 
   const { lang, conn } = ui();
   const belief = conn.belief;
@@ -71,7 +72,7 @@
   {#if open}
     <div class="fade">
       {#each earlier as run (run.run)}
-        <Thread {run} {onRetry} />
+        <Thread {run} {onFork} {onRetry} />
       {/each}
     </div>
   {/if}

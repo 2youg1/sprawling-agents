@@ -11,9 +11,15 @@
   // words as they arrive. The rounds come from the server; only the live
   // text, the posture and the rhythm the words arrived in come from what
   // this page has seen itself.
+  //
+  // Every entry a person could have branched the conversation at - their
+  // own words, a reply, a call - carries the one fork action. Hovering
+  // or focusing shows it; the `fork.here` chord answers for the entry
+  // under the hand (roadmap S2, ux A7).
   import { readAnswer } from "../../core/answered";
   import { QUERIES } from "../../core/asking";
   import type { RunBelief } from "../../core/belief";
+  import { keymap } from "../../core/keys";
   import { drawsCalls } from "../../core/results";
   import { fill, say } from "../../core/lang";
   import { toFragment } from "../../core/route";
@@ -33,15 +39,19 @@
   import { firstHeadSaid } from "./frozen";
   import { restriction, sandboxQuery, sandboxSaid } from "./sandbox";
   import { called, dispatcherOf } from "./naming";
+  import { planFork } from "./forking";
   import { turnsAround } from "./around";
   import { cutOff, silentRun } from "./silence";
   import type { Phase } from "./silence";
+  import type { ForkEntry, ForkPlan } from "./forking";
 
   interface Props {
     readonly run: RunBelief;
+    // Absent where the page holding the thread cannot branch: the run
+    // page draws the same conversation with nowhere to fork to.
+    readonly onFork?: ((plan: ForkPlan) => void) | undefined;
     // The run came back with no words: say the task again as a new run.
-    // Absent where the page holding the thread starts no run: the run
-    // page draws the same conversation.
+    // Absent for the same reason.
     readonly onRetry?: ((task: string) => void) | undefined;
     // Whether this run opens the stretch of the room on screen, so its
     // first head states the model the session froze (docs/frontend-method.md §7D).
@@ -53,11 +63,19 @@
     readonly around?: Seq | null;
   }
 
-  const { run, onRetry, opens = true, around = null }: Props = $props();
+  const { run, onFork, onRetry, opens = true, around = null }: Props = $props();
 
   const u = ui();
   const { lang } = u;
   const held = u.prefs.held;
+
+  // The entry under the hand - hovered or focused - which is the one the
+  // `fork.here` chord branches from. Cleared as the hand leaves, so a
+  // chord pressed pages away can never reach a stale entry.
+  let active: ForkEntry | null = $state(null);
+  const hoverFork = (entry: ForkEntry | null): void => {
+    active = entry;
+  };
 
   // The run this thread reads, named once: the page draws one thread
   // per run and keys it to that run, so the rounds question is minted
@@ -71,6 +89,13 @@
   const turns = $derived(answer?.turns ?? []);
   const drawn = $derived(turnsAround(turns, around));
   const task = $derived(answer?.opening?.task ?? run.task ?? "");
+  // The opening task is a person's words like any other, and rides the
+  // first turn - its turn's parent - because the wire gives it no line
+  // of its own.
+  const taskEntry = $derived.by((): ForkEntry | null => {
+    const first = turns.at(0);
+    return first === undefined ? null : { kind: "message", turn: first, text: task };
+  });
   // What this city told the provider a reply may be at most. Read here
   // rather than per turn, because it is one fact about the city and not
   // one fact about a turn.
@@ -213,7 +238,44 @@
     }
   });
 
+  // The branch a call's action asks for: the entry carries the turn it
+  // sits in, so the plan is built here where both are in hand.
+  function planCall(entry: ForkEntry): void {
+    onFork?.(planFork(run.run, entry));
+  }
+
+  // The press the key table judges: where it landed decides whether a
+  // single letter is the shell's or the person's typing. This mirrors
+  // the shell's own reading of `KeyboardEvent.target`; the rule itself
+  // lives in `core/keys`' `matches`.
+  function inField(target: EventTarget | null): boolean {
+    return (
+      target instanceof HTMLInputElement ||
+      target instanceof HTMLTextAreaElement ||
+      target instanceof HTMLSelectElement ||
+      (target instanceof HTMLElement && target.isContentEditable)
+    );
+  }
+
+  function forkKey(event: KeyboardEvent): void {
+    const action = keymap().acting({
+      key: event.key,
+      ctrlKey: event.ctrlKey,
+      metaKey: event.metaKey,
+      shiftKey: event.shiftKey,
+      altKey: event.altKey,
+      target: inField(event.target) ? "field" : "page",
+    });
+    if (action !== "fork.here") return;
+    const entry = active;
+    if (entry === null || onFork === undefined) return;
+    event.preventDefault();
+    onFork(planFork(run.run, entry));
+  }
+
 </script>
+
+<svelte:window onkeydown={forkKey} />
 
 <section aria-label={run.run} class={frozen ? "settled" : undefined}>
   {#if task !== ""}
@@ -222,6 +284,10 @@
       label={from.label}
       labelHref={from.href}
       at={run.started ?? undefined}
+      entry={taskEntry}
+      run={run.run}
+      {onFork}
+      onHover={hoverFork}
     />
   {/if}
   {#if read.kind === "unavailable"}
@@ -239,6 +305,9 @@
       showEmpty={!emptyRun}
       {ceiling}
       {whole}
+      {onFork}
+      onCall={onFork === undefined ? undefined : planCall}
+      onHover={hoverFork}
     />
   {/each}
   {#if drawn.cut}

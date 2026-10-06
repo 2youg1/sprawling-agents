@@ -104,7 +104,7 @@ shelves = ["~/.claude/skills"]
 | 终端里的会话 | 浏览器里的一页，由二进制提供；终端变成城的控制台 |
 | 工作目录 | 一栋楼里的一个房间；它的地址决定 agent 能写哪里 |
 | `CLAUDE.md` | 楼的 `SPEC.md` 与 `RULES.toml`、居民的 `URBANITE.md`，以及项目自带的 `AGENTS.md`，城会把它交给在那个项目里干活的 agent |
-| `/clear`、`/compact` | `/clear` 与 `/new` 开一段新会话；`/new --carry` 把房间的 `Handoff.md` 带过去 |
+| `/clear`、`/compact` | `/new` 开一段新会话；`/compact` 等于 `/new --carry`，把房间的 `Handoff.md` 带过去 |
 | `/model` | `/model <id>`、输入框下的 **模型** 药丸，或设置里的模型表 |
 | 思考预算 | **强度** 药丸，从 `none` 到 `max` |
 | plan 模式 | 去问 Mayor，做计划本来就是它的活 |
@@ -354,7 +354,7 @@ sprawling resume ./cities/first
 | `/stop` | 取消你眼前这次 run |
 | `/halt [addr\|--all]`、`/release [addr\|--all]` | 让一栋楼或整座城停下，再放开 |
 | `/raise <addr> [minimal\|confidential\|hall]` | 按模板盖一栋楼 |
-| `/new [--carry]`、`/clear` | 在这个房间开一段新会话；`--carry` 带上房间的 `Handoff.md` |
+| `/new [--carry]` | 在这个房间开一段新会话；`--carry` 带上房间的 `Handoff.md` |
 | `/fork [addr]` | 从一个房间最新的 run 分出第二条对话线 |
 | `/model <id>`、`/effort <档位>` | 让 `main` 换一个模型；设定强度 |
 | `/diff`、`/go <页面>`、`/mcp`、`/doctor`、`/help` | 打开改动、一个页面、MCP 页、电脑环境检查、命令列表 |

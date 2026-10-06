@@ -10,20 +10,18 @@
   // model is still saying, the two lists that open over that box, and
   // the questions the city is holding for them - plus the session and
   // fork shapes a thread gains when one room runs more than once: one
-  // round, the divider that folds a previous segment away, and the
-  // picker a bare `/fork` opens. No control in a thread branches it:
-  // a typed verb is the only way (docs/frontend-method.md §7I).
+  // round, the divider that folds a previous segment away, the fork
+  // button on a message, and the picker a bare `/fork` opens.
   //
   // Two of these need room the page gives them and a fixture does not.
   // The list that opens over the composer opens *upward*, so the
   // padding above it is the room the foot of a page has; the sheet the
   // questions sit in is drawn where the page draws it.
   //
-  // The session and fork shapes are drawn here rather than through
-  // `talk/` because those modules do not exist yet: the divider is
-  // what they will draw, frozen at the state worth
-  // looking at, and the picker is the real multi-column `parts`
-  // popover they are specified to walk (roadmap S2).
+  // The divider is drawn here, frozen at the state worth looking at;
+  // a person's words are the real `talk/person.svelte` with its real
+  // fork button, and the picker is the real multi-column `parts`
+  // popover (roadmap S2).
 
   import type { Doing } from "../../core/doing";
   import { sendingInto } from "../../core/doing";
@@ -31,7 +29,8 @@
   import { fill, say } from "../../core/lang";
   import { toFragment } from "../../core/route";
   import { UNSTATED, offered } from "../../core/slash";
-  import { RunId } from "../../wire";
+  import type { Turn } from "../../wire";
+  import { RunId, Seq, TimeMs } from "../../wire";
   import { motherName } from "../talk/forking";
   import type { Utterance } from "./served";
   import { CALLS, EARLIER_SEGMENT, ONE_QUESTION, ROUND, TURNS, WAITING } from "./served";
@@ -57,6 +56,9 @@
   // What the mother run was asked: the divider names it by its first
   // sentence, never by the id above.
   const MOTHER_TASK = EARLIER_SEGMENT.find((line) => line.speaker === "person")?.text ?? "";
+  // The turn a person's words in these fixtures arrived in: a fork from
+  // a message cuts before the turn it landed in.
+  const LANDED: Turn = { calls: [], notes: [], number: 1, opened: Seq.make(1), t: TimeMs.make(1), timing: "measured" };
 </script>
 
 <script lang="ts">
@@ -66,6 +68,7 @@
   import Saying from "../talk/saying.svelte";
   import { WaitingCards } from "../talk/waiting.svelte";
   import Asked from "../talk/asked.svelte";
+  import Person from "../talk/person.svelte";
   import Case from "./case.svelte";
   import { CHOSEN, MODELS } from "./served";
 
@@ -97,6 +100,25 @@
   </div>
 {/snippet}
 
+<!-- A line of a thread that can be branched from: a person's words are
+the real message with its real fork button, revealed on hover or focus
+like the thread's own. -->
+{#snippet branchable(line: Utterance)}
+  {#if line.speaker === "person"}
+    <Person
+      text={line.text}
+      label={say($lang, "talk_you")}
+      at={undefined}
+      entry={{ kind: "message", turn: LANDED, text: line.text }}
+      run={MOTHER}
+      onFork={() => undefined}
+      onHover={() => undefined}
+    />
+  {:else}
+    <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
+    {@render utterance(line)}
+  {/if}
+{/snippet}
 
 {#each POSTURES as doing (doing.kind)}
   <Case label={`${doing.kind} · ${sendingInto(doing)}`}>
@@ -241,10 +263,8 @@ time somebody sends, so both landings are on this page. -->
   <div class="flex min-h-output flex-col">
     <div class="flex-1">
       {#each ROUND as line (line.text)}
-        <div class="relative">
-          <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
-          {@render utterance(line)}
-        </div>
+        <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
+        {@render branchable(line)}
       {/each}
     </div>
     <div class="px-pane pb-pane">
@@ -303,16 +323,27 @@ came from. -->
     <span class="h-px flex-1 bg-raised"></span>
   </div>
   {#each ROUND as line (line.text)}
-    <div class="relative">
-      <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
-      {@render utterance(line)}
-    </div>
+    <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
+    {@render branchable(line)}
   {/each}
   <p class="mb-tight text-note text-text-faint" role="status">
     {fill(say($lang, "fork_pending"), { turn: "3" })}
   </p>
 </Case>
 
+<!-- The fork button in its revealed state, because a state that only
+appears under a pointer is a state nobody judges: on any message it
+arrives on hover or when anything inside the message holds focus, at
+the end of the line under the words, and the keyboard reaches it in
+the message's own tab stop. -->
+<Case label="message · fork from here, revealed under the message">
+  <div class="[&_[data-fork]]:opacity-100">
+    {#each ROUND as line (line.text)}
+      <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
+      {@render branchable(line)}
+    {/each}
+  </div>
+</Case>
 
 <!-- A bare `/fork` opens the picker: turns of this run down the left,
 what the marked turn did down the right. The columns are the real

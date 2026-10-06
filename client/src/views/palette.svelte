@@ -173,7 +173,6 @@
     switch (spelling) {
       case "/dispatch":
       case "/new":
-      case "/clear":
       case "/compact": case "/tag": case "/untag":
         return here === null ? NEEDS_ROOM : undefined;
       // The run in hand, or else the newest run of the room in hand.

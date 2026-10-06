@@ -214,15 +214,6 @@ export const SLASH: readonly Slash[] = [
     },
   },
   {
-    spelling: "/clear",
-    grammar: "",
-    about: "slash_clear",
-    section: "sessions",
-    run: (hands) => {
-      fresh(hands, { verb: "/clear", words: [], rest: "" });
-    },
-  },
-  {
     spelling: "/fork",
     grammar: "[addr]",
     about: "slash_fork",

@@ -4,9 +4,10 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 // Where a branch may cut the mother's conversation, what each cut takes
-// with it, and how a stretch of conversation began. The picker a typed
-// `/fork` opens (`forking.svelte`) asks this file; no control in the
-// thread branches the conversation (docs/frontend-method.md section 7I).
+// with it, and how a stretch of conversation began. One home: the hover
+// action in the thread and the picker in `forking.svelte` both ask this
+// file, so the rules a person reads off two surfaces cannot drift
+// (roadmap S1, S2).
 //
 // **A person's words fork at their turn's parent and come back to the
 // box.** A message is re-sayable - the point of returning it is that the
