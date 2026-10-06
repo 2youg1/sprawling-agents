@@ -130,6 +130,10 @@ const FIXTURE: &str = "SPRAWLING_INSTALL_REMOVAL_FIXTURE";
 
 #[cfg(target_os = "windows")]
 #[test]
+#[allow(
+    clippy::disallowed_methods,
+    reason = "fixture deadline polls OS helper cleanup after process exit"
+)]
 fn windows_uninstall_removes_its_running_executable() {
     if let Some(dir) = std::env::var_os(FIXTURE) {
         let dir = Path::new(&dir);
