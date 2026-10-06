@@ -52,7 +52,7 @@ pub struct TuningDefaults {
 #[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct EndpointTuning {
     /// Explicit ordered accounts; absence leaves the existing accounts intact.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub accounts: Option<Vec<kernel::event::record::ProviderAccount>>,
     /// What to call this endpoint on screen; absent means its id.
     pub label: Option<String>,

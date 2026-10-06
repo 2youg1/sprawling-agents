@@ -19,7 +19,7 @@ use crate::views::snapshot::start::SnapshotFold;
 /// [`StandingFolds`] changes within one version of this binary. The
 /// suffix is the digest of a fixed fixture's encoding, which the tests
 /// beside this file hold, so the encoding cannot move alone.
-const STANDING_FOLD_RULES: &str = "standing-fold-4cd43c1f21671df2";
+const STANDING_FOLD_RULES: &str = "standing-fold-09b58ed92caf4015";
 
 /// The five folds of [`Standing`] after the last line they read, before
 /// the collaboration fold settles: a tail folded on after a snapshot
