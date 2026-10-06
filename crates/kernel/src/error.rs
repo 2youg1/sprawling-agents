@@ -18,6 +18,9 @@
 //!   only way to obtain an [`AxError`].
 //! - `retry` defaults to `Retry::No`; a caller must opt in explicitly
 //!   (fail-closed).
+//! - `account` is `AccountDisposition::Advance` only beside `Retry::No`
+//!   with no wait: [`ErrorDraft::account_unusable`] is the only path that
+//!   sets it, and every other retry builder puts it back to `Keep`.
 //!
 //! The carrier-event declaration (`AxCode::carrier`) lives together with
 //! `kernel::event` because it names `EventKind`.
@@ -28,6 +31,6 @@ mod refusal;
 mod shape;
 
 pub use code::{AxCode, Carrier};
-pub use provider::ProviderFailureKind;
+pub use provider::{AccountDisposition, ProviderFailureKind};
 pub use refusal::GateRefusal;
 pub use shape::{AxError, ErrorDraft, Retry};

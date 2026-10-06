@@ -39,6 +39,29 @@ impl Redemption {
         Redemption { secrets, images }
     }
 
+    /// Redeems the credential of the account this endpoint calls as.
+    ///
+    /// A reference the store does not hold is this account's matter, so
+    /// its `E_CREDENTIAL_MISSING` says the next account should take the
+    /// request (gateway D31); every other refusal passes through as it
+    /// came, because a locked or broken vault fails every account alike
+    /// (kernel D55).
+    pub(crate) fn account_credential(
+        &self,
+        reference: &SecretRef,
+    ) -> Result<Sealed<String>, AxError> {
+        (self.secrets)(reference).map_err(|err| {
+            if *err.code() == AxCode::CredentialMissing {
+                AxError::failure(AxCode::CredentialMissing, err.action(), err.subject())
+                    .with_nearby(err.nearby().to_vec())
+                    .account_unusable()
+                    .with_recovery(err.recovery())
+            } else {
+                err
+            }
+        })
+    }
+
     /// For a call that has no business carrying a picture — a probe
     /// asking an endpoint which models it serves. A picture reaching it
     /// is a wiring mistake, and the refusal says so rather than sending
@@ -137,7 +160,7 @@ mod tests {
             let err = endpoint.call(&request()).unwrap_err();
             let json = serde_json::to_value(&err).unwrap();
             (
-                err.code().clone(),
+                *err.code(),
                 json["retry"].clone(),
                 json.get("account").cloned(),
             )
