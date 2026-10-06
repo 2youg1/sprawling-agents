@@ -43,7 +43,9 @@ info 的内容是 daemon 的自述，不是已执行的隔离验收；daemon、O
 D50 Backlog 在分配输出文件之前取得唯一名字与副本的清理 owner，然后在 create 之前登记成员；
 计数、表锁或输出文件失败同样不能丢失副本的清理责任，成员的进程值同时拥有 daemon 身份
 与可选的 attach 子进程。start／inspect／attach／create 应答丢失均按登记身份清理。
-停止时先置 stopping，再请求 rm --force --volumes；删除失败保留成员与副本，下一次
+停止时先置 stopping，再请求 rm --force --volumes；Podman 另带 --time 0，令强制删除立即终止目标，
+因为其默认 stop 宽限期可超过 control 的有界预算，不能把宽限等待当成清理完成。
+删除失败保留成员与副本，下一次
 harvest 重试并返回 typed failure，release 的 Drop 调用只记录待清理责任，不能声称删除成功。
 只有成功的删除应答或成功 inventory 确认身份缺席才释放副本。CLI 结束后 inspect State.ExitCode
 才决定目标程序结果；只有 Status 为 exited／dead 且 Running=false 才是终止结果，
@@ -53,7 +55,7 @@ created、缺少 Status 或与 Running 不一致都以 E_SANDBOX_DENIED 拒绝�
 使用 control 的有界预算，失败后成员不得重新 start。这里的界限是轮询预算，不是 OS 调度、
 文件 I/O 或 kill／wait 系统调用的硬实时期限，也不限定独立 guardian 的存活时间。
 D52 生产 doctor 给 runtime 绑定当前 harness executable；Backlog 在 create 前起动独立 guardian，
-它读取 scratch 中唯一 ownership 文件（cleanup record 与无损 OsString argv）后通过 file-backed stdout 报 ready，再守住只由父进程持有的 stdin。
+它读取 scratch 中唯一 ownership 文件（含冻结 ContainerEngine 的 cleanup record 与无损 OsString argv）后通过 file-backed stdout 报 ready，再守住只由父进程持有的 stdin。
 create 请求从既有 stdin 下达，应答写同一 scratch 中的文件，避免把整条 argv 再塞进进程命令行。
 父进程确认 daemon 删除与副本释放后发 done；EOF、父进程异常终止或读失败都转为独立清理，
 复用同一个有界 rm／inventory 规则并保留责任重试，直到确认删除。未取得 ready 时不能 create。
