@@ -254,3 +254,37 @@ const fn tally() -> (usize, usize) {
 const TALLY: (usize, usize) = tally();
 const _: () = assert!(PrivacyOriginal::ALL.len() == 52);
 const _: () = assert!(TALLY.0 == 39 && TALLY.1 == 13);
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::indexing_slicing, reason = "test code")]
+mod tests {
+    use super::*;
+
+    /// The page explains a line it does not write in the line's own
+    /// words, kept in the client's phrase table under the line's name; the
+    /// client cannot know which lines those are, so this table checks it.
+    /// A written line has no explanation, so one left over from an earlier
+    /// decision fails here too.
+    #[test]
+    fn exactly_the_lines_not_written_have_a_reason_in_both_languages() {
+        let words: serde_json::Value = serde_json::from_str(include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../client/src/lang.json"
+        )))
+        .unwrap();
+        let wrong: Vec<String> = PrivacyOriginal::ALL
+            .iter()
+            .filter_map(|item| {
+                let name = serde_json::to_value(item).unwrap();
+                let key = format!("privacy_original_{}_reason", name.as_str().unwrap());
+                let entry = &words[&key];
+                let worded = ["en", "zh"]
+                    .iter()
+                    .all(|lang| entry[lang].as_str().is_some_and(|text| !text.is_empty()));
+                let owed = matches!(original(*item).disposition, Disposition::NotWritten { .. });
+                (worded != owed || (!owed && !entry.is_null())).then_some(key)
+            })
+            .collect();
+        assert_eq!(wrong, Vec::<String>::new());
+    }
+}
