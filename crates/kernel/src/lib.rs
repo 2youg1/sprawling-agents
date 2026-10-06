@@ -18,6 +18,7 @@
 //! way out, because a second spelling of one name is the defect
 //! `xtask lexicon` exists to catch.
 
+pub mod account_recovery;
 pub mod address;
 pub mod approval;
 pub mod backpressure;
