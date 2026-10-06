@@ -40,6 +40,12 @@ info 的内容是 daemon 的自述，不是已执行的隔离验收；daemon、O
 用户轴的非 root 身份不等于独立宿主安全主体：rootful daemon 可让相同数值 UID
 出现在宿主和容器中。若要求两者必不同或要求 user namespace，当前臂没有该保证。
 
+Podman 的 stopped-container inspect 兼容范围尚有未决：能力准入通过后仍可能在起动前的
+边界核对中拒绝配置，须将被拒的真实 JSON 与冻结限额、挂载、capabilities 及 security options
+逐项比较，确认应拒的配置与需要支持的合法字段表示；`.github/workflows/on-demand.yml`
+的 container job 保存这份 JSON 并运行同一生产检查，未知表示仍以 E_SANDBOX_DENIED 拒绝，
+不从 capability admission 推出这个后端已经通过五轴验收。
+
 D50 Backlog 在分配输出文件之前取得唯一名字与副本的清理 owner，然后在 create 之前登记成员；
 计数、表锁或输出文件失败同样不能丢失副本的清理责任，成员的进程值同时拥有 daemon 身份
 与可选的 attach 子进程。start／inspect／attach／create 应答丢失均按登记身份清理。
