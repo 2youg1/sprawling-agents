@@ -192,3 +192,109 @@ interpreter = \"bash\"
     .unwrap_err();
     assert_eq!(err.code(), &kernel::AxCode::ConfigInvalid);
 }
+
+/// The `[[mcp]]` row a person writes by hand, spelled the way the
+/// write face would spell `server`.
+fn handwritten(server: &McpServer) -> String {
+    let label = server.label.as_str();
+    let table = |pairs: &[(String, String)]| {
+        pairs
+            .iter()
+            .map(|(name, value)| format!("{name:?} = {value:?}"))
+            .collect::<Vec<_>>()
+            .join(", ")
+    };
+    match &server.transport {
+        McpTransport::Stdio { command, env, .. } => format!(
+            "[[mcp]]\nlabel = {label:?}\ncommand = {command:?}\nenv = {{ {} }}\n",
+            table(env)
+        ),
+        McpTransport::Http { url, headers } => format!(
+            "[[mcp]]\nlabel = {label:?}\nurl = {url:?}\nheaders = {{ {} }}\n",
+            table(headers)
+        ),
+        McpTransport::Sse { url, headers } => format!(
+            "[[mcp]]\nlabel = {label:?}\nurl = {url:?}\ntransport = \"sse\"\nheaders = {{ {} }}\n",
+            table(headers)
+        ),
+    }
+}
+
+/// A plaintext key written by hand into `CONFIG.toml` is refused when
+/// the file is read, with the refusal the write face gives for the same
+/// row: the file is committed with the project, so a key the reader
+/// accepted would be a key the city keeps in every clone.
+#[test]
+fn a_handwritten_plaintext_mcp_credential_is_refused_on_read_as_on_write() {
+    let dir = tempfile::tempdir().unwrap();
+    let rows = [
+        hosted(vec![("Authorization".to_owned(), "Bearer plain".to_owned())]),
+        vec![McpServer {
+            label: ServerLabel::parse("apps").unwrap(),
+            transport: McpTransport::Stdio {
+                command: "mcp-apps".to_owned(),
+                args: Vec::new(),
+                env: vec![("API_KEY".to_owned(), "plain-value".to_owned())],
+            },
+        }],
+    ];
+    for servers in rows {
+        let written = write_mcp(dir.path(), &room(), Layer::City, &servers).unwrap_err();
+        let read = ConfigLayer::parse(&handwritten(&servers[0])).unwrap_err();
+        assert_eq!(read, written);
+        assert_eq!(read.code(), &AxCode::ConfigInvalid);
+        assert!(read.recovery().contains("vault"), "{}", read.recovery());
+    }
+
+    let referenced = hosted(vec![
+        ("Authorization".to_owned(), "secret:mcp/hosted".to_owned()),
+        ("X-Account".to_owned(), "acme".to_owned()),
+    ]);
+    let layer = ConfigLayer::parse(&handwritten(&referenced[0])).unwrap();
+    assert_eq!(layer.mcp(), Some(referenced.as_slice()));
+}
+
+/// A url keeps the query and fragment a server needs, and is refused,
+/// on both faces with one refusal, when it carries a credential in its
+/// userinfo or in a query parameter — named or shaped, after percent
+/// decoding — or when it is not an http or https address with a host.
+#[test]
+fn an_mcp_url_keeps_harmless_parameters_and_refuses_credentials() {
+    let dir = tempfile::tempdir().unwrap();
+    let at = |url: &str| {
+        let mut servers = hosted(Vec::new());
+        servers[0].transport = McpTransport::Http {
+            url: url.to_owned(),
+            headers: Vec::new(),
+        };
+        servers
+    };
+    for url in [
+        "https://example.test/mcp?mode=tools#selection",
+        "http://[::1]:3001/mcp",
+    ] {
+        write_mcp(dir.path(), &room(), Layer::Building, &at(url)).unwrap();
+        assert_eq!(super::super::load(dir.path(), &room()).unwrap().mcp, at(url));
+    }
+    let file = path(dir.path(), &room(), Layer::Building).unwrap();
+    let kept = std::fs::read_to_string(&file).unwrap();
+    let shaped = format!(
+        "https://example.test/mcp?trace=ghp_{}{}{}",
+        "aB3dE5fG7hJ9k", "L1mN3pQ5rS7t", "U9vW1xY3zA5"
+    );
+    for url in [
+        "https://example.test/mcp?api%5Fkey=fixture-value",
+        "https://example.test/mcp?Token=fixture-value",
+        shaped.as_str(),
+        "https://name:password@example.test/mcp",
+        "https://name@example.test/mcp",
+        "ftp://example.test/mcp",
+        "not a url",
+    ] {
+        let written = write_mcp(dir.path(), &room(), Layer::Building, &at(url)).unwrap_err();
+        let read = ConfigLayer::parse(&handwritten(&at(url)[0])).unwrap_err();
+        assert_eq!(read, written, "{url}");
+        assert_eq!(read.code(), &AxCode::ConfigInvalid, "{url}");
+        assert_eq!(std::fs::read_to_string(&file).unwrap(), kept, "{url}");
+    }
+}
