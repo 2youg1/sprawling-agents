@@ -128,6 +128,7 @@ pub fn search_supplier(configuration: &SearchConfiguration) -> Result<Option<Sea
 pub fn default_search_supplier() -> Result<SearchSupplier, AxError>;   // 缺省那一家的唯一声明
 pub fn settled_search(city_root: &Path, addr: &Address)
     -> Result<Option<(SearchConfiguration, Layer)>, AxError>;         // 值连同说出它的那一级
+pub fn city_search(city_root: &Path) -> Result<Option<SearchConfiguration>, AxError>;   // 只读城那一级
 pub fn write_search(city_root: &Path, configuration: &SearchConfiguration) -> Result<(), AxError>;
 ```
 
@@ -155,7 +156,7 @@ header = "x-api-key"
 - **带引用的账号必须写 `header`**：MCP 的 header 值按整个值兑付（一个 `secret:realm/name` 换成整份密文），所以 Key 只能原样放进一个具名 header；`Authorization: Bearer` 要一个兑付者不加的前缀。缺省那一家收 `x-api-key`。重开参数：出现一家只收 Bearer 的供应方。
 - **只写在城与楼两级**：房间那一级写 `[search]` 由梯子拒（`crates/city/spec/ConfigLayers/Ladder.lean` 的 `Confined.Search`），恢复语指向楼或城的 `CONFIG.toml`。理由：设置页编辑城那一级、只读列出各楼的覆盖，房间那一级的值会治理一个 run 却不出现在页面上；房间的文件又是会话写记录的地方（§8-14）。楼一级整值覆盖城一级，同 `[[mcp]]`。
 - **写面**：`write_search` 只写城那一级（设置页只编辑那一级），把值包成 `Change::Search`，先调读面同一个校验，过了才进 `change`，`change` 再复读整份文本（§8-4b）。`Default` 也写出 `choice = "default"`，读回的就是写下的。
-- **读回来源**：`settled_search` 与 `settled_effort` 爬同一条梯子，连同说出值的那一级答；在城根地址上问答的是城那一级，在某栋楼的地址上问答的是这栋楼被什么治理。没有 `[search]` 的旧 `CONFIG.toml` 照旧读得回来，答 `None`，求值为 `Default`。
+- **读回来源**：`settled_search` 与 `settled_effort` 爬同一条梯子，连同说出值的那一级答：在某栋楼（或它的房间）的地址上问，答的是这里被什么治理。没有地址指城根，所以设置页要编辑的城那一级由 `city_search` 单独读：它只读城自己那份 `CONFIG.toml`，与梯子读那一级用的是同一个 `stated`，一栋楼自己写了 `[search]` 也不会把楼的值当成城的值答出来（`crates/wire/spec/Answer/Config.lean` §8-86）。没有 `[search]` 的旧 `CONFIG.toml` 照旧读得回来，两者都答 `None`，求值为 `Default`。
 - **不在本模块的事**：机密楼不提供 `web_search`、账号怎么选、失败怎么恢复、连接怎么复用，都在 `crates/accounting/spec/Connectors.lean` §8-35。本模块只回答文件说了什么、它指哪一家。
 -/
 
