@@ -5,6 +5,8 @@
 
 //! UTF16 launch packet; six terminated strings followed by an explicit
 //! double-terminated environment. No process environment is inherited.
+//! Argument preservation follows `Runtime.NativeWindows.Argv` in
+//! `crates/runtime/spec/Tools/Exec/NativeWindows.lean`; this is the sole encoder.
 
 use super::{Action, Failure, Launch};
 use std::ffi::{OsStr, OsString};

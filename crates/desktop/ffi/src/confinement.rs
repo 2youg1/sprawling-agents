@@ -398,7 +398,9 @@ mod tests {
         }
     }
 
-    use std::os::windows::ffi::{OsStrExt, OsStringExt};
+    use std::os::windows::ffi::OsStringExt;
+
+    const ARGV_SEED: u64 = 20_261_006;
 
     fn argv_launch(args: Vec<OsString>) -> Launch {
         Launch {
@@ -477,6 +479,12 @@ mod tests {
     }
 
     proptest! {
+        #![proptest_config(ProptestConfig {
+            cases: 256,
+            rng_seed: proptest::test_runner::RngSeed::Fixed(ARGV_SEED),
+            ..ProptestConfig::default()
+        })]
+
         #[test]
         fn native_encoded_arguments_preserve_units_and_order(
             args in proptest::collection::vec(argv_units(), 0..16),

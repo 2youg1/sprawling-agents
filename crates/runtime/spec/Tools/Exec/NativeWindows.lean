@@ -327,19 +327,20 @@ theorem program_body_preserves_path (pathFront : List Nat) (last slashes : Nat)
     · simp [encodeTail, slash, unitNotQuote, ih 0 restNoQuotes, List.append_assoc]
 
 inductive CrtProgram : List Nat → List Nat → List Nat → Prop where
-  | quoted (program suffix : List Nat) (noQuotes : 34 ∉ program)
-      (boundary : argumentBoundary suffix) :
+  | quoted (program suffix : List Nat) (valid : admitted program)
+      (noQuotes : 34 ∉ program) (boundary : argumentBoundary suffix) :
       CrtProgram (34 :: (program ++ 34 :: suffix)) program suffix
 
 theorem encoded_program_preserves_path (pathFront : List Nat) (last : Nat)
     (suffix : List Nat) (noQuotes : 34 ∉ pathFront)
     (lastNotQuote : last ≠ 34) (lastNotSlash : last ≠ 92)
-    (boundary : argumentBoundary suffix) :
+    (valid : admitted (pathFront ++ [last])) (boundary : argumentBoundary suffix) :
     CrtProgram (34 :: encodeTail 0 (pathFront ++ [last]) suffix)
       (pathFront ++ [last]) suffix := by
   rw [program_body_preserves_path pathFront last 0 suffix noQuotes lastNotQuote lastNotSlash]
   simpa [List.append_assoc] using
-    CrtProgram.quoted (pathFront ++ [last]) suffix (by simp [noQuotes, lastNotQuote]) boundary
+    CrtProgram.quoted (pathFront ++ [last]) suffix valid
+      (by simp [noQuotes, Ne.symm lastNotQuote]) boundary
 
 end Argv
 
