@@ -71,6 +71,26 @@ Microsoft 的 Naming Files, Paths, and Names 规定这两类 prefix，.NET refer
 source 的 FileIOPermission 规定非法字符检查；disposable Framework probe 与
 两种 PowerShell 初始化回归确认环境前提，网络 capability 仍为空。
 
+D59：子进程自己打开 NUL 设备时（Rust std 的 `Stdio::null`，即 `Command::output`
+与 `status` 的缺省 stdin；cmd 的 `>nul`），平台按 `\Device\Null` 的 DACL 判定，
+而 AppContainer 的访问检查只认 package SID、capability SID 与
+ALL APPLICATION PACKAGES (AC)，不认 Everyone。Windows 11 client 的 NUL DACL
+带 `(A;;0x1201bf;;;AC)` 与 `(A;;0x1201bf;;;S-1-15-2-2)`；GitHub windows-latest 的
+Windows Server 2025 镜像只有 WD、SY、BA、RC 四条 ACE，于是 cargo 起
+`rustc -vV` 时被拒（os error 5，cargo 报 never executed）。叶子给子进程的 stdin
+是父进程打开、经 handle list 继承的 NUL handle，不受此前提影响。
+harness 不改设备 DACL，因为它对整台机器的所有进程生效、要管理员的 WRITE_DAC，
+且重启后复原；被否的备选是叶子在声明根授权的同一 Global mutex 内给本次 SID
+加 NUL ACE，它在未提权的进程里必然失败，并把平台缺省的差异藏进每次起动。
+disposable acceptance 先把 runner 的 NUL DACL 补上 client 的这两条 ACE，再运行
+回归；`native_windows_disposable_argv_and_unrequested_memory` 的 `nul` child 经
+Rust std 的缺省 capture 与直接打开 NUL 判定该前提。
+未决：缺这两条 ACE 的主机（Windows Server）上明写 native 时，子进程自开 NUL
+的失败只出现在命令的输出里。可选做法是起动前以挂起子进程的 token 对 NUL 的
+security descriptor 做 AccessCheck 并拒绝起动，或由 doctor 的 native 行报告；
+判定证据是 Windows Server 上真实工具链（cargo、cmd）在缺 ACE 时的命令结果，
+缺省改为 native 之前须定。
+
 失败拒绝，不再起动普通子进程；cleanup 拒绝时保留错误及未释放资源的 owner，
 模型的 closing 只表示不能恢复执行，closed 才表示 cleanup 已成功。
 launch failure 的未释放资源随 typed Failure 返回，由 run Job 保留，后续 native

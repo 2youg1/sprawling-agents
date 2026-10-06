@@ -354,24 +354,22 @@ fn native_windows_disposable_argv_and_unrequested_memory() {
     }
     let backlog = crate::Backlog::with_window(crate::PollBudget::new(10_000, 5));
     let mut command = Command::new(&exe);
-    command.env_clear().current_dir(&directory).arg("pipes");
+    command.env_clear().current_dir(&directory).arg("nul");
     let result = backlog
         .run_native(
             RunId::from_bytes([0x90; 16]),
             &scope,
-            "child stdio diagnostic".to_owned(),
+            "child opens the null device".to_owned(),
             command,
         )
         .unwrap();
-    let crate::Started::Settled {
-        exit,
-        stdout,
-        stderr,
-    } = result
-    else {
-        panic!("stdio diagnostic settles: {result:?}");
-    };
-    assert_eq!(exit, crate::Exit::Ended { code: 0 }, "{stderr}");
-    assert!(stdout.contains("INHERITED_STDIO_EXIT=0"), "{stdout}");
-    eprintln!("NATIVE_STDIO_DIAGNOSTIC={stdout}");
+    assert_eq!(
+        result,
+        crate::Started::Settled {
+            exit: crate::Exit::Ended { code: 0 },
+            stdout: "DEFAULT_CAPTURE=Ok(Some(0))\nNUL_DEVICE=Ok(())\n".to_owned(),
+            stderr: String::new(),
+        },
+        "an AppContainer child opens NUL itself (D59)"
+    );
 }
