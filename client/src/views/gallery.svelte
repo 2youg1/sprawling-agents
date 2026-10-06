@@ -33,6 +33,7 @@
 
   import { say } from "../core/lang";
   import { setUi, ui } from "../ui";
+  import Accounted from "./gallery/accounted.svelte";
   import Anchored from "./gallery/anchored.svelte";
   import Conversation from "./gallery/conversation.svelte";
   import Doc from "./gallery/doc.svelte";
@@ -135,6 +136,7 @@
   <Filed />
   <Pga />
   <Screens />
+  <Accounted />
   <Runs />
   <Shelved />
   <Used />

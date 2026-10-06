@@ -3287,6 +3287,134 @@
     "en": "What a run in this building may touch. The card is written whole: every face below is what the building's sandbox will say.",
     "zh": "这栋楼里的 run 能碰到什么。整张卡一起写入：下面每一项都是这栋楼的沙箱将要说的。"
   },
+  "setup_account_add": {
+    "en": "add an account",
+    "zh": "添加账号"
+  },
+  "setup_account_busy": {
+    "en": "a key is being filed",
+    "zh": "正在存入密钥"
+  },
+  "setup_account_cancel": {
+    "en": "cancel",
+    "zh": "取消"
+  },
+  "setup_account_down": {
+    "en": "move down",
+    "zh": "下移"
+  },
+  "setup_account_edit": {
+    "en": "edit",
+    "zh": "编辑"
+  },
+  "setup_account_editing": {
+    "en": "edit account {id}",
+    "zh": "编辑账号 {id}"
+  },
+  "setup_account_first": {
+    "en": "already first",
+    "zh": "已经是第一个"
+  },
+  "setup_account_header": {
+    "en": "header name",
+    "zh": "header 名"
+  },
+  "setup_account_id": {
+    "en": "account id",
+    "zh": "账号 id"
+  },
+  "setup_account_id_shape": {
+    "en": "lowercase letters and digits only",
+    "zh": "只能用小写字母和数字"
+  },
+  "setup_account_id_taken": {
+    "en": "this id is already listed; edit that account instead",
+    "zh": "这个 id 已在列表里，请改为编辑那个账号"
+  },
+  "setup_account_key_anonymous": {
+    "en": "no key",
+    "zh": "不用密钥"
+  },
+  "setup_account_key_environment": {
+    "en": "key from an environment variable, read-only",
+    "zh": "密钥来自环境变量，只读"
+  },
+  "setup_account_key_environment_help": {
+    "en": "this key is read from an environment variable; change it there",
+    "zh": "这个密钥从环境变量读取，请在那里修改"
+  },
+  "setup_account_key_environment_unusable": {
+    "en": "environment variable set, key unusable",
+    "zh": "环境变量已设，但密钥不可用"
+  },
+  "setup_account_key_kept": {
+    "en": "leave blank to keep the stored key",
+    "zh": "留空即保留已存的密钥"
+  },
+  "setup_account_key_missing": {
+    "en": "key missing",
+    "zh": "缺密钥"
+  },
+  "setup_account_key_route": {
+    "en": "The key goes straight to the vault; this page keeps only the reference the city answers with.",
+    "zh": "密钥直接存进密钥库，本页只保留城返回的引用。"
+  },
+  "setup_account_key_stored": {
+    "en": "key stored",
+    "zh": "密钥已存入"
+  },
+  "setup_account_key_unread": {
+    "en": "key not checked yet",
+    "zh": "还没查看密钥"
+  },
+  "setup_account_last": {
+    "en": "already last",
+    "zh": "已经是最后一个"
+  },
+  "setup_account_more": {
+    "en": "reference and header",
+    "zh": "引用与 header"
+  },
+  "setup_account_not_sent": {
+    "en": "not sent: the link to the city is down; the draft is kept",
+    "zh": "没有发出：与城的连接断了，草稿保留"
+  },
+  "setup_account_only": {
+    "en": "a provider keeps at least one account",
+    "zh": "供应方至少要留一个账号"
+  },
+  "setup_account_reference": {
+    "en": "existing reference",
+    "zh": "已有引用"
+  },
+  "setup_account_remove": {
+    "en": "remove",
+    "zh": "移除"
+  },
+  "setup_account_save": {
+    "en": "save account",
+    "zh": "保存账号"
+  },
+  "setup_account_up": {
+    "en": "move up",
+    "zh": "上移"
+  },
+  "setup_accounts": {
+    "en": "accounts",
+    "zh": "账号"
+  },
+  "setup_accounts_legacy": {
+    "en": "This provider still uses the one key it was attached with. Saving an account replaces that key with this list, so enter the same key again as the first account.",
+    "zh": "这个供应方还在用接入时填的那一个密钥。保存账号后，这个列表会取代它，所以请把同一个密钥再填一次，作为第一个账号。"
+  },
+  "setup_accounts_order": {
+    "en": "A new session takes the first usable account in this list and stays on it while it answers; the order decides only new sessions and where a request goes after an account fails.",
+    "zh": "新会话取列表里第一个可用的账号，只要它还在回答就一直用它；顺序只决定新会话用哪个，以及一个账号出错后换到哪个。"
+  },
+  "setup_accounts_toggle": {
+    "en": "accounts · {n}",
+    "zh": "账号 · {n}"
+  },
   "setup_add_row": {
     "en": "add a row",
     "zh": "加一行"

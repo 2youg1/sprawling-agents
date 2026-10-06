@@ -9,7 +9,7 @@
 
 import { mintIdem } from "./idem";
 export type { Endpoint, Pair, Tuning } from "./commands/endpoint";
-export { attachEndpoint, probeEndpoint } from "./commands/endpoint";
+export { attachEndpoint, probeEndpoint, reattachEndpoint } from "./commands/endpoint";
 import { providerName } from "./commands/endpoint";
 export { providerName };
 import type {

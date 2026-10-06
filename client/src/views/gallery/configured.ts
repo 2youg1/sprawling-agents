@@ -7,7 +7,8 @@
 // every fixture that asks: an endpoint's tuning as it reads back, and
 // the `[search]` part of the configuration answer.
 
-import type { EndpointTuning, SettledSearch } from "../../wire";
+import type { EndpointSummary, EndpointTuning, SettledSearch } from "../../wire";
+import { ServerLabel } from "../../wire";
 
 // What an endpoint read back when nobody opened its advanced section:
 // every figure absent, and the proxy rule the city settles absence to.
@@ -21,3 +22,34 @@ export const SEARCH: SettledSearch = {
   default_url: "https://mcp.exa.ai/mcp",
   from: "default",
 };
+
+// One provider with three accounts in order, one for each state a key
+// can be in that a person has to read differently: stored, missing,
+// and read from an environment variable the page cannot write.
+export const ACCOUNTED: EndpointSummary = {
+  base_url: "https://api.zenmux.ai/v1",
+  connection_kind: "openai_compat",
+  dialect: "open_ai",
+  has_credential: true,
+  label: "ZenMux",
+  local: false,
+  models: [{ id: "fable", input_modalities: [] }],
+  name: "zenmux",
+  tuning: {
+    ...UNTUNED,
+    accounts: [
+      { id: ServerLabel.make("main"), reference: "secret:providers/zenmux.main" },
+      { id: ServerLabel.make("spare"), reference: "secret:providers/zenmux.spare" },
+      { id: ServerLabel.make("team"), reference: "secret:providers/zenmux.team" },
+    ],
+  },
+  account_status: [
+    { id: ServerLabel.make("main"), key: "stored" },
+    { id: ServerLabel.make("spare"), key: "missing" },
+    { id: ServerLabel.make("team"), key: "environment" },
+  ],
+};
+
+// The same provider as it stands when it was attached with one key and
+// no list: the editor says what a first account replaces.
+export const UNLISTED: EndpointSummary = { ...ACCOUNTED, account_status: [], tuning: UNTUNED };

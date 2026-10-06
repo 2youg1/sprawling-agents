@@ -23,6 +23,10 @@
   // confidential building is refused every endpoint without it
   // (`gateway::router::book::select`), so it is the one property of a
   // row that changes what a person may do with it.
+  //
+  // **Each row folds its account editor under one disclosure**, named
+  // with how many accounts it lists, because the list is read far more
+  // often than it is reordered (`providers/accounts.svelte`).
 
   import type { EndpointsAnswer } from "../../wire";
 
@@ -33,10 +37,11 @@
 
 <script lang="ts">
   import { wireApiOf } from "../../core/commands";
-  import { say } from "../../core/lang";
+  import { fill, say } from "../../core/lang";
   import { ui } from "../../ui";
   import Badge from "../parts/badge.svelte";
   import EmptyState from "../parts/empty.svelte";
+  import Accounts from "./providers/accounts.svelte";
 
   const { answer }: EndpointListProps = $props();
   const { lang } = ui();
@@ -66,6 +71,14 @@
             <span class="rounded-pill bg-raised px-snug">{model.id}</span>
           {/each}
         </div>
+        <details class="mt-snug">
+          <summary class="text-text-quiet">
+            {fill(say($lang, "setup_accounts_toggle"), { n: String(endpoint.tuning.accounts?.length ?? 0) })}
+          </summary>
+          <div class="pt-snug">
+            <Accounts {endpoint} />
+          </div>
+        </details>
       </li>
     {/each}
   </ul>
