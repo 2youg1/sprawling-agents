@@ -273,6 +273,14 @@ impl Custodian {
         }
     }
 
+    /// Deletes the stored value of `reference` (gateway D33).
+    ///
+    /// # Errors
+    /// Not yet written.
+    pub fn forget(&mut self, reference: &SecretRef) -> Result<(), AxError> {
+        self.backend.get(reference).map(|_| ())
+    }
+
     /// State you can render; the value stays unreachable.
     pub fn describe(&self, reference: &SecretRef) -> Described {
         let key = env_key(reference);

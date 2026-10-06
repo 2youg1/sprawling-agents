@@ -45,13 +45,13 @@ fn exposed() -> SocketAddr {
 #[test]
 fn the_command_and_query_tables_hold_their_declared_counts() {
     // The counts are the wire's closed surface, not a style choice.
-    assert_eq!(COMMAND_NAMES.len(), 42, "command table");
+    assert_eq!(COMMAND_NAMES.len(), 43, "command table");
     assert_eq!(QUERY_NAMES.len(), 56, "query table");
 
     let mut sorted = COMMAND_NAMES.to_vec();
     sorted.sort_unstable();
     sorted.dedup();
-    assert_eq!(sorted.len(), 42, "command names are distinct");
+    assert_eq!(sorted.len(), 43, "command names are distinct");
 
     let mut sorted = QUERY_NAMES.to_vec();
     sorted.sort_unstable();
@@ -89,7 +89,7 @@ fn the_schema_hash_is_stable_across_calls_and_covers_the_wire_version() {
         "schema hash changed - update `crates/wire/spec/Frames.lean` §8-1 in the same commit"
     );
     assert_eq!(
-        WIRE_V, 60,
+        WIRE_V, 61,
         "WIRE_V rises once between two pushes, for a shape change under names that stay (wire D1)"
     );
 }
@@ -113,7 +113,7 @@ fn the_schema_hash_covers_every_event_kind_name() {
 
 /// A function of WIRE_V, the two frame name tables and the event kind
 /// names, so any change to the protocol surface lands here first.
-const WIRE_SCHEMA_GOLDEN: &str = "b069c8ae87f79bb4e135c62e3266af51d23f95b9d12bdda2161ca923269ca0b3";
+const WIRE_SCHEMA_GOLDEN: &str = "10526bff82e01bc6e440ed9f21ac581dd4e7d77f294275c00d61d66dd74335e3";
 
 /// The schema hash reads names only, so a field added under names that
 /// stay leaves it where it was. This digest reads the whole shape with the
@@ -153,7 +153,7 @@ fn strip_prose(value: &mut serde_json::Value) {
 
 /// The digest of `wire_schema()` with its prose removed.
 #[cfg(feature = "schema")]
-const WIRE_SHAPE_GOLDEN: &str = "39562b087c7b2fd9167fa417e89871d232ec4b678af5b25cae76a386217083d0";
+const WIRE_SHAPE_GOLDEN: &str = "cda691e826e38aa3d3c5986c5d63f1691ee5e20800610b1e1a4cbe862bca5a38";
 
 // -------------------------------------------------------------- binding face
 
@@ -628,6 +628,10 @@ title = \"a window\"
             idem,
         }),
         Command::CloseRemoteDoor(wire::DoorStep { idem }),
+        Command::ForgetSecret {
+            reference: "secret:search/brave.main".to_owned(),
+            idem,
+        },
     ]
 }
 

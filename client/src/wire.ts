@@ -9,9 +9,9 @@
 import { Schema } from "effect";
 
 /** The wire version both ends compare on connect. */
-export const WIRE_V = 60 as const;
+export const WIRE_V = 61 as const;
 /** The schema hash the server checks: `wire::schema_hash()`. */
-export const WIRE_HASH = "b069c8ae87f79bb4e135c62e3266af51d23f95b9d12bdda2161ca923269ca0b3" as const;
+export const WIRE_HASH = "10526bff82e01bc6e440ed9f21ac581dd4e7d77f294275c00d61d66dd74335e3" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 /** The body sizes a person may ask for: `wire::BODY_PX_MIN` and `BODY_PX_MAX`. */
@@ -5109,6 +5109,12 @@ export const Command = Schema.Union([
   }),
   Schema.Struct({
     close_remote_door: DoorStep,
+  }),
+  Schema.Struct({
+    forget_secret: Schema.Struct({
+      idem: IdemKey,
+      reference: Schema.String,
+    }),
   }),
   Schema.Struct({
     auth: Schema.Struct({

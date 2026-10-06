@@ -72,6 +72,14 @@ impl RunWorker {
         self.record(EventKind::SecretCaptured, Payload::of(&captured)?)
     }
 
+    /// Deletes one reference's key from the vault (`crates/accounting/spec/Worker.lean` §8-37).
+    ///
+    /// # Errors
+    /// Not yet written.
+    pub(in crate::worker) fn forget_secret(&mut self, reference: &str) -> Result<(), AxError> {
+        kernel::SecretRef::parse(reference).map(|_| ())
+    }
+
     /// The redemption closure the adapters take: one resolve per call,
     /// nothing cached, the lock held only while the vault is read.
     pub(in crate::worker) fn resolver(&self) -> gateway::SecretResolver {

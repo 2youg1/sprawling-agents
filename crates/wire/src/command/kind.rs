@@ -386,6 +386,15 @@ pub enum Command<Secret = Sealed<String>> {
     ReplaceCityKey(DoorStep),
     ConfirmRemoteDoor(DoorAnswer),
     CloseRemoteDoor(DoorStep),
+    /// Deletes the vault's value of one reference, spelled
+    /// `secret:realm/name`. Refused while an attached endpoint or a
+    /// configuration still names the reference, and for a key the
+    /// environment supplies (gateway D33); writes nothing to the ledger
+    /// (`crates/accounting/spec/Worker.lean` §8-37).
+    ForgetSecret {
+        reference: String,
+        idem: IdemKey,
+    },
     /// Presenting a pairing token. Read-only, hence no `IdemKey`; the token is plain here because a
     /// token that must cross a wire has, by definition, no secrecy left to protect in transit - it
     /// is sealed the moment it lands (see `server::decide_handshake`).

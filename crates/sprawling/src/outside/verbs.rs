@@ -69,6 +69,7 @@ pub(super) fn command_class(command: &wire::WireCommand) -> VerbClass {
         | wire::Command::CreateBuilding { .. }
         | wire::Command::RemoveBuilding { .. }
         | wire::Command::PutSecret { .. }
+        | wire::Command::ForgetSecret { .. }
         | wire::Command::Reveal { .. }
         | wire::Command::RestoreDiscard { .. }
         | wire::Command::DoctorInstall { .. }

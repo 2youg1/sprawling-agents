@@ -15,6 +15,7 @@
 //! order.
 
 mod affinity;
+mod forgetting;
 mod readback;
 mod recovery;
 
