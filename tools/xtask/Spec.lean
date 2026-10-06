@@ -1399,23 +1399,19 @@ CI 与 justfile 调用面；ARCHITECTURE.md §3（`depmap`、`directions` 围栏
 - `crates/desktop/Spec.lean` D14：叶子那张 lint 表为什么存在（§8-46、D14）。
 -/
 
-/-! D32 归档派生 Homebrew 与 AUR
+/-! D32 归档派生 AUR
 
-本节描述 `tools/xtask/src/channel/system.rs` 的包管理器接口，不是形式证明。
-channel::run 每次读取归档后用 sha2 计算一次 SHA256，平台仍只来自 platform::PLATFORMS，
-将归档名、摘要、平台行交给 system 生成器；相同 Linux 归档的 formula、PKGBUILD 与
-.SRCINFO 携同一摘要。URL 从工作区 repository、已验证 tag 和实际归档名派生。
-部分平台归档可以生成相应 formula 分支；没有 Linux 归档不生成 AUR，未知平台仍拒绝。
-版本用 kernel::Release 的 npm_version，AUR 将连字符转换为下划线，保留发行日期。
-Homebrew 安装二进制到 keg 的 bin，随附资源与许可到 libexec；AUR 安装二进制与
-资源到 kernel::release::aur_install_directory()，以 /usr/bin/sprawling 链接它，
-包名取 kernel::release::AUR_PACKAGE_NAME，许可另到 share/licenses。
-二者不调用 sprawling install，不修改用户登录配置。PKGBUILD 与 .SRCINFO 从同一值生成。
-release.yml 每次构建在 macOS/Linux 用本地 formula 安装，并在 Arch 容器以非 root
-执行 makepkg，再安装并运行 --version；验证的 URL 指向本次归档的回环 HTTP，
-仅 homebrew/sprawling.rb、aur/PKGBUILD、aur/.SRCINFO 的下载基址替换，
-其他文件按字节保留，摘要与包内容不变；含 ELF/Mach-O 非 UTF-8 字节的 fixture
-通过同一 validate.py 入口验证，再由 release build 执行真实安装。发布仅限 tag push，生成文件推送至
-tap/AUR 前已发布归档；凭据缺失以 notice 跳过，不能跳过生成或验证。
-验收：channel fixture 的摘要一致检查、brew install、makepkg --printsrcinfo 对拍与 --version。
+本节描述 tools/xtask/src/channel/system.rs 的包管理器接口，不是形式证明。
+channel::run 从 platform::PLATFORMS 读取平台，计算归档 SHA256 后交给生成器。
+Linux x86-64 归档生成 PKGBUILD 与 .SRCINFO，两者共享摘要、URL 与版本；没有该
+平台时不生成 AUR，未知平台仍拒绝。URL 从 repository、已验证 tag 和归档名派生。
+版本用 kernel::Release 的 npm_version，将连字符转换为下划线。
+包名取 kernel::release::AUR_PACKAGE_NAME，安装目录取 aur_install_directory()，
+二进制链接至 /usr/bin/sprawling，许可另到 share/licenses。
+包不调用 sprawling install，不修改用户登录配置。
+release.yml 在 Linux 的 Arch 容器以非 root 执行 makepkg，安装并运行 --version。
+validate.py 只替换 aur/PKGBUILD 与 aur/.SRCINFO 的下载基址为回环 HTTP，
+其他文件按字节保留；validate_test.py 用 ELF/Mach-O 非 UTF-8 字节验证同一入口。
+发布仅限 tag push，AUR_SSH_KEY 缺失以 notice 跳过发布，生成与验证仍执行。
+验收：channel 摘要与共享布局 fixture、makepkg --printsrcinfo 对拍与 --version。
 -/
