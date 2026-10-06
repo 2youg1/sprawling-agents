@@ -45,6 +45,26 @@ sys.stdin.read(1)
             process.communicate(timeout=5)
     raise SystemExit(0)
 
+if "--memorystatus-fixture" in sys.argv:
+    libc = ctypes.CDLL("/usr/lib/libSystem.B.dylib", use_errno=True)
+    class MemlimitProperties(ctypes.Structure):
+        _fields_ = [("active_mb", ctypes.c_int32), ("active_attr", ctypes.c_uint32),
+                    ("inactive_mb", ctypes.c_int32), ("inactive_attr", ctypes.c_uint32)]
+
+    # XNU kern_memorystatus.h: SET_MEMLIMIT_PROPERTIES = 7; only this probe pid.
+    setter = getattr(libc, "memorystatus_control", None)
+    if setter is None:
+        result_row = {"entry_present": False}
+    else:
+        setter.argtypes = [ctypes.c_uint32, ctypes.c_int32, ctypes.c_uint32, ctypes.c_void_p, ctypes.c_size_t]
+        setter.restype = ctypes.c_int
+        properties = MemlimitProperties(96, 0, 96, 0)
+        ctypes.set_errno(0)
+        result = setter(7, os.getpid(), 0, ctypes.byref(properties), ctypes.sizeof(properties))
+        result_row = {"result": result, "errno": ctypes.get_errno()}
+    print(json.dumps(result_row))
+    raise SystemExit(0)
+
 report = {"os": platform.mac_ver()[0], "machine": platform.machine(), "euid": os.geteuid(), "source_commit": os.environ.get("GITHUB_SHA"), "candidate_state": "evidence_only_not_aggregate_enforcement"}
 libc = ctypes.CDLL("/usr/lib/libSystem.B.dylib", use_errno=True)
 # apple-oss-distributions/xnu f6217f...: osfmk/mach/coalition.h lines 43-54,
@@ -74,23 +94,9 @@ for name, flags in [("resource", 0), ("jetsam", 16)]:
     report["coalition_attempts"].append(row)
 report["coalition_logical_writes_setter_present"] = getattr(libc, "coalition_ledger_set_logical_writes_limit", None) is not None
 
-class MemlimitProperties(ctypes.Structure):
-    _fields_ = [("active_mb", ctypes.c_int32), ("active_attr", ctypes.c_uint32),
-                ("inactive_mb", ctypes.c_int32), ("inactive_attr", ctypes.c_uint32)]
-
-# XNU kern_memorystatus.h: SET_MEMLIMIT_PROPERTIES = 7; only this probe pid.
-setter = getattr(libc, "memorystatus_control", None)
-if setter is None:
-    report["memorystatus_self_limit"] = {"entry_present": False}
-else:
-    setter.argtypes = [ctypes.c_uint32, ctypes.c_int32, ctypes.c_uint32, ctypes.c_void_p, ctypes.c_size_t]
-    setter.restype = ctypes.c_int
-    properties = MemlimitProperties(96, 0, 96, 0)
-    ctypes.set_errno(0)
-    result = setter(7, os.getpid(), 0, ctypes.byref(properties), ctypes.sizeof(properties))
-    report["memorystatus_self_limit"] = {"result": result, "errno": ctypes.get_errno()}
 
 for candidate, command in [
+    ("memorystatus_self_limit", [sys.executable, __file__, "--memorystatus-fixture"]),
     ("taskpolicy_children", ["/usr/sbin/taskpolicy", "-m", "96", sys.executable, __file__, "--tree-fixture"]),
     ("rlimit_as_children", [sys.executable, __file__, "--tree-fixture", "--rlimit-as"]),
     ("rlimit_rss_children", [sys.executable, __file__, "--tree-fixture", "--rlimit-rss"]),
