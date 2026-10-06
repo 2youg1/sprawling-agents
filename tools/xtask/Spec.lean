@@ -1396,3 +1396,11 @@ CI 与 justfile 调用面；ARCHITECTURE.md §3（`depmap`、`directions` 围栏
 - `tools/adversary/Spec.lean`：检验器的规格，`spec` 门按位置认出它（§8-47、D13）。
 - `crates/desktop/Spec.lean` D14：叶子那张 lint 表为什么存在（§8-46、D14）。
 -/
+
+/-! wiring 的设置覆盖：从 person 配置及 building CONFIG.toml 的 Deserialize
+声明枚举每个命名字段，含嵌套类型与带字段的枚举；每个字段在 owning SPEC 有一行
+`settings-control Type.field client/src/path` 或 `settings-reason Type.field 理由`。
+记录字段名而不再声明 TOML 拼写；控制路径必须存在，理由不能空。新增可设字段没有
+记录时 wiring 变红；无字段的枚举由其承载字段覆盖。该检查确认覆盖决策，控件行为
+由客户端类型检查、interaction contracts 与 render 判断。
+-/
