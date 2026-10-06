@@ -222,7 +222,7 @@ pub(crate) struct Violation {
 
 /-! ### 8-8 color：一个客户端，一处颜色产地（形状 6 数据面）
 
-**权威是一句话**：颜色在每个客户端里恰好被命名一次。浏览器客户端的那一处是 `client/src/theme.css` 的 `@theme` 块，`THEME` 常量即它，七条令牌断言只读它。产地表（`color/scan.rs` 的 `PRODUCTION_POINTS`）有两行：`THEME`，以及 playback 技能的参考页 `skills/playback/template.html`——城交给人的一个单文件页面，载不进客户端的样式表，所以它的颜色在自己的 `:root` 块里各命名一次。「断言读哪份表」与「扫描放过谁」从此是两个答案。
+**权威是一句话**：颜色在每个客户端里恰好被命名一次。浏览器客户端的那一处是 `client/src/theme.css` 的 `@theme` 块，`THEME` 常量即它，七条令牌断言只读它。产地表（`color/scan.rs` 的 `PRODUCTION_POINTS`）有两行：`THEME`，以及 playback 技能的样式源文件 `skills/playback/src/style.css`——离线页面载不进客户端的样式表，所以它的颜色在自己的 `:root` 块里各命名一次。`skills/playback/template.html` 是该样式的组装输出，只在带有生成横幅时跳过字面量扫描；共享 Bun 检查逐字节比对它与源片段，未标记的页面仍受扫描。「断言读哪份表」与「扫描放过谁」从此是两个答案。
 
 **七条令牌断言读 CSS 自定义属性，不读 Rust 表**。解析面因此是 `--color-*`／`--text-*`／`--font-weight-*` 这一类声明，值取 `oklch(L C H)` 的三个分量。灰阶的 `L` 以千分之一为单位比较（`0.145` 读作 145），与断言里的 `L_FLOOR`／`L_CEILING` 同刻度。
 
