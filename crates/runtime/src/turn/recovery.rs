@@ -219,6 +219,7 @@ impl<'a, 'h> ModelCall<'a, 'h> {
     /// history rather than as silence.
     fn record(&mut self) -> Result<(), AxError> {
         let called = ModelCalled {
+            provider_account: self.model.provider_account(),
             segments: self.request.segments.to_vec(),
             model: self.request.chat.model.clone(),
         };

@@ -60,7 +60,7 @@ fn fixture(city_root: &Path) -> Views {
     views
 }
 
-pub(crate) fn provider_registrations() -> [(EventKind, serde_json::Value); 2] {
+pub(crate) fn provider_registrations() -> [(EventKind, serde_json::Value); 5] {
     [
         (
             EventKind::EndpointAttached,
@@ -78,6 +78,18 @@ pub(crate) fn provider_registrations() -> [(EventKind, serde_json::Value); 2] {
                     {"id": "anonymous"}
                 ]}
             }),
+        ),
+        (
+            EventKind::ModelCalled,
+            serde_json::json!({"provider_account": {"provider": "explicit", "account": "first"}, "model": "fixture", "segments": []}),
+        ),
+        (
+            EventKind::ModelReturned,
+            serde_json::json!({"message": {"content": []}, "calls": 0}),
+        ),
+        (
+            EventKind::ModelCalled,
+            serde_json::json!({"provider_account": {"provider": "explicit", "account": "anonymous"}, "model": "fixture", "segments": []}),
         ),
     ]
 }

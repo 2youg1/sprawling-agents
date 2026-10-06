@@ -56,10 +56,26 @@ pub type Increments<'a> = &'a mut dyn FnMut(&Increment);
 /// `crates/runtime/spec/Turn/Speculation.lean`.
 pub type EarlyCalls<'a> = &'a mut dyn FnMut(&ToolCall);
 
+/// How an adapter selects a Session account before its first call.
+pub enum AccountSelection {
+    First,
+    Preferred(crate::ServerLabel),
+}
+
 /// The model port. Production adapter: gateway::endpoint;
 /// second adapter: citysim scripted model. Implementations never sample
 /// clocks or read global state.
 pub trait Model {
+    /// The non-secret identity recorded before each actual request.
+    fn provider_account(&self) -> Option<crate::event::record::ProviderAccountBinding> {
+        None
+    }
+    /// Selects a Session's account without sending a request.
+    /// # Errors
+    /// Propagates the adapter's Vault selection failure.
+    fn select_account(&mut self, _selection: AccountSelection) -> Result<(), AxError> {
+        Ok(())
+    }
     fn call(&mut self, req: &ModelRequest) -> Result<ModelReturn, AxError>;
 
     /// The same call, reporting text as it arrives.

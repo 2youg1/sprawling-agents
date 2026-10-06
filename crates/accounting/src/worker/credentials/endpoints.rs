@@ -620,6 +620,7 @@ mod tests {
                 crate::worker::fixture::completion("answered", None),
                 crate::worker::fixture::completion("answered", None),
                 crate::worker::fixture::completion("answered", None),
+                crate::worker::fixture::completion("new session", None),
             ],
         );
         let mut worker = worker_with_provider(dir.path(), &base_url, "m-1").unwrap();
@@ -674,6 +675,43 @@ mod tests {
         };
         attach(&mut worker, accounts.to_vec(), b"account-order-one");
         dispatch(&mut worker, b"account-run-one");
+        let recorded = runtime::replay::verify_ledger_dir(
+            &kernel::layout::CityLayout::new(dir.path()).ledger(),
+        )
+        .unwrap();
+        let called = recorded
+            .lines()
+            .iter()
+            .filter_map(|line| match line {
+                runtime::replay::VerifiedLine::Known { record, .. }
+                    if record.kind() == kernel::EventKind::ModelCalled =>
+                {
+                    Some(
+                        record
+                            .data()
+                            .read::<kernel::event::record::ModelCalled>()
+                            .unwrap()
+                            .provider_account,
+                    )
+                }
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert!(
+            called.iter().any(|binding| binding
+                .as_ref()
+                .is_some_and(|binding| binding.account.as_str() == "one")),
+            "production calls must record account identity: {called:?}"
+        );
+        assert_eq!(
+            worker
+                .credentials
+                .book
+                .session_account(&Address::parse("lab/room1").unwrap(), "house")
+                .map(ServerLabel::as_str),
+            Some("one"),
+            "first successful call must enter the live binding projection"
+        );
         attach(
             &mut worker,
             accounts.iter().rev().cloned().collect(),
@@ -690,6 +728,15 @@ mod tests {
         worker.read_volume_with(crate::worker::fixture::roomy_volume);
         enrol(&mut worker);
         dispatch(&mut worker, b"account-run-three");
+        worker
+            .handle(wire::Command::OpenSession {
+                addr: Address::parse("lab/room1").unwrap(),
+                carry: wire::Carry::Nothing,
+                from: None,
+                idem: IdemKey::derive(&RunId::CITY, Seq::FIRST, b"account-session-new"),
+            })
+            .unwrap();
+        dispatch(&mut worker, b"account-run-four");
         let auth = provider
             .exchanges()
             .into_iter()
@@ -704,7 +751,11 @@ mod tests {
             .collect::<Vec<_>>();
         assert_eq!(
             auth,
-            vec!["authorization: Bearer fixture-value-one".to_owned(); 3]
+            [
+                vec!["authorization: Bearer fixture-value-one".to_owned(); 3],
+                vec!["authorization: Bearer fixture-value-two".to_owned()]
+            ]
+            .concat()
         );
     }
 }

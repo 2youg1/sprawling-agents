@@ -225,6 +225,9 @@ pub(crate) struct Gated {
     endpoint: Endpoint,
     gate: Arc<Gate>,
     monotonic: fn() -> Instant,
+    provider: String,
+    accounts: Vec<kernel::event::record::ProviderAccount>,
+    active: usize,
 }
 
 impl Gated {
@@ -233,13 +236,36 @@ impl Gated {
             endpoint,
             gate,
             monotonic,
+            provider: String::new(),
+            accounts: Vec::new(),
+            active: 0,
         }
+    }
+
+    pub(super) fn with_accounts(
+        mut self,
+        provider: String,
+        accounts: Vec<kernel::event::record::ProviderAccount>,
+    ) -> Gated {
+        self.provider = provider;
+        self.accounts = accounts;
+        self
     }
 
     fn through(
         &mut self,
         door: impl FnOnce(&mut Endpoint) -> Result<ModelReturn, AxError>,
     ) -> Result<ModelReturn, AxError> {
+        if let Some(account) = self.accounts.get(self.active) {
+            self.endpoint.config.auth = match &account.reference {
+                Some(reference) => super::AuthSpec::for_dialect(
+                    self.endpoint.config.dialect,
+                    reference.clone(),
+                    account.header.clone(),
+                ),
+                None => super::AuthSpec::None,
+            };
+        }
         let admitted = self
             .gate
             .admit(self.monotonic, &self.endpoint.config.base_url)?;
@@ -250,6 +276,30 @@ impl Gated {
 }
 
 impl kernel::Model for Gated {
+    fn provider_account(&self) -> Option<kernel::event::record::ProviderAccountBinding> {
+        self.accounts.get(self.active).map(|account| {
+            kernel::event::record::ProviderAccountBinding {
+                provider: self.provider.clone(),
+                account: account.id.clone(),
+            }
+        })
+    }
+
+    fn select_account(
+        &mut self,
+        selection: kernel::model::AccountSelection,
+    ) -> Result<(), AxError> {
+        self.active = match selection {
+            kernel::model::AccountSelection::First => 0,
+            kernel::model::AccountSelection::Preferred(id) => self
+                .accounts
+                .iter()
+                .position(|account| account.id == id)
+                .unwrap_or(0),
+        };
+        Ok(())
+    }
+
     fn call(&mut self, req: &ModelRequest) -> Result<ModelReturn, AxError> {
         self.through(|endpoint| endpoint.call(req))
     }

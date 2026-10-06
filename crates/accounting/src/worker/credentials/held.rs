@@ -45,8 +45,10 @@ impl Credentials {
     pub(in crate::worker) fn absorb(
         &mut self,
         kind: EventKind,
+        run: kernel::RunId,
+        addr: Option<&kernel::Address>,
         data: &Payload,
     ) -> Result<(), AxError> {
-        self.book.apply_payload(kind, data)
+        self.book.absorb(kind, run, addr, data)
     }
 }

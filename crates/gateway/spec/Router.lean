@@ -22,7 +22,6 @@ pub struct AttachedEndpoint { pub name, pub base_url, pub dialect: DialectKind,
                               pub tuning: EndpointTuning }   // §8-16
 impl AttachedEndpoint {
     pub fn is_local(&self) -> bool;          // 与 client_for 绕开代理同一依据（reach::is_local）
-    pub fn effective_accounts(&self) -> Result<Vec<ProviderAccount>, AxError>;
     pub fn first_auth(&self) -> Result<AuthSpec, AxError>; // 原登记或显式列表首账号
     pub fn has_credential(&self) -> bool;    // 关于凭证，金库外只能回答这一问
     pub fn chat_url(&self) -> String;        // base_url ＋ 该兼容格式自己的路径
@@ -81,6 +80,7 @@ endpoint_attached.tuning.accounts 为同一列表的 Ledger 形状，旧记录�
 从 AttachedEndpoint::first_auth 取得凭据，snapshot 保留同一账号列表，
 显式列表不回退原 auth。成功回答将非秘密账号 ID 绑定到房间的 Session，
 重排与重启不改变仍在列表中的绑定；新 Session 清除绑定，被移除的绑定回到首账号。
+旧单账号登记继续使用原 AuthSpec，不构造虚拟账号或重新选择认证头。
 失败处理仍由 runtime 既有的 Provider 策略决定，账号故障转移不在本接口内。
 Accounts 模型以通过账号校验的提交为输入；
 空表、重复引用和非法 header 由 Rust 账户校验回归判断。
@@ -177,7 +177,9 @@ end Gateway.Router.Accounts
 保存每个 Run 的最后一次非秘密账号尝试，model_returned 将它提交到该房间的亲和。
 RunFrozen 删除未成功尝试，SessionOpened 清该房间的亲和；snapshot 保存这些投影，
 不含 Key。派活在 room_for 后将成功亲和传给 adapter，不把未定房间当 Session。
-重排不挪健康账号；被移除的绑定按新表的首账号选择。 -/
+重排不挪健康账号；被移除的绑定按新表的首账号选择。
+模型假设同一房间只有一个活动 Run，生产 open_session 在房间忙时返回 E_BUSY，
+因此新 Session 不会在旧 Run 的回答尚未返回时覆盖它的绑定作用域。 -/
 namespace Gateway.Router.Affinity
 inductive Step (Account : Type) where
   | attempt (account : Account)

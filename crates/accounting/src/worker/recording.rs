@@ -305,7 +305,7 @@ impl RunWorker {
             self.planning.absorb(kind, addr, data),
             self.flight.gate.booked.absorb(kind, addr, data),
             super::collaborating::register_goal(&mut self.collaborating.goals, kind, data),
-            self.credentials.absorb(kind, data),
+            self.credentials.absorb(kind, run, addr, data),
         ]
         .into_iter()
         .collect()

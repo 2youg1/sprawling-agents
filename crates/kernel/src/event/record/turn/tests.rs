@@ -139,6 +139,7 @@ fn hand_written_called(segments: &[B3Hash; 2]) -> Payload {
 fn a_call_line_writes_the_bytes_the_hand_written_map_wrote() {
     let segments = [B3Hash::digest(b"city"), B3Hash::digest(b"run")];
     let called = ModelCalled {
+        provider_account: None,
         segments: segments.to_vec(),
         model: "claude-x".to_owned(),
     };

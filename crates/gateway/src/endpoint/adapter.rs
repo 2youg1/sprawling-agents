@@ -67,7 +67,12 @@ pub fn adapter_for(
         },
         redemption,
     )?;
-    Ok(Box::new(endpoint.gated(chosen.transport, monotonic)))
+    Ok(Box::new(
+        endpoint.gated(chosen.transport, monotonic).with_accounts(
+            chosen.endpoint.name.clone(),
+            chosen.endpoint.tuning.accounts.clone().unwrap_or_default(),
+        ),
+    ))
 }
 
 #[cfg(test)]

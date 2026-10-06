@@ -85,7 +85,18 @@ impl RunWorker {
         // where the run works.
         at.addr = self.room_for(at.addr, session.as_ref())?;
         let agreed = match seat {
-            Seat::Model(agreed) => agreed,
+            Seat::Model(mut agreed) => {
+                use kernel::Model as _;
+                let selection = self
+                    .credentials
+                    .book
+                    .session_account(&at.addr, &agreed.provider)
+                    .map_or(kernel::model::AccountSelection::First, |id| {
+                        kernel::model::AccountSelection::Preferred(id.clone())
+                    });
+                agreed.adapter.select_account(selection)?;
+                agreed
+            }
             // A harness freezes no model and no effort into the room: it
             // chooses its own, so the session shape below is a model's.
             Seat::Harness(seat) => {
