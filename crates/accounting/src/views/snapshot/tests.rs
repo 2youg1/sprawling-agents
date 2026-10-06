@@ -49,7 +49,12 @@ fn fixture(city_root: &Path) -> Views {
         ),
         (EventKind::RulesChanged, rules_changed()),
     ];
-    for (seq, (kind, data)) in (1..).zip(records.into_iter().chain(provider_registrations())) {
+    for (seq, (run, kind, data)) in (1..).zip(
+        records
+            .into_iter()
+            .map(|(kind, data)| (run, kind, data))
+            .chain(provider_registrations()),
+    ) {
         let serde_json::Value::Object(data) = data else {
             panic!("each fixture payload is an object");
         };
@@ -60,9 +65,12 @@ fn fixture(city_root: &Path) -> Views {
     views
 }
 
-pub(crate) fn provider_registrations() -> [(EventKind, serde_json::Value); 6] {
+pub(crate) fn provider_registrations() -> [(RunId, EventKind, serde_json::Value); 12] {
+    let old = RunId::from_bytes([7; 16]);
+    let fresh = RunId::from_bytes([8; 16]);
     [
         (
+            old,
             EventKind::EndpointAttached,
             serde_json::json!({
                 "name": "legacy", "base_url": "https://api.example.test/v1",
@@ -70,6 +78,7 @@ pub(crate) fn provider_registrations() -> [(EventKind, serde_json::Value); 6] {
             }),
         ),
         (
+            old,
             EventKind::EndpointAttached,
             serde_json::json!({
                 "name": "explicit", "base_url": "https://api.example.test/v1",
@@ -80,18 +89,52 @@ pub(crate) fn provider_registrations() -> [(EventKind, serde_json::Value); 6] {
             }),
         ),
         (
+            old,
             EventKind::RunStarted,
             serde_json::json!({"task": "fixture"}),
         ),
         (
+            old,
             EventKind::ModelCalled,
             serde_json::json!({"provider_account": {"provider": "explicit", "account": "first"}, "model": "fixture", "segments": []}),
         ),
         (
+            old,
             EventKind::ModelReturned,
             serde_json::json!({"message": {"content": []}, "calls": 0}),
         ),
         (
+            old,
+            EventKind::ModelCalled,
+            serde_json::json!({"provider_account": {"provider": "explicit", "account": "anonymous"}, "model": "fixture", "segments": []}),
+        ),
+        (
+            RunId::CITY,
+            EventKind::SessionOpened,
+            serde_json::json!({"carried": false}),
+        ),
+        (
+            old,
+            EventKind::ModelReturned,
+            serde_json::json!({"message": {"content": []}, "calls": 0}),
+        ),
+        (
+            fresh,
+            EventKind::RunStarted,
+            serde_json::json!({"task": "fixture"}),
+        ),
+        (
+            fresh,
+            EventKind::ModelCalled,
+            serde_json::json!({"provider_account": {"provider": "explicit", "account": "first"}, "model": "fixture", "segments": []}),
+        ),
+        (
+            fresh,
+            EventKind::ModelReturned,
+            serde_json::json!({"message": {"content": []}, "calls": 0}),
+        ),
+        (
+            fresh,
             EventKind::ModelCalled,
             serde_json::json!({"provider_account": {"provider": "explicit", "account": "anonymous"}, "model": "fixture", "segments": []}),
         ),
@@ -249,7 +292,7 @@ proptest::proptest! {
             (EventKind::ModelCalled, spare, None, called("spare")),
             (EventKind::ModelCalled, other, None, called("neighbour")),
             (EventKind::ModelReturned, other, None, returned.clone()),
-            (EventKind::SessionOpened, RunId::CITY, Some(room.clone()), Payload::empty()),
+            (EventKind::SessionOpened, RunId::CITY, Some(room.clone()), Payload::of(&kernel::event::record::SessionOpened { carried: false, from: None }).unwrap()),
         ];
         let mut live = gateway::EndpointBook::new();
         for (kind, run, addr, data) in &events {
@@ -280,8 +323,7 @@ proptest::proptest! {
             let (kind, data) = match step % 3 {
                 0 => (EventKind::ModelCalled, called("late")),
                 1 => (EventKind::ModelReturned, returned.clone()),
-                2 => (EventKind::RunFrozen, Payload::empty()),
-                _ => unreachable!(),
+                2.. => (EventKind::RunFrozen, Payload::empty()),
             };
             let addr = if step < 6 { None } else { Some(room.clone()) };
             events.push((kind, run, addr, data));
@@ -294,7 +336,7 @@ proptest::proptest! {
         let mut live = gateway::EndpointBook::new();
         let mut replay = Views::new(dir.path());
         let mut restored = Views::new(dir.path());
-        let cut = cut % (records.len() + 1);
+        let cut = cut.min(records.len());
         for (index, record) in records.iter().enumerate() {
             live.absorb(record.kind(), record.run(), record.addr(), record.data()).unwrap();
             replay.apply(record).unwrap();

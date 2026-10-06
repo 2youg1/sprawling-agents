@@ -55,7 +55,7 @@ pub struct EndpointBook {
     #[serde(default)]
     attempts: BTreeMap<kernel::RunId, kernel::event::record::ProviderAccountBinding>,
     #[serde(default)]
-    active_rooms: BTreeMap<kernel::RunId, kernel::Address>,
+    session_rooms: BTreeMap<kernel::RunId, kernel::Address>,
 }
 
 /// One attached endpoint and the client its calls share. A second
@@ -116,6 +116,9 @@ impl EndpointBook {
     }
 
     /// Folds both registration and successful Session account affinity.
+    /// `RunStarted` admits each Run to its room's current Session.
+    /// `SessionOpened` revokes the room's old Runs; their subsequent calls
+    /// and answers cannot bind, even when the answer carries an address.
     ///
     /// # Errors
     /// Propagates unreadable owned records before making a decision from them.
@@ -129,18 +132,21 @@ impl EndpointBook {
         self.apply_payload(kind, data)?;
         if kind == EventKind::RunStarted {
             if let Some(addr) = addr {
-                self.active_rooms.insert(run, addr.clone());
+                self.session_rooms.insert(run, addr.clone());
             }
         } else if kind == EventKind::ModelCalled {
             let called: kernel::event::record::ModelCalled = data.read()?;
+            if !self.session_rooms.contains_key(&run) {
+                return Ok(());
+            }
             if let Some(binding) = called.provider_account {
                 self.attempts.insert(run, binding);
             } else {
                 self.attempts.remove(&run);
             }
         } else if kind == EventKind::ModelReturned {
-            if let Some(binding) = self.attempts.remove(&run)
-                && let Some(addr) = addr.or_else(|| self.active_rooms.get(&run))
+            if let Some(addr) = self.session_rooms.get(&run)
+                && let Some(binding) = self.attempts.remove(&run)
             {
                 self.affinity
                     .entry(addr.clone())
@@ -150,10 +156,18 @@ impl EndpointBook {
         } else if kind == EventKind::SessionOpened {
             if let Some(addr) = addr {
                 self.affinity.remove(addr);
+                self.session_rooms.retain(|run, room| {
+                    if room == addr {
+                        self.attempts.remove(run);
+                        false
+                    } else {
+                        true
+                    }
+                });
             }
         } else if kind == EventKind::RunFrozen {
             self.attempts.remove(&run);
-            self.active_rooms.remove(&run);
+            self.session_rooms.remove(&run);
         }
         Ok(())
     }
