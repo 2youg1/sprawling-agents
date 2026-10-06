@@ -34,6 +34,16 @@ export const AccountDisposition = Schema.Union([
 export type AccountDisposition = typeof AccountDisposition.Type;
 
 /**
+ * How many more times one account is asked the same request before the
+ * round moves on. A person picks one or two on the provider's advanced
+ * form; it is read only where the roster has two accounts or more. On
+ * the wire and in the ledger `"one"` or `"two"`; the default lives in
+ * gateway's `EndpointTuning::DEFAULTS` alone.
+ */
+export const AccountRetries = Schema.Literals(["one", "two"]).annotate({ identifier: "AccountRetries" });
+export type AccountRetries = typeof AccountRetries.Type;
+
+/**
  * A canonical relative path inside the city: `/`-separated segments, none empty, none `.` or `..`, no backslash, no `:`, no control character, and no segment ending in a dot or whitespace, as `kernel::Address::parse` accepts it.
  */
 export const Address = Schema.String.check(Schema.isPattern(new RegExp("^(?:[^/\\\\:\\p{Cc}]*[^/\\\\:\\p{Cc}.\\p{White_Space}])(?:/[^/\\\\:\\p{Cc}]*[^/\\\\:\\p{Cc}.\\p{White_Space}])*$", "u"))).pipe(Schema.brand("Address"));
@@ -951,6 +961,7 @@ export type Proxying = typeof Proxying.Type;
  * draws what this carries, and the numbers have one home.
  */
 export const TuningDefaults = Schema.Struct({
+  account_retries: AccountRetries,
   from: ConfigLayer,
   proxying: Proxying,
   request_max_retries: Schema.optional(Schema.NullOr(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)))),
@@ -2404,7 +2415,7 @@ export type ListingAnswer = typeof ListingAnswer.Type;
 /**
  * One of the closed set of error codes, as `AxCode::as_str` spells it.
  */
-export const AxCode = Schema.Literals(["E_PATH_NOT_FOUND", "E_TOOL_UNKNOWN", "E_TOOL_UNAVAILABLE", "E_INVALID_ARGS", "E_OUTSIDE_WRITE_DOMAIN", "E_VERSION_CONFLICT", "E_GATE_DENIED", "E_BUDGET_EXHAUSTED", "E_TIMEOUT", "E_PROVIDER", "E_EVIDENCE_MISSING", "E_LOOP_SUSPECTED", "E_LOCATOR_INVALID", "E_SANDBOX_DENIED", "E_BUSY", "E_DRAFT_STALE", "E_GOAL_CONFLICT", "E_TAINTED_ACTION", "E_REPAIR_BUSY", "E_DELEGATION_DEPTH", "E_APPROVAL_PENDING", "E_APPROVAL_DENIED", "E_CROSS_BUILDING_DENIED", "E_DIGEST_SUSPECT", "E_CREDENTIAL_MISSING", "E_MODEL_UNCHOSEN", "E_CONFIG_INVALID", "E_CAS_CORRUPT", "E_STORAGE_FATAL", "E_WORKTREE_BUSY", "E_BROWSER_UNAVAILABLE", "E_ENDPOINT_DIALECT_UNSUPPORTED", "E_WIRE_MISMATCH", "E_LOG_VERSION_UNSUPPORTED", "E_LEDGER_HELD", "E_HISTORY_UNPROVEN", "E_SECRET_EGRESS", "E_DISCARD_IRREVERSIBLE", "E_BACKPRESSURE_SHED", "E_TOOL_OUTCOME_UNKNOWN", "E_PLAN_MISSING"]).annotate({ identifier: "AxCode" });
+export const AxCode = Schema.Literals(["E_PATH_NOT_FOUND", "E_TOOL_UNKNOWN", "E_TOOL_UNAVAILABLE", "E_INVALID_ARGS", "E_OUTSIDE_WRITE_DOMAIN", "E_VERSION_CONFLICT", "E_GATE_DENIED", "E_BUDGET_EXHAUSTED", "E_TIMEOUT", "E_PROVIDER", "E_EVIDENCE_MISSING", "E_LOOP_SUSPECTED", "E_LOCATOR_INVALID", "E_SANDBOX_DENIED", "E_BUSY", "E_DRAFT_STALE", "E_GOAL_CONFLICT", "E_TAINTED_ACTION", "E_REPAIR_BUSY", "E_DELEGATION_DEPTH", "E_APPROVAL_PENDING", "E_APPROVAL_DENIED", "E_CROSS_BUILDING_DENIED", "E_DIGEST_SUSPECT", "E_CREDENTIAL_MISSING", "E_MODEL_UNCHOSEN", "E_CONFIG_INVALID", "E_CAS_CORRUPT", "E_STORAGE_FATAL", "E_WORKTREE_BUSY", "E_BROWSER_UNAVAILABLE", "E_ENDPOINT_DIALECT_UNSUPPORTED", "E_WIRE_MISMATCH", "E_LOG_VERSION_UNSUPPORTED", "E_LEDGER_HELD", "E_HISTORY_UNPROVEN", "E_SECRET_EGRESS", "E_DISCARD_IRREVERSIBLE", "E_BACKPRESSURE_SHED", "E_TOOL_OUTCOME_UNKNOWN", "E_PLAN_MISSING", "E_PROVIDER_ACCOUNTS_EXHAUSTED"]).annotate({ identifier: "AxCode" });
 export type AxCode = typeof AxCode.Type;
 
 /**
@@ -4456,6 +4467,7 @@ export type ProviderAccount = typeof ProviderAccount.Type;
  * opinion sends.
  */
 export const EndpointTuning = Schema.Struct({
+  account_retries: Schema.optional(Schema.NullOr(AccountRetries)),
   accounts: Schema.optional(Schema.NullOr(Schema.Array(ProviderAccount))),
   headers: Schema.Array(HeaderPair),
   label: Schema.optional(Schema.NullOr(Schema.String)),

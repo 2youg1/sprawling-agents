@@ -5015,6 +5015,10 @@
     "en": "the provider failed to answer",
     "zh": "供应商没有答上来"
   },
+  "err_e_provider_accounts_exhausted": {
+    "en": "every account of this provider failed",
+    "zh": "这个供应方的每个账号都没答上来"
+  },
   "err_e_evidence_missing": {
     "en": "the city needs to see the work first",
     "zh": "城需要先看到证据"
@@ -6106,6 +6110,10 @@
   "recover_e_provider": {
     "en": "Check the provider's key and status on the model settings page, then send again.",
     "zh": "在模型设置页面检查供应方的密钥和状态，然后再发一次。"
+  },
+  "recover_e_provider_accounts_exhausted": {
+    "en": "On the model settings page, file a key or add credit for one of this provider's accounts, or add another account, then send again.",
+    "zh": "在模型设置页面为这个供应方的某个账号补存密钥或充值，或者新增一个账号，然后再发一次。"
   },
   "recover_e_evidence_missing": {
     "en": "Let the run show the work first: a test, a diff or a file it wrote.",

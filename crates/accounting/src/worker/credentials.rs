@@ -120,7 +120,7 @@ pub(super) fn tuning_of(wire: wire::EndpointTuning) -> Result<gateway::EndpointT
             .filter(|ceiling| *ceiling > 0)
             .map(gateway::MaxInFlight::try_from)
             .transpose()?,
-        account_retries: None,
+        account_retries: wire.account_retries,
     })
 }
 

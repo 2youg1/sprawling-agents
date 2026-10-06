@@ -103,7 +103,7 @@ fn tuning_of(kept: AttachedTuning) -> Result<EndpointTuning, AxError> {
             Some(Ok(ceiling)) => Some(ceiling),
             Some(Err(_)) | None => None,
         },
-        account_retries: None,
+        account_retries: kept.account_retries,
     })
 }
 
