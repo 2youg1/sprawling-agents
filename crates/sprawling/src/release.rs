@@ -242,7 +242,7 @@ pub(crate) fn channel(
         .any(|(parent, child)| parent.as_os_str() == "Cellar" && child.as_os_str() == "sprawling");
     if homebrew {
         InstallChannel::Homebrew
-    } else if dir.is_some_and(|dir| dir.ends_with("usr/lib/sprawling-bin")) {
+    } else if kernel::release::is_aur_install(exe) {
         InstallChannel::Aur
     } else if packaged {
         InstallChannel::Package
@@ -571,7 +571,10 @@ mod tests {
     fn system_package_paths_select_their_own_update_guidance() {
         let root = tempfile::tempdir().unwrap();
         let brew = root.path().join("Cellar/sprawling/0.0.10/bin/sprawling");
-        let aur = root.path().join("usr/lib/sprawling-bin/sprawling");
+        let aur = root
+            .path()
+            .join(kernel::release::aur_install_directory())
+            .join("sprawling");
         assert_eq!(
             [channel(&brew, None), channel(&aur, None)],
             [InstallChannel::Homebrew, InstallChannel::Aur]

@@ -168,6 +168,25 @@ description = 'fixture'
     let srcinfo = std::fs::read_to_string(out.join("aur/.SRCINFO")).unwrap();
     assert!(formula.contains("on_macos") && formula.contains("on_linux"));
     assert!(pkgbuild.contains("pkgver=0.0.10_pre.261005"));
+    let executable = pkgbuild
+        .lines()
+        .find_map(|line| line.strip_prefix("  ln -s \""))
+        .unwrap()
+        .split('"')
+        .next()
+        .unwrap();
+    assert!(kernel::release::is_aur_install(std::path::Path::new(
+        executable
+    )));
+    let package = pkgbuild
+        .lines()
+        .find_map(|line| line.strip_prefix("pkgname="))
+        .unwrap();
+    assert!(
+        srcinfo
+            .lines()
+            .any(|line| line == format!("pkgname = {package}"))
+    );
     let digest = srcinfo
         .lines()
         .find_map(|line| line.trim().strip_prefix("sha256sums = "))

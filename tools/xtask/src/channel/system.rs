@@ -82,7 +82,8 @@ fn aur(
     let sha256 = &archive.sha256;
     let source = format!("{}::{url}", archive.name);
     let description = "Local agent harness (release binary)";
-    let package = "sprawling-bin";
+    let package = kernel::release::AUR_PACKAGE_NAME;
+    let directory = kernel::release::aur_install_directory();
     super::write(
         &out.join("aur/PKGBUILD"),
         format!(
@@ -100,10 +101,10 @@ sha256sums=('{sha256}')
 package() {{
   local application
   application=$(dirname "$(find "$srcdir" -type f -name '{binary}' -print -quit)")
-  install -d "$pkgdir/usr/lib/$pkgname" "$pkgdir/usr/bin"
-  cp -a "$application/." "$pkgdir/usr/lib/$pkgname/"
-  chmod 755 "$pkgdir/usr/lib/$pkgname/{binary}"
-  ln -s "/usr/lib/$pkgname/{binary}" "$pkgdir/usr/bin/{binary}"
+  install -d "$pkgdir/{directory}" "$pkgdir/usr/bin"
+  cp -a "$application/." "$pkgdir/{directory}/"
+  chmod 755 "$pkgdir/{directory}/{binary}"
+  ln -s "/{directory}/{binary}" "$pkgdir/usr/bin/{binary}"
   install -Dm644 "$application/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
 }}
 "#
