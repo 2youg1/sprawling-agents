@@ -269,9 +269,29 @@ test-std:
 test-archive file:
     cargo nextest archive --workspace --locked --all-features --archive-file '{{file}}'
 
-# Names and filtersets live here; CI consumes the checked matrix rather
-# than maintaining a second roster. List from the archive, then reuse its
-# metadata for each filterset, so coverage needs no second compilation.
+# Names, filtersets and the environment each slice needs live here; CI
+# consumes the checked matrix rather than maintaining a second roster.
+# List from the archive, then reuse its metadata for each filterset, so
+# coverage needs no second compilation.
+#
+# A part is a disjoint set of tests; a slice is the parts one runner
+# takes. A slice's runner pays ~60 s of setup before its first test while
+# most parts run in 10-80 s, so the parts are bundled into four slices
+# balanced on their measured nextest time rather than given a runner
+# each. trybuild is split by package and citysim stands alone as parts;
+# the other unit tests are grouped by crate, the integration tests by
+# package, and the remaining kinds fall into one part. The unit
+# scenarios of accounting are split into execution, collaboration and
+# the rest, and the first two share a slice that carries no other heavy
+# part, because their file writes and worker scenarios are the heaviest
+# load one runner takes. The domain module names live only in these
+# predicates, and the rest is generated from them.
+#
+# `environment` names what a slice installs beyond the toolchain and
+# the archive: `compile` builds projects of its own (trybuild), so it
+# needs Zig, the registry and its scratch cache; `client` holds the xtask
+# tests that read `client/node_modules` and the bundle; `plain` needs
+# neither. A part moves between slices by editing one list below.
 test-slice-plan file out:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -280,10 +300,10 @@ test-slice-plan file out:
     python - '{{out}}' <<'PY'
     import json, pathlib, subprocess, sys
     out = pathlib.Path(sys.argv[1])
-    slices = []
+    parts = {}
     for package in ['kernel', 'storage', 'collab', 'runtime', 'wire']:
-        slices.append({'name': 'trybuild-' + package, 'filter': f'package(=sprawling-{package}) & binary(=trybuild)'})
-    slices.append({'name': 'citysim', 'filter': 'package(=citysim)'})
+        parts['trybuild-' + package] = f'package(=sprawling-{package}) & binary(=trybuild)'
+    parts['citysim'] = 'package(=citysim)'
     unit = '(kind(lib) | kind(bin) | kind(proc-macro)) & !package(=citysim)'
     groups = {
         'runtime': 'package(=sprawling-runtime)',
@@ -301,21 +321,31 @@ test-slice-plan file out:
         groups['accounting-' + domain] = f'({accounting} & {predicate})'
     groups['accounting-other'] = f'({accounting} & !(' + ' | '.join(accounting_domains.values()) + '))'
     for name, packages in groups.items():
-        slices.append({'name': 'unit-' + name, 'filter': f'{unit} & {packages}'})
-    slices.append({'name': 'unit-other', 'filter': unit + ' & !(' + ' | '.join(groups.values()) + ')'})
+        parts['unit-' + name] = f'{unit} & {packages}'
+    parts['unit-other'] = unit + ' & !(' + ' | '.join(groups.values()) + ')'
     integration = 'kind(test) & !binary(=trybuild) & !package(=citysim)'
-    slices.extend([
-        {'name': 'integration-sprawling', 'filter': integration + ' & package(=sprawling)'},
-        {'name': 'integration-other', 'filter': integration + ' & !package(=sprawling)'},
-        {'name': 'other-kinds', 'filter': '!(kind(lib) | kind(bin) | kind(proc-macro) | kind(test)) & !package(=citysim)'},
-    ])
+    parts['integration-sprawling'] = integration + ' & package(=sprawling)'
+    parts['integration-other'] = integration + ' & !package(=sprawling)'
+    parts['other-kinds'] = '!(kind(lib) | kind(bin) | kind(proc-macro) | kind(test)) & !package(=citysim)'
+    bundles = [
+        ('trybuild', 'compile', ['trybuild-kernel', 'trybuild-storage', 'trybuild-collab', 'trybuild-runtime',
+                                 'trybuild-wire', 'unit-kernel-storage', 'other-kinds']),
+        ('sprawling', 'client', ['unit-xtask', 'unit-sprawling', 'integration-sprawling', 'integration-other']),
+        ('accounting', 'plain', ['unit-accounting-other', 'unit-runtime', 'unit-other', 'unit-gateway-protocols']),
+        ('worker', 'plain', ['unit-accounting-execution', 'unit-accounting-collaboration', 'citysim']),
+    ]
+    bundled = [part for _, _, members in bundles for part in members]
+    if sorted(bundled) != sorted(parts) or len(bundled) != len(set(bundled)):
+        sys.exit('test-slice-plan: every part belongs to exactly one slice')
     active = []
-    for row in slices:
-        with (out / (row['name'] + '.json')).open('w', encoding='utf-8') as output:
+    for name, environment, members in bundles:
+        row = {'name': name, 'environment': environment,
+               'filter': ' | '.join(f'({parts[member]})' for member in members)}
+        with (out / (name + '.json')).open('w', encoding='utf-8') as output:
             subprocess.run(['cargo', 'nextest', 'list', '--cargo-metadata', 'target/nextest/cargo-metadata.json',
                             '--binaries-metadata', 'target/nextest/binaries-metadata.json', '--workspace-remap', '.',
                             '--run-ignored', 'all', '--message-format', 'json', '-E', row['filter']], stdout=output, check=True)
-        listing = json.loads((out / (row['name'] + '.json')).read_text(encoding='utf-8'))
+        listing = json.loads((out / (name + '.json')).read_text(encoding='utf-8'))
         if any(case['filter-match']['status'] == 'matches' for suite in listing['rust-suites'].values()
                for case in suite.get('testcases', {}).values()):
             active.append(row)
@@ -356,9 +386,16 @@ test-slice-coverage out:
     PY
 
 # Unpack at the checkout path compiled into tests that spawn workspace
-# binaries. Fetch first: trybuild compiles its own project offline.
-test-slice file filter:
-    cargo fetch --locked
+# binaries. A `compile` slice fetches first, because trybuild compiles its
+# own project offline; the other environments read no registry.
+test-slice file environment filter:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    case '{{environment}}' in
+        compile) cargo fetch --locked ;;
+        client | plain) ;;
+        *) echo "test-slice: unknown environment '{{environment}}'; test-slice-plan names compile, client and plain" >&2; exit 2 ;;
+    esac
     cargo nextest run --archive-file '{{file}}' --workspace-remap . --extract-to . --extract-overwrite -E '{{filter}}' --no-fail-fast --no-tests=warn
 
 # Compare completed successful Actions inventories, exported with:
