@@ -6,6 +6,7 @@ on:
       - crates/runtime/**
       - crates/desktop/ffi/**
       - crates/kernel/**
+      - crates/accounting/src/worker/driving/tests/sieving.rs
       - Cargo.toml
       - Cargo.lock
       - .github/workflows/native-windows-acceptance.yml
@@ -49,19 +50,24 @@ jobs:
         run: |
           cargo nextest run -p sprawling-runtime --run-ignored ignored-only --no-tests fail --no-fail-fast --failure-output immediate-final -E 'test(native_windows_disposable)' 2>&1 | Tee-Object native-evidence/production.log
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: Native priority and declared Rust build regressions
+      - name: Six regressions under explicitly selected native confinement
         if: ${{ !cancelled() }}
         shell: pwsh
         run: |
-          $filter = 'test(a_dispatched_command_runs_below_the_core) | binary(exec_builds)'
-          cargo nextest list -p sprawling-runtime -E $filter --message-format json > native-evidence/regressions.json 2> native-evidence/regressions-list.stderr
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          $suites = (Get-Content native-evidence/regressions.json -Raw | ConvertFrom-Json).'rust-suites'.PSObject.Properties.Value
-          $priority = @($suites | ForEach-Object { $_.testcases.PSObject.Properties } | Where-Object { $_.Name -ceq 'tools::exec::tests::yielding::a_dispatched_command_runs_below_the_core' -and $_.Value.'filter-match'.status -eq 'matches' -and -not $_.Value.ignored })
-          $build = @($suites | Where-Object { $_.'binary-name' -ceq 'exec_builds' } | ForEach-Object { $_.testcases.PSObject.Properties } | Where-Object { $_.Value.'filter-match'.status -eq 'matches' -and -not $_.Value.ignored })
-          if ($priority.Count -ne 1 -or $build.Count -eq 0) { throw 'Both native regressions must be selected and runnable.' }
-          cargo nextest run -p sprawling-runtime --no-tests fail --no-fail-fast --failure-output immediate-final --success-output immediate -E $filter 2>&1 | Tee-Object native-evidence/regressions.log
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $runtime = 'test(the_program_arm_runs_a_real_child_with_a_scrubbed_environment) | test(a_sandboxed_command_writes_in_a_copy_and_leaves_the_source_tree_alone) | test(a_child_sees_the_names_its_building_declared_and_no_others) | test(a_dispatched_command_runs_below_the_core) | binary(exec_builds)'
+          $accounting = 'test(a_command_output_over_the_floor_reaches_the_model_sieved_with_the_way_back)'
+          $failed = $false
+          foreach ($probe in @(@{ crate = 'sprawling-runtime'; filter = $runtime; count = 5 }, @{ crate = 'sprawling-accounting'; filter = $accounting; count = 1 })) {
+            $name = $probe.crate
+            cargo nextest list -p $name -E $probe.filter --message-format json > "native-evidence/$name.json" 2> "native-evidence/$name-list.stderr"
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            $suites = (Get-Content "native-evidence/$name.json" -Raw | ConvertFrom-Json).'rust-suites'.PSObject.Properties.Value
+            $selected = @($suites | ForEach-Object { $_.testcases.PSObject.Properties } | Where-Object { $_.Value.'filter-match'.status -eq 'matches' -and -not $_.Value.ignored })
+            if ($selected.Count -ne $probe.count) { throw "Expected $($probe.count) runnable regressions in $name; selected $($selected.Count)." }
+            cargo nextest run -p $name --no-tests fail --no-fail-fast --failure-output immediate-final --success-output immediate -E $probe.filter 2>&1 | Tee-Object "native-evidence/$name-regressions.log"
+            if ($LASTEXITCODE -ne 0) { $failed = $true }
+          }
+          if ($failed) { exit 1 }
       - name: Hash the actual probe binaries
         if: always()
         shell: pwsh
