@@ -69,16 +69,19 @@ pub(super) fn stopped(
     });
     let caps = host.get("CapDrop").and_then(Value::as_array);
     let security = host.get("SecurityOpt").and_then(Value::as_array);
-    let caps_dropped = caps.is_some_and(|caps| {
-        caps.iter().any(|cap| {
-            cap.as_str()
-                .is_some_and(|cap| cap.eq_ignore_ascii_case("ALL"))
-        })
-    }) || matches!(engine, ContainerEngine::Podman)
-        && value
-            .get("EffectiveCaps")
-            .and_then(Value::as_array)
-            .is_some_and(Vec::is_empty);
+    let caps_dropped = match engine {
+        ContainerEngine::Docker => caps.is_some_and(|caps| {
+            caps.iter().any(|cap| {
+                cap.as_str()
+                    .is_some_and(|cap| cap.eq_ignore_ascii_case("ALL"))
+            })
+        }),
+        ContainerEngine::Podman => ["EffectiveCaps", "BoundingCaps"].iter().all(|field| {
+            value
+                .get(field)
+                .is_some_and(|caps| caps.is_null() || caps.as_array().is_some_and(Vec::is_empty))
+        }),
+    };
     if !cpu
         || host.get("Memory") != Some(&json!(limits.memory_bytes.get()))
         || host.get("MemorySwap") != Some(&json!(limits.memory_bytes.get()))
