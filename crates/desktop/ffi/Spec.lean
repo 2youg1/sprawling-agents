@@ -561,13 +561,16 @@ example : walk (fun _ => 0) 64 3 0 = none := by decide
 **D4 处理器拓扑、节能限流与 run 的 job 份额也在这片叶子里，叶子只做调用，记录由安全的 Rust 解析。** `sprawling` 的放置（`crates/sprawling/spec/Serving/Placement.lean` D41、D45）要 `GetSystemCpuSetInformation` 与 `GetThreadGroupAffinity`，D40 要 `SetProcessInformation(ProcessPowerThrottling)`，`crates/runtime/spec/Tools/Exec.lean` D29 要 job 的 CPU 权重与作业级内存上限；`std`、`thread-priority` 3.1.1、`win32job` 2.0.3、`winsafe` 0.0.29 都不给这几项，而 `unsafe` 只许在本包（`xtask guard`），所以它们是本叶子的新 export，各做一次完整的调用：CPU set 的记录原样写进 Rust 借出的字节缓冲（`NoRoom` 附需要的长度，Rust 加大重试），组亲和与限流各写一个小结构。解析不进叶子：记录的走法（上面 `walk` 的两条定理）在 `cpu_set::parse` 里，是纯的安全 Rust，在每个平台上都编译，于是一台 i5-1340P 实读的记录作为夹具在 Linux 与 macOS 的 runner 上也被解析；它的 fuzz 是 proptest 在任意字节上跑（不 panic、只报 `Malformed`），叶子一侧没有可对拍的纯函数，所以这一组没有 Zig 侧的对拍。被否：①叶子解析好再交结构——解析是最可能出错的一段，放在 Zig 里就只能在 Windows 上测，也离开了 Rust 的类型；②为它们另开一个 FFI crate——要动门的机器（guard 的 lint 表名单），换来的只是名字更贴切。重开参数：一个对外安全的 crate 给出这些调用，那一组离开叶子。
 
 **D5 native confinement 的资源跨越 backlog 多次轮询，由安全 Rust owner 持有句柄。**
-`src/confinement.rs` 的 `OwnedProcess` 只持有叶子产生的 Job/process 句柄与唯一
-AppContainer profile 名，`zig/confinement.zig` 通过完整 launch、poll、terminate、cleanup
-操作管理它们；没有调用借出缓冲的地址留下。生产 caller 是
+`src/confinement.rs` 的 `OwnedProcess` 持有叶子产生的 command Job/process 句柄、
+唯一 AppContainer profile 名和 ACL 授权记录，`zig/confinement.zig` 通过完整
+launch、poll、terminate、cleanup 操作管理它们；授权路径在叶子内复制，
+没有调用借出缓冲的地址留下。生产 caller 是
 `crates/runtime/src/tools/exec/native_windows.rs` 与 backlog 的 native process arm，
 launch 以 capability-free AppContainer 挂起创建、给 command job 配置 CPU cap（内存上限只在
 run job 上，由 D6 的 watch 读撞限），装进 command job 与 run job 后恢复。scratch ACL 与 profile storage 都只属于这次执行；
-harness 网络不进入 AppContainer。Rust 负责 argv/env/限额与 typed failures，叶子不选择策略。
+harness 网络不进入 AppContainer。声明的 toolchain home 只授予 read/execute，
+撤销在 job tree 停止后移除本次 SID；失败时保留授权路径供 cleanup 重试。
+Rust 负责 argv/env/限额与 typed failures，叶子不选择策略。
 
 `winsafe` 的安全 CreateProcess 面只收 STARTUPINFO，不能给 SECURITY_CAPABILITIES，
 `win32job` 不提供 AppContainer 起动，所以采用既有 FFI seam，而非再建 unsafe crate；

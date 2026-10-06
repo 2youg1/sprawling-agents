@@ -242,8 +242,7 @@ admitted 输入；它们证明 parser relation 接受编码结果，未证明 pa
 native_windows_disposable_argv_and_unrequested_memory 另编译独立 Rust child，
 由 native Backlog 经过生产 packet 起动，让 child 以 args_os/encode_wide 读回
 包含空参数、引号、空格、尾反斜杠与孤立 surrogate 的实际 argv。
-同一 child 在 Shares::Unset 与 Shares::Cpu 下分配并写入超过旧默认上限的
-内存；资源轴对拍另明确给定 Shares::CpuAndMemory，不能依赖默认额度。
+同一 child 在 Shares::Unset 与 Shares::Cpu 下分配并写入 320 MiB 内存；资源轴对拍另明确给定 Shares::CpuAndMemory，不能依赖默认额度。
 有限 child 对拍验证实现与模型之间的环境假设，不构成对 CRT 的形式证明。
 
 D56：packet 按已解析程序的文件名区分 cmd.exe/cmd 与 CRT 程序，比较不分 ASCII 大小写。
