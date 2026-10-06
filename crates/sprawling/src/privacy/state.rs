@@ -100,9 +100,27 @@ struct Summary {
     statuses: Vec<Status>,
 }
 
+/// A folded history. What it holds is released only through
+/// [`History::disclose`] and [`History::holdings`], each behind the check
+/// of its owner reference.
 #[derive(Debug, Default)]
-pub(super) struct History {
-    summary: Option<Summary>,
+pub(super) struct History(Fold);
+
+/// What a history holds for the one operation about to run, released once
+/// its owner reference passed the identity check (Privacy D66).
+#[cfg_attr(
+    not(test),
+    expect(
+        dead_code,
+        reason = "the privacy write verbs are the coordinator's production caller and are not built yet"
+    )
+)]
+#[derive(Debug)]
+pub(super) struct Holdings<'h> {
+    owner: SecretRef,
+    owned: &'h BTreeMap<PrivacyControl, Vec<Intent>>,
+    unresolved: Option<&'h Intent>,
+    latest: Option<NonZeroU64>,
 }
 
 /// The operation still open at the end of the lines read so far.
@@ -122,7 +140,7 @@ enum Stage {
 
 /// The fold's working state: each control's ownership stack, the open
 /// operation, and the newest operation number seen.
-#[derive(Default)]
+#[derive(Debug, Default)]
 struct Fold {
     summary: Option<Summary>,
     owned: BTreeMap<PrivacyControl, Vec<Intent>>,
@@ -146,9 +164,7 @@ impl History {
                 } => fold.reconcile(operation, settlement)?,
             }
         }
-        Ok(Self {
-            summary: fold.summary,
-        })
+        Ok(Self(fold))
     }
 
     /// The operation summaries, released only once `authorize` accepts the
@@ -161,9 +177,68 @@ impl History {
         &self,
         authorize: impl FnOnce(&SecretRef) -> Result<(), AxError>,
     ) -> Result<&[Status], AxError> {
-        match &self.summary {
+        match &self.0.summary {
             None => Ok(&[]),
             Some(summary) => authorize(&summary.owner).map(|()| summary.statuses.as_slice()),
+        }
+    }
+
+    /// The ownership stacks, the unresolved operation and the next
+    /// operation number, released once `authorize` accepts the recorded
+    /// owner reference (`None` for an empty history) and names the owner
+    /// every new intent is prepared under.
+    ///
+    /// # Errors
+    /// The refusal `authorize` returns; nothing of the history is released.
+    #[cfg_attr(
+        not(test),
+        expect(
+            dead_code,
+            reason = "the privacy write verbs are the coordinator's production caller and are not built yet"
+        )
+    )]
+    pub(super) fn holdings(
+        &self,
+        authorize: impl FnOnce(Option<&SecretRef>) -> Result<SecretRef, AxError>,
+    ) -> Result<Holdings<'_>, AxError> {
+        let owner = authorize(self.0.summary.as_ref().map(|summary| &summary.owner))?;
+        Ok(Holdings {
+            owner,
+            owned: &self.0.owned,
+            unresolved: self.0.pending.as_ref().map(|pending| &pending.intent),
+            latest: self.0.latest,
+        })
+    }
+}
+
+#[cfg_attr(
+    not(test),
+    expect(
+        dead_code,
+        reason = "the privacy write verbs are the coordinator's production caller and are not built yet"
+    )
+)]
+impl Holdings<'_> {
+    pub(super) fn owner(&self) -> &SecretRef {
+        &self.owner
+    }
+
+    /// The operation that has no conclusion yet: prepared and never
+    /// finished, or finished `Unknown` and never reconciled.
+    pub(super) fn unresolved(&self) -> Option<&Intent> {
+        self.unresolved
+    }
+
+    /// The latest operation `control` still owns: the top of its stack.
+    pub(super) fn latest_owned(&self, control: PrivacyControl) -> Option<&Intent> {
+        self.owned.get(&control).and_then(|stack| stack.last())
+    }
+
+    /// The number the next operation takes; `None` once the numbers ran out.
+    pub(super) fn next_operation(&self) -> Option<NonZeroU64> {
+        match self.latest {
+            None => Some(NonZeroU64::MIN),
+            Some(latest) => latest.checked_add(1),
         }
     }
 }
@@ -338,12 +413,13 @@ pub(super) enum HistoryFault {
 }
 
 impl HistoryFault {
-    pub(super) fn into_ax(self) -> AxError {
+    /// The error a caller that was doing `action` reports.
+    pub(super) fn into_ax(self, action: &'static str) -> AxError {
         let (code, subject, recovery) = match self {
             Self::Io(source) => (
                 AxCode::StorageFatal,
                 format!("history IO: {source}"),
-                "check local history access and retry the read",
+                "check local history access and retry",
             ),
             Self::Decode {
                 line,
@@ -370,7 +446,7 @@ impl HistoryFault {
                 "preserve the history and use a reader that supports its size; do not remove original values",
             ),
         };
-        AxError::failure(code, "read local privacy history", subject).with_recovery(recovery)
+        AxError::failure(code, action, subject).with_recovery(recovery)
     }
 }
 

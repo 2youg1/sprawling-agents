@@ -117,3 +117,19 @@ pub(crate) enum Snapshot {
     Registry(RawValue),
     Task(TaskState),
 }
+
+/// One successful read of a control's target: its snapshot, and whether a
+/// registry value's parent key exists, which is recorded beside the value
+/// and never compared as part of it (Privacy.State D58).
+#[cfg_attr(
+    not(test),
+    expect(
+        dead_code,
+        reason = "the privacy write verbs are the coordinator's production caller and are not built yet"
+    )
+)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Reading {
+    pub(crate) value: Snapshot,
+    pub(crate) key_existed: bool,
+}

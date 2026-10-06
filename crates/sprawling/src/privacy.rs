@@ -7,8 +7,32 @@
 
 pub mod cli;
 mod controls;
+#[cfg_attr(
+    not(test),
+    expect(
+        dead_code,
+        reason = "the privacy write verbs are the coordinator's production caller and are not built yet"
+    )
+)]
+mod coordinator;
+#[cfg_attr(
+    not(test),
+    expect(
+        dead_code,
+        reason = "the privacy write verbs are the coordinator's production caller and are not built yet"
+    )
+)]
+mod fault;
 mod identity;
 mod journal;
 mod originals;
+#[cfg_attr(
+    not(test),
+    expect(
+        dead_code,
+        reason = "the privacy write verbs are the coordinator's production caller and are not built yet"
+    )
+)]
+mod plan;
 mod state;
 mod target;

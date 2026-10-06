@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc f27cd3e9accf5948b3afdeae3739eeed65f9a02f6b1a0e7fcdc5b8d624fda76f # shrinks to turns = [Turn { external: None, ask: Apply, control: 0, stale: false, reads: [Reads, Reads, Reads], writes: [LandsThird, Lands], appends: [Durable, Durable], lapse: false }]

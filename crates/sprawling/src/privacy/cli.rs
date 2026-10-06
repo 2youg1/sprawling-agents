@@ -31,7 +31,8 @@ fn status_at(
     verify: impl FnOnce(&SecretRef, &str) -> Result<(), AxError>,
 ) -> Result<String, AxError> {
     let observed = identity()?;
-    let history = super::journal::read(path).map_err(super::state::HistoryFault::into_ax)?;
+    let history =
+        super::journal::read(path).map_err(|fault| fault.into_ax("read local privacy history"))?;
     let statuses = history.disclose(|owner| verify(owner, &observed))?;
     serde_json::to_string(statuses).map_err(|source| {
         AxError::failure(

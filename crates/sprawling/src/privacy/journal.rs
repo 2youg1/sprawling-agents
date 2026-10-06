@@ -358,7 +358,7 @@ mod tests {
                 Err(fault) => fault,
             };
             assert!(!format!("{fault:?}").contains(PRIVATE_INPUT));
-            let fault = fault.into_ax();
+            let fault = fault.into_ax("read local privacy history");
             assert!(!fault.to_string().contains(PRIVATE_INPUT));
             assert_eq!(fault.code(), &kernel::AxCode::StorageFatal);
             assert!(fault.subject().contains("column"));
