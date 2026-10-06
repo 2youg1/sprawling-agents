@@ -76,7 +76,11 @@ on:
         description: which run
         required: true
         type: choice
-        options: [mutants, mutants-modules, sim, shots, release, pgo, fresh, runtime, keychain, container]
+        options: [mutants, mutants-modules, sim, shots, release, pgo, fresh, runtime, keychain, container, bench]
+      responses_base:
+        description: optional ref with the matched Responses instrument
+        type: string
+        default: ""
       base:
         description: the ref `mutants` diffs against (a branch on origin, a tag, or a commit)
         required: false
@@ -809,3 +813,97 @@ jobs:
           name: container-${{ matrix.engine }}-${{ github.sha }}
           path: target/container-evidence
           if-no-files-found: warn
+  bench:
+    if: inputs.job == 'bench'
+    runs-on: windows-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: install pinned toolchain
+        run: rustup show
+      - uses: ./.github/actions/zig
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: bench
+          key: ${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+          save-if: false
+      - uses: ./.github/actions/client-artifacts
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
+      - id: tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p target/bench-out
+          echo "sha=$(git rev-parse 'HEAD^{tree}')" >> "$GITHUB_OUTPUT"
+          git rev-parse HEAD 'HEAD^{tree}' > target/bench-out/source.txt
+          rustc --version --verbose > target/bench-out/toolchain.txt
+          python - <<'PYTHON'
+          import json, os, platform
+          from pathlib import Path
+          Path("target/bench-out/machine.json").write_text(json.dumps({
+              "os": platform.system(), "osVersion": platform.release(),
+              "architecture": platform.machine(), "cores": os.cpu_count(),
+              "runner": "windows-latest", "profile": "release", "features": "defaults",
+              "run": os.environ["GITHUB_RUN_ID"], "attempt": os.environ["GITHUB_RUN_ATTEMPT"],
+              "rustflags": os.environ.get("RUSTFLAGS", ""),
+              "memorySource": "not sampled; this job measures processing durations"
+          }, indent=2), encoding="utf-8")
+          PYTHON
+      - name: compile the repository harness before measurement
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo build --release -p citysim --bin bench --locked
+          cargo nextest run -p sprawling -p sprawling-accounting -p sprawling-gateway -p sprawling-runtime --release --lib --run-ignored only -E 'test(/::instrument_/)' --no-run
+      - name: repository benchmark harness
+        shell: bash
+        run: |
+          set -euo pipefail
+          just bench 2>&1 | tee target/bench-out/bench.log
+      - name: compile matched Responses arms
+        if: inputs.responses_base != ''
+        shell: bash
+        env:
+          RESPONSES_BASE: ${{ inputs.responses_base }}
+        run: |
+          set -euo pipefail
+          out="$PWD/target/bench-out"
+          for arm in baseline candidate; do
+            if [ "$arm" = baseline ]; then git checkout --detach "$RESPONSES_BASE"
+            else git checkout --detach "$GITHUB_SHA"; fi
+            git rev-parse HEAD 'HEAD^{tree}' > "$out/$arm-source.txt"
+            cargo test --release -p sprawling-gateway --lib --no-run --locked --message-format=json > "$out/$arm-build.jsonl"
+            ARM="$arm" OUT="$out" python - <<'PYTHON'
+          import hashlib, json, os, shutil
+          from pathlib import Path
+          out, arm = Path(os.environ["OUT"]), os.environ["ARM"]
+          artifacts = [json.loads(line) for line in (out / f"{arm}-build.jsonl").read_text().splitlines()]
+          binaries = [Path(a["executable"]) for a in artifacts if a.get("reason") == "compiler-artifact" and a.get("executable") and a["target"]["name"] == "gateway"]
+          if len(binaries) != 1:
+              raise SystemExit("expected one gateway test executable")
+          binary = out / f"{arm}.exe"
+          shutil.copyfile(binaries[0], binary)
+          (out / f"{arm}.sha256").write_text(hashlib.sha256(binary.read_bytes()).hexdigest(), encoding="utf-8")
+          PYTHON
+          done
+      - name: alternate matched Responses arms on this runner
+        if: inputs.responses_base != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          for round in 1 2 3 4 5; do
+            if [ "$((round % 2))" -eq 1 ]; then arms="baseline candidate"; else arms="candidate baseline"; fi
+            for arm in $arms; do
+              target/bench-out/$arm.exe --ignored instrument_responses_stream --nocapture --test-threads=1 2>&1 | tee "target/bench-out/$arm-$round.log"
+            done
+          done
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: bench-${{ steps.tree.outputs.sha }}
+          path: target/bench-out
+          if-no-files-found: error
