@@ -265,8 +265,9 @@ print('filesystem, network, UID and cgroup settings checked')
         json!(0),
         "the hard memory ceiling must reject actual allocation: {memory}"
     );
-    let pids = r#"import errno,os,signal
+    let pids = r#"import errno,os
 children=[]
+reader,writer=os.pipe()
 try:
  for i in range(128):
   try:
@@ -275,13 +276,14 @@ try:
    assert e.errno==errno.EAGAIN
    break
   if pid==0:
-   signal.pause();os._exit(0)
+   os.close(writer);os.read(reader,1);os._exit(0)
   children.append(pid)
  assert 0<len(children)<64
  print('pids enforced',len(children))
 finally:
- for pid in children: os.kill(pid,signal.SIGKILL)
+ os.close(writer)
  for pid in children: os.waitpid(pid,0)
+ os.close(reader)
 "#;
     let checked = tool
         .invoke(&call(
