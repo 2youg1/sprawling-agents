@@ -262,8 +262,8 @@ mod tests {
             (1, "secret:privacy/fixture-owner"),
         ] {
             let mut line = serde_json::to_value(&prepared).unwrap();
-            line["schema"] = serde_json::json!(schema);
-            line["event"]["intent"]["owner"] = serde_json::json!(owner);
+            *line.pointer_mut("/schema").unwrap() = serde_json::json!(schema);
+            *line.pointer_mut("/event/intent/owner").unwrap() = serde_json::json!(owner);
             let mut before = serde_json::to_vec(&line).unwrap();
             before.push(b'\n');
             std::fs::write(&path, &before).unwrap();
@@ -278,9 +278,17 @@ mod tests {
         for field in ["control", "unexpected", "owner"] {
             let mut line = serde_json::to_value(&prepared).unwrap();
             if field == "unexpected" {
-                line["event"]["intent"]["fixture-private-principal"] = serde_json::json!(true);
+                line.pointer_mut("/event/intent")
+                    .unwrap()
+                    .as_object_mut()
+                    .unwrap()
+                    .insert(
+                        "fixture-private-principal".to_owned(),
+                        serde_json::json!(true),
+                    );
             } else {
-                line["event"]["intent"][field] = serde_json::json!("fixture-private-principal");
+                *line.pointer_mut(&format!("/event/intent/{field}")).unwrap() =
+                    serde_json::json!("fixture-private-principal");
             }
             let mut before = serde_json::to_vec(&line).unwrap();
             before.push(b'\n');
