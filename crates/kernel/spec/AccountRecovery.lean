@@ -51,6 +51,8 @@ impl AccountRound {
 | `Stop { Unknown }` | 原错误原样，带着 `effect_unknown`，冻结原因 `ProviderRefused` | 同上 |
 | `Stop { Exhausted }` | 一条 `E_PROVIDER_ACCOUNTS_EXHAUSTED`，carrier 与 `E_PROVIDER` 相同，run 以 `Cancelled` 冻结；subject 列出 Provider 与每个账号 id 及其最后一种失败，不含 Key 与引用；恢复语：补录凭据或额度、或新增账号，然后再派活 | 同一个码作为失败的工具结果 |
 
+模型路径的生产回归在 `crates/accounting/src/worker/credentials/tests/accounts/recovery.rs`：一个 Provider 的两个账号经真实 `RunWorker` 与按 Key 作答的回环 Provider，逐一检查忙碌时原号再发到余额用完后换号、401 与额度用完只发一次就换号、400 只发一次且不换号、答复丢失只在原号再发且停下时仍是 `effect_unknown`、全部失败只记一条 `E_PROVIDER_ACCOUNTS_EXHAUSTED`、等待中停下 run，以及每个请求只带 `model_called` 记下的那个账号的 Key、Ledger 里没有 Key 的明文。根 run 由人的 `Cancel` 停下，交下去的 run 由 `Halt` 经它的 backlog 成员停下，两者在等待里由同一处（`Interrupting::halted`）询问；回归驱动的是前者。
+
 **谁看见 `held`**：模型路径的 `held` 是 Session 的绑定（`gateway::router` 的 `EndpointBook` 从 Ledger 折出，`crates/gateway/spec/Router.lean` D30），派活时取它开第一轮，此后每一轮取适配器当前的账号；回答之后 `model_returned` 提交绑定，下一轮从新绑定开始。`web_search` 不记 Session 绑定（D54），每一轮的 `held` 恒缺席，所以总从名册里第一个可兑付的账号开始。
 -/
 

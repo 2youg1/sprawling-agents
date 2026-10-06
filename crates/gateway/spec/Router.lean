@@ -188,6 +188,9 @@ snapshot 保存同一投影而不含 Key。派活在 room_for 后将成功亲和
 同一房间允许并发 Run，队列持有者归还后备用 Run 仍可执行，房间忙检查不能保障
 Session 边界；SessionOpened 撤销旧 Run 的成员资格，使后续调用也不能重新绑定。
 资格只由唯一 RunId 的 RunStarted 建立，按房间撤销不影响其它房间，因此不另存 epoch。
+分支是带 `from` 的 `OpenSession`，与 `/new` 一样写 `session_opened`，所以两者都从首个可兑付账号重新选起，
+不继承来源 Session 的绑定。删除 snapshot 后重启、分支与 `/new` 三种情形由
+`crates/accounting/src/worker/credentials/tests/accounts/affinity.rs` 经真实 `RunWorker` 检查。
 换号的分类在 D31，换号的预算与步进在 kernel D54；搜索设置与账号登记界面不在本接口内。 -/
 
 namespace Gateway.Router.Affinity
