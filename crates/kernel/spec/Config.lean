@@ -112,10 +112,10 @@ Native 不可给时 E_SANDBOX_DENIED，不退到 copied_tree；CopiedTree 明确
 沿用既有 WASI 接口。选择在 Run 起点冻结，在工具入 catalogue 之前接入并描述其实际保证。
 -/
 
-/-! container 设置覆盖；kernel 声明文法，building 设置编辑配置。
-settings-reason ContainerLimits.image container 是显式选择的 sandbox 资源配置，由 building CONFIG.toml 原文编辑；专用容器表单尚未实现。
-settings-reason ContainerLimits.user container 是显式选择的 sandbox 资源配置，由 building CONFIG.toml 原文编辑；专用容器表单尚未实现。
-settings-reason ContainerLimits.cpu_millis container 是显式选择的 sandbox 资源配置，由 building CONFIG.toml 原文编辑；专用容器表单尚未实现。
-settings-reason ContainerLimits.memory_bytes container 是显式选择的 sandbox 资源配置，由 building CONFIG.toml 原文编辑；专用容器表单尚未实现。
-settings-reason ContainerLimits.pids container 是显式选择的 sandbox 资源配置，由 building CONFIG.toml 原文编辑；专用容器表单尚未实现。
+/-! container 设置覆盖：kernel 声明文法，building 的 sandbox 卡片写整份 `[sandbox.container]`。
+settings-control ContainerLimits.image client/src/views/building/sandbox.svelte
+settings-control ContainerLimits.user client/src/views/building/sandbox.svelte
+settings-control ContainerLimits.cpu_millis client/src/views/building/sandbox.svelte
+settings-control ContainerLimits.memory_bytes client/src/views/building/sandbox.svelte
+settings-control ContainerLimits.pids client/src/views/building/sandbox.svelte
 -/

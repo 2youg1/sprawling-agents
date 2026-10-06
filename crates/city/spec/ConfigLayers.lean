@@ -229,46 +229,46 @@ theorem the_layer_on_disk_stays_readable {Text : Type} (readable parses : Text �
 
 end City.ConfigLayers
 
-/-! 设置覆盖：CONFIG.toml 的字段声明是文法 authority。building 目前通过
-设置树的 building 页面编辑配置原文；以下理由记录专用控件的范围，原文入口不
-冒充逐项校验的表单。新增声明必须在本规格记录覆盖决策。
-settings-reason CacheSection.keep_warm building 设置提供 CONFIG.toml 原文编辑；当前没有此字段的专用控件，专用校验表单仍需实现。
-settings-reason ClockSection.stamp building 设置提供 CONFIG.toml 原文编辑；当前没有此字段的专用控件，专用校验表单仍需实现。
-settings-reason ConfigFile.cache building 设置提供 CONFIG.toml 原文编辑；当前没有此字段的专用控件，专用校验表单仍需实现。
-settings-reason ConfigFile.clock building 设置提供 CONFIG.toml 原文编辑；当前没有此字段的专用控件，专用校验表单仍需实现。
+/-! 设置覆盖：CONFIG.toml 的字段声明是文法 authority，`xtask wiring` 逐字段要求下面一行。
+`settings-control` 指向写这个字段的控件；`settings-reason` 说为什么设置里没有控件。
+一个字段在多层出现时，控件写的是它注明的那一层，其余层由同一文件手写。
+settings-control ConfigFile.cache client/src/views/settings/city_layer.svelte
+settings-control CacheSection.keep_warm client/src/views/settings/city_layer.svelte
+settings-reason ConfigFile.clock 时钟行多久出一次只改结果里那一行的疏密，不改任何保证；缺省 minute 是 kernel 常量，需要改的人在城或楼的 CONFIG.toml 里写，拼错在解析点拒。
+settings-reason ClockSection.stamp 时钟行多久出一次只改结果里那一行的疏密，不改任何保证；缺省 minute 是 kernel 常量，需要改的人在城或楼的 CONFIG.toml 里写，拼错在解析点拒。
 settings-control ConfigFile.context client/src/views/settings/context_rung.svelte
-settings-reason ConfigFile.identity 由 session 首次 run 冻结 identity version，User 不直接改写已冻结的身份。
-settings-control ConfigFile.mcp client/src/views/mcp.svelte
-settings-reason ConfigFile.model 模型名和 effort 的 building 覆盖通过 CONFIG.toml 原文设置；默认模型和 effort 控件写 city 层，building 覆盖控件尚未实现。
-settings-reason ConfigFile.remote 只允许 city 层，building 声明时拒绝；remote 设置组管理 city 的 route。
-settings-reason ConfigFile.resident harness 页面说明主机安装与登录；building 的 harness 选择当前通过 CONFIG.toml 原文设置，专用选择控件尚未实现。
-settings-reason ConfigFile.sandbox building 设置提供 CONFIG.toml 原文编辑；当前没有此字段的专用控件，专用校验表单仍需实现。
-settings-reason ConfigFile.skills 外部 shelves 只允许 city 层，building 不能把机器路径声明为自己的书架。
 settings-control ContextSection.second_threshold client/src/views/settings/context_rung.svelte
-settings-reason IdentitySection.version 由 session 首次 run 冻结 identity version，User 不直接改写已冻结的身份。
-settings-reason McpSection.args building 设置提供 CONFIG.toml 原文编辑；当前没有此字段的专用控件，专用校验表单仍需实现。
-settings-reason McpSection.command building 设置提供 CONFIG.toml 原文编辑；当前没有此字段的专用控件，专用校验表单仍需实现。
-settings-reason McpSection.env building 设置提供 CONFIG.toml 原文编辑；当前没有此字段的专用控件，专用校验表单仍需实现。
-settings-reason McpSection.headers building 设置提供 CONFIG.toml 原文编辑；当前没有此字段的专用控件，专用校验表单仍需实现。
-settings-reason McpSection.label building 设置提供 CONFIG.toml 原文编辑；当前没有此字段的专用控件，专用校验表单仍需实现。
-settings-reason McpSection.transport building 设置提供 CONFIG.toml 原文编辑；当前没有此字段的专用控件，专用校验表单仍需实现。
-settings-reason McpSection.url building 设置提供 CONFIG.toml 原文编辑；当前没有此字段的专用控件，专用校验表单仍需实现。
-settings-reason ModelSection.effort city effort 控件不覆盖 building 已明确填写的值；building 的专用覆盖控件尚未实现，当前编辑 CONFIG.toml 原文。
-settings-reason ModelSection.name 此名是 building 的配置覆盖，不是端点册的默认模型选择；当前通过 CONFIG.toml 原文设置，专用覆盖控件尚未实现。
-settings-reason RemoteRoute.Cloudflare.command 只允许 city 层，building 声明时拒绝；remote 设置组管理 city 的 route。
-settings-reason RemoteRoute.Cloudflare.tunnel 只允许 city 层，building 声明时拒绝；remote 设置组管理 city 的 route。
-settings-reason RemoteRoute.Cloudflare.url 只允许 city 层，building 声明时拒绝；remote 设置组管理 city 的 route。
-settings-reason RemoteRoute.Command.args 只允许 city 层，building 声明时拒绝；remote 设置组管理 city 的 route。
-settings-reason RemoteRoute.Command.command 只允许 city 层，building 声明时拒绝；remote 设置组管理 city 的 route。
-settings-reason RemoteRoute.Command.permanence 只允许 city 层，building 声明时拒绝；remote 设置组管理 city 的 route。
-settings-reason ResidentSection.harness 这是 building 的 harness 选择，不是主机安装状态；当前通过 CONFIG.toml 原文设置，专用选择控件尚未实现。
-settings-reason SandboxSection.arm building 设置提供 CONFIG.toml 原文编辑；当前没有此字段的专用控件，专用校验表单仍需实现。
-settings-reason SandboxSection.container building 设置提供 CONFIG.toml 原文编辑；当前没有此字段的专用控件，专用校验表单仍需实现。
-settings-reason SandboxSection.env_passthrough building 设置提供 CONFIG.toml 原文编辑；当前没有此字段的专用控件，专用校验表单仍需实现。
-settings-reason SandboxSection.fuel building 设置提供 CONFIG.toml 原文编辑；当前没有此字段的专用控件，专用校验表单仍需实现。
-settings-reason SandboxSection.interpreter building 设置提供 CONFIG.toml 原文编辑；当前没有此字段的专用控件，专用校验表单仍需实现。
-settings-reason SandboxSection.mounts building 设置提供 CONFIG.toml 原文编辑；当前没有此字段的专用控件，专用校验表单仍需实现。
-settings-reason SandboxSection.shell building 设置提供 CONFIG.toml 原文编辑；当前没有此字段的专用控件，专用校验表单仍需实现。
-settings-reason SandboxSection.trusted building 设置提供 CONFIG.toml 原文编辑；当前没有此字段的专用控件，专用校验表单仍需实现。
-settings-reason SkillsSection.shelves 外部 shelves 只允许 city 层，building 不能把机器路径声明为自己的书架。
+settings-reason ConfigFile.identity 城在会话第一次 run 时写下命名版本，`/new` 拿掉它；这是会话的记录，不是 User 的设定，改它会让会话读到另一套名字。
+settings-reason IdentitySection.version 城在会话第一次 run 时写下命名版本，`/new` 拿掉它；这是会话的记录，不是 User 的设定，改它会让会话读到另一套名字。
+settings-control ConfigFile.mcp client/src/views/mcp.svelte
+settings-control McpSection.label client/src/views/mcp/by_command.svelte
+settings-control McpSection.command client/src/views/mcp/by_command.svelte
+settings-control McpSection.args client/src/views/mcp/by_command.svelte
+settings-control McpSection.env client/src/views/mcp/by_command.svelte
+settings-control McpSection.url client/src/views/mcp/by_url.svelte
+settings-control McpSection.headers client/src/views/mcp/by_url.svelte
+settings-control McpSection.transport client/src/views/mcp/by_url.svelte
+settings-reason ConfigFile.model `[model] name` 是城在会话第一次 run 时写下的会话记录（`write_session`），模型由会话里的模型选择决定，`/new` 拿掉它；改它会让一段会话中途换居民，所以设置里没有控件。
+settings-reason ModelSection.name `[model] name` 是城在会话第一次 run 时写下的会话记录（`write_session`），模型由会话里的模型选择决定，`/new` 拿掉它；改它会让一段会话中途换居民，所以设置里没有控件。
+settings-control ModelSection.effort client/src/views/settings/city_layer.svelte
+settings-reason ConfigFile.remote 通路点名城所在机器上要执行的程序与参数；一个经远程门连进来的设备若能写它，就能让城在这台机器上执行任意程序，所以只在城的 CONFIG.toml 里手写，楼与房间写它即拒。
+settings-reason RemoteRoute.Cloudflare.command 通路点名城所在机器上要执行的程序与参数；一个经远程门连进来的设备若能写它，就能让城在这台机器上执行任意程序，所以只在城的 CONFIG.toml 里手写。
+settings-reason RemoteRoute.Cloudflare.tunnel 通路点名城所在机器上要执行的程序与参数；一个经远程门连进来的设备若能写它，就能让城在这台机器上执行任意程序，所以只在城的 CONFIG.toml 里手写。
+settings-reason RemoteRoute.Cloudflare.url 通路点名城所在机器上要执行的程序与参数；一个经远程门连进来的设备若能写它，就能让城在这台机器上执行任意程序，所以只在城的 CONFIG.toml 里手写。
+settings-reason RemoteRoute.Command.args 通路点名城所在机器上要执行的程序与参数；一个经远程门连进来的设备若能写它，就能让城在这台机器上执行任意程序，所以只在城的 CONFIG.toml 里手写。
+settings-reason RemoteRoute.Command.command 通路点名城所在机器上要执行的程序与参数；一个经远程门连进来的设备若能写它，就能让城在这台机器上执行任意程序，所以只在城的 CONFIG.toml 里手写。
+settings-reason RemoteRoute.Command.permanence 通路点名城所在机器上要执行的程序与参数；一个经远程门连进来的设备若能写它，就能让城在这台机器上执行任意程序，所以只在城的 CONFIG.toml 里手写。
+settings-reason ConfigFile.resident 选 harness 就是把房间的内容交给厂商的外部进程（confidential 楼因此拒 harness 派活）；这一步由 User 在 CONFIG.toml 里有意写下，设置页的 harness 组只说明安装与登录。
+settings-reason ResidentSection.harness 选 harness 就是把房间的内容交给厂商的外部进程（confidential 楼因此拒 harness 派活）；这一步由 User 在 CONFIG.toml 里有意写下，设置页的 harness 组只说明安装与登录。
+settings-control ConfigFile.sandbox client/src/views/building/sandbox.svelte
+settings-control SandboxSection.arm client/src/views/building/sandbox.svelte
+settings-control SandboxSection.container client/src/views/building/sandbox.svelte
+settings-control SandboxSection.env_passthrough client/src/views/building/sandbox.svelte
+settings-control SandboxSection.fuel client/src/views/building/sandbox.svelte
+settings-control SandboxSection.interpreter client/src/views/building/sandbox.svelte
+settings-control SandboxSection.mounts client/src/views/building/sandbox.svelte
+settings-control SandboxSection.shell client/src/views/building/sandbox.svelte
+settings-control SandboxSection.trusted client/src/views/building/sandbox.svelte
+settings-reason ConfigFile.skills 书架是城外的机器目录，挂进来后每栋楼都读得到；一个经远程门连进来的设备若能写它，就能把这台机器上的任意目录交给 Agent 读，所以只在城的 CONFIG.toml 里手写，楼与房间写它即拒。
+settings-reason SkillsSection.shelves 书架是城外的机器目录，挂进来后每栋楼都读得到；一个经远程门连进来的设备若能写它，就能把这台机器上的任意目录交给 Agent 读，所以只在城的 CONFIG.toml 里手写，楼与房间写它即拒。
 -/
