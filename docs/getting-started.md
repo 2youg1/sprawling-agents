@@ -196,7 +196,7 @@ A checkout builds the complete deliverable with `just dist`. A plain `cargo buil
 
 ### With Nix
 
-On Linux x86-64, Nix can build the complete application from this repository. Enable the Nix features `nix-command` and `flakes`, and check out a tag or commit whose `flake.nix` builds the client before Rust and includes a committed `flake.lock` before building:
+On Linux x86-64, Nix can build the complete application from this repository. sprawling is not packaged in nixpkgs, so the repository flake is the Nix path. Enable the Nix features `nix-command` and `flakes`, and check out a tag or commit whose `flake.nix` builds the client before Rust and includes a committed `flake.lock` before building:
 
 ```bash
 nix build .#default --no-update-lock-file

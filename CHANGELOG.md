@@ -36,7 +36,7 @@ The existing container command path preserves the configured engine, encodes a s
 
 Release archives keep ZIP with Deflate level 9, with archive suffixes and platform names taken from the shared platform table. Release validation uses the existing parallel CI entry point and its cache configuration. Manual release-workflow dispatch builds and checks artifacts without publishing GitHub releases, npm packages or crates, and does not invent release provenance.
 
-The repository Nix flake builds the browser client before Rust and includes the shipped skills and licences. A source flake and a package accepted into nixpkgs are distinct distribution paths; using the former does not establish availability in a nixpkgs channel. Windows resource generation reads Cargo package metadata for the product and file version. Build provenance, archive checksums and OS code signing are separate facts.
+The repository Nix flake builds the browser client before Rust and includes the shipped skills and licences. The flake is the only Nix distribution path; sprawling is not submitted to nixpkgs. Windows resource generation reads Cargo package metadata for the product and file version. Build provenance, archive checksums and OS code signing are separate facts.
 
 ### Documentation and contribution rules
 

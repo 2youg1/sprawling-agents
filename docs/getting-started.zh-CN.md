@@ -196,7 +196,7 @@ gh attestation verify <archive.zip> --repo 2youg1/sprawling-agents
 
 ### 用 Nix
 
-Linux x86-64 上可以用 Nix 从本仓库构建完整应用。启用 Nix 的 `nix-command` 和 `flakes`，先检出 `flake.nix` 先构建客户端再构建 Rust、且已提交 `flake.lock` 的 tag 或 commit，再构建：
+Linux x86-64 上可以用 Nix 从本仓库构建完整应用。sprawling 不在 nixpkgs 中打包，Nix 用户使用本仓库的 flake。启用 Nix 的 `nix-command` 和 `flakes`，先检出 `flake.nix` 先构建客户端再构建 Rust、且已提交 `flake.lock` 的 tag 或 commit，再构建：
 
 ```bash
 nix build .#default --no-update-lock-file
