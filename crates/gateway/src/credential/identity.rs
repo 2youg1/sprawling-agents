@@ -62,7 +62,9 @@ pub(crate) fn bind_identity(
     if vault.get(reference).map_err(unavailable)?.is_some() {
         return Err(Refusal::Occupied.into_ax(BIND));
     }
-    Ok(())
+    vault
+        .put(reference, Zeroizing::new(observed.to_owned()))
+        .map_err(unavailable)
 }
 
 /// Why an owner was not verified; each reason carries the one recovery
