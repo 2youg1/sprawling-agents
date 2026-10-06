@@ -52,6 +52,7 @@
   import Keepers from "./gallery/kept.svelte";
   import RefusedLine from "./gallery/refused_line.svelte";
   import Prop from "./gallery/prop.svelte";
+  import PrivacyGallery from "./gallery/privacy.svelte";
   import Rfr from "./gallery/rfr.svelte";
   import Md from "./gallery/md.svelte";
   import Monitor from "./gallery/monitor.svelte";
@@ -141,6 +142,7 @@
   <Keepers />
   <Settings />
   <SettingsPanel />
+  <PrivacyGallery />
   <G2 />
   <R3 />
   <Doc />

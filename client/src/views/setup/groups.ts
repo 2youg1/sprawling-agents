@@ -29,6 +29,7 @@ export const HEADING: Record<SetupGroup, Key> = {
   colours: "setup_group_colours",
   keys: "setup_group_keys",
   advanced: "setup_group_advanced",
+  privacy: "setup_group_privacy",
   about: "release_title",
 };
 
@@ -49,6 +50,7 @@ export const HINT: Record<SetupGroup, Key | null> = {
   colours: "setup_group_hint_colours",
   keys: "setup_group_hint_keys",
   advanced: "setup_group_hint_advanced",
+  privacy: "setup_group_hint_privacy",
   about: null,
 };
 
@@ -71,6 +73,7 @@ export const WIDTH: Record<SetupGroup, string> = {
   colours: "",
   keys: "max-w-talk",
   advanced: "",
+  privacy: "",
   about: "max-w-talk",
 };
 
