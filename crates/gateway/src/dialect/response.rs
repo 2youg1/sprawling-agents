@@ -5,9 +5,9 @@
 
 //! Response translation and stream retention for the three provider dialects.
 //!
-//! StreamFrames routes retention to each dialect. Responses discard delta
+//! `StreamFrames` routes retention to each dialect. Responses discard delta
 //! frames; the other dialects retain fragments needed to rebuild their reply.
-//! Final parsing remains response_from_wire on both call paths.
+//! Final parsing remains `response_from_wire` on both call paths.
 //!
 //! Spec: `crates/gateway/spec/Endpoint/Stream.lean` §8-13.
 
