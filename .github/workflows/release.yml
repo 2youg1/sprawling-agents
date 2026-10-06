@@ -455,8 +455,8 @@ jobs:
         run: |
           set -euo pipefail
           install -d -m 700 "$RUNNER_TEMP/aur-ssh"
-          printf '%s
-' "$AUR_SSH_KEY" > "$RUNNER_TEMP/aur-ssh/key"
+          printf '%s' "$AUR_SSH_KEY" > "$RUNNER_TEMP/aur-ssh/key"
+          echo >> "$RUNNER_TEMP/aur-ssh/key"
           chmod 600 "$RUNNER_TEMP/aur-ssh/key"
           curl -fsSL https://aur.archlinux.org/ > "$RUNNER_TEMP/aur-ssh/host.html"
           ssh-keyscan -t ed25519 aur.archlinux.org > "$RUNNER_TEMP/aur-ssh/known_hosts"
