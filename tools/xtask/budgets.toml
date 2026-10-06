@@ -918,3 +918,19 @@ status = "measured, held by that test rather than weighed by budget: 0 loose obj
 what = "files created per step of three rooms delegated in a row with the restock still checking out at the second, at N = 8, 16 and 32 files"
 measured_by = "cargo nextest run -p sprawling-storage -E 'test(a_room_placed_while_the_stock_is_being_made_checks_out_once_and_the_stock_survives)'"
 status = "measured, held by that test rather than weighed by budget: first room 0, restock N, second room N, refresh 0, third room 0"
+
+[responses_stream]
+what = "Responses frame parsing, increment construction, retention and the existing final reply parser; HTTP, reader thread and channel waits excluded"
+measured_by = "gh workflow run on-demand.yml -f job=bench -f responses_base=<matched-ref>; instrument_responses_stream (200 raw nanosecond samples after 20 warmups, 8 or 16384 deltas of 64 bytes); Linux heaptrack runs instrument_responses_heap_small and instrument_responses_heap_long once each"
+status = "baseline allocation profile recorded; matched latency comparison and the final integrated-tree reading remain owed; no wall-clock gate"
+baseline_ref = "882a5dae793ed03d11132a99d7af423dfcd72e2b"
+baseline_tree = "9277204d9a05fdd92eaf736959d9cd6f295068e6"
+baseline_allocation_run = "https://github.com/2youg1/sprawling-agents/actions/runs/37401209316"
+baseline_allocation_artifact = "bench-allocations-165e1dae299107babcb8650639efbe289ef8e6d1"
+baseline_linux_binary_sha256 = "f2a0f828d69083aca404cebca6b63f93c5d25ef6d8fe7847658de9ba67c61ae8"
+allocation_machine = "ubuntu-latest, x86_64, 4 logical processors, release defaults; heaptrack traces the complete test process including runner and fixture creation"
+baseline_small_allocation_calls = 353
+baseline_long_allocation_calls = 98620
+baseline_small_peak_heap = "119.97K (heaptrack rounded output, bytes)"
+baseline_long_peak_heap = "13.11M (heaptrack rounded output, bytes)"
+retention_condition = "retain only if the five alternating rounds show a long-stream gain larger than the baseline p50 range and no repeatable small-stream regression, with fewer allocation calls and a lower long-stream peak heap"
