@@ -194,8 +194,10 @@ command line 或 environment 长度、profile 与限额验证而答 `Action::Enc
 
 `encoded_tail_preserves_units` 与 `encoded_arguments_preserve_order` 量化所有
 admitted 输入；它们证明 parser relation 接受编码结果，未证明 parser 的
-确定性。Rust 侧的独立 decoder 派生检查与 disposable child 的真实 `args_os`
-对拍检验模型和生产的对应，不能把 Lean 定理本身当成 CRT 执行证据。
+确定性。当前 Rust 派生检查调用生产 `packet::encode`，再用独立 CRT decoder
+检查 UTF16 units 与参数顺序；它不启动子进程，不能证明实际 CRT 按该 relation
+解析。disposable child 的真实 `args_os` 对拍尚未实现，native acceptance workflow
+也未执行该检查；需补齐探针及执行证据，才能确认模型与实际 CRT 的对应。
 
 D56：packet 按已解析程序的文件名区分 cmd.exe/cmd 与 CRT 程序，比较不分 ASCII 大小写。
 cmd 的开关不加 CRT 引号，/C 或 /K 后的各项按单个空格拼成脚本文本；
