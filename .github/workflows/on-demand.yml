@@ -802,7 +802,7 @@ jobs:
           set -euo pipefail
           mkdir -p target/container-evidence
           git rev-parse HEAD 'HEAD^{tree}' > target/container-evidence/source.txt
-          cargo nextest run -p sprawling-runtime --run-ignored only -E 'test(a_real_daemon)' 2>&1 | tee target/container-evidence/isolation.log
+          cargo nextest run -p sprawling-runtime --test-threads 1 --run-ignored only -E 'test(a_real_daemon)' 2>&1 | tee target/container-evidence/isolation.log
       - uses: actions/upload-artifact@v7
         if: always()
         with:
