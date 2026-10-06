@@ -6,7 +6,7 @@
 /-!
 # city::config_layers
 
-规定 `config_layers`、`config_layers::write`、`config_layers::settled`、`config_layers::session`、`config_layers::resident`、`config_layers::mcp`、`config_layers::context`、`config_layers::cache`、`config_layers::clock`、`config_layers::refuse`（`crates/city/src/` 下同名的文件）。三层配置住哪三个文件、怎么求成一份 `FrozenConfig`、怎么写回去。本文件是 `crates/city/Spec.lean` 的一个分部；下面每一节保留它在 city 规格里的标签 §8-n，别处引作 `crates/city/Spec.lean §8-n`，决定引作 `city D<n>`。
+规定 `config_layers`、`config_layers::write`、`config_layers::settled`、`config_layers::session`、`config_layers::resident`、`config_layers::mcp`、`config_layers::search`、`config_layers::context`、`config_layers::cache`、`config_layers::clock`、`config_layers::refuse`（`crates/city/src/` 下同名的文件）。三层配置住哪三个文件、怎么求成一份 `FrozenConfig`、怎么写回去。本文件是 `crates/city/Spec.lean` 的一个分部；下面每一节保留它在 city 规格里的标签 §8-n，别处引作 `crates/city/Spec.lean §8-n`，决定引作 `city D<n>`。
 -/
 
 /-!
@@ -16,12 +16,13 @@
 pub use kernel::layout::CONFIG_FILE;               // 文件名的权威在 kernel::layout
 pub enum Layer { City, Building, Resident }        // 穷尽三级，与 kernel::LayeredValue 同形
 pub fn path(city_root: &Path, addr: &Address, layer: Layer) -> Result<PathBuf, AxError>;
-pub struct ConfigLayer { /* model / harness / effort / sandbox / mcp / second_threshold / clock_stamp / keep_warm / shelves / naming / remote —— 私有 */ }
+pub struct ConfigLayer { /* model / harness / effort / sandbox / mcp / search / second_threshold / clock_stamp / keep_warm / shelves / naming / remote —— 私有 */ }
 impl ConfigLayer {
     pub fn parse(text: &str) -> Result<ConfigLayer, AxError>;   // 纯函数，无 I/O
     pub fn model(&self) -> Option<&str>;                        // 这一级冻下的模型，照写下的读回
     pub fn effort(&self) -> Option<Effort>;
     pub fn sandbox(&self) -> Option<&SandboxLimits>;   pub fn mcp(&self) -> Option<&[McpServer]>;
+    pub fn search(&self) -> Option<&SearchConfiguration>;      // [search] 一节（§8-4c）
     pub fn second_threshold(&self) -> Option<SecondThreshold>;
     pub fn clock_stamp(&self) -> Option<ClockStampGranularity>;   // §8-31
     pub fn keep_warm(&self) -> Option<KeepWarm>;                  // [cache] 一节
@@ -114,8 +115,48 @@ pub fn write_mcp(city_root: &Path, addr: &Address, layer: Layer, servers: &[McpS
 - **写出的字节必须是 `ConfigFile` 读得回来的那种，`change` 在落盘前自己读一遍**：`McpServer` 的 serde 形状是嵌套的，而文件语法是平的（`label` ＋ `command`/`args`/`env` 或 `url`/`headers`/`transport`），写面照文件语法拼，一条往返测试逐支覆盖三种 transport。`Sse` 一行必写出 `transport = "sse"`：缺省是 `http`，不写就会被读回成另一种 transport。拼错之外还有组合错：往一份点名了 harness 的文件里写会话的 `[model] name`，写出的文件每个读者都拒，整栋楼从此派不出活。所以 `change` 把改好的整份文本先交给 `ConfigLayer::parse`，拒了就以 `E_CONFIG_INVALID` 拒这次写，原文件一字不动。读面是文件语法的唯一权威，写面复读一次，就不必在写面另记一份「哪些键不能并存」。
 - **空的 `mcp` 表要写出来而不是省略**：省略即继承上一级，而一个人删掉最后一台服务器不是想继承一台。
 - **`env` 与 `headers` 逐值判定凭据，落盘之前就拒**：一个值只要不是 `SecretRef::parse` 认得的 `secret:realm/name`，名字命中 `kernel::secret::scan::names_a_credential` 或值命中 `kernel::secret::scan::scan` 即以 `AxCode::ConfigInvalid` 拒，恢复语指向金库。判定在 `write_mcp` 进 `change` 之前逐对做，因此一次被拒的写入一个字节都没落；拒绝文字报出是哪一台服务器、哪一张表、哪一个名字，因为人手里只有那句话。**理由是这份文件进版本库**：楼的 `CONFIG.toml` 由 `city::gitignore` 放行进历史（§8-21），写进去的 key 就在这个项目的每一次克隆里。**判定不重建**：「什么叫凭据」是 `kernel::secret` 的答案，与 `[sandbox] env_passthrough` 走 `EnvVarName::parse` 是同一个权威的两次调用。
-- **读面不判这一条**：手写进 `CONFIG.toml` 的明文 key 仍然读得回来（`ConfigLayer::parse` 不调凭据谓词）。补齐要让 `ConfigLayer::parse` 调同一个谓词，那时谓词升为 `pub(crate)` 并只有一处实现。
-- **所有写面只有一条写路径**：各自把要说的话包成 `Change`（穷尽：`Session` / `Forget` / `Sandbox` / `Mcp` / `SecondThreshold` / `Naming` / `KeepWarm` / `Effort`），同走内部的 `change`——取 `city::document` 对这份文件的持有、读、改一个键、整份原子换上去。各自读写时，两个会话改同一份 `CONFIG.toml` 会各自从同一份原件出发，后写的那一个抄掉先写的那一个的改动。`[model]` 那一节的三个值由同一条 `table` 找到或建出，免得三处对「该写进哪张表」各有各的说法。
+- **读面用同一个判定**：`config_layers::mcp` 把一张 `[[mcp]]` 表解成 `McpServer` 之后、交出之前，对每一台调同一个 `validate`（`pub(crate)`，实现只有一处；`write_mcp` 进 `change` 之前调的也是它）。所以手写进 `CONFIG.toml` 的明文 key 在读这份文件时以 `E_CONFIG_INVALID` 拒，拒绝文字与写面那一句相同，只在 subject 前多一个文件（梯子加的，D8 (a)）；`secret:realm/name` 引用与不像凭据的字面值照旧读得回来。理由同写面：这份文件进版本库，读得回来的明文 key 等于这座城认可了它留在每一次克隆里。手写明文的旧配置因此第一次读就被拒，这是一次行为变化，恢复语指向金库：把值存进 vault，在原处写它的引用。
+- **url 的判定**：`Http` 与 `Sse` 的 `url` 在同一个 `validate` 里判，读写两面一起。用 `url::Url` 解析，scheme 只收 `http`／`https`；带 userinfo（`user:pass@`）、host 为空、或 query 里有一个参数的名字命中 `names_a_credential` 或值命中 `scan`（都按 percent 解码之后判）即拒。不像凭据的 query 与 fragment 照原字节保留，已有配置里的这类 url 照旧读得回来；凭据要走的路是带引用的 header。用 `url::Url` 而不是自己切字符串的理由见 D25。
+- **所有写面只有一条写路径**：各自把要说的话包成 `Change`（穷尽：`Session` / `Forget` / `Sandbox` / `Mcp` / `Search` / `SecondThreshold` / `Naming` / `KeepWarm` / `Effort`），同走内部的 `change`——取 `city::document` 对这份文件的持有、读、改一个键、整份原子换上去。各自读写时，两个会话改同一份 `CONFIG.toml` 会各自从同一份原件出发，后写的那一个抄掉先写的那一个的改动。`[model]` 那一节的三个值由同一条 `table` 找到或建出，免得三处对「该写进哪张表」各有各的说法。
+-/
+
+/-!
+### 8-4c `[search]`：网络搜索接哪一家（`config_layers::search`，形状 1 判定／求值）
+
+```rust
+pub fn search_supplier(configuration: &SearchConfiguration) -> Result<Option<SearchSupplier>, AxError>;
+pub fn default_search_supplier() -> Result<SearchSupplier, AxError>;   // 缺省那一家的唯一声明
+pub fn settled_search(city_root: &Path, addr: &Address)
+    -> Result<Option<(SearchConfiguration, Layer)>, AxError>;         // 值连同说出它的那一级
+pub fn write_search(city_root: &Path, configuration: &SearchConfiguration) -> Result<(), AxError>;
+```
+
+文件里这样写（`choice` 三选一；`selected` 与 `suppliers` 只跟 `"custom"` 出现）：
+
+```toml
+[search]
+choice = "custom"                # "default" | "custom" | "off"
+selected = "brave"
+[[search.suppliers]]
+id = "brave"
+url = "https://search.example/mcp"
+remote = "brave_web_search"
+query = "query"
+count = "count"                  # 可缺；objective 同样可缺
+[[search.suppliers.accounts]]
+id = "main"
+reference = "secret:search/brave.main"
+header = "x-api-key"
+```
+
+- **求值**：`search_supplier` 是「一个 run 的 `web_search` 接哪一家」的唯一答案。`Default` 答 `default_search_supplier()`，`Custom` 答 `id` 等于 `selected` 的那一家，`Off` 答 `None`（这里不提供 `web_search`）。`Custom` 的答案恒不是缺省那一家，除非人把它列进了 `suppliers` 并选了它；`selected` 在列表里找不到时以 `E_CONFIG_INVALID` 拒，不回落（D24）。冻结的值是 `FrozenConfig.search`（`crates/kernel/spec/Config.lean` §8-22），accounting 在 Run 起点对它调一次本函数（`crates/accounting/spec/Connectors.lean` §8-35）。
+- **缺省那一家只在这里声明**：`id = "exa"`，`url = "https://mcp.exa.ai/mcp"`，`remote = "web_search_exa"`，`query = "query"`，`objective = "objective"`，`count = "numResults"`，一个匿名账号 `anonymous`。设置页显示的缺省地址由 `Query::Config` 从这个函数读回，页面与 kernel 都不写第二份。这组参数名的出处见 D24。
+- **解析时拒**（`E_CONFIG_INVALID`，梯子在 subject 前加上文件）：`choice` 不是三种拼写之一；`"default"`／`"off"` 带着 `selected` 或 `suppliers`；`"custom"` 缺 `selected`、`suppliers` 为空或 `selected` 不在其中；两家同 `id`；`url` 过不了 `[[mcp]]` 的 url 判定（§8-4b，D25）；`remote` 或 `query` 为空；写了的 `objective`／`count` 为空，或三个参数名里有两个相同；`accounts` 过不了 `ProviderAccount` 的校验（空表、重复 id 或引用、匿名账号带 header）；带引用的账号没写 `header`；任何不认的键。
+- **带引用的账号必须写 `header`**：MCP 的 header 值按整个值兑付（一个 `secret:realm/name` 换成整份密文），所以 Key 只能原样放进一个具名 header；`Authorization: Bearer` 要一个兑付者不加的前缀。缺省那一家收 `x-api-key`。重开参数：出现一家只收 Bearer 的供应方。
+- **只写在城与楼两级**：房间那一级写 `[search]` 由梯子拒（`crates/city/spec/ConfigLayers/Ladder.lean` 的 `Confined.Search`），恢复语指向楼或城的 `CONFIG.toml`。理由：设置页编辑城那一级、只读列出各楼的覆盖，房间那一级的值会治理一个 run 却不出现在页面上；房间的文件又是会话写记录的地方（§8-14）。楼一级整值覆盖城一级，同 `[[mcp]]`。
+- **写面**：`write_search` 只写城那一级（设置页只编辑那一级），把值包成 `Change::Search`，先调读面同一个校验，过了才进 `change`，`change` 再复读整份文本（§8-4b）。`Default` 也写出 `choice = "default"`，读回的就是写下的。
+- **读回来源**：`settled_search` 与 `settled_effort` 爬同一条梯子，连同说出值的那一级答；在城根地址上问答的是城那一级，在某栋楼的地址上问答的是这栋楼被什么治理。没有 `[search]` 的旧 `CONFIG.toml` 照旧读得回来，答 `None`，求值为 `Default`。
+- **不在本模块的事**：机密楼不提供 `web_search`、账号怎么选、失败怎么恢复、连接怎么复用，都在 `crates/accounting/spec/Connectors.lean` §8-35。本模块只回答文件说了什么、它指哪一家。
 -/
 
 /-!
@@ -163,10 +204,32 @@ stamp = "minute"   # "off" | "minute" | "five_minute" | "hour"
 **重开参数**：harness 的会话也要冻下一条房间层的记录时（例如一段 harness 会话要跨 run 续上），房间层的记录要能说 harness，同层互斥与记录优先要一起重议。
 -/
 
+/-! D24 `[search]` 是三臂的值，`Custom` 不回落到缺省那一家，缺省那一家只在 `config_layers::search` 声明
+
+**决定**：`SearchConfiguration` 是 `Default`／`Custom { selected, suppliers }`／`Off` 三臂；`Custom` 只接 `selected` 点名的那一家，这一家连不上、`tools/list` 里没有它的远端工具或调用失败时，`web_search` 交回失败的工具结果，不换到缺省那一家，也不换到列表里的另一家。缺省那一家（Exa）的地址、远端工具名与参数映射只在 `default_search_supplier` 写一次，设置页经 `Query::Config` 读它。
+
+**理由**：一次搜索把 run 写下的查询文字交给一个城外的服务。人选了一家，换到另一家就是悄悄换掉了数据的接收方，而且没有一行记录告诉人这件事。`selected` 加 `Off` 让三种意图各有一个拼写：要缺省、要这一家、不要。缺省那一家的参数名照实测写：对 `https://mcp.exa.ai/mcp` 做只读的 `initialize` 与 `tools/list`，服务自报 `exa-search-server` 3.2.1、协议版本 `2025-06-18`；`web_search_exa` 的 `inputSchema` 必填 `query`（string，至少 1 字符）与 `objective`（string，1–4096 字符），可选 `numResults`（number），`additionalProperties` 为 false。所以缺省映射带 `objective`，`web_search` 对这一家把 `objective` 列为必填参数（§8-35）。
+
+**被否**：①每家一个 `enabled` 开关、取第一个启用的：两家都启用时谁说了算要读者去猜，全都关掉与 `Off` 又是同一件事的两种拼法；②`Custom` 失败时回落到 Exa：见理由，数据接收方被换掉；③把缺省地址写进 kernel 常量或页面：同一个事实两个家，页面那份会在服务地址变化时与实际调用分叉。
+
+**重开参数**：缺省那一家的 `tools/list` 不再列出 `web_search_exa` 或改了这几个参数，`web_search` 的映射校验会在调用前拒（§8-35），那时改 `default_search_supplier` 一处；人要求在多家之间按顺序回落时，重开的是本决定的第一条。
+-/
+
+/-! D25 MCP url 用 `url::Url` 解析，凭据的名字与值仍由 `kernel::secret` 判
+
+**决定**：§8-4b 的 url 判定用 workspace 钉版的 `url` crate 解析 scheme、userinfo、host 与 query，并按 percent 解码之后把每个 query 参数的名字交给 `names_a_credential`、值交给 `scan`。
+
+**理由**：url 的语法有 percent 编码、`+`、重复的 `?` 与 IPv6 字面量，自己切字符串会漏掉 `%61pi_key=` 这样编码过的参数名，也会把一个正常的 query 当作凭据而拒掉已有的 MCP 设置。「什么叫凭据」已经有 `kernel::secret` 一处答案，这里只缺一个按标准读 url 的解析器。
+
+**被否**：①手写 url 切分：见理由；②一律拒带 query 的 url：许多服务把非凭据的选项放在 query 里，已有配置会无故被拒。
+
+**重开参数**：`url` crate 的解析与 WHATWG URL 标准在本判定用到的部分出现分歧时。
+-/
+
 /-!
 ## 模型：每一次写都先让读者读一遍
 
-所有写面（`write_session`、`forget_session`、`write_sandbox`、`write_mcp`、`write_second_threshold`、`write_city_setting`、`freeze_naming`）都把要说的话包成一个 `Change`，走同一个 `change`：在文档锁里读出整份文件，读不成一份 TOML 文档就拒；改它要改的键；把改好的整份文本交给 `ConfigLayer::parse`，读者拒了就拒这次写，什么都不落；读者收下才整份换上（§8-4b、D6）。锁与整份换上是 `crates/city/spec/Document.lean` 的模型，这里只说「写下的总是读者收得下的」。
+所有写面（`write_session`、`forget_session`、`write_sandbox`、`write_mcp`、`write_search`、`write_second_threshold`、`write_city_setting`、`freeze_naming`）都把要说的话包成一个 `Change`，走同一个 `change`：在文档锁里读出整份文件，读不成一份 TOML 文档就拒；改它要改的键；把改好的整份文本交给 `ConfigLayer::parse`，读者拒了就拒这次写，什么都不落；读者收下才整份换上（§8-4b、D6）。锁与整份换上是 `crates/city/spec/Document.lean` 的模型，这里只说「写下的总是读者收得下的」。
 
 * `change` 交出的文本读者一定收下（`a_change_lands_only_what_the_reader_accepts`）。
 * 被拒的一次写不动文件（`a_refused_change_leaves_the_file`）。
@@ -228,3 +291,51 @@ theorem the_layer_on_disk_stays_readable {Text : Type} (readable parses : Text �
       exact reads
 
 end City.ConfigLayers
+
+/-!
+## 模型：`Custom` 只接它选的那一家
+
+`search_supplier` 的 Lean 读法（§8-4c，D24）。`S` 是一家供应方，`id` 读出它的名字，`exa` 是 `default_search_supplier` 的那一份声明。
+
+* `Custom` 接到的那一家一定在它自己的列表里、名字就是 `selected`（`a_custom_choice_reaches_only_its_selection`）。
+* `selected` 不在列表里时答 `none`，不回落到缺省那一家（`a_custom_choice_never_falls_back`）；解析把这种值拒在文件那一格。
+* `selected` 在列表里时一定接得到（`a_listed_selection_is_reached`）。
+
+由它派生的 Rust 检查在 `config_layers::search` 的测试里：缺席读作缺省那一家，`Custom` 只取 `selected` 并在它缺席时拒，`Off` 没有供应方，楼一级覆盖城一级。
+-/
+
+namespace City.ConfigLayers.Search
+
+/-- `SearchConfiguration`：要缺省、要这一家、不要。 -/
+inductive Configuration (S : Type) where
+  | Default
+  | Custom (selected : String) (suppliers : List S)
+  | Off
+
+/-- `search_supplier`：一个 run 的 `web_search` 接哪一家。 -/
+def supplier {S : Type} (id : S → String) (exa : S) : Configuration S → Option S
+  | .Default => some exa
+  | .Custom selected suppliers => suppliers.find? (fun one => id one == selected)
+  | .Off => none
+
+theorem a_custom_choice_reaches_only_its_selection {S : Type} (id : S → String) (exa : S)
+    (selected : String) (suppliers : List S) (reached : S)
+    (answer : supplier id exa (.Custom selected suppliers) = some reached) :
+    reached ∈ suppliers ∧ id reached = selected := by
+  simp only [supplier] at answer
+  exact ⟨List.mem_of_find?_eq_some answer, by simpa using List.find?_some answer⟩
+
+theorem a_custom_choice_never_falls_back {S : Type} (id : S → String) (exa : S)
+    (selected : String) (suppliers : List S) (missing : ∀ one ∈ suppliers, id one ≠ selected) :
+    supplier id exa (.Custom selected suppliers) = none := by
+  simp only [supplier]
+  exact List.find?_eq_none.mpr fun one listed => by simpa using missing one listed
+
+theorem a_listed_selection_is_reached {S : Type} (id : S → String) (exa : S)
+    (selected : String) (suppliers : List S) (listed : ∃ one ∈ suppliers, id one = selected) :
+    (supplier id exa (.Custom selected suppliers)).isSome := by
+  obtain ⟨one, member, named⟩ := listed
+  simp only [supplier, List.find?_isSome]
+  exact ⟨one, member, by simpa using named⟩
+
+end City.ConfigLayers.Search
