@@ -108,6 +108,15 @@ fn refused(subject: &str) -> AxError {
 mod tests {
     use super::*;
 
+    /// The production path end to end: the protected installation path,
+    /// the PowerShell query through `doctor::asking`, and the line it
+    /// keeps, which `principal` accepts only as a SID. It only reads, and
+    /// a refusal names no answer.
+    #[test]
+    fn the_running_account_answers_with_a_sid() {
+        read().unwrap();
+    }
+
     #[test]
     fn only_a_sid_is_kept_and_a_refusal_never_repeats_the_answer() {
         for sid in ["S-1-5-18", "S-1-5-21-1004336348-1177238915-682003330-1001"] {

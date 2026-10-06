@@ -27,20 +27,45 @@ pub fn verify_identity_binding(
     read: impl FnOnce(&SecretRef) -> Result<Option<Zeroizing<String>>, AxError>,
 ) -> Result<(), AxError> {
     let stored = read(reference)
-        .map_err(|source| refused(*source.code(), "platform identity binding unavailable"))?
-        .ok_or_else(|| refused(AxCode::CredentialMissing, "privacy owner binding missing"))?;
+        .map_err(|source| Refusal::Unavailable(*source.code()).into_ax())?
+        .ok_or_else(|| Refusal::Missing.into_ax())?;
     if observed.is_empty() || stored.as_str() != observed {
-        return Err(refused(
-            AxCode::ConfigInvalid,
-            "privacy history belongs to another identity",
-        ));
+        return Err(Refusal::Foreign.into_ax());
     }
     Ok(())
 }
 
-fn refused(code: AxCode, subject: &str) -> AxError {
-    AxError::failure(code, "verify privacy owner", subject)
-        .with_recovery("unlock the platform credential service and use the owning account; leave the binding and history unchanged")
+/// Why an owner was not verified; each reason carries the one recovery
+/// that answers it, and none carries what the binding source said.
+enum Refusal {
+    /// The source refused the read; its code is kept, its words are not,
+    /// because they may repeat the private input.
+    Unavailable(AxCode),
+    Missing,
+    Foreign,
+}
+
+impl Refusal {
+    fn into_ax(self) -> AxError {
+        let (code, subject, recovery) = match self {
+            Self::Unavailable(code) => (
+                code,
+                "platform identity binding unavailable",
+                "unlock the platform credential service and ask again; the binding and history stay unchanged",
+            ),
+            Self::Missing => (
+                AxCode::CredentialMissing,
+                "privacy owner binding missing",
+                "sign in to the account whose credential store holds the owner binding; the history stays unchanged",
+            ),
+            Self::Foreign => (
+                AxCode::ConfigInvalid,
+                "privacy history belongs to another identity",
+                "run as the Windows account that owns this history; the binding and history stay unchanged",
+            ),
+        };
+        AxError::failure(code, "verify privacy owner", subject).with_recovery(recovery)
+    }
 }
 
 #[cfg(test)]
