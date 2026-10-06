@@ -535,6 +535,17 @@ mod tests {
         }
 
         #[test]
+        fn native_cmd_source_preserves_utf16_units(source in argv_units()) {
+            let mut request = argv_launch(vec![OsString::from("/C"), OsString::from_wide(&source)]);
+            request.program = PathBuf::from(r"C:\Windows\System32\cmd.exe");
+            let encoded = packet::encode(&request).unwrap();
+            let command = encoded.split(|unit| *unit == 0).nth(1).unwrap();
+            let prefix: Vec<u16> = r#""C:\Windows\System32\cmd.exe" /D /S /C ""#.encode_utf16().collect();
+            let decoded = command.strip_prefix(prefix.as_slice()).unwrap().strip_suffix(&[34]).unwrap();
+            prop_assert_eq!(decoded, source);
+        }
+
+        #[test]
         fn native_nul_argument_is_rejected_before_launch(
             mut units in argv_units(), position in 0_usize..129,
         ) {
