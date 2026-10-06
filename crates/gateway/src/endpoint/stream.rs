@@ -588,51 +588,70 @@ data: {}
         server.join().unwrap();
     }
 
+    fn process_responses_fixture(deltas: usize, delta: &str, terminal: &str) -> usize {
+        use kernel::DialectKind;
+        let mut peak_retained = 0;
+        let mut frames = dialect::StreamFrames::new(DialectKind::OpenAiResponses);
+        for line in std::iter::repeat_n(delta, deltas).chain(std::iter::once(terminal)) {
+            let frame = frame_of(std::hint::black_box(line)).unwrap();
+            std::hint::black_box(dialect::increment_of(DialectKind::OpenAiResponses, &frame));
+            assert!(frames.retain_and_complete(frame).unwrap().is_none());
+            peak_retained = peak_retained.max(frames.retained_frames());
+        }
+        let reply =
+            dialect::response_from_wire(DialectKind::OpenAiResponses, &frames.finish().unwrap())
+                .unwrap();
+        std::hint::black_box(reply);
+        peak_retained
+    }
+
+    fn responses_fixture(deltas: usize) -> (String, String) {
+        use serde_json::json;
+        let delta = format!(
+            "data: {}",
+            json!({"type": "response.output_text.delta", "delta": "x".repeat(64)})
+        );
+        let terminal = format!(
+            "data: {}",
+            json!({
+                "type": "response.completed", "response": {
+                    "status": "completed", "output": [{"type": "message", "content": [
+                        {"type": "output_text", "text": "final"}]}],
+                    "usage": {"input_tokens": 10, "output_tokens": deltas}
+                }
+            })
+        );
+        (delta, terminal)
+    }
+
+    #[test]
+    #[ignore = "allocation instrument; run under heaptrack"]
+    fn instrument_responses_heap_small() {
+        let (delta, terminal) = responses_fixture(8);
+        std::hint::black_box(process_responses_fixture(8, &delta, &terminal));
+    }
+
+    #[test]
+    #[ignore = "allocation instrument; run under heaptrack"]
+    fn instrument_responses_heap_long() {
+        let (delta, terminal) = responses_fixture(16_384);
+        std::hint::black_box(process_responses_fixture(16_384, &delta, &terminal));
+    }
+
     #[test]
     #[ignore = "wall-clock instrument; just bench runs it"]
     #[allow(clippy::disallowed_methods, reason = "instrument samples its clock")]
     fn instrument_responses_stream() {
-        use kernel::DialectKind;
-        use serde_json::json;
         use std::time::Instant;
         for deltas in [8, 16_384] {
-            let delta = format!(
-                "data: {}",
-                json!({"type": "response.output_text.delta", "delta": "x".repeat(64)})
-            );
-            let terminal = format!(
-                "data: {}",
-                json!({
-                    "type": "response.completed", "response": {
-                        "status": "completed", "output": [{"type": "message", "content": [
-                            {"type": "output_text", "text": "final"}]}],
-                        "usage": {"input_tokens": 10, "output_tokens": deltas}
-                    }
-                })
-            );
+            let (delta, terminal) = responses_fixture(deltas);
             let fixture = kernel::B3Hash::digest(format!("{deltas}:{delta}:{terminal}").as_bytes());
             let mut peak_retained = 0;
             let mut samples = Vec::new();
             for sample in 0..220 {
                 let started = Instant::now();
-                let mut frames = dialect::StreamFrames::new(DialectKind::OpenAiResponses);
-                for line in std::iter::repeat_n(delta.as_str(), deltas)
-                    .chain(std::iter::once(terminal.as_str()))
-                {
-                    let frame = frame_of(std::hint::black_box(line)).unwrap();
-                    std::hint::black_box(dialect::increment_of(
-                        DialectKind::OpenAiResponses,
-                        &frame,
-                    ));
-                    assert!(frames.retain_and_complete(frame).unwrap().is_none());
-                    peak_retained = peak_retained.max(frames.retained_frames());
-                }
-                let reply = dialect::response_from_wire(
-                    DialectKind::OpenAiResponses,
-                    &frames.finish().unwrap(),
-                )
-                .unwrap();
-                std::hint::black_box(reply);
+                peak_retained =
+                    peak_retained.max(process_responses_fixture(deltas, &delta, &terminal));
                 let nanos = started.elapsed().as_nanos();
                 if sample >= 20 {
                     samples.push(nanos);

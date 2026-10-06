@@ -43,3 +43,8 @@
 p50 与 p99 取最近秩。内存读数是精确的持有帧数，不是私有字节或分配器总分配数。
 Actions 在同一个 runner 上交替运行两份预先编译的 executable，编译不计时。
 -/
+
+/-! `instrument_responses_heap_small` 与 `instrument_responses_heap_long` 各运行同一帧处理入口一次；
+Actions 用 Linux heaptrack 记录分配次数、总量、峰值与分配栈，小／长夹具分别运行，不把 profiler 的耗时
+用作延迟读数。进程启动、测试 runner 与夹具生成也在 heap profile 中，两臂有相同的这份固定开销。
+-/
