@@ -12,9 +12,14 @@ use super::{ContainerEngine, WORKDIR, denied};
 
 pub(super) fn image(bytes: &[u8], limits: &ContainerLimits) -> Result<(), AxError> {
     let value = first(bytes)?;
-    let volumes = value.pointer("/Config/Volumes");
-    if value.get("Id").and_then(Value::as_str) != Some(limits.image.as_str())
-        || !matches!(volumes, Some(Value::Null))
+    let pinned = value.get("Id").and_then(Value::as_str).is_some_and(|id| {
+        id == limits.image.as_str() || limits.image.as_str().strip_prefix("sha256:") == Some(id)
+    });
+    let config = value.get("Config").and_then(Value::as_object);
+    let volumes = config.and_then(|config| config.get("Volumes"));
+    if !pinned
+        || config.is_none()
+        || !matches!(volumes, None | Some(Value::Null))
             && !volumes
                 .is_some_and(|value| value.as_object().is_some_and(serde_json::Map::is_empty))
     {
