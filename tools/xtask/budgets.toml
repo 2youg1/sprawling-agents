@@ -251,7 +251,7 @@ names = [
 # today is the ratchet - nothing new may be born over 400 lines, and
 # nothing already over it may grow.
 [file_length]
-what = "one source file under a crate's src/ or under client/src, every line of it, tests included"
+what = "one source file under a crate's src/, any .zig in a package, or any file of a file-face-only language in the tree, Rust and Zig counting production lines and the rest every line"
 budget_lines = 400
 measured_by = "cargo xtask length"
 status = "gated, with a register of the files that predate the rule"
@@ -265,13 +265,13 @@ status = "gated, with a register of the files that predate the rule"
 # **The client arrived on 2026-09-19**, when `xtask length` reached
 # `client/src`. The 400-line rule had been stated for the whole
 # repository and executed on Rust only, so 18,000 lines of TypeScript
-# were read by the same two readers with nothing holding the line - the
-# six rows below are what that cost, and they are pinned at the length
-# each file had on the day the gate reached it. They carry the same
-# three properties every other row does, and they are worked off the
-# same way: by splitting the file, never by raising its number.
+# were read by the same two readers with nothing holding the line. The
+# rows that cost were pinned at the length each file had on the day the
+# gate reached it, carried the same three properties every other row
+# does, and were worked off the same way: by splitting the file, never
+# by raising its number.
 #
-# `client/src/wire.ts` (2,445 lines) is not here and never will be.
+# `client/src/wire.ts` is not here and never will be.
 # `cargo xtask wire-ts` writes it from the Rust wire, so its length is a
 # fact about the generator; the gate reads the exemption from the banner
 # the generator puts at the top rather than from a path written here.
@@ -288,9 +288,13 @@ status = "gated, with a register of the files that predate the rule"
 #
 # Delete a row by doing the split, never by raising its number.
 [file_length.predating]
-# Empty. The one entry this register held (`talk/composer.tsx = 478`) was
-# struck when the Solid client retired with the port; a stale entry is
-# refused by the gate, which is exactly how the list stays honest.
+# The stylesheet arrived when the rule reached every file-face-only
+# language in the tree (tools/xtask/Spec.lean section 8-53, D33): CSS,
+# HTML, the scripts and the Nix flake had been read by the same two
+# readers with nothing holding the line. It is pinned at the length it had
+# when the gate reached it, and it is worked off by splitting it into
+# parts the entry imports, never by raising its number.
+"client/src/theme.css" = 2108
 
 # White box is Rust, black box is Lean (the person's ruling).
 # `cargo xtask boundary` refuses a Rust check that reaches this product
