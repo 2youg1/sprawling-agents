@@ -23,8 +23,9 @@
   用恢复前刚读到的值作 expected，输出每个控制各自的结果。
 - privacy reconcile <expected>（Changes）：对未结操作执行人的核对（Privacy 的 Reconcile），
   expected 是 inspect 为该操作的控制打印的读数；不写系统。
-- privacy elevated-write <batch>（Changes）：只供 `bin::privacy::elevation` 的提升子进程使用，
-  见 Privacy.Windows D57；它不经 coordinator、不读日志、不输出读数。
+- privacy elevated-write <write>（Changes）：只供 `bin::privacy::elevation` 的提升子进程使用，
+  write 是一次机器作用域写入的十六进制 JSON，见 Privacy.Windows D57；它不经 coordinator、不读日志、
+  不读系统、不输出读数，校验失败或写入失败时以 AxError 退出失败。
 每个写入动词输出一行 JSON 结果（plan 的拒绝或 Finished 结论），失败输出 AxError 与 recovery
 并退出失败。CLI 是一次性 runner 验收进入生产路径的入口。
 输出不包含 owner、绝对 home 路径；读数与原值按 Privacy.State D52 明文。

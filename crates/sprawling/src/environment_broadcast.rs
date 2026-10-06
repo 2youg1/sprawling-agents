@@ -62,3 +62,11 @@ pub fn announce() -> Result<(), AxError> {
         .with_recovery("the value is written; programs started after the next sign-in read it")),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn the_announcing_script_parses() {
+        assert!(crate::privacy::windows::parses(super::ANNOUNCE));
+    }
+}

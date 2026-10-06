@@ -25,7 +25,9 @@
 - scheduled_task_enabled：经受保护安装目录下的 Windows PowerShell（与身份读取共用同一路径解析，
   Privacy.Cli D54）调用 ScheduledTasks 模块：读取任务是否存在、是否启用、去掉启用标志后的任务 XML
   的 SHA-256；写入只用 Disable-ScheduledTask 与 Enable-ScheduledTask，从不删除或注册任务。
-  脚本输出是一行 JSON，未知字段或状态拒绝。
+  脚本输出是一行 JSON，未知字段或状态拒绝；查询失败从不读作任务不存在，只有 ObjectNotFound 才是。
+  控制表有四个任务目标（CEIP 的 Consolidator 与 UsbCeip、Device Information 的 Device 与
+  Device User），路径与名称只来自控制表，经环境变量交给脚本，不拼进脚本文字。
 
 注册表目标的根不限于 SOFTWARE\Policies：控制表里还有 SOFTWARE\Microsoft\Windows\CurrentVersion\Policies
 下的值、SOFTWARE\Microsoft\OneDrive 下的值与 HKCU 的 Control Panel 下的值，适配器按控制表给出的
@@ -47,11 +49,18 @@ Education 为 education，Enterprise 为 enterprise，IoTEnterprise 为 iot_ente
 -/
 
 /-! D57 机器作用域的写入经短命的 UAC 提升子进程，父进程读回是唯一判定
-父进程以 Start-Process 的 RunAs 动词启动当前可执行文件的 privacy elevated-write 动词，参数是一批
-写入（目标、种类、类型码与原始字节）。子进程按 `bin::privacy::controls` 校验每个目标确在控制表中、
-种类一致、字节长度不超过上界，然后只写，不读、不记录、不判定；父进程等待它退出后自己读回，
-按 Privacy 的 judgeReadback 判定。UAC 被拒、子进程非零退出或访问拒绝都不单独当作结论，
-一律由读回决定（多数情况读回原值，即 NotApplied）。回滚写入同样经提升子进程。
+父进程以 ShellExecute 的 runas 动词启动当前可执行文件的 privacy elevated-write 动词，参数是一次写入：
+控制名与它要成为的快照（MachineWrite），编码为 JSON 后写成小写十六进制，所以命令行没有引号规则。
+一次提升只带一次写入（Privacy D60：同一时刻至多一个未结操作）。子进程按 `bin::privacy::controls`
+校验：控制的目标是机器作用域（HKLM 值或计划任务，HKCU 从不提升，D63）、快照种类与目标种类一致
+（注册表值配 Registry 快照，任务配 Enabled 或 Disabled，任务的 Absent 拒绝，因为适配器从不注册或
+删除任务）、注册表值字节不超过 1024；然后只写，不读、不记录、不判定。父进程等待它退出后自己读回，
+按 Privacy 的 judgeReadback 判定。UAC 被拒（ERROR_CANCELLED 1223）、子进程非零退出或访问拒绝都
+不单独当作结论，一律由读回决定（多数情况读回原值，即 NotApplied）。回滚写入同样经提升子进程。
+父进程的等待不设计数上限：UAC 提示在等人的决定，而在子进程仍可能写入时就读回，会把一次迟到的
+写入判成 NotApplied，留下一处无人拥有的修改。
+1024 字节的上界来自命令行：Windows 命令行最长 32767 个字符，一个字节在 JSON 数组与十六进制里约占
+8 个字符；控制表写入的值都是 4 字节，超过上界的只能是某个原值，plan 应在 apply 前拒绝这样的控制。
 被否：①整个 server 以管理员运行——城市的所有工具与模型调用都会获得机器级写权限，而需要它的
 只是这一小批注册表值与一个计划任务；②把日志放进 ProgramData 由管理员进程记录——日志的
 拥有者会与人的身份分离，Vault 绑定（Privacy.State D52）无从核对，且需要一个常驻的提升进程。

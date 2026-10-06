@@ -23,6 +23,40 @@ pub fn status() -> Result<String, AxError> {
     )
 }
 
+/// Carries out one machine-scope write as the elevated child the privacy
+/// page starts (`crates/sprawling/spec/Privacy/Windows.lean` D57): checks
+/// it against the control table and writes, reading nothing back and
+/// recording nothing.
+///
+/// # Errors
+/// `InvalidArgs` when `write` is missing or is not one machine-scope write
+/// the control table allows; `StorageFatal` when the write fails;
+/// `ToolUnavailable` off Windows.
+pub fn elevated_write(write: Option<&str>) -> Result<(), AxError> {
+    let refused = |code, subject: &str, recovery: &str| {
+        AxError::failure(code, "check an elevated privacy write", subject).with_recovery(recovery)
+    };
+    let write = write.ok_or_else(|| {
+        refused(
+            AxCode::InvalidArgs,
+            "no write was given",
+            "nothing was written; this verb is started only by the privacy page's elevation",
+        )
+    })?;
+    #[cfg(windows)]
+    {
+        super::elevation::carry_out(write)
+    }
+    #[cfg(not(windows))]
+    {
+        Err(refused(
+            AxCode::ToolUnavailable,
+            &format!("a {}-character write names a Windows control", write.len()),
+            "nothing was written; privacy controls are written on Windows only",
+        ))
+    }
+}
+
 /// The identity is sampled before the history is opened, so a failed
 /// sample says nothing about the history, not even whether it is intact.
 fn status_at(

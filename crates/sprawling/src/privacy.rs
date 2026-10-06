@@ -7,6 +7,8 @@
 
 pub mod cli;
 mod controls;
+#[cfg(windows)]
+mod elevation;
 mod identity;
 mod journal;
 mod originals;

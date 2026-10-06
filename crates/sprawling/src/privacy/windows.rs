@@ -13,14 +13,18 @@
 
 #[expect(
     dead_code,
-    reason = "the coordinator and the elevated child are the callers; until they exist no write is reached"
+    reason = "the coordinator is the caller; until it exists nothing reads or writes the user environment"
 )]
 pub(super) mod environment;
-#[expect(
-    dead_code,
-    reason = "the coordinator and the elevated child are the callers; until they exist no write is reached"
+#[cfg_attr(
+    not(test),
+    expect(
+        dead_code,
+        reason = "the coordinator reads through this adapter; until it exists only tests read"
+    )
 )]
 pub(super) mod registry;
+pub(super) mod task;
 
 use kernel::{AxCode, AxError};
 use winreg::RegKey;
@@ -126,6 +130,51 @@ fn edition(edition_id: &str) -> Option<PrivacyEdition> {
     ]
     .into_iter()
     .find_map(|(prefix, edition)| edition_id.starts_with(prefix).then_some(edition))
+}
+
+/// The bytes `hex` spells as pairs of lowercase hex digits, or nothing
+/// when it is anything else: the spelling of a task digest and of the
+/// elevated child's argument.
+pub(super) fn bytes_of_hex(hex: &str) -> Option<Vec<u8>> {
+    let nibble = |byte: u8| {
+        (0_u8..)
+            .zip(b"0123456789abcdef")
+            .find_map(|(value, digit)| (*digit == byte).then_some(value))
+    };
+    let (pairs, rest) = hex.as_bytes().as_chunks::<2>();
+    if !rest.is_empty() {
+        return None;
+    }
+    pairs
+        .iter()
+        .map(|[high, low]| nibble(*high)?.checked_mul(16)?.checked_add(nibble(*low)?))
+        .collect()
+}
+
+/// Whether Windows PowerShell parses `script` without running it, so a
+/// script this binary embeds is known to be well formed before a runner
+/// first executes it.
+#[cfg(test)]
+pub(crate) fn parses(script: &str) -> bool {
+    use crate::doctor::asking::{self, Ended};
+
+    let Ok(executable) = powershell() else {
+        return false;
+    };
+    let mut command = std::process::Command::new(executable);
+    command
+        .args([
+            "-NoLogo",
+            "-NoProfile",
+            "-NonInteractive",
+            "-Command",
+            "$errors = $null; [void][Management.Automation.Language.Parser]::ParseInput($env:SPRAWLING_SCRIPT, [ref]$null, [ref]$errors); if ($errors.Count -gt 0) { exit 1 }",
+        ])
+        .env("SPRAWLING_SCRIPT", script);
+    matches!(
+        asking::ask(&mut command, PATIENCE, |_| false),
+        Ended::Exited { code: Some(0), .. }
+    )
 }
 
 fn current_version() -> std::io::Result<RegKey> {
