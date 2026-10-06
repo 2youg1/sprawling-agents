@@ -80,9 +80,9 @@ endpoint_attached.tuning.accounts 为同一列表的 Ledger 形状，旧记录�
 AttachedEndpoint::account_auths，probe 经 first_auth 取首账号，adapter 取整张表供
 Session 选择，snapshot 保留同一账号列表，
 显式列表不回退原 auth。成功回答将非秘密账号 ID 绑定到房间的 Session，
-重排与重启不改变仍在列表中的绑定；新 Session 清除绑定，被移除的绑定回到首账号。
+重排与重启不改变仍在列表中的绑定；新 Session 清除绑定，被移除的绑定回到名册里第一个可兑付的账号（`AccountRound::start`，kernel D54）。
 旧单账号登记继续使用原 AuthSpec，不构造虚拟账号或重新选择认证头。
-失败处理仍由 runtime 既有的 Provider 策略决定，账号故障转移不在本接口内。
+失败之后原号再发、换号还是停下由 kernel 的 `AccountRound` 决定（`crates/kernel/spec/AccountRecovery.lean`，kernel D54），哪些失败说「换号」由 `endpoint::failure` 决定（D31）；本接口只供名册与按名选号（`crates/kernel/spec/Model.lean`）。
 Accounts 模型以通过账号校验的提交为输入；
 空表、重复引用和非法 header 由 Rust 账户校验回归判断。
 -/
@@ -188,7 +188,7 @@ snapshot 保存同一投影而不含 Key。派活在 room_for 后将成功亲和
 同一房间允许并发 Run，队列持有者归还后备用 Run 仍可执行，房间忙检查不能保障
 Session 边界；SessionOpened 撤销旧 Run 的成员资格，使后续调用也不能重新绑定。
 资格只由唯一 RunId 的 RunStarted 建立，按房间撤销不影响其它房间，因此不另存 epoch。
-未覆盖的恢复分类、有限换账号预算、搜索设置与账号登记 UI 仍由各自接口后续规定。 -/
+换号的分类在 D31，换号的预算与步进在 kernel D54；搜索设置与账号登记界面不在本接口内。 -/
 
 namespace Gateway.Router.Affinity
 

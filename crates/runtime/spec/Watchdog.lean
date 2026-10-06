@@ -20,9 +20,10 @@ pub struct Watchdog { /* corrections: u32、provider_failures: u32、streak: u32
 // retries 的类型是 kernel::Retries（§8-43）
 pub enum Disposal { Proceed, CorrectiveSteer { text: String },
                                      BackOff { until: TimeMs, code: AxCode, subject: String },
+                                     Switch { to: ServerLabel, code: AxCode, subject: String },   // 不等；drive 换号再问（D89）
                                      Freeze { reason: FreezeReason } }
 // fired_payload 写的是 kernel::event::record::WatchdogFired（`crates/kernel/Spec.lean` §8-4），本 crate 不另声明其形状
-pub enum FreezeReason { Stall, ProviderRefused }
+pub enum FreezeReason { Stall, ProviderRefused, AccountsExhausted }
 impl Watchdog {
     pub fn new(retries: Retries, run: RunId) -> Watchdog;               // run 的 16 字节折成抖动种子
     /// Consumes kernel::stall's verdict verbatim; never re-derives it.
@@ -37,9 +38,21 @@ impl Watchdog {
 - **provider 失败按 `AxError::retry` 的三态分类。** `No`→`Freeze { ProviderRefused }`，一次即止；`Yes` 与 `Unknown`→`BackOff { until }`（一次模型调用的效果只是一份城里从未收到的回答，效果是否落在对端只关乎计费，不关乎城里的状态，故「不知道」照样再问），`until = now + 退避`。**退避表只住 `Watchdog`**：自 provider 上次作答以来连续第 n 次失败的基准是 `500 ms × 2^(n-1)`，基准封顶 60 s（第 8 次起恒为 60 s）；实际等待是基准加一段抖动，抖动落在 `[0, 基准/2]`，所以第 n 次等待落在 `[基准, 1.5 × 基准]`，最长 90 s。起点 500 ms 与封顶 60 s 都是对端的尺度（一次过载的恢复时间），与所在机器的快慢无关，故不从机器的测量推导。落选的是「由调用层给 `until`」：调用层手里只有当前时刻，而 `gateway` 里并没有持 retry-after 的准入状态，结果是 `until` 恒等于「现在」，重试不隔一刻。**连续的计数在 provider 作答时归零**（`on_provider_answered`，`drive` 在每个走完的回合后调用）：一个已经恢复的 provider 不欠下一次故障一分钟的首等，而对重试的上限是对「同一个调用再问一次」的上限，不是对整个 Run 一生碰上几次故障的上限。`provider_failures` 仍是这个 Run 的总数，只作观察。**对端说了等多久时，等的是两者中较长的那个**：`until = now + max(退避表, AxError::retry_after_ms)`。对端的 `retry-after` 是它对自己何时恢复的陈述，早于它再问只会再收一次 429；退避表仍是下限，因为一个说「1 秒后」的对端连续失败时，连续计数照样该拉长间隔。对端给的等待不设上限：它可以很长，而停下一个在等的 Run 的是 `Halt`，`watchdog_fired` 里的 `until_ms` 让人看见它在等什么。**抖动以 `RunId` 为种子，同一个 Run 永远得到同一串等待。** 同一时刻被同一次故障打断的多个 Run 若按同一张表等待，会在同一毫秒一齐再问，把刚恢复的对端再压垮一次；抖动把它们错开。种子是 `RunId` 的 16 字节经 FNV-1a 折叠，与连续计数一起过一遍 splitmix64 的收尾混合，再对 `基准/2 + 1` 取余；不取随机源，因为一个 Run 的历史要能逐字节重放（citysim 与离线重放读的是同一张表），而 uuid v7 的末 74 位本身就是随机的，已经把同一毫秒启动的 Run 分开。抖动只往上加：退避表仍是下限，`retry-after` 取两者较长的规则不变。落选的是往下抖（`[基准/2, 基准]`）：那样第一次等待可以短于 500 ms，而表说的是「至少等这么久」。
 - **可重试的失败只对着人设的那个上限冻住**（`Retries`）。`UntilHalted` 下停它的是 `Halt`，城里唯一的刹车；`AtMost(n)` 下停它的是人在端点表单上填的那个数。**这两格是穷尽而不是一个带哨兵值的计数**：「一直试到有人喊停」与「试四次」是两种意图，一个数字拼不出前者。填进表单却没有任何东西去读的数字，比根本不给这个字段更糟，所以 `request_max_retries` 的读者就是 `Watchdog`，而它的调用方是下一条的 `drive`。
 - **`runtime::run::drive` 是那个调用方**：一次可重试的失败写一条 `watchdog_fired` 再重来，于是历史里第二条 `model_called` 就是人读到的那次重试，而不是一次无声的重复。节奏归 `Watchdog` 的退避表：`drive` 先把 `Watchdog` 给的 `until` 写进 `watchdog_fired`，再交给 `RunHooks::wait` 等到那一刻，于是历史许诺的「不早于 `until_ms`」与下一条 `model_called` 一致。**等待是 `Halt` 够得着一个没有回合在飞的 run 的地方**：`wait` 答 `Halted` 时 run 以 `Cancelled` 冻住，不再发下一次调用。落选的是「等完再问 `interrupt`」：退避长到一分钟，一个晚一分钟才生效的刹车不是刹车。装配层的 `wait` 以 50 ms 为片睡到 `until`，每片问一次是否停下；等待中到达的 steer 留到下一个安全点，不在等待里被吞掉。计数时钟（citysim、离线重放）答 `Allowed` 且不等，因为它重放的东西不在真实时间里等待。
+- **一个 Provider 有多个账号时，再发、换号与停下由 `AccountRound` 回答**（`crates/kernel/spec/AccountRecovery.lean` §8-86，kernel D54），`Watchdog` 只执行它的处置，不另判一次（D89）。`drive` 在每一次模型调用的第一次发送之前，用适配器答出的名册（`Model::account_roster`，`crates/kernel/spec/Model.lean`）、这个 Run 的 `Retries` 与适配器当前的账号开一轮，交给 `Watchdog` 持有；`on_provider_answered` 结束这一轮。`on_provider_failure` 问这一轮的 `next`、`apply` 它，再把处置翻成 `Disposal`：`Resend` 是上面的 `BackOff`，节奏仍归这里的退避表与 `retry-after`；`Switch { to }` 是 `Disposal::Switch { to, code, subject }`，不等，连续失败的计数归零（退避是对那个失败账号的陈述），`drive` 写一条 `watchdog_fired`（action `switch`，载荷带 `to`、`code`、`subject`，形状落地时记进 `crates/kernel/Spec.lean` §8-4）后经 `Model::select_account` 换号再问；`Stop { Refused }`、`Stop { Cap }` 与 `Stop { Unknown }` 是 `Freeze { ProviderRefused }`，原错误原样；`Stop { Exhausted }` 是 `Freeze { AccountsExhausted }`，`drive` 写一条 `E_PROVIDER_ACCOUNTS_EXHAUSTED`，run 以 `Cancelled` 冻住。单账号的名册（`Roster::Single`）的处置与上一条逐臂相同，所以单账号端点的行为不因这一轮而变。
 - **为什么按 `AxError::retry` 分类而不设固定次数。** 一个计数器对两种截然不同的失败给同一份预算：`E_WIRE_MISMATCH`（对端不说这个形状）重试三次就是把同一个 400 买三遍，而 429 重试三次就放弃又恰好把一个只需要等待的维护窗口当成了死亡。能否再试是产错处已经知道的事实（`Retry`，fail-closed），拿它分类比在这里重新猜一遍强。
-- **冻结原因叫 `ProviderRefused`**（载荷 `reason` 为 `provider_refused`）：没有重试预算，就没有东西被耗尽；冻住的原因是对端给了一个重试不能修复的答复。
+- **冻结原因叫 `ProviderRefused`**（载荷 `reason` 为 `provider_refused`）：没有重试预算，就没有东西被耗尽；冻住的原因是对端给了一个重试不能修复的答复。多账号的一轮把每个可兑付的账号都试过而无一作答时，冻结原因是 `AccountsExhausted`：那时被耗尽的确实是账号，`ProviderRefused` 会让人去查一个账号的拒绝，而出路是补录凭据、补额度或新增账号。
 - fired_payload 的形状由 `kernel::event::record::WatchdogFired`（`crates/kernel/Spec.lean` §8-4）独家拼出：`drive` 若对同一个 kind、同一个 `back_off` 词另写一份 {action, code, subject}，一份历史里就有两种 `watchdog_fired`。退避的原因随 `Disposal::BackOff` 一同旅行——说自己退避却不说退避什么的一行，没人能据以行动。字段＝{action: steer|back_off|freeze, text|(until_ms,code,subject)|reason, corrections, provider_failures}；Proceed 拒绝成帐（无事不记）；纠正只发一次（corrections 计数），第二次 Stall 即冻——分级穷尽于 steer→freeze 两级，「停滞中间态」不另设（它就是 Stall verdict 本身）。`provider_failures` 留下作为**观察**（这个 Run 碰上了几次），不是一个阀值。
+-/
+
+/-! D89 `Watchdog` 执行 `AccountRound` 的处置，不持有模型、不另写换号循环
+
+**决定**：模型路径的换号由 `Watchdog` 从 `AccountRound::next` 读出、经 `Disposal::Switch` 交给 `drive`，由 `drive` 调 `Model::select_account` 执行；`Watchdog` 的方法不收 `&mut dyn Model`，`drive` 不在 `Disposal` 之外判「要不要换号」。退避表、`retry-after` 与 `Halt` 在等待中的作用都不变，只有 `Resend` 走它们。
+
+**理由**：选号与恢复的规则只有一个家（kernel D54），`Watchdog` 一直是「这次失败之后做什么」的翻译处，换号只是多了一种处置；让它直接改模型会让一个方法既改状态又返回处置，而且搜索路径没有 `Watchdog`，那里的驱动方只读同一个 `AccountStep`。
+
+**被否**：①`Watchdog::on_model_failure(&mut self, failure, now, model: &mut dyn Model)`——命令与查询混在一个方法里，`Model` 的状态变化藏在一个看似只判定的调用后面；②`drive` 自己在 `BackOff` 之后看 `AxError::account` 决定换号——`Watchdog` 之外的第二个处置权威。
+
+**重开参数**：出现第三个模型路径的驱动方，它不经 `drive`。
 -/
 
 /-!
