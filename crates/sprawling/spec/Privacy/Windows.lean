@@ -37,6 +37,9 @@
 
 机器作用域（HKLM 与计划任务）的写入经 `bin::privacy::elevation`（D57）；用户作用域在本进程写入，
 从不提升（D63）。
+`bin::privacy::windows::host` 是 coordinator 的生产 Host：按控制表的目标把读与写路由到这三个适配器
+与提升，把适配器的失败映射为 Privacy §12 的 ReadFault 与 WriteFault，并持有身份与 owner 绑定
+（Privacy.Cli）。适配器本身不知道控制，也不判定结论。
 受保护的 Windows PowerShell 路径（Privacy.Cli D54）在 `bin::privacy::windows` 一处解析，
 身份读取、计划任务适配器、提升与环境广播共用它。
 主机信息：答案带该主机的 EditionID（原样）、它映射到的版本、CurrentBuild 与 UBR 组成的 build、

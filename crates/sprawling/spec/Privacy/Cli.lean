@@ -5,31 +5,54 @@
 
 /-!
 # privacy::cli 的本地入口
-规定 `crates/sprawling/src/privacy/cli.rs` 与它读取真实身份的
-`crates/sprawling/src/privacy/identity.rs`。本文件是接口说明，不是形式证明：
-写入动词的次序与性质由 crates.sprawling.spec.Privacy 证明，CLI 只把参数交给同一个
-`bin::privacy::coordinator`；status 是一次无状态查询，披露性质由类型持有（见 D53）。
+规定 `crates/sprawling/src/privacy/cli.rs`、它读取真实身份的
+`crates/sprawling/src/privacy/identity.rs`，以及写入动词交给 coordinator 的生产 Host
+`bin::privacy::windows::host`。本文件是接口说明，不是形式证明：写入动词的次序与性质由
+crates.sprawling.spec.Privacy 证明，CLI 只把参数交给同一个 `bin::privacy::coordinator`；
+status 与 inspect 是无状态查询，披露性质由类型持有（见 D53）。
 
-动词（main::verbs 各登记一次，main::router 直接调用）：
+动词（main::verbs 各登记一次，main::router 直接调用；时钟由 router 交入 assembly 的 SystemClock，
+不在 privacy 里取样）：
 - privacy status（ReadsOnly）：依次读取真实 Windows 身份（失败即返回且不打开日志）、
   通过 Home::detect().privacy_history() 调用 journal::read、把 History::disclose 交出的摘要
   序列化成一行 JSON。没有 city 参数，没有网络或 wire。
-- privacy inspect（ReadsOnly）：每个控制一行 JSON：控制名、控制表状态（可写或不写原因）、当前读数、
-  本应用拥有时的原值；不写的控制不读系统。
+- privacy inspect [control]（ReadsOnly）：先读真实身份与历史（同 status 的次序），经
+  History::standing 按 owner 核对后，每个控制一行 JSON（给出 control 时只那一行）：
+  control、reading（读到的快照，即 apply 与 restore 的 expected）与 key_existed，或读失败时的
+  unreadable（access_denied 或 failed）；owned（本应用仍拥有的最近操作的 operation、original、
+  modified，否则为 null）；unresolved（该控制是否有未结操作）。所有控制都可写
+  （Privacy D66），不写的原项不是控制，所以不出现在这里。
 - privacy apply <control> <expected> 与 privacy restore <control> <expected>（Changes）：
-  expected 是 inspect 为该控制打印的读数 JSON，原样传回；它就是 Privacy.Confirmation D55 的绑定，
+  expected 是 inspect 为该控制打印的 reading JSON，原样传回；它就是 Privacy.Confirmation D55 的绑定，
   缺少或不符即拒绝。
 - privacy restore-all（Changes）：按控制逐个恢复本应用仍拥有的修改（Privacy D60），每个控制
-  用恢复前刚读到的值作 expected，输出每个控制各自的结果。
+  用恢复前刚读到的值作 expected，输出每个控制各自的结果；第一个失败之后不再继续，
+  已完成的结果照样输出，退出失败。
 - privacy reconcile <expected>（Changes）：对未结操作执行人的核对（Privacy 的 Reconcile），
-  expected 是 inspect 为该操作的控制打印的读数；不写系统。
+  expected 是 inspect 为该操作的控制打印的 reading；不写系统。
 - privacy elevated-write <write>（Changes）：只供 `bin::privacy::elevation` 的提升子进程使用，
   write 是一次机器作用域写入的十六进制 JSON，见 Privacy.Windows D57；它不经 coordinator、不读日志、
   不读系统、不输出读数，校验失败或写入失败时以 AxError 退出失败。
-每个写入动词输出一行 JSON 结果（plan 的拒绝或 Finished 结论），失败输出 AxError 与 recovery
-并退出失败。CLI 是一次性 runner 验收进入生产路径的入口。
+apply、restore、reconcile 成功时输出一行 JSON：{"done":"applied"|"restored","operation":n}、
+{"done":"already_written"} 或 {"done":"reconciled","operation":n,"settlement":…}；restore-all 每个
+控制一行 {"control":…,"done":…}。失败时把 AxError 与 recovery 写到 stderr 并退出失败；
+--json 时 stderr 是一行 AxError JSON，subject 以 Privacy §12 的稳定码开头，一次性 runner 的
+验收按它判定。CLI 是一次性 runner 验收进入生产路径的入口。
 输出不包含 owner、绝对 home 路径；读数与原值按 Privacy.State D52 明文。
 HistoryFault 的稳定 code 与 recovery 映射归 `bin::privacy::fault`，调用者只给出自己的 action，不在路由器重写。
+
+生产 Host（`bin::privacy::windows::host`）：
+- identity 是 `bin::privacy::identity` 读到的 SID；owner(recorded, identity)：有记录的引用时经
+  gateway::verify_platform_identity 核对后原样返回；空历史时抽取 64 位随机数，作名字
+  owner-<16 位小写十六进制> 在 realm privacy 下建一个新引用，经 gateway::bind_platform_identity
+  把 SID 写进平台 Vault（gateway D30），返回这个引用。空历史第一次写入之前的失败（例如 changed）
+  会留下一条没有历史引用的绑定，它只在本人的凭据库里保存本人的 SID。
+- read 与 write 按控制表的目标交给适配器（Privacy.Windows）：HKCU 值与用户环境在本进程，
+  HKLM 值与计划任务经 `bin::privacy::elevation`；适配器的访问拒绝映射为 Privacy §12 的
+  access_denied，UAC 被拒映射为 elevation_declined，其他失败带原因。计划任务没有父键，
+  它的读数记录 key_existed 为 true，所以从不报告残留的空键。
+- 用户环境的写入在广播失败时仍是成功的写入：值已写下，读回判定结论；广播失败只影响已运行的
+  程序何时读到它。
 -/
 
 /-! D53 status 的摘要也是身份披露，只交给 owner 引用在平台 Vault 中绑定的身份
@@ -41,6 +64,8 @@ status 的 authorize 是 gateway::verify_platform_identity(owner, 实时身份)�
 缺失返回 CredentialMissing，锁定保留平台错误码，不匹配返回 ConfigInvalid。
 空历史没有 owner，不访问 Vault，返回空摘要。身份读取先于日志读取，
 所以读不到身份时不报告日志是否损坏。每次查询保持日志字节不变。
+inspect 与 restore-all 经 History::standing(authorize) 取得拥有栈栈顶与未结操作，authorize 与 status
+相同；空历史同样不访问 Vault。
 此边界只核对 owner；写入动词经 coordinator 用同一核对，身份不符时在披露任何历史之前拒绝。
 被否：①在 Lean 中把查询写成快照序列上的 map 再证明——每次查询相互独立，
 定理只是复述定义的一支；②cli 先取 owner 再取摘要的两个 getter——
