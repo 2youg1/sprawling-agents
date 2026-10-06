@@ -132,9 +132,8 @@ fn open_or_create(path: &Path) -> Result<File, HistoryFault> {
         .open(path)
         .map_err(HistoryFault::Io)?;
     sync_directory(directory)?;
-    match (created_directory, directory.parent()) {
-        (true, Some(above)) => sync_directory(above)?,
-        (true, None) | (false, Some(_) | None) => (),
+    if created_directory && let Some(above) = directory.parent() {
+        sync_directory(above)?;
     }
     Ok(file)
 }
@@ -160,8 +159,7 @@ fn sync_directory(directory: &Path) -> Result<(), HistoryFault> {
 
 fn read_bounded(file: &File) -> Result<Vec<u8>, HistoryFault> {
     let mut bytes = Vec::new();
-    (&*file)
-        .take(HISTORY_BYTES_MAX.saturating_add(1))
+    file.take(HISTORY_BYTES_MAX.saturating_add(1))
         .read_to_end(&mut bytes)
         .map_err(HistoryFault::Io)?;
     if exceeds_capacity(&bytes)? {
@@ -376,6 +374,10 @@ mod tests {
         journal.append_durable(&prepared(&intent)).unwrap();
         let first = bytes(&[prepared(&intent)]);
         assert_eq!(journal.bytes, first);
+        assert_eq!(
+            serde_json::to_value(journal.history().disclose(|_| Ok(())).unwrap()).unwrap(),
+            serde_json::json!([{ "operation": 1, "outcome": "unresolved" }])
+        );
         drop(journal);
         assert_eq!(std::fs::read(&path).unwrap(), first);
         let mut journal = LockedJournal::open(&path).unwrap();
