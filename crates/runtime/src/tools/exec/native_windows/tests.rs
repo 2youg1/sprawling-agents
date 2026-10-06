@@ -246,6 +246,7 @@ fn native_windows_disposable_argv_and_unrequested_memory() {
         exit,
         stdout,
         stderr,
+        ..
     } = result
     else {
         panic!("argv child must settle: {result:?}");
@@ -372,6 +373,7 @@ fn native_windows_disposable_argv_and_unrequested_memory() {
             exit: crate::Exit::Ended { code: 0 },
             stdout: "DEFAULT_CAPTURE=Ok(Some(0))\nNUL_DEVICE=Ok(())\n".to_owned(),
             stderr: String::new(),
+            ceiling: None,
         },
         "an AppContainer child opens NUL itself (D59)"
     );
