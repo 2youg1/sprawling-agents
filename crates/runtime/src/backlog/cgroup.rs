@@ -11,8 +11,8 @@
 //! a cgroup that holds processes may not hand out its own resources —
 //! opens `cpu` and `memory` in the parent's `cgroup.subtree_control`,
 //! and gives each run a child named `run-<RunId>`. The child holds
-//! `cpu.weight` 100, the same for every run, and `memory.max` when the
-//! arm asked for a limit; each command of the run writes its pid into
+//! `cpu.weight` 100, the same for every run, and `memory.max` set to the
+//! requested limit or `max` to clear a limit in a reused directory; each command of the run writes its pid into
 //! the child's `cgroup.procs`.
 //!
 //! The parent is a parameter rather than a constant, so the tests run
@@ -174,8 +174,8 @@ impl Cgroups {
 }
 
 /// Makes the run's child cgroup under `parent` and writes the shares
-/// `asked` for: `cpu.weight` for every run, `memory.max` only for a
-/// limit. `false` when a write was refused, which leaves the run
+/// `asked` for: `cpu.weight` for every run, and `memory.max` set to the
+/// requested limit or `max` to clear a prior ceiling. `false` when a write was refused, which leaves the run
 /// unshared rather than failing its command (D29).
 #[cfg(any(not(windows), test))]
 fn made(dir: &Path, asked: Shares) -> bool {
@@ -185,7 +185,9 @@ fn made(dir: &Path, asked: Shares) -> bool {
         Shares::CpuAndMemory { limit } => weighed
             .and_then(|()| std::fs::write(dir.join("memory.max"), limit.get().to_string()))
             .is_ok(),
-        Shares::Cpu | Shares::Unset => weighed.is_ok(),
+        Shares::Cpu | Shares::Unset => weighed
+            .and_then(|()| std::fs::write(dir.join("memory.max"), "max"))
+            .is_ok(),
     }
 }
 

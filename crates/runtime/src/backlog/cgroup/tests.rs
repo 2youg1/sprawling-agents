@@ -101,8 +101,8 @@ fn a_run_reads_unshared_where_the_root_cannot_be_written() {
     );
 }
 
-/// Two runs get the same weight, `memory.max` only where the arm asked
-/// for a limit, and each command's pid joins its own run's cgroup.
+/// Two runs get the same weight, only the requested memory ceiling,
+/// and each command's pid joins its own run's cgroup.
 #[test]
 fn two_runs_hold_the_same_weight_and_the_limit_the_arm_asked_for() {
     let root = FakeRoot::delegated();
@@ -131,7 +131,7 @@ fn two_runs_hold_the_same_weight_and_the_limit_the_arm_asked_for() {
         root.read(&format!("run-{first}/memory.max")),
         limit.get().to_string()
     );
-    assert!(!root.has(&format!("run-{second}/memory.max")));
+    assert_eq!(root.read(&format!("run-{second}/memory.max")), "max");
     assert_eq!(root.read(&format!("run-{first}/cgroup.procs")), "111");
     assert_eq!(root.read(&format!("run-{second}/cgroup.procs")), "222");
 
@@ -149,6 +149,7 @@ fn cpu_only_clears_a_previous_ceiling_when_a_run_directory_is_reused() {
         limit: NonZeroU64::new(64 << 20).unwrap(),
     };
     assert_eq!(first.enter(run, 111, capped), capped);
+    drop(first);
     let mut restarted = Cgroups::adopt(root.path(), 4242);
     let held = restarted.enter(run, 222, Shares::Cpu);
     assert_eq!(
