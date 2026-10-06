@@ -8,10 +8,11 @@
 use std::collections::BTreeMap;
 use std::num::NonZeroU64;
 
-use kernel::{AxCode, AxError, SecretRef};
+use kernel::{AxError, SecretRef};
 use serde::{Deserialize, Serialize};
 use wire::PrivacyControl;
 
+use super::fault::HistoryFault;
 use super::target::Snapshot;
 
 pub(super) const SCHEMA: u32 = 3;
@@ -110,10 +111,7 @@ pub(super) struct History(Fold);
 /// its owner reference passed the identity check (Privacy D66).
 #[cfg_attr(
     not(test),
-    expect(
-        dead_code,
-        reason = "the privacy write verbs are the coordinator's production caller and are not built yet"
-    )
+    expect(dead_code, reason = "read only by the coordinator, not yet called")
 )]
 #[derive(Debug)]
 pub(super) struct Holdings<'h> {
@@ -192,10 +190,7 @@ impl History {
     /// The refusal `authorize` returns; nothing of the history is released.
     #[cfg_attr(
         not(test),
-        expect(
-            dead_code,
-            reason = "the privacy write verbs are the coordinator's production caller and are not built yet"
-        )
+        expect(dead_code, reason = "read only by the coordinator, not yet called")
     )]
     pub(super) fn holdings(
         &self,
@@ -213,10 +208,7 @@ impl History {
 
 #[cfg_attr(
     not(test),
-    expect(
-        dead_code,
-        reason = "the privacy write verbs are the coordinator's production caller and are not built yet"
-    )
+    expect(dead_code, reason = "read only by the coordinator, not yet called")
 )]
 impl Holdings<'_> {
     pub(super) fn owner(&self) -> &SecretRef {
@@ -396,58 +388,6 @@ enum Ownership {
     Take,
     Release,
     Keep,
-}
-
-/// Failure reasons remain distinct until the CLI boundary maps them to AxError.
-#[derive(Debug)]
-pub(super) enum HistoryFault {
-    Io(std::io::Error),
-    Decode {
-        line: usize,
-        column: usize,
-        category: serde_json::error::Category,
-    },
-    Invalid(&'static str),
-    Busy,
-    Capacity,
-}
-
-impl HistoryFault {
-    /// The error a caller that was doing `action` reports.
-    pub(super) fn into_ax(self, action: &'static str) -> AxError {
-        let (code, subject, recovery) = match self {
-            Self::Io(source) => (
-                AxCode::StorageFatal,
-                format!("history IO: {source}"),
-                "check local history access and retry",
-            ),
-            Self::Decode {
-                line,
-                column,
-                category,
-            } => (
-                AxCode::StorageFatal,
-                format!("history decoding at line {line} column {column} ({category:?})"),
-                "preserve the history bytes and inspect the malformed line; do not truncate it",
-            ),
-            Self::Invalid(reason) => (
-                AxCode::StorageFatal,
-                reason.to_owned(),
-                "preserve the history and resolve its incompatible or unresolved operation before any write",
-            ),
-            Self::Busy => (
-                AxCode::LedgerHeld,
-                "privacy history is held by another process".to_owned(),
-                "wait for that operation to end, then read status again",
-            ),
-            Self::Capacity => (
-                AxCode::StorageFatal,
-                "privacy history exceeds its reader capacity".to_owned(),
-                "preserve the history and use a reader that supports its size; do not remove original values",
-            ),
-        };
-        AxError::failure(code, action, subject).with_recovery(recovery)
-    }
 }
 
 /// History lines for the tests of this module and of its readers.

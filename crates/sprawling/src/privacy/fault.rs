@@ -3,8 +3,9 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Why a privacy operation did not make the change asked for, and the one
-//! map from that to the error a person reads
+//! Why a privacy operation did not make the change asked for, or its
+//! history could not be read or extended, and the one map from each to the
+//! error a person reads
 //! (`crates/sprawling/spec/Privacy.lean` §12).
 
 use std::num::NonZeroU64;
@@ -12,7 +13,58 @@ use std::num::NonZeroU64;
 use kernel::{AxCode, AxError};
 use wire::PrivacyControl;
 
-use super::state::HistoryFault;
+/// Why a history was not read or a line not written. Reasons stay
+/// distinct until a caller maps them to AxError with its own action.
+#[derive(Debug)]
+pub(super) enum HistoryFault {
+    Io(std::io::Error),
+    Decode {
+        line: usize,
+        column: usize,
+        category: serde_json::error::Category,
+    },
+    Invalid(&'static str),
+    Busy,
+    Capacity,
+}
+
+impl HistoryFault {
+    /// The error a caller that was doing `action` reports.
+    pub(super) fn into_ax(self, action: &'static str) -> AxError {
+        let (code, subject, recovery) = match self {
+            Self::Io(source) => (
+                AxCode::StorageFatal,
+                format!("history IO: {source}"),
+                "check local history access and retry",
+            ),
+            Self::Decode {
+                line,
+                column,
+                category,
+            } => (
+                AxCode::StorageFatal,
+                format!("history decoding at line {line} column {column} ({category:?})"),
+                "preserve the history bytes and inspect the malformed line; do not truncate it",
+            ),
+            Self::Invalid(reason) => (
+                AxCode::StorageFatal,
+                reason.to_owned(),
+                "preserve the history and resolve its incompatible or unresolved operation before any write",
+            ),
+            Self::Busy => (
+                AxCode::LedgerHeld,
+                "privacy history is held by another process".to_owned(),
+                "wait for that operation to end, then read status again",
+            ),
+            Self::Capacity => (
+                AxCode::StorageFatal,
+                "privacy history exceeds its reader capacity".to_owned(),
+                "preserve the history and use a reader that supports its size; do not remove original values",
+            ),
+        };
+        AxError::failure(code, action, subject).with_recovery(recovery)
+    }
+}
 
 /// Why a read of a target failed.
 #[derive(Debug)]

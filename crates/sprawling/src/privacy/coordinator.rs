@@ -14,10 +14,10 @@ use std::num::NonZeroU64;
 use kernel::{AxError, SecretRef};
 use wire::PrivacyControl;
 
-use super::fault::{PrivacyFault, ReadFault, Unconfirmed, WriteFault};
+use super::fault::{HistoryFault, PrivacyFault, ReadFault, Unconfirmed, WriteFault};
 use super::journal::LockedJournal;
 use super::plan::{self, ApplyPlan, ReconcilePlan, Request, RestorePlan, RollbackEnd, Verdict};
-use super::state::{Event, History, HistoryFault, Intent, Line, Outcome, SCHEMA, Settlement};
+use super::state::{Event, History, Intent, Line, Outcome, SCHEMA, Settlement};
 use super::target::{Reading, Snapshot};
 
 /// How long after a command is accepted its write may still start

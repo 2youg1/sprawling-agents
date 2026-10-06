@@ -11,7 +11,8 @@ use std::fs::{File, OpenOptions, TryLockError};
 use std::io::{ErrorKind, Read, Write};
 use std::path::Path;
 
-use super::state::{History, HistoryFault, Line};
+use super::fault::HistoryFault;
+use super::state::{History, Line};
 
 /// History input bound, not a claim about Windows registry value limits.
 const HISTORY_BYTES_MAX: u64 = 8 * 1024 * 1024;

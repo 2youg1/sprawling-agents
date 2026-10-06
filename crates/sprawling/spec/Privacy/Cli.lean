@@ -28,7 +28,7 @@
 每个写入动词输出一行 JSON 结果（plan 的拒绝或 Finished 结论），失败输出 AxError 与 recovery
 并退出失败。CLI 是一次性 runner 验收进入生产路径的入口。
 输出不包含 owner、绝对 home 路径；读数与原值按 Privacy.State D52 明文。
-HistoryFault 的稳定 code/action/recovery 映射归 state，不在路由器重写。
+HistoryFault 的稳定 code 与 recovery 映射归 `bin::privacy::fault`，调用者只给出自己的 action，不在路由器重写。
 -/
 
 /-! D53 status 的摘要也是身份披露，只交给 owner 引用在平台 Vault 中绑定的身份

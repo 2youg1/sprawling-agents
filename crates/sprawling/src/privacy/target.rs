@@ -123,10 +123,7 @@ pub(crate) enum Snapshot {
 /// and never compared as part of it (Privacy.State D58).
 #[cfg_attr(
     not(test),
-    expect(
-        dead_code,
-        reason = "the privacy write verbs are the coordinator's production caller and are not built yet"
-    )
+    expect(dead_code, reason = "read only by the coordinator, not yet called")
 )]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Reading {
