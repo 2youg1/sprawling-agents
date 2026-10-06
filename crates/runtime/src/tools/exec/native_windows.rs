@@ -10,6 +10,7 @@ use std::collections::BTreeMap;
 use std::ffi::OsString;
 use std::num::{NonZeroU16, NonZeroUsize};
 use std::os::windows::ffi::{OsStrExt, OsStringExt};
+use std::os::windows::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -104,14 +105,14 @@ pub(crate) fn launch(
             .map_err(|err| denied("enumerate declared toolchain home", err))?
         {
             let entry = entry.map_err(|err| denied("read declared toolchain entry", err))?;
-            let kind = entry
-                .file_type()
+            let metadata = entry
+                .metadata()
                 .map_err(|err| denied("read toolchain entry type", err))?;
-            if kind.is_symlink() {
+            if metadata.file_attributes() & winsafe::co::FILE_ATTRIBUTE::REPARSE_POINT.raw() != 0 {
                 continue;
             }
             let path = entry.path();
-            if kind.is_dir() {
+            if metadata.is_dir() {
                 pending.push(path.clone());
             }
             toolchain_roots.push(path);
