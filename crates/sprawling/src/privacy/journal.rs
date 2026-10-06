@@ -280,8 +280,10 @@ mod tests {
             before.push(b'\n');
             let fault = match decode(&before) {
                 Ok(_) => panic!("private input accepted"),
-                Err(fault) => fault.into_ax(),
+                Err(fault) => fault,
             };
+            assert!(!format!("{fault:?}").contains("fixture-private-principal"));
+            let fault = fault.into_ax();
             assert!(!fault.to_string().contains("fixture-private-principal"));
             assert_eq!(fault.code(), &kernel::AxCode::StorageFatal);
             assert!(fault.subject().contains("column"));

@@ -37,7 +37,8 @@ History::statuses 返回 operation 与 Outcome 摘要，不输出 raw bytes 或 
 禁止自动迁移，因为没有经核对的 Vault 绑定就不能把旧身份当作可执行恢复授权。
 当前只读入口没有 Vault 解析、身份授权或 writer；这些消费者仍是执行接口缺口。
 serde 拒绝无效 SecretRef 时可能在错误文字中复述输入，HistoryFault 的公开拒绝
-仅携带 JSON 解码位置及类别，不复述 owner、值、未知 enum 或未知字段。
+仅携带 JSON 解码位置及类别，不复述 owner、值、未知 enum 或未知字段；
+Decode 在构造时移除输入文字，内部 Debug 与公开 AxError 都遵守此边界。
 验收：明文 owner 拒绝且文件不变，旧 schema 拒绝，合法引用 roundtrip，
 畸形身份/字段/enum 的诊断不泄露输入；注册表原字节的既有检查保持。
 -/
