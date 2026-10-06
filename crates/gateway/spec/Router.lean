@@ -8,7 +8,7 @@
 
 规定 `router`（`crates/gateway/src/router.rs`）：已登记端点的簿与每个标签的选择；一次取模型只答一问。本文件是 `crates/gateway/Spec.lean` 的一个分部；下面每一节保留它在 gateway 规格里的标签 §8-n，别处引作 `crates/gateway/Spec.lean §8-n`。
 
-这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与 `gateway::router::normalise::tests` 守住。
+本分部的 Accounts 模型证明显式账号在提交轨迹上保持存在，其他接口由 Rust 类型与 router 旁的回归检查守住。
 -/
 
 /-!
@@ -22,6 +22,7 @@ pub struct AttachedEndpoint { pub name, pub base_url, pub dialect: DialectKind,
                               pub tuning: EndpointTuning }   // §8-16
 impl AttachedEndpoint {
     pub fn is_local(&self) -> bool;          // 与 client_for 绕开代理同一依据（reach::is_local）
+    pub fn first_auth(&self) -> Result<AuthSpec, AxError>; // 原登记或显式列表首账号
     pub fn has_credential(&self) -> bool;    // 关于凭证，金库外只能回答这一问
     pub fn chat_url(&self) -> String;        // base_url ＋ 该兼容格式自己的路径
     pub fn models_url(&self) -> String;
@@ -34,6 +35,8 @@ impl EndpointBook {
     pub fn apply(&mut self, record: &EventRecord) -> Result<(), AxError>;
     pub fn apply_payload(&mut self, kind: EventKind, data: &Payload) -> Result<(), AxError>;
     pub fn select(&self, tag: ModelTag, policy: &BuildingPolicy) -> Result<Chosen<'_>, AxError>;
+    pub fn accounts_for_attachment(&self, name: &str, incoming: Option<Vec<ProviderAccount>>)
+        -> Option<Vec<ProviderAccount>>; // 登记与重放共用的缺席保留规则
     pub fn endpoints(&self) -> impl Iterator<Item = &AttachedEndpoint>;
     pub fn choices(&self) -> impl Iterator<Item = (ModelTag, &str, &ModelEntry)>;
 }
@@ -69,10 +72,11 @@ EndpointTuning.accounts 缺席表示保留已有显式列表，尚未迁移的�
 显式列表必须非空、id/reference 不重复，匿名账号不得带 header。
 endpoint_attached.tuning.accounts 为同一列表的 Ledger 形状，旧记录缺席仍可读。
 账号列表的创建、替换、移除和重排走原 AttachEndpoint，不创建第二个 Provider 数据库。
-校验住 gateway::router::tuning::validate_accounts；probe、adapter 与 snapshot
+保留规则只由 EndpointBook::accounts_for_attachment 决定，登记面与重放均调用它。
+校验住 kernel::event::record::validate_provider_accounts；probe、adapter 与 snapshot
 都读 AttachedEndpoint::first_auth，显式列表不回退原 auth。
 D28：保持原登记事件与 Vault 格式，以完整有序列表为一次原子替换，避免逐账号命令
-产生半个登记；拒绝空列表以免误作匿名或回退。Session 亲和与故障转移由运行记录规定。
+产生半个登记；拒绝空列表以免误作匿名或回退。此登记接口只规定账号声明与首次凭据解析，不承诺 Session 亲和或失败恢复。
 -/
 namespace Gateway.Router.Accounts
 /-- 列表缺席才使用旧登记；显式空表不是旧登记。 -/
@@ -101,10 +105,10 @@ end Gateway.Router.Accounts
 
 `accounting::worker::credentials::endpoints::endpoint_of` 先保留缺席的 accounts，
 再调用 `gateway::AttachedEndpoint::validate_legacy_fields` 判定旧 credential；
-该纯准入方法是 router、RunWorker 与 Doctor §8-81 描述共用的唯一拒绝权威。
+该纯准入方法是登记命令拒绝旧字段的唯一权威。
 有效 accounts 存在时，`secret` 或 `auth_header` 在场均返回
 `E_CONFIG_INVALID`，action 为 `configure provider accounts`，subject 含 Provider 名及固定原因文字，不含 secret、header 或 reference，
-recovery 引导编辑具名账号的 reference/header 并省略旧字段。ProbeEndpoint 与
+recovery 引导修改具名账号的 reference/header 并省略旧字段。ProbeEndpoint 与
 AttachEndpoint 共用这个判定，拒绝发生在 probe、诊断成功和 Ledger 写入之前。
 旧字段与显式新列表同时出现也拒绝，避免一次提交宣称两种凭据权威。
 校验只读字段的存在性，空字符串也算在场，拒绝先于 SecretRef 解析；

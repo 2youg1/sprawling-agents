@@ -20,6 +20,7 @@ pub struct TuningDefaults { pub timeout_ms: u64, pub retries: Retries, pub strea
 pub enum HeaderValue { Plain(String), Redeemed(SecretRef) }
 
 pub struct EndpointTuning {
+    pub accounts: Option<Vec<kernel::event::record::ProviderAccount>>, // 顺序决定优先级
     pub label: Option<String>,
     pub timeout_ms: Option<u64>,
     pub request_max_retries: Retries,

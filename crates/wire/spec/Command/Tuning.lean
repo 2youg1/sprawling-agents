@@ -16,6 +16,7 @@
 
 ```rust
 pub struct EndpointTuning {
+    pub accounts: Option<Vec<kernel::event::record::ProviderAccount>>, // 顺序决定优先级
     pub label: Option<String>,               // 显示名，缺省即 id
     pub timeout_ms: Option<u64>,             // 一次已结请求的期限
     pub request_max_retries: Option<u32>,    // 值得再问一次的失败再问几次
