@@ -40,20 +40,6 @@ info 的内容是 daemon 的自述，不是已执行的隔离验收；daemon、O
 用户轴的非 root 身份不等于独立宿主安全主体：rootful daemon 可让相同数值 UID
 出现在宿主和容器中。若要求两者必不同或要求 user namespace，当前臂没有该保证。
 
-Docker 的 CapDrop 必须明确含 ALL；Podman 的 CapDrop 是相对默认集合的差值，
-因此起动前改核对其 EffectiveCaps 与 BoundingCaps 两个实际集合，二者均须明确为空。
-Podman 的这两个不省略字段来自 OCI spec 的切片，空切片可输出 null 或 []，二者都表示空集合；
-缺字段、非数组的其它值或任一非空集合都拒绝，不能把非 root 用户的空 EffectiveCaps
-误当成全部 capabilities 已移除。字段来源为 Podman 的
-https://github.com/containers/podman/blob/v4.9.3/libpod/define/container_inspect.go 与
-https://github.com/containers/podman/blob/v4.9.3/libpod/container_inspect.go 。
-
-Podman 的 stopped-container inspect 兼容范围尚有未决：能力准入通过后仍可能在起动前的
-边界核对中拒绝配置，须将被拒的真实 JSON 与冻结限额、挂载、capabilities 及 security options
-逐项比较，确认应拒的配置与需要支持的合法字段表示；`.github/workflows/on-demand.yml`
-的 container job 保存这份 JSON 并运行同一生产检查，未知表示仍以 E_SANDBOX_DENIED 拒绝，
-不从 capability admission 推出这个后端已经通过五轴验收。
-
 D50 Backlog 在分配输出文件之前取得唯一名字与副本的清理 owner，然后在 create 之前登记成员；
 计数、表锁或输出文件失败同样不能丢失副本的清理责任，成员的进程值同时拥有 daemon 身份
 与可选的 attach 子进程。start／inspect／attach／create 应答丢失均按登记身份清理。
@@ -145,6 +131,13 @@ image inspect 的 Id 必须与 kernel 的固定 ID 相同，或等于其省略 s
 因为 Podman 输出后者；Config 必须是对象，Volumes 可省略、为 null 或为空对象，
 这些是未声明卷的合法格式，其余形状与非空卷表均拒绝。Podman 的容器 inspect
 把单元素 entrypoint 报为字符串，Docker 报为数组；验收按后端 schema 核对同一 program。
+Docker 的 CapDrop 必须明确含 ALL；Podman 的 CapDrop 是相对默认集合的差值，
+因此起动前核对其 EffectiveCaps 与 BoundingCaps 两个实际集合，二者均须明确为空。
+Podman 的这两个不省略字段来自 OCI spec 的切片，空切片可输出 null 或 []，二者都表示空集合；
+缺字段、非数组的其它值或任一非空集合都拒绝，不能把非 root 用户的空 EffectiveCaps
+误当成全部 capabilities 已移除。字段来源为 Podman 的
+https://github.com/containers/podman/blob/v4.9.3/libpod/define/container_inspect.go 与
+https://github.com/containers/podman/blob/v4.9.3/libpod/container_inspect.go 。
 固定 /work 是容器路径的唯一权威，宿主路径绝不被当成容器可执行文件路径。
 
 被否：拼成 shell 文本、继承镜像 entrypoint、隐式 pull、只看 CLI version 即声明五轴已保。
