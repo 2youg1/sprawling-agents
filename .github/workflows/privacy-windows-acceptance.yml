@@ -1,0 +1,148 @@
+# Real privacy writes on disposable Windows runners
+# (crates/sprawling/spec/Privacy.lean section 16).
+#
+# The ignored tests in crates/sprawling/tests/privacy_disposable.rs write
+# the registry, the user environment and scheduled tasks through the
+# built binary's privacy verbs, and refuse to run anywhere but here. The
+# step that runs them exports every registry key the controls write before
+# and after, in the same step, and fails when a key that existed before
+# reads differently after; a key the run created is listed as a residual
+# key. Nothing here reads a secret, and the runner is thrown away after.
+name: privacy-windows-acceptance
+on:
+  push:
+    branches: ["s10/**"]
+    paths:
+      - crates/sprawling/src/privacy/**
+      - crates/sprawling/spec/Privacy*
+      - crates/sprawling/spec/Privacy/**
+      - crates/sprawling/tests/privacy_disposable.rs
+      - .github/workflows/privacy-windows-acceptance.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: privacy-windows-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  privacy:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2022, windows-2025]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 150
+    env:
+      CARGO_INCREMENTAL: "0"
+      SPRAWLING_DISPOSABLE_PRIVACY: "1"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/zig
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: privacy-windows-${{ matrix.os }}
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - name: Record exact source and host
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force privacy-evidence | Out-Null
+          git rev-parse HEAD | Out-File -Encoding utf8 privacy-evidence/head.txt
+          git rev-parse 'HEAD^{tree}' | Out-File -Encoding utf8 privacy-evidence/tree.txt
+          Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion' |
+            Select-Object EditionID, CurrentBuild, UBR, DisplayVersion |
+            ConvertTo-Json | Out-File -Encoding utf8 privacy-evidence/host.json
+          @(
+            'The runner account is an elevated administrator, so this run cannot show',
+            'whether a standard account may write HKCU\Software\Policies; a write there',
+            'that Windows refuses ends not_applied with the code access_denied.'
+          ) | Out-File -Encoding utf8 privacy-evidence/README.txt
+      - name: Build the binary and the disposable tests
+        shell: pwsh
+        run: cargo test -p sprawling --test privacy_disposable --no-run
+      - name: Write, read back, restore, and compare the registry
+        shell: pwsh
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $false
+          $keys = @(
+            'HKCU\Control Panel\International\User Profile',
+            'HKCU\Environment',
+            'HKCU\Software\Microsoft\InputPersonalization',
+            'HKCU\Software\Microsoft\Speech_OneCore\Settings\OnlineSpeechPrivacy',
+            'HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced',
+            'HKCU\SOFTWARE\Policies\Microsoft\Windows\CloudContent',
+            'HKLM\SOFTWARE\Microsoft\OneDrive',
+            'HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer',
+            'HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\TextInput',
+            'HKLM\SOFTWARE\Policies\Microsoft\Camera',
+            'HKLM\SOFTWARE\Policies\Microsoft\Dsh',
+            'HKLM\SOFTWARE\Policies\Microsoft\FindMyDevice',
+            'HKLM\SOFTWARE\Policies\Microsoft\InputPersonalization',
+            'HKLM\SOFTWARE\Policies\Microsoft\SQMClient\Windows',
+            'HKLM\SOFTWARE\Policies\Microsoft\Windows\AdvertisingInfo',
+            'HKLM\SOFTWARE\Policies\Microsoft\Windows\AppCompat',
+            'HKLM\SOFTWARE\Policies\Microsoft\Windows\AppPrivacy',
+            'HKLM\SOFTWARE\Policies\Microsoft\Windows\CloudContent',
+            'HKLM\SOFTWARE\Policies\Microsoft\Windows\CurrentVersion\PushNotifications',
+            'HKLM\SOFTWARE\Policies\Microsoft\Windows\DataCollection',
+            'HKLM\SOFTWARE\Policies\Microsoft\Windows\DeliveryOptimization',
+            'HKLM\SOFTWARE\Policies\Microsoft\Windows\HandwritingErrorReports',
+            'HKLM\SOFTWARE\Policies\Microsoft\Windows\LocationAndSensors',
+            'HKLM\SOFTWARE\Policies\Microsoft\Windows\Messaging',
+            'HKLM\SOFTWARE\Policies\Microsoft\Windows\OneDrive',
+            'HKLM\SOFTWARE\Policies\Microsoft\Windows\System',
+            'HKLM\SOFTWARE\Policies\Microsoft\Windows\TabletPC',
+            'HKLM\SOFTWARE\Policies\Microsoft\Windows\Windows Error Reporting',
+            'HKLM\SOFTWARE\Policies\Microsoft\Windows\Windows Search',
+            'HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsAI'
+          )
+          $tasks = @(
+            @('\Microsoft\Windows\Customer Experience Improvement Program\', 'Consolidator'),
+            @('\Microsoft\Windows\Customer Experience Improvement Program\', 'UsbCeip'),
+            @('\Microsoft\Windows\Device Information\', 'Device'),
+            @('\Microsoft\Windows\Device Information\', 'Device User')
+          )
+          function Export-State($side) {
+            $dir = "privacy-evidence/$side"
+            New-Item -ItemType Directory -Force $dir | Out-Null
+            for ($i = 0; $i -lt $keys.Count; $i++) {
+              $file = Join-Path $dir ('{0:d2}.reg' -f $i)
+              reg export $keys[$i] $file /y 2>$null | Out-Null
+              if ($LASTEXITCODE -ne 0) { Set-Content -Path $file -Value 'absent' -Encoding utf8 }
+            }
+            $tasks | ForEach-Object {
+              $found = Get-ScheduledTask -TaskPath $_[0] -TaskName $_[1] -ErrorAction SilentlyContinue
+              [ordered]@{ path = $_[0]; name = $_[1]; state = if ($found) { "$($found.State)" } else { 'absent' } }
+            } | ConvertTo-Json | Out-File -Encoding utf8 "$dir/tasks.json"
+          }
+          Export-State 'before'
+          $env:SPRAWLING_PRIVACY_EVIDENCE = (Resolve-Path privacy-evidence).Path
+          cargo test -p sprawling --test privacy_disposable -- --ignored --test-threads=1 2>&1 | Tee-Object privacy-evidence/tests.log
+          $tested = $LASTEXITCODE
+          Export-State 'after'
+          $changed = @(); $residual = @()
+          for ($i = 0; $i -lt $keys.Count; $i++) {
+            $name = '{0:d2}.reg' -f $i
+            $before = [IO.File]::ReadAllBytes("privacy-evidence/before/$name")
+            $after = [IO.File]::ReadAllBytes("privacy-evidence/after/$name")
+            if ([Convert]::ToBase64String($before) -eq [Convert]::ToBase64String($after)) { continue }
+            if ((Get-Content "privacy-evidence/before/$name" -Raw).Trim() -eq 'absent') { $residual += $keys[$i] } else { $changed += $keys[$i] }
+          }
+          $taskBefore = Get-Content privacy-evidence/before/tasks.json -Raw
+          $taskAfter = Get-Content privacy-evidence/after/tasks.json -Raw
+          [ordered]@{
+            tests_exit = $tested
+            changed_keys = $changed
+            residual_keys = $residual
+            tasks_equal = ($taskBefore -eq $taskAfter)
+          } | ConvertTo-Json | Out-File -Encoding utf8 privacy-evidence/comparison.json
+          Get-Content privacy-evidence/comparison.json
+          if ($tested -ne 0) { exit $tested }
+          if ($changed.Count -gt 0) { throw "registry keys differ after the run: $($changed -join ', ')" }
+          if ($taskBefore -ne $taskAfter) { throw 'scheduled task states differ after the run' }
+          exit 0
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: privacy-windows-${{ matrix.os }}-${{ github.sha }}
+          path: privacy-evidence
+          if-no-files-found: error

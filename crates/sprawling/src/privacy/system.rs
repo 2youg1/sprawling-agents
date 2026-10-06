@@ -3,90 +3,146 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The production host the privacy page and its operations run through
-//! (`crates/sprawling/spec/Privacy/Service.lean` D68): this process's
-//! clock, the identity of the account running it, the owner binding in the
-//! platform vault, and the targets of the controls.
-//!
-//! Only the clock, the identity and the check of a recorded owner are real
-//! today. Target reads and writes, the version record and the first owner
-//! binding are refused with a recovery, so the page shows every control as
-//! unread rather than as holding no value.
+//! The machine this process runs on, as the privacy page sees it
+//! (`crates/sprawling/spec/Privacy/Service.lean` D68): on Windows the
+//! production host (`bin::privacy::windows::host`) with the facts its
+//! version record states; anywhere else a host that has no privacy
+//! controls, refuses every operation and is never read.
 
-use kernel::{AxCode, AxError, SecretRef, TimeMs};
-use wire::{PrivacyControl, PrivacyHost};
-use zeroize::Zeroizing;
+use wire::PrivacyHost;
 
-use super::coordinator::Host;
-use super::fault::{ReadFault, WriteFault};
 use super::service::Machine;
-use super::target::{Reading, Snapshot};
 
 /// The machine this process runs on.
-pub(crate) struct System;
+#[cfg(windows)]
+pub(crate) type System = super::windows::host::WindowsHost<crate::assembly::SystemClock>;
+/// The machine this process runs on.
+#[cfg(not(windows))]
+pub(crate) type System = Elsewhere;
 
-impl accounting::Clock for System {
-    fn now(&self) -> Result<TimeMs, AxError> {
-        accounting::Clock::now(&crate::assembly::SystemClock)
+/// A fresh handle on the machine this process runs on.
+pub(crate) const fn this_machine() -> System {
+    #[cfg(windows)]
+    {
+        super::windows::host::WindowsHost::new(crate::assembly::SystemClock)
+    }
+    #[cfg(not(windows))]
+    {
+        Elsewhere
     }
 }
 
-impl Host for System {
-    type Identity = Zeroizing<String>;
-
-    fn identity(&mut self) -> Result<Zeroizing<String>, AxError> {
-        super::identity::read()
-    }
-
-    fn owner(
-        &mut self,
-        recorded: Option<&SecretRef>,
-        identity: &Zeroizing<String>,
-    ) -> Result<SecretRef, AxError> {
-        let recorded = recorded.ok_or_else(|| {
-            unbuilt(
-                "bind this account as the owner of the privacy history",
-                "the platform vault has no writer for the owner binding yet",
-            )
-        })?;
-        gateway::verify_platform_identity(recorded, identity).map(|()| recorded.clone())
-    }
-
-    fn read(&mut self, _control: PrivacyControl) -> Result<Reading, ReadFault> {
-        Err(ReadFault::Failed(targets("read a privacy control")))
-    }
-
-    fn write(&mut self, _control: PrivacyControl, _value: &Snapshot) -> Result<(), WriteFault> {
-        Err(WriteFault::Failed(targets("write a privacy control")))
-    }
-}
-
-impl Machine for System {
+#[cfg(windows)]
+impl<C: accounting::Clock + Send> Machine for super::windows::host::WindowsHost<C> {
     fn facts(&mut self) -> PrivacyHost {
-        if cfg!(windows) {
-            PrivacyHost::Unreadable {
-                error: targets("read the Windows version record"),
-            }
-        } else {
-            PrivacyHost::NotWindows
+        match super::windows::host_facts() {
+            Ok(facts) => PrivacyHost::Windows(wire::PrivacyWindows {
+                edition_id: facts.edition_id,
+                edition: facts.edition,
+                build: facts.build,
+                display_version: facts.display_version,
+            }),
+            Err(error) => PrivacyHost::Unreadable { error },
         }
     }
 }
 
-/// Why a target or the version record is not read: on Windows the
-/// adapters are not routed here yet, elsewhere there is nothing to read.
-fn targets(action: &'static str) -> AxError {
-    if cfg!(windows) {
-        unbuilt(
-            action,
-            "the Windows privacy adapters are not part of this build",
-        )
-    } else {
-        unbuilt(action, "privacy controls exist only on Windows")
+/// A host that is not Windows: privacy controls are Windows settings.
+#[cfg(not(windows))]
+pub(crate) struct Elsewhere;
+
+#[cfg(not(windows))]
+impl accounting::Clock for Elsewhere {
+    fn now(&self) -> Result<kernel::TimeMs, kernel::AxError> {
+        accounting::Clock::now(&crate::assembly::SystemClock)
     }
 }
 
-fn unbuilt(action: &'static str, subject: &str) -> AxError {
-    AxError::failure(AxCode::ToolUnavailable, action, subject)
-        .with_recovery("nothing was read or written; this build cannot change this setting")
+#[cfg(not(windows))]
+impl super::coordinator::Host for Elsewhere {
+    type Identity = ();
+
+    fn identity(&mut self) -> Result<(), kernel::AxError> {
+        Err(windows_only("read privacy principal"))
+    }
+
+    fn owner(
+        &mut self,
+        _recorded: Option<&kernel::SecretRef>,
+        (): &(),
+    ) -> Result<kernel::SecretRef, kernel::AxError> {
+        Err(windows_only("verify privacy owner"))
+    }
+
+    fn read(
+        &mut self,
+        _control: wire::PrivacyControl,
+    ) -> Result<super::target::Reading, super::fault::ReadFault> {
+        Err(super::fault::ReadFault::Failed(windows_only(
+            "read a privacy control",
+        )))
+    }
+
+    fn write(
+        &mut self,
+        _control: wire::PrivacyControl,
+        _value: &super::target::Snapshot,
+    ) -> Result<(), super::fault::WriteFault> {
+        Err(super::fault::WriteFault::Failed(windows_only(
+            "write a privacy control",
+        )))
+    }
+}
+
+#[cfg(not(windows))]
+impl Machine for Elsewhere {
+    fn facts(&mut self) -> PrivacyHost {
+        PrivacyHost::NotWindows
+    }
+}
+
+/// Why `action` is refused on a host that is not Windows.
+#[cfg(not(windows))]
+pub(super) fn windows_only(action: &'static str) -> kernel::AxError {
+    kernel::AxError::failure(
+        kernel::AxCode::ToolUnavailable,
+        action,
+        "privacy controls are Windows settings",
+    )
+    .with_recovery("nothing was written; privacy controls are written on Windows only")
+}
+
+#[cfg(all(test, windows))]
+#[allow(clippy::unwrap_used, reason = "test code")]
+mod tests {
+    use wire::PrivacyCurrent;
+
+    use super::super::service::Service;
+    use super::*;
+
+    /// The page's production path end to end on this machine, reading
+    /// only: the version record, then every control through the adapters
+    /// the CLI write verbs use. A history in a fresh directory keeps the
+    /// person's own history out of it, and nothing is written.
+    #[test]
+    fn the_page_reads_every_control_of_this_machine() {
+        let dir = tempfile::tempdir().unwrap();
+        let answer = Service::new(this_machine, dir.path().join("changes.jsonl")).answer();
+        assert!(
+            matches!(answer.host, PrivacyHost::Windows(_)),
+            "{:?}",
+            answer.host
+        );
+        assert_eq!(answer.controls.len(), wire::PrivacyControl::ALL.len());
+        for entry in &answer.controls {
+            assert!(
+                matches!(
+                    entry.current,
+                    PrivacyCurrent::Read { .. } | PrivacyCurrent::AccessDenied
+                ),
+                "{entry:?}"
+            );
+        }
+        assert!(!dir.path().join("changes.jsonl").exists());
+    }
 }

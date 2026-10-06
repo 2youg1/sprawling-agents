@@ -62,7 +62,7 @@ impl Service<super::system::System> {
     /// The person's home could not be found.
     pub(crate) fn of_this_machine() -> Result<Self, AxError> {
         Ok(Self::new(
-            || super::system::System,
+            super::system::this_machine,
             accounting::home::Home::detect()?.privacy_history(),
         ))
     }
@@ -196,12 +196,16 @@ impl<M: Machine + 'static> Service<M> {
                 };
             }
         };
-        let released = history.standing(|owner| {
-            let identity = machine.identity()?;
-            machine.owner(Some(owner), &identity).map(drop)
+        // An empty history has no owner, so no identity is sampled for it.
+        let released = history.holdings(|recorded| match recorded {
+            None => Ok(()),
+            Some(owner) => {
+                let identity = machine.identity()?;
+                machine.owner(Some(owner), &identity).map(drop)
+            }
         });
         match released {
-            Ok(holdings) => super::answer::disclosed(holdings.as_ref()),
+            Ok(holdings) => super::answer::disclosed(&holdings),
             Err(error) => PrivacyHistory::Withheld { error },
         }
     }
@@ -457,7 +461,13 @@ mod tests {
     fn an_empty_history_samples_no_identity() {
         let (_dir, machine, service) = served();
         let answer = service.answer();
-        assert_eq!(answer.history, PrivacyHistory::Empty);
+        assert_eq!(
+            answer.history,
+            PrivacyHistory::Disclosed {
+                owned: Vec::new(),
+                unresolved: None
+            }
+        );
         assert_eq!(answer.controls.len(), PrivacyControl::ALL.len());
         assert_eq!(machine.world().identities, 0);
     }

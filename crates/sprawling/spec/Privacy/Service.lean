@@ -23,9 +23,9 @@ crates.sprawling.spec.Privacy 证明，服务只把页面的一次询问或一�
 - 主机不是 Windows：`host` 为 `NotWindows`，不读历史之外的任何主机值，每个控制 `current` 为 `NotRead`。
 - 历史用 `journal::read` 读，不取写锁、不建文件；读不成（被另一个操作占着、损坏）答
   `PrivacyHistory::Unreadable`，答复的其余部分照常给出。
-- 空历史没有 owner，答 `Empty`，不取样身份、不问 Vault。非空历史先取样实时身份，再经 Host 的 owner
-  核对它与记录的 owner 引用，通过后才从 `History::standing` 取出每个控制的拥有栈栈顶与未结操作，
-  答 `Disclosed`；核对拒绝或做不成答 `Withheld`，答复里没有任何记录下的值（Privacy.Cli D53 的同一边界）。
+- 空历史没有 owner，答空的 `Disclosed`，不取样身份、不问 Vault。非空历史先取样实时身份，再经 Host 的
+  owner 核对它与记录的 owner 引用，通过后 `History::holdings` 才交出每个控制的拥有栈栈顶与未结操作
+  （读者形式，owner 为 `()`，Privacy.State），答 `Disclosed`；核对拒绝或做不成答 `Withheld`，答复里没有任何记录下的值（Privacy.Cli D53 的同一边界）。
 - 每个控制读一次目标：读到值、访问拒绝或其他失败；`written` 是控制表的写入值在当前值之上会留下的值。
 - 组装只读控制表（`bin::privacy::controls`、`bin::privacy::originals`），无 IO：版本适用由
   `Editions::fit` 与主机的版本一处算出（Privacy.Controls D64），快照与线上的值互换由
@@ -51,15 +51,15 @@ crates.sprawling.spec.Privacy 证明，服务只把页面的一次询问或一�
 **重开参数**：页面需要跨城重启取回结果时，改从隐私日志的结论读，而不是在服务里留得更久。
 -/
 
-/-! D68 生产主机现状：只有身份、owner 核对与时钟是真的
-`bin::privacy::system` 是服务与 CLI 写入动词共用的生产 Host：时钟是 `bin::assembly` 的 SystemClock，
-身份由 `bin::privacy::identity` 取样，记录的 owner 由 `gateway::verify_platform_identity` 核对。
-目标的读写与主机版本事实经 Windows 适配器（Privacy.Windows），它们接到这里之前，读与写以
-`ToolUnavailable` 拒绝、版本事实答 `Unreadable`，页面如实显示每个控制读不成；空历史的第一次写入
-要为实时身份建立 owner 绑定，gateway 还没有这个写入者，所以它以 `ToolUnavailable` 拒绝，什么也不写。
-非 Windows 主机答 `NotWindows`，读写以「仅 Windows」拒绝。
-**理由**：服务与装配在适配器之前就能接上并验收（远程拒绝、身份不符时不披露）；拒绝带着动作与恢复，
-不会被读成「主机没有这个值」。
-**被否**：适配器到位前不接装配——页面与 CLI 各自要再接一次，接线的验收也要再做一次。
-**重开参数**：Windows 适配器与 owner 绑定的写入者落地时，本条改写为它们的路由，拒绝随之删除。
+/-! D68 页面与 CLI 写入动词经同一个生产 Host；不是 Windows 的主机没有隐私控制
+`bin::privacy::system` 选出进程所在的主机：Windows 上是 `bin::privacy::windows::host` 的生产 Host（身份、owner 的
+核对与绑定、按控制路由到适配器、机器作用域经提升子进程，Privacy.Cli 与 Privacy.Windows），时钟是
+`bin::assembly` 的 SystemClock，主机事实由 `bin::privacy::windows` 读版本记录（读不成答 `Unreadable`）；
+其他平台是一台没有隐私控制的主机：答 `NotWindows`，不读任何目标，每个操作以 `ToolUnavailable`
+「隐私控制是 Windows 的设置」拒绝，这句拒绝由 `bin::privacy::system` 一处给出，CLI 也用它。
+**理由**：页面与 CLI 走同一个 coordinator，也走同一个 Host，所以一条控制在两处的读写、拒绝与恢复相同；
+平台的选择只在一处。
+**被否**：服务自建一个 Host——同一台机器有两种读写路径，验收过的那一种（一次性 runner 上的 CLI）
+不是页面用的那一种。
+**重开参数**：macOS 或 Linux 有了隐私控制时，`bin::privacy::system` 为该平台选它的 Host。
 -/

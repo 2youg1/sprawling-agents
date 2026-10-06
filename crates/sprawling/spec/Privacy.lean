@@ -48,10 +48,14 @@ OS 写入没有 compare-and-swap：writeStarted 要求调用前最后一次读�
 ## 4 现状分析
 控制表（`bin::privacy::controls`、`bin::privacy::originals`、`bin::privacy::target`）、schema 3 的
 磁盘投影、journal 的写入器、`bin::privacy::plan` 与 `bin::privacy::coordinator` 已实现；
-coordinator 经两个端口（Host 与 Journal，§7）运行。页面的服务与 wire 帧已接上（Privacy.Service）；
-生产的 Host（`bin::privacy::system`）只有身份、owner 核对与时钟，目标读写要等平台适配器接入
-（Privacy.Service D68），CLI 写入动词尚未接上，所以 `bin::privacy::cli` 只有 status。平台适配器与
-CLI 的接口写在 Privacy.Windows、Privacy.Cli，由后续阶段按本模型实现。
+coordinator 经两个端口（Host 与 Journal，§7）运行；平台适配器（Privacy.Windows）与生产 Host
+`bin::privacy::windows::host` 已实现，`bin::privacy::cli` 的写入动词（Privacy.Cli）与页面的服务
+（Privacy.Service）经它们进入 coordinator；wire 帧见 wire 的 Privacy 分部。
+尚未实现的拒绝：原值无法经它的写入路径原样写回时（机器作用域的原值超过提升子进程的 1024 字节上界，
+或注册表原值没有无损的原始编码），apply 应在 Prepared 之前拒绝（Privacy.Windows D57）；现在这样的
+apply 照常写入，之后的恢复或回滚由子进程或适配器拒绝写回，以 NotApplied 或 unknown 如实结束。
+控制表写入的值都是 4 字节，只有人的主机上已有的异常原值会走到这里；补上它需要在 planApply 增加
+一个拒绝分支并重新证明 §2 的性质。
 
 ## 5 权威信源
 原始读写：RegQueryValueExW/RegSetValueExW 规定原始类型与字节、缺值和访问失败
@@ -842,8 +846,18 @@ fold、fresh read（计划任务经 Windows PowerShell 读取，冷启动要几�
 修改值或回滚时的原值）、move_owns_only_matched（Applied 与 Restored 只在目标真实值等于修改值时记录）、
 step_rollback_ends（RolledBack 只在目标真实值等于原值时记录）与 trace_unknown（unknown 之后、
 核对之前没有系统写入）对应的性质；另有一条经真实 LockedJournal 的 apply 与 restore。证明只覆盖模型，不证明 IO 适配器。
-真实 Windows 行为只在一次性 GitHub Actions runner 上验收：每种 operation kind 各一次 apply 与
-restore，并逐个扫过全部可写控制；测试永不写人的主机。
+真实 Windows 行为只在一次性 GitHub Actions runner 上验收（`.github/workflows/privacy-windows-acceptance.yml`，
+windows-2022 与 windows-2025）：`crates/sprawling/tests/privacy_disposable.rs` 的测试全部 #[ignore]，
+开头要求 GITHUB_ACTIONS=true、RUNNER_OS=Windows 与 SPRAWLING_DISPOSABLE_PRIVACY=1 同时成立，
+否则失败而不写任何东西，所以默认测试与人的主机都不会运行它们。测试经构建出的二进制的 privacy CLI
+进入生产路径（提升子进程就是这个可执行文件），每个用例一个临时 home，读回另用 reg.exe 与
+Get-ScheduledTask 独立核对：四种 operation kind 各一次 apply 与 restore，覆盖原值缺席与原值存在且
+不同（预置值按原字节恢复，而不是删除）；恢复冲突（apply 后外部改成第三个值或重新启用任务，
+restore 返回 conflict 且值不变）；已是写入值时 already_written 且历史不增行；
+全部 88 个控制逐个 apply → 读回 → restore → 读回，restore 不等于原值或出现 unknown、
+readback_mismatch 即失败，apply 以 not_applied 结束只记录不失败。工作流在测试前后导出受影响的
+注册表键并逐字节比较，扫描新建的空键单列为残留键；runner 账户已提升，所以它不能说明标准账户
+能否写 HKCU\Software\Policies，产物如实写明这一点。测试永不写人的主机。
 
 ## 17 文档关系
 本契约与 ARCHITECTURE.md §9/§11、Privacy.Controls（控制表）、Privacy.Confirmation（确认）、

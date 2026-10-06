@@ -77,7 +77,7 @@ pub enum PrivacyTarget { RegistryValueHklm { path, name }, RegistryValueHkcu { p
 pub enum PrivacyCurrent { Read { value: PrivacyValue }, AccessDenied, Failed { error: AxError }, NotRead }
 pub enum PrivacyValue { Absent, Dword { number }, Text { text }, Raw { kind, hex }, TaskAbsent,
                         TaskEnabled { definition_sha256 }, TaskDisabled { definition_sha256 } }  // tag "value"
-pub enum PrivacyHistory { Empty, Disclosed { owned: Vec<PrivacyIntent>, unresolved: Option<PrivacyIntent> },
+pub enum PrivacyHistory { Disclosed { owned: Vec<PrivacyIntent>, unresolved: Option<PrivacyIntent> },
                           Withheld { error: AxError }, Unreadable { error: AxError } }
 pub struct PrivacyIntent { operation: u64, control, original: PrivacyValue, modified: PrivacyValue,
                            restore_of: Option<u64> }
@@ -91,8 +91,8 @@ pub struct PrivacyIntent { operation: u64, control, original: PrivacyValue, modi
   每个控制都是 `NotStated`。
 - **`written` 是 apply 在 `current` 之上会留下的值**，由控制表的写入值算出；`current` 没读成或主机
   没有该任务时缺席。
-- **历史按问的人披露。** 空历史答 `Empty`，不核对身份；非空历史只在实时身份通过 owner 的核对之后
-  答 `Disclosed`，否则答 `Withheld`，答复里没有任何记录下的值（原值只在 `Disclosed` 里，所以
+- **历史按问的人披露。** 空历史没有 owner，答空的 `Disclosed`，不核对身份；非空历史只在实时身份通过
+  owner 的核对之后答 `Disclosed`，否则答 `Withheld`，答复里没有任何记录下的值（原值只在 `Disclosed` 里，所以
   「未经核对却带着原值」不可表示）。日志被另一个操作占着或已损坏答 `Unreadable`，其余部分照常作答。
 - **主机不是 Windows 时什么也不读**：`host` 为 `NotWindows`，每个控制的 `current` 为 `NotRead`。
 - `outcomes` 是主机保留的操作结果（§8-87）；同一份答复里一并给出，所以页面问一次就同时看到结果与

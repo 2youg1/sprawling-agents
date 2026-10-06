@@ -70,11 +70,8 @@ impl HistoryFault {
 #[derive(Debug)]
 pub(crate) enum ReadFault {
     #[cfg_attr(
-        not(test),
-        expect(
-            dead_code,
-            reason = "the Windows adapters construct it and are not routed to the production host yet (Privacy.Service D68)"
-        )
+        not(any(test, windows)),
+        expect(dead_code, reason = "only the Windows adapters construct it")
     )]
     AccessDenied,
     Failed(AxError),
@@ -85,20 +82,14 @@ pub(crate) enum ReadFault {
 #[derive(Debug)]
 pub(crate) enum WriteFault {
     #[cfg_attr(
-        not(test),
-        expect(
-            dead_code,
-            reason = "the Windows adapters construct it and are not routed to the production host yet (Privacy.Service D68)"
-        )
+        not(any(test, windows)),
+        expect(dead_code, reason = "only the Windows adapters construct it")
     )]
     AccessDenied,
     /// The person declined the UAC prompt.
     #[cfg_attr(
-        not(test),
-        expect(
-            dead_code,
-            reason = "the Windows adapters construct it and are not routed to the production host yet (Privacy.Service D68)"
-        )
+        not(any(test, windows)),
+        expect(dead_code, reason = "only the Windows adapters construct it")
     )]
     Declined,
     Failed(AxError),

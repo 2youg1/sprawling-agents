@@ -187,9 +187,8 @@ pub enum PrivacyValue {
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum PrivacyHistory {
-    /// This app has written nothing on this host.
-    Empty,
-    /// The account running the city is the one the history belongs to.
+    /// The account running the city is the one the history belongs to,
+    /// or the history is empty and has nobody to belong to.
     Disclosed {
         /// For each control this app still owns a change of, the latest
         /// such change, in page order.

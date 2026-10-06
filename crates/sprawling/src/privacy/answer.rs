@@ -94,16 +94,12 @@ pub(super) fn answer(
     }
 }
 
-/// What a history released to the account asking: nothing for an empty
-/// history, otherwise each control's latest owned change and the
-/// operation that has no conclusion.
-pub(super) fn disclosed(holdings: Option<&Holdings<'_>>) -> PrivacyHistory {
-    match holdings {
-        None => PrivacyHistory::Empty,
-        Some(holdings) => PrivacyHistory::Disclosed {
-            owned: holdings.owned().map(intent).collect(),
-            unresolved: holdings.unresolved().map(intent),
-        },
+/// What a history released to the account asking: each control's latest
+/// owned change and the operation that has no conclusion.
+pub(super) fn disclosed(holdings: &Holdings<'_, ()>) -> PrivacyHistory {
+    PrivacyHistory::Disclosed {
+        owned: holdings.owned().map(intent).collect(),
+        unresolved: holdings.unresolved().map(intent),
     }
 }
 

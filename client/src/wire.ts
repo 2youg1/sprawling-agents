@@ -3069,7 +3069,6 @@ export type PrivacyIntent = typeof PrivacyIntent.Type;
  * What this app's history tells the page, which depends on who asks.
  */
 export const PrivacyHistory = Schema.Union([
-  Schema.Literal("empty"),
   Schema.Struct({
     disclosed: Schema.Struct({
       owned: Schema.Array(PrivacyIntent),
