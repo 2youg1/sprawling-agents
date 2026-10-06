@@ -114,6 +114,9 @@ pub struct RulesWrite {
 pub struct CitySettings {
     pub keep_warm: Option<KeepWarm>,
     pub effort: Option<Effort>,
+    /// The city's whole `[search]` table, written before the other two
+    /// so a value the city refuses lands nothing.
+    pub search: Option<kernel::config::SearchConfiguration>,
     pub idem: IdemKey,
 }
 

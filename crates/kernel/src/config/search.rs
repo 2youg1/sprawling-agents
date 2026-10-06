@@ -19,6 +19,7 @@ use crate::tool::ServerLabel;
 
 /// One search service reached over MCP streamable HTTP.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct SearchSupplier {
     /// The supplier's name, and the Connector label `web_search` carries.
     pub id: ServerLabel,
@@ -45,6 +46,7 @@ pub struct SearchSupplier {
 /// absence: a layer that states it covers a farther layer's `Custom`.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum SearchConfiguration {
     /// The supplier `city` declares as the default.
     #[default]

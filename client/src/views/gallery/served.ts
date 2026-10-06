@@ -18,7 +18,8 @@
 import type { Key } from "../../core/lang";
 import type { ModelFact } from "../../core/probed";
 import type { AxCode, ApprovalClass, ApprovalItem, EndpointsAnswer, ModelFactsSummary } from "../../wire";
-import { ApprovalId, Ceiling, Locator, TimeMs, Window } from "../../wire";
+import { ApprovalId, Ceiling, Locator, ServerLabel, TimeMs, Window } from "../../wire";
+import { UNTUNED } from "./configured";
 
 // The three model ids, each written once. Every list below names them
 // through these, so a fixture cannot describe a model the endpoint does
@@ -102,7 +103,8 @@ export const PROBED: readonly ModelFact[] = [
 ];
 
 // Two attached providers, one with a key filed for it and one without,
-// which is the difference the endpoint list exists to show.
+// which is the difference the endpoint list exists to show. The first
+// lists two accounts, one whose key is stored and one whose is not.
 export const ENDPOINTS: EndpointsAnswer = {
   chosen: [{ endpoint: "zenmux", model: CHOSEN.id, tag: "main" }],
   endpoints: [
@@ -115,6 +117,17 @@ export const ENDPOINTS: EndpointsAnswer = {
       local: false,
       models: [facts(FABLE, 204_800, 64_000), facts(NUCLEUS, 400_000, null)],
       name: "zenmux",
+      tuning: {
+        ...UNTUNED,
+        accounts: [
+          { id: ServerLabel.make("main"), reference: "secret:providers/zenmux.main" },
+          { id: ServerLabel.make("spare"), reference: "secret:providers/zenmux.spare" },
+        ],
+      },
+      account_status: [
+        { id: ServerLabel.make("main"), key: "stored" },
+        { id: ServerLabel.make("spare"), key: "missing" },
+      ],
     },
     {
       base_url: "http://127.0.0.1:11434/v1",
@@ -125,6 +138,8 @@ export const ENDPOINTS: EndpointsAnswer = {
       local: true,
       models: [facts("local/qwen3", null, null)],
       name: "local",
+      tuning: UNTUNED,
+      account_status: [],
     },
   ],
 };

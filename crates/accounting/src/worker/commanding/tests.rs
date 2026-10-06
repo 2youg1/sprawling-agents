@@ -5,6 +5,7 @@
 
 mod answering;
 mod clockwork;
+mod configuring;
 mod entrance;
 mod guide;
 mod restoring;

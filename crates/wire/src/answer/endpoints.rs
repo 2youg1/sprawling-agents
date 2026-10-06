@@ -5,7 +5,7 @@
 
 //! What the settings page reads back about attached endpoints.
 
-use kernel::{Ceiling, DialectKind, ModelTag};
+use kernel::{Ceiling, DialectKind, ModelTag, ServerLabel};
 use serde::{Deserialize, Serialize};
 
 use super::ModelFactsSummary;
@@ -48,6 +48,47 @@ pub struct EndpointSummary {
     /// a confidential building may use.
     pub local: bool,
     pub has_credential: bool,
+    /// What the person attached this endpoint with, read back in the
+    /// shape `AttachEndpoint` carries it: a page that changes the account
+    /// list sends this back whole with only `accounts` replaced, so the
+    /// figures, headers and overrides nobody touched stay as they were
+    /// (`crates/wire/spec/Answer/Endpoints.lean` §8-85, wire D49).
+    pub tuning: crate::EndpointTuning,
+    /// Whether each listed account's key is there, one row per id in the
+    /// order of `tuning.accounts`; empty for an endpoint registered
+    /// without an account list.
+    pub account_status: Vec<AccountStatus>,
+}
+
+/// Whether one account's key is there, by the account's id. Says nothing
+/// of the key's value.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct AccountStatus {
+    pub id: ServerLabel,
+    pub key: KeyState,
+}
+
+/// Where one account's key stands, decided by the city so a page draws a
+/// word rather than reading two flags.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub enum KeyState {
+    /// The account names no reference: its requests carry no key.
+    Anonymous,
+    /// The vault holds a key under the account's reference.
+    Stored,
+    /// Neither the vault nor an environment variable has one, and the
+    /// page may store one.
+    Missing,
+    /// An environment variable supplies it; the page cannot change it.
+    Environment,
+    /// An environment variable is set for it and does not read as text:
+    /// it shades the vault, so the key cannot be used either way.
+    EnvironmentUnusable,
+    /// This city has no vault open, so nothing was looked up.
+    Unread,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

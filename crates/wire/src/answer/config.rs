@@ -5,7 +5,8 @@
 
 //! What one address is actually governed by, and which file said so.
 
-use kernel::{Address, Effort, Proxying};
+use kernel::config::SearchConfiguration;
+use kernel::{Address, Effort, Proxying, ServerLabel};
 use serde::{Deserialize, Serialize};
 
 /// Which file settled one value.
@@ -133,4 +134,39 @@ pub struct ConfigAnswer {
     #[serde(default)]
     pub first: Option<u64>,
     pub tuning: TuningDefaults,
+    /// Which outside service `web_search` reaches here, and what the
+    /// settings page edits (`crates/wire/spec/Answer/Config.lean` §8-86).
+    pub search: SettledSearch,
+}
+
+/// `[search]` at one address, beside the city's own statement of it.
+///
+/// The value in force and the value the page edits are answered apart:
+/// the page edits the city's file only, and a building that states its
+/// own `[search]` would otherwise hand the page the building's value to
+/// edit as the city's.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct SettledSearch {
+    /// What `web_search` reaches at this address.
+    pub configuration: SearchConfiguration,
+    /// The file that stated it; [`ConfigLayer::Default`] when none has a
+    /// `[search]` table.
+    pub from: ConfigLayer,
+    /// What the city's own file states, which is what the page edits;
+    /// absent when that file has no `[search]` table.
+    pub city: Option<SearchConfiguration>,
+    /// The address the default supplier is reached at, read from the one
+    /// place it is declared, so the page draws it without a copy.
+    pub default_url: String,
+    /// Whether each key of every supplier `city` lists is there.
+    pub account_status: Vec<SupplierAccounts>,
+}
+
+/// The key of each account of one listed search supplier.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct SupplierAccounts {
+    pub supplier: ServerLabel,
+    pub accounts: Vec<super::AccountStatus>,
 }

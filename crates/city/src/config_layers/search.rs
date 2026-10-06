@@ -102,6 +102,22 @@ pub fn settled_search(
         .cloned())
 }
 
+/// What the city's own `CONFIG.toml` states for `[search]`, and nothing a
+/// building states: the value the settings page edits. No address names
+/// the city's root, so this reads that one rung directly, through the
+/// same reader the ladder uses for it.
+///
+/// # Errors
+/// Refuses a city file that cannot be read or does not parse, exactly as
+/// [`settled_search`] does.
+pub fn city_search(city_root: &Path) -> Result<Option<SearchConfiguration>, AxError> {
+    Ok(
+        super::ladder::stated(&CityLayout::new(city_root).city_config(), Layer::City)?
+            .search()
+            .cloned(),
+    )
+}
+
 /// Writes the city's own `[search]`: the one rung the settings page
 /// edits. `Default` is written out too, so what is read back is what
 /// was written.

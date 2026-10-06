@@ -47,6 +47,7 @@ pub mod mcp_health;
 pub mod prefix;
 pub mod prepared;
 pub mod proposals;
+pub mod providers;
 pub mod published;
 pub mod rounds;
 pub mod served;

@@ -40,7 +40,8 @@ pub(super) mod preview;
 pub(super) mod range;
 pub(super) mod reply;
 pub(super) mod stored;
-use super::lines::{endpoints_answer, known_hosts_answer};
+use super::lines::known_hosts_answer;
+use super::providers::{ProviderAsk, endpoints_answer};
 
 /// How many runs a cost view names besides every active one: a bound
 /// on the size of an answer on the wire, not a machine reading, so it is
@@ -228,10 +229,11 @@ impl Views {
             }
             wire::Query::GithubLogin(host) => return self.github_of(host.as_deref()),
             wire::Query::Config { addr } => {
-                return Prepared::Config {
+                return Prepared::Provider(ProviderAsk::Config {
                     city_root: self.city_root.clone(),
                     addr: addr.clone(),
-                };
+                    vault: self.vault.clone(),
+                });
             }
             wire::Query::Content { locator } => {
                 return Prepared::Content {
@@ -252,7 +254,12 @@ impl Views {
                     unavailable_because(format!("GitStatus({})", building.as_str()), &stopped)
                 }
             },
-            wire::Query::EndpointView => wire::Answer::Endpoints(endpoints_answer(&self.book)),
+            wire::Query::EndpointView => {
+                return Prepared::Provider(ProviderAsk::Endpoints {
+                    held: endpoints_answer(&self.book),
+                    vault: self.vault.clone(),
+                });
+            }
             wire::Query::KnownHosts => known_hosts_answer(),
             wire::Query::Harnesses => return Prepared::Harnesses(self.reach.programs),
             wire::Query::Doctor => self.doctor_or_unavailable(),

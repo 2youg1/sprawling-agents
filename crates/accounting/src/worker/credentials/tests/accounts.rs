@@ -15,6 +15,7 @@
 //! order.
 
 mod affinity;
+mod readback;
 mod recovery;
 
 use kernel::account_recovery::AccountRetries;

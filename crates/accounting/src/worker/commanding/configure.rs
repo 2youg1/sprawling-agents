@@ -142,23 +142,29 @@ impl RunWorker {
     }
 
     /// Writes the city's own layer from the settings page, one fact at a
-    /// time, and books the change once (`crates/wire/Spec.lean` §8-61). A frame that
-    /// states nothing writes nothing and books nothing.
+    /// time, and books the change once (`crates/wire/spec/Command/Step.lean`
+    /// §8-61). A frame that states nothing writes nothing and books
+    /// nothing.
+    ///
+    /// `[search]` goes first: it is the one fact the city refuses for
+    /// what it says, so a refused frame leaves the file as it was.
     ///
     /// # Errors
-    /// Propagates a city layer this build cannot read or write, and a
+    /// `E_CONFIG_INVALID` for a `[search]` value the reader would refuse;
+    /// propagates a city layer this build cannot read or write, and a
     /// history that will not take the line.
     pub(in crate::worker) fn configure_city(
         &mut self,
-        keep_warm: Option<kernel::KeepWarm>,
-        effort: Option<kernel::Effort>,
+        settings: wire::CitySettings,
     ) -> Result<(), AxError> {
-        let settings = keep_warm
+        let search: Option<Result<(), AxError>> = None;
+        let others = settings
+            .keep_warm
             .map(city::CitySetting::KeepWarm)
             .into_iter()
-            .chain(effort.map(city::CitySetting::Effort));
-        let mut written = false;
-        for setting in settings {
+            .chain(settings.effort.map(city::CitySetting::Effort));
+        let mut written = search.transpose()?.is_some();
+        for setting in others {
             city::write_city_setting(&self.city_root, setting)?;
             written = true;
         }
