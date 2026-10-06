@@ -12,12 +12,12 @@
 use std::num::NonZeroU64;
 
 use kernel::{AxError, SecretRef};
-use wire::PrivacyControl;
+use wire::{PrivacyControl, PrivacySettlement};
 
 use super::fault::{HistoryFault, PrivacyFault, ReadFault, Unconfirmed, WriteFault};
 use super::journal::LockedJournal;
 use super::plan::{self, ApplyPlan, ReconcilePlan, Request, RestorePlan, RollbackEnd, Verdict};
-use super::state::{Event, History, Intent, Line, Outcome, SCHEMA, Settlement};
+use super::state::{Event, History, Intent, Line, Outcome, SCHEMA};
 use super::target::{Reading, Snapshot};
 
 /// How long after a command is accepted its write may still start
@@ -26,7 +26,7 @@ const TTL_MS: u64 = 60_000;
 
 /// The machine a privacy operation runs on: its clock, the identity of
 /// the account running it, and the targets of the controls.
-pub(super) trait Host: accounting::Clock {
+pub(crate) trait Host: accounting::Clock {
     type Identity;
 
     /// Samples the identity of the account this process runs as.
@@ -111,7 +111,7 @@ pub(super) enum Done {
     AlreadyWritten,
     Reconciled {
         operation: NonZeroU64,
-        settlement: Settlement,
+        settlement: PrivacySettlement,
     },
 }
 
@@ -363,10 +363,10 @@ mod tests {
     use kernel::{AxCode, TimeMs};
     use proptest::prelude::*;
 
-    use super::super::fault::FaultCode;
     use super::super::state::fixtures::{dword, owner};
     use super::super::target::{RawValue, TaskState};
     use super::*;
+    use wire::PrivacyFaultCode;
 
     /// One control of each operation kind.
     const CONTROLS: [PrivacyControl; 4] = [
@@ -676,7 +676,7 @@ mod tests {
             let error = fault.into_ax(command.action());
             let worded = !matches!(
                 code,
-                FaultCode::Identity | FaultCode::Clock | FaultCode::History
+                PrivacyFaultCode::Identity | PrivacyFaultCode::Clock | PrivacyFaultCode::History
             );
             assert!(
                 !worded || error.subject().starts_with(code.as_str()),
@@ -744,11 +744,11 @@ mod tests {
                         assert_eq!(*operation, intent.operation);
                         let truth = &values[&intent.control];
                         match settlement {
-                            Settlement::Applied | Settlement::Restored => {
+                            PrivacySettlement::Applied | PrivacySettlement::Restored => {
                                 assert_eq!(*truth, intent.modified);
                             }
-                            Settlement::NotApplied => assert_eq!(*truth, intent.original),
-                            Settlement::Abandoned => {
+                            PrivacySettlement::NotApplied => assert_eq!(*truth, intent.original),
+                            PrivacySettlement::Abandoned => {
                                 assert!(*truth != intent.modified && *truth != intent.original);
                             }
                         }

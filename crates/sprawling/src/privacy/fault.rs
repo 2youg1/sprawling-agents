@@ -11,7 +11,7 @@
 use std::num::NonZeroU64;
 
 use kernel::{AxCode, AxError};
-use wire::PrivacyControl;
+use wire::{PrivacyControl, PrivacyFaultCode};
 
 /// Why a history was not read or a line not written. Reasons stay
 /// distinct until a caller maps them to AxError with its own action.
@@ -68,7 +68,14 @@ impl HistoryFault {
 
 /// Why a read of a target failed.
 #[derive(Debug)]
-pub(super) enum ReadFault {
+pub(crate) enum ReadFault {
+    #[cfg_attr(
+        not(test),
+        expect(
+            dead_code,
+            reason = "the Windows adapters construct it and are not routed to the production host yet (Privacy.Service D68)"
+        )
+    )]
     AccessDenied,
     Failed(AxError),
 }
@@ -76,9 +83,23 @@ pub(super) enum ReadFault {
 /// Why a write of a target reported failure. It never decides the
 /// outcome: the readback does.
 #[derive(Debug)]
-pub(super) enum WriteFault {
+pub(crate) enum WriteFault {
+    #[cfg_attr(
+        not(test),
+        expect(
+            dead_code,
+            reason = "the Windows adapters construct it and are not routed to the production host yet (Privacy.Service D68)"
+        )
+    )]
     AccessDenied,
     /// The person declined the UAC prompt.
+    #[cfg_attr(
+        not(test),
+        expect(
+            dead_code,
+            reason = "the Windows adapters construct it and are not routed to the production host yet (Privacy.Service D68)"
+        )
+    )]
     Declined,
     Failed(AxError),
 }
@@ -148,77 +169,29 @@ pub(super) enum Unconfirmed {
     RollbackUnreadable(ReadFault),
 }
 
-/// The stable code of a [`PrivacyFault`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum FaultCode {
-    Identity,
-    Clock,
-    History,
-    Unreadable,
-    Unresolved,
-    Changed,
-    TargetAbsent,
-    NothingOwned,
-    Conflict,
-    NothingUnresolved,
-    HistoryFull,
-    Expired,
-    AccessDenied,
-    ElevationDeclined,
-    NotApplied,
-    ReadbackMismatch,
-    Unknown,
-    ReceiptLost,
-}
-
 impl PrivacyFault {
-    pub(super) fn code(&self) -> FaultCode {
+    pub(super) fn code(&self) -> PrivacyFaultCode {
         match self {
-            Self::Identity(_) => FaultCode::Identity,
-            Self::Clock(_) => FaultCode::Clock,
-            Self::History(_) => FaultCode::History,
-            Self::HistoryFull => FaultCode::HistoryFull,
-            Self::Unreadable { .. } => FaultCode::Unreadable,
-            Self::Unresolved => FaultCode::Unresolved,
-            Self::Changed { .. } => FaultCode::Changed,
-            Self::TargetAbsent { .. } => FaultCode::TargetAbsent,
-            Self::NothingOwned { .. } => FaultCode::NothingOwned,
-            Self::Conflict { .. } => FaultCode::Conflict,
-            Self::NothingUnresolved => FaultCode::NothingUnresolved,
-            Self::Expired { .. } => FaultCode::Expired,
+            Self::Identity(_) => PrivacyFaultCode::Identity,
+            Self::Clock(_) => PrivacyFaultCode::Clock,
+            Self::History(_) => PrivacyFaultCode::History,
+            Self::HistoryFull => PrivacyFaultCode::HistoryFull,
+            Self::Unreadable { .. } => PrivacyFaultCode::Unreadable,
+            Self::Unresolved => PrivacyFaultCode::Unresolved,
+            Self::Changed { .. } => PrivacyFaultCode::Changed,
+            Self::TargetAbsent { .. } => PrivacyFaultCode::TargetAbsent,
+            Self::NothingOwned { .. } => PrivacyFaultCode::NothingOwned,
+            Self::Conflict { .. } => PrivacyFaultCode::Conflict,
+            Self::NothingUnresolved => PrivacyFaultCode::NothingUnresolved,
+            Self::Expired { .. } => PrivacyFaultCode::Expired,
             Self::NotApplied { cause, .. } => match cause {
-                Some(WriteFault::AccessDenied) => FaultCode::AccessDenied,
-                Some(WriteFault::Declined) => FaultCode::ElevationDeclined,
-                Some(WriteFault::Failed(_)) | None => FaultCode::NotApplied,
+                Some(WriteFault::AccessDenied) => PrivacyFaultCode::AccessDenied,
+                Some(WriteFault::Declined) => PrivacyFaultCode::ElevationDeclined,
+                Some(WriteFault::Failed(_)) | None => PrivacyFaultCode::NotApplied,
             },
-            Self::RolledBack { .. } => FaultCode::ReadbackMismatch,
-            Self::Unknown { .. } => FaultCode::Unknown,
-            Self::ReceiptLost { .. } => FaultCode::ReceiptLost,
-        }
-    }
-}
-
-impl FaultCode {
-    pub(super) const fn as_str(self) -> &'static str {
-        match self {
-            Self::Identity => "identity",
-            Self::Clock => "clock",
-            Self::History => "history",
-            Self::Unreadable => "unreadable",
-            Self::Unresolved => "unresolved",
-            Self::Changed => "changed",
-            Self::TargetAbsent => "target_absent",
-            Self::NothingOwned => "nothing_owned",
-            Self::Conflict => "conflict",
-            Self::NothingUnresolved => "nothing_unresolved",
-            Self::HistoryFull => "history_full",
-            Self::Expired => "expired",
-            Self::AccessDenied => "access_denied",
-            Self::ElevationDeclined => "elevation_declined",
-            Self::NotApplied => "not_applied",
-            Self::ReadbackMismatch => "readback_mismatch",
-            Self::Unknown => "unknown",
-            Self::ReceiptLost => "receipt_lost",
+            Self::RolledBack { .. } => PrivacyFaultCode::ReadbackMismatch,
+            Self::Unknown { .. } => PrivacyFaultCode::Unknown,
+            Self::ReceiptLost { .. } => PrivacyFaultCode::ReceiptLost,
         }
     }
 }

@@ -10,7 +10,7 @@ use std::num::NonZeroU64;
 
 use kernel::{AxError, SecretRef};
 use serde::{Deserialize, Serialize};
-use wire::PrivacyControl;
+use wire::{PrivacyControl, PrivacySettlement};
 
 use super::fault::HistoryFault;
 use super::target::Snapshot;
@@ -34,7 +34,7 @@ pub(super) struct Intent {
 }
 
 /// How a write ended, judged by the readback. `Unknown` does not end the
-/// operation: only a [`Settlement`] does.
+/// operation: only a [`PrivacySettlement`] does.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub(super) enum Outcome {
@@ -43,16 +43,6 @@ pub(super) enum Outcome {
     Restored,
     RolledBack,
     Unknown,
-}
-
-/// The person's check of an unresolved operation; it writes nothing.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub(super) enum Settlement {
-    Applied,
-    NotApplied,
-    Restored,
-    Abandoned,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -67,7 +57,7 @@ pub(super) enum Event {
     },
     Reconciled {
         operation: NonZeroU64,
-        settlement: Settlement,
+        settlement: PrivacySettlement,
     },
 }
 
@@ -83,7 +73,7 @@ pub(super) struct Line {
 pub(super) enum StatusOutcome {
     Unresolved,
     Finished(Outcome),
-    Reconciled(Settlement),
+    Reconciled(PrivacySettlement),
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize)]
@@ -109,10 +99,6 @@ pub(super) struct History(Fold);
 
 /// What a history holds for the one operation about to run, released once
 /// its owner reference passed the identity check (Privacy D66).
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "read only by the coordinator, not yet called")
-)]
 #[derive(Debug)]
 pub(super) struct Holdings<'h> {
     owner: SecretRef,
@@ -188,28 +174,41 @@ impl History {
     ///
     /// # Errors
     /// The refusal `authorize` returns; nothing of the history is released.
-    #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "read only by the coordinator, not yet called")
-    )]
     pub(super) fn holdings(
         &self,
         authorize: impl FnOnce(Option<&SecretRef>) -> Result<SecretRef, AxError>,
     ) -> Result<Holdings<'_>, AxError> {
         let owner = authorize(self.0.summary.as_ref().map(|summary| &summary.owner))?;
-        Ok(Holdings {
+        Ok(self.released(owner))
+    }
+
+    /// What [`History::holdings`] releases, for a reader that prepares
+    /// nothing: an empty history releases nothing and asks nobody; any
+    /// other is released once `authorize` accepts its owner reference.
+    ///
+    /// # Errors
+    /// The refusal `authorize` returns; nothing of the history is released.
+    pub(super) fn standing(
+        &self,
+        authorize: impl FnOnce(&SecretRef) -> Result<(), AxError>,
+    ) -> Result<Option<Holdings<'_>>, AxError> {
+        let Some(summary) = &self.0.summary else {
+            return Ok(None);
+        };
+        authorize(&summary.owner)?;
+        Ok(Some(self.released(summary.owner.clone())))
+    }
+
+    fn released(&self, owner: SecretRef) -> Holdings<'_> {
+        Holdings {
             owner,
             owned: &self.0.owned,
             unresolved: self.0.pending.as_ref().map(|pending| &pending.intent),
             latest: self.0.latest,
-        })
+        }
     }
 }
 
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "read only by the coordinator, not yet called")
-)]
 impl Holdings<'_> {
     pub(super) fn owner(&self) -> &SecretRef {
         &self.owner
@@ -219,6 +218,11 @@ impl Holdings<'_> {
     /// finished, or finished `Unknown` and never reconciled.
     pub(super) fn unresolved(&self) -> Option<&Intent> {
         self.unresolved
+    }
+
+    /// The latest operation each control still owns, in page order.
+    pub(super) fn owned(&self) -> impl Iterator<Item = &Intent> {
+        self.owned.values().filter_map(|stack| stack.last())
     }
 
     /// The latest operation `control` still owns: the top of its stack.
@@ -310,7 +314,7 @@ impl Fold {
     fn reconcile(
         &mut self,
         operation: NonZeroU64,
-        settlement: Settlement,
+        settlement: PrivacySettlement,
     ) -> Result<(), HistoryFault> {
         let pending = self.pending.take().ok_or(HistoryFault::Invalid(
             "reconciliation has no unresolved operation",
@@ -321,10 +325,12 @@ impl Fold {
             ));
         }
         let owns = match (settlement, pending.intent.restore_of) {
-            (Settlement::Applied, None) => Ownership::Take,
-            (Settlement::Restored, Some(_)) => Ownership::Release,
-            (Settlement::NotApplied | Settlement::Abandoned, None | Some(_)) => Ownership::Keep,
-            (Settlement::Applied, Some(_)) | (Settlement::Restored, None) => {
+            (PrivacySettlement::Applied, None) => Ownership::Take,
+            (PrivacySettlement::Restored, Some(_)) => Ownership::Release,
+            (PrivacySettlement::NotApplied | PrivacySettlement::Abandoned, None | Some(_)) => {
+                Ownership::Keep
+            }
+            (PrivacySettlement::Applied, Some(_)) | (PrivacySettlement::Restored, None) => {
                 return Err(HistoryFault::Invalid(
                     "reconciliation has the wrong settlement for its action",
                 ));
@@ -459,7 +465,7 @@ pub(super) mod fixtures {
         }
     }
 
-    pub(in crate::privacy) fn reconciled(intent: &Intent, settlement: Settlement) -> Line {
+    pub(in crate::privacy) fn reconciled(intent: &Intent, settlement: PrivacySettlement) -> Line {
         Line {
             schema: SCHEMA,
             event: Event::Reconciled {
@@ -554,9 +560,9 @@ mod tests {
             assert_eq!(History::fold(lines).is_ok(), owns, "{end:?}");
         }
         for (settlement, owns) in [
-            (Settlement::Abandoned, false),
-            (Settlement::NotApplied, false),
-            (Settlement::Applied, true),
+            (PrivacySettlement::Abandoned, false),
+            (PrivacySettlement::NotApplied, false),
+            (PrivacySettlement::Applied, true),
         ] {
             let intent = apply(1, TELEMETRY, dword(5), dword(0));
             let lines = vec![
@@ -585,14 +591,17 @@ mod tests {
         for refused in [
             finished(&intent, Outcome::Applied),
             prepared(&next),
-            reconciled(&other, Settlement::Abandoned),
+            reconciled(&other, PrivacySettlement::Abandoned),
         ] {
             let mut lines = unknown.clone();
             lines.push(refused);
             assert!(History::fold(lines).is_err());
         }
         let mut settled = unknown;
-        settled.extend([reconciled(&intent, Settlement::Abandoned), prepared(&next)]);
+        settled.extend([
+            reconciled(&intent, PrivacySettlement::Abandoned),
+            prepared(&next),
+        ]);
         assert_eq!(
             statuses(settled).unwrap(),
             serde_json::json!([
@@ -600,7 +609,7 @@ mod tests {
                 { "operation": 2, "outcome": "unresolved" }
             ])
         );
-        assert!(History::fold(vec![reconciled(&intent, Settlement::Applied)]).is_err());
+        assert!(History::fold(vec![reconciled(&intent, PrivacySettlement::Applied)]).is_err());
     }
 
     fn snapshots() -> impl proptest::strategy::Strategy<Value = Snapshot> {

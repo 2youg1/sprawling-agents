@@ -36,26 +36,12 @@ pub(super) fn read(path: &Path) -> Result<History, HistoryFault> {
 /// The history held for writing: an exclusive lock on the file, taken
 /// before its bytes are read and released on drop, so the fold the
 /// caller decides from is the file every append extends.
-#[cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "the coordinator is its one writer and is not built yet"
-    )
-)]
 pub(super) struct LockedJournal {
     file: File,
     bytes: Vec<u8>,
     history: History,
 }
 
-#[cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "the coordinator is its one writer and is not built yet"
-    )
-)]
 impl LockedJournal {
     /// Opens `path` under an exclusive lock, creating the file and its
     /// directory when absent and syncing the directory that gained an

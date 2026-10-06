@@ -16,10 +16,6 @@ use wire::{PrivacyControl, PrivacyNotWritten, PrivacyOriginal};
 
 /// One original item.
 #[derive(Debug)]
-#[expect(
-    dead_code,
-    reason = "the privacy answer and the coordinator are its readers; until they exist only tests and the compile-time tallies read it"
-)]
 pub(crate) struct Original {
     pub(crate) text: &'static str,
     pub(crate) disposition: Disposition,
@@ -27,10 +23,6 @@ pub(crate) struct Original {
 
 /// What became of an original item.
 #[derive(Debug)]
-#[expect(
-    dead_code,
-    reason = "the privacy answer and the coordinator are its readers; until they exist only tests and the compile-time tallies read it"
-)]
 pub(crate) enum Disposition {
     Writes(PrivacyControl),
     NotWritten {

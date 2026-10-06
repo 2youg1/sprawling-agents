@@ -312,6 +312,11 @@ pub enum Query {
     /// Which release this city is running, and which ones npm and crates.io offer
     /// (`crates/wire/spec/Answer/Release.lean` §8-36).
     NewestRelease,
+    /// The host's privacy controls, their current values and what this
+    /// app's history discloses to the account asking
+    /// (`crates/wire/spec/Privacy.lean` §8-86). Answered by the city's
+    /// listener, never through a remote device.
+    Privacy,
     /// Everything this person settled about their own reading of the
     /// city: the language, the appearance, the chords they rebound.
     ///

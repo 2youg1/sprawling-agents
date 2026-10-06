@@ -14,7 +14,9 @@ use std::num::NonZeroU64;
 use wire::PrivacyControl;
 
 use super::controls::definition;
-use super::state::{Holdings, Intent, Settlement};
+use wire::PrivacySettlement;
+
+use super::state::{Holdings, Intent};
 use super::target::{Reading, Snapshot};
 
 /// One apply or restore, as the coordinator accepted it: the control, the
@@ -80,7 +82,7 @@ pub(super) enum RollbackEnd {
 
 #[derive(Debug, PartialEq, Eq)]
 pub(super) enum ReconcilePlan {
-    Settle(Settlement),
+    Settle(PrivacySettlement),
     Changed,
 }
 
@@ -183,12 +185,12 @@ pub(super) fn plan_reconcile(
     ReconcilePlan::Settle(reconciled(unresolved, fresh))
 }
 
-fn reconciled(intent: &Intent, value: &Snapshot) -> Settlement {
+fn reconciled(intent: &Intent, value: &Snapshot) -> PrivacySettlement {
     match settle(intent, judge_readback(intent, value)) {
-        Verdict::Applied => Settlement::Applied,
-        Verdict::Restored => Settlement::Restored,
-        Verdict::NotApplied => Settlement::NotApplied,
-        Verdict::RollBack => Settlement::Abandoned,
+        Verdict::Applied => PrivacySettlement::Applied,
+        Verdict::Restored => PrivacySettlement::Restored,
+        Verdict::NotApplied => PrivacySettlement::NotApplied,
+        Verdict::RollBack => PrivacySettlement::Abandoned,
     }
 }
 
@@ -440,20 +442,36 @@ mod tests {
         assert_eq!(
             judged,
             [
-                (Readback::Matches, Verdict::Applied, Settlement::Applied),
+                (
+                    Readback::Matches,
+                    Verdict::Applied,
+                    PrivacySettlement::Applied
+                ),
                 (
                     Readback::StillOriginal,
                     Verdict::NotApplied,
-                    Settlement::NotApplied
+                    PrivacySettlement::NotApplied
                 ),
-                (Readback::Other, Verdict::RollBack, Settlement::Abandoned),
-                (Readback::Matches, Verdict::Restored, Settlement::Restored),
+                (
+                    Readback::Other,
+                    Verdict::RollBack,
+                    PrivacySettlement::Abandoned
+                ),
+                (
+                    Readback::Matches,
+                    Verdict::Restored,
+                    PrivacySettlement::Restored
+                ),
                 (
                     Readback::StillOriginal,
                     Verdict::NotApplied,
-                    Settlement::NotApplied
+                    PrivacySettlement::NotApplied
                 ),
-                (Readback::Other, Verdict::RollBack, Settlement::Abandoned),
+                (
+                    Readback::Other,
+                    Verdict::RollBack,
+                    PrivacySettlement::Abandoned
+                ),
             ]
         );
     }

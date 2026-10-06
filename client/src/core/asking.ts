@@ -64,6 +64,7 @@ export const QUERIES = {
   automation: "automation",
   guide: "guide",
   shells: "shells",
+  privacy: "privacy",
 } as const satisfies Readonly<Record<string, Extract<Query, string>>>;
 
 // One page of a building's commits. The answer carries the building

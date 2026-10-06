@@ -3,16 +3,25 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The names the privacy page and the host share: which control, which
-//! line of the request list, why a line is not written, and the closed
-//! sets every control is described by (`crates/wire/spec/Privacy.lean`
-//! §8-85).
+//! The privacy page's vocabulary (`crates/wire/spec/Privacy.lean`): the
+//! closed sets every control is described by (§8-85), the answer to
+//! `Query::Privacy` (§8-86) and the operation `Command::PrivacyOperation`
+//! carries (§8-87).
 //!
-//! **Only names cross the wire.** A control's target path, the value it
-//! writes and its edition lists are defined once, in the binary's
-//! `privacy::controls`; the words the page shows are defined once, in the
-//! client's `lang.json`, keyed by these spellings. Each set therefore has
-//! exactly one list of members, and every reader takes it from here.
+//! **The host's table is the one authority.** A control's target path, the
+//! value it writes and its edition lists are defined once, in the binary's
+//! `privacy::controls`, and reach the page only inside the answer; the
+//! words the page shows are defined once, in the client's `lang.json`,
+//! keyed by the spellings of these sets. Each set therefore has exactly
+//! one list of members, and every reader takes it from here.
+
+mod answer;
+mod operation;
+
+pub use answer::{PrivacyAnswer, PrivacyControlEntry, PrivacyCurrent, PrivacyEditions};
+pub use answer::{PrivacyHistory, PrivacyHost, PrivacyIntent, PrivacyNotWrittenEntry};
+pub use answer::{PrivacyOriginalLine, PrivacyTarget, PrivacyValue, PrivacyWindows};
+pub use operation::{PrivacyAction, PrivacyOutcome, PrivacyRequest, PrivacyResult};
 
 use serde::{Deserialize, Serialize};
 
@@ -270,5 +279,102 @@ listed! {
         /// Neither list names the host's edition, or the host's edition is
         /// not one of [`PrivacyEdition`].
         NotStated,
+    }
+}
+
+listed! {
+    /// Whose settings a control changes. A machine-scope write goes
+    /// through administrator approval.
+    pub enum PrivacyScope {
+        User,
+        Machine,
+    }
+}
+
+listed! {
+    /// The person's check of an operation that has no conclusion. It
+    /// writes nothing; it records what the target held.
+    pub enum PrivacySettlement {
+        /// The target held the operation's modified value: an apply now
+        /// owns its change.
+        Applied,
+        /// The target held the operation's original value.
+        NotApplied,
+        /// The target held a restore's modified value: the change it
+        /// undid is no longer owned.
+        Restored,
+        /// The target held neither value; nothing is owned and nothing is
+        /// put back.
+        Abandoned,
+    }
+}
+
+listed! {
+    /// Why a privacy operation ended without the change asked for, or
+    /// with a result nobody could confirm: the closed set of stable codes
+    /// (`crates/sprawling/spec/Privacy.lean` §12).
+    pub enum PrivacyFaultCode {
+        Identity,
+        Clock,
+        History,
+        Unreadable,
+        Unresolved,
+        Changed,
+        TargetAbsent,
+        NothingOwned,
+        Conflict,
+        NothingUnresolved,
+        HistoryFull,
+        Expired,
+        AccessDenied,
+        ElevationDeclined,
+        NotApplied,
+        ReadbackMismatch,
+        Unknown,
+        ReceiptLost,
+    }
+}
+
+impl PrivacyFaultCode {
+    /// The code as it travels, which every privacy error's subject also
+    /// opens with.
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Identity => "identity",
+            Self::Clock => "clock",
+            Self::History => "history",
+            Self::Unreadable => "unreadable",
+            Self::Unresolved => "unresolved",
+            Self::Changed => "changed",
+            Self::TargetAbsent => "target_absent",
+            Self::NothingOwned => "nothing_owned",
+            Self::Conflict => "conflict",
+            Self::NothingUnresolved => "nothing_unresolved",
+            Self::HistoryFull => "history_full",
+            Self::Expired => "expired",
+            Self::AccessDenied => "access_denied",
+            Self::ElevationDeclined => "elevation_declined",
+            Self::NotApplied => "not_applied",
+            Self::ReadbackMismatch => "readback_mismatch",
+            Self::Unknown => "unknown",
+            Self::ReceiptLost => "receipt_lost",
+        }
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, reason = "test code")]
+mod tests {
+    use super::PrivacyFaultCode;
+
+    /// The subject prefix and the wire spelling are one spelling.
+    #[test]
+    fn a_fault_code_reads_as_it_travels() {
+        for code in PrivacyFaultCode::ALL {
+            assert_eq!(
+                serde_json::to_value(code).unwrap(),
+                serde_json::Value::from(code.as_str())
+            );
+        }
     }
 }
