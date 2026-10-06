@@ -1640,8 +1640,8 @@
     "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。"
   },
   "privacy_control_sensors_editions": {
-    "en": "CSP (ADMX_Sensors/DisableSensors_2): Windows 10 2004 with KB5005101 and later, Windows 11. The template also names Server. Microsoft's CSP edition table does not list Home; whether Home applies it is not stated.",
-    "zh": "CSP（ADMX_Sensors/DisableSensors_2）：Windows 10 2004 + KB5005101 起、Windows 11。模板也列出 Server。微软的 CSP 版本表没有列出 Home，Home 上是否执行没有说明。"
+    "en": "CSP (DisableSensors_2 in ADMX_Sensors): Windows 10 2004 with KB5005101 and later, Windows 11. The template also names Server. Microsoft's CSP edition table does not list Home; whether Home applies it is not stated.",
+    "zh": "CSP（ADMX_Sensors 中的 DisableSensors_2）：Windows 10 2004 + KB5005101 起、Windows 11。模板也列出 Server。微软的 CSP 版本表没有列出 Home，Home 上是否执行没有说明。"
   },
   "privacy_control_start_launch_tracking_title": {
     "en": "App launch tracking (preference)",
