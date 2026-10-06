@@ -39,9 +39,10 @@ History::holdings(authorize) 是 coordinator 的出口：authorize 收到记录�
 接受后才交出 Holdings：每个控制的拥有栈栈顶、未结操作（Prepared 之后没有结论或结论为 Unknown）
 与下一个操作编号（最新编号加一，越界即拒绝）。所以身份不符时 coordinator 不看到任何历史值
 （Privacy D66）。
-History::standing(authorize) 是只读者（inspect、restore-all 选控制）的出口：与 disclose 一样，
-非空历史先把 owner 引用交给 authorize，接受后才交出每个控制的拥有栈栈顶与未结操作；空历史不询问
-authorize，交出空的拥有关系。它不交出 owner 与下一个操作编号，所以只读者无法据此准备写入。
+Holdings 对 authorize 返回的 owner 类型泛型。只读者（inspect、restore-all 选控制）以 () 作 owner：
+非空历史的 authorize 核对记录的引用，空历史的 authorize 收到无、不访问 Vault 也不建立绑定，
+交出空的拥有关系。只读者的 Holdings 不带 owner 引用，plan 只接受带 SecretRef 的 Holdings，
+所以只读者无法据此准备写入。
 数据编码是 serde 的带标签闭集 enum 与 JSON byte array，未知字段拒绝；schema 与容量上界由 Rust
 一处定义，writer 在系统写入前通过同一 decoder。
 验收：未知字段/坏版本、重复 id、非法结论、越层恢复、跨控制恢复被拒、同控制栈顶恢复、

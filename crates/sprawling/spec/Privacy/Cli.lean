@@ -17,7 +17,7 @@ status 与 inspect 是无状态查询，披露性质由类型持有（见 D53）
   通过 Home::detect().privacy_history() 调用 journal::read、把 History::disclose 交出的摘要
   序列化成一行 JSON。没有 city 参数，没有网络或 wire。
 - privacy inspect [control]（ReadsOnly）：先读真实身份与历史（同 status 的次序），经
-  History::standing 按 owner 核对后，每个控制一行 JSON（给出 control 时只那一行）：
+  History::holdings 以只读的 () owner 核对后（Privacy.State），每个控制一行 JSON（给出 control 时只那一行）：
   control、reading（读到的快照，即 apply 与 restore 的 expected）与 key_existed，或读失败时的
   unreadable（access_denied 或 failed）；owned（本应用仍拥有的最近操作的 operation、original、
   modified，否则为 null）；unresolved（该控制是否有未结操作）。所有控制都可写
@@ -64,8 +64,8 @@ status 的 authorize 是 gateway::verify_platform_identity(owner, 实时身份)�
 缺失返回 CredentialMissing，锁定保留平台错误码，不匹配返回 ConfigInvalid。
 空历史没有 owner，不访问 Vault，返回空摘要。身份读取先于日志读取，
 所以读不到身份时不报告日志是否损坏。每次查询保持日志字节不变。
-inspect 与 restore-all 经 History::standing(authorize) 取得拥有栈栈顶与未结操作，authorize 与 status
-相同；空历史同样不访问 Vault。
+inspect 与 restore-all 经只读的 History::holdings 取得拥有栈栈顶与未结操作，非空历史的 authorize
+与 status 相同；空历史同样不访问 Vault。
 此边界只核对 owner；写入动词经 coordinator 用同一核对，身份不符时在披露任何历史之前拒绝。
 被否：①在 Lean 中把查询写成快照序列上的 map 再证明——每次查询相互独立，
 定理只是复述定义的一支；②cli 先取 owner 再取摘要的两个 getter——
