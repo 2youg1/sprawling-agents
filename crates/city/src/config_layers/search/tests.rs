@@ -8,7 +8,7 @@
 //! `City.ConfigLayers.Search`).
 
 use super::*;
-use kernel::SecretRef;
+use kernel::{AxCode, SecretRef};
 
 fn room() -> Address {
     Address::parse("lab/room1").unwrap()

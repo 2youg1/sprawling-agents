@@ -19,11 +19,11 @@ use std::path::Path;
 use kernel::config::{SearchConfiguration, SearchSupplier};
 use kernel::event::record::{ProviderAccount, validate_provider_accounts};
 use kernel::layout::CityLayout;
-use kernel::{Address, AxCode, AxError, ServerLabel};
+use kernel::{Address, AxError, ServerLabel};
 
 use super::ConfigLayer;
 use super::ladder::{Ladder, Layer};
-use super::refuse::refuse;
+use super::refuse::{refuse, refuse_with};
 use super::write::{Change, change_at};
 
 mod section;
@@ -179,12 +179,10 @@ fn supplier(supplier: &SearchSupplier) -> Result<(), AxError> {
         }
     }
     validate_provider_accounts(Some(&supplier.accounts)).map_err(|err| {
-        AxError::failure(
-            AxCode::ConfigInvalid,
-            "read a configuration layer",
+        refuse_with(
             format!("{SEARCH_KEY} supplier `{id}`: {}", err.subject()),
+            err.recovery(),
         )
-        .with_recovery(err.recovery())
     })?;
     // A header value is redeemed whole, so a key reaches the service only
     // as the value of a header the account names.
@@ -193,15 +191,13 @@ fn supplier(supplier: &SearchSupplier) -> Result<(), AxError> {
         .iter()
         .find(|account| account.reference.is_some() && account.header.is_none())
     {
-        Some(account) => Err(AxError::failure(
-            AxCode::ConfigInvalid,
-            "read a configuration layer",
+        Some(account) => Err(refuse_with(
             format!(
                 "{SEARCH_KEY} supplier `{id}`: account `{}` has a key and no header",
                 account.id.as_str()
             ),
-        )
-        .with_recovery("name the header the service reads its key from, such as `x-api-key`")),
+            "name the header the service reads its key from, such as `x-api-key`",
+        )),
         None => Ok(()),
     }
 }

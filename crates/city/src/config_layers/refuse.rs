@@ -23,11 +23,19 @@ use super::shelves::SHELVES_KEY;
 /// The message names the key, so the sentence does not.
 const CHANGE_THE_VALUE: &str = "change the value the message names, or take that key out";
 
+/// What every refusal of a layer says it was doing.
+pub(super) const READ_A_LAYER: &str = "read a configuration layer";
+
 /// The refusal a layer answers with when a value it read is not one this
 /// build accepts. `subject` is the caller's: which file, and which value.
 pub(super) fn refuse(subject: String) -> AxError {
-    AxError::failure(AxCode::ConfigInvalid, "read a configuration layer", subject)
-        .with_recovery(CHANGE_THE_VALUE)
+    refuse_with(subject, CHANGE_THE_VALUE)
+}
+
+/// [`refuse`] for a value whose repair is narrower than taking the key
+/// out: `recovery` says what to write instead.
+pub(super) fn refuse_with(subject: String, recovery: impl Into<String>) -> AxError {
+    AxError::failure(AxCode::ConfigInvalid, READ_A_LAYER, subject).with_recovery(recovery)
 }
 
 /// The refusal for text serde itself will not read.
@@ -47,8 +55,7 @@ pub(super) fn unreadable(text: &str, err: &toml::de::Error) -> AxError {
         Some(table) => format!("under `{table}`, {CHANGE_THE_VALUE}"),
         None => CHANGE_THE_VALUE.to_owned(),
     };
-    AxError::failure(AxCode::ConfigInvalid, "read a configuration layer", subject)
-        .with_recovery(recovery)
+    refuse_with(subject, recovery)
 }
 
 /// A table that may be stated only on the farther rungs of the ladder.
@@ -112,12 +119,10 @@ pub(super) fn too_near(file: &Path, table: Confined) -> AxError {
             format!("the building's or the city root's `{RESERVED_PREFIX}/{CONFIG_FILE}`")
         }
     };
-    AxError::failure(
-        AxCode::ConfigInvalid,
-        "read a configuration layer",
+    refuse_with(
         format!("{}: `{key}`", file.display()),
+        format!("move `{key}` into {into}: {}", table.because()),
     )
-    .with_recovery(format!("move `{key}` into {into}: {}", table.because()))
 }
 
 /// The refusal for one layer that names a model and a harness.
@@ -126,14 +131,12 @@ pub(super) fn too_near(file: &Path, table: Confined) -> AxError {
 /// forgets it; the harness is a person's setting. Which of the two the
 /// layer meant is not a reader's to guess.
 pub(super) fn two_residents(model: &str, harness: &str) -> AxError {
-    AxError::failure(
-        AxCode::ConfigInvalid,
-        "read a configuration layer",
+    refuse_with(
         format!("{MODEL_NAME_KEY} = \"{model}\" beside {HARNESS_KEY} = \"{harness}\""),
+        format!(
+            "keep one: `/new` forgets the model a session wrote here, or take {HARNESS_KEY} out"
+        ),
     )
-    .with_recovery(format!(
-        "keep one: `/new` forgets the model a session wrote here, or take {HARNESS_KEY} out"
-    ))
 }
 
 /// The table header the parser was inside, as the document spells it.

@@ -33,7 +33,7 @@ use kernel::layout::CityLayout;
 use kernel::{Address, AxCode, AxError, LayeredValue};
 
 use super::ConfigLayer;
-use super::refuse::too_near;
+use super::refuse::{READ_A_LAYER, too_near};
 use crate::building::Building;
 
 /// Declares [`Layer`] and `Layer::ALL` from one list, so the order the
@@ -179,7 +179,7 @@ pub(crate) fn stated(file: &Path, rung: Layer) -> Result<ConfigLayer, AxError> {
         Err(err) => {
             return Err(AxError::failure(
                 AxCode::StorageFatal,
-                "read a configuration layer",
+                READ_A_LAYER,
                 format!("{}: {err}", file.display()),
             )
             .with_recovery("fix the file's permissions; a configuration that exists is read"));
