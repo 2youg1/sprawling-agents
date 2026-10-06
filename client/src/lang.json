@@ -1145,7 +1145,7 @@
   },
   "privacy_control_ceip_consolidator_task_does": {
     "en": "Disables the scheduled task Consolidator (Customer Experience Improvement Program). When the user has consented to CEIP, this task collects and sends usage data. It is disabled, never deleted; when the task is absent on this host the page says so and writes nothing.",
-    "zh": "停用计划任务 Consolidator（客户体验改善计划）。用户同意参加 CEIP 时，该任务收集并发送使用数据。只停用，不删除；本机没有此任务时显示“本机没有此任务”，不写入。"
+    "zh": "停用计划任务 Consolidator（客户体验改善计划）。用户同意参加 CEIP 时，该任务收集并发送使用数据。只停用，不删除；这台电脑没有此任务时显示“这台电脑没有此任务”，不写入。"
   },
   "privacy_control_ceip_consolidator_task_benefit": {
     "en": "The task no longer collects and sends usage data on its schedule.",
@@ -1165,7 +1165,7 @@
   },
   "privacy_control_ceip_consolidator_task_editions": {
     "en": "Depends on whether the task exists on this host, not on the edition; the full path is resolved at run time and nothing is written when it is absent.",
-    "zh": "取决于本机是否有这个任务，与版本无关；运行时按完整路径解析，没有就不写。"
+    "zh": "取决于这台电脑是否有这个任务，与版本无关；运行时按完整路径解析，没有就不写。"
   },
   "privacy_control_ceip_usb_task_title": {
     "en": "CEIP scheduled task UsbCeip",
@@ -1173,7 +1173,7 @@
   },
   "privacy_control_ceip_usb_task_does": {
     "en": "Disables the scheduled task UsbCeip (Customer Experience Improvement Program). When the user participates in CEIP it collects USB-related statistics and machine information and sends them to Microsoft. It is disabled, never deleted; when the task is absent on this host the page says so and writes nothing.",
-    "zh": "停用计划任务 UsbCeip（客户体验改善计划）。用户参加 CEIP 时，它收集 USB 相关统计和本机信息并发给微软。只停用，不删除；本机没有此任务时显示“本机没有此任务”，不写入。"
+    "zh": "停用计划任务 UsbCeip（客户体验改善计划）。用户参加 CEIP 时，它收集 USB 相关统计和这台电脑的信息并发给微软。只停用，不删除；这台电脑没有此任务时显示“这台电脑没有此任务”，不写入。"
   },
   "privacy_control_ceip_usb_task_benefit": {
     "en": "The task no longer collects and sends USB statistics on its schedule.",
@@ -1181,7 +1181,7 @@
   },
   "privacy_control_ceip_usb_task_affects": {
     "en": "Microsoft no longer receives USB statistics from this machine; no first-hand source says it affects how USB devices work.",
-    "zh": "微软收不到这台机器的 USB 统计；没有一手资料说它影响 USB 设备本身的工作。"
+    "zh": "微软收不到这台电脑的 USB 统计；没有一手资料说它影响 USB 设备本身的工作。"
   },
   "privacy_control_ceip_usb_task_overlooked": {
     "en": "The task's own description says it does nothing when the user has not joined CEIP; with 'Turn off Windows CEIP' applied, disabling it removes no further data. It does not restrict USB devices or file access. The task is disabled, never deleted.",
@@ -1193,7 +1193,7 @@
   },
   "privacy_control_ceip_usb_task_editions": {
     "en": "Depends on whether the task exists on this host, not on the edition; the full path is resolved at run time and nothing is written when it is absent.",
-    "zh": "取决于本机是否有这个任务，与版本无关；运行时按完整路径解析，没有就不写。"
+    "zh": "取决于这台电脑是否有这个任务，与版本无关；运行时按完整路径解析，没有就不写。"
   },
   "privacy_control_windows_ceip_title": {
     "en": "Windows Customer Experience Improvement Program",
@@ -1313,7 +1313,7 @@
   },
   "privacy_control_location_provider_does": {
     "en": "Enables the policy 'Turn off Windows Location Provider', which the template defines as no program on this computer being able to use the Windows Location Provider.",
-    "zh": "启用策略“关闭 Windows 位置提供程序”：模板定义为本机所有程序不能使用 Windows Location Provider。"
+    "zh": "启用策略“关闭 Windows 位置提供程序”：模板定义为这台电脑所有程序不能使用 Windows Location Provider。"
   },
   "privacy_control_location_provider_benefit": {
     "en": "On the versions the template declares, programs cannot obtain location through the Windows Location Provider.",
@@ -1345,7 +1345,7 @@
   },
   "privacy_control_location_feature_benefit": {
     "en": "Programs cannot obtain this machine's location through the Windows location feature.",
-    "zh": "程序不能通过 Windows 定位功能取得本机位置。"
+    "zh": "程序不能通过 Windows 定位功能取得这台电脑的位置。"
   },
   "privacy_control_location_feature_affects": {
     "en": "Navigation, automatic time zone, Find my device and other features that use system location stop working; websites can still infer the region from the IP address.",
@@ -1401,7 +1401,7 @@
   },
   "privacy_control_search_web_results_benefit": {
     "en": "Search returns local results only, and input is not used for web queries.",
-    "zh": "搜索只给本机结果，输入不用于网页查询。"
+    "zh": "搜索只给本地结果，输入不用于网页查询。"
   },
   "privacy_control_search_web_results_affects": {
     "en": "The official CSP does not support Pro; it does not guarantee the search component makes no network connection.",
@@ -1489,7 +1489,7 @@
   },
   "privacy_control_online_speech_recognition_affects": {
     "en": "Windows online dictation and voice typing stop working; on-device recognition and third-party transcription (including sprawling's transcription endpoint) are unaffected.",
-    "zh": "Windows 在线听写和语音输入不可用；本机识别和第三方转写（包括 sprawling 的转写 Endpoint）不受影响。"
+    "zh": "Windows 在线听写和语音输入不可用；设备端识别和第三方转写（包括 sprawling 的转写 Endpoint）不受影响。"
   },
   "privacy_control_online_speech_recognition_overlooked": {
     "en": "Windows 11 voice typing (Win+H) uses online speech recognition and stops working; only on-device features such as Narrator remain. This is a preference the user can switch back in Settings at any time. Third-party transcription, including sprawling's own transcription endpoint, is unaffected. The 'online speech (policy)' entry is stronger and locks the switch.",
@@ -1825,7 +1825,7 @@
   },
   "privacy_control_app_motion_affects": {
     "en": "Fitness and activity-recognition features stop; with no motion sensor the item has no effect. Per-app exception lists can still override the default; ordinary desktop programs are not bound by this policy.",
-    "zh": "健身、活动识别类功能失效；本机没有运动传感器时此项无作用。逐应用例外列表仍可覆盖默认值；普通桌面程序不受此策略约束。"
+    "zh": "健身、活动识别类功能失效；这台电脑没有运动传感器时此项无作用。逐应用例外列表仍可覆盖默认值；普通桌面程序不受此策略约束。"
   },
   "privacy_control_app_motion_overlooked": {
     "en": "Binds Windows (packaged) apps only; ordinary desktop programs such as browsers and meeting software are not bound. Per-app exception lists (LetAppsAccessMotion_ForceAllowTheseApps and the others) override this default; the page reads and shows them and never writes them. The matching Settings switch is locked; an app that is already running is affected only after it restarts. It has no effect on a device without motion sensors.",
@@ -2161,7 +2161,7 @@
   },
   "privacy_control_error_reporting_affects": {
     "en": "Solution information is no longer offered in Security and Maintenance; vendors receive no crash reports from this machine.",
-    "zh": "“安全和维护”里不再提供解决方案信息；厂商无法收到这台机器上的崩溃报告。"
+    "zh": "“安全和维护”里不再提供解决方案信息；厂商无法收到这台电脑上的崩溃报告。"
   },
   "privacy_control_error_reporting_overlooked": {
     "en": "When this value is absent or 0, the ICM policy of the same name decides, then Control Panel; that policy also writes a second value, while this entry writes only this one, which the WER policy text says is sufficient. Turning diagnostic data off is a separate entry.",
@@ -2293,7 +2293,7 @@
   },
   "privacy_control_device_census_task_does": {
     "en": "Disables the scheduled task Device Information\\Device, which runs devicecensus.exe in system context on a schedule. It is disabled, never deleted; nothing is written when the task is absent.",
-    "zh": "停用计划任务 Device Information\\Device：它定期以系统上下文运行 devicecensus.exe。只停用，不删除；本机没有此任务时不写。"
+    "zh": "停用计划任务 Device Information\\Device：它定期以系统上下文运行 devicecensus.exe。只停用，不删除；这台电脑没有此任务时不写。"
   },
   "privacy_control_device_census_task_benefit": {
     "en": "DeviceCensus no longer reports device information through the diagnostic data endpoint on its schedule.",
@@ -2313,7 +2313,7 @@
   },
   "privacy_control_device_census_task_editions": {
     "en": "Depends on whether the task exists on this host, not on the edition; the full path is resolved at run time. Windows Update for Business reports themselves support Pro, Education and Enterprise only.",
-    "zh": "取决于本机是否有这个任务，与版本无关；运行时按完整路径解析。Windows Update for Business 报告本身只支持 Pro、Education、Enterprise。"
+    "zh": "取决于这台电脑是否有这个任务，与版本无关；运行时按完整路径解析。Windows Update for Business 报告本身只支持 Pro、Education、Enterprise。"
   },
   "privacy_control_device_census_user_task_title": {
     "en": "DeviceCensus user task",
@@ -2321,7 +2321,7 @@
   },
   "privacy_control_device_census_user_task_does": {
     "en": "Disables the scheduled task Device Information\\Device User, which runs devicecensus.exe in user context on a schedule. It is disabled, never deleted; nothing is written when the task is absent.",
-    "zh": "停用计划任务 Device Information\\Device User：它定期以用户上下文运行 devicecensus.exe。只停用，不删除；本机没有此任务时不写。"
+    "zh": "停用计划任务 Device Information\\Device User：它定期以用户上下文运行 devicecensus.exe。只停用，不删除；这台电脑没有此任务时不写。"
   },
   "privacy_control_device_census_user_task_benefit": {
     "en": "DeviceCensus user-context reporting stops on its schedule.",
@@ -2341,7 +2341,7 @@
   },
   "privacy_control_device_census_user_task_editions": {
     "en": "Depends on whether the task exists on this host, not on the edition; the full path is resolved at run time.",
-    "zh": "取决于本机是否有这个任务，与版本无关；运行时按完整路径解析。"
+    "zh": "取决于这台电脑是否有这个任务，与版本无关；运行时按完整路径解析。"
   },
   "privacy_control_dotnet_cli_telemetry_optout_title": {
     "en": ".NET SDK CLI telemetry (current user)",
@@ -2381,7 +2381,7 @@
   },
   "privacy_control_linguistic_data_collection_benefit": {
     "en": "Typing and inking samples no longer leave this machine.",
-    "zh": "键入与手写样本不再离开这台机器。"
+    "zh": "键入与手写样本不再离开这台电脑。"
   },
   "privacy_control_linguistic_data_collection_affects": {
     "en": "Nothing changes locally.",
@@ -2829,7 +2829,7 @@
   },
   "privacy_control_activity_publish_benefit": {
     "en": "Activity history is no longer recorded locally, so there is nothing to upload or read later.",
-    "zh": "活动历史不再在本机记录，也就没有可上传或读取的记录。"
+    "zh": "活动历史不再在这台电脑上记录，也就没有可上传或读取的记录。"
   },
   "privacy_control_activity_publish_affects": {
     "en": "Features that resume work from activity history (Windows 10 Timeline) get no new entries.",
@@ -2893,7 +2893,7 @@
   },
   "privacy_control_clipboard_history_overlooked": {
     "en": "Clipboard history is local memory, not the part that goes to the cloud; that is the 'cross-device clipboard' entry. The sources do not say whether cloud clipboard needs history, so the page does not claim this entry stops cloud sync. Takes effect immediately.",
-    "zh": "剪贴板历史在本机内存中，不是上云的部分；上云的是“跨设备剪贴板”一项。来源没有说跨设备剪贴板是否依赖历史开启，所以本页不说本项也停止云同步。立即生效。"
+    "zh": "剪贴板历史在这台电脑的内存中，不是上云的部分；上云的是“跨设备剪贴板”一项。来源没有说跨设备剪贴板是否依赖历史开启，所以本页不说本项也停止云同步。立即生效。"
   },
   "privacy_control_clipboard_history_undo": {
     "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
@@ -2913,15 +2913,15 @@
   },
   "privacy_control_cloud_clipboard_benefit": {
     "en": "Copied content no longer leaves this machine.",
-    "zh": "复制的内容不再离开这台机器。"
+    "zh": "复制的内容不再离开这台电脑。"
   },
   "privacy_control_cloud_clipboard_affects": {
     "en": "Pasting on another device what was copied here, and the reverse, stops.",
-    "zh": "在另一台设备上粘贴本机复制的内容（及反向）不再可用。"
+    "zh": "在另一台设备上粘贴这台电脑复制的内容（及反向）不再可用。"
   },
   "privacy_control_cloud_clipboard_overlooked": {
     "en": "Local clipboard history (Win+V) is a separate entry; this is one of the formal counterparts of the original's 'cross-device sync'. Takes effect immediately.",
-    "zh": "本机剪贴板历史（Win+V）是另一项；这是原文“跨设备同步”的正式对应之一。立即生效。"
+    "zh": "这台电脑上的剪贴板历史（Win+V）是另一项；这是原文“跨设备同步”的正式对应之一。立即生效。"
   },
   "privacy_control_cloud_clipboard_undo": {
     "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
@@ -2937,15 +2937,15 @@
   },
   "privacy_control_continue_experiences_does": {
     "en": "Disables 'Continue experiences on this device': the device is not discoverable by the same user's other devices and takes no part in cross-device experiences.",
-    "zh": "停用策略“在此设备上继续体验”：本机不被同一用户的其他设备发现，不参与跨设备体验。"
+    "zh": "停用策略“在此设备上继续体验”：这台电脑不被同一用户的其他设备发现，不参与跨设备体验。"
   },
   "privacy_control_continue_experiences_benefit": {
     "en": "The device no longer announces itself to other devices.",
-    "zh": "本机不再向其他设备公布自己。"
+    "zh": "这台电脑不再向其他设备公布自己。"
   },
   "privacy_control_continue_experiences_affects": {
     "en": "Opening apps and continuing tasks between this PC and other devices stops.",
-    "zh": "在本机与其他设备之间打开应用、继续任务不再可用。"
+    "zh": "在这台电脑与其他设备之间打开应用、继续任务不再可用。"
   },
   "privacy_control_continue_experiences_overlooked": {
     "en": "Takes effect after a restart, and so does restore. The template says the default when not configured depends on the Windows edition, so restoring to 'absent' may return to different states on different editions. It is not a master switch for all sync.",
@@ -2965,11 +2965,11 @@
   },
   "privacy_control_phone_pc_linking_does": {
     "en": "Disables 'Phone-PC linking on this device': the PC cannot be linked to phones and removes itself from linked phones' device lists.",
-    "zh": "停用策略“此设备上的手机与电脑连接”：本机不能与手机连接，并把自己从已连接手机的设备列表中移除。"
+    "zh": "停用策略“此设备上的手机与电脑连接”：这台电脑不能与手机连接，并把自己从已连接手机的设备列表中移除。"
   },
   "privacy_control_phone_pc_linking_benefit": {
     "en": "The data flow between phones and this PC stops.",
-    "zh": "手机与本机之间的连接数据流停止。"
+    "zh": "手机与这台电脑之间的连接数据流停止。"
   },
   "privacy_control_phone_pc_linking_affects": {
     "en": "'Continue on PC' stops; the Settings button to add a phone is greyed out.",
@@ -2977,7 +2977,7 @@
   },
   "privacy_control_phone_pc_linking_overlooked": {
     "en": "Takes effect after a restart. Applying it removes the PC from phones' device lists; restore does not re-list it, so the phone may need to be linked again.",
-    "zh": "重启后才生效。应用时本机会从手机的设备列表中移除，恢复不会让手机重新列出本机，可能要在手机上重新连接。"
+    "zh": "重启后才生效。应用时这台电脑会从手机的设备列表中移除，恢复不会让手机重新列出这台电脑，可能要在手机上重新连接。"
   },
   "privacy_control_phone_pc_linking_undo": {
     "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control. A restart is needed afterwards, and the phone may need to be linked again.",
@@ -3109,7 +3109,7 @@
   },
   "privacy_control_onedrive_file_storage_benefit": {
     "en": "No file leaves this machine through OneDrive.",
-    "zh": "没有文件经 OneDrive 离开这台机器。"
+    "zh": "没有文件经 OneDrive 离开这台电脑。"
   },
   "privacy_control_onedrive_file_storage_affects": {
     "en": "OneDrive cannot be opened from the OneDrive app or the file picker; Store apps cannot use OneDrive; OneDrive no longer appears in the File Explorer navigation pane; files stop syncing with the cloud; the camera roll is no longer uploaded automatically.",
@@ -3117,7 +3117,7 @@
   },
   "privacy_control_onedrive_file_storage_overlooked": {
     "en": "This ends OneDrive on the PC, including cloud backup of Desktop and Documents; files that exist only in the cloud cannot be reached from File Explorer. It is one of the heaviest entries on the page. To keep OneDrive but stop its traffic until sign-in, see 'OneDrive traffic before sign-in'.",
-    "zh": "这会在本机结束 OneDrive，包括桌面/文档的云备份；只在云端的文件从资源管理器里打不开。这是本页影响最大的条目之一。只想在未登录时不联网，可选“OneDrive 登录前不联网”。"
+    "zh": "这会在这台电脑上结束 OneDrive，包括桌面/文档的云备份；只在云端的文件从资源管理器里打不开。这是本页影响最大的条目之一。只想在未登录时不联网，可选“OneDrive 登录前不联网”。"
   },
   "privacy_control_onedrive_file_storage_undo": {
     "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
@@ -3169,7 +3169,7 @@
   },
   "privacy_control_push_notifications_network_affects": {
     "en": "Apps and system features receive no notifications from the network (tiles, badges, toasts); an app running on the machine can still raise notifications locally.",
-    "zh": "应用和系统功能收不到来自网络的通知（磁贴、徽章、弹出通知）；应用在本机运行时仍可在本地发出通知。"
+    "zh": "应用和系统功能收不到来自网络的通知（磁贴、徽章、弹出通知）；应用在这台电脑上运行时仍可在本地发出通知。"
   },
   "privacy_control_push_notifications_network_overlooked": {
     "en": "Push notifications from chat, mail and other apps do not arrive while those apps are not running. The CSP warns that MDM real-time tasks that rely on WNS (remote wipe, unenroll, remote find, mandatory app install) stop working. No restart is needed.",
@@ -3424,16 +3424,16 @@
     "zh": "依赖读取屏幕文字的打包应用（推断：AI 助手、翻译、读屏类）失去这项能力。"
   },
   "privacy_control_app_foreground_text_overlooked": {
-    "en": "Binds Windows (packaged) apps only; ordinary desktop programs are not bound. Per-app exception lists (LetAppsAccessForegroundText_ForceAllowTheseApps and the others) override this default; the page reads and shows them and never writes them. The matching Settings switch is locked; an app that is already running is affected only after it restarts. The two first-hand sources disagree on the minimum version: this host's client template says Windows 11 25H2 and later, the CSP says 21H2 and later; whether 21H2–24H2 apply it is unknown. The runner images' templates do not have it. Most screen-reading accessibility software is desktop software and is unaffected.",
-    "zh": "只约束 Windows 应用（打包应用），普通桌面程序不受约束。按应用的例外列表（LetAppsAccessForegroundText_ForceAllowTheseApps 等）优先于这个默认值，本页读取并显示这些列表，不写入。设置中对应开关被锁定；正在运行的应用要重启后才受影响。两份一手来源的最低版本不一致：本机客户端模板写 Windows 11 25H2 起，CSP 写 21H2 起；21H2–24H2 上是否执行未知。runner 镜像的模板里没有这一条。读屏类无障碍软件多为桌面程序，不受影响。"
+    "en": "Binds Windows (packaged) apps only; ordinary desktop programs are not bound. Per-app exception lists (LetAppsAccessForegroundText_ForceAllowTheseApps and the others) override this default; the page reads and shows them and never writes them. The matching Settings switch is locked; an app that is already running is affected only after it restarts. The two first-hand sources disagree on the minimum version: the template of a Windows 11 client (build 26220) says Windows 11 25H2 and later, the CSP says 21H2 and later; whether 21H2–24H2 apply it is unknown. The runner images' templates do not have it. Most screen-reading accessibility software is desktop software and is unaffected.",
+    "zh": "只约束 Windows 应用（打包应用），普通桌面程序不受约束。按应用的例外列表（LetAppsAccessForegroundText_ForceAllowTheseApps 等）优先于这个默认值，本页读取并显示这些列表，不写入。设置中对应开关被锁定；正在运行的应用要重启后才受影响。两份一手来源的最低版本不一致：一台 Windows 11 客户端（build 26220）的模板写 Windows 11 25H2 起，CSP 写 21H2 起；21H2–24H2 上是否执行未知。runner 镜像的模板里没有这一条。读屏类无障碍软件多为桌面程序，不受影响。"
   },
   "privacy_control_app_foreground_text_undo": {
     "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
     "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。"
   },
   "privacy_control_app_foreground_text_editions": {
-    "en": "Template (this host): Windows 11 25H2 and later; CSP: Windows 11 21H2 and later. Microsoft's CSP edition table does not list Home; whether Home applies it is not stated.",
-    "zh": "模板（本机）：Windows 11 25H2 起；CSP：Windows 11 21H2 起。微软的 CSP 版本表没有列出 Home，Home 上是否执行没有说明。"
+    "en": "Template (Windows 11 client, build 26220): Windows 11 25H2 and later; CSP: Windows 11 21H2 and later. Microsoft's CSP edition table does not list Home; whether Home applies it is not stated.",
+    "zh": "模板（Windows 11 客户端，build 26220）：Windows 11 25H2 起；CSP：Windows 11 21H2 起。微软的 CSP 版本表没有列出 Home，Home 上是否执行没有说明。"
   },
   "privacy_control_camera_device_title": {
     "en": "Camera devices (machine)",
@@ -3488,8 +3488,8 @@
     "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。"
   },
   "privacy_control_app_system_ai_models_editions": {
-    "en": "Only in the 24H2 template set and this host's templates; the CSP has no entry, so editions and minimum build are unknown.",
-    "zh": "只出现在 24H2 模板集和本机模板中；CSP 没有这一条，版本与最低 build 未知。"
+    "en": "Only in the 24H2 template set and the templates of a Windows 11 client (build 26220); the CSP has no entry, so editions and minimum build are unknown.",
+    "zh": "只出现在 24H2 模板集和一台 Windows 11 客户端（build 26220）的模板中；CSP 没有这一条，版本与最低 build 未知。"
   },
   "privacy_control_recall_snapshots_title": {
     "en": "Recall snapshots",
@@ -3588,8 +3588,8 @@
     "zh": "两个现行 runner 镜像（Server 2022 共 162 个任务、Server 2025 共 209 个）都没有 AitAgent 任务，微软文档也没有定义它。现行模板中对应的正式开关是“关闭 Application Telemetry”（AITEnable），本页另列。"
   },
   "privacy_original_k06_reason": {
-    "en": "The CEIP task folder on the Server 2022 and Server 2025 images and on this host (build 26220) holds only Consolidator and UsbCeip, no KernelCeipTask. The formal CEIP switch 'Turn off Windows CEIP' is writable.",
-    "zh": "Server 2022、Server 2025 镜像和本机（build 26220）的客户体验改善计划文件夹里只有 Consolidator 和 UsbCeip，没有 KernelCeipTask。CEIP 的正式总开关“关闭 Windows 客户体验改善计划”已可写。"
+    "en": "The CEIP task folder on the Server 2022 and Server 2025 images and on a Windows 11 client (build 26220) holds only Consolidator and UsbCeip, no KernelCeipTask. The formal CEIP switch 'Turn off Windows CEIP' is writable.",
+    "zh": "Server 2022、Server 2025 镜像和一台 Windows 11 客户端（build 26220）的客户体验改善计划文件夹里只有 Consolidator 和 UsbCeip，没有 KernelCeipTask。CEIP 的正式总开关“关闭 Windows 客户体验改善计划”已可写。"
   },
   "privacy_original_k09_reason": {
     "en": "'Stop SQM completely' is an outcome, not a setting; no single switch covers every product. The formal Windows CEIP opt-out and Application Telemetry are writable, but together they do not cover the SQM of every program; Office and others have their own switches.",
@@ -3608,8 +3608,8 @@
     "zh": "现行的三套模板和策略 CSP 都没有 AllowCrossDeviceSync。Windows 的“跨设备同步”是几个分开的正式控制：跨设备剪贴板、在此设备上继续体验、手机与电脑连接、活动历史，本页各自列出，需要分别选择；设置同步（Sync your settings）一次写两个值，本版不写。"
   },
   "privacy_original_k48_reason": {
-    "en": "No AppPrivacy template (24 policies on Server 2022, 26 on Server 2025, 29 on this host) and no Privacy page of the Policy CSP has LetAppsAccessBluetooth; the CSP page never mentions Bluetooth. Related but different writable entries: apps control radios, apps use trusted devices, apps talk to unpaired devices; none of them stops apps from talking to paired devices, and no Windows policy does.",
-    "zh": "AppPrivacy 模板（Server 2022 的 24 条、Server 2025 的 26 条、本机的 29 条）和策略 CSP 的 Privacy 页都没有 LetAppsAccessBluetooth，CSP 页全文没有 Bluetooth 一词。相近但不相同的已写项：应用控制无线电、应用使用受信任设备、应用与未配对设备通信；三者都不阻止应用与已配对设备通信，没有任何 Windows 策略能做到。"
+    "en": "No AppPrivacy template (24 policies on Server 2022, 26 on Server 2025, 29 on a Windows 11 client, build 26220) and no Privacy page of the Policy CSP has LetAppsAccessBluetooth; the CSP page never mentions Bluetooth. Related but different writable entries: apps control radios, apps use trusted devices, apps talk to unpaired devices; none of them stops apps from talking to paired devices, and no Windows policy does.",
+    "zh": "AppPrivacy 模板（Server 2022 的 24 条、Server 2025 的 26 条、Windows 11 客户端（build 26220）的 29 条）和策略 CSP 的 Privacy 页都没有 LetAppsAccessBluetooth，CSP 页全文没有 Bluetooth 一词。相近但不相同的已写项：应用控制无线电、应用使用受信任设备、应用与未配对设备通信；三者都不阻止应用与已配对设备通信，没有任何 Windows 策略能做到。"
   },
   "privacy_original_k49_reason": {
     "en": "No template set and no Privacy page of the Policy CSP has LetAppsAccessDocumentsFolder; this access has neither a Group Policy nor an MDM policy. It is managed per user and per app in Windows Settings (ms-settings:privacy-documents); Microsoft does not document how those switches are stored, so they cannot be written. Ordinary desktop programs downloaded from the web are not bound by that switch.",
@@ -3701,15 +3701,15 @@
   },
   "privacy_fit_honoured": {
     "en": "Microsoft documents that this edition honours it",
-    "zh": "微软文档写明本机版本执行此项"
+    "zh": "微软文档写明这台电脑的版本执行此项"
   },
   "privacy_fit_ignored": {
     "en": "Microsoft documents that this edition ignores it",
-    "zh": "微软文档写明本机版本忽略此项"
+    "zh": "微软文档写明这台电脑的版本忽略此项"
   },
   "privacy_fit_not_stated": {
     "en": "Microsoft's documentation does not say for this edition",
-    "zh": "微软文档没有说明本机版本是否执行"
+    "zh": "微软文档没有说明这台电脑的版本是否执行"
   },
   "privacy_reason_absent": {
     "en": "no such setting in current Windows",
@@ -3737,7 +3737,7 @@
   },
   "privacy_page_fact_3": {
     "en": "The edition tables Microsoft publishes for these policies list Pro, Enterprise, Education and IoT Enterprise, never Home. Whether Home applies them is not stated; each entry shows whether this host's edition is listed.",
-    "zh": "微软为这些策略公布的版本表只列 Pro、Enterprise、Education、IoT Enterprise，没有列出 Home。Home 上是否执行，微软没有说明；页面在每一项旁标出本机版本是否被列出。"
+    "zh": "微软为这些策略公布的版本表只列 Pro、Enterprise、Education、IoT Enterprise，没有列出 Home。Home 上是否执行，微软没有说明；页面在每一项旁标出这台电脑的版本是否被列出。"
   },
   "privacy_page_fact_4": {
     "en": "Policy entries lock the matching switch in Settings so it cannot be changed there; preference entries are the switch itself and can be changed back at any time.",
