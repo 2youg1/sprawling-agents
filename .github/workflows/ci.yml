@@ -310,11 +310,16 @@ jobs:
       # scratch is cached on its own, keyed per slice because each slice
       # fills a different part of it.
       - uses: actions/cache/restore@v6
+        if: startsWith(matrix.name, 'trybuild-')
         id: trybuild-scratch
         with:
           path: target/tests
           key: trybuild-${{ runner.os }}-${{ matrix.name }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml', 'crates/*/tests/**') }}
-          restore-keys: trybuild-${{ runner.os }}-${{ matrix.name }}-
+          # Seed the new names from the former first count slice, which
+          # held all five trybuild suites. Cargo validates restored inputs.
+          restore-keys: |
+            trybuild-${{ runner.os }}-${{ matrix.name }}-
+            trybuild-${{ runner.os }}-1-
       # xtask's npm gate has tests that read the installed client tree and
       # refuse when it is missing, which is what a bare runner has.
       - uses: ./.github/actions/client-artifacts
@@ -328,7 +333,7 @@ jobs:
         shell: bash
         run: just test-slice target/nextest-archive.tar.zst "$TEST_FILTER"
       - uses: actions/cache/save@v6
-        if: ${{ github.ref == 'refs/heads/main' && steps.trybuild-scratch.outputs.cache-hit != 'true' }}
+        if: ${{ startsWith(matrix.name, 'trybuild-') && github.ref == 'refs/heads/main' && steps.trybuild-scratch.outputs.cache-hit != 'true' }}
         with:
           path: target/tests
           key: trybuild-${{ runner.os }}-${{ matrix.name }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml', 'crates/*/tests/**') }}
