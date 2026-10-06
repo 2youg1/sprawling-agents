@@ -13,11 +13,14 @@
 四种 operation kind：
 - registry_value_hklm 与 registry_value_hkcu：winreg 的安全原始值接口，64 位视图
   （KEY_WOW64_64KEY）；读取保留值缺席、父键是否存在（Privacy.State D58）、类型码与原始字节，
-  访问拒绝与其他 IO 失败分别报告；写入用原类型码与原字节；原值缺席时恢复只删除本值，保留父键；
+  访问拒绝与其他 IO 失败分别报告；写入用原类型码与原字节，父键不存在时创建；原值缺席时恢复只删除
+  本值，保留父键；
   REG_SZ/REG_EXPAND_SZ 的原字节无法无损重写（例如未终止的字符串）时 apply 前拒绝。
 - environment_variable_user：用户持久环境，即 HKCU\Environment 的同名值，读写规则同上；
   每次写入后广播环境变更（WM_SETTINGCHANGE "Environment"），广播与 PATH 安装共用
-  `bin::install::environment_broadcast` 一处实现。新进程环境与持久值分开：已运行的进程与
+  `bin::environment_broadcast` 一处实现。它在库 crate 中：install 是二进制 crate 的模块，库里的
+  环境适配器调用不到那里。广播失败不致命：值已写下，写入报告「广播未送达，新登录后的程序才读到」，
+  与 Install §8-9 的约定相同。新进程环境与持久值分开：已运行的进程与
   sprawling 清洗过的 exec 环境不继承此值，页面不声称它们已生效。
 - scheduled_task_enabled：经受保护安装目录下的 Windows PowerShell（与身份读取共用同一路径解析，
   Privacy.Cli D54）调用 ScheduledTasks 模块：读取任务是否存在、是否启用、去掉启用标志后的任务 XML
@@ -30,6 +33,8 @@
 
 机器作用域（HKLM 与计划任务）的写入经 `bin::privacy::elevation`（D57）；用户作用域在本进程写入，
 从不提升（D63）。
+受保护的 Windows PowerShell 路径（Privacy.Cli D54）在 `bin::privacy::windows` 一处解析，
+身份读取、计划任务适配器、提升与环境广播共用它。
 主机信息：答案带该主机的 EditionID（原样）、它映射到的版本、CurrentBuild 与 UBR 组成的 build、
 DisplayVersion，全部只读 HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion，以及本进程是否已提升。
 EditionID 按前缀映射，规则在 `bin::privacy::windows` 一处定义：Core 为 home，Professional 为 pro，

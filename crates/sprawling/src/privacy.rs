@@ -12,3 +12,5 @@ mod journal;
 mod originals;
 mod state;
 mod target;
+#[cfg(windows)]
+pub(crate) mod windows;

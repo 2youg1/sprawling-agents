@@ -21,6 +21,8 @@ pub mod assembly;
 pub mod audience;
 pub mod console;
 pub mod doctor;
+#[cfg(windows)]
+pub mod environment_broadcast;
 pub mod firstrun;
 pub mod monitor;
 pub mod privacy;
