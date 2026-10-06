@@ -9,6 +9,7 @@ use super::*;
 use crate::worker::RunWorker;
 use crate::worker::fixture::*;
 
+mod live;
 mod rounds;
 
 /// What the loopback supplier answers one request with.
