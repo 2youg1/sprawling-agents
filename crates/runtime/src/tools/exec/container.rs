@@ -24,7 +24,7 @@ mod lifetime;
 pub(crate) use lifetime::ContainerLease;
 
 /// The CLI grammar and info schema to use for one daemon.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum ContainerEngine {
     Docker,
     Podman,

@@ -11,7 +11,7 @@ use std::process::Command;
 use kernel::AxError;
 use serde::{Deserialize, Serialize};
 
-use super::{ContainerRuntime, control, denied};
+use super::{ContainerEngine, ContainerRuntime, control, denied};
 
 #[derive(Clone, Copy)]
 pub(super) enum Confirmation {
@@ -22,6 +22,7 @@ pub(super) enum Confirmation {
 #[derive(Clone, Serialize, Deserialize)]
 pub(super) struct Cleanup {
     pub(super) program: PathBuf,
+    engine: ContainerEngine,
     pub(super) name: String,
     pub(super) copy: PathBuf,
 }
@@ -30,6 +31,7 @@ impl Cleanup {
     pub(super) fn registered(runtime: &ContainerRuntime, name: String, copy: PathBuf) -> Self {
         Self {
             program: runtime.program.clone(),
+            engine: runtime.engine,
             name,
             copy,
         }
@@ -37,7 +39,14 @@ impl Cleanup {
 
     pub(super) fn remove(&self, confirmation: Confirmation) -> Result<(), AxError> {
         let mut remove = Command::new(&self.program);
-        remove.args(["rm", "--force", "--volumes", &self.name]);
+        remove.args(["rm", "--force", "--volumes"]);
+        match self.engine {
+            ContainerEngine::Docker => {}
+            ContainerEngine::Podman => {
+                remove.args(["--time", "0"]);
+            }
+        }
+        remove.arg(&self.name);
         let removed = control::output(&mut remove, control::Wait::Bounded)?;
         if !removed.status.success() {
             if matches!(confirmation, Confirmation::Deletion) {
