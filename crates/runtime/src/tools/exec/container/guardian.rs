@@ -281,7 +281,7 @@ fn read_command(input: &mut impl Read) -> Result<Vec<u8>, AxError> {
             break;
         }
         answer.extend_from_slice(&byte);
-        if byte == [b'\n'] {
+        if byte == *b"\n" {
             break;
         }
     }
