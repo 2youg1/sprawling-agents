@@ -78,6 +78,18 @@ fn run(verb: Verb, read: &Arguments, args: &[String]) -> ExitCode {
     let nth = |n| read.positional(n);
     match verb {
         Verb::Status => status(args),
+        Verb::PrivacyElevatedWrite => {
+            match sprawling::privacy::cli::elevated_write(nth(1).map(String::as_str)) {
+                Ok(()) => ExitCode::SUCCESS,
+                Err(error) => {
+                    eprint!(
+                        "{}",
+                        super::refusal::written(&error, super::refusal::Form::Human)
+                    );
+                    ExitCode::FAILURE
+                }
+            }
+        }
         Verb::PrivacyStatus => match sprawling::privacy::cli::status() {
             Ok(answer) => {
                 println!("{answer}");

@@ -23,6 +23,8 @@ mod coordinator;
     )
 )]
 mod fault;
+#[cfg(windows)]
+mod elevation;
 mod identity;
 mod journal;
 mod originals;
@@ -36,3 +38,5 @@ mod originals;
 mod plan;
 mod state;
 mod target;
+#[cfg(windows)]
+pub(crate) mod windows;

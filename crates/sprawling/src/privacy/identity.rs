@@ -8,12 +8,6 @@
 use kernel::{AxCode, AxError};
 use zeroize::Zeroizing;
 
-/// How many knocks the principal query gets: `PATIENCE * asking::TICK`
-/// is fifteen seconds, because a cold Windows PowerShell takes seconds
-/// to start before it answers.
-#[cfg(windows)]
-const PATIENCE: u32 = 300;
-
 /// The current Windows user's SID, asked of the PowerShell under the
 /// protected installation path.
 ///
@@ -22,6 +16,7 @@ const PATIENCE: u32 = 300;
 /// fails; the refusal never repeats the answer.
 #[cfg(windows)]
 pub(super) fn read() -> Result<Zeroizing<String>, AxError> {
+    use super::windows::{PATIENCE, powershell};
     use crate::doctor::asking::{self, Ended};
 
     let mut command = std::process::Command::new(powershell()?);
@@ -52,30 +47,6 @@ pub(super) fn read() -> Result<Zeroizing<String>, AxError> {
     Err(refused(
         "Windows privacy controls are unavailable on this platform",
     ))
-}
-
-/// Windows PowerShell under `SystemRoot` as HKLM records it, which only
-/// an administrator can change, rather than as PATH or the environment
-/// of this user says.
-#[cfg(windows)]
-fn powershell() -> Result<std::path::PathBuf, AxError> {
-    use winreg::RegKey;
-    use winreg::enums::{HKEY_LOCAL_MACHINE, KEY_QUERY_VALUE, KEY_WOW64_64KEY};
-
-    let installation = RegKey::predef(HKEY_LOCAL_MACHINE)
-        .open_subkey_with_flags(
-            r"SOFTWARE\Microsoft\Windows NT\CurrentVersion",
-            KEY_QUERY_VALUE | KEY_WOW64_64KEY,
-        )
-        .and_then(|key| key.get_value::<std::ffi::OsString, _>("SystemRoot"))
-        .map_err(|_| refused("protected Windows installation path unavailable"))?;
-    let executable = std::path::PathBuf::from(installation)
-        .join(r"System32\WindowsPowerShell\v1.0\powershell.exe");
-    if executable.is_absolute() {
-        Ok(executable)
-    } else {
-        Err(refused("Windows installation path is not absolute"))
-    }
 }
 
 /// The answer, kept only when it is a SID: `S-1-`, an identifier

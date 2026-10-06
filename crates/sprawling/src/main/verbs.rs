@@ -37,6 +37,7 @@ pub(super) enum Verb {
     Install,
     Status,
     PrivacyStatus,
+    PrivacyElevatedWrite,
 }
 
 /// Whether running a verb can change a city or this machine. `--help`
@@ -200,6 +201,16 @@ pub(super) const VERBS: &[Row] = &[
         flags: &[],
         says: "read local privacy operation receipts without changing history or the OS",
         effect: Effect::ReadsOnly,
+        after_dashes: AfterDashes::Refused,
+    },
+    Row {
+        verb: Verb::PrivacyElevatedWrite,
+        name: "privacy elevated-write",
+        aliases: &[],
+        positionals: &[("write", Required)],
+        flags: &[],
+        says: "write one machine-scope privacy value; started only by the privacy page through UAC",
+        effect: Effect::Changes,
         after_dashes: AfterDashes::Refused,
     },
     Row {

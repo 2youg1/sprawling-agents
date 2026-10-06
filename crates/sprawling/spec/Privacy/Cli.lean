@@ -23,8 +23,9 @@
   用恢复前刚读到的值作 expected，输出每个控制各自的结果。
 - privacy reconcile <expected>（Changes）：对未结操作执行人的核对（Privacy 的 Reconcile），
   expected 是 inspect 为该操作的控制打印的读数；不写系统。
-- privacy elevated-write <batch>（Changes）：只供 `bin::privacy::elevation` 的提升子进程使用，
-  见 Privacy.Windows D57；它不经 coordinator、不读日志、不输出读数。
+- privacy elevated-write <write>（Changes）：只供 `bin::privacy::elevation` 的提升子进程使用，
+  write 是一次机器作用域写入的十六进制 JSON，见 Privacy.Windows D57；它不经 coordinator、不读日志、
+  不读系统、不输出读数，校验失败或写入失败时以 AxError 退出失败。
 每个写入动词输出一行 JSON 结果（plan 的拒绝或 Finished 结论），失败输出 AxError 与 recovery
 并退出失败。CLI 是一次性 runner 验收进入生产路径的入口。
 输出不包含 owner、绝对 home 路径；读数与原值按 Privacy.State D52 明文。
@@ -58,8 +59,10 @@ System32\WindowsPowerShell\v1.0\powershell.exe；不从 PATH、SystemRoot
 而 HKLM 需要管理员。路径读失败或不是绝对路径即拒绝。
 命令关闭 profile、非交互，只输出
 [Security.Principal.WindowsIdentity]::GetCurrent().User.Value；
-经 doctor::asking 询问，只保留第一行，最多等 300 次 knock
-（300 × asking::TICK = 15 秒，因为冷启动的 Windows PowerShell 要几秒才开始回答）。
+经 doctor::asking 询问，只保留第一行，最多等 1200 次 knock（1200 × asking::TICK = 一分钟）。
+这个上界由 `bin::privacy::windows` 一处定义，身份查询、计划任务查询与环境广播共用：冷启动的
+Windows PowerShell 在同时有其他构建的工作站上空命令就要 5.1 秒，与整个测试套件并行时身份查询用了
+13.9 秒、任务查询超过 15 秒；一分钟是所见最慢回答的四倍，而查询只在人等页面时等待。
 超时、非零退出、无法启动均以 ToolUnavailable 拒绝，不保留 stopping 诊断中的路径或身份。
 答案必须符合 SID 文法 `S-1-<authority>(-<sub-authority>)+`，每段是非空十进制数字；
 不符合即拒绝，拒绝文字不回显答案。身份放在 Zeroizing 中，不写日志、不落盘。
