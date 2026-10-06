@@ -92,12 +92,14 @@ fn a_run_reads_unshared_where_the_root_cannot_be_written() {
     let limit = NonZeroU64::new(8 << 30).unwrap();
     let asked = Shares::CpuAndMemory { limit };
     let mut cgroups = Cgroups::adopt(root.path(), 4242);
+    let why = if cfg!(target_os = "macos") {
+        Unapplied::Platform
+    } else {
+        Unapplied::NotDelegated
+    };
     assert_eq!(
         cgroups.enter(run, 111, asked),
-        Mark::Unapplied {
-            limit,
-            why: Unapplied::NotDelegated
-        }
+        Mark::Unapplied { limit, why }
     );
     assert_eq!(cgroups.enter(run, 112, Shares::Cpu), Mark::NotAsked);
     assert_eq!(cgroups.held(run), Shares::Unset);
