@@ -23,6 +23,7 @@ pub struct AttachedEndpoint { pub name, pub base_url, pub dialect: DialectKind,
 impl AttachedEndpoint {
     pub fn is_local(&self) -> bool;          // 与 client_for 绕开代理同一依据（reach::is_local）
     pub fn first_auth(&self) -> Result<AuthSpec, AxError>; // 原登记或显式列表首账号
+    pub(crate) fn account_auths(&self) -> Result<Vec<(ServerLabel, AuthSpec)>, AxError>; // 按优先级的账号与凭据
     pub fn has_credential(&self) -> bool;    // 关于凭证，金库外只能回答这一问
     pub fn chat_url(&self) -> String;        // base_url ＋ 该兼容格式自己的路径
     pub fn models_url(&self) -> String;
@@ -33,7 +34,8 @@ pub struct Chosen<'b> { pub endpoint: &'b AttachedEndpoint, pub entry: &'b Model
 impl EndpointBook {
     pub fn new() -> EndpointBook;   pub fn is_empty(&self) -> bool;
     pub fn apply(&mut self, record: &EventRecord) -> Result<(), AxError>;
-    pub fn apply_payload(&mut self, kind: EventKind, data: &Payload) -> Result<(), AxError>;
+    pub fn session_account(&self, addr: &Address, provider: &str) -> Option<&ServerLabel>;
+    pub fn absorb(&mut self, kind: EventKind, run: RunId, addr: Option<&Address>, data: &Payload) -> Result<(), AxError>;
     pub fn select(&self, tag: ModelTag, policy: &BuildingPolicy) -> Result<Chosen<'_>, AxError>;
     pub fn accounts_for_attachment(&self, name: &str, incoming: Option<Vec<ProviderAccount>>)
         -> Option<Vec<ProviderAccount>>; // 登记与重放共用的缺席保留规则
@@ -48,7 +50,7 @@ pub fn selected_payload(ModelTag, &str, &ModelEntry, Option<CeilingSource>) -> R
 - **三种不答，三个码**：这一类标签没人选过＝`E_MODEL_UNCHOSEN`（出路：去设置页接供应方、选模型）；选过的端点已不在＝`E_CONFIG_INVALID`；confidential 楼的选择会让字节离开运行中的机器＝`E_GATE_DENIED`。「没选」单独成码，因为它是一座新城的第一个状态，客户端要按码给「去设置」，而 `E_CONFIG_INVALID` 在别处还答「会话中途换了模型」，那里的出路是开新对话。
 
 - **为何不是 duty pool**：多 Agent 功能未成形之前，职责池没有消费者，而没人读的权威只会漂。降为 `ModelTag` 两值枚举（`Main`／`Digest`）：**标签因为有人按它取模型而存在**，新增一个标签的前提是先有调用方。
-- **两个入口一个读者**：`apply`（重建路径，手里是 record）与 `apply_payload`（写入路径，手里是刚要写的 payload）共用同一套载荷读取，于是「写者以为的」与「重建得到的」不可能分岔。
+- **两个入口一个读者**：`apply`（重建路径，手里是 record）与 `absorb`（写入路径，手里是刚要写的 kind、run、addr 与 payload）共用同一套载荷读取，于是「写者以为的」与「重建得到的」不可能分岔。
 - **confidential 在选型点再守一次**：非回环 endpoint 对 confidential 楼恒拒（`E_GATE_DENIED`）。`gateway::endpoint` 的兜底拒同期改为**按本地性判定**（而非一律拒）：规则是「字节不出运行中的机器」，不是「不准用这个类型」；否则一个回环的 Anthropic 服务器会被误拒。
 - **路径归兼容格式**：人输入 base URL（provider 文档就是那么印的），`messages`／`chat/completions`／`models` 由兼容格式拼。这与 `EndpointConfig.base_url`「完整端点 URL、不拼路径」并不矛盾：适配器保持字面，拼路径的是上层登记面。
 - **`probed` 是这份 models 的来源，不是端点的健康度**：`true` ＝ `GET .../models` 答了，登记的 id 是对端自己说的；`false` ＝ 探测失败而人自己报了型号，城照登。载荷里缺 `probed` 键读作 `true`，于是没有这个键的 `endpoint_attached` 重放不变。
@@ -74,12 +76,14 @@ endpoint_attached.tuning.accounts 为同一列表的 Ledger 形状，旧记录�
 列表内账号的增加、替换、移除和重排用完整非空列表走原 AttachEndpoint，
 不创建第二个 Provider 数据库；缺席列表不移除已迁移声明。
 保留规则只由 EndpointBook::accounts_for_attachment 决定，登记面与重放均调用它。
-校验住 kernel::event::record::validate_provider_accounts；probe 与 adapter
-从 AttachedEndpoint::first_auth 取得凭据，snapshot 保留同一账号列表，
-显式列表不回退原 auth。每次构造 Model adapter 都采用当时列表的首账号；
-Session 没有成功账号绑定，重排后的新 adapter 与重启后构造的 adapter
-仍按列表顺序选取首账号。账号声明影响凭据解析与登记，失败处理由 runtime
-既有的 Provider 策略决定。Accounts 模型以通过账号校验的提交为输入；
+校验住 kernel::event::record::validate_provider_accounts；账号到凭据的唯一换算是
+AttachedEndpoint::account_auths，probe 经 first_auth 取首账号，adapter 取整张表供
+Session 选择，snapshot 保留同一账号列表，
+显式列表不回退原 auth。成功回答将非秘密账号 ID 绑定到房间的 Session，
+重排与重启不改变仍在列表中的绑定；新 Session 清除绑定，被移除的绑定回到首账号。
+旧单账号登记继续使用原 AuthSpec，不构造虚拟账号或重新选择认证头。
+失败处理仍由 runtime 既有的 Provider 策略决定，账号故障转移不在本接口内。
+Accounts 模型以通过账号校验的提交为输入；
 空表、重复引用和非法 header 由 Rust 账户校验回归判断。
 -/
 
@@ -169,3 +173,92 @@ theorem legacy_submissions_preserve_accounts {Account : Type} (held : List Accou
   | cons accounts rest ih =>
     cases accounts <;> simpa [apply, submit, replace] using ih
 end Gateway.Router.Accounts
+
+/-! EndpointBook::absorb(kind,run,addr,data) 是实时与重放共用入口。
+run_started 登记当前 Session 的 Run 成员资格，model_called 只保存成员的最后一次非秘密
+账号尝试，model_returned 只提交成员的尝试，并使用登记的房间而不信任答复的 addr。
+RunFrozen 删除未成功尝试与成员资格，SessionOpened 清该房间的亲和、所有成员资格与暂存；
+snapshot 保存同一投影而不含 Key。派活在 room_for 后将成功亲和传给 adapter，
+不把未定房间当 Session。重排不挪健康账号，被移除的绑定按新表的首账号选择。 -/
+
+/-! D30 当前 Session 成员的成功 model_returned 是唯一绑定提交点；使用原 Ledger 投影而不保存第二份
+账号文件，保证实时、全重放和 snapshot+tail 读同一规则。账号撤销后按首账号选择，
+不会在无错误请求之间轮换。Rust 的生产回归驱动 HTTP、重排和进程重建，投影检查
+覆盖任意失败尝试序列；这些检查是实现符合性证据，不是 Rust 精化证明。
+同一房间允许并发 Run，队列持有者归还后备用 Run 仍可执行，房间忙检查不能保障
+Session 边界；SessionOpened 撤销旧 Run 的成员资格，使后续调用也不能重新绑定。
+资格只由唯一 RunId 的 RunStarted 建立，按房间撤销不影响其它房间，因此不另存 epoch。
+未覆盖的恢复分类、有限换账号预算、搜索设置与账号登记 UI 仍由各自接口后续规定。 -/
+
+namespace Gateway.Router.Affinity
+
+/-- `crates/gateway/src/router/book.rs`：单个房间可有多个 Run，成员资格属于当前 Session。 -/
+structure State (Run Account : Type) where
+  eligible : Run → Bool := fun _ => false
+  pending : Run → Option Account := fun _ => none
+  bound : Option Account := none
+
+inductive Step (Run Account : Type) where
+  | started (run : Run)
+  | attempted (run : Run) (account : Account)
+  | answered (run : Run)
+  | frozen (run : Run)
+  | opened
+
+def apply [DecidableEq Run] (state : State Run Account) : Step Run Account → State Run Account
+  | .started run => { state with eligible := fun other => if other = run then true else state.eligible other }
+  | .attempted run account => if state.eligible run then
+      { state with pending := fun other => if other = run then some account else state.pending other }
+    else state
+  | .answered run => if state.eligible run then
+      { state with pending := fun other => if other = run then none else state.pending other,
+                   bound := (state.pending run).or state.bound }
+    else state
+  | .frozen run =>
+      { state with
+        eligible := fun other => if other = run then false else state.eligible other
+        pending := fun other => if other = run then none else state.pending other }
+  | .opened => {}
+
+/-- 任意 Run 的连续失败调用不能覆盖最后一次成功绑定。 -/
+theorem attempts_preserve_binding [DecidableEq Run] (state : State Run Account)
+    (attempts : List (Run × Account)) :
+    (attempts.foldl (fun current attempt => apply current (.attempted attempt.1 attempt.2)) state).bound = state.bound := by
+  induction attempts generalizing state with
+  | nil => rfl
+  | cons attempt tail ih =>
+    cases eligible : state.eligible attempt.1 <;>
+      simpa [apply, eligible] using ih (apply state (.attempted attempt.1 attempt.2))
+
+inductive RetiredStep (Account : Type) where
+  | attempted (account : Account)
+  | answered
+  | frozen
+
+def retired (run : Run) : RetiredStep Account → Step Run Account
+  | .attempted account => .attempted run account
+  | .answered => .answered run
+  | .frozen => .frozen run
+
+/-- 任意旧 Run 的后续调用、答复和冻结轨迹都不能改变当前绑定，包括另一 Run 已成功的绑定。
+`crates/accounting/src/views/snapshot/tests.rs` 生成该轨迹并在实时、重放与任意快照切点检验。 -/
+theorem retired_trace_preserves_binding [DecidableEq Run] (state : State Run Account)
+    (run : Run) (steps : List (RetiredStep Account)) (h : state.eligible run = false) :
+    (steps.foldl (fun current step => apply current (retired run step)) state).bound = state.bound := by
+  induction steps generalizing state with
+  | nil => rfl
+  | cons step tail ih =>
+    cases step with
+    | attempted account => simpa [retired, apply, h] using ih state h
+    | answered => simpa [retired, apply, h] using ih state h
+    | frozen =>
+      have excluded : (apply state (.frozen run)).eligible run = false := by simp [apply]
+      simpa [retired, apply] using ih (apply state (.frozen run)) excluded
+
+/-- 新 Session 从任意并发状态打开，旧 Run 的任意后续轨迹都不能产生绑定。 -/
+theorem opened_excludes_old_runs [DecidableEq Run] (state : State Run Account)
+    (run : Run) (steps : List (RetiredStep Account)) :
+    (steps.foldl (fun current step => apply current (retired run step)) (apply state .opened)).bound = none := by
+  exact retired_trace_preserves_binding (apply state .opened) run steps rfl
+
+end Gateway.Router.Affinity

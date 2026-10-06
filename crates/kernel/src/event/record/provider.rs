@@ -154,3 +154,11 @@ pub fn validate_provider_accounts(
     }
     Ok(())
 }
+
+/// The non-secret identity of an account attempted by a model call.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct ProviderAccountBinding {
+    pub provider: String,
+    pub account: crate::ServerLabel,
+}

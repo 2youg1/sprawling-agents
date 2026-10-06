@@ -608,4 +608,155 @@ mod tests {
         assert_eq!(entry.id, "m-2");
         assert_eq!(entry.max_output_tokens, None);
     }
+    #[test]
+    fn provider_accounts_keep_the_successful_session_after_reorder_and_restart() {
+        use kernel::event::record::ProviderAccount;
+        use kernel::{Address, IdemKey, RunId, Seq, ServerLabel};
+        let dir = tempfile::tempdir().unwrap();
+        crate::worker::fixture::init_city(dir.path()).unwrap();
+        let (base_url, provider) = fake_openai(
+            &["m-1"],
+            vec![
+                crate::worker::fixture::completion("answered", None),
+                crate::worker::fixture::completion("answered", None),
+                crate::worker::fixture::completion("answered", None),
+                crate::worker::fixture::completion("new session", None),
+            ],
+        );
+        let mut worker = worker_with_provider(dir.path(), &base_url, "m-1").unwrap();
+        let accounts = ["one", "two"].map(|name| ProviderAccount {
+            id: ServerLabel::parse(name).unwrap(),
+            reference: Some(kernel::SecretRef::new("fixture", name).unwrap()),
+            header: None,
+        });
+        let enrol = |worker: &mut crate::worker::RunWorker| {
+            for name in ["one", "two"] {
+                worker
+                    .handle(wire::Command::PutSecret {
+                        realm: "fixture".to_owned(),
+                        name: name.to_owned(),
+                        value: kernel::Sealed::new(Box::new(format!("fixture-value-{name}"))),
+                    })
+                    .unwrap();
+            }
+        };
+        enrol(&mut worker);
+        let attach =
+            |worker: &mut crate::worker::RunWorker, order: Vec<ProviderAccount>, marker: &[u8]| {
+                worker
+                    .handle(wire::Command::AttachEndpoint {
+                        name: wire::ProviderName::parse("house").unwrap(),
+                        base_url: base_url.clone(),
+                        dialect: kernel::DialectKind::OpenAi,
+                        secret: None,
+                        auth_header: None,
+                        admit: vec!["m-1".to_owned()],
+                        tuning: wire::EndpointTuning {
+                            accounts: Some(order),
+                            ..wire::EndpointTuning::default()
+                        },
+                        idem: IdemKey::derive(&RunId::CITY, Seq::FIRST, marker),
+                    })
+                    .unwrap();
+            };
+        let dispatch = |worker: &mut crate::worker::RunWorker, marker: &[u8]| {
+            worker
+                .handle(wire::Command::Dispatch {
+                    addr: Address::parse("lab/room1").unwrap(),
+                    task: "answer once".to_owned(),
+                    goal: "one answer".to_owned(),
+                    policy: kernel::RunPolicy::of(kernel::Mode::Work),
+                    idem: IdemKey::derive(&RunId::CITY, Seq::FIRST, marker),
+                    session: None,
+                    effort: None,
+                    model: None,
+                })
+                .unwrap();
+        };
+        attach(&mut worker, accounts.to_vec(), b"account-order-one");
+        dispatch(&mut worker, b"account-run-one");
+        let recorded = runtime::replay::verify_ledger_dir(
+            &kernel::layout::CityLayout::new(dir.path()).ledger(),
+        )
+        .unwrap();
+        let called = recorded
+            .lines()
+            .iter()
+            .filter_map(|line| match line {
+                runtime::replay::VerifiedLine::Known { record, .. }
+                    if record.kind() == kernel::EventKind::ModelCalled =>
+                {
+                    Some(
+                        record
+                            .data()
+                            .read::<kernel::event::record::ModelCalled>()
+                            .unwrap()
+                            .provider_account,
+                    )
+                }
+                runtime::replay::VerifiedLine::Known { .. }
+                | runtime::replay::VerifiedLine::IgnoredUnknown { .. } => None,
+            })
+            .collect::<Vec<_>>();
+        assert!(
+            called.iter().any(|binding| binding
+                .as_ref()
+                .is_some_and(|binding| binding.account.as_str() == "one")),
+            "production calls must record account identity: {called:?}"
+        );
+        assert_eq!(
+            worker
+                .credentials
+                .book
+                .session_account(&Address::parse("lab/room1").unwrap(), "house")
+                .map(ServerLabel::as_str),
+            Some("one"),
+            "first successful call must enter the live binding projection"
+        );
+        attach(
+            &mut worker,
+            accounts.iter().rev().cloned().collect(),
+            b"account-order-two",
+        );
+        dispatch(&mut worker, b"account-run-two");
+        drop(worker);
+        let mut worker = crate::worker::RunWorker::new(
+            dir.path(),
+            runtime::diagnostics::Diagnostics::off(),
+            crate::worker::fixture::hands(),
+        )
+        .unwrap();
+        worker.read_volume_with(crate::worker::fixture::roomy_volume);
+        enrol(&mut worker);
+        dispatch(&mut worker, b"account-run-three");
+        worker
+            .handle(wire::Command::OpenSession {
+                addr: Address::parse("lab/room1").unwrap(),
+                carry: wire::Carry::Nothing,
+                from: None,
+                idem: IdemKey::derive(&RunId::CITY, Seq::FIRST, b"account-session-new"),
+            })
+            .unwrap();
+        dispatch(&mut worker, b"account-run-four");
+        let auth = provider
+            .exchanges()
+            .into_iter()
+            .filter(|request| request.starts_with("POST "))
+            .map(|request| {
+                request
+                    .lines()
+                    .find(|line| line.to_ascii_lowercase().starts_with("authorization:"))
+                    .unwrap()
+                    .to_owned()
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            auth,
+            [
+                vec!["authorization: Bearer fixture-value-one".to_owned(); 3],
+                vec!["authorization: Bearer fixture-value-two".to_owned()]
+            ]
+            .concat()
+        );
+    }
 }

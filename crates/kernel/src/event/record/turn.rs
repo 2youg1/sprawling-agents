@@ -103,10 +103,15 @@ pub enum SkipReason {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ModelCalled {
+    /// The account attempted, never its credential or reference.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provider_account: Option<super::ProviderAccountBinding>,
     /// The four segment hashes, in prefix order.
     #[cfg_attr(feature = "schema", schemars(with = "Vec<String>"))]
+    #[serde(default)]
     pub segments: Vec<B3Hash>,
-    /// The endpoint's own model id, as the request spelled it.
+    /// The endpoint's own model id; absent in legacy incomplete call records.
+    #[serde(default)]
     pub model: String,
 }
 

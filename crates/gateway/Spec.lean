@@ -344,6 +344,7 @@ kernel 已有码，语义照 Custody 一节；不新增码。
 - D27 Responses stream 在 EOF 后投影出最后有效 terminal 与首个 reported error，复用最终解析器：`crates/gateway/spec/Dialect/Responses.lean`
 - D28 保持原登记事件与 Vault 格式，以完整有序列表为一次原子替换，避免逐账号命令：`crates/gateway/spec/Router.lean`
 - D29 显式账号列表生效时拒绝旧凭据字段：`crates/gateway/spec/Router.lean`
+- D30 当前 Session 成员的成功 model_returned 是唯一绑定提交点；使用原 Ledger 投影而不保存第二份：`crates/gateway/spec/Router.lean`
 - D31 隐私 owner 的只读核对在 Vault 内完成，不交出原值、不运行 probe：`crates/gateway/spec/Credential.lean`
 -/
 

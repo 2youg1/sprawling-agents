@@ -164,6 +164,14 @@ impl<C: FnMut() -> Result<TimeMs, AxError>> Warmed<C> {
 }
 
 impl<C: FnMut() -> Result<TimeMs, AxError>> Model for Warmed<C> {
+    fn provider_account(&self) -> Option<kernel::event::record::ProviderAccountBinding> {
+        self.model.provider_account()
+    }
+
+    fn select_account(&mut self, selection: kernel::model::AccountSelection) {
+        self.model.select_account(selection);
+    }
+
     fn call(&mut self, req: &ModelRequest) -> Result<ModelReturn, AxError> {
         self.recorded(req, |model| model.call(req))
     }

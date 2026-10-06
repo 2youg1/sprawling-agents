@@ -161,21 +161,25 @@ fn encoding_fixture() -> StandingFolds {
         ),
     ];
     let mut folds = StandingFolds::empty(Path::new("."));
-    for (seq, (kind, data)) in (1..).zip(
-        records.into_iter().chain(
-            crate::views::snapshot::tests::provider_registrations()
-                .into_iter()
-                .map(|(kind, value)| {
-                    (
-                        kind,
-                        kernel::Payload::new(value.as_object().unwrap().clone()).unwrap(),
-                    )
-                }),
-        ),
+    for (seq, (run, kind, data)) in (1..).zip(
+        records
+            .into_iter()
+            .map(|(kind, data)| (RunId::from_bytes([7; 16]), kind, data))
+            .chain(
+                crate::views::snapshot::tests::provider_registrations()
+                    .into_iter()
+                    .map(|(run, kind, value)| {
+                        (
+                            run,
+                            kind,
+                            kernel::Payload::new(value.as_object().unwrap().clone()).unwrap(),
+                        )
+                    }),
+            ),
     ) {
         let record = EventRecord::from_draft(
             kernel::EventDraft {
-                run: RunId::from_bytes([7u8; 16]),
+                run,
                 t: kernel::TimeMs::new(1_000),
                 who: room.as_str().to_owned(),
                 addr: Some(room.clone()),
