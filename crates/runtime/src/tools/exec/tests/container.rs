@@ -20,6 +20,7 @@ struct Daemon {
     program: PathBuf,
 }
 
+#[cfg(test)]
 #[cfg(unix)]
 impl Daemon {
     fn open() -> Self {
@@ -69,6 +70,8 @@ start)
   echo target-output
   exit 91 ;;
 rm)
+  if [ -f remove-retried ]; then touch remove-retried-again; fi
+  if [ -f remove-attempted ]; then touch remove-retried; fi
   touch remove-attempted
   if [ ! -f owned ]; then echo absent >&2; exit 44; fi
   if [ -f fail-remove ]; then echo refused >&2; exit 43; fi
@@ -92,6 +95,26 @@ esac
             limits(),
             ContainerRuntime::probe(ContainerEngine::Docker, self.program.clone()).unwrap(),
         )
+    }
+
+    fn guardian(&self) -> PathBuf {
+        use std::os::unix::fs::PermissionsExt;
+        let executable = std::env::current_exe().unwrap();
+        let executable = executable.to_str().unwrap().replace('\'', "'\\''");
+        let exited = self.dir.path().join("guardian-exited");
+        let exited = exited.to_str().unwrap().replace('\'', "'\\''");
+        let harness = self.dir.path().join("guardian");
+        std::fs::write(
+            &harness,
+            format!(r#"#!/bin/bash
+set -eu -o pipefail
+export SPRAWLING_GUARD_RECORD="$2"
+'{executable}' --exact tools::exec::tests::container::guardian_process --ignored --nocapture --quiet | awk '/^ready$/ {{print; fflush()}}'
+touch '{exited}'
+"#),
+        ).unwrap();
+        std::fs::set_permissions(&harness, std::fs::Permissions::from_mode(0o700)).unwrap();
+        harness
     }
 
     fn exists(&self) -> bool {
@@ -165,6 +188,7 @@ fn a_refused_cleanup_keeps_the_identity_and_copy_until_retry() {
     assert!(!daemon.exists() && !copy.exists());
 }
 
+#[cfg(test)]
 #[test]
 #[ignore = "requires a disposable Linux daemon and a prepared immutable image with python3 and /bin/sh"]
 fn a_real_daemon_executes_and_cleans_the_production_container() {
@@ -214,7 +238,7 @@ assert pathlib.Path('/sys/fs/cgroup/memory.max').read_text().strip()=='67108864'
 assert pathlib.Path('/sys/fs/cgroup/pids.max').read_text().strip()=='64'
 q,p=map(int,pathlib.Path('/sys/fs/cgroup/cpu.max').read_text().split())
 assert q*1000==p*1250
-print('five axes checked')
+print('filesystem, network, UID and cgroup settings checked')
 "#;
     let answer = tool
         .invoke(&call(
@@ -325,12 +349,51 @@ print('cpu seconds per wall second',ratio)
             json!("backgrounded")
         );
         assert_eq!(short.standing(&scope).unwrap().len(), 1);
+        let inventory = std::process::Command::new(&program)
+            .args(["container", "ls", "--format", "{{.Names}}"])
+            .output()
+            .unwrap();
+        assert!(inventory.status.success());
+        let name = String::from_utf8(inventory.stdout)
+            .unwrap()
+            .lines()
+            .find(|name| name.starts_with(&format!("sprawling-sandbox-{}-", std::process::id())))
+            .unwrap()
+            .to_owned();
+        let columns = match engine {
+            ContainerEngine::Docker => vec!["-eo", "pid"],
+            ContainerEngine::Podman => vec!["hpid"],
+        };
+        let tree = std::process::Command::new(&program)
+            .args(["top", &name])
+            .args(columns)
+            .output()
+            .unwrap();
+        assert!(tree.status.success());
+        let pids: Vec<u32> = String::from_utf8(tree.stdout)
+            .unwrap()
+            .lines()
+            .skip(1)
+            .map(|line| line.trim().parse().unwrap())
+            .collect();
+        assert!(pids.len() >= 2, "the target must have a live descendant");
         if halt {
             short.halt(Some(&scope)).unwrap();
         }
         drop(background);
         short.harvest(run).unwrap();
         assert!(short.standing(&scope).unwrap().is_empty());
+        #[cfg(target_os = "linux")]
+        for pid in pids {
+            let process = PathBuf::from(format!("/proc/{pid}"));
+            for _ in 0..1000 {
+                if !process.exists() {
+                    break;
+                }
+                std::thread::sleep(std::time::Duration::from_millis(10));
+            }
+            assert!(!process.exists(), "cleanup retained a container descendant");
+        }
     }
     let inventory = std::process::Command::new(program)
         .args(["container", "ls", "--all", "--format", "{{.Names}}"])
@@ -379,9 +442,7 @@ fn guardian_parent_process() {
 #[cfg(unix)]
 #[test]
 fn guardian_eof_waits_for_late_create_and_reaps_its_client() {
-    use std::os::unix::fs::PermissionsExt;
     use std::process::{Command, Stdio};
-    use std::time::Duration;
 
     for lost_response in [false, true] {
         let daemon = Daemon::open();
@@ -391,14 +452,7 @@ fn guardian_eof_waits_for_late_create_and_reaps_its_client() {
 
         let work = tempfile::tempdir().unwrap();
         let executable = std::env::current_exe().unwrap();
-        let harness = daemon.dir.path().join("guardian");
-        std::fs::write(&harness, r#"#!/bin/bash
-set -eu -o pipefail
-export SPRAWLING_GUARD_RECORD="$2"
-"$SPRAWLING_GUARD_TEST_EXE" --exact tools::exec::tests::container::guardian_process --ignored --nocapture --quiet | awk '/^ready$/ {print; fflush()}'
-touch "$SPRAWLING_GUARD_EXITED"
-"#).unwrap();
-        std::fs::set_permissions(&harness, std::fs::Permissions::from_mode(0o700)).unwrap();
+        let harness = daemon.guardian();
         std::fs::write(daemon.dir.path().join("create-barrier"), "").unwrap();
         assert!(
             Command::new("mkfifo")
@@ -415,25 +469,14 @@ touch "$SPRAWLING_GUARD_EXITED"
                 "--ignored",
                 "--nocapture",
             ])
-            .env("SPRAWLING_GUARD_TEST_EXE", &executable)
             .env("SPRAWLING_GUARD_DAEMON", &daemon.program)
             .env("SPRAWLING_GUARD_HARNESS", &harness)
             .env("SPRAWLING_GUARD_WORK", work.path())
-            .env("SPRAWLING_GUARD_EXITED", &exited)
             .stdout(Stdio::null())
             .stderr(Stdio::inherit())
             .spawn()
             .unwrap();
-        let wait = |path: &std::path::Path| {
-            for _ in 0..1000 {
-                if path.exists() {
-                    return;
-                }
-                std::thread::sleep(Duration::from_millis(10));
-            }
-            panic!("fixture condition did not arrive: {}", path.display());
-        };
-        wait(&daemon.dir.path().join("create-entered"));
+        wait_for_fixture(&daemon.dir.path().join("create-entered"));
         let creator = std::fs::read_to_string(daemon.dir.path().join("create-parent"))
             .unwrap()
             .trim()
@@ -444,7 +487,7 @@ touch "$SPRAWLING_GUARD_EXITED"
         parent.wait().unwrap();
         if creator == parent_id {
             // The parent-owned client can outlive a guardian that accepted absence.
-            wait(&exited);
+            wait_for_fixture(&exited);
         }
         let absent = Command::new(&daemon.program)
             .args(["container", "ls", "--all", "--format", "{{.Names}}"])
@@ -452,8 +495,8 @@ touch "$SPRAWLING_GUARD_EXITED"
             .unwrap();
         assert!(absent.status.success() && absent.stdout.is_empty());
         std::fs::write(daemon.dir.path().join("create-fifo"), "release\n").unwrap();
-        wait(&daemon.dir.path().join("create-completed"));
-        wait(&exited);
+        wait_for_fixture(&daemon.dir.path().join("create-completed"));
+        wait_for_fixture(&exited);
         let copy = PathBuf::from(std::fs::read_to_string(daemon.dir.path().join("copy")).unwrap());
         let released = !daemon.exists() && !copy.exists();
         if daemon.exists() {
@@ -478,5 +521,119 @@ touch "$SPRAWLING_GUARD_EXITED"
                 .success(),
             "guardian must reap the create client before it exits"
         );
+    }
+}
+
+#[cfg(unix)]
+fn wait_for_fixture(path: &std::path::Path) {
+    for _ in 0..1000 {
+        if path.exists() {
+            return;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+    panic!("fixture condition did not arrive: {}", path.display());
+}
+
+#[cfg(unix)]
+#[test]
+fn guardian_timeout_retains_the_member_until_harvest() {
+    use std::process::Command;
+    use std::time::Duration;
+
+    for lost_response in [false, true] {
+        let daemon = Daemon::open();
+        let work = tempfile::tempdir().unwrap();
+        let backlog = patient();
+        let runtime = ContainerRuntime::probe(ContainerEngine::Docker, daemon.program.clone())
+            .unwrap()
+            .guarded(daemon.guardian());
+        let tool = ExecTool::new(
+            setup(work.path(), None, None),
+            Box::new(EchoSandbox::new()),
+            backlog.clone(),
+        )
+        .unwrap()
+        .with_container(limits(), runtime);
+        let scope = tool.setup.domain.clone();
+        let run = tool.setup.run;
+        if lost_response {
+            std::fs::write(daemon.dir.path().join("fail-create"), "").unwrap();
+            std::fs::write(daemon.dir.path().join("fail-remove"), "").unwrap();
+        }
+        std::fs::write(daemon.dir.path().join("create-barrier"), "").unwrap();
+        assert!(
+            Command::new("mkfifo")
+                .arg(daemon.dir.path().join("create-fifo"))
+                .status()
+                .unwrap()
+                .success()
+        );
+        std::thread::scope(|threads| {
+            let (answer, response) = std::sync::mpsc::channel();
+            let invocation = &tool;
+            threads.spawn(move || {
+                answer
+                    .send(
+                        invocation
+                            .invoke(&call(json!({"program":{"path":"/bin/true","args":[]}})))
+                            .map(|_| ()),
+                    )
+                    .unwrap();
+            });
+            wait_for_fixture(&daemon.dir.path().join("create-entered"));
+            let returned = response.recv_timeout(Duration::from_secs(10));
+            // Release even a regressed unbounded parent before joining the scoped thread.
+            if returned.is_err() {
+                std::fs::write(daemon.dir.path().join("create-fifo"), "release\n").unwrap();
+            }
+            assert_eq!(
+                returned.unwrap().unwrap_err().code(),
+                &kernel::AxCode::SandboxDenied
+            );
+            let copy =
+                PathBuf::from(std::fs::read_to_string(daemon.dir.path().join("copy")).unwrap());
+            assert!(copy.is_dir());
+            assert_eq!(backlog.standing(&scope).unwrap().len(), 1);
+            assert!(backlog.harvest(run).is_err());
+            assert!(!daemon.dir.path().join("guardian-exited").exists());
+            let absent = Command::new(&daemon.program)
+                .args(["container", "ls", "--all", "--format", "{{.Names}}"])
+                .output()
+                .unwrap();
+            assert!(absent.status.success() && absent.stdout.is_empty());
+            std::fs::write(daemon.dir.path().join("create-fifo"), "release\n").unwrap();
+            wait_for_fixture(&daemon.dir.path().join("create-completed"));
+            if lost_response {
+                wait_for_fixture(&daemon.dir.path().join("remove-attempted"));
+                std::fs::remove_file(daemon.dir.path().join("owned")).unwrap();
+                wait_for_fixture(&daemon.dir.path().join("remove-retried"));
+                wait_for_fixture(&daemon.dir.path().join("remove-retried-again"));
+                assert!(backlog.harvest(run).is_err());
+                assert!(copy.is_dir());
+                assert_eq!(backlog.standing(&scope).unwrap().len(), 1);
+                assert!(!daemon.dir.path().join("guardian-exited").exists());
+                std::fs::write(daemon.dir.path().join("owned"), "").unwrap();
+                std::fs::remove_file(daemon.dir.path().join("fail-remove")).unwrap();
+            }
+            wait_for_fixture(&daemon.dir.path().join("guardian-exited"));
+            for _ in 0..1000 {
+                if backlog.harvest(run).is_ok() {
+                    break;
+                }
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            assert!(backlog.standing(&scope).unwrap().is_empty());
+            assert!(!daemon.exists() && !copy.exists());
+            let pid = std::fs::read_to_string(daemon.dir.path().join("create-pid")).unwrap();
+            assert!(
+                !Command::new("kill")
+                    .args(["-0", pid.trim()])
+                    .status()
+                    .unwrap()
+                    .success(),
+                "create client must be reaped before harvest forgets its owner"
+            );
+        });
     }
 }

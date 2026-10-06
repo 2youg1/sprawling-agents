@@ -12,8 +12,8 @@ use kernel::{AxError, ContainerLimits};
 
 use crate::backlog::{Exit, Unseen};
 
-use super::cleanup::Cleanup;
-use super::guardian::Guard;
+use super::cleanup::{Cleanup, Confirmation};
+use super::guardian::{Guard, Launch};
 use super::{ContainerLaunch, ContainerRuntime, control, denied, inspection};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -24,10 +24,18 @@ enum State {
     Removed,
 }
 
+enum Creation {
+    Unsubmitted,
+    Pending,
+    Confirmed,
+    Unknown,
+}
+
 pub(crate) struct ContainerLease {
     runtime: ContainerRuntime,
     cleanup: Cleanup,
     guardian: Option<Guard>,
+    creation: Creation,
     limits: ContainerLimits,
     state: State,
     attach: Option<Child>,
@@ -45,6 +53,7 @@ impl ContainerLease {
             cleanup: Cleanup::registered(&runtime, name, copy),
             runtime,
             guardian: None,
+            creation: Creation::Unsubmitted,
             limits,
             state: State::Registered,
             attach: None,
@@ -65,18 +74,6 @@ impl ContainerLease {
                 "this member already started or was stopped",
             ));
         }
-        if let Some(harness) = &self.runtime.guardian {
-            self.guardian = Some(Guard::spawn(
-                harness,
-                &self.cleanup,
-                ready,
-                err.try_clone()
-                    .map_err(|err| denied("share guardian failure output", err))?,
-            )?);
-        }
-        let mut image = self.runtime.command();
-        image.args(["image", "inspect", self.limits.image.as_str()]);
-        inspection::image(&control::checked(&mut image)?, &self.limits)?;
         let mut create = self.runtime.create_command(
             &self.limits,
             &ContainerLaunch {
@@ -85,7 +82,29 @@ impl ContainerLease {
                 command: target,
             },
         )?;
-        control::checked(&mut create)?;
+        if let Some(harness) = &self.runtime.guardian {
+            self.guardian = Some(Guard::spawn(
+                harness,
+                Launch {
+                    cleanup: &self.cleanup,
+                    command: &create,
+                },
+                ready,
+                err.try_clone()
+                    .map_err(|err| denied("share guardian failure output", err))?,
+            )?);
+        }
+        let mut image = self.runtime.command();
+        image.args(["image", "inspect", self.limits.image.as_str()]);
+        inspection::image(&control::checked(&mut image)?, &self.limits)?;
+        if let Some(guardian) = &mut self.guardian {
+            self.creation = Creation::Pending;
+            guardian.create()?;
+        } else {
+            self.creation = Creation::Unknown;
+            control::checked(&mut create)?;
+        }
+        self.creation = Creation::Confirmed;
         let mut inspect = self.inspect_command();
         inspection::stopped(
             &control::checked(&mut inspect)?,
@@ -176,7 +195,20 @@ impl ContainerLease {
 
     fn remove(&mut self) -> Result<(), AxError> {
         self.state = State::Stopping;
-        self.cleanup.remove()?;
+        let confirmation = match self.creation {
+            Creation::Pending => {
+                self.guardian
+                    .as_mut()
+                    .ok_or_else(|| denied("clean up the container", "missing guardian owner"))?
+                    .finish_cleanup()?;
+                self.state = State::Removed;
+                return Ok(());
+            }
+            Creation::Unknown => Confirmation::Deletion,
+            Creation::Unsubmitted | Creation::Confirmed => Confirmation::Absence,
+        };
+        self.cleanup.remove(confirmation)?;
+        self.creation = Creation::Confirmed;
         if let Some(child) = &mut self.attach {
             match child.try_wait() {
                 Ok(Some(_)) => {}
@@ -192,10 +224,10 @@ impl ContainerLease {
             }
         }
         self.cleanup.release_copy()?;
-        self.state = State::Removed;
         if let Some(guardian) = &mut self.guardian {
             guardian.disarm()?;
         }
+        self.state = State::Removed;
         Ok(())
     }
 }
