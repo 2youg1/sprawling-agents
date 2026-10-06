@@ -58,8 +58,6 @@ irm https://raw.githubusercontent.com/2youg1/sprawling-agents/main/install.ps1 |
 
 Prebuilt archives support Windows x86-64, macOS on Apple silicon and Linux x86-64. Use the [release list](https://github.com/2youg1/sprawling-agents/releases) for manual downloads and the [installation guide](docs/getting-started.md#1-install) for version selection, verification and source builds with Nix.
 
-The AUR package is not published yet. Release builds generate and validate its PKGBUILD and .SRCINFO; publication requires `AUR_SSH_KEY`. Once published, Arch Linux x86-64 users can inspect the package and run `makepkg -si` in its checkout, then update with `git pull --ff-only && makepkg -si`.
-
 After installation, all channels use the same command:
 
 ```sh

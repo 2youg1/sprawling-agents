@@ -62,7 +62,7 @@ Cargo bin 目录答 CargoOrBinstall，需要在 Cargo 编译与 binstall 下载�
 归档安装器复制二进制后写来源标记，卸载移除标记；标记名只由
 `sprawling::release::ARCHIVE_ORIGIN_FILE` 定义，旁边仍有 skills 的解压归档同属 Archive。
 明确的 `SPRAWLING_INSTALL_CHANNEL` 手动选择接受 npm/bun/cargo/binstall/archive/aur。
-Aur 的识别与安装布局由 sprawling Install D53 规定；GitHub 比较不保证外部包定义已同步。
+Aur 的识别与安装布局由 sprawling Install D54 规定；GitHub 比较不保证外部包定义已同步。
 
 `command` 只有来源明确时才给出；`alternatives` 给出不明确来源允许的精确命令。
 页面选择必须是候选之一，清空或收到新答复后没有默认选择，Copy 只接收明确命令

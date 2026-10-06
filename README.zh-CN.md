@@ -58,8 +58,6 @@ irm https://raw.githubusercontent.com/2youg1/sprawling-agents/main/install.ps1 |
 
 预编译归档支持 Windows x86-64、Apple 芯片的 macOS 与 Linux x86-64；手动下载见[发行列表](https://github.com/2youg1/sprawling-agents/releases)，版本选择、验证与 Nix 源码构建见[安装指南](docs/getting-started.zh-CN.md#1-安装)。
 
-AUR 包尚未发布。发行构建生成并验证 PKGBUILD 与 .SRCINFO，发布需要 `AUR_SSH_KEY`。发布后，Arch Linux x86-64 用户可在包的 checkout 中检查定义并运行 `makepkg -si`，更新用 `git pull --ff-only && makepkg -si`。
-
 所有渠道安装后使用同一条命令：
 
 ```sh
