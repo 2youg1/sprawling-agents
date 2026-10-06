@@ -282,7 +282,7 @@ Windows 上先以 `symlink_metadata` 读取安装目录 entry；文件 symlink�
 查找、规范化、移动、复制 helper 或启动 helper 失败均以 `E_STORAGE_FATAL` 返回，保留 OS 错误与目标路径；
 移动之后的失败可能已释放安装名称，恢复要求从原归档重复 install，不承诺事务回滚。
 原进程退出后 OS 删除临时文件的成功属于环境验收，断电或其他进程继续占用临时映像可能留下临时文件，
-不能把 helper 已安排当成物理删除的证明。
+不能把 helper 已安排当成物理删除的证明。 临时映像必须实际消失才算检查完成，等待终止由 `.config/nextest.toml` 的默认 profile 管理，fixture 不另定义清理时限。
 
 派生检查 `bin::install::tests::windows_uninstall_removes_its_running_executable` 在独立临时目录运行
 测试 EXE 的副本，调用同一个 `displace`，要求子进程成功、安装 EXE 缺席、隔离 TEMP 内无残留；
