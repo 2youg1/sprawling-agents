@@ -27,7 +27,9 @@ command job 不另设同值上限：两只同值 job 嵌套时撞限消息落到
 只获这次副本的继承读写 ACL，不获源树 ACL，无网络 capability 与 loopback exemption。
 D57：显式环境声明的 CARGO_HOME 与 RUSTUP_HOME 可获得该 profile SID 的继承
 read/execute ACE，不授 write、delete 或 ACL 修改权限。未声明的工具目录不自动授权。
-授予与撤销在跨 harness 的命名 mutex 内读取并改写当前 DACL；声明根内的普通目录与文件先由 Rust 枚举，不跟随子 reparse point；
+授予与撤销在跨 Windows session 的 Global 命名 mutex 内读取并改写当前 DACL；
+mutex 的 DACL 只给 Authenticated Users synchronize/modify-state，不给 WRITE_DAC，
+因此其它账户的授权操作也使用同一排他机制，而文件的 WRITE_DAC 仍由 OS 单独检查。声明根内的普通目录与文件先由 Rust 枚举，不跟随子 reparse point；
 叶子只在声明根和启用 DACL protection 的后代授予 ACE，避免保护位阻止继承。
 撤销只移除本次
 唯一 SID，不恢复旧 snapshot，因此另一个仍运行的 SID 授权不会丢失。
