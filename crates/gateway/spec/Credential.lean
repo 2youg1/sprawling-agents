@@ -92,6 +92,11 @@ impl Custodian {
 重导出为 `gateway::verify_platform_identity`，只读取
 平台 Vault，并在模块内部比较 stored 与 observed；返回 Result<(), AxError>，
 不返回原值，不调用 Sealed::expose，不使用 provider 的环境遮蔽，不运行 probe。
+身份比较的唯一 authority 是 gateway 根接口重导出的
+`verify_identity_binding(reference, observed, read)`；read 是 FnOnce(&SecretRef)
+到 Result<Option<Zeroizing<String>>, AxError> 的读取缝，生产端调用现有
+KeyringVault::get，派生检查提供内存条目，函数只交出 Result<(), AxError>。
+此缝不新增 Vault、不改变凭据位置、不允许写入，也不把 stored identity 返回调用方。
 缺失返回 CredentialMissing，不匹配返回 ConfigInvalid，平台拒绝保留错误码但
 移除可能包含私密输入的诊断文字；任何失败都不写、删除或重建引用。
 此入口核对真实身份与既有引用，不建立 journal 的随机身份绑定，不授予写权限。

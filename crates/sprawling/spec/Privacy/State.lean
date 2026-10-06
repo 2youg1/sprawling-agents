@@ -49,6 +49,14 @@ Decode 在构造时移除输入文字，内部 Debug 与公开 AxError 都遵守
 此边界只核对 owner，不证明 journal 与引用的随机身份绑定；后续 writer 必须
 同时建立 journal identity 绑定，不能以本查询接口授权 apply/restore。
 下面的任意快照轨迹性质复用已确认的 HistoryQuery 契约。
+派生检查在 privacy::cli::tests：proptest 生成身份、原值字节、operation 数量及
+包含 apply/restore、NotApplied、Unknown 与未结操作的合法历史快照序列，
+经真实 status_at 与 gateway::verify_identity_binding 的 Vault 读取缝重放。
+foreign_trace_discloses_nothing 对应 foreign_snapshot_traces_disclose_nothing；
+failed_identity_trace_discloses_nothing 对应 failed_identity_snapshot_traces_disclose_nothing。
+同账号的非空快照必须成功返回摘要，以免拒绝所有查询让性质空洞成立；
+跨账号无摘要，身份读取失败不访问 Vault，每次查询保持快照字节不变。
+有限生成规模只限制测试资源，不把 Lean 的任意轨迹长度证明改成有限保证。
 -/
 namespace Sprawling.Privacy.HistoryQuery
 
@@ -75,4 +83,3 @@ theorem failed_identity_trace_discloses_nothing {α : Type}
   cases owner <;> simp [disclose]
 
 end Sprawling.Privacy.HistoryQuery
-
