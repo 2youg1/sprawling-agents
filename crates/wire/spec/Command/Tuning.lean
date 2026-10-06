@@ -41,3 +41,7 @@ EndpointSummary { name, label, base_url, dialect, models, local, has_credential 
 - **`EndpointSummary` 长出 `label`**：缺省即 `name`，所以页面永远不必替一个没写显示名的端点决定显示什么。
 - **`proxying` 跟着 tuning 走，因而探测与调用恒用同一个决定**（WIRE_V 27→28）。一个只在调用时生效的代理设置，会让表单上那份分段读数描述一条真正的调用不会走的路，而那份读数存在的全部意义就是告诉人调用停在了哪一段。`Option` 而非值：线上的缺席是「没人定过」，装配层把它翻成城的默认值（`ExceptLocal`），于是 `gateway` 一侧拿到的是一个已经定下来的值，没有第三种状态要每一个调用方再答一次。
 -/
+
+/-! EndpointTuning 的可缺席 accounts 按输入顺序替换完整账号表；每行 id 为 ServerLabel，
+reference 为可缺席 SecretRef，header 为可缺席字符串。无列表保留旧登记，显式非空表
+由 gateway::router::tuning::validate_accounts 校验。凭据原文只走 enrolment。 -/

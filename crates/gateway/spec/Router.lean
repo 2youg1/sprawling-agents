@@ -59,3 +59,40 @@ pub fn selected_payload(ModelTag, &str, &ModelEntry, Option<CeilingSource>) -> R
 
 **重开的参数**：设置面上有人能为一个标签指定备用端点与备用模型，且 `runtime` 侧有一处在失败时读它。那时备用端点与 §8-6 的准入一起设计，因为何时改投备用端点只能由退避节奏回答。
 -/
+
+/-!
+## 有序 Provider accounts
+
+`kernel::event::record::ProviderAccount` 为账号声明，只含 ServerLabel id、可缺席的
+SecretRef reference 与可缺席的 header；无 reference 为显式匿名账号。
+EndpointTuning.accounts 缺席表示保留已有显式列表，尚未迁移的登记仍读原 auth。
+显式列表必须非空、id/reference 不重复，匿名账号不得带 header。
+endpoint_attached.tuning.accounts 为同一列表的 Ledger 形状，旧记录缺席仍可读。
+账号列表的创建、替换、移除和重排走原 AttachEndpoint，不创建第二个 Provider 数据库。
+校验住 gateway::router::tuning::validate_accounts；probe、adapter 与 snapshot
+都读 AttachedEndpoint::first_auth，显式列表不回退原 auth。
+D28：保持原登记事件与 Vault 格式，以完整有序列表为一次原子替换，避免逐账号命令
+产生半个登记；拒绝空列表以免误作匿名或回退。Session 亲和与故障转移由运行记录规定。
+-/
+namespace Gateway.Router.Accounts
+/-- 列表缺席才使用旧登记；显式空表不是旧登记。 -/
+def effective {Account : Type} (legacy : Account) (stated : Option (List Account)) : List Account :=
+  match stated with
+  | none => [legacy]
+  | some accounts => accounts
+/-- 整次重排替换列表，缺席的更新保留已迁移列表。 -/
+def replace {Account : Type} (held incoming : Option (List Account)) : Option (List Account) :=
+  incoming.or held
+theorem explicit_does_not_fall_back {Account : Type} (legacy : Account) (accounts : List Account) :
+    effective legacy (some accounts) = accounts := by rfl
+theorem absent_update_preserves {Account : Type} (held : Option (List Account)) :
+    replace held none = held := by rfl
+theorem updates_preserve_explicit {Account : Type} (held : List Account) (updates : List (Option (List Account))) :
+    (updates.foldl replace (some held)).isSome = true := by
+  induction updates generalizing held with
+  | nil => rfl
+  | cons update rest ih =>
+    cases update with
+    | none => exact ih held
+    | some accounts => exact ih accounts
+end Gateway.Router.Accounts
