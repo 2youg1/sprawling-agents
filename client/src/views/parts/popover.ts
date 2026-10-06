@@ -30,6 +30,12 @@ export interface PopoverRow {
   readonly chosen?: boolean | undefined;
 }
 
+export interface PopoverBinding {
+  readonly keys: (event: KeyboardEvent) => boolean;
+  readonly controls: readonly string[];
+  readonly pointColumn: (columnId: string) => void;
+}
+
 export interface PopoverColumn {
   // Unique within one popover.
   readonly id: string;

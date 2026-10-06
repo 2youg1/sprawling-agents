@@ -33,9 +33,7 @@ long enough to scroll gets a filter; a list of six does not. -->
   import { ui } from "../../ui";
   import Glyph from "../parts/glyph.svelte";
   import type { Pill } from "./composer";
-
-  // How many rows a list holds before a filter earns its place.
-  const FILTER_AFTER = 8;
+  import { FILTER_AFTER } from "./composer";
 
   interface Props {
     readonly spec: Pill;

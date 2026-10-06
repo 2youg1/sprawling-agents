@@ -31,6 +31,7 @@
   import Record from "./record.svelte";
   import TypedLine from "./typed_line.svelte";
   import Popover from "../parts/popover.svelte";
+  import type { PopoverBinding } from "../parts/popover";
   import Unkept from "../parts/unkept.svelte";
   import {
     draftAt,
@@ -102,7 +103,7 @@
   // The verb that row spells, which a Tab that cannot lengthen the typed
   // prefix takes into the box.
   let pointed = $state<string | undefined>(undefined);
-  let menuKeys: ((event: KeyboardEvent) => boolean) | null = null;
+  let menuBinding = $state<PopoverBinding | null>(null);
 
   $effect(() => {
     const next = draft;
@@ -228,10 +229,6 @@
 
   const showing = $derived(open ? menuColumns($lang, text) : []);
 
-  function holdKeys(keys: (event: KeyboardEvent) => boolean): void {
-    menuKeys = keys;
-  }
-
   function closeMenu(): void {
     open = false;
     box?.focus();
@@ -271,7 +268,7 @@
         write(completed(text, pointed));
         return;
       }
-      if (menuKeys?.(event) === true) {
+      if (menuBinding?.keys(event) === true) {
         event.preventDefault();
         return;
       }
@@ -334,7 +331,7 @@ strength, and a drag over the box by the wash it takes. -->
         if (chosen !== undefined) pick(chosen);
       }}
       onClose={closeMenu}
-      bind={holdKeys}
+      bind={(binding: PopoverBinding) => { menuBinding = binding; }}
       onCursorChange={(rowId) => {
         activeId = rowId;
       }}
@@ -359,7 +356,8 @@ strength, and a drag over the box by the wash it takes. -->
         rows={1}
         {placeholder}
         aria-label={placeholder}
-        aria-activedescendant={activeId}
+        aria-activedescendant={showing.length > 0 ? activeId : null}
+        aria-controls={showing.length > 0 ? menuBinding?.controls.join(" ") : undefined}
         autofocus
         onkeydown={onKeydown}
         oninput={onInput}

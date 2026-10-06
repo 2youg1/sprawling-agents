@@ -113,6 +113,9 @@ export interface Served extends Names {
 // the seam is.
 const MID = "\u0000";
 
+/** The list size after which a chooser offers filtering. */
+export const FILTER_AFTER = 8;
+
 export function modelValue(chosen: Names | undefined): string | null {
   return chosen === undefined ? null : `${chosen.endpoint}${MID}${chosen.model}`;
 }

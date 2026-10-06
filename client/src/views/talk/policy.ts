@@ -12,6 +12,14 @@ import { say } from "../../core/lang";
 import type { RunPolicy } from "../../wire";
 import type { PopoverColumn } from "../parts/popover";
 
+export const POLICY_SWITCHES = {
+  mode: { off: "chat", on: "work" },
+  write: { off: "create", on: "full" },
+} satisfies {
+  readonly mode: { readonly off: RunPolicy["mode"]; readonly on: RunPolicy["mode"] };
+  readonly write: { readonly off: RunPolicy["write"]; readonly on: RunPolicy["write"] };
+};
+
 type Chosen = "write" | "admit" | "landing";
 
 // The menu: one column per value, each row a value the wire offers, the

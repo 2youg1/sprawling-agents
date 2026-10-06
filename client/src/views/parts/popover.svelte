@@ -22,7 +22,7 @@
   import type { Key } from "../../core/lang";
   import { say } from "../../core/lang";
   import { ui } from "../../ui";
-  import type { PopoverColumn, PopoverRow } from "./popover";
+  import type { PopoverBinding, PopoverColumn, PopoverRow } from "./popover";
 
   interface Props {
     // The accessible name of the dialog, a lang.json key.
@@ -31,10 +31,10 @@
     readonly onApply: (column: PopoverColumn, row: PopoverRow) => void;
     readonly onClose: () => void;
     // Bind mode: the caller's text box keeps the focus and forwards the
-    // keys it does not want through the handler handed over here. The
-    // handler answers whether the popover used the key, so the caller
+    // keys it does not want through the binding handed over here. Its
+    // listbox ids supply aria-controls, and the handler answers whether the popover used the key, so the caller
     // knows whether to let the character through.
-    readonly bind?: ((keys: (event: KeyboardEvent) => boolean) => void) | undefined;
+    readonly bind?: ((binding: PopoverBinding) => void) | undefined;
     // The cursor row's DOM id whenever the cursor lands on a row, `null`
     // when the list holds none. Bind mode writes it as
     // `aria-activedescendant` on the caller's own focused text box - the
@@ -47,6 +47,8 @@
     // Where the data is not enough: renders one row's body in place of
     // the label and the secondary cell.
     readonly row?: Snippet<[PopoverRow]> | undefined;
+    // An owned input or toolbar above the columns.
+    readonly header?: Snippet | undefined;
   }
 
   const {
@@ -58,18 +60,20 @@
     onCursorChange,
     onCursorRow,
     row,
+    header,
   }: Props = $props();
 
   const { lang } = ui();
   // Unique within the document, so `aria-activedescendant` points at one
   // row and not at every popover that ever opened.
   const seat = $props.id();
+  const listSeat = (at: number): string => `${seat}-c${String(at)}`;
   const rowSeat = (at: number, index: number): string =>
     `${seat}-r${String(at)}-${String(index)}`;
 
   let column = $state(0);
   let cursor = $state(0);
-  const lists = $state<(HTMLUListElement | undefined)[]>([]);
+  const lists = $state<(HTMLUListElement | null | undefined)[]>([]);
 
   // A list that shrank under a cursor - somebody typed another letter -
   // leaves the raw cursor on a row that is no longer there, so both
@@ -104,6 +108,13 @@
     const item = rows.at(heldRow);
     if (pane === undefined || item === undefined) return;
     onApply(pane, item);
+  };
+
+  const pointColumn = (columnId: string): void => {
+    const at = columns.findIndex((pane) => pane.id === columnId);
+    if (at < 0) return;
+    column = at;
+    cursor = 0;
   };
 
   // Answers whether the popover used the key, so a text box that
@@ -156,7 +167,7 @@
   $effect(() => {
     if (bind !== undefined) return;
     const target = lists.at(heldColumn);
-    if (target === undefined) return;
+    if (target === undefined || target === null) return;
     if (!captured) {
       captured = true;
       const held = document.activeElement;
@@ -170,7 +181,7 @@
   });
 
   $effect(() => {
-    bind?.(keys);
+    bind?.({ keys, pointColumn, controls: columns.map((_pane, at) => listSeat(at)) });
   });
   $effect(() => {
     onCursorChange?.(activeId);
@@ -190,6 +201,7 @@
   role="dialog"
   aria-label={say($lang, label)}
 >
+  {#if header !== undefined}{@render header()}{/if}
   <div class="flex gap-snug">
     {#each columns as pane, at (pane.id)}
       <div class="flex min-w-0 flex-col">
@@ -197,6 +209,7 @@
           {say($lang, pane.label)}
         </div>
         <ul
+          id={listSeat(at)}
           bind:this={lists[at]}
           class="max-h-palette overflow-y-auto"
           role="listbox"
@@ -250,6 +263,8 @@
                 {/if}
               {/if}
             </li>
+          {:else}
+            <li role="presentation" class="px-snug py-tight text-note text-text-faint">{say($lang, "part_no_match")}</li>
           {/each}
         </ul>
       </div>

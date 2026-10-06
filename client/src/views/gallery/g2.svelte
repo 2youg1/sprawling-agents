@@ -7,7 +7,7 @@
   import { EFFORTS } from "../../core/commands";
   import { ui } from "../../ui";
   import Tier from "../setup/tier.svelte";
-  import { pills } from "../talk/composer";
+  import { FILTER_AFTER, pills } from "../talk/composer";
   import SettingsRow from "../talk/settings_row.svelte";
   import Case from "./case.svelte";
   import { CHOSEN, MODELS } from "./served";
@@ -22,6 +22,11 @@
     rooms: ["hall/mayor"],
     here: Address.make("hall/mayor"),
     effort: EFFORTS[2] ?? null,
+  }, { model: ignore, workspace: ignore, effort: ignore }));
+  const many = $derived(pills($lang, {
+    served: [{ endpoint: "gallery", model: CHOSEN.id, label: "gallery" }, ...Array.from({ length: FILTER_AFTER + 4 }, (_unused, index) => ({ endpoint: "gallery", model: `gallery/model-${String(index)}`, label: "gallery" })), { endpoint: "alternate", model: "alternate/small", label: "alternate" }],
+    chosen: { endpoint: "gallery", model: CHOSEN.id }, session: null,
+    rooms: ["hall/mayor"], here: Address.make("hall/mayor"), effort: null,
   }, { model: ignore, workspace: ignore, effort: ignore }));
   const empty = $derived(pills($lang, {
     served: [], chosen: undefined, session: null, rooms: ["hall/mayor"],
@@ -43,6 +48,11 @@
 <Case label="settings row · provider with its model and thinking">
   <div class="flex min-h-[36rem] flex-col justify-end">
     <SettingsRow {specs} room={null} draws="everything" kept={false} menu="model" />
+  </div>
+</Case>
+<Case label="settings row · provider with many models · search">
+  <div class="flex min-h-[36rem] flex-col justify-end">
+    <SettingsRow specs={many} room={null} draws="everything" kept={false} menu="model" />
   </div>
 </Case>
 <Case label="settings row · after a session starts · no controls">

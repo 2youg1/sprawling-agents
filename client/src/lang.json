@@ -5531,6 +5531,10 @@
     "en": "this session",
     "zh": "本会话"
   },
+  "talk_find_model": {
+    "en": "filter models",
+    "zh": "筛选模型"
+  },
   "talk_column_provider": {
     "en": "provider",
     "zh": "provider"
