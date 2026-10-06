@@ -5,6 +5,7 @@
 
 use super::*;
 
+mod credentials;
 mod framing;
 mod reconnect;
 mod trace;
