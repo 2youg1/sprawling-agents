@@ -259,8 +259,7 @@ mod tests {
             line["schema"] = serde_json::json!(schema);
             line["event"]["intent"]["owner"] = serde_json::json!(owner);
             let mut before = serde_json::to_vec(&line).unwrap();
-            before.push(b'
-');
+            before.push(b'\n');
             std::fs::write(&path, &before).unwrap();
             assert!(read(&path).is_err(), "unsafe history was accepted");
             assert_eq!(std::fs::read(&path).unwrap(), before);
@@ -278,8 +277,7 @@ mod tests {
                 line["event"]["intent"][field] = serde_json::json!("fixture-private-principal");
             }
             let mut before = serde_json::to_vec(&line).unwrap();
-            before.push(b'
-');
+            before.push(b'\n');
             let fault = match decode(&before) {
                 Ok(_) => panic!("private input accepted"),
                 Err(fault) => fault.into_ax(),
