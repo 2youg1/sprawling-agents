@@ -5,6 +5,7 @@
 
 //! Exact history values and their fold (`crates/sprawling/spec/Privacy/State.lean`).
 
+use std::collections::BTreeMap;
 use std::num::NonZeroU64;
 
 use kernel::{AxCode, AxError, SecretRef};
@@ -124,7 +125,7 @@ enum Stage {
 #[derive(Default)]
 struct Fold {
     summary: Option<Summary>,
-    owned: Vec<Intent>,
+    owned: BTreeMap<PrivacyControl, Vec<Intent>>,
     pending: Option<Pending>,
     latest: Option<NonZeroU64>,
 }
@@ -184,10 +185,10 @@ impl Fold {
         if let Some(id) = intent.restore_of {
             let top = self
                 .owned
-                .last()
+                .get(&intent.control)
+                .and_then(|stack| stack.last())
                 .ok_or(HistoryFault::Invalid("restore is not owned"))?;
             if top.operation != id
-                || top.control != intent.control
                 || top.modified != intent.original
                 || top.original != intent.modified
             {
@@ -292,10 +293,11 @@ impl Fold {
         outcome: StatusOutcome,
     ) -> Result<(), HistoryFault> {
         match owns {
-            Ownership::Take => self.owned.push(intent),
+            Ownership::Take => self.owned.entry(intent.control).or_default().push(intent),
             Ownership::Release => {
                 self.owned
-                    .pop()
+                    .get_mut(&intent.control)
+                    .and_then(Vec::pop)
                     .ok_or(HistoryFault::Invalid("restore is not owned"))?;
             }
             Ownership::Keep => (),
