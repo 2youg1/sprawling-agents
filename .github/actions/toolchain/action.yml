@@ -19,8 +19,8 @@
 # reads into `registry/src` before it compiles, and Rust cache does not
 # keep that directory. From "Updating crates.io index" to the first
 # compiled crate took 25 s in the test build and 35 s in clippy with the
-# home on C:, and 9 s in both on D:; trybuild's `cargo fetch`, which
-# downloads as well, fell from 49 s to 14 s.
+# home on C:, and 9-10 s in both on D:; trybuild's `cargo fetch`, which
+# downloads as well, fell from 49 s to 14-22 s.
 name: rust toolchain
 description: >-
   Install the Rust toolchain rust-toolchain.toml pins into a rustup home

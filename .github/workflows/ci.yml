@@ -285,8 +285,9 @@ jobs:
   #
   # The suite links with rust-lld (lld-link) rather than Microsoft's
   # link.exe: the archive holds 78 linked binaries, and on a warm cache
-  # the compile from the first workspace crate to the archive fell from
-  # 201 s to 171 s. This archive is a test build that nobody downloads;
+  # the compile from the first workspace crate to the archive took 171 s
+  # and 194 s in two runs against 201 s with link.exe. This archive is a
+  # test build that nobody downloads;
   # `release.yml` builds what ships with link.exe, so the linker of a
   # released binary is not this one (`tools/xtask/Spec.lean` D27).
   test-build:
