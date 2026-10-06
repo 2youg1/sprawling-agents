@@ -5839,6 +5839,38 @@
     "en": "following this run",
     "zh": "跟随这个 run"
   },
+  "mon_ceiling_hit": {
+    "en": "memory ceiling of {limit} bytes reached: an allocation in this run was refused, which may be why the command failed (Settings › Performance)",
+    "zh": "撞到了 {limit} 字节的内存上限：这个 run 里有一次分配被拒，命令可能因此失败（设置 › 性能）"
+  },
+  "mon_ceiling_of": {
+    "en": "{handle}: {line}",
+    "zh": "{handle}：{line}"
+  },
+  "mon_ceiling_unapplied": {
+    "en": "the memory ceiling of {limit} bytes did not apply to this command: {why}",
+    "zh": "{limit} 字节的内存上限没有作用在这条命令上：{why}"
+  },
+  "mon_ceiling_unread": {
+    "en": "memory ceiling of {limit} bytes: whether this run reached it cannot be read",
+    "zh": "{limit} 字节的内存上限：读不出这个 run 是否撞到了它"
+  },
+  "mon_ceiling_why_not_delegated": {
+    "en": "this machine does not delegate its cgroup to the city",
+    "zh": "城所在机器的 cgroup 没有委派给城"
+  },
+  "mon_ceiling_why_platform": {
+    "en": "this platform has no memory ceiling for a run",
+    "zh": "这个平台没有按 run 的内存上限"
+  },
+  "mon_ceiling_why_refused": {
+    "en": "the operating system refused the ceiling or the means to see it reached",
+    "zh": "操作系统拒绝了这个上限，或拒绝了读出撞限的手段"
+  },
+  "mon_ceiling_why_unjoined": {
+    "en": "the command did not join its run's job or cgroup; a container command is held by the building's container limits",
+    "zh": "这条命令没有进入 run 的 job 或 cgroup；容器里的命令由楼的容器限额管"
+  },
   "mon_code": {
     "en": "code",
     "zh": "代码"
@@ -7380,8 +7412,8 @@
     "zh": "填写正整数字节数，或留空表示不限。"
   },
   "performance_memory_note": {
-    "en": "Empty means unlimited. Enter a positive whole number; enforced only with soft with memory ceiling. Applies to all commands of one run together.",
-    "zh": "留空不限，填写正整数；仅在“软放置与内存上限”下生效，同一 run 的全部命令合用。"
+    "en": "Empty means unlimited; there is no default ceiling. Enter a positive whole number of bytes; it applies only with soft with memory ceiling, to all commands of one run together, and hitting it is reported as an error on the command.",
+    "zh": "留空不限，没有缺省上限。填写正整数字节数；仅在“软放置与内存上限”下生效，同一 run 的全部命令合用，撞到时命令上会报错。"
   },
   "performance_none": {
     "en": "none",
@@ -7440,8 +7472,8 @@
     "zh": "软放置与内存上限"
   },
   "performance_soft_shares_note": {
-    "en": "Soft placement plus the memory ceiling you enter below, shared by all commands of each run. Empty means no ceiling. Windows jobs and delegated Linux cgroups enforce it; macOS does not.",
-    "zh": "软放置加下方填写的内存上限，每个 run 的全部命令合用；留空不限。Windows job 和获委派的 Linux cgroup 执行限制，macOS 不强制。"
+    "en": "Soft placement plus the memory ceiling you enter below, shared by all commands of each run; empty means no ceiling. An allocation above it fails inside that run, and the command's result and the terminal say the ceiling was reached. Windows jobs and delegated Linux cgroups enforce it; elsewhere each command says it did not apply.",
+    "zh": "软放置加下方填写的内存上限，每个 run 的全部命令合用；留空不限。超过上限的分配在这个 run 里失败，命令结果和终端会说撞到了上限。Windows job 和获委派的 Linux cgroup 执行它；别处每条命令都会说上限没有生效。"
   },
   "setup_group_hint_performance": {
     "en": "Core threads and per-run resources. Changes take effect after restarting the city server.",

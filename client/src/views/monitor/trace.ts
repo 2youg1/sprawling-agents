@@ -18,12 +18,30 @@
 // head, because a record that drops what it cannot parse hides the
 // calls most worth looking at. A command's duration is the span between
 // the moment the call was made and the moment it was answered, and a
-// call still running has none yet.
+// call still running has none yet. A result whose run hit the person's
+// memory ceiling, or ran outside the ceiling the person asked for,
+// carries `memory_ceiling` (crates/runtime/spec/Tools/Exec.lean D95), on
+// itself and on each background row it brings; every one is read, so
+// the terminal can say it in the alert ink under the command.
 
 import { Option, Schema } from "effect";
 
 import type { Call, Outcome, Seq, Turn } from "../../wire";
 import { lastedOf } from "../talk/timing";
+
+export type CeilingWhy = "platform" | "not_delegated" | "refused" | "unjoined";
+
+export type Ceiling =
+  | { readonly state: "hit"; readonly limit: number }
+  | { readonly state: "unapplied"; readonly limit: number; readonly why: CeilingWhy }
+  | { readonly state: "unread"; readonly limit: number };
+
+// One ceiling report, and the background command it belongs to; `null`
+// for the call's own command.
+export interface CeilingNote {
+  readonly handle: string | null;
+  readonly ceiling: Ceiling;
+}
 
 export type Ending =
   | { readonly kind: "code"; readonly code: number }
@@ -42,6 +60,7 @@ export type Entry =
       readonly cut: number;
       // Milliseconds from call to answer; null while the call runs.
       readonly took: number | null;
+      readonly ceilings: readonly CeilingNote[];
     }
   | {
       readonly kind: "call";
@@ -98,10 +117,23 @@ const Arm = Schema.Struct({
   ]),
 });
 
+const MemoryCeiling = Schema.Union([
+  Schema.Struct({ state: Schema.Literals(["hit", "unread"]), limit_bytes: Schema.Number }),
+  Schema.Struct({
+    state: Schema.Literal("unapplied"),
+    limit_bytes: Schema.Number,
+    why: Schema.Literals(["platform", "not_delegated", "refused", "unjoined"]),
+  }),
+]);
+
 const Ran = Schema.Struct({
   stdout: Schema.optional(Schema.String),
   stderr: Schema.optional(Schema.String),
   outcome: Schema.optional(Schema.String),
+  memory_ceiling: Schema.optional(MemoryCeiling),
+  background: Schema.optional(
+    Schema.Array(Schema.Struct({ handle: Schema.String, memory_ceiling: Schema.optional(MemoryCeiling) })),
+  ),
 });
 
 const Edited = Schema.Struct({ path: Schema.String, base_version: Schema.String, diff: Schema.String });
@@ -156,7 +188,22 @@ export function commandOf(call: Call): Entry {
     ending: endingOf(call, ran),
     cut: call.output?.cut ?? 0,
     took: lastedOf(call),
+    ceilings: Option.match(ran, { onNone: () => [], onSome: ceilingsOf }),
   };
+}
+
+function ceilingsOf(ran: typeof Ran.Type): readonly CeilingNote[] {
+  const own = ran.memory_ceiling === undefined ? [] : [{ handle: null, ceiling: ceilingOf(ran.memory_ceiling) }];
+  const rows = (ran.background ?? []).flatMap((row) =>
+    row.memory_ceiling === undefined ? [] : [{ handle: row.handle, ceiling: ceilingOf(row.memory_ceiling) }],
+  );
+  return [...own, ...rows];
+}
+
+function ceilingOf(read: typeof MemoryCeiling.Type): Ceiling {
+  return read.state === "unapplied"
+    ? { state: read.state, limit: read.limit_bytes, why: read.why }
+    : { state: read.state, limit: read.limit_bytes };
 }
 
 function endingOf(call: Call, ran: Option.Option<typeof Ran.Type>): Ending {

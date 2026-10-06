@@ -76,8 +76,50 @@ describe("a run's turns read as a terminal record and a code column", () => {
   test("an exec call is its command, both streams, its exit code and how long it took", () => {
     const { entries } = traceOf([exec]);
     expect(entries).toEqual([
-      { kind: "command", at: at(11), text: "cargo test", stdout: "ok\n", stderr: "warn\n", ending: { kind: "code", code: 101 }, cut: 0, took: 250 },
-      { kind: "command", at: at(12), text: "git status", stdout: "", stderr: "", ending: { kind: "running" }, cut: 0, took: null },
+      { kind: "command", at: at(11), text: "cargo test", stdout: "ok\n", stderr: "warn\n", ending: { kind: "code", code: 101 }, cut: 0, took: 250, ceilings: [] },
+      { kind: "command", at: at(12), text: "git status", stdout: "", stderr: "", ending: { kind: "running" }, cut: 0, took: null, ceilings: [] },
+    ]);
+  });
+
+  // The runtime writes `memory_ceiling` on a settled result and on each
+  // background row it brings (crates/runtime/src/tools/exec/outcome.rs);
+  // both are read, the background one with its handle.
+  test("a command whose run reached the memory ceiling carries the report, and so does a background row", () => {
+    const head = JSON.stringify({
+      arm: "shell",
+      stdout: "",
+      stderr: "memory allocation failed",
+      exit_code: 101,
+      memory_ceiling: { state: "hit", limit_bytes: 1073741824, detail: "an allocation was refused" },
+      background: [
+        { handle: "bg-4", what: "cargo build", exit_code: 0, stdout: "", stderr: "" },
+        {
+          handle: "bg-5",
+          what: "make",
+          exit_code: 0,
+          stdout: "",
+          stderr: "",
+          memory_ceiling: { state: "unapplied", why: "not_delegated", limit_bytes: 1073741824, detail: "not applied" },
+        },
+      ],
+    });
+    const hit = turn(4, [
+      {
+        at: 41,
+        tool: "exec",
+        outcome: "answered",
+        called: 4000,
+        answered: 4100,
+        exit_code: 101,
+        arguments: { cut: 0, head: JSON.stringify({ arm: { shell: { text: "cargo test" } } }) },
+        output: { cut: 0, head },
+      },
+    ]);
+    expect(traceOf([hit]).entries.map((entry) => (entry.kind === "command" ? entry.ceilings : null))).toEqual([
+      [
+        { handle: null, ceiling: { state: "hit", limit: 1073741824 } },
+        { handle: "bg-5", ceiling: { state: "unapplied", limit: 1073741824, why: "not_delegated" } },
+      ],
     ]);
   });
 

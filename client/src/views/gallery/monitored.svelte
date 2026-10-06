@@ -7,9 +7,10 @@
 
 <script lang="ts" module>
   // The monitor over a run that has edited a file, run a command that
-  // failed with coloured output, and is still running a second one, so
-  // one fixture shows every ending a terminal row draws and a hunk with
-  // both line numbers. The results are the compact JSON the runtime
+  // failed with coloured output after its run reached the person's memory
+  // ceiling, and is still running a second one, so one fixture shows every
+  // ending a terminal row draws, the ceiling report under a command, and a
+  // hunk with both line numbers. The results are the compact JSON the runtime
   // writes, which is the shape `monitor/trace.ts` reads.
 
   import { Schema } from "effect";
@@ -55,8 +56,13 @@
           output: said({
             arm: "shell",
             stdout: `running 3 tests\ntest append ... ${ESC}[32mok${ESC}[0m\ntest full ... ${ESC}[31mFAILED${ESC}[0m\n`,
-            stderr: "error: test failed, to rerun pass `-p ledger --lib`\n",
+            stderr: "memory allocation of 2147483648 bytes failed\nerror: test failed, to rerun pass `-p ledger --lib`\n",
             exit_code: 101,
+            memory_ceiling: {
+              state: "hit",
+              limit_bytes: 1073741824,
+              detail: "an allocation of this run's processes was refused at the memory ceiling",
+            },
           }),
         },
         {

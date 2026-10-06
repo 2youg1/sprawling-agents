@@ -31,6 +31,7 @@
   import { ui } from "../../ui";
   import type { Answer, Call, Query } from "../../wire";
   import { INK, rows } from "../monitor/ansi";
+  import Ceilings from "../monitor/ceilings.svelte";
   import type { Ending } from "../monitor/trace";
   import Unanswered from "../parts/unanswered.svelte";
   import { printedOf } from "./terminal";
@@ -104,6 +105,11 @@
       {/if}
     </p>
   </div>
+  {#if printed.ceilings.length > 0}
+    <div class="shrink-0 border-b border-edge px-wide py-snug font-mono text-note">
+      <Ceilings notes={printed.ceilings} />
+    </div>
+  {/if}
   <div class="min-h-0 flex-1 overflow-auto">
     {#if rawQuestion !== null}
       {#if original.kind === "held"}
