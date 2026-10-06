@@ -318,7 +318,7 @@
   <Composer
     {placeholder}
     recipient={!band && blank ? who : undefined}
-    started={shown.length > 0 || echo !== null}
+    started={echo !== null}
     sending={sendingInto(live?.doing)}
     draft={address}
     hearing={u.hearing()}

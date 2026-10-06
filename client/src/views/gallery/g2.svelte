@@ -41,7 +41,7 @@
   </div>
 </Case>
 <Case label="settings row · provider with its model and thinking">
-  <div class="flex min-h-[20rem] flex-col justify-end">
+  <div class="flex min-h-[36rem] flex-col justify-end">
     <SettingsRow {specs} room={null} draws="everything" kept={false} menu="model" />
   </div>
 </Case>
