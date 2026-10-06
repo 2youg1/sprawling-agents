@@ -51,11 +51,14 @@ System32\WindowsPowerShell\v1.0\powershell.exe；不从 PATH、SystemRoot
 命令关闭 profile、非交互，只输出
 [Security.Principal.WindowsIdentity]::GetCurrent().User.Value；
 经 doctor::asking 询问，只保留第一行，最多等 300 次 knock
-（300 × asking::TICK = 15 秒，因为冷启动的 Windows PowerShell 要几秒才开始回答）。超时、非零退出、无法启动均以 ToolUnavailable 拒绝，
-不保留 stopping 诊断中的路径或身份。
+（300 × asking::TICK = 15 秒，因为冷启动的 Windows PowerShell 要几秒才开始回答）。
+超时、非零退出、无法启动均以 ToolUnavailable 拒绝，不保留 stopping 诊断中的路径或身份。
 答案必须符合 SID 文法 `S-1-<authority>(-<sub-authority>)+`，每段是非空十进制数字；
 不符合即拒绝，拒绝文字不回显答案。身份放在 Zeroizing 中，不写日志、不落盘。
 非 Windows 没有对应 control，返回 ToolUnavailable，不伪造身份。
+Rust 检查在 privacy::identity::tests（仅 Windows）：SID 文法的接受与拒绝；
+以及经真实安装路径、真实 PowerShell 与 asking 只读查询一次，得到 SID——
+只有这条走生产路径的检查能发现「答案带行尾」「保留了错误的行」一类缺陷。
 被否：①whoami /user——输出带账户名，要解析再丢弃明文身份；
 ②windows crate 的 GetTokenInformation——需要 unsafe，按 AGENTS.md 平台调用的次序，
 有安全接口时不用；③windows-registry crate——计划中的 privacy::windows 读写原始注册表值，

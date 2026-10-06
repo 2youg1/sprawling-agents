@@ -97,8 +97,14 @@ impl Custodian {
 到 Result<Option<Zeroizing<String>>, AxError> 的读取缝，生产端调用现有
 KeyringVault::get，派生检查提供内存条目，函数只交出 Result<(), AxError>。
 此缝不新增 Vault、不改变凭据位置、不允许写入，也不把 stored identity 返回调用方。
-缺失返回 CredentialMissing，不匹配返回 ConfigInvalid，平台拒绝保留错误码但
-移除可能包含私密输入的诊断文字；任何失败都不写、删除或重建引用。
+拒绝是三种之一，各带一句只回答它自己的 recovery：读取被拒（保留来源的错误码，
+移除可能复述私密输入的诊断文字，recovery 叫人解锁平台凭据服务后再问）、
+缺失（CredentialMissing，recovery 叫人登录持有该绑定的账户）、
+不匹配或观察到的身份为空（ConfigInvalid，recovery 叫人以拥有该历史的
+Windows 账户运行）。任何失败都不写、删除或重建引用；读取缝只交出值，
+函数拿不到可写的 Vault，所以零写由类型持有，测试不再复述。
 此入口核对真实身份与既有引用，不建立 journal 的随机身份绑定，不授予写权限。
-测试复用 Vault 的 MemoryVault 与拒绝适配器，检查缺失、不匹配、服务失败和零写。
+测试经 MemoryVault 检查缺失、匹配、不匹配与空身份，经拒绝的读取缝检查
+错误码保留而诊断文字不出现；都比较整个 AxError。
+被否：三种拒绝共用一句 recovery——不匹配时叫人「解锁凭据服务」，读者照做也无用。
 -/
