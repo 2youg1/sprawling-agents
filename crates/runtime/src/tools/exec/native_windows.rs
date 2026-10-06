@@ -80,6 +80,7 @@ pub(crate) fn launch(
     for name in ["USERPROFILE", "APPDATA", "LOCALAPPDATA", "TEMP", "TMP"] {
         command.env(name, &directory);
     }
+    msvc::prepend_search_directories(&mut command);
     let environment: BTreeMap<OsString, OsString> = command
         .get_envs()
         .filter_map(|(name, value)| value.map(|value| (name.to_os_string(), value.to_os_string())))
@@ -221,6 +222,8 @@ pub(crate) fn denied(action: &str, detail: impl std::fmt::Display) -> AxError {
     AxError::failure(AxCode::SandboxDenied, action, detail.to_string())
         .with_recovery("check Windows AppContainer/Job support, the configured limits and disposable directory permissions; retry the sandbox command")
 }
+
+mod msvc;
 
 #[cfg(test)]
 mod child;
