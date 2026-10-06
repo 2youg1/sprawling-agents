@@ -12,15 +12,6 @@ use kernel::{Address, Payload, RunId, Tool, ToolCall, ToolName};
 use serde_json::Value;
 
 #[test]
-fn default_windows_native_admission_requires_all_five_axes() {
-    use crate::tools::exec::confinement::{Confinement, Guarantee, Kept};
-    let chosen = Confinement::detect();
-    for axis in Guarantee::ALL {
-        assert_eq!(chosen.assurances().of(axis), Kept::Yes, "{axis:?}");
-    }
-}
-
-#[test]
 #[ignore = "writes AppContainer profiles and disposable ACLs; explicit Windows Actions acceptance only"]
 fn native_windows_disposable_production_axes_and_cleanup() {
     assert_eq!(std::env::var("SPRAWLING_DISPOSABLE_NATIVE").unwrap(), "1");
@@ -65,7 +56,11 @@ fn native_windows_disposable_production_axes_and_cleanup() {
         Box::new(EchoSandbox::new()),
         backlog.clone(),
     )
-    .unwrap();
+    .unwrap()
+    .confined(crate::tools::exec::confinement::Confined::with_arm(
+        crate::tools::exec::confinement::Confinement::WindowsJobObject,
+        Some(std::env::temp_dir()),
+    ));
     let call = ToolCall {
         id: "native-production".to_owned(), name: ToolName::parse("exec").unwrap(),
         args: Payload::new(serde_json::json!({"arm":{"program":{

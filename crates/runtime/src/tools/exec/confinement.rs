@@ -176,7 +176,11 @@ impl Confinement {
         Confinement::choose(&Offerings::this_machine())
     }
 
-    /// The arm a machine with these capabilities gives.
+    /// The arm a machine with these capabilities gives when no arm is named.
+    ///
+    /// A Windows build resolves [`Confinement::CopiedTree`] until the native
+    /// arm passes the conformance that `Tools/Exec.lean` SB1 item 3 lists;
+    /// a building that names `native` still gets [`Confinement::WindowsJobObject`].
     pub fn choose(offered: &Offerings) -> Confinement {
         if offered.scratch.is_none() {
             return Confinement::Unavailable {
@@ -187,7 +191,6 @@ impl Confinement {
             Some(wrapper) => Confinement::LinuxNamespaces {
                 wrapper: wrapper.clone(),
             },
-            None if cfg!(windows) => Confinement::WindowsJobObject,
             None => Confinement::CopiedTree,
         }
     }

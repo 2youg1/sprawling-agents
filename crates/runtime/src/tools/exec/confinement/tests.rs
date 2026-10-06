@@ -36,12 +36,8 @@ fn the_sandbox_arm_a_machine_gets_is_chosen_from_what_it_has() {
             namespace_tool: None,
             scratch: scratch.clone(),
         }),
-        if cfg!(windows) {
-            Confinement::WindowsJobObject
-        } else {
-            Confinement::CopiedTree
-        },
-        "a Windows build has its native leaf; other platforms need a wrapper"
+        Confinement::CopiedTree,
+        "without a wrapper the default is the copied tree, Windows included until SB1 item 3"
     );
     let wrapper = PathBuf::from("/usr/bin/bwrap");
     assert_eq!(
