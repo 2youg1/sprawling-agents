@@ -6,7 +6,7 @@
 /-!
 # 让二进制成为一个词：搜索路径的两个判定
 
-规定 `crates/sprawling/src/install.rs` 里的 `plan_append` 与 `plan_remove`（`bin::install`，形状 4 adapter：决定纯，落地薄）。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威（§8-9）。拷贝、可执行文件删除、注册表读写与广播是适配器的事，这里不建模；Windows 自卸载的环境契约与实际检查见 D52。
+规定 `crates/sprawling/src/install.rs` 里的 `plan_append` 与 `plan_remove`（`bin::install`，形状 4 adapter：决定纯，落地薄）。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威（§8-9）。拷贝、可执行文件删除、注册表读写与广播是适配器的事，这里不建模；Windows 自卸载的环境契约与实际检查见 D53。
 
 一条搜索路径在模型里是它按分隔符切开的各段，按原来的次序。段的类型 `α` 是参数，因为判定只需要两件事：两段是不是同一个目录（`same`，Rust 里是 `same_directory`：去掉首尾空白与尾随的斜杠，Windows 上再不分大小写），以及一段是不是空段（`blank`）。空白的整串在模型里是空表，于是「空串变成那一个目录」不是一个特例。
 
@@ -257,7 +257,7 @@ Nix 用户的唯一渠道是本仓库的 flake（人的决定）：项目不向 
 三平台隔离安装、up、参数与信号验收检验这些环境条件，模型证明不覆盖包管理器行为。
 -/
 
-/-! D52 Windows 自卸载使用安全 Rust API 释放安装路径
+/-! D53 Windows 自卸载使用安全 Rust API 释放安装路径
 
 本节是文件系统适配器的契约说明，不是 OS 或依赖实现的形式证明；上面的搜索路径模型与证明继续约束 PATH 判定。
 `bin::install::displace` 只删除 `program_dir` 下的 `installed_name`，目标不存在返回 false；

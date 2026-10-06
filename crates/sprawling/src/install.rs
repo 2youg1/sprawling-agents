@@ -204,7 +204,7 @@ fn place(dir: &Path) -> Result<PathBuf, AxError> {
 /// Releases the installed name, and says whether there was a copy.
 ///
 /// On Windows the running image survives under a temporary name until
-/// process exit; D52 in the Install specification owns that contract.
+/// process exit; D53 in the Install specification owns that contract.
 fn displace(dir: &Path) -> Result<bool, AxError> {
     let target = dir.join(installed_name());
     remove_installed_entry(&target).map_err(|err| {
@@ -214,7 +214,7 @@ fn displace(dir: &Path) -> Result<bool, AxError> {
             format!("{}: {err}", target.display()),
         )
         .with_recovery(
-            "close any other running sprawling and try again; if the installed name was              already moved, repeat install from the original archive",
+            "close any other running sprawling and try again; if the installed name was already moved, repeat install from the original archive",
         )
     })
 }

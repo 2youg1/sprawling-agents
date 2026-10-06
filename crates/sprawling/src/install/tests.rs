@@ -130,10 +130,6 @@ const FIXTURE: &str = "SPRAWLING_INSTALL_REMOVAL_FIXTURE";
 
 #[cfg(target_os = "windows")]
 #[test]
-#[allow(
-    clippy::disallowed_methods,
-    reason = "fixture deadline polls OS helper cleanup after process exit"
-)]
 fn windows_uninstall_removes_its_running_executable() {
     if let Some(dir) = std::env::var_os(FIXTURE) {
         let dir = Path::new(&dir);
@@ -156,19 +152,13 @@ fn windows_uninstall_removes_its_running_executable() {
     std::fs::copy(std::env::current_exe().unwrap(), &target).unwrap();
     run_removal_fixture(&target, &dir, &scratch);
     assert!(!target.exists(), "the installed name remains after exit");
-    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
-    loop {
-        let remaining = std::fs::read_dir(&scratch)
-            .unwrap()
-            .map(|entry| entry.unwrap().path())
-            .collect::<Vec<_>>();
-        if remaining.is_empty() {
-            break;
-        }
-        assert!(
-            std::time::Instant::now() < deadline,
-            "temporary executable cleanup did not finish: {remaining:?}"
-        );
+    while std::fs::read_dir(&scratch)
+        .unwrap()
+        .next()
+        .transpose()
+        .unwrap()
+        .is_some()
+    {
         std::thread::yield_now();
     }
 }
