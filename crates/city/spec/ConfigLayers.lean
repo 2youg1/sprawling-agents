@@ -228,3 +228,47 @@ theorem the_layer_on_disk_stays_readable {Text : Type} (readable parses : Text �
       exact reads
 
 end City.ConfigLayers
+
+/-! 设置覆盖：CONFIG.toml 的字段声明是文法 authority。building 目前通过
+设置树的 building 页面编辑配置原文；以下理由记录专用控件的范围，原文入口不
+冒充逐项校验的表单。新增声明必须在本规格记录覆盖决策。
+settings-reason CacheSection.keep_warm building 设置提供 CONFIG.toml 原文编辑；当前没有此字段的专用控件，专用校验表单仍需实现。
+settings-reason ClockSection.stamp building 设置提供 CONFIG.toml 原文编辑；当前没有此字段的专用控件，专用校验表单仍需实现。
+settings-reason ConfigFile.cache building 设置提供 CONFIG.toml 原文编辑；当前没有此字段的专用控件，专用校验表单仍需实现。
+settings-reason ConfigFile.clock building 设置提供 CONFIG.toml 原文编辑；当前没有此字段的专用控件，专用校验表单仍需实现。
+settings-control ConfigFile.context client/src/views/settings/context_rung.svelte
+settings-reason ConfigFile.identity 由 session 首次 run 冻结 identity version，User 不直接改写已冻结的身份。
+settings-control ConfigFile.mcp client/src/views/mcp.svelte
+settings-control ConfigFile.model client/src/views/setup/models.svelte
+settings-reason ConfigFile.remote 只允许 city 层，building 声明时拒绝；remote 设置组管理 city 的 route。
+settings-control ConfigFile.resident client/src/views/setup/harnesses.svelte
+settings-reason ConfigFile.sandbox building 设置提供 CONFIG.toml 原文编辑；当前没有此字段的专用控件，专用校验表单仍需实现。
+settings-reason ConfigFile.skills 外部 shelves 只允许 city 层，building 不能把机器路径声明为自己的书架。
+settings-control ContextSection.second_threshold client/src/views/settings/context_rung.svelte
+settings-reason IdentitySection.version 由 session 首次 run 冻结 identity version，User 不直接改写已冻结的身份。
+settings-reason McpSection.args building 设置提供 CONFIG.toml 原文编辑；当前没有此字段的专用控件，专用校验表单仍需实现。
+settings-reason McpSection.command building 设置提供 CONFIG.toml 原文编辑；当前没有此字段的专用控件，专用校验表单仍需实现。
+settings-reason McpSection.env building 设置提供 CONFIG.toml 原文编辑；当前没有此字段的专用控件，专用校验表单仍需实现。
+settings-reason McpSection.headers building 设置提供 CONFIG.toml 原文编辑；当前没有此字段的专用控件，专用校验表单仍需实现。
+settings-reason McpSection.label building 设置提供 CONFIG.toml 原文编辑；当前没有此字段的专用控件，专用校验表单仍需实现。
+settings-reason McpSection.transport building 设置提供 CONFIG.toml 原文编辑；当前没有此字段的专用控件，专用校验表单仍需实现。
+settings-reason McpSection.url building 设置提供 CONFIG.toml 原文编辑；当前没有此字段的专用控件，专用校验表单仍需实现。
+settings-control ModelSection.effort client/src/views/shared/effort.svelte
+settings-control ModelSection.name client/src/views/setup/models.svelte
+settings-reason RemoteRoute.Cloudflare.command 只允许 city 层，building 声明时拒绝；remote 设置组管理 city 的 route。
+settings-reason RemoteRoute.Cloudflare.tunnel 只允许 city 层，building 声明时拒绝；remote 设置组管理 city 的 route。
+settings-reason RemoteRoute.Cloudflare.url 只允许 city 层，building 声明时拒绝；remote 设置组管理 city 的 route。
+settings-reason RemoteRoute.Command.args 只允许 city 层，building 声明时拒绝；remote 设置组管理 city 的 route。
+settings-reason RemoteRoute.Command.command 只允许 city 层，building 声明时拒绝；remote 设置组管理 city 的 route。
+settings-reason RemoteRoute.Command.permanence 只允许 city 层，building 声明时拒绝；remote 设置组管理 city 的 route。
+settings-control ResidentSection.harness client/src/views/setup/harnesses.svelte
+settings-reason SandboxSection.arm building 设置提供 CONFIG.toml 原文编辑；当前没有此字段的专用控件，专用校验表单仍需实现。
+settings-reason SandboxSection.container building 设置提供 CONFIG.toml 原文编辑；当前没有此字段的专用控件，专用校验表单仍需实现。
+settings-reason SandboxSection.env_passthrough building 设置提供 CONFIG.toml 原文编辑；当前没有此字段的专用控件，专用校验表单仍需实现。
+settings-reason SandboxSection.fuel building 设置提供 CONFIG.toml 原文编辑；当前没有此字段的专用控件，专用校验表单仍需实现。
+settings-reason SandboxSection.interpreter building 设置提供 CONFIG.toml 原文编辑；当前没有此字段的专用控件，专用校验表单仍需实现。
+settings-reason SandboxSection.mounts building 设置提供 CONFIG.toml 原文编辑；当前没有此字段的专用控件，专用校验表单仍需实现。
+settings-reason SandboxSection.shell building 设置提供 CONFIG.toml 原文编辑；当前没有此字段的专用控件，专用校验表单仍需实现。
+settings-reason SandboxSection.trusted building 设置提供 CONFIG.toml 原文编辑；当前没有此字段的专用控件，专用校验表单仍需实现。
+settings-reason SkillsSection.shelves 外部 shelves 只允许 city 层，building 不能把机器路径声明为自己的书架。
+-/

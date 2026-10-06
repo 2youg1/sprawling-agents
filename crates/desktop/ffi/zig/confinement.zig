@@ -97,7 +97,8 @@ fn limits(record: *api.Record) u32 {
     const job = api.CreateJobObjectW(null, null) orelse return lastError();
     record.job = @intFromPtr(job);
     var memory: cpu.JOBOBJECT_EXTENDED_LIMIT_INFORMATION = .{};
-    memory.BasicLimitInformation.LimitFlags = api.kill_on_close | cpu.JOB_OBJECT_LIMIT_JOB_MEMORY;
+    memory.BasicLimitInformation.LimitFlags = api.kill_on_close;
+    if (record.memory != 0) memory.BasicLimitInformation.LimitFlags |= cpu.JOB_OBJECT_LIMIT_JOB_MEMORY;
     memory.JobMemoryLimit = record.memory;
     if (cpu.SetInformationJobObject(job, cpu.JOB_OBJECT_EXTENDED_LIMIT_INFORMATION, &memory, @sizeOf(@TypeOf(memory))) == .FALSE) return lastError();
     const rate: cpu.JOBOBJECT_CPU_RATE_CONTROL_INFORMATION = .{
@@ -207,7 +208,7 @@ fn start(parts: Packet, sid: *anyopaque, record: *api.Record) u32 {
 export fn sprawling_native_launch(text: [*]const u16, units: usize, record: *api.Record, bytes: usize) u32 {
     if (bytes != @sizeOf(api.Record)) return api.invalid_parameter;
     phase(record, @src().fn_name);
-    if (record.memory == 0 or record.cpu == 0 or record.cpu > 10_000 or record.parent_job == 0 or record.job != 0 or record.process != 0) return api.invalid_parameter;
+    if (record.cpu == 0 or record.cpu > 10_000 or record.parent_job == 0 or record.job != 0 or record.process != 0) return api.invalid_parameter;
     const parts = packet(text[0..units]) orelse return api.invalid_parameter;
     var sid: ?*anyopaque = null;
     const profile = api.CreateAppContainerProfile(parts.strings[3].ptr, parts.strings[3].ptr, parts.strings[3].ptr, null, 0, &sid);

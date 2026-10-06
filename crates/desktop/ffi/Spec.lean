@@ -565,7 +565,8 @@ example : walk (fun _ => 0) 64 3 0 = none := by decide
 AppContainer profile 名，`zig/confinement.zig` 通过完整 launch、poll、terminate、cleanup
 操作管理它们；没有调用借出缓冲的地址留下。生产 caller 是
 `crates/runtime/src/tools/exec/native_windows.rs` 与 backlog 的 native process arm，
-launch 以 capability-free AppContainer 挂起创建、配置 aggregate job memory/CPU cap，
+launch 以 capability-free AppContainer 挂起创建、配置 CPU cap 与仅由 User 输入的可选 aggregate job memory cap；
+Launch.memory_bytes 是 Option<NonZeroUsize>，None 经 packet 的 memory = 0 表示不设内存标志，
 装进 command job 与 run job 后恢复。scratch ACL 与 profile storage 都只属于这次执行；
 harness 网络不进入 AppContainer。Rust 负责 argv/env/限额与 typed failures，叶子不选择策略。
 

@@ -7370,5 +7370,85 @@
   "release_behind_undated": {
     "en": "A newer version is available: {version}.",
     "zh": "有更新版本可用：{version}。"
+  },
+  "performance_memory": {
+    "en": "Per-run memory ceiling (bytes)",
+    "zh": "每个 run 的内存上限（字节）"
+  },
+  "performance_memory_invalid": {
+    "en": "Enter a positive whole number of bytes, or leave empty for no ceiling.",
+    "zh": "填写正整数字节数，或留空表示不限。"
+  },
+  "performance_memory_note": {
+    "en": "Empty means unlimited. Enter a positive whole number; enforced only with soft with memory ceiling. Applies to all commands of one run together.",
+    "zh": "留空不限，填写正整数；仅在“软放置与内存上限”下生效，同一 run 的全部命令合用。"
+  },
+  "performance_none": {
+    "en": "none",
+    "zh": "不放置"
+  },
+  "performance_none_note": {
+    "en": "Leave threads and run CPU shares to the operating system.",
+    "zh": "线程和 run CPU 份额交给操作系统。"
+  },
+  "performance_normal": {
+    "en": "normal",
+    "zh": "正常"
+  },
+  "performance_normal_note": {
+    "en": "Use normal priority for core threads; child commands still run below the core.",
+    "zh": "核心线程用正常优先级；子命令仍低于核心。"
+  },
+  "performance_pinned": {
+    "en": "pinned",
+    "zh": "硬亲和"
+  },
+  "performance_pinned_note": {
+    "en": "Request hard affinity to the placement plan, with run CPU shares. Windows also requests the remaining processors for run jobs. Unsupported platforms report the fallback.",
+    "zh": "请求放置计划的硬亲和及 run CPU 份额；Windows 还为 run job 请求余下处理器。不支持的平台报告退路。"
+  },
+  "performance_placement": {
+    "en": "CPU placement",
+    "zh": "CPU 放置"
+  },
+  "performance_priority": {
+    "en": "Core priority",
+    "zh": "核心优先级"
+  },
+  "performance_raised": {
+    "en": "raised",
+    "zh": "提高"
+  },
+  "performance_raised_note": {
+    "en": "Raise hot core threads above normal so command trees do not delay city responses.",
+    "zh": "提高核心热线程优先级，避免命令进程树延迟城的响应。"
+  },
+  "performance_restart": {
+    "en": "Restart the city server to apply these settings.",
+    "zh": "重启城服务以应用设置。"
+  },
+  "performance_soft": {
+    "en": "soft",
+    "zh": "软放置"
+  },
+  "performance_soft_note": {
+    "en": "Prefer the fastest cores on Windows, lift power throttling, and request equal CPU weight for runs. Platform support varies.",
+    "zh": "Windows 上优先使用最快核、解除节能限流，并请求 run 等 CPU 权重；能力依平台而定。"
+  },
+  "performance_soft_shares": {
+    "en": "soft with memory ceiling",
+    "zh": "软放置与内存上限"
+  },
+  "performance_soft_shares_note": {
+    "en": "Soft placement plus the memory ceiling you enter below, shared by all commands of each run. Empty means no ceiling. Windows jobs and delegated Linux cgroups enforce it; macOS does not.",
+    "zh": "软放置加下方填写的内存上限，每个 run 的全部命令合用；留空不限。Windows job 和获委派的 Linux cgroup 执行限制，macOS 不强制。"
+  },
+  "setup_group_hint_performance": {
+    "en": "Core threads and per-run resources. Changes take effect after restarting the city server.",
+    "zh": "核心线程与每个 run 的资源；重启城服务后生效。"
+  },
+  "setup_group_performance": {
+    "en": "performance",
+    "zh": "性能"
   }
 }

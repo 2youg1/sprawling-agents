@@ -111,3 +111,11 @@ Native 不可给时 E_SANDBOX_DENIED，不退到 copied_tree；CopiedTree 明确
 明确请求 host，仍受 Create 写限制；Python 臂拒绝 sandbox program/shell，python guest
 沿用既有 WASI 接口。选择在 Run 起点冻结，在工具入 catalogue 之前接入并描述其实际保证。
 -/
+
+/-! container 设置覆盖；kernel 声明文法，building 设置编辑配置。
+settings-reason ContainerLimits.image container 是显式选择的 sandbox 资源配置，由 building CONFIG.toml 原文编辑；专用容器表单尚未实现。
+settings-reason ContainerLimits.user container 是显式选择的 sandbox 资源配置，由 building CONFIG.toml 原文编辑；专用容器表单尚未实现。
+settings-reason ContainerLimits.cpu_millis container 是显式选择的 sandbox 资源配置，由 building CONFIG.toml 原文编辑；专用容器表单尚未实现。
+settings-reason ContainerLimits.memory_bytes container 是显式选择的 sandbox 资源配置，由 building CONFIG.toml 原文编辑；专用容器表单尚未实现。
+settings-reason ContainerLimits.pids container 是显式选择的 sandbox 资源配置，由 building CONFIG.toml 原文编辑；专用容器表单尚未实现。
+-/

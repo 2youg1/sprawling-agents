@@ -113,3 +113,38 @@ pub struct ThemeOverride { pub tokens: BTreeMap<String, String>, pub css: Option
 none、soft、soft_shares、pinned；配置读者与客户端 schema 共用此声明。
 新字段及补丁改变线形，WIRE_V 升一并重生 wire.ts。
 -/
+
+/-! 设置覆盖：记录的是声明字段；TOML 拼写仍由 serde 类型决定。
+settings-control PreferencesAnswer.lang client/src/views/setup.svelte
+settings-control PreferencesAnswer.core client/src/views/settings/performance.svelte
+settings-control PreferencesAnswer.panel client/src/views/talk.svelte
+settings-control PreferencesAnswer.appearance client/src/views/setup/appearance.svelte
+settings-control PreferencesAnswer.proxying client/src/views/setup.svelte
+settings-control PreferencesAnswer.chords client/src/views/setup/keys.svelte
+settings-control PreferencesAnswer.tags client/src/views/world/session_menu.svelte
+settings-control PreferencesAnswer.theme client/src/views/setup/colours.svelte
+settings-control CorePreferences.placement client/src/views/settings/performance.svelte
+settings-control CorePreferences.priority client/src/views/settings/performance.svelte
+settings-control CorePreferences.memory_bytes client/src/views/settings/performance.svelte
+settings-control ThemeOverride.tokens client/src/views/setup/colours.svelte
+settings-control ThemeOverride.css client/src/views/setup/colours.svelte
+settings-control Chord.action client/src/views/setup/keys.svelte
+settings-control Chord.spelled client/src/views/setup/keys.svelte
+settings-control Appearance.lighting client/src/views/setup/appearance.svelte
+settings-control Appearance.sans client/src/views/setup/appearance.svelte
+settings-control Appearance.mono client/src/views/setup/appearance.svelte
+settings-control Appearance.sans_stack client/src/views/setup/appearance.svelte
+settings-control Appearance.mono_stack client/src/views/setup/appearance.svelte
+settings-control Appearance.body_px client/src/views/setup/appearance.svelte
+settings-control Appearance.density client/src/views/setup/appearance.svelte
+settings-control Appearance.chroma client/src/views/setup/appearance.svelte
+settings-control Appearance.motion client/src/views/setup/appearance.svelte
+settings-control Appearance.glass client/src/views/setup/appearance.svelte
+settings-control Appearance.blend_percent client/src/views/setup/appearance.svelte
+settings-reason PreferencesAnswer.welcomed 由 welcome 流程记录是否已走过，不提供任意改写历史的开关；设置中的 welcome 入口可再次打开。
+settings-reason PreferencesAnswer.tier tier 只属于当前 tab；持久文件字段仍可读但不覆盖每次启动的 zen，层键提供当前 tab 控制。
+settings-reason SessionTags.city 标签通过 session 控件整体设置，定位字段来自 session 的身份，不另提供原始字段编辑。
+settings-reason SessionTags.room 标签通过 session 控件整体设置，定位字段来自 session 的身份，不另提供原始字段编辑。
+settings-reason SessionTags.began 标签通过 session 控件整体设置，定位字段来自 session 的身份，不另提供原始字段编辑。
+settings-reason SessionTags.tags 标签通过 session 控件整体设置，定位字段来自 session 的身份，不另提供原始字段编辑。
+-/

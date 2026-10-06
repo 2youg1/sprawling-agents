@@ -107,7 +107,7 @@ fn setting() -> CorePlacement {
 /// The shares each run's commands ask for under the person's arm (D47),
 /// handed to the runtime through `Hands`.
 pub(crate) fn run_shares() -> Shares {
-    shares_of(setting(), crate::monitor::memory::read().physical)
+    shares_of(setting(), memory_ceiling())
 }
 
 /// The pinned arm's remaining processors, saved before the core joins
@@ -124,29 +124,27 @@ pub(crate) fn run_affinity() -> runtime::backlog::RunAffinity {
     pinned::run_affinity()
 }
 
-/// What one arm asks for each run: nothing with placement off, an even
-/// CPU share for the other three, and with `"soft_shares"` a memory limit
-/// of half the physical memory as well. A physical memory read as zero
-/// leaves the limit out, and says so on stderr.
-fn shares_of(arm: CorePlacement, physical: u64) -> Shares {
-    match arm {
-        CorePlacement::Off => Shares::Unset,
-        CorePlacement::Soft | CorePlacement::Pinned => Shares::Cpu,
-        CorePlacement::SoftShares => match NonZeroU64::new(physical / RUN_MEMORY_PARTS) {
-            Some(limit) => Shares::CpuAndMemory { limit },
-            None => {
-                eprintln!(
-                    "each run keeps no memory limit: this machine's memory reads as {physical} bytes"
-                );
-                Shares::Cpu
-            }
-        },
+/// Reads only a User-entered ceiling; invalid settings are reported.
+fn memory_ceiling() -> Option<NonZeroU64> {
+    match accounting::person::read() {
+        Ok(answer) => answer.core.memory_bytes,
+        Err(err) => {
+            eprintln!("run memory ceiling cannot be read: {err}");
+            None
+        }
     }
 }
 
-/// A run under `"soft_shares"` may commit one part in this many of the
-/// physical memory (`crates/runtime/spec/Tools/Exec.lean` D29).
-const RUN_MEMORY_PARTS: u64 = 2;
+/// Only soft_shares requests the explicitly entered memory ceiling.
+fn shares_of(arm: CorePlacement, limit: Option<NonZeroU64>) -> Shares {
+    match (arm, limit) {
+        (CorePlacement::Off, _) => Shares::Unset,
+        (CorePlacement::Soft | CorePlacement::Pinned, _) | (CorePlacement::SoftShares, None) => {
+            Shares::Cpu
+        }
+        (CorePlacement::SoftShares, Some(limit)) => Shares::CpuAndMemory { limit },
+    }
+}
 
 /// Lifts this process out of the throttling background work gets,
 /// telling the reason once when the platform refuses (D40).
@@ -216,10 +214,7 @@ pub(crate) fn report() -> String {
             format!("{} ({})", describe(&read), pinned::clause(&seats_of(&read)))
         }
     };
-    let runs = runs_share(
-        shares_of(arm, crate::monitor::memory::read().physical),
-        platform_shares(),
-    );
+    let runs = runs_share(shares_of(arm, memory_ceiling()), platform_shares());
     format!("{threads}; {runs}{unread}")
 }
 

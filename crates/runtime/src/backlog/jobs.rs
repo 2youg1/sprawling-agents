@@ -131,7 +131,7 @@ impl Jobs {
     pub(super) fn native_job(
         &mut self,
         owner: RunId,
-        memory: NonZeroUsize,
+        memory: Option<NonZeroUsize>,
         affinity: RunAffinity,
     ) -> Result<NonZeroUsize, AxError> {
         use crate::tools::native_windows::denied;
@@ -147,8 +147,12 @@ impl Jobs {
             .job
             .as_ref()
             .ok_or_else(|| denied("create run Job", "Job owner disappeared"))?;
-        desktop_ffi::cpu::job_share(job.handle(), RUN_CPU_WEIGHT, memory.get())
-            .map_err(|err| denied("set run memory ceiling", format!("{err:?}")))?;
+        desktop_ffi::cpu::job_share(
+            job.handle(),
+            RUN_CPU_WEIGHT,
+            memory.map_or(0, NonZeroUsize::get),
+        )
+        .map_err(|err| denied("set run memory ceiling", format!("{err:?}")))?;
         if let RunAffinity::Mask(mask) = affinity {
             let mut info = job
                 .query_extended_limit_info()
@@ -157,11 +161,15 @@ impl Jobs {
             job.set_extended_limit_info(&info)
                 .map_err(|err| denied("set run Job affinity", err))?;
         }
-        run.share = Shares::CpuAndMemory {
-            limit: NonZeroU64::new(
-                u64::try_from(memory.get()).map_err(|err| denied("read run Job memory", err))?,
-            )
-            .ok_or_else(|| denied("read run Job memory", "zero memory"))?,
+        run.share = match memory {
+            None => Shares::Cpu,
+            Some(memory) => Shares::CpuAndMemory {
+                limit: NonZeroU64::new(
+                    u64::try_from(memory.get())
+                        .map_err(|err| denied("read run Job memory", err))?,
+                )
+                .ok_or_else(|| denied("read run Job memory", "zero memory"))?,
+            },
         };
         run.affinity = affinity;
         NonZeroUsize::new(usize::try_from(job.handle()).map_err(|err| denied("lend run Job", err))?)

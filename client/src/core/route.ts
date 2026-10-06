@@ -32,7 +32,7 @@ export const LENSES: readonly Lens[] = ["ledger", "archive", "bin", "log"];
 // (`views/settings/tree.ts`); this is only the set the address bar reads.
 export const SETUP_GROUPS = [
   "you", "accounts", "harnesses", "network", "remote", "run", "rules", "automation",
-  "skills", "tools", "appearance", "colours", "keys", "advanced", "about",
+  "skills", "tools", "performance", "appearance", "colours", "keys", "advanced", "about",
 ] as const;
 
 export type SetupGroup = (typeof SETUP_GROUPS)[number];
