@@ -83,6 +83,7 @@ pub(super) struct Status {
 #[derive(Default)]
 pub(super) struct History {
     statuses: Vec<Status>,
+    owner: Option<SecretRef>,
 }
 
 impl History {
@@ -91,7 +92,6 @@ impl History {
         let mut owned: Vec<Intent> = Vec::new();
         let mut pending: Option<Intent> = None;
         let mut latest = None;
-        let mut owner: Option<SecretRef> = None;
         for line in lines {
             if line.schema != SCHEMA {
                 return Err(HistoryFault::Invalid("unknown history schema"));
@@ -103,7 +103,8 @@ impl History {
                     }
                     if latest.is_some_and(|id| id >= intent.operation)
                         || intent.definition != DEFINITION
-                        || owner
+                        || history
+                            .owner
                             .as_ref()
                             .is_some_and(|previous| previous != &intent.owner)
                         || intent.original == intent.modified
@@ -132,7 +133,7 @@ impl History {
                             "apply differs from its recommendation",
                         ));
                     }
-                    owner = Some(intent.owner.clone());
+                    history.owner = Some(intent.owner.clone());
                     latest = Some(intent.operation);
                     history.statuses.push(Status {
                         operation: intent.operation,
@@ -176,6 +177,10 @@ impl History {
             }
         }
         Ok(history)
+    }
+
+    pub(super) fn owner(&self) -> Option<&SecretRef> {
+        self.owner.as_ref()
     }
 
     pub(super) fn statuses(&self) -> &[Status] {

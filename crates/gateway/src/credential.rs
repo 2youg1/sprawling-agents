@@ -17,6 +17,7 @@
 //! and session memory.
 
 mod custodian;
+pub mod identity;
 mod vault;
 
 pub use custodian::{Custodian, Custody, Store};

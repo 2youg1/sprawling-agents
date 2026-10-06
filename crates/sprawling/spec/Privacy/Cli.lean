@@ -9,7 +9,8 @@
 
 pub fn status() -> Result<String, AxError> 通过 Home::detect().privacy_history()
 先读取真实 Windows identity，失败时不打开日志；调用 journal::read 后通过
-平台 Vault 核对每一条 Prepared 的 owner，再序列化 History::statuses。
+History::fold 已核对所有 Prepared 的 owner 引用一致，入口通过平台 Vault
+核对这一引用的真实身份，再序列化 History::statuses。
 空历史不访问 Vault，没有 city 参数，没有网络或 wire。
 main::verbs 的唯一 spelling 为 privacy status，Effect::ReadsOnly；main::router
 直接调用 status，输出一行 JSON，失败输出 AxError 与 recovery 并退出失败。
