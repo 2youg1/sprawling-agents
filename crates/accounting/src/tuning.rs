@@ -83,7 +83,29 @@ pub(crate) fn tuning_of(wire: wire::EndpointTuning) -> Result<gateway::EndpointT
 pub(crate) fn tuning_as_attached(tuning: &gateway::EndpointTuning) -> wire::EndpointTuning {
     wire::EndpointTuning {
         accounts: tuning.accounts.clone(),
-        ..wire::EndpointTuning::default()
+        label: tuning.label.clone(),
+        timeout_ms: tuning.timeout_ms,
+        request_max_retries: tuning.request_max_retries.stated(),
+        stream_idle_timeout_ms: tuning.stream_idle_timeout_ms,
+        headers: tuning
+            .extra_headers
+            .iter()
+            .map(|(name, value)| wire::HeaderPair {
+                name: name.clone(),
+                value: value.spelled(),
+            })
+            .collect(),
+        overrides: tuning
+            .overrides
+            .iter()
+            .map(|(pointer, value)| wire::BodyOverride {
+                pointer: pointer.clone(),
+                value: value.clone(),
+            })
+            .collect(),
+        proxying: Some(tuning.proxying),
+        max_in_flight: tuning.max_in_flight.map(gateway::MaxInFlight::get),
+        account_retries: tuning.account_retries,
     }
 }
 

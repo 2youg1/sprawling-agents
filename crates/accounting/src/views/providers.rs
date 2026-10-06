@@ -196,13 +196,30 @@ fn settled_search(
     addr: &Address,
     vault: Option<&Vault>,
 ) -> Result<wire::SettledSearch, AxError> {
-    let (_, _, _) = (city_root, addr, vault);
+    let (configuration, from) = city::settled_search(city_root, addr)?.map_or(
+        (SearchConfiguration::Default, wire::ConfigLayer::Default),
+        |(configuration, layer)| (configuration, rung_of(layer)),
+    );
+    let city = city::city_search(city_root)?;
+    let account_status = match &city {
+        Some(SearchConfiguration::Custom { suppliers, .. }) => {
+            let custodian = vault.map(lock).transpose()?;
+            suppliers
+                .iter()
+                .map(|supplier| wire::SupplierAccounts {
+                    supplier: supplier.id.clone(),
+                    accounts: statuses(&supplier.accounts, custodian.as_deref()),
+                })
+                .collect()
+        }
+        Some(SearchConfiguration::Default | SearchConfiguration::Off) | None => Vec::new(),
+    };
     Ok(wire::SettledSearch {
-        configuration: SearchConfiguration::Default,
-        from: wire::ConfigLayer::Default,
-        city: None,
+        configuration,
+        from,
+        city,
         default_url: city::default_search_supplier()?.url,
-        account_status: Vec::new(),
+        account_status,
     })
 }
 
@@ -242,9 +259,18 @@ fn statuses(
 /// environment's pair of states, and the vault's pair is read by
 /// whether it holds a value.
 fn key_state(account: &ProviderAccount, custodian: Option<&gateway::Custodian>) -> wire::KeyState {
-    match (&account.reference, custodian) {
-        (None, _) => wire::KeyState::Anonymous,
-        (Some(_), _) => wire::KeyState::Unread,
+    let Some(reference) = &account.reference else {
+        return wire::KeyState::Anonymous;
+    };
+    let Some(custodian) = custodian else {
+        return wire::KeyState::Unread;
+    };
+    let described = custodian.describe(reference);
+    match (described.writable, described.configured) {
+        (true, true) => wire::KeyState::Stored,
+        (true, false) => wire::KeyState::Missing,
+        (false, true) => wire::KeyState::Environment,
+        (false, false) => wire::KeyState::EnvironmentUnusable,
     }
 }
 

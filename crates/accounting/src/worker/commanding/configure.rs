@@ -157,7 +157,9 @@ impl RunWorker {
         &mut self,
         settings: wire::CitySettings,
     ) -> Result<(), AxError> {
-        let search: Option<Result<(), AxError>> = None;
+        let search = settings
+            .search
+            .map(|search| city::write_search(&self.city_root, &search));
         let others = settings
             .keep_warm
             .map(city::CitySetting::KeepWarm)
