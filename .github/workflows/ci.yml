@@ -145,6 +145,10 @@ jobs:
       - uses: taiki-e/install-action@v2
         with:
           tool: just
+      - name: native payloads in system channel validation
+        env:
+          PYTHONUTF8: "1"
+        run: python tools/xtask/src/channel/validate_test.py
       - name: fmt
         run: just fmt-check
       - name: the gates that read sources
