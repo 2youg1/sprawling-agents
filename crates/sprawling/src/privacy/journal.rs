@@ -50,7 +50,13 @@ fn decode(bytes: &[u8]) -> Result<History, HistoryFault> {
     }
     let mut lines = Vec::new();
     for line in bytes.split_inclusive(|byte| *byte == b'\n') {
-        lines.push(serde_json::from_slice::<Line>(line).map_err(HistoryFault::Decode)?);
+        lines.push(serde_json::from_slice::<Line>(line).map_err(|source| {
+            HistoryFault::Decode {
+                line: source.line(),
+                column: source.column(),
+                category: source.classify(),
+            }
+        })?);
     }
     History::fold(lines)
 }
@@ -67,6 +73,8 @@ mod tests {
     use super::*;
     use std::num::NonZeroU64;
 
+    const PRIVATE_INPUT: &str = "fixture-private-principal";
+
     fn intent(operation: u64, original: RawValue) -> Intent {
         let modified = RawValue::Present {
             kind: 1,
@@ -76,7 +84,7 @@ mod tests {
             operation: NonZeroU64::new(operation).unwrap(),
             control: Control::WindowsUserPowershellTelemetry,
             definition: DEFINITION,
-            owner: "fixture-owner".to_owned(),
+            owner: kernel::SecretRef::new("privacy", "fixture-owner").unwrap(),
             original,
             modified: modified.clone(),
             recommendation: modified,
@@ -219,7 +227,7 @@ mod tests {
     fn unknown_fields_duplicate_ids_and_cross_identity_history_are_refused() {
         let first = intent(1, RawValue::Absent { key_existed: true });
         let mut other = intent(2, first.original.clone());
-        other.owner = "another-fixture-owner".to_owned();
+        other.owner = kernel::SecretRef::new("privacy", "another-fixture-owner").unwrap();
         assert!(
             decode(&bytes(&[
                 prepared(first.clone()),
@@ -244,6 +252,52 @@ mod tests {
         let mut line = serde_json::to_vec(&value).unwrap();
         line.push(b'\n');
         assert!(decode(&line).is_err());
+    }
+
+    #[test]
+    fn plaintext_identity_and_old_schema_are_refused_without_rewriting() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("fixture.jsonl");
+        let prepared = prepared(intent(1, RawValue::Absent { key_existed: true }));
+        for (schema, owner) in [(SCHEMA, PRIVATE_INPUT), (1, "secret:privacy/fixture-owner")] {
+            let mut line = serde_json::to_value(&prepared).unwrap();
+            *line.pointer_mut("/schema").unwrap() = serde_json::json!(schema);
+            *line.pointer_mut("/event/intent/owner").unwrap() = serde_json::json!(owner);
+            let mut before = serde_json::to_vec(&line).unwrap();
+            before.push(b'\n');
+            std::fs::write(&path, &before).unwrap();
+            assert!(read(&path).is_err(), "unsafe history was accepted");
+            assert_eq!(std::fs::read(&path).unwrap(), before);
+        }
+    }
+
+    #[test]
+    fn decoding_refusal_never_repeats_private_input() {
+        let prepared = prepared(intent(1, RawValue::Absent { key_existed: true }));
+        for field in ["control", "unexpected", "owner"] {
+            let mut line = serde_json::to_value(&prepared).unwrap();
+            if field == "unexpected" {
+                line.pointer_mut("/event/intent")
+                    .unwrap()
+                    .as_object_mut()
+                    .unwrap()
+                    .insert(PRIVATE_INPUT.to_owned(), serde_json::json!(true));
+            } else {
+                *line.pointer_mut(&format!("/event/intent/{field}")).unwrap() =
+                    serde_json::json!(PRIVATE_INPUT);
+            }
+            let mut before = serde_json::to_vec(&line).unwrap();
+            before.push(b'\n');
+            let fault = match decode(&before) {
+                Ok(_) => panic!("private input accepted"),
+                Err(fault) => fault,
+            };
+            assert!(!format!("{fault:?}").contains(PRIVATE_INPUT));
+            let fault = fault.into_ax();
+            assert!(!fault.to_string().contains(PRIVATE_INPUT));
+            assert_eq!(fault.code(), &kernel::AxCode::StorageFatal);
+            assert!(fault.subject().contains("column"));
+        }
     }
 
     proptest::proptest! {
