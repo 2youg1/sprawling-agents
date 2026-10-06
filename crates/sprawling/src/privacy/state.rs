@@ -107,15 +107,13 @@ struct Summary {
 #[derive(Debug, Default)]
 pub(super) struct History(Fold);
 
-/// What a history holds for the one operation about to run, released once
-/// its owner reference passed the identity check (Privacy D66).
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "read only by the coordinator, not yet called")
-)]
+/// What a history holds, released once its owner reference passed the
+/// identity check (Privacy D66). `O` is what the check returned: the
+/// owner reference new intents are prepared under, or `()` for a reader
+/// that will not write (Privacy.State).
 #[derive(Debug)]
-pub(super) struct Holdings<'h> {
-    owner: SecretRef,
+pub(super) struct Holdings<'h, O = SecretRef> {
+    owner: O,
     owned: &'h BTreeMap<PrivacyControl, Vec<Intent>>,
     unresolved: Option<&'h Intent>,
     latest: Option<NonZeroU64>,
@@ -183,19 +181,15 @@ impl History {
 
     /// The ownership stacks, the unresolved operation and the next
     /// operation number, released once `authorize` accepts the recorded
-    /// owner reference (`None` for an empty history) and names the owner
-    /// every new intent is prepared under.
+    /// owner reference (`None` for an empty history) and returns the owner
+    /// every new intent is prepared under, or `()` for a reader.
     ///
     /// # Errors
     /// The refusal `authorize` returns; nothing of the history is released.
-    #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "read only by the coordinator, not yet called")
-    )]
-    pub(super) fn holdings(
+    pub(super) fn holdings<O>(
         &self,
-        authorize: impl FnOnce(Option<&SecretRef>) -> Result<SecretRef, AxError>,
-    ) -> Result<Holdings<'_>, AxError> {
+        authorize: impl FnOnce(Option<&SecretRef>) -> Result<O, AxError>,
+    ) -> Result<Holdings<'_, O>, AxError> {
         let owner = authorize(self.0.summary.as_ref().map(|summary| &summary.owner))?;
         Ok(Holdings {
             owner,
@@ -206,15 +200,21 @@ impl History {
     }
 }
 
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "read only by the coordinator, not yet called")
-)]
 impl Holdings<'_> {
     pub(super) fn owner(&self) -> &SecretRef {
         &self.owner
     }
 
+    /// The number the next operation takes; `None` once the numbers ran out.
+    pub(super) fn next_operation(&self) -> Option<NonZeroU64> {
+        match self.latest {
+            None => Some(NonZeroU64::MIN),
+            Some(latest) => latest.checked_add(1),
+        }
+    }
+}
+
+impl<O> Holdings<'_, O> {
     /// The operation that has no conclusion yet: prepared and never
     /// finished, or finished `Unknown` and never reconciled.
     pub(super) fn unresolved(&self) -> Option<&Intent> {
@@ -224,14 +224,6 @@ impl Holdings<'_> {
     /// The latest operation `control` still owns: the top of its stack.
     pub(super) fn latest_owned(&self, control: PrivacyControl) -> Option<&Intent> {
         self.owned.get(&control).and_then(|stack| stack.last())
-    }
-
-    /// The number the next operation takes; `None` once the numbers ran out.
-    pub(super) fn next_operation(&self) -> Option<NonZeroU64> {
-        match self.latest {
-            None => Some(NonZeroU64::MIN),
-            Some(latest) => latest.checked_add(1),
-        }
     }
 }
 

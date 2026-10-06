@@ -51,8 +51,8 @@ HistoryFault 的稳定 code 与 recovery 映射归 `bin::privacy::fault`，调�
   HKLM 值与计划任务经 `bin::privacy::elevation`；适配器的访问拒绝映射为 Privacy §12 的
   access_denied，UAC 被拒映射为 elevation_declined，其他失败带原因。计划任务没有父键，
   它的读数记录 key_existed 为 true，所以从不报告残留的空键。
-- 用户环境的写入在广播失败时仍是成功的写入：值已写下，读回判定结论；广播失败只影响已运行的
-  程序何时读到它。
+- 用户环境的值写下而广播失败时，Host 把广播失败作为写入报告的失败交给 coordinator：结论照旧由
+  读回决定（值已写下即 Applied），广播失败只影响已运行的程序何时读到它。
 -/
 
 /-! D53 status 的摘要也是身份披露，只交给 owner 引用在平台 Vault 中绑定的身份

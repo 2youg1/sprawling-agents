@@ -122,7 +122,7 @@ pub(crate) enum Snapshot {
 /// registry value's parent key exists, which is recorded beside the value
 /// and never compared as part of it (Privacy.State D58).
 #[cfg_attr(
-    not(test),
+    not(any(test, windows)),
     expect(dead_code, reason = "read only by the coordinator, not yet called")
 )]
 #[derive(Debug, Clone, PartialEq, Eq)]

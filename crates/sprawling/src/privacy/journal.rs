@@ -37,10 +37,10 @@ pub(super) fn read(path: &Path) -> Result<History, HistoryFault> {
 /// before its bytes are read and released on drop, so the fold the
 /// caller decides from is the file every append extends.
 #[cfg_attr(
-    not(test),
+    not(any(test, windows)),
     expect(
         dead_code,
-        reason = "the coordinator is its one writer and is not built yet"
+        reason = "the coordinator is its one writer and runs on Windows only"
     )
 )]
 pub(super) struct LockedJournal {
@@ -50,10 +50,10 @@ pub(super) struct LockedJournal {
 }
 
 #[cfg_attr(
-    not(test),
+    not(any(test, windows)),
     expect(
         dead_code,
-        reason = "the coordinator is its one writer and is not built yet"
+        reason = "the coordinator is its one writer and runs on Windows only"
     )
 )]
 impl LockedJournal {

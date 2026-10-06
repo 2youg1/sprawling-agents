@@ -76,13 +76,6 @@ pub(in crate::privacy) enum TaskFault {
 ///
 /// # Errors
 /// [`TaskFault`]; a fault is never read as an absent task.
-#[cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "the coordinator reads tasks back; until it exists only tests read"
-    )
-)]
 pub(in crate::privacy) fn read(path: &str, name: &str) -> Result<TaskState, TaskFault> {
     decoded(&asked(READ, path, name, None)?)
 }

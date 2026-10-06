@@ -8,31 +8,31 @@
 pub mod cli;
 mod controls;
 #[cfg_attr(
-    not(test),
+    not(any(test, windows)),
     expect(
         dead_code,
-        reason = "the privacy write verbs are the coordinator's production caller and are not built yet"
+        reason = "the privacy write verbs run the coordinator on Windows only"
     )
 )]
 mod coordinator;
+#[cfg(windows)]
+mod elevation;
 #[cfg_attr(
-    not(test),
+    not(any(test, windows)),
     expect(
         dead_code,
-        reason = "the privacy write verbs are the coordinator's production caller and are not built yet"
+        reason = "the privacy write verbs run the coordinator on Windows only"
     )
 )]
 mod fault;
-#[cfg(windows)]
-mod elevation;
 mod identity;
 mod journal;
 mod originals;
 #[cfg_attr(
-    not(test),
+    not(any(test, windows)),
     expect(
         dead_code,
-        reason = "the privacy write verbs are the coordinator's production caller and are not built yet"
+        reason = "the privacy write verbs run the coordinator on Windows only"
     )
 )]
 mod plan;

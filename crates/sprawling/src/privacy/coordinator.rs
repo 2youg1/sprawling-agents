@@ -99,8 +99,9 @@ pub(super) enum Command {
     },
 }
 
-/// A command that ended well.
-#[derive(Debug, PartialEq, Eq)]
+/// A command that ended well, as the CLI prints it.
+#[derive(Debug, PartialEq, Eq, serde::Serialize)]
+#[serde(tag = "done", rename_all = "snake_case")]
 pub(super) enum Done {
     Applied {
         operation: NonZeroU64,

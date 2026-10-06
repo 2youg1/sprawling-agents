@@ -11,18 +11,8 @@
 //! neither the PowerShell this module names nor the facts it reports can
 //! be redirected by another process of the same user.
 
-#[expect(
-    dead_code,
-    reason = "the coordinator is the caller; until it exists nothing reads or writes the user environment"
-)]
 pub(super) mod environment;
-#[cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "the coordinator reads through this adapter; until it exists only tests read"
-    )
-)]
+pub(super) mod host;
 pub(super) mod registry;
 pub(super) mod task;
 

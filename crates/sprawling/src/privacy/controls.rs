@@ -79,7 +79,7 @@ pub(crate) struct Editions {
 }
 
 #[cfg_attr(
-    not(test),
+    not(any(test, windows)),
     expect(
         dead_code,
         reason = "the privacy answer and the coordinator are its readers; until they exist only tests and the compile-time tallies read it"
@@ -87,7 +87,7 @@ pub(crate) struct Editions {
 )]
 const REG_SZ: u32 = 1;
 #[cfg_attr(
-    not(test),
+    not(any(test, windows)),
     expect(
         dead_code,
         reason = "the privacy answer and the coordinator are its readers; until they exist only tests and the compile-time tallies read it"
@@ -201,7 +201,7 @@ impl Written {
     /// host does not have). Mirrors `Recommendation.target` in
     /// `crates/sprawling/spec/Privacy.lean`.
     #[cfg_attr(
-        not(test),
+        not(any(test, windows)),
         expect(
             dead_code,
             reason = "the privacy answer and the coordinator are its readers; until they exist only tests and the compile-time tallies read it"

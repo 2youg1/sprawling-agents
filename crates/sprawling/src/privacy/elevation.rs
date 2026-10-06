@@ -33,13 +33,6 @@ const DECLINED: i32 = 1223;
 /// reach this script through the environment, so it carries no quoting
 /// rule; a declined prompt surfaces as a `Win32Exception` somewhere in
 /// the exception chain and exits with its code.
-#[cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "the coordinator starts elevated writes; until it exists only a test parses this script"
-    )
-)]
 const ELEVATE: &str = r"
 $ErrorActionPreference='Stop'
 $start = New-Object System.Diagnostics.ProcessStartInfo
@@ -73,10 +66,6 @@ pub(in crate::privacy) struct MachineWrite {
 /// Why the elevated write did not report success. None of these is an
 /// outcome: the parent reads the target back either way.
 #[derive(Debug)]
-#[expect(
-    dead_code,
-    reason = "the coordinator starts elevated writes and reports their faults; until it exists only the child side runs"
-)]
 pub(in crate::privacy) enum ElevationFault {
     /// The person declined the UAC prompt.
     Declined,
@@ -95,10 +84,6 @@ pub(in crate::privacy) enum ElevationFault {
 ///
 /// # Errors
 /// [`ElevationFault`].
-#[expect(
-    dead_code,
-    reason = "the coordinator starts elevated writes and reports their faults; until it exists only the child side runs"
-)]
 pub(in crate::privacy) fn write(write: &MachineWrite) -> Result<(), ElevationFault> {
     let encoded = serde_json::to_vec(write)
         .map_err(|source| ElevationFault::Unavailable(refused(&source.to_string())))?;
@@ -256,10 +241,6 @@ fn invalid(subject: &str) -> AxError {
     .with_recovery("nothing was written; this verb is started only by the privacy page's elevation")
 }
 
-#[expect(
-    dead_code,
-    reason = "the coordinator starts elevated writes and reports their faults; until it exists only the child side runs"
-)]
 fn refused(subject: &str) -> AxError {
     AxError::failure(
         AxCode::ToolUnavailable,
