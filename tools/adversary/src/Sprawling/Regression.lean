@@ -375,7 +375,7 @@ private def attachHelper : List String :=
   , "        secret: None,"
   , "        auth_header: None,"
   , s!"        admit: vec![{quoted unlistedModel}.to_owned()],"
-  , "        tuning: wire::EndpointTuning { accounts: None, ..Default::default() },"
+  , "        tuning: wire::EndpointTuning::default(),"
   , "        idem: IdemKey::derive(&RunId::CITY, Seq::FIRST, name.as_bytes()),"
   , "    })"
   , "}" ]
