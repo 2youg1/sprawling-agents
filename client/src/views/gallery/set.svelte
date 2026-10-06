@@ -71,7 +71,7 @@
         };
       }
       if (typeof query === "object" && "config" in query) {
-        return { config: { addr: HALL, effort: { effort: "high", from: "city" }, second: { domain: { max: 90, min: 31 }, from: "default", percent: 65 }, tuning: { from: "default", proxying: "except_local", timeout_ms: 600_000 } } };
+        return { config: { addr: HALL, effort: { effort: "high", from: "city" }, second: { domain: { max: 90, min: 31 }, from: "default", percent: 65 }, tuning: { from: "default", proxying: "except_local", timeout_ms: 600_000, account_retries: "two" } } };
       }
       if (typeof query === "object" && "document" in query) {
         if (query.document.at === CITY_CONFIG) return { document: text(CITY_CONFIG, CONFIG) };
