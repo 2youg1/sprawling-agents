@@ -334,7 +334,12 @@ print('cpu seconds per wall second',ratio)
             .unwrap()
             .is_empty()
     );
-    for halt in [true, false] {
+    enum Ending {
+        Halt,
+        Release,
+        Natural,
+    }
+    for ending in [Ending::Halt, Ending::Release, Ending::Natural] {
         let short = Backlog::with_window(crate::PollBudget::new(1, 1));
         let owner = setup(work.path(), None, None);
         let run = owner.run;
@@ -342,15 +347,25 @@ print('cpu seconds per wall second',ratio)
         let background = ExecTool::new(owner, Box::new(EchoSandbox::new()), short.clone())
             .unwrap()
             .with_container(limits.clone(), runtime.clone());
-        let started = background.invoke(&call(json!({"program":{"path":"python3","args":["-c",
-            "import subprocess,time; subprocess.Popen(['python3','-c','import time; time.sleep(600)']); time.sleep(600)"]}}))).unwrap();
+        let delay = match ending {
+            Ending::Halt | Ending::Release => 600,
+            Ending::Natural => 5,
+        };
+        let target = format!(
+            "import subprocess,time; subprocess.Popen(['python3','-c','import time; time.sleep(600)']); time.sleep({delay})"
+        );
+        let started = background
+            .invoke(&call(
+                json!({"program":{"path":"python3","args":["-c",target]}}),
+            ))
+            .unwrap();
         assert_eq!(
             serde_json::to_value(started.result).unwrap()["outcome"],
             json!("backgrounded")
         );
         assert_eq!(short.standing(&scope).unwrap().len(), 1);
         let inventory = std::process::Command::new(&program)
-            .args(["container", "ls", "--format", "{{.Names}}"])
+            .args(["container", "ls", "--all", "--format", "{{.Names}}"])
             .output()
             .unwrap();
         assert!(inventory.status.success());
@@ -364,21 +379,40 @@ print('cpu seconds per wall second',ratio)
             ContainerEngine::Docker => vec!["-eo", "pid"],
             ContainerEngine::Podman => vec!["hpid"],
         };
-        let tree = std::process::Command::new(&program)
-            .args(["top", &name])
-            .args(columns)
-            .output()
-            .unwrap();
-        assert!(tree.status.success());
-        let pids: Vec<u32> = String::from_utf8(tree.stdout)
-            .unwrap()
-            .lines()
-            .skip(1)
-            .map(|line| line.trim().parse().unwrap())
-            .collect();
+        let mut pids = Vec::<u32>::new();
+        for _ in 0..250 {
+            let tree = std::process::Command::new(&program)
+                .args(["top", &name])
+                .args(&columns)
+                .output()
+                .unwrap();
+            if tree.status.success() {
+                pids = String::from_utf8(tree.stdout)
+                    .unwrap()
+                    .lines()
+                    .skip(1)
+                    .map(|line| line.trim().parse().unwrap())
+                    .collect();
+                if pids.len() >= 2 {
+                    break;
+                }
+            }
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
         assert!(pids.len() >= 2, "the target must have a live descendant");
-        if halt {
-            short.halt(Some(&scope)).unwrap();
+        match ending {
+            Ending::Halt => short.halt(Some(&scope)).unwrap(),
+            Ending::Release => {}
+            Ending::Natural => {
+                for _ in 0..1000 {
+                    short.harvest(run).unwrap();
+                    if short.standing(&scope).unwrap().is_empty() {
+                        break;
+                    }
+                    std::thread::sleep(std::time::Duration::from_millis(10));
+                }
+                assert!(short.standing(&scope).unwrap().is_empty());
+            }
         }
         drop(background);
         short.harvest(run).unwrap();
