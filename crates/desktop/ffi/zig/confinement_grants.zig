@@ -12,18 +12,18 @@ extern "kernel32" fn ReleaseMutex(mutex: api.HANDLE) callconv(.winapi) api.BOOL;
 extern "userenv" fn DeriveAppContainerSidFromAppContainerName(name: [*:0]const u16, sid: *?*anyopaque) callconv(.winapi) i32;
 extern "advapi32" fn GetSecurityDescriptorControl(descriptor: *anyopaque, control: *u16, revision: *u32) callconv(.winapi) api.BOOL;
 const mutex_access: u32 = api.synchronize | 1;
-const mutex_name = std.unicode.utf8ToUtf16LeStringLiteral("Global\\sprawling.native.acl");
+const mutex_name = wideText("Global\\sprawling.native.acl");
 
 fn lastError() u32 {
     return @intFromEnum(std.os.windows.GetLastError());
 }
 
 fn update(path: [*:0]const u16, sid: *anyopaque, mode: u32, declared: bool) u32 {
-    const sddl = std.unicode.utf8ToUtf16LeStringLiteral(std.fmt.comptimePrint("D:(A;;0x{x};;;AU)", .{mutex_access}));
+    const sddl = comptime wideText(std.fmt.comptimePrint("D:(A;;0x{x};;;AU)", .{mutex_access}));
     var descriptor: ?*anyopaque = null;
-    if (api.ConvertStringSecurityDescriptorToSecurityDescriptorW(sddl, 1, &descriptor, null) == .FALSE) return lastError();
+    if (api.ConvertStringSecurityDescriptorToSecurityDescriptorW(&sddl, 1, &descriptor, null) == .FALSE) return lastError();
     const security: api.Security = .{ .descriptor = descriptor, .inherit = .FALSE };
-    const opened = CreateMutexExW(&security, mutex_name, 0, mutex_access);
+    const opened = CreateMutexExW(&security, &mutex_name, 0, mutex_access);
     var result: u32 = if (opened == null) lastError() else 0;
     if (api.LocalFree(descriptor) != null and result == 0) result = lastError();
     const mutex = opened orelse return result;
@@ -97,4 +97,11 @@ pub fn revoke(profile: [*:0]const u16, record: *api.Record) u32 {
     record.grant_paths = 0;
     record.grant_units = 0;
     return 0;
+}
+
+fn wideText(comptime text: []const u8) [text.len:0]u16 {
+    var units: [text.len:0]u16 = @splat(0);
+    const used = std.unicode.utf8ToUtf16Le(&units, text) catch |err| @compileError(@errorName(err));
+    units[used] = 0;
+    return units;
 }
