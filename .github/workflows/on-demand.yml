@@ -598,7 +598,7 @@ jobs:
         shell: pwsh
         run: .github/workflows/install-windows.ps1 -Archives target/package -Evidence "${{ steps.fresh.outputs.dir }}/logs/install"
       - name: browser for the served production client
-        if: ${ !cancelled() && steps.fresh.outcome == 'success' }
+        if: ${{ !cancelled() && steps.fresh.outcome == 'success' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -609,7 +609,7 @@ jobs:
           ! command -v cygpath > /dev/null 2>&1 || module="$(cygpath -m "$module")"
           echo "PLAYWRIGHT_MODULE=$module" >> "$GITHUB_ENV"
       - name: real settings routes, keyboard focus and cropped pixels
-        if: ${ !cancelled() && steps.fresh.outcome == 'success' }
+        if: ${{ !cancelled() && steps.fresh.outcome == 'success' }}
         shell: bash
         run: |
           set -euo pipefail
