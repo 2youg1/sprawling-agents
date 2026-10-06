@@ -70,15 +70,15 @@ sprawling does not update automatically; check for updates in Settings and follo
 
 ## Five capabilities
 
-**Long-running work and automation.** Plans, decisions and handoffs stay in readable documents, giving agents a record to continue across sessions. Hierarchical plans coordinate larger tasks, while roles, skills and tool integrations let you define the workflow. A standing goal keeps dispatching ready tasks until no work can advance.
+**Long-running work and automation.** Plans, decisions and handoffs stay in readable documents, giving agents a record to continue across sessions. Hierarchical plans coordinate larger tasks, while roles, skills and tool integrations let you define the workflow. A standing goal dispatches ready plan nodes and waits for active runs; [daily operation](docs/operating.md) explains how to steer, pause and stop work.
 
-**Social simulation.** Agents can find one another, exchange messages, coordinate work and wait for replies without you relaying each conversation. Your main agent explains the work and reports its progress; the recorded exchanges let you inspect how the group interacts.
+**Social simulation.** Agents can find one another, exchange messages, coordinate work and wait for replies without you relaying each conversation. Your main agent explains the work and reports its progress; the recorded exchanges let you inspect how the group interacts, and [playback](crates/city/skills/playback/SKILL.md) exports a history you can check against the Ledger.
 
 **Easy to start.** Conversations, skills and tool connections follow patterns familiar from other agents. The [getting-started guide](docs/getting-started.md) offers separate routes for agent users moving their configuration and chat users starting their first project, through the first task, reading its report and stopping work.
 
 **Built-in monitoring.** Inspect run timings, model calls, token use, costs and resource readings as work progresses. Use the monitor and `sprawling gauge` to build performance evals around your own workload and compare readings on your hardware. The [performance guide](docs/performance.md) describes counters, reproduction and measurement provenance.
 
-**Customisation and development.** Define how agents work through role documents, project rules and skills; connect the models and MCP tools your tasks need, or bring a supported harness over ACP. Build another interface against the wire and use the documented seams for runtime changes. These parts let you build workflows and an AgentOS around your own requirements.
+**Customisation and development.** Define how agents work through role documents, project rules and skills; connect the models and MCP tools your tasks need, or bring a supported harness over ACP. Build another interface against the wire and use the documented seams for runtime changes. These parts suit a workflow or AgentOS that needs persistent project teams, document-based handoffs and a shared history on one machine; [integrations](docs/integrations.md) covers the existing connections, and [architecture](ARCHITECTURE.md#8-where-to-change-what) locates runtime changes.
 
 ## Documentation
 
