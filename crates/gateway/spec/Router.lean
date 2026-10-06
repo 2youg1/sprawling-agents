@@ -76,8 +76,11 @@ endpoint_attached.tuning.accounts 为同一列表的 Ledger 形状，旧记录�
 保留规则只由 EndpointBook::accounts_for_attachment 决定，登记面与重放均调用它。
 校验住 kernel::event::record::validate_provider_accounts；probe 与 adapter
 从 AttachedEndpoint::first_auth 取得凭据，snapshot 保留同一账号列表，
-显式列表不回退原 auth。Accounts 模型以通过账号校验的提交为输入；空表、
-重复引用和非法 header 由 Rust 账户校验回归判断。
+显式列表不回退原 auth。每次构造 Model adapter 都采用当时列表的首账号；
+Session 没有成功账号绑定，重排后的新 adapter 与重启后构造的 adapter
+仍按列表顺序选取首账号。账号声明影响凭据解析与登记，失败处理由 runtime
+既有的 Provider 策略决定。Accounts 模型以通过账号校验的提交为输入；
+空表、重复引用和非法 header 由 Rust 账户校验回归判断。
 -/
 
 /-! D28 保持原登记事件与 Vault 格式，以完整有序列表为一次原子替换，避免逐账号命令
