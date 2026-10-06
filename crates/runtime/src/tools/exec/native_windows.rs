@@ -20,6 +20,7 @@ use kernel::{AxCode, AxError};
 
 /// Native CPU cap is independent of the optional User memory ceiling.
 const DEFAULT_CPU_RATE: u16 = 5_000;
+const REPARSE_POINT_ATTRIBUTE: u32 = 0x400;
 
 pub(crate) struct Limits {
     pub(crate) memory: Option<NonZeroUsize>,
@@ -108,7 +109,7 @@ pub(crate) fn launch(
             let metadata = entry
                 .metadata()
                 .map_err(|err| denied("read toolchain entry type", err))?;
-            if metadata.file_attributes() & winsafe::co::FILE_ATTRIBUTE::REPARSE_POINT.raw() != 0 {
+            if metadata.file_attributes() & REPARSE_POINT_ATTRIBUTE != 0 {
                 continue;
             }
             let path = entry.path();
