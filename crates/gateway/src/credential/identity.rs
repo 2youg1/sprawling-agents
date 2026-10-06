@@ -7,18 +7,26 @@
 
 use super::vault::{KeyringVault, Vault};
 use kernel::{AxCode, AxError, SecretRef};
+use zeroize::Zeroizing;
 
 /// Compares a sampled OS identity with a platform Vault binding without exposing it.
 ///
 /// # Errors
 /// Missing, mismatched or inaccessible bindings refuse disclosure. No probe or write occurs.
 pub fn verify_platform_identity(reference: &SecretRef, observed: &str) -> Result<(), AxError> {
-    verify(&KeyringVault, reference, observed)
+    verify_identity_binding(reference, observed, |reference| KeyringVault.get(reference))
 }
 
-fn verify(vault: &impl Vault, reference: &SecretRef, observed: &str) -> Result<(), AxError> {
-    let stored = vault
-        .get(reference)
+/// Verifies an identity through a read-only binding source without returning its value.
+///
+/// # Errors
+/// Missing, mismatched or inaccessible bindings refuse disclosure; source diagnostics are removed.
+pub fn verify_identity_binding(
+    reference: &SecretRef,
+    observed: &str,
+    read: impl FnOnce(&SecretRef) -> Result<Option<Zeroizing<String>>, AxError>,
+) -> Result<(), AxError> {
+    let stored = read(reference)
         .map_err(|source| refused(*source.code(), "platform identity binding unavailable"))?
         .ok_or_else(|| refused(AxCode::CredentialMissing, "privacy owner binding missing"))?;
     if observed.is_empty() || stored.as_str() != observed {
@@ -48,18 +56,25 @@ mod tests {
         let reference = SecretRef::new("privacy", "fixture-owner").unwrap();
         let mut vault = MemoryVault::default();
         assert_eq!(
-            verify(&vault, &reference, "fixture-owner")
-                .unwrap_err()
-                .code(),
+            verify_identity_binding(&reference, "fixture-owner", |reference| vault
+                .get(reference))
+            .unwrap_err()
+            .code(),
             &AxCode::CredentialMissing
         );
         vault
             .put(&reference, Zeroizing::new("fixture-owner".to_owned()))
             .unwrap();
-        assert!(verify(&vault, &reference, "fixture-owner").is_ok());
+        assert!(
+            verify_identity_binding(&reference, "fixture-owner", |reference| vault
+                .get(reference))
+            .is_ok()
+        );
         for observed in ["fixture-foreign", ""] {
             assert_eq!(
-                verify(&vault, &reference, observed).unwrap_err().code(),
+                verify_identity_binding(&reference, observed, |reference| vault.get(reference))
+                    .unwrap_err()
+                    .code(),
                 &AxCode::ConfigInvalid
             );
         }
@@ -94,7 +109,10 @@ mod tests {
             reads: Cell::new(0),
         };
         let reference = SecretRef::new("privacy", "fixture-owner").unwrap();
-        let error = verify(&vault, &reference, "private-fixture-input").unwrap_err();
+        let error = verify_identity_binding(&reference, "private-fixture-input", |reference| {
+            vault.get(reference)
+        })
+        .unwrap_err();
         assert_eq!(error.code(), &AxCode::ConfigInvalid);
         assert!(!format!("{error:?}").contains("private-fixture-input"));
         assert_eq!(vault.reads.get(), 1);

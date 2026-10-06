@@ -149,4 +149,144 @@ mod tests {
         assert_eq!(summary, r#"[{"operation":1,"outcome":"unresolved"}]"#);
         assert_eq!(std::fs::read(path).unwrap(), before);
     }
+
+    fn snapshot(steps: Vec<(u32, Vec<u8>, u8, bool)>) -> (Vec<u8>, usize) {
+        use super::super::state::{
+            Control, DEFINITION, Event, Intent, Line, Outcome, RawValue, SCHEMA,
+        };
+        let mut bytes = Vec::new();
+        let mut owned: Vec<Intent> = Vec::new();
+        let mut count = 0usize;
+        for (index, (kind, raw, outcome, restore)) in steps.into_iter().enumerate() {
+            let previous = if restore { owned.last() } else { None };
+            let modified = previous.map_or_else(
+                || RawValue::Present { kind, bytes: raw },
+                |previous| previous.original.clone(),
+            );
+            let intent = Intent {
+                operation: std::num::NonZeroU64::new(
+                    u64::try_from(index.checked_add(1).unwrap()).unwrap(),
+                )
+                .unwrap(),
+                control: Control::WindowsUserPowershellTelemetry,
+                definition: DEFINITION,
+                owner: SecretRef::new("privacy", "fixture-owner").unwrap(),
+                original: previous.map_or(RawValue::Absent { key_existed: false }, |previous| {
+                    previous.modified.clone()
+                }),
+                modified: modified.clone(),
+                recommendation: modified,
+                restore_of: previous.map(|previous| previous.operation),
+            };
+            let line = Line {
+                schema: SCHEMA,
+                event: Event::Prepared {
+                    intent: intent.clone(),
+                },
+            };
+            bytes.extend(serde_json::to_vec(&line).unwrap());
+            bytes.push(b'\n');
+            count = count.checked_add(1).unwrap();
+            if outcome == 3 {
+                break;
+            }
+            let result = match outcome {
+                0 => {
+                    if intent.restore_of.is_some() {
+                        Outcome::Restored
+                    } else {
+                        Outcome::Applied
+                    }
+                }
+                1 => Outcome::NotApplied,
+                2 => Outcome::Unknown,
+                _ => panic!("generator outcome outside its strategy"),
+            };
+            bytes.extend(
+                serde_json::to_vec(&Line {
+                    schema: SCHEMA,
+                    event: Event::Finished {
+                        operation: intent.operation,
+                        outcome: result,
+                    },
+                })
+                .unwrap(),
+            );
+            bytes.push(b'\n');
+            match result {
+                Outcome::Applied => owned.push(intent),
+                Outcome::Restored => {
+                    owned.pop().unwrap();
+                }
+                Outcome::NotApplied => (),
+                Outcome::Unknown => break,
+            }
+        }
+        (bytes, count)
+    }
+
+    fn snapshot_traces() -> impl proptest::strategy::Strategy<Value = Vec<(Vec<u8>, usize)>> {
+        use proptest::prelude::*;
+        proptest::collection::vec(
+            proptest::collection::vec(
+                (
+                    any::<u32>(),
+                    proptest::collection::vec(any::<u8>(), 0..64),
+                    0u8..4,
+                    any::<bool>(),
+                ),
+                0..24,
+            )
+            .prop_map(snapshot),
+            0..12,
+        )
+    }
+
+    proptest::proptest! {
+        #[test]
+        fn foreign_snapshot_traces_disclose_nothing(
+            snapshots in snapshot_traces(), owner in proptest::num::u64::ANY,
+            offset in 1u64..=u64::MAX,
+        ) {
+            let dir = tempfile::tempdir().unwrap();
+            let path = dir.path().join("history.jsonl");
+            let reference = SecretRef::new("privacy", "fixture-owner").unwrap();
+            let stored = owner.to_string();
+            let foreign = owner.wrapping_add(offset).to_string();
+            for (bytes, count) in snapshots {
+                std::fs::write(&path, &bytes).unwrap();
+                for observed in [&stored, &foreign] {
+                    let mut reads = 0usize;
+                    let result = status_at(&path, || Ok(Zeroizing::new(observed.clone())),
+                        |requested, observed| gateway::verify_identity_binding(requested, observed, |requested| {
+                            reads = reads.checked_add(1).unwrap();
+                            assert_eq!(requested, &reference);
+                            Ok(Some(Zeroizing::new(stored.clone())))
+                        }));
+                    if count == 0 || observed == &stored {
+                        let values: serde_json::Value = serde_json::from_str(&result.unwrap()).unwrap();
+                        proptest::prop_assert_eq!(values.as_array().unwrap().len(), count);
+                    } else {
+                        proptest::prop_assert_eq!(*result.unwrap_err().code(), AxCode::ConfigInvalid);
+                    }
+                    proptest::prop_assert_eq!(reads, usize::from(count != 0));
+                    proptest::prop_assert_eq!(std::fs::read(&path).unwrap(), bytes.clone());
+                }
+            }
+        }
+
+        #[test]
+        fn failed_identity_snapshot_traces_disclose_nothing(snapshots in snapshot_traces()) {
+            let dir = tempfile::tempdir().unwrap();
+            let path = dir.path().join("history.jsonl");
+            for (bytes, _) in snapshots {
+                std::fs::write(&path, &bytes).unwrap();
+                let result = status_at(&path, || Err(refused()),
+                    |requested, observed| gateway::verify_identity_binding(requested, observed,
+                        |_| panic!("failed identity must not read Vault")));
+                proptest::prop_assert_eq!(result, Err(refused()));
+                proptest::prop_assert_eq!(std::fs::read(&path).unwrap(), bytes);
+            }
+        }
+    }
 }
