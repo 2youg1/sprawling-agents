@@ -18,6 +18,7 @@
 )]
 
 use super::*;
+use kernel::ServerLabel;
 
 fn room() -> Address {
     Address::parse("lab/room1").unwrap()
@@ -228,7 +229,10 @@ fn handwritten(server: &McpServer) -> String {
 fn a_handwritten_plaintext_mcp_credential_is_refused_on_read_as_on_write() {
     let dir = tempfile::tempdir().unwrap();
     let rows = [
-        hosted(vec![("Authorization".to_owned(), "Bearer plain".to_owned())]),
+        hosted(vec![(
+            "Authorization".to_owned(),
+            "Bearer plain".to_owned(),
+        )]),
         vec![McpServer {
             label: ServerLabel::parse("apps").unwrap(),
             transport: McpTransport::Stdio {
@@ -274,7 +278,10 @@ fn an_mcp_url_keeps_harmless_parameters_and_refuses_credentials() {
         "http://[::1]:3001/mcp",
     ] {
         write_mcp(dir.path(), &room(), Layer::Building, &at(url)).unwrap();
-        assert_eq!(super::super::load(dir.path(), &room()).unwrap().mcp, at(url));
+        assert_eq!(
+            super::super::load(dir.path(), &room()).unwrap().mcp,
+            at(url)
+        );
     }
     let file = path(dir.path(), &room(), Layer::Building).unwrap();
     let kept = std::fs::read_to_string(&file).unwrap();

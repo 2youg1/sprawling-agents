@@ -32,6 +32,10 @@ Windows run jobs apply the selected processor affinity. JSONL preallocation read
 
 The existing container command path preserves the configured engine, encodes a single Podman entrypoint and refuses non-UTF8 arguments instead of changing them silently. Configuration, native-platform mechanisms and lifecycle guarantees are described in [operating](docs/operating.md#how-exec-is-confined) according to the shipped implementation.
 
+### Configuration
+
+Behaviour change: a plaintext credential written by hand into an `[[mcp]]` row of `CONFIG.toml` is now refused when the file is read, with the same `E_CONFIG_INVALID` refusal the settings page already gave when writing that row. Before, the reader accepted such a row and started the server with the key, although the file is committed with the project. An `env` or `headers` value whose name reads as a credential, or whose value has a credential's shape, must be a `secret:realm/name` vault reference. An MCP url must be an absolute `http` or `https` address with a host, with no userinfo and no credential in a query parameter; a query or fragment that carries no credential is kept as written. To recover, store the key in the vault and write its reference where the key was.
+
 ### Distribution and verification
 
 Release archives keep ZIP with Deflate level 9, with archive suffixes and platform names taken from the shared platform table. Release validation uses the existing parallel CI entry point and its cache configuration. Manual release-workflow dispatch builds and checks artifacts without publishing GitHub releases, npm packages or crates, and does not invent release provenance.
