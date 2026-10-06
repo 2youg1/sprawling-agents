@@ -54,6 +54,9 @@ jobs:
         if: ${{ !cancelled() }}
         shell: pwsh
         run: |
+          if (-not $env:CARGO_HOME) { $env:CARGO_HOME = Join-Path $env:USERPROFILE '.cargo' }
+          $env:RUSTUP_HOME = rustup show home
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $runtime = 'test(the_program_arm_runs_a_real_child_with_a_scrubbed_environment) | test(a_sandboxed_command_writes_in_a_copy_and_leaves_the_source_tree_alone) | test(a_child_sees_the_names_its_building_declared_and_no_others) | test(a_dispatched_command_runs_below_the_core) | binary(exec_builds)'
           $accounting = 'test(a_command_output_over_the_floor_reaches_the_model_sieved_with_the_way_back)'
           $failed = $false
