@@ -13,6 +13,9 @@
 ## 2 验收标准
 经 Confined::place 与 ExecTool::invoke 的实际 macOS 对拍检查副本写入成功、绝对路径
 与逃逸链接写入失败、TCP／UDP／后代网络失败、初始化失败不执行目标。
+Python 夹具在宿主以 xcrun --find python3 找到实际解释器后进入 Seatbelt，
+避免 /usr/bin/python3 的开发工具 launcher 在副本外写缓存；生产策略仍拒绝这些写入，
+生产结果仍保留 launcher 的原始诊断，不把它们抹掉以满足测试。
 后台命令用副本内的就绪文件与放行文件协调，确认后台持有副本、只交 owner 一次完整
 stdout／stderr／退出码；halt 与工具 drop 经生产 Backlog 回收已起动的主进程，
 另一 owner 的后台命令不被 release 终止。主进程 pid 回收与副本清理分别检查，

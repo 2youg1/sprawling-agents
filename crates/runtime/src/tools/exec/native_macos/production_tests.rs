@@ -22,11 +22,23 @@ fn native_tool(source: &std::path::Path, scratch: &std::path::Path, backlog: Bac
 }
 
 fn invoke_python(tool: &ExecTool, script: &str, args: &[String]) -> Value {
+    let python = Command::new("/usr/bin/xcrun")
+        .args(["--find", "python3"])
+        .output()
+        .unwrap();
+    assert!(python.status.success(), "{python:?}");
+    let python = String::from_utf8(python.stdout).unwrap();
+    let python = python.trim();
+    assert!(std::path::Path::new(python).is_absolute());
+    assert_ne!(
+        python, "/usr/bin/python3",
+        "fixture must bypass the launcher"
+    );
     let mut arguments = vec!["-c".to_owned(), script.to_owned()];
     arguments.extend_from_slice(args);
     let result = tool
         .invoke(&call(serde_json::json!({
-            "program": {"path": "/usr/bin/python3", "args": arguments}
+            "program": {"path": python, "args": arguments}
         })))
         .unwrap();
     serde_json::to_value(result.result).unwrap()
