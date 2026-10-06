@@ -246,6 +246,50 @@ mod tests {
         assert!(decode(&line).is_err());
     }
 
+    #[test]
+    fn plaintext_identity_and_old_schema_are_refused_without_rewriting() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("fixture.jsonl");
+        let prepared = prepared(intent(1, RawValue::Absent { key_existed: true }));
+        for (schema, owner) in [
+            (SCHEMA, "fixture-private-principal"),
+            (1, "secret:privacy/fixture-owner"),
+        ] {
+            let mut line = serde_json::to_value(&prepared).unwrap();
+            line["schema"] = serde_json::json!(schema);
+            line["event"]["intent"]["owner"] = serde_json::json!(owner);
+            let mut before = serde_json::to_vec(&line).unwrap();
+            before.push(b'
+');
+            std::fs::write(&path, &before).unwrap();
+            assert!(read(&path).is_err(), "unsafe history was accepted");
+            assert_eq!(std::fs::read(&path).unwrap(), before);
+        }
+    }
+
+    #[test]
+    fn decoding_refusal_never_repeats_private_input() {
+        let prepared = prepared(intent(1, RawValue::Absent { key_existed: true }));
+        for field in ["owner", "control", "unexpected"] {
+            let mut line = serde_json::to_value(&prepared).unwrap();
+            if field == "unexpected" {
+                line["event"]["intent"]["fixture-private-principal"] = serde_json::json!(true);
+            } else {
+                line["event"]["intent"][field] = serde_json::json!("fixture-private-principal");
+            }
+            let mut before = serde_json::to_vec(&line).unwrap();
+            before.push(b'
+');
+            let fault = match decode(&before) {
+                Ok(_) => panic!("private input accepted"),
+                Err(fault) => fault.into_ax(),
+            };
+            assert!(!fault.to_string().contains("fixture-private-principal"));
+            assert_eq!(fault.code(), &kernel::AxCode::StorageFatal);
+            assert!(fault.subject().contains("column"));
+        }
+    }
+
     proptest::proptest! {
         #[test]
         fn original_raw_values_roundtrip_without_normalization(
