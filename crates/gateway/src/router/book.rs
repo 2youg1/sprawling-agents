@@ -123,7 +123,13 @@ impl EndpointBook {
     pub fn apply_payload(&mut self, kind: EventKind, data: &Payload) -> Result<(), AxError> {
         match kind {
             EventKind::EndpointAttached => {
-                let attached = read_attached(data)?;
+                let mut attached = read_attached(data)?;
+                if attached.tuning.accounts.is_none() {
+                    attached.tuning.accounts = self
+                        .endpoints
+                        .get(&attached.name)
+                        .and_then(|held| held.endpoint.tuning.accounts.clone());
+                }
                 self.endpoints.insert(
                     attached.name.clone(),
                     Held::from(Kept { endpoint: attached }),
@@ -133,6 +139,7 @@ impl EndpointBook {
             EventKind::EndpointLost => {
                 let EndpointLost { name } = data.read()?;
                 self.endpoints.remove(&name);
+
                 self.chosen.retain(|_, choice| choice.endpoint != name);
                 Ok(())
             }
@@ -465,14 +472,82 @@ mod tests {
     #[test]
     fn malformed_provider_accounts_are_refused_during_replay() {
         let mut payload = attached_payload(&attached("house", "https://api.example.test/v1"))
-            .unwrap().as_map().clone();
-        payload.insert("tuning".to_owned(), serde_json::json!({
-            "accounts": [{"id": "first", "reference": "plain"}]
-        }));
+            .unwrap()
+            .as_map()
+            .clone();
+        payload.insert(
+            "tuning".to_owned(),
+            serde_json::json!({
+                "accounts": [{"id": "first", "reference": "plain"}]
+            }),
+        );
         let mut book = EndpointBook::new();
-        assert!(book.apply_payload(EventKind::EndpointAttached, &Payload::new(payload).unwrap()).is_err(),
-            "an invalid explicit account must not silently fall back to legacy auth");
+        assert!(
+            book.apply_payload(EventKind::EndpointAttached, &Payload::new(payload).unwrap())
+                .is_err(),
+            "an invalid explicit account must not silently fall back to legacy auth"
+        );
         assert!(book.is_empty());
     }
 
+    fn accounts() -> Vec<kernel::event::record::ProviderAccount> {
+        ["first", "second"]
+            .map(|id| kernel::event::record::ProviderAccount {
+                id: kernel::ServerLabel::parse(id).unwrap(),
+                reference: Some(kernel::SecretRef::new("providers", id).unwrap()),
+                header: None,
+            })
+            .to_vec()
+    }
+
+    #[test]
+    fn provider_accounts_preserve_explicit_reorder_and_reject_malformed_replay() {
+        let mut endpoint = attached("house", "http://127.0.0.1:11434/v1");
+        endpoint.tuning.accounts = Some(accounts());
+        let mut book = EndpointBook::new();
+        book.apply_payload(
+            EventKind::EndpointAttached,
+            &attached_payload(&endpoint).unwrap(),
+        )
+        .unwrap();
+        endpoint.tuning.accounts.as_mut().unwrap().reverse();
+        book.apply_payload(
+            EventKind::EndpointAttached,
+            &attached_payload(&endpoint).unwrap(),
+        )
+        .unwrap();
+        endpoint.tuning.accounts = None;
+        book.apply_payload(
+            EventKind::EndpointAttached,
+            &attached_payload(&endpoint).unwrap(),
+        )
+        .unwrap();
+        let kept = book.endpoints().next().unwrap();
+        assert_eq!(
+            kept.tuning
+                .accounts
+                .as_ref()
+                .unwrap()
+                .iter()
+                .map(|account| account.id.as_str())
+                .collect::<Vec<_>>(),
+            ["second", "first"]
+        );
+        assert_eq!(
+            kept.first_auth().unwrap(),
+            AuthSpec::Bearer(SecretRef::new("providers", "second").unwrap())
+        );
+        let encoded = serde_json::to_vec(&book).unwrap();
+        let restored: EndpointBook = serde_json::from_slice(&encoded).unwrap();
+        assert_eq!(
+            serde_json::to_value(&restored).unwrap(),
+            serde_json::to_value(&book).unwrap()
+        );
+        let mut payload = attached_payload(kept).unwrap().as_map().clone();
+        payload.get_mut("tuning").unwrap()["accounts"][0]["reference"] = serde_json::json!("plain");
+        assert!(
+            book.apply_payload(EventKind::EndpointAttached, &Payload::new(payload).unwrap())
+                .is_err()
+        );
+    }
 }

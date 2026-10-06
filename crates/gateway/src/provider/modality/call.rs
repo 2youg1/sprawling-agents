@@ -196,7 +196,7 @@ impl<'a> Face<'a> {
                 base_url: self.url.clone(),
                 dialect: self.endpoint.connection_kind.wire(),
                 model: self.model.clone(),
-                auth: self.endpoint.auth.clone(),
+                auth: self.endpoint.first_auth()?,
                 extra_headers: tuning.extra_headers.clone(),
                 // An override names a field of a conversation's body;
                 // see this module's header.

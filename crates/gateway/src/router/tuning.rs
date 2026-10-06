@@ -51,6 +51,9 @@ pub struct TuningDefaults {
 /// when it has no opinion and what an older record replays as.
 #[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct EndpointTuning {
+    /// Explicit ordered accounts; absence leaves the existing accounts intact.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub accounts: Option<Vec<kernel::event::record::ProviderAccount>>,
     /// What to call this endpoint on screen; absent means its id.
     pub label: Option<String>,
     /// How long one settled request may take.
@@ -129,6 +132,8 @@ impl EndpointTuning {
     }
 }
 
+pub use kernel::event::record::validate_provider_accounts as validate_accounts;
+
 #[cfg(test)]
 #[allow(
     clippy::unwrap_used,
@@ -187,6 +192,29 @@ mod tests {
             }
             .call_timeout_ms(),
             9_000
+        );
+    }
+    #[test]
+    fn accounts_reject_empty_duplicate_and_anonymous_headers() {
+        let account = kernel::event::record::ProviderAccount {
+            id: kernel::ServerLabel::parse("one").unwrap(),
+            reference: Some(kernel::SecretRef::new("providers", "one").unwrap()),
+            header: None,
+        };
+        assert!(validate_accounts(Some(&[])).is_err());
+        assert!(validate_accounts(Some(&[account.clone(), account.clone()])).is_err());
+        let repeated_reference = kernel::event::record::ProviderAccount {
+            id: kernel::ServerLabel::parse("two").unwrap(),
+            ..account.clone()
+        };
+        assert!(validate_accounts(Some(&[account, repeated_reference])).is_err());
+        assert!(
+            validate_accounts(Some(&[kernel::event::record::ProviderAccount {
+                id: kernel::ServerLabel::parse("anonymous").unwrap(),
+                reference: None,
+                header: Some("x-api-key".to_owned())
+            }]))
+            .is_err()
         );
     }
 }

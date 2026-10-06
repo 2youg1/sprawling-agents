@@ -28,4 +28,4 @@ pub use book::{Chosen, EndpointBook};
 pub(crate) use normalise::HostDefaults;
 pub use normalise::{DialectHint, normalise_entered};
 pub use payload::{attached_payload, selected_payload};
-pub use tuning::{EndpointTuning, TuningDefaults};
+pub use tuning::{EndpointTuning, TuningDefaults, validate_accounts};

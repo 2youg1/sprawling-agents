@@ -95,7 +95,9 @@ pub(super) fn tuning_of(wire: wire::EndpointTuning) -> Result<gateway::EndpointT
             gateway::HeaderValue::parse(&name, &row.value)?,
         ));
     }
+    gateway::validate_accounts(wire.accounts.as_deref())?;
     Ok(gateway::EndpointTuning {
+        accounts: wire.accounts,
         label: wire
             .label
             .map(|given| given.trim().to_owned())

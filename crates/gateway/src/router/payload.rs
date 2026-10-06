@@ -62,6 +62,7 @@ pub fn attached_payload(endpoint: &AttachedEndpoint) -> Result<Payload, AxError>
 /// silent about it.
 fn settled(tuning: &EndpointTuning) -> Option<AttachedTuning> {
     let kept = AttachedTuning {
+        accounts: tuning.accounts.clone(),
         label: tuning.label.clone(),
         timeout_ms: tuning.timeout_ms,
         stream_idle_timeout_ms: tuning.stream_idle_timeout_ms,

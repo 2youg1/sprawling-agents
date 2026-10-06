@@ -91,7 +91,7 @@ pub use history::{FileRestored, WentBack};
 pub use log::LogTruncated;
 pub use modality::{EmbeddingCalled, RerankCalled};
 pub use probe::{EndpointProbed, ModelFacts, ProbeFailure};
-pub use provider::{ProviderDegraded, VaultFellBack};
+pub use provider::{ProviderAccount, ProviderDegraded, VaultFellBack, validate_provider_accounts};
 pub use remote::{
     DevicePaired, DeviceRevoked, RemoteClosed, RemoteClosing, RemoteOpened, RemoteSessionStarted,
 };

@@ -63,14 +63,16 @@ pub(crate) fn read_attached(payload: &Payload) -> Result<AttachedEndpoint, AxErr
             })
             .collect(),
         probed: attached.probed,
-        tuning: tuning_of(attached.tuning.unwrap_or_default()),
+        tuning: tuning_of(attached.tuning.unwrap_or_default())?,
     })
 }
 
 /// How the person set this endpoint up, as the line kept it; what the
 /// line left out reads as nothing settled.
-fn tuning_of(kept: AttachedTuning) -> EndpointTuning {
-    EndpointTuning {
+fn tuning_of(kept: AttachedTuning) -> Result<EndpointTuning, AxError> {
+    super::super::tuning::validate_accounts(kept.accounts.as_deref())?;
+    Ok(EndpointTuning {
+        accounts: kept.accounts,
         label: kept.label,
         timeout_ms: kept.timeout_ms,
         request_max_retries: Retries::of(kept.request_max_retries),
@@ -101,7 +103,7 @@ fn tuning_of(kept: AttachedTuning) -> EndpointTuning {
             Some(Ok(ceiling)) => Some(ceiling),
             Some(Err(_)) | None => None,
         },
-    }
+    })
 }
 
 pub(crate) fn read_choice(payload: &Payload) -> Result<(ModelTag, Choice), AxError> {

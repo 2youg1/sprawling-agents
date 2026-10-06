@@ -89,7 +89,7 @@ fn the_schema_hash_is_stable_across_calls_and_covers_the_wire_version() {
         "schema hash changed - update `crates/wire/spec/Frames.lean` §8-1 in the same commit"
     );
     assert_eq!(
-        WIRE_V, 57,
+        WIRE_V, 58,
         "WIRE_V rises once between two pushes, for a shape change under names that stay (wire D1)"
     );
 }

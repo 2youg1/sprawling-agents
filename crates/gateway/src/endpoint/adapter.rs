@@ -57,7 +57,7 @@ pub fn adapter_for(
             base_url: url,
             dialect: endpoint.dialect,
             model: chosen.entry.id.clone(),
-            auth: endpoint.auth.clone(),
+            auth: endpoint.first_auth()?,
             extra_headers,
             overrides: tuning.applied_overrides(),
             timeout_ms,

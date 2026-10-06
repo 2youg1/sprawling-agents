@@ -55,8 +55,16 @@ impl RunWorker {
             base_url,
             dialect,
             credential,
-            tuning,
+            mut tuning,
         } = entered;
+        if tuning.accounts.is_none() {
+            tuning.accounts = self
+                .credentials
+                .book
+                .endpoints()
+                .find(|endpoint| endpoint.name == name)
+                .and_then(|endpoint| endpoint.tuning.accounts.clone());
+        }
         let auth = match credential {
             Credential::Absent { header } => self.kept_credential(&name, dialect, header),
             Credential::Key { reference, header } => gateway::AuthSpec::for_dialect(
@@ -144,7 +152,35 @@ impl RunWorker {
         admit: &[String],
     ) -> Result<(), AxError> {
         let entered = entered.resolved()?;
+        let explicit_accounts = entered.tuning.accounts.is_some();
         let mut endpoint = self.endpoint_of(entered)?;
+        let kept = self
+            .credentials
+            .book
+            .endpoints()
+            .find(|kept| kept.name == endpoint.name)
+            .cloned();
+        if explicit_accounts && let Some(kept) = kept {
+            let mut comparing = endpoint.tuning.clone();
+            comparing.accounts = kept.tuning.accounts.clone();
+            if endpoint.base_url == kept.base_url
+                && endpoint.dialect == kept.dialect
+                && comparing == kept.tuning
+                && admit
+                    == kept
+                        .models
+                        .iter()
+                        .map(|model| model.id.clone())
+                        .collect::<Vec<_>>()
+            {
+                endpoint.models = kept.models.clone();
+                endpoint.probed = kept.probed;
+                return self.record(
+                    EventKind::EndpointAttached,
+                    gateway::attached_payload(&endpoint)?,
+                );
+            }
+        }
         let unprobed = match self.probe(&endpoint) {
             Ok(served) => {
                 endpoint.probed = true;
@@ -228,7 +264,7 @@ impl RunWorker {
                 base_url: endpoint.chat_url(),
                 dialect: endpoint.dialect,
                 model: String::new(),
-                auth: endpoint.auth.clone(),
+                auth: endpoint.first_auth()?,
                 extra_headers,
                 overrides: Vec::new(),
                 timeout_ms: tuning.timeout_ms.unwrap_or(PROBE_TIMEOUT_MS),

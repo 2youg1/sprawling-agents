@@ -73,7 +73,32 @@ impl AttachedEndpoint {
     /// a settings page needs.
     #[must_use]
     pub fn has_credential(&self) -> bool {
-        auth_reference(&self.auth).is_some()
+        match &self.tuning.accounts {
+            Some(accounts) => accounts.iter().any(|account| account.reference.is_some()),
+            None => auth_reference(&self.auth).is_some(),
+        }
+    }
+
+    /// The first declared account, or the legacy credential before migration.
+    ///
+    /// # Errors
+    /// Refuses an invalid explicit account list rather than using the old key.
+    pub fn first_auth(&self) -> Result<AuthSpec, kernel::AxError> {
+        super::tuning::validate_accounts(self.tuning.accounts.as_deref())?;
+        match self
+            .tuning
+            .accounts
+            .as_ref()
+            .and_then(|accounts| accounts.first())
+        {
+            Some(account) => Ok(match &account.reference {
+                Some(reference) => {
+                    AuthSpec::for_dialect(self.dialect, reference.clone(), account.header.clone())
+                }
+                None => AuthSpec::None,
+            }),
+            None => Ok(self.auth.clone()),
+        }
     }
 
     /// What to call this endpoint on screen: the label the person gave

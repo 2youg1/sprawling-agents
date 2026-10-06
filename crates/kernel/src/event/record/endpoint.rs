@@ -48,7 +48,7 @@ pub struct EndpointAttached {
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
-        deserialize_with = "readable"
+        deserialize_with = "readable_tuning"
     )]
     pub tuning: Option<AttachedTuning>,
 }
@@ -63,6 +63,9 @@ pub struct EndpointAttached {
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct AttachedTuning {
+    /// Explicit ordered accounts; absent keeps the legacy registration.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub accounts: Option<Vec<super::ProviderAccount>>,
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
@@ -117,6 +120,19 @@ pub struct AttachedTuning {
         deserialize_with = "readable_pairs"
     )]
     pub overrides: Vec<(String, String)>,
+}
+
+fn readable_tuning<'de, D: Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Option<AttachedTuning>, D::Error> {
+    let value = Value::deserialize(deserializer)?;
+    if value.get("accounts").is_some() {
+        AttachedTuning::deserialize(value)
+            .map(Some)
+            .map_err(serde::de::Error::custom)
+    } else {
+        readable(value).map_err(serde::de::Error::custom)
+    }
 }
 
 const fn probed_by_default() -> bool {
