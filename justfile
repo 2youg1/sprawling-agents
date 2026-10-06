@@ -414,8 +414,10 @@ web-bundle:
 # installs and bundles exactly once even though both recipes are in it.
 check-client: build-web client-checks
 
-# The client's own gates on the dependencies build-web installed.
+# The generated offline playback page, then the client's own gates on
+# the dependencies build-web installed. Both checks run under Bun.
 client-checks:
+    bun crates/city/skills/playback/assemble.js --check
     cd client && bun run lint && bun run typecheck && bun run test
 
 # The gate that opens the gallery in a real engine, on its own: roles,
