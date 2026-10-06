@@ -132,6 +132,7 @@ inductive AxCode where
   | BudgetExhausted
   | Timeout
   | Provider
+  | ProviderAccountsExhausted
   | EvidenceMissing
   | LoopSuspected
   | LocatorInvalid
@@ -186,6 +187,7 @@ def AxCode.carrier : AxCode → Carrier
   | .BudgetExhausted => .Event .BudgetLimit
   | .Timeout => .Event .ToolResult
   | .Provider => .Event .ProviderDegraded
+  | .ProviderAccountsExhausted => .Event .ProviderDegraded
   | .EvidenceMissing => .Event .ToolResult
   | .LoopSuspected => .Event .WatchdogFired
   | .LocatorInvalid => .Event .ToolResult
@@ -236,6 +238,7 @@ def AxCode.all : List AxCode := [
   .BudgetExhausted,
   .Timeout,
   .Provider,
+  .ProviderAccountsExhausted,
   .EvidenceMissing,
   .LoopSuspected,
   .LocatorInvalid,

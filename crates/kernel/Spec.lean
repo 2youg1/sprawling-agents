@@ -368,6 +368,7 @@ ARCHITECTURE.md §3「nothing here is published」是这条判定成立的前提
 - `E_SECRET_EGRESS`／`E_DISCARD_IRREVERSIBLE`：不可——两门存在的理由即这两类越界可发生；类型已把「无 Restoration 的 Discard 值」定义掉，Unplanned 请求（exec 预判路）是剩余不可消部分。
 - `E_CONFIG_INVALID`：不可——SecretRef 形状非法与明文入配置必须在反序列化即拒。
 - `E_MODEL_UNCHOSEN`（这一类模型还没有人选定）：不可——城在没接供应方、没选模型时也要能开，所以「这一类没有模型」是人可达的状态。它不并进 `E_CONFIG_INVALID`：那一码还答「会话中途换了模型」「端点已不在」等情形，出路各不相同（去设置 对 开新对话），而客户端只能按码给出路。生产者只有 `gateway::router` 的 `EndpointBook::select`；账本此刻可写，所以 carrier 是 `tool_result`，不进装载期白名单。
+- `E_PROVIDER_ACCOUNTS_EXHAUSTED`（一轮里名册上每个账号都试过或不可兑付，`crates/kernel/spec/AccountRecovery.lean` §8-86 的 `Stop { Exhausted }`）：不可——账号的 Key 被拒、额度用尽、凭据没存都是人可达的状态。它不并进 `E_PROVIDER`：只报最后一个账号的失败会让人以为只有那一个账号坏了，而出路是补录凭据或额度、或新增账号，不是等待或换模型。carrier 与 `E_PROVIDER` 相同（`provider_degraded`），因为它就是 Provider 这一侧的降级；subject 列出 Provider（或搜索供应方）与每个账号 id 及其最后一种失败，不写 Key 也不写引用。生产者是两个驱动方：模型路径的 `runtime::watchdog` 与 accounting 的 `web_search`。
 
 未在本节列出的码，其「能否定义掉」写在生产它的模块所属 SPEC 章。
 

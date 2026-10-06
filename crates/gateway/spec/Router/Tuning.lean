@@ -16,7 +16,8 @@
 
 ```rust
 // Retries 即 kernel::Retries，缺席即 UntilHalted；本 crate 不导出别名
-pub struct TuningDefaults { pub timeout_ms: u64, pub retries: Retries, pub stream_idle_timeout_ms: Option<u64> }
+pub struct TuningDefaults { pub timeout_ms: u64, pub retries: Retries, pub stream_idle_timeout_ms: Option<u64>,
+                            pub account_retries: kernel::account_recovery::AccountRetries }
 pub enum HeaderValue { Plain(String), Redeemed(SecretRef) }
 
 pub struct EndpointTuning {
@@ -31,7 +32,7 @@ pub struct EndpointTuning {
     pub max_in_flight: Option<MaxInFlight>,   // 缺席取这一类连接的默认（D21，§8-6）
 }
 impl EndpointTuning {
-    pub const DEFAULTS: TuningDefaults;                        // 三个默认值的唯一住处
+    pub const DEFAULTS: TuningDefaults;                        // 四个默认值的唯一住处
     pub fn call_timeout_ms(&self) -> u64;                      // 人设的，否则 DEFAULTS
     pub fn idle_timeout_ms(&self) -> Option<u64>;
     pub fn applied_overrides(&self) -> Vec<(String, Value)>;   // 文本读成 JSON 的唯一权威
@@ -50,7 +51,7 @@ impl Endpoint { pub fn list_models(&self, url: &str) -> Result<Vec<ModelFacts>, 
 - **人写的头顶掉兼容格式自己的同名头**（按 ASCII 大小写不敏感比较），不是并列两行：两条 `anthropic-version` 是一条没有供应方承诺按谁的意思读的请求。
 - **`stream_idle_timeout_ms` 是一次沉默的上限，不是整次应答的期限**。三层一个名字：线上、本 crate 与文案都叫 `stream_idle_timeout_ms`，装配层不翻译它。**实现与名字一致**：`reqwest::blocking` 把一个请求的 timeout 当整体期限执行（异步层的 total timeout 覆盖整个 body），所以流式请求发出前把 `timeout` 清成 `None`，正文在一条自己的线程上逐行读，调用侧用 `recv_timeout(idle)` 计时，每收到一行重置。缺席则取 `timeout_ms`：一条没单独设过界的流也不允许永远安静。**代价写在这里而不是藏着**：对侧不说话又不断连时，那条读线程阻到对侧断连为止；结束这次调用是人要的，结束那条连接是对侧的。拒词报出越过的那个界（`no byte arrived for N ms`）而不是传输的原句。**败给的方案**：把线上字段改名 `stream_deadline_ms`——那会让一段写了六分钟的长回答在五分钟整被切，而那正是人抱怨的那件事。
 - **重试只有一个家，就是 `Retries`**。`Endpoint::call` 一次调用一个来回；「人没填」只有一个意思：缺席就是 `Retries::UntilHalted`，读者拼不出第二种答案。没有刹车的地方（设置页上的探测，人正等着，`Halt` 按不下去）读 `Retries::without_a_brake()`，它把 `UntilHalted` 兑成 **1 次**重试——这个读法住在设置自身上，而不是调用点的第二个默认值。账本里仍然只写已设的数字，缺键即无上限（`Retries::stated()`／`Retries::of()` 一对）。
-- **三个默认值住 `EndpointTuning::DEFAULTS`**：`timeout_ms = 120_000`、`retries = UntilHalted`、`stream_idle_timeout_ms = 无`。`adapter_for` 读 `call_timeout_ms()`；表单的占位符由 `Query::Config` 带回这三个值，客户端不手抄一份。
+- **四个默认值住 `EndpointTuning::DEFAULTS`**：`timeout_ms = 120_000`、`retries = UntilHalted`、`stream_idle_timeout_ms = 无`、`account_retries = Two`。最后一个是多账号时同一账号上再发的次数（`crates/kernel/spec/AccountRecovery.lean` §8-86），在允许的一到两次里取较宽的那个，因为一次限流常在第二次退避之内恢复，而换号就丢掉那个账号的 prompt cache；它只在名册有两个以上账号时被读，`web_search` 读的也是它（`crates/accounting/spec/Connectors.lean` §8-35）。`adapter_for` 读 `call_timeout_ms()`；表单的占位符由 `Query::Config` 带回这三个值，客户端不手抄一份。
 - **自定义头的值是一个类型，不是一段依前缀猜的文本**。`HeaderValue::Plain` 逐字发出，`HeaderValue::Redeemed` 走与 `authorize` 同一格的兑付；写入侧（`HeaderValue::parse`）对 `Plain` 跑一次 `kernel::secret::scan`，命中即拒，拒词不复述那个值。**一条规则**：本城读得出的金库引用就是引用（`SecretRef::parse` 是该语法的唯一读者），其余一律是字面量。账本里写的是 `spelled()`，对 `Redeemed` 即那条引用，所以 `endpoint_attached` 仍然可导出。重放一条没有经过这项检查的记录时，读不出引用的值仍读作 `Plain`：键已在账本里，在重放处丢掉它只会让人的端点不声不响地换一种叫法。
 - **`list_models` 读出每一行真正说了的东西**。OpenAI 形的 `/models` 一行里除 id 之外有什么由供应方决定：`context_length` 与 `max_completion_tokens`、同样两项嵌在 `top_provider` 之下、模态写在 `architecture` 里、绝大多数什么都不写。读法因此是「一组问题，各自由第一个带着它的键作答，没有键带着它就缺席」。**城不补零、不补默认、不补猜测**：补出来的数字会盖过真正计费的那个。
 - **价格按供应方自己的文本原样携带**。单位也是供应方的——按 token 还是按百万 token，按美元还是按美分——而一个没人能拿去对账单的换算值，比供应方印出来的那串字符更糟。
