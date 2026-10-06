@@ -577,8 +577,8 @@ Microsoft `UpdateProcThreadAttribute`、`CreateAppContainerProfile` 与 Job Obje
 的普通参数保全、程序名支持域、NUL 内容拒绝与 cmd 脚本边界，本文件不复制
 该编码或 parser 定义，也不沿逆向 crate dependency 导入 runtime 的规格。
 `confinement::tests` 从 packet 的生产入口检验 `Argv` 量化的输入空间；
-disposable child 以 lossless UTF16 比对实际 Windows system decoder 的 argv，
-它与微软 CRT 独立 decoder 的纯检查分别记录，cmd 的执行结果另记。
+微软 CRT 独立 decoder 的纯检查验证 UTF16 argv 保全；cmd 的脚本形成由
+该规格 D56 规定，执行结果由 runtime 与 accounting 的真实回归另验。
 Rust-reference equivalence、两侧 fuzz 和 disposable Windows production 五轴对拍
 分别验证各自的边界、输入空间与系统行为，argv 通过不代表这些范围全部通过。
 D1 的重开条件已满足：后台命令跨越多次工具调用。cleanup 的显式失败抵达调用者，

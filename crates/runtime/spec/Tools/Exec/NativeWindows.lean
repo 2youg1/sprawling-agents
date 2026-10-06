@@ -197,9 +197,16 @@ admitted 输入；它们证明 parser relation 接受编码结果，未证明 pa
 确定性。Rust 侧的独立 decoder 派生检查与 disposable child 的真实 `args_os`
 对拍检验模型和生产的对应，不能把 Lean 定理本身当成 CRT 执行证据。
 
-`cmd /C`、`/K` 的剩余文本还经过 cmd 的脚本解释，CRT argv 保全不保证脚本
-含空格、引号、元字符或开关时的执行结果；`/D /S /C` 的 echo 与 exit 探针
-单独记录结果，不以它们代签一般脚本域。Microsoft
+D56：packet 按已解析程序的文件名区分 cmd.exe/cmd 与 CRT 程序，比较不分 ASCII 大小写。
+cmd 的开关不加 CRT 引号，/C 或 /K 后的各项按单个空格拼成脚本文本；
+它们是 shell source，不承诺 argv 保全。编码器在原开关前加 /D /S，禁用
+AutoRun，并使 cmd 按 /S 规则去掉脚本文本外的一对引号。脚本内容原样保留，
+不把其中的引号变成反斜杠引号；NUL 与长度超界仍在启动前拒绝。
+调用方若需把一个值当作 shell literal，应按 cmd 语法在 source 内写出它，
+不能把 CRT quoting 当成 cmd escaping。没有 /C 或 /K 时只原样拼接开关。
+`CmdSource` 模型以 Microsoft 的 /S 外层引号删除为环境假设，证明包装不改
+source；生产检查经 ExecTool 执行 exit、环境读取、文件写入与 accounting 的 type。
+Microsoft
 [cmd](https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/cmd)
 规定这些开关的脚本行为。击败的备选是在 runtime 或 Zig 再写编码器，
 因为调用链只需传递 packet，复制规则会产生第二权威；重开条件是调用方
@@ -341,6 +348,17 @@ theorem encoded_program_preserves_path (pathFront : List Nat) (last : Nat)
   simpa [List.append_assoc] using
     CrtProgram.quoted (pathFront ++ [last]) suffix valid
       (by simp [noQuotes, Ne.symm lastNotQuote]) boundary
+
+/-- cmd /S 的 source 边界；内部文字不经过 CRT 转义。 -/
+def cmdSource (source : List Nat) : List Nat := 34 :: (source ++ [34])
+
+/-- Microsoft /S 删除首尾引号，余下是同一段 source。 -/
+def stripCmdSource (line : List Nat) : List Nat := line.drop 1 |>.dropLast
+
+/-- 对全部 source（含引号、反斜杠与空格）保留每个单元与次序。 -/
+theorem cmd_source_preserves_units (source : List Nat) :
+    stripCmdSource (cmdSource source) = source := by
+  simp [stripCmdSource, cmdSource]
 
 end Argv
 

@@ -417,6 +417,23 @@ mod tests {
         }
     }
 
+    #[test]
+    fn native_cmd_script_uses_source_instead_of_crt_arguments() {
+        for args in [vec!["/C", "exit 3"], vec!["/C", "type", "build.log"],
+            vec!["/C", "echo written> made.txt && type made.txt"],
+            vec!["/C", "echo \"quoted text\" & echo %PATH%"],
+            vec!["/d", "/s", "/c", "echo tail\\"]] {
+            let mut request = argv_launch(args.iter().map(OsString::from).collect());
+            request.program = PathBuf::from(r"C:\Windows\System32\cmd.exe");
+            let encoded = packet::encode(&request).unwrap();
+            let command = encoded.split(|unit| *unit == 0).nth(1).unwrap();
+            let boundary = args.iter().position(|arg| arg.eq_ignore_ascii_case("/c")).unwrap();
+            let expected = format!("\"{}\" /D /S {} \"{}\"", request.program.display(),
+                args[..=boundary].join(" "), args[boundary + 1..].join(" "));
+            assert_eq!(OsString::from_wide(command), OsString::from(expected));
+        }
+    }
+
     fn argv_units() -> impl Strategy<Value = Vec<u16>> {
         proptest::collection::vec(
             prop_oneof![
