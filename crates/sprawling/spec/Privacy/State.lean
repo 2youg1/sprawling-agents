@@ -5,30 +5,39 @@
 
 /-!
 # privacy::state 的磁盘投影接口
-规定 `crates/sprawling/src/privacy/state.rs`。这是磁盘编码与投影说明，
-执行 trace 性质由 crates.sprawling.spec.Privacy 保持，不另定义执行授权；
-磁盘事件 fold 的任意 trace 对应证明尚未提供，不能把 reader 算作 coordinator 验收。
+规定 `crates/sprawling/src/privacy/state.rs`。这是磁盘编码与投影说明，不是形式证明：
+执行轨迹的性质由 crates.sprawling.spec.Privacy 保持，fold 是该模型 journal 与拥有栈的磁盘投影，
+不另定义执行授权。
 
-Line 是 schema 和 Event；Prepared 保存不可变 Intent，Finished 只引用 operation
-和 Outcome。Intent 保存闭集 Control、definition、owner 的 SecretRef、original、modified、
-recommendation 和 restore_of。RawValue 的 Absent 保留 key_existed，Present 保留
-kind 与 bytes；不展开、不 trim、不 lossy decode。唯一闭集对象是 PowerShell
-用户 telemetry 变量，目标路径由后续平台目录决定，不接受任意磁盘 target。
+磁盘 schema 3。Line 是 schema 和 Event；Event 是三种之一：
+- Prepared{intent}：不可变 Intent，字段为 operation、control（闭集 PrivacyControl）、owner 的
+  SecretRef、original 与 modified（Snapshot）、key_existed、restore_of。
+- Finished{operation, outcome}：outcome 为 Applied、NotApplied、Restored、RolledBack、Unknown。
+  Unknown 表示回滚后仍读不到原值，它不结束操作。
+- Reconciled{operation, settlement}：人的核对给未结操作的结论，settlement 为 Applied、
+  NotApplied、Restored、Abandoned（模型 Reconcile 与 reconciled）。
+Snapshot 是 Registry(RawValue) 或 Task(TaskState)；RawValue 的 Absent 不带字段，Present 保留
+kind 与 bytes；不展开、不 trim、不 lossy decode。
 
-History::fold(Vec<Line>) 返回投影或 HistoryFault：schema/definition 未知、operation
-重复或倒退、无效 owner 引用或跨 owner 引用、缺少 Prepared 的 Finished、交错的未结意图和越层恢复
-均拒绝。恢复 Prepared 必须引用栈顶，original 等于被撤销项 modified，modified
-等于被撤销项 original；Applied/Restored 与 apply/restore 匹配后才变拥有栈。
-Prepared 没有 Finished 时状态是 unresolved，status 不能自动结算或推断失败。
-本投影只能报告磁盘事实，不能证明当前 OS 值或授权；调用者不能据此执行写入。
+History::fold(Vec<Line>) 返回投影或 HistoryFault。拒绝：未知 schema、未知字段或 enum、
+operation 重复或倒退、owner 引用无效或跨 owner、original 等于 modified、缺少 Prepared 的
+Finished 或 Reconciled、对已结束操作的第二个结论、有未结操作时的新 Prepared（Privacy D60）、
+越层恢复。拥有栈按控制分开：恢复 Prepared 必须引用同一控制的栈顶，original 等于被撤销项的
+modified，modified 等于被撤销项的 original；Applied 与 apply 匹配后压栈，Restored 与 restore
+匹配后弹栈，NotApplied、RolledBack、Abandoned 不改变拥有栈。fold 不查控制表（D59）。
+Prepared 之后没有结论、或结论是 Unknown 时，该操作 unresolved：status 报告 unresolved，
+coordinator 拒绝所有控制的新写入，只有 Reconciled 能结束它。
+本投影只报告磁盘事实，不证明当前 OS 值或授权；调用者不能据此执行写入。
 
-History::disclose(authorize) 是摘要唯一的出口：非空历史先把 owner 引用交给
-authorize，接受后才返回 operation 与 Outcome 摘要；空历史没有 owner，不询问
-authorize，返回空摘要。摘要与 owner 引用存在同一个值里，没有 owner 的非空摘要
-不可表示。摘要不输出 raw bytes 或 owner；status 的 authorize 见 Privacy.Cli D53。
-数据编码是 serde 的带标签闭集 enum 与 JSON byte array，未知字段拒绝；schema
-与容量上界由 Rust 一处定义，未来 writer 必须在系统写入前通过同一 decoder。
-验收：未知字段/坏版本、重复 id、非法 phase、越层恢复和原始字节 roundtrip。
+History::disclose(authorize) 是摘要唯一的出口：非空历史先把 owner 引用交给 authorize，
+接受后才返回 operation 与结论摘要；空历史没有 owner，不询问 authorize，返回空摘要。
+摘要与 owner 引用存在同一个值里，没有 owner 的非空摘要不可表示。摘要不输出 owner；
+status 的 authorize 见 Privacy.Cli D53。coordinator 需要的拥有栈与未结操作经同一 authorize
+之后才交出，所以身份不符时不披露任何历史值。
+数据编码是 serde 的带标签闭集 enum 与 JSON byte array，未知字段拒绝；schema 与容量上界由 Rust
+一处定义，writer 在系统写入前通过同一 decoder。
+验收：未知字段/坏版本、重复 id、非法结论、越层恢复、跨控制恢复被拒、同控制栈顶恢复、
+RolledBack 与 Abandoned 不取得拥有、原始字节 roundtrip。
 -/
 
 /-! D52 恢复日志只保存身份凭据引用（人的决定）
@@ -36,13 +45,30 @@ authorize，返回空摘要。摘要与 owner 引用存在同一个值里，没�
 `gateway::credential` Vault，日志只保存 `kernel::SecretRef`。owner 使用该类型，
 不重新实现其语法，也不把身份编码在引用名称中；引用相等只能验证日志一致性，
 不能代替从 Vault 解析真实 OS identity 后的拥有关系检查。
-磁盘 schema 由 Rust authority 升级，旧明文身份记录拒绝且原字节不变；
-禁止自动迁移，因为没有经核对的 Vault 绑定就不能把旧身份当作可执行恢复授权。
-status 入口经 History::disclose 通过 Vault 核对身份（Privacy.Cli D53）；
-writer 与 journal identity 绑定仍是执行接口缺口。
+旧明文身份记录拒绝且原字节不变；禁止自动迁移，因为没有经核对的 Vault 绑定就不能把旧身份
+当作可执行恢复授权。status 入口经 History::disclose 通过 Vault 核对身份（Privacy.Cli D53）；
+writer 首次写入时建立同一绑定。
 serde 拒绝无效 SecretRef 时可能在错误文字中复述输入，HistoryFault 的公开拒绝
 仅携带 JSON 解码位置及类别，不复述 owner、值、未知 enum 或未知字段；
 Decode 在构造时移除输入文字，内部 Debug 与公开 AxError 都遵守此边界。
 验收：明文 owner 拒绝且文件不变，旧 schema 拒绝，合法引用 roundtrip，
 畸形身份/字段/enum 的诊断不泄露输入；注册表原字节的既有检查保持。
+-/
+
+/-! D58 键是否存在是 Intent 的记录，不是值的一部分
+Intent 带 key_existed（读取 original 时父键是否存在）；RawValue::Absent 不带字段，所以快照相等
+就是模型的值相等，plan、读回判定与 fold 的撤销检查都用它。恢复删除本值而保留父键：若键的存在性
+算进值，apply 时新建了父键的控制在恢复后读回 Absent{key_existed: true}，不等于原值
+Absent{key_existed: false}，就会触发一次错误的回滚。key_existed 只供报告残留的空键。
+被否：把 key_existed 留在 Absent 里并另写一个忽略它的比较——同一类型上有两种相等，derive 出的
+那一种会在某个调用点被默默用错。
+-/
+
+/-! D59 schema 3 的 Intent 只记录写了什么，不记录控制表为什么这样写
+Intent 不再保存 definition 与 recommendation：控制表在 Prepared 之前由 plan 判定一次，恢复只需要
+记录下来的 original。fold 不查控制表，所以控制表修订（某控制改为不写、推荐值变化）不会使已拥有的
+修改无法恢复。schema 2 不保留兼容：此前没有发布过写入器，磁盘上不存在 schema 2 写入的修改记录；
+遇到其他 schema 按未知 schema 拒绝，原字节不变。
+被否：保留 definition 并在 fold 时拒绝未知 definition——控制表每次修订都会让旧历史整体不可读，
+人就失去恢复的路径。
 -/

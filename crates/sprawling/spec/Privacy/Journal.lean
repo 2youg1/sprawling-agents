@@ -4,27 +4,32 @@
 -- Copyright (c) 2026 2youg1 and the sprawling contributors
 
 /-!
-# privacy::journal 的只读 history 接口
+# privacy::journal 的 history 读写接口
 规定 `crates/sprawling/src/privacy/journal.rs`。本节是 IO 契约说明，不是 fsync 证明。
-History 的行为性质引用 crates.sprawling.spec.Privacy 的任意 trace 契约。
+History 的行为性质引用 crates.sprawling.spec.Privacy 的任意轨迹契约；writer 满足该模型
+durablePrepared 的环境假设（成功返回即已持久）。
 
-read(path: &Path) -> Result<History, HistoryFault> 只以 File::open 打开既有文件，
-无文件时返回空 history，不创建目录、lock 文件、JSONL 或补写终态。现有文件
+读取：read(path: &Path) -> Result<History, HistoryFault> 只以 File::open 打开既有文件，
+无文件时返回空 history，不创建目录、lock 文件或 JSONL，不补写终态。现有文件
 以 try_lock_shared 取得 OS-backed 同一文件锁，WouldBlock 返回 Busy，其他错误
 保留 source。读完并完成验证前持有该 File，释放通过 handle drop 完成。
-未来 writer 必须对同一文件取得 exclusive lock，不能创建第二套锁路径。
+
+写入：LockedJournal::open(path) 以 try_lock 对同一文件取得 exclusive lock（WouldBlock 返回
+Busy），首次创建文件时同步父目录；不创建第二套锁路径。持锁期间先读出并 fold 现有内容，
+损坏末行即拒绝且不修复。LockedJournal::append_durable(line) 把一行编码为 JSON 加 LF，
+先经与读取相同的 decoder 校验，再 write_all 与 sync_all，成功返回才表示该行已持久；
+失败时调用者不得发起系统写入。coordinator 在一次操作的全过程持有该锁：fold、fresh read、
+Prepared、写、读回、回滚与结论（Privacy §10）。
 
 读取文件以容量界加一个字节的 Read::take 判超界；完整非空 history 必须以 LF
 结束；空白行、坏 JSON、未知 schema/字段、无效 UTF-8、损坏末行均拒绝，不跳过、
-不截断。容量是本应用恢复日志的操作界，不能宣称注册表本身受此上限约束。
+不截断。容量是本应用恢复日志的操作界，不能宣称注册表本身受此上限约束；
+追加会越界时 writer 拒绝写入并报告容量。
 只读拒绝不抹除原字节；metadata 和内容由真实临时文件检查。
 拒绝诊断不复述 JSON 内容，只报告解码位置和类别，保密契约见 Privacy.State D52。
 
-当前没有 append_durable/first-create barrier，也没有写入 coordinator；它们
-必须满足 Privacy.durablePrepared 的环境假设后才可向本接口追加真实修改。
-不能将此 reader 标成耐久 journal writer 已完成。
-
 来源：https://doc.rust-lang.org/std/fs/struct.File.html#method.try_lock_shared
 该锁在 Windows 用 LockFileEx，Unix 用 flock，drop 释放；它不约束不合作的进程。
-验收：缺文件零创建、读取字节不变、持 exclusive lock 时 Busy、torn tail 零修复。
+验收（真实临时文件）：缺文件时纯读零创建、读取字节不变、读者持锁时写者 Busy、
+append_durable 返回前该行已在磁盘上、损坏末行拒写且字节不变。
 -/

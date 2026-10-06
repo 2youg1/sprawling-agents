@@ -4,22 +4,31 @@
 -- Copyright (c) 2026 2youg1 and the sprawling contributors
 
 /-!
-# privacy::cli 的只读入口
+# privacy::cli 的本地入口
 规定 `crates/sprawling/src/privacy/cli.rs` 与它读取真实身份的
 `crates/sprawling/src/privacy/identity.rs`。本文件是接口说明，不是形式证明：
-status 是一次无状态查询，没有可以量化的轨迹；披露性质由类型持有（见 D53）。
+写入动词的次序与性质由 crates.sprawling.spec.Privacy 证明，CLI 只把参数交给同一个
+`bin::privacy::coordinator`；status 是一次无状态查询，披露性质由类型持有（见 D53）。
 
-pub fn status() -> Result<String, AxError> 依次做三件事：读取真实 Windows 身份，
-失败即返回且不打开日志；通过 Home::detect().privacy_history() 调用 journal::read；
-把 History::disclose 交出的摘要序列化成一行 JSON。没有 city 参数，没有网络或 wire。
-main::verbs 的唯一 spelling 为 privacy status，Effect::ReadsOnly；main::router
-直接调用 status，输出一行 JSON，失败输出 AxError 与 recovery 并退出失败。
-摘要不包含 owner、raw bytes、绝对 home 路径；unresolved 不是失败或成功。
+动词（main::verbs 各登记一次，main::router 直接调用）：
+- privacy status（ReadsOnly）：依次读取真实 Windows 身份（失败即返回且不打开日志）、
+  通过 Home::detect().privacy_history() 调用 journal::read、把 History::disclose 交出的摘要
+  序列化成一行 JSON。没有 city 参数，没有网络或 wire。
+- privacy inspect（ReadsOnly）：每个控制一行 JSON：控制名、控制表状态（可写或不写原因）、当前读数、
+  本应用拥有时的原值；不写的控制不读系统。
+- privacy apply <control> <expected> 与 privacy restore <control> <expected>（Changes）：
+  expected 是 inspect 为该控制打印的读数 JSON，原样传回；它就是 Privacy.Confirmation D55 的绑定，
+  缺少或不符即拒绝。
+- privacy restore-all（Changes）：按控制逐个恢复本应用仍拥有的修改（Privacy D60），每个控制
+  用恢复前刚读到的值作 expected，输出每个控制各自的结果。
+- privacy reconcile <expected>（Changes）：对未结操作执行人的核对（Privacy 的 Reconcile），
+  expected 是 inspect 为该操作的控制打印的读数；不写系统。
+- privacy elevated-write <batch>（Changes）：只供 `bin::privacy::elevation` 的提升子进程使用，
+  见 Privacy.Windows D57；它不经 coordinator、不读日志、不输出读数。
+每个写入动词输出一行 JSON 结果（plan 的拒绝或 Finished 结论），失败输出 AxError 与 recovery
+并退出失败。CLI 是一次性 runner 验收进入生产路径的入口。
+输出不包含 owner、绝对 home 路径；读数与原值按 Privacy.State D52 明文。
 HistoryFault 的稳定 code/action/recovery 映射归 state，不在路由器重写。
-
-当前入口只检查实时身份，不查询当前 registry 值，也不产生确认或修改。
-inspect/confirm/apply/restore 尚未接入，读取已有 history 不能冒充首个控制完成；
-未来入口仍走同一个 coordinator。
 -/
 
 /-! D53 status 的摘要也是身份披露，只交给 owner 引用在平台 Vault 中绑定的身份
@@ -31,8 +40,7 @@ status 的 authorize 是 gateway::verify_platform_identity(owner, 实时身份)�
 缺失返回 CredentialMissing，锁定保留平台错误码，不匹配返回 ConfigInvalid。
 空历史没有 owner，不访问 Vault，返回空摘要。身份读取先于日志读取，
 所以读不到身份时不报告日志是否损坏。每次查询保持日志字节不变。
-此边界只核对 owner，不证明 journal 与引用的随机身份绑定；后续 writer 必须
-同时建立该绑定，不能以本查询接口授权 apply/restore。
+此边界只核对 owner；写入动词经 coordinator 用同一核对，身份不符时在披露任何历史之前拒绝。
 被否：①在 Lean 中把查询写成快照序列上的 map 再证明——每次查询相互独立，
 定理只是复述定义的一支；②cli 先取 owner 再取摘要的两个 getter——
 漏掉核对的调用者照样能序列化摘要。
@@ -61,6 +69,6 @@ Rust 检查在 privacy::identity::tests（仅 Windows）：SID 文法的接受�
 只有这条走生产路径的检查能发现「答案带行尾」「保留了错误的行」一类缺陷。
 被否：①whoami /user——输出带账户名，要解析再丢弃明文身份；
 ②windows crate 的 GetTokenInformation——需要 unsafe，按 AGENTS.md 平台调用的次序，
-有安全接口时不用；③windows-registry crate——计划中的 privacy::windows 读写原始注册表值，
+有安全接口时不用；③windows-registry crate——`bin::privacy::windows::registry` 读写原始注册表值，
 winreg 的 get_raw_value/set_raw_value 已是它要的安全接口，同一个 OS 接口只留一个依赖。winreg 的版本由 workspace 决定。
 -/
