@@ -149,6 +149,20 @@ mod tests {
     use proptest::prelude::*;
     use serde_json::{Map, json};
     #[test]
+    fn responses_retention_is_bounded_after_any_number_of_deltas() {
+        let mut frames = StreamFrames::new(DialectKind::OpenAiResponses);
+        for _ in 0..100 {
+            frames
+                .retain_and_complete(json!({"type": "response.output_text.delta", "delta": "text"}))
+                .unwrap();
+            assert!(
+                frames.retained_frames() <= 2,
+                "Responses keeps only terminal and first error"
+            );
+        }
+    }
+
+    #[test]
     fn anthropic_returns_thinking_blocks_exactly_as_it_issued_them() {
         // Official rule: "Include the complete unmodified block back to
         // the API"; altering it earns a 400 saying the thinking blocks

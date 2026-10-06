@@ -404,6 +404,190 @@ mod tests {
         assert_eq!(ret.stop, Some(kernel::StopReason::EndTurn));
     }
 
+    fn responses_answer(text: &str) -> Value {
+        serde_json::json!({
+            "status": "completed", "output": [
+                {"type": "reasoning", "summary": [{"text": "reason"}]},
+                {"type": "message", "content": [{"type": "output_text", "text": text}]},
+                {"type": "function_call", "call_id": "call-1", "name": "read", "arguments": "{\"path\":\"notes.md\"}"}
+            ],
+            "usage": {"input_tokens": 10, "output_tokens": 5,
+                "input_tokens_details": {"cached_tokens": 3, "cache_write_tokens": 2}}
+        })
+    }
+
+    #[test]
+    fn responses_terminal_revises_deltas_and_returns_the_complete_reply() {
+        use super::super::fakes::fake_provider;
+        let answer = responses_answer("revision");
+        let (forwarded, waiting) = std::sync::mpsc::channel();
+        let (url, server) = fake_stream_provider(
+            vec![serde_json::json!({"type": "response.output_text.delta", "delta": "draft"}).to_string()],
+            waiting,
+            vec![
+                serde_json::json!({"type": "response.completed", "response": responses_answer("old")}).to_string(),
+                serde_json::json!({"type": "response.completed", "response": answer}).to_string(),
+                serde_json::json!({"type": "response.completed"}).to_string(),
+            ],
+        );
+        let mut endpoint = Endpoint::new(
+            EndpointConfig {
+                dialect: kernel::DialectKind::OpenAiResponses,
+                ..config(&url)
+            },
+            redemption(),
+        )
+        .unwrap();
+        let mut increments = Vec::new();
+        let streamed = endpoint
+            .stream(
+                &request(),
+                &mut |increment| {
+                    increments.push(increment.clone());
+                    forwarded.send(()).unwrap();
+                },
+                &mut |_| {},
+            )
+            .unwrap();
+        assert!(server.join().unwrap(), "the delta is forwarded before EOF");
+        assert_eq!(
+            increments,
+            vec![kernel::Increment::Said("draft".to_owned())]
+        );
+        let (url, server) = fake_provider(vec![(200, answer.to_string())], false);
+        let mut endpoint = Endpoint::new(
+            EndpointConfig {
+                dialect: kernel::DialectKind::OpenAiResponses,
+                ..config(&url)
+            },
+            redemption(),
+        )
+        .unwrap();
+        assert_eq!(streamed, endpoint.call(&request()).unwrap());
+        server.join().unwrap();
+    }
+
+    #[test]
+    fn responses_first_error_keeps_forwarding_deltas_until_eof() {
+        let (forwarded, waiting) = std::sync::mpsc::channel();
+        let (url, server) = fake_stream_provider(
+            vec![
+                serde_json::json!({"type": "error", "code": "server_error"}).to_string(),
+                serde_json::json!({"type": "response.output_text.delta", "delta": "after error"}).to_string(),
+            ], waiting,
+            vec![
+                serde_json::json!({"type": "error", "code": "invalid_prompt"}).to_string(),
+                serde_json::json!({"type": "response.reasoning_text.delta", "delta": "later"}).to_string(),
+                serde_json::json!({"type": "response.completed", "response": responses_answer("final")}).to_string(),
+            ],
+        );
+        let mut endpoint = Endpoint::new(
+            EndpointConfig {
+                dialect: kernel::DialectKind::OpenAiResponses,
+                ..config(&url)
+            },
+            redemption(),
+        )
+        .unwrap();
+        let mut increments = Vec::new();
+        let error = endpoint
+            .stream(
+                &request(),
+                &mut |increment| {
+                    increments.push(increment.clone());
+                    if increments.len() == 1 {
+                        forwarded.send(()).unwrap();
+                    }
+                },
+                &mut |_| {},
+            )
+            .unwrap_err();
+        assert!(
+            server.join().unwrap(),
+            "error must not return before the following delta"
+        );
+        assert_eq!(
+            increments,
+            vec![
+                kernel::Increment::Said("after error".to_owned()),
+                kernel::Increment::Thought("later".to_owned())
+            ]
+        );
+        assert_eq!(error.subject(), "the stream reported server_error");
+    }
+
+    #[test]
+    fn responses_silence_precedes_a_terminal_and_a_reported_error() {
+        let (url, server) = paced_stream_provider(vec![
+            serde_json::json!({"type": "response.completed", "response": responses_answer("final")}).to_string(),
+            serde_json::json!({"type": "error", "code": "server_error"}).to_string(),
+        ], Duration::ZERO, Duration::from_millis(500));
+        let mut endpoint = Endpoint::new(
+            EndpointConfig {
+                dialect: kernel::DialectKind::OpenAiResponses,
+                stream_idle_timeout_ms: Some(100),
+                ..config(&url)
+            },
+            redemption(),
+        )
+        .unwrap();
+        let error = endpoint
+            .stream(&request(), &mut |_| {}, &mut |_| {})
+            .unwrap_err();
+        assert_eq!(error.subject(), "no byte arrived for 100 ms");
+        server.join().unwrap();
+    }
+
+    #[test]
+    fn responses_read_failure_precedes_a_terminal_and_a_reported_error() {
+        use std::io::{BufRead as _, Read as _, Write as _};
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = format!("http://{}/v1/responses", listener.local_addr().unwrap());
+        let server = std::thread::spawn(move || {
+            let (mut socket, _) = listener.accept().unwrap();
+            let mut reader = std::io::BufReader::new(&mut socket);
+            let mut line = String::new();
+            let mut length = 0;
+            loop {
+                line.clear();
+                reader.read_line(&mut line).unwrap();
+                if line == "\r\n" {
+                    break;
+                }
+                if let Some(value) = line.to_ascii_lowercase().strip_prefix("content-length:") {
+                    length = value.trim().parse::<u64>().unwrap();
+                }
+            }
+            std::io::copy(&mut reader.take(length), &mut std::io::sink()).unwrap();
+            let body = format!(
+                "data: {}
+
+data: {}
+
+",
+                serde_json::json!({"type": "response.completed", "response": responses_answer("final")}),
+                serde_json::json!({"type": "error", "code": "server_error"})
+            );
+            write!(socket, "HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{body}", body.len() + 100).unwrap();
+        });
+        let mut endpoint = Endpoint::new(
+            EndpointConfig {
+                dialect: kernel::DialectKind::OpenAiResponses,
+                ..config(&url)
+            },
+            redemption(),
+        )
+        .unwrap();
+        let error = endpoint
+            .stream(&request(), &mut |_| {}, &mut |_| {})
+            .unwrap_err();
+        assert!(matches!(
+            error.provider_failure(),
+            Some(kernel::ProviderFailureKind::Cut)
+        ));
+        server.join().unwrap();
+    }
+
     #[test]
     #[ignore = "wall-clock instrument; just bench runs it"]
     #[allow(clippy::disallowed_methods, reason = "instrument samples its clock")]

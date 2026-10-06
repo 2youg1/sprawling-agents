@@ -341,6 +341,7 @@ kernel 已有码，语义照 Custody 一节；不新增码。
 - D24 一个凭证环境变量的值不是 Unicode 时，它是一个点名变量的配置错，不是「没配过」：`crates/gateway/spec/Credential.lean`
 - D25 `prompt_cache_key` 是预置表的一列，只写给文档说收它的主机，值是会话标识：`crates/gateway/spec/Provider.lean`
 - D26 开城时为每个已登记端点预热一次连接：一次不带凭据的 `GET models_url`，失败只停这一次预热，谁也不等它（§8-35）：`crates/gateway/spec/Endpoint/Transport.lean`
+- D27 Responses stream 只持有最后有效 terminal 与首个 reported error，读到 EOF 后复用最终解析器：`crates/gateway/spec/Dialect/Responses.lean`
 -/
 
 /-! ## 13 依赖选型
@@ -376,6 +377,7 @@ golden：两 Dialect 各一请求一响应（insta）；proptest：响应往返�
 - 预置表的行：`provider::preset` 的 proptest `the_row_rule_keeps_the_lean_properties` 与测试（`a_documented_model_is_matched_by_the_longest_prefix_that_fits`、`a_relay_forwarding_a_vendors_id_reads_the_vendors_row_and_a_local_server_does_not`、`no_pinned_catalogue_row_is_also_matched_by_this_table`）。
 - 能否再试：`endpoint::failure` 的测试（`what_never_completed_is_asked_again_and_what_was_refused_is_not`、`a_provider_that_says_busy_or_broken_is_asked_again_and_one_that_refuses_is_not`、`a_request_that_outgrew_the_window_is_told_how_to_fit_again`）。
 - 名额：`concurrency` 的 proptest `permits_keep_the_lean_properties` 与 `a_trace_without_narrowing_keeps_in_use_within_the_limit`，`endpoint::permit` 的 `grants_follow_arrival`。
+- Responses：`spec/Dialect/Responses.lean` 的任意轨迹保留性质，由 `responses_keep_the_lean_trace_properties`、`responses_retention_is_bounded_after_any_number_of_deltas` 与 endpoint 的 `responses_` 行为检查对拍；后者检查完整 `ModelReturn`、增量在 EOF 前交付、error 后增量以及 cut/silence 优先级。
 - 结算：`cost` 的测试（`the_authoritative_amount_always_wins`、`the_price_sheet_computes_integer_shares`、`overflowing_settlements_are_errors_not_wraps`）。
 
 只有节注释的分部，其要求由类型与 `cargo nextest run -p sprawling-gateway` 的各模块测试守住。

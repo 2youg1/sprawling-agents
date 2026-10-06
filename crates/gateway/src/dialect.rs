@@ -28,4 +28,4 @@ pub use request::request_wire;
 pub(crate) use response::StreamFrames;
 #[cfg(test)]
 pub(crate) use response::response_wire;
-pub use response::{increment_of, response_from_wire, settled_from_stream};
+pub use response::{increment_of, response_from_wire};

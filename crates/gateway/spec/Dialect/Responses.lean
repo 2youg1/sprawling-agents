@@ -8,7 +8,7 @@
 
 规定 `dialect::responses`（`crates/gateway/src/dialect/responses.rs`）：第三支笔：OpenAI responses 面。本文件是 `crates/gateway/Spec.lean` 的一个分部；下面每一节保留它在 gateway 规格里的标签 §8-n，别处引作 `crates/gateway/Spec.lean §8-n`。
 
-这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与 `gateway::dialect::responses::reply`、`gateway::dialect::responses::request`、`gateway::dialect::responses::stream` 旁的测试守住。
+请求与最终 reply 的接口由文字描述；stream 的保留性质由下方模型证明，Rust 实现由 `gateway::dialect::responses::reply`、`gateway::dialect::responses::request`、`gateway::dialect::responses::stream` 旁的测试守住。
 -/
 
 /-!
@@ -37,3 +37,88 @@
 
 **`provider::stability` 的守卫因此长出第三条读法**：system 文本在这面是 `input[0].content[*].text`。那道闸的两条断言（两次派活逐字节相等、上线文本与交给供应层的几块逐字节相等且前面不多任何东西）现在覆盖全部三种连接。
 -/
+
+/-! D27 stream 是 projection：只持有最后带 `response` 字段的 terminal 与首个 reported error。
+「有效」指可读的事件名且 `response` 字段存在，不提前验证 response 内容，最终仍由
+`response_from` 决定；缺字段的 terminal 不覆盖已有答案，存在的 null 仍交给原解析器拒绝。
+读到 EOF 才 settle，error 不阻断后续 delta；读失败或 silence 先于已持有的 error 与 terminal。
+落选：保留全部帧再扫描，长流的存储随 delta 数增长；提前返回 error 则改变 EOF 与错误优先级。
+模型的 Nat 是不透明 response、error、delta 身份，不解释其内容；解析器不是模型的第二份。
+`dialect::response` 的派生检查按任意事件轨迹比较完整结果与增量，并检查持有数至多二。
+-/
+namespace Gateway.Dialect.Responses
+
+inductive Frame where
+  | terminal (response : Option Nat)
+  | reported (code : Nat)
+  | delta (text : Nat)
+  | unread
+  deriving DecidableEq
+
+structure Held where
+  terminal : Option Nat := none
+  reported : Option Nat := none
+  deriving DecidableEq
+
+def retain (held : Held) : Frame → Held
+  | .terminal (some response) => { held with terminal := some response }
+  | .terminal none => held
+  | .reported code => { held with reported := held.reported.or (some code) }
+  | .delta _ => held
+  | .unread => held
+
+def run (frames : List Frame) (held : Held := {}) : Held :=
+  frames.foldl retain held
+
+/-- 首个 error 在任意后续轨迹中保持。 -/
+theorem first_reported_survives (frames : List Frame) (held : Held) (code : Nat)
+    (first : held.reported = some code) : (run frames held).reported = some code := by
+  induction frames generalizing held with
+  | nil => exact first
+  | cons frame frames ih =>
+    apply ih
+    cases frame with
+    | terminal response => cases response <;> simpa [retain] using first
+    | reported next => simp [retain, first]
+    | delta text => exact first
+    | unread => exact first
+
+/-- 不携 response 的 terminal 与 delta 都不能抹去已定答案。 -/
+theorem terminal_survives (frames : List Frame) (held : Held)
+    (noRevision : ∀ frame ∈ frames, ∀ response, frame ≠ .terminal (some response)) :
+    (run frames held).terminal = held.terminal := by
+  induction frames generalizing held with
+  | nil => rfl
+  | cons frame frames ih =>
+    have tail := ih (retain held frame) (by
+      intro f member response
+      exact noRevision f (List.mem_cons_of_mem frame member) response)
+    change (run frames (retain held frame)).terminal = held.terminal
+    rw [tail]
+    cases frame with
+    | terminal response =>
+      cases response with
+      | none => rfl
+      | some response => exact False.elim (noRevision _ (by simp) response rfl)
+    | reported code => rfl
+    | delta text => rfl
+    | unread => rfl
+
+/-- 任意前缀与不再修订的后缀之间，最后一份 response 作答。 -/
+theorem last_terminal_wins (before after : List Frame) (response : Nat)
+    (noRevision : ∀ frame ∈ after, ∀ value, frame ≠ .terminal (some value)) :
+    (run (before ++ [.terminal (some response)] ++ after)).terminal = some response := by
+  simp only [run, List.foldl_append, List.foldl_cons, List.foldl_nil]
+  exact terminal_survives after _ noRevision
+
+def increment : Frame → Option Nat
+  | .delta text => some text
+  | .terminal _ | .reported _ | .unread => none
+
+/-- reported error 不改变后缀增量的交付。 -/
+theorem reported_keeps_deltas (before after : List Frame) (code : Nat) :
+    (before ++ [Frame.reported code] ++ after).filterMap increment =
+      before.filterMap increment ++ after.filterMap increment := by
+  simp [List.filterMap_append, List.filterMap_cons, increment]
+
+end Gateway.Dialect.Responses
