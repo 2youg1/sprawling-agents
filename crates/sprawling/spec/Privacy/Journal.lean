@@ -14,11 +14,14 @@ durablePrepared 的环境假设（成功返回即已持久）。
 以 try_lock_shared 取得 OS-backed 同一文件锁，WouldBlock 返回 Busy，其他错误
 保留 source。读完并完成验证前持有该 File，释放通过 handle drop 完成。
 
-写入：LockedJournal::open(path) 以 try_lock 对同一文件取得 exclusive lock（WouldBlock 返回
-Busy），首次创建文件时同步父目录；不创建第二套锁路径。持锁期间先读出并 fold 现有内容，
+写入：LockedJournal::open(path) 以读与追加方式打开文件，不存在时创建它与所在目录；新建文件后同步
+所在目录，目录也是新建的则再同步其上一级。Windows 上目录经带 backup semantics 与写权限打开的句柄
+同步（File::sync_all 即 FlushFileBuffers），其他平台经只读打开的目录句柄同步。随后以 try_lock 对
+同一文件取得 exclusive lock（WouldBlock 返回 Busy）；不创建第二套锁路径。持锁期间先读出并 fold 现有内容，
 损坏末行即拒绝且不修复。LockedJournal::append_durable(line) 把一行编码为 JSON 加 LF，
 先经与读取相同的 decoder 校验，再 write_all 与 sync_all，成功返回才表示该行已持久；
-失败时调用者不得发起系统写入。coordinator 在一次操作的全过程持有该锁：fold、fresh read、
+失败时调用者不得发起系统写入；校验拒绝或超出容量时文件不变。
+history() 交出持锁时的 fold，它包含每一次成功追加的行。coordinator 在一次操作的全过程持有该锁：fold、fresh read、
 Prepared、写、读回、回滚与结论（Privacy §10）。
 
 读取文件以容量界加一个字节的 Read::take 判超界；完整非空 history 必须以 LF
