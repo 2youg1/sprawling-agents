@@ -211,6 +211,10 @@ namespace Argv
 def admitted (units : List Nat) : Prop :=
   ∀ unit ∈ units, 0 < unit ∧ unit < 65536
 
+/-- 结束引号后必须是参数边界；相邻引号还在当前参数内，不能无条件结束。 -/
+def argumentBoundary (suffix : List Nat) : Prop :=
+  suffix = [] ∨ suffix.head? = some 32 ∨ suffix.head? = some 9
+
 /-- 待决反斜杠只在后继已知时输出，对应 packet::quoted 的 slashes。 -/
 def encodeTail (slashes : Nat) : List Nat → List Nat → List Nat
   | [], suffix => List.replicate (2 * slashes) 92 ++ 34 :: suffix
@@ -223,7 +227,7 @@ def encodeTail (slashes : Nat) : List Nat → List Nat → List Nat
 /-- CRT 已打开引号内的规则；suffix 在结束引号之后，因而覆盖边界。
 规则按 Microsoft 文档独立规定，不以 encodeTail 的结果定义解析成功。 -/
 inductive CrtTail : List Nat → List Nat → List Nat → Prop where
-  | close (slashes : Nat) (suffix : List Nat) :
+  | close (slashes : Nat) (suffix : List Nat) (boundary : argumentBoundary suffix) :
       CrtTail (List.replicate (2 * slashes) 92 ++ 34 :: suffix)
         (List.replicate slashes 92) suffix
   | escaped (slashes : Nat) (input output suffix : List Nat)
@@ -236,13 +240,13 @@ inductive CrtTail : List Nat → List Nat → List Nat → Prop where
       CrtTail (List.replicate slashes 92 ++ unit :: input)
         (List.replicate slashes 92 ++ unit :: output) suffix
 
-/-- 循环不变量量化所有 admitted 参数、所有待决反斜杠数量与后续 suffix。 -/
+/-- 循环不变量量化所有 admitted 参数、所有待决反斜杠数量与以参数边界开头的 suffix。 -/
 theorem encoded_tail_preserves_units (units : List Nat) (slashes : Nat)
-    (suffix : List Nat) (valid : admitted units) :
+    (suffix : List Nat) (valid : admitted units) (boundary : argumentBoundary suffix) :
     CrtTail (encodeTail slashes units suffix)
       (List.replicate slashes 92 ++ units) suffix := by
   induction units generalizing slashes with
-  | nil => simpa [encodeTail] using CrtTail.close slashes suffix
+  | nil => simpa [encodeTail] using CrtTail.close slashes suffix boundary
   | cons unit rest ih =>
     have restValid : admitted rest := by
       intro value member
@@ -287,7 +291,8 @@ theorem encoded_arguments_preserve_order (args : List (List Nat))
     apply CrtArguments.next
     · simpa using encoded_tail_preserves_units units 0
         (if rest.isEmpty then [] else 32 :: encodeArguments rest)
-        (valid units (by simp))
+        (valid units (by simp)) (by
+          cases empty : rest.isEmpty <;> simp [empty, argumentBoundary])
     · exact ih (by
         intro units member
         exact valid units (List.mem_cons_of_mem _ member))
@@ -322,17 +327,19 @@ theorem program_body_preserves_path (prefix : List Nat) (last slashes : Nat)
     · simp [encodeTail, slash, unitNotQuote, ih 0 restNoQuotes, List.append_assoc]
 
 inductive CrtProgram : List Nat → List Nat → List Nat → Prop where
-  | quoted (program suffix : List Nat) (noQuotes : 34 ∉ program) :
+  | quoted (program suffix : List Nat) (noQuotes : 34 ∉ program)
+      (boundary : argumentBoundary suffix) :
       CrtProgram (34 :: (program ++ 34 :: suffix)) program suffix
 
 theorem encoded_program_preserves_path (prefix : List Nat) (last : Nat)
     (suffix : List Nat) (noQuotes : 34 ∉ prefix)
-    (lastNotQuote : last ≠ 34) (lastNotSlash : last ≠ 92) :
+    (lastNotQuote : last ≠ 34) (lastNotSlash : last ≠ 92)
+    (boundary : argumentBoundary suffix) :
     CrtProgram (34 :: encodeTail 0 (prefix ++ [last]) suffix)
       (prefix ++ [last]) suffix := by
   rw [program_body_preserves_path prefix last 0 suffix noQuotes lastNotQuote lastNotSlash]
   simpa [List.append_assoc] using
-    CrtProgram.quoted (prefix ++ [last]) suffix (by simp [noQuotes, lastNotQuote])
+    CrtProgram.quoted (prefix ++ [last]) suffix (by simp [noQuotes, lastNotQuote]) boundary
 
 end Argv
 
