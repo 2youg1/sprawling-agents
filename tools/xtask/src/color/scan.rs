@@ -12,14 +12,13 @@ use super::THEME;
 use crate::report::{Violation, XtaskError};
 use crate::walk;
 
-/// The colour production points: each client names colour once, and these
-/// are where. The second row is the playback skill's reference page, a
-/// single file a city hands a person, which names its colours once in its
-/// own `:root` blocks because it cannot load the client's stylesheet. The
-/// question this table answers - which files the scan walks past - is not
-/// the question `THEME` answers, so the page joins it without touching
-/// which file the token assertions read.
-const PRODUCTION_POINTS: [&str; 2] = [THEME, "crates/city/skills/playback/template.html"];
+/// Each client names colour in one stylesheet. Playback owns its own
+/// palette because the exported page cannot load the browser client's CSS.
+const PRODUCTION_POINTS: [&str; 2] = [THEME, "crates/city/skills/playback/src/style.css"];
+
+/// The offline output of the playback stylesheet. Its generation banner
+/// identifies output; the shared Bun recipe verifies the assembled bytes.
+const PLAYBACK_PAGE: &str = "crates/city/skills/playback/template.html";
 
 /// The files that spell colour because reading a colour means naming
 /// it, and the one test that writes the spelling it asserts. Same shape
@@ -106,6 +105,9 @@ pub(super) fn scan_for_literals(root: &Path) -> Result<Vec<Violation>, XtaskErro
         }
         let style_file = !rel.ends_with(".rs");
         let text = walk::read_text(&path)?;
+        if rel == PLAYBACK_PAGE && crate::length::generated(&text) {
+            continue;
+        }
         for (number, line) in text.lines().enumerate() {
             if let Some(syntax) = literal_at(line, style_file) {
                 let line_number = number.saturating_add(1);
@@ -208,6 +210,18 @@ mod tests {
                 .map(|v| format!("{} :: {}", v.rule, v.violation))
                 .collect::<Vec<_>>()
                 .join(" | ")
+        );
+        std::fs::write(root.join(PLAYBACK_PAGE), "<style>color: rgb(1,2,3)</style>").unwrap();
+        let found = scan_for_literals(&root).unwrap();
+        assert_eq!(
+            found
+                .iter()
+                .map(|v| v.location.as_str())
+                .collect::<Vec<_>>(),
+            [
+                "client/src/panel.css:1",
+                "crates/city/skills/playback/template.html:1"
+            ]
         );
         std::fs::remove_dir_all(&root).unwrap();
     }
