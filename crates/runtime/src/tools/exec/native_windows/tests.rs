@@ -284,7 +284,7 @@ fn main() {
             "-NoProfile",
             "-NonInteractive",
             "-Command",
-            "(Get-Acl -LiteralPath $env:NATIVE_ACL_FIXTURE).Sddl.Replace('D:AI', 'D:')",
+            "Get-Acl -LiteralPath @($env:NATIVE_ACL_FIXTURE, (Join-Path $env:NATIVE_ACL_FIXTURE 'protected'), (Join-Path $env:NATIVE_ACL_FIXTURE 'protected/input')) | ForEach-Object { $_.Sddl.Replace('D:PAI','D:P').Replace('D:AI','D:') }",
         ])
         .output()
         .unwrap();
@@ -338,7 +338,7 @@ fn main() {
             "-NoProfile",
             "-NonInteractive",
             "-Command",
-            "(Get-Acl -LiteralPath $env:NATIVE_ACL_FIXTURE).Sddl.Replace('D:AI', 'D:')",
+            "Get-Acl -LiteralPath @($env:NATIVE_ACL_FIXTURE, (Join-Path $env:NATIVE_ACL_FIXTURE 'protected'), (Join-Path $env:NATIVE_ACL_FIXTURE 'protected/input')) | ForEach-Object { $_.Sddl.Replace('D:PAI','D:P').Replace('D:AI','D:') }",
         ])
         .output()
         .unwrap();
