@@ -793,6 +793,8 @@ jobs:
           case "$image" in sha256:*) ;; *) image="sha256:$image" ;; esac
           echo "SPRAWLING_CONTAINER_TEST_PROGRAM=$program" >> "$GITHUB_ENV"
           echo "SPRAWLING_CONTAINER_TEST_IMAGE=$image" >> "$GITHUB_ENV"
+          mkdir -p target/container-evidence
+          "$program" image inspect "$image" | python3 -c 'import json,sys; i=json.load(sys.stdin)[0]; c=i.get("Config",{}); print(json.dumps({"Id":i.get("Id"),"Config":c}))' > target/container-evidence/image.json
       - name: production execution, five axes and process cleanup
         shell: bash
         run: |
