@@ -62,6 +62,19 @@ impl Redemption {
         })
     }
 
+    /// Whether `reference` can be redeemed right now (kernel D55). The
+    /// sealed value is dropped, and so zeroed, the moment it is answered:
+    /// it never leaves this line. Only a reference the store does not hold
+    /// is unredeemable; a locked or broken store answers yes, so the send
+    /// reports the store's own failure and the round stops there instead
+    /// of blaming every account for it.
+    pub(crate) fn holds(&self, reference: &SecretRef) -> bool {
+        match (self.secrets)(reference) {
+            Ok(_dropped) => true,
+            Err(err) => *err.code() != AxCode::CredentialMissing,
+        }
+    }
+
     /// For a call that has no business carrying a picture — a probe
     /// asking an endpoint which models it serves. A picture reaching it
     /// is a wiring mistake, and the refusal says so rather than sending

@@ -1482,3 +1482,239 @@ fn a_read_handed_over_while_the_model_writes_runs_during_the_writing() {
     );
     assert_eq!(speculated.lines, serial.lines);
 }
+
+/// How one account of [`Accounted`] answers every request sent on it.
+#[derive(Clone, Copy)]
+enum Answers {
+    /// It answers; the first answer of the run asks for one tool call,
+    /// so the run takes a second turn.
+    Yes,
+    /// Its key is rejected: no resend helps, another account may.
+    RejectedKey,
+}
+
+/// A provider with named accounts. Every request goes out on the account
+/// selected last, and the account it went out on is noted, so a test
+/// reads which account each call used off the ledger and off the model.
+struct Accounted {
+    accounts: Vec<(&'static str, bool, Answers)>,
+    current: usize,
+    answered: u32,
+    sent: std::rc::Rc<std::cell::RefCell<Vec<&'static str>>>,
+}
+
+impl Accounted {
+    fn new(accounts: Vec<(&'static str, bool, Answers)>) -> Accounted {
+        Accounted {
+            accounts,
+            current: 0,
+            answered: 0,
+            sent: std::rc::Rc::default(),
+        }
+    }
+
+    fn label(name: &str) -> kernel::ServerLabel {
+        kernel::ServerLabel::parse(name).unwrap()
+    }
+}
+
+impl Model for Accounted {
+    fn provider_account(&self) -> Option<kernel::event::record::ProviderAccountBinding> {
+        Some(kernel::event::record::ProviderAccountBinding {
+            provider: "house".to_owned(),
+            account: Accounted::label(self.accounts[self.current].0),
+        })
+    }
+
+    fn account_roster(&self) -> Option<kernel::model::AccountRoster> {
+        Some(kernel::model::AccountRoster {
+            provider: "house".to_owned(),
+            accounts: self
+                .accounts
+                .iter()
+                .map(|(name, usable, _)| kernel::model::RosterEntry {
+                    account: Accounted::label(name),
+                    usable: *usable,
+                })
+                .collect(),
+            current: Accounted::label(self.accounts[self.current].0),
+            retries: kernel::account_recovery::AccountRetries::One,
+        })
+    }
+
+    fn select_account(&mut self, account: &kernel::ServerLabel) {
+        if let Some(position) = self
+            .accounts
+            .iter()
+            .position(|(name, _, _)| *name == account.as_str())
+        {
+            self.current = position;
+        }
+    }
+
+    fn call(&mut self, _req: &ModelRequest) -> Result<ModelReturn, AxError> {
+        let (name, _, answers) = self.accounts[self.current];
+        self.sent.borrow_mut().push(name);
+        match answers {
+            Answers::RejectedKey => Err(AxError::provider(
+                kernel::ProviderFailureKind::Refused { status: 401 },
+                "call the model",
+                "401 Unauthorized",
+            )
+            .account_unusable()
+            .with_recovery("file another key for this account")),
+            Answers::Yes => {
+                self.answered = self.answered.saturating_add(1);
+                let calls = if self.answered == 1 {
+                    vec![call("t-1")]
+                } else {
+                    Vec::new()
+                };
+                Ok(ModelReturn::bare(
+                    message_payload(&[ContentBlock::Text {
+                        text: "working".to_owned(),
+                    }])
+                    .unwrap(),
+                    calls,
+                ))
+            }
+        }
+    }
+}
+
+/// Drives `model` to its end with hooks whose wait refuses to be asked:
+/// a switch goes out at once, so a test that switches never waits.
+fn drive_accounts(model: &mut Accounted) -> (RecordingLedger, Completion) {
+    let mut ledger = RecordingLedger::new();
+    let mut now = counter();
+    let mut interrupt = |_: SafePoint| Interrupt::None;
+    let mut invoke = |_: &ToolCall, _: TimeMs| {
+        Ok(ToolOutcome {
+            result: Payload::empty(),
+            attachments: Vec::new(),
+        })
+    };
+    let mut hooks = RunHooks {
+        now: &mut now,
+        monotonic_us: &mut || 0,
+        interrupt: &mut interrupt,
+        checkpoint: None,
+        writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
+        invoke: &mut invoke,
+        wait: &mut |_: TimeMs| panic!("no call in these runs waits"),
+        deltas: None,
+    };
+    let frozen = drive(plan(), &mut ledger, model, &mut hooks, &handoff()).unwrap();
+    let completion = frozen.completion().clone();
+    (ledger, completion)
+}
+
+/// The data of every line of `kind`, in ledger order.
+fn data_of(ledger: &RecordingLedger, kind: &str) -> Vec<serde_json::Value> {
+    ledger
+        .lines
+        .iter()
+        .map(|line| serde_json::from_slice::<serde_json::Value>(line).unwrap())
+        .filter(|line| line["kind"] == kind)
+        .map(|line| line["data"].clone())
+        .collect()
+}
+
+/// A rejected key moves the call to the next account at once, the line
+/// that says so comes before the call it announces, and the next model
+/// call of the run starts on the account that answered rather than going
+/// back to the first.
+#[test]
+fn a_rejected_key_switches_the_account_at_once_and_the_run_keeps_the_one_that_answered() {
+    let mut model = Accounted::new(vec![
+        ("a", true, Answers::RejectedKey),
+        ("b", true, Answers::Yes),
+    ]);
+    let (ledger, completion) = drive_accounts(&mut model);
+
+    assert_eq!(*model.sent.borrow(), ["a", "b", "b"]);
+    let called: Vec<serde_json::Value> = data_of(&ledger, "model_called")
+        .into_iter()
+        .map(|data| data["provider_account"]["account"].clone())
+        .collect();
+    assert_eq!(called, ["a", "b", "b"].map(serde_json::Value::from));
+    let fired = data_of(&ledger, "watchdog_fired");
+    assert_eq!(
+        fired
+            .iter()
+            .map(|data| (
+                data["action"].clone(),
+                data["to"].clone(),
+                data["code"].clone()
+            ))
+            .collect::<Vec<_>>(),
+        [(
+            serde_json::json!("switch"),
+            serde_json::json!("b"),
+            serde_json::json!("E_PROVIDER")
+        )]
+    );
+    let kinds = ledger.kinds();
+    let at = |wanted: &str| {
+        kinds
+            .iter()
+            .enumerate()
+            .filter(|(_, kind)| *kind == wanted)
+            .map(|(index, _)| index)
+            .collect::<Vec<_>>()
+    };
+    let (switch, called) = (at("watchdog_fired")[0], at("model_called"));
+    assert!(
+        called[0] < switch && switch < called[1],
+        "the switch is written between the call it answers and the call it announces: {kinds:?}"
+    );
+    assert!(!matches!(completion, Completion::Cancelled));
+}
+
+/// Every account failing ends the run with one refusal of its own, which
+/// names each account and what it met; no account is asked twice.
+#[test]
+fn every_account_failing_records_one_exhausted_refusal() {
+    let mut model = Accounted::new(vec![
+        ("a", true, Answers::RejectedKey),
+        ("b", true, Answers::RejectedKey),
+    ]);
+    let (ledger, completion) = drive_accounts(&mut model);
+
+    assert_eq!(*model.sent.borrow(), ["a", "b"]);
+    let degraded = data_of(&ledger, "provider_degraded");
+    assert_eq!(
+        degraded
+            .iter()
+            .map(|data| (data["code"].clone(), data["subject"].clone()))
+            .collect::<Vec<_>>(),
+        [(
+            serde_json::json!("E_PROVIDER_ACCOUNTS_EXHAUSTED"),
+            serde_json::json!(
+                "house: a E_PROVIDER Refused { status: 401 }; b E_PROVIDER Refused { status: 401 }"
+            )
+        )]
+    );
+    assert!(matches!(completion, Completion::Cancelled));
+}
+
+/// A roster with no account whose key can be redeemed sends nothing: the
+/// run records why and stops before any model call.
+#[test]
+fn a_roster_with_nothing_redeemable_sends_nothing() {
+    let mut model = Accounted::new(vec![("a", false, Answers::Yes), ("b", false, Answers::Yes)]);
+    let (ledger, completion) = drive_accounts(&mut model);
+
+    assert!(model.sent.borrow().is_empty());
+    assert!(data_of(&ledger, "model_called").is_empty());
+    assert_eq!(
+        data_of(&ledger, "provider_degraded")
+            .iter()
+            .map(|data| data["subject"].clone())
+            .collect::<Vec<_>>(),
+        [serde_json::json!(
+            "house: a not redeemable; b not redeemable"
+        )]
+    );
+    assert!(matches!(completion, Completion::Cancelled));
+}

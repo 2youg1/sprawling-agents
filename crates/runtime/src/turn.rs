@@ -70,6 +70,10 @@ pub struct Assembling(());
 pub struct Calling<'c> {
     segments: [B3Hash; 4],
     chat: ChatRequest<'c>,
+    /// The watchdog whose account round this call belongs to; the repair
+    /// segment asks it before sending again. `None` outside a run's
+    /// driver, where no round is open.
+    round: Option<&'c mut crate::Watchdog>,
 }
 
 #[derive(Debug)]
@@ -161,8 +165,28 @@ impl<'h> Turn<'h, Assembling> {
         };
         Ok(PhaseOutcome::Advanced(Turn {
             journal: self.journal,
-            state: Calling { segments, chat },
+            state: Calling {
+                segments,
+                chat,
+                round: None,
+            },
         }))
+    }
+}
+
+impl<'h, 'c> Turn<'h, Calling<'c>> {
+    /// Places this call in the account round `watchdog` holds, so a
+    /// repair that sends it again is one more send on the round's
+    /// current account (`crates/runtime/spec/Turn/Recovery.lean` §8-49).
+    #[must_use]
+    pub fn under(self, watchdog: &'c mut crate::Watchdog) -> Turn<'h, Calling<'c>> {
+        Turn {
+            journal: self.journal,
+            state: Calling {
+                round: Some(watchdog),
+                ..self.state
+            },
+        }
     }
 }
 
@@ -187,7 +211,11 @@ impl<'h> Turn<'h, Calling<'_>> {
         if let Some(cancelled) = self.consume_boundary(interrupt, ledger)? {
             return Ok(PhaseOutcome::Cancelled(cancelled));
         }
-        let Calling { segments, chat } = self.state;
+        let Calling {
+            segments,
+            chat,
+            round,
+        } = self.state;
         // The hashes above describe the prefix; these describe the four
         // system blocks that will actually go on the wire. They are the
         // second per-turn digest, and they disagree only if the request
@@ -206,7 +234,12 @@ impl<'h> Turn<'h, Calling<'_>> {
         // §8-49), and every attempt - first or repaired - is recorded
         // before it is made.
         let mut call = recovery::ModelCall::open(&mut self.journal, ledger, model, &request);
-        let mut repair = recovery::BlockingResend;
+        // Outside a driver no round is open, and a watchdog with no round
+        // admits a repair as one always could.
+        let mut unheld = crate::Watchdog::default();
+        let mut repair = recovery::BlockingResend {
+            round: round.unwrap_or(&mut unheld),
+        };
         let recovery::Settled {
             returned: returned_value,
             speculated,

@@ -87,14 +87,14 @@ impl RunWorker {
         let agreed = match seat {
             Seat::Model(mut agreed) => {
                 use kernel::Model as _;
-                let selection = self
+                // The Session's binding opens the run's first account round.
+                if let Some(bound) = self
                     .credentials
                     .book
                     .session_account(&at.addr, &agreed.provider)
-                    .map_or(kernel::model::AccountSelection::First, |id| {
-                        kernel::model::AccountSelection::Preferred(id.clone())
-                    });
-                agreed.adapter.select_account(selection);
+                {
+                    agreed.adapter.select_account(bound);
+                }
                 agreed
             }
             // A harness freezes no model and no effort into the room: it

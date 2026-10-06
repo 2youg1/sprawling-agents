@@ -230,6 +230,8 @@ pub(crate) struct Gated {
     /// The declared accounts in priority order, each with its credential.
     accounts: Vec<(kernel::ServerLabel, super::AuthSpec)>,
     active: usize,
+    /// How many more times one account is asked before the next one.
+    retries: kernel::account_recovery::AccountRetries,
 }
 
 impl Gated {
@@ -241,6 +243,7 @@ impl Gated {
             provider: String::new(),
             accounts: Vec::new(),
             active: 0,
+            retries: crate::EndpointTuning::DEFAULTS.account_retries,
         }
     }
 
@@ -248,10 +251,28 @@ impl Gated {
         mut self,
         provider: String,
         accounts: Vec<(kernel::ServerLabel, super::AuthSpec)>,
+        retries: kernel::account_recovery::AccountRetries,
     ) -> Gated {
         self.provider = provider;
         self.accounts = accounts;
+        self.retries = retries;
         self
+    }
+
+    /// Whether an account's credential can be redeemed now. Asked only
+    /// where there is another account to move to: a single account is
+    /// sent on whatever it holds, as it always was.
+    fn usable(&self, auth: &super::AuthSpec) -> bool {
+        if self.accounts.len() < 2 {
+            return true;
+        }
+        match auth {
+            super::AuthSpec::Bearer(reference)
+            | super::AuthSpec::Header {
+                value: reference, ..
+            } => self.endpoint.redemption.holds(reference),
+            super::AuthSpec::None => true,
+        }
     }
 
     fn through(
@@ -277,16 +298,33 @@ impl kernel::Model for Gated {
         })
     }
 
-    fn select_account(&mut self, selection: kernel::model::AccountSelection) {
-        self.active = match selection {
-            kernel::model::AccountSelection::First => 0,
-            kernel::model::AccountSelection::Preferred(id) => self
+    fn account_roster(&self) -> Option<kernel::model::AccountRoster> {
+        let (current, _) = self.accounts.get(self.active)?;
+        Some(kernel::model::AccountRoster {
+            provider: self.provider.clone(),
+            accounts: self
                 .accounts
                 .iter()
-                .position(|(account, _)| *account == id)
-                .unwrap_or(0),
+                .map(|(account, auth)| kernel::model::RosterEntry {
+                    account: account.clone(),
+                    usable: self.usable(auth),
+                })
+                .collect(),
+            current: current.clone(),
+            retries: self.retries,
+        })
+    }
+
+    fn select_account(&mut self, account: &kernel::ServerLabel) {
+        let Some(position) = self
+            .accounts
+            .iter()
+            .position(|(listed, _)| listed == account)
+        else {
+            return;
         };
-        if let Some((_, auth)) = self.accounts.get(self.active) {
+        if let Some((_, auth)) = self.accounts.get(position) {
+            self.active = position;
             self.endpoint.config.auth = auth.clone();
         }
     }

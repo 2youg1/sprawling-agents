@@ -255,7 +255,8 @@ pub fn note_of(kind: EventKind, record: &EventRecord) -> Option<Note> {
     }
 }
 
-/// A back-off is the provider's refusal, waited out: the line keeps the
+/// A back-off is the provider's refusal, waited out, and a switch is the
+/// same refusal answered on another account: the line keeps the
 /// failure's stable code and subject, and they are shown as that
 /// refusal. The line records only the code and the subject, so the
 /// action and the recovery are composed here from the kind of line it is,
@@ -272,26 +273,34 @@ fn speaker_of(source: &str) -> Speaker {
 }
 
 fn backed_off(action: FiredAction, at: Seq) -> Option<Note> {
-    match action {
+    let (code, subject, recovery) = match action {
         FiredAction::BackOff {
             until_ms,
             code,
             subject,
-        } => Some(match AxCode::parse(&code) {
-            Some(code) => Note::Refused {
-                error: AxError::failure(code, "call the provider", subject).with_recovery(format!(
-                    "the watchdog calls again no earlier than {until_ms} ms"
-                )),
-                at,
-            },
-            None => unreadable(
-                EventKind::WatchdogFired,
-                &format!("unknown code {code}"),
-                at,
-            ),
-        }),
-        FiredAction::Steer { .. } | FiredAction::Freeze { .. } => None,
-    }
+        } => (
+            code,
+            subject,
+            format!("the watchdog calls again no earlier than {until_ms} ms"),
+        ),
+        FiredAction::Switch { to, code, subject } => (
+            code,
+            subject,
+            format!("the watchdog calls again at once on the account {to}"),
+        ),
+        FiredAction::Steer { .. } | FiredAction::Freeze { .. } => return None,
+    };
+    Some(match AxCode::parse(&code) {
+        Some(code) => Note::Refused {
+            error: AxError::failure(code, "call the provider", subject).with_recovery(recovery),
+            at,
+        },
+        None => unreadable(
+            EventKind::WatchdogFired,
+            &format!("unknown code {code}"),
+            at,
+        ),
+    })
 }
 
 /// The note a payload leaves when it will not read back as its kind.

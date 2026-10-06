@@ -71,6 +71,7 @@ pub fn adapter_for(
         endpoint.gated(chosen.transport, monotonic).with_accounts(
             chosen.endpoint.name.clone(),
             chosen.endpoint.account_auths()?,
+            tuning.account_retries(),
         ),
     ))
 }

@@ -6,7 +6,9 @@
 //! What an active run does on the ledger: the dispatch pair that brings
 //! it into existence, one turn, and the freeze that is its only exit.
 
-use kernel::{AxError, Completion, Evidence, Ledger, Model, Payload, StopReason};
+use kernel::{
+    AxError, Carrier, Completion, EventDraft, Evidence, Ledger, Model, Payload, StopReason, TimeMs,
+};
 
 use crate::conversation::Conversation;
 use crate::handoff::Handoff;
@@ -75,6 +77,50 @@ fn concluded(report: &TurnReport, lines: &HeldLines) -> Result<Completion, AxErr
 }
 
 impl Run<Active> {
+    /// One line of this run's, written by the driver at `t`.
+    pub(super) fn line(&self, t: TimeMs, kind: kernel::EventKind, data: Payload) -> EventDraft {
+        EventDraft {
+            run: self.plan.run,
+            t,
+            who: self.plan.who.clone(),
+            addr: Some(self.plan.addr.clone()),
+            kind,
+            data,
+            ig: false,
+        }
+    }
+
+    /// The `watchdog_fired` line for a disposal that sends the call
+    /// again: written before the wait or the switch, so the next
+    /// `model_called` in the history follows the reason for it.
+    pub(super) fn record_fired(
+        &self,
+        ledger: &mut dyn Ledger,
+        t: TimeMs,
+        disposal: &crate::Disposal,
+    ) -> Result<(), AxError> {
+        let data = self.state.watchdog.fired_payload(disposal)?;
+        ledger
+            .append(self.line(t, kernel::EventKind::WatchdogFired, data))
+            .map(|_| ())
+    }
+
+    /// A refusal the driver itself raised, written under its code's
+    /// carrier event.
+    pub(super) fn record_refusal(
+        &self,
+        ledger: &mut dyn Ledger,
+        t: TimeMs,
+        refusal: &AxError,
+    ) -> Result<(), AxError> {
+        let Carrier::Event(kind) = refusal.code().carrier() else {
+            return Err(refusal.clone());
+        };
+        ledger
+            .append(self.line(t, kind, Payload::of(refusal)?))
+            .map(|_| ())
+    }
+
     /// The dispatch pair: the job pin lands first, then the run exists.
     /// Two ledger lines, two clock samples — the pin is a fact about the
     /// city and the start is a fact about the run. Written by the plan's
@@ -108,6 +154,7 @@ impl Run<Active> {
             kernel::Tokens::new(plan.shape.context_tokens),
             plan.second_threshold,
         );
+        let watchdog = crate::Watchdog::new(plan.retries, plan.run);
         Ok(Run {
             plan,
             state: Active {
@@ -119,6 +166,7 @@ impl Run<Active> {
                 prompt: crate::turn::PromptRecord::default(),
                 checkpoint: CheckpointPolicy::opening(),
                 lines,
+                watchdog,
             },
         })
     }
@@ -179,7 +227,7 @@ impl Run<Active> {
         );
         self.state.prior_shape = Some(shape);
         let calling = (hooks.interrupt)(SafePoint::BeforeCall { turn: index });
-        let called = turn.call(
+        let called = turn.under(&mut self.state.watchdog).call(
             calling.clone(),
             ledger,
             model,

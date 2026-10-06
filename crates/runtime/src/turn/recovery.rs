@@ -257,13 +257,23 @@ pub(super) fn recover(
 /// one that reads a complete body. Anything else is skipped — a
 /// retriable failure is the watchdog's to dispose of, and re-sending a
 /// refusal only buys the same refusal.
-pub(super) struct BlockingResend;
+///
+/// The resend is one more send on the call's account, so it goes out
+/// only when the round the watchdog holds admits it, and is counted there
+/// when it does (kernel D54).
+pub(super) struct BlockingResend<'w> {
+    pub(super) round: &'w mut crate::Watchdog,
+}
 
-impl Segment for BlockingResend {
+impl Segment for BlockingResend<'_> {
     fn attempt(&mut self, failure: &AxError, call: &mut ModelCall<'_, '_>) -> SegmentOutcome {
-        if !call.streamed() || *failure.code() != AxCode::WireMismatch {
+        if !call.streamed()
+            || *failure.code() != AxCode::WireMismatch
+            || !self.round.admits_repair()
+        {
             return SegmentOutcome::Skipped(failure.clone());
         }
+        self.round.repaired();
         match call.resend_blocking() {
             Ok(value) => SegmentOutcome::Recovered(value),
             Err(err) => SegmentOutcome::Failed(err),
