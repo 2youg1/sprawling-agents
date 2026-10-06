@@ -463,7 +463,8 @@ storage::jsonl／storage::cas／runtime::replay／runtime::fork／citysim 全部
 - 可忽略性与版本：`storage::jsonl` 的 `an_ignorable_line_from_a_newer_vocabulary_is_kept_and_chained`、`consts_external` 的 `readable_log_v` 测试、`event::moment::tests`。
 - 判定表：`discard/verdict.rs` 的测试、`approval::tests` 的十二行真值表、`delegation` 与 `pursuit` 的测试、kani 的 `backpressure::verification` 两条与它们的 proptest 镜像、`idem` 与 `version` 的测试、`ToolBench` 的 `dedup_runs_before_the_side_effect`。
 - 链：`Ledger` 的 conformance 套件（§8-9 的六条断言），由 `storage::JsonlLedger` 与 citysim 的内存 Ledger 各跑一次。
-- 账号轮：`spec/AccountRecovery.lean` 用 `#eval` 打印的轨迹向量由 Rust 模块旁的测试逐条重放，proptest 覆盖任意失败序列与名册长度，检查本分部的量化定理；Rust 模块尚未落地，这两项随它一同进来。
+- 账号轮：`spec/AccountRecovery.lean` 用 `#eval` 打印的轨迹向量由 `account_recovery::tests::the_lean_trace_vectors_replay_one_by_one` 逐条重放；`every_round_keeps_the_lean_properties` 与 `a_single_account_round_reads_retry_alone` 用 proptest 覆盖任意失败序列、名册长度、可兑付子集与人设上限，检查该分部的量化定理。
+- 换号与重试同行：`error::shape::tests::no_order_of_calls_advances_a_resendable_failure` 用 proptest 走任意次序的四个构造器，对拍 `spec/Error.lean` 的同名定理与 `no_order_of_calls_waits_without_retrying`；`only_a_switch_is_written_and_an_old_record_reads_as_keep` 守住 `Keep` 不上线、旧行读作 `Keep`。
 
 没有 Lean 模型、由 Rust 守住的：Payload 的浮点与深度、规范字节与 golden、Locator 文法、密钥扫描与熵、计划树与份额守恒、门的拒词与 `DOORS` 矩阵、降级读数、保温续期、模型端口的三扇门。它们的分部只有节注释，要求由类型、trybuild 反例（`crates/kernel/tests/ui`）、kani 与 `cargo nextest run -p sprawling-kernel` 的各模块测试守住；把其中一条写成定理，是下一次改它时的事。
 -/

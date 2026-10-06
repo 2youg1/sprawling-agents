@@ -8,9 +8,9 @@ import crates.kernel.spec.Error
 /-!
 # kernel::account_recovery
 
-规定 `account_recovery`（`crates/kernel/src/` 下同名的文件）：一次逻辑请求面对一个 Provider 的有序账号时，先用哪个账号、失败后在原号上再发还是换号、何时停下。本文件是 `crates/kernel/Spec.lean` 的一个分部，节标签 §8-86，别处引作 `crates/kernel/Spec.lean §8-86` 或它的决定 `kernel D54`、`kernel D55`。
+规定 `kernel::account_recovery`（`crates/kernel/src/account_recovery.rs`）：一次逻辑请求面对一个 Provider 的有序账号时，先用哪个账号、失败后在原号上再发还是换号、何时停下。本文件是 `crates/kernel/Spec.lean` 的一个分部，节标签 §8-86，别处引作 `crates/kernel/Spec.lean §8-86` 或它的决定 `kernel D54`、`kernel D55`。
 
-本分部先于 Rust 模块写成：`crates/kernel/src/` 下还没有这个文件，模块图在它落地的那个变更里登记一行，形状是 `state machine`。模块落地之前，模型路径的恢复仍由 `runtime::watchdog` 的 `Retry` 三态规则执行（`crates/runtime/spec/Watchdog.lean` §8-9）；这条规则就是下面单账号名册（`Roster.Single`）的处置，所以落地不改变单账号端点的行为（`a_single_account_ignores_the_disposition`）。
+模块图把它登记为 `state machine`。两个驱动方还没有接上它：模型路径的恢复今天仍由 `runtime::watchdog` 的 `Retry` 三态规则执行（`crates/runtime/spec/Watchdog.lean` §8-9），`web_search` 工具还不存在。那条三态规则就是下面单账号名册（`Roster.Single`）的处置，所以驱动方接上本模块时，单账号端点的行为不变（`a_single_account_ignores_the_disposition`）。
 
 模型证明，对任意名册、任意人设上限、任意失败与修复的轨迹：请求错误不再发送；说「换号」的失败不在原号上重发；一个账号一轮里的发送不超过 1＋k；一轮里每个账号至多到一次，总发送不超过 n·(1＋k)，且不超过 `AtMost` 上限＋1；效果不明的请求不换号；Session 的绑定只在回答时移动。
 
@@ -23,7 +23,7 @@ pub enum Roster { Single, Several { accounts: Vec<ServerLabel>, retries: Account
                                                         // Several 恒有两个以上账号，名册序即优先级
 pub enum RoundEnd { Refused, Unknown, Cap, Exhausted }
 pub enum AccountStep { Resend, Switch { to: ServerLabel }, Stop { why: RoundEnd } }
-pub struct AccountRound { /* roster、usable、cap: Retries、held、current、tried: BTreeSet、here、total —— 私有 */ }
+pub struct AccountRound { /* roster、usable、cap: Retries、current、tried: BTreeSet、here、total —— 私有 */ }
 impl AccountRound {
     /// 一次逻辑请求的第一次发送之前：held 仍在名册里且可兑付即用它，否则名册里第一个可兑付的。
     pub fn start(roster: Roster, usable: BTreeSet<ServerLabel>, cap: Retries, held: Option<ServerLabel>)
@@ -36,7 +36,7 @@ impl AccountRound {
 }
 ```
 
-`next` 只返回信息、`apply` 只推进状态（命令与查询分离），两个驱动方——模型路径的 `runtime::watchdog` 与 `runtime::run::drive`（`crates/runtime/spec/Watchdog.lean` §8-9），以及 accounting 的 `web_search` 工具——都只执行 `AccountStep`，各自不另写一个重试循环、不另判一次选哪个账号。下面的 Lean 定义就是这些方法的参考语义：`next` 一臂对一臂，`apply`、`admits_repair`、`repaired` 逐字段相同；`tried` 在 Rust 是集合，在模型是到过的顺序（最新的在前），因为证明要数它的长度。
+`next` 只返回信息、`apply` 只推进状态（命令与查询分离），两个驱动方——模型路径的 `runtime::watchdog` 与 `runtime::run::drive`（`crates/runtime/spec/Watchdog.lean` §8-9），以及 accounting 的 `web_search` 工具——都只执行 `AccountStep`，各自不另写一个重试循环、不另判一次选哪个账号。下面的 Lean 定义就是这些方法的参考语义：`next` 一臂对一臂，`apply`、`admits_repair`、`repaired` 逐字段相同；`tried` 在 Rust 是集合，在模型是到过的顺序（最新的在前），因为证明要数它的长度。模型的 `held` 与 `answered` 只为陈述绑定的性质而在，Rust 的轮不存 `held`：只有 `start` 读它一次。计数在 Rust 里饱和而不回绕：单账号的轮在 `UntilHalted` 之下一直再发到 `Halt`，回绕的计数会读成一个新账号的余额。
 
 **本轮**（round）是一次逻辑请求：从第一次发送起，到回答、停下或 `Halt` 为止。模型调用每一次 `Model::call` 开一轮，`web_search` 每一次工具调用开一轮。恢复轮次与已用的余额不入账、不持久化：进程重启后的下一次请求从绑定的账号开新的一轮（绑定本身由 Ledger 重建，`crates/gateway/spec/Router.lean` D30）。
 
@@ -573,7 +573,7 @@ theorem a_single_account_ignores_the_disposition (round : AccountRound Account)
 
 /-! ## 轨迹向量
 
-下面的 `#eval` 打印给 Rust 逐条重放的轨迹向量：每一条给出名册、不可兑付的账号、人设上限、开轮时持有的账号与一串事件，答出开轮选中的账号与每个事件之后的处置（修复行的处置是 `Resend`，或缺席表示不放行）。Rust 侧的检查住在 `account_recovery` 模块旁的测试里，与本分部的定理一同点名本文件。 -/
+下面的 `#eval` 打印给 Rust 逐条重放的轨迹向量：每一条给出名册、不可兑付的账号、人设上限、开轮时持有的账号与一串事件，答出开轮选中的账号与每个事件之后的处置（修复行的处置是 `Resend`，或缺席表示不放行）。Rust 侧的 `account_recovery::tests::the_lean_trace_vectors_replay_one_by_one` 按同样的次序逐条重放它们与下面的 `decide` 例子；`every_round_keeps_the_lean_properties` 与 `a_single_account_round_reads_retry_alone` 用 proptest 在任意名册、可兑付子集、人设上限、持有账号与失败和修复的轨迹上检查本分部的量化定理，发送数由驱动方执行的处置数出，不读轮的内部。 -/
 
 /-- 一条轨迹的处置序列；停下即止。 -/
 def AccountRound.decisions (round : AccountRound Account) :
