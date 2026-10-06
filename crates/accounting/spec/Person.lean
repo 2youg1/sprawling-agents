@@ -32,7 +32,7 @@ pub fn core_placement() -> Result<CorePlacement, AxError>; // 缺省 Soft；不�
 
 **本章测试**：`what_the_file_states_and_what_the_answer_states_are_one_record`、`a_section_this_build_does_not_read_survives_a_write`、`a_file_that_does_not_parse_is_refused_rather_than_replaced`、`each_placement_spelling_reads_as_its_arm`（`accounting::person::tests`）。
 - **D51 四种 placement 解析结果由人层读者给出，平台行为由 serving 决定**：`core_placement` 把 `[core] placement` 的 `"none"`、`"soft"`、`"soft_shares"`、`"pinned"` 分别读成 `Off`、`Soft`、`SoftShares`、`Pinned`，缺席答 `Soft`；其余拼写与非字符串值报 `E_CONFIG_INVALID`，恢复语指向可接受的设置。`soft_shares` 表示选择请求内存份额的臂，不表示所在平台已经兑现该限额；各臂请求什么归 `crates/sprawling/spec/Serving/Placement.lean` D47，实际兑现归 `crates/runtime/spec/Tools/Exec.lean` D29、D33，硬亲和归 Placement D41、D49。人层读者只解释设置，因而不会因平台能力不同改变同一文件的语义。被否决的做法：按当前机器是否支持机制来收窄配置拼写——这样同一份设置换机器便读不回，设置解析还要重建平台能力判定。重开参数：四臂对照选出默认并明确退役某臂时，读者与消费者在同一次改动里收窄取值集合。
-- **`CorePriority` 住在这里而不在 `bin::serving::standing`**：它是这份文件里 `[core] priority` 读出来的值；真去抬高一条线程的做法归 `serving::standing`（`crates/sprawling/Spec.lean` §8-93），它从这里取值。
+- **`CorePriority` 的文法归 wire，本模块重导出它**：它是这份文件里 `[core] priority` 读出来的值；真去抬高一条线程的做法归 `serving::standing`（`crates/sprawling/Spec.lean` §8-93），它从这里取值。
 -/
 
 /-! D52 性能设置读写 `[core]`，wire 的 `CorePreferences` 是唯一文法

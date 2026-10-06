@@ -406,7 +406,7 @@ pub(crate) struct Unread(String);                   // 为什么没读到，写�
 
 ```rust
 // accounting::person —— 读人的配置（`crates/accounting/spec/Person.lean`）
-pub enum CorePlacement { Off, Soft, SoftShares }   // [core] placement 的 "none"、"soft"（缺省）、"soft_shares"
+pub use wire::CorePlacement; // 四臂拼写由 wire 的配置文法声明
 // bin::serving::placement —— 每一臂打开哪几项，只在这里定
 pub(crate) fn run_shares() -> runtime::Shares;     // 读设置与 User 填写的上限，答每个 run 的份额
 ```
@@ -427,7 +427,7 @@ pub(crate) fn run_shares() -> runtime::Shares;     // 读设置与 User 填写�
 - 缺省带上 CPU 份额，因为份额按权重分：核被抢时每个 run 各得一份，机器空着时什么也不改；它防的正是本节要防的事——一个 run 的构建起几十个编译进程，把别的 run 与核心都挤到后面。内存上限会让超过它的构建因内存不足失败，因此只有 User 选择 `"soft_shares"` 且填写 `[core] memory_bytes` 时才请求。User 裁定没有缺省 run 内存上限，不能从物理内存推导。
 - 份额是一个值 `runtime::Shares`：`bin::assembly` 造 `accounting::worker::hands::Hands` 时调 `run_shares` 一次，`accounting` 打开车队时把它交给 `runtime::Backlog::with_shares`；runtime 不读人的配置，所以一臂开关什么只有这一处定义。`memory_bytes` 缺席时 `"soft_shares"` 只给 CPU 份额；零、负数与非整数在配置读取处拒绝。
 - 设置读不懂时，起动照常、按 `"soft"` 做，并向标准错误说一次；doctor 那一行说出读不懂。内存上限始终只由 User 输入，不随测量改变。
-- doctor 一行，先说拓扑与计划，例：「CPU: 2 classes — 4 performance cores (8 threads), 8 efficiency cores; hot threads prefer the 4 performance cores」；「CPU: one class, 8 cores; left to the operating system」；「CPU: one class, 16 cores in 2 cache groups; left to the operating system and its cache steering」；读不到时「CPU: topology unread (<原因>); left to the operating system」；macOS 与 Linux 上计划有座位时写「this platform has no placement call; its scheduler places threads」。再说每个 run 的份额：「each run's commands share the processors by weight」，`"soft_shares"` 再加「and commit at most <n> MiB each」，Linux 上没有委派时写「runs' commands compete thread by thread and run below the core: the cgroup is not delegated」，`"none"` 或别的平台给不了份额时写「runs' commands compete thread by thread」。措辞只在 `placement::report` 一处。
+- doctor 一行，先说拓扑与计划，例：「CPU: 2 classes — 4 performance cores (8 threads), 8 efficiency cores; hot threads prefer the 4 performance cores」；「CPU: one class, 8 cores; left to the operating system」；「CPU: one class, 16 cores in 2 cache groups; left to the operating system and its cache steering」；读不到时「CPU: topology unread (<原因>); left to the operating system」；macOS 与 Linux 上计划有座位时写「this platform has no placement call; its scheduler places threads」。再说每个 run 的份额：「each run's commands share the processors by weight」，`"soft_shares"` 再加「and commit at most <n> bytes」，Linux 上没有委派时写「runs' commands compete thread by thread and run below the core: the cgroup is not delegated」，`"none"` 或别的平台给不了份额时写「runs' commands compete thread by thread」。措辞只在 `placement::report` 一处。
 
 **被否**：①CPU 份额也只在 `"soft_shares"` 打开——缺省就留着一个 run 的构建占满全部核的情形，而份额在机器空着时没有代价；②两个独立的设置，线程放置一个、子进程份额一个——关掉全部要改两处，对照从四格变成九格，而每一臂本来就是一组一起开关的机制；③runtime 自己读人的配置——设置就有了两个读者，一臂开关什么就有了两处定义；④doctor 打出原始的记录表——User 要的是机器被怎样对待，不是 `EfficiencyClass` 的数。
 

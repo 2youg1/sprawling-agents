@@ -239,8 +239,8 @@ fn runs_share(asked: Shares, platform: PlatformShares) -> String {
                 .to_owned()
         }
         (Shares::CpuAndMemory { limit }, PlatformShares::CpuAndMemory) => format!(
-            "each run's commands share the processors evenly and commit at most {} MiB",
-            limit.get() / (1 << 20)
+            "each run's commands share the processors evenly and commit at most {} bytes",
+            limit.get()
         ),
     }
 }

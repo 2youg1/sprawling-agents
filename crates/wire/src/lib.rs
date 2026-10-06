@@ -106,10 +106,8 @@ pub use frames::{QUERY_NAMES, WIRE_V, schema_hash};
 pub use guide::{GuideMark, GuideProgress, GuideState, GuideStep};
 pub use kernel::{FileChange, How, Lines};
 pub use preference::{Appearance, Chord, Chroma, Density, Face, Lang, Lighting, Motion};
-pub use preference::{
-    BODY_PX_MAX, BODY_PX_MIN, CorePlacement, CorePreferences, CorePriority, PreferencePatch,
-    PreferencesAnswer,
-};
+pub use preference::{BODY_PX_MAX, BODY_PX_MIN, PreferencePatch, PreferencesAnswer};
+pub use preference::{CorePlacement, CorePreferences, CorePriority};
 pub use preference::{Glass, ThemeOverride, Tier};
 pub use preference::{SessionTags, TAG_MAX, Tag};
 pub use reading::{OUTPUT_LINES, arguments_in, note_of, output_in, said_in};

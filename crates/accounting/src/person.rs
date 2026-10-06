@@ -39,7 +39,7 @@ use crate::home::Home;
 /// spelling and read under another is a setting that never takes
 /// effect.
 const UI: &str = "ui";
-/// The section and key of the one core setting (`crates/sprawling/Spec.lean` §8-93).
+/// Performance settings adopted at serving startup (`crates/sprawling/Spec.lean` §8-93).
 const CORE: &str = "core";
 /// Everything this person settled, as their file states it.
 ///

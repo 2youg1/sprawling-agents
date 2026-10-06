@@ -11,6 +11,7 @@
   import { CorePlacement, CorePriority, type CorePreferences } from "../../wire";
   import Field from "../parts/field.svelte";
   import Segmented from "../parts/segmented.svelte";
+  import Unanswered from "../parts/unanswered.svelte";
   import Card from "./card.svelte";
   import { HELD, RECEIPT_MS, edited, refused, sent, waited, type Saving } from "./saving";
 
@@ -109,4 +110,6 @@
       {...(valid ? {} : { error: say($lang, "performance_memory_invalid") })}
       onInput={(value) => { memory = value; moved(); }} mono />
   </Card>
+{:else if $asked !== undefined && "unavailable" in $asked}
+  <Unanswered query={$asked.unavailable.query} asked={QUERIES.preferences} />
 {/if}

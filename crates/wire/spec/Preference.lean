@@ -117,7 +117,7 @@ none、soft、soft_shares、pinned；配置读者与客户端 schema 共用此�
 /-! 设置覆盖：记录的是声明字段；TOML 拼写仍由 serde 类型决定。
 settings-control PreferencesAnswer.lang client/src/views/setup.svelte
 settings-control PreferencesAnswer.core client/src/views/settings/performance.svelte
-settings-control PreferencesAnswer.panel client/src/views/talk.svelte
+settings-control PreferencesAnswer.panel client/src/views/right.svelte
 settings-control PreferencesAnswer.appearance client/src/views/setup/appearance.svelte
 settings-control PreferencesAnswer.proxying client/src/views/setup.svelte
 settings-control PreferencesAnswer.chords client/src/views/setup/keys.svelte

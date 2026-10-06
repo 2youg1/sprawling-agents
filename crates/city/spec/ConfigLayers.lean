@@ -239,9 +239,9 @@ settings-reason ConfigFile.clock building 设置提供 CONFIG.toml 原文编辑�
 settings-control ConfigFile.context client/src/views/settings/context_rung.svelte
 settings-reason ConfigFile.identity 由 session 首次 run 冻结 identity version，User 不直接改写已冻结的身份。
 settings-control ConfigFile.mcp client/src/views/mcp.svelte
-settings-control ConfigFile.model client/src/views/setup/models.svelte
+settings-reason ConfigFile.model 模型名和 effort 的 building 覆盖通过 CONFIG.toml 原文设置；默认模型和 effort 控件写 city 层，building 覆盖控件尚未实现。
 settings-reason ConfigFile.remote 只允许 city 层，building 声明时拒绝；remote 设置组管理 city 的 route。
-settings-control ConfigFile.resident client/src/views/setup/harnesses.svelte
+settings-reason ConfigFile.resident harness 页面说明主机安装与登录；building 的 harness 选择当前通过 CONFIG.toml 原文设置，专用选择控件尚未实现。
 settings-reason ConfigFile.sandbox building 设置提供 CONFIG.toml 原文编辑；当前没有此字段的专用控件，专用校验表单仍需实现。
 settings-reason ConfigFile.skills 外部 shelves 只允许 city 层，building 不能把机器路径声明为自己的书架。
 settings-control ContextSection.second_threshold client/src/views/settings/context_rung.svelte
@@ -253,15 +253,15 @@ settings-reason McpSection.headers building 设置提供 CONFIG.toml 原文编�
 settings-reason McpSection.label building 设置提供 CONFIG.toml 原文编辑；当前没有此字段的专用控件，专用校验表单仍需实现。
 settings-reason McpSection.transport building 设置提供 CONFIG.toml 原文编辑；当前没有此字段的专用控件，专用校验表单仍需实现。
 settings-reason McpSection.url building 设置提供 CONFIG.toml 原文编辑；当前没有此字段的专用控件，专用校验表单仍需实现。
-settings-control ModelSection.effort client/src/views/shared/effort.svelte
-settings-control ModelSection.name client/src/views/setup/models.svelte
+settings-reason ModelSection.effort city effort 控件不覆盖 building 已明确填写的值；building 的专用覆盖控件尚未实现，当前编辑 CONFIG.toml 原文。
+settings-reason ModelSection.name 此名是 building 的配置覆盖，不是端点册的默认模型选择；当前通过 CONFIG.toml 原文设置，专用覆盖控件尚未实现。
 settings-reason RemoteRoute.Cloudflare.command 只允许 city 层，building 声明时拒绝；remote 设置组管理 city 的 route。
 settings-reason RemoteRoute.Cloudflare.tunnel 只允许 city 层，building 声明时拒绝；remote 设置组管理 city 的 route。
 settings-reason RemoteRoute.Cloudflare.url 只允许 city 层，building 声明时拒绝；remote 设置组管理 city 的 route。
 settings-reason RemoteRoute.Command.args 只允许 city 层，building 声明时拒绝；remote 设置组管理 city 的 route。
 settings-reason RemoteRoute.Command.command 只允许 city 层，building 声明时拒绝；remote 设置组管理 city 的 route。
 settings-reason RemoteRoute.Command.permanence 只允许 city 层，building 声明时拒绝；remote 设置组管理 city 的 route。
-settings-control ResidentSection.harness client/src/views/setup/harnesses.svelte
+settings-reason ResidentSection.harness 这是 building 的 harness 选择，不是主机安装状态；当前通过 CONFIG.toml 原文设置，专用选择控件尚未实现。
 settings-reason SandboxSection.arm building 设置提供 CONFIG.toml 原文编辑；当前没有此字段的专用控件，专用校验表单仍需实现。
 settings-reason SandboxSection.container building 设置提供 CONFIG.toml 原文编辑；当前没有此字段的专用控件，专用校验表单仍需实现。
 settings-reason SandboxSection.env_passthrough building 设置提供 CONFIG.toml 原文编辑；当前没有此字段的专用控件，专用校验表单仍需实现。
