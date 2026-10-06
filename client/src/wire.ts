@@ -9,13 +9,29 @@
 import { Schema } from "effect";
 
 /** The wire version both ends compare on connect. */
-export const WIRE_V = 58 as const;
+export const WIRE_V = 59 as const;
 /** The schema hash the server checks: `wire::schema_hash()`. */
-export const WIRE_HASH = "6baf4fb62c3b1cd13aa11d50015423f94b56128e1e4f1f06292c1c23e8fc0205" as const;
+export const WIRE_HASH = "16ae067ba128afe3e02a2ce2681a0e6e551ab4efcfb1bc5f6ebbeff24aee4c8e" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 /** The body sizes a person may ask for: `wire::BODY_PX_MIN` and `BODY_PX_MAX`. */
 export const BODY_PX = { min: 12, max: 20 } as const;
+
+/**
+ * Whether the account a request went out on can still take it
+ * (`crates/kernel/spec/Error.lean` D53).
+ * 
+ * A second answer beside `Retry` rather than a reading of it:
+ * a rejected key and a request the provider calls malformed are both
+ * `Retry::No`, and only the first is mended by another account. On the
+ * wire `"keep"` or `"advance"`; `Keep` is left out, so a record written
+ * before this field existed reads as `Keep` and keeps its bytes.
+ */
+export const AccountDisposition = Schema.Union([
+  Schema.Literal("keep"),
+  Schema.Literal("advance"),
+]).annotate({ identifier: "AccountDisposition" });
+export type AccountDisposition = typeof AccountDisposition.Type;
 
 /**
  * A canonical relative path inside the city: `/`-separated segments, none empty, none `.` or `..`, no backslash, no `:`, no control character, and no segment ending in a dot or whitespace, as `kernel::Address::parse` accepts it.
@@ -2422,6 +2438,10 @@ export const ProviderFailureKind = Schema.Union([
     status: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   }),
   Schema.Struct({
+    kind: Schema.Literal("quota"),
+    status: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  }),
+  Schema.Struct({
     kind: Schema.Literal("overflow"),
     status: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   }),
@@ -2461,6 +2481,7 @@ export type Retry = typeof Retry.Type;
  * wire shape flat and the field order unchanged.
  */
 export const AxError = Schema.Struct({
+  account: Schema.optional(AccountDisposition),
   action: Schema.String,
   code: AxCode,
   gate: Schema.optional(Schema.NullOr(GateRefusal)),

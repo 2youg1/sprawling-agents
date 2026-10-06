@@ -70,7 +70,7 @@ import crates.gateway.spec.Transcribe.Recording
 - `spec/Provider/Ceiling.lean`：要这个字段的一面上恒有一个数（`a_face_that_needs_a_figure_always_gets_one`），本城钉下的数与策略缺省只在这一面要一个数时作答（`the_city_states_a_figure_only_where_the_face_needs_one`）；每一档压过下一档是 `resolve` 的一条臂。
 - `spec/Provider/Input.lean`：答案要么是一个说过的事实（人、目录、预置表，先说者胜），要么是 `Text`（`every_answer_is_a_stated_fact_or_text`）。
 - `spec/Provider/Preset.lean`：这台电脑上的服务不借厂商的行（`a_server_on_this_machine_borrows_no_vendor_row`）；host 有自己的行时只由它们作答（`a_host_with_rows_of_its_own_answers_from_them`）；作答的行的前缀是这个 id 的前缀（`the_answer_is_a_prefix_of_the_id`）。
-- `spec/Endpoint/Failure.lean`：没发出去的请求再发，发出去丢了回答的效果不明；非 2xx 恰在 408、429 与 5xx 时再问（`a_refusal_is_asked_again_exactly_when_the_provider_is_busy`、`the_status_table`）；溢出恰是 400 或 413 且拒词说窗口满了（`a_refusal_is_an_overflow_exactly_when_it_names_the_window`），从不再试。
+- `spec/Endpoint/Failure.lean`：没发出去的请求再发，发出去丢了回答的效果不明；非 2xx 恰在 408、429 与 5xx 时再问（`a_refusal_is_asked_again_exactly_when_the_provider_is_busy`、`the_status_table`）；溢出恰是 400 或 413 且拒词说窗口满了（`a_refusal_is_an_overflow_exactly_when_it_names_the_window`），从不再试；换账号恰在 401、结构化额度用尽的 429 与流内的 `insufficient_quota`（`a_refusal_advances_exactly_for_a_rejected_key_or_an_exhausted_quota`、`a_reported_error_advances_exactly_for_an_exhausted_quota`），效果不明的失败从不换账号（`unknown_keeps_account`），换账号的失败都不再发（`an_advance_is_never_asked_again`）。
 - `spec/Cost.lean`：权威计费额在场恒胜（`the_authoritative_amount_always_wins`）；价目推算答出的数是精确的和、装得进 `u64`（`a_settled_sheet_is_the_exact_sum`）。
 - `spec/Concurrency.lean`：一个端点的名额在任意轨迹上上限留在 1 到配置值之间（`run_valid`）、没有收窄时在用数不超过上限（`run_keeps_within`）、`Retry-After` 的时刻之前不放宽（`no_widening_before_hold`）、等到的时刻严格晚于此刻（`wait_is_later`）；排队的号按拿号的次序取到（`grants_follow_arrival`）。
 
@@ -115,7 +115,7 @@ Lean 里的名字与 Rust 的对应：
 - `Gateway.Provider.Ceiling.resolve` ↔ `OutputCeiling::resolve`，其参数 `preset` ↔ `preset::ceiling_for(target.base_url, target.id)`，`policy` ↔ `OUTPUT_CEILING_DEFAULT`，`wire` ↔ `Target.wire`；`field_on`、`Field` ↔ 同名的私有函数与枚举；`Ceiling.new` ↔ `kernel::Ceiling::new`。
 - `Gateway.Provider.Input.accepted_input` ↔ `provider::input::first_stated`（私有），`accepted_input` 用 `preset::input_for(base_url, id)` 的答案作它的参数 `preset`。
 - `Gateway.Provider.Preset.model_for` ↔ `preset::row_for`（私有；`preset::model_for` 交给它真实的表），`own` ↔ host 自己那一行的 `models`，`vendors` ↔ `PRESETS` 全部的模型行，`isLocal` ↔ `reach::is_local(base_url)`；`longest` ↔ `max_by_key(|row| row.id_prefix.len())`。
-- `Gateway.Endpoint.Failure.retry`、`refusal` ↔ `ProviderFailure::retry`、`ProviderFailure::refusal`；`busy` ↔ `retry` 里 408、429、`is_server_error` 那一臂的条件；`RETRIABLE_KINDS` ↔ `Reported` 那一臂的 `matches!` 列表；`Exchange` 的参数 ↔ `reqwest::Error::is_connect`。
+- `Gateway.Endpoint.Failure.retry`、`refusal`、`account_disposition` ↔ `ProviderFailure::retry`、`ProviderFailure::refusal`、`ProviderFailure::account_disposition`；`busy` ↔ `retry` 里 408、429、`is_server_error` 那一臂的条件；`RETRIABLE_KINDS` ↔ `Reported` 那一臂的 `matches!` 列表；`Exchange` 的参数 ↔ `reqwest::Error::is_connect`。
 - `Gateway.Cost.settle`、`share` ↔ `cost::settle`、`cost::share`；`settle_from` ↔ `settle` 里逐项 `checked_add` 的循环；`checked` ↔ `u64` 的 `checked_mul`／`checked_add`；`exact` 是模型里不回绕的份额，Rust 没有对应。
 -/
 
@@ -341,6 +341,10 @@ kernel 已有码，语义照 Custody 一节；不新增码。
 - D24 一个凭证环境变量的值不是 Unicode 时，它是一个点名变量的配置错，不是「没配过」：`crates/gateway/spec/Credential.lean`
 - D25 `prompt_cache_key` 是预置表的一列，只写给文档说收它的主机，值是会话标识：`crates/gateway/spec/Provider.lean`
 - D26 开城时为每个已登记端点预热一次连接：一次不带凭据的 `GET models_url`，失败只停这一次预热，谁也不等它（§8-35）：`crates/gateway/spec/Endpoint/Transport.lean`
+- D28 保持原登记事件与 Vault 格式，以完整有序列表为一次原子替换：`crates/gateway/spec/Router.lean`
+- D29 显式账号列表生效时拒绝旧凭据字段：`crates/gateway/spec/Router.lean`
+- D30 当前 Session 成员的成功 `model_returned` 是唯一绑定提交点：`crates/gateway/spec/Router.lean`
+- D31 「这个账号还能不能接这个请求」与「能否再试」同住 `endpoint::failure`：`crates/gateway/spec/Endpoint/Failure.lean`，在 `account_disposition` 正上方
 -/
 
 /-! ## 13 依赖选型

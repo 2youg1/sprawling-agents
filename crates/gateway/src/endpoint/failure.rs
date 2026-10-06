@@ -4,10 +4,11 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! What failed about one provider call, and the one place that decides
-//! whether it may be asked again and what the person does next
-//! (`crates/gateway/spec/Endpoint/Failure.lean`, gateway D2 and D3).
+//! whether it may be asked again, whether the account that met it can
+//! still take it, and what the person does next
+//! (`crates/gateway/spec/Endpoint/Failure.lean`, gateway D2, D3 and D31).
 
-use kernel::{AxError, ProviderFailureKind, Retry};
+use kernel::{AccountDisposition, AxError, ProviderFailureKind, Retry};
 
 /// A transport failure as its whole chain states it.
 ///
@@ -56,6 +57,13 @@ pub(crate) enum ProviderFailure<'e> {
         status: reqwest::StatusCode,
         headers: &'e reqwest::header::HeaderMap,
     },
+    /// The provider refused the request because this account's quota is
+    /// used up, said in the refusal's structured error rather than in its
+    /// message (D31). Unlike a busy 429, waiting does not mend it.
+    AccountUnavailable {
+        url: &'e str,
+        status: reqwest::StatusCode,
+    },
     /// The provider refused the request because it no longer fits the
     /// model's context window. Sent again it would not fit again; what
     /// fits it is a shorter conversation or a wider model.
@@ -86,8 +94,34 @@ const WINDOW_MARKERS: [&str; 4] = [
     "context window",
 ];
 
+/// The structured code, or failing it the type, an OpenAI-dialect error
+/// carries when the account's quota is used up: in a 429's body, and in
+/// an error chunk part-way through a stream (D31).
+const QUOTA_EXHAUSTED: &str = "insufficient_quota";
+
+/// Whether a refusal's body says, in its structured `error` object, that
+/// the quota is used up: `error.code`, or `error.type` where the code is
+/// absent or null. The message is never read, and a body that is not
+/// JSON says nothing.
+fn names_an_exhausted_quota(said: &str) -> bool {
+    let Ok(body) = serde_json::from_str::<serde_json::Value>(said) else {
+        return false;
+    };
+    let error = body.get("error");
+    let field = |name: &str| {
+        error
+            .and_then(|error| error.get(name))
+            .filter(|value| !value.is_null())
+    };
+    field("code")
+        .or_else(|| field("type"))
+        .and_then(serde_json::Value::as_str)
+        == Some(QUOTA_EXHAUSTED)
+}
+
 impl<'e> ProviderFailure<'e> {
-    /// A non-2xx answer, classed by its status and by what its body says.
+    /// A non-2xx answer, classed by its status and by what its body says:
+    /// the window first (D3), then the quota (D31).
     ///
     /// The body is read to classify and never quoted back; a body that
     /// could not be read classes the refusal by its status alone.
@@ -103,6 +137,9 @@ impl<'e> ProviderFailure<'e> {
         };
         match (status.as_u16(), body) {
             (400 | 413, Ok(said)) if outgrew(said) => ProviderFailure::Overflow { url, status },
+            (429, Ok(said)) if names_an_exhausted_quota(said) => {
+                ProviderFailure::AccountUnavailable { url, status }
+            }
             _ => ProviderFailure::Refused {
                 url,
                 status,
@@ -121,6 +158,7 @@ impl ProviderFailure<'_> {
                 format!("no byte arrived for {quiet_ms} ms")
             }
             ProviderFailure::Refused { url, status, .. }
+            | ProviderFailure::AccountUnavailable { url, status }
             | ProviderFailure::Overflow { url, status } => {
                 format!("{url} answered {}", status.as_u16())
             }
@@ -140,6 +178,11 @@ impl ProviderFailure<'_> {
             ProviderFailure::Refused { status: code, .. } => ProviderFailureKind::Refused {
                 status: status(code),
             },
+            ProviderFailure::AccountUnavailable { status: code, .. } => {
+                ProviderFailureKind::Quota {
+                    status: status(code),
+                }
+            }
             ProviderFailure::Overflow { status: code, .. } => ProviderFailureKind::Overflow {
                 status: status(code),
             },
@@ -182,10 +225,39 @@ impl ProviderFailure<'_> {
                 Retry::Yes
             }
             ProviderFailure::Refused { .. }
+            | ProviderFailure::AccountUnavailable { .. }
             | ProviderFailure::Overflow { .. }
             | ProviderFailure::Reported { .. }
             | ProviderFailure::Unreadable(_)
             | ProviderFailure::Unbuilt(_) => Retry::No,
+        }
+    }
+
+    /// Whether the account this request went out on can still take it
+    /// (D31): a rejected key (401) and a used-up quota, refused or
+    /// reported mid-stream, send the request to the next account. Every
+    /// other failure keeps the account - a busy provider is asked again
+    /// on it, a malformed request would fail on any account, and a lost
+    /// answer is no evidence against it.
+    fn account_disposition(&self) -> AccountDisposition {
+        match self {
+            ProviderFailure::Refused { status, .. }
+                if *status == reqwest::StatusCode::UNAUTHORIZED =>
+            {
+                AccountDisposition::Advance
+            }
+            ProviderFailure::AccountUnavailable { .. }
+            | ProviderFailure::Reported {
+                kind: QUOTA_EXHAUSTED,
+            } => AccountDisposition::Advance,
+            ProviderFailure::Exchange(_)
+            | ProviderFailure::Cut(_)
+            | ProviderFailure::Silence { .. }
+            | ProviderFailure::Refused { .. }
+            | ProviderFailure::Overflow { .. }
+            | ProviderFailure::Unreadable(_)
+            | ProviderFailure::Reported { .. }
+            | ProviderFailure::Unbuilt(_) => AccountDisposition::Keep,
         }
     }
 
@@ -207,6 +279,17 @@ impl ProviderFailure<'_> {
             (ProviderFailure::Unbuilt(_), _) => {
                 "check this endpoint's `base_url` and its extra headers: the request was \
                  refused by this side before it was sent"
+            }
+            (
+                ProviderFailure::AccountUnavailable { .. }
+                | ProviderFailure::Reported {
+                    kind: QUOTA_EXHAUSTED,
+                },
+                _,
+            ) => {
+                "this account's quota is used up, and asking again will not restore it: add \
+                 credit to the account, or add another account to this provider on the \
+                 Provider page, then dispatch again"
             }
             (ProviderFailure::Overflow { .. }, _) => {
                 "the conversation no longer fits this model's context window, and it would not \
@@ -231,15 +314,20 @@ impl ProviderFailure<'_> {
 }
 
 /// One provider failure as an `E_PROVIDER` error, its kind, its
-/// retriability and its way out taken from [`ProviderFailure`], never
-/// decided here.
+/// retriability, its account disposition and its way out taken from
+/// [`ProviderFailure`], never decided here.
 pub(crate) fn provider_err(action: &str, failure: &ProviderFailure<'_>) -> AxError {
     let draft = AxError::provider(failure.kind(), action, failure.subject());
-    let draft = match (failure.retry(), failure.retry_after_ms()) {
-        (Retry::Yes, Some(wait_ms)) => draft.retriable_after(wait_ms),
-        (Retry::Yes, None) => draft.retriable(),
-        (Retry::Unknown, _) => draft.effect_unknown(),
-        (Retry::No, _) => draft,
+    let draft = match (
+        failure.account_disposition(),
+        failure.retry(),
+        failure.retry_after_ms(),
+    ) {
+        (AccountDisposition::Advance, _, _) => draft.account_unusable(),
+        (AccountDisposition::Keep, Retry::Yes, Some(wait_ms)) => draft.retriable_after(wait_ms),
+        (AccountDisposition::Keep, Retry::Yes, None) => draft.retriable(),
+        (AccountDisposition::Keep, Retry::Unknown, _) => draft.effect_unknown(),
+        (AccountDisposition::Keep, Retry::No, _) => draft,
     };
     draft.with_recovery(failure.recovery())
 }
@@ -378,6 +466,150 @@ mod tests {
             ],
             [Some(7_000), Some(250), None, None]
         );
+    }
+
+    /// Derived from `crates/gateway/spec/Endpoint/Failure.lean`: every
+    /// status a provider refuses with, crossed with whether the body names
+    /// the window and whether it says the quota is used up, lands on the
+    /// kind, the retry and the account disposition the model gives
+    /// (`a_refusal_advances_exactly_for_a_rejected_key_or_an_exhausted_quota`,
+    /// `a_refusal_is_an_overflow_exactly_when_it_names_the_window`,
+    /// `the_status_table`).
+    #[test]
+    fn a_refusal_advances_exactly_for_a_rejected_key_or_an_exhausted_quota() {
+        let headers = reqwest::header::HeaderMap::new();
+        let statuses = [400, 401, 402, 403, 404, 408, 413, 422, 429, 500, 503, 529];
+        for status in statuses {
+            for outgrew in [false, true] {
+                for quota in [false, true] {
+                    let body = serde_json::json!({ "error": {
+                        "message": if outgrew { "maximum context length is 8192 tokens" } else { "no" },
+                        "type": if quota { "insufficient_quota" } else { "invalid_request_error" },
+                        "code": serde_json::Value::Null,
+                    }})
+                    .to_string();
+                    let failure = ProviderFailure::refusal(
+                        "http://house/v1",
+                        reqwest::StatusCode::from_u16(status).unwrap(),
+                        &headers,
+                        &Ok(body),
+                    );
+                    let json =
+                        serde_json::to_value(provider_err("call provider", &failure)).unwrap();
+                    let overflow = matches!(status, 400 | 413) && outgrew;
+                    let exhausted = status == 429 && quota;
+                    let busy = matches!(status, 408 | 429) || status >= 500;
+                    let kind = if overflow {
+                        "overflow"
+                    } else if exhausted {
+                        "quota"
+                    } else {
+                        "refused"
+                    };
+                    let retry = if busy && !overflow && !exhausted {
+                        "yes"
+                    } else {
+                        "no"
+                    };
+                    let account =
+                        (status == 401 || exhausted).then(|| serde_json::json!("advance"));
+                    assert_eq!(
+                        (&json["provider"], &json["retry"], json.get("account")),
+                        (
+                            &serde_json::json!({ "kind": kind, "status": status }),
+                            &serde_json::json!(retry),
+                            account.as_ref()
+                        ),
+                        "status {status}, outgrew {outgrew}, quota {quota}"
+                    );
+                }
+            }
+        }
+    }
+
+    /// The structured `error.code` names the quota; a null or absent code
+    /// leaves it to `error.type`. Nothing else grants a switch: not the
+    /// words of the message, not a body that is not JSON, not a body that
+    /// could not be read.
+    #[test]
+    fn only_the_structured_code_or_type_says_the_quota_is_used_up() {
+        let headers = reqwest::header::HeaderMap::new();
+        let kind_of = |body: reqwest::Result<String>| {
+            let failure = ProviderFailure::refusal(
+                "http://house/v1",
+                reqwest::StatusCode::TOO_MANY_REQUESTS,
+                &headers,
+                &body,
+            );
+            serde_json::to_value(provider_err("call provider", &failure)).unwrap()["provider"]["kind"]
+                .clone()
+        };
+        let said = |error: serde_json::Value| Ok(serde_json::json!({ "error": error }).to_string());
+        assert_eq!(
+            [
+                kind_of(said(
+                    serde_json::json!({ "type": "insufficient_quota", "code": "insufficient_quota" })
+                )),
+                kind_of(said(
+                    serde_json::json!({ "type": "requests", "code": "insufficient_quota" })
+                )),
+                kind_of(said(serde_json::json!({ "type": "insufficient_quota" }))),
+                kind_of(said(
+                    serde_json::json!({ "type": "insufficient_quota", "code": "rate_limit_exceeded" })
+                )),
+                kind_of(said(
+                    serde_json::json!({ "type": "requests", "message": "insufficient_quota" })
+                )),
+                kind_of(Ok("insufficient_quota".to_owned())),
+            ],
+            ["quota", "quota", "quota", "refused", "refused", "refused"]
+        );
+    }
+
+    /// A stream that reports an exhausted quota part-way switches the
+    /// account and is not asked again; one that reports a busy provider is
+    /// asked again on the same account.
+    #[test]
+    fn a_reported_error_advances_exactly_for_an_exhausted_quota() {
+        let said = |kind: &str| {
+            let json = serde_json::to_value(provider_err(
+                "read provider stream",
+                &ProviderFailure::Reported { kind },
+            ))
+            .unwrap();
+            (json["retry"].clone(), json.get("account").cloned())
+        };
+        assert_eq!(
+            [
+                said("insufficient_quota"),
+                said("rate_limit_exceeded"),
+                said("invalid_prompt")
+            ],
+            [
+                (serde_json::json!("no"), Some(serde_json::json!("advance"))),
+                (serde_json::json!("yes"), None),
+                (serde_json::json!("no"), None),
+            ]
+        );
+    }
+
+    /// A request that went out and lost its answer never switches the
+    /// account (`unknown_keeps_account`): another account would bill the
+    /// same request again.
+    #[test]
+    fn an_unknown_effect_keeps_the_account() {
+        let cut = std::io::Error::new(std::io::ErrorKind::UnexpectedEof, "the body stopped");
+        for failure in [
+            ProviderFailure::Cut(&cut),
+            ProviderFailure::Silence { quiet_ms: 5 },
+        ] {
+            let json =
+                serde_json::to_value(provider_err("read provider response", &failure)).unwrap();
+            assert_eq!(
+                (&json["retry"], json.get("account")),
+                (&serde_json::json!("unknown"), None)
+            );
+        }
     }
 
     /// Both dialects refuse an over-long request with a 400 and say why

@@ -2339,6 +2339,10 @@
     "en": "the conversation no longer fits this model's window (the provider answered {status}); start a new session that keeps the summary, or choose a model with a larger window",
     "zh": "对话已经放不进这个模型的窗口（供应方回答 {status}）：开一个带摘要的新会话，或换一个窗口更大的模型"
   },
+  "provider_quota": {
+    "en": "this account's quota is used up (the provider answered {status}); add credit to it, or add another account to this provider",
+    "zh": "这个账号的额度已经用完（供应方回答 {status}）：给它充值，或给这个 Provider 再添一个账号"
+  },
   "provider_refused": {
     "en": "the provider refused with {status}; check this endpoint's model name, key and dialect",
     "zh": "供应方以 {status} 拒绝了请求：检查这个接口的模型名、密钥和接口形态"

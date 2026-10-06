@@ -3,6 +3,7 @@
 -- file, You can obtain one at https://mozilla.org/MPL/2.0/.
 -- Copyright (c) 2026 2youg1 and the sprawling contributors
 
+import crates.kernel.spec.AccountRecovery
 import crates.kernel.spec.Address
 import crates.kernel.spec.Approval
 import crates.kernel.spec.Backpressure
@@ -97,7 +98,8 @@ kernel 是纯判定函数层：只吃入参吐 verdict，零内部 crate 依赖�
 分部里的定理是模型对性质的证明：
 
 - `spec/Event/Kind.lean`：`EventKind` 的每个种类恰落在一个窗类里（`EventKind.windowClass` 是穷尽的定义，`specalign` 逐臂与 kernel 对账，所以哪些种类入窗只有这一张表）；名册完整（`EventKind.all_complete`）。
-- `spec/Error.lean`：每个码恰有一个 carrier（`AxCode.carrier` 是穷尽的定义），装载期白名单与门的码由 `AxCode.carrier` 一表给出，`cargo xtask gates specalign` 逐臂对照 `kernel::AxCode::carrier`；只要拼写是单射，每个码的拼写读回它自己（`parse_inverts_as_str`），单射去掉即有反例（`a_shared_spelling_loses_a_code`）；不论构造器按什么次序调用，「不是 `Yes` 却带等待」拼不出来（`no_order_of_calls_waits_without_retrying`）。
+- `spec/Error.lean`：每个码恰有一个 carrier（`AxCode.carrier` 是穷尽的定义），装载期白名单与门的码由 `AxCode.carrier` 一表给出，`cargo xtask gates specalign` 逐臂对照 `kernel::AxCode::carrier`；只要拼写是单射，每个码的拼写读回它自己（`parse_inverts_as_str`），单射去掉即有反例（`a_shared_spelling_loses_a_code`）；不论构造器按什么次序调用，「不是 `Yes` 却带等待」拼不出来（`no_order_of_calls_waits_without_retrying`），「换号」也恒与「不再发」同行（`no_order_of_calls_advances_a_resendable_failure`）。
+- `spec/AccountRecovery.lean`：对任意名册、人设上限与失败和修复的轨迹，请求错误不再发送，说「换号」的失败不在原号上重发，一个账号一轮里的发送不超过 1＋k，每个账号一轮至多到一次、总发送不超过 n·(1＋k) 且不超过 `AtMost` 上限＋1，效果不明的请求不换号，Session 的绑定只在回答时移动，持有的账号仍在名册里就从它开轮，单账号名册不读换号那一格。
 - `spec/Event.lean`：`ig` 不藏认得的种类，一行被跳过当且仅当它的种类未知且写方标了 `ig`（`a_line_is_skipped_exactly_when_unknown_and_marked`）；有时刻的行恰是那四种之一且时刻就是信封的 `t`，早于时刻版本的行没有时刻；`Seq::next` 恒加一。
 - `spec/Ledger.lean`：被覆盖的行决定声索，单射时声索决定被覆盖的行，最后一行不被链证明，追加一行不动已欠的声索。
 - `spec/ConstsExternal.lean`：打得开的账本版本恰是从首版本到本版本的那一段（`opens_exactly_from_first_to_current`）。
@@ -281,6 +283,7 @@ ARCHITECTURE.md §3「nothing here is published」是这条判定成立的前提
 | 8-56 | `crates/kernel/spec/Layout.lean` |
 | 8-76 | `crates/kernel/spec/Layout.lean` |
 | 8-72 | `crates/kernel/spec/Retries.lean` |
+| 8-86 | `crates/kernel/spec/AccountRecovery.lean` |
 | 8-73（上限类政策值） | `crates/kernel/spec/PolicyLimit.lean` |
 | 8-74（缓存保温） | `crates/kernel/spec/KeepWarm.lean` |
 | 8-4（种类与窗类的表） | `crates/kernel/spec/Event/Kind.lean` |
@@ -403,6 +406,9 @@ ARCHITECTURE.md §3「nothing here is published」是这条判定成立的前提
 | D36 | 没报的缓存数是「没报」，不是 0 | `crates/kernel/spec/Model.lean` |
 | D37 | 发信与派活各有自己的呈现意图 | `crates/kernel/spec/Tool.lean` |
 | D38 | 一封信落在哪里是一行 record-only 的 `signal_landed` | `crates/kernel/spec/Event/Record.lean` |
+| D53 | 「这个账号还能不能接这个请求」是 `AxError` 上与 `retry` 并列的第二格 | `crates/kernel/spec/Error.lean` |
+| D54 | 选号与恢复只有一个家：`AccountRound` | `crates/kernel/spec/AccountRecovery.lean` |
+| D55 | 凭据能否兑付在开轮时读一次；一个账号的凭据缺失只让这个账号出局，vault 本身的故障让整轮停下 | `crates/kernel/spec/AccountRecovery.lean` |
 -/
 
 /-! ## 13 依赖选型
@@ -433,6 +439,8 @@ ARCHITECTURE.md §3「nothing here is published」是这条判定成立的前提
 
 storage::jsonl／storage::cas／runtime::replay／runtime::fork／citysim 全部消费本 crate 的公开面；全部 kernel 决断模块建立在 error/event 之上。公开面变更须与本规格同一变更集；守它的是编译器（下游 crate 不编译）与 `crates/wire/tests/wire_contract.rs` 的 schema golden，xtask 不存公开面基线（`tools/xtask/Spec.lean` §8-32）。
 
+改 `AccountRound` 的一种处置（`spec/AccountRecovery.lean`），同一个变更集改它的两个驱动方：模型路径的 `Watchdog` 与 `drive`（`crates/runtime/spec/Watchdog.lean` §8-9）与 accounting 的 `web_search` 工具；改 `AccountDisposition` 的一臂，同一个变更集改 gateway 的分类（`crates/gateway/spec/Endpoint/Failure.lean` D31）。
+
 改 `EventKind` 或 `AxCode` 的一个变体，同一个变更集改 `spec/Event/Kind.lean` 或 `spec/Error.lean` 里的那一臂（`specalign` 判）；改了与某个 `inductive` 同名的枚举，同一个变更集改那个 `inductive`；改了被模型化的判定（§2 列出的那几个），同一个变更集改模型与它的证明。
 -/
 
@@ -455,6 +463,7 @@ storage::jsonl／storage::cas／runtime::replay／runtime::fork／citysim 全部
 - 可忽略性与版本：`storage::jsonl` 的 `an_ignorable_line_from_a_newer_vocabulary_is_kept_and_chained`、`consts_external` 的 `readable_log_v` 测试、`event::moment::tests`。
 - 判定表：`discard/verdict.rs` 的测试、`approval::tests` 的十二行真值表、`delegation` 与 `pursuit` 的测试、kani 的 `backpressure::verification` 两条与它们的 proptest 镜像、`idem` 与 `version` 的测试、`ToolBench` 的 `dedup_runs_before_the_side_effect`。
 - 链：`Ledger` 的 conformance 套件（§8-9 的六条断言），由 `storage::JsonlLedger` 与 citysim 的内存 Ledger 各跑一次。
+- 账号轮：`spec/AccountRecovery.lean` 用 `#eval` 打印的轨迹向量由 Rust 模块旁的测试逐条重放，proptest 覆盖任意失败序列与名册长度，检查本分部的量化定理；Rust 模块尚未落地，这两项随它一同进来。
 
 没有 Lean 模型、由 Rust 守住的：Payload 的浮点与深度、规范字节与 golden、Locator 文法、密钥扫描与熵、计划树与份额守恒、门的拒词与 `DOORS` 矩阵、降级读数、保温续期、模型端口的三扇门。它们的分部只有节注释，要求由类型、trybuild 反例（`crates/kernel/tests/ui`）、kani 与 `cargo nextest run -p sprawling-kernel` 的各模块测试守住；把其中一条写成定理，是下一次改它时的事。
 -/
