@@ -104,50 +104,180 @@ pub struct AccountRound {
 }
 
 impl AccountRound {
-    /// Opens a round before its first send.
+    /// Opens a round before its first send, and counts that send. The
+    /// account `held` - the Session's binding on the model path, absent
+    /// for `web_search` - opens the round while it is listed and
+    /// redeemable; otherwise the first redeemable account in roster
+    /// order does.
     ///
     /// # Errors
-    /// [`RoundEnd::Exhausted`] when no listed account is redeemable.
+    /// [`RoundEnd::Exhausted`] when no listed account is redeemable: the
+    /// round sends nothing.
     pub fn start(
         roster: Roster,
         usable: BTreeSet<ServerLabel>,
         cap: Retries,
         held: Option<ServerLabel>,
     ) -> Result<AccountRound, RoundEnd> {
+        let current = match &roster {
+            Roster::Single => None,
+            Roster::Several { accounts, .. } => {
+                let opening = held
+                    .filter(|account| accounts.contains(account) && usable.contains(account))
+                    .or_else(|| {
+                        accounts
+                            .iter()
+                            .find(|account| usable.contains(*account))
+                            .cloned()
+                    });
+                Some(opening.ok_or(RoundEnd::Exhausted)?)
+            }
+        };
         Ok(AccountRound {
             roster,
             usable,
             cap,
-            current: held,
-            tried: BTreeSet::new(),
-            here: 0,
-            total: 0,
+            tried: current.iter().cloned().collect(),
+            current,
+            here: 1,
+            total: 1,
         })
     }
 
+    /// The account the next send goes out on; `None` for a single-account
+    /// roster, which names none.
     #[must_use]
     pub fn current(&self) -> Option<&ServerLabel> {
         self.current.as_ref()
     }
 
+    /// What to do after `failure`, read from its `retry` and its
+    /// `account` disposition alone (D54).
     #[must_use]
-    pub fn next(&self, _failure: &AxError) -> AccountStep {
-        AccountStep::Resend
+    pub fn next(&self, failure: &AxError) -> AccountStep {
+        match &self.roster {
+            Roster::Single => match failure.retry() {
+                Retry::No => AccountStep::Stop {
+                    why: RoundEnd::Refused,
+                },
+                Retry::Yes | Retry::Unknown => self.resend(),
+            },
+            Roster::Several { retries, .. } => {
+                let spare = self.here <= retries.count();
+                match (failure.retry(), failure.account()) {
+                    (Retry::Unknown, AccountDisposition::Keep | AccountDisposition::Advance) => {
+                        if spare {
+                            self.resend()
+                        } else {
+                            AccountStep::Stop {
+                                why: RoundEnd::Unknown,
+                            }
+                        }
+                    }
+                    (Retry::Yes | Retry::No, AccountDisposition::Advance) => self.switch(),
+                    (Retry::Yes, AccountDisposition::Keep) => {
+                        if spare {
+                            self.resend()
+                        } else {
+                            self.switch()
+                        }
+                    }
+                    (Retry::No, AccountDisposition::Keep) => AccountStep::Stop {
+                        why: RoundEnd::Refused,
+                    },
+                }
+            }
+        }
     }
 
+    /// The round after the driver carried out `step`. `Stop` changes
+    /// nothing. The counts saturate rather than wrap: a single-account
+    /// round under `UntilHalted` resends until a `Halt`, and a count that
+    /// wrapped would read as a fresh account's spare sends.
     #[must_use]
-    pub fn apply(self, _step: &AccountStep) -> AccountRound {
-        self
+    pub fn apply(self, step: &AccountStep) -> AccountRound {
+        match step {
+            AccountStep::Resend => AccountRound {
+                here: self.here.saturating_add(1),
+                total: self.total.saturating_add(1),
+                ..self
+            },
+            AccountStep::Switch { to } => {
+                let mut tried = self.tried;
+                tried.insert(to.clone());
+                AccountRound {
+                    current: Some(to.clone()),
+                    tried,
+                    here: 1,
+                    total: self.total.saturating_add(1),
+                    ..self
+                }
+            }
+            AccountStep::Stop { .. } => self,
+        }
     }
 
+    /// Whether the repair stage may send the request again through the
+    /// blocking door. With several accounts that send is one more on the
+    /// current account, so it needs the account's spare sends and the
+    /// person's ceiling; a single-account roster is let through as
+    /// before.
     #[must_use]
     pub fn admits_repair(&self) -> bool {
-        true
+        match &self.roster {
+            Roster::Single => true,
+            Roster::Several { retries, .. } => {
+                self.here <= retries.count() && admits(self.cap, self.total)
+            }
+        }
     }
 
+    /// The round after the repair stage sent again: one more send on the
+    /// current account with several accounts, uncounted with one.
     #[must_use]
     pub fn repaired(self) -> AccountRound {
-        self
+        match self.roster {
+            Roster::Single => self,
+            Roster::Several { .. } => self.apply(&AccountStep::Resend),
+        }
+    }
+
+    fn resend(&self) -> AccountStep {
+        if admits(self.cap, self.total) {
+            AccountStep::Resend
+        } else {
+            AccountStep::Stop { why: RoundEnd::Cap }
+        }
+    }
+
+    /// Switches to the first listed account that is redeemable and not
+    /// yet tried this round. Running out is said before the ceiling is,
+    /// because "no account is left" points at the way out (D54, rule 7).
+    fn switch(&self) -> AccountStep {
+        let Roster::Several { accounts, .. } = &self.roster else {
+            return AccountStep::Stop {
+                why: RoundEnd::Exhausted,
+            };
+        };
+        match accounts
+            .iter()
+            .find(|account| self.usable.contains(*account) && !self.tried.contains(*account))
+        {
+            None => AccountStep::Stop {
+                why: RoundEnd::Exhausted,
+            },
+            Some(to) if admits(self.cap, self.total) => AccountStep::Switch { to: to.clone() },
+            Some(_) => AccountStep::Stop { why: RoundEnd::Cap },
+        }
+    }
+}
+
+/// Whether the person's ceiling lets one more send follow `sent` sends.
+/// `AtMost(0)` sends once and stops, as the watchdog has always read it.
+fn admits(cap: Retries, sent: u32) -> bool {
+    match cap {
+        Retries::UntilHalted => true,
+        Retries::AtMost(retries) => sent <= retries,
     }
 }
 
