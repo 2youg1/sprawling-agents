@@ -345,6 +345,7 @@ fn checked(action: Action, code: u32) -> Result<(), Failure> {
     unsafe_code,
     clippy::unwrap_used,
     clippy::indexing_slicing,
+    clippy::arithmetic_side_effects,
     reason = "test code"
 )]
 mod tests {
@@ -394,6 +395,115 @@ mod tests {
             // SAFETY: the generated vector is live for this call, with its exact length.
             let found = unsafe { sprawling_native_packet_valid(units.as_ptr(), units.len()) };
             prop_assert_eq!(found != 0, packet::valid(&units));
+        }
+    }
+
+    use std::os::windows::ffi::{OsStrExt, OsStringExt};
+
+    fn argv_launch(args: Vec<OsString>) -> Launch {
+        Launch {
+            program: PathBuf::from(r"C:\argv probe\argv child.exe"),
+            args,
+            directory: PathBuf::from(r"C:\argv probe"),
+            profile: "sprawling.argv".to_owned(),
+            stdout: PathBuf::from("out"),
+            stderr: PathBuf::from("err"),
+            environment: BTreeMap::new(),
+            memory_bytes: NonZeroUsize::MIN,
+            cpu_rate: NonZeroU16::MIN,
+            parent_job: NonZeroUsize::MIN,
+        }
+    }
+
+    fn argv_units() -> impl Strategy<Value = Vec<u16>> {
+        proptest::collection::vec(
+            prop_oneof![
+                4 => proptest::sample::select(vec![9_u16, 32, 34, 92]),
+                1 => 1_u16..=u16::MAX,
+            ],
+            0..128,
+        )
+    }
+
+    fn crt_arguments(command: &[u16]) -> Vec<Vec<u16>> {
+        let mut at = 0;
+        let mut quoted = false;
+        let mut program = Vec::new();
+        while at < command.len() {
+            match command[at] {
+                34 => quoted = !quoted,
+                9 | 32 if !quoted => break,
+                unit => program.push(unit),
+            }
+            at += 1;
+        }
+        let mut args = vec![program];
+        loop {
+            while at < command.len() && matches!(command[at], 9 | 32) {
+                at += 1;
+            }
+            if at == command.len() {
+                return args;
+            }
+            quoted = false;
+            let mut argument = Vec::new();
+            while at < command.len() && (quoted || !matches!(command[at], 9 | 32)) {
+                let mut slashes = 0;
+                while at < command.len() && command[at] == 92 {
+                    slashes += 1;
+                    at += 1;
+                }
+                if at < command.len() && command[at] == 34 {
+                    argument.extend(std::iter::repeat_n(92, slashes / 2));
+                    if slashes % 2 == 1 {
+                        argument.push(34);
+                    } else if quoted && command.get(at + 1) == Some(&34) {
+                        argument.push(34);
+                        at += 1;
+                    } else {
+                        quoted = !quoted;
+                    }
+                    at += 1;
+                } else {
+                    argument.extend(std::iter::repeat_n(92, slashes));
+                    if at < command.len() && (quoted || !matches!(command[at], 9 | 32)) {
+                        argument.push(command[at]);
+                        at += 1;
+                    }
+                }
+            }
+            args.push(argument);
+        }
+    }
+
+    proptest! {
+        #[test]
+        fn native_encoded_arguments_preserve_units_and_order(
+            args in proptest::collection::vec(argv_units(), 0..16),
+            program in argv_units().prop_filter("nonempty program without quotes or terminal backslash",
+                |units| !units.is_empty() && !units.contains(&34) && units.last() != Some(&92)),
+        ) {
+            let mut request = argv_launch(args.iter().map(|units| OsString::from_wide(units)).collect());
+            request.program = PathBuf::from(OsString::from_wide(&program));
+            let encoded = packet::encode(&request).unwrap();
+            let command = encoded.split(|unit| *unit == 0).nth(1).unwrap();
+            let mut expected = vec![program];
+            expected.extend(args);
+            prop_assert_eq!(crt_arguments(command), expected);
+        }
+
+        #[test]
+        fn native_nul_argument_is_rejected_before_launch(
+            mut units in argv_units(), position in 0_usize..129,
+        ) {
+            let at = position % (units.len() + 1);
+            units.insert(at, 0);
+            let failure = packet::encode(&argv_launch(vec![OsString::from_wide(&units)])).unwrap_err();
+            prop_assert_eq!(failure.action, Action::Encode);
+            prop_assert_eq!(failure.code, 87);
+            prop_assert!(failure.phase.is_empty());
+            prop_assert_eq!(failure.cleanup_code, None);
+            prop_assert!(failure.resources.is_none());
         }
     }
 }
