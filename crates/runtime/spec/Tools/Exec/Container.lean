@@ -111,7 +111,8 @@ container.rs 是 decision，lifetime 是 adapter，control 拥有普通请求的
 ## 9 工作流程
 
 Rust 的 admission 是一次性能力合取，没有多步探测状态：先判 JSON 形状，再判 Linux／cgroup／
-控制器，最后才构造值。下面的模型只规定这个合取；daemon 命令失败的清理与取消属于 backlog。
+控制器，最后才构造值。controls 模型规定这个合取；ResourceState 规定 Backlog 的清理责任，
+CreationState 规定 guardian 对在途 create 与未知应答的所有权，两者不把父轮询超时当成删除确认。
 
 ## 10 实现逻辑
 
