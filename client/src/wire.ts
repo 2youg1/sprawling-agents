@@ -9,9 +9,9 @@
 import { Schema } from "effect";
 
 /** The wire version both ends compare on connect. */
-export const WIRE_V = 57 as const;
+export const WIRE_V = 58 as const;
 /** The schema hash the server checks: `wire::schema_hash()`. */
-export const WIRE_HASH = "4f1661f862af58ee66ffad0df9261453c7660717800c2a4e5ff523218d04168d" as const;
+export const WIRE_HASH = "6baf4fb62c3b1cd13aa11d50015423f94b56128e1e4f1f06292c1c23e8fc0205" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 /** The body sizes a person may ask for: `wire::BODY_PX_MIN` and `BODY_PX_MAX`. */
@@ -4418,6 +4418,16 @@ export const HeaderPair = Schema.Struct({
 export type HeaderPair = typeof HeaderPair.Type;
 
 /**
+ * One ordered account declaration; plaintext credentials stay in the vault.
+ */
+export const ProviderAccount = Schema.Struct({
+  header: Schema.optional(Schema.NullOr(Schema.String)),
+  id: ServerLabel,
+  reference: Schema.optional(Schema.NullOr(Schema.String)),
+}).annotate({ identifier: "ProviderAccount" });
+export type ProviderAccount = typeof ProviderAccount.Type;
+
+/**
  * Everything a person settles about one endpoint beyond its address.
  * 
  * `Default` is "nothing was settled", which is what a form that never
@@ -4425,6 +4435,7 @@ export type HeaderPair = typeof HeaderPair.Type;
  * opinion sends.
  */
 export const EndpointTuning = Schema.Struct({
+  accounts: Schema.optional(Schema.NullOr(Schema.Array(ProviderAccount))),
   headers: Schema.Array(HeaderPair),
   label: Schema.optional(Schema.NullOr(Schema.String)),
   max_in_flight: Schema.optional(Schema.NullOr(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)))),
