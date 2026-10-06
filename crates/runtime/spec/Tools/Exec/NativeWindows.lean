@@ -9,19 +9,21 @@
 `crates/desktop/ffi/src/confinement.rs`、`crates/desktop/ffi/zig/confinement.zig`。
 
 D53：Windows native 使用无 capability 的 AppContainer 与匿名 Job Object；
-CreateProcessW 以 CREATE_SUSPENDED 创建，设置 Job 的 aggregate committed-memory
-上限、CPU hard cap 与 kill-on-close，AssignProcessToJobObject 成功之后才 ResumeThread。
+CreateProcessW 以 CREATE_SUSPENDED 创建，设置 command Job 的 CPU hard cap 与 kill-on-close
+（User 填写的 aggregate committed-memory 上限在 run Job 上，D54），AssignProcessToJobObject 成功之后才 ResumeThread。
 没有准入安全 API 的平台调用进入既有 Zig leaf；win32job 与 winsafe 的现有安全
 CreateProcess 面没有 SECURITY_CAPABILITIES / STARTUPINFOEX，不能承担此契约。
 
 D54：native 的 CPU hard cap 默认 50% 整机份额，未设置 run memory 时不设置内存上限；仅配置的 Shares::CpuAndMemory 请求
-aggregate committed-memory 上限。CPU 默认数只在 native_windows.rs 定义。run job 在 table lock 内先创建并设同一
-memory 上限，native command 同时加入 command job 与 run job，再恢复；多个命令的
-aggregate 内存不能通过每条命令分别领限额来扩大。拒绝设置限额时停止启动。
+aggregate committed-memory 上限，且只设在 run job 上。CPU 默认数只在 native_windows.rs 定义。run job 在 table lock 内先创建、
+设上限并挂上撞限的 watch（`crates/runtime/spec/Tools/Exec.lean` D95），native command 同时加入 command job 与 run job，再恢复；
+command job 嵌在 run job 里，run job 的上限管住整棵树，多个命令的 aggregate 内存不能通过每条命令分别领限额来扩大。
+command job 不另设同值上限：两只同值 job 嵌套时撞限消息落到内层 command job，run job 的 watch 读不到（实测见 Exec.lean D95），一个读处才说得清撞没撞。
+拒绝设置限额或 watch 时停止启动。
 内存不设缺省值是产品约束：没有填写上限的命令不能被隐式限额拒绝。
 
-输入由 Rust 决定：已复制工作目录、明确程序和 argv、允许的环境、可缺席的非零内存与
-CPU 上限、唯一 profile 名及 output files；叶子只执行平台操作。AppContainer SID
+输入由 Rust 决定：已复制工作目录、明确程序和 argv、允许的环境、CPU 上限、
+唯一 profile 名及 output files；叶子只执行平台操作。AppContainer SID
 只获这次副本的继承读写 ACL，不获源树 ACL，无网络 capability 与 loopback exemption。
 scratch 的继承 mandatory-integrity label 为 Low，避免 medium 默认标签即使
 DACL 已授权仍因 write-up 禁止而拒绝 AppContainer 写入；只修改这次复制目录，
