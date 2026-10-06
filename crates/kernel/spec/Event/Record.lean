@@ -205,6 +205,7 @@ pub struct WatchdogFired { #[serde(flatten)] pub action: FiredAction,
 #[serde(tag = "action", rename_all = "snake_case")]
 pub enum FiredAction { Steer { text: String },
                        BackOff { until_ms: u64, code: String, subject: String },
+                       Switch { to: ServerLabel, code: String, subject: String },   // 换到名册里的另一个账号，不等（§8-86）
                        Freeze { reason: String } }
 pub struct GateChecked {}               // 无生产写方：结构是决定
 pub struct PolicyChanged { pub id: String }   // policy_created／policy_revoked，无写方：结构是决定

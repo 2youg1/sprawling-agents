@@ -10,7 +10,7 @@ import crates.kernel.spec.Error
 
 规定 `kernel::account_recovery`（`crates/kernel/src/account_recovery.rs`）：一次逻辑请求面对一个 Provider 的有序账号时，先用哪个账号、失败后在原号上再发还是换号、何时停下。本文件是 `crates/kernel/Spec.lean` 的一个分部，节标签 §8-86，别处引作 `crates/kernel/Spec.lean §8-86` 或它的决定 `kernel D54`、`kernel D55`。
 
-模块图把它登记为 `state machine`。两个驱动方还没有接上它：模型路径的恢复今天仍由 `runtime::watchdog` 的 `Retry` 三态规则执行（`crates/runtime/spec/Watchdog.lean` §8-9），`web_search` 工具还不存在。那条三态规则就是下面单账号名册（`Roster.Single`）的处置，所以驱动方接上本模块时，单账号端点的行为不变（`a_single_account_ignores_the_disposition`）。
+模块图把它登记为 `state machine`。模型路径的驱动方已经接上它：`runtime::watchdog` 持有每一次模型调用的一轮，`runtime::run::drive` 执行它的处置（`crates/runtime/spec/Watchdog.lean` §8-9，runtime D89）；`web_search` 工具还不存在。`Watchdog` 原来的 `Retry` 三态规则就是下面单账号名册（`Roster.Single`）的处置，所以单账号端点的行为不因接上本模块而变（`a_single_account_ignores_the_disposition`），`runtime::watchdog` 旁原有的测试一字不改照样通过。
 
 模型证明，对任意名册、任意人设上限、任意失败与修复的轨迹：请求错误不再发送；说「换号」的失败不在原号上重发；一个账号一轮里的发送不超过 1＋k；一轮里每个账号至多到一次，总发送不超过 n·(1＋k)，且不超过 `AtMost` 上限＋1；效果不明的请求不换号；Session 的绑定只在回答时移动。
 
@@ -162,11 +162,11 @@ def AccountRound.start (roster : Roster Account) (usable : Account → Bool) (ca
 
 /-! D55 凭据能否兑付在开轮时读一次；一个账号的凭据缺失只让这个账号出局，vault 本身的故障让整轮停下
 
-**决定**：`usable` 是开轮时对名册里每个账号问一次「它的引用此刻能否兑付」（vault 里有这个条目，或环境变量提供了它；不兑付、不读 Key 的值），开轮与换号都跳过不可兑付的账号。发送时兑付仍可能失败：引用在 vault 里不见了，端点的兑付处（gateway D31）把那条 `E_CREDENTIAL_MISSING` 标成 `Advance`，于是只有这个账号出局；vault 锁住或不可用的错误不标 `Advance`，以 `Refused` 停下整轮。
+**决定**：`usable` 是开轮时对名册里每个账号问一次「它的引用此刻能否兑付」（vault 里有这个条目，或环境变量提供了它），开轮与换号都跳过不可兑付的账号。问法是端点的兑付处（gateway `Redemption::holds`）向同一个 `SecretResolver` 兑付一次、只看结果、把封好的值当场丢掉（`Sealed` 丢弃即清零），值不离开那一格；只有 `E_CREDENTIAL_MISSING` 让账号不可兑付，别的兑付失败（vault 锁住、读不了）照旧算可兑付，让发送那一刻把 vault 的错误原样报出来并以 `Refused` 停下整轮。名册只有一个账号时不问：那里没有可换的账号，`Single` 不读 `usable`。发送时兑付仍可能失败：引用在 vault 里不见了，端点的兑付处（gateway D31）把那条 `E_CREDENTIAL_MISSING` 标成 `Advance`，于是只有这个账号出局；vault 锁住或不可用的错误不标 `Advance`，以 `Refused` 停下整轮。
 
 **理由**：一个账号的引用缺失是这个账号的事，换下一个账号能修好；vault 锁住是所有账号共用的存储的事，换号只会把同一个错误在每个账号上各买一遍，最后报出的「账号用尽」也指错了出路。开轮时先问一次，免得把一次注定失败的兑付算作一次发送。
 
-**被否**：①开轮不问、全靠发送时的 `E_CREDENTIAL_MISSING` 换号——结果相同，但每个缺凭据的账号都要占掉一次发送与一行 `model_called`；②给「整轮停下」另设一种 `AccountDisposition`——vault 故障本来就是 `No` 且 `Keep`，`Refused` 已经说出「不再发」，第三臂没有新的处置可给。
+**被否**：①开轮不问、全靠发送时的 `E_CREDENTIAL_MISSING` 换号——结果相同，但每个缺凭据的账号都要占掉一次发送与一行 `model_called`；②给兑付处另接一个只描述不兑付的闭包——`Custodian::describe` 判「有没有」时同样把值从后端读出来，多一个闭包只是让每个装配点多接一根线，换不来少读一次；③给「整轮停下」另设一种 `AccountDisposition`——vault 故障本来就是 `No` 且 `Keep`，`Refused` 已经说出「不再发」，第三臂没有新的处置可给。
 
 **重开参数**：出现一种存储，部分账号的凭据可读而其余不可读（例如按账号分开的硬件密钥）。
 -/

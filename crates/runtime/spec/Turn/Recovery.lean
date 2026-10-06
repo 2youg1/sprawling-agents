@@ -37,7 +37,7 @@ impl ModelCall<'_> {
 /// 全段转手则把最后转手的错误原样答成 Skipped。
 pub(super) fn recover(segments: &mut [&mut dyn Segment], call: &mut ModelCall<'_>, failure: AxError)
     -> SegmentOutcome;
-pub(super) struct BlockingResend;                        // 今天唯一的生产段
+pub(super) struct BlockingResend<'w> { round: &'w mut Watchdog }   // 今天唯一的生产段；问的是这个 Run 的 Watchdog 所持的那一轮
 ```
 
 **五条口径：**
@@ -50,7 +50,7 @@ pub(super) struct BlockingResend;                        // 今天唯一的生�
 
 **失败码**：本层不造码。`Failed` 携带的是修复重发拿到的原错误（生产段即阻塞门自己的失败，码由 gateway 一处给出，通常是 `E_WIRE_MISMATCH`）；全段转手即首个失败的原码，逐字段不变。`E_WIRE_MISMATCH` 的"能否定义掉"随 §12 走：恢复段只是把「同样的请求再发一次」换成「换一扇门再问一次」，没有改变该码的可定义性。
 
-**生产段 `BlockingResend` 的触发点，一个都不多**：失败那次走的是**流式门**且失败码是 `E_WIRE_MISMATCH`，并且这次调用的账号轮放行一次修复（`AccountRound::admits_repair`，`crates/kernel/spec/AccountRecovery.lean` §8-86）。多账号时那次换门重发是原号上的一次发送：放行才发，发了就记 `AccountRound::repaired`，不放行即 `Skipped`，原错误交给下一段与 `Watchdog`，于是一个账号一轮里的发送不超过 1＋k（`sends_on_one_account_stay_within_the_budget`）；单账号的轮总是放行、不计数，与这一条出现之前相同。理由：两扇门是同一条缝的两个口（`kernel::model` 保证同答同败），但**流式装配与整身解析是两条解析路径**——流式工具调用拼接出的半句话在阻塞门是一份完整 body。其余失败一律 `Skipped`：可重试族归 watchdog，门拒与配置族换门重发只会把同一个拒词买回来。
+**生产段 `BlockingResend` 的触发点，一个都不多**：失败那次走的是**流式门**且失败码是 `E_WIRE_MISMATCH`，并且这次调用的账号轮放行一次修复（`AccountRound::admits_repair`，`crates/kernel/spec/AccountRecovery.lean` §8-86）。多账号时那次换门重发是原号上的一次发送：放行才发，发了就记 `AccountRound::repaired`（段问的是 `Watchdog::admits_repair` 与 `Watchdog::repaired`，它们转问 `Watchdog` 持有的那一轮；没有开着的轮时放行、不计，与单账号相同），不放行即 `Skipped`，原错误交给下一段与 `Watchdog`，于是一个账号一轮里的发送不超过 1＋k（`sends_on_one_account_stay_within_the_budget`）；单账号的轮总是放行、不计数，与这一条出现之前相同。理由：两扇门是同一条缝的两个口（`kernel::model` 保证同答同败），但**流式装配与整身解析是两条解析路径**——流式工具调用拼接出的半句话在阻塞门是一份完整 body。其余失败一律 `Skipped`：可重试族归 watchdog，门拒与配置族换门重发只会把同一个拒词买回来。
 
 **被否（各记理由与会重开它的参数）：**
 
