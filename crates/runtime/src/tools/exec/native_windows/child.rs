@@ -30,7 +30,7 @@ fn main() {
         }
         match Command::new(&program).arg("exit").output() {
             Ok(output) => println!("DEFAULT_CAPTURE_EXIT={:?}", output.status.code()),
-            Err(error) => println!("DEFAULT_CAPTURE_ERROR={:?}", error.raw_os_error()),
+            Err(error) => println!("DEFAULT_CAPTURE_ERROR={error}"),
         }
         match std::fs::OpenOptions::new().read(true).write(true).open("NUL") {
             Ok(file) => { drop(file); println!("NUL_DEVICE_OPEN=OK"); }
