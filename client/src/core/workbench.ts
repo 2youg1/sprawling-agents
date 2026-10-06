@@ -12,7 +12,7 @@
 // **Widths are counted in grid columns, never in pixels.** A pane edge
 // that falls between two column lines is an edge no other region of the
 // page can line up with, so a drag snaps to a column line and the value
-// kept is the count. The columns are not equal: `theme.css` lays three
+// kept is the count. The columns are not equal: `theme/surface.css` lays three
 // of them into each side part of the shell's silver cut and six into
 // the middle part, so lines 4 and 10 are the silver lines, and a count
 // names a silver proportion exactly where it lands on them. Three counts

@@ -1,0 +1,172 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ * Copyright (c) 2026 2youg1 and the sprawling contributors */
+
+/* The three motions the city drawing makes, all on the compositor: a
+ * figure bobs, a window or a thought blinks, a flag waves. Nothing
+ * else moves. */
+@keyframes bob {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-3px);
+  }
+}
+@keyframes blink {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0.35;
+  }
+}
+@keyframes wave {
+  from {
+    transform: skewY(-6deg);
+  }
+  to {
+    transform: skewY(6deg);
+  }
+}
+.bob {
+  animation: bob 1.4s ease-in-out infinite alternate;
+  will-change: transform;
+}
+.wave {
+  animation: wave 1.8s ease-in-out infinite alternate;
+  will-change: transform;
+}
+.blink {
+  animation: blink 1.1s ease-in-out infinite alternate;
+  will-change: opacity;
+}
+/* The two entrances: a popover rises into place, a page-level banner
+ * drops from the edge it belongs to. Both surfaces appearing in their
+ * own place, so both take `panel`, and both only move transform and
+ * opacity, so neither costs a layout. */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes drop {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.rise {
+  animation: rise var(--transition-duration-panel) var(--ease-arrive) both;
+}
+.drop {
+  animation: drop var(--transition-duration-panel) var(--ease-arrive) both;
+}
+/* The motion vocabulary is seven names and this is its whole table:
+ * `cut` is no motion at all (no class - it is what a same-level page
+ * switch does), `rise` above comes up from below, `slide` comes in
+ * from the left edge a revealed page belongs to, `fade` is a state
+ * change that keeps its position, `shift` is one body replacing another
+ * in the same place (a settings group picked from the tree), and
+ * `side-in` is a side panel arriving from the right edge it stands on,
+ * with `side-in-then` for the level inside it, which starts when the
+ * panel is halfway so the two read as one movement in two steps, and
+ * `push` is a layer of the edge arriving whole from the left edge it
+ * stands on (the mailbox, client D60). Every one moves only transform and
+ * opacity, and every one goes still under the two reduction lists
+ * below. An exit is deliberately not in this table: a leaving element
+ * animates through `transition-behavior: allow-discrete` plus a
+ * display toggle in the component that owns it (the dialog draws
+ * itself this way already), never through a JS timer. */
+@keyframes slide {
+  from {
+    opacity: 0;
+    transform: translateX(-16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.slide {
+  animation: slide var(--transition-duration-panel) var(--ease-arrive) both;
+}
+.fade {
+  animation: fade var(--transition-duration-short) var(--ease-arrive) both;
+}
+@keyframes shift {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.shift {
+  animation: shift var(--transition-duration-short) var(--ease-arrive) backwards;
+}
+@keyframes side-in {
+  from {
+    opacity: 0;
+    transform: translateX(32px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+.side-in {
+  animation: side-in var(--transition-duration-page) var(--ease-arrive) backwards;
+}
+.side-in-then {
+  animation: side-in var(--transition-duration-page) var(--ease-arrive) calc(var(--transition-duration-page) / 2) backwards;
+}
+@keyframes push {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+.push {
+  animation: push var(--transition-duration-page) var(--ease-arrive) backwards;
+}
+/* The settings panel's second level (the group beside the tree) starts
+ * when the panel's own arrival from the left (`.settings-panel`, a
+ * `panel` transition) is halfway, the way `side-in-then` follows
+ * `side-in` on the right, so the panel and its group read as one
+ * movement in two steps. */
+.slide-then {
+  animation: slide var(--transition-duration-panel) var(--ease-arrive) calc(var(--transition-duration-panel) / 2) backwards;
+}
+/* The four fill backwards only: once arrived, no transform stays on
+ * the box, so it does not become the containing block of a fixed menu
+ * inside it. */
+/* On one column the side is a sheet that already travels in whole
+ * (`.sheet`), and a second movement inside it would be the same arrival
+ * told twice. */
+.sheet .side-in,
+.sheet .side-in-then {
+  animation: none;
+}

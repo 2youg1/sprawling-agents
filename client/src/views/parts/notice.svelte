@@ -18,7 +18,7 @@
   // Each seat carries the one entrance the motion vocabulary grants it:
   // a toast is a popover, and a popover rises into place; a strip in a
   // form and an entry in a list are state changes that keep their
-  // position, so they fade. `theme.css` stills every one of these under
+  // position, so they fade. `theme/motion-state.css` stills every one of these under
   // the two reduction lists. There is deliberately no exit class: a
   // leaving notice is removed by whoever keeps the list, and that owner
   // animates the departure through `allow-discrete` plus a display

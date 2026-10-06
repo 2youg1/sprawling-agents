@@ -12,7 +12,7 @@ import { BODY_PX } from "../wire";
 // than a number and a flag: an empty box and a refused box lead to
 // different acts, and only one of them changes the page.
 export type Sizing =
-  // Nothing in the box: the page goes back to the size `theme.css` draws.
+  // Nothing in the box: the page goes back to the size `theme/tokens-type.css` draws.
   | { readonly kind: "cleared" }
   | { readonly kind: "sized"; readonly px: number }
   // Not a whole number in range. The field says so and the page holds

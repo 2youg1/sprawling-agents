@@ -14,7 +14,7 @@ import type { Plugin } from "vite";
 import { thirdPartyNotices } from "./scripts/notices";
 
 // The two files the shipped face is made of: one variable woff2, and
-// the licence it is given under. `theme.css` names the woff2 file, so
+// the licence it is given under. `theme/fonts.css` names the woff2 file, so
 // the asset pipeline emits it by itself; the licence is named by
 // nothing, and OFL-1.1 requires it to travel with the font, so this
 // plugin puts it in the bundle beside it.

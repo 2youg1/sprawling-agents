@@ -150,7 +150,7 @@ chords are heard. -->
     <span id="{id}-asker" class="min-w-0 flex-1 truncate text-text-quiet">{asker}</span>
     <span class="figure shrink-0 text-text-faint">{at}</span>
     <!-- The digit a list of entries draws beside each one; empty
-    wherever the card is not in such a list (theme.css, the mailbox). -->
+    wherever the card is not in such a list (theme/mailbox.css). -->
     <kbd class="entry-n" aria-hidden="true"></kbd>
   </div>
   <div class="min-w-0">{@render body()}</div>

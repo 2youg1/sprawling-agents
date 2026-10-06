@@ -1,0 +1,18 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ * Copyright (c) 2026 2youg1 and the sprawling contributors */
+
+/* THR */
+/* The steer pin (refrain §3-5): a wedge pointing left at the place a
+ * steer pressed now is heard - the call line the run is in, or the end of
+ * the words it is still saying. Drawn with borders rather than a fill, so
+ * a forced-colours mode keeps the shape when it repaints the ink. */
+.steer-pin {
+  display: inline-block;
+  inline-size: 0;
+  block-size: 0;
+  border-block: 4px solid transparent;
+  border-inline-end: 6px solid var(--color-accent);
+  vertical-align: middle;
+}

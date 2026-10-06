@@ -7,9 +7,9 @@
 // override is worn and taken off, and the legibility it warns about
 // (roadmap CT, `crates/wire/spec/Preference.lean` D29).
 //
-// **The theme is read off the page, never copied.** `theme.css` is
+// **The theme is read off the page, never copied.** The theme is
 // compiled into the bundle, so the running page has no file to open;
-// its `@theme` block is a set of CSS variables, and the stylesheets the
+// its `@theme` blocks are a set of CSS variables, and the stylesheets the
 // document holds are where this file reads their names. The tiers a
 // text token claims and the brightest surface text may sit on are read
 // the same way, from the `--tier-*` and `--surface-ceiling` declarations
@@ -30,7 +30,7 @@ import type { Theme } from "../../core/theme_override";
 // The prefix the `@theme` block gives every colour token.
 const TOKEN_PREFIX = "--color-";
 
-// The declarations `theme.css` states for `xtask color` beside the
+// The declarations `theme/colour.css` states for `xtask color` beside the
 // values it judges: a text token's tier is `--tier-<name>` for
 // `--color-<name>`, the ceiling names a rung of the grey ramp, and the
 // slack is how far under its tier a reading may fall - the rounding the

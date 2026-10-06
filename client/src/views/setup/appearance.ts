@@ -39,11 +39,11 @@ declare global {
 export type Axis = "sans" | "mono";
 
 // The custom property the body size is written to, which is the same
-// property `theme.css` declares the default in and derives the note and
+// property `theme/tokens-type.css` declares the default in and derives the note and
 // label steps from.
 const BODY_PROPERTY = "--text-body";
 // The custom property the world layer's opacity in the blend tier is
-// written to, which `theme.css` declares the default in.
+// written to, which `theme/colour.css` declares the default in.
 const BLEND_PROPERTY = "--blend-opacity";
 
 // The word each stored value is offered under. A record keyed by the

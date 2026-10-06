@@ -8,7 +8,7 @@
 //
 // A command's output arrives with SGR escapes in it, and eight ANSI
 // colours cannot be drawn by a theme with one hue axis and its one
-// complement (`theme.css`). So the colours are read for what tools use
+// complement (the theme). So the colours are read for what tools use
 // them to say rather than for what they look like: red, yellow and
 // magenta are trouble and take the alert; green, blue and cyan are
 // progress and take the accent; white is emphasis and bright black is
@@ -84,7 +84,7 @@ export function rows(text: string): readonly (readonly Span[])[] {
   return out;
 }
 
-// Every colour comes from `theme.css`; this names the class a tone
+// Every colour comes from the theme; this names the class a tone
 // paints with.
 export const INK: Readonly<Record<Tone, string>> = {
   plain: "text-text-quiet",

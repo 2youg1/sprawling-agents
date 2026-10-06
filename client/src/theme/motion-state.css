@@ -1,0 +1,102 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ * Copyright (c) 2026 2youg1 and the sprawling contributors */
+
+/* Motion has three states and the root element spells which one holds:
+ * no attribute follows the machine, `off` reduces whatever the machine
+ * says, and `on` keeps the full motion even on a machine that asks for
+ * less. The machine's own answer is therefore scoped to `:not([on])`,
+ * so a person who asked for movement is not overruled by their
+ * operating system. */
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-motion="on"]) .bob,
+  :root:not([data-motion="on"]) .blink,
+  :root:not([data-motion="on"]) .wave,
+  :root:not([data-motion="on"]) .rise,
+  :root:not([data-motion="on"]) .drop,
+  :root:not([data-motion="on"]) .slide,
+  :root:not([data-motion="on"]) .fade,
+  :root:not([data-motion="on"]) .shift,
+  :root:not([data-motion="on"]) .side-in,
+  :root:not([data-motion="on"]) .side-in-then,
+  :root:not([data-motion="on"]) .slide-then,
+  :root:not([data-motion="on"]) .push,
+  :root:not([data-motion="on"]) .shimmer,
+  :root:not([data-motion="on"]) .animate-pulse {
+    animation: none;
+  }
+}
+/* The person's own answer, which any element may carry rather than only
+ * the root element. The appearance section writes it on `<html>`, so
+ * dropping `:root` from these two selectors changes nothing about the
+ * page a person is looking at; what it buys is a fixture that means what
+ * it says, because `#/gallery` marks one subtree `data-motion="off"` and
+ * expects that subtree to stop moving.
+ *
+ * The machine's own answer above stays bound to `:root`, and that is not
+ * an oversight: an operating system preference is a fact about the whole
+ * window, and a subtree saying `on` has to be able to overrule it. */
+[data-motion="off"] .bob,
+[data-motion="off"] .blink,
+[data-motion="off"] .wave,
+[data-motion="off"] .rise,
+[data-motion="off"] .drop,
+[data-motion="off"] .slide,
+[data-motion="off"] .fade,
+[data-motion="off"] .shift,
+[data-motion="off"] .side-in,
+[data-motion="off"] .side-in-then,
+[data-motion="off"] .slide-then,
+[data-motion="off"] .push,
+[data-motion="off"] .shimmer,
+[data-motion="off"] .animate-pulse {
+  animation: none;
+}
+/* Motion off is every duration at zero (docs/frontend-method.md §4-43): every
+ * transition and entrance reads one of them, so the state still changes
+ * where the eye was and nothing travels. The default duration is set
+ * beside them rather than left to follow `short`, because a custom
+ * property inherits the value it computed to on the root, not the
+ * reference it was written with. The machine's own answer zeroes them
+ * too unless the person said `on`. */
+[data-motion="off"] {
+  --transition-duration-short: 0s;
+  --transition-duration-panel: 0s;
+  --transition-duration-page: 0s;
+  --transition-duration-coin: 0s;
+  --default-transition-duration: 0s;
+}
+[data-motion="off"] * {
+  scroll-behavior: auto;
+}
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-motion="on"]) {
+    --transition-duration-short: 0s;
+    --transition-duration-panel: 0s;
+    --transition-duration-page: 0s;
+    --transition-duration-coin: 0s;
+    --default-transition-duration: 0s;
+  }
+}
+
+/* One route replacing another, as one page becoming the next.
+ *
+ * The page's own title survives a route change and says so: naming it
+ * hands the browser one pair of boxes to carry from the old page to the
+ * new one, and the rest of the page cross-fades. The router draws one
+ * page inside `<main>` at a time, so the name is held by one box.
+ *
+ * The JS side wraps the route change in `document.startViewTransition`
+ * where the engine has it; Firefox does not yet, and there the route
+ * changes in one frame. Motion off stops the animation rather than the
+ * transition, bound to the root element because the boxes a transition
+ * animates hang off it and no descendant selector can reach them. */
+main h1 {
+  view-transition-name: title;
+}
+[data-motion="off"]::view-transition-group(*),
+[data-motion="off"]::view-transition-old(*),
+[data-motion="off"]::view-transition-new(*) {
+  animation: none;
+}

@@ -8,7 +8,7 @@
   // drawn out to the end of the longest line written and fades after it,
   // so an empty box shows only a lead from the left edge and the first
   // words draw the line out like a progress bar; after a send it shrinks
-  // back. How it is painted is `theme.css`'s `.typed-line`; this file only
+  // back. How it is painted is `theme/composer.css`'s `.typed-line`; this file only
   // says how far the words reach.
   //
   // The width is measured rather than read off the box, because the box

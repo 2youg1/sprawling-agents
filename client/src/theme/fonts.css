@@ -1,0 +1,18 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ * Copyright (c) 2026 2youg1 and the sprawling contributors */
+
+/* `optional` rather than `swap`, because the file is beside the page
+ * rather than across a network: the browser is given a moment to use
+ * Geist and never swaps the face afterwards. A face that arrives late
+ * therefore costs the first paint nothing and moves no text a person is
+ * already reading, which is what `swap` could not promise. `index.html`
+ * preloads the file so that moment is long enough. */
+@font-face {
+  font-family: "Geist Mono";
+  src: url("../fonts/GeistMono-Variable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: optional;
+}

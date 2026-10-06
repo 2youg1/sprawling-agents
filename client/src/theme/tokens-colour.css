@@ -1,0 +1,181 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ * Copyright (c) 2026 2youg1 and the sprawling contributors */
+
+@theme {
+  --color-*: initial;
+  --font-*: initial;
+  --ease-*: initial;
+  --text-*: initial;
+  --font-weight-*: initial;
+  --radius-*: initial;
+  --spacing: initial;
+  --spacing-*: initial;
+  --container-*: initial;
+
+  /* The grey ramp: the information surface, never pure black or white. */
+  --color-g0: oklch(0.145 0.014 250);
+  --color-g1: oklch(0.172 0.014 250);
+  --color-g2: oklch(0.215 0.014 250);
+  --color-g3: oklch(0.265 0.014 250);
+  --color-g4: oklch(0.330 0.014 250);
+  --color-g5: oklch(0.410 0.014 250);
+  --color-g6: oklch(0.500 0.014 250);
+  --color-g7: oklch(0.610 0.014 250);
+  --color-g8: oklch(0.720 0.014 250);
+  --color-g9: oklch(0.825 0.014 250);
+  --color-g10: oklch(0.930 0.014 250);
+
+  /* The coloured tokens: ACCENT, the acid blue, at 90% of the sRGB
+   * gamut, ALERT, the warm complement, at 70%; a hover keeps its base
+   * ratio at a higher lightness. ACCENT says something is moving or
+   * chosen here, ALERT that a person is needed or something is missing
+   * (docs/frontend-method.md §7B). */
+  --color-accent: oklch(0.720 calc(0.136 * var(--chroma)) 250);
+  --color-alert: oklch(0.800 calc(0.113 * var(--chroma)) 70);
+  --color-accent-hover: oklch(0.790 calc(0.099 * var(--chroma)) 250);
+  --color-alert-hover: oklch(0.850 calc(0.082 * var(--chroma)) 70);
+  --color-accent-solid: oklch(0.919 calc(0.036 * var(--chroma)) 250);
+
+  /* The two checkpoints on the context ring, and the only colours off
+   * the axis: green where the first reminder sounds, red where the
+   * handoff reminder does (docs/frontend-method.md §7J, tools/xtask/Spec.lean 8-8b).
+   * Nothing else may take either hue. */
+  --color-reminder-first: oklch(0.800 calc(0.154 * var(--chroma)) 150);
+  --color-reminder-second: oklch(0.680 calc(0.187 * var(--chroma)) 25);
+
+  /* Text: each lightness reaches one APCA Bronze tier on G2. */
+  --color-text: oklch(0.930 0.014 250);
+  --color-text-quiet: oklch(0.850 0.014 250);
+  --color-text-faint: oklch(0.770 0.014 250);
+  --color-text-disabled: oklch(0.580 0.014 250);
+
+  /* The roles: what a surface is for, as against what a surface is.
+   *
+   * The ramp above holds eleven values and `xtask color` asserts that
+   * count. It never held an answer to the question a view actually
+   * asks - *what should a lifted control be filled with* - so every
+   * view answered it where it stood, and the answer had two hundred
+   * and thirty-six homes: one per `bg-g2` and one per `border-g3` that
+   * somebody typed. None of them was the authority, and two of them
+   * disagreeing was invisible.
+   *
+   * A role is a single hop to a rung and nothing else. It carries no
+   * `oklch()` of its own, because a literal beside the rung it copies
+   * is immediately a second home for that value and has to be re-tuned
+   * whenever the rung moves. The hop also means one declaration serves
+   * both ways of lighting the page: the light block (colour.css) restates the
+   * rungs, and every role follows without being mentioned there.
+   *
+   * `xtask color` reads this block as a closed vocabulary. A name it
+   * does not know is refused, a name it knows and cannot find here is
+   * refused, a role nothing in `src/views` spells is refused, and a
+   * value that is not a single hop to a declared rung is refused. A
+   * hex alias - the shape this section was first drafted in - fails
+   * twice over: it parses as neither an `oklch()` nor a hop.
+   *
+   * **The page is the deepest surface, and the chrome lifts off it.**
+   * A dark interface usually draws its panels brighter than its page,
+   * which reads as cards pasted onto a board; the reference this
+   * section was measured against does the opposite and draws the code
+   * pane darker than the page, which reads as content set into the
+   * surface. This library cannot copy that directly - `xtask color`
+   * holds the contract that `g0` is the page, and nothing may sit
+   * below it. So the same figure-ground reading is bought from the
+   * other side: content stays on the page at `g0`, and what frames the
+   * work - the right side's tab strip and terminal, a view's own header -
+   * rises to `chrome`. What is left deepest on the screen is the work, and the
+   * contract is untouched.
+   *
+   * The distance that matters is page to raised, which is 100 per
+   * mille on the dark page: a control has to be visible as a thing you
+   * can press without a border. Page to chrome is half that on
+   * purpose, because a frame that announced itself would compete with
+   * the work it frames, and it carries an `edge` as well. */
+
+  /* The four fills a surface can be, from the page outwards. */
+  --color-page: var(--color-g0);
+  --color-chrome: var(--color-g1);
+  --color-raised: var(--color-g2);
+  --color-raised-hover: var(--color-g3);
+
+  /* What fills a small surface of the edge layer that lets the page
+   * behind it show through (docs/frontend-method.md §4-43): the edge keys, and the
+   * mailbox and the settings sheet if they take glass. The rung is the
+   * one a raised control sits on; how much of it covers what is behind
+   * is `--glass-opacity` (colour.css), which `xtask color` judges. */
+  --color-glass: var(--color-g2);
+
+  /* Three fills that are not a surface a person navigates: what a
+   * person said drawn as a shape, the well a value travels along, and
+   * a control that cannot be pressed. `speech` and `track` sit on the
+   * raised rung today and are named apart from it because they answer
+   * different questions - a bubble is not a control, and moving either
+   * one later must not move the other. */
+  --color-speech: var(--color-g2);
+  --color-track: var(--color-g2);
+  --color-disabled: var(--color-g3);
+
+  /* The fill of a mark that reports a state rather than offering an
+   * action: a run that has stopped, a dependency nothing needs, the
+   * share of a bill that was already paid for. It sits above every
+   * surface because a mark has to be found without being read, and
+   * there is one of it rather than two - the draft of this section
+   * had a rung for `stopped` and a rung for `resting`, and no reader
+   * could have said which a given dot was. */
+  --color-mark: var(--color-g5);
+
+  /* **An edge encodes what can be done to the box, not how high it
+   * sits.** Three brightnesses, told apart at a glance and without
+   * colour: a rule line saying this box ends here, the outline of a
+   * box that is over the page rather than part of it, and a box that
+   * takes what you type. Each step up the ramp is one more thing a
+   * hand can do to what it bounds.
+   *
+   * The reference this ladder was measured against has a fourth and
+   * brightest step for an object a person can pick up and carry off -
+   * an attachment on a message. There is no such object in this
+   * product, and a token nothing fills is a name with a value and no
+   * reader, so the step is not declared. `xtask::color::roles` refuses
+   * a role nothing spells, which is what keeps that true. */
+  --color-edge: var(--color-g2);
+  --color-edge-panel: var(--color-g3);
+  --color-edge-input: var(--color-g4);
+
+  /* The ink that goes on top of a filled coloured token. The page's
+   * own rung is the right answer in both lightings without a second
+   * declaration: where the page is dark the accent is light, and where
+   * the page is light the accent is dark. */
+  --color-on-accent: var(--color-g0);
+
+  /* The city drawing has a vocabulary of its own, and it is not this
+   * file's surfaces.
+   *
+   * A wall is not a raised control and a doorway is not a page: the
+   * drawing's greys encode *depth in a picture* - how near the viewer
+   * a thing is and whether it is a hole, a body or a part - where the
+   * surfaces above encode what can be done to a box. Two different
+   * questions, so two vocabularies rather than one stretched over
+   * both.
+   *
+   * They are here for the reason the surfaces are: twenty-six of these
+   * tones were typed into `views/city/` by hand, one rung at a time,
+   * and re-toning the drawing meant finding all twenty-six and hoping.
+   * The drawing is one picture and its palette is one table. */
+  --color-drawn-hollow: var(--color-g0);
+  --color-drawn-solid: var(--color-g1);
+  --color-drawn-solid-lit: var(--color-g2);
+  --color-drawn-line: var(--color-g3);
+  --color-drawn-edge: var(--color-g4);
+  --color-drawn-part: var(--color-g5);
+  --color-drawn-stem: var(--color-g6);
+  --color-drawn-aside: var(--color-g7);
+  --color-drawn-figure: var(--color-g9);
+
+  --background-image-progress-done: linear-gradient(
+    90deg,
+    var(--color-g10),
+    var(--color-accent)
+  );
+}

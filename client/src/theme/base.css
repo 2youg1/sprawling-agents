@@ -1,0 +1,232 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ * Copyright (c) 2026 2youg1 and the sprawling contributors */
+
+/* Base: a page is dark, text never pure white, links carry no
+ * underline until a hand is on them. */
+@layer base {
+  /* The page is lit from behind unless the light block says otherwise;
+   * that block carries `color-scheme: light` beside the rungs that make
+   * it light, so this line is the default and not a second answer. */
+  html {
+    color-scheme: dark;
+    background: var(--color-g0);
+  }
+  body {
+    margin: 0;
+    -webkit-font-smoothing: antialiased;
+  }
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+  a:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    text-decoration-color: var(--color-g6);
+  }
+  /* A key is a picture of a key rather than a word in a sentence, so
+   * the underline a link grows under the pointer stops at its edge. A
+   * navigation row once drew `g c` underlined for as long as the
+   * underline existed. */
+  kbd {
+    display: inline-block;
+    text-decoration: none;
+  }
+  a:hover kbd {
+    text-decoration: none;
+  }
+  button {
+    cursor: pointer;
+  }
+  textarea,
+  input,
+  select {
+    font: inherit;
+    color: inherit;
+  }
+  /* The parts of a control the browser paints for itself: the tick in a
+   * checkbox, the dot in a radio, the bar a `<progress>` fills, and the
+   * caret. Left alone they come out in whichever blue the machine was
+   * shipped with, which is the one colour this library does not use. */
+  input,
+  progress {
+    accent-color: var(--color-accent);
+  }
+  textarea,
+  input {
+    caret-color: var(--color-accent);
+  }
+  /* Selected text is the accent thinned until the words survive it,
+   * derived from the accent rather than chosen beside it so that the
+   * page keeps one hue axis and a person turning colour off turns this
+   * off with it. An engine too old for relative colour drops the line
+   * and falls back to the platform's own selection colour, which is
+   * legible by construction. */
+  ::selection {
+    background: oklch(from var(--color-accent) l c h / 0.35);
+  }
+  /* Anything a link can land on clears the bar that may be sitting over
+   * it, so an approval reached from a notice arrives below the header
+   * rather than under it. */
+  [id] {
+    scroll-margin-top: var(--spacing-bar);
+  }
+  /* A heading breaks into even lines rather than leaving one word alone
+   * on the last of them, and a paragraph avoids ending on a single short
+   * word. Engines without either value ignore the line and set the text
+   * the way they do today. */
+  :is(h1, h2, h3, h4, h5, h6) {
+    text-wrap: balance;
+  }
+  p,
+  li {
+    text-wrap: pretty;
+  }
+  /* One scrollbar everywhere: thin, the g3 grey, on a transparent
+   * track, and a gutter that is reserved before it is needed so a page
+   * never shifts when it grows past the fold. A scrolling region also
+   * keeps its scroll to itself rather than handing it to the page. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-g3) transparent;
+  }
+  main,
+  .overflow-auto,
+  .overflow-y-auto {
+    scrollbar-gutter: stable;
+    overscroll-behavior: contain;
+  }
+  /* The page's own scrollport reserves the gutter at both edges, so a
+   * column centred with `mx-auto` stays centred once the page grows past
+   * the fold instead of sliding half a scrollbar to the left. An engine
+   * that does not know `both-edges` drops this line and keeps the single
+   * gutter declared above it. The page's `<main>` carries
+   * `overflow-y-auto`, whose class outranks an element rule, so the
+   * class is named here too: with one gutter a page stood half a
+   * scrollbar left of the shell's centre and off Main's silver lines. */
+  main,
+  main.overflow-y-auto {
+    scrollbar-gutter: stable both-edges;
+  }
+  /* The main region measures itself, so the columns inside it can ask
+   * how much room they have instead of how wide the window is. The two
+   * are not the same number: the shell's grid gives a page only some of
+   * its columns, and a layout that asked the window would put three
+   * columns into a space that holds two.
+   *
+   * Naming the container lets a query say which box it is asking about,
+   * which matters the day a second container appears inside this one.
+   *
+   * `inline-size` also makes this box the containing block for any
+   * `fixed` descendant, which is what a query container costs. Nothing
+   * in the shell pays it - the palette, the refusal, the notice panel
+   * and the key sheet are all drawn outside the main region - but a
+   * hint anchored with `position: fixed` inside it is clipped by this
+   * box rather than escaping it. */
+  main {
+    container-type: inline-size;
+    container-name: page;
+  }
+  /* **The conversation page is no container.** It is the shell's grid
+   * continued through `subgrid`, and a query container is laid out in
+   * containment, which the engine treats as a grid of its own: its
+   * columns read as `none`, every pane falls into an implicit column
+   * and the sessions and commits panes are drawn over each other at
+   * the left edge. Nothing inside it asks `page`; each region that
+   * measures itself names its own container. */
+  main.workspace {
+    container-type: normal;
+  }
+  /* A fold that opens at a readable speed.
+   *
+   * `interpolate-size` is what lets a height travel to `auto`; without
+   * it the only animatable heights are the ones somebody measured, and
+   * a preview whose height nobody can know in advance is exactly the
+   * case. It is declared on the root element because it inherits, so
+   * one line covers every fold on every page.
+   *
+   * `content-visibility` carries the second half: the contents of a
+   * closed `<details>` are not rendered at all, so without a discrete
+   * transition holding them visible the box would collapse instantly
+   * and the height would have nothing to travel over.
+   *
+   * Safari and Firefox implement neither today and are given no
+   * fallback on purpose: they drop the rules they cannot read, the fold
+   * opens at once, and that is the behaviour those engines have now. */
+  :root {
+    interpolate-size: allow-keywords;
+  }
+  details::details-content {
+    height: 0;
+    overflow: hidden;
+    transition:
+      height var(--transition-duration-panel) var(--ease-arrive),
+      content-visibility var(--transition-duration-panel) allow-discrete;
+  }
+  details[open]::details-content {
+    height: auto;
+  }
+  /* The focus ring is one of the two things the accent is spent on,
+   * and it is drawn thinned rather than solid.
+   *
+   * At full strength it was the loudest mark on the screen at all
+   * times - louder than the stop button, which is the one control a
+   * person has to hit in a hurry. Thinning it to 60 per cent of the
+   * accent over whatever is behind keeps it the first thing a
+   * keyboard user finds and stops it being the first thing everybody
+   * else sees. `color-mix` resolves against the surface under it, so
+   * the ring stays legible on the page, on a raised control and on a
+   * floating panel without three values.
+   *
+   * An engine without `color-mix` drops the second declaration and
+   * keeps the solid ring above it, which is the ring that engine
+   * draws today. */
+  *:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-color: color-mix(in oklch, var(--color-accent) 60%, transparent);
+    outline-offset: 2px;
+  }
+  /* An element with `tabindex="-1"` is focused only by script - a page
+   * heading taking focus after a route change, for a screen reader -
+   * and never by Tab, so a ring on it marks nothing a keyboard can
+   * reach and reads as a selected input. */
+  [tabindex="-1"]:focus-visible {
+    outline: none;
+  }
+  /* Text is shaped for the screen it lands on, not the one it was
+   * drawn on: legibility over speed, optical sizing where the face has
+   * it, and no synthetic weights. */
+  html {
+    text-rendering: optimizeLegibility;
+    font-optical-sizing: auto;
+    font-synthesis: none;
+  }
+  button,
+  a {
+    touch-action: manipulation;
+  }
+}
+
+/* Chinese is broken and spaced by rules of its own, and the root element
+ * already carries the language the person chose, so one selector states
+ * all three: no line may begin with a closing bracket or a full stop, an
+ * opening mark may hang into the margin instead of indenting the line
+ * behind it, and the space a full-width mark carries on its left is
+ * trimmed where the line starts. An engine without one of these
+ * properties ignores that line and sets the text as it does today. */
+:root:lang(zh) {
+  line-break: strict;
+  hanging-punctuation: first allow-end;
+  text-spacing-trim: space-first;
+  /* A Chinese character carries far more strokes into the same square
+   * than a Latin letter does, so the same nominal size is a denser
+   * mark: the note step is not reduced here, and the lines are given
+   * more room. Tracking is a Latin device - it separates words by
+   * spacing their letters - and on a script whose words are already
+   * separate squares it only loosens the line. */
+  --text-note: var(--text-body);
+  line-height: 1.6;
+  letter-spacing: 0;
+}

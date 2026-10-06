@@ -1,0 +1,85 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ * Copyright (c) 2026 2youg1 and the sprawling contributors */
+
+/* What the utility layer is told here, it is told in the class names the
+ * views already spell, so that a screen keeps its own vocabulary and
+ * the theme stays the only place the answer changes. */
+@layer utilities {
+  /* A viewport unit that survives a phone: `100vh` is measured against a
+   * browser with its address bar hidden, so the shell overflows by the
+   * height of that bar until the person scrolls. `100dvh` is the
+   * viewport there is right now. Desktop reads the two identically. */
+  .h-screen {
+    height: 100dvh;
+  }
+  /* The step a number is displayed at brings its own figures. */
+  .text-figure {
+    font-variant-numeric: var(--figures);
+  }
+  /* A bar pinned to the bottom edge of a phone sits over the home
+   * indicator, so it holds that strip clear. The height has to move with
+   * the padding: a bar told to be exactly one bar tall would spend the
+   * strip out of its own content rather than beside it, and its buttons
+   * would be squeezed by however much the device reserves. `index.html`
+   * asks for the viewport that has the strip, and the shell's frame keeps
+   * its own edges clear of it; a bar pinned inside a box of its own still
+   * owes the strip this padding. */
+  .sticky.bottom-0 {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    height: auto;
+    min-height: var(--spacing-bar);
+  }
+
+  /* A dense screen draws a hairline where a coarse one draws a pixel:
+   * every rule line, and the caret, thins to half a device pixel's
+   * worth at two or more device pixels per CSS pixel. */
+  @media (min-resolution: 2dppx) {
+    .border,
+    .border-t,
+    .border-b,
+    .border-l,
+    .border-r {
+      border-width: 0.5px;
+    }
+    .border-t {
+      border-width: 0 0 0 0;
+      border-top-width: 0.5px;
+    }
+    .border-b {
+      border-width: 0;
+      border-bottom-width: 0.5px;
+    }
+    .border-l {
+      border-width: 0;
+      border-left-width: 0.5px;
+    }
+    .border-r {
+      border-width: 0;
+      border-right-width: 0.5px;
+    }
+  }
+}
+
+/* A frozen stretch of conversation out of view is not laid out until
+ * it scrolls in; the reserved height keeps the scrollbar honest.
+ * `content-visibility: auto` already contains paint, which clips to the
+ * box; `overflow: clip` states that clip in the computed style, so a
+ * reader of the page (the render gate) sees the reserved box hold what
+ * it will hold once laid out instead of words spilling out of 160px. */
+.settled {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 160px;
+  overflow: clip;
+}
+
+/* The same deferral for one row of a long list - the record, the ledger,
+ * the cost breakdown - where the saving is the one that matters: a
+ * thousand rows cost the first paint only the rows in view. A row is one
+ * step tall, so the height reserved for it is the height it will have
+ * and the scrollbar is right before anything is laid out. */
+.settled-row {
+  content-visibility: auto;
+  contain-intrinsic-size: auto var(--spacing-step);
+}

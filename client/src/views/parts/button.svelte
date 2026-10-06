@@ -40,7 +40,7 @@ export interface ButtonProps {
 }
 
 // The resting paint of each tone and the only hover it answers, with the
-// height each tone stands at on the control scale from `theme.css`. The
+// height each tone stands at on the control scale from `theme/tokens-space.css`. The
 // primary takes the large step because it is "the one action a screen is
 // for", which is that tier's own definition; the other three take the
 // ordinary step, the tier named for a secondary button.
