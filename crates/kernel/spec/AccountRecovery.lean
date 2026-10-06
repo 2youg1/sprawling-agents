@@ -18,7 +18,8 @@ import crates.kernel.spec.Error
 
 ```rust
 // kernel::account_recovery —— 纯状态机，无 I/O、无时钟；ServerLabel 是账号 id
-pub enum AccountRetries { One, Two }                    // 同一账号上最多再发几次；缺省值只在 gateway 的 TuningDefaults::DEFAULTS，Query::Config 读回给页面
+#[serde(rename_all = "snake_case")]
+pub enum AccountRetries { One, Two }                    // 同一账号上最多再发几次；线上与账本拼作 one／two；缺省值只在 gateway 的 EndpointTuning::DEFAULTS，Query::Config 读回给页面
 pub enum Roster { Single, Several { accounts: Vec<ServerLabel>, retries: AccountRetries } }
                                                         // Several 恒有两个以上账号，名册序即优先级
 pub enum RoundEnd { Refused, Unknown, Cap, Exhausted }
