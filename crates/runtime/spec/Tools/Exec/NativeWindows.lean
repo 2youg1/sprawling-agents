@@ -5,7 +5,8 @@
 
 /-!
 # Windows native execution
-规定 `crates/runtime/src/tools/exec/native_windows.rs` 与
+规定 `crates/runtime/src/tools/exec/native_windows.rs`、
+`crates/runtime/src/tools/exec/native_windows/msvc.rs` 与
 `crates/desktop/ffi/src/confinement.rs`、`crates/desktop/ffi/zig/confinement.zig`。
 
 D53：Windows native 使用无 capability 的 AppContainer 与匿名 Job Object；
@@ -90,6 +91,32 @@ Rust std 的缺省 capture 与直接打开 NUL 判定该前提。
 security descriptor 做 AccessCheck 并拒绝起动，或由 doctor 的 native 行报告；
 判定证据是 Windows Server 上真实工具链（cargo、cmd）在缺 ACE 时的命令结果，
 缺省改为 native 之前须定。
+
+D60：AppContainer 子进程自己找不到 MSVC。rustc 找 `link.exe`、cc 找 `cl.exe` 用的是
+find-msvc-tools：先经 Visual Studio Setup Configuration 的 COM 枚举实例，再试
+vswhere，二者读的 InprocServer32 DLL 与实例状态都在 `%ProgramData%\Microsoft\VisualStudio`
+下，那里的 DACL 只给 Users 与 Everyone 读，没有 ALL APPLICATION PACKAGES。发现失败后
+rustc 退回 PATH 上的裸 `link.exe`；GitHub windows-latest 的 PATH 上 Git 的
+`usr\bin\link.exe`（msys coreutils）排在前面，它在容器里建不了 msys 的命名对象
+（0xC0000022），以 0xc0000142 退出，`exec_builds` 的 Rust 构建因此失败。
+launch 因此在容器外、以子进程已声明的环境为输入调用 find-msvc-tools 的
+`find_tool_with_env`，求 host 架构的 `link.exe`，把它给出的 PATH、LIB、INCLUDE 目录
+前置于子进程已声明的同名值（未声明时只含这些目录），与 vcvars 相同；子进程内的
+rustc 退回裸 `link.exe` 时便落到 MSVC，cc 的 `cl.exe` 也同样。getter 不交出
+PATH、LIB、INCLUDE 的原值，拼接由 runtime 用 `;` 完成，所以子进程原值里的字符
+不会让该 crate 的 `join_paths` 在 harness 内 panic。建筑声明了 `VCINSTALLDIR`
+即已是 developer prompt 环境，不再添加；主机没有 MSVC 时什么也不加。这些目录都在
+Program Files 下，平台已给 ALL APPLICATION PACKAGES 读与执行，无须 ACL 授权，
+名字与值也不含凭据。用 find-msvc-tools 而非自写发现，是因为它就是不受限的 rustc
+会用的那一份逻辑，于是两种臂找到同一个实例；它已作为 cc 的依赖在 lockfile 里。
+被否：①给本次 SID 授 `%ProgramData%\Microsoft\VisualStudio` 的读 ACE——要该目录的
+WRITE_DAC，普通账户没有，且与 D59 一样把主机差异藏进每次起动；②要求建筑声明
+vcvars 的变量——harness 进程通常不在 developer prompt 里，声明的名字取不到值；
+③设 `CARGO_TARGET_<triple>_LINKER`——只覆盖 cargo 的链接，cc 的 `cl.exe` 仍找不到。
+限制：前置的是 host 架构的目录，子进程交叉编译到别的架构时须自己声明 developer
+prompt 变量。重开条件：VS 的实例状态对 AppContainer 可读，或 find-msvc-tools 在
+AppContainer 内能发现实例。`msvc` 模块的测试在装有 MSVC 的 Windows runner 上检查
+别名合并与前置顺序；`exec_builds` 的 native acceptance 检查实际构建。
 
 失败拒绝，不再起动普通子进程；cleanup 拒绝时保留错误及未释放资源的 owner，
 模型的 closing 只表示不能恢复执行，closed 才表示 cleanup 已成功。
