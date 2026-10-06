@@ -52,6 +52,11 @@ coordinator 经两个端口（Host 与 Journal，§7）运行；平台适配器�
 `bin::privacy::windows::host` 已实现，`bin::privacy::cli` 的写入动词经它们进入 coordinator
 （Privacy.Cli）。确认的 typestate 与 wire 帧、页面服务尚未实现；各自的接口写在
 Privacy.Confirmation 与 wire 的 Privacy 分部，由后续阶段按本模型实现。
+尚未实现的拒绝：原值无法经它的写入路径原样写回时（机器作用域的原值超过提升子进程的 1024 字节上界，
+或注册表原值没有无损的原始编码），apply 应在 Prepared 之前拒绝（Privacy.Windows D57）；现在这样的
+apply 照常写入，之后的恢复或回滚由子进程或适配器拒绝写回，以 NotApplied 或 unknown 如实结束。
+控制表写入的值都是 4 字节，只有人的主机上已有的异常原值会走到这里；补上它需要在 planApply 增加
+一个拒绝分支并重新证明 §2 的性质。
 
 ## 5 权威信源
 原始读写：RegQueryValueExW/RegSetValueExW 规定原始类型与字节、缺值和访问失败
