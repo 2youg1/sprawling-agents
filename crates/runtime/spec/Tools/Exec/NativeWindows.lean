@@ -178,4 +178,162 @@ theorem cleanup_failure_trace_preserves_owner (owner : CleanupOwner)
       exact failed answer (by simp [member])
     cases answer <;> simp_all [retainUntilStopped]
 
+/-! ## argv 保全（D55）
+
+D55：`crates/desktop/ffi/src/confinement/packet.rs` 的 `quoted` 是唯一生产编码器；
+这里规定保全性质，runtime 与 Zig 不再编码 argv。微软 CRT 对普通参数的
+反斜杠／引号规则规定 `CrtTail`，程序名的独立规则规定 `CrtProgram`；
+Microsoft [Parsing C command-line arguments](https://learn.microsoft.com/en-us/cpp/c-language/parsing-c-command-line-arguments)
+是两者的环境前提，操作系统与 CRT 实现该规则不是本模型证明的事。
+
+支持域为非零 UTF16 units，包含空参数与孤立 surrogate；程序名另外要求是
+非空文件路径，不含引号且末尾不是反斜杠，允许路径中有空格。`quoteChecked`
+只规定 NUL 内容拒绝，生产 `packet::encode` 还可因 checked arithmetic、
+command line 或 environment 长度、profile 与限额验证而答 `Action::Encode`。
+保全性质以编码成功为条件，不保证任意大小输入都能启动。
+
+`encoded_tail_preserves_units` 与 `encoded_arguments_preserve_order` 量化所有
+admitted 输入；它们证明 parser relation 接受编码结果，未证明 parser 的
+确定性。Rust 侧的独立 decoder 派生检查与 disposable child 的真实 `args_os`
+对拍检验模型和生产的对应，不能把 Lean 定理本身当成 CRT 执行证据。
+
+`cmd /C`、`/K` 的剩余文本还经过 cmd 的脚本解释，CRT argv 保全不保证脚本
+含空格、引号、元字符或开关时的执行结果；`/D /S /C` 的 echo 与 exit 探针
+单独记录结果，不以它们代签一般脚本域。Microsoft
+[cmd](https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/cmd)
+规定这些开关的脚本行为。击败的备选是在 runtime 或 Zig 再写编码器，
+因为调用链只需传递 packet，复制规则会产生第二权威；重开条件是调用方
+需要另一种明确的解析语法，此时该语法应有自己的契约。
+-/
+namespace Argv
+
+/-- quoted 的输入是 UTF16 code units；surrogate 不做归一化，NUL 不属于 admitted。 -/
+def admitted (units : List Nat) : Prop :=
+  ∀ unit ∈ units, 0 < unit ∧ unit < 65536
+
+/-- 待决反斜杠只在后继已知时输出，对应 packet::quoted 的 slashes。 -/
+def encodeTail (slashes : Nat) : List Nat → List Nat → List Nat
+  | [], suffix => List.replicate (2 * slashes) 92 ++ 34 :: suffix
+  | unit :: rest, suffix =>
+    if unit = 92 then encodeTail (slashes + 1) rest suffix
+    else if unit = 34 then
+      List.replicate (2 * slashes + 1) 92 ++ 34 :: encodeTail 0 rest suffix
+    else List.replicate slashes 92 ++ unit :: encodeTail 0 rest suffix
+
+/-- CRT 已打开引号内的规则；suffix 在结束引号之后，因而覆盖边界。
+规则按 Microsoft 文档独立规定，不以 encodeTail 的结果定义解析成功。 -/
+inductive CrtTail : List Nat → List Nat → List Nat → Prop where
+  | close (slashes : Nat) (suffix : List Nat) :
+      CrtTail (List.replicate (2 * slashes) 92 ++ 34 :: suffix)
+        (List.replicate slashes 92) suffix
+  | escaped (slashes : Nat) (input output suffix : List Nat)
+      (next : CrtTail input output suffix) :
+      CrtTail (List.replicate (2 * slashes + 1) 92 ++ 34 :: input)
+        (List.replicate slashes 92 ++ 34 :: output) suffix
+  | literal (slashes unit : Nat) (input output suffix : List Nat)
+      (notSlash : unit ≠ 92) (notQuote : unit ≠ 34) (notNul : unit ≠ 0)
+      (next : CrtTail input output suffix) :
+      CrtTail (List.replicate slashes 92 ++ unit :: input)
+        (List.replicate slashes 92 ++ unit :: output) suffix
+
+/-- 循环不变量量化所有 admitted 参数、所有待决反斜杠数量与后续 suffix。 -/
+theorem encoded_tail_preserves_units (units : List Nat) (slashes : Nat)
+    (suffix : List Nat) (valid : admitted units) :
+    CrtTail (encodeTail slashes units suffix)
+      (List.replicate slashes 92 ++ units) suffix := by
+  induction units generalizing slashes with
+  | nil => simpa [encodeTail] using CrtTail.close slashes suffix
+  | cons unit rest ih =>
+    have restValid : admitted rest := by
+      intro value member
+      exact valid value (List.mem_cons_of_mem unit member)
+    have notNul : unit ≠ 0 := by
+      have positive := (valid unit (by simp)).1
+      omega
+    by_cases slash : unit = 92
+    · subst unit
+      simpa [encodeTail, List.replicate_succ', List.append_assoc] using
+        ih (slashes + 1) restValid
+    · by_cases quote : unit = 34
+      · subst unit
+        simpa [encodeTail] using
+          CrtTail.escaped slashes (encodeTail 0 rest suffix) rest suffix
+            (by simpa using ih 0 restValid)
+      · simpa [encodeTail, slash, quote] using
+          CrtTail.literal slashes unit (encodeTail 0 rest suffix) rest suffix
+            slash quote notNul (by simpa using ih 0 restValid)
+
+/-- argv 尾部只有加引号的参数与单空格边界。 -/
+def encodeArguments : List (List Nat) → List Nat
+  | [] => []
+  | units :: rest => 34 :: encodeTail 0 units
+      (if rest.isEmpty then [] else 32 :: encodeArguments rest)
+
+inductive CrtArguments : List Nat → List (List Nat) → Prop where
+  | empty : CrtArguments [] []
+  | next (input units suffix : List Nat) (rest : List (List Nat))
+      (argument : CrtTail input units
+        (if rest.isEmpty then [] else 32 :: suffix))
+      (remaining : CrtArguments suffix rest) :
+      CrtArguments (34 :: input) (units :: rest)
+
+/-- 任意长度 argv[1..] 保留所有 units 与次序，包含空参数；不规定 cmd 脚本解释。 -/
+theorem encoded_arguments_preserve_order (args : List (List Nat))
+    (valid : ∀ units ∈ args, admitted units) :
+    CrtArguments (encodeArguments args) args := by
+  induction args with
+  | nil => exact CrtArguments.empty
+  | cons units rest ih =>
+    apply CrtArguments.next
+    · simpa using encoded_tail_preserves_units units 0
+        (if rest.isEmpty then [] else 32 :: encodeArguments rest)
+        (valid units (by simp))
+    · exact ih (by
+        intro units member
+        exact valid units (List.mem_cons_of_mem _ member))
+
+/-- 内容检查拒绝 NUL；Nat 模型不包含生产 checked arithmetic 或 packet 长度拒绝。 -/
+def quoteChecked (units : List Nat) : Option (List Nat) :=
+  if 0 ∈ units then none else some (34 :: encodeTail 0 units [])
+
+theorem nul_is_exactly_the_content_refusal (units : List Nat) :
+    quoteChecked units = none ↔ 0 ∈ units := by
+  simp [quoteChecked]
+
+/-- 无引号的文件路径使用 CRT 独立的程序名规则；末尾反斜杠是目录，不在该支持域。 -/
+theorem program_body_preserves_path (prefix : List Nat) (last slashes : Nat)
+    (suffix : List Nat) (noQuotes : 34 ∉ prefix)
+    (lastNotQuote : last ≠ 34) (lastNotSlash : last ≠ 92) :
+    encodeTail slashes (prefix ++ [last]) suffix =
+      List.replicate slashes 92 ++ prefix ++ last :: 34 :: suffix := by
+  induction prefix generalizing slashes with
+  | nil => simp [encodeTail, lastNotQuote, lastNotSlash]
+  | cons unit rest ih =>
+    have unitNotQuote : unit ≠ 34 := by
+      intro equal
+      exact noQuotes (by simp [equal])
+    have restNoQuotes : 34 ∉ rest := by
+      intro member
+      exact noQuotes (List.mem_cons_of_mem unit member)
+    by_cases slash : unit = 92
+    · subst unit
+      simpa [encodeTail, List.replicate_succ', List.append_assoc] using
+        ih (slashes + 1) restNoQuotes
+    · simp [encodeTail, slash, unitNotQuote, ih 0 restNoQuotes, List.append_assoc]
+
+inductive CrtProgram : List Nat → List Nat → List Nat → Prop where
+  | quoted (program suffix : List Nat) (noQuotes : 34 ∉ program) :
+      CrtProgram (34 :: (program ++ 34 :: suffix)) program suffix
+
+theorem encoded_program_preserves_path (prefix : List Nat) (last : Nat)
+    (suffix : List Nat) (noQuotes : 34 ∉ prefix)
+    (lastNotQuote : last ≠ 34) (lastNotSlash : last ≠ 92) :
+    CrtProgram (34 :: encodeTail 0 (prefix ++ [last]) suffix)
+      (prefix ++ [last]) suffix := by
+  rw [program_body_preserves_path prefix last 0 suffix noQuotes lastNotQuote lastNotSlash]
+  simpa [List.append_assoc] using
+    CrtProgram.quoted (prefix ++ [last]) suffix (by simp [noQuotes, lastNotQuote])
+
+end Argv
+
 end Runtime.NativeWindows
