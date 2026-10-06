@@ -42,7 +42,7 @@ Markdown 时的标签 `8-n`，别处引作 `tools/xtask/Spec.lean §8-n`。
 | spec | 一个包恰有一份生效规格；散文里点名的 `<名>-SPEC` 在树上；Lean 的 import 纪律；`.lean` 里没有 `sorry`、`admit`、`axiom`；规格引用的仓内路径在盘上；状态机分部里没有定理的数与解析不到的 Rust 路径数只降不升（§8-42） |
 | budget | `tools/xtask/budgets.toml` 里每一行可称重且被 gated 的预算，当场称一次；没有构建产物可称时沉默（`just check` 不构建 release 二进制），壁钟读数只入册不入门 |
 | color | 颜色在每个客户端里恰好被命名一次（产地表见 §8-8），且以色域上限的比值表达；扫仓库根，文件自豁免；玻璃按 `--glass-opacity` 盖在最亮的表面上时字仍够层级（§8-51） |
-| motion | 过渡的曲线与时长只住 `client/src/theme.css`：别处的 `cubic-bezier(`、`linear(`、`steps(` 与 Tailwind 的 `duration-<数字>`、`duration-[`、`ease-[` 即红（§8-51） |
+| motion | 过渡的曲线与时长只住客户端的主题（入口 `client/src/theme.css` 与它 import 的部分）：别处的 `cubic-bezier(`、`linear(`、`steps(` 与 Tailwind 的 `duration-<数字>`、`duration-[`、`ease-[` 即红（§8-51） |
 | release | 公开树由过滤生成；六条断言：公开树上零脚手架路径、产品文档不得链向或在正文里点名脚手架、任何发布文件不得携家目录路径、不得引用树里没有的文件、不得把一台机器的工作记录写进产品文档、链接的拼法与树上的名字逐字节相等（§8-15） |
 | length | 一个生产函数不得长过 `function_length`、不得多于 `argument_count` 个参数（不含接收者），一个源文件的生产行不得多过 `file_length`；三个预算都住 `tools/xtask/budgets.toml`；函数尺寸与签名以 `syn` 量得，Rust 文件尺寸是总行数减去顶层 `#[cfg(test)]` 项所跨的行；`.zig` 受函数与文件两面、不受参数面，按 Zig 的词法量，文件尺寸减去 `test` 声明所跨的行（§8-48、D15）；只量文件面的语言（`length::surface::FILE_FACE` 所列扩展名，在仓库里哪个目录都一样）只受文件面，文件尺寸是总行数（§8-53、D33） |
 | npm | `client/` 的依赖面：锁文件在盘且与 `package.json` 逐条同、运行时依赖恰为 `npm::RUNTIME` 那张表、树上每个包的许可证都在 `deny.toml` 的准许表内（§8-12） |
@@ -224,7 +224,7 @@ pub(crate) struct Violation {
 
 /-! ### 8-8 color：一个客户端，一处颜色产地（形状 6 数据面）
 
-**权威是一句话**：颜色在每个客户端里恰好被命名一次。浏览器客户端的那一处是 `client/src/theme.css` 的 `@theme` 块，`THEME` 常量即它，七条令牌断言只读它。产地表（`color/scan.rs` 的 `PRODUCTION_POINTS`）有两行：`THEME`，以及 playback 技能的样式源文件 `skills/playback/src/style.css`——离线页面载不进客户端的样式表，所以它的颜色在自己的 `:root` 块里各命名一次。`skills/playback/template.html` 是该样式的组装输出，只在带有生成横幅时跳过字面量扫描；共享 Bun 检查逐字节比对它与源片段，未标记的页面仍受扫描。「断言读哪份表」与「扫描放过谁」从此是两个答案。
+**权威是一句话**：颜色在每个客户端里恰好被命名一次。浏览器客户端的那一处是它的主题：入口 `client/src/theme.css`，加上入口按顺序 `@import "./theme/<部分>.css";` 的各个部分文件（`client/src/theme/`）。主题在哪、按什么顺序读，只由 `tools/xtask/src/theme.rs` 回答（`ENTRY`、`Theme::read`、`is_theme`）；七条令牌断言读的是 `Theme::inlined()`——入口里每一行 import 换成它点名的那个部分——所以拆成几个文件不改变断言读到的文本。违例报在声明它所判之物的那个部分文件上（`Theme::declaring`）。产地有两处：浏览器客户端的主题（`theme::is_theme`），以及 playback 技能的样式源文件 `skills/playback/src/style.css`——离线页面载不进客户端的样式表，所以它的颜色在自己的 `:root` 块里各命名一次。`skills/playback/template.html` 是该样式的组装输出，只在带有生成横幅时跳过字面量扫描；共享 Bun 检查逐字节比对它与源片段，未标记的页面仍受扫描。「断言读哪份表」与「扫描放过谁」从此是两个答案。
 
 **七条令牌断言读 CSS 自定义属性，不读 Rust 表**。解析面因此是 `--color-*`／`--text-*`／`--font-weight-*` 这一类声明，值取 `oklch(L C H)` 的三个分量。灰阶的 `L` 以千分之一为单位比较（`0.145` 读作 145），与断言里的 `L_FLOOR`／`L_CEILING` 同刻度。
 
@@ -237,17 +237,19 @@ pub(crate) struct Violation {
 | 对比按文本可落的**最亮表面**判 | 表面是一条排版约定，不是令牌 | `--surface-ceiling` |
 | 读数低于层级多少仍算够到（APCA 公布值的取整） | 余量是判定的容差，不是颜色；门与配色页（`client/src/views/setup/colours.ts`）读同一个数 | `--tier-slack` |
 
-这四组属性不参与层叠——没有任何规则引用它们，浏览器读到即忽略。它们在这里，是因为 `theme.css` 是颜色唯一的家：这三件事若不写在它旁边，门就剩下三条无从判起的断言，而一道找不到输入就变绿的门，正是 §8-13 点名要避的失效。写进 CSS 而非另起一份 TOML，是为了让一个改颜色的人在同一屏里看见他改的值和那个值必须守的比值。
+这四组属性不参与层叠——没有任何规则引用它们，浏览器读到即忽略。它们在这里，是因为主题是颜色唯一的家：这三件事若不写在它旁边，门就剩下三条无从判起的断言，而一道找不到输入就变绿的门，正是 §8-13 点名要避的失效。写进 CSS 而非另起一份 TOML，是为了让一个改颜色的人在同一屏里看见他改的值和那个值必须守的比值。
 
 - **一份样式表被读成两块调色板**（`Mode::Dark`／`Mode::Light`）。`reading()` 把 `:root[data-theme="light"]` 那一块切出来，深色读数是剩下的部分，浅色读数是那一块加上剔除了 `--color-` 声明的共用部分；七条断言各对两份读数各跑一遍，违例报告先报是哪一面。**切成文本而不是先解成表**：下游每一个读者本来就读文本，多一层表就是这道门本来要防的那个第二权威。
 - **色阶按页面命名，不按墨色**：`g0` 永远是页面，`g10` 永远是离页面最远的那一面。断言一因此是「每一档都比前一档更远离页面」，断言二是每个 mode 自己的一对端点。**两对端点不对称是 APCA 的结论而不是口味**：浅底深字被收的费远高于深底浅字，一个在 878 的表面上没有任何墨色能够到 Lc 90，于是浅色页把它的量程花在三个要承载文字的面上，剩下的才给下方的填色。
 - **浅色在哪里被选中不归这份样式表管**：`system` 由客户端读 `prefers-color-scheme` 后写成 `data-theme`，而不是在 CSS 里再写一遍同一套令牌。**败给的方案**：`@media (prefers-color-scheme: light)` 里再声明一遍十一档——那是同一块调色板的第二份定义，两份在他们开始不一致之前都是对的。
 - **改价条件**：参考页改为读城发出的某份样式表时，它的那一行从产地表删去；出现第三个客户端时，它照参考页的样子加一行。
+
+D34 **主题是一个入口加它按顺序 import 的部分，顺序只住在入口里。** 主题超过一个文件的长度上限（§8-53），按将来谁拥有它切成连续的几段，每段一个部分文件，入口按原来的顺序 import 它们，层叠因此不变。两种错误各有稳定的码：入口 import 的部分不在盘上（`theme-part-missing`），`client/src/theme/` 里有一个入口没有 import 的 `.css`（`theme-part-unimported`）——后者若放过，就是一份每道门都豁免、却没有页面画它的文件。被击败的备选：①按文件名排序读部分——要给每个文件加编号前缀，顺序就有了入口之外的第二个家；②各部分各判各的——浅色块覆写的令牌与它所覆写的那些声明分在两份文本里，`reading()` 拼不出一种打光的整张表。**重开参数**：Tailwind 不再自己内联 `@import`，或主题回到一个文件之内。
 -/
 
 /-! #### 8-8a 禁用墨色只写在禁用状态之后（`color/disabled.rs`，形状 6 数据面）
 
-`--color-text-disabled` 的目标是 APCA Lc 30（`--tier-text-disabled`），浅色页上约 2:1，只够告诉手「这里按不动」，不够让眼读出一个字。所以门的规则是：客户端源码（`client/src` 下的 `.svelte`／`.ts`／`.css`，不含 `theme.css`）里每一处 `text-text-disabled` 类名，都必须挂在一个名字里带 `disabled` 的变体之后，例如 `aria-disabled:text-text-disabled`、`disabled:text-text-disabled`、`group-aria-disabled:text-text-disabled`。花费、时刻、模型名、run id、占位字、按键字样这些人要读的信息，改用 `text-text-faint`（Lc 60）或更高一级。
+`--color-text-disabled` 的目标是 APCA Lc 30（`--tier-text-disabled`），浅色页上约 2:1，只够告诉手「这里按不动」，不够让眼读出一个字。所以门的规则是：客户端源码（`client/src` 下的 `.svelte`／`.ts`／`.css`，不含主题的入口与部分）里每一处 `text-text-disabled` 类名，都必须挂在一个名字里带 `disabled` 的变体之后，例如 `aria-disabled:text-text-disabled`、`disabled:text-text-disabled`、`group-aria-disabled:text-text-disabled`。花费、时刻、模型名、run id、占位字、按键字样这些人要读的信息，改用 `text-text-faint`（Lc 60）或更高一级。
 
 - **判的是类名的写法，不是运行时的条件**：`{off ? 'text-text-disabled' : …}` 这种三元式里，门看不出条件是不是「禁用」，所以不收；元素本来就带 `aria-disabled`，写成变体，状态与墨色由同一个属性决定，没有第二个权威。
 - **类名的边界**：从出现处往前取到空白、引号、反引号或花括号为止，这一段按 `:` 切开，最后一段之前的任何一段含 `disabled` 即算禁用上下文；最后一段是紧贴在类名前面的文字，不是变体，不算。否定的任意变体（`[&:not(:disabled)]:`）也含 `disabled`，同样算禁用上下文，这是按文字判的代价，客户端里没有这种写法。
@@ -1198,7 +1200,7 @@ pub(crate) fn package_field<'a>(manifest: &'a toml::Value, key: &str) -> Option<
 **本节属门禁机具，与产品代码分开提交。**
 -/
 
-/-! ### 8-51 `motion`：曲线与时长只住 `theme.css`；`color` 判玻璃；`render` 判对话页的常驻入口（形状 1 判定）
+/-! ### 8-51 `motion`：曲线与时长只住主题；`color` 判玻璃；`render` 判对话页的常驻入口（形状 1 判定）
 
 **要挡的三件事**，都是 docs/frontend-method.md §4-43 与 refrain P2、P6、P11、P12 写下、而今天没有机器读者的规则：一条过渡在视图里自己写曲线或毫秒数，于是同一种位移有五个答案；玻璃的不透明度被调低到字压不住背后；对话页长出一条固定的顶栏或浮动操作栏，或常驻入口悄悄变多。
 
@@ -1217,13 +1219,13 @@ pub(super) fn talk_controls_within_register(
 );
 ```
 
-**`motion` 判什么**：`client/src` 下每个 `.svelte`、`.ts`、`.css`、`.html` 文件（`client/src/theme.css` 是产地，豁免，与 §8-8 的产地表同形），逐行找四种写法，命中一处即一条违规，位置 `<文件>:<行>`：
+**`motion` 判什么**：`client/src` 下每个 `.svelte`、`.ts`、`.css`、`.html` 文件（主题——入口 `client/src/theme.css` 与 `client/src/theme/` 里它 import 的部分，`theme::is_theme`——是产地，豁免，与 §8-8 的产地表同形），逐行找四种写法，命中一处即一条违规，位置 `<文件>:<行>`：
 
 - `cubic-bezier(`；
 - `linear(` 与 `steps(`，**只在括号里第一个非空白字符是数字、`.` 或 `-` 时算**：CSS 的这两个函数只收数，而 `{#snippet steps(each: Walk)}` 是一个名叫 `steps` 的片段，不是一条时间函数；
 - Tailwind 的 `duration-<数字>` 与 `duration-[`、`ease-[`，前一个字符不是字母、数字、`-` 或 `_`（`group-hover:duration-150` 的冒号算边界，`--transition-duration-short` 不算）。
 
-规则写「a transition's curve and duration are named once, in the client's theme file」，替代写「`duration-short|panel|page` 与 `ease-arrive|leave`（docs/frontend-method.md §4-43）；要第四种时长或第三条曲线，先在 `theme.css` 声明它」。**不读**：`style=` 里的 `animation-duration` 与 `animation-delay`（城市插画的环境动画与逐个错开的延迟，不是位移）、`delay-*`（悬停意图的门槛，4-18，不是动效的时长）。
+规则写「a transition's curve and duration are named once, in the client's theme」，替代写「`duration-short|panel|page` 与 `ease-arrive|leave`（docs/frontend-method.md §4-43）；要第四种时长或第三条曲线，先在主题的动效令牌里声明它」。**不读**：`style=` 里的 `animation-duration` 与 `animation-delay`（城市插画的环境动画与逐个错开的延迟，不是位移）、`delay-*`（悬停意图的门槛，4-18，不是动效的时长）。
 
 **`color` 多判一件事：玻璃按自己的不透明度盖在页面最亮的表面上，字仍够得到层级。** `judge_glass` 在每种打光的读法上各跑一次（§8-8 的 `Mode`）：读 `--glass-opacity: <n>%`（缺席、不是 1–100 的整数百分数各是一条违规），读 `--color-glass` 单跳到的那一档、`raised-hover` 单跳到的那一档、`--color-text` 的明度与 `--tier-text`；把玻璃那一档的 sRGB 按 n% 盖在 `raised-hover` 那一档上（逐通道在编码空间里线性混合，即引擎合成一层半透明底色的做法），算 `--color-text` 对合成色的 APCA Lc，低于 `--tier-text` 即红，拒词写出两种打光里哪一种、够到多少、要多少。**为什么是 `raised-hover` 而不是最亮的墨**：玻璃的模糊（24 px）把背后的字摊进它所在的表面，留下的是表面；页面画面积的表面里最亮的是悬停中的抬起控件。墨不按面积画，按墨判会把不透明度逼到 97%，玻璃就不是玻璃了。`glass` 进 `ROLES`（§8-8 的封闭词表），共 22 个。
 
@@ -1240,7 +1242,7 @@ pub(super) fn talk_controls_within_register(
 
 **测试**：`motion::tests` 判 `literal_at` 的正反例（三种函数、`steps(each`、`duration-150`、`hover:duration-[90ms]`、`ease-[`、`duration-panel`、`--transition-duration-short` 各一例）；`color::tests` 判玻璃：今天的样式表两种打光都绿，把 `--glass-opacity` 改成 40% 时浅色那一面红，缺这一行时红；`render::talk::tests` 在手写的 `Drawn` 夹具上判：对话框里的控件、滚动区里的控件、`status` 里的控件都不红，对话地标里一个不在三者之中的按钮红；三簇各两个控件计 6；计数大于登记时红、等于时不红；画廊没有对话页时红。
 
-D20 **曲线、时长与玻璃的下限各有一个机器读者，且读者读的就是层叠用的那个数。** `motion` 拒绝 `theme.css` 之外的时间函数与 Tailwind 的时长字面量，`color` 用 `--glass-opacity` 本身判玻璃的可读性，`render` 用画出来的页数对话页的常驻入口。理由：三条规则写在 docs/frontend-method.md §4-43 与 refrain P2、P6、P11、P12 里，若没有读者，第一个赶时间的视图就会写下 `duration-200`、第一次调玻璃的人就会把字调到读不清；而玻璃那一条若另立一个 `--glass-floor` 给门读，层叠用的数与门判的数就是两个可以分开的家。被击败的备选：①只拒 `cubic-bezier(` 等三个函数（路线图的原文）——同一种位移今天有 90、100、120、150、200 ms 五个答案，函数一个都没写；②按类名认对话页的三簇——类名是写下来的，门判的是画出来的页；③在探针里加 `position` 一格再判 `fixed`——那是改 `crates/browser`，与门不能同一个提交，而父链与滚动轴已经说得出同一件事。**重开参数**：`browser::survey` 下一次加读数时，对话页的两条性质迁进去（§8-38 的同一条）；客户端出现第二个产地（例如第二套主题文件），`motion` 的产地从一个文件变成一张表。
+D20 **曲线、时长与玻璃的下限各有一个机器读者，且读者读的就是层叠用的那个数。** `motion` 拒绝主题之外的时间函数与 Tailwind 的时长字面量，`color` 用 `--glass-opacity` 本身判玻璃的可读性，`render` 用画出来的页数对话页的常驻入口。理由：三条规则写在 docs/frontend-method.md §4-43 与 refrain P2、P6、P11、P12 里，若没有读者，第一个赶时间的视图就会写下 `duration-200`、第一次调玻璃的人就会把字调到读不清；而玻璃那一条若另立一个 `--glass-floor` 给门读，层叠用的数与门判的数就是两个可以分开的家。被击败的备选：①只拒 `cubic-bezier(` 等三个函数（路线图的原文）——同一种位移今天有 90、100、120、150、200 ms 五个答案，函数一个都没写；②按类名认对话页的三簇——类名是写下来的，门判的是画出来的页；③在探针里加 `position` 一格再判 `fixed`——那是改 `crates/browser`，与门不能同一个提交，而父链与滚动轴已经说得出同一件事。**重开参数**：`browser::survey` 下一次加读数时，对话页的两条性质迁进去（§8-38 的同一条）；客户端出现第二个产地（例如第二套主题），`motion` 的产地从一个主题变成一张表。
 
 **本节属门禁机具，与产品代码分开提交。**
 -/

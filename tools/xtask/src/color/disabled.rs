@@ -13,8 +13,8 @@
 
 use std::path::Path;
 
-use super::THEME;
 use crate::report::{Violation, XtaskError};
+use crate::theme;
 use crate::walk;
 
 const DISABLED_INK: &str = "text-text-disabled";
@@ -25,7 +25,7 @@ pub(super) fn judge_disabled_ink(root: &Path) -> Result<Vec<Violation>, XtaskErr
     let mut violations = Vec::new();
     for path in walk::files_with_ext(&root.join(walk::CLIENT_SRC), &CLIENT_EXTS)? {
         let rel = walk::rel(root, &path);
-        if rel == THEME {
+        if theme::is_theme(&rel) {
             continue;
         }
         violations.extend(bare_uses(&walk::read_text(&path)?).into_iter().map(|line| {

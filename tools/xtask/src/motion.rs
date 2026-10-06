@@ -4,9 +4,10 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Motion gate: a transition's curve and duration are named once, in the
-//! client's theme file (tools/xtask/Spec.lean §8-51, docs/frontend-method.md §4-43).
+//! client's theme (tools/xtask/Spec.lean §8-51, docs/frontend-method.md §4-43).
 //!
-//! The same shape as the colour scan: one production point, and every
+//! The same shape as the colour scan: one production point, the theme's
+//! entry and the parts it imports (`crate::theme`), and every
 //! other file in the client refused the spellings that would make it a
 //! second one. A curve is a timing function; a duration is what Tailwind
 //! turns `duration-150` into. Both have tokens - `ease-arrive`,
@@ -23,10 +24,8 @@
 use std::path::Path;
 
 use crate::report::{Violation, XtaskError};
+use crate::theme;
 use crate::walk;
-
-/// The one file allowed to spell a curve or a duration.
-const THEME: &str = concat!(crate::walk::client_src!(), "/theme.css");
 
 /// The client's file kinds that carry a class or a style.
 const SCAN_EXTS: [&str; 4] = ["svelte", "ts", "css", "html"];
@@ -40,7 +39,7 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     let mut violations = Vec::new();
     for path in walk::files_with_ext(&root.join(walk::CLIENT_SRC), &SCAN_EXTS)? {
         let rel = walk::rel(root, &path);
-        if rel == THEME {
+        if theme::is_theme(&rel) {
             continue;
         }
         let text = walk::read_text(&path)?;
@@ -51,14 +50,17 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
             violations.push(Violation {
                 gate: "motion",
                 location: format!("{rel}:{}", index.saturating_add(1)),
-                rule: "a transition's curve and duration are named once, in the client's theme file"
+                rule: "a transition's curve and duration are named once, in the client's theme"
                     .to_owned(),
-                violation: format!("`{spelling}` outside {THEME}"),
-                alternative: format!(
-                    "spell `duration-short`, `duration-panel` or `duration-page` and `ease-arrive` or \
-                     `ease-leave` (docs/frontend-method.md §4-43); a fourth duration or a third curve is declared \
-                     in {THEME} first"
+                violation: format!(
+                    "`{spelling}` outside the theme ({} and the parts it imports)",
+                    theme::ENTRY
                 ),
+                alternative: "spell `duration-short`, `duration-panel` or `duration-page` and \
+                              `ease-arrive` or `ease-leave` (docs/frontend-method.md §4-43); a \
+                              fourth duration or a third curve is declared in the theme's \
+                              motion tokens first"
+                    .to_owned(),
             });
         }
     }
@@ -121,7 +123,50 @@ fn tailwind_literal(line: &str) -> Option<&'static str> {
     reason = "test code"
 )]
 mod tests {
-    use super::literal_at;
+    use super::{check, literal_at};
+
+    /// A curve declared in a part the theme imports is the theme's own
+    /// spelling; the same curve in a view is a second home for it.
+    #[test]
+    fn a_part_the_theme_imports_may_spell_a_curve() {
+        let root = std::env::temp_dir().join(format!("motion-theme-part-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let written = [
+            (
+                "client/src/theme.css",
+                "@import \"tailwindcss\";
+@import \"./theme/tokens-motion.css\";
+",
+            ),
+            (
+                "client/src/theme/tokens-motion.css",
+                "@theme {
+  --ease-arrive: cubic-bezier(0, 0, 0.1, 1);
+}
+",
+            ),
+            (
+                "client/src/views/panel.svelte",
+                "<div style=\"transition: x 1s cubic-bezier(0, 0, 0.1, 1)\"></div>
+",
+            ),
+        ];
+        for (rel, body) in written {
+            let path = root.join(rel);
+            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+            std::fs::write(&path, body).unwrap();
+        }
+
+        let found = check(&root).unwrap();
+        assert_eq!(
+            found
+                .iter()
+                .map(|v| v.location.as_str())
+                .collect::<Vec<_>>(),
+            ["client/src/views/panel.svelte:1"]
+        );
+        std::fs::remove_dir_all(&root).unwrap();
+    }
 
     #[test]
     fn the_three_timing_functions_are_refused_and_a_snippet_named_steps_is_not() {

@@ -7,7 +7,7 @@
 //! still legible (tools/xtask/Spec.lean §8-51, docs/frontend-method.md §4-43).
 //!
 //! **The opacity judged is the opacity drawn.** `--glass-opacity` is the
-//! number `theme.css` mixes the glass role with, and it is the number
+//! number the theme mixes the glass role with, and it is the number
 //! read here; a second declaration kept for this gate would be a floor
 //! that could drift away from what the page draws.
 //!
@@ -18,11 +18,12 @@
 //! pointer. Judged against ink, the opacity would have to reach 97 per
 //! cent and the glass would be a solid.
 
+use super::Mode;
 use super::contrast::apca_lc_over;
 use super::roles::rung_of;
 use super::tables::{grey_ramp, parse_text_tokens, tier_slack};
-use super::{Mode, THEME};
 use crate::report::Violation;
+use crate::theme;
 
 /// The role the glass is filled with, and the surface it is judged over.
 const GLASS: &str = "glass";
@@ -31,7 +32,7 @@ const BACKDROP: &str = "raised-hover";
 /// `parse_text_tokens` names it.
 const TEXT: &str = "TEXT";
 /// The declaration that says how much of the role covers the backdrop.
-const OPACITY: &str = "--glass-opacity:";
+pub(super) const OPACITY: &str = "--glass-opacity:";
 
 /// Text on the glass over the backdrop, in one lighting.
 ///
@@ -106,7 +107,7 @@ fn opacity(written: &str) -> Option<u16> {
 fn refuse(violation: String, alternative: &str) -> Violation {
     Violation {
         gate: "color",
-        location: THEME.to_owned(),
+        location: theme::ENTRY.to_owned(),
         rule: "text on glass reaches its tier over the brightest surface behind it".to_owned(),
         violation,
         alternative: alternative.to_owned(),

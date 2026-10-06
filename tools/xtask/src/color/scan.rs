@@ -8,13 +8,15 @@
 
 use std::path::Path;
 
-use super::THEME;
 use crate::report::{Violation, XtaskError};
+use crate::theme;
 use crate::walk;
 
-/// Each client names colour in one stylesheet. Playback owns its own
-/// palette because the exported page cannot load the browser client's CSS.
-const PRODUCTION_POINTS: [&str; 2] = [THEME, "crates/city/skills/playback/src/style.css"];
+/// Each client names colour in one theme. The browser client's is the
+/// entry and the parts it imports (`theme::is_theme`); playback owns its
+/// own palette because the exported page cannot load the browser
+/// client's CSS.
+const PLAYBACK_THEME: &str = "crates/city/skills/playback/src/style.css";
 
 /// The offline output of the playback stylesheet. Its generation banner
 /// identifies output; the shared Bun recipe verifies the assembled bytes.
@@ -98,7 +100,8 @@ pub(super) fn scan_for_literals(root: &Path) -> Result<Vec<Violation>, XtaskErro
     for path in walk::files_with_ext(root, &SCAN_EXTS)? {
         let rel = walk::rel(root, &path);
         if walk::in_isolation_zone(&rel)
-            || PRODUCTION_POINTS.contains(&rel.as_str())
+            || theme::is_theme(&rel)
+            || rel == PLAYBACK_THEME
             || SPELLS_COLOUR.contains(&rel.as_str())
         {
             continue;
@@ -181,7 +184,7 @@ mod tests {
         let root = std::env::temp_dir().join(format!("color-theme-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         let written = [
-            (THEME, "  --color-g0: oklch(0.145 0.018 264);"),
+            (theme::ENTRY, "  --color-g0: oklch(0.145 0.018 264);"),
             ("client/src/panel.css", "  color: oklch(0.145 0.018 264);"),
             (
                 "crates/city/skills/playback/src/style.css",
@@ -222,6 +225,46 @@ mod tests {
                 "client/src/panel.css:1",
                 "crates/city/skills/playback/template.html:1"
             ]
+        );
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    /// The theme is its entry and every part the entry imports: a token
+    /// declared in a part is the theme naming a colour, while a
+    /// stylesheet beside the parts that no entry imports is not.
+    #[test]
+    fn a_part_the_theme_imports_names_colour_as_the_theme() {
+        let root = std::env::temp_dir().join(format!("color-theme-part-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let written = [
+            (
+                "client/src/theme.css",
+                "@import \"tailwindcss\";
+@import \"./theme/tokens-colour.css\";
+",
+            ),
+            (
+                "client/src/theme/tokens-colour.css",
+                "@theme {
+  --color-g0: oklch(0.145 0.014 250);
+}
+",
+            ),
+            ("client/src/panel.css", "  color: oklch(0.145 0.018 264);"),
+        ];
+        for (rel, body) in written {
+            let path = root.join(rel);
+            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+            std::fs::write(&path, body).unwrap();
+        }
+
+        let found = scan_for_literals(&root).unwrap();
+        assert_eq!(
+            found
+                .iter()
+                .map(|v| v.location.as_str())
+                .collect::<Vec<_>>(),
+            ["client/src/panel.css:1"]
         );
         std::fs::remove_dir_all(&root).unwrap();
     }

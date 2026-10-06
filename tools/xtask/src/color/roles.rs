@@ -35,8 +35,8 @@
 
 use std::path::Path;
 
-use super::THEME;
 use crate::report::{Violation, XtaskError};
+use crate::theme;
 use crate::walk;
 
 /// Where the views that must speak in roles live. `walk` states the
@@ -218,7 +218,7 @@ fn is_text(name: &str) -> bool {
 fn spellings(root: &Path) -> Result<Vec<String>, XtaskError> {
     let mut held = Vec::new();
     for path in walk::files_with_ext(&root.join(VIEWS), &VIEW_EXTS)? {
-        if walk::rel(root, &path) == THEME {
+        if theme::is_theme(&walk::rel(root, &path)) {
             continue;
         }
         held.push(walk::read_text(&path)?);
@@ -258,7 +258,7 @@ fn rungs_outside_the_theme(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     let mut violations = Vec::new();
     for path in walk::files_with_ext(&root.join(VIEWS), &VIEW_EXTS)? {
         let rel = walk::rel(root, &path);
-        if rel == THEME {
+        if theme::is_theme(&rel) {
             continue;
         }
         let text = walk::read_text(&path)?;
@@ -273,7 +273,9 @@ fn rungs_outside_the_theme(root: &Path) -> Result<Vec<Violation>, XtaskError> {
                     violation: format!("`{spelling}` names a rung of the ramp"),
                     alternative: format!(
                         "spell the role whose job this is; the vocabulary is the ROLES table in \
-                         tools/xtask/src/color/roles.rs, and {THEME} maps each one to a rung"
+                         tools/xtask/src/color/roles.rs, and the theme ({}) maps each one to \
+                         a rung",
+                        theme::ENTRY
                     ),
                 });
             }
@@ -317,7 +319,7 @@ fn rung_utility(line: &str) -> Option<String> {
 fn refuse(rule: &str, violation: String, alternative: &str) -> Violation {
     Violation {
         gate: "color",
-        location: THEME.to_owned(),
+        location: theme::ENTRY.to_owned(),
         rule: rule.to_owned(),
         violation,
         alternative: alternative.to_owned(),
