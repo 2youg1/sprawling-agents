@@ -221,10 +221,13 @@ impl HttpServer {
         // can say "authenticating" where it would otherwise say "failed"
         // (`crates/sprawling/Spec.lean` §8-61).
         if status == 401 || status == 403 {
-            return AxError::failure(
-                AxCode::CredentialMissing,
-                "call an mcp server",
-                format!("{}: the server answered {status}", self.url),
+            return standing(
+                status,
+                AxError::failure(
+                    AxCode::CredentialMissing,
+                    "call an mcp server",
+                    format!("{}: the server answered {status}", self.url),
+                ),
             )
             .with_recovery(
                 "this server wants an account; store its key in the vault and name it in \
@@ -255,12 +258,27 @@ impl HttpServer {
         }
         // The body is not quoted: a server's error page is other
         // people's text and this refusal is read by a person.
-        AxError::failure(
-            AxCode::ToolUnavailable,
-            "call an mcp server",
-            format!("{}: the server answered {status}", self.url),
+        standing(
+            status,
+            AxError::failure(
+                AxCode::ToolUnavailable,
+                "call an mcp server",
+                format!("{}: the server answered {status}", self.url),
+            ),
         )
         .with_recovery("check the url and the header this building configured")
+    }
+}
+
+/// What a refused status says about the account and about sending again,
+/// for HTTP and SSE alike (`crates/agent_protocols/Spec.lean` §8-17): a
+/// 401 rejects this account's key, the five retriable statuses say the
+/// server did not handle the request now, and the rest stay `No`.
+pub(super) fn standing(status: u16, draft: kernel::ErrorDraft) -> kernel::ErrorDraft {
+    match status {
+        401 => draft.account_unusable(),
+        408 | 429 | 502 | 503 | 504 => draft.retriable(),
+        _ => draft,
     }
 }
 

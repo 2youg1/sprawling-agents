@@ -222,6 +222,11 @@ impl Laying {
         // into the city's playback exports (`crates/sprawling/Spec.lean` §8-132).
         admitted.push(Box::new(self.playback_tool(site, addr)?));
         admitted.push(Box::new(self.proposal_tool(site, addr, &bound)?));
+        // The city's own way onto the web, to the supplier `[search]`
+        // names (`crates/accounting/spec/Connectors.lean` §8-35).
+        if let Some(search) = self.search_tool(site)? {
+            admitted.push(Box::new(search));
+        }
         admitted.extend(self.outside_tools(site)?);
         for tool in admitted {
             held(&catalog, "lay out the catalog")?.admit_tool(tool.meta())?;
