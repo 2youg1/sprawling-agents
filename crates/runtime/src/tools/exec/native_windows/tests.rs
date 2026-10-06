@@ -192,51 +192,6 @@ fn native_windows_disposable_cancellation_owns_the_tree() {
 }
 
 #[test]
-#[ignore = "writes AppContainer profiles and disposable ACLs; explicit Windows Actions acceptance only"]
-fn native_windows_disposable_pwsh_initializes_network_types() {
-    assert_eq!(std::env::var("SPRAWLING_DISPOSABLE_NATIVE").unwrap(), "1");
-    let copy = tempfile::tempdir().unwrap();
-    let backlog = crate::Backlog::with_window(crate::PollBudget::new(6_000, 20));
-    for (index, program) in ["powershell.exe", "pwsh"].into_iter().enumerate() {
-        let mut command = Command::new(program);
-        command.env_clear().env("PATH", std::env::var_os("PATH").unwrap())
-        .current_dir(copy.path()).args(["-NoLogo", "-NoProfile", "-NonInteractive", "-Command",
-            "$ErrorActionPreference='Stop'; [System.Net.ServicePointManager]::SecurityProtocol | Out-Null; [System.Diagnostics.Process]::GetCurrentProcess().PriorityClass"]);
-        let result = backlog
-            .run_native(
-                RunId::from_bytes([u8::try_from(index + 0x73).unwrap(); 16]),
-                &Address::parse("work").unwrap(),
-                "pwsh initialization".to_owned(),
-                command,
-            )
-            .unwrap();
-        let result = match result {
-            crate::Started::Settled {
-                exit,
-                stdout,
-                stderr,
-                ceiling,
-            } => crate::Started::Settled {
-                exit,
-                stdout: stdout.trim().to_owned(),
-                stderr,
-                ceiling,
-            },
-            background @ crate::Started::Backgrounded { .. } => background,
-        };
-        assert_eq!(
-            result,
-            crate::Started::Settled {
-                exit: crate::Exit::Ended { code: 0 },
-                stdout: "BelowNormal".to_owned(),
-                stderr: String::new(),
-                ceiling: None,
-            }
-        );
-    }
-}
-
-#[test]
 fn native_memory_is_unrequested_without_a_user_ceiling() {
     for shares in [Shares::Unset, Shares::Cpu] {
         assert_eq!(limits(shares).unwrap().memory, None);

@@ -176,3 +176,12 @@ pub(crate) fn denied(action: &str, detail: impl std::fmt::Display) -> AxError {
     reason = "disposable native conformance test code"
 )]
 mod tests;
+
+#[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    reason = "disposable framework initialization diagnostics"
+)]
+mod initialization;
