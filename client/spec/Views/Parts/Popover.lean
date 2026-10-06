@@ -15,6 +15,10 @@ import client.spec.Views.Parts
 1. **换列把游标复位到第 0 行，列号留在列之内**（`a_new_column_starts_at_its_top`）。
 2. **游标钳在当前列两端**（`a_move_stays_inside`）。
 3. **Enter 应用的是当前列的游标行**（`enter_applies_the_cursor_of_this_column`）。
+4. **能装进视口的活动行完整可见**（`a_fitting_row_is_visible`）。
+5. **非空视口与非空活动行相交**（`a_nonempty_viewport_reaches_the_row`）。
+
+列表持焦与 `bind` 文本框持焦共用活动行的可见性规则，滚动不取焦、不移动其他列或外层页面。坐标模型使用有序的非负离散单位；浏览器检查负责 DOM 的实际行高、亚像素坐标、焦点保持与按键到滚动的接线。
 -/
 
 namespace Client.Views.Parts.Popover
@@ -45,6 +49,33 @@ def press (columns : Nat) (rows : Nat → Nat) (s : State) : Key → State
   | .finish => { s with cursor := rows s.column - 1 }
   | .tab => ⟨wrap columns s.column .forward, 0⟩
   | .shiftTab => ⟨wrap columns s.column .backward, 0⟩
+
+/-- D1：DOM 更新后让活动行可见，只滚动当前列；最近的可见边界保留其余行的位置，过高的行露出行首。
+`top` 与 `bottom` 是行在列内容中的边界，`scroll` 是视口起点，`height` 是视口高度。 -/
+def reveal (top bottom scroll height : Nat) : Nat :=
+  if top < scroll ∨ height < bottom - top then top
+  else if scroll + height < bottom then bottom - height
+  else scroll
+
+/-- 对每一个能容纳整行的视口，滚动后的两条边界包住活动行。 -/
+theorem a_fitting_row_is_visible (top bottom scroll height : Nat)
+    (fits : bottom ≤ top + height) :
+    reveal top bottom scroll height ≤ top ∧
+      bottom ≤ reveal top bottom scroll height + height := by
+  unfold reveal
+  split
+  · omega
+  · split <;> omega
+
+/-- 任意初始滚动位置下，非空视口都与非空行相交，包括视口容纳不了整行的情况。 -/
+theorem a_nonempty_viewport_reaches_the_row (top bottom scroll height : Nat)
+    (row : top < bottom) (viewport : 0 < height) :
+    reveal top bottom scroll height < bottom ∧
+      top < reveal top bottom scroll height + height := by
+  unfold reveal
+  split
+  · omega
+  · split <;> omega
 
 /-- Enter 应用哪一行：当前列与它的游标。 -/
 def applied (s : State) : Nat × Nat := (s.column, s.cursor)

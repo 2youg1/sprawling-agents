@@ -17,7 +17,7 @@
   // key table either way, which is the point.
 
   import type { Snippet } from "svelte";
-  import { onDestroy } from "svelte";
+  import { onDestroy, tick } from "svelte";
 
   import type { Key } from "../../core/lang";
   import { say } from "../../core/lang";
@@ -124,7 +124,7 @@
   // is claimed here in both modes: a column change is what Tab means
   // inside this dialog, and a caller that wants Tab for something else
   // takes it before forwarding, as the composer's completion does.
-  const keys = (event: KeyboardEvent): boolean => {
+  const press = (event: KeyboardEvent): boolean => {
     if (event.key === "ArrowDown") {
       move(1);
       return true;
@@ -154,6 +154,24 @@
       return true;
     }
     return false;
+  };
+  const revealCursor = (): void => {
+    const list = lists.at(heldColumn);
+    const item = activeId === null ? null : document.getElementById(activeId);
+    if (rows.at(heldRow) === undefined || list === undefined || list === null || item === null) return;
+    const viewport = list.getBoundingClientRect();
+    const bounds = item.getBoundingClientRect();
+    if (bounds.top < viewport.top || bounds.height > viewport.height) {
+      list.scrollTop += bounds.top - viewport.top;
+    } else if (bounds.bottom > viewport.bottom) {
+      list.scrollTop += bounds.bottom - viewport.bottom;
+    }
+  };
+  const keys = (event: KeyboardEvent): boolean => {
+    const used = press(event);
+    // A clamped key still reveals a cursor scrolled out by the wheel.
+    if (used) void tick().then(revealCursor);
+    return used;
   };
   const down = (event: KeyboardEvent): void => {
     if (keys(event)) event.preventDefault();
@@ -185,6 +203,7 @@
   $effect(() => {
     bind?.({ keys, pointColumn, controls: columns.map((_pane, at) => listSeat(at)) });
   });
+  $effect(revealCursor);
   $effect(() => {
     onCursorChange?.(activeId);
   });

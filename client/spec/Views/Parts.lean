@@ -118,7 +118,7 @@
 
 `combobox.svelte` 的 `aria-*`（规格）：文本框是 `role="combobox"`，带 `aria-expanded`、`aria-controls` 指向列表、`aria-activedescendant` 指向游标行；列表 `role="listbox"` ＋ `aria-label`；每行 `role="option"`，`aria-selected` 只标**已选中的那个值**，不标游标。今天的实现把 `aria-haspopup="listbox"` ＋ `aria-expanded` 放在触发按钮上、过滤框没有角色、游标只有底色——见 7-8 第 1 条。
 
-`popover.svelte` 的 `aria-*`（规格）：外层 `role="dialog"` ＋ `aria-label`；每列 `<ul role="listbox">` ＋ `aria-label`；每行 `role="option"`。**`aria-selected` 在两个部件里必须说同一件事——「这是当前生效的值」**，游标一律由持焦元素的 `aria-activedescendant` 承担；今天 `popover.svelte` 用 `aria-selected` 标游标，而真正生效的那一项只有一个圆点（7-8 第 3 条）。两种触发各有一条焦点路：按钮触发时列表自己取焦（`tabindex` 只给当前列 `0`）；文本框触发时调用方经 `bind` 拿走键表，焦点留在文本框里，此时 `aria-activedescendant` 必须写在那个文本框上（7-8 第 4 条）。
+`popover.svelte` 的 `aria-*`：外层 `role="dialog"` ＋ `aria-label`；每列 `<ul role="listbox">` ＋ `aria-label`；每行 `role="option"`。`aria-selected` 表示当前生效的值，游标由持焦元素的 `aria-activedescendant` 承担。按钮触发时列表取焦，`tabindex` 只给当前列 `0`；文本框触发时调用方经 `bind` 拿走键表，焦点留在文本框，`aria-activedescendant` 写在文本框上。菜单仍存在时，两条路径都在活动行或数据变化，以及键表采纳按键后的 DOM 更新完成后，将该行滚入当前列的视口；能容纳整行时露出整行，行高超过视口时露出行首，不改变持焦元素或外层页面位置。几何规则与证明在 `client/spec/Views/Parts/Popover.lean`。
 -/
 
 /-!
