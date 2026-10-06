@@ -6107,6 +6107,10 @@
     "en": "Check the provider's key and status on the model settings page, then send again.",
     "zh": "在模型设置页面检查供应方的密钥和状态，然后再发一次。"
   },
+  "recover_e_provider_accounts_exhausted": {
+    "en": "Every account of this provider was refused or holds no key. Store a key, add credit, or add another account in settings, then send again.",
+    "zh": "这个供应方的每个账号都被拒了，或者没存密钥。在设置里存入密钥、充值，或者再加一个账号，然后再发一次。"
+  },
   "recover_e_evidence_missing": {
     "en": "Let the run show the work first: a test, a diff or a file it wrote.",
     "zh": "先让 run 拿出做过的证据：一次测试、一份改动或它写下的文件。"

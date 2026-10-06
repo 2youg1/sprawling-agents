@@ -23,7 +23,7 @@ pub enum Carrier {
 /// Extension is additive only; the wire spelling lives in [`AxCode::as_str`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum AxCode {
-    // Base table (15).
+    // Base table (16).
     PathNotFound,
     ToolUnknown,
     ToolUnavailable,
@@ -34,6 +34,11 @@ pub enum AxCode {
     BudgetExhausted,
     Timeout,
     Provider,
+    /// Every account of one provider was tried or could not be redeemed
+    /// in one round (`crates/kernel/spec/AccountRecovery.lean` §8-86).
+    /// Apart from `Provider` because its recovery differs: a stored key,
+    /// added credit or another account mends it, and waiting does not.
+    ProviderAccountsExhausted,
     EvidenceMissing,
     LoopSuspected,
     LocatorInvalid,
@@ -101,7 +106,7 @@ pub enum AxCode {
 impl AxCode {
     /// Every code, in the order the SPEC table lists them. Data face for tests and
     /// `xtask specalign`.
-    pub const ALL: [AxCode; 41] = [
+    pub const ALL: [AxCode; 42] = [
         AxCode::PathNotFound,
         AxCode::ToolUnknown,
         AxCode::ToolUnavailable,
@@ -112,6 +117,7 @@ impl AxCode {
         AxCode::BudgetExhausted,
         AxCode::Timeout,
         AxCode::Provider,
+        AxCode::ProviderAccountsExhausted,
         AxCode::EvidenceMissing,
         AxCode::LoopSuspected,
         AxCode::LocatorInvalid,
@@ -158,6 +164,7 @@ impl AxCode {
             AxCode::BudgetExhausted => "E_BUDGET_EXHAUSTED",
             AxCode::Timeout => "E_TIMEOUT",
             AxCode::Provider => "E_PROVIDER",
+            AxCode::ProviderAccountsExhausted => "E_PROVIDER_ACCOUNTS_EXHAUSTED",
             AxCode::EvidenceMissing => "E_EVIDENCE_MISSING",
             AxCode::LoopSuspected => "E_LOOP_SUSPECTED",
             AxCode::LocatorInvalid => "E_LOCATOR_INVALID",
@@ -216,7 +223,9 @@ impl AxCode {
             AxCode::ApprovalDenied => Carrier::Event(EventKind::ApprovalResolved),
             AxCode::BudgetExhausted => Carrier::Event(EventKind::BudgetLimit),
             AxCode::LoopSuspected => Carrier::Event(EventKind::WatchdogFired),
-            AxCode::Provider => Carrier::Event(EventKind::ProviderDegraded),
+            AxCode::Provider | AxCode::ProviderAccountsExhausted => {
+                Carrier::Event(EventKind::ProviderDegraded)
+            }
             AxCode::EndpointDialectUnsupported => Carrier::Event(EventKind::EndpointLost),
             AxCode::ConfigInvalid
             | AxCode::CasCorrupt

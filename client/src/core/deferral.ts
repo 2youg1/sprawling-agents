@@ -36,6 +36,7 @@ const URGENCY: Readonly<Record<AxCode, Urgency>> = {
   // city can speak to is in place.
   E_MODEL_UNCHOSEN: "needs_you",
   E_CREDENTIAL_MISSING: "needs_you",
+  E_PROVIDER_ACCOUNTS_EXHAUSTED: "needs_you",
   E_ENDPOINT_DIALECT_UNSUPPORTED: "needs_you",
   // The room is frozen against its session: only `/new` or `/fork`,
   // which the person types, moves it.

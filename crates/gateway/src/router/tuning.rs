@@ -28,7 +28,7 @@ use kernel::Retries;
 
 /// What every endpoint is called with until a person says otherwise.
 ///
-/// **The one home of these three figures.** A form that printed its own
+/// **The one home of these four figures.** A form that printed its own
 /// numbers into empty boxes made an endpoint attached from a form
 /// behave differently from one attached from a configuration file,
 /// while the person had filled in nothing either way; the form shows
@@ -43,6 +43,10 @@ pub struct TuningDefaults {
     /// is held to the same bound as a settled call, which is the only
     /// figure this city can state without inventing one.
     pub stream_idle_timeout_ms: Option<u64>,
+    /// How many more times one account is asked the same request before
+    /// the round moves to the next account; read only where an endpoint
+    /// or a search supplier lists two accounts or more.
+    pub account_retries: kernel::account_recovery::AccountRetries,
 }
 
 /// How a person set one endpoint up.
@@ -96,6 +100,7 @@ impl EndpointTuning {
         timeout_ms: 120_000,
         retries: Retries::UntilHalted,
         stream_idle_timeout_ms: None,
+        account_retries: kernel::account_recovery::AccountRetries::Two,
     };
 
     /// How long one settled call to this endpoint may take.
