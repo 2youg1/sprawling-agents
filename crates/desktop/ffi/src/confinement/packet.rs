@@ -16,7 +16,8 @@ const BACKSLASH: u16 = 92;
 const INVALID_PARAMETER: u32 = 87;
 
 pub(super) fn encode(launch: &Launch) -> Result<Vec<u16>, Failure> {
-    if launch.cpu_rate.get() > 10_000
+    if launch.declared_roots > launch.toolchain_roots.len()
+        || launch.cpu_rate.get() > 10_000
         || launch.profile.is_empty()
         || launch.profile.len() > 64
         || !launch

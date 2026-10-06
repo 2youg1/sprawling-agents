@@ -84,7 +84,7 @@ pub(crate) fn launch(
     let profile = output
         .file_name()
         .ok_or_else(|| denied("name native profile", "output directory has no name"))?;
-    let toolchain_roots = environment
+    let mut toolchain_roots = environment
         .iter()
         .filter(|(name, _)| {
             name.eq_ignore_ascii_case("CARGO_HOME") || name.eq_ignore_ascii_case("RUSTUP_HOME")
@@ -95,8 +95,29 @@ pub(crate) fn launch(
                 .map_err(|err| denied("resolve declared toolchain home", err))
         })
         .collect::<Result<Vec<_>, _>>()?;
+    let declared_roots = toolchain_roots.len();
+    let mut pending = toolchain_roots.clone();
+    while let Some(directory) = pending.pop() {
+        for entry in std::fs::read_dir(&directory)
+            .map_err(|err| denied("enumerate declared toolchain home", err))?
+        {
+            let entry = entry.map_err(|err| denied("read declared toolchain entry", err))?;
+            let kind = entry
+                .file_type()
+                .map_err(|err| denied("read toolchain entry type", err))?;
+            if kind.is_symlink() {
+                continue;
+            }
+            let path = entry.path();
+            if kind.is_dir() {
+                pending.push(path.clone());
+            }
+            toolchain_roots.push(path);
+        }
+    }
     let request = Launch {
         toolchain_roots,
+        declared_roots,
         program,
         args: command
             .get_args()

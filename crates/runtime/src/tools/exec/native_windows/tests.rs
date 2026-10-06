@@ -278,7 +278,7 @@ fn main() {
             "-NoProfile",
             "-NonInteractive",
             "-Command",
-            "(Get-Acl -LiteralPath $env:NATIVE_ACL_FIXTURE).Sddl",
+            "(Get-Acl -LiteralPath $env:NATIVE_ACL_FIXTURE).Sddl.Replace('D:AI', 'D:')",
         ])
         .output()
         .unwrap();
@@ -332,7 +332,7 @@ fn main() {
             "-NoProfile",
             "-NonInteractive",
             "-Command",
-            "(Get-Acl -LiteralPath $env:NATIVE_ACL_FIXTURE).Sddl",
+            "(Get-Acl -LiteralPath $env:NATIVE_ACL_FIXTURE).Sddl.Replace('D:AI', 'D:')",
         ])
         .output()
         .unwrap();

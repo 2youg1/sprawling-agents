@@ -22,6 +22,8 @@ pub struct Launch {
     pub environment: BTreeMap<OsString, OsString>,
     /// Explicitly declared homes; only this profile receives read/execute.
     pub toolchain_roots: Vec<PathBuf>,
+    /// Initial entries are declared roots; remaining entries are their descendants.
+    pub declared_roots: usize,
     /// The run Job is owned by the backlog; assignment occurs before resume.
     pub parent_job: NonZeroUsize,
     /// Hundredths of a percent of the machine's CPU, from 1 to 10,000.
@@ -92,6 +94,7 @@ struct Record {
     profile_created: usize,
     grant_paths: usize,
     grant_units: usize,
+    grant_roots: usize,
     failure_phase: [u8; 32],
 }
 
@@ -171,6 +174,7 @@ pub fn launch(launch: &Launch) -> Result<OwnedProcess, Failure> {
     let mut record = Record {
         cpu: usize::from(launch.cpu_rate.get()),
         parent_job: launch.parent_job.get(),
+        grant_roots: launch.declared_roots,
         ..Record::default()
     };
     // SAFETY: text and record are live, exclusively borrowed buffers with the
@@ -414,6 +418,7 @@ mod tests {
             stderr: PathBuf::from("err"),
             environment: BTreeMap::new(),
             toolchain_roots: Vec::new(),
+            declared_roots: 0,
             cpu_rate: NonZeroU16::MIN,
             parent_job: NonZeroUsize::MIN,
         }

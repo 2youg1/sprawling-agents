@@ -371,7 +371,7 @@ WindowsSandbox.exe present: False
 
 | 平台 | 缺省 | 可选 |
 |---|---|---|
-| Windows | `native`：Job Object 加 AppContainer（exec），Job Object（居民）；SB1 第 3 条落地之前解出 `copied_tree` 并照实说 | `copied_tree`、`container`（Docker Desktop 或 Podman Desktop，要另装）、`python`、`none` |
+| Windows | `copied_tree`；缺省读取 wire D26，SB1 第 3 条六项 native 回归通过之前保持这一选择 | `native`（Job Object 加 AppContainer 的 exec，Job Object 的居民）、`container`（Docker Desktop 或 Podman Desktop，要另装）、`python`、`none` |
 | macOS | `copied_tree`，缺省读取 wire D26 | `native`（Seatbelt，文件写入与网络；其余三轴不保，见 D40）、`container`（Docker Desktop 或 Podman Desktop，要另装）、`python`、`none` |
 | Linux | `native`：`bwrap`；没有 `bwrap` 时解出 `copied_tree` 并照实说 | `copied_tree`、`container`（rootless Podman 或 Docker，要另装；gVisor 作为它的运行时）、`python`、`none` |
 
