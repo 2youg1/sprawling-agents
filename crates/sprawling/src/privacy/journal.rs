@@ -73,6 +73,8 @@ mod tests {
     use super::*;
     use std::num::NonZeroU64;
 
+    const PRIVATE_INPUT: &str = "fixture-private-principal";
+
     fn intent(operation: u64, original: RawValue) -> Intent {
         let modified = RawValue::Present {
             kind: 1,
@@ -257,10 +259,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("fixture.jsonl");
         let prepared = prepared(intent(1, RawValue::Absent { key_existed: true }));
-        for (schema, owner) in [
-            (SCHEMA, "fixture-private-principal"),
-            (1, "secret:privacy/fixture-owner"),
-        ] {
+        for (schema, owner) in [(SCHEMA, PRIVATE_INPUT), (1, "secret:privacy/fixture-owner")] {
             let mut line = serde_json::to_value(&prepared).unwrap();
             *line.pointer_mut("/schema").unwrap() = serde_json::json!(schema);
             *line.pointer_mut("/event/intent/owner").unwrap() = serde_json::json!(owner);
@@ -282,13 +281,10 @@ mod tests {
                     .unwrap()
                     .as_object_mut()
                     .unwrap()
-                    .insert(
-                        "fixture-private-principal".to_owned(),
-                        serde_json::json!(true),
-                    );
+                    .insert(PRIVATE_INPUT.to_owned(), serde_json::json!(true));
             } else {
                 *line.pointer_mut(&format!("/event/intent/{field}")).unwrap() =
-                    serde_json::json!("fixture-private-principal");
+                    serde_json::json!(PRIVATE_INPUT);
             }
             let mut before = serde_json::to_vec(&line).unwrap();
             before.push(b'\n');
@@ -296,9 +292,9 @@ mod tests {
                 Ok(_) => panic!("private input accepted"),
                 Err(fault) => fault,
             };
-            assert!(!format!("{fault:?}").contains("fixture-private-principal"));
+            assert!(!format!("{fault:?}").contains(PRIVATE_INPUT));
             let fault = fault.into_ax();
-            assert!(!fault.to_string().contains("fixture-private-principal"));
+            assert!(!fault.to_string().contains(PRIVATE_INPUT));
             assert_eq!(fault.code(), &kernel::AxCode::StorageFatal);
             assert!(fault.subject().contains("column"));
         }
