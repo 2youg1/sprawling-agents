@@ -70,7 +70,7 @@ pub fn adapter_for(
     Ok(Box::new(
         endpoint.gated(chosen.transport, monotonic).with_accounts(
             chosen.endpoint.name.clone(),
-            chosen.endpoint.tuning.accounts.clone().unwrap_or_default(),
+            chosen.endpoint.account_auths()?,
         ),
     ))
 }
@@ -276,13 +276,17 @@ mod tests {
             .unwrap()
             .clone();
         let mut book = crate::router::EndpointBook::new();
-        book.apply_payload(
+        book.absorb(
             kernel::EventKind::EndpointAttached,
+            kernel::RunId::CITY,
+            None,
             &crate::router::attached_payload(&endpoint).unwrap(),
         )
         .unwrap();
-        book.apply_payload(
+        book.absorb(
             kernel::EventKind::ModelSelected,
+            kernel::RunId::CITY,
+            None,
             &crate::router::selected_payload(kernel::ModelTag::Main, "local", &entry, None)
                 .unwrap(),
         )

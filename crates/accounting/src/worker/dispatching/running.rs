@@ -94,7 +94,7 @@ impl RunWorker {
                     .map_or(kernel::model::AccountSelection::First, |id| {
                         kernel::model::AccountSelection::Preferred(id.clone())
                     });
-                agreed.adapter.select_account(selection)?;
+                agreed.adapter.select_account(selection);
                 agreed
             }
             // A harness freezes no model and no effort into the room: it

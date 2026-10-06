@@ -113,21 +113,41 @@ impl AttachedEndpoint {
     /// # Errors
     /// Refuses an invalid explicit account list rather than using the old key.
     pub fn first_auth(&self) -> Result<AuthSpec, kernel::AxError> {
+        Ok(self
+            .account_auths()?
+            .into_iter()
+            .next()
+            .map_or_else(|| self.auth.clone(), |(_, auth)| auth))
+    }
+
+    /// Every declared account with the credential it calls with, in
+    /// priority order; empty for a registration that declares none. The
+    /// one place an account becomes a credential header, so the first
+    /// call and a Session's later selection cannot disagree on it.
+    ///
+    /// # Errors
+    /// Refuses an invalid explicit account list rather than using the old key.
+    pub(crate) fn account_auths(
+        &self,
+    ) -> Result<Vec<(kernel::ServerLabel, AuthSpec)>, kernel::AxError> {
         super::tuning::validate_accounts(self.tuning.accounts.as_deref())?;
-        match self
+        Ok(self
             .tuning
             .accounts
-            .as_ref()
-            .and_then(|accounts| accounts.first())
-        {
-            Some(account) => Ok(match &account.reference {
-                Some(reference) => {
-                    AuthSpec::for_dialect(self.dialect, reference.clone(), account.header.clone())
-                }
-                None => AuthSpec::None,
-            }),
-            None => Ok(self.auth.clone()),
-        }
+            .iter()
+            .flatten()
+            .map(|account| {
+                let auth = match &account.reference {
+                    Some(reference) => AuthSpec::for_dialect(
+                        self.dialect,
+                        reference.clone(),
+                        account.header.clone(),
+                    ),
+                    None => AuthSpec::None,
+                };
+                (account.id.clone(), auth)
+            })
+            .collect())
     }
 
     /// What to call this endpoint on screen: the label the person gave

@@ -115,13 +115,23 @@ impl EndpointBook {
         self.absorb(record.kind(), record.run(), record.addr(), record.data())
     }
 
-    /// Folds both registration and successful Session account affinity.
-    /// `RunStarted` admits each Run to its room's current Session.
-    /// `SessionOpened` revokes the room's old Runs; their subsequent calls
-    /// and answers cannot bind, even when the answer carries an address.
+    /// The same fold, for the writer that has the payload in hand and
+    /// not yet a record. Both entry points read the payload with one
+    /// reader, so what the writer believes and what a rebuild produces
+    /// cannot drift.
+    ///
+    /// Besides registrations it folds successful Session account
+    /// affinity: `RunStarted` admits each Run to its room's current
+    /// Session, `ModelCalled` holds a member's last attempted account,
+    /// `ModelReturned` commits it, and `SessionOpened` revokes the room's
+    /// old Runs, whose later calls and answers then cannot bind.
     ///
     /// # Errors
     /// Propagates unreadable owned records before making a decision from them.
+    #[expect(
+        clippy::wildcard_enum_match_arm,
+        reason = "three kinds move registrations and five move Session affinity; the rest of the vocabulary passes through"
+    )]
     pub fn absorb(
         &mut self,
         kind: EventKind,
@@ -129,72 +139,6 @@ impl EndpointBook {
         addr: Option<&kernel::Address>,
         data: &Payload,
     ) -> Result<(), AxError> {
-        self.apply_payload(kind, data)?;
-        if kind == EventKind::RunStarted {
-            if let Some(addr) = addr {
-                self.session_rooms.insert(run, addr.clone());
-            }
-        } else if kind == EventKind::ModelCalled {
-            let called: kernel::event::record::ModelCalled = data.read()?;
-            if !self.session_rooms.contains_key(&run) {
-                return Ok(());
-            }
-            if let Some(binding) = called.provider_account {
-                self.attempts.insert(run, binding);
-            } else {
-                self.attempts.remove(&run);
-            }
-        } else if kind == EventKind::ModelReturned {
-            if let Some(addr) = self.session_rooms.get(&run)
-                && let Some(binding) = self.attempts.remove(&run)
-            {
-                self.affinity
-                    .entry(addr.clone())
-                    .or_default()
-                    .insert(binding.provider, binding.account);
-            }
-        } else if kind == EventKind::SessionOpened {
-            if let Some(addr) = addr {
-                self.affinity.remove(addr);
-                self.session_rooms.retain(|run, room| {
-                    if room == addr {
-                        self.attempts.remove(run);
-                        false
-                    } else {
-                        true
-                    }
-                });
-            }
-        } else if kind == EventKind::RunFrozen {
-            self.attempts.remove(&run);
-            self.session_rooms.remove(&run);
-        }
-        Ok(())
-    }
-
-    /// The account which last answered successfully in this Session.
-    pub fn session_account(
-        &self,
-        addr: &kernel::Address,
-        provider: &str,
-    ) -> Option<&kernel::ServerLabel> {
-        self.affinity
-            .get(addr)
-            .and_then(|bindings| bindings.get(provider))
-    }
-
-    /// The same fold, for the writer that has the payload in hand and
-    /// not yet a record. Both entry points read the payload with one
-    /// reader, so what the writer believes and what a rebuild produces
-    /// cannot drift.
-    ///
-    /// # Errors
-    /// As [`EndpointBook::apply`].
-    #[expect(
-        clippy::wildcard_enum_match_arm,
-        reason = "four kinds move an endpoint book; the rest of the vocabulary passes through"
-    )]
-    pub fn apply_payload(&mut self, kind: EventKind, data: &Payload) -> Result<(), AxError> {
         match kind {
             EventKind::EndpointAttached => {
                 let mut attached = read_attached(data)?;
@@ -204,7 +148,6 @@ impl EndpointBook {
                     attached.name.clone(),
                     Held::from(Kept { endpoint: attached }),
                 );
-                Ok(())
             }
             EventKind::EndpointLost => {
                 let EndpointLost { name } = data.read()?;
@@ -214,17 +157,70 @@ impl EndpointBook {
                     !bindings.is_empty()
                 });
                 self.chosen.retain(|_, choice| choice.endpoint != name);
-                Ok(())
             }
             EventKind::ModelSelected => {
                 let (tag, choice) = read_choice(data)?;
                 self.chosen.insert(tag, choice);
-                Ok(())
+            }
+            EventKind::RunStarted => {
+                if let Some(addr) = addr {
+                    self.session_rooms.insert(run, addr.clone());
+                }
+            }
+            EventKind::ModelCalled => {
+                let called: kernel::event::record::ModelCalled = data.read()?;
+                if self.session_rooms.contains_key(&run) {
+                    match called.provider_account {
+                        Some(binding) => self.attempts.insert(run, binding),
+                        None => self.attempts.remove(&run),
+                    };
+                }
+            }
+            EventKind::ModelReturned => {
+                if let Some(addr) = self.session_rooms.get(&run)
+                    && let Some(binding) = self.attempts.remove(&run)
+                {
+                    self.affinity
+                        .entry(addr.clone())
+                        .or_default()
+                        .insert(binding.provider, binding.account);
+                }
+            }
+            EventKind::SessionOpened => {
+                if let Some(addr) = addr {
+                    self.affinity.remove(addr);
+                    self.session_rooms.retain(|run, room| {
+                        if room == addr {
+                            self.attempts.remove(run);
+                            false
+                        } else {
+                            true
+                        }
+                    });
+                }
+            }
+            EventKind::RunFrozen => {
+                self.attempts.remove(&run);
+                self.session_rooms.remove(&run);
             }
             // The rest of the vocabulary says nothing about which
-            // endpoint answers, which is what this book holds.
-            _ => Ok(()),
+            // endpoint answers, or with which account, which is what
+            // this book holds.
+            _ => {}
         }
+        Ok(())
+    }
+
+    /// The account which last answered successfully in this Session.
+    #[must_use]
+    pub fn session_account(
+        &self,
+        addr: &kernel::Address,
+        provider: &str,
+    ) -> Option<&kernel::ServerLabel> {
+        self.affinity
+            .get(addr)
+            .and_then(|bindings| bindings.get(provider))
     }
 
     /// The model for one tag under one building's policy.
@@ -572,8 +568,13 @@ mod tests {
         );
         let mut book = EndpointBook::new();
         assert!(
-            book.apply_payload(EventKind::EndpointAttached, &Payload::new(payload).unwrap())
-                .is_err(),
+            book.absorb(
+                EventKind::EndpointAttached,
+                RunId::CITY,
+                None,
+                &Payload::new(payload).unwrap()
+            )
+            .is_err(),
             "an invalid explicit account must not silently fall back to legacy auth"
         );
         assert!(book.is_empty());
@@ -594,20 +595,26 @@ mod tests {
         let mut endpoint = attached("house", "http://127.0.0.1:11434/v1");
         endpoint.tuning.accounts = Some(accounts());
         let mut book = EndpointBook::new();
-        book.apply_payload(
+        book.absorb(
             EventKind::EndpointAttached,
+            RunId::CITY,
+            None,
             &attached_payload(&endpoint).unwrap(),
         )
         .unwrap();
         endpoint.tuning.accounts.as_mut().unwrap().reverse();
-        book.apply_payload(
+        book.absorb(
             EventKind::EndpointAttached,
+            RunId::CITY,
+            None,
             &attached_payload(&endpoint).unwrap(),
         )
         .unwrap();
         endpoint.tuning.accounts = None;
-        book.apply_payload(
+        book.absorb(
             EventKind::EndpointAttached,
+            RunId::CITY,
+            None,
             &attached_payload(&endpoint).unwrap(),
         )
         .unwrap();
@@ -635,8 +642,13 @@ mod tests {
         let mut payload = attached_payload(kept).unwrap().as_map().clone();
         payload.get_mut("tuning").unwrap()["accounts"][0]["reference"] = serde_json::json!("plain");
         assert!(
-            book.apply_payload(EventKind::EndpointAttached, &Payload::new(payload).unwrap())
-                .is_err()
+            book.absorb(
+                EventKind::EndpointAttached,
+                RunId::CITY,
+                None,
+                &Payload::new(payload).unwrap()
+            )
+            .is_err()
         );
     }
 
@@ -690,6 +702,40 @@ mod tests {
         )
         .unwrap();
         assert!(book.session_account(&addr, "house").is_none());
+    }
+    #[test]
+    fn old_run_answer_must_not_bind_a_new_session() {
+        let mut book = EndpointBook::new();
+        let room = kernel::Address::parse("lab/room1").unwrap();
+        let old_run = RunId::from_bytes([2; 16]);
+        book.absorb(
+            EventKind::RunStarted,
+            old_run,
+            Some(&room),
+            &Payload::empty(),
+        )
+        .unwrap();
+        let called = Payload::of(&kernel::event::record::ModelCalled {
+            model: "fixture".to_owned(),
+            segments: Vec::new(),
+            provider_account: Some(kernel::event::record::ProviderAccountBinding {
+                provider: "house".to_owned(),
+                account: kernel::ServerLabel::parse("old").unwrap(),
+            }),
+        })
+        .unwrap();
+        book.absorb(EventKind::ModelCalled, old_run, None, &called)
+            .unwrap();
+        book.absorb(
+            EventKind::SessionOpened,
+            RunId::CITY,
+            Some(&room),
+            &Payload::empty(),
+        )
+        .unwrap();
+        book.absorb(EventKind::ModelReturned, old_run, None, &Payload::empty())
+            .unwrap();
+        assert_eq!(book.session_account(&room, "house"), None);
     }
     proptest::proptest! {
         #[test]

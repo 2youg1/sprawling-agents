@@ -225,8 +225,10 @@ pub(crate) struct Gated {
     endpoint: Endpoint,
     gate: Arc<Gate>,
     monotonic: fn() -> Instant,
+    /// The Provider the accounts belong to; empty while `accounts` is.
     provider: String,
-    accounts: Vec<kernel::event::record::ProviderAccount>,
+    /// The declared accounts in priority order, each with its credential.
+    accounts: Vec<(kernel::ServerLabel, super::AuthSpec)>,
     active: usize,
 }
 
@@ -245,7 +247,7 @@ impl Gated {
     pub(super) fn with_accounts(
         mut self,
         provider: String,
-        accounts: Vec<kernel::event::record::ProviderAccount>,
+        accounts: Vec<(kernel::ServerLabel, super::AuthSpec)>,
     ) -> Gated {
         self.provider = provider;
         self.accounts = accounts;
@@ -256,16 +258,6 @@ impl Gated {
         &mut self,
         door: impl FnOnce(&mut Endpoint) -> Result<ModelReturn, AxError>,
     ) -> Result<ModelReturn, AxError> {
-        if let Some(account) = self.accounts.get(self.active) {
-            self.endpoint.config.auth = match &account.reference {
-                Some(reference) => super::AuthSpec::for_dialect(
-                    self.endpoint.config.dialect,
-                    reference.clone(),
-                    account.header.clone(),
-                ),
-                None => super::AuthSpec::None,
-            };
-        }
         let admitted = self
             .gate
             .admit(self.monotonic, &self.endpoint.config.base_url)?;
@@ -277,27 +269,26 @@ impl Gated {
 
 impl kernel::Model for Gated {
     fn provider_account(&self) -> Option<kernel::event::record::ProviderAccountBinding> {
-        self.accounts.get(self.active).map(|account| {
+        self.accounts.get(self.active).map(|(account, _)| {
             kernel::event::record::ProviderAccountBinding {
                 provider: self.provider.clone(),
-                account: account.id.clone(),
+                account: account.clone(),
             }
         })
     }
 
-    fn select_account(
-        &mut self,
-        selection: kernel::model::AccountSelection,
-    ) -> Result<(), AxError> {
+    fn select_account(&mut self, selection: kernel::model::AccountSelection) {
         self.active = match selection {
             kernel::model::AccountSelection::First => 0,
             kernel::model::AccountSelection::Preferred(id) => self
                 .accounts
                 .iter()
-                .position(|account| account.id == id)
+                .position(|(account, _)| *account == id)
                 .unwrap_or(0),
         };
-        Ok(())
+        if let Some((_, auth)) = self.accounts.get(self.active) {
+            self.endpoint.config.auth = auth.clone();
+        }
     }
 
     fn call(&mut self, req: &ModelRequest) -> Result<ModelReturn, AxError> {

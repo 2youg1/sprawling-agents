@@ -58,7 +58,10 @@ pub type EarlyCalls<'a> = &'a mut dyn FnMut(&ToolCall);
 
 /// How an adapter selects a Session account before its first call.
 pub enum AccountSelection {
+    /// The account with the highest priority: a Session with no
+    /// successful account yet.
     First,
+    /// The account that last answered successfully in this Session.
     Preferred(crate::ServerLabel),
 }
 
@@ -70,12 +73,11 @@ pub trait Model {
     fn provider_account(&self) -> Option<crate::event::record::ProviderAccountBinding> {
         None
     }
-    /// Selects a Session's account without sending a request.
-    /// # Errors
-    /// Propagates the adapter's Vault selection failure.
-    fn select_account(&mut self, _selection: AccountSelection) -> Result<(), AxError> {
-        Ok(())
-    }
+    /// Selects the account every later request of this adapter uses,
+    /// without sending a request; an account the adapter does not declare
+    /// selects its first. The credential is redeemed at call time, so
+    /// selecting cannot fail.
+    fn select_account(&mut self, _selection: AccountSelection) {}
     fn call(&mut self, req: &ModelRequest) -> Result<ModelReturn, AxError>;
 
     /// The same call, reporting text as it arrives.

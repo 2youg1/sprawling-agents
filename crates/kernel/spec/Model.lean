@@ -252,5 +252,6 @@ pub enum ModelTag { Main, Digest, Transcribe, Ocr }   // 线上 "main" | "digest
 
 /-! Model 的账号面：provider_account 返回非秘密 Provider/account 身份；
 select_account 在房间确定后选择成功绑定，缺席或被移除的 ID 选首账号；
+选择只换后续请求所用的凭据引用，不发请求、不兑现 Vault，因此不返回错误；
 无账号适配器保持原行为。ModelCalled 记录尝试，ModelReturned 才提交绑定。
 本接口不规定账号故障转移；失败继续由 runtime 原重试策略处理。 -/

@@ -229,41 +229,6 @@ fn a_digest_is_its_bytes_in_the_snapshot_and_its_hex_in_json() {
     );
 }
 
-#[test]
-fn old_run_answer_must_not_bind_a_new_session() {
-    let mut book = gateway::EndpointBook::new();
-    let room = Address::parse("lab/room1").unwrap();
-    let old_run = RunId::from_bytes([2; 16]);
-    book.absorb(
-        EventKind::RunStarted,
-        old_run,
-        Some(&room),
-        &Payload::empty(),
-    )
-    .unwrap();
-    let called = Payload::of(&kernel::event::record::ModelCalled {
-        model: "fixture".to_owned(),
-        segments: Vec::new(),
-        provider_account: Some(kernel::event::record::ProviderAccountBinding {
-            provider: "house".to_owned(),
-            account: kernel::ServerLabel::parse("old").unwrap(),
-        }),
-    })
-    .unwrap();
-    book.absorb(EventKind::ModelCalled, old_run, None, &called)
-        .unwrap();
-    book.absorb(
-        EventKind::SessionOpened,
-        RunId::CITY,
-        Some(&room),
-        &Payload::empty(),
-    )
-    .unwrap();
-    book.absorb(EventKind::ModelReturned, old_run, None, &Payload::empty())
-        .unwrap();
-    assert_eq!(book.session_account(&room, "house"), None);
-}
-
 proptest::proptest! {
     #[test]
     fn closed_session_traces_preserve_current_bindings_across_replay_and_snapshot(

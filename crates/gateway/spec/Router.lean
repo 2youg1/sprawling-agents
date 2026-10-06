@@ -23,6 +23,7 @@ pub struct AttachedEndpoint { pub name, pub base_url, pub dialect: DialectKind,
 impl AttachedEndpoint {
     pub fn is_local(&self) -> bool;          // 与 client_for 绕开代理同一依据（reach::is_local）
     pub fn first_auth(&self) -> Result<AuthSpec, AxError>; // 原登记或显式列表首账号
+    pub(crate) fn account_auths(&self) -> Result<Vec<(ServerLabel, AuthSpec)>, AxError>; // 按优先级的账号与凭据
     pub fn has_credential(&self) -> bool;    // 关于凭证，金库外只能回答这一问
     pub fn chat_url(&self) -> String;        // base_url ＋ 该兼容格式自己的路径
     pub fn models_url(&self) -> String;
@@ -35,7 +36,6 @@ impl EndpointBook {
     pub fn apply(&mut self, record: &EventRecord) -> Result<(), AxError>;
     pub fn session_account(&self, addr: &Address, provider: &str) -> Option<&ServerLabel>;
     pub fn absorb(&mut self, kind: EventKind, run: RunId, addr: Option<&Address>, data: &Payload) -> Result<(), AxError>;
-    pub fn apply_payload(&mut self, kind: EventKind, data: &Payload) -> Result<(), AxError>;
     pub fn select(&self, tag: ModelTag, policy: &BuildingPolicy) -> Result<Chosen<'_>, AxError>;
     pub fn accounts_for_attachment(&self, name: &str, incoming: Option<Vec<ProviderAccount>>)
         -> Option<Vec<ProviderAccount>>; // 登记与重放共用的缺席保留规则
@@ -50,7 +50,7 @@ pub fn selected_payload(ModelTag, &str, &ModelEntry, Option<CeilingSource>) -> R
 - **三种不答，三个码**：这一类标签没人选过＝`E_MODEL_UNCHOSEN`（出路：去设置页接供应方、选模型）；选过的端点已不在＝`E_CONFIG_INVALID`；confidential 楼的选择会让字节离开运行中的机器＝`E_GATE_DENIED`。「没选」单独成码，因为它是一座新城的第一个状态，客户端要按码给「去设置」，而 `E_CONFIG_INVALID` 在别处还答「会话中途换了模型」，那里的出路是开新对话。
 
 - **为何不是 duty pool**：多 Agent 功能未成形之前，职责池没有消费者，而没人读的权威只会漂。降为 `ModelTag` 两值枚举（`Main`／`Digest`）：**标签因为有人按它取模型而存在**，新增一个标签的前提是先有调用方。
-- **两个入口一个读者**：`apply`（重建路径，手里是 record）与 `apply_payload`（写入路径，手里是刚要写的 payload）共用同一套载荷读取，于是「写者以为的」与「重建得到的」不可能分岔。
+- **两个入口一个读者**：`apply`（重建路径，手里是 record）与 `absorb`（写入路径，手里是刚要写的 kind、run、addr 与 payload）共用同一套载荷读取，于是「写者以为的」与「重建得到的」不可能分岔。
 - **confidential 在选型点再守一次**：非回环 endpoint 对 confidential 楼恒拒（`E_GATE_DENIED`）。`gateway::endpoint` 的兜底拒同期改为**按本地性判定**（而非一律拒）：规则是「字节不出运行中的机器」，不是「不准用这个类型」；否则一个回环的 Anthropic 服务器会被误拒。
 - **路径归兼容格式**：人输入 base URL（provider 文档就是那么印的），`messages`／`chat/completions`／`models` 由兼容格式拼。这与 `EndpointConfig.base_url`「完整端点 URL、不拼路径」并不矛盾：适配器保持字面，拼路径的是上层登记面。
 - **`probed` 是这份 models 的来源，不是端点的健康度**：`true` ＝ `GET .../models` 答了，登记的 id 是对端自己说的；`false` ＝ 探测失败而人自己报了型号，城照登。载荷里缺 `probed` 键读作 `true`，于是没有这个键的 `endpoint_attached` 重放不变。
@@ -76,8 +76,9 @@ endpoint_attached.tuning.accounts 为同一列表的 Ledger 形状，旧记录�
 列表内账号的增加、替换、移除和重排用完整非空列表走原 AttachEndpoint，
 不创建第二个 Provider 数据库；缺席列表不移除已迁移声明。
 保留规则只由 EndpointBook::accounts_for_attachment 决定，登记面与重放均调用它。
-校验住 kernel::event::record::validate_provider_accounts；probe 与 adapter
-从 AttachedEndpoint::first_auth 取得凭据，snapshot 保留同一账号列表，
+校验住 kernel::event::record::validate_provider_accounts；账号到凭据的唯一换算是
+AttachedEndpoint::account_auths，probe 经 first_auth 取首账号，adapter 取整张表供
+Session 选择，snapshot 保留同一账号列表，
 显式列表不回退原 auth。成功回答将非秘密账号 ID 绑定到房间的 Session，
 重排与重启不改变仍在列表中的绑定；新 Session 清除绑定，被移除的绑定回到首账号。
 旧单账号登记继续使用原 AuthSpec，不构造虚拟账号或重新选择认证头。
