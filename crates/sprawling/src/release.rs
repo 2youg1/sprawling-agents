@@ -526,6 +526,15 @@ mod tests {
         );
     }
 
+    #[test]
+    fn system_package_paths_select_their_own_update_guidance() {
+        let root = tempfile::tempdir().unwrap();
+        let brew = root.path().join("Cellar/sprawling/0.0.10/bin/sprawling");
+        let aur = root.path().join("usr/lib/sprawling-bin/sprawling");
+        assert_ne!(channel(&brew, None), InstallChannel::Source);
+        assert_ne!(channel(&aur, None), InstallChannel::Source);
+    }
+
     /// The check this test exists for is not which state a test binary
     /// is in, but that reading it never panics and never invents a
     /// release: `cargo test` sets no tag, and a build that did set one

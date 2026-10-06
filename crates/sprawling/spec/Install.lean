@@ -300,3 +300,22 @@ helper 在原进程退出后删除移走的运行映像，再启动 `cmd.exe` �
 核对归档/落位字节、同渠道重新安装、退出后的 EXE/来源标记缺席及 PATH 仅删除对应项。
 该检查及独立 Session 验收通过之前，不把 Windows 自卸载登记为已完成。
 -/
+
+/-! D54 Homebrew tap 与 AUR 交付同一发行归档（人的决定）
+
+本节描述外部包管理器接口，不是形式证明。macOS arm64 与 Linux x86-64 使用 Homebrew
+tap；Arch Linux x86-64 使用 AUR 的 sprawling-bin。两者复用发行二进制及随附资源，
+平台、归档名与摘要的生成接口只由 tools/xtask/Spec.lean D32 规定。
+选择理由：已有包管理器可以管理安装位置与更新，Alpha 项目不满足 nixpkgs 的源码
+构建与普遍使用条件；继续只提供手动归档需要每个用户管理 PATH 与替换二进制。
+Nix 用户仍使用 D50 的仓库 flake，不向 nixpkgs 提交包。
+用户创建 tap 仓库与 AUR 账号并配置 HOMEBREW_TAP_TOKEN、AUR_SSH_KEY 后，
+release.yml 的 tag 发布将生成定义推送至对应仓库；缺凭据只跳过推送并明确说明。
+Homebrew 用户 brew update 后 brew upgrade sprawling；AUR 用户在原 PKGBUILD
+checkout 中 git pull --ff-only 后 makepkg -si。程序只显示更新命令，不能替包管理器更新。
+Homebrew 的 Cellar/sprawling 路径与 AUR 的 /usr/lib/sprawling-bin 路径辨认来源；
+明确环境选择也可指定 homebrew/aur，复制到其他位置后按未知来源要求确认。
+GitHub 发布比较表示有新归档，不保证 tap/AUR 已同步；执行前仍需检查包管理器版本。
+重开参数：新增平台需有对应发行归档；进入稳定阶段且满足 nixpkgs 条件时重新评估
+收录；包管理器改变安装布局或支持可验证来源元数据时重新评估路径识别。
+-/
