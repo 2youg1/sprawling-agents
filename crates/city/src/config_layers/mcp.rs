@@ -6,19 +6,165 @@
 //! The `[[mcp]]` table: the servers one layer reaches, each read into
 //! exactly one transport.
 //!
-//! Specified by `crates/city/spec/ConfigLayers.lean` §8-4.
+//! Specified by `crates/city/spec/ConfigLayers.lean` §8-4 and §8-4b.
 
-use kernel::{AxError, McpServer, McpTransport, ServerLabel};
+use kernel::{AxCode, AxError, McpServer, McpTransport, SecretRef, ServerLabel};
 use serde::Deserialize;
 
 use super::refuse::refuse;
+
+/// What a refusal of this judgement says it was doing: the same words
+/// whether the row came from a person's file or from the settings page.
+const ACTION: &str = "check the servers a layer reaches";
+
+/// Judges every server one layer reaches, for the reader and the writer
+/// alike: a value in `env` or `headers` that is a credential rather
+/// than a vault reference, and a url that is not a plain http or https
+/// address, are refused.
+///
+/// One judgement for both faces, because a building's `CONFIG.toml` is
+/// committed with the project: a key the reader accepted from a file a
+/// person wrote by hand is a key in every clone of that repository, just
+/// as one the settings page had written would be.
+///
+/// # Errors
+/// `E_CONFIG_INVALID`, naming the server and the value, never the value's
+/// bytes.
+pub(crate) fn validate(servers: &[McpServer]) -> Result<(), AxError> {
+    servers
+        .iter()
+        .try_for_each(|server| match &server.transport {
+            McpTransport::Stdio { env, .. } => vaulted(&server.label, Carried::Env, env),
+            McpTransport::Http { url, headers } | McpTransport::Sse { url, headers } => {
+                check_url(&server.label, url)?;
+                vaulted(&server.label, Carried::Header, headers)
+            }
+        })
+}
+
+/// Judges one configured address. `url::Url` reads it by the WHATWG
+/// rules, so a credential hidden in userinfo or behind a percent-encoded
+/// parameter name is seen (city D25); a query or fragment that carries
+/// no credential is kept byte for byte, because the file keeps the text
+/// a person wrote and only the judgement reads the parsed form.
+///
+/// # Errors
+/// `E_CONFIG_INVALID` for text that is not an absolute url, a scheme other
+/// than http or https, a missing host, userinfo, a query parameter whose
+/// decoded name reads as a credential or whose decoded value has a
+/// credential's shape, and credential-shaped bytes anywhere in the text.
+pub(crate) fn check_url(label: &ServerLabel, url: &str) -> Result<(), AxError> {
+    let unreachable = |why: String| {
+        AxError::failure(
+            AxCode::ConfigInvalid,
+            ACTION,
+            format!("{}: the url {why}", label.as_str()),
+        )
+        .with_recovery("write an absolute `http` or `https` address with a host")
+    };
+    let parsed =
+        url::Url::parse(url).map_err(|err| unreachable(format!("does not parse ({err})")))?;
+    if !matches!(parsed.scheme(), "http" | "https") {
+        return Err(unreachable(format!("uses `{}`", parsed.scheme())));
+    }
+    if parsed.host_str().is_none_or(str::is_empty) {
+        return Err(unreachable("names no host".to_owned()));
+    }
+    let named = |violation: String| {
+        AxError::failure(
+            AxCode::ConfigInvalid,
+            ACTION,
+            format!("{}: the url {violation}", label.as_str()),
+        )
+        .with_recovery(IN_A_HEADER)
+    };
+    if !parsed.username().is_empty() || parsed.password().is_some() {
+        return Err(named("carries userinfo".to_owned()));
+    }
+    if let Some((name, _)) = parsed.query_pairs().find(|(name, value)| {
+        kernel::secret::names_a_credential(name)
+            || !kernel::secret::scan(value.as_bytes()).is_empty()
+    }) {
+        return Err(named(format!(
+            "query parameter `{name}` carries a credential"
+        )));
+    }
+    if !kernel::secret::scan(url.as_bytes()).is_empty() {
+        return Err(named("has the shape of a credential".to_owned()));
+    }
+    Ok(())
+}
+
+/// Where a credential a url carried belongs instead.
+const IN_A_HEADER: &str = "keep the secret in the vault and send it in a header whose value is \
+     its `secret:realm/name` reference; this file is committed with the project";
+
+/// Which table a value sits in, so a refusal names the line a person
+/// has to go and edit.
+#[derive(Clone, Copy)]
+enum Carried {
+    Env,
+    Header,
+}
+
+impl Carried {
+    fn noun(self) -> &'static str {
+        match self {
+            Carried::Env => "environment value",
+            Carried::Header => "header",
+        }
+    }
+}
+
+/// Refuses one pair at a time, so the refusal names which value is the
+/// problem rather than which server.
+///
+/// A `secret:realm/name` reference is what this file is for: the value
+/// on disk says where the secret is kept, and the assembly layer
+/// redeems it when a server is started. Anything else that reads as a
+/// credential — by the name in front of it or by the shape of the value
+/// itself — is refused. What reads as a credential is
+/// `kernel::secret`'s answer, the same one `EnvVarName::parse` gives
+/// for a declared environment name.
+fn vaulted(
+    label: &ServerLabel,
+    carried: Carried,
+    pairs: &[(String, String)],
+) -> Result<(), AxError> {
+    for (name, value) in pairs {
+        if SecretRef::parse(value).is_ok() {
+            continue;
+        }
+        let named = kernel::secret::names_a_credential(name);
+        let shaped = !kernel::secret::scan(value.as_bytes()).is_empty();
+        let violation = match (named, shaped) {
+            (true, _) => "the name reads as a credential",
+            (false, true) => "the value has the shape of a credential",
+            (false, false) => continue,
+        };
+        return Err(AxError::failure(
+            AxCode::ConfigInvalid,
+            ACTION,
+            format!(
+                "{}: {} `{name}`: {violation}",
+                label.as_str(),
+                carried.noun()
+            ),
+        )
+        .with_recovery(
+            "keep the secret in the vault and write its `secret:realm/name` reference here; \
+             this file is committed with the project",
+        ));
+    }
+    Ok(())
+}
 
 /// Reads one layer's `[[mcp]]` entries.
 ///
 /// # Errors
 /// Refuses a label `kernel` does not accept, a row that names both a
-/// command and a url or neither, a stream chosen for a command, and two
-/// rows under one label.
+/// command and a url or neither, a stream chosen for a command, two
+/// rows under one label, and every row [`validate`] refuses.
 pub(super) fn servers(entries: Vec<McpSection>) -> Result<Vec<McpServer>, AxError> {
     let mut servers: Vec<McpServer> = Vec::new();
     for entry in entries {
@@ -81,6 +227,7 @@ pub(super) fn servers(entries: Vec<McpSection>) -> Result<Vec<McpServer>, AxErro
         }
         servers.push(McpServer { label, transport });
     }
+    validate(&servers)?;
     Ok(servers)
 }
 

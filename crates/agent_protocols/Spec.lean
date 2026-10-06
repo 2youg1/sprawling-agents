@@ -232,6 +232,7 @@ pub fn counting_starts(answer: &str, starts: &Path) -> (String, Vec<String>); //
 - **`echoing` 在 `conformance` 后面**：装配层的测试要起同一个假 server；产品二进制不带它（`xtask artifact`）。
 - **请求交出之后丢了答，效果未知，不可重试**：性质在 `spec/Mcp/Link.lean`。请求已经完整交给对侧之后（stdio 是那一行写完并 flush，HTTP 与 SSE 是 POST 得到回应），期限内没有答案（`E_TIMEOUT`）、对侧在作答前关了输出或流断了（`E_TOOL_UNAVAILABLE`）、答复被读端拒（`E_WIRE_MISMATCH`），都标 `effect_unknown`（`Retry::Unknown`，`crates/kernel/spec/Error.lean` 的三态）：server 可能已经做了，再发一次同一调用可能把一次写做两遍，由看得见这次调用的人决定要不要再问。请求还没交出去时的失败（stdio 写管道失败、POST 本身失败）按对侧没收下读，照旧 `Retry::No`。
 - 失败码：各传输沿用 §12 的 `E_TIMEOUT`／`E_WIRE_MISMATCH`／`E_TOOL_UNAVAILABLE`，HTTP 与 SSE 在 401／403 抬 `E_CREDENTIAL_MISSING`，客户端构造不成抬 `E_CONFIG_INVALID`。
+- **换不换账号、能不能再发，由这里标在错误上**（`AxError::account` 与 `retry`，`crates/kernel/spec/Error.lean` D53）：401 是这个账号的 Key 被拒，标 `Advance`（`ErrorDraft::account_unusable`），下一个账号可能被收下；403 不标，它可能是权限、地域或这台 server 的规则，换一个账号不见得修得好。408、429、502、503、504 是对端这次没有处理这个请求，标可重试（`Retry::Yes`），这五个状态码只在 HTTP 与 SSE 的拒词这一处判；其余非 2xx 照旧 `No`。读者是 `web_search` 的一轮（`crates/accounting/spec/Connectors.lean` §8-35）；其它 MCP 工具不自动重发，这两格只是交给模型的事实。
 
 HTTP 的答复 body 经 `read_whole_message` 受同一个上限，非 2xx 的答复不读 body：D8，写在 `spec/Mcp/Reading.lean` 的 `readWhole` 上方。
 

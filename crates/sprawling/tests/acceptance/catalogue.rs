@@ -75,6 +75,7 @@ fn run_the_script(
     city::move_in(dir.path(), setup.neighbour);
     std::fs::write(::city::roadmap_path(dir.path(), &building), PLAN).unwrap();
     episodes::lay_draft(dir.path(), setup);
+    crate::web_search::supply(dir.path());
     let rules_before = std::fs::read(::city::rules_path(dir.path(), &building)).unwrap_or_default();
     let dispatched = city::dispatch(&mut worker, setup.room);
 

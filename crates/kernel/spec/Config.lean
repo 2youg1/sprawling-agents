@@ -6,7 +6,7 @@
 /-!
 # kernel::config
 
-规定 `kernel::config`（`crates/kernel/src/config.rs` 与 `crates/kernel/src/config/interpreter.rs`）：分层配置与 Run 起点冻结的那一份。本文件是 `crates/kernel/Spec.lean` 的一个分部；下面每一节保留它在 kernel 规格里的标签 §8-n，别处引作 `crates/kernel/Spec.lean §8-n`。
+规定 `kernel::config`（`crates/kernel/src/config.rs`、`crates/kernel/src/config/interpreter.rs` 与 `crates/kernel/src/config/search.rs`）：分层配置与 Run 起点冻结的那一份。本文件是 `crates/kernel/Spec.lean` 的一个分部；下面每一节保留它在 kernel 规格里的标签 §8-n，别处引作 `crates/kernel/Spec.lean §8-n`。
 
 这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与 `kernel::config::tests` 守住。
 -/
@@ -23,12 +23,19 @@ pub struct FrozenConfig {                                            // Run 起�
     pub clock_stamp: ClockStampGranularity, pub clock_zones: Vec<ClockZone>,
     pub sandbox: SandboxLimits, pub mcp: Vec<McpServer>,
     pub effort: Option<Effort>, pub second_threshold: Option<SecondThreshold>,
+    #[serde(default)] pub search: SearchConfiguration,               // 缺省 Default
 }
 pub struct LiveConfig {}                                             // 热载面；今天没有字段
-pub fn freeze(clock_stamp: &LayeredValue<ClockStampGranularity>, clock_zones: &LayeredValue<Vec<ClockZone>>,
-              effort: &LayeredValue<Effort>, sandbox: &LayeredValue<SandboxLimits>,
-              mcp: &LayeredValue<Vec<McpServer>>, second_threshold: &LayeredValue<SecondThreshold>) -> FrozenConfig;
+pub struct StatedConfig {                                            // 梯子上每个关切各一格，一起交给 freeze
+    pub clock_stamp: LayeredValue<ClockStampGranularity>, pub clock_zones: LayeredValue<Vec<ClockZone>>,
+    pub effort: LayeredValue<Effort>, pub sandbox: LayeredValue<SandboxLimits>,
+    pub mcp: LayeredValue<Vec<McpServer>>, pub second_threshold: LayeredValue<SecondThreshold>,
+    pub search: LayeredValue<SearchConfiguration>,
+}
+pub fn freeze(stated: &StatedConfig) -> FrozenConfig;
 ```
+
+- **`freeze` 收一个 `StatedConfig`，不收七个参数**：每个关切的 `LayeredValue` 总是一起从 `city::load_config` 走到 `freeze`，一起走的值是一个具名的值；`search` 是第七个关切，七个参数会越过每个函数四个参数的上限。加一个关切因此是 `StatedConfig` 多一个字段，`freeze` 的签名不再变。
 
 - **无字段交集可机械判**：单测将两型缺省值 serde 成 JSON，断言键集交集为空；新增字段自动入判。
 - `CLOCK_STAMP_DEFAULT: ClockStampGranularity = Minute` 落 consts_policy：没有一级写 `[clock] stamp` 的城，`Timestamped` 结果每条带戳，`Timeless` 结果每分钟至多一条（runtime D8）。
@@ -42,6 +49,30 @@ pub fn freeze(clock_stamp: &LayeredValue<ClockStampGranularity>, clock_zones: &L
 **shell 臂的解释器（config）**：`pub enum Interpreter { System, Pwsh }`，`SandboxLimits.interpreter`，缺省 `System`，文件里写作 `[sandbox] interpreter = "system"` 或 `"pwsh"`（serde 小写，`#[serde(default)]`，所以没写这个键的层与线上旧帧读作 `System`）。配置文件里的值只经 `Interpreter::parse` 构造（`city::config_layers` 把这个键读成文本再交给它；serde 只读线上帧与冻结配置）：别的拼写以 `E_CONFIG_INVALID` 拒，主语是这个键与写下的值，恢复语给出两种拼法；不猜，也不当作缺省。它与 `shell` 是两件事：`shell` 决定 shell 臂给不给，`interpreter` 决定给的时候是哪一个；写的是名字而不是路径，理由同「主机事实不入城」。口径与 `mounts` 同形：整值上梯、Run 起点冻结、解析点拒。为什么要它、在主机上怎么解析、缺席时怎么拒，住 `crates/runtime/Spec.lean` §8-13-2 D30。
 
 **外部 MCP server（config）**：`McpServer { label: ServerLabel, transport: McpTransport }`，`McpTransport { Stdio { command, args, env }, Http { url, headers }, Sse { url, headers } }`——**穷尽枚举而非两个裸字段**：一行既写 command 又写 url 就是一行要读者去猜的配置，故配置层当场拒（`ServerLabel` 住 §8-23）。**枚举是闭的**（无 `#[non_exhaustive]`）：读者全在这一个二进制里，通配臂只会把下一种 transport 从必须表态的模块面前藏起来。`env` 与 `headers` 皆为名在前、值在后的成对表，值可以是 `secret:realm/name` 引用——交给子进程的名字收不回来，故兑付发生在起进程／发请求的那一格，而恒不写进配置文件。`Sse` 自成一支而不是 `Http` 的一个开关：两者开法与败法都不同。`FrozenConfig.mcp: Vec<McpServer>` 缺省空表＝这栋楼不接任何外部 server。三条口径：①**整表覆盖**，与 zones／sandbox 同一条理由——一层说到 `[[mcp]]` 就说全部，欠说的层只会收窄而恒不会悄悄接上上层没提过的服务；②**冻结的理由就是工具表本身**——外部工具在 Run 起点入 catalog，而 provider 把工具数组哈希在 system prompt 之前，Run 内变宽的工具表既自毁缓存又没有人审过；③**命令与参数是主机事实**（一个可执行文件在运行中的机器上的位置），故它们住 `CONFIG.toml` 而恒不入 Ledger 载荷——一座城被搬到另一台机器时不该带着运行中的机器的路径。
+
+**网络搜索（config）**：子模块 `config::search` 定义两个值，`FrozenConfig.search` 持有后一个。
+
+```rust
+pub struct SearchSupplier {                // 一家经 MCP streamable HTTP 接入的搜索服务
+    pub id: ServerLabel,                   // 供应方的名字，也是 web_search 的 Connector label
+    pub url: String,                       // MCP HTTP 地址；判定同 [[mcp]] 的 url（city D25）
+    pub remote: String,                    // tools/list 里那个远端工具的名字
+    pub query_field: String,               // web_search 的 query 交给远端哪个参数
+    pub objective_field: Option<String>,   // objective 交给哪个参数；None＝这家不收 objective
+    pub count_field: Option<String>,       // num_results 交给哪个参数；None＝这家不收条数
+    pub accounts: Vec<ProviderAccount>,    // 有序；匿名账号是 reference 缺席的那一行
+}
+pub enum SearchConfiguration {
+    Default,                                                      // 缺省的那一家
+    Custom { selected: ServerLabel, suppliers: Vec<SearchSupplier> },
+    Off,                                                          // 这里不提供 web_search
+}
+```
+
+- **三臂穷尽，没有 `enabled` 开关**：「取第一个启用的」要读者去猜两家都启用时谁说了算；`selected` 直接点名用哪一家，`Off` 直接说不用。`Default` 是一个被说出来的值，不是缺席：一层写 `Default` 就盖住更远一级的 `Custom`。
+- **本模块只持有形状**：`Default` 指哪一家、`selected` 怎么找到它、什么配置被拒、写在哪几级，全住 `config_layers::search`（`crates/city/spec/ConfigLayers.lean` §8-4c，city D24）。缺省那一家的地址与参数因此只有那一处声明，kernel 里没有它的副本。
+- **整值上梯、Run 起点冻结**：理由同 `mcp`——`web_search` 在 Run 起点进工具表，它的参数表由这一家的映射决定，Run 内换一家既自毁缓存又换掉了数据接收方而没有人审过。
+- **凭据只以引用出现**：`accounts` 的每一行与模型端点的账号是同一个类型 `ProviderAccount`（`crates/kernel/spec/Event/Record.lean`），Key 原文只在 vault；这个值不进 Ledger 载荷，它住 `CONFIG.toml`。
 
 **信任的连接器（config）**：`SandboxLimits.trusted: Vec<ServerLabel>`，缺省空表；`SandboxLimits::trusts(&ServerLabel)` 是这张表的唯一读者。它回答 `gate::undoable` 的问题——这楼层准哪个连接器伸到运行中的运行这座城的机器上。口径与 `mounts` 同形：整值上梯、Run 起点冻结、在解析点拒。缺省空表的意思是「这楼层不准任何连接器碰运行这座城的机器」，而一条写在 `CONFIG.toml` 里的信任是人在看得见整张表时做的决定，比在模型等着时做的决定更值得信。
 

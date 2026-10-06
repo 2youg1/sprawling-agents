@@ -16,9 +16,11 @@ use crate::tool::ServerLabel;
 mod container;
 mod interpreter;
 mod sandbox;
+mod search;
 pub use container::{ContainerImage, ContainerLimits};
 pub use interpreter::Interpreter;
 pub use sandbox::{SandboxArm, SandboxLimits};
+pub use search::{SearchConfiguration, SearchSupplier};
 
 /// One environment variable name a scope declares its runs may inherit.
 ///
@@ -301,6 +303,28 @@ pub struct FrozenConfig {
     /// Frozen with the run: a rung that moved mid-run would make "each
     /// rung sounds once per run" depend on when somebody edited a file.
     pub second_threshold: Option<SecondThreshold>,
+    /// Which supplier `web_search` reaches, frozen for the reason `mcp`
+    /// is: the tool and its parameters enter the catalog at run start,
+    /// and a supplier changed mid-run would change who receives the
+    /// run's queries without anybody reviewing it. Absent in a snapshot
+    /// written before search existed, which reads as `Default`.
+    #[serde(default)]
+    pub search: SearchConfiguration,
+}
+
+/// Every concern's ladder, handed to [`freeze`] together: the values
+/// always travel from the configuration reader to the freeze as one, so
+/// a concern added later is a field here and `freeze` keeps its
+/// signature.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct StatedConfig {
+    pub clock_stamp: LayeredValue<ClockStampGranularity>,
+    pub clock_zones: LayeredValue<Vec<ClockZone>>,
+    pub effort: LayeredValue<Effort>,
+    pub sandbox: LayeredValue<SandboxLimits>,
+    pub mcp: LayeredValue<Vec<McpServer>>,
+    pub second_threshold: LayeredValue<SecondThreshold>,
+    pub search: LayeredValue<SearchConfiguration>,
 }
 
 /// Hot-reloadable surface. Empty: the type exists so the no-field-overlap
@@ -311,24 +335,20 @@ pub struct LiveConfig {}
 /// Resolves the ladder into the Run-start snapshot. Absence everywhere
 /// falls back to the policy default; the zones ladder overrides as a
 /// whole list (a building that writes zones replaces the city list).
-pub fn freeze(
-    clock_stamp: &LayeredValue<ClockStampGranularity>,
-    clock_zones: &LayeredValue<Vec<ClockZone>>,
-    effort: &LayeredValue<Effort>,
-    sandbox: &LayeredValue<SandboxLimits>,
-    mcp: &LayeredValue<Vec<McpServer>>,
-    second_threshold: &LayeredValue<SecondThreshold>,
-) -> FrozenConfig {
+pub fn freeze(stated: &StatedConfig) -> FrozenConfig {
     FrozenConfig {
-        clock_stamp: *clock_stamp.resolve().unwrap_or(&CLOCK_STAMP_DEFAULT),
-        clock_zones: clock_zones.resolve().cloned().unwrap_or_default(),
-        sandbox: sandbox.resolve().cloned().unwrap_or_default(),
-        effort: effort.resolve().copied(),
+        clock_stamp: *stated.clock_stamp.resolve().unwrap_or(&CLOCK_STAMP_DEFAULT),
+        clock_zones: stated.clock_zones.resolve().cloned().unwrap_or_default(),
+        sandbox: stated.sandbox.resolve().cloned().unwrap_or_default(),
+        effort: stated.effort.resolve().copied(),
         // A layer that speaks about servers speaks about all of them:
         // an unstated layer reaches nothing rather than inheriting a
         // reach nobody at that layer wrote down.
-        mcp: mcp.resolve().cloned().unwrap_or_default(),
-        second_threshold: second_threshold.resolve().copied(),
+        mcp: stated.mcp.resolve().cloned().unwrap_or_default(),
+        second_threshold: stated.second_threshold.resolve().copied(),
+        // Silence on every rung is the default supplier, which is what
+        // a city written before `[search]` existed meant.
+        search: stated.search.resolve().cloned().unwrap_or_default(),
     }
 }
 

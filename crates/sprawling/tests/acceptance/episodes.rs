@@ -68,8 +68,9 @@ pub(crate) struct Episode {
 const MARK: &str = "kiln-temperature-1280";
 
 /// The episodes for a building that builds, in the order they run.
-/// `succeed` is last because the successor starts only when this run
-/// ends.
+/// `web_search` comes after `exec`, because what it brings in from
+/// outside taints the run and a tainted run runs no command; `succeed`
+/// is last because the successor starts only when this run ends.
 pub(crate) fn for_builders(setup: &Setup) -> Vec<Episode> {
     let mut episodes = shared(setup);
     episodes.extend([
@@ -78,6 +79,7 @@ pub(crate) fn for_builders(setup: &Setup) -> Vec<Episode> {
         exec(),
         delegate(setup),
         workshop(setup),
+        crate::web_search::episode(),
         succeed(),
     ]);
     episodes
@@ -88,7 +90,13 @@ pub(crate) fn for_builders(setup: &Setup) -> Vec<Episode> {
 /// `delegate` or `workshop`, and it has `city`.
 pub(crate) fn for_city_hall(setup: &Setup) -> Vec<Episode> {
     let mut episodes = shared(setup);
-    episodes.extend([pr_list(), rules(), city(), succeed()]);
+    episodes.extend([
+        pr_list(),
+        rules(),
+        city(),
+        crate::web_search::episode(),
+        succeed(),
+    ]);
     episodes
 }
 

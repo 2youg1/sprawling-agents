@@ -9,7 +9,7 @@ import crates.city.spec.Building
 /-!
 # city::config_layers::ladder
 
-规定 `config_layers::ladder` 与 `config_layers::ladder::tests`（`crates/city/src/` 下同名的文件）。一个地址被哪几级配置治理、每一级说了什么、哪一级说的算，以及只有城那一层能写的表在下层怎样被拒。接口与取舍写在 `crates/city/spec/ConfigLayers.lean` 的 §8-4，本文件只放它们的模型与证明；本文件是 `crates/city/Spec.lean` 的一个分部，决定引作 `city D<n>`。
+规定 `config_layers::ladder` 与 `config_layers::ladder::tests`（`crates/city/src/` 下同名的文件）。一个地址被哪几级配置治理、每一级说了什么、哪一级说的算，以及一张只许写在较远几级的表写得太近时怎样被拒。接口与取舍写在 `crates/city/spec/ConfigLayers.lean` 的 §8-4，本文件只放它们的模型与证明；本文件是 `crates/city/Spec.lean` 的一个分部，决定引作 `city D<n>`。
 -/
 
 /-!
@@ -20,7 +20,7 @@ import crates.city.spec.Building
 * 设置页答的值就是 run 被治理的值（`the_setting_page_and_the_run_read_one_value`）：`settled_effort` 与 `load` 爬的是同一条梯子，`resolve` 只是 `tagged` 丢掉那一级。
 * 最近的那一级说了算，且说出它是哪一级（`the_nearest_rung_that_speaks_wins`）；一级都没说就是 `none`，城有意把这件事交给缺省或供应方。
 * 地址就是楼时只有两级、同一份文件只读一次（`an_address_that_is_its_building_reads_two_rungs`）；房间的地址读三级（`a_room_reads_three_rungs`）。文件的位置是 kernel 布局的模型（`crates/kernel/spec/Layout.lean` 的 `config`），楼取地址首段是 `crates/city/spec/Building.lean` 的 `head`。
-* 只有城那一层能写的表（`[skills] shelves`、`[remote]`）在下层读文件时即拒（`a_city_only_table_is_refused_below_the_city`），城那一层照读（`the_city_states_its_own_tables`）。
+* 有的表只许写在较远的几级：`[skills] shelves` 与 `[remote]` 只在城那一级，`[search]` 在城与楼两级（`crates/city/spec/ConfigLayers.lean` §8-4c）。一级写了一张比它够得到的那一级更近的表，读文件时即拒（`a_table_written_too_near_is_refused`）；一级写的表它全都够得到就照读（`a_rung_reads_the_tables_it_reaches`），城那一级够得到每一张（`the_city_states_its_own_tables`）。
 * 梯子给一个解析拒词只加上文件，码与恢复语照解析器给的（`the_ladder_keeps_the_parsers_recovery`，D8 (a)）。
 * 一层只点名一种居民，地址自己那一层有会话记录时梯子上的 harness 不生效（`a_session_that_opened_on_a_model_keeps_it`），没有记录时最近的那一级点名的 harness 生效（`without_a_record_the_nearest_harness_runs`，D6）。
 -/
@@ -137,11 +137,28 @@ theorem a_room_reads_three_rungs {C : Type} (names : Names) (city : CityLayout)
     simp at this
   simp [read, Layer.ALL, file, ladder, config, governed, governed_root, scope, City.Building.head, tail]
 
-/-- `refuse::CityOnly`：只有城那一层能写的表。 -/
-inductive CityOnly where
+/-- `refuse::Confined`：只许写在较远几级的表。 -/
+inductive Confined where
   | Shelves
   | Remote
+  | Search
   deriving DecidableEq, Repr
+
+/-- 一级离城多远：城 0、楼 1、房间 2。 -/
+def Layer.depth : Layer → Nat
+  | .City => 0
+  | .Building => 1
+  | .Resident => 2
+
+/-- `Confined::nearest`：这张表最近能写到哪一级。 -/
+def Confined.nearest : Confined → Layer
+  | .Shelves => .City
+  | .Remote => .City
+  | .Search => .Building
+
+/-- 这一级够不够得到这张表：不比它最近的那一级更近。 -/
+def reaches (rung : Layer) (table : Confined) : Bool :=
+  rung.depth ≤ table.nearest.depth
 
 /-- 梯子上的拒词：哪一份文件、什么码、恢复语。 -/
 structure Refusal where
@@ -151,32 +168,47 @@ structure Refusal where
   recovery : String
   deriving DecidableEq, Repr
 
-/-- `ladder::stated`：一级的文件读出的东西。解析拒了就把文件加在 subject 前、其余照原样（`in_file`）；城以下的一级写了城独占的表即拒（`refuse::below_city`）。 -/
-def statedAt {C : Type} (cityOnly : C → Option CityOnly) (belowCity : List String → CityOnly → Refusal)
+/-- `ladder::stated`：一级的文件读出的东西。解析拒了就把文件加在 subject 前、其余照原样（`in_file`）；这一级写了它够不到的表即拒（`refuse::too_near`），`confined` 列出这一层写了的每一张受限的表（`ConfigLayer::confined`）。 -/
+def statedAt {C : Type} (confined : C → List Confined) (tooNear : List String → Confined → Refusal)
     (file : List String) (rung : Layer) (parsed : Except Refusal C) : Except Refusal C :=
   match parsed with
   | .error refused => .error { refused with file := file }
   | .ok layer =>
-    match rung, cityOnly layer with
-    | .City, _ => .ok layer
-    | _, none => .ok layer
-    | _, some table => .error (belowCity file table)
+    match (confined layer).find? (fun table => !reaches rung table) with
+    | none => .ok layer
+    | some table => .error (tooNear file table)
 
-theorem a_city_only_table_is_refused_below_the_city {C : Type} (cityOnly : C → Option CityOnly)
-    (belowCity : List String → CityOnly → Refusal) (file : List String) (rung : Layer)
-    (layer : C) (table : CityOnly) (below : rung ≠ .City) (writes : cityOnly layer = some table) :
-    statedAt cityOnly belowCity file rung (.ok layer) = .error (belowCity file table) := by
-  cases rung <;> simp_all [statedAt]
+theorem a_table_written_too_near_is_refused {C : Type} (confined : C → List Confined)
+    (tooNear : List String → Confined → Refusal) (file : List String) (rung : Layer)
+    (layer : C) (table : Confined) (writes : table ∈ confined layer)
+    (near : reaches rung table = false) :
+    ∃ named, reaches rung named = false ∧
+      statedAt confined tooNear file rung (.ok layer) = .error (tooNear file named) := by
+  simp only [statedAt]
+  cases found : (confined layer).find? (fun table => !reaches rung table) with
+  | none =>
+    have := List.find?_eq_none.mp found table writes
+    simp [near] at this
+  | some named =>
+    exact ⟨named, by simpa using List.find?_some found, rfl⟩
 
-theorem the_city_states_its_own_tables {C : Type} (cityOnly : C → Option CityOnly)
-    (belowCity : List String → CityOnly → Refusal) (file : List String) (layer : C) :
-    statedAt cityOnly belowCity file .City (.ok layer) = .ok layer := by
-  simp [statedAt]
+theorem a_rung_reads_the_tables_it_reaches {C : Type} (confined : C → List Confined)
+    (tooNear : List String → Confined → Refusal) (file : List String) (rung : Layer)
+    (layer : C) (within : ∀ table ∈ confined layer, reaches rung table = true) :
+    statedAt confined tooNear file rung (.ok layer) = .ok layer := by
+  simp only [statedAt]
+  rw [List.find?_eq_none.mpr fun table writes => by simp [within table writes]]
 
-theorem the_ladder_keeps_the_parsers_recovery {C : Type} (cityOnly : C → Option CityOnly)
-    (belowCity : List String → CityOnly → Refusal) (file : List String) (rung : Layer)
+theorem the_city_states_its_own_tables {C : Type} (confined : C → List Confined)
+    (tooNear : List String → Confined → Refusal) (file : List String) (layer : C) :
+    statedAt confined tooNear file .City (.ok layer) = .ok layer :=
+  a_rung_reads_the_tables_it_reaches confined tooNear file .City layer
+    fun table _ => by simp [reaches, Layer.depth]
+
+theorem the_ladder_keeps_the_parsers_recovery {C : Type} (confined : C → List Confined)
+    (tooNear : List String → Confined → Refusal) (file : List String) (rung : Layer)
     (refused : Refusal) :
-    statedAt cityOnly belowCity file rung (.error refused : Except Refusal C) =
+    statedAt confined tooNear file rung (.error refused : Except Refusal C) =
       .error { refused with file := file } := by
   simp [statedAt]
 

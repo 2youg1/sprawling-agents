@@ -33,6 +33,17 @@ pub trait Connectors {
         confidential: bool,
         resolve: &gateway::SecretResolver,
     ) -> Result<(Vec<agent_protocols::McpTool>, Reached), AxError>;
+
+    /// Drops every resident connection whose declaration carries
+    /// `reference`, so the next [`Connectors::connect`] redeems the
+    /// reference again.
+    ///
+    /// A connection redeems its credentials once, when it opens, and
+    /// sends that value for as long as it lives; the vault taking a new
+    /// value under the same reference is what makes such a connection
+    /// stale. The account id does not change, so the Session's account
+    /// binding is untouched.
+    fn invalidate(&self, reference: &kernel::SecretRef);
 }
 
 /// How one call to [`Connectors::connect`] reached its server.

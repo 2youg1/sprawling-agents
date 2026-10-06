@@ -22,9 +22,10 @@
 
 use std::path::{Path, PathBuf};
 
+use kernel::config::{SearchConfiguration, StatedConfig};
 use kernel::{
-    Address, AxError, B3Hash, ClockStampGranularity, Effort, FrozenConfig, KeepWarm, LayeredValue,
-    McpServer, SandboxLimits, SecondThreshold, ServerLabel,
+    Address, AxError, B3Hash, ClockStampGranularity, Effort, FrozenConfig, KeepWarm, McpServer,
+    SandboxLimits, SecondThreshold, ServerLabel,
 };
 use serde::Deserialize;
 
@@ -40,6 +41,7 @@ mod mcp;
 mod refuse;
 mod remote;
 mod resident;
+mod search;
 mod session;
 mod settled;
 mod shelves;
@@ -50,6 +52,7 @@ pub use city_layer::{CitySetting, write_city_setting};
 pub use ladder::Layer;
 pub use remote::{HostPermanence, RemoteRoute, remote_route};
 pub use resident::settled_harness;
+pub use search::{default_search_supplier, search_supplier, settled_search, write_search};
 pub(crate) use session::forget as forget_session;
 pub use session::{freeze_naming, own_layer, write_session};
 pub use settled::{settled_effort, settled_second};
@@ -59,7 +62,7 @@ pub use write::{write_mcp, write_sandbox, write_second_threshold};
 
 use ladder::Ladder;
 // The refusal shapes every reader in this module answers with.
-use refuse::{CityOnly, refuse, unreadable};
+use refuse::{Confined, refuse, unreadable};
 
 /// Where a layer's file lives for a run at `addr`.
 ///
@@ -82,6 +85,8 @@ pub struct ConfigLayer {
     effort: Option<Effort>,
     sandbox: Option<SandboxLimits>,
     mcp: Option<Vec<McpServer>>,
+    /// Which supplier `web_search` reaches (§8-4c); refused on a room's rung.
+    search: Option<SearchConfiguration>,
     /// The second context-reminder rung this layer states.
     second_threshold: Option<SecondThreshold>,
     /// How often this layer's results carry the clock line.
@@ -158,6 +163,7 @@ impl ConfigLayer {
             }
         };
         let mcp = file.mcp.map(mcp::servers).transpose()?;
+        let search = file.search.map(search::stated).transpose()?;
         let model = resident::stated_name(file.model.name, resident::MODEL_NAME_KEY)?;
         let harness = file.resident.and_then(|section| section.harness);
         let harness = resident::stated_name(harness, resident::HARNESS_KEY)?;
@@ -172,6 +178,7 @@ impl ConfigLayer {
             effort: file.model.effort,
             sandbox,
             mcp,
+            search,
             second_threshold,
             clock_stamp: file.clock.map(|section| section.stamp),
             keep_warm: file.cache.map(|section| section.keep_warm),
@@ -245,13 +252,17 @@ impl ConfigLayer {
         self.remote.as_ref()
     }
 
-    /// The first table this layer states that only the city's own
-    /// layer may state, which the ladder refuses on every other rung.
-    fn city_only(&self) -> Option<CityOnly> {
-        self.shelves
-            .as_ref()
-            .map(|_| CityOnly::Shelves)
-            .or_else(|| self.remote.as_ref().map(|_| CityOnly::Remote))
+    /// Every table this layer states that only farther rungs may state,
+    /// which the ladder refuses on a rung nearer than the table allows.
+    fn confined(&self) -> Vec<Confined> {
+        [
+            self.shelves.as_ref().map(|_| Confined::Shelves),
+            self.remote.as_ref().map(|_| Confined::Remote),
+            self.search.as_ref().map(|_| Confined::Search),
+        ]
+        .into_iter()
+        .flatten()
+        .collect()
     }
 }
 
@@ -268,16 +279,17 @@ impl ConfigLayer {
 /// ordinary case.
 pub fn load(city_root: &Path, addr: &Address) -> Result<FrozenConfig, AxError> {
     let ladder = Ladder::read(city_root, addr)?;
-    Ok(kernel::config::freeze(
-        &ladder.resolve(ConfigLayer::clock_stamp),
+    Ok(kernel::config::freeze(&StatedConfig {
+        clock_stamp: ladder.resolve(ConfigLayer::clock_stamp),
         // No layer states zones: a stamp is written in UTC, and the key
         // is refused where it is written (`crates/city/spec/ConfigLayers.lean` §8-31).
-        &LayeredValue::default(),
-        &ladder.resolve(ConfigLayer::effort),
-        &ladder.resolve(|layer| layer.sandbox().cloned()),
-        &ladder.resolve(|layer| layer.mcp().map(<[McpServer]>::to_vec)),
-        &ladder.resolve(|layer| layer.second_threshold),
-    ))
+        clock_zones: kernel::LayeredValue::default(),
+        effort: ladder.resolve(ConfigLayer::effort),
+        sandbox: ladder.resolve(|layer| layer.sandbox().cloned()),
+        mcp: ladder.resolve(|layer| layer.mcp().map(<[McpServer]>::to_vec)),
+        second_threshold: ladder.resolve(|layer| layer.second_threshold),
+        search: ladder.resolve(|layer| layer.search().cloned()),
+    }))
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -289,6 +301,8 @@ pub(crate) struct ConfigFile {
     sandbox: Option<SandboxSection>,
     #[serde(default)]
     mcp: Option<Vec<mcp::McpSection>>,
+    #[serde(default)]
+    search: Option<search::SearchSection>,
     #[serde(default)]
     context: Option<ContextSection>,
     #[serde(default)]

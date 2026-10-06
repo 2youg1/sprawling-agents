@@ -22,6 +22,7 @@ use kernel::layout::CityLayout;
 use kernel::{AxCode, AxError};
 use serde::Deserialize;
 
+use super::refuse::refuse_with;
 use super::{Layer, ladder};
 
 /// The table this module reads, spelled once for every refusal that
@@ -99,12 +100,10 @@ pub(super) fn stated(route: RemoteRoute) -> Result<RemoteRoute, AxError> {
         RemoteRoute::Command { command, .. } => Some(command.as_str()),
     };
     if program.is_some_and(|program| program.trim().is_empty()) {
-        return Err(AxError::failure(
-            AxCode::ConfigInvalid,
-            "read a configuration layer",
+        return Err(refuse_with(
             format!("`{REMOTE_KEY} command` is empty"),
-        )
-        .with_recovery("name the program the route runs, or its full path"));
+            "name the program the route runs, or its full path",
+        ));
     }
     Ok(route)
 }
