@@ -46,6 +46,4 @@ pub fn core_placement() -> Result<CorePlacement, AxError>; // 缺省 Soft；不�
 配置读回由 disposable tempfile 回归检查，真实 User 的文件不进入测试。
 设置在下一次 serving 起动采用；当前 run 的 Shares 不因 UI 修改而改变。
 
-执行错误的未决接口：命令撞到限额时，exec 的结构化结果须携上限与修改入口，
-UI 须显示该错误；当前操作系统分配拒绝仍只由子进程的退出与输出报告。
 -/
