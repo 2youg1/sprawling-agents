@@ -26,14 +26,16 @@ try:
     with tempfile.TemporaryDirectory() as temporary:
         local = pathlib.Path(temporary)
         shutil.copytree(channels, local / "channels")
-        for definition in (local / "channels").rglob("*"):
-            if definition.is_file() and definition.suffix in (".rb", "", ".SRCINFO"):
+        for relative in ("homebrew/sprawling.rb", "aur/PKGBUILD", "aur/.SRCINFO"):
+            definition = local / "channels" / relative
+            if definition.is_file():
                 definition.write_text(
                     re.sub(
                         r"https://[^\s\"']+/releases/download/[^/]+/",
                         f"http://127.0.0.1:{server.server_port}/",
-                        definition.read_text(),
-                    )
+                        definition.read_text(encoding="utf-8"),
+                    ),
+                    encoding="utf-8",
                 )
         run("brew", "tap-new", "--no-git", "local/channels")
         tap = subprocess.check_output(
