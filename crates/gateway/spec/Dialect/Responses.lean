@@ -44,6 +44,8 @@
 读到 EOF 才 settle，error 不阻断后续 delta；读失败或 silence 先于已持有的 error 与 terminal。
 落选：保留全部帧再扫描，长流的存储随 delta 数增长；提前返回 error 则改变 EOF 与错误优先级。
 模型的 Nat 是不透明 response、error、delta 身份，不解释其内容；解析器不是模型的第二份。
+性能接受的条件、读数与未决项由 `tools/xtask/budgets.toml` 的 `[responses_stream]` 持有，
+本模型证明保留语义，不证明延迟或分配收益。
 `dialect::response` 的派生检查按任意事件轨迹比较完整结果与增量，并检查持有数至多二。
 -/
 namespace Gateway.Dialect.Responses
