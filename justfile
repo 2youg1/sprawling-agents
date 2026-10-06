@@ -733,7 +733,7 @@ budget:
 # next product build relinks it.
 bench:
     cargo run --release -p citysim --bin bench
-    cargo nextest run -p sprawling -p sprawling-accounting -p sprawling-gateway -p sprawling-runtime --release --lib --run-ignored only -E 'test(/::instrument_/)' --no-capture
+    cargo nextest run -p sprawling -p sprawling-accounting -p sprawling-gateway -p sprawling-runtime --release --lib --profile bench --run-ignored only -E 'test(/::instrument_/)' --no-capture
 
 # The four-action pressure reading (tools/citysim/Spec.lean 8-5) - install,
 # startup, raise a city, open a session - measured, never gated.

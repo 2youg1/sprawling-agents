@@ -61,7 +61,8 @@
 #
 # Every job here runs on Windows, the platform a person reproduces a red
 # on, except `fresh`, whose question is asked of all three platforms, and
-# `keychain`, whose question exists only on macOS.
+# `keychain`, whose question exists only on macOS, and the matched
+# allocation arm of `bench`, which runs on Linux.
 # `pgo` runs on Windows, the platform the readings belong to. The same
 # three stages run unchanged on macOS and Linux (the rustc flags and
 # `llvm-profdata` from the `llvm-tools` component are the same there,
@@ -76,7 +77,11 @@ on:
         description: which run
         required: true
         type: choice
-        options: [mutants, mutants-modules, sim, shots, release, pgo, fresh, runtime, keychain, container]
+        options: [mutants, mutants-modules, sim, shots, release, pgo, fresh, runtime, keychain, container, bench]
+      responses_base:
+        description: optional ref with the matched Responses instrument
+        type: string
+        default: ""
       base:
         description: the ref `mutants` diffs against (a branch on origin, a tag, or a commit)
         required: false
@@ -809,3 +814,128 @@ jobs:
           name: container-${{ matrix.engine }}-${{ github.sha }}
           path: target/container-evidence
           if-no-files-found: warn
+  bench:
+    if: inputs.job == 'bench'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ${{ fromJSON(inputs.responses_base != '' && '["windows-latest", "ubuntu-latest"]' || '["windows-latest"]') }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: install pinned toolchain
+        run: rustup show
+      - uses: ./.github/actions/zig
+        if: runner.os == 'Windows'
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: bench
+          key: ${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+          save-if: false
+      - uses: ./.github/actions/client-artifacts
+        if: runner.os == 'Windows'
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
+      - name: Linux allocation profiler
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends heaptrack
+      - id: tree
+        shell: bash
+        env:
+          BENCH_RUNNER: ${{ matrix.os }}
+        run: |
+          set -euo pipefail
+          mkdir -p target/bench-out
+          echo "sha=$(git rev-parse 'HEAD^{tree}')" >> "$GITHUB_OUTPUT"
+          git rev-parse HEAD 'HEAD^{tree}' > target/bench-out/source.txt
+          rustc --version --verbose > target/bench-out/toolchain.txt
+          python - <<'PYTHON'
+          import json, os, platform
+          from pathlib import Path
+          Path("target/bench-out/machine.json").write_text(json.dumps({
+              "os": platform.system(), "osVersion": platform.release(),
+              "architecture": platform.machine(), "cores": os.cpu_count(),
+              "runner": os.environ["BENCH_RUNNER"], "profile": "release", "features": "defaults",
+              "run": os.environ["GITHUB_RUN_ID"], "attempt": os.environ["GITHUB_RUN_ATTEMPT"],
+              "rustflags": os.environ.get("RUSTFLAGS", ""),
+              "memorySource": "not sampled; this job measures processing durations"
+          }, indent=2), encoding="utf-8")
+          PYTHON
+      - name: compile the repository harness before measurement
+        if: inputs.responses_base == ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo build --release -p citysim --bin bench --locked
+          cargo nextest run -p sprawling -p sprawling-accounting -p sprawling-gateway -p sprawling-runtime --release --lib --run-ignored only -E 'test(/::instrument_/)' --no-run
+      - name: repository benchmark harness
+        if: inputs.responses_base == ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          just bench 2>&1 | tee target/bench-out/bench.log
+      - name: compile matched Responses arms
+        if: inputs.responses_base != ''
+        shell: bash
+        env:
+          RESPONSES_BASE: ${{ inputs.responses_base }}
+        run: |
+          set -euo pipefail
+          out="$PWD/target/bench-out"
+          for arm in baseline candidate; do
+            if [ "$arm" = baseline ]; then git checkout --detach "$RESPONSES_BASE"
+            else git checkout --detach "$GITHUB_SHA"; fi
+            git rev-parse HEAD 'HEAD^{tree}' > "$out/$arm-source.txt"
+            cargo test --release -p sprawling-gateway --lib --no-run --locked --message-format=json > "$out/$arm-build.jsonl"
+            ARM="$arm" OUT="$out" python - <<'PYTHON'
+          import hashlib, json, os, shutil
+          from pathlib import Path
+          out, arm = Path(os.environ["OUT"]), os.environ["ARM"]
+          artifacts = [json.loads(line) for line in (out / f"{arm}-build.jsonl").read_text().splitlines()]
+          binaries = [Path(a["executable"]) for a in artifacts if a.get("reason") == "compiler-artifact" and a.get("executable") and a["target"]["name"] == "gateway"]
+          if len(binaries) != 1:
+              raise SystemExit("expected one gateway test executable")
+          binary = out / f"{arm}.exe"
+          shutil.copy2(binaries[0], binary)
+          (out / f"{arm}.sha256").write_text(hashlib.sha256(binary.read_bytes()).hexdigest(), encoding="utf-8")
+          PYTHON
+          done
+      - name: alternate matched Responses arms on this runner
+        if: inputs.responses_base != '' && runner.os == 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          for round in 1 2 3 4 5; do
+            if [ "$((round % 2))" -eq 1 ]; then arms="baseline candidate"; else arms="candidate baseline"; fi
+            for arm in $arms; do
+              target/bench-out/$arm.exe --ignored instrument_responses_stream --nocapture --test-threads=1 2>&1 | tee "target/bench-out/$arm-$round.log"
+            done
+          done
+      - name: allocation counts, bytes, peaks and allocation stacks
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$PWD/target/bench-out"
+          heaptrack --version > "$out/profiler.txt"
+          lscpu > "$out/cpu.txt"
+          for size in small long; do
+            for arm in baseline candidate; do
+              heaptrack -o "$out/$arm-$size" "$out/$arm.exe" --ignored "instrument_responses_heap_$size" --nocapture --test-threads=1 2>&1 | tee "$out/$arm-$size.log"
+              profile=$(find "$out" -maxdepth 1 -type f \( -name "$arm-$size*.gz" -o -name "$arm-$size*.zst" \))
+              test -n "$profile"
+              heaptrack_print "$profile" > "$out/$arm-$size-summary.txt"
+            done
+          done
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: bench-${{ runner.os }}-${{ steps.tree.outputs.sha }}
+          path: target/bench-out
+          if-no-files-found: error

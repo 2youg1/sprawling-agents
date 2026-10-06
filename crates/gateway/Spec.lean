@@ -36,7 +36,7 @@ import crates.gateway.spec.Transcribe.Recording
 
 本文件是 crate 的规格入口，分部在 `spec/` 下，布局见 ARCHITECTURE.md §11「Specifications in Lean」。接口一节一节写在规定它的那个模块的分部里，每一节保留它的标签 §8-n，别处引作 `crates/gateway/Spec.lean §8-n`；本文件 §8 列出每个标签住在哪个分部，并写下四节不属于任何一个模块的 crate 级接口。决定写作 `D<n>`，放在它所管的声明正上方，或它所管主题的那个分部里，别处引作 `gateway D<n>`；D1 到 D15 是这份规格在 Markdown 时 §12 各段按出现顺序的编号，D16 起是迁到 Lean 之后的决定，§12 末尾列出每条住在哪里。
 
-能写成定理的规则在分部里证明，Lean 模型是「必须守住哪些性质」的权威，Rust 代码是「怎样守住」的权威：输出上限的事实梯（`spec/Provider/Ceiling.lean`）、一个模型收得下什么（`spec/Provider/Input.lean`）、预置表里哪一行为一个模型 id 作答（`spec/Provider/Preset.lean`）、一次失败能不能再试（`spec/Endpoint/Failure.lean`）、一次调用的结算（`spec/Cost.lean`）、一个端点的并发名额与排队（`spec/Concurrency.lean`）。其余分部只有节注释：它们写的是接口的形状、取舍与被否的备选，由 Rust 的类型与各模块旁的测试守住（§16）。
+能写成定理的规则在分部里证明，Lean 模型是「必须守住哪些性质」的权威，Rust 代码是「怎样守住」的权威：输出上限的事实梯（`spec/Provider/Ceiling.lean`）、一个模型收得下什么（`spec/Provider/Input.lean`）、预置表里哪一行为一个模型 id 作答（`spec/Provider/Preset.lean`）、一次失败能不能再试（`spec/Endpoint/Failure.lean`）、一次调用的结算（`spec/Cost.lean`）、一个端点的并发名额与排队（`spec/Concurrency.lean`）、Responses 流的 EOF 结算（`spec/Dialect/Responses.lean`）。其余分部只有节注释：它们写的是接口的形状、取舍与被否的备选，由 Rust 的类型与各模块旁的测试守住（§16）。
 -/
 
 /-! ## 1 需求分解
@@ -341,6 +341,7 @@ kernel 已有码，语义照 Custody 一节；不新增码。
 - D24 一个凭证环境变量的值不是 Unicode 时，它是一个点名变量的配置错，不是「没配过」：`crates/gateway/spec/Credential.lean`
 - D25 `prompt_cache_key` 是预置表的一列，只写给文档说收它的主机，值是会话标识：`crates/gateway/spec/Provider.lean`
 - D26 开城时为每个已登记端点预热一次连接：一次不带凭据的 `GET models_url`，失败只停这一次预热，谁也不等它（§8-35）：`crates/gateway/spec/Endpoint/Transport.lean`
+- D27 Responses stream 在 EOF 后投影出最后有效 terminal 与首个 reported error，复用最终解析器：`crates/gateway/spec/Dialect/Responses.lean`
 -/
 
 /-! ## 13 依赖选型
@@ -376,6 +377,7 @@ golden：两 Dialect 各一请求一响应（insta）；proptest：响应往返�
 - 预置表的行：`provider::preset` 的 proptest `the_row_rule_keeps_the_lean_properties` 与测试（`a_documented_model_is_matched_by_the_longest_prefix_that_fits`、`a_relay_forwarding_a_vendors_id_reads_the_vendors_row_and_a_local_server_does_not`、`no_pinned_catalogue_row_is_also_matched_by_this_table`）。
 - 能否再试：`endpoint::failure` 的测试（`what_never_completed_is_asked_again_and_what_was_refused_is_not`、`a_provider_that_says_busy_or_broken_is_asked_again_and_one_that_refuses_is_not`、`a_request_that_outgrew_the_window_is_told_how_to_fit_again`）。
 - 名额：`concurrency` 的 proptest `permits_keep_the_lean_properties` 与 `a_trace_without_narrowing_keeps_in_use_within_the_limit`，`endpoint::permit` 的 `grants_follow_arrival`。
+- Responses：`spec/Dialect/Responses.lean` 的任意轨迹结算性质，由 `responses_keep_the_lean_trace_properties` 与 endpoint 的 `responses_` 行为检查对拍；后者检查完整 `ModelReturn`、增量在 EOF 前交付、error 后增量以及 cut/silence 优先级。
 - 结算：`cost` 的测试（`the_authoritative_amount_always_wins`、`the_price_sheet_computes_integer_shares`、`overflowing_settlements_are_errors_not_wraps`）。
 
 只有节注释的分部，其要求由类型与 `cargo nextest run -p sprawling-gateway` 的各模块测试守住。
