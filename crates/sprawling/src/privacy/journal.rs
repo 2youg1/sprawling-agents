@@ -124,7 +124,13 @@ mod tests {
     fn reading_missing_history_creates_nothing() {
         let home = tempfile::tempdir().unwrap();
         let path = accounting::home::Home::at(home.path()).privacy_history();
-        assert!(read(&path).unwrap().statuses().is_empty());
+        assert!(
+            read(&path)
+                .unwrap()
+                .disclose(|_| Ok(()))
+                .unwrap()
+                .is_empty()
+        );
         assert_eq!(std::fs::read_dir(home.path()).unwrap().count(), 0);
     }
 
@@ -134,7 +140,8 @@ mod tests {
         let path = dir.path().join("fixture.jsonl");
         let before = bytes(&[prepared(intent(1, RawValue::Absent { key_existed: false }))]);
         std::fs::write(&path, &before).unwrap();
-        let status = serde_json::to_value(read(&path).unwrap().statuses()).unwrap();
+        let status =
+            serde_json::to_value(read(&path).unwrap().disclose(|_| Ok(())).unwrap()).unwrap();
         assert_eq!(
             status,
             serde_json::json!([{ "operation": 1, "outcome": "unresolved" }])
@@ -155,7 +162,13 @@ mod tests {
         writer.try_lock().unwrap();
         assert!(matches!(read(&path), Err(HistoryFault::Busy)));
         drop(writer);
-        assert!(read(&path).unwrap().statuses().is_empty());
+        assert!(
+            read(&path)
+                .unwrap()
+                .disclose(|_| Ok(()))
+                .unwrap()
+                .is_empty()
+        );
     }
 
     #[test]

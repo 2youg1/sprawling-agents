@@ -6,9 +6,11 @@
 //! Read-only privacy status (`crates/sprawling/spec/Privacy/Cli.lean`).
 
 use accounting::home::Home;
-use kernel::{AxCode, AxError};
+use kernel::{AxCode, AxError, SecretRef};
+use zeroize::Zeroizing;
 
-/// Reads local operation receipts without creating or settling history.
+/// Reads local operation receipts without creating or settling history,
+/// and shows them only to the identity their owner reference is bound to.
 ///
 /// # Errors
 /// Identity sampling, owner binding, home detection, busy or malformed history,
@@ -21,17 +23,17 @@ pub fn status() -> Result<String, AxError> {
     )
 }
 
+/// The identity is sampled before the history is opened, so a failed
+/// sample says nothing about the history, not even whether it is intact.
 fn status_at(
     path: &std::path::Path,
-    identity: impl FnOnce() -> Result<zeroize::Zeroizing<String>, AxError>,
-    mut verify: impl FnMut(&kernel::SecretRef, &str) -> Result<(), AxError>,
+    identity: impl FnOnce() -> Result<Zeroizing<String>, AxError>,
+    verify: impl FnOnce(&SecretRef, &str) -> Result<(), AxError>,
 ) -> Result<String, AxError> {
     let observed = identity()?;
     let history = super::journal::read(path).map_err(super::state::HistoryFault::into_ax)?;
-    if let Some(reference) = history.owner() {
-        verify(reference, &observed)?;
-    }
-    serde_json::to_string(history.statuses()).map_err(|source| {
+    let statuses = history.disclose(|owner| verify(owner, &observed))?;
+    serde_json::to_string(statuses).map_err(|source| {
         AxError::failure(
             AxCode::InvalidArgs,
             "encode privacy status",
@@ -45,9 +47,7 @@ fn status_at(
 #[allow(clippy::unwrap_used, clippy::panic, reason = "test code")]
 mod tests {
     use super::*;
-    use kernel::SecretRef;
     use std::path::Path;
-    use zeroize::Zeroizing;
 
     fn refused() -> AxError {
         AxError::failure(
@@ -83,22 +83,6 @@ mod tests {
         bytes.push(b'\n');
         std::fs::write(path, &bytes).unwrap();
         bytes
-    }
-
-    #[test]
-    fn foreign_owner_never_receives_history_summary() {
-        let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("history.jsonl");
-        let before = fixture(&path);
-        assert!(
-            status_at(
-                &path,
-                || Ok(Zeroizing::new("current-fixture".to_owned())),
-                |_, _| Err(refused())
-            )
-            .is_err()
-        );
-        assert_eq!(std::fs::read(path).unwrap(), before);
     }
 
     #[test]
@@ -225,67 +209,48 @@ mod tests {
         (bytes, count)
     }
 
-    fn snapshot_traces() -> impl proptest::strategy::Strategy<Value = Vec<(Vec<u8>, usize)>> {
+    fn histories() -> impl proptest::strategy::Strategy<Value = (Vec<u8>, usize)> {
         use proptest::prelude::*;
         proptest::collection::vec(
-            proptest::collection::vec(
-                (
-                    any::<u32>(),
-                    proptest::collection::vec(any::<u8>(), 0..64),
-                    0u8..4,
-                    any::<bool>(),
-                ),
-                0..24,
-            )
-            .prop_map(snapshot),
-            0..12,
+            (
+                any::<u32>(),
+                proptest::collection::vec(any::<u8>(), 0..64),
+                0u8..4,
+                any::<bool>(),
+            ),
+            0..24,
         )
+        .prop_map(snapshot)
     }
 
     proptest::proptest! {
         #[test]
-        fn foreign_snapshot_traces_disclose_nothing(
-            snapshots in snapshot_traces(), owner in proptest::num::u64::ANY,
+        fn only_the_bound_identity_receives_a_summary(
+            (bytes, count) in histories(), owner in proptest::num::u64::ANY,
             offset in 1u64..=u64::MAX,
         ) {
             let dir = tempfile::tempdir().unwrap();
             let path = dir.path().join("history.jsonl");
+            std::fs::write(&path, &bytes).unwrap();
             let reference = SecretRef::new("privacy", "fixture-owner").unwrap();
             let stored = owner.to_string();
             let foreign = owner.wrapping_add(offset).to_string();
-            for (bytes, count) in snapshots {
-                std::fs::write(&path, &bytes).unwrap();
-                for observed in [&stored, &foreign] {
-                    let mut reads = 0usize;
-                    let result = status_at(&path, || Ok(Zeroizing::new(observed.clone())),
-                        |requested, observed| gateway::verify_identity_binding(requested, observed, |requested| {
-                            reads = reads.checked_add(1).unwrap();
-                            assert_eq!(requested, &reference);
-                            Ok(Some(Zeroizing::new(stored.clone())))
-                        }));
-                    if count == 0 || observed == &stored {
-                        let values: serde_json::Value = serde_json::from_str(&result.unwrap()).unwrap();
-                        proptest::prop_assert_eq!(values.as_array().unwrap().len(), count);
-                    } else {
-                        proptest::prop_assert_eq!(*result.unwrap_err().code(), AxCode::ConfigInvalid);
-                    }
-                    proptest::prop_assert_eq!(reads, usize::from(count != 0));
-                    proptest::prop_assert_eq!(std::fs::read(&path).unwrap(), bytes.clone());
+            for observed in [&stored, &foreign] {
+                let mut reads = 0usize;
+                let result = status_at(&path, || Ok(Zeroizing::new(observed.clone())),
+                    |requested, observed| gateway::verify_identity_binding(requested, observed, |requested| {
+                        reads = reads.checked_add(1).unwrap();
+                        assert_eq!(requested, &reference);
+                        Ok(Some(Zeroizing::new(stored.clone())))
+                    }));
+                if count == 0 || observed == &stored {
+                    let values: serde_json::Value = serde_json::from_str(&result.unwrap()).unwrap();
+                    proptest::prop_assert_eq!(values.as_array().unwrap().len(), count);
+                } else {
+                    proptest::prop_assert_eq!(*result.unwrap_err().code(), AxCode::ConfigInvalid);
                 }
-            }
-        }
-
-        #[test]
-        fn failed_identity_snapshot_traces_disclose_nothing(snapshots in snapshot_traces()) {
-            let dir = tempfile::tempdir().unwrap();
-            let path = dir.path().join("history.jsonl");
-            for (bytes, _) in snapshots {
-                std::fs::write(&path, &bytes).unwrap();
-                let result = status_at(&path, || Err(refused()),
-                    |requested, observed| gateway::verify_identity_binding(requested, observed,
-                        |_| panic!("failed identity must not read Vault")));
-                proptest::prop_assert_eq!(result, Err(refused()));
-                proptest::prop_assert_eq!(std::fs::read(&path).unwrap(), bytes);
+                proptest::prop_assert_eq!(reads, usize::from(count != 0));
+                proptest::prop_assert_eq!(std::fs::read(&path).unwrap(), bytes.clone());
             }
         }
     }

@@ -17,8 +17,9 @@
 //! and session memory.
 
 mod custodian;
-pub mod identity;
+mod identity;
 mod vault;
 
 pub use custodian::{Custodian, Custody, Store};
+pub use identity::{verify_identity_binding, verify_platform_identity};
 pub use vault::Persistence;

@@ -78,13 +78,16 @@ fn powershell() -> Result<std::path::PathBuf, AxError> {
     }
 }
 
-/// The answer, kept only when it is a SID.
+/// The answer, kept only when it is a SID: `S-1-`, an identifier
+/// authority and at least one sub-authority, each a non-empty run of
+/// decimal digits.
 #[cfg(windows)]
 fn principal(answer: Zeroizing<String>) -> Result<Zeroizing<String>, AxError> {
-    if answer.starts_with("S-1-")
-        && answer
-            .bytes()
-            .all(|byte| byte == b'S' || byte == b'-' || byte.is_ascii_digit())
+    let decimal =
+        |group: &str| !group.is_empty() && group.bytes().all(|byte| byte.is_ascii_digit());
+    if answer
+        .strip_prefix("S-1-")
+        .is_some_and(|groups| groups.split('-').nth(1).is_some() && groups.split('-').all(decimal))
     {
         Ok(answer)
     } else {

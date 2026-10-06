@@ -49,7 +49,6 @@ mod tests {
     use super::super::vault::MemoryVault;
     use super::*;
     use std::cell::Cell;
-    use zeroize::Zeroizing;
 
     #[test]
     fn binding_comparison_refuses_missing_foreign_and_empty_identities() {
