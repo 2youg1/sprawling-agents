@@ -105,14 +105,13 @@ impl Endpoint {
                 )
             })?
         } else {
-            let mut frames = Vec::new();
+            let mut frames = dialect::StreamFrames::new(self.config.dialect);
             self.lines_of(response, |line| {
                 if let Some(frame) = frame_of(&line) {
                     if let Some(held) = dialect::increment_of(self.config.dialect, &frame) {
                         onto(&held);
                     }
-                    frames.push(frame);
-                    if let Some(call) = dialect::call_completed_by(self.config.dialect, &frames)? {
+                    if let Some(call) = frames.retain_and_complete(frame)? {
                         early(&call);
                     }
                 }
@@ -121,7 +120,7 @@ impl Endpoint {
             // A cut stream is a provider failure, never a shortened
             // reply: a return is built from the settled frame, and a
             // body that ended before that frame arrived has none.
-            dialect::settled_from_stream(self.config.dialect, &frames)?
+            frames.finish()?
         };
         self.returned(&settled)
     }
@@ -403,5 +402,71 @@ mod tests {
         );
         assert_eq!(said.borrow().as_slice(), ["on ", "it"]);
         assert_eq!(ret.stop, Some(kernel::StopReason::EndTurn));
+    }
+
+    #[test]
+    #[ignore = "wall-clock instrument; just bench runs it"]
+    #[allow(clippy::disallowed_methods, reason = "instrument samples its clock")]
+    fn instrument_responses_stream() {
+        use kernel::DialectKind;
+        use serde_json::json;
+        use std::time::Instant;
+        for deltas in [8, 16_384] {
+            let delta = format!(
+                "data: {}",
+                json!({"type": "response.output_text.delta", "delta": "x".repeat(64)})
+            );
+            let terminal = format!(
+                "data: {}",
+                json!({
+                    "type": "response.completed", "response": {
+                        "status": "completed", "output": [{"type": "message", "content": [
+                            {"type": "output_text", "text": "final"}]}],
+                        "usage": {"input_tokens": 10, "output_tokens": deltas}
+                    }
+                })
+            );
+            let fixture = kernel::B3Hash::digest(format!("{deltas}:{delta}:{terminal}").as_bytes());
+            let mut peak_retained = 0;
+            let mut samples = Vec::new();
+            for sample in 0..220 {
+                let started = Instant::now();
+                let mut frames = dialect::StreamFrames::new(DialectKind::OpenAiResponses);
+                for line in std::iter::repeat_n(delta.as_str(), deltas)
+                    .chain(std::iter::once(terminal.as_str()))
+                {
+                    let frame = frame_of(std::hint::black_box(line)).unwrap();
+                    std::hint::black_box(dialect::increment_of(
+                        DialectKind::OpenAiResponses,
+                        &frame,
+                    ));
+                    assert!(frames.retain_and_complete(frame).unwrap().is_none());
+                    peak_retained = peak_retained.max(frames.retained_frames());
+                }
+                let reply = dialect::response_from_wire(
+                    DialectKind::OpenAiResponses,
+                    &frames.finish().unwrap(),
+                )
+                .unwrap();
+                std::hint::black_box(reply);
+                let nanos = started.elapsed().as_nanos();
+                if sample >= 20 {
+                    samples.push(nanos);
+                    println!(
+                        "responses_sample deltas={deltas} sample={} nanos={nanos}",
+                        sample - 20
+                    );
+                }
+            }
+            samples.sort_unstable();
+            println!(
+                "responses_summary fixture={fixture} deltas={deltas} delta_bytes=64 samples={} floor_ns={} p50_ns={} p99_ns={} max_ns={} peak_retained_frames={peak_retained} memory_source=owned_frame_count network=excluded warmup=20",
+                samples.len(),
+                samples[0],
+                samples[99],
+                samples[197],
+                samples[199]
+            );
+        }
     }
 }

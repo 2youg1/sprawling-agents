@@ -78,6 +78,39 @@ pub fn settled_from_stream(kind: DialectKind, frames: &[Value]) -> Result<Value,
     }
 }
 
+/// Frames retained until EOF; transport failures are decided before settlement.
+/// Spec: `crates/gateway/spec/Endpoint/Stream.lean` §8-13.
+pub(crate) struct StreamFrames {
+    kind: DialectKind,
+    frames: Vec<Value>,
+}
+
+impl StreamFrames {
+    pub(crate) fn new(kind: DialectKind) -> Self {
+        Self {
+            kind,
+            frames: Vec::new(),
+        }
+    }
+
+    pub(crate) fn retain_and_complete(
+        &mut self,
+        frame: Value,
+    ) -> Result<Option<ToolCall>, AxError> {
+        self.frames.push(frame);
+        call_completed_by(self.kind, &self.frames)
+    }
+
+    pub(crate) fn finish(self) -> Result<Value, AxError> {
+        settled_from_stream(self.kind, &self.frames)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn retained_frames(&self) -> usize {
+        self.frames.len()
+    }
+}
+
 /// Wire response into the canonical shape.
 pub fn response_from_wire(kind: DialectKind, wire: &Value) -> Result<ChatResponse, AxError> {
     match kind {

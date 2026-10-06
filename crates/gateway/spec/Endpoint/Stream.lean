@@ -14,7 +14,7 @@
 /-!
 ### 8-13 逐字读一次调用（形状 3 适配器）
 
-`Endpoint::call_streaming`（crate 内固有方法，`permit::Gated` 的 `Model::call_streaming` 过门后调它）：请求带 `stream: true`，逐行读 `data:`，把每一帧交给 `dialect::increment_of`，最后 `dialect::settled_from_stream` 把收集到的帧重装成**这个 dialect 非流式的那个形状**，再交给同一个 `response_from_wire`。
+`Endpoint::call_streaming`（crate 内固有方法，`permit::Gated` 的 `Model::call_streaming` 过门后调它）：请求带 `stream: true`，逐行读 `data:`，把每一帧交给 `dialect::increment_of`，`dialect::StreamFrames` 接收每一帧并在 EOF 后把收集到的帧重装成**这个 dialect 非流式的那个形状**，再交给同一个 `response_from_wire`。
 
 **「逐行」指的是响应体到达的节奏，而不是一个已经读完的字符串的行。** `Response` 当 `std::io::Read` 包进 `BufReader` 逐行读，一帧到达即交一帧；先把整个 body 读完再逐行转发，会让全部增量在模型停下之后的同一毫秒里一起发出。否决「把转发搬到 socket 任务那一层去查锁」：`to_watchers` 是非阻塞广播，帧压根没有到达那里，往下游找只会找到一个不存在的原因。**验收形式**：假供应方先写开头几帧并 flush，**然后等调用方回报「第一条增量已转出」才写剩下的**；读完再回放的实现永远回报不了，服务器自己就是断言，测试侧不读时钟。
 
@@ -35,4 +35,11 @@
 **认不出的帧跳过，缺失的结算帧不跳过。** provider 会加新的事件类型，一个人不该因为其中一个是新的就丢掉整次调用；但流在说明「为什么停」的那一帧之前结束，是 `Provider` 失败并且可重试——它和一个被截断的 body 是同一种失败，刻意不允许「保留已收到的增量」来补救：把不完整的回复当成完整的呈现出去，是这里唯一不能有的结局。
 
 **机密楼宇的拒绝写一次。** 两扇门（`call` 与 `call_streaming`）都说同一句话，出自同一个 `confidential_refusal`——一条安全拒绝有两份拷贝，就是两个各自变软的机会。
+-/
+
+/-! `instrument_responses_stream` 经生产的 `frame_of`、`increment_of`、`StreamFrames` 与
+`response_from_wire` 测量本地帧解析、转发值构造、保留与最终解析；HTTP、读线程与通道等待不计入。
+夹具在计时前生成，摘要覆盖终帧、delta 与重复数；小流与长流各预热 20 次后记录 200 个原始纳秒样本，
+p50 与 p99 取最近秩。内存读数是精确的持有帧数，不是私有字节或分配器总分配数。
+Actions 在同一个 runner 上交替运行两份预先编译的 executable，编译不计时。
 -/
