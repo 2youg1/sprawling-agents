@@ -653,13 +653,15 @@ shebang 和现有运行时选择，不要求二者同时安装。被否：只在
 
 **败给的方案**：在 `ci.yml` 里照抄那两条命令，附一句「与 `justfile` 保持一致」。那正是分叉发生时的写法，而没有任何东西会注意到它们不再一致。
 
-D27 **验证编排只住 `.github/workflows/ci.yml`，release 经 `workflow_call` 调同一提交的入口。** 本段描述 GitHub Actions 的调用契约，不是 Lean 证明；job 状态与矩阵完整性由 Actions 引擎提供。输入 `release-validation` 是默认 false 的 boolean，true 保持发行原有的阻塞范围：跳过 `changes`、Linux/macOS `core` 与条件 `proof`，其余 job 与普通 CI 共用 recipes、矩阵和准备步骤。普通 CI 的路径条件与手动 proof 不变；扩大 core/proof 的发布阻塞范围须另有明确决定。`validation` 经 `needs` 汇合必需 job，只有每项为 success 才成功；failure、cancelled、skipped 与因构建失败而未运行的分片都拒绝。四分片共用本轮 `test-build` 的 archive，矩阵与分区继续由 CI 定义，release 不另写检查清单。
+D27 **验证编排只住 `.github/workflows/ci.yml`，release 经 `workflow_call` 调同一提交的入口。** 本段描述 GitHub Actions 的调用契约，不是 Lean 证明；job 状态与矩阵完整性由 Actions 引擎提供。输入 `release-validation` 是默认 false 的 boolean，true 保持发行原有的阻塞范围：跳过 `changes`、Linux/macOS `core` 与条件 `proof`，其余 job 与普通 CI 共用 recipes、矩阵和准备步骤。普通 CI 的路径条件与手动 proof 不变；扩大 core/proof 的发布阻塞范围须另有明确决定。`validation` 经 `needs` 汇合必需 job，只有每项为 success 才成功；failure、cancelled、skipped 与因构建失败而未运行的分片都拒绝。类型分片共用本轮 `test-build` 的 archive；`justfile` 的 `test-slice-plan` 是分片名称与 nextest filterset 的唯一权威，CI 使用该 recipe 输出的矩阵，release 不另写检查清单。构建作业用 archive 的完整 nextest JSON 清单与每个 filterset 的清单比较 `(binary-id, test name)`，包括 ignored 项；未分配、重复分配或清单外的项都失败，只有覆盖验证成功才输出矩阵。trybuild 按 package 分开，citysim 独立，其余 unit 按 crate 分组、integration 按 package 分组，其他 kind 归入兜底分片；accounting 的 unit 场景按执行、协作及补集三个模块域分开，因为其文件写入与 worker 场景集中在一个 runner 会成为执行热点，域的 module 名称只在 `test-slice-plan` 的 predicates 定义，补集从这些 predicates 生成。新测试必须仍恰好落入一个分片。
 
 `test-build` 的两项 Cargo debug 环境覆盖只在共享入口定义，main 与 tag 因而读同一种 test 缓存身份；fast/clippy/test 的用途仍各自独立，Rust cache 保持默认 workspace 产物清理，只有 main 写入。缓存恢复不是验证证据。release 调用的 concurrency 以 run id 隔离且不替代取消，普通 CI 仍按 ref 替代旧运行；调用权限只有 contents read，不传 secrets。release 的 advisories 是本轮新读，发行 archive 仍并行构建，publish 等待 verify、advisories 与 archive 成功，发行消费者只下载 archive-*。verify/archive job 名与 Windows 签名输出 archive-Windows 的位置保留。
 
+`test-timings` 读取两份 `gh run view --json conclusion,headSha,startedAt,updatedAt,jobs` 的完整成功结果，对照全 CI、从 test build 启动到 test 汇总结束的测试链、构建与最长分片的 wall time，并逐片列出读数；排队计入全 CI 与测试链，不能从该差额推断分片算法的净收益。未成功或缺少构建、分片、test 汇总的输入不产生测量结论。
+
 `release.yml` 的手动 `workflow_dispatch` 恒为只构建验证，必填 boolean 输入 `build-only` 缺省为 true；即使输入 false 或选择 tag，手动事件也不能执行 publish、channel、crates 或取得这些发布 job 的 OIDC 权限。三处发布 job 都要求 push 事件且 ref 以 `refs/tags/v` 开头；tag push 保持既有发布政策。手动运行复用 verify、advisories 与 archive，不设 `SPRAWLING_RELEASE_TAG`，产物标识为源码构建；保留准确 commit/tree、归档摘要、耗时与缓存读数作为验证证据。本契约不改变 D27 的必需 job 集合、矩阵或失败／取消／缺席拒绝，不调用未配置的 SignPath。手动运行是否只构建由事件边界决定，输入值不授予发布能力。
 
-被否：release 另抄 jobs 或 Cargo 命令，会再次分叉；缓存 composite action 在只有一个 test-build 定义时增加无用的接口；接受历史 CI 绿结果需要本方案没有的来源、时效与完整性协议。重开参数：发行要求 core/proof 阻塞，或确有跨运行结果复用需求。验证以两个 YAML 的解析、inputs/权限/needs、缓存环境唯一性与四分片对照为本地边界；真实 cache hit、失败传播与耗时由 Actions 运行确认。
+被否：release 另抄 jobs 或 Cargo 命令，会再次分叉；缓存 composite action 在只有一个 test-build 定义时增加无用的接口；接受历史 CI 绿结果需要本方案没有的来源、时效与完整性协议。重开参数：发行要求 core/proof 阻塞，或确有跨运行结果复用需求。验证以两个 YAML 的解析、inputs/权限/needs、缓存环境唯一性与类型分片覆盖对照为本地边界；真实 cache hit、失败传播与耗时由 Actions 运行确认。
 
 **只有一份**：`features` 不是门。`just check` 已经调这条 recipe，再在 `gates` 里跑同一条工作区检查就是同一次编译每轮跑两遍；只留 recipe 是一条裁决。
 -/
