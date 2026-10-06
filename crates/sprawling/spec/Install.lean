@@ -314,7 +314,8 @@ release.yml 的 tag 发布将生成定义推送至对应仓库；缺凭据只跳
 Homebrew 用户 brew update 后 brew upgrade sprawling；AUR 用户在原 PKGBUILD
 checkout 中 git pull --ff-only 后 makepkg -si。程序只显示更新命令，不能替包管理器更新。
 先解析 current_exe 的符号链接，再以 Homebrew 的 Cellar/sprawling 路径与 AUR 的
-/usr/lib/sprawling-bin 路径辨认来源；链接解析失败保留未知来源，不猜包管理器。
+kernel::release::is_aur_install 辨认来源；包名与布局由同模块的
+AUR_PACKAGE_NAME 和 aur_install_directory 生成，链接解析失败保留未知来源，不猜包管理器。
 Cargo bin 的候选路径同步解析符号链接，避免真实 exe 路径与未解析的 Cargo
 目录错开；候选目录不可解析时保留原路径，已有的直接目录匹配仍可用。
 明确环境选择也可指定 homebrew/aur，复制到其他位置后按未知来源要求确认。

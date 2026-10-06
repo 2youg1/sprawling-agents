@@ -1408,11 +1408,14 @@ channel::run 每次读取归档后用 sha2 计算一次 SHA256，平台仍只来
 部分平台归档可以生成相应 formula 分支；没有 Linux 归档不生成 AUR，未知平台仍拒绝。
 版本用 kernel::Release 的 npm_version，AUR 将连字符转换为下划线，保留发行日期。
 Homebrew 安装二进制到 keg 的 bin，随附资源与许可到 libexec；AUR 安装二进制与
-资源到 /usr/lib/sprawling-bin，以 /usr/bin/sprawling 链接它，许可另到 share/licenses。
+资源到 kernel::release::aur_install_directory()，以 /usr/bin/sprawling 链接它，
+包名取 kernel::release::AUR_PACKAGE_NAME，许可另到 share/licenses。
 二者不调用 sprawling install，不修改用户登录配置。PKGBUILD 与 .SRCINFO 从同一值生成。
 release.yml 每次构建在 macOS/Linux 用本地 formula 安装，并在 Arch 容器以非 root
 执行 makepkg，再安装并运行 --version；验证的 URL 指向本次归档的回环 HTTP，
-只有生成文件的下载基址替换，摘要与包内容不变。发布仅限 tag push，生成文件推送至
+仅 homebrew/sprawling.rb、aur/PKGBUILD、aur/.SRCINFO 的下载基址替换，
+其他文件按字节保留，摘要与包内容不变；含 ELF/Mach-O 非 UTF-8 字节的 fixture
+通过同一 validate.py 入口验证，再由 release build 执行真实安装。发布仅限 tag push，生成文件推送至
 tap/AUR 前已发布归档；凭据缺失以 notice 跳过，不能跳过生成或验证。
 验收：channel fixture 的摘要一致检查、brew install、makepkg --printsrcinfo 对拍与 --version。
 -/

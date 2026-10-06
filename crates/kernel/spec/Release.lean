@@ -271,3 +271,14 @@ theorem crates_and_npm_give_one_verdict (pre : Nat) (mine newest : Release)
     crates_orders_by_version]
 
 end Kernel.Release
+
+/-! ### AUR 归档布局接口
+
+本节描述接口，不是形式证明。`kernel::release::AUR_PACKAGE_NAME` 是 AUR 包名的
+唯一权威，`aur_install_directory() -> String` 从它生成相对发行根目录的 POSIX 路径，
+`is_aur_install(exe: &Path) -> bool` 判断 exe 的父目录是否以后者为后缀。
+包名与布局由生成器的交付规则决定，放在既有 release 模块供 xtask 与运行时共同读取，
+避免工具目录成为产品依赖，也避免两个消费者各自决定安装路径。
+PKGBUILD、.SRCINFO 和运行时来源识别都读取这些接口；xtask fixture 从生成的
+PKGBUILD 链接目标提取 exe 路径并交给同一识别接口，验收跨消费者的一致性。
+-/
