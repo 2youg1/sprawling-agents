@@ -119,7 +119,7 @@ Identity（两态）｜Resident｜Ephemeral｜Dossier｜URBANITE.md。**不引�
 
 Lean 里的名字与 Rust 的对应：
 
-- `City.ConfigLayers.Ladder.Layer`／`Layer.ALL`／`read`／`tagged`／`resolve`／`file` ↔ `config_layers::ladder` 的 `Layer`、`Layer::ALL`、`Ladder::read`、`Ladder::tagged`、`Ladder::resolve`、`Layer::file`；`statedAt` ↔ `ladder::stated` 加上它调的 `in_file`；`Confined`／`Confined.nearest` ↔ `refuse::Confined` 与它的 `nearest`，`statedAt` 的 `confined` ↔ `ConfigLayer::confined`、`tooNear` ↔ `refuse::too_near`；`settledHarness` ↔ `settled_harness`；`LayeredValue` ↔ `kernel::LayeredValue`。
+- `City.ConfigLayers.Ladder.Layer`／`Layer.ALL`／`read`／`tagged`／`resolve`／`file` ↔ `config_layers::ladder` 的 `Layer`、`Layer::ALL`、`Ladder::read`、`Ladder::tagged`、`Ladder::resolve`、`Layer::file`；`statedAt` ↔ `ladder::stated` 加上它调的 `in_file`；`Confined`／`Confined.nearest`／`reaches` ↔ `refuse::Confined` 与它的 `nearest`、`reached_from`（`Layer.depth` 是 Rust `Layer` 由远及近派生的 `Ord`），`statedAt` 的 `confined` ↔ `ConfigLayer::confined`、`tooNear` ↔ `refuse::too_near`；`settledHarness` ↔ `settled_harness`；`LayeredValue` ↔ `kernel::LayeredValue`。
 - `City.ConfigLayers.change`／`land` ↔ `config_layers::write::change_at` 与它之后盘上的那份文件。
 - `City.ConfigLayers.Search.Configuration`／`supplier` ↔ `SearchConfiguration`（kernel 的 `config::search`）与 `config_layers::search::search_supplier`。
 - `City.Building.of`／`holds`／`create`／`head` ↔ `Building::of`、`Building::holds`、`building::create`，`head` 是 `of` 取首段的那一步；`removed` ↔ `building::removal` 的落点。

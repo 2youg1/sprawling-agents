@@ -6,7 +6,7 @@
 /-!
 # city::config_layers
 
-规定 `config_layers`、`config_layers::write`、`config_layers::settled`、`config_layers::session`、`config_layers::resident`、`config_layers::mcp`、`config_layers::search`、`config_layers::context`、`config_layers::cache`、`config_layers::clock`、`config_layers::refuse`（`crates/city/src/` 下同名的文件）。三层配置住哪三个文件、怎么求成一份 `FrozenConfig`、怎么写回去。本文件是 `crates/city/Spec.lean` 的一个分部；下面每一节保留它在 city 规格里的标签 §8-n，别处引作 `crates/city/Spec.lean §8-n`，决定引作 `city D<n>`。
+规定 `config_layers`、`config_layers::write`、`config_layers::settled`、`config_layers::session`、`config_layers::resident`、`config_layers::mcp`、`config_layers::search`、`config_layers::search::section`、`config_layers::context`、`config_layers::cache`、`config_layers::clock`、`config_layers::refuse`（`crates/city/src/` 下同名的文件）。三层配置住哪三个文件、怎么求成一份 `FrozenConfig`、怎么写回去。本文件是 `crates/city/Spec.lean` 的一个分部；下面每一节保留它在 city 规格里的标签 §8-n，别处引作 `crates/city/Spec.lean §8-n`，决定引作 `city D<n>`。
 -/
 
 /-!
