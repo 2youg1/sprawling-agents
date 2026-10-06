@@ -694,7 +694,8 @@ mod tests {
                             .provider_account,
                     )
                 }
-                _ => None,
+                runtime::replay::VerifiedLine::Known { .. }
+                | runtime::replay::VerifiedLine::IgnoredUnknown { .. } => None,
             })
             .collect::<Vec<_>>();
         assert!(
