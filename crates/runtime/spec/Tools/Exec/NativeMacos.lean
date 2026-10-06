@@ -57,7 +57,7 @@ https://github.com/apple-oss-distributions/system_cmds/blob/408bba7453608006b897
 同一 XNU 固定提交的
 https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/bsd/kern/kern_resource.c#L1647
 以 current_map() 设置 RLIMIT_AS，限制的是当前进程地址空间；继承额度不把额度变成共享池。
-同一提交的 bsd/sys/resource.h L147 定义 RLIMIT_AS 为 RLIMIT_RSS 的别名，
+同一提交的 bsd/sys/resource.h L509–511 定义 RLIMIT_RSS 为 RLIMIT_AS 的别名，
 不是第二种独立的树级机制。vm_map_set_size_limit（osfmk/vm/vm_map.c L22094）
 拒绝低于当前 map->size 的额度；runner 中 Python 设置 512 MiB AS 与 96 MiB RSS
 均被拒绝，报告保留失败，不把它们称为成功的分配超限对拍。
