@@ -265,22 +265,94 @@ test *args:
 test-std:
     cargo test --workspace --locked
 
-# The suite of `test`, compiled once into an archive that `test-slice`
-# runs a part of on another machine with the same checkout path: `ci.yml`
-# builds it on one runner and runs four slices on four others, so the
-# compile is paid once and the run is a quarter of the wall clock.
+# Compile the suite once; every CI slice consumes this archive.
 test-archive file:
     cargo nextest archive --workspace --locked --all-features --archive-file '{{file}}'
 
-# One slice of an archive `test-archive` wrote, `partition` in nextest's
-# spelling (`count:2/4`). The archive is unpacked over this checkout's
-# own `target/`, because a test that spawns a workspace binary reads the
-# absolute path cargo baked in at compile time. The fetch first, because
-# the trybuild suites compile a project of their own offline and find no
-# dependency on a runner that never resolved one.
-test-slice file partition:
+# Names and filtersets live here; CI consumes the checked matrix rather
+# than maintaining a second roster. List from the archive, then reuse its
+# metadata for each filterset, so coverage needs no second compilation.
+test-slice-plan file out:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    mkdir -p '{{out}}'
+    cargo nextest list --archive-file '{{file}}' --workspace-remap . --extract-to . --extract-overwrite --message-format json > '{{out}}/full.json'
+    python - '{{out}}' <<'PY'
+    import json, pathlib, subprocess, sys
+    out = pathlib.Path(sys.argv[1])
+    slices = []
+    for package in ['kernel', 'storage', 'collab', 'runtime', 'wire']:
+        slices.append({'name': 'trybuild-' + package, 'filter': f'package(=sprawling-{package}) & binary(=trybuild)'})
+    slices.append({'name': 'citysim', 'filter': 'package(=citysim)'})
+    unit = '(kind(lib) | kind(bin) | kind(proc-macro)) & !package(=citysim)'
+    groups = {
+        'runtime': 'package(=sprawling-runtime)',
+        'accounting': 'package(=sprawling-accounting)',
+        'sprawling': 'package(=sprawling)',
+        'xtask': 'package(=xtask)',
+        'kernel-storage': '(package(=sprawling-kernel) | package(=sprawling-storage))',
+        'gateway-protocols': '(package(=sprawling-gateway) | package(=sprawling-agent-protocols))',
+    }
+    for name, packages in groups.items():
+        slices.append({'name': 'unit-' + name, 'filter': f'{unit} & {packages}'})
+    slices.append({'name': 'unit-other', 'filter': unit + ' & !(' + ' | '.join(groups.values()) + ')'})
+    integration = 'kind(test) & !binary(=trybuild) & !package(=citysim)'
+    slices.extend([
+        {'name': 'integration-sprawling', 'filter': integration + ' & package(=sprawling)'},
+        {'name': 'integration-other', 'filter': integration + ' & !package(=sprawling)'},
+        {'name': 'other-kinds', 'filter': '!(kind(lib) | kind(bin) | kind(proc-macro) | kind(test)) & !package(=citysim)'},
+    ])
+    active = []
+    for row in slices:
+        with (out / (row['name'] + '.json')).open('w', encoding='utf-8') as output:
+            subprocess.run(['cargo', 'nextest', 'list', '--cargo-metadata', 'target/nextest/cargo-metadata.json',
+                            '--binaries-metadata', 'target/nextest/binaries-metadata.json', '--workspace-remap', '.',
+                            '--message-format', 'json', '-E', row['filter']], stdout=output, check=True)
+        listing = json.loads((out / (row['name'] + '.json')).read_text(encoding='utf-8'))
+        if any(case['filter-match']['status'] == 'matches' for suite in listing['rust-suites'].values()
+               for case in suite.get('testcases', {}).values()):
+            active.append(row)
+    (out / 'matrix.json').write_text(json.dumps({'include': active}), encoding='utf-8')
+    PY
+    just test-slice-coverage '{{out}}'
+
+# Compare identities, not counts: equal totals can hide a missing test
+# behind a duplicate. Ignored tests stay in the proof and remain ignored
+# when run, exactly as in the unsliced suite.
+test-slice-coverage out:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    python - '{{out}}' <<'PY'
+    import collections, json, pathlib, sys
+    out = pathlib.Path(sys.argv[1])
+    def identities(path):
+        suites = json.loads(path.read_text(encoding='utf-8'))['rust-suites']
+        return {(suite['binary-id'], name) for suite in suites.values()
+                for name, case in suite.get('testcases', {}).items() if case['filter-match']['status'] == 'matches'}
+    full = identities(out / 'full.json')
+    matrix = json.loads((out / 'matrix.json').read_text(encoding='utf-8'))['include']
+    names = [row['name'] for row in matrix]
+    if not full or not names or len(names) != len(set(names)):
+        sys.exit('test-slice-coverage: empty suite/matrix or duplicate slice name')
+    owners = collections.defaultdict(list)
+    for name in names:
+        selected = identities(out / (name + '.json'))
+        print(f'{name}: {len(selected)} tests')
+        for identity in selected:
+            owners[identity].append(name)
+    defects = [f'unassigned: {identity}' for identity in sorted(full - owners.keys())]
+    defects += [f'outside full suite: {identity}' for identity in sorted(owners.keys() - full)]
+    defects += [f'assigned twice: {identity}: {owners[identity]}' for identity in sorted(owners) if len(owners[identity]) != 1]
+    if defects:
+        sys.exit('test-slice-coverage: ' + chr(10).join(defects))
+    print(f'test-slice-coverage: {len(full)} tests assigned exactly once across {len(names)} slices')
+    PY
+
+# Unpack at the checkout path compiled into tests that spawn workspace
+# binaries. Fetch first: trybuild compiles its own project offline.
+test-slice file filter:
     cargo fetch --locked
-    cargo nextest run --archive-file '{{file}}' --workspace-remap . --extract-to . --extract-overwrite --partition '{{partition}}' --no-fail-fast
+    cargo nextest run --archive-file '{{file}}' --workspace-remap . --extract-to . --extract-overwrite -E '{{filter}}' --no-fail-fast --no-tests=warn
 
 # The packages every platform builds and tests. The desktop server
 # and its FFI seam serve a Windows desktop only, and xtask judges the
