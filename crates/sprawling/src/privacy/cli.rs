@@ -59,28 +59,14 @@ mod tests {
     }
 
     fn fixture(path: &Path) -> Vec<u8> {
-        use super::super::state::{Control, DEFINITION, Event, Intent, Line, RawValue, SCHEMA};
-        let modified = RawValue::Present {
-            kind: 1,
-            bytes: vec![49, 0, 0, 0],
-        };
-        let mut bytes = serde_json::to_vec(&Line {
-            schema: SCHEMA,
-            event: Event::Prepared {
-                intent: Intent {
-                    operation: std::num::NonZeroU64::new(1).unwrap(),
-                    control: Control::WindowsUserPowershellTelemetry,
-                    definition: DEFINITION,
-                    owner: SecretRef::new("privacy", "fixture-owner").unwrap(),
-                    original: RawValue::Absent { key_existed: false },
-                    modified: modified.clone(),
-                    recommendation: modified,
-                    restore_of: None,
-                },
-            },
-        })
-        .unwrap();
-        bytes.push(b'\n');
+        use super::super::state::fixtures::{apply, bytes, dword, prepared};
+        use super::super::target::{RawValue, Snapshot};
+        let bytes = bytes(&[prepared(&apply(
+            1,
+            wire::PrivacyControl::PowershellTelemetryOptout,
+            Snapshot::Registry(RawValue::Absent),
+            dword(1),
+        ))]);
         std::fs::write(path, &bytes).unwrap();
         bytes
     }
@@ -135,78 +121,53 @@ mod tests {
     }
 
     fn snapshot(steps: Vec<(u32, Vec<u8>, u8, bool)>) -> (Vec<u8>, usize) {
-        use super::super::state::{
-            Control, DEFINITION, Event, Intent, Line, Outcome, RawValue, SCHEMA,
-        };
-        let mut bytes = Vec::new();
+        use super::super::state::fixtures::{apply, finished, prepared, restore};
+        use super::super::state::{Intent, Outcome};
+        use super::super::target::{RawValue, Snapshot};
+        let mut lines = Vec::new();
         let mut owned: Vec<Intent> = Vec::new();
         let mut count = 0usize;
-        for (index, (kind, raw, outcome, restore)) in steps.into_iter().enumerate() {
-            let previous = if restore { owned.last() } else { None };
-            let modified = previous.map_or_else(
-                || RawValue::Present { kind, bytes: raw },
-                |previous| previous.original.clone(),
-            );
-            let intent = Intent {
-                operation: std::num::NonZeroU64::new(
-                    u64::try_from(index.checked_add(1).unwrap()).unwrap(),
-                )
-                .unwrap(),
-                control: Control::WindowsUserPowershellTelemetry,
-                definition: DEFINITION,
-                owner: SecretRef::new("privacy", "fixture-owner").unwrap(),
-                original: previous.map_or(RawValue::Absent { key_existed: false }, |previous| {
-                    previous.modified.clone()
-                }),
-                modified: modified.clone(),
-                recommendation: modified,
-                restore_of: previous.map(|previous| previous.operation),
+        for (index, (kind, raw, outcome, restoring)) in steps.into_iter().enumerate() {
+            let id = u64::try_from(index.checked_add(1).unwrap()).unwrap();
+            let intent = match owned.last() {
+                Some(previous) if restoring => restore(id, previous),
+                Some(_) | None => apply(
+                    id,
+                    wire::PrivacyControl::PowershellTelemetryOptout,
+                    owned
+                        .last()
+                        .map_or(Snapshot::Registry(RawValue::Absent), |previous| {
+                            previous.modified.clone()
+                        }),
+                    Snapshot::Registry(RawValue::Present { kind, bytes: raw }),
+                ),
             };
-            let line = Line {
-                schema: SCHEMA,
-                event: Event::Prepared {
-                    intent: intent.clone(),
-                },
-            };
-            bytes.extend(serde_json::to_vec(&line).unwrap());
-            bytes.push(b'\n');
+            if intent.original == intent.modified {
+                break;
+            }
+            lines.push(prepared(&intent));
             count = count.checked_add(1).unwrap();
             if outcome == 3 {
                 break;
             }
             let result = match outcome {
-                0 => {
-                    if intent.restore_of.is_some() {
-                        Outcome::Restored
-                    } else {
-                        Outcome::Applied
-                    }
-                }
+                0 if intent.restore_of.is_some() => Outcome::Restored,
+                0 => Outcome::Applied,
                 1 => Outcome::NotApplied,
                 2 => Outcome::Unknown,
                 _ => panic!("generator outcome outside its strategy"),
             };
-            bytes.extend(
-                serde_json::to_vec(&Line {
-                    schema: SCHEMA,
-                    event: Event::Finished {
-                        operation: intent.operation,
-                        outcome: result,
-                    },
-                })
-                .unwrap(),
-            );
-            bytes.push(b'\n');
+            lines.push(finished(&intent, result));
             match result {
                 Outcome::Applied => owned.push(intent),
                 Outcome::Restored => {
                     owned.pop().unwrap();
                 }
-                Outcome::NotApplied => (),
+                Outcome::NotApplied | Outcome::RolledBack => (),
                 Outcome::Unknown => break,
             }
         }
-        (bytes, count)
+        (super::super::state::fixtures::bytes(&lines), count)
     }
 
     fn histories() -> impl proptest::strategy::Strategy<Value = (Vec<u8>, usize)> {

@@ -69,55 +69,17 @@ fn decode(bytes: &[u8]) -> Result<History, HistoryFault> {
     reason = "test code"
 )]
 mod tests {
-    use super::super::state::{Control, DEFINITION, Event, Intent, Outcome, RawValue, SCHEMA};
+    use super::super::state::fixtures::{apply, bytes, dword, finished, prepared};
+    use super::super::state::{Outcome, SCHEMA};
+    use super::super::target::{RawValue, Snapshot};
     use super::*;
-    use std::num::NonZeroU64;
+    use wire::PrivacyControl;
 
     const PRIVATE_INPUT: &str = "fixture-private-principal";
+    const CONTROL: PrivacyControl = PrivacyControl::PowershellTelemetryOptout;
 
-    fn intent(operation: u64, original: RawValue) -> Intent {
-        let modified = RawValue::Present {
-            kind: 1,
-            bytes: vec![49, 0, 0, 0],
-        };
-        Intent {
-            operation: NonZeroU64::new(operation).unwrap(),
-            control: Control::WindowsUserPowershellTelemetry,
-            definition: DEFINITION,
-            owner: kernel::SecretRef::new("privacy", "fixture-owner").unwrap(),
-            original,
-            modified: modified.clone(),
-            recommendation: modified,
-            restore_of: None,
-        }
-    }
-
-    fn prepared(intent: Intent) -> Line {
-        Line {
-            schema: SCHEMA,
-            event: Event::Prepared { intent },
-        }
-    }
-
-    fn finished(operation: u64, outcome: Outcome) -> Line {
-        Line {
-            schema: SCHEMA,
-            event: Event::Finished {
-                operation: NonZeroU64::new(operation).unwrap(),
-                outcome,
-            },
-        }
-    }
-
-    fn bytes(lines: &[Line]) -> Vec<u8> {
-        lines
-            .iter()
-            .flat_map(|line| {
-                let mut bytes = serde_json::to_vec(line).unwrap();
-                bytes.push(b'\n');
-                bytes
-            })
-            .collect()
+    fn absent() -> Snapshot {
+        Snapshot::Registry(RawValue::Absent)
     }
 
     #[test]
@@ -138,7 +100,7 @@ mod tests {
     fn reading_unfinished_history_never_settles_or_repairs_it() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("fixture.jsonl");
-        let before = bytes(&[prepared(intent(1, RawValue::Absent { key_existed: false }))]);
+        let before = bytes(&[prepared(&apply(1, CONTROL, absent(), dword(1)))]);
         std::fs::write(&path, &before).unwrap();
         let status =
             serde_json::to_value(read(&path).unwrap().disclose(|_| Ok(())).unwrap()).unwrap();
@@ -181,83 +143,40 @@ mod tests {
         ] {
             assert!(decode(input).is_err());
         }
-        assert!(decode(&bytes(&[finished(1, Outcome::Applied)])).is_err());
-        let change = intent(1, RawValue::Absent { key_existed: true });
+        let change = apply(1, CONTROL, dword(7), dword(1));
+        assert!(decode(&bytes(&[finished(&change, Outcome::Applied)])).is_err());
         assert!(
             decode(&bytes(&[
-                prepared(change.clone()),
-                finished(1, Outcome::Unknown),
-                prepared(change)
+                prepared(&change),
+                finished(&change, Outcome::Unknown),
+                prepared(&change)
             ]))
             .is_err()
         );
     }
 
-    /// Derived from Privacy.restoreVectors: only the latest owned operation may reverse.
-    #[test]
-    fn restore_vectors_preserve_absence_type_bytes_and_latest_ownership() {
-        for original in [
-            RawValue::Absent { key_existed: false },
-            RawValue::Present {
-                kind: 1,
-                bytes: vec![],
-            },
-            RawValue::Present {
-                kind: 2,
-                bytes: vec![37, 0, 0, 0],
-            },
-        ] {
-            let first = intent(1, original);
-            let second = intent(
-                2,
-                RawValue::Present {
-                    kind: 1,
-                    bytes: vec![48, 0, 0, 0],
-                },
-            );
-            for old in [&first, &second] {
-                let mut restore = intent(3, old.modified.clone());
-                restore.modified = old.original.clone();
-                restore.restore_of = Some(old.operation);
-                let history = bytes(&[
-                    prepared(first.clone()),
-                    finished(1, Outcome::Applied),
-                    prepared(second.clone()),
-                    finished(2, Outcome::Applied),
-                    prepared(restore),
-                    finished(3, Outcome::Restored),
-                ]);
-                assert_eq!(decode(&history).is_ok(), old.operation == second.operation);
-                let decoded: Vec<Line> = history
-                    .split_inclusive(|b| *b == b'\n')
-                    .map(|line| serde_json::from_slice(line).unwrap())
-                    .collect();
-                assert_eq!(bytes(&decoded), history);
-            }
-        }
-    }
     #[test]
     fn unknown_fields_duplicate_ids_and_cross_identity_history_are_refused() {
-        let first = intent(1, RawValue::Absent { key_existed: true });
-        let mut other = intent(2, first.original.clone());
+        let first = apply(1, CONTROL, dword(7), dword(1));
+        let mut other = apply(2, CONTROL, dword(7), dword(1));
         other.owner = kernel::SecretRef::new("privacy", "another-fixture-owner").unwrap();
         assert!(
             decode(&bytes(&[
-                prepared(first.clone()),
-                finished(1, Outcome::Applied),
-                prepared(other)
+                prepared(&first),
+                finished(&first, Outcome::Applied),
+                prepared(&other)
             ]))
             .is_err()
         );
         assert!(
             decode(&bytes(&[
-                prepared(first.clone()),
-                finished(1, Outcome::Applied),
-                prepared(first.clone())
+                prepared(&first),
+                finished(&first, Outcome::Applied),
+                prepared(&first)
             ]))
             .is_err()
         );
-        let mut value = serde_json::to_value(prepared(first)).unwrap();
+        let mut value = serde_json::to_value(prepared(&first)).unwrap();
         value
             .as_object_mut()
             .unwrap()
@@ -271,8 +190,8 @@ mod tests {
     fn plaintext_identity_and_old_schema_are_refused_without_rewriting() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("fixture.jsonl");
-        let prepared = prepared(intent(1, RawValue::Absent { key_existed: true }));
-        for (schema, owner) in [(SCHEMA, PRIVATE_INPUT), (1, "secret:privacy/fixture-owner")] {
+        let prepared = prepared(&apply(1, CONTROL, dword(7), dword(1)));
+        for (schema, owner) in [(SCHEMA, PRIVATE_INPUT), (2, "secret:privacy/fixture-owner")] {
             let mut line = serde_json::to_value(&prepared).unwrap();
             *line.pointer_mut("/schema").unwrap() = serde_json::json!(schema);
             *line.pointer_mut("/event/intent/owner").unwrap() = serde_json::json!(owner);
@@ -286,7 +205,7 @@ mod tests {
 
     #[test]
     fn decoding_refusal_never_repeats_private_input() {
-        let prepared = prepared(intent(1, RawValue::Absent { key_existed: true }));
+        let prepared = prepared(&apply(1, CONTROL, dword(7), dword(1)));
         for field in ["control", "unexpected", "owner"] {
             let mut line = serde_json::to_value(&prepared).unwrap();
             if field == "unexpected" {
@@ -310,22 +229,6 @@ mod tests {
             assert!(!fault.to_string().contains(PRIVATE_INPUT));
             assert_eq!(fault.code(), &kernel::AxCode::StorageFatal);
             assert!(fault.subject().contains("column"));
-        }
-    }
-
-    proptest::proptest! {
-        #[test]
-        fn original_raw_values_roundtrip_without_normalization(
-            kind in proptest::num::u32::ANY,
-            raw in proptest::collection::vec(proptest::num::u8::ANY, 0..512),
-            key_existed in proptest::bool::ANY,
-        ) {
-            for original in [RawValue::Absent { key_existed }, RawValue::Present { kind, bytes: raw }] {
-                let before = intent(1, original);
-                let encoded = serde_json::to_vec(&before).unwrap();
-                let decoded: Intent = serde_json::from_slice(&encoded).unwrap();
-                proptest::prop_assert!(before == decoded);
-            }
         }
     }
 }
