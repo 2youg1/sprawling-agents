@@ -41,7 +41,13 @@ create)
     esac
     shift
   done
-  touch owned
+  if [ -f create-barrier ]; then
+    echo "$$" >create-pid
+    ps -o ppid= -p "$$" >create-parent
+    touch create-entered
+    read -r release <create-fifo
+  fi
+  touch owned create-completed
   if [ -f fail-create ]; then exit 42; fi
   echo container-id ;;
 container)
@@ -63,6 +69,8 @@ start)
   echo target-output
   exit 91 ;;
 rm)
+  touch remove-attempted
+  if [ ! -f owned ]; then echo absent >&2; exit 44; fi
   if [ -f fail-remove ]; then echo refused >&2; exit 43; fi
   rm -f owned running
   echo removed ;;
@@ -335,4 +343,140 @@ print('cpu seconds per wall second',ratio)
             .lines()
             .any(|name| name.starts_with(&format!("sprawling-sandbox-{}-", std::process::id())))
     );
+}
+
+#[cfg(unix)]
+#[test]
+#[ignore = "private subprocess fixture selected only by the guardian regression"]
+fn guardian_process() {
+    let record = std::env::var("SPRAWLING_GUARD_RECORD").unwrap();
+    crate::tools::run_container_guard(&["__container-guardian".into(), record])
+        .unwrap()
+        .unwrap();
+}
+
+#[cfg(unix)]
+#[test]
+#[ignore = "private subprocess fixture selected only by the guardian regression"]
+fn guardian_parent_process() {
+    let program = PathBuf::from(std::env::var("SPRAWLING_GUARD_DAEMON").unwrap());
+    let harness = PathBuf::from(std::env::var("SPRAWLING_GUARD_HARNESS").unwrap());
+    let work = PathBuf::from(std::env::var("SPRAWLING_GUARD_WORK").unwrap());
+    let runtime = ContainerRuntime::probe(ContainerEngine::Docker, program)
+        .unwrap()
+        .guarded(harness);
+    let tool = ExecTool::new(
+        setup(&work, None, None),
+        Box::new(EchoSandbox::new()),
+        patient(),
+    )
+    .unwrap()
+    .with_container(limits(), runtime);
+    tool.invoke(&call(json!({"program":{"path":"/bin/true","args":[]}})))
+        .unwrap();
+}
+
+#[cfg(unix)]
+#[test]
+fn guardian_eof_waits_for_late_create_and_reaps_its_client() {
+    use std::os::unix::fs::PermissionsExt;
+    use std::process::{Command, Stdio};
+    use std::time::Duration;
+
+    for lost_response in [false, true] {
+        let daemon = Daemon::open();
+        if lost_response {
+            std::fs::write(daemon.dir.path().join("fail-create"), "").unwrap();
+        }
+
+        let work = tempfile::tempdir().unwrap();
+        let executable = std::env::current_exe().unwrap();
+        let harness = daemon.dir.path().join("guardian");
+        std::fs::write(&harness, r#"#!/bin/bash
+set -eu -o pipefail
+export SPRAWLING_GUARD_RECORD="$2"
+"$SPRAWLING_GUARD_TEST_EXE" --exact tools::exec::tests::container::guardian_process --ignored --nocapture --quiet | awk '/^ready$/ {print; fflush()}'
+touch "$SPRAWLING_GUARD_EXITED"
+"#).unwrap();
+        std::fs::set_permissions(&harness, std::fs::Permissions::from_mode(0o700)).unwrap();
+        std::fs::write(daemon.dir.path().join("create-barrier"), "").unwrap();
+        assert!(
+            Command::new("mkfifo")
+                .arg(daemon.dir.path().join("create-fifo"))
+                .status()
+                .unwrap()
+                .success()
+        );
+        let exited = daemon.dir.path().join("guardian-exited");
+        let mut parent = Command::new(&executable)
+            .args([
+                "--exact",
+                "tools::exec::tests::container::guardian_parent_process",
+                "--ignored",
+                "--nocapture",
+            ])
+            .env("SPRAWLING_GUARD_TEST_EXE", &executable)
+            .env("SPRAWLING_GUARD_DAEMON", &daemon.program)
+            .env("SPRAWLING_GUARD_HARNESS", &harness)
+            .env("SPRAWLING_GUARD_WORK", work.path())
+            .env("SPRAWLING_GUARD_EXITED", &exited)
+            .stdout(Stdio::null())
+            .stderr(Stdio::inherit())
+            .spawn()
+            .unwrap();
+        let wait = |path: &std::path::Path| {
+            for _ in 0..1000 {
+                if path.exists() {
+                    return;
+                }
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            panic!("fixture condition did not arrive: {}", path.display());
+        };
+        wait(&daemon.dir.path().join("create-entered"));
+        let creator = std::fs::read_to_string(daemon.dir.path().join("create-parent"))
+            .unwrap()
+            .trim()
+            .parse::<u32>()
+            .unwrap();
+        let parent_id = parent.id();
+        parent.kill().unwrap();
+        parent.wait().unwrap();
+        if creator == parent_id {
+            // The parent-owned client can outlive a guardian that accepted absence.
+            wait(&exited);
+        }
+        let absent = Command::new(&daemon.program)
+            .args(["container", "ls", "--all", "--format", "{{.Names}}"])
+            .output()
+            .unwrap();
+        assert!(absent.status.success() && absent.stdout.is_empty());
+        std::fs::write(daemon.dir.path().join("create-fifo"), "release\n").unwrap();
+        wait(&daemon.dir.path().join("create-completed"));
+        wait(&exited);
+        let copy = PathBuf::from(std::fs::read_to_string(daemon.dir.path().join("copy")).unwrap());
+        let released = !daemon.exists() && !copy.exists();
+        if daemon.exists() {
+            assert!(
+                Command::new(&daemon.program)
+                    .args(["rm", "--force", "--volumes", "fixture"])
+                    .status()
+                    .unwrap()
+                    .success()
+            );
+        }
+        assert!(
+            released,
+            "EOF plus an absent inventory cannot release ownership before late create"
+        );
+        let pid = std::fs::read_to_string(daemon.dir.path().join("create-pid")).unwrap();
+        assert!(
+            !Command::new("kill")
+                .args(["-0", pid.trim()])
+                .status()
+                .unwrap()
+                .success(),
+            "guardian must reap the create client before it exits"
+        );
+    }
 }
