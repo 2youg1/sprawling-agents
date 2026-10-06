@@ -381,6 +381,20 @@ settings-control SandboxSection.interpreter client/src/views/building/sandbox.sv
 settings-control SandboxSection.mounts client/src/views/building/sandbox.svelte
 settings-control SandboxSection.shell client/src/views/building/sandbox.svelte
 settings-control SandboxSection.trusted client/src/views/building/sandbox.svelte
+settings-control ConfigFile.search client/src/views/setup/search/search.svelte
+settings-control SearchSection.choice client/src/views/setup/search/search.svelte
+settings-control SearchSection.selected client/src/views/setup/search/search.svelte
+settings-control SearchSection.suppliers client/src/views/setup/search/search.svelte
+settings-control SupplierSection.id client/src/views/setup/search/search.svelte
+settings-control SupplierSection.url client/src/views/setup/search/search.svelte
+settings-control SupplierSection.remote client/src/views/setup/search/search.svelte
+settings-control SupplierSection.query client/src/views/setup/search/search.svelte
+settings-control SupplierSection.count client/src/views/setup/search/search.svelte
+settings-control SupplierSection.objective client/src/views/setup/search/search.svelte
+settings-control SupplierSection.accounts client/src/views/setup/providers/accounts.svelte
+settings-control AccountSection.id client/src/views/setup/providers/accounts.svelte
+settings-control AccountSection.reference client/src/views/setup/providers/accounts.svelte
+settings-control AccountSection.header client/src/views/setup/providers/accounts.svelte
 settings-reason ConfigFile.skills 书架是城外的机器目录，挂进来后每栋楼都读得到；一个经远程门连进来的设备若能写它，就能把城所在机器上的任意目录交给 Agent 读，所以只在城的 CONFIG.toml 里手写，楼与房间写它即拒。
 settings-reason SkillsSection.shelves 书架是城外的机器目录，挂进来后每栋楼都读得到；一个经远程门连进来的设备若能写它，就能把城所在机器上的任意目录交给 Agent 读，所以只在城的 CONFIG.toml 里手写，楼与房间写它即拒。
 -/
