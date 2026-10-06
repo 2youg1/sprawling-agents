@@ -287,9 +287,9 @@ mod tests {
         // The length is the close of the table, so it is stated once:
         // a code added without a spelling, or two codes sharing one,
         // fails here rather than at a caller.
-        assert_eq!(AxCode::ALL.len(), 41);
+        assert_eq!(AxCode::ALL.len(), 42);
         let spellings: BTreeSet<&str> = AxCode::ALL.iter().map(AxCode::as_str).collect();
-        assert_eq!(spellings.len(), 41);
+        assert_eq!(spellings.len(), 42);
         for s in &spellings {
             assert!(s.starts_with("E_"));
         }

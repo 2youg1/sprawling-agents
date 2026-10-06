@@ -117,6 +117,12 @@ fn carrier_declarations_cover_every_code() {
         AxCode::Provider.carrier(),
         Carrier::Event(EventKind::ProviderDegraded)
     );
+    // Exhausted accounts are the provider side's degradation too, so the
+    // run freezes under the line `E_PROVIDER` is written under.
+    assert_eq!(
+        AxCode::parse("E_PROVIDER_ACCOUNTS_EXHAUSTED").map(|code| code.carrier()),
+        Some(Carrier::Event(EventKind::ProviderDegraded))
+    );
     assert_eq!(
         AxCode::EndpointDialectUnsupported.carrier(),
         Carrier::Event(EventKind::EndpointLost)
