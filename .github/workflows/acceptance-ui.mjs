@@ -167,7 +167,7 @@ try {
       }
       await page.keyboard.press("Escape");
       await dialog.waitFor({ state: "hidden" });
-      if (!(await opener.evaluate((element) => element === document.activeElement))) throw new Error("Escape did not return focus to the settings opener");
+      await page.waitForFunction((element) => element?.isConnected && element === document.activeElement, await opener.elementHandle());
       await context.close();
       activePage = undefined;
     }
