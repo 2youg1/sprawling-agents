@@ -35,7 +35,7 @@
   import TurnView from "./turn.svelte";
   import { heard, landed, lost } from "./arrivals.svelte";
   import { callWord } from "./calls";
-  import { frozenSaid } from "./frozen";
+  import { firstHeadSaid } from "./frozen";
   import { called, dispatcherOf } from "./naming";
   import { planFork } from "./forking";
   import { turnsAround } from "./around";
@@ -171,7 +171,7 @@
   // the model again only where a round answered with a different one.
   const firstModel = $derived(turns.at(0)?.model ?? null);
   const firstStated = $derived.by(() => {
-    const frozen = frozenSaid(answer?.opening, $lang);
+    const frozen = firstHeadSaid(answer?.opening, $lang);
     return firstModel === null || frozen === "" ? firstModel : `${firstModel} · ${frozen}`;
   });
   const stated = $derived(

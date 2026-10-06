@@ -119,6 +119,15 @@
     }} />
 {/snippet}
 
+{#snippet modelRow(item: PopoverRow)}
+  <div class="w-full min-w-0">
+    <span class="block wrap-anywhere">{item.label}</span>
+    {#if item.secondary !== undefined}
+      <span class="mt-tight block wrap-anywhere text-note text-text-faint">{item.secondary}</span>
+    {/if}
+  </div>
+{/snippet}
+
 {#snippet listening()}
   {#if room !== null}<Listening {room} />{/if}
 {/snippet}
@@ -133,7 +142,7 @@
   </div>
   {#if draws === "everything"}
     {#if menu === "model" && providers.length > 0}
-      <Popover label="talk_column_model" {columns} onApply={modelPick} onClose={closeModel}
+      <Popover label="talk_column_model" {columns} layout="equal" row={modelRow} onApply={modelPick} onClose={closeModel}
         header={needsFilter ? modelSearch : undefined}
         bind={needsFilter ? (binding: PopoverBinding) => {
           const initial = untrack(() => modelBinding?.controls.at(0) !== binding.controls.at(0));

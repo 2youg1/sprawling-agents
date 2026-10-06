@@ -28,6 +28,7 @@
     // The accessible name of the dialog, a lang.json key.
     readonly label: Key;
     readonly columns: readonly PopoverColumn[];
+    readonly layout?: "content" | "equal";
     readonly onApply: (column: PopoverColumn, row: PopoverRow) => void;
     readonly onClose: () => void;
     // Bind mode: the caller's text box keeps the focus and forwards the
@@ -54,6 +55,7 @@
   const {
     label,
     columns,
+    layout = "content",
     onApply,
     onClose,
     bind,
@@ -202,7 +204,7 @@
   aria-label={say($lang, label)}
 >
   {#if header !== undefined}{@render header()}{/if}
-  <div class="flex gap-snug">
+  <div class={["gap-snug", layout === "equal" ? "grid auto-cols-fr grid-flow-col" : "flex"]}>
     {#each columns as pane, at (pane.id)}
       <div class="flex min-w-0 flex-col">
         <div class="mb-tight px-snug text-note text-text-faint">
