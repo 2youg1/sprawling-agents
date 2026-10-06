@@ -209,7 +209,7 @@ import client.spec.Views.Workspace
 | `remote/session.ts` | 4 适配器 | `dialFor(location) -> Dial`：每次连接判一次走哪条线——`https:` 且这个源存着配对过的设备时是远程会话，否则是 `plainDial(socketUrl(location))`；`talk(door, session, hearing) -> Line`：握手之后的会话，发出的帧按调用的次序一帧封完再封下一帧，收到的帧一帧开完再开下一帧，打不开、读不成或收到锁门时关上这条线（4-64） |
 | `remote/device.ts` | 4 适配器 | `kept() -> Promise<Device \| null>`、`keep(device) -> Promise<boolean>`、`forget() -> Promise<boolean>`：这台设备配对的结果存在这个源的 IndexedDB 里，`Device { city, fingerprint, id, key, at }`；`key.ed25519` 以 `CryptoKey` 原样存入，浏览器不让任何脚本导出它。种子不存 |
 
-`src/ui.ts` 是视图拿到的一切，一个上下文、一个取法：`setUi(value)` 由 `app.svelte` 挂载时调一次；后代组件在初始化期调 `ui(): Ui` 拿到 `Ui { conn, prefs, lang, effort, mode, approvals, bar, origin, pairing, now, chooseEffort, chooseMode, go, send, hearing }`。旧的 `useUi`／`useSay`／`useGo`／`useCommand`／`useHearing`／`useApprovals` 等透传壳收敛成这一个门（AGENTS：不做只改名的壳）。**词不是上下文**：`core/lang.ts` 的 `say(lang, key)` 保持纯函数，插槽由 `fill(pattern, slots)` 填，模板写 `say($lang, key)`，`$lang` 的订阅就是换语言时重画的来源。`pairing` 是开这一页的地址栏上的配对码，两扇会动作的 HTTP 门要它。
+`src/ui.ts` 是视图拿到的一切，一个上下文、一个取法：`setUi(value)` 由 `app.svelte` 挂载时调一次；后代组件在初始化期调 `ui(): Ui` 拿到 `Ui { conn, prefs, tags, lang, effort, policy, conversing, approvals, bar, origin, pairing, now, chooseEffort, choosePolicy, go, send, hearing }`。旧的 `useUi`／`useSay`／`useGo`／`useCommand`／`useHearing`／`useApprovals` 等透传壳收敛成这一个门（AGENTS：不做只改名的壳）。**词不是上下文**：`core/lang.ts` 的 `say(lang, key)` 保持纯函数，插槽由 `fill(pattern, slots)` 填，模板写 `say($lang, key)`，`$lang` 的订阅就是换语言时重画的来源。`pairing` 是开这一页的地址栏上的配对码，两扇会动作的 HTTP 门要它。
 
 ### 视图（免 SPEC，列出以便定位）
 
@@ -924,7 +924,7 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
 
 /-! D38 run 策略是页面上的一个值，设置行上一个权限入口
 
-- **决策**：页面把下一次派发的四个值作为一个 `RunPolicy` 持有（`Ui.policy`，`mode` 是它的读出），设置行在会话开始之前用一个权限入口持有模式与写入限制两个开关，另两项在同一面内选择（4-60）。`/admit` 只改准入要求。
+- **决策**：页面把下一次派发的四个值作为一个 `RunPolicy` 持有（`Ui.policy`，模式从它的 `mode` 字段读取），设置行在会话开始之前用一个权限入口持有模式与写入限制两个开关，另两项在同一面内选择（4-60）。`/admit` 只改准入要求。
 - **理由**：线上派发带的就是这一个值（wire D4），页面另持四个散的值会让 `/dispatch` 与发送键各拼一次。写入限制是一次派发最常改的边界（「只读可新建」），准入与试验是少数派发才动的（refrain 4-2「试验与准入选择放展开面」）；合着的键写出被改过的值，是因为一个看不见的试验会让人以为工作已经落地。
 - **被击败的备选**：①模式与写入限制分开常驻——设置行多一个常驻控件（7-11 的常驻数由 `xtask render` 数着、`budgets.toml` 的 `talk_controls` 没有余量），且大多数时候它们说的是「什么也没加」；②准入与落地放进设置面——那是一个人的长期偏好，而这三个值按派发选（`settings/admission.svelte` 只解释它们）；③每次派发后把准入复位——模式与强度都留在本页，单这一项复位会让同一行里的选择有两种寿命。
 - **重开参数**：人要一种派发后自动复位的选择时，复位规则写在 `Ui.policy` 一处，四个值一起定。
