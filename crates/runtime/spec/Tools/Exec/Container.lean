@@ -27,6 +27,19 @@ info 的内容是 daemon 的自述，不是已执行的隔离验收；daemon、O
 实际起动仍须 inspect 验证限额与挂载，然后用同一容器跑 cgroup 与网络对拍。
 镜像、daemon 接口或 OCI runtime 更新时应重跑实测。
 
+五轴的生产声明按实际边界解释；admission 不表示五轴已经实测：
+
+| 轴 | 生产执行与验证 | 保证的范围 |
+|---|---|---|
+| 文件 | 仅 bind 副本到 /work，inspect 拒额外挂载与可写根 | 写入工作目录不改源树；镜像内容仍可读，不承诺读隔离 |
+| 网络 | create 与 inspect 均要求 network=none | 禁止外部与宿主回环连接；容器自己的 loopback 仍可用 |
+| 进程树 | Backlog 持有 daemon 名字，终止时 force rm，失败保留 owner | 确认清理后没有该容器的后代；父轮询超时不表示树已终止 |
+| 用户 | kernel 拒零 UID，create 与 inspect 核对冻结 UID，drop ALL 与 no-new-privileges | 非 root 身份；未要求 user namespace，也未要求数值 UID 与宿主不同 |
+| 资源 | admission 要 cgroup v2 控制器，inspect 核对 CPU、memory、swap 与 pids | daemon／OCI 受信前提下强制每容器额度，不是每 RunId 聚合额度 |
+
+用户轴的非 root 身份不等于独立宿主安全主体：rootful daemon 可让相同数值 UID
+出现在宿主和容器中。若要求两者必不同或要求 user namespace，当前臂没有该保证。
+
 D50 Backlog 在分配输出文件之前取得唯一名字与副本的清理 owner，然后在 create 之前登记成员；
 计数、表锁或输出文件失败同样不能丢失副本的清理责任，成员的进程值同时拥有 daemon 身份
 与可选的 attach 子进程。start／inspect／attach／create 应答丢失均按登记身份清理。
@@ -151,7 +164,10 @@ spawn/enrol 失败必须走同一清理权威。容器收下限额之前不得�
 Rust 的公开 admission／argv 测试检查实际实现，entrypoint 回归覆盖两个后端、JSON 数组形状、
 空 JSON 数组、null、引号与普通路径，以及 Unix 下不可编码的 OsStr program；
 非 UTF-8 输入直接经公开 create_command 检查 typed refusal，不经过有损字符串转换。
-真实隔离验收必须运行 docker/podman。
+真实隔离验收由 `.github/workflows/container.yml` 在 disposable Linux runner 上运行 docker/podman，
+先显式准备带 python3 与 /bin/sh 的镜像，再将不可变本地 image ID 交给生产 create；
+测试检查副本写入、宿主回环拒绝、非 root UID、超额内存／进程分配、CPU 配额与清理后的后代缺席。
+它不证明 rootless 委派、Desktop VM 或任意 OCI runtime 的行为，替换这些环境时须重跑。
 `guardian_eof_waits_for_late_create_and_reaps_its_client` 检查模型允许的具体 EOF 轨迹：
 经真实 ExecTool／Backlog 启动受控 CLI，create 在 FIFO 屏障内、父进程被终止、inventory 确认缺席，
 放行迟到创建后要求 container／copy 消失、guardian 与 create child 被回收；成功与未知应答分别覆盖。
