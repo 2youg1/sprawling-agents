@@ -147,6 +147,7 @@ Two lists exist and they answer different questions, so both are kept and neithe
 | [wasmtime-wasi](https://crates.io/crates/wasmtime-wasi) | Apache-2.0 with the LLVM exception |
 | [wat](https://crates.io/crates/wat) | Apache-2.0 with the LLVM exception, or Apache-2.0, or MIT |
 | [windows-native-keyring-store](https://crates.io/crates/windows-native-keyring-store) | MIT OR Apache-2.0 |
+| [winreg](https://crates.io/crates/winreg) | MIT |
 | [zeroize](https://crates.io/crates/zeroize) | Apache-2.0 OR MIT |
 | [zip](https://crates.io/crates/zip) | MIT |
 

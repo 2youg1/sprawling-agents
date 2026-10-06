@@ -76,6 +76,8 @@ zeroize = { workspace = true }
 win32job = { workspace = true }
 # Windows self-uninstall releases the installed name before exit (Install.lean D53).
 self-replace = "=1.5.0"
+# Protected Windows installation path for the read-only privacy identity query.
+winreg = { workspace = true }
 
 [features]
 # The execution engine is on by default, so `cargo install sprawling`

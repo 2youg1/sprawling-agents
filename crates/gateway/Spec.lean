@@ -342,6 +342,9 @@ kernel 已有码，语义照 Custody 一节；不新增码。
 - D25 `prompt_cache_key` 是预置表的一列，只写给文档说收它的主机，值是会话标识：`crates/gateway/spec/Provider.lean`
 - D26 开城时为每个已登记端点预热一次连接：一次不带凭据的 `GET models_url`，失败只停这一次预热，谁也不等它（§8-35）：`crates/gateway/spec/Endpoint/Transport.lean`
 - D27 Responses stream 在 EOF 后投影出最后有效 terminal 与首个 reported error，复用最终解析器：`crates/gateway/spec/Dialect/Responses.lean`
+- D28 保持原登记事件与 Vault 格式，以完整有序列表为一次原子替换，避免逐账号命令：`crates/gateway/spec/Router.lean`
+- D29 显式账号列表生效时拒绝旧凭据字段：`crates/gateway/spec/Router.lean`
+- D31 隐私 owner 的只读核对在 Vault 内完成，不交出原值、不运行 probe：`crates/gateway/spec/Credential.lean`
 -/
 
 /-! ## 13 依赖选型

@@ -6,5 +6,6 @@
 //! Local privacy history modules (`crates/sprawling/spec/Privacy.lean`).
 
 pub mod cli;
+mod identity;
 mod journal;
 mod state;

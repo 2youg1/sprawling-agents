@@ -27,6 +27,7 @@ pub use adviser::{AdviserClient, Question};
 pub use concurrency::MaxInFlight;
 pub use cost::settle;
 pub use credential::{Custodian, Custody, Persistence, Store};
+pub use credential::{verify_identity_binding, verify_platform_identity};
 pub use dialect::{ImageBytes, response_from_wire};
 pub use endpoint::{AuthSpec, Endpoint, EndpointConfig, HeaderValue, SecretResolver};
 pub use endpoint::{ModelFacts, Redemption};
