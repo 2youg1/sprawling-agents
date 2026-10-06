@@ -200,6 +200,22 @@ jobs:
         if: runner.os != 'Windows'
         shell: bash
         run: sh .github/install-loopback.sh target/package
+      - name: generate system channels from this archive
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          tag="$GITHUB_REF_NAME"
+          if [ "$GITHUB_EVENT_NAME" != push ]; then
+            version=$(cargo metadata --format-version 1 --no-deps | jq -r '.packages[] | select(.name == "sprawling") | .version')
+            tag="v${version}-$(sed -n 's/.*pub const MATURITY: Maturity = Maturity::\([A-Za-z]*\);/\1/p' crates/kernel/src/release.rs)-$(date -u +%y%m%d)"
+          fi
+          cargo xtask channel --tag "$tag" --assets target/package --out target/channels
+      - name: validate native payloads without decoding binaries
+        if: runner.os == 'Linux'
+        run: python3 tools/xtask/src/channel/validate_test.py
+      - name: install the generated Arch package
+        if: runner.os == 'Linux'
+        run: python3 tools/xtask/src/channel/validate.py target/channels target/package
       - uses: actions/upload-artifact@v7
         with:
           name: archive-${{ runner.os }}${{ matrix.target && format('-{0}', matrix.target) || '' }}
@@ -396,6 +412,53 @@ jobs:
             npm publish "$dir" --access public --tag latest --provenance
           done
           npm publish target/npm/sprawling --access public --tag latest --provenance
+
+  system-channels:
+    if: *tag-publication
+    needs: publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      AUR_SSH_KEY: ${{ secrets.AUR_SSH_KEY }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: *release-archives
+          path: assets
+          merge-multiple: true
+      - name: generate definitions from the published archives
+        run: cargo xtask channel --tag "$GITHUB_REF_NAME" --assets assets --out target/channels
+      - name: publish the AUR package
+        if: env.AUR_SSH_KEY != ''
+        run: |
+          set -euo pipefail
+          install -d -m 700 "$RUNNER_TEMP/aur-ssh"
+          printf '%s' "$AUR_SSH_KEY" > "$RUNNER_TEMP/aur-ssh/key"
+          echo >> "$RUNNER_TEMP/aur-ssh/key"
+          chmod 600 "$RUNNER_TEMP/aur-ssh/key"
+          trap 'rm -f "$RUNNER_TEMP/aur-ssh/key"' EXIT
+          curl -fsSL https://aur.archlinux.org/ > "$RUNNER_TEMP/aur-ssh/host.html"
+          ssh-keyscan -t ed25519 aur.archlinux.org > "$RUNNER_TEMP/aur-ssh/known_hosts"
+          fingerprint=$(ssh-keygen -lf "$RUNNER_TEMP/aur-ssh/known_hosts" -E sha256 | awk '{print $2}')
+          test -n "$fingerprint"
+          grep -F "<code>$fingerprint</code>" "$RUNNER_TEMP/aur-ssh/host.html"
+          export GIT_SSH_COMMAND="ssh -i $RUNNER_TEMP/aur-ssh/key -o IdentitiesOnly=yes -o UserKnownHostsFile=$RUNNER_TEMP/aur-ssh/known_hosts -o StrictHostKeyChecking=yes"
+          package=$(sed -n 's/^pkgname=//p' target/channels/aur/PKGBUILD)
+          test -n "$package"
+          git clone "ssh://aur@aur.archlinux.org/$package.git" "$RUNNER_TEMP/aur"
+          cp target/channels/aur/PKGBUILD target/channels/aur/.SRCINFO "$RUNNER_TEMP/aur/"
+          cd "$RUNNER_TEMP/aur"
+          git config user.name github-actions
+          git config user.email github-actions@users.noreply.github.com
+          git add PKGBUILD .SRCINFO
+          if ! git diff --cached --quiet; then
+            git commit -m "Update sprawling to $GITHUB_REF_NAME"
+            git push origin HEAD
+          fi
+      - name: AUR publication prerequisite
+        if: env.AUR_SSH_KEY == ''
+        run: echo "::notice::AUR publication skipped; create an AUR account and configure AUR_SSH_KEY."
 
   # The same source, reachable by `cargo install sprawling` and, through the
   # binstall metadata in `crates/sprawling/Cargo.toml`, by `cargo binstall

@@ -13,18 +13,20 @@
 ## 2 验收标准
 经 Confined::place 与 ExecTool::invoke 的实际 macOS 对拍检查副本写入成功、绝对路径
 与逃逸链接写入失败、TCP／UDP／后代网络失败、初始化失败不执行目标。
-本模型证明每一步子进程操作都携带策略；不证明 XNU 执行策略。
+Python 夹具在宿主以 xcrun --find python3 找到实际解释器后进入 Seatbelt，
+避免 /usr/bin/python3 的开发工具 launcher 在副本外写缓存；生产策略仍拒绝这些写入，
+生产结果仍保留 launcher 的原始诊断，不把它们抹掉以满足测试。
+后台命令用副本内的就绪文件与放行文件协调，确认后台持有副本、只交 owner 一次完整
+stdout／stderr／退出码；halt 的验收保持工具存活，经 owner harvest 取得唯一 Signalled
+结局并检查主进程 pid 已被回收、副本仍在，之后才 drop 工具检查副本清理。
+release 用独立测试先 drop 工具，再由另一 owner harvest 确认无主成员已被回收；
+另一 owner 的后台命令不被 release 终止。主进程 pid 回收与副本清理分别检查，
+不把主进程回收称为整棵进程树终止。本模型证明每一步子进程操作都携带策略；不证明 XNU 执行策略。
 
 ## 3 假设与歧义
 内核是策略执行者。探测成功不保证之后的包装起动成功，真实目标仍必须携带同一策略。
 包装初始化失败与目标退出码的区别尚无起动握手；非零结果保留原 stderr，不宣称已区分。
-macOS host 的同 RunId 多命令聚合硬内存机制尚未成立；RLIMIT、taskpolicy 与采样不满足。
-resource／jetsam coalition 的创建在已运行的 macOS 26.6.2 上均被普通账户与 root 以 EPERM
-拒绝；这只限定这些入口与该系统，不证明所有 macOS 聚合机制均不可行。taskpolicy -m 96
-之下两名子进程同时写入各 64 MiB（其中一名 setsid）并存活，成功的宿主对照也存活；
-因此此候选没有兑现 96 MiB 的树级聚合上限。没有创建成功的 coalition 就没有其清理对象。
-受控执行服务只有在同一 run 的所有命令与任意后代共享一个硬额度且不能逃离时才满足
-D29；独立命令各得一个完整额度的容器不满足，不以未实现的替代方案关闭此未决。
+macOS native 不强制同 RunId 多命令与任意后代的聚合硬内存上限，resources 为不保。
 
 ## 4 现状分析
 副本同步与后台持有归 confinement::placing；叶子不建立第二张 run／副本表。
@@ -37,15 +39,6 @@ macOS 26.6.2（25G83）的 sandbox-exec(1) 自带手册写明 “execute within 
 弃用状态不等于已移除，但不保证未来系统继续提供此程序，缺席或拒绝必须拒开。
 App Sandbox entitlement 文档不能证明命令行 profile 的行为；sandbox_init(3) 与真实拒绝
 实验仍须分别核实，支持范围只随已运行的系统证据扩大。
-Apple XNU 固定提交 f6217f891ac0bb64f3d375211650a4c1ff8ca1ea 的
-https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/bsd/kern/sys_coalition.c#L232
-检查 task_is_in_privileged_coalition，root 身份不替代此条件；
-https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/bsd/kern/kern_exec.c#L4078
-的指定 coalition 起动检查 privileged coalition 或 COALITION_SPAWN_ENTITLEMENT。
-Apple system_cmds 固定提交 408bba7453608006b89772db185defbac8fe2fd0 的
-https://github.com/apple-oss-distributions/system_cmds/blob/408bba7453608006b89772db185defbac8fe2fd0/taskpolicy/taskpolicy.c#L266
-把 memory limit 交给单个 posix_spawn 的 active／inactive jetsam 限额；不能从其参数名
-推导同 run 的共享额度。runner 的 launchd.plist(5) 也把 ResourceLimits 定为 setrlimit(2)。
 
 ## 6 命名统一
 wrapper 是 sandbox-exec 程序；copy 是唯一可写工作树；profile 是固定 SBPL 策略。
@@ -98,9 +91,6 @@ Lean 量化任意 fork／exec／退出序列，证明模型里的策略身份不
 验证任意目标 argv 都使用同一固定策略与独立路径参数，并不作为 fork 继承的 derived 证据。
 真实 macOS ExecTool 后代网络测试检查已运行的继承轨迹，不能推广为任意系统轨迹证明。
 完整平台验收需运行目标系统，不以 Windows 上的字符串断言替代。
-`crates/runtime/src/tools/exec/native_macos/memory_probe.py` 仅在可丢弃的 GitHub macOS
-runner 执行，不是生产依赖或默认 Rust 检查；它实际尝试 coalition 的创建与成功后的清理，
-并对拍 taskpolicy 与宿主双子进程。失败尝试与反例是候选证据，不是聚合强制实现。
 
 ## 17 文档关系
 父分部 D32、§8-13-2 定选择与副本；D29 定 Shares 与聚合内存要求；本分部不复制这些定义。

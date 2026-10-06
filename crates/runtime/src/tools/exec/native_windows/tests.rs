@@ -11,6 +11,8 @@ use crate::tools::exec::{ExecSetup, ExecTool, Shell};
 use kernel::{Address, Payload, RunId, Tool, ToolCall, ToolName};
 use serde_json::Value;
 
+const TEST_MEMORY_BYTES: usize = 0x1000_0000;
+
 #[test]
 #[ignore = "writes AppContainer profiles and disposable ACLs; explicit Windows Actions acceptance only"]
 fn native_windows_disposable_production_axes_and_cleanup() {
@@ -29,18 +31,22 @@ fn native_windows_disposable_production_axes_and_cleanup() {
         work.path().join("native-input.json"),
         serde_json::to_vec(&serde_json::json!({
             "outside": host.path().join("escape"), "address": address.to_string(),
-            "memory": DEFAULT_MEMORY_BYTES,
+            "memory": TEST_MEMORY_BYTES,
         }))
         .unwrap(),
     )
     .unwrap();
     let mut host_allocation = Vec::<u8>::new();
     host_allocation
-        .try_reserve_exact(DEFAULT_MEMORY_BYTES)
+        .try_reserve_exact(TEST_MEMORY_BYTES)
         .unwrap();
     drop(host_allocation);
     let owner = RunId::from_bytes([0x71; 16]);
-    let backlog = crate::Backlog::with_window(crate::PollBudget::new(3_000, 5));
+    let backlog = crate::Backlog::with_window(crate::PollBudget::new(3_000, 5)).with_shares(
+        Shares::CpuAndMemory {
+            limit: std::num::NonZeroU64::new(u64::try_from(TEST_MEMORY_BYTES).unwrap()).unwrap(),
+        },
+    );
     let tool = ExecTool::new(
         ExecSetup {
             workdir: work.path().to_path_buf(),
@@ -70,6 +76,17 @@ fn native_windows_disposable_production_axes_and_cleanup() {
     let outcome = tool.invoke(&call).unwrap();
     let result = serde_json::to_value(outcome.result).unwrap();
     assert_eq!(result["exit_code"], 0, "{result}");
+    assert_eq!(
+        (
+            &result["memory_ceiling"]["state"],
+            &result["memory_ceiling"]["limit_bytes"]
+        ),
+        (
+            &Value::from("hit"),
+            &Value::from(u64::try_from(TEST_MEMORY_BYTES).unwrap())
+        ),
+        "the probe's refused allocation is reported as reaching the ceiling: {result}"
+    );
     assert!(
         result["stdout"]
             .as_str()
@@ -99,6 +116,9 @@ fn native_windows_child_axes() {
     let input: Value =
         serde_json::from_slice(&std::fs::read("native-input.json").unwrap()).unwrap();
     std::fs::write("native-copy-marker", "copy write permitted").unwrap();
+    let temp = std::env::temp_dir();
+    std::fs::write(temp.join("native-temp-probe"), "temp write permitted")
+        .unwrap_or_else(|err| panic!("the redirected TEMP {} is writable: {err}", temp.display()));
     assert!(std::fs::write(input["outside"].as_str().unwrap(), "escape").is_err());
     let address = input["address"].as_str().unwrap().parse().unwrap();
     assert!(
@@ -175,41 +195,186 @@ fn native_windows_disposable_cancellation_owns_the_tree() {
 }
 
 #[test]
+fn native_memory_is_unrequested_without_a_user_ceiling() {
+    for shares in [Shares::Unset, Shares::Cpu] {
+        assert_eq!(limits(shares).unwrap().memory, None);
+    }
+}
+
+#[test]
 #[ignore = "writes AppContainer profiles and disposable ACLs; explicit Windows Actions acceptance only"]
-fn native_windows_disposable_pwsh_initializes_network_types() {
+fn native_windows_disposable_argv_and_unrequested_memory() {
+    use std::os::windows::ffi::OsStringExt;
     assert_eq!(std::env::var("SPRAWLING_DISPOSABLE_NATIVE").unwrap(), "1");
     let copy = tempfile::tempdir().unwrap();
-    let backlog = crate::Backlog::with_window(crate::PollBudget::new(6_000, 20));
-    let mut command = Command::new("pwsh");
-    command.env_clear().env("PATH", std::env::var_os("PATH").unwrap())
-        .current_dir(copy.path()).args(["-NoLogo", "-NoProfile", "-NonInteractive", "-Command",
-            "$ErrorActionPreference='Stop'; [System.Net.ServicePointManager]::SecurityProtocol | Out-Null; [System.Diagnostics.Process]::GetCurrentProcess().PriorityClass"]);
+    let directory = copy.path().join("path with spaces");
+    std::fs::create_dir(&directory).unwrap();
+    let source = directory.join("probe.rs");
+    let exe = directory.join("probe.exe");
+    std::fs::write(&source, super::child::SOURCE).unwrap();
+    let built = Command::new("rustc")
+        .arg(&source)
+        .arg("-o")
+        .arg(&exe)
+        .output()
+        .unwrap();
+    assert!(built.status.success(), "{built:?}");
+    let args = vec![
+        vec![],
+        vec![32, 9],
+        vec![34, 92, 34],
+        vec![92, 92],
+        vec![0xd800, 32, 0xdc00],
+        vec![97, 92, 34, 98, 92],
+    ];
+    let backlog = crate::Backlog::with_window(crate::PollBudget::new(10_000, 5));
+    let scope = Address::parse("work").unwrap();
+    let mut command = Command::new(&exe);
+    command
+        .env_clear()
+        .current_dir(&directory)
+        .args(args.iter().map(|units| OsString::from_wide(units)));
     let result = backlog
         .run_native(
-            RunId::from_bytes([0x73; 16]),
-            &Address::parse("work").unwrap(),
-            "pwsh initialization".to_owned(),
+            RunId::from_bytes([0x74; 16]),
+            &scope,
+            "argv round trip".to_owned(),
             command,
         )
         .unwrap();
-    let result = match result {
-        crate::Started::Settled {
-            exit,
-            stdout,
-            stderr,
-        } => crate::Started::Settled {
-            exit,
-            stdout: stdout.trim().to_owned(),
-            stderr,
-        },
-        background @ crate::Started::Backgrounded { .. } => background,
+    let crate::Started::Settled {
+        exit,
+        stdout,
+        stderr,
+        ..
+    } = result
+    else {
+        panic!("argv child must settle: {result:?}");
     };
+    assert_eq!(exit, crate::Exit::Ended { code: 0 }, "{stderr}");
+    assert_eq!(
+        serde_json::from_str::<Vec<Vec<u16>>>(&stdout).unwrap(),
+        args
+    );
+    let home = tempfile::tempdir().unwrap();
+    let protected = home.path().join("protected");
+    std::fs::create_dir(&protected).unwrap();
+    std::fs::write(protected.join("input"), "read only").unwrap();
+    let prepared = Command::new("pwsh").env("NATIVE_ACL_FIXTURE", &protected)
+        .args(["-NoProfile", "-NonInteractive", "-Command", "$acl=Get-Acl -LiteralPath $env:NATIVE_ACL_FIXTURE; $acl.SetAccessRuleProtection($true,$true); Set-Acl -LiteralPath $env:NATIVE_ACL_FIXTURE -AclObject $acl"])
+        .output().unwrap();
+    assert!(prepared.status.success(), "{prepared:?}");
+    let before = Command::new("pwsh")
+        .env("NATIVE_ACL_FIXTURE", home.path())
+        .args([
+            "-NoProfile",
+            "-NonInteractive",
+            "-Command",
+            "Get-Acl -LiteralPath @($env:NATIVE_ACL_FIXTURE, (Join-Path $env:NATIVE_ACL_FIXTURE 'protected'), (Join-Path $env:NATIVE_ACL_FIXTURE 'protected/input')) | ForEach-Object { $_.Sddl.Replace('D:PAI','D:P').Replace('D:AI','D:') }",
+        ])
+        .output()
+        .unwrap();
+    assert!(before.status.success(), "{before:?}");
+    let backlog = crate::Backlog::with_window(crate::PollBudget::new(100, 5));
+    let copies = [tempfile::tempdir().unwrap(), tempfile::tempdir().unwrap()];
+    for (index, copy) in copies.iter().enumerate() {
+        let index = u8::try_from(index).unwrap();
+        let probe = copy.path().join("probe.exe");
+        std::fs::copy(&exe, &probe).unwrap();
+        let mut command = Command::new(probe);
+        command
+            .env_clear()
+            .env("CARGO_HOME", home.path())
+            .current_dir(copy.path())
+            .args(["grant", &index.to_string()]);
+        assert!(matches!(
+            backlog
+                .run_native(
+                    RunId::from_bytes([index + 0x80; 16]),
+                    &scope,
+                    "concurrent read-execute grant".to_owned(),
+                    command
+                )
+                .unwrap(),
+            crate::Started::Backgrounded { .. }
+        ));
+    }
+    for index in 0..2_u8 {
+        std::fs::write(home.path().join(index.to_string()), "open").unwrap();
+        let owner = RunId::from_bytes([index + 0x80; 16]);
+        let mut finished = None;
+        for _ in 0..2_000 {
+            if let Some(result) = backlog.harvest(owner).unwrap().into_iter().next() {
+                finished = Some(result);
+                break;
+            }
+            std::thread::park_timeout(std::time::Duration::from_millis(5));
+        }
+        let result = finished.expect("declared home reader settles");
+        assert_eq!(
+            (result.exit, result.stdout.trim(), result.stderr),
+            (crate::Exit::Ended { code: 0 }, "read only", String::new())
+        );
+        backlog.release(owner);
+    }
+    assert!(!home.path().join("forbidden").exists());
+    let after = Command::new("pwsh")
+        .env("NATIVE_ACL_FIXTURE", home.path())
+        .args([
+            "-NoProfile",
+            "-NonInteractive",
+            "-Command",
+            "Get-Acl -LiteralPath @($env:NATIVE_ACL_FIXTURE, (Join-Path $env:NATIVE_ACL_FIXTURE 'protected'), (Join-Path $env:NATIVE_ACL_FIXTURE 'protected/input')) | ForEach-Object { $_.Sddl.Replace('D:PAI','D:P').Replace('D:AI','D:') }",
+        ])
+        .output()
+        .unwrap();
+    assert!(after.status.success(), "{after:?}");
+    assert_eq!(
+        after.stdout, before.stdout,
+        "both unique SID grants are revoked"
+    );
+    for (index, shares) in [Shares::Unset, Shares::Cpu].into_iter().enumerate() {
+        let backlog =
+            crate::Backlog::with_window(crate::PollBudget::new(10_000, 5)).with_shares(shares);
+        let mut command = Command::new(&exe);
+        command.env_clear().current_dir(&directory).arg("allocate");
+        let result = backlog
+            .run_native(
+                RunId::from_bytes([u8::try_from(index).unwrap(); 16]),
+                &scope,
+                "unrequested memory".to_owned(),
+                command,
+            )
+            .unwrap();
+        assert_eq!(
+            result,
+            crate::Started::Settled {
+                exit: crate::Exit::Ended { code: 0 },
+                stdout: "2348810240\n".to_owned(),
+                stderr: String::new(),
+                ceiling: None,
+            }
+        );
+    }
+    let backlog = crate::Backlog::with_window(crate::PollBudget::new(10_000, 5));
+    let mut command = Command::new(&exe);
+    command.env_clear().current_dir(&directory).arg("nul");
+    let result = backlog
+        .run_native(
+            RunId::from_bytes([0x90; 16]),
+            &scope,
+            "child opens the null device".to_owned(),
+            command,
+        )
+        .unwrap();
     assert_eq!(
         result,
         crate::Started::Settled {
             exit: crate::Exit::Ended { code: 0 },
-            stdout: "BelowNormal".to_owned(),
+            stdout: "DEFAULT_CAPTURE=Ok(Some(0))\nNUL_DEVICE=Ok(())\n".to_owned(),
             stderr: String::new(),
-        }
+            ceiling: None,
+        },
+        "an AppContainer child opens NUL itself (D59)"
     );
 }

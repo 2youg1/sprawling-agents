@@ -142,3 +142,11 @@ Native 不可给时 E_SANDBOX_DENIED，不退到 copied_tree；CopiedTree 明确
 明确请求 host，仍受 Create 写限制；Python 臂拒绝 sandbox program/shell，python guest
 沿用既有 WASI 接口。选择在 Run 起点冻结，在工具入 catalogue 之前接入并描述其实际保证。
 -/
+
+/-! container 设置覆盖：kernel 声明文法，building 的 sandbox 卡片写整份 `[sandbox.container]`。
+settings-control ContainerLimits.image client/src/views/building/sandbox.svelte
+settings-control ContainerLimits.user client/src/views/building/sandbox.svelte
+settings-control ContainerLimits.cpu_millis client/src/views/building/sandbox.svelte
+settings-control ContainerLimits.memory_bytes client/src/views/building/sandbox.svelte
+settings-control ContainerLimits.pids client/src/views/building/sandbox.svelte
+-/

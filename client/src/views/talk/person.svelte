@@ -40,16 +40,16 @@ action. -->
   const { lang } = u;
 </script>
 
-<div class="group relative my-base flex flex-col items-end">
-  {#if entry !== null && onFork !== undefined}
-    <ForkButton {entry} {run} {onFork} {onHover} />
-  {/if}
+<div class="group my-base flex flex-col items-end">
   <div
     class="max-w-[83%] rounded-panel bg-speech px-pane py-base text-body leading-relaxed whitespace-pre-wrap wrap-anywhere"
   >
     {text}
   </div>
-  <div class="mt-tight text-note text-text-faint">
-    {#if labelHref === undefined}{label}{:else}<a href={labelHref} class="text-text-quiet hover:text-text">{label}</a>{/if}{#if at !== undefined} · {clock($lang, at)}{/if}
+  <div class="mt-tight flex items-center gap-snug text-note text-text-faint">
+    {#if entry !== null && onFork !== undefined}
+      <ForkButton {entry} {run} {onFork} {onHover} />
+    {/if}
+    <span>{#if labelHref === undefined}{label}{:else}<a href={labelHref} class="text-text-quiet hover:text-text">{label}</a>{/if}{#if at !== undefined} · {clock($lang, at)}{/if}</span>
   </div>
 </div>

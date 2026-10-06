@@ -17,6 +17,7 @@ const NPM_UPDATE: &str = "npm install -g sprawling@latest";
 const BUN_UPDATE: &str = "bun install -g sprawling@latest";
 const BINSTALL_UPDATE: &str = "cargo binstall sprawling";
 const CARGO_UPDATE: &str = "cargo install sprawling --locked";
+const AUR_UPDATE: &str = "git pull --ff-only && makepkg -si";
 const ARCHIVE_SIBLING: &str = "skills";
 /// Build identity; source builds carry no invented release tag.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -146,6 +147,13 @@ fn judged(mine: Built, installed: InstallChannel, at: &Registries<'_>) -> Releas
                 hint(installed),
             )
         }),
+        InstallChannel::Aur => github.map(|newest| {
+            (
+                kernel::release::stands(&mine, &newest.cut),
+                line(&newest.cut),
+                hint(installed),
+            )
+        }),
         InstallChannel::Archive => github.map(|newest| {
             let mut update = hint(installed);
             update.command = Some(archive_command(ArchiveVersion::Tag(&newest.tag)));
@@ -192,6 +200,7 @@ fn this_channel() -> InstallChannel {
         Ok("binstall") => return InstallChannel::Binstall,
         Ok("archive") => return InstallChannel::Archive,
         Ok("package") => return InstallChannel::Package,
+        Ok("aur") => return InstallChannel::Aur,
         Ok(_) | Err(_) => {}
     }
     let cargo_home = match std::env::var_os("CARGO_HOME") {
@@ -201,8 +210,14 @@ fn this_channel() -> InstallChannel {
             Err(_no_home) => None,
         },
     };
-    let cargo_bin = cargo_home.map(|cargo_home| cargo_home.join("bin"));
-    match std::env::current_exe() {
+    let cargo_bin = cargo_home.map(|cargo_home| {
+        let path = cargo_home.join("bin");
+        match std::fs::canonicalize(&path) {
+            Ok(resolved) => resolved,
+            Err(_unresolved_candidate) => path,
+        }
+    });
+    match std::env::current_exe().and_then(std::fs::canonicalize) {
         Ok(exe) => channel(&exe, cargo_bin.as_deref()),
         Err(_unnamed) => InstallChannel::Source,
     }
@@ -219,7 +234,9 @@ pub(crate) fn channel(
         )
     });
     let dir = exe.parent();
-    if packaged {
+    if kernel::release::is_aur_install(exe) {
+        InstallChannel::Aur
+    } else if packaged {
         InstallChannel::Package
     } else if cargo_bin.is_some() && dir == cargo_bin {
         InstallChannel::CargoOrBinstall
@@ -272,6 +289,7 @@ fn hint(channel: InstallChannel) -> UpdateHint {
         ),
         InstallChannel::Binstall => (Some(BINSTALL_UPDATE.to_owned()), Vec::new()),
         InstallChannel::Archive => (Some(archive_command(ArchiveVersion::Latest)), Vec::new()),
+        InstallChannel::Aur => (Some(AUR_UPDATE.to_owned()), Vec::new()),
         InstallChannel::Source => (None, Vec::new()),
         InstallChannel::Unknown => (
             None,
@@ -281,6 +299,7 @@ fn hint(channel: InstallChannel) -> UpdateHint {
                 CARGO_UPDATE.to_owned(),
                 BINSTALL_UPDATE.to_owned(),
                 archive_command(ArchiveVersion::Latest),
+                AUR_UPDATE.to_owned(),
             ],
         ),
     };
@@ -436,7 +455,8 @@ mod tests {
                 InstallChannel::Binstall,
                 InstallChannel::Archive,
                 InstallChannel::CargoOrBinstall,
-                InstallChannel::Package
+                InstallChannel::Package,
+                InstallChannel::Aur
             ]
             .map(read),
             [
@@ -474,6 +494,11 @@ mod tests {
                     "0.0.9-pre.261005".to_owned(),
                     None,
                     vec![super::NPM_UPDATE.to_owned(), super::BUN_UPDATE.to_owned()]
+                ),
+                (
+                    "0.0.8-pre.261006".to_owned(),
+                    Some(super::AUR_UPDATE.to_owned()),
+                    vec![]
                 ),
             ]
         );
@@ -524,6 +549,16 @@ mod tests {
                 InstallChannel::Source,
             ]
         );
+    }
+
+    #[test]
+    fn system_package_paths_select_their_own_update_guidance() {
+        let root = tempfile::tempdir().unwrap();
+        let aur = root
+            .path()
+            .join(kernel::release::aur_install_directory())
+            .join("sprawling");
+        assert_eq!(channel(&aur, None), InstallChannel::Aur);
     }
 
     /// The check this test exists for is not which state a test binary

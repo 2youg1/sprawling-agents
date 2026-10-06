@@ -139,7 +139,10 @@
   // covers the back button and every `<a href="#/…">`. Firefox lacks the
   // API, and motion turned off asks for no travel: both take a plain swap.
   function follow(): void {
-    if (!("startViewTransition" in document) || motionOff(document.documentElement)) {
+    // The panel has its own CSS arrival; a document transition would
+    // delay its close and can overlap the next group navigation.
+    if (view.kind === "setup" || Option.getOrElse(current(u.bar), () => DEFAULT_VIEW).kind === "setup"
+      || !("startViewTransition" in document) || motionOff(document.documentElement)) {
       settle();
       return;
     }

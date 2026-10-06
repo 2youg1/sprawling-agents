@@ -45,7 +45,7 @@ pub enum AccountDisposition {
 }
 pub enum ProviderFailureKind {  // 携 serde，内标签 kind
     Exchange, Cut, Silence, Refused { status: u32 },
-    Quota { status: u32 },      // 额度用尽的拒绝：gateway D31 的 AccountUnavailable，恢复语指向补额度或加账号
+    Quota { status: u32 },      // 额度用尽的拒绝：gateway D32 的 AccountUnavailable，恢复语指向补额度或加账号
     Overflow { status: u32 }, Unreadable, Reported, Unbuilt,
 }
 

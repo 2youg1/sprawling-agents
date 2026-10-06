@@ -8,6 +8,12 @@ Copyright (c) 2026 2youg1 and the sprawling contributors -->
 branch glyph -, its name in words beside the mark, and a hint on hover
 and focus that says what the branch keeps.
 
+It stands at the end of its entry's own line - after the speaker and
+time under a person's words, after the head of a reply - and never over
+the words, because a button laid over text hides the text it would
+branch from. It keeps its place while hidden, so revealing it moves
+nothing. The nearest `group` around it is the entry it reveals with.
+
 `onHover` reports the entry under the hand - entered or focused, and
 cleared as the hand leaves - which is the one the `fork.here` chord
 branches from. Clearing matters: a chord pressed pages away must never
@@ -34,7 +40,7 @@ reach a stale entry. -->
   const { lang } = u;
 </script>
 
-<div class="absolute top-0 right-0 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 focus-within:opacity-100">
+<div data-fork class="shrink-0 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 focus-within:opacity-100">
   <Tip text={say($lang, "fork_here_hint")}>
     {#snippet children(hint: string)}
       <button

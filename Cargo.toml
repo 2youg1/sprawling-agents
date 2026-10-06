@@ -108,6 +108,8 @@ winapi-util = "0.1.11"
 # memory a measured command's process reached in `sprawling gauge`
 # (`crates/sprawling/Spec.lean` §8-129-4); the crate's public surface is safe.
 win32job = "2.0.3"
+# Safe read of the protected Windows installation path for privacy identity queries.
+winreg = "0.56"
 # The desktop server's safe Win32 calls, and the handle and error types its
 # FFI seam hands back (`crates/desktop/Spec.lean` D9 and section 8-12): the server
 # and the seam both name it, so its version and features are written once.

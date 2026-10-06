@@ -148,7 +148,9 @@
     asking: {
       ...outer.conn.asking,
       ask: (query: Query) => held(() => answer(query)),
+      refresh: () => undefined,
     },
+    command: () => true,
     retry: () => undefined,
     markNoticesSeen: () => undefined,
   };

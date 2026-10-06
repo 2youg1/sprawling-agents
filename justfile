@@ -265,22 +265,146 @@ test *args:
 test-std:
     cargo test --workspace --locked
 
-# The suite of `test`, compiled once into an archive that `test-slice`
-# runs a part of on another machine with the same checkout path: `ci.yml`
-# builds it on one runner and runs four slices on four others, so the
-# compile is paid once and the run is a quarter of the wall clock.
+# Compile the suite once; every CI slice consumes this archive.
 test-archive file:
     cargo nextest archive --workspace --locked --all-features --archive-file '{{file}}'
 
-# One slice of an archive `test-archive` wrote, `partition` in nextest's
-# spelling (`count:2/4`). The archive is unpacked over this checkout's
-# own `target/`, because a test that spawns a workspace binary reads the
-# absolute path cargo baked in at compile time. The fetch first, because
-# the trybuild suites compile a project of their own offline and find no
-# dependency on a runner that never resolved one.
-test-slice file partition:
+# Names and filtersets live here; CI consumes the checked matrix rather
+# than maintaining a second roster. List from the archive, then reuse its
+# metadata for each filterset, so coverage needs no second compilation.
+test-slice-plan file out:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    mkdir -p '{{out}}'
+    cargo nextest list --archive-file '{{file}}' --workspace-remap . --extract-to . --extract-overwrite --run-ignored all --message-format json > '{{out}}/full.json'
+    python - '{{out}}' <<'PY'
+    import json, pathlib, subprocess, sys
+    out = pathlib.Path(sys.argv[1])
+    slices = []
+    for package in ['kernel', 'storage', 'collab', 'runtime', 'wire']:
+        slices.append({'name': 'trybuild-' + package, 'filter': f'package(=sprawling-{package}) & binary(=trybuild)'})
+    slices.append({'name': 'citysim', 'filter': 'package(=citysim)'})
+    unit = '(kind(lib) | kind(bin) | kind(proc-macro)) & !package(=citysim)'
+    groups = {
+        'runtime': 'package(=sprawling-runtime)',
+        'sprawling': 'package(=sprawling)',
+        'xtask': 'package(=xtask)',
+        'kernel-storage': '(package(=sprawling-kernel) | package(=sprawling-storage))',
+        'gateway-protocols': '(package(=sprawling-gateway) | package(=sprawling-agent-protocols))',
+    }
+    accounting = 'package(=sprawling-accounting)'
+    accounting_domains = {
+        'execution': 'test(/^worker::(driving|dispatching|freezing|mcp|workbench)::/)',
+        'collaboration': 'test(/^worker::(waking|plans|reviewing|settling|commanding)::/)',
+    }
+    for domain, predicate in accounting_domains.items():
+        groups['accounting-' + domain] = f'({accounting} & {predicate})'
+    groups['accounting-other'] = f'({accounting} & !(' + ' | '.join(accounting_domains.values()) + '))'
+    for name, packages in groups.items():
+        slices.append({'name': 'unit-' + name, 'filter': f'{unit} & {packages}'})
+    slices.append({'name': 'unit-other', 'filter': unit + ' & !(' + ' | '.join(groups.values()) + ')'})
+    integration = 'kind(test) & !binary(=trybuild) & !package(=citysim)'
+    slices.extend([
+        {'name': 'integration-sprawling', 'filter': integration + ' & package(=sprawling)'},
+        {'name': 'integration-other', 'filter': integration + ' & !package(=sprawling)'},
+        {'name': 'other-kinds', 'filter': '!(kind(lib) | kind(bin) | kind(proc-macro) | kind(test)) & !package(=citysim)'},
+    ])
+    active = []
+    for row in slices:
+        with (out / (row['name'] + '.json')).open('w', encoding='utf-8') as output:
+            subprocess.run(['cargo', 'nextest', 'list', '--cargo-metadata', 'target/nextest/cargo-metadata.json',
+                            '--binaries-metadata', 'target/nextest/binaries-metadata.json', '--workspace-remap', '.',
+                            '--run-ignored', 'all', '--message-format', 'json', '-E', row['filter']], stdout=output, check=True)
+        listing = json.loads((out / (row['name'] + '.json')).read_text(encoding='utf-8'))
+        if any(case['filter-match']['status'] == 'matches' for suite in listing['rust-suites'].values()
+               for case in suite.get('testcases', {}).values()):
+            active.append(row)
+    (out / 'matrix.json').write_text(json.dumps({'include': active}), encoding='utf-8')
+    PY
+    just test-slice-coverage '{{out}}'
+
+# Compare identities, not counts: equal totals can hide a missing test
+# behind a duplicate. Ignored tests stay in the proof and remain ignored
+# when run, exactly as in the unsliced suite.
+test-slice-coverage out:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    python - '{{out}}' <<'PY'
+    import collections, json, pathlib, sys
+    out = pathlib.Path(sys.argv[1])
+    def identities(path):
+        suites = json.loads(path.read_text(encoding='utf-8'))['rust-suites']
+        return {(suite['binary-id'], name) for suite in suites.values()
+                for name, case in suite.get('testcases', {}).items() if case['filter-match']['status'] == 'matches'}
+    full = identities(out / 'full.json')
+    matrix = json.loads((out / 'matrix.json').read_text(encoding='utf-8'))['include']
+    names = [row['name'] for row in matrix]
+    if not full or not names or len(names) != len(set(names)):
+        sys.exit('test-slice-coverage: empty suite/matrix or duplicate slice name')
+    owners = collections.defaultdict(list)
+    for name in names:
+        selected = identities(out / (name + '.json'))
+        print(f'{name}: {len(selected)} tests')
+        for identity in selected:
+            owners[identity].append(name)
+    defects = [f'unassigned: {identity}' for identity in sorted(full - owners.keys())]
+    defects += [f'outside full suite: {identity}' for identity in sorted(owners.keys() - full)]
+    defects += [f'assigned twice: {identity}: {owners[identity]}' for identity in sorted(owners) if len(owners[identity]) != 1]
+    if defects:
+        sys.exit('test-slice-coverage: ' + chr(10).join(defects))
+    print(f'test-slice-coverage: {len(full)} tests assigned exactly once across {len(names)} slices')
+    PY
+
+# Unpack at the checkout path compiled into tests that spawn workspace
+# binaries. Fetch first: trybuild compiles its own project offline.
+test-slice file filter:
     cargo fetch --locked
-    cargo nextest run --archive-file '{{file}}' --workspace-remap . --extract-to . --extract-overwrite --partition '{{partition}}' --no-fail-fast
+    cargo nextest run --archive-file '{{file}}' --workspace-remap . --extract-to . --extract-overwrite -E '{{filter}}' --no-fail-fast --no-tests=warn
+
+# Compare completed successful Actions inventories, exported with:
+# gh run view <id> --json conclusion,headSha,startedAt,updatedAt,jobs
+# Queueing stays in run and test-chain wall time; job durations are
+# reported separately rather than presented as the algorithm's gain.
+test-timings baseline current:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    python - '{{baseline}}' '{{current}}' <<'PY'
+    import datetime, json, pathlib, sys
+    def instant(value):
+        return datetime.datetime.fromisoformat(value.replace('Z', '+00:00'))
+    def seconds(start, end):
+        elapsed = (instant(end) - instant(start)).total_seconds()
+        if elapsed < 0:
+            sys.exit('test-timings: end precedes start')
+        return elapsed
+    def inventory(path):
+        run = json.loads(pathlib.Path(path).read_text(encoding='utf-8'))
+        if run['conclusion'] != 'success':
+            sys.exit(f'test-timings: {path} is not a successful completed run')
+        jobs = {job['name']: job for job in run['jobs']}
+        slices = [job for job in run['jobs'] if job['name'].startswith('test (')]
+        if len(jobs) != len(run['jobs']) or not slices or 'test build' not in jobs or 'test' not in jobs:
+            sys.exit('test-timings: duplicate job names or missing test build, slices or verdict')
+        for job in [jobs['test build'], jobs['test'], *slices]:
+            if job['conclusion'] != 'success' or not job['completedAt']:
+                sys.exit(f"test-timings: {job['name']} did not finish successfully")
+        duration = lambda job: seconds(job['startedAt'], job['completedAt'])
+        return run, slices, {
+            'ci-wall-seconds': seconds(run['startedAt'], run['updatedAt']),
+            'test-chain-wall-seconds': seconds(jobs['test build']['startedAt'], jobs['test']['completedAt']),
+            'test-build-seconds': duration(jobs['test build']),
+            'longest-slice-job-seconds': max(map(duration, slices)),
+        }
+    before, before_slices, baseline = inventory(sys.argv[1])
+    after, after_slices, current = inventory(sys.argv[2])
+    print('metric	baseline	current	delta-seconds')
+    for metric in baseline:
+        print(f'{metric}	{baseline[metric]:g}	{current[metric]:g}	{current[metric] - baseline[metric]:+g}')
+    for label, run, slices in [('baseline', before, before_slices), ('current', after, after_slices)]:
+        print(f"{label} HEAD: {run['headSha']}")
+        for job in sorted(slices, key=lambda job: job['name']):
+            print(f"{label} {job['name']}: {seconds(job['startedAt'], job['completedAt']):g}s")
+    PY
 
 # The packages every platform builds and tests. The desktop server
 # and its FFI seam serve a Windows desktop only, and xtask judges the
@@ -414,8 +538,10 @@ web-bundle:
 # installs and bundles exactly once even though both recipes are in it.
 check-client: build-web client-checks
 
-# The client's own gates on the dependencies build-web installed.
+# The generated offline playback page, then the client's own gates on
+# the dependencies build-web installed. Both checks run under Bun.
 client-checks:
+    bun crates/city/skills/playback/assemble.js --check
     cd client && bun run lint && bun run typecheck && bun run test
 
 # The gate that opens the gallery in a real engine, on its own: roles,
@@ -607,7 +733,7 @@ budget:
 # next product build relinks it.
 bench:
     cargo run --release -p citysim --bin bench
-    cargo nextest run -p sprawling -p sprawling-accounting -p sprawling-gateway -p sprawling-runtime --release --lib --run-ignored only -E 'test(/::instrument_/)' --no-capture
+    cargo nextest run -p sprawling -p sprawling-accounting -p sprawling-gateway -p sprawling-runtime --release --lib --profile bench --run-ignored only -E 'test(/::instrument_/)' --no-capture
 
 # The four-action pressure reading (tools/citysim/Spec.lean 8-5) - install,
 # startup, raise a city, open a session - measured, never gated.

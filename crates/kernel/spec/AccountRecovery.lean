@@ -130,7 +130,7 @@ variable {Account : Type} [DecidableEq Account]
 **决定**：一个 Provider 有多个账号时，「先用哪个账号」与「失败后原号再发、换号还是停下」都由 `AccountRound` 一处回答。规则：
 
 1. **没有并列**。名册序就是优先级。开轮时，Session 持有的账号仍在名册里且可兑付就用它，否则用名册里第一个可兑付的；换号时用名册里第一个可兑付而本轮没到过的。
-2. **说「换号」的失败（`Advance`）立刻换号**，不在原号上重发：401、额度用尽、该账号引用的凭据缺失（gateway D31）。
+2. **说「换号」的失败（`Advance`）立刻换号**，不在原号上重发：401、额度用尽、该账号引用的凭据缺失（gateway D32）。
 3. **说「稍后再问」的失败（`Yes` 且 `Keep`）在原号上再发至多 k 次**（k 取 `AccountRetries`，一或二），用完再换号；连接没建起、408、限流的 429、5xx 与列明的流内错误属于这一族。
 4. **效果不明的失败（`Unknown`）只在原号上、在同一份 k 次余额内再发，从不换号**；余额用完以 `Unknown` 停下，原错误带着 `effect_unknown` 交出。
 5. **请求错误（`No` 且 `Keep`）不再发**，以 `Refused` 停下。
@@ -164,7 +164,7 @@ def AccountRound.start (roster : Roster Account) (usable : Account → Bool) (ca
 
 /-! D55 凭据能否兑付在开轮时读一次；一个账号的凭据缺失只让这个账号出局，vault 本身的故障让整轮停下
 
-**决定**：`usable` 是开轮时对名册里每个账号问一次「它的引用此刻能否兑付」（vault 里有这个条目，或环境变量提供了它），开轮与换号都跳过不可兑付的账号。问法是端点的兑付处（gateway `Redemption::holds`）向同一个 `SecretResolver` 兑付一次、只看结果、把封好的值当场丢掉（`Sealed` 丢弃即清零），值不离开那一格；只有 `E_CREDENTIAL_MISSING` 让账号不可兑付，别的兑付失败（vault 锁住、读不了）照旧算可兑付，让发送那一刻把 vault 的错误原样报出来并以 `Refused` 停下整轮。名册只有一个账号时不问：那里没有可换的账号，`Single` 不读 `usable`。发送时兑付仍可能失败：引用在 vault 里不见了，端点的兑付处（gateway D31）把那条 `E_CREDENTIAL_MISSING` 标成 `Advance`，于是只有这个账号出局；vault 锁住或不可用的错误不标 `Advance`，以 `Refused` 停下整轮。
+**决定**：`usable` 是开轮时对名册里每个账号问一次「它的引用此刻能否兑付」（vault 里有这个条目，或环境变量提供了它），开轮与换号都跳过不可兑付的账号。问法是端点的兑付处（gateway `Redemption::holds`）向同一个 `SecretResolver` 兑付一次、只看结果、把封好的值当场丢掉（`Sealed` 丢弃即清零），值不离开那一格；只有 `E_CREDENTIAL_MISSING` 让账号不可兑付，别的兑付失败（vault 锁住、读不了）照旧算可兑付，让发送那一刻把 vault 的错误原样报出来并以 `Refused` 停下整轮。名册只有一个账号时不问：那里没有可换的账号，`Single` 不读 `usable`。发送时兑付仍可能失败：引用在 vault 里不见了，端点的兑付处（gateway D32）把那条 `E_CREDENTIAL_MISSING` 标成 `Advance`，于是只有这个账号出局；vault 锁住或不可用的错误不标 `Advance`，以 `Refused` 停下整轮。
 
 **理由**：一个账号的引用缺失是这个账号的事，换下一个账号能修好；vault 锁住是所有账号共用的存储的事，换号只会把同一个错误在每个账号上各买一遍，最后报出的「账号用尽」也指错了出路。开轮时先问一次，免得把一次注定失败的兑付算作一次发送。
 

@@ -6,7 +6,7 @@
 //! What failed about one provider call, and the one place that decides
 //! whether it may be asked again, whether the account that met it can
 //! still take it, and what the person does next
-//! (`crates/gateway/spec/Endpoint/Failure.lean`, gateway D2, D3 and D31).
+//! (`crates/gateway/spec/Endpoint/Failure.lean`, gateway D2, D3 and D32).
 
 use kernel::{AccountDisposition, AxError, ProviderFailureKind, Retry};
 
@@ -59,7 +59,7 @@ pub(crate) enum ProviderFailure<'e> {
     },
     /// The provider refused the request because this account's quota is
     /// used up, said in the refusal's structured error rather than in its
-    /// message (D31). Unlike a busy 429, waiting does not mend it.
+    /// message (D32). Unlike a busy 429, waiting does not mend it.
     AccountUnavailable {
         url: &'e str,
         status: reqwest::StatusCode,
@@ -96,7 +96,7 @@ const WINDOW_MARKERS: [&str; 4] = [
 
 /// The structured code, or failing it the type, an OpenAI-dialect error
 /// carries when the account's quota is used up: in a 429's body, and in
-/// an error chunk part-way through a stream (D31).
+/// an error chunk part-way through a stream (D32).
 const QUOTA_EXHAUSTED: &str = "insufficient_quota";
 
 /// Whether a refusal's body says, in its structured `error` object, that
@@ -121,7 +121,7 @@ fn names_an_exhausted_quota(said: &str) -> bool {
 
 impl<'e> ProviderFailure<'e> {
     /// A non-2xx answer, classed by its status and by what its body says:
-    /// the window first (D3), then the quota (D31).
+    /// the window first (D3), then the quota (D32).
     ///
     /// The body is read to classify and never quoted back; a body that
     /// could not be read classes the refusal by its status alone.
@@ -234,7 +234,7 @@ impl ProviderFailure<'_> {
     }
 
     /// Whether the account this request went out on can still take it
-    /// (D31): a rejected key (401) and a used-up quota, refused or
+    /// (D32): a rejected key (401) and a used-up quota, refused or
     /// reported mid-stream, send the request to the next account. Every
     /// other failure keeps the account - a busy provider is asked again
     /// on it, a malformed request would fail on any account, and a lost

@@ -43,7 +43,7 @@ impl Redemption {
     ///
     /// A reference the store does not hold is this account's matter, so
     /// its `E_CREDENTIAL_MISSING` says the next account should take the
-    /// request (gateway D31); every other refusal passes through as it
+    /// request (gateway D32); every other refusal passes through as it
     /// came, because a locked or broken vault fails every account alike
     /// (kernel D55).
     pub(crate) fn account_credential(
@@ -144,7 +144,7 @@ mod tests {
     use super::super::fakes::{config, request};
     use super::*;
 
-    /// gateway D31: the credential the account calls with is this
+    /// gateway D32: the credential the account calls with is this
     /// account's matter, so its absence switches to the next account; a
     /// reference in an extra header belongs to the endpoint every account
     /// shares, and switching would not bring it back.

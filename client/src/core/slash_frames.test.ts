@@ -131,7 +131,6 @@ const CASES: Readonly<Record<string, readonly Case[]>> = {
     { line: "/raise lab palace", done: NOTHING },
   ],
   "/new": [{ line: "/new", done: opening("nothing") }],
-  "/clear": [{ line: "/clear", done: opening("nothing") }],
   // The run in hand is stopped first; the session opens once it froze,
   // which `slash_session.test.ts` follows.
   "/compact": [{ line: "/compact", done: sending({ command: { cancel: { run: LIVE, idem: IDEM } } }) }],

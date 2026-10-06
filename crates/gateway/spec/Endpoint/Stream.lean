@@ -14,7 +14,7 @@
 /-!
 ### 8-13 逐字读一次调用（形状 3 适配器）
 
-`Endpoint::call_streaming`（crate 内固有方法，`permit::Gated` 的 `Model::call_streaming` 过门后调它）：请求带 `stream: true`，逐行读 `data:`，把每一帧交给 `dialect::increment_of`，最后 `dialect::settled_from_stream` 把收集到的帧重装成**这个 dialect 非流式的那个形状**，再交给同一个 `response_from_wire`。
+`Endpoint::call_streaming`（crate 内固有方法，`permit::Gated` 的 `Model::call_streaming` 过门后调它）：请求带 `stream: true`，逐行读 `data:`，把每一帧交给 `dialect::increment_of`，`dialect::StreamFrames` 接收每一帧并在 EOF 后把收集到的帧重装成**这个 dialect 非流式的那个形状**，再交给同一个 `response_from_wire`。
 
 **「逐行」指的是响应体到达的节奏，而不是一个已经读完的字符串的行。** `Response` 当 `std::io::Read` 包进 `BufReader` 逐行读，一帧到达即交一帧；先把整个 body 读完再逐行转发，会让全部增量在模型停下之后的同一毫秒里一起发出。否决「把转发搬到 socket 任务那一层去查锁」：`to_watchers` 是非阻塞广播，帧压根没有到达那里，往下游找只会找到一个不存在的原因。**验收形式**：假供应方先写开头几帧并 flush，**然后等调用方回报「第一条增量已转出」才写剩下的**；读完再回放的实现永远回报不了，服务器自己就是断言，测试侧不读时钟。
 
@@ -28,11 +28,23 @@
 
 **半个工具参数恒拒，两家同码同形。** 流中断时 `partial_json`／`arguments` 停在一个值的中间；把它读成 `{}` 就是把半次调用变成一次真的「无参数调用」，而 `exec {}`／`write {}` 会落账、过门、真执行。判定住 `mismatch::settled_tool_arguments(tool, at, raw)`——两家 dialect 都从碎片拼参数，故拼完即校验的那一句只有一处，拒词点名工具、index、已收字符数与解析停在哪里，码取 `E_PROVIDER`（`stream_cut`，`Retry::Unknown`：截断的流与截断的 body 是同一种失败）。落选的是「在 OpenAI 侧沿用 `response_from` 的 `E_WIRE_MISMATCH`」：形状没有漂，漂的是这次传输，而 `E_WIRE_MISMATCH` 的恢复语会让人去改 dialect 与 base url 两个没有错的设置。
 
-**一个工具调用在它的 `content_block_stop` 到达时就是完整的，解码器在那一刻交出它。** `anthropic::stream::completed_call(frames, at) -> Result<Option<ToolCall>, AxError>`：`frames` 是迄今收到的帧，`at` 是刚收到 `content_block_stop` 的那个 index。块是 `tool_use` 则答 `Some(ToolCall)`，别的块答 `None`；参数停在一个值的中间照旧是 `E_PROVIDER`（同 `settled_tool_arguments`）。**重装只有一处**：`settled` 与 `completed_call` 都经 `rebuilt` 把帧按 index 拼回块，再由 `block_from` 读成 `ContentBlock`——提前交出的调用与结算后 `ModelReturn` 里那一条逐字段相等，这由测试钉住。**交出的不是 `Increment`**：`Increment` 在线协议上、只供人看、不许任何下游据以决策（kernel `Increments` 的约定），而一次提前交出的调用恰恰是要据以执行的；把它塞进 `Increment` 既要动 `WIRE_V`，又会让「看的东西」变成「决定的东西」。`Endpoint::stream` 每收到一帧就问 `dialect::call_completed_by(kind, frames)`：Anthropic 兼容格式在最后一帧是 `content_block_stop` 时经 `completed_call` 作答，别的兼容格式恒答 `None`；答出的调用交给 `call_speculating` 的 `early`。
+**一个工具调用在它的 `content_block_stop` 到达时就是完整的，解码器在那一刻交出它。** `anthropic::stream::completed_call(frames, at) -> Result<Option<ToolCall>, AxError>`：`frames` 是迄今收到的帧，`at` 是刚收到 `content_block_stop` 的那个 index。块是 `tool_use` 则答 `Some(ToolCall)`，别的块答 `None`；参数停在一个值的中间照旧是 `E_PROVIDER`（同 `settled_tool_arguments`）。**重装只有一处**：`settled` 与 `completed_call` 都经 `rebuilt` 把帧按 index 拼回块，再由 `block_from` 读成 `ContentBlock`——提前交出的调用与结算后 `ModelReturn` 里那一条逐字段相等，这由测试钉住。**交出的不是 `Increment`**：`Increment` 在线协议上、只供人看、不许任何下游据以决策（kernel `Increments` 的约定），而一次提前交出的调用恰恰是要据以执行的；把它塞进 `Increment` 既要动 `WIRE_V`，又会让「看的东西」变成「决定的东西」。`Endpoint::stream` 每收到一帧就交给 `StreamFrames::retain_and_complete`：Anthropic 兼容格式在最后一帧是 `content_block_stop` 时经 `completed_call` 作答，别的兼容格式恒答 `None`；三种兼容格式都保留帧到 EOF，再按各自文法结算；Responses 的结算投影见 D27；答出的调用交给 `call_speculating` 的 `early`。
 
 **提前交出的调用不是历史**：账本仍只从结算后的 `ModelReturn` 记 `tool_called`；回答被截断或取消，提前交出的调用与据它得出的结果一并丢弃。这两句与「只提前启动第一个写调用之前的只读调用」由 `crates/runtime/spec/Turn/Speculation.lean` 证明：`speculation_is_not_an_event`、`speculation_keeps_serial_order`、`a_cut_answer_discards_its_cache`；`speculating_past_a_write_changes_the_ledger` 给出落选设计（写调用之后的读也提前启动）的反例——提前启动的读看到的是写之前的世界。
 
 **认不出的帧跳过，缺失的结算帧不跳过。** provider 会加新的事件类型，一个人不该因为其中一个是新的就丢掉整次调用；但流在说明「为什么停」的那一帧之前结束，是 `Provider` 失败并且可重试——它和一个被截断的 body 是同一种失败，刻意不允许「保留已收到的增量」来补救：把不完整的回复当成完整的呈现出去，是这里唯一不能有的结局。
 
 **机密楼宇的拒绝写一次。** 两扇门（`call` 与 `call_streaming`）都说同一句话，出自同一个 `confidential_refusal`——一条安全拒绝有两份拷贝，就是两个各自变软的机会。
+-/
+
+/-! `instrument_responses_stream` 经生产的 `frame_of`、`increment_of`、`StreamFrames` 与
+`response_from_wire` 测量本地帧解析、转发值构造、保留与最终解析；HTTP、读线程与通道等待不计入。
+夹具在计时前生成，摘要覆盖终帧、delta 与重复数；小流与长流各预热 20 次后记录 200 个原始纳秒样本，
+p50 与 p99 取最近秩。内存读数是精确的持有帧数，不是私有字节或分配器总分配数。
+Actions 在同一个 runner 上交替运行两份预先编译的 executable，编译不计时。
+-/
+
+/-! `instrument_responses_heap_small` 与 `instrument_responses_heap_long` 各运行同一帧处理入口一次；
+Actions 用 Linux heaptrack 记录分配次数、总量、峰值与分配栈，小／长夹具分别运行，不把 profiler 的耗时
+用作延迟读数。进程启动、测试 runner 与夹具生成也在 heap profile 中，两臂有相同的这份固定开销。
 -/

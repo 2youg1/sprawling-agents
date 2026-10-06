@@ -20,7 +20,7 @@ import type { Tail } from "../../core/live_output";
 import { Locator } from "../../wire";
 import type { Call, TimeMs } from "../../wire";
 import { lastedOf } from "../talk/timing";
-import { commandOf, type Ending } from "../monitor/trace";
+import { commandOf, type CeilingNote, type Ending } from "../monitor/trace";
 
 export interface Printed {
   // The command line, or what any other call was called on.
@@ -39,6 +39,8 @@ export interface Printed {
   readonly pinned: Locator | null;
   // Whether `out` and `err` are the live tail rather than the Ledger's.
   readonly live: boolean;
+  // What the result said about the person's memory ceiling.
+  readonly ceilings: readonly CeilingNote[];
 }
 
 export function printedOf(call: Call, tail: Tail): Printed {
@@ -58,6 +60,7 @@ export function printedOf(call: Call, tail: Tail): Printed {
       finished,
       pinned,
       live,
+      ceilings: entry.ceilings,
     };
   }
   const answered = call.output?.head ?? "";
@@ -71,5 +74,6 @@ export function printedOf(call: Call, tail: Tail): Printed {
     finished,
     pinned,
     live,
+    ceilings: [],
   };
 }

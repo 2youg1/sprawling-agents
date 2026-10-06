@@ -250,7 +250,7 @@ names = [
 # today is the ratchet - nothing new may be born over 400 lines, and
 # nothing already over it may grow.
 [file_length]
-what = "one source file under a crate's src/ or under client/src, every line of it, tests included"
+what = "one source file under a crate's src/, any .zig in a package, or any file of a file-face-only language in the tree, Rust and Zig counting production lines and the rest every line"
 budget_lines = 400
 measured_by = "cargo xtask length"
 status = "gated, with a register of the files that predate the rule"
@@ -264,13 +264,13 @@ status = "gated, with a register of the files that predate the rule"
 # **The client arrived on 2026-09-19**, when `xtask length` reached
 # `client/src`. The 400-line rule had been stated for the whole
 # repository and executed on Rust only, so 18,000 lines of TypeScript
-# were read by the same two readers with nothing holding the line - the
-# six rows below are what that cost, and they are pinned at the length
-# each file had on the day the gate reached it. They carry the same
-# three properties every other row does, and they are worked off the
-# same way: by splitting the file, never by raising its number.
+# were read by the same two readers with nothing holding the line. The
+# rows that cost were pinned at the length each file had on the day the
+# gate reached it, carried the same three properties every other row
+# does, and were worked off the same way: by splitting the file, never
+# by raising its number.
 #
-# `client/src/wire.ts` (2,445 lines) is not here and never will be.
+# `client/src/wire.ts` is not here and never will be.
 # `cargo xtask wire-ts` writes it from the Rust wire, so its length is a
 # fact about the generator; the gate reads the exemption from the banner
 # the generator puts at the top rather than from a path written here.
@@ -287,9 +287,13 @@ status = "gated, with a register of the files that predate the rule"
 #
 # Delete a row by doing the split, never by raising its number.
 [file_length.predating]
-# Empty. The one entry this register held (`talk/composer.tsx = 478`) was
-# struck when the Solid client retired with the port; a stale entry is
-# refused by the gate, which is exactly how the list stays honest.
+# The stylesheet arrived when the rule reached every file-face-only
+# language in the tree (tools/xtask/Spec.lean section 8-53, D33): CSS,
+# HTML, the scripts and the Nix flake had been read by the same two
+# readers with nothing holding the line. It is pinned at the length it had
+# when the gate reached it, and it is worked off by splitting it into
+# parts the entry imports, never by raising its number.
+"client/src/theme.css" = 2108
 
 # White box is Rust, black box is Lean (the person's ruling).
 # `cargo xtask boundary` refuses a Rust check that reaches this product
@@ -917,3 +921,44 @@ status = "measured, held by that test rather than weighed by budget: 0 loose obj
 what = "files created per step of three rooms delegated in a row with the restock still checking out at the second, at N = 8, 16 and 32 files"
 measured_by = "cargo nextest run -p sprawling-storage -E 'test(a_room_placed_while_the_stock_is_being_made_checks_out_once_and_the_stock_survives)'"
 status = "measured, held by that test rather than weighed by budget: first room 0, restock N, second room N, refresh 0, third room 0"
+
+[responses_stream]
+what = "Responses frame parsing, increment construction, retention and the existing final reply parser; HTTP, reader thread and channel waits excluded"
+measured_by = "gh workflow run on-demand.yml -f job=bench -f responses_base=<matched-ref>; instrument_responses_stream (200 raw nanosecond samples after 20 warmups, 8 or 16384 deltas of 64 bytes); Linux heaptrack runs instrument_responses_heap_small and instrument_responses_heap_long once each"
+status = "candidate rejected after matched small-stream regression repeats; production retains frame buffering; final integrated-tree readings remain owed; no wall-clock gate"
+baseline_ref = "882a5dae793ed03d11132a99d7af423dfcd72e2b"
+baseline_tree = "9277204d9a05fdd92eaf736959d9cd6f295068e6"
+baseline_allocation_run = "https://github.com/2youg1/sprawling-agents/actions/runs/37401209316"
+baseline_allocation_artifact = "bench-allocations-165e1dae299107babcb8650639efbe289ef8e6d1"
+baseline_linux_binary_sha256 = "f2a0f828d69083aca404cebca6b63f93c5d25ef6d8fe7847658de9ba67c61ae8"
+allocation_machine = "ubuntu-latest, x86_64, 4 logical processors, release defaults; heaptrack traces the complete test process including runner and fixture creation"
+baseline_small_allocation_calls = 353
+baseline_long_allocation_calls = 98620
+baseline_small_peak_heap = "119.97K (heaptrack rounded output, bytes)"
+baseline_long_peak_heap = "13.11M (heaptrack rounded output, bytes)"
+retention_condition = "retain only if the five alternating rounds show a long-stream gain larger than the baseline p50 range and no repeatable small-stream regression, with fewer allocation calls and a lower long-stream peak heap"
+candidate_ref = "d3adfe648b160bb4e5ac074661ecb4d19963964e"
+candidate_tree = "1637edf74280893f0ec3e1d73f360d730e52f924"
+comparison_run = "https://github.com/2youg1/sprawling-agents/actions/runs/37407581820"
+comparison_artifacts = "bench job artifacts at comparison_run; names are defined by on-demand.yml from runner OS and source tree"
+latency_machine = "windows-latest, Windows 2025Server, AMD64, 4 logical processors, release defaults; 5 alternating rounds, 200 samples per fixture per arm per round, 20 warmups per round"
+baseline_small_round_p50_ns = [8100, 8200, 8100, 8200, 8100]
+candidate_small_round_p50_ns = [16800, 9400, 8500, 8500, 8500]
+baseline_small_round_p99_ns = [14400, 16000, 17300, 16400, 16900]
+candidate_small_round_p99_ns = [24000, 22900, 17100, 20700, 17900]
+baseline_long_round_p50_ns = [18593000, 16815500, 17456300, 18808600, 18737200]
+candidate_long_round_p50_ns = [7829300, 7840900, 7829300, 7913100, 7727400]
+baseline_long_round_p99_ns = [23866800, 21020400, 23612300, 25768400, 22153400]
+candidate_long_round_p99_ns = [9921800, 11422600, 11496000, 11275500, 8845700]
+small_fixture = "252e6bddc669911ee059c8908667c49a40eba24289911b56e23f7afe72d1458d"
+long_fixture = "79e16f9d7635b27430f61bf7db86012ce06e2ce002145e89d90e2e8a25d034bc"
+candidate_small_allocation_calls = 331
+candidate_long_allocation_calls = 98587
+candidate_long_peak_heap = "119.97K (heaptrack rounded output, bytes)"
+comparison_note = "long-stream median p50 improves by 10763700 ns (57.89%), beyond the 1993100 ns baseline round range; small-stream median p50 is 8100 ns baseline and 8500 ns candidate, with all five candidate rounds slower and a 100 ns baseline range; the long gain does not satisfy the complete retention condition"
+original_comparison_run = "https://github.com/2youg1/sprawling-agents/actions/runs/37402131312"
+original_small_baseline_round_p50_ns = [13900, 8200, 8200, 8100, 8100]
+original_small_candidate_round_p50_ns = [9200, 8800, 8500, 8000, 10000]
+repeat_comparison_run = "https://github.com/2youg1/sprawling-agents/actions/runs/37406060142"
+repeat_small_baseline_round_p50_ns = [4800, 4800, 4900, 4800, 4800]
+repeat_small_candidate_round_p50_ns = [5000, 5100, 4900, 4900, 4800]

@@ -10,12 +10,14 @@
 import type { Answer, Call, CommitAnswer, Query, Turn } from "../../wire";
 import { Address, GitOid, RunId, Seq, TimeMs, Tokens, UsdMicros } from "../../wire";
 import { SEARCH } from "./configured";
+import { FIRST_POLICY } from "../../core/commands";
 import { ENDPOINTS } from "./served";
 
 // The room the conversation is in: it has a run waiting, one finished
 // and one going (`resulted.svelte` deals its rooms out in turn).
 export const ROOM = Address.make("release/ledger");
 export const EMPTY_ROOM = Address.make("lab/fresh");
+const SANDBOXED = Address.make("release");
 const START = 1_790_000_000_000;
 const MODEL = "anthropic/claude-fable-5.1";
 
@@ -74,9 +76,28 @@ const COMMITS: readonly CommitAnswer[] = [
 // run has done anything a right pane would open on.
 export function answering(calling: boolean): (query: Query) => Answer | undefined {
   return (query) => {
+    if (query === "endpoint_view") return { endpoints: ENDPOINTS };
     if (typeof query !== "object") return undefined;
-    if ("rounds" in query) return { rounds: { run: query.rounds.run, turns: turnsOf(calling) } };
-    if ("endpoint_view" in query) return { endpoints: ENDPOINTS };
+    if ("rounds" in query) return { rounds: { run: query.rounds.run, turns: turnsOf(calling), opening: { at: TimeMs.make(START), task: "Review the document", goal: "", policy: FIRST_POLICY, effort: "high" } } };
+    // The working room's building boxes a run in a copied tree, so its
+    // sandbox is a fact the first message head states; the empty room's
+    // building has none, so nothing about a sandbox is drawn there.
+    if ("building_view" in query && query.building_view.addr === SANDBOXED) {
+      return {
+        building: {
+          addr: SANDBOXED,
+          archive: [],
+          blocked: [],
+          docs: [],
+          mcp: [],
+          plan: [],
+          problems: [],
+          progress: { unplanned: { budget: { tokens: Tokens.make(0), usd: UsdMicros.make(0) }, steps: 0 } },
+          rooms: [ROOM],
+          sandbox: { arm: "copied_tree", fuel: 0, mounts: [SANDBOXED], shell: true },
+        },
+      };
+    }
     if ("commits" in query) return { commits: { building: null, before: null, commits: COMMITS, more: false } };
     if ("config" in query) {
       return {

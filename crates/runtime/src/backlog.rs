@@ -190,12 +190,14 @@ impl Backlog {
         let mut done = Vec::new();
         let mut spent = Vec::new();
         let mut live = Vec::new();
-        for (id, member) in &mut table.members {
+        let Table { members, jobs, .. } = &mut *table;
+        for (id, member) in members.iter_mut() {
             let Body::Command {
                 child,
                 dir,
                 claim,
                 tail,
+                ceiling,
             } = &mut member.body
             else {
                 continue;
@@ -220,6 +222,7 @@ impl Backlog {
                     exit,
                     stdout,
                     stderr,
+                    ceiling: jobs.ceiling(owner, *ceiling),
                 });
             } else {
                 // Output owed to nobody is not read at all. A directory
@@ -318,6 +321,7 @@ mod container;
 mod process;
 pub(crate) use container::ContainerRequest;
 
+mod ceiling;
 mod cgroup;
 mod config;
 mod host;
@@ -326,9 +330,12 @@ mod member;
 #[cfg(windows)]
 mod native_windows;
 mod report;
+#[cfg(windows)]
+mod run_job;
 mod scratch;
 mod tail;
 pub mod waiting;
+pub use ceiling::{Ceiling, Unapplied};
 pub use cgroup::{PlatformShares, platform_shares};
 pub use jobs::{RunAffinity, RunProcesses, Shares};
 use member::{Body, Claim, Member, RunState, collect, storage};

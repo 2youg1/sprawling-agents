@@ -30,7 +30,7 @@ pub enum ProviderFailureKind {
     /// spell a `u16` with.
     Refused { status: u32 },
     /// The provider refused the request because this account's quota is
-    /// used up (gateway D31). Asked again it answers the same; another
+    /// used up (gateway D32). Asked again it answers the same; another
     /// account, or credit added to this one, is the way out.
     Quota { status: u32 },
     /// The provider refused the request because it no longer fits the

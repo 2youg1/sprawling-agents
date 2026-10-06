@@ -26,8 +26,8 @@ impl Backlog {
         let limits = native_windows::limits(self.shares)?;
         {
             let mut table = self.hold()?;
-            let job = match table.jobs.native_job(owner, limits.memory, self.affinity) {
-                Ok(job) => job,
+            let (job, ceiling) = match table.jobs.native_job(owner, limits.memory, self.affinity) {
+                Ok(lent) => lent,
                 Err(error) => {
                     table.jobs.keep_failed_native(
                         owner,
@@ -62,6 +62,7 @@ impl Backlog {
                         dir: dir.clone(),
                         claim: Claim::Window(owner),
                         tail: Tail::default(),
+                        ceiling,
                     },
                 },
             );

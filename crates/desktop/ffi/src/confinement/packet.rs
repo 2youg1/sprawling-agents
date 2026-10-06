@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! UTF16 launch packet; six terminated strings followed by an explicit
+//! UTF16 launch packet; seven terminated strings followed by an explicit
 //! double-terminated environment. No process environment is inherited.
 //! Argument preservation follows `Runtime.NativeWindows.Argv` in
 //! `crates/runtime/spec/Tools/Exec/NativeWindows.lean`; this is the sole encoder.
@@ -16,7 +16,8 @@ const BACKSLASH: u16 = 92;
 const INVALID_PARAMETER: u32 = 87;
 
 pub(super) fn encode(launch: &Launch) -> Result<Vec<u16>, Failure> {
-    if launch.cpu_rate.get() > 10_000
+    if launch.declared_roots > launch.toolchain_roots.len()
+        || launch.cpu_rate.get() > 10_000
         || launch.profile.is_empty()
         || launch.profile.len() > 64
         || !launch
@@ -75,6 +76,18 @@ pub(super) fn encode(launch: &Launch) -> Result<Vec<u16>, Failure> {
     ] {
         packet.extend(terminated(part)?);
     }
+    for (index, root) in launch.toolchain_roots.iter().enumerate() {
+        if index != 0 {
+            packet.push(10);
+        }
+        for unit in root.as_os_str().encode_wide() {
+            if unit == 0 || unit == 10 {
+                return Err(invalid());
+            }
+            packet.push(unit);
+        }
+    }
+    packet.push(0);
     let mut environment = Vec::new();
     for (name, value) in &launch.environment {
         let key: Vec<u16> = name.encode_wide().collect();
@@ -148,11 +161,11 @@ fn invalid() -> Failure {
 
 #[cfg(test)]
 pub(super) fn valid(mut units: &[u16]) -> bool {
-    for _ in 0..6 {
+    for index in 0..7 {
         let Some(end) = units.iter().position(|unit| *unit == 0) else {
             return false;
         };
-        if end == 0 {
+        if end == 0 && index != 6 {
             return false;
         }
         let Some(next) = end.checked_add(1).and_then(|n| units.get(n..)) else {

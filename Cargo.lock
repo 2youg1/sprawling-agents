@@ -2576,6 +2576,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "self-replace"
+version = "1.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "03ec815b5eab420ab893f63393878d89c90fdd94c0bcc44c07abb8ad95552fb7"
+dependencies = [
+ "fastrand",
+ "tempfile",
+ "windows-sys 0.52.0",
+]
+
+[[package]]
 name = "semver"
 version = "1.0.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2814,6 +2825,7 @@ dependencies = [
  "proptest",
  "qrcodegen",
  "reqwest",
+ "self-replace",
  "serde",
  "serde_json",
  "sprawling-accounting",
@@ -2836,6 +2848,7 @@ dependencies = [
  "tokio-tungstenite",
  "toml",
  "win32job",
+ "winreg",
  "winresource",
  "zeroize",
 ]
@@ -3007,6 +3020,7 @@ name = "sprawling-runtime"
 version = "0.0.10"
 dependencies = [
  "base64 0.23.1",
+ "find-msvc-tools",
  "insta",
  "png",
  "proptest",
@@ -4477,6 +4491,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "23b97319f7b8343df12cc98938e5c3eb436064524c8d2b4e30a1d3a36eecdf81"
 
 [[package]]
+name = "winreg"
+version = "0.56.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7d6f32a0ff4a9f6f01231eb2059cc85479330739333e0e58cadf03b6af2cca10"
+dependencies = [
+ "cfg-if",
+ "windows-sys 0.61.2",
+]
+
+[[package]]
 name = "winresource"
 version = "0.1.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4571,6 +4595,7 @@ dependencies = [
  "proc-macro2",
  "serde",
  "serde_json",
+ "sha2 0.11.0",
  "sprawling-browser",
  "sprawling-kernel",
  "sprawling-wire",

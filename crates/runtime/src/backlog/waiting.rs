@@ -17,8 +17,9 @@ use std::time::Duration;
 
 use kernel::AxError;
 
+use super::ceiling::Ceiling;
 use super::tail::Tail;
-use super::{BacklogId, Body, Claim, Member};
+use super::{BacklogId, Body, Claim, Member, Table};
 
 /// The rate a watched command's output is read at, 64 KiB a second:
 /// several times what a person reads on a page, and small enough that a
@@ -156,19 +157,30 @@ impl Unseen {
 }
 
 impl super::Backlog {
-    /// Whether this member has stopped. Removing it here is what keeps
+    /// Whether this member has stopped, and how the memory ceiling fared
+    /// while it ran. Removing it here is what keeps
     /// [`super::Backlog::harvest`] from reporting a result its own caller is
     /// about to return.
-    pub(super) fn settle(&self, id: BacklogId) -> Result<Option<Exit>, AxError> {
+    pub(super) fn settle(&self, id: BacklogId) -> Result<Option<(Exit, Option<Ceiling>)>, AxError> {
         let mut table = self.hold()?;
+        let Table { members, jobs, .. } = &mut *table;
         let Some(Member {
-            body: Body::Command { child, claim, .. },
+            body:
+                Body::Command {
+                    child,
+                    claim,
+                    ceiling,
+                    ..
+                },
             ..
-        }) = table.members.get_mut(&id)
+        }) = members.get_mut(&id)
         else {
-            return Ok(Some(Exit::Unknown {
-                why: Unseen::LeftTheTable,
-            }));
+            return Ok(Some((
+                Exit::Unknown {
+                    why: Unseen::LeftTheTable,
+                },
+                None,
+            )));
         };
         let stopped = match child.poll() {
             Ok(stopped) => stopped,
@@ -179,10 +191,15 @@ impl super::Backlog {
                 return Err(err);
             }
         };
-        if stopped.is_some() {
-            table.members.remove(&id);
-        }
-        Ok(stopped)
+        let Some(exit) = stopped else {
+            return Ok(None);
+        };
+        let reported = match *claim {
+            Claim::Window(owner) | Claim::Run(owner) => jobs.ceiling(owner, *ceiling),
+            Claim::Nobody => None,
+        };
+        members.remove(&id);
+        Ok(Some((exit, reported)))
     }
 
     /// Past the window: the command is owed to its run's harvest, which
@@ -212,12 +229,13 @@ impl super::Backlog {
     ) -> Result<super::Started, AxError> {
         let mut tail = Tail::default();
         for _ in 0..self.window.polls() {
-            if let Some(exit) = self.settle(id)? {
+            if let Some((exit, ceiling)) = self.settle(id)? {
                 let (stdout, stderr) = super::collect(&dir);
                 return Ok(super::Started::Settled {
                     exit,
                     stdout,
                     stderr,
+                    ceiling,
                 });
             }
             if let Some(sink) = &self.sink {

@@ -3,19 +3,22 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The three values of a run policy beside the mode, as one control on
-// the composer's settings row (refrain roadmap 4-2): its face is the
-// write limit, and its menu holds the write limit, the admission
-// requirement and the landing as three columns, because most
-// dispatches change none of the last two. The values and their order
-// are the wire's (`core/commands.ts`); this file only names them and
-// says what a pick does.
+// The admission and landing rows of the permissions entry are read from
+// the wire's lists. Its two switches change mode and write in Ui.policy.
 
 import { ADMISSIONS, FIRST_POLICY, LANDINGS, WRITE_LIMITS } from "../../core/commands";
 import type { Key, Lang } from "../../core/lang";
 import { say } from "../../core/lang";
 import type { RunPolicy } from "../../wire";
 import type { PopoverColumn } from "../parts/popover";
+
+export const POLICY_SWITCHES = {
+  mode: { off: "chat", on: "work" },
+  write: { off: "create", on: "full" },
+} satisfies {
+  readonly mode: { readonly off: RunPolicy["mode"]; readonly on: RunPolicy["mode"] };
+  readonly write: { readonly off: RunPolicy["write"]; readonly on: RunPolicy["write"] };
+};
 
 type Chosen = "write" | "admit" | "landing";
 

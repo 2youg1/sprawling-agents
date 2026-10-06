@@ -13,6 +13,9 @@ runs, with the arguments an agent types, and reading the two streams an agent
 reads. There is no linking, no FFI, and no shared type: what cannot be reached
 through this module cannot be tested here, which is the point.
 
+Release answers carry AUR installation origins as opaque JSON;
+this door does not choose an updater or decode installation channels.
+
 ARCHITECTURE section 8 says the wire is the whole API and that a second client
 writes against it. `sprawling call` is that second client; this module is a
 third one, written outside the repository to attack rather than to use.
@@ -183,23 +186,73 @@ instance : ToString Answer where
     | .denied complaint => s!"Denied {complaint}"
     | .quiet => "Quiet"
 
-/-- How long the door waits for the city to go silent.
+/-- How long the door waits for the city to go silent, for a command that
+can end no other way.
 
 The client returns only after this much silence, so the window is paid in full
-by every single action — the first draft set it above the product's longest
+by every such command — the first draft set it above the product's longest
 synchronous path (`PROBE_TIMEOUT_MS`, 15 s) and thereby charged thirty seconds
-for a query that answers in one millisecond.
+for a command that answers in one millisecond.
 
 What makes a short window honest is that no verb this adversary drives touches a
 slow path: the model never attaches an endpoint, and every command it sends is
-answered off local disk over loopback. `quiet` therefore means "this city did
-not answer promptly", and the slow path's own hazard is asserted by
+answered off local disk over loopback. The slow path's own hazard is asserted by
 `Sprawling.Model` having no action that walks it rather than by waiting for one.
 
-Measured rather than guessed: every command the model sends answered inside one
-millisecond on the machine class this was written on, so 250 ms is three orders
+Measured rather than guessed: every such command answered inside one millisecond
+on an idle machine of the class this was written on, so 250 ms is three orders
 of margin and still two hundredths of the first draft's cost. -/
 def quietMillis : Nat := 250
+
+/-- The longest the door waits for a call that ends on its own answer.
+
+Paid in full only by a city that says nothing at all, so its length costs a
+passing run nothing; it is twenty times the 250 ms that answers on a machine
+busy compiling were measured to overrun (`tools/adversary/Spec.lean` D9). -/
+def answerMillis : Nat := 5000
+
+/-- What ends one call: the reply to a query, the one record a command's
+acceptance writes, or the city going silent.
+
+Each verb says which, in `Verb.ending`, because only the asker knows what it is
+waiting for: a call that ends on silence reads a slow answer as no answer, and
+on a busy machine that turned an answering city into a finding
+(`tools/adversary/Spec.lean` D9). -/
+inductive Ending where
+  | reply
+  /-- The record's kind, spelled as `EventKind` serialises it, which is the
+  spelling `call --until` reads. -/
+  | record (kind : String)
+  | silence
+
+/-- Which frame ends the call that carries this verb.
+
+A command is given a record only when its acceptance always writes exactly one
+kind: `dispatch` writes as many as the run does, the endpoint verbs answer from
+the network, and a preference is the person's and writes nothing to the
+city's history. -/
+def Verb.ending : Verb → Ending
+  | .cityView => .reply
+  | .endpointView => .reply
+  | .buildingView _ => .reply
+  | .document _ => .reply
+  | .preferences => .reply
+  | .configureBuilding .. => .record "building_configured"
+  | .createBuilding .. => .record "building_created"
+  | .halt .. => .record "city_halted"
+  | .release .. => .record "city_halted"
+  | .putAppearance .. => .silence
+  | .dispatch .. => .silence
+  | .batchByBuilding .. => .silence
+  | .probeEndpoint .. => .silence
+  | .attachEndpoint .. => .silence
+  | .selectModel .. => .silence
+
+/-- The arguments of `call` that say when it stops listening. -/
+private def Ending.listening : Ending → Array String
+  | .reply => #["--quiet-ms", toString answerMillis]
+  | .record kind => #["--quiet-ms", toString answerMillis, "--until", kind]
+  | .silence => #["--quiet-ms", toString quietMillis]
 
 /-- The JSON one verb travels as.
 
@@ -546,10 +599,10 @@ private inductive Author where
 A refusal is an answer. A line that will not parse is not: it means the wire has
 changed shape, so this throws rather than reporting a green test against a
 program it can no longer read. -/
-private def Door.say (door : Door) (port : Port) (frame : String) (author : Author) :
-    IO Answer := do
+private def Door.say (door : Door) (port : Port) (frame : String) (ending : Ending)
+    (author : Author) : IO Answer := do
   let said ← capture door.binary
-    #["call", frame, "--at", s!"127.0.0.1:{port}", "--quiet-ms", toString quietMillis]
+    (#["call", frame, "--at", s!"127.0.0.1:{port}"] ++ ending.listening)
   if said.exitCode == 2 then
     match author, localRefusal said.err with
     | .byHand, some complaint => return .denied complaint
@@ -566,9 +619,13 @@ private def Door.say (door : Door) (port : Port) (frame : String) (author : Auth
   return interpret (localRefusal said.err) frames
 
 /-- Sends a frame written out by hand, for the checks whose point is that the
-door refuses to carry it. -/
+door refuses to carry it.
+
+It ends on silence because a frame written by hand names no verb to ask what
+it waits for; a query among them still returns on its reply, which `call`
+decides from the frame itself. -/
 def Door.askRaw (door : Door) (port : Port) (frame : String) : IO Answer :=
-  door.say port frame .byHand
+  door.say port frame .silence .byHand
 
 /-- How many times a command is sent again while the city is still proving the
 history it opened from, and how long it waits between two sends.
@@ -588,9 +645,9 @@ def Door.ask (door : Door) (port : Port) (verb : Verb) : IO Answer :=
   untilProved unprovenRetries
 where
   untilProved : Nat → IO Answer
-    | 0 => door.say port verb.frame .encoded
+    | 0 => door.say port verb.frame verb.ending .encoded
     | left + 1 => do
-      match ← door.say port verb.frame .encoded with
+      match ← door.say port verb.frame verb.ending .encoded with
       | .denied complaint =>
         if complaint.code.value == "E_HISTORY_UNPROVEN" then
           IO.sleep unprovenPauseMillis

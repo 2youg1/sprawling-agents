@@ -22,7 +22,10 @@ History::fold(Vec<Line>) 返回投影或 HistoryFault：schema/definition 未知
 Prepared 没有 Finished 时状态是 unresolved，status 不能自动结算或推断失败。
 本投影只能报告磁盘事实，不能证明当前 OS 值或授权；调用者不能据此执行写入。
 
-History::statuses 返回 operation 与 Outcome 摘要，不输出 raw bytes 或 owner。
+History::disclose(authorize) 是摘要唯一的出口：非空历史先把 owner 引用交给
+authorize，接受后才返回 operation 与 Outcome 摘要；空历史没有 owner，不询问
+authorize，返回空摘要。摘要与 owner 引用存在同一个值里，没有 owner 的非空摘要
+不可表示。摘要不输出 raw bytes 或 owner；status 的 authorize 见 Privacy.Cli D54。
 数据编码是 serde 的带标签闭集 enum 与 JSON byte array，未知字段拒绝；schema
 与容量上界由 Rust 一处定义，未来 writer 必须在系统写入前通过同一 decoder。
 验收：未知字段/坏版本、重复 id、非法 phase、越层恢复和原始字节 roundtrip。
@@ -35,7 +38,8 @@ History::statuses 返回 operation 与 Outcome 摘要，不输出 raw bytes 或 
 不能代替从 Vault 解析真实 OS identity 后的拥有关系检查。
 磁盘 schema 由 Rust authority 升级，旧明文身份记录拒绝且原字节不变；
 禁止自动迁移，因为没有经核对的 Vault 绑定就不能把旧身份当作可执行恢复授权。
-当前只读入口没有 Vault 解析、身份授权或 writer；这些消费者仍是执行接口缺口。
+status 入口经 History::disclose 通过 Vault 核对身份（Privacy.Cli D54）；
+writer 与 journal identity 绑定仍是执行接口缺口。
 serde 拒绝无效 SecretRef 时可能在错误文字中复述输入，HistoryFault 的公开拒绝
 仅携带 JSON 解码位置及类别，不复述 owner、值、未知 enum 或未知字段；
 Decode 在构造时移除输入文字，内部 Debug 与公开 AxError 都遵守此边界。

@@ -12,9 +12,9 @@
 #   models    the Lean specifications under `crates/`
 #   clippy    the zero-warning build of every target and feature, and the
 #             feature combinations `just features` runs
-#   test build, test (1/4) .. test (4/4), test
+#   test build, test (<type>), test
 #             the suite, compiled once into a nextest archive and run in
-#             four slices on four runners; `test` only collects the four
+#             type slices on separate runners; `test` collects all
 #             verdicts, so the check a branch protection names stays one
 #   core      clippy and the suite of the packages every platform ships
 #             (`just check-core`), on ubuntu and macOS
@@ -145,6 +145,10 @@ jobs:
       - uses: taiki-e/install-action@v2
         with:
           tool: just
+      - name: native payloads in system channel validation
+        env:
+          PYTHONUTF8: "1"
+        run: python tools/xtask/src/channel/validate_test.py
       - name: fmt
         run: just fmt-check
       - name: the gates that read sources
@@ -232,13 +236,15 @@ jobs:
         run: just features
 
   # The suite, compiled once. The archive carries every test binary and
-  # the workspace binaries they spawn; the four slices below run it on
+  # the workspace binaries they spawn; the type slices below run it on
   # runners whose checkout path is the same as this one, which is what
   # lets a path cargo baked in at compile time resolve there. Debug
   # information is cut to line tables: it is most of the archive's bytes,
   # and a backtrace still names the file and the line.
   test-build:
     name: test build
+    outputs:
+      slices: ${{ steps.plan.outputs.slices }}
     runs-on: windows-latest
     timeout-minutes: 30
     env:
@@ -263,6 +269,20 @@ jobs:
       - uses: ./.github/actions/client-artifacts
       - name: the suite, compiled once
         run: just test-archive target/nextest-archive.tar.zst
+      - name: prove every test belongs to exactly one type slice
+        id: plan
+        shell: bash
+        run: |
+          set -euo pipefail
+          just test-slice-plan target/nextest-archive.tar.zst target/test-slices
+          echo "slices=$(cat target/test-slices/matrix.json)" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: test-slice-coverage
+          path: target/test-slices
+          retention-days: 1
+          if-no-files-found: error
       - uses: actions/upload-artifact@v7
         with:
           name: nextest-archive
@@ -270,19 +290,17 @@ jobs:
           retention-days: 1
           if-no-files-found: error
 
-  # One quarter of the suite each, by nextest's count partition, which
-  # deals the tests out in turn so the slices hold equal numbers. The
+  # Disjoint type slices, whose union is checked before the matrix starts. The
   # toolchain, Zig and the client tree are installed because some tests
   # compile (trybuild), build the leaf, or read `client/node_modules`.
   test-slice:
-    name: test (${{ matrix.slice }}/4)
+    name: test (${{ matrix.name }})
     needs: test-build
     runs-on: windows-latest
     timeout-minutes: 30
     strategy:
       fail-fast: false
-      matrix:
-        slice: [1, 2, 3, 4]
+      matrix: ${{ fromJSON(needs.test-build.outputs.slices) }}
     steps:
       - uses: actions/checkout@v7
       - name: install pinned toolchain
@@ -296,11 +314,16 @@ jobs:
       # scratch is cached on its own, keyed per slice because each slice
       # fills a different part of it.
       - uses: actions/cache/restore@v6
+        if: startsWith(matrix.name, 'trybuild-')
         id: trybuild-scratch
         with:
           path: target/tests
-          key: trybuild-${{ runner.os }}-${{ matrix.slice }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml', 'crates/*/tests/**') }}
-          restore-keys: trybuild-${{ runner.os }}-${{ matrix.slice }}-
+          key: trybuild-${{ runner.os }}-${{ matrix.name }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml', 'crates/*/tests/**') }}
+          # Seed the new names from the former first count slice, which
+          # held all five trybuild suites. Cargo validates restored inputs.
+          restore-keys: |
+            trybuild-${{ runner.os }}-${{ matrix.name }}-
+            trybuild-${{ runner.os }}-1-
       # xtask's npm gate has tests that read the installed client tree and
       # refuse when it is missing, which is what a bare runner has.
       - uses: ./.github/actions/client-artifacts
@@ -309,15 +332,18 @@ jobs:
           name: nextest-archive
           path: target
       - name: tests
-        run: just test-slice target/nextest-archive.tar.zst count:${{ matrix.slice }}/4
+        env:
+          TEST_FILTER: ${{ matrix.filter }}
+        shell: bash
+        run: just test-slice target/nextest-archive.tar.zst "$TEST_FILTER"
       - uses: actions/cache/save@v6
-        if: ${{ github.ref == 'refs/heads/main' && steps.trybuild-scratch.outputs.cache-hit != 'true' }}
+        if: ${{ startsWith(matrix.name, 'trybuild-') && github.ref == 'refs/heads/main' && steps.trybuild-scratch.outputs.cache-hit != 'true' }}
         with:
           path: target/tests
-          key: trybuild-${{ runner.os }}-${{ matrix.slice }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml', 'crates/*/tests/**') }}
+          key: trybuild-${{ runner.os }}-${{ matrix.name }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml', 'crates/*/tests/**') }}
 
   # The one verdict of the suite, under the name branch protection
-  # requires. It reads the build and all four slices, so a slice that
+  # requires. It reads the build and all type slices, so a slice that
   # failed, or never started because the build failed, fails it.
   test:
     needs: [test-build, test-slice]
@@ -363,10 +389,6 @@ jobs:
           command -v sandbox-exec > target/platform-evidence/sandbox-exec-path.txt
           MANPAGER=cat PAGER=cat man sandbox-exec | col -b > target/platform-evidence/sandbox-exec.txt
           test -s target/platform-evidence/sandbox-exec.txt
-          MANPAGER=cat PAGER=cat man taskpolicy | col -b > target/platform-evidence/taskpolicy.txt
-          MANPAGER=cat PAGER=cat man launchd.plist | col -b > target/platform-evidence/launchd-plist.txt
-          python3 crates/runtime/src/tools/exec/native_macos/memory_probe.py > target/platform-evidence/memory-ordinary.json 2> target/platform-evidence/memory-ordinary.err
-          sudo env GITHUB_ACTIONS=true /usr/bin/python3 crates/runtime/src/tools/exec/native_macos/memory_probe.py > target/platform-evidence/memory-root.json 2> target/platform-evidence/memory-root.err
       - uses: actions/upload-artifact@v7
         if: always() && runner.os == 'macOS'
         with:

@@ -115,10 +115,13 @@
 | | | Tab／Shift+Tab | **换列**（环绕）并把游标复位到第 0 行——本部件在此覆盖平台的 Tab |
 | | | Enter | 应用当前列的游标行，回调 `onApply` |
 | | | Escape | 回调 `onClose` |
+| `popover.svelte`（`layout="rows"`：一张表，每列一行，行首是列名） | 同上，装成两行的表 | ←／→ | 当前行的游标左移／右移，钳在两端 |
+| | | ↓／↑ | **换行**（环绕）并把游标复位到第 0 行，与 Tab 同一动作 |
+| | | Tab／Shift+Tab、Home／End、Enter、Escape | 同上（换行／行内两端／应用／关闭） |
 
 `combobox.svelte` 的 `aria-*`（规格）：文本框是 `role="combobox"`，带 `aria-expanded`、`aria-controls` 指向列表、`aria-activedescendant` 指向游标行；列表 `role="listbox"` ＋ `aria-label`；每行 `role="option"`，`aria-selected` 只标**已选中的那个值**，不标游标。今天的实现把 `aria-haspopup="listbox"` ＋ `aria-expanded` 放在触发按钮上、过滤框没有角色、游标只有底色——见 7-8 第 1 条。
 
-`popover.svelte` 的 `aria-*`（规格）：外层 `role="dialog"` ＋ `aria-label`；每列 `<ul role="listbox">` ＋ `aria-label`；每行 `role="option"`。**`aria-selected` 在两个部件里必须说同一件事——「这是当前生效的值」**，游标一律由持焦元素的 `aria-activedescendant` 承担；今天 `popover.svelte` 用 `aria-selected` 标游标，而真正生效的那一项只有一个圆点（7-8 第 3 条）。两种触发各有一条焦点路：按钮触发时列表自己取焦（`tabindex` 只给当前列 `0`）；文本框触发时调用方经 `bind` 拿走键表，焦点留在文本框里，此时 `aria-activedescendant` 必须写在那个文本框上（7-8 第 4 条）。
+`popover.svelte` 的 `aria-*`：外层 `role="dialog"` ＋ `aria-label`；每列 `<ul role="listbox">` ＋ `aria-label`；每行 `role="option"`。`aria-selected` 表示当前生效的值，游标由持焦元素的 `aria-activedescendant` 承担。**生效的那一行画成更深的底色**（`wash-strong`），游标只在没有生效值的那一行用底色梯级（`bg-raised-hover`）：两者不互相盖过，也不需要确认键或勾选标记。按钮触发时列表取焦，`tabindex` 只给当前列 `0`；文本框触发时调用方经 `bind` 拿走键表，焦点留在文本框，`aria-activedescendant` 写在文本框上。菜单仍存在时，两条路径都在活动行或数据变化，以及键表采纳按键后的 DOM 更新完成后，将该行滚入当前列的视口；能容纳整行时露出整行，行高超过视口时露出行首，不改变持焦元素或外层页面位置。几何规则与证明在 `client/spec/Views/Parts/Popover.lean`。
 -/
 
 /-!
@@ -139,7 +142,8 @@
 | 平台 | `dialog.svelte` | `close()` 按 HTML 标准把焦点还给 `showModal()` 之前持焦点的元素，本文件因此没有一行取焦代码 |
 | 状态模块 | 检视面（`views/inspect/open.svelte.ts`） | 从检视面之外打开一项时记下当时持焦点的元素；关上检视面或它最后一个页签时，焦点若在检视面里（或因面板卸载落到 `body`），交还给那个元素，它已不在页面上时不还 |
 | 部件自己 | `combobox.svelte`、`popover.svelte` | 前者记住触发按钮的 ref，`shut()` 时还；后者在 `onMount` 记下当时的 `document.activeElement`，`onCleanup` 还（`bind` 模式下焦点从未离开文本框，因此不还）|
-| 外壳 | `kbd.svelte` 的 `Cheatsheet` | `app.svelte` 在打开前记 `opener`，`closeSheet` 时还。表关上时它所在的 `{#if}` 分支连同 `<dialog>` 一起离开页面，平台的 `close()` 落在一个已摘下的元素上，外壳不把还原押在那一步上——**全客户端唯一一处还原权威不在部件里** |
+| 外壳 | `kbd.svelte` 的 `Cheatsheet` | `app.svelte` 在打开前记 `opener`，`closeSheet` 时还。表关上时它所在的 `{#if}` 分支连同 `<dialog>` 一起离开页面，平台的 `close()` 落在一个已摘下的元素上，外壳不把还原押在那一步上 |
+| 状态模块与外壳 | 设置面（`views/settings/hosted.svelte.ts`、`app.svelte`） | `hostSettled` 记打开者与关闭请求，路由关闭后由外壳在 `tick()` 完成时还原焦点；打开者已离开页面时不还。面与组的动效由它们自己的 CSS 承担，设置导航不启动 document view transition，避免组切换重叠或延后卸下面板。 浏览器验收先等 `DEFAULT_VIEW` 的 conversation 输入框进入 DOM，再保存并打开实际的 opener 节点，关闭后检查同一节点仍连接且持焦点；地址变化早于 view transition 的 DOM 更新，单独观察地址不能证明打开者已在目标页上。 |
 -/
 
 /-!

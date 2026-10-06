@@ -25,6 +25,7 @@
   import { toFragment } from "../../core/route";
   import { clock, count } from "../../core/time";
   import { untrack } from "svelte";
+  import { readable } from "svelte/store";
   import type { Query, RunId, Seq } from "../../wire";
   import { ui } from "../../ui";
   import Failed from "./failed.svelte";
@@ -35,7 +36,8 @@
   import TurnView from "./turn.svelte";
   import { heard, landed, lost } from "./arrivals.svelte";
   import { callWord } from "./calls";
-  import { frozenSaid } from "./frozen";
+  import { firstHeadSaid } from "./frozen";
+  import { restriction, sandboxQuery, sandboxSaid } from "./sandbox";
   import { called, dispatcherOf } from "./naming";
   import { planFork } from "./forking";
   import { turnsAround } from "./around";
@@ -166,13 +168,19 @@
         };
     }
   });
-  // The frozen facts each round's head states: the session's model, its
-  // effort and the mode its run was dispatched in on the first head, and
+  // The session facts each round's head states: on the first head the
+  // session's model, the effort and policy its run was dispatched with,
+  // and the sandbox when one restricts the room's building; afterwards
   // the model again only where a round answered with a different one.
+  // A fact that is not known is left out, never written as "none".
   const firstModel = $derived(turns.at(0)?.model ?? null);
+  const building = $derived(opens && run.addr !== null ? u.conn.asking.ask(sandboxQuery(run.addr)) : readable(undefined));
+  const bounded = $derived(restriction($building));
   const firstStated = $derived.by(() => {
-    const frozen = frozenSaid(answer?.opening, $lang);
-    return firstModel === null || frozen === "" ? firstModel : `${firstModel} · ${frozen}`;
+    const facts = [firstModel ?? "", firstHeadSaid(answer?.opening, $lang), bounded === null ? "" : sandboxSaid(bounded, $lang)]
+      .filter((part) => part !== "")
+      .join(" · ");
+    return facts === "" ? null : facts;
   });
   const stated = $derived(
     turns.map((turn, at) => {

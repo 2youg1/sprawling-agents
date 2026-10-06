@@ -43,6 +43,8 @@ flate2.workspace = true
 syn = { version = "3", features = ["full", "parsing", "printing", "visit"] }
 proc-macro2 = { version = "1", features = ["span-locations"] }
 zip.workspace = true
+# Release archive SHA256 feeds every system package definition.
+sha2.workspace = true
 
 [lints]
 workspace = true

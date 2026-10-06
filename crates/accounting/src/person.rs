@@ -14,7 +14,7 @@
 //! the first browser happened to cache.
 //!
 //! **One record, one grammar.** The `[ui]` section is
-//! `wire::PreferencesAnswer` serialised, so the keys the file may
+//! `wire::PreferencesAnswer` without its separately stored `core`, so the keys the file may
 //! hold and the fields the answer states are one declaration: this
 //! module reads and writes, and states nothing about what a preference
 //! is. What a named change does to the record is the patch's own rule
@@ -30,7 +30,7 @@
 use std::path::{Path, PathBuf};
 
 use kernel::{AxCode, AxError};
-use wire::{PreferencePatch, PreferencesAnswer};
+use wire::{CorePreferences, PreferencePatch, PreferencesAnswer};
 
 use crate::home::Home;
 
@@ -39,12 +39,8 @@ use crate::home::Home;
 /// spelling and read under another is a setting that never takes
 /// effect.
 const UI: &str = "ui";
-/// The section and key of the one core setting (`crates/sprawling/Spec.lean` §8-93).
+/// Performance settings adopted at serving startup (`crates/sprawling/Spec.lean` §8-93).
 const CORE: &str = "core";
-const PRIORITY: &str = "priority";
-/// The key that turns CPU placement off (`crates/sprawling/spec/Serving/Placement.lean` D47).
-const PLACEMENT: &str = "placement";
-
 /// Everything this person settled, as their file states it.
 ///
 /// A file nobody has written yet is not a failure: it is somebody who
@@ -78,17 +74,15 @@ fn land(file: &Path, patch: PreferencePatch) -> Result<(), AxError> {
     city::edit_document(file, |held| {
         let mut document = document(file)?;
         match patch {
-            // The one fact that is not the page's: the serving core reads
-            // it from `[core]`, where it has always lived.
-            PreferencePatch::CorePriority(level) => {
-                let spelled = toml::Value::try_from(level).map_err(|err| invalid(file, &err))?;
-                let core = document
-                    .entry(CORE.to_owned())
-                    .or_insert_with(|| toml::Value::Table(toml::Table::new()));
-                let toml::Value::Table(core) = core else {
-                    return Err(invalid(file, &format!("[{CORE}] is not a section")));
-                };
-                core.insert(PRIORITY.to_owned(), spelled);
+            PreferencePatch::CorePriority(_)
+            | PreferencePatch::CorePlacement(_)
+            | PreferencePatch::RunMemory(_) => {
+                let mut settled = section(&document, file)?;
+                settled.apply(patch);
+                document.insert(
+                    CORE.to_owned(),
+                    toml::Value::try_from(&settled.core).map_err(|err| invalid(file, &err))?,
+                );
             }
             PreferencePatch::Lang(_)
             | PreferencePatch::Welcomed(_)
@@ -111,95 +105,30 @@ fn land(file: &Path, patch: PreferencePatch) -> Result<(), AxError> {
 
 /// Whether the core's threads are raised: the setting a person turns
 /// off. Its words are the wire's, which is what a page writes it with.
-pub use wire::CorePriority;
+pub use wire::{CorePlacement, CorePriority};
 
-/// Whether the core's threads stand above normal: `priority` in the
-/// `[core]` section, `"raised"` when absent (`crates/sprawling/Spec.lean` §8-93).
+/// The priority read from the same core grammar as the preferences answer.
 ///
 /// # Errors
-///
-/// As [`read`] for a file that cannot be read or parsed, and
-/// `ConfigInvalid` for a `priority` that is neither `"raised"` nor
-/// `"normal"`.
+/// The configuration and storage failures returned by [`read`].
 pub fn core_priority() -> Result<CorePriority, AxError> {
     stated_core_priority(&file()?)
 }
 
 fn stated_core_priority(file: &Path) -> Result<CorePriority, AxError> {
-    match document(file)?
-        .get(CORE)
-        .and_then(|core| core.get(PRIORITY))
-    {
-        None => Ok(CorePriority::Raised),
-        // Read in the words the wire writes it with, so the page and the
-        // file cannot spell one setting two ways.
-        Some(stated) => stated.clone().try_into().map_err(|_| {
-            AxError::failure(
-                AxCode::ConfigInvalid,
-                "read whether the core stands above normal",
-                format!("{}: [{CORE}] {PRIORITY} = {stated}", file.display()),
-            )
-            .with_recovery(
-                "write priority = \"raised\" or priority = \"normal\" under [core], or delete the line",
-            )
-        }),
-    }
+    Ok(stated(file)?.core.priority)
 }
 
-/// Which arm of CPU placement the core takes: what each arm turns on is
-/// decided in one place, `bin::serving::placement`
-/// (`crates/sprawling/spec/Serving/Placement.lean` D47).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CorePlacement {
-    /// Nothing read, nothing asked of the platform: the scheduler alone.
-    Off,
-    /// Power throttling lifted, each hot thread a soft ideal processor
-    /// from the placement plan, and each run's commands an even CPU
-    /// share.
-    Soft,
-    /// `Soft`, and each run's commands held to a memory limit.
-    SoftShares,
-    /// The comparison arm: the plan's processors held by hard affinity
-    /// (`crates/sprawling/spec/Serving/Placement.lean` D41).
-    Pinned,
-}
-
-/// Which arm of CPU placement the core takes: `placement` in the
-/// `[core]` section, `"soft"` when absent, `"soft_shares"` to hold each
-/// run to a memory limit as well, `"none"` to turn placement off, and
-/// `"pinned"` for the hard-affinity comparison arm
-/// (`crates/sprawling/spec/Serving/Placement.lean` D47).
+/// The placement arm read from the same core grammar as the page.
 ///
 /// # Errors
-///
-/// As [`read`] for a file that cannot be read or parsed, and
-/// `ConfigInvalid` for a `placement` that is none of those three,
-/// for a `placement` that is none of those four.
+/// The configuration and storage failures returned by [`read`].
 pub fn core_placement() -> Result<CorePlacement, AxError> {
     stated_core_placement(&file()?)
 }
 
 fn stated_core_placement(file: &Path) -> Result<CorePlacement, AxError> {
-    match document(file)?
-        .get(CORE)
-        .and_then(|core| core.get(PLACEMENT))
-    {
-        None => Ok(CorePlacement::Soft),
-        Some(stated) => match stated.as_str() {
-            Some("soft") => Ok(CorePlacement::Soft),
-            Some("soft_shares") => Ok(CorePlacement::SoftShares),
-            Some("none") => Ok(CorePlacement::Off),
-            Some("pinned") => Ok(CorePlacement::Pinned),
-            Some(_) | None => Err(AxError::failure(
-                AxCode::ConfigInvalid,
-                "read how the core places its threads",
-                format!("{}: [{CORE}] {PLACEMENT} = {stated}", file.display()),
-            )
-            .with_recovery(
-                "write placement = \"soft\", \"soft_shares\", \"pinned\" or \"none\" under [core], or delete the line",
-            )),
-        },
-    }
+    Ok(stated(file)?.core.placement)
 }
 
 /// Where this person's file is. The home directory is `home::Home`'s
@@ -235,17 +164,32 @@ fn document(file: &Path) -> Result<toml::Table, AxError> {
 /// absent section states nothing, which is the ordinary case until
 /// somebody changes a setting.
 fn section(document: &toml::Table, file: &Path) -> Result<PreferencesAnswer, AxError> {
-    match document.get(UI) {
-        None => Ok(PreferencesAnswer::default()),
+    if document.get(UI).and_then(|ui| ui.get(CORE)).is_some() {
+        return Err(invalid(file, &"[ui] core is not stored here; use [core]"));
+    }
+    let mut answer: PreferencesAnswer = match document.get(UI) {
+        None => PreferencesAnswer::default(),
         Some(section) => section
             .clone()
             .try_into()
-            .map_err(|err| invalid(file, &format!("[{UI}]: {err}"))),
-    }
+            .map_err(|err| invalid(file, &format!("[{UI}]: {err}")))?,
+    };
+    answer.core = match document.get(CORE) {
+        None => CorePreferences::default(),
+        Some(section) => section
+            .clone()
+            .try_into()
+            .map_err(|err| invalid(file, &format!("[{CORE}]: {err}")))?,
+    };
+    Ok(answer)
 }
 
 fn rendered(settled: &PreferencesAnswer, file: &Path) -> Result<toml::Value, AxError> {
-    toml::Value::try_from(settled).map_err(|err| invalid(file, &err))
+    let mut ui = toml::Value::try_from(settled).map_err(|err| invalid(file, &err))?;
+    if let toml::Value::Table(table) = &mut ui {
+        table.remove(CORE);
+    }
+    Ok(ui)
 }
 
 /// One refusal for every way this file can fail to be understood, so
@@ -259,7 +203,7 @@ fn invalid(file: &Path, why: &impl std::fmt::Display) -> AxError {
         format!("{}: {why}", file.display()),
     )
     .with_recovery(
-        "fix the `[ui]` section by hand, or delete it and choose again on the settings page",
+        "fix the named section by hand, or delete it and choose again on the settings page",
     )
 }
 
@@ -299,6 +243,10 @@ mod tests {
                 tags: vec![Tag::parse("重构").unwrap(), Tag::parse("pin").unwrap()],
             }),
             PreferencePatch::Lang(Lang::En),
+            PreferencePatch::CorePlacement(CorePlacement::SoftShares),
+            PreferencePatch::RunMemory(std::num::NonZeroU64::new(64 << 20)),
+            PreferencePatch::CorePriority(CorePriority::Normal),
+            PreferencePatch::RunMemory(None),
         ] {
             expected.apply(patch.clone());
             land(&file, patch).unwrap();
@@ -403,6 +351,51 @@ placement = \"{arm}\"
             ),
             (CorePriority::Normal, Some(Lang::Zh))
         );
+    }
+
+    #[test]
+    fn performance_answer_reads_the_core_section() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("config.toml");
+        std::fs::write(
+            &file,
+            "[core]
+priority = \"normal\"
+placement = \"none\"
+",
+        )
+        .unwrap();
+        assert_eq!(
+            stated(&file).unwrap().core,
+            CorePreferences {
+                priority: CorePriority::Normal,
+                placement: CorePlacement::Off,
+                memory_bytes: None,
+            }
+        );
+    }
+
+    #[test]
+    fn a_zero_ceiling_and_a_duplicate_authority_are_refused_without_overwriting() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("config.toml");
+        for text in [
+            "[core]
+memory_bytes = 0
+",
+            "[ui.core]
+priority = \"normal\"
+",
+        ] {
+            std::fs::write(&file, text).unwrap();
+            assert_eq!(
+                land(&file, PreferencePatch::Panel(false))
+                    .unwrap_err()
+                    .code(),
+                &AxCode::ConfigInvalid
+            );
+            assert_eq!(std::fs::read_to_string(&file).unwrap(), text);
+        }
     }
 
     /// A file this build cannot read is not overwritten: the person

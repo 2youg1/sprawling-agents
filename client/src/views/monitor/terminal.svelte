@@ -20,6 +20,7 @@
   import Glyph from "../parts/glyph.svelte";
   import type { GlyphName } from "../parts/glyph";
   import { INK, rows } from "./ansi";
+  import Ceilings from "./ceilings.svelte";
   import type { Span } from "./ansi";
   import type { Ending, Entry } from "./trace";
   import type { Tail } from "../../core/live_output";
@@ -90,6 +91,7 @@
         {#if (entry.ending.kind === "running" ? tail.cut : entry.cut) > 0}
           <div class="text-text-faint">{fill(say($lang, "mon_lines_cut"), { n: String(entry.ending.kind === "running" ? tail.cut : entry.cut) })}</div>
         {/if}
+        <Ceilings notes={entry.ceilings} />
       </div>
     {:else}
       <div class="flex min-h-control items-center gap-snug px-snug">

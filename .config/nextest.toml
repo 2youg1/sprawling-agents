@@ -23,3 +23,12 @@ test-group = 'clipboard'
 [[profile.default.overrides]]
 filter = 'binary(trybuild)'
 slow-timeout = { period = "120s", terminate-after = 10 }
+
+# The throughput instrument includes provider holds over all selected arms.
+# Its measured arm exceeds the ordinary-test timeout; only the opt-in bench
+# profile gives this instrument an hour to finish the full matrix.
+[profile.bench]
+
+[[profile.bench.overrides]]
+filter = 'package(sprawling-accounting) & test(instrument_throughput)'
+slow-timeout = { period = "60s", terminate-after = 60 }

@@ -3,9 +3,9 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// What the session verbs of the slash table do: `/new` and `/clear`,
-// `/compact`, `/tag` and `/untag`. Apart from `slash.ts` because these
-// open sessions and change tags through the hands, while the table only
+// What the session verbs of the slash table do: `/new`, `/compact`,
+// `/tag` and `/untag`. Apart from `slash.ts` because these open
+// sessions and change tags through the hands, while the table only
 // spells and routes; `slash.ts` stays the one list of verbs.
 
 import type { Address } from "../wire";
@@ -16,8 +16,9 @@ import type { SlashCall, SlashHands } from "./slash_hands";
 
 const CARRY = "--carry";
 
-// `/new` and `/clear` are one verb: a new session here, with nothing
-// from the last one unless `--carry` says so. A room with no handoff
+// `/new`: a new session here, with nothing from the last one unless
+// `--carry` says so. It is the only verb that replaces a session
+// (client/Spec.lean D44). A room with no handoff
 // answers `carried: false` rather than refusing, so the word passes on.
 export function fresh(hands: SlashHands, call: SlashCall): void {
   if (hands.here === null) return;

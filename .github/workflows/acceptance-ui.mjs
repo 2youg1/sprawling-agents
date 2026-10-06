@@ -129,9 +129,12 @@ try {
       await putOff.waitFor();
       await putOff.click();
       await page.waitForFunction((fragment) => location.hash === fragment, toFragment(DEFAULT_VIEW));
+      await page.locator("main textarea").waitFor();
       const opener = page.getByRole("link", { name: english("nav_settings"), exact: true });
       await opener.waitFor();
-      await opener.focus();
+      const openerElement = await opener.elementHandle();
+      if (openerElement === null) throw new Error("the rendered conversation has no settings opener");
+      await openerElement.focus();
       await page.keyboard.press("Enter");
       const dialog = page.getByRole("dialog");
       await dialog.waitFor();
@@ -167,7 +170,7 @@ try {
       }
       await page.keyboard.press("Escape");
       await dialog.waitFor({ state: "hidden" });
-      if (!(await opener.evaluate((element) => element === document.activeElement))) throw new Error("Escape did not return focus to the settings opener");
+      await page.waitForFunction((element) => element?.isConnected && element === document.activeElement, openerElement);
       await context.close();
       activePage = undefined;
     }

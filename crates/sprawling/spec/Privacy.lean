@@ -372,7 +372,8 @@ unknown 没有 prepare/write 出口，读取不自动补终态；恢复冲突要
 
 ## 13 依赖选型
 journal 使用标准库 try_lock/write_all/sync_all，OS 使用经版本核对的安全原始
-注册表 API；本模型未新增依赖，也没有认定某个注册表 crate 已通过验收。
+注册表 API。winreg 目前只读 HKLM 的 SystemRoot（Privacy.Cli D55）；它的写接口
+尚未通过真实写入验收，本模型也不因此认定它满足 writeStarted 的契约。
 
 ## 14 硬编码声明
 TTL、闭集 control、目录版本、支持类型由对应生产 authority 决定并传入模型；

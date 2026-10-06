@@ -19,7 +19,7 @@
 //!
 //! **The authority is one sentence**: colour is named once per client, in
 //! that client's theme file. The token assertions read `THEME`; the scan's
-//! table of production points also holds the playback reference page.
+//! table of production points also holds the playback stylesheet source.
 //!
 //! **The seven token assertions read the stylesheet, not a Rust table.**
 //! Three of them ask what a resolved `oklch()` value was resolved *from* -

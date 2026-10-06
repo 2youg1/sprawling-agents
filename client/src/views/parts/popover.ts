@@ -26,8 +26,16 @@ export interface PopoverRow {
   // What is applied now, marked rather than merely pointed at: a
   // cursor says where a person is, not what the city is doing. The
   // mark is `aria-selected` here exactly as in the combobox - the
-  // cursor is carried by `aria-activedescendant` and never by this.
+  // cursor is carried by `aria-activedescendant` and never by this -
+  // and it is drawn as the deeper wash, so a person sees the value in
+  // force without a second control confirming it.
   readonly chosen?: boolean | undefined;
+}
+
+export interface PopoverBinding {
+  readonly keys: (event: KeyboardEvent) => boolean;
+  readonly controls: readonly string[];
+  readonly pointColumn: (columnId: string) => void;
 }
 
 export interface PopoverColumn {
@@ -36,5 +44,10 @@ export interface PopoverColumn {
   // The one word this column is known by, a lang.json key: it names
   // both the heading and the list for a screen reader.
   readonly label: Key;
+  // This list is its own section of a `rows` layout: a rule stands
+  // above it, because what it lists is not a step of the table above
+  // but a separate choice (the model's thinking beside provider and
+  // model, which are two steps of one table).
+  readonly apart?: boolean | undefined;
   readonly rows: readonly PopoverRow[];
 }

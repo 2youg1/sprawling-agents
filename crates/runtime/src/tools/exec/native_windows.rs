@@ -9,6 +9,8 @@
 use std::collections::BTreeMap;
 use std::ffi::OsString;
 use std::num::{NonZeroU16, NonZeroUsize};
+use std::os::windows::ffi::{OsStrExt, OsStringExt};
+use std::os::windows::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -16,25 +18,28 @@ use crate::backlog::Shares;
 use desktop_ffi::confinement::{Launch, OwnedProcess};
 use kernel::{AxCode, AxError};
 
-/// Native defaults are bounded even when placement supplied no run ceiling.
-const DEFAULT_MEMORY_BYTES: usize = 0x1000_0000;
+/// Native CPU cap is independent of the optional User memory ceiling.
 const DEFAULT_CPU_RATE: u16 = 5_000;
+const REPARSE_POINT_ATTRIBUTE: u32 = 0x400;
 
 pub(crate) struct Limits {
-    pub(crate) memory: NonZeroUsize,
+    pub(crate) memory: Option<NonZeroUsize>,
     pub(crate) cpu_rate: NonZeroU16,
 }
 
 pub(crate) fn limits(shares: Shares) -> Result<Limits, AxError> {
     let memory = match shares {
-        Shares::Unset | Shares::Cpu => DEFAULT_MEMORY_BYTES,
-        Shares::CpuAndMemory { limit } => {
-            usize::try_from(limit.get()).map_err(|err| denied("read native memory limit", err))?
-        }
+        Shares::Unset | Shares::Cpu => None,
+        Shares::CpuAndMemory { limit } => Some(
+            NonZeroUsize::new(
+                usize::try_from(limit.get())
+                    .map_err(|err| denied("read native memory limit", err))?,
+            )
+            .ok_or_else(|| denied("read native memory limit", "zero bytes"))?,
+        ),
     };
     Ok(Limits {
-        memory: NonZeroUsize::new(memory)
-            .ok_or_else(|| denied("read native memory limit", "zero bytes"))?,
+        memory,
         cpu_rate: NonZeroU16::new(DEFAULT_CPU_RATE)
             .ok_or_else(|| denied("read native CPU limit", "zero rate"))?,
     })
@@ -72,9 +77,20 @@ pub(crate) fn launch(
     for name in ["SystemRoot", "windir"] {
         command.env(name, &root);
     }
-    for name in ["USERPROFILE", "APPDATA", "LOCALAPPDATA", "TEMP", "TMP"] {
+    for name in ["USERPROFILE", "APPDATA", "TEMP", "TMP"] {
         command.env(name, &directory);
     }
+    // The platform redirects LOCALAPPDATA, TEMP and TMP to
+    // `<LOCALAPPDATA>\Packages\<profile>\AC`, which exists only under the
+    // LocalAppData of the account that created the profile: this process.
+    let local_app_data = std::env::var_os("LOCALAPPDATA").ok_or_else(|| {
+        denied(
+            "read the AppContainer profile base",
+            "the serving process has no LOCALAPPDATA",
+        )
+    })?;
+    command.env("LOCALAPPDATA", local_app_data);
+    msvc::prepend_search_directories(&mut command);
     let environment: BTreeMap<OsString, OsString> = command
         .get_envs()
         .filter_map(|(name, value)| value.map(|value| (name.to_os_string(), value.to_os_string())))
@@ -82,7 +98,41 @@ pub(crate) fn launch(
     let profile = output
         .file_name()
         .ok_or_else(|| denied("name native profile", "output directory has no name"))?;
+    let mut toolchain_roots = environment
+        .iter()
+        .filter(|(name, _)| {
+            name.eq_ignore_ascii_case("CARGO_HOME") || name.eq_ignore_ascii_case("RUSTUP_HOME")
+        })
+        .map(|(_, value)| {
+            PathBuf::from(value)
+                .canonicalize()
+                .map_err(|err| denied("resolve declared toolchain home", err))
+                .and_then(ordinary_path)
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let declared_roots = toolchain_roots.len();
+    let mut pending = toolchain_roots.clone();
+    while let Some(directory) = pending.pop() {
+        for entry in std::fs::read_dir(&directory)
+            .map_err(|err| denied("enumerate declared toolchain home", err))?
+        {
+            let entry = entry.map_err(|err| denied("read declared toolchain entry", err))?;
+            let metadata = entry
+                .metadata()
+                .map_err(|err| denied("read toolchain entry type", err))?;
+            if metadata.file_attributes() & REPARSE_POINT_ATTRIBUTE != 0 {
+                continue;
+            }
+            let path = entry.path();
+            if metadata.is_dir() {
+                pending.push(path.clone());
+            }
+            toolchain_roots.push(path);
+        }
+    }
     let request = Launch {
+        toolchain_roots,
+        declared_roots,
         program,
         args: command
             .get_args()
@@ -90,7 +140,6 @@ pub(crate) fn launch(
             .collect(),
         directory,
         environment,
-        memory_bytes: limits.memory,
         cpu_rate: limits.cpu_rate,
         parent_job,
         profile: format!(
@@ -112,13 +161,15 @@ fn resolved(command: &Command, directory: &Path) -> Result<PathBuf, AxError> {
     if program.is_absolute() {
         return program
             .canonicalize()
-            .map_err(|err| denied("resolve native program", err));
+            .map_err(|err| denied("resolve native program", err))
+            .and_then(ordinary_path);
     }
     if program.components().count() > 1 {
         return directory
             .join(program)
             .canonicalize()
-            .map_err(|err| denied("resolve native program", err));
+            .map_err(|err| denied("resolve native program", err))
+            .and_then(ordinary_path);
     }
     let path = command.get_envs().find_map(|(name, value)| {
         if name.eq_ignore_ascii_case("PATH") {
@@ -139,7 +190,8 @@ fn resolved(command: &Command, directory: &Path) -> Result<PathBuf, AxError> {
             if candidate.is_file() {
                 return candidate
                     .canonicalize()
-                    .map_err(|err| denied("resolve native program", err));
+                    .map_err(|err| denied("resolve native program", err))
+                    .and_then(ordinary_path);
             }
         }
     }
@@ -149,10 +201,42 @@ fn resolved(command: &Command, directory: &Path) -> Result<PathBuf, AxError> {
     ))
 }
 
+fn ordinary_path(path: PathBuf) -> Result<PathBuf, AxError> {
+    let units: Vec<u16> = path.as_os_str().encode_wide().collect();
+    if units.get(..4) != Some(&[92, 92, 63, 92]) {
+        return Ok(path);
+    }
+    let units = if units.get(5) == Some(&58) {
+        units
+            .get(4..)
+            .ok_or_else(|| denied("normalize native path", "missing DOS path"))?
+            .to_vec()
+    } else if units.get(4..8) == Some(&[85, 78, 67, 92]) {
+        let mut ordinary = vec![92, 92];
+        ordinary.extend(
+            units
+                .get(8..)
+                .ok_or_else(|| denied("normalize native path", "missing UNC path"))?,
+        );
+        ordinary
+    } else {
+        return Err(denied(
+            "normalize native path",
+            "unsupported device namespace; use a DOS or UNC file path",
+        ));
+    };
+    Ok(PathBuf::from(OsString::from_wide(&units)))
+}
+
 pub(crate) fn denied(action: &str, detail: impl std::fmt::Display) -> AxError {
     AxError::failure(AxCode::SandboxDenied, action, detail.to_string())
         .with_recovery("check Windows AppContainer/Job support, the configured limits and disposable directory permissions; retry the sandbox command")
 }
+
+mod msvc;
+
+#[cfg(test)]
+mod child;
 
 #[cfg(test)]
 #[allow(
@@ -163,3 +247,12 @@ pub(crate) fn denied(action: &str, detail: impl std::fmt::Display) -> AxError {
     reason = "disposable native conformance test code"
 )]
 mod tests;
+
+#[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    reason = "disposable framework initialization diagnostics"
+)]
+mod initialization;

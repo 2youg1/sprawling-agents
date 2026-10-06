@@ -80,9 +80,17 @@ pub(super) struct Status {
     outcome: StatusOutcome,
 }
 
+/// The operations of one history and the owner reference every one of
+/// them was prepared under, held together so that a summary without an
+/// owner cannot be built (`crates/sprawling/spec/Privacy/State.lean`).
+struct Summary {
+    owner: SecretRef,
+    statuses: Vec<Status>,
+}
+
 #[derive(Default)]
 pub(super) struct History {
-    statuses: Vec<Status>,
+    summary: Option<Summary>,
 }
 
 impl History {
@@ -91,7 +99,6 @@ impl History {
         let mut owned: Vec<Intent> = Vec::new();
         let mut pending: Option<Intent> = None;
         let mut latest = None;
-        let mut owner: Option<SecretRef> = None;
         for line in lines {
             if line.schema != SCHEMA {
                 return Err(HistoryFault::Invalid("unknown history schema"));
@@ -103,9 +110,10 @@ impl History {
                     }
                     if latest.is_some_and(|id| id >= intent.operation)
                         || intent.definition != DEFINITION
-                        || owner
+                        || history
+                            .summary
                             .as_ref()
-                            .is_some_and(|previous| previous != &intent.owner)
+                            .is_some_and(|summary| summary.owner != intent.owner)
                         || intent.original == intent.modified
                     {
                         return Err(HistoryFault::Invalid(
@@ -132,12 +140,20 @@ impl History {
                             "apply differs from its recommendation",
                         ));
                     }
-                    owner = Some(intent.owner.clone());
                     latest = Some(intent.operation);
-                    history.statuses.push(Status {
+                    let status = Status {
                         operation: intent.operation,
                         outcome: StatusOutcome::Unresolved,
-                    });
+                    };
+                    match &mut history.summary {
+                        Some(summary) => summary.statuses.push(status),
+                        None => {
+                            history.summary = Some(Summary {
+                                owner: intent.owner.clone(),
+                                statuses: vec![status],
+                            });
+                        }
+                    }
                     pending = Some(intent);
                 }
                 Event::Finished { operation, outcome } => {
@@ -165,8 +181,9 @@ impl History {
                         }
                     }
                     let status = history
-                        .statuses
-                        .last_mut()
+                        .summary
+                        .as_mut()
+                        .and_then(|summary| summary.statuses.last_mut())
                         .ok_or(HistoryFault::Invalid("receipt has no status"))?;
                     if status.outcome != StatusOutcome::Unresolved {
                         return Err(HistoryFault::Invalid("operation already has a receipt"));
@@ -178,8 +195,20 @@ impl History {
         Ok(history)
     }
 
-    pub(super) fn statuses(&self) -> &[Status] {
-        &self.statuses
+    /// The operation summaries, released only once `authorize` accepts the
+    /// owner reference they were prepared under. An empty history has no
+    /// owner, so `authorize` is not asked and nothing is released.
+    ///
+    /// # Errors
+    /// The refusal `authorize` returns; the history is unchanged.
+    pub(super) fn disclose(
+        &self,
+        authorize: impl FnOnce(&SecretRef) -> Result<(), AxError>,
+    ) -> Result<&[Status], AxError> {
+        match &self.summary {
+            None => Ok(&[]),
+            Some(summary) => authorize(&summary.owner).map(|()| summary.statuses.as_slice()),
+        }
     }
 }
 

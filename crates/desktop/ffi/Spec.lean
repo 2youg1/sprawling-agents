@@ -18,7 +18,7 @@ namespace DesktopFfi
 
 - **边界规则**（`zig/boundary.zig`，Rust 面 `desktop_ffi::boundary`）：叶子往 Rust 的内存里写什么。四条：一串句柄按缓冲长度保留、按全长计数（`kept`）；一段别的程序写的剪贴板文本复制到第一个零单元为止、恒不越过块的大小（`textCopy`）；一段新文本恰好带一个终止符写进恰好那么长的块（`textFill`）；一张位图的字节数不溢出（`bitmapBytes`）。
 - **资源配对**（`zig/leaf.zig`）：每个操作在它自己的 export 之内取得、也释放它取得的一切。剪贴板写的那块内存要么交给剪贴板、要么由叶子释放（`write`）；捕获取得的三个 GDI 对象各释放一次，位图解除选择之后才读回（`captured`）。
-- **处理器与份额**（`desktop_ffi` 的 `cpu_set`、`cpu`，D4）：叶子把 CPU set 的原始记录写进借来的缓冲、读调用线程的组亲和、关掉本进程的执行速度限流、给一只 job 设 CPU 权重与内存上限；记录由 `cpu_set::parse` 按每条自己的 `Size` 走，走法的性质在 §10 证明。
+- **处理器与份额**（`desktop_ffi` 的 `cpu_set`、`cpu`，D4）：叶子把 CPU set 的原始记录写进借来的缓冲、读调用线程的组亲和、关掉本进程的执行速度限流、给一只 job 设 CPU 权重与内存上限、挂上读撞限的 completion port（D6）；记录由 `cpu_set::parse` 按每条自己的 `Size` 走，走法的性质在 §10 证明。
 - **Rust 面**（`desktop_ffi` 的 `top_level`、`capture`、`clipboard`、`dpi`、`ended`）：每个 export 一个安全函数，函数里恰好一个 `unsafe` 块，块上一行 `SAFETY:` 写使它成立、并且可能为假的前提。来源：AGENTS.md「Rust」一节的平台调用次序；路线图 X3。
 -/
 
@@ -561,13 +561,16 @@ example : walk (fun _ => 0) 64 3 0 = none := by decide
 **D4 处理器拓扑、节能限流与 run 的 job 份额也在这片叶子里，叶子只做调用，记录由安全的 Rust 解析。** `sprawling` 的放置（`crates/sprawling/spec/Serving/Placement.lean` D41、D45）要 `GetSystemCpuSetInformation` 与 `GetThreadGroupAffinity`，D40 要 `SetProcessInformation(ProcessPowerThrottling)`，`crates/runtime/spec/Tools/Exec.lean` D29 要 job 的 CPU 权重与作业级内存上限；`std`、`thread-priority` 3.1.1、`win32job` 2.0.3、`winsafe` 0.0.29 都不给这几项，而 `unsafe` 只许在本包（`xtask guard`），所以它们是本叶子的新 export，各做一次完整的调用：CPU set 的记录原样写进 Rust 借出的字节缓冲（`NoRoom` 附需要的长度，Rust 加大重试），组亲和与限流各写一个小结构。解析不进叶子：记录的走法（上面 `walk` 的两条定理）在 `cpu_set::parse` 里，是纯的安全 Rust，在每个平台上都编译，于是一台 i5-1340P 实读的记录作为夹具在 Linux 与 macOS 的 runner 上也被解析；它的 fuzz 是 proptest 在任意字节上跑（不 panic、只报 `Malformed`），叶子一侧没有可对拍的纯函数，所以这一组没有 Zig 侧的对拍。被否：①叶子解析好再交结构——解析是最可能出错的一段，放在 Zig 里就只能在 Windows 上测，也离开了 Rust 的类型；②为它们另开一个 FFI crate——要动门的机器（guard 的 lint 表名单），换来的只是名字更贴切。重开参数：一个对外安全的 crate 给出这些调用，那一组离开叶子。
 
 **D5 native confinement 的资源跨越 backlog 多次轮询，由安全 Rust owner 持有句柄。**
-`src/confinement.rs` 的 `OwnedProcess` 只持有叶子产生的 Job/process 句柄与唯一
-AppContainer profile 名，`zig/confinement.zig` 通过完整 launch、poll、terminate、cleanup
-操作管理它们；没有调用借出缓冲的地址留下。生产 caller 是
+`src/confinement.rs` 的 `OwnedProcess` 持有叶子产生的 command Job/process 句柄、
+唯一 AppContainer profile 名和 ACL 授权记录，`zig/confinement.zig` 通过完整
+launch、poll、terminate、cleanup 操作管理它们；授权路径在叶子内复制，
+没有调用借出缓冲的地址留下。生产 caller 是
 `crates/runtime/src/tools/exec/native_windows.rs` 与 backlog 的 native process arm，
-launch 以 capability-free AppContainer 挂起创建、配置 aggregate job memory/CPU cap，
-装进 command job 与 run job 后恢复。scratch ACL 与 profile storage 都只属于这次执行；
-harness 网络不进入 AppContainer。Rust 负责 argv/env/限额与 typed failures，叶子不选择策略。
+launch 以 capability-free AppContainer 挂起创建、给 command job 配置 CPU cap（内存上限只在
+run job 上，由 D6 的 watch 读撞限），装进 command job 与 run job 后恢复。scratch ACL 与 profile storage 都只属于这次执行；
+harness 网络不进入 AppContainer。声明的 toolchain home 只授予 read/execute，
+撤销在 job tree 停止后移除本次 SID；失败时保留授权路径供 cleanup 重试。
+Rust 负责 argv/env/限额与 typed failures，叶子不选择策略。
 
 `winsafe` 的安全 CreateProcess 面只收 STARTUPINFO，不能给 SECURITY_CAPABILITIES，
 `win32job` 不提供 AppContainer 起动，所以采用既有 FFI seam，而非再建 unsafe crate；
@@ -583,6 +586,19 @@ Rust-reference equivalence、两侧 fuzz 和 disposable Windows production 五�
 分别验证各自的边界、输入空间与系统行为，argv 通过不代表这些范围全部通过。
 D1 的重开条件已满足：后台命令跨越多次工具调用。cleanup 的显式失败抵达调用者，
 Drop 是 caller 放弃所有权时的 emergency teardown，仍尝试每项资源并报告失败。
+
+**D6 run job 的撞限读处是一个 completion port，由安全 Rust owner `cpu::JobWatch` 持有。**
+`crates/runtime/spec/Tools/Exec.lean` D95 要知道一个 run 的分配有没有在 job 的内存上限处被拒；
+Windows 只用 job 的 completion port 投递 `JOB_OBJECT_MSG_JOB_MEMORY_LIMIT` 说这件事，
+`win32job` 2.0.3 与 `winsafe` 0.0.29 都不挂 port，所以是本叶子的三个 export：
+`sprawling_desktop_job_watch` 建 port 并以 `JobObjectAssociateCompletionPortInformation`
+挂到 job 上（挂不上就关掉 port，什么也不留，step `JobWatch`）；`sprawling_desktop_job_memory_hits`
+以零等待取空队列，只数撞限消息，一次最多取 `DRAIN_LIMIT` 条，余下的留给下一次；
+`sprawling_desktop_job_unwatch` 关掉 port。port 跨越一个 run 的多条命令存在，与 D5 同理由 Rust
+owner 持有：`JobWatch` 只持 port 的句柄值，`Drop` 关它。被否：①在 `job_share` 里顺手挂 port——
+设份额与读撞限是两个调用者各自的时机，合成一个 export 会让只要 CPU 份额的 run 也多一个句柄；
+②读 `JobObjectLimitViolationInformation`——它报的是通知限额，不是硬上限的拒绝。重开参数：
+一个对外安全的 crate 能挂 job 的 completion port，或 Windows 给出不经 port 的撞限查询。
 
 **D1 一个 export 做完整段操作，桌面瞬时资源句柄恒不跨边界；native backlog 资源按 D5。** 被否：把每个 Win32 调用各包一个 export、在 Rust 里持 HDC 与 HGLOBAL 并靠 `Drop` 释放——那样释放的前提又回到 Rust 的 `unsafe` 里，缝也变成二十个而不是六个。重开参数：一个操作需要跨两次工具调用持有系统资源。
 -/

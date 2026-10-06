@@ -44,7 +44,7 @@ Markdown 时的标签 `8-n`，别处引作 `tools/xtask/Spec.lean §8-n`。
 | color | 颜色在每个客户端里恰好被命名一次（产地表见 §8-8），且以色域上限的比值表达；扫仓库根，文件自豁免；玻璃按 `--glass-opacity` 盖在最亮的表面上时字仍够层级（§8-51） |
 | motion | 过渡的曲线与时长只住 `client/src/theme.css`：别处的 `cubic-bezier(`、`linear(`、`steps(` 与 Tailwind 的 `duration-<数字>`、`duration-[`、`ease-[` 即红（§8-51） |
 | release | 公开树由过滤生成；六条断言：公开树上零脚手架路径、产品文档不得链向或在正文里点名脚手架、任何发布文件不得携家目录路径、不得引用树里没有的文件、不得把一台机器的工作记录写进产品文档、链接的拼法与树上的名字逐字节相等（§8-15） |
-| length | 一个生产函数不得长过 `function_length`、不得多于 `argument_count` 个参数（不含接收者），一个源文件的生产行不得多过 `file_length`；三个预算都住 `tools/xtask/budgets.toml`；函数尺寸与签名以 `syn` 量得，Rust 文件尺寸是总行数减去顶层 `#[cfg(test)]` 项所跨的行；`.zig` 受函数与文件两面、不受参数面，按 Zig 的词法量，文件尺寸减去 `test` 声明所跨的行（§8-48、D15） |
+| length | 一个生产函数不得长过 `function_length`、不得多于 `argument_count` 个参数（不含接收者），一个源文件的生产行不得多过 `file_length`；三个预算都住 `tools/xtask/budgets.toml`；函数尺寸与签名以 `syn` 量得，Rust 文件尺寸是总行数减去顶层 `#[cfg(test)]` 项所跨的行；`.zig` 受函数与文件两面、不受参数面，按 Zig 的词法量，文件尺寸减去 `test` 声明所跨的行（§8-48、D15）；只量文件面的语言（`length::surface::FILE_FACE` 所列扩展名，在仓库里哪个目录都一样）只受文件面，文件尺寸是总行数（§8-53、D33） |
 | npm | `client/` 的依赖面：锁文件在盘且与 `package.json` 逐条同、运行时依赖恰为 `npm::RUNTIME` 那张表、树上每个包的许可证都在 `deny.toml` 的准许表内（§8-12） |
 | boundary | Rust 检查不得跨进程边界够到本产品；黑箱那一半住 `tools/adversary/` |
 | artifact | 发布出去的那件东西的形状：测试脚手架不得进产品二进制、客户端落点只有一个家（§8-18）、平台与归档命名只有一张表（§8-19）、挂到 tag 上的归档先有构件证明（§8-34） |
@@ -129,6 +129,8 @@ gate／Violation／rule／violation／alternative（三段式拒绝的施工侧�
 判定面一门一文件。门表与门序只住 `gates::GATES` 那张数组，`COUNT` 是它的长度类型参数——数目与清单相隔一个 token，故不可能各说各话。本文只说每道门判什么，不抄一份名册，也不手写门数，因为手写的名册与数组相隔一次代码改动而不是一个 token：要知道跑哪几道，读那张数组或跑 `cargo xtask gates --list`；门数只写在 D2 的受管标记里。
 
 三个不判只做的模块：`main`（分发）｜`report`（Violation 与渲染）｜`walk`（确定性文件遍历）。其余各文件各自被某一道门调用而不自成一门：`architecture`（这份文档的名字与按 `## N 标题` 切节这一个读法，被 `depmap` 与 `proof` 调用，§8-22）｜`vocabulary`（`lexicon` 用它让退役词指向被定义的词；`proof` 用它的数词表读 `kani harness` 前的数）｜`members`（包在哪、叫什么、是产品还是工具，`cargo metadata` 的唯一读者，被每一道按包取目录的门调用，§8-39）｜`spec`（一个 crate 的 Lean 规格：命令新建骨架，同名的门判树，§8-41、§8-42）｜`lean`（把一份 `.lean` 当文本读出门要的几种受限形状，被 `spec`、`specalign`、`wiring` 调用，§8-43）｜`mem`／`sbom`／`repro`／`package`（`just` 的量具与交付物，恒不入 `gates`）｜`survey`（一页画出来之后才有的那些事实的判定，被 `render` 调用，§8-26）｜`bundle`（客户端落点这一个事实的读法，被 `render`、`budget` 与 `artifact` 调用，§8-18）｜`platform`（平台与归档命名这一张表，被 `channel` 与 `artifact` 调用，§8-19）｜`attestation`（挂到 tag 上的归档先有构件证明，被 `artifact` 调用，§8-34）。
+
+`length::surface`（`src/length/surface.rs`，形状 value）拥有「哪些语言只量文件面」这一个事实：扩展名表 `FILE_FACE` 与从仓库根按它取文件的 `sources(root)`；`length::check` 只遍历它交出的文件，不再自己持一个目录或一张扩展名表（§8-53、D33）。
 
 `secret::nix`（`src/secret/nix.rs`，形状 value）拥有 `NarHashes::classify(rel, bytes) -> NarHashes` 与 `NarHashes::admits(&SecretSpan) -> bool`；私有 span 集只经 canonical JSON 属性分类构造，provider 与整段匹配规则也由它决定，`secret::check` 只询问分类结果（§8-9）。关联缺陷回归在 `src/secret/nix_tests.rs`，经真实 `secret::check` 验证。
 
@@ -222,7 +224,7 @@ pub(crate) struct Violation {
 
 /-! ### 8-8 color：一个客户端，一处颜色产地（形状 6 数据面）
 
-**权威是一句话**：颜色在每个客户端里恰好被命名一次。浏览器客户端的那一处是 `client/src/theme.css` 的 `@theme` 块，`THEME` 常量即它，七条令牌断言只读它。产地表（`color/scan.rs` 的 `PRODUCTION_POINTS`）有两行：`THEME`，以及 playback 技能的参考页 `skills/playback/template.html`——城交给人的一个单文件页面，载不进客户端的样式表，所以它的颜色在自己的 `:root` 块里各命名一次。「断言读哪份表」与「扫描放过谁」从此是两个答案。
+**权威是一句话**：颜色在每个客户端里恰好被命名一次。浏览器客户端的那一处是 `client/src/theme.css` 的 `@theme` 块，`THEME` 常量即它，七条令牌断言只读它。产地表（`color/scan.rs` 的 `PRODUCTION_POINTS`）有两行：`THEME`，以及 playback 技能的样式源文件 `skills/playback/src/style.css`——离线页面载不进客户端的样式表，所以它的颜色在自己的 `:root` 块里各命名一次。`skills/playback/template.html` 是该样式的组装输出，只在带有生成横幅时跳过字面量扫描；共享 Bun 检查逐字节比对它与源片段，未标记的页面仍受扫描。「断言读哪份表」与「扫描放过谁」从此是两个答案。
 
 **七条令牌断言读 CSS 自定义属性，不读 Rust 表**。解析面因此是 `--color-*`／`--text-*`／`--font-weight-*` 这一类声明，值取 `oklch(L C H)` 的三个分量。灰阶的 `L` 以千分之一为单位比较（`0.145` 读作 145），与断言里的 `L_FLOOR`／`L_CEILING` 同刻度。
 
@@ -653,13 +655,15 @@ shebang 和现有运行时选择，不要求二者同时安装。被否：只在
 
 **败给的方案**：在 `ci.yml` 里照抄那两条命令，附一句「与 `justfile` 保持一致」。那正是分叉发生时的写法，而没有任何东西会注意到它们不再一致。
 
-D27 **验证编排只住 `.github/workflows/ci.yml`，release 经 `workflow_call` 调同一提交的入口。** 本段描述 GitHub Actions 的调用契约，不是 Lean 证明；job 状态与矩阵完整性由 Actions 引擎提供。输入 `release-validation` 是默认 false 的 boolean，true 保持发行原有的阻塞范围：跳过 `changes`、Linux/macOS `core` 与条件 `proof`，其余 job 与普通 CI 共用 recipes、矩阵和准备步骤。普通 CI 的路径条件与手动 proof 不变；扩大 core/proof 的发布阻塞范围须另有明确决定。`validation` 经 `needs` 汇合必需 job，只有每项为 success 才成功；failure、cancelled、skipped 与因构建失败而未运行的分片都拒绝。四分片共用本轮 `test-build` 的 archive，矩阵与分区继续由 CI 定义，release 不另写检查清单。
+D27 **验证编排只住 `.github/workflows/ci.yml`，release 经 `workflow_call` 调同一提交的入口。** 本段描述 GitHub Actions 的调用契约，不是 Lean 证明；job 状态与矩阵完整性由 Actions 引擎提供。输入 `release-validation` 是默认 false 的 boolean，true 保持发行原有的阻塞范围：跳过 `changes`、Linux/macOS `core` 与条件 `proof`，其余 job 与普通 CI 共用 recipes、矩阵和准备步骤。普通 CI 的路径条件与手动 proof 不变；扩大 core/proof 的发布阻塞范围须另有明确决定。`validation` 经 `needs` 汇合必需 job，只有每项为 success 才成功；failure、cancelled、skipped 与因构建失败而未运行的分片都拒绝。类型分片共用本轮 `test-build` 的 archive；`justfile` 的 `test-slice-plan` 是分片名称与 nextest filterset 的唯一权威，CI 使用该 recipe 输出的矩阵，release 不另写检查清单。构建作业用 archive 的完整 nextest JSON 清单与每个 filterset 的清单比较 `(binary-id, test name)`，包括 ignored 项；未分配、重复分配或清单外的项都失败，只有覆盖验证成功才输出矩阵。trybuild 按 package 分开，citysim 独立，其余 unit 按 crate 分组、integration 按 package 分组，其他 kind 归入兜底分片；accounting 的 unit 场景按执行、协作及补集三个模块域分开，因为其文件写入与 worker 场景集中在一个 runner 会成为执行热点，域的 module 名称只在 `test-slice-plan` 的 predicates 定义，补集从这些 predicates 生成。新测试必须仍恰好落入一个分片。
 
 `test-build` 的两项 Cargo debug 环境覆盖只在共享入口定义，main 与 tag 因而读同一种 test 缓存身份；fast/clippy/test 的用途仍各自独立，Rust cache 保持默认 workspace 产物清理，只有 main 写入。缓存恢复不是验证证据。release 调用的 concurrency 以 run id 隔离且不替代取消，普通 CI 仍按 ref 替代旧运行；调用权限只有 contents read，不传 secrets。release 的 advisories 是本轮新读，发行 archive 仍并行构建，publish 等待 verify、advisories 与 archive 成功，发行消费者只下载 archive-*。verify/archive job 名与 Windows 签名输出 archive-Windows 的位置保留。
 
-`release.yml` 的手动 `workflow_dispatch` 恒为只构建验证，必填 boolean 输入 `build-only` 缺省为 true；即使输入 false 或选择 tag，手动事件也不能执行 publish、channel、crates 或取得这些发布 job 的 OIDC 权限。三处发布 job 都要求 push 事件且 ref 以 `refs/tags/v` 开头；tag push 保持既有发布政策。手动运行复用 verify、advisories 与 archive，不设 `SPRAWLING_RELEASE_TAG`，产物标识为源码构建；保留准确 commit/tree、归档摘要、耗时与缓存读数作为验证证据。本契约不改变 D27 的必需 job 集合、矩阵或失败／取消／缺席拒绝，不调用未配置的 SignPath。手动运行是否只构建由事件边界决定，输入值不授予发布能力。
+`test-timings` 读取两份 `gh run view --json conclusion,headSha,startedAt,updatedAt,jobs` 的完整成功结果，对照全 CI、从 test build 启动到 test 汇总结束的测试链、构建与最长分片的 wall time，并逐片列出读数；排队计入全 CI 与测试链，不能从该差额推断分片算法的净收益。未成功或缺少构建、分片、test 汇总的输入不产生测量结论。
 
-被否：release 另抄 jobs 或 Cargo 命令，会再次分叉；缓存 composite action 在只有一个 test-build 定义时增加无用的接口；接受历史 CI 绿结果需要本方案没有的来源、时效与完整性协议。重开参数：发行要求 core/proof 阻塞，或确有跨运行结果复用需求。验证以两个 YAML 的解析、inputs/权限/needs、缓存环境唯一性与四分片对照为本地边界；真实 cache hit、失败传播与耗时由 Actions 运行确认。
+`release.yml` 的手动 `workflow_dispatch` 恒为只构建验证，必填 boolean 输入 `build-only` 缺省为 true；即使输入 false 或选择 tag，手动事件也不能执行 publish、channel、system-channels、crates 或取得这些发布 job 的 OIDC 权限。四处发布 job 都要求 push 事件且 ref 以 `refs/tags/v` 开头；tag push 保持既有发布政策。手动运行复用 verify、advisories 与 archive，不设 `SPRAWLING_RELEASE_TAG`，产物标识为源码构建；保留准确 commit/tree、归档摘要、耗时与缓存读数作为验证证据。本契约不改变 D27 的必需 job 集合、矩阵或失败／取消／缺席拒绝，不调用未配置的 SignPath。手动运行是否只构建由事件边界决定，输入值不授予发布能力。
+
+被否：release 另抄 jobs 或 Cargo 命令，会再次分叉；缓存 composite action 在只有一个 test-build 定义时增加无用的接口；接受历史 CI 绿结果需要本方案没有的来源、时效与完整性协议。重开参数：发行要求 core/proof 阻塞，或确有跨运行结果复用需求。验证以两个 YAML 的解析、inputs/权限/needs、缓存环境唯一性与类型分片覆盖对照为本地边界；真实 cache hit、失败传播与耗时由 Actions 运行确认。
 
 **只有一份**：`features` 不是门。`just check` 已经调这条 recipe，再在 `gates` 里跑同一条工作区检查就是同一次编译每轮跑两遍；只留 recipe 是一条裁决。
 -/
@@ -873,7 +877,7 @@ pub(crate) fn run(root: &Path, args: &[String]) -> Result<String, XtaskError>; /
 | `modmap` | 全部包减去本门所在的包（D9）的目录：条目过滤与磁盘遍历用同一组目录 |
 | `specalign` | 锚点里的 `<x>-SPEC.md` 在全部包目录里找，恰好一个包目录持有它 |
 | `artifact`、`secret` 的 `.expose(` 一半 | `product` 的目录 |
-| `length` | 每个包的 `src/`、每个包目录下的 `.zig`，加 `client/src` |
+| `length` | 每个包的 `src/`、每个包目录下的 `.zig`，加仓库内 `FILE_FACE` 所列扩展名的文件（`local/` 与构建目录除外，§8-53） |
 | `proof` | `in_product_graph` 的包；`cargo kani -p` 取 `package` |
 | `boundary` | 一个文件归哪个包，那个包是什么角色 |
 | `spec` | 参数经 `find` 找包，`Spec.lean` 骨架写进它的 `dir` |
@@ -1263,6 +1267,30 @@ D21 **生成器只发 Effect 4 的写法，不留 3.x 的分支。** 理由：`c
 **本节属门禁机具，与产品代码分开提交。**
 -/
 
+/-! ### 8-53 `length` 的文件面：只量文件面的语言，按扩展名认，不按目录认（形状 1 判定）
+
+400 行的文件预算写给整个仓库，执行却只到了 Rust、Zig 与 `client/src` 的 `.ts`／`.svelte`：样式表、随 skill 发出的页面与脚本、安装脚本、CI 脚本、打包文件都没有执行者，`client/src/theme.css` 因此长到了 2108 行而没有任何东西变红。本节把文件面扩到这些语言，并让「哪些语言只量文件面」只住一处。
+
+```rust
+// xtask::length::surface —— 形状 2 值：只量文件面的语言，与从仓库根取它们的文件
+pub(super) const FILE_FACE: [&str; 15] = ["ts", "svelte", "css", "html", "js", "mjs", "cjs",
+    "py", "ps1", "psm1", "sh", "bash", "cmd", "bat", "nix"];
+pub(super) fn sources(root: &Path) -> Result<Vec<PathBuf>, XtaskError>; // walk::files 之后按 FILE_FACE 留下，去掉 local/
+```
+
+- **取哪些文件**：从仓库根用 `walk::files` 遍历（它已跳过 `walk::SKIP_DIRS` 的构建目录、`.git` 与嵌套的 checkout），按扩展名留下 `FILE_FACE` 所列的文件，再以 `walk::in_isolation_zone` 去掉 `local/`。扩展名按小写逐字比对，与 `walk::files_with_ext` 同一读法。
+- **怎样判**：文件尺寸是总行数；前十行带 `Generated by` 加反引号横幅的文件不量（`length::generated`，与 `wording` 共用）；其余交给 `judge_file`，预算、登记表 `[file_length.predating]` 与三条性质与 Rust、Zig 两侧相同（`spec/Length.lean`），所以本节不改那份证明。
+- **`length::check` 不再持 `client/src` 这个目录与 `.ts`／`.svelte` 这张表**：第三个循环遍历 `surface::sources`。客户端的 `.ts`／`.svelte` 照旧被量，范围随之从 `client/src` 扩到 `client/scripts` 与 `client/*.config.ts`。
+- **登记**：扩面那一刻超长的非生成文件只有 `client/src/theme.css`，按那一刻的长度 2108 钉进 `[file_length.predating]`，由拆分把它划掉。`crates/city/skills/playback/template.html` 带生成横幅，按横幅豁免，不登记。
+- **失败**：一份文件读不出是 `XtaskError::Io`，与另两侧相同；不解析，所以没有「判不动」这一种失败。
+
+**测试**：`length::tests::a_long_file_in_any_file_face_language_is_named`：`root::fixture::relocated` 上写六份超过文件预算的文件——`client/src` 下的一份样式表、一个 skill 目录下的一张页面、`tools/` 下的一份 PowerShell 与一份 Python 脚本、根目录的一份 shell 安装脚本与一份 `.nix`——每一份都以 `too_long` 被点名；同一夹具里同样长的 `local/` 下的一份 `.js`、`docs/` 下的一份 Markdown、`client/src` 下的一份 JSON 词表与一份带生成横幅的页面都不报。整组违规一次比对。
+
+**本节属门禁机具，与产品代码分开提交。**
+
+D33 **只量文件面的语言按扩展名认，在仓库里哪个目录都量；`.nix` 与 `.github/` 下的脚本在内。** 文件预算要限制的是一个读者一次要装进上下文的东西，这与文件写成什么语言、放在哪个目录无关；随产品发出的文本源文件都有这两个读者，所以都受这一面。按扩展名认，一份脚本挪了目录也逃不出去，新出现的目录不需要谁记得把它加上。`flake.nix` 是发行打包文件，与安装脚本同类，故在内（人的裁定）。**不量的类型与理由**：`.md` 与 `.lean` 是文档与规格，按人的裁定放宽；`.yml`、`.toml`、`justfile`、`.json` 是配置、登记表与数据，像 `data` 形状一样被查而不被通读（`client/src/lang.json` 就是一张词表）；生成物按横幅豁免；`data` 形状的豁免只对模块表里有的 Rust 与 Zig 文件起作用，因为只有它们有模块表的行。这些语言都不量函数面，理由与客户端相同：不为一道门往工作区里加解析器。被击败的备选：①按目录列（`client/src`、`crates/city/skills`……）——以后新出现的目录会被漏掉，而一份路径清单就是「哪些文件随产品发出」的第二个家；②用 `git ls-files` 取文件——门从此依赖一个 git 进程，而 `walk` 的既有约定是 `SKIP_DIRS` 加隔离区，与 `secret`、`release`、`header` 走同一个扫描面。重开参数：树里进来一种按这张表会被量、却是数据而不是源码的扩展名，或者 `walk` 改读忽略文件（`walk::SKIP_DIRS` 的文档写着那一天）。
+-/
+
 /-! ## 9 工作流程
 
 `cargo xtask <gate>` → 定位仓库根（`root::judged`，见 D3）→ 读数据面（`architecture.toml`／ARCHITECTURE.md／`lexicon.toml`／`budgets.toml`）→ 纯函数判定 → 渲染违规 → 退出码。`gates` 每道门各占一条 `thread::scope` 线程并行判定，按门序汇合结果后统一渲染（§8-31）；汇合取哪个退出码，见 `spec/Report.lean`。
@@ -1293,7 +1321,7 @@ D3 **判的是哪棵树。** 仓库根取「当前目录往上第一个含 `Carg
 7. **length**：尺寸有**两个单位**，因为两者的失效方式不同——长函数藏起一条控制流，长文件藏起「东西在哪」。
    **文件面带一张先于规则存在的文件登记表**（`[file_length.predating]`），每个文件钉在划线时的行数上。**这张表只会变短**：表上没有的文件直接按预算拒绝，所以它不会变长；表上的文件不得超过自己的钉子，所以没有一个欠债会长大；而一个回到预算之内的文件必须从表上划掉，所以豁免会自己消失，不需要谁记得它（三件事是 `spec/Length.lean` 的 `an_unpinned_file_passes_exactly_inside_the_budget`、`a_pinned_file_never_grows`、`a_kept_pin_is_still_needed`）。**删一行的办法是把文件拆了，不是把数字改大。** 重开参数：在一个超长文件上迭代的代价低于拆分一次的代价时，文件面的预算才值得放宽。
    **参数面**：一条参数表长过预算就是一个 data clump——总是一起走的那几个值，是一个还没被命名的值。本仓库已经写下过这个修法：`Reporter` 的 doc 说「四个值总是一起走、从不被单独选择，所以它们作为一个走」。预算比 Clean Code 的 3 宽一格，因为三字段值的构造函数正当地需要三个，门不该跟它们吵。接收者不算：`&self` 是这个函数之所以是方法的原因，不是谁决定要穿过去的值。豁免表是一张名字数组（`文件路径::函数名`），**表上没有的名字直接拒绝**，划掉一个名字的办法是给那几个值起个名字，不是把预算调大。一条断言核对表上每个名字仍然存在且仍然超标，所以一个已经修好的豁免不会留在那里等下一个人花掉。**一个参数很多的私有方法，就是策略没有对象可住时的样子**，故参数超标的地方往往也是文件超标的地方。
-   **文件面只数生产行**：顶层 `#[cfg(test)]` 项（内联 `mod tests`、测试专用函数）所跨的行从文件总行数里减去。文件预算要限制的是一个模块持有多少生产策略；把内联测试也算进去，逼人为了挪测试而拆模块，拆出来的是一次与接口无关的移动。**扫描面**：每个包（§8-39）的 `src/`、每个包目录下的 `.zig`（§8-48、D15）与 `client/src`；`tests/` 与 `benches/` 不在内，因为测试代码本就允许放松约束（AGENTS.md）。**客户端只受文件面，不受函数面**：量一个函数要解析它写成的那门语言，`syn` 解析 Rust，而为一道门往工作区清单里加一个 TypeScript 解析器不成立；数括号的量法会量错（§13），故客户端的函数长度是**未量且明说未量**，而不是量错。**生成物两面都不量**：`client/src/wire.ts` 是 `cargo xtask wire-ts` 从 Rust 线面写出来的，拆它就是拆生成器的输出；豁免的依据是生成器自己写在文件头上的那一行横幅，不是门里的一条路径。**两类不量**：① 带 `#[cfg(test)]` 的项（它标的是**一个项**而不是文件剩下的部分）；② 模块表形状列为 `data` 的文件（ARCHITECTURE §9 形状 6：数据而无分支）。**两类豁免都取自已有权威**（属性、模块表），而不是新建一张名单——一张名单就是一个可以悄悄变长的豁免口。形状列由 `modmap::shapes` 交出，与 modmap 共用同一个解析器。
+   **文件面只数生产行**：顶层 `#[cfg(test)]` 项（内联 `mod tests`、测试专用函数）所跨的行从文件总行数里减去。文件预算要限制的是一个模块持有多少生产策略；把内联测试也算进去，逼人为了挪测试而拆模块，拆出来的是一次与接口无关的移动。**扫描面**：每个包（§8-39）的 `src/`、每个包目录下的 `.zig`（§8-48、D15），以及仓库里每一份只量文件面的语言写的文件（`length::surface`，§8-53、D33）；`tests/` 与 `benches/` 不在内，因为测试代码本就允许放松约束（AGENTS.md）。**只量文件面的语言只受文件面，不受函数面**：量一个函数要解析它写成的那门语言，`syn` 解析 Rust，而为一道门往工作区清单里加一个 TypeScript、CSS 或 shell 解析器不成立；数括号的量法会量错（§13），故这些语言的函数长度是**未量且明说未量**，而不是量错。**生成物两面都不量**：文件前十行中带有 `Generated by` 加反引号命令的横幅即为生成物，命令不限定为 `cargo xtask`，因为随 skill 发出的离线页面也由 Bun 组装；生成页的 CI 字节比对持住它与源片段的对应关系。`client/src/wire.ts` 是 `cargo xtask wire-ts` 从 Rust 线面写出来的，拆它就是拆生成器的输出；豁免的依据是生成器自己写在文件头上的那一行横幅，不是门里的一条路径。**两类不量**：① 带 `#[cfg(test)]` 的项（它标的是**一个项**而不是文件剩下的部分）；② 模块表形状列为 `data` 的文件（ARCHITECTURE §9 形状 6：数据而无分支）。**两类豁免都取自已有权威**（属性、模块表），而不是新建一张名单——一张名单就是一个可以悄悄变长的豁免口。形状列由 `modmap::shapes` 交出，与 modmap 共用同一个解析器。
 8. **报告**：三段式渲染，与产品的 Gate 拒绝同构——施工者被拒时拿到的也是「规则｜违反点｜替代」，不是一句 fail。
 
 ### 两个设计
@@ -1395,4 +1423,29 @@ CI 与 justfile 调用面；ARCHITECTURE.md §3（`depmap`、`directions` 围栏
 - `skills/sdd/SKILL.md`：`spec` 骨架的十七节（§8-41）与本规格的十七节。
 - `tools/adversary/Spec.lean`：检验器的规格，`spec` 门按位置认出它（§8-47、D13）。
 - `crates/desktop/Spec.lean` D14：叶子那张 lint 表为什么存在（§8-46、D14）。
+-/
+
+/-! wiring 的设置覆盖：从 person 配置及 building CONFIG.toml 的 Deserialize
+声明枚举每个命名字段，含嵌套类型与带字段的枚举；每个字段在 owning SPEC 有一行
+`settings-control Type.field client/src/path` 或 `settings-reason Type.field 理由`。
+记录字段名而不再声明 TOML 拼写；控制路径必须存在，理由不能空。新增可设字段没有
+记录时 wiring 变红；无字段的枚举由其承载字段覆盖。该检查确认覆盖决策，控件行为
+由客户端类型检查、interaction contracts 与 render 判断。
+-/
+
+/-! D32 归档派生 AUR
+
+本节描述 tools/xtask/src/channel/system.rs 的包管理器接口，不是形式证明。
+channel::run 从 platform::PLATFORMS 读取平台，计算归档 SHA256 后交给生成器。
+Linux x86-64 归档生成 PKGBUILD 与 .SRCINFO，两者共享摘要、URL 与版本；没有该
+平台时不生成 AUR，未知平台仍拒绝。URL 从 repository、已验证 tag 和归档名派生。
+版本用 kernel::Release 的 npm_version，将连字符转换为下划线。
+包名取 kernel::release::AUR_PACKAGE_NAME，安装目录取 aur_install_directory()，
+二进制链接至 /usr/bin/sprawling，许可另到 share/licenses。
+包不调用 sprawling install，不修改用户登录配置。
+release.yml 在 Linux 的 Arch 容器以非 root 执行 makepkg，安装并运行 --version。
+validate.py 只替换 aur/PKGBUILD 与 aur/.SRCINFO 的下载基址为回环 HTTP，
+其他文件按字节保留；validate_test.py 用 ELF/Mach-O 非 UTF-8 字节验证同一入口。
+发布仅限 tag push，AUR_SSH_KEY 缺失以 notice 跳过发布，生成与验证仍执行。
+验收：channel 摘要与共享布局 fixture、makepkg --printsrcinfo 对拍与 --version。
 -/
