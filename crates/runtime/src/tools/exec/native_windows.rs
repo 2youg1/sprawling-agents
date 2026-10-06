@@ -77,9 +77,19 @@ pub(crate) fn launch(
     for name in ["SystemRoot", "windir"] {
         command.env(name, &root);
     }
-    for name in ["USERPROFILE", "APPDATA", "LOCALAPPDATA", "TEMP", "TMP"] {
+    for name in ["USERPROFILE", "APPDATA", "TEMP", "TMP"] {
         command.env(name, &directory);
     }
+    // The platform redirects LOCALAPPDATA, TEMP and TMP to
+    // `<LOCALAPPDATA>\Packages\<profile>\AC`, which exists only under the
+    // LocalAppData of the account that created the profile: this process.
+    let local_app_data = std::env::var_os("LOCALAPPDATA").ok_or_else(|| {
+        denied(
+            "read the AppContainer profile base",
+            "the serving process has no LOCALAPPDATA",
+        )
+    })?;
+    command.env("LOCALAPPDATA", local_app_data);
     msvc::prepend_search_directories(&mut command);
     let environment: BTreeMap<OsString, OsString> = command
         .get_envs()
