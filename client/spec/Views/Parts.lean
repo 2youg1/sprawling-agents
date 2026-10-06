@@ -140,7 +140,7 @@
 | 状态模块 | 检视面（`views/inspect/open.svelte.ts`） | 从检视面之外打开一项时记下当时持焦点的元素；关上检视面或它最后一个页签时，焦点若在检视面里（或因面板卸载落到 `body`），交还给那个元素，它已不在页面上时不还 |
 | 部件自己 | `combobox.svelte`、`popover.svelte` | 前者记住触发按钮的 ref，`shut()` 时还；后者在 `onMount` 记下当时的 `document.activeElement`，`onCleanup` 还（`bind` 模式下焦点从未离开文本框，因此不还）|
 | 外壳 | `kbd.svelte` 的 `Cheatsheet` | `app.svelte` 在打开前记 `opener`，`closeSheet` 时还。表关上时它所在的 `{#if}` 分支连同 `<dialog>` 一起离开页面，平台的 `close()` 落在一个已摘下的元素上，外壳不把还原押在那一步上 |
-| 状态模块与外壳 | 设置面（`views/settings/hosted.svelte.ts`、`app.svelte`） | `hostSettled` 记打开者与关闭请求，路由关闭后由外壳在 `tick()` 完成时还原焦点；打开者已离开页面时不还。面与组的动效由它们自己的 CSS 承担，设置导航不启动 document view transition，避免组切换重叠或延后卸下面板。 |
+| 状态模块与外壳 | 设置面（`views/settings/hosted.svelte.ts`、`app.svelte`） | `hostSettled` 记打开者与关闭请求，路由关闭后由外壳在 `tick()` 完成时还原焦点；打开者已离开页面时不还。面与组的动效由它们自己的 CSS 承担，设置导航不启动 document view transition，避免组切换重叠或延后卸下面板。 浏览器验收先等 `DEFAULT_VIEW` 的 conversation 输入框进入 DOM，再保存并打开实际的 opener 节点，关闭后检查同一节点仍连接且持焦点；地址变化早于 view transition 的 DOM 更新，单独观察地址不能证明打开者已在目标页上。 |
 -/
 
 /-!
