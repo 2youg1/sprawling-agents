@@ -7,10 +7,10 @@
 
 use std::num::NonZeroU64;
 
-use kernel::{AxCode, AxError};
+use kernel::{AxCode, AxError, SecretRef};
 use serde::{Deserialize, Serialize};
 
-pub(super) const SCHEMA: u32 = 1;
+pub(super) const SCHEMA: u32 = 2;
 pub(super) const DEFINITION: u32 = 1;
 
 #[derive(Clone, PartialEq, Eq, Deserialize, Serialize)]
@@ -32,7 +32,7 @@ pub(super) struct Intent {
     pub(super) operation: NonZeroU64,
     pub(super) control: Control,
     pub(super) definition: u32,
-    pub(super) owner: String,
+    pub(super) owner: SecretRef,
     pub(super) original: RawValue,
     pub(super) modified: RawValue,
     pub(super) recommendation: RawValue,
@@ -91,7 +91,7 @@ impl History {
         let mut owned: Vec<Intent> = Vec::new();
         let mut pending: Option<Intent> = None;
         let mut latest = None;
-        let mut owner: Option<String> = None;
+        let mut owner: Option<SecretRef> = None;
         for line in lines {
             if line.schema != SCHEMA {
                 return Err(HistoryFault::Invalid("unknown history schema"));
@@ -103,7 +103,6 @@ impl History {
                     }
                     if latest.is_some_and(|id| id >= intent.operation)
                         || intent.definition != DEFINITION
-                        || intent.owner.is_empty()
                         || owner
                             .as_ref()
                             .is_some_and(|previous| previous != &intent.owner)
@@ -188,7 +187,11 @@ impl History {
 #[derive(Debug)]
 pub(super) enum HistoryFault {
     Io(std::io::Error),
-    Decode(serde_json::Error),
+    Decode {
+        line: usize,
+        column: usize,
+        category: serde_json::error::Category,
+    },
     Invalid(&'static str),
     Busy,
     Capacity,
@@ -202,9 +205,13 @@ impl HistoryFault {
                 format!("history IO: {source}"),
                 "check local history access and retry the read",
             ),
-            Self::Decode(source) => (
+            Self::Decode {
+                line,
+                column,
+                category,
+            } => (
                 AxCode::StorageFatal,
-                format!("history decoding: {source}"),
+                format!("history decoding at line {line} column {column} ({category:?})"),
                 "preserve the history bytes and inspect the malformed line; do not truncate it",
             ),
             Self::Invalid(reason) => (

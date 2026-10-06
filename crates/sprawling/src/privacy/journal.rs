@@ -50,7 +50,13 @@ fn decode(bytes: &[u8]) -> Result<History, HistoryFault> {
     }
     let mut lines = Vec::new();
     for line in bytes.split_inclusive(|byte| *byte == b'\n') {
-        lines.push(serde_json::from_slice::<Line>(line).map_err(HistoryFault::Decode)?);
+        lines.push(serde_json::from_slice::<Line>(line).map_err(|source| {
+            HistoryFault::Decode {
+                line: source.line(),
+                column: source.column(),
+                category: source.classify(),
+            }
+        })?);
     }
     History::fold(lines)
 }
@@ -76,7 +82,7 @@ mod tests {
             operation: NonZeroU64::new(operation).unwrap(),
             control: Control::WindowsUserPowershellTelemetry,
             definition: DEFINITION,
-            owner: "fixture-owner".to_owned(),
+            owner: kernel::SecretRef::new("privacy", "fixture-owner").unwrap(),
             original,
             modified: modified.clone(),
             recommendation: modified,
@@ -219,7 +225,7 @@ mod tests {
     fn unknown_fields_duplicate_ids_and_cross_identity_history_are_refused() {
         let first = intent(1, RawValue::Absent { key_existed: true });
         let mut other = intent(2, first.original.clone());
-        other.owner = "another-fixture-owner".to_owned();
+        other.owner = kernel::SecretRef::new("privacy", "another-fixture-owner").unwrap();
         assert!(
             decode(&bytes(&[
                 prepared(first.clone()),
