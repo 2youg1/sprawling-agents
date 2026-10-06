@@ -618,7 +618,8 @@ fn guardian_timeout_retains_the_member_until_harvest() {
                     .unwrap();
             });
             wait_for_fixture(&daemon.dir.path().join("create-entered"));
-            let returned = response.recv_timeout(Duration::from_secs(10));
+            // The parent budget counts polls; the fixture also allows for OS scheduling.
+            let returned = response.recv_timeout(Duration::from_secs(30));
             // Release even a regressed unbounded parent before joining the scoped thread.
             if returned.is_err() {
                 std::fs::write(daemon.dir.path().join("create-fifo"), "release\n").unwrap();
