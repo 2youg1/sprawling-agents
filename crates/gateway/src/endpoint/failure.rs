@@ -380,6 +380,150 @@ mod tests {
         );
     }
 
+    /// Derived from `crates/gateway/spec/Endpoint/Failure.lean`: every
+    /// status a provider refuses with, crossed with whether the body names
+    /// the window and whether it says the quota is used up, lands on the
+    /// kind, the retry and the account disposition the model gives
+    /// (`a_refusal_advances_exactly_for_a_rejected_key_or_an_exhausted_quota`,
+    /// `a_refusal_is_an_overflow_exactly_when_it_names_the_window`,
+    /// `the_status_table`).
+    #[test]
+    fn a_refusal_advances_exactly_for_a_rejected_key_or_an_exhausted_quota() {
+        let headers = reqwest::header::HeaderMap::new();
+        let statuses = [400, 401, 402, 403, 404, 408, 413, 422, 429, 500, 503, 529];
+        for status in statuses {
+            for outgrew in [false, true] {
+                for quota in [false, true] {
+                    let body = serde_json::json!({ "error": {
+                        "message": if outgrew { "maximum context length is 8192 tokens" } else { "no" },
+                        "type": if quota { "insufficient_quota" } else { "invalid_request_error" },
+                        "code": serde_json::Value::Null,
+                    }})
+                    .to_string();
+                    let failure = ProviderFailure::refusal(
+                        "http://house/v1",
+                        reqwest::StatusCode::from_u16(status).unwrap(),
+                        &headers,
+                        &Ok(body),
+                    );
+                    let json =
+                        serde_json::to_value(provider_err("call provider", &failure)).unwrap();
+                    let overflow = matches!(status, 400 | 413) && outgrew;
+                    let exhausted = status == 429 && quota;
+                    let busy = matches!(status, 408 | 429) || status >= 500;
+                    let kind = if overflow {
+                        "overflow"
+                    } else if exhausted {
+                        "quota"
+                    } else {
+                        "refused"
+                    };
+                    let retry = if busy && !overflow && !exhausted {
+                        "yes"
+                    } else {
+                        "no"
+                    };
+                    let account =
+                        (status == 401 || exhausted).then(|| serde_json::json!("advance"));
+                    assert_eq!(
+                        (&json["provider"], &json["retry"], json.get("account")),
+                        (
+                            &serde_json::json!({ "kind": kind, "status": status }),
+                            &serde_json::json!(retry),
+                            account.as_ref()
+                        ),
+                        "status {status}, outgrew {outgrew}, quota {quota}"
+                    );
+                }
+            }
+        }
+    }
+
+    /// The structured `error.code` names the quota; a null or absent code
+    /// leaves it to `error.type`. Nothing else grants a switch: not the
+    /// words of the message, not a body that is not JSON, not a body that
+    /// could not be read.
+    #[test]
+    fn only_the_structured_code_or_type_says_the_quota_is_used_up() {
+        let headers = reqwest::header::HeaderMap::new();
+        let kind_of = |body: reqwest::Result<String>| {
+            let failure = ProviderFailure::refusal(
+                "http://house/v1",
+                reqwest::StatusCode::TOO_MANY_REQUESTS,
+                &headers,
+                &body,
+            );
+            serde_json::to_value(provider_err("call provider", &failure)).unwrap()["provider"]["kind"]
+                .clone()
+        };
+        let said = |error: serde_json::Value| Ok(serde_json::json!({ "error": error }).to_string());
+        assert_eq!(
+            [
+                kind_of(said(
+                    serde_json::json!({ "type": "insufficient_quota", "code": "insufficient_quota" })
+                )),
+                kind_of(said(
+                    serde_json::json!({ "type": "requests", "code": "insufficient_quota" })
+                )),
+                kind_of(said(serde_json::json!({ "type": "insufficient_quota" }))),
+                kind_of(said(
+                    serde_json::json!({ "type": "insufficient_quota", "code": "rate_limit_exceeded" })
+                )),
+                kind_of(said(
+                    serde_json::json!({ "type": "requests", "message": "insufficient_quota" })
+                )),
+                kind_of(Ok("insufficient_quota".to_owned())),
+            ],
+            ["quota", "quota", "quota", "refused", "refused", "refused"]
+        );
+    }
+
+    /// A stream that reports an exhausted quota part-way switches the
+    /// account and is not asked again; one that reports a busy provider is
+    /// asked again on the same account.
+    #[test]
+    fn a_reported_error_advances_exactly_for_an_exhausted_quota() {
+        let said = |kind: &str| {
+            let json = serde_json::to_value(provider_err(
+                "read provider stream",
+                &ProviderFailure::Reported { kind },
+            ))
+            .unwrap();
+            (json["retry"].clone(), json.get("account").cloned())
+        };
+        assert_eq!(
+            [
+                said("insufficient_quota"),
+                said("rate_limit_exceeded"),
+                said("invalid_prompt")
+            ],
+            [
+                (serde_json::json!("no"), Some(serde_json::json!("advance"))),
+                (serde_json::json!("yes"), None),
+                (serde_json::json!("no"), None),
+            ]
+        );
+    }
+
+    /// A request that went out and lost its answer never switches the
+    /// account (`unknown_keeps_account`): another account would bill the
+    /// same request again.
+    #[test]
+    fn an_unknown_effect_keeps_the_account() {
+        let cut = std::io::Error::new(std::io::ErrorKind::UnexpectedEof, "the body stopped");
+        for failure in [
+            ProviderFailure::Cut(&cut),
+            ProviderFailure::Silence { quiet_ms: 5 },
+        ] {
+            let json =
+                serde_json::to_value(provider_err("read provider response", &failure)).unwrap();
+            assert_eq!(
+                (&json["retry"], json.get("account")),
+                (&serde_json::json!("unknown"), None)
+            );
+        }
+    }
+
     /// Both dialects refuse an over-long request with a 400 and say why
     /// in the body; the advice for a refusal in general (check the model
     /// name, the credential and the dialect) points at three settings

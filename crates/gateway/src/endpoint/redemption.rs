@@ -94,3 +94,72 @@ pub(crate) fn redemption() -> Redemption {
         Arc::new(|_at: &Locator| Ok(b"the-pixels".to_vec())),
     )
 }
+
+#[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing,
+    reason = "test code"
+)]
+mod tests {
+    use super::super::config::Endpoint;
+    use super::super::fakes::{config, request};
+    use super::*;
+
+    /// gateway D31: the credential the account calls with is this
+    /// account's matter, so its absence switches to the next account; a
+    /// reference in an extra header belongs to the endpoint every account
+    /// shares, and switching would not bring it back.
+    #[test]
+    fn a_missing_account_credential_switches_the_account_and_a_missing_header_does_not() {
+        let account = SecretRef::parse("secret:anthropic/api").unwrap();
+        let only = move |present: Option<SecretRef>| -> Redemption {
+            Redemption::new(
+                Box::new(move |reference: &SecretRef| {
+                    if present.as_ref() == Some(reference) {
+                        Ok(Sealed::new(Box::new("sk-test".to_owned())))
+                    } else {
+                        Err(AxError::failure(
+                            AxCode::CredentialMissing,
+                            "resolve credential",
+                            reference.to_string(),
+                        )
+                        .with_recovery("store the credential"))
+                    }
+                }),
+                Arc::new(|_at: &Locator| Ok(Vec::new())),
+            )
+        };
+        let refused = |endpoint_config, redemption| {
+            let mut endpoint = Endpoint::new(endpoint_config, redemption).unwrap();
+            let err = endpoint.call(&request()).unwrap_err();
+            let json = serde_json::to_value(&err).unwrap();
+            (
+                err.code().clone(),
+                json["retry"].clone(),
+                json.get("account").cloned(),
+            )
+        };
+        let mut shared = config("http://127.0.0.1:9/v1");
+        shared.extra_headers.push((
+            "x-gateway-key".to_owned(),
+            crate::endpoint::HeaderValue::Redeemed(SecretRef::parse("secret:gateway/key").unwrap()),
+        ));
+        assert_eq!(
+            [
+                refused(config("http://127.0.0.1:9/v1"), only(None)),
+                refused(shared, only(Some(account))),
+            ],
+            [
+                (
+                    AxCode::CredentialMissing,
+                    serde_json::json!("no"),
+                    Some(serde_json::json!("advance"))
+                ),
+                (AxCode::CredentialMissing, serde_json::json!("no"), None),
+            ]
+        );
+    }
+}
