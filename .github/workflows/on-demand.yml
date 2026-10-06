@@ -61,7 +61,8 @@
 #
 # Every job here runs on Windows, the platform a person reproduces a red
 # on, except `fresh`, whose question is asked of all three platforms, and
-# `keychain`, whose question exists only on macOS.
+# `keychain`, whose question exists only on macOS, and the matched
+# allocation arm of `bench`, which runs on Linux.
 # `pgo` runs on Windows, the platform the readings belong to. The same
 # three stages run unchanged on macOS and Linux (the rustc flags and
 # `llvm-profdata` from the `llvm-tools` component are the same there,
@@ -922,6 +923,8 @@ jobs:
         run: |
           set -euo pipefail
           out="$PWD/target/bench-out"
+          heaptrack --version > "$out/profiler.txt"
+          lscpu > "$out/cpu.txt"
           for size in small long; do
             for arm in baseline candidate; do
               heaptrack -o "$out/$arm-$size" "$out/$arm.exe" --ignored "instrument_responses_heap_$size" --nocapture --test-threads=1 2>&1 | tee "$out/$arm-$size.log"
