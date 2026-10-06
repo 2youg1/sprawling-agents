@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Read-only owner verification (`crates/gateway/spec/Credential.lean` D25).
+//! Read-only owner verification (`crates/gateway/spec/Credential.lean` D27).
 
 use super::vault::{KeyringVault, Vault};
 use kernel::{AxCode, AxError, SecretRef};
