@@ -786,7 +786,8 @@ jobs:
             sudo apt-get install --yes --no-install-recommends podman
           fi
           program="$RUNNER_TEMP/container-cli"
-          printf '#!/bin/sh\nexec sudo %s "$@"\n' "$engine" > "$program"
+          mkdir -p target/container-evidence
+          printf '#!/bin/bash\nset -eu -o pipefail\nif [ "$1" = inspect ] || { [ "$1" = container ] && [ "${2:-}" = inspect ]; }; then\n  sudo %s "$@" | tee "%s/stopped.json"\nelse\n  exec sudo %s "$@"\nfi\n' "$engine" "$PWD/target/container-evidence" "$engine" > "$program"
           chmod +x "$program"
           "$program" pull docker.io/library/python:3.13-slim
           image=$("$program" image inspect docker.io/library/python:3.13-slim --format '{{.Id}}')
