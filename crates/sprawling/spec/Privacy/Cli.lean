@@ -59,8 +59,10 @@ System32\WindowsPowerShell\v1.0\powershell.exe；不从 PATH、SystemRoot
 而 HKLM 需要管理员。路径读失败或不是绝对路径即拒绝。
 命令关闭 profile、非交互，只输出
 [Security.Principal.WindowsIdentity]::GetCurrent().User.Value；
-经 doctor::asking 询问，只保留第一行，最多等 300 次 knock
-（300 × asking::TICK = 15 秒，因为冷启动的 Windows PowerShell 要几秒才开始回答）。
+经 doctor::asking 询问，只保留第一行，最多等 1200 次 knock（1200 × asking::TICK = 一分钟）。
+这个上界由 `bin::privacy::windows` 一处定义，身份查询、计划任务查询与环境广播共用：冷启动的
+Windows PowerShell 在同时有其他构建的工作站上空命令就要 5.1 秒，与整个测试套件并行时身份查询用了
+13.9 秒、任务查询超过 15 秒；一分钟是所见最慢回答的四倍，而查询只在人等页面时等待。
 超时、非零退出、无法启动均以 ToolUnavailable 拒绝，不保留 stopping 诊断中的路径或身份。
 答案必须符合 SID 文法 `S-1-<authority>(-<sub-authority>)+`，每段是非空十进制数字；
 不符合即拒绝，拒绝文字不回显答案。身份放在 Zeroizing 中，不写日志、不落盘。

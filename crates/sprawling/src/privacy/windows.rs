@@ -35,9 +35,12 @@ use wire::PrivacyEdition;
 const CURRENT_VERSION: &str = r"SOFTWARE\Microsoft\Windows NT\CurrentVersion";
 
 /// How many knocks one Windows PowerShell call gets: `PATIENCE *
-/// asking::TICK` is fifteen seconds, because a cold Windows PowerShell
-/// takes seconds to start before it answers.
-pub(crate) const PATIENCE: u32 = 300;
+/// asking::TICK` is a minute. A cold Windows PowerShell took 5.1 seconds
+/// to run an empty command on a workstation running other builds, the
+/// identity query 13.9 seconds and a task query more than 15 beside the
+/// whole test suite; a minute is four times the slowest answer seen, and
+/// a query only waits while a person waits (Privacy.Cli D54).
+pub(crate) const PATIENCE: u32 = 1200;
 
 /// Windows PowerShell under `SystemRoot` as HKLM records it, rather than
 /// as PATH, the `SystemRoot` variable or the current directory say, all

@@ -26,6 +26,8 @@
   Privacy.Cli D54）调用 ScheduledTasks 模块：读取任务是否存在、是否启用、去掉启用标志后的任务 XML
   的 SHA-256；写入只用 Disable-ScheduledTask 与 Enable-ScheduledTask，从不删除或注册任务。
   脚本输出是一行 JSON，未知字段或状态拒绝；查询失败从不读作任务不存在，只有 ObjectNotFound 才是。
+  一次任务查询与身份查询共用一分钟的上界（Privacy.Cli D54）：它要启动 PowerShell、导入 ScheduledTasks
+  模块并做两次 CIM 调用，在同时有其他构建的工作站上用了 7.7–9.1 秒。
   控制表有四个任务目标（CEIP 的 Consolidator 与 UsbCeip、Device Information 的 Device 与
   Device User），路径与名称只来自控制表，经环境变量交给脚本，不拼进脚本文字。
 
