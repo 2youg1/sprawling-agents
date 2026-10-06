@@ -46,7 +46,7 @@ import client.spec.Views.Workspace
 | `client/spec/Views/Parts/Row.lean` | `RowList` 的走法 | （§7-4） |
 | `client/spec/Views/Parts/Combobox.lean` | 组合框的游标、过滤与关闭 | （§7-5） |
 | `client/spec/Views/Parts/Popover.lean` | 多列弹层的换列与游标 | （§7-5） |
-| `client/spec/Views/Parts/Decide.lean` | 请决定卡的 y／e／n | （§7-11、§7C） |
+| `client/spec/Views/Parts/Decide.lean` | 请决定卡的三个答复键 | （§7-11、§7C） |
 | `client/spec/Views/Workspace.lean` | 外壳的控件：图层键、硬币键、信箱的走法 | §7-11 |
 | `client/spec/Views/Inspect/Open.lean` | 检视面的页签带与它至多留几项 | （§7-11、§4-45） |
 | `client/spec/Core/Workbench.lean` | 工作台分隔线的宽度 | （§7-11、D24） |
@@ -54,7 +54,7 @@ import client.spec.Views.Workspace
 | `client/spec/Views/Guide.lean` | 启动时进不进上手指南，跳过之后落在哪 | （§7G、D54） |
 | `client/spec/Views/Door.lean` | 远程组的门开关、「更换城钥匙」与确认码输入框：焦点、Escape 与拒绝 | （4-57） |
 
-其余标签都在本文件：§3-1、§3-2 在 §8，§3-4 在 §3，其余 §4-n 与 §7C、§7G、§7K、§7L、§7N 在 §10，§7-8 在 §4，§7-9 在 §13；决定 D1 至 D48（含 D42a）、D52 至 D55、D72、D78、D80、D81、D82、D83、D85、D86、D88、D89、D90 与 D91 在 §10 之后，D60 与 D73 在 `client/spec/Views/Workspace.lean`。
+其余标签都在本文件：§3-1、§3-2 在 §8，§3-4 在 §3，其余 §4-n 与 §7C、§7G、§7K、§7L、§7N 在 §10，§7-8 在 §4，§7-9 在 §13；决定 D1 至 D48（含 D42a）、D52 至 D55、D72、D78、D80、D81、D82、D83、D85、D86、D88、D89、D90、D91 与 D92 在 §10 之后，D60 与 D73 在 `client/spec/Views/Workspace.lean`。
 -/
 
 /-! ## 2 验收标准
@@ -70,7 +70,7 @@ import client.spec.Views.Workspace
 - `spec/Views/Parts.lean`：环绕一步可逆、走满一圈回到原处、每一格都走得到（`wrap_back_undoes_forward`、`a_full_turn_comes_home`、`every_cell_is_reached`）；钳住不出界、两端是不动点（`clamp_stays`、`clamp_holds_the_last`、`clamp_holds_the_first`）；关上一层把焦点还给打开者，层层关上回到最初（`closing_returns_to_the_opener`、`closing_every_layer_restores_the_page`）；模态外面的事件——Escape 与点背景——从不确认（`escape_never_confirms`）。
 - `spec/Views/Parts/Segmented.lean`：方向键从不落在不能选的格上（`an_arrow_never_lands_on_a_refused_cell`），落点在控件之内（`an_arrow_stays_inside`），Tab 站是一格或没有（`the_stop_is_a_cell`、`an_empty_control_offers_no_stop`、`a_refused_control_offers_its_first_cell`）。
 - `spec/Views/Parts/Tabs.lean`、`Row.lean`、`Combobox.lean`、`Popover.lean`：每个键留在部件之内；行列表两端不环绕、文本框留住自己的键；游标走动不改生效的值；打字复位游标；Escape 关上并清空过滤词而不改值；换列复位游标。
-- `spec/Views/Parts/Decide.lean`：门只收「知道了」、过期的提案只能拒绝、文本框里的字母是字。
+- `spec/Views/Parts/Decide.lean`：门只收「知道了」、过期的提案只能拒绝、不带 accel 的一下按键不是答复。
 - `spec/Views/Workspace.lean`：图层键三下回原档、看一眼不改选定的档；变淡的发送面什么都不做、停止面不发字；信箱的数字只落到画出来的条目。
 - `spec/Views/Inspect/Open.lean`：至多 `KEPT` 项、刚打开的那一项在、Delete 之后焦点落在一个页签上。
 - `spec/Core/Workbench.lean`：分隔线不改一对栏的总宽、两栏都不窄于两栏。
@@ -116,7 +116,7 @@ import client.spec.Views.Workspace
 
 /-! ## 6 命名统一
 
-概念名取自 `docs/glossary.md`，由 `xtask lexicon` 守住；对人的每一个字取自 `client/src/lang.json`（§3-1），由 `xtask wording` 守住。Lean 声明名是英文：`Tier` 的三个值就是 client D17 定下的 `zen`、`blend`、`panorama`，`Reply` 的三个值就是请决定卡的 y、e、n。
+概念名取自 `docs/glossary.md`，由 `xtask lexicon` 守住；对人的每一个字取自 `client/src/lang.json`（§3-1），由 `xtask wording` 守住。Lean 声明名是英文：`Tier` 的三个值就是 client D17 定下的 `zen`、`blend`、`panorama`，`Reply` 的三个值就是请决定卡的同意、改后同意与不同意。
 -/
 
 /-! ## 7 模块边界
@@ -172,7 +172,7 @@ import client.spec.Views.Workspace
 | `time.ts` | 1 判定 | `ago`, `clock`, `hhmm`, `hhmmss`, `isoInstant`, `isoDay`, `isoTime`, `lasted`, `count`, `kilo`, `usd`, `kib`；`isoDay(at)`／`isoTime(at)` 是一个账本时刻按 UTC 的两半——`2026-10-02` 与 `03:04:05.678Z`——时间轴的轴头写一次日期、每行写到毫秒的时刻（`docs/frontend-method.md` §7D），所以「这个时刻在 UTC 里怎么写」只有这一处，`isoInstant(at)` 是两者相接、`<time datetime>` 读的整个时刻，视图不自己相接；`kilo(n)` 是一眼比较两个 token 数时的写法：千记 `k`、百万记 `M`、三位有效数字、不留尾零，千以下照写（上下文环的 `82.4k / 200k`） |
 | `notify.ts` | 1 判定 | `notices(heard, items, scene) -> [Heard, ApprovalItem[]]`：哪些待批事项变成一条浏览器通知。`Heard` 是「快照未到」或「已算过的 `ApprovalId` 集」；`Scene { notifying, focus, elapsed, watching }`。只对需要人决定的事（`approval_queue` 的答）发，四道闸全过才发：窗口失焦、过了预热期 `WARMUP_MS`、不在首个快照里也不在已算过的集里、不是正在看的那个地址（`item.actor`）。每个见过的 id 都记进 `Heard`，所以一件事在任何一道闸下被放过一次就永远不再弹。适配器是 `views/notifier.svelte`（权限为 `granted` 才 `new Notification`），开关是 `prefs.ts` 的 `notifying`，默认 `off` |
 | `deferral.ts` | 1 判定 | `Urgency = "needs_you" \| "ordinary"`、`urgencyOf(error) -> Urgency`（按 `AxCode` 穷尽的一张表：哪些拒绝不等人就动不了）；`Box = absent \| holding \| emptied { at, by: "send" \| "hand" }`（对话框此刻的状况：页面没有对话框、框里有字、从某一刻起是空的以及是发送还是人手清空的）、`Attention { box, visible, returnedAt }`、`Moment = "sent" \| "idle" \| "returned"`、`momentOf(attention, now) -> Moment \| null`、`deliverable(urgency, attention, now) -> boolean`、`wakeAt(attention, now) -> number \| null`（不再发生任何事时下一个时刻在哪一毫秒开始，只有一个事件能打开时刻时为 `null`）、`IDLE_MS = 5000`、`RETURNED_MS = 1000`：普通通知何时主动冒头的唯一判定（4-35、D26）；`needs_you` 恒可投递，`ordinary` 只在一个时刻里投递，其余时候只动信箱键上的标记。适配器是 `views/mailbox/attention.ts`（从页面读出 `Attention`）与 toast 座位 `views/refusal.svelte` |
-| `keys.ts` | 1 判定 | `ACTIONS`、`Action`、`Chord`、`DEFAULTS`、`LABELS`：外壳听的每一个键在这一张表里；`readChord(text)`、`spell(chord)`、`marks(chord, platform)`、`platformOf(userAgent)`、`matches(chord, pressed)`、`reserved(chord)`、`conflictsOf(bound)`；`loadKeys(door, userAgent) -> Keymap` 把人的覆写（`prefs.ts` 的 `chord`）叠在默认上，`keymap()` 是页面的那一份。左下三键的名字、按住即现的提示、外壳与设置页都读它，没有一处自己拼一个键；外壳自己的动作是 `tier.cycle`（`\`，图层键）、`mailbox`（Accel-B，信箱键）、`inspect`（Accel-J，右侧的开合）与 `go.setup`（Accel-,，设置键），`decide.yes`／`decide.edit`／`decide.no`（y／e／n）只由持焦点的请决定卡听，外壳不答它们，默认表里没有两个动作共用一个键；`run.stop` 的标签是 `run_cancel`（`/stop`），它发的是对眼前的 run 的 `cancel`，不是整城的 `halt`（D16）；`finder`（Accel-P）打开找文件的面（4-62）。`folded(key)`（不分大小写的唯一定义）与 `face(key)`（一个键画成什么）也由它交出，`lines.ts` 读这两个 |
+| `keys.ts` | 1 判定 | `ACTIONS`、`Action`、`Chord`、`DEFAULTS`、`LABELS`：外壳听的每一个键在这一张表里；`readChord(text)`、`spell(chord)`、`marks(chord, platform)`、`platformOf(userAgent)`、`matches(chord, pressed)`、`reserved(chord)`、`conflictsOf(bound)`；`loadKeys(door, userAgent) -> Keymap` 把人的覆写（`prefs.ts` 的 `chord`）叠在默认上，`keymap()` 是页面的那一份。左下三键的名字、按住即现的提示、外壳与设置页都读它，没有一处自己拼一个键；会改变状态或打开浮层的动作只用带 accel 的组合键，单键只剩 `composer.focus`（`/`，只把焦点移进输入框，D92）；外壳自己的动作是 `tier.cycle`（Accel-\，图层键）、`mailbox`（Accel-B，信箱键）、`inspect`（Accel-J，右侧的开合）、`help`（Accel-`/`，快捷键速查）与 `go.setup`（Accel-,，设置键），`fork.here`（Accel-Shift-F）只由线程听，`decide.yes`／`decide.edit`／`decide.no`（Accel-Shift-Y／E／X）只由持焦点的请决定卡听，外壳不答它们，默认表里没有两个动作共用一个键；`run.stop` 的标签是 `run_cancel`（`/stop`），它发的是对眼前的 run 的 `cancel`，不是整城的 `halt`（D16）；`finder`（Accel-P）打开找文件的面（4-62）。`folded(key)`（不分大小写的唯一定义）与 `face(key)`（一个键画成什么）也由它交出，`lines.ts` 读这两个 |
 | `press.ts` | 2 值 | `Pressed`：两张键表判的同一条按下记录；`pressedOf(event)` 是读一次 `KeyboardEvent` 的唯一一处：落在文本框里或正在组合输入的按下算作 `field`；`HOLD_MS`（300）是「按住」的唯一定义，按住看一眼与按住即现都读它 |
 | `lines.ts` | 1 判定 | 行间走动的表 `LINE_KEYS`（`LineMove` → 键序列：`line.next` ↓／j、`line.previous` ↑／k、`line.first` Home／gg、`line.last` End／G、`line.open` Enter、`line.close` Esc；每一步的第一个键是行尾画的那一个），`lineWalker()` 交出一个读者 `(pressed, at) -> LineMove \| null`：只认文本框之外、不带修饰键的按下，gg 是两次 g 相隔不超过 `SEQUENCE_MS`（1000 ms），其间任何别的键都把第一个 g 作废；`lineFaces(move)` 是每个键画出来的样子，字母照打出的大小写画（g 与 G 是两个键）。`initialOf(name, slug)` 是一行按首字母到达时用的那个字母：名字的第一个字是一个键打得出的拉丁字母或数字时取它，否则取 `slug` 的第一个字母（D40）；`initialTyped(pressed)` 读出一次按下是不是这样一个字母。工具行、信箱的条目、run 板与设置树读它，没有一处自己拼一个走动的键 |
 | `in_front.ts` | 1 判定 | `runInFront(belief, view) -> RunBelief \| undefined`：「眼前的 run」的唯一答案。对话页是这个房间最新的在干活的 run（`newestWorking`），run 页是地址里那个仍在干活的 run，城页、楼页、monitor 与其余页面没有——它们同时画着很多 run，替人挑一个就是替人决定停哪个。Accel-.、palette 与输入框的 `/stop`、`/steer`、`/diff` 都读它（4-41、D16），O(L) |
@@ -980,7 +980,7 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
 
 /-! D44 会话栏一行一段 session，过去的一段只读；替换 session 只靠 `/new`，分叉是另一项功能
 
-- **决策**：会话栏列每个房间的每一段，点一行把它放进主区；过去的一段只读，其下是回到当前一段的链接。对话里**替换** session——丢掉眼前的对话、在同一地址从空白开新的一段——只有一条路：打 `/new`（`/compact` 是 `/new --carry`，带上交接）；没有同义的 `/clear`，选模型也不顺带开新会话。**分叉**是另一项功能，不是替换：线程里每条消息、回合与工具行上的分叉键（`talk/fork_button.svelte`，键 `f`）、`/fork` 与信箱「最近」段的分叉入口（起点是那一段的末尾，`tailOf`），都从对话里的一行开出一条新的线，原来的对话一字不丢地留在账本与会话栏里。路由以 `#/talk/<地址>:<began>` 点名一段（§3-2、7K）。
+- **决策**：会话栏列每个房间的每一段，点一行把它放进主区；过去的一段只读，其下是回到当前一段的链接。对话里**替换** session——丢掉眼前的对话、在同一地址从空白开新的一段——只有一条路：打 `/new`（`/compact` 是 `/new --carry`，带上交接）；没有同义的 `/clear`，选模型也不顺带开新会话。**分叉**是另一项功能，不是替换：线程里每条消息、回合与工具行上的分叉键（`talk/fork_button.svelte`，键 Accel-Shift-F）、`/fork` 与信箱「最近」段的分叉入口（起点是那一段的末尾，`tailOf`），都从对话里的一行开出一条新的线，原来的对话一字不丢地留在账本与会话栏里。路由以 `#/talk/<地址>:<began>` 点名一段（§3-2、7K）。
 - **理由**：这是人定下的规则：替换会把眼前的对话换走，一个顺手就能按到的控件或一个与它同义的第二个拼写，会在人没打算丢掉对话时把它丢掉，所以替换只留给明说的 `/new`；分叉不丢任何东西，人点分叉键正是要从那一行另起一条线，所以它的控件留在对话里。在过去的一段上「继续」只能是分叉，因为城只接着一个房间最新的一段说下去（glossary：Session），开新的一段即结束旧的。`:` 是地址文法拒绝的字符，作分隔不会与地址混淆；`began` 是 `Query::Sessions` 已答出的稳定序号。城在有 run 工作的房间里拒开新段（`E_BUSY`），所以一个地址上不会同时活着两段。
 - **被击败的备选**：①保留 `/clear` 作 `/new` 的同义词——同一件事的第二个拼写，人读到两个动词会以为它们做的事不同；②去掉对话里的分叉键——把分叉当成了替换，人要从一行另起一条线时只剩打字；③在过去的一段上直接派活——城会把它接到当前一段上，人看到的不是他点的那一段；④一行一个房间、过去的段折在房间下——多一次点击，键盘路径更长；⑤过去的一段下再放一个「从它的末尾接着说」按钮——它只是分叉的第二个入口，人要从旧的一段接着说时，逐条的分叉键与信箱的分叉入口已经在手边，多一个按钮只多占一处常驻控件。
 - **重开参数**：城开始允许一个房间有不止一段同时活着，或人要求替换 session 有第二条路。
@@ -1013,7 +1013,7 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
 
 /-! D48 图层键在任何时候都回到对话
 
-- **决策**（User 定）：宽屏上按图层键（键或 `\`），开着设置面或别的一页时先回到对话（设置面下面是对话时回到那段对话，否则回到市长的房间），再换到下一档；换页与换档是同一次视图过渡，焦点落进对话框。状态机是 `client/spec/Views/Workspace.lean` 的 `pressLayers`。一栏上的图层键照旧开关世界层的面（4-52）。
+- **决策**（User 定）：宽屏上按图层键（键或 Accel-\），开着设置面或别的一页时先回到对话（设置面下面是对话时回到那段对话，否则回到市长的房间），再换到下一档；换页与换档是同一次视图过渡，焦点落进对话框。状态机是 `client/spec/Views/Workspace.lean` 的 `pressLayers`。一栏上的图层键照旧开关世界层的面（4-52）。
 - **理由**：档是对话页的排法；在设置面或成本页上按图层键只改一个看不见的值，人看不出键有没有反应。
 - **被击败的备选**：在别的页上让图层键什么都不做——人按了没有反应，比换页更难懂。
 -/
@@ -1046,6 +1046,14 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
 - **决策**（User 定行为，手感由前端定）：展开着的那一步由城的配置变成已完成时，指南展开下一个还没完成也没人推迟的步，原来那一步收起；一次只展开一步；展开的正文用 `theme.css` 的 `drop` 进来，收起没有动画；`prefers-reduced-motion` 或外观里关掉动效时静止。
 - **理由**：做完一步之后人的下一个动作是下一步；让做完的那一步继续开着，人要先收起它再找下一步。收起不做动画，是动效表的通则：离开的东西不该多停一刻。
 - **被击败的备选**：用高度过渡做展开与收起——要动 `height`，动效表只动 transform 与 opacity，而且 Firefox 没有 `interpolate-size`，三家引擎读出两种手感。
+-/
+
+/-! D92 会改变状态或打开浮层的动作只用组合键
+
+- **决策**（User 定）：`core/keys.ts` 的默认表里，除 `composer.focus`（`/`）之外每个动作都带 accel：图层键 Accel-\，快捷键速查 Accel-`/`，从手下那一条分叉 Accel-Shift-F，请决定卡的三个答复 Accel-Shift-Y／E／X。浏览器自己留着的组合（`RESERVED`：N、T、W，带不带 Shift）不用，默认表里没有两个动作共用一个组合；`keys.test.ts` 判这三条。人在设置的快捷键组里仍可把任何动作改回单键，那是人自己的选择。
+- **理由**：任何不带修饰键的键都有打字误触的风险：焦点停在消息、卡片或页面上而不在输入框里时，打出的一个字母会分叉对话、换档、开出速查面，`y`／`n` 会直接替人作决定。`matches` 只在文本框里不认单键，挡不住焦点不在文本框时的误触。`/` 留作单键，因为它只把焦点移进输入框，误按的后果是接下来的字落进输入框，正好接住误打的字。分叉与三个答复带 Shift，是因为 Accel-F 是浏览器的查找，Accel-Y、Accel-E 在一些浏览器里是历史与搜索；不同意取 X，是因为 Accel-N 带不带 Shift 都在页面听到之前开出新窗口。
+- **被击败的备选**：①保留单键、只在焦点处于消息或卡片时才认——误触正是发生在焦点停在那里的时候；②用 Alt 组合——`matches` 不认 Alt，因为 Alt 在 macOS 上用来打出别的字符，在 Windows 上会把焦点交给浏览器的菜单栏。
+- **重开参数**：浏览器开始允许页面接住 Accel-N，或人要求某个动作改回单键。
 -/
 
 /-! ## 11 边界枚举
