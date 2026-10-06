@@ -50,6 +50,10 @@ win32job = { workspace = true }
 # Each run's job takes a weighted CPU share through the one FFI seam
 # (`crates/runtime/spec/Tools/Exec.lean` D29).
 desktop_ffi = { workspace = true }
+# The MSVC discovery rustc and cc use, run outside the AppContainer that
+# cannot read Visual Studio's instance state; already in the lock beneath
+# cc (`crates/runtime/spec/Tools/Exec/NativeWindows.lean` D60).
+find-msvc-tools = "0.1.14"
 
 [features]
 wasm = ["dep:wasmtime", "dep:wasmtime-wasi"]

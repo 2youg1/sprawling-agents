@@ -6,18 +6,88 @@
 //! The MSVC search directories an AppContainer child cannot discover for
 //! itself, specified by `crates/runtime/spec/Tools/Exec/NativeWindows.lean` D60.
 
+use std::ffi::{OsStr, OsString};
 use std::process::Command;
+
+use find_msvc_tools::{Env, EnvGetter};
+
+/// The search lists the linker's environment carries. The discovery never
+/// reads the child's values of these, so runtime alone joins them.
+const SEARCH_LISTS: [&str; 3] = ["PATH", "LIB", "INCLUDE"];
 
 /// Prepends the host linker's PATH, LIB and INCLUDE directories to the values
 /// the child declared, so a bare `link.exe` or `cl.exe` inside the container
 /// resolves to MSVC. Leaves the command unchanged when the building declared a
 /// developer prompt (`VCINSTALLDIR`) or no MSVC is installed.
 pub(super) fn prepend_search_directories(command: &mut Command) {
-    let _ = command;
+    let declared = Declared(
+        command
+            .get_envs()
+            .filter_map(|(name, value)| Some((name.to_os_string(), value?.to_os_string())))
+            .collect(),
+    );
+    if declared.value("VCINSTALLDIR").is_some() {
+        return;
+    }
+    let Some(linker) =
+        find_msvc_tools::find_tool_with_env(std::env::consts::ARCH, "link.exe", &declared)
+    else {
+        return;
+    };
+    for (name, directories) in linker.env() {
+        if !is_search_list(name) {
+            continue;
+        }
+        let joined = std::env::split_paths(directories)
+            .map(std::path::PathBuf::into_os_string)
+            .chain(declared.value(name).map(OsStr::to_os_string))
+            .filter(|entry| !entry.is_empty())
+            .fold(OsString::new(), |mut joined, entry| {
+                if !joined.is_empty() {
+                    joined.push(";");
+                }
+                joined.push(entry);
+                joined
+            });
+        command.env(name, joined);
+    }
+}
+
+fn is_search_list(name: impl AsRef<OsStr>) -> bool {
+    SEARCH_LISTS
+        .iter()
+        .any(|list| name.as_ref().eq_ignore_ascii_case(list))
+}
+
+/// The child's declared environment, as the discovery sees it.
+struct Declared(Vec<(OsString, OsString)>);
+
+impl Declared {
+    fn value(&self, name: impl AsRef<OsStr>) -> Option<&OsStr> {
+        self.0
+            .iter()
+            .find(|(key, _)| key.eq_ignore_ascii_case(name.as_ref()))
+            .map(|(_, value)| value.as_os_str())
+    }
+}
+
+impl EnvGetter for Declared {
+    fn get_env(&self, name: &'static str) -> Option<Env> {
+        if is_search_list(name) {
+            return None;
+        }
+        self.value(name)
+            .map(|value| Env::Owned(value.to_os_string()))
+    }
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used, reason = "test code")]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    reason = "test code"
+)]
 mod tests {
     use std::ffi::OsStr;
     use std::path::PathBuf;

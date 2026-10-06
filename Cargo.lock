@@ -3006,6 +3006,7 @@ name = "sprawling-runtime"
 version = "0.0.10"
 dependencies = [
  "base64 0.23.1",
+ "find-msvc-tools",
  "insta",
  "png",
  "proptest",
