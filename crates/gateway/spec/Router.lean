@@ -173,38 +173,91 @@ theorem legacy_submissions_preserve_accounts {Account : Type} (held : List Accou
     cases accounts <;> simpa [apply, submit, replace] using ih
 end Gateway.Router.Accounts
 
-/-! EndpointBook::absorb(kind,run,addr,data) 是实时与重放共用入口；model_called
-run_started 保存活动 Run 的房间，model_called 保存每个 Run 的最后一次非秘密账号尝试，
-model_returned 将它提交到该房间的亲和；回合记录不带 addr 时使用 run_started 的房间。
-RunFrozen 删除未成功尝试与活动房间，SessionOpened 清该房间的亲和；snapshot 保存这些投影，
-不含 Key。派活在 room_for 后将成功亲和传给 adapter，不把未定房间当 Session。
-重排不挪健康账号；被移除的绑定按新表的首账号选择。
-模型假设同一房间只有一个活动 Run，生产 open_session 在房间忙时返回 E_BUSY，
-因此新 Session 不会在旧 Run 的回答尚未返回时覆盖它的绑定作用域。 -/
-namespace Gateway.Router.Affinity
-inductive Step (Account : Type) where
-  | attempt (account : Account)
-  | answered
-  | frozen
-  | opened
-structure State (Account : Type) where
-  pending : Option Account := none
-  bound : Option Account := none
-def apply {Account : Type} (state : State Account) : Step Account → State Account
-  | .attempt account => { state with pending := some account }
-  | .answered => { pending := none, bound := state.pending.or state.bound }
-  | .frozen => { state with pending := none }
-  | .opened => {}
-theorem attempts_preserve_binding {Account : Type} (state : State Account) (attempts : List Account) :
-    (attempts.foldl (fun held account => apply held (.attempt account)) state).bound = state.bound := by
-  induction attempts generalizing state with
-  | nil => rfl
-  | cons account rest ih => exact ih (apply state (.attempt account))
-end Gateway.Router.Affinity
+/-! EndpointBook::absorb(kind,run,addr,data) 是实时与重放共用入口。
+run_started 登记当前 Session 的 Run 成员资格，model_called 只保存成员的最后一次非秘密
+账号尝试，model_returned 只提交成员的尝试，并使用登记的房间而不信任答复的 addr。
+RunFrozen 删除未成功尝试与成员资格，SessionOpened 清该房间的亲和、所有成员资格与暂存；
+snapshot 保存同一投影而不含 Key。派活在 room_for 后将成功亲和传给 adapter，
+不把未定房间当 Session。重排不挪健康账号，被移除的绑定按新表的首账号选择。 -/
 
-
-/-! D30 成功的 model_returned 是唯一绑定提交点；使用原 Ledger 投影而不保存第二份
+/-! D30 当前 Session 成员的成功 model_returned 是唯一绑定提交点；使用原 Ledger 投影而不保存第二份
 账号文件，保证实时、全重放和 snapshot+tail 读同一规则。账号撤销后按首账号选择，
 不会在无错误请求之间轮换。Rust 的生产回归驱动 HTTP、重排和进程重建，投影检查
 覆盖任意失败尝试序列；这些检查是实现符合性证据，不是 Rust 精化证明。
+同一房间允许并发 Run，队列持有者归还后备用 Run 仍可执行，房间忙检查不能保障
+Session 边界；SessionOpened 撤销旧 Run 的成员资格，使后续调用也不能重新绑定。
+资格只由唯一 RunId 的 RunStarted 建立，按房间撤销不影响其它房间，因此不另存 epoch。
 未覆盖的恢复分类、有限换账号预算、搜索设置与账号登记 UI 仍由各自接口后续规定。 -/
+
+namespace Gateway.Router.Affinity
+
+/-- `crates/gateway/src/router/book.rs`：单个房间可有多个 Run，成员资格属于当前 Session。 -/
+structure State (Run Account : Type) where
+  eligible : Run → Bool := fun _ => false
+  pending : Run → Option Account := fun _ => none
+  bound : Option Account := none
+
+inductive Step (Run Account : Type) where
+  | started (run : Run)
+  | attempted (run : Run) (account : Account)
+  | answered (run : Run)
+  | frozen (run : Run)
+  | opened
+
+def apply [DecidableEq Run] (state : State Run Account) : Step Run Account → State Run Account
+  | .started run => { state with eligible := fun other => if other = run then true else state.eligible other }
+  | .attempted run account => if state.eligible run then
+      { state with pending := fun other => if other = run then some account else state.pending other }
+    else state
+  | .answered run => if state.eligible run then
+      { state with pending := fun other => if other = run then none else state.pending other,
+                   bound := (state.pending run).or state.bound }
+    else state
+  | .frozen run =>
+      { state with
+        eligible := fun other => if other = run then false else state.eligible other
+        pending := fun other => if other = run then none else state.pending other }
+  | .opened => {}
+
+/-- 任意 Run 的连续失败调用不能覆盖最后一次成功绑定。 -/
+theorem attempts_preserve_binding [DecidableEq Run] (state : State Run Account)
+    (attempts : List (Run × Account)) :
+    (attempts.foldl (fun current attempt => apply current (.attempted attempt.1 attempt.2)) state).bound = state.bound := by
+  induction attempts generalizing state with
+  | nil => rfl
+  | cons attempt tail ih =>
+    cases eligible : state.eligible attempt.1 <;>
+      simpa [apply, eligible] using ih (apply state (.attempted attempt.1 attempt.2))
+
+inductive RetiredStep (Account : Type) where
+  | attempted (account : Account)
+  | answered
+  | frozen
+
+def retired (run : Run) : RetiredStep Account → Step Run Account
+  | .attempted account => .attempted run account
+  | .answered => .answered run
+  | .frozen => .frozen run
+
+/-- 任意旧 Run 的后续调用、答复和冻结轨迹都不能改变当前绑定，包括另一 Run 已成功的绑定。
+`crates/accounting/src/views/snapshot/tests.rs` 生成该轨迹并在实时、重放与任意快照切点检验。 -/
+theorem retired_trace_preserves_binding [DecidableEq Run] (state : State Run Account)
+    (run : Run) (steps : List (RetiredStep Account)) (h : state.eligible run = false) :
+    (steps.foldl (fun current step => apply current (retired run step)) state).bound = state.bound := by
+  induction steps generalizing state with
+  | nil => rfl
+  | cons step tail ih =>
+    cases step with
+    | attempted account => simpa [retired, apply, h] using ih state h
+    | answered => simpa [retired, apply, h] using ih state h
+    | frozen =>
+      have excluded : (apply state (.frozen run)).eligible run = false := by simp [apply]
+      simpa [retired, apply] using ih (apply state (.frozen run)) excluded
+
+/-- 新 Session 从任意并发状态打开，旧 Run 的任意后续轨迹都不能产生绑定。 -/
+theorem opened_excludes_old_runs [DecidableEq Run] (state : State Run Account)
+    (run : Run) (steps : List (RetiredStep Account)) :
+    (steps.foldl (fun current step => apply current (retired run step)) (apply state .opened)).bound = none := by
+  exact retired_trace_preserves_binding (apply state .opened) run steps rfl
+
+end Gateway.Router.Affinity
