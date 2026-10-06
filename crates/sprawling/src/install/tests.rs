@@ -112,3 +112,122 @@ fn other_platforms_install_under_the_xdg_user_binary_directory() {
 fn with_nowhere_to_install_the_answer_is_nowhere() {
     assert_eq!(program_dir(None, None), None);
 }
+
+#[test]
+fn displacing_an_external_copy_never_removes_the_running_binary() {
+    let root = tempfile::tempdir().unwrap();
+    let running = std::env::current_exe().unwrap();
+    let target = root.path().join(super::installed_name());
+    std::fs::write(&target, b"installed copy").unwrap();
+    assert!(super::displace(root.path()).unwrap());
+    assert!(!target.exists());
+    assert!(running.exists());
+    assert!(!super::displace(root.path()).unwrap());
+}
+
+#[cfg(target_os = "windows")]
+const FIXTURE: &str = "SPRAWLING_INSTALL_REMOVAL_FIXTURE";
+
+#[cfg(target_os = "windows")]
+#[test]
+fn windows_uninstall_removes_its_running_executable() {
+    if let Some(dir) = std::env::var_os(FIXTURE) {
+        let dir = Path::new(&dir);
+        assert_eq!(
+            std::env::current_exe().unwrap().canonicalize().unwrap(),
+            dir.join(super::installed_name()).canonicalize().unwrap()
+        );
+        assert!(super::displace(dir).unwrap());
+        return;
+    }
+    let root = tempfile::Builder::new()
+        .prefix("uninstall fixture ")
+        .tempdir()
+        .unwrap();
+    let dir = root.path().join("installed");
+    let scratch = root.path().join("scratch");
+    std::fs::create_dir(&dir).unwrap();
+    std::fs::create_dir(&scratch).unwrap();
+    let target = dir.join(super::installed_name());
+    std::fs::copy(std::env::current_exe().unwrap(), &target).unwrap();
+    run_removal_fixture(&target, &dir, &scratch);
+    assert!(!target.exists(), "the installed name remains after exit");
+    while std::fs::read_dir(&scratch)
+        .unwrap()
+        .next()
+        .transpose()
+        .unwrap()
+        .is_some()
+    {
+        std::thread::yield_now();
+    }
+}
+
+#[cfg(target_os = "windows")]
+#[test]
+fn windows_uninstall_removes_only_the_link_to_an_external_running_executable() {
+    let root = tempfile::tempdir().unwrap();
+    let archive = root.path().join("archive.exe");
+    let dir = root.path().join("installed");
+    let scratch = root.path().join("scratch");
+    std::fs::create_dir(&dir).unwrap();
+    std::fs::create_dir(&scratch).unwrap();
+    std::fs::copy(std::env::current_exe().unwrap(), &archive).unwrap();
+    let original = std::fs::read(&archive).unwrap();
+    let target = dir.join(super::installed_name());
+    std::os::windows::fs::symlink_file(&archive, &target).unwrap();
+    assert!(std::fs::symlink_metadata(&target).unwrap().is_symlink());
+    run_removal_fixture(&archive, &dir, &scratch);
+    assert!(
+        archive.is_file(),
+        "the external running executable was removed"
+    );
+    assert_eq!(std::fs::read(&archive).unwrap(), original);
+    assert_eq!(
+        std::fs::symlink_metadata(&target).unwrap_err().kind(),
+        std::io::ErrorKind::NotFound
+    );
+    assert_eq!(std::fs::read_dir(&scratch).unwrap().count(), 0);
+    assert!(!super::displace(&dir).unwrap());
+}
+
+#[cfg(target_os = "windows")]
+#[test]
+fn windows_uninstall_removes_a_dangling_file_link() {
+    let root = tempfile::tempdir().unwrap();
+    let missing = root.path().join("missing.exe");
+    let dir = root.path().join("installed");
+    std::fs::create_dir(&dir).unwrap();
+    let target = dir.join(super::installed_name());
+    std::os::windows::fs::symlink_file(&missing, &target).unwrap();
+    assert!(std::fs::symlink_metadata(&target).unwrap().is_symlink());
+    assert!(super::displace(&dir).unwrap());
+    assert_eq!(
+        std::fs::symlink_metadata(&target).unwrap_err().kind(),
+        std::io::ErrorKind::NotFound
+    );
+    assert!(!missing.exists());
+    assert!(!super::displace(&dir).unwrap());
+}
+
+#[cfg(target_os = "windows")]
+fn run_removal_fixture(exe: &Path, dir: &Path, scratch: &Path) {
+    let done = std::process::Command::new(exe)
+        .args([
+            "--exact",
+            "install::tests::windows_uninstall_removes_its_running_executable",
+            "--nocapture",
+        ])
+        .env(FIXTURE, dir)
+        .env("TEMP", scratch)
+        .env("TMP", scratch)
+        .output()
+        .unwrap();
+    assert!(
+        done.status.success(),
+        "stdout: {}
+stderr: {}",
+        String::from_utf8_lossy(&done.stdout),
+        String::from_utf8_lossy(&done.stderr)
+    );
+}
