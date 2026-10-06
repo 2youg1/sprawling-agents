@@ -119,30 +119,31 @@ mod tests {
 
     #[test]
     fn a_new_field_requires_its_own_coverage_decision() {
-        let fixture = tempfile::tempdir().unwrap();
+        let fixture = crate::root::fixture::relocated("settings-fields");
         let text = "#[derive(Deserialize)] struct Config { known: u64, added: Option<u64> }";
         let fields = fields(text, "fixture.rs").unwrap();
         let records = "settings-reason Config.known resolved by a session control";
         let missing: Vec<_> = fields
             .iter()
-            .filter(|field| !covered(fixture.path(), records, field))
+            .filter(|field| !covered(&fixture, records, field))
             .cloned()
             .collect();
         assert_eq!(missing, vec!["Config.added"]);
         assert!(covered(
-            fixture.path(),
+            &fixture,
             "settings-reason Config.added explicitly edited in raw config",
             "Config.added"
         ));
         assert!(!covered(
-            fixture.path(),
+            &fixture,
             "settings-control Config.added client/src/missing.svelte",
             "Config.added"
         ));
         assert!(!covered(
-            fixture.path(),
+            &fixture,
             "settings-reason Config.added ",
             "Config.added"
         ));
+        std::fs::remove_dir_all(fixture).unwrap();
     }
 }
