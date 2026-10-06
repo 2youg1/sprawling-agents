@@ -128,6 +128,7 @@ Two lists exist and they answer different questions, so both are kept and neithe
 | [same-file](https://crates.io/crates/same-file) | Unlicense OR MIT |
 | [schemars](https://crates.io/crates/schemars) | MIT |
 | [secrecy](https://crates.io/crates/secrecy) | Apache-2.0 OR MIT |
+| [self-replace](https://crates.io/crates/self-replace) | Apache-2.0 |
 | [serde](https://crates.io/crates/serde) | MIT OR Apache-2.0 |
 | [serde_json](https://crates.io/crates/serde_json) | MIT OR Apache-2.0 |
 | [sha2](https://crates.io/crates/sha2) | MIT OR Apache-2.0 |
