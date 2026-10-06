@@ -223,6 +223,9 @@ pub(crate) fn denied(action: &str, detail: impl std::fmt::Display) -> AxError {
 }
 
 #[cfg(test)]
+mod child;
+
+#[cfg(test)]
 #[allow(
     clippy::unwrap_used,
     clippy::expect_used,
