@@ -34,6 +34,8 @@ use kernel::RunId;
 
 #[cfg(any(not(windows), test))]
 use super::Shares;
+#[cfg(any(not(windows), test))]
+use super::ceiling::{Mark, Unapplied};
 
 /// The weight every run's child cgroup holds, from 1 to 10000: the same
 /// for every run, so the runs share the processors evenly among
@@ -127,37 +129,49 @@ impl Cgroups {
     }
 
     /// Puts `pid` into `run`'s child cgroup, making the child on first
-    /// use with the shares `asked` for, and answers the shares the run
-    /// now holds: `asked` when the cgroup took them, `Unset` when it
-    /// did not (D29).
-    pub(super) fn enter(&mut self, run: RunId, pid: u32, asked: Shares) -> Shares {
+    /// use with the shares `asked` for, and answers how the memory
+    /// ceiling `asked` holds for this command (Exec.lean D95). A run whose
+    /// cgroup refused its shares holds `Unset` and its command starts
+    /// anyway (D29).
+    pub(super) fn enter(&mut self, run: RunId, pid: u32, asked: Shares) -> Mark {
+        let limit = asked.memory();
         if asked == Shares::Unset {
-            return Shares::Unset;
+            return Mark::NotAsked;
         }
         if !self.adopted {
             *self = Cgroups::this_machine();
         }
         let Some(parent) = &self.parent else {
-            return Shares::Unset;
+            let why = if cfg!(target_os = "macos") {
+                Unapplied::Platform
+            } else {
+                Unapplied::NotDelegated
+            };
+            return Mark::outside(limit, why);
         };
         let dir = parent.join(format!("run-{run}"));
-        let held = match self.runs.get(&run) {
-            Some(held) => *held,
-            None => {
-                if !made(&dir, asked) {
-                    return Shares::Unset;
-                }
-                self.runs.insert(run, asked);
-                asked
+        if let std::collections::btree_map::Entry::Vacant(first) = self.runs.entry(run) {
+            if !made(&dir, asked) {
+                return Mark::outside(limit, Unapplied::Refused);
             }
-        };
-        // Every command of the run joins its cgroup. One whose pid
-        // cannot be written still runs under its parent's shares, and
-        // it is one more command of this run read as itself only —
-        // which `unfollowed` already says for every Unix command (D29).
-        match std::fs::write(dir.join("cgroup.procs"), pid.to_string()) {
-            Ok(()) | Err(_) => held,
+            first.insert(asked);
         }
+        // A command whose pid cannot be written still runs, under its
+        // parent's shares and outside the ceiling, and its result says so.
+        if std::fs::write(dir.join("cgroup.procs"), pid.to_string()).is_err() {
+            return Mark::outside(limit, Unapplied::Unjoined);
+        }
+        match limit {
+            Some(limit) => Mark::entered(limit, refusals(&dir)),
+            None => Mark::NotAsked,
+        }
+    }
+
+    /// How many times `run`'s cgroup refused an allocation at its
+    /// `memory.max`; `None` when it has no cgroup or the count does not
+    /// read (Exec.lean D95).
+    pub(super) fn refusals(&self, run: RunId) -> Option<u64> {
+        refusals(&self.parent.as_ref()?.join(format!("run-{run}")))
     }
 
     /// The shares `run` holds; `Unset` for a run this machine never
@@ -189,6 +203,21 @@ fn made(dir: &Path, asked: Shares) -> bool {
             .and_then(|()| std::fs::write(dir.join("memory.max"), "max"))
             .is_ok(),
     }
+}
+
+/// The `oom` line of a run cgroup's `memory.events`: how many times its
+/// usage reached `memory.max` and an allocation was about to fail. The
+/// `max` line is not read, because it also counts a reclaim that
+/// succeeded (Exec.lean D95).
+#[cfg(any(not(windows), test))]
+fn refusals(dir: &Path) -> Option<u64> {
+    std::fs::read_to_string(dir.join("memory.events"))
+        .ok()?
+        .lines()
+        .find_map(|line| line.strip_prefix("oom "))?
+        .trim()
+        .parse()
+        .ok()
 }
 
 /// Moves this process into `parent/core` and opens `cpu` and `memory`

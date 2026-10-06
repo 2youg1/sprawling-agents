@@ -76,6 +76,17 @@ fn native_windows_disposable_production_axes_and_cleanup() {
     let outcome = tool.invoke(&call).unwrap();
     let result = serde_json::to_value(outcome.result).unwrap();
     assert_eq!(result["exit_code"], 0, "{result}");
+    assert_eq!(
+        (
+            &result["memory_ceiling"]["state"],
+            &result["memory_ceiling"]["limit_bytes"]
+        ),
+        (
+            &Value::from("hit"),
+            &Value::from(u64::try_from(TEST_MEMORY_BYTES).unwrap())
+        ),
+        "the probe's refused allocation is reported as reaching the ceiling: {result}"
+    );
     assert!(
         result["stdout"]
             .as_str()
@@ -203,10 +214,12 @@ fn native_windows_disposable_pwsh_initializes_network_types() {
             exit,
             stdout,
             stderr,
+            ceiling,
         } => crate::Started::Settled {
             exit,
             stdout: stdout.trim().to_owned(),
             stderr,
+            ceiling,
         },
         background @ crate::Started::Backgrounded { .. } => background,
     };
@@ -216,6 +229,7 @@ fn native_windows_disposable_pwsh_initializes_network_types() {
             exit: crate::Exit::Ended { code: 0 },
             stdout: "BelowNormal".to_owned(),
             stderr: String::new(),
+            ceiling: None,
         }
     );
 }

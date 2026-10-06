@@ -126,11 +126,31 @@ pub(crate) fn run_affinity() -> runtime::backlog::RunAffinity {
 
 /// Reads only a User-entered ceiling; invalid settings are reported.
 fn memory_ceiling() -> Option<NonZeroU64> {
-    match accounting::person::read() {
-        Ok(answer) => answer.core.memory_bytes,
-        Err(err) => {
-            eprintln!("run memory ceiling cannot be read: {err}");
-            None
+    entered_ceiling().unwrap_or_else(|err| {
+        eprintln!("run memory ceiling cannot be read: {err}");
+        None
+    })
+}
+
+/// The ceiling the person entered, or why their file does not read.
+fn entered_ceiling() -> Result<Option<NonZeroU64>, String> {
+    accounting::person::read()
+        .map(|answer| answer.core.memory_bytes)
+        .map_err(|err| err.to_string())
+}
+
+/// What the doctor adds when an entered ceiling does not apply: the arm
+/// is not `"soft_shares"`, or the person's file does not read (D47).
+fn ceiling_note(arm: CorePlacement, entered: &Result<Option<NonZeroU64>, String>) -> String {
+    match (arm, entered) {
+        (_, Err(err)) => format!("; the memory ceiling does not read, so none applies: {err}"),
+        (CorePlacement::SoftShares, Ok(_)) | (_, Ok(None)) => String::new(),
+        (CorePlacement::Off | CorePlacement::Soft | CorePlacement::Pinned, Ok(Some(limit))) => {
+            format!(
+                "; the entered memory ceiling of {} bytes is not applied: [core] placement is \
+                 not \"soft_shares\"",
+                limit.get()
+            )
         }
     }
 }
@@ -214,8 +234,11 @@ pub(crate) fn report() -> String {
             format!("{} ({})", describe(&read), pinned::clause(&seats_of(&read)))
         }
     };
-    let runs = runs_share(shares_of(arm, memory_ceiling()), platform_shares());
-    format!("{threads}; {runs}{unread}")
+    let entered = entered_ceiling();
+    let limit = entered.as_ref().ok().copied().flatten();
+    let runs = runs_share(shares_of(arm, limit), platform_shares());
+    let ceiling = ceiling_note(arm, &entered);
+    format!("{threads}; {runs}{ceiling}{unread}")
 }
 
 /// What each run's commands share on this machine, given what the arm

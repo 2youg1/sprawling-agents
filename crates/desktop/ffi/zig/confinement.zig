@@ -96,19 +96,19 @@ fn limits(record: *api.Record) u32 {
     phase(record, @src().fn_name);
     const job = api.CreateJobObjectW(null, null) orelse return lastError();
     record.job = @intFromPtr(job);
-    var memory: cpu.JOBOBJECT_EXTENDED_LIMIT_INFORMATION = .{};
-    memory.BasicLimitInformation.LimitFlags = api.kill_on_close;
-    if (record.memory != 0) memory.BasicLimitInformation.LimitFlags |= cpu.JOB_OBJECT_LIMIT_JOB_MEMORY;
-    memory.JobMemoryLimit = record.memory;
-    if (cpu.SetInformationJobObject(job, cpu.JOB_OBJECT_EXTENDED_LIMIT_INFORMATION, &memory, @sizeOf(@TypeOf(memory))) == .FALSE) return lastError();
+    // The run Job holds the memory ceiling; an equal limit here would take
+    // its refusal message away from the run Job's watch (runtime Exec.lean D95).
+    var closing: cpu.JOBOBJECT_EXTENDED_LIMIT_INFORMATION = .{};
+    closing.BasicLimitInformation.LimitFlags = api.kill_on_close;
+    if (cpu.SetInformationJobObject(job, cpu.JOB_OBJECT_EXTENDED_LIMIT_INFORMATION, &closing, @sizeOf(@TypeOf(closing))) == .FALSE) return lastError();
     const rate: cpu.JOBOBJECT_CPU_RATE_CONTROL_INFORMATION = .{
         .ControlFlags = cpu.JOB_OBJECT_CPU_RATE_CONTROL_ENABLE | api.hard_cap,
         .Weight = @intCast(record.cpu),
     };
     if (cpu.SetInformationJobObject(job, cpu.JOB_OBJECT_CPU_RATE_CONTROL_INFORMATION, &rate, @sizeOf(@TypeOf(rate))) == .FALSE) return lastError();
-    var actual_memory: cpu.JOBOBJECT_EXTENDED_LIMIT_INFORMATION = .{};
-    if (api.QueryInformationJobObject(job, cpu.JOB_OBJECT_EXTENDED_LIMIT_INFORMATION, &actual_memory, @sizeOf(@TypeOf(actual_memory)), null) == .FALSE) return lastError();
-    if (actual_memory.BasicLimitInformation.LimitFlags & memory.BasicLimitInformation.LimitFlags != memory.BasicLimitInformation.LimitFlags or actual_memory.JobMemoryLimit != record.memory) return 5;
+    var actual_closing: cpu.JOBOBJECT_EXTENDED_LIMIT_INFORMATION = .{};
+    if (api.QueryInformationJobObject(job, cpu.JOB_OBJECT_EXTENDED_LIMIT_INFORMATION, &actual_closing, @sizeOf(@TypeOf(actual_closing)), null) == .FALSE) return lastError();
+    if (actual_closing.BasicLimitInformation.LimitFlags & closing.BasicLimitInformation.LimitFlags != closing.BasicLimitInformation.LimitFlags) return 5;
     var actual_rate = std.mem.zeroes(cpu.JOBOBJECT_CPU_RATE_CONTROL_INFORMATION);
     if (api.QueryInformationJobObject(job, cpu.JOB_OBJECT_CPU_RATE_CONTROL_INFORMATION, &actual_rate, @sizeOf(@TypeOf(actual_rate)), null) == .FALSE) return lastError();
     if (actual_rate.ControlFlags != rate.ControlFlags or actual_rate.Weight != rate.Weight) return 5;

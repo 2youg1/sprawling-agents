@@ -13,6 +13,7 @@
 use kernel::Address;
 
 use super::BacklogId;
+use super::ceiling::Ceiling;
 use super::waiting::Exit;
 
 /// What the short window came to. Exhaustive rather than an optional
@@ -25,6 +26,9 @@ pub enum Started {
         exit: Exit,
         stdout: String,
         stderr: String,
+        /// How the person's memory ceiling fared while it ran; `None` when
+        /// none was asked for or it held unreached (Exec.lean D95).
+        ceiling: Option<Ceiling>,
     },
     Backgrounded {
         id: BacklogId,
@@ -66,4 +70,6 @@ pub struct Finished {
     pub exit: Exit,
     pub stdout: String,
     pub stderr: String,
+    /// How the person's memory ceiling fared while it ran (Exec.lean D95).
+    pub ceiling: Option<Ceiling>,
 }

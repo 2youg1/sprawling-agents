@@ -92,7 +92,6 @@ pub(crate) fn launch(
             .collect(),
         directory,
         environment,
-        memory_bytes: limits.memory,
         cpu_rate: limits.cpu_rate,
         parent_job,
         profile: format!(

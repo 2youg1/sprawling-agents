@@ -32,4 +32,5 @@ pub const Step = enum(u32) {
     Affinity = 21,
     Throttling = 22,
     JobShare = 23,
+    JobWatch = 24,
 };

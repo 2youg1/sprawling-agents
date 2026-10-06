@@ -8,7 +8,6 @@ const w = @import("std").os.windows;
 pub const HANDLE = w.HANDLE;
 pub const BOOL = w.BOOL;
 pub const Record = extern struct {
-    memory: usize,
     cpu: usize,
     job: usize,
     process: usize,
