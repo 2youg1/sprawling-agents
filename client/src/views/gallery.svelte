@@ -38,6 +38,10 @@
   import Attaching from "./gallery/attaching.svelte";
   import Anchored from "./gallery/anchored.svelte";
   import Conversation from "./gallery/conversation.svelte";
+  import LooksBuilding from "./gallery/looks_building.svelte";
+  import LooksPages from "./gallery/looks_pages.svelte";
+  import LooksParts from "./gallery/looks_parts.svelte";
+  import LooksTalk from "./gallery/looks_talk.svelte";
   import Doc from "./gallery/doc.svelte";
   import Filed from "./gallery/filed.svelte";
   import FirstRun from "./gallery/first_run.svelte";
@@ -217,4 +221,8 @@
   <Prop />
   <Gd />
   <G6 />
+  <LooksBuilding />
+  <LooksTalk />
+  <LooksPages />
+  <LooksParts />
 </div>

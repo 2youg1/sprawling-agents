@@ -12,7 +12,7 @@
   import { ui } from "../../../ui";
   import Button from "../../parts/button.svelte";
   import EmptyState from "../../parts/empty.svelte";
-  import { Table } from "../../parts/table";
+  import Table from "../../parts/table.svelte";
   import type { Column } from "../../parts/table";
   import Case from "../case.svelte";
   import { CHOSEN, MODELS } from "../served";
