@@ -16,3 +16,39 @@
   font-style: normal;
   font-display: optional;
 }
+
+/* Libron, the serif face reading text may be set in (wire D52), one
+ * declaration per file the release ships. `swap` rather than Geist's
+ * `optional`: these files are fetched only once a person has chosen
+ * Libron, usually mid-visit, and `optional` would let the browser keep
+ * the fallback for the rest of that visit, so the choice would show
+ * nothing until a reload. Nothing preloads them, for the same reason:
+ * a page that reads in the interface's face never needs them. */
+@font-face {
+  font-family: "Libron";
+  src: url("../fonts/Libron-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Libron";
+  src: url("../fonts/Libron-Italic.woff2") format("woff2");
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Libron";
+  src: url("../fonts/Libron-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Libron";
+  src: url("../fonts/Libron-BoldItalic.woff2") format("woff2");
+  font-weight: 700;
+  font-style: italic;
+  font-display: swap;
+}

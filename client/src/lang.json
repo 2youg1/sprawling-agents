@@ -48,8 +48,8 @@
     "zh": "紧凑"
   },
   "appearance_face": {
-    "en": "the reading face",
-    "zh": "正文字体"
+    "en": "the interface face",
+    "zh": "界面字体"
   },
   "appearance_face_custom": {
     "en": "a stack I write",
@@ -130,6 +130,26 @@
   "appearance_preview": {
     "en": "preview",
     "zh": "预览"
+  },
+  "appearance_reading": {
+    "en": "the reading face",
+    "zh": "阅读正文字体"
+  },
+  "appearance_reading_interface": {
+    "en": "the interface face",
+    "zh": "与界面相同"
+  },
+  "appearance_reading_libron": {
+    "en": "Libron serif",
+    "zh": "Libron 衬线字体"
+  },
+  "appearance_reading_note": {
+    "en": "the face messages, documents and reports are set in; code, paths and commands stay in the mono face",
+    "zh": "消息、文档与报告的正文用哪个字体；代码、路径与命令仍是等宽字体"
+  },
+  "appearance_reading_sample": {
+    "en": "A settled reply reads like a page of a book. 一段写完的回复，读起来像书里的一页。",
+    "zh": "一段写完的回复，读起来像书里的一页。A settled reply reads like a page of a book."
   },
   "appearance_sample": {
     "en": "The city keeps 1 ledger, and reads both 中文 and English from it.",
@@ -5456,8 +5476,8 @@
     "zh": "页面用明暗哪一套"
   },
   "appearance_face_note": {
-    "en": "the face the prose is set in",
-    "zh": "正文用哪个字体"
+    "en": "the face controls, labels and figures are set in, and reading text unless you choose another below",
+    "zh": "按钮、标签与数字用哪个字体；阅读正文也用它，除非在下面另选"
   },
   "appearance_mono_note": {
     "en": "the face ids, keys and paths are set in",

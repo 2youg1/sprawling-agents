@@ -36,7 +36,7 @@
 <div class="my-base text-body">
   <div class="mb-tight text-note text-text-faint">{who}</div>
   <Laid blocks={laid.blocks} />
-  <div class="whitespace-pre-wrap break-words leading-relaxed">
+  <div class="whitespace-pre-wrap break-words font-read leading-relaxed">
     {settled}<span class="text-text-faint">{edge}</span><span
       class="blink ml-tight inline-block size-[6px] bg-accent align-baseline"
     ></span>

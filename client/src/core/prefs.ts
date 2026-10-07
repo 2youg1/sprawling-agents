@@ -45,7 +45,7 @@ import {
 } from "../wire";
 import { appearanceOnWire, type Keeper } from "./prefs_city";
 import { readTheme, type Theme } from "./theme_override";
-import { CHROMAS, DENSITIES, FACES, GLASSES, LIGHTINGS, MOTIONS, blendOf, type Appearance } from "./appearance";
+import { CHROMAS, DENSITIES, FACES, GLASSES, LIGHTINGS, MOTIONS, READING_FACES, blendOf, type Appearance } from "./appearance";
 import { readBody, readLang, readOne, readStack, writeFigure } from "./prefs_values";
 import type { Notifying } from "./notify";
 import { SHOWINGS, type Showing } from "./results";
@@ -67,6 +67,7 @@ const ROWS = {
   mono: "sprawling.appearance.mono",
   sansStack: "sprawling.appearance.sans_stack",
   monoStack: "sprawling.appearance.mono_stack",
+  reading: "sprawling.appearance.reading",
   body: "sprawling.appearance.body",
   density: "sprawling.appearance.density",
   chroma: "sprawling.appearance.chroma",
@@ -211,6 +212,7 @@ function readAppearance(rows: Rows): Appearance {
     mono: readOne(FACES, rows.getItem(ROWS.mono), "geist"),
     sansStack: readStack(rows.getItem(ROWS.sansStack)),
     monoStack: readStack(rows.getItem(ROWS.monoStack)),
+    reading: readOne(READING_FACES, rows.getItem(ROWS.reading), "interface"),
     body: readBody(rows.getItem(ROWS.body)),
     density: readOne(DENSITIES, rows.getItem(ROWS.density), "comfortable"),
     chroma: readOne(CHROMAS, rows.getItem(ROWS.chroma), "full"),
@@ -226,6 +228,7 @@ function writeAppearance(rows: Rows, next: Appearance): void {
   rows.setItem(ROWS.mono, next.mono);
   rows.setItem(ROWS.sansStack, next.sansStack);
   rows.setItem(ROWS.monoStack, next.monoStack);
+  rows.setItem(ROWS.reading, next.reading);
   writeFigure(rows, ROWS.body, next.body);
   rows.setItem(ROWS.density, next.density);
   rows.setItem(ROWS.chroma, next.chroma);

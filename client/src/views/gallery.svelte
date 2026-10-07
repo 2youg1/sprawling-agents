@@ -83,6 +83,7 @@
   import Monitored from "./gallery/monitored.svelte";
   import Timed from "./gallery/timed.svelte";
   import Tok from "./gallery/tok.svelte";
+  import Read from "./gallery/read.svelte";
   import Used from "./gallery/used.svelte";
   import Workbench from "./gallery/workbench.svelte";
   import Ss from "./gallery/ss.svelte";
@@ -157,6 +158,7 @@
   <Resulted />
   <Streamed />
   <Tok />
+  <Read />
   <Rfr />
   <Fmt />
   <G3 />

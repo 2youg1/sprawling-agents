@@ -5,7 +5,9 @@
 
 <script lang="ts">
   // How the page is drawn: faces, body size, air, colour, motion, glass,
-  // and how much of the world layer the blend tier shows.
+  // and how much of the world layer the blend tier shows. The cards for
+  // the faces and the size are `appearance_type.svelte`, which writes
+  // through `write` and ends each card with `foot` like the rest.
   //
   // Every choice is a name or a number whose meaning is the theme's.
   // This view writes the root element and the page a person is looking
@@ -23,38 +25,27 @@
 
   import type { Key } from "../../core/lang";
   import { fill, say } from "../../core/lang";
-  import { BLEND_PERCENT, CHROMAS, DENSITIES, FACES, GLASSES, LIGHTINGS, MOTIONS, blendOf } from "../../core/appearance";
-  import { sizingOf } from "../../core/sizing";
-  import { BODY_PX } from "../../wire";
+  import { BLEND_PERCENT, CHROMAS, DENSITIES, GLASSES, LIGHTINGS, MOTIONS, blendOf } from "../../core/appearance";
   import type { Appearance } from "../../core/appearance";
   import { ui } from "../../ui";
-  import Button from "../parts/button.svelte";
-  import Field from "../parts/field.svelte";
-  import type { FieldProps } from "../parts/field.svelte";
   import Glyph from "../parts/glyph.svelte";
   import Segmented from "../parts/segmented.svelte";
+  import AppearanceType from "./appearance_type.svelte";
   import Notifying from "./notifying.svelte";
   import Tier from "./tier.svelte";
   import Showing from "../shared/showing.svelte";
   import {
     CHROMA_WORDS,
     DENSITY_WORDS,
-    FACE_WORDS,
     GLASS_WORDS,
     LIGHTING_WORDS,
     MOTION_WORDS,
     applyAppearance,
     cellsOf,
     drawnBlend,
-    drawnSize,
     saveReceipt,
-    stackRefused,
   } from "./appearance";
-  import type { Axis } from "./appearance";
-
-  // Which card a receipt belongs to: a setting, since one setting can
-  // grow a second control (a face card carries its stack box).
-  type Setting = "lighting" | "face" | "mono" | "body" | "density" | "chroma" | "motion" | "glass" | "blend";
+  import type { Setting } from "./appearance";
 
   const u = ui();
   const lang = u.lang;
@@ -67,16 +58,9 @@
   const receipt = saveReceipt();
   const saved = receipt.saved;
 
-  // What is in the size box, which is not the size: a box mid-edit holds
-  // text the page must not act on yet.
-  let box = $state("");
   // What the slider stands at: the person's figure, or the one the page
   // draws while they have stated none.
   let blend = $state<number | null>(null);
-  // The faces this machine has, once a person asks for them and the
-  // browser agrees. Empty until both happen.
-  let installed = $state<readonly string[]>([]);
-  let note = $state<string | undefined>(undefined);
 
   const write = (next: Appearance, name: Setting): void => {
     u.prefs.setAppearance(next);
@@ -88,7 +72,6 @@
   // choices, so it applies them itself; from then on `write` moves them.
   onMount(() => {
     applyAppearance(root, look);
-    box = look.body === null ? drawnSize(root) : String(look.body);
     blend = look.blend ?? drawnBlend(root);
   });
 
@@ -105,67 +88,6 @@
       max: String(BLEND_PERCENT.max),
       step: String(BLEND_PERCENT.step),
     });
-
-  // Every keystroke in the size box is read once, and only a whole
-  // number in range reaches the page.
-  const resize = (typed: string): void => {
-    box = typed;
-    const saidSize = sizingOf(typed);
-    switch (saidSize.kind) {
-      case "cleared":
-        write({ ...look, body: null }, "body");
-        return;
-      case "sized":
-        write({ ...look, body: saidSize.px }, "body");
-        return;
-      case "refused":
-        return;
-    }
-  };
-
-  // A family from this machine pins its axis to `custom`; the axis is
-  // the one the list is drawn under, never inferred.
-  const wear = (axis: Axis, family: string): void => {
-    write(
-      axis === "sans"
-        ? { ...look, sans: "custom", sansStack: family }
-        : { ...look, mono: "custom", monoStack: family },
-      axis === "sans" ? "face" : "mono",
-    );
-  };
-
-  // Chromium lists this machine's faces after asking the person; any
-  // other engine has no such door, and the text field is the fallback.
-  const offered = (): boolean => typeof window.queryLocalFonts === "function";
-
-  const list = (): void => {
-    const ask = window.queryLocalFonts;
-    if (ask === undefined) {
-      note = say($lang, "appearance_local_none");
-      return;
-    }
-    void ask()
-      .then((faces) => {
-        installed = [...new Set(faces.map((face) => face.family))].sort();
-        note = undefined;
-      })
-      .catch(() => {
-        note = say($lang, "appearance_local_denied");
-      });
-  };
-
-  // The size box's one line of constraint: the card's foot carries it,
-  // and a refused box repeats it where the person is looking.
-  const sizeFloor = (): string =>
-    fill(say($lang, "appearance_body_floor"), { min: String(BODY_PX.min) });
-
-  // A refusal, or no such property at all: spreading it keeps an absent
-  // error apart from `error={undefined}`, which marks the box.
-  const refusal = (stack: string): Pick<FieldProps, "error"> =>
-    stackRefused(stack) ? { error: say($lang, "appearance_stack_refused") } : {};
-
-  const sizeRefusal = (): Pick<FieldProps, "error"> =>
-    sizingOf(box).kind === "refused" ? { error: sizeFloor() } : {};
 </script>
 
 {#snippet foot(constraint: string | undefined, name: Setting)}
@@ -179,46 +101,6 @@
         <Glyph name="check" size="sm" class="shrink-0" />
         {say($lang, "setup_saved")}
       </span>
-    {/if}
-  </div>
-{/snippet}
-
-{#snippet stackFor(axis: Axis, name: Key)}
-  <div class="flex flex-col gap-tight">
-    <Field
-      label={say($lang, "appearance_stack")}
-      help={say($lang, "appearance_stack_help")}
-      {...refusal(axis === "sans" ? look.sansStack : look.monoStack)}
-      value={axis === "sans" ? look.sansStack : look.monoStack}
-      mono
-      onInput={(stack) => {
-        write(
-          axis === "sans" ? { ...look, sansStack: stack } : { ...look, monoStack: stack },
-          axis === "sans" ? "face" : "mono",
-        );
-      }}
-    />
-    {#if offered()}
-      <Button label={say($lang, "appearance_local")} onPress={list} />
-    {:else}
-      <p class="text-note text-text-faint">{say($lang, "appearance_local_none")}</p>
-    {/if}
-    {#if note !== undefined}
-      <p class="text-note text-alert" role="alert">{note}</p>
-    {/if}
-    {#if installed.length > 0}
-      <!-- One control tier and radius; the families are this machine's own words, never translated. -->
-      <select
-        class="h-control w-full min-w-0 rounded-control border border-edge-input bg-raised px-base text-body text-text"
-        aria-label={fill(say($lang, "appearance_local_for"), { face: say($lang, name) })}
-        onchange={(event) => {
-          wear(axis, event.currentTarget.value);
-        }}
-      >
-        {#each installed as family (family)}
-          <option value={family}>{family}</option>
-        {/each}
-      </select>
     {/if}
   </div>
 {/snippet}
@@ -241,69 +123,7 @@ language card the settings page adds beside them takes the next cell. -->
     {@render foot(undefined, "lighting")}
   </div>
 
-  <div class="flex flex-col gap-tight rounded-card bg-raised px-base py-snug">
-    <span class="text-label font-label text-text">{say($lang, "appearance_face")}</span>
-    <p class="text-note text-text-faint">{say($lang, "appearance_face_note")}</p>
-    <Segmented
-      label={say($lang, "appearance_face")}
-      options={cellsOf(FACES, FACE_WORDS, said)}
-      held={look.sans}
-      onPick={(sans) => {
-        write({ ...look, sans }, "face");
-      }}
-    />
-    {#if look.sans === "custom"}
-      <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
-      {@render stackFor("sans", "appearance_face")}
-    {/if}
-    <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
-    {@render foot(undefined, "face")}
-  </div>
-
-  <div class="flex flex-col gap-tight rounded-card bg-raised px-base py-snug">
-    <span class="text-label font-label text-text">{say($lang, "appearance_mono")}</span>
-    <p class="text-note text-text-faint">{say($lang, "appearance_mono_note")}</p>
-    <Segmented
-      label={say($lang, "appearance_mono")}
-      options={cellsOf(FACES, FACE_WORDS, said)}
-      held={look.mono}
-      onPick={(mono) => {
-        write({ ...look, mono }, "mono");
-      }}
-    />
-    {#if look.mono === "custom"}
-      <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
-      {@render stackFor("mono", "appearance_mono")}
-    {/if}
-    <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
-    {@render foot(undefined, "mono")}
-  </div>
-
-  <div class="flex flex-col gap-tight rounded-card bg-raised px-base py-snug">
-    <span class="text-label font-label text-text">{say($lang, "appearance_body")}</span>
-    <p class="text-note text-text-faint">{say($lang, "appearance_body_note")}</p>
-    <Field
-      label={say($lang, "appearance_body")}
-      labelling="hidden"
-      {...sizeRefusal()}
-      kind="number"
-      step={1}
-      suffix={say($lang, "appearance_body_unit")}
-      mono
-      value={box}
-      onInput={resize}
-    />
-    <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
-    {@render foot(sizeFloor(), "body")}
-  </div>
-
-  <div class="flex flex-col gap-tight rounded-card bg-raised px-base py-snug">
-    <span class="text-label font-label text-text">{say($lang, "appearance_preview")}</span>
-    <div class="flex flex-col gap-tight rounded-card bg-chrome p-base">
-      <p class="font-sans text-body text-text">{say($lang, "appearance_sample")}</p>
-      <p class="font-mono text-body text-text-quiet">{say($lang, "appearance_sample")}</p>
-    </div>
-  </div>
+  <AppearanceType {look} {write} {foot} />
 
   <div class="flex flex-col gap-tight rounded-card bg-raised px-base py-snug">
     <span class="text-label font-label text-text">{say($lang, "appearance_density")}</span>

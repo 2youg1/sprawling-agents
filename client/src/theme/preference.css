@@ -14,6 +14,17 @@
   --face-mono: ui-monospace;
 }
 
+/* Reading text in Libron, the one serif face that ships (wire D52).
+ * The stack ends on the generic `serif` and names no CJK family, so Han
+ * glyphs fall to whatever serif face the machine has, for the reasons
+ * `theme/tokens-type.css` gives for the interface stack. Any element may
+ * carry the attribute, not only the root, so a gallery case can show the
+ * face without changing the page around it. */
+[data-read="libron"] {
+  --font-read: "Libron", serif;
+  --font-read--font-feature-settings: normal;
+}
+
 /* All the colour, or none of it. The coefficient is already the one
  * place desaturation is expressed; this only says who may set it. */
 :root[data-chroma="off"] {

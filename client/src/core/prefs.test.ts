@@ -25,6 +25,7 @@ const STATED: Preferences = {
     mono: "custom",
     sansStack: "Iosevka",
     monoStack: "Iosevka Term",
+    reading: "libron",
     body: 17,
     density: "compact",
     chroma: "off",

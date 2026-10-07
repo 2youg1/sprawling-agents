@@ -127,6 +127,8 @@
   {/each}
 {/snippet}
 
+<!-- Reading text takes the reading face (wire D52); the wrapper adds no box, so the blocks lay out as its parent's children. -->
+<div class="contents font-read">
 {#each blocks as block, index (index)}
   {@const start = placed ? spanOf(block) : undefined}
   {#if "heading" in block}
@@ -204,3 +206,4 @@
     <pre data-start={start} class="my-snug overflow-x-auto whitespace-pre-wrap font-mono text-note text-text-faint">{block.unsupported.source}</pre>
   {/if}
 {/each}
+</div>

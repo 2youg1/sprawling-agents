@@ -65,7 +65,7 @@
 
 /-! D52 阅读正文的字体是外观里的一格 `reading`，两个值，缺席即没说过
 
-**决定**：`Appearance` 加 `reading: Option<ReadingFace>`，带 `#[serde(default)]`，随整份外观一起写。`ReadingFace` 是闭集，两个值：`interface`——阅读正文跟界面同一种字体，也就是外观组给界面选的那一种（缺省 Geist Mono）；`libron`——随包发的衬线字体 Libron（`client/src/fonts/Libron-*.woff2`，`docs/third-party.md` §4）。阅读正文是对话里的消息、文档与报告的正文；控件、标签、数字、代码、路径与命令不读这一格，仍是界面的字体与等宽字体。缺席与 `glass` 同理（D14）：这个人没说过，页面画它自己的姿态，即 `interface`。页面在根元素上写 `data-read`，`client/src/theme/preference.css` 据它把 `--font-read` 换成 `"Libron", serif`；栈以泛称 `serif` 结尾，不点名任何中文字体，中文落到本机的衬线字体。答面的既有帧加了字段，按 D1 `WIRE_V` 进一位。
+**决定**：`Appearance` 加 `reading: Option<ReadingFace>`，带 `#[serde(default)]`，随整份外观一起写。`ReadingFace` 是闭集，两个值：`interface`——阅读正文跟界面同一种字体，也就是外观组给界面选的那一种（缺省 Geist Mono）；`libron`——随包发的衬线字体 Libron（`client/src/fonts/Libron-*.woff2`，`docs/third-party.md` §4）。阅读正文是对话里的消息、文档与报告的正文；控件、标签、数字、代码、路径与命令不读这一格，仍是界面的字体与等宽字体。缺席与 `glass` 同理（D14）：这个人没说过，页面画它自己的姿态，即 `interface`。页面在根元素上写 `data-read`，`client/src/theme/preference.css` 据它把 `--font-read` 换成 `"Libron", serif`；栈以泛称 `serif` 结尾，不点名任何中文字体，中文落到设备自带的衬线字体。答面的既有帧加了字段，按 D1 `WIRE_V` 进一位。
 
 **理由**：Geist Mono 适合大部分界面，长段的阅读正文换一种衬线字体是人的要求（人的决定），而它只管读的那部分字，所以是一格自己的选择，不是 `sans` 的第四个值：`sans` 换的是整个界面，把衬线字体放进去会把按钮与数字一起换掉。两个值而不是「字体名加一段自写的栈」：随包的衬线字体只有一种，`sans` 已经有自写栈的门，再开一扇就是第二个家。
 
@@ -153,11 +153,12 @@ settings-control ThemeOverride.css client/src/views/setup/colours.svelte
 settings-control Chord.action client/src/views/setup/keys.svelte
 settings-control Chord.spelled client/src/views/setup/keys.svelte
 settings-control Appearance.lighting client/src/views/setup/appearance.svelte
-settings-control Appearance.sans client/src/views/setup/appearance.svelte
-settings-control Appearance.mono client/src/views/setup/appearance.svelte
-settings-control Appearance.sans_stack client/src/views/setup/appearance.svelte
-settings-control Appearance.mono_stack client/src/views/setup/appearance.svelte
-settings-control Appearance.body_px client/src/views/setup/appearance.svelte
+settings-control Appearance.sans client/src/views/setup/appearance_type.svelte
+settings-control Appearance.mono client/src/views/setup/appearance_type.svelte
+settings-control Appearance.sans_stack client/src/views/setup/appearance_type.svelte
+settings-control Appearance.mono_stack client/src/views/setup/appearance_type.svelte
+settings-control Appearance.body_px client/src/views/setup/appearance_type.svelte
+settings-control Appearance.reading client/src/views/setup/appearance_type.svelte
 settings-control Appearance.density client/src/views/setup/appearance.svelte
 settings-control Appearance.chroma client/src/views/setup/appearance.svelte
 settings-control Appearance.motion client/src/views/setup/appearance.svelte
