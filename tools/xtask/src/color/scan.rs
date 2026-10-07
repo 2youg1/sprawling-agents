@@ -9,6 +9,7 @@
 use std::path::Path;
 
 use crate::report::{Violation, XtaskError};
+use crate::sheet::{self, Reading};
 use crate::theme;
 use crate::walk;
 
@@ -45,30 +46,33 @@ const SPELLS_COLOUR: [&str; 8] = [
     "crates/browser/src/survey/tests.rs",
 ];
 
-/// Extensions worth scanning. Rust, and the two file kinds that carry style.
-const SCAN_EXTS: [&str; 3] = ["rs", "css", "html"];
+/// Extensions worth scanning: Rust, the two file kinds that carry style,
+/// and the client's components, whose `<style>` block is a stylesheet
+/// (`sheet::lines`).
+const SCAN_EXTS: [&str; 4] = ["rs", "css", "html", "svelte"];
 
 /// Colour spellings that must not appear outside the theme.
 ///
 /// Hex is judged differently per language, because `#` means different
-/// things in each. In style files a bare `#1a2b3c` is a colour. In Rust it
-/// is far more often a Locator fragment or an issue number, so only a
+/// things in each. In style files a bare `#1a2b3c` is a colour. In Rust,
+/// and in a component's script and markup, it is far more often a
+/// Locator fragment, an issue number or a block (`{#each}`), so only a
 /// fully-quoted `"#1a2b3c"` counts - the shape somebody actually writes
 /// when they mean a colour. The first run of this gate caught
 /// `cas:b3-…#B01-2` and taught this distinction.
-pub(super) fn literal_at(line: &str, style_file: bool) -> Option<&'static str> {
+pub(super) fn literal_at(line: &str, reading: Reading) -> Option<&'static str> {
     for syntax in ["oklch(", "rgb(", "rgba(", "hsl(", "hsla("] {
         if line.contains(syntax) {
             return Some(syntax);
         }
     }
-    if hex_colour(line, style_file) {
+    if hex_colour(line, reading) {
         return Some("#rrggbb");
     }
     None
 }
 
-fn hex_colour(line: &str, style_file: bool) -> bool {
+fn hex_colour(line: &str, reading: Reading) -> bool {
     let bytes = line.as_bytes();
     for (index, byte) in bytes.iter().enumerate() {
         if *byte != b'#' {
@@ -88,7 +92,7 @@ fn hex_colour(line: &str, style_file: bool) -> bool {
             .and_then(|i| i.checked_add(1))
             .and_then(|i| bytes.get(i));
         let quoted = opens == Some(&b'"') && closes == Some(&b'"');
-        if quoted || (style_file && closes.is_none_or(|b| !b.is_ascii_hexdigit())) {
+        if quoted || (reading == Reading::Sheet && closes.is_none_or(|b| !b.is_ascii_hexdigit())) {
             return true;
         }
     }
@@ -106,17 +110,15 @@ pub(super) fn scan_for_literals(root: &Path) -> Result<Vec<Violation>, XtaskErro
         {
             continue;
         }
-        let style_file = !rel.ends_with(".rs");
         let text = walk::read_text(&path)?;
         if rel == PLAYBACK_PAGE && crate::length::generated(&text) {
             continue;
         }
-        for (number, line) in text.lines().enumerate() {
-            if let Some(syntax) = literal_at(line, style_file) {
-                let line_number = number.saturating_add(1);
+        for line in sheet::lines(&rel, &text) {
+            if let Some(syntax) = literal_at(line.text, line.reading) {
                 violations.push(Violation {
                     gate: "color",
-                    location: format!("{rel}:{line_number}"),
+                    location: format!("{rel}:{}", line.number),
                     rule: "colour is named once per client, in that client's theme file".to_owned(),
                     violation: format!("colour literal `{syntax}` outside a theme file"),
                     alternative: "use a token from the client's theme through its CSS \
@@ -138,37 +140,46 @@ pub(super) fn scan_for_literals(root: &Path) -> Result<Vec<Violation>, XtaskErro
     clippy::arithmetic_side_effects,
     reason = "test code"
 )]
-mod tests {
+pub(super) mod tests {
     use super::*;
 
     #[test]
     fn colour_spellings_are_recognised_and_locators_are_not() {
-        assert_eq!(literal_at("  color: #070A12;", true), Some("#rrggbb"));
-        assert_eq!(literal_at("background: rgb(1,2,3)", true), Some("rgb("));
         assert_eq!(
-            literal_at("--G0:oklch(0.145 0.018 264)", true),
+            literal_at("  color: #070A12;", Reading::Sheet),
+            Some("#rrggbb")
+        );
+        assert_eq!(
+            literal_at("background: rgb(1,2,3)", Reading::Sheet),
+            Some("rgb(")
+        );
+        assert_eq!(
+            literal_at("--G0:oklch(0.145 0.018 264)", Reading::Sheet),
             Some("oklch(")
         );
-        assert_eq!(literal_at("let x = 3;", false), None);
+        assert_eq!(literal_at("let x = 3;", Reading::Code), None);
 
         // The shape somebody writes in Rust when they mean a colour.
         assert_eq!(
-            literal_at(r##"let bg = "#070A12";"##, false),
+            literal_at(r##"let bg = "#070A12";"##, Reading::Code),
             Some("#rrggbb")
         );
 
         // A Locator fragment is not a colour. This exact line is what the
         // gate's first run tripped on.
         assert_eq!(
-            literal_at(r##"format!("cas:b3-{H64}#B01-2"),"##, false),
+            literal_at(r##"format!("cas:b3-{H64}#B01-2"),"##, Reading::Code),
             None
         );
-        assert_eq!(literal_at("issue #4707 records the status", false), None);
+        assert_eq!(
+            literal_at("issue #4707 records the status", Reading::Code),
+            None
+        );
         // A digest is longer than six hex digits either way.
         assert_eq!(
             literal_at(
                 "// 692b5f963f99f018496b8df111314dfe1bed52ccfe1a40cb9a5975b3bc8664fe",
-                true
+                Reading::Sheet
             ),
             None
         );
@@ -268,4 +279,44 @@ mod tests {
         );
         std::fs::remove_dir_all(&root).unwrap();
     }
+
+    /// A `.svelte` file is markup with one stylesheet inside it. The
+    /// markup is judged as Rust is, where `#` is far more often a
+    /// fragment or a block (`{#each}` would read as the colour `#eac`),
+    /// and the top-level `<style>` block as a stylesheet is.
+    #[test]
+    fn a_component_style_is_judged_as_a_stylesheet_and_its_markup_is_not() {
+        let root = std::env::temp_dir().join(format!("color-svelte-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let path = root.join("client/src/views/panel.svelte");
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(&path, SVELTE_FIXTURE).unwrap();
+
+        let found = scan_for_literals(&root).unwrap();
+        assert_eq!(
+            found
+                .iter()
+                .map(|v| v.location.as_str())
+                .collect::<Vec<_>>(),
+            ["client/src/views/panel.svelte:7"]
+        );
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    /// The component the color gate's tests share: markup that only
+    /// looks like colour, then a `<style>` block with one literal (line
+    /// 7), one rung (8), one misspelt role (9) and one colour declared
+    /// outside the theme (10).
+    pub(in crate::color) const SVELTE_FIXTURE: &str = "<script lang=\"ts\">
+  const rows = [1];
+</script>
+{#each rows as row}<a href=\"#/gallery\">{row}</a>{/each}
+<div class=\"[stop-color:var(--color-accent)]\"></div>
+<style>
+  .x { color: #1a2b3c; }
+  .y { background: var(--color-g3); }
+  .z { border-color: var(--color-raisd); }
+  .w { --color-mine: var(--color-accent); }
+</style>
+";
 }

@@ -145,7 +145,7 @@ third layer). -->
       </span>
       <span class="figure flex items-center justify-end gap-tight whitespace-nowrap text-text-faint">
         {#if call.outcome === "waiting"}
-          <span class="inline-block size-dot shrink-0 animate-pulse rounded-pill bg-accent" aria-hidden="true"></span>
+          <span class="inline-block size-dot shrink-0 pulse rounded-pill bg-accent" aria-hidden="true"></span>
         {/if}
         {#if time.kind === "landed"}
           {tookWords(time.took, $lang)}

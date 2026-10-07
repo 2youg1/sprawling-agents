@@ -4,6 +4,12 @@
  * Copyright (c) 2026 2youg1 and the sprawling contributors */
 
 @theme {
+  /* Tailwind's own animations (`animate-pulse` and its siblings) carry
+   * curves and durations that are not these tokens, so they are cleared
+   * like the colour and type defaults; a loop the interface needs is a
+   * class of the theme's motion part that reads the durations below. */
+  --animate-*: initial;
+
   /* Motion (docs/frontend-method.md §4-43): durations named for how far a
    * thing travels, and two easings, named for which way it goes. They
    * sit in Tailwind's own namespaces, so `duration-panel` and

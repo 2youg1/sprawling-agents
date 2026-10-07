@@ -44,12 +44,12 @@
   // The 300 ms delay is the whole point of the transition: it stops a
   // pointer crossing a row from lighting its hints one after another,
   // and client/Spec.lean §4-18 pins it. Only opacity moves, so the reveal
-  // costs no layout, and `motion-reduce` cuts it to nothing.
+  // costs no layout, and `still` cuts it to nothing.
   const PAINT =
     "pointer-events-none w-max max-w-measure rounded-card border border-edge-panel bg-raised " +
     "px-snug py-tight text-note text-text shadow-float " +
     "transition-[opacity,display] transition-discrete delay-300 duration-panel ease-leave " +
-    "motion-reduce:transition-none";
+    "still:transition-none";
 
   // Hidden costs nothing to draw and nothing to measure; shown is what
   // hover and focus both switch to.

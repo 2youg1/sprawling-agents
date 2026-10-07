@@ -220,7 +220,7 @@
     border: var(--spacing-hair) solid var(--color-edge-input);
     border-radius: var(--radius-control);
     padding: 0 var(--spacing-snug);
-    background: var(--color-g1);
+    background: var(--color-raised);
     color: var(--color-text);
   }
   .mono,

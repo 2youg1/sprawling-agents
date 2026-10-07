@@ -154,7 +154,7 @@
                   name="chevron"
                   size="sm"
                   class={[
-                    "shrink-0 text-text-faint transition-transform motion-reduce:transition-none",
+                    "shrink-0 text-text-faint transition-transform still:transition-none",
                     openNow ? "rotate-90" : "",
                   ]}
                 />

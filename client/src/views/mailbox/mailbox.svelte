@@ -195,7 +195,7 @@
         <span
           class={[
             "absolute bottom-[6px] left-1/2 h-[2px] w-[10px] -translate-x-1/2 rounded-pill",
-            connecting ? "animate-pulse bg-text-quiet" : "bg-alert",
+            connecting ? "pulse bg-text-quiet" : "bg-alert",
           ]}
           aria-hidden="true"
         ></span>

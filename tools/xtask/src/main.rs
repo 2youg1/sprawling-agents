@@ -48,6 +48,7 @@ mod repro;
 mod root;
 mod sbom;
 mod secret;
+mod sheet;
 mod shots;
 mod spec;
 mod specalign;

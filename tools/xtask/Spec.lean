@@ -42,7 +42,7 @@ Markdown 时的标签 `8-n`，别处引作 `tools/xtask/Spec.lean §8-n`。
 | spec | 一个包恰有一份生效规格；散文里点名的 `<名>-SPEC` 在树上；Lean 的 import 纪律；`.lean` 里没有 `sorry`、`admit`、`axiom`；规格引用的仓内路径在盘上；状态机分部里没有定理的数与解析不到的 Rust 路径数只降不升（§8-42） |
 | budget | `tools/xtask/budgets.toml` 里每一行可称重且被 gated 的预算，当场称一次；没有构建产物可称时沉默（`just check` 不构建 release 二进制），壁钟读数只入册不入门 |
 | color | 颜色在每个客户端里恰好被命名一次（产地表见 §8-8），且以色域上限的比值表达；扫仓库根，文件自豁免；玻璃按 `--glass-opacity` 盖在最亮的表面上时字仍够层级（§8-51） |
-| motion | 过渡的曲线与时长只住客户端的主题（入口 `client/src/theme.css` 与它 import 的部分）：别处的 `cubic-bezier(`、`linear(`、`steps(` 与 Tailwind 的 `duration-<数字>`、`duration-[`、`ease-[` 即红（§8-51） |
+| motion | 过渡的曲线与时长只住客户端的主题（入口 `client/src/theme.css` 与它 import 的部分）：别处的 `cubic-bezier(`、`linear(`、`steps(`、Tailwind 的 `duration-<数字>`、`duration-[`、`ease-[` 与只听系统的 `motion-reduce:`／`motion-safe:` 即红；组件样式表里的时长字面量、`@keyframes` 与动效令牌的声明即红（§8-51） |
 | release | 公开树由过滤生成；六条断言：公开树上零脚手架路径、产品文档不得链向或在正文里点名脚手架、任何发布文件不得携家目录路径、不得引用树里没有的文件、不得把一台机器的工作记录写进产品文档、链接的拼法与树上的名字逐字节相等（§8-15） |
 | length | 一个生产函数不得长过 `function_length`、不得多于 `argument_count` 个参数（不含接收者），一个源文件的生产行不得多过 `file_length`；三个预算都住 `tools/xtask/budgets.toml`；函数尺寸与签名以 `syn` 量得，Rust 文件尺寸是总行数减去顶层 `#[cfg(test)]` 项所跨的行；`.zig` 受函数与文件两面、不受参数面，按 Zig 的词法量，文件尺寸减去 `test` 声明所跨的行（§8-48、D15）；只量文件面的语言（`length::surface::FILE_FACE` 所列扩展名，在仓库里哪个目录都一样）只受文件面，文件尺寸是总行数（§8-53、D33） |
 | npm | `client/` 的依赖面：锁文件在盘且与 `package.json` 逐条同、运行时依赖恰为 `npm::RUNTIME` 那张表、树上每个包的许可证都在 `deny.toml` 的准许表内（§8-12） |
@@ -245,6 +245,10 @@ pub(crate) struct Violation {
 - **改价条件**：参考页改为读城发出的某份样式表时，它的那一行从产地表删去；出现第三个客户端时，它照参考页的样子加一行。
 
 D34 **主题是一个入口加它按顺序 import 的部分，顺序只住在入口里。** 主题超过一个文件的长度上限（§8-53），按将来谁拥有它切成连续的几段，每段一个部分文件，入口按原来的顺序 import 它们，层叠因此不变。两种错误各有稳定的码：入口 import 的部分不在盘上（`theme-part-missing`），`client/src/theme/` 里有一个入口没有 import 的 `.css`（`theme-part-unimported`）——后者若放过，就是一份每道门都豁免、却没有页面画它的文件。被击败的备选：①按文件名排序读部分——要给每个文件加编号前缀，顺序就有了入口之外的第二个家；②各部分各判各的——浅色块覆写的令牌与它所覆写的那些声明分在两份文本里，`reading()` 拼不出一种打光的整张表。**重开参数**：Tailwind 不再自己内联 `@import`，或主题回到一个文件之内。
+
+**组件的样式表也在扫描面里**。一个 `.svelte` 文件是标记里装着一份样式表：顶层的 `<style>` 块（行首 `<style` 到行首 `</style>` 之间的行；同一行开合的块整行算）按样式文件的规则判，裸 `#1a2b3c` 即颜色；脚本与模板按 Rust 的规则判，只认颜色函数与带引号的 `"#rrggbb"`。`.css` 与 `.html` 整份是样式文件。哪一行是样式表只由 `tools/xtask/src/sheet.rs` 回答（`sheet::lines`，`Reading::Sheet`／`Reading::Code`），`color` 与 `motion`（§8-51）都读它。角色层（`color/roles.rs`）的第四条规则因此伸进组件样式：它走 `client/src` 与替代外观的目录 `client/swap/`（不在盘上就不走，`walk::client_files`）下每个 `.svelte`、`.ts`、`.html`、`.css`，主题豁免，逐行判三件事：①写档名，`bg-g2` 这类工具类或 `var(--color-g<n>)`，都是视图自己挑亮度；②`var(--color-<名>)` 读的名字主题没有声明——拼错的角色在引擎里安静地取不到值，页面上什么也不说；③样式表行（`Reading::Sheet`）声明 `--color-*`——那是主题之外的第二个颜色产地。第三条规则「每个角色至少有一个读者」仍只数 `client/src`，现在连 `.css` 一起：替代外观不进出货的 bundle，只有它读的角色不算有读者。
+
+D35 **一个 `.svelte` 分两段判：顶层 `<style>` 按样式文件，其余按 Rust。** 被击败的备选：①整份按样式文件判——模板里的 `{#each` 会被读成三位十六进制颜色 `#eac`，`href="#/gallery"` 之类的片段也要逐个豁免；②整份按 Rust 判——`<style>` 里不带引号的 `#1a2b3c` 与 `transition: opacity 200ms` 都放过去，组件样式就成了颜色与时长的第二个产地。判哪一行属于样式表放在 `sheet.rs` 一处，因为 `color` 与 `motion` 问的是同一个问题，两份答案迟早不一致。**重开参数**：组件改用 `<style>` 块之外的方式带样式（CSS 模块文件、预处理语言），或 Svelte 允许缩进的顶层 `<style>`。
 -/
 
 /-! #### 8-8a 禁用墨色只写在禁用状态之后（`color/disabled.rs`，形状 6 数据面）
@@ -1233,13 +1237,22 @@ pub(super) fn talk_controls_within_register(
 );
 ```
 
-**`motion` 判什么**：`client/src` 下每个 `.svelte`、`.ts`、`.css`、`.html` 文件（主题——入口 `client/src/theme.css` 与 `client/src/theme/` 里它 import 的部分，`theme::is_theme`——是产地，豁免，与 §8-8 的产地表同形），逐行找四种写法，命中一处即一条违规，位置 `<文件>:<行>`：
+**`motion` 判什么**：`client/src` 与替代外观的目录 `client/swap/`（不在盘上就不走，`walk::client_files`）下每个 `.svelte`、`.ts`、`.css`、`.html` 文件（主题——入口 `client/src/theme.css` 与 `client/src/theme/` 里它 import 的部分，`theme::is_theme`——是产地，豁免，与 §8-8 的产地表同形），逐行找下面的写法，一行至多一条违规，位置 `<文件>:<行>`。每一行都找：
 
 - `cubic-bezier(`；
 - `linear(` 与 `steps(`，**只在括号里第一个非空白字符是数字、`.` 或 `-` 时算**：CSS 的这两个函数只收数，而 `{#snippet steps(each: Walk)}` 是一个名叫 `steps` 的片段，不是一条时间函数；
-- Tailwind 的 `duration-<数字>` 与 `duration-[`、`ease-[`，前一个字符不是字母、数字、`-` 或 `_`（`group-hover:duration-150` 的冒号算边界，`--transition-duration-short` 不算）。
+- Tailwind 的 `duration-<数字>` 与 `duration-[`、`ease-[`，前一个字符不是字母、数字、`-` 或 `_`（`group-hover:duration-150` 的冒号算边界，`--transition-duration-short` 不算）；
+- 变体 `motion-reduce:` 与 `motion-safe:`，边界同上。替代写 `still:`（D36）。
 
-规则写「a transition's curve and duration are named once, in the client's theme」，替代写「`duration-short|panel|page` 与 `ease-arrive|leave`（docs/frontend-method.md §4-43）；要第四种时长或第三条曲线，先在主题的动效令牌里声明它」。**不读**：`style=` 里的 `animation-duration` 与 `animation-delay`（城市插画的环境动画与逐个错开的延迟，不是位移）、`delay-*`（悬停意图的门槛，4-18，不是动效的时长）。
+样式表行（`sheet::lines` 判为 `Reading::Sheet` 的行：组件的顶层 `<style>` 块、主题之外的 `.css` 与 `.html`，§8-8 D35）另找三种：
+
+- `@keyframes`：动画的词表住在主题的动效部分，组件用那里的类；
+- 声明 `--ease-*`、`--transition-duration-*`、`--animate-*`、`--default-transition-*`（前面是行首、空白、`{` 或 `;`，后面跟名字与冒号；`var(--ease-arrive)` 是读，不是声明）；
+- `transition`、`transition-duration`、`animation`、`animation-duration` 的值里出现时长字面量（按空白、逗号与括号切开后，形如 `<数>s` 或 `<数>ms` 的一段，如 `200ms`、`.2s`、`1.5s`）。值从属性的冒号起到下一个 `;` 或 `}` 止，可以跨行，字面量报在它所在的那一行。值只能读 `var(--transition-duration-*)` 与 `var(--ease-*)`：`data-motion="off"` 与机器的减少动效都把时长令牌归零（docs/frontend-method.md §4-43），只读令牌的样式表因此自动服从动效关闭，这就是规则的理由。
+
+规则写「a transition's curve and duration are named once, in the client's theme」，替代写「`duration-short|panel|page` 与 `ease-arrive|leave`（docs/frontend-method.md §4-43）；要第四种时长或第三条曲线，先在主题的动效令牌里声明它」。**不读**：`style=` 里的 `animation-duration` 与 `animation-delay`（城市插画的环境动画与逐个错开的延迟，不是位移）、样式表里的 `animation-delay` 与 `transition-delay`、`delay-*`（悬停意图的门槛，4-18，不是动效的时长）。
+
+D36 **动效关闭是人的选择，也是机器的；组件写 `still:`，不写 `motion-reduce:`。** `motion-reduce:` 与 `motion-safe:` 只听操作系统的 `prefers-reduced-motion`：人在外观组把动效关掉、系统没要求时，按钮按下的缩放照旧发生。`still:` 是主题动效状态部分（`client/src/theme/motion-state.css`）里的 `@custom-variant`，与那里的三态同义：在 `data-motion="off"` 的子树里成立；系统要求减少动效、且根元素不是 `data-motion="on"` 时成立。Tailwind 自带的动画（`animate-pulse` 等）的曲线与时长不是本项目的令牌，主题用 `--animate-*: initial` 清掉，`pulse` 改成主题动效部分里读 `--transition-duration-page` 的类，进动效关闭的清单。被击败的备选：在每个调用处写任意变体 `[[data-motion=off]_&]:transition-none`——三态的规则就有了十三份抄本。**重开参数**：Tailwind 的 `motion-reduce:` 能读一个由页面属性给出的偏好。
 
 **`color` 多判一件事：玻璃按自己的不透明度盖在页面最亮的表面上，字仍够得到层级。** `judge_glass` 在每种打光的读法上各跑一次（§8-8 的 `Mode`）：读 `--glass-opacity: <n>%`（缺席、不是 1–100 的整数百分数各是一条违规），读 `--color-glass` 单跳到的那一档、`raised-hover` 单跳到的那一档、`--color-text` 的明度与 `--tier-text`；把玻璃那一档的 sRGB 按 n% 盖在 `raised-hover` 那一档上（逐通道在编码空间里线性混合，即引擎合成一层半透明底色的做法），算 `--color-text` 对合成色的 APCA Lc，低于 `--tier-text` 即红，拒词写出两种打光里哪一种、够到多少、要多少。**为什么是 `raised-hover` 而不是最亮的墨**：玻璃的模糊（24 px）把背后的字摊进它所在的表面，留下的是表面；页面画面积的表面里最亮的是悬停中的抬起控件。墨不按面积画，按墨判会把不透明度逼到 97%，玻璃就不是玻璃了。`glass` 进 `ROLES`（§8-8 的封闭词表），共 22 个。
 

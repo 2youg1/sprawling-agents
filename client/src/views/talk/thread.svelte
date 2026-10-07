@@ -356,7 +356,7 @@
   {/if}
   {#if !frozen && !streaming && !lineSaysIt}
     <div class="my-snug flex items-center gap-snug text-note text-text-faint">
-      <span class="inline-block size-dot animate-pulse rounded-pill bg-accent"></span>
+      <span class="inline-block size-dot pulse rounded-pill bg-accent"></span>
       <span>{posture}</span>
       {#if run.doing.kind === "thinking"}
         <span class="steer-pin" aria-hidden="true"></span>

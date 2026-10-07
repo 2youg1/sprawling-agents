@@ -42,6 +42,17 @@
   animation: blink 1.1s ease-in-out infinite alternate;
   will-change: opacity;
 }
+/* A mark that says work is under way breathes: opacity only, one
+ * breath in about two seconds, timed from the `page` duration so that
+ * the person's motion choice stills it with every other movement. */
+@keyframes pulse {
+  50% {
+    opacity: 0.5;
+  }
+}
+.pulse {
+  animation: pulse calc(var(--transition-duration-page) * 6) ease-in-out infinite;
+}
 /* The two entrances: a popover rises into place, a page-level banner
  * drops from the edge it belongs to. Both surfaces appearing in their
  * own place, so both take `panel`, and both only move transform and

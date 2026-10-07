@@ -168,7 +168,7 @@
             <span class={SUBJECT}>{row.call.subject ?? ""}</span>
             <span class="{MEASURE} flex items-center gap-snug">
               {#if row.call.outcome === "waiting"}
-                <span class="size-dot animate-pulse rounded-pill bg-accent" aria-hidden="true"></span>
+                <span class="size-dot pulse rounded-pill bg-accent" aria-hidden="true"></span>
               {/if}
               {took(row.call)}
               {#if row.call.exit_code !== undefined && row.call.exit_code !== null}

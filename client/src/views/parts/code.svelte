@@ -33,7 +33,7 @@ const SHAPE =
   "before:-inset-snug before:content-[''] transition-opacity ease-leave " +
   "hover:bg-raised hover:text-text group-hover:opacity-100 " +
   "group-hover:pointer-events-auto group-hover:ease-arrive group-focus-within:opacity-100 group-focus-within:ease-arrive " +
-  "group-focus-within:pointer-events-auto motion-reduce:transition-none pointer-events-none";
+  "group-focus-within:pointer-events-auto still:transition-none pointer-events-none";
 </script>
 
 <script lang="ts">

@@ -140,6 +140,23 @@ pub(crate) use client_src;
 /// The directory the macro above names, for the readers that want a value.
 pub(crate) const CLIENT_SRC: &str = client_src!();
 
+/// Where a replacement look for a component sits, mirroring the path of
+/// the look it replaces under [`CLIENT_SRC`]. A replacement is drawn only
+/// by the swap build and never ships, but it is held to the same colour
+/// and motion rules as the look it stands in for.
+pub(crate) const CLIENT_SWAP: &str = "client/swap";
+
+/// Every file of the given extensions that the client draws from: its
+/// sources and its replacement looks, the second skipped while the tree
+/// has none.
+pub(crate) fn client_files(root: &Path, keep: &[&str]) -> Result<Vec<PathBuf>, XtaskError> {
+    files_under(
+        root,
+        std::iter::once(CLIENT_SRC).chain(root.join(CLIENT_SWAP).is_dir().then_some(CLIENT_SWAP)),
+        keep,
+    )
+}
+
 fn collect(dir: &Path, out: &mut Vec<PathBuf>) -> Result<(), XtaskError> {
     let entries = std::fs::read_dir(dir).map_err(|source| XtaskError::Io {
         path: dir.to_string_lossy().into_owned(),

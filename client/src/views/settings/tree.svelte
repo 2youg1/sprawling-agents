@@ -169,7 +169,7 @@
 
 {#snippet chevron(shown: boolean)}
   <span class={MARK} aria-hidden="true">
-    <Glyph name="chevron" size="sm" class={["transition-transform motion-reduce:transition-none", shown && "rotate-90"]} />
+    <Glyph name="chevron" size="sm" class={["transition-transform still:transition-none", shown && "rotate-90"]} />
   </span>
 {/snippet}
 

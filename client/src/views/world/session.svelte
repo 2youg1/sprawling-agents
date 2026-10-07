@@ -88,7 +88,7 @@
     <h3 class="truncate text-heading font-heading text-text">{title}</h3>
     <span class="flex shrink-0 items-center gap-snug text-note text-text-quiet">
       {#if posture === "running"}
-        <span class="size-dot animate-pulse rounded-pill bg-accent" aria-hidden="true"></span>
+        <span class="size-dot pulse rounded-pill bg-accent" aria-hidden="true"></span>
         {say($lang, "world_running")}
       {:else if posture === "waiting"}
         <span class="size-dot rounded-pill bg-alert" aria-hidden="true"></span>
