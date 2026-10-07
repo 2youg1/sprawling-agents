@@ -25,6 +25,7 @@ describe("the preferences the city keeps", () => {
         mono: "custom",
         sans_stack: "Iosevka",
         mono_stack: "Iosevka Term",
+        reading: "libron",
         body_px: 17,
         density: "compact",
         chroma: "off",
@@ -45,6 +46,7 @@ describe("the preferences the city keeps", () => {
         mono: "custom",
         sansStack: "Iosevka",
         monoStack: "Iosevka Term",
+        reading: "libron",
         body: 17,
         density: "compact",
         chroma: "off",
@@ -67,12 +69,12 @@ describe("the preferences the city keeps", () => {
     expect(adopted(held, {}).theme).toEqual(held.theme);
   });
 
-  test("a city that never heard of the tier or the glass leaves this browser's, and an opacity outside the slider is no opacity", () => {
+  test("a city that never heard of the tier, the reading face or the glass leaves this browser's, and an opacity outside the slider is no opacity", () => {
     const door = loadPreferences(memory(), "en");
     door.setTier("zen");
-    door.setAppearance({ ...get(door.held).appearance, glass: "off", blend: 60 });
+    door.setAppearance({ ...get(door.held).appearance, reading: "libron", glass: "off", blend: 60 });
     const held = get(door.held);
-    const answer = { tier: null, appearance: { ...appearanceOnWire(held.appearance), glass: null, blend_percent: 7 } };
+    const answer = { tier: null, appearance: { ...appearanceOnWire(held.appearance), reading: null, glass: null, blend_percent: 7 } };
 
     expect(adopted(held, answer)).toEqual({ ...held, appearance: { ...held.appearance, blend: null } });
   });
@@ -102,6 +104,7 @@ describe("the preferences the city keeps", () => {
           mono: appearance.mono,
           sans_stack: appearance.sansStack,
           mono_stack: appearance.monoStack,
+          reading: appearance.reading,
           body_px: 15,
           density: appearance.density,
           chroma: appearance.chroma,

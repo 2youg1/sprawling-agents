@@ -13,28 +13,30 @@
  * parts it imports below, from theme/ - is the only place in the client
  * that may hold a colour, a size or a family literal.
  *
- * One font file ships inside the binary: Geist Mono, one variable woff2
- * in client/src/fonts/, and it is the face of the whole interface - prose,
+ * Two faces ship inside the binary. Geist Mono, one variable woff2 in
+ * client/src/fonts/, is the face of the whole interface - prose,
  * labels, figures and code alike, with hierarchy carried by size, weight
- * and the grey ramp (docs/frontend-method.md §4-37). The reason it ships at all is
+ * and the grey ramp (docs/frontend-method.md §4-37). Libron, four static
+ * woff2 files beside it, is the serif face a person may choose for
+ * reading text alone (wire D52). The reason Geist ships at all is
  * that the client is one screen a person judges the whole product by,
  * and a stack that starts at whatever the machine happens to have gives
  * that screen a different shape on every machine, with metrics nobody
- * here can measure. They are
- * licensed OFL-1.1, whose text travels beside it as
- * client/src/fonts/OFL.txt; docs/third-party.md carries the obligation.
+ * here can measure. Both are licensed OFL-1.1, whose texts travel beside
+ * them as client/src/fonts/OFL.txt and client/src/fonts/Libron-OFL.txt;
+ * docs/third-party.md carries the obligation.
  * Nothing is fetched at run time - a client that reached out to a font
  * host would leak that a city was opened, and would draw nothing on a
  * machine with no route out. A missing file is not a failure either:
- * `font-display: optional` and the fallback chain (theme/tokens-type.css) draw the page
+ * `font-display` and the fallback chain (theme/tokens-type.css) draw the page
  * with what the machine has, starting with the monospaced faces the
  * machine is likely to carry, so the page keeps its column widths.
  *
- * Nine things a person may change about how the page is drawn - which
- * way it is lit, the sans face, the mono face, the body size, the
- * amount of colour, how tight the spacing is, whether anything moves,
- * whether the edge layer is glass, and how much of the world layer the
- * blend tier shows - are declared in the theme and selected from the
+ * Ten things a person may change about how the page is drawn - which
+ * way it is lit, the sans face, the mono face, the reading face, the
+ * body size, the amount of colour, how tight the spacing is, whether
+ * anything moves, whether the edge layer is glass, and how much of the
+ * world layer the blend tier shows - are declared in the theme and selected from the
  * root element, so the theme stays the one authority for what the
  * choices *are* and the appearance section only says which one holds.
  *

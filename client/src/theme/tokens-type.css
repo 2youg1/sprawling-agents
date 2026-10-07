@@ -47,6 +47,14 @@
    * and `pre` alike. */
   --font-mono--font-feature-settings: "liga" 0, "calt" 0;
   --font-sans--font-feature-settings: "liga" 0, "calt" 0;
+  /* Reading text - a conversation's messages, documents, reports - in
+   * the interface's own face until the person chooses Libron for it
+   * (`theme/preference.css`, wire D52), so the default page is still
+   * one face. The ligature rule follows the face: it is there so a
+   * command reads as typed, which holds for Geist and has nothing to
+   * say about a serif paragraph. */
+  --font-read: var(--font-sans);
+  --font-read--font-feature-settings: var(--font-sans--font-feature-settings);
 
   /* The type scale: a step is named for its job, not its size.
    *

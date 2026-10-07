@@ -162,16 +162,18 @@ Two lists exist and they answer different questions, so both are kept and neithe
 
 ## 4 What the client ships that others wrote
 
-The client draws itself in **Geist Mono** ([vercel/geist-font](https://github.com/vercel/geist-font)), one variable-weight `woff2`, under **SIL Open Font License 1.1**. It is the only binary asset in this repository that is somebody else's work.
+The client draws itself in **Geist Mono** ([vercel/geist-font](https://github.com/vercel/geist-font)), one variable-weight `woff2`. A person may set reading text — messages, documents, reports — in **Libron** ([nicoverbruggen/libron](https://github.com/nicoverbruggen/libron)), a serif face shipped as four static `woff2` files: regular, italic, bold and bold italic. Both are under **SIL Open Font License 1.1**, and neither declares a Reserved Font Name. The two faces are the only binary assets in this repository that are somebody else's work.
 
 | File | Family | Licence |
 |---|---|---|
 | `client/src/fonts/GeistMono-Variable.woff2` | Geist Mono | OFL-1.1 |
 | `client/src/fonts/OFL.txt` | the licence text, copied verbatim from upstream `LICENSE.TXT` | OFL-1.1 |
+| `client/src/fonts/Libron-Regular.woff2`, `Libron-Italic.woff2`, `Libron-Bold.woff2`, `Libron-BoldItalic.woff2` | Libron, from the `Libron_Web.zip` asset of upstream release tag `v0.25` | OFL-1.1 |
+| `client/src/fonts/Libron-OFL.txt` | the copyright lines (Newsreader, Readerly, Libron) and the licence text, copied verbatim from upstream `LICENSE` at tag `v0.25` | OFL-1.1 |
 
-**The licence travels with the font, not with this document.** OFL-1.1 §2 requires the copyright notice and the licence text to accompany every copy of the font, including one embedded in a program, so `OFL.txt` sits in the same directory as the `woff2` file and `client/vite.config.ts` emits it into the bundle as `fonts/OFL.txt`. The binary embeds the bundle, so the obligation is discharged wherever the binary goes. A build whose `client/src/fonts/` is missing either name says so once per file and produces a bundle that draws in the fallback stack.
+**The licence travels with the font, not with this document.** OFL-1.1 §2 requires the copyright notice and the licence text to accompany every copy of the font, including one embedded in a program, so each licence file sits in the same directory as its `woff2` files and `client/vite.config.ts` emits both into the bundle, as `fonts/OFL.txt` and `fonts/Libron-OFL.txt`. The binary embeds the bundle, so the obligation is discharged wherever the binary goes. A build whose `client/src/fonts/` is missing any of these names says so once per file and produces a bundle that draws in the fallback stack.
 
-**Three things OFL-1.1 asks that this repository keeps honouring**: the font is not sold on its own, the licence and the copyright line travel with every copy, and a modified copy drops any Reserved Font Name. The client's file travels unmodified, under its own name.
+**Three things OFL-1.1 asks that this repository keeps honouring**: the font is not sold on its own, the licence and the copyright line travel with every copy, and a modified copy drops any Reserved Font Name. The client's files travel unmodified, under their own names.
 
 **The JavaScript inside the bundle carries its notices the same way.** When Vite writes the bundle, `client/scripts/notices.ts` reads which npm packages the emitted chunks were built from, and writes `THIRD-PARTY-NOTICES.txt` at the bundle's root with each package's name, version, declared licence and its licence file verbatim. The binary embeds the bundle, so the notices go wherever the binary goes, and a running city serves them at `/THIRD-PARTY-NOTICES.txt`. A package that reaches the bundle without a licence file stops the build and is named, because a notice file that silently lacks one package is the gap it exists to close.
 

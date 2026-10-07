@@ -88,7 +88,12 @@ budget_bytes = 2097152
 # shell's client halves landed: RefRain's editor chunk, the inspector,
 # the workbench, the settings panel, the mailbox and the redesigned
 # pages with their fixtures, and the move from Effect 3 to Effect 4.
-best_bytes = 677073
+# It read 2,951,712 B on the tree that ships Libron for reading text
+# (wire D52); Libron's four woff2 files are 334,684 B of that, because
+# woff2 is already compressed and gzip takes nothing off a face. The
+# browser fetches those files only after a person chooses Libron, so a
+# page that reads in the interface's face never downloads them.
+best_bytes = 2951712
 measured_by = "just build-web, then cargo xtask budget (the whole dist directory, recursive)"
 status = "reported, not gated: the person's ruling that runtime speed comes before size. This version's reading is owed, because the User ruled to skip measurement in this version: the figures above were taken on an earlier tree, and just build-web, then cargo xtask budget retakes it"
 

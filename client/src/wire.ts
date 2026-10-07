@@ -2870,6 +2870,18 @@ export const Motion = Schema.Literals(["system", "on", "off"]).annotate({ identi
 export type Motion = typeof Motion.Type;
 
 /**
+ * Which face reading text is drawn in: the messages of a conversation,
+ * documents and reports. Controls, labels, figures and code keep the
+ * interface's faces whichever this says
+ * (`crates/wire/spec/Preference.lean` D52).
+ */
+export const ReadingFace = Schema.Union([
+  Schema.Literal("interface"),
+  Schema.Literal("libron"),
+]).annotate({ identifier: "ReadingFace" });
+export type ReadingFace = typeof ReadingFace.Type;
+
+/**
  * How the pages look.
  */
 export const Appearance = Schema.Struct({
@@ -2882,6 +2894,7 @@ export const Appearance = Schema.Struct({
   mono: Face,
   mono_stack: Schema.String,
   motion: Motion,
+  reading: Schema.optional(Schema.NullOr(ReadingFace)),
   sans: Face,
   sans_stack: Schema.String,
 }).annotate({ identifier: "Appearance" });

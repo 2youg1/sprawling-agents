@@ -34,9 +34,8 @@ import { derived, get, writable } from "svelte/store";
 import type { Readable } from "svelte/store";
 
 import { EDITORS, type Opening } from "./editor";
-import { langOf, type Lang } from "./lang";
+import type { Lang } from "./lang";
 import { browserRows, type Rows } from "./rows";
-import { sizingOf } from "./sizing";
 import {
   Proxying,
   Tier as TierSchema,
@@ -46,7 +45,8 @@ import {
 } from "../wire";
 import { appearanceOnWire, type Keeper } from "./prefs_city";
 import { readTheme, type Theme } from "./theme_override";
-import { CHROMAS, DENSITIES, FACES, GLASSES, LIGHTINGS, MOTIONS, STACK_SHAPE, blendOf, type Appearance } from "./appearance";
+import { CHROMAS, DENSITIES, FACES, GLASSES, LIGHTINGS, MOTIONS, READING_FACES, blendOf, type Appearance } from "./appearance";
+import { readBody, readLang, readOne, readStack, writeFigure } from "./prefs_values";
 import type { Notifying } from "./notify";
 import { SHOWINGS, type Showing } from "./results";
 import { readWorkbench, spelledWorkbench, type Workbench } from "./workbench";
@@ -67,6 +67,7 @@ const ROWS = {
   mono: "sprawling.appearance.mono",
   sansStack: "sprawling.appearance.sans_stack",
   monoStack: "sprawling.appearance.mono_stack",
+  reading: "sprawling.appearance.reading",
   body: "sprawling.appearance.body",
   density: "sprawling.appearance.density",
   chroma: "sprawling.appearance.chroma",
@@ -204,25 +205,6 @@ export interface PreferenceDoor {
   readonly setWorkbench: (next: Workbench) => void;
 }
 
-// A stored word, or the posture this client ships with when the row is
-// empty or holds a word this build no longer offers.
-function readOne<T extends string>(offered: readonly T[], raw: string | null, fallback: T): T {
-  return offered.find((each) => each === raw) ?? fallback;
-}
-
-function readBody(raw: string | null): number | null {
-  const said = sizingOf(raw ?? "");
-  return said.kind === "sized" ? said.px : null;
-}
-
-function readStack(raw: string | null): string {
-  return raw !== null && STACK_SHAPE.test(raw) ? raw : "";
-}
-
-function readLang(raw: string | null, fallback: string): Lang {
-  return raw === "en" || raw === "zh" ? raw : langOf(fallback);
-}
-
 function readAppearance(rows: Rows): Appearance {
   return {
     lighting: readOne(LIGHTINGS, rows.getItem(ROWS.lighting), "system"),
@@ -230,6 +212,7 @@ function readAppearance(rows: Rows): Appearance {
     mono: readOne(FACES, rows.getItem(ROWS.mono), "geist"),
     sansStack: readStack(rows.getItem(ROWS.sansStack)),
     monoStack: readStack(rows.getItem(ROWS.monoStack)),
+    reading: readOne(READING_FACES, rows.getItem(ROWS.reading), "interface"),
     body: readBody(rows.getItem(ROWS.body)),
     density: readOne(DENSITIES, rows.getItem(ROWS.density), "comfortable"),
     chroma: readOne(CHROMAS, rows.getItem(ROWS.chroma), "full"),
@@ -245,19 +228,13 @@ function writeAppearance(rows: Rows, next: Appearance): void {
   rows.setItem(ROWS.mono, next.mono);
   rows.setItem(ROWS.sansStack, next.sansStack);
   rows.setItem(ROWS.monoStack, next.monoStack);
+  rows.setItem(ROWS.reading, next.reading);
   writeFigure(rows, ROWS.body, next.body);
   rows.setItem(ROWS.density, next.density);
   rows.setItem(ROWS.chroma, next.chroma);
   rows.setItem(ROWS.motion, next.motion);
   rows.setItem(ROWS.glass, next.glass);
   writeFigure(rows, ROWS.blend, next.blend);
-}
-
-// A size or an opacity the person has not stated is absent from storage
-// too, so the stylesheet's own figure keeps its one home in the theme.
-function writeFigure(rows: Rows, row: string, figure: number | null): void {
-  if (figure === null) rows.removeItem(row);
-  else rows.setItem(row, String(figure));
 }
 
 // The two words a yes-or-no row is written and read with. Each row is

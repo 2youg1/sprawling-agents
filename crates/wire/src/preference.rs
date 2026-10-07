@@ -72,6 +72,20 @@ pub enum Face {
     Custom,
 }
 
+/// Which face reading text is drawn in: the messages of a conversation,
+/// documents and reports. Controls, labels, figures and code keep the
+/// interface's faces whichever this says
+/// (`crates/wire/spec/Preference.lean` D52).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub enum ReadingFace {
+    /// The face the interface is drawn in, whichever [`Face`] that is.
+    Interface,
+    /// Libron, the serif face this build ships for reading.
+    Libron,
+}
+
 /// How much air the spacing steps carry. Two named postures rather than
 /// a coefficient, because the coefficient is the stylesheet's to
 /// choose.
@@ -140,6 +154,10 @@ pub struct Appearance {
     pub sans_stack: String,
     /// See `sans_stack`.
     pub mono_stack: String,
+    /// Absent means the person stated no opinion and reading text is
+    /// drawn in the interface's face.
+    #[serde(default)]
+    pub reading: Option<ReadingFace>,
     /// The size of a line of body text in pixels, at least
     /// [`BODY_PX_MIN`]. Absent means the person
     /// stated no size and the stylesheet's own is drawn — which is a
@@ -276,6 +294,7 @@ impl Default for Appearance {
             mono: Face::Geist,
             sans_stack: String::new(),
             mono_stack: String::new(),
+            reading: None,
             body_px: None,
             density: Density::Comfortable,
             chroma: Chroma::Full,
@@ -461,6 +480,45 @@ mod tests {
                 Some(&serde_json::json!(px))
             );
         }
+    }
+
+    /// The reading face is the person's to state and absent until they
+    /// do (`crates/wire/spec/Preference.lean` D52): a section that names
+    /// it reads back the face it named, and one written before the
+    /// field existed reads back as never stated.
+    #[test]
+    fn the_reading_face_reads_back_as_stated_and_absent_as_never_said() {
+        let appearance = |reading: Option<&str>| {
+            let mut stated = serde_json::json!({
+                "lighting": "dark", "sans": "geist", "mono": "geist",
+                "sans_stack": "", "mono_stack": "", "body_px": null,
+                "density": "compact", "chroma": "full", "motion": "system",
+            });
+            if let (Some(face), Some(fields)) = (reading, stated.as_object_mut()) {
+                fields.insert("reading".to_owned(), serde_json::json!(face));
+            }
+            serde_json::json!({ "appearance": stated })
+        };
+        let read_back = |reading: Option<&str>| {
+            let held: PreferencesAnswer = serde_json::from_value(appearance(reading)).unwrap();
+            serde_json::to_value(&held)
+                .unwrap()
+                .pointer("/appearance/reading")
+                .cloned()
+        };
+        assert_eq!(
+            [
+                read_back(Some("libron")),
+                read_back(Some("interface")),
+                read_back(None)
+            ],
+            [
+                Some(serde_json::json!("libron")),
+                Some(serde_json::json!("interface")),
+                Some(serde_json::Value::Null),
+            ]
+        );
+        assert!(serde_json::from_value::<PreferencesAnswer>(appearance(Some("georgia"))).is_err());
     }
 
     /// A key this build does not read is refused where it is written.

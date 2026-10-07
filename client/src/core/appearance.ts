@@ -9,7 +9,12 @@
 // between visits and `prefs_city.ts` carries it to the city; this file
 // only says what a valid one is.
 
-import { Glass as GlassSchema, type Glass as WireGlass } from "../wire";
+import {
+  Glass as GlassSchema,
+  ReadingFace as ReadingFaceSchema,
+  type Glass as WireGlass,
+  type ReadingFace as WireReadingFace,
+} from "../wire";
 
 // `system` is the absence of an opinion, and it is resolved where the
 // page is drawn rather than in the stylesheet: the light palette is
@@ -18,6 +23,9 @@ import { Glass as GlassSchema, type Glass as WireGlass } from "../wire";
 // same eleven rungs.
 export type Lighting = "system" | "dark" | "light";
 export type Face = "geist" | "system" | "custom";
+// Which face reading text is set in: the interface's own, or the serif
+// face Libron, spelled by the wire (`wire::ReadingFace`, wire D52).
+export type ReadingFace = WireReadingFace;
 // How much air the six spacing steps carry, as `theme/preference.css` spells it
 // in `:root[data-density="compact"]`. Two named postures rather than a
 // coefficient, because the coefficient is the stylesheet's to choose.
@@ -35,6 +43,7 @@ export type Glass = WireGlass;
 // person can pick is therefore an option this build can load.
 export const LIGHTINGS: readonly Lighting[] = ["system", "dark", "light"];
 export const FACES: readonly Face[] = ["geist", "system", "custom"];
+export const READING_FACES: readonly ReadingFace[] = ReadingFaceSchema.members.map((face) => face.literal);
 export const DENSITIES: readonly Density[] = ["comfortable", "compact"];
 export const CHROMAS: readonly Chroma[] = ["full", "off"];
 export const MOTIONS: readonly Motion[] = ["system", "on", "off"];
@@ -55,6 +64,7 @@ export interface Appearance {
   readonly mono: Face;
   readonly sansStack: string;
   readonly monoStack: string;
+  readonly reading: ReadingFace;
   // The size of a line of body text in pixels, or nothing when the
   // person has stated no size and the stylesheet's own is drawn.
   readonly body: number | null;
