@@ -52,6 +52,7 @@
   import Hints from "./gallery/hints.svelte";
   import Inspected from "./gallery/ins.svelte";
   import Keepers from "./gallery/kept.svelte";
+  import SetupLooks from "./gallery/setup_looks.svelte";
   import RefusedLine from "./gallery/refused_line.svelte";
   import Prop from "./gallery/prop.svelte";
   import PrivacyGallery from "./gallery/privacy.svelte";
@@ -145,6 +146,7 @@
   <Shelved />
   <Used />
   <Keepers />
+  <SetupLooks />
   <Settings />
   <SettingsPanel />
   <PrivacyGallery />

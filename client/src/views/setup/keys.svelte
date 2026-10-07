@@ -15,19 +15,21 @@
   // This section is mounted by the settings page, which owns its own
   // column and its own section chrome; the heading below is the same one
   // that page draws so the section reads the same wherever it is placed.
-
-  // Keys that are only ever half of a chord.
-  const MODIFIERS = ["Control", "Meta", "Shift", "Alt", "AltGraph", "CapsLock"];
+  //
+  // The button that records a chord is `chord.ts`, drawn by
+  // `chord.look.svelte`; this file holds which row listens and the
+  // keymap the chord lands in.
 </script>
 
 <script lang="ts">
   import { ACTIONS, LABELS, keymap, spell } from "../../core/keys";
-  import type { Action, Chord } from "../../core/keys";
+  import type { Action } from "../../core/keys";
   import { fill, say } from "../../core/lang";
   import { ui } from "../../ui";
   import Button from "../parts/button.svelte";
-  import { Kbd } from "../parts/kbd.svelte";
-  import Tip from "../parts/tip.svelte";
+  import { chordOf } from "./chord";
+  import type { ChordHands } from "./chord";
+  import ChordLook from "./chord.look.svelte";
 
   const { lang } = ui();
   const keys = keymap();
@@ -45,24 +47,14 @@
     return clash === undefined ? [] : clash.actions.filter((other) => other !== action);
   }
 
-  function capture(action: Action, event: KeyboardEvent): void {
-    if (MODIFIERS.includes(event.key)) {
-      return;
-    }
-    event.preventDefault();
-    if (event.key === "Escape") {
-      recording = null;
-      return;
-    }
-    // Shift is part of a chord only beside the accelerator: without
-    // one, the browser already hands back the character the layout
-    // produced, and judging shift as well would put `?` out of reach
-    // on a keyboard that needs shift to type it.
-    const accel = event.ctrlKey || event.metaKey;
-    const chord: Chord = { accel, shift: accel && event.shiftKey, key: event.key };
-    keys.bind(action, chord);
-    recording = null;
-  }
+  const hands: ChordHands = {
+    listen: (action) => {
+      recording = action;
+    },
+    bind: (action, chord) => {
+      keys.bind(action, chord);
+    },
+  };
 </script>
 
 <section class="border-t border-edge py-wide">
@@ -76,44 +68,18 @@
             {fill(say($lang, "keys_conflict"), { name: say($lang, LABELS[taken(action)[0] ?? action]) })}
           </span>
         {/if}
-        <Tip text={say($lang, "keys_change")}>
-          {#snippet children(hint: string)}
-            <!-- This control carries what `parts/button.svelte` cannot:
-                 a drawn chord while it waits and the listening posture
-                 while it records. Enter and Space reach the one click
-                 guard below through the platform, as every button's do
-                 (client/Spec.lean §7-2). -->
-            <button
-              type="button"
-              class="h-control-sm rounded-control border border-edge px-snug hover:bg-raised aria-pressed:bg-raised-hover"
-              aria-describedby={hint}
-              aria-pressed={recording === action}
-              onclick={() => {
-                recording = action;
-              }}
-              onblur={() => {
-                recording = null;
-              }}
-              onkeydown={(event) => {
-                if (recording === action) {
-                  capture(action, event);
-                }
-              }}
-            >
-              {#if recording === action}
-                <span class="font-mono text-note text-text-faint">{say($lang, "keys_press")}</span>
-              {:else}
-                <!-- The chord is redrawn whenever it changes: the marks
-                     read `core/keys` outside the reactive surface, so
-                     the key here is what brings them back. -->
-                {#key spell($bound[action])}
-                  <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression, @typescript-eslint/no-unsafe-call (a snippet call is the render itself, typed `void`; a snippet exported from another component resolves for `svelte-check` but not for the type-aware lint lane) -->
-                  {@render Kbd({ action })}
-                {/key}
-              {/if}
-            </button>
-          {/snippet}
-        </Tip>
+        <ChordLook
+          {...chordOf(
+            {
+              action,
+              spelled: spell($bound[action]),
+              listening: recording === action,
+              prompt: say($lang, "keys_press"),
+              tip: say($lang, "keys_change"),
+            },
+            hands,
+          )}
+        />
         <!-- Rebuilt when the chord changes so that `keys.changed` - the
              one judge of whether this row left its default - is asked
              again at the moment the answer can differ. The reason rides

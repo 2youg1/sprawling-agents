@@ -22,6 +22,9 @@
   import type { Editing } from "../refrain/editing";
   import { phrasesIn } from "../refrain/reading";
   import Button from "../parts/button.svelte";
+  import Card from "./card.look.svelte";
+  import { tokenOf } from "./token";
+  import Token from "./token.look.svelte";
   import { colourTokens, declaredNames, drawnRgb, shortfalls, textClaims, type Rgb } from "./colours";
 
   const u = ui();
@@ -110,52 +113,46 @@
 </script>
 
 <div class="grid grid-fit items-start gap-base">
-  <div class="flex flex-col gap-tight rounded-card bg-raised px-base py-snug">
-    <span class="text-label font-label text-text">{say($lang, "colours_tokens")}</span>
-    <p class="text-note text-text-faint">{say($lang, "colours_tokens_note")}</p>
+  <Card title={say($lang, "colours_tokens")} note={say($lang, "colours_tokens_note")}>
     <ul class="flex flex-col gap-tight">
       {#each tokens as token (token)}
-        <li class="flex items-center gap-tight">
-          <input
-            type="color"
-            class="h-control w-control shrink-0 rounded-control border border-edge-input bg-raised"
-            aria-label={token}
-            value={drawn[token] ?? ""}
-            onchange={(event) => {
-              pick(token, event.currentTarget.value);
-            }}
-          />
-          <span class="min-w-0 flex-1 truncate font-mono text-note text-text-quiet">{token}</span>
-          {#if token in theme.tokens}
-            <button
-              type="button"
-              class="text-note text-text-quiet underline"
-              aria-label={fill(say($lang, "colours_token_default_for"), { token })}
-              onclick={() => {
-                unpick(token);
-              }}>{say($lang, "colours_token_default")}</button
-            >
-          {/if}
-        </li>
+        <Token
+          {...tokenOf(
+            {
+              name: token,
+              drawn: drawn[token],
+              reset:
+                token in theme.tokens
+                  ? {
+                      word: say($lang, "colours_token_default"),
+                      label: fill(say($lang, "colours_token_default_for"), { token }),
+                    }
+                  : undefined,
+            },
+            { pick, unpick },
+          )}
+        />
       {/each}
     </ul>
-  </div>
-  <div class="flex flex-col gap-tight">
-    <div class="flex flex-col gap-tight rounded-card bg-raised px-base py-snug">
-      <span class="text-label font-label text-text">{say($lang, "colours_legibility")}</span>
-      {#if warnings.length === 0}
-        <p class="text-note text-text-faint">{say($lang, "colours_fine")}</p>
-      {:else}
-        <ul class="flex flex-col gap-tight" role="status">
-          {#each warnings as warning (warning)}
-            <li class="text-note text-alert">{warning}</li>
-          {/each}
-        </ul>
-      {/if}
-    </div>
-    <div class="flex flex-col gap-tight rounded-card bg-raised px-base py-snug">
-      <span class="text-label font-label text-text">{say($lang, "colours_css")}</span>
-      <p class="text-note text-text-faint">{say($lang, "colours_css_note")}</p>
+  </Card>
+  <div class="flex flex-col gap-base">
+    <Card title={say($lang, "colours_legibility")}>
+      <!-- The region stands while all is well too, so a warning that
+      arrives is announced: a live region is only heard when it changes
+      after it was put on the page. -->
+      <div role="status">
+        {#if warnings.length === 0}
+          <p class="text-note text-text-faint">{say($lang, "colours_fine")}</p>
+        {:else}
+          <ul class="flex flex-col gap-tight">
+            {#each warnings as warning (warning)}
+              <li class="text-note text-alert">{warning}</li>
+            {/each}
+          </ul>
+        {/if}
+      </div>
+    </Card>
+    <Card title={say($lang, "colours_css")} note={say($lang, "colours_css_note")}>
       <!-- The editor is RefRain's, so it takes RefRain's dress: outside a
       `refrain` box CodeMirror falls back to its own light theme and
       paints the active line's gutter as a light block on a dark page. -->
@@ -165,13 +162,11 @@
       <div class="flex justify-end">
         <Button label={say($lang, "colours_css_apply")} onPress={applyCss} />
       </div>
-    </div>
-    <div class="flex flex-col gap-tight rounded-card bg-raised px-base py-snug">
-      <span class="text-label font-label text-text">{say($lang, "colours_restore")}</span>
-      <p class="text-note text-text-faint">{say($lang, "colours_restore_note")}</p>
+    </Card>
+    <Card title={say($lang, "colours_restore")} note={say($lang, "colours_restore_note")}>
       <div class="flex justify-end">
         <Button label={say($lang, "colours_restore")} onPress={restore} />
       </div>
-    </div>
+    </Card>
   </div>
 </div>
