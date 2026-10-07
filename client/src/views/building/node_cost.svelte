@@ -20,6 +20,7 @@
   import { ui } from "../../ui";
   import type { Address, NodeId, Query } from "../../wire";
   import Unanswered from "../parts/unanswered.svelte";
+  import FactLink from "./fact_link.look.svelte";
 
   interface Props {
     readonly building: Address;
@@ -67,9 +68,12 @@
       <ul>
         {#each placed.here as row (row.run)}
           <li class="grid grid-cols-[10ch_minmax(0,1fr)_auto] items-center gap-x-base">
-            <a href={toFragment({ kind: "run", run: row.run })} class="figure text-text-quiet hover:text-accent"
-              >{row.run.slice(0, RUN_SHORT)}</a
-            >
+            <FactLink
+              label={row.run.slice(0, RUN_SHORT)}
+              face="figure"
+              ink="quiet"
+              wire={{ href: toFragment({ kind: "run", run: row.run }) }}
+            />
             <span class="truncate font-mono text-text-faint">{roomOf(row.room)}</span>
             <span class="figure text-text-quiet">{usd(row.spent)}</span>
           </li>

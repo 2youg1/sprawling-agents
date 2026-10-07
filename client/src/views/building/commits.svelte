@@ -26,6 +26,7 @@
   import { GitOid } from "../../wire";
   import type { Address, Answer, CommitAnswer, CommitsAnswer, Seq } from "../../wire";
   import EmptyState from "../parts/empty.svelte";
+  import Field from "../parts/field.svelte";
   import Unanswered from "../parts/unanswered.svelte";
   import Commit from "./commit.svelte";
   import Whose from "./whose.svelte";
@@ -47,6 +48,8 @@
   // The oid typed into the head's box, and the one it asked about.
   let typed = $state("");
   let whose = $state<GitOid | null>(null);
+  // Whether the last ask was refused, until the box changes again.
+  let refused = $state(false);
 
   interface Pages {
     readonly rows: readonly CommitAnswer[];
@@ -126,24 +129,33 @@
 </script>
 
 <div class="flex min-w-0 flex-col gap-base">
-  <div class="flex min-w-0 flex-wrap items-center justify-between gap-x-wide gap-y-snug">
-    <h2 class="text-note text-text-faint">{say($lang, "bld_commits")}</h2>
-    <label class="flex min-w-0 items-center gap-snug text-note">
-      <span class="shrink-0 whitespace-nowrap text-text-faint">{say($lang, "whose_label")}</span>
-      <input
-        class="h-control-sm w-[42ch] max-w-full min-w-0 rounded-control border border-edge-input bg-raised px-snug font-mono text-note placeholder:text-text-faint aria-invalid:border-alert"
+  <div class="flex min-w-0 flex-wrap items-end justify-between gap-x-wide gap-y-snug">
+    <h2 class="flex h-control items-center text-note text-text-faint">{say($lang, "bld_commits")}</h2>
+    <!-- A form, so Enter in the box asks. What was typed is judged when
+         it is asked, not at every key: an oid is forty characters, and a
+         box that says "not an oid" from the first of them scolds a person
+         who has not finished. -->
+    <form
+      class="w-[42ch] max-w-full min-w-0"
+      onsubmit={(event) => {
+        event.preventDefault();
+        refused = typedOid === null;
+        whose = typedOid;
+      }}
+    >
+      <Field
+        label={say($lang, "whose_label")}
         placeholder={say($lang, "whose_placeholder")}
-        aria-invalid={typed.trim() !== "" && typedOid === null}
-        bind:value={typed}
-        onkeydown={(event) => {
-          if (event.key === "Enter") whose = typedOid;
+        mono
+        value={typed}
+        onInput={(value) => {
+          typed = value;
+          refused = false;
         }}
+        {...refused ? { error: say($lang, "whose_not_oid") } : {}}
       />
-    </label>
+    </form>
   </div>
-  {#if typed.trim() !== "" && typedOid === null}
-    <p class="text-note text-text-faint" role="status">{say($lang, "whose_not_oid")}</p>
-  {/if}
   {#if whose !== null}
     <div class="border-l border-edge-input pl-base">
       <Whose oid={whose} />

@@ -14,9 +14,10 @@
   import { ui } from "../../ui";
   import type { Address, CommitAnswer, GitOid } from "../../wire";
   import Changes from "../changes.svelte";
-  import Glyph from "../parts/glyph.svelte";
   import CommitFacts from "./commit_facts.svelte";
   import CommitLine from "./commit_line.svelte";
+  import { disclosureWire } from "./disclosure";
+  import Disclosure from "./disclosure.look.svelte";
   import TakeBack from "./take_back.svelte";
 
   interface Props {
@@ -42,16 +43,12 @@
   <TakeBack {building} {path} point={commit.oid} />
 {/snippet}
 
+{#snippet line()}
+  <CommitLine {commit} />
+{/snippet}
+
 <li class="border-b border-edge" id="commit-{commit.oid}">
-  <button
-    type="button"
-    class="grid h-control w-full grid-cols-[var(--spacing-glyph-sm)_8ch_minmax(0,1fr)_auto_auto] items-center gap-x-base rounded-control px-snug text-left text-note hover:wash narrow:grid-cols-[var(--spacing-glyph-sm)_8ch_minmax(0,1fr)]"
-    aria-expanded={open}
-    onclick={onToggle}
-  >
-    <Glyph name="chevron" size="sm" class="text-text-faint transition-transform {open ? 'rotate-90' : ''}" />
-    <CommitLine {commit} />
-  </button>
+  <Disclosure layout="commit" {open} wire={disclosureWire(open, onToggle)} cells={line} />
   {#if open}
     <div class="flex min-w-0 flex-col gap-base pt-snug pb-wide pl-wide narrow:pl-0">
       <CommitFacts {commit} {holds} {onOpen} />

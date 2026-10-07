@@ -22,9 +22,14 @@
   import { kib } from "../../core/time";
   import { ui } from "../../ui";
   import { Address, type Query, type SpineDocument } from "../../wire";
+  import Button from "../parts/button.svelte";
   import Path from "../parts/path.svelte";
   import Unanswered from "../parts/unanswered.svelte";
   import Prose from "../prose.svelte";
+  import { sourceToggleWire } from "./source_toggle";
+  import SourceToggle from "./source_toggle.look.svelte";
+  import { textBoxWire } from "./text_box";
+  import TextBox from "./text_box.look.svelte";
 
   // The four documents a person may write through this door. `PutSpine`
   // names one of them and never a path, so a file outside this table has
@@ -103,27 +108,16 @@
     {/if}
     <span class="flex-1"></span>
     {#if markdown && doc !== undefined && !doc.binary}
-      <button
-        type="button"
-        class={[
-          "h-control-sm rounded-pill px-snug text-note",
-          raw ? "bg-raised text-text" : "text-text-faint hover:text-text-quiet",
-        ]}
-        onclick={() => {
+      <!-- wording-ok: the name of the file format this toggle shows the source of -->
+      <SourceToggle
+        label=".md"
+        pressed={raw}
+        wire={sourceToggleWire(raw, () => {
           raw = !raw;
-        }}
-      >
-        <!-- wording-ok: the name of the file format this toggle shows the source of -->
-        .md
-      </button>
+        })}
+      />
       {#if spine !== null && !editing}
-        <button
-          type="button"
-          class="h-control-sm rounded-pill px-snug text-note text-text-faint hover:text-text-quiet"
-          onclick={change}
-        >
-          {say($lang, "file_edit")}
-        </button>
+        <Button label={say($lang, "file_edit")} tone="quiet" onPress={change} />
       {/if}
     {/if}
   </div>
@@ -143,27 +137,21 @@
       {/if}
       {#if !doc.binary}
         {#if editing}
-          <textarea
-            class="min-h-palette w-full rounded-card border border-edge-input bg-chrome p-snug font-mono text-note leading-relaxed"
-            bind:value={draft}
-          ></textarea>
+          <TextBox
+            size="document"
+            wire={textBoxWire(draft, at, false, (value) => {
+              draft = value;
+            })}
+          />
           <div class="mt-base flex gap-base">
-            <button
-              type="button"
-              class="h-control-sm rounded-pill bg-raised px-snug text-note text-text"
-              onclick={save}
-            >
-              {say($lang, "file_save")}
-            </button>
-            <button
-              type="button"
-              class="h-control-sm rounded-pill px-snug text-note text-text-faint hover:text-text-quiet"
-              onclick={() => {
+            <Button label={say($lang, "file_save")} onPress={save} />
+            <Button
+              label={say($lang, "file_discard")}
+              tone="quiet"
+              onPress={() => {
                 editing = false;
               }}
-            >
-              {say($lang, "file_discard")}
-            </button>
+            />
           </div>
         {:else if markdown && !raw}
           <div class="mx-auto w-full max-w-measure">

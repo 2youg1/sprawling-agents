@@ -24,12 +24,12 @@
   import { ui } from "../../ui";
   import type { Address, Entry, RunId } from "../../wire";
   import { Address as AddressSchema } from "../../wire";
-  import Glyph from "../parts/glyph.svelte";
-  import Tip from "../parts/tip.svelte";
   // The next level down. A self-import rather than `<svelte:self>`,
   // which the compiler marks deprecated in favour of exactly this.
   import Branch from "./tree.svelte";
   import { transcriptOf } from "./transcript";
+  import { treeRowWire, type TreeMark, type TreeRowLook } from "./tree_row";
+  import Row from "./tree_row.look.svelte";
 
   // What the tree hands back when a row is picked. Stated beside the
   // component that hands it over; the neighbours that read it take it
@@ -93,6 +93,41 @@
     return run?.task ?? transcript.slice(0, 8);
   }
 
+  // One row as its look draws it: the mark before the name, how loudly
+  // the name is drawn, the lit dot and the size a hand reveals.
+  function rowOf(entry: Entry, here: Address, open: boolean): TreeRowLook {
+    const transcript = transcriptOf(entry.name);
+    const mark: TreeMark =
+      entry.kind === "directory"
+        ? { kind: "directory", open }
+        : transcript === null
+          ? { kind: "file" }
+          : { kind: "transcript", hint: say($lang, "tree_transcript") };
+    return {
+      name: nameOf(entry.name, transcript),
+      mark,
+      tone: picked?.at === here ? "picked" : entry.name.startsWith(".") ? "hidden" : "plain",
+      coded: transcript !== null,
+      live: lit(entry.kind === "directory", here, transcript) ? say($lang, "tree_live") : undefined,
+      size: entry.kind === "directory" ? undefined : kib(entry.kind.file.bytes),
+      wire: treeRowWire(mark, () => {
+        press(entry, here, transcript, open);
+      }),
+    };
+  }
+
+  // A transcript opens the run that wrote it; a folder turns over and
+  // is picked; a file is picked.
+  function press(entry: Entry, here: Address, transcript: RunId | null, open: boolean): void {
+    if (transcript !== null) {
+      u.go({ kind: "run", run: transcript });
+      return;
+    }
+    const isDir = entry.kind === "directory";
+    if (isDir) opened[here] = !open;
+    onPick({ at: here, kind: isDir ? "directory" : "file" });
+  }
+
   // Whether something is working under this row: a directory holds work
   // when a run lives at or below it, a transcript when its run has not
   // frozen.
@@ -121,73 +156,11 @@
     {:else}
       {#each entries as entry (entry.name)}
         {@const here = join(dir, entry.name)}
-        {@const transcript = transcriptOf(entry.name)}
         {@const isDir = entry.kind === "directory"}
         {@const hidden = entry.name.startsWith(".")}
         {@const openNow = opened[here] ?? (nesting === 0 && !hidden)}
         <li>
-          <button
-            type="button"
-            class={[
-              "group/row flex h-step w-full items-center gap-tight rounded-control pl-tight pr-snug text-left text-note leading-none hover:bg-chrome",
-              picked?.at === here
-                ? "bg-raised text-text"
-                : hidden
-                  ? "text-text-faint"
-                  : "text-text-quiet",
-            ]}
-            aria-expanded={isDir ? openNow : undefined}
-            onclick={() => {
-              if (transcript !== null) {
-                u.go({ kind: "run", run: transcript });
-                return;
-              }
-              if (isDir) {
-                opened[here] = !openNow;
-              }
-              onPick({ at: here, kind: isDir ? "directory" : "file" });
-            }}
-          >
-            <span class="flex w-glyph-sm shrink-0 justify-center">
-              {#if isDir}
-                <Glyph
-                  name="chevron"
-                  size="sm"
-                  class={[
-                    "shrink-0 text-text-faint transition-transform still:transition-none",
-                    openNow ? "rotate-90" : "",
-                  ]}
-                />
-              {:else if transcript !== null}
-                <Tip text={say($lang, "tree_transcript")}>
-                  {#snippet children(hint: string)}
-                    <!-- wording-ok: a typographic arrow, named by the hint it is labelled by -->
-                    <span class="text-text-faint" role="img" aria-labelledby={hint}>↗</span>
-                  {/snippet}
-                </Tip>
-              {/if}
-            </span>
-            <span class={["truncate", transcript === null ? "" : "font-mono text-text-faint"]}
-              >{nameOf(entry.name, transcript)}</span
-            >
-            {#if lit(isDir, here, transcript)}
-              <Tip text={say($lang, "tree_live")}>
-                {#snippet children(hint: string)}
-                  <span
-                    class="ml-tight inline-block size-dot shrink-0 rounded-pill bg-accent"
-                    role="img"
-                    aria-labelledby={hint}
-                  ></span>
-                {/snippet}
-              </Tip>
-            {/if}
-            <span class="flex-1"></span>
-            {#if entry.kind !== "directory"}
-              <span class="hidden shrink-0 whitespace-nowrap font-mono text-text-faint group-hover/row:inline">
-                {kib(entry.kind.file.bytes)}
-              </span>
-            {/if}
-          </button>
+          <Row {...rowOf(entry, here, openNow)} />
           {#if isDir && openNow}
             <Branch {root} {picked} {onPick} at={here} depth={nesting + 1} />
           {/if}

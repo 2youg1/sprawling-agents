@@ -16,8 +16,9 @@
   import { ui } from "../../ui";
   import type { Address, BuildingAnswer } from "../../wire";
   import { Address as AddressSchema } from "../../wire";
-  import Badge from "../parts/badge.svelte";
   import Button from "../parts/button.svelte";
+  import Field from "../parts/field.svelte";
+  import RoomRow from "./room_row.look.svelte";
 
   interface RoomsProps {
     readonly answer: BuildingAnswer;
@@ -48,22 +49,16 @@
       {#each answer.rooms as name (name)}
         {@const room = AddressSchema.make(`${answer.addr}/${name}`)}
         <li>
-          <button
-            type="button"
-            class="flex h-step w-full items-center gap-snug rounded-control px-snug text-left leading-none text-text-quiet hover:bg-chrome"
-            onclick={() => {
-              onPick(room);
+          <RoomRow
+            name={roomOf(room)}
+            live={living(room) > 0 ? fill(say($lang, "city_active"), { n: String(living(room)) }) : undefined}
+            wire={{
+              type: "button",
+              onclick: () => {
+                onPick(room);
+              },
             }}
-          >
-            <span class="min-w-0 flex-1 truncate">{roomOf(room)}</span>
-            {#if living(room) > 0}
-              <Badge
-                text={fill(say($lang, "city_active"), { n: String(living(room)) })}
-                weight="live"
-                dot
-              />
-            {/if}
-          </button>
+          />
         </li>
       {/each}
     </ul>
@@ -72,21 +67,30 @@
   {/if}
   <!-- The box keeps room for its whole placeholder, and in a column too
   narrow for both the button moves under it rather than cutting the
-  words that say what the box is for. -->
-  <div class="mt-base flex flex-wrap items-center gap-snug">
-    <input
-      class="h-control min-w-[min(100%,26ch)] flex-1 rounded-control border border-edge-input bg-raised px-base text-note placeholder:text-text-faint"
-      aria-label={say($lang, "bld_room_name")}
-      placeholder={say($lang, "bld_room_name")}
-      bind:value={roomName}
-      onkeydown={(event) => {
-        if (event.key === "Enter") talkIn();
-      }}
-    />
+  words that say what the box is for. A form, so Enter in the box is the
+  same request as the button. -->
+  <form
+    class="mt-base flex flex-wrap items-center gap-snug"
+    onsubmit={(event) => {
+      event.preventDefault();
+      talkIn();
+    }}
+  >
+    <div class="min-w-[min(100%,26ch)] flex-1">
+      <Field
+        label={say($lang, "bld_room_name")}
+        labelling="hidden"
+        placeholder={say($lang, "bld_room_name")}
+        value={roomName}
+        onInput={(value) => {
+          roomName = value;
+        }}
+      />
+    </div>
     <Button
       label={say($lang, "bld_room_talk")}
+      type="submit"
       tone={Option.isSome(named) ? "primary" : "secondary"}
-      onPress={talkIn}
     />
-  </div>
+  </form>
 </div>

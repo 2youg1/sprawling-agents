@@ -19,6 +19,7 @@
   import type { CommitAnswer, Effort, GitOid } from "../../wire";
   import { shortOid } from "../changes";
   import Copy from "../parts/copy.svelte";
+  import FactLink from "./fact_link.look.svelte";
   import Whose from "./whose.svelte";
 
   interface Props {
@@ -57,18 +58,24 @@
     <div class="flex min-w-0 flex-col">
       <dt class="text-text-faint">{say($lang, "commit_run")}</dt>
       <dd>
-        <a href={toFragment({ kind: "run", run: commit.run, lens: "changes" })} class="figure text-text hover:text-accent"
-          >{commit.run.slice(0, RUN_SHORT)}</a
-        >
+        <FactLink
+          label={commit.run.slice(0, RUN_SHORT)}
+          face="figure"
+          ink="text"
+          wire={{ href: toFragment({ kind: "run", run: commit.run, lens: "changes" }) }}
+        />
       </dd>
     </div>
     {#if commit.session !== null && commit.session !== undefined}
       <div class="flex min-w-0 flex-col">
         <dt class="text-text-faint">{say($lang, "commit_session")}</dt>
         <dd class="truncate">
-          <a href={toFragment({ kind: "talk", address: commit.actor })} class="text-text hover:text-accent"
-            >{commit.session}</a
-          >
+          <FactLink
+            label={commit.session}
+            face="words"
+            ink="text"
+            wire={{ href: toFragment({ kind: "talk", address: commit.actor }) }}
+          />
         </dd>
       </div>
     {/if}
@@ -87,9 +94,12 @@
         <dt class="text-text-faint">{say($lang, "commits_lineage")}</dt>
         <dd class="flex flex-wrap gap-x-snug">
           {#each commit.lineage.slice(1) as run (run)}
-            <a href={toFragment({ kind: "run", run })} class="figure text-text-quiet hover:text-accent"
-              >{run.slice(0, RUN_SHORT)}</a
-            >
+            <FactLink
+              label={run.slice(0, RUN_SHORT)}
+              face="figure"
+              ink="quiet"
+              wire={{ href: toFragment({ kind: "run", run }) }}
+            />
           {/each}
         </dd>
       </div>
@@ -98,14 +108,18 @@
       <dt class="text-text-faint">{say($lang, "commit_parents")}</dt>
       <dd class="flex flex-wrap gap-x-snug">
         {#each commit.parents ?? [] as oid (oid)}
-          <button
-            type="button"
-            class={["figure hover:text-accent", asked === oid ? "text-text" : "text-text-quiet"]}
-            aria-expanded={holds?.(oid) === true ? undefined : asked === oid}
-            onclick={() => {
-              parent(oid);
-            }}>{shortOid(oid)}</button
-          >
+          <FactLink
+            label={shortOid(oid)}
+            face="figure"
+            ink={asked === oid ? "text" : "quiet"}
+            wire={{
+              type: "button",
+              "aria-expanded": holds?.(oid) === true ? undefined : asked === oid,
+              onclick: () => {
+                parent(oid);
+              },
+            }}
+          />
         {:else}
           <span class="text-text-faint">{say($lang, "commit_root")}</span>
         {/each}

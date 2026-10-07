@@ -67,6 +67,8 @@
   import Status from "./building/status.svelte";
   import Tree from "./building/tree.svelte";
   import Rooms from "./building/rooms.svelte";
+  import { sectionsLookOf } from "./building/sections";
+  import Sections from "./building/sections.look.svelte";
   import { openItems, type RightItem } from "./inspect/open.svelte";
   import Right from "./right.svelte";
 
@@ -125,6 +127,17 @@
 
   const opened = $derived(openItems().length > 0 || beside.length > 0);
 
+  const index = $derived(
+    sectionsLookOf(
+      SECTIONS.map((key) => ({ key, label: say($lang, SECTION_WORD[key]) })),
+      section,
+      (next) => {
+        section = next;
+        picked = null;
+      },
+    ),
+  );
+
   // How many runs are working at or below a room, which is what the
   // rooms list lights its dots for.
   function livingIn(room: Address): number {
@@ -174,29 +187,7 @@
       class="col-[1/4] row-start-1 min-w-0 narrow:col-span-full narrow:row-auto"
       aria-label={say($lang, "bld_index")}
     >
-      <ul class="flex flex-col narrow:flex-row narrow:flex-wrap narrow:gap-tight">
-        {#each SECTIONS as each (each)}
-          <li>
-            <button
-              type="button"
-              class={[
-                "relative flex h-control w-full items-center rounded-control px-snug text-left text-note narrow:w-auto",
-                section === each ? "wash-strong text-text" : "text-text-quiet hover:wash",
-              ]}
-              aria-current={section === each ? "true" : undefined}
-              onclick={() => {
-                section = each;
-                picked = null;
-              }}
-            >
-              {#if section === each}
-                <span class="absolute inset-y-snug left-0 w-hair rounded-pill bg-accent" aria-hidden="true"></span>
-              {/if}
-              {say($lang, SECTION_WORD[each])}
-            </button>
-          </li>
-        {/each}
-      </ul>
+      <Sections {...index} />
     </nav>
     <section
       class={[

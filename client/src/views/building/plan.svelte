@@ -29,6 +29,8 @@
   import Badge from "../parts/badge.svelte";
   import type { Weight } from "../parts/glyph";
   import Progress from "../parts/progress.svelte";
+  import { disclosureWire } from "./disclosure";
+  import Disclosure from "./disclosure.look.svelte";
   import NodeCost from "./node_cost.svelte";
 
   interface Props {
@@ -124,14 +126,7 @@
     <ul class="border-t border-edge text-note">
       {#each answer.plan as row (row.node)}
         <li class="border-b border-edge">
-          <button
-            type="button"
-            class="grid min-h-control w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-x-base rounded-control py-tight pr-snug text-left hover:wash"
-            aria-expanded={open === row.node}
-            onclick={() => {
-              open = open === row.node ? null : row.node;
-            }}
-          >
+          {#snippet cells()}
             <span class="flex min-w-0 items-baseline gap-base" style:padding-left={indentOf(row.node)}>
               <span class="w-figure shrink-0 figure text-text-faint">{row.node}</span>
               <span class={row.status === "done" ? "text-text-faint" : "text-text"}>
@@ -142,9 +137,17 @@
               </span>
             </span>
             <Badge text={statusWord(row)} weight={weightOf(row)} dot />
-          </button>
+          {/snippet}
+          <Disclosure
+            layout="plan"
+            open={open === row.node}
+            wire={disclosureWire(open === row.node, () => {
+              open = open === row.node ? null : row.node;
+            })}
+            {cells}
+          />
           {#if open === row.node}
-            <div class="pb-base pl-[calc(var(--spacing-figure)+var(--spacing-base))]">
+            <div class="pb-base pl-[calc(var(--spacing-glyph-sm)+var(--spacing-snug)+var(--spacing-figure)+var(--spacing-base))]">
               <NodeCost building={answer.addr} node={row.node} />
             </div>
           {/if}
