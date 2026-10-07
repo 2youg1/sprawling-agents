@@ -11,12 +11,10 @@
   // that cannot be chosen and says why, a control nobody has answered
   // yet, and the whole control with motion turned off.
   //
-  // It is a file of its own rather than six more cases among the shared
-  // controls because each fixture holds the choice a person made in it,
-  // and six more signals is what would push that component past
-  // reading in one screen.
+  // Each fixture holds the choice a person made in it, so pressing a
+  // cell on `#/gallery` moves the slider as it would on a page.
 
-  import type { Choice, Group } from "../parts/segmented";
+  import type { Choice, Group } from "../../parts/segmented";
 
   // The two laboratories the three dialects come from, and the colour
   // each is given. The sliding chooser is the only control in the
@@ -31,13 +29,13 @@
 </script>
 
 <script lang="ts">
-  import { WIRE_APIS } from "../../core/commands";
-  import type { WireApi } from "../../core/commands";
-  import { say } from "../../core/lang";
-  import type { Chroma, Lighting, Motion } from "../../core/appearance";
-  import { ui } from "../../ui";
-  import Segmented from "../parts/segmented.svelte";
-  import Case from "./case.svelte";
+  import { WIRE_APIS } from "../../../core/commands";
+  import type { WireApi } from "../../../core/commands";
+  import { say } from "../../../core/lang";
+  import type { Chroma, Lighting, Motion } from "../../../core/appearance";
+  import { ui } from "../../../ui";
+  import Segmented from "../../parts/segmented.svelte";
+  import Case from "../case.svelte";
 
   const { lang } = ui();
 
