@@ -82,12 +82,16 @@ impl<M: Machine + 'static> Service<M> {
 
     /// Reads the host and answers the page. Every failure of a read is a
     /// part of the answer, so the page always learns what was read.
+    ///
+    /// The results are copied before the history is read (Privacy.Service
+    /// D71): an operation records its conclusion before its result settles,
+    /// so a concluded result never outruns the history beside it.
     pub(crate) fn answer(&self) -> PrivacyAnswer {
+        let outcomes = self.kept().outcomes.iter().cloned().collect();
         let mut machine = (self.machine)();
         let host = machine.facts();
         let history = self.disclosed(&mut machine);
         let windows = !matches!(host, PrivacyHost::NotWindows);
-        let outcomes = self.kept().outcomes.iter().cloned().collect();
         super::answer::answer(
             host,
             |control| windows.then(|| machine.read(control).map(|reading| reading.value)),
