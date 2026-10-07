@@ -4,6 +4,8 @@
 
 **让Agent像市民生活在sprawling这座“城市”中，省下你的注意力和时间。**
 
+<p align="center"><a href="README.md">English</a> · <a href="README.zh-CN.md">简体中文</a></p>
+
 <p align="center">
   <a href="https://crates.io/crates/sprawling"><img alt="crates.io" src="https://img.shields.io/crates/v/sprawling?logo=rust&amp;labelColor=171717&amp;color=DEA584"></a>
   <a href="https://www.npmjs.com/package/sprawling"><img alt="npm" src="https://img.shields.io/npm/v/sprawling?logo=npm&amp;labelColor=171717&amp;color=CB3837"></a>
@@ -28,7 +30,7 @@ sprawling尽量少打断你。Agent在自己的楼里默认拥有全部权限，
 
 **状态：<!-- xtask:begin maturity:word -->alpha<!-- xtask:end -->。** 版本之间数据格式、wire和界面都还可能变。
 
-English：[README.md](README.md) · 给要介绍项目的模型读：[LLM.md](LLM.md) · 改代码之前读：[AGENTS.md](AGENTS.md)
+给要介绍项目的模型读：[LLM.md](LLM.md) · 改代码之前读：[AGENTS.md](AGENTS.md)
 
 **优点**：体积小；概念超级潮酷；面向多Agent，而不是一个Agent挂一圈扩展。
 

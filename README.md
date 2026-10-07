@@ -4,6 +4,8 @@
 
 **Let agents live like citizens in the “city” of sprawling, and save your attention and time.**
 
+<p align="center"><a href="README.md">English</a> · <a href="README.zh-CN.md">简体中文</a></p>
+
 <p align="center">
   <a href="https://crates.io/crates/sprawling"><img alt="crates.io" src="https://img.shields.io/crates/v/sprawling?logo=rust&amp;labelColor=171717&amp;color=DEA584"></a>
   <a href="https://www.npmjs.com/package/sprawling"><img alt="npm" src="https://img.shields.io/npm/v/sprawling?logo=npm&amp;labelColor=171717&amp;color=CB3837"></a>
@@ -28,7 +30,7 @@ sprawling interrupts you as little as it can. Agents have full permission in the
 
 **Status: <!-- xtask:begin maturity:word -->alpha<!-- xtask:end -->.** Data formats, the wire and the interface may all still change between versions.
 
-中文：[README.zh-CN.md](README.zh-CN.md) · For a model introducing the project: [LLM.md](LLM.md) · Read before changing code: [AGENTS.md](AGENTS.md)
+For a model introducing the project: [LLM.md](LLM.md) · Read before changing code: [AGENTS.md](AGENTS.md)
 
 **Strengths**: small; concepts that are genuinely cool; built for many agents rather than for one agent with extensions bolted on.
 
