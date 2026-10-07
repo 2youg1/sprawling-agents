@@ -59,9 +59,18 @@
   import Ring from "./gallery/ring.svelte";
   import Md from "./gallery/md.svelte";
   import Monitor from "./gallery/monitor.svelte";
-  import Parts from "./gallery/parts.svelte";
   import PartsBadge from "./gallery/parts/badge.svelte";
   import PartsCopy from "./gallery/parts/copy.svelte";
+  import PartButton from "./gallery/parts/button.svelte";
+  import PartCombobox from "./gallery/parts/combobox.svelte";
+  import PartDialog from "./gallery/parts/dialog.svelte";
+  import PartField from "./gallery/parts/field.svelte";
+  import PartNotice from "./gallery/parts/notice.svelte";
+  import PartPath from "./gallery/parts/path.svelte";
+  import PartPopover from "./gallery/parts/popover.svelte";
+  import PartSegmented from "./gallery/parts/segmented.svelte";
+  import PartTable from "./gallery/parts/table.svelte";
+  import PartTip from "./gallery/parts/tip.svelte";
   import Mailbox from "./gallery/mailbox.svelte";
   import Mob from "./gallery/mob.svelte";
   import Pga from "./gallery/pga.svelte";
@@ -76,7 +85,6 @@
   import SettingsPanel from "./gallery/set.svelte";
   import Shell from "./gallery/shell.svelte";
   import Shelved from "./gallery/shelved.svelte";
-  import Switches from "./gallery/switches.svelte";
   import TabsCases from "./gallery/parts/tabs.svelte";
   import Talking from "./gallery/talking.svelte";
   import Thr from "./gallery/thr.svelte";
@@ -160,11 +168,19 @@
   <Tables />
   <PartRow />
   <Monitor />
-  <Parts />
   <PartsBadge />
   <PartsCopy />
-  <Switches />
   <TabsCases />
+  <PartButton />
+  <PartField />
+  <PartPath />
+  <PartCombobox />
+  <PartTable />
+  <PartDialog />
+  <PartPopover />
+  <PartTip />
+  <PartNotice />
+  <PartSegmented />
   <Monitored />
   <Timed />
   <Resulted />

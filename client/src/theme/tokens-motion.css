@@ -29,6 +29,14 @@
   --transition-duration-coin: 420ms;
   --default-transition-duration: var(--transition-duration-short);
 
+  /* How far a control gives under the hand that presses it: one fact
+   * that every key which yields to a press reads, so a press feels the
+   * same wherever it lands. A ratio rather than a distance, because CSS
+   * cannot divide by a box's own width; at 96 % a 32 px key gives a
+   * pixel and a wide button a few, which reads as yielding rather than
+   * as shrinking. */
+  --scale-press: 0.96;
+
   /* Entering and arriving decelerate, leaving accelerates (refrain Q1),
    * so a thing coming in is read before it stops and a thing going out
    * does not linger. The values are Open Props' `--ease-out-4` and

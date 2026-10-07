@@ -41,7 +41,8 @@
 |---|---|---|---|
 | `button.svelte` | APG Button | Enter | 激活；`state() !== "idle"` 时 `onClick` 原地返回 |
 | | | Space | 同 Enter：平台把两个键都送进同一个 `onClick`，所以一次判定挡住指针、Enter 与 Space 三种输入 |
-| `path.svelte` 的显示控件 | APG Button | Enter／Space | 地址解析得出时发 `reveal`；解析不出时 `aria-disabled="true"`，点击落进一个空操作 |
+| `icon_button.svelte` 只有图标的键 | APG Button | Enter／Space | 激活；`why` 在场时 `onclick` 原地返回 |
+| `path.svelte` 的显示控件（一个 `icon_button`） | APG Button | Enter／Space | 地址解析得出时发 `reveal`；解析不出时 `aria-disabled="true"`，点击落进一个空操作 |
 | `field.svelte` | 有标签的文本框（无复合模式） | 平台的单行编辑键 | 由浏览器实现，本部件不截获 |
 | | | ↑／↓（`kind="number"`） | 按 `step` 增减，由平台实现 |
 | `inspect/patch.svelte` 的行号栏（调用方给了 `talk` 地址时：检视面的 diff 与 `changes.svelte` 打开的一行） | 链接 | Enter | 把「路径:新行号」（删去的行是「路径@旧提交:旧行号」）和该行的引文接到那个地址的草稿之后，再打开那段对话；composer 挂载时从草稿门读出它。每行一站 Tab，不给 `talk` 的页面行号栏不取焦 |
@@ -54,6 +55,8 @@
 | `building/sandbox.svelte` 的保存 | APG Button | Enter | 整值发 `configureSandbox`；燃料不是正整数时按不动，`why` 说为什么 |
 
 `button.svelte` 的 `aria-*`：`aria-disabled` 在 `loading` 或 `why` 在场时为 `"true"`，`aria-busy` 只在 `loading` 时为 `"true"`，`why` 在场时 `aria-describedby` 指向 `Tip` 的 id。**用 `aria-disabled` 而不是 `disabled`**：控件因此留在 Tab 序列里，键盘到得了它，读屏也读得到它为什么按不动。
+
+`icon_button.svelte` 的 `aria-*`：名字恒为 `aria-label`，取调用方给的 `label`；它的 `Tip` 在键可用时画同一个名字，不可用时画 `why`；`aria-describedby` 只在 `why` 在场时指向 `Tip`，因为可用时提示与名字是同一句，再读一遍只是重复；`aria-disabled` 恰在 `why` 在场时为 `"true"`。名字经 `Tip` 画出而不是写进 `title`，因为 `title` 键盘到不了、触屏看不见（设计 4-18）。键画在 `control-sm` 的方框里；`pointer: coarse` 下命中区由 `::before` 扩到 `--spacing-touch`（44），画出的方框不变（`docs/frontend-method.md` §4-34）。
 
 `field.svelte` 的 `aria-*`：`<label for>` 给名字（`labelling="hidden"` 只把标签移出视线，名字仍在）；`aria-invalid` 恒等于 `error !== undefined`；`aria-describedby` 是调用方的 `describedBy` 与本格说明段 id 的并集，**错误替换说明而不是叠在它上面**，错误段自己带 `role="alert"`。红边有两条权威且说的是两件事：`error` 是城的回答，一到就红；`:user-invalid` 是浏览器读 `type` 与 `pattern` 的结果，失焦后才红。
 -/
