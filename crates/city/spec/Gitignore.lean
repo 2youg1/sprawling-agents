@@ -46,10 +46,24 @@ pub const SPEC_FILE: &str = "SPEC.md";   // 字节来自 crates/city/templates/S
 - **城替派活新建的房间都封上**：派活开房间的那一步（`crates/sprawling/Spec.lean` §8-40 的 `room_for`，城为一次派活写下的第一件东西）遇到一个没经过 `open` 的房间地址时调 `city::claim_room`：房间还不存在就建出它并封上，与 `room::open` 同一个 `seal_room`。放在这一步而不是写 `JOB.md` 时，是因为会话冻下的形状（`write_session`）在任务单之前就写进房间自己的 `.sprawling/CONFIG.toml`，那一写会先把目录建出来。一个直接派到 `building/room` 地址、没经过 `open` 的派活因此不再留下一个没封的房间。已存在的目录不封（理由同上一条），它里面的城文件由按名的规则挡住。
 - **每次开城补一遍**：`place_everywhere` 在城的写者打开时（门面名 `city::keep_records_out_of_git`，由 `accounting::worker::lifetime` 的 `RunWorker::holding` 调用；serve、resume 与立城都经过它）对城根与 `building::all` 列出的每栋楼各补一遍缺的行。规则表是会长的：它长出一行时，早先立起的楼要在下一次开城就拿到这一行，而不是只有新立的楼才有——D5 的定规对一座已经在跑的城同样成立。只追加、逐行比对，所以一栋规则齐全的楼一个字节都不会被写。一份写不进去的 `.gitignore` 让开城以 `E_STORAGE_FATAL` 拒绝：城说不出它的对话记录会不会进 git 时，不接活。
 - **房间由房间自己忽略**：`room::open` 在新开的房间里放一份只有 `*` 一行的 `.gitignore`。楼这一层的 `.gitignore` 写不出「房间」——房间是人当场命名的普通子目录，立楼时它们还不存在，而在被收编的仓库里按通配符去猜哪个子目录是房间会误伤源码目录。
+- **封条整张出现**：`seal_room` 只封调用方刚以 `create_dir` 独占建出的目录，封条经 `document::replace` 落盘（暂存、刷盘、改名），所以任何读者在那个目录里看到的要么没有封条，要么是完整的 `*` 一行（city D24）。
 - **追加读的是 UTF-8 文本，写的是 LF**：`append_missing` 以 `read_to_string` 读已有的文件，一份不是 UTF-8 的 `.gitignore` 读不出，开城以 `E_STORAGE_FATAL` 拒绝并给出路径，而不是把它当作空文件整份覆盖。补进去的每一行以 `
 ` 结尾；已有的行原样保留，比对时去掉首尾空白，所以 CRLF 的行同样算「已有」，一份 CRLF 的文件补过之后是混合行尾，git 逐行读，匹配不受影响。读、比对、写在 `document::edit` 的同一次持有里，它只挡住本进程里的其他写者，挡不住人在编辑器里同时改这份文件。
 - **三个平台**：规则文本、追加与比对在 Windows、macOS、Linux 上是同一段代码、同一个结果。git 在大小写不敏感的文件系统上（Windows 与 macOS 的缺省）建仓时置 `core.ignorecase=true`，规则对大小写不同的同名文件同样生效；Linux 上区分大小写。城自己写的文件名大小写固定，所以三个平台忽略的是同一组城写下的文件。
 - 被否：在楼的 `.gitignore` 里写 `*/JOB.md`、`*/URBANITE.md` 一类通配。它只忽略房间里的某几个文件名，会让一次会话的其余产物照样进历史，等于把这条规则写成一半。
+-/
+
+/-! D24 房间的封条整张出现：暂存再改名，不用 `create_new` 加写入
+
+**决定**：`seal_room` 把 `*` 一行写进同目录的暂存文件（`kernel::layout::document_staging_name`），刷盘，再一次 `rename` 放到 `.gitignore` 上；门就是 `document::replace`。
+
+**理由**：派活新建的房间在楼的写域里，而同一栋楼里另一个 run 的检查点此刻可能正在 `add_all` 这一片目录。`create_new` 先让一个空的 `.gitignore` 出现、再写进两个字节：空的封条不忽略任何东西，连它自己也不忽略，于是 libgit2 把它当作未跟踪文件，先 stat 得到一个尺寸，读的时候读到另一个，报 `failed to read file into stream`，整波检查点以 `E_WORKTREE_BUSY` 被拒；stat 与读恰好都落在写入之前时，这份空文件被悄悄收进那一波检查点。一个协调者连着派三个房间时（citysim `tests/collaboration.rs` 的 TP3 场景），它第二次 `delegate` 前的检查点正落在这扇窗里：第一个孩子的房间刚建出、封条还是空的。暂存文件的名字是检查点在打开之前按名跳过的那一种（storage D30），改名之后完整的 `*` 连同暂存文件一起被忽略。
+
+**为什么改名不会盖掉别人的封条**：占名的是目录，不是封条——`room::open` 与 `room::claim` 先以 `create_dir` 独占建出房间，只有建成功才封，所以封条落下时这个目录在一瞬之前还不存在，没有第二个写者的 `.gitignore` 可盖。storage D15 否决「新建走暂存再 `rename`」，是因为那里名字本身就是竞争的对象；这里不是。
+
+**被否**：①暂存后 `hard_link` 到位——同样整张出现、也不覆盖，但 FAT 与 exFAT 上没有硬链接，一座放在这类盘上的城从此开不了房间。②让检查点在这类读失败时跳过该路径——storage D30 已否：竞态窗口仍在，只把失败换成漏收。
+
+**重开参数**：`seal_room` 有了一个封已存在目录的调用方，那时封条的名字成了竞争对象，要改用不覆盖的落盘。
 -/
 
 /-! D5 定规：项目文件夹里的工作文档与对话记录恒不进 git
