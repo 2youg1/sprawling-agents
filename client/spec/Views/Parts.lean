@@ -125,7 +125,7 @@
 
 `combobox.svelte` 的 `aria-*`（规格）：文本框是 `role="combobox"`，带 `aria-expanded`、`aria-controls` 指向列表、`aria-activedescendant` 指向游标行；列表 `role="listbox"` ＋ `aria-label`；每行 `role="option"`，`aria-selected` 只标**已选中的那个值**，不标游标。
 
-`popover.svelte` 的 `aria-*`：外层 `role="dialog"` ＋ `aria-label`；每列 `<ul role="listbox">` ＋ `aria-label`；每行 `role="option"`。`aria-selected` 表示当前生效的值，游标由持焦元素的 `aria-activedescendant` 承担。**生效的那一行画成更深的底色**（`wash-strong`），游标只在没有生效值的那一行用底色梯级（`bg-raised-hover`）：两者不互相盖过，也不需要确认键或勾选标记。按钮触发时列表取焦，`tabindex` 只给当前列 `0`；文本框触发时调用方经 `bind` 拿走键表，焦点留在文本框，`aria-activedescendant` 写在文本框上。菜单仍存在时，两条路径都在活动行或数据变化，以及键表采纳按键后的 DOM 更新完成后，将该行滚入当前列的视口；能容纳整行时露出整行，行高超过视口时露出行首，不改变持焦元素或外层页面位置。几何规则与证明在 `client/spec/Views/Parts/Popover.lean`。
+`popover.svelte` 的 `aria-*`：外层 `role="dialog"` ＋ `aria-label`；每列 `<ul role="listbox">` ＋ `aria-label`；每行 `role="option"`。`aria-selected` 表示当前生效的值，游标由持焦元素的 `aria-activedescendant` 承担。**生效的那一行画成更深的底色**（`wash-strong`），游标只在没有生效值的那一行用底色梯级（`bg-raised-hover`）：两者不互相盖过，也不需要确认键或勾选标记。游标另在行首画一道 accent 竖条，落在生效的那一行上也画：强制色去掉一切底色时边框留着，所以游标不只靠颜色可见；`combobox.svelte` 的列表用同一画法。按钮触发时列表取焦，`tabindex` 只给当前列 `0`；文本框触发时调用方经 `bind` 拿走键表，焦点留在文本框，`aria-activedescendant` 写在文本框上。菜单仍存在时，两条路径都在活动行或数据变化，以及键表采纳按键后的 DOM 更新完成后，将该行滚入当前列的视口；能容纳整行时露出整行，行高超过视口时露出行首，不改变持焦元素或外层页面位置。几何规则与证明在 `client/spec/Views/Parts/Popover.lean`。
 -/
 
 /-!
