@@ -50,8 +50,9 @@
 {#each PLACED as placed, at (placed.label)}
   <Case label={placed.label}>
     <!-- Room on every side, so the hint lands inside the fold whichever
-    way the engine flips it. -->
-    <div class="py-section">
+    way the engine flips it: a hint above is centred on its control and
+    wider than it, so the control stands in the middle of the fold. -->
+    <div class="flex justify-center py-section">
       <TipLook {...standing(placed, at)}>
         {#snippet children(hint: string)}
           <button
