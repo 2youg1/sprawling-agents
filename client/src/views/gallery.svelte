@@ -73,6 +73,7 @@
   import Shell from "./gallery/shell.svelte";
   import Shelved from "./gallery/shelved.svelte";
   import Switches from "./gallery/switches.svelte";
+  import TabsCases from "./gallery/parts/tabs.svelte";
   import Talking from "./gallery/talking.svelte";
   import Thr from "./gallery/thr.svelte";
   import AgentMessages from "./gallery/agent_messages.svelte";
@@ -152,6 +153,7 @@
   <Monitor />
   <Parts />
   <Switches />
+  <TabsCases />
   <Monitored />
   <Timed />
   <Resulted />
