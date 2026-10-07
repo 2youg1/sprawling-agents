@@ -72,8 +72,9 @@
 
 <div class="flex flex-col gap-base">
   <textarea
-    class="min-h-output w-full min-w-0 rounded-control border border-edge-panel bg-raised px-base py-snug font-mono text-note text-text placeholder:text-text-faint"
+    class="min-h-output w-full min-w-0 rounded-control border border-edge-input bg-raised px-base py-snug font-mono text-note text-text placeholder:text-text-faint"
     rows={8}
+    spellcheck="false"
     aria-label={say($lang, "mcp_door_json")}
     placeholder={say($lang, "mcp_json_placeholder")}
     value={text}

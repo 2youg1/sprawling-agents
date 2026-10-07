@@ -18,16 +18,21 @@
 // pausing listens to them and not to the `scroll` event. `F`, or the
 // follow button, takes it up again; the key is heard page-wide because
 // it only means something while this view is on the page.
+//
+// This file is the seat (client D95): it holds the two states and the
+// two panes, and `./monitor.ts` turns them into the value the look
+// (`monitor.look.svelte`) draws.
 </script>
 
 <script lang="ts">
-  import { fill, say } from "../../core/lang";
-  import { count } from "../../core/time";
   import { ui } from "../../ui";
   import type { Turn } from "../../wire";
   import CodeColumn from "./code_column.svelte";
+  import Look from "./monitor.look.svelte";
   import Terminal from "./terminal.svelte";
   import type { Tail } from "../../core/live_output";
+  import { lookOf, resumes } from "./monitor";
+  import type { Following, Pane } from "./monitor";
   import { traceOf } from "./trace";
   import type { Target } from "./trace";
 
@@ -39,18 +44,19 @@
     readonly live: boolean;
     readonly onDraft: (text: string) => void;
     readonly onSteer: (text: string) => void;
+    // How the monitor opens; the gallery draws the folded and paused
+    // states from these, and the page takes the defaults.
+    readonly following?: Following;
+    readonly terminal?: Pane;
   }
 
-  const { turns, tail, live, onDraft, onSteer }: Props = $props();
+  const { turns, tail, live, onDraft, onSteer, following: openFollowing = "following", terminal: openTerminal = "open" }: Props = $props();
   const { lang } = ui();
 
-  type Following = "following" | "paused";
-  type Pane = "open" | "folded";
-
-  const SCROLLING = new Set(["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End", " "]);
-
-  let following = $state<Following>("following");
-  let terminal = $state<Pane>("open");
+  // svelte-ignore state_referenced_locally (the props say how the monitor opens; the person moves both after that)
+  let following = $state<Following>(openFollowing);
+  // svelte-ignore state_referenced_locally (as above)
+  let terminal = $state<Pane>(openTerminal);
   let code = $state<HTMLElement | undefined>(undefined);
   let record = $state<HTMLElement | undefined>(undefined);
 
@@ -79,88 +85,51 @@
     }
   }
 
-  function jump(path: string): void {
-    following = "paused";
-    land({ kind: "file", path });
-  }
+  // The same two attachments on every draw, so a redraw keeps its panes.
+  const holdCode = (node: HTMLElement): (() => void) => {
+    code = node;
+    return () => {
+      code = undefined;
+    };
+  };
+  const holdRecord = (node: HTMLElement): (() => void) => {
+    record = node;
+    return () => {
+      record = undefined;
+    };
+  };
 
-  function scrolledBy(event: KeyboardEvent): void {
-    if (SCROLLING.has(event.key)) following = "paused";
-  }
+  const look = $derived(
+    lookOf({ following, terminal, paths: trace.files.map((file) => file.path) }, $lang, {
+      follow: (next) => {
+        following = next;
+      },
+      fold: (next) => {
+        terminal = next;
+      },
+      jump: (path) => {
+        following = "paused";
+        land({ kind: "file", path });
+      },
+      holdCode,
+      holdRecord,
+    }),
+  );
 
   function resumeBy(event: KeyboardEvent): void {
     const typing = event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement;
-    if (event.key.toLowerCase() !== "f" || typing || event.ctrlKey || event.metaKey || event.altKey) return;
-    following = "following";
+    if (resumes({ key: event.key, ctrlKey: event.ctrlKey, metaKey: event.metaKey, altKey: event.altKey, typing })) following = "following";
   }
-
-  const PANE = "relative min-h-0 flex-1 overflow-y-auto focus-visible:outline-2 focus-visible:outline-accent";
 </script>
 
 <svelte:window onkeydown={resumeBy} />
 
-<section class="flex min-h-0 flex-1 flex-col" aria-label={say($lang, "mon_monitor")}>
-  <header class="flex flex-wrap items-center gap-snug border-b border-edge bg-chrome px-pane py-snug text-note">
-    <span class="text-label text-text">{say($lang, "mon_code")}</span>
-    <span class="text-text-faint figure">{trace.files.length === 1 ? say($lang, "mon_files_one") : fill(say($lang, "mon_files_n"), { n: count(trace.files.length) })}</span>
-    <button
-      type="button"
-      class="ms-auto inline-flex h-control-sm items-center rounded-control px-snug text-label {following === 'following'
-        ? 'text-accent'
-        : 'bg-raised text-text'}"
-      aria-pressed={following === "following"}
-      onclick={() => (following = following === "following" ? "paused" : "following")}
-      >{say($lang, following === "following" ? "mon_following" : "mon_paused")}</button
-    >
-    <button
-      type="button"
-      class="inline-flex h-control-sm items-center rounded-control px-snug text-label text-text-quiet hover:bg-raised"
-      aria-expanded={terminal === "open"}
-      onclick={() => (terminal = terminal === "open" ? "folded" : "open")}
-      >{say($lang, terminal === "open" ? "mon_terminal_fold" : "mon_terminal_open")}</button
-    >
-  </header>
-  <div class="flex min-h-0 flex-1">
-    {#if terminal === "folded"}
-      <nav class="w-index shrink-0 overflow-y-auto border-e border-edge py-tight" aria-label={say($lang, "mon_files")}>
-        {#each trace.files as file (file.path)}
-          <button
-            type="button"
-            class="block w-full truncate px-snug py-tight text-start font-mono text-note text-text-quiet hover:bg-raised"
-            onclick={() => {
-              jump(file.path);
-            }}>{file.path}</button
-          >
-        {/each}
-      </nav>
-    {/if}
-    <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions (the pane takes focus so the keyboard can scroll it, and a scrolling key pauses following) -->
-    <div
-      bind:this={code}
-      class="{PANE} {terminal === 'open' ? 'flex-[1.4] border-e border-edge' : ''}"
-      role="region"
-      aria-label={say($lang, "mon_code")}
-      tabindex="0"
-      onwheel={() => (following = "paused")}
-      ontouchmove={() => (following = "paused")}
-      onkeydown={scrolledBy}
-    >
-      <CodeColumn files={trace.files} {live} {onDraft} {onSteer} />
-    </div>
-    {#if terminal === "open"}
-      <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions (the pane takes focus so the keyboard can scroll it, and a scrolling key pauses following) -->
-      <div
-        bind:this={record}
-        class="{PANE} bg-page"
-        role="region"
-        aria-label={say($lang, "mon_terminal")}
-        tabindex="0"
-        onwheel={() => (following = "paused")}
-        ontouchmove={() => (following = "paused")}
-        onkeydown={scrolledBy}
-      >
-        <Terminal entries={trace.entries} {tail} />
-      </div>
-    {/if}
-  </div>
-</section>
+{#snippet column()}
+  <CodeColumn files={trace.files} {live} {onDraft} {onSteer} />
+{/snippet}
+
+{#snippet printed()}
+  <Terminal entries={trace.entries} {tail} />
+{/snippet}
+
+<Look {...look} {column} {printed} />

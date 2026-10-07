@@ -4,22 +4,9 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The windows on this person's own machine a building's connector may
-// touch, one building at a time.
-//
-// One box holding the whole file, because that is what the file is: the
-// connector reads it whole at start-up and permits nothing it cannot
-// read, so a form with a field per window would be a second reading of
-// a syntax this side does not own (`crates/city/Spec.lean` §8-26).
-
-import { Address } from "../wire";
-
-// Where the file lives, as the city spells it. One authority on this
-// side too: a page that joined its own path could join one that leaves
-// the subtree.
-export function desktopScopeAt(addr: Address): Address {
-  return Address.make(`${addr}/.sprawling/DESKTOP.toml`);
-}
+// The seat of a building's desktop allowlist editor (client D95): it
+// asks for the file, holds the draft, and sends the save; `./desktop.ts`
+// turns them into the value the look (`desktop.look.svelte`) draws.
 </script>
 
 <script lang="ts">
@@ -27,10 +14,10 @@ export function desktopScopeAt(addr: Address): Address {
 
   import { configureDesktop } from "../core/commands";
   import { readDocument } from "../core/document";
-  import { fill, say } from "../core/lang";
   import { ui } from "../ui";
-  import type { Query } from "../wire";
-  import Button from "./parts/button.svelte";
+  import type { Address, Query } from "../wire";
+  import { desktopScopeAt, lookOf } from "./desktop";
+  import Look from "./desktop.look.svelte";
 
   interface Props {
     readonly addr: Address;
@@ -77,32 +64,21 @@ export function desktopScopeAt(addr: Address): Address {
       edited = false;
     }
   }
+
+  const file = $derived.by((): "missing" | "empty" | "held" => {
+    if (read.kind === "unavailable") return "missing";
+    return read.kind === "held" && onDisk === "" ? "empty" : "held";
+  });
+
+  const look = $derived(
+    lookOf({ addr, draft, edited, file }, $lang, {
+      type: (text) => {
+        draft = text;
+        edited = true;
+      },
+      save,
+    }),
+  );
 </script>
 
-<div class="flex flex-col gap-snug">
-  <textarea
-    class="min-h-output w-full rounded-control border border-edge-input bg-raised px-base py-snug font-mono text-note text-text placeholder:text-text-faint"
-    aria-label={say($lang, "desktop_allowlist")}
-    placeholder={say($lang, "desktop_empty")}
-    bind:value={draft}
-    oninput={() => {
-      edited = true;
-    }}
-  ></textarea>
-  {#if read.kind === "unavailable"}
-    <p class="text-note text-text-faint">{fill(say($lang, "desktop_missing"), { path: desktopScopeAt(addr) })}</p>
-  {/if}
-  <div class="flex items-center gap-base">
-    <Button
-      label={say($lang, "desktop_save")}
-      tone="primary"
-      {...(edited ? {} : { why: say($lang, "desktop_unchanged") })}
-      onPress={save}
-    />
-    {#if !edited && read.kind === "held" && onDisk === ""}
-      <span class="text-note text-text-faint">{say($lang, "desktop_none")}</span>
-    {/if}
-    <span class="flex-1"></span>
-    <code class="truncate font-mono text-note text-text-faint">{desktopScopeAt(addr)}</code>
-  </div>
-</div>
+<Look {...look} />
