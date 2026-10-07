@@ -134,8 +134,8 @@
   const records = recordsAt(now);
   const answers = answering(now);
   const MAINS: readonly (readonly [string, Tier])[] = [
-    ["sessions · an earlier session in main, blend, its continue offer", "blend"],
-    ["sessions · an earlier session in main, panorama, its continue offer", "panorama"],
+    ["sessions · an earlier session in main, blend, the way back to the current session", "blend"],
+    ["sessions · an earlier session in main, panorama, the way back to the current session", "panorama"],
   ];
 </script>
 
