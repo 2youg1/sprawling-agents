@@ -12,7 +12,7 @@
 
 四种 operation kind：
 - registry_value_hklm 与 registry_value_hkcu：winreg 的安全原始值接口，64 位视图
-  （KEY_WOW64_64KEY）；读取保留值缺席、父键是否存在（Privacy.State D60）、类型码与原始字节，
+  （KEY_WOW64_64KEY）；读取保留值缺席、父键是否存在（Privacy.State D61）、类型码与原始字节，
   访问拒绝与其他 IO 失败分别报告；写入用原类型码与原字节，父键不存在时创建；原值缺席时恢复只删除
   本值，保留父键；
   REG_SZ/REG_EXPAND_SZ 的原字节无法无损重写（例如未终止的字符串）时 apply 前拒绝。
@@ -35,8 +35,8 @@
 下的值、SOFTWARE\Microsoft\OneDrive 下的值与 HKCU 的 Control Panel 下的值，适配器按控制表给出的
 路径读写，不按前缀筛选。ERROR_ACCESS_DENIED 读作访问拒绝，与其他 IO 失败分开报告。
 
-机器作用域（HKLM 与计划任务）的写入经 `bin::privacy::elevation`（D59）；用户作用域在本进程写入，
-从不提升（D65）。
+机器作用域（HKLM 与计划任务）的写入经 `bin::privacy::elevation`（D60）；用户作用域在本进程写入，
+从不提升（D66）。
 `bin::privacy::windows::host` 是 coordinator 的生产 Host：按控制表的目标把读与写路由到这三个适配器
 与提升，把适配器的失败映射为 Privacy §12 的 ReadFault 与 WriteFault，并持有身份与 owner 绑定
 （Privacy.Cli）。适配器本身不知道控制，也不判定结论。
@@ -46,18 +46,18 @@
 DisplayVersion，全部只读 HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion，以及本进程是否已提升。
 EditionID 按前缀映射，规则在 `bin::privacy::windows` 一处定义：Core 为 home，Professional 为 pro，
 Education 为 education，Enterprise 为 enterprise，IoTEnterprise 为 iot_enterprise，Server 为 server，
-其他为无映射（页面显示原样的 EditionID，每个控制的版本适用都是 NotStated，Privacy.Controls D66）。
+其他为无映射（页面显示原样的 EditionID，每个控制的版本适用都是 NotStated，Privacy.Controls D67）。
 非 Windows 主机没有这些适配器：所有条目只读，页面说明仅 Windows。
 
 验收：只读用例在任何 Windows 上运行且不写注册表（不存在的随机键读作缺席且父键不存在；类型表往返）；
 真实写入只在一次性 GitHub Actions Windows runner 上，按 Privacy §16 执行，绝不改人的主机设置。
 -/
 
-/-! D59 机器作用域的写入经短命的 UAC 提升子进程，父进程读回是唯一判定
+/-! D60 机器作用域的写入经短命的 UAC 提升子进程，父进程读回是唯一判定
 父进程以 ShellExecute 的 runas 动词启动当前可执行文件的 privacy elevated-write 动词，参数是一次写入：
 控制名与它要成为的快照（MachineWrite），编码为 JSON 后写成小写十六进制，所以命令行没有引号规则。
-一次提升只带一次写入（Privacy D62：同一时刻至多一个未结操作）。子进程按 `bin::privacy::controls`
-校验：控制的目标是机器作用域（HKLM 值或计划任务，HKCU 从不提升，D65）、快照种类与目标种类一致
+一次提升只带一次写入（Privacy D63：同一时刻至多一个未结操作）。子进程按 `bin::privacy::controls`
+校验：控制的目标是机器作用域（HKLM 值或计划任务，HKCU 从不提升，D66）、快照种类与目标种类一致
 （注册表值配 Registry 快照，任务配 Enabled 或 Disabled，任务的 Absent 拒绝，因为适配器从不注册或
 删除任务）、注册表值字节不超过 1024；然后只写，不读、不记录、不判定。父进程等待它退出后自己读回，
 按 Privacy 的 judgeReadback 判定。UAC 被拒（ERROR_CANCELLED 1223）、子进程非零退出或访问拒绝都
@@ -73,7 +73,7 @@ Education 为 education，Enterprise 为 enterprise，IoTEnterprise 为 iot_ente
 该目标的读回也要移入子进程，并重新论证「父进程读回是唯一判定」。
 -/
 
-/-! D65 HKCU 的写入从不提升；访问拒绝以 NotApplied 结束
+/-! D66 HKCU 的写入从不提升；访问拒绝以 NotApplied 结束
 HKCU\Software\Policies 下的值（以及其他 HKCU 目标）在本进程写入。标准账户能否写 Software\Policies
 没有来源说明；写入被拒时目标读回原值，按现有判定以 NotApplied 结束，错误带稳定码 access_denied，
 说明这个账户不能写这个策略键、什么都没有改变。不新增状态。

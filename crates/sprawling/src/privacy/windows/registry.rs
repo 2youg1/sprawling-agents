@@ -44,7 +44,7 @@ const REGISTRY_TYPES: [(u32, RegType); 12] = [
 /// What one read of a value found.
 pub(in crate::privacy) enum Reading {
     /// The value or its absence, and whether its key exists, which is
-    /// recorded beside the value rather than inside it (Privacy.State D60).
+    /// recorded beside the value rather than inside it (Privacy.State D61).
     Value { value: RawValue, key_existed: bool },
     /// `ERROR_ACCESS_DENIED`: this account may not read the key.
     AccessDenied,
@@ -100,7 +100,7 @@ pub(in crate::privacy) fn read(hive: HKEY, key: &str, name: &str) -> Reading {
 /// written under its own type code, creating the key when it is missing;
 /// an absent one deletes only the value and keeps the key, so a key the
 /// apply created stays behind as an empty key the report can name
-/// (Privacy.State D60).
+/// (Privacy.State D61).
 ///
 /// # Errors
 /// [`WriteFault`]; a write that fails part-way is told apart by the

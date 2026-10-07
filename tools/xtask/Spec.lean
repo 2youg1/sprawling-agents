@@ -42,7 +42,7 @@ Markdown 时的标签 `8-n`，别处引作 `tools/xtask/Spec.lean §8-n`。
 | spec | 一个包恰有一份生效规格；散文里点名的 `<名>-SPEC` 在树上；Lean 的 import 纪律；`.lean` 里没有 `sorry`、`admit`、`axiom`；规格引用的仓内路径在盘上；状态机分部里没有定理的数与解析不到的 Rust 路径数只降不升（§8-42） |
 | budget | `tools/xtask/budgets.toml` 里每一行可称重且被 gated 的预算，当场称一次；没有构建产物可称时沉默（`just check` 不构建 release 二进制），壁钟读数只入册不入门 |
 | color | 颜色在每个客户端里恰好被命名一次（产地表见 §8-8），且以色域上限的比值表达；扫仓库根，文件自豁免；玻璃按 `--glass-opacity` 盖在最亮的表面上时字仍够层级（§8-51） |
-| motion | 过渡的曲线与时长只住 `client/src/theme.css`：别处的 `cubic-bezier(`、`linear(`、`steps(` 与 Tailwind 的 `duration-<数字>`、`duration-[`、`ease-[` 即红（§8-51） |
+| motion | 过渡的曲线与时长只住客户端的主题（入口 `client/src/theme.css` 与它 import 的部分）：别处的 `cubic-bezier(`、`linear(`、`steps(` 与 Tailwind 的 `duration-<数字>`、`duration-[`、`ease-[` 即红（§8-51） |
 | release | 公开树由过滤生成；六条断言：公开树上零脚手架路径、产品文档不得链向或在正文里点名脚手架、任何发布文件不得携家目录路径、不得引用树里没有的文件、不得把一台机器的工作记录写进产品文档、链接的拼法与树上的名字逐字节相等（§8-15） |
 | length | 一个生产函数不得长过 `function_length`、不得多于 `argument_count` 个参数（不含接收者），一个源文件的生产行不得多过 `file_length`；三个预算都住 `tools/xtask/budgets.toml`；函数尺寸与签名以 `syn` 量得，Rust 文件尺寸是总行数减去顶层 `#[cfg(test)]` 项所跨的行；`.zig` 受函数与文件两面、不受参数面，按 Zig 的词法量，文件尺寸减去 `test` 声明所跨的行（§8-48、D15）；只量文件面的语言（`length::surface::FILE_FACE` 所列扩展名，在仓库里哪个目录都一样）只受文件面，文件尺寸是总行数（§8-53、D33） |
 | npm | `client/` 的依赖面：锁文件在盘且与 `package.json` 逐条同、运行时依赖恰为 `npm::RUNTIME` 那张表、树上每个包的许可证都在 `deny.toml` 的准许表内（§8-12） |
@@ -224,7 +224,7 @@ pub(crate) struct Violation {
 
 /-! ### 8-8 color：一个客户端，一处颜色产地（形状 6 数据面）
 
-**权威是一句话**：颜色在每个客户端里恰好被命名一次。浏览器客户端的那一处是 `client/src/theme.css` 的 `@theme` 块，`THEME` 常量即它，七条令牌断言只读它。产地表（`color/scan.rs` 的 `PRODUCTION_POINTS`）有两行：`THEME`，以及 playback 技能的样式源文件 `skills/playback/src/style.css`——离线页面载不进客户端的样式表，所以它的颜色在自己的 `:root` 块里各命名一次。`skills/playback/template.html` 是该样式的组装输出，只在带有生成横幅时跳过字面量扫描；共享 Bun 检查逐字节比对它与源片段，未标记的页面仍受扫描。「断言读哪份表」与「扫描放过谁」从此是两个答案。
+**权威是一句话**：颜色在每个客户端里恰好被命名一次。浏览器客户端的那一处是它的主题：入口 `client/src/theme.css`，加上入口按顺序 `@import "./theme/<部分>.css";` 的各个部分文件（`client/src/theme/`）。主题在哪、按什么顺序读，只由 `tools/xtask/src/theme.rs` 回答（`ENTRY`、`Theme::read`、`is_theme`）；七条令牌断言读的是 `Theme::inlined()`——入口里每一行 import 换成它点名的那个部分——所以拆成几个文件不改变断言读到的文本。违例报在声明它所判之物的那个部分文件上（`Theme::declaring`）。产地有两处：浏览器客户端的主题（`theme::is_theme`），以及 playback 技能的样式源文件 `skills/playback/src/style.css`——离线页面载不进客户端的样式表，所以它的颜色在自己的 `:root` 块里各命名一次。`skills/playback/template.html` 是该样式的组装输出，只在带有生成横幅时跳过字面量扫描；共享 Bun 检查逐字节比对它与源片段，未标记的页面仍受扫描。「断言读哪份表」与「扫描放过谁」从此是两个答案。
 
 **七条令牌断言读 CSS 自定义属性，不读 Rust 表**。解析面因此是 `--color-*`／`--text-*`／`--font-weight-*` 这一类声明，值取 `oklch(L C H)` 的三个分量。灰阶的 `L` 以千分之一为单位比较（`0.145` 读作 145），与断言里的 `L_FLOOR`／`L_CEILING` 同刻度。
 
@@ -237,17 +237,19 @@ pub(crate) struct Violation {
 | 对比按文本可落的**最亮表面**判 | 表面是一条排版约定，不是令牌 | `--surface-ceiling` |
 | 读数低于层级多少仍算够到（APCA 公布值的取整） | 余量是判定的容差，不是颜色；门与配色页（`client/src/views/setup/colours.ts`）读同一个数 | `--tier-slack` |
 
-这四组属性不参与层叠——没有任何规则引用它们，浏览器读到即忽略。它们在这里，是因为 `theme.css` 是颜色唯一的家：这三件事若不写在它旁边，门就剩下三条无从判起的断言，而一道找不到输入就变绿的门，正是 §8-13 点名要避的失效。写进 CSS 而非另起一份 TOML，是为了让一个改颜色的人在同一屏里看见他改的值和那个值必须守的比值。
+这四组属性不参与层叠——没有任何规则引用它们，浏览器读到即忽略。它们在这里，是因为主题是颜色唯一的家：这三件事若不写在它旁边，门就剩下三条无从判起的断言，而一道找不到输入就变绿的门，正是 §8-13 点名要避的失效。写进 CSS 而非另起一份 TOML，是为了让一个改颜色的人在同一屏里看见他改的值和那个值必须守的比值。
 
 - **一份样式表被读成两块调色板**（`Mode::Dark`／`Mode::Light`）。`reading()` 把 `:root[data-theme="light"]` 那一块切出来，深色读数是剩下的部分，浅色读数是那一块加上剔除了 `--color-` 声明的共用部分；七条断言各对两份读数各跑一遍，违例报告先报是哪一面。**切成文本而不是先解成表**：下游每一个读者本来就读文本，多一层表就是这道门本来要防的那个第二权威。
 - **色阶按页面命名，不按墨色**：`g0` 永远是页面，`g10` 永远是离页面最远的那一面。断言一因此是「每一档都比前一档更远离页面」，断言二是每个 mode 自己的一对端点。**两对端点不对称是 APCA 的结论而不是口味**：浅底深字被收的费远高于深底浅字，一个在 878 的表面上没有任何墨色能够到 Lc 90，于是浅色页把它的量程花在三个要承载文字的面上，剩下的才给下方的填色。
 - **浅色在哪里被选中不归这份样式表管**：`system` 由客户端读 `prefers-color-scheme` 后写成 `data-theme`，而不是在 CSS 里再写一遍同一套令牌。**败给的方案**：`@media (prefers-color-scheme: light)` 里再声明一遍十一档——那是同一块调色板的第二份定义，两份在他们开始不一致之前都是对的。
 - **改价条件**：参考页改为读城发出的某份样式表时，它的那一行从产地表删去；出现第三个客户端时，它照参考页的样子加一行。
+
+D34 **主题是一个入口加它按顺序 import 的部分，顺序只住在入口里。** 主题超过一个文件的长度上限（§8-53），按将来谁拥有它切成连续的几段，每段一个部分文件，入口按原来的顺序 import 它们，层叠因此不变。两种错误各有稳定的码：入口 import 的部分不在盘上（`theme-part-missing`），`client/src/theme/` 里有一个入口没有 import 的 `.css`（`theme-part-unimported`）——后者若放过，就是一份每道门都豁免、却没有页面画它的文件。被击败的备选：①按文件名排序读部分——要给每个文件加编号前缀，顺序就有了入口之外的第二个家；②各部分各判各的——浅色块覆写的令牌与它所覆写的那些声明分在两份文本里，`reading()` 拼不出一种打光的整张表。**重开参数**：Tailwind 不再自己内联 `@import`，或主题回到一个文件之内。
 -/
 
 /-! #### 8-8a 禁用墨色只写在禁用状态之后（`color/disabled.rs`，形状 6 数据面）
 
-`--color-text-disabled` 的目标是 APCA Lc 30（`--tier-text-disabled`），浅色页上约 2:1，只够告诉手「这里按不动」，不够让眼读出一个字。所以门的规则是：客户端源码（`client/src` 下的 `.svelte`／`.ts`／`.css`，不含 `theme.css`）里每一处 `text-text-disabled` 类名，都必须挂在一个名字里带 `disabled` 的变体之后，例如 `aria-disabled:text-text-disabled`、`disabled:text-text-disabled`、`group-aria-disabled:text-text-disabled`。花费、时刻、模型名、run id、占位字、按键字样这些人要读的信息，改用 `text-text-faint`（Lc 60）或更高一级。
+`--color-text-disabled` 的目标是 APCA Lc 30（`--tier-text-disabled`），浅色页上约 2:1，只够告诉手「这里按不动」，不够让眼读出一个字。所以门的规则是：客户端源码（`client/src` 下的 `.svelte`／`.ts`／`.css`，不含主题的入口与部分）里每一处 `text-text-disabled` 类名，都必须挂在一个名字里带 `disabled` 的变体之后，例如 `aria-disabled:text-text-disabled`、`disabled:text-text-disabled`、`group-aria-disabled:text-text-disabled`。花费、时刻、模型名、run id、占位字、按键字样这些人要读的信息，改用 `text-text-faint`（Lc 60）或更高一级。
 
 - **判的是类名的写法，不是运行时的条件**：`{off ? 'text-text-disabled' : …}` 这种三元式里，门看不出条件是不是「禁用」，所以不收；元素本来就带 `aria-disabled`，写成变体，状态与墨色由同一个属性决定，没有第二个权威。
 - **类名的边界**：从出现处往前取到空白、引号、反引号或花括号为止，这一段按 `:` 切开，最后一段之前的任何一段含 `disabled` 即算禁用上下文；最后一段是紧贴在类名前面的文字，不是变体，不算。否定的任意变体（`[&:not(:disabled)]:`）也含 `disabled`，同样算禁用上下文，这是按文字判的代价，客户端里没有这种写法。
@@ -655,9 +657,21 @@ shebang 和现有运行时选择，不要求二者同时安装。被否：只在
 
 **败给的方案**：在 `ci.yml` 里照抄那两条命令，附一句「与 `justfile` 保持一致」。那正是分叉发生时的写法，而没有任何东西会注意到它们不再一致。
 
-D27 **验证编排只住 `.github/workflows/ci.yml`，release 经 `workflow_call` 调同一提交的入口。** 本段描述 GitHub Actions 的调用契约，不是 Lean 证明；job 状态与矩阵完整性由 Actions 引擎提供。输入 `release-validation` 是默认 false 的 boolean，true 保持发行原有的阻塞范围：跳过 `changes`、Linux/macOS `core` 与条件 `proof`，其余 job 与普通 CI 共用 recipes、矩阵和准备步骤。普通 CI 的路径条件与手动 proof 不变；扩大 core/proof 的发布阻塞范围须另有明确决定。`validation` 经 `needs` 汇合必需 job，只有每项为 success 才成功；failure、cancelled、skipped 与因构建失败而未运行的分片都拒绝。类型分片共用本轮 `test-build` 的 archive；`justfile` 的 `test-slice-plan` 是分片名称与 nextest filterset 的唯一权威，CI 使用该 recipe 输出的矩阵，release 不另写检查清单。构建作业用 archive 的完整 nextest JSON 清单与每个 filterset 的清单比较 `(binary-id, test name)`，包括 ignored 项；未分配、重复分配或清单外的项都失败，只有覆盖验证成功才输出矩阵。trybuild 按 package 分开，citysim 独立，其余 unit 按 crate 分组、integration 按 package 分组，其他 kind 归入兜底分片；accounting 的 unit 场景按执行、协作及补集三个模块域分开，因为其文件写入与 worker 场景集中在一个 runner 会成为执行热点，域的 module 名称只在 `test-slice-plan` 的 predicates 定义，补集从这些 predicates 生成。新测试必须仍恰好落入一个分片。
+D27 **验证编排只住 `.github/workflows/ci.yml`，release 经 `workflow_call` 调同一提交的入口。** 本段描述 GitHub Actions 的调用契约，不是 Lean 证明；job 状态与矩阵完整性由 Actions 引擎提供。输入 `release-validation` 是默认 false 的 boolean，true 保持发行原有的阻塞范围：跳过 `changes`、Linux/macOS `core` 与条件 `proof`，其余 job 与普通 CI 共用 recipes、矩阵和准备步骤。普通 CI 的路径条件与手动 proof 不变；扩大 core/proof 的发布阻塞范围须另有明确决定。`validation` 经 `needs` 汇合必需 job，只有每项为 success 才成功；failure、cancelled、skipped 与因构建失败而未运行的分片都拒绝。分片共用本轮 `test-build` 的 archive；`justfile` 的 `test-slice-plan` 是分片名称与 nextest filterset 的唯一权威，CI 使用该 recipe 输出的矩阵，release 不另写检查清单。构建作业用 archive 的完整 nextest JSON 清单与每个 filterset 的清单比较 `(binary-id, test name)`，包括 ignored 项；未分配、重复分配或清单外的项都失败，只有覆盖验证成功才输出矩阵。filterset 由两层组成：part 是互不相交的测试集合——trybuild 按 package 分开，citysim 独立，其余 unit 按 crate 分组、integration 按 package 分组，其他 kind 归入兜底 part；accounting 的 unit 场景按执行、协作及补集三个模块域分开，域的 module 名称只在 `test-slice-plan` 的 predicates 定义，补集从这些 predicates 生成。分片是一个 runner 承担的若干 part，按实测 nextest 时间凑成四片：Windows 托管 runner 上一个分片在第一个测试之前要付约 60 s 的准备，而多数 part 只跑 10–80 s，一 part 一 runner 时一轮 CI 起 31 个 job、其中 23 个 Windows，与账户约 20 个并发 job 的上限相撞，两轮并发即互相排队，而墙钟并不比四片短。accounting 的执行与协作两个域同在一片且该片不带别的重 part，因为它们的文件写入与 worker 场景是一个 runner 最重的负载。新测试必须仍恰好落入一个 part，每个 part 恰好属于一个分片，recipe 对后者自查。
 
-`test-build` 的两项 Cargo debug 环境覆盖只在共享入口定义，main 与 tag 因而读同一种 test 缓存身份；fast/clippy/test 的用途仍各自独立，Rust cache 保持默认 workspace 产物清理，只有 main 写入。缓存恢复不是验证证据。release 调用的 concurrency 以 run id 隔离且不替代取消，普通 CI 仍按 ref 替代旧运行；调用权限只有 contents read，不传 secrets。release 的 advisories 是本轮新读，发行 archive 仍并行构建，publish 等待 verify、advisories 与 archive 成功，发行消费者只下载 archive-*。verify/archive job 名与 Windows 签名输出 archive-Windows 的位置保留。
+每个分片带一个 `environment`，同样只在 `test-slice-plan` 定义：`compile`（trybuild 自行编译，需要 Zig、registry 与 trybuild 草稿缓存；`test-slice` 只在这一种下 `cargo fetch`），`client`（xtask 的测试读 `client/node_modules` 与 bundle），`plain`（两者都不需要）。ci.yml 按它决定装什么，所以不编译的分片不为客户端树与 Zig 付一分钟。trybuild 的所有套件共用一个 target 目录 `target/tests/trybuild`，因此草稿缓存在 Windows 上是 `compile` 分片的一条，在 ubuntu 与 macOS 的 `core` 上各一条；冷的 trybuild 是 core 测试运行的大头（macOS 上单个套件 219 s）。
+
+只需几秒工作的 job 并入已经装好其工具的 job：fmt、读源码的门、提交信息与 Zig leaf 自测并入 `gates`，它本就装 Zig、编 xtask；各判定步骤以 `!cancelled()` 运行，一处红不遮住其余。`supply` 在 ubuntu 上跑，因为 `deny.toml` 不指定 target，cargo-deny 读的是所有平台的依赖图，判定与宿主无关，且它什么都不编译。被否：保留一 part 一 runner——墙钟没有缩短，排队变长；按 count 均分——把冷 trybuild 与 unit 混在一起，最慢一片由 trybuild 决定。重开参数：并发 job 上限、单个分片的准备开销、或某个 part 的实测时间显著变化。
+
+编译的 job 经 `.github/actions/toolchain` 装工具链：rustup home 放在 runner 的临时目录，里面只有 `rust-toolchain.toml` 钉住的那一个工具链，并设为默认（测试会在不受 `rust-toolchain.toml` 管辖的临时目录里运行 `cargo`）。原因是 Rust cache 把 rustup 装着的每个工具链都算进缓存键，镜像预装的 `stable` 因而也在键里：某次 ubuntu 镜像把 `stable` 从 1.98.1 换成 1.99.0 后，`core` 的键不再是 main 一小时前写下的那条，冷编译 474 s。在 Windows 上 Cargo home 移到工作盘（D:，checkout 所在）：托管 Windows runner 的系统盘 C: 写小文件慢得多，而 Cargo 在编译前要把构建读的每个 crate 解包进 `registry/src`，Rust cache 不保留这个目录。从 `Updating crates.io index` 到第一个 crate 开始编译，C: 上 test build 25 s、clippy 35 s，D: 上两者都是 9–10 s；trybuild 分片的 `cargo fetch`（含下载）从 49 s 降到 14–22 s。同理 bun 在 Windows 上下载到工作盘且不恢复缓存：88 MB 的缓存条目解包进 C: 的用户目录要 30 s，解包到 D: 是 6–7 s，而完全不用缓存的 `bun install` 是 7 s，条目在那里买不到时间。`proof` 不换：kani 缓存是对镜像自带的两个 home 写的。被否：`compile` 分片按 `Cargo.lock` 缓存 registry 的 index 与 crate 文件——Cargo home 在 D: 后，命中时恢复 3 s 加 `cargo fetch` 14 s，不缓存时两次读数 14 s 与 22 s，差别在 runner 波动之内，却多占一条 88 MB 的缓存；Dev Drive（ReFS）——test build 与分片要求同一 checkout 路径，换盘符要连带改 rust-cache 与全部分片，而 D: 已经拿到了这里量到的收益；直接卸载镜像的 `stable`——在 C: 上删文件同样慢，下一个预装工具链还会进键。重开参数：托管 runner 的磁盘布局，或 Rust cache 改变键的组成。
+
+`test-build` 用 rust-lld（lld-link）链接，设在该 job 的 `CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER`：archive 有 78 个链接产物，热缓存下从第一个 workspace crate 开始编译到产出 archive，两次读数 171 s 与 194 s，link.exe 时为 201 s。这个 archive 只用于测试、不发布，发布产物由 `release.yml` 用 link.exe 构建，所以发布二进制的链接器不变；`.cargo/config.toml` 的 `/Brepro` lld-link 同样接受。`clippy` 不换：它只链接几个 build script，换链接器还会让缓存键变冷一次。被否：在 `.cargo/config.toml` 里全局设 linker——那会改变发布产物与 `xtask repro` 判定的那份字节。
+
+`setup-zig` 的全局缓存只在 `gates` 恢复与保存（`.github/actions/zig` 的输入 `cache`，缺省 false）：它每次运行、每个 job、每个 ref 都存一条约 17 MB 的新条目，而仓库缓存预算已满，每存一条就挤掉一条旧的。只有 `zig test`（`just check-desktop`）对着空的全局缓存要多编约一倍时间；`build.rs` 的 `build-lib` 对着空缓存只多几秒，与恢复（约 2 s）加保存（约 4 s）的代价相当。
+
+不做的两项：让 `test-build` 不存缓存、另设只在 main 运行的 job 去写——只有 main 上 lockfile 或 manifest 变化的那一轮受益，而 main 的运行没人等，代价是每轮 main 多一个 Windows job；去重依赖版本——锁文件里 35 个名字有多个版本，没有一个能只靠 lockfile 更新消掉（每个依赖方都已是兼容范围内最新），唯一的 manifest 升级 comrak 0.55→0.56 消掉 phf 0.13 的四个 crate 却新增 fearless_simd、fearless_simd_macros 与 memchr-n，编译量不降。
+
+`test-build` 的 Cargo 环境覆盖（两项 debug 与 linker）只在共享入口定义，main 与 tag 因而读同一种 test 缓存身份；gates/clippy/test 的用途仍各自独立，Rust cache 保持默认 workspace 产物清理，只有 main 写入。缓存恢复不是验证证据。release 调用的 concurrency 以 run id 隔离且不替代取消，普通 CI 仍按 ref 替代旧运行；调用权限只有 contents read，不传 secrets。release 的 advisories 是本轮新读，发行 archive 仍并行构建，publish 等待 verify、advisories 与 archive 成功，发行消费者只下载 archive-*。verify/archive job 名与 Windows 签名输出 archive-Windows 的位置保留。
 
 `test-timings` 读取两份 `gh run view --json conclusion,headSha,startedAt,updatedAt,jobs` 的完整成功结果，对照全 CI、从 test build 启动到 test 汇总结束的测试链、构建与最长分片的 wall time，并逐片列出读数；排队计入全 CI 与测试链，不能从该差额推断分片算法的净收益。未成功或缺少构建、分片、test 汇总的输入不产生测量结论。
 
@@ -1198,7 +1212,7 @@ pub(crate) fn package_field<'a>(manifest: &'a toml::Value, key: &str) -> Option<
 **本节属门禁机具，与产品代码分开提交。**
 -/
 
-/-! ### 8-51 `motion`：曲线与时长只住 `theme.css`；`color` 判玻璃；`render` 判对话页的常驻入口（形状 1 判定）
+/-! ### 8-51 `motion`：曲线与时长只住主题；`color` 判玻璃；`render` 判对话页的常驻入口（形状 1 判定）
 
 **要挡的三件事**，都是 docs/frontend-method.md §4-43 与 refrain P2、P6、P11、P12 写下、而今天没有机器读者的规则：一条过渡在视图里自己写曲线或毫秒数，于是同一种位移有五个答案；玻璃的不透明度被调低到字压不住背后；对话页长出一条固定的顶栏或浮动操作栏，或常驻入口悄悄变多。
 
@@ -1217,13 +1231,13 @@ pub(super) fn talk_controls_within_register(
 );
 ```
 
-**`motion` 判什么**：`client/src` 下每个 `.svelte`、`.ts`、`.css`、`.html` 文件（`client/src/theme.css` 是产地，豁免，与 §8-8 的产地表同形），逐行找四种写法，命中一处即一条违规，位置 `<文件>:<行>`：
+**`motion` 判什么**：`client/src` 下每个 `.svelte`、`.ts`、`.css`、`.html` 文件（主题——入口 `client/src/theme.css` 与 `client/src/theme/` 里它 import 的部分，`theme::is_theme`——是产地，豁免，与 §8-8 的产地表同形），逐行找四种写法，命中一处即一条违规，位置 `<文件>:<行>`：
 
 - `cubic-bezier(`；
 - `linear(` 与 `steps(`，**只在括号里第一个非空白字符是数字、`.` 或 `-` 时算**：CSS 的这两个函数只收数，而 `{#snippet steps(each: Walk)}` 是一个名叫 `steps` 的片段，不是一条时间函数；
 - Tailwind 的 `duration-<数字>` 与 `duration-[`、`ease-[`，前一个字符不是字母、数字、`-` 或 `_`（`group-hover:duration-150` 的冒号算边界，`--transition-duration-short` 不算）。
 
-规则写「a transition's curve and duration are named once, in the client's theme file」，替代写「`duration-short|panel|page` 与 `ease-arrive|leave`（docs/frontend-method.md §4-43）；要第四种时长或第三条曲线，先在 `theme.css` 声明它」。**不读**：`style=` 里的 `animation-duration` 与 `animation-delay`（城市插画的环境动画与逐个错开的延迟，不是位移）、`delay-*`（悬停意图的门槛，4-18，不是动效的时长）。
+规则写「a transition's curve and duration are named once, in the client's theme」，替代写「`duration-short|panel|page` 与 `ease-arrive|leave`（docs/frontend-method.md §4-43）；要第四种时长或第三条曲线，先在主题的动效令牌里声明它」。**不读**：`style=` 里的 `animation-duration` 与 `animation-delay`（城市插画的环境动画与逐个错开的延迟，不是位移）、`delay-*`（悬停意图的门槛，4-18，不是动效的时长）。
 
 **`color` 多判一件事：玻璃按自己的不透明度盖在页面最亮的表面上，字仍够得到层级。** `judge_glass` 在每种打光的读法上各跑一次（§8-8 的 `Mode`）：读 `--glass-opacity: <n>%`（缺席、不是 1–100 的整数百分数各是一条违规），读 `--color-glass` 单跳到的那一档、`raised-hover` 单跳到的那一档、`--color-text` 的明度与 `--tier-text`；把玻璃那一档的 sRGB 按 n% 盖在 `raised-hover` 那一档上（逐通道在编码空间里线性混合，即引擎合成一层半透明底色的做法），算 `--color-text` 对合成色的 APCA Lc，低于 `--tier-text` 即红，拒词写出两种打光里哪一种、够到多少、要多少。**为什么是 `raised-hover` 而不是最亮的墨**：玻璃的模糊（24 px）把背后的字摊进它所在的表面，留下的是表面；页面画面积的表面里最亮的是悬停中的抬起控件。墨不按面积画，按墨判会把不透明度逼到 97%，玻璃就不是玻璃了。`glass` 进 `ROLES`（§8-8 的封闭词表），共 22 个。
 
@@ -1240,7 +1254,7 @@ pub(super) fn talk_controls_within_register(
 
 **测试**：`motion::tests` 判 `literal_at` 的正反例（三种函数、`steps(each`、`duration-150`、`hover:duration-[90ms]`、`ease-[`、`duration-panel`、`--transition-duration-short` 各一例）；`color::tests` 判玻璃：今天的样式表两种打光都绿，把 `--glass-opacity` 改成 40% 时浅色那一面红，缺这一行时红；`render::talk::tests` 在手写的 `Drawn` 夹具上判：对话框里的控件、滚动区里的控件、`status` 里的控件都不红，对话地标里一个不在三者之中的按钮红；三簇各两个控件计 6；计数大于登记时红、等于时不红；画廊没有对话页时红。
 
-D20 **曲线、时长与玻璃的下限各有一个机器读者，且读者读的就是层叠用的那个数。** `motion` 拒绝 `theme.css` 之外的时间函数与 Tailwind 的时长字面量，`color` 用 `--glass-opacity` 本身判玻璃的可读性，`render` 用画出来的页数对话页的常驻入口。理由：三条规则写在 docs/frontend-method.md §4-43 与 refrain P2、P6、P11、P12 里，若没有读者，第一个赶时间的视图就会写下 `duration-200`、第一次调玻璃的人就会把字调到读不清；而玻璃那一条若另立一个 `--glass-floor` 给门读，层叠用的数与门判的数就是两个可以分开的家。被击败的备选：①只拒 `cubic-bezier(` 等三个函数（路线图的原文）——同一种位移今天有 90、100、120、150、200 ms 五个答案，函数一个都没写；②按类名认对话页的三簇——类名是写下来的，门判的是画出来的页；③在探针里加 `position` 一格再判 `fixed`——那是改 `crates/browser`，与门不能同一个提交，而父链与滚动轴已经说得出同一件事。**重开参数**：`browser::survey` 下一次加读数时，对话页的两条性质迁进去（§8-38 的同一条）；客户端出现第二个产地（例如第二套主题文件），`motion` 的产地从一个文件变成一张表。
+D20 **曲线、时长与玻璃的下限各有一个机器读者，且读者读的就是层叠用的那个数。** `motion` 拒绝主题之外的时间函数与 Tailwind 的时长字面量，`color` 用 `--glass-opacity` 本身判玻璃的可读性，`render` 用画出来的页数对话页的常驻入口。理由：三条规则写在 docs/frontend-method.md §4-43 与 refrain P2、P6、P11、P12 里，若没有读者，第一个赶时间的视图就会写下 `duration-200`、第一次调玻璃的人就会把字调到读不清；而玻璃那一条若另立一个 `--glass-floor` 给门读，层叠用的数与门判的数就是两个可以分开的家。被击败的备选：①只拒 `cubic-bezier(` 等三个函数（路线图的原文）——同一种位移今天有 90、100、120、150、200 ms 五个答案，函数一个都没写；②按类名认对话页的三簇——类名是写下来的，门判的是画出来的页；③在探针里加 `position` 一格再判 `fixed`——那是改 `crates/browser`，与门不能同一个提交，而父链与滚动轴已经说得出同一件事。**重开参数**：`browser::survey` 下一次加读数时，对话页的两条性质迁进去（§8-38 的同一条）；客户端出现第二个产地（例如第二套主题），`motion` 的产地从一个主题变成一张表。
 
 **本节属门禁机具，与产品代码分开提交。**
 -/
@@ -1281,7 +1295,7 @@ pub(super) fn sources(root: &Path) -> Result<Vec<PathBuf>, XtaskError>; // walk:
 - **取哪些文件**：从仓库根用 `walk::files` 遍历（它已跳过 `walk::SKIP_DIRS` 的构建目录、`.git` 与嵌套的 checkout），按扩展名留下 `FILE_FACE` 所列的文件，再以 `walk::in_isolation_zone` 去掉 `local/`。扩展名按小写逐字比对，与 `walk::files_with_ext` 同一读法。
 - **怎样判**：文件尺寸是总行数；前十行带 `Generated by` 加反引号横幅的文件不量（`length::generated`，与 `wording` 共用）；其余交给 `judge_file`，预算、登记表 `[file_length.predating]` 与三条性质与 Rust、Zig 两侧相同（`spec/Length.lean`），所以本节不改那份证明。
 - **`length::check` 不再持 `client/src` 这个目录与 `.ts`／`.svelte` 这张表**：第三个循环遍历 `surface::sources`。客户端的 `.ts`／`.svelte` 照旧被量，范围随之从 `client/src` 扩到 `client/scripts` 与 `client/*.config.ts`。
-- **登记**：扩面那一刻超长的非生成文件只有 `client/src/theme.css`，按那一刻的长度 2108 钉进 `[file_length.predating]`，由拆分把它划掉。`crates/city/skills/playback/template.html` 带生成横幅，按横幅豁免，不登记。
+- **登记**：`[file_length.predating]` 是空的：样式表是主题的入口加按归属切开的部分（§8-8 D34），每个文件都在上限之内。`crates/city/skills/playback/template.html` 带生成横幅，按横幅豁免，不登记。
 - **失败**：一份文件读不出是 `XtaskError::Io`，与另两侧相同；不解析，所以没有「判不动」这一种失败。
 
 **测试**：`length::tests::a_long_file_in_any_file_face_language_is_named`：`root::fixture::relocated` 上写六份超过文件预算的文件——`client/src` 下的一份样式表、一个 skill 目录下的一张页面、`tools/` 下的一份 PowerShell 与一份 Python 脚本、根目录的一份 shell 安装脚本与一份 `.nix`——每一份都以 `too_long` 被点名；同一夹具里同样长的 `local/` 下的一份 `.js`、`docs/` 下的一份 Markdown、`client/src` 下的一份 JSON 词表与一份带生成横幅的页面都不报。整组违规一次比对。

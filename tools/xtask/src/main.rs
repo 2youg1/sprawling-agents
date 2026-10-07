@@ -51,6 +51,7 @@ mod secret;
 mod shots;
 mod spec;
 mod specalign;
+mod theme;
 mod unused;
 mod vocabulary;
 mod walk;

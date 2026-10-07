@@ -49,7 +49,7 @@
 
 <!-- A compact page draws a row's title and drops the line that only
 elaborates it: here the two columns marked `summary` - when it was
-filed, and what kind of thing it is. `theme.css` owns that rule and
+filed, and what kind of thing it is. `theme/preference.css` owns that rule and
 states it once; this fixture only asks for the posture, so that the
 tightened reading has a reader that is not a person remembering to
 switch their own appearance over. The rule is written at `:root`

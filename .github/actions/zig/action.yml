@@ -7,10 +7,25 @@
 # edit to that one file; `build.rs` refuses a `zig` of another version,
 # and the last step asks `zig version` so a failed install stops the job
 # here rather than as a build-script error later.
+#
+# Zig's global cache is restored and saved only where a job asks for it.
+# setup-zig saves a new entry of about 17 MB on every run, in every job
+# and on every ref, and the repository's cache budget is full, so each
+# entry pushes an older one out. It pays only for `zig test`, which links
+# an executable and builds Zig's runtime for it: about twice as long
+# against an empty global cache. A `build-lib` of the leaf, which is all
+# `crates/desktop/ffi/build.rs` asks for, adds a few seconds against an
+# empty one, which the restore and the save of the entry cost as well.
 name: zig
 description: >-
   Install the Zig crates/desktop/ffi/zig-version pins on a Windows runner, and
   prove zig answers with that version.
+inputs:
+  cache:
+    description: >-
+      Restore and save Zig's global cache; 'true' only in a job that runs
+      `zig test`.
+    default: 'false'
 runs:
   using: composite
   steps:
@@ -23,6 +38,7 @@ runs:
       if: runner.os == 'Windows'
       with:
         version: ${{ steps.pin.outputs.version }}
+        use-cache: ${{ inputs.cache }}
     - name: zig answers with the pinned version
       if: runner.os == 'Windows'
       shell: bash

@@ -63,6 +63,14 @@ pub(crate) enum XtaskError {
         "find package `{name}`: no package in this workspace has that package or lib name (unknown-package); name one of: {known}"
     )]
     UnknownPackage { name: String, known: String },
+    #[error(
+        "read theme {entry}: it imports {part}, and no such file exists (theme-part-missing); create the part, or delete its `@import` line from {entry}"
+    )]
+    ThemePartMissing { entry: String, part: String },
+    #[error(
+        "read theme {entry}: {part} sits among the theme's parts and {entry} imports it nowhere (theme-part-unimported); import it from {entry} at the place its rules belong in the cascade, or delete it"
+    )]
+    ThemePartUnimported { entry: String, part: String },
 }
 
 pub(crate) fn render(violations: &[Violation]) {

@@ -7,7 +7,7 @@
 //! the answer to `Query::Privacy`, read off the host with the history
 //! disclosed only to the account it belongs to, and the operations
 //! `Command::PrivacyOperation` asks for, carried out one at a time with
-//! their results kept under the page's `idem` (Privacy D69).
+//! their results kept under the page's `idem` (Privacy D70).
 
 use std::collections::{BTreeSet, VecDeque};
 use std::path::PathBuf;
@@ -22,7 +22,7 @@ use super::coordinator::{self, Command, Done, Host};
 use super::journal::{self, LockedJournal};
 use super::target::Snapshot;
 
-/// How many results an answer carries; older ones give way (Privacy D69).
+/// How many results an answer carries; older ones give way (Privacy D70).
 const KEPT: usize = 64;
 
 /// The machine the page reads: the coordinator's port, and the facts its
@@ -84,7 +84,7 @@ impl<M: Machine + 'static> Service<M> {
     /// part of the answer, so the page always learns what was read.
     ///
     /// The results are copied before the history is read (Privacy.Service
-    /// D71): an operation records its conclusion before its result settles,
+    /// D72): an operation records its conclusion before its result settles,
     /// so a concluded result never outruns the history beside it.
     pub(crate) fn answer(&self) -> PrivacyAnswer {
         let outcomes = self.kept().outcomes.iter().cloned().collect();
@@ -546,7 +546,7 @@ mod tests {
 
     /// An operation that concludes while an answer is being read is never
     /// reported concluded by an answer whose history lacks its conclusion
-    /// (Privacy.Service D71): the page stops asking on that answer and draws
+    /// (Privacy.Service D72): the page stops asking on that answer and draws
     /// its ownership and buttons from it.
     #[test]
     fn an_answer_reports_no_conclusion_its_history_lacks() {

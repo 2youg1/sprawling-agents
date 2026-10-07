@@ -1,0 +1,68 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ * Copyright (c) 2026 2youg1 and the sprawling contributors */
+
+/* Paper.
+ *
+ * A sheet takes no input, has no second surface to lift a panel onto,
+ * and charges for every drop of ink. Three rules follow from that, and
+ * each is stated once.
+ *
+ * **Only the main region prints.** The edge keys, the notice panel, the
+ * halt banner, the refusal, the command palette and the key sheet are
+ * all controls, and all of them are drawn outside `<main>` - so one rule
+ * keeps `<main>`, everything inside it and everything that contains it,
+ * and drops the rest without naming a single screen. A page added next
+ * year needs no line here. The composer is the one input surface inside
+ * the main region, and it is the form a person types a message into.
+ *
+ * **The page is the paper and the text is the ink.** The eleven
+ * surfaces this library draws with mean nothing on a sheet, and the
+ * text tokens of a dark page are pale enough to print as nothing at
+ * all, so every fill drops out and every word takes the ink the medium
+ * names for itself. A rule line keeps 45 per cent of that ink, which is
+ * how a table still reads as a table. Saying `color-scheme: light`
+ * first is what makes `Canvas` and `CanvasText` mean paper and ink
+ * rather than whichever way the screen was lit.
+ *
+ * **A sheet is as long as it needs to be.** The shell is one viewport
+ * tall and scrolls inside itself; on paper that would print the first
+ * screen and lose the rest, so the height comes off and the main region
+ * stops clipping. Rows deferred until they scroll into view are the
+ * same trap - a ledger of a thousand rows would print as a blank page -
+ * so they are laid out unconditionally.
+ *
+ * A link on paper cannot be followed, so it prints where it goes.
+ * Only absolute ones: this client's own routes are page fragments, and
+ * `(#/city)` after every word would be noise. */
+@media print {
+  :root {
+    color-scheme: light;
+  }
+  body *:not(main, main *, :has(main)) {
+    display: none;
+  }
+  main form:has(textarea) {
+    display: none;
+  }
+  * {
+    background: none;
+    color: CanvasText;
+    border-color: color-mix(in oklch, CanvasText 45%, Canvas);
+    box-shadow: none;
+  }
+  .h-screen {
+    height: auto;
+  }
+  main {
+    overflow: visible;
+  }
+  .settled,
+  .settled-row {
+    content-visibility: visible;
+  }
+  a[href^="http"]::after {
+    content: " (" attr(href) ")";
+  }
+}

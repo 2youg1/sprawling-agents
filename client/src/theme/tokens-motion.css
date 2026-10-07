@@ -1,0 +1,52 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ * Copyright (c) 2026 2youg1 and the sprawling contributors */
+
+@theme {
+  /* Motion (docs/frontend-method.md §4-43): durations named for how far a
+   * thing travels, and two easings, named for which way it goes. They
+   * sit in Tailwind's own namespaces, so `duration-panel` and
+   * `ease-arrive` are utilities; `xtask motion` refuses a curve or a
+   * duration spelled anywhere else.
+   *
+   * A control changing state where it stands takes `short`; a surface
+   * appearing or turning over in its own place - a hint, a popover, a
+   * dialog, the coin key, the composer's line - takes `panel`; a move
+   * across the page - the world layer, the composer sinking, the
+   * context ring's arc - takes `page`. The coin key alone turns over
+   * in `coin`, the template's 420 ms: a half turn in 250 ms reads as a
+   * blink rather than as the key flipping to its other face. */
+  --transition-duration-short: 150ms;
+  --transition-duration-panel: 250ms;
+  --transition-duration-page: 350ms;
+  --transition-duration-coin: 420ms;
+  --default-transition-duration: var(--transition-duration-short);
+
+  /* Entering and arriving decelerate, leaving accelerates (refrain Q1),
+   * so a thing coming in is read before it stops and a thing going out
+   * does not linger. The values are Open Props' `--ease-out-4` and
+   * `--ease-in-4` (open-props 1.7.23, `src/props.easing.css`, MIT),
+   * copied rather than installed (client D20). A transition that
+   * runs both ways writes `ease-leave` on its resting state and
+   * `ease-arrive` on the state it arrives in, because CSS takes the
+   * timing function of the state being entered. */
+  --ease-arrive: cubic-bezier(0, 0, 0.1, 1);
+  --ease-leave: cubic-bezier(0.9, 0, 1, 1);
+  --default-transition-timing-function: var(--ease-arrive);
+}
+
+/* Where the engine can draw it, arriving is a spring rather than a
+ * curve: Open Props' `--ease-spring-1`, which overshoots by 1.7% and
+ * settles, so a box that moves reads as one solid thing coming to rest
+ * (Chang & Ungar's solidity, refrain P6). Copied by value from the same
+ * file as the curves above. */
+@supports (transition-timing-function: linear(0, 1)) {
+  :root {
+    --ease-arrive: linear(
+      0, 0.006, 0.025 2.8%, 0.101 6.1%, 0.539 18.9%, 0.721 25.3%, 0.849 31.5%,
+      0.937 38.1%, 0.968 41.8%, 0.991 45.7%, 1.006 50.1%, 1.015 55%, 1.017 63.9%,
+      1.001
+    );
+  }
+}

@@ -18,7 +18,7 @@
 //
 // The bar under a row is that row's summary: it restates the figure
 // beside the name, so a compact page draws the name and the figure and
-// stops there. Which pages are compact is `theme.css`'s one density
+// stops there. Which pages are compact is `theme/preference.css`'s one density
 // attribute, not a switch of this page's own.
 
 import type { Key } from "../core/lang";

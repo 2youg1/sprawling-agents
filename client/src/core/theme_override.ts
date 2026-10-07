@@ -19,7 +19,7 @@ export interface Theme {
   readonly css: string | null;
 }
 
-// Nothing laid over the theme `theme.css` ships: what "restore default" writes.
+// Nothing laid over the theme the client ships: what "restore default" writes.
 export const BUILT_IN_THEME: Theme = { tokens: {}, css: null };
 
 export function themeOf(stated: ThemeOverride): Theme {

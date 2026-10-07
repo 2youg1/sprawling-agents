@@ -26,7 +26,7 @@ pub struct PrivacyRequest {
 /// One change the person confirmed on the page. `expected` is the value
 /// the page showed when the person confirmed; the host writes nothing when
 /// its fresh read differs (`crates/sprawling/spec/Privacy/Confirmation.lean`
-/// D57).
+/// D58).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]

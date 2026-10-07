@@ -7,7 +7,7 @@
 // commands it sends, and the answers it reads them back from.
 //
 // The host keeps each operation's result under the idem the page minted
-// (`crates/sprawling/spec/Privacy/Service.lean` D69), so an entry reads
+// (`crates/sprawling/spec/Privacy/Service.lean` D70), so an entry reads
 // only the result of its own idem and never a refusal some other command
 // raised. The answer is asked again after a send, and once more after
 // each answer that still leaves one of this page's operations without a

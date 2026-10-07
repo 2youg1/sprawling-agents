@@ -14,7 +14,7 @@ reachable_catalogued 与 planApply 证明。
 
 控制表的形状：
 - privacy control 是一个可写目标：Target、写入值（Written）、类别、版本清单（honoured 与 ignored）、
-  build effect。operation kind 与作用域由 Target 推出，不在行里另存（D67）：
+  build effect。operation kind 与作用域由 Target 推出，不在行里另存（D68）：
   Registry{HKLM} 为 registry_value_hklm，Registry{HKCU} 为 registry_value_hkcu，
   UserEnvironment 为 environment_variable_user，ScheduledTask 为 scheduled_task_enabled；
   前者与计划任务是机器作用域（经 UAC），HKCU 与用户环境变量是用户作用域。
@@ -45,7 +45,7 @@ reachable_catalogued 与 planApply 证明。
 
 当前控制表：52 行原文中 39 行可写，映射到 37 个控制（K30 与 K23、K31 与 K22 两对同义原项）；
 13 行不写：8 行 Absent（K04、K06、K39、K48–K52），4 行 Undeterminable（K02、K09、K11、K26），
-1 行 NeedsOperationKind（K03）。原文之外另有 51 个控制（D63），共 88 个控制：
+1 行 NeedsOperationKind（K03）。原文之外另有 51 个控制（D64），共 88 个控制：
 74 个 registry_value_hklm、8 个 registry_value_hkcu、2 个 environment_variable_user、
 4 个 scheduled_task_enabled，即 78 个机器作用域、10 个用户作用域。
 原项总数、可写与不写的行数、控制总数与四种 kind 的个数由 Rust 的编译期断言固定。
@@ -63,11 +63,11 @@ reachable_catalogued 与 planApply 证明。
 - 用户环境变量只写用户持久环境；sprawling 自己的 exec 环境按白名单清洗，它启动的进程不继承
   此变量，页面如实说明。
 - 有些写入会删除 Windows 不再交还的数据，有些需要重启；这些事实在每个控制的容易忽略之处与
-  恢复说明里，确认框在人点下之前显示它们（Privacy.Confirmation D57）。
+  恢复说明里，确认框在人点下之前显示它们（Privacy.Confirmation D58）。
 - 计划任务在该主机不存在时不写，页面说明该主机上没有这个任务（模型 ApplyPlan.targetAbsent）。
 -/
 
-/-! D58 是否写由研究结论决定，不逐项取得生产写入资格（人的决定）
+/-! D59 是否写由研究结论决定，不逐项取得生产写入资格（人的决定）
 一个原项可写，当且仅当研究给出了它的正式目标、原始类型与写入值；研究说目标不存在、已废弃、
 无法确定或需要本版本没有的 operation kind 的原项不写，页面给出原因。每种 operation kind 在
 一次性 GitHub Actions Windows runner 上各实测一次 apply 与 restore，并在同一测试里逐个扫过全部
@@ -80,7 +80,7 @@ reachable_catalogued 与 planApply 证明。
 该 kind 需要自己的生效检查。
 -/
 
-/-! D63 控制可以超出人的原始清单；页面只告知，不劝导（人的决定）
+/-! D64 控制可以超出人的原始清单；页面只告知，不劝导（人的决定）
 控制表收入研究核实过的、原始清单之外的隐私设置（51 个），每个都写明它的代价与容易忽略之处。
 页面不预选、不排序推荐、没有「全部应用」，也没有写着「推荐」的标记；写入值一栏叫「写入值」。
 每一项只在人逐项明确点击并确认后写入。
@@ -89,7 +89,7 @@ reachable_catalogued 与 planApply 证明。
 重开参数：若控制多到逐项浏览不可行，再讨论分组折叠，而不是预选。
 -/
 
-/-! D64 一次启用写多个值的策略，在有原子多值写入的 operation kind 之前不写
+/-! D65 一次启用写多个值的策略，在有原子多值写入的 operation kind 之前不写
 模板在一个 enabledList 里同时写多个值的策略（例如「关闭自动学习」同时写文本与墨迹两个值），
 只写其中一个是组策略从不产生的状态，效果没有文档；拆成两个控制、让人分两次点，页面就能造出这种
 半状态。所以这类策略作为候选记录、不写，直到有一种 operation kind 能原子地写入并恢复多个值。
@@ -97,7 +97,7 @@ reachable_catalogued 与 planApply 证明。
 重开参数：新增原子多值写入的 operation kind 时，这些候选改为可写只是数据变更。
 -/
 
-/-! D66 版本是否适用由服务器按控制表与主机 EditionID 判定一次
+/-! D67 版本是否适用由服务器按控制表与主机 EditionID 判定一次
 答案带主机的 EditionID 与它映射到的版本（映射规则在 `bin::privacy::windows`，按前缀，一处定义，
 Privacy.Windows），每个控制带 PrivacyEditionFit：主机版本在 honoured 里为 Honoured，在 ignored 里
 为 Ignored，否则（包括主机版本不属于六个具名版本）为 NotStated。判定是控制表的 Editions::fit，
@@ -106,7 +106,7 @@ Privacy.Windows），每个控制带 PrivacyEditionFit：主机版本在 honoure
 重开参数：若 Microsoft 的适用范围依赖 build 号而不只是版本，判定要加入 build。
 -/
 
-/-! D67 operation kind、作用域与是否需要管理员由 Target 推出，不在行里另存
+/-! D68 operation kind、作用域与是否需要管理员由 Target 推出，不在行里另存
 目标在哪里就决定了怎样写、写谁的设置：HKLM 值与计划任务是机器作用域，经 UAC；HKCU 值与用户环境
 变量是用户作用域。行只存 Target，`Target::kind` 与 `OperationKind::scope` 用穷尽匹配推出其余两项。
 被否：照研究表的形状，每行同时存 kind、scope 与 admin——同一事实写三遍，其中一份改错时没有东西

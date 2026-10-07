@@ -84,7 +84,7 @@ impl Journal for LockedJournal {
 }
 
 /// What the person asked for. `expected` is the snapshot the page showed
-/// when the person confirmed (Privacy.Confirmation D57).
+/// when the person confirmed (Privacy.Confirmation D58).
 pub(super) enum Command {
     Apply {
         control: PrivacyControl,

@@ -1,0 +1,80 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ * Copyright (c) 2026 2youg1 and the sprawling contributors */
+
+/* MOB */
+/* The container the `narrow` variant asks (client D30): the page's body, which
+ * is the window's width, and on `#/gallery` a specimen's own box, which a
+ * fixture names `shell` in the same way (`@container/shell`). */
+body {
+  container: shell / inline-size;
+}
+
+/* The shell is as tall as the part of the page the person can see
+ * (client/Spec.lean §4-52). A phone's soft keyboard shrinks the visual
+ * viewport and leaves the layout viewport, and with it `100dvh`, where
+ * it was, so a shell sized by `dvh` alone keeps its composer under the
+ * keyboard; `views/shared/frame.ts` writes the visual viewport's height
+ * and its offset into the layout viewport on the frame, and the shell
+ * stands exactly over what is visible. Until the script has run,
+ * and on an engine without the visual viewport, the shell is `100dvh`
+ * at the top, which is today's page. The translate also makes the shell
+ * the box every fixed descendant is placed in, so a sheet or a toast
+ * covers what is visible and not what the keyboard hides. */
+@utility visual-viewport {
+  height: var(--viewport-block, 100dvh);
+  translate: 0 var(--viewport-top, 0px);
+}
+
+/* A full-screen sheet of the one-column shell - the world layer from the
+ * left, the right side from the right (refrain U9) - arrives across the
+ * whole width from the side it belongs to, as a move across the page.
+ * It never animates out, for the settings panel's reason: the shell
+ * takes it away when the history entry that holds it is left, and a
+ * sheet that lingered would answer taps for a state already gone. */
+.sheet {
+  transition: translate var(--transition-duration-page) var(--ease-arrive);
+}
+@starting-style {
+  .sheet[data-side="left"] {
+    translate: -100% 0;
+  }
+  .sheet[data-side="right"] {
+    translate: 100% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-motion="on"]) .sheet {
+    transition: none;
+  }
+}
+
+/* The edge keys in the composer's chip row (refrain §3-2, the phone
+ * working): on one column the chip group opens with room for the three
+ * keys, and the keys are anchored at its start, so they sit beside the
+ * room chip wherever the composer stands - at the foot of the
+ * conversation, or under the world sheet as its band - and in the thumb's
+ * reach while the soft keyboard is open; a chip that wraps stays beside
+ * them. The group belongs to the frame's own conversation page
+ * (`.workspace`); on any other page, and on an engine that cannot
+ * anchor, the keys keep their own row at the foot. */
+@supports (anchor-name: --edge-slot) {
+  .edge-slot {
+    @variant narrow {
+      padding-inline-start: calc(3 * var(--spacing-key) + 3 * var(--spacing-snug));
+      min-block-size: var(--spacing-key);
+      anchor-name: --edge-slot;
+    }
+  }
+  .frame:has(> .workspace .edge-slot) > .edge-keys {
+    @variant narrow {
+      position: absolute;
+      position-anchor: --edge-slot;
+      inset: auto;
+      top: anchor(top);
+      left: anchor(left);
+      padding-top: 0;
+    }
+  }
+}

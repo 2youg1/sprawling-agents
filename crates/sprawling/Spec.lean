@@ -444,21 +444,22 @@ pub struct SystemClock;   // 墙钟的唯一采样点（clippy.toml 的 disallow
 | D54 | `crates/sprawling/spec/Privacy/Cli.lean` |
 | D55 | `crates/sprawling/spec/Privacy/Cli.lean` |
 | D56 | `crates/sprawling/spec/Install.lean` |
-| D57 | `crates/sprawling/spec/Privacy/Confirmation.lean` |
-| D58 | `crates/sprawling/spec/Privacy/Controls.lean` |
-| D59 | `crates/sprawling/spec/Privacy/Windows.lean` |
-| D60 | `crates/sprawling/spec/Privacy/State.lean` |
+| D57 | `crates/sprawling/spec/Install.lean` |
+| D58 | `crates/sprawling/spec/Privacy/Confirmation.lean` |
+| D59 | `crates/sprawling/spec/Privacy/Controls.lean` |
+| D60 | `crates/sprawling/spec/Privacy/Windows.lean` |
 | D61 | `crates/sprawling/spec/Privacy/State.lean` |
-| D62 | `crates/sprawling/spec/Privacy.lean` |
-| D63 | `crates/sprawling/spec/Privacy/Controls.lean` |
+| D62 | `crates/sprawling/spec/Privacy/State.lean` |
+| D63 | `crates/sprawling/spec/Privacy.lean` |
 | D64 | `crates/sprawling/spec/Privacy/Controls.lean` |
-| D65 | `crates/sprawling/spec/Privacy/Windows.lean` |
-| D66 | `crates/sprawling/spec/Privacy/Controls.lean` |
+| D65 | `crates/sprawling/spec/Privacy/Controls.lean` |
+| D66 | `crates/sprawling/spec/Privacy/Windows.lean` |
 | D67 | `crates/sprawling/spec/Privacy/Controls.lean` |
-| D68 | `crates/sprawling/spec/Privacy.lean` |
-| D69 | `crates/sprawling/spec/Privacy/Service.lean` |
+| D68 | `crates/sprawling/spec/Privacy/Controls.lean` |
+| D69 | `crates/sprawling/spec/Privacy.lean` |
 | D70 | `crates/sprawling/spec/Privacy/Service.lean` |
 | D71 | `crates/sprawling/spec/Privacy/Service.lean` |
+| D72 | `crates/sprawling/spec/Privacy/Service.lean` |
 -/
 
 /-! D15 不从别的工具的配置里读 provider 表（人的决定）

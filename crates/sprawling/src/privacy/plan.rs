@@ -86,7 +86,7 @@ pub(super) enum ReconcilePlan {
     Changed,
 }
 
-/// `planApply` after the identity check (Privacy D68).
+/// `planApply` after the identity check (Privacy D69).
 pub(super) fn plan_apply(
     holdings: &Holdings<'_>,
     request: &Request<'_>,

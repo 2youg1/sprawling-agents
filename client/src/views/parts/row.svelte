@@ -32,7 +32,7 @@
 // compact page does not draw.
 //
 // The second text is the row's summary, and a compact page does not
-// draw it: `theme.css` owns that judgement under the one density
+// draw it: `theme/preference.css` owns that judgement under the one density
 // attribute the six spacing steps already read, so this file marks the
 // line and states no rule about it.
 

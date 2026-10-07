@@ -210,7 +210,7 @@ Two more relations are worth stating because they are easy to invert. A **Gate**
 | **progress bar** | The part that shows how far along something is, as a bar and the two numbers it was drawn from; when the end is not known it says it is busy instead of claiming a fraction (`client/src/views/parts/progress.svelte`). |
 | **ACCENT** | Acid blue, `H=250`, meaning "something is moving here, or this is the one chosen". |
 | **ALERT** | Warm amber, `H=70`, ACCENT's complement, meaning "a person is needed here, or something is missing". |
-| **single-hue language** | Every colour on one hue axis, ACCENT's, with ALERT as the one derived exception and the greys taken on the same axis; the two checkpoints of the **context ring**, green and red, are the only other hues, each named; `client/src/theme.css` holds the values. |
+| **single-hue language** | Every colour on one hue axis, ACCENT's, with ALERT as the one derived exception and the greys taken on the same axis; the two checkpoints of the **context ring**, green and red, are the only other hues, each named; the client's theme (`client/src/theme/tokens-colour.css`, and the light block in `client/src/theme/colour.css`) holds the values. |
 
 ## 7 Construction vocabulary (not product concepts)
 

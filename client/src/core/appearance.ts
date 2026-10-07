@@ -18,7 +18,7 @@ import { Glass as GlassSchema, type Glass as WireGlass } from "../wire";
 // same eleven rungs.
 export type Lighting = "system" | "dark" | "light";
 export type Face = "geist" | "system" | "custom";
-// How much air the six spacing steps carry, as `theme.css` spells it
+// How much air the six spacing steps carry, as `theme/preference.css` spells it
 // in `:root[data-density="compact"]`. Two named postures rather than a
 // coefficient, because the coefficient is the stylesheet's to choose.
 export type Density = "comfortable" | "compact";
@@ -41,7 +41,7 @@ export const MOTIONS: readonly Motion[] = ["system", "on", "off"];
 export const GLASSES: readonly Glass[] = GlassSchema.literals;
 // The slider that sets the world layer's opacity in the blend tier, in
 // percent. The opacity drawn while the person has said nothing is
-// `theme.css`'s `--blend-opacity`, and only there.
+// `theme/colour.css`'s `--blend-opacity`, and only there.
 export const BLEND_PERCENT = { min: 30, max: 90, step: 5 } as const;
 // What a person may write into a font stack: the characters a family
 // name and its punctuation are made of, and nothing that could close

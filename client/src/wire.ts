@@ -3170,7 +3170,7 @@ export type IdemKey = typeof IdemKey.Type;
  * One change the person confirmed on the page. `expected` is the value
  * the page showed when the person confirmed; the host writes nothing when
  * its fresh read differs (`crates/sprawling/spec/Privacy/Confirmation.lean`
- * D57).
+ * D58).
  */
 export const PrivacyAction = Schema.Union([
   Schema.Struct({

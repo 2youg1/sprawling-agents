@@ -101,7 +101,7 @@ pub(super) fn host_facts() -> Result<HostFacts, AxError> {
 }
 
 /// The edition an `EditionID` names, by its prefix: the one rule the
-/// page's edition fit is decided from (Privacy.Controls D66). Variants
+/// page's edition fit is decided from (Privacy.Controls D67). Variants
 /// such as `CoreCountrySpecific`, `EnterpriseS` or `ServerDatacenter`
 /// keep their family; anything else names no edition, and every control
 /// then shows its edition as not stated.

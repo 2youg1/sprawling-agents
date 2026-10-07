@@ -30,7 +30,7 @@ use crate::report::XtaskError;
 /// `.zig-cache` is where `mlugg/setup-zig` points Zig's global cache,
 /// `$GITHUB_WORKSPACE/.zig-cache`, and the leaf's build fills it: a
 /// `zig build-lib` overrides only the local cache, so the system
-/// libraries it resolves land here. It is walked where CI's `fast` job
+/// libraries it resolves land here. It is walked where CI's `gates` job
 /// is green and the release's `verify` job is red for it, because
 /// `verify` runs `just check`, whose first step builds the workspace and
 /// whose third then reads the binary contents of the cache: twenty-odd

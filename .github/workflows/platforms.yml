@@ -1,9 +1,11 @@
 # What ci.yml deliberately does not ask on every push.
 #
-# Three claims live here, and each is about machines rather than about a
+# Four claims live here, and each is about machines rather than about a
 # change. The repository's gates hold on macOS, where ci.yml lints and
 # tests the core packages but never runs xtask, so a platform this
-# workflow does not run is a promise rather than a fact. The flake
+# workflow does not run is a promise rather than a fact. The published
+# packages build with the oldest compiler `rust-version` names, which
+# every other job here, pinned to `rust-toolchain.toml`, never runs. The flake
 # claims a person on NixOS can build this tree with the Rust version
 # `rust-toolchain.toml` names, and only an evaluation of the flake can say
 # whether that is so. And two builds of one tree are one artifact, which
@@ -126,6 +128,41 @@ jobs:
       - name: xtask gates
         if: ${{ !cancelled() }}
         run: cargo xtask gates
+
+  # The oldest compiler a `cargo install sprawling` may use, exactly.
+  #
+  # clippy's `incompatible_msrv` refuses a standard-library API newer than
+  # `rust-version`, and nothing else reads the claim: a language feature
+  # stabilised after it, or a dependency whose own `rust-version` is
+  # newer, passes every pinned job and breaks the install. Linux, because
+  # this compiles every package but the Windows-only code and a Windows
+  # runner is the scarce one (`crates/sprawling/spec/Doctor.lean` D31).
+  # The version is read from the root manifest, its one authority.
+  msrv:
+    needs: moved
+    if: needs.moved.outputs.verdict == 'run' && (github.event_name != 'workflow_dispatch' || inputs.job == 'all')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - name: the release rust-version names
+        id: floor
+        shell: bash
+        run: |
+          set -euo pipefail
+          floor=$(sed -n 's/^rust-version = "\([0-9.]*\)"$/\1/p' Cargo.toml)
+          test -n "$floor" && test "$(printf '%s\n' "$floor" | wc -l)" -eq 1
+          # A two-part `1.N` means `1.N.0` to Cargo, while rustup would
+          # read it as the newest `1.N` patch release.
+          case "$floor" in *.*.*) ;; *) floor="$floor.0" ;; esac
+          rustup toolchain install "$floor" --profile minimal
+          echo "toolchain=$floor" >> "$GITHUB_OUTPUT"
+      - name: the workspace on that compiler
+        env:
+          FLOOR: ${{ steps.floor.outputs.toolchain }}
+        run: |
+          cargo "+$FLOOR" check --workspace --all-targets --locked
+          cargo "+$FLOOR" check --workspace --all-targets --all-features --locked
 
   # Two builds of one tree, byte for byte (release item three).
   #

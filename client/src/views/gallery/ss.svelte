@@ -12,7 +12,7 @@
   // menu held open, on an earlier session and on the current one, whose
   // menu also renames it and changes its run policy; and an earlier
   // session in main, beside the pane in the blend tier and under the session pane in the panorama tier, with
-  // its offer to continue from its end.
+  // the way back to the room's current session.
   import type { Answer, EventKind, EventRecord, Query, SessionLine, SessionTags, Turn } from "../../wire";
   import { Address, B3Hash, RunId, Seq, Tag, TimeMs } from "../../wire";
 
@@ -134,8 +134,8 @@
   const records = recordsAt(now);
   const answers = answering(now);
   const MAINS: readonly (readonly [string, Tier])[] = [
-    ["sessions · an earlier session in main, blend, its continue offer", "blend"],
-    ["sessions · an earlier session in main, panorama, its continue offer", "panorama"],
+    ["sessions · an earlier session in main, blend, the way back to the current session", "blend"],
+    ["sessions · an earlier session in main, panorama, the way back to the current session", "panorama"],
   ];
 </script>
 

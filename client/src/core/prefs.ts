@@ -23,7 +23,7 @@
 //
 // **A guess this build cannot read is dropped rather than repaired.**
 // An unreadable row falls back to the posture the client ships with,
-// which `theme.css` already draws, so a cache can never become a
+// which the theme already draws, so a cache can never become a
 // second authority for a value somebody else owns.
 //
 // How hard the model thinks is deliberately absent. It is the city's
@@ -254,7 +254,7 @@ function writeAppearance(rows: Rows, next: Appearance): void {
 }
 
 // A size or an opacity the person has not stated is absent from storage
-// too, so the stylesheet's own figure keeps its one home in `theme.css`.
+// too, so the stylesheet's own figure keeps its one home in the theme.
 function writeFigure(rows: Rows, row: string, figure: number | null): void {
   if (figure === null) rows.removeItem(row);
   else rows.setItem(row, String(figure));

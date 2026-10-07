@@ -1,0 +1,195 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ * Copyright (c) 2026 2youg1 and the sprawling contributors */
+
+/* **What needs a person's consent, wherever it appears.**
+ *
+ * Three things in this product stop and ask: a run attaching to the
+ * browser the person is signed into, a command about to run outside a
+ * sandbox, and an approval waiting in a queue. They are drawn the same
+ * way on purpose - a person learns the mark once, and every later one
+ * is recognised rather than read.
+ *
+ * A bar down the leading edge, and a glyph beside the words. **The
+ * glyph is the encoding and the colour is the reinforcement**, never
+ * the other way round: a forced-colour mode replaces every fill and
+ * every border colour with a system colour, so a mark that said
+ * "decide this" in amber alone says nothing at all on the machines
+ * whose owner turned that mode on - which are disproportionately the
+ * machines whose owner needs the mark most.
+ *
+ * The bar is the leading edge rather than the left one, because the
+ * page is also set in languages that run the other way.
+ *
+ * `client/Spec.lean` carries the rule; this is where it is drawn. */
+@utility asks {
+  border-inline-start: var(--spacing-hair) solid var(--color-alert);
+  padding-inline-start: var(--spacing-base);
+}
+
+/* The four corner radii. Their curvature is one exponent for all of
+ * them, drawn by the `@supports` rule in colour.css. */
+@utility rounded-panel {
+  border-radius: var(--radius-panel);
+}
+@utility rounded-card {
+  border-radius: var(--radius-card);
+}
+@utility rounded-control {
+  border-radius: var(--radius-control);
+}
+@utility rounded-pill {
+  border-radius: var(--radius-pill);
+}
+
+/* A number that changes while a person watches it keeps its columns.
+ * The `text-figure` step is the size a number is displayed at, so it
+ * carries this without being asked (see the utilities layer in
+ * utilities.css); anything else - a token count in a table, a duration in
+ * a run, a price in a ledger - asks for it by name. */
+@utility figure {
+  font-variant-numeric: var(--figures);
+}
+
+/* A shell narrower than twelve readable columns (client/Spec.lean §4-52,
+ * client D30). The question is put to the shell's own box, the container
+ * named `shell` (the page's body, see the MOB block), rather than to the
+ * window: a specimen of the shell on `#/gallery` is its own `shell`, so
+ * a 390-pixel specimen draws the phone's page in a 1440-pixel window,
+ * and the gate that measures the gallery judges it. In the shell the
+ * container is the window's width, so the page itself reads the same
+ * either way. */
+@custom-variant narrow (@container shell (width < 768px));
+
+/* The shell's one grid (docs/frontend-method.md §4-33). Every region of the page is
+ * placed on its column lines, so two edges that should line up are one
+ * line rather than two measurements. The first row is the banners a
+ * page may carry; the second is the page. A device that draws under its
+ * notch or its home indicator reserves those strips here, once, so
+ * nothing on the page has to know they exist (4-52).
+ *
+ * `--shell-columns` is how many columns the grid has, written where the
+ * grid is decided: the script that has to know (which tier a one-column
+ * shell can draw) reads it off the element rather than spelling the
+ * width a second time (`views/shared/frame.ts`). */
+/* One side part of the window's silver cut, as a length: registered so
+ * the frame computes it once against its own container, and every page
+ * and panel inside inherits the pixels rather than the formula, whose
+ * `cqw` would otherwise be read again against whichever container stands
+ * nearer (`silver-columns`, the settings panel). */
+@property --silver-side {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0px;
+}
+
+@utility frame {
+  --shell-columns: 12;
+  /* The window is cut once, side : main : side = 1 : √2 : 1, and the
+   * twelve columns are laid into the three parts - three, six, three -
+   * so lines 4 and 10 are the two silver lines and every region still
+   * has column lines to stand on. The cut is measured on the window,
+   * margins included, so the middle part is centred on the screen and a
+   * gutter is centred on each silver line; the middle six columns are
+   * fixed by that and the outer six share what is left, which keeps the
+   * page symmetric whatever the margins are. */
+  --silver-side: calc(100cqw / (2 + var(--silver)));
+  display: grid;
+  grid-template-columns:
+    repeat(3, minmax(0, 1fr))
+    repeat(6, calc((var(--silver-side) * var(--silver) - 6 * var(--spacing-gutter)) / 6))
+    repeat(3, minmax(0, 1fr));
+  grid-template-rows: auto minmax(0, 1fr);
+  column-gap: var(--spacing-gutter);
+  padding: max(var(--spacing-margin), env(safe-area-inset-top, 0px)) max(var(--spacing-margin), env(safe-area-inset-right, 0px))
+    max(var(--spacing-margin), env(safe-area-inset-bottom, 0px)) max(var(--spacing-margin), env(safe-area-inset-left, 0px));
+  /* The edge keys sit in the composer's chip row on one column; the
+   * name they find it by is this frame's alone, so two specimens on one
+   * page never borrow each other's row. */
+  anchor-scope: --edge-slot;
+
+  /* One column: the conversation in it, and the edge keys at its foot
+   * (in the composer's chip row where the engine can anchor them). */
+  @variant narrow {
+    --shell-columns: 1;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    padding: max(var(--spacing-pane), env(safe-area-inset-top, 0px)) max(var(--spacing-pane), env(safe-area-inset-right, 0px))
+      max(var(--spacing-pane), env(safe-area-inset-bottom, 0px)) max(var(--spacing-pane), env(safe-area-inset-left, 0px));
+  }
+}
+
+/* Main's silver lines on a page that is not the conversation (client D24): a
+ * middle column exactly as wide as the shell's middle part, and the two
+ * sides sharing the rest. A page is centred in the shell, so the middle
+ * column's edges stand on the shell's two silver lines, the lines the
+ * conversation and the panes beside it stand on, and a person switching
+ * between a page and the conversation sees the same edges. */
+@utility silver-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) calc(var(--silver-side) * var(--silver) - var(--spacing-gutter)) minmax(0, 1fr);
+  column-gap: var(--spacing-gutter);
+}
+
+/* Glass, for the small surfaces of the edge layer and nothing larger
+ * (docs/frontend-method.md §4-34, §4-43): a blurred, saturated view of what is
+ * behind, the glass role at the opacity the colour gate judges, one
+ * edge that separates it from the words it floats over, and one level
+ * of shadow that says it floats. */
+@utility glass {
+  background-color: color-mix(in oklch, var(--color-glass) var(--glass-opacity), transparent);
+  border: 1px solid color-mix(in oklch, var(--color-text) 10%, transparent);
+  box-shadow:
+    inset 0 1px 0 color-mix(in oklch, var(--color-text) 5%, transparent),
+    var(--shadow-float);
+  backdrop-filter: blur(24px) saturate(170%);
+}
+
+/* Glass turned solid: the same role, covering what is behind it whole,
+ * with nothing blurred. Three reasons and one drawing - the person said
+ * `off` in the appearance group (on any element, so a fixture can say
+ * it of one specimen), the machine asks for less transparency (an
+ * answer only Chromium gives today, which is why the switch exists), or
+ * the engine cannot blur what is behind at all. Unlayered, so each
+ * outranks the utility it replaces. */
+[data-glass="off"] .glass {
+  background-color: var(--color-glass);
+  backdrop-filter: none;
+}
+@media (prefers-reduced-transparency: reduce) {
+  .glass {
+    background-color: var(--color-glass);
+    backdrop-filter: none;
+  }
+}
+@supports not (backdrop-filter: blur(1px)) {
+  .glass {
+    background-color: var(--color-glass);
+  }
+}
+
+/* The two washes a row takes over the page: under the pointer, and
+ * chosen. A wash of the ink rather than a rung of the ramp, because the
+ * shell's rows sit on the page itself and a lifted surface would draw a
+ * card where there is only a row. */
+@utility wash {
+  background-color: color-mix(in oklch, var(--color-text) 5%, transparent);
+}
+@utility wash-strong {
+  background-color: color-mix(in oklch, var(--color-text) 8%, transparent);
+}
+
+/* As many columns of prose as the room holds, and no breakpoint.
+ *
+ * A settings page and a dependency page are lists of cards that read
+ * well at a measure and badly when stretched. Asking for one column
+ * below a breakpoint and two above it answers the question at two
+ * points and guesses in between; `auto-fit` answers it continuously,
+ * from the one width that decides it - how wide a column of prose is.
+ * A room narrower than one measure gets one column as wide as the room,
+ * because a track whose floor is the measure itself draws its cards past
+ * the edge of anything narrower. */
+@utility grid-fit {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--container-measure)), 1fr));
+}

@@ -21,17 +21,17 @@ status 与 inspect 是无状态查询，披露性质由类型持有（见 D54）
   control、reading（读到的快照，即 apply 与 restore 的 expected）与 key_existed，或读失败时的
   unreadable（access_denied 或 failed）；owned（本应用仍拥有的最近操作的 operation、original、
   modified，否则为 null）；unresolved（该控制是否有未结操作）。所有控制都可写
-  （Privacy D68），不写的原项不是控制，所以不出现在这里。
+  （Privacy D69），不写的原项不是控制，所以不出现在这里。
 - privacy apply <control> <expected> 与 privacy restore <control> <expected>（Changes）：
-  expected 是 inspect 为该控制打印的 reading JSON，原样传回；它就是 Privacy.Confirmation D57 的绑定，
+  expected 是 inspect 为该控制打印的 reading JSON，原样传回；它就是 Privacy.Confirmation D58 的绑定，
   缺少或不符即拒绝。
-- privacy restore-all（Changes）：按控制逐个恢复本应用仍拥有的修改（Privacy D62），每个控制
+- privacy restore-all（Changes）：按控制逐个恢复本应用仍拥有的修改（Privacy D63），每个控制
   用恢复前刚读到的值作 expected，输出每个控制各自的结果；第一个失败之后不再继续，
   已完成的结果照样输出，退出失败。
 - privacy reconcile <expected>（Changes）：对未结操作执行人的核对（Privacy 的 Reconcile），
   expected 是 inspect 为该操作的控制打印的 reading；不写系统。
 - privacy elevated-write <write>（Changes）：只供 `bin::privacy::elevation` 的提升子进程使用，
-  write 是一次机器作用域写入的十六进制 JSON，见 Privacy.Windows D59；它不经 coordinator、不读日志、
+  write 是一次机器作用域写入的十六进制 JSON，见 Privacy.Windows D60；它不经 coordinator、不读日志、
   不读系统、不输出读数，校验失败或写入失败时以 AxError 退出失败。
 apply、restore、reconcile 成功时输出一行 JSON：{"done":"applied"|"restored","operation":n}、
 {"done":"already_written"} 或 {"done":"reconciled","operation":n,"settlement":…}；restore-all 每个
