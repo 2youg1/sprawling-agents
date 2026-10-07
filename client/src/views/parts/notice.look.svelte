@@ -71,8 +71,10 @@
 
 <style>
   /* A toast keeps a readable measure and never runs past the viewport's
-  inset on a narrow screen. */
+  inset on a narrow screen, nor past the stack or the box that holds it,
+  which can be narrower than the viewport leaves. */
   .toast {
     width: min(var(--container-measure), calc(100vw - 2 * var(--spacing-pane)));
+    max-width: 100%;
   }
 </style>
