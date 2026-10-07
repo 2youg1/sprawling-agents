@@ -32,8 +32,8 @@
           {...row.wire}
           class={[
             "flex w-full cursor-pointer items-center justify-between gap-snug rounded-control px-base py-snug text-left text-body",
-            "transition-colors ease-leave",
-            row.refused ? "text-text-disabled" : "hover:bg-raised-hover hover:ease-arrive",
+            "transition-colors ease-leave aria-disabled:text-text-disabled",
+            row.refused ? "" : "hover:bg-raised-hover hover:ease-arrive",
             row.active ? "bg-raised-hover ease-arrive" : "",
           ]}
         >
