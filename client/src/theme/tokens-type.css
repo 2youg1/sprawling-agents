@@ -54,15 +54,16 @@
    * both qualify the prose beside them, so each is set one pixel under
    * whatever size the person chose for that prose, and a label is that
    * same size carrying weight 600. Writing the two as literals froze
-   * them while the body moved: at the default body of 15px a note was
-   * the same size as the prose it is meant to sit under, and at a body
-   * of 14px a note was larger than that prose. One number now moves the
-   * whole ladder. */
+   * them while the body moved: at a body of 15px a note was the same
+   * size as the prose it is meant to sit under, and at a body of 14px a
+   * note was larger than that prose. One number now moves the whole
+   * ladder; the default body is 15px, and a person may set any whole
+   * number from `wire::BODY_PX_MIN` up. */
   --text-figure: 28px;
   --text-title: 20px;
   --text-heading: 18px;
   --text-label: calc(var(--text-body) - 1px);
-  --text-body: 14px;
+  --text-body: 15px;
   --text-note: calc(var(--text-body) - 1px);
   --font-weight-figure: 600;
   --font-weight-title: 600;

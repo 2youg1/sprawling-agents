@@ -30,6 +30,9 @@ use serde::{Deserialize, Serialize};
 mod core;
 pub use core::{CorePlacement, CorePreferences, CorePriority};
 
+mod body;
+pub use body::{BODY_PX_MIN, BodyPx};
+
 mod tag;
 pub use tag::{SessionTags, TAG_MAX, Tag};
 
@@ -125,17 +128,6 @@ pub enum Tier {
     Panorama,
 }
 
-/// The smallest and the largest body size a person may ask for.
-///
-/// The floor is the smallest size the colour gate holds its contrast
-/// tiers at, and the ceiling is where a line of body text stops being
-/// body text. Stated here because both the form that offers the box
-/// and the layer that writes the file have to agree, and a pair of
-/// numbers typed twice is a pair that can be typed differently.
-pub const BODY_PX_MIN: u32 = 12;
-/// See [`BODY_PX_MIN`].
-pub const BODY_PX_MAX: u32 = 20;
-
 /// How the pages look.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
@@ -148,12 +140,12 @@ pub struct Appearance {
     pub sans_stack: String,
     /// See `sans_stack`.
     pub mono_stack: String,
-    /// The size of a line of body text in pixels, between
-    /// [`BODY_PX_MIN`] and [`BODY_PX_MAX`]. Absent means the person
+    /// The size of a line of body text in pixels, at least
+    /// [`BODY_PX_MIN`]. Absent means the person
     /// stated no size and the stylesheet's own is drawn — which is a
     /// different statement from any number this build could pick for
     /// them.
-    pub body_px: Option<u32>,
+    pub body_px: Option<BodyPx>,
     pub density: Density,
     pub chroma: Chroma,
     pub motion: Motion,
@@ -444,6 +436,31 @@ mod tests {
         let mut chosen = held;
         chosen.apply(PreferencePatch::Tier(Tier::Panorama));
         assert_eq!(chosen.tier, Some(Tier::Panorama));
+    }
+
+    /// The body size has a floor and no ceiling (`crates/wire/spec/Preference.lean`
+    /// D51): a size under the floor is refused where it is read, so the
+    /// person's file and a frame meet the rule the page's box states,
+    /// and any size above it reads back as the number it was.
+    #[test]
+    fn a_body_size_under_the_floor_is_refused_and_any_size_above_it_reads() {
+        let appearance = |px: u32| {
+            serde_json::json!({ "appearance": {
+                "lighting": "dark", "sans": "geist", "mono": "geist",
+                "sans_stack": "", "mono_stack": "", "body_px": px,
+                "density": "compact", "chroma": "full", "motion": "system",
+            }})
+        };
+        assert!(serde_json::from_value::<PreferencesAnswer>(appearance(11)).is_err());
+        for px in [12, 24, 96] {
+            let held: PreferencesAnswer = serde_json::from_value(appearance(px)).unwrap();
+            assert_eq!(
+                serde_json::to_value(&held)
+                    .unwrap()
+                    .pointer("/appearance/body_px"),
+                Some(&serde_json::json!(px))
+            );
+        }
     }
 
     /// A key this build does not read is refused where it is written.

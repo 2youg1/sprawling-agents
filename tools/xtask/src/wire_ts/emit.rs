@@ -58,13 +58,9 @@ pub(super) fn emit(document: &Value, constants: &Constants) -> Result<String, Re
          export const WIRE_HASH = \"{}\" as const;\n\
          /** The run a city-level record carries: `kernel::RunId::CITY`. */\n\
          export const CITY_RUN = \"{}\" as const;\n\
-         /** The body sizes a person may ask for: `wire::BODY_PX_MIN` and `BODY_PX_MAX`. */\n\
-         export const BODY_PX = {{ min: {}, max: {} }} as const;\n\n",
-        constants.wire_v,
-        constants.hash,
-        constants.city_run,
-        constants.body_px.min,
-        constants.body_px.max
+         /** The smallest body size a person may ask for: `wire::BODY_PX_MIN`. */\n\
+         export const BODY_PX = {{ min: {} }} as const;\n\n",
+        constants.wire_v, constants.hash, constants.city_run, constants.body_px_min
     );
     let edges = edges(&defs);
     let recursive = recursive(&edges);

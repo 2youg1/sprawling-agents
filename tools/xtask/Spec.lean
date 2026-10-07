@@ -811,9 +811,9 @@ fn run(root: &Path, args: &[String]) -> Result<String, XtaskError>;
 
 /-! ### 8-36 `wire-ts` 发出 `BODY_PX`
 
-人可以要的正文字号区间住 `wire::BODY_PX_MIN`／`BODY_PX_MAX`：写 `[ui]` 的那一层据它拒；外观页若自写一份区间，两份区间在其中一份先动的那一刻就是两个区间。生成器因此在文件开头多发一条 `export const BODY_PX = { min, max } as const;`，两个数取自那两个常量，随 `WIRE_V`、`WIRE_HASH`、`CITY_RUN` 一起作为 `Constants` 的一个字段走（`body_px: BodyPx`），而不是给 `emit` 添参数。
+人可以要的正文字号只有下限，住 `wire::BODY_PX_MIN`，由类型 `wire::BodyPx` 执行：`[ui]` 文件与 `PutPreferences` 帧里小于它的数在反序列化处即被拒（`crates/wire/spec/Preference.lean` D51），没有上限。外观页若自写一个下限，两个下限在其中一个先动的那一刻就是两个数。生成器因此在文件开头多发一条 `export const BODY_PX = { min } as const;`，这个数取自那个常量，随 `WIRE_V`、`WIRE_HASH`、`CITY_RUN` 一起作为 `Constants` 的一个字段走（`body_px_min: u32`），而不是给 `emit` 添参数。schema 里 `Appearance.body_px` 内联的 `minimum` 是同一个常量，管页面读到的答案；`BODY_PX` 管人还在打字时的那个框，两者都从 `BODY_PX_MIN` 来。
 
-**被否**：把区间放进 `PreferencesAnswer`——那个类型同时是 `[ui]` 文件的文法，多一个字段就是文件里多一个人能写、而写了也不生效的键；放进 `Query::Config`——那个回答按地址爬梯子，而正文字号是这个人的、不是某个地址的。区间是这个构建的常量，不随城变，故走生成物而不走一次查询。
+**被否**：把下限放进 `PreferencesAnswer`——那个类型同时是 `[ui]` 文件的文法，多一个字段就是文件里多一个人能写、而写了也不生效的键；放进 `Query::Config`——那个回答按地址爬梯子，而正文字号是这个人的、不是某个地址的。下限是这个构建的常量，不随城变，故走生成物而不走一次查询。
 -/
 
 /-! ### 8-37 `unused`：清单里声明、源码里从不点名的依赖（形状 1 判定）

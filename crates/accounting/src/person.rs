@@ -410,4 +410,28 @@ priority = \"normal\"
         assert_eq!(err.code(), &AxCode::ConfigInvalid);
         assert!(err.subject().contains("[ui]"), "{}", err.subject());
     }
+
+    /// The body size floor holds at the file, the door a person writes
+    /// by hand (`crates/wire/spec/Preference.lean` D51): 11 is refused
+    /// where it is read, and a size far above the page's old ceiling is
+    /// read as written.
+    #[test]
+    fn a_body_size_under_the_floor_is_refused_in_the_file_and_a_large_one_is_read() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("config.toml");
+        let ui = |px: u32| {
+            format!(
+                "[ui.appearance]\nlighting = \"dark\"\nsans = \"geist\"\nmono = \"geist\"\n\
+                 sans_stack = \"\"\nmono_stack = \"\"\nbody_px = {px}\n\
+                 density = \"compact\"\nchroma = \"full\"\nmotion = \"system\"\n"
+            )
+        };
+        std::fs::write(&file, ui(11)).unwrap();
+        assert_eq!(stated(&file).unwrap_err().code(), &AxCode::ConfigInvalid);
+        std::fs::write(&file, ui(24)).unwrap();
+        assert_eq!(
+            stated(&file).unwrap().appearance.body_px,
+            Some(wire::BodyPx::new(24).unwrap())
+        );
+    }
 }

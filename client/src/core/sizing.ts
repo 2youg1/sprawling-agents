@@ -3,9 +3,10 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The sizes a person may ask for are the city's range
-// (`wire::BODY_PX_MIN` and `BODY_PX_MAX`), which the generated wire
-// file states, so the box and the `[ui]` writer refuse the same sizes.
+// The smallest size a person may ask for is the city's floor
+// (`wire::BODY_PX_MIN`, enforced by `wire::BodyPx`), which the generated
+// wire file states, so the box and the `[ui]` reader refuse the same
+// sizes. There is no ceiling.
 import { BODY_PX } from "../wire";
 
 // What a box of digits says about the body size. Three outcomes rather
@@ -15,7 +16,7 @@ export type Sizing =
   // Nothing in the box: the page goes back to the size `theme/tokens-type.css` draws.
   | { readonly kind: "cleared" }
   | { readonly kind: "sized"; readonly px: number }
-  // Not a whole number in range. The field says so and the page holds
+  // Not a whole number at or above the floor. The field says so and the page holds
   // the size it already has.
   | { readonly kind: "refused" };
 
@@ -24,5 +25,5 @@ export function sizingOf(text: string): Sizing {
   if (trimmed === "") return { kind: "cleared" };
   if (!/^[0-9]+$/.test(trimmed)) return { kind: "refused" };
   const px = Number.parseInt(trimmed, 10);
-  return px >= BODY_PX.min && px <= BODY_PX.max ? { kind: "sized", px } : { kind: "refused" };
+  return px >= BODY_PX.min ? { kind: "sized", px } : { kind: "refused" };
 }

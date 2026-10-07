@@ -361,6 +361,7 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 | D47 | `Answer::Unavailable` 带上没看成的原因 | `crates/wire/spec/Server.lean` |
 | D48 | 每个 shell 解释器的读数是一个查询，与 skill、MCP 的使用同一遍折叠 | `crates/wire/spec/Reading.lean` |
 | D49 | 设置页靠读回的 tuning 整份重发一次挂接，Key 状态按账号 id 答 | `crates/wire/spec/Answer/Endpoints.lean` |
+| D51 | 正文字号的下限是类型 `BodyPx`，没有上限 | `crates/wire/spec/Preference.lean` |
 -/
 
 /-! ## 13 依赖选型
