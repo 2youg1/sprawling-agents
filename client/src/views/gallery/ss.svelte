@@ -124,6 +124,7 @@
   import type { Tier } from "../../core/prefs";
   import { ui } from "../../ui";
   import Workspace from "../workspace.svelte";
+  import SessionMenu from "../world/session_menu.svelte";
   import Sessions from "../world/sessions.svelte";
   import Case from "./case.svelte";
   import Stand from "./stand.svelte";
@@ -163,6 +164,11 @@
       <Sessions here={ROOM} narrow={false} {head} />
     </div>
   </Stand>
+</Case>
+<Case label="sessions · a row's menu key while the city has no name" width={360}>
+  <div class="flex justify-end p-base">
+    <SessionMenu named={null} label="room1" tags={[]} pinning="none" session={{ name: "", run: null }} />
+  </div>
 </Case>
 {#each MAINS as [label, tier] (label)}
   <Case {label} width={1440}>

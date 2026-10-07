@@ -292,10 +292,15 @@
   import Workspace from "../workspace.svelte";
   import City from "../world/city.svelte";
   import Commits from "../world/commits.svelte";
+  import Divider from "../world/divider.svelte";
   import Files from "../world/files.svelte";
+  import PaneMenu from "../world/pane_menu.svelte";
   import Session from "../world/session.svelte";
   import Sheet from "../world/sheet.svelte";
+  import SheetHead from "../world/sheet_head.svelte";
+  import Timeline from "../world/timeline.svelte";
   import Case from "./case.svelte";
+  import { pressing } from "./ss.svelte";
   import Stand from "./stand.svelte";
 
   const u = ui();
@@ -380,4 +385,41 @@
       <Commits here={ROOM} />
     </div>
   </Stand>
+</Case>
+<Case label="workbench · the timeline at a phone's width, a checkpoint picked" width={390}>
+  <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} answers={answering} {records}>
+    <div class="flex h-[420px] flex-col">
+      <Timeline run={run(6)} turns={TURNS} commits={COMMITS} picked={PICKED?.oid ?? null} />
+    </div>
+  </Stand>
+</Case>
+<Case label="workbench · a pane's label, its menu open on the middle pane" width={640}>
+  <div class="flex h-[160px] flex-col px-base" {@attach pressing('button[aria-haspopup="menu"]')}>
+    <PaneMenu pane="session" label={say($lang, "world_session")} arranged="menu" />
+  </div>
+</Case>
+<Case label="workbench · a pane's label in the blend tier, words only" width={640}>
+  <div class="flex flex-col px-base">
+    <PaneMenu pane="sessions" label={say($lang, "world_sessions")} arranged="words" />
+  </div>
+</Case>
+<Case label="workbench · the divider between the first two panes" width={1440}>
+  <!-- The shell's frame, so the divider snaps to the lines it reads. -->
+  <div class="frame grid h-[160px] grid-rows-[minmax(0,1fr)_auto]">
+    <div class="row-[1/3] rounded-panel border border-edge-panel" style:grid-column="1 / 4"></div>
+    <Divider divider={0} label={say($lang, "world_sessions")} controls="gallery-sessions" column={4} />
+    <div class="row-[1/3] rounded-panel border border-edge-panel" style:grid-column="4 / 10"></div>
+  </div>
+</Case>
+<Case label="workbench · the world sheet's head on a phone" width={390}>
+  <SheetHead
+    tabs={[
+      { pane: "sessions", label: say($lang, "world_sessions") },
+      { pane: "session", label: say($lang, "world_session") },
+      { pane: "commits", label: roomOf(ROOM) },
+    ]}
+    shown="commits"
+    prefix="gallery-sheet"
+    onShow={() => undefined}
+  />
 </Case>
