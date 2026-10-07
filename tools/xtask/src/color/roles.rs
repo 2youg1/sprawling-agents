@@ -30,12 +30,17 @@
 //! Four rules, and together they make the vocabulary closed in both
 //! directions: a name this file does not know cannot be declared, a
 //! name it knows cannot go undeclared, a role nothing spells is a name
-//! with no reader, and a rung spelled outside the stylesheet is a view
-//! answering the question again on its own.
+//! with no reader, and a rung spelled outside the stylesheet, as a
+//! utility or through `var()`, is a view answering the question again on
+//! its own. The walk that finds those rungs also refuses a
+//! `var(--color-*)` the theme never declares, which the engine would draw
+//! as nothing without a word, and a `--color-*` a component's stylesheet
+//! declares for itself, which would be a second home for a colour.
 
 use std::path::Path;
 
 use crate::report::{Violation, XtaskError};
+use crate::sheet::{self, Reading};
 use crate::theme;
 use crate::walk;
 
@@ -43,10 +48,12 @@ use crate::walk;
 /// directory; this gate only says that it is the one it reads.
 use crate::walk::CLIENT_SRC as VIEWS;
 
-/// Which file kinds carry a class name. Wider than what the client is
-/// written in, because `index.html` carries classes too and a rung
-/// spelled there draws exactly as wrongly as one spelled in a view.
-const VIEW_EXTS: [&str; 3] = ["svelte", "ts", "html"];
+/// Which file kinds carry a class name or read a colour. Wider than what
+/// the client is written in, because `index.html` carries classes too
+/// and a rung spelled there draws exactly as wrongly as one spelled in a
+/// view, and a stylesheet outside the theme reads colours as a
+/// component's `<style>` block does.
+const VIEW_EXTS: [&str; 4] = ["svelte", "ts", "html", "css"];
 
 /// The closed vocabulary.
 ///
@@ -174,8 +181,10 @@ pub(super) fn judge_roles(root: &Path, source: &str) -> Result<Vec<Violation>, X
     }
 
     // 4. A rung spelled outside the stylesheet is a view deciding for
-    //    itself how bright a surface should be - which is the defect.
-    violations.extend(rungs_outside_the_theme(root)?);
+    //    itself how bright a surface should be - which is the defect. The
+    //    same walk refuses a colour read that the theme never declares
+    //    and a colour a component's stylesheet declares for itself.
+    violations.extend(views_outside_the_theme(root, source)?);
     Ok(violations)
 }
 
@@ -253,21 +262,29 @@ fn class_word(text: &str, word: &str) -> bool {
     })
 }
 
-/// Every place a view names a rung directly.
-fn rungs_outside_the_theme(root: &Path) -> Result<Vec<Violation>, XtaskError> {
+/// Every place a view, a component's stylesheet or a replacement look
+/// names a rung directly, reads a colour the theme never declares, or
+/// declares a colour of its own.
+fn views_outside_the_theme(root: &Path, source: &str) -> Result<Vec<Violation>, XtaskError> {
+    let known: Vec<&str> = declared(source).map(|held| held.name).collect();
     let mut violations = Vec::new();
-    for path in walk::files_with_ext(&root.join(VIEWS), &VIEW_EXTS)? {
+    for path in walk::client_files(root, &VIEW_EXTS)? {
         let rel = walk::rel(root, &path);
         if theme::is_theme(&rel) {
             continue;
         }
         let text = walk::read_text(&path)?;
-        for (index, line) in text.lines().enumerate() {
-            if let Some(spelling) = rung_utility(line) {
-                let at = index.saturating_add(1);
+        for line in sheet::lines(&rel, &text) {
+            let at = format!("{rel}:{}", line.number);
+            let rung = rung_utility(line.text).or_else(|| {
+                reads(line.text)
+                    .find(|name| is_rung(name))
+                    .map(|name| format!("var(--color-{name})"))
+            });
+            if let Some(spelling) = rung {
                 violations.push(Violation {
                     gate: "color",
-                    location: format!("{rel}:{at}"),
+                    location: at.clone(),
                     rule: "a view spells the role a surface has, never the rung it resolves to"
                         .to_owned(),
                     violation: format!("`{spelling}` names a rung of the ramp"),
@@ -279,9 +296,58 @@ fn rungs_outside_the_theme(root: &Path) -> Result<Vec<Violation>, XtaskError> {
                     ),
                 });
             }
+            if let Some(name) =
+                reads(line.text).find(|name| !is_rung(name) && !known.contains(name))
+            {
+                violations.push(Violation {
+                    gate: "color",
+                    location: at.clone(),
+                    rule: "a view reads only the colours the theme declares".to_owned(),
+                    violation: format!(
+                        "`var(--color-{name})` reads a colour the theme never declares, so the \
+                         engine draws nothing in its place and says nothing"
+                    ),
+                    alternative: "spell a role from the ROLES table in \
+                                  tools/xtask/src/color/roles.rs or a token the theme declares"
+                        .to_owned(),
+                });
+            }
+            let own = (line.reading == Reading::Sheet)
+                .then(|| sheet::declared(line.text, "--color-").next())
+                .flatten();
+            if let Some(name) = own {
+                violations.push(Violation {
+                    gate: "color",
+                    location: at,
+                    rule: "colour is named once per client, in that client's theme file".to_owned(),
+                    violation: format!("--color-{name} is declared outside the theme"),
+                    alternative: format!(
+                        "declare the colour in the theme ({} and the parts it imports) and read \
+                         it here through var()",
+                        theme::ENTRY
+                    ),
+                });
+            }
         }
     }
     Ok(violations)
+}
+
+/// Every colour name a line reads through `var(--color-<name>)`. A name
+/// built at run time (`var(--color-${role})`) is not a reading the gate
+/// can resolve, and is skipped.
+fn reads(line: &str) -> impl Iterator<Item = &str> {
+    const OPEN: &str = "var(--color-";
+    line.match_indices(OPEN).filter_map(|(at, _)| {
+        let tail = line.get(at.saturating_add(OPEN.len())..)?;
+        let length = tail
+            .bytes()
+            .take_while(|byte| byte.is_ascii_alphanumeric() || *byte == b'-')
+            .count();
+        let name = tail.get(..length)?;
+        let closes = tail.get(length..)?.trim_start().starts_with([')', ',']);
+        (closes && !name.is_empty()).then_some(name)
+    })
 }
 
 /// Whether a line carries `bg-g2`, `border-g3`, `text-g0` or any other
@@ -323,5 +389,48 @@ fn refuse(rule: &str, violation: String, alternative: &str) -> Violation {
         rule: rule.to_owned(),
         violation,
         alternative: alternative.to_owned(),
+    }
+}
+
+#[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    reason = "test code"
+)]
+mod tests {
+    use super::judge_roles;
+    use crate::color::scan::tests::SVELTE_FIXTURE;
+
+    /// A component's stylesheet speaks in roles the theme declares: a
+    /// rung read through `var()` is a view choosing a brightness again, a
+    /// misspelt role reads as nothing without a word, and a colour
+    /// declared there is a second home for it.
+    #[test]
+    fn a_component_style_reads_declared_roles_and_declares_no_colour() {
+        let root = std::env::temp_dir().join(format!("color-roles-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let path = root.join("client/src/views/panel.svelte");
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(&path, SVELTE_FIXTURE).unwrap();
+        let source = "  --color-g3: oklch(0.3 0.014 250);
+  --color-accent: oklch(0.6 calc(0.151 * var(--chroma)) 250);
+";
+
+        let found = judge_roles(&root, source).unwrap();
+        assert_eq!(
+            found
+                .iter()
+                .filter(|v| v.location.starts_with("client/src/views/"))
+                .map(|v| v.location.as_str())
+                .collect::<Vec<_>>(),
+            [
+                "client/src/views/panel.svelte:8",
+                "client/src/views/panel.svelte:9",
+                "client/src/views/panel.svelte:10",
+            ]
+        );
+        std::fs::remove_dir_all(&root).unwrap();
     }
 }
