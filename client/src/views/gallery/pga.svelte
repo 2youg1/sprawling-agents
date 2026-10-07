@@ -15,8 +15,8 @@
   //
   // The moments are fixed rather than read off the clock, so a picture
   // of this route compares with yesterday's.
-  import type { Answer, BuildingAnswer, CommitAnswer, Entry, GitStatusAnswer, Query, SandboxLimits } from "../../wire";
-  import { Address, ContainerImage, EnvVarName, GitOid, NodeId, RunId, Seq, ServerLabel, SessionName, TimeMs, UsdMicros } from "../../wire";
+  import type { Answer, BuildingAnswer, CommitAnswer, Entry, GitStatusAnswer, Query, SandboxLimits, SkillsAnswer } from "../../wire";
+  import { Address, B3Hash, ContainerImage, EnvVarName, GitOid, NodeId, RunId, Seq, ServerLabel, SessionName, TimeMs, UsdMicros } from "../../wire";
 
   const LAB = Address.make("lab");
   const AT = 1_790_000_000_000;
@@ -50,8 +50,11 @@
     };
   }
 
+  // The newest commit, which the opened-row case opens.
+  const NEWEST = commit(1, "parser: read unicode escapes in string literals\n\nThe lexer took \\u as two characters.", "lab/parser", [oid("2")]);
+
   export const COMMITS: readonly CommitAnswer[] = [
-    commit(1, "parser: read unicode escapes in string literals\n\nThe lexer took \\u as two characters.", "lab/parser", [oid("2")]),
+    NEWEST,
     commit(2, "tests for the escape table", "lab/parser", [oid("3")]),
     commit(3, null, "lab/docs", [oid("4")]),
     commit(4, "first checkpoint of lab", "lab", []),
@@ -126,6 +129,19 @@
     { kind: { file: { bytes: 3_406 } }, name: "escape.rs" },
   ];
 
+  // Two skills a building reads: one on its own shelf, which opens, and
+  // one mounted from outside the city, which has no address to open.
+  const SKILLS: SkillsAnswer = {
+    building: LAB,
+    missing: [],
+    skills: [
+      { admitted: true, disclosure: "Read a Rust lexer's escape table", hash: B3Hash.make("1".repeat(64)), name: "escapes", pinned_by: [run("a")], section: "", shelf: { building: Address.make("lab/skills/escapes/SKILL.md") } },
+      { admitted: false, disclosure: "Format a release note", hash: B3Hash.make("2".repeat(64)), name: "notes", pinned_by: [], section: "", shelf: { external: { index: 1, path: "notes/SKILL.md" } } },
+    ],
+  };
+
+  const ROADMAP = "# Roadmap\n\n- Read unicode escapes\n- Review the escape table\n";
+
   // Which listing a directory answers: the rooms hold transcripts, the
   // source directory holds files.
   function listingOf(at: Address | null | undefined): readonly Entry[] {
@@ -146,6 +162,10 @@
       return held === undefined ? { unavailable: { query: "commit" } } : { commit: held };
     }
     if ("cost_of" in query) return { cost_of: { node: query.cost_of.node, spent: UsdMicros.make(312_000), runs: [[run("9"), UsdMicros.make(312_000)]] } };
+    if ("skills" in query) return { skills: SKILLS };
+    if ("document" in query) {
+      return { document: { at: query.document.at, state: { held: { body: { text: { coverage: "whole", encoding: "utf8", head: { span: { start: 0, end: ROADMAP.length }, text: ROADMAP } } }, bytes: ROADMAP.length, format: "markdown", version: B3Hash.make("3".repeat(64)) } } } };
+    }
     if ("listing" in query) return { listing: { at: query.listing.at ?? null, entries: [...listingOf(query.listing.at)] } };
     return undefined;
   }
@@ -156,8 +176,12 @@
 
 <script lang="ts">
   import Building from "../building.svelte";
+  import Commit from "../building/commit.svelte";
   import Commits from "../building/commits.svelte";
   import Directory from "../building/directory.svelte";
+  import FileView from "../building/file.svelte";
+  import Skills from "../building/skills.svelte";
+  import Tree from "../building/tree.svelte";
   import Sandbox from "../building/sandbox.svelte";
   import Status from "../building/status.svelte";
   import Whose from "../building/whose.svelte";
@@ -172,6 +196,29 @@
   </Case>
   <Case label="building · commits, one without a message" width={MIDDLE_WIDTH}>
     <Commits building={LAB} />
+  </Case>
+  <Case label="building · a commit opened on its facts and its changed files" width={MIDDLE_WIDTH}>
+    <ul>
+      <Commit
+        building={LAB}
+        commit={NEWEST}
+        older={COMMITS[1] ?? null}
+        first={false}
+        open
+        onToggle={() => undefined}
+        holds={() => true}
+        onOpen={() => undefined}
+      />
+    </ul>
+  </Case>
+  <Case label="building · the tree with a file picked" width={360}>
+    <Tree root={LAB} picked={{ at: Address.make("lab/Roadmap.md"), kind: "file" }} onPick={() => undefined} />
+  </Case>
+  <Case label="building · a spine file, its source key and its edit key" width={MIDDLE_WIDTH}>
+    <FileView at={Address.make("lab/Roadmap.md")} root={LAB} />
+  </Case>
+  <Case label="building · skills, one on a shelf outside the city" width={MIDDLE_WIDTH}>
+    <Skills building={LAB} onPick={() => undefined} />
   </Case>
   <Case label="building · changes since the last checkpoint" width={MIDDLE_WIDTH}>
     <Status building={LAB} />

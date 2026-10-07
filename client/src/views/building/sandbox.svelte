@@ -35,6 +35,10 @@
   import Button from "../parts/button.svelte";
   import Field from "../parts/field.svelte";
   import Segmented from "../parts/segmented.svelte";
+  import { armSelectWire } from "./arm_select";
+  import ArmSelect from "./arm_select.look.svelte";
+  import { textBoxWire } from "./text_box";
+  import TextBox from "./text_box.look.svelte";
 
   interface Props {
     readonly address: Address;
@@ -209,19 +213,13 @@
     </div>
     <div class="flex min-w-0 flex-col gap-snug">
       <span class="text-note text-text-quiet">{say($lang, "sandbox_arm")}</span>
-      <select
-        class="h-control w-full rounded-control border border-edge-input bg-raised px-base text-note text-text"
-        aria-label={say($lang, "sandbox_arm")}
-        value={draft.arm}
-        onchange={(event) => {
-          const arm = ARMS.find((each) => each === event.currentTarget.value);
+      <ArmSelect
+        options={ARMS.map((arm) => ({ value: arm, label: say($lang, `sandbox_arm_${arm}`) }))}
+        wire={armSelectWire(say($lang, "sandbox_arm"), draft.arm, (value) => {
+          const arm = ARMS.find((each) => each === value);
           if (arm !== undefined) edit({ arm });
-        }}
-      >
-        {#each ARMS as arm (arm)}
-          <option value={arm}>{say($lang, `sandbox_arm_${arm}`)}</option>
-        {/each}
-      </select>
+        })}
+      />
       <p class="text-note text-text-faint">{say($lang, "sandbox_arm_help")}</p>
       {#if draft.arm === "container"}
         <p class="text-note text-text-faint">{say($lang, "sandbox_container_help")}</p>
@@ -249,14 +247,12 @@
     {#each LISTS as list (list.key)}
       <label class="flex min-w-0 flex-col gap-snug">
         <span class="text-note text-text-quiet">{say($lang, list.label)}</span>
-        <textarea
-          class="min-h-[calc(var(--spacing-control)*3)] w-full rounded-control border border-edge-input bg-raised px-base py-snug font-mono text-note text-text aria-invalid:border-alert"
-          aria-invalid={list.bad !== null}
-          value={draft.lists[list.key]}
-          oninput={(event) => {
-            editList(list.key, event.currentTarget.value);
-          }}
-        ></textarea>
+        <TextBox
+          size="list"
+          wire={textBoxWire(draft.lists[list.key], undefined, list.bad !== null, (value) => {
+            editList(list.key, value);
+          })}
+        />
         {#if list.bad === null}
           <span class="text-note text-text-faint">{say($lang, list.help)}</span>
         {:else}

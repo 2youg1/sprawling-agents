@@ -54,6 +54,9 @@
   import EmptyState from "../parts/empty.svelte";
   import Path from "../parts/path.svelte";
   import Unanswered from "../parts/unanswered.svelte";
+  import FactLink from "./fact_link.look.svelte";
+  import RunRow from "./run_row.look.svelte";
+  import TalkLink from "./talk_link.look.svelte";
   import type { Picked } from "./tree.svelte";
   import { transcriptOf } from "./transcript";
 
@@ -154,12 +157,7 @@
       <span class="text-note text-text-faint">{say($lang, KIND_WORD[kind])}</span>
       <span class="flex-1"></span>
       {#if kind === "room"}
-        <a
-          href={toFragment({ kind: "talk", address: at })}
-          class="rounded-control bg-raised px-base py-tight text-label hover:bg-raised-hover"
-        >
-          {say($lang, "bld_open_talk")}
-        </a>
+        <TalkLink label={say($lang, "bld_open_talk")} wire={{ href: toFragment({ kind: "talk", address: at }) }} />
       {/if}
     </div>
     {#if kind === "governance"}
@@ -170,38 +168,22 @@
         <ul class="text-note">
           {#each runs as run (run.run)}
             {@const micros = spent(run.run)}
-            <li class="border-b border-edge py-snug">
-              <a
-                href={toFragment({ kind: "run", run: run.run })}
-                class="flex items-center gap-base hover:text-text"
-              >
-                <span
-                  class={[
-                    "inline-block size-dot shrink-0 rounded-pill",
-                    run.doing.kind === "frozen" ? "bg-mark" : "bg-accent",
-                  ]}
-                ></span>
-                <span class="min-w-0 flex-1 truncate text-text-quiet">{run.task ?? run.run}</span>
-                <span class="shrink-0 text-text-faint">{posture(run.doing)}</span>
-                {#if micros !== null && micros !== 0}
-                  <span class="shrink-0 text-text-faint">{usd(micros)}</span>
-                {/if}
-                {#if run.started}
-                  <span class="shrink-0 text-text-faint">{clock($lang, run.started)}</span>
-                {/if}
-              </a>
+            <li class="border-b border-edge">
+              <RunRow
+                task={run.task ?? run.run}
+                live={run.doing.kind !== "frozen"}
+                posture={posture(run.doing)}
+                spent={micros !== null && micros !== 0 ? usd(micros) : undefined}
+                started={run.started ? clock($lang, run.started) : undefined}
+                wire={{ href: toFragment({ kind: "run", run: run.run }) }}
+              />
             </li>
           {/each}
         </ul>
       {:else if earlier.length === 0}
         <EmptyState missing="dir_room_empty">
           {#snippet action()}
-            <a
-              href={toFragment({ kind: "talk", address: at })}
-              class="rounded-control bg-raised px-base py-tight text-label hover:bg-raised-hover"
-            >
-              {say($lang, "bld_open_talk")}
-            </a>
+            <TalkLink label={say($lang, "bld_open_talk")} wire={{ href: toFragment({ kind: "talk", address: at }) }} />
           {/snippet}
         </EmptyState>
       {/if}
@@ -212,9 +194,12 @@
         <ul class="flex flex-wrap gap-x-base text-note">
           {#each earlier as run (run)}
             <li>
-              <a href={toFragment({ kind: "run", run })} class="figure text-text-quiet hover:text-accent"
-                >{run.slice(0, 8)}</a
-              >
+              <FactLink
+                label={run.slice(0, 8)}
+                face="figure"
+                ink="quiet"
+                wire={{ href: toFragment({ kind: "run", run }) }}
+              />
             </li>
           {/each}
         </ul>

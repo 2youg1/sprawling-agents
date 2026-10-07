@@ -17,6 +17,7 @@
   import { ui } from "../../ui";
   import type { Address } from "../../wire";
   import Button from "../parts/button.svelte";
+  import Field from "../parts/field.svelte";
 
   interface Props {
     readonly address: Address;
@@ -29,7 +30,6 @@
   const city = u.conn.asking.ask(QUERIES.city);
 
   let goal = $state("");
-  let field = $state<HTMLInputElement | undefined>(undefined);
 
   const pursuit = $derived.by(() => {
     const held = $city;
@@ -39,11 +39,12 @@
   });
 
   // An empty goal sends nothing; the press moves the caret to the box,
-  // so the person sees where the goal is missing.
-  function setGoalNow(): void {
+  // so the person sees where the goal is missing. The box is the form's
+  // one input, so the form is where the caret is sent from.
+  function setGoalNow(form: HTMLFormElement): void {
     const words = goal.trim();
     if (words === "") {
-      field?.focus();
+      form.querySelector("input")?.focus();
     } else if (u.send(pursue(address, { set: { goal: words } }))) {
       goal = "";
     }
@@ -53,24 +54,29 @@
 <div class="flex min-w-0 items-center gap-base" role="group" aria-label={say($lang, "bld_goal")}>
   <span class="w-figure shrink-0 text-note text-text-faint">{say($lang, "bld_goal")}</span>
   {#if pursuit === undefined}
-    <!-- The box wears the same line as every other input, and its button
-         is always there, so a person reads it as a place to type rather
-         than as a label. -->
-    <input
-      class="h-control min-w-0 flex-1 rounded-control border border-edge-input bg-raised px-base text-note placeholder:text-text-faint"
-      placeholder={fill(say($lang, "bld_goal_placeholder"), { addr: address })}
-      aria-label={say($lang, "bld_goal")}
-      bind:value={goal}
-      bind:this={field}
-      onkeydown={(event) => {
-        if (event.key === "Enter") setGoalNow();
+    <!-- The box is the one every other input is, and its button is
+         always there, so a person reads it as a place to type rather
+         than as a label. A form, so Enter in the box is the button. -->
+    <form
+      class="flex min-w-0 flex-1 items-center gap-base"
+      onsubmit={(event) => {
+        event.preventDefault();
+        setGoalNow(event.currentTarget);
       }}
-    />
-    <Button
-      label={say($lang, "bld_pursue")}
-      tone={goal.trim() === "" ? "secondary" : "primary"}
-      onPress={setGoalNow}
-    />
+    >
+      <div class="min-w-0 flex-1">
+        <Field
+          label={say($lang, "bld_goal")}
+          labelling="hidden"
+          placeholder={fill(say($lang, "bld_goal_placeholder"), { addr: address })}
+          value={goal}
+          onInput={(value) => {
+            goal = value;
+          }}
+        />
+      </div>
+      <Button label={say($lang, "bld_pursue")} type="submit" tone={goal.trim() === "" ? "secondary" : "primary"} />
+    </form>
   {:else}
     <span
       class={["size-dot shrink-0 rounded-pill", pursuit.state === "running" ? "bg-accent" : "bg-mark"]}

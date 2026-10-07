@@ -61,6 +61,7 @@
   import { ui } from "../../ui";
   import type { Query } from "../../wire";
   import Unanswered from "../parts/unanswered.svelte";
+  import SkillRow from "./skill_row.look.svelte";
   import type { Picked } from "./tree.svelte";
 
   interface Props {
@@ -100,45 +101,23 @@
         {#each answer.skills as skill (skillId(skill))}
           {@const place = placeOf(skill.shelf, $lang)}
           <li class="border-b border-edge">
-            <!-- Two lines: what the skill is (its name and the summary
-                 its SKILL.md opens with), then where it lives - the
-                 shelf, the file on it, and the two qualifiers - so a
-                 User who finds a name twice can see which copy runs
-                 read. -->
-            <button
-              type="button"
-              disabled={place.at === null}
-              class="flex w-full min-w-0 flex-col gap-tight py-snug text-left text-note hover:text-text disabled:cursor-default disabled:hover:text-inherit"
-              onclick={() => {
-                open(place.at);
+            <SkillRow
+              name={skill.name}
+              summary={skill.disclosure}
+              shelf={place.word}
+              at={place.at ?? ""}
+              admitted={skill.admitted ? say($lang, "skills_admitted") : say($lang, "skills_not_admitted")}
+              used={skill.pinned_by.length > 0
+                ? fill(say($lang, "skills_used_by"), { n: String(skill.pinned_by.length) })
+                : say($lang, "skills_used_never")}
+              wire={{
+                type: "button",
+                disabled: place.at === null,
+                onclick: () => {
+                  open(place.at);
+                },
               }}
-            >
-              <span class="flex w-full min-w-0 items-baseline gap-base">
-                <span class="shrink-0 font-mono text-text-quiet">{skill.name}</span>
-                <span class="min-w-0 flex-1 truncate text-text-faint">{skill.disclosure}</span>
-              </span>
-              <span class="flex w-full min-w-0 items-baseline gap-base">
-                <span class="shrink-0 text-text-faint">{place.word}</span>
-                <span class="min-w-0 flex-1 truncate font-mono text-text-faint">{place.at ?? ""}</span>
-                <!-- The two trailing qualifiers shrink; they do not hold
-                    their width against the row. Five cells were `shrink-0`
-                    except the one in the middle, so once the four fixed
-                    ones and their gaps passed the pane's width the last of
-                    them was painted outside the button and over the column
-                    beside it. The name and the shelf keep their width
-                    because they are what identifies the row; whether it is
-                    admitted and who pinned it are qualifiers, and a
-                    qualifier that has to be cut short is still read. -->
-                <span class="min-w-0 truncate text-text-faint">
-                  {skill.admitted ? say($lang, "skills_admitted") : say($lang, "skills_not_admitted")}
-                </span>
-                <span class="min-w-0 truncate text-text-faint">
-                  {skill.pinned_by.length > 0
-                    ? fill(say($lang, "skills_used_by"), { n: String(skill.pinned_by.length) })
-                    : say($lang, "skills_used_never")}
-                </span>
-              </span>
-            </button>
+            />
           </li>
         {/each}
       </ul>

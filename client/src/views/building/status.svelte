@@ -25,6 +25,9 @@
   import { howWord, linesWord, shortOid } from "../changes";
   import { openDocument, rightItem } from "../inspect/open.svelte";
   import EmptyState from "../parts/empty.svelte";
+  import FactLink from "./fact_link.look.svelte";
+  import { fileRowWire } from "./file_row";
+  import FileRow from "./file_row.look.svelte";
   import TakeBack from "./take_back.svelte";
 
   interface Props {
@@ -54,13 +57,18 @@
 {#snippet checkpoint(commit: CommitAnswer)}
   <p class="flex flex-wrap items-baseline gap-x-base text-note">
     <span class="text-text-faint">{say($lang, "git_checkpoint")}</span>
-    <a
-      href={toFragment({ kind: "run", run: commit.run })}
-      class="figure text-text-quiet hover:text-text">{shortOid(commit.oid)}</a
-    >
-    <a href={toFragment({ kind: "talk", address: commit.actor })} class="text-text-quiet hover:text-text"
-      >{roomOf(commit.actor)}</a
-    >
+    <FactLink
+      label={shortOid(commit.oid)}
+      face="figure"
+      ink="quiet"
+      wire={{ href: toFragment({ kind: "run", run: commit.run }) }}
+    />
+    <FactLink
+      label={roomOf(commit.actor)}
+      face="words"
+      ink="quiet"
+      wire={{ href: toFragment({ kind: "talk", address: commit.actor }) }}
+    />
     {#if commit.model !== ""}
       <span class="text-text-faint">{commit.model}</span>
     {/if}
@@ -99,25 +107,16 @@
       {@const point = status.checkpoint?.oid ?? null}
       <ul class="border-t border-edge text-note">
         {#each status.files as file (file.path)}
-          <li class="relative flex min-w-0 items-center gap-snug border-b border-edge">
-            {#if isOpen(file.path)}
-              <span class="absolute inset-y-snug left-0 w-hair rounded-pill bg-accent" aria-hidden="true"></span>
-            {/if}
-            <button
-              type="button"
-              class={[
-                "grid h-control min-w-0 flex-1 grid-cols-[16ch_minmax(0,1fr)_auto] narrow:grid-cols-[8ch_minmax(0,1fr)_auto] items-center gap-x-base rounded-control pr-snug pl-base text-left hover:wash",
-                isOpen(file.path) ? "wash-strong" : "",
-              ]}
-              aria-label={fill(say($lang, "git_open_file"), { path: file.path })}
-              onclick={() => {
+          <li class="flex min-w-0 items-center gap-snug border-b border-edge">
+            <FileRow
+              how={howWord($lang, file.how)}
+              path={file.path}
+              lines={linesWord($lang, file.lines)}
+              current={isOpen(file.path)}
+              wire={fileRowWire(fill(say($lang, "git_open_file"), { path: file.path }), isOpen(file.path), () => {
                 openDocument({ building, path: file.path, version: null });
-              }}
-            >
-              <span class="truncate text-text-faint">{howWord($lang, file.how)}</span>
-              <span class="truncate font-mono text-text">{file.path}</span>
-              <span class="figure text-text-faint">{linesWord($lang, file.lines)}</span>
-            </button>
+              })}
+            />
             {#if point !== null}
               <TakeBack {building} path={file.path} {point} />
             {/if}

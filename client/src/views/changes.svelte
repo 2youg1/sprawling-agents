@@ -24,6 +24,8 @@
   import { say } from "../core/lang";
   import { ui } from "../ui";
   import type { Address, Answer, GitOid, Query } from "../wire";
+  import { disclosureWire } from "./building/disclosure";
+  import Disclosure from "./building/disclosure.look.svelte";
   import { howWord, linesWord } from "./changes";
   import Patch from "./inspect/patch.svelte";
   import Unanswered from "./parts/unanswered.svelte";
@@ -80,18 +82,21 @@
     {#each files as file (file.path)}
       <li class="border-b border-edge">
         <div class="flex items-center gap-snug">
-          <button
-            type="button"
-            class="flex min-w-0 flex-1 items-center gap-base py-snug text-left hover:text-text"
-            aria-expanded={open === file.path}
-            onclick={() => {
-              toggle(file.path);
-            }}
-          >
-            <span class="w-figure shrink-0 text-text-faint">{howWord($lang, file.how)}</span>
-            <span class="flex-1 truncate font-mono text-text-quiet">{file.path}</span>
-            <span class="shrink-0 font-mono text-text-faint">{linesWord($lang, file.lines)}</span>
-          </button>
+          {#snippet cells()}
+            <span class="truncate text-text-faint">{howWord($lang, file.how)}</span>
+            <span class="truncate font-mono text-text-quiet">{file.path}</span>
+            <span class="font-mono text-text-faint">{linesWord($lang, file.lines)}</span>
+          {/snippet}
+          <div class="min-w-0 flex-1">
+            <Disclosure
+              layout="change"
+              open={open === file.path}
+              wire={disclosureWire(open === file.path, () => {
+                toggle(file.path);
+              })}
+              {cells}
+            />
+          </div>
           {#if act !== undefined}
             {@render act(file.path)}
           {/if}
