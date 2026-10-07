@@ -15,43 +15,26 @@
   // The lens set is `parts/tabs.svelte`, which owns both halves of the
   // tab-and-panel association (client/Spec.lean §7-8 item 6).
 
-  import { Option, Schema } from "effect";
-  import { SvelteMap } from "svelte/reactivity";
-  import { readable } from "svelte/store";
-  import type { Readable } from "svelte/store";
-
-  import { readAnswer } from "../core/answered";
   import { adopted } from "../core/belief/adopted";
   import { cancel, steer } from "../core/commands";
   import { sendingInto } from "../core/doing";
   import { fill, say } from "../core/lang";
   import { STOP } from "../core/slash";
   import type { Key } from "../core/lang";
-  import { RUN_LENSES, buildingOf, roomOf, type RunLens } from "../core/route";
-  import { count } from "../core/time";
+  import { RUN_LENSES, roomOf, type RunLens } from "../core/route";
   import { ui } from "../ui";
-  import { Address } from "../wire";
-  import type {
-    Answer,
-    EvidenceKind,
-    Query,
-    RunId,
-    RoundsAnswer,
-    RunSummary,
-    Turn,
-    Used,
-  } from "../wire";
+  import type { Address, RunId, RoundsAnswer, RunSummary } from "../wire";
   import Changes from "./changes.svelte";
   import Button from "./parts/button.svelte";
   import EmptyState from "./parts/empty.svelte";
-  import Path from "./parts/path.svelte";
-  import Unanswered from "./parts/unanswered.svelte";
   import Tabs from "./parts/tabs.svelte";
   import type { Lens } from "./parts/tabs.svelte";
   import Head from "./run/head.svelte";
   import Monitor from "./monitor/monitor.svelte";
   import { NO_TAIL } from "../core/live_output";
   import type { Share } from "./run/lanes";
+  import Context from "./run/context.svelte";
+  import Evidence from "./run/evidence.svelte";
   import Prompt from "./run/prompt.svelte";
   import River from "./run/river.svelte";
   import Composer from "./talk/composer.svelte";
@@ -74,11 +57,6 @@
     changes: "run_changes",
     evidence: "run_evidence",
   };
-  const EVIDENCE_WORD: Record<EvidenceKind, Key> = {
-    screenshot: "evidence_screenshot",
-    finished: "evidence_finished",
-  };
-  const NOTHING: Readable<Answer | undefined> = readable(undefined);
 
   // The lens the person chose; until they choose, the run's own state
   // picks one (`firstLens` below).
@@ -122,8 +100,6 @@
   const checkpoint = $derived(rounds?.opened_at ?? null);
   const lastCheckpoint = $derived(lastCheckpointIn(turns));
 
-  const peak = $derived(peakOf(turns));
-  const seen = $derived(seenOf(turns));
   const live = $derived(shown !== undefined && shown.doing.kind !== "frozen");
   const room = $derived(shown?.addr ?? null);
   // Where the changes lens stops. A live run that has not checkpointed past
@@ -142,16 +118,6 @@
     return lastCheckpoint !== null && lastCheckpoint !== checkpoint ? "changes" : "turns";
   });
   const current = $derived(chosen ?? firstLens);
-
-  // The evidence question exists only while its lens is open: a
-  // watched answer is refreshed when stale, and nobody is looking at
-  // this one between visits.
-  const evidenceQuestion = $derived<Query>({ evidence: { run } });
-  const evidenceStore = $derived(current === "evidence" ? u.conn.asking.ask(evidenceQuestion) : NOTHING);
-  const evidenceRead = $derived(
-    readAnswer($evidenceStore, (held) => ("evidence" in held ? held.evidence.items : undefined)),
-  );
-  const items = $derived(evidenceRead.kind === "held" ? evidenceRead.value : undefined);
 
   // The run's clock as the page knows it: from the opening (or the
   // first turn) to the closing, or to now while the run is live.
@@ -176,46 +142,6 @@
         return null;
     }
   });
-
-  function peakOf(round: readonly Turn[]): number {
-    return Math.max(1, ...round.map((turn) => (turn.used?.input ?? 0) + (turn.used?.output ?? 0)));
-  }
-
-  // What this run read, most consulted first: the window's own list
-  // says what it holds, and this says what it kept going back to.
-  function seenOf(round: readonly Turn[]): readonly (readonly [string, number])[] {
-    const files = new SvelteMap<string, number>();
-    for (const turn of round) {
-      for (const call of turn.calls) {
-        if (
-          (call.tool === "read" || call.tool === "search") &&
-          call.subject !== null &&
-          call.subject !== undefined
-        ) {
-          files.set(call.subject, (files.get(call.subject) ?? 0) + 1);
-        }
-      }
-    }
-    return [...files.entries()].sort((a, b) => b[1] - a[1]);
-  }
-
-  function barOf(used: Used | null | undefined, top: number, part: "cached" | "input" | "output"): number {
-    if (used === null || used === undefined) return 0;
-    const held = Math.min(used.cached ?? 0, used.input);
-    const value = part === "cached" ? held : part === "input" ? used.input - held : used.output;
-    return (value / top) * 100;
-  }
-
-  // A file the run read is opened where the page can open it: the
-  // building it belongs to. Which file the page then shows is not in
-  // the address bar's vocabulary, so the path stops at the door.
-  function opening(file: string): (() => void) | undefined {
-    const at = Option.getOrNull(Schema.decodeOption(Address)(file));
-    if (at === null) return undefined;
-    return () => {
-      u.go({ kind: "building", address: buildingOf(at) });
-    };
-  }
 
   function roomWord(at: Address | null): string {
     return at === null ? say($lang, "talk_resident") : roomOf(at);
@@ -269,64 +195,7 @@
   {:else if eye.id === "prompt"}
     <Prompt {run} />
   {:else if eye.id === "context"}
-    <div class="grid grid-cols-[repeat(auto-fit,minmax(320px,1fr))] gap-wide">
-      <section>
-        <h2 class="mb-base text-note text-text-faint">{say($lang, "run_window")}</h2>
-        {#if turns.some((turn) => turn.used !== null && turn.used !== undefined)}
-          <ul class="text-note">
-            {#each turns as turn (turn.number)}
-              <li class="my-tight flex items-center gap-snug">
-                <span class="w-figure shrink-0 text-text-faint"
-                  >{fill(say($lang, "run_turn_n"), { n: String(turn.number) })}</span
-                >
-                <!-- The legend under the list names the three colours,
-                     so a hint on each segment would say a second time
-                     what the page already says once. -->
-                <span
-                  class="flex h-dot flex-1 overflow-hidden rounded-pill bg-track"
-                  aria-hidden="true"
-                >
-                  <span class="bg-mark" style:width="{barOf(turn.used, peak, 'cached')}%"></span>
-                  <span class="bg-accent" style:width="{barOf(turn.used, peak, 'input')}%"></span>
-                  <span class="bg-accent-solid" style:width="{barOf(turn.used, peak, 'output')}%"
-                  ></span>
-                </span>
-                <span class="w-figure shrink-0 text-right text-text-faint">
-                  {turn.used !== null && turn.used !== undefined
-                    ? count(turn.used.input + turn.used.output)
-                    : "—"}
-                </span>
-              </li>
-            {/each}
-          </ul>
-          <p class="mt-snug text-note text-text-faint">
-            <span class="mr-base"><span class="inline-block size-dot rounded-pill bg-mark"></span>
-              {say($lang, "run_cached")}</span>
-            <span class="mr-base"><span class="inline-block size-dot rounded-pill bg-accent"></span>
-              {say($lang, "run_input")}</span>
-            <span><span class="inline-block size-dot rounded-pill bg-accent-solid"></span>
-              {say($lang, "run_output")}</span>
-          </p>
-        {:else}
-          <p class="text-text-faint">{say($lang, "run_no_usage")}</p>
-        {/if}
-      </section>
-      <section>
-        <h2 class="mb-base text-note text-text-faint">{say($lang, "run_read_files")}</h2>
-        {#if seen.length > 0}
-          <ul class="text-note">
-            {#each seen as [file, n] (file)}
-              <li class="my-tight flex items-center justify-between gap-base">
-                <Path path={file} onOpen={opening(file)} />
-                <span class="shrink-0 text-text-faint">{n > 1 ? `×${String(n)}` : ""}</span>
-              </li>
-            {/each}
-          </ul>
-        {:else}
-          <p class="text-text-faint">{say($lang, "run_read_nothing")}</p>
-        {/if}
-      </section>
-    </div>
+    <Context {turns} />
   {:else if eye.id === "changes"}
     {#if checkpoint !== null}
       <Changes base={checkpoint} head={changedTo} />
@@ -334,28 +203,7 @@
       <EmptyState missing="run_no_checkpoint" />
     {/if}
   {:else if eye.id === "evidence"}
-    {#if evidenceRead.kind === "unavailable"}
-      <Unanswered query={evidenceRead.query} asked={evidenceQuestion} />
-    {:else if items === undefined}
-      <p class="text-text-faint">…</p>
-    {:else if items.length > 0}
-      <ul class="text-note">
-        {#each items as item (item.at)}
-          <li class="flex items-center gap-base border-b border-edge py-snug">
-            <span class="w-figure shrink-0 text-text-faint">{say($lang, EVIDENCE_WORD[item.kind])}</span>
-            <span class="flex-1 truncate font-mono text-text-quiet">{item.locator}</span>
-            {#if item.picture !== null && item.picture !== undefined}
-              <span class="text-text-faint"
-                >{item.picture.width}×{item.picture.height} {item.picture.media_type}</span
-              >
-            {/if}
-            <span class="text-text-faint">#{item.at}</span>
-          </li>
-        {/each}
-      </ul>
-    {:else}
-      <EmptyState missing="run_no_evidence" />
-    {/if}
+    <Evidence {run} />
   {/if}
 {/snippet}
 

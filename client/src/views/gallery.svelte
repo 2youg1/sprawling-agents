@@ -98,6 +98,8 @@
   import PartRow from "./gallery/parts/row.svelte";
   import Monitored from "./gallery/monitored.svelte";
   import Timed from "./gallery/timed.svelte";
+  import Lensed from "./gallery/lensed.svelte";
+  import Recorded from "./gallery/recorded.svelte";
   import Tok from "./gallery/tok.svelte";
   import Read from "./gallery/read.svelte";
   import TipPlaced from "./gallery/parts/tip_placed.svelte";
@@ -193,6 +195,8 @@
   <PartSegmented />
   <Monitored />
   <Timed />
+  <Lensed />
+  <Recorded />
   <Resulted />
   <Streamed />
   <Tok />

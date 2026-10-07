@@ -6,15 +6,16 @@
 -->
 
 <script lang="ts">
-  // The seat of the run page's sheet: it lends the decision (`./head`)
-  // the person's language and draws whatever `./head.look.svelte` is.
+  // The seat of one timeline row: it lends the decision (`./entry`) the
+  // person's language and draws whatever `./entry.look.svelte` is. The
+  // timeline owns which record is open; this row only reports a press.
 
   import { ui } from "../../ui";
-  import { lookOf } from "./head";
-  import type { HeadProps } from "./head";
-  import Look from "./head.look.svelte";
+  import { lookOf } from "./entry";
+  import type { EntryProps } from "./entry";
+  import Look from "./entry.look.svelte";
 
-  const props: HeadProps = $props();
+  const props: EntryProps = $props();
   const lang = ui().lang;
   const look = $derived(lookOf(props, $lang));
 </script>

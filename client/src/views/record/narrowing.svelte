@@ -6,15 +6,16 @@
 -->
 
 <script lang="ts">
-  // The seat of the run page's sheet: it lends the decision (`./head`)
-  // the person's language and draws whatever `./head.look.svelte` is.
+  // The seat of one narrowing choice: it lends the decision
+  // (`./narrowing`) the person's language and draws whatever
+  // `./narrowing.look.svelte` is.
 
   import { ui } from "../../ui";
-  import { lookOf } from "./head";
-  import type { HeadProps } from "./head";
-  import Look from "./head.look.svelte";
+  import { lookOf } from "./narrowing";
+  import type { NarrowingProps } from "./narrowing";
+  import Look from "./narrowing.look.svelte";
 
-  const props: HeadProps = $props();
+  const props: NarrowingProps = $props();
   const lang = ui().lang;
   const look = $derived(lookOf(props, $lang));
 </script>
