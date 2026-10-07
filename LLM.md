@@ -126,7 +126,8 @@ reports, rather than as a complete before-effect account of that harness.
 
 Review is a building policy, not a step every run receives: `minimal` disables
 it. An experiment works in its own worktree and is not merged. A copied working
-tree is not an operating-system sandbox; host-command guarantees depend on the
+tree is not an operating-system sandbox, and it is copied from the run's own room,
+not the whole building; host-command guarantees depend on the
 selected platform mechanism. Built-in taint gates do not control all external
 programs. Use [execution boundaries](docs/operating.md#how-exec-is-confined) and
 [the security policy](SECURITY.md) when those conditions affect the reader's task.

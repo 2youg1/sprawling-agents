@@ -254,6 +254,8 @@ sprawling replay ./cities/restore-check/.sprawling/ledger
 
 更新后运行 `sprawling version` 与 `sprawling help`，确认 PATH 上解析到预期的二进制，再用 `sprawling up ./cities/first` 打开城。核对页面能连接、配置能读取、项目文件和历史仍在，并执行一件小任务。验证成功之前保留旧版和备份。
 
+从 0.0.9 升到 0.0.10 不需要手工转换任何文件。0.0.9 写下的城可以直接打开：第一次打开时，因为快照格式变了，视图与常驻状态会从 Ledger 开头重新折叠一遍，控制台会说明这一点，历史照常校验。0.0.9 存进 Vault 的 provider Key 原样可用，用 `secret:providers/<name>` 引用登记的 endpoint 不必重新输入 Key。个人配置 `~/.sprawling/config.toml` 只读取、不改写，其中没写的设置取这一版的默认值，例如正文 15 px、阅读字体 Geist Mono。
+
 ### 安全回退
 
 停下更新后的城，通过原渠道恢复旧二进制并检查版本；用旧二进制把更新前的 bundle 恢复到新的城目录，再对它的 Ledger 运行 `replay`。按需恢复另存的主机配置、重新登记凭证，然后启动恢复的城。除非所选发行明确说明兼容，否则不要让旧二进制读取已由新版迁移的城。单独保留更新后的城供检查；回退到备份不会保留备份之后完成的工作。

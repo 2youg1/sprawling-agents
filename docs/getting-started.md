@@ -254,6 +254,8 @@ Update through the original channel:
 
 After updating, run `sprawling version` and `sprawling help`, check the intended executable is the one on PATH, then reopen the city with `sprawling up ./cities/first`. Confirm the page connects, configuration loads, project files and history are present and a small task works. Keep the old version and backup until this check succeeds.
 
+From 0.0.9 to 0.0.10 nothing has to be converted by hand. A city written by 0.0.9 opens as it is: on the first open the views and the standing are folded again from the start of the Ledger, because the snapshot format changed, and the console says so; the history is proved as before. Provider keys that 0.0.9 stored in the vault are used as they are, so an endpoint registered with a `secret:providers/<name>` reference works without entering the key again. The personal configuration `~/.sprawling/config.toml` is read without being rewritten, and settings it does not name take this version's defaults, for example 15 px body text and Geist Mono for reading text.
+
 ### Roll back safely
 
 Stop the updated city. Restore the previous binary through its original channel, verify its version, then use that previous binary to restore the pre-update bundle into a fresh city directory and run `replay` on its Ledger. Reapply any separately backed-up host configuration, enroll credentials where needed, and start this restored city. Do not ask an older binary to read a city that the newer version migrated unless the selected release explicitly documents that compatibility. Preserve the updated city separately for inspection; rollback to the backup does not retain work performed after it was taken.
