@@ -215,4 +215,63 @@ mod tests {
         assert_eq!(room.as_str(), "lab/notes");
         assert!(!room.is_reserved());
     }
+
+    /// A reader that looks at a room while it is claimed finds no seal or
+    /// the whole one. A checkpoint walking the building is such a reader:
+    /// a seal it found empty and then read grown refused the wave as a file
+    /// that changed under it (city D24). The watcher polls each room's
+    /// seal before that room is claimed, so every claim happens under its
+    /// eye.
+    #[test]
+    fn a_claimed_rooms_seal_is_never_seen_half_written() {
+        use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+
+        const ROOMS: usize = 100;
+        let dir = tempfile::tempdir().unwrap();
+        let rooms: Vec<Address> = (0..ROOMS)
+            .map(|n| Address::parse(&format!("lab/r{n}")).unwrap())
+            .collect();
+        let watching = AtomicUsize::new(0);
+        let claimed = AtomicBool::new(false);
+        let (seen, refused) = std::thread::scope(|scope| {
+            let watcher = scope.spawn(|| {
+                let mut seen = Vec::new();
+                for (n, room) in rooms.iter().enumerate() {
+                    let seal = dir.path().join(room.as_str()).join(".gitignore");
+                    watching.store(n, Ordering::SeqCst);
+                    loop {
+                        if let Ok(bytes) = std::fs::read(&seal) {
+                            seen.push(bytes);
+                            break;
+                        }
+                        if claimed.load(Ordering::SeqCst) && !seal.exists() {
+                            break;
+                        }
+                        std::hint::spin_loop();
+                    }
+                }
+                seen
+            });
+            let mut refused = Vec::new();
+            for (n, room) in rooms.iter().enumerate() {
+                while watching.load(Ordering::SeqCst) < n {
+                    std::hint::spin_loop();
+                }
+                if let Err(err) = super::claim(dir.path(), room) {
+                    refused.push(err.to_string());
+                }
+            }
+            claimed.store(true, Ordering::SeqCst);
+            (watcher.join().unwrap(), refused)
+        });
+        let torn = seen
+            .iter()
+            .filter(|bytes| bytes.as_slice() != b"*\n")
+            .count();
+        assert_eq!(
+            (seen.len(), torn, refused),
+            (ROOMS, 0, Vec::<String>::new()),
+            "every room's seal is read whole"
+        );
+    }
 }

@@ -273,6 +273,7 @@ resident 段是模型每回合都读到的四段之一。`URBANITE.md` 建议 30
 | D21 | JOB.md 用 `<from>` 写明交活的人，任务与目标转义后放进各自的节 | `crates/city/spec/SpineFiles.lean` |
 | D22 | `City.md` 写明哪种形状是 User 的话，信与居民交下的活只带那个居民的身份 | `crates/city/spec/SpineFiles.lean` |
 | D23 | `rules` 工具只读：说明不提供它恒拒的操作，也不留写面 | `crates/city/spec/RulesTool.lean` |
+| D24 | 房间的封条整张出现：暂存再改名，不用 `create_new` 加写入 | `crates/city/spec/Gitignore.lean` |
 -/
 
 /-! D8 定规：拒词的恢复语归写拒词的那一处

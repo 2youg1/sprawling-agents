@@ -39,7 +39,7 @@ pub(crate) fn place_tree(target: &Path, entries: &[TreeEntry<'_>]) -> Result<(),
 
 **锁是本进程的**：一个人在编辑器里改同一份文件不受它约束，而在本仓库现有依赖下也无法约束（跨进程文件锁需要新依赖，`crates/city/Cargo.toml` 只认 `kernel` + std + `toml`/`serde`）。挡住那个人的是原子替换：他的编辑器永远读不到半份文档。
 
-**`create_new` 那一族不归本模块**：`spine_files::write_new`、`building::create`、`gitignore::seal_room` 要的是「独占地认领一个名字」，而 `OpenOptions::create_new` 已经把认领与拒绝合成一个操作。把它们改道本模块只会让一条已经成立的规则多一个家。
+**`create_new` 那一族不归本模块**：`spine_files::write_new`、`building::create` 要的是「独占地认领一个名字」，而 `OpenOptions::create_new` 已经把认领与拒绝合成一个操作。把它们改道本模块只会让一条已经成立的规则多一个家。`gitignore::seal_room` 不在这一族：它封的目录刚由调用方独占建出，封条没有名字要认领，而它要的是整张出现，所以经 `replace` 落盘（city D24）。
 
 **错误面**：`E_STORAGE_FATAL`，主题是失败的那条路径与操作系统的原话，恢复语一句——把目录改成可写、确认磁盘有空间，然后重存。八个写面共用这一句。经 `edit_against` 另有一个码：`E_VERSION_CONFLICT`，含义是「文件不再是你起手时的那份」，恢复语是重读再发。它与 `runtime::tools::edit`、`library::install` 报同一件事的码相同，客户端已有它的词条，故不是新开的一种失败。
 
