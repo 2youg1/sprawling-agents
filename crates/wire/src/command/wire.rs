@@ -82,6 +82,7 @@ impl<Secret> Command<Secret> {
             | Self::ConfirmRemoteDoor(DoorAnswer { ref idem, .. })
             | Self::ReplaceCityKey(DoorStep { ref idem })
             | Self::CloseRemoteDoor(DoorStep { ref idem })
+            | Self::PrivacyOperation(crate::PrivacyRequest { ref idem, .. })
             | Self::ForgetSecret(SecretForgetting { ref idem, .. }) => Some(idem),
             Self::PutSecret { .. } | Self::Auth { .. } => None,
         }
@@ -270,6 +271,7 @@ impl From<WireCommand> for Command {
             Command::ReplaceCityKey(step) => Self::ReplaceCityKey(step),
             Command::ConfirmRemoteDoor(answer) => Self::ConfirmRemoteDoor(answer),
             Command::CloseRemoteDoor(step) => Self::CloseRemoteDoor(step),
+            Command::PrivacyOperation(request) => Self::PrivacyOperation(request),
             Command::ForgetSecret(forgetting) => Self::ForgetSecret(forgetting),
             Command::PutShelved {
                 shelf,

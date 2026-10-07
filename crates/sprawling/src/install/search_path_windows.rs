@@ -27,26 +27,18 @@ if ($k.GetValueNames() -contains 'Path') {
 Write-Output $kind
 ";
 
-/// Writes the value back under the type it was read as, then tells
-/// every top-level window that the environment moved.
+/// Writes the value back under the type it was read as.
 ///
 /// `[Environment]::SetEnvironmentVariable` is the obvious call and
 /// the wrong one: it always writes REG_SZ, which demotes a
 /// REG_EXPAND_SZ search path so its `%VAR%` entries stop expanding
 /// (dotnet/runtime#1442). Writing the registry directly means the
-/// broadcast is ours to send, and `#![forbid(unsafe_code)]` puts
-/// `SendMessageTimeout` out of Rust's reach - so it is sent from
-/// here.
+/// broadcast is ours to send, which `sprawling::environment_broadcast`
+/// does once the value is in place.
 const WRITE: &str = r#"
 $ErrorActionPreference='Stop'
 $v = [IO.File]::ReadAllText($env:SPRAWLING_PATH_FILE, (New-Object Text.UTF8Encoding $false))
 Set-ItemProperty -LiteralPath 'HKCU:\Environment' -Name 'Path' -Value $v -Type $env:SPRAWLING_PATH_KIND
-Add-Type -Namespace SprawlingNative -Name Env -MemberDefinition @'
-[DllImport("user32.dll", SetLastError=true, CharSet=CharSet.Auto)]
-public static extern IntPtr SendMessageTimeout(IntPtr hWnd, uint Msg, UIntPtr wParam, string lParam, uint fuFlags, uint uTimeout, out UIntPtr lpdwResult);
-'@
-$r = [UIntPtr]::Zero
-[void][SprawlingNative.Env]::SendMessageTimeout([IntPtr]0xffff, 0x1A, [UIntPtr]::Zero, 'Environment', 2, 5000, [ref]$r)
 "#;
 
 struct Raw {
@@ -125,7 +117,15 @@ fn write(raw: &Raw, value: &str) -> Result<Option<String>, AxError> {
     // person's search path, so it does not outlive the edit.
     drop(std::fs::remove_file(&raw.carrier));
     outcome?;
-    Ok(None)
+    // The path is written whether or not the desktop heard about it, so a
+    // failed announcement is a line for the person, not a failure.
+    Ok(match sprawling::environment_broadcast::announce() {
+        Ok(()) => None,
+        Err(unannounced) => Some(format!(
+            "the search path is written, but {}; windows opened after you sign out and back in will see it",
+            unannounced.subject()
+        )),
+    })
 }
 
 pub(super) fn extend(dir: &str) -> Result<(PathOutcome, Option<String>), AxError> {

@@ -5,7 +5,20 @@
 
 //! Local privacy history modules (`crates/sprawling/spec/Privacy.lean`).
 
+mod answer;
 pub mod cli;
+mod controls;
+mod coordinator;
+#[cfg(windows)]
+mod elevation;
+mod fault;
 mod identity;
 mod journal;
+mod originals;
+mod plan;
+pub(crate) mod service;
 mod state;
+pub(crate) mod system;
+mod target;
+#[cfg(windows)]
+pub(crate) mod windows;

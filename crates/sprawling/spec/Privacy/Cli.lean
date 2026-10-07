@@ -4,22 +4,55 @@
 -- Copyright (c) 2026 2youg1 and the sprawling contributors
 
 /-!
-# privacy::cli 的只读入口
-规定 `crates/sprawling/src/privacy/cli.rs` 与它读取真实身份的
-`crates/sprawling/src/privacy/identity.rs`。本文件是接口说明，不是形式证明：
-status 是一次无状态查询，没有可以量化的轨迹；披露性质由类型持有（见 D54）。
+# privacy::cli 的本地入口
+规定 `crates/sprawling/src/privacy/cli.rs`、它读取真实身份的
+`crates/sprawling/src/privacy/identity.rs`，以及写入动词交给 coordinator 的生产 Host
+`bin::privacy::windows::host`。本文件是接口说明，不是形式证明：写入动词的次序与性质由
+crates.sprawling.spec.Privacy 证明，CLI 只把参数交给同一个 `bin::privacy::coordinator`；
+status 与 inspect 是无状态查询，披露性质由类型持有（见 D54）。
 
-pub fn status() -> Result<String, AxError> 依次做三件事：读取真实 Windows 身份，
-失败即返回且不打开日志；通过 Home::detect().privacy_history() 调用 journal::read；
-把 History::disclose 交出的摘要序列化成一行 JSON。没有 city 参数，没有网络或 wire。
-main::verbs 的唯一 spelling 为 privacy status，Effect::ReadsOnly；main::router
-直接调用 status，输出一行 JSON，失败输出 AxError 与 recovery 并退出失败。
-摘要不包含 owner、raw bytes、绝对 home 路径；unresolved 不是失败或成功。
-HistoryFault 的稳定 code/action/recovery 映射归 state，不在路由器重写。
+动词（main::verbs 各登记一次，main::router 直接调用；时钟由 router 交入 assembly 的 SystemClock，
+不在 privacy 里取样）：
+- privacy status（ReadsOnly）：依次读取真实 Windows 身份（失败即返回且不打开日志）、
+  通过 Home::detect().privacy_history() 调用 journal::read、把 History::disclose 交出的摘要
+  序列化成一行 JSON。没有 city 参数，没有网络或 wire。
+- privacy inspect [control]（ReadsOnly）：先读真实身份与历史（同 status 的次序），经
+  History::holdings 以只读的 () owner 核对后（Privacy.State），每个控制一行 JSON（给出 control 时只那一行）：
+  control、reading（读到的快照，即 apply 与 restore 的 expected）与 key_existed，或读失败时的
+  unreadable（access_denied 或 failed）；owned（本应用仍拥有的最近操作的 operation、original、
+  modified，否则为 null）；unresolved（该控制是否有未结操作）。所有控制都可写
+  （Privacy D69），不写的原项不是控制，所以不出现在这里。
+- privacy apply <control> <expected> 与 privacy restore <control> <expected>（Changes）：
+  expected 是 inspect 为该控制打印的 reading JSON，原样传回；它就是 Privacy.Confirmation D58 的绑定，
+  缺少或不符即拒绝。
+- privacy restore-all（Changes）：按控制逐个恢复本应用仍拥有的修改（Privacy D63），每个控制
+  用恢复前刚读到的值作 expected，输出每个控制各自的结果；第一个失败之后不再继续，
+  已完成的结果照样输出，退出失败。
+- privacy reconcile <expected>（Changes）：对未结操作执行人的核对（Privacy 的 Reconcile），
+  expected 是 inspect 为该操作的控制打印的 reading；不写系统。
+- privacy elevated-write <write>（Changes）：只供 `bin::privacy::elevation` 的提升子进程使用，
+  write 是一次机器作用域写入的十六进制 JSON，见 Privacy.Windows D60；它不经 coordinator、不读日志、
+  不读系统、不输出读数，校验失败或写入失败时以 AxError 退出失败。
+apply、restore、reconcile 成功时输出一行 JSON：{"done":"applied"|"restored","operation":n}、
+{"done":"already_written"} 或 {"done":"reconciled","operation":n,"settlement":…}；restore-all 每个
+控制一行 {"control":…,"done":…}。失败时把 AxError 与 recovery 写到 stderr 并退出失败；
+--json 时 stderr 是一行 AxError JSON，subject 以 Privacy §12 的稳定码开头，一次性 runner 的
+验收按它判定。CLI 是一次性 runner 验收进入生产路径的入口。
+输出不包含 owner、绝对 home 路径；读数与原值按 Privacy.State D52 明文。
+HistoryFault 的稳定 code 与 recovery 映射归 `bin::privacy::fault`，调用者只给出自己的 action，不在路由器重写。
 
-当前入口只检查实时身份，不查询当前 registry 值，也不产生确认或修改。
-inspect/confirm/apply/restore 尚未接入，读取已有 history 不能冒充首个控制完成；
-未来入口仍走同一个 coordinator。
+生产 Host（`bin::privacy::windows::host`）：
+- identity 是 `bin::privacy::identity` 读到的 SID；owner(recorded, identity)：有记录的引用时经
+  gateway::verify_platform_identity 核对后原样返回；空历史时抽取 64 位随机数，作名字
+  owner-<16 位小写十六进制> 在 realm privacy 下建一个新引用，经 gateway::bind_platform_identity
+  把 SID 写进平台 Vault（gateway D34），返回这个引用。空历史第一次写入之前的失败（例如 changed）
+  会留下一条没有历史引用的绑定，它只在本人的凭据库里保存本人的 SID。
+- read 与 write 按控制表的目标交给适配器（Privacy.Windows）：HKCU 值与用户环境在本进程，
+  HKLM 值与计划任务经 `bin::privacy::elevation`；适配器的访问拒绝映射为 Privacy §12 的
+  access_denied，UAC 被拒映射为 elevation_declined，其他失败带原因。计划任务没有父键，
+  它的读数记录 key_existed 为 true，所以从不报告残留的空键。
+- 用户环境的值写下而广播失败时，Host 把广播失败作为写入报告的失败交给 coordinator：结论照旧由
+  读回决定（值已写下即 Applied），广播失败只影响已运行的程序何时读到它。
 -/
 
 /-! D54 status 的摘要也是身份披露，只交给 owner 引用在平台 Vault 中绑定的身份
@@ -31,8 +64,9 @@ status 的 authorize 是 gateway::verify_platform_identity(owner, 实时身份)�
 缺失返回 CredentialMissing，锁定保留平台错误码，不匹配返回 ConfigInvalid。
 空历史没有 owner，不访问 Vault，返回空摘要。身份读取先于日志读取，
 所以读不到身份时不报告日志是否损坏。每次查询保持日志字节不变。
-此边界只核对 owner，不证明 journal 与引用的随机身份绑定；后续 writer 必须
-同时建立该绑定，不能以本查询接口授权 apply/restore。
+inspect 与 restore-all 经只读的 History::holdings 取得拥有栈栈顶与未结操作，非空历史的 authorize
+与 status 相同；空历史同样不访问 Vault。
+此边界只核对 owner；写入动词经 coordinator 用同一核对，身份不符时在披露任何历史之前拒绝。
 被否：①在 Lean 中把查询写成快照序列上的 map 再证明——每次查询相互独立，
 定理只是复述定义的一支；②cli 先取 owner 再取摘要的两个 getter——
 漏掉核对的调用者照样能序列化摘要。
@@ -50,8 +84,10 @@ System32\WindowsPowerShell\v1.0\powershell.exe；不从 PATH、SystemRoot
 而 HKLM 需要管理员。路径读失败或不是绝对路径即拒绝。
 命令关闭 profile、非交互，只输出
 [Security.Principal.WindowsIdentity]::GetCurrent().User.Value；
-经 doctor::asking 询问，只保留第一行，最多等 300 次 knock
-（300 × asking::TICK = 15 秒，因为冷启动的 Windows PowerShell 要几秒才开始回答）。
+经 doctor::asking 询问，只保留第一行，最多等 1200 次 knock（1200 × asking::TICK = 一分钟）。
+这个上界由 `bin::privacy::windows` 一处定义，身份查询、计划任务查询与环境广播共用：冷启动的
+Windows PowerShell 在同时有其他构建的工作站上空命令就要 5.1 秒，与整个测试套件并行时身份查询用了
+13.9 秒、任务查询超过 15 秒；一分钟是所见最慢回答的四倍，而查询只在人等页面时等待。
 超时、非零退出、无法启动均以 ToolUnavailable 拒绝，不保留 stopping 诊断中的路径或身份。
 答案必须符合 SID 文法 `S-1-<authority>(-<sub-authority>)+`，每段是非空十进制数字；
 不符合即拒绝，拒绝文字不回显答案。身份放在 Zeroizing 中，不写日志、不落盘。
@@ -61,6 +97,6 @@ Rust 检查在 privacy::identity::tests（仅 Windows）：SID 文法的接受�
 只有这条走生产路径的检查能发现「答案带行尾」「保留了错误的行」一类缺陷。
 被否：①whoami /user——输出带账户名，要解析再丢弃明文身份；
 ②windows crate 的 GetTokenInformation——需要 unsafe，按 AGENTS.md 平台调用的次序，
-有安全接口时不用；③windows-registry crate——计划中的 privacy::windows 读写原始注册表值，
+有安全接口时不用；③windows-registry crate——`bin::privacy::windows::registry` 读写原始注册表值，
 winreg 的 get_raw_value/set_raw_value 已是它要的安全接口，同一个 OS 接口只留一个依赖。winreg 的版本由 workspace 决定。
 -/

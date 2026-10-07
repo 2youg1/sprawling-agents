@@ -30,6 +30,8 @@
 	// brightness filter asks the platform for no colour, so it darkens
 	// the page under both lightings and cannot fail quietly.
 
+	import type { Snippet } from "svelte";
+
 	export interface DialogProps {
 		readonly open: boolean;
 		// Already in the person's language: what is about to happen.
@@ -42,6 +44,9 @@
 		readonly onCancel: () => void;
 		// Whether the confirming answer destroys something.
 		readonly destructive?: boolean;
+		// What the question rests on, drawn between the detail and the
+		// answers when one sentence cannot carry it.
+		readonly children?: Snippet;
 	}
 </script>
 
@@ -57,6 +62,7 @@
 		onConfirm,
 		onCancel,
 		destructive = false,
+		children,
 	}: DialogProps = $props();
 
 	// One instance, one id root: the title and the detail derive their
@@ -107,6 +113,7 @@
 	{#if detail !== undefined}
 		<p id={body} class="text-note text-text-quiet">{detail}</p>
 	{/if}
+	{#if children !== undefined}{@render children()}{/if}
 	<div class="flex items-center justify-end gap-snug">
 		<!-- The way out is written first, so it is the control the
 			platform puts under the hand when the dialog opens. -->

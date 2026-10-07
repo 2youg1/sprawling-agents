@@ -3,13 +3,16 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Strict read-only local JSONL (`crates/sprawling/spec/Privacy/Journal.lean`).
+//! Strict local JSONL: a read that never creates or settles anything, and
+//! a writer that holds the file for a whole operation and returns only once
+//! a line is on disk (`crates/sprawling/spec/Privacy/Journal.lean`).
 
-use std::fs::{File, TryLockError};
-use std::io::{ErrorKind, Read};
+use std::fs::{File, OpenOptions, TryLockError};
+use std::io::{ErrorKind, Read, Write};
 use std::path::Path;
 
-use super::state::{History, HistoryFault, Line};
+use super::fault::HistoryFault;
+use super::state::{History, Line};
 
 /// History input bound, not a claim about Windows registry value limits.
 const HISTORY_BYTES_MAX: u64 = 8 * 1024 * 1024;
@@ -25,20 +28,137 @@ pub(super) fn read(path: &Path) -> Result<History, HistoryFault> {
         Err(TryLockError::WouldBlock) => return Err(HistoryFault::Busy),
         Err(TryLockError::Error(source)) => return Err(HistoryFault::Io(source)),
     }
-    let mut bytes = Vec::new();
-    (&file)
-        .take(HISTORY_BYTES_MAX.saturating_add(1))
-        .read_to_end(&mut bytes)
-        .map_err(HistoryFault::Io)?;
-    if u64::try_from(bytes.len())
-        .map_err(|source| HistoryFault::Io(std::io::Error::other(source)))?
-        > HISTORY_BYTES_MAX
-    {
-        return Err(HistoryFault::Capacity);
-    }
-    let history = decode(&bytes)?;
+    let history = decode(&read_bounded(&file)?)?;
     drop(file);
     Ok(history)
+}
+
+/// The history held for writing: an exclusive lock on the file, taken
+/// before its bytes are read and released on drop, so the fold the
+/// caller decides from is the file every append extends.
+pub(super) struct LockedJournal {
+    file: File,
+    bytes: Vec<u8>,
+    history: History,
+}
+
+impl LockedJournal {
+    /// Opens `path` under an exclusive lock, creating the file and its
+    /// directory when absent and syncing the directory that gained an
+    /// entry. An existing history is read and folded first; one that does
+    /// not decode is refused and left byte for byte as it was.
+    ///
+    /// # Errors
+    /// `Busy` while another process holds the file, `Io` on any file
+    /// failure, and every refusal [`read`] gives for the same bytes.
+    pub(super) fn open(path: &Path) -> Result<Self, HistoryFault> {
+        let file = open_or_create(path)?;
+        match file.try_lock() {
+            Ok(()) => (),
+            Err(TryLockError::WouldBlock) => return Err(HistoryFault::Busy),
+            Err(TryLockError::Error(source)) => return Err(HistoryFault::Io(source)),
+        }
+        let bytes = read_bounded(&file)?;
+        let history = decode(&bytes)?;
+        Ok(Self {
+            file,
+            bytes,
+            history,
+        })
+    }
+
+    pub(super) fn history(&self) -> &History {
+        &self.history
+    }
+
+    /// Appends `line` and returns once the file holds it on disk. The
+    /// history with the line added must pass the same decoder a read
+    /// uses; a line it would refuse is never written.
+    ///
+    /// # Errors
+    /// The fold's refusal or `Capacity`, with nothing written; `Io` when
+    /// the write or the sync fails, after which the caller writes nothing
+    /// to the host and a later read reports whatever reached the file.
+    pub(super) fn append_durable(&mut self, line: &Line) -> Result<(), HistoryFault> {
+        let mut encoded =
+            serde_json::to_vec(line).map_err(|source| HistoryFault::Io(source.into()))?;
+        encoded.push(b'\n');
+        let mut extended = self.bytes.clone();
+        extended.extend_from_slice(&encoded);
+        if exceeds_capacity(&extended)? {
+            return Err(HistoryFault::Capacity);
+        }
+        let history = decode(&extended)?;
+        (&self.file)
+            .write_all(&encoded)
+            .and_then(|()| self.file.sync_all())
+            .map_err(HistoryFault::Io)?;
+        self.bytes = extended;
+        self.history = history;
+        Ok(())
+    }
+}
+
+/// The history file, opened for reading and appending. A file created
+/// here makes its directory's entry durable before any line is written.
+fn open_or_create(path: &Path) -> Result<File, HistoryFault> {
+    let directory = path
+        .parent()
+        .ok_or(HistoryFault::Invalid("history path has no directory"))?;
+    let mut options = OpenOptions::new();
+    options.read(true).append(true);
+    match options.open(path) {
+        Ok(file) => return Ok(file),
+        Err(source) if source.kind() == ErrorKind::NotFound => (),
+        Err(source) => return Err(HistoryFault::Io(source)),
+    }
+    let created_directory = !directory.is_dir();
+    std::fs::create_dir_all(directory).map_err(HistoryFault::Io)?;
+    let file = options
+        .create_new(true)
+        .open(path)
+        .map_err(HistoryFault::Io)?;
+    sync_directory(directory)?;
+    if created_directory && let Some(above) = directory.parent() {
+        sync_directory(above)?;
+    }
+    Ok(file)
+}
+
+/// Makes a directory's entries durable. Windows flushes a directory only
+/// through a handle opened with backup semantics and write access.
+fn sync_directory(directory: &Path) -> Result<(), HistoryFault> {
+    #[cfg(windows)]
+    let handle = {
+        use std::os::windows::fs::OpenOptionsExt;
+        const FILE_FLAG_BACKUP_SEMANTICS: u32 = 0x0200_0000;
+        OpenOptions::new()
+            .write(true)
+            .custom_flags(FILE_FLAG_BACKUP_SEMANTICS)
+            .open(directory)
+    };
+    #[cfg(not(windows))]
+    let handle = File::open(directory);
+    handle
+        .and_then(|handle| handle.sync_all())
+        .map_err(HistoryFault::Io)
+}
+
+fn read_bounded(file: &File) -> Result<Vec<u8>, HistoryFault> {
+    let mut bytes = Vec::new();
+    file.take(HISTORY_BYTES_MAX.saturating_add(1))
+        .read_to_end(&mut bytes)
+        .map_err(HistoryFault::Io)?;
+    if exceeds_capacity(&bytes)? {
+        return Err(HistoryFault::Capacity);
+    }
+    Ok(bytes)
+}
+
+fn exceeds_capacity(bytes: &[u8]) -> Result<bool, HistoryFault> {
+    u64::try_from(bytes.len())
+        .map(|length| length > HISTORY_BYTES_MAX)
+        .map_err(|source| HistoryFault::Io(std::io::Error::other(source)))
 }
 
 fn decode(bytes: &[u8]) -> Result<History, HistoryFault> {
@@ -69,55 +189,17 @@ fn decode(bytes: &[u8]) -> Result<History, HistoryFault> {
     reason = "test code"
 )]
 mod tests {
-    use super::super::state::{Control, DEFINITION, Event, Intent, Outcome, RawValue, SCHEMA};
+    use super::super::state::fixtures::{apply, bytes, dword, finished, prepared};
+    use super::super::state::{Outcome, SCHEMA};
+    use super::super::target::{RawValue, Snapshot};
     use super::*;
-    use std::num::NonZeroU64;
+    use wire::PrivacyControl;
 
     const PRIVATE_INPUT: &str = "fixture-private-principal";
+    const CONTROL: PrivacyControl = PrivacyControl::PowershellTelemetryOptout;
 
-    fn intent(operation: u64, original: RawValue) -> Intent {
-        let modified = RawValue::Present {
-            kind: 1,
-            bytes: vec![49, 0, 0, 0],
-        };
-        Intent {
-            operation: NonZeroU64::new(operation).unwrap(),
-            control: Control::WindowsUserPowershellTelemetry,
-            definition: DEFINITION,
-            owner: kernel::SecretRef::new("privacy", "fixture-owner").unwrap(),
-            original,
-            modified: modified.clone(),
-            recommendation: modified,
-            restore_of: None,
-        }
-    }
-
-    fn prepared(intent: Intent) -> Line {
-        Line {
-            schema: SCHEMA,
-            event: Event::Prepared { intent },
-        }
-    }
-
-    fn finished(operation: u64, outcome: Outcome) -> Line {
-        Line {
-            schema: SCHEMA,
-            event: Event::Finished {
-                operation: NonZeroU64::new(operation).unwrap(),
-                outcome,
-            },
-        }
-    }
-
-    fn bytes(lines: &[Line]) -> Vec<u8> {
-        lines
-            .iter()
-            .flat_map(|line| {
-                let mut bytes = serde_json::to_vec(line).unwrap();
-                bytes.push(b'\n');
-                bytes
-            })
-            .collect()
+    fn absent() -> Snapshot {
+        Snapshot::Registry(RawValue::Absent)
     }
 
     #[test]
@@ -138,7 +220,7 @@ mod tests {
     fn reading_unfinished_history_never_settles_or_repairs_it() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("fixture.jsonl");
-        let before = bytes(&[prepared(intent(1, RawValue::Absent { key_existed: false }))]);
+        let before = bytes(&[prepared(&apply(1, CONTROL, absent(), dword(1)))]);
         std::fs::write(&path, &before).unwrap();
         let status =
             serde_json::to_value(read(&path).unwrap().disclose(|_| Ok(())).unwrap()).unwrap();
@@ -181,83 +263,40 @@ mod tests {
         ] {
             assert!(decode(input).is_err());
         }
-        assert!(decode(&bytes(&[finished(1, Outcome::Applied)])).is_err());
-        let change = intent(1, RawValue::Absent { key_existed: true });
+        let change = apply(1, CONTROL, dword(7), dword(1));
+        assert!(decode(&bytes(&[finished(&change, Outcome::Applied)])).is_err());
         assert!(
             decode(&bytes(&[
-                prepared(change.clone()),
-                finished(1, Outcome::Unknown),
-                prepared(change)
+                prepared(&change),
+                finished(&change, Outcome::Unknown),
+                prepared(&change)
             ]))
             .is_err()
         );
     }
 
-    /// Derived from Privacy.restoreVectors: only the latest owned operation may reverse.
-    #[test]
-    fn restore_vectors_preserve_absence_type_bytes_and_latest_ownership() {
-        for original in [
-            RawValue::Absent { key_existed: false },
-            RawValue::Present {
-                kind: 1,
-                bytes: vec![],
-            },
-            RawValue::Present {
-                kind: 2,
-                bytes: vec![37, 0, 0, 0],
-            },
-        ] {
-            let first = intent(1, original);
-            let second = intent(
-                2,
-                RawValue::Present {
-                    kind: 1,
-                    bytes: vec![48, 0, 0, 0],
-                },
-            );
-            for old in [&first, &second] {
-                let mut restore = intent(3, old.modified.clone());
-                restore.modified = old.original.clone();
-                restore.restore_of = Some(old.operation);
-                let history = bytes(&[
-                    prepared(first.clone()),
-                    finished(1, Outcome::Applied),
-                    prepared(second.clone()),
-                    finished(2, Outcome::Applied),
-                    prepared(restore),
-                    finished(3, Outcome::Restored),
-                ]);
-                assert_eq!(decode(&history).is_ok(), old.operation == second.operation);
-                let decoded: Vec<Line> = history
-                    .split_inclusive(|b| *b == b'\n')
-                    .map(|line| serde_json::from_slice(line).unwrap())
-                    .collect();
-                assert_eq!(bytes(&decoded), history);
-            }
-        }
-    }
     #[test]
     fn unknown_fields_duplicate_ids_and_cross_identity_history_are_refused() {
-        let first = intent(1, RawValue::Absent { key_existed: true });
-        let mut other = intent(2, first.original.clone());
+        let first = apply(1, CONTROL, dword(7), dword(1));
+        let mut other = apply(2, CONTROL, dword(7), dword(1));
         other.owner = kernel::SecretRef::new("privacy", "another-fixture-owner").unwrap();
         assert!(
             decode(&bytes(&[
-                prepared(first.clone()),
-                finished(1, Outcome::Applied),
-                prepared(other)
+                prepared(&first),
+                finished(&first, Outcome::Applied),
+                prepared(&other)
             ]))
             .is_err()
         );
         assert!(
             decode(&bytes(&[
-                prepared(first.clone()),
-                finished(1, Outcome::Applied),
-                prepared(first.clone())
+                prepared(&first),
+                finished(&first, Outcome::Applied),
+                prepared(&first)
             ]))
             .is_err()
         );
-        let mut value = serde_json::to_value(prepared(first)).unwrap();
+        let mut value = serde_json::to_value(prepared(&first)).unwrap();
         value
             .as_object_mut()
             .unwrap()
@@ -271,8 +310,8 @@ mod tests {
     fn plaintext_identity_and_old_schema_are_refused_without_rewriting() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("fixture.jsonl");
-        let prepared = prepared(intent(1, RawValue::Absent { key_existed: true }));
-        for (schema, owner) in [(SCHEMA, PRIVATE_INPUT), (1, "secret:privacy/fixture-owner")] {
+        let prepared = prepared(&apply(1, CONTROL, dword(7), dword(1)));
+        for (schema, owner) in [(SCHEMA, PRIVATE_INPUT), (2, "secret:privacy/fixture-owner")] {
             let mut line = serde_json::to_value(&prepared).unwrap();
             *line.pointer_mut("/schema").unwrap() = serde_json::json!(schema);
             *line.pointer_mut("/event/intent/owner").unwrap() = serde_json::json!(owner);
@@ -286,7 +325,7 @@ mod tests {
 
     #[test]
     fn decoding_refusal_never_repeats_private_input() {
-        let prepared = prepared(intent(1, RawValue::Absent { key_existed: true }));
+        let prepared = prepared(&apply(1, CONTROL, dword(7), dword(1)));
         for field in ["control", "unexpected", "owner"] {
             let mut line = serde_json::to_value(&prepared).unwrap();
             if field == "unexpected" {
@@ -306,26 +345,92 @@ mod tests {
                 Err(fault) => fault,
             };
             assert!(!format!("{fault:?}").contains(PRIVATE_INPUT));
-            let fault = fault.into_ax();
+            let fault = fault.into_ax("read local privacy history");
             assert!(!fault.to_string().contains(PRIVATE_INPUT));
             assert_eq!(fault.code(), &kernel::AxCode::StorageFatal);
             assert!(fault.subject().contains("column"));
         }
     }
 
-    proptest::proptest! {
-        #[test]
-        fn original_raw_values_roundtrip_without_normalization(
-            kind in proptest::num::u32::ANY,
-            raw in proptest::collection::vec(proptest::num::u8::ANY, 0..512),
-            key_existed in proptest::bool::ANY,
-        ) {
-            for original in [RawValue::Absent { key_existed }, RawValue::Present { kind, bytes: raw }] {
-                let before = intent(1, original);
-                let encoded = serde_json::to_vec(&before).unwrap();
-                let decoded: Intent = serde_json::from_slice(&encoded).unwrap();
-                proptest::prop_assert!(before == decoded);
-            }
-        }
+    #[test]
+    fn an_appended_line_is_in_the_file_when_the_append_returns() {
+        let home = tempfile::tempdir().unwrap();
+        let path = accounting::home::Home::at(home.path()).privacy_history();
+        let intent = apply(1, CONTROL, absent(), dword(1));
+        let mut journal = LockedJournal::open(&path).unwrap();
+        journal.append_durable(&prepared(&intent)).unwrap();
+        let first = bytes(&[prepared(&intent)]);
+        assert_eq!(journal.bytes, first);
+        assert_eq!(
+            serde_json::to_value(journal.history().disclose(|_| Ok(())).unwrap()).unwrap(),
+            serde_json::json!([{ "operation": 1, "outcome": "unresolved" }])
+        );
+        drop(journal);
+        assert_eq!(std::fs::read(&path).unwrap(), first);
+        let mut journal = LockedJournal::open(&path).unwrap();
+        journal
+            .append_durable(&finished(&intent, Outcome::Applied))
+            .unwrap();
+        drop(journal);
+        let both = bytes(&[prepared(&intent), finished(&intent, Outcome::Applied)]);
+        assert_eq!(std::fs::read(&path).unwrap(), both);
+        assert_eq!(
+            serde_json::to_value(read(&path).unwrap().disclose(|_| Ok(())).unwrap()).unwrap(),
+            serde_json::json!([{ "operation": 1, "outcome": { "finished": "applied" } }])
+        );
+    }
+
+    #[test]
+    fn a_reader_and_the_writer_exclude_each_other() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("fixture.jsonl");
+        std::fs::write(&path, b"").unwrap();
+        let reader = File::open(&path).unwrap();
+        reader.try_lock_shared().unwrap();
+        assert!(matches!(
+            LockedJournal::open(&path),
+            Err(HistoryFault::Busy)
+        ));
+        drop(reader);
+        let writer = LockedJournal::open(&path).unwrap();
+        assert!(matches!(read(&path), Err(HistoryFault::Busy)));
+        assert!(matches!(
+            LockedJournal::open(&path),
+            Err(HistoryFault::Busy)
+        ));
+        drop(writer);
+        assert!(read(&path).is_ok());
+    }
+
+    #[test]
+    fn a_corrupt_tail_refuses_the_writer_and_keeps_its_bytes() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("fixture.jsonl");
+        let mut torn = bytes(&[prepared(&apply(1, CONTROL, absent(), dword(1)))]);
+        torn.extend_from_slice(b"{\"schema\":");
+        std::fs::write(&path, &torn).unwrap();
+        assert!(matches!(
+            LockedJournal::open(&path),
+            Err(HistoryFault::Invalid(_))
+        ));
+        assert_eq!(std::fs::read(&path).unwrap(), torn);
+    }
+
+    /// The writer runs a line through the reader's fold before writing it,
+    /// so a line no reader would accept never reaches the file.
+    #[test]
+    fn a_line_the_history_would_refuse_is_never_written() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("fixture.jsonl");
+        let first = apply(1, CONTROL, absent(), dword(1));
+        let second = apply(2, CONTROL, absent(), dword(1));
+        let mut journal = LockedJournal::open(&path).unwrap();
+        journal.append_durable(&prepared(&first)).unwrap();
+        assert!(matches!(
+            journal.append_durable(&prepared(&second)),
+            Err(HistoryFault::Invalid(_))
+        ));
+        drop(journal);
+        assert_eq!(std::fs::read(&path).unwrap(), bytes(&[prepared(&first)]));
     }
 }

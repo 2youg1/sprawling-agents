@@ -275,6 +275,18 @@ impl Views {
             wire::Query::UsageExport { what, format } => return self.usage(Export(*what, *format)),
             wire::Query::Shells => return self.usage(Shells),
             wire::Query::NewestRelease => return Prepared::Release(self.reach.registry),
+            // The host's privacy page is read by the serving binary's own
+            // listener (`crates/sprawling/spec/Privacy/Service.lean`); the
+            // views hold nothing of the host.
+            wire::Query::Privacy => unavailable_because(
+                "Privacy".to_owned(),
+                &kernel::AxError::failure(
+                    kernel::AxCode::ToolUnavailable,
+                    "answer the privacy page",
+                    "the city's views do not read host privacy controls",
+                )
+                .with_recovery("ask the city's own listener, which serves the privacy page"),
+            ),
             wire::Query::UpstreamVersion { item } => return self.upstream_of(item),
             wire::Query::BuildingView { addr } => {
                 return Prepared::Building {

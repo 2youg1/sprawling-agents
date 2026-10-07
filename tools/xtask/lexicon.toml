@@ -332,3 +332,11 @@ replacement = "skill audit（审核）"
 [[entry]]
 banned = "使用日志"
 replacement = "usage record（调用记录）"
+
+[[entry]]
+banned = "privacy catalog"
+replacement = "privacy control"
+
+[[entry]]
+banned = "隐私目录"
+replacement = "privacy control（控制表）"

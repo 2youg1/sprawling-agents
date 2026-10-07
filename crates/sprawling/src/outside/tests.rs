@@ -220,6 +220,38 @@ fn a_local_only_frame_is_refused_and_reaches_no_city() {
     assert_eq!(refusal(&mut mine, step), Some(AxCode::GateDenied));
 }
 
+/// The privacy page reads and changes the host, not the city: a device
+/// that may act is refused both the question and the operation, and
+/// neither reaches the city (`crates/wire/Spec.lean` §8-88, §8-89).
+#[test]
+fn the_privacy_page_is_refused_to_a_device_that_may_act() {
+    let dir = tempfile::tempdir().unwrap();
+    let doorway = kept(dir.path(), &Written::default());
+    doorway.open(local(), lasting("1h")).unwrap();
+    let laptop = pair(&doorway, "laptop", Authority::Act, 2);
+    let (mut conduit, mut mine) = admit(&doorway, &laptop, None);
+    let ask = wire::ClientFrame::Ask(wire::Ask {
+        ask_id: wire::AskId(1),
+        query: wire::Query::Privacy,
+    });
+    let operation = command(wire::WireCommand::PrivacyOperation(wire::PrivacyRequest {
+        action: wire::PrivacyAction::Apply {
+            control: wire::PrivacyControl::StartLaunchTracking,
+            expected: wire::PrivacyValue::Absent,
+        },
+        idem: idem(),
+    }));
+    for frame in [ask, operation] {
+        let (_, bytes) = sealed(&mut mine, &frame);
+        let step = conduit.judge(&bytes).unwrap();
+        assert_eq!(
+            refusal(&mut mine, step),
+            Some(AxCode::GateDenied),
+            "{frame:?}"
+        );
+    }
+}
+
 #[test]
 fn a_watching_device_is_refused_a_verb_that_acts_and_may_still_ask() {
     let dir = tempfile::tempdir().unwrap();

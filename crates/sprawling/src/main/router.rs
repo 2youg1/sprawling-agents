@@ -12,6 +12,7 @@
 //! commands, and the commands themselves stay where they belong.
 
 use kernel::consts_policy::DEFAULT_AT;
+use sprawling::assembly::SystemClock;
 use sprawling::firstrun;
 
 use super::calling::call;
@@ -78,19 +79,48 @@ fn run(verb: Verb, read: &Arguments, args: &[String]) -> ExitCode {
     let nth = |n| read.positional(n);
     match verb {
         Verb::Status => status(args),
-        Verb::PrivacyStatus => match sprawling::privacy::cli::status() {
-            Ok(answer) => {
-                println!("{answer}");
-                ExitCode::SUCCESS
+        Verb::PrivacyElevatedWrite => {
+            match sprawling::privacy::cli::elevated_write(nth(1).map(String::as_str)) {
+                Ok(()) => ExitCode::SUCCESS,
+                Err(error) => {
+                    eprint!(
+                        "{}",
+                        super::refusal::written(&error, super::refusal::Form::Human)
+                    );
+                    ExitCode::FAILURE
+                }
             }
-            Err(error) => {
-                eprint!(
-                    "{}",
-                    super::refusal::written(&error, super::refusal::Form::Human)
-                );
-                ExitCode::FAILURE
-            }
-        },
+        }
+        Verb::PrivacyStatus => answered(sprawling::privacy::cli::status(), args),
+        Verb::PrivacyInspect => answered(
+            sprawling::privacy::cli::inspect(SystemClock, nth(1).map(String::as_str)),
+            args,
+        ),
+        Verb::PrivacyApply => answered(
+            sprawling::privacy::cli::apply(
+                SystemClock,
+                nth(1).map(String::as_str),
+                nth(2).map(String::as_str),
+            ),
+            args,
+        ),
+        Verb::PrivacyRestore => answered(
+            sprawling::privacy::cli::restore(
+                SystemClock,
+                nth(1).map(String::as_str),
+                nth(2).map(String::as_str),
+            ),
+            args,
+        ),
+        Verb::PrivacyRestoreAll => answered(
+            sprawling::privacy::cli::restore_all(SystemClock, |line| println!("{line}"))
+                .map(|()| String::new()),
+            args,
+        ),
+        Verb::PrivacyReconcile => answered(
+            sprawling::privacy::cli::reconcile(SystemClock, nth(1).map(String::as_str)),
+            args,
+        ),
         Verb::Replay => replay(nth(1)),
         Verb::Whose => super::whose::verb(read),
         Verb::Check => super::check::verb(nth(1)),
@@ -112,6 +142,26 @@ fn run(verb: Verb, read: &Arguments, args: &[String]) -> ExitCode {
         Verb::Resume => resume(nth(1)),
         Verb::Fork => fork(args),
         Verb::Adopt => adopt(nth(1), nth(2)),
+    }
+}
+
+/// Prints a privacy verb's answer, or its refusal in the form the line
+/// asked for.
+fn answered(result: Result<String, kernel::AxError>, args: &[String]) -> ExitCode {
+    match result {
+        Ok(answer) => {
+            if !answer.is_empty() {
+                println!("{answer}");
+            }
+            ExitCode::SUCCESS
+        }
+        Err(error) => {
+            eprint!(
+                "{}",
+                super::refusal::written(&error, super::refusal::Form::of(args))
+            );
+            ExitCode::FAILURE
+        }
     }
 }
 

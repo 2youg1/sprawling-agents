@@ -114,3 +114,21 @@ Windows 账户运行）。任何失败都不写、删除或重建引用；读取
 错误码保留而诊断文字不出现；都比较整个 AxError。
 被否：三种拒绝共用一句 recovery——不匹配时叫人「解锁凭据服务」，读者照做也无用。
 -/
+
+/-! D34 隐私 owner 的绑定只写一个新引用，写入与核对共用同一个平台 Vault
+`credential::identity::bind_platform_identity(reference, observed)` 由 gateway 根接口重导出为
+`gateway::bind_platform_identity`：privacy 的写入者在一个空历史的第一次写入之前调用它，
+reference 是调用方新抽取的随机名字（Privacy.State D52）。它先 get：引用已有任何值即拒绝
+（ConfigInvalid，recovery 叫人重试，下一次会抽取新名字），从不覆盖或删除既有条目，因为
+一个被占用的名字可能属于另一份历史；引用为空时把 observed put 进 KeyringVault，
+之后 D31 的核对读的就是这一条。observed 为空与 D31 一样拒绝（ConfigInvalid）。
+读取或写入被拒时保留来源的错误码、移除诊断文字，与 D31 的 Unavailable 同一种拒绝。
+比较与写入的唯一实现是 crate 内的 `bind_identity(reference, observed, vault)`，vault 是
+crate 内的 Vault 缝：生产传 KeyringVault，派生检查传 MemoryVault（空引用写入后 D31 的核对通过、
+占用的引用拒绝且原值不变、空身份拒绝、来源拒绝保留错误码而不带诊断文字）。
+不经 Custodian：Custodian 在平台服务不可用时落到会话内存，那样写下的绑定在进程结束时消失，
+而核对只读平台 Vault，下一次就会读到「缺失」。
+被否：①引用已有相同值时视为成功——随机名字下相同值只能来自同一份历史的重复绑定，这条路
+不存在，留着它只是多一种要测的情形；②让 privacy 直接调用 KeyringVault——Vault 缝不离开
+gateway（§8-4），平台服务的绑定与错误映射会出现第二份。
+-/

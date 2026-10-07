@@ -246,6 +246,7 @@ pub enum Answer {
     Automation(Box<AutomationAnswer>),
     GithubLogin(GithubLoginAnswer),
     Guide(GuideProgress),
+    Privacy(Box<crate::PrivacyAnswer>),
     /// `reason` is the text of what stopped a view that tried to look
     /// (`crates/wire/spec/Server.lean` D47); absent when the view names
     /// the query alone.
