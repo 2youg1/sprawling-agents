@@ -16,6 +16,8 @@
 // of the ledger shows the log lines written while that page's records
 // were - the head page also every line written since.
 
+import type { Key } from "../../core/lang";
+import { isoDay } from "../../core/time";
 import type { EventRecord, LogLevel, LogLine, RunId, Seq } from "../../wire";
 
 // Which source the timeline reads. `log` is what `#/record/log` named
@@ -24,6 +26,18 @@ import type { EventRecord, LogLevel, LogLine, RunId, Seq } from "../../wire";
 export type Source = "every" | "ledger" | "log";
 
 export const SOURCES: readonly Source[] = ["every", "ledger", "log"];
+
+// The five levels `docs/logging.md` names, in its order, and the word
+// for each: the level filter offers them and a log row is marked with one.
+export const LEVELS: readonly LogLevel[] = ["refuse", "effect", "decide", "trace", "wire"];
+
+export const LEVEL_NAMES: Record<LogLevel, Key> = {
+  refuse: "log_refuse",
+  effect: "log_effect",
+  decide: "log_decide",
+  trace: "log_trace",
+  wire: "log_wire",
+};
 
 export type Entry =
   | { readonly kind: "record"; readonly key: string; readonly seq: Seq; readonly t: number; readonly record: EventRecord }
@@ -57,6 +71,22 @@ export function entriesOf(page: Page, lines: readonly LogLine[], source: Source,
   // Newest first. A line written at ledger position n was written after
   // record n, so at one position the line stands above the record.
   return entries.sort((a, b) => b.seq - a.seq || order(a) - order(b));
+}
+
+// The day written above each entry that opens one, in UTC, and `null`
+// above every other: the day is written once, above the first row of
+// each day. A log line the page holds without a time opens no day and
+// does not end one, so the next timed entry is read against the last
+// timed entry above it.
+export function daysOf(entries: readonly Entry[]): readonly (string | null)[] {
+  let above: string | null = null;
+  return entries.map((entry) => {
+    if (entry.t === null) return null;
+    const day = isoDay(entry.t);
+    const opens = day === above ? null : day;
+    above = day;
+    return opens;
+  });
 }
 
 function order(entry: Entry): number {
