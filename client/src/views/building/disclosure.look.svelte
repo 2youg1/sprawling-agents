@@ -16,17 +16,21 @@ pointer, the way every row does; a control's lift is for controls. -->
 
   const look: DisclosureLook = $props();
 
+  // A plan row stands in the narrow middle column beside its badge, so
+  // its chevron sits close to the node and the row keeps its width for
+  // the step's words; the other two rows run the width of their pane.
   const COLUMNS: Record<DisclosureLayout, string> = {
-    plan: "min-h-control grid-cols-[var(--spacing-glyph-sm)_minmax(0,1fr)_auto] py-tight",
+    plan: "min-h-control grid-cols-[var(--spacing-glyph-sm)_minmax(0,1fr)_auto] gap-x-snug py-tight pr-snug",
     commit:
-      "h-control grid-cols-[var(--spacing-glyph-sm)_8ch_minmax(0,1fr)_auto_auto] narrow:grid-cols-[var(--spacing-glyph-sm)_8ch_minmax(0,1fr)]",
-    change: "min-h-control grid-cols-[var(--spacing-glyph-sm)_var(--spacing-figure)_minmax(0,1fr)_auto] py-tight",
+      "h-control grid-cols-[var(--spacing-glyph-sm)_8ch_minmax(0,1fr)_auto_auto] gap-x-base px-snug narrow:grid-cols-[var(--spacing-glyph-sm)_8ch_minmax(0,1fr)]",
+    change:
+      "min-h-control grid-cols-[var(--spacing-glyph-sm)_var(--spacing-figure)_minmax(0,1fr)_auto] gap-x-base py-tight px-snug",
   };
 </script>
 
 <button
   {...look.wire}
-  class="grid w-full items-center gap-x-base rounded-control px-snug text-left text-note hover:wash {COLUMNS[look.layout]}"
+  class="grid w-full items-center rounded-control text-left text-note hover:wash {COLUMNS[look.layout]}"
 >
   <Glyph
     name="chevron"

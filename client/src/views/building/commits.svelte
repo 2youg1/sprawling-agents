@@ -130,7 +130,7 @@
 
 <div class="flex min-w-0 flex-col gap-base">
   <div class="flex min-w-0 flex-wrap items-end justify-between gap-x-wide gap-y-snug">
-    <h2 class="text-note text-text-faint">{say($lang, "bld_commits")}</h2>
+    <h2 class="flex h-control items-center text-note text-text-faint">{say($lang, "bld_commits")}</h2>
     <!-- A form, so Enter in the box asks. What was typed is judged when
          it is asked, not at every key: an oid is forty characters, and a
          box that says "not an oid" from the first of them scolds a person

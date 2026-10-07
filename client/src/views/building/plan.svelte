@@ -147,7 +147,7 @@
             {cells}
           />
           {#if open === row.node}
-            <div class="pb-base pl-[calc(var(--spacing-snug)+var(--spacing-glyph-sm)+var(--spacing-figure)+var(--spacing-base)*2)]">
+            <div class="pb-base pl-[calc(var(--spacing-glyph-sm)+var(--spacing-snug)+var(--spacing-figure)+var(--spacing-base))]">
               <NodeCost building={answer.addr} node={row.node} />
             </div>
           {/if}
