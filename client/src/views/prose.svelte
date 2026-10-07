@@ -47,6 +47,6 @@
 <div oncopy={copy}>
   <Laid blocks={laid.blocks} />
   {#if rest !== ""}
-    <p class="my-snug whitespace-pre-wrap break-words leading-relaxed">{rest}</p>
+    <p class="my-snug whitespace-pre-wrap break-words font-read leading-relaxed">{rest}</p>
   {/if}
 </div>

@@ -21,7 +21,7 @@ import type { Readable } from "svelte/store";
 
 import type { Key } from "../../core/lang";
 import { STACK_SHAPE } from "../../core/appearance";
-import type { Appearance, Chroma, Density, Face, Glass, Lighting, Motion } from "../../core/appearance";
+import type { Appearance, Chroma, Density, Face, Glass, Lighting, Motion, ReadingFace } from "../../core/appearance";
 import type { PreferenceDoor } from "../../core/prefs";
 
 // The Local Font Access API, which Chromium offers and other engines do
@@ -37,6 +37,23 @@ declare global {
 // inferred from which face happens to be custom made one of the two
 // unreachable whenever both were.
 export type Axis = "sans" | "mono";
+
+// Which card a receipt belongs to: a setting, since one setting can
+// grow a second control (a face card carries its stack box). The type
+// cards (`appearance_type.svelte`) and the rest of the group
+// (`appearance.svelte`) write through one receipt, so one list names
+// them all.
+export type Setting =
+  | "lighting"
+  | "face"
+  | "mono"
+  | "reading"
+  | "body"
+  | "density"
+  | "chroma"
+  | "motion"
+  | "glass"
+  | "blend";
 
 // The custom property the body size is written to, which is the same
 // property `theme/tokens-type.css` declares the default in and derives the note and
@@ -60,6 +77,10 @@ export const FACE_WORDS: Record<Face, Key> = {
   geist: "appearance_face_geist",
   system: "appearance_face_system",
   custom: "appearance_face_custom",
+};
+export const READING_WORDS: Record<ReadingFace, Key> = {
+  interface: "appearance_reading_interface",
+  libron: "appearance_reading_libron",
 };
 export const DENSITY_WORDS: Record<Density, Key> = {
   comfortable: "appearance_density_comfortable",
@@ -125,6 +146,7 @@ export function applyAppearance(root: HTMLElement, held: Appearance): void {
   root.dataset.theme = held.lighting === "system" ? machineLighting() : held.lighting;
   wearFace(root, "sans", held.sans, held.sansStack);
   wearFace(root, "mono", held.mono, held.monoStack);
+  root.dataset.read = held.reading;
   if (held.body === null) {
     root.style.removeProperty(BODY_PROPERTY);
   } else {

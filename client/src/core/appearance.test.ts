@@ -60,11 +60,11 @@ describe("the blend tier's opacity", () => {
 });
 
 describe("the city's answer", () => {
-  test("from a city that keeps neither leaves glass and the blend opacity where this browser had them", () => {
+  test("from a city that keeps none of them leaves the reading face, glass and the blend opacity where this browser had them", () => {
     const rows = memory();
     const door = loadPreferences(rows, "en");
     const before = get(door.held);
-    const held = { ...before, appearance: { ...before.appearance, glass: "off" as const, blend: 40 } };
+    const held = { ...before, appearance: { ...before.appearance, reading: "libron" as const, glass: "off" as const, blend: 40 } };
     const answer = {
       appearance: {
         lighting: "light" as const,
@@ -84,6 +84,7 @@ describe("the city's answer", () => {
       mono: "geist",
       sansStack: "",
       monoStack: "",
+      reading: "libron",
       body: null,
       density: "compact",
       chroma: "full",

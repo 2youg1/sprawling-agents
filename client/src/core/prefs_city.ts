@@ -72,6 +72,7 @@ export function appearanceOnWire(next: Appearance): WireAppearance {
     mono: next.mono,
     sans_stack: next.sansStack,
     mono_stack: next.monoStack,
+    reading: next.reading,
     body_px: next.body,
     density: next.density,
     chroma: next.chroma,
@@ -81,11 +82,11 @@ export function appearanceOnWire(next: Appearance): WireAppearance {
   };
 }
 
-// Glass and the opacity are absent from an answer by a city that keeps
-// neither, and this browser's values stand. The city keeps the opacity
-// as a bare percent and the slider's domain is this client's
-// (`BLEND_PERCENT`), so a stated figure outside it - a file edited by
-// hand - reads as no opacity, as a stored row would.
+// The reading face, glass and the opacity are absent from an answer by
+// a city that keeps none of them, and this browser's values stand. The
+// city keeps the opacity as a bare percent and the slider's domain is
+// this client's (`BLEND_PERCENT`), so a stated figure outside it - a
+// file edited by hand - reads as no opacity, as a stored row would.
 function appearanceOfCity(stated: WireAppearance, held: Appearance): Appearance {
   return {
     lighting: stated.lighting,
@@ -93,6 +94,7 @@ function appearanceOfCity(stated: WireAppearance, held: Appearance): Appearance 
     mono: stated.mono,
     sansStack: stated.sans_stack,
     monoStack: stated.mono_stack,
+    reading: stated.reading ?? held.reading,
     body: stated.body_px ?? null,
     density: stated.density,
     chroma: stated.chroma,

@@ -11,7 +11,7 @@ import { Schema } from "effect";
 /** The wire version both ends compare on connect. */
 export const WIRE_V = 63 as const;
 /** The schema hash the server checks: `wire::schema_hash()`. */
-export const WIRE_HASH = "5fdf9f842f5ef2bf038b723cb0777227bd33d4938c1108de2851fb0d75a8c530" as const;
+export const WIRE_HASH = "6548368659ab2ee2041f5465e5a4604848cbd797a78deadf8b0511018c1c97dc" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 /** The smallest body size a person may ask for: `wire::BODY_PX_MIN`. */
@@ -2870,6 +2870,18 @@ export const Motion = Schema.Literals(["system", "on", "off"]).annotate({ identi
 export type Motion = typeof Motion.Type;
 
 /**
+ * Which face reading text is drawn in: the messages of a conversation,
+ * documents and reports. Controls, labels, figures and code keep the
+ * interface's faces whichever this says
+ * (`crates/wire/spec/Preference.lean` D52).
+ */
+export const ReadingFace = Schema.Union([
+  Schema.Literal("interface"),
+  Schema.Literal("libron"),
+]).annotate({ identifier: "ReadingFace" });
+export type ReadingFace = typeof ReadingFace.Type;
+
+/**
  * How the pages look.
  */
 export const Appearance = Schema.Struct({
@@ -2882,6 +2894,7 @@ export const Appearance = Schema.Struct({
   mono: Face,
   mono_stack: Schema.String,
   motion: Motion,
+  reading: Schema.optional(Schema.NullOr(ReadingFace)),
   sans: Face,
   sans_stack: Schema.String,
 }).annotate({ identifier: "Appearance" });
@@ -3073,376 +3086,6 @@ export const PreviewAnswer = Schema.Struct({
   version: B3Hash,
 }).annotate({ identifier: "PreviewAnswer" });
 export type PreviewAnswer = typeof PreviewAnswer.Type;
-
-/**
- * What the sources say about whether writing a control changes
- * anything on current Windows builds.
- */
-export const PrivacyBuildEffect = Schema.Union([
-  Schema.Literal("documented"),
-  Schema.Literal("uncertain"),
-  Schema.Literal("no_current_effect"),
-]).annotate({ identifier: "PrivacyBuildEffect" });
-export type PrivacyBuildEffect = typeof PrivacyBuildEffect.Type;
-
-/**
- * The sections of the privacy page, in page order.
- */
-export const PrivacyCategory = Schema.Literals(["diagnostics", "speech_input", "location_sensors", "search", "content", "activity_sync", "cloud_services", "app_permissions", "windows_ai"]).annotate({ identifier: "PrivacyCategory" });
-export type PrivacyCategory = typeof PrivacyCategory.Type;
-
-/**
- * One host setting this binary may change for the person on request
- * (a privacy control). Declared in page order: by
- * [`PrivacyCategory`], and within a category in the order of the
- * controls table.
- */
-export const PrivacyControl = Schema.Literals(["powershell_telemetry_optout", "ceip_consolidator_task", "ceip_usb_task", "windows_ceip", "diagnostic_data", "feedback_notifications", "steps_recorder", "error_reporting", "error_reporting_additional_data", "diagnostic_log_collection", "dump_collection", "application_telemetry", "device_census_task", "device_census_user_task", "dotnet_cli_telemetry_optout", "voice_activation", "voice_activation_above_lock", "online_speech_recognition", "implicit_text_collection", "implicit_ink_collection", "handwriting_error_reports", "input_personalization", "linguistic_data_collection", "handwriting_data_sharing", "location_provider", "location_feature", "sensors", "search_web", "search_web_results", "cloud_search", "cortana", "cortana_above_lock", "search_location", "search_highlights", "tailored_experiences", "spotlight", "consumer_features", "cloud_optimized_content", "windows_tips", "consumer_account_state_content", "third_party_suggestions", "settings_online_tips", "widgets", "advertising_id", "language_list_websites", "start_launch_tracking", "activity_feed", "activity_publish", "activity_upload", "clipboard_history", "cloud_clipboard", "continue_experiences", "phone_pc_linking", "message_sync", "onesettings_downloads", "find_my_device", "delivery_optimization", "onedrive_file_storage", "onedrive_pre_signin_traffic", "push_notifications_network", "app_location", "app_account_info", "app_motion", "app_phone_calls", "app_trusted_devices", "app_unpaired_devices", "app_diagnostic_info", "app_contacts", "app_calendar", "app_call_history", "app_email", "app_tasks", "app_messaging", "app_radios", "app_camera", "app_microphone", "app_notifications", "app_background", "app_screen_capture_programmatic", "app_screen_capture_borderless", "app_gaze_input", "app_human_presence", "app_foreground_text", "camera_device", "app_system_ai_models", "recall_snapshots", "recall_component", "click_to_do"]).annotate({ identifier: "PrivacyControl" });
-export type PrivacyControl = typeof PrivacyControl.Type;
-
-/**
- * One value of a target, exactly as the host holds it.
- * 
- * Every value has exactly one spelling: a registry value is `dword` when
- * it is a `REG_DWORD` of four bytes, `text` when it is a `REG_SZ` whose
- * bytes are UTF-16 ending in one terminating NUL, and `raw` otherwise. A
- * page sends a value back as `expected` unchanged, and the host turns it
- * into the bytes it compares with what it reads, refusing any other
- * spelling (`crates/wire/spec/Privacy.lean` D50).
- */
-export const PrivacyValue = Schema.Union([
-  Schema.Struct({
-    value: Schema.Literal("absent"),
-  }),
-  Schema.Struct({
-    number: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
-    value: Schema.Literal("dword"),
-  }),
-  Schema.Struct({
-    text: Schema.String,
-    value: Schema.Literal("text"),
-  }),
-  Schema.Struct({
-    hex: Schema.String,
-    kind: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
-    value: Schema.Literal("raw"),
-  }),
-  Schema.Struct({
-    value: Schema.Literal("task_absent"),
-  }),
-  Schema.Struct({
-    definition_sha256: Schema.String,
-    value: Schema.Literal("task_enabled"),
-  }),
-  Schema.Struct({
-    definition_sha256: Schema.String,
-    value: Schema.Literal("task_disabled"),
-  }),
-]).annotate({ identifier: "PrivacyValue" });
-export type PrivacyValue = typeof PrivacyValue.Type;
-
-/**
- * What a read of a control's target gave.
- */
-export const PrivacyCurrent = Schema.Union([
-  Schema.Struct({
-    read: Schema.Struct({
-      value: PrivacyValue,
-    }),
-  }),
-  Schema.Literal("access_denied"),
-  Schema.Struct({
-    failed: Schema.Struct({
-      error: AxError,
-    }),
-  }),
-  Schema.Literal("not_read"),
-]).annotate({ identifier: "PrivacyCurrent" });
-export type PrivacyCurrent = typeof PrivacyCurrent.Type;
-
-/**
- * How a control's edition lists read for the edition of this host.
- */
-export const PrivacyEditionFit = Schema.Union([
-  Schema.Literal("honoured"),
-  Schema.Literal("ignored"),
-  Schema.Literal("not_stated"),
-]).annotate({ identifier: "PrivacyEditionFit" });
-export type PrivacyEditionFit = typeof PrivacyEditionFit.Type;
-
-/**
- * The Windows editions Microsoft's documentation names when it says
- * where a policy is honoured or ignored.
- */
-export const PrivacyEdition = Schema.Literals(["home", "pro", "enterprise", "education", "iot_enterprise", "server"]).annotate({ identifier: "PrivacyEdition" });
-export type PrivacyEdition = typeof PrivacyEdition.Type;
-
-/**
- * Where Microsoft's documentation says a control is honoured and where it
- * is ignored; an edition in neither list is not stated.
- */
-export const PrivacyEditions = Schema.Struct({
-  honoured: Schema.Array(PrivacyEdition),
-  ignored: Schema.Array(PrivacyEdition),
-}).annotate({ identifier: "PrivacyEditions" });
-export type PrivacyEditions = typeof PrivacyEditions.Type;
-
-/**
- * One line of the privacy request list as the person wrote it (an
- * original item), numbered as the list numbers it.
- */
-export const PrivacyOriginal = Schema.Literals(["k01", "k02", "k03", "k04", "k05", "k06", "k07", "k08", "k09", "k10", "k11", "k12", "k13", "k14", "k15", "k16", "k17", "k18", "k19", "k20", "k21", "k22", "k23", "k24", "k25", "k26", "k27", "k28", "k29", "k30", "k31", "k32", "k33", "k34", "k35", "k36", "k37", "k38", "k39", "k40", "k41", "k42", "k43", "k44", "k45", "k46", "k47", "k48", "k49", "k50", "k51", "k52"]).annotate({ identifier: "PrivacyOriginal" });
-export type PrivacyOriginal = typeof PrivacyOriginal.Type;
-
-/**
- * One line of the request list, as the person wrote it.
- */
-export const PrivacyOriginalLine = Schema.Struct({
-  item: PrivacyOriginal,
-  text: Schema.String,
-}).annotate({ identifier: "PrivacyOriginalLine" });
-export type PrivacyOriginalLine = typeof PrivacyOriginalLine.Type;
-
-/**
- * Whose settings a control changes. A machine-scope write goes
- * through administrator approval.
- */
-export const PrivacyScope = Schema.Literals(["user", "machine"]).annotate({ identifier: "PrivacyScope" });
-export type PrivacyScope = typeof PrivacyScope.Type;
-
-/**
- * The place on the host a control writes, named by its operation kind.
- */
-export const PrivacyTarget = Schema.Union([
-  Schema.Struct({
-    kind: Schema.Literal("registry_value_hklm"),
-    name: Schema.String,
-    path: Schema.String,
-  }),
-  Schema.Struct({
-    kind: Schema.Literal("registry_value_hkcu"),
-    name: Schema.String,
-    path: Schema.String,
-  }),
-  Schema.Struct({
-    kind: Schema.Literal("environment_variable_user"),
-    name: Schema.String,
-  }),
-  Schema.Struct({
-    kind: Schema.Literal("scheduled_task_enabled"),
-    name: Schema.String,
-    path: Schema.String,
-  }),
-]).annotate({ identifier: "PrivacyTarget" });
-export type PrivacyTarget = typeof PrivacyTarget.Type;
-
-/**
- * One control as the host's table defines it and as the host reads now.
- */
-export const PrivacyControlEntry = Schema.Struct({
-  build_effect: PrivacyBuildEffect,
-  category: PrivacyCategory,
-  control: PrivacyControl,
-  current: PrivacyCurrent,
-  editions: PrivacyEditions,
-  host_fit: PrivacyEditionFit,
-  originals: Schema.Array(PrivacyOriginalLine),
-  scope: PrivacyScope,
-  target: PrivacyTarget,
-  written: Schema.optional(Schema.NullOr(PrivacyValue)),
-}).annotate({ identifier: "PrivacyControlEntry" });
-export type PrivacyControlEntry = typeof PrivacyControlEntry.Type;
-
-/**
- * One recorded operation: the value it found and the value it wrote.
- */
-export const PrivacyIntent = Schema.Struct({
-  control: PrivacyControl,
-  modified: PrivacyValue,
-  operation: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
-  original: PrivacyValue,
-  restore_of: Schema.optional(Schema.NullOr(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)))),
-}).annotate({ identifier: "PrivacyIntent" });
-export type PrivacyIntent = typeof PrivacyIntent.Type;
-
-/**
- * What this app's history tells the page, which depends on who asks.
- */
-export const PrivacyHistory = Schema.Union([
-  Schema.Struct({
-    disclosed: Schema.Struct({
-      owned: Schema.Array(PrivacyIntent),
-      unresolved: Schema.optional(Schema.NullOr(PrivacyIntent)),
-    }),
-  }),
-  Schema.Struct({
-    withheld: Schema.Struct({
-      error: AxError,
-    }),
-  }),
-  Schema.Struct({
-    unreadable: Schema.Struct({
-      error: AxError,
-    }),
-  }),
-]).annotate({ identifier: "PrivacyHistory" });
-export type PrivacyHistory = typeof PrivacyHistory.Type;
-
-/**
- * What `HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion` records.
- */
-export const PrivacyWindows = Schema.Struct({
-  build: Schema.String,
-  display_version: Schema.optional(Schema.NullOr(Schema.String)),
-  edition: Schema.optional(Schema.NullOr(PrivacyEdition)),
-  edition_id: Schema.String,
-}).annotate({ identifier: "PrivacyWindows" });
-export type PrivacyWindows = typeof PrivacyWindows.Type;
-
-/**
- * The machine the controls belong to: the one running this city.
- */
-export const PrivacyHost = Schema.Union([
-  Schema.Struct({
-    windows: PrivacyWindows,
-  }),
-  Schema.Struct({
-    unreadable: Schema.Struct({
-      error: AxError,
-    }),
-  }),
-  Schema.Literal("not_windows"),
-]).annotate({ identifier: "PrivacyHost" });
-export type PrivacyHost = typeof PrivacyHost.Type;
-
-/**
- * Why an original item is not written. The research decided each
- * one; nothing here is a judgement the host makes at run time.
- */
-export const PrivacyNotWritten = Schema.Union([
-  Schema.Literal("absent"),
-  Schema.Literal("obsolete"),
-  Schema.Literal("undeterminable"),
-  Schema.Literal("needs_operation_kind"),
-]).annotate({ identifier: "PrivacyNotWritten" });
-export type PrivacyNotWritten = typeof PrivacyNotWritten.Type;
-
-/**
- * An original item no control writes.
- */
-export const PrivacyNotWrittenEntry = Schema.Struct({
-  alternatives: Schema.Array(PrivacyControl),
-  line: PrivacyOriginalLine,
-  reason: PrivacyNotWritten,
-}).annotate({ identifier: "PrivacyNotWrittenEntry" });
-export type PrivacyNotWrittenEntry = typeof PrivacyNotWrittenEntry.Type;
-
-/**
- * The deduplication key of one outward action: `idem1-` then 32 lowercase hex digits.
- */
-export const IdemKey = Schema.String.check(Schema.isPattern(new RegExp("^idem1-[0-9a-f]{32}$", "u"))).pipe(Schema.brand("IdemKey"));
-export type IdemKey = typeof IdemKey.Type;
-
-/**
- * One change the person confirmed on the page. `expected` is the value
- * the page showed when the person confirmed; the host writes nothing when
- * its fresh read differs (`crates/sprawling/spec/Privacy/Confirmation.lean`
- * D58).
- */
-export const PrivacyAction = Schema.Union([
-  Schema.Struct({
-    apply: Schema.Struct({
-      control: PrivacyControl,
-      expected: PrivacyValue,
-    }),
-  }),
-  Schema.Struct({
-    restore: Schema.Struct({
-      control: PrivacyControl,
-      expected: PrivacyValue,
-    }),
-  }),
-  Schema.Struct({
-    reconcile: Schema.Struct({
-      expected: PrivacyValue,
-    }),
-  }),
-]).annotate({ identifier: "PrivacyAction" });
-export type PrivacyAction = typeof PrivacyAction.Type;
-
-/**
- * Why a privacy operation ended without the change asked for, or
- * with a result nobody could confirm: the closed set of stable codes
- * (`crates/sprawling/spec/Privacy.lean` §12).
- */
-export const PrivacyFaultCode = Schema.Literals(["identity", "clock", "history", "unreadable", "unresolved", "changed", "target_absent", "nothing_owned", "conflict", "nothing_unresolved", "history_full", "expired", "access_denied", "elevation_declined", "not_applied", "readback_mismatch", "unknown", "receipt_lost"]).annotate({ identifier: "PrivacyFaultCode" });
-export type PrivacyFaultCode = typeof PrivacyFaultCode.Type;
-
-/**
- * The person's check of an operation that has no conclusion. It
- * writes nothing; it records what the target held.
- */
-export const PrivacySettlement = Schema.Union([
-  Schema.Literal("applied"),
-  Schema.Literal("not_applied"),
-  Schema.Literal("restored"),
-  Schema.Literal("abandoned"),
-]).annotate({ identifier: "PrivacySettlement" });
-export type PrivacySettlement = typeof PrivacySettlement.Type;
-
-/**
- * Where one operation stands.
- */
-export const PrivacyResult = Schema.Union([
-  Schema.Literal("running"),
-  Schema.Struct({
-    applied: Schema.Struct({
-      operation: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
-    }),
-  }),
-  Schema.Struct({
-    restored: Schema.Struct({
-      operation: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
-    }),
-  }),
-  Schema.Literal("already_written"),
-  Schema.Struct({
-    reconciled: Schema.Struct({
-      operation: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
-      settlement: PrivacySettlement,
-    }),
-  }),
-  Schema.Struct({
-    refused: Schema.Struct({
-      code: PrivacyFaultCode,
-      error: AxError,
-    }),
-  }),
-]).annotate({ identifier: "PrivacyResult" });
-export type PrivacyResult = typeof PrivacyResult.Type;
-
-/**
- * The result kept for one operation a page sent.
- */
-export const PrivacyOutcome = Schema.Struct({
-  action: PrivacyAction,
-  idem: IdemKey,
-  result: PrivacyResult,
-}).annotate({ identifier: "PrivacyOutcome" });
-export type PrivacyOutcome = typeof PrivacyOutcome.Type;
-
-/**
- * Everything the privacy page shows, read in one pass on the host that
- * runs the city.
- */
-export const PrivacyAnswer = Schema.Struct({
-  controls: Schema.Array(PrivacyControlEntry),
-  history: PrivacyHistory,
-  host: PrivacyHost,
-  not_written: Schema.Array(PrivacyNotWrittenEntry),
-  outcomes: Schema.Array(PrivacyOutcome),
-}).annotate({ identifier: "PrivacyAnswer" });
-export type PrivacyAnswer = typeof PrivacyAnswer.Type;
 
 /**
  * The role one sentence plays on a card.
@@ -4611,9 +4254,6 @@ export const Answer = Schema.Union([
     guide: GuideProgress,
   }),
   Schema.Struct({
-    privacy: PrivacyAnswer,
-  }),
-  Schema.Struct({
     unavailable: Schema.Struct({
       query: Schema.String,
       reason: Schema.optional(Schema.NullOr(Schema.String)),
@@ -4851,7 +4491,6 @@ export const Query = Schema.Union([
   }),
   Schema.Literal("toolkits"),
   Schema.Literal("newest_release"),
-  Schema.Literal("privacy"),
   Schema.Literal("preferences"),
   Schema.Struct({
     config: Schema.Struct({
@@ -4904,6 +4543,12 @@ export type Ask = typeof Ask.Type;
  */
 export const BeatMs = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)).pipe(Schema.brand("BeatMs"));
 export type BeatMs = typeof BeatMs.Type;
+
+/**
+ * The deduplication key of one outward action: `idem1-` then 32 lowercase hex digits.
+ */
+export const IdemKey = Schema.String.check(Schema.isPattern(new RegExp("^idem1-[0-9a-f]{32}$", "u"))).pipe(Schema.brand("IdemKey"));
+export type IdemKey = typeof IdemKey.Type;
 
 /**
  * Whether this city renews a warm prompt cache before it expires.
@@ -5052,18 +4697,6 @@ export const PreferencePatch = Schema.Union([
   }),
 ]).annotate({ identifier: "PreferencePatch" });
 export type PreferencePatch = typeof PreferencePatch.Type;
-
-/**
- * Change one host privacy control, or check the operation that has no
- * conclusion: the payload of `Command::PrivacyOperation`. The city's
- * listener carries it out on the host, and its result is read back from
- * [`crate::PrivacyAnswer::outcomes`] under `idem`.
- */
-export const PrivacyRequest = Schema.Struct({
-  action: PrivacyAction,
-  idem: IdemKey,
-}).annotate({ identifier: "PrivacyRequest" });
-export type PrivacyRequest = typeof PrivacyRequest.Type;
 
 /**
  * Take the sentence's change, or take an inserted sentence after
@@ -5501,9 +5134,6 @@ export const Command = Schema.Union([
   }),
   Schema.Struct({
     close_remote_door: DoorStep,
-  }),
-  Schema.Struct({
-    privacy_operation: PrivacyRequest,
   }),
   Schema.Struct({
     forget_secret: SecretForgetting,

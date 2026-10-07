@@ -46,7 +46,7 @@ const SEPARATOR = "-".repeat(72);
 
 const HEAD = [
   "The npm packages this bundle was built from, each with the licence text it ships.",
-  "The licence of the fonts is fonts/OFL.txt.",
+  "The licences of the fonts are fonts/OFL.txt (Geist Mono) and fonts/Libron-OFL.txt (Libron).",
 ];
 
 // A package that reaches the bundle without a licence file stops the
