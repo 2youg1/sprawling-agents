@@ -9,6 +9,7 @@
 
 import { describe, expect, test } from "bun:test";
 
+import { say } from "../../core/lang";
 import { Seq, TimeMs } from "../../wire";
 import type { SessionLine } from "../../wire";
 import { rowOf } from "./recent_row";
@@ -26,10 +27,11 @@ describe("a recent session's row", () => {
 
   test("forks from the last turn while the page holds it", () => {
     const look = rowOf({ room: "lab/east", line: LINE, forkable: true }, "en", "", HANDS);
+    const name = say("en", "mailbox_fork_last");
     expect(look.fork).toEqual({
-      name: "fork from the last turn",
+      name,
       why: undefined,
-      wire: { type: "button", "aria-label": "fork from the last turn", "aria-disabled": false, onclick: HANDS.fork },
+      wire: { type: "button", "aria-label": name, "aria-disabled": false, onclick: HANDS.fork },
     });
   });
 
