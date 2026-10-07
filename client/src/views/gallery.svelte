@@ -35,7 +35,7 @@
   import { setUi, ui } from "../ui";
   import Accounted from "./gallery/accounted.svelte";
   import Searched from "./gallery/searched.svelte";
-  import Probed from "./gallery/probed.svelte";
+  import Attaching from "./gallery/attaching.svelte";
   import Anchored from "./gallery/anchored.svelte";
   import Conversation from "./gallery/conversation.svelte";
   import Doc from "./gallery/doc.svelte";
@@ -141,7 +141,7 @@
   <Screens />
   <Accounted />
   <Searched />
-  <Probed />
+  <Attaching />
   <Runs />
   <Shelved />
   <Used />
