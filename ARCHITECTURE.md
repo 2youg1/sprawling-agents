@@ -1017,7 +1017,7 @@ criterion is written before the reading, rounds of the two arms interleave,
 and the measurement has the machine to itself. Target numbers are not set
 in advance: a target enters `budgets.toml` once its baseline is read and the
 User accepts it. The figures quoted below were taken on earlier trees:
-the User ruled to skip measurement in 0.0.9, so each row of the register
+the User ruled to skip measurement in 0.0.9 and again in 0.0.10, so each row of the register
 that waits on a reading says this version's reading is owed and names the
 recipe that retakes it.
 

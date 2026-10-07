@@ -100,7 +100,7 @@ Release builds generate an Arch Linux package from the archive and install it in
 
 ### Documentation and contribution rules
 
-README now introduces the city, documents that carry work across Sessions, five capabilities and a complete reading index in matching English and Chinese. The paired getting-started guides distinguish prebuilt and locally compiled channels and explain version selection, provenance checks, stopped-city export, verified restore, updating and rollback from the pre-update backup. Root host configuration and vault credentials require separate handling; an exported directory alone is not proof of recoverability.
+README opens on the city its agents live in: a city is one directory, and an address settles which files an agent may write, which documents it starts with and whom it reports to. Six capabilities and a complete reading index follow. The Chinese README is written first, in the author's register, and the English README translates it. The paired getting-started guides distinguish prebuilt and locally compiled channels and explain version selection, provenance checks, stopped-city export, verified restore, updating and rollback from the pre-update backup. Root host configuration and vault credentials require separate handling; an exported directory alone is not proof of recoverability.
 
 [LLM.md](LLM.md) introduces the project for another model; [wire](docs/wire.md) owns the protocol reference, [integrations](docs/integrations.md) owns ACP/MCP/CLI setup and [performance](docs/performance.md) owns monitoring and reproducible evaluation. Onboarding objectives and historical readings are not presented as measurements of this release.
 
