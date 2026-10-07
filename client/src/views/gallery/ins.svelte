@@ -205,7 +205,8 @@ impl Document {
   // The strip, the line between the regions, the worded keys and a
   // patch with a chosen line, drawn from their looks with fixed values:
   // what a person opened is one state for the whole page, so the states
-  // a follow cannot reach - a tab behind with its close mark, a draft
+  // a follow cannot reach - tabs behind, whose close mark waits for the
+  // pointer or the focus, a draft
   // the city has not taken, an item with no link, a toggle held down -
   // are drawn here rather than by opening items.
   const NOTHING = (): undefined => undefined;
@@ -226,6 +227,7 @@ impl Document {
   );
   const KEYS: readonly TextKeyLook[] = [
     { label: "editor", wire: { href: "#/gallery" } },
+    { label: "sent by release/ledger", wire: { href: "#/gallery" } },
     { label: "copy the place", wire: { type: "button", onclick: NOTHING } },
     { label: "original", wire: { type: "button", "aria-pressed": false, onclick: NOTHING } },
     { label: "original", wire: { type: "button", "aria-pressed": true, onclick: NOTHING } },

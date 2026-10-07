@@ -16,8 +16,11 @@
   //
   // A tab keeps the same padding in front and behind, so bringing it
   // forward changes its fill and never moves its words. The close mark
-  // of a tab behind shows while the pointer or the focus is on that tab,
-  // which is when a hand can reach it.
+  // of a tab behind is drawn only while the pointer or the focus is on
+  // that tab, which is when a hand can reach it; the rest of the time it
+  // is not a standing control (refrain P2), and its place stays held so
+  // the tab does not widen when the mark comes. Delete on the tab is the
+  // keyboard's way to the same action.
   import Glyph from "../parts/glyph.svelte";
 
   import type { StripLook } from "./strip";
@@ -42,15 +45,17 @@
             <span class="sr-only">{tab.unsaved}</span>
           {/if}
         </a>
-        <button
-          {...tab.close}
-          class={[
-            "mark relative flex size-glyph-sm items-center justify-center rounded-control text-text-faint before:absolute before:-inset-tight before:content-[''] hover:bg-raised hover:text-text",
-            tab.front ? "" : "opacity-0 group-focus-within/tab:opacity-100 group-hover/tab:opacity-100",
-          ]}
-        >
-          <Glyph name="cross" size="sm" />
-        </button>
+        <span class="flex size-glyph-sm shrink-0">
+          <button
+            {...tab.close}
+            class={[
+              "mark relative size-glyph-sm items-center justify-center rounded-control text-text-faint before:absolute before:-inset-tight before:content-[''] hover:bg-raised hover:text-text",
+              tab.front ? "flex" : "hidden group-focus-within/tab:flex group-hover/tab:flex",
+            ]}
+          >
+            <Glyph name="cross" size="sm" />
+          </button>
+        </span>
       </div>
     {/each}
   </div>
@@ -82,21 +87,19 @@
     background-color: var(--color-page);
   }
 
-  /* Ink, fill and the close mark's appearance fade back when the pointer
-   * leaves and arrive when it comes: the resting state leaves, the
-   * hovered state arrives (docs/frontend-method.md §4-43). */
+  /* Ink and fill fade back when the pointer leaves and arrive when it
+   * comes: the resting state leaves, the hovered state arrives
+   * (docs/frontend-method.md §4-43). */
   .tab,
   .mark,
   .key {
     transition:
       color var(--transition-duration-short) var(--ease-leave),
-      background-color var(--transition-duration-short) var(--ease-leave),
-      opacity var(--transition-duration-short) var(--ease-leave);
+      background-color var(--transition-duration-short) var(--ease-leave);
   }
   .tab:hover,
   .tab:focus-within,
-  .tab:hover .mark,
-  .tab:focus-within .mark,
+  .mark:hover,
   .key:hover {
     transition-timing-function: var(--ease-arrive);
   }
