@@ -99,24 +99,6 @@
       return undefined;
     };
   }
-
-  // A fixture opens on the state it names - the filter chosen, the menu
-  // open - each time it comes into view, because another fixture on the
-  // route may take the focus away and close a menu meanwhile.
-  export function pressing(selector: string): (node: HTMLElement) => () => void {
-    return (node) => {
-      const seen = new IntersectionObserver((entries) => {
-        if (!entries.some((entry) => entry.isIntersecting)) return;
-        const button = node.querySelector<HTMLButtonElement>(selector);
-        const held = button?.getAttribute("aria-pressed") ?? button?.getAttribute("aria-expanded");
-        if (held !== "true") button?.click();
-      });
-      seen.observe(node);
-      return () => {
-        seen.disconnect();
-      };
-    };
-  }
 </script>
 
 <script lang="ts">
@@ -127,6 +109,7 @@
   import SessionMenu from "../world/session_menu.svelte";
   import Sessions from "../world/sessions.svelte";
   import Case from "./case.svelte";
+  import { pressing } from "./pressing";
   import Stand from "./stand.svelte";
 
   const u = ui();

@@ -86,6 +86,7 @@
   import Used from "./gallery/used.svelte";
   import Workbench from "./gallery/workbench.svelte";
   import Ss from "./gallery/ss.svelte";
+  import World from "./gallery/world.svelte";
 
   const { lang } = ui();
 
@@ -117,6 +118,7 @@
   <Mob />
   <Workbench />
   <Ss />
+  <World />
   <Mailbox />
   <Conversation />
   <Md />
