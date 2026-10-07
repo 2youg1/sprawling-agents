@@ -14,6 +14,7 @@
 import { closeRemoteDoor, confirmRemoteDoor, openRemoteDoor, replaceCityKey } from "../../core/commands";
 import type { Key } from "../../core/lang";
 import type { AxCode, Command } from "../../wire";
+import type { GlyphName } from "../parts/glyph";
 
 export type Opener = "door" | "key";
 
@@ -136,4 +137,22 @@ export function doorCommand(sent: DoorSent | "close", lastingMs: number): Comman
     case "confirm":
       return confirmRemoteDoor(sent.code);
   }
+}
+
+// One door control as its look draws it: a glyph, a visible name, and
+// a note on hover and keyboard focus (D55). A control that may not be
+// pressed now stays in the Tab sequence with `aria-disabled`, and its
+// press is dropped by the seat rather than by the look. The confirm
+// control is the form's submit, so the form's `onsubmit` is its press.
+export interface DoorKeyLook {
+  readonly glyph: GlyphName;
+  readonly label: string;
+  readonly note: string;
+  readonly wire: DoorKeyWire;
+}
+
+export interface DoorKeyWire {
+  readonly type: "button" | "submit";
+  readonly "aria-disabled": boolean;
+  readonly onclick?: () => void;
 }
