@@ -139,11 +139,12 @@
     <p data-start={start} class="my-snug leading-relaxed">{@render drawn(block.paragraph.inline)}</p>
   {:else if "list" in block}
     {@const order = block.list.order}
+    <!-- An ordered marker such as "10. " is wider than a bullet in a monospaced face, so an ordered list reserves two more characters for it instead of letting the scroller clip the number. -->
     <svelte:element
       this={order === "bullet" ? "ul" : "ol"}
       data-start={start}
       start={order === "bullet" ? undefined : order.ordered.start}
-      class={["my-snug pl-wide", order === "bullet" ? "list-disc" : "list-decimal"]}
+      class={["my-snug", order === "bullet" ? "pl-wide list-disc" : "pl-[calc(var(--spacing-wide)+2ch)] list-decimal"]}
     >
       {#each block.list.items as item, at (at)}
         <!-- A tight list's paragraphs sit on the item's own line; a task's

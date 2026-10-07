@@ -52,7 +52,7 @@ action. -->
     {#if entry !== null && onFork !== undefined}
       <ForkButton {entry} {run} {onFork} {onHover} />
     {/if}
-    <span>{#if labelHref === undefined}{label}{:else}<a href={labelHref} class="text-text-quiet hover:text-text">{label}</a>{/if}{#if at !== undefined} · {clock($lang, at)}{/if}</span>
+    <span>{#if labelHref === undefined}{label}{:else}<a href={labelHref} class="text-text-quiet hover:text-text">{label}</a>{/if}{#if at !== undefined}&nbsp;· {clock($lang, at)}{/if}</span>
   </div>
 </div>
 </NotePlace>
