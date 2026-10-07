@@ -283,22 +283,24 @@ history, and five of them is not what the person came back for. -->
       {/each}
     </div>
   {/if}
-  <Rule
-    parts={[
-      {
-        kind: "fold",
-        fold: {
-          label: `${fill(say($lang, "session_previous"), { n: "5" })} · ${say($lang, open ? "session_collapse" : "session_expand")}`,
-          wire: foldWire(open, () => {
-            open = !open;
-          }),
+  <div class="my-snug flex flex-col gap-snug">
+    <Rule
+      parts={[
+        {
+          kind: "fold",
+          fold: {
+            label: `${fill(say($lang, "session_previous"), { n: "5" })} · ${say($lang, open ? "session_collapse" : "session_expand")}`,
+            wire: foldWire(open, () => {
+              open = !open;
+            }),
+          },
         },
-      },
-    ]}
-    mark="none"
-    wire={{}}
-  />
-  <Rule parts={[{ kind: "text", text: fill(say($lang, "session_new_divider"), { at: "12:04" }) }]} mark="none" wire={{}} />
+      ]}
+      mark="none"
+      wire={{}}
+    />
+    <Rule parts={[{ kind: "text", text: fill(say($lang, "session_new_divider"), { at: "12:04" }) }]} mark="none" wire={{}} />
+  </div>
   {#each ROUND as line (line.text)}
     <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
     {@render utterance(line)}
