@@ -6,7 +6,7 @@
 <!-- The settings row's states that `g2.svelte` and `talking.svelte` do
 not draw: the notice of a sentence the link did not take, on its own and
 beside the entries, and the workspace chip's menu long enough to carry
-a filter. -->
+a filter, in a box tall enough to hold the whole menu with its filter. -->
 <script lang="ts">
   import { ui } from "../../ui";
   import { Address } from "../../wire";
@@ -43,7 +43,7 @@ a filter. -->
   <SettingsRow {specs} room={null} draws="everything" kept={true} />
 </Case>
 <Case label="settings row · the workspace chip open on a long list · filter">
-  <div class="flex min-h-[36rem] items-end">
+  <div class="flex min-h-[48rem] items-end">
     <PillView spec={specs[1]} starts="open" />
   </div>
 </Case>
