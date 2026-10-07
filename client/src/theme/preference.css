@@ -1,0 +1,111 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ * Copyright (c) 2026 2youg1 and the sprawling contributors */
+
+/* The faces a person may choose instead of the shipped one. Geist Mono
+ * is the absent case, so a root element saying nothing is already right.
+ * A stack somebody typed is the one value the theme cannot hold, and
+ * arrives as `--face-sans` set on the root element itself. */
+:root[data-sans="system"] {
+  --face-sans: system-ui;
+}
+:root[data-mono="system"] {
+  --face-mono: ui-monospace;
+}
+
+/* The three body sizes a person chooses between, declared here so the
+ * colour gate reads each one and demands the tier it needs: at weight
+ * 400 all three sit at Lc 90, which is what --color-text reaches on the
+ * surface ceiling. Only the body step moves - a note stays at 15px,
+ * because a smaller note would demand a tier its token does not
+ * reach. */
+:root[data-body="14"] {
+  --text-body: 14px;
+}
+:root[data-body="16"] {
+  --text-body: 16px;
+}
+
+/* All the colour, or none of it. The coefficient is already the one
+ * place desaturation is expressed; this only says who may set it. */
+:root[data-chroma="off"] {
+  --chroma: 0;
+}
+
+/* A page for somebody reading tables rather than prose. One quarter off
+ * every spacing step, which is the whole change: type, colour and line
+ * height stay where they are, because a compact page is a page with less
+ * air in it and not a page with smaller writing in it. */
+:root[data-density="compact"] {
+  --density: 0.75;
+}
+
+/* A row in a compact list is its title and nothing else: the line that
+ * only elaborates the line above it - a record's payload digest, a
+ * discard's way back, a cost row's share bar, a row's second text - is
+ * not drawn. `.summary` is the class those lists put on that line; the
+ * `<summary>` element of a `<details>` is untouched. The rule sits
+ * outside every layer, so it outranks the utility that gave the line
+ * its own `display`. */
+[data-density="compact"] .summary {
+  display: none;
+}
+
+/* A machine asking for more contrast gets it by moving one token. The
+ * faintest text steps up to the tier above it, so every line on the page
+ * reaches at least Lc 75; nothing else moves, because nothing else was
+ * quiet enough to be the complaint. The value is taken from the quiet
+ * token rather than written out, so the step follows whichever way the
+ * page is lit.
+ *
+ * Both selectors are needed and they are not a duplicate: the light page
+ * declares this token at `:root[data-theme="light"]`, which outweighs a
+ * bare `:root`, so the override has to match that weight to be able to
+ * win. */
+@media (prefers-contrast: more) {
+  :root,
+  :root[data-theme] {
+    --color-text-faint: var(--color-text-quiet);
+  }
+}
+
+/* Windows high contrast, and every other forced-colour mode, replaces
+ * each background with a system colour. A shape whose entire message is
+ * its fill - a badge, a status dot, the chosen pill in a group of them -
+ * becomes Canvas on Canvas and disappears. Every pill therefore draws its
+ * own edge in the system ink, which is the one colour the mode guarantees
+ * is visible against whatever it painted behind. */
+@media (forced-colors: active) {
+  .rounded-pill {
+    border: 1px solid CanvasText;
+  }
+  /* The bar keeps its edge in the system ink for the same reason a
+   * pill does, and it matters more here: this is the mark that says a
+   * person has to decide something. */
+  .asks {
+    border-inline-start-color: CanvasText;
+  }
+  /* Glass becomes the system's own surface, edged in its ink: an
+   * alpha the mode keeps would let the words behind show through. */
+  .glass {
+    background-color: Canvas;
+    border-color: CanvasText;
+    backdrop-filter: none;
+  }
+  /* The composer's line and the context ring's checkpoints are drawn in
+   * fills the mode replaces. The line keeps its fade in the system ink;
+   * the two checkpoints lose their green and red and keep their order,
+   * which is where on the ring each one sits. */
+  .typed-line {
+    background: linear-gradient(
+      to right,
+      CanvasText 0,
+      CanvasText var(--typed),
+      transparent calc(var(--typed) + 160px)
+    );
+  }
+  .rung {
+    background-color: CanvasText;
+  }
+}

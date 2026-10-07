@@ -7,7 +7,7 @@
   // How the page is drawn: faces, body size, air, colour, motion, glass,
   // and how much of the world layer the blend tier shows.
   //
-  // Every choice is a name or a number whose meaning is `theme.css`'s.
+  // Every choice is a name or a number whose meaning is the theme's.
   // This view writes the root element and the page a person is looking
   // at *is* the preview. **A number the person has not stated is absent
   // here too**: an empty size box or an untouched slider removes the

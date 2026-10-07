@@ -1,0 +1,175 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ * Copyright (c) 2026 2youg1 and the sprawling contributors */
+
+/* What `cargo xtask color` proves, stated where the values it judges are.
+ *
+ * `oklch()` keeps only a resolved number, and three of the gate's seven
+ * assertions ask what the number was resolved *from*: which share of the
+ * displayable chroma a coloured token takes, which APCA tier a text token
+ * claims to reach, and the brightest surface text is allowed to sit on.
+ * None of the three is a colour component, so none of them survives into
+ * an `oklch()` call, and a gate that cannot read its own inputs is a gate
+ * that silently passes.
+ *
+ * Nothing in the cascade refers to these: they are declarations a browser
+ * reads and ignores. They live here, rather than in a table beside the
+ * stylesheet, so that somebody changing a colour sees in one screen both
+ * the value and the ratio that value has to honour. */
+:root {
+  /* Share of the displayable chroma each coloured token takes, in percent.
+   * Exactly two across the whole library: a hover variant is the same role
+   * at a higher lightness, not a different amount of colour. */
+  --ratio-accent: 90;
+  --ratio-alert: 70;
+  --ratio-accent-hover: 90;
+  --ratio-alert-hover: 70;
+  --ratio-accent-solid: 90;
+  --ratio-reminder-first: 70;
+  --ratio-reminder-second: 90;
+
+  /* The APCA Lc each text token reaches, and each type step demands. On a
+   * dark surface APCA charges heavily for small text, so a quieter line is
+   * bought with a larger step and never with a darker grey. */
+  --tier-text: 90;
+  --tier-text-quiet: 75;
+  --tier-text-faint: 60;
+  --tier-text-disabled: 30;
+  --tier-figure: 60;
+  --tier-title: 60;
+  --tier-heading: 60;
+  --tier-label: 90;
+  --tier-body: 90;
+  /* A note is one pixel under the body, so at every body size this
+   * stylesheet offers it is at most 15px of unemphasised content text,
+   * and APCA Bronze admits that size at Lc 90 and at nothing lower. A
+   * note is therefore drawn in the full text token, and what makes it
+   * quiet is the space around it rather than a paler grey - which is
+   * the rule stated above, now applied to the step that used to be the
+   * exception to it. */
+  --tier-note: 90;
+  /* How far under its tier a reading may fall and still reach it: the
+   * rounding of the published APCA figures, so a pair the tables give
+   * Lc 90 is not refused at 89.96. `xtask color` and the colour page
+   * both read it here. */
+  --tier-slack: 0.05;
+
+  /* The brightest surface that may carry text. G3 reaches only Lc 89.9
+   * against the ramp ceiling while body text needs 90, so G3 stays a
+   * border and a fill that carries nothing. */
+  --surface-ceiling: g2;
+}
+
+:root {
+  --chroma: 1;
+  /* How tight the page is, as one coefficient in front of the six
+   * spacing steps, exactly as `--chroma` sits in front of every coloured
+   * token. A density is therefore one number to change and one number to
+   * read, and no step can drift out of proportion with the others. */
+  --density: 1;
+  /* The ink every shadow is cast in: the page's own hue at the darkest
+   * lightness the library uses, carrying no alpha of its own so that
+   * each height states the strength it needs. */
+  --shadow-ink: oklch(0.1 0.014 250);
+  /* What a number is set with when its columns have to hold still: one
+   * advance per digit, and a zero that cannot be read as a letter. */
+  --figures: tabular-nums slashed-zero;
+  /* The face each stack starts with. Geist Mono for the whole page
+   * while the person says nothing; the appearance section writes a
+   * generic family or a stack they typed. */
+  --face-sans: "Geist Mono";
+  --face-mono: "Geist Mono";
+  /* How much of the glass role covers what is behind it. A percentage
+   * because `color-mix` takes one, and the number the colour gate reads:
+   * over the brightest surface the page draws, text on glass still
+   * reaches its tier in both lightings, so lowering this until it does
+   * not turns `xtask color` red (docs/frontend-method.md §4-43). */
+  --glass-opacity: 75%;
+  /* How opaque the world layer is in the blend tier, while the person
+   * has not moved the appearance group's slider (docs/frontend-method.md §7H, U2). */
+  --blend-opacity: 60%;
+  /* The one corner exponent (docs/frontend-method.md §4-43): the parameter CSS
+   * `superellipse()` takes, and the one `city/shape.ts` reads for the
+   * drawing, so a building on the map and the panel beside it have one
+   * curvature. 1.6 is the edge keys' corner the person approved. */
+  --corner-exponent: 1.6;
+  /* The one proportion the shell is cut by (client D24): main
+   * against what stands beside it is the silver ratio, 1 : √2, the
+   * person's ruling over an evenly divided grid. Every silver line on
+   * every page is derived from this number and the shell's width, in
+   * `frame` (surface.css). */
+  --silver: sqrt(2);
+}
+
+/* An engine that knows the curve draws it on every rounded box; one
+ * that does not keeps the plain arc of the same radius, which is what
+ * every box drew before. One rule rather than one per radius utility,
+ * because the attribute reaches the variants (`hover:`, `rounded-t-`)
+ * and the radius Tailwind derives from `--radius-key` alike. */
+@supports (corner-shape: superellipse(2)) {
+  [class*="rounded-"] {
+    corner-shape: superellipse(var(--corner-exponent));
+  }
+}
+
+/* The page lit from the other side.
+ *
+ * Every token here is one tokens-colour.css also declares, at the
+ * lightness the same role needs when the page is paper rather than
+ * ink: the ramp runs down instead of up, text runs dark instead of
+ * light, and a hover is a step towards the ink rather than away from
+ * it. The ratios and the tiers are not repeated, because a share of
+ * the gamut and an APCA claim are the same demand whichever way the
+ * page is lit - which is also what makes the gate able to judge both
+ * readings against one table.
+ *
+ * The page stops short of the ceiling for the reason the dark page
+ * stops short of the floor: a full-white page glares, and on an OLED
+ * panel it is the most expensive thing a screen can draw.
+ *
+ * **The three surfaces that carry text sit close together here, and
+ * that is APCA's doing rather than a taste.** Contrast is not symmetric
+ * about the middle of the range: dark ink on a light surface is charged
+ * far more than light ink on a dark one, so a light page that spaced
+ * its first three rungs the way the dark page does could not carry body
+ * text on a card at all - no ink short of black reaches Lc 90 against a
+ * surface at 878. The rungs a card and a control are drawn with
+ * therefore stay within 45 per mille of the page, and the ramp does its
+ * travelling below them, where nothing has to be read.
+ *
+ * **`color-scheme` belongs in this block and nowhere else.** The parts of
+ * the page the browser draws for itself - the list a `<select>` drops, the
+ * scrollbar, a date picker, the backdrop behind a modal - read that
+ * property and nothing else, so a light page that forgot to say so stays
+ * dark in exactly the places this stylesheet cannot reach. Saying it here,
+ * beside the eleven rungs that make the page light, leaves one answer to
+ * the question of what lighting holds. */
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --color-g0: oklch(0.978 0.014 250);
+  --color-g1: oklch(0.962 0.014 250);
+  --color-g2: oklch(0.940 0.014 250);
+  --color-g3: oklch(0.905 0.014 250);
+  --color-g4: oklch(0.860 0.014 250);
+  --color-g5: oklch(0.800 0.014 250);
+  --color-g6: oklch(0.720 0.014 250);
+  --color-g7: oklch(0.620 0.014 250);
+  --color-g8: oklch(0.510 0.014 250);
+  --color-g9: oklch(0.380 0.014 250);
+  --color-g10: oklch(0.250 0.014 250);
+
+  --color-accent: oklch(0.550 calc(0.140 * var(--chroma)) 250);
+  --color-alert: oklch(0.580 calc(0.088 * var(--chroma)) 70);
+  --color-accent-hover: oklch(0.490 calc(0.124 * var(--chroma)) 250);
+  --color-alert-hover: oklch(0.520 calc(0.078 * var(--chroma)) 70);
+  --color-accent-solid: oklch(0.320 calc(0.081 * var(--chroma)) 250);
+  --color-reminder-first: oklch(0.620 calc(0.119 * var(--chroma)) 150);
+  --color-reminder-second: oklch(0.580 calc(0.212 * var(--chroma)) 25);
+
+  --color-text: oklch(0.230 0.014 250);
+  --color-text-quiet: oklch(0.420 0.014 250);
+  --color-text-faint: oklch(0.545 0.014 250);
+  --color-text-disabled: oklch(0.748 0.014 250);
+}

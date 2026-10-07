@@ -36,7 +36,7 @@ export interface Column<T> {
   // Present makes the column sortable.
   readonly compare?: (a: T, b: T) => number;
   // A column a compact page does not draw. The header and every cell
-  // carry the class `theme.css` hides under `[data-density=compact]`,
+  // carry the class `theme/preference.css` hides under `[data-density=compact]`,
   // so one rule covers a table and a list alike.
   readonly summary?: true;
   // What the column may not be drawn narrower than. Nothing a column

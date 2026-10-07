@@ -10,7 +10,7 @@
 // first and the last entry, and a digit reaches the entry it is drawn
 // beside. An entry is any element marked `data-entry`, in document
 // order, so the sections need not know how many entries stand above
-// them; the digit beside each is a CSS counter (`theme.css`, the mailbox
+// them; the digit beside each is a CSS counter (`theme/mailbox.css`, the mailbox
 // block) counting the same marks in the same order, so the number drawn
 // and the number pressed cannot disagree.
 //

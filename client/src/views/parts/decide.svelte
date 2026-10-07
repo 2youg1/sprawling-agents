@@ -9,9 +9,9 @@
   // The one card for everything that stops and asks the person
   // (client/Spec.lean §7C): a 2 px bar down the leading edge and a glyph, a
   // heading that says who asks and when, a body that is the kind's own,
-  // and at most three answers on the keys `git add -p` taught - y, e and
-  // n. A person learns the card once; every later one is recognised
-  // rather than read.
+  // and at most three answers, each on a chord the key table names
+  // (`core/keys`). A person learns the card once; every later one is
+  // recognised rather than read.
   //
   // **The glyph is the encoding, the colour only repeats it**: a
   // forced-colour mode repaints the bar and leaves the drawing, so each
@@ -56,7 +56,7 @@
     readonly at: string;
     // The kind's own body: what is asked, and what it is about.
     readonly body: Snippet;
-    // At most one choice per answer, in the order y, e, n.
+    // At most one choice per answer, in the order yes, edit, no.
     readonly choices: readonly Choice[];
   }
 
@@ -110,9 +110,10 @@
     };
   });
 
-  // y, e and n answer this card while the focus is anywhere inside it,
-  // and nowhere else: the letters are the card's, read through the one
-  // key table so a rebinding reaches them.
+  // The three chords answer this card while the focus is anywhere inside
+  // it, and nowhere else: they are the card's, read through the one key
+  // table so a rebinding reaches them. Each holds the accelerator, so a
+  // letter typed while the focus sat on the card answers nothing.
   function answer(event: KeyboardEvent): void {
     if (event.isComposing) return;
     const action = keys.acting({
@@ -133,8 +134,8 @@
 
 <!-- The card is one region for a reader, named by its heading, and one
 entry of whatever list it stands in: its own focus is where `j`/`k` and
-the digits of the mailbox land (client/Spec.lean §7-11), and where y, e and n
-are heard. -->
+the digits of the mailbox land (client/Spec.lean §7-11), and where its three
+chords are heard. -->
 <div
   class="asks flex min-w-0 flex-col gap-snug rounded-card py-base pr-pane focus-visible:wash"
   role="group"
@@ -149,7 +150,7 @@ are heard. -->
     <span id="{id}-asker" class="min-w-0 flex-1 truncate text-text-quiet">{asker}</span>
     <span class="figure shrink-0 text-text-faint">{at}</span>
     <!-- The digit a list of entries draws beside each one; empty
-    wherever the card is not in such a list (theme.css, the mailbox). -->
+    wherever the card is not in such a list (theme/mailbox.css). -->
     <kbd class="entry-n" aria-hidden="true"></kbd>
   </div>
   <div class="min-w-0">{@render body()}</div>

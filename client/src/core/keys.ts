@@ -21,6 +21,16 @@
 // outside a text box for a second and a half before deciding it meant
 // nothing, and no other window the person has open answers it.
 //
+// **An action that changes state or opens a layer holds the
+// accelerator.** A single key is what a person types, and a person
+// types into the wrong place: a letter pressed while the focus sat on a
+// message, a card or the page rather than in the box would fork a
+// conversation, answer a decide card, change the tier or open a sheet.
+// Only `composer.focus` stays a single key, because all `/` does is
+// move the focus into the message box, and a `/` pressed by mistake
+// leaves the next letters typed there, which is where they were meant
+// to go.
+//
 // **Shift is a fact only beside the accelerator.** With no modifier
 // held, the browser hands over the character the layout produced, and
 // that character already says whether Shift was down: `?` is `?`
@@ -116,11 +126,12 @@ function accelShift(key: string): Chord {
 // The three edge keys borrow their chords from the habits a person
 // already has: the mailbox is the side panel on B, the right pane is
 // the panel on J, as in the editors that taught both, and the tier is
-// the backslash, the one key here with no borrowed meaning.
+// the backslash, the one key here with no borrowed meaning. The key
+// list is on the slash beside the accelerator, where the web
+// applications that taught the habit put it.
 //
-// `?`, `/` and the backslash hold no modifier because they are read
-// only outside a text box; that rule is `matches`'s below, and it is
-// the reason those three can stay single keys.
+// `/` alone holds no modifier; the paragraph at the top of this file
+// says why, and `matches` below keeps it out of a text box.
 export const DEFAULTS: Readonly<Record<Action, Chord>> = {
   "go.talk": accel("1"),
   "go.city": accel("2"),
@@ -131,22 +142,25 @@ export const DEFAULTS: Readonly<Record<Action, Chord>> = {
   "go.setup": accel(","),
   "go.waiting": accelShift("a"),
   palette: accel("k"),
-  "tier.cycle": plain("\\"),
+  "tier.cycle": accel("\\"),
   mailbox: accel("b"),
   inspect: accel("j"),
-  help: plain("?"),
+  help: accel("/"),
   "composer.focus": plain("/"),
   "run.stop": accel("."),
-  // Branch the conversation from the entry under the hand. One letter
-  // with no modifier, because it is read only outside a text box and
-  // only where a thread entry is hovered or focused (roadmap 4.5).
-  "fork.here": plain("f"),
-  // Answer the decide card that holds the focus, as `git add -p` answers
-  // a hunk. Read only outside a text box and only by the card itself
-  // (`parts/decide.svelte`), so the letters mean nothing elsewhere.
-  "decide.yes": plain("y"),
-  "decide.edit": plain("e"),
-  "decide.no": plain("n"),
+  // Branch the conversation from the entry under the hand: read only
+  // where a thread entry is hovered or focused (roadmap 4.5). Shift
+  // because the accelerator with F alone is the browser's find.
+  "fork.here": accelShift("f"),
+  // Answer the decide card that holds the focus, on the letters
+  // `git add -p` answers a hunk with, and read only by the card itself
+  // (`parts/decide.svelte`). Shift because the accelerator with Y or E
+  // alone is a browser's history or search; refusing takes X, because
+  // N with the accelerator, with or without Shift, opens a window
+  // before the page hears it (`RESERVED` below).
+  "decide.yes": accelShift("y"),
+  "decide.edit": accelShift("e"),
+  "decide.no": accelShift("x"),
   // Where the editors that taught the habit put it; the palette's entry
   // of the same name is the way in where a browser keeps it for printing.
   finder: accel("p"),

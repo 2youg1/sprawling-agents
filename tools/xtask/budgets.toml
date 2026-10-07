@@ -288,13 +288,6 @@ status = "gated, with a register of the files that predate the rule"
 #
 # Delete a row by doing the split, never by raising its number.
 [file_length.predating]
-# The stylesheet arrived when the rule reached every file-face-only
-# language in the tree (tools/xtask/Spec.lean section 8-53, D33): CSS,
-# HTML, the scripts and the Nix flake had been read by the same two
-# readers with nothing holding the line. It is pinned at the length it had
-# when the gate reached it, and it is worked off by splitting it into
-# parts the entry imports, never by raising its number.
-"client/src/theme.css" = 2108
 
 # White box is Rust, black box is Lean (the person's ruling).
 # `cargo xtask boundary` refuses a Rust check that reaches this product

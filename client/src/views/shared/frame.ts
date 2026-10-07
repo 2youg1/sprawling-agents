@@ -7,7 +7,7 @@
 // how many columns its grid has, and how much of the page the person can
 // see while a soft keyboard is open.
 
-// One column or the twelve of the grid. `theme.css` decides which, where
+// One column or the twelve of the grid. `theme/surface.css` decides which, where
 // the grid is decided, and writes it as `--shell-columns`; a script that
 // has to know asks the element, so the width the grid folds at has one
 // spelling and it is a style.
@@ -33,7 +33,7 @@ export function watchColumns(element: Element, onColumns: (columns: Columns) => 
 
 // Keeps `--viewport-block` and `--viewport-top` on the shell's `frame`
 // equal to the visual viewport's height and its offset into the layout
-// viewport, which `theme.css`'s `visual-viewport` stands the frame on,
+// viewport, which `theme/narrow.css`'s `visual-viewport` stands the frame on,
 // until the returned function is called. A phone's soft keyboard shrinks the visual viewport
 // and leaves the layout viewport where it was, and a browser may pan the
 // one inside the other to show the field being typed in; the shell

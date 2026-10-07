@@ -1,0 +1,39 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ * Copyright (c) 2026 2youg1 and the sprawling contributors */
+
+/* MBX */
+
+/* The digit beside each of the mailbox's first nine entries (client/Spec.lean
+ * §7-11): the column counts every `data-entry` mark in document order,
+ * which is the order `views/mailbox/entries.ts` walks, so the number
+ * drawn is the number a digit reaches. Past nine the slot is empty; a
+ * slot outside the mailbox is never counted and stays empty too. */
+@counter-style mailbox-blank {
+  system: cyclic;
+  symbols: "";
+}
+@counter-style mailbox-digit {
+  system: extends decimal;
+  range: 1 9;
+  fallback: mailbox-blank;
+}
+.mailbox {
+  counter-reset: entry;
+}
+.mailbox [data-entry] {
+  counter-increment: entry;
+}
+.entry-n {
+  flex-shrink: 0;
+  min-width: 1ch;
+  margin-inline-start: var(--spacing-snug);
+  font-family: var(--font-mono);
+  font-size: var(--text-note);
+  line-height: 1;
+  color: var(--color-text-faint);
+}
+.mailbox .entry-n::before {
+  content: counter(entry, mailbox-digit);
+}

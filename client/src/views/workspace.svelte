@@ -168,7 +168,7 @@
   const uid = $props.id();
 
   // A shell narrower than the grid's columns can be read in is one
-  // column (`theme.css` decides, client D30): the conversation alone, the world
+  // column (`theme/surface.css` decides, client D30): the conversation alone, the world
   // and the right side as sheets over it (4-52).
   let columns = $state<Columns>("twelve");
   const narrow = $derived(columns === "one");
@@ -283,7 +283,7 @@ taller; on one column the second row is the band, as tall as it needs. -->
   aria-label={seat === "page" ? say($lang, "region_main") : title}
 >
   <!-- The page's own name: a reader arriving by keyboard or screen reader
-  lands on it, and `theme.css` hangs the view transition off `main h1`. -->
+  lands on it, and `theme/motion-state.css` hangs the view transition off `main h1`. -->
   <svelte:element this={seat === "page" ? "h1" : "h2"} tabindex="-1" class="sr-only">{title}</svelte:element>
   {#if layout.world !== "none"}
     <!-- The world layer, on the shell's own columns through `subgrid`, so

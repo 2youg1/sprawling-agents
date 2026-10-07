@@ -5,7 +5,7 @@
 
 import { describe, expect, test } from "bun:test";
 
-import { DEFAULTS, conflictsOf, loadKeys } from "./keys";
+import { ACTIONS, DEFAULTS, conflictsOf, loadKeys, reserved } from "./keys";
 import type { Pressed } from "./press";
 import { loadPreferences } from "./prefs";
 import { memory } from "./rows";
@@ -17,9 +17,9 @@ function press(key: string, held: Partial<Pressed> = {}): Pressed {
 describe("the shell's own keys", () => {
   const keys = loadKeys(loadPreferences(memory(), "en"), "Windows");
 
-  test("the backslash changes the tier on the page and is typed inside a text box", () => {
-    expect(keys.acting(press("\\"))).toBe("tier.cycle");
-    expect(keys.acting(press("\\", { target: "field" }))).toBeNull();
+  test("Accel-backslash changes the tier, and the backslash alone is typed", () => {
+    expect(keys.acting(press("\\", { ctrlKey: true }))).toBe("tier.cycle");
+    expect([keys.acting(press("\\")), keys.acting(press("\\", { target: "field" }))]).toEqual([null, null]);
   });
 
   test("Accel-B opens the mailbox and Accel-J the right pane, from a text box too", () => {
@@ -29,8 +29,19 @@ describe("the shell's own keys", () => {
 
   // The chord was once dropped with the fork button; branching is its
   // own feature and keeps its key (client/Spec.lean D44).
-  test("f branches from the entry under the hand on the page and is typed inside a text box", () => {
-    expect([keys.acting(press("f")), keys.acting(press("f", { target: "field" }))]).toEqual(["fork.here", null]);
+  test("Accel-Shift-F branches from the entry under the hand, and f alone is typed", () => {
+    expect([keys.acting(press("F", { ctrlKey: true, shiftKey: true })), keys.acting(press("f"))]).toEqual(["fork.here", null]);
+  });
+
+  // A letter pressed while the focus sat on a message or a card forked
+  // the conversation or answered the card for the person; only the key
+  // that moves the focus into the message box stays a single key.
+  test("every action but focusing the message box holds the accelerator", () => {
+    expect(ACTIONS.filter((action) => !DEFAULTS[action].accel)).toEqual(["composer.focus"]);
+  });
+
+  test("no action ships on a chord the browser keeps for itself", () => {
+    expect(ACTIONS.filter((action) => reserved(DEFAULTS[action]))).toEqual([]);
   });
 
   test("no two actions ship on one chord", () => {

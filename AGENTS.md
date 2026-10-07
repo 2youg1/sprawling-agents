@@ -146,8 +146,8 @@ A violation turns the check red with a message that names the rule, the violatio
 | Every dependency a manifest declares named by the code of its package, and every workspace dependency inherited by some package. | `xtask unused` |
 | The client's lockfile in step with its manifest, its runtime dependencies exactly the list `RUNTIME` in `tools/xtask/src/npm.rs` names, each one admitted with the reason `client/Spec.lean` §7-9 records for it, every licence on the list `deny.toml` permits. | `xtask npm` |
 | Credentials as `secret:realm/name` references; plaintext reaches the vault and nowhere else. | `xtask secret` |
-| Colour taken from the `@theme` block in `client/src/theme.css`, expressed as a ratio of the gamut limit, and text on glass legible over the brightest surface behind it. | `xtask color` |
-| A transition's curve and duration taken from the tokens in `client/src/theme.css`, never spelled in a view. | `xtask motion` |
+| Colour taken from the client's theme — the `@theme` blocks of the parts `client/src/theme.css` imports from `client/src/theme/` — expressed as a ratio of the gamut limit, and text on glass legible over the brightest surface behind it. | `xtask color` |
+| A transition's curve and duration taken from the motion tokens of the client's theme (`client/src/theme/tokens-motion.css`), never spelled in a view. | `xtask motion` |
 | Every word a reader is given taken from `client/src/lang.json`. | `xtask wording` |
 | Every role, accessible name and landmark a settled screen wrote down, offered by the shipped screen, with no box outside its container; no fixed bar over the conversation, and its standing controls within `talk_controls`. | `xtask render` |
 | Every verb the city can carry out reached by some control, or classified on the wire seam with the reason a person may not ask for it. | `xtask wiring` |
@@ -166,7 +166,7 @@ A violation turns the check red with a message that names the rule, the violatio
 
 ## The view layer
 
-`client/` is held to colour from `theme.css`, wording from `lang.json`, the size budget, and the eslint rules the client's own config sets (no `any`, no `as`, no `throw`, no `try`, no non-exhaustive switch). It is exempt from SPEC-first and from red-before-green, because cheap iteration is what makes an interface good, and a SPEC and a failing test for every visual change would tax that iteration to buy correctness the view layer was not losing. The interaction contract of each part — its ARIA pattern, its keys, where focus returns — is the half that is not exempt, and `client/Spec.lean` holds it: section 9 names the parts under `client/spec/` where each contract is a state machine with its proofs.
+`client/` is held to colour from its theme (`client/src/theme.css` and the parts it imports), wording from `lang.json`, the size budget, and the eslint rules the client's own config sets (no `any`, no `as`, no `throw`, no `try`, no non-exhaustive switch). It is exempt from SPEC-first and from red-before-green, because cheap iteration is what makes an interface good, and a SPEC and a failing test for every visual change would tax that iteration to buy correctness the view layer was not losing. The interaction contract of each part — its ARIA pattern, its keys, where focus returns — is the half that is not exempt, and `client/Spec.lean` holds it: section 9 names the parts under `client/spec/` where each contract is a state machine with its proofs.
 
 Read [`docs/frontend-method.md`](docs/frontend-method.md) before you change a screen. It says how a screen is built here: settled against the shipped stylesheet, given a fixture on `#/gallery`, and accepted by `cargo xtask render`, which measures where the boxes landed in a real engine. Its last part holds the design as approved — the grid, the tokens, the surfaces and the shell's parts — under the labels the code cites, so how a screen looks is described there and nowhere else.
 

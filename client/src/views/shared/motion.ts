@@ -6,7 +6,7 @@
 // Whether this person asked the page to stop moving.
 //
 // `setup/appearance.tsx` writes the answer onto the root element as
-// `data-motion`, and `theme.css` reads that same attribute to shorten
+// `data-motion`, and `theme/motion-state.css` reads that same attribute to shorten
 // every transition to one frame. The two animations a script starts by
 // itself - the composer falling to the foot of the page, and the view
 // transition between two routes - cannot be reached by that rule, so
@@ -15,7 +15,7 @@
 // for movement on a machine that asks for less.
 //
 // `system` is the absence of an opinion, which is the one case where
-// the machine answers. That is the reading `theme.css` gives the same
+// the machine answers. That is the reading `theme/motion-state.css` gives the same
 // three values.
 
 // The only query a browser offers for this, spelled once.

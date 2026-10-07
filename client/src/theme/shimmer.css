@@ -1,0 +1,37 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ * Copyright (c) 2026 2youg1 and the sprawling contributors */
+
+/* The shape of what is coming, while it is coming: a light band travels
+ * across the bar once per pass. A block that fades in and out reads as
+ * something broken, and a band travelling one way reads as something on
+ * its way, which is the whole reason to prefer it.
+ *
+ * **It is not free, and the trade is deliberate.** Moving a background
+ * repaints the box every frame, where the opacity fade it replaces was
+ * composited without repainting anything. The bars are few and small, so
+ * the paint is affordable and the reading is worth it.
+ *
+ * At rest - motion off, or a machine asking for less - the band sits at
+ * the far edge and the bar is the flat grey it travels over, so stopping
+ * the animation needs nothing said about the paint. */
+@keyframes shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+.shimmer {
+  background-color: var(--color-g2);
+  background-image: linear-gradient(
+    90deg,
+    var(--color-g2) 0 45%,
+    var(--color-g3) 50%,
+    var(--color-g2) 55% 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.6s linear infinite;
+}

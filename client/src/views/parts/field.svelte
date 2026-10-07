@@ -19,7 +19,7 @@
 // a URL is never red while it is half typed.
 //
 // The box carries no `outline` rule of its own. The focus ring is one
-// declaration in `theme.css`, and a box that hid it was the reason a
+// declaration in `theme/base.css`, and a box that hid it was the reason a
 // keyboard user could not see where they were on the settings page.
 
 export interface FieldProps {

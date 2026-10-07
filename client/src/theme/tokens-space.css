@@ -1,0 +1,143 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ * Copyright (c) 2026 2youg1 and the sprawling contributors */
+
+@theme {
+  /* The spacing scale: six steps, every one a multiple of four, and each
+   * one taken through the density coefficient so that tightening the
+   * page is one number rather than six. Zero is named too, because a
+   * flex column that may shrink needs `min-h-0`, and with no multiplier
+   * the numeral would resolve to nothing; zero is left outside the
+   * coefficient because no amount of tightening makes it smaller. */
+  --spacing-0: 0px;
+  --spacing-tight: calc(4px * var(--density));
+  --spacing-snug: calc(8px * var(--density));
+  --spacing-base: calc(12px * var(--density));
+  --spacing-pane: calc(16px * var(--density));
+  --spacing-wide: calc(24px * var(--density));
+  --spacing-section: calc(32px * var(--density));
+
+  /* The widths a page is built from: prose, a conversation, a page. */
+  --container-measure: 520px;
+  --container-talk: 760px;
+  --container-page: 1040px;
+
+  /* The two widths at which the main region affords another column,
+   * written as container widths so that `@lg:` and `@wide:` ask what
+   * the columns actually have. The window is the wrong ruler: the
+   * shell's grid gives a page only some of its columns, so a page that
+   * broke at 1440px of window would lay three columns into the room
+   * those columns leave and crush the middle one.
+   *
+   * Each number is the sum of what has to fit - a tree pane beside a
+   * measure of prose is 300 + 520, and a second pane on the far side of
+   * that prose is 300 more. The sum is spelled out rather than added up
+   * from `--spacing-tree` and `--container-measure` because Tailwind
+   * drops any `--container-*` whose declared value contains `var()`:
+   * the variant reads the value before the cascade can resolve it, and
+   * a `@lg:` class whose width did not resolve produces no CSS at all
+   * rather than an error. Moving either part therefore means moving the
+   * sum here, and that is the one place in the theme where a number is
+   * written twice. */
+  --container-lg: 820px;
+  --container-wide: 1120px;
+  /* **A container named after a spacing step cannot be reached.**
+   * `max-w-wide` is `--spacing-wide`, 24px, and not the 1120px
+   * above: Tailwind resolves the utility's named value out of the
+   * spacing scale first, so a `max-w-wide` on a page column caps it
+   * at twenty-four pixels and every child of it collapses. Use
+   * `max-w-page`, or write the value out as `max-w-[1120px]`, or
+   * rename the step. Only `page`, `measure` and `talk` are names a
+   * spacing token does not shadow. */
+
+  /* The few fixed sizes a shell needs: the bar, a status dot, the
+   * building glyphs, and the pane a tree takes beside a file. */
+  --spacing-bar: 44px;
+  /* One row of the performance panel's plot (`views/monitor.svelte`).
+   * A numeric utility would be shorter to write and does nothing here:
+   * the theme clears Tailwind's counted scale, so `h-10` emits no rule
+   * at all and the plot took its height from the SVG's own aspect
+   * ratio - three thousand pixels a row. */
+  --spacing-plot: 40px;
+  /* The field a pairing code is typed into (`settings/remote_door.svelte`):
+   * a code is four groups of five readable characters, so the whole of
+   * it stays visible while it is transcribed. */
+  --spacing-code: 256px;
+  /* The column a list of files or groups takes beside what it opens:
+   * the monitor's file list, wide enough for a path's last two parts. */
+  --spacing-index: 232px;
+  /* The icon grids. An icon is drawn on one of two squares - sixteen
+   * for a mark that sits inside a line of text, twenty for the ones a
+   * column of navigation is built from - and the box it is drawn in is
+   * that square, so a stroke stays on the pixel the artist put it on. */
+  --spacing-glyph-sm: 16px;
+  --spacing-glyph: 20px;
+  /* The three heights a control may sit at. Named here because they were
+   * being invented at each call site, and three buttons standing in one
+   * row came out 26, 28 and 30 pixels tall. A control is small when it
+   * lives inside a row or a table cell, ordinary when it is a field or a
+   * secondary button, and large when it is the one action a screen is
+   * for. */
+  --spacing-control-sm: 28px;
+  --spacing-control: 32px;
+  --spacing-control-lg: 36px;
+  --spacing-dot: 8px;
+  --spacing-tree: 300px;
+  --spacing-figure: 72px;
+  /* A glyph and a count of up to four digits in the mono face, the box
+   * each count of the city's building table stands in so the columns
+   * line up down the rows. */
+  --spacing-count: 56px;
+  --spacing-step: 28px;
+  --spacing-output: 240px;
+  --spacing-palette: 360px;
+  --spacing-caret: 18px;
+  --spacing-hair: 2px;
+
+  /* The shell's grid (docs/frontend-method.md §4-33): twelve columns, a margin round
+   * the window, a gutter between columns, and an eight-pixel baseline
+   * the rows are counted in. Outside the density coefficient on
+   * purpose: the grid is what makes two edges one line, and a tighter
+   * page is tighter inside its columns, not a different set of them. */
+  --spacing-margin: 32px;
+  --spacing-gutter: 24px;
+  --spacing-baseline: 8px;
+  /* The edge keys and the context ring are drawn in one square, so the
+   * ring round the coin key and the three keys share a size; the coin
+   * sits inside the ring with four pixels of air. The glyph a key is
+   * drawn with sits between the two icon squares, because a key is
+   * read from further away than a line of text and nearer than a
+   * column of navigation. */
+  --spacing-key: 40px;
+  --spacing-coin: 32px;
+  --spacing-glyph-key: 18px;
+  /* The stop face's square: lucide's square fills three quarters of its
+   * box and the stroke adds a pixel and a half, so an 8.5 px box draws
+   * the 7.9 px square the template draws - seven sixteenths of the
+   * 18 px key glyph. A larger stop reads as a second, heavier key. */
+  --spacing-glyph-stop: 8.5px;
+  /* The conversation as a band along the bottom of the panorama tier:
+   * the last thing said, the field, and its line. */
+  --spacing-band: 112px;
+
+  /* Three heights a box may sit at above the page, and they are one ink
+   * at three strengths rather than three colours: a row or a control
+   * that has lifted slightly, a panel floating over the page, and the
+   * one box that has taken the page's attention entirely. Alpha is not a
+   * hue, so the single-axis rule is untouched. */
+  --shadow-raise: 0 1px 2px oklch(from var(--shadow-ink) l c h / 0.25);
+  --shadow-float: 0 8px 24px oklch(from var(--shadow-ink) l c h / 0.45);
+  /* The tier a sheet takes: a drawer, a dialog, the one box that has
+   * taken the page rather than floating over a part of it. */
+  --shadow-sheet: 0 24px 64px oklch(from var(--shadow-ink) l c h / 0.6);
+
+  /* The corner scales; the shape is the superellipse exponent halved. */
+  --radius-panel: 12px;
+  --radius-card: 8px;
+  --radius-control: 6px;
+  --radius-pill: 999px;
+  /* The edge keys: rounder than a control, because a key that floats
+   * over the page reads as an object rather than as part of a form. */
+  --radius-key: 14px;
+}

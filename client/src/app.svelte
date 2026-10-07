@@ -19,7 +19,7 @@
   import { QUERIES } from "./core/asking";
   import { cancel } from "./core/commands";
   import { runInFront } from "./core/in_front";
-  import { keymap } from "./core/keys";
+  import { folded, keymap } from "./core/keys";
   import { HOLD_MS, pressedOf } from "./core/press";
   import type { Action } from "./core/keys";
   import { say } from "./core/lang";
@@ -214,9 +214,13 @@
     else cycleTier();
   }
 
+  // The chord is let go when its own key comes up, or when the
+  // accelerator does: a Mac sends no key-up for a key pressed while
+  // Command is held.
   function letGo(event: KeyboardEvent): void {
     if (event.key === "Control" || event.key === "Meta") expose(false);
-    if (tierHeld !== null && !(event.ctrlKey || event.metaKey)) releaseTier();
+    const tierKey = folded(event.key) === folded(bindings.chord("tier.cycle").key);
+    if (tierHeld !== null && (tierKey || !(event.ctrlKey || event.metaKey))) releaseTier();
   }
 
   function forget(): void {

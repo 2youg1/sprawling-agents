@@ -18,8 +18,10 @@
 //! else may name a colour.
 //!
 //! **The authority is one sentence**: colour is named once per client, in
-//! that client's theme file. The token assertions read `THEME`; the scan's
-//! table of production points also holds the playback stylesheet source.
+//! that client's theme. The browser client's theme is an entry and the
+//! parts it imports (`crate::theme`); the token assertions read it as one
+//! stylesheet, and the scan's table of production points also holds the
+//! playback stylesheet source.
 //!
 //! **The seven token assertions read the stylesheet, not a Rust table.**
 //! Three of them ask what a resolved `oklch()` value was resolved *from* -
@@ -31,7 +33,7 @@
 use std::path::Path;
 
 use crate::report::{Violation, XtaskError};
-use crate::walk;
+use crate::theme::{self, Theme};
 
 mod contrast;
 mod disabled;
@@ -47,7 +49,6 @@ use readability::judge_readability;
 use scan::scan_for_literals;
 use tables::{colour_tokens_without_ratio, grey_chromas, parse_colour_tokens};
 
-const THEME: &str = concat!(crate::walk::client_src!(), "/theme.css");
 const HUE_AXIS: u16 = 250;
 const HUE_ALERT: u16 = 70;
 const GRAY_CHROMA: u16 = 14;
@@ -63,6 +64,11 @@ const CHECKPOINTS: [(&str, u16); 2] = [("REMINDER_FIRST", 150), ("REMINDER_SECON
 /// which reading; a selector is the only marker CSS gives it.
 const LIGHT_SELECTOR: &str = ":root[data-theme=\"light\"] {";
 const BLOCK_END: &str = "\n}";
+
+/// What the dark reading is built on: the first rung of the ramp. The
+/// part that declares it is where a finding about the token table is
+/// reported, and the part holding `LIGHT_SELECTOR` for the light reading.
+const RAMP: &str = "--color-g0:";
 
 /// One of the two ways the client draws a page.
 ///
@@ -109,6 +115,14 @@ impl Mode {
             Mode::Light => 250,
         }
     }
+
+    /// What the theme writes where this reading's token table begins.
+    const fn opens(self) -> &'static str {
+        match self {
+            Mode::Dark => RAMP,
+            Mode::Light => LIGHT_SELECTOR,
+        }
+    }
 }
 
 /// The stylesheet as one mode reads it: the shared declarations, with
@@ -138,26 +152,35 @@ fn reading(source: &str, mode: Mode) -> String {
 
 pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     let mut violations = Vec::new();
-    let theme_path = root.join(THEME);
-    if !theme_path.is_file() {
+    if !root.join(theme::ENTRY).is_file() {
         violations.push(Violation {
             gate: "color",
-            location: THEME.to_owned(),
-            rule: "the client's theme file is the sole production point for colour".to_owned(),
-            violation: "the theme file is missing".to_owned(),
-            alternative: format!("restore {THEME}"),
+            location: theme::ENTRY.to_owned(),
+            rule: "the client's theme is the sole production point for colour".to_owned(),
+            violation: "the theme's entry is missing".to_owned(),
+            alternative: format!("restore {}", theme::ENTRY),
         });
         return Ok(violations);
     }
-    let source = walk::read_text(&theme_path)?;
+    let theme = Theme::read(root)?;
+    let source = theme.inlined();
     for mode in Mode::ALL {
         let read = reading(&source, mode);
-        violations.extend(judge_tokens(&read, mode));
-        violations.extend(glass::judge_glass(&source, &read, mode));
+        violations.extend(placed(
+            judge_tokens(&read, mode),
+            theme.declaring(mode.opens()),
+        ));
+        violations.extend(placed(
+            glass::judge_glass(&source, &read, mode),
+            theme.declaring(glass::OPACITY),
+        ));
     }
     // Roles are judged as written: the hop is what serves both lightings,
     // and a mode's reading no longer holds the hops.
-    violations.extend(roles::judge_roles(root, &source)?);
+    violations.extend(placed(
+        roles::judge_roles(root, &source)?,
+        theme.declaring(RAMP),
+    ));
     violations.extend(scan_for_literals(root)?);
     violations.extend(disabled::judge_disabled_ink(root)?);
     Ok(violations)
@@ -304,13 +327,30 @@ fn judge_tokens(source: &str, mode: Mode) -> Vec<Violation> {
     violations
 }
 
+/// The token, glass and role assertions judge the theme as one text and
+/// name its entry; this names the part that declares what they judged.
+/// A finding that already names its own file, such as a rung spelled in a
+/// view, keeps it.
+fn placed(found: Vec<Violation>, part: &str) -> impl Iterator<Item = Violation> {
+    found.into_iter().map(move |found| {
+        if found.location == theme::ENTRY {
+            Violation {
+                location: part.to_owned(),
+                ..found
+            }
+        } else {
+            found
+        }
+    })
+}
+
 fn token_violation(rule: &str, violation: String) -> Violation {
     Violation {
         gate: "color",
-        location: THEME.to_owned(),
+        location: theme::ENTRY.to_owned(),
         rule: rule.to_owned(),
         violation,
-        alternative: "adjust the client's theme file, and record the reason in \
+        alternative: "adjust the client's theme, and record the reason in \
                       tools/xtask/Spec.lean §8-8; colour rules are mechanical by design"
             .to_owned(),
     }
