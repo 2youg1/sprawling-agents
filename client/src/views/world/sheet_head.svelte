@@ -14,11 +14,18 @@
   //
   // APG Tabs with automatic activation, as `parts/tabs.svelte` reads it:
   // one stop on the way in, the arrows, Home and End once inside.
+  //
+  // This file is the seat: it holds the drawn tabs the focus moves
+  // between; the keys are `./sheet_head.ts`, and `./sheet_head.look.svelte`
+  // draws the key and the strip.
   import { say } from "../../core/lang";
   import type { Pane } from "../../core/workbench";
   import { ui } from "../../ui";
-  import Glyph from "../parts/glyph.svelte";
   import { leaveSheet } from "../sheets.svelte";
+  import { drawnElements } from "./drawn";
+  import { sheetHeadOf } from "./sheet_head";
+  import type { SheetHeadLook } from "./sheet_head";
+  import Look from "./sheet_head.look.svelte";
 
   interface Props {
     // The panes in the person's order, each with the name its column
@@ -34,60 +41,21 @@
   const { tabs, shown, prefix, onShow }: Props = $props();
   const { lang } = ui();
 
-  const drawn: Partial<Record<Pane, HTMLButtonElement>> = {};
+  const drawn = drawnElements();
 
-  function travel(event: KeyboardEvent): void {
-    const at = tabs.findIndex((tab) => tab.pane === shown);
-    const last = tabs.length - 1;
-    const to = new Map([
-      ["ArrowRight", at === last ? 0 : at + 1],
-      ["ArrowLeft", at <= 0 ? last : at - 1],
-      ["Home", 0],
-      ["End", last],
-    ]).get(event.key);
-    const tab = to === undefined ? undefined : tabs[to];
-    if (tab === undefined) return;
-    event.preventDefault();
-    onShow(tab.pane);
-    drawn[tab.pane]?.focus();
-  }
+  const look: SheetHeadLook = $derived(
+    sheetHeadOf(
+      { tabs, shown, prefix, words: { back: say($lang, "world_back"), strip: say($lang, "world_panes") } },
+      {
+        leave: () => {
+          leaveSheet("world");
+        },
+        show: onShow,
+        focus: (pane) => drawn.get(pane)?.focus(),
+        hold: drawn.hold,
+      },
+    ),
+  );
 </script>
 
-<div class="flex min-w-0 items-center gap-snug border-b border-edge">
-  <button
-    type="button"
-    class="-ml-snug grid size-bar shrink-0 place-items-center rounded-control text-text-quiet hover:wash hover:text-text"
-    aria-label={say($lang, "world_back")}
-    onclick={() => {
-      leaveSheet("world");
-    }}
-  >
-    <Glyph name="chevron" class="rotate-180" />
-  </button>
-  <div class="flex min-w-0 items-stretch overflow-x-auto" role="tablist" aria-label={say($lang, "world_panes")}>
-    {#each tabs as tab (tab.pane)}
-      <button
-        bind:this={drawn[tab.pane]}
-        type="button"
-        role="tab"
-        id="{prefix}-tab-{tab.pane}"
-        aria-controls="{prefix}-{tab.pane}"
-        aria-selected={tab.pane === shown}
-        tabindex={tab.pane === shown ? 0 : -1}
-        class={[
-          "flex h-bar min-w-0 items-center border-b-2 px-base text-label whitespace-nowrap",
-          tab.pane === shown ? "shrink-0 border-accent text-text" : "border-transparent text-text-quiet hover:text-text",
-        ]}
-        onclick={() => {
-          onShow(tab.pane);
-        }}
-        onkeydown={travel}
-      >
-        <!-- On a phone the three names outrun the strip; the tab that is
-        shown keeps its whole name and the others give up their ends, so
-        the name of what the sheet shows is never the one cut. -->
-        <span class="truncate">{tab.label}</span>
-      </button>
-    {/each}
-  </div>
-</div>
+<Look {...look} />
