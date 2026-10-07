@@ -27,7 +27,7 @@ export interface WorkingRowLook {
 
 // `now` is the page's one ticking clock (client/Spec.lean §4-59), so the
 // reading is recomputed from the run's own start.
-export function rowOf(run: RunBelief, room: string, lang: Lang, now: number, link: Omit<EntryLink, "data-entry">): WorkingRowLook {
+export function rowOf(run: Pick<RunBelief, "doing" | "started" | "task">, room: string, lang: Lang, now: number, link: Omit<EntryLink, "data-entry">): WorkingRowLook {
   const gone = run.started === null ? "" : lasted(now - run.started);
   return {
     room,

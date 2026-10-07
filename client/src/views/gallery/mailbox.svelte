@@ -95,14 +95,21 @@
 </script>
 
 <script lang="ts">
+  import { ago } from "../../core/time";
+  import { ui } from "../../ui";
   import Column from "../mailbox/column.svelte";
   import Mailbox from "../mailbox/mailbox.svelte";
+  import { rowOf as recentRow } from "../mailbox/recent_row";
+  import RecentRow from "../mailbox/recent_row.look.svelte";
+  import { rowOf as workingRow } from "../mailbox/working_row";
+  import WorkingRow from "../mailbox/working_row.look.svelte";
   import Case from "./case.svelte";
   import { ONE_QUESTION } from "./served";
   import Stand from "./stand.svelte";
   import WaitingCards from "../talk/waiting_cards.svelte";
   import Deciding from "../mailbox/deciding.svelte";
 
+  const { lang } = ui();
   const LIVE = { kind: "live", city: "sprawling" } as const;
   const COLUMN = "flex h-[1480px] flex-col bg-raised";
   const ignore = (): void => undefined;
@@ -164,6 +171,46 @@ the alert's and does not pulse. -->
       <Column onClose={ignore} />
     </div>
   </Stand>
+</Case>
+
+<!-- One row of each list on its own, at the column's width: a session
+the page can still fork, one whose last turn is older than the page,
+and a room calling a tool and one waiting on the person. -->
+<Case label="mailbox rows · recent sessions, one that forks and one that cannot" width={440}>
+  <ul class="bg-raised px-base">
+    {#each [true, false] as forkable (forkable)}
+      {@const line = SESSIONS[MAYOR]?.[forkable ? 0 : 1]}
+      {#if line !== undefined}
+        <RecentRow
+          {...recentRow({ room: MAYOR, line, forkable }, $lang, ago($lang, line.at, NOW), {
+            href: "#/gallery",
+            follow: ignore,
+            fork: ignore,
+          })}
+        />
+      {/if}
+    {/each}
+  </ul>
+</Case>
+
+<Case label="mailbox rows · a room calling a tool and one waiting on the person" width={440}>
+  <ul class="bg-raised px-base">
+    <WorkingRow
+      {...workingRow(
+        { doing: { kind: "calling", tool: "exec", subject: null }, started: TimeMs.make(NOW - 6 * MINUTE), task: "make the document reader lossless" },
+        EAST,
+        $lang,
+        NOW,
+        { href: "#/gallery", onclick: ignore },
+      )}
+    />
+    <WorkingRow
+      {...workingRow({ doing: { kind: "waiting" }, started: TimeMs.make(NOW - 3 * MINUTE), task: null }, WEST, $lang, NOW, {
+        href: "#/gallery",
+        onclick: ignore,
+      })}
+    />
+  </ul>
 </Case>
 
 <Case label="decide card · a design question in the conversation">
