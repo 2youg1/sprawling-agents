@@ -29,6 +29,7 @@
   const question = $derived<Query>({ archive_search: { needle } });
   const search = $derived(u.conn.asking.ask(question));
   const read = $derived(readAnswer($search, (held) => ("archive" in held ? held.archive.hits : undefined)));
+  const hits = $derived(read.kind === "held" ? read.value : undefined);
 </script>
 
 <div class="flex flex-col gap-base">
@@ -47,11 +48,11 @@
   </div>
   {#if read.kind === "unavailable"}
     <Unanswered query={read.query} asked={question} />
-  {:else if read.kind === "asking"}
+  {:else if hits === undefined}
     <p class="text-text-faint">…</p>
-  {:else if read.value.length === 0}
+  {:else if hits.length === 0}
     <EmptyState missing="rec_archive_nothing" seat="region" />
   {:else}
-    <Look {...lookOf(read.value)} />
+    <Look {...lookOf(hits)} />
   {/if}
 </div>

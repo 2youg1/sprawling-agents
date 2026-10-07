@@ -38,15 +38,16 @@
   const question = $derived<Query>({ evidence: { run } });
   const asked = $derived(u.conn.asking.ask(question));
   const read = $derived(readAnswer($asked, (held) => ("evidence" in held ? held.evidence.items : undefined)));
+  const items = $derived(read.kind === "held" ? read.value : undefined);
 </script>
 
 {#if read.kind === "unavailable"}
   <Unanswered query={read.query} asked={question} />
-{:else if read.kind !== "held"}
+{:else if items === undefined}
   <p class="text-text-faint">…</p>
-{:else if read.value.length > 0}
+{:else if items.length > 0}
   <ul class="text-note">
-    {#each read.value as item (item.at)}
+    {#each items as item (item.at)}
       <li class="flex items-center gap-base border-b border-edge py-snug">
         <span class="w-figure shrink-0 text-text-faint">{say($lang, EVIDENCE_WORD[item.kind])}</span>
         <span class="flex-1 truncate font-mono text-text-quiet">{item.locator}</span>

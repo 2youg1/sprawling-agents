@@ -7,10 +7,11 @@
 // bring back itself, what the press hands on, and the way back each
 // row states in words.
 
-import { describe, expect, test } from "bun:test";
+import { beforeAll, describe, expect, test } from "bun:test";
 
 import { Locator, TimeMs } from "../../wire";
 import type { DiscardLine, Restoration } from "../../wire";
+import { clock } from "../../core/time";
 import { lookOf } from "./bin";
 
 const AT = TimeMs.make(Date.UTC(2026, 9, 2, 12));
@@ -24,6 +25,14 @@ const INTERRED: Restoration = { interred: Locator.make("interred/2026-10-02/draf
 const REBUILT: Restoration = { rebuildable: { reason: "rebuilt on the next read" } };
 
 describe("the recycle bin", () => {
+  // Every row writes its moment through Intl, and the first locale-aware
+  // date format in a Bun process loads the ICU data - about a second on
+  // an idle machine, several on a loaded one. That cost is the runtime's,
+  // so it is paid once here and no test's budget measures it.
+  beforeAll(() => {
+    clock("en", 0);
+  });
+
   test("offers the press only on a tracked row that is still gone, and the press sends that row's way back", () => {
     const sent: Restoration[] = [];
     const rows = [line(TRACKED, false), line(TRACKED, true), line(INTERRED, false), line(REBUILT, false)];
