@@ -2,7 +2,7 @@
 
 # sprawling
 
-**Run many agents on your own machine as a city. One Rust binary; the interface is a page in your browser.**
+**Let agents live like citizens in the “city” of sprawling, and save your attention and time.**
 
 <p align="center">
   <a href="https://crates.io/crates/sprawling"><img alt="crates.io" src="https://img.shields.io/crates/v/sprawling?logo=rust&amp;labelColor=171717&amp;color=DEA584"></a>
@@ -14,9 +14,11 @@
 
 </div>
 
-Give your agents a city to work in. In sprawling, projects become buildings where agents exchange messages, divide the work and keep you informed as it progresses.
+In sprawling, a city is one directory on your machine, projects are the buildings in it, and agents live in the buildings as residents: they message one another, split up the work and tell you how far they have got. Behind it all is one Rust binary running locally; it serves the interface to your browser and records the city's history in an append-only Ledger.
 
-Plans, decisions and handoffs live in files. sprawling uses these records to carry long-running work across sessions, organise larger tasks and follow workflows you define. One Rust binary runs locally, serves the browser interface and records the city's history in an append-only Ledger.
+The city is more than a metaphor. Buildings, floors and rooms are the directory tree itself, so an address such as `lab/room1` settles three things at once: which files an agent may write, which documents it starts with, and whom it reports to. The three are one fact to begin with, and no extra rule is needed to keep them agreeing ([glossary](docs/glossary.md)). A resident is an identity that lasts across runs, and what costs money is the run it is sent out on, so however many residents a city has, the idle ones cost nothing.
+
+sprawling interrupts you as little as it can. Agents have full permission in their own building by default: in a building raised from the `minimal` template an agent may write every file, and finished work lands without review (to turn on review or limit writes, see [A building of your own](docs/getting-started.md#a-building-of-your-own)). What reaches you for a decision is a design question a resident cannot settle from the building's rules. Plans, decisions and handoffs are written down as files you can read directly, an agent in a new session picks the work up from these records, and the memory lives in your files, code and document libraries. There are no built-in workflows for now; you define the workflow through roles, skills and tool connections.
 
 <p align="center">
   <img alt="The Main conversation page before a session: the text box, the workspace on the left, the model, effort and permission controls on the right" src="docs/images/main-before-a-session.png" width="49%">
@@ -24,9 +26,9 @@ Plans, decisions and handoffs live in files. sprawling uses these records to car
   <img alt="The report the run wrote, with its table and numbered list, beside the CSV file it read" src="docs/images/a-report-beside-its-file.png" width="98%">
 </p>
 
-**Status: <!-- xtask:begin maturity:word -->alpha<!-- xtask:end -->.** Data formats, the wire and the interface may still change between versions.
+**Status: <!-- xtask:begin maturity:word -->alpha<!-- xtask:end -->.** Data formats, the wire and the interface may all still change between versions.
 
-中文：[README.zh-CN.md](README.zh-CN.md) · Project introduction: [LLM.md](LLM.md) · Code changes: [AGENTS.md](AGENTS.md)
+中文：[README.zh-CN.md](README.zh-CN.md) · For a model introducing the project: [LLM.md](LLM.md) · Read before changing code: [AGENTS.md](AGENTS.md)
 
 **Strengths**: small; concepts that are genuinely cool; built for many agents rather than for one agent with extensions bolted on.
 
@@ -34,21 +36,21 @@ Plans, decisions and handoffs live in files. sprawling uses these records to car
 
 ## Quick start
 
-Choose an install channel. npm/Bun and cargo-binstall download prebuilt binaries; `cargo install` compiles locally. The shell installers need no JavaScript or Rust toolchain.
+Pick one way to install. npm/Bun and cargo-binstall download a prebuilt binary, `cargo install` compiles locally, and the shell installers need no JavaScript or Rust toolchain.
 
-npm, with Node.js and npm installed:
+npm (needs Node.js and npm):
 
 ```sh
 npm install --global sprawling@latest
 ```
 
-Bun, with Bun installed:
+Bun (needs Bun):
 
 ```sh
 bun install --global sprawling@latest
 ```
 
-crates.io, with the Rust compiler and native build tools required by the published package; with cargo-binstall installed, use `cargo binstall sprawling` to download a release archive:
+crates.io (needs the Rust compiler the published package requires and the native build tools for your platform; with cargo-binstall installed, `cargo binstall sprawling` downloads a release archive directly):
 
 ```sh
 cargo install sprawling --locked
@@ -66,35 +68,45 @@ Windows PowerShell:
 irm https://raw.githubusercontent.com/2youg1/sprawling-agents/main/install.ps1 | iex
 ```
 
-Prebuilt archives support Windows x86-64, macOS on Apple silicon and Linux x86-64. Use the [release list](https://github.com/2youg1/sprawling-agents/releases) for manual downloads and the [installation guide](docs/getting-started.md#1-install) for version selection, verification and source builds with Nix.
+Prebuilt archives support Windows x86-64, macOS on Apple silicon and Linux x86-64. To download one by hand, go to the [release list](https://github.com/2youg1/sprawling-agents/releases); for choosing a version, verifying it and building from source with Nix, see the [installation guide](docs/getting-started.md#1-install).
 
-After installation, all channels use the same command:
+Whichever way you installed it, one command starts it:
 
 ```sh
 sprawling up ./cities/first
 ```
 
-The terminal becomes the city's console and prints the serving address; the browser opens the page. Connect a provider or local model, choose a model for `main`, then tell the Mayor what result you want and what counts as done. The Mayor plans and the buildings' residents execute; you follow progress, answer questions and inspect results. `Ctrl-C` in the console stops the city.
+The terminal becomes this city's console and prints the serving address, and your browser opens the page. On the page, connect a provider or a local model, choose a model for `main`, then tell the Mayor what result you want and how far counts as done. The Mayor plans and the residents of the buildings carry the work out; on your side, you follow the progress, answer their questions and check the results. To stop the city, press `Ctrl-C` in the console.
 
-Agents work with full permission inside their building by default: in a building raised from the `minimal` template they may write every file under the building, and their work is not reviewed before it lands. [A building of your own](docs/getting-started.md#a-building-of-your-own) shows how to turn on review and limit writes.
+sprawling does not update itself; when you want to, check the version in Settings and follow the [update guide](docs/getting-started.md#updating).
 
-sprawling does not update automatically; check for updates in Settings and follow the [update guide](docs/getting-started.md#updating).
+Conversations, skills and tool connections work much as they do in other agents. The [getting-started guide](docs/getting-started.md) has a route for each of two kinds of reader: people already using another agent move their configuration over, and people who have only used chat start from their first piece of work; the routes go as far as the first task, reading its report and stopping work.
 
 ## What it does
 
-**Long-running work and automation.** Plans, decisions and handoffs stay in readable documents, giving agents a record to continue across sessions. Hierarchical plans coordinate larger tasks, while roles, skills and tool integrations let you define the workflow. A standing goal dispatches ready plan nodes and waits for active runs; [daily operation](docs/operating.md) explains how to steer, pause and stop work.
+### Long-running work and automation
 
-**Social simulation.** Agents can find one another, exchange messages, coordinate work and wait for replies without you relaying each conversation. Your main agent explains the work and reports its progress; the recorded exchanges let you inspect how the group interacts, and [playback](crates/city/skills/playback/SKILL.md) exports a history you can check against the Ledger.
+Larger tasks are coordinated through hierarchical plans: the Mayor writes an idea down as a roadmap, then hands each building its part through `plan`. Once you set a standing goal, it dispatches the plan nodes that are ready and waits for the runs in progress; [daily operation](docs/operating.md) covers how to steer, pause and stop this work.
 
-**Easy to start.** Conversations, skills and tool connections follow patterns familiar from other agents. The [getting-started guide](docs/getting-started.md) offers separate routes for agent users moving their configuration and chat users starting their first project, through the first task, reading its report and stopping work.
+### Social simulation
 
-**Performance.** One process serves the page and runs the city, with no database and no separate service; the city's history is an append-only Ledger on disk. Settings → Performance chooses CPU placement and core priority, and a memory ceiling for each run that only you set, because there is none by default ([choosing how the city uses the machine](docs/performance.md#choose-how-the-city-uses-the-machine)). Commands start below the city's own priority, so a build does not slow the page down. Command output is trimmed according to the command that produced it before it reaches the model, and the full text stays retrievable ([sieve](crates/runtime/spec/Sieve.lean)). The monitor and `sprawling gauge` show run timings, model calls, tokens, cost and resource use on your own hardware, and the [performance register](tools/xtask/budgets.toml) holds the project's budgets and recorded readings ([performance guide](docs/performance.md)).
+Agents can find one another, send messages, coordinate tasks and wait for replies, without you relaying each one. The main agent explains the work to you and reports progress; this communication is recorded, so you can see how the group of agents actually interacts, and [playback](crates/city/skills/playback/SKILL.md) exports the history for you to check against the Ledger.
 
-**Privacy.** A key you paste into a message goes to the vault, and the model sees only a reference to it ([custody](crates/accounting/src/worker/dispatching/custody.rs)). Secret-shaped values in model replies and tool results are replaced by a marker before they reach the permanent history ([redact](crates/runtime/src/redact.rs)). Nothing leaves the machine except the model calls and tools you connect and the default web search, which sends the search words to Exa until you turn it off; a confidential building makes no call to a remote provider. On Windows, Settings offers 88 optional privacy controls, from diagnostic data and speech input to app permissions and Windows AI features. Each one shows its current value, what it changes and what it costs, and is applied or restored one at a time and read back after every write ([Windows privacy controls](docs/operating.md#windows-privacy-controls)). Privacy is not security, and it is not always at odds with convenience, but many of these settings do cost some; the page gives you what you need to weigh each one.
+### Performance
 
-**A history you can replay.** Every decision the city makes is a line in the Ledger, and the same lines replay byte for byte on any machine, because decision paths read time as a parameter, use no random source and keep a fixed order ([determinism](ARCHITECTURE.md#10-determinism-and-hardening)). Tools and model calls are not run again on replay; their recorded results are read back. The city states facts and limits, and leaves the method to the model ([LLM First](ARCHITECTURE.md#llm-first-mechanism-from-the-city-method-from-the-model)).
+The page and the whole city are served and run by one process, with no database and no separate service; the city's history is an append-only Ledger on disk. In Settings → Performance you can choose CPU placement and core priority, and give each run a memory ceiling; there is none by default, and only you can set one ([choosing how the city uses the machine](docs/performance.md#choose-how-the-city-uses-the-machine)). Commands start at a lower priority than the city itself, so running a build does not slow the page down. Before command output reaches the model, it is trimmed according to the command that produced it, and the full original text can still be fetched afterwards ([sieve](crates/runtime/spec/Sieve.lean)). The monitor and `sprawling gauge` show run timings, model calls, tokens, cost and resource use on your own hardware, and the project's budgets and recorded readings are kept in the [performance register](tools/xtask/budgets.toml) ([performance guide](docs/performance.md)).
 
-**Customisation and development.** Define how agents work through role documents, project rules and skills; connect the models and MCP tools your tasks need, with several accounts per provider in the order you choose, or bring a supported harness over ACP. Build another interface against the wire and use the documented seams for runtime changes. These parts suit a workflow or AgentOS that needs persistent project teams, document-based handoffs and a shared history on one machine; [integrations](docs/integrations.md) covers the existing connections, and [architecture](ARCHITECTURE.md#8-where-to-change-what) locates runtime changes.
+### Privacy
+
+A key you paste into a message goes into the vault first, and the model sees only a reference to it ([custody](crates/accounting/src/worker/dispatching/custody.rs)). Values in model replies and tool results that look like secrets are replaced with a marker before they are written into the permanent history ([redact](crates/runtime/src/redact.rs)). Apart from the model calls and tools you connect, plus the web search that is on by default (until you turn it off, it sends the search words to Exa), nothing leaves your machine; a confidential building calls no remote provider. On Windows, Settings has 88 optional privacy controls, ranging from diagnostic data and speech input to app permissions and Windows AI features. Each one shows its current value, what it changes and what it costs; you apply or restore them one at a time, and each write is read back to check it ([Windows privacy controls](docs/operating.md#windows-privacy-controls)). Privacy is not security, and it is not always at odds with convenience, but many of these settings do cost some convenience; the page lays out each one so that you can weigh it yourself.
+
+### A history you can replay
+
+Every decision the city makes is a line in the Ledger, and replaying those lines on any machine gives a byte-for-byte identical result, because decision paths take time as a parameter, use no random source and keep a fixed order ([determinism](ARCHITECTURE.md#10-determinism-and-hardening)). A replay does not run tools or call models again; it reads back the results recorded at the time. The city supplies only the facts and the limits, and leaves how to do the work to the model ([LLM First](ARCHITECTURE.md#llm-first-mechanism-from-the-city-method-from-the-model)).
+
+### Customisation and development
+
+How agents work is defined by role documents, project rules and skills; connect whatever models and MCP tools you need (one provider can hold several accounts, used in the priority order you set), or bring in a supported harness over ACP. You can build your own interface on the wire, or change the runtime along the seams in the architecture. If your workflow or AgentOS needs standing project teams, handoffs through documents and a shared history on one machine, these parts are there to build it with; [integrations](docs/integrations.md) covers the existing connections, and [architecture](ARCHITECTURE.md#8-where-to-change-what) shows where to change the runtime.
 
 ## Why I built this
 
@@ -122,34 +134,35 @@ I don’t sell APIs and I can’t afford a hard drive full of your data, so ever
 
 ## Documentation
 
+Apart from the two READMEs, the two getting-started guides and the comments in the crate specifications, the documents are in English.
+
 | Document | What it holds |
 |---|---|
-| [`docs/getting-started.md`](docs/getting-started.md) ([中文](docs/getting-started.zh-CN.md)) | The guide for a newcomer: every concept met on the way, from installing to a reviewed merge |
-| [`docs/operating.md`](docs/operating.md) | Daily use: steering and stopping work, answering residents, swapping providers and MCP servers, remote access, recovering from failures |
-| [`docs/glossary.md`](docs/glossary.md) | One meaning for each word the code, the page and the documents use |
-| [`LLM.md`](LLM.md) | Project capabilities, boundaries and reading paths for a model introducing sprawling |
-| [`docs/wire.md`](docs/wire.md) | CLI, frames, answers and exit codes for programmatic control |
-| [`docs/integrations.md`](docs/integrations.md) | ACP harnesses, MCP tool servers and CLI control from an existing agent |
-| [`docs/performance.md`](docs/performance.md) | Monitor readings, reproducible workloads and measurement provenance |
-| [`ARCHITECTURE.md`](ARCHITECTURE.md) | The crates and their dependency rules, the seams, one dispatch end to end, what is on disk, how it is verified, and where each kind of change goes |
-| [`AGENTS.md`](AGENTS.md) | The rules every change follows and the commands that check them, read first by people and agents alike |
-| [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) | Contribution preparation, feature admission and submission, with links to the repository rules |
+| [`docs/getting-started.md`](docs/getting-started.md) ([中文](docs/getting-started.zh-CN.md)) | A guide for newcomers: from installing to a reviewed merge, with every concept met on the way |
+| [`docs/operating.md`](docs/operating.md) | Daily use: steering and stopping work, answering residents, swapping providers and MCP servers, remote access, and what to do when something goes wrong |
+| [`docs/glossary.md`](docs/glossary.md) | Every word the code, the page and the documents use, each with exactly one meaning |
+| [`LLM.md`](LLM.md) | For a model that introduces sprawling: what it can do, where its limits are, and in what order to read |
+| [`docs/wire.md`](docs/wire.md) | The CLI, frames, answers and exit codes for controlling the city from a program |
+| [`docs/integrations.md`](docs/integrations.md) | ACP harnesses, MCP tool servers, and controlling the city through the CLI from an existing agent |
+| [`docs/performance.md`](docs/performance.md) | Monitor readings, reproducible workloads and where the measurements come from |
+| [`ARCHITECTURE.md`](ARCHITECTURE.md) | The crates and the dependency rules between them, the seams, one dispatch from start to finish, what is on disk, how it is verified, and where each kind of change goes |
+| [`AGENTS.md`](AGENTS.md) | The rules every change keeps and the commands that check them; people and agents both read it first |
+| [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) | Preparing a contribution, feature admission and the submission process, with the way into the repository rules |
 | [`docs/frontend-method.md`](docs/frontend-method.md) | How a screen is built and accepted, and the approved visual design |
-| [`crates/README.md`](crates/README.md) | Every crate, what it owns and where its specification is; each specification, `crates/<dir>/Spec.lean`, holds that crate's interfaces, decisions and proofs, with comments in Chinese |
-| [`crates/city/templates/`](crates/city/templates/) | The documents the city writes into each building, which agents read and so can you |
-| [`crates/city/skills/`](crates/city/skills/) | The skills that ship with the release |
-| [`docs/logging.md`](docs/logging.md) | What goes into the diagnostic log, what goes into the Ledger, and why the two stay apart |
-| [`docs/third-party.md`](docs/third-party.md) | The upstream facts this tree follows, credits and licence obligations |
-| [`CHANGELOG.md`](CHANGELOG.md) | What each release changed, and what it left known and unfixed |
+| [`crates/README.md`](crates/README.md) | What each crate owns and where its specification is; the specification, `crates/<dir>/Spec.lean`, holds the crate's interfaces, decisions and proofs, with comments in Chinese |
+| [`crates/city/templates/`](crates/city/templates/) | The documents the city writes into each building; agents read them, and so can you |
+| [`crates/city/skills/`](crates/city/skills/) | The skills distributed with the release |
+| [`docs/logging.md`](docs/logging.md) | What goes into the diagnostic log, what goes into the Ledger, and why the two are kept apart |
+| [`docs/third-party.md`](docs/third-party.md) | The upstream facts this repository follows, credits and licence obligations |
+| [`CHANGELOG.md`](CHANGELOG.md) | What each release changed, and which known problems are still unfixed |
 | [`SECURITY.md`](SECURITY.md) | How to report a vulnerability |
 
 ## Sources and credits
 
-Provider interfaces and harness launch commands follow the ACP registry and vendor documentation; where needed, vendor clients supply more precise facts without copying their code. This repository implements its own interface controls, with keyboard behaviour following W3C ARIA Authoring Practices, Kobalte and Ark UI documentation. [Third-party sources](docs/third-party.md) records source versions and full licence obligations.
+Provider interfaces and harness launch commands follow the ACP registry and vendor documentation; where a fact needs checking precisely, it is read from the vendor's client without copying the client's code. This repository implements its interface controls itself, with keyboard behaviour following the W3C ARIA Authoring Practices, Kobalte and Ark UI documentation. Source versions and full licences are in [third-party](docs/third-party.md).
 
-The shipped `sdd`, `tutor` and `translation` are English adaptations of the author's Chinese skills. `why`, `how` and `blast-radius` adapt Lauren Tan (poteto)'s [pstack](https://github.com/cursor/plugins/tree/main/pstack), and `authority-review` adapts Thermos from the same repository; all four keep MIT. [skills/LICENSES.md](crates/city/skills/LICENSES.md) carries each skill's terms and credit.
+The shipped `sdd`, `tutor` and `translation` are English adaptations of the author's Chinese skills; `why`, `how` and `blast-radius` are adapted from Lauren Tan (poteto)'s [pstack](https://github.com/cursor/plugins/tree/main/pstack), and `authority-review` from Thermos in the same repository; all four keep the MIT licence. Each skill's credit and licence are in [skills/LICENSES.md](crates/city/skills/LICENSES.md).
 
-Report bugs or request features through the [issue forms](https://github.com/2youg1/sprawling-agents/issues/new/choose). For code changes, follow [AGENTS.md](AGENTS.md) and [CONTRIBUTING](docs/CONTRIBUTING.md). Use the private reporting channel in [SECURITY.md](SECURITY.md) for vulnerabilities.
+To report a bug or request a feature, use the [issue forms](https://github.com/2youg1/sprawling-agents/issues/new/choose). For code changes, follow [AGENTS.md](AGENTS.md) and [CONTRIBUTING](docs/CONTRIBUTING.md). Report vulnerabilities through the private channel in [SECURITY.md](SECURITY.md).
 
-
-The project is [MPL-2.0](LICENSE); shipped skills carry their individual licences with their files.
+The project is licensed under [MPL-2.0](LICENSE); the shipped skills each carry their own licence with their files.
