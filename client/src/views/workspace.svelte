@@ -297,7 +297,7 @@ taller; on one column the second row is the band, as tall as it needs. -->
       class={[
         sheet
           ? "sheet -mx-pane row-[1] grid min-h-0 grid-rows-[auto_minmax(0,1fr)] bg-page px-pane"
-          : "col-span-full row-[1/3] grid min-h-0 grid-cols-subgrid grid-rows-subgrid transition-opacity duration-page",
+          : "col-span-full row-[1/3] grid min-h-0 grid-cols-subgrid grid-rows-subgrid",
       ]}
       data-side="left"
       role={sheet ? "region" : undefined}
