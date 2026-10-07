@@ -24,7 +24,11 @@
   import type { Address, DocumentVersion } from "../../wire";
   import Button from "../parts/button.svelte";
   import Empty from "../parts/empty.svelte";
+  import { editorWire } from "./editor";
+  import Editor from "./editor.look.svelte";
   import { Gathered } from "./gathered.svelte";
+  import { sideWire, type PairLook } from "./pair";
+  import Pair from "./pair.look.svelte";
   import type { Session } from "./session.svelte";
   import { short } from "./reading";
   import { saveFile } from "./saved_file";
@@ -88,6 +92,21 @@
     to = value;
   }
 
+  // The two lists, from and to, each offering every side.
+  const pair: PairLook = $derived({
+    sides: [
+      { key: "from", label: say($lang, "refrain_from"), held: left ?? "", pick: pickFrom },
+      { key: "to", label: say($lang, "refrain_to"), held: right ?? "", pick: pickTo },
+    ].map((side) => ({
+      key: side.key,
+      label: side.label,
+      held: side.held,
+      options: sides.map((each) => ({ value: each.value, label: each.label, disabled: !each.kept })),
+      wire: sideWire(side.label, side.pick),
+    })),
+    more: read.kind === "held" && read.value.more ? say($lang, "refrain_versions_more") : null,
+  });
+
   const format = $derived(session.file?.kind === "text" ? session.file.gathering.format : "plain");
   const leftText = new Gathered(u.conn.asking);
   const rightText = new Gathered(u.conn.asking);
@@ -121,6 +140,9 @@
   const nameOfSide = (value: string | null): string => sides.find((each) => each.value === value)?.label ?? "";
 
   let host = $state<HTMLDivElement>();
+  const wire = editorWire((box) => {
+    host = box;
+  });
 
   $effect(() => {
     const parent = host;
@@ -157,28 +179,7 @@
 {:else if choosable.length < 2}
   <Empty missing="refrain_versions_one" />
 {:else}
-  <!-- Two native lists rather than rows of cells: a version's name, where
-       it came from and when do not fit an equal cell (frontend-method). -->
-  <div class="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-base gap-y-snug border-b border-edge px-wide py-snug">
-    {#each [{ key: "refrain_from" as const, held: left, set: pickFrom }, { key: "refrain_to" as const, held: right, set: pickTo }] as side (side.key)}
-      <span class="text-note text-text-faint">{say($lang, side.key)}</span>
-      <select
-        class="h-control-sm w-full min-w-0 rounded-control border border-edge-input bg-raised px-snug text-note text-text"
-        aria-label={say($lang, side.key)}
-        value={side.held ?? ""}
-        onchange={(event) => {
-          side.set(event.currentTarget.value);
-        }}
-      >
-        {#each sides as each (each.value)}
-          <option value={each.value} disabled={!each.kept}>{each.label}</option>
-        {/each}
-      </select>
-    {/each}
-    {#if read.kind === "held" && read.value.more}
-      <p class="col-span-2 text-note text-text-faint">{say($lang, "refrain_versions_more")}</p>
-    {/if}
-  </div>
+  <Pair {...pair} />
   {#if lost}
     <p class="p-pane text-note text-text-quiet">{say($lang, "refrain_version_lost")}</p>
   {:else if a === null || b === null}
@@ -189,6 +190,6 @@
     <div class="flex justify-end border-b border-edge px-wide py-tight">
       <Button label={say($lang, "refrain_export_comparison")} tone="quiet" onPress={exportComparison} />
     </div>
-    <div class="refrain-editor min-h-0 flex-1" bind:this={host}></div>
+    <Editor {wire} />
   {/if}
 {/if}

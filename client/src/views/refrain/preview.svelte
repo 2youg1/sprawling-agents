@@ -22,6 +22,7 @@
   import Empty from "../parts/empty.svelte";
   import Unanswered from "../parts/unanswered.svelte";
   import Laid from "./laid.svelte";
+  import Line from "./line.look.svelte";
   import { short } from "./reading";
 
   interface Props {
@@ -117,9 +118,9 @@
 
 <div class="min-h-0 flex-1 overflow-y-auto" bind:this={scroller} onscroll={scrolled}>
   {#if drafted}
-    <p class="refrain-line text-note text-text-faint">
+    <Line tone="faint">
       {fill(say($lang, "refrain_preview_draft"), { version: short(positions.version) })}
-    </p>
+    </Line>
   {/if}
   {#if unsupported !== null}
     <p class="p-pane text-note text-text-quiet">{fill(say($lang, "refrain_preview_unsupported"), { encoding: unsupported })}</p>

@@ -11,8 +11,10 @@
   // changes on it, and handed to the session. Imported lazily by
   // `document.svelte`, so the editor's chunk is fetched with the first
   // document a person opens.
-  import { onMount } from "svelte";
+  import { untrack } from "svelte";
 
+  import { editorWire } from "./editor";
+  import Editor from "./editor.look.svelte";
   import { openEditor } from "./editing";
   import type { Session } from "./session.svelte";
 
@@ -24,28 +26,39 @@
 
   const { session, label, phrases }: Props = $props();
 
-  let host: HTMLDivElement;
+  let host = $state<HTMLDivElement>();
+  const wire = editorWire((box) => {
+    host = box;
+  });
 
-  onMount(() => {
-    const opening = session.opening;
-    if (opening === null) return undefined;
-    const editing = openEditor({
-      parent: host,
-      text: opening.text,
-      changes: opening.changes,
-      label,
-      phrases,
-      onEdit: () => {
-        session.edited();
-      },
-      onSave: () => {
-        session.save();
-      },
+  // The view is built once the box is drawn, from the opening the
+  // session held then; nothing it reads afterwards rebuilds it, because a
+  // rebuilt view would drop the cursor, the undo history and a
+  // composition in progress.
+  $effect(() => {
+    const parent = host;
+    if (parent === undefined) return undefined;
+    return untrack(() => {
+      const opening = session.opening;
+      if (opening === null) return undefined;
+      const editing = openEditor({
+        parent,
+        text: opening.text,
+        changes: opening.changes,
+        label,
+        phrases,
+        onEdit: () => {
+          session.edited();
+        },
+        onSave: () => {
+          session.save();
+        },
+      });
+      session.attach(editing);
+      return () => {
+        editing.destroy();
+      };
     });
-    session.attach(editing);
-    return () => {
-      editing.destroy();
-    };
   });
 
   $effect(() => {
@@ -53,4 +66,4 @@
   });
 </script>
 
-<div class="refrain-editor min-h-0 flex-1" bind:this={host}></div>
+<Editor {wire} />

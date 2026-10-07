@@ -19,6 +19,8 @@
   import { fill, say } from "../../core/lang";
   import { BUILT_IN_THEME, type Theme } from "../../core/theme_override";
   import { ui } from "../../ui";
+  import { editorWire } from "../refrain/editor";
+  import Editor from "../refrain/editor.look.svelte";
   import type { Editing } from "../refrain/editing";
   import { phrasesIn } from "../refrain/reading";
   import Button from "../parts/button.svelte";
@@ -36,6 +38,9 @@
   let drawn = $state<Readonly<Record<string, string>>>({});
   let warnings = $state<readonly string[]>([]);
   let host = $state<HTMLDivElement | undefined>(undefined);
+  const wire = editorWire((box) => {
+    host = box;
+  });
   let editing: Editing | undefined;
 
   onMount(() => {
@@ -156,11 +161,12 @@
     <div class="flex flex-col gap-tight rounded-card bg-raised px-base py-snug">
       <span class="text-label font-label text-text">{say($lang, "colours_css")}</span>
       <p class="text-note text-text-faint">{say($lang, "colours_css_note")}</p>
-      <!-- The editor is RefRain's, so it takes RefRain's dress: outside a
-      `refrain` box CodeMirror falls back to its own light theme and
-      paints the active line's gutter as a light block on a dark page. -->
-      <div class="refrain">
-        <div bind:this={host} class="refrain-editor h-output overflow-auto rounded-control border border-edge-input"></div>
+      <!-- The editor is RefRain's, so it is mounted in RefRain's box and
+      takes its dress: outside it CodeMirror falls back to its own light
+      theme and paints the active line's gutter as a light block on a
+      dark page. -->
+      <div class="flex h-output flex-col overflow-hidden rounded-control border border-edge-input">
+        <Editor {wire} />
       </div>
       <div class="flex justify-end">
         <Button label={say($lang, "colours_css_apply")} onPress={applyCss} />
