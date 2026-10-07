@@ -30,7 +30,7 @@
 
   import { enrol } from "../../../core/enrol";
   import { ui } from "../../../ui";
-  import { freshEditor, leave, refuse, settle } from "./account_editor";
+  import { awaits, freshEditor, leave, refuse, settle } from "./account_editor";
   import type { Editor, Hands, Step } from "./account_editor";
   import { lookOf } from "./accounts";
   import type { Holds } from "./accounts";
@@ -93,7 +93,7 @@
   });
   $effect(() => {
     const refused = $belief.refusal;
-    if (refused === null || editor.sent === null) return;
+    if (refused === null || !awaits(editor)) return;
     refuse(editor, refused);
     u.conn.dismissRefusal();
   });

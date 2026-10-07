@@ -72,18 +72,24 @@ impl crate::Connectors for Residents {
 }
 
 impl Keyed {
-    /// Whether one of the pairs this server is started or reached with
-    /// names `reference`, read by the grammar redemption reads it with.
     fn carries(&self, reference: &kernel::SecretRef) -> bool {
-        let pairs = match &self.server.transport {
-            kernel::McpTransport::Stdio { env, .. } => env,
-            kernel::McpTransport::Http { headers, .. }
-            | kernel::McpTransport::Sse { headers, .. } => headers,
-        };
-        pairs.iter().any(|(_, value)| {
-            kernel::SecretRef::parse(value.trim()).is_ok_and(|named| named == *reference)
-        })
+        names(&self.server, reference)
     }
+}
+
+/// Whether one of the pairs `server` is started or reached with names
+/// `reference`, read by the grammar redemption reads it with. The one
+/// answer for a connection to drop and for a key to stay in the vault.
+pub(in crate::worker) fn names(server: &kernel::McpServer, reference: &kernel::SecretRef) -> bool {
+    let pairs = match &server.transport {
+        kernel::McpTransport::Stdio { env, .. } => env,
+        kernel::McpTransport::Http { headers, .. } | kernel::McpTransport::Sse { headers, .. } => {
+            headers
+        }
+    };
+    pairs.iter().any(|(_, value)| {
+        kernel::SecretRef::parse(value.trim()).is_ok_and(|named| named == *reference)
+    })
 }
 
 impl Residents {

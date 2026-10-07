@@ -15,7 +15,7 @@ import type { Attachment } from "svelte/attachments";
 import { fill, say } from "../../../core/lang";
 import type { Key } from "../../../core/lang";
 import type { AccountRetries, AxError, KeyState } from "../../../wire";
-import { cancel, edit, input, move, pickRetries, remove, save, shown, shownRetries, unsaveable } from "./account_editor";
+import { cancel, edit, forget, input, move, pickRetries, remove, save, shown, shownRetries, unsaveable } from "./account_editor";
 import type { Editor, Hands, Roster, Step } from "./account_editor";
 
 export type Control = "up" | "down" | "edit" | "remove";
@@ -81,6 +81,9 @@ export interface AccountsLook {
   readonly route: string;
   readonly save: { readonly label: string; readonly why: string | undefined; readonly loading: boolean; readonly press: () => void };
   readonly cancel: { readonly label: string; readonly press: () => void } | undefined;
+  // Offered right after an account whose key the vault holds was
+  // removed: the key stays in the vault unless this is pressed.
+  readonly forget: { readonly text: string; readonly label: string; readonly press: () => void } | undefined;
   readonly note: string | undefined;
   readonly refused: AxError | undefined;
 }
@@ -213,6 +216,16 @@ export function lookOf(editor: Editor, hands: Hands, holds: Holds): AccountsLook
       },
     },
     cancel: editor.editing === null ? undefined : { label: say(lang, "setup_account_cancel"), press: () => { cancel(editor); } },
+    forget:
+      editor.removed === null
+        ? undefined
+        : {
+            text: fill(say(lang, "setup_account_forget_offer"), { id: editor.removed.id }),
+            label: say(lang, "setup_account_forget"),
+            press: () => {
+              forget(editor, hands);
+            },
+          },
     note: editor.note ?? undefined,
     refused: editor.refused ?? undefined,
   };

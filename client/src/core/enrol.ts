@@ -8,6 +8,8 @@
 // cannot spell a secret; what comes back is the reference to put in
 // the attach form, and the value itself is never held past the send.
 
+import type { Command } from "../wire";
+import { mintIdem } from "./idem";
 import type { Lang } from "./lang";
 import { say } from "./lang";
 import { bearing } from "./socket";
@@ -95,6 +97,14 @@ export function searchReferenceFor(supplier: string, account: string): SecretAt 
 
 function accountName(owner: string, account: string): string {
   return `${owner}.${account}`;
+}
+
+// The vault's other door: the value filed under `reference` deleted. It
+// is a command rather than a route because it carries no secret; the
+// city refuses it while an endpoint or a configuration still names the
+// reference, and for a key the environment supplies (gateway D33).
+export function forgetSecret(reference: string): Command {
+  return { forget_secret: { reference, idem: mintIdem() } };
 }
 
 // How a place in the vault is spelled, in the one grammar

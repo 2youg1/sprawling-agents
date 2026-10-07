@@ -4790,6 +4790,18 @@ export const RulesWrite = Schema.Struct({
 export type RulesWrite = typeof RulesWrite.Type;
 
 /**
+ * What `ForgetSecret` carries: the vault reference whose key is deleted, spelled
+ * `secret:realm/name`. Refused while an attached endpoint or a configuration still names the
+ * reference, and for a key the environment supplies (gateway D33); writes nothing to the ledger
+ * (`crates/accounting/spec/Worker.lean` §8-37).
+ */
+export const SecretForgetting = Schema.Struct({
+  idem: IdemKey,
+  reference: Schema.String,
+}).annotate({ identifier: "SecretForgetting" });
+export type SecretForgetting = typeof SecretForgetting.Type;
+
+/**
  * A display name for the session of `room` that began at `began`; an
  * empty name takes it back (`crates/wire/spec/Answer/Sessions.lean` D27).
  */
@@ -5111,10 +5123,7 @@ export const Command = Schema.Union([
     close_remote_door: DoorStep,
   }),
   Schema.Struct({
-    forget_secret: Schema.Struct({
-      idem: IdemKey,
-      reference: Schema.String,
-    }),
+    forget_secret: SecretForgetting,
   }),
   Schema.Struct({
     auth: Schema.Struct({

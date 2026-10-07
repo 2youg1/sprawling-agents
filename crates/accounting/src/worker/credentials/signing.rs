@@ -13,8 +13,9 @@
 
 use std::sync::Arc;
 
+use kernel::config::SearchConfiguration;
 use kernel::event::record::SecretCaptured;
-use kernel::{AxError, EventKind, Payload};
+use kernel::{AxCode, AxError, EventKind, Payload, SecretRef};
 
 use crate::held_vault::{poisoned_vault, resolving};
 
@@ -72,12 +73,78 @@ impl RunWorker {
         self.record(EventKind::SecretCaptured, Payload::of(&captured)?)
     }
 
-    /// Deletes one reference's key from the vault (`crates/accounting/spec/Worker.lean` §8-37).
+    /// Deletes one reference's key from the vault, once nothing the city
+    /// reads names it (`crates/accounting/spec/Worker.lean` §8-37).
+    ///
+    /// Nothing is recorded: no fold reads that a reference once held a
+    /// value, and the book and the configuration, which say who uses
+    /// which reference, stopped naming it before this.
     ///
     /// # Errors
-    /// Not yet written.
+    /// The reference grammar's refusal; `E_CONFIG_INVALID` naming the
+    /// first place that still names the reference; a configuration that
+    /// cannot be read; the custodian's refusal of a key the environment
+    /// supplies; a poisoned vault lock.
     pub(in crate::worker) fn forget_secret(&mut self, reference: &str) -> Result<(), AxError> {
-        kernel::SecretRef::parse(reference).map(|_| ())
+        let reference = kernel::SecretRef::parse(reference)?;
+        if let Some(holder) = self.named_by(&reference)? {
+            return Err(AxError::failure(
+                AxCode::ConfigInvalid,
+                "forget credential",
+                format!("{reference} is still named by {holder}"),
+            )
+            .with_recovery(format!(
+                "remove {reference} from {holder} first, then forget the key"
+            )));
+        }
+        self.credentials
+            .vault
+            .lock()
+            .map_err(|_| poisoned_vault())?
+            .forget(&reference)?;
+        // Same reason as `put_secret`: a standing connection redeemed the
+        // key when it opened and still carries it.
+        self.connectors.invalidate(&reference);
+        Ok(())
+    }
+
+    /// The first place the city reads that names `reference`: an attached
+    /// endpoint, the city's own `[search]`, then what each building's
+    /// configuration puts in force. A room's own layer is not read; a
+    /// room that names a forgotten key is told so by its next run.
+    fn named_by(&self, reference: &kernel::SecretRef) -> Result<Option<String>, AxError> {
+        if let Some(endpoint) = self
+            .credentials
+            .book
+            .endpoints()
+            .find(|endpoint| endpoint.references().contains(&reference))
+        {
+            return Ok(Some(format!("provider `{}`", endpoint.name)));
+        }
+        if let Some(supplier) = city::city_search(&self.city_root)?
+            .as_ref()
+            .and_then(|search| supplier_naming(search, reference))
+        {
+            return Ok(Some(format!("the city's [search] supplier `{supplier}`")));
+        }
+        for building in city::buildings(&self.city_root)? {
+            let frozen = city::load_config(&self.city_root, &building)?;
+            let at = building.as_str();
+            if let Some(server) = frozen
+                .mcp
+                .iter()
+                .find(|server| super::super::mcp::names(server, reference))
+            {
+                return Ok(Some(format!(
+                    "[[mcp]] `{}` at `{at}`",
+                    server.label.as_str()
+                )));
+            }
+            if let Some(supplier) = supplier_naming(&frozen.search, reference) {
+                return Ok(Some(format!("[search] supplier `{supplier}` at `{at}`")));
+            }
+        }
+        Ok(None)
     }
 
     /// The redemption closure the adapters take: one resolve per call,
@@ -95,5 +162,22 @@ impl RunWorker {
     /// one path rather than two.
     pub fn vault_handle(&self) -> Arc<std::sync::Mutex<gateway::Custodian>> {
         Arc::clone(&self.credentials.vault)
+    }
+}
+
+/// The id of the `[search]` supplier one of whose accounts calls with
+/// `reference`, if any.
+fn supplier_naming<'a>(search: &'a SearchConfiguration, reference: &SecretRef) -> Option<&'a str> {
+    match search {
+        SearchConfiguration::Custom { suppliers, .. } => suppliers
+            .iter()
+            .find(|supplier| {
+                supplier
+                    .accounts
+                    .iter()
+                    .any(|account| account.reference.as_ref() == Some(reference))
+            })
+            .map(|supplier| supplier.id.as_str()),
+        SearchConfiguration::Default | SearchConfiguration::Off => None,
     }
 }

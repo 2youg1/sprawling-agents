@@ -211,7 +211,7 @@ impl RunWorker {
                 value,
                 crate::worker::credentials::signing::Arrival::Enrolment,
             ),
-            wire::Command::ForgetSecret { reference, .. } => self.forget_secret(&reference),
+            wire::Command::ForgetSecret(forgetting) => self.forget_secret(&forgetting.reference),
             wire::Command::CreateBuilding { addr, template, .. } => {
                 self.create_building(addr, template.as_str())
             }

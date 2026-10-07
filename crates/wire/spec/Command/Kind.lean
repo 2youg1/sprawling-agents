@@ -244,7 +244,7 @@ def Command.reach : Command → Reach
   | .ConfirmRemoteDoor => .client
   -- 立刻关远程门，结束每一个远程会话；不要守卫，因为关门只减少访问（remote_access D5）
   | .CloseRemoteDoor => .client
-  -- 从 vault 删掉一个引用的 Key：`reference: String`（`secret:realm/name`）、`idem`。还有端点或配置在用它就拒，环境变量提供的拒并说要 unset 哪个（gateway D33）；不写账本。控件是账号编辑器移除账号之后的「同时删除 Key」（client D92）
+  -- 从 vault 删掉一个引用的 Key：载荷 `wire::SecretForgetting` 带 `reference: String`（`secret:realm/name`）与 `idem`。还有端点或配置在用它就拒，环境变量提供的拒并说要 unset 哪个（gateway D33）；不写账本。控件是账号编辑器移除账号之后的「同时删除 Key」（client D92）
   | .ForgetSecret => .client
 
 /-! D6 动词类是 §19-2 的一列，由中继的穷尽匹配实现、门机器对照

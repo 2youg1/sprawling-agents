@@ -3407,6 +3407,18 @@
     "en": "Each search starts from the first usable account in this list; the order decides which account is asked first and where a search goes after an account fails.",
     "zh": "每次搜索都从列表里第一个可用的账号开始；顺序决定先问哪个账号，以及一个账号出错后换到哪个。"
   },
+  "setup_account_forget_offer": {
+    "en": "the key of {id} is still in the vault",
+    "zh": "{id} 的 Key 还在 vault 里"
+  },
+  "setup_account_forget": {
+    "en": "delete the key too",
+    "zh": "同时删除 Key"
+  },
+  "setup_account_forget_sent": {
+    "en": "deleting the key; the city refuses while something else still names it",
+    "zh": "正在删除 Key；还有别处在用它时城会拒绝"
+  },
   "setup_account_retries": {
     "en": "retries on one account",
     "zh": "同一账号的重试次数"

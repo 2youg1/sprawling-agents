@@ -282,6 +282,40 @@ describe("the order of the accounts", () => {
   });
 });
 
+describe("the key of a removed account", () => {
+  const holds = { heading: () => undefined, control: () => () => undefined };
+
+  test("is offered for deletion after the list that no longer names it, and the deletion follows that list", () => {
+    const { editor, hands, sent } = rig();
+    wiring.remove(editor, hands, "main");
+    const offer = lookOf(editor, hands, holds).forget;
+    expect(offer?.text).toBe(say("en", "setup_account_forget_offer").replace("{id}", "main"));
+    offer?.press();
+    expect({
+      frames: sent.map((command) => Object.keys(command)[0]),
+      forgotten: sent.map((command) => ("forget_secret" in command ? command.forget_secret.reference : null)).at(-1),
+      awaits: wiring.awaits(editor),
+      offer: lookOf(editor, hands, holds).forget,
+    }).toEqual({
+      frames: ["attach_endpoint", "forget_secret"],
+      forgotten: "secret:providers/house.main",
+      awaits: true,
+      offer: undefined,
+    });
+  });
+
+  test("is not offered for a key the vault does not hold, and the offer goes with the next change", () => {
+    const { editor, hands } = rig({ ...ENDPOINT, tuning: { ...ENDPOINT.tuning, accounts: [account("main"), account("spare"), account("third")] } });
+    wiring.remove(editor, hands, "spare");
+    expect(lookOf(editor, hands, holds).forget).toBeUndefined();
+    wiring.remove(editor, hands, "main");
+    expect(lookOf(editor, hands, holds).forget).not.toBeUndefined();
+    typed(editor, "fourth", "");
+    wiring.save(editor, hands);
+    expect(lookOf(editor, hands, holds).forget).toBeUndefined();
+  });
+});
+
 describe("the retry count on one account", () => {
   const holds = { heading: () => undefined, control: () => () => undefined };
 

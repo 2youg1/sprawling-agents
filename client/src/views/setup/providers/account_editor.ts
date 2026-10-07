@@ -19,6 +19,7 @@
 
 import { Schema } from "effect";
 
+import { forgetSecret } from "../../../core/enrol";
 import type { Enrolling, Enrolment, SecretAt } from "../../../core/enrol";
 import { say } from "../../../core/lang";
 import type { Key, Lang } from "../../../core/lang";
@@ -96,6 +97,13 @@ export interface Sent {
   readonly against: string;
 }
 
+// An account just removed whose key the vault still holds: the editor
+// offers to delete the key, and the offer stands until the next press.
+export interface Removed {
+  readonly id: string;
+  readonly reference: string;
+}
+
 export interface Editor {
   draft: AccountDraft;
   // The id of the account the form is editing; null while adding.
@@ -104,6 +112,9 @@ export interface Editor {
   refused: AxError | null;
   pending: Filing | null;
   sent: Sent | null;
+  removed: Removed | null;
+  // A deletion was sent, so a refusal that arrives is this editor's.
+  forgetting: boolean;
 }
 
 // Where the city and pairing the page talks to stand right now.
@@ -130,7 +141,7 @@ export interface Hands {
 const BLANK: AccountDraft = { id: "", reference: "", header: "", key: "" };
 
 export function freshEditor(): Editor {
-  return { draft: BLANK, editing: null, note: null, refused: null, pending: null, sent: null };
+  return { draft: BLANK, editing: null, note: null, refused: null, pending: null, sent: null, removed: null, forgetting: false };
 }
 
 const labelled = Schema.is(ServerLabel);
@@ -156,12 +167,21 @@ export function settle(editor: Editor, roster: Roster): void {
 // says why beside it.
 export function refuse(editor: Editor, error: AxError): void {
   editor.sent = null;
+  editor.forgetting = false;
   editor.refused = error;
 }
 
-// Leaving the editor: a key still on its way lands nowhere.
+// Whether a refusal that arrived now answers something this editor sent.
+export function awaits(editor: Editor): boolean {
+  return editor.sent !== null || editor.forgetting;
+}
+
+// Leaving the editor: a key still on its way lands nowhere, and a
+// refusal that arrives later is no longer this editor's to show, since
+// the city answers a deletion that succeeds with nothing.
 export function leave(editor: Editor): void {
   editor.pending = null;
+  editor.forgetting = false;
 }
 
 export function input(editor: Editor, part: keyof AccountDraft, value: string): void {
@@ -249,14 +269,38 @@ export function move(editor: Editor, hands: Hands, id: string, step: Step): void
 
 export function remove(editor: Editor, hands: Hands, id: string): void {
   if (editor.pending !== null) return;
-  const rows = shown(editor, hands.roster());
+  const roster = hands.roster();
+  const rows = shown(editor, roster);
   if (rows.length <= 1) return;
+  const reference = rows.find((row) => row.id === id)?.reference ?? null;
+  const stored = roster.keys.some((status) => status.id === id && status.key === "stored");
   if (!commit(editor, hands, rows.filter((row) => row.id !== id))) return;
+  // Only a key the vault holds is offered: one the environment supplies
+  // is refused by the city (gateway D33), and an anonymous account has
+  // none.
+  editor.removed = reference !== null && stored ? { id, reference } : null;
   if (editor.editing === id) {
     editor.editing = null;
     editor.draft = BLANK;
   }
   hands.focusHeading();
+}
+
+// Deletes the key of the account just removed. Sent after the list that
+// no longer names it, on the same link, so the city reads the two in
+// that order; were the list refused, this is refused too, because the
+// reference is still named.
+export function forget(editor: Editor, hands: Hands): void {
+  const removed = editor.removed;
+  if (removed === null) return;
+  if (!hands.send(forgetSecret(removed.reference))) {
+    editor.note = say(hands.lang(), "setup_account_not_sent");
+    return;
+  }
+  editor.removed = null;
+  editor.forgetting = true;
+  editor.refused = null;
+  editor.note = say(hands.lang(), "setup_account_forget_sent");
 }
 
 // Picks the per-account retry count: the same frame, the list as drawn.
@@ -282,6 +326,8 @@ function commit(
   }
   editor.note = null;
   editor.refused = null;
+  editor.removed = null;
+  editor.forgetting = false;
   editor.sent = { rows, retries, against: roster.stamp };
   return true;
 }

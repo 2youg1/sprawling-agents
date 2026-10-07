@@ -628,10 +628,10 @@ title = \"a window\"
             idem,
         }),
         Command::CloseRemoteDoor(wire::DoorStep { idem }),
-        Command::ForgetSecret {
+        Command::ForgetSecret(wire::SecretForgetting {
             reference: "secret:search/brave.main".to_owned(),
             idem,
-        },
+        }),
     ]
 }
 

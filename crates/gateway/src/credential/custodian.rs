@@ -218,12 +218,7 @@ impl Custodian {
             ));
         }
         let key = env_key(reference);
-        let shaded = match (self.env)(&key) {
-            Ok(value) => !value.is_empty(),
-            Err(std::env::VarError::NotUnicode(_)) => true,
-            Err(std::env::VarError::NotPresent) => false,
-        };
-        if shaded {
+        if self.shaded(&key) {
             return Err(AxError::failure(
                 AxCode::ConfigInvalid,
                 "store credential",
@@ -273,12 +268,39 @@ impl Custodian {
         }
     }
 
-    /// Deletes the stored value of `reference` (gateway D33).
+    /// Deletes the stored value of `reference`; a value that was never
+    /// stored is already forgotten (gateway D33).
     ///
     /// # Errors
-    /// Not yet written.
+    /// `E_CONFIG_INVALID` naming the variable when the environment
+    /// supplies this key: deleting the stored copy while the variable
+    /// still answers would read as done and change nothing. Propagates
+    /// the store's own refusal to delete.
     pub fn forget(&mut self, reference: &SecretRef) -> Result<(), AxError> {
-        self.backend.get(reference).map(|_| ())
+        let key = env_key(reference);
+        if self.shaded(&key) {
+            return Err(AxError::failure(
+                AxCode::ConfigInvalid,
+                "forget credential",
+                format!("{reference} is supplied by the environment variable {key}"),
+            )
+            .with_recovery(format!(
+                "unset {key} in the environment the city starts from; \
+                 the stored copy is kept until then"
+            )));
+        }
+        self.backend.delete(reference)
+    }
+
+    /// Whether the environment variable `key` shades the store: set to
+    /// something, or set to a value that is not Unicode (gateway D24).
+    /// `set` and `forget` both refuse on it.
+    fn shaded(&self, key: &str) -> bool {
+        match (self.env)(key) {
+            Ok(value) => !value.is_empty(),
+            Err(std::env::VarError::NotUnicode(_)) => true,
+            Err(std::env::VarError::NotPresent) => false,
+        }
     }
 
     /// State you can render; the value stays unreachable.

@@ -84,6 +84,12 @@
       {/each}
     </ol>
   {/if}
+  {#if look.forget !== undefined}
+    <p class="controls">
+      <span class="quiet">{look.forget.text}</span>
+      <button type="button" class="control" onclick={look.forget.press}>{look.forget.label}</button>
+    </p>
+  {/if}
   {#if look.retries !== undefined}
     <fieldset class="retries">
       <legend>{look.retries.label}</legend>

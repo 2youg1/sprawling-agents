@@ -65,6 +65,12 @@
       {/each}
     </ol>
   {/if}
+  {#if look.forget !== undefined}
+    <div class="flex flex-wrap items-center gap-snug text-note">
+      <span class="text-text-quiet">{look.forget.text}</span>
+      <Button tone="quiet" label={look.forget.label} onPress={look.forget.press} />
+    </div>
+  {/if}
   {#if look.retries !== undefined}
     <div class="flex flex-col gap-tight">
       <span class="text-note text-text-quiet">{look.retries.label}</span>

@@ -16,10 +16,10 @@ fn forget(rig: &mut Rig, reference: &str) -> Result<(), AxError> {
     rig.sent = rig.sent.saturating_add(1);
     let idem = IdemKey::derive(&RunId::CITY, Seq::FIRST, &rig.sent.to_be_bytes());
     rig.worker
-        .handle(wire::Command::ForgetSecret {
+        .handle(wire::Command::ForgetSecret(wire::SecretForgetting {
             reference: reference.to_owned(),
             idem,
-        })
+        }))
         .map(|_| ())
 }
 
