@@ -10,18 +10,17 @@
   // ended, its room, its task, and what it produced or why it stopped.
   // Only `FIRST` runs of an outcome are drawn and the tab keeps the whole
   // count, so the page costs the same for a city of ten runs as for a
-  // city of thousands (core/results.ts).
-  import Glyph from "../parts/glyph.svelte";
-  import { OUTCOME_GLYPH, OUTCOME_INK } from "../shared/outcome";
-  import { hhmm } from "../../core/time";
+  // city of thousands (core/results.ts). This file is the seat: the
+  // filter and the count above the list, and `./results.ts`'s value
+  // handed to whatever `./results.look.svelte` is.
+  import { fill, say } from "../../core/lang";
+  import { FIRST, bandsOf, resultsOf } from "../../core/results";
+  import type { Outcome } from "../../core/results";
+  import { ui } from "../../ui";
   import Segmented from "../parts/segmented.svelte";
   import type { Choice } from "../parts/segmented";
-  import Produced from "./produced.svelte";
-  import { fill, say } from "../../core/lang";
-  import { FIRST, bandsOf, outcomeOf, resultsOf } from "../../core/results";
-  import type { Outcome } from "../../core/results";
-  import { toFragment } from "../../core/route";
-  import { ui } from "../../ui";
+  import { resultsLookOf } from "./results";
+  import Look from "./results.look.svelte";
 
   type Tab = "all" | Outcome;
 
@@ -71,43 +70,7 @@
       }}
     />
   </div>
-  {#if bands.length === 0}
-    <p class="mt-wide text-note text-text-faint">{say($lang, "results_none")}</p>
-  {/if}
-  {#each bands as band (band.recency)}
-    <section class="mt-wide" aria-label={say($lang, `results_${band.recency}`)}>
-      <h2 class="mb-tight border-b border-edge pb-tight text-note text-text-quiet">
-        {say($lang, `results_${band.recency}`)}
-        <span class="text-text-faint">{band.runs.length}</span>
-      </h2>
-      <ul>
-        {#each band.runs as run (run.run)}
-          {@const outcome = outcomeOf(run)}
-          <li class="border-b border-l-2 border-b-edge {outcome === 'waiting' ? 'border-l-alert' : 'border-l-transparent'}">
-            <a
-              href={toFragment({ kind: "run", run: run.run })}
-              class="flex items-baseline gap-base px-tight py-snug text-note hover:bg-chrome"
-            >
-              <span class="w-figure shrink-0 font-mono text-text-faint">{run.started === null ? "" : hhmm(run.started)}</span>
-              {#if outcome !== null}
-                <span class="shrink-0 self-center {OUTCOME_INK[outcome]}"><Glyph name={OUTCOME_GLYPH[outcome]} size="sm" /></span>
-              {/if}
-              <span class="w-output shrink-0 truncate font-mono text-text-quiet">{run.addr ?? ""}</span>
-              <span class="min-w-0 flex-1 truncate text-body text-text">{run.task ?? run.run}</span>
-              {#if outcome === "done"}
-                <Produced run={run.run} />
-                {#if run.pr !== null}
-                  <span class="shrink-0 text-text-quiet">{fill(say($lang, "results_row_pr"), { pr: run.pr })}</span>
-                {/if}
-              {:else if outcome === "waiting" && run.ask !== null}
-                <span class="min-w-0 shrink truncate text-text">{fill(say($lang, "results_row_ask"), { ask: run.ask })}</span>
-              {:else if outcome === "failed" && run.doing.kind === "frozen" && run.doing.completion !== null}
-                <span class="shrink-0 text-text-quiet">{run.doing.completion}</span>
-              {/if}
-            </a>
-          </li>
-        {/each}
-      </ul>
-    </section>
-  {/each}
+  <div class="mt-wide">
+    <Look {...resultsLookOf(bands, $lang)} />
+  </div>
 </div>

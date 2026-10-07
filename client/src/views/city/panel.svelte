@@ -70,7 +70,7 @@
   </div>
   <a
     href={toFragment({ kind: "building", address: addr })}
-    class="inline-flex h-control items-center self-start rounded-control bg-raised px-base text-label hover:bg-raised-hover"
+    class="inline-flex h-control items-center self-start rounded-control bg-raised px-base text-label transition-colors ease-leave hover:bg-raised-hover hover:ease-arrive"
   >
     {say($lang, "city_enter")}
   </a>
@@ -109,7 +109,7 @@
           <li class="border-b border-edge py-snug">
             <a
               href={toFragment({ kind: "run", run: run.run })}
-              class="flex items-center gap-snug hover:text-text"
+              class="group flex items-center gap-snug"
             >
               <span
                 class={[
@@ -117,7 +117,7 @@
                   run.doing.kind === "frozen" ? "bg-mark" : "bg-accent",
                 ]}
               ></span>
-              <span class="min-w-0 flex-1 truncate text-text-quiet">{run.task ?? run.run}</span>
+              <span class="min-w-0 flex-1 truncate text-text-quiet transition-colors ease-leave group-hover:text-text group-hover:ease-arrive">{run.task ?? run.run}</span>
               {#if run.started !== null}
                 <span class="shrink-0 text-text-faint">{clock($lang, run.started)}</span>
               {/if}
