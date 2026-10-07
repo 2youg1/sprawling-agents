@@ -26,6 +26,7 @@
   import HtmlPreview from "./formats/html.svelte";
   import Opaque from "./formats/opaque.svelte";
   import Head from "./head.svelte";
+  import Line from "./line.look.svelte";
   import Preview from "./preview.svelte";
   import Proposals from "./proposals.svelte";
   import { Session } from "./session.svelte";
@@ -136,41 +137,42 @@
 <div class="refrain flex min-h-0 flex-1 flex-col bg-page">
   <Head
     {at}
-    {building}
     {session}
     {reading}
     previewed={markdown || html}
     onPick={pick}
   />
   {#if session.locked !== null && session.file?.kind === "text"}
-    <p class="refrain-line text-note text-text-faint">{lockedLine(session.locked)}</p>
+    <Line tone="faint">{lockedLine(session.locked)}</Line>
   {/if}
   {#if session.receipt.kind === "refused"}
-    <p class="refrain-line text-note text-alert">{session.receipt.error.recovery}</p>
+    <Line tone="alert">{session.receipt.error.recovery}</Line>
   {:else if session.receipt.kind === "pending"}
-    <p class="refrain-line text-note text-text-faint">{say($lang, "refrain_receipt_pending_why")}</p>
+    <Line tone="faint">{say($lang, "refrain_receipt_pending_why")}</Line>
   {/if}
   {#if $unkept && drafted}
-    <div class="refrain-line"><Unkept words={() => session.editing?.text() ?? ""} /></div>
+    <Line tone="alert"><Unkept words={() => session.editing?.text() ?? ""} /></Line>
   {/if}
   {#if session.lostDraft !== null}
-    <p class="refrain-line text-note text-alert">
+    <Line tone="alert">
       {fill(say($lang, "refrain_draft_lost"), { version: short(session.lostDraft) })}
-    </p>
+    </Line>
   {/if}
   {#if reading === "diff" && session.positions !== null && (session.receipt.kind === "clean" || session.receipt.kind === "saved")}
-    <p class="refrain-line text-note text-text-faint">
+    <Line tone="faint">
       {fill(say($lang, "refrain_diff_same"), { version: short(session.positions.version) })}
-    </p>
+    </Line>
   {/if}
   {#if session.receipt.kind === "conflict"}
-    <Conflict
-      {name}
-      {session}
-      onCompare={() => {
-        pick("versions");
-      }}
-    />
+    <div class="px-wide py-snug">
+      <Conflict
+        {name}
+        {session}
+        onCompare={() => {
+          pick("versions");
+        }}
+      />
+    </div>
   {/if}
   <Proposals doc={at} {unshowable} onShow={show} />
   {#if session.read.kind === "asking"}

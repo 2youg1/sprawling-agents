@@ -19,6 +19,8 @@
   import { ui } from "../../../ui";
   import type { B3Hash } from "../../../wire";
   import Button from "../../parts/button.svelte";
+  import { editorWire } from "../editor";
+  import Editor from "../editor.look.svelte";
   import { phrasesIn, short } from "../reading";
   import { saveFile } from "../saved_file";
   import { NAME, TOOL } from "./format";
@@ -48,6 +50,9 @@
 
   let texts = $state<{ readonly from: Yield; readonly to: Yield } | "broken" | null>(null);
   let host = $state<HTMLDivElement>();
+  const wire = editorWire((box) => {
+    host = box;
+  });
 
   function yieldOf(bytes: Uint8Array): Promise<Yield | null> {
     if (format === "docx") {
@@ -141,6 +146,6 @@
     <div class="flex justify-end border-b border-edge px-wide py-tight">
       <Button label={say($lang, "refrain_export_comparison")} tone="quiet" onPress={exportComparison} />
     </div>
-    <div class="refrain-editor min-h-0 flex-1" bind:this={host}></div>
+    <Editor {wire} />
   {/if}
 </div>

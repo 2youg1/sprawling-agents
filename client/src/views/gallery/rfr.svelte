@@ -11,8 +11,9 @@
   // a plain text file read literally (a byte-order mark, CRLF lines, a
   // tab), a file larger than RefRain edits, a missing file, and a draft
   // kept on a version the city has since replaced - drawn as its conflict
-  // bar and as the two versions compared. Each is drawn at the width the
-  // right side has beside a conversation at 1440.
+  // bar and as the two versions compared - and the head line with every
+  // word a save leaves on it. Each is drawn at the width the right side
+  // has beside a conversation at 1440.
   import { draftPlace, writeDraft } from "../../core/document_save";
   import { EDITABLE_BYTES_MAX } from "../../core/document_windows";
   import { Address, B3Hash, Seq } from "../../wire";
@@ -152,8 +153,14 @@
 </script>
 
 <script lang="ts">
+  import type { Receipt } from "../../core/document_save";
   import { positionsOf } from "../../core/document_pos";
+  import { say } from "../../core/lang";
   import { ui } from "../../ui";
+  import Button from "../parts/button.svelte";
+  import Segmented from "../parts/segmented.svelte";
+  import { receiptWord } from "../refrain/head";
+  import Head from "../refrain/head.look.svelte";
   import Document from "../refrain/document.svelte";
   import Preview from "../refrain/preview.svelte";
   import RefRain from "../refrain/refrain.svelte";
@@ -163,6 +170,11 @@
   // The draft the conflict cases restore, written where RefRain looks
   // for it before they mount.
   ui().prefs.setDraft(MOVED_PLACE, keptDraft());
+
+  const lang = ui().lang;
+  // Every kind of receipt but `clean`, which leaves no word: the head
+  // line as a person meets it after each.
+  const KINDS: readonly Receipt["kind"][] = ["draft", "saving", "pending", "saved", "conflict", "refused"];
 
   const FRAME = "refrain-specimen flex h-[480px] flex-col overflow-hidden bg-page";
 </script>
@@ -177,7 +189,7 @@
       document mounts its preview once the text has landed, after the
       stand has handed `ui.ts`'s door back to the real city, which holds
       no preview of this version. -->
-      <div class="refrain flex min-h-0 flex-1 flex-col bg-page">
+      <div class="flex min-h-0 flex-1 flex-col bg-page">
         <Preview
           positions={positionsOf(V1, "utf8", MARKDOWN)}
           building={SHOP}
@@ -204,6 +216,32 @@
   <Case label="refrain · the replaced version against the city's" width={600}>
     <div class={FRAME}>
       <Document at={Address.make(`shop/${MOVED}`)} building={SHOP} version={null} reading="versions" />
+    </div>
+  </Case>
+  <Case label="refrain · the head line, every word a save leaves on it" width={600}>
+    <div class="flex flex-col">
+      {#each KINDS as kind (kind)}
+        {@const said = receiptWord(kind)}
+        <Head
+          place={{ folder: "shop/notes/", name: "plan.md" }}
+          version="3c1f0a9"
+          receipt={said === null ? null : { text: say($lang, said.key), alert: said.alert }}
+          wire={{ role: "status" }}
+        >
+          {#snippet actions()}
+            <Segmented
+              label={say($lang, "refrain_reading")}
+              options={[
+                { value: "source", label: say($lang, "refrain_source") },
+                { value: "preview", label: say($lang, "refrain_preview") },
+              ]}
+              held="source"
+              onPick={() => undefined}
+            />
+            <Button label={say($lang, "refrain_save")} tone="quiet" onPress={() => undefined} />
+          {/snippet}
+        </Head>
+      {/each}
     </div>
   </Case>
 </Stand>
