@@ -77,3 +77,21 @@ export function refused(saving: Saving, error: AxError): Saving {
 export function waited(saving: Saving): Saving {
   return saving.kind === "saving" ? { kind: "unverified", from: saving.from } : saving;
 }
+
+// Where one card keeps its standing: how to read it now, and how to
+// set it.
+export interface Slot {
+  readonly now: () => Saving;
+  readonly mark: (saving: Saving) => void;
+}
+
+// Starts the page's patience for the save `mine`, which the card has
+// just been marked with. When the patience runs out and the card still
+// stands on that save, it is marked as unverified; a card that moved on
+// - a receipt, a refusal, an edit, another save - is left alone, so the
+// timer of an earlier save changes nothing.
+export function awaitReceipt(mine: Saving, slot: Slot): void {
+  setTimeout(() => {
+    if (slot.now() === mine) slot.mark(waited(mine));
+  }, RECEIPT_MS);
+}

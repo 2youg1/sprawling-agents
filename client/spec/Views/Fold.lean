@@ -6,7 +6,7 @@
 /-!
 # fold：一次只展开一项
 
-规定两处折叠：设置树的枝（`client/src/views/settings/tree.svelte`，`client/Spec.lean` §7L、D53）与上手指南的步骤（`client/src/views/welcome.svelte`，§7G、D55）。TypeScript 是「怎样守住」的权威，本模型是「必须守住哪些性质」的权威；`tree.test.ts` 与 `guide.test.ts` 判实现与这里读出同一项。
+规定两处折叠：设置树的枝（`client/src/views/settings/folds.ts` 的 `toggled`，座位 `tree.svelte` 持有它的状态，`client/Spec.lean` §7L、D53）与上手指南的步骤（`client/src/views/welcome.svelte`，§7G、D55）。TypeScript 是「怎样守住」的权威，本模型是「必须守住哪些性质」的权威；`tree.test.ts` 与 `guide.test.ts` 判实现与这里读出同一项。
 
 状态是至多一项展开（`Option α`，`none` 是全部收起），所以「同时展开两项」在类型上写不出来。事件有两种：人按下一项的标题（`toggle`），以及当前所在的那一项移动了（`land`）——设置面开在一页之上、在树里选了另一组、指南因一步做完而前进到下一步。
 

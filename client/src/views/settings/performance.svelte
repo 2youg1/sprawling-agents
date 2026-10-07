@@ -13,7 +13,7 @@
   import Segmented from "../parts/segmented.svelte";
   import Unanswered from "../parts/unanswered.svelte";
   import Card from "./card.svelte";
-  import { HELD, RECEIPT_MS, edited, refused, sent, waited, type Saving } from "./saving";
+  import { HELD, awaitReceipt, edited, refused, sent, type Saving, type Slot } from "./saving";
 
   const PLACEMENT: Record<CorePlacement, readonly [Key, Key]> = {
     none: ["performance_none", "performance_none_note"],
@@ -37,6 +37,7 @@
   let priority = $state<CorePriority | undefined>(undefined);
   let memory = $state("");
   let saving = $state.raw<Saving>(HELD);
+  const slot: Slot = { now: () => saving, mark: (next) => (saving = next) };
   let awaiting = $state.raw<CorePreferences | null>(null);
   let baseline = $state.raw<CorePreferences | null>(null);
   let readBeforeSave = $state.raw<CorePreferences | null>(null);
@@ -104,9 +105,7 @@
       u.conn.asking.refresh(QUERIES.preferences);
       setTimeout(recheck, 1_000);
     }, 1_000);
-    setTimeout(() => {
-      if (saving === mine) saving = waited(mine);
-    }, RECEIPT_MS);
+    awaitReceipt(mine, slot);
   }
 </script>
 

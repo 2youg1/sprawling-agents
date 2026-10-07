@@ -20,6 +20,7 @@
   import { ui } from "../../ui";
   import type { Answer, GithubReading } from "../../wire";
   import Button from "../parts/button.svelte";
+  import Field from "../parts/field.svelte";
 
   interface Props {
     readonly onTake: (login: string, host: string) => void;
@@ -54,12 +55,18 @@
 <div class="flex flex-col gap-tight border-t border-edge pt-snug">
   <p class="text-note text-text-faint">{say($lang, "you_import_note")}</p>
   <div class="flex flex-wrap items-center gap-snug">
-    <input
-      class="h-control min-w-[16ch] flex-1 rounded-control border border-edge-input bg-page px-base font-mono text-note text-text"
-      aria-label={say($lang, "you_import_host")}
-      placeholder={say($lang, "you_import_host_default")}
-      bind:value={host}
-    />
+    <div class="min-w-[16ch] flex-1">
+      <Field
+        label={say($lang, "you_import_host")}
+        labelling="hidden"
+        placeholder={say($lang, "you_import_host_default")}
+        value={host}
+        mono
+        onInput={(next: string) => {
+          host = next;
+        }}
+      />
+    </div>
     <Button label={say($lang, "you_import")} tone="secondary" loading={asked !== null && answer === undefined} onPress={ask} />
   </div>
   {#if read !== null}

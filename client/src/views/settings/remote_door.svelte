@@ -10,16 +10,16 @@
   // answer opens. `step` in `remote_door.ts` decides every move; this
   // component sends what it says to send, feeds it the city's answers
   // and puts the focus where it says. Each control carries a glyph, a
-  // visible name and a note on hover and keyboard focus (D55).
+  // visible name and a note on hover and keyboard focus (D55), drawn by
+  // `door_key.look.svelte` from the `DoorKeyLook` this file builds.
 
-  import { tick, type Snippet } from "svelte";
+  import { tick } from "svelte";
 
   import { fill, say, type Key } from "../../core/lang";
   import { ui } from "../../ui";
-  import Glyph from "../parts/glyph.svelte";
   import type { GlyphName } from "../parts/glyph";
   import Segmented from "../parts/segmented.svelte";
-  import Tip from "../parts/tip.svelte";
+  import DoorKey from "./door_key.look.svelte";
   import { RECEIPT_MS } from "./saving";
   import {
     IDLE,
@@ -31,6 +31,7 @@
     step,
     type Door,
     type DoorEvent,
+    type DoorKeyLook,
     type DoorSent,
   } from "./remote_door";
 
@@ -120,35 +121,22 @@
   const asking = $derived(door.phase.kind === "awaiting" || door.phase.kind === "confirming");
   const busy = $derived(door.phase.kind === "requesting" || door.phase.kind === "confirming");
 
-  // The checker types a `{#snippet}` name as a void call, which the lint
-  // lane rejects inside a render tag; the name is taken again as its
-  // `Snippet` type, as `parts/button.svelte` does.
-  const drawn: Snippet<[GlyphName, Key, Key, boolean, () => void]> = control;
-
-  const WEAR =
-    "relative flex h-control shrink-0 items-center gap-tight rounded-control bg-raised px-base " +
-    "text-label text-text transition-[background-color,color] hover:bg-raised-hover " +
-    "aria-disabled:bg-raised aria-disabled:text-text-disabled still:transition-none";
-</script>
-
-{#snippet control(glyph: GlyphName, name: Key, note: Key, disabled: boolean, onPress: () => void)}
-  <Tip text={say($lang, note)}>
-    {#snippet children(hint: string)}
-      <button
-        type="button"
-        class={WEAR}
-        aria-describedby={hint}
-        aria-disabled={disabled}
-        onclick={() => {
+  // One door control; a press on a disabled one is dropped here.
+  function doorKey(glyph: GlyphName, name: Key, note: Key, disabled: boolean, onPress: () => void): DoorKeyLook {
+    return {
+      glyph,
+      label: say($lang, name),
+      note: say($lang, note),
+      wire: {
+        type: "button",
+        "aria-disabled": disabled,
+        onclick: () => {
           if (!disabled) onPress();
-        }}
-      >
-        <Glyph name={glyph} size="sm" class="shrink-0" />
-        {say($lang, name)}
-      </button>
-    {/snippet}
-  </Tip>
-{/snippet}
+        },
+      },
+    };
+  }
+</script>
 
 <section class="flex flex-col gap-base" aria-labelledby={`${uid}-door`}>
   <h3 id={`${uid}-door`} class="text-label font-label text-text">{say($lang, "remote_door")}</h3>
@@ -167,15 +155,19 @@
   </div>
   <div class="flex flex-wrap gap-snug">
     <span bind:this={openButton} class="contents">
-      {@render drawn("door", "remote_door_open", "remote_door_open_note", busy || asking, () => {
-        move({ kind: "press", opener: "door" });
-      })}
+      <DoorKey
+        {...doorKey("door", "remote_door_open", "remote_door_open_note", busy || asking, () => {
+          move({ kind: "press", opener: "door" });
+        })}
+      />
     </span>
-    {@render drawn("gate", "remote_door_close", "remote_door_close_note", false, close)}
+    <DoorKey {...doorKey("gate", "remote_door_close", "remote_door_close_note", false, close)} />
     <span bind:this={keyButton} class="contents">
-      {@render drawn("key", "remote_key_replace", "remote_key_replace_note", busy || asking, () => {
-        move({ kind: "press", opener: "key" });
-      })}
+      <DoorKey
+        {...doorKey("key", "remote_key_replace", "remote_key_replace_note", busy || asking, () => {
+          move({ kind: "press", opener: "key" });
+        })}
+      />
     </span>
   </div>
   <p class="text-note text-text-faint">{say($lang, "remote_key_where")}</p>
@@ -208,14 +200,12 @@
           }}
         />
       </div>
-      <Tip text={say($lang, "remote_door_confirm_note")}>
-        {#snippet children(hint: string)}
-          <button type="submit" class={WEAR} aria-describedby={hint} aria-disabled={door.phase.kind === "confirming"}>
-            <Glyph name="check" size="sm" class="shrink-0" />
-            {say($lang, "remote_door_confirm")}
-          </button>
-        {/snippet}
-      </Tip>
+      <DoorKey
+        glyph="check"
+        label={say($lang, "remote_door_confirm")}
+        note={say($lang, "remote_door_confirm_note")}
+        wire={{ type: "submit", "aria-disabled": door.phase.kind === "confirming" }}
+      />
       <p id={`${uid}-code-help`} class="basis-full text-note text-text-faint">{say($lang, "remote_door_code_help")}</p>
     </form>
   {/if}

@@ -18,9 +18,14 @@
 // yet is not in the table, because a row that goes nowhere is a dead
 // button.
 
+import { createAttachmentKey, type Attachment } from "svelte/attachments";
+
 import type { Key } from "../../core/lang";
-import type { SetupGroup, View } from "../../core/route";
+import { initialOf, type LineMove } from "../../core/lines";
+import { toFragment, type SetupGroup, type View } from "../../core/route";
 import type { Address } from "../../wire";
+import { HEADING } from "../setup/groups";
+import type { Fold, Folds } from "./folds";
 
 // A page and the word the tree names it by.
 export interface Page {
@@ -158,4 +163,229 @@ export function nestOf(view: View): Nest | null {
     case "gallery":
       return null;
   }
+}
+
+// The entry a line key moves the focus to from the entry at `at`; -1
+// is a focus outside the entries.
+export function stepped<T>(entries: readonly T[], at: number, move: LineMove | null): T | undefined {
+  switch (move) {
+    case "line.next":
+      return entries[Math.min(at + 1, entries.length - 1)];
+    case "line.previous":
+      return entries[Math.max(at - 1, 0)];
+    case "line.first":
+      return entries[0];
+    case "line.last":
+      return entries.at(-1);
+    case "line.open":
+    case "line.close":
+    case null:
+      return undefined;
+  }
+}
+
+// The next entry after the focus whose letter is `letter`, from the top
+// again past the last one (client D40).
+export function byInitial<T>(
+  entries: readonly T[],
+  at: number,
+  letter: string,
+  initial: (entry: T) => string | undefined,
+): T | undefined {
+  return [...entries.slice(at + 1), ...entries.slice(0, at + 1)].find((each) => initial(each) === letter);
+}
+
+// What the tree's look is given. Every word is already in the person's
+// language, and every role, state, id and handler sits in a wire bag
+// the look spreads on the element it belongs to.
+
+// The bag spread on the `<nav>`. Its symbol key is a Svelte attachment
+// that hands the seat the element whose entries the line keys walk.
+export interface NavWire {
+  readonly "aria-label": string;
+  readonly onkeydown: (event: KeyboardEvent) => void;
+  readonly [hold: symbol]: Attachment<HTMLElement>;
+}
+
+// The bag spread on a button that opens a list of its own: a branch, a
+// nest, a "more". `data-entry` marks every element the keys walk.
+export interface FoldWire {
+  readonly type: "button";
+  readonly "data-entry": "";
+  readonly "aria-expanded": boolean;
+  readonly "aria-controls": string;
+  readonly onclick: () => void;
+}
+
+// The bag spread on a group's button; `data-initial` is the letter the
+// keys reach it by.
+export interface GroupWire {
+  readonly type: "button";
+  readonly "data-entry": "";
+  readonly "data-initial": string;
+  readonly "aria-current": "true" | undefined;
+  readonly onclick: () => void;
+}
+
+// The bag spread on a page's link.
+export interface PageWire {
+  readonly "data-entry": "";
+  readonly href: string;
+  readonly "aria-current": "page" | undefined;
+}
+
+export interface FoldLook {
+  readonly label: string;
+  readonly open: boolean;
+  // The id of the list the fold opens.
+  readonly list: string;
+  readonly wire: FoldWire;
+}
+
+// `here` is the group drawn in the panel's body.
+export interface GroupLook {
+  readonly kind: "group";
+  readonly key: string;
+  readonly label: string;
+  readonly initial: string;
+  readonly here: boolean;
+  readonly wire: GroupWire;
+}
+
+// `here` is the page under the panel; `reading` is the one line the
+// performance page's entry carries about the city's processes.
+export interface PageLook {
+  readonly kind: "page";
+  readonly key: string;
+  readonly label: string;
+  readonly here: boolean;
+  readonly reading: string | null;
+  readonly wire: PageWire;
+}
+
+export type LeafLook = GroupLook | PageLook;
+
+export interface NestLook {
+  readonly kind: "nest";
+  readonly key: string;
+  readonly fold: FoldLook;
+  readonly pages: readonly PageLook[];
+}
+
+export interface MoreLook {
+  readonly fold: FoldLook;
+  readonly entries: readonly LeafLook[];
+}
+
+export interface BranchLook {
+  readonly key: string;
+  readonly fold: FoldLook;
+  readonly entries: readonly (LeafLook | NestLook)[];
+  readonly more: MoreLook | null;
+}
+
+export interface TreeLook {
+  readonly nav: NavWire;
+  readonly branches: readonly BranchLook[];
+}
+
+// What the tree reads besides its own presses: the group drawn, the
+// page beneath, the folds, each nest's pages, and the performance
+// reading.
+export interface TreeState {
+  readonly group: SetupGroup;
+  readonly beneath: View;
+  readonly folds: Folds;
+  readonly leaves: Readonly<Record<Nest, readonly Page[]>>;
+  readonly reading: string | null;
+}
+
+// What only the seat holds: the words of the language on the page, the
+// presses, the key handler, and the attachment that finds the `<nav>`.
+export interface TreeHands {
+  readonly words: (key: Key) => string;
+  readonly pick: (group: SetupGroup) => void;
+  readonly toggle: (fold: Fold) => void;
+  readonly walk: (event: KeyboardEvent) => void;
+  readonly hold: Attachment<HTMLElement>;
+}
+
+const HOLD = createAttachmentKey();
+
+// The whole value the tree's look draws.
+export function lookOf(state: TreeState, uid: string, hands: TreeHands): TreeLook {
+  const foldOf = (label: Key, open: boolean, list: string, fold: Fold): FoldLook => ({
+    label: hands.words(label),
+    open,
+    list,
+    wire: {
+      type: "button",
+      "data-entry": "",
+      "aria-expanded": open,
+      "aria-controls": list,
+      onclick: () => {
+        hands.toggle(fold);
+      },
+    },
+  });
+  const leafOf = (leaf: Leaf): LeafLook =>
+    leaf.kind === "group" ? groupOf(leaf.group, state.group, hands) : pageOf(leaf, state, hands.words);
+  const nestLookOf = (nest: Nest, word: Key): NestLook => ({
+    kind: "nest",
+    key: nest,
+    fold: foldOf(word, state.folds.nests[nest], `${uid}-${nest}`, { kind: "nest", nest }),
+    pages: state.leaves[nest].map((page) => pageOf(page, state, hands.words)),
+  });
+  return {
+    nav: { "aria-label": hands.words("settings_tree"), onkeydown: hands.walk, [HOLD]: hands.hold },
+    branches: TREE.map((branch, at) => {
+      const list = `${uid}-${String(at)}`;
+      return {
+        key: branch.word,
+        fold: foldOf(branch.word, state.folds.branch === at, list, { kind: "branch", at }),
+        entries: branch.entries.map((entry) => (entry.kind === "nest" ? nestLookOf(entry.nest, entry.word) : leafOf(entry))),
+        more:
+          branch.more.length === 0
+            ? null
+            : { fold: foldOf("settings_more", state.folds.more, `${list}-more`, { kind: "more" }), entries: branch.more.map(leafOf) },
+      };
+    }),
+  };
+}
+
+function groupOf(named: SetupGroup, drawn: SetupGroup, hands: TreeHands): GroupLook {
+  const label = hands.words(HEADING[named]);
+  const initial = initialOf(label, named);
+  const here = named === drawn;
+  return {
+    kind: "group",
+    key: named,
+    label,
+    initial,
+    here,
+    wire: {
+      type: "button",
+      "data-entry": "",
+      "data-initial": initial,
+      "aria-current": here ? "true" : undefined,
+      onclick: () => {
+        hands.pick(named);
+      },
+    },
+  };
+}
+
+// A building's entry is named by its address, which is the city's word
+// and not this page's.
+function pageOf(page: Page, state: TreeState, words: (key: Key) => string): PageLook {
+  const href = toFragment(page.view);
+  const here = href === toFragment(state.beneath);
+  return {
+    kind: "page",
+    key: href,
+    label: page.view.kind === "building" ? page.view.address : words(page.word),
+    here,
+    reading: page.view.kind === "monitor" ? state.reading : null,
+    wire: { "data-entry": "", href, "aria-current": here ? "page" : undefined },
+  };
 }

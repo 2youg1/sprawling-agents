@@ -18,11 +18,13 @@
   // pushing one, so the back button leaves the panel instead of walking
   // back through every group looked at.
   //
-  // A click on the backdrop lands on the `<dialog>` itself, because the
-  // inner frame fills the whole element: that is the one click that
-  // closes it.
+  // This file is the seat: it owns the element and when it opens; the
+  // look (`panel.look.svelte`) draws the frame and its arrival, and
+  // spreads the wiring `dialogOf` builds (`panel.ts`).
 
   import type { SetupGroup, View } from "../../core/route";
+  import { dialogOf } from "./panel";
+  import Look from "./panel.look.svelte";
   import Sheet from "./sheet.svelte";
 
   interface Props {
@@ -37,6 +39,12 @@
   const uid = $props.id();
 
   let sheet = $state<HTMLDialogElement | undefined>(undefined);
+  const hold = (node: HTMLDialogElement): (() => void) => {
+    sheet = node;
+    return () => {
+      sheet = undefined;
+    };
+  };
 
   // Opening hands the focus to the entry that names the group drawn,
   // rather than to the first control the platform would pick.
@@ -47,24 +55,6 @@
   });
 </script>
 
-<!-- One width: from the window's left edge to the shell's right silver
-  line (client D24), so its tree stands where the sessions pane stands and its
-  group where the conversation stands; the whole window on one column.
-  The arrival from the left is `.settings-panel` in `theme/settings.css`, a
-  transition from its `@starting-style`. -->
-<dialog
-  bind:this={sheet}
-  class="settings-panel fixed inset-y-0 left-0 m-0 h-dvh max-h-none w-full max-w-[calc(var(--silver-side)*(1+var(--silver))-var(--spacing-gutter)/2)] bg-page narrow:max-w-none p-0 text-body text-text shadow-sheet backdrop:bg-transparent backdrop:backdrop-brightness-50"
-  aria-labelledby={`${uid}-title`}
-  oncancel={(event) => {
-    // Escape asks the caller, which moves the address bar; closing the
-    // element here would leave the address saying it is open.
-    event.preventDefault();
-    onClose();
-  }}
-  onclick={(event) => {
-    if (event.target === sheet) onClose();
-  }}
->
+<Look dialog={dialogOf(`${uid}-title`, onClose, hold)}>
   <Sheet {group} {beneath} {onPick} {onClose} titleId={`${uid}-title`} />
-</dialog>
+</Look>
