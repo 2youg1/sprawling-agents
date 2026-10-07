@@ -20,9 +20,53 @@ release notes and their commits.
 
 ---
 
-## <!-- xtask:begin workspace_version -->0.0.10<!-- xtask:end --> INNOCENT
+## v0.0.10-Alpha-261007
 
-Prepared for Alpha 261005; this section describes source changes and is not a published tag. The workspace manifest owns the package version, `kernel::release::MATURITY` owns maturity, and the release workflow supplies the actual tag to a released binary. A checkout without that provenance continues to report `built from source`.
+**sprawling 0.0.10 innocent**
+
+Alpha, cut on 2026-10-07 (UTC) as `v0.0.10-Alpha-261007`. The workspace manifest carries <!-- xtask:begin workspace_version -->0.0.10<!-- xtask:end -->; `kernel::release::MATURITY` owns maturity, and the release workflow supplies the tag to a released binary. It records what landed after `v0.0.9-Alpha-261004`. The wire moved from WIRE_V 56 to 59, once for each push in which its shape changed (`crates/wire/Spec.lean` D1): 57 when a doctor report's sandbox arm gained `macos_seatbelt`, 58 when a provider endpoint began to carry an ordered account list, and 59 when the person's preferences gained the performance group and the release answer lost the Homebrew origin. `EVENT_LOG_V` stays at 2: a line written by 0.0.9 reads unchanged.
+
+**TODO (final session, before tagging):** if the R11 or R06 merges move `WIRE_V` past 59, give the final value above and name each further step; confirm `EVENT_LOG_V` is still 2 on the tagged tree.
+
+### Behaviour changes
+
+- `/clear` is removed. `/new` is the only verb that replaces the session in a room, and `/new --carry` brings the room's `Handoff.md`; branching is a separate feature and keeps `/fork`, the fork key on each entry and the mailbox's fork entry (`client/Spec.lean` D44).
+- There is no default per-run memory ceiling. A run's commands get one only when the person enters a number of bytes under Settings → Performance and chooses `[core] placement = "soft_shares"` ("soft with memory ceiling"); an empty field means no ceiling. All commands of one run share it; Windows jobs and delegated Linux cgroups enforce it, and macOS does not. When a command reaches the ceiling, or the ceiling could not be applied or read back, the command's result and the monitor and inspector terminals say so instead of passing silently (`crates/runtime/spec/Tools/Exec.lean` D95).
+- Action shortcuts that were single keys now hold the accelerator (Ctrl, or ⌘ on a Mac): Ctrl+Shift+F forks from the entry under the pointer (was `f`); Ctrl+Shift+Y, Ctrl+Shift+E and Ctrl+Shift+X answer the decide card that holds the focus (were `y`, `e` and `n`; refusing moved to X because Ctrl+N opens a browser window before the page hears it); Ctrl+\ changes how much of the city the page draws (was `\`); and Ctrl+/ opens the key list (was `?`). `/` stays a single key, because it only moves the focus into the box. A letter typed while the focus is outside the box therefore changes nothing (`client/src/core/keys.ts`).
+- The read-only view of an earlier session no longer draws a "continue from its end" button. Going on from an earlier session is a branch: use the fork key on one of its entries or the mailbox's fork entry.
+- sprawling is not distributed through Homebrew: no tap is published, and the update check recognises no Homebrew install. On macOS, install through npm, Bun, crates.io, the shell installer or the release archive.
+- **TODO (final session, R11):** one line pointing to Configuration below for the refusal of handwritten plaintext MCP credentials, once R11 is merged; otherwise delete this line.
+- **TODO (final session, FONT-SIZE):** "The default body size is 15 px instead of 14 px. The smallest accepted size stays 12 px and there is no upper bound." once that line is merged; otherwise delete this line.
+
+### Main input area and settings
+
+Before a session starts, the row under the text box holds three controls: the workspace chip, one model entry (provider, then model, with thinking beside it) and one permissions entry with two switches, the mode and the write limit. A control with nothing to choose is hidden. Once the session has a run, no control stays under the box; the model, effort, mode, write limit and, where a real restriction exists, the sandbox are recorded on the session's first message head. The placeholder names the agent the box speaks to and disappears as soon as the person types. Fork buttons stand at the end of their entry's own line and no longer cover text.
+
+Settings gains a Performance group: CPU placement (`none`, `soft`, `soft_shares`, `pinned`) and core priority (`raised`, `normal`), each with a note on what the platform does, and the per-run memory ceiling above. The values are kept in `[core]` of `~/.sprawling/config.toml` and apply after the city server restarts. Every settable field of the personal configuration and of a building's `CONFIG.toml` now records in its crate's specification either the control that edits it or the reason it has none, and `xtask wiring` turns red for a new field without that record.
+
+The client's stylesheet `client/src/theme.css` is now an entry that imports its parts from `client/src/theme/`, one part for each owner: the token tables, the light block and the person's choices, the surfaces, the motion vocabulary, the base layer, and the parts a screen owns.
+
+**TODO (final session, FONT-FACE):** the paragraph on the serif reading face Libron (Geist Mono stays the default; woff2 files with the OFL licence beside them, `docs/third-party.md` §4; no bundled CJK face) once that line is merged; otherwise delete this line.
+
+**TODO (final session, front-end split):** one paragraph on what a person can now replace, the replacement test that proves it, and where `docs/frontend-method.md` describes it, once the split is merged; otherwise delete this line.
+
+### Privacy
+
+`sprawling privacy status` prints the privacy history summary as one JSON line. It discloses a summary only after the live Windows identity matches the owner bound in the platform vault, and a missing, locked or mismatched binding is refused with its own recovery (`crates/sprawling/spec/Privacy/Cli.lean` D54).
+
+**TODO (final session, R06):** the paragraph on the optional Windows privacy controls in Settings (catalogue size, per-entry target, scope, recommended value and cost, apply and restore one entry at a time after confirmation, UAC for machine-scope writes, read-back with restore on mismatch, entries not written and why, privacy is not security, refused to a paired remote device), checked clause by clause against the merged page and `crates/sprawling/spec/Privacy*.lean`; otherwise delete this line.
+
+### Model providers and search
+
+A resident MCP connection over streamable HTTP whose session the server ended is dropped and reconnected (open, handshake, tool list) on the next dispatch; the failed call itself is returned, not sent again.
+
+A provider endpoint can list several accounts in order. The list order chooses the first account, and a Session stays on the account that first answered it, across reordering and restarts.
+
+**TODO (final session, R11):** the `insufficient_quota` paragraph and the "two or more accounts" paragraph from the R11 branch's CHANGELOG, moved here; otherwise delete this line.
+
+### Configuration
+
+**TODO (final session, R11):** the R11 branch's two Configuration paragraphs, verbatim: the refusal of a plaintext credential written by hand into an `[[mcp]]` row, and the `web_search` tool offered to every building that is not confidential. If R11 does not merge, delete this section.
 
 ### Execution and recovery
 
@@ -32,11 +76,21 @@ Windows run jobs apply the selected processor affinity. JSONL preallocation read
 
 The existing container command path preserves the configured engine, encodes a single Podman entrypoint and refuses non-UTF8 arguments instead of changing them silently. Configuration, native-platform mechanisms and lifecycle guarantees are described in [operating](docs/operating.md#how-exec-is-confined) according to the shipped implementation.
 
+On Windows, explicitly selected native confinement (AppContainer with a Job Object) passes the six child-process regressions and the PowerShell and toolchain checks on disposable runners, and the MSVC toolchain is found outside the container. Windows still defaults to the copied working tree until `crates/runtime/spec/Tools/Exec/NativeWindows.lean` D59 is settled.
+
 ### Distribution and verification
 
 Release archives keep ZIP with Deflate level 9, with archive suffixes and platform names taken from the shared platform table. Release validation uses the existing parallel CI entry point and its cache configuration. Manual release-workflow dispatch builds and checks artifacts without publishing GitHub releases, npm packages or crates, and does not invent release provenance.
 
 The repository Nix flake builds the browser client before Rust and includes the shipped skills and licences. The flake is the only Nix distribution path; sprawling is not submitted to nixpkgs. Windows resource generation reads Cargo package metadata for the product and file version. Build provenance, archive checksums and OS code signing are separate facts.
+
+The static Linux archive stays linked with musl-gcc, which produces a static PIE; cargo-zigbuild produced a binary without PIE, and its release build took 9-27 s longer on GitHub's hosted Ubuntu runner (`crates/sprawling/spec/Install.lean` D57). `rust-version` stays 1.97, and a nightly `msrv` job in `platforms.yml` builds the workspace with exactly that compiler.
+
+`ci.yml` runs the test suite in four slices balanced on measured nextest time, and checks before the slices start that every test belongs to exactly one of them; a run starts 16 jobs, 7 of them on Windows, where it started 31, 23 of them on Windows. On the Windows runners Cargo's home sits on the work drive, and the test archive links with rust-lld: on a warm cache its compile took 171 s and 194 s in two runs, against 201 s with link.exe, on GitHub's hosted Windows runner. A released binary is still linked with link.exe (`tools/xtask/Spec.lean` D27). A release is published only when every slice of its own `ci.yml` run passed, so a slice that failed, was cancelled or never started stops it.
+
+**TODO (final session, R02):** the wall-clock reading of a whole `ci.yml` run on the final tree with its machine class, and the fault-injection release run that shows a failed slice stopping publication; otherwise delete this line.
+
+Release builds generate an Arch Linux package from the archive and install it in an Arch container; the AUR is pushed only on a tag push with the `AUR_SSH_KEY` secret.
 
 ### Documentation and contribution rules
 
@@ -45,6 +99,15 @@ README now introduces the city, documents that carry work across Sessions, five 
 [LLM.md](LLM.md) introduces the project for another model; [wire](docs/wire.md) owns the protocol reference, [integrations](docs/integrations.md) owns ACP/MCP/CLI setup and [performance](docs/performance.md) owns monitoring and reproducible evaluation. Onboarding objectives and historical readings are not presented as measurements of this release.
 
 Contribution policy uses AGENTS as its single authority, distinguishes negative fixtures, fixed regressions and opt-in experiments, and requires matching English and Chinese issue/PR descriptions. The security policy states actual trust boundaries, private reporting, no bounty, optional credit by consent and next-release fixes without backports.
+
+**TODO (final session, R12):** one sentence on the rewritten README and LLM.md once they are written; otherwise delete this line.
+
+### Known and unfixed
+
+- Windows formal code signing is not done in this version; Windows Defender may quarantine the binary of a downloaded archive.
+- The performance readings of the four placement arms (R13) were not taken; the default `[core] placement = "soft"` is supported by the design, not by a reading.
+- The first message head breaks inside a Chinese fact when it wraps.
+- **TODO (final session, R06):** "Microsoft does not state whether most privacy policies apply on Windows Home; the page shows 'not stated' for those controls", with the count confirmed on the merged catalogue; otherwise delete this line.
 
 ---
 
