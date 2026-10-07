@@ -19,7 +19,8 @@
   import { ui } from "../../../ui";
   import type { Address, B3Hash } from "../../../wire";
   import { StoredBytes } from "../fetched.svelte";
-  import { short } from "../reading";
+  import { againstLookOf } from "./against";
+  import Against from "./against.look.svelte";
   import Compare from "./compare.svelte";
   import Docx from "./docx.svelte";
   import { NAME, TOOL, drawnAs } from "./format";
@@ -76,24 +77,11 @@
     </p>
   {:else}
     {#if others.length > 0}
-      <div class="flex items-center gap-base border-b border-edge px-wide py-tight">
-        <label class="flex min-w-0 flex-1 items-center gap-snug text-note text-text-faint">
-          {say($lang, "format_compare_with")}
-          <select
-            class="h-control-sm min-w-0 flex-1 rounded-control border border-edge-input bg-raised px-snug text-note text-text"
-            value={against ?? ""}
-            onchange={(event) => {
-              const picked = others.find((each) => each.version === event.currentTarget.value);
-              against = picked?.version ?? null;
-            }}
-          >
-            <option value="">{say($lang, "format_compare_none")}</option>
-            {#each others as each (each.version)}
-              <option value={each.version}>{short(each.version)}</option>
-            {/each}
-          </select>
-        </label>
-      </div>
+      <Against
+        {...againstLookOf(others, against, $lang, (picked) => {
+          against = picked;
+        })}
+      />
     {/if}
     {#if current.lost !== null || other.lost !== null}
       <p class="px-wide py-snug text-note text-text-quiet">{say($lang, "format_lost")}</p>

@@ -9,12 +9,14 @@
   // The proposal cards open on the document RefRain shows, above its
   // text (client/Spec.lean §4-55). Nothing is drawn while the document has no
   // open card. The band takes at most two fifths of the right side and
-  // scrolls on its own, so a long card never pushes the editor out.
+  // scrolls on its own, so a long card never pushes the editor out;
+  // `proposals.look.svelte` draws the band.
   import { readAnswer } from "../../core/answered";
   import { fill, say } from "../../core/lang";
   import { ui } from "../../ui";
   import type { Address, ProposalCard } from "../../wire";
   import Button from "../parts/button.svelte";
+  import Look from "./proposals.look.svelte";
   import Card from "./proposals_card.svelte";
 
   interface Props {
@@ -34,30 +36,35 @@
   const asked = $derived(u.conn.asking.ask({ proposals: doc }));
   const read = $derived(readAnswer($asked, (answer) => ("proposals" in answer ? answer.proposals : undefined)));
   const open = $derived(read.kind === "held" ? read.value.open : []);
+  const version = $derived(read.kind === "held" ? (read.value.version ?? null) : null);
   const id = $props.id();
 </script>
 
-{#if read.kind === "held" && open.length > 0}
-  <section class="refrain-proposals" aria-labelledby="{id}-title">
-    <h3 id="{id}-title" class="text-note text-text-quiet">
-      {fill(say($lang, "proposals_title"), { n: String(open.length) })}
-    </h3>
-    {#each open as card (card.id)}
-      <Card {doc} {card} version={read.value.version ?? null}>
-        {#snippet lead()}
-          {@const why = unshowable(card)}
-          <div class="flex justify-end">
-            <Button
-              tone="quiet"
-              label={say($lang, "proposal_show")}
-              {...why === undefined ? {} : { why }}
-              onPress={() => {
-                onShow(card);
-              }}
-            />
-          </div>
-        {/snippet}
-      </Card>
-    {/each}
-  </section>
+{#if open.length > 0}
+  <Look
+    band={{ "aria-labelledby": `${id}-title` }}
+    heading={{ id: `${id}-title` }}
+    title={fill(say($lang, "proposals_title"), { n: String(open.length) })}
+    {cards}
+  />
 {/if}
+
+{#snippet cards()}
+  {#each open as card (card.id)}
+    <Card {doc} {card} {version}>
+      {#snippet lead()}
+        {@const why = unshowable(card)}
+        <div class="flex justify-end">
+          <Button
+            tone="quiet"
+            label={say($lang, "proposal_show")}
+            {...why === undefined ? {} : { why }}
+            onPress={() => {
+              onShow(card);
+            }}
+          />
+        </div>
+      {/snippet}
+    </Card>
+  {/each}
+{/snippet}

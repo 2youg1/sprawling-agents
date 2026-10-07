@@ -13,6 +13,8 @@
 // (documents D16); every answer a card gives is built by `verdictsOf`,
 // which can spell none of the four.
 
+import type { Snippet } from "svelte";
+
 import type { Address, AxError, B3Hash, Command, ProposalCard, ProposalDecision, SliceVerdict } from "../../wire";
 
 // ------------------------------------------------------------ standing
@@ -137,4 +139,16 @@ export function refusesCard(error: AxError, doc: Address, card: B3Hash): boolean
   if (error.subject === doc) return true;
   if (!DECIDING_ACTIONS.has(error.action)) return false;
   return error.subject.includes(card) || !NAMES_A_CARD.test(error.subject);
+}
+
+// ------------------------------------------------------------ the band
+
+// What `proposals.look.svelte` draws above the document in RefRain: the
+// band's heading, which names the band, and the open cards under it.
+export interface ProposalsLook {
+  readonly band: { readonly "aria-labelledby": string };
+  readonly heading: { readonly id: string };
+  // How many cards are open, in words.
+  readonly title: string;
+  readonly cards: Snippet;
 }

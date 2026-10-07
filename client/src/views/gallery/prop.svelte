@@ -12,9 +12,15 @@
   // left. Each card alone, one opened for editing, both above the
   // document in RefRain, the mailbox's deciding section holding them,
   // the letter one of them opens on the right side (roadmap A25), and
-  // the mailbox key counting them.
+  // the mailbox key counting them. Three bodies are drawn from the
+  // card's look value alone, for states a fixture cannot press its way
+  // into: an edit that leaves a removal out and rewrites a sentence, a
+  // decision on its way to the city, and one the city refused.
   import { Address, B3Hash, RunId, Seq, TimeMs } from "../../wire";
-  import type { Answer, Call, DocumentState, EventRecord, ProposalCard, ProposalsAnswer, Query, RoundsAnswer, Slice } from "../../wire";
+  import type { Answer, AxError, Call, DocumentState, EventRecord, ProposalCard, ProposalsAnswer, Query, RoundsAnswer, Slice } from "../../wire";
+  import { decideProposals } from "../../core/commands";
+  import { editOf, rejectionOf, retaken } from "../refrain/proposals";
+  import type { Deciding, Edit } from "../refrain/proposals";
 
   const SHOP = Address.make("shop");
   const PATH = "notes/plan.md";
@@ -135,6 +141,24 @@
     { doc: DOC, id: STALE.id, at: TimeMs.make(NOW - 6 * 60_000) },
   ];
 
+  // The edit after a person left the first removal out and rewrote the
+  // first inserted sentence.
+  const EDITED: Edit = retaken(retaken(editOf(CURRENT), 1, { taken: false }), 2, {
+    text: "It edits in the browser, one draft per version.",
+  });
+
+  const SENT: Deciding = { kind: "sent", command: decideProposals(DOC, [rejectionOf(CURRENT)]) };
+
+  const REFUSED: AxError = {
+    action: "decide proposals",
+    code: "E_VERSION_CONFLICT",
+    gate: null,
+    nearby: [],
+    recovery: "The plan moved to a new version while this card was open; read the card again before deciding.",
+    retry: "no",
+    subject: DOC,
+  };
+
   function answering(query: Query): Answer | undefined {
     if (query === "open_proposals") return { open_proposals: { open: OPEN } };
     if (typeof query !== "object") return undefined;
@@ -152,7 +176,10 @@
   import Column from "../mailbox/column.svelte";
   import Mailbox from "../mailbox/mailbox.svelte";
   import Letter from "../inspect/letter.svelte";
+  import Proposals from "../refrain/proposals.svelte";
   import Card from "../refrain/proposals_card.svelte";
+  import Body from "../refrain/proposals_card.look.svelte";
+  import { cardLookOf } from "../refrain/proposals_card";
   import RefRain from "../refrain/refrain.svelte";
   import Case from "./case.svelte";
   import Stand from "./stand.svelte";
@@ -160,6 +187,12 @@
   const { lang } = ui();
   const LIVE = { kind: "live", city: "sprawling" } as const;
   const ignore = (): void => undefined;
+  const hands = { retake: ignore };
+  const current = { kind: "current" } as const;
+  // The band alone: the current card can be shown in the text, the stale
+  // one cannot, because the editor holds another version.
+  const unshowable = (card: ProposalCard): string | undefined =>
+    card.id === STALE.id ? say($lang, "proposal_show_why") : undefined;
 
   // The edited case is the card after a person pressed its edit answer;
   // the fixture presses it once, the way they would.
@@ -182,6 +215,22 @@
   </Case>
   <Case label="proposal card · edited before it is accepted">
     <div bind:this={editedHost}><Card doc={DOC} card={CURRENT} version={V1} /></div>
+  </Case>
+  <Case label="proposal card body · a removal left out and an inserted sentence rewritten">
+    <Body {...cardLookOf(CURRENT, { standing: current, deciding: { kind: "idle" }, edit: EDITED, lead: undefined }, $lang, hands)} />
+  </Case>
+  <Case label="proposal card body · a decision on its way to the city">
+    <Body {...cardLookOf(CURRENT, { standing: current, deciding: SENT, edit: null, lead: undefined }, $lang, hands)} />
+  </Case>
+  <Case label="proposal card body · a decision the city refused, its recovery on the card">
+    <Body
+      {...cardLookOf(CURRENT, { standing: current, deciding: { kind: "refused", error: REFUSED }, edit: null, lead: undefined }, $lang, hands)}
+    />
+  </Case>
+  <Case label="proposal cards · the band, one card shown in the text and one not" width={600}>
+    <div class="flex h-[640px] flex-col overflow-hidden bg-page">
+      <Proposals doc={DOC} {unshowable} onShow={ignore} />
+    </div>
   </Case>
   <Case label="proposal cards · above the document in RefRain" width={600}>
     <div class="flex h-[640px] flex-col overflow-hidden bg-page">

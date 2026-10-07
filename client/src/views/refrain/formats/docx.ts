@@ -48,9 +48,24 @@ const OPTIONS: Partial<Options> = {
 
 // The pages stand on the pane behind the frame, not on the library's
 // grey board, and a page wider than the frame starts at its left edge
-// rather than spilling past both.
-const BOARD =
-  ".docx-wrapper { background: transparent; padding: 16px; align-items: safe center; } .docx-wrapper > section.docx { margin-bottom: 16px; }";
+// rather than spilling past both. The space around the pages and
+// between them is the pane's gutter, `--spacing-pane`, at the density
+// the person chose; the frame's page cannot read the theme, so the
+// board is written with the pixels the token resolves to here.
+function boardOf(gutter: number): string {
+  const px = `${String(gutter)}px`;
+  return `.docx-wrapper { background: transparent; padding: ${px}; align-items: safe center; } .docx-wrapper > section.docx { margin-bottom: ${px}; }`;
+}
+
+// The pane's gutter in pixels, as the theme resolves it on this page.
+function gutterOf(doc: Document): number {
+  const probe = doc.createElement("div");
+  probe.style.padding = "var(--spacing-pane)";
+  doc.body.append(probe);
+  const px = Number.parseFloat(getComputedStyle(probe).paddingTop);
+  probe.remove();
+  return Number.isFinite(px) ? px : 0;
+}
 
 // A page wider than the frame is scaled to the frame in steps of this
 // many pixels, so a line still breaks where the file breaks it and
@@ -58,7 +73,6 @@ const BOARD =
 // inside it can ask.
 const FIT_STEP = 40;
 const FIT_MIN = 280;
-const BOARD_PADDING = 32;
 
 export function readDocx(bytes: Uint8Array): Promise<Read> {
   return unpack(bytes).then((unpacked) => (unpacked.kind === "refused" ? unpacked : drawn(bytes, unpacked.parts)));
@@ -67,11 +81,12 @@ export function readDocx(bytes: Uint8Array): Promise<Read> {
 function drawn(bytes: Uint8Array, parts: ReadonlyMap<string, Uint8Array>): Promise<Read> {
   const body = document.createElement("div");
   const styles = document.createElement("div");
+  const gutter = gutterOf(document);
   const drawing: Promise<unknown> = renderAsync(new Blob([bytes.slice()]), body, styles, OPTIONS);
   return drawing.then(
     (): Read => ({
       kind: "drawn",
-      page: `<!doctype html><html><head>${styles.innerHTML}<style>${BOARD}${fitted(widthOf(body))}</style></head><body>${body.innerHTML}</body></html>`,
+      page: `<!doctype html><html><head>${styles.innerHTML}<style>${boardOf(gutter)}${fitted(widthOf(body), gutter)}</style></head><body>${body.innerHTML}</body></html>`,
       coverage: coverageOf(parts),
     }),
     (reason: unknown): Read => ({ kind: "broken", reason: String(reason) }),
@@ -86,12 +101,14 @@ function widthOf(body: HTMLElement): number | null {
 }
 
 // One rule per step of frame width below the page's, the narrowest
-// last so it wins: each scales the page to the narrow end of its step.
-function fitted(width: number | null): string {
+// last so it wins: each scales the page to the narrow end of its step,
+// less the gutter on either side.
+function fitted(width: number | null, gutter: number): string {
   if (width === null) return "";
+  const board = 2 * gutter;
   const rules: string[] = [];
-  for (let frame = Math.ceil((width + BOARD_PADDING) / FIT_STEP) * FIT_STEP; frame > FIT_MIN; frame -= FIT_STEP) {
-    const zoom = Math.min(1, (frame - FIT_STEP - BOARD_PADDING) / width);
+  for (let frame = Math.ceil((width + board) / FIT_STEP) * FIT_STEP; frame > FIT_MIN; frame -= FIT_STEP) {
+    const zoom = Math.min(1, (frame - FIT_STEP - board) / width);
     rules.push(`@media (max-width: ${String(frame)}px) { .docx-wrapper > section.docx { zoom: ${zoom.toFixed(3)}; } }`);
   }
   return rules.join(" ");

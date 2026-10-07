@@ -81,6 +81,9 @@
 </script>
 
 <script lang="ts">
+  import { ui } from "../../ui";
+  import { againstLookOf } from "../refrain/formats/against";
+  import Against from "../refrain/formats/against.look.svelte";
   import Compare from "../refrain/formats/compare.svelte";
   import Docx from "../refrain/formats/docx.svelte";
   import Pdf from "../refrain/formats/pdf.svelte";
@@ -90,6 +93,13 @@
   import Stand from "./stand.svelte";
 
   const FRAME = "refrain flex h-[480px] flex-col overflow-hidden bg-page";
+
+  const { lang } = ui();
+  const EARLIER = [
+    { version: V1, bytes: PDF_V1.length, kept: true, source: "on_disk" },
+    { version: V3, bytes: PDF_V2.length, kept: true, source: "on_disk" },
+  ] as const;
+  const ignore = (): void => undefined;
 </script>
 
 <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} answers={answering}>
@@ -113,6 +123,12 @@
     <div class={FRAME}>
       <Compare format="docx" from={{ version: V1, bytes: DOCX_V1 }} to={{ version: V2, bytes: DOCX_V2 }} name="plan.docx" />
     </div>
+  </Case>
+  <Case label="formats · the version picker above a PDF, compared with nothing" width={600}>
+    <Against {...againstLookOf(EARLIER, null, $lang, ignore)} />
+  </Case>
+  <Case label="formats · the version picker above a PDF, compared with an earlier version" width={600}>
+    <Against {...againstLookOf(EARLIER, V1, $lang, ignore)} />
   </Case>
   <Case label="formats · a DOCX that unpacks past the bound, refused unopened" width={600}>
     <div class={FRAME}><Docx bytes={DOCX_LARGE} version={V3} name="large.docx" /></div>
