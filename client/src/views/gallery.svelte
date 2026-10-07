@@ -62,6 +62,7 @@
   import PartDialog from "./gallery/parts/dialog.svelte";
   import PartField from "./gallery/parts/field.svelte";
   import PartNotice from "./gallery/parts/notice.svelte";
+  import PartPath from "./gallery/parts/path.svelte";
   import PartPopover from "./gallery/parts/popover.svelte";
   import PartSegmented from "./gallery/parts/segmented.svelte";
   import PartTable from "./gallery/parts/table.svelte";
@@ -159,6 +160,7 @@
   <Monitor />
   <PartButton />
   <PartField />
+  <PartPath />
   <PartCombobox />
   <PartTable />
   <PartDialog />

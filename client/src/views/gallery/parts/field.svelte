@@ -6,10 +6,10 @@
 -->
 
 <script lang="ts">
-  // The text field with help, with the city's error, with the browser's
-  // own reading of `pattern`, and in mono with fixed parts.
-  import { say } from "../../../core/lang";
+  // The labelled box in every state it can be in, each holding its own
+  // value so a person can type into the fixture and watch the borders.
   import { referenceFor, referenceText } from "../../../core/enrol";
+  import { say } from "../../../core/lang";
   import { ui } from "../../../ui";
   import Field from "../../parts/field.svelte";
   import Case from "../case.svelte";
@@ -20,6 +20,7 @@
   let bad = $state("api_gateway.internal");
   let key = $state(referenceText(referenceFor("zenmux")));
   let measured = $state("a million");
+  let stepped = $state("200000");
 </script>
 
 <!-- Two red edges that mean two things: `error` is the city's answer
@@ -61,6 +62,25 @@ and arrives red at once; `:user-invalid` is the browser reading
         key = value;
       }}
       mono
+    />
+  </div>
+</Case>
+
+<!-- A box nobody may change keeps its seat in the Tab order and puts
+back what is typed; a box in a column that already names it hides its
+label; a number steps with the arrow keys. -->
+<Case label="field · disabled, a hidden label, a number that steps">
+  <div class="flex flex-col gap-base">
+    <Field label={say($lang, "setup_key")} value={key} onInput={() => undefined} mono disabled />
+    <Field
+      label={say($lang, "part_context_window")}
+      labelling="hidden"
+      kind="number"
+      step={1024}
+      value={stepped}
+      onInput={(value) => {
+        stepped = value;
+      }}
     />
   </div>
 </Case>
