@@ -11,7 +11,6 @@
   // states that need a signal - a chosen model, a ticked row, an open
   // dialog - are held here beside the fixtures that show them.
 
-  import type { PopoverColumn } from "../parts/popover";
   import type { ModelRow } from "./served";
 
   // One refusal as the wire carries it: the action that failed, its
@@ -65,20 +64,20 @@
 </script>
 
 <script lang="ts">
-  import { fill, say } from "../../core/lang";
+  import { say } from "../../core/lang";
   import { referenceFor, referenceText } from "../../core/enrol";
   import { ui } from "../../ui";
   import Button from "../parts/button.svelte";
-  import Combobox from "../parts/combobox.svelte";
   import Dialog from "../parts/dialog.svelte";
   import EmptyState from "../parts/empty.svelte";
   import Field from "../parts/field.svelte";
   import Notice from "../parts/notice.svelte";
-  import Popover from "../parts/popover.svelte";
   import { Table } from "../parts/table";
   import type { Column } from "../parts/table";
   import Tip from "../parts/tip.svelte";
   import Case from "./case.svelte";
+  import ComboboxCases from "./parts/combobox.svelte";
+  import PopoverCases from "./parts/popover.svelte";
   import { CHOSEN, MODELS } from "./served";
 
   const { lang } = ui();
@@ -87,9 +86,6 @@
   let bad = $state("api_gateway.internal");
   let key = $state(referenceText(referenceFor("zenmux")));
   let measured = $state("a million");
-  let model = $state<string | null>(null);
-  const modelChoices = MODELS.map((each) => ({ value: each.id, label: each.id, note: each.context }));
-  const pickModel = (value: string): void => { model = value; };
   let rows = $state<readonly ModelRow[]>(MODELS);
   let picked = $state<readonly string[]>([CHOSEN.id]);
   let asking = $state(false);
@@ -121,37 +117,6 @@
       },
     },
   ];
-
-  // The point picker's two columns: where a run turned, and what it did
-  // in that turn. Turn numbers are filled from the one phrase that
-  // numbers a turn; the call rows are the wire's own verb and subject.
-  function forkColumns(): readonly PopoverColumn[] {
-    return [
-      {
-        id: "turns",
-        label: "run_turns",
-        rows: [
-          {
-            id: "turn-3",
-            label: fill(say($lang, "run_turn_n"), { n: "3" }),
-            secondary: "03:35",
-            chosen: true,
-          },
-          { id: "turn-2", label: fill(say($lang, "run_turn_n"), { n: "2" }), secondary: "03:12" },
-          { id: "turn-1", label: fill(say($lang, "run_turn_n"), { n: "1" }), secondary: "02:58" },
-        ],
-      },
-      {
-        id: "calls",
-        label: "talk_calls",
-        rows: [
-          { id: "call-11", label: "exec: cargo test -p sprawling-kernel", chosen: true },
-          { id: "call-10", label: "edit: crates/kernel/src/gate/door.rs" },
-          { id: "call-4", label: "search: GateOutcome" },
-        ],
-      },
-    ];
-  }
 </script>
 
 {#snippet idCell(row: ModelRow)}
@@ -225,16 +190,7 @@ and arrives red at once; `:user-invalid` is the browser reading
   </div>
 </Case>
 
-<!-- Stacked as the settings page stacks them: the open list covers the second trigger.
-The list is positioned and takes no room, so `pb-output` (the list's own max height) grows the section to hold it. -->
-<Case label="combobox · open on click, nothing chosen">
-  <div class="flex flex-col gap-base pb-output">
-    <Combobox label={say($lang, "setup_main")} placeholder={say($lang, "part_search")} empty={say($lang, "part_no_match")}
-      choices={modelChoices} value={model} onPick={pickModel} starts="open" />
-    <Combobox label={say($lang, "setup_digest")} placeholder={say($lang, "part_search")} empty={say($lang, "part_no_match")}
-      choices={modelChoices} value={model} onPick={pickModel} />
-  </div>
-</Case>
+<ComboboxCases />
 
 <Case label="table · partial selection, sortable, corrected in place">
   <Table
@@ -297,23 +253,7 @@ The list is positioned and takes no room, so `pb-output` (the list's own max hei
   />
 </Case>
 
-<!-- The two columns the point picker opens over the composer: the
-list is drawn open here because the state worth looking at is the
-state it opens into. -->
-<Case label="popover · two columns of one choice">
-  <div class="pt-palette">
-    <div class="pt-output">
-      <div class="relative">
-        <Popover
-          label="fork_pick_title"
-          columns={forkColumns()}
-          onApply={() => undefined}
-          onClose={() => undefined}
-        />
-      </div>
-    </div>
-  </div>
-</Case>
+<PopoverCases />
 
 <!-- The relation `tip.tsx` documents on a control that is named by
 its own text: the hint is `aria-describedby`, never the name.
