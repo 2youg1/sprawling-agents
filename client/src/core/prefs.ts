@@ -34,9 +34,8 @@ import { derived, get, writable } from "svelte/store";
 import type { Readable } from "svelte/store";
 
 import { EDITORS, type Opening } from "./editor";
-import { langOf, type Lang } from "./lang";
+import type { Lang } from "./lang";
 import { browserRows, type Rows } from "./rows";
-import { sizingOf } from "./sizing";
 import {
   Proxying,
   Tier as TierSchema,
@@ -46,7 +45,8 @@ import {
 } from "../wire";
 import { appearanceOnWire, type Keeper } from "./prefs_city";
 import { readTheme, type Theme } from "./theme_override";
-import { CHROMAS, DENSITIES, FACES, GLASSES, LIGHTINGS, MOTIONS, STACK_SHAPE, blendOf, type Appearance } from "./appearance";
+import { CHROMAS, DENSITIES, FACES, GLASSES, LIGHTINGS, MOTIONS, blendOf, type Appearance } from "./appearance";
+import { readBody, readLang, readOne, readStack, writeFigure } from "./prefs_values";
 import type { Notifying } from "./notify";
 import { SHOWINGS, type Showing } from "./results";
 import { readWorkbench, spelledWorkbench, type Workbench } from "./workbench";
@@ -204,25 +204,6 @@ export interface PreferenceDoor {
   readonly setWorkbench: (next: Workbench) => void;
 }
 
-// A stored word, or the posture this client ships with when the row is
-// empty or holds a word this build no longer offers.
-function readOne<T extends string>(offered: readonly T[], raw: string | null, fallback: T): T {
-  return offered.find((each) => each === raw) ?? fallback;
-}
-
-function readBody(raw: string | null): number | null {
-  const said = sizingOf(raw ?? "");
-  return said.kind === "sized" ? said.px : null;
-}
-
-function readStack(raw: string | null): string {
-  return raw !== null && STACK_SHAPE.test(raw) ? raw : "";
-}
-
-function readLang(raw: string | null, fallback: string): Lang {
-  return raw === "en" || raw === "zh" ? raw : langOf(fallback);
-}
-
 function readAppearance(rows: Rows): Appearance {
   return {
     lighting: readOne(LIGHTINGS, rows.getItem(ROWS.lighting), "system"),
@@ -251,13 +232,6 @@ function writeAppearance(rows: Rows, next: Appearance): void {
   rows.setItem(ROWS.motion, next.motion);
   rows.setItem(ROWS.glass, next.glass);
   writeFigure(rows, ROWS.blend, next.blend);
-}
-
-// A size or an opacity the person has not stated is absent from storage
-// too, so the stylesheet's own figure keeps its one home in the theme.
-function writeFigure(rows: Rows, row: string, figure: number | null): void {
-  if (figure === null) rows.removeItem(row);
-  else rows.setItem(row, String(figure));
 }
 
 // The two words a yes-or-no row is written and read with. Each row is
