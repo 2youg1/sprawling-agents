@@ -10,7 +10,8 @@
   // (client/Spec.lean §4-39): a link when the line belongs to the worktree's
   // current text and an editor is chosen, and otherwise the location
   // written out to copy, so the page never claims an editor opened
-  // something (`core/editor.ts`'s `reachOf`).
+  // something (`core/editor.ts`'s `reachOf`). It is drawn by the
+  // inspector's worded key, `./text_key.look.svelte`.
 
   // How long the copy receipt holds: long enough to see, short enough
   // that it never becomes the control's face.
@@ -22,6 +23,8 @@
   import type { Shown } from "../../core/editor";
   import { say } from "../../core/lang";
   import { ui } from "../../ui";
+  import type { TextKeyLook } from "./text_key";
+  import Look from "./text_key.look.svelte";
 
   interface Props {
     // Relative to the city, as the ledger records it.
@@ -37,7 +40,6 @@
   const lang = u.lang;
 
   const reach = $derived(reachOf({ ...u.prefs.editor(), path, line }, shown));
-  const place = $derived(reach.kind === "copy" ? reach.text : "");
 
   let copied = $state(false);
 
@@ -52,17 +54,24 @@
     });
   }
 
-  const SHAPE = "flex h-control-sm shrink-0 items-center rounded-control px-snug text-note text-text-faint hover:bg-raised hover:text-text";
+  const look: TextKeyLook = $derived.by(() => {
+    switch (reach.kind) {
+      case "link":
+        return { label: say($lang, "setup_editor"), wire: { href: reach.href } };
+      case "copy": {
+        const place = reach.text;
+        return {
+          label: say($lang, copied ? "code_copied" : "inspect_copy_place"),
+          wire: {
+            type: "button",
+            onclick: () => {
+              copy(place);
+            },
+          },
+        };
+      }
+    }
+  });
 </script>
 
-{#if reach.kind === "link"}
-  <a class={SHAPE} href={reach.href}>{say($lang, "setup_editor")}</a>
-{:else}
-  <button
-    type="button"
-    class={SHAPE}
-    onclick={() => {
-      copy(place);
-    }}>{say($lang, copied ? "code_copied" : "inspect_copy_place")}</button
-  >
-{/if}
+<Look {...look} />

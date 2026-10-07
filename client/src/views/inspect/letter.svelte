@@ -19,6 +19,10 @@
   // around the line that offered the card, with a link to the whole
   // session (client D91).
   //
+  // The heading is the document's whole address, broken across lines
+  // where the column is narrow rather than cut short, because a cut name
+  // reaches a pointer only through a hover and a keyboard not at all.
+  //
   // The heading takes the focus when the letter opens, so the mailbox
   // that stowed for it does not hand the focus to its key, and Escape
   // in here is the inspector's: the way back to the row is
@@ -80,7 +84,7 @@
 
 <div class="flex min-h-0 flex-1 flex-col bg-page">
   <div class="flex flex-wrap items-center gap-x-base gap-y-tight border-b border-edge px-wide py-snug">
-    <h2 bind:this={heading} tabindex="-1" class="min-w-0 flex-1 truncate font-mono text-note text-text-quiet" title={doc}>{doc}</h2>
+    <h2 bind:this={heading} tabindex="-1" class="min-w-0 flex-1 font-mono text-note break-all text-text-quiet">{doc}</h2>
     {#if held !== null}
       <a class="text-note text-text-quiet underline hover:text-text" href={toFragment({ kind: "run", run: held.run })}>
         {fill(say($lang, "letter_sender"), { who: $belief.runs[held.run]?.addr ?? held.run.slice(0, 8) })}
