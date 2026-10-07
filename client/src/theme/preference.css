@@ -14,19 +14,6 @@
   --face-mono: ui-monospace;
 }
 
-/* The three body sizes a person chooses between, declared here so the
- * colour gate reads each one and demands the tier it needs: at weight
- * 400 all three sit at Lc 90, which is what --color-text reaches on the
- * surface ceiling. Only the body step moves - a note stays at 15px,
- * because a smaller note would demand a tier its token does not
- * reach. */
-:root[data-body="14"] {
-  --text-body: 14px;
-}
-:root[data-body="16"] {
-  --text-body: 16px;
-}
-
 /* All the colour, or none of it. The coefficient is already the one
  * place desaturation is expressed; this only says who may set it. */
 :root[data-chroma="off"] {

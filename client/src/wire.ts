@@ -9,13 +9,13 @@
 import { Schema } from "effect";
 
 /** The wire version both ends compare on connect. */
-export const WIRE_V = 61 as const;
+export const WIRE_V = 62 as const;
 /** The schema hash the server checks: `wire::schema_hash()`. */
-export const WIRE_HASH = "10526bff82e01bc6e440ed9f21ac581dd4e7d77f294275c00d61d66dd74335e3" as const;
+export const WIRE_HASH = "43fead7e874fcc0a23f1054344ab8e3718011e4492216e69c8791c7427a86eaa" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
-/** The body sizes a person may ask for: `wire::BODY_PX_MIN` and `BODY_PX_MAX`. */
-export const BODY_PX = { min: 12, max: 20 } as const;
+/** The smallest body size a person may ask for: `wire::BODY_PX_MIN`. */
+export const BODY_PX = { min: 12 } as const;
 
 /**
  * Whether the account a request went out on can still take it
@@ -2874,7 +2874,7 @@ export type Motion = typeof Motion.Type;
  */
 export const Appearance = Schema.Struct({
   blend_percent: Schema.optional(Schema.NullOr(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)))),
-  body_px: Schema.optional(Schema.NullOr(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)))),
+  body_px: Schema.optional(Schema.NullOr(Schema.Int.check(Schema.isGreaterThanOrEqualTo(12)))),
   chroma: Chroma,
   density: Density,
   glass: Schema.optional(Schema.NullOr(Glass)),

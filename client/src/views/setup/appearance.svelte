@@ -156,11 +156,8 @@
 
   // The size box's one line of constraint: the card's foot carries it,
   // and a refused box repeats it where the person is looking.
-  const sizeRange = (): string =>
-    fill(say($lang, "appearance_body_range"), {
-      min: String(BODY_PX.min),
-      max: String(BODY_PX.max),
-    });
+  const sizeFloor = (): string =>
+    fill(say($lang, "appearance_body_floor"), { min: String(BODY_PX.min) });
 
   // A refusal, or no such property at all: spreading it keeps an absent
   // error apart from `error={undefined}`, which marks the box.
@@ -168,7 +165,7 @@
     stackRefused(stack) ? { error: say($lang, "appearance_stack_refused") } : {};
 
   const sizeRefusal = (): Pick<FieldProps, "error"> =>
-    sizingOf(box).kind === "refused" ? { error: sizeRange() } : {};
+    sizingOf(box).kind === "refused" ? { error: sizeFloor() } : {};
 </script>
 
 {#snippet foot(constraint: string | undefined, name: Setting)}
@@ -297,7 +294,7 @@ language card the settings page adds beside them takes the next cell. -->
       onInput={resize}
     />
     <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
-    {@render foot(sizeRange(), "body")}
+    {@render foot(sizeFloor(), "body")}
   </div>
 
   <div class="flex flex-col gap-tight rounded-card bg-raised px-base py-snug">

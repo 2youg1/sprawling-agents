@@ -7,9 +7,9 @@
     "en": "body size",
     "zh": "正文字号"
   },
-  "appearance_body_range": {
-    "en": "a whole number of pixels from {min} to {max}; an empty box takes the size the page is drawn at",
-    "zh": "{min} 到 {max} 之间的整数像素；留空即采用页面本来的字号"
+  "appearance_body_floor": {
+    "en": "a whole number of pixels from {min} up; an empty box takes the size the page is drawn at",
+    "zh": "{min} 起的整数像素；留空即采用页面本来的字号"
   },
   "appearance_body_unit": {
     "en": "px",
