@@ -20,7 +20,8 @@ Plans, decisions and handoffs live in files. sprawling uses these records to car
 
 <p align="center">
   <img alt="The Main conversation page before a session: the text box, the workspace on the left, the model, effort and permission controls on the right" src="docs/images/main-before-a-session.png" width="49%">
-  <img alt="The same page during a session: the reply, a tool call, and no controls under the box" src="docs/images/main-during-a-session.png" width="49%">
+  <img alt="A finished session with its sheet: time to first token, output rate, cache hits and tokens, then each tool call with how long it took, and the file it read open on the right" src="docs/images/a-session-at-work.png" width="49%">
+  <img alt="The report the run wrote, with its table and numbered list, beside the CSV file it read" src="docs/images/a-report-beside-its-file.png" width="98%">
 </p>
 
 **Status: <!-- xtask:begin maturity:word -->alpha<!-- xtask:end -->.** Data formats, the wire and the interface may still change between versions.

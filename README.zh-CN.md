@@ -20,7 +20,8 @@
 
 <p align="center">
   <img alt="会话开始前的 Main 对话页：输入框，左边是工作区，右边是模型、思考强度和权限三个控件" src="docs/images/main-before-a-session.png" width="49%">
-  <img alt="会话进行中的同一页：回复、一次工具调用，输入框下没有控件" src="docs/images/main-during-a-session.png" width="49%">
+  <img alt="一个完成的会话和它的仪表：首个 token 用时、输出速度、缓存命中和 token 数，下面是每次工具调用和它的耗时，右边打开着它读过的文件" src="docs/images/a-session-at-work.png" width="49%">
+  <img alt="这次 run 写出的报告，带表格和编号列表，旁边是它读的 CSV 文件" src="docs/images/a-report-beside-its-file.png" width="98%">
 </p>
 
 **状态：<!-- xtask:begin maturity:word -->alpha<!-- xtask:end -->。** 数据格式、wire 与界面在版本之间仍可能改变。
