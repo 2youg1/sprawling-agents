@@ -236,6 +236,15 @@ A contributor without push access to this repository runs tier 2 in a fork befor
 
 Four workflows run on a schedule rather than on a push, and each judges something a push cannot: `nightly.yml` (advisories and fuzzing), `platforms.yml` (the gates on macOS, the workspace on the oldest compiler `rust-version` names, the Nix flake, a byte-for-byte rebuild), `adversary.yml` (the Lean adversary on a fresh seed) and `upstream-watch.yml`. A red scheduled run is news about the tree as it stands; read it the next morning and fix the cause on `main`. `on-demand.yml` runs what nobody waits for on a push — mutation of a branch's diff, citysim, the screenshots, a release build of a ref, a profile-guided release build — when it is dispatched with `-f job=<name>`, and the kani autoharness lead runs when `nightly.yml` is dispatched by hand.
 
+## Delegated work
+
+Work handed to several agents at once tends to fail between its steps rather than inside them: a call drops, a stage acts on a premise that has since changed, a clean-up removes work that never landed. These rules hold whatever tool runs the agents.
+
+- Give each delegated call its own result and start the next stage from those results, because a dropped call or a reset connection is routine and should cost one retry, not every stage that waits behind it.
+- Before a stage that deletes branches, worktrees or files, save every ref it touches with `git bundle`, and start it only after the work it cleans up after has reported success; a deletion that follows a failure removes the only copy.
+- A delegated run keeps the premise it started with, so when a ruling changes a name, a date or a scope while it runs, read its report against that ruling and write the ruling where the next run reads its state.
+- Before a release, run the final tree with a real model on a copy of data the previous release wrote, because the gates judge the shapes they were written for and this run reaches what none of them does.
+
 ## Commits
 
 - The first line is `card-<stage>.<index>: <what>`, for example `card-S4.02: the wire, and the two frames a socket cannot spell`.
