@@ -180,6 +180,29 @@
   background-color: color-mix(in oklch, var(--color-text) 8%, transparent);
 }
 
+/* The chosen one of a list of rows: a 2 px accent bar down its leading
+ * edge, standing in from the row's top and bottom by one `snug` step
+ * (docs/frontend-method.md §7B). This is the bar's one drawing; a
+ * session row, a settings group and a list row all write `chosen`.
+ *
+ * The bar is a border rather than a fill, for the reason `asks` gives:
+ * a forced-colour mode replaces every fill with a system colour, and a
+ * bar painted as a background would vanish into the row, while a border
+ * becomes the text colour and stays. The row is the containing block,
+ * so whatever the row already positions is left where it was. */
+@utility chosen {
+  position: relative;
+
+  &::before {
+    content: "";
+    position: absolute;
+    inset-block: var(--spacing-snug);
+    inset-inline-start: 0;
+    border-inline-start: var(--spacing-hair) solid var(--color-accent);
+    border-radius: var(--radius-pill);
+  }
+}
+
 /* As many columns of prose as the room holds, and no breakpoint.
  *
  * A settings page and a dependency page are lists of cards that read
