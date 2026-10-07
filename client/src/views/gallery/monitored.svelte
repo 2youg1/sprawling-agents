@@ -89,3 +89,20 @@
     <Monitor turns={TURNS} tail={NO_TAIL} live={true} onDraft={() => undefined} onSteer={() => undefined} />
   </div>
 </Case>
+
+<!-- Folded and paused: the column of changed files stands where the
+terminal was, and the follow toggle stands on its raised fill. -->
+<Case label="monitor · the terminal folded">
+  <div class="flex h-[32rem] min-h-0 flex-col rounded-card border border-edge">
+    <Monitor turns={TURNS} tail={NO_TAIL} live={true} following="paused" terminal="folded" onDraft={() => undefined} onSteer={() => undefined} />
+  </div>
+</Case>
+
+<!-- A finished run takes no steer, so a hunk offers no comment or
+revert; with no editor chosen it offers nothing, and draws no empty
+strip of actions over its lines. -->
+<Case label="monitor · a finished run">
+  <div class="flex h-[32rem] min-h-0 flex-col rounded-card border border-edge">
+    <Monitor turns={TURNS} tail={NO_TAIL} live={false} onDraft={() => undefined} onSteer={() => undefined} />
+  </div>
+</Case>
