@@ -41,9 +41,14 @@
             class="flex items-baseline gap-base px-tight py-snug text-note transition-colors ease-leave hover:wash hover:ease-arrive"
           >
             <span class="w-figure shrink-0 font-mono text-text-faint">{row.at}</span>
-            {#if row.outcome !== null}
-              <span class="shrink-0 self-center {OUTCOME_INK[row.outcome]}"><Glyph name={OUTCOME_GLYPH[row.outcome]} size="sm" /></span>
-            {/if}
+            <!-- The mark's slot stands even where a run has no outcome
+            yet, so the room and task columns start at one edge down the
+            list. -->
+            <span class={["inline-flex size-glyph-sm shrink-0 self-center", row.outcome === null ? "" : OUTCOME_INK[row.outcome]]}>
+              {#if row.outcome !== null}
+                <Glyph name={OUTCOME_GLYPH[row.outcome]} size="sm" />
+              {/if}
+            </span>
             <span class="w-output shrink-0 truncate font-mono text-text-quiet">{row.addr}</span>
             <span class="min-w-0 flex-1 truncate text-body text-text">{row.title}</span>
             {#if row.tail.kind === "produced"}
