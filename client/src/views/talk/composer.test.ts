@@ -7,8 +7,8 @@ import { describe, expect, test } from "bun:test";
 
 import type { RunBelief } from "../../core/belief";
 import { Address, RunId, Seq, TimeMs } from "../../wire";
-import { menuColumns, modelMove, picksFor, pills, sessionModel } from "./composer";
-import type { Around, Picks } from "./composer";
+import { boxKey, menuColumns, modelMove, picksFor, pills, sessionModel } from "./composer";
+import type { Around, BoxKey, Picks } from "./composer";
 
 const ignore = (): void => undefined;
 const picks: Picks = { model: ignore, workspace: ignore, effort: ignore };
@@ -97,4 +97,39 @@ test("a model pick sends selection alone, never a session command", () => {
   expect(sent).toMatchObject([{ select_model: { endpoint: "local", model: "fake-chat", tag: "main" } }]);
   picksFor(hands, "fake-small").model("local\u0000fake-chat");
   expect(sent).toHaveLength(1);
+});
+
+describe("a key in the box", () => {
+  const pressed = (key: string, shiftKey = false, isComposing = false) => ({ key, shiftKey, isComposing });
+  const keys = ["Enter", "Tab", "ArrowUp", "a"] as const;
+  const boxes = [
+    { menu: false, empty: false },
+    { menu: false, empty: true },
+    { menu: true, empty: false },
+  ] as const;
+
+  // Every key, with and without Shift, in every box: a key that confirms
+  // an input method's composition is the input method's, so an Enter that
+  // picks a candidate never sends half a sentence.
+  test("a composing key is always the box's", () => {
+    const decided: BoxKey[] = keys.flatMap((key) =>
+      boxes.flatMap((box) => [false, true].map((shift) => boxKey(pressed(key, shift, true), box))),
+    );
+    expect(new Set(decided)).toEqual(new Set(["type"]));
+  });
+
+  test("Enter sends and Shift+Enter starts a line", () => {
+    expect([boxKey(pressed("Enter"), boxes[0]), boxKey(pressed("Enter", true), boxes[0])]).toEqual(["send", "type"]);
+  });
+
+  test("ArrowUp recalls only in an empty box, where it cannot move the caret", () => {
+    expect([boxKey(pressed("ArrowUp"), boxes[1]), boxKey(pressed("ArrowUp"), boxes[0])]).toEqual(["recall", "type"]);
+  });
+
+  // Under an open menu Tab completes and every other key is offered to
+  // the menu first; one the menu does not take is the box's own again.
+  test("an open menu takes Tab and is offered the rest", () => {
+    expect(keys.map((key) => boxKey(pressed(key), boxes[2]))).toEqual(["menu", "complete", "menu", "menu"]);
+    expect(boxKey(pressed("Enter"), { ...boxes[2], menu: false })).toBe("send");
+  });
 });

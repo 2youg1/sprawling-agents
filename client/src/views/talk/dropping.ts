@@ -13,9 +13,15 @@
 import { bearing } from "../../core/socket";
 
 // What one file came to.
-export type Kept =
-  | { readonly kind: "path"; readonly path: string }
-  | { readonly kind: "refused"; readonly name: string; readonly said: string };
+export type Kept = { readonly kind: "path"; readonly path: string } | Refused;
+
+// A file the city did not keep, and the reason it gave; an empty reason
+// is a city the page did not reach.
+export interface Refused {
+  readonly kind: "refused";
+  readonly name: string;
+  readonly said: string;
+}
 
 // The local paths a `text/uri-list` names. Lines starting `#` are
 // comments in that format; a URI that is not `file:` names nothing on
@@ -40,15 +46,18 @@ export function spelled(paths: readonly string[]): string {
   return paths.map((path) => (/\s/.test(path) ? `"${path}"` : path)).join(" ");
 }
 
-// Sends one file to the city and reads back where it was kept.
+// Sends one file to the city and reads back where it was kept. A send
+// or an answer that broke off is a refusal with nothing said, which the
+// box words as the city not being reached, so a file never vanishes
+// from a drop without a line under the box.
 export async function keep(origin: string, token: string | null, file: File): Promise<Kept> {
   const answer = await fetch(`${origin}/drop?name=${encodeURIComponent(file.name)}`, {
     method: "POST",
     headers: { "content-type": "application/octet-stream", ...bearing(token) },
     body: file,
   }).catch(() => null);
-  if (answer === null) return { kind: "refused", name: file.name, said: "" };
-  const said = await answer.text();
+  const said = answer === null ? null : await answer.text().catch(() => null);
+  if (answer === null || said === null) return { kind: "refused", name: file.name, said: "" };
   return answer.ok ? { kind: "path", path: said } : { kind: "refused", name: file.name, said };
 }
 

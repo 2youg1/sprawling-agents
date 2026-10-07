@@ -5,7 +5,7 @@
 
 import { describe, expect, test } from "bun:test";
 
-import { insertAt, localPaths, spelled } from "./dropping";
+import { insertAt, keep, localPaths, spelled } from "./dropping";
 
 describe("dropping", () => {
   test("a file manager's URIs become the paths they name, on either system", () => {
@@ -29,5 +29,32 @@ describe("dropping", () => {
 
   test("a path with a space in it stays one path in the box", () => {
     expect(spelled(["C:/a b/c.txt", "/d/e.txt"])).toBe('"C:/a b/c.txt" /d/e.txt');
+  });
+});
+
+// An answer whose body breaks off half way, in place of the city: the
+// stub replaces the one browser facility `keep` reaches for.
+function breakingOff(): () => void {
+  const held = globalThis.fetch;
+  const body = new ReadableStream({
+    start(controller) {
+      controller.error(new Error("the link closed"));
+    },
+  });
+  const answer = (): Promise<Response> => Promise.resolve(new Response(body, { status: 200 }));
+  globalThis.fetch = Object.assign(answer, { preconnect: held.preconnect });
+  return () => {
+    globalThis.fetch = held;
+  };
+}
+
+describe("a file sent to the city", () => {
+  // A file must not vanish from a drop without a line under the box: an
+  // answer the page could not read is a refusal with nothing said.
+  test("an answer that broke off is a refusal, not a lost file", async () => {
+    const restore = breakingOff();
+    const kept = await keep("http://localhost:7000", null, new File(["x"], "notes.md"));
+    restore();
+    expect(kept).toEqual({ kind: "refused", name: "notes.md", said: "" });
   });
 });

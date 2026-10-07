@@ -117,6 +117,9 @@
    * the 7.9 px square the template draws - seven sixteenths of the
    * 18 px key glyph. A larger stop reads as a second, heavier key. */
   --spacing-glyph-stop: 8.5px;
+  /* How far the composer's line fades out past the end of the words:
+   * an empty box shows only this lead from the left edge (§7I). */
+  --spacing-typed-fade: 160px;
   /* The conversation as a band along the bottom of the panorama tier:
    * the last thing said, the field, and its line. */
   --spacing-band: 112px;

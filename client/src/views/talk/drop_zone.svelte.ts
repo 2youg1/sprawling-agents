@@ -11,11 +11,11 @@
 
 import type { Ui } from "../../ui";
 import { dropped } from "./dropping";
-import type { Kept } from "./dropping";
+import type { Refused } from "./dropping";
 
 export class DropZone {
   over = $state(false);
-  refused = $state<readonly Kept[]>([]);
+  refused = $state<readonly Refused[]>([]);
 
   constructor(
     private readonly ui: Ui,
@@ -44,7 +44,7 @@ export class DropZone {
     }
     void drop.kept.then((kept) => {
       this.place(kept.flatMap((each) => (each.kind === "path" ? [each.path] : [])));
-      this.refused = kept.filter((each) => each.kind === "refused");
+      this.refused = kept.filter((each): each is Refused => each.kind === "refused");
     });
   };
 }

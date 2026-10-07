@@ -5,16 +5,18 @@
 
 // What the box a person writes in knows: where a message lands and how
 // that is spelled, what its three choosers offer and what a pick means,
-// which verb a typed `/` line runs, and where unsent words are kept.
-// `composer.svelte` draws these; this file decides them, so a chooser
-// row and a menu row cannot come to mean two different things.
+// which verb a typed `/` line runs, and what a key in the box does.
+// `composer.svelte` seats these and `composer.look.svelte` draws them;
+// this file decides them, so a chooser row and a menu row cannot come to
+// mean two different things. Where unsent words are kept is `draft.ts`.
 
 import { Option, Schema } from "effect";
+import type { Snippet } from "svelte";
+import type { HTMLFormAttributes, HTMLTextareaAttributes } from "svelte/elements";
 
 import type { Belief, RunBelief } from "../../core/belief";
 import { heldIn } from "../../core/belief/rooms";
 import { EFFORTS, selectModel } from "../../core/commands";
-import type { PreferenceDoor } from "../../core/prefs";
 import type { Key, Lang } from "../../core/lang";
 import { fill, say } from "../../core/lang";
 import { MAYOR } from "../../core/route";
@@ -36,62 +38,6 @@ export const SPELLING: Record<Sending, Key> = {
   steer: "talk_steer",
   queued: "talk_steer_queued",
 };
-
-// How long a keystroke waits before the draft is written.
-const DRAFT_MS = 500;
-
-// ------------------------------------------------------------- the draft
-
-// What was typed and not sent, for one place a person writes. The words
-// not yet written and the timer that will write them travel with the
-// door they go through, so the box cannot end up with one of the three
-// and not the others.
-//
-// A keystroke schedules a write instead of making one: the draft door
-// touches browser storage, and a write per key is a write per key. A
-// change that empties or replaces the box writes at once - those are
-// rare, and a reload right after a send must not resurrect the words
-// that just went out.
-export interface Draft {
-  // Read once, when the box mounts: the door is a plain function, not a
-  // signal.
-  readonly read: string;
-  // Words typed, to be written when the person pauses.
-  keep(words: string): void;
-  // Words placed in the box - sent away, transcribed, completed - to be
-  // written now.
-  replace(words: string): void;
-  flush(): void;
-}
-
-export function draftAt(door: PreferenceDoor, at: string | undefined): Draft {
-  let pending: string | null = null;
-  let flushing: ReturnType<typeof setTimeout> | undefined = undefined;
-
-  function flush(): void {
-    if (flushing !== undefined) {
-      clearTimeout(flushing);
-      flushing = undefined;
-    }
-    if (pending === null || at === undefined) return;
-    door.setDraft(at, pending);
-    pending = null;
-  }
-
-  return {
-    read: at === undefined ? "" : door.draft(at),
-    keep(words) {
-      pending = words;
-      if (flushing !== undefined) clearTimeout(flushing);
-      flushing = setTimeout(flush, DRAFT_MS);
-    },
-    replace(words) {
-      pending = words;
-      flush();
-    },
-    flush,
-  };
-}
 
 // -------------------------------------------------------- the three pills
 
@@ -368,4 +314,61 @@ export function slashHands(reach: Reach): SlashHands {
     newest: (room) => reached(heldIn(reach.belief, room).at(-1)),
     models: reach.models.map((each) => ({ endpoint: each.endpoint, model: each.model })),
   };
+}
+
+// ------------------------------------------------------ a key in the box
+
+// What one key pressed in the box does. `complete` takes the menu's
+// verb into the box, `menu` offers the key to the open `/` menu first,
+// `recall` brings back what was last sent here, `send` hands the words
+// on, and `type` leaves the key to the box. A key that confirms an input
+// method's composition belongs to the input method, so it is always
+// `type`: an Enter that picks a candidate must not send half a sentence.
+export type BoxKey = "complete" | "menu" | "recall" | "send" | "type";
+
+export interface KeyPressed {
+  readonly key: string;
+  readonly shiftKey: boolean;
+  readonly isComposing: boolean;
+}
+
+export interface BoxState {
+  // Whether the `/` menu is over the box with rows in it.
+  readonly menu: boolean;
+  readonly empty: boolean;
+}
+
+// A key the menu does not take is asked again with `menu: false`, so the
+// box keeps its own keys under an open menu.
+export function boxKey(pressed: KeyPressed, box: BoxState): BoxKey {
+  if (pressed.isComposing) return "type";
+  if (box.menu) return pressed.key === "Tab" ? "complete" : "menu";
+  if (pressed.key === "ArrowUp" && box.empty) return "recall";
+  if (pressed.key === "Enter" && !pressed.shiftKey) return "send";
+  return "type";
+}
+
+// ---------------------------------------------------------- the look
+
+// What `composer.look.svelte` is handed (docs/frontend-method.md §7I):
+// the form's wiring - its name, the submit, and the three handlers of a
+// drop target - and the text box's, each as one bag the look spreads on
+// its element, whether a drag is over the box, and the parts the look
+// places around the words, each already seated.
+export interface ComposerLook {
+  readonly form: HTMLFormAttributes;
+  readonly over: boolean;
+  readonly box: HTMLTextareaAttributes;
+  // The `/` menu, while it is open over the box.
+  readonly menu: Snippet | undefined;
+  // What stands above the words in the band (the last thing said).
+  readonly band: Snippet | undefined;
+  // What stands at the end of the words' row: the microphone, the
+  // context ring and the coin key.
+  readonly keys: Snippet;
+  // The line under the words.
+  readonly line: Snippet;
+  // Under the line: the send receipt, the draft the browser did not
+  // keep, the files a drop did not keep, and the settings row.
+  readonly under: Snippet;
 }
