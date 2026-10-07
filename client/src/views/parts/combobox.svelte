@@ -107,6 +107,13 @@
 			}
 			side = PREFERRED;
 			layer = "open";
+			// The filter takes the focus once the popup is drawn, so every key
+			// of the table lands on the combobox rather than on the trigger.
+			// Without scrolling: the popup sits beside the trigger the person
+			// just pressed. Only an opening by the person takes the focus: a
+			// popup drawn open on load that took it would lose it to the next
+			// one drawn open, and a leaving focus closes the popup.
+			void tick().then(() => search?.focus({ preventScroll: true }));
 		},
 		act,
 		type: (typed) => {
@@ -146,14 +153,6 @@
 	};
 
 	const look = $derived(lookOf({ props, uid, layer, query, cursor, rows, side }, hands));
-
-	// The filter takes the focus the moment the popup opens, so every key
-	// of the table lands on the combobox rather than on the trigger.
-	// Without scrolling: the popup sits beside the trigger the person
-	// just pressed, and a popup drawn open on load must not move the page.
-	$effect(() => {
-		if (layer === "open" && search !== undefined) search.focus({ preventScroll: true });
-	});
 
 	// Measured once per opening, on the side it was drawn on: a side that
 	// changed with every letter typed would make the list jump while the
