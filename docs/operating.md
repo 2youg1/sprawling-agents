@@ -240,6 +240,29 @@ A copied working tree alone does not restrict absolute host paths, network acces
 
 The shell arm is off until a building's `CONFIG.toml` sets `[sandbox] shell = true`. It runs the interpreter `COMSPEC` names on Windows (`cmd.exe` when it is unset) with `/C`, and the one `SHELL` names on macOS and Linux (`/bin/sh` when it is unset) with `-c`; when no interpreter is found the call is refused and names the program arm instead. Python runs as a wasip1 guest and reaches only its configured preopened directories. Set `[sandbox] interpreter = "pwsh"` to use PowerShell 7 on any supported platform; if it is missing, the tool refuses rather than interpreting its syntax with the system shell. [Exec D30](../crates/runtime/spec/Tools/Exec.lean) defines interpreter selection and error reporting.
 
+## Privacy
+
+Privacy here means what leaves your machine and what stays in the city's records; it is not the same thing as security. Many of the settings below cost some convenience, and only you can weigh that cost.
+
+**Keys you type into a conversation.** A provider-shaped key in a message you send to a room goes to the vault before the run sees it, and the message carries its `secret:pasted/<name>` reference instead ([custody](../crates/accounting/src/worker/dispatching/custody.rs)). The model never reads the key. Only keys that match the provider shape table are taken, because a long random-looking string is as often a commit hash the agent has to read.
+
+**Keys in model replies and tool results.** Before a model reply, a tool call or a tool result is written to the Ledger, every secret-shaped span in it is replaced by a `secret:redacted/<16 hex>` marker ([redact](../crates/runtime/src/redact.rs)). The marker shows that two occurrences are the same value without being the value. The conversation the model works in keeps the original bytes, so replacing them cannot break a reply's signature or the model's train of thought; the Ledger is permanent and exportable, so that is where the value is removed.
+
+**What reaches the network.** Model calls go only to the providers you connect. A building that is not confidential offers its runs `web_search`, which by default sends the search words to Exa's hosted service; `choice = "off"` under `[search]` removes the tool. A confidential building (`/raise vault confidential`) makes no call to a remote provider and starts no MCP server ([getting started](getting-started.md#a-building-of-your-own)).
+
+### Windows privacy controls
+
+On Windows, Settings "privacy" lists 88 optional controls in nine categories, from diagnostic data and speech input to app permissions and Windows AI features ([the control table](../crates/sprawling/src/privacy/controls.rs)). Each control is one host setting: a machine or user registry value, a user environment variable, or the enabled state of a scheduled task. For each one the page shows the current value, the value it would write, whether it is per user or for the whole machine, what it changes, what may stop working, and which Windows editions Microsoft says honour it. For most controls Microsoft does not say whether Windows Home honours them, and the page then says "not stated".
+
+Nothing is applied for you, and there is no "apply all". You apply or restore one control at a time:
+
+1. The confirmation names the value the page showed. If the value on the machine changed since then, the city refuses the operation.
+2. A machine-wide setting asks for administrator rights through a UAC prompt.
+3. The city records the original value before the first write, writes, and reads the setting back. A read-back that is not the written value makes it write the original back; if that also fails, the control stays marked as unsettled, and no control can be changed until you check it on the page.
+4. Restore writes back the value recorded before your first change. "Restore all" restores the changed controls one at a time, with the same read-back.
+
+The page answers only on the machine that runs the city: a phone or a second computer paired through the remote door is refused. The command line has the same verbs: `sprawling privacy status`, `inspect`, `apply`, `restore`, `restore-all` and `reconcile` ([Privacy.lean](../crates/sprawling/spec/Privacy.lean)).
+
 ## Parts you can replace
 
 This repository bundles nobody's key, pays for nothing, and proxies nothing. Everything that reaches outside is therefore an adapter you can swap, and this section says where each one lives.

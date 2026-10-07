@@ -35,8 +35,8 @@ Alpha, cut on 2026-10-07 (UTC) as `v0.0.10-Alpha-261007`. The workspace manifest
 - Action shortcuts that were single keys now hold the accelerator (Ctrl, or ⌘ on a Mac): Ctrl+Shift+F forks from the entry under the pointer (was `f`); Ctrl+Shift+Y, Ctrl+Shift+E and Ctrl+Shift+X answer the decide card that holds the focus (were `y`, `e` and `n`; refusing moved to X because Ctrl+N opens a browser window before the page hears it); Ctrl+\ changes how much of the city the page draws (was `\`); and Ctrl+/ opens the key list (was `?`). `/` stays a single key, because it only moves the focus into the box. A letter typed while the focus is outside the box therefore changes nothing (`client/src/core/keys.ts`).
 - The read-only view of an earlier session no longer draws a "continue from its end" button. Going on from an earlier session is a branch: use the fork key on one of its entries or the mailbox's fork entry.
 - sprawling is not distributed through Homebrew: no tap is published, and the update check recognises no Homebrew install. On macOS, install through npm, Bun, crates.io, the shell installer or the release archive.
-- **TODO (final session, R11):** one line pointing to Configuration below for the refusal of handwritten plaintext MCP credentials, once R11 is merged; otherwise delete this line.
-- **TODO (final session, FONT-SIZE):** "The default body size is 15 px instead of 14 px. The smallest accepted size stays 12 px and there is no upper bound." once that line is merged; otherwise delete this line.
+- A plaintext credential written by hand into an `[[mcp]]` row of `CONFIG.toml` is now refused when the file is read; see Configuration below for the rule and the recovery.
+- The default body size is 15 px instead of 14 px. The smallest accepted size stays 12 px, and there is no upper bound any more (`wire::BODY_PX_MIN`, `crates/wire/spec/Preference.lean` D51).
 
 ### Main input area and settings
 
@@ -46,7 +46,7 @@ Settings gains a Performance group: CPU placement (`none`, `soft`, `soft_shares`
 
 The client's stylesheet `client/src/theme.css` is now an entry that imports its parts from `client/src/theme/`, one part for each owner: the token tables, the light block and the person's choices, the surfaces, the motion vocabulary, the base layer, and the parts a screen owns.
 
-**TODO (final session, FONT-FACE):** the paragraph on the serif reading face Libron (Geist Mono stays the default; woff2 files with the OFL licence beside them, `docs/third-party.md` §4; no bundled CJK face) once that line is merged; otherwise delete this line.
+The appearance group offers a reading face for running text: conversation messages, documents and reports. Geist Mono stays the default face for the whole interface. The second choice is the serif face [Libron](https://github.com/nicoverbruggen/libron), shipped like Geist Mono as web font files with its SIL Open Font License beside them in `client/src/fonts/` (`docs/third-party.md` §4); controls, labels, figures, code, paths and commands stay in Geist Mono. No Chinese face is bundled: Chinese text in the reading face falls back to the machine's own `serif` face. The choice is the new `reading` field of the person's appearance preference, and a preference written by 0.0.9 reads as the default face (`crates/wire/spec/Preference.lean` D52).
 
 **TODO (final session, front-end split):** one paragraph on what a person can now replace, the replacement test that proves it, and where `docs/frontend-method.md` describes it, once the split is merged; otherwise delete this line.
 
@@ -54,25 +54,13 @@ The client's stylesheet `client/src/theme.css` is now an entry that imports its 
 
 `sprawling privacy status` prints the privacy history summary as one JSON line. It discloses a summary only after the live Windows identity matches the owner bound in the platform vault, and a missing, locked or mismatched binding is refused with its own recovery (`crates/sprawling/spec/Privacy/Cli.lean` D54).
 
-**TODO (final session, R06):** the paragraph on the optional Windows privacy controls in Settings (catalogue size, per-entry target, scope, recommended value and cost, apply and restore one entry at a time after confirmation, UAC for machine-scope writes, read-back with restore on mismatch, entries not written and why, privacy is not security, refused to a paired remote device), checked clause by clause against the merged page and `crates/sprawling/spec/Privacy*.lean`; otherwise delete this line.
+On Windows, the settings page has a privacy group with 88 optional privacy controls in nine categories, from diagnostic data and speech input to app permissions and Windows AI features. Each control is one host setting: 74 machine registry values, 8 user registry values, 2 user environment variables and 4 scheduled tasks (`bin::privacy::controls`, `crates/sprawling/spec/Privacy/Controls.lean`). For each one the page shows its current value, the value it would write, its scope, what it changes and what stops working when it is applied, and, where Microsoft states it, which Windows editions honour it. Nothing is applied by default and there is no "apply all". A person applies or restores one control at a time, after a confirmation that binds the value the page showed; if the value on the machine changed meanwhile, the operation is refused. A machine-scope write goes through a UAC prompt. Every write is read back: when the read-back value is not the written one, the original value is written back, and when that also fails, the control stays unsettled until the person checks it (`crates/sprawling/spec/Privacy.lean`). The original value is recorded before the first write, so each control can be restored to it, and "restore all" restores the controls one by one. Of the 52 items of the original request list, 39 map to controls; the other 13 are listed with the reason they are not written (absent, obsolete, undeterminable, or needing an operation kind this version lacks). The page answers only on the machine that runs the city; a paired remote device is refused. These controls are choices about privacy, not security: many of them cost convenience, and each one shows that cost so the person can weigh it. Real writes of every operation kind were applied and restored on disposable Windows runners, never on a person's machine.
 
 ### Model providers and search
 
 A resident MCP connection over streamable HTTP whose session the server ended is dropped and reconnected (open, handshake, tool list) on the next dispatch; the failed call itself is returned, not sent again.
 
 A provider endpoint can list several accounts in order. The list order chooses the first account, and a Session stays on the account that first answered it, across reordering and restarts.
-
-**TODO (final session, R11):** the `insufficient_quota` paragraph and the "two or more accounts" paragraph from the R11 branch's CHANGELOG, moved here; otherwise delete this line.
-
-### Configuration
-
-**TODO (final session, R11):** the R11 branch's two Configuration paragraphs, verbatim: the refusal of a plaintext credential written by hand into an `[[mcp]]` row, and the `web_search` tool offered to every building that is not confidential. If R11 does not merge, delete this section.
-
-### Execution and recovery
-
-Linux host-command confinement explicitly requests a user namespace and refuses a failed namespace setup. A copied working tree remains a placement mechanism; it does not isolate other host paths or the network. Sandbox guarantees are reported by axis rather than inferred from a platform name.
-
-Windows run jobs apply the selected processor affinity. JSONL preallocation reads scan the zero tail with bounded memory while preserving rejection of nonzero bytes after the tail; they do not skip that verification I/O. Skill audit execution binds results to the installed content digest, records unreachable services without claiming a successful audit, and observes shelves through the serving assembly.
 
 A provider refusal with status 429 whose structured error code (or, when the code is absent, its error type) is `insufficient_quota` is now its own failure kind, `quota`. It is no longer backed off and sent again until a Halt, because waiting does not restore a used-up quota: the run stops with the refusal, and the page says to add credit to the account or add another account. A 429 without that code is still a busy provider and is asked again. Each provider error also records whether the account it was sent on can still take the request (a rejected key, a used-up quota or a missing account credential cannot); the record omits this field when the answer is yes, so earlier Ledger lines are unchanged.
 
@@ -82,15 +70,21 @@ Each provider on the settings page now folds an account editor under its row. It
 
 The providers group of the settings page now has a web search card below the provider card. It chooses between the default service (Exa, whose address the city reports), a custom list of MCP services with one of them in use, and no web search, and writes the city's own `[search]` table whole each time. Each listed service folds the same account editor the providers use; a service's keys are stored in the vault under `secret:search/<service>.<account>` and travel only in the header the account names. When a file nearer the hall states its own `[search]`, the card says so and leaves that file alone. A provider with two or more accounts also offers the number of retries on one account before the next account is tried (once or twice); while none is chosen the card shows the city's default.
 
-The existing container command path preserves the configured engine, encodes a single Podman entrypoint and refuses non-UTF8 arguments instead of changing them silently. Configuration, native-platform mechanisms and lifecycle guarantees are described in [operating](docs/operating.md#how-exec-is-confined) according to the shipped implementation.
-
-On Windows, explicitly selected native confinement (AppContainer with a Job Object) passes the six child-process regressions and the PowerShell and toolchain checks on disposable runners, and the MSVC toolchain is found outside the container. Windows still defaults to the copied working tree until `crates/runtime/spec/Tools/Exec/NativeWindows.lean` D59 is settled.
-
 ### Configuration
 
 Behaviour change: a plaintext credential written by hand into an `[[mcp]]` row of `CONFIG.toml` is now refused when the file is read, with the same `E_CONFIG_INVALID` refusal the settings page already gave when writing that row. Before, the reader accepted such a row and started the server with the key, although the file is committed with the project. An `env` or `headers` value whose name reads as a credential, or whose value has a credential's shape, must be a `secret:realm/name` vault reference. An MCP url must be an absolute `http` or `https` address with a host, with no userinfo and no credential in a query parameter; a query or fragment that carries no credential is kept as written. To recover, store the key in the vault and write its reference where the key was.
 
 Every building that is not confidential now offers its runs a `web_search` tool. With no `[search]` table in `CONFIG.toml` the tool reaches Exa's hosted MCP service without an account, so the words a run searches for leave the machine to that service; `choice = "off"` under `[search]` removes the tool, and a confidential building never has it. A custom supplier is reached over MCP streamable HTTP only, its accounts are tried in their listed order, and a failing custom supplier is never replaced by Exa. A search does not stay on one account for the rest of a Session: each search starts from the first account whose key is stored.
+
+### Execution and recovery
+
+Linux host-command confinement explicitly requests a user namespace and refuses a failed namespace setup. A copied working tree remains a placement mechanism; it does not isolate other host paths or the network. Sandbox guarantees are reported by axis rather than inferred from a platform name.
+
+Windows run jobs apply the selected processor affinity. JSONL preallocation reads scan the zero tail with bounded memory while preserving rejection of nonzero bytes after the tail; they do not skip that verification I/O. Skill audit execution binds results to the installed content digest, records unreachable services without claiming a successful audit, and observes shelves through the serving assembly.
+
+The existing container command path preserves the configured engine, encodes a single Podman entrypoint and refuses non-UTF8 arguments instead of changing them silently. Configuration, native-platform mechanisms and lifecycle guarantees are described in [operating](docs/operating.md#how-exec-is-confined) according to the shipped implementation.
+
+On Windows, explicitly selected native confinement (AppContainer with a Job Object) passes the six child-process regressions and the PowerShell and toolchain checks on disposable runners, and the MSVC toolchain is found outside the container. Windows still defaults to the copied working tree until `crates/runtime/spec/Tools/Exec/NativeWindows.lean` D59 is settled.
 
 ### Distribution and verification
 
@@ -121,7 +115,7 @@ Contribution policy uses AGENTS as its single authority, distinguishes negative 
 - Windows formal code signing is not done in this version; Windows Defender may quarantine the binary of a downloaded archive.
 - The performance readings of the four placement arms (R13) were not taken; the default `[core] placement = "soft"` is supported by the design, not by a reading.
 - The first message head breaks inside a Chinese fact when it wraps.
-- **TODO (final session, R06):** "Microsoft does not state whether most privacy policies apply on Windows Home; the page shows 'not stated' for those controls", with the count confirmed on the merged catalogue; otherwise delete this line.
+- Microsoft does not state whether most privacy policies apply on Windows Home: for 79 of the 88 privacy controls the page shows "not stated" for the Home edition.
 
 ---
 

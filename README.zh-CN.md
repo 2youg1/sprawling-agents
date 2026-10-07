@@ -22,6 +22,10 @@
 
 English：[README.md](README.md) · 介绍项目：[LLM.md](LLM.md) · 修改代码：[AGENTS.md](AGENTS.md)
 
+**优点**：体积小；概念超级潮酷；面向多 Agent，而不是一个 Agent 挂一圈扩展。
+
+**缺点数不胜数**：不由中转站资助、也不由实验室维护的学生项目；没有二次元形象；WebUI 想做好，能力实在差点；功能的稳定性与可用性都还要调。
+
 ## 快速开始
 
 选择一种安装渠道。npm/Bun 与 cargo-binstall 下载预编译二进制，`cargo install` 在本地编译；shell 安装器不需要 JavaScript 或 Rust 工具链。
@@ -66,9 +70,11 @@ sprawling up ./cities/first
 
 终端成为城的控制台并打印服务地址，浏览器打开页面。在页面接上 provider 或本地模型，给 `main` 选一个模型，然后告诉 Mayor 要完成什么、怎样算完成。Mayor 规划，楼里的居民执行；你看进展、回答提问并检查结果。控制台按 `Ctrl-C` 停城。
 
+Agent 在自己的楼里默认拥有全部权限：用 `minimal` 模板盖的楼，Agent 能写楼内的每个文件，工作落地前不经审查。怎样打开审查、限制写入，见[一栋你自己的楼](docs/getting-started.zh-CN.md#一栋你自己的楼)。
+
 sprawling 不会自动更新；需要时在设置中检查版本，并按[更新指南](docs/getting-started.zh-CN.md#更新)操作。
 
-## 五项能力
+## 能做什么
 
 **长程任务与自动化。** 计划、决定和交接保存在可读文档中，让 Agent 跨会话接着推进；分层计划协调大规模任务，角色、skills 和工具接入让你定义工作流。常驻目标派出就绪的计划节点，并等待进行中的 run；怎样引导、暂停和停止工作见[日常操作](docs/operating.md)。
 
@@ -76,9 +82,37 @@ sprawling 不会自动更新；需要时在设置中检查版本，并按[更新
 
 **容易上手。** 对话、skills 与工具接入沿用其他 Agent 中熟悉的方式。[上手指南](docs/getting-started.zh-CN.md)分别提供已有 Agent 用户迁移配置与 Chat 用户首次工作的路线，覆盖首次任务、查看报告和停止工作。
 
-**内置监视器。** 工作进行时查看 run 耗时、模型调用、token、成本与资源读数；结合监视器和 `sprawling gauge` 为自己的负载建立性能 Eval，在自己的设备上比较结果。[性能文档](docs/performance.md)说明计数器、复现方法与测量来源。
+**性能。** 一个进程同时提供页面并运行整座城，没有数据库，也没有另外的服务；城的历史是磁盘上只追加的 Ledger。设置 → 性能里可以选 CPU 放置方式和核心优先级，也可以给每个 run 设内存上限，这个上限只由你填写，默认没有（[城怎样使用你的硬件](docs/performance.md#choose-how-the-city-uses-the-machine)）。命令以低于城自身的优先级启动，所以一次构建不会拖慢页面。命令输出在交给模型之前，按产生它的命令裁剪，完整原文仍可取回（[sieve](crates/runtime/spec/Sieve.lean)）。监视器和 `sprawling gauge` 在你自己的硬件上显示 run 耗时、模型调用、token、成本与资源占用；[性能登记表](tools/xtask/budgets.toml)记录项目的预算和已有读数（[性能文档](docs/performance.md)）。
 
-**定制与二次开发。** 用角色文档、项目规则和 skills 定义 Agent 如何工作，接入所需模型与 MCP 工具，或通过 ACP 使用支持的 harness；基于 wire 构建自己的界面，沿架构中的 seams 修改运行机制。如果工作流或 AgentOS 需要常驻项目团队、文档交接和同一台机器上的共享历史，可以用这些部件搭建；现有连接见[接入文档](docs/integrations.md)，运行机制的修改位置见[架构](ARCHITECTURE.md#8-where-to-change-what)。
+**隐私。** 你在消息里粘贴的 Key 会先进 Vault，模型只看到它的引用（[custody](crates/accounting/src/worker/dispatching/custody.rs)）。模型回复和工具结果里形状像密钥的值，在写入永久历史之前被替换成标记（[redact](crates/runtime/src/redact.rs)）。除了你接入的模型调用和工具，以及默认的网页搜索（关掉之前会把搜索词发给 Exa），没有东西离开你的电脑；保密楼不调用任何远程 provider。在 Windows 上，设置里提供 88 项可选的隐私控制，从诊断数据、语音输入到应用权限和 Windows AI 功能。每一项都显示当前值、它改变什么、代价是什么，逐项应用或恢复，每次写入后都读回核对（[Windows 隐私控制](docs/operating.md#windows-privacy-controls)）。隐私不等于安全，也不一定和便利冲突，但其中许多设置确实要牺牲一些便利；页面给出你逐项权衡所需的信息。
+
+**可重放的历史。** 城做的每个决定都是 Ledger 里的一行，同样的行在任何机器上逐字节重放出同样的结果，因为决策路径把时间当参数传入、不用随机源、顺序固定（[确定性](ARCHITECTURE.md#10-determinism-and-hardening)）。重放时不会再次执行工具或调用模型，而是读回记录下来的结果。城只提供事实和边界，方法交给模型（[LLM First](ARCHITECTURE.md#llm-first-mechanism-from-the-city-method-from-the-model)）。
+
+**定制与二次开发。** 用角色文档、项目规则和 skills 定义 Agent 如何工作，接入所需模型与 MCP 工具（一个 provider 可以按你定的顺序登记多个账号），或通过 ACP 使用支持的 harness；基于 wire 构建自己的界面，沿架构中的 seams 修改运行机制。如果工作流或 AgentOS 需要常驻项目团队、文档交接和同一台机器上的共享历史，可以用这些部件搭建；现有连接见[接入文档](docs/integrations.md)，运行机制的修改位置见[架构](ARCHITECTURE.md#8-where-to-change-what)。
+
+## 为什么做它
+
+我不想24/7守在电脑面前，直到5h额度撞墙再去睡觉，你也不想。
+
+我换过很多Harness，有些理念落后，有些超出实际：就以RSI来说，在LLM本身脱离无状态之前，Harness能做的只是不断地针对最新的模型做适配和学习公司的现有业务流程并更高速地运行，前者的趋势是消融实验，后者则需要隐私。
+
+越来越多的小规模公司正在出现，它们是有着大量Agent开发在线服务的小型团队，其中99%就是Markdown集+几个天才。
+
+因而我想要制作一个跟上新生的多Agent（Graph engineering）又同时能务实地处理RSI和记忆相关概念风潮的Harness，我将务实的可拓展、节省用户精力、实验性的agent规模化的成本控制、隐私与可靠性、长时运行能力这些放在了设计的核心，并结合了一些城市学与社会学的内容设计了sprawling。
+
+Agent的能力和规模越强，人的注意力就越贵，我不想sprawling成为无数希望劫持你注意力应用中的一个。sprawling区别于常规Hanress聚焦于编写Prompt，最佳使用实践应是转向Loop，安排工作流，让Agent开发sprawling，接管你的固定工作……让你本人专注于新业务的设计，新技能的学习，偶尔回来看一眼跑的怎么样。
+
+诚实地说目前还没有一种多Agent方案提升的性能对得起规模化提升的成本，但探索这项技术在自动化业务，社会模拟以及AI对齐方面的研究刚刚起步，我们还需要花费很多精力和资源探索Agent集群场景下模型的交互行为、协作效率与社会性表现。
+
+Agent记忆的确是实现RSI很重要的途径，但不是依靠Harness做注入，你的文件、代码，文档库就是记忆，Agent真正和你一起成长的尝试在LLM脱离无状态之前大多是对模型的拖累。
+
+如果你想继续用自己喜欢的Harness，sprawling已经支持通过ACP接入（[接入文档](docs/integrations.md)）。我正在准备开发的kasanagi是一个辅助搭建聊天软件的项目，以后会作为MCP解决多个sprawling实例之间的远程协作。sprawling主要面向为小团队持久化运营和学术（无论计算机还是人文社科）研究平台，目前还处于研究与开发阶段，欢迎一起开发，也欢迎和我联系/讨论。
+
+除了迁移必要的业务skill/MCP/ACP之外，推荐暂时保持精简，在使用中遇到问题时再手动追加内容，即使是相同的模型搭配不同的Harness都会有完全不同的行为。
+
+我用的电脑不好，所以我不会放任多Agent产生性能开销指数增长的问题，也适合部署在你的旧电脑或云电脑上。
+
+我不卖API也买不起装你信息的硬盘，因而数据都留在本地，我设计了专门的保密楼，配上本地模型完全可以用于处理隐私数据，但这也意味着我没法运行巨大规模的测试。
 
 ## 文档
 
