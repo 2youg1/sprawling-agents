@@ -18,6 +18,11 @@ Give your agents a city to work in. In sprawling, projects become buildings wher
 
 Plans, decisions and handoffs live in files. sprawling uses these records to carry long-running work across sessions, organise larger tasks and follow workflows you define. One Rust binary runs locally, serves the browser interface and records the city's history in an append-only Ledger.
 
+<p align="center">
+  <img alt="The Main conversation page before a session: the text box, the workspace on the left, the model, effort and permission controls on the right" src="docs/images/main-before-a-session.png" width="49%">
+  <img alt="The same page during a session: the reply, a tool call, and no controls under the box" src="docs/images/main-during-a-session.png" width="49%">
+</p>
+
 **Status: <!-- xtask:begin maturity:word -->alpha<!-- xtask:end -->.** Data formats, the wire and the interface may still change between versions.
 
 中文：[README.zh-CN.md](README.zh-CN.md) · Project introduction: [LLM.md](LLM.md) · Code changes: [AGENTS.md](AGENTS.md)

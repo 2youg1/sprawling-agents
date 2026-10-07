@@ -18,6 +18,11 @@
 
 计划、决定和交接保存在文件里。sprawling 依据这些记录延续跨会话工作，组织更大的任务，并执行你定义的工作流。一个 Rust 二进制在本地运行，向浏览器提供界面，并把城的历史记入只追加的 Ledger。
 
+<p align="center">
+  <img alt="会话开始前的 Main 对话页：输入框，左边是工作区，右边是模型、思考强度和权限三个控件" src="docs/images/main-before-a-session.png" width="49%">
+  <img alt="会话进行中的同一页：回复、一次工具调用，输入框下没有控件" src="docs/images/main-during-a-session.png" width="49%">
+</p>
+
 **状态：<!-- xtask:begin maturity:word -->alpha<!-- xtask:end -->。** 数据格式、wire 与界面在版本之间仍可能改变。
 
 English：[README.md](README.md) · 介绍项目：[LLM.md](LLM.md) · 修改代码：[AGENTS.md](AGENTS.md)
