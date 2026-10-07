@@ -10,7 +10,10 @@
   // building's rules, the city's automation, the run group, and the
   // accounts group, which holds the city's own layer beside the default
   // model (client D52), and the colour page at both widths, drawn with
-  // the kept override of whoever opens the gallery. The panel's `<dialog>` is not mounted here: a
+  // the kept override of whoever opens the gallery. The performance
+  // group, and the tree opened over the performance page (its entry
+  // named as the page beneath, with the process reading), close the
+  // tree's states. The panel's `<dialog>` is not mounted here: a
   // modal covers every other specimen on this route, so the fixture
   // draws what the dialog holds (`views/settings/sheet.svelte`).
 
@@ -58,6 +61,7 @@
   function city(identity: IdentityAnswer) {
     return (query: Query): Answer | undefined => {
       if (query === "identity") return { identity };
+      if (query === "preferences") return { preferences: { core: { placement: "soft_shares", priority: "normal", memory_bytes: null } } };
       if (query === "automation") {
         return {
           automation: {
@@ -88,24 +92,30 @@
   import Case from "./case.svelte";
   import Stand from "./stand.svelte";
 
-  const BENEATH = { kind: "city" } as const;
+  const CITY = { kind: "city" } as const;
+  const MONITOR = { kind: "monitor" } as const;
   const CASES = [
-    ["you", STATED, 1040],
-    ["you", UNREADABLE, 1040],
-    ["rules", STATED, 1040],
-    ["automation", STATED, 1040],
-    ["run", STATED, 1040],
-    ["accounts", STATED, 1040],
-    ["colours", STATED, 1040],
-    ["colours", STATED, 390],
-    ["you", STATED, 390],
+    ["you", STATED, 1040, CITY],
+    ["you", UNREADABLE, 1040, CITY],
+    ["rules", STATED, 1040, CITY],
+    ["automation", STATED, 1040, CITY],
+    ["run", STATED, 1040, CITY],
+    ["accounts", STATED, 1040, CITY],
+    ["performance", STATED, 1040, CITY],
+    ["performance", STATED, 1040, MONITOR],
+    ["colours", STATED, 1040, CITY],
+    ["colours", STATED, 390, CITY],
+    ["you", STATED, 390, CITY],
   ] as const;
 </script>
 
-{#each CASES as [group, identity, width], index (index)}
-  <Case label={`settings panel · ${group}${identity === UNREADABLE ? " · unreadable" : ""} at ${String(width)}`} {width}>
+{#each CASES as [group, identity, width, beneath], index (index)}
+  <Case
+    label={`settings panel · ${group}${identity === UNREADABLE ? " · unreadable" : ""}${beneath === MONITOR ? " · over the monitor" : ""} at ${String(width)}`}
+    {width}
+  >
     <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} answers={city(identity)}>
-      <Sheet {group} beneath={BENEATH} onPick={() => undefined} onClose={() => undefined} titleId={`set-fixture-${String(index)}`} />
+      <Sheet {group} {beneath} onPick={() => undefined} onClose={() => undefined} titleId={`set-fixture-${String(index)}`} />
     </Stand>
   </Case>
 {/each}
