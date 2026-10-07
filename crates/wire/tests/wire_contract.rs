@@ -45,18 +45,18 @@ fn exposed() -> SocketAddr {
 #[test]
 fn the_command_and_query_tables_hold_their_declared_counts() {
     // The counts are the wire's closed surface, not a style choice.
-    assert_eq!(COMMAND_NAMES.len(), 43, "command table");
-    assert_eq!(QUERY_NAMES.len(), 56, "query table");
+    assert_eq!(COMMAND_NAMES.len(), 44, "command table");
+    assert_eq!(QUERY_NAMES.len(), 57, "query table");
 
     let mut sorted = COMMAND_NAMES.to_vec();
     sorted.sort_unstable();
     sorted.dedup();
-    assert_eq!(sorted.len(), 43, "command names are distinct");
+    assert_eq!(sorted.len(), 44, "command names are distinct");
 
     let mut sorted = QUERY_NAMES.to_vec();
     sorted.sort_unstable();
     sorted.dedup();
-    assert_eq!(sorted.len(), 56, "query names are distinct");
+    assert_eq!(sorted.len(), 57, "query names are distinct");
 }
 
 #[test]
@@ -113,7 +113,7 @@ fn the_schema_hash_covers_every_event_kind_name() {
 
 /// A function of WIRE_V, the two frame name tables and the event kind
 /// names, so any change to the protocol surface lands here first.
-const WIRE_SCHEMA_GOLDEN: &str = "6548368659ab2ee2041f5465e5a4604848cbd797a78deadf8b0511018c1c97dc";
+const WIRE_SCHEMA_GOLDEN: &str = "5fdf9f842f5ef2bf038b723cb0777227bd33d4938c1108de2851fb0d75a8c530";
 
 /// The schema hash reads names only, so a field added under names that
 /// stay leaves it where it was. This digest reads the whole shape with the
@@ -153,7 +153,7 @@ fn strip_prose(value: &mut serde_json::Value) {
 
 /// The digest of `wire_schema()` with its prose removed.
 #[cfg(feature = "schema")]
-const WIRE_SHAPE_GOLDEN: &str = "06ca43eca8a8632dd4c53f2b143255e9f2bd4ac0cc32f0593d34c815940c3764";
+const WIRE_SHAPE_GOLDEN: &str = "fea9d6de873332e9b4730777eb29dda32ea765f9aadef0457ddafc841c65e5d5";
 
 // -------------------------------------------------------------- binding face
 
@@ -628,6 +628,13 @@ title = \"a window\"
             idem,
         }),
         Command::CloseRemoteDoor(wire::DoorStep { idem }),
+        Command::PrivacyOperation(wire::PrivacyRequest {
+            action: wire::PrivacyAction::Apply {
+                control: wire::PrivacyControl::StartLaunchTracking,
+                expected: wire::PrivacyValue::Dword { number: 1 },
+            },
+            idem,
+        }),
         Command::ForgetSecret(wire::SecretForgetting {
             reference: "secret:search/brave.main".to_owned(),
             idem,
