@@ -9,12 +9,13 @@
   const { wire, label }: DoorLook = $props();
 </script>
 
-<!-- A door stands on a card as often as on the page, and the card's own
-fill is `raised`, so the door takes the control's edge to be seen there
-and lifts to `raised-hover` under the pointer. -->
+<!-- A door stands on a card as often as on the page, and the card's fill
+is `raised`, the same step as `edge`, so the door takes the edge a text
+box has (`edge-input`) to be seen there, and lifts to `raised-hover`
+under the pointer. -->
 <a
   {...wire}
-  class="inline-flex h-control w-fit items-center rounded-control border border-edge bg-raised px-base text-label text-text transition-colors duration-short ease-leave hover:bg-raised-hover hover:ease-arrive"
+  class="inline-flex h-control w-fit items-center rounded-control border border-edge-input bg-raised px-base text-label text-text transition-colors duration-short ease-leave hover:bg-raised-hover hover:ease-arrive"
 >
   {label}
 </a>
