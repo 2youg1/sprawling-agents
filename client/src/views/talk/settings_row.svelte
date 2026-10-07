@@ -3,215 +3,185 @@
      file, You can obtain one at https://mozilla.org/MPL/2.0/.
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
-<script lang="ts" module>
-  export type RowDraws = "everything" | "notice";
-</script>
-
+<!-- The settings row under the composer's line (docs/frontend-method.md
+§7I, client/Spec.lean §4-60): before a session starts, the workspace
+chip with the sandbox beside it on the left, the model entry and the
+permissions entry on the right; once one has, nothing but the notice
+that a sentence the link did not take was kept in the box.
+This file is the seat (client D95): it holds which menu is open, the
+provider pointed at, the typed filter and the drawn elements, and moves
+the focus. `settings_row.ts` and `policy.ts` build the value
+`settings_row.look.svelte` draws. It writes no class. -->
 <script lang="ts">
   import { untrack } from "svelte";
+  import type { Attachment } from "svelte/attachments";
+
   import { say } from "../../core/lang";
   import { ui } from "../../ui";
   import type { Address } from "../../wire";
-  import type { Choice, Pill } from "./composer";
-  import { FILTER_AFTER, splitModel } from "./composer";
+  import type { PopoverBinding } from "../parts/popover";
+  import type { Pill } from "./composer";
   import Listening from "./listening.svelte";
-  import { Popover } from "../parts/popover";
-  import type { PopoverBinding, PopoverColumn, PopoverRow } from "../parts/popover";
-  import PillView, { FACT } from "./pill.svelte";
+  import PillView from "./pill.svelte";
+  import { permissionsOf } from "./policy";
   import Sandbox from "./sandbox.svelte";
-  import { picked, policyColumns, policyFace, POLICY_SWITCHES } from "./policy";
+  import { COLUMN, menuOf, modelOf, parentOf, sameBinding } from "./settings_row";
+  import type { RowDraws, RowMenu, RowStarts, SettingsRowLook } from "./settings_row";
+  import Look from "./settings_row.look.svelte";
 
   interface Props {
     readonly specs: readonly [Pill, Pill, Pill];
     readonly room: Address | null;
     readonly draws: RowDraws;
     readonly kept: boolean;
-    readonly menu?: "open" | "closed" | "model";
+    // The menu a fixture draws open; it takes no focus until somebody
+    // opens a menu themselves.
+    readonly menu?: RowStarts;
   }
-
-  const PROVIDER_COLUMN = "provider";
-  const MODEL_COLUMN = "model";
-  const EFFORT_COLUMN = "effort";
 
   const { specs, room, draws, kept, menu: starts = "closed" }: Props = $props();
   const u = ui();
   const { lang } = u;
   const policy = u.policy;
-  let menu = $state<"policy" | "model" | null>(untrack(() => starts) === "open" ? "policy" : untrack(() => starts) === "model" ? "model" : null);
-  let provider = $state<string | null>(null);
-  let modelTrigger = $state<HTMLButtonElement | null | undefined>(undefined);
-  let filter = $state<HTMLInputElement | null | undefined>(undefined);
-  let modelQuery = $state("");
-  let modelBinding = $state<PopoverBinding | null>(null);
-  let modelActive = $state<string | null>(null);
-  let modelPreview = untrack(() => starts) === "model";
-  let permission = $state<HTMLButtonElement | null | undefined>(undefined);
-  let first = $state<HTMLInputElement | null | undefined>(undefined);
-  let panel = $state<HTMLDivElement | null | undefined>(undefined);
-  let preview = untrack(() => starts) === "open";
 
-  const providers = $derived(specs[0].choices.flatMap((row) => {
-    const model = splitModel(row.value);
-    return model === null ? [] : [{ id: model.endpoint, label: row.note ?? model.endpoint }];
-  }).filter((row, index, all) => all.findIndex((each) => each.id === row.id) === index));
-  const parent = $derived(provider ?? splitModel(specs[0].value ?? "")?.endpoint ?? providers.at(0)?.id);
-  const children = $derived(modelsFor(parent));
-  const needsFilter = $derived(children.length > FILTER_AFTER);
-  // The model entry's menu: provider and model are two steps of one
-  // table, so its lists stack as rows - provider first, then the models
-  // that provider serves, which grow the second row as the first is
-  // chosen. Thinking is not a step of that table: it is its own choice,
-  // listed apart under a rule (the person's design).
-  const columns = $derived<readonly PopoverColumn[]>([
-    { id: PROVIDER_COLUMN, label: "talk_column_provider", rows: providers.map((row) => ({ ...row, chosen: row.id === parent })) },
-    { id: MODEL_COLUMN, label: "talk_column_model", rows: children.filter((row) => row.label.toLowerCase().includes(modelQuery.trim().toLowerCase())).map((row) => ({ id: row.value, label: row.label, chosen: row.value === specs[0].value })) },
-    { id: EFFORT_COLUMN, label: "talk_column_effort", apart: true, rows: specs[2].choices.map((row) => ({ id: row.value, label: row.label, secondary: row.note, chosen: row.value === specs[2].value })) },
-  ]);
-  const modelFace = $derived(specs[0].choices.find((row) => row.value === specs[0].value)?.label ?? specs[0].placeholder);
-  const effortFace = $derived(specs[2].choices.find((row) => row.value === specs[2].value)?.label ?? specs[2].placeholder);
+  let menu = $state<RowMenu>(menuOf(untrack(() => starts)));
+  let preview = untrack(() => starts) !== "closed";
+  let pointed = $state<string | null>(null);
+  let query = $state("");
+  let binding = $state<PopoverBinding | null>(null);
+  let active = $state<string | null>(null);
 
+  // The two entries' triggers and the frame of the permissions entry,
+  // which no draw reads: a plain record, so the attachments that fill it
+  // never write during a derivation.
+  const drawn: Record<"model" | "permission" | "frame", HTMLElement | undefined> = { model: undefined, permission: undefined, frame: undefined };
+  const keep = (slot: "model" | "permission" | "frame"): Attachment<HTMLElement> => (node) => {
+    drawn[slot] = node;
+    return () => {
+      if (drawn[slot] === node) drawn[slot] = undefined;
+    };
+  };
+  const hold = { model: keep("model"), permission: keep("permission"), frame: keep("frame") };
+  // The two elements an opened panel gives the focus to, held as state,
+  // because the panel's content is drawn after it opens and the focus
+  // waits for it.
+  let search = $state<HTMLElement | undefined>(undefined);
+  let first = $state<HTMLElement | undefined>(undefined);
+  const holdSearch: Attachment<HTMLElement> = (node) => {
+    search = node;
+    return () => {
+      if (search === node) search = undefined;
+    };
+  };
+  const holdFirst: Attachment<HTMLElement> = (node) => {
+    first = node;
+    return () => {
+      if (first === node) first = undefined;
+    };
+  };
+
+  // An opened panel takes the focus: the permissions panel on its first
+  // switch, the model panel in its search box, again whenever another
+  // provider's row brings one. A panel a fixture drew open does not,
+  // once.
   $effect(() => {
-    if (menu !== "policy" || (first === undefined || first === null)) return;
-    if (preview) { preview = false; return; }
+    if (menu !== "policy" || first === undefined) return;
+    if (preview) {
+      preview = false;
+      return;
+    }
     first.focus();
   });
-
   $effect(() => {
-    if (menu !== "model" || filter === undefined || filter === null || parent === undefined) return;
-    if (modelPreview) { modelPreview = false; return; }
-    filter.focus({ preventScroll: true });
+    if (menu !== "model" || search === undefined || parentOf(pointed, specs[0]) === undefined) return;
+    if (preview) {
+      preview = false;
+      return;
+    }
+    search.focus({ preventScroll: true });
   });
 
-  function modelPick(column: PopoverColumn, row: PopoverRow): void {
-    modelPreview = false;
-    if (column.id === PROVIDER_COLUMN) {
-      if (needsFilter && modelsFor(row.id).length <= FILTER_AFTER) modelTrigger?.focus();
-      else filter?.focus({ preventScroll: true });
-      provider = row.id;
-      modelQuery = "";
-    }
-    if (column.id === MODEL_COLUMN) specs[0].pick(row.id);
-    if (column.id === EFFORT_COLUMN) specs[2].pick(row.id);
-    if (column.id !== PROVIDER_COLUMN) filter?.focus({ preventScroll: true });
-  }
-
-  function modelsFor(endpoint: string | undefined): readonly Choice[] {
-    return specs[0].choices.filter((row) => splitModel(row.value)?.endpoint === endpoint);
-  }
-
-  function closeModel(): void {
-    menu = null;
-    modelQuery = "";
-    modelBinding = null;
-    queueMicrotask(() => { modelTrigger?.focus(); });
-  }
-
-  function closePermission(): void {
-    menu = null;
-    permission?.focus();
-  }
+  const look: SettingsRowLook = $derived({
+    facts: draws === "everything" ? facts : undefined,
+    notLive: kept ? say($lang, "talk_not_live") : undefined,
+    model:
+      draws === "everything"
+        ? modelOf(
+            { lang: $lang, models: specs[0], effort: specs[2] },
+            { open: menu === "model", pointed, query, binding, active },
+            {
+              toggle: () => {
+                preview = false;
+                query = "";
+                menu = menu === "model" ? null : "model";
+              },
+              close: () => {
+                menu = null;
+                query = "";
+                binding = null;
+                queueMicrotask(() => {
+                  drawn.model?.focus();
+                });
+              },
+              point: (provider) => {
+                pointed = provider;
+                query = "";
+              },
+              query: (text) => {
+                query = text;
+              },
+              bound: (next) => {
+                if (untrack(() => sameBinding(binding, next))) return;
+                const initial = untrack(() => binding?.controls.at(0) !== next.controls.at(0));
+                binding = next;
+                if (initial) next.pointColumn(COLUMN.model);
+              },
+              cursor: (id) => {
+                active = id;
+              },
+              focus: {
+                trigger: () => {
+                  preview = false;
+                  drawn.model?.focus();
+                },
+                search: () => {
+                  preview = false;
+                  search?.focus({ preventScroll: true });
+                },
+              },
+              hold: { trigger: hold.model, search: holdSearch },
+            },
+          )
+        : undefined,
+    permissions:
+      draws === "everything"
+        ? permissionsOf($lang, $policy, menu === "policy", {
+            choose: u.choosePolicy,
+            toggle: () => {
+              menu = menu === "policy" ? null : "policy";
+            },
+            close: (focus) => {
+              menu = null;
+              if (focus === "opener") drawn.permission?.focus();
+            },
+            inside: (target) => target instanceof Node && drawn.frame?.contains(target) === true,
+            hold: { frame: hold.frame, trigger: hold.permission, first: holdFirst },
+          })
+        : undefined,
+  });
 </script>
-
-{#snippet modelSearch()}
-  <input bind:this={filter} bind:value={modelQuery} type="search"
-    aria-label={say($lang, "talk_find_model")} placeholder={say($lang, "talk_find_model")}
-    aria-activedescendant={modelActive ?? undefined} aria-controls={modelBinding?.controls.join(" ")}
-    class="mb-snug h-control w-full min-w-0 rounded-control bg-page px-snug text-body text-text outline-hidden placeholder:text-text-faint"
-    onfocus={() => { modelBinding?.pointColumn(MODEL_COLUMN); }}
-    oninput={() => { modelBinding?.pointColumn(MODEL_COLUMN); }}
-    onkeydown={(event) => {
-      if (event.isComposing || event.key === "Home" || event.key === "End") return;
-      if (modelBinding?.keys(event) === true) { event.preventDefault(); event.stopPropagation(); }
-    }} />
-{/snippet}
-
-{#snippet modelRow(item: PopoverRow)}
-  <div class="w-full min-w-0">
-    <span class="block wrap-anywhere">{item.label}</span>
-    {#if item.secondary !== undefined}
-      <span class="mt-tight block wrap-anywhere text-note text-text-faint">{item.secondary}</span>
-    {/if}
-  </div>
-{/snippet}
 
 {#snippet listening()}
   {#if room !== null}<Listening {room} />{/if}
 {/snippet}
 
-{#if draws === "everything" || kept}
-<div class="relative mt-tight flex items-center justify-between gap-tight">
-  <div class="edge-slot -ml-snug flex min-w-0 flex-wrap items-center narrow:ml-0">
-    {#if draws === "everything" && specs[1].choices.length > 0}
-      <PillView spec={specs[1]} told={room === null ? undefined : listening} />
-    {/if}
-    {#if draws === "everything"}<Sandbox {room} />{/if}
-    {#if kept}<span class="px-snug text-note text-alert">{say($lang, "talk_not_live")}</span>{/if}
-  </div>
-  {#if draws === "everything"}
-    {#if menu === "model" && providers.length > 0}
-      <Popover label="talk_column_model" {columns} layout="rows" row={modelRow} onApply={modelPick} onClose={closeModel}
-        header={needsFilter ? modelSearch : undefined}
-        bind={needsFilter ? (binding: PopoverBinding) => {
-          const initial = untrack(() => modelBinding?.controls.at(0) !== binding.controls.at(0));
-          modelBinding = binding;
-          if (initial) binding.pointColumn(MODEL_COLUMN);
-        } : undefined}
-        onCursorChange={(id: string | null) => { modelActive = id; }} />
-    {/if}
-    <div class="-mr-snug ml-auto flex min-w-0 items-center narrow:mr-0">
-      {#if providers.length > 0}
-        <button bind:this={modelTrigger} type="button" class="{FACT} hover:wash hover:text-text aria-expanded:wash aria-expanded:text-text"
-          aria-label={`${specs[0].label}: ${modelFace} | ${effortFace}`} aria-haspopup="dialog" aria-expanded={menu === "model"}
-          onclick={() => { modelPreview = false; modelQuery = ""; menu = menu === "model" ? null : "model"; }}>
-          <span class="min-w-0 truncate">{modelFace}</span>
-          <span aria-hidden="true" class="shrink-0">│</span>
-          <span class="shrink-0">{effortFace}</span>
-        </button>
-      {/if}
-      <div bind:this={panel} class="flex min-w-0" onfocusout={(event) => {
-        if (menu !== "policy") return;
-        const next = event.relatedTarget;
-        if (next instanceof Node && panel?.contains(next)) return;
-        menu = null;
-      }}>
-        <button bind:this={permission} type="button" class="{FACT} hover:wash hover:text-text aria-expanded:wash aria-expanded:text-text"
-          aria-label={`${say($lang, "talk_permissions")}: ${say($lang, `mode_${$policy.mode}`)} · ${policyFace($lang, $policy)}`}
-          aria-haspopup="dialog" aria-expanded={menu === "policy"}
-          onclick={() => { menu = menu === "policy" ? null : "policy"; }}>
-          <span class="truncate">{say($lang, `mode_${$policy.mode}`)} · {policyFace($lang, $policy)}</span>
-        </button>
-        {#if menu === "policy"}
-          <div role="dialog" tabindex="-1" aria-label={say($lang, "talk_permissions")}
-            class="rise absolute bottom-full left-0 mb-snug flex w-full flex-col gap-base rounded-panel border border-edge-panel bg-raised p-base shadow-float"
-            onkeydown={(event) => {
-              if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); closePermission(); }
-            }}>
-            <label class="flex items-center justify-between gap-base text-body text-text">
-              {say($lang, "talk_work_switch")}
-              <input bind:this={first} type="checkbox" role="switch" checked={$policy.mode === POLICY_SWITCHES.mode.on}
-                onchange={(event) => { u.choosePolicy({ ...$policy, mode: event.currentTarget.checked ? POLICY_SWITCHES.mode.on : POLICY_SWITCHES.mode.off }); }} />
-            </label>
-            <label class="flex items-center justify-between gap-base text-body text-text">
-              {say($lang, "talk_write_switch")}
-              <input type="checkbox" role="switch" checked={$policy.write === POLICY_SWITCHES.write.on}
-                onchange={(event) => { u.choosePolicy({ ...$policy, write: event.currentTarget.checked ? POLICY_SWITCHES.write.on : POLICY_SWITCHES.write.off }); }} />
-            </label>
-            <div class="flex flex-wrap gap-base">
-              {#each policyColumns($lang, $policy).filter((column) => column.id !== "write") as column (column.id)}
-                <label class="flex min-w-0 flex-1 flex-col gap-tight text-note text-text-quiet">
-                  {say($lang, column.label)}
-                  <select class="h-control w-full min-w-0 rounded-control bg-page px-snug text-body text-text"
-                    value={column.rows.find((row) => row.chosen)?.id}
-                    onchange={(event) => { u.choosePolicy(picked($policy, column.id, event.currentTarget.value)); }}>
-                    {#each column.rows as row (row.id)}<option value={row.id}>{row.label}</option>{/each}
-                  </select>
-                </label>
-              {/each}
-            </div>
-          </div>
-        {/if}
-      </div>
-    </div>
+{#snippet facts()}
+  {#if specs[1].choices.length > 0}
+    <PillView spec={specs[1]} told={room === null ? undefined : listening} />
   {/if}
-</div>
+  <Sandbox {room} />
+{/snippet}
+
+{#if draws === "everything" || kept}
+  <Look {...look} />
 {/if}

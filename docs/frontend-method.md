@@ -260,7 +260,7 @@ The composer is laid out like a page: the words on top, a 1 px line under them, 
 
 **An empty room**: in zen the composer stands on the page's vertical centre line and **nothing stands above it**: the placeholder names who is being spoken to ("Write to {recipient}…", `client/Spec.lean` §4-10) and the workspace chip names the workspace, so a title over the box would say one of them twice; after the first send the composer sinks to the foot with `duration-page` and `--ease-arrive`.
 
-**The conversation band on one column is the same composer**: the line above it is the last thing said, laid out as a message in the thread (one line of message head, the body cut to one line), and the line, the ring and the coin key are unchanged. The settings row is not drawn, because the sheet's gauge already writes the room, the gate and the sandbox. On the panorama workbench the conversation is not a band: it draws the whole thread and the full composer (§7H). A sentence that the link did not take, kept in the box, is still said as usual (`RowDraws` in `talk/settings_row.svelte`).
+**The conversation band on one column is the same composer**: the line above it is the last thing said, laid out as a message in the thread (one line of message head, the body cut to one line), and the line, the ring and the coin key are unchanged. The settings row is not drawn, because the sheet's gauge already writes the room, the gate and the sandbox. On the panorama workbench the conversation is not a band: it draws the whole thread and the full composer (§7H). A sentence that the link did not take, kept in the box, is still said as usual (`RowDraws` in `talk/settings_row.ts`).
 
 ### §7J The context ring
 

@@ -87,6 +87,7 @@
   import Shelved from "./gallery/shelved.svelte";
   import TabsCases from "./gallery/parts/tabs.svelte";
   import Talking from "./gallery/talking.svelte";
+  import TalkRow from "./gallery/talk_row.svelte";
   import Thr from "./gallery/thr.svelte";
   import AgentMessages from "./gallery/agent_messages.svelte";
   import AgentLetters from "./gallery/agent_letters.svelte";
@@ -167,6 +168,7 @@
   <SettingsPanel />
   <PrivacyGallery />
   <G2 />
+  <TalkRow />
   <R3 />
   <Doc />
   <Tables />

@@ -10,8 +10,7 @@ a run there (`sandbox.ts`), so the row never says "none". -->
   import { readable } from "svelte/store";
   import { ui } from "../../ui";
   import type { Address } from "../../wire";
-  import Glyph from "../parts/glyph.svelte";
-  import { FACT } from "./pill.svelte";
+  import Fact from "./fact.look.svelte";
   import { restriction, sandboxQuery, sandboxSaid } from "./sandbox";
 
   interface Props {
@@ -27,8 +26,5 @@ a run there (`sandbox.ts`), so the row never says "none". -->
 </script>
 
 {#if limits !== null}
-  <span class={FACT}>
-    <Glyph name="sandbox" size="sm" />
-    <span class="truncate">{sandboxSaid(limits, $lang)}</span>
-  </span>
+  <Fact glyph="sandbox"><span class="truncate">{sandboxSaid(limits, $lang)}</span></Fact>
 {/if}
