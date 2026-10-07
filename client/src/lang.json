@@ -9740,8 +9740,8 @@
     "zh": "{n} t/s"
   },
   "world_tps_note": {
-    "en": "slowest 1% {p1} t/s · {n} turns",
-    "zh": "最慢 1% {p1} t/s · {n} 个回合"
+    "en": "worst {p1} t/s · {n} turns",
+    "zh": "最慢 {p1} t/s · {n} 个回合"
   },
   "world_bounds": {
     "en": "bounds",
