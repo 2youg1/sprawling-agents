@@ -12,7 +12,7 @@
 /-!
 ## §7 `views/parts/` 的交互契约
 
-> **这是规格，不是描述。** 表里写的是部件欠使用者什么；今天的代码欠而未还的十一处，逐条点名在 7-8。模式名与键表借鉴自哪几份文档、为什么不产生许可证义务，一处记在 `docs/third-party.md` §6，本节不复述。
+> **这是规格，不是描述。** 表里写的是部件欠使用者什么，代码照它实现；拆成座位与外观的部件，键、Tab 站与 `aria-*` 都由座位经接线包交给外观（`client/Spec.lean` D95）。模式名与键表借鉴自哪几份文档、为什么不产生许可证义务，一处记在 `docs/third-party.md` §6，本节不复述。
 
 **判定：一个库只在它替换掉一样东西、并且同一变更集里有生产读者时才进来（由人定）。** `tools/xtask/src/npm.rs` 的 `RUNTIME` 是这条判定的机器面——运行时依赖恰为那张表所列，名单以表为准；加一项是门机制的一次提交，与引入它的变更集分开，好让评审看见门为什么动。**平台先来**：`parts/dialog.svelte` 把模态整个交给原生 `<dialog>`（top layer、焦点陷阱、Esc、其余页面 `inert`，见设计 4-20），`parts/tip.svelte` 把 `title` 换成一个 `role="tooltip"` 的兄弟节点（设计 4-18）；平台已经提供的行为不再引一个库来提供第二遍，因为同一件事两个提供者，第一次分歧就落在键盘用户身上。今天名单上的界面库有两项：`@lucide/svelte`，它替换了 `parts/glyph.ts` 手画的那张路径表，换来人在别的软件里已经认得的图标（`docs/frontend-method.md` §4-34）；CodeMirror 6 的五个包，它替换了 RefRain 原本要手写的编辑面与行级 diff（D23）；pdf.js 与 docx-preview，它们替换了本客户端画不出的 PDF 页与 DOCX 页（D32）。引入的条件写在 7-9。
 -/
@@ -63,14 +63,14 @@
 
 | 部件 | 模式 | 键 | 结果 |
 |---|---|---|---|
-| `tip.svelte` | APG Tooltip | Escape | **规格要求撤下提示；今天没有实现**（7-8 第 9 条）|
+| `tip.svelte` | APG Tooltip | Escape | 撤下提示，指针或焦点还停着时也不回来，下一次移入或聚焦再唤回（WCAG 1.4.13）|
 | `dialog.svelte` | APG Modal Dialog | Tab／Shift+Tab | 在对话框内循环，由平台实现 |
 | | | Escape | 平台发 `cancel`，本部件 `preventDefault()` 后回调 `onCancel`——默认行为会绕过调用方关掉元素，而 `open` 还说着开着 |
 | `kbd.svelte` 的 `Cheatsheet`（`seat="modal"`） | APG Modal Dialog，原生 `<dialog>` 加 `showModal()` | Tab／Shift+Tab | 在表内循环，由平台实现 |
 | | | Escape | 平台发 `cancel`，本部件 `preventDefault()` 后回调 `onClose`；外壳 `app.svelte` 的按键处理器在同一次 Escape 上也调 `closeSheet`，两条路落到同一个关闭 |
 | `kbd.svelte` 的 `Cheatsheet`（`seat="specimen"`） | 无：`#/gallery` 的标本，`<dialog open>` 留在折页的流里 | 无 | 不取焦、不令页面 `inert`、不收 Escape——那条路由上没有人向它提问，进 top layer 只会盖住每一个折页 |
 
-`tip.svelte` 的 `aria-*`：提示节点是 `role="tooltip"`，id 交给调用方——控件自己有可见文字时写 `aria-describedby`，这句话就是它唯一的名字时写 `aria-labelledby`。**组件不猜**，因为只有调用点知道控件有没有名字。显示由 `:hover` 与 `:focus-within` 触发，延迟 300 ms；提示自己 `pointer-events-none`，永不取焦。
+`tip.svelte` 的 `aria-*`：提示节点是 `role="tooltip"`，id 交给调用方（调用方也可以经 `id` 自己定这个 id：拆成座位与外观的部件由座位定 id、写进接线包，外观只把同一个 id 交给提示）——控件自己有可见文字时写 `aria-describedby`，这句话就是它唯一的名字时写 `aria-labelledby`。**组件不猜**，因为只有调用点知道控件有没有名字。显示由 `:hover` 与 `:focus-within` 触发，延迟 300 ms；提示自己 `pointer-events-none`，永不取焦。
 
 `dialog.svelte` 的 `aria-*`：`aria-labelledby` 指向标题，`aria-describedby` 指向说明段**且仅在 `detail` 在场时才写**。取焦由文档顺序决定：平台取对话框内第一个可聚焦控件，而取消按钮写在确认按钮之前，所以撤不回来的那一问把安全的答案放在手下。**点 `::backdrop` 不关闭**：撤不回来的那一问不该被一次落在外面的点击答掉。
 -/
@@ -83,8 +83,9 @@
 | `segmented.svelte` | APG Radio Group（roving tabindex） | Tab／Shift+Tab | 进出控件；控件在 Tab 序列里只占一站 |
 | | | → | 移到下一个可选格并选中它，走到末端回到开头 |
 | | | ← | 移到上一个可选格并选中它，走到开头回到末端 |
-| | | ↓／↑ | **规格要求同 →／←；今天没有实现**（7-8 第 5 条）|
-| | | Space | **规格要求选中当前聚焦格；今天没有实现**（7-8 第 5 条）|
+| | | ↓／↑ | 同 →／← |
+| | | Space | 选中当前聚焦格；不可选的格上什么都不选 |
+| | | Enter | 由平台的按钮激活走到点击，与点击同一条路；键表不另答它，免得选两次 |
 | `tabs.svelte` | APG Tabs（自动激活） | → | 下一个透镜并立即切换，走到末端回到开头 |
 | | | ← | 上一个透镜并立即切换，走到开头回到末端 |
 | | | Home／End | 第一个／最后一个透镜并立即切换 |
@@ -96,7 +97,7 @@
 
 `segmented.svelte` 的 `aria-*`：轨道 `role="radiogroup"` ＋ `aria-label`；每格 `role="radio"`、`aria-checked` 等于「这一格就是 `held`」、`why` 在场时 `aria-disabled="true"` 并 `aria-describedby` 指向 `Tip`。**Tab 序列里的那一站由 `tabStop` 独家决定**：选中格；无选中时第一个可选格；全部被拒时第 0 格（那格的原因还得读得到）；空控件一站都没有。选择跟随焦点，所以不可选的格被 `nextStop` 跳过——落在上面就等于选中它。
 
-`tabs.svelte` 的 `aria-*`：`role="tablist"` ＋ `aria-label`；每个 `role="tab"`、`aria-selected` 等于「这就是 `current`」、`tabindex` 只给当前那个 `0`。自动激活是 APG 对「面板内容已在本地、切换无可察延迟」的推荐读法，本客户端三个使用者都满足它。
+`tabs.svelte` 的 `aria-*`：`role="tablist"` ＋ `aria-label`；每个 `role="tab"`、`aria-selected` 等于「这就是 `current`」、`tabindex` 只给当前那个 `0`。页签与它的面板是一个事实，所以两半都由 `tabs.svelte` 画：每个页签带一个按实例加前缀的 `id` 与指向自己面板的 `aria-controls`；每个透镜都有一个 `role="tabpanel"` ＋ `aria-labelledby` 指回页签的外壳，显示与否都在，所以 `aria-controls` 总有落点。自动激活是 APG 对「面板内容已在本地、切换无可察延迟」的推荐读法，本客户端三个使用者都满足它。
 -/
 
 /-!
@@ -105,10 +106,10 @@
 | 部件 | 模式 | 键 | 结果 |
 |---|---|---|---|
 | `combobox.svelte` | APG Combobox（listbox 弹层） | ↓／↑ | 游标下移／上移一行，钳在列表两端 |
-| | | Home／End | **规格要求到首行／末行；今天没有实现**（7-8 第 2 条）|
+| | | Home／End | 游标到首行／末行 |
 | | | Enter | 采纳游标行，关闭弹层，焦点回触发器 |
 | | | Escape | 关闭弹层，清空过滤词，焦点回触发器 |
-| | | Tab | **规格要求关闭弹层并让焦点正常离开；今天弹层留着**（7-8 第 2 条）|
+| | | Tab | 关闭弹层，焦点照常离开 |
 | | | 可打印字符 | 过滤，并把游标复位到第 0 行 |
 | `popover.svelte` | 多列 listbox，装在 `role="dialog"` 里 | ↓／↑ | 当前列的游标下移／上移，钳在两端 |
 | | | Home／End | 当前列的首行／末行 |
@@ -119,7 +120,7 @@
 | | | ↓／↑ | **换行**（环绕）并把游标复位到第 0 行，与 Tab 同一动作 |
 | | | Tab／Shift+Tab、Home／End、Enter、Escape | 同上（换行／行内两端／应用／关闭） |
 
-`combobox.svelte` 的 `aria-*`（规格）：文本框是 `role="combobox"`，带 `aria-expanded`、`aria-controls` 指向列表、`aria-activedescendant` 指向游标行；列表 `role="listbox"` ＋ `aria-label`；每行 `role="option"`，`aria-selected` 只标**已选中的那个值**，不标游标。今天的实现把 `aria-haspopup="listbox"` ＋ `aria-expanded` 放在触发按钮上、过滤框没有角色、游标只有底色——见 7-8 第 1 条。
+`combobox.svelte` 的 `aria-*`（规格）：文本框是 `role="combobox"`，带 `aria-expanded`、`aria-controls` 指向列表、`aria-activedescendant` 指向游标行；列表 `role="listbox"` ＋ `aria-label`；每行 `role="option"`，`aria-selected` 只标**已选中的那个值**，不标游标。
 
 `popover.svelte` 的 `aria-*`：外层 `role="dialog"` ＋ `aria-label`；每列 `<ul role="listbox">` ＋ `aria-label`；每行 `role="option"`。`aria-selected` 表示当前生效的值，游标由持焦元素的 `aria-activedescendant` 承担。**生效的那一行画成更深的底色**（`wash-strong`），游标只在没有生效值的那一行用底色梯级（`bg-raised-hover`）：两者不互相盖过，也不需要确认键或勾选标记。按钮触发时列表取焦，`tabindex` 只给当前列 `0`；文本框触发时调用方经 `bind` 拿走键表，焦点留在文本框，`aria-activedescendant` 写在文本框上。菜单仍存在时，两条路径都在活动行或数据变化，以及键表采纳按键后的 DOM 更新完成后，将该行滚入当前列的视口；能容纳整行时露出整行，行高超过视口时露出行首，不改变持焦元素或外层页面位置。几何规则与证明在 `client/spec/Views/Parts/Popover.lean`。
 -/
@@ -129,7 +130,7 @@
 
 `table.svelte` 是一张数据表，**不是 APG Grid**：它不做二维方向键导航，Tab 依次走过排序按钮、勾选框与可改单元格，Enter／Space 在排序按钮上切换方向。
 
-`aria-*`：`<caption class="sr-only">` 给表名；**`aria-sort` 只写在可排序的列上**，取 `"ascending"`／`"descending"`／`"none"`；表头勾选框 `aria-label` 取 `allLabel`，行勾选框取 `keyOf(row)`，可改单元格取 `"<列名> <keyOf(row)>"`。表头勾选框在部分选中时必须是 `indeterminate`——说「一个都没选」是一句假话（7-8 第 7、8 条）。
+`aria-*`：`<caption class="sr-only">` 给表名；**`aria-sort` 只写在可排序的列上**，取 `"ascending"`／`"descending"`／`"none"`；表头勾选框 `aria-label` 取 `allLabel`，行勾选框取 `keyOf(row)`，可改单元格取 `"<列名> <keyOf(row)>"`。表头勾选框在部分选中时必须是 `indeterminate`——说「一个都没选」是一句假话。不可排序的列不写 `aria-sort`：那是一句关于一个排不了序的列的排序陈述。
 -/
 
 /-!
