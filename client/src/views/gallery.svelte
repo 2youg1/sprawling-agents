@@ -74,6 +74,7 @@
   import Shelved from "./gallery/shelved.svelte";
   import Switches from "./gallery/switches.svelte";
   import Talking from "./gallery/talking.svelte";
+  import TalkRow from "./gallery/talk_row.svelte";
   import Thr from "./gallery/thr.svelte";
   import AgentMessages from "./gallery/agent_messages.svelte";
   import AgentLetters from "./gallery/agent_letters.svelte";
@@ -146,6 +147,7 @@
   <Settings />
   <SettingsPanel />
   <G2 />
+  <TalkRow />
   <R3 />
   <Doc />
   <Tables />

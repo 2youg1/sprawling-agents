@@ -15,13 +15,16 @@
   // mark this product uses for anything that needs a person (`asks`,
   // client/Spec.lean §7C), which survives a forced colour mode where a
   // colour alone would not.
+  //
+  // Both facts are drawn in the settings row's one shape for a fact
+  // (`fact.look.svelte`); this file decides what they say and writes no
+  // class.
   import { readAnswer } from "../../core/answered";
   import { QUERIES } from "../../core/asking";
   import { say } from "../../core/lang";
   import { ui } from "../../ui";
   import type { Address } from "../../wire";
-  import Glyph from "../parts/glyph.svelte";
-  import { FACT } from "./pill.svelte";
+  import Fact from "./fact.look.svelte";
   import Sandbox from "./sandbox.svelte";
 
   interface Props {
@@ -55,9 +58,5 @@
   });
 </script>
 
-<span class={[FACT, gate.worrying ? "asks" : ""]}>
-  <Glyph name="gate" size="sm" />
-  <span class="sr-only">{say($lang, "facts_autonomy")}</span>
-  {gate.words}
-</span>
+<Fact glyph="gate" heard={say($lang, "facts_autonomy")} asks={gate.worrying}>{gate.words}</Fact>
 <Sandbox {room} />
