@@ -587,6 +587,39 @@ client-checks:
 render:
     cargo xtask render
 
+# The swap test (tools/xtask/Spec.lean section 8-13): every look under
+# client/swap/ drawn in place of the look at the same path under
+# client/src/, and the client still holds. The replacement satisfies the
+# look's props type (typecheck), the wiring tests of each replaced part
+# pass untouched (a test imports no look, by the client's lint), the
+# swap build replaces every look it holds, and render, its parts roster
+# among it, judges the result. The bundle lands in target/swap-web, never
+# in crates/sprawling/web-dist, so a stopped run leaves nothing for the
+# binary to embed. Needs the client's dependencies, which `build-web`
+# installs.
+swap:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    tests=()
+    while IFS= read -r look; do
+        test="src/${look%.look.svelte}.test.ts"
+        if [ ! -f "client/$test" ]; then
+            echo "swap: client/swap/$look replaces a part with no wiring test at client/$test" >&2
+            exit 1
+        fi
+        tests+=("./$test")
+    done < <(cd client/swap && find . -name '*.look.svelte' | sed 's#^\./##' | sort)
+    if [ ${#tests[@]} -eq 0 ]; then
+        echo "swap: client/swap holds no look, so nothing would be swapped" >&2
+        exit 1
+    fi
+    cd client
+    bun run typecheck
+    bun run test "${tests[@]}"
+    bun run build --config vite.swap.config.ts
+    cd ..
+    cargo xtask render --bundle target/swap-web
+
 # The kernel propositions kani holds against real MIR. Not in
 # `just check`, for the same reason as `adversary`: kani has no Windows
 # host, and a check that always skips on a Windows desk would read as
