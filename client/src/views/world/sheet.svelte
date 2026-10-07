@@ -188,7 +188,7 @@ not, so a figure is never cut to a few letters. -->
     {:else}
       <dd class="figure truncate text-text">{fill(say($lang, "world_tps"), { n: String(Math.round(speed.tps.p50)) })}</dd>
       <dd class="truncate text-note text-text-faint">
-        {fill(say($lang, "world_tps_note"), { p99: String(Math.round(speed.tps.p99)), n: String(speed.tps.turns) })}
+        {fill(say($lang, "world_tps_note"), { p1: String(Math.round(speed.tps.p1)), n: String(speed.tps.turns) })}
       </dd>
     {/if}
   </div>

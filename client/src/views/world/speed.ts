@@ -6,14 +6,15 @@
 // What the two speed cells of the session's sheet say (client/Spec.lean
 // §7K): over the turns that measured a time to first content, its median
 // and its mean and how many turns that is; over the turns that measured
-// an output rate (`tpsOf`), its 50th and 99th percentile and how many
+// an output rate (`tpsOf`), its 50th and 1st percentile and how many
 // turns that is, absent when none did.
 //
 // The median is the figure a person compares sessions by, because one
 // turn that waited on a cold provider would otherwise move it; the mean
 // stands beside it because that cold turn is also a fact the person
-// pays for. The rate's 99th percentile is the fastest stretch the
-// provider gave, and the gap to the 50th says how even it was. Every
+// pays for. A rate's tail is on the slow side, so the figure beside the
+// median is the 1st percentile, the slowest stretch the provider gave,
+// and the gap between them says how even it was. Every
 // percentile is a nearest rank - a value one turn actually measured,
 // never an interpolation between two. A turn whose times are not
 // measurements (`Turn.timing`), or that streamed nothing, has no figure
@@ -33,7 +34,7 @@ export interface Speed {
 // Output tokens a second at two ranks, over `turns` measured turns.
 export interface Spread {
   readonly p50: number;
-  readonly p99: number;
+  readonly p1: number;
   readonly turns: number;
 }
 
@@ -44,12 +45,12 @@ export function speedOf(turns: readonly Turn[]): Speed | null {
   if (ttft === null || mean === null) return null;
   const rates = measuredBy(turns, tpsOf);
   const p50 = rankOf(rates, 50);
-  const p99 = rankOf(rates, 99);
+  const p1 = rankOf(rates, 1);
   return {
     ttft: Math.round(ttft),
     ttftMean: Math.round(mean),
     turns: ttfts.length,
-    tps: p50 === null || p99 === null ? null : { p50, p99, turns: rates.length },
+    tps: p50 === null || p1 === null ? null : { p50, p1, turns: rates.length },
   };
 }
 

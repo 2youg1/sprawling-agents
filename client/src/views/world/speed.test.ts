@@ -13,6 +13,11 @@ describe("the speed cell's ranks", () => {
     expect([rankOf(rates, 50), rankOf(rates, 99), rankOf([7], 99), rankOf([], 50)]).toEqual([20, 40, 7, null]);
   });
 
+  test("the rate's tail is its slowest turn, not its fastest", () => {
+    const rates = [276, 379, 250, 300];
+    expect(rankOf(rates, 1)).toBe(250);
+  });
+
   test("one cold turn moves the mean and leaves the median", () => {
     const ttfts = [300, 320, 310, 4000];
     expect([rankOf(ttfts, 50), meanOf(ttfts), meanOf([])]).toEqual([310, 1232.5, null]);
