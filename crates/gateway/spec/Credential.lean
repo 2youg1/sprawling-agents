@@ -109,7 +109,7 @@ Windows 账户运行）。任何失败都不写、删除或重建引用；读取
 被否：三种拒绝共用一句 recovery——不匹配时叫人「解锁凭据服务」，读者照做也无用。
 -/
 
-/-! D32 隐私 owner 的绑定只写一个新引用，写入与核对共用同一个平台 Vault
+/-! D34 隐私 owner 的绑定只写一个新引用，写入与核对共用同一个平台 Vault
 `credential::identity::bind_platform_identity(reference, observed)` 由 gateway 根接口重导出为
 `gateway::bind_platform_identity`：privacy 的写入者在一个空历史的第一次写入之前调用它，
 reference 是调用方新抽取的随机名字（Privacy.State D52）。它先 get：引用已有任何值即拒绝

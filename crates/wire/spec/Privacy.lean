@@ -8,7 +8,7 @@
 
 规定 `privacy`、`privacy::answer` 与 `privacy::operation`（`crates/wire/src/` 下同名的文件）：
 主机隐私页与城共享的名字、`Query::Privacy` 的答复与 `Command::PrivacyOperation` 的载荷。本文件是
-`crates/wire/Spec.lean` 的一个分部；下面各节保留它们在 wire 规格里的标签 §8-85 到 §8-87，别处引作
+`crates/wire/Spec.lean` 的一个分部；下面各节保留它们在 wire 规格里的标签 §8-87 到 §8-89，别处引作
 `crates/wire/Spec.lean §8-n`。
 
 这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；名字集合与答复的形状由
@@ -18,7 +18,7 @@ Rust 的类型守住，每个名字背后的数据与它们进入写入路径的
 -/
 
 /-!
-### 8-85 隐私页的闭集
+### 8-87 隐私页的闭集
 
 ```rust
 pub enum PrivacyControl { PowershellTelemetryOptout, CeipConsolidatorTask, … }  // 88 个，"powershell_telemetry_optout" …
@@ -39,7 +39,7 @@ pub enum PrivacyFaultCode { Identity, Clock, History, Unreadable, Unresolved, Ch
 ```
 
 **控制表只有一份。** 一个控制的目标路径、写入值、版本清单只在二进制的 `privacy::controls` 定义一次，
-只随 `Query::Privacy` 的答复到页面（§8-86）；页面上的文字只在客户端的 `lang.json` 定义一次，按这些
+只随 `Query::Privacy` 的答复到页面（§8-88）；页面上的文字只在客户端的 `lang.json` 定义一次，按这些
 名字的拼写取。名字集合因此各只有一份成员表，每个读者从这里取。
 
 `PrivacySettlement` 也是磁盘上 `Reconciled` 一行的结论（crates/sprawling/spec/Privacy/State.lean），
@@ -55,7 +55,7 @@ pub enum PrivacyFaultCode { Identity, Clock, History, Unreadable, Unresolved, Ch
 -/
 
 /-!
-### 8-86 `Query::Privacy` 与 `PrivacyAnswer`
+### 8-88 `Query::Privacy` 与 `PrivacyAnswer`
 
 ```rust
 Query::Privacy                                   // 无字段
@@ -95,12 +95,12 @@ pub struct PrivacyIntent { operation: u64, control, original: PrivacyValue, modi
   owner 的核对之后答 `Disclosed`，否则答 `Withheld`，答复里没有任何记录下的值（原值只在 `Disclosed` 里，所以
   「未经核对却带着原值」不可表示）。日志被另一个操作占着或已损坏答 `Unreadable`，其余部分照常作答。
 - **主机不是 Windows 时什么也不读**：`host` 为 `NotWindows`，每个控制的 `current` 为 `NotRead`。
-- `outcomes` 是主机保留的操作结果（§8-87）；同一份答复里一并给出，所以页面问一次就同时看到结果与
+- `outcomes` 是主机保留的操作结果（§8-89）；同一份答复里一并给出，所以页面问一次就同时看到结果与
   它之后的当前值。
 -/
 
 /-!
-### 8-87 `Command::PrivacyOperation`
+### 8-89 `Command::PrivacyOperation`
 
 ```rust
 Command::PrivacyOperation(PrivacyRequest)
@@ -124,7 +124,7 @@ pub enum PrivacyResult { Running, Applied { operation }, Restored { operation },
   （crates/sprawling/spec/Privacy/Service.lean）。
 -/
 
-/-! D49 线上的值是主机读到的原样，页面原样送回作 expected
+/-! D50 线上的值是主机读到的原样，页面原样送回作 expected
 
 `PrivacyValue` 对每个快照只有一种拼写：四字节的 `REG_DWORD` 写作 `Dword`，字节恰为 UTF-16 加一个结尾 NUL
 的 `REG_SZ` 写作 `Text`，其余注册表值写作 `Raw`（类型码与小写十六进制字节），任务带定义摘要的十六进制。
@@ -138,7 +138,7 @@ pub enum PrivacyResult { Running, Applied { operation }, Restored { operation },
 **重开参数**：控制表出现 `REG_DWORD`、`REG_SZ` 之外的写入类型时，再考虑给它一种可读的拼写。
 -/
 
-/-! D50 没有「全部恢复」的帧：页面为每个仍拥有的控制各发一次 Restore
+/-! D51 没有「全部恢复」的帧：页面为每个仍拥有的控制各发一次 Restore
 
 restore-all 是逐个控制的单次恢复（crates/sprawling/spec/Privacy.lean D63），每次机器作用域的写入各要一次
 管理员批准；页面按 `PrivacyHistory::Disclosed.owned` 为每一条发一次 `Restore`，各带自己的 idem 与它显示的

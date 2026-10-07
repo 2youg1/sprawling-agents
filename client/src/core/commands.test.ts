@@ -42,7 +42,7 @@ describe("the session menu's two verbs", () => {
 });
 
 // The privacy page reads its result back under the idem it sent, so the
-// idem handed back is the one inside the frame (crates/wire/spec/Privacy.lean §8-87).
+// idem handed back is the one inside the frame (crates/wire/spec/Privacy.lean §8-89).
 describe("a privacy operation", () => {
   test("hands back the idem its frame carries", () => {
     const action = { restore: { control: "start_launch_tracking", expected: { value: "dword", number: 0 } } } as const;

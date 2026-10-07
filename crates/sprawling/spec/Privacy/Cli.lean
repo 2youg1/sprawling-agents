@@ -45,7 +45,7 @@ HistoryFault 的稳定 code 与 recovery 映射归 `bin::privacy::fault`，调�
 - identity 是 `bin::privacy::identity` 读到的 SID；owner(recorded, identity)：有记录的引用时经
   gateway::verify_platform_identity 核对后原样返回；空历史时抽取 64 位随机数，作名字
   owner-<16 位小写十六进制> 在 realm privacy 下建一个新引用，经 gateway::bind_platform_identity
-  把 SID 写进平台 Vault（gateway D32），返回这个引用。空历史第一次写入之前的失败（例如 changed）
+  把 SID 写进平台 Vault（gateway D34），返回这个引用。空历史第一次写入之前的失败（例如 changed）
   会留下一条没有历史引用的绑定，它只在本人的凭据库里保存本人的 SID。
 - read 与 write 按控制表的目标交给适配器（Privacy.Windows）：HKCU 值与用户环境在本进程，
   HKLM 值与计划任务经 `bin::privacy::elevation`；适配器的访问拒绝映射为 Privacy §12 的

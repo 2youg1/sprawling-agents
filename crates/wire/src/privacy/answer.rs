@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The answer to `Query::Privacy` (`crates/wire/spec/Privacy.lean` §8-86):
+//! The answer to `Query::Privacy` (`crates/wire/spec/Privacy.lean` §8-88):
 //! the host, every control with its current value, every original item
 //! that is not written, what this app's history discloses, and the
 //! results the host keeps for the operations pages sent.
@@ -151,7 +151,7 @@ pub enum PrivacyCurrent {
 /// bytes are UTF-16 ending in one terminating NUL, and `raw` otherwise. A
 /// page sends a value back as `expected` unchanged, and the host turns it
 /// into the bytes it compares with what it reads, refusing any other
-/// spelling (`crates/wire/spec/Privacy.lean` D49).
+/// spelling (`crates/wire/spec/Privacy.lean` D50).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "value", rename_all = "snake_case", deny_unknown_fields)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]

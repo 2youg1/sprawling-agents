@@ -346,7 +346,7 @@ kernel 已有码，语义照 Custody 一节；不新增码。
 - D29 显式账号列表生效时拒绝旧凭据字段：`crates/gateway/spec/Router.lean`
 - D30 当前 Session 成员的成功 model_returned 是唯一绑定提交点；使用原 Ledger 投影而不保存第二份：`crates/gateway/spec/Router.lean`
 - D31 隐私 owner 的只读核对在 Vault 内完成，不交出原值、不运行 probe：`crates/gateway/spec/Credential.lean`
-- D32 隐私 owner 的绑定只写一个新引用，经平台 Vault 而不经 Custodian：`crates/gateway/spec/Credential.lean`
+- D34 隐私 owner 的绑定只写一个新引用，经平台 Vault 而不经 Custodian：`crates/gateway/spec/Credential.lean`
 -/
 
 /-! ## 13 依赖选型

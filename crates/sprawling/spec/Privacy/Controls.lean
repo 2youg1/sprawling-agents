@@ -7,7 +7,7 @@
 # privacy 控制表：privacy control 与 original item
 规定 `bin::privacy::controls`（行按类别放在 `crates/sprawling/src/privacy/controls/` 下各一个文件）、
 `bin::privacy::originals` 与 `bin::privacy::target`，以及 wire 上的名字闭集 `wire::privacy`
-（`crates/wire/spec/Privacy.lean` §8-85）。
+（`crates/wire/spec/Privacy.lean` §8-87）。
 本文件是接口说明，不是形式证明：控制表是固定数据，没有可量化的轨迹；控制表进入写入路径的
 性质（不写的控制没有写入，apply 的目标只来自控制表）由 crates.sprawling.spec.Privacy 的
 reachable_catalogued 与 planApply 证明。

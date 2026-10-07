@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! What `Command::PrivacyOperation` asks for, and the result the host
-//! keeps for it under its `idem` (`crates/wire/spec/Privacy.lean` §8-87).
+//! keeps for it under its `idem` (`crates/wire/spec/Privacy.lean` §8-89).
 
 use kernel::{AxError, IdemKey};
 use serde::{Deserialize, Serialize};

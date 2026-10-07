@@ -132,7 +132,7 @@ export function resultOf(shown: PrivacyResult): Result {
 }
 
 // Two values are the same exactly when they are spelled the same: the
-// wire gives every value one spelling (wire D49).
+// wire gives every value one spelling (wire D50).
 export function sameValue(a: PrivacyValue, b: PrivacyValue): boolean {
   switch (a.value) {
     case "absent":

@@ -71,7 +71,7 @@ import crates.wire.spec.Server.Socket
 | `aggregate` | 多 City 只读聚合：只转发 Query 与 Event，恒不转发 Command |
 | `reception` | 一帧进来之后的判定：读不出的帧、会动作的门先问配对（§8-37、§8-40） |
 | `preference` | 客户端读的那几张偏好枚举，值集在这里生成 |
-| `privacy` | 主机隐私页与城共享的名字闭集（§8-85）、`Query::Privacy` 的答复（§8-86）与 `Command::PrivacyOperation` 的载荷和结果（§8-87） |
+| `privacy` | 主机隐私页与城共享的名字闭集（§8-87）、`Query::Privacy` 的答复（§8-88）与 `Command::PrivacyOperation` 的载荷和结果（§8-89） |
 | `reading` | 一次回合的读法回到服务端（§8-21） |
 
 **本 crate 是进程外边界的唯一守卫**。它不实现任何业务判定：Command 的执行、Query 的求值、Event 的产生全在上游（runtime／storage／city），本 crate 只负责「让非法的帧在类型层或握手层就不存在」。
@@ -270,9 +270,9 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 | 8-81 | `crates/wire/spec/Answer/DocumentBytes.lean` |
 | 8-82 | `crates/wire/spec/Answer/Find.lean` |
 | 8-84 | `crates/wire/spec/Preference.lean` |
-| 8-85 | `crates/wire/spec/Privacy.lean` |
-| 8-86 | `crates/wire/spec/Privacy.lean` |
 | 8-87 | `crates/wire/spec/Privacy.lean` |
+| 8-88 | `crates/wire/spec/Privacy.lean` |
+| 8-89 | `crates/wire/spec/Privacy.lean` |
 | 19 | `crates/wire/spec/Command/Kind.lean` |
 | 19-1 | `crates/wire/spec/Command/Kind.lean` |
 | 19-2 | `crates/wire/spec/Command/Kind.lean` |
@@ -363,8 +363,8 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 | D46 | 采样节拍是 `Monitoring` 的第四个变体，按城记住 | `crates/wire/spec/Frames/Monitor.lean` |
 | D47 | `Answer::Unavailable` 带上没看成的原因 | `crates/wire/spec/Server.lean` |
 | D48 | 每个 shell 解释器的读数是一个查询，与 skill、MCP 的使用同一遍折叠 | `crates/wire/spec/Reading.lean` |
-| D49 | 线上的值是主机读到的原样，页面原样送回作 expected | `crates/wire/spec/Privacy.lean` |
-| D50 | 没有「全部恢复」的帧：页面为每个仍拥有的控制各发一次 Restore | `crates/wire/spec/Privacy.lean` |
+| D50 | 线上的值是主机读到的原样，页面原样送回作 expected | `crates/wire/spec/Privacy.lean` |
+| D51 | 没有「全部恢复」的帧：页面为每个仍拥有的控制各发一次 Restore | `crates/wire/spec/Privacy.lean` |
 -/
 
 /-! ## 13 依赖选型

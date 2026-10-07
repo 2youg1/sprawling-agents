@@ -8,7 +8,7 @@
 规定 `bin::privacy::service`、`bin::privacy::answer`、`bin::privacy::system` 与装配层的
 `bin::assembly::privacy`。本文件是接口说明，不是形式证明：写入次序与它的性质由
 crates.sprawling.spec.Privacy 证明，服务只把页面的一次询问或一个命令交给同一个
-`bin::privacy::coordinator`；线上的形状归 `crates/wire/spec/Privacy.lean` §8-86、§8-87。
+`bin::privacy::coordinator`；线上的形状归 `crates/wire/spec/Privacy.lean` §8-88、§8-89。
 
 ## 装配层的拦截（`bin::assembly::privacy`）
 城的监听收到的 `Query::Privacy` 由服务作答，其余询问照旧由视图作答；`Command::PrivacyOperation`
@@ -29,7 +29,7 @@ crates.sprawling.spec.Privacy 证明，服务只把页面的一次询问或一�
 - 每个控制读一次目标：读到值、访问拒绝或其他失败；`written` 是控制表的写入值在当前值之上会留下的值。
 - 组装只读控制表（`bin::privacy::controls`、`bin::privacy::originals`），无 IO：版本适用由
   `Editions::fit` 与主机的版本一处算出（Privacy.Controls D67），快照与线上的值互换由
-  `bin::privacy::target` 一处定义（wire D49），换回后再换出不等于原拼写的值拒绝。
+  `bin::privacy::target` 一处定义（wire D50），换回后再换出不等于原拼写的值拒绝。
 
 ## 命令（`Service::accept` 与 `Service::perform`）
 - `accept` 在监听的任务上同步完成：`expected` 换不回快照即以 `E_INVALID_ARGS` 拒绝，不记结果；

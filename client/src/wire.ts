@@ -2931,7 +2931,7 @@ export type PrivacyControl = typeof PrivacyControl.Type;
  * bytes are UTF-16 ending in one terminating NUL, and `raw` otherwise. A
  * page sends a value back as `expected` unchanged, and the host turns it
  * into the bytes it compares with what it reads, refusing any other
- * spelling (`crates/wire/spec/Privacy.lean` D49).
+ * spelling (`crates/wire/spec/Privacy.lean` D50).
  */
 export const PrivacyValue = Schema.Union([
   Schema.Struct({

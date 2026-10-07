@@ -4,9 +4,9 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The privacy page's vocabulary (`crates/wire/spec/Privacy.lean`): the
-//! closed sets every control is described by (§8-85), the answer to
-//! `Query::Privacy` (§8-86) and the operation `Command::PrivacyOperation`
-//! carries (§8-87).
+//! closed sets every control is described by (§8-87), the answer to
+//! `Query::Privacy` (§8-88) and the operation `Command::PrivacyOperation`
+//! carries (§8-89).
 //!
 //! **The host's table is the one authority.** A control's target path, the
 //! value it writes and its edition lists are defined once, in the binary's

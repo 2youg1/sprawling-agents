@@ -172,7 +172,7 @@ impl RawValue {
 }
 
 impl From<&Snapshot> for PrivacyValue {
-    /// The one spelling of `snapshot` on the wire (wire D49).
+    /// The one spelling of `snapshot` on the wire (wire D50).
     fn from(snapshot: &Snapshot) -> Self {
         match snapshot {
             Snapshot::Registry(RawValue::Absent) => Self::Absent,
@@ -246,7 +246,7 @@ impl TryFrom<&PrivacyValue> for Snapshot {
     type Error = AxError;
 
     /// The snapshot `value` spells, refused unless `value` is that
-    /// snapshot's one spelling (wire D49), so two spellings of one value
+    /// snapshot's one spelling (wire D50), so two spellings of one value
     /// never reach a comparison.
     fn try_from(value: &PrivacyValue) -> Result<Self, AxError> {
         let digest =
@@ -304,7 +304,7 @@ mod tests {
 
     proptest! {
         /// Every snapshot has one wire spelling and comes back from it
-        /// byte for byte (wire D49).
+        /// byte for byte (wire D50).
         #[test]
         fn a_snapshot_survives_its_wire_spelling(snapshot in snapshots()) {
             let value = PrivacyValue::from(&snapshot);

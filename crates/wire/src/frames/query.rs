@@ -314,7 +314,7 @@ pub enum Query {
     NewestRelease,
     /// The host's privacy controls, their current values and what this
     /// app's history discloses to the account asking
-    /// (`crates/wire/spec/Privacy.lean` §8-86). Answered by the city's
+    /// (`crates/wire/spec/Privacy.lean` §8-88). Answered by the city's
     /// listener, never through a remote device.
     Privacy,
     /// Everything this person settled about their own reading of the
