@@ -128,6 +128,21 @@
         : each,
     ),
   };
+
+  // The panel's building: `docs` as the skyline has it, under a running
+  // pursuit and with one problem the city reported.
+  const PANEL: CityAnswer = {
+    ...SKYLINE,
+    pursuits: [
+      ...SKYLINE.pursuits,
+      { addr: Address.make("docs"), goal: "every page translated", state: "running", verdict: { kind: "waiting", in_flight: 1 } },
+    ],
+    buildings: SKYLINE.buildings.map((each) => (each.addr === "docs" ? { ...each, ready: 1, problems: ["the glossary file does not parse"] } : each)),
+  };
+
+  // The bar's figures: two queues hold something, so two figures are in
+  // the alert tone.
+  const METRICS = { approvals_waiting: 2, buildings: 7, discards_outstanding: 0, events: 18_204, runs_active: 6, runs_frozen: 16, signals_waiting: 1 };
 </script>
 
 <script lang="ts">
@@ -135,8 +150,12 @@
   import { bandsOf } from "../../core/results";
   import { ui } from "../../ui";
   import AskMayor from "../city/ask_mayor.svelte";
+  import { barLookOf } from "../city/bar";
+  import Bar from "../city/bar.look.svelte";
   import { legendOf } from "../city/legend";
   import Legend from "../city/legend.look.svelte";
+  import { panelLookOf } from "../city/panel";
+  import Panel from "../city/panel.look.svelte";
   import { resultsLookOf } from "../city/results";
   import Results from "../city/results.look.svelte";
   import { cornerPower } from "../city/shape";
@@ -156,6 +175,12 @@
         picked = addr;
       },
     ),
+  );
+  const bar = $derived(barLookOf(METRICS, 12_340_000, $lang));
+  const panel = $derived(
+    panelLookOf({ addr: Address.make("docs"), city: PANEL, held: HELD.filter((run) => run.addr?.startsWith("docs/") === true), lang: $lang }, () => {
+      picked = null;
+    }),
   );
 </script>
 
@@ -180,4 +205,12 @@
 </Case>
 <Case label="city · nothing asked yet, the way to the Mayor">
   <AskMayor />
+</Case>
+<Case label="city · the row of figures, two queues waiting for the person" width={1200}>
+  {#if bar !== null}
+    <Bar {...bar} />
+  {/if}
+</Case>
+<Case label="city · the picked building's panel, planned, stuck, under a pursuit" width={360}>
+  <Panel {...panel} />
 </Case>

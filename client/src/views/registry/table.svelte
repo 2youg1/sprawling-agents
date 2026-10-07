@@ -54,7 +54,7 @@
   when the column is narrower than the address, never broken. -->
   <a
     href={toFragment({ kind: "building", address: line.addr })}
-    class="block truncate font-mono text-note text-text-quiet underline decoration-edge underline-offset-2 hover:decoration-accent"
+    class="block truncate font-mono text-note text-text-quiet underline decoration-edge underline-offset-2 transition-colors ease-leave hover:decoration-accent hover:ease-arrive"
   >
     {line.addr}
   </a>
