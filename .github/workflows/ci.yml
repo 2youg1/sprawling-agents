@@ -7,35 +7,45 @@
 # alone cannot hold: the commit messages of the range under review, and the
 # kani proofs, which need a Linux host.
 #
-#   fast      fmt, the gates that read sources, the commit
-#             messages; compiles only xtask, so it answers first
+#   gates     fmt, the gates that read sources, the commit messages, the
+#             desktop server's Zig leaf (whose tests no cargo command
+#             runs), then the gates that judge the built client bundle;
+#             compiles only xtask
 #   models    the Lean specifications under `crates/`
 #   clippy    the zero-warning build of every target and feature, and the
 #             feature combinations `just features` runs
-#   test build, test (<type>), test
+#   test build, test (<slice>), test
 #             the suite, compiled once into a nextest archive and run in
-#             type slices on separate runners; `test` collects all
+#             four slices on separate runners; `test` collects all
 #             verdicts, so the check a branch protection names stays one
 #   core      clippy and the suite of the packages every platform ships
 #             (`just check-core`), on ubuntu and macOS
-#   gates     the gates that judge the built client bundle
 #   supply    licences, bans and sources; compiles nothing
 #   client    the client's own linter, typecheck and tests
-#   desktop   the desktop server's Zig leaf, whose tests no cargo command runs
 #   proof     the kernel propositions kani can hold; `changes` decides
 #             whether a change touched anything a proof is about
 #
 # The nine phases of `just check-all` map onto these jobs one to one or
-# into a job that holds several: fmt -> fast, build-web -> gates (its
-# recipe builds the bundle), clippy and features -> clippy, test -> the
-# test jobs, gates -> fast (sources), gates (artifacts) and supply
-# (`just deny`), models -> models, client -> client, desktop -> desktop.
+# into a job that holds several: fmt, desktop, build-web and gates (both
+# halves) -> gates, clippy and features -> clippy, test -> the test jobs,
+# the supply-chain read of `just gates` -> supply, models -> models,
+# client -> client.
 #
 # The order a red arrives in is fmt, then the source gates, then clippy,
 # then the suite, then the client, because every job starts in the first
-# second of the run and the cheap ones finish first. Chaining them with
-# `needs` would buy the same order and cost the sum of the jobs as wall
-# clock instead of the slowest one.
+# second of the run and the cheap ones finish first, and `gates` runs its
+# cheap verdicts before it builds the bundle. Chaining jobs with `needs`
+# would buy the same order and cost the sum of the jobs as wall clock
+# instead of the slowest one.
+#
+# A job is a runner, and the account runs about twenty at once across
+# every workflow, so a run that starts more jobs than it needs queues
+# behind itself and behind the next branch's run. A job that only needs
+# a few seconds of work therefore rides in a job that already holds its
+# tools: the Zig leaf's tests and the source gates ride in `gates`, which
+# installs Zig and compiles xtask for its artifact gates anyway. Each
+# verdict step in such a job runs even after an earlier one failed
+# (`!cancelled()`), so one red does not hide the others.
 #
 # Which jobs a pull request must pass is a repository setting rather than a
 # line in this file. `changes` is deliberately not required: it exists to
@@ -44,10 +54,12 @@
 #
 # Windows for everything a person can reproduce at their desk, because it is
 # the platform the project is developed on, so a red job is a red local run.
-# Three jobs run on ubuntu because the tool they drive runs better or only
-# there: `client` drives bun, `models` drives Lean, `proof` drives kani,
-# whose upstream builds for Linux only; `core` runs on ubuntu and macOS
-# because a person on either runs the same binary. The macOS source
+# Four jobs run on ubuntu because the tool they drive runs better or only
+# there, or because their verdict cannot depend on the host: `client`
+# drives bun, `models` drives Lean, `proof` drives kani, whose upstream
+# builds for Linux only, and `supply` reads `Cargo.lock` for every target
+# (`deny.toml` names none) and compiles nothing; `core` runs on ubuntu and
+# macOS because a person on either runs the same binary. The macOS source
 # gates, byte-identity and the Nix leg are `platforms.yml`, nightly, and
 # the runs nobody waits for on every push - mutation, citysim, the
 # screenshots, a release build of a ref - are `on-demand.yml`.
@@ -61,6 +73,12 @@
 # `client/bun.lock`, and only the branch everyone builds on writes a cache:
 # a pull request's save is readable by that pull request alone, and it
 # pushes the shared entry out of the repository's cache budget by age.
+# Every job that compiles installs its toolchain through
+# `./.github/actions/toolchain`, which leaves the pinned toolchain alone
+# in its rustup home, so a runner image that moves its own `stable` no
+# longer moves every cache key, and on Windows keeps Cargo's home on the
+# work drive with the checkout, because the system drive writes small
+# files several times slower.
 #
 # Every job carries a timeout. GitHub's default is six hours, so a hung job
 # would burn a runner for a working day while the person waited on a
@@ -122,36 +140,44 @@ jobs:
               - '.github/workflows/ci.yml'
               - '.github/workflows/kani-version.txt'
 
-  # The verdicts that compile nothing but xtask, in the order they cost.
+  # The verdicts that compile nothing but xtask, in the order they cost:
+  # the source half first, then the Zig leaf, then the bundle and the
+  # three gates that judge it. Every verdict step runs even after an
+  # earlier one failed, so a red fmt still reports the gates.
   #
   # `fetch-depth: 0` because the commit-message check judges every commit
   # in the change-set, and a base branch can sit any distance back.
-  fast:
+  gates:
     runs-on: windows-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - name: install pinned toolchain
-        run: rustup show
-      # The Zig the desktop's leaf is built with; every Windows build of
-      # `sprawling` compiles it (`crates/desktop/Spec.lean` section 8-12).
+      - uses: ./.github/actions/toolchain
+      # The Zig the desktop's leaf is built with and formatted by
+      # (`crates/desktop/Spec.lean` section 8-12). The one job whose Zig
+      # cache pays: `just check-desktop` runs `zig test`.
       - uses: ./.github/actions/zig
+        with:
+          cache: true
       - uses: Swatinem/rust-cache@v2
         with:
-          shared-key: fast
+          shared-key: gates
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: taiki-e/install-action@v2
         with:
           tool: just
       - name: native payloads in system channel validation
+        if: ${{ !cancelled() }}
         env:
           PYTHONUTF8: "1"
         run: python tools/xtask/src/channel/validate_test.py
       - name: fmt
+        if: ${{ !cancelled() }}
         run: just fmt-check
       - name: the gates that read sources
+        if: ${{ !cancelled() }}
         run: just gates-sources
       # base..head for a pull request, before..after for a push. A push
       # that rewrote history leaves `before` unreachable in a fresh clone,
@@ -159,6 +185,7 @@ jobs:
       # alone and say so, because a range that cannot be resolved must not
       # read as a range that was clean.
       - name: commit messages
+        if: ${{ !cancelled() }}
         shell: bash
         run: |
           set -euo pipefail
@@ -191,6 +218,21 @@ jobs:
           esac
           echo "judging $range"
           just commits "$range"
+      # The desktop server and its FFI seam are workspace members, so
+      # clippy and the suite judge them; what is left is the Zig leaf's
+      # own tests, which no cargo command runs (`crates/desktop/Spec.lean`
+      # section 8-12).
+      - name: the Zig leaf's own tests
+        if: ${{ !cancelled() }}
+        run: just check-desktop
+      - uses: ./.github/actions/client-artifacts
+        if: ${{ !cancelled() }}
+      # `--no-deps` because the action above has just run `build-web`,
+      # the recipe's one dependency; a second bundle build would cost
+      # half a minute and judge the same bytes.
+      - name: the gates that judge the client bundle
+        if: ${{ !cancelled() }}
+        run: just --no-deps gates-artifacts
 
   # The Lean specifications. The checker in `tools/adversary/` is not built here:
   # it attacks the binary from outside and stays out of every required
@@ -212,8 +254,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
-      - name: install pinned toolchain
-        run: rustup show
+      - uses: ./.github/actions/toolchain
       # The Zig the desktop's leaf is built with; every Windows build of
       # `sprawling` compiles it (`crates/desktop/Spec.lean` section 8-12).
       - uses: ./.github/actions/zig
@@ -236,11 +277,19 @@ jobs:
         run: just features
 
   # The suite, compiled once. The archive carries every test binary and
-  # the workspace binaries they spawn; the type slices below run it on
+  # the workspace binaries they spawn; the slices below run it on
   # runners whose checkout path is the same as this one, which is what
   # lets a path cargo baked in at compile time resolve there. Debug
   # information is cut to line tables: it is most of the archive's bytes,
   # and a backtrace still names the file and the line.
+  #
+  # The suite links with rust-lld (lld-link) rather than Microsoft's
+  # link.exe: the archive holds 78 linked binaries, and on a warm cache
+  # the compile from the first workspace crate to the archive took 171 s
+  # and 194 s in two runs against 201 s with link.exe. This archive is a
+  # test build that nobody downloads;
+  # `release.yml` builds what ships with link.exe, so the linker of a
+  # released binary is not this one (`tools/xtask/Spec.lean` D27).
   test-build:
     name: test build
     outputs:
@@ -250,10 +299,10 @@ jobs:
     env:
       CARGO_PROFILE_DEV_DEBUG: line-tables-only
       CARGO_PROFILE_TEST_DEBUG: line-tables-only
+      CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER: rust-lld.exe
     steps:
       - uses: actions/checkout@v7
-      - name: install pinned toolchain
-        run: rustup show
+      - uses: ./.github/actions/toolchain
       # The Zig the desktop's leaf is built with; every Windows build of
       # `sprawling` compiles it (`crates/desktop/Spec.lean` section 8-12).
       - uses: ./.github/actions/zig
@@ -269,7 +318,7 @@ jobs:
       - uses: ./.github/actions/client-artifacts
       - name: the suite, compiled once
         run: just test-archive target/nextest-archive.tar.zst
-      - name: prove every test belongs to exactly one type slice
+      - name: prove every test belongs to exactly one slice
         id: plan
         shell: bash
         run: |
@@ -290,9 +339,11 @@ jobs:
           retention-days: 1
           if-no-files-found: error
 
-  # Disjoint type slices, whose union is checked before the matrix starts. The
-  # toolchain, Zig and the client tree are installed because some tests
-  # compile (trybuild), build the leaf, or read `client/node_modules`.
+  # Disjoint slices, whose union is checked before the matrix starts.
+  # Every slice installs the toolchain, because nextest runs as a cargo
+  # subcommand; the rest of its setup follows the `environment`
+  # `just test-slice-plan` gives it, so a slice that compiles nothing
+  # does not pay a minute for a client tree or a Zig it never opens.
   test-slice:
     name: test (${{ matrix.name }})
     needs: test-build
@@ -303,47 +354,47 @@ jobs:
       matrix: ${{ fromJSON(needs.test-build.outputs.slices) }}
     steps:
       - uses: actions/checkout@v7
-      - name: install pinned toolchain
-        run: rustup show
+      - uses: ./.github/actions/toolchain
+      # trybuild compiles `sprawling-runtime`, which builds the Zig leaf.
       - uses: ./.github/actions/zig
+        if: matrix.environment == 'compile'
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-nextest,just
       # The trybuild suites are cold rather than slow: one suite is 21.4s
       # against an empty scratch and 0.9s against a warm one, so the
-      # scratch is cached on its own, keyed per slice because each slice
-      # fills a different part of it.
+      # scratch is cached on its own. trybuild gives every suite one
+      # target directory, `target/tests/trybuild`, so the one slice that
+      # runs them all keeps one entry.
       - uses: actions/cache/restore@v6
-        if: startsWith(matrix.name, 'trybuild-')
+        if: matrix.environment == 'compile'
         id: trybuild-scratch
         with:
           path: target/tests
           key: trybuild-${{ runner.os }}-${{ matrix.name }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml', 'crates/*/tests/**') }}
-          # Seed the new names from the former first count slice, which
-          # held all five trybuild suites. Cargo validates restored inputs.
-          restore-keys: |
-            trybuild-${{ runner.os }}-${{ matrix.name }}-
-            trybuild-${{ runner.os }}-1-
+          restore-keys: trybuild-${{ runner.os }}-${{ matrix.name }}-
       # xtask's npm gate has tests that read the installed client tree and
       # refuse when it is missing, which is what a bare runner has.
       - uses: ./.github/actions/client-artifacts
+        if: matrix.environment == 'client'
       - uses: actions/download-artifact@v8
         with:
           name: nextest-archive
           path: target
       - name: tests
         env:
+          TEST_ENVIRONMENT: ${{ matrix.environment }}
           TEST_FILTER: ${{ matrix.filter }}
         shell: bash
-        run: just test-slice target/nextest-archive.tar.zst "$TEST_FILTER"
+        run: just test-slice target/nextest-archive.tar.zst "$TEST_ENVIRONMENT" "$TEST_FILTER"
       - uses: actions/cache/save@v6
-        if: ${{ startsWith(matrix.name, 'trybuild-') && github.ref == 'refs/heads/main' && steps.trybuild-scratch.outputs.cache-hit != 'true' }}
+        if: ${{ matrix.environment == 'compile' && github.ref == 'refs/heads/main' && steps.trybuild-scratch.outputs.cache-hit != 'true' }}
         with:
           path: target/tests
           key: trybuild-${{ runner.os }}-${{ matrix.name }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml', 'crates/*/tests/**') }}
 
   # The one verdict of the suite, under the name branch protection
-  # requires. It reads the build and all type slices, so a slice that
+  # requires. It reads the build and all slices, so a slice that
   # failed, or never started because the build failed, fails it.
   test:
     needs: [test-build, test-slice]
@@ -370,8 +421,7 @@ jobs:
         os: [ubuntu-latest, macos-latest]
     steps:
       - uses: actions/checkout@v7
-      - name: install pinned toolchain
-        run: rustup show
+      - uses: ./.github/actions/toolchain
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: core
@@ -395,32 +445,29 @@ jobs:
           name: macos-mechanism-${{ github.sha }}-${{ github.run_attempt }}
           path: target/platform-evidence
           if-no-files-found: error
+      # The same scratch the `compile` test slice keeps, for the same
+      # reason: cold, the five trybuild suites are most of this job's
+      # test run (219 s for one of them on macOS). Restored after the
+      # Rust cache, which never holds `target/tests` (see below).
+      - uses: actions/cache/restore@v6
+        id: trybuild-scratch
+        with:
+          path: target/tests
+          key: trybuild-${{ runner.os }}-core-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml', 'crates/*/tests/**') }}
+          restore-keys: trybuild-${{ runner.os }}-core-
       - name: clippy and the suite of the core packages
         run: just check-core
-      # See the test slices: the cache's save step cannot walk trybuild's
-      # scratch (rust-cache#193).
+      - uses: actions/cache/save@v6
+        if: ${{ github.ref == 'refs/heads/main' && steps.trybuild-scratch.outputs.cache-hit != 'true' }}
+        with:
+          path: target/tests
+          key: trybuild-${{ runner.os }}-core-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml', 'crates/*/tests/**') }}
+      # The Rust cache's save step cannot walk trybuild's scratch
+      # (rust-cache#193), so the scratch leaves before that step runs.
       - name: clear the trybuild scratch before the cache is saved
         if: always()
         shell: bash
         run: rm -rf target/tests
-
-  # The three gates that judge the built client rather than a source.
-  # `just gates-artifacts` builds the bundle itself; the action before it
-  # installs bun and restores bun's cache.
-  gates:
-    runs-on: windows-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v7
-      - name: install pinned toolchain
-        run: rustup show
-      - uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: gates
-          save-if: ${{ github.ref == 'refs/heads/main' }}
-      - uses: ./.github/actions/client-artifacts
-      - name: the gates that judge the client bundle
-        run: just gates-artifacts
 
   # Licences, banned crates and where they came from. It reads `Cargo.lock`
   # and compiles nothing. `advisories` is deliberately absent from
@@ -428,7 +475,7 @@ jobs:
   # touched would turn a pull request red for a reason its author did not
   # write. It runs in `nightly.yml`, where red means "go and look".
   supply:
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
@@ -458,24 +505,6 @@ jobs:
       - name: lint, typecheck and test the client
         run: just check-client
 
-  # The desktop server and its FFI seam are workspace members, so the jobs
-  # above lint and test them; what is left is the Zig leaf's own tests,
-  # which no cargo command runs (`crates/desktop/Spec.lean` section 8-12). It compiles
-  # no Rust, so it needs no toolchain and no cache.
-  desktop:
-    runs-on: windows-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v7
-      # The Zig the desktop's leaf is built with (`crates/desktop/Spec.lean` section
-      # 8-12).
-      - uses: ./.github/actions/zig
-      - uses: taiki-e/install-action@v2
-        with:
-          tool: just
-      - name: the Zig leaf's own tests
-        run: just check-desktop
-
   # The propositions only a proof can hold, against real MIR.
   #
   # Which harnesses run is not written here: `cargo xtask proof --list`
@@ -494,6 +523,9 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
+      # Not `./.github/actions/toolchain`: the kani cache below was
+      # written against the image's own rustup and Cargo homes, and
+      # moving them under kani is a change nobody has measured.
       - name: install pinned toolchain
         run: rustup show
       - uses: Swatinem/rust-cache@v2
@@ -533,7 +565,7 @@ jobs:
   # D27 in tools/xtask/Spec.lean: skipped required work is not a green tree.
   # This is the shared verdict, so release has no second list of checks.
   validation:
-    needs: [fast, models, clippy, test, gates, supply, client, desktop]
+    needs: [models, clippy, test, gates, supply, client]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
