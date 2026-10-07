@@ -50,17 +50,44 @@ route to the first task; completion time depends on installation, credentials
 and the reader's experience. Providers are configured explicitly, rather than
 automatically imported from another harness's private configuration.
 
-**Built-in monitoring.** The monitor exposes run timings, model calls, token
-use, costs and resource readings. `sprawling gauge` measures a command, a
-process tree or a served city. These are tools for evaluating the reader's own
-workload; a performance claim needs the measured version, workload, build and
-machine class. A call without a provider price has no reported price, which
-must not be presented as zero cost.
+**Performance.** One process serves the page and runs the city, with no
+database. Settings → Performance chooses CPU placement and core priority, and
+an optional memory ceiling per run: the ceiling comes only from a number the
+User enters, there is none by default, it applies only with the `soft_shares`
+placement, and Windows jobs and delegated Linux cgroups enforce it while other
+platforms report that it did not apply
+([performance](docs/performance.md#choose-how-the-city-uses-the-machine)). Run
+commands start below the core's priority. The sieve trims a command's output by
+the command that produced it before the model reads it, and keeps the full text
+retrievable. The monitor exposes run timings, model calls, token use, costs and
+resource readings, and `sprawling gauge` measures a command, a process tree or
+a served city. These are tools for evaluating the reader's own workload; a
+performance claim needs the measured version, workload, build and machine
+class, and the placement arms have no comparative reading in this release. A
+call without a provider price has no reported price, which must not be
+presented as zero cost.
+
+**Privacy.** A provider-shaped key pasted into a message goes to the vault
+and the message carries its reference, so the model never reads the key.
+Secret-shaped spans in model replies, tool calls and tool results are replaced
+by a marker before they enter the Ledger; the live conversation keeps the
+original bytes. A confidential building makes no call to a remote provider. A
+building that is not confidential has `web_search`, which by default sends the
+search words to Exa until `[search]` turns it off. On Windows, the settings
+page offers 88 optional privacy controls, applied or restored one at a time
+after a confirmation, with machine-scope writes through UAC and a read-back
+after every write ([privacy](docs/operating.md#privacy)). Microsoft does not
+state whether most of them apply on Windows Home. Present these as informed
+choices with costs: privacy is not security, and applying more controls is
+not better in itself.
 
 **Customisation and development.** Role documents, project rules and skills
 control how agents work. Models connect through provider endpoints; external
 tools connect through MCP, and supported vendor harnesses run through ACP.
-Another client can use the wire, and the architecture describes seams for
+A provider can hold several accounts in a chosen order; a Session stays on the
+account that first answered it, and a rejected key or a used-up quota moves the
+request to the next account. Another client can use the wire, and the
+architecture describes seams for
 runtime changes. These suit a custom workflow or AgentOS that needs persistent
 teams,
 document-based continuity and a shared history on one machine. Use existing
