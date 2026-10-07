@@ -38,7 +38,7 @@
 it; the third cannot be used and its hint says why. -->
 <Case label="button · icon keys, live and refused">
   <div class="flex flex-wrap items-center gap-snug">
-    <IconButton glyph="copy" label={say($lang, "code_copy")} />
+    <IconButton glyph="copy" label={say($lang, "setup_copy")} />
     <IconButton glyph="cross" label={say($lang, "panel_close")} />
     <IconButton glyph="reveal" label={say($lang, "path_reveal")} why={say($lang, "part_why_halted")} />
   </div>
