@@ -80,11 +80,4 @@
     border-color: CanvasText;
     backdrop-filter: none;
   }
-  /* The context ring's checkpoints are drawn in fills the mode
-   * replaces: the two lose their green and red and keep their order,
-   * which is where on the ring each one sits. The composer's line says
-   * its own (talk/typed_line.look.svelte). */
-  .rung {
-    background-color: CanvasText;
-  }
 }

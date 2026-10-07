@@ -19,6 +19,7 @@ import type { Belief } from "../../core/belief";
 import { heldIn } from "../../core/belief/rooms";
 import type { Lang } from "../../core/lang";
 import { fill, say } from "../../core/lang";
+import { kilo } from "../../core/time";
 import type { Address, Answer, EndpointSummary, RunId, Turn } from "../../wire";
 
 // The percents at which the two reminders sound, or null where the page
@@ -90,7 +91,110 @@ export function usedPercent(context: Context): number {
 // from the start clockwise, so what is drawn begins where the used part
 // ends and runs to the start. Only what remains is stroked; an overlay
 // of the page colour over a whole ring leaves a fringe where they meet.
-export function remainingArc(context: Context): { readonly dasharray: string; readonly dashoffset: string } {
+export function remainingArc(context: Context): Arc {
   const used = usedPercent(context);
   return { dasharray: `${String(100 - used)} 100`, dashoffset: String(-used) };
+}
+
+// Which reminder a checkpoint marks: the first, or the second, which is
+// the handoff. The two are drawn alike and told apart by colour and by
+// where they sit, so one look draws both (`checkpoint.look.svelte`).
+export type Reminder = "first" | "second";
+
+export interface Checkpoint {
+  readonly reminder: Reminder;
+  // Its percent of the window, the place it is drawn at.
+  readonly at: number;
+}
+
+// The checkpoints a room's reminders put on the ring, the ones the page
+// was told and no others.
+export function checkpointsOf(reminders: Reminders): readonly Checkpoint[] {
+  return [
+    ...(reminders.first === null ? [] : [{ reminder: "first" as const, at: reminders.first }]),
+    ...(reminders.second === null ? [] : [{ reminder: "second" as const, at: reminders.second }]),
+  ];
+}
+
+// What the ring's focusable element carries, spread onto it as it is.
+// It is a meter rather than a button: it reports a reading and does
+// nothing when pressed. It takes focus so a keyboard reaches the reading
+// the tip spells out, as a pointer does by hovering; the tip says the
+// same words as `aria-valuetext`, so the meter is not also described by
+// it, which would have a screen reader read the line twice.
+export interface MeterWire {
+  readonly role: "meter";
+  readonly tabindex: 0;
+  readonly "aria-label": string;
+  readonly "aria-valuemin": 0;
+  readonly "aria-valuemax": number;
+  readonly "aria-valuenow": number;
+  readonly "aria-valuetext": string;
+}
+
+// Everything the ring's look is given. The coin key it surrounds is the
+// look's child, not part of this value, because the ring draws round
+// whatever key the composer puts in it.
+export interface RingLook {
+  readonly meter: MeterWire;
+  // The one line the ring says on hover and on focus.
+  readonly reading: string;
+  readonly arc: Arc;
+  readonly checkpoints: readonly Checkpoint[];
+}
+
+export interface Arc {
+  readonly dasharray: string;
+  readonly dashoffset: string;
+}
+
+// The ring for a session's context, or null where there is no window to
+// draw against and the coin key stands alone. The reading is used
+// against the window, the share, and the reminders the page knows
+// about, which is also the whole of what a screen reader is told.
+export function ringOf(lang: Lang, context: Context | null): RingLook | null {
+  if (context === null) return null;
+  const reading = [
+    fill(say(lang, "ring_used"), { used: kilo(context.used), window: kilo(context.window) }),
+    fill(say(lang, "ring_share"), { n: String(usedPercent(context)) }),
+    ...remindersSaid(lang, context),
+  ].join(" · ");
+  return {
+    meter: {
+      role: "meter",
+      tabindex: 0,
+      "aria-label": say(lang, "ring_name"),
+      "aria-valuemin": 0,
+      "aria-valuemax": context.window,
+      "aria-valuenow": Math.min(context.used, context.window),
+      "aria-valuetext": reading,
+    },
+    reading,
+    arc: remainingArc(context),
+    checkpoints: checkpointsOf(context),
+  };
+}
+
+// Everything a sessions row's context bar is given: the share of the
+// window used, the handoff checkpoint where the room states one, and
+// the share in words for a screen reader, since the bar itself is
+// drawing. Only the handoff is marked, because the bar answers which
+// session is about to hand off; the ring beside the composer carries
+// both reminders.
+export interface ContextBarLook {
+  readonly share: number;
+  readonly handoff: Checkpoint | undefined;
+  readonly said: string;
+}
+
+// The bar for a session's context, or null where its model stated no
+// window, as the ring draws no ring.
+export function barOf(lang: Lang, context: Context | null): ContextBarLook | null {
+  if (context === null) return null;
+  const share = usedPercent(context);
+  return {
+    share,
+    handoff: checkpointsOf(context).find((each) => each.reminder === "second"),
+    said: fill(say(lang, "ring_share"), { n: String(share) }),
+  };
 }

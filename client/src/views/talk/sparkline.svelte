@@ -23,7 +23,7 @@ and a screen reader reading twenty heights would be reading noise. -->
 </script>
 
 <svg
-  class="inline-block h-[12px] w-[40px] shrink-0 self-center text-text-faint"
+  class="inline-block h-sparkline-tall w-sparkline shrink-0 self-center text-text-faint"
   viewBox="0 0 {SLICES * 2} {HEIGHT}"
   aria-hidden="true"
 >

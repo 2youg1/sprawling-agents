@@ -56,6 +56,7 @@
   import Prop from "./gallery/prop.svelte";
   import PrivacyGallery from "./gallery/privacy.svelte";
   import Rfr from "./gallery/rfr.svelte";
+  import Ring from "./gallery/ring.svelte";
   import Md from "./gallery/md.svelte";
   import Monitor from "./gallery/monitor.svelte";
   import Parts from "./gallery/parts.svelte";
@@ -124,6 +125,7 @@
   <Md />
   <RefusedLine />
   <Talking />
+  <Ring />
   <Thr />
   <AgentMessages />
   <AgentLetters />
