@@ -80,10 +80,9 @@
     border-color: CanvasText;
     backdrop-filter: none;
   }
-  /* The composer's line and the context ring's checkpoints are drawn in
-   * fills the mode replaces. The line keeps its fade in the system ink;
-   * the two checkpoints lose their green and red and keep their order,
-   * which is where on the ring each one sits. */
+  /* The composer's line is drawn in a fill the mode replaces, so it
+   * keeps its fade in the system ink. The context ring's checkpoints
+   * say the same of themselves (`talk/checkpoint.look.svelte`). */
   .typed-line {
     background: linear-gradient(
       to right,
@@ -91,8 +90,5 @@
       CanvasText var(--typed),
       transparent calc(var(--typed) + 160px)
     );
-  }
-  .rung {
-    background-color: CanvasText;
   }
 }

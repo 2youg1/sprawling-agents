@@ -4,21 +4,27 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // The third line of a sessions row (client/Spec.lean §7K): a 2 px bar of how
-  // much of the window the room's newest run used, with a tick where the
-  // handoff reminder sounds, so a person scanning the pane sees which
-  // session is about to hand off. It is the context ring's reading drawn
-  // flat: the same pair of numbers and the same settled threshold, read
-  // through `talk/gauge.ts`, so a row and the ring cannot disagree.
+  // The third line of a sessions row (client/Spec.lean §7K): a 2 px bar
+  // of how much of the window the room's newest run used, with the
+  // handoff checkpoint where that reminder sounds, so a person scanning
+  // the pane sees which session is about to hand off. It is the context
+  // ring's reading drawn
+  // flat: the same pair of numbers, the same settled threshold and the
+  // same checkpoint, read through `talk/gauge.ts`, so a row and the ring
+  // cannot disagree.
   //
   // A run whose model stated no window draws no bar, as the ring draws
   // no ring. The share is said to a screen reader as words inside the
-  // row's link; the bar itself is drawing.
+  // row's link; the bar itself is drawing (`context_bar.look.svelte`).
+  //
+  // The seat keeps the bar's place in the row's grid - the second and
+  // third columns, a step below the line above - because the row lays
+  // out its lines and the look draws inside the place it is given.
   import { QUERIES } from "../../core/asking";
-  import { fill, say } from "../../core/lang";
   import { ui } from "../../ui";
   import type { Address, RoundsAnswer, RunId } from "../../wire";
-  import { contextOf, remindersOf, usedPercent } from "../talk/gauge";
+  import { barOf, contextOf, remindersOf } from "../talk/gauge";
+  import Look from "./context_bar.look.svelte";
 
   interface Props {
     readonly room: Address;
@@ -41,22 +47,18 @@
     });
   });
 
-  const context = $derived(
-    contextOf(
-      rounds?.turns ?? [],
-      $endpoints !== undefined && "endpoints" in $endpoints ? $endpoints.endpoints.endpoints : [],
-      remindersOf($config),
+  const bar = $derived(
+    barOf(
+      $lang,
+      contextOf(
+        rounds?.turns ?? [],
+        $endpoints !== undefined && "endpoints" in $endpoints ? $endpoints.endpoints.endpoints : [],
+        remindersOf($config),
+      ),
     ),
   );
 </script>
 
-{#if context !== null}
-  {@const share = usedPercent(context)}
-  <span class="relative col-start-2 col-end-4 mt-snug h-hair rounded-pill bg-edge-panel" aria-hidden="true">
-    <span class="absolute inset-y-0 left-0 rounded-pill bg-text-quiet" style:width="{share}%"></span>
-    {#if context.second !== null}
-      <span class="absolute -top-[2px] h-[6px] w-px bg-reminder-second" style:left="{context.second}%"></span>
-    {/if}
-  </span>
-  <span class="sr-only">{fill(say($lang, "ring_share"), { n: String(share) })}</span>
+{#if bar !== null}
+  <span class="col-start-2 col-end-4 mt-snug"><Look {...bar} /></span>
 {/if}

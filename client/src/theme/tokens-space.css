@@ -117,6 +117,21 @@
    * the 7.9 px square the template draws - seven sixteenths of the
    * 18 px key glyph. A larger stop reads as a second, heavier key. */
   --spacing-glyph-stop: 8.5px;
+  /* A reminder's checkpoint on the context ring and on a sessions row's
+   * context bar (`talk/checkpoint.look.svelte`): a dot five pixels
+   * across, ringed in a pixel and a half of the page colour so it reads
+   * over the line it sits on. */
+  --spacing-checkpoint: 5px;
+  --spacing-checkpoint-halo: 1.5px;
+  /* The read-wear bar's thumb and round ticks (`talk/wear.look.svelte`):
+   * three pixels, a pixel either side of the track's line, so they sit
+   * centred on it; a tick is never shorter than it is wide. */
+  --spacing-wear: 3px;
+  /* A reply's arrival rhythm at the end of its head
+   * (`talk/sparkline.svelte`): twenty slices of two pixels, a line of
+   * note text tall. */
+  --spacing-sparkline: 40px;
+  --spacing-sparkline-tall: 12px;
   /* The conversation as a band along the bottom of the panorama tier:
    * the last thing said, the field, and its line. */
   --spacing-band: 112px;
