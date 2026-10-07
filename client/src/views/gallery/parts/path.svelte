@@ -26,5 +26,5 @@
 </Case>
 
 <Case label="path · outside the city, in a narrow column" width={240}>
-  <Path path="C:\Users\shared\experiments\2026\07\completions-with-a-long-name.md" />
+  <Path path="D:\shared\experiments\2026\07\completions-with-a-long-name.md" />
 </Case>
