@@ -6,7 +6,7 @@
 import { describe, expect, test } from "bun:test";
 
 import type { AxError } from "../../wire";
-import { pressable, standingOf } from "./card";
+import { pressable, type Standing, standingOf } from "./card";
 import { HELD, sent, waited } from "./saving";
 
 const words = (key: string): string => key;
@@ -22,7 +22,7 @@ const refusal: AxError = {
 
 describe("a settings card's foot", () => {
   test("says when a saved change takes effect, on every card", () => {
-    const saved = { word: "saving_saved", weight: "quiet", saved: true, detail: "next run" };
+    const saved: Standing = { word: "saving_saved", weight: "quiet", saved: true, detail: "next run" };
     expect(standingOf({ kind: "saved" }, "next run", true, words)).toEqual(saved);
     expect(standingOf({ kind: "saved" }, "next run", false, words)).toEqual(saved);
   });

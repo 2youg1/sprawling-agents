@@ -87,7 +87,7 @@
   <span class="text-label font-label text-text">{say($lang, "context_second")}</span>
   <p class="text-note text-text-faint">{say($lang, "context_second_note")}</p>
   <select
-    class="h-control w-tree max-w-full rounded-control border border-edge-input bg-page px-base text-body text-text"
+    class="h-control w-tree max-w-full rounded-control border border-edge-input bg-raised px-base text-body text-text"
     aria-label={say($lang, "context_second_building")}
     value={addr}
     onchange={(event) => {

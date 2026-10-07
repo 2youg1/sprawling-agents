@@ -91,7 +91,7 @@
   </select>
   <Card title="rules_title" note="rules_note" {saving} settled="settings_next_run" onSave={save}>
     <textarea
-      class="min-h-output w-full rounded-control border border-edge-input bg-page px-base py-snug font-mono text-note text-text"
+      class="min-h-output w-full rounded-control border border-edge-input bg-raised px-base py-snug font-mono text-note text-text"
       aria-label={say($lang, "rules_title")}
       spellcheck="false"
       bind:value={draft}

@@ -65,7 +65,8 @@
   {/if}
 {/snippet}
 
-<!-- svelte-ignore a11y_no_noninteractive_element_interactions (the arrow keys move between the links and buttons inside, the APG pattern for this navigation) -->
+<!-- The arrow keys the wire bag carries move between the links and
+  buttons inside: the APG pattern for this navigation. -->
 <nav {...nav} class="flex flex-col gap-hair">
   {#each branches as branch (branch.key)}
     <div class="flex flex-col gap-hair">

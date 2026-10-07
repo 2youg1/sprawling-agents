@@ -148,7 +148,7 @@
       <label class="flex flex-col gap-tight">
         <span class="text-note text-text-quiet">{say($lang, "you_about")}</span>
         <textarea
-          class="min-h-figure w-full rounded-control border border-edge-input bg-page px-base py-snug text-body text-text"
+          class="min-h-figure w-full rounded-control border border-edge-input bg-raised px-base py-snug text-body text-text"
           bind:value={about}
           oninput={personMoved}
         ></textarea>

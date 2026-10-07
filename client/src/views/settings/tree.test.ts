@@ -71,7 +71,7 @@ describe("the settings tree's wiring", () => {
 
   const leavesOf = (look: TreeLook): LeafLook[] =>
     look.branches.flatMap((branch) => [
-      ...branch.entries.flatMap((entry) => (entry.kind === "nest" ? entry.pages : [entry])),
+      ...branch.entries.flatMap((entry): readonly LeafLook[] => (entry.kind === "nest" ? entry.pages : [entry])),
       ...(branch.more?.entries ?? []),
     ]);
 
@@ -111,7 +111,7 @@ describe("the settings tree's wiring", () => {
       expect(leaf.wire["data-entry"]).toBe("");
       if (leaf.kind === "group") expect(leaf.wire["data-initial"]).toBe(leaf.initial);
     }
-    expect(look.branches.every((branch) => branch.fold.wire["data-entry"] === "")).toBe(true);
+    expect(look.branches.map((branch) => branch.fold.wire["data-entry"])).toEqual(look.branches.map(() => ""));
   });
 
   test("puts the process reading on the performance page's entry alone", () => {
