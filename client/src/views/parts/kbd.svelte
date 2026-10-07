@@ -11,16 +11,17 @@
 // mark draws a list's own keys at a row's end: a line move, or the first
 // letter a row is reached by.
 //
+// This file is the seat of both: it reads the key table and holds the
+// sheet's element, and `kbd.look.svelte` and `kbd_sheet.look.svelte`
+// draw.
+//
 // **The sheet is a modal dialog the platform owns.** `showModal()` puts
 // it in the top layer, traps the focus, marks the rest of the page
 // `inert`, and answers Escape - four behaviours this file used to carry
 // as an overlay, a focus call and a stacking order. There is therefore
 // no `z-index` here (design 4-21) and no focus code: `close()` at
 // teardown returns the focus to whatever held it before the sheet
-// opened (SPEC 7-7). Escape arrives as a `cancel` request, which is
-// answered by the caller rather than by the element, and a click on the
-// backdrop closes nothing - a sheet of key chords is not a question one
-// answers by missing it (SPEC 7-3).
+// opened (SPEC 7-7).
 //
 // **The sheet has two seats.** `modal` is the one above; `specimen` is
 // the same box drawn open in the page's flow, with no `showModal()`, for
@@ -33,47 +34,30 @@
 // `Kbd` is the exported snippet, one glyph per `<kbd>`, no focus and no
 // keys of its own (SPEC 7-1).
 
+import type { Attachment } from "svelte/attachments";
+
 import { ACTIONS, LABELS } from "../../core/keys";
 import { say } from "../../core/lang";
 import { ui } from "../../ui";
-
-// Where the sheet stands: in the top layer as the page's one modal, or
-// in the gallery's flow as a picture of itself.
-type Seat = "modal" | "specimen";
+import Look from "./kbd_sheet.look.svelte";
+import { sheetOf, type Seat } from "./kbd";
 
 interface CheatsheetProps {
   readonly seat: Seat;
   readonly onClose: () => void;
 }
 
-// The sheet's own box, in the shape `parts/dialog.svelte` draws: a
-// shadowed face draws no border, it fades in through `@starting-style`
-// and out through `transition-behavior: allow-discrete`, moves only
-// opacity, and goes still under `prefers-reduced-motion`. The seat is
-// the one the sheet has always had - a section below the top edge,
-// centred across the page - because reading twelve chords is not
-// navigating and the page underneath should not have to move to be read
-// over.
-const SHEET =
-  "m-auto mt-section hidden w-full max-w-measure flex-col gap-base rounded-panel " +
-  "bg-raised p-pane opacity-0 shadow-sheet transition-[opacity,display,overlay] " +
-  "transition-discrete duration-panel ease-leave open:flex open:opacity-100 open:ease-arrive " +
-  "starting:open:opacity-0 still:transition-none " +
-  "backdrop:bg-transparent backdrop:backdrop-brightness-50";
-
 const uid = $props.id();
 const { lang } = ui();
 const { seat, onClose }: CheatsheetProps = $props();
 
-// The specimen stands in the flow of its fold, so the platform's
-// `position: absolute` for a non-modal dialog is undone and the box is
-// measured inside the fold that holds it.
-const PLACE: Record<Seat, string> = {
-  modal: "",
-  specimen: "static",
-};
-
 let sheet = $state<HTMLDialogElement | undefined>(undefined);
+const hold: Attachment<HTMLDialogElement> = (node) => {
+  sheet = node;
+  return () => {
+    sheet = undefined;
+  };
+};
 
 // The caller owns whether the sheet stands; this only carries that
 // answer to the element. Asking an already-open dialog to open throws,
@@ -88,6 +72,22 @@ $effect(() => {
     node.close();
   };
 });
+
+const look = $derived(
+  sheetOf(
+    { uid, seat, onClose, hold },
+    {
+      title: say($lang, "keys_title"),
+      dismiss: say($lang, "dismiss"),
+      where: say($lang, "keys_where"),
+      rows: ACTIONS.map((action) => ({
+        key: action,
+        label: say($lang, LABELS[action]),
+        marks: chordMarks({ action }),
+      })),
+    },
+  ),
+);
 </script>
 
 <script module>
@@ -95,6 +95,7 @@ import type { Action } from "../../core/keys";
 import { keymap, marks } from "../../core/keys";
 import type { LineMove } from "../../core/lines";
 import { lineFaces } from "../../core/lines";
+import KbdLook from "./kbd.look.svelte";
 
 // What is drawn: the chord of a shell action, the key a row draws for a
 // line move (the first of that move's keys), or a row's first letter.
@@ -118,50 +119,7 @@ function chordMarks(props: KbdProps): readonly string[] {
 </script>
 
 {#snippet Kbd(props: KbdProps)}
-  <span class={["inline-flex items-center gap-tight", props.class]}>
-    {#each chordMarks(props) as mark (mark)}
-      <kbd
-        class="rounded-control px-tight font-mono text-note leading-none text-text-quiet no-underline"
-        >{mark}</kbd
-      >
-    {/each}
-  </span>
+  <KbdLook marks={chordMarks(props)} class={props.class} />
 {/snippet}
 
-<dialog
-  bind:this={sheet}
-  class={[SHEET, PLACE[seat]]}
-  open={seat === "specimen"}
-  aria-labelledby="{uid}-title"
-  aria-describedby="{uid}-where"
-  oncancel={(event) => {
-    // Escape reaches here as a cancel request. The default would close
-    // the element behind the caller's back, so the request is handed to
-    // the caller instead (SPEC 7-3).
-    event.preventDefault();
-    onClose();
-  }}
->
-  <div class="mb-base flex items-baseline justify-between">
-    <h2 id="{uid}-title" class="text-heading font-heading text-text">{say($lang, "keys_title")}</h2>
-    <button
-      type="button"
-      class="rounded-control px-snug py-tight text-label text-text-quiet hover:bg-raised hover:text-text"
-      onclick={() => {
-        onClose();
-      }}
-    >
-      {say($lang, "dismiss")}
-    </button>
-  </div>
-  <ul class="flex flex-col">
-    {#each ACTIONS as action (action)}
-      <li class="flex items-center justify-between gap-base py-tight text-label">
-        <span class="truncate text-text-quiet">{say($lang, LABELS[action])}</span>
-        <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
-        {@render Kbd({ action })}
-      </li>
-    {/each}
-  </ul>
-  <p id="{uid}-where" class="mt-base text-note text-text-faint">{say($lang, "keys_where")}</p>
-</dialog>
+<Look {...look} />
