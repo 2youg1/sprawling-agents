@@ -44,8 +44,8 @@
   <p class="text-note text-text-faint">{WORDS.held}</p>
 {/snippet}
 
-<Case label="page frame · a page with its note, and a section inside it">
-  <Page title={WORDS.page} note={WORDS.note}>
+<Case label="page frame · a section with its note, and a section inside it">
+  <Page title={WORDS.page} rank="section" note={WORDS.note}>
     <Page title={WORDS.section} rank="section" children={body} />
   </Page>
 </Case>
