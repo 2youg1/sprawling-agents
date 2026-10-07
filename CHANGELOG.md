@@ -24,9 +24,7 @@ release notes and their commits.
 
 **sprawling 0.0.10 innocent**
 
-Alpha, cut on 2026-10-07 (UTC) as `v0.0.10-Alpha-261007`. The workspace manifest carries <!-- xtask:begin workspace_version -->0.0.10<!-- xtask:end -->; `kernel::release::MATURITY` owns maturity, and the release workflow supplies the tag to a released binary. It records what landed after `v0.0.9-Alpha-261004`. The wire moved from WIRE_V 56 to 59, once for each push in which its shape changed (`crates/wire/Spec.lean` D1): 57 when a doctor report's sandbox arm gained `macos_seatbelt`, 58 when a provider endpoint began to carry an ordered account list, and 59 when the person's preferences gained the performance group and the release answer lost the Homebrew origin. `EVENT_LOG_V` stays at 2: a line written by 0.0.9 reads unchanged.
-
-**TODO (final session, before tagging):** if the R11 or R06 merges move `WIRE_V` past 59, give the final value above and name each further step; confirm `EVENT_LOG_V` is still 2 on the tagged tree.
+Alpha, cut on 2026-10-07 (UTC) as `v0.0.10-Alpha-261007`. The workspace manifest carries <!-- xtask:begin workspace_version -->0.0.10<!-- xtask:end -->; `kernel::release::MATURITY` owns maturity, and the release workflow supplies the tag to a released binary. It records what landed after `v0.0.9-Alpha-261004`. The wire moved from WIRE_V 56 to 64, once for each push in which its shape changed (`crates/wire/Spec.lean` D1): 57 when a doctor report's sandbox arm gained `macos_seatbelt`, 58 when a provider endpoint began to carry an ordered account list, 59 when the person's preferences gained the performance group and the release answer lost the Homebrew origin, 60 when the settings page began to read an endpoint's stored keys, tuning and the city's `[search]` back, 61 with the `ForgetSecret` command, 62 when the body size lost its upper bound, 63 with the privacy query and operation frames, and 64 when the appearance preference gained the reading face. `EVENT_LOG_V` stays at 2: a line written by 0.0.9 reads unchanged.
 
 ### Behaviour changes
 
@@ -48,7 +46,7 @@ The client's stylesheet `client/src/theme.css` is now an entry that imports its 
 
 The appearance group offers a reading face for running text: conversation messages, documents and reports. Geist Mono stays the default face for the whole interface. The second choice is the serif face [Libron](https://github.com/nicoverbruggen/libron), shipped like Geist Mono as web font files with its SIL Open Font License beside them in `client/src/fonts/` (`docs/third-party.md` §4); controls, labels, figures, code, paths and commands stay in Geist Mono. No Chinese face is bundled: Chinese text in the reading face falls back to the machine's own `serif` face. The choice is the new `reading` field of the person's appearance preference, and a preference written by 0.0.9 reads as the default face (`crates/wire/spec/Preference.lean` D52).
 
-**TODO (final session, front-end split):** one paragraph on what a person can now replace, the replacement test that proves it, and where `docs/frontend-method.md` describes it, once the split is merged; otherwise delete this line.
+The client's controls are now split into a seat and a look (`client/Spec.lean` D95). The seat is the file callers import: it owns the wiring to the city, the state, the keys and the focus, and hands each operable element to the look as a wire bag that carries its role, `aria-*` values, tab stop and handlers. The look is markup and a `<style>` block only; it reads colour and motion from the theme's tokens and imports nothing from the client's core, which eslint refuses. A person can therefore replace a look with a component of another UI library, or change its colours and motion, without losing the wiring or the alignment, which belongs to the screen that places it. `just swap` proves it: it builds the client with the replacement looks under `client/swap/` in place of the shipped ones, then runs the type check, the wiring tests and `cargo xtask render` on that build, and `ci.yml` runs it in the gates job. `cargo xtask render` also reads a roster of parts and fails when a look drops the role its contract requires. [Seats and looks](docs/frontend-method.md#seats-and-looks) explains how to write a replacement. The split also adjusted details on the way: transitions arrive and leave on the theme's curves, one hover vocabulary is defined (rows on `wash`, controls on `raised`), copying to the clipboard has one part that reports a failed write, and the fork entry reads as a branch from a turn.
 
 ### Privacy
 
@@ -96,7 +94,7 @@ The static Linux archive stays linked with musl-gcc, which produces a static PIE
 
 `ci.yml` runs the test suite in four slices balanced on measured nextest time, and checks before the slices start that every test belongs to exactly one of them; a run starts 16 jobs, 7 of them on Windows, where it started 31, 23 of them on Windows. On the Windows runners Cargo's home sits on the work drive, and the test archive links with rust-lld: on a warm cache its compile took 171 s and 194 s in two runs, against 201 s with link.exe, on GitHub's hosted Windows runner. A released binary is still linked with link.exe (`tools/xtask/Spec.lean` D27). A release is published only when every slice of its own `ci.yml` run passed, so a slice that failed, was cancelled or never started stops it.
 
-**TODO (final session, R02):** the wall-clock reading of a whole `ci.yml` run on the final tree with its machine class, and the fault-injection release run that shows a failed slice stopping publication; otherwise delete this line.
+A fault-injection run of the release workflow on a throwaway branch checked that rule: a stand-in publish step ran when every slice passed, and was skipped when one slice failed, when a test was left out of every slice (the coverage check in the test build named the unassigned tests), and when a slice was cancelled. A whole `ci.yml` run took 557 s of wall clock on GitHub's hosted runners with a warm cache, against 650 s before the cache and toolchain changes ([run 37539251320](https://github.com/2youg1/sprawling-agents/actions/runs/37539251320)).
 
 Release builds generate an Arch Linux package from the archive and install it in an Arch container; the AUR is pushed only on a tag push with the `AUR_SSH_KEY` secret.
 
@@ -108,7 +106,7 @@ README now introduces the city, documents that carry work across Sessions, five 
 
 Contribution policy uses AGENTS as its single authority, distinguishes negative fixtures, fixed regressions and opt-in experiments, and requires matching English and Chinese issue/PR descriptions. The security policy states actual trust boundaries, private reporting, no bounty, optional credit by consent and next-release fixes without backports.
 
-**TODO (final session, R12):** one sentence on the rewritten README and LLM.md once they are written; otherwise delete this line.
+README presents performance and privacy as the two features of this release, each with the guide that explains it: the new privacy section of [operating](docs/operating.md#privacy) and the performance settings in [performance](docs/performance.md#choose-how-the-city-uses-the-machine); it states that agents work with full permission inside their building by default, and carries the author's own lines on strengths, weaknesses and why the project exists. [LLM.md](LLM.md) states the same performance and privacy boundaries for a model that introduces the project.
 
 ### Known and unfixed
 
