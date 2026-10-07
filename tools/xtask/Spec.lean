@@ -388,6 +388,16 @@ D19（人的定规）：彩色令牌照旧只落在主轴与它的补色上，�
 
 **探针等懒加载的视图落地才量。** 客户端把单独成块、按需取来的视图（例如 `#/gallery`）在块落地之前标一个 `data-pending` 属性，块到了这个标记随占位一起消失。以 `file://` 取来的块不占住引擎的虚拟时间，所以只在 `SETTLE_MS` 那一刻量一次，量到的是一页没有首标题的半成品。所以门给自己那份插了探针的副本在 `<head>` 里为 bundle `assets/` 下每个页面自己没点名的脚本块加一行 `<link rel="modulepreload">`（`engine::preloads`）：预取属于文档加载，而文档加载占住虚拟时间，块于是在探针量之前就已取到，之后的 `import()` 直接拿到它；交付的页面不带这几行，仍然按需取。探针在 `SETTLE_MS` 之后每 `POLL_MS` 问一次，直到页上没有 `PENDING`；到 `BUDGET_MS` 前两次轮询还在等，就把「还在等」写进 `FAILED`，门报「页面没有在量之前稳下来」，不去判那半页。不用 ARIA 的 `aria-busy`，理由是画廊把骨架屏和加载中的按钮当夹具来画，它们在页面开着的整段时间里都读作忙碌，拿它当信号探针永远等不到。
 
+**部件花名册**（`render/parts.rs` 的 `ROSTER`，`client/spec/Views/Parts.lean` §7-10 指定的那个机器读者）。画廊的每个夹具是 `<section aria-label={label}>`（`gallery/case.svelte`），名字以部件名加中点开头（`segmented · two cells`）。名字以花名册里某个部件名加 ` ·` 开头的区域里，画出来的页必须有该部件契约要求的角色，各自至少几次、是否必须有名字，每行注明读的是 Parts.lean 哪一节：`segmented` 一个有名的 `radiogroup` 加至少两个有名的 `radio`（§7-4）；`tabs` 一个有名的 `tablist`、至少两个有名的 `tab`、一个 `tabpanel`（§7-4）；`combobox` 一个有名的 `combobox`（§7-5）；`popover` 有名的 `dialog`、`listbox` 与 `option`（§7-5）；`tip` 一个有名的 `tooltip`（§7-3）；`progress` 一个有名的 `progressbar`、`skeleton` 一个有名的 `status`、`notice` 一个有名的 `status` 或 `alert`（§7-1）；`table` 至少一个有名的 `<th>`（§7-6）。角色读的是探针记下的 `role` 属性，原生元素按标签认。花名册不收 `row`（`Row` 没有自己的角色，`RowList` 欠的是键不是角色，画出来的页分不出丢了接线包的行）与 `dialog`（画廊里它的夹具只画触发键，关着的 `<dialog>` 不在画出来的页上）。没有夹具的部件不报：花名册写的是契约，第一个 `tabs ·` 夹具落地时不改这张表就被判。**它挡的缺陷是外观忘了展开接线包**：外观自己画一个 `<button>` 而不展开座位给的那一包，页面照样画得出、对得齐、过得了其余每一条性质，读屏遇到的却是一排无名按钮。替换测试靠这一条咬人。
+
+**每个外观都被量到，并且只从令牌取尺寸**（`render/looks.rs`，从源码判，没有构建产物时也判）。`client/src` 下每个 `*.look.svelte`，它自己或同词干的座位（旁边的 `.svelte`）被 `client/src/views/gallery/` 下（含子目录）至少一个文件以相对路径直接 import；画廊不画的外观，本门的每一条性质都读不到它。每个外观（`client/swap/` 下的替代外观在内）的标记里不写 `[<数>px]` 任意尺寸类，`<style>` 里不写 `0` 与 `1px` 之外的 px 长度；唯一能写出来的长度是 1px 的线，其余取尺寸令牌，部件之间的间距归父级的 `gap`（`client/Spec.lean` 座位与外观的契约第 3 条）。
+
+**`--bundle <dir>` 量另一个目录里的客户端包**，`<dir>` 相对仓库根。只有替换测试用它；不带时读 `crate::bundle::dist(root)`，§8-18「门与二进制打开同一个目录」不变。
+
+**替换测试 `just swap`**：①`bun run typecheck`，`client/swap/` 在 tsconfig 里，替代外观必须满足它所替换的外观的 props 类型；②`client/swap/` 里每个替代外观对应的 `client/src/<同路径>.test.ts` 接线测试原样通过，缺这个文件即红；③`bun run build --config vite.swap.config.ts`，构建在 Vite 的 `resolveId` 钩子里、按解析之后的绝对路径把 `client/src/<路径>.look.svelte` 换成 `client/swap/<同路径>.look.svelte`，产物写进仓库根的 `target/swap-web`；`client/swap/` 里没有外观、或某个替代外观一次也没被换进去（没有对应的外观，或没有座位 import 它）时构建失败；④`cargo xtask render --bundle target/swap-web`，全部性质加部件花名册；⑤`color` 与 `motion` 本来就走 `client/swap/`（§8-8、§8-51）。`ci.yml` 的 `gates` 作业在 `gates-artifacts` 之后跑它。替代外观不进出货的 bundle，`artifact` 与 `packaged` 不受影响。
+
+D37 **替换测试换的是解析后的路径，产物不落在二进制嵌入的目录。** 外观都以 `./x.look.svelte` 相对引入，按说明符字符串匹配要么漏掉、要么误中别的同名文件，按解析后的绝对路径匹配两者都不会。产物写在仓库自己的 `target/swap-web`，不写 `crates/sprawling/web-dist`：中途打断的一次替换构建若留在那里，下一次 `cargo build` 就把换过外观的页面嵌进二进制；也不写 `CARGO_TARGET_DIR`，几个工作树可能共用它。花名册按区域的名字认部件而不按类名，理由与 §8-51 按名字认页相同：名字是读屏跳转用的名字，类名属于将被替换掉的那个外观。外观被量到要求画廊直接 import 座位，而不接受经某个屏幕间接到达：直接 import 它的夹具才是给它的各种状态命名的那个。被击败的备选：①把替代外观也打进出货的 bundle、由运行时开关挑选——测试用的东西就进了人下载的二进制，那正是 `artifact` 要拒的；②替换测试只跑类型检查——忘了展开接线包的外观满足类型，只在画出来的页上露馅。**重开参数**：Vite 改变 `resolveId` 的先后，或画廊不再以 `case.svelte` 给每个夹具命名。
+
 **本节属门禁机具，与产品代码分开提交。**
 -/
 
