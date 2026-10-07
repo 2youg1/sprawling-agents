@@ -45,18 +45,18 @@ fn exposed() -> SocketAddr {
 #[test]
 fn the_command_and_query_tables_hold_their_declared_counts() {
     // The counts are the wire's closed surface, not a style choice.
-    assert_eq!(COMMAND_NAMES.len(), 43, "command table");
-    assert_eq!(QUERY_NAMES.len(), 56, "query table");
+    assert_eq!(COMMAND_NAMES.len(), 44, "command table");
+    assert_eq!(QUERY_NAMES.len(), 57, "query table");
 
     let mut sorted = COMMAND_NAMES.to_vec();
     sorted.sort_unstable();
     sorted.dedup();
-    assert_eq!(sorted.len(), 43, "command names are distinct");
+    assert_eq!(sorted.len(), 44, "command names are distinct");
 
     let mut sorted = QUERY_NAMES.to_vec();
     sorted.sort_unstable();
     sorted.dedup();
-    assert_eq!(sorted.len(), 56, "query names are distinct");
+    assert_eq!(sorted.len(), 57, "query names are distinct");
 }
 
 #[test]
@@ -153,7 +153,7 @@ fn strip_prose(value: &mut serde_json::Value) {
 
 /// The digest of `wire_schema()` with its prose removed.
 #[cfg(feature = "schema")]
-const WIRE_SHAPE_GOLDEN: &str = "06ca43eca8a8632dd4c53f2b143255e9f2bd4ac0cc32f0593d34c815940c3764";
+const WIRE_SHAPE_GOLDEN: &str = "fea9d6de873332e9b4730777eb29dda32ea765f9aadef0457ddafc841c65e5d5";
 
 // -------------------------------------------------------------- binding face
 
@@ -628,6 +628,13 @@ title = \"a window\"
             idem,
         }),
         Command::CloseRemoteDoor(wire::DoorStep { idem }),
+        Command::PrivacyOperation(wire::PrivacyRequest {
+            action: wire::PrivacyAction::Apply {
+                control: wire::PrivacyControl::StartLaunchTracking,
+                expected: wire::PrivacyValue::Dword { number: 1 },
+            },
+            idem,
+        }),
         Command::ForgetSecret(wire::SecretForgetting {
             reference: "secret:search/brave.main".to_owned(),
             idem,
