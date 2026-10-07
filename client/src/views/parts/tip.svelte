@@ -76,6 +76,10 @@
   // hint's id and writes `aria-describedby` when it is named by its own
   // text, or `aria-labelledby` when these words are the only name it
   // has. Writing neither leaves a hint a screen reader never reads.
+  // A part split into a seat and a look (client D95) passes `id`
+  // instead: the seat chose the id and already wrote the relation into
+  // the control's wire bag, so the look hands the same id here and
+  // writes no ARIA of its own.
   //
   // **Placement has two branches, because engines disagree.** Where
   // anchor positioning is implemented the hint is `fixed` against the
@@ -104,6 +108,8 @@
     // `aria-describedby` when the control is named by its own text, as
     // `aria-labelledby` when these words are that name.
     readonly children: Snippet<[string]>;
+    // The hint's id, when the caller decided it; otherwise one is made.
+    readonly id?: string;
     readonly side?: TipSide;
     // Whether holding the accelerator alone draws this hint with the
     // others (docs/frontend-method.md §7E): the names of the edge keys are, a hint
@@ -111,16 +117,17 @@
     readonly exposable?: boolean;
   }
 
-  const { text, children, side = "above", exposable = false }: Props = $props();
+  const { text, children, id, side = "above", exposable = false }: Props = $props();
 
-  const hint = $props.id();
+  const own = $props.id();
+  const hint = $derived(id ?? own);
 
   let dismissed = $state(false);
 
   // One anchor name per instance, carried to the hint by inheritance, so
   // two hints on one row anchor to their own control rather than both to
   // whichever came last in the document.
-  const anchor = `--tip-${hint}`;
+  const anchor = $derived(`--tip-${hint}`);
 
   const reengage: Attachment = (node) => {
     const enter = on(node, "mouseenter", () => {

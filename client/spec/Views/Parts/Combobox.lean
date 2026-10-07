@@ -8,7 +8,7 @@ import client.spec.Views.Parts
 /-!
 # combobox：一层 listbox 弹层
 
-规定 `client/src/views/parts/combobox.svelte`（APG Combobox，listbox 弹层），键表在 `client/spec/Views/Parts.lean` §7-5。模型是规格，今天的实现欠而未还的几处（Home／End、Tab 关闭弹层、过滤框的角色）点名在 `client/Spec.lean` §4 的 §7-8。
+规定 `client/src/views/parts/combobox.svelte`（APG Combobox，listbox 弹层），键表在 `client/spec/Views/Parts.lean` §7-5。
 
 状态是：弹层开不开、游标在第几行、过滤词、焦点在哪，以及**生效的值**（`chosen`，`aria-selected` 读它）。游标由持焦元素的 `aria-activedescendant` 承担，从不写进 `aria-selected`。
 

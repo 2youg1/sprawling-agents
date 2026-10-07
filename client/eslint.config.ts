@@ -95,4 +95,47 @@ export default defineConfig([
       ],
     },
   },
+  // A look draws and nothing else (client D95): it takes the value its
+  // seat built and spreads the wire bags in it, so it never reaches the
+  // page's doors - the effect core, the socket and the shell's `ui()`,
+  // the wire's own types as values, the commands. A look that did would
+  // carry wiring a replacement look has to write again. Its own
+  // judgement module's types stay importable, as do other parts' seats.
+  {
+    files: ["src/**/*.look.svelte", "swap/**/*.svelte", "swap/**/*.ts"],
+    rules: {
+      "@typescript-eslint/no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              regex: "(^|/)(core|ui|wire)(/|$)",
+              allowTypeImports: true,
+              message:
+                "A look draws only what its seat hands it (client D95): take the value from the seat's look type instead.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  // A wiring test holds for every look only while it imports none of
+  // them (client D95).
+  {
+    files: ["src/**/*.test.ts"],
+    rules: {
+      "@typescript-eslint/no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              regex: "\\.look\\.svelte$",
+              message:
+                "A wiring test reads the seat's look value, never a look (client D95): call the part's lookOf instead.",
+            },
+          ],
+        },
+      ],
+    },
+  },
 ]);

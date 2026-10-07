@@ -47,6 +47,28 @@ One test file runs as `bun run test src/<path>.test.ts` from `client/`. The scri
 
 **The client's own lint rules hold.** eslint refuses `any`, `as`, `throw`, `try` and a `switch` that is not exhaustive. A value read from outside the page — a stored preference, a frame from the socket, the value of a `<select>` — is narrowed by looking it up in the list of values the code knows (`EDITORS.find((each) => each === word)`), never cast.
 
+## Seats and looks
+
+A part under `client/src/views/parts/` that has been split is four files with one stem, as `segmented` is (`client/Spec.lean` D95):
+
+- `segmented.ts` decides everything that does not need the DOM: where an arrow key lands, which cell is the tab stop, and the whole value a look draws, `SegmentedLook`, built by `lookOf`.
+- `segmented.test.ts` tests that value. It imports no look, so it holds for any look.
+- `segmented.svelte` is the seat, the file every caller imports, with the same props as before. It owns the drawn elements and the focus, and draws whatever `segmented.look.svelte` is.
+- `segmented.look.svelte` is the look: markup and a `<style>` block, taking `SegmentedLook` and nothing else.
+
+Each element a person operates arrives in the look with a wire bag: an object that holds its `role`, its `aria-*` values, its `tabindex`, its event handlers and an attachment through which the seat gets the element. The look spreads the bag on that element, `<button {...cell.wire}>`. Most component libraries forward the props they do not know to their root element, so a library button takes the bag as it is.
+
+**To replace a part's look**, write a new `segmented.look.svelte` that takes the same `SegmentedLook` and spreads every wire bag where the old one did, and put it in place of the old file. `client/swap/` holds replacement looks at the same paths as `client/src/`; `client/swap/views/parts/segmented.look.svelte` draws the control as a vertical list with a check and an accent edge, from its own `<style>` alone. The type checker holds a replacement to the look type, and the wiring tests do not change.
+
+**What a look may not change**, because the seat and the tests own it:
+
+- the keys, the tab stop, the focus and every `aria-*` value: they are in the wire bags, and a look that writes its own drops what the bag says;
+- the doors of the page: a look imports nothing from `core/`, `ui.ts` or `wire.ts` except types, and eslint refuses the rest;
+- alignment: the look's root has no outer margin and no page position, because gaps and grid lines belong to the screen that places it, and sizes come from the theme's tokens, with a 1 px line the one literal;
+- colour and motion: a look reads `var(--color-<role>)`, `var(--transition-duration-*)` and `var(--ease-*)` or the matching utilities and declares none of them, so `data-motion="off"`, which sets every duration to zero, also stops a look nobody wrote a reduced-motion rule for. `cargo xtask color` and `cargo xtask motion` read `client/swap/` as well as `client/src/`.
+
+A screen is not split this way. It keeps its wiring and its grid placement, composes parts, and gives any control of its own a local look beside it, `<name>.look.svelte`.
+
 ## What `cargo xtask render` asserts
 
 It opens the built bundle's `#/gallery` in a headless Chromium-family engine and measures what was drawn. It opens the page once at each width `tools/xtask/src/render/pass.rs` names — 768, 1280 and 2560 CSS pixels — because the columns are laid out by container queries and a property that holds at one width is a property about that width. Then it opens the page once in the light and once in a forced-colour mode, at the width the product is read at most, and each pass checks that the page drew the lighting it asked for.
