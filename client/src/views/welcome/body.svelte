@@ -12,8 +12,6 @@
 
   import { QUERIES } from "../../core/asking";
   import { readAnswer } from "../../core/answered";
-  import { say } from "../../core/lang";
-  import { toFragment } from "../../core/route";
   import { ui } from "../../ui";
   import type { GuideStep } from "../../wire";
   import Machine from "../machine.svelte";
@@ -21,6 +19,8 @@
   import ModelChoice from "../setup/models.svelte";
   import SkillsSection from "../setup/skills.svelte";
   import ProviderDoor from "../shared/provider.svelte";
+  import { mcpDoorOf } from "./door";
+  import Door from "./door.look.svelte";
 
   interface Props {
     readonly step: GuideStep;
@@ -48,10 +48,5 @@
 {:else if step === "skills"}
   <SkillsSection />
 {:else if step === "mcp"}
-  <a
-    href={toFragment({ kind: "mcp" })}
-    class="inline-flex h-control items-center self-start text-label font-label text-accent hover:text-accent-hover"
-  >
-    {say($lang, "guide_step_mcp_open")}
-  </a>
+  <Door {...mcpDoorOf($lang)} />
 {/if}

@@ -36,18 +36,18 @@
   import { readAnswer } from "../core/answered";
   import { putGuide } from "../core/commands";
   import { say } from "../core/lang";
-  import type { Key } from "../core/lang";
   import { MAYOR } from "../core/route";
   import { ui } from "../ui";
   import type { GuideProgress, GuideStep } from "../wire";
   import Button from "./parts/button.svelte";
-  import Glyph from "./parts/glyph.svelte";
   import Page from "./parts/page.svelte";
   import Unanswered from "./parts/unanswered.svelte";
   import { outstanding } from "./setup/dependencies";
-  import type { Configured, Standing } from "./welcome/guide";
+  import type { Configured } from "./welcome/guide";
   import { STEPS, advanced, currentOf, left, opened, putOff, skipAll, standingOf } from "./welcome/guide";
   import Body from "./welcome/body.svelte";
+  import { ABOUT, bodyId, stepLookOf } from "./welcome/step";
+  import Step from "./welcome/step.look.svelte";
 
   interface Props {
     // Whether this layout is the page or a region inside one: a
@@ -174,35 +174,6 @@
   function headId(step: GuideStep): string {
     return `${uid}-${step}`;
   }
-
-  const TITLE: Record<GuideStep, Key> = {
-    provider: "guide_step_provider",
-    dependencies: "guide_step_dependencies",
-    texts: "guide_step_texts",
-    skills: "guide_step_skills",
-    mcp: "guide_step_mcp",
-  };
-  const ABOUT: Record<GuideStep, Key> = {
-    provider: "guide_step_provider_about",
-    dependencies: "guide_step_dependencies_about",
-    texts: "guide_step_texts_about",
-    skills: "guide_step_skills_about",
-    mcp: "guide_step_mcp_about",
-  };
-  const WORD: Record<Standing, Key | null> = {
-    configured: "guide_standing_configured",
-    required: "guide_standing_required",
-    skipped: "guide_standing_skipped",
-    seen: "guide_standing_seen",
-    untouched: null,
-  };
-  const INK: Record<Standing, string> = {
-    configured: "text-text",
-    required: "text-alert",
-    skipped: "text-text-faint",
-    seen: "text-text-quiet",
-    untouched: "text-text-faint",
-  };
 </script>
 
 <!-- One column, standing in the middle part of the shell's silver cut
@@ -220,33 +191,25 @@ rather than one per kind of row. -->
           {/if}
           <ol aria-label={say($lang, "guide_steps")}>
             {#each STEPS as step, at (step)}
-              {@const standing = standingOf(step, progress, configured)}
-              {@const word = WORD[standing]}
               <li class="border-b border-edge">
-                <h2>
-                  <button
-                    id={headId(step)}
-                    type="button"
-                    class="grid w-full grid-cols-[4ch_minmax(0,1fr)_auto] items-baseline gap-x-base py-base text-left transition-colors hover:wash"
-                    aria-expanded={open === step}
-                    aria-controls={`${headId(step)}-body`}
-                    onclick={() => {
+                <Step
+                  {...stepLookOf(
+                    {
+                      step,
+                      at,
+                      standing: standingOf(step, progress, configured),
+                      open: open === step,
+                      id: headId(step),
+                      lang: $lang,
+                    },
+                    () => {
                       toggle(step);
-                    }}
-                  >
-                    <span class="figure text-heading text-text-faint">{String(at + 1).padStart(2, "0")}</span>
-                    <span class="min-w-0 text-label font-label text-text">{say($lang, TITLE[step])}</span>
-                    <span class={["flex items-center gap-tight text-note", INK[standing]]}>
-                      {#if standing === "configured"}
-                        <Glyph name="check" class="size-glyph-sm" />
-                      {/if}
-                      {#if word !== null}{say($lang, word)}{/if}
-                    </span>
-                  </button>
-                </h2>
+                    },
+                  )}
+                />
                 {#if open === step}
                   <section
-                    id={`${headId(step)}-body`}
+                    id={bodyId(headId(step))}
                     aria-labelledby={headId(step)}
                     class="drop flex min-w-0 flex-col gap-base pb-wide pl-[calc(4ch+var(--spacing-base))] @max-[40rem]:pl-0"
                   >

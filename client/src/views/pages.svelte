@@ -12,7 +12,6 @@
   // itself out by the tier and is not here (`workspace.svelte`).
   import type { View } from "../core/route";
   import { say } from "../core/lang";
-  import { toFragment } from "../core/route";
   import { ui } from "../ui";
   import Building from "./building.svelte";
   import City from "./city.svelte";
@@ -23,8 +22,8 @@
   import Registry from "./registry.svelte";
   import Run from "./run.svelte";
   import Welcome from "./welcome.svelte";
-  import { backOf } from "./parts/back";
-  import Glyph from "./parts/glyph.svelte";
+  import { backLookOf } from "./pages/back";
+  import Back from "./pages/back.look.svelte";
 
   interface Props {
     readonly view: View;
@@ -34,7 +33,7 @@
   const u = ui();
   const { lang } = u;
   const samples = u.conn.monitor.samples;
-  const back = $derived(backOf(view));
+  const back = $derived(backLookOf(view, $lang));
 </script>
 
 <main
@@ -46,14 +45,10 @@
        page draws its own (A3, A6); the welcome page, one column in the
        middle of the frame, is handed the key to stand on that column. -->
   {#snippet backKey()}
-    {#if back !== null}
-      <a
-        href={toFragment(back)}
-        class="mb-snug flex h-control-sm w-fit items-center gap-tight rounded-control pr-snug text-note text-text-faint hover:wash hover:text-text"
-      >
-        <Glyph name="chevron" size="sm" class="rotate-180" />
-        {say($lang, back.kind === "city" ? "nav_city" : "nav_settings")}
-      </a>
+    {#if back !== undefined}
+      <div class="mb-snug">
+        <Back {...back} />
+      </div>
     {/if}
   {/snippet}
   {#if view.kind !== "welcome"}

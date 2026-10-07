@@ -18,7 +18,7 @@
   //
   // **A toast leaves by itself.** Eight seconds, paused while the
   // pointer or the focus is on it - a person reading one is never
-  // racing it. The departure is the display toggle `parts/dialog`
+  // racing it (`refusal.ts` keeps that clock). The departure is the display toggle `parts/dialog`
   // already models (`transition-behavior: allow-discrete` fading the
   // opacity first and hiding the box at the end), not a script timing
   // the animation; the timer here decides *when* a toast goes, never
@@ -42,6 +42,10 @@
   // **What a recovery's control says and does is
   // `notice_recovery.ts`'s**, shared with the drawer (client/Spec.lean
   // §4-35).
+  //
+  // This is the seat: it keeps the toasts and their clocks and draws
+  // each notice; how the stack and a toast look is
+  // `refusal.look.svelte`'s.
   import { SvelteMap } from "svelte/reactivity";
   import { get } from "svelte/store";
 
@@ -56,6 +60,9 @@
   import { attending } from "./mailbox/attention";
   import Button from "./parts/button.svelte";
   import Notice from "./parts/notice.svelte";
+  import type { Clock, Holder, Stand, ToastLook } from "./refusal";
+  import { held as heldBy, released, within } from "./refusal";
+  import Look from "./refusal.look.svelte";
 
   // How many may stand at once, and how long one waits before it goes.
   const VISIBLE = 3;
@@ -69,13 +76,11 @@
   interface Toast {
     readonly id: number;
     readonly said: Said;
-    // Set means it is leaving: the display toggle below plays the
+    // Set means it is leaving: the look's display toggle plays the
     // departure, and the next arrival sweeps it out of the list.
     gone: boolean;
-    // How much of its life is left, and when the stretch being counted
-    // began - the two halves of a hover pause.
-    left: number;
-    since: number;
+    // How much of its life is left, and what holds it.
+    clock: Clock;
   }
 
   const { stopsWithoutRun }: { readonly stopsWithoutRun: number } = $props();
@@ -101,14 +106,25 @@
 
   function arm(toast: Toast): void {
     stop(toast);
-    toast.since = u.now();
+    toast.clock = { ...toast.clock, since: u.now() };
     timers.set(
       toast.id,
       window.setTimeout(() => {
         timers.delete(toast.id);
         leave(toast);
-      }, toast.left),
+      }, toast.clock.left),
     );
+  }
+
+  function hold(toast: Toast, by: Holder): void {
+    stop(toast);
+    toast.clock = heldBy(toast.clock, by, u.now());
+  }
+
+  function letGo(toast: Toast, by: Holder): void {
+    const after = released(toast.clock, by, u.now());
+    toast.clock = after.clock;
+    if (after.runs && !toast.gone) arm(toast);
   }
 
   function stop(toast: Toast): void {
@@ -135,8 +151,7 @@
       id: follow,
       said,
       gone: false,
-      left: LIFE,
-      since: u.now(),
+      clock: { left: LIFE, since: u.now(), holders: [] },
     };
     follow += 1;
     toasts = [...kept, next];
@@ -199,24 +214,19 @@
   // column, or nowhere in particular when the page has none. Measured
   // only while a toast stands, and again whenever the composer's box
   // moves or the window changes size.
-  interface Place {
-    readonly left: number;
-    readonly width: number;
-    readonly bottom: number;
-  }
-  let place = $state.raw<Place | null>(null);
+  let stand = $state.raw<Stand>({ kind: "foot" });
   const standing = $derived(toasts.some((toast) => !toast.gone));
   $effect(() => {
     if (!standing) return;
     const box = document.querySelector("main textarea");
     const form = box instanceof HTMLElement ? box.closest("form") : null;
     if (form === null) {
-      place = null;
+      stand = { kind: "foot" };
       return;
     }
     const measure = (): void => {
       const rect = form.getBoundingClientRect();
-      place = { left: rect.left, width: rect.width, bottom: window.innerHeight - rect.top };
+      stand = { kind: "composer", left: rect.left, width: rect.width, bottom: window.innerHeight - rect.top };
     };
     measure();
     const watching = new ResizeObserver(measure);
@@ -237,82 +247,82 @@
   });
 </script>
 
-<!-- Standing on the composer and clear of it, so the stack never covers
-the coin key, which is the retry. -->
-<ul
-  class={[
-    "fixed flex flex-col items-stretch gap-snug",
-    place === null
-      ? "bottom-[calc(var(--spacing-margin)+8*var(--spacing-baseline)+var(--spacing-section)*2)] left-1/2 w-[min(480px,calc(100vw-2*var(--spacing-margin)))] -translate-x-1/2"
-      : "pb-snug",
-  ]}
-  style:left={place === null ? undefined : `${String(place.left)}px`}
-  style:width={place === null ? undefined : `${String(place.width)}px`}
-  style:bottom={place === null ? undefined : `${String(place.bottom)}px`}
->
-  {#each toasts as toast (toast.id)}
-    <li
-      class={[
-        "transition-[opacity,display] transition-discrete duration-panel still:transition-none",
-        toast.gone ? "hidden opacity-0 ease-leave" : "opacity-100 ease-arrive",
-      ]}
-      onmouseenter={() => {
-        stop(toast);
-        toast.left = Math.max(0, toast.left - (u.now() - toast.since));
-      }}
-      onmouseleave={() => {
-        if (!toast.gone) arm(toast);
-      }}
-    >
-      {#if toast.said.kind === "refused"}
-        {@const refused = toast.said.refused}
-        <Notice
-          seat="toast"
-          weight="alert"
-          action={refused.error.action}
-          code={refused.error.code}
-          subject={refused.error.subject}
-          recovery={refused.error.recovery}
-        >
-          {#snippet actions()}
-            <div class="flex flex-col gap-tight">
-              <Button
-                tone="quiet"
-                label={say($lang, "dismiss")}
-                onPress={() => {
-                  // Waving one away is still the answer to what was
-                  // asked, so the corner lets go and the drawer keeps it.
-                  u.conn.dismissRefusal();
-                  leave(toast);
-                }}
-              />
-              {#each recoveryFor(refused.error) as recovery (recoveryLabel(recovery, $lang))}
-                {@const why = recoveryWhy(u, recovery, refused)}
-                <Button
-                  tone="quiet"
-                  label={recoveryLabel(recovery, $lang)}
-                  {...why === undefined ? {} : { why: say($lang, why) }}
-                  onPress={() => {
-                    recover(u, recovery, refused);
-                  }}
-                />
-              {/each}
-            </div>
-          {/snippet}
-        </Notice>
-      {:else}
-        <Notice seat="toast" weight="info" heading="no_run_in_front" next="stop_whole_city">
-          {#snippet actions()}
+{#snippet body(id: number)}
+  {@const toast = toasts.find((each) => each.id === id)}
+  {#if toast !== undefined}
+    {#if toast.said.kind === "refused"}
+      {@const refused = toast.said.refused}
+      <Notice
+        seat="toast"
+        weight="alert"
+        action={refused.error.action}
+        code={refused.error.code}
+        subject={refused.error.subject}
+        recovery={refused.error.recovery}
+      >
+        {#snippet actions()}
+          <div class="flex flex-col gap-tight">
             <Button
               tone="quiet"
               label={say($lang, "dismiss")}
               onPress={() => {
+                // Waving one away is still the answer to what was
+                // asked, so the corner lets go and the drawer keeps it.
+                u.conn.dismissRefusal();
                 leave(toast);
               }}
             />
-          {/snippet}
-        </Notice>
-      {/if}
-    </li>
-  {/each}
-</ul>
+            {#each recoveryFor(refused.error) as recovery (recoveryLabel(recovery, $lang))}
+              {@const why = recoveryWhy(u, recovery, refused)}
+              <Button
+                tone="quiet"
+                label={recoveryLabel(recovery, $lang)}
+                {...why === undefined ? {} : { why: say($lang, why) }}
+                onPress={() => {
+                  recover(u, recovery, refused);
+                }}
+              />
+            {/each}
+          </div>
+        {/snippet}
+      </Notice>
+    {:else}
+      <Notice seat="toast" weight="info" heading="no_run_in_front" next="stop_whole_city">
+        {#snippet actions()}
+          <Button
+            tone="quiet"
+            label={say($lang, "dismiss")}
+            onPress={() => {
+              leave(toast);
+            }}
+          />
+        {/snippet}
+      </Notice>
+    {/if}
+  {/if}
+{/snippet}
+
+<Look
+  {stand}
+  toasts={toasts.map(
+    (toast): ToastLook => ({
+      key: toast.id,
+      gone: toast.gone,
+      wire: {
+        onmouseenter: () => {
+          hold(toast, "pointer");
+        },
+        onmouseleave: () => {
+          letGo(toast, "pointer");
+        },
+        onfocusin: () => {
+          hold(toast, "focus");
+        },
+        onfocusout: (event) => {
+          if (!within(event)) letGo(toast, "focus");
+        },
+      },
+    }),
+  )}
+  {body}
+/>
