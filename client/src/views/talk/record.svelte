@@ -5,15 +5,17 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 -->
 <script lang="ts">
-  // The microphone beside the composer. One press records and a second
-  // stops; what the city heard comes back as words for the box, and a
-  // city that refused to transcribe says so beside the button.
+  // The seat of the microphone beside the composer. One press records and
+  // a second stops; what the city heard comes back as words for the box,
+  // and a city that refused to transcribe says so beside the button. How
+  // it is drawn is `./record.look.svelte`.
   import { onMount } from "svelte";
   import { get } from "svelte/store";
 
-  import { say } from "../../core/lang";
   import { dictation } from "../../core/speaking";
   import { ui } from "../../ui";
+  import { lookOf } from "./record";
+  import Look from "./record.look.svelte";
   import { speakAsked } from "./speak_asked";
 
   const { onWords }: { readonly onWords: (words: string) => void } = $props();
@@ -44,17 +46,4 @@
   });
 </script>
 
-<button
-  type="button"
-  class={[
-    "relative flex h-control-sm shrink-0 items-center gap-tight rounded-pill px-base text-note before:absolute before:-inset-snug before:content-['']",
-    $taking ? "bg-alert text-on-accent" : $transcribing ? "bg-raised aria-disabled:text-text-disabled" : "bg-raised text-text-quiet hover:bg-raised-hover",
-  ]}
-  aria-disabled={$transcribing}
-  onclick={press}
->
-  {$transcribing ? say($lang, "talk_hearing") : $taking ? say($lang, "talk_recording") : say($lang, "talk_record")}
-</button>
-{#if $refused}
-  <span class="text-alert">{say($lang, "link_refused")}</span>
-{/if}
+<Look {...lookOf({ taking: $taking, hearing: $transcribing, refused: $refused }, $lang, press)} />

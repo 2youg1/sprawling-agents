@@ -33,16 +33,11 @@
   import Popover from "../parts/popover.svelte";
   import type { PopoverBinding } from "../parts/popover";
   import Unkept from "../parts/unkept.svelte";
-  import {
-    draftAt,
-    menuColumns,
-    pickSlash,
-    picksFor,
-    pills,
-    roomsKnown,
-    sessionModel,
-    slashHands,
-  } from "./composer";
+  import { boxKey, menuColumns, pickSlash, picksFor, pills, roomsKnown, sessionModel, slashHands } from "./composer";
+  import type { BoxKey, ComposerLook } from "./composer";
+  import Look from "./composer.look.svelte";
+  import { draftAt } from "./draft";
+  import { TextBox } from "./box.svelte";
   import { IDLE, hand, settle } from "./handing";
   import { sessionHands } from "./session_hands";
   import type { Handing } from "./handing";
@@ -88,7 +83,7 @@
   let place = draft;
   let keptDraft = draftAt(u.prefs, place);
   let text = $state(keptDraft.read);
-  let box = $state<HTMLTextAreaElement | undefined>(undefined);
+  const field = new TextBox(() => text);
   // A message the connection would not take: the words stay in the box.
   let kept = $state(false);
   // How many times words were handed, which the send receipt counts.
@@ -113,7 +108,7 @@
 
   function moveTo(next: string | undefined): void {
     keptDraft.flush();
-    keepSelection(place, box);
+    keepSelection(place, field.element);
     place = next;
     keptDraft = draftAt(u.prefs, next);
     text = keptDraft.read;
@@ -124,29 +119,21 @@
   // A box that arrived at its place: grown to the words, the caret where
   // the person left it there.
   function arrived(): void {
-    grow();
-    restoreSelection(place, box);
+    field.grow();
+    restoreSelection(place, field.element);
   }
 
   // A line quoted from the inspector while this box is open joins the
   // words where they end, and the caret stays where the person left it.
   $effect(() => (draft === undefined ? undefined : hearQuotes(draft, quoted)));
   function quoted(quote: string): void {
-    keepSelection(place, box);
+    keepSelection(place, field.element);
     write(joined(text, quote));
     requestAnimationFrame(arrived);
   }
 
   // Whether the browser refused to keep this place's words (4-63).
   const unkept = $derived(draft === undefined ? readable(false) : u.prefs.draftUnkept(draft));
-  // `field-sizing: content` grows the box before the frame is painted
-  // where the engine has it; this is the path for the engines without it.
-  function grow(): void {
-    if (CSS.supports("field-sizing", "content")) return;
-    if (box === undefined) return;
-    box.style.height = "auto";
-    box.style.height = `${String(box.scrollHeight)}px`;
-  }
 
   // Whatever put words in the box - a transcription, a completion, a
   // command that empties it - goes through here, and the menu follows
@@ -155,7 +142,9 @@
     text = words;
     open = words.startsWith("/");
     keptDraft.replace(words);
-    requestAnimationFrame(grow);
+    requestAnimationFrame(() => {
+      field.grow();
+    });
   }
 
   function submit(): void {
@@ -230,7 +219,7 @@
 
   function closeMenu(): void {
     open = false;
-    box?.focus();
+    field.element?.focus();
   }
 
   function pick(chosen: Slash): void {
@@ -255,47 +244,95 @@
     );
     if (rest === null) return;
     write(rest);
-    box?.focus();
+    field.element?.focus();
   }
 
   function onKeydown(event: KeyboardEvent): void {
-    // A key that confirms an input method's composition belongs to the
-    // input method, not to the menu.
-    if (open && showing.length > 0 && !event.isComposing) {
-      if (event.key === "Tab") {
+    const state = { menu: open && showing.length > 0, empty: text === "" };
+    const first = boxKey(event, state);
+    if (first === "menu" && menuBinding?.keys(event) === true) {
+      event.preventDefault();
+      return;
+    }
+    act(first === "menu" ? boxKey(event, { ...state, menu: false }) : first, event);
+  }
+
+  function act(key: BoxKey, event: KeyboardEvent): void {
+    switch (key) {
+      case "complete":
         event.preventDefault();
         write(completed(text, pointed));
         return;
-      }
-      if (menuBinding?.keys(event) === true) {
+      case "recall": {
+        // ↑ in an empty box brings back what was last sent here.
+        const last = here === null ? null : recalled(get(belief), here);
+        if (last === null) return;
         event.preventDefault();
+        write(last);
         return;
       }
-    }
-    // ↑ in an empty box brings back what was last sent here.
-    const last = event.key === "ArrowUp" && text === "" && !event.isComposing && here !== null ? recalled(get(belief), here) : null;
-    if (last !== null) {
-      event.preventDefault();
-      write(last);
-      return;
-    }
-    if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
-      event.preventDefault();
-      submit();
+      case "send":
+        event.preventDefault();
+        submit();
+        return;
+      case "menu":
+      case "type":
+        return;
     }
   }
 
-  function onInput(): void {
+  function onInput(event: Event & { readonly currentTarget: HTMLTextAreaElement }): void {
+    text = event.currentTarget.value;
     keptDraft.keep(text);
-    grow();
+    field.grow();
     open = text.startsWith("/");
   }
 
   // ----------------------------------------------------------- dropping
 
   const zone = new DropZone(u, (paths) => {
-    write(insertAt(text, box?.selectionStart ?? text.length, paths));
-    box?.focus();
+    write(insertAt(text, field.element?.selectionStart ?? text.length, paths));
+    field.element?.focus();
+  });
+
+  // ------------------------------------------------------- the look
+
+  const look: ComposerLook = $derived({
+    form: {
+      "aria-label": say($lang, "region_composer"),
+      onsubmit: (event: SubmitEvent) => {
+        event.preventDefault();
+        submit();
+      },
+      ondragover: zone.enter,
+      ondragleave: zone.leave,
+      ondrop: zone.drop,
+    },
+    over: zone.over,
+    box: {
+      rows: 1,
+      placeholder,
+      "aria-label": placeholder,
+      "aria-activedescendant": showing.length > 0 ? activeId : null,
+      "aria-controls": showing.length > 0 ? menuBinding?.controls.join(" ") : undefined,
+      // The box is what the page exists for, and the shell's own focus
+      // chord reaches it the same way.
+      autofocus: true,
+      onkeydown: onKeydown,
+      oninput: onInput,
+      onfocus: () => {
+        focused = true;
+      },
+      onblur: () => {
+        focused = false;
+      },
+      [field.key]: field.hold,
+    },
+    menu: open && showing.length > 0 ? drawMenu : undefined,
+    band,
+    keys: drawKeys,
+    line: drawLine,
+    under: drawUnder,
   });
 
   onMount(() => {
@@ -303,85 +340,57 @@
   });
 
   onDestroy(() => {
-    keepSelection(place, box);
+    keepSelection(place, field.element);
     keptDraft.flush();
   });
 </script>
 
-<!-- A page, not a card: focus is said by the line coming to full
-strength, and a drag over the box by the wash it takes. -->
-<form
-  class={["relative rounded-control transition-colors", zone.over ? "wash" : ""]}
-  aria-label={say($lang, "region_composer")}
-  onsubmit={(event) => {
-    event.preventDefault();
-    submit();
-  }}
-  ondragover={zone.enter}
-  ondragleave={zone.leave}
-  ondrop={zone.drop}
->
-  {#if open && showing.length > 0}
-    <Popover
-      label="talk_commands"
-      columns={showing}
-      onApply={(_column, row: { readonly id: string }) => {
-        const chosen = find(row.id);
-        if (chosen !== undefined) pick(chosen);
-      }}
-      onClose={closeMenu}
-      bind={(binding: PopoverBinding) => { menuBinding = binding; }}
-      onCursorChange={(rowId) => {
-        activeId = rowId;
-      }}
-      onCursorRow={(row) => {
-        pointed = row?.id;
+{#snippet drawMenu()}
+  <Popover
+    label="talk_commands"
+    columns={showing}
+    onApply={(_column, row: { readonly id: string }) => {
+      const chosen = find(row.id);
+      if (chosen !== undefined) pick(chosen);
+    }}
+    onClose={closeMenu}
+    bind={(binding: PopoverBinding) => { menuBinding = binding; }}
+    onCursorChange={(rowId) => {
+      activeId = rowId;
+    }}
+    onCursorRow={(row) => {
+      pointed = row?.id;
+    }}
+  />
+{/snippet}
+
+{#snippet drawKeys()}
+  {#if hearing === true && canRecord()}
+    <!-- What the microphone heard joins the words; it is never sent by itself (4-16). -->
+    <Record onWords={(words: string) => { write(text === "" ? words : `${text} ${words}`); }} />
+  {/if}
+  <Gauge room={here}>
+    <Coin
+      face={faceOf(text, live !== undefined)}
+      {sending}
+      onStop={() => {
+        onStop();
       }}
     />
-  {/if}
-  {#if band !== undefined}{@render band()}{/if}
-  <div class="relative pb-snug">
-    <div class="flex min-h-key items-end gap-base">
-      <!-- svelte-ignore a11y_autofocus (the box is what the page exists for, and the shell's own focus chord reaches it the same way) -->
-      <textarea
-        bind:this={box}
-        bind:value={text}
-        class="block max-h-output min-h-key min-w-0 flex-1 resize-none overflow-y-auto bg-transparent py-snug text-body leading-relaxed text-text caret-accent outline-hidden field-sizing-content placeholder:text-text-faint"
-        rows={1}
-        {placeholder}
-        aria-label={placeholder}
-        aria-activedescendant={showing.length > 0 ? activeId : null}
-        aria-controls={showing.length > 0 ? menuBinding?.controls.join(" ") : undefined}
-        autofocus
-        onkeydown={onKeydown}
-        oninput={onInput}
-        onfocus={() => {
-          focused = true;
-        }}
-        onblur={() => {
-          focused = false;
-        }}
-      ></textarea>
-      {#if hearing === true && canRecord()}
-        <!-- What the microphone heard joins the words; it is never sent by itself (4-16). -->
-        <Record onWords={(words: string) => { write(text === "" ? words : `${text} ${words}`); }} />
-      {/if}
-      <Gauge room={here}>
-        <Coin
-          face={faceOf(text, live !== undefined)}
-          {sending}
-          onStop={() => {
-            onStop();
-          }}
-        />
-      </Gauge>
-    </div>
-    <TypedLine {text} {box} lit={focused || text !== ""} />
-  </div>
+  </Gauge>
+{/snippet}
+
+{#snippet drawLine()}
+  <TypedLine {text} box={field.element} lit={focused || text !== ""} />
+{/snippet}
+
+{#snippet drawUnder()}
   <Handed room={here} {sent} />
   {#if $unkept && text !== ""}
     <Unkept words={() => text} />
   {/if}
   <DropRefused refused={zone.refused} />
   <SettingsRow {specs} room={here} draws={band !== undefined || started || startedHere ? "notice" : "everything"} {kept} />
-</form>
+{/snippet}
+
+<Look {...look} />
