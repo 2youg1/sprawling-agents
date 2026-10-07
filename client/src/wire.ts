@@ -9,9 +9,9 @@
 import { Schema } from "effect";
 
 /** The wire version both ends compare on connect. */
-export const WIRE_V = 62 as const;
+export const WIRE_V = 63 as const;
 /** The schema hash the server checks: `wire::schema_hash()`. */
-export const WIRE_HASH = "43fead7e874fcc0a23f1054344ab8e3718011e4492216e69c8791c7427a86eaa" as const;
+export const WIRE_HASH = "6548368659ab2ee2041f5465e5a4604848cbd797a78deadf8b0511018c1c97dc" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 /** The smallest body size a person may ask for: `wire::BODY_PX_MIN`. */
@@ -2870,6 +2870,18 @@ export const Motion = Schema.Literals(["system", "on", "off"]).annotate({ identi
 export type Motion = typeof Motion.Type;
 
 /**
+ * Which face reading text is drawn in: the messages of a conversation,
+ * documents and reports. Controls, labels, figures and code keep the
+ * interface's faces whichever this says
+ * (`crates/wire/spec/Preference.lean` D52).
+ */
+export const ReadingFace = Schema.Union([
+  Schema.Literal("interface"),
+  Schema.Literal("libron"),
+]).annotate({ identifier: "ReadingFace" });
+export type ReadingFace = typeof ReadingFace.Type;
+
+/**
  * How the pages look.
  */
 export const Appearance = Schema.Struct({
@@ -2882,6 +2894,7 @@ export const Appearance = Schema.Struct({
   mono: Face,
   mono_stack: Schema.String,
   motion: Motion,
+  reading: Schema.optional(Schema.NullOr(ReadingFace)),
   sans: Face,
   sans_stack: Schema.String,
 }).annotate({ identifier: "Appearance" });

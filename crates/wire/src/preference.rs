@@ -72,6 +72,20 @@ pub enum Face {
     Custom,
 }
 
+/// Which face reading text is drawn in: the messages of a conversation,
+/// documents and reports. Controls, labels, figures and code keep the
+/// interface's faces whichever this says
+/// (`crates/wire/spec/Preference.lean` D52).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub enum ReadingFace {
+    /// The face the interface is drawn in, whichever [`Face`] that is.
+    Interface,
+    /// Libron, the serif face this build ships for reading.
+    Libron,
+}
+
 /// How much air the spacing steps carry. Two named postures rather than
 /// a coefficient, because the coefficient is the stylesheet's to
 /// choose.
@@ -140,6 +154,10 @@ pub struct Appearance {
     pub sans_stack: String,
     /// See `sans_stack`.
     pub mono_stack: String,
+    /// Absent means the person stated no opinion and reading text is
+    /// drawn in the interface's face.
+    #[serde(default)]
+    pub reading: Option<ReadingFace>,
     /// The size of a line of body text in pixels, at least
     /// [`BODY_PX_MIN`]. Absent means the person
     /// stated no size and the stylesheet's own is drawn — which is a
@@ -276,6 +294,7 @@ impl Default for Appearance {
             mono: Face::Geist,
             sans_stack: String::new(),
             mono_stack: String::new(),
+            reading: None,
             body_px: None,
             density: Density::Comfortable,
             chroma: Chroma::Full,
