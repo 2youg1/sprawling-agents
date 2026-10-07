@@ -98,6 +98,10 @@
   import Timed from "./gallery/timed.svelte";
   import Tok from "./gallery/tok.svelte";
   import Read from "./gallery/read.svelte";
+  import TipPlaced from "./gallery/parts/tip_placed.svelte";
+  import DialogDrawn from "./gallery/parts/dialog_drawn.svelte";
+  import KbdMarks from "./gallery/parts/kbd.svelte";
+  import Deciding from "./gallery/parts/decide.svelte";
   import Used from "./gallery/used.svelte";
   import Workbench from "./gallery/workbench.svelte";
   import Ss from "./gallery/ss.svelte";
@@ -187,6 +191,10 @@
   <Streamed />
   <Tok />
   <Read />
+  <TipPlaced />
+  <DialogDrawn />
+  <KbdMarks />
+  <Deciding />
   <Rfr />
   <Fmt />
   <G3 />
