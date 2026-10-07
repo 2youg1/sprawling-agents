@@ -174,22 +174,17 @@ fn append_missing(path: &Path, rules: &[String]) -> Result<(), AxError> {
 /// wildcard guessing which subdirectories are rooms would catch the
 /// source tree of a directory the city adopted.
 ///
+/// `room` is a directory the caller has just created with `create_dir`,
+/// which is the claim on the name, so no other writer's seal can stand
+/// there. The seal lands whole through [`crate::document::replace`]: a
+/// checkpoint walking the building at that moment finds no seal or the
+/// whole one, never an empty file it would stage or read as grown under
+/// it (`crates/city/spec/Gitignore.lean` D24).
+///
 /// # Errors
 /// `E_STORAGE_FATAL` naming the path when the file cannot be written.
 pub(crate) fn seal_room(room: &Path) -> Result<(), AxError> {
-    let path = room.join(GITIGNORE_FILE);
-    match std::fs::OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(&path)
-    {
-        Ok(mut handle) => {
-            std::io::Write::write_all(&mut handle, b"*\n").map_err(|err| storage(&path, &err))
-        }
-        // Whatever the room already says about itself is the room's.
-        Err(err) if err.kind() == std::io::ErrorKind::AlreadyExists => Ok(()),
-        Err(err) => Err(storage(&path, &err)),
-    }
+    crate::document::replace(&room.join(GITIGNORE_FILE), b"*\n")
 }
 
 fn storage(path: &Path, err: &std::io::Error) -> AxError {
