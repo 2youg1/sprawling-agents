@@ -80,6 +80,7 @@
   import AgentChildren from "./gallery/agent_children.svelte";
   import AgentWaits from "./gallery/agent_waits.svelte";
   import Tables from "./gallery/tables.svelte";
+  import PartRow from "./gallery/parts/row.svelte";
   import Monitored from "./gallery/monitored.svelte";
   import Timed from "./gallery/timed.svelte";
   import Tok from "./gallery/tok.svelte";
@@ -149,6 +150,7 @@
   <R3 />
   <Doc />
   <Tables />
+  <PartRow />
   <Monitor />
   <Parts />
   <Switches />
