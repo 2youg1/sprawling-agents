@@ -811,9 +811,10 @@ repro:
 # `--features` (citysim D9); `cargo xtask package` refuses a binary
 # without the engine, so a build that lost it fails at the last step
 # instead of publishing a crippled one. The size this produces is the size
-# a person downloads.
+# a person downloads. `--timings` writes target/cargo-timings/, which
+# release.yml keeps with its evidence; it changes no byte of the binary.
 dist target="": build-web
-    cargo build --release -p sprawling --locked {{ if target == "" { "" } else { "--target " + target } }}
+    cargo build --release -p sprawling --locked --timings {{ if target == "" { "" } else { "--target " + target } }}
     cargo xtask sbom
 
 # The release archive: the one file a person downloads, unpacks and runs.
