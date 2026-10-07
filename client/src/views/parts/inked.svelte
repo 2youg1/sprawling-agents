@@ -7,24 +7,13 @@
 // Code drawn in its inks, meant to sit inside a `<pre>` the caller
 // owns. The text is on screen at once in plain ink and takes its
 // colours when the highlighter answers, so a slow chunk delays colour
-// and never the words. The file view and a Markdown code block both
-// draw through here, which is why the ink table lives here.
-
-import type { Ink } from "./code";
-
-// Every colour comes from the theme; this file states no value. The
-// fifth ink is the plain text around the four the theme distinguishes.
-const PAINT: Record<Ink, string> = {
-  plain: "",
-  comment: "text-text-faint",
-  string: "text-alert",
-  number: "text-accent",
-  word: "text-text",
-};
+// and never the words. This is the seat: it asks the highlighter and
+// draws whatever `./inked.look.svelte` is.
 </script>
 
 <script lang="ts">
   import { painted, type Piece } from "./code";
+  import Look from "./inked.look.svelte";
 
   interface Props {
     readonly text: string;
@@ -62,4 +51,4 @@ const PAINT: Record<Ink, string> = {
   });
 </script>
 
-{#each pieces as piece (piece)}<span class={PAINT[piece.ink]}>{piece.text}</span>{/each}
+<Look {pieces} />

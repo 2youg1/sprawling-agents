@@ -12,78 +12,53 @@
 // produce", and every one of those three answers a question about
 // editing a project instead.
 //
-// The row that names the file also carries the one secondary action:
-// copy, shown when the pointer or the keyboard is inside this view and
-// nowhere else, so the code is the only thing that greets the eye.
+// This is the seat: it decides the trail and the gutter, holds the two
+// elements it scrolls, and draws whatever `./code.look.svelte` is.
+import type { Snippet } from "svelte";
 
-// How long the copy receipt holds its check mark: long enough to see
-// one, short enough that the mark never becomes the button's face.
-const RECEIPT_MS = 1200;
-
-// The secondary action, at the small control height. It is invisible
-// and click-through at rest, so the corner never stands between a hand
-// and the text under it, and it arrives as `fade` - the motion
-// vocabulary's name for a state change that keeps its position. The
-// `::before` widens the touch surface to 44 while the drawn control
-// stays 28, and a machine that asks for less motion simply gets the
-// mark without the arrival.
-const SHAPE =
-  "relative ms-auto flex h-control-sm w-control-sm shrink-0 items-center " +
-  "justify-center rounded-control text-text-quiet opacity-0 before:absolute " +
-  "before:-inset-snug before:content-[''] transition-opacity ease-leave " +
-  "hover:bg-raised hover:text-text group-hover:opacity-100 " +
-  "group-hover:pointer-events-auto group-hover:ease-arrive group-focus-within:opacity-100 group-focus-within:ease-arrive " +
-  "group-focus-within:pointer-events-auto still:transition-none pointer-events-none";
+export interface CodeProps {
+  // The file this came from, as the tool named it. An empty string
+  // when the call named none: the trail is then not drawn and nothing
+  // is coloured.
+  readonly path: string;
+  readonly text: string;
+  // The line a reader was sent to, one-based: the view scrolls it to
+  // the middle and marks it with the accent bar. The inspector's file
+  // view names the line a call read from.
+  readonly cited?: number | undefined;
+  // Controls of the caller's that belong to this file, drawn at the
+  // right end of the header.
+  readonly aside?: Snippet | undefined;
+}
 </script>
 
 <script lang="ts">
-  import type { Snippet } from "svelte";
+  import type { Attachment } from "svelte/attachments";
 
   import { say } from "../../core/lang";
   import { ui } from "../../ui";
-  import Inked from "./inked.svelte";
+  import { crumbsOf, gutterOf } from "./code";
+  import Look from "./code.look.svelte";
 
-  interface Props {
-    // The file this came from, as the tool named it. An empty string
-    // when the call named none: the trail is then not drawn and nothing
-    // is coloured.
-    readonly path: string;
-    readonly text: string;
-    // The line a reader was sent to, one-based: the view scrolls it to
-    // the middle and marks it with the accent bar. The inspector's file
-    // view names the line a call read from.
-    readonly cited?: number | undefined;
-    // Controls of the caller's that belong to this file, drawn at the
-    // right end of the header.
-    readonly aside?: Snippet | undefined;
-  }
-
-  const { path, text, cited, aside }: Props = $props();
+  const { path, text, cited, aside }: CodeProps = $props();
 
   const { lang } = ui();
 
-  // Crumbs carry their own identity so a path whose segment repeats -
-  // `src/.../src/...` - keys no two rows alike.
-  const crumbs = $derived(
-    path
-      .split("/")
-      .filter((part) => part !== "")
-      .map((part) => ({ part })),
-  );
+  let scroller = $state<HTMLElement | undefined>(undefined);
+  let mark = $state<HTMLElement | undefined>(undefined);
 
-  // Line numbers start at one because the wire hands over the head of a
-  // result and says nothing about where in the file it began. The day a
-  // call carries that offset, this becomes a prop rather than a fact
-  // decided here (client/Spec.lean §4-26).
-  const gutter = $derived(
-    text
-      .split("\n")
-      .map((_line, at) => String(at + 1))
-      .join("\n"),
-  );
-
-  let scroller = $state<HTMLDivElement | undefined>(undefined);
-  let mark = $state<HTMLDivElement | undefined>(undefined);
+  const holdScroller: Attachment<HTMLElement> = (node) => {
+    scroller = node;
+    return () => {
+      scroller = undefined;
+    };
+  };
+  const holdMark: Attachment<HTMLElement> = (node) => {
+    mark = node;
+    return () => {
+      mark = undefined;
+    };
+  };
 
   // The scroller is moved rather than the mark scrolled into view, which
   // would move every scrolling box around it as well - the page included.
@@ -91,64 +66,17 @@ const SHAPE =
     if (scroller === undefined || mark === undefined) return;
     scroller.scrollTop = Math.max(0, mark.offsetTop - scroller.clientHeight / 2);
   });
-
-  let copied = $state(false);
-  let receipt: ReturnType<typeof setTimeout> | undefined = undefined;
-
-  // The receipt appears only after the write landed, so a press that
-  // quietly failed shows no check rather than a lying one.
-  function copy(): void {
-    void navigator.clipboard.writeText(text).then(() => {
-      copied = true;
-      if (receipt !== undefined) clearTimeout(receipt);
-      receipt = setTimeout(() => {
-        copied = false;
-        receipt = undefined;
-      }, RECEIPT_MS);
-    });
-  }
 </script>
 
-<div class="group flex min-h-0 min-w-0 flex-col">
-  <div class="flex items-center gap-tight border-b border-edge px-snug py-tight text-note">
-    {#if crumbs.length > 0}
-      <nav class="flex min-w-0 flex-wrap items-center gap-tight" aria-label={say($lang, "code_crumbs")}>
-        {#each crumbs as crumb, at (crumb)}
-          {#if at > 0}<span class="text-text-faint" aria-hidden="true">/</span>{/if}<span
-            class={at === crumbs.length - 1 ? "text-text-quiet" : "text-text-faint"}>{crumb.part}</span
-          >
-        {/each}
-      </nav>
-    {/if}
-    <button
-      type="button"
-      class={SHAPE}
-      aria-label={say($lang, copied ? "code_copied" : "code_copy")}
-      onclick={copy}
-    >
-      <!-- Two marks and no motion between them: the receipt is a cut. -->
-      {#if copied}
-        <svg class="size-glyph" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5 8 14.5 16 5.5" /></svg>
-      {:else}
-        <svg class="size-glyph" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="7" width="10" height="10" rx="2" /><path d="M13 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2" /></svg>
-      {/if}
-    </button>
-    {#if aside !== undefined}<span class="flex shrink-0 items-center">{@render aside()}</span>{/if}
-  </div>
-  <!-- The code scrolls sideways and never folds a line in half: the
-  gutter stays put at the left while the text runs under it. -->
-  <div class="min-h-0 flex-1 overflow-auto" bind:this={scroller}>
-    <div class="relative flex min-w-max font-mono text-note leading-relaxed">
-      <pre class="sticky left-0 shrink-0 select-none bg-chrome px-snug text-right text-text-faint" aria-hidden="true">{gutter}</pre>
-      <pre class="px-snug text-text-quiet"><Inked {text} source={path} /></pre>
-      {#if cited !== undefined && cited >= 1}
-        <div
-          bind:this={mark}
-          class="pointer-events-none absolute inset-x-0 h-[1lh] bg-accent/12 shadow-[inset_var(--spacing-hair)_0_0_var(--color-accent)]"
-          style:top="calc({cited - 1} * 1lh)"
-          aria-hidden="true"
-        ></div>
-      {/if}
-    </div>
-  </div>
-</div>
+<Look
+  crumbs={crumbsOf(path)}
+  trail={{ "aria-label": say($lang, "code_crumbs") }}
+  gutter={gutterOf(text)}
+  {text}
+  {path}
+  {cited}
+  copy={{ text, note: say($lang, "code_copy_note"), form: "bare" }}
+  scroller={holdScroller}
+  mark={holdMark}
+  {aside}
+/>

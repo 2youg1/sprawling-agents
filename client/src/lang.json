@@ -5391,10 +5391,6 @@
     "en": "the outcome is unknown",
     "zh": "结果未知"
   },
-  "code_copy": {
-    "en": "copy",
-    "zh": "复制"
-  },
   "code_copied": {
     "en": "copied",
     "zh": "已复制"
@@ -7246,6 +7242,26 @@
   "copy_note": {
     "en": "Puts this on the clipboard exactly as written: {text}",
     "zh": "把这段原样放进剪贴板：{text}"
+  },
+  "copy_refused": {
+    "en": "not copied",
+    "zh": "没有复制"
+  },
+  "copy_refused_note": {
+    "en": "The browser did not copy it, and the clipboard holds what it held before: {why}",
+    "zh": "浏览器没有复制它，剪贴板里还是原来的内容：{why}"
+  },
+  "copy_no_clipboard": {
+    "en": "Nothing was copied: a browser offers the clipboard only to a page served over https or from localhost.",
+    "zh": "没有复制：浏览器只把剪贴板给 https 或 localhost 上的页面。"
+  },
+  "code_copy_note": {
+    "en": "Puts the whole file on the clipboard, exactly as shown",
+    "zh": "把整份文件原样放进剪贴板"
+  },
+  "unkept_copy_note": {
+    "en": "Puts this draft on the clipboard, exactly as written",
+    "zh": "把这份草稿原样放进剪贴板"
   },
   "remote_verb_replace_key": {
     "en": "makes a new city key; every device pairs again",

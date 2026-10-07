@@ -18,7 +18,7 @@
   import { ui } from "../../ui";
   import type { CommitAnswer, Effort, GitOid } from "../../wire";
   import { shortOid } from "../changes";
-  import Copy from "../machine/copy.svelte";
+  import Copy from "../parts/copy.svelte";
   import Whose from "./whose.svelte";
 
   interface Props {
