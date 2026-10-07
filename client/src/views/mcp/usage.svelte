@@ -13,7 +13,7 @@
   // with the whole tool name. Which tools a server offers now is the
   // handshake's question, which the servers list above asks.
   import type { DayCount, McpServerUsage, McpUse } from "../../wire";
-  import type { UseRow } from "../parts/usage_uses.svelte";
+  import type { UseRow } from "../parts/usage_uses";
 
   interface ToolLine {
     readonly tool: string;
