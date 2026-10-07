@@ -66,7 +66,6 @@
 @import "./theme/preference.css";
 @import "./theme/surface.css";
 @import "./theme/motion.css";
-@import "./theme/expose.css";
 @import "./theme/shimmer.css";
 @import "./theme/motion-state.css";
 @import "./theme/base.css";
@@ -75,6 +74,5 @@
 @import "./theme/thread.css";
 @import "./theme/refrain.css";
 @import "./theme/settings.css";
-@import "./theme/mailbox.css";
 @import "./theme/narrow.css";
 @import "./theme/proposal.css";

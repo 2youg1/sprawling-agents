@@ -29,6 +29,13 @@
   const STOPS = refusal("E_MODEL_UNCHOSEN", "dispatch to hall/mayor", "main", "choose a main model in settings");
   const ORDINARY = refusal("E_PATH_NOT_FOUND", "read a file", "lab/east/docs/SPEC.md", "check the path and ask again");
 
+  // The city turned the page away: a page built for another wire, which
+  // only a reload mends.
+  const TURNED_AWAY = {
+    kind: "refused",
+    error: refusal("E_WIRE_MISMATCH", "open the link to the city", "wire", "reload the page to fetch the client this city serves"),
+  } as const;
+
   // The fixture's clock: its runs began a few minutes before the page
   // opened, so the times they show read the way a working city reads.
   const NOW = Date.now();
@@ -88,14 +95,21 @@
 </script>
 
 <script lang="ts">
+  import { ago } from "../../core/time";
+  import { ui } from "../../ui";
   import Column from "../mailbox/column.svelte";
   import Mailbox from "../mailbox/mailbox.svelte";
+  import { rowOf as recentRow } from "../mailbox/recent_row";
+  import RecentRow from "../mailbox/recent_row.look.svelte";
+  import { rowOf as workingRow } from "../mailbox/working_row";
+  import WorkingRow from "../mailbox/working_row.look.svelte";
   import Case from "./case.svelte";
   import { ONE_QUESTION } from "./served";
   import Stand from "./stand.svelte";
   import WaitingCards from "../talk/waiting_cards.svelte";
   import Deciding from "../mailbox/deciding.svelte";
 
+  const { lang } = ui();
   const LIVE = { kind: "live", city: "sprawling" } as const;
   const COLUMN = "flex h-[1480px] flex-col bg-raised";
   const ignore = (): void => undefined;
@@ -127,6 +141,14 @@ pulses rather than asking for anything. -->
   </Stand>
 </Case>
 
+<!-- Refused by the city, the state only the person mends: the bar is
+the alert's and does not pulse. -->
+<Case label="mailbox key · the city refused the page">
+  <Stand link={TURNED_AWAY} unread={[STOPS]} waiting={[]}>
+    <Mailbox asked={0} hint={(words: string) => words} />
+  </Stand>
+</Case>
+
 <Case label="mailbox · every section holding something" width={440}>
   <Stand link={LIVE} unread={[ASKS, STOPS, ORDINARY]} waiting={[ONE_QUESTION]} answers={sessions} records={RECORDS}>
     <div class={COLUMN}>
@@ -141,6 +163,54 @@ pulses rather than asking for anything. -->
       <Column onClose={ignore} />
     </div>
   </Stand>
+</Case>
+
+<Case label="mailbox · the city refused the page, with the way to mend it" width={440}>
+  <Stand link={TURNED_AWAY} unread={[]} waiting={[]}>
+    <div class="flex h-[480px] flex-col bg-raised">
+      <Column onClose={ignore} />
+    </div>
+  </Stand>
+</Case>
+
+<!-- One row of each list on its own, at the column's width: a session
+the page can still fork, one whose last turn is older than the page,
+and a room calling a tool and one waiting on the person. -->
+<Case label="mailbox rows · recent sessions, one that forks and one that cannot" width={440}>
+  <ul class="bg-raised px-base">
+    {#each [true, false] as forkable (forkable)}
+      {@const line = SESSIONS[MAYOR]?.[forkable ? 0 : 1]}
+      {#if line !== undefined}
+        <RecentRow
+          {...recentRow({ room: MAYOR, line, forkable }, $lang, ago($lang, line.at, NOW), {
+            href: "#/gallery",
+            follow: ignore,
+            fork: ignore,
+          })}
+        />
+      {/if}
+    {/each}
+  </ul>
+</Case>
+
+<Case label="mailbox rows · a room calling a tool and one waiting on the person" width={440}>
+  <ul class="bg-raised px-base">
+    <WorkingRow
+      {...workingRow(
+        { doing: { kind: "calling", tool: "exec", subject: null }, started: TimeMs.make(NOW - 6 * MINUTE), task: "make the document reader lossless" },
+        EAST,
+        $lang,
+        NOW,
+        { href: "#/gallery", onclick: ignore },
+      )}
+    />
+    <WorkingRow
+      {...workingRow({ doing: { kind: "waiting" }, started: TimeMs.make(NOW - 3 * MINUTE), task: null }, WEST, $lang, NOW, {
+        href: "#/gallery",
+        onclick: ignore,
+      })}
+    />
+  </ul>
 </Case>
 
 <Case label="decide card · a design question in the conversation">
