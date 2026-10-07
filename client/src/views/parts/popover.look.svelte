@@ -79,7 +79,7 @@
                   ? "flex min-w-0 items-center gap-tight"
                   : "flex items-center justify-between gap-snug",
                 item.chosen
-                  ? "chosen wash-strong text-text"
+                  ? "applied wash-strong text-text"
                   : item.cursor
                     ? "bg-raised-hover text-text-quiet"
                     : "text-text-quiet",
@@ -128,7 +128,7 @@
     border-inline-start: var(--spacing-hair) solid var(--color-accent);
   }
   /* Forced colours drop the wash and keep an outline. */
-  .chosen {
+  .applied {
     outline: 1px solid transparent;
     outline-offset: -1px;
   }

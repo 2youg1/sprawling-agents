@@ -48,7 +48,7 @@
 					<li
 						class={[
 							"relative flex cursor-pointer items-baseline justify-between gap-snug rounded-control px-base py-snug text-body",
-							option.chosen ? "chosen wash-strong text-text" : option.cursor ? "bg-raised-hover text-text" : "text-text-quiet",
+							option.chosen ? "applied wash-strong text-text" : option.cursor ? "bg-raised-hover text-text" : "text-text-quiet",
 							option.cursor && "cursor",
 						]}
 						{...option.wire}
@@ -108,7 +108,7 @@
 		border-inline-start: var(--spacing-hair) solid var(--color-accent);
 	}
 	/* Forced colours drop the wash and keep an outline. */
-	.chosen {
+	.applied {
 		outline: 1px solid transparent;
 		outline-offset: -1px;
 	}
