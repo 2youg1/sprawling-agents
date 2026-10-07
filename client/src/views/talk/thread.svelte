@@ -34,6 +34,9 @@
   import Saying from "./saying.svelte";
   import { phaseOf } from "../runs/lineage";
   import TurnView from "./turn.svelte";
+  import Reasoning from "./reasoning.look.svelte";
+  import Rule from "./rule.look.svelte";
+  import SteerPin from "./steer_pin.look.svelte";
   import { heard, landed, lost } from "./arrivals.svelte";
   import { callWord } from "./calls";
   import { firstHeadSaid } from "./frozen";
@@ -238,12 +241,6 @@
     }
   });
 
-  // The branch a call's action asks for: the entry carries the turn it
-  // sits in, so the plan is built here where both are in hand.
-  function planCall(entry: ForkEntry): void {
-    onFork?.(planFork(run.run, entry));
-  }
-
   // The press the key table judges: where it landed decides whether a
   // single letter is the shell's or the person's typing. This mirrors
   // the shell's own reading of `KeyboardEvent.target`; the rule itself
@@ -306,7 +303,6 @@
       {ceiling}
       {whole}
       {onFork}
-      onCall={onFork === undefined ? undefined : planCall}
       onHover={hoverFork}
     />
   {/each}
@@ -319,19 +315,20 @@
        token hears noise (ux B2). The frozen line below is what speaks,
        and it speaks once. -->
   {#if !frozen && run.thinking.length > 0 && whole}
-    <details class="my-tight text-note text-text-faint" open>
-      <summary class="cursor-pointer rounded-control px-tight marker:text-text-faint hover:bg-chrome hover:text-text-quiet">
-        <span class="text-text-faint">{say($lang, "talk_reasoning")}</span>
-        {fill(say($lang, "talk_reasoning_length"), { n: count(run.thinking.length) })}
-      </summary>
-      <div class="mt-tight border-l border-edge-panel pl-base whitespace-pre-wrap break-words">{run.thinking}</div>
-    </details>
+    <div class="my-tight">
+      <Reasoning
+        label={say($lang, "talk_reasoning")}
+        length={fill(say($lang, "talk_reasoning_length"), { n: count(run.thinking.length) })}
+        text={run.thinking}
+        open
+      />
+    </div>
   {/if}
   {#if streaming}
     <Saying text={run.saying} {who} />
     <!-- While the model is still saying this, a steer is heard at the
          end of it: the pin stands where the words stop (refrain §3-5). -->
-    <span class="steer-pin" aria-hidden="true"></span>
+    <SteerPin />
   {/if}
   {#if emptyRun}
     <!-- The zero-output run: what happened where the reply would have
@@ -359,17 +356,23 @@
       <span class="inline-block size-dot pulse rounded-pill bg-accent"></span>
       <span>{posture}</span>
       {#if run.doing.kind === "thinking"}
-        <span class="steer-pin" aria-hidden="true"></span>
+        <SteerPin />
       {/if}
     </div>
   {/if}
   {#if frozen}
-    <div class="my-wide flex items-center gap-base text-note text-text-faint" role="status" data-wear={phaseOf(run.doing)}>
-      <span class="h-px flex-1 bg-raised"></span>
-      <a href={toFragment({ kind: "run", run: run.run })} class="hover:text-text-quiet">
-        {completion}{#if closedAt !== null} · {clock($lang, closedAt)}{/if}
-      </a>
-      <span class="h-px flex-1 bg-raised"></span>
+    <div class="my-wide">
+      <Rule
+        parts={[
+          {
+            kind: "link",
+            text: closedAt === null ? completion : `${completion} · ${clock($lang, closedAt)}`,
+            href: toFragment({ kind: "run", run: run.run }),
+          },
+        ]}
+        mark="none"
+        wire={{ role: "status", "data-wear": phaseOf(run.doing) }}
+      />
     </div>
   {/if}
 </section>

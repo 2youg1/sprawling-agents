@@ -183,14 +183,22 @@
 </script>
 
 <script lang="ts">
+  import { fill, say } from "../../core/lang";
   import { ui } from "../../ui";
   import Talk from "../talk.svelte";
   import Delivered from "../talk/delivered.svelte";
   import Head from "../talk/head.svelte";
+  import Reasoning from "../talk/reasoning.look.svelte";
+  import SteerPin from "../talk/steer_pin.look.svelte";
+  import Unread from "../talk/unread.look.svelte";
   import Case from "./case.svelte";
   import Stand from "./stand.svelte";
 
-  const now = ui().now();
+  const u = ui();
+  const { lang } = u;
+  const now = u.now();
+  const SAID = "The failing test reads the clock twice.";
+  const THOUGHT = `${SAID} Pin the clock once, then compare the two readings.`;
   const records = recordsAt(now);
   const answers = answering(now);
 </script>
@@ -219,4 +227,36 @@
   {#each DELIVERIES as delivery (delivery.kind)}
     <Delivered {delivery} />
   {/each}
+</Case>
+
+<!-- The thread's own small looks, each in every state it stands in: the
+reasoning of a round folded and of the round being said open, the steer
+pin where the words stop, and the count of what arrived below with the
+way down. -->
+<Case label="thread · reasoning folded and open, the steer pin, and the count of what arrived below" width={760}>
+  <div class="flex flex-col gap-base">
+    <Reasoning
+      label={say($lang, "talk_reasoning")}
+      length={fill(say($lang, "talk_reasoning_length"), { n: "92" })}
+      text={THOUGHT}
+      open={false}
+    />
+    <Reasoning
+      label={say($lang, "talk_reasoning")}
+      length={fill(say($lang, "talk_reasoning_length"), { n: "92" })}
+      text={THOUGHT}
+      open
+    />
+    <p class="text-body">{SAID} <SteerPin /></p>
+    <div class="self-center">
+      <Unread
+        text={fill(say($lang, "talk_unread"), { n: "3" })}
+        wire={{
+          type: "button",
+          "aria-label": `${fill(say($lang, "talk_unread"), { n: "3" })} · ${say($lang, "talk_unread_follow")}`,
+          onclick: () => undefined,
+        }}
+      />
+    </div>
+  </div>
 </Case>

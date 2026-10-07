@@ -20,10 +20,9 @@ S2). -->
   import type { Doing } from "../../core/doing";
   import type { Call, RunId, Turn } from "../../wire";
   import { ui } from "../../ui";
-  import Glyph from "../parts/glyph.svelte";
-  import Tip from "../parts/tip.svelte";
   import CallLine from "./call_line.svelte";
-  import type { ForkEntry } from "./forking";
+  import ForkButton from "./fork_button.svelte";
+  import type { ForkEntry, ForkPlan } from "./forking";
 
   interface Props {
     readonly calls: readonly Call[];
@@ -33,37 +32,26 @@ S2). -->
     // opened.
     readonly turn: Turn;
     // Absent where the page holding the thread cannot branch - the run
-    // page shows the same lines with nowhere to fork to.
-    readonly onFork?: ((entry: ForkEntry) => void) | undefined;
+    // page shows the same lines with nowhere to branch to.
+    readonly onFork?: ((plan: ForkPlan) => void) | undefined;
+    // The entry under the hand, which the `fork.here` chord branches
+    // from: a call is one, like a reply or a person's words.
+    readonly onHover: (entry: ForkEntry | null) => void;
     // The run's posture, handed only to the turn the run is in now.
     readonly doing?: Doing | undefined;
   }
 
-  const { calls, run, turn, onFork, doing }: Props = $props();
+  const { calls, run, turn, onFork, onHover, doing }: Props = $props();
 
   const { lang } = ui();
 </script>
 
 <ul class="my-tight flex flex-col" aria-label={say($lang, "talk_calls")}>
   {#each calls as call (call.at)}
-    <li class="group flex items-center [&>span:first-child]:flex-1">
+    <li class="group flex items-center gap-tight [&>span:first-child]:flex-1">
       <CallLine {call} {run} {doing} />
       {#if onFork !== undefined}
-        <Tip text={say($lang, "fork_here_hint")}>
-          {#snippet children(hint: string)}
-            <button
-              type="button"
-              class="flex h-control shrink-0 items-center gap-tight rounded-control px-tight text-note whitespace-nowrap text-text-faint opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 focus:opacity-100 hover:bg-chrome hover:text-text-quiet"
-              aria-describedby={hint}
-              onclick={() => {
-                onFork({ kind: "call", turn, call });
-              }}
-            >
-              <Glyph name="branch" size="sm" />
-              {say($lang, "fork_here")}
-            </button>
-          {/snippet}
-        </Tip>
+        <ForkButton entry={{ kind: "call", turn, call }} {run} {onFork} {onHover} />
       {/if}
     </li>
   {/each}

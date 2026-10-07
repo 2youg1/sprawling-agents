@@ -25,6 +25,7 @@ bar and the thread cannot disagree about where a round is. -->
   import ForkButton from "./fork_button.svelte";
   import Head from "./head.svelte";
   import NoteLine from "./note_line.svelte";
+  import Reasoning from "./reasoning.look.svelte";
   import { noteAt } from "./note_line";
   import { rhythmOf } from "./rhythm";
   import { cutOff, silentTurn } from "./silence";
@@ -51,11 +52,10 @@ bar and the thread cannot disagree about where a round is. -->
     // draws neither).
     readonly whole: boolean;
     readonly onFork?: ((plan: ForkPlan) => void) | undefined;
-    readonly onCall?: ((entry: ForkEntry) => void) | undefined;
     readonly onHover: (entry: ForkEntry | null) => void;
   }
 
-  const { turn, run, who, model, live, doing, showEmpty, ceiling, whole, onFork, onCall, onHover }: Props = $props();
+  const { turn, run, who, model, live, doing, showEmpty, ceiling, whole, onFork, onHover }: Props = $props();
 
   const { lang } = ui();
 
@@ -96,13 +96,12 @@ bar and the thread cannot disagree about where a round is. -->
         </div>
       {/if}
       {#if turn.thought && whole}
-        <details class="text-note text-text-faint">
-          <summary class="cursor-pointer rounded-control px-tight marker:text-text-faint hover:bg-chrome hover:text-text-quiet">
-            <span class="text-text-faint">{say($lang, "talk_reasoning")}</span>
-            {fill(say($lang, "talk_reasoning_length"), { n: count(turn.thought.length) })}
-          </summary>
-          <div class="mt-tight border-l border-edge-panel pl-base whitespace-pre-wrap break-words">{turn.thought}</div>
-        </details>
+        <Reasoning
+          label={say($lang, "talk_reasoning")}
+          length={fill(say($lang, "talk_reasoning_length"), { n: count(turn.thought.length) })}
+          text={turn.thought}
+          open={false}
+        />
       {/if}
       {#if said !== ""}
         <div class="text-body"><Prose text={said} /></div>
@@ -110,7 +109,7 @@ bar and the thread cannot disagree about where a round is. -->
     </div>
   {/if}
   {#if turn.calls.length > 0 && whole}
-    <Calls calls={turn.calls} {run} {turn} {doing} onFork={onCall} />
+    <Calls calls={turn.calls} {run} {turn} {doing} {onFork} {onHover} />
   {/if}
   {#if empty && showEmpty}
     <div class="rounded-card border border-alert/40 px-base py-snug text-note text-alert">
