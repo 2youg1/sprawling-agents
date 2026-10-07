@@ -14,6 +14,7 @@
   import type { Tier } from "../../core/prefs";
   import { ui } from "../../ui";
   import Segmented from "../parts/segmented.svelte";
+  import Card from "./card.look.svelte";
 
   const u = ui();
   const held = u.prefs.held;
@@ -24,13 +25,11 @@
   }
 </script>
 
-<div class="flex flex-col gap-tight rounded-card bg-raised px-base py-snug">
-  <span class="text-label font-label text-text">{say($lang, "appearance_tier")}</span>
-  <p class="text-note text-text-faint">{say($lang, "appearance_tier_note")}</p>
+<Card title={say($lang, "appearance_tier")} note={say($lang, "appearance_tier_note")}>
   <Segmented
     label={say($lang, "appearance_tier")}
     options={TIERS.map((each) => ({ value: each, label: say($lang, `tier_${each}`) }))}
     held={$held.tier}
     onPick={pick}
   />
-</div>
+</Card>

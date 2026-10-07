@@ -38,6 +38,9 @@ export function governedAt(which: GovernedDocument): Address {
   import Button from "../parts/button.svelte";
   import Segmented from "../parts/segmented.svelte";
   import Unanswered from "../parts/unanswered.svelte";
+  import Card from "./card.look.svelte";
+  import { draftOf } from "./draft";
+  import Draft from "./draft.look.svelte";
 
   const u = ui();
   const lang = u.lang;
@@ -74,9 +77,7 @@ export function governedAt(which: GovernedDocument): Address {
   }
 </script>
 
-<div class="flex flex-col gap-tight rounded-card bg-raised px-base py-snug">
-  <span class="text-label font-label text-text">{say($lang, "setup_governed")}</span>
-  <p class="text-note text-text-faint">{say($lang, "setup_governed_note")}</p>
+<Card title={say($lang, "setup_governed")} note={say($lang, "setup_governed_note")}>
   <Segmented
     label={say($lang, "setup_governed")}
     options={GOVERNED.map((each) => ({ value: each, label: say($lang, `governed_${each}`) }))}
@@ -85,14 +86,12 @@ export function governedAt(which: GovernedDocument): Address {
       which = next;
     }}
   />
-  <textarea
-    class="min-h-output w-full rounded-control bg-chrome px-base py-snug font-mono text-note text-text"
-    aria-label={say($lang, `governed_${which}`)}
-    bind:value={draft}
-    oninput={() => {
+  <Draft
+    {...draftOf(say($lang, `governed_${which}`), draft, (text) => {
+      draft = text;
       edited = true;
-    }}
-  ></textarea>
+    })}
+  />
   {#if read.kind === "unavailable"}
     <Unanswered query={read.query} asked={question} />
   {/if}
@@ -106,4 +105,4 @@ export function governedAt(which: GovernedDocument): Address {
     <span class="flex-1"></span>
     <code class="truncate font-mono text-note text-text-faint">{governedAt(which)}</code>
   </div>
-</div>
+</Card>

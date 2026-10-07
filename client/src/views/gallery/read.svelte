@@ -69,18 +69,19 @@
   import Prose from "../prose.svelte";
   import Laid from "../refrain/laid.svelte";
   import AppearanceType from "../setup/appearance_type.svelte";
+  import { receiptOf } from "../setup/card";
+  import type { ReceiptLook } from "../setup/card";
   import Person from "../talk/person.svelte";
   import Case from "./case.svelte";
 
   const { lang } = ui();
   const ignore = (): void => undefined;
+  const resting = (): ReceiptLook => receiptOf(false, say($lang, "setup_saved"));
 </script>
-
-{#snippet noFoot()}{/snippet}
 
 <Case label="reading face · the type cards with Libron chosen" width={1280}>
   <div class="grid grid-fit items-start gap-base">
-    <AppearanceType look={LIBRON} write={ignore} foot={noFoot} />
+    <AppearanceType look={LIBRON} write={ignore} receipt={resting} />
   </div>
 </Case>
 

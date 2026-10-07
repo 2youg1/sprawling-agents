@@ -19,6 +19,7 @@
   import { ui } from "../../ui";
   import EmptyState from "../parts/empty.svelte";
   import { CITY_CONFIG } from "../settings/files";
+  import TomlLook from "./toml.look.svelte";
 
   const u = ui();
   const { lang } = u;
@@ -26,16 +27,14 @@
   const read = $derived(readDocument($file));
 </script>
 
-<aside class="min-w-0" aria-label={say($lang, "setup_toml")}>
-  <details class="rounded-card bg-chrome/60 px-base py-tight">
-    <summary class="cursor-pointer text-label text-text-quiet hover:text-text">
-      {say($lang, "setup_toml_toggle")}
-      <code class="ml-snug font-mono text-note text-text-faint">{CITY_CONFIG}</code>
-    </summary>
-    {#if read.kind === "held" && read.value.text !== ""}
-      <pre class="overflow-x-auto py-snug font-mono text-note text-text-quiet">{read.value.text}</pre>
-    {:else}
-      <EmptyState missing="setup_toml_unread" />
-    {/if}
-  </details>
-</aside>
+{#snippet unread()}
+  <EmptyState missing="setup_toml_unread" />
+{/snippet}
+
+<TomlLook
+  region={{ "aria-label": say($lang, "setup_toml") }}
+  toggle={say($lang, "setup_toml_toggle")}
+  path={CITY_CONFIG}
+  text={read.kind === "held" && read.value.text !== "" ? read.value.text : undefined}
+  {unread}
+/>

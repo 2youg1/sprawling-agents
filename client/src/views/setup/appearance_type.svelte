@@ -10,14 +10,13 @@
   //
   // The record and its writing are the group's (`appearance.svelte`):
   // this file is handed the record as it stands, the one way to write a
-  // change to it, and the foot every card of the group ends with, so a
+  // change to it, and the receipt every card of the group ends with, so a
   // change made here lands through the same door, the same root element
   // and the same receipt as a change made on any other card. What it
   // owns is the state these cards alone have - the size box mid-edit and
   // the faces this machine has installed.
 
   import { onMount } from "svelte";
-  import type { Snippet } from "svelte";
 
   import type { Key } from "../../core/lang";
   import { fill, say } from "../../core/lang";
@@ -27,21 +26,23 @@
   import { BODY_PX } from "../../wire";
   import { ui } from "../../ui";
   import Button from "../parts/button.svelte";
+  import Combobox from "../parts/combobox.svelte";
   import Field from "../parts/field.svelte";
   import type { FieldProps } from "../parts/field.svelte";
   import Segmented from "../parts/segmented.svelte";
   import { FACE_WORDS, READING_WORDS, cellsOf, drawnSize, stackRefused } from "./appearance";
   import type { Axis, Setting } from "./appearance";
+  import type { ReceiptLook } from "./card";
+  import Card from "./card.look.svelte";
 
   interface Props {
     readonly look: Appearance;
     readonly write: (next: Appearance, name: Setting) => void;
-    // The foot of one card: the line of constraint it states, if any,
-    // and the receipt when the last change landed on that card.
-    readonly foot: Snippet<[string | undefined, Setting]>;
+    // The receipt of one card, said when the last change landed on it.
+    readonly receipt: (name: Setting) => ReceiptLook;
   }
 
-  const { look, write, foot }: Props = $props();
+  const { look, write, receipt }: Props = $props();
 
   const lang = ui().lang;
   const said = (key: Key): string => say($lang, key);
@@ -144,26 +145,24 @@
       <p class="text-note text-alert" role="alert">{note}</p>
     {/if}
     {#if installed.length > 0}
-      <!-- One control tier and radius; the families are this machine's own words, never translated. -->
-      <select
-        class="h-control w-full min-w-0 rounded-control border border-edge-input bg-raised px-base text-body text-text"
-        aria-label={fill(say($lang, "appearance_local_for"), { face: say($lang, name) })}
-        onchange={(event) => {
-          wear(axis, event.currentTarget.value);
+      <!-- A machine has hundreds of faces, so they are searched rather
+      than scrolled; the families are this machine's own words, never
+      translated. -->
+      <Combobox
+        label={fill(say($lang, "appearance_local_for"), { face: say($lang, name) })}
+        placeholder={say($lang, "part_search")}
+        empty={say($lang, "part_no_match")}
+        choices={installed.map((family) => ({ value: family, label: family }))}
+        value={axis === "sans" ? look.sansStack : look.monoStack}
+        onPick={(family: string) => {
+          wear(axis, family);
         }}
-      >
-        {#each installed as family (family)}
-          <option value={family}>{family}</option>
-        {/each}
-      </select>
+      />
     {/if}
   </div>
 {/snippet}
 
-<!-- Each `{@render}` below carries one lint suppression, as `parts/segmented.svelte` does. -->
-<div class="flex flex-col gap-tight rounded-card bg-raised px-base py-snug">
-  <span class="text-label font-label text-text">{say($lang, "appearance_face")}</span>
-  <p class="text-note text-text-faint">{say($lang, "appearance_face_note")}</p>
+<Card title={say($lang, "appearance_face")} note={say($lang, "appearance_face_note")} receipt={receipt("face")}>
   <Segmented
     label={say($lang, "appearance_face")}
     options={cellsOf(FACES, FACE_WORDS, said)}
@@ -176,13 +175,9 @@
     <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
     {@render stackFor("sans", "appearance_face")}
   {/if}
-  <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
-  {@render foot(undefined, "face")}
-</div>
+</Card>
 
-<div class="flex flex-col gap-tight rounded-card bg-raised px-base py-snug">
-  <span class="text-label font-label text-text">{say($lang, "appearance_mono")}</span>
-  <p class="text-note text-text-faint">{say($lang, "appearance_mono_note")}</p>
+<Card title={say($lang, "appearance_mono")} note={say($lang, "appearance_mono_note")} receipt={receipt("mono")}>
   <Segmented
     label={say($lang, "appearance_mono")}
     options={cellsOf(FACES, FACE_WORDS, said)}
@@ -195,13 +190,9 @@
     <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
     {@render stackFor("mono", "appearance_mono")}
   {/if}
-  <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
-  {@render foot(undefined, "mono")}
-</div>
+</Card>
 
-<div class="flex flex-col gap-tight rounded-card bg-raised px-base py-snug">
-  <span class="text-label font-label text-text">{say($lang, "appearance_reading")}</span>
-  <p class="text-note text-text-faint">{say($lang, "appearance_reading_note")}</p>
+<Card title={say($lang, "appearance_reading")} note={say($lang, "appearance_reading_note")} receipt={receipt("reading")}>
   <Segmented
     label={say($lang, "appearance_reading")}
     options={cellsOf(READING_FACES, READING_WORDS, said)}
@@ -214,13 +205,9 @@
   <p class="rounded-card bg-chrome p-base font-read text-body leading-relaxed text-text" data-read={look.reading}>
     {say($lang, "appearance_reading_sample")}
   </p>
-  <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
-  {@render foot(undefined, "reading")}
-</div>
+</Card>
 
-<div class="flex flex-col gap-tight rounded-card bg-raised px-base py-snug">
-  <span class="text-label font-label text-text">{say($lang, "appearance_body")}</span>
-  <p class="text-note text-text-faint">{say($lang, "appearance_body_note")}</p>
+<Card title={say($lang, "appearance_body")} note={say($lang, "appearance_body_note")} constraint={sizeFloor()} receipt={receipt("body")}>
   <Field
     label={say($lang, "appearance_body")}
     labelling="hidden"
@@ -232,14 +219,11 @@
     value={box}
     onInput={resize}
   />
-  <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
-  {@render foot(sizeFloor(), "body")}
-</div>
+</Card>
 
-<div class="flex flex-col gap-tight rounded-card bg-raised px-base py-snug">
-  <span class="text-label font-label text-text">{say($lang, "appearance_preview")}</span>
+<Card title={say($lang, "appearance_preview")}>
   <div class="flex flex-col gap-tight rounded-card bg-chrome p-base">
     <p class="font-sans text-body text-text">{say($lang, "appearance_sample")}</p>
     <p class="font-mono text-body text-text-quiet">{say($lang, "appearance_sample")}</p>
   </div>
-</div>
+</Card>

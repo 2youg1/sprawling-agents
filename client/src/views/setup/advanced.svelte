@@ -17,10 +17,13 @@
   import type { Editor, Opening } from "../../core/editor";
   import { say } from "../../core/lang";
   import type { Key } from "../../core/lang";
-  import { toFragment } from "../../core/route";
   import { ui } from "../../ui";
+  import Combobox from "../parts/combobox.svelte";
   import Field from "../parts/field.svelte";
   import Admission from "../settings/admission.svelte";
+  import Card from "./card.look.svelte";
+  import { doorOf } from "./door";
+  import Door from "./door.look.svelte";
 
   // One word per editor, keyed by the editor: an editor added to
   // `core/editor.ts` leaves this table refusing to compile until it has
@@ -54,21 +57,15 @@
 </script>
 
 <div class="grid grid-fit items-start gap-base">
-  <div class="flex flex-col gap-tight rounded-card bg-raised px-base py-snug">
-    <span class="text-label font-label text-text">{say($lang, "setup_editor")}</span>
-    <p class="text-note text-text-faint">{say($lang, "setup_editor_note")}</p>
-    <select
-      class="h-control w-full min-w-0 rounded-control border border-edge-input bg-raised px-base text-body text-text"
-      aria-label={say($lang, "setup_editor")}
+  <Card title={say($lang, "setup_editor")} note={say($lang, "setup_editor_note")}>
+    <Combobox
+      label={say($lang, "setup_editor")}
+      placeholder={say($lang, "part_search")}
+      empty={say($lang, "part_no_match")}
+      choices={EDITORS.map((each) => ({ value: each, label: say($lang, WORDS[each]) }))}
       value={held.editor}
-      onchange={(event) => {
-        pick(event.currentTarget.value);
-      }}
-    >
-      {#each EDITORS as each (each)}
-        <option value={each}>{say($lang, WORDS[each])}</option>
-      {/each}
-    </select>
+      onPick={pick}
+    />
     <Field
       label={say($lang, "setup_editor_folder")}
       help={say($lang, "setup_editor_folder_help")}
@@ -78,26 +75,14 @@
         keep({ ...held, folder });
       }}
     />
-  </div>
+  </Card>
   <Admission />
   <!-- The way to the privacy group: a link, because it moves the address
       bar like the tree's own entry does. -->
-  <div class="flex flex-col gap-tight rounded-card bg-raised px-base py-snug">
-    <span class="text-label font-label text-text">{say($lang, "privacy_open")}</span>
-    <p class="text-note text-text-faint">{say($lang, "privacy_open_note")}</p>
-    <a
-      href={toFragment({ kind: "setup", group: "privacy" })}
-      class="inline-flex h-control w-fit items-center rounded-control bg-raised px-base text-label hover:bg-raised-hover"
-    >
-      {say($lang, "setup_group_privacy")}
-    </a>
-  </div>
+  <Card title={say($lang, "privacy_open")} note={say($lang, "privacy_open_note")}>
+    <Door {...doorOf({ kind: "setup", group: "privacy" }, say($lang, "setup_group_privacy"))} />
+  </Card>
   <!-- The door back into the welcome walk: a link, because it moves the
       address bar like every other way off this page. -->
-  <a
-    href={toFragment({ kind: "welcome" })}
-    class="inline-flex h-control w-fit items-center rounded-control bg-raised px-base text-label hover:bg-raised-hover"
-  >
-    {say($lang, "setup_rerun")}
-  </a>
+  <Door {...doorOf({ kind: "welcome" }, say($lang, "setup_rerun"))} />
 </div>

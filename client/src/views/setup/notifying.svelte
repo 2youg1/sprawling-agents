@@ -13,6 +13,7 @@
   import { NOTIFYINGS } from "../../core/prefs";
   import { ui } from "../../ui";
   import Segmented from "../parts/segmented.svelte";
+  import Card from "./card.look.svelte";
 
   const u = ui();
   const held = u.prefs.held;
@@ -38,13 +39,11 @@
   }
 </script>
 
-<div class="flex flex-col gap-tight rounded-card bg-raised px-base py-snug">
-  <span class="text-label font-label text-text">{say($lang, "setup_notify")}</span>
-  <p class="text-note text-text-faint">{say($lang, "setup_notify_note")}</p>
+<Card title={say($lang, "setup_notify")} note={say($lang, "setup_notify_note")}>
   <Segmented
     label={say($lang, "setup_notify")}
     options={NOTIFYINGS.map((each) => ({ value: each, label: say($lang, WORDS[each]) }))}
     held={$held.notifying}
     onPick={pick}
   />
-</div>
+</Card>
