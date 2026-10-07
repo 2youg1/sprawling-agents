@@ -9,10 +9,12 @@ wire D43; the child's room when the sending was not paired), then how
 it ended, finished with who verified it or stopped with the reason. -->
 <script lang="ts">
   import { ui } from "../../ui";
-  import { fill, say } from "../../core/lang";
   import { toFragment } from "../../core/route";
   import { clock } from "../../core/time";
   import { called, residentAt } from "./naming";
+  import NoteRow from "./note.look.svelte";
+  import NotePlace from "./note_place.svelte";
+  import { handbackLook, named } from "./note";
   import type { HandbackNote, RunId } from "../../wire";
 
   interface Props {
@@ -33,17 +35,6 @@ it ended, finished with who verified it or stopped with the reason. -->
   );
 </script>
 
-<div class="my-snug flex flex-wrap items-baseline gap-snug text-note text-text-faint" role="note">
-  {#if link !== null}
-    <a href={link} class="text-text-quiet hover:text-text">{child}</a>
-  {:else}
-    <span class="text-text-quiet">{child}</span>
-  {/if}
-  <span>{say($lang, "talk_handback")}</span>
-  {#if "finished" in handback}
-    <span class="text-accent">{fill(say($lang, "talk_handback_finished"), { by: handback.finished.verified_by })}</span>
-  {:else}
-    <span class="text-alert">{fill(say($lang, "talk_handback_stopped"), { because: handback.stopped.because })}</span>
-  {/if}
-  <span>· {clock($lang, t)}</span>
-</div>
+<NotePlace rhythm="line">
+  <NoteRow {...handbackLook($lang, named(child, link), handback, clock($lang, t))} />
+</NotePlace>

@@ -19,6 +19,7 @@ action. -->
   import { clock } from "../../core/time";
   import ForkButton from "./fork_button.svelte";
   import type { ForkEntry, ForkPlan } from "./forking";
+  import NotePlace from "./note_place.svelte";
   import type { RunId } from "../../wire";
 
   interface Props {
@@ -40,7 +41,8 @@ action. -->
   const { lang } = u;
 </script>
 
-<div class="group my-base flex flex-col items-end">
+<NotePlace rhythm="shape">
+<div class="group flex flex-col items-end">
   <div
     class="max-w-[83%] rounded-panel bg-speech px-pane py-base text-body leading-relaxed whitespace-pre-wrap wrap-anywhere"
   >
@@ -53,3 +55,4 @@ action. -->
     <span>{#if labelHref === undefined}{label}{:else}<a href={labelHref} class="text-text-quiet hover:text-text">{label}</a>{/if}{#if at !== undefined} · {clock($lang, at)}{/if}</span>
   </div>
 </div>
+</NotePlace>

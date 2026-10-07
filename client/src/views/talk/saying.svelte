@@ -14,6 +14,9 @@
   // per-character node.
   import Laid from "../refrain/laid.svelte";
   import { laidReply } from "../reply.svelte";
+  import Look from "./saying.look.svelte";
+  import NotePlace from "./note_place.svelte";
+  import { faded } from "./saying";
 
   interface Props {
     readonly text: string;
@@ -22,23 +25,13 @@
 
   const { text, who }: Props = $props();
 
-  // How many characters at the growing edge are drawn faint. Wide enough
-  // that text emerges instead of appearing, narrow enough that the band a
-  // reader's eye sits on is not the shimmering one.
-  const EDGE = 10;
-
   const laid = laidReply(() => text, "streaming");
-  const open = $derived(text.slice(laid.reached));
-  const settled = $derived(open.slice(0, -EDGE));
-  const edge = $derived(open.slice(-EDGE));
 </script>
 
-<div class="my-base text-body">
-  <div class="mb-tight text-note text-text-faint">{who}</div>
+{#snippet blocks()}
   <Laid blocks={laid.blocks} />
-  <div class="whitespace-pre-wrap break-words leading-relaxed">
-    {settled}<span class="text-text-faint">{edge}</span><span
-      class="blink ml-tight inline-block size-[6px] bg-accent align-baseline"
-    ></span>
-  </div>
-</div>
+{/snippet}
+
+<NotePlace rhythm="shape">
+  <Look {who} laid={blocks} {...faded(text.slice(laid.reached))} />
+</NotePlace>
