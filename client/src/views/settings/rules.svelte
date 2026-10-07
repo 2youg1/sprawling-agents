@@ -22,8 +22,8 @@
   import { HALL, useBuildings } from "../shared/buildings";
   import Card from "./card.svelte";
   import { rulesAt } from "./files";
-  import { HELD, RECEIPT_MS, answered, edited, refused, sent, waited } from "./saving";
-  import type { Saving } from "./saving";
+  import { HELD, answered, awaitReceipt, edited, refused, sent } from "./saving";
+  import type { Saving, Slot } from "./saving";
 
   const u = ui();
   const { lang } = u;
@@ -41,6 +41,7 @@
 
   let draft = $state("");
   let saving = $state.raw<Saving>(HELD);
+  const slot: Slot = { now: () => saving, mark: (next) => (saving = next) };
 
   // The box follows the file until somebody types, and again once their
   // text has landed or another building is chosen.
@@ -65,9 +66,7 @@
     if (onDisk === null || !u.send(putRules(chosen, onDisk, draft))) return;
     const mine = sent(onDisk);
     saving = mine;
-    setTimeout(() => {
-      if (saving === mine) saving = waited(mine);
-    }, RECEIPT_MS);
+    awaitReceipt(mine, slot);
   }
 </script>
 

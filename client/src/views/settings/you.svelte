@@ -28,11 +28,12 @@
   import { toFragment } from "../../core/route";
   import { ui } from "../../ui";
   import type { IdentityCard, StatedIdentity } from "../../wire";
+  import Field from "../parts/field.svelte";
   import Unanswered from "../parts/unanswered.svelte";
   import Card from "./card.svelte";
   import Import from "./import.svelte";
-  import { HELD, RECEIPT_MS, answered, edited, refused, sent, waited } from "./saving";
-  import type { Saving } from "./saving";
+  import { HELD, answered, awaitReceipt, edited, refused, sent } from "./saving";
+  import type { Saving, Slot } from "./saving";
 
   const u = ui();
   const { lang } = u;
@@ -79,30 +80,29 @@
     named = refused(named, error);
   });
 
+  const personSlot: Slot = { now: () => person, mark: (next) => (person = next) };
+  const namedSlot: Slot = { now: () => named, mark: (next) => (named = next) };
+
   // Sends one card against the text the answer named as its base, and
-  // answers the card's new standing; the receipt or the patience settles
-  // it later. A timer left by an earlier save of the same card finds the
-  // card moved on and changes nothing.
-  function settle(card: IdentityCard, base: string, mark: (saving: Saving) => void, now: () => Saving): void {
+  // marks the card sent; the receipt or the patience settles it later.
+  function settle(card: IdentityCard, base: string, slot: Slot): void {
     if (stated === null || !u.send(putIdentity(card, base))) return;
     const mine = sent(stated.version);
-    mark(mine);
-    setTimeout(() => {
-      if (now() === mine) mark(waited(mine));
-    }, RECEIPT_MS);
+    slot.mark(mine);
+    awaitReceipt(mine, slot);
   }
 
   function savePerson(): void {
     if (stated === null) return;
     const id = userId.trim();
     const card: IdentityCard = { person: { user_id: id === "" ? null : id, imported_from: id === "" ? null : importedFrom, about } };
-    settle(card, stated.preferences_text, (next) => (person = next), () => person);
+    settle(card, stated.preferences_text, personSlot);
   }
 
   function saveMayor(): void {
     if (stated === null) return;
     const name = mayor.trim();
-    settle({ mayor: { name: name === "" ? null : name } }, stated.mayor_text, (next) => (named = next), () => named);
+    settle({ mayor: { name: name === "" ? null : name } }, stated.mayor_text, namedSlot);
   }
 
   function personMoved(): void {
@@ -127,18 +127,17 @@
 {:else}
   <div class="flex max-w-talk flex-col gap-base">
     <Card title="you_person" note="you_person_note" saving={person} settled="you_next_session" onSave={savePerson}>
-      <label class="flex flex-col gap-tight">
-        <span class="text-note text-text-quiet">{say($lang, "you_user_id")}</span>
-        <input
-          class="h-control w-full min-w-0 rounded-control border border-edge-input bg-page px-base font-mono text-body text-text"
-          placeholder={say($lang, "you_user_id_default")}
-          bind:value={userId}
-          oninput={() => {
-            importedFrom = null;
-            personMoved();
-          }}
-        />
-      </label>
+      <Field
+        label={say($lang, "you_user_id")}
+        placeholder={say($lang, "you_user_id_default")}
+        value={userId}
+        mono
+        onInput={(next: string) => {
+          userId = next;
+          importedFrom = null;
+          personMoved();
+        }}
+      />
       <Import
         onTake={(login: string, host: string) => {
           userId = login;
@@ -156,17 +155,15 @@
       </label>
     </Card>
     <Card title="you_mayor" note="you_mayor_note" saving={named} settled="you_next_session" onSave={saveMayor}>
-      <label class="flex flex-col gap-tight">
-        <span class="text-note text-text-quiet">{say($lang, "you_mayor_name")}</span>
-        <input
-          class="h-control w-full min-w-0 rounded-control border border-edge-input bg-page px-base text-body text-text"
-          placeholder={say($lang, "nav_mayor")}
-          bind:value={mayor}
-          oninput={() => {
-            named = edited(mayor.trim() !== (stated?.mayor ?? ""));
-          }}
-        />
-      </label>
+      <Field
+        label={say($lang, "you_mayor_name")}
+        placeholder={say($lang, "nav_mayor")}
+        value={mayor}
+        onInput={(next: string) => {
+          mayor = next;
+          named = edited(mayor.trim() !== (stated?.mayor ?? ""));
+        }}
+      />
       <p class="text-note text-text-faint">{say($lang, "you_mayor_address")}</p>
     </Card>
   </div>
