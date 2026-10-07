@@ -94,8 +94,10 @@ jobs:
     # `aws-lc-sys` compiles AWS-LC's own C, and `libgit2-sys` and
     # `libz-sys` compile theirs, so a musl build needs a C compiler that
     # targets musl rather than the runner's glibc gcc. `musl-gcc` is what
-    # `musl-tools` installs. Declared for the whole job because only the
-    # row that builds this triple ever reads a `CC_<triple>` variable;
+    # `musl-tools` installs; `cargo zigbuild` was measured against it and
+    # lost, because its link is not position-independent and so drops
+    # ASLR (`crates/sprawling/spec/Install.lean` D57). Declared for the
+    # whole job because only the row that builds this triple ever reads a `CC_<triple>` variable;
     # the two host rows never look at it.
     #
     # No bindgen is needed: aws-lc-sys 0.44.0 ships

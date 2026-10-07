@@ -313,3 +313,26 @@ AUR 更新在原 PKGBUILD checkout 运行 git pull --ff-only && makepkg -si。
 来源识别先解析 exe 链接，再读取共享安装目录；明确环境选择也可指定 aur。
 GitHub 发布比较表示有新归档，不保证 AUR 已同步，执行前仍需检查包版本。
 -/
+
+/-! D57 静态 Linux 归档用 musl-gcc 编译 C 依赖，不用 cargo-zigbuild
+
+本节描述构建接口，不是形式证明。
+
+`release.yml` 的 `x86_64-unknown-linux-musl` 一行在 ubuntu runner 上原生构建：`musl-tools` 提供 `musl-gcc`，
+`CC_x86_64_unknown_linux_musl=musl-gcc` 让 `aws-lc-sys`、`libgit2-sys`、`libz-sys` 的 C 源码按 musl 编译，链接走 rustc
+对该目标的默认设置。理由在产物上：这条路径交出 `static-pie` 可执行文件，`file` 读作 `static-pie linked`，`ldd` 读作
+statically linked，没有 `PT_INTERP`，内核每次启动随机化它的加载地址（ASLR）；同一棵树在两台 runner 上构建出的二进制
+sha256 相同。
+
+被否：`cargo zigbuild`，即以 `zig cc` 作 C 编译器与链接器。同一 commit、同一次 workflow、ubuntu-latest 托管 runner、
+冷缓存的实测：Zig 0.16.0 与 0.15.2 配 cargo-zigbuild 0.23.4 都能构建、打包并通过 `install-loopback.sh`，但
+①产物是不带 PIE 的 `statically linked` 可执行文件，ASLR 随之失去；②`cargo build --release` 一步 522–526 s，
+musl-gcc 为 499–513 s；③链接器每次多出一条 `ignoring deprecated linker optimization setting '1'` 警告；④省下的
+`musl-tools` 与 `CC_<triple>` 换来 Zig 与 cargo-zigbuild 两步安装，要维护的部件没有变少。体积小 3%
+（33.5 MB 对 34.6 MB）抵不过 ASLR。其余构建处也不用它：Windows 一行是 MSVC 目标，cargo-zigbuild 不支持 `*-windows-msvc`；
+macOS 一行与 `ci.yml` 都是宿主构建，系统 C 工具链已对准目标；Nix 构建由 `buildRustPackage` 与 nixpkgs 的工具链负责
+（D50）；本地开发只建宿主目标。Zig 只编译 `crates/desktop/ffi` 的叶子，由那个包的 build script 调用，与链接器无关。
+
+重开参数：发布矩阵加入一个 runner 不能原生构建、Ubuntu 也没有现成交叉 C 工具链的目标（例如要求 glibc 版本下限的
+`*-linux-gnu` 产物），或 cargo-zigbuild 能交出 `static-pie` 且不比 musl-gcc 慢。
+-/
