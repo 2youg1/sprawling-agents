@@ -253,7 +253,7 @@ the coin key, which is the retry. -->
   {#each toasts as toast (toast.id)}
     <li
       class={[
-        "transition-[opacity,display] transition-discrete duration-panel motion-reduce:transition-none",
+        "transition-[opacity,display] transition-discrete duration-panel still:transition-none",
         toast.gone ? "hidden opacity-0 ease-leave" : "opacity-100 ease-arrive",
       ]}
       onmouseenter={() => {

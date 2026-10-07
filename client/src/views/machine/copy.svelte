@@ -31,7 +31,7 @@ const WEAR =
   "relative flex h-control shrink-0 items-center gap-tight rounded-control px-snug " +
   "text-label text-text-quiet before:absolute before:-inset-snug before:content-[''] " +
   "transition-[background-color,color] hover:bg-raised " +
-  "hover:text-text motion-reduce:transition-none";
+  "hover:text-text still:transition-none";
 </script>
 
 <script lang="ts">

@@ -41,20 +41,27 @@
   ]);
 
   // A picture of the page the browser tool looked at: a drawing rather
-  // than a photograph, so the fixture carries no image file.
-  const SHOT_BYTES = utf8(
-    [
-      '<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">',
-      '<rect width="1280" height="720" fill="#f4f1ea"/>',
-      '<rect x="0" y="0" width="1280" height="64" fill="#2b2a28"/>',
-      '<rect x="80" y="120" width="560" height="40" rx="6" fill="#d9d3c4"/>',
-      '<rect x="80" y="190" width="1120" height="16" rx="4" fill="#e3ddd0"/>',
-      '<rect x="80" y="222" width="980" height="16" rx="4" fill="#e3ddd0"/>',
-      '<rect x="80" y="290" width="520" height="300" rx="10" fill="#c8b98f"/>',
-      '<rect x="680" y="290" width="520" height="300" rx="10" fill="#9fb3a6"/>',
-      "</svg>",
-    ].join(""),
-  );
+  // than a photograph, so the fixture carries no image file. Its fills
+  // are the theme's roles, read off the page when the picture is asked
+  // for, so the drawing holds no colour of its own and follows the
+  // lighting the gallery is drawn in.
+  const shotBytes = (): Uint8Array => {
+    const drawn = getComputedStyle(document.documentElement);
+    const fill = (role: string): string => drawn.getPropertyValue(`--color-${role}`).trim();
+    return utf8(
+      [
+        '<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">',
+        `<rect width="1280" height="720" fill="${fill("page")}"/>`,
+        `<rect x="0" y="0" width="1280" height="64" fill="${fill("chrome")}"/>`,
+        `<rect x="80" y="120" width="560" height="40" rx="6" fill="${fill("raised-hover")}"/>`,
+        `<rect x="80" y="190" width="1120" height="16" rx="4" fill="${fill("track")}"/>`,
+        `<rect x="80" y="222" width="980" height="16" rx="4" fill="${fill("track")}"/>`,
+        `<rect x="80" y="290" width="520" height="300" rx="10" fill="${fill("accent")}"/>`,
+        `<rect x="680" y="290" width="520" height="300" rx="10" fill="${fill("mark")}"/>`,
+        "</svg>",
+      ].join(""),
+    );
+  };
 
   const bytesOf = (text: string): number => utf8(text).length;
   const at = (seq: number, ms: number): { saved: { seq: Seq; at: TimeMs } } => ({
@@ -109,7 +116,7 @@
       return { range: { version: query.range.version, window } };
     }
     if ("bytes" in query) {
-      const whole = query.bytes.version === PDF ? REPORT_BYTES : query.bytes.version === SHOT ? SHOT_BYTES : null;
+      const whole = query.bytes.version === PDF ? REPORT_BYTES : query.bytes.version === SHOT ? shotBytes() : null;
       if (whole === null) return { unavailable: { query: "Bytes" } };
       const start = Math.min(query.bytes.range.start, whole.length);
       const end = Math.min(whole.length, start + WINDOW, query.bytes.range.end);

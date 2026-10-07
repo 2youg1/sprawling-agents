@@ -29,7 +29,7 @@
     "m-auto mt-section hidden w-full max-w-measure flex-col gap-snug rounded-panel " +
     "bg-raised p-snug opacity-0 shadow-sheet transition-[opacity,display,overlay] " +
     "transition-discrete duration-panel ease-leave open:flex open:opacity-100 open:ease-arrive " +
-    "starting:open:opacity-0 motion-reduce:transition-none " +
+    "starting:open:opacity-0 still:transition-none " +
     "backdrop:bg-transparent backdrop:backdrop-brightness-50";
 
   const uid = $props.id();

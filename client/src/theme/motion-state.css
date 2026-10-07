@@ -23,8 +23,24 @@
   :root:not([data-motion="on"]) .slide-then,
   :root:not([data-motion="on"]) .push,
   :root:not([data-motion="on"]) .shimmer,
-  :root:not([data-motion="on"]) .animate-pulse {
+  :root:not([data-motion="on"]) .pulse {
     animation: none;
+  }
+}
+/* `still:` is the same three states as a variant, for a transition or a
+ * transform a component spells as a class: it holds inside a subtree
+ * marked `off`, and where the machine asks for less motion unless the
+ * root says `on`. Tailwind's `motion-reduce:` hears only the machine,
+ * so a person who turned motion off would still see a press scale, and
+ * `xtask motion` refuses it for this one. */
+@custom-variant still {
+  &:where([data-motion="off"], [data-motion="off"] *) {
+    @slot;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    &:where(:root:not([data-motion="on"]), :root:not([data-motion="on"]) *) {
+      @slot;
+    }
   }
 }
 /* The person's own answer, which any element may carry rather than only
@@ -50,7 +66,7 @@
 [data-motion="off"] .slide-then,
 [data-motion="off"] .push,
 [data-motion="off"] .shimmer,
-[data-motion="off"] .animate-pulse {
+[data-motion="off"] .pulse {
   animation: none;
 }
 /* Motion off is every duration at zero (docs/frontend-method.md §4-43): every

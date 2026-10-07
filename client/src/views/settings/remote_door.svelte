@@ -128,7 +128,7 @@
   const WEAR =
     "relative flex h-control shrink-0 items-center gap-tight rounded-control bg-raised px-base " +
     "text-label text-text transition-[background-color,color] hover:bg-raised-hover " +
-    "aria-disabled:bg-raised aria-disabled:text-text-disabled motion-reduce:transition-none";
+    "aria-disabled:bg-raised aria-disabled:text-text-disabled still:transition-none";
 </script>
 
 {#snippet control(glyph: GlyphName, name: Key, note: Key, disabled: boolean, onPress: () => void)}

@@ -69,11 +69,11 @@ const MUTED =
 // Background colour is among them so a hover arrives rather than
 // switching, which is what tells a hand the control heard it. The press
 // and the pulse move transform and opacity only, and both stand still
-// for a machine that asks for less motion.
+// when the person or the machine asks for less motion.
 const SHAPE =
   "inline-flex items-center gap-snug rounded-control px-base text-label " +
   "transition-[background-color,color,opacity,transform] " +
-  "active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:scale-100";
+  "active:scale-[0.98] still:transition-none still:active:scale-100";
 </script>
 
 <script lang="ts">
@@ -121,7 +121,7 @@ single guard below is what stands between every input and `onPress`. -->
     }}
   >
     {#if state === "loading"}
-      <span class="inline-block size-dot animate-pulse rounded-pill bg-current"></span>
+      <span class="inline-block size-dot pulse rounded-pill bg-current"></span>
     {/if}
     {label}
   </button>
