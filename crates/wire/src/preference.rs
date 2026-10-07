@@ -463,6 +463,45 @@ mod tests {
         }
     }
 
+    /// The reading face is the person's to state and absent until they
+    /// do (`crates/wire/spec/Preference.lean` D52): a section that names
+    /// it reads back the face it named, and one written before the
+    /// field existed reads back as never stated.
+    #[test]
+    fn the_reading_face_reads_back_as_stated_and_absent_as_never_said() {
+        let appearance = |reading: Option<&str>| {
+            let mut stated = serde_json::json!({
+                "lighting": "dark", "sans": "geist", "mono": "geist",
+                "sans_stack": "", "mono_stack": "", "body_px": null,
+                "density": "compact", "chroma": "full", "motion": "system",
+            });
+            if let (Some(face), Some(fields)) = (reading, stated.as_object_mut()) {
+                fields.insert("reading".to_owned(), serde_json::json!(face));
+            }
+            serde_json::json!({ "appearance": stated })
+        };
+        let read_back = |reading: Option<&str>| {
+            let held: PreferencesAnswer = serde_json::from_value(appearance(reading)).unwrap();
+            serde_json::to_value(&held)
+                .unwrap()
+                .pointer("/appearance/reading")
+                .cloned()
+        };
+        assert_eq!(
+            [
+                read_back(Some("libron")),
+                read_back(Some("interface")),
+                read_back(None)
+            ],
+            [
+                Some(serde_json::json!("libron")),
+                Some(serde_json::json!("interface")),
+                Some(serde_json::Value::Null),
+            ]
+        );
+        assert!(serde_json::from_value::<PreferencesAnswer>(appearance(Some("georgia"))).is_err());
+    }
+
     /// A key this build does not read is refused where it is written.
     /// Ignoring it produces the one state nobody can diagnose: the
     /// setting is in the file, and nothing happens.
