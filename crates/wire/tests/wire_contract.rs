@@ -89,7 +89,7 @@ fn the_schema_hash_is_stable_across_calls_and_covers_the_wire_version() {
         "schema hash changed - update `crates/wire/spec/Frames.lean` §8-1 in the same commit"
     );
     assert_eq!(
-        WIRE_V, 63,
+        WIRE_V, 64,
         "WIRE_V rises once between two pushes, for a shape change under names that stay (wire D1)"
     );
 }
@@ -113,7 +113,7 @@ fn the_schema_hash_covers_every_event_kind_name() {
 
 /// A function of WIRE_V, the two frame name tables and the event kind
 /// names, so any change to the protocol surface lands here first.
-const WIRE_SCHEMA_GOLDEN: &str = "5fdf9f842f5ef2bf038b723cb0777227bd33d4938c1108de2851fb0d75a8c530";
+const WIRE_SCHEMA_GOLDEN: &str = "4eb1568c2ccf64c11d9ac7e8c1afc0da2e9724675d3b1725d79f9b3cfb9408d1";
 
 /// The schema hash reads names only, so a field added under names that
 /// stay leaves it where it was. This digest reads the whole shape with the
