@@ -23,17 +23,24 @@
   // and Delete closes the tab under the focus. Each tab also has its own
   // close mark for a pointer; it is not a second Tab stop, because Delete
   // is that action's key.
+  //
+  // This file is the seat (client D95): it resolves each open item into
+  // the words and facts the strip shows, holds the drawn tabs to move the
+  // focus between them, and draws whatever `./strip.look.svelte` is; the
+  // key table and the wire bags are `./strip.ts`'s.
 </script>
 
 <script lang="ts">
   import { tick } from "svelte";
+  import type { Attachment } from "svelte/attachments";
 
   import { fill, say } from "../../core/lang";
   import { ui } from "../../ui";
-  import Glyph from "../parts/glyph.svelte";
   import { holdsDraft } from "../refrain/session.svelte";
   import { itemKey, sameItem, type RightItem } from "./open.svelte";
   import type { Region, Tab } from "./reading";
+  import { lookOf, type StripLook, type StripTab } from "./strip";
+  import Look from "./strip.look.svelte";
 
   interface Props {
     readonly tabs: readonly Tab[];
@@ -52,99 +59,75 @@
 
   const lang = ui().lang;
 
-  let strip = $state<HTMLDivElement | undefined>(undefined);
+  // Two registries no draw reads, so plain records rather than reactive
+  // maps: the derived look hands out the attachments that write them.
+  const drawn: Record<string, HTMLElement | undefined> = {};
+  const holds: Record<string, Attachment<HTMLElement> | undefined> = {};
 
-  async function focusTab(at: number): Promise<void> {
+  function hold(key: string): Attachment<HTMLElement> {
+    const kept = holds[key];
+    if (kept !== undefined) return kept;
+    const made: Attachment<HTMLElement> = (node) => {
+      drawn[key] = node;
+      return () => {
+        if (drawn[key] === node) drawn[key] = undefined;
+      };
+    };
+    holds[key] = made;
+    return made;
+  }
+
+  // The focus lands on the tab at that place in the strip as it is
+  // drawn after the change, which a Delete has just shortened.
+  async function focusAt(at: number): Promise<void> {
     await tick();
-    strip?.querySelectorAll<HTMLElement>('[role="tab"]')[at]?.focus();
+    const tab = tabs[at];
+    if (tab !== undefined) drawn[itemKey(tab.item)]?.focus();
   }
 
-  function keys(event: KeyboardEvent, at: number): void {
-    const last = tabs.length - 1;
-    const to = ((): number | null => {
-      switch (event.key) {
-        case "ArrowLeft":
-          return at === 0 ? last : at - 1;
-        case "ArrowRight":
-          return at === last ? 0 : at + 1;
-        case "Home":
-          return 0;
-        case "End":
-          return last;
-        default:
-          return null;
-      }
-    })();
-    const here = tabs[at];
-    if (event.key === "Delete" && here !== undefined) {
-      event.preventDefault();
-      onClose(here.item);
-      void focusTab(Math.min(at, last - 1));
-      return;
-    }
-    const there = to === null ? undefined : tabs[to];
-    if (to === null || there === undefined) return;
-    event.preventDefault();
-    onPick(there.item);
-    void focusTab(to);
+  function itemAt(at: number, then: (item: RightItem) => void): void {
+    const tab = tabs[at];
+    if (tab !== undefined) then(tab.item);
   }
+
+  const shown = $derived(
+    tabs.map(
+      (tab): StripTab => ({
+        key: itemKey(tab.item),
+        label: tab.label,
+        terminal: tab.region === "terminal",
+        unsaved: tab.item.kind === "document" && holdsDraft(tab.item),
+        front: sameItem(front, tab.item),
+        href: linkOf(tab.item),
+        controls: panels[tab.region],
+      }),
+    ),
+  );
+
+  const look: StripLook = $derived(
+    lookOf(
+      shown,
+      {
+        tabs: say($lang, "inspect_tabs"),
+        unsaved: say($lang, "inspect_unsaved"),
+        closeAll: say($lang, "inspect_close"),
+        closeItem: (name) => fill(say($lang, "inspect_close_item"), { name }),
+      },
+      {
+        pick: (at) => {
+          itemAt(at, onPick);
+        },
+        close: (at) => {
+          itemAt(at, onClose);
+        },
+        closeAll: onCloseAll,
+        focus: (at) => {
+          void focusAt(at);
+        },
+        hold,
+      },
+    ),
+  );
 </script>
 
-<div class="flex h-[calc(6*var(--spacing-baseline))] shrink-0 items-stretch border-b border-edge pr-snug text-note">
-  <div bind:this={strip} class="flex min-w-0 flex-1 items-stretch overflow-x-auto" role="tablist" aria-label={say($lang, "inspect_tabs")}>
-    {#each tabs as tab, at (itemKey(tab.item))}
-      {@const on = sameItem(front, tab.item)}
-      <div
-        class={[
-          "group/tab relative flex shrink-0 items-center gap-snug border-r border-edge pr-snug first:pl-wide",
-          on ? "bg-page text-text after:absolute after:inset-x-0 after:-bottom-px after:h-px after:bg-page after:content-['']" : "pl-pane text-text-faint hover:text-text-quiet",
-        ]}
-      >
-        <a
-          role="tab"
-          class="flex h-full max-w-[calc(24*var(--spacing-baseline))] items-center gap-snug pl-pane whitespace-nowrap group-first/tab:pl-0"
-          href={linkOf(tab.item)}
-          aria-selected={on}
-          aria-controls={panels[tab.region]}
-          tabindex={on || (front === null && at === 0) ? 0 : -1}
-          onclick={(event) => {
-            event.preventDefault();
-            onPick(tab.item);
-          }}
-          onkeydown={(event) => {
-            keys(event, at);
-          }}
-        >
-          {#if tab.region === "terminal"}<Glyph name="terminal" size="sm" />{/if}
-          <span class="truncate">{tab.label}</span>
-          {#if tab.item.kind === "document" && holdsDraft(tab.item)}
-            <span class="size-dot shrink-0 rounded-pill bg-alert" aria-hidden="true"></span>
-            <span class="sr-only">{say($lang, "inspect_unsaved")}</span>
-          {/if}
-        </a>
-        <button
-          type="button"
-          tabindex="-1"
-          class={[
-            "relative flex size-glyph-sm items-center justify-center rounded-control text-text-faint before:absolute before:-inset-tight before:content-[''] hover:bg-raised hover:text-text",
-            on ? "" : "opacity-0 group-hover/tab:opacity-100",
-          ]}
-          aria-label={fill(say($lang, "inspect_close_item"), { name: tab.label })}
-          onclick={() => {
-            onClose(tab.item);
-          }}
-        >
-          <Glyph name="cross" size="sm" />
-        </button>
-      </div>
-    {/each}
-  </div>
-  <button
-    type="button"
-    class="my-auto ml-snug flex size-control-sm items-center justify-center rounded-control text-text-faint hover:bg-raised hover:text-text"
-    aria-label={say($lang, "inspect_close")}
-    onclick={onCloseAll}
-  >
-    <Glyph name="cross" />
-  </button>
-</div>
+<Look {...look} />

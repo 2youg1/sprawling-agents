@@ -35,6 +35,7 @@
   import type { Ending } from "../monitor/trace";
   import Unanswered from "../parts/unanswered.svelte";
   import { printedOf } from "./terminal";
+  import TextKey from "./text_key.look.svelte";
 
   interface Props {
     readonly call: Call;
@@ -81,14 +82,18 @@
       <span class="mr-base font-label">{call.tool}</span>{printed.line}
     </p>
     {#if printed.pinned !== null}
-      <button
-        type="button"
-        class="row-span-2 h-control-sm self-center rounded-control px-snug text-note text-text-quiet hover:bg-raised hover:text-text aria-pressed:bg-raised aria-pressed:text-text"
-        aria-pressed={raw}
-        onclick={() => {
-          raw = !raw;
-        }}>{say($lang, "inspect_raw")}</button
-      >
+      <div class="row-span-2 self-center">
+        <TextKey
+          label={say($lang, "inspect_raw")}
+          wire={{
+            type: "button",
+            "aria-pressed": raw,
+            onclick: () => {
+              raw = !raw;
+            },
+          }}
+        />
+      </div>
     {/if}
     <p class="col-start-1 flex gap-pane overflow-hidden font-mono text-note leading-[calc(2*var(--spacing-baseline))] whitespace-nowrap text-text-faint">
       {#if printed.took !== null}<span class="figure">{fill(say($lang, "inspect_took"), { ms: count(printed.took) })}</span>{/if}

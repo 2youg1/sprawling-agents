@@ -23,6 +23,10 @@
   // **Lines do not fold.** A patch is read by column, so a long line runs
   // sideways inside the scroller and the rows stay one baseline step
   // apart.
+  //
+  // This file is the seat (client D95): it quotes a chosen line into the
+  // conversation and draws whatever `./patch.look.svelte` is; the rows and
+  // their wire bags are `./patch.ts`'s.
 </script>
 
 <script lang="ts">
@@ -30,10 +34,11 @@
   import { toFragment } from "../../core/route";
   import { ui } from "../../ui";
   import type { Address, HunksAnswer } from "../../wire";
-  import { numbered, quoteLine } from "../changes";
+  import { quoteLine } from "../changes";
   import type { CodeLine } from "../changes";
-  import Inked from "../parts/inked.svelte";
   import { quoteInto } from "../talk/quoting";
+  import { lookOf, type PatchLook } from "./patch";
+  import Look from "./patch.look.svelte";
 
   interface Props {
     readonly patch: HunksAnswer;
@@ -50,71 +55,27 @@
   const u = ui();
   const lang = u.lang;
 
-  const lines = $derived(numbered(patch));
-
-  const WASH: Record<CodeLine["kind"], string> = {
-    added: "bg-accent/12",
-    removed: "bg-alert/12",
-    context: "",
-  };
-  const MARK: Record<CodeLine["kind"], string> = {
-    added: "text-accent",
-    removed: "text-alert",
-    context: "text-text-faint",
-  };
-  const SIGN: Record<CodeLine["kind"], string> = { added: "+", removed: "−", context: "" };
-
   // A chosen line joins whatever the person had already started to
   // write there - in the box when one is open there, in its draft
   // otherwise - and the link then opens that conversation.
-  function choose(to: Address, line: CodeLine): void {
-    quoteInto(u.prefs, to, quoteLine(patch, line));
+  function choose(line: CodeLine): void {
+    if (talk === undefined) return;
+    quoteInto(u.prefs, talk, quoteLine(patch, line));
     onCursor?.(line);
   }
+
+  const look: PatchLook = $derived(
+    lookOf(
+      patch,
+      cursor,
+      {
+        withheld: (n, reason) => fill(say($lang, "run_withheld"), { n, reason }),
+        folded: (n) => fill(say($lang, "change_folded"), { n }),
+        quote: (n) => fill(say($lang, "change_line_quote"), { n }),
+      },
+      { href: talk === undefined ? undefined : toFragment({ kind: "talk", address: talk }), choose },
+    ),
+  );
 </script>
 
-<div class="w-max min-w-full py-snug font-mono text-note leading-[calc(3*var(--spacing-baseline))]">
-  {#each lines as line (line.number)}
-    {#if line.kind === "withheld"}
-      <div class="pl-[calc(9*var(--spacing-baseline))] text-text-faint">
-        {fill(say($lang, "run_withheld"), { n: String(line.number), reason: line.reason })}
-      </div>
-    {:else if line.kind === "head"}
-      <div class="pl-[calc(9*var(--spacing-baseline))] whitespace-pre text-text-faint">{line.text}</div>
-    {:else if line.kind === "hunk"}
-      <div class="my-tight flex gap-base bg-raised pl-[calc(9*var(--spacing-baseline))] pr-wide text-text-faint">
-        {#if line.folded > 0}
-          <span class="shrink-0">{fill(say($lang, "change_folded"), { n: String(line.folded) })}</span>
-        {/if}
-        <span class="whitespace-pre">{line.text}</span>
-      </div>
-    {:else}
-      {@const place = line.kind === "removed" ? line.old : line.new}
-      <div
-        class={[
-          "grid grid-cols-[calc(7*var(--spacing-baseline))_calc(2*var(--spacing-baseline))_auto] pr-wide",
-          WASH[line.kind],
-          cursor === line.number && "shadow-[inset_var(--spacing-hair)_0_0_var(--color-accent)]",
-        ]}
-        data-line={line.number}
-      >
-        {#if talk === undefined}
-          <span class="pr-pane text-right select-none {MARK[line.kind]}">{place ?? ""}</span>
-        {:else}
-          {@const to = talk}
-          <a
-            class="pr-pane text-right select-none hover:text-text {MARK[line.kind]}"
-            href={toFragment({ kind: "talk", address: to })}
-            aria-label={fill(say($lang, "change_line_quote"), { n: String(place ?? line.number) })}
-            onclick={() => {
-              choose(to, line);
-            }}>{place ?? ""}</a
-          >
-        {/if}
-        <!-- wording-ok: the diff format's own marks, not words. -->
-        <span class="select-none {MARK[line.kind]}" aria-hidden="true">{SIGN[line.kind]}</span>
-        <span class="whitespace-pre text-text"><Inked text={line.text} source={patch.path} /></span>
-      </div>
-    {/if}
-  {/each}
-</div>
+<Look {...look} />

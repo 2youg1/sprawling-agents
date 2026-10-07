@@ -16,6 +16,10 @@
   import type { Answer, Call, Query, RoundsAnswer, Turn } from "../../wire";
   import { Address, B3Hash, GitOid, Locator, RunId, Seq, TimeMs } from "../../wire";
   import type { RightItem } from "../inspect/open.svelte";
+  import { lookOf as patchOf } from "../inspect/patch";
+  import { lookOf as splitOf } from "../inspect/split";
+  import { lookOf as stripOf } from "../inspect/strip";
+  import type { TextKeyLook } from "../inspect/text_key";
 
   const ROOM = Address.make("release/ledger");
   const RUN = RunId.make("0199c0de-5a6b-4c3d-8e4f-000000000123");
@@ -198,6 +202,43 @@ impl Document {
     readonly moved: boolean;
   }
 
+  // The strip, the line between the regions, the worded keys and a
+  // patch with a chosen line, drawn from their looks with fixed values:
+  // what a person opened is one state for the whole page, so the states
+  // a follow cannot reach - tabs behind, whose close mark waits for the
+  // pointer or the focus, a draft
+  // the city has not taken, an item with no link, a toggle held down -
+  // are drawn here rather than by opening items.
+  const NOTHING = (): undefined => undefined;
+  const STRIP = stripOf(
+    [
+      { key: "a", label: "document.rs", terminal: false, unsaved: false, front: false, href: "#/talk/release/ledger", controls: "fixture-editor" },
+      { key: "b", label: "notes.md", terminal: false, unsaved: true, front: true, href: "#/talk/release/ledger", controls: "fixture-editor" },
+      { key: "c", label: "cargo nextest -p city", terminal: true, unsaved: false, front: false, href: "#/talk/release/ledger", controls: "fixture-terminal" },
+      { key: "d", label: "7c41e09", terminal: false, unsaved: false, front: false, href: null, controls: "fixture-editor" },
+    ],
+    { tabs: "open in the inspector", unsaved: "unsaved", closeAll: "close the inspector", closeItem: (name) => `close ${name}` },
+    { pick: NOTHING, close: NOTHING, closeAll: NOTHING, focus: NOTHING, hold: () => NOTHING },
+  );
+  const LINE = splitOf(
+    { lines: 12, least: 6, most: 30, controls: "fixture-editor", step: 24, onLines: NOTHING, onReset: NOTHING },
+    "move the line between the editor and the terminal",
+    { capture: NOTHING, hold: NOTHING, grip: { from: null } },
+  );
+  const KEYS: readonly TextKeyLook[] = [
+    { label: "editor", wire: { href: "#/gallery" } },
+    { label: "sent by release/ledger", wire: { href: "#/gallery" } },
+    { label: "copy the place", wire: { type: "button", onclick: NOTHING } },
+    { label: "original", wire: { type: "button", "aria-pressed": false, onclick: NOTHING } },
+    { label: "original", wire: { type: "button", "aria-pressed": true, onclick: NOTHING } },
+  ];
+  const CHOSEN = patchOf(
+    { oid_a: OPENED, oid_b: CHECKED, path: PATH, lines: PATCH.map((text, at) => ({ number: at + 1, text })), withheld: [{ number: 99, reason: "a key-shaped value" }] },
+    7,
+    { withheld: (n, reason) => `line ${n} withheld: ${reason}`, folded: (n) => `${n} lines folded`, quote: (n) => `quote line ${n}` },
+    { href: "#/gallery", choose: NOTHING },
+  );
+
   const SHOWN: readonly Shown[] = [
     { label: "inspector · a diff above the command that tested it", following: [item(EDIT), item(TESTS)], moved: false },
     { label: "inspector · a diff the worktree has moved past", following: [item(EDIT)], moved: true },
@@ -207,6 +248,10 @@ impl Document {
 </script>
 
 <script lang="ts">
+  import PatchLook from "../inspect/patch.look.svelte";
+  import SplitLook from "../inspect/split.look.svelte";
+  import StripLook from "../inspect/strip.look.svelte";
+  import TextKey from "../inspect/text_key.look.svelte";
   import Right from "../right.svelte";
   import Case from "./case.svelte";
   import Stand from "./stand.svelte";
@@ -221,3 +266,18 @@ impl Document {
     </Stand>
   </Case>
 {/each}
+
+<Case label="inspector · the strip, the line, the worded keys and a chosen patch line" width={720}>
+  <div class="flex flex-col bg-chrome">
+    <StripLook {...STRIP} />
+    <div id="fixture-terminal" class="flex items-center gap-base px-wide py-snug">
+      {#each KEYS as key, at (at)}
+        <TextKey {...key} />
+      {/each}
+    </div>
+    <SplitLook {...LINE} />
+    <div id="fixture-editor" class="overflow-auto bg-page">
+      <PatchLook {...CHOSEN} />
+    </div>
+  </div>
+</Case>
