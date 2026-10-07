@@ -142,7 +142,7 @@ const STEP: Record<StepState, { readonly key: Key; readonly weight: Weight }> = 
         <span class="shrink-0 whitespace-nowrap"><Tip text={site}>
           {#snippet children(hint)}
             <a
-              class="font-mono text-label text-text underline decoration-edge underline-offset-2 hover:decoration-accent"
+              class="font-mono text-label text-text underline decoration-edge underline-offset-2 transition-colors ease-leave hover:decoration-accent hover:ease-arrive"
               href={site}
               target="_blank"
               rel="noreferrer"

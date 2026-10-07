@@ -192,7 +192,7 @@
     href="https://platform.composio.dev"
     target="_blank"
     rel="noopener noreferrer"
-    class="w-fit text-note text-text-faint hover:text-text-quiet"
+    class="w-fit text-note text-text-faint transition-colors ease-leave hover:text-text-quiet hover:ease-arrive"
   >
     {say($lang, "mcp_open_composio")}
   </a>
@@ -237,7 +237,7 @@
   console. Kept because it costs one collapsed section and answers the
   one case the directory cannot: a server this city did not open. -->
   <details class="text-note">
-    <summary class="cursor-pointer text-text-faint hover:text-text-quiet">
+    <summary class="cursor-pointer text-text-faint transition-colors ease-leave hover:text-text-quiet hover:ease-arrive">
       {say($lang, "mcp_by_id")}
     </summary>
     <div class="mt-base flex flex-col gap-base">

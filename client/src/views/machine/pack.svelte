@@ -75,7 +75,7 @@
             <span class="shrink-0 font-mono text-label text-text">{member.name}</span>
           {:else}
             <a
-              class="shrink-0 font-mono text-label text-text underline decoration-edge underline-offset-2 hover:decoration-accent"
+              class="shrink-0 font-mono text-label text-text underline decoration-edge underline-offset-2 transition-colors ease-leave hover:decoration-accent hover:ease-arrive"
               href={member.homepage}
               target="_blank"
               rel="noreferrer">{member.name}</a
