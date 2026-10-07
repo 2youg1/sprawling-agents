@@ -25,7 +25,7 @@ the focus. `settings_row.ts` and `policy.ts` build the value
   import PillView from "./pill.svelte";
   import { permissionsOf } from "./policy";
   import Sandbox from "./sandbox.svelte";
-  import { COLUMN, menuOf, modelOf, parentOf } from "./settings_row";
+  import { COLUMN, menuOf, modelOf, parentOf, sameBinding } from "./settings_row";
   import type { RowDraws, RowMenu, RowStarts, SettingsRowLook } from "./settings_row";
   import Look from "./settings_row.look.svelte";
 
@@ -131,6 +131,7 @@ the focus. `settings_row.ts` and `policy.ts` build the value
                 query = text;
               },
               bound: (next) => {
+                if (untrack(() => sameBinding(binding, next))) return;
                 const initial = untrack(() => binding?.controls.at(0) !== next.controls.at(0));
                 binding = next;
                 if (initial) next.pointColumn(COLUMN.model);

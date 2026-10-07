@@ -17,7 +17,7 @@ import type { Pill } from "./composer";
 import { FILTER_AFTER, modelValue } from "./composer";
 import { permissionsOf } from "./policy";
 import type { PermissionsHands } from "./policy";
-import { COLUMN, menuOf, modelOf, searchKeeps } from "./settings_row";
+import { COLUMN, menuOf, modelOf, sameBinding, searchKeeps } from "./settings_row";
 import type { ModelHands, ModelHeld } from "./settings_row";
 
 const nothing = (): (() => void) => () => undefined;
@@ -97,6 +97,17 @@ test("the search box keeps Home, End and composing keys, and hands the other men
   const search = model({ binding, active: "row-4" }).look?.search;
   expect([search?.["aria-controls"], search?.["aria-activedescendant"]]).toEqual(["list-a list-b", "row-4"]);
   expect([searchKeeps("Home", false), searchKeeps("End", false), searchKeeps("ArrowDown", true), searchKeeps("ArrowDown", false), searchKeeps("Enter", false)]).toEqual([true, true, true, false, false]);
+});
+
+test("a binding handed over again with the same keys and lists is the one already held", () => {
+  const keys = (): boolean => true;
+  const held: PopoverBinding = { keys, pointColumn: nothing, controls: ["a", "b"] };
+  expect([
+    sameBinding(null, held),
+    sameBinding(held, { ...held, controls: ["a", "b"] }),
+    sameBinding(held, { ...held, controls: ["a", "c"] }),
+    sameBinding(held, { ...held, keys: () => false }),
+  ]).toEqual([false, true, false, false]);
 });
 
 test("a provider with few models has no search box and no binding", () => {

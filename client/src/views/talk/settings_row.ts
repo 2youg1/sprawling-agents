@@ -114,6 +114,19 @@ export function searchKeeps(key: string, composing: boolean): boolean {
   return composing || key === "Home" || key === "End";
 }
 
+// Whether a binding the popover hands over again is the one already
+// held. The popover hands its binding over each time its props change,
+// as a new object; holding each new object would change the row's look,
+// which changes the popover's props again, without end.
+export function sameBinding(held: PopoverBinding | null, next: PopoverBinding): boolean {
+  return (
+    held !== null &&
+    held.keys === next.keys &&
+    held.pointColumn === next.pointColumn &&
+    held.controls.join(" ") === next.controls.join(" ")
+  );
+}
+
 // What a closed pill shows: the label of the value in force, or its
 // placeholder.
 export function faceOf(pill: Pill): string {
