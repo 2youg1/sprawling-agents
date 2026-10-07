@@ -7,12 +7,23 @@
 //
 // What the segmented control decides before anything is drawn: the
 // vocabulary a track is built from, where a track begins and ends,
-// where an arrow key lands, and which cell a keyboard arrives at. The
-// drawing is `segmented.svelte`; this module touches no DOM, so these
-// decisions are testable without compiling a component (`bun test`
-// cannot compile Svelte). Where a box landed is not something a unit
-// test can be told: `cargo xtask render` measures that in a real
-// engine against the gallery fixtures.
+// where an arrow key lands, which cell a keyboard arrives at, and the
+// value a look draws. The drawing is `segmented.look.svelte`; this
+// module touches no DOM, so these decisions are testable without
+// compiling a component (`bun test` cannot compile Svelte). Where a
+// box landed is not something a unit test can be told: `cargo xtask
+// render` measures that in a real engine against the gallery fixtures.
+//
+// The control is a seat and a look (client D95): `segmented.svelte` is
+// the seat a caller imports, `segmented.look.svelte` draws, and the
+// value between them is `SegmentedLook`, built here by `lookOf`. Every
+// role, `aria-*` value, tab stop and key handler travels to the look
+// inside a wire bag the look spreads on the element it draws, so a
+// look taken from a component library keeps the key table of
+// client/Spec.lean §7-4 without restating a line of it.
+
+import { createAttachmentKey } from "svelte/attachments";
+import type { Attachment } from "svelte/attachments";
 
 // What paints the chosen cell. It is a caller's decision and never an
 // inference: this control knows nothing about what its values mean.
@@ -146,4 +157,176 @@ export function tabStop<V extends string>(options: readonly Choice<V>[], held: V
   const free = options.findIndex((choice) => choice.why === undefined);
   if (free >= 0) return free;
   return options.length > 0 ? 0 : -1;
+}
+
+// The cell a key selects from the cell at `at`, or `undefined` when the
+// key is not one this control answers. This is the whole APG Radio
+// Group key table (client/Spec.lean §7-4): Right and Down step forward,
+// Left and Up step back, both through `nextStop`, and Space selects the
+// focused cell. Enter is absent on purpose: it reaches the cell's click
+// through the platform's button activation, and answering it here as
+// well would select twice.
+export function landing<V extends string>(
+  options: readonly Choice<V>[],
+  at: number,
+  key: string,
+): number | undefined {
+  switch (key) {
+    case "ArrowRight":
+    case "ArrowDown":
+      return nextStop(options, at, 1);
+    case "ArrowLeft":
+    case "ArrowUp":
+      return nextStop(options, at, -1);
+    case " ":
+      return at;
+    default:
+      return undefined;
+  }
+}
+
+// What a key handler on a cell reads from the event, and nothing more,
+// so the wiring test can press a key without a DOM.
+export type KeyPress = Pick<KeyboardEvent, "key" | "preventDefault">;
+
+// The bag spread on the track: the question the cells answer.
+export interface GroupWire {
+  readonly role: "radiogroup";
+  readonly "aria-label": string;
+}
+
+// The bag spread on one cell's focusable element. Its symbol key is a
+// Svelte attachment (`createAttachmentKey`), which hands the seat the
+// element it moves focus to; spreading the bag carries it along, so a
+// look never holds an element reference of its own.
+export interface CellWire {
+  readonly role: "radio";
+  readonly "aria-checked": boolean;
+  readonly "aria-disabled": boolean;
+  readonly "aria-describedby": string | undefined;
+  readonly tabindex: 0 | -1;
+  readonly onclick: () => void;
+  readonly onkeydown: (event: KeyPress) => void;
+  readonly [hold: symbol]: Attachment<HTMLElement>;
+}
+
+// The reason a refused cell gives, and the id the cell's
+// `aria-describedby` already names. The seat decides the id, so the
+// look hands it to `Tip` and writes no ARIA of its own.
+export interface Why {
+  readonly id: string;
+  readonly text: string;
+}
+
+// How a cell is drawn. `refused` wins over `held`: a value the caller
+// still holds but may no longer choose is drawn as refused, and the
+// slider still stands under it, because that is what is held.
+export type CellState = "held" | "free" | "refused";
+
+export interface CellLook {
+  // The cell's value, unique within the control; a key for `#each`.
+  readonly key: string;
+  // Already in the person's language.
+  readonly label: string;
+  readonly state: CellState;
+  readonly why: Why | undefined;
+  readonly wire: CellWire;
+}
+
+export interface BandLook {
+  // Where the band starts in the caller's flat list; a key for `#each`.
+  readonly key: number;
+  // The group heading, already in the person's language.
+  readonly heading: string | undefined;
+  // What paints the chosen cell of this band.
+  readonly tone: Tone;
+  // The chosen cell's position inside this band, or -1 when the chosen
+  // cell is in another band or nobody has chosen; the slider stands
+  // here.
+  readonly held: number;
+  readonly cells: readonly CellLook[];
+}
+
+// Everything a look is given.
+export interface SegmentedLook {
+  readonly group: GroupWire;
+  readonly bands: readonly BandLook[];
+}
+
+// What only the seat can do, because only it holds the drawn elements:
+// move focus to the cell carrying a value, and hand out the attachment
+// that records which element that is. `hold` answers the same
+// attachment for the same value on every call, so a redraw of the look
+// does not let go of an element and take it again.
+export interface Hands<V extends string> {
+  readonly focus: (value: V) => void;
+  readonly hold: (value: V) => Attachment<HTMLElement>;
+}
+
+// One key for every cell's attachment. Svelte keeps one attachment per
+// element under each symbol key, so a single key is enough.
+const HOLD = createAttachmentKey();
+
+// The whole value a look draws, from the props a caller gave, the id
+// the seat owns, and the seat's two hands.
+export function lookOf<V extends string>(
+  props: SegmentedProps<V>,
+  uid: string,
+  hands: Hands<V>,
+): SegmentedLook {
+  const { options, held } = props;
+  const stop = tabStop(options, held);
+
+  // Select the cell at `at` and take focus there. A cell that cannot be
+  // chosen is never selected - not by a click, not by an arrow landing
+  // back on it when nothing else can be chosen, not by Space.
+  const choose = (at: number): void => {
+    const choice = options[at];
+    if (choice === undefined || choice.why !== undefined) return;
+    props.onPick(choice.value);
+    hands.focus(choice.value);
+  };
+
+  const cellOf = (choice: Choice<V>, at: number): CellLook => {
+    const why = choice.why === undefined ? undefined : { id: `${uid}-why-${String(at)}`, text: choice.why };
+    return {
+      key: choice.value,
+      label: choice.label,
+      state: stateOf(choice, held),
+      why,
+      wire: {
+        role: "radio",
+        "aria-checked": choice.value === held,
+        "aria-disabled": why !== undefined,
+        "aria-describedby": why?.id,
+        tabindex: at === stop ? 0 : -1,
+        onclick: () => {
+          choose(at);
+        },
+        onkeydown: (event) => {
+          const to = landing(options, at, event.key);
+          if (to === undefined) return;
+          event.preventDefault();
+          choose(to);
+        },
+        [HOLD]: hands.hold(choice.value),
+      },
+    };
+  };
+
+  return {
+    group: { role: "radiogroup", "aria-label": props.label },
+    bands: bands(options).map((band) => ({
+      key: band.from,
+      heading: band.group?.label,
+      tone: band.group?.tone ?? props.tone ?? "plain",
+      held: band.cells.findIndex((choice) => choice.value === held),
+      cells: band.cells.map((choice, inBand) => cellOf(choice, band.from + inBand)),
+    })),
+  };
+}
+
+function stateOf<V extends string>(choice: Choice<V>, held: V | null): CellState {
+  if (choice.why !== undefined) return "refused";
+  return choice.value === held ? "held" : "free";
 }

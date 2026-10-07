@@ -12,11 +12,13 @@ import { runesFor } from "./svelte.config";
 const client = import.meta.dirname.replaceAll("\\", "/");
 
 describe("svelte config", () => {
-  test("a component in src is compiled in runes mode, one in node_modules is left to infer", () => {
+  test("a component in src or swap is compiled in runes mode, one in node_modules is left to infer", () => {
     expect([
       runesFor(`${client}/src/views/talk.svelte`),
+      runesFor(`${client}/swap/views/parts/segmented.look.svelte`),
       runesFor(`${client}/node_modules/some-kit/Button.svelte`),
       runesFor(`${client}/src-old/legacy.svelte`),
-    ]).toEqual([{ runes: true }, undefined, undefined]);
+      runesFor(`${client}/swapped/legacy.svelte`),
+    ]).toEqual([{ runes: true }, { runes: true }, undefined, undefined, undefined]);
   });
 });
