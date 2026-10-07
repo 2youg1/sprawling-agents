@@ -82,6 +82,12 @@
   --spacing-control-sm: 28px;
   --spacing-control: 32px;
   --spacing-control-lg: 36px;
+  /* The least square a finger is given (docs/frontend-method.md
+   * §4-34). A control drawn smaller than this keeps its drawn size and
+   * widens only the area that takes the touch, under `pointer: coarse`;
+   * `parts/icon_button.svelte` is the one place that widening is
+   * written. */
+  --spacing-touch: 44px;
   --spacing-dot: 8px;
   --spacing-tree: 300px;
   --spacing-figure: 72px;

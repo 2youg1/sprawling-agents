@@ -33,99 +33,69 @@
 //
 // The second text is the row's summary, and a compact page does not
 // draw it: `theme/preference.css` owns that judgement under the one density
-// attribute the six spacing steps already read, so this file marks the
+// attribute the six spacing steps already read, so the look marks the
 // line and states no rule about it.
+//
+// **This file is the seat.** It owns the walk and the wiring - which
+// keys the list takes (`./row`), where focus lands, what a screen
+// reader is told - and draws a row through `./row.look.svelte`, which
+// holds every class a row is painted with. The list itself is a bare
+// `<ul>` here: it carries a name and a key handler and nothing a
+// person sees.
 
-const { primary, secondary, status, actions, onOpen }: RowProps = $props();
+import Look from "./row.look.svelte";
+import { lookOf } from "./row";
+import type { RowProps } from "./row";
+
+const props: RowProps = $props();
+const look = $derived(lookOf(props));
 </script>
 
 <script module>
-import type { Snippet } from "svelte";
-
-export interface RowProps {
-  // Already in the person's language, or an identifier.
-  readonly primary: string;
-  readonly secondary?: string;
-  // Usually a Badge: where the thing stands.
-  readonly status?: Snippet;
-  // Usually Buttons: what can be done to it.
-  readonly actions?: Snippet;
-  // Present makes the row lead somewhere.
-  readonly onOpen?: () => void;
-}
-
-export interface RowListProps {
-  // The accessible name of the list, already in the person's language.
-  readonly label: string;
-  // The rows, in the order they are drawn. Each renders an `<li>` -
-  // a `Row` here, or a row the page draws for itself.
-  readonly rows: Snippet;
-}
+import { landing, taken } from "./row";
+import type { RowListProps, Target } from "./row";
 
 export { RowList };
 
 // What a keyboard can land on inside a row. A row usually offers one
-// control and sometimes three; the walk stops at the first of them, and
-// a row offering none - a spacer, a sentinel - is stepped over.
+// control and sometimes three; the walk stops at the first of them.
 const REACHABLE = 'a[href], button:not([disabled]), [tabindex="0"]';
 
-// A key the control under the pointer is already using is not the
-// list's to take: an arrow moves the caret in a box somebody is typing
-// in, Home and End reach the ends of that line, and a select opens its
-// own menu.
-function occupied(target: EventTarget | null): boolean {
+function targetOf(target: EventTarget | null): Target {
   if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) {
-    return true;
+    return "text";
   }
   if (target instanceof HTMLSelectElement) {
-    return true;
+    return "select";
   }
-  return target instanceof HTMLElement && target.isContentEditable;
+  return target instanceof HTMLElement && target.isContentEditable ? "editable" : "row";
 }
 
-// Which row an arrow key asks for.
-type Step = "next" | "previous" | "first" | "last";
-
-function stepOf(key: string): Step | null {
-  switch (key) {
-    case "ArrowDown":
-      return "next";
-    case "ArrowUp":
-      return "previous";
-    case "Home":
-      return "first";
-    case "End":
-      return "last";
-    default:
-      return null;
+function walk(event: KeyboardEvent & { readonly currentTarget: EventTarget & HTMLUListElement }): void {
+  const step = taken(targetOf(event.target), event.key);
+  if (step === null) {
+    return;
   }
-}
-
-// Where a step starts and which way it runs. The ends do not wrap: a
-// thousand-row ledger that jumps from the last row to the first has
-// moved a person somewhere they cannot see they went.
-function courseOf(step: Step, from: number, last: number): readonly [number, number] {
-  switch (step) {
-    case "next":
-      return [from + 1, 1];
-    case "previous":
-      return [from - 1, -1];
-    case "first":
-      return [0, 1];
-    case "last":
-      return [last, -1];
+  const rows = [...event.currentTarget.children];
+  const from = rows.findIndex((row) => event.target instanceof Node && row.contains(event.target));
+  if (from < 0) {
+    return;
   }
-}
-
-function landing(rows: readonly Element[], step: Step, from: number): HTMLElement | null {
-  const [start, by] = courseOf(step, from, rows.length - 1);
-  for (let at = start; at >= 0 && at < rows.length; at += by) {
-    const reach = rows[at]?.querySelector(REACHABLE);
-    if (reach instanceof HTMLElement) {
-      return reach;
-    }
+  const next = landing(
+    rows.map((row) => {
+      const reach = row.querySelector(REACHABLE);
+      return reach instanceof HTMLElement ? reach : undefined;
+    }),
+    step,
+    from,
+  );
+  if (next === undefined) {
+    return;
   }
-  return null;
+  // The page must not scroll out from under the row that just took
+  // the focus.
+  event.preventDefault();
+  next.focus();
 }
 </script>
 
@@ -134,62 +104,9 @@ function landing(rows: readonly Element[], step: Step, from: number): HTMLElemen
        arrives bubbled from a control inside a row, which is why this
        listener may sit on a list element. -->
   <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-  <ul
-    aria-label={props.label}
-    onkeydown={(event) => {
-      const step = stepOf(event.key);
-      if (step === null || occupied(event.target)) {
-        return;
-      }
-      const rows = [...event.currentTarget.children];
-      const from = rows.findIndex(
-        (row) => event.target instanceof Node && row.contains(event.target),
-      );
-      if (from < 0) {
-        return;
-      }
-      const next = landing(rows, step, from);
-      if (next === null) {
-        return;
-      }
-      // The page must not scroll out from under the row that just
-      // took the focus.
-      event.preventDefault();
-      next.focus();
-    }}
-  >
+  <ul aria-label={props.label} onkeydown={walk}>
     {@render props.rows()}
   </ul>
 {/snippet}
 
-{#snippet texts()}
-  <span class="truncate text-body text-text">{primary}</span>
-  {#if secondary}
-    <span class="summary truncate text-note text-text-faint">{secondary}</span>
-  {/if}
-{/snippet}
-
-<li
-  class="flex min-h-[44px] w-full min-w-0 items-center gap-base border-b border-edge px-base py-snug hover:bg-chrome has-[:focus-visible]:bg-chrome"
->
-  {#if onOpen}
-    {@const open = onOpen}
-    <button type="button" class="flex min-w-0 flex-1 flex-col text-left" onclick={() => {
-        open();
-      }}>
-      <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
-      {@render texts()}
-    </button>
-  {:else}
-    <div class="flex min-w-0 flex-1 flex-col text-left">
-      <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
-      {@render texts()}
-    </div>
-  {/if}
-  {#if status}
-    <div class="shrink-0">{@render status()}</div>
-  {/if}
-  {#if actions}
-    <div class="flex shrink-0 items-center gap-tight">{@render actions()}</div>
-  {/if}
-</li>
+<Look {...look} />

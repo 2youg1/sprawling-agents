@@ -223,7 +223,7 @@ import client.spec.Views.Workspace
 
 **本节只说哪个屏用哪个部件；部件欠使用者什么写在 §9。**
 
-**`views/parts/` 的五个复合部件各有生产座位**，`#/gallery` 只是它们的第二个读者：`combobox` 在 `setup/models.svelte`、`setup/model_table.svelte`、`talk/composer.ts` 与 `talk/pill.svelte`（一个端点答两百个模型时，下拉正是它替换的那个控件）；`notice` 在 `views/mailbox/{deciding,notices}.svelte` 与 `views/refusal.svelte`，AxError 的三段式因此只有它一个画法（4-35）；`row` 在 `building/commits.svelte`、`mcp/servers.svelte` 与 `record/ledger.svelte`；`skeleton` 在 `machine/skeleton.svelte`。`dialog` 的座位是撤不回来的删除，它们在发帧之前先问（D1）：删除 MCP 服务器（`mcp/servers.svelte`）与移除一栋楼（`building.svelte`，楼的文件随之搬出城）。设置页没有移除端点的控件，所以这一族里没有第三个座位；`part_remove_endpoint` 只由 `#/gallery` 的 dialog 夹具读。
+**`views/parts/` 的五个复合部件各有生产座位**，`#/gallery` 只是它们的第二个读者：`combobox` 在 `setup/models.svelte`、`setup/model_table.svelte`、`talk/composer.ts` 与 `talk/pill.svelte`（一个端点答两百个模型时，下拉正是它替换的那个控件）；`notice` 在 `views/mailbox/{deciding,notices}.svelte` 与 `views/refusal.svelte`，AxError 的三段式因此只有它一个画法（4-35）；`row` 在 `mcp/servers.svelte`（`Row` 与 `RowList`）与 `record/timeline.svelte`（`RowList`）；`skeleton` 在 `machine/skeleton.svelte`。`dialog` 的座位是撤不回来的删除，它们在发帧之前先问（D1）：删除 MCP 服务器（`mcp/servers.svelte`）与移除一栋楼（`building.svelte`，楼的文件随之搬出城）。设置页没有移除端点的控件，所以这一族里没有第三个座位；`part_remove_endpoint` 只由 `#/gallery` 的 dialog 夹具读。
 -/
 
 /-! ## 8 接口先行
