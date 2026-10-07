@@ -10,17 +10,23 @@
 // first and the last entry, and a digit reaches the entry it is drawn
 // beside. An entry is any element marked `data-entry`, in document
 // order, so the sections need not know how many entries stand above
-// them; the digit beside each is a CSS counter (`theme/mailbox.css`, the mailbox
-// block) counting the same marks in the same order, so the number drawn
-// and the number pressed cannot disagree.
+// them; the digit beside each is a CSS counter (`./column.look.svelte`)
+// counting the same marks in the same order, so the number drawn and the
+// number pressed cannot disagree.
 //
 // The keys are the column's own, as a list's arrows are a list's own:
 // keys typed into a field, or pressed with a modifier, are not theirs,
 // and an entry the virtual list has not mounted is not one yet. Enter
 // and Escape stay the entry's and the panel's own.
 
+import type { HTMLAnchorAttributes } from "svelte/elements";
+
 import { initialTyped, lineWalker } from "../../core/lines";
 import { pressedOf } from "../../core/press";
+
+// A row that goes somewhere, as its look spreads it: where it goes, the
+// press that puts the mailbox away, and the mark that makes it an entry.
+export type EntryLink = Pick<HTMLAnchorAttributes, "href" | "onclick"> & { readonly "data-entry": "" };
 
 // How many entries a digit can reach: one to nine.
 const DIGITS = 9;

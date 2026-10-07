@@ -29,6 +29,13 @@
   const STOPS = refusal("E_MODEL_UNCHOSEN", "dispatch to hall/mayor", "main", "choose a main model in settings");
   const ORDINARY = refusal("E_PATH_NOT_FOUND", "read a file", "lab/east/docs/SPEC.md", "check the path and ask again");
 
+  // The city turned the page away: a page built for another wire, which
+  // only a reload mends.
+  const TURNED_AWAY = {
+    kind: "refused",
+    error: refusal("E_WIRE_MISMATCH", "open the link to the city", "wire", "reload the page to fetch the client this city serves"),
+  } as const;
+
   // The fixture's clock: its runs began a few minutes before the page
   // opened, so the times they show read the way a working city reads.
   const NOW = Date.now();
@@ -127,6 +134,14 @@ pulses rather than asking for anything. -->
   </Stand>
 </Case>
 
+<!-- Refused by the city, the state only the person mends: the bar is
+the alert's and does not pulse. -->
+<Case label="mailbox key · the city refused the page">
+  <Stand link={TURNED_AWAY} unread={[STOPS]} waiting={[]}>
+    <Mailbox asked={0} hint={(words: string) => words} />
+  </Stand>
+</Case>
+
 <Case label="mailbox · every section holding something" width={440}>
   <Stand link={LIVE} unread={[ASKS, STOPS, ORDINARY]} waiting={[ONE_QUESTION]} answers={sessions} records={RECORDS}>
     <div class={COLUMN}>
@@ -137,6 +152,14 @@ pulses rather than asking for anything. -->
 
 <Case label="mailbox · nothing in it, the link connecting" width={440}>
   <Stand link={{ kind: "backoff", attempt: 2 }} unread={[]} waiting={[]}>
+    <div class="flex h-[480px] flex-col bg-raised">
+      <Column onClose={ignore} />
+    </div>
+  </Stand>
+</Case>
+
+<Case label="mailbox · the city refused the page, with the way to mend it" width={440}>
+  <Stand link={TURNED_AWAY} unread={[]} waiting={[]}>
     <div class="flex h-[480px] flex-col bg-raised">
       <Column onClose={ignore} />
     </div>

@@ -10,9 +10,14 @@
   // the difference is what shows through; every rounded box at the one
   // corner exponent; and the appearance group, where glass and the blend
   // tier's opacity are chosen.
+  import type { Key } from "../../core/lang";
   import type { GlyphName } from "../parts/glyph";
 
-  const KEYS: readonly GlyphName[] = ["layers", "inbox", "settings"];
+  const KEYS: readonly { readonly glyph: GlyphName; readonly name: Key }[] = [
+    { glyph: "layers", name: "edge_layers" },
+    { glyph: "inbox", name: "edge_mailbox" },
+    { glyph: "settings", name: "nav_settings" },
+  ];
 
   // What stands behind the keys: a page of words, which is the hardest
   // thing glass has to keep apart from what it carries.
@@ -28,11 +33,15 @@
 </script>
 
 <script lang="ts">
-  import { EDGE_KEY } from "../edge.svelte";
+  import { say } from "../../core/lang";
+  import { ui } from "../../ui";
+  import { NO_CORNER, NO_FOOT } from "../edge";
+  import EdgeKey from "../edge_key.look.svelte";
   import Setup from "../setup.svelte";
-  import Glyph from "../parts/glyph.svelte";
   import Case from "./case.svelte";
   import { ENDPOINTS } from "./served";
+
+  const { lang } = ui();
 </script>
 
 {#snippet keysOver(glass: "on" | "off")}
@@ -43,8 +52,15 @@
       {/each}
     </div>
     <div class="absolute bottom-snug left-wide flex flex-col gap-snug">
-      {#each KEYS as key (key)}
-        <span class={EDGE_KEY}><Glyph name={key} size="key" /></span>
+      {#each KEYS as key (key.glyph)}
+        {@const name = say($lang, key.name)}
+        <EdgeKey
+          glyph={key.glyph}
+          hint={name}
+          foot={NO_FOOT}
+          corner={NO_CORNER}
+          key={{ as: "button", wire: { type: "button", "aria-label": name } }}
+        />
       {/each}
     </div>
   </div>

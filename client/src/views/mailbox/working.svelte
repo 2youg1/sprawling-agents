@@ -16,15 +16,12 @@
   // is left, on the same clock as its age (client/Spec.lean D88).
   import type { RunBelief } from "../../core/belief";
   import { toFragment } from "../../core/route";
-  import { lasted } from "../../core/time";
   import { ui } from "../../ui";
   import type { Address } from "../../wire";
-  import Glyph from "../parts/glyph.svelte";
-  import type { Weight } from "../parts/glyph";
-  import { phaseOf } from "../runs/lineage";
-  import { PHASE_MARK, phaseSaid } from "../runs/phase";
-  import Section from "./section.svelte";
   import { ticker } from "../talk/timing";
+  import Section from "./section.svelte";
+  import { rowOf } from "./working_row";
+  import Row from "./working_row.look.svelte";
 
   interface Props {
     // Following a row leaves the mailbox for the room.
@@ -32,9 +29,6 @@
   }
 
   const { onLeave }: Props = $props();
-
-  // The tier a phase's mark is painted in, as the runs board paints it.
-  const INK: Readonly<Record<Weight, string>> = { quiet: "text-text-quiet", live: "text-accent", alert: "text-alert" };
 
   const u = ui();
   const { lang } = u;
@@ -59,26 +53,7 @@
 <Section title="mailbox_working" empty="mailbox_working_none" count={rows.length}>
   <ul>
     {#each rows as { room, run } (run.run)}
-      {@const phase = phaseOf(run.doing)}
-      {@const mark = PHASE_MARK[phase]}
-      <li>
-        <a
-          href={toFragment({ kind: "talk", address: room })}
-          class="grid grid-cols-[var(--spacing-glyph-sm)_minmax(0,1fr)_auto_auto] items-center gap-x-snug rounded-card px-snug py-tight hover:wash focus-visible:wash"
-          data-entry
-          onclick={onLeave}
-        >
-          <Glyph name={mark.glyph} size="sm" class={INK[mark.weight]} />
-          <span class="min-w-0 truncate font-label">{room}</span>
-          <span class="figure text-note text-text-faint">
-            {phaseSaid($lang, run.doing, $tick)} · {run.started === null ? "" : lasted($tick - run.started)}
-          </span>
-          <kbd class="entry-n" aria-hidden="true"></kbd>
-          {#if run.task !== null}
-            <span class="col-start-2 col-end-5 truncate text-note text-text-quiet">{run.task}</span>
-          {/if}
-        </a>
-      </li>
+      <Row {...rowOf(run, room, $lang, $tick, { href: toFragment({ kind: "talk", address: room }), onclick: onLeave })} />
     {/each}
   </ul>
 </Section>

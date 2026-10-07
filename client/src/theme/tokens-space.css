@@ -112,6 +112,10 @@
   --spacing-key: 40px;
   --spacing-coin: 32px;
   --spacing-glyph-key: 18px;
+  /* A tier tick under the layers key is this long and `--spacing-hair`
+   * thick (docs/frontend-method.md §7E, 4×2); the mailbox key's link
+   * bar is as long as the row of three. */
+  --spacing-tick: 4px;
   /* The stop face's square: lucide's square fills three quarters of its
    * box and the stroke adds a pixel and a half, so an 8.5 px box draws
    * the 7.9 px square the template draws - seven sixteenths of the

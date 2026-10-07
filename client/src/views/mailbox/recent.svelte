@@ -28,15 +28,15 @@
   // says so rather than let an empty result read as "no such session".
   import { openSession } from "../../core/commands";
   import { fill, say } from "../../core/lang";
-  import type { Key } from "../../core/lang";
   import { toFragment } from "../../core/route";
   import { tailOf } from "../../core/stretches";
   import { ago } from "../../core/time";
   import { ui } from "../../ui";
   import type { Address, Origin, SessionLine } from "../../wire";
-  import Tip from "../parts/tip.svelte";
   import { OVERSCAN, windowOf } from "../run/lanes";
   import { askStretches } from "../world/stretches.svelte";
+  import { rowOf } from "./recent_row";
+  import Row from "./recent_row.look.svelte";
   import Section from "./section.svelte";
 
   interface Props {
@@ -53,7 +53,7 @@
   const { lang } = u;
   const uid = $props.id();
 
-  interface Row {
+  interface Session {
     readonly room: Address;
     readonly line: SessionLine;
     // Where a fork of this session would cut: its last run's tail, or
@@ -68,10 +68,10 @@
   // sessions pane takes too (`world/stretches.svelte.ts`).
   const stretches = askStretches(u);
   let search = $state("");
-  const rows = $derived.by((): Row[] => {
+  const rows = $derived.by((): Session[] => {
     const needle = search.trim().toLowerCase();
     return stretches.all
-      .map((stretch): Row => ({
+      .map((stretch): Session => ({
         room: stretch.room,
         line: stretch.line,
         origin: tailOf(stretch),
@@ -81,14 +81,7 @@
   });
   const earlier = $derived(stretches.earlier);
 
-  function startOf(line: SessionLine): Key {
-    if ("dispatched" in line.start) return "mailbox_start_dispatched";
-    const opened = line.start.opened;
-    if (opened.from !== undefined && opened.from !== null) return "mailbox_start_forked";
-    return opened.carry === "handoff" ? "mailbox_start_carried" : "mailbox_start_new";
-  }
-
-  function fork(row: Row): void {
+  function fork(row: Session): void {
     if (row.origin === null) return;
     if (!u.send(openSession(row.room, "nothing", row.origin))) return;
     onLeave();
@@ -140,39 +133,15 @@
     style:padding-top={`${String(shown.first * rowPx)}px`}
   >
     {#each rows.slice(shown.first, shown.end) as row (`${row.room}@${String(row.line.began)}`)}
-      {@const why = row.origin === null ? say($lang, "mailbox_fork_unheld") : undefined}
-      <li class="-mx-snug flex h-control items-center gap-snug rounded-card px-snug hover:wash">
-        <a
-          href={toFragment({ kind: "talk", address: row.room })}
-          class="grid min-w-0 flex-1 grid-cols-[minmax(10ch,1fr)_minmax(0,auto)_var(--spacing-figure)] items-center gap-x-base rounded-control whitespace-nowrap focus-visible:wash"
-          data-entry
-          onclick={onLeave}
-        >
-          <span class="min-w-0 truncate">{row.room}</span>
-          <span class="truncate text-note text-text-faint">
-            {say($lang, startOf(row.line))} · {row.line.runs === 1 ? say($lang, "mailbox_run_one") : fill(say($lang, "mailbox_runs"), { n: String(row.line.runs) })}
-          </span>
-          <span class="figure text-right text-note text-text-faint">{ago($lang, row.line.at, u.now())}</span>
-        </a>
-        <Tip text={why ?? say($lang, "mailbox_fork_last")}>
-          {#snippet children(hint)}
-            <button
-              type="button"
-              class="grid size-control-sm shrink-0 place-items-center rounded-control text-text-quiet hover:bg-raised-hover hover:text-text aria-disabled:text-text-disabled"
-              aria-label={say($lang, "mailbox_fork_last")}
-              aria-describedby={hint}
-              aria-disabled={why !== undefined}
-              onclick={() => {
-                fork(row);
-              }}
-            >
-              <!-- wording-ok: a drawing in type, not a word; the action's name is the aria-label beside it. -->
-              ⑂
-            </button>
-          {/snippet}
-        </Tip>
-        <kbd class="entry-n" aria-hidden="true"></kbd>
-      </li>
+      <Row
+        {...rowOf({ room: row.room, line: row.line, forkable: row.origin !== null }, $lang, ago($lang, row.line.at, u.now()), {
+          href: toFragment({ kind: "talk", address: row.room }),
+          follow: onLeave,
+          fork: () => {
+            fork(row);
+          },
+        })}
+      />
     {/each}
   </ul>
   {#if earlier > 0}
