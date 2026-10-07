@@ -8,6 +8,13 @@
 # and after, in the same step, and fails when a key that existed before
 # reads differently after; a key the run created is listed as a residual
 # key. Nothing here reads a secret, and the runner is thrown away after.
+#
+# The `page` job serves the release archive and drives the privacy page
+# in a browser through .github/workflows/privacy-ui.mjs: it enters the
+# page from the Advanced group's link, checks the page against the city's
+# own answer, applies and restores one user-scope and one machine-scope
+# control by pressing the page's buttons, reads every write back with
+# reg.exe, and keeps the cropped screenshots of every state.
 name: privacy-windows-acceptance
 on:
   push:
@@ -18,6 +25,9 @@ on:
       - crates/sprawling/spec/Privacy/**
       - crates/sprawling/tests/privacy_disposable.rs
       - .github/workflows/privacy-windows-acceptance.yml
+      - .github/workflows/privacy-ui.mjs
+      - .github/workflows/acceptance-focus.mjs
+      - client/src/views/setup/privacy/**
   workflow_dispatch:
 permissions:
   contents: read
@@ -145,4 +155,66 @@ jobs:
         with:
           name: privacy-windows-${{ matrix.os }}-${{ github.sha }}
           path: privacy-evidence
+          if-no-files-found: error
+
+  page:
+    runs-on: windows-2025
+    timeout-minutes: 120
+    env:
+      CARGO_INCREMENTAL: "0"
+      SPRAWLING_DISPOSABLE_PRIVACY: "1"
+    steps:
+      - uses: actions/checkout@v7
+      - name: install pinned toolchain
+        run: rustup show
+      - uses: ./.github/actions/zig
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: privacy-page
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - uses: ./.github/actions/client-artifacts
+      - uses: ./.github/actions/lean
+      - name: The archive a person downloads, and the checker that serves it
+        shell: bash
+        run: |
+          set -euo pipefail
+          just package
+          lake build Sprawling acceptance
+      - name: Unpack the archive and record what is judged
+        id: archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/privacy-page"
+          rm -rf "$out"
+          mkdir -p "$out/unpacked" "$out/evidence"
+          archive="$(ls "$PWD"/target/package/*.zip)"
+          test "$(echo "$archive" | wc -l)" -eq 1
+          unzip -q "$archive" -d "$out/unpacked"
+          binary="$(find "$out/unpacked" -type f -name sprawling.exe | head -n 1)"
+          test -n "$binary"
+          git rev-parse HEAD 'HEAD^{tree}' > "$out/evidence/source.txt"
+          sha256sum "$archive" "$binary" > "$out/evidence/archive-binary.sha256"
+          {
+            echo "dir=$out"
+            echo "binary=$(cygpath -m "$binary")"
+          } >> "$GITHUB_OUTPUT"
+      - name: Browser for the served client
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/acceptance-browser"
+          bun add --cwd "$RUNNER_TEMP/acceptance-browser" playwright@1.58.2
+          "$RUNNER_TEMP/acceptance-browser/node_modules/.bin/playwright" install chromium
+          echo "PLAYWRIGHT_MODULE=$(cygpath -m "$RUNNER_TEMP/acceptance-browser/node_modules/playwright/index.mjs")" >> "$GITHUB_ENV"
+      - name: Apply and restore through the page, read back with reg.exe
+        shell: bash
+        run: |
+          set -euo pipefail
+          SPRAWLING_BIN="${{ steps.archive.outputs.binary }}" lake exe acceptance client-ui .github/workflows/privacy-ui.mjs "${{ steps.archive.outputs.dir }}/evidence/ui"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: privacy-page-${{ github.sha }}
+          path: ${{ runner.temp }}/privacy-page/evidence
           if-no-files-found: error
