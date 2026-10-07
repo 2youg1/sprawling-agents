@@ -297,7 +297,7 @@ taller; on one column the second row is the band, as tall as it needs. -->
       class={[
         sheet
           ? "sheet -mx-pane row-[1] grid min-h-0 grid-rows-[auto_minmax(0,1fr)] bg-page px-pane"
-          : "col-span-full row-[1/3] grid min-h-0 grid-cols-subgrid grid-rows-subgrid transition-opacity duration-page",
+          : "col-span-full row-[1/3] grid min-h-0 grid-cols-subgrid grid-rows-subgrid",
       ]}
       data-side="left"
       role={sheet ? "region" : undefined}
@@ -329,7 +329,11 @@ taller; on one column the second row is the band, as tall as it needs. -->
             // Beside the conversation the world is dimmed and takes no
             // input, but for the sessions, which move main to a session.
             layout.world === "beside" && placed.pane !== "sessions" ? "pointer-events-none opacity-(--blend-opacity)" : "",
-            layout.world === "beside" && placed.pane === "sessions" ? "opacity-(--blend-opacity) transition-opacity duration-page hover:opacity-100 focus-within:opacity-100" : "",
+            // It comes up with the arriving curve and fades back with the
+            // leaving one.
+            layout.world === "beside" && placed.pane === "sessions"
+              ? "opacity-(--blend-opacity) transition-opacity duration-page ease-leave hover:opacity-100 hover:ease-arrive focus-within:opacity-100 focus-within:ease-arrive"
+              : "",
           ]}
           inert={layout.world === "beside" && placed.pane !== "sessions"}
           style:grid-column={at(placed.lines)}

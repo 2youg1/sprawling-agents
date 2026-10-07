@@ -17,10 +17,17 @@
   // other region of the page stands on too, the two silver lines among
   // them. The columns are not equal (client D24), so the lines are read off
   // the shell's grid as the engine laid it out rather than counted.
+  //
+  // This file is the seat: it places the gutter on the grid, reads the
+  // column lines and writes the workbench; the keys are `./divider.ts`,
+  // and the line is whatever `./divider.look.svelte` draws.
   import { fill, say } from "../../core/lang";
-  import { NARROWEST, WORKBENCH, resized, widest } from "../../core/workbench";
+  import { WORKBENCH, resized, widest } from "../../core/workbench";
   import type { Divider } from "../../core/workbench";
   import { ui } from "../../ui";
+  import { dividerLookOf } from "./divider";
+  import type { DividerLook } from "./divider";
+  import Look from "./divider.look.svelte";
 
   interface Props {
     readonly divider: Divider;
@@ -69,62 +76,36 @@
   }
 
   let dragging = $state(false);
+  let gutter = $state<HTMLElement | undefined>(undefined);
 
-  function keys(event: KeyboardEvent): void {
-    switch (event.key) {
-      case "ArrowLeft":
-        set(span - 1);
-        break;
-      case "ArrowRight":
-        set(span + 1);
-        break;
-      case "Home":
-        set(NARROWEST);
-        break;
-      case "End":
-        set(widest($bench, divider));
-        break;
-      case "Enter":
-        reset();
-        break;
-      default:
-        return;
-    }
-    event.preventDefault();
-  }
+  const look: DividerLook = $derived(
+    dividerLookOf(
+      {
+        label: fill(say($lang, "world_divider"), { pane: label }),
+        controls,
+        span,
+        widest: widest($bench, divider),
+        dragging,
+      },
+      {
+        set,
+        reset,
+        drag: (now) => {
+          dragging = now;
+        },
+        follow: (clientX) => {
+          const grid = gutter?.parentElement;
+          if (grid === null || grid === undefined) return;
+          set(lineAt(grid, clientX) - start);
+        },
+      },
+    ),
+  );
 </script>
 
-<!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions (a focusable separator is the APG window splitter, an interactive widget that moves with the arrow keys) -->
-<div
-  role="separator"
-  tabindex="0"
-  aria-orientation="vertical"
-  aria-label={fill(say($lang, "world_divider"), { pane: label })}
-  aria-controls={controls}
-  aria-valuenow={span}
-  aria-valuemin={NARROWEST}
-  aria-valuemax={widest($bench, divider)}
-  class={[
-    "relative row-[1/3] -ml-gutter flex w-gutter cursor-col-resize touch-none justify-center justify-self-start outline-offset-[-2px]",
-    "before:w-px before:transition-colors hover:before:bg-edge-input focus-visible:before:bg-accent",
-    dragging ? "before:bg-accent" : "",
-  ]}
-  style:grid-column="{column} / span 1"
-  onkeydown={keys}
-  ondblclick={reset}
-  onpointerdown={(event) => {
-    event.currentTarget.setPointerCapture(event.pointerId);
-    dragging = true;
-  }}
-  onpointermove={(event) => {
-    const grid = event.currentTarget.parentElement;
-    if (!dragging || grid === null) return;
-    set(lineAt(grid, event.clientX) - start);
-  }}
-  onpointerup={() => {
-    dragging = false;
-  }}
-  onpointercancel={() => {
-    dragging = false;
-  }}
-></div>
+<!-- The gutter the divider stands in: the grid's column on the left of
+the pane after it, the full height of the workbench. Where it stands is
+this seat's; how the line in it is drawn is the look's. -->
+<div bind:this={gutter} class="row-[1/3] -ml-gutter flex w-gutter justify-self-start" style:grid-column="{column} / span 1">
+  <Look {...look} />
+</div>

@@ -17,6 +17,11 @@
   //
   // The Mayor's current session is pinned by being current, not by a
   // tag, so its menu offers no way to unpin it.
+  //
+  // This file is the seat: it decides the items and what each does,
+  // owns whether the menu is open and the field it turns into, and
+  // draws whatever `./session_menu.look.svelte` is; the keys are
+  // `./menu.ts`.
   import { tick } from "svelte";
 
   import { readAnswer } from "../../core/answered";
@@ -27,7 +32,10 @@
   import type { Named } from "../../core/tags";
   import { ui } from "../../ui";
   import type { RunId, RunPolicy, Tag } from "../../wire";
-  import Glyph from "../parts/glyph.svelte";
+  import { drawnElements } from "./drawn";
+  import { sessionMenuLookOf } from "./session_menu";
+  import type { Item, SessionMenuLook } from "./session_menu";
+  import Look from "./session_menu.look.svelte";
 
   interface Props {
     // The session as its tags name it; null where the city has no name
@@ -47,17 +55,13 @@
 
   // The longest display name the field takes: a row shows a line of it.
   const NAME_MAX = 80;
+  // The longest tag the field takes, as the hint under it says.
+  const TAG_MAX = 24;
 
   const u = ui();
   const { lang } = u;
   const held = u.tags.held;
   const seat = $props.id();
-
-  interface Item {
-    readonly id: string;
-    readonly word: string;
-    readonly act: () => void;
-  }
 
   // The policy the run opened under, asked only while the menu is open;
   // until it is held the menu offers no policy change, because a change
@@ -113,28 +117,30 @@
   // Which field the menu has turned into, if any.
   let naming = $state<"tag" | "name" | null>(null);
   let typed = $state("");
-  let trigger = $state<HTMLButtonElement | undefined>(undefined);
-  let field = $state<HTMLInputElement | undefined>(undefined);
-  const entries: (HTMLButtonElement | undefined)[] = [];
+  const drawn = drawnElements();
   const wrong = $derived(naming === "tag" && typed.trim() !== "" && readTag(typed) === null);
+
+  function live(): HTMLElement[] {
+    return items.flatMap((item) => drawn.get(item.id) ?? []);
+  }
 
   function enter(which: "tag" | "name", start: string): void {
     naming = which;
     typed = start;
-    queueMicrotask(() => field?.focus());
+    queueMicrotask(() => drawn.get("field")?.focus());
   }
 
   function show(): void {
     open = true;
     naming = null;
     typed = "";
-    queueMicrotask(() => entries[0]?.focus());
+    queueMicrotask(() => live()[0]?.focus());
   }
 
   function close(): void {
     open = false;
     naming = null;
-    void tick().then(() => trigger?.focus());
+    void tick().then(() => drawn.get("trigger")?.focus());
   }
 
   function change(how: typeof given, tag: Tag): void {
@@ -152,32 +158,7 @@
     close();
   }
 
-  function walk(event: KeyboardEvent): void {
-    const live = entries.filter((entry): entry is HTMLButtonElement => entry !== undefined);
-    const now = live.findIndex((entry) => entry === document.activeElement);
-    switch (event.key) {
-      case "ArrowDown":
-        event.preventDefault();
-        live[(now + 1) % live.length]?.focus();
-        return;
-      case "ArrowUp":
-        event.preventDefault();
-        live[(now - 1 + live.length) % live.length]?.focus();
-        return;
-      case "Escape":
-        event.preventDefault();
-        close();
-        return;
-      case "Tab":
-        open = false;
-        return;
-      default:
-        return;
-    }
-  }
-
-  function submit(event: SubmitEvent): void {
-    event.preventDefault();
+  function submit(): void {
     if (naming === "name") {
       rename(typed);
       return;
@@ -185,79 +166,42 @@
     const tag = readTag(typed);
     if (tag !== null) change(given, tag);
   }
-</script>
 
-<div class="relative">
-  <button
-    bind:this={trigger}
-    type="button"
-    class="grid size-control-sm place-items-center rounded-control text-text-quiet hover:wash hover:text-text aria-expanded:wash aria-expanded:text-text disabled:text-text-disabled"
-    aria-haspopup="menu"
-    aria-expanded={open}
-    aria-controls="{seat}-menu"
-    aria-label={fill(say($lang, "world_row_menu"), { room: label })}
-    title={named === null ? say($lang, "world_tags_offline") : undefined}
-    disabled={named === null}
-    onclick={() => {
-      if (open) close();
-      else show();
-    }}
-    onkeydown={(event) => {
-      if (event.key === "ArrowDown" && !open) {
-        event.preventDefault();
-        show();
-      }
-    }}
-  >
-    <Glyph name="more" size="sm" />
-  </button>
-  {#if open}
-    <div
-      id="{seat}-menu"
-      class="absolute top-full right-0 z-10 flex min-w-[20ch] flex-col rounded-card bg-raised p-tight shadow-float"
-      onfocusout={(event) => {
-        if (!(event.relatedTarget instanceof Node && event.currentTarget.contains(event.relatedTarget))) {
+  const look: SessionMenuLook = $derived(
+    sessionMenuLookOf(
+      {
+        uid: seat,
+        open,
+        why: named === null ? say($lang, "world_tags_offline") : undefined,
+        name: fill(say($lang, "world_row_menu"), { room: label }),
+        items,
+        naming:
+          naming === null
+            ? null
+            : {
+                label: say($lang, naming === "tag" ? "world_tag_name" : "world_rename_field"),
+                hint: say($lang, naming === "tag" ? "world_tag_hint" : "world_rename_hint"),
+                typed,
+                wrong,
+                max: naming === "tag" ? TAG_MAX : NAME_MAX,
+              },
+      },
+      {
+        live,
+        show,
+        close,
+        leave: () => {
           open = false;
           naming = null;
-        }
-      }}
-    >
-      {#if naming !== null}
-        <form class="flex flex-col gap-tight p-tight" onsubmit={submit}>
-          <input
-            bind:this={field}
-            bind:value={typed}
-            class="h-control-sm rounded-control bg-page px-snug text-note text-text"
-            aria-label={say($lang, naming === "tag" ? "world_tag_name" : "world_rename_field")}
-            aria-invalid={wrong}
-            aria-describedby="{seat}-hint"
-            maxlength={naming === "tag" ? 24 : NAME_MAX}
-            onkeydown={(event) => {
-              if (event.key === "Escape") {
-                event.preventDefault();
-                close();
-              }
-            }}
-          />
-          <p id="{seat}-hint" class={["text-note", wrong ? "text-alert" : "text-text-faint"]}>{say($lang, naming === "tag" ? "world_tag_hint" : "world_rename_hint")}</p>
-        </form>
-      {:else}
-        <ul role="menu" tabindex="-1" aria-label={fill(say($lang, "world_row_menu"), { room: label })} onkeydown={walk}>
-          {#each items as item, index (item.id)}
-            <li role="none">
-              <button
-                bind:this={entries[index]}
-                type="button"
-                role="menuitem"
-                class="flex h-control-sm w-full items-center rounded-control px-snug text-left text-note text-text hover:wash focus-visible:wash"
-                onclick={item.act}
-              >
-                {item.word}
-              </button>
-            </li>
-          {/each}
-        </ul>
-      {/if}
-    </div>
-  {/if}
-</div>
+        },
+        type: (next) => {
+          typed = next;
+        },
+        submit,
+        hold: drawn.hold,
+      },
+    ),
+  );
+</script>
+
+<Look {...look} />
