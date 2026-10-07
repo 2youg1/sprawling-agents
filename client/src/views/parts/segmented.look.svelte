@@ -45,7 +45,7 @@
   const ink = (cell: CellLook, tone: Tone): string => {
     switch (cell.state) {
       case "refused":
-        return "text-text-disabled";
+        return "aria-disabled:text-text-disabled";
       case "free":
         return "text-text-quiet hover:text-text";
       case "held":
