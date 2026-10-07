@@ -137,7 +137,7 @@ impl Harness {
             },
             Harness::GrokBuild => Launch {
                 program: Program::Npx,
-                args: &["-y", "@xai-official/grok@1.0.49", "agent", "stdio"],
+                args: &["-y", "@xai-official/grok@1.0.50", "agent", "stdio"],
             },
             Harness::KimiCode => Launch {
                 program: Program::Kimi,
