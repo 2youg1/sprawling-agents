@@ -41,6 +41,7 @@ describe("the figures an empty tuning box shows", () => {
     timeout_ms: 120_000,
     request_max_retries: null,
     stream_idle_timeout_ms: null,
+    account_retries: "two",
   };
 
   test("an untouched form shows the city's timeout for the idle box too", () => {

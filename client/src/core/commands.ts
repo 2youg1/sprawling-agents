@@ -9,7 +9,7 @@
 
 import { mintIdem } from "./idem";
 export type { Endpoint, Pair, Tuning } from "./commands/endpoint";
-export { attachEndpoint, probeEndpoint } from "./commands/endpoint";
+export { attachEndpoint, probeEndpoint, reattachEndpoint } from "./commands/endpoint";
 import { providerName } from "./commands/endpoint";
 export { providerName };
 import type {
@@ -39,6 +39,7 @@ import type {
   Restoration,
   RunId,
   RunPolicy,
+  SearchConfiguration,
   Seq,
   ToolkitSlug,
   WriteLimit,
@@ -366,6 +367,12 @@ export { privacyOperation, type PrivacyOperation } from "./commands/privacy";
 // The city's own layer: `null` leaves a key as it is.
 export function configureCity(keepWarm: KeepWarm | null, effort: Effort | null): Command {
   return { configure_city: { keep_warm: keepWarm, effort, idem: mintIdem() } };
+}
+
+// The city's whole `[search]`: a supplier is never sent alone, so the
+// city writes what the page drew (client D94).
+export function configureSearch(search: SearchConfiguration): Command {
+  return { configure_city: { search, idem: mintIdem() } };
 }
 
 // One of a building's own spine documents. `base` is the text the

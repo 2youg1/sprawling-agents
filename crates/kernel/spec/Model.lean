@@ -250,8 +250,23 @@ pub enum ModelTag { Main, Digest, Transcribe, Ocr }   // 线上 "main" | "digest
 **重开参数**：出现第三种落地方式（例如合并到别的分支）时，`LandingPolicy` 加一臂；出现一种 mode 需要自己的证据规则时，重议「mode 不参与准入」。
 -/
 
-/-! Model 的账号面：provider_account 返回非秘密 Provider/account 身份；
-select_account 在房间确定后选择成功绑定，缺席或被移除的 ID 选首账号；
-选择只换后续请求所用的凭据引用，不发请求、不兑现 Vault，因此不返回错误；
-无账号适配器保持原行为。ModelCalled 记录尝试，ModelReturned 才提交绑定。
-本接口不规定账号故障转移；失败继续由 runtime 原重试策略处理。 -/
+/-! Model 的账号面：适配器答出它当前的账号与它的账号名册，并按名选号。选择只换后续请求所用的凭据引用，不发请求、不兑现 Vault，因此不返回错误；没有具名账号的适配器答 `None`，行为不变。`ModelCalled` 记录每一次尝试用的账号，`ModelReturned` 才提交 Session 的绑定（`crates/gateway/spec/Router.lean` D30）。
+
+先用哪个账号、失败后原号再发、换号还是停下，由 `AccountRound`（`crates/kernel/spec/AccountRecovery.lean` §8-86）决定；端口不自己判「绑定的账号不在名册里就选首账号」，那是 `AccountRound::start` 的事：
+
+```rust
+pub struct AccountRoster {
+    pub provider: String,
+    pub accounts: Vec<RosterEntry>,      // 名册序即优先级
+    pub current: ServerLabel,            // 下一次请求用的账号
+    pub retries: AccountRetries,         // 端点 tuning 的 account_retries()，缺席时取 gateway 的 EndpointTuning::DEFAULTS
+}
+pub struct RosterEntry { pub account: ServerLabel, pub usable: bool }   // usable：引用此刻能否兑付（D55），不含 Key 与引用
+trait Model {
+    fn provider_account(&self) -> Option<ProviderAccountBinding>;   // 当前账号：ModelCalled 的那一格，不问 vault
+    fn account_roster(&self) -> Option<AccountRoster>;   // None＝没有具名账号的适配器；两个以上账号时 usable 要问 vault
+    fn select_account(&mut self, account: &ServerLabel); // 名字来自同一适配器答出的名册；名册外的名字不改选择
+}
+```
+
+`ModelCalled.provider_account` 取 `provider_account()`，它与名册的 `provider`、`current` 同值，却不经名册：名册的 `usable` 要问 vault，而每一次尝试都写一行 `model_called`，记账不该每次把所有账号的凭据兑付一遍。名册只有一个账号或适配器没有具名账号时，调用方开的是单账号的轮（`Roster::Single`），行为与这一面出现之前相同。派活时调用方按 Session 的绑定 `select_account`（没有绑定就不选，适配器从名册首位开始），所以开第一轮时名册的 `current` 就是 Session 的绑定；此后每一轮的 `held` 是名册的 `current`，即上一轮作答的账号。「先用哪个账号」只由 `AccountRound::start` 回答（kernel D54），驱动方在发送之前把它答的账号 `select_account` 下去。 -/

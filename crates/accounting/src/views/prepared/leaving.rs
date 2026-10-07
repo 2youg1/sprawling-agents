@@ -5,21 +5,22 @@
 
 //! The reads a query leaves for after the view lock whose answer is not
 //! this city's own record: the person's settings file, this city's
-//! configuration ladder and first-run guide, the release registry, the
-//! doctor's upstream check and this machine's search path.
+//! first-run guide, the release registry, the doctor's upstream check
+//! and this machine's search path.
 //!
 //! Apart from `prepared`, which routes every read to the module that
 //! does it, because each of these answers a fact about how this city and
 //! this machine are set up rather than a line the Ledger holds: a file
-//! the person edits while the page is open, a ladder settled under a
-//! running city, a guide the next write would reset, a release published
+//! the person edits while the page is open, a guide the next write
+//! would reset, a release published
 //! since, a program installed into a search path. Each is read with the
 //! snapshot let go, and each decides its own refusal here, beside the
 //! read it belongs to - an unreadable file is not an empty one.
 //!
-//! `GithubLogin`, `McpHealth` and `Toolkits` are not here: each hands
-//! its whole answer to the module that owns it, so the routing match is
-//! already the only line those three need.
+//! `GithubLogin`, `McpHealth`, `Toolkits` and the provider questions
+//! (`Config`, `EndpointView`) are not here: each hands its whole answer
+//! to the module that owns it, so the routing match is already the only
+//! line those need.
 
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -47,17 +48,6 @@ impl Prepared {
         match crate::person::read() {
             Ok(settled) => wire::Answer::Preferences(Box::new(settled)),
             Err(_) => unavailable("Preferences".to_owned()),
-        }
-    }
-
-    /// The configuration ladder of one address.
-    ///
-    /// A ladder that cannot be read is "I could not look", not figures
-    /// nothing on disk states.
-    pub(super) fn config_answer(city_root: PathBuf, addr: Address) -> wire::Answer {
-        match crate::views::lines::config_answer(&city_root, &addr) {
-            Ok(answer) => wire::Answer::Config(Box::new(answer)),
-            Err(_) => unavailable(format!("Config({})", addr.as_str())),
         }
     }
 

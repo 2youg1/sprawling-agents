@@ -91,4 +91,4 @@ pub use transcript::{Transcript, TranscriptRecord};
 pub use turn::Admitted;
 pub use turn::ConcurrentInvoke;
 pub use turn::{Interrupt, NextCall, PhaseOutcome, Turn, TurnCancelled, TurnReport};
-pub use watchdog::{Disposal, FreezeReason, Watchdog};
+pub use watchdog::{Disposal, FreezeReason, Watchdog, backoff_ms};

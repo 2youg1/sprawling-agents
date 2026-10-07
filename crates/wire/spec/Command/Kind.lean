@@ -141,6 +141,7 @@ inductive Command where
   | ConfirmRemoteDoor
   | CloseRemoteDoor
   | PrivacyOperation
+  | ForgetSecret
   deriving DecidableEq, Repr
 
 /-- §19-1 的四个取值：城里谁该够得到一个动词。 -/
@@ -246,6 +247,8 @@ def Command.reach : Command → Reach
   | .CloseRemoteDoor => .client
   -- 改主机的一个隐私控制，或核对没有结论的那一次操作；执行者是城的监听（crates/wire/spec/Privacy.lean §8-89）
   | .PrivacyOperation => .client
+  -- 从 vault 删掉一个引用的 Key：载荷 `wire::SecretForgetting` 带 `reference: String`（`secret:realm/name`）与 `idem`。还有端点或配置在用它就拒，环境变量提供的拒并说要 unset 哪个（gateway D33）；不写账本。控件是账号编辑器移除账号之后的「同时删除 Key」（client D93）
+  | .ForgetSecret => .client
 
 /-! D6 动词类是 §19-2 的一列，由中继的穷尽匹配实现、门机器对照
 
@@ -303,6 +306,7 @@ def Command.verbClass : Command → VerbClass
   | .ConfirmRemoteDoor => .LocalOnly
   | .CloseRemoteDoor => .LocalOnly
   | .PrivacyOperation => .LocalOnly
+  | .ForgetSecret => .LocalOnly
 
 /-- **没有一个 Command 属 `Read`**：读城的是 `Ask` 与 `Monitor` 两种帧，不是命令（§19-3）。一行写成 `Read` 的命令就是一个改东西的动词被当成只读放进了城。 -/
 theorem no_command_is_a_read (c : Command) : c.verbClass ≠ .Read := by

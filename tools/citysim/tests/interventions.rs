@@ -110,6 +110,7 @@ fn two_wave_scenario(cancel: Option<CancelPoint>, steer: Option<(u32, String)>) 
             mcp: Vec::new(),
             effort: None,
             second_threshold: None,
+            search: kernel::config::SearchConfiguration::Default,
         },
         checkpoint: None,
         cancel,

@@ -270,6 +270,8 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 | 8-81 | `crates/wire/spec/Answer/DocumentBytes.lean` |
 | 8-82 | `crates/wire/spec/Answer/Find.lean` |
 | 8-84 | `crates/wire/spec/Preference.lean` |
+| 8-85 | `crates/wire/spec/Answer/Endpoints.lean` |
+| 8-86 | `crates/wire/spec/Answer/Config.lean` |
 | 8-87 | `crates/wire/spec/Privacy.lean` |
 | 8-88 | `crates/wire/spec/Privacy.lean` |
 | 8-89 | `crates/wire/spec/Privacy.lean` |
@@ -363,6 +365,7 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 | D46 | 采样节拍是 `Monitoring` 的第四个变体，按城记住 | `crates/wire/spec/Frames/Monitor.lean` |
 | D47 | `Answer::Unavailable` 带上没看成的原因 | `crates/wire/spec/Server.lean` |
 | D48 | 每个 shell 解释器的读数是一个查询，与 skill、MCP 的使用同一遍折叠 | `crates/wire/spec/Reading.lean` |
+| D49 | 设置页靠读回的 tuning 整份重发一次挂接，Key 状态按账号 id 答 | `crates/wire/spec/Answer/Endpoints.lean` |
 | D50 | 线上的值是主机读到的原样，页面原样送回作 expected | `crates/wire/spec/Privacy.lean` |
 | D51 | 没有「全部恢复」的帧：页面为每个仍拥有的控制各发一次 Restore | `crates/wire/spec/Privacy.lean` |
 -/

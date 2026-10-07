@@ -18,6 +18,7 @@
 //! way out, because a second spelling of one name is the defect
 //! `xtask lexicon` exists to catch.
 
+pub mod account_recovery;
 pub mod address;
 pub mod approval;
 pub mod backpressure;
@@ -78,7 +79,8 @@ pub use config::{McpServer, McpTransport, SecondThreshold};
 pub use delegation::{Delegate, DelegateKind, DelegationVerdict, Delegator, Depth};
 pub use discard::Restoration;
 pub use discard::{DenyReason, Discard, DiscardForecast, DiscardRequest, DiscardVerdict};
-pub use error::{AxCode, AxError, Carrier, ErrorDraft, GateRefusal, ProviderFailureKind, Retry};
+pub use error::{AccountDisposition, AxCode, AxError, Carrier, ErrorDraft, GateRefusal};
+pub use error::{ProviderFailureKind, Retry};
 pub use event::record::InputKinds;
 pub use event::{EventDraft, EventKind, EventRecord, EventRef, Payload};
 pub use event::{RunId, Seq, TimeMs, WindowClass};

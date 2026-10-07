@@ -20,9 +20,53 @@ release notes and their commits.
 
 ---
 
-## <!-- xtask:begin workspace_version -->0.0.10<!-- xtask:end --> INNOCENT
+## v0.0.10-Alpha-261007
 
-Prepared for Alpha 261005; this section describes source changes and is not a published tag. The workspace manifest owns the package version, `kernel::release::MATURITY` owns maturity, and the release workflow supplies the actual tag to a released binary. A checkout without that provenance continues to report `built from source`.
+**sprawling 0.0.10 innocent**
+
+Alpha, cut on 2026-10-07 (UTC) as `v0.0.10-Alpha-261007`. The workspace manifest carries <!-- xtask:begin workspace_version -->0.0.10<!-- xtask:end -->; `kernel::release::MATURITY` owns maturity, and the release workflow supplies the tag to a released binary. It records what landed after `v0.0.9-Alpha-261004`. The wire moved from WIRE_V 56 to 59, once for each push in which its shape changed (`crates/wire/Spec.lean` D1): 57 when a doctor report's sandbox arm gained `macos_seatbelt`, 58 when a provider endpoint began to carry an ordered account list, and 59 when the person's preferences gained the performance group and the release answer lost the Homebrew origin. `EVENT_LOG_V` stays at 2: a line written by 0.0.9 reads unchanged.
+
+**TODO (final session, before tagging):** if the R11 or R06 merges move `WIRE_V` past 59, give the final value above and name each further step; confirm `EVENT_LOG_V` is still 2 on the tagged tree.
+
+### Behaviour changes
+
+- `/clear` is removed. `/new` is the only verb that replaces the session in a room, and `/new --carry` brings the room's `Handoff.md`; branching is a separate feature and keeps `/fork`, the fork key on each entry and the mailbox's fork entry (`client/Spec.lean` D44).
+- There is no default per-run memory ceiling. A run's commands get one only when the person enters a number of bytes under Settings → Performance and chooses `[core] placement = "soft_shares"` ("soft with memory ceiling"); an empty field means no ceiling. All commands of one run share it; Windows jobs and delegated Linux cgroups enforce it, and macOS does not. When a command reaches the ceiling, or the ceiling could not be applied or read back, the command's result and the monitor and inspector terminals say so instead of passing silently (`crates/runtime/spec/Tools/Exec.lean` D95).
+- Action shortcuts that were single keys now hold the accelerator (Ctrl, or ⌘ on a Mac): Ctrl+Shift+F forks from the entry under the pointer (was `f`); Ctrl+Shift+Y, Ctrl+Shift+E and Ctrl+Shift+X answer the decide card that holds the focus (were `y`, `e` and `n`; refusing moved to X because Ctrl+N opens a browser window before the page hears it); Ctrl+\ changes how much of the city the page draws (was `\`); and Ctrl+/ opens the key list (was `?`). `/` stays a single key, because it only moves the focus into the box. A letter typed while the focus is outside the box therefore changes nothing (`client/src/core/keys.ts`).
+- The read-only view of an earlier session no longer draws a "continue from its end" button. Going on from an earlier session is a branch: use the fork key on one of its entries or the mailbox's fork entry.
+- sprawling is not distributed through Homebrew: no tap is published, and the update check recognises no Homebrew install. On macOS, install through npm, Bun, crates.io, the shell installer or the release archive.
+- **TODO (final session, R11):** one line pointing to Configuration below for the refusal of handwritten plaintext MCP credentials, once R11 is merged; otherwise delete this line.
+- **TODO (final session, FONT-SIZE):** "The default body size is 15 px instead of 14 px. The smallest accepted size stays 12 px and there is no upper bound." once that line is merged; otherwise delete this line.
+
+### Main input area and settings
+
+Before a session starts, the row under the text box holds three controls: the workspace chip, one model entry (provider, then model, with thinking beside it) and one permissions entry with two switches, the mode and the write limit. A control with nothing to choose is hidden. Once the session has a run, no control stays under the box; the model, effort, mode, write limit and, where a real restriction exists, the sandbox are recorded on the session's first message head. The placeholder names the agent the box speaks to and disappears as soon as the person types. Fork buttons stand at the end of their entry's own line and no longer cover text.
+
+Settings gains a Performance group: CPU placement (`none`, `soft`, `soft_shares`, `pinned`) and core priority (`raised`, `normal`), each with a note on what the platform does, and the per-run memory ceiling above. The values are kept in `[core]` of `~/.sprawling/config.toml` and apply after the city server restarts. Every settable field of the personal configuration and of a building's `CONFIG.toml` now records in its crate's specification either the control that edits it or the reason it has none, and `xtask wiring` turns red for a new field without that record.
+
+The client's stylesheet `client/src/theme.css` is now an entry that imports its parts from `client/src/theme/`, one part for each owner: the token tables, the light block and the person's choices, the surfaces, the motion vocabulary, the base layer, and the parts a screen owns.
+
+**TODO (final session, FONT-FACE):** the paragraph on the serif reading face Libron (Geist Mono stays the default; woff2 files with the OFL licence beside them, `docs/third-party.md` §4; no bundled CJK face) once that line is merged; otherwise delete this line.
+
+**TODO (final session, front-end split):** one paragraph on what a person can now replace, the replacement test that proves it, and where `docs/frontend-method.md` describes it, once the split is merged; otherwise delete this line.
+
+### Privacy
+
+`sprawling privacy status` prints the privacy history summary as one JSON line. It discloses a summary only after the live Windows identity matches the owner bound in the platform vault, and a missing, locked or mismatched binding is refused with its own recovery (`crates/sprawling/spec/Privacy/Cli.lean` D54).
+
+**TODO (final session, R06):** the paragraph on the optional Windows privacy controls in Settings (catalogue size, per-entry target, scope, recommended value and cost, apply and restore one entry at a time after confirmation, UAC for machine-scope writes, read-back with restore on mismatch, entries not written and why, privacy is not security, refused to a paired remote device), checked clause by clause against the merged page and `crates/sprawling/spec/Privacy*.lean`; otherwise delete this line.
+
+### Model providers and search
+
+A resident MCP connection over streamable HTTP whose session the server ended is dropped and reconnected (open, handshake, tool list) on the next dispatch; the failed call itself is returned, not sent again.
+
+A provider endpoint can list several accounts in order. The list order chooses the first account, and a Session stays on the account that first answered it, across reordering and restarts.
+
+**TODO (final session, R11):** the `insufficient_quota` paragraph and the "two or more accounts" paragraph from the R11 branch's CHANGELOG, moved here; otherwise delete this line.
+
+### Configuration
+
+**TODO (final session, R11):** the R11 branch's two Configuration paragraphs, verbatim: the refusal of a plaintext credential written by hand into an `[[mcp]]` row, and the `web_search` tool offered to every building that is not confidential. If R11 does not merge, delete this section.
 
 ### Execution and recovery
 
@@ -30,13 +74,37 @@ Linux host-command confinement explicitly requests a user namespace and refuses 
 
 Windows run jobs apply the selected processor affinity. JSONL preallocation reads scan the zero tail with bounded memory while preserving rejection of nonzero bytes after the tail; they do not skip that verification I/O. Skill audit execution binds results to the installed content digest, records unreachable services without claiming a successful audit, and observes shelves through the serving assembly.
 
+A provider refusal with status 429 whose structured error code (or, when the code is absent, its error type) is `insufficient_quota` is now its own failure kind, `quota`. It is no longer backed off and sent again until a Halt, because waiting does not restore a used-up quota: the run stops with the refusal, and the page says to add credit to the account or add another account. A 429 without that code is still a busy provider and is asked again. Each provider error also records whether the account it was sent on can still take the request (a rejected key, a used-up quota or a missing account credential cannot); the record omits this field when the answer is yes, so earlier Ledger lines are unchanged.
+
+A model provider registered with two or more accounts now uses them in the listed order for each model call. A rejected key, a used-up quota or a credential the vault does not hold moves the same request to the next account at once, and the history records a `watchdog_fired` line with action `switch` before the next call. A busy provider is asked again on the same account one or two times (the endpoint's `account_retries`, two when it is not set), then the next account takes the request. A request whose answer was lost is sent again only on its own account. When every account has failed, the run stops with `E_PROVIDER_ACCOUNTS_EXHAUSTED`, which names each account and the last failure it met. The next model call of the run starts on the account that answered last. An endpoint with one account behaves as before.
+
+Each provider on the settings page now folds an account editor under its row. It lists the accounts in their order with the state of each key (stored, missing, or read from an environment variable and therefore read-only), moves an account up or down, edits or removes it, and adds a new one; a key typed there goes straight to the vault under `secret:providers/<provider>.<account>`, and the page keeps only the reference the city answers with. Every change sends the whole list with the endpoint's tuning as the city read it back, so timeouts, headers and overrides set earlier are kept. A provider still attached with its one key says that saving an account replaces that key with the list. Removing an account whose key the vault holds leaves the key in the vault and offers "delete the key too" beside the list; that sends the new `ForgetSecret` command, which the city refuses while an endpoint, the city's `[search]` or a building's configuration still names the reference, and refuses for a key an environment variable supplies, naming the variable to unset.
+
+The providers group of the settings page now has a web search card below the provider card. It chooses between the default service (Exa, whose address the city reports), a custom list of MCP services with one of them in use, and no web search, and writes the city's own `[search]` table whole each time. Each listed service folds the same account editor the providers use; a service's keys are stored in the vault under `secret:search/<service>.<account>` and travel only in the header the account names. When a file nearer the hall states its own `[search]`, the card says so and leaves that file alone. A provider with two or more accounts also offers the number of retries on one account before the next account is tried (once or twice); while none is chosen the card shows the city's default.
+
 The existing container command path preserves the configured engine, encodes a single Podman entrypoint and refuses non-UTF8 arguments instead of changing them silently. Configuration, native-platform mechanisms and lifecycle guarantees are described in [operating](docs/operating.md#how-exec-is-confined) according to the shipped implementation.
+
+On Windows, explicitly selected native confinement (AppContainer with a Job Object) passes the six child-process regressions and the PowerShell and toolchain checks on disposable runners, and the MSVC toolchain is found outside the container. Windows still defaults to the copied working tree until `crates/runtime/spec/Tools/Exec/NativeWindows.lean` D59 is settled.
+
+### Configuration
+
+Behaviour change: a plaintext credential written by hand into an `[[mcp]]` row of `CONFIG.toml` is now refused when the file is read, with the same `E_CONFIG_INVALID` refusal the settings page already gave when writing that row. Before, the reader accepted such a row and started the server with the key, although the file is committed with the project. An `env` or `headers` value whose name reads as a credential, or whose value has a credential's shape, must be a `secret:realm/name` vault reference. An MCP url must be an absolute `http` or `https` address with a host, with no userinfo and no credential in a query parameter; a query or fragment that carries no credential is kept as written. To recover, store the key in the vault and write its reference where the key was.
+
+Every building that is not confidential now offers its runs a `web_search` tool. With no `[search]` table in `CONFIG.toml` the tool reaches Exa's hosted MCP service without an account, so the words a run searches for leave the machine to that service; `choice = "off"` under `[search]` removes the tool, and a confidential building never has it. A custom supplier is reached over MCP streamable HTTP only, its accounts are tried in their listed order, and a failing custom supplier is never replaced by Exa. A search does not stay on one account for the rest of a Session: each search starts from the first account whose key is stored.
 
 ### Distribution and verification
 
 Release archives keep ZIP with Deflate level 9, with archive suffixes and platform names taken from the shared platform table. Release validation uses the existing parallel CI entry point and its cache configuration. Manual release-workflow dispatch builds and checks artifacts without publishing GitHub releases, npm packages or crates, and does not invent release provenance.
 
 The repository Nix flake builds the browser client before Rust and includes the shipped skills and licences. The flake is the only Nix distribution path; sprawling is not submitted to nixpkgs. Windows resource generation reads Cargo package metadata for the product and file version. Build provenance, archive checksums and OS code signing are separate facts.
+
+The static Linux archive stays linked with musl-gcc, which produces a static PIE; cargo-zigbuild produced a binary without PIE, and its release build took 9-27 s longer on GitHub's hosted Ubuntu runner (`crates/sprawling/spec/Install.lean` D57). `rust-version` stays 1.97, and a nightly `msrv` job in `platforms.yml` builds the workspace with exactly that compiler.
+
+`ci.yml` runs the test suite in four slices balanced on measured nextest time, and checks before the slices start that every test belongs to exactly one of them; a run starts 16 jobs, 7 of them on Windows, where it started 31, 23 of them on Windows. On the Windows runners Cargo's home sits on the work drive, and the test archive links with rust-lld: on a warm cache its compile took 171 s and 194 s in two runs, against 201 s with link.exe, on GitHub's hosted Windows runner. A released binary is still linked with link.exe (`tools/xtask/Spec.lean` D27). A release is published only when every slice of its own `ci.yml` run passed, so a slice that failed, was cancelled or never started stops it.
+
+**TODO (final session, R02):** the wall-clock reading of a whole `ci.yml` run on the final tree with its machine class, and the fault-injection release run that shows a failed slice stopping publication; otherwise delete this line.
+
+Release builds generate an Arch Linux package from the archive and install it in an Arch container; the AUR is pushed only on a tag push with the `AUR_SSH_KEY` secret.
 
 ### Documentation and contribution rules
 
@@ -45,6 +113,15 @@ README now introduces the city, documents that carry work across Sessions, five 
 [LLM.md](LLM.md) introduces the project for another model; [wire](docs/wire.md) owns the protocol reference, [integrations](docs/integrations.md) owns ACP/MCP/CLI setup and [performance](docs/performance.md) owns monitoring and reproducible evaluation. Onboarding objectives and historical readings are not presented as measurements of this release.
 
 Contribution policy uses AGENTS as its single authority, distinguishes negative fixtures, fixed regressions and opt-in experiments, and requires matching English and Chinese issue/PR descriptions. The security policy states actual trust boundaries, private reporting, no bounty, optional credit by consent and next-release fixes without backports.
+
+**TODO (final session, R12):** one sentence on the rewritten README and LLM.md once they are written; otherwise delete this line.
+
+### Known and unfixed
+
+- Windows formal code signing is not done in this version; Windows Defender may quarantine the binary of a downloaded archive.
+- The performance readings of the four placement arms (R13) were not taken; the default `[core] placement = "soft"` is supported by the design, not by a reading.
+- The first message head breaks inside a Chinese fact when it wraps.
+- **TODO (final session, R06):** "Microsoft does not state whether most privacy policies apply on Windows Home; the page shows 'not stated' for those controls", with the count confirmed on the merged catalogue; otherwise delete this line.
 
 ---
 

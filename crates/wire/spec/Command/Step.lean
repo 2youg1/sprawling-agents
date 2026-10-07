@@ -80,16 +80,18 @@ pub struct RulesWrite { pub building: Address, pub base: String, pub body: Strin
 ```rust
 // Command
 ConfigureCity(CitySettings)
-pub struct CitySettings { pub keep_warm: Option<KeepWarm>, pub effort: Option<Effort>, pub idem: IdemKey }
+pub struct CitySettings { pub keep_warm: Option<KeepWarm>, pub effort: Option<Effort>,
+                          pub search: Option<kernel::config::SearchConfiguration>, pub idem: IdemKey }
 // PreferencePatch 多一臂
 CorePriority(CorePriority)                 // {"core_priority":"raised"} | {"core_priority":"normal"}
 pub enum CorePriority { Raised, Normal }   // 值集与拼法住这里，accounting::person 读写 `[core] priority` 用的就是它
 ```
 
-- **城那一层，两个键。** `ConfigureCity` 写城自己那份 `CONFIG.toml`（`<city>/.sprawling/CONFIG.toml`）：`keep_warm` 写 `[cache] keep_warm`，`effort` 写 `[model] effort`；`None` 不动那一项。城那一层从梯子的最远一端说话，楼与房间各自的一层照旧压过它（`crates/city/Spec.lean` §8-4）。`ConfigureBuilding` 不改：它的地址就是它写的楼，城那一层没有地址可写，所以是另一条帧，而不是 `ConfigureBuilding` 收一个特殊地址。
+- **城那一层，三项。** `ConfigureCity` 写城自己那份 `CONFIG.toml`（`<city>/.sprawling/CONFIG.toml`）：`keep_warm` 写 `[cache] keep_warm`，`effort` 写 `[model] effort`，`search` 整值写 `[search]`（`city::write_search`，`crates/city/spec/ConfigLayers.lean` §8-4c）；`None` 不动那一项。`search` 先写：它是三项里唯一会因内容被拒的一项（明文凭据、非法 url、`selected` 不在列表里），先判它，一次被拒的保存就什么都不落；拒词是城的 `E_CONFIG_INVALID`，页面留着草稿。城那一层从梯子的最远一端说话，楼与房间各自的一层照旧压过它（`crates/city/Spec.lean` §8-4）。`ConfigureBuilding` 不改：它的地址就是它写的楼，城那一层没有地址可写，所以是另一条帧，而不是 `ConfigureBuilding` 收一个特殊地址。
 - **账上一行。** 写成之后城记一行 `rules_changed { scope: city, which: "CONFIG.toml", … }`，与派活前核对城配置的那一行同形。
 - **核心优先级是这个人自己那一层。** `CorePriority` 进 `PreferencePatch`，所以经已有的 `PutPreferences` 写，落在 `~/.sprawling/config.toml` 的 `[core] priority`——那是它一直住的地方（`crates/sprawling/Spec.lean` §8-93），不在 `[ui]` 里，所以 `PreferencesAnswer` 不带它；页面从 `Query::Doctor` 的核心一项读到它此刻的效果。写下之后，下一次 `serve` 起线程时读它。
-- 验收：city 的 `a_city_setting_lands_in_the_city_layer_and_the_rooms_read_it`（城层写 `keep_warm` 之后，一间没有说话的房间读到 `FiveMinute`；写 `effort` 之后梯子答它来自城那一层）；accounting 的 `the_core_priority_lands_in_its_own_section_and_reads_back`。
+- **`search` 是一个改形**：`CitySettings` 名字不变而多一个字段，`WIRE_V` 随 §8-85、§8-86 同一次进位（D1）。
+- 验收：city 的 `a_city_setting_lands_in_the_city_layer_and_the_rooms_read_it`（城层写 `keep_warm` 之后，一间没有说话的房间读到 `FiveMinute`；写 `effort` 之后梯子答它来自城那一层）；accounting 的 `the_core_priority_lands_in_its_own_section_and_reads_back`；accounting 的 `a_city_search_setting_lands_in_the_city_layer_and_reads_back`（`ConfigureCity` 带 `search` 写下城一级，`Query::Config` 读回生效值与城的值）与 `a_refused_search_setting_writes_nothing`（`selected` 不在列表里时整帧被拒，旁边的 `keep_warm` 也不落）。
 -/
 
 /-!

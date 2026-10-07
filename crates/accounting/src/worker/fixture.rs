@@ -21,8 +21,8 @@ mod provider;
 // one fixture module and not two.
 #[cfg(test)]
 pub(super) use provider::{
-    FirstChat, Pace, completion, completion_with, fake_openai, fake_openai_paced,
-    fake_openai_routed, fake_openai_routed_with,
+    FakeProvider, FirstChat, Pace, Reply, completion, completion_with, fake_openai,
+    fake_openai_keyed, fake_openai_paced, fake_openai_routed, fake_openai_routed_with,
 };
 
 /// A worker with one endpoint attached and one model chosen, exactly

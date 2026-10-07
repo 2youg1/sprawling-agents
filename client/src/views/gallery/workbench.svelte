@@ -28,6 +28,7 @@
   import type { Answer, Call, CityAnswer, CommitAnswer, EndpointsAnswer, EventKind, EventRecord, Opening, PrefixSlot, Query, Turn } from "../../wire";
   import { Address, B3Hash, GitOid, RunId, Seq, TimeMs, Tokens, UsdMicros, Window } from "../../wire";
   import { pickCommit } from "../world/chosen.svelte";
+  import { SEARCH, UNTUNED } from "./configured";
 
   export const ROOM = Address.make("lab/room1");
   const MODEL = "anthropic/claude-fable-5.1";
@@ -181,6 +182,8 @@
           },
         ],
         name: "zenmux",
+        tuning: UNTUNED,
+        account_status: [],
       },
     ],
   };
@@ -224,7 +227,8 @@
           addr: query.config.addr,
           first: 30,
           second: { percent: 65, domain: { min: 31, max: 90 }, from: "city" },
-          tuning: { from: "default", proxying: "except_local", timeout_ms: 600_000 },
+          tuning: { from: "default", proxying: "except_local", timeout_ms: 600_000, account_retries: "two" },
+          search: SEARCH,
         },
       };
     }

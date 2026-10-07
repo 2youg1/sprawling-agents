@@ -8,6 +8,8 @@
 // cannot spell a secret; what comes back is the reference to put in
 // the attach form, and the value itself is never held past the send.
 
+import type { Command } from "../wire";
+import { mintIdem } from "./idem";
 import type { Lang } from "./lang";
 import { say } from "./lang";
 import { bearing } from "./socket";
@@ -35,8 +37,8 @@ export function enrol(at: Enrolling): Promise<Enrolment> {
     method: "POST",
     headers: { "content-type": "application/json", ...bearing(token) },
     body: JSON.stringify({ realm, name, value }),
-  }).then(
-    (response) =>
+  })
+    .then((response) =>
       // **The reference comes back from the city, never from here.**
       // `kernel::SecretRef` is the grammar of a vault place and the
       // route answers 201 with the text it parsed, so a realm or a
@@ -50,11 +52,15 @@ export function enrol(at: Enrolling): Promise<Enrolment> {
               reason: said === "" ? say(lang, "enrol_city_said_nothing") : said,
             },
       ),
-    (): Enrolment => ({
-      kind: "refused",
-      reason: say(lang, "enrol_unreachable"),
-    }),
-  );
+    )
+    // A body that broke off half read is the same answer as no answer:
+    // the caller is told once, and nothing is left rejecting unheard.
+    .catch(
+      (): Enrolment => ({
+        kind: "refused",
+        reason: say(lang, "enrol_unreachable"),
+      }),
+    );
 }
 
 // Where one key is filed in the vault.
@@ -69,11 +75,36 @@ export interface SecretAt {
 // form shows and the command that carries the reference have to mean
 // the same place.
 const PROVIDERS = "providers";
+// The realm a web search supplier's account keys are filed under, apart
+// from the providers', so a supplier and a provider that share an id
+// never share a key.
+const SEARCH = "search";
 
-// The realm and name a provider's key is filed under: one key per
-// provider, named after it, so the reference reads as what it is.
-export function referenceFor(provider: string): SecretAt {
-  return { realm: PROVIDERS, name: provider };
+// The realm and name a provider's key is filed under, so the reference
+// reads as what it is: `<provider>` for the one key an endpoint was
+// attached with, `<provider>.<account>` for one of its accounts. An
+// account id is a `ServerLabel`, which has no `.`, so the last `.` of
+// the name always splits it back into the two ids.
+export function referenceFor(provider: string, account?: string): SecretAt {
+  return { realm: PROVIDERS, name: account === undefined ? provider : accountName(provider, account) };
+}
+
+// The realm and name one account of a search supplier files its key
+// under: `<supplier>.<account>`, by the same rule as a provider's.
+export function searchReferenceFor(supplier: string, account: string): SecretAt {
+  return { realm: SEARCH, name: accountName(supplier, account) };
+}
+
+function accountName(owner: string, account: string): string {
+  return `${owner}.${account}`;
+}
+
+// The vault's other door: the value filed under `reference` deleted. It
+// is a command rather than a route because it carries no secret; the
+// city refuses it while an endpoint or a configuration still names the
+// reference, and for a key the environment supplies (gateway D33).
+export function forgetSecret(reference: string): Command {
+  return { forget_secret: { reference, idem: mintIdem() } };
 }
 
 // How a place in the vault is spelled, in the one grammar

@@ -66,7 +66,8 @@ pub use building::{ArchiveLine, BlockedLine, BuildingAnswer, BuildingDoc};
 pub use building::{BuildingProgress, PlanRow, PursuitLine};
 pub use commits::{CommitAnswer, CommitAt, CommitsAnswer};
 pub use config::{
-    ConfigAnswer, ConfigLayer, SecondDomain, SettledEffort, SettledSecond, TuningDefaults,
+    ConfigAnswer, ConfigLayer, SecondDomain, SettledEffort, SettledSearch, SettledSecond,
+    SupplierAccounts, TuningDefaults,
 };
 pub use cost::{CostAnswer, UnpricedCalls};
 pub use cost_of::{CostOfAnswer, RUN_COSTS_MAX, RunCostsAnswer};
@@ -79,7 +80,7 @@ pub use doctor::{DoctorSandboxMissing, SandboxArm};
 pub use document::{Coverage, DocumentAnswer, DocumentBody, DocumentState, HeldDocument};
 pub use document_bytes::{BYTES_WINDOW_MAX, BytesAnswer, ExportAnswer};
 pub use document_versions::{DocumentVersion, VERSIONS_MAX, VersionSource, VersionsAnswer};
-pub use endpoints::{ChosenSummary, EndpointSummary, EndpointsAnswer};
+pub use endpoints::{AccountStatus, ChosenSummary, EndpointSummary, EndpointsAnswer, KeyState};
 pub use evidence::{EvidenceAnswer, EvidenceItem, EvidenceKind, Picture};
 pub use find::{FIND_MAX, FIND_WALK_MAX, FindAnswer, Walked};
 pub use git_status::{Drift, GitStatusAnswer};

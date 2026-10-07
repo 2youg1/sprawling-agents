@@ -71,6 +71,7 @@ pub fn adapter_for(
         endpoint.gated(chosen.transport, monotonic).with_accounts(
             chosen.endpoint.name.clone(),
             chosen.endpoint.account_auths()?,
+            tuning.account_retries(),
         ),
     ))
 }
@@ -193,6 +194,94 @@ mod tests {
         assert_eq!(body["stream"], serde_json::Value::Bool(true), "{body}");
         assert_eq!(said.borrow().as_slice(), ["on ", "it"]);
         assert_eq!(ret.stop, Some(kernel::StopReason::EndTurn));
+    }
+
+    /// The adapter answers its accounts in the order the person listed
+    /// them, says which can be redeemed without handing over a key, carries
+    /// the per-account retry figure, and moves only to a listed account.
+    #[test]
+    fn the_adapter_answers_its_roster_and_selects_only_listed_accounts() {
+        let reference = |name: &str| {
+            kernel::SecretRef::parse(&format!("secret:providers/house.{name}")).unwrap()
+        };
+        let account = |name: &str| kernel::event::record::ProviderAccount {
+            id: kernel::ServerLabel::parse(name).unwrap(),
+            reference: Some(reference(name)),
+            header: None,
+        };
+        let endpoint = AttachedEndpoint {
+            name: "house".to_owned(),
+            base_url: "https://api.example.test/v1".to_owned(),
+            dialect: ConnectionKind::OpenAiCompat.wire(),
+            connection_kind: ConnectionKind::OpenAiCompat,
+            auth: AuthSpec::None,
+            models: Vec::new(),
+            probed: false,
+            tuning: EndpointTuning {
+                accounts: Some(vec![account("a"), account("b")]),
+                account_retries: Some(kernel::account_recovery::AccountRetries::One),
+                ..EndpointTuning::default()
+            },
+        };
+        let entry = crate::market::MarketSnapshot::builtin()
+            .unwrap()
+            .lookup("local")
+            .unwrap()
+            .clone();
+        let transport = crate::endpoint::Transport::default();
+        let missing = reference("a");
+        let redemption = Redemption::new(
+            Box::new(move |asked: &kernel::SecretRef| {
+                if *asked == missing {
+                    Err(kernel::AxError::failure(
+                        kernel::AxCode::CredentialMissing,
+                        "resolve credential",
+                        asked.to_string(),
+                    )
+                    .with_recovery("store the credential"))
+                } else {
+                    Ok(kernel::Sealed::new(Box::new("held".to_owned())))
+                }
+            }),
+            std::sync::Arc::new(|_at: &kernel::Locator| Ok(Vec::new())),
+        );
+        let mut model = adapter_for(
+            &Chosen {
+                endpoint: &endpoint,
+                entry: &entry,
+                transport: &transport,
+            },
+            redemption,
+            Vec::new(),
+            crate::endpoint::fakes::monotonic,
+        )
+        .unwrap();
+        let label = |name: &str| kernel::ServerLabel::parse(name).unwrap();
+        assert_eq!(
+            model.account_roster(),
+            Some(kernel::model::AccountRoster {
+                provider: "house".to_owned(),
+                accounts: vec![
+                    kernel::model::RosterEntry {
+                        account: label("a"),
+                        usable: false,
+                    },
+                    kernel::model::RosterEntry {
+                        account: label("b"),
+                        usable: true,
+                    },
+                ],
+                current: label("a"),
+                retries: kernel::account_recovery::AccountRetries::One,
+            })
+        );
+        model.select_account(&label("b"));
+        model.select_account(&label("stranger"));
+        assert_eq!(
+            model.provider_account().map(|binding| binding.account),
+            Some(label("b")),
+            "a name outside the roster leaves the selection where it was"
+        );
     }
 
     /// A loopback server that keeps each connection open, answers

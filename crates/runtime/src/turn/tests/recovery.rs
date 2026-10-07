@@ -39,7 +39,7 @@ impl Segment for Scripted<'_> {
     }
 }
 
-fn wire_mismatch() -> AxError {
+pub(super) fn wire_mismatch() -> AxError {
     AxError::failure(
         AxCode::WireMismatch,
         "translate wire",
@@ -48,7 +48,7 @@ fn wire_mismatch() -> AxError {
     .with_recovery("check that the endpoint's dialect matches the provider")
 }
 
-fn provider_wobble() -> AxError {
+pub(super) fn provider_wobble() -> AxError {
     AxError::failure(
         AxCode::Provider,
         "call provider",
@@ -68,7 +68,7 @@ fn request() -> ModelRequest<'static> {
     }
 }
 
-fn model_return() -> ModelReturn {
+pub(super) fn model_return() -> ModelReturn {
     ModelReturn::bare(
         kernel::model::message_payload(&[ContentBlock::Text {
             text: "recovered".to_owned(),

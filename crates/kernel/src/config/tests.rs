@@ -14,14 +14,10 @@ fn lower_layer_overrides_upper() {
         resident: None,
     };
     assert_eq!(
-        freeze(
-            &ladder,
-            &LayeredValue::default(),
-            &LayeredValue::default(),
-            &LayeredValue::default(),
-            &LayeredValue::default(),
-            &LayeredValue::default(),
-        )
+        freeze(&StatedConfig {
+            clock_stamp: ladder,
+            ..StatedConfig::default()
+        })
         .clock_stamp,
         ClockStampGranularity::Minute
     );
@@ -31,14 +27,10 @@ fn lower_layer_overrides_upper() {
         resident: Some(ClockStampGranularity::FiveMinute),
     };
     assert_eq!(
-        freeze(
-            &ladder,
-            &LayeredValue::default(),
-            &LayeredValue::default(),
-            &LayeredValue::default(),
-            &LayeredValue::default(),
-            &LayeredValue::default(),
-        )
+        freeze(&StatedConfig {
+            clock_stamp: ladder,
+            ..StatedConfig::default()
+        })
         .clock_stamp,
         ClockStampGranularity::FiveMinute
     );
@@ -47,14 +39,10 @@ fn lower_layer_overrides_upper() {
 #[test]
 fn absence_everywhere_takes_the_policy_default() {
     let ladder: LayeredValue<ClockStampGranularity> = LayeredValue::default();
-    let frozen = freeze(
-        &ladder,
-        &LayeredValue::default(),
-        &LayeredValue::default(),
-        &LayeredValue::default(),
-        &LayeredValue::default(),
-        &LayeredValue::default(),
-    );
+    let frozen = freeze(&StatedConfig {
+        clock_stamp: ladder,
+        ..StatedConfig::default()
+    });
     assert_eq!(frozen.clock_stamp, CLOCK_STAMP_DEFAULT);
     assert_eq!(frozen.clock_stamp, ClockStampGranularity::Minute);
     assert!(frozen.clock_zones.is_empty());
@@ -71,14 +59,10 @@ fn effort_resolves_down_the_same_ladder() {
         building: Some(Effort::Max),
         resident: None,
     };
-    let frozen = freeze(
-        &LayeredValue::default(),
-        &LayeredValue::default(),
-        &effort,
-        &LayeredValue::default(),
-        &LayeredValue::default(),
-        &LayeredValue::default(),
-    );
+    let frozen = freeze(&StatedConfig {
+        effort,
+        ..StatedConfig::default()
+    });
     assert_eq!(frozen.effort, Some(Effort::Max));
 }
 
@@ -103,14 +87,10 @@ fn the_sandbox_resolves_as_one_value_so_a_thin_layer_only_narrows() {
         building: Some(terse),
         resident: None,
     };
-    let frozen = freeze(
-        &LayeredValue::default(),
-        &LayeredValue::default(),
-        &LayeredValue::default(),
-        &ladder,
-        &LayeredValue::default(),
-        &LayeredValue::default(),
-    );
+    let frozen = freeze(&StatedConfig {
+        sandbox: ladder,
+        ..StatedConfig::default()
+    });
     assert_eq!(frozen.sandbox.fuel, 20);
     assert!(
         !frozen.sandbox.shell,
@@ -122,14 +102,7 @@ fn the_sandbox_resolves_as_one_value_so_a_thin_layer_only_narrows() {
 
 #[test]
 fn an_unstated_sandbox_is_closed_with_the_default_fuel() {
-    let frozen = freeze(
-        &LayeredValue::default(),
-        &LayeredValue::default(),
-        &LayeredValue::default(),
-        &LayeredValue::default(),
-        &LayeredValue::default(),
-        &LayeredValue::default(),
-    );
+    let frozen = freeze(&StatedConfig::default());
     assert!(!frozen.sandbox.shell);
     assert_eq!(
         frozen.sandbox.fuel,
@@ -157,14 +130,10 @@ fn zones_override_as_a_whole_list() {
         }]),
         resident: None,
     };
-    let frozen = freeze(
-        &LayeredValue::default(),
-        &zones,
-        &LayeredValue::default(),
-        &LayeredValue::default(),
-        &LayeredValue::default(),
-        &LayeredValue::default(),
-    );
+    let frozen = freeze(&StatedConfig {
+        clock_zones: zones,
+        ..StatedConfig::default()
+    });
     assert_eq!(frozen.clock_zones.len(), 1);
     assert_eq!(frozen.clock_zones[0].id, "nyc");
 }
@@ -184,25 +153,14 @@ fn servers_override_as_a_whole_table_and_silence_reaches_nothing() {
         building: Some(vec![server("apps")]),
         resident: None,
     };
-    let frozen = freeze(
-        &LayeredValue::default(),
-        &LayeredValue::default(),
-        &LayeredValue::default(),
-        &LayeredValue::default(),
-        &ladder,
-        &LayeredValue::default(),
-    );
+    let frozen = freeze(&StatedConfig {
+        mcp: ladder,
+        ..StatedConfig::default()
+    });
     assert_eq!(frozen.mcp.len(), 1);
     assert_eq!(frozen.mcp[0].label.as_str(), "apps");
 
-    let silent = freeze(
-        &LayeredValue::default(),
-        &LayeredValue::default(),
-        &LayeredValue::default(),
-        &LayeredValue::default(),
-        &LayeredValue::default(),
-        &LayeredValue::default(),
-    );
+    let silent = freeze(&StatedConfig::default());
     assert!(
         silent.mcp.is_empty(),
         "a building nobody granted a server reaches none of them"
@@ -218,6 +176,7 @@ fn frozen_and_live_share_no_field() {
         effort: None,
         mcp: Vec::new(),
         second_threshold: None,
+        search: SearchConfiguration::Default,
     })
     .unwrap();
     let live = serde_json::to_value(LiveConfig {}).unwrap();
@@ -281,24 +240,13 @@ fn the_second_rung_resolves_down_the_same_ladder() {
         building: None,
         resident: Some(stated),
     };
-    let frozen = freeze(
-        &LayeredValue::default(),
-        &LayeredValue::default(),
-        &LayeredValue::default(),
-        &LayeredValue::default(),
-        &LayeredValue::default(),
-        &ladder,
-    );
+    let frozen = freeze(&StatedConfig {
+        second_threshold: ladder,
+        ..StatedConfig::default()
+    });
     assert_eq!(frozen.second_threshold, Some(stated));
 
-    let silent = freeze(
-        &LayeredValue::default(),
-        &LayeredValue::default(),
-        &LayeredValue::default(),
-        &LayeredValue::default(),
-        &LayeredValue::default(),
-        &LayeredValue::default(),
-    );
+    let silent = freeze(&StatedConfig::default());
     assert_eq!(
         silent.second_threshold, None,
         "no layer speaking is a fact, not a default: the rung falls back where it is read"
@@ -333,14 +281,10 @@ fn the_declared_environment_names_ride_the_same_whole_value_ladder_as_mounts() {
         building: Some(SandboxLimits::default()),
         resident: None,
     };
-    let frozen = freeze(
-        &LayeredValue::default(),
-        &LayeredValue::default(),
-        &LayeredValue::default(),
-        &ladder,
-        &LayeredValue::default(),
-        &LayeredValue::default(),
-    );
+    let frozen = freeze(&StatedConfig {
+        sandbox: ladder,
+        ..StatedConfig::default()
+    });
     assert!(
         frozen.sandbox.env_passthrough.is_empty(),
         "a layer that speaks about the sandbox speaks about all of it"

@@ -103,6 +103,14 @@ pub enum FiredAction {
         code: String,
         subject: String,
     },
+    /// The same call goes out at once on another account of the
+    /// provider, because of the failure whose stable code and subject are
+    /// named here (`crates/kernel/spec/AccountRecovery.lean` §8-86).
+    Switch {
+        to: crate::ServerLabel,
+        code: String,
+        subject: String,
+    },
     /// The run was frozen.
     Freeze { reason: String },
 }

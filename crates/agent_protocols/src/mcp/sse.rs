@@ -40,7 +40,7 @@ use std::time::Duration;
 
 use kernel::{AxCode, AxError, TimeoutMs};
 
-use super::http::{WholeRequest, client_for};
+use super::http::{WholeRequest, client_for, standing};
 use super::reading::answer_unread;
 use super::redeeming::{Redeemed, redeem};
 use super::{Received, read_one_message};
@@ -314,10 +314,13 @@ fn silent(url: &str) -> AxError {
 
 fn refused(url: &str, status: u16) -> AxError {
     if status == 401 || status == 403 {
-        return AxError::failure(
-            AxCode::CredentialMissing,
-            "reach an mcp server",
-            format!("{url}: the server answered {status}"),
+        return standing(
+            status,
+            AxError::failure(
+                AxCode::CredentialMissing,
+                "reach an mcp server",
+                format!("{url}: the server answered {status}"),
+            ),
         )
         .with_recovery(
             "this server wants an account; store its key in the vault and name it in `headers`, \
@@ -326,10 +329,13 @@ fn refused(url: &str, status: u16) -> AxError {
     }
     // The body is not quoted: a server's error page is other people's
     // text and this refusal is read by a person.
-    AxError::failure(
-        AxCode::ToolUnavailable,
-        "reach an mcp server",
-        format!("{url}: the server answered {status}"),
+    standing(
+        status,
+        AxError::failure(
+            AxCode::ToolUnavailable,
+            "reach an mcp server",
+            format!("{url}: the server answered {status}"),
+        ),
     )
     .with_recovery("check the url and the headers this building configured")
 }

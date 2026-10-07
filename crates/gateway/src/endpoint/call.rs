@@ -174,11 +174,11 @@ impl Endpoint {
     ) -> Result<reqwest::blocking::RequestBuilder, AxError> {
         let mut request = match &self.config.auth {
             AuthSpec::Bearer(reference) => {
-                let sealed = (self.redemption.secrets)(reference)?;
+                let sealed = self.redemption.account_credential(reference)?;
                 request.header("authorization", format!("Bearer {}", sealed.expose()))
             }
             AuthSpec::Header { name, value } => {
-                let sealed = (self.redemption.secrets)(value)?;
+                let sealed = self.redemption.account_credential(value)?;
                 request.header(name, sealed.expose().as_str())
             }
             AuthSpec::None => request,

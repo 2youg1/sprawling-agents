@@ -18,7 +18,7 @@ use crate::command::shelf::Shelf;
 use crate::command::step::{
     Carry, CitySettings, DoorAnswer, DoorOpening, DoorStep, GovernedDocument, HaltScope,
     IdentityCard, PolicyChange, ProposalDecisions, PursuitStep, RangeWrite, RulesWrite,
-    SessionNaming, SpineDocument,
+    SecretForgetting, SessionNaming, SpineDocument,
 };
 use crate::command::tuning::EndpointTuning;
 use crate::guide::GuideProgress;
@@ -170,11 +170,9 @@ pub enum Command<Secret = Sealed<String>> {
         template: TemplateName,
         idem: IdemKey,
     },
-    /// Take a building out of the city. Its files move under the
-    /// reserved subtree and its history stays in the Ledger, so nothing
-    /// the person made is lost; a building with a run going is refused.
-    ///
-    /// Writes `building_removed`.
+    /// Take a building out of the city. Its files move under the reserved subtree and its history
+    /// stays in the Ledger, so nothing the person made is lost; a building with a run going is
+    /// refused. Writes `building_removed`.
     RemoveBuilding {
         addr: Address,
         idem: IdemKey,
@@ -387,6 +385,8 @@ pub enum Command<Secret = Sealed<String>> {
     ConfirmRemoteDoor(DoorAnswer),
     CloseRemoteDoor(DoorStep),
     PrivacyOperation(crate::PrivacyRequest),
+    /// Deletes the vault's value of one reference ([`SecretForgetting`]).
+    ForgetSecret(SecretForgetting),
     /// Presenting a pairing token. Read-only, hence no `IdemKey`; the token is plain here because a
     /// token that must cross a wire has, by definition, no secrecy left to protect in transit - it
     /// is sealed the moment it lands (see `server::decide_handshake`).

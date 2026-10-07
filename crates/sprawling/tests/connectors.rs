@@ -116,6 +116,9 @@ impl accounting::Connectors for Scripted {
         };
         Ok((tools, accounting::Reached::Connected(opened)))
     }
+
+    /// Keeps no connection, so there is nothing a new key makes stale.
+    fn invalidate(&self, _reference: &kernel::SecretRef) {}
 }
 
 /// A loopback address nothing listens on: bound once for a free port,
@@ -260,6 +263,9 @@ impl accounting::Connectors for Answering {
         };
         Ok((tools, accounting::Reached::Connected(opened)))
     }
+
+    /// Keeps no connection, so there is nothing a new key makes stale.
+    fn invalidate(&self, _reference: &kernel::SecretRef) {}
 }
 
 /// Calls the offered tool once, then records what it read back.

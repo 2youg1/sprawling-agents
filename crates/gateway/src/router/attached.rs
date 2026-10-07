@@ -102,9 +102,20 @@ impl AttachedEndpoint {
     /// a settings page needs.
     #[must_use]
     pub fn has_credential(&self) -> bool {
+        !self.references().is_empty()
+    }
+
+    /// Every vault reference this registration calls with: each listed
+    /// account's, or the legacy credential's while it lists none. The one
+    /// answer to which keys an endpoint still needs (gateway D33).
+    #[must_use]
+    pub fn references(&self) -> Vec<&kernel::SecretRef> {
         match &self.tuning.accounts {
-            Some(accounts) => accounts.iter().any(|account| account.reference.is_some()),
-            None => auth_reference(&self.auth).is_some(),
+            Some(accounts) => accounts
+                .iter()
+                .filter_map(|account| account.reference.as_ref())
+                .collect(),
+            None => auth_reference(&self.auth).into_iter().collect(),
         }
     }
 

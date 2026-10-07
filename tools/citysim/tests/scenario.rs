@@ -42,6 +42,7 @@ fn quiet_config() -> FrozenConfig {
         mcp: Vec::new(),
         effort: None,
         second_threshold: None,
+        search: kernel::config::SearchConfiguration::Default,
     }
 }
 
@@ -438,6 +439,7 @@ fn s3_14_one_resident_closes_the_loop_through_the_real_adapters() {
             mcp: Vec::new(),
             effort: None,
             second_threshold: None,
+            search: kernel::config::SearchConfiguration::Default,
         },
         // The real net over the real tree: a checkpoint before every wave.
         checkpoint: Some((

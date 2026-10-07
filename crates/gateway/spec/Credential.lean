@@ -45,6 +45,7 @@ impl Custodian {
                                     // 持 Sealed 者恒密封直至线上；PutSecret 命令在自己边界内转 Zeroizing。
     pub fn resolve(&self, reference: &SecretRef) -> Result<Sealed<String>, AxError>;   // 未命中→E_CREDENTIAL_MISSING；恒不跨操作缓存
     pub fn describe(&self, reference: &SecretRef) -> Described;                        // 恒不返回值
+    pub fn forget(&mut self, reference: &SecretRef) -> Result<(), AxError>;            // 遮蔽即拒（D33）；库里本就没有不算错
     pub fn persistence(&self) -> Persistence;                                          // 等于 custody().persistence
 }
 ```
@@ -85,6 +86,11 @@ impl Custodian {
 /-! D24 一个凭证环境变量的值不是 Unicode 时，它是一个点名变量的配置错，不是「没配过」
 
 决定：`EnvReader` 答 `std::env::var` 自己的 `Result<String, VarError>`。值不是 Unicode 的变量照样算设了：它遮住金库，所以 `set` 照遮蔽拒绝；`resolve` 以 `E_CONFIG_INVALID` 拒，主题是「`<变量名>` is set to a value that is not Unicode」，恢复语叫人把这个变量设成 key 的文本，或取消它让金库作答；`describe` 报来源是这个环境变量、`configured` 为假、不可写，与 `resolve` 的答案一致。空值与没设照旧让金库作答。理由：读取器原来是 `std::env::var(key).ok()`，把「设了却读不出」与「没设」并成一个 `None`，于是金库里的旧 key 静默作答，或者人读到「请存这个凭证」，而他明明设了变量。被否：①读不出时当没设——就是旧的读法；②有损地转成字符串再用——发给 provider 的就不是人给的 key。三个平台：不是 Unicode 的值在 macOS 与 Linux 上是不合法的 UTF-8 字节，在 Windows 上是落单的代理项，`std::env::var` 在三处都答 `VarError::NotUnicode`，所以三处拒得一样。
+-/
+
+/-! D33 删一把 Key 只删库里那一份，环境变量提供的 Key 拒删并说要 unset 哪个变量
+
+决定：`Custodian::forget(reference)` 先问与 `set` 同一个遮蔽判定（`shaded`，一处定义）：这个引用的环境变量设了（非空，或不是 Unicode，D24），就以 `E_CONFIG_INVALID` 拒，动作是 `forget credential`，主题点名引用与变量名，恢复语叫人在城启动的环境里 unset 这个变量；城不改自己的环境。没有遮蔽时交给后端的 `delete`：三家后端对一个本就没有的条目都答成功（平台服务的 `NoEntry`、内存表、加密文件），所以连按两次「删除」与删一个从没存过的 Key 都不是错。「还有登记在用这把 Key」不在本模块判：本模块不知道城里谁在用哪个引用，那是持有端点簿与配置梯子的执行者的事（`crates/accounting/spec/Worker.lean` §8-37）；端点这一侧的答案是 `AttachedEndpoint::references()`——列了账号时是每个账号的引用，没列时是旧的单个凭据的引用，`has_credential` 读的也是它，「这个端点用哪些 Key」只有这一处。理由：删掉库里那一份而环境变量照旧作答，人读到「已删除」而 provider 照收这个 Key，比拒绝更糟。被否：①遮蔽时照删库里那一份并报成功——同上；②删一个不存在的条目报 `E_CREDENTIAL_MISSING`——页面在删之前已经读过 Key 的状态，两次之间别处删掉了它，人要的结果已经成立。三个平台：遮蔽判定读进程环境，与平台无关；`delete` 在 Windows 凭据管理器、macOS 钥匙串、Linux 内核 keyring 上都把「没有这一项」读成 `NoEntry` 并答成功。
 -/
 
 /-! D31 隐私 owner 的只读核对在 Vault 内完成

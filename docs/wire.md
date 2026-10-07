@@ -72,10 +72,10 @@ again. A successful repeat does not replay the original events; a repeat
 whose refusal is still remembered returns that refusal. An ask changes nothing.
 
 Commands, every one the city accepts, generated from the wire schema by
-`cargo xtask docnum` (<!-- xtask:begin command_frames -->43<!-- xtask:end --> in all):
+`cargo xtask docnum` (<!-- xtask:begin command_frames -->44<!-- xtask:end --> in all):
 
 <!-- xtask:begin command_names -->
-`dispatch`, `probe_endpoint`, `configure_building`, `attach_endpoint`, `select_model`, `open_session`, `create_building`, `remove_building`, `put_secret`, `steer`, `cancel`, `halt`, `reveal`, `restore_discard`, `doctor_install`, `doctor_refresh`, `release`, `batch_by_building`, `approve`, `hand_off`, `set_autonomy`, `pursue`, `wake`, `put_document`, `put_identity`, `put_rules`, `restore_file`, `put_guide`, `configure_city`, `put_spine`, `put_range`, `decide_proposals`, `connect_toolkit`, `put_preferences`, `put_shelved`, `name_session`, `change_run_policy`, `open_remote_door`, `replace_city_key`, `confirm_remote_door`, `close_remote_door`, `privacy_operation`, `auth`
+`dispatch`, `probe_endpoint`, `configure_building`, `attach_endpoint`, `select_model`, `open_session`, `create_building`, `remove_building`, `put_secret`, `steer`, `cancel`, `halt`, `reveal`, `restore_discard`, `doctor_install`, `doctor_refresh`, `release`, `batch_by_building`, `approve`, `hand_off`, `set_autonomy`, `pursue`, `wake`, `put_document`, `put_identity`, `put_rules`, `restore_file`, `put_guide`, `configure_city`, `put_spine`, `put_range`, `decide_proposals`, `connect_toolkit`, `put_preferences`, `put_shelved`, `name_session`, `change_run_policy`, `open_remote_door`, `replace_city_key`, `confirm_remote_door`, `close_remote_door`, `privacy_operation`, `forget_secret`, `auth`
 <!-- xtask:end -->
 
 `put_secret` is listed because the schema names it, and no socket can send
@@ -103,6 +103,7 @@ The ones whose arguments need saying:
 | `open_remote_door {lasting_ms, idem}` · `replace_city_key {idem}` | ask for the remote door open for `lasting_ms`, one minute to seven days, or for a new city key. The request does nothing by itself: the city prints a code on its own console and answers `E_APPROVAL_PENDING`. Only the User at that console can read the code, so an agent cannot finish this step |
 | `confirm_remote_door {code, idem}` | carry back the code the console printed, within two minutes; every answer, right or wrong, ends the request it answers |
 | `close_remote_door {idem}` | close the remote door; no code, because closing only takes access away |
+| `forget_secret {reference, idem}` | delete the key the vault holds under `reference` (`secret:realm/name`). Refused with `E_CONFIG_INVALID` while an attached endpoint, the city's `[search]` or a building's configuration still names the reference, and for a key an environment variable supplies, with the variable to unset as the recovery. A reference the vault never held is already forgotten, so a second press succeeds. Nothing is written to the Ledger |
 | `wake {source, subject, body, idem}` | something happened outside; the city's own routing decides which room hears it, and what it carries arrives as data from outside |
 
 `select_model` also accepts `input`, an optional statement of the model's

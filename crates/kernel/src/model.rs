@@ -56,28 +56,50 @@ pub type Increments<'a> = &'a mut dyn FnMut(&Increment);
 /// `crates/runtime/spec/Turn/Speculation.lean`.
 pub type EarlyCalls<'a> = &'a mut dyn FnMut(&ToolCall);
 
-/// How an adapter selects a Session account before its first call.
-pub enum AccountSelection {
-    /// The account with the highest priority: a Session with no
-    /// successful account yet.
-    First,
-    /// The account that last answered successfully in this Session.
-    Preferred(crate::ServerLabel),
+/// The accounts an adapter can call as, in priority order, and the one
+/// its next request goes out on. Answered once before a round opens
+/// (`crates/kernel/spec/AccountRecovery.lean` §8-86), never per attempt.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AccountRoster {
+    pub provider: String,
+    /// The order is the priority.
+    pub accounts: Vec<RosterEntry>,
+    /// The account the next request goes out on.
+    pub current: crate::ServerLabel,
+    /// How many more times one account is asked before the next takes
+    /// the request.
+    pub retries: crate::account_recovery::AccountRetries,
+}
+
+/// One account of a roster, and whether its reference can be redeemed
+/// right now (kernel D55). Neither the key nor the reference is here.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RosterEntry {
+    pub account: crate::ServerLabel,
+    pub usable: bool,
 }
 
 /// The model port. Production adapter: gateway::endpoint;
 /// second adapter: citysim scripted model. Implementations never sample
 /// clocks or read global state.
 pub trait Model {
-    /// The non-secret identity recorded before each actual request.
+    /// The non-secret identity recorded before each actual request: the
+    /// roster's provider and current account, answered without asking
+    /// the vault.
     fn provider_account(&self) -> Option<crate::event::record::ProviderAccountBinding> {
         None
     }
+    /// The accounts this adapter can call as; `None` for an adapter with
+    /// no named account. With two accounts or more each entry's
+    /// `usable` asks the vault, so a caller asks once per round.
+    fn account_roster(&self) -> Option<AccountRoster> {
+        None
+    }
     /// Selects the account every later request of this adapter uses,
-    /// without sending a request; an account the adapter does not declare
-    /// selects its first. The credential is redeemed at call time, so
+    /// without sending a request; a name outside the roster leaves the
+    /// selection as it was. The credential is redeemed at call time, so
     /// selecting cannot fail.
-    fn select_account(&mut self, _selection: AccountSelection) {}
+    fn select_account(&mut self, _account: &crate::ServerLabel) {}
     fn call(&mut self, req: &ModelRequest) -> Result<ModelReturn, AxError>;
 
     /// The same call, reporting text as it arrives.

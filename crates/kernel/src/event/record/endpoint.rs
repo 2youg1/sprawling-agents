@@ -106,6 +106,14 @@ pub struct AttachedTuning {
         deserialize_with = "readable"
     )]
     pub max_in_flight: Option<u32>,
+    /// How many more times one account is asked before the next account
+    /// takes the request; absent when nobody settled it.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "readable"
+    )]
+    pub account_retries: Option<crate::account_recovery::AccountRetries>,
     /// Header name and the person's own spelling of its value, which for
     /// a credential is its reference.
     #[serde(

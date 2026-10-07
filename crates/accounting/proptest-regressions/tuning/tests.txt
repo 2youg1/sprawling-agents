@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc a72447ec9496aeb06000a17e00df9662dc65d073ffe3f633cfd8ce46be6f9c67 # shrinks to entered = EndpointTuning { accounts: None, label: None, timeout_ms: None, request_max_retries: None, stream_idle_timeout_ms: None, headers: [], overrides: [], proxying: None, max_in_flight: Some(1), account_retries: None }

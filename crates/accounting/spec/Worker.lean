@@ -144,7 +144,7 @@ pub fn form_city(city_root: &Path, adopt: Adopt) -> Result<InitReport, AxError>;
 | §8-50 | `accounting::worker::credentials::tests::endpoints`、`accounting::worker::workbench::engine` |
 | §8-55 | `accounting::worker::commanding::configure` |
 | §8-60 | `accounting::worker::commanding::tests::revealing` |
-| §8-62 | `accounting::worker::credentials::probing`、`accounting::worker::credentials::tests::probing` |
+| §8-62 | `accounting::worker::credentials::probing`、`accounting::worker::credentials::tests::probing`、`accounting::tuning`、`accounting::tuning::tests` |
 | §8-64 | `accounting::worker::commanding::machine` |
 | §8-71 | `accounting::worker::credentials::endpoints::choosing` |
 | §8-79 | `accounting::worker::dispatching::session_shape`、`accounting::worker::dispatching::session_shape::tests` |
@@ -169,4 +169,19 @@ pub fn form_city(city_root: &Path, adopt: Adopt) -> Result<InitReport, AxError>;
 | §8-124 | `accounting::worker::dispatching::harness`、`accounting::worker::dispatching::harness::tests`、`accounting::worker::dispatching::harness::tests::turn`、`accounting::worker::driving::harness`、`accounting::worker::driving::harness::turn` |
 | §8-133 | `accounting::worker::dispatching::tests::experiment` |
 | §8-145 | `accounting::worker::dispatching::preparing::tests` |
+-/
+
+/-!
+### 8-37 从 vault 删一把 Key（`accounting::worker::credentials::signing`；`crates/wire/spec/Command/Kind.lean` 的 `ForgetSecret`，gateway D33）
+
+```rust
+impl RunWorker {
+    pub(in crate::worker) fn forget_secret(&mut self, reference: &str) -> Result<(), AxError>;
+}
+```
+
+- **先问还有谁在用。** 引用读不成 `secret:realm/name` 就以 `SecretRef::parse` 自己的拒绝作答，它点名哪一段不合文法。然后按下面的次序找第一个还点名它的地方，找到就以 `E_CONFIG_INVALID` 拒，主题说出引用与那个地方（「provider `zenmux`」「the city's [search] supplier `brave`」「[[mcp]] `exa` at `hall`」「[search] supplier `brave` at `hall`」），恢复语叫人先从那里拿掉它：①端点簿里每个端点的 `AttachedEndpoint::references()`；②城那一层的 `[search]`（`city::city_search`，设置页编辑的就是它）；③每一栋楼此刻生效的配置（`city::load_config` 在楼的地址上，即城与楼两层合起来）里的 `[[mcp]]` 的 env／headers 与 `[search]` 各供应方的账号。房间自己那一层不读：一个房间的 `[[mcp]]` 点名一把删掉的 Key，它下一次 run 以 `E_CREDENTIAL_MISSING` 点名这个引用，人从那里知道去哪改。
+- **再删。** 交给 `Custodian::forget`，环境变量提供的 Key 在那里被拒（gateway D33）。删成之后对这个引用调 `Connectors::invalidate`，与 `PutSecret` 同一个理由：一条常驻连接在打开时兑付了这把 Key，之后一直带着它。
+- **不写账本。** `secret_captured` 记一把 Key 进了 vault，是因为之后的 run 会兑付它；删掉之后没有任何 fold 读「这个引用曾经有值」，端点簿与配置才是谁在用哪个引用的记录，而它们在删之前已经不点名它。被否：新种类 `secret_forgotten`——一个没有读者的种类，只多一张要对齐的表。
+- 页面上的发出点是账号编辑器移除账号之后那一行「同时删除 Key」（client D93），排在移除那一帧之后；城按到达次序执行，所以列表被拒时这一帧因 ①被拒。
 -/

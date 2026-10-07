@@ -5,6 +5,7 @@
 
 //! The index of the credential tests.
 
+mod accounts;
 mod endpoints;
 mod kept;
 mod probing;

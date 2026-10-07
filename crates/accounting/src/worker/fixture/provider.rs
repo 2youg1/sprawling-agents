@@ -3,8 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The loopback provider a fixture talks to, and the two shapes of
-//! script it answers with.
+//! The loopback provider a fixture talks to, the scripts it answers
+//! with, and the refusals and lost answers a reply can be.
 
 /// A loopback provider that answers a model list and then a fixed
 /// number of chat completions, registered the way a person would
@@ -27,6 +27,64 @@ pub(in crate::worker) struct FakeProvider {
 pub(in crate::worker) enum FirstChat {
     Answered,
     Dropped,
+}
+
+/// What the provider sends back for one chat request.
+///
+/// A script of answers is what most tests need; a refusal and a lost
+/// answer are what a test of the account round needs, and only the
+/// status, its headers and the wire's silence tell those apart.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(in crate::worker) enum Reply {
+    /// This status, these extra headers, this body.
+    Status {
+        status: u16,
+        headers: Vec<(String, String)>,
+        body: String,
+    },
+    /// The request is read whole and recorded, and the connection closes
+    /// without a byte of answer: the request may have run, and nobody
+    /// can say.
+    Lost,
+}
+
+impl Reply {
+    /// A 200 carrying `body`.
+    pub(in crate::worker) fn answered(body: String) -> Reply {
+        Reply::Status {
+            status: 200,
+            headers: Vec::new(),
+            body,
+        }
+    }
+
+    /// A refusal with this status and this structured error body.
+    pub(in crate::worker) fn refused(status: u16, error: &serde_json::Value) -> Reply {
+        Reply::Status {
+            status,
+            headers: Vec::new(),
+            body: serde_json::json!({ "error": error }).to_string(),
+        }
+    }
+
+    /// The same reply with one more header.
+    pub(in crate::worker) fn with_header(self, name: &str, value: &str) -> Reply {
+        match self {
+            Reply::Status {
+                status,
+                mut headers,
+                body,
+            } => {
+                headers.push((name.to_owned(), value.to_owned()));
+                Reply::Status {
+                    status,
+                    headers,
+                    body,
+                }
+            }
+            Reply::Lost => Reply::Lost,
+        }
+    }
 }
 
 impl FakeProvider {
@@ -79,8 +137,8 @@ pub(in crate::worker) fn fake_openai(
 /// makes a node's answer independent of who asked first.
 enum Script {
     InOrder {
-        queued: std::vec::IntoIter<String>,
-        last: String,
+        queued: std::vec::IntoIter<Reply>,
+        last: Reply,
     },
     Routed {
         routes: Vec<Route>,
@@ -91,16 +149,16 @@ enum Script {
 /// One route of a [`Script::Routed`]: the phrase, and what to answer.
 struct Route {
     key: String,
-    queued: std::vec::IntoIter<String>,
-    last: String,
+    queued: std::vec::IntoIter<Reply>,
+    last: Reply,
 }
 
 impl Route {
-    fn new(key: &str, replies: Vec<String>) -> Route {
+    fn new(key: &str, replies: Vec<Reply>) -> Route {
         Route {
             key: key.to_owned(),
             queued: replies.into_iter(),
-            last: String::new(),
+            last: Reply::answered(String::new()),
         }
     }
 
@@ -108,7 +166,7 @@ impl Route {
     ///
     /// The last reply repeats because a test says what the interesting
     /// turns are, not how many turns the loop will take.
-    fn take(&mut self) -> String {
+    fn take(&mut self) -> Reply {
         let next = self
             .queued
             .next()
@@ -118,7 +176,7 @@ impl Route {
 }
 
 impl Script {
-    fn answer(&mut self, request: &str) -> String {
+    fn answer(&mut self, request: &str) -> Reply {
         match self {
             Script::InOrder { queued, last } => {
                 let next = queued.next().inspect(|reply| last.clone_from(reply));
@@ -183,13 +241,43 @@ pub(in crate::worker) fn fake_openai_paced(
     serve(models, routed(routes, fallback), FirstChat::Answered, pace)
 }
 
-fn routed(routes: Vec<(&str, Vec<String>)>, fallback: Vec<String>) -> Script {
-    Script::Routed {
-        routes: routes
+/// A provider that answers each request by the credential it carries.
+///
+/// `keys` pairs a key's value with the replies for the requests that
+/// carry it, the last one repeating; a request that carries none of them,
+/// or two, is refused with 401, as a real provider refuses a key it does
+/// not know. `pace` sees every request first, as in
+/// [`fake_openai_paced`].
+#[cfg(test)]
+pub(in crate::worker) fn fake_openai_keyed(
+    models: &[&str],
+    keys: Vec<(&str, Vec<Reply>)>,
+    pace: Pace,
+) -> (String, FakeProvider) {
+    let script = Script::Routed {
+        routes: keys
             .into_iter()
             .map(|(key, replies)| Route::new(key, replies))
             .collect(),
-        fallback: Route::new("", fallback),
+        fallback: Route::new(
+            "",
+            vec![Reply::refused(
+                401,
+                &serde_json::json!({ "code": "invalid_api_key" }),
+            )],
+        ),
+    };
+    serve(models, script, FirstChat::Answered, pace)
+}
+
+fn routed(routes: Vec<(&str, Vec<String>)>, fallback: Vec<String>) -> Script {
+    let replies = |bodies: Vec<String>| bodies.into_iter().map(Reply::answered).collect();
+    Script::Routed {
+        routes: routes
+            .into_iter()
+            .map(|(key, bodies)| Route::new(key, replies(bodies)))
+            .collect(),
+        fallback: Route::new("", replies(fallback)),
     }
 }
 
@@ -205,8 +293,12 @@ pub(in crate::worker) fn fake_openai_with(
     first_chat: FirstChat,
 ) -> (String, FakeProvider) {
     let script = Script::InOrder {
-        queued: replies.into_iter(),
-        last: String::new(),
+        queued: replies
+            .into_iter()
+            .map(Reply::answered)
+            .collect::<Vec<_>>()
+            .into_iter(),
+        last: Reply::answered(String::new()),
     };
     serve(models, script, first_chat, unpaced())
 }
@@ -316,17 +408,29 @@ fn serve(
                 // The whole exchange, headers included: a test about
                 // what went out on the wire needs the headers too.
                 recorder.lock().unwrap().push(head.clone());
-                let (status, body) = if a_chat {
+                let reply = if a_chat {
                     // Chosen under the lock, so two requests never take
                     // one reply between them.
-                    (200, script.lock().unwrap().answer(&head))
+                    script.lock().unwrap().answer(&head)
                 } else if serves_a_list {
-                    (200, list)
+                    Reply::answered(list)
                 } else {
-                    (404, "{\"error\":\"no such route\"}".to_owned())
+                    Reply::refused(404, &serde_json::json!("no such route"))
                 };
+                let Reply::Status {
+                    status,
+                    headers,
+                    body,
+                } = reply
+                else {
+                    return;
+                };
+                let extra: String = headers
+                    .iter()
+                    .map(|(name, value)| format!("{name}: {value}\r\n"))
+                    .collect();
                 let response = format!(
-                    "HTTP/1.1 {status} OK\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{body}",
+                    "HTTP/1.1 {status} OK\r\ncontent-type: application/json\r\n{extra}content-length: {}\r\nconnection: close\r\n\r\n{body}",
                     body.len()
                 );
                 let _ = std::io::Write::write_all(&mut stream, response.as_bytes());

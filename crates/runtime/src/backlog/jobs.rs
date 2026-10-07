@@ -373,16 +373,8 @@ mod tests {
             assert_eq!(reading.unfollowed, 0);
             assert_eq!(reading.share, backlog.shares());
             std::fs::write(&gate, b"ready").unwrap();
-            let mut finished = None;
-            for _ in 0..500 {
-                if let Some(done) = backlog.harvest(owner).unwrap().into_iter().next() {
-                    finished = Some(done);
-                    break;
-                }
-                std::thread::sleep(std::time::Duration::from_millis(20));
-            }
+            let finished = harvested(backlog, owner);
             std::fs::remove_file(gate).unwrap();
-            let finished = finished.expect("the affinity reader finishes");
             assert_eq!(
                 finished.exit,
                 crate::Exit::Ended { code: 23 },
@@ -536,20 +528,28 @@ mod tests {
             (reading.affinity, reading.share, reading.unfollowed),
             (super::RunAffinity::Os, Shares::Cpu, 0)
         );
-        for _ in 0..500 {
+        let done = harvested(&backlog, owner);
+        backlog.release(owner);
+        assert_eq!(
+            done.exit,
+            crate::Exit::Ended { code: 23 },
+            "{}",
+            done.stderr
+        );
+    }
+
+    /// The first command of `owner` to finish. It waits on that condition
+    /// alone: how long `powershell.exe` takes to start depends on how busy
+    /// the machine is, so a counted budget fails a correct command on a
+    /// loaded runner, and a command that never ends is ended by nextest's
+    /// `terminate-after` instead.
+    #[cfg(windows)]
+    fn harvested(backlog: &Backlog, owner: kernel::RunId) -> crate::Finished {
+        loop {
             if let Some(done) = backlog.harvest(owner).unwrap().into_iter().next() {
-                assert_eq!(
-                    done.exit,
-                    crate::Exit::Ended { code: 23 },
-                    "{}",
-                    done.stderr
-                );
-                backlog.release(owner);
-                return;
+                return done;
             }
             std::thread::sleep(std::time::Duration::from_millis(20));
         }
-        backlog.release(owner);
-        panic!("the command finishes despite refusal");
     }
 }

@@ -16,8 +16,8 @@
 //! hold (§8-15): `handoff_written` and `run_frozen` close every run, once.
 
 use kernel::{
-    Address, AxError, BuildingPolicy, Carrier, Completion, EventDraft, Ledger, Locator, Model,
-    Payload, RunId, TimeMs, ToolCall, ToolDef,
+    Address, AxError, BuildingPolicy, Carrier, Completion, Ledger, Locator, Model, Payload, RunId,
+    TimeMs, ToolCall, ToolDef,
 };
 
 use kernel::ChatMessage;
@@ -224,6 +224,10 @@ pub struct Active {
     /// The lines the run's turns appended and no barrier has carried
     /// yet, with the refs of those that one has (runtime D36).
     lines: crate::turn::HeldLines,
+    /// The run's watchdog, here rather than on `drive`'s stack because a
+    /// turn's repair segment asks the same account round whether one more
+    /// send is allowed (`crates/runtime/spec/Watchdog.lean` §8-9).
+    watchdog: crate::Watchdog,
 }
 
 /// A frozen run. There is no method back to [`Active`]: waking an old run
@@ -291,11 +295,25 @@ pub fn drive(
     hooks: &mut RunHooks<'_>,
     handoff: &Handoff,
 ) -> Result<Run<Frozen>, AxError> {
-    let mut watchdog = crate::Watchdog::new(plan.retries, plan.run);
     let mut run = Run::dispatch(plan, ledger, hooks)?;
     let ending = loop {
+        // Each model call goes out on the account its round opens with
+        // (kernel D54); a round stays open across the resends and switches
+        // of one call and closes when the provider answers.
+        if !run.state.watchdog.round_open() {
+            match run.state.watchdog.open_round(model.account_roster()) {
+                Ok(Some(account)) => model.select_account(&account),
+                Ok(None) => {}
+                Err(exhausted) => {
+                    run.state.lines.barrier(ledger)?;
+                    let t = (hooks.now)()?;
+                    run.record_refusal(ledger, t, &exhausted)?;
+                    break Completion::Cancelled;
+                }
+            }
+        }
         match run.advance(ledger, model, hooks) {
-            Ok(Advance::Turned) => watchdog.on_provider_answered(),
+            Ok(Advance::Turned) => run.state.watchdog.on_provider_answered(),
             Ok(Advance::Concluded(completion)) => break completion,
             // A run always ends. A mid-turn failure whose code has a
             // carrier event (provider down, budget, watchdog) is written
@@ -331,35 +349,42 @@ pub fn drive(
                 // when; the line records that moment before the wait,
                 // and the wait is where a halt reaches a run that has
                 // no turn in flight to stop.
-                let disposal = watchdog.on_provider_failure(&err, t);
-                if let crate::Disposal::BackOff { until, .. } = disposal {
-                    ledger.append(EventDraft {
-                        run: run.plan.run,
-                        t,
-                        who: run.plan.who.clone(),
-                        addr: Some(run.plan.addr.clone()),
-                        kind: kernel::EventKind::WatchdogFired,
-                        data: watchdog.fired_payload(&disposal)?,
-                        ig: false,
-                    })?;
-                    match (hooks.wait)(until) {
-                        crate::NextCall::Allowed => continue,
-                        crate::NextCall::Halted => break Completion::Cancelled,
+                // A switch goes at once on the account the round named,
+                // so the wait is never asked and a halt reaches the run
+                // at the next safe point instead.
+                let disposal = run.state.watchdog.on_provider_failure(&err, t);
+                match &disposal {
+                    crate::Disposal::BackOff { until, .. } => {
+                        let until = *until;
+                        run.record_fired(ledger, t, &disposal)?;
+                        match (hooks.wait)(until) {
+                            crate::NextCall::Allowed => continue,
+                            crate::NextCall::Halted => break Completion::Cancelled,
+                        }
+                    }
+                    crate::Disposal::Switch { to, .. } => {
+                        let to = to.clone();
+                        run.record_fired(ledger, t, &disposal)?;
+                        model.select_account(&to);
+                        continue;
+                    }
+                    crate::Disposal::Freeze {
+                        reason: crate::FreezeReason::AccountsExhausted,
+                    } => {
+                        let exhausted = run.state.watchdog.exhausted();
+                        run.record_refusal(ledger, t, &exhausted)?;
+                    }
+                    crate::Disposal::Proceed
+                    | crate::Disposal::CorrectiveSteer { .. }
+                    | crate::Disposal::Freeze {
+                        reason: crate::FreezeReason::Stall | crate::FreezeReason::ProviderRefused,
+                    } => {
+                        // The failure itself is the payload, through the
+                        // one door: an encoding that fails travels as a
+                        // refusal rather than as an empty object.
+                        ledger.append(run.line(t, kind, Payload::of(&err)?))?;
                     }
                 }
-                // The failure itself is the payload, through the one
-                // door: an encoding that fails travels as a refusal
-                // rather than as an empty object.
-                let data = Payload::of(&err)?;
-                ledger.append(EventDraft {
-                    run: run.plan.run,
-                    t,
-                    who: run.plan.who.clone(),
-                    addr: Some(run.plan.addr.clone()),
-                    kind,
-                    data,
-                    ig: false,
-                })?;
                 break Completion::Cancelled;
             }
         }

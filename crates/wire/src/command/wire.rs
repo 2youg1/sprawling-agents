@@ -29,7 +29,7 @@ use super::kind::Command;
 use super::no_secret::NoSecret;
 use super::step::{
     CitySettings, DoorAnswer, DoorOpening, DoorStep, PolicyChange, ProposalDecisions, RangeWrite,
-    RulesWrite, SessionNaming,
+    RulesWrite, SecretForgetting, SessionNaming,
 };
 
 /// The Command set a socket can carry. `PutSecret` is unreachable because
@@ -82,7 +82,8 @@ impl<Secret> Command<Secret> {
             | Self::ConfirmRemoteDoor(DoorAnswer { ref idem, .. })
             | Self::ReplaceCityKey(DoorStep { ref idem })
             | Self::CloseRemoteDoor(DoorStep { ref idem })
-            | Self::PrivacyOperation(crate::PrivacyRequest { ref idem, .. }) => Some(idem),
+            | Self::PrivacyOperation(crate::PrivacyRequest { ref idem, .. })
+            | Self::ForgetSecret(SecretForgetting { ref idem, .. }) => Some(idem),
             Self::PutSecret { .. } | Self::Auth { .. } => None,
         }
     }
@@ -271,6 +272,7 @@ impl From<WireCommand> for Command {
             Command::ConfirmRemoteDoor(answer) => Self::ConfirmRemoteDoor(answer),
             Command::CloseRemoteDoor(step) => Self::CloseRemoteDoor(step),
             Command::PrivacyOperation(request) => Self::PrivacyOperation(request),
+            Command::ForgetSecret(forgetting) => Self::ForgetSecret(forgetting),
             Command::PutShelved {
                 shelf,
                 name,

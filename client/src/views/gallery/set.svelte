@@ -18,6 +18,7 @@
   import type { Answer, DocumentAnswer, IdentityAnswer, Query } from "../../wire";
   import { CITY_CONFIG, rulesAt } from "../settings/files";
   import { HALL } from "../shared/buildings";
+  import { SEARCH } from "./configured";
 
   const VERSION = B3Hash.make("7f3a9c0e21d4b5a6978812ccde0f13a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0");
 
@@ -71,7 +72,7 @@
         };
       }
       if (typeof query === "object" && "config" in query) {
-        return { config: { addr: HALL, effort: { effort: "high", from: "city" }, second: { domain: { max: 90, min: 31 }, from: "default", percent: 65 }, tuning: { from: "default", proxying: "except_local", timeout_ms: 600_000 } } };
+        return { config: { addr: HALL, effort: { effort: "high", from: "city" }, second: { domain: { max: 90, min: 31 }, from: "default", percent: 65 }, tuning: { from: "default", proxying: "except_local", timeout_ms: 600_000, account_retries: "two" }, search: SEARCH } };
       }
       if (typeof query === "object" && "document" in query) {
         if (query.document.at === CITY_CONFIG) return { document: text(CITY_CONFIG, CONFIG) };
