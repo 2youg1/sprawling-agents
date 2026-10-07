@@ -21,8 +21,12 @@ import client.spec.Views.Parts
 5. **非空视口与非空活动行相交**（`a_nonempty_viewport_reaches_the_row`）。
 6. **表的行内走法留在本行**（`a_side_step_stays_in_its_row`）。
 7. **换行把游标复位到第 0 行，行号留在表内**（`a_step_between_rows_starts_at_its_top`）。
+8. **首选一侧放得下，弹层就开在那一侧**（`a_fitting_side_is_kept`）。
+9. **换到另一侧只为更多的空间**（`a_flip_gains_room`）。
 
 列表持焦与 `bind` 文本框持焦共用活动行的可见性规则，滚动不取焦、不移动其他列或外层页面。坐标模型使用有序的非负离散单位；浏览器检查负责 DOM 的实际行高、亚像素坐标、焦点保持与按键到滚动的接线。
+
+`reveal` 与 `opensOn` 这两条几何规则也管 `combobox.svelte` 的单列表：它的游标行按同一个 `reveal` 滚进视野，它的弹层按同一个 `opensOn` 选上下。两个部件读的是同一份实现 `client/src/views/parts/layer.ts`，派生检查是旁边的 `layer.test.ts`。
 -/
 
 namespace Client.Views.Parts.Popover
@@ -96,6 +100,34 @@ theorem a_nonempty_viewport_reaches_the_row (top bottom scroll height : Nat)
   split
   · omega
   · split <;> omega
+
+/-- 弹层开在锚的哪一侧：`preferred` 是部件自己的那一侧（composer 上方的列表朝上，表单里的组合框朝下），`other` 是对面。 -/
+inductive Side where
+  | preferred
+  | other
+  deriving DecidableEq, Repr
+
+/-- D2：弹层打开时选一侧。`seen` 是锚是否落在裁剪它的那个盒子里（最近一个不让内容溢出的祖先，没有时是视口），`here` 与 `there` 是首选一侧与对面在那个盒子里各剩多高，`height` 是弹层高。
+锚看不见时不换：一个卷到视口外的夹具没有「贴边」可言，量出来的空间说的是滚动位置而不是布局。被否决的做法是按两侧谁更宽来选，那会让一个两边都放得下的弹层随滚动位置来回换边；按视口而不按裁剪盒来量也被否决，因为设置页的组合框站在一个会滚动的面里，被裁掉的是那个面的边，不是窗口的边。 -/
+def opensOn (seen : Bool) (here there height : Nat) : Side :=
+  if seen ∧ here < height ∧ here < there then .other else .preferred
+
+/-- 首选一侧放得下时，不论对面多宽、锚在哪里，弹层都开在首选一侧。 -/
+theorem a_fitting_side_is_kept (seen : Bool) (here there height : Nat) (fits : height ≤ here) :
+    opensOn seen here there height = .preferred := by
+  unfold opensOn
+  split
+  · omega
+  · rfl
+
+/-- 换到对面时，对面比首选一侧宽，而首选一侧放不下。 -/
+theorem a_flip_gains_room (seen : Bool) (here there height : Nat)
+    (flipped : opensOn seen here there height = .other) :
+    here < height ∧ here < there := by
+  unfold opensOn at flipped
+  split at flipped
+  · omega
+  · cases flipped
 
 /-- Enter 应用哪一行：当前列与它的游标。 -/
 def applied (s : State) : Nat × Nat := (s.column, s.cursor)

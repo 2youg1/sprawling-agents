@@ -9,13 +9,11 @@
   // to close. The combined selector beside the composer and the `/`
   // menu are the same list with different rows.
   //
-  // Two layouts, one key table each. `content` and `equal` lay their
-  // lists side by side, so the arrows walk one list and Tab changes it.
-  // `rows` stacks them as a table - each list is one row, its label the
-  // leading cell - so the left and right arrows walk one row and the up
-  // and down arrows change it, exactly as Tab does. Left and right are
-  // claimed only where there is a row to walk; elsewhere they are left
-  // to a caller's caret.
+  // This is the seat: it holds the cursor and the elements focus,
+  // scrolling and measuring need, and draws whatever
+  // `./popover.look.svelte` is. What each key does is decided in
+  // `./popover_wiring`; which side the list opens on and how far it
+  // scrolls is `./layer`, the rule the combobox follows too.
   //
   // Two triggers want two different things from the keyboard, and that
   // is the only fork in here. A button hands the keyboard over: the
@@ -26,23 +24,30 @@
 
   import type { Snippet } from "svelte";
   import { onDestroy, tick } from "svelte";
+  import type { Attachment } from "svelte/attachments";
 
   import type { Key } from "../../core/lang";
   import { say } from "../../core/lang";
   import { ui } from "../../ui";
+  import { revealIn, sideFor } from "./layer";
+  import type { Side } from "./layer";
   import type { PopoverBinding, PopoverColumn, PopoverRow } from "./popover";
+  import Look from "./popover.look.svelte";
+  import { keysOf, listId, lookOf, rowId } from "./popover_wiring";
+  import type { Hands, Keyed, Layout, Place, PopoverView } from "./popover_wiring";
 
   interface Props {
     // The accessible name of the dialog, a lang.json key.
     readonly label: Key;
     readonly columns: readonly PopoverColumn[];
-    readonly layout?: "content" | "equal" | "rows";
+    readonly layout?: Layout;
     readonly onApply: (column: PopoverColumn, row: PopoverRow) => void;
     readonly onClose: () => void;
     // Bind mode: the caller's text box keeps the focus and forwards the
     // keys it does not want through the binding handed over here. Its
-    // listbox ids supply aria-controls, and the handler answers whether the popover used the key, so the caller
-    // knows whether to let the character through.
+    // listbox ids supply aria-controls, and the handler answers whether
+    // the popover used the key, so the caller knows whether to let the
+    // character through.
     readonly bind?: ((binding: PopoverBinding) => void) | undefined;
     // The cursor row's DOM id whenever the cursor lands on a row, `null`
     // when the list holds none. Bind mode writes it as
@@ -73,52 +78,88 @@
     header,
   }: Props = $props();
 
+  // A popover opens over the box or the button below it, where the
+  // page has its room.
+  const PREFERRED: Side = "above";
+
   const { lang } = ui();
-  // Unique within the document, so `aria-activedescendant` points at one
-  // row and not at every popover that ever opened.
   const seat = $props.id();
-  const listSeat = (at: number): string => `${seat}-c${String(at)}`;
-  const rowSeat = (at: number, index: number): string =>
-    `${seat}-r${String(at)}-${String(index)}`;
 
   let column = $state(0);
   let cursor = $state(0);
-  const lists = $state<(HTMLUListElement | null | undefined)[]>([]);
+  let side = $state<Side>(PREFERRED);
+  let dialog = $state<HTMLDivElement | undefined>(undefined);
+  const lists = $state<(HTMLUListElement | undefined)[]>([]);
 
   // A list that shrank under a cursor - somebody typed another letter -
   // leaves the raw cursor on a row that is no longer there, so both
   // positions are clamped where they are read rather than repaired
   // where they are written.
-  const heldColumn = $derived(
-    Math.min(column, Math.max(0, columns.length - 1)),
-  );
-  const here = $derived(columns.at(heldColumn));
-  const rows = $derived(here?.rows ?? []);
-  const heldRow = $derived(Math.min(cursor, Math.max(0, rows.length - 1)));
+  const place: Place = $derived.by(() => {
+    const held = Math.min(column, Math.max(0, columns.length - 1));
+    const rows = columns.at(held)?.rows.length ?? 0;
+    return { column: held, cursor: Math.min(cursor, Math.max(0, rows - 1)) };
+  });
+  const here = $derived(columns.at(place.column)?.rows ?? []);
   // The cursor row's element id, or `null` on an empty list.
-  const activeId = $derived(
-    rows.length === 0 ? null : rowSeat(heldColumn, heldRow),
-  );
+  const activeId = $derived(here.length === 0 ? null : rowId(seat, place.column, place.cursor));
 
-  // Where the cursor is: the arrows walk it within one column, and the
-  // pointer picks it up wherever it lands - whichever row the pointer
-  // is over holds it. It never marks what is applied; `chosen` does.
-  const move = (by: number): void => {
-    if (rows.length === 0) return;
-    cursor = Math.min(rows.length - 1, Math.max(0, heldRow + by));
+  const revealCursor = (): void => {
+    const list = lists.at(place.column);
+    const item = activeId === null ? null : document.getElementById(activeId);
+    if (list === undefined || item === null) return;
+    revealIn(list, item);
   };
-  const step = (by: number): void => {
-    const count = columns.length;
-    if (count < 2) return;
-    column = (heldColumn + by + count) % count;
-    cursor = 0;
+
+  // One attachment per list for the life of the seat, so a redraw does
+  // not let go of an element and take it again.
+  const listHolds: Attachment<HTMLUListElement>[] = [];
+  const hands: Hands = {
+    place: (to) => {
+      column = to.column;
+      cursor = to.cursor;
+      void tick().then(revealCursor);
+    },
+    apply: (pane, item) => {
+      onApply(pane, item);
+    },
+    close: () => {
+      onClose();
+    },
+    holdDialog: (node) => {
+      dialog = node;
+      return () => {
+        dialog = undefined;
+      };
+    },
+    holdList: (at) => {
+      const kept = listHolds.at(at);
+      if (kept !== undefined) return kept;
+      const made: Attachment<HTMLUListElement> = (node) => {
+        lists[at] = node;
+        return () => {
+          lists[at] = undefined;
+        };
+      };
+      listHolds[at] = made;
+      return made;
+    },
   };
-  const apply = (): void => {
-    const pane = here;
-    const item = rows.at(heldRow);
-    if (pane === undefined || item === undefined) return;
-    onApply(pane, item);
-  };
+
+  const view: PopoverView = $derived({
+    seat,
+    layout,
+    columns,
+    place,
+    holder: bind === undefined ? "list" : "caller",
+    side,
+    title: label,
+    say: (key: Key) => say($lang, key),
+  });
+  // Read at the moment of the key rather than bound to one state, so a
+  // caller holding it from `bind` is not handed a new one at every move.
+  const keys = (key: Keyed): boolean => keysOf(view, hands)(key);
+  const look = $derived(lookOf(view, hands, { header, row }));
 
   const pointColumn = (columnId: string): void => {
     const at = columns.findIndex((pane) => pane.id === columnId);
@@ -127,76 +168,15 @@
     cursor = 0;
   };
 
-  // Answers whether the popover used the key, so a text box that
-  // forwards its keys knows whether to let the character through. Tab
-  // is claimed here in both modes: a column change is what Tab means
-  // inside this dialog, and a caller that wants Tab for something else
-  // takes it before forwarding, as the composer's completion does.
-  const press = (event: KeyboardEvent): boolean => {
-    const asRow = layout === "rows";
-    if (event.key === "ArrowRight") {
-      if (!asRow) return false;
-      move(1);
-      return true;
-    }
-    if (event.key === "ArrowLeft") {
-      if (!asRow) return false;
-      move(-1);
-      return true;
-    }
-    if (event.key === "ArrowDown") {
-      if (asRow) step(1);
-      else move(1);
-      return true;
-    }
-    if (event.key === "ArrowUp") {
-      if (asRow) step(-1);
-      else move(-1);
-      return true;
-    }
-    if (event.key === "Home") {
-      cursor = 0;
-      return true;
-    }
-    if (event.key === "End") {
-      cursor = Math.max(0, rows.length - 1);
-      return true;
-    }
-    if (event.key === "Tab") {
-      step(event.shiftKey ? -1 : 1);
-      return true;
-    }
-    if (event.key === "Enter") {
-      apply();
-      return true;
-    }
-    if (event.key === "Escape") {
-      onClose();
-      return true;
-    }
-    return false;
-  };
-  const revealCursor = (): void => {
-    const list = lists.at(heldColumn);
-    const item = activeId === null ? null : document.getElementById(activeId);
-    if (rows.at(heldRow) === undefined || list === undefined || list === null || item === null) return;
-    const viewport = list.getBoundingClientRect();
-    const bounds = item.getBoundingClientRect();
-    if (bounds.top < viewport.top || bounds.height > viewport.height) {
-      list.scrollTop += bounds.top - viewport.top;
-    } else if (bounds.bottom > viewport.bottom) {
-      list.scrollTop += bounds.bottom - viewport.bottom;
-    }
-  };
-  const keys = (event: KeyboardEvent): boolean => {
-    const used = press(event);
-    // A clamped key still reveals a cursor scrolled out by the wheel.
-    if (used) void tick().then(revealCursor);
-    return used;
-  };
-  const down = (event: KeyboardEvent): void => {
-    if (keys(event)) event.preventDefault();
-  };
+  // Measured once, on the side it was first drawn on: a side that
+  // changed with every letter typed into the composer would make the
+  // list jump while the person reads it.
+  let measured = false;
+  $effect(() => {
+    if (measured || dialog === undefined) return;
+    measured = true;
+    side = sideFor(dialog, PREFERRED);
+  });
 
   // What had the keyboard a moment ago is what gets it back: a person
   // who opened a menu and closed it is where they were, not at the top
@@ -207,155 +187,33 @@
   let captured = false;
   $effect(() => {
     if (bind !== undefined) return;
-    const target = lists.at(heldColumn);
-    if (target === undefined || target === null) return;
+    const target = lists.at(place.column);
+    if (target === undefined) return;
     if (!captured) {
       captured = true;
       const held = document.activeElement;
       opener = held instanceof HTMLElement ? held : null;
     }
     // The column that holds the cursor is the one that holds the focus.
-    target.focus();
+    // Without scrolling: the list opens beside what the person just
+    // pressed, on the side that has room, and a list drawn open on load
+    // must not move the page under the lists measured after it.
+    target.focus({ preventScroll: true });
   });
   onDestroy(() => {
     if (bind === undefined) opener?.focus();
   });
 
   $effect(() => {
-    bind?.({ keys, pointColumn, controls: columns.map((_pane, at) => listSeat(at)) });
+    bind?.({ keys, pointColumn, controls: columns.map((_pane, at) => listId(seat, at)) });
   });
   $effect(revealCursor);
   $effect(() => {
     onCursorChange?.(activeId);
   });
   $effect(() => {
-    onCursorRow?.(rows.at(heldRow) ?? null);
+    onCursorRow?.(here.at(place.cursor) ?? null);
   });
 </script>
 
-<!-- No stacking number on the panel below: a positioned box is painted
-     after every box that is not positioned, so the list already covers
-     the text box and the buttons it opens over. It rises into place
-     through the theme's one entrance for a popover, which falls back to
-     a cut under `prefers-reduced-motion`. -->
-<div
-  class={[
-    "absolute bottom-full left-0 mb-snug w-max min-w-full max-w-full rounded-panel border border-edge-panel bg-raised p-snug shadow-float rise",
-    // The table is one surface, so it is the surface that scrolls: a
-    // row that wraps to more lines than a narrow window holds moves the
-    // whole table rather than trapping the pointer in a second
-    // scroller. Laid beside their names the lists keep their own cap.
-    layout === "rows" ? "max-h-palette overflow-y-auto" : "",
-  ]}
-  role="dialog"
-  aria-label={say($lang, label)}
->
-  {#if header !== undefined}{@render header()}{/if}
-  <div
-    class={[
-      "gap-snug",
-      layout === "equal"
-        ? "grid auto-cols-fr grid-flow-col"
-        : layout === "rows"
-          ? "flex flex-col"
-          : "flex",
-    ]}
-  >
-    {#each columns as pane, at (pane.id)}
-      <!-- One list, either a column of pickable rows or the cell row of
-           the table: what changes with the layout is where its name
-           stands and whether its rows stack or wrap. -->
-      <div
-        class={[
-          layout === "rows"
-            ? "grid min-w-0 grid-cols-[auto_1fr] items-baseline gap-snug"
-            : "flex min-w-0 flex-col",
-          layout === "rows" && pane.apart === true
-            ? "border-t border-edge-panel pt-snug"
-            : "",
-        ]}
-      >
-        {#if layout === "rows"}
-          <div class="text-note text-text-faint">{say($lang, pane.label)}</div>
-        {:else}
-          <div class="mb-tight px-snug text-note text-text-faint">
-            {say($lang, pane.label)}
-          </div>
-        {/if}
-        <ul
-          id={listSeat(at)}
-          bind:this={lists[at]}
-          class={layout === "rows"
-            ? "flex min-w-0 flex-wrap content-start gap-tight"
-            : "max-h-palette overflow-y-auto"}
-          role="listbox"
-          aria-label={say($lang, pane.label)}
-          tabindex={bind === undefined && at === heldColumn ? 0 : -1}
-          aria-activedescendant={at === heldColumn && bind === undefined
-            ? activeId
-            : null}
-          onkeydown={down}
-        >
-          {#each pane.rows as item, index (item.id)}
-            <!-- svelte-ignore a11y_click_events_have_key_events (the key table lives on the listbox, which holds the focus and names this row through aria-activedescendant; a pointer may still land on a row directly) -->
-            <li
-              id={rowSeat(at, index)}
-              role="option"
-              aria-selected={item.chosen === true}
-              class={[
-                "cursor-pointer rounded-control px-snug py-tight text-body",
-                layout === "rows"
-                  ? "flex min-w-0 items-center gap-tight"
-                  : "flex items-center justify-between gap-snug",
-                // What is applied reads as the deeper wash; the cursor
-                // takes the rung only where nothing is applied, so the
-                // two never paint over each other.
-                item.chosen === true
-                  ? "wash-strong text-text"
-                  : at === heldColumn && index === heldRow
-                    ? "bg-raised-hover"
-                    : "",
-                item.chosen === true ? "" : "text-text-quiet",
-              ]}
-              onmouseenter={() => {
-                column = at;
-                cursor = index;
-              }}
-              onclick={() => {
-                onApply(pane, item);
-              }}
-            >
-              {#if row}
-                {@render row(item)}
-              {:else}
-                <!-- The name never shrinks; the secondary cell does.
-                     Both are capped rather than one holding its width
-                     against the other, so a one-word hint beside a long
-                     label survives whole, and letting the long secondary
-                     cell take the row's width is what used to paint
-                     `high` as `hi…`. A cell of the table wraps instead
-                     of truncating, because a column is as wide as its
-                     own name and a row as wide as the dialog. -->
-                <span
-                  class={layout === "rows"
-                    ? "min-w-0 max-w-[24ch] wrap-anywhere"
-                    : "min-w-0 max-w-[24ch] truncate"}
-                >
-                  {item.label}
-                </span>
-                {#if item.secondary !== undefined}
-                  <span
-                    class="min-w-0 max-w-[20ch] line-clamp-2 text-note text-text-faint"
-                    >{item.secondary}</span
-                  >
-                {/if}
-              {/if}
-            </li>
-          {:else}
-            <li role="presentation" class="px-snug py-tight text-note text-text-faint">{say($lang, "part_no_match")}</li>
-          {/each}
-        </ul>
-      </div>
-    {/each}
-  </div>
-</div>
+<Look {...look} />
