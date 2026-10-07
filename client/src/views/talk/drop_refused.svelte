@@ -6,21 +6,16 @@
 -->
 
 <script lang="ts">
-  // The files a drop on the box did not take, each with the city's
-  // reason beside its name, inline under the box the drop was aimed at
-  // (`drop_zone.svelte.ts`).
-  import { fill, say } from "../../core/lang";
+  // The seat of the files a drop on the box did not take: it reads the
+  // language and hands `./drop_refused.ts`'s value to whatever
+  // `./drop_refused.look.svelte` is.
   import { ui } from "../../ui";
-  import type { Kept } from "./dropping";
+  import type { Refused } from "./dropping";
+  import { lookOf } from "./drop_refused";
+  import Look from "./drop_refused.look.svelte";
 
-  const { refused }: { readonly refused: readonly Kept[] } = $props();
+  const { refused }: { readonly refused: readonly Refused[] } = $props();
   const { lang } = ui();
 </script>
 
-{#each refused as each (each.kind === "refused" ? each.name : "")}
-  {#if each.kind === "refused"}
-    <p class="text-note text-alert" role="alert">
-      {fill(say($lang, "talk_drop_refused"), { name: each.name, why: each.said === "" ? say($lang, "talk_not_live") : each.said })}
-    </p>
-  {/if}
-{/each}
+<Look {...lookOf(refused, $lang)} />

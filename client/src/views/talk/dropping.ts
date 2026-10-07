@@ -13,9 +13,15 @@
 import { bearing } from "../../core/socket";
 
 // What one file came to.
-export type Kept =
-  | { readonly kind: "path"; readonly path: string }
-  | { readonly kind: "refused"; readonly name: string; readonly said: string };
+export type Kept = { readonly kind: "path"; readonly path: string } | Refused;
+
+// A file the city did not keep, and the reason it gave; an empty reason
+// is a city the page did not reach.
+export interface Refused {
+  readonly kind: "refused";
+  readonly name: string;
+  readonly said: string;
+}
 
 // The local paths a `text/uri-list` names. Lines starting `#` are
 // comments in that format; a URI that is not `file:` names nothing on
