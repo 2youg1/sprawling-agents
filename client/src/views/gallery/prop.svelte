@@ -176,6 +176,7 @@
   import Column from "../mailbox/column.svelte";
   import Mailbox from "../mailbox/mailbox.svelte";
   import Letter from "../inspect/letter.svelte";
+  import Proposals from "../refrain/proposals.svelte";
   import Card from "../refrain/proposals_card.svelte";
   import Body from "../refrain/proposals_card.look.svelte";
   import { cardLookOf } from "../refrain/proposals_card";
@@ -188,6 +189,10 @@
   const ignore = (): void => undefined;
   const hands = { retake: ignore };
   const current = { kind: "current" } as const;
+  // The band alone: the current card can be shown in the text, the stale
+  // one cannot, because the editor holds another version.
+  const unshowable = (card: ProposalCard): string | undefined =>
+    card.id === STALE.id ? say($lang, "proposal_show_why") : undefined;
 
   // The edited case is the card after a person pressed its edit answer;
   // the fixture presses it once, the way they would.
@@ -221,6 +226,11 @@
     <Body
       {...cardLookOf(CURRENT, { standing: current, deciding: { kind: "refused", error: REFUSED }, edit: null, lead: undefined }, $lang, hands)}
     />
+  </Case>
+  <Case label="proposal cards · the band, one card shown in the text and one not" width={600}>
+    <div class="flex h-[640px] flex-col overflow-hidden bg-page">
+      <Proposals doc={DOC} {unshowable} onShow={ignore} />
+    </div>
   </Case>
   <Case label="proposal cards · above the document in RefRain" width={600}>
     <div class="flex h-[640px] flex-col overflow-hidden bg-page">
