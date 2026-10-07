@@ -83,6 +83,8 @@
   import Tables from "./gallery/tables.svelte";
   import Monitored from "./gallery/monitored.svelte";
   import Timed from "./gallery/timed.svelte";
+  import Lensed from "./gallery/lensed.svelte";
+  import Recorded from "./gallery/recorded.svelte";
   import Tok from "./gallery/tok.svelte";
   import Used from "./gallery/used.svelte";
   import Workbench from "./gallery/workbench.svelte";
@@ -156,6 +158,8 @@
   <Switches />
   <Monitored />
   <Timed />
+  <Lensed />
+  <Recorded />
   <Resulted />
   <Streamed />
   <Tok />
