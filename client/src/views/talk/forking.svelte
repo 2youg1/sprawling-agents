@@ -126,13 +126,12 @@
   ]);
 
   // The picker opens over the box and this line stands under it: which
-  // list is showing, and - when the cursor has landed inside a call
-  // still open - where the branch will really cut.
+  // list is showing, that the conversation being branched from stays as
+  // it is, and - when the cursor has landed inside a call still open -
+  // where the branch will really cut.
   const footer = $derived.by((): string => {
-    const named = say($lang, FILTER_KEY[filter]);
-    return heldPlan?.walkedBack
-      ? `${named} · ${say($lang, "fork_safe_point")}`
-      : named;
+    const told = `${say($lang, FILTER_KEY[filter])} · ${say($lang, "fork_keeps")}`;
+    return heldPlan?.walkedBack ? `${told} · ${say($lang, "fork_safe_point")}` : told;
   });
 
   function apply(pane: PopoverColumn, row: PopoverRow): void {

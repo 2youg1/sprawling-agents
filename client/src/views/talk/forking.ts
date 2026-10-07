@@ -4,10 +4,16 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 // Where a branch may cut the mother's conversation, what each cut takes
-// with it, and how a stretch of conversation began. One home: the hover
-// action in the thread and the picker in `forking.svelte` both ask this
-// file, so the rules a person reads off two surfaces cannot drift
+// with it, how a stretch of conversation began, and where the way back
+// to the original conversation leads. One home: the hover action in the
+// thread, the picker in `forking.svelte` and the divider all ask this
+// file, so the rules a person reads off three surfaces cannot drift
 // (roadmap S1, S2).
+//
+// The page calls the act a branch, because that is what a person sees:
+// a new line of the conversation starting at one turn while the line it
+// left stays as it was. The code keeps the glossary's name, Fork, which
+// is also the verb `/fork` a person types.
 //
 // **A person's words fork at their turn's parent and come back to the
 // box.** A message is re-sayable - the point of returning it is that the
@@ -26,7 +32,9 @@
 // no provider accepts, so the exchange is dropped whole and the picker
 // reports the walk-back instead of hiding it.
 
-import type { Call, Origin, RunId, Turn } from "../../wire";
+import type { RunBelief } from "../../core/belief";
+import type { View } from "../../core/route";
+import type { Call, Origin, RunId, SessionLine, Turn } from "../../wire";
 import { Seq } from "../../wire";
 
 // What a person pointed at. A message is a person's own words - the
@@ -114,4 +122,23 @@ export function motherName(task: string): string | null {
   const line = task.trim().split("\n")[0] ?? "";
   const named = SENTENCE.exec(line)?.[0] ?? line;
   return named === "" ? null : named;
+}
+
+// Where "back to the original" leads from a branch: the stretch of the
+// mother's room the mother run lies in, which is the conversation the
+// branch left, still readable in main as an earlier session. The room's
+// lines come newest first, and a run belongs to the newest stretch that
+// began at or before its last line (`core/stretches`, the same rule the
+// sessions pane reads). Until the page holds the mother run and its
+// room has answered, the way back is the run's own page, which every
+// run has.
+export function originalOf(
+  mother: RunId,
+  held: Pick<RunBelief, "addr" | "lastSeq"> | undefined,
+  lines: readonly SessionLine[],
+): View {
+  const room = held?.addr ?? null;
+  const line = held === undefined ? undefined : lines.find((each) => each.began <= held.lastSeq);
+  if (room === null || line === undefined) return { kind: "run", run: mother };
+  return { kind: "talk", address: room, session: line.began };
 }

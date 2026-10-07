@@ -34,6 +34,7 @@
   import { ago } from "../../core/time";
   import { ui } from "../../ui";
   import type { Address, Origin, SessionLine } from "../../wire";
+  import Glyph from "../parts/glyph.svelte";
   import Tip from "../parts/tip.svelte";
   import { OVERSCAN, windowOf } from "../run/lanes";
   import { askStretches } from "../world/stretches.svelte";
@@ -166,8 +167,9 @@
                 fork(row);
               }}
             >
-              <!-- wording-ok: a drawing in type, not a word; the action's name is the aria-label beside it. -->
-              ⑂
+              <!-- The same mark the thread's branch action carries, so the
+              two doors to one act look alike. -->
+              <Glyph name="branch" size="sm" />
             </button>
           {/snippet}
         </Tip>
