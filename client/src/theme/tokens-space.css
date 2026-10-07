@@ -42,6 +42,12 @@
    * written twice. */
   --container-lg: 820px;
   --container-wide: 1120px;
+  /* The width a world pane needs before a row of figures stands on
+   * one line: the timeline's four cells side by side, and the
+   * instrument sheet's three cells to a row (`views/world/`), each
+   * asked as `@min-cells:`. Under it a row takes two lines, because a
+   * figure cut to a few letters says nothing. */
+  --container-cells: 400px;
   /* **A container named after a spacing step cannot be reached.**
    * `max-w-wide` is `--spacing-wide`, 24px, and not the 1120px
    * above: Tailwind resolves the utility's named value out of the

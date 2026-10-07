@@ -111,7 +111,7 @@
 <!-- Three cells to a row where the pane holds them, two where it does
 not, so a figure is never cut to a few letters. -->
 <div class="@container shrink-0">
-<dl class="grid grid-flow-row-dense grid-cols-2 gap-x-gutter gap-y-pane border-y border-edge py-pane @min-[400px]:grid-cols-3">
+<dl class="grid grid-flow-row-dense grid-cols-2 gap-x-gutter gap-y-pane border-y border-edge py-pane @min-cells:grid-cols-3">
   <div class="flex min-w-0 flex-col">
     <dt class="text-note text-text-faint">{say($lang, "world_model")}</dt>
     <dd class="truncate text-text">{model ?? DASH}</dd>

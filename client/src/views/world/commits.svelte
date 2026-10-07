@@ -20,18 +20,23 @@
   // row: its full oid, the B3 of the checkpoint that announced it and its
   // parents. Both hashes are written whole on one line and cut by the
   // pane's edge, so a copy takes the whole value.
+  //
+  // This file is the seat: it asks, picks and opens; `./commits.ts`
+  // reads each row and `./commits.look.svelte` draws the graph and the
+  // rows.
   import { readAnswer } from "../../core/answered";
   import { fill, say } from "../../core/lang";
   import { MAYOR, buildingOf, roomOf, toFragment } from "../../core/route";
   import { ui } from "../../ui";
-  import type { Address, CommitAnswer, RunId } from "../../wire";
+  import type { Address, CommitAnswer } from "../../wire";
   import { openChanges } from "../inspect/open.svelte";
   import Unanswered from "../parts/unanswered.svelte";
   import { phaseOf } from "../runs/lineage";
-  import { PHASE_FILL } from "../runs/phase";
   import { commitsIn, pickCommit, pickedCommit, sessionRun } from "./chosen.svelte";
+  import { HEIGHT, rowOf, widthOf } from "./commits";
+  import type { CommitsLook } from "./commits";
+  import Look from "./commits.look.svelte";
   import { graphOf } from "./lanes";
-  import type { Line } from "./lanes";
 
   interface Props {
     readonly here: Address;
@@ -52,35 +57,39 @@
   const session = $derived(sessionRun($belief, here));
   const picked = $derived(pickedCommit(here));
 
-  // An oid as git prints it short.
-  const SHORT = 7;
-  // One lane's width and the row's height, in the drawing's own pixels.
-  const LANE = 14;
-  const HEIGHT = 44;
-  const MID = HEIGHT / 2;
-  const width = $derived(Math.max(1, graph.lanes) * LANE);
-  const x = (lane: number): number => LANE / 2 + lane * LANE;
-
-  function path(line: Line): string {
-    const [x1, x2] = [x(line.from), x(line.to)];
-    switch (line.part) {
-      case "through":
-        return `M${String(x1)} 0V${String(HEIGHT)}`;
-      case "in":
-        return `M${String(x1)} 0C${String(x1)} ${String(MID / 2)} ${String(x2)} ${String(MID / 2)} ${String(x2)} ${String(MID)}`;
-      case "out":
-        return `M${String(x1)} ${String(MID)}C${String(x1)} ${String(MID * 1.5)} ${String(x2)} ${String(MID * 1.5)} ${String(x2)} ${String(HEIGHT)}`;
-    }
-  }
-
-  const ownRun = (row: number): RunId | undefined => commits[row]?.run;
-
   function pick(commit: CommitAnswer): void {
     pickCommit(commit);
     const parent = commit.parents?.[0];
     if (parent !== undefined) openChanges({ base: parent, head: commit.oid });
     if (commit.actor !== here) u.go({ kind: "talk", address: commit.actor });
   }
+
+  const look: CommitsLook = $derived({
+    width: widthOf(graph),
+    height: HEIGHT,
+    rows: commits.map((commit, row) => {
+      const doing = $belief.runs[commit.run]?.doing;
+      return rowOf({
+        commit,
+        graph,
+        row,
+        picked: commit.oid === picked,
+        here: commit.actor === here,
+        phase: doing === undefined ? "done" : phaseOf(doing),
+        mine: (at) => commits[at]?.run === session,
+        room: roomOf(commit.actor),
+        pick,
+      });
+    }),
+    labels: { oid: say($lang, "world_commit_oid"), b3: say($lang, "world_commit_b3"), parents: say($lang, "world_parents") },
+    more:
+      read.kind === "held" && read.value.more && here !== MAYOR
+        ? {
+            href: toFragment({ kind: "building", address: buildingOf(here) }),
+            word: fill(say($lang, "world_commits_more"), { building: buildingOf(here) }),
+          }
+        : undefined,
+  });
 </script>
 
 <div class="min-h-0 flex-1 overflow-y-auto">
@@ -89,76 +98,6 @@
   {:else if read.kind === "held" && commits.length === 0}
     <p class="py-snug text-note text-text-faint">{say($lang, "world_no_commits")}</p>
   {:else}
-    <ol>
-      {#each commits as commit, row (commit.oid)}
-        {@const placed = graph.rows[row]}
-        {@const mine = commit.run === session}
-        {@const doing = $belief.runs[commit.run]?.doing}
-        <li>
-          <button
-            type="button"
-            class={[
-              "-mr-snug grid h-bar w-full grid-cols-[auto_8ch_minmax(0,1fr)] items-center gap-x-base rounded-card pr-snug text-left text-note",
-              commit.oid === picked ? "wash-strong" : "hover:wash",
-              commit.actor === here ? "text-text" : "text-text-faint",
-            ]}
-            aria-expanded={commit.oid === picked}
-            onclick={() => {
-              pick(commit);
-            }}
-          >
-            <span class="relative h-bar" style:width="{width}px" aria-hidden="true">
-              <svg class="absolute inset-0 overflow-visible" width={width} height={HEIGHT} viewBox="0 0 {width} {HEIGHT}">
-                {#each placed?.lines ?? [] as line, at (at)}
-                  <path
-                    d={path(line)}
-                    fill="none"
-                    stroke-width="2"
-                    class={ownRun(line.owner) === session ? "stroke-accent" : "stroke-edge-input"}
-                  />
-                {/each}
-              </svg>
-              <span
-                class={[
-                  "absolute top-1/2 size-dot -translate-x-1/2 -translate-y-1/2 rounded-pill",
-                  doing === undefined ? PHASE_FILL.done : PHASE_FILL[phaseOf(doing)],
-                  mine ? "ring-2 ring-accent" : "",
-                ]}
-                style:left="{x(placed?.lane ?? 0)}px"
-              ></span>
-            </span>
-            <span class="figure text-text-quiet">{commit.oid.slice(0, SHORT)}</span>
-            <span class="truncate">
-              {commit.message ?? ""}
-              <span class="ml-snug text-text-faint">{roomOf(commit.actor)}</span>
-            </span>
-          </button>
-          {#if commit.oid === picked}
-            <div class="mb-base ml-[calc(var(--spacing-base)+8ch)] border-l border-edge-panel pl-base text-note">
-              <dl class="grid grid-cols-[8ch_minmax(0,1fr)] gap-x-base text-text-quiet">
-                <dt class="text-text-faint">{say($lang, "world_commit_oid")}</dt>
-                <dd class="figure truncate">{commit.oid}</dd>
-                {#if commit.b3 !== undefined && commit.b3 !== null}
-                  <dt class="text-text-faint">{say($lang, "world_commit_b3")}</dt>
-                  <dd class="figure truncate">{commit.b3}</dd>
-                {/if}
-                <dt class="text-text-faint">{say($lang, "world_parents")}</dt>
-                <dd class="figure truncate">
-                  {(commit.parents ?? []).map((oid) => oid.slice(0, SHORT)).join(" · ") || "—"}
-                </dd>
-              </dl>
-            </div>
-          {/if}
-        </li>
-      {/each}
-    </ol>
-    {#if read.kind === "held" && read.value.more && here !== MAYOR}
-      <a
-        class="block py-snug text-note text-accent hover:text-accent-hover"
-        href={toFragment({ kind: "building", address: buildingOf(here) })}
-      >
-        {fill(say($lang, "world_commits_more"), { building: buildingOf(here) })}
-      </a>
-    {/if}
+    <Look {...look} />
   {/if}
 </div>

@@ -329,7 +329,11 @@ taller; on one column the second row is the band, as tall as it needs. -->
             // Beside the conversation the world is dimmed and takes no
             // input, but for the sessions, which move main to a session.
             layout.world === "beside" && placed.pane !== "sessions" ? "pointer-events-none opacity-(--blend-opacity)" : "",
-            layout.world === "beside" && placed.pane === "sessions" ? "opacity-(--blend-opacity) transition-opacity duration-page hover:opacity-100 focus-within:opacity-100" : "",
+            // It comes up with the arriving curve and fades back with the
+            // leaving one.
+            layout.world === "beside" && placed.pane === "sessions"
+              ? "opacity-(--blend-opacity) transition-opacity duration-page ease-leave hover:opacity-100 hover:ease-arrive focus-within:opacity-100 focus-within:ease-arrive"
+              : "",
           ]}
           inert={layout.world === "beside" && placed.pane !== "sessions"}
           style:grid-column={at(placed.lines)}
