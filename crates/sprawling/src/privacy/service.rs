@@ -307,6 +307,8 @@ mod tests {
         identities: usize,
         reads: usize,
         writes: usize,
+        /// Runs once, at the next identity sample, outside the world's lock.
+        on_identity: Option<Box<dyn FnOnce() + Send>>,
     }
 
     #[derive(Clone, Default)]
@@ -328,7 +330,14 @@ mod tests {
         type Identity = ();
 
         fn identity(&mut self) -> Result<(), AxError> {
-            self.world().identities += 1;
+            let hook = {
+                let mut world = self.world();
+                world.identities += 1;
+                world.on_identity.take()
+            };
+            if let Some(hook) = hook {
+                hook();
+            }
             Ok(())
         }
 
@@ -529,6 +538,49 @@ mod tests {
             }
         )));
         assert_eq!(machine.world().writes, 0);
+    }
+
+    /// An operation that concludes while an answer is being read is never
+    /// reported concluded by an answer whose history lacks its conclusion
+    /// (Privacy.Service D71): the page stops asking on that answer and draws
+    /// its ownership and buttons from it.
+    #[test]
+    fn an_answer_reports_no_conclusion_its_history_lacks() {
+        let (_dir, machine, service) = served();
+        let other = PrivacyControl::FeedbackNotifications;
+        machine.world().values.insert(CONTROL, dword(1));
+        let first = PrivacyAction::Apply {
+            control: other,
+            expected: PrivacyValue::Absent,
+        };
+        run(&service, first, idem(1));
+        assert_eq!(
+            result(&service, idem(1)),
+            PrivacyResult::Applied { operation: 1 }
+        );
+        let operation = service
+            .accept(apply(PrivacyValue::Dword { number: 1 }), idem(2))
+            .unwrap()
+            .unwrap();
+        let performer = Arc::clone(&service);
+        machine.world().on_identity = Some(Box::new(move || performer.perform(operation)));
+
+        let answer = service.answer();
+        let result = &answer
+            .outcomes
+            .iter()
+            .find(|outcome| outcome.idem == idem(2))
+            .unwrap()
+            .result;
+        let PrivacyHistory::Disclosed { owned, .. } = &answer.history else {
+            panic!("the owner is shown the history: {:?}", answer.history);
+        };
+        let owns = owned.iter().any(|intent| intent.control == CONTROL);
+        assert!(
+            owns || *result == PrivacyResult::Running,
+            "the answer reports {result:?} while its history does not own {CONTROL:?}"
+        );
+        assert_eq!(machine.world().values[&CONTROL], dword(0));
     }
 
     /// An accepted operation reads as running until it is performed, and
