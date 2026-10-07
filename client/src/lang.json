@@ -6611,6 +6611,10 @@
     "en": "The Mayor's current session is always pinned",
     "zh": "市长当前这段对话总是置顶"
   },
+  "world_pinned_tagged": {
+    "en": "Pinned by you; the row's menu unpins it",
+    "zh": "你置顶的；在这一行的菜单里取消置顶"
+  },
   "world_tag_add": {
     "en": "add a tag",
     "zh": "加标签"
