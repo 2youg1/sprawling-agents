@@ -54,7 +54,9 @@ use crate::report::{Violation, XtaskError};
 
 mod announced;
 pub(crate) mod engine;
+mod looks;
 mod marks;
+mod parts;
 mod pass;
 pub(crate) mod probe;
 mod room;
@@ -64,6 +66,7 @@ mod talk;
 use announced::{every_control_is_announceable, every_landmark_is_named, one_first_heading};
 use engine::{Measured, Opening, browser, measure};
 use marks::no_key_is_underlined;
+use parts::{ROSTER, every_part_draws_its_roles};
 use pass::Pass;
 use room::{every_popover_shows_an_option, no_text_is_crushed};
 
@@ -91,6 +94,10 @@ const TAGGED: &str = "--tagged";
 /// The flag that opens a route other than the gallery.
 const ROUTE: &str = "--route";
 
+/// The flag that measures a bundle in another directory: the swap
+/// build, which must not land where the binary embeds its client.
+const BUNDLE: &str = "--bundle";
+
 /// What one run of this gate is for.
 ///
 /// Both errands take the same readings off the same page. What differs
@@ -105,10 +112,17 @@ enum Errand {
 pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     // Where the bundle lands is the build script's statement, read
     // rather than repeated: this gate and the binary must open one
-    // directory (tools/xtask/Spec.lean §8-18).
-    let bundle = crate::bundle::dist(root)?;
+    // directory (tools/xtask/Spec.lean §8-18). `--bundle` names another
+    // one for the swap build alone (§8-13), which never ships.
+    let bundle = match asked_for(BUNDLE) {
+        Some(dir) => root.join(dir),
+        None => crate::bundle::dist(root)?,
+    };
+    // The looks are judged from their sources, so a missing bundle does
+    // not hide a look the gallery never draws.
+    let mut violations = looks::check(root)?;
     if !bundle.join("index.html").is_file() {
-        return Ok(vec![violation(
+        violations.push(violation(
             EVERY_PASS,
             "the client bundle this gate measures is built",
             format!(
@@ -116,15 +130,17 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
                 bundle.display()
             ),
             "run `just build-web`",
-        )]);
+        ));
+        return Ok(violations);
     }
     let Some(browser) = browser() else {
-        return Ok(vec![violation(
+        violations.push(violation(
             EVERY_PASS,
             "a real engine draws the page this gate measures",
             "no headless browser was found, so no page was measured".to_owned(),
             "install a Chromium-family browser, or point `SPRAWLING_BROWSER` at one",
-        )]);
+        ));
+        return Ok(violations);
     };
     let route = asked_for(ROUTE).unwrap_or_else(|| GALLERY.to_owned());
     let errand = if flagged(SURVEY) {
@@ -153,7 +169,6 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
         bundle: &bundle,
         route: &route,
     };
-    let mut violations = Vec::new();
     for pass in pass::wanted()? {
         let at = format!("{route} {}", pass.called());
         let measured = measure(&opening, pass)?;
@@ -168,6 +183,7 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
         no_key_is_underlined(&page.drawn, &at, &mut violations);
         no_text_is_crushed(&page.drawn, &at, &mut violations);
         every_popover_shows_an_option(&page.drawn, &at, &mut violations);
+        every_part_draws_its_roles(ROSTER, &page.drawn, &at, &mut violations);
         if let Some((words, register)) = &talk {
             let counted = talk::the_conversation_page_holds_its_controls(
                 &page.drawn,

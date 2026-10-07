@@ -233,6 +233,12 @@ jobs:
       - name: the gates that judge the client bundle
         if: ${{ !cancelled() }}
         run: just --no-deps gates-artifacts
+      # Every replacement look under client/swap/ drawn in place of the
+      # shipped one, and the client still typechecks, keeps its wiring
+      # tests and passes render (tools/xtask/Spec.lean section 8-13).
+      - name: the swap test
+        if: ${{ !cancelled() }}
+        run: just swap
 
   # The Lean specifications. The checker in `tools/adversary/` is not built here:
   # it attacks the binary from outside and stays out of every required
