@@ -12,6 +12,7 @@
   // nothing. The run's rounds hold the words and the two trees; the room
   // asks only for its own runs.
   import Glyph from "../parts/glyph.svelte";
+  import AsideLink from "./aside_link.look.svelte";
   import Produced from "./produced.svelte";
   import { lastCheckpointIn } from "../checkpoints";
   import { OUTCOME_GLYPH, OUTCOME_INK } from "../shared/outcome";
@@ -76,10 +77,8 @@
         {/if}
       {:else if outcome === null && run.doing.kind !== "frozen"}
         <span class="text-accent">{say($lang, "results_block_working")}</span>
-        <span class={THEN}>
-          <a class="text-text underline" href={toFragment({ kind: "run", run: run.run })}>
-            {say($lang, "results_block_open")}
-          </a>
+        <span class="text-text {THEN}">
+          <AsideLink text={say($lang, "results_block_open")} href={toFragment({ kind: "run", run: run.run })} />
         </span>
       {:else}
         <span class="text-text">

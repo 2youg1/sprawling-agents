@@ -4,12 +4,12 @@ file, You can obtain one at https://mozilla.org/MPL/2.0/.
 Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <!-- A boundary of the conversation: quiet words between two hairlines.
-A link on it underlines under the pointer rather than taking a wash,
-because it sits in a sentence; the fold is a press and takes the row's
-wash. Stretches after the first are set off by a dot. The air above and
+A link on it is the thread's link in a sentence; the fold is a press and
+takes the row's wash. Stretches after the first are set off by a dot. The air above and
 below is the seat's, like every gap between parts. -->
 <script lang="ts">
   import Glyph from "../parts/glyph.svelte";
+  import AsideLink from "./aside_link.look.svelte";
   import Fold from "./fold.look.svelte";
   import type { RuleLook } from "./rule";
 
@@ -33,7 +33,7 @@ below is the seat's, like every gap between parts. -->
       {#if part.kind === "text"}
         <span>{part.text}</span>
       {:else if part.kind === "link"}
-        <a href={part.href} class="underline-offset-2 hover:text-text-quiet hover:underline">{part.text}</a>
+        <AsideLink text={part.text} href={part.href} />
       {:else}
         <Fold {...part.fold} />
       {/if}

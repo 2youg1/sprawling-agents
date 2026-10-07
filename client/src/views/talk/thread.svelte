@@ -34,6 +34,7 @@
   import Saying from "./saying.svelte";
   import { phaseOf } from "../runs/lineage";
   import TurnView from "./turn.svelte";
+  import AsideLink from "./aside_link.look.svelte";
   import Reasoning from "./reasoning.look.svelte";
   import Rule from "./rule.look.svelte";
   import SteerPin from "./steer_pin.look.svelte";
@@ -308,7 +309,7 @@
   {/each}
   {#if drawn.cut}
     <p class="my-snug text-note text-text-faint">
-      <a class="underline hover:text-text" href={toFragment({ kind: "run", run: run.run })}>{say($lang, "letter_whole_talk")}</a>
+      <AsideLink text={say($lang, "letter_whole_talk")} href={toFragment({ kind: "run", run: run.run })} />
     </p>
   {/if}
   <!-- No `aria-live` on the growing text: a screen reader told every
