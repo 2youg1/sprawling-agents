@@ -5,9 +5,10 @@
 
 import { describe, expect, test } from "bun:test";
 
-import { SETUP_GROUPS } from "../../core/route";
+import { SETUP_GROUPS, type SetupGroup, type View } from "../../core/route";
 import { Address } from "../../wire";
-import { TREE, buildingPages, standingOf } from "./tree";
+import { foldsOf, toggled, type Fold, type Folds } from "./folds";
+import { TREE, buildingPages, byInitial, lookOf, standingOf, stepped, type LeafLook, type TreeLook } from "./tree";
 
 // The address bar may name any group (`core/route.ts`), and the tree is
 // the only way to one by hand, so a group the tree leaves out is a
@@ -45,6 +46,120 @@ describe("the settings tree", () => {
   test("lists a city of one building, the hall", () => {
     expect(buildingPages([Address.make("hall")]).map((page) => page.view)).toEqual([
       { kind: "building", address: Address.make("hall") },
+    ]);
+  });
+});
+
+// The look is handed every role, state and handler of client/Spec.lean
+// §7-11 in its wire bags, so these hold for whatever look draws the tree.
+describe("the settings tree's wiring", () => {
+  const talk = { kind: "talk", address: Address.make("hall/mayor") } as const;
+  const leaves = { buildings: buildingPages([Address.make("hall")]), record: [] };
+
+  function drawn(group: SetupGroup, beneath: View, folds: Folds = foldsOf(group, beneath)) {
+    const picked: SetupGroup[] = [];
+    const pressed: Fold[] = [];
+    const look = lookOf({ group, beneath, folds, leaves, reading: "3% · 120 MB" }, "t", {
+      words: (key) => key,
+      pick: (named) => picked.push(named),
+      toggle: (fold) => pressed.push(fold),
+      walk: () => undefined,
+      hold: () => undefined,
+    });
+    return { look, picked, pressed };
+  }
+
+  const leavesOf = (look: TreeLook): LeafLook[] =>
+    look.branches.flatMap((branch) => [
+      ...branch.entries.flatMap((entry) => (entry.kind === "nest" ? entry.pages : [entry])),
+      ...(branch.more?.entries ?? []),
+    ]);
+
+  test("names the group drawn, and only it, as the current one", () => {
+    const { look } = drawn("rules", talk);
+    const current = leavesOf(look).filter((leaf) => leaf.wire["aria-current"] !== undefined);
+    expect(current.map((leaf) => [leaf.key, leaf.wire["aria-current"]])).toEqual([["rules", "true"]]);
+  });
+
+  test("names the page beneath as the current page", () => {
+    const { look } = drawn("you", { kind: "monitor" });
+    const current = leavesOf(look).filter((leaf) => leaf.kind === "page" && leaf.wire["aria-current"] === "page");
+    expect(current.map((leaf) => leaf.wire)).toEqual([{ "data-entry": "", href: "#/monitor", "aria-current": "page" }]);
+  });
+
+  test("opens one branch, whose button says so and names the list it opens", () => {
+    const { look } = drawn("automation", talk);
+    const open = look.branches.filter((branch) => branch.fold.wire["aria-expanded"]);
+    expect(open).toHaveLength(1);
+    const [branch] = open;
+    expect(branch?.fold.wire["aria-controls"]).toBe(branch?.fold.list);
+    expect(branch?.more?.fold.wire["aria-expanded"]).toBe(true);
+  });
+
+  test("hands each press to the seat: a group to pick, a fold to toggle", () => {
+    const { look, picked, pressed } = drawn("you", talk);
+    const group = leavesOf(look).find((leaf) => leaf.kind === "group" && leaf.key === "performance");
+    if (group?.kind === "group") group.wire.onclick();
+    look.branches[2]?.fold.wire.onclick();
+    expect(picked).toEqual(["performance"]);
+    expect(pressed).toEqual([{ kind: "branch", at: 2 }]);
+  });
+
+  test("marks every entry the keys walk, and gives a group the letter it is reached by", () => {
+    const { look } = drawn("you", talk);
+    for (const leaf of leavesOf(look)) {
+      expect(leaf.wire["data-entry"]).toBe("");
+      if (leaf.kind === "group") expect(leaf.wire["data-initial"]).toBe(leaf.initial);
+    }
+    expect(look.branches.every((branch) => branch.fold.wire["data-entry"] === "")).toBe(true);
+  });
+
+  test("puts the process reading on the performance page's entry alone", () => {
+    const { look } = drawn("you", talk);
+    const read = leavesOf(look).flatMap((leaf) => (leaf.kind === "page" && leaf.reading !== null ? [leaf.key] : []));
+    expect(read).toEqual(["#/monitor"]);
+  });
+});
+
+describe("the settings tree's folds", () => {
+  const folds: Folds = { branch: 1, more: true, nests: { buildings: false, record: true } };
+
+  test("opening another branch folds the open one and its more", () => {
+    expect(toggled(folds, { kind: "branch", at: 3 })).toEqual({ ...folds, branch: 3, more: false });
+  });
+
+  test("pressing the open branch folds it", () => {
+    expect(toggled(folds, { kind: "branch", at: 1 })).toEqual({ ...folds, branch: null, more: false });
+  });
+
+  test("a nest and the more fold open and close on their own", () => {
+    expect(toggled(folds, { kind: "nest", nest: "buildings" })).toEqual({ ...folds, nests: { buildings: true, record: true } });
+    expect(toggled(folds, { kind: "more" })).toEqual({ ...folds, more: false });
+  });
+});
+
+describe("the settings tree's keys", () => {
+  const entries = ["a", "b", "c", "d"];
+
+  test("step to the next, the previous and the ends, from outside the entries too", () => {
+    expect([stepped(entries, -1, "line.next"), stepped(entries, 3, "line.next"), stepped(entries, 0, "line.previous")]).toEqual([
+      "a",
+      "d",
+      "a",
+    ]);
+    expect([stepped(entries, 1, "line.first"), stepped(entries, 1, "line.last"), stepped(entries, 1, null)]).toEqual([
+      "a",
+      "d",
+      undefined,
+    ]);
+  });
+
+  test("a letter moves to the next entry it starts, wrapping past the last", () => {
+    const initial = (entry: string): string => (entry === "b" || entry === "d" ? "x" : "y");
+    expect([byInitial(entries, 1, "x", initial), byInitial(entries, 3, "x", initial), byInitial(entries, 0, "z", initial)]).toEqual([
+      "d",
+      "b",
+      undefined,
     ]);
   });
 });
