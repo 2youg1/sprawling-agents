@@ -67,6 +67,10 @@
   /* The column a list of files or groups takes beside what it opens:
    * the monitor's file list, wide enough for a path's last two parts. */
   --spacing-index: 232px;
+  /* The narrowest column a labelled box stands in when a form lays its
+   * boxes out as many to a row as fit (`setup/providers/advanced.look.svelte`):
+   * wide enough for a header name or a figure with its label above it. */
+  --spacing-field-track: 320px;
   /* The icon grids. An icon is drawn on one of two squares - sixteen
    * for a mark that sits inside a line of text, twenty for the ones a
    * column of navigation is built from - and the box it is drawn in is

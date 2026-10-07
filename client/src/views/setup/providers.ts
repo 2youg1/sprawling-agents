@@ -8,6 +8,6 @@
 // through one specifier - so the components are re-exported here
 // beside the two proxy words the network screen draws.
 
-export { default as EndpointList } from "./providers.svelte";
+export { default as EndpointList } from "./providers/endpoint_list.svelte";
 export { default as AttachForm } from "./providers/form.svelte";
 export { PROXYINGS, proxyingNote } from "./providers/draft";
