@@ -73,10 +73,13 @@
   <section>
     <h2 class="mb-base text-note text-text-faint">{say($lang, "run_window")}</h2>
     {#if turns.some((turn) => turn.used !== null && turn.used !== undefined)}
-      <ul class="text-note">
+      <!-- One grid for every row, each row on its columns through
+           `subgrid`: the turn's name is as wide as the widest name, so
+           "turn 10" neither wraps nor pushes its bar off the bars above. -->
+      <ul class="grid grid-cols-[max-content_minmax(0,1fr)_max-content] gap-x-snug text-note">
         {#each turns as turn (turn.number)}
-          <li class="my-tight flex items-center gap-snug">
-            <span class="w-figure shrink-0 text-text-faint">{fill(say($lang, "run_turn_n"), { n: String(turn.number) })}</span>
+          <li class="col-span-full my-tight grid grid-cols-subgrid items-center">
+            <span class="whitespace-nowrap text-text-faint">{fill(say($lang, "run_turn_n"), { n: String(turn.number) })}</span>
             <!-- The legend under the list names the three colours, so a
                  hint on each segment would say a second time what the
                  page already says once. -->
@@ -85,7 +88,7 @@
               <span class="bg-accent" style:width="{barOf(turn.used, 'input')}%"></span>
               <span class="bg-accent-solid" style:width="{barOf(turn.used, 'output')}%"></span>
             </span>
-            <span class="figure w-figure shrink-0 text-right text-text-faint">
+            <span class="figure min-w-figure text-right text-text-faint">
               {turn.used !== null && turn.used !== undefined ? count(turn.used.input + turn.used.output) : "—"}
             </span>
           </li>
