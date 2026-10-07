@@ -168,7 +168,7 @@
           <span class="shrink-0">{effortFace}</span>
         </button>
       {/if}
-      <div bind:this={panel} onfocusout={(event) => {
+      <div bind:this={panel} class="flex min-w-0" onfocusout={(event) => {
         if (menu !== "policy") return;
         const next = event.relatedTarget;
         if (next instanceof Node && panel?.contains(next)) return;
