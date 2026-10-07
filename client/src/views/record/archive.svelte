@@ -5,17 +5,21 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 // The archive as the buildings filed it, searched across every
-// building at once: one row per hit, and the building is the link.
+// building at once: one row per hit, and the building is the link. This
+// seat asks the city and places the search box over the answer; the
+// hits are drawn by whatever `./archive.look.svelte` is.
 -->
 
 <script lang="ts">
-  import { toFragment } from "../../core/route";
   import { readAnswer } from "../../core/answered";
   import { say } from "../../core/lang";
   import { ui } from "../../ui";
   import type { Query } from "../../wire";
   import EmptyState from "../parts/empty.svelte";
+  import Field from "../parts/field.svelte";
   import Unanswered from "../parts/unanswered.svelte";
+  import { lookOf } from "./archive";
+  import Look from "./archive.look.svelte";
 
   const u = ui();
   const lang = u.lang;
@@ -25,36 +29,29 @@
   const question = $derived<Query>({ archive_search: { needle } });
   const search = $derived(u.conn.asking.ask(question));
   const read = $derived(readAnswer($search, (held) => ("archive" in held ? held.archive.hits : undefined)));
-  const hits = $derived(read.kind === "held" ? read.value : undefined);
 </script>
 
-<div>
-  <input
-    class="mb-base w-full max-w-talk rounded-control border border-edge-input bg-raised px-base py-snug text-body placeholder:text-text-faint"
-    placeholder={say($lang, "rec_search")}
-    bind:value={needle}
-  />
+<div class="flex flex-col gap-base">
+  <!-- The box is named by the word it used to show only as a
+       placeholder, which a screen reader does not take for a name. -->
+  <div class="max-w-talk">
+    <Field
+      label={say($lang, "rec_search")}
+      labelling="hidden"
+      placeholder={say($lang, "rec_search")}
+      value={needle}
+      onInput={(value) => {
+        needle = value;
+      }}
+    />
+  </div>
   {#if read.kind === "unavailable"}
     <Unanswered query={read.query} asked={question} />
-  {:else if hits === undefined}
+  {:else if read.kind === "asking"}
     <p class="text-text-faint">…</p>
-  {:else if hits.length === 0}
+  {:else if read.value.length === 0}
     <EmptyState missing="rec_archive_nothing" seat="region" />
   {:else}
-    <ul class="text-note">
-      {#each hits as hit (hit)}
-        <li class="settled-row flex gap-base border-b border-edge py-snug">
-          <span class="w-figure shrink-0 text-text-faint">{hit.day}</span>
-          <span class="w-figure shrink-0 text-text-faint">{hit.kind}</span>
-          <a
-            href={toFragment({ kind: "building", address: hit.building })}
-            class="block max-w-[24ch] shrink-0 truncate text-text-quiet"
-          >
-            {hit.building}
-          </a>
-          <span class="flex-1 truncate text-text">{hit.subject}</span>
-        </li>
-      {/each}
-    </ul>
+    <Look {...lookOf(read.value)} />
   {/if}
 </div>
