@@ -6,9 +6,7 @@ Copyright (c) 2026 2youg1 and the sprawling contributors -->
 <!-- The head of one message: who said it, the frozen facts it was said
 under, when, and - once the turn is in the Ledger - how fast it came:
 time to first content, then the output rate (refrain §3-3, client/Spec.lean
-§4-44). One line of note text, the speaker in
-the label weight and everything else faint, so a thread reads as a
-column of names with words under them.
+§4-44). This seat says the figures; `head.look.svelte` draws them.
 
 **Each figure is drawn only where the screen has no other home for it**
 (docs/frontend-method.md §7D). The model is a fact of the session, so it stands on
@@ -21,6 +19,7 @@ it lives. -->
   import { fill, say } from "../../core/lang";
   import { hhmmss, isoInstant } from "../../core/time";
   import { ui } from "../../ui";
+  import Look from "./head.look.svelte";
   import Sparkline from "./sparkline.svelte";
   import { tookWords } from "./timing";
   import type { Took } from "./timing";
@@ -44,26 +43,14 @@ it lives. -->
   const { who, at, model, ttft, tps, rhythm }: Props = $props();
 
   const { lang } = ui();
+  const first = $derived(ttft === null ? undefined : `${say($lang, "talk_ttft")} ${tookWords(ttft, $lang)}`);
+  const rate = $derived(tps === null ? undefined : fill(say($lang, "talk_tps"), { n: String(Math.round(tps)) }));
 </script>
 
-<!-- Inline flow rather than one clipped row: the first head carries the
-session's frozen facts, which can outrun the column, and a fact cut off
-by an ellipsis is a fact the head no longer states. A space and the
-tight margin make the gap the row had; short figures keep their words
-together, and the facts wrap where the column ends. -->
-<div class="min-w-0 text-note text-text-faint">
-  <span class="me-tight font-label text-label whitespace-nowrap text-text">{who}</span>
-  {#if model !== null}
-    <span class="me-tight wrap-anywhere">{model}</span>
-  {/if}
-  <time class="figure me-tight whitespace-nowrap" datetime={isoInstant(at)}>{hhmmss(at)}</time>
-  {#if ttft !== null}
-    <span class="figure me-tight whitespace-nowrap">{say($lang, "talk_ttft")} {tookWords(ttft, $lang)}</span>
-  {/if}
-  {#if tps !== null}
-    <span class="figure me-tight whitespace-nowrap">{fill(say($lang, "talk_tps"), { n: String(Math.round(tps)) })}</span>
-  {/if}
+{#snippet arrived()}
   {#if rhythm !== null}
     <Sparkline {rhythm} />
   {/if}
-</div>
+{/snippet}
+
+<Look {who} {model} time={{ text: hhmmss(at), iso: isoInstant(at) }} ttft={first} tps={rate} rhythm={rhythm === null ? undefined : arrived} />

@@ -11,9 +11,10 @@
   // read it answers slower or answers blind. Bounded like a tool's
   // output, and cut by the same content answer the file view reads.
 
-  import { fill, say } from "../../core/lang";
-  import { kib } from "../../core/time";
+  import { say } from "../../core/lang";
   import { ui } from "../../ui";
+  import Look from "./asked.look.svelte";
+  import { shownOf } from "./asked";
   import type { ContentAnswer, Locator } from "../../wire";
 
   interface Props {
@@ -36,19 +37,6 @@
   });
 </script>
 
-<details class="my-snug text-note" open>
-  <summary class="cursor-pointer text-text-faint hover:text-text-quiet">{say($lang, "wait_asks")}</summary>
-  {#if shown === undefined}
-    <p class="text-text-faint">…</p>
-  {:else if shown.binary}
-    <p class="text-text-faint">{fill(say($lang, "file_binary"), { kib: kib(shown.bytes) })}</p>
-  {:else}
-    <pre
-      class="mt-tight max-h-output overflow-auto rounded-card border border-edge bg-page p-snug font-mono text-note whitespace-pre-wrap text-text-quiet">{shown.text}</pre>
-    {#if shown.truncated}
-      <p class="text-text-faint">
-        {fill(say($lang, "file_truncated"), { kib: kib(shown.text.length), total: kib(shown.bytes) })}
-      </p>
-    {/if}
-  {/if}
-</details>
+<div class="my-snug">
+  <Look summary={say($lang, "wait_asks")} shown={shownOf($lang, shown)} />
+</div>
