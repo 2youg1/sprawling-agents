@@ -31,9 +31,10 @@
   const lang = u.lang;
   let waiting = $state<ExportFormat | null>(null);
   let missed = $state<Exported | null>(null);
-  const waits = new Set<() => void>();
+  // The open wait of each format; the button's busy state allows one.
+  const waits: Record<ExportFormat, (() => void) | undefined> = { jsonl: undefined, csv: undefined };
   onDestroy(() => {
-    for (const off of waits) off();
+    for (const format of FORMATS) waits[format]?.();
   });
 
   function press(format: ExportFormat): void {
@@ -53,10 +54,10 @@
       if (exported.kind === "file") saveFile(`${what}-usage.${format}`, TYPES[format], exported.body);
       else missed = exported;
       waiting = null;
-      waits.delete(off);
+      waits[format] = undefined;
       queueMicrotask(off);
     });
-    waits.add(off);
+    waits[format] = off;
   }
 
   const unavailable = $derived.by(() => {

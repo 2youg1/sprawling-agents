@@ -21,31 +21,32 @@
   const { lang } = ui();
 
   let copied: Copied = $state(REST);
-  const waits = new Set<() => void>();
+  // The wiring keeps at most one receipt waiting, so one handle is all
+  // a key that goes away has to cancel.
+  let waiting: ReturnType<typeof setTimeout> | undefined = undefined;
   onDestroy(() => {
-    for (const cancel of waits) cancel();
+    clearTimeout(waiting);
   });
 
   const press = presser({
     board: () => navigator.clipboard,
     later: (run, ms) => {
-      const held = setTimeout(() => {
-        waits.delete(cancel);
-        run();
-      }, ms);
-      const cancel = (): void => {
+      const held = setTimeout(run, ms);
+      waiting = held;
+      return () => {
         clearTimeout(held);
-        waits.delete(cancel);
       };
-      waits.add(cancel);
-      return cancel;
     },
     show: (now) => {
       copied = now;
     },
   });
 
-  const look = $derived(lookOf(props, copied, $lang, () => press(textOf(props.text))));
+  const look = $derived(
+    lookOf(props, copied, $lang, () => {
+      press(textOf(props.text));
+    }),
+  );
 </script>
 
 <Look {...look} />
