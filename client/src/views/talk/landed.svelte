@@ -13,6 +13,7 @@
   import type { Landing } from "../../core/landing";
   import { toFragment } from "../../core/route";
   import { ui } from "../../ui";
+  import NoteRow from "./note.look.svelte";
 
   interface Props {
     readonly landing: Landing;
@@ -23,13 +24,13 @@
 </script>
 
 {#if landing.kind === "elsewhere"}
-  <p role="status" class="mb-snug text-note text-text-faint">
-    {say($lang, "talk_landed")}
-    <a
-      href={toFragment({ kind: "talk", address: landing.addr })}
-      class="font-mono text-text-quiet underline hover:text-text"
-    >
-      {landing.addr}
-    </a>
-  </p>
+  <div class="mb-snug">
+    <NoteRow
+      role="status"
+      pieces={[
+        { kind: "words", text: say($lang, "talk_landed"), ink: "faint" },
+        { kind: "link", text: landing.addr, href: toFragment({ kind: "talk", address: landing.addr }), face: "mono" },
+      ]}
+    />
+  </div>
 {/if}

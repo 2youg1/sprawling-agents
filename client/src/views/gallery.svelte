@@ -96,6 +96,7 @@
   import AgentLetters from "./gallery/agent_letters.svelte";
   import AgentChildren from "./gallery/agent_children.svelte";
   import AgentWaits from "./gallery/agent_waits.svelte";
+  import AgentNotes from "./gallery/agent_notes.svelte";
   import Tables from "./gallery/tables.svelte";
   import PartRow from "./gallery/parts/row.svelte";
   import Monitored from "./gallery/monitored.svelte";
@@ -156,6 +157,7 @@
   <AgentLetters />
   <AgentChildren />
   <AgentWaits />
+  <AgentNotes />
   <G1 />
   <Folded />
   <Followed />

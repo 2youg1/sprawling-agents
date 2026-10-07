@@ -10,13 +10,13 @@ endings it was, each in its own ink. The reply itself is an arrival of
 its own, drawn as a letter. -->
 <script lang="ts">
   import { ui } from "../../ui";
-  import { fill, say } from "../../core/lang";
-  import type { Key } from "../../core/lang";
   import { toFragment } from "../../core/route";
-  import { lasted } from "../../core/time";
   import { called } from "./naming";
+  import NoteRow from "./note.look.svelte";
+  import NotePlace from "./note_place.svelte";
+  import { named, replyWaitLook } from "./note";
   import { ticker } from "./timing";
-  import type { Address, ReplyEnd, ReplyEnded } from "../../wire";
+  import type { Address, ReplyEnded } from "../../wire";
 
   interface Props {
     readonly on: Address;
@@ -29,26 +29,9 @@ its own, drawn as a letter. -->
   const u = ui();
   const { lang } = u;
   const clock = ticker(u.now);
-
-  const ENDING: Readonly<Record<ReplyEnd, { readonly key: Key; readonly ink: string }>> = {
-    reply: { key: "talk_reply_ended_reply", ink: "text-accent" },
-    timeout: { key: "talk_reply_ended_timeout", ink: "text-alert" },
-    left: { key: "talk_reply_ended_left", ink: "text-text-faint" },
-  };
-
-  const left = $derived(until - $clock);
+  const room = $derived(named(called(on, null, $lang), toFragment({ kind: "talk", address: on })));
 </script>
 
-<div class="my-snug flex flex-wrap items-baseline gap-snug text-note text-text-faint">
-  {#if ended === undefined || ended === null}
-    <span>{say($lang, "talk_reply_wait")}</span>
-    <a href={toFragment({ kind: "talk", address: on })} class="text-text-quiet hover:text-text">{called(on, null, $lang)}</a>
-    <span class={left > 0 ? "text-text-quiet" : "text-alert"}>
-      · {left > 0 ? fill(say($lang, "talk_reply_left"), { left: lasted(left) }) : say($lang, "talk_reply_due")}
-    </span>
-  {:else}
-    <span>{say($lang, "talk_reply_waited")}</span>
-    <a href={toFragment({ kind: "talk", address: on })} class="text-text-quiet hover:text-text">{called(on, null, $lang)}</a>
-    <span class={ENDING[ended.by].ink}>· {say($lang, ENDING[ended.by].key)}</span>
-  {/if}
-</div>
+<NotePlace rhythm="line">
+  <NoteRow {...replyWaitLook($lang, room, until - $clock, ended)} />
+</NotePlace>

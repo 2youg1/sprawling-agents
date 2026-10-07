@@ -13,8 +13,11 @@
   import { say } from "../../core/lang";
   import { toFragment } from "../../core/route";
   import { ago } from "../../core/time";
+  import Look from "./inbox.look.svelte";
   import { kindSaid, waitingSaid } from "./inbox";
+  import type { InboxRow } from "./inbox";
   import { called, residentAt } from "./naming";
+  import NotePlace from "./note_place.svelte";
   import { ui } from "../../ui";
   import type { Address } from "../../wire";
 
@@ -27,30 +30,25 @@
   const { lang } = u;
 
   const answer = $derived(u.conn.asking.ask({ inbox_view: { addr } }));
-  const waiting = $derived.by(() => {
+  const rows = $derived.by((): InboxRow[] => {
     const held = $answer;
-    return held !== undefined && "inbox" in held ? held.inbox.waiting : [];
+    const waiting = held !== undefined && "inbox" in held ? held.inbox.waiting : [];
+    return waiting.map((line) => {
+      const sender = residentAt(line.from);
+      return {
+        key: line.id,
+        href: sender === null ? undefined : toFragment({ kind: "talk", address: sender }),
+        kind: kindSaid($lang, line.kind),
+        first: line.first_line ?? "",
+        from: sender === null ? line.from : called(sender, null, $lang),
+        ago: ago($lang, line.at, u.now()),
+      };
+    });
   });
 </script>
 
-{#if waiting.length > 0}
-  <section class="my-base text-note" aria-label={say($lang, "inbox_waiting")}>
-    <h2 class="text-label font-label text-text-quiet">{waitingSaid($lang, waiting.length)}</h2>
-    <ul>
-      {#each waiting as line (line.id)}
-        {@const sender = residentAt(line.from)}
-        <li>
-          <a
-            href={sender === null ? undefined : toFragment({ kind: "talk", address: sender })}
-            class="flex items-baseline gap-base rounded-control py-tight hover:bg-raised-hover"
-          >
-            <span class="shrink-0 text-text-quiet">{kindSaid($lang, line.kind)}</span>
-            <span class="min-w-0 flex-1 truncate">{line.first_line ?? ""}</span>
-            <span class="max-w-[30%] truncate text-text-faint">{sender === null ? line.from : called(sender, null, $lang)}</span>
-            <span class="shrink-0 text-text-faint">{ago($lang, line.at, u.now())}</span>
-          </a>
-        </li>
-      {/each}
-    </ul>
-  </section>
+{#if rows.length > 0}
+  <NotePlace rhythm="shape">
+    <Look label={say($lang, "inbox_waiting")} heading={waitingSaid($lang, rows.length)} {rows} />
+  </NotePlace>
 {/if}

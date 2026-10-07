@@ -108,7 +108,9 @@
   --spacing-step: 28px;
   --spacing-output: 240px;
   --spacing-palette: 360px;
-  --spacing-caret: 18px;
+  /* The square that follows a reply's growing edge while it arrives
+   * (`talk/saying.look.svelte`). */
+  --spacing-caret: 6px;
   --spacing-hair: 2px;
 
   /* The shell's grid (docs/frontend-method.md §4-33): twelve columns, a margin round

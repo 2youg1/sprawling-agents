@@ -12,6 +12,7 @@ the same words as its task once the city starts the run. -->
   import { say } from "../../core/lang";
   import { ui } from "../../ui";
   import type { Delivery } from "./delivery";
+  import NotePlace from "./note_place.svelte";
 
   interface Props {
     readonly delivery: Exclude<Delivery, { readonly kind: "none" }>;
@@ -35,13 +36,15 @@ the same words as its task once the city starts the run. -->
   });
 </script>
 
-<div class="my-base flex flex-col items-end" data-local-feedback={delivery.kind}>
-  <div
-    class="max-w-[83%] rounded-panel bg-speech px-pane py-base text-body leading-relaxed whitespace-pre-wrap text-text-quiet wrap-anywhere"
-  >
-    {delivery.words}
+<NotePlace rhythm="shape" data-local-feedback={delivery.kind}>
+  <div class="flex flex-col items-end">
+    <div
+      class="max-w-[83%] rounded-panel bg-speech px-pane py-base text-body leading-relaxed whitespace-pre-wrap text-text-quiet wrap-anywhere"
+    >
+      {delivery.words}
+    </div>
+    <div class={["mt-tight text-note", delivery.kind === "unknown" ? "text-alert" : "text-text-faint"]} role="status">
+      {state}
+    </div>
   </div>
-  <div class={["mt-tight text-note", delivery.kind === "unknown" ? "text-alert" : "text-text-faint"]} role="status">
-    {state}
-  </div>
-</div>
+</NotePlace>

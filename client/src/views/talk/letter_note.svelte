@@ -16,7 +16,11 @@ to the sender's room, the session that sent it, and when it arrived
   import { clock } from "../../core/time";
   import type { RunId } from "../../wire";
   import { kindSaid } from "./inbox";
+  import Look from "./letter_note.look.svelte";
   import { called, residentAt } from "./naming";
+  import NotePlace from "./note_place.svelte";
+  import { named, stamped } from "./note";
+  import type { Piece } from "./note";
 
   interface Props {
     readonly from: string | null | undefined;
@@ -31,24 +35,18 @@ to the sender's room, the session that sent it, and when it arrived
   const u = ui();
   const { lang } = u;
   const sender = $derived(residentAt(from));
-  const head = $derived(kind === null ? say($lang, "talk_letter") : kindSaid($lang, kind));
+  const head = $derived.by((): Piece[] => [
+    { kind: "words", text: kind === null ? say($lang, "talk_letter") : kindSaid($lang, kind), ink: "faint" },
+    ...(sender !== null
+      ? [named(called(sender, null, $lang), toFragment({ kind: "talk", address: sender }))]
+      : from !== undefined && from !== null
+        ? [named(from, null)]
+        : []),
+    ...(session === null ? [] : [named(say($lang, "talk_letter_session"), toFragment({ kind: "run", run: session }))]),
+    stamped(clock($lang, t)),
+  ]);
 </script>
 
-<article
-  class="my-base mr-auto max-w-[83%] rounded-card border border-edge-panel border-l-2 border-l-accent px-pane py-base"
-  aria-label={say($lang, "talk_letter")}
->
-  <div class="mb-tight flex flex-wrap items-baseline gap-snug text-note text-text-faint">
-    <span>{head}</span>
-    {#if sender !== null}
-      <a href={toFragment({ kind: "talk", address: sender })} class="text-text-quiet hover:text-text">{called(sender, null, $lang)}</a>
-    {:else if from !== undefined && from !== null}
-      <span class="text-text-quiet">{from}</span>
-    {/if}
-    {#if session !== null}
-      <a href={toFragment({ kind: "run", run: session })} class="text-text-quiet hover:text-text">{say($lang, "talk_letter_session")}</a>
-    {/if}
-    <span>· {clock($lang, t)}</span>
-  </div>
-  <div class="text-body leading-relaxed whitespace-pre-wrap wrap-anywhere">{said}</div>
-</article>
+<NotePlace rhythm="shape">
+  <Look label={say($lang, "talk_letter")} {head} {said} />
+</NotePlace>
