@@ -24,6 +24,7 @@ mod frames;
 mod guide;
 mod named_frames;
 mod preference;
+mod privacy;
 mod reading;
 #[cfg(feature = "server")]
 mod reception;
@@ -111,6 +112,13 @@ pub use preference::{BODY_PX_MIN, BodyPx, PreferencePatch, PreferencesAnswer};
 pub use preference::{CorePlacement, CorePreferences, CorePriority};
 pub use preference::{Glass, ThemeOverride, Tier};
 pub use preference::{SessionTags, TAG_MAX, Tag};
+pub use privacy::{PrivacyAction, PrivacyOutcome, PrivacyRequest, PrivacyResult};
+pub use privacy::{PrivacyAnswer, PrivacyControlEntry, PrivacyCurrent, PrivacyEditions};
+pub use privacy::{PrivacyBuildEffect, PrivacyCategory, PrivacyEdition, PrivacyEditionFit};
+pub use privacy::{PrivacyControl, PrivacyFaultCode, PrivacyNotWritten, PrivacyOriginal};
+pub use privacy::{PrivacyHistory, PrivacyHost, PrivacyIntent, PrivacyNotWrittenEntry};
+pub use privacy::{PrivacyOriginalLine, PrivacyTarget, PrivacyValue, PrivacyWindows};
+pub use privacy::{PrivacyScope, PrivacySettlement};
 pub use reading::{OUTPUT_LINES, arguments_in, note_of, output_in, said_in};
 pub use reading::{text, thought_in, used_in};
 #[cfg(feature = "server")]

@@ -15,6 +15,7 @@ import client.spec.Views.Parts.Popover
 import client.spec.Views.Parts.Row
 import client.spec.Views.Parts.Segmented
 import client.spec.Views.Parts.Tabs
+import client.spec.Views.Privacy
 import client.spec.Views.Workspace
 
 /-! # client 的规格
@@ -53,6 +54,7 @@ import client.spec.Views.Workspace
 | `client/spec/Views/Fold.lean` | 设置树的枝与上手指南的步骤一次只展开一项 | （§7L、§7G、D53、D55） |
 | `client/spec/Views/Guide.lean` | 启动时进不进上手指南，跳过之后落在哪 | （§7G、D54） |
 | `client/spec/Views/Door.lean` | 远程组的门开关、「更换城钥匙」与确认码输入框：焦点、Escape 与拒绝 | （4-57） |
+| `client/spec/Views/Privacy.lean` | 隐私组每一项从按下、确认、发送到按 idem 读回结果 | （§7L） |
 
 其余标签都在本文件：§3-1、§3-2 在 §8，§3-4 在 §3，其余 §4-n 与 §7C、§7G、§7K、§7L、§7N 在 §10，§7-8 在 §4，§7-9 在 §13；决定 D1 至 D48（含 D42a）、D52 至 D55、D72、D78、D80、D81、D82、D83、D85、D86、D88、D89、D90、D91、D92、D93 与 D94 在 §10 之后，D60 与 D73 在 `client/spec/Views/Workspace.lean`。
 -/
@@ -72,6 +74,7 @@ import client.spec.Views.Workspace
 - `spec/Views/Parts/Tabs.lean`、`Row.lean`、`Combobox.lean`、`Popover.lean`：每个键留在部件之内；行列表两端不环绕、文本框留住自己的键；游标走动不改生效的值；打字复位游标；Escape 关上并清空过滤词而不改值；换列复位游标。
 - `spec/Views/Parts/Decide.lean`：门只收「知道了」、过期的提案只能拒绝、不带 accel 的一下按键不是答复。
 - `spec/Views/Workspace.lean`：图层键三下回原档、看一眼不改选定的档；变淡的发送面什么都不做、停止面不发字；信箱的数字只落到画出来的条目。
+- `spec/Views/Privacy.lean`：取消从不发送，只有确认才发、发的是确认框里的那个动作，别的 idem 的结果不改这一项，发送中不再发，没送出的可以再按；轨迹向量由 `views/setup/privacy/entry.test.ts` 回放。
 - `spec/Views/Inspect/Open.lean`：至多 `KEPT` 项、刚打开的那一项在、Delete 之后焦点落在一个页签上。
 - `spec/Core/Workbench.lean`：分隔线不改一对栏的总宽、两栏都不窄于两栏。
 - `spec/Views/Door.lean`：任意一段按键与回答之后，Escape 把焦点还给按下的那个控件；码只从等码的输入框发出、且不空；在途时的拒绝清空输入框；没离开页面的命令回到按下的控件、不编一个拒绝；焦点在框里、框里有字，只在码被要着的时候。
@@ -133,7 +136,7 @@ import client.spec.Views.Workspace
 | `answered.ts` | 1 判定 | `readAnswer(answer, pick) -> Answered<T>`，`Answered = asking \| held { value } \| unavailable { query }`：一个视图只画一种变体，槽里的其余答案仍是答案——`Answer::Unavailable` 带回城拼写的那一问，别的变体以自己的键名为 `query`；视图用 `views/parts/unanswered.svelte` 画它，恢复是 `asking.refresh` 再问一次。不折成「还在问」或「空」，因为那两种读法把「城没能看」说成「城在忙」或「城是空的」 |
 | `frames.ts` | 4 适配器 | `decodeFrame(text) -> ServerFrame \| null`（event／delta 帧走窄校验快路，其余经 `Schema.decodeUnknownResult`）, `encodeFrame(ClientFrame)` |
 | `staleness.ts` | 1 判定 | `reachOf(name, kind) -> Reach`（`every`／`none`／`same_run`／`newest_page`）与 `reaches(reach, key, run)`：事件到查询的失效表，按问题名判，不按每条答案判。**一次写的回执就是它让哪个答案失效**：`governed_document_written` 让 `identity` 失效（「你与主 Agent」两张卡的保存回执是城重答的新版本，4-36），`rules_changed` 让 `config` 与楼里的 `document` 失效（`RULES.toml` 与城层 `CONFIG.toml` 的保存经 `rules_changed` 入账），`building_configured` 让 `config` 失效；`automation` 不失效，因为 `SCHEDULE.toml`／`WATCH.toml` 由人手改、城不为它们写记录；`sessions` 被 `session_opened`、`run_started`、`run_frozen` 置旧，作用面是 `every`，因为一段的最后一行与 run 数在这三个时刻移动，信箱与会话栏才看得到新开的一段 |
-| `asking.ts` | 1 判定 | `createAsking(send) -> Asking { ask(query) -> Readable<Answer\|undefined>, refresh, answered, invalidate(record), reconnected, resumed }`（`reconnected` 标旧重问全部，`resumed` 只重发在途的；`Readable` 皆为 `svelte/store` 面，模板以 `$` 订阅）；`QUERIES` 是每个问题名的唯一拼写，`COMMITS_PAGE` 与 `commitsQuery(building, before)` 见 4-15，`HELD_CAP` 是页面保留的答案数上界（超过时丢掉最久没用、也没人看着的那一个，所以开了一周的标签页与第一天持有一样多），`keyOf` 是问题的合并键，`askedIn(subject)` 从本页自己写出的拒绝（如 `E_TIMEOUT`）的 subject 读回那个问题的线上名字；答案按内容匹配问题，无名者按到达序；失效按 `staleness.ts` 的表 |
+| `asking.ts` | 1 判定 | `createAsking(send) -> Asking { ask(query) -> Readable<Answer\|undefined>, refresh, answered, invalidate(record), reconnected, resumed }`（`reconnected` 标旧重问全部，`resumed` 只重发在途的；`Readable` 皆为 `svelte/store` 面，模板以 `$` 订阅）；`QUERIES` 是每个问题名的唯一拼写，`COMMITS_PAGE` 与 `commitsQuery(building, before)` 见 4-15，`HELD_CAP` 是页面保留的答案数上界（超过时丢掉最久没用、也没人看着的那一个，所以开了一周的标签页与第一天持有一样多），`keyOf` 是问题的合并键，耐心按问题定（`patienceOf`：一般 15 s，读主机的 `privacy` 120 s，因为它经 Windows PowerShell 读计划任务，一次可超过 15 s；较快的问题排在后面仍按自己的期限判迟），`askedIn(subject)` 从本页自己写出的拒绝（如 `E_TIMEOUT`）的 subject 读回那个问题的线上名字；答案按内容匹配问题，无名者按到达序；失效按 `staleness.ts` 的表 |
 | `belief.ts` | 7 投影 | `createBelief(now) -> BeliefStore { belief, adoptCity, apply(record) -> string \| null, say(delta), logged(line), refused(error), named(city), noticesSeen, forget, batch(folds) }`——`now` 是取时刻的那一个入口；`batch` 里的折叠只在最外层结束时 `set` 一次，`socket.ts` 的 `drain`（连同其中 `filled` 折的缺口页）与 welcome 各是一批，所以两帧之间的一串记录是一次更新、一次重绘；`forget` 在账本换了（welcome 的 `epoch` 变了）时丢弃全部折叠。**`apply` 答的是它读不出的字段名**（如 `tool_called.name`），`null` 才是读全了：一份形状不对的载荷仍然推进位置，但不静默当作缺席 |
 | `belief/shape.ts` | 6 数据 | `Belief { runs, live, rooms, cancelled, halted, haltedAt, refusal, notices, city, sessions, policies, probed, logs }`（`policies` 是每个房间最新的一次 `run_policy_changed`，按 seq 只向前写：会话菜单从它起改，对话在它落下的位置画一行「从下一步起：<模式>，<写入限制>」，它不在当前一段里时两处都读 run 开场的 `Opening.policy`）；`RunBelief { run, addr, started, task, lastSeq, doing, model, pr, ask, local, saying, thinking }`；`Notice { error, seen, at: TimeMs, key, count, about: Address \| RunId \| null }`；`merged(notices, error, at)` 按 `key`（`code + subject`）合并同文并计 `count`，`at` 取首见时刻；`LOG_WINDOW` 与 `NOTICE_WINDOW` 是页面持有多少日志行与通知的唯一答案 |
 | `belief/fold.ts` | 7 投影 | `unseen(run, at) -> RunBelief`（页面第一次见到的 run）、`fold(held, record) -> [RunBelief, string \| null]`：一条记录对一个 run 做了什么；记录属于哪个 run、是不是新的，由 `belief.ts` 判 |
@@ -285,7 +288,7 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
 
 /-! ## 9 工作流程
 
-收键部件的状态机是本规格形式化的那一部分，各在自己的分部：`views/parts/` 的键表与焦点还原在 `client/spec/Views/Parts.lean`（§7、§7-1 至 §7-7、§7-10），每个复合部件的模型在 `client/spec/Views/Parts/` 下，外壳的控件在 `client/spec/Views/Workspace.lean`（§7-11），检视面的页签带在 `client/spec/Views/Inspect/Open.lean`，工作台的分隔线在 `client/spec/Core/Workbench.lean`，远程组的门开关与确认码输入框在 `client/spec/Views/Door.lean`。模型只保留键与焦点的次序，不规定一帧里先画什么：画法由视图决定，`cargo xtask render` 量它落在哪。
+收键部件的状态机是本规格形式化的那一部分，各在自己的分部：`views/parts/` 的键表与焦点还原在 `client/spec/Views/Parts.lean`（§7、§7-1 至 §7-7、§7-10），每个复合部件的模型在 `client/spec/Views/Parts/` 下，外壳的控件在 `client/spec/Views/Workspace.lean`（§7-11），检视面的页签带在 `client/spec/Views/Inspect/Open.lean`，工作台的分隔线在 `client/spec/Core/Workbench.lean`，远程组的门开关与确认码输入框在 `client/spec/Views/Door.lean`，隐私组每一项的确认与结果在 `client/spec/Views/Privacy.lean`。模型只保留键与焦点的次序，不规定一帧里先画什么：画法由视图决定，`cargo xtask render` 量它落在哪。
 -/
 
 /-! ## 10 实现逻辑
@@ -490,7 +493,7 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
 | 运行 | 运行（权限与运行策略的默认）、规则 | 自动化 | — |
 | 扩展 | 技能、MCP（`#/mcp`） | — | — |
 | 偏好 | 外观、配色、快捷键 | — | — |
-| 诊断 | 记录、性能（`#/monitor`）、依赖 | 关于这一版、上手指南（`#/welcome`）、高级 | 记录：每个透镜一项（`#/record/<lens>`） |
+| 诊断 | 记录、性能（`#/monitor`）、依赖 | 关于这一版、上手指南（`#/welcome`）、高级、隐私（高级组里另有一条链接到它） | 记录：每个透镜一项（`#/record/<lens>`） |
 
 **分组按对象分**（D52）：城是这座城自己的事实，接入是城能够到什么，运行是一个 run 被允许做什么，扩展是城装进来的技能与 MCP，偏好只属于这个人（外观与配色随城的偏好文件走，D47 的档位与工作台留在这个标签页与这个浏览器），诊断是出了事去看的地方。还没有页的条目不进树，等它的页落地再加：运行枝的沙箱与工具、扩展枝技能下的审核与调用记录、MCP 下的调用记录；树上不放按不动的条目。楼的子条目今天开的是楼页，楼页里有这栋楼的规则、技能、MCP 与文件各节（4-50），等它们各有地址时再成为楼下的第三级。**「你与主 Agent」是城枝的第一项，也是设置面第一次打开时画的组**：身份按城保存（refrain 路线图 §3-13），所以它是这座城的事实，而它是人第一次打开设置时最该先看见的那一组。从对话页到任何一页最多是「设置键、枝、条目」三步，楼与记录的子项与「更多」里的项多一步。**性能条目带一行进程读数**（处理器与工作集，`core/monitor.ts` 的 `summary`）：设置树画着时页面向监视器要摘要（`watchSummary`），城只在有人看时采样（`docs/frontend-method.md` §7D）。
 

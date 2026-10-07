@@ -1103,6 +1103,2934 @@
     "en": "The two versions read the same text.",
     "zh": "两版读出的文字相同。"
   },
+  "privacy_control_powershell_telemetry_optout_title": {
+    "en": "PowerShell 7 telemetry (current user)",
+    "zh": "PowerShell 7 遥测（当前用户）"
+  },
+  "privacy_control_powershell_telemetry_optout_does": {
+    "en": "Sets POWERSHELL_TELEMETRY_OPTOUT=1 in the current user's persistent environment, so PowerShell 7 started afterwards sends no usage telemetry. The original spelling lacked two underscores; the official name is written.",
+    "zh": "在当前用户的持久环境变量中设置 POWERSHELL_TELEMETRY_OPTOUT=1，此后新启动的 PowerShell 7 不发送使用遥测。原文拼写少了两个下划线，按官方名称写入。"
+  },
+  "privacy_control_powershell_telemetry_optout_benefit": {
+    "en": "PowerShell stops reporting start-up and usage statistics to Microsoft.",
+    "zh": "PowerShell 不再向 Microsoft 报告启动和使用统计。"
+  },
+  "privacy_control_powershell_telemetry_optout_affects": {
+    "en": "Affects only PowerShell 7 started later; running processes, Windows PowerShell 5.1 and other programs are unaffected. sprawling scrubs the environment of the commands it starts, so the pwsh it launches does not inherit this variable.",
+    "zh": "只影响之后启动的 PowerShell 7；已在运行的进程、Windows PowerShell 5.1 和其他程序不受影响。sprawling 为命令清洗环境，它启动的 pwsh 不继承此变量。"
+  },
+  "privacy_control_powershell_telemetry_optout_overlooked": {
+    "en": "Applies only to PowerShell 7 started afterwards, so open windows must be reopened. It covers the current user only; other accounts, services and scheduled tasks running as SYSTEM are not covered (a machine-wide variable needs an operation kind this version lacks). sprawling scrubs the environment of the commands it starts, so pwsh run by an Agent inside sprawling does not see this variable. Since PowerShell 7.5.7, turning off 'Send optional diagnostic data' in Windows also turns off PowerShell telemetry.",
+    "zh": "只对之后新启动的 PowerShell 7 生效，已打开的窗口要重开；只覆盖当前用户，其他账户、服务和以 SYSTEM 运行的计划任务不受影响（整机变量需要本版没有的操作种类）。sprawling 给它启动的命令清洗环境，Agent 在 sprawling 里运行的 pwsh 读不到这个变量。PowerShell 7.5.7 起，在 Windows 里关闭“发送可选诊断数据”也会关闭 PowerShell 遥测。"
+  },
+  "privacy_control_powershell_telemetry_optout_undo": {
+    "en": "Writes back the value recorded before apply, or deletes only this variable if it was absent, then broadcasts the environment change again; processes already running are unaffected.",
+    "zh": "写回应用前记录的值，或在原先不存在时只删除这个变量，然后再次广播环境变更；已经运行的进程不受影响。"
+  },
+  "privacy_control_powershell_telemetry_optout_editions": {
+    "en": "PowerShell 7 reads this variable on every platform, whatever the Windows edition; it has no effect on Windows PowerShell 5.1.",
+    "zh": "PowerShell 7 在所有平台读取这个变量，与 Windows 版本无关；对 Windows PowerShell 5.1 没有效果。"
+  },
+  "privacy_control_ceip_consolidator_task_title": {
+    "en": "CEIP scheduled task Consolidator",
+    "zh": "CEIP 计划任务 Consolidator"
+  },
+  "privacy_control_ceip_consolidator_task_does": {
+    "en": "Disables the scheduled task Consolidator (Customer Experience Improvement Program). When the user has consented to CEIP, this task collects and sends usage data. It is disabled, never deleted; when the task is absent on this host the page says so and writes nothing.",
+    "zh": "停用计划任务 Consolidator（客户体验改善计划）。用户同意参加 CEIP 时，该任务收集并发送使用数据。只停用，不删除；这台电脑没有此任务时显示“这台电脑没有此任务”，不写入。"
+  },
+  "privacy_control_ceip_consolidator_task_benefit": {
+    "en": "The task no longer collects and sends usage data on its schedule.",
+    "zh": "该任务以后不再按计划收集和发送使用数据。"
+  },
+  "privacy_control_ceip_consolidator_task_affects": {
+    "en": "The quality feedback the task provides is lost; the extra benefit after leaving CEIP is unknown.",
+    "zh": "失去该任务提供的质量反馈；已退出 CEIP 时额外收益未知。"
+  },
+  "privacy_control_ceip_consolidator_task_overlooked": {
+    "en": "By the task's own description it collects and sends data only when the user has consented to CEIP; on a machine where 'Turn off Windows CEIP' is applied, disabling it removes no further data. The task is disabled, never deleted.",
+    "zh": "按任务自己的说明，只有用户同意参加 CEIP 时它才收集和发送数据；已应用“关闭 Windows 客户体验改善计划”的机器上，停用它不再多减少数据。只停用，不删除。"
+  },
+  "privacy_control_ceip_consolidator_task_undo": {
+    "en": "Enables the task again if it was enabled before apply; if the task definition changed in between, nothing is written and the page reports a conflict.",
+    "zh": "应用前任务是启用的，就重新启用；任务定义在此期间被改过时不写，页面报告冲突。"
+  },
+  "privacy_control_ceip_consolidator_task_editions": {
+    "en": "Depends on whether the task exists on this host, not on the edition; the full path is resolved at run time and nothing is written when it is absent.",
+    "zh": "取决于这台电脑是否有这个任务，与版本无关；运行时按完整路径解析，没有就不写。"
+  },
+  "privacy_control_ceip_usb_task_title": {
+    "en": "CEIP scheduled task UsbCeip",
+    "zh": "CEIP 计划任务 UsbCeip"
+  },
+  "privacy_control_ceip_usb_task_does": {
+    "en": "Disables the scheduled task UsbCeip (Customer Experience Improvement Program). When the user participates in CEIP it collects USB-related statistics and machine information and sends them to Microsoft. It is disabled, never deleted; when the task is absent on this host the page says so and writes nothing.",
+    "zh": "停用计划任务 UsbCeip（客户体验改善计划）。用户参加 CEIP 时，它收集 USB 相关统计和这台电脑的信息并发给微软。只停用，不删除；这台电脑没有此任务时显示“这台电脑没有此任务”，不写入。"
+  },
+  "privacy_control_ceip_usb_task_benefit": {
+    "en": "The task no longer collects and sends USB statistics on its schedule.",
+    "zh": "该任务不再按计划收集和发送 USB 统计。"
+  },
+  "privacy_control_ceip_usb_task_affects": {
+    "en": "Microsoft no longer receives USB statistics from this machine; no first-hand source says it affects how USB devices work.",
+    "zh": "微软收不到这台电脑的 USB 统计；没有一手资料说它影响 USB 设备本身的工作。"
+  },
+  "privacy_control_ceip_usb_task_overlooked": {
+    "en": "The task's own description says it does nothing when the user has not joined CEIP; with 'Turn off Windows CEIP' applied, disabling it removes no further data. It does not restrict USB devices or file access. The task is disabled, never deleted.",
+    "zh": "任务说明原文写明：用户没有加入 CEIP 时它什么都不做；已应用“关闭 Windows 客户体验改善计划”的机器上，停用它不再多减少数据。它不限制 USB 设备或文件访问。只停用，不删除。"
+  },
+  "privacy_control_ceip_usb_task_undo": {
+    "en": "Enables the task again if it was enabled before apply; if the task definition changed in between, nothing is written and the page reports a conflict.",
+    "zh": "应用前任务是启用的，就重新启用；任务定义在此期间被改过时不写，页面报告冲突。"
+  },
+  "privacy_control_ceip_usb_task_editions": {
+    "en": "Depends on whether the task exists on this host, not on the edition; the full path is resolved at run time and nothing is written when it is absent.",
+    "zh": "取决于这台电脑是否有这个任务，与版本无关；运行时按完整路径解析，没有就不写。"
+  },
+  "privacy_control_windows_ceip_title": {
+    "en": "Windows Customer Experience Improvement Program",
+    "zh": "Windows 客户体验改善计划"
+  },
+  "privacy_control_windows_ceip_does": {
+    "en": "Enables the policy 'Turn off Windows Customer Experience Improvement Program', opting all users out of Windows CEIP. The letter O in the original is corrected to the digit 0.",
+    "zh": "启用“关闭 Windows 客户体验改善计划”策略，所有用户退出 Windows CEIP。原文的字母 O 改为数字 0。"
+  },
+  "privacy_control_windows_ceip_benefit": {
+    "en": "Windows stops collecting usage information under CEIP.",
+    "zh": "Windows 不再以 CEIP 名义收集使用情况。"
+  },
+  "privacy_control_windows_ceip_affects": {
+    "en": "CEIP quality feedback is lost; other products' own telemetry is unaffected; 'similar keys' are not touched.",
+    "zh": "失去 CEIP 质量反馈；其他产品自己的遥测不受影响；“类似键”不处理。"
+  },
+  "privacy_control_windows_ceip_overlooked": {
+    "en": "The value runs opposite to its name: 0 opts out, and 1 would opt every user in. Turning CEIP off also turns off Application Telemetry and the Inventory Collector. CEIP is not the main Windows 10/11 diagnostic channel; the 'diagnostic data level' entry governs that.",
+    "zh": "值的方向与名字相反：0 表示退出，写 1 会让所有用户加入 CEIP。关闭 CEIP 时 Windows 同时关闭 Application Telemetry 和 Inventory Collector。CEIP 不是 Windows 10/11 主要的诊断数据通道，那由“诊断数据级别”一项管理。"
+  },
+  "privacy_control_windows_ceip_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。"
+  },
+  "privacy_control_windows_ceip_editions": {
+    "en": "Template: at least Windows Vista; CSP (ADMX_ICM/CEIPEnable): Windows 10 2004 with KB5005101 and later, Windows 11. Microsoft's CSP edition table does not list Home; whether Home applies it is not stated.",
+    "zh": "模板：至少 Windows Vista；CSP（ADMX_ICM/CEIPEnable）：Windows 10 2004 + KB5005101 起、Windows 11。微软的 CSP 版本表没有列出 Home，Home 上是否执行没有说明。"
+  },
+  "privacy_control_diagnostic_data_title": {
+    "en": "Diagnostic data level",
+    "zh": "诊断数据级别"
+  },
+  "privacy_control_diagnostic_data_does": {
+    "en": "Sets the Windows diagnostic data policy to 0 (diagnostic data off). Only Enterprise, Education and Server editions treat it as off; other editions treat 0 as 1 (required diagnostic data only).",
+    "zh": "把 Windows 诊断数据策略设为 0（诊断数据关闭）。只有 Enterprise、Education 和 Server 版本按“关闭”执行；其他版本 Windows 把 0 当作 1（仅必需诊断数据）。"
+  },
+  "privacy_control_diagnostic_data_benefit": {
+    "en": "On supported editions, Windows and its components stop sending diagnostic data to Microsoft.",
+    "zh": "在支持的版本上，Windows 及其组件不再向 Microsoft 发送诊断数据。"
+  },
+  "privacy_control_diagnostic_data_affects": {
+    "en": "Microsoft and the organisation no longer receive update-failure, compatibility and reliability data, and management services that need diagnostic data (such as update reports) are affected; Windows Update and Defender stay on, and third-party programs are unaffected.",
+    "zh": "Microsoft 和组织收不到更新失败、兼容性和可靠性资料，依赖诊断数据的管理服务（如更新报告）受影响；不关闭 Windows Update 或 Defender，不影响第三方程序。"
+  },
+  "privacy_control_diagnostic_data_overlooked": {
+    "en": "On Home and Pro the result is 'required diagnostic data only', not off. The 'Optional diagnostic data' switch in Settings is locked and the level cannot be raised; Settings may not display a 0 set by policy. On editions that honour 'off', update-failure information also stops reaching Microsoft. It covers Windows components only, not third-party or Microsoft 365 apps. A user-level twin policy exists; when both are set the more restrictive one applies.",
+    "zh": "Home 与 Pro 上结果是“仅必需诊断数据”，不是关闭。设置中“可选诊断数据”开关被锁定，用户不能调高级别；设置页可能不显示由策略设的 0。在执行“关闭”的版本上，更新失败的信息也不再发给微软。只管 Windows 组件，不管第三方或 Microsoft 365 应用。同名用户级策略存在，两者都设时取更严格的一个。"
+  },
+  "privacy_control_diagnostic_data_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。"
+  },
+  "privacy_control_diagnostic_data_editions": {
+    "en": "Value 0 means 'off' only on Enterprise, Education and Server; on other editions it equals 1 (required diagnostic data only), which is also the lowest level those editions offer. IoT Enterprise is not named. Windows 10 / Server 2016 and later.",
+    "zh": "值 0 只在 Enterprise、Education、Server 上表示“关闭”；在其他版本上等同于 1（仅必需诊断数据），这也是那些版本能设的最低级别。IoT Enterprise 没有被单独点名。Windows 10 / Server 2016 起。"
+  },
+  "privacy_control_voice_activation_title": {
+    "en": "Voice activation of apps",
+    "zh": "应用语音激活"
+  },
+  "privacy_control_voice_activation_does": {
+    "en": "Force-denies activation of Windows apps by voice keyword (Windows 10 1903 and later).",
+    "zh": "强制拒绝 Windows 应用通过语音关键词被激活（Windows 10 1903 起）。"
+  },
+  "privacy_control_voice_activation_benefit": {
+    "en": "When no voice assistant is used, apps no longer wait for a wake word in the background.",
+    "zh": "不用语音助手时，应用不再在后台等待唤醒词。"
+  },
+  "privacy_control_voice_activation_affects": {
+    "en": "Apps that rely on a wake word cannot be woken by voice; ordinary recording, push-to-talk dictation and desktop programs' microphone access are not restricted by this item.",
+    "zh": "依赖唤醒词的应用不能被语音唤醒；普通录音、按键听写和桌面程序的麦克风访问不受此项限制。"
+  },
+  "privacy_control_voice_activation_overlooked": {
+    "en": "It does not turn off the microphone or restrict recording by apps (that is the 'apps access the microphone' entry); it binds Windows apps only, not desktop programs; the Settings switch for voice activation is locked.",
+    "zh": "不关闭麦克风，也不限制应用录音（那是“应用访问麦克风”一项）；只管 Windows 应用，桌面程序不受约束；设置中“允许应用使用语音激活”开关被锁定。"
+  },
+  "privacy_control_voice_activation_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。"
+  },
+  "privacy_control_voice_activation_editions": {
+    "en": "CSP: Windows 10 1903 and later. The template also names Server. Microsoft's CSP edition table does not list Home; whether Home applies it is not stated.",
+    "zh": "CSP：Windows 10 1903 起。模板也列出 Server。微软的 CSP 版本表没有列出 Home，Home 上是否执行没有说明。"
+  },
+  "privacy_control_voice_activation_above_lock_title": {
+    "en": "Voice activation of apps while locked",
+    "zh": "锁屏时应用语音激活"
+  },
+  "privacy_control_voice_activation_above_lock_does": {
+    "en": "Force-denies voice activation of Windows apps while the system is locked. The original's 'microphone hardware disabled' is inaccurate: this policy does not turn off the microphone hardware.",
+    "zh": "强制拒绝系统锁定时 Windows 应用被语音激活。原文“麦克风硬件禁用”不准确：此策略不关闭麦克风硬件。"
+  },
+  "privacy_control_voice_activation_above_lock_benefit": {
+    "en": "Nobody can call an app by voice while the screen is locked.",
+    "zh": "他人不能在锁屏状态下通过语音调用应用。"
+  },
+  "privacy_control_voice_activation_above_lock_affects": {
+    "en": "Voice assistants cannot be used on the lock screen; once K12 denies activation this item adds nothing.",
+    "zh": "锁屏时不能使用语音助手；K12 已拒绝时此项没有额外作用。"
+  },
+  "privacy_control_voice_activation_above_lock_overlooked": {
+    "en": "The CSP says this applies only when voice activation itself is allowed; with the previous entry applied (voice activation denied) this entry adds nothing. The original's claim that it disables the microphone hardware at sign-in is not accurate.",
+    "zh": "CSP 写明本项只在“语音激活”本身允许时起作用；已应用上一项（语音激活 = 拒绝）时，本项不再增加效果。原文说它在登录时禁用麦克风硬件，这不准确。"
+  },
+  "privacy_control_voice_activation_above_lock_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。"
+  },
+  "privacy_control_voice_activation_above_lock_editions": {
+    "en": "CSP: Windows 10 1903 and later. The template also names Server. Microsoft's CSP edition table does not list Home; whether Home applies it is not stated.",
+    "zh": "CSP：Windows 10 1903 起。模板也列出 Server。微软的 CSP 版本表没有列出 Home，Home 上是否执行没有说明。"
+  },
+  "privacy_control_location_provider_title": {
+    "en": "Windows Location Provider",
+    "zh": "Windows 位置提供程序"
+  },
+  "privacy_control_location_provider_does": {
+    "en": "Enables the policy 'Turn off Windows Location Provider', which the template defines as no program on this computer being able to use the Windows Location Provider.",
+    "zh": "启用策略“关闭 Windows 位置提供程序”：模板定义为这台电脑所有程序不能使用 Windows Location Provider。"
+  },
+  "privacy_control_location_provider_benefit": {
+    "en": "On the versions the template declares, programs cannot obtain location through the Windows Location Provider.",
+    "zh": "在模板声明支持的版本上，程序不能经 Windows Location Provider 取得位置。"
+  },
+  "privacy_control_location_provider_affects": {
+    "en": "On Windows 8/8.1, location features that rely on this provider stop; on Windows 10/11 the effect is not documented first-hand.",
+    "zh": "在 Windows 8/8.1 上依赖该提供程序的定位功能失效；在 Windows 10/11 上效果没有一手说明。"
+  },
+  "privacy_control_location_provider_overlooked": {
+    "en": "Windows' own template marks this 'Windows 8/8.1 only'; no first-hand source says whether it changes anything on Windows 10/11. Microsoft's Windows 10/11 connection-management guide turns location off with the 'turn off location (machine)' entry and never mentions this value. Applying it does not mean location is off.",
+    "zh": "Windows 自己的模板把这项标为“仅 Windows 8/8.1”；在 Windows 10/11 上它是否改变任何行为，没有一手说明。微软的 Windows 10/11 连接管理指南关闭定位用的是“关闭定位（整机）”一项，完全没有提到这个值。应用本项不能当作定位已经关闭。"
+  },
+  "privacy_control_location_provider_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。"
+  },
+  "privacy_control_location_provider_editions": {
+    "en": "Two first-hand sources disagree: the template says 'Windows Server 2012, Windows 8, Windows 8.1 only'; the CSP (ADMX_LocationProviderAdm) lists Pro, Enterprise, Education and IoT Enterprise on Windows 10 2004 with KB5005101 and later and Windows 11. Microsoft's CSP edition table does not list Home.",
+    "zh": "两份一手来源不一致：模板写“仅 Windows Server 2012、Windows 8、Windows 8.1”；CSP（ADMX_LocationProviderAdm）列出 Windows 10 2004 + KB5005101 起与 Windows 11 的 Pro、Enterprise、Education、IoT Enterprise。微软的 CSP 版本表没有列出 Home。"
+  },
+  "privacy_control_location_feature_title": {
+    "en": "Location (machine)",
+    "zh": "定位（整机）"
+  },
+  "privacy_control_location_feature_does": {
+    "en": "Turns off the Windows location feature (machine policy).",
+    "zh": "关闭 Windows 定位功能（机器策略）。"
+  },
+  "privacy_control_location_feature_benefit": {
+    "en": "Programs cannot obtain this machine's location through the Windows location feature.",
+    "zh": "程序不能通过 Windows 定位功能取得这台电脑的位置。"
+  },
+  "privacy_control_location_feature_affects": {
+    "en": "Navigation, automatic time zone, Find my device and other features that use system location stop working; websites can still infer the region from the IP address.",
+    "zh": "导航、自动时区、查找我的设备等依赖系统定位的功能失效；网站仍可按 IP 推断地区。"
+  },
+  "privacy_control_location_feature_overlooked": {
+    "en": "Every location privacy switch is greyed out and cannot be changed; automatic time zone, Find my device and other location-based features stop. Windows still determines and shares precise location during an emergency call; a few features such as taskbar weather still estimate location from the IP address; desktop programs and third-party services may still estimate location from Bluetooth, IP or a cellular modem.",
+    "zh": "所有定位隐私开关变灰，用户不能更改；自动时区、查找我的设备等依赖定位的功能停止。紧急呼叫时 Windows 仍会确定并共享精确位置；任务栏天气等少数功能仍用 IP 地址估计位置；桌面程序和第三方服务仍可能用蓝牙、IP 或蜂窝模块估计位置。"
+  },
+  "privacy_control_location_feature_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。"
+  },
+  "privacy_control_location_feature_editions": {
+    "en": "CSP (System/AllowLocation): Windows 10 1507 and later. The template also names Server. Microsoft's CSP edition table does not list Home; whether Home applies it is not stated.",
+    "zh": "CSP（System/AllowLocation）：Windows 10 1507 起。模板也列出 Server。微软的 CSP 版本表没有列出 Home，Home 上是否执行没有说明。"
+  },
+  "privacy_control_search_web_title": {
+    "en": "Web search option in Windows Search",
+    "zh": "Windows 搜索的网页搜索选项"
+  },
+  "privacy_control_search_web_does": {
+    "en": "Stops Windows Search from offering web search.",
+    "zh": "禁止 Windows 搜索提供网页搜索。"
+  },
+  "privacy_control_search_web_benefit": {
+    "en": "What is typed into the Start menu search box is no longer sent as a web search.",
+    "zh": "在开始菜单搜索框里输入的内容不再作为网页搜索发出。"
+  },
+  "privacy_control_search_web_affects": {
+    "en": "Start menu search no longer shows web results; browsers and sprawling's search provider are unaffected. Official documentation covers Enterprise and Server.",
+    "zh": "开始菜单搜索不再给出网页结果；浏览器和 sprawling 的搜索 Provider 不受影响。官方文档范围是 Enterprise 与 Server。"
+  },
+  "privacy_control_search_web_overlooked": {
+    "en": "It may have no effect on Windows 10/11; web results in Start and taskbar search are governed by the 'search does not use web results' entry.",
+    "zh": "在 Windows 10/11 上可能没有效果；开始菜单和任务栏搜索的网页结果由“搜索不使用网页结果”一项管理。"
+  },
+  "privacy_control_search_web_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。"
+  },
+  "privacy_control_search_web_editions": {
+    "en": "The template declares it for Windows Search 3.01 or later on Windows XP or Server 2003 and has no CSP mapping; only the Enterprise connection-management guide lists it for Windows 10/11 and gives the value 1.",
+    "zh": "模板写明适用于 Windows XP 或 Server 2003 上的 Windows Search 3.01 及以后，没有 CSP 映射；只有面向 Enterprise 的连接管理指南把它列给 Windows 10/11，并给出值 1。"
+  },
+  "privacy_control_search_web_results_title": {
+    "en": "Web results in Search",
+    "zh": "搜索中的网页结果"
+  },
+  "privacy_control_search_web_results_does": {
+    "en": "Makes Windows Search neither search the web nor show web results.",
+    "zh": "让 Windows 搜索不搜索网页、不显示网页结果。"
+  },
+  "privacy_control_search_web_results_benefit": {
+    "en": "Search returns local results only, and input is not used for web queries.",
+    "zh": "搜索只给本地结果，输入不用于网页查询。"
+  },
+  "privacy_control_search_web_results_affects": {
+    "en": "The official CSP does not support Pro; it does not guarantee the search component makes no network connection.",
+    "zh": "官方 CSP 不支持 Pro 版；不能保证搜索组件没有任何网络连接。"
+  },
+  "privacy_control_search_web_results_overlooked": {
+    "en": "The value runs opposite to its name: 0 means no web search. On Pro web results keep appearing, and Home is not listed. It does not promise that the search component makes no network connection.",
+    "zh": "值的方向与名字相反：0 表示不搜索网页。Pro 上网页结果照旧出现，Home 未列出。它不保证搜索组件完全不联网。"
+  },
+  "privacy_control_search_web_results_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。"
+  },
+  "privacy_control_search_web_results_editions": {
+    "en": "The CSP (Search/DoNotUseWebResults) marks Pro unsupported and lists Enterprise, Education and IoT Enterprise, Windows 10 1803 and later; Home is not listed.",
+    "zh": "CSP（Search/DoNotUseWebResults）把 Pro 标为不支持，列出 Enterprise、Education、IoT Enterprise，Windows 10 1803 起；Home 没有列出。"
+  },
+  "privacy_control_tailored_experiences_title": {
+    "en": "Tailored experiences from diagnostic data (current user)",
+    "zh": "基于诊断数据的定制体验（当前用户）"
+  },
+  "privacy_control_tailored_experiences_does": {
+    "en": "The original preference key is unverified; the official user policy 'Do not use diagnostic data for tailored experiences' is written instead.",
+    "zh": "原项的偏好键未获证实，改写正式用户策略“不使用诊断数据提供定制体验”。"
+  },
+  "privacy_control_tailored_experiences_benefit": {
+    "en": "Windows no longer uses diagnostic data to personalise tips and recommendations.",
+    "zh": "Windows 不再依据诊断数据推送个性化提示和推荐。"
+  },
+  "privacy_control_tailored_experiences_affects": {
+    "en": "Tips, suggestions and offers may still appear, only less relevant; diagnostic data collection does not stop.",
+    "zh": "提示、建议和优惠仍可能出现，只是相关度更低；不停止诊断数据收集。"
+  },
+  "privacy_control_tailored_experiences_overlooked": {
+    "en": "Tips and offers may still appear, only less relevant; diagnostic data collection continues. It applies to the current user only, so each account applies it separately. It is written under HKCU\\Software\\Policies; whether a standard account may write there is not documented, and if Windows refuses, the page shows access denied and changes nothing. The original preference key is not written; Microsoft's formal user policy is.",
+    "zh": "提示和推荐仍可能出现，只是相关性降低；诊断数据照常收集。只对当前用户生效，每个账户要各自应用。写在 HKCU\\Software\\Policies 下，标准账户能否写入没有文档说明，被拒绝时页面显示访问被拒绝，不做更改。原文的偏好键没有写，写的是微软正式的用户策略。"
+  },
+  "privacy_control_tailored_experiences_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。"
+  },
+  "privacy_control_tailored_experiences_editions": {
+    "en": "CSP (Experience/AllowTailoredExperiencesWithDiagnosticData): user scope, Windows 10 1703 and later. The template also names Server. Microsoft's CSP edition table does not list Home; whether Home applies it is not stated.",
+    "zh": "CSP（Experience/AllowTailoredExperiencesWithDiagnosticData）：用户作用域，Windows 10 1703 起。模板也列出 Server。微软的 CSP 版本表没有列出 Home，Home 上是否执行没有说明。"
+  },
+  "privacy_control_spotlight_title": {
+    "en": "All Windows spotlight features (current user)",
+    "zh": "全部 Windows Spotlight 功能（当前用户）"
+  },
+  "privacy_control_spotlight_does": {
+    "en": "ContentDeliveryManager is a container, not a value; the official user policy 'Turn off all Windows spotlight features' is written instead.",
+    "zh": "ContentDeliveryManager 是一个容器而不是一个值；改写正式用户策略“关闭所有 Windows 聚焦功能”。"
+  },
+  "privacy_control_spotlight_benefit": {
+    "en": "Spotlight lock-screen images, Windows tips and consumer feature suggestions are no longer downloaded, reducing that network traffic.",
+    "zh": "锁屏聚焦图片、Windows 提示和消费者功能推荐不再下载，相关网络流量减少。"
+  },
+  "privacy_control_spotlight_affects": {
+    "en": "Spotlight images and tips are lost; the official CSP supports Enterprise and Education, not Pro; it does not cover every recommendation.",
+    "zh": "失去聚焦图片与提示；官方 CSP 只支持 Enterprise、Education，不支持 Pro；不覆盖所有推荐。"
+  },
+  "privacy_control_spotlight_overlooked": {
+    "en": "Microsoft marks Pro unsupported and does not list Home, so on those editions it most likely does nothing. Since October 2024 (KB5046633) the default desktop wallpaper can also be Spotlight. It applies to the current user only; it is written under HKCU\\Software\\Policies, and whether a standard account may write there is not documented. The original's ContentDeliveryManager is a key, not a value, and is not written.",
+    "zh": "Pro 上微软标为不支持，Home 未列出，这两个版本上很可能没有效果。2024 年 10 月（KB5046633）起默认桌面背景也可能是 Spotlight。只对当前用户生效；写在 HKCU\\Software\\Policies 下，标准账户能否写入没有文档说明。原文的 ContentDeliveryManager 是一个键而不是值，没有写。"
+  },
+  "privacy_control_spotlight_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。"
+  },
+  "privacy_control_spotlight_editions": {
+    "en": "The CSP (Experience/AllowWindowsSpotlight) marks Pro unsupported; Microsoft's Spotlight configuration page says 'Windows spotlight is available on Windows Enterprise and Education editions only'; the template excludes Server. Home is not listed.",
+    "zh": "CSP（Experience/AllowWindowsSpotlight）把 Pro 标为不支持；微软 Spotlight 配置页写明 “Windows spotlight is available on Windows Enterprise and Education editions only”；模板不适用于 Server。Home 没有列出。"
+  },
+  "privacy_control_online_speech_recognition_title": {
+    "en": "Online speech recognition (preference)",
+    "zh": "在线语音识别（偏好）"
+  },
+  "privacy_control_online_speech_recognition_does": {
+    "en": "Turns off Microsoft online speech recognition.",
+    "zh": "关闭 Microsoft 在线语音识别。"
+  },
+  "privacy_control_online_speech_recognition_benefit": {
+    "en": "Speech is no longer uploaded to the Microsoft online recognition service.",
+    "zh": "语音不再上传到 Microsoft 在线识别服务。"
+  },
+  "privacy_control_online_speech_recognition_affects": {
+    "en": "Windows online dictation and voice typing stop working; on-device recognition and third-party transcription (including sprawling's transcription endpoint) are unaffected.",
+    "zh": "Windows 在线听写和语音输入不可用；设备端识别和第三方转写（包括 sprawling 的转写 Endpoint）不受影响。"
+  },
+  "privacy_control_online_speech_recognition_overlooked": {
+    "en": "Windows 11 voice typing (Win+H) uses online speech recognition and stops working; only on-device features such as Narrator remain. This is a preference the user can switch back in Settings at any time. Third-party transcription, including sprawling's own transcription endpoint, is unaffected. The 'online speech (policy)' entry is stronger and locks the switch.",
+    "zh": "Windows 11 的语音输入（Win+H）依赖在线语音识别，会停止工作；只保留讲述人等设备端功能。这是偏好，用户随时可以在设置里改回。不影响第三方转写，包括 sprawling 自己的转写端点。“禁止在线语音（策略）”一项更强，并锁定开关。"
+  },
+  "privacy_control_online_speech_recognition_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。"
+  },
+  "privacy_control_online_speech_recognition_editions": {
+    "en": "Documented only in Microsoft's connection-management guide for Windows 10/11 Enterprise and Server 2016/2019; whether Home and Pro read this value is not stated. Home and Pro have the same Settings switch.",
+    "zh": "只在微软面向 Windows 10/11 Enterprise 与 Server 2016/2019 的连接管理指南中有记载；Home、Pro 是否读这个值没有说明。设置页在 Home、Pro 上有同名开关。"
+  },
+  "privacy_control_feedback_notifications_title": {
+    "en": "Feedback notifications",
+    "zh": "反馈通知"
+  },
+  "privacy_control_feedback_notifications_does": {
+    "en": "Hides Windows feedback request notifications.",
+    "zh": "隐藏 Windows 反馈请求通知。"
+  },
+  "privacy_control_feedback_notifications_benefit": {
+    "en": "Windows no longer pops up feedback questions on its own.",
+    "zh": "Windows 不再主动弹出反馈问卷。"
+  },
+  "privacy_control_feedback_notifications_affects": {
+    "en": "Only the feedback invitations are hidden; diagnostic data collection continues and the Feedback Hub can still be opened by hand.",
+    "zh": "只隐藏反馈邀请，不停止诊断数据收集，也不阻止手动打开反馈中心。"
+  },
+  "privacy_control_feedback_notifications_overlooked": {
+    "en": "It only hides prompts asking for feedback; diagnostic and usage data are still sent (Microsoft: feedback frequency applies only to user-generated feedback), and Feedback Hub can still be opened by hand.",
+    "zh": "只隐藏请求反馈的通知；诊断和使用数据照常发送（微软原文：反馈频率只适用于用户主动提交的反馈），反馈中心仍可手动打开。"
+  },
+  "privacy_control_feedback_notifications_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。"
+  },
+  "privacy_control_feedback_notifications_editions": {
+    "en": "CSP (Experience/DoNotShowFeedbackNotifications): Windows 10 1607 and later. The template also names Server. Microsoft's CSP edition table does not list Home; whether Home applies it is not stated.",
+    "zh": "CSP（Experience/DoNotShowFeedbackNotifications）：Windows 10 1607 起。模板也列出 Server。微软的 CSP 版本表没有列出 Home，Home 上是否执行没有说明。"
+  },
+  "privacy_control_implicit_text_collection_title": {
+    "en": "Learning from typing (preference)",
+    "zh": "从键入中学习（偏好）"
+  },
+  "privacy_control_implicit_text_collection_does": {
+    "en": "Stops Windows from implicitly learning text from your typing (personal dictionary).",
+    "zh": "停止 Windows 从你的输入中隐式学习文字（个人词库）。"
+  },
+  "privacy_control_implicit_text_collection_benefit": {
+    "en": "Names and words you type are no longer collected for personalisation.",
+    "zh": "你输入的姓名和词语不再被收集用于个性化。"
+  },
+  "privacy_control_implicit_text_collection_affects": {
+    "en": "Text recognition and word prediction become less personal; restoring the setting does not bring back learning data that was deleted.",
+    "zh": "文字识别和词语预测的个性化程度降低；恢复设置不能找回已删除的学习数据。"
+  },
+  "privacy_control_implicit_text_collection_overlooked": {
+    "en": "This is a user preference and can be switched back in Settings. Microsoft's recipe for turning off typing and inking data collection is the text and ink entries plus 'improve inking and typing recognition'; this entry is one of the three. Whether it deletes learned data is not documented. The machine policy form (which deletes stored data and locks Control Panel) writes two values at once and is not written in this version; see the candidate list.",
+    "zh": "这是用户偏好，可以在设置里改回。微软关闭键入与手写数据收集的做法是文本、手写两项再加“改进墨迹书写和键入识别”一项，本项只是其中之一。是否删除已学到的数据没有文档说明。机器级策略形式（会删除已存数据并锁定控制面板）一次写两个值，本版不写，见候选清单。"
+  },
+  "privacy_control_implicit_text_collection_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。"
+  },
+  "privacy_control_implicit_text_collection_editions": {
+    "en": "Documented only in Microsoft's connection-management guide for Windows 10/11 Enterprise and Server 2016/2019; whether Home and Pro read this value is not stated.",
+    "zh": "只在微软面向 Windows 10/11 Enterprise 与 Server 2016/2019 的连接管理指南中有记载；Home、Pro 是否读这个值没有说明。"
+  },
+  "privacy_control_implicit_ink_collection_title": {
+    "en": "Learning from handwriting (preference)",
+    "zh": "从手写中学习（偏好）"
+  },
+  "privacy_control_implicit_ink_collection_does": {
+    "en": "Stops Windows from implicitly learning from your handwriting.",
+    "zh": "停止 Windows 从你的手写中隐式学习笔迹。"
+  },
+  "privacy_control_implicit_ink_collection_benefit": {
+    "en": "Your handwriting samples are no longer collected for personalisation.",
+    "zh": "你的笔迹样本不再被收集用于个性化。"
+  },
+  "privacy_control_implicit_ink_collection_affects": {
+    "en": "Handwriting recognition adapts less to your writing; restoring the setting does not bring back learning data that was deleted.",
+    "zh": "手写识别对个人字形的适配降低；恢复设置不能找回已删除的学习数据。"
+  },
+  "privacy_control_implicit_ink_collection_overlooked": {
+    "en": "This is a user preference and can be switched back in Settings; it matters mainly on pen-capable devices (inference). Microsoft's recipe is the text and ink entries plus 'improve inking and typing recognition'. Whether it deletes learned data is not documented. The machine policy form is not written in this version; see the candidate list.",
+    "zh": "这是用户偏好，可以在设置里改回；主要在有笔的设备上有意义（推断）。微软的做法是文本、手写两项再加“改进墨迹书写和键入识别”一项。是否删除已学到的数据没有文档说明。机器级策略形式本版不写，见候选清单。"
+  },
+  "privacy_control_implicit_ink_collection_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。"
+  },
+  "privacy_control_implicit_ink_collection_editions": {
+    "en": "Documented only in Microsoft's connection-management guide for Windows 10/11 Enterprise and Server 2016/2019; whether Home and Pro read this value is not stated.",
+    "zh": "只在微软面向 Windows 10/11 Enterprise 与 Server 2016/2019 的连接管理指南中有记载；Home、Pro 是否读这个值没有说明。"
+  },
+  "privacy_control_handwriting_error_reports_title": {
+    "en": "Handwriting recognition error reports",
+    "zh": "手写识别错误报告"
+  },
+  "privacy_control_handwriting_error_reports_does": {
+    "en": "Prevents starting the handwriting recognition error reporting tool and sending its reports to Microsoft.",
+    "zh": "禁止启动手写识别错误报告工具，也不向 Microsoft 发送其报告。"
+  },
+  "privacy_control_handwriting_error_reports_benefit": {
+    "en": "Handwriting samples are not sent through that tool.",
+    "zh": "手写样本不会通过该工具发出。"
+  },
+  "privacy_control_handwriting_error_reports_affects": {
+    "en": "That reporting channel is lost; other error reporting stays on.",
+    "zh": "失去该报告渠道；不关闭其他错误报告。"
+  },
+  "privacy_control_handwriting_error_reports_overlooked": {
+    "en": "The tool belongs to the old Tablet PC Input Panel; its standalone template is gone from the 24H2 set, so it may have no effect on current Windows (inference). Other error reporting is unaffected.",
+    "zh": "这个工具属于旧的 Tablet PC 输入面板；独立模板已从 24H2 模板集中移除，在当前 Windows 上可能没有效果（推断）。其他错误报告不受影响。"
+  },
+  "privacy_control_handwriting_error_reports_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。"
+  },
+  "privacy_control_handwriting_error_reports_editions": {
+    "en": "The standalone template InkWatson.admx (at least Windows Vista) is only in the Server 2022 set; the 24H2 set writes this value only inside the 'Restrict Internet communication' umbrella policy; no CSP page was found (the constructed URL returned 404).",
+    "zh": "独立模板 InkWatson.admx（至少 Windows Vista）只在 Server 2022 模板集里；24H2 模板集只在“限制 Internet 通信”总策略中写这个值；没有找到 CSP 页面（构造的地址返回 404）。"
+  },
+  "privacy_control_sensors_title": {
+    "en": "Sensors (machine)",
+    "zh": "传感器（整机）"
+  },
+  "privacy_control_sensors_does": {
+    "en": "Turns off the Windows sensor feature (machine policy).",
+    "zh": "关闭 Windows 传感器功能（机器策略）。"
+  },
+  "privacy_control_sensors_benefit": {
+    "en": "Programs cannot read motion, orientation and environment sensors through the Windows sensor feature.",
+    "zh": "程序不能通过 Windows 传感器功能读取运动、姿态和环境传感器。"
+  },
+  "privacy_control_sensors_affects": {
+    "en": "Features that depend on sensors (such as auto-rotation or ambient light) may stop working; the sensor hardware is not powered off.",
+    "zh": "依赖传感器的功能（如自动旋转、环境光）可能失效；不等于传感器硬件断电。"
+  },
+  "privacy_control_sensors_overlooked": {
+    "en": "The sensor hardware is not powered off; features built on sensors such as auto-rotation or adaptive brightness may stop (inference; Microsoft lists none). Whether it also blocks location is not documented; the 'turn off location (machine)' entry is the documented location switch.",
+    "zh": "不关闭传感器硬件；自动旋转、自动亮度等依赖传感器的功能可能停止（推断，微软没有列出）。是否同时挡住定位没有文档说明，关闭定位看“关闭定位（整机）”一项。"
+  },
+  "privacy_control_sensors_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。"
+  },
+  "privacy_control_sensors_editions": {
+    "en": "CSP (DisableSensors_2 in ADMX_Sensors): Windows 10 2004 with KB5005101 and later, Windows 11. The template also names Server. Microsoft's CSP edition table does not list Home; whether Home applies it is not stated.",
+    "zh": "CSP（ADMX_Sensors 中的 DisableSensors_2）：Windows 10 2004 + KB5005101 起、Windows 11。模板也列出 Server。微软的 CSP 版本表没有列出 Home，Home 上是否执行没有说明。"
+  },
+  "privacy_control_start_launch_tracking_title": {
+    "en": "App launch tracking (preference)",
+    "zh": "跟踪应用启动（偏好）"
+  },
+  "privacy_control_start_launch_tracking_does": {
+    "en": "Stops Windows from tracking app launches to improve Start and search.",
+    "zh": "停止 Windows 记录应用启动来改进开始菜单和搜索。"
+  },
+  "privacy_control_start_launch_tracking_benefit": {
+    "en": "Windows no longer records which programs you start most.",
+    "zh": "Windows 不再记录你常启动哪些程序。"
+  },
+  "privacy_control_start_launch_tracking_affects": {
+    "en": "Start menu ordering by frequent use and launch suggestions stop; it may need a new sign-in to take effect; existing records are not deleted.",
+    "zh": "开始菜单的常用程序排序和启动建议失效；可能需要重新登录才生效；不删除已有记录。"
+  },
+  "privacy_control_start_launch_tracking_overlooked": {
+    "en": "This is a preference, not locked, and can be switched back in Settings; whether existing records are deleted is not documented. The old policy 'Turn off user tracking' applies only to Vista and earlier and is not a substitute. The value for recently opened items in Start (Start_TrackDocs) has no documented type and is not written in this version.",
+    "zh": "这是偏好，不锁定，用户可以在设置里改回；已有记录是否删除没有文档说明。旧策略“关闭用户跟踪”只适用于 Vista 及以前，不是替代。开始菜单“最近打开的项目”对应的值（Start_TrackDocs）类型没有文档，本版不写。"
+  },
+  "privacy_control_start_launch_tracking_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。"
+  },
+  "privacy_control_start_launch_tracking_editions": {
+    "en": "Documented only in Microsoft's connection-management guide for Windows 10/11 Enterprise and Server 2016/2019; whether Home and Pro read this value is not stated. The guide lists it among the Windows 10 1703 options.",
+    "zh": "只在微软面向 Windows 10/11 Enterprise 与 Server 2016/2019 的连接管理指南中有记载；Home、Pro 是否读这个值没有说明。指南把它列在 Windows 10 1703 的选项中。"
+  },
+  "privacy_control_input_personalization_title": {
+    "en": "Online speech services (policy)",
+    "zh": "在线语音服务（策略）"
+  },
+  "privacy_control_input_personalization_does": {
+    "en": "Prevents users from turning on Microsoft online speech services. The lowercase l in the original is corrected to an uppercase I.",
+    "zh": "禁止用户启用 Microsoft 在线语音服务。原文小写 l 改为大写 I。"
+  },
+  "privacy_control_input_personalization_benefit": {
+    "en": "Speech is not sent to Microsoft online speech services.",
+    "zh": "语音不会发送到 Microsoft 在线语音服务。"
+  },
+  "privacy_control_input_personalization_affects": {
+    "en": "Online dictation and apps that need online speech stop working, and users cannot turn them back on in Settings; keyboard input is unaffected.",
+    "zh": "在线听写和依赖在线语音的应用不可用，用户也不能在设置中再打开；不影响键盘输入。"
+  },
+  "privacy_control_input_personalization_overlooked": {
+    "en": "Despite the name InputPersonalization, it governs online speech, not typing or inking personalisation. Windows 11 voice typing stops and cannot be turned back on in Settings. With this applied, the 'online speech recognition (preference)' entry adds nothing.",
+    "zh": "名字叫 InputPersonalization，管的却是在线语音，不是键入或手写个性化。Windows 11 语音输入停止，用户不能在设置里重新打开。应用本项后，“在线语音识别（偏好）”一项不再增加效果。"
+  },
+  "privacy_control_input_personalization_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。"
+  },
+  "privacy_control_input_personalization_editions": {
+    "en": "CSP (Privacy/AllowInputPersonalization): Windows 10 1507 and later (semantics updated in 1809). The template also names Server. Microsoft's CSP edition table does not list Home; whether Home applies it is not stated.",
+    "zh": "CSP（Privacy/AllowInputPersonalization）：Windows 10 1507 起（1809 调整语义）。模板也列出 Server。微软的 CSP 版本表没有列出 Home，Home 上是否执行没有说明。"
+  },
+  "privacy_control_steps_recorder_title": {
+    "en": "Steps Recorder",
+    "zh": "步骤记录器"
+  },
+  "privacy_control_steps_recorder_does": {
+    "en": "Turns off Steps Recorder (PSR.exe). The original path is incomplete; the official policy is written. Microsoft lists Steps Recorder as deprecated.",
+    "zh": "关闭步骤记录器（PSR.exe）。原文路径不完整，按正式策略写入。Microsoft 已把步骤记录器列为弃用组件。"
+  },
+  "privacy_control_steps_recorder_benefit": {
+    "en": "Steps Recorder cannot capture screens and steps.",
+    "zh": "步骤记录器不能截取屏幕和操作步骤。"
+  },
+  "privacy_control_steps_recorder_affects": {
+    "en": "This troubleshooting tool is lost; other screenshot or recording tools are not blocked; on systems where the component is removed the item has no effect.",
+    "zh": "失去这一故障复现工具；不阻止其他截图或录屏工具；组件已移除的系统上此项无作用。"
+  },
+  "privacy_control_steps_recorder_overlooked": {
+    "en": "Steps Recorder records keyboard and mouse input, UI data and screenshots. Microsoft has deprecated it and will remove it in a future release; where it is removed this entry has no effect. Snipping Tool, Xbox Game Bar and Clipchamp can still record the screen.",
+    "zh": "步骤记录器会记录键盘鼠标操作、界面数据和截图。微软已弃用它，将在未来版本移除，移除后本项没有效果。截图工具、Xbox Game Bar、Clipchamp 等仍能录屏。"
+  },
+  "privacy_control_steps_recorder_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。"
+  },
+  "privacy_control_steps_recorder_editions": {
+    "en": "CSP (ADMX_AppCompat): Windows 10 2004 with KB5005101 and later, Windows 11. The template also names Server. Microsoft's CSP edition table does not list Home; whether Home applies it is not stated.",
+    "zh": "CSP（ADMX_AppCompat）：Windows 10 2004 + KB5005101 起、Windows 11。模板也列出 Server。微软的 CSP 版本表没有列出 Home，Home 上是否执行没有说明。"
+  },
+  "privacy_control_activity_feed_title": {
+    "en": "Activity feed",
+    "zh": "活动源"
+  },
+  "privacy_control_activity_feed_does": {
+    "en": "Stops apps and the system from publishing activity history and stops roaming it.",
+    "zh": "禁止应用和系统发布活动历史，并停止其漫游。"
+  },
+  "privacy_control_activity_feed_benefit": {
+    "en": "Activity records are no longer published or synced through the activity feed.",
+    "zh": "活动记录不再通过活动源发布和同步。"
+  },
+  "privacy_control_activity_feed_affects": {
+    "en": "Continue-where-you-left-off features such as the Windows 10 Timeline are affected (Windows 11 has no Timeline UI); existing history is not deleted, and browser history and OneDrive are unaffected.",
+    "zh": "Windows 10 时间线等连续任务体验受影响，Windows 11 已没有时间线界面；不删除已有历史，不影响浏览器历史或 OneDrive。"
+  },
+  "privacy_control_activity_feed_overlooked": {
+    "en": "Microsoft's recipe sets three values together: this one, 'publish user activities' and 'upload user activities'; with this one alone, local activities are still published. Existing history is not deleted; use 'Clear activity history' in Settings. Windows 11 has no Timeline UI, and activity upload ended in 2021 (Microsoft accounts) and January 2024 (Entra accounts), so on current Windows 11 the visible effect is small.",
+    "zh": "微软的做法是三项一起设：本项、“发布用户活动”、“上传用户活动”；只应用本项时，本地活动仍会被发布。已有历史不会删除，需要在设置里“清除活动历史”。Windows 11 没有时间线界面，活动上传服务已于 2021 年（Microsoft 账户）和 2024 年 1 月（Entra 账户）停止，所以在当前 Windows 11 上可见效果很小。"
+  },
+  "privacy_control_activity_feed_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。"
+  },
+  "privacy_control_activity_feed_editions": {
+    "en": "CSP (Privacy/EnableActivityFeed): Windows 10 1709 and later. The template also names Server. Microsoft's CSP edition table does not list Home; whether Home applies it is not stated.",
+    "zh": "CSP（Privacy/EnableActivityFeed）：Windows 10 1709 起。模板也列出 Server。微软的 CSP 版本表没有列出 Home，Home 上是否执行没有说明。"
+  },
+  "privacy_control_app_location_title": {
+    "en": "Apps access location",
+    "zh": "应用访问位置"
+  },
+  "privacy_control_app_location_does": {
+    "en": "Sets the default for Windows apps' access to location to 'force deny'.",
+    "zh": "把 Windows 应用访问位置的默认设置设为“强制拒绝”。"
+  },
+  "privacy_control_app_location_benefit": {
+    "en": "Managed Windows apps (Store/UWP) cannot get location by default.",
+    "zh": "受管 Windows 应用（商店/UWP）默认不能取得位置。"
+  },
+  "privacy_control_app_location_affects": {
+    "en": "Navigation, weather and other automatic location features stop; IP-based location is unaffected. Per-app exception lists can still override the default; ordinary desktop programs are not bound by this policy.",
+    "zh": "导航、天气等自动定位功能失效；IP 定位不受影响。逐应用例外列表仍可覆盖默认值；普通桌面程序不受此策略约束。"
+  },
+  "privacy_control_app_location_overlooked": {
+    "en": "Binds Windows (packaged) apps only; ordinary desktop programs such as browsers and meeting software are not bound. Per-app exception lists (LetAppsAccessLocation_ForceAllowTheseApps and the others) override this default; the page reads and shows them and never writes them. The matching Settings switch is locked; an app that is already running is affected only after it restarts. Windows features that use location (automatic time zone, Find my device) are governed by the 'turn off location (machine)' entry, not by this one (inference).",
+    "zh": "只约束 Windows 应用（打包应用），浏览器、会议软件等普通桌面程序不受约束。按应用的例外列表（LetAppsAccessLocation_ForceAllowTheseApps 等）优先于这个默认值，本页读取并显示这些列表，不写入。设置中对应开关被锁定；正在运行的应用要重启后才受影响。使用定位的 Windows 功能（自动时区、查找我的设备）由“关闭定位（整机）”一项管理，不受本项影响（推断）。"
+  },
+  "privacy_control_app_location_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。"
+  },
+  "privacy_control_app_location_editions": {
+    "en": "CSP: Windows 10 1607 and later. The template also names Server. Microsoft's CSP edition table does not list Home; whether Home applies it is not stated.",
+    "zh": "CSP：Windows 10 1607 起。模板也列出 Server。微软的 CSP 版本表没有列出 Home，Home 上是否执行没有说明。"
+  },
+  "privacy_control_app_account_info_title": {
+    "en": "Apps access account info",
+    "zh": "应用访问账户信息"
+  },
+  "privacy_control_app_account_info_does": {
+    "en": "Sets the default for Windows apps' access to account name, picture and other account info to 'force deny'.",
+    "zh": "把 Windows 应用访问账户姓名、头像等信息的默认设置设为“强制拒绝”。"
+  },
+  "privacy_control_app_account_info_benefit": {
+    "en": "Managed Windows apps (Store/UWP) cannot get account name, picture and other account info by default.",
+    "zh": "受管 Windows 应用（商店/UWP）默认不能取得账户姓名、头像等信息。"
+  },
+  "privacy_control_app_account_info_affects": {
+    "en": "Apps cannot show your account name and picture; passwords, tokens and cookies are not protected by this. Per-app exception lists can still override the default; ordinary desktop programs are not bound by this policy.",
+    "zh": "应用不能显示你的账户姓名和头像；不保护密码、令牌或 Cookie。逐应用例外列表仍可覆盖默认值；普通桌面程序不受此策略约束。"
+  },
+  "privacy_control_app_account_info_overlooked": {
+    "en": "Binds Windows (packaged) apps only; ordinary desktop programs such as browsers and meeting software are not bound. Per-app exception lists (LetAppsAccessAccountInfo_ForceAllowTheseApps and the others) override this default; the page reads and shows them and never writes them. The matching Settings switch is locked; an app that is already running is affected only after it restarts. It does not protect passwords, tokens or cookies.",
+    "zh": "只约束 Windows 应用（打包应用），浏览器、会议软件等普通桌面程序不受约束。按应用的例外列表（LetAppsAccessAccountInfo_ForceAllowTheseApps 等）优先于这个默认值，本页读取并显示这些列表，不写入。设置中对应开关被锁定；正在运行的应用要重启后才受影响。不保护密码、令牌或 Cookie。"
+  },
+  "privacy_control_app_account_info_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。"
+  },
+  "privacy_control_app_account_info_editions": {
+    "en": "CSP: Windows 10 1607 and later. The template also names Server. Microsoft's CSP edition table does not list Home; whether Home applies it is not stated.",
+    "zh": "CSP：Windows 10 1607 起。模板也列出 Server。微软的 CSP 版本表没有列出 Home，Home 上是否执行没有说明。"
+  },
+  "privacy_control_app_motion_title": {
+    "en": "Apps access motion data",
+    "zh": "应用访问运动数据"
+  },
+  "privacy_control_app_motion_does": {
+    "en": "Sets the default for Windows apps' access to motion data to 'force deny'.",
+    "zh": "把 Windows 应用访问运动数据的默认设置设为“强制拒绝”。"
+  },
+  "privacy_control_app_motion_benefit": {
+    "en": "Managed Windows apps (Store/UWP) cannot get motion data by default.",
+    "zh": "受管 Windows 应用（商店/UWP）默认不能取得运动数据。"
+  },
+  "privacy_control_app_motion_affects": {
+    "en": "Fitness and activity-recognition features stop; with no motion sensor the item has no effect. Per-app exception lists can still override the default; ordinary desktop programs are not bound by this policy.",
+    "zh": "健身、活动识别类功能失效；这台电脑没有运动传感器时此项无作用。逐应用例外列表仍可覆盖默认值；普通桌面程序不受此策略约束。"
+  },
+  "privacy_control_app_motion_overlooked": {
+    "en": "Binds Windows (packaged) apps only; ordinary desktop programs such as browsers and meeting software are not bound. Per-app exception lists (LetAppsAccessMotion_ForceAllowTheseApps and the others) override this default; the page reads and shows them and never writes them. The matching Settings switch is locked; an app that is already running is affected only after it restarts. It has no effect on a device without motion sensors.",
+    "zh": "只约束 Windows 应用（打包应用），浏览器、会议软件等普通桌面程序不受约束。按应用的例外列表（LetAppsAccessMotion_ForceAllowTheseApps 等）优先于这个默认值，本页读取并显示这些列表，不写入。设置中对应开关被锁定；正在运行的应用要重启后才受影响。没有运动传感器的设备上没有效果。"
+  },
+  "privacy_control_app_motion_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。"
+  },
+  "privacy_control_app_motion_editions": {
+    "en": "CSP: Windows 10 1607 and later. The template also names Server. Microsoft's CSP edition table does not list Home; whether Home applies it is not stated.",
+    "zh": "CSP：Windows 10 1607 起。模板也列出 Server。微软的 CSP 版本表没有列出 Home，Home 上是否执行没有说明。"
+  },
+  "privacy_control_app_phone_calls_title": {
+    "en": "Apps make phone calls",
+    "zh": "应用拨打电话"
+  },
+  "privacy_control_app_phone_calls_does": {
+    "en": "Sets the default for Windows apps' access to making phone calls to 'force deny'.",
+    "zh": "把 Windows 应用访问拨打电话的默认设置设为“强制拒绝”。"
+  },
+  "privacy_control_app_phone_calls_benefit": {
+    "en": "Managed Windows apps (Store/UWP) cannot get making phone calls by default.",
+    "zh": "受管 Windows 应用（商店/UWP）默认不能取得拨打电话。"
+  },
+  "privacy_control_app_phone_calls_affects": {
+    "en": "Apps cannot place phone calls; it is not a general limit on phone data or calling software. Per-app exception lists can still override the default; ordinary desktop programs are not bound by this policy.",
+    "zh": "应用不能发起电话；不是对手机数据或通话软件的总体限制。逐应用例外列表仍可覆盖默认值；普通桌面程序不受此策略约束。"
+  },
+  "privacy_control_app_phone_calls_overlooked": {
+    "en": "Binds Windows (packaged) apps only; ordinary desktop programs such as browsers and meeting software are not bound. Per-app exception lists (LetAppsAccessPhone_ForceAllowTheseApps and the others) override this default; the page reads and shows them and never writes them. The matching Settings switch is locked; an app that is already running is affected only after it restarts. It covers apps placing phone calls, not calling software in general.",
+    "zh": "只约束 Windows 应用（打包应用），浏览器、会议软件等普通桌面程序不受约束。按应用的例外列表（LetAppsAccessPhone_ForceAllowTheseApps 等）优先于这个默认值，本页读取并显示这些列表，不写入。设置中对应开关被锁定；正在运行的应用要重启后才受影响。只管应用拨打电话，不是对通话软件的总体限制。"
+  },
+  "privacy_control_app_phone_calls_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。"
+  },
+  "privacy_control_app_phone_calls_editions": {
+    "en": "CSP: Windows 10 1607 and later. The template also names Server. Microsoft's CSP edition table does not list Home; whether Home applies it is not stated.",
+    "zh": "CSP：Windows 10 1607 起。模板也列出 Server。微软的 CSP 版本表没有列出 Home，Home 上是否执行没有说明。"
+  },
+  "privacy_control_app_trusted_devices_title": {
+    "en": "Apps use trusted devices",
+    "zh": "应用使用受信任设备"
+  },
+  "privacy_control_app_trusted_devices_does": {
+    "en": "Sets the default for Windows apps' access to trusted devices to 'force deny'.",
+    "zh": "把 Windows 应用访问受信任设备的默认设置设为“强制拒绝”。"
+  },
+  "privacy_control_app_trusted_devices_benefit": {
+    "en": "Managed Windows apps (Store/UWP) cannot get trusted devices by default.",
+    "zh": "受管 Windows 应用（商店/UWP）默认不能取得受信任设备。"
+  },
+  "privacy_control_app_trusted_devices_affects": {
+    "en": "Device interactions that need this permission stop; paired devices are not removed and drivers are not restricted. Per-app exception lists can still override the default; ordinary desktop programs are not bound by this policy.",
+    "zh": "依赖此权限的设备交互失效；不撤销已配对设备，也不限制驱动程序。逐应用例外列表仍可覆盖默认值；普通桌面程序不受此策略约束。"
+  },
+  "privacy_control_app_trusted_devices_overlooked": {
+    "en": "Binds Windows (packaged) apps only; ordinary desktop programs such as browsers and meeting software are not bound. Per-app exception lists (LetAppsAccessTrustedDevices_ForceAllowTheseApps and the others) override this default; the page reads and shows them and never writes them. The matching Settings switch is locked; an app that is already running is affected only after it restarts. Paired devices are not removed.",
+    "zh": "只约束 Windows 应用（打包应用），浏览器、会议软件等普通桌面程序不受约束。按应用的例外列表（LetAppsAccessTrustedDevices_ForceAllowTheseApps 等）优先于这个默认值，本页读取并显示这些列表，不写入。设置中对应开关被锁定；正在运行的应用要重启后才受影响。已配对的设备不会被移除。"
+  },
+  "privacy_control_app_trusted_devices_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。"
+  },
+  "privacy_control_app_trusted_devices_editions": {
+    "en": "CSP: Windows 10 1607 and later. The template also names Server. Microsoft's CSP edition table does not list Home; whether Home applies it is not stated.",
+    "zh": "CSP：Windows 10 1607 起。模板也列出 Server。微软的 CSP 版本表没有列出 Home，Home 上是否执行没有说明。"
+  },
+  "privacy_control_app_unpaired_devices_title": {
+    "en": "Apps talk to unpaired devices",
+    "zh": "应用与未配对设备通信"
+  },
+  "privacy_control_app_unpaired_devices_does": {
+    "en": "Sets the default for Windows apps' access to communicating with unpaired wireless devices to 'force deny'.",
+    "zh": "把 Windows 应用访问与未配对的无线设备通信的默认设置设为“强制拒绝”。"
+  },
+  "privacy_control_app_unpaired_devices_benefit": {
+    "en": "Managed Windows apps (Store/UWP) cannot get communicating with unpaired wireless devices by default.",
+    "zh": "受管 Windows 应用（商店/UWP）默认不能取得与未配对的无线设备通信。"
+  },
+  "privacy_control_app_unpaired_devices_affects": {
+    "en": "Apps cannot discover or talk to unpaired wireless devices; the original's 'sync' is broader than this; OneDrive and account sync are unaffected. Per-app exception lists can still override the default; ordinary desktop programs are not bound by this policy.",
+    "zh": "应用不能发现或连接未配对的无线设备；原项称“同步”，范围过宽；不影响 OneDrive 或账户同步。逐应用例外列表仍可覆盖默认值；普通桌面程序不受此策略约束。"
+  },
+  "privacy_control_app_unpaired_devices_overlooked": {
+    "en": "Binds Windows (packaged) apps only; ordinary desktop programs such as browsers and meeting software are not bound. Per-app exception lists (LetAppsSyncWithDevices_ForceAllowTheseApps and the others) override this default; the page reads and shows them and never writes them. The matching Settings switch is locked; an app that is already running is affected only after it restarts. It covers communication with unpaired wireless devices only, narrower than the original's 'sync'; OneDrive and account sync are unaffected.",
+    "zh": "只约束 Windows 应用（打包应用），浏览器、会议软件等普通桌面程序不受约束。按应用的例外列表（LetAppsSyncWithDevices_ForceAllowTheseApps 等）优先于这个默认值，本页读取并显示这些列表，不写入。设置中对应开关被锁定；正在运行的应用要重启后才受影响。只管与未配对无线设备通信，比原文的“同步”窄；OneDrive 和账户同步不受影响。"
+  },
+  "privacy_control_app_unpaired_devices_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。"
+  },
+  "privacy_control_app_unpaired_devices_editions": {
+    "en": "CSP: Windows 10 1607 and later. The template also names Server. Microsoft's CSP edition table does not list Home; whether Home applies it is not stated.",
+    "zh": "CSP：Windows 10 1607 起。模板也列出 Server。微软的 CSP 版本表没有列出 Home，Home 上是否执行没有说明。"
+  },
+  "privacy_control_app_diagnostic_info_title": {
+    "en": "Apps read other apps' diagnostic info",
+    "zh": "应用读取其他应用的诊断信息"
+  },
+  "privacy_control_app_diagnostic_info_does": {
+    "en": "Sets the default for Windows apps' access to other apps' diagnostic information to 'force deny'.",
+    "zh": "把 Windows 应用访问其他应用的诊断信息的默认设置设为“强制拒绝”。"
+  },
+  "privacy_control_app_diagnostic_info_benefit": {
+    "en": "Managed Windows apps (Store/UWP) cannot get other apps' diagnostic information by default.",
+    "zh": "受管 Windows 应用（商店/UWP）默认不能取得其他应用的诊断信息。"
+  },
+  "privacy_control_app_diagnostic_info_affects": {
+    "en": "Diagnostic and resource-monitor apps are affected; this is not the setting that controls Windows sending diagnostic data to Microsoft (Windows 10 1703 and later). Per-app exception lists can still override the default; ordinary desktop programs are not bound by this policy.",
+    "zh": "诊断或资源监视类应用受影响；这不是控制 Windows 向 Microsoft 发送诊断数据的设置（Windows 10 1703 起）。逐应用例外列表仍可覆盖默认值；普通桌面程序不受此策略约束。"
+  },
+  "privacy_control_app_diagnostic_info_overlooked": {
+    "en": "Binds Windows (packaged) apps only; ordinary desktop programs such as browsers and meeting software are not bound. Per-app exception lists (LetAppsGetDiagnosticInfo_ForceAllowTheseApps and the others) override this default; the page reads and shows them and never writes them. The matching Settings switch is locked; an app that is already running is affected only after it restarts. It covers apps reading diagnostic information about other apps (including the user name); it is unrelated to Windows sending diagnostic data to Microsoft.",
+    "zh": "只约束 Windows 应用（打包应用），浏览器、会议软件等普通桌面程序不受约束。按应用的例外列表（LetAppsGetDiagnosticInfo_ForceAllowTheseApps 等）优先于这个默认值，本页读取并显示这些列表，不写入。设置中对应开关被锁定；正在运行的应用要重启后才受影响。管的是应用读取其他应用的诊断信息（包括用户名），与 Windows 向微软发送诊断数据无关。"
+  },
+  "privacy_control_app_diagnostic_info_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。"
+  },
+  "privacy_control_app_diagnostic_info_editions": {
+    "en": "CSP: Windows 10 1703 and later. The template also names Server. Microsoft's CSP edition table does not list Home; whether Home applies it is not stated.",
+    "zh": "CSP：Windows 10 1703 起。模板也列出 Server。微软的 CSP 版本表没有列出 Home，Home 上是否执行没有说明。"
+  },
+  "privacy_control_app_contacts_title": {
+    "en": "Apps access contacts",
+    "zh": "应用访问联系人"
+  },
+  "privacy_control_app_contacts_does": {
+    "en": "Sets the default for Windows apps' access to contacts to 'force deny'.",
+    "zh": "把 Windows 应用访问联系人的默认设置设为“强制拒绝”。"
+  },
+  "privacy_control_app_contacts_benefit": {
+    "en": "Managed Windows apps (Store/UWP) cannot get contacts by default.",
+    "zh": "受管 Windows 应用（商店/UWP）默认不能取得联系人。"
+  },
+  "privacy_control_app_contacts_affects": {
+    "en": "Contact completion and display stop; web services and exported contact files are not restricted. Per-app exception lists can still override the default; ordinary desktop programs are not bound by this policy.",
+    "zh": "联系人补全和显示失效；不限制网页服务或导出的通讯录文件。逐应用例外列表仍可覆盖默认值；普通桌面程序不受此策略约束。"
+  },
+  "privacy_control_app_contacts_overlooked": {
+    "en": "Binds Windows (packaged) apps only; ordinary desktop programs such as browsers and meeting software are not bound. Per-app exception lists (LetAppsAccessContacts_ForceAllowTheseApps and the others) override this default; the page reads and shows them and never writes them. The matching Settings switch is locked; an app that is already running is affected only after it restarts. Web contacts are unaffected.",
+    "zh": "只约束 Windows 应用（打包应用），浏览器、会议软件等普通桌面程序不受约束。按应用的例外列表（LetAppsAccessContacts_ForceAllowTheseApps 等）优先于这个默认值，本页读取并显示这些列表，不写入。设置中对应开关被锁定；正在运行的应用要重启后才受影响。网页通讯录不受影响。"
+  },
+  "privacy_control_app_contacts_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。"
+  },
+  "privacy_control_app_contacts_editions": {
+    "en": "CSP: Windows 10 1607 and later. The template also names Server. Microsoft's CSP edition table does not list Home; whether Home applies it is not stated.",
+    "zh": "CSP：Windows 10 1607 起。模板也列出 Server。微软的 CSP 版本表没有列出 Home，Home 上是否执行没有说明。"
+  },
+  "privacy_control_app_calendar_title": {
+    "en": "Apps access the calendar",
+    "zh": "应用访问日历"
+  },
+  "privacy_control_app_calendar_does": {
+    "en": "Sets the default for Windows apps' access to calendar to 'force deny'.",
+    "zh": "把 Windows 应用访问日历的默认设置设为“强制拒绝”。"
+  },
+  "privacy_control_app_calendar_benefit": {
+    "en": "Managed Windows apps (Store/UWP) cannot get calendar by default.",
+    "zh": "受管 Windows 应用（商店/UWP）默认不能取得日历。"
+  },
+  "privacy_control_app_calendar_affects": {
+    "en": "Calendar integration stops; browser calendars and separately authorised MCP calendar services are not governed by this. Per-app exception lists can still override the default; ordinary desktop programs are not bound by this policy.",
+    "zh": "日程整合失效；浏览器日历和单独授权的 MCP 日历服务不受此项控制。逐应用例外列表仍可覆盖默认值；普通桌面程序不受此策略约束。"
+  },
+  "privacy_control_app_calendar_overlooked": {
+    "en": "Binds Windows (packaged) apps only; ordinary desktop programs such as browsers and meeting software are not bound. Per-app exception lists (LetAppsAccessCalendar_ForceAllowTheseApps and the others) override this default; the page reads and shows them and never writes them. The matching Settings switch is locked; an app that is already running is affected only after it restarts. Web calendars are unaffected.",
+    "zh": "只约束 Windows 应用（打包应用），浏览器、会议软件等普通桌面程序不受约束。按应用的例外列表（LetAppsAccessCalendar_ForceAllowTheseApps 等）优先于这个默认值，本页读取并显示这些列表，不写入。设置中对应开关被锁定；正在运行的应用要重启后才受影响。网页日历不受影响。"
+  },
+  "privacy_control_app_calendar_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。"
+  },
+  "privacy_control_app_calendar_editions": {
+    "en": "CSP: Windows 10 1607 and later. The template also names Server. Microsoft's CSP edition table does not list Home; whether Home applies it is not stated.",
+    "zh": "CSP：Windows 10 1607 起。模板也列出 Server。微软的 CSP 版本表没有列出 Home，Home 上是否执行没有说明。"
+  },
+  "privacy_control_app_call_history_title": {
+    "en": "Apps access call history",
+    "zh": "应用访问通话记录"
+  },
+  "privacy_control_app_call_history_does": {
+    "en": "Sets the default for Windows apps' access to call history to 'force deny'.",
+    "zh": "把 Windows 应用访问通话记录的默认设置设为“强制拒绝”。"
+  },
+  "privacy_control_app_call_history_benefit": {
+    "en": "Managed Windows apps (Store/UWP) cannot get call history by default.",
+    "zh": "受管 Windows 应用（商店/UWP）默认不能取得通话记录。"
+  },
+  "privacy_control_app_call_history_affects": {
+    "en": "Call history display stops; existing records are not deleted. Per-app exception lists can still override the default; ordinary desktop programs are not bound by this policy.",
+    "zh": "通话记录显示失效；不删除已有记录。逐应用例外列表仍可覆盖默认值；普通桌面程序不受此策略约束。"
+  },
+  "privacy_control_app_call_history_overlooked": {
+    "en": "Binds Windows (packaged) apps only; ordinary desktop programs such as browsers and meeting software are not bound. Per-app exception lists (LetAppsAccessCallHistory_ForceAllowTheseApps and the others) override this default; the page reads and shows them and never writes them. The matching Settings switch is locked; an app that is already running is affected only after it restarts. Existing records are not deleted.",
+    "zh": "只约束 Windows 应用（打包应用），浏览器、会议软件等普通桌面程序不受约束。按应用的例外列表（LetAppsAccessCallHistory_ForceAllowTheseApps 等）优先于这个默认值，本页读取并显示这些列表，不写入。设置中对应开关被锁定；正在运行的应用要重启后才受影响。已有记录不会删除。"
+  },
+  "privacy_control_app_call_history_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。"
+  },
+  "privacy_control_app_call_history_editions": {
+    "en": "CSP: Windows 10 1607 and later. The template also names Server. Microsoft's CSP edition table does not list Home; whether Home applies it is not stated.",
+    "zh": "CSP：Windows 10 1607 起。模板也列出 Server。微软的 CSP 版本表没有列出 Home，Home 上是否执行没有说明。"
+  },
+  "privacy_control_app_email_title": {
+    "en": "Apps access email",
+    "zh": "应用访问电子邮件"
+  },
+  "privacy_control_app_email_does": {
+    "en": "Sets the default for Windows apps' access to email to 'force deny'.",
+    "zh": "把 Windows 应用访问电子邮件的默认设置设为“强制拒绝”。"
+  },
+  "privacy_control_app_email_benefit": {
+    "en": "Managed Windows apps (Store/UWP) cannot get email by default.",
+    "zh": "受管 Windows 应用（商店/UWP）默认不能取得电子邮件。"
+  },
+  "privacy_control_app_email_affects": {
+    "en": "Mail integration stops; browser mail, IMAP/SMTP programs and local mail files are not restricted by this. Per-app exception lists can still override the default; ordinary desktop programs are not bound by this policy.",
+    "zh": "邮件整合失效；浏览器邮箱、IMAP/SMTP 程序和本地邮件文件不受此项限制。逐应用例外列表仍可覆盖默认值；普通桌面程序不受此策略约束。"
+  },
+  "privacy_control_app_email_overlooked": {
+    "en": "Binds Windows (packaged) apps only; ordinary desktop programs such as browsers and meeting software are not bound. Per-app exception lists (LetAppsAccessEmail_ForceAllowTheseApps and the others) override this default; the page reads and shows them and never writes them. The matching Settings switch is locked; an app that is already running is affected only after it restarts. IMAP/SMTP desktop mail programs and web mail are unaffected.",
+    "zh": "只约束 Windows 应用（打包应用），浏览器、会议软件等普通桌面程序不受约束。按应用的例外列表（LetAppsAccessEmail_ForceAllowTheseApps 等）优先于这个默认值，本页读取并显示这些列表，不写入。设置中对应开关被锁定；正在运行的应用要重启后才受影响。IMAP/SMTP 桌面邮件程序和网页邮箱不受影响。"
+  },
+  "privacy_control_app_email_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。"
+  },
+  "privacy_control_app_email_editions": {
+    "en": "CSP: Windows 10 1607 and later. The template also names Server. Microsoft's CSP edition table does not list Home; whether Home applies it is not stated.",
+    "zh": "CSP：Windows 10 1607 起。模板也列出 Server。微软的 CSP 版本表没有列出 Home，Home 上是否执行没有说明。"
+  },
+  "privacy_control_app_tasks_title": {
+    "en": "Apps access tasks",
+    "zh": "应用访问待办任务"
+  },
+  "privacy_control_app_tasks_does": {
+    "en": "Sets the default for Windows apps' access to user tasks (to-dos) to 'force deny'.",
+    "zh": "把 Windows 应用访问用户任务（待办）的默认设置设为“强制拒绝”。"
+  },
+  "privacy_control_app_tasks_benefit": {
+    "en": "Managed Windows apps (Store/UWP) cannot get user tasks (to-dos) by default.",
+    "zh": "受管 Windows 应用（商店/UWP）默认不能取得用户任务（待办）。"
+  },
+  "privacy_control_app_tasks_affects": {
+    "en": "To-do integration stops; these tasks are not Windows scheduled tasks (Windows 10 1703 and later). Per-app exception lists can still override the default; ordinary desktop programs are not bound by this policy.",
+    "zh": "待办整合失效；这里的任务不是 Windows 计划任务（Windows 10 1703 起）。逐应用例外列表仍可覆盖默认值；普通桌面程序不受此策略约束。"
+  },
+  "privacy_control_app_tasks_overlooked": {
+    "en": "Binds Windows (packaged) apps only; ordinary desktop programs such as browsers and meeting software are not bound. Per-app exception lists (LetAppsAccessTasks_ForceAllowTheseApps and the others) override this default; the page reads and shows them and never writes them. The matching Settings switch is locked; an app that is already running is affected only after it restarts. These tasks are to-dos, not Windows scheduled tasks.",
+    "zh": "只约束 Windows 应用（打包应用），浏览器、会议软件等普通桌面程序不受约束。按应用的例外列表（LetAppsAccessTasks_ForceAllowTheseApps 等）优先于这个默认值，本页读取并显示这些列表，不写入。设置中对应开关被锁定；正在运行的应用要重启后才受影响。这里的“任务”是待办事项，不是 Windows 计划任务。"
+  },
+  "privacy_control_app_tasks_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。"
+  },
+  "privacy_control_app_tasks_editions": {
+    "en": "CSP: Windows 10 1703 and later. The template also names Server. Microsoft's CSP edition table does not list Home; whether Home applies it is not stated.",
+    "zh": "CSP：Windows 10 1703 起。模板也列出 Server。微软的 CSP 版本表没有列出 Home，Home 上是否执行没有说明。"
+  },
+  "privacy_control_app_messaging_title": {
+    "en": "Apps read and send messages",
+    "zh": "应用收发短信"
+  },
+  "privacy_control_app_messaging_does": {
+    "en": "Sets the default for Windows apps' access to reading and sending SMS/MMS to 'force deny'.",
+    "zh": "把 Windows 应用访问短信和彩信的读写的默认设置设为“强制拒绝”。"
+  },
+  "privacy_control_app_messaging_benefit": {
+    "en": "Managed Windows apps (Store/UWP) cannot get reading and sending SMS/MMS by default.",
+    "zh": "受管 Windows 应用（商店/UWP）默认不能取得短信和彩信的读写。"
+  },
+  "privacy_control_app_messaging_affects": {
+    "en": "Messaging features that need this stop; it is not a limit on every chat program. Per-app exception lists can still override the default; ordinary desktop programs are not bound by this policy.",
+    "zh": "相关消息功能失效；不是对所有聊天软件的限制。逐应用例外列表仍可覆盖默认值；普通桌面程序不受此策略约束。"
+  },
+  "privacy_control_app_messaging_overlooked": {
+    "en": "Binds Windows (packaged) apps only; ordinary desktop programs such as browsers and meeting software are not bound. Per-app exception lists (LetAppsAccessMessaging_ForceAllowTheseApps and the others) override this default; the page reads and shows them and never writes them. The matching Settings switch is locked; an app that is already running is affected only after it restarts. It covers SMS and MMS, not chat programs.",
+    "zh": "只约束 Windows 应用（打包应用），浏览器、会议软件等普通桌面程序不受约束。按应用的例外列表（LetAppsAccessMessaging_ForceAllowTheseApps 等）优先于这个默认值，本页读取并显示这些列表，不写入。设置中对应开关被锁定；正在运行的应用要重启后才受影响。管的是短信与彩信，不限制聊天程序。"
+  },
+  "privacy_control_app_messaging_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。"
+  },
+  "privacy_control_app_messaging_editions": {
+    "en": "CSP: Windows 10 1607 and later. The template also names Server. Microsoft's CSP edition table does not list Home; whether Home applies it is not stated.",
+    "zh": "CSP：Windows 10 1607 起。模板也列出 Server。微软的 CSP 版本表没有列出 Home，Home 上是否执行没有说明。"
+  },
+  "privacy_control_app_radios_title": {
+    "en": "Apps control radios",
+    "zh": "应用控制无线电"
+  },
+  "privacy_control_app_radios_does": {
+    "en": "Sets the default for Windows apps' access to controlling radios (Wi-Fi and Bluetooth switches) to 'force deny'.",
+    "zh": "把 Windows 应用访问控制无线电（Wi-Fi、蓝牙开关）的默认设置设为“强制拒绝”。"
+  },
+  "privacy_control_app_radios_benefit": {
+    "en": "Managed Windows apps (Store/UWP) cannot get controlling radios (Wi-Fi and Bluetooth switches) by default.",
+    "zh": "受管 Windows 应用（商店/UWP）默认不能取得控制无线电（Wi-Fi、蓝牙开关）。"
+  },
+  "privacy_control_app_radios_affects": {
+    "en": "Apps cannot switch radios on or off; it is not airplane mode and does not stop connected programs from uploading. Per-app exception lists can still override the default; ordinary desktop programs are not bound by this policy.",
+    "zh": "应用不能开关无线电；不等于飞行模式，也不阻止已联网的程序上传。逐应用例外列表仍可覆盖默认值；普通桌面程序不受此策略约束。"
+  },
+  "privacy_control_app_radios_overlooked": {
+    "en": "Binds Windows (packaged) apps only; ordinary desktop programs such as browsers and meeting software are not bound. Per-app exception lists (LetAppsAccessRadios_ForceAllowTheseApps and the others) override this default; the page reads and shows them and never writes them. The matching Settings switch is locked; an app that is already running is affected only after it restarts. It is not airplane mode; apps that are already connected still upload.",
+    "zh": "只约束 Windows 应用（打包应用），浏览器、会议软件等普通桌面程序不受约束。按应用的例外列表（LetAppsAccessRadios_ForceAllowTheseApps 等）优先于这个默认值，本页读取并显示这些列表，不写入。设置中对应开关被锁定；正在运行的应用要重启后才受影响。不是飞行模式；已经联网的应用照常上传。"
+  },
+  "privacy_control_app_radios_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。"
+  },
+  "privacy_control_app_radios_editions": {
+    "en": "CSP: Windows 10 1607 and later. The template also names Server. Microsoft's CSP edition table does not list Home; whether Home applies it is not stated.",
+    "zh": "CSP：Windows 10 1607 起。模板也列出 Server。微软的 CSP 版本表没有列出 Home，Home 上是否执行没有说明。"
+  },
+  "privacy_control_error_reporting_title": {
+    "en": "Windows Error Reporting",
+    "zh": "Windows 错误报告"
+  },
+  "privacy_control_error_reporting_does": {
+    "en": "Enables the machine policy 'Disable Windows Error Reporting': when software stops or fails unexpectedly, no problem report is collected or sent.",
+    "zh": "启用策略“禁用 Windows 错误报告”（整机）：程序意外停止或失败时，不收集也不发送问题报告。"
+  },
+  "privacy_control_error_reporting_benefit": {
+    "en": "Crash and failure reports no longer reach Microsoft or vendors that rely on WER.",
+    "zh": "崩溃与故障报告不再发给微软或依赖 WER 的厂商。"
+  },
+  "privacy_control_error_reporting_affects": {
+    "en": "Solution information is no longer offered in Security and Maintenance; vendors receive no crash reports from this machine.",
+    "zh": "“安全和维护”里不再提供解决方案信息；厂商无法收到这台电脑上的崩溃报告。"
+  },
+  "privacy_control_error_reporting_overlooked": {
+    "en": "When this value is absent or 0, the ICM policy of the same name decides, then Control Panel; that policy also writes a second value, while this entry writes only this one, which the WER policy text says is sufficient. Turning diagnostic data off is a separate entry.",
+    "zh": "本值缺席或为 0 时，由“限制 Internet 通信”下的同名策略决定，其后才是控制面板；那条策略还写另一个值，本项只写这一个，WER 策略原文说这一个已足够。关闭诊断数据是另一项。"
+  },
+  "privacy_control_error_reporting_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。"
+  },
+  "privacy_control_error_reporting_editions": {
+    "en": "Template: at least Windows Vista; CSP (ErrorReporting/DisableWindowsErrorReporting): Windows 10 1703 and later. Microsoft's CSP edition table does not list Home; whether Home applies it is not stated.",
+    "zh": "模板：至少 Windows Vista；CSP（ErrorReporting/DisableWindowsErrorReporting）：Windows 10 1703 起。微软的 CSP 版本表没有列出 Home，Home 上是否执行没有说明。"
+  },
+  "privacy_control_error_reporting_additional_data_title": {
+    "en": "Additional data for error reports",
+    "zh": "错误报告的附加数据"
+  },
+  "privacy_control_error_reporting_additional_data_does": {
+    "en": "Automatically declines Microsoft's requests for additional data after an error report, without notifying the user.",
+    "zh": "自动拒绝微软在错误报告之后索取的附加数据，不通知用户。"
+  },
+  "privacy_control_error_reporting_additional_data_benefit": {
+    "en": "Additional data beyond the report (which may include files or memory content) is no longer sent.",
+    "zh": "报告之外的附加数据（可能含文件或内存内容）不再发送。"
+  },
+  "privacy_control_error_reporting_additional_data_affects": {
+    "en": "Microsoft cannot obtain the follow-up data needed to diagnose a reported crash.",
+    "zh": "微软无法取得诊断某次崩溃所需的后续数据。"
+  },
+  "privacy_control_error_reporting_additional_data_overlooked": {
+    "en": "It matters only while Windows Error Reporting stays on; with 'Disable Windows Error Reporting' applied it adds nothing.",
+    "zh": "只在 Windows 错误报告仍开启时有意义；已应用“禁用 Windows 错误报告”时本项不再增加效果。"
+  },
+  "privacy_control_error_reporting_additional_data_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。"
+  },
+  "privacy_control_error_reporting_additional_data_editions": {
+    "en": "Template: at least Windows Vista; the CSP has ErrorReporting/DoNotSendAdditionalData. Microsoft's CSP edition table does not list Home; whether Home applies it is not stated.",
+    "zh": "模板：至少 Windows Vista；CSP 有 ErrorReporting/DoNotSendAdditionalData。微软的 CSP 版本表没有列出 Home，Home 上是否执行没有说明。"
+  },
+  "privacy_control_diagnostic_log_collection_title": {
+    "en": "Additional diagnostic logs",
+    "zh": "附加诊断日志"
+  },
+  "privacy_control_diagnostic_log_collection_does": {
+    "en": "Enables 'Limit Diagnostic Log Collection': additional diagnostic logs are not collected even when more information is needed.",
+    "zh": "启用策略“限制诊断日志收集”：需要更多信息时也不收集额外的诊断日志。"
+  },
+  "privacy_control_diagnostic_log_collection_benefit": {
+    "en": "Extra troubleshooting logs are no longer uploaded.",
+    "zh": "额外的排错日志不再上传。"
+  },
+  "privacy_control_diagnostic_log_collection_affects": {
+    "en": "Microsoft does not receive these additional logs.",
+    "zh": "微软收不到这些附加日志。"
+  },
+  "privacy_control_diagnostic_log_collection_overlooked": {
+    "en": "Microsoft: diagnostic logs are sent only when the device sends optional diagnostic data. With diagnostic data at Required, or the 'diagnostic data level' entry applied, there is nothing for this entry to stop; it guards against optional data being turned on later.",
+    "zh": "微软原文：诊断日志只在设备设为发送可选诊断数据时才发送。诊断数据为“必需”或已应用“诊断数据级别”一项时，本项没有可阻止的东西，它防的是以后有人打开可选诊断数据。"
+  },
+  "privacy_control_diagnostic_log_collection_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。"
+  },
+  "privacy_control_diagnostic_log_collection_editions": {
+    "en": "Template: Server 2016 / Windows 10 1909 and later; CSP: Windows 11 21H2 and later. The template also names Server. Microsoft's CSP edition table does not list Home; whether Home applies it is not stated.",
+    "zh": "模板：Server 2016 / Windows 10 1909 起；CSP：Windows 11 21H2 起。模板也列出 Server。微软的 CSP 版本表没有列出 Home，Home 上是否执行没有说明。"
+  },
+  "privacy_control_dump_collection_title": {
+    "en": "Full crash dumps",
+    "zh": "完整崩溃转储"
+  },
+  "privacy_control_dump_collection_does": {
+    "en": "Enables 'Limit Dump Collection': error reporting sends only kernel mini dumps and user-mode triage dumps, not full or heap dumps.",
+    "zh": "启用策略“限制转储收集”：错误报告只发送内核小型转储和用户态分诊转储，不发送完整或堆转储。"
+  },
+  "privacy_control_dump_collection_benefit": {
+    "en": "Full dumps, which can contain the memory of the crashed program, are no longer sent.",
+    "zh": "可能含崩溃程序内存内容的完整转储不再发送。"
+  },
+  "privacy_control_dump_collection_affects": {
+    "en": "Microsoft receives less complete crash dumps.",
+    "zh": "微软收到的崩溃转储不完整。"
+  },
+  "privacy_control_dump_collection_overlooked": {
+    "en": "Same condition as the previous entry: it acts only while optional diagnostic data is sent; with 'Disable Windows Error Reporting' applied no dumps are sent at all.",
+    "zh": "与上一项条件相同：只在发送可选诊断数据时起作用；已应用“禁用 Windows 错误报告”时完全不发送转储。"
+  },
+  "privacy_control_dump_collection_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。"
+  },
+  "privacy_control_dump_collection_editions": {
+    "en": "Template: Server 2016 / Windows 10 1909 and later; CSP: Windows 11 21H2 and later. The template also names Server. Microsoft's CSP edition table does not list Home; whether Home applies it is not stated.",
+    "zh": "模板：Server 2016 / Windows 10 1909 起；CSP：Windows 11 21H2 起。模板也列出 Server。微软的 CSP 版本表没有列出 Home，Home 上是否执行没有说明。"
+  },
+  "privacy_control_application_telemetry_title": {
+    "en": "Application Telemetry",
+    "zh": "Application Telemetry（应用遥测）"
+  },
+  "privacy_control_application_telemetry_does": {
+    "en": "Enables 'Turn off Application Telemetry': stops tracking anonymous use of specific Windows components by applications.",
+    "zh": "启用策略“关闭 Application Telemetry”：停止跟踪应用对特定 Windows 组件的匿名使用。"
+  },
+  "privacy_control_application_telemetry_benefit": {
+    "en": "Usage data collection by Application Telemetry stops.",
+    "zh": "应用使用统计停止收集。"
+  },
+  "privacy_control_application_telemetry_affects": {
+    "en": "No user-visible effect is documented; compatibility fixes are governed by a different policy that this entry does not touch.",
+    "zh": "没有记载用户可见的影响；兼容性修复由另一条策略管理，本项不碰。"
+  },
+  "privacy_control_application_telemetry_overlooked": {
+    "en": "The value runs opposite to its name: 0 turns it off. It affects newly started programs; the template says to restart to stop collection for all programs. Application Telemetry is off whenever CEIP is off, so with 'Turn off Windows CEIP' applied this entry adds nothing. It is the formal counterpart, in the current templates, of the original's AitAgent task.",
+    "zh": "值的方向与名字相反：0 表示关闭。只对之后新启动的程序生效，模板说要重启才能对所有程序停止。CEIP 关闭时 Application Telemetry 本来就关闭，已应用“关闭 Windows 客户体验改善计划”时本项不再增加效果。这是原文 AitAgent 任务在现行模板中的正式对应。"
+  },
+  "privacy_control_application_telemetry_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。"
+  },
+  "privacy_control_application_telemetry_editions": {
+    "en": "Template: Windows 7 / Server 2008 R2 and later; CSP (ADMX_AppCompat): Windows 10 2004 with KB5005101 and later, Windows 11. The template also names Server. Microsoft's CSP edition table does not list Home; whether Home applies it is not stated.",
+    "zh": "模板：Windows 7 / Server 2008 R2 起；CSP（ADMX_AppCompat）：Windows 10 2004 + KB5005101 起、Windows 11。模板也列出 Server。微软的 CSP 版本表没有列出 Home，Home 上是否执行没有说明。"
+  },
+  "privacy_control_device_census_task_title": {
+    "en": "DeviceCensus system task",
+    "zh": "DeviceCensus 系统任务"
+  },
+  "privacy_control_device_census_task_does": {
+    "en": "Disables the scheduled task Device Information\\Device, which runs devicecensus.exe in system context on a schedule. It is disabled, never deleted; nothing is written when the task is absent.",
+    "zh": "停用计划任务 Device Information\\Device：它定期以系统上下文运行 devicecensus.exe。只停用，不删除；这台电脑没有此任务时不写。"
+  },
+  "privacy_control_device_census_task_benefit": {
+    "en": "DeviceCensus no longer reports device information through the diagnostic data endpoint on its schedule.",
+    "zh": "DeviceCensus 不再按计划经诊断数据端点上报设备信息。"
+  },
+  "privacy_control_device_census_task_affects": {
+    "en": "A managed device loses most of its information in Windows Update for Business reports; no first-hand source says other features on a personal device depend on it.",
+    "zh": "被组织纳管的设备在 Windows Update for Business 报告里会缺少大部分设备信息；个人设备上没有一手资料说明其他功能依赖它。"
+  },
+  "privacy_control_device_census_task_overlooked": {
+    "en": "Disabling the task neither removes the program nor stops other components from calling it; how much it reports is also bounded by the diagnostic data level. Choose it together with the DeviceCensus user task to cover user context. It is the writable alternative to the firewall rule the original asked for.",
+    "zh": "停用任务不删除程序，也不阻止其他组件调用它；它上报多少同时受诊断数据级别约束。要和“DeviceCensus 用户任务”一起选才覆盖用户上下文。原文要求的防火墙规则本版写不了，这是可写的替代。"
+  },
+  "privacy_control_device_census_task_undo": {
+    "en": "Enables the task again if it was enabled before apply; if the task definition changed in between, nothing is written and the page reports a conflict.",
+    "zh": "应用前任务是启用的，就重新启用；任务定义在此期间被改过时不写，页面报告冲突。"
+  },
+  "privacy_control_device_census_task_editions": {
+    "en": "Depends on whether the task exists on this host, not on the edition; the full path is resolved at run time. Windows Update for Business reports themselves support Pro, Education and Enterprise only.",
+    "zh": "取决于这台电脑是否有这个任务，与版本无关；运行时按完整路径解析。Windows Update for Business 报告本身只支持 Pro、Education、Enterprise。"
+  },
+  "privacy_control_device_census_user_task_title": {
+    "en": "DeviceCensus user task",
+    "zh": "DeviceCensus 用户任务"
+  },
+  "privacy_control_device_census_user_task_does": {
+    "en": "Disables the scheduled task Device Information\\Device User, which runs devicecensus.exe in user context on a schedule. It is disabled, never deleted; nothing is written when the task is absent.",
+    "zh": "停用计划任务 Device Information\\Device User：它定期以用户上下文运行 devicecensus.exe。只停用，不删除；这台电脑没有此任务时不写。"
+  },
+  "privacy_control_device_census_user_task_benefit": {
+    "en": "DeviceCensus user-context reporting stops on its schedule.",
+    "zh": "DeviceCensus 的用户上下文上报按计划停止。"
+  },
+  "privacy_control_device_census_user_task_affects": {
+    "en": "Same as the DeviceCensus system task.",
+    "zh": "同“DeviceCensus 系统任务”。"
+  },
+  "privacy_control_device_census_user_task_overlooked": {
+    "en": "Despite 'User' in its name it is a machine task that applies to every user; it is complete only together with the system task.",
+    "zh": "名字里有 User，但它是机器上的系统任务，对所有用户生效；与系统任务一起选才完整。"
+  },
+  "privacy_control_device_census_user_task_undo": {
+    "en": "Enables the task again if it was enabled before apply; if the task definition changed in between, nothing is written and the page reports a conflict.",
+    "zh": "应用前任务是启用的，就重新启用；任务定义在此期间被改过时不写，页面报告冲突。"
+  },
+  "privacy_control_device_census_user_task_editions": {
+    "en": "Depends on whether the task exists on this host, not on the edition; the full path is resolved at run time.",
+    "zh": "取决于这台电脑是否有这个任务，与版本无关；运行时按完整路径解析。"
+  },
+  "privacy_control_dotnet_cli_telemetry_optout_title": {
+    "en": ".NET SDK CLI telemetry (current user)",
+    "zh": ".NET SDK 命令行遥测（当前用户）"
+  },
+  "privacy_control_dotnet_cli_telemetry_optout_does": {
+    "en": "Sets DOTNET_CLI_TELEMETRY_OPTOUT=1 in the current user's persistent environment, so .NET SDK commands started afterwards (dotnet build, dotnet run and so on) send no usage data.",
+    "zh": "在当前用户的持久环境中设置 DOTNET_CLI_TELEMETRY_OPTOUT=1，之后启动的 .NET SDK 命令（dotnet build、dotnet run 等）不再发送使用数据。"
+  },
+  "privacy_control_dotnet_cli_telemetry_optout_benefit": {
+    "en": "The .NET SDK stops sending commands, partly hashed project information and CLI crash stacks.",
+    "zh": ".NET SDK 不再发送命令、部分哈希过的项目信息和 CLI 崩溃的异常栈。"
+  },
+  "privacy_control_dotnet_cli_telemetry_optout_affects": {
+    "en": "Only .NET SDK commands are affected; running an app with dotnet app.dll collects nothing anyway.",
+    "zh": "只影响 .NET SDK 命令；用 dotnet app.dll 运行应用本来就不收集。"
+  },
+  "privacy_control_dotnet_cli_telemetry_optout_overlooked": {
+    "en": "Only processes started afterwards are affected; the single install-time telemetry entry already sent cannot be recalled (it must be set before installing). It covers the current user only. sprawling scrubs the environment of the commands it starts, so dotnet run by an Agent inside sprawling does not see the variable unless the building declares it. DOTNET_NOLOGO only hides the banner and is unrelated to telemetry.",
+    "zh": "只影响之后新启动的进程；安装 SDK 时已发出的那一次安装遥测无法撤回（要在安装前设置）。只覆盖当前用户。sprawling 给它启动的命令清洗环境，Agent 在 sprawling 里运行的 dotnet 读不到这个变量，除非 building 声明放行。DOTNET_NOLOGO 只关欢迎信息，与遥测无关。"
+  },
+  "privacy_control_dotnet_cli_telemetry_optout_undo": {
+    "en": "Writes back the value recorded before apply, or deletes only this variable if it was absent, then broadcasts the environment change again; processes already running are unaffected.",
+    "zh": "写回应用前记录的值，或在原先不存在时只删除这个变量，然后再次广播环境变更；已经运行的进程不受影响。"
+  },
+  "privacy_control_dotnet_cli_telemetry_optout_editions": {
+    "en": "Independent of the Windows edition; every Microsoft distribution of the .NET SDK reads this variable.",
+    "zh": "与 Windows 版本无关；微软发行的 .NET SDK 都读取这个变量。"
+  },
+  "privacy_control_linguistic_data_collection_title": {
+    "en": "Improve inking and typing recognition",
+    "zh": "改进墨迹书写和键入识别"
+  },
+  "privacy_control_linguistic_data_collection_does": {
+    "en": "Disables 'Improve inking and typing recognition': inking and typing samples are no longer sent to Microsoft to improve language recognition and suggestions.",
+    "zh": "停用策略“改进墨迹书写和键入识别”：不再把墨迹和键入样本发给微软用于改进语言识别与建议。"
+  },
+  "privacy_control_linguistic_data_collection_benefit": {
+    "en": "Typing and inking samples no longer leave this machine.",
+    "zh": "键入与手写样本不再离开这台电脑。"
+  },
+  "privacy_control_linguistic_data_collection_affects": {
+    "en": "Nothing changes locally.",
+    "zh": "本地没有可见变化。"
+  },
+  "privacy_control_linguistic_data_collection_overlooked": {
+    "en": "The key is under Microsoft\\Windows\\CurrentVersion\\Policies, not the usual SOFTWARE\\Policies. Microsoft says this sending is turned off automatically when diagnostic data is at Basic or Security. It is the sending half; local learning is governed by the typing and ink entries.",
+    "zh": "键在 Microsoft\\Windows\\CurrentVersion\\Policies 下，不在通常的 SOFTWARE\\Policies 下。微软说明诊断数据为基本或安全级别时，这项发送本来就自动关闭。它是发送的一半，本地学习由键入、手写两项管理。"
+  },
+  "privacy_control_linguistic_data_collection_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。"
+  },
+  "privacy_control_linguistic_data_collection_editions": {
+    "en": "Template: Server 2016 / Windows 10 1803 and later; CSP (TextInput/AllowLinguisticDataCollection): Windows 10 1607 and later. The template also names Server. Microsoft's CSP edition table does not list Home; whether Home applies it is not stated.",
+    "zh": "模板：Server 2016 / Windows 10 1803 起；CSP（TextInput/AllowLinguisticDataCollection）：Windows 10 1607 起。模板也列出 Server。微软的 CSP 版本表没有列出 Home，Home 上是否执行没有说明。"
+  },
+  "privacy_control_handwriting_data_sharing_title": {
+    "en": "Handwriting personalization data sharing",
+    "zh": "手写个性化数据共享"
+  },
+  "privacy_control_handwriting_data_sharing_does": {
+    "en": "Enables 'Turn off handwriting personalization data sharing': the handwriting recognition personalisation tool does not send data to Microsoft.",
+    "zh": "启用策略“关闭手写个性化数据共享”：手写识别个性化工具不把数据发给微软。"
+  },
+  "privacy_control_handwriting_data_sharing_benefit": {
+    "en": "Handwriting personalisation data is no longer shared with Microsoft.",
+    "zh": "手写个性化数据不再共享给微软。"
+  },
+  "privacy_control_handwriting_data_sharing_affects": {
+    "en": "No user-visible effect is documented.",
+    "zh": "没有记载用户可见的影响。"
+  },
+  "privacy_control_handwriting_data_sharing_overlooked": {
+    "en": "The standalone template ShapeCollector.admx is only in the Server 2022 set; the 24H2 set writes this value only inside the 'Restrict Internet communication' umbrella policy. No source says which current component reads it, so it may have no effect on current Windows. The 'handwriting error reports' entry is in the same position.",
+    "zh": "独立模板 ShapeCollector.admx 只在 Server 2022 模板集里；24H2 模板集只在“限制 Internet 通信”总策略中写这个值。没有资料说当前哪个组件读取它，在当前 Windows 上可能没有效果。与“手写识别错误报告”一项情况相同。"
+  },
+  "privacy_control_handwriting_data_sharing_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。"
+  },
+  "privacy_control_handwriting_data_sharing_editions": {
+    "en": "The standalone template (at least Windows 7) is only in the Server 2022 set; there is no CSP edition table.",
+    "zh": "独立模板（至少 Windows 7）只在 Server 2022 模板集中；没有 CSP 版本表。"
+  },
+  "privacy_control_cloud_search_title": {
+    "en": "Cloud search",
+    "zh": "云搜索"
+  },
+  "privacy_control_cloud_search_does": {
+    "en": "Sets 'Allow Cloud Search' to disabled: Windows Search and Cortana do not search cloud sources such as OneDrive and SharePoint.",
+    "zh": "把“允许云搜索”设为禁用：Windows 搜索和 Cortana 不搜索 OneDrive、SharePoint 等云端内容。"
+  },
+  "privacy_control_cloud_search_benefit": {
+    "en": "Search terms are no longer sent to signed-in cloud content sources.",
+    "zh": "搜索词不再发往已登录的云端内容源。"
+  },
+  "privacy_control_cloud_search_affects": {
+    "en": "Search results no longer include OneDrive, SharePoint or other cloud content.",
+    "zh": "搜索结果里没有 OneDrive、SharePoint 等云端内容。"
+  },
+  "privacy_control_cloud_search_overlooked": {
+    "en": "It stops searching cloud content only; web results (two other entries) and search highlights are separate.",
+    "zh": "只停止搜索云端内容，不停止网页结果（另有两项）和搜索亮点。"
+  },
+  "privacy_control_cloud_search_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。"
+  },
+  "privacy_control_cloud_search_editions": {
+    "en": "CSP (Search/AllowCloudSearch): Windows 10 1709 and later. The template also names Server. Microsoft's CSP edition table does not list Home; whether Home applies it is not stated.",
+    "zh": "CSP（Search/AllowCloudSearch）：Windows 10 1709 起。模板也列出 Server。微软的 CSP 版本表没有列出 Home，Home 上是否执行没有说明。"
+  },
+  "privacy_control_cortana_title": {
+    "en": "Cortana",
+    "zh": "Cortana"
+  },
+  "privacy_control_cortana_does": {
+    "en": "Disables 'Allow Cortana': Cortana is turned off and local search keeps working.",
+    "zh": "停用策略“允许 Cortana”：Cortana 被关闭，本地搜索照常。"
+  },
+  "privacy_control_cortana_benefit": {
+    "en": "Cortana no longer runs or handles voice and search requests.",
+    "zh": "Cortana 不再运行，也不再处理语音或搜索请求。"
+  },
+  "privacy_control_cortana_affects": {
+    "en": "Cortana, where present, is unavailable.",
+    "zh": "Cortana（如果存在）不可用。"
+  },
+  "privacy_control_cortana_overlooked": {
+    "en": "Microsoft has deprecated the standalone Cortana app; on current Windows 11 there may be nothing left to turn off.",
+    "zh": "微软已弃用独立的 Cortana 应用；在当前 Windows 11 上可能没有可关闭的东西。"
+  },
+  "privacy_control_cortana_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。"
+  },
+  "privacy_control_cortana_editions": {
+    "en": "CSP (Experience/AllowCortana): Windows 10 1507 and later. The template also names Server. Microsoft's CSP edition table does not list Home; whether Home applies it is not stated.",
+    "zh": "CSP（Experience/AllowCortana）：Windows 10 1507 起。模板也列出 Server。微软的 CSP 版本表没有列出 Home，Home 上是否执行没有说明。"
+  },
+  "privacy_control_cortana_above_lock_title": {
+    "en": "Cortana above the lock screen",
+    "zh": "锁屏上的 Cortana"
+  },
+  "privacy_control_cortana_above_lock_does": {
+    "en": "Disables 'Allow Cortana above lock screen': the system must be unlocked before talking to Cortana.",
+    "zh": "停用策略“允许在锁屏上使用 Cortana”：必须先解锁才能用语音与 Cortana 交互。"
+  },
+  "privacy_control_cortana_above_lock_benefit": {
+    "en": "Cortana cannot be used by voice while the system is locked.",
+    "zh": "锁屏状态下不能经语音使用 Cortana。"
+  },
+  "privacy_control_cortana_above_lock_affects": {
+    "en": "Cortana cannot be called by voice on the lock screen.",
+    "zh": "锁屏上不能用语音调用 Cortana。"
+  },
+  "privacy_control_cortana_above_lock_overlooked": {
+    "en": "As with the Cortana entry, the standalone app is deprecated; once the Cortana entry is applied this one adds nothing.",
+    "zh": "同“Cortana”一项，独立应用已弃用；应用“Cortana”一项后本项多余。"
+  },
+  "privacy_control_cortana_above_lock_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。"
+  },
+  "privacy_control_cortana_above_lock_editions": {
+    "en": "CSP (AboveLock/AllowCortanaAboveLock): Windows 10 1607 and later. The template also names Server. Microsoft's CSP edition table does not list Home; whether Home applies it is not stated.",
+    "zh": "CSP（AboveLock/AllowCortanaAboveLock）：Windows 10 1607 起。模板也列出 Server。微软的 CSP 版本表没有列出 Home，Home 上是否执行没有说明。"
+  },
+  "privacy_control_search_location_title": {
+    "en": "Search uses location",
+    "zh": "搜索使用位置"
+  },
+  "privacy_control_search_location_does": {
+    "en": "Disables 'Allow search and Cortana to use location'.",
+    "zh": "停用策略“允许搜索和 Cortana 使用位置”。"
+  },
+  "privacy_control_search_location_benefit": {
+    "en": "Search no longer uses location for its results.",
+    "zh": "搜索不再按位置给出结果。"
+  },
+  "privacy_control_search_location_affects": {
+    "en": "Local results in Search (weather, nearby places) disappear.",
+    "zh": "搜索里的本地结果（天气、附近地点）消失。"
+  },
+  "privacy_control_search_location_overlooked": {
+    "en": "Narrower than 'turn off location (machine)'; with that entry applied this one adds nothing.",
+    "zh": "比“关闭定位（整机）”窄；已应用那一项时本项不再增加效果。"
+  },
+  "privacy_control_search_location_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。"
+  },
+  "privacy_control_search_location_editions": {
+    "en": "CSP (Search/AllowSearchToUseLocation): Windows 10 1507 and later. The template also names Server. Microsoft's CSP edition table does not list Home; whether Home applies it is not stated.",
+    "zh": "CSP（Search/AllowSearchToUseLocation）：Windows 10 1507 起。模板也列出 Server。微软的 CSP 版本表没有列出 Home，Home 上是否执行没有说明。"
+  },
+  "privacy_control_search_highlights_title": {
+    "en": "Search highlights",
+    "zh": "搜索亮点"
+  },
+  "privacy_control_search_highlights_does": {
+    "en": "Disables 'Allow search highlights': the search box and search home show no online trending searches or daily content.",
+    "zh": "停用策略“允许搜索亮点”：开始菜单搜索框和搜索主页不显示在线的热门搜索与每日内容。"
+  },
+  "privacy_control_search_highlights_benefit": {
+    "en": "The search box no longer fetches online content.",
+    "zh": "搜索框不再拉取在线内容。"
+  },
+  "privacy_control_search_highlights_affects": {
+    "en": "Trending searches and daily content disappear.",
+    "zh": "热门搜索与每日内容消失。"
+  },
+  "privacy_control_search_highlights_overlooked": {
+    "en": "The value name EnableDynamicContentInWSB differs from the policy name, which makes manual checks confusing. It does not turn off web results. The Server 2022 template set does not have this policy.",
+    "zh": "值名 EnableDynamicContentInWSB 与策略名不同，手动核对时容易找错。它不关闭网页结果。Server 2022 模板集里没有这条策略。"
+  },
+  "privacy_control_search_highlights_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。"
+  },
+  "privacy_control_search_highlights_editions": {
+    "en": "CSP (Search/AllowSearchHighlights): Windows 10 20H2–21H2 with KB5011543, Windows 11 21H2 with KB5023774, Windows 11 22H2 and later. The template is in the 24H2 set. Microsoft's CSP edition table does not list Home; whether Home applies it is not stated.",
+    "zh": "CSP（Search/AllowSearchHighlights）：Windows 10 20H2–21H2 加 KB5011543、Windows 11 21H2 加 KB5023774、Windows 11 22H2 起。模板见于 24H2 模板集。微软的 CSP 版本表没有列出 Home，Home 上是否执行没有说明。"
+  },
+  "privacy_control_consumer_features_title": {
+    "en": "Microsoft consumer experiences",
+    "zh": "Microsoft 消费者体验"
+  },
+  "privacy_control_consumer_features_does": {
+    "en": "Enables 'Turn off Microsoft consumer experiences': no personalised recommendations or Microsoft account notifications.",
+    "zh": "启用策略“关闭 Microsoft 消费者体验”：不显示个性化推荐和 Microsoft 账户通知。"
+  },
+  "privacy_control_consumer_features_benefit": {
+    "en": "Start suggestions, post-setup app installs and similar consumer content stop.",
+    "zh": "开始菜单推荐、初次设置后的应用安装等消费者内容停止。"
+  },
+  "privacy_control_consumer_features_affects": {
+    "en": "On editions that honour it, these suggestions and automatic installs no longer appear.",
+    "zh": "在执行它的版本上，这些推荐和自动安装不再出现。"
+  },
+  "privacy_control_consumer_features_overlooked": {
+    "en": "The ADML says it applies to Enterprise and Education only. On Home, Pro and Server it has no effect.",
+    "zh": "ADML 原文：只适用于 Enterprise 和 Education。Home、Pro、Server 上没有效果。"
+  },
+  "privacy_control_consumer_features_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。"
+  },
+  "privacy_control_consumer_features_editions": {
+    "en": "The ADML says 'This setting only applies to Enterprise and Education SKUs'; the CSP marks Pro unsupported; the template excludes Server.",
+    "zh": "ADML 原文“This setting only applies to Enterprise and Education SKUs”；CSP 把 Pro 标为不支持；模板不适用于 Server。"
+  },
+  "privacy_control_cloud_optimized_content_title": {
+    "en": "Cloud optimized content",
+    "zh": "云优化内容"
+  },
+  "privacy_control_cloud_optimized_content_does": {
+    "en": "Enables 'Turn off cloud optimized content': Windows experiences that use cloud optimized content show default content instead.",
+    "zh": "启用策略“关闭云优化内容”：使用云优化内容的 Windows 体验改为显示默认内容。"
+  },
+  "privacy_control_cloud_optimized_content_benefit": {
+    "en": "Those surfaces no longer download cloud content.",
+    "zh": "这些界面不再下载云端内容。"
+  },
+  "privacy_control_cloud_optimized_content_affects": {
+    "en": "Some surfaces show default content.",
+    "zh": "部分界面显示默认内容。"
+  },
+  "privacy_control_cloud_optimized_content_overlooked": {
+    "en": "The CSP marks Pro unsupported and does not list Home. Microsoft's guide says to set it within 15 minutes of installing Windows; set later, content already cached may remain (inference). The guide gives an HKCU path, but the template declares a machine policy, so HKLM is written as the template defines.",
+    "zh": "CSP 把 Pro 标为不支持，Home 未列出。微软指南说这一项应在安装 Windows 后 15 分钟内设置，之后才设时已缓存的内容可能仍在（推断）。指南给的是 HKCU 路径，但模板声明为机器策略，这里按模板写 HKLM。"
+  },
+  "privacy_control_cloud_optimized_content_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。"
+  },
+  "privacy_control_cloud_optimized_content_editions": {
+    "en": "CSP (Experience/DisableCloudOptimizedContent): Enterprise, Education, IoT Enterprise, Windows 11 21H2 and later; Pro marked unsupported. Template: Server 2016 / Windows 10 1909 and later. Home is not listed.",
+    "zh": "CSP（Experience/DisableCloudOptimizedContent）：Enterprise、Education、IoT Enterprise，Windows 11 21H2 起；Pro 标为不支持。模板：Server 2016 / Windows 10 1909 起。Home 未列出。"
+  },
+  "privacy_control_windows_tips_title": {
+    "en": "Windows tips",
+    "zh": "Windows 提示"
+  },
+  "privacy_control_windows_tips_does": {
+    "en": "Enables 'Do not show Windows tips': no contextual pop-ups explaining how to use Windows.",
+    "zh": "启用策略“不显示 Windows 提示”：不弹出讲解 Windows 用法的上下文提示。"
+  },
+  "privacy_control_windows_tips_benefit": {
+    "en": "Tips chosen by Microsoft from diagnostic data stop.",
+    "zh": "微软按诊断数据挑选提示的这一过程停止。"
+  },
+  "privacy_control_windows_tips_affects": {
+    "en": "Tip pop-ups no longer appear.",
+    "zh": "提示弹窗不再出现。"
+  },
+  "privacy_control_windows_tips_overlooked": {
+    "en": "The ADML says it applies to Enterprise and Education only; on Home and Pro it has no effect. With diagnostic data at Basic or below, users see a limited set of tips even without it. The Tips app itself is deprecated.",
+    "zh": "ADML 原文：只适用于 Enterprise 和 Education；Home、Pro 上没有效果。诊断数据为基本级别或更低时，即使不设也只看到少量提示。“提示”应用本身已被弃用。"
+  },
+  "privacy_control_windows_tips_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。"
+  },
+  "privacy_control_windows_tips_editions": {
+    "en": "The ADML says 'this setting only applies to Enterprise and Education SKUs'; the CSP (Experience/AllowWindowsTips) marks Pro unsupported; the template excludes Server.",
+    "zh": "ADML 原文“this setting only applies to Enterprise and Education SKUs”；CSP（Experience/AllowWindowsTips）把 Pro 标为不支持；模板不适用于 Server。"
+  },
+  "privacy_control_consumer_account_state_content_title": {
+    "en": "Cloud consumer account state content",
+    "zh": "云端消费者账户状态内容"
+  },
+  "privacy_control_consumer_account_state_content_does": {
+    "en": "Enables 'Turn off cloud consumer account state content': the related Windows experiences show default content.",
+    "zh": "启用策略“关闭云端消费者账户状态内容”：相关 Windows 体验显示默认内容。"
+  },
+  "privacy_control_consumer_account_state_content_benefit": {
+    "en": "Those experiences no longer fetch account-state content from the cloud.",
+    "zh": "这些体验不再取云端的账户状态内容。"
+  },
+  "privacy_control_consumer_account_state_content_affects": {
+    "en": "Microsoft account status content (for example account notices) is not shown; the sources do not list which surfaces.",
+    "zh": "微软账户状态类内容（例如账户提示）不再显示；具体是哪些界面，来源没有列出。"
+  },
+  "privacy_control_consumer_account_state_content_overlooked": {
+    "en": "The sources do not say which surfaces use this content, so the page can only repeat the template's words. The CSP marks Pro unsupported; the Server 2022 template set does not have this policy.",
+    "zh": "来源没有说明哪些界面使用这类内容，页面只能重复模板的措辞。CSP 把 Pro 标为不支持；Server 2022 模板集没有这条策略。"
+  },
+  "privacy_control_consumer_account_state_content_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。"
+  },
+  "privacy_control_consumer_account_state_content_editions": {
+    "en": "CSP (Experience/DisableConsumerAccountStateContent): Enterprise, Education, IoT Enterprise, Windows 11 21H2 and later; Pro marked unsupported. Home is not listed.",
+    "zh": "CSP（Experience/DisableConsumerAccountStateContent）：Enterprise、Education、IoT Enterprise，Windows 11 21H2 起；Pro 标为不支持。Home 未列出。"
+  },
+  "privacy_control_third_party_suggestions_title": {
+    "en": "Third-party suggestions in Spotlight (current user)",
+    "zh": "Spotlight 中的第三方推荐（当前用户）"
+  },
+  "privacy_control_third_party_suggestions_does": {
+    "en": "Enables the user policy 'Do not suggest third-party content in Windows spotlight'.",
+    "zh": "启用用户策略“不在 Windows Spotlight 中推荐第三方内容”。"
+  },
+  "privacy_control_third_party_suggestions_benefit": {
+    "en": "Apps and content from third-party publishers no longer appear in lock-screen Spotlight, Start suggestions and tips.",
+    "zh": "锁屏 Spotlight、开始菜单推荐和提示里不再出现第三方发布者的应用与内容。"
+  },
+  "privacy_control_third_party_suggestions_affects": {
+    "en": "Suggestions about Microsoft features and apps may still appear.",
+    "zh": "仍可能看到关于微软功能和应用的建议。"
+  },
+  "privacy_control_third_party_suggestions_overlooked": {
+    "en": "With 'Turn off all Windows spotlight features' applied there is nothing left to filter. It applies to the current user only; it is written under HKCU\\Software\\Policies, and whether a standard account may write there is not documented; if Windows refuses, the page shows access denied.",
+    "zh": "已应用“关闭所有 Windows Spotlight 功能”时没有可过滤的内容。只对当前用户生效；写在 HKCU\\Software\\Policies 下，标准账户能否写入没有文档说明，被拒绝时页面显示访问被拒绝。"
+  },
+  "privacy_control_third_party_suggestions_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。"
+  },
+  "privacy_control_third_party_suggestions_editions": {
+    "en": "CSP (Experience/AllowThirdPartySuggestionsInWindowsSpotlight): user scope, Windows 10 1607 and later. The template excludes Server. Microsoft's CSP edition table does not list Home; whether Home applies it is not stated.",
+    "zh": "CSP（Experience/AllowThirdPartySuggestionsInWindowsSpotlight）：用户作用域，Windows 10 1607 起。模板标为不适用于 Server。微软的 CSP 版本表没有列出 Home，Home 上是否执行没有说明。"
+  },
+  "privacy_control_settings_online_tips_title": {
+    "en": "Online tips in Settings",
+    "zh": "设置中的联机提示"
+  },
+  "privacy_control_settings_online_tips_does": {
+    "en": "Disables 'Allow Online Tips': the Settings app does not contact Microsoft content services for tips and help.",
+    "zh": "停用策略“允许联机提示”：“设置”应用不联系微软内容服务取提示和帮助。"
+  },
+  "privacy_control_settings_online_tips_benefit": {
+    "en": "Opening Settings pages no longer fetches tip content from Microsoft.",
+    "zh": "打开设置页时不再向微软取提示内容。"
+  },
+  "privacy_control_settings_online_tips_affects": {
+    "en": "Online help and tips panes in Settings disappear.",
+    "zh": "设置里的联机帮助与提示窗格消失。"
+  },
+  "privacy_control_settings_online_tips_overlooked": {
+    "en": "The key holds many other Explorer policies; restore touches only this value. It is a different control from 'Do not show Windows tips'.",
+    "zh": "这个键里还有许多资源管理器策略，恢复只动这一个值。它与“不显示 Windows 提示”是不同的控制。"
+  },
+  "privacy_control_settings_online_tips_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。"
+  },
+  "privacy_control_settings_online_tips_editions": {
+    "en": "Template: Server 2016 / Windows 10 1709 and later; CSP (Settings/AllowOnlineTips): Windows 10 1709 and later. The template also names Server. Microsoft's CSP edition table does not list Home; whether Home applies it is not stated.",
+    "zh": "模板：Server 2016 / Windows 10 1709 起；CSP（Settings/AllowOnlineTips）：Windows 10 1709 起。模板也列出 Server。微软的 CSP 版本表没有列出 Home，Home 上是否执行没有说明。"
+  },
+  "privacy_control_widgets_title": {
+    "en": "Widgets",
+    "zh": "小组件"
+  },
+  "privacy_control_widgets_does": {
+    "en": "Disables 'Allow widgets': the whole Widgets feature, including its taskbar content, is turned off.",
+    "zh": "停用策略“允许小组件”：整个小组件功能（包括任务栏上的内容）关闭。"
+  },
+  "privacy_control_widgets_benefit": {
+    "en": "The Widgets news and feeds service no longer connects.",
+    "zh": "小组件的新闻与信息流服务不再连接。"
+  },
+  "privacy_control_widgets_affects": {
+    "en": "The Widgets board and the taskbar weather/news button disappear; Microsoft says apps using the service may stop working.",
+    "zh": "小组件面板和任务栏天气/新闻按钮消失；微软说使用该服务的应用可能停止工作。"
+  },
+  "privacy_control_widgets_overlooked": {
+    "en": "This is the Windows 11 control; Windows 10 'news and interests' has no usable template and is not written in this version.",
+    "zh": "这是 Windows 11 的控制；Windows 10 的“资讯和兴趣”没有可用模板，本版不写。"
+  },
+  "privacy_control_widgets_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。"
+  },
+  "privacy_control_widgets_editions": {
+    "en": "CSP (NewsAndInterests/AllowNewsAndInterests): Windows 11 21H2 and later. The template excludes Server. Microsoft's CSP edition table does not list Home; whether Home applies it is not stated.",
+    "zh": "CSP（NewsAndInterests/AllowNewsAndInterests）：Windows 11 21H2 起。模板标为不适用于 Server。微软的 CSP 版本表没有列出 Home，Home 上是否执行没有说明。"
+  },
+  "privacy_control_advertising_id_title": {
+    "en": "Advertising ID",
+    "zh": "广告 ID"
+  },
+  "privacy_control_advertising_id_does": {
+    "en": "Enables 'Turn off the advertising ID': apps cannot use the advertising ID to link the user across apps.",
+    "zh": "启用策略“关闭广告 ID”：应用不能用广告 ID 跨应用关联用户。"
+  },
+  "privacy_control_advertising_id_benefit": {
+    "en": "The advertising ID is turned off, not just reset.",
+    "zh": "广告 ID 被关闭，不只是重置。"
+  },
+  "privacy_control_advertising_id_affects": {
+    "en": "In-app ads are no longer personalised by the advertising ID; the number of ads does not change.",
+    "zh": "应用内广告不再按广告 ID 个性化，广告数量不变。"
+  },
+  "privacy_control_advertising_id_overlooked": {
+    "en": "Writing 0 is not 'on'; it hands the choice back to the user, so this page only writes 1 or deletes. Microsoft's guide also writes a separate preference value on its registry route; this entry writes only the policy value the template defines.",
+    "zh": "写 0 不是“开启”，而是交还用户决定；本页只写 1 或删除。微软指南的注册表路线还另写一个偏好值，本项只写模板定义的策略值。"
+  },
+  "privacy_control_advertising_id_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。"
+  },
+  "privacy_control_advertising_id_editions": {
+    "en": "Template: Windows 8.1 / Server 2012 R2 and later; CSP (Privacy/DisableAdvertisingId): Windows 10 1607 and later. The template also names Server. Microsoft's CSP edition table does not list Home; whether Home applies it is not stated.",
+    "zh": "模板：Windows 8.1 / Server 2012 R2 起；CSP（Privacy/DisableAdvertisingId）：Windows 10 1607 起。模板也列出 Server。微软的 CSP 版本表没有列出 Home，Home 上是否执行没有说明。"
+  },
+  "privacy_control_language_list_websites_title": {
+    "en": "Websites read the language list (preference)",
+    "zh": "网站读取语言列表（偏好）"
+  },
+  "privacy_control_language_list_websites_does": {
+    "en": "Turns off 'Let websites provide locally relevant content by accessing my language list' (current user's preference).",
+    "zh": "关闭“允许网站访问我的语言列表以提供本地相关内容”（当前用户的偏好）。"
+  },
+  "privacy_control_language_list_websites_benefit": {
+    "en": "Websites no longer receive the language list Windows offers.",
+    "zh": "网站拿不到 Windows 提供的语言列表。"
+  },
+  "privacy_control_language_list_websites_affects": {
+    "en": "Web pages may not pick the user's language automatically.",
+    "zh": "网页可能不会自动选择用户的语言。"
+  },
+  "privacy_control_language_list_websites_overlooked": {
+    "en": "This is a preference, not locked, and can be switched back in Settings; it applies to the current user only. It does not control what a browser itself sends.",
+    "zh": "这是偏好，不锁定，用户可以在设置里改回；只对当前用户生效。它不控制浏览器自己发送的内容。"
+  },
+  "privacy_control_language_list_websites_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。"
+  },
+  "privacy_control_language_list_websites_editions": {
+    "en": "Documented only in Microsoft's connection-management guide for Windows 10/11 Enterprise and Server 2016/2019; whether Home and Pro read this value is not stated.",
+    "zh": "只在微软面向 Windows 10/11 Enterprise 与 Server 2016/2019 的连接管理指南中有记载；Home、Pro 是否读这个值没有说明。"
+  },
+  "privacy_control_activity_publish_title": {
+    "en": "Publish user activities",
+    "zh": "发布用户活动"
+  },
+  "privacy_control_activity_publish_does": {
+    "en": "Disables 'Allow publishing of User Activities': apps and Windows cannot publish User Activity records.",
+    "zh": "停用策略“允许发布用户活动”：应用和 Windows 不能发布“用户活动”记录。"
+  },
+  "privacy_control_activity_publish_benefit": {
+    "en": "Activity history is no longer recorded locally, so there is nothing to upload or read later.",
+    "zh": "活动历史不再在这台电脑上记录，也就没有可上传或读取的记录。"
+  },
+  "privacy_control_activity_publish_affects": {
+    "en": "Features that resume work from activity history (Windows 10 Timeline) get no new entries.",
+    "zh": "依赖活动历史的“从上次停下处继续”功能（Windows 10 时间线）不再有新记录。"
+  },
+  "privacy_control_activity_publish_overlooked": {
+    "en": "Takes effect immediately; existing history is not deleted and must be cleared in Settings. Microsoft's recipe sets it together with 'activity feed' and 'upload user activities'.",
+    "zh": "立即生效；已有历史不会删除，需要在设置里清除。微软的做法是与“活动源”“上传用户活动”三项一起设。"
+  },
+  "privacy_control_activity_publish_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。"
+  },
+  "privacy_control_activity_publish_editions": {
+    "en": "CSP (Privacy/PublishUserActivities): Windows 10 1709 and later. The template also names Server. Microsoft's CSP edition table does not list Home; whether Home applies it is not stated.",
+    "zh": "CSP（Privacy/PublishUserActivities）：Windows 10 1709 起。模板也列出 Server。微软的 CSP 版本表没有列出 Home，Home 上是否执行没有说明。"
+  },
+  "privacy_control_activity_upload_title": {
+    "en": "Upload user activities",
+    "zh": "上传用户活动"
+  },
+  "privacy_control_activity_upload_does": {
+    "en": "Disables 'Allow upload of User Activities'.",
+    "zh": "停用策略“允许上传用户活动”。"
+  },
+  "privacy_control_activity_upload_benefit": {
+    "en": "Published activities are not uploaded to the cloud.",
+    "zh": "已发布的活动不会上传到云端。"
+  },
+  "privacy_control_activity_upload_affects": {
+    "en": "Nothing visible changes for a current user.",
+    "zh": "当前用户看不到变化。"
+  },
+  "privacy_control_activity_upload_overlooked": {
+    "en": "The upload service it governs has ended: Microsoft accounts could not upload new activity from July 2021 and Entra accounts from January 2024, so on today's service writing it changes nothing. Activity already uploaded is not deleted by it.",
+    "zh": "它管的上传服务已经停止：Microsoft 账户自 2021 年 7 月、Entra 账户自 2024 年 1 月起不能上传新活动，所以在今天的服务上写入不改变行为。已上传的活动不会因此删除。"
+  },
+  "privacy_control_activity_upload_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。"
+  },
+  "privacy_control_activity_upload_editions": {
+    "en": "CSP (Privacy/UploadUserActivities): Windows 10 1803 and later. The template also names Server. Microsoft's CSP edition table does not list Home; whether Home applies it is not stated.",
+    "zh": "CSP（Privacy/UploadUserActivities）：Windows 10 1803 起。模板也列出 Server。微软的 CSP 版本表没有列出 Home，Home 上是否执行没有说明。"
+  },
+  "privacy_control_clipboard_history_title": {
+    "en": "Clipboard history",
+    "zh": "剪贴板历史"
+  },
+  "privacy_control_clipboard_history_does": {
+    "en": "Disables 'Allow Clipboard History': clipboard contents are not kept in history (Win+V).",
+    "zh": "停用策略“允许剪贴板历史”：剪贴板内容不再保存在历史中（Win+V）。"
+  },
+  "privacy_control_clipboard_history_benefit": {
+    "en": "After the next copy, earlier clipboard contents can no longer be paged back.",
+    "zh": "下一次复制后，之前的剪贴板内容不再能翻回查看。"
+  },
+  "privacy_control_clipboard_history_affects": {
+    "en": "Win+V clipboard history and pinned items are unavailable; ordinary copy and paste keeps working.",
+    "zh": "Win+V 剪贴板历史和固定项不可用；普通复制粘贴照常。"
+  },
+  "privacy_control_clipboard_history_overlooked": {
+    "en": "Clipboard history is local memory, not the part that goes to the cloud; that is the 'cross-device clipboard' entry. The sources do not say whether cloud clipboard needs history, so the page does not claim this entry stops cloud sync. Takes effect immediately.",
+    "zh": "剪贴板历史在这台电脑的内存中，不是上云的部分；上云的是“跨设备剪贴板”一项。来源没有说跨设备剪贴板是否依赖历史开启，所以本页不说本项也停止云同步。立即生效。"
+  },
+  "privacy_control_clipboard_history_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。"
+  },
+  "privacy_control_clipboard_history_editions": {
+    "en": "CSP (Experience/AllowClipboardHistory): Windows 10 1809 and later. The template also names Server. Microsoft's CSP edition table does not list Home; whether Home applies it is not stated.",
+    "zh": "CSP（Experience/AllowClipboardHistory）：Windows 10 1809 起。模板也列出 Server。微软的 CSP 版本表没有列出 Home，Home 上是否执行没有说明。"
+  },
+  "privacy_control_cloud_clipboard_title": {
+    "en": "Cross-device clipboard",
+    "zh": "跨设备剪贴板"
+  },
+  "privacy_control_cloud_clipboard_does": {
+    "en": "Disables 'Allow Clipboard synchronization across devices': clipboard contents are no longer uploaded for the same account's other devices to paste.",
+    "zh": "停用策略“允许跨设备同步剪贴板”：剪贴板内容不再上传到云端供同一账户的其他设备粘贴。"
+  },
+  "privacy_control_cloud_clipboard_benefit": {
+    "en": "Copied content no longer leaves this machine.",
+    "zh": "复制的内容不再离开这台电脑。"
+  },
+  "privacy_control_cloud_clipboard_affects": {
+    "en": "Pasting on another device what was copied here, and the reverse, stops.",
+    "zh": "在另一台设备上粘贴这台电脑复制的内容（及反向）不再可用。"
+  },
+  "privacy_control_cloud_clipboard_overlooked": {
+    "en": "Local clipboard history (Win+V) is a separate entry; this is one of the formal counterparts of the original's 'cross-device sync'. Takes effect immediately.",
+    "zh": "这台电脑上的剪贴板历史（Win+V）是另一项；这是原文“跨设备同步”的正式对应之一。立即生效。"
+  },
+  "privacy_control_cloud_clipboard_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。"
+  },
+  "privacy_control_cloud_clipboard_editions": {
+    "en": "CSP (Privacy/AllowCrossDeviceClipboard): Windows 10 1809 and later. The template also names Server. Microsoft's CSP edition table does not list Home; whether Home applies it is not stated.",
+    "zh": "CSP（Privacy/AllowCrossDeviceClipboard）：Windows 10 1809 起。模板也列出 Server。微软的 CSP 版本表没有列出 Home，Home 上是否执行没有说明。"
+  },
+  "privacy_control_continue_experiences_title": {
+    "en": "Continue experiences on this device",
+    "zh": "在此设备上继续体验"
+  },
+  "privacy_control_continue_experiences_does": {
+    "en": "Disables 'Continue experiences on this device': the device is not discoverable by the same user's other devices and takes no part in cross-device experiences.",
+    "zh": "停用策略“在此设备上继续体验”：这台电脑不被同一用户的其他设备发现，不参与跨设备体验。"
+  },
+  "privacy_control_continue_experiences_benefit": {
+    "en": "The device no longer announces itself to other devices.",
+    "zh": "这台电脑不再向其他设备公布自己。"
+  },
+  "privacy_control_continue_experiences_affects": {
+    "en": "Opening apps and continuing tasks between this PC and other devices stops.",
+    "zh": "在这台电脑与其他设备之间打开应用、继续任务不再可用。"
+  },
+  "privacy_control_continue_experiences_overlooked": {
+    "en": "Takes effect after a restart, and so does restore. The template says the default when not configured depends on the Windows edition, so restoring to 'absent' may return to different states on different editions. It is not a master switch for all sync.",
+    "zh": "重启后才生效，恢复后也要重启。模板说未配置时的默认行为取决于 Windows 版本，所以恢复为“缺席”在不同版本上回到的状态可能不同。它不是所有同步的总开关。"
+  },
+  "privacy_control_continue_experiences_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control. A restart is needed afterwards.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。之后需要重启。"
+  },
+  "privacy_control_continue_experiences_editions": {
+    "en": "CSP (ADMX_GroupPolicy/EnableCDP): Windows 10 2004 with KB5005101 and later, Windows 11. The template also names Server. Microsoft's CSP edition table does not list Home; whether Home applies it is not stated.",
+    "zh": "CSP（ADMX_GroupPolicy/EnableCDP）：Windows 10 2004 + KB5005101 起、Windows 11。模板也列出 Server。微软的 CSP 版本表没有列出 Home，Home 上是否执行没有说明。"
+  },
+  "privacy_control_phone_pc_linking_title": {
+    "en": "Phone-PC linking",
+    "zh": "手机与电脑连接"
+  },
+  "privacy_control_phone_pc_linking_does": {
+    "en": "Disables 'Phone-PC linking on this device': the PC cannot be linked to phones and removes itself from linked phones' device lists.",
+    "zh": "停用策略“此设备上的手机与电脑连接”：这台电脑不能与手机连接，并把自己从已连接手机的设备列表中移除。"
+  },
+  "privacy_control_phone_pc_linking_benefit": {
+    "en": "The data flow between phones and this PC stops.",
+    "zh": "手机与这台电脑之间的连接数据流停止。"
+  },
+  "privacy_control_phone_pc_linking_affects": {
+    "en": "'Continue on PC' stops; the Settings button to add a phone is greyed out.",
+    "zh": "“在电脑上继续”不可用；设置里添加手机的按钮变灰。"
+  },
+  "privacy_control_phone_pc_linking_overlooked": {
+    "en": "Takes effect after a restart. Applying it removes the PC from phones' device lists; restore does not re-list it, so the phone may need to be linked again.",
+    "zh": "重启后才生效。应用时这台电脑会从手机的设备列表中移除，恢复不会让手机重新列出这台电脑，可能要在手机上重新连接。"
+  },
+  "privacy_control_phone_pc_linking_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control. A restart is needed afterwards, and the phone may need to be linked again.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。之后需要重启，并可能要在手机上重新连接。"
+  },
+  "privacy_control_phone_pc_linking_editions": {
+    "en": "Template: Server 2016 / Windows 10 1803 and later; CSP (Connectivity/AllowPhonePCLinking): Windows 10 1803 and later. The template also names Server. Microsoft's CSP edition table does not list Home; whether Home applies it is not stated.",
+    "zh": "模板：Server 2016 / Windows 10 1803 起；CSP（Connectivity/AllowPhonePCLinking）：Windows 10 1803 起。模板也列出 Server。微软的 CSP 版本表没有列出 Home，Home 上是否执行没有说明。"
+  },
+  "privacy_control_message_sync_title": {
+    "en": "Text message cloud sync",
+    "zh": "短信云同步"
+  },
+  "privacy_control_message_sync_does": {
+    "en": "Disables 'Allow Message Service Cloud Sync': cellular text messages are not backed up to or restored from Microsoft's cloud.",
+    "zh": "停用策略“允许消息服务云同步”：蜂窝短信不备份到微软云，也不从云恢复。"
+  },
+  "privacy_control_message_sync_benefit": {
+    "en": "Text messages are no longer stored on servers outside the user's control.",
+    "zh": "短信不再存到组织控制之外的服务器上。"
+  },
+  "privacy_control_message_sync_affects": {
+    "en": "On devices that have text messages, cloud backup and restore of them stop.",
+    "zh": "有短信的设备上，短信云备份与恢复停止。"
+  },
+  "privacy_control_message_sync_overlooked": {
+    "en": "It covers cellular text messages only; a PC without a cellular modem has nothing to sync. Chat programs and Phone Link are unaffected.",
+    "zh": "只管蜂窝短信；没有蜂窝模块的电脑上没有可同步的东西。不影响聊天程序或“手机连接”。"
+  },
+  "privacy_control_message_sync_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。"
+  },
+  "privacy_control_message_sync_editions": {
+    "en": "Template: Server 2016 / Windows 10 1709 and later; CSP (Messaging/AllowMessageSync): Windows 10 1607 and later. The template also names Server. Microsoft's CSP edition table does not list Home; whether Home applies it is not stated.",
+    "zh": "模板：Server 2016 / Windows 10 1709 起；CSP（Messaging/AllowMessageSync）：Windows 10 1607 起。模板也列出 Server。微软的 CSP 版本表没有列出 Home，Home 上是否执行没有说明。"
+  },
+  "privacy_control_onesettings_downloads_title": {
+    "en": "OneSettings downloads",
+    "zh": "OneSettings 配置下载"
+  },
+  "privacy_control_onesettings_downloads_does": {
+    "en": "Enables 'Disable OneSettings Downloads': Windows does not connect to the OneSettings service to download configuration.",
+    "zh": "启用策略“禁用 OneSettings 下载”：Windows 不连接 OneSettings 服务下载配置。"
+  },
+  "privacy_control_onesettings_downloads_benefit": {
+    "en": "One periodic connection to Microsoft is removed.",
+    "zh": "减少一个定期连接微软的通道。"
+  },
+  "privacy_control_onesettings_downloads_affects": {
+    "en": "Microsoft: apps that use this service may stop working; which apps is not listed.",
+    "zh": "微软原文：使用这项服务的应用可能停止工作；具体是哪些应用没有列出。"
+  },
+  "privacy_control_onesettings_downloads_overlooked": {
+    "en": "It does not reduce diagnostic data by itself. The failures it can cause are not specified.",
+    "zh": "它本身不减少诊断数据。可能出现的故障没有具体说明。"
+  },
+  "privacy_control_onesettings_downloads_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。"
+  },
+  "privacy_control_onesettings_downloads_editions": {
+    "en": "Template: Server 2016 / Windows 10 1909 and later; CSP (System/DisableOneSettingsDownloads): Windows 11 21H2 and later. The template also names Server. Microsoft's CSP edition table does not list Home; whether Home applies it is not stated.",
+    "zh": "模板：Server 2016 / Windows 10 1909 起；CSP（System/DisableOneSettingsDownloads）：Windows 11 21H2 起。模板也列出 Server。微软的 CSP 版本表没有列出 Home，Home 上是否执行没有说明。"
+  },
+  "privacy_control_find_my_device_title": {
+    "en": "Find My Device",
+    "zh": "查找我的设备"
+  },
+  "privacy_control_find_my_device_does": {
+    "en": "Disables 'Turn On/Off Find My Device': the device and its location are not registered in the cloud.",
+    "zh": "停用策略“打开/关闭查找我的设备”：设备及其位置不登记到云端。"
+  },
+  "privacy_control_find_my_device_benefit": {
+    "en": "The device's location (and the last-use location of an active pen) is no longer uploaded.",
+    "zh": "设备位置（以及主动式笔最后使用的位置）不再上传。"
+  },
+  "privacy_control_find_my_device_affects": {
+    "en": "A lost or stolen PC can no longer be located or locked from account.microsoft.com; the pen's last-use location is not shown.",
+    "zh": "丢失或被盗时不能从 account.microsoft.com 定位、锁定这台电脑；看不到笔最后使用的位置。"
+  },
+  "privacy_control_find_my_device_overlooked": {
+    "en": "This is a loss-protection feature; once applied, a lost laptop cannot be located. It does not turn off location (that is the 'turn off location (machine)' entry).",
+    "zh": "这是防丢失的安全功能，应用后丢失的笔记本无法定位。它不关闭定位（那是“关闭定位（整机）”一项）。"
+  },
+  "privacy_control_find_my_device_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。"
+  },
+  "privacy_control_find_my_device_editions": {
+    "en": "Template: at least Windows 10 (not Server); CSP (Experience/AllowFindMyDevice): Windows 10 1703 and later. The template excludes Server. Microsoft's CSP edition table does not list Home; whether Home applies it is not stated.",
+    "zh": "模板：至少 Windows 10（不含 Server）；CSP（Experience/AllowFindMyDevice）：Windows 10 1703 起。模板标为不适用于 Server。微软的 CSP 版本表没有列出 Home，Home 上是否执行没有说明。"
+  },
+  "privacy_control_delivery_optimization_title": {
+    "en": "Delivery Optimization download mode",
+    "zh": "传递优化下载模式"
+  },
+  "privacy_control_delivery_optimization_does": {
+    "en": "Sets the Delivery Optimization download mode to 99 (Simple): HTTP only, no peering, no use of the Delivery Optimization cloud service.",
+    "zh": "把传递优化下载模式设为 99（简单）：只用 HTTP，不做对等共享，不使用传递优化云服务。"
+  },
+  "privacy_control_delivery_optimization_benefit": {
+    "en": "Update data is no longer exchanged with other PCs, and the Delivery Optimization cloud service is no longer contacted.",
+    "zh": "不再与其他电脑交换更新数据，也不再连接传递优化云服务。"
+  },
+  "privacy_control_delivery_optimization_affects": {
+    "en": "Peer sharing of updates on the local network stops; updates still download from the source or a Microsoft Connected Cache server.",
+    "zh": "局域网内对等共享更新停止；更新照常从源站或微软缓存服务器下载。"
+  },
+  "privacy_control_delivery_optimization_overlooked": {
+    "en": "The default mode peers with PCs behind the same public IP that the Delivery Optimization cloud service finds. Value 0 also stops peering but still uses cloud metadata, so it protects less; value 100 is deprecated from Windows 11 and Microsoft says it can make some content fail to download, so this page never writes it.",
+    "zh": "默认模式会与同一公网 IP 下由传递优化云服务找到的电脑对等共享。值 0 也不对等，但仍使用云服务的元数据，保护较少；值 100 微软说 Windows 11 起已弃用、可能导致部分内容下载失败，本页不写它。"
+  },
+  "privacy_control_delivery_optimization_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。"
+  },
+  "privacy_control_delivery_optimization_editions": {
+    "en": "CSP (DeliveryOptimization/DODownloadMode): Windows 10 1507 and later. The template also names Server. Microsoft's CSP edition table does not list Home; whether Home applies it is not stated.",
+    "zh": "CSP（DeliveryOptimization/DODownloadMode）：Windows 10 1507 起。模板也列出 Server。微软的 CSP 版本表没有列出 Home，Home 上是否执行没有说明。"
+  },
+  "privacy_control_onedrive_file_storage_title": {
+    "en": "OneDrive file storage",
+    "zh": "OneDrive 文件存储"
+  },
+  "privacy_control_onedrive_file_storage_does": {
+    "en": "Enables 'Prevent the usage of OneDrive for file storage'.",
+    "zh": "启用策略“禁止使用 OneDrive 存储文件”。"
+  },
+  "privacy_control_onedrive_file_storage_benefit": {
+    "en": "No file leaves this machine through OneDrive.",
+    "zh": "没有文件经 OneDrive 离开这台电脑。"
+  },
+  "privacy_control_onedrive_file_storage_affects": {
+    "en": "OneDrive cannot be opened from the OneDrive app or the file picker; Store apps cannot use OneDrive; OneDrive no longer appears in the File Explorer navigation pane; files stop syncing with the cloud; the camera roll is no longer uploaded automatically.",
+    "zh": "OneDrive 应用和文件选择器打不开 OneDrive；商店应用不能用 OneDrive；资源管理器导航栏不再显示 OneDrive；文件不再与云端同步；相机胶卷不再自动上传。"
+  },
+  "privacy_control_onedrive_file_storage_overlooked": {
+    "en": "This ends OneDrive on the PC, including cloud backup of Desktop and Documents; files that exist only in the cloud cannot be reached from File Explorer. It is one of the heaviest entries on the page. To keep OneDrive but stop its traffic until sign-in, see 'OneDrive traffic before sign-in'.",
+    "zh": "这会在这台电脑上结束 OneDrive，包括桌面/文档的云备份；只在云端的文件从资源管理器里打不开。这是本页影响最大的条目之一。只想在未登录时不联网，可选“OneDrive 登录前不联网”。"
+  },
+  "privacy_control_onedrive_file_storage_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。"
+  },
+  "privacy_control_onedrive_file_storage_editions": {
+    "en": "Template: Windows 7 / Server 2008 R2 and later; CSP (System/DisableOneDriveFileSync): Windows 10 1703 and later. The template also names Server. Microsoft's CSP edition table does not list Home; whether Home applies it is not stated.",
+    "zh": "模板：Windows 7 / Server 2008 R2 起；CSP（System/DisableOneDriveFileSync）：Windows 10 1703 起。模板也列出 Server。微软的 CSP 版本表没有列出 Home，Home 上是否执行没有说明。"
+  },
+  "privacy_control_onedrive_pre_signin_traffic_title": {
+    "en": "OneDrive traffic before sign-in",
+    "zh": "OneDrive 登录前的网络流量"
+  },
+  "privacy_control_onedrive_pre_signin_traffic_does": {
+    "en": "Enables 'Prevent OneDrive from generating network traffic until the user signs in to OneDrive'.",
+    "zh": "启用策略“用户登录 OneDrive 之前，不让 OneDrive 产生网络流量”。"
+  },
+  "privacy_control_onedrive_pre_signin_traffic_benefit": {
+    "en": "For a user who never signs in, OneDrive stops contacting its service.",
+    "zh": "从不登录 OneDrive 的用户，OneDrive 不再联系服务。"
+  },
+  "privacy_control_onedrive_pre_signin_traffic_affects": {
+    "en": "Nothing changes for a user who signs in to OneDrive.",
+    "zh": "登录 OneDrive 的用户没有变化。"
+  },
+  "privacy_control_onedrive_pre_signin_traffic_overlooked": {
+    "en": "It is the lighter option for keeping OneDrive installed but unused. The key is shared with the OneDrive client; restore touches only this value.",
+    "zh": "这是保留 OneDrive 但不用时的较轻做法。键与 OneDrive 客户端共用，恢复只动这一个值。"
+  },
+  "privacy_control_onedrive_pre_signin_traffic_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。"
+  },
+  "privacy_control_onedrive_pre_signin_traffic_editions": {
+    "en": "Template SkyDrive.admx: Windows 7 / Server 2008 R2 and later; no CSP edition table was found, so whether each client edition applies it is not stated.",
+    "zh": "模板 SkyDrive.admx：Windows 7 / Server 2008 R2 起；没有找到 CSP 版本表，各客户端版本是否执行没有说明。"
+  },
+  "privacy_control_push_notifications_network_title": {
+    "en": "Notifications network usage (push)",
+    "zh": "通知网络使用（推送通知）"
+  },
+  "privacy_control_push_notifications_network_does": {
+    "en": "Enables 'Turn off notifications network usage': Windows disconnects from the Windows Push Notification Service (WNS) and apps cannot poll their services to update tiles.",
+    "zh": "启用策略“关闭通知网络使用”：断开 Windows 与 Windows 推送通知服务（WNS）的连接，应用也不能轮询服务来更新磁贴。"
+  },
+  "privacy_control_push_notifications_network_benefit": {
+    "en": "Windows no longer connects to WNS at sign-in and no longer polls for tile updates in the background.",
+    "zh": "登录时不再连接 WNS，后台不再轮询磁贴更新。"
+  },
+  "privacy_control_push_notifications_network_affects": {
+    "en": "Apps and system features receive no notifications from the network (tiles, badges, toasts); an app running on the machine can still raise notifications locally.",
+    "zh": "应用和系统功能收不到来自网络的通知（磁贴、徽章、弹出通知）；应用在这台电脑上运行时仍可在本地发出通知。"
+  },
+  "privacy_control_push_notifications_network_overlooked": {
+    "en": "Push notifications from chat, mail and other apps do not arrive while those apps are not running. The CSP warns that MDM real-time tasks that rely on WNS (remote wipe, unenroll, remote find, mandatory app install) stop working. No restart is needed.",
+    "zh": "应用未运行时，聊天、邮件等应用的推送通知收不到。CSP 警告：依赖 WNS 的 MDM 实时任务（远程擦除、取消注册、远程查找、强制安装）会失效。无需重启。"
+  },
+  "privacy_control_push_notifications_network_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。"
+  },
+  "privacy_control_push_notifications_network_editions": {
+    "en": "Template: Windows 8 / Server 2012 and later; CSP (Notifications/DisallowCloudNotification): Windows 10 1803 and later. The template also names Server. Microsoft's CSP edition table does not list Home; whether Home applies it is not stated.",
+    "zh": "模板：Windows 8 / Server 2012 起；CSP（Notifications/DisallowCloudNotification）：Windows 10 1803 起。模板也列出 Server。微软的 CSP 版本表没有列出 Home，Home 上是否执行没有说明。"
+  },
+  "privacy_control_app_camera_title": {
+    "en": "Apps access the camera",
+    "zh": "应用访问相机"
+  },
+  "privacy_control_app_camera_does": {
+    "en": "Sets the default for Windows apps' access to the camera to 'force deny'.",
+    "zh": "把 Windows 应用访问相机的默认值设为“强制拒绝”。"
+  },
+  "privacy_control_app_camera_benefit": {
+    "en": "Packaged apps cannot use the camera.",
+    "zh": "打包应用不能使用相机。"
+  },
+  "privacy_control_app_camera_affects": {
+    "en": "The built-in Camera app and packaged meeting apps cannot use the camera.",
+    "zh": "内置“相机”应用和打包版会议应用不能用相机。"
+  },
+  "privacy_control_app_camera_overlooked": {
+    "en": "Binds Windows (packaged) apps only; ordinary desktop programs are not bound. Per-app exception lists (LetAppsAccessCamera_ForceAllowTheseApps and the others) override this default; the page reads and shows them and never writes them. The matching Settings switch is locked; an app that is already running is affected only after it restarts. Desktop programs are governed by a separate Settings switch, and whether this policy also sets it is not stated; Microsoft says desktop programs might still access the camera when that switch is off. Windows Hello face sign-in is unaffected. To block the camera for everything, see 'disable camera devices'.",
+    "zh": "只约束 Windows 应用（打包应用），普通桌面程序不受约束。按应用的例外列表（LetAppsAccessCamera_ForceAllowTheseApps 等）优先于这个默认值，本页读取并显示这些列表，不写入。设置中对应开关被锁定；正在运行的应用要重启后才受影响。桌面程序由设置里的另一个开关管，本策略是否连带它没有说明；微软说桌面程序在开关关闭时仍可能访问相机。Windows Hello 人脸登录不受影响。要整机挡住相机，见“禁用相机设备”。"
+  },
+  "privacy_control_app_camera_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。"
+  },
+  "privacy_control_app_camera_editions": {
+    "en": "CSP: Windows 10 1607 and later. The template also names Server. Microsoft's CSP edition table does not list Home; whether Home applies it is not stated.",
+    "zh": "CSP：Windows 10 1607 起。模板也列出 Server。微软的 CSP 版本表没有列出 Home，Home 上是否执行没有说明。"
+  },
+  "privacy_control_app_microphone_title": {
+    "en": "Apps access the microphone",
+    "zh": "应用访问麦克风"
+  },
+  "privacy_control_app_microphone_does": {
+    "en": "Sets the default for Windows apps' access to the microphone to 'force deny'.",
+    "zh": "把 Windows 应用访问麦克风的默认值设为“强制拒绝”。"
+  },
+  "privacy_control_app_microphone_benefit": {
+    "en": "Packaged apps cannot record audio.",
+    "zh": "打包应用不能录音。"
+  },
+  "privacy_control_app_microphone_affects": {
+    "en": "Voice input, packaged calling and meeting apps and Voice Recorder cannot record; videos recorded by packaged apps may have no sound (inference).",
+    "zh": "语音输入、打包版通话/会议应用、录音机等不能录音；打包应用录的视频可能没有声音（推断）。"
+  },
+  "privacy_control_app_microphone_overlooked": {
+    "en": "Binds Windows (packaged) apps only; ordinary desktop programs are not bound. Per-app exception lists (LetAppsAccessMicrophone_ForceAllowTheseApps and the others) override this default; the page reads and shows them and never writes them. The matching Settings switch is locked; an app that is already running is affected only after it restarts. Desktop programs are governed by a separate Settings switch, and whether this policy also sets it is not stated. Voice activation is governed by two other entries.",
+    "zh": "只约束 Windows 应用（打包应用），普通桌面程序不受约束。按应用的例外列表（LetAppsAccessMicrophone_ForceAllowTheseApps 等）优先于这个默认值，本页读取并显示这些列表，不写入。设置中对应开关被锁定；正在运行的应用要重启后才受影响。桌面程序由设置里的另一个开关管，本策略是否连带它没有说明。语音激活由另外两项管理。"
+  },
+  "privacy_control_app_microphone_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。"
+  },
+  "privacy_control_app_microphone_editions": {
+    "en": "CSP: Windows 10 1607 and later. The template also names Server. Microsoft's CSP edition table does not list Home; whether Home applies it is not stated.",
+    "zh": "CSP：Windows 10 1607 起。模板也列出 Server。微软的 CSP 版本表没有列出 Home，Home 上是否执行没有说明。"
+  },
+  "privacy_control_app_notifications_title": {
+    "en": "Apps read your notifications",
+    "zh": "应用读取你的通知"
+  },
+  "privacy_control_app_notifications_does": {
+    "en": "Sets the default for Windows apps reading the user's notifications to 'force deny': apps cannot read all notifications you receive, including those of other apps, through the notification listener.",
+    "zh": "把 Windows 应用读取用户通知的默认值设为“强制拒绝”：应用不能经通知侦听器读取你收到的全部通知，包括其他应用的通知。"
+  },
+  "privacy_control_app_notifications_benefit": {
+    "en": "Other apps can no longer read the content of your notifications.",
+    "zh": "其他应用不能读到你的通知内容。"
+  },
+  "privacy_control_app_notifications_affects": {
+    "en": "Watch and phone companion apps and notification-mirroring packaged apps receive no notifications; when denied the API just returns an empty list and the app reports no error.",
+    "zh": "手表/手机伴侣、通知镜像类打包应用拿不到通知；被拒绝时 API 只返回空列表，应用不会报错。"
+  },
+  "privacy_control_app_notifications_overlooked": {
+    "en": "Binds Windows (packaged) apps only; ordinary desktop programs are not bound. Per-app exception lists (LetAppsAccessNotifications_ForceAllowTheseApps and the others) override this default; the page reads and shows them and never writes them. The matching Settings switch is locked; an app that is already running is affected only after it restarts. This is not whether apps may send you notifications; they still can, so it does not reduce interruptions. Cloud push is a separate entry ('turn off notifications network usage').",
+    "zh": "只约束 Windows 应用（打包应用），普通桌面程序不受约束。按应用的例外列表（LetAppsAccessNotifications_ForceAllowTheseApps 等）优先于这个默认值，本页读取并显示这些列表，不写入。设置中对应开关被锁定；正在运行的应用要重启后才受影响。这不是“应用能否给你发通知”，应用照常可以弹出通知，本项不减少打扰。通知的云端推送是另一项（“关闭通知网络使用”）。"
+  },
+  "privacy_control_app_notifications_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。"
+  },
+  "privacy_control_app_notifications_editions": {
+    "en": "CSP: Windows 10 1703 and later. The template also names Server. Microsoft's CSP edition table does not list Home; whether Home applies it is not stated.",
+    "zh": "CSP：Windows 10 1703 起。模板也列出 Server。微软的 CSP 版本表没有列出 Home，Home 上是否执行没有说明。"
+  },
+  "privacy_control_app_background_title": {
+    "en": "Apps run in the background",
+    "zh": "应用后台运行"
+  },
+  "privacy_control_app_background_does": {
+    "en": "Sets the default for Windows apps running in the background to 'force deny'.",
+    "zh": "把 Windows 应用后台运行的默认值设为“强制拒绝”。"
+  },
+  "privacy_control_app_background_benefit": {
+    "en": "Apps cannot keep running when not in the foreground, which reduces their chances to collect or upload data unseen (inference).",
+    "zh": "应用不在前台时不能继续运行，减少它们在你看不见时收集或上传数据的机会（推断）。"
+  },
+  "privacy_control_app_background_affects": {
+    "en": "The CSP warns that SMS, email and voicemail notifications from communication apps may stop and background mail sync may fail; Microsoft says Cortana, Search and others might not work as expected.",
+    "zh": "CSP 警告：通信类应用的短信、邮件、语音信箱通知可能不再工作，后台邮件同步可能失效；微软说 Cortana 和搜索等可能不按预期工作。"
+  },
+  "privacy_control_app_background_overlooked": {
+    "en": "Binds Windows (packaged) apps only; ordinary desktop programs are not bound. Per-app exception lists (LetAppsRunInBackground_ForceAllowTheseApps and the others) override this default; the page reads and shows them and never writes them. The matching Settings switch is locked; an app that is already running is affected only after it restarts. This is the costliest entry in the group: packaged mail, calendar and chat apps get no new messages once closed. Windows 11 removed the background apps page; each app's background permission is under Installed apps → Advanced options, and that section is hidden once the policy is set. Desktop programs keep running in the background.",
+    "zh": "只约束 Windows 应用（打包应用），普通桌面程序不受约束。按应用的例外列表（LetAppsRunInBackground_ForceAllowTheseApps 等）优先于这个默认值，本页读取并显示这些列表，不写入。设置中对应开关被锁定；正在运行的应用要重启后才受影响。这是本组代价最大的一项：打包版邮件、日历、聊天应用关窗后收不到新消息。Windows 11 已移除后台应用总开关页，每个应用的后台权限在“已安装的应用 → 高级选项”里，设了策略后那一节不再显示。桌面程序照常后台运行。"
+  },
+  "privacy_control_app_background_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。"
+  },
+  "privacy_control_app_background_editions": {
+    "en": "CSP: Windows 10 1703 and later. The template also names Server. Microsoft's CSP edition table does not list Home; whether Home applies it is not stated.",
+    "zh": "CSP：Windows 10 1703 起。模板也列出 Server。微软的 CSP 版本表没有列出 Home，Home 上是否执行没有说明。"
+  },
+  "privacy_control_app_screen_capture_programmatic_title": {
+    "en": "Apps capture the screen without the picker",
+    "zh": "应用不经选择器截屏"
+  },
+  "privacy_control_app_screen_capture_programmatic_does": {
+    "en": "Sets the default for Windows apps capturing the screen without the system picker to 'force deny'.",
+    "zh": "把 Windows 应用不经选择器直接截屏的默认值设为“强制拒绝”。"
+  },
+  "privacy_control_app_screen_capture_programmatic_benefit": {
+    "en": "Apps can capture only after you pick a window through the system picker each time.",
+    "zh": "应用只能在你每次经系统选择器挑选窗口后截取画面。"
+  },
+  "privacy_control_app_screen_capture_programmatic_affects": {
+    "en": "Packaged apps that rely on automatic capture (recording, remote assistance, screen reading or AI screen analysis) must ask you to pick a window each time, or fail.",
+    "zh": "依赖自动截屏的打包应用（录屏、远程协助、读屏或 AI 识屏类）要每次手动选窗口，或直接失败。"
+  },
+  "privacy_control_app_screen_capture_programmatic_overlooked": {
+    "en": "Binds Windows (packaged) apps only; ordinary desktop programs are not bound. Per-app exception lists (LetAppsAccessGraphicsCaptureProgrammatic_ForceAllowTheseApps and the others) override this default; the page reads and shows them and never writes them. The matching Settings switch is locked; an app that is already running is affected only after it restarts. It blocks neither picker-based capture nor desktop programs capturing through other APIs. The template claims Windows 10 support, but the CSP lists Windows 11 only, so it has no effect on Windows 10.",
+    "zh": "只约束 Windows 应用（打包应用），普通桌面程序不受约束。按应用的例外列表（LetAppsAccessGraphicsCaptureProgrammatic_ForceAllowTheseApps 等）优先于这个默认值，本页读取并显示这些列表，不写入。设置中对应开关被锁定；正在运行的应用要重启后才受影响。不阻止经选择器的截屏，也不阻止桌面程序用其他 API 截屏。模板写支持 Windows 10，CSP 只承认 Windows 11，在 Windows 10 上写入无效。"
+  },
+  "privacy_control_app_screen_capture_programmatic_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。"
+  },
+  "privacy_control_app_screen_capture_programmatic_editions": {
+    "en": "CSP: Windows 11 21H2 and later; no effect on Windows 10. The template also names Server. Microsoft's CSP edition table does not list Home; whether Home applies it is not stated.",
+    "zh": "CSP：Windows 11 21H2 起；Windows 10 上无效。模板也列出 Server。微软的 CSP 版本表没有列出 Home，Home 上是否执行没有说明。"
+  },
+  "privacy_control_app_screen_capture_borderless_title": {
+    "en": "Apps capture without the border",
+    "zh": "应用截屏时去掉边框"
+  },
+  "privacy_control_app_screen_capture_borderless_does": {
+    "en": "Sets the default for Windows apps removing the capture border to 'force deny'.",
+    "zh": "把 Windows 应用截屏时去掉提示边框的默认值设为“强制拒绝”。"
+  },
+  "privacy_control_app_screen_capture_borderless_benefit": {
+    "en": "The border stays on during capture, so you can always see that capture is in progress.",
+    "zh": "截屏期间边框始终显示，你总能看到自己正在被截取。"
+  },
+  "privacy_control_app_screen_capture_borderless_affects": {
+    "en": "Recording and streaming packaged apps cannot remove the border; the feature itself still works.",
+    "zh": "录屏/直播类打包应用无法去掉边框；功能本身不受影响。"
+  },
+  "privacy_control_app_screen_capture_borderless_overlooked": {
+    "en": "Binds Windows (packaged) apps only; ordinary desktop programs are not bound. Per-app exception lists (LetAppsAccessGraphicsCaptureWithoutBorder_ForceAllowTheseApps and the others) override this default; the page reads and shows them and never writes them. The matching Settings switch is locked; an app that is already running is affected only after it restarts. It does not block capture, only keeps it visible; to block capture without the picker, see the previous entry. No effect on Windows 10.",
+    "zh": "只约束 Windows 应用（打包应用），普通桌面程序不受约束。按应用的例外列表（LetAppsAccessGraphicsCaptureWithoutBorder_ForceAllowTheseApps 等）优先于这个默认值，本页读取并显示这些列表，不写入。设置中对应开关被锁定；正在运行的应用要重启后才受影响。本项不阻止截屏，只保证看得见；要阻止不经选择器的截屏，见上一项。Windows 10 上无效。"
+  },
+  "privacy_control_app_screen_capture_borderless_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。"
+  },
+  "privacy_control_app_screen_capture_borderless_editions": {
+    "en": "CSP: Windows 11 21H2 and later; no effect on Windows 10. The template also names Server. Microsoft's CSP edition table does not list Home; whether Home applies it is not stated.",
+    "zh": "CSP：Windows 11 21H2 起；Windows 10 上无效。模板也列出 Server。微软的 CSP 版本表没有列出 Home，Home 上是否执行没有说明。"
+  },
+  "privacy_control_app_gaze_input_title": {
+    "en": "Apps read gaze (eye tracker)",
+    "zh": "应用读取视线（眼动仪）"
+  },
+  "privacy_control_app_gaze_input_does": {
+    "en": "Sets the default for Windows apps reading gaze position from an eye tracker to 'force deny'.",
+    "zh": "把 Windows 应用读取眼动仪视线位置的默认值设为“强制拒绝”。"
+  },
+  "privacy_control_app_gaze_input_benefit": {
+    "en": "Apps cannot tell where you are looking on screen.",
+    "zh": "应用不能知道你在看屏幕的哪里。"
+  },
+  "privacy_control_app_gaze_input_affects": {
+    "en": "Packaged apps that rely on eye tracking cannot read gaze; for people who use an eye tracker as an accessibility input, this disables that aid (inference).",
+    "zh": "依赖眼动的打包应用不能读视线；对用眼动仪做无障碍输入的用户，这会使辅助功能失效（推断）。"
+  },
+  "privacy_control_app_gaze_input_overlooked": {
+    "en": "Binds Windows (packaged) apps only; ordinary desktop programs are not bound. Per-app exception lists (LetAppsAccessGazeInput_ForceAllowTheseApps and the others) override this default; the page reads and shows them and never writes them. The matching Settings switch is locked; an app that is already running is affected only after it restarts. On a PC without an eye tracker, writing it has no visible effect.",
+    "zh": "只约束 Windows 应用（打包应用），普通桌面程序不受约束。按应用的例外列表（LetAppsAccessGazeInput_ForceAllowTheseApps 等）优先于这个默认值，本页读取并显示这些列表，不写入。设置中对应开关被锁定；正在运行的应用要重启后才受影响。没有眼动仪的电脑上写入没有可见效果。"
+  },
+  "privacy_control_app_gaze_input_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。"
+  },
+  "privacy_control_app_gaze_input_editions": {
+    "en": "CSP: Windows 10 1803 and later. The template also names Server. Microsoft's CSP edition table does not list Home; whether Home applies it is not stated.",
+    "zh": "CSP：Windows 10 1803 起。模板也列出 Server。微软的 CSP 版本表没有列出 Home，Home 上是否执行没有说明。"
+  },
+  "privacy_control_app_human_presence_title": {
+    "en": "Apps read presence sensing",
+    "zh": "应用读取存在感应"
+  },
+  "privacy_control_app_human_presence_does": {
+    "en": "Sets the default for Windows apps reading presence sensors to 'force deny'.",
+    "zh": "把 Windows 应用读取存在感应传感器的默认值设为“强制拒绝”。"
+  },
+  "privacy_control_app_human_presence_benefit": {
+    "en": "Apps cannot tell whether you are at the PC or looking at the screen.",
+    "zh": "应用不能知道你是否在电脑前、是否在看屏幕。"
+  },
+  "privacy_control_app_human_presence_affects": {
+    "en": "Packaged apps that read presence sensing get no data.",
+    "zh": "读取存在感应的打包应用拿不到数据。"
+  },
+  "privacy_control_app_human_presence_overlooked": {
+    "en": "Binds Windows (packaged) apps only; ordinary desktop programs are not bound. Per-app exception lists (LetAppsAccessHumanPresence_ForceAllowTheseApps and the others) override this default; the page reads and shows them and never writes them. The matching Settings switch is locked; an app that is already running is affected only after it restarts. It matters only on devices with presence sensors that meet Microsoft's definition; OEM custom sensors are not governed by these privacy settings. Whether Windows' own lock-on-leave and wake-on-approach also turn off is not stated. The CSP says build 25000 and later (a preview build number; inference: Windows 11 24H2 among releases).",
+    "zh": "只约束 Windows 应用（打包应用），普通桌面程序不受约束。按应用的例外列表（LetAppsAccessHumanPresence_ForceAllowTheseApps 等）优先于这个默认值，本页读取并显示这些列表，不写入。设置中对应开关被锁定；正在运行的应用要重启后才受影响。只在内置符合微软定义的存在传感器的设备上有意义；OEM 自定义传感器不受这类隐私设置管理。Windows 自带的离开锁屏、靠近唤醒是否一并关闭没有说明。CSP 写 build 25000 起（预览版编号；推断正式版为 Windows 11 24H2 起）。"
+  },
+  "privacy_control_app_human_presence_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。"
+  },
+  "privacy_control_app_human_presence_editions": {
+    "en": "CSP: 10.0.25000 and later; the Server 2022 template set does not have this policy. The template also names Server. Microsoft's CSP edition table does not list Home; whether Home applies it is not stated.",
+    "zh": "CSP：10.0.25000 起；Server 2022 模板集没有这条策略。模板也列出 Server。微软的 CSP 版本表没有列出 Home，Home 上是否执行没有说明。"
+  },
+  "privacy_control_app_foreground_text_title": {
+    "en": "Apps read foreground text",
+    "zh": "应用读取前台程序文字"
+  },
+  "privacy_control_app_foreground_text_does": {
+    "en": "Sets the default for Windows apps reading text content from foreground applications to 'force deny'.",
+    "zh": "把 Windows 应用读取前台程序文本内容的默认值设为“强制拒绝”。"
+  },
+  "privacy_control_app_foreground_text_benefit": {
+    "en": "Apps cannot read the text in other programs you are looking at.",
+    "zh": "应用不能读取你正在看的其他程序里的文字。"
+  },
+  "privacy_control_app_foreground_text_affects": {
+    "en": "Packaged apps that read on-screen text (inference: AI assistants, translators, screen readers) lose that ability.",
+    "zh": "依赖读取屏幕文字的打包应用（推断：AI 助手、翻译、读屏类）失去这项能力。"
+  },
+  "privacy_control_app_foreground_text_overlooked": {
+    "en": "Binds Windows (packaged) apps only; ordinary desktop programs are not bound. Per-app exception lists (LetAppsAccessForegroundText_ForceAllowTheseApps and the others) override this default; the page reads and shows them and never writes them. The matching Settings switch is locked; an app that is already running is affected only after it restarts. The two first-hand sources disagree on the minimum version: the template of a Windows 11 client (build 26220) says Windows 11 25H2 and later, the CSP says 21H2 and later; whether 21H2–24H2 apply it is unknown. The runner images' templates do not have it. Most screen-reading accessibility software is desktop software and is unaffected.",
+    "zh": "只约束 Windows 应用（打包应用），普通桌面程序不受约束。按应用的例外列表（LetAppsAccessForegroundText_ForceAllowTheseApps 等）优先于这个默认值，本页读取并显示这些列表，不写入。设置中对应开关被锁定；正在运行的应用要重启后才受影响。两份一手来源的最低版本不一致：一台 Windows 11 客户端（build 26220）的模板写 Windows 11 25H2 起，CSP 写 21H2 起；21H2–24H2 上是否执行未知。runner 镜像的模板里没有这一条。读屏类无障碍软件多为桌面程序，不受影响。"
+  },
+  "privacy_control_app_foreground_text_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。"
+  },
+  "privacy_control_app_foreground_text_editions": {
+    "en": "Template (Windows 11 client, build 26220): Windows 11 25H2 and later; CSP: Windows 11 21H2 and later. Microsoft's CSP edition table does not list Home; whether Home applies it is not stated.",
+    "zh": "模板（Windows 11 客户端，build 26220）：Windows 11 25H2 起；CSP：Windows 11 21H2 起。微软的 CSP 版本表没有列出 Home，Home 上是否执行没有说明。"
+  },
+  "privacy_control_camera_device_title": {
+    "en": "Camera devices (machine)",
+    "zh": "相机设备（整机）"
+  },
+  "privacy_control_camera_device_does": {
+    "en": "Disables 'Allow Use of Camera': camera devices on the machine are disabled.",
+    "zh": "停用策略“允许使用相机”：整台电脑的相机设备被禁用。"
+  },
+  "privacy_control_camera_device_benefit": {
+    "en": "No program can use the camera, including desktop programs and external USB cameras.",
+    "zh": "任何程序都不能使用相机，包括桌面程序和外接 USB 摄像头。"
+  },
+  "privacy_control_camera_device_affects": {
+    "en": "Video calls, code scanning and photos all stop; Windows Hello face sign-in may also stop (inference), and without a PIN or password sign-in may then be impossible.",
+    "zh": "视频会议、扫码、拍照全部失效；Windows Hello 人脸登录也可能无法使用（推断），没有设置 PIN 或密码时可能无法登录。"
+  },
+  "privacy_control_camera_device_overlooked": {
+    "en": "The value runs opposite to the AppPrivacy entries: 0 disables and 'absent' allows. It is the only camera control not limited to Windows apps, and the costliest.",
+    "zh": "值的方向与 AppPrivacy 相反：0 表示禁用，“缺席”表示允许。这是唯一不限于 Windows 应用的相机控制，代价也最大。"
+  },
+  "privacy_control_camera_device_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。"
+  },
+  "privacy_control_camera_device_editions": {
+    "en": "CSP (Camera/AllowCamera): Windows 10 1507 and later. The template also names Server. Microsoft's CSP edition table does not list Home; whether Home applies it is not stated.",
+    "zh": "CSP（Camera/AllowCamera）：Windows 10 1507 起。模板也列出 Server。微软的 CSP 版本表没有列出 Home，Home 上是否执行没有说明。"
+  },
+  "privacy_control_app_system_ai_models_title": {
+    "en": "Apps use Windows text and image generation",
+    "zh": "应用使用 Windows 文本与图像生成"
+  },
+  "privacy_control_app_system_ai_models_does": {
+    "en": "Sets the default for Windows apps using Windows text and image generation to 'force deny'.",
+    "zh": "把 Windows 应用使用 Windows 文本与图像生成功能的默认值设为“强制拒绝”。"
+  },
+  "privacy_control_app_system_ai_models_benefit": {
+    "en": "Apps cannot call Windows' built-in generative models on your content.",
+    "zh": "应用不能调用 Windows 内置的生成式模型处理你的内容。"
+  },
+  "privacy_control_app_system_ai_models_affects": {
+    "en": "Packaged apps that call these features lose them.",
+    "zh": "调用这类功能的打包应用失去它。"
+  },
+  "privacy_control_app_system_ai_models_overlooked": {
+    "en": "Binds Windows (packaged) apps only; ordinary desktop programs are not bound. Per-app exception lists (LetAppsAccessSystemAIModels_ForceAllowTheseApps and the others) override this default; the page reads and shows them and never writes them. The matching Settings switch is locked; an app that is already running is affected only after it restarts. The CSP page has no entry for it, so there is no edition table; the first build with the feature is not stated, and on systems without the feature writing it has no effect. Cloud AI services and models bundled with desktop programs are unaffected.",
+    "zh": "只约束 Windows 应用（打包应用），普通桌面程序不受约束。按应用的例外列表（LetAppsAccessSystemAIModels_ForceAllowTheseApps 等）优先于这个默认值，本页读取并显示这些列表，不写入。设置中对应开关被锁定；正在运行的应用要重启后才受影响。CSP 页没有这一条，所以没有版本表；功能从哪个 build 起存在没有说明，没有该功能的系统上写入无效。不影响云端 AI 服务和桌面程序自带的模型。"
+  },
+  "privacy_control_app_system_ai_models_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。"
+  },
+  "privacy_control_app_system_ai_models_editions": {
+    "en": "Only in the 24H2 template set and the templates of a Windows 11 client (build 26220); the CSP has no entry, so editions and minimum build are unknown.",
+    "zh": "只出现在 24H2 模板集和一台 Windows 11 客户端（build 26220）的模板中；CSP 没有这一条，版本与最低 build 未知。"
+  },
+  "privacy_control_recall_snapshots_title": {
+    "en": "Recall snapshots",
+    "zh": "Recall 快照"
+  },
+  "privacy_control_recall_snapshots_does": {
+    "en": "Enables 'Turn off saving snapshots for use with Recall': screen snapshots are no longer saved for Recall.",
+    "zh": "启用策略“关闭为 Recall 保存快照”：屏幕快照不再为 Recall 保存。"
+  },
+  "privacy_control_recall_snapshots_benefit": {
+    "en": "No more screen snapshots are saved, and those already saved are deleted.",
+    "zh": "不再保存屏幕快照，已保存的快照被删除。"
+  },
+  "privacy_control_recall_snapshots_affects": {
+    "en": "Recall's timeline and search of past screens are unavailable.",
+    "zh": "Recall 的时间线和对以往屏幕的搜索不可用。"
+  },
+  "privacy_control_recall_snapshots_overlooked": {
+    "en": "Snapshots already saved are deleted when it is applied, and restore cannot bring them back. Recall exists only on Copilot+ PCs; elsewhere this entry has no effect. Recall processing is local and snapshots are not sent to Microsoft, but it occasionally fetches icons and metadata from the internet for the top-level domain of a snapshot URL.",
+    "zh": "应用时已保存的快照会被删除，恢复不能找回。Recall 只在 Copilot+ PC 上存在，其他电脑上本项没有效果。Recall 的处理在本地，快照不发给微软，但会偶尔按快照里网址的顶级域名从网上取图标等资料。"
+  },
+  "privacy_control_recall_snapshots_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control. Deleted snapshots do not come back.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。已删除的快照不会恢复。"
+  },
+  "privacy_control_recall_snapshots_editions": {
+    "en": "Template: Windows 11 Pro/Enterprise/Education with Windows Sandbox, not Server; CSP: Windows 11 24H2 with KB5055627 (26100.3915) and later; Recall exists only on Copilot+ PCs. Home is not named.",
+    "zh": "模板：Windows 11 Pro/Enterprise/Education（带 Windows 沙盒），不适用于 Server；CSP：Windows 11 24H2 加 KB5055627（26100.3915）起；只在 Copilot+ PC 上有 Recall。Home 没有被点名。"
+  },
+  "privacy_control_recall_component_title": {
+    "en": "Recall component",
+    "zh": "Recall 组件"
+  },
+  "privacy_control_recall_component_does": {
+    "en": "Disables 'Allow Recall to be enabled': the Recall component is disabled and its files are removed from the device.",
+    "zh": "停用策略“允许启用 Recall”：Recall 组件处于停用状态，其文件从设备移除。"
+  },
+  "privacy_control_recall_component_benefit": {
+    "en": "Recall is unavailable as a whole and the user cannot opt in.",
+    "zh": "Recall 整体不可用，用户也不能选择加入。"
+  },
+  "privacy_control_recall_component_affects": {
+    "en": "All of Recall stops; removal needs a restart.",
+    "zh": "Recall 全部功能停止；移除需要重启。"
+  },
+  "privacy_control_recall_component_overlooked": {
+    "en": "Applying it deletes saved snapshots and needs a restart. Restore (deleting the value) returns to 'not configured', which the template describes as the Recall component being disabled; whether removed files come back is not documented, and the optional feature may need reinstalling. It matters only on Copilot+ PCs.",
+    "zh": "应用时删除已保存的快照，并要重启。恢复（删除这个值）回到“未配置”，模板说那时 Recall 组件处于停用状态；被移除的文件是否回来没有文档，可能需要重新安装可选功能。只在 Copilot+ PC 上有意义。"
+  },
+  "privacy_control_recall_component_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control. Deleted snapshots do not come back, the removed component may need reinstalling, and a restart is needed.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。已删除的快照不会恢复，被移除的组件可能需要重新安装，并需要重启。"
+  },
+  "privacy_control_recall_component_editions": {
+    "en": "Template: at least Windows 11 Pro, Enterprise or Education with Windows Sandbox, not Server; Home is not named. Only in the 24H2 template set.",
+    "zh": "模板：至少 Windows 11 Pro、Enterprise 或 Education（带 Windows 沙盒），不适用于 Server；Home 没有被点名。只在 24H2 模板集中。"
+  },
+  "privacy_control_click_to_do_title": {
+    "en": "Click to Do",
+    "zh": "Click to Do 功能"
+  },
+  "privacy_control_click_to_do_does": {
+    "en": "Enables 'Disable Click to Do': the Click to Do component and its entry points are unavailable.",
+    "zh": "启用策略“禁用 Click to Do”：Click to Do 组件和入口不可用。"
+  },
+  "privacy_control_click_to_do_benefit": {
+    "en": "Screen content is no longer captured and analysed.",
+    "zh": "屏幕内容不再被截图分析。"
+  },
+  "privacy_control_click_to_do_affects": {
+    "en": "Win+Q / Win+click actions on screen content are unavailable.",
+    "zh": "Win+Q / Win+单击 的屏幕操作不可用。"
+  },
+  "privacy_control_click_to_do_overlooked": {
+    "en": "Analysis is local; content leaves the device only when you choose an online action such as 'Search the web' (sent to Bing), so the privacy gain is no screenshot analysis rather than less upload. It does not affect Click to Do inside Recall. The CSP lists Windows Insider Preview only; support on release builds is shown only by the template's presence in the 24H2 set. A Copilot+ PC is required.",
+    "zh": "分析在本地进行，只有你选择“在网上搜索”这类在线操作时内容才离开设备（发给 Bing），所以隐私收益在于不截图分析，而不在于减少上传。本策略不影响 Recall 里的 Click to Do。CSP 只列 Windows Insider 预览版，正式版是否执行只由 24H2 模板的存在说明。需要 Copilot+ PC。"
+  },
+  "privacy_control_click_to_do_undo": {
+    "en": "Writes back the value recorded before apply (same type and bytes); if the value was absent before apply, deletes only this value and keeps the key. The matching Settings switch returns to user control.",
+    "zh": "写回应用前记录的值（同类型、同字节）；应用前该值不存在时，只删除这一个值，保留键。设置中对应开关回到用户控制。"
+  },
+  "privacy_control_click_to_do_editions": {
+    "en": "Template: at least Windows 11 Pro, Enterprise or Education with Windows Sandbox, not Server; Home is not named. Only in the 24H2 template set.",
+    "zh": "模板：至少 Windows 11 Pro、Enterprise 或 Education（带 Windows 沙盒），不适用于 Server；Home 没有被点名。只在 24H2 模板集中。"
+  },
+  "privacy_original_k02_reason": {
+    "en": "No program that reads TELEMETRY_OPT_IN_OUT was found: none of the three template sets contains the name and earlier research found no reader; not finding it does not prove absence, so it is undeterminable. Real switches of this kind have their own names, such as DOTNET_CLI_TELEMETRY_OPTOUT for the .NET SDK and POWERSHELL_TELEMETRY_OPTOUT for PowerShell 7, both listed separately on this page.",
+    "zh": "没有找到读取 TELEMETRY_OPT_IN_OUT 的程序：三套模板都不含这个名字，此前的研究也没有找到读取方；搜不到不能证明不存在，所以判为无法确定。真实的同类开关各有名字，例如 .NET SDK 的 DOTNET_CLI_TELEMETRY_OPTOUT 与 PowerShell 7 的 POWERSHELL_TELEMETRY_OPTOUT，二者在本页另列。"
+  },
+  "privacy_original_k03_reason": {
+    "en": "Blocking DeviceCensus.exe from the network needs a Windows Firewall outbound rule, which this version's writer cannot create. The writable alternative is to disable the two scheduled tasks that run it (Device Information\\Device and Device User), listed separately; that stops its scheduled runs but is not a firewall-level guarantee.",
+    "zh": "阻止 DeviceCensus.exe 联网要用 Windows 防火墙出站规则，本版的写入器没有这种操作。可写的替代是停用调用它的两个计划任务（Device Information\\Device 与 Device User），本页另列；那会让它不再按计划运行，但不是防火墙级的保证。"
+  },
+  "privacy_original_k04_reason": {
+    "en": "Neither current runner image (162 tasks on Server 2022, 209 on Server 2025) has an AitAgent task, and no Microsoft document defines it. The formal switch in the current templates is 'Turn off Application Telemetry' (AITEnable), listed separately.",
+    "zh": "两个现行 runner 镜像（Server 2022 共 162 个任务、Server 2025 共 209 个）都没有 AitAgent 任务，微软文档也没有定义它。现行模板中对应的正式开关是“关闭 Application Telemetry”（AITEnable），本页另列。"
+  },
+  "privacy_original_k06_reason": {
+    "en": "The CEIP task folder on the Server 2022 and Server 2025 images and on a Windows 11 client (build 26220) holds only Consolidator and UsbCeip, no KernelCeipTask. The formal CEIP switch 'Turn off Windows CEIP' is writable.",
+    "zh": "Server 2022、Server 2025 镜像和一台 Windows 11 客户端（build 26220）的客户体验改善计划文件夹里只有 Consolidator 和 UsbCeip，没有 KernelCeipTask。CEIP 的正式总开关“关闭 Windows 客户体验改善计划”已可写。"
+  },
+  "privacy_original_k09_reason": {
+    "en": "'Stop SQM completely' is an outcome, not a setting; no single switch covers every product. The formal Windows CEIP opt-out and Application Telemetry are writable, but together they do not cover the SQM of every program; Office and others have their own switches.",
+    "zh": "“完全停止 SQM”是一个效果诉求，不是一个设置，没有覆盖所有产品的单一开关。Windows CEIP 的正式退出与 Application Telemetry 两项已可写，但加起来也不等于所有软件的 SQM，Office 等软件各有自己的开关。"
+  },
+  "privacy_original_k11_reason": {
+    "en": "Neither the three template sets nor the Privacy area of the Policy CSP contains AgentActivationEnabled, so no formal location or reader was found. The formal policies for the same purpose, app voice activation and voice activation above lock, are writable.",
+    "zh": "三套模板和策略 CSP 的 Privacy 区都没有 AgentActivationEnabled，找不到正式位置和读取方。同一目的的正式策略是“应用语音激活”与“锁屏时语音激活”，已可写。"
+  },
+  "privacy_original_k26_reason": {
+    "en": "The policy 'Turn off Inventory Collector' exists (AppCompat\\DisableInventory), but the template gives no enabled value and no Microsoft document states what type and value are written when it is omitted, so it cannot be written. The template also says the Inventory Collector is off whenever CEIP is off, which the writable 'Turn off Windows CEIP' entry covers.",
+    "zh": "策略“关闭 Inventory Collector”存在（AppCompat\\DisableInventory），但模板没有给出启用值，微软文档也没有规定省略时写入什么类型和值，所以不能写。模板说明另有一句：CEIP 关闭时 Inventory Collector 本来就关闭，已可写的“关闭 Windows 客户体验改善计划”一项覆盖这个效果。"
+  },
+  "privacy_original_k39_reason": {
+    "en": "No current template set or Policy CSP has AllowCrossDeviceSync. Cross-device sync in Windows is several separate formal controls: cross-device clipboard, continue experiences on this device, phone-PC linking and activity history, each listed and chosen separately; settings sync writes two values at once and is not written in this version.",
+    "zh": "现行的三套模板和策略 CSP 都没有 AllowCrossDeviceSync。Windows 的“跨设备同步”是几个分开的正式控制：跨设备剪贴板、在此设备上继续体验、手机与电脑连接、活动历史，本页各自列出，需要分别选择；设置同步（Sync your settings）一次写两个值，本版不写。"
+  },
+  "privacy_original_k48_reason": {
+    "en": "No AppPrivacy template (24 policies on Server 2022, 26 on Server 2025, 29 on a Windows 11 client, build 26220) and no Privacy page of the Policy CSP has LetAppsAccessBluetooth; the CSP page never mentions Bluetooth. Related but different writable entries: apps control radios, apps use trusted devices, apps talk to unpaired devices; none of them stops apps from talking to paired devices, and no Windows policy does.",
+    "zh": "AppPrivacy 模板（Server 2022 的 24 条、Server 2025 的 26 条、Windows 11 客户端（build 26220）的 29 条）和策略 CSP 的 Privacy 页都没有 LetAppsAccessBluetooth，CSP 页全文没有 Bluetooth 一词。相近但不相同的已写项：应用控制无线电、应用使用受信任设备、应用与未配对设备通信；三者都不阻止应用与已配对设备通信，没有任何 Windows 策略能做到。"
+  },
+  "privacy_original_k49_reason": {
+    "en": "No template set and no Privacy page of the Policy CSP has LetAppsAccessDocumentsFolder; this access has neither a Group Policy nor an MDM policy. It is managed per user and per app in Windows Settings (ms-settings:privacy-documents); Microsoft does not document how those switches are stored, so they cannot be written. Ordinary desktop programs downloaded from the web are not bound by that switch.",
+    "zh": "三套模板和策略 CSP 的 Privacy 页都没有 LetAppsAccessDocumentsFolder，这类访问没有组策略也没有 MDM 策略。它只能在 Windows 设置里由每个用户逐应用管理（ms-settings:privacy-documents），微软没有公开这些开关的存储方式，所以不能写；从网上下载的普通桌面程序不受这个开关约束。"
+  },
+  "privacy_original_k50_reason": {
+    "en": "No template set and no Privacy page of the Policy CSP has LetAppsAccessPicturesFolder; this access has neither a Group Policy nor an MDM policy. It is managed per user and per app in Windows Settings (ms-settings:privacy-pictures); Microsoft does not document how those switches are stored, so they cannot be written. Ordinary desktop programs downloaded from the web are not bound by that switch.",
+    "zh": "三套模板和策略 CSP 的 Privacy 页都没有 LetAppsAccessPicturesFolder，这类访问没有组策略也没有 MDM 策略。它只能在 Windows 设置里由每个用户逐应用管理（ms-settings:privacy-pictures），微软没有公开这些开关的存储方式，所以不能写；从网上下载的普通桌面程序不受这个开关约束。"
+  },
+  "privacy_original_k51_reason": {
+    "en": "No template set and no Privacy page of the Policy CSP has LetAppsAccessVideosFolder; this access has neither a Group Policy nor an MDM policy. It is managed per user and per app in Windows Settings (ms-settings:privacy-videos); Microsoft does not document how those switches are stored, so they cannot be written. Ordinary desktop programs downloaded from the web are not bound by that switch.",
+    "zh": "三套模板和策略 CSP 的 Privacy 页都没有 LetAppsAccessVideosFolder，这类访问没有组策略也没有 MDM 策略。它只能在 Windows 设置里由每个用户逐应用管理（ms-settings:privacy-videos），微软没有公开这些开关的存储方式，所以不能写；从网上下载的普通桌面程序不受这个开关约束。"
+  },
+  "privacy_original_k52_reason": {
+    "en": "No template set and no Privacy page of the Policy CSP has LetAppsAccessFileSystem; this access has neither a Group Policy nor an MDM policy. It is managed per user and per app in Windows Settings (ms-settings:privacy-broadfilesystemaccess); Microsoft does not document how those switches are stored, so they cannot be written. Ordinary desktop programs downloaded from the web are not bound by that switch.",
+    "zh": "三套模板和策略 CSP 的 Privacy 页都没有 LetAppsAccessFileSystem，这类访问没有组策略也没有 MDM 策略。它只能在 Windows 设置里由每个用户逐应用管理（ms-settings:privacy-broadfilesystemaccess），微软没有公开这些开关的存储方式，所以不能写；从网上下载的普通桌面程序不受这个开关约束。"
+  },
+  "privacy_category_diagnostics": {
+    "en": "Diagnostics and telemetry",
+    "zh": "诊断与遥测"
+  },
+  "privacy_category_speech_input": {
+    "en": "Speech, typing and inking",
+    "zh": "语音、键入与手写"
+  },
+  "privacy_category_location_sensors": {
+    "en": "Location and sensors",
+    "zh": "定位与传感器"
+  },
+  "privacy_category_search": {
+    "en": "Search",
+    "zh": "搜索"
+  },
+  "privacy_category_content": {
+    "en": "Suggestions, advertising and cloud content",
+    "zh": "推荐、广告与云端内容"
+  },
+  "privacy_category_activity_sync": {
+    "en": "Activity history and cross-device",
+    "zh": "活动历史与跨设备"
+  },
+  "privacy_category_cloud_services": {
+    "en": "Cloud services and network connections",
+    "zh": "云服务与网络连接"
+  },
+  "privacy_category_app_permissions": {
+    "en": "App permissions",
+    "zh": "应用权限"
+  },
+  "privacy_category_windows_ai": {
+    "en": "Windows AI",
+    "zh": "Windows AI 功能"
+  },
+  "privacy_edition_home": {
+    "en": "Home",
+    "zh": "家庭版"
+  },
+  "privacy_edition_pro": {
+    "en": "Pro",
+    "zh": "专业版"
+  },
+  "privacy_edition_enterprise": {
+    "en": "Enterprise",
+    "zh": "企业版"
+  },
+  "privacy_edition_education": {
+    "en": "Education",
+    "zh": "教育版"
+  },
+  "privacy_edition_iot_enterprise": {
+    "en": "IoT Enterprise",
+    "zh": "IoT 企业版"
+  },
+  "privacy_edition_server": {
+    "en": "Server",
+    "zh": "Server"
+  },
+  "privacy_effect_documented": {
+    "en": "Effect documented",
+    "zh": "效果有文档说明"
+  },
+  "privacy_effect_uncertain": {
+    "en": "May have no effect on current Windows",
+    "zh": "在当前 Windows 上可能没有效果"
+  },
+  "privacy_effect_no_current_effect": {
+    "en": "The service or feature it governs has ended; writing it changes nothing today",
+    "zh": "对应的服务或功能已停止，写入不改变当前行为"
+  },
+  "privacy_fit_honoured": {
+    "en": "Microsoft documents that this edition honours it",
+    "zh": "微软文档写明这台电脑的版本执行此项"
+  },
+  "privacy_fit_ignored": {
+    "en": "Microsoft documents that this edition ignores it",
+    "zh": "微软文档写明这台电脑的版本忽略此项"
+  },
+  "privacy_fit_not_stated": {
+    "en": "Microsoft's documentation does not say for this edition",
+    "zh": "微软文档没有说明这台电脑的版本是否执行"
+  },
+  "privacy_reason_absent": {
+    "en": "no such setting in current Windows",
+    "zh": "现行 Windows 没有这个设置"
+  },
+  "privacy_reason_obsolete": {
+    "en": "retired by Microsoft",
+    "zh": "已被微软废弃"
+  },
+  "privacy_reason_undeterminable": {
+    "en": "where and what to write cannot be determined",
+    "zh": "无法确定写在哪里、写什么"
+  },
+  "privacy_reason_needs_operation_kind": {
+    "en": "needs a kind of write this version does not have",
+    "zh": "需要本版没有的写入方式"
+  },
+  "privacy_page_fact_1": {
+    "en": "Privacy is not security: these entries decide what data Windows and apps may collect, upload or read; they do not make the computer more secure, and entries that would weaken security protection are not listed. Many cost convenience, for example location, push or cloud features stop working; each entry states its cost, and you decide entry by entry.",
+    "zh": "隐私不等于安全：这些条目决定 Windows 和应用能收集、上传或读取哪些数据，不会让电脑更安全；会削弱安全防护的条目没有列入。许多条目会以便利为代价，例如定位、推送或云端功能停止工作，每一项都写明了代价，是否应用由你逐项决定。"
+  },
+  "privacy_page_fact_2": {
+    "en": "If an organisation's Group Policy or MDM manages the same value, the next policy refresh overwrites what this page wrote; the page always shows the value read back.",
+    "zh": "策略值写入后，若组织的组策略或 MDM 也管理同一个值，下一次策略刷新会覆盖本页的写入；页面始终显示读回的当前值。"
+  },
+  "privacy_page_fact_3": {
+    "en": "The edition tables Microsoft publishes for these policies list Pro, Enterprise, Education and IoT Enterprise, never Home. Whether Home applies them is not stated; each entry shows whether this host's edition is listed.",
+    "zh": "微软为这些策略公布的版本表只列 Pro、Enterprise、Education、IoT Enterprise，没有列出 Home。Home 上是否执行，微软没有说明；页面在每一项旁标出这台电脑的版本是否被列出。"
+  },
+  "privacy_page_fact_4": {
+    "en": "Policy entries lock the matching switch in Settings so it cannot be changed there; preference entries are the switch itself and can be changed back at any time.",
+    "zh": "策略类条目会锁定设置中对应的开关，用户不能在设置里改回；偏好类条目就是开关本身，用户随时可以改回。"
+  },
+  "privacy_page_fact_5": {
+    "en": "Restore writes back the registry value or task state only; it cannot bring back data Windows deleted when the entry was applied (for example Recall snapshots or learned input data).",
+    "zh": "恢复只写回注册表或任务状态，不能找回应用时被 Windows 删除的数据（例如 Recall 快照、已学习的输入数据）。"
+  },
+  "privacy_page_fact_6": {
+    "en": "App permission policies bind Windows (packaged) apps only; ordinary desktop programs such as browsers, meeting software and sprawling are not bound by them.",
+    "zh": "应用权限类策略只约束 Windows 应用（打包应用）；浏览器、会议软件、sprawling 等普通桌面程序不受这些策略约束。"
+  },
+  "privacy_host_title": {
+    "en": "The machine these entries belong to: the one running this city",
+    "zh": "这些条目属于运行这座城的那台机器"
+  },
+  "privacy_host_version": {
+    "en": "Windows version",
+    "zh": "Windows 版本"
+  },
+  "privacy_host_edition": {
+    "en": "edition",
+    "zh": "版本类型"
+  },
+  "privacy_host_build": {
+    "en": "build",
+    "zh": "内部版本号"
+  },
+  "privacy_host_unrecorded": {
+    "en": "not recorded",
+    "zh": "没有记录"
+  },
+  "privacy_host_edition_unlisted": {
+    "en": "{id}, not an edition the documentation lists",
+    "zh": "{id}，不在文档列出的版本里"
+  },
+  "privacy_host_unreadable": {
+    "en": "The Windows version record could not be read, so every entry's edition fit reads as not stated.",
+    "zh": "读不到 Windows 的版本记录，所以每一项的版本适用都按“未说明”显示。"
+  },
+  "privacy_host_not_windows": {
+    "en": "These controls exist only on Windows. This city runs on another system, so nothing is read or written.",
+    "zh": "这些控制只在 Windows 上存在。这座城运行在别的系统上，所以什么都不读、不写。"
+  },
+  "privacy_history_withheld": {
+    "en": "This app's earlier changes are not shown: the account running the city is not the one that made them. Nothing can be applied or restored until that account runs the city.",
+    "zh": "不显示本应用以前的改动：运行这座城的账户不是做出改动的那个账户。在那个账户运行这座城之前，什么都不能应用或恢复。"
+  },
+  "privacy_history_unreadable": {
+    "en": "This app's record of its changes could not be read: another operation holds it, or it is damaged. Nothing can be written until it can be read.",
+    "zh": "读不到本应用的改动记录：另一个操作正占用它，或者它已损坏。读到之前什么都不能写。"
+  },
+  "privacy_unresolved": {
+    "en": "One change has no confirmed result. Every new write waits until you check that entry.",
+    "zh": "有一个改动没有确认的结果。在你核对那一项之前，所有新的写入都会等待。"
+  },
+  "privacy_reading": {
+    "en": "reading every entry on this machine",
+    "zh": "正在读取这台电脑的每一项"
+  },
+  "privacy_refresh": {
+    "en": "read again",
+    "zh": "重新读取"
+  },
+  "privacy_cancel": {
+    "en": "cancel",
+    "zh": "取消"
+  },
+  "privacy_restore_all": {
+    "en": "restore every change this app made",
+    "zh": "恢复本应用做过的全部改动"
+  },
+  "privacy_restore_all_title": {
+    "en": "Restore {count} entries?",
+    "zh": "恢复 {count} 项？"
+  },
+  "privacy_restore_all_detail": {
+    "en": "Each entry this app changed, and whose value is still the one it wrote, gets back the value it had before. Entries for the whole machine each ask Windows for administrator approval.",
+    "zh": "本应用改过、且值仍是它写入的那些条目，各自写回原来的值。作用于整台机器的条目，每一项都会请 Windows 要求管理员批准。"
+  },
+  "privacy_not_written_title": {
+    "en": "Lines not written",
+    "zh": "没有写入的行"
+  },
+  "privacy_not_written_hint": {
+    "en": "Lines from the original list that no entry writes, and why. Where an entry comes close, it is linked.",
+    "zh": "原始清单里没有任何条目写入的行，以及原因。有相近条目时附上链接。"
+  },
+  "privacy_see": {
+    "en": "see {title}",
+    "zh": "参见 {title}"
+  },
+  "privacy_none_close": {
+    "en": "no entry comes close",
+    "zh": "没有相近的条目"
+  },
+  "privacy_open": {
+    "en": "Windows privacy controls",
+    "zh": "Windows 隐私控制"
+  },
+  "privacy_open_note": {
+    "en": "Settings on the machine running this city that decide what data Windows and apps may collect. Each entry states its cost and is changed only when you press it.",
+    "zh": "运行这座城的机器上的设置，决定 Windows 与应用能收集哪些数据。每一项都写明代价，只有你按下才会改动。"
+  },
+  "privacy_lines": {
+    "en": "your lines",
+    "zh": "你的原文"
+  },
+  "privacy_added": {
+    "en": "added beyond the original list",
+    "zh": "原始清单之外增加的条目"
+  },
+  "privacy_does": {
+    "en": "what it does",
+    "zh": "做什么"
+  },
+  "privacy_benefit": {
+    "en": "what stays private",
+    "zh": "隐私上的作用"
+  },
+  "privacy_affects": {
+    "en": "what it affects",
+    "zh": "影响什么"
+  },
+  "privacy_overlooked": {
+    "en": "easy to overlook",
+    "zh": "容易忽略"
+  },
+  "privacy_undo": {
+    "en": "how it is undone",
+    "zh": "如何撤销"
+  },
+  "privacy_editions": {
+    "en": "Windows editions",
+    "zh": "Windows 版本"
+  },
+  "privacy_editions_lists": {
+    "en": "honoured on: {honoured}; ignored on: {ignored}",
+    "zh": "执行：{honoured}；忽略：{ignored}"
+  },
+  "privacy_none_listed": {
+    "en": "none listed",
+    "zh": "未列出"
+  },
+  "privacy_current": {
+    "en": "current value",
+    "zh": "当前值"
+  },
+  "privacy_written": {
+    "en": "value written",
+    "zh": "写入值"
+  },
+  "privacy_written_unknown": {
+    "en": "not known until the target is read",
+    "zh": "读到目标之前不知道"
+  },
+  "privacy_original": {
+    "en": "before this app wrote it",
+    "zh": "本应用写入之前"
+  },
+  "privacy_not_changed": {
+    "en": "not changed by this app",
+    "zh": "未由本应用修改"
+  },
+  "privacy_scope": {
+    "en": "whose settings",
+    "zh": "作用范围"
+  },
+  "privacy_scope_user": {
+    "en": "this account; no administrator approval",
+    "zh": "当前账户；不需要管理员批准"
+  },
+  "privacy_scope_machine": {
+    "en": "the whole machine; Windows asks for administrator approval",
+    "zh": "整台机器；Windows 会要求管理员批准"
+  },
+  "privacy_target": {
+    "en": "where it is written",
+    "zh": "写在哪里"
+  },
+  "privacy_value_absent": {
+    "en": "not set",
+    "zh": "未设置"
+  },
+  "privacy_value_raw": {
+    "en": "registry type {kind}: {hex}",
+    "zh": "注册表类型 {kind}：{hex}"
+  },
+  "privacy_value_task_absent": {
+    "en": "no such task on this machine",
+    "zh": "这台电脑没有此任务"
+  },
+  "privacy_value_task_enabled": {
+    "en": "task enabled",
+    "zh": "任务已启用"
+  },
+  "privacy_value_task_disabled": {
+    "en": "task disabled",
+    "zh": "任务已停用"
+  },
+  "privacy_current_access_denied": {
+    "en": "this account may not read it",
+    "zh": "当前账户无权读取"
+  },
+  "privacy_current_not_read": {
+    "en": "not read",
+    "zh": "未读取"
+  },
+  "privacy_current_failed": {
+    "en": "could not be read: {why}",
+    "zh": "读取失败：{why}"
+  },
+  "privacy_apply": {
+    "en": "apply",
+    "zh": "应用"
+  },
+  "privacy_restore": {
+    "en": "restore",
+    "zh": "恢复"
+  },
+  "privacy_reconcile": {
+    "en": "check",
+    "zh": "核对"
+  },
+  "privacy_confirm_apply": {
+    "en": "Apply {title}?",
+    "zh": "应用“{title}”？"
+  },
+  "privacy_confirm_restore": {
+    "en": "Restore {title}?",
+    "zh": "恢复“{title}”？"
+  },
+  "privacy_confirm_reconcile": {
+    "en": "Check {title}?",
+    "zh": "核对“{title}”？"
+  },
+  "privacy_after": {
+    "en": "after",
+    "zh": "之后"
+  },
+  "privacy_recorded": {
+    "en": "recorded as the result",
+    "zh": "记为结果"
+  },
+  "privacy_reconcile_label": {
+    "en": "what the check does",
+    "zh": "核对做什么"
+  },
+  "privacy_reconcile_detail": {
+    "en": "It writes nothing. It records what the target holds now as the end of the change that has no confirmed result, and new writes may go again.",
+    "zh": "它不写任何东西。它把目标此刻的值记为那个没有确认结果的改动的结局，之后新的写入可以继续。"
+  },
+  "privacy_waiting": {
+    "en": "waiting for the host",
+    "zh": "等待主机"
+  },
+  "privacy_waiting_machine": {
+    "en": "waiting for the host; Windows may be asking for administrator approval",
+    "zh": "等待主机；Windows 可能正在要求管理员批准"
+  },
+  "privacy_unsent": {
+    "en": "not sent: the link to the city is down; press again when it is back",
+    "zh": "没有发出：与城的连接断了；恢复后再按一次"
+  },
+  "privacy_result_applied": {
+    "en": "applied, and the value read back matches",
+    "zh": "已应用，读回的值相符"
+  },
+  "privacy_result_restored": {
+    "en": "restored, and the value read back matches",
+    "zh": "已恢复，读回的值相符"
+  },
+  "privacy_result_already": {
+    "en": "already held the value written; nothing changed",
+    "zh": "本来就是写入值；没有改动"
+  },
+  "privacy_result_reconciled": {
+    "en": "checked: {settlement}",
+    "zh": "已核对：{settlement}"
+  },
+  "privacy_result_refused": {
+    "en": "not changed: {why}",
+    "zh": "没有改动：{why}"
+  },
+  "privacy_settlement_applied": {
+    "en": "the change took effect",
+    "zh": "改动已生效"
+  },
+  "privacy_settlement_not_applied": {
+    "en": "the change did not take effect",
+    "zh": "改动没有生效"
+  },
+  "privacy_settlement_restored": {
+    "en": "the original value is back",
+    "zh": "原值已回来"
+  },
+  "privacy_settlement_abandoned": {
+    "en": "the target holds a third value; this app no longer owns it",
+    "zh": "目标是第三个值；本应用不再拥有它"
+  },
   "proposal_from": {
     "en": "{who} proposes a change",
     "zh": "{who} 提议修改"
@@ -3635,6 +6563,10 @@
     "en": "advanced",
     "zh": "高级"
   },
+  "setup_group_privacy": {
+    "en": "privacy",
+    "zh": "隐私"
+  },
   "setup_group_appearance": {
     "en": "appearance",
     "zh": "外观"
@@ -3670,6 +6602,10 @@
   "setup_group_hint_advanced": {
     "en": "the welcome walk, from its first step",
     "zh": "从第一步重走欢迎页"
+  },
+  "setup_group_hint_privacy": {
+    "en": "Windows settings on the machine running this city that decide what data Windows and apps may collect, upload or read. Nothing is preselected; an entry changes only when you press it, and the value it wrote can be put back; what an entry says Windows deletes on apply does not come back.",
+    "zh": "运行这座城的机器上、决定 Windows 与应用能收集、上传或读取哪些数据的设置。没有任何预选；只有你按下某一项才会改动，它写入的值可以恢复；条目注明 Windows 在应用时删除的数据不会回来。"
   },
   "setup_group_hint_accounts": {
     "en": "who the city may call, and with which key",

@@ -12,7 +12,7 @@
   import Sheet from "./sheet.look.svelte";
   import type { DialogLook } from "./dialog";
 
-  const { sheet, stands, heading, detail, answers }: DialogLook = $props();
+  const { sheet, stands, heading, detail, grounds, answers }: DialogLook = $props();
 </script>
 
 <Sheet wire={sheet} {stands}>
@@ -20,6 +20,7 @@
   {#if detail !== undefined}
     <p id={detail.id} class="text-note text-text-quiet">{detail.text}</p>
   {/if}
+  {#if grounds !== undefined}{@render grounds()}{/if}
   <div class="flex items-center justify-end gap-snug">
     {#each answers as answer (answer.tone)}
       <Button label={answer.label} tone={answer.tone} onPress={answer.onPress} />

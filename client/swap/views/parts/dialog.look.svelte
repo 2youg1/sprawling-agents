@@ -15,7 +15,7 @@
   // answers live in `dialog.ts` and the seat, not in the shipped markup.
   import type { DialogLook } from "../../../src/views/parts/dialog";
 
-  const { sheet, stands, heading, detail, answers }: DialogLook = $props();
+  const { sheet, stands, heading, detail, grounds, answers }: DialogLook = $props();
 </script>
 
 <dialog {...sheet} class="question" class:in-flow={stands === "in-flow"}>
@@ -23,6 +23,7 @@
   {#if detail !== undefined}
     <p id={detail.id}>{detail.text}</p>
   {/if}
+  {#if grounds !== undefined}{@render grounds()}{/if}
   <div class="answers">
     {#each answers as answer (answer.tone)}
       <button type="button" class={answer.tone} onclick={answer.onPress}>{answer.label}</button>

@@ -21,5 +21,5 @@ mod identity;
 mod vault;
 
 pub use custodian::{Custodian, Custody, Store};
-pub use identity::{verify_identity_binding, verify_platform_identity};
+pub use identity::{bind_platform_identity, verify_identity_binding, verify_platform_identity};
 pub use vault::Persistence;

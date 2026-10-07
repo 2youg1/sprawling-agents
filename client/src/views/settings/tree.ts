@@ -90,7 +90,7 @@ export const TREE: readonly Branch[] = [
     ],
     // The guide stays reachable after the person has left it
     // (refrain 3-15): its steps are where a skipped setting is made.
-    more: [group("about"), { kind: "page", view: { kind: "welcome" }, word: "welcome_title" }, group("advanced")],
+    more: [group("about"), { kind: "page", view: { kind: "welcome" }, word: "welcome_title" }, group("advanced"), group("privacy")],
   },
 ];
 

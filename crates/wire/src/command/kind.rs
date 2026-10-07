@@ -384,6 +384,7 @@ pub enum Command<Secret = Sealed<String>> {
     ReplaceCityKey(DoorStep),
     ConfirmRemoteDoor(DoorAnswer),
     CloseRemoteDoor(DoorStep),
+    PrivacyOperation(crate::PrivacyRequest),
     /// Deletes the vault's value of one reference ([`SecretForgetting`]).
     ForgetSecret(SecretForgetting),
     /// Presenting a pairing token. Read-only, hence no `IdemKey`; the token is plain here because a
@@ -394,7 +395,6 @@ pub enum Command<Secret = Sealed<String>> {
     },
 }
 
-/// The Command surface, in declaration order — the order the handshake
-/// hash mixes these names in.
+/// The Command surface, in declaration order — the order the handshake hash mixes these names in.
 pub const COMMAND_NAMES;
 }

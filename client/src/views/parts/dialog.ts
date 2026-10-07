@@ -8,6 +8,7 @@
 // `<dialog>`, the cancel request answered by the caller, and the two
 // answers in the order the platform's focus reads them.
 
+import type { Snippet } from "svelte";
 import { createAttachmentKey } from "svelte/attachments";
 import type { Attachment } from "svelte/attachments";
 
@@ -25,6 +26,9 @@ export interface DialogProps {
   readonly onCancel: () => void;
   // Whether the confirming answer destroys something.
   readonly destructive?: boolean;
+  // What the question rests on, drawn between the detail and the
+  // answers when one sentence cannot carry it.
+  readonly children?: Snippet;
 }
 
 export interface Said {
@@ -43,6 +47,7 @@ export interface DialogLook {
   readonly stands: Stands;
   readonly heading: Said;
   readonly detail: Said | undefined;
+  readonly grounds: Snippet | undefined;
   // The way out first: the platform focuses the first control inside
   // the dialog, so document order is what puts the safe answer under
   // the hand on a question about deleting something.
@@ -72,6 +77,7 @@ export function lookOf(props: DialogProps, uid: string, hold: Attachment<HTMLDia
     stands: "centre",
     heading,
     detail,
+    grounds: props.children,
     answers: [
       { label: props.cancelLabel, tone: "secondary", onPress: props.onCancel },
       { label: props.confirmLabel, tone: props.destructive === true ? "destructive" : "primary", onPress: props.onConfirm },

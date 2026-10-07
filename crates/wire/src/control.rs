@@ -167,6 +167,9 @@ pub fn classify(command: &Command) -> ControlVerdict {
         | Command::ReplaceCityKey { .. }
         | Command::ConfirmRemoteDoor { .. }
         | Command::CloseRemoteDoor { .. }
+        // A host privacy control is a setting of the machine, outside
+        // every run.
+        | Command::PrivacyOperation { .. }
         // A run that already redeemed a key holds the value it read, and
         // the next one finds the vault without it; no turn is cut.
         | Command::ForgetSecret(_)

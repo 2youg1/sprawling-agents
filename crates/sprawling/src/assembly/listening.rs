@@ -30,7 +30,7 @@ use crate::outside::keeper::CityKey;
 use crate::serving::Serving;
 use crate::serving::output_ring::OutputRing;
 use crate::serving::standing::monotonic_now;
-use accounting::views::{Published, answer_outside_the_lock};
+use accounting::views::Published;
 use accounting::worker::opening_cost::{OpeningCost, Phase};
 use accounting::worker::{Closing, CommandDesk, acp_dispatch, start_served_views};
 use monitor_feed::watched;
@@ -185,12 +185,11 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
     // asks. The answer stays `None` until `DoctorRefresh` fills it,
     // which is the one verb that asks this machine.
     let views = Arc::new(Published::new(rebuilt));
-    let query_views = Arc::clone(&views);
+    let privacy = super::privacy::page();
     // Built once and handed to both surfaces below. The socket and the
     // terminal are two ways into one city, and this is the read half of
     // what makes that literally true rather than a claim.
-    let answering: crate::console::Answering =
-        Arc::new(move |query: wire::Query| answer_outside_the_lock(&query_views, &query));
+    let answering = super::privacy::answering(Arc::clone(&views), privacy.clone());
     // Read once, at startup, from the views the ledger just rebuilt.
     let started_from = views.snapshot();
     let city_name = started_from.city();
@@ -201,7 +200,6 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
     // The in-process Command set, not the wire one: the enrolment
     // route delivers a sealed credential here, and no wire frame can.
     let desk = Arc::new(CommandDesk::default());
-    let commands_desk = Arc::clone(&desk);
     let secrets_desk = Arc::clone(&desk);
     let acp_desk = Arc::clone(&desk);
     // Taken before `log` moves into the worker: the opening line is said
@@ -256,10 +254,7 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
     let front = crate::outside::asking::Front::default();
     let config = wire::ServeConfig {
         client: Arc::clone(&page),
-        commands: front.commands(move |command: wire::WireCommand, reply: wire::Reply| {
-            commands_desk.post(command.into(), reply);
-            Ok(())
-        }),
+        commands: super::privacy::commands(&front, Arc::clone(&desk), privacy),
         events,
         deltas,
         logs,

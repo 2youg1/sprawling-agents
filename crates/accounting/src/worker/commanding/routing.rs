@@ -56,6 +56,18 @@ fn the_door_is_held_elsewhere() -> AxError {
     .with_recovery("send it to the city's own listener, which serves the remote door")
 }
 
+/// The serving binary answers host privacy operations on its own listener
+/// (`crates/sprawling/spec/Privacy/Service.lean`), so one arriving here came
+/// by a path that skipped it.
+fn privacy_is_served_elsewhere() -> AxError {
+    AxError::failure(
+        AxCode::ToolUnavailable,
+        "carry out a privacy operation",
+        "the run worker does not change host privacy controls",
+    )
+    .with_recovery("send it to the city's own listener, which serves the privacy page")
+}
+
 /// The task and the goal a person typed, travelling together.
 ///
 /// An empty goal is not a missing field: no job file is written and the
@@ -282,6 +294,7 @@ impl RunWorker {
             | wire::Command::ReplaceCityKey { .. }
             | wire::Command::ConfirmRemoteDoor { .. }
             | wire::Command::CloseRemoteDoor { .. } => Err(the_door_is_held_elsewhere()),
+            wire::Command::PrivacyOperation { .. } => Err(privacy_is_served_elsewhere()),
             // Verbs the wire spells and this city cannot perform, one arm each and no
             // catch-all, so a Command added without an executor stops the build here.
             wire::Command::BatchByBuilding { addr, .. } => {

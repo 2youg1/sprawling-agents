@@ -37,6 +37,12 @@ pub(super) enum Verb {
     Install,
     Status,
     PrivacyStatus,
+    PrivacyInspect,
+    PrivacyApply,
+    PrivacyRestore,
+    PrivacyRestoreAll,
+    PrivacyReconcile,
+    PrivacyElevatedWrite,
 }
 
 /// Whether running a verb can change a city or this machine. `--help`
@@ -118,6 +124,7 @@ const NO_OPEN: Flag = flag(
     "leave the screen alone (so does SPRAWLING_OPEN=never)",
 );
 const AT: Flag = flag("--at", Value("addr"), "the served city to talk to");
+const JSON: Flag = flag("--json", Nothing, "write a refusal as one line of json");
 /// The person's one way to widen a playback bundle, on both verbs, so an
 /// export and its check read as the same person.
 const INCLUDE_CONFIDENTIAL: Flag = flag(
@@ -203,6 +210,66 @@ pub(super) const VERBS: &[Row] = &[
         after_dashes: AfterDashes::Refused,
     },
     Row {
+        verb: Verb::PrivacyInspect,
+        name: "privacy inspect",
+        aliases: &[],
+        positionals: &[("control", Optional)],
+        flags: &[],
+        says: "print what each privacy control reads now and what this app owns of it",
+        effect: Effect::ReadsOnly,
+        after_dashes: AfterDashes::Refused,
+    },
+    Row {
+        verb: Verb::PrivacyApply,
+        name: "privacy apply",
+        aliases: &[],
+        positionals: &[("control", Required), ("expected", Required)],
+        flags: &[JSON],
+        says: "write one privacy control's value if it still reads what inspect printed",
+        effect: Effect::Changes,
+        after_dashes: AfterDashes::Refused,
+    },
+    Row {
+        verb: Verb::PrivacyRestore,
+        name: "privacy restore",
+        aliases: &[],
+        positionals: &[("control", Required), ("expected", Required)],
+        flags: &[JSON],
+        says: "write back the original this app replaced, if the control still reads its value",
+        effect: Effect::Changes,
+        after_dashes: AfterDashes::Refused,
+    },
+    Row {
+        verb: Verb::PrivacyRestoreAll,
+        name: "privacy restore-all",
+        aliases: &[],
+        positionals: &[],
+        flags: &[JSON],
+        says: "restore every privacy control this app still owns, one at a time",
+        effect: Effect::Changes,
+        after_dashes: AfterDashes::Refused,
+    },
+    Row {
+        verb: Verb::PrivacyReconcile,
+        name: "privacy reconcile",
+        aliases: &[],
+        positionals: &[("expected", Required)],
+        flags: &[JSON],
+        says: "record what an unresolved privacy operation left, without writing",
+        effect: Effect::Changes,
+        after_dashes: AfterDashes::Refused,
+    },
+    Row {
+        verb: Verb::PrivacyElevatedWrite,
+        name: "privacy elevated-write",
+        aliases: &[],
+        positionals: &[("write", Required)],
+        flags: &[],
+        says: "write one machine-scope privacy value; started only by the privacy page through UAC",
+        effect: Effect::Changes,
+        after_dashes: AfterDashes::Refused,
+    },
+    Row {
         verb: Verb::Up,
         name: "up",
         aliases: &[],
@@ -264,7 +331,7 @@ pub(super) const VERBS: &[Row] = &[
                 Value("kind"),
                 "a command ends on the first event of this kind",
             ),
-            flag("--json", Nothing, "write a refusal as one line of json"),
+            JSON,
         ],
         says: "send one wire frame, print every frame back",
         effect: Effect::Changes,

@@ -6,7 +6,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { Address, Seq } from "../wire";
-import { FIRST_POLICY, changeRunPolicy, nameSession, selectModel } from "./commands";
+import { FIRST_POLICY, changeRunPolicy, nameSession, privacyOperation, selectModel } from "./commands";
 
 // What a person states about a model reaches the frame, and what they
 // did not state is absent rather than guessed (client/Spec.lean §7).
@@ -38,5 +38,15 @@ describe("the session menu's two verbs", () => {
     const policy = { ...FIRST_POLICY, mode: "work" as const, write: "create" as const };
     const frame = changeRunPolicy(room, policy);
     expect("change_run_policy" in frame ? { ...frame.change_run_policy, idem: null } : null).toEqual({ room, policy, idem: null });
+  });
+});
+
+// The privacy page reads its result back under the idem it sent, so the
+// idem handed back is the one inside the frame (crates/wire/spec/Privacy.lean §8-89).
+describe("a privacy operation", () => {
+  test("hands back the idem its frame carries", () => {
+    const action = { restore: { control: "start_launch_tracking", expected: { value: "dword", number: 0 } } } as const;
+    const { command, idem } = privacyOperation(action);
+    expect("privacy_operation" in command ? command.privacy_operation : null).toEqual({ action, idem });
   });
 });
