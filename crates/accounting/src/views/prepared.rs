@@ -11,8 +11,8 @@
 //! that module decides what a query takes while the fold waits, and this
 //! one how the read is done while it does not. The reads whose answer is
 //! not this city's own record - the person's settings file, the
-//! configuration ladder, the first-run guide, the registry, the upstream
-//! check and the search path - are answered in `leaving`, beside the
+//! first-run guide, the registry, the upstream check and the search
+//! path - are answered in `leaving`, beside the
 //! refusal each of them decides; this module keeps the one list of reads
 //! and routes each of them to the module that does it.
 
@@ -85,8 +85,9 @@ pub enum Prepared {
     },
     /// The first-run guide's progress of the city at this root.
     Guide(PathBuf),
-    /// The configuration ladder of one address.
-    Config { city_root: PathBuf, addr: Address },
+    /// The endpoint book or the configuration ladder, each with the keys
+    /// its accounts name still to read from the vault.
+    Provider(super::providers::ProviderAsk),
     /// The release page, which leaves this machine.
     Release(Option<fn() -> wire::ReleaseAnswer>),
     /// The harness page, which walks this machine's search path.
@@ -292,7 +293,7 @@ impl Prepared {
                 super::answering::github::github_answer(ask, host.as_deref())
             }
             Self::Guide(city_root) => Self::guide_answer(city_root),
-            Self::Config { city_root, addr } => Self::config_answer(city_root, addr),
+            Self::Provider(ask) => ask.answer(),
             Self::Release(newest) => Self::release_answer(newest),
             Self::Harnesses(reach) => Self::harnesses_answer(reach),
             Self::Upstream { ask, item } => Self::upstream_answer(ask, item),

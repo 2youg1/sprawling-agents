@@ -76,6 +76,17 @@ pub struct DoorStep {
     pub idem: IdemKey,
 }
 
+/// What `ForgetSecret` carries: the vault reference whose key is deleted, spelled
+/// `secret:realm/name`. Refused while an attached endpoint or a configuration still names the
+/// reference, and for a key the environment supplies (gateway D33); writes nothing to the ledger
+/// (`crates/accounting/spec/Worker.lean` §8-37).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct SecretForgetting {
+    pub reference: String,
+    pub idem: IdemKey,
+}
+
 /// A person's decision on proposal cards of one document, landed as one
 /// save (`crates/wire/spec/Answer/Proposals.lean` §8-73).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -114,6 +125,9 @@ pub struct RulesWrite {
 pub struct CitySettings {
     pub keep_warm: Option<KeepWarm>,
     pub effort: Option<Effort>,
+    /// The city's whole `[search]` table, written before the other two
+    /// so a value the city refuses lands nothing.
+    pub search: Option<kernel::config::SearchConfiguration>,
     pub idem: IdemKey,
 }
 

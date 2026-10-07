@@ -63,3 +63,36 @@ fn a_watchdog_back_off_reads_as_the_failure_it_waits_out() {
         (&AxCode::Provider, "the provider answered 503", Seq::FIRST)
     );
 }
+
+/// The bytes `runtime::watchdog` writes for a switch to another account:
+/// the failure the first account met, shown as that refusal, with where
+/// the call went next.
+#[test]
+fn a_watchdog_switch_reads_as_the_failure_the_account_met() {
+    let line = record(
+        EventKind::WatchdogFired,
+        json!({
+            "action": "switch",
+            "to": "b",
+            "code": AxCode::Provider.as_str(),
+            "subject": "401 Unauthorized",
+            "corrections": 0,
+            "provider_failures": 1,
+        }),
+    );
+    let Some(Note::Refused { error, at }) = note_of(EventKind::WatchdogFired, &line) else {
+        panic!(
+            "a switch is a refusal answered on another account: {:?}",
+            note_of(EventKind::WatchdogFired, &line)
+        );
+    };
+    assert_eq!(
+        (error.code(), error.subject(), error.recovery(), at),
+        (
+            &AxCode::Provider,
+            "401 Unauthorized",
+            "the watchdog calls again at once on the account b",
+            Seq::FIRST
+        )
+    );
+}

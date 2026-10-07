@@ -10,9 +10,12 @@
 // fills in over several screens before anything is sent.
 
 import type {
+  AccountRetries,
   Command,
   DialectKind,
+  EndpointSummary,
   EndpointTuning,
+  ProviderAccount,
   ProviderName,
   Proxying,
 } from "../../wire";
@@ -112,6 +115,33 @@ export function attachEndpoint(e: Endpoint, admit: readonly string[]): Command {
       auth_header: e.authHeader,
       admit: [...admit],
       tuning: tuningFrame(e.tuning),
+      idem: mintIdem(),
+    },
+  };
+}
+
+// An attached endpoint sent back with a new list of accounts and its
+// per-account retry count, nothing else changed. `AttachEndpoint`
+// replaces the whole tuning, so the tuning goes back as the city read it
+// out (`EndpointSummary.tuning`, wire D49) with only those two replaced, and the models it already
+// serves are admitted again: the city then sees the same address, face,
+// tuning and models, and writes the list without asking the endpoint
+// anything. The legacy key and header are not sent, because an explicit
+// list leaves them no account to belong to (gateway Router D29).
+export function reattachEndpoint(
+  summary: EndpointSummary,
+  accounts: readonly ProviderAccount[],
+  retries: AccountRetries | null,
+): Command {
+  return {
+    attach_endpoint: {
+      name: providerName(summary.name),
+      base_url: summary.base_url,
+      dialect: summary.dialect,
+      secret: null,
+      auth_header: null,
+      admit: summary.models.map((model) => model.id),
+      tuning: { ...summary.tuning, accounts: [...accounts], account_retries: retries },
       idem: mintIdem(),
     },
   };

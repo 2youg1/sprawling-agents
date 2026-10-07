@@ -76,8 +76,8 @@ import crates.city.spec.Wizard
 
 分部里的定理是模型对性质的证明：
 
-- `spec/ConfigLayers/Ladder.lean`：设置页答的值就是 run 被治理的值（`the_setting_page_and_the_run_read_one_value`）；最近说话的那一级胜并说出它是哪一级（`the_nearest_rung_that_speaks_wins`）；地址就是楼时读两级、房间读三级（`an_address_that_is_its_building_reads_two_rungs`、`a_room_reads_three_rungs`）；城独占的表在下层即拒、城那一层照读（`a_city_only_table_is_refused_below_the_city`、`the_city_states_its_own_tables`）；梯子只给拒词加上文件（`the_ladder_keeps_the_parsers_recovery`，D8 (a)）；会话记录压过梯子上的 harness（`a_session_that_opened_on_a_model_keeps_it`、`without_a_record_the_nearest_harness_runs`，D6）。
-- `spec/ConfigLayers.lean`：写面交出的文本读者一定收下，被拒的写不动文件，读得懂的配置写多少次都读得懂（`a_change_lands_only_what_the_reader_accepts`、`a_refused_change_leaves_the_file`、`the_layer_on_disk_stays_readable`）。
+- `spec/ConfigLayers/Ladder.lean`：设置页答的值就是 run 被治理的值（`the_setting_page_and_the_run_read_one_value`）；最近说话的那一级胜并说出它是哪一级（`the_nearest_rung_that_speaks_wins`）；地址就是楼时读两级、房间读三级（`an_address_that_is_its_building_reads_two_rungs`、`a_room_reads_three_rungs`）；写得比够得到的那一级更近的表即拒、够得到的照读、城那一级够得到每一张（`a_table_written_too_near_is_refused`、`a_rung_reads_the_tables_it_reaches`、`the_city_states_its_own_tables`）；梯子只给拒词加上文件（`the_ladder_keeps_the_parsers_recovery`，D8 (a)）；会话记录压过梯子上的 harness（`a_session_that_opened_on_a_model_keeps_it`、`without_a_record_the_nearest_harness_runs`，D6）。
+- `spec/ConfigLayers.lean`：写面交出的文本读者一定收下，被拒的写不动文件，读得懂的配置写多少次都读得懂（`a_change_lands_only_what_the_reader_accepts`、`a_refused_change_leaves_the_file`、`the_layer_on_disk_stays_readable`）；`[search]` 的 `Custom` 只接它选的那一家、选的不在列表里时不回落、在列表里时一定接得到（`a_custom_choice_reaches_only_its_selection`、`a_custom_choice_never_falls_back`、`a_listed_selection_is_reached`，D25）。
 - `spec/Building.lean`：一个地址被它的楼管着，楼的楼是它自己（`a_building_holds_every_address_it_governs`、`a_building_is_its_own_building`）；保留子树不属于任何楼（`the_reserved_subtree_belongs_to_no_building`）；建起的楼恰是它自己的楼，房间与二次出生各拒（`a_created_building_governs_itself`、`a_room_is_not_a_building`、`a_second_birth_is_refused`）；移走的楼在一切写域之外（`a_removed_building_is_out_of_every_write_domain`）。
 - `spec/Policy.lean`：不说 `confidential` 或 `write` 即拒（`a_rules_file_that_does_not_say_confidential_is_refused`）；机密楼没有出路（`a_confidential_building_has_no_way_out`）；机密楼的写域止于本楼，没写前缀就是整栋楼（`a_confidential_domain_stays_in_its_building`、`no_prefix_means_the_building_alone`）；楼规与桌面白名单在一切写域之外（`the_rules_are_out_of_every_write_domain`）；留着的规则就是现读的规则（`kept_rules_answer_what_a_read_would`，D3）。
 - `spec/Document.lean`：不在的文档读作空（`a_missing_document_reads_as_no_bytes`）；文件动过即拒且不动（`a_moved_document_is_refused_and_left`）；同一版出发的两次保存只落先到的（`two_saves_from_one_version_land_once`）；锁里的 `n` 次加一恰好加了 `n`，锁外有反例（`increments_under_the_lock_add_up`、`without_the_lock_an_update_is_lost`，D17）。
@@ -119,8 +119,9 @@ Identity（两态）｜Resident｜Ephemeral｜Dossier｜URBANITE.md。**不引�
 
 Lean 里的名字与 Rust 的对应：
 
-- `City.ConfigLayers.Ladder.Layer`／`Layer.ALL`／`read`／`tagged`／`resolve`／`file` ↔ `config_layers::ladder` 的 `Layer`、`Layer::ALL`、`Ladder::read`、`Ladder::tagged`、`Ladder::resolve`、`Layer::file`；`statedAt` ↔ `ladder::stated` 加上它调的 `in_file`；`CityOnly` ↔ `refuse::CityOnly`；`settledHarness` ↔ `settled_harness`；`LayeredValue` ↔ `kernel::LayeredValue`。
+- `City.ConfigLayers.Ladder.Layer`／`Layer.ALL`／`read`／`tagged`／`resolve`／`file` ↔ `config_layers::ladder` 的 `Layer`、`Layer::ALL`、`Ladder::read`、`Ladder::tagged`、`Ladder::resolve`、`Layer::file`；`statedAt` ↔ `ladder::stated` 加上它调的 `in_file`；`Confined`／`Confined.nearest`／`reaches` ↔ `refuse::Confined` 与它的 `nearest`、`reached_from`（`Layer.depth` 是 Rust `Layer` 由远及近派生的 `Ord`），`statedAt` 的 `confined` ↔ `ConfigLayer::confined`、`tooNear` ↔ `refuse::too_near`；`settledHarness` ↔ `settled_harness`；`LayeredValue` ↔ `kernel::LayeredValue`。
 - `City.ConfigLayers.change`／`land` ↔ `config_layers::write::change_at` 与它之后盘上的那份文件。
+- `City.ConfigLayers.Search.Configuration`／`supplier` ↔ `SearchConfiguration`（kernel 的 `config::search`）与 `config_layers::search::search_supplier`。
 - `City.Building.of`／`holds`／`create`／`head` ↔ `Building::of`、`Building::holds`、`building::create`，`head` 是 `of` 取首段的那一步；`removed` ↔ `building::removal` 的落点。
 - `City.Policy.evaluate`／`writeDomain`／`load` ↔ `policy::evaluate`、`BuildingRules::write_domain`、`RulesCache::load`；`Written`、`Granted`、`DomainReach`、`BuildingRules` 与 Rust 同名。
 - `City.Document.revise`／`againstBase` ↔ `document::revise`、`edit_against`。
@@ -152,6 +153,7 @@ workspace 内只依赖 `kernel`（ARCHITECTURE.md §3 的 `depmap`），规格�
 | 8-3 | `crates/city/spec/Building.lean` |
 | 8-4 | `crates/city/spec/ConfigLayers.lean` |
 | 8-4b | `crates/city/spec/ConfigLayers.lean` |
+| 8-4c | `crates/city/spec/ConfigLayers.lean` |
 | 8-5 | `crates/city/spec/SpineFiles.lean` |
 | 8-6 | `crates/city/spec/Schedule.lean` |
 | 8-7 | `crates/city/spec/Watch.lean` |
@@ -274,6 +276,8 @@ resident 段是模型每回合都读到的四段之一。`URBANITE.md` 建议 30
 | D22 | `City.md` 写明哪种形状是 User 的话，信与居民交下的活只带那个居民的身份 | `crates/city/spec/SpineFiles.lean` |
 | D23 | `rules` 工具只读：说明不提供它恒拒的操作，也不留写面 | `crates/city/spec/RulesTool.lean` |
 | D24 | 房间的封条整张出现：暂存再改名，不用 `create_new` 加写入 | `crates/city/spec/Gitignore.lean` |
+| D25 | `[search]` 是三臂的值，`Custom` 不回落到缺省那一家，缺省那一家只在 `config_layers::search` 声明 | `crates/city/spec/ConfigLayers.lean` |
+| D26 | MCP url 用 `url::Url` 解析，凭据的名字与值仍由 `kernel::secret` 判 | `crates/city/spec/ConfigLayers.lean` |
 -/
 
 /-! D8 定规：拒词的恢复语归写拒词的那一处
@@ -304,6 +308,8 @@ resident 段是模型每回合都读到的四段之一。`URBANITE.md` 建议 30
 workspace 内只依赖 `kernel`（拓扑硬约束）。dev 依赖 `tempfile`。外部依赖如下，均在 workspace 钉版（不新增版本权威）。
 
 `toml` 与 `serde`（derive）。理由：三层配置的格式是 TOML，而 `toml` 已被 `xtask` 消费（budgets.toml／lexicon.toml）；解析走 serde derive 加 `deny_unknown_fields`，使「写错的键」在反序列化那一刻失败。手写一个 TOML 子集解析器是可行的另一条路，已落选：它会把一个已有权威的格式变成本库自己的私有变体。
+
+`url`（workspace 钉版）：MCP 与搜索供应方的 url 判定要按 WHATWG URL 标准读出 scheme、userinfo、host 与 percent 解码后的 query 参数（`spec/ConfigLayers.lean` §8-4b，D26）。它已在锁文件里（`reqwest` 之下），许可相同。落选的另一条路是手写切分，理由见 D26。
 
 `cap-std` 与 `cap-fs-ext`（workspace 钉版）：技能包预检要按打开的目录句柄相对地列举与打开（§8-28），标准库只按路径打开。它们是安全 Rust 里的那一层 `openat`；其下的 `cap-primitives` 已在锁文件里（`wasmtime-wasi` 之下），许可相同。落选的另一条路是只收城自己控制的暂存区里的来源：它把「来源是谁的目录」变成一条安装方要遵守的约定，而不是由读法成立。
 

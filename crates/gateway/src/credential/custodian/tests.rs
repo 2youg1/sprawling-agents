@@ -216,3 +216,55 @@ fn a_credential_variable_that_is_not_unicode_is_refused_by_its_name() {
     );
     assert!(!agreed(&custodian, &reference));
 }
+
+#[test]
+fn forgetting_deletes_the_stored_value_and_forgetting_again_is_not_an_error() {
+    let mut custodian = Custodian::in_memory();
+    let reference = SecretRef::parse("secret:search/brave.main").unwrap();
+    custodian
+        .set(&reference, Zeroizing::new(sample_token()))
+        .unwrap();
+    custodian.forget(&reference).unwrap();
+    let missing = custodian.resolve(&reference).map(|_| ()).unwrap_err();
+    assert_eq!(*missing.code(), AxCode::CredentialMissing);
+    assert!(!custodian.describe(&reference).configured);
+    custodian.forget(&reference).unwrap();
+}
+
+/// gateway D33: deleting the stored copy while the variable still
+/// answers would read as done and change nothing, so the custodian
+/// refuses and names the variable to unset.
+#[test]
+fn a_key_the_environment_supplies_is_not_forgotten_and_the_refusal_names_the_variable() {
+    let reference = SecretRef::parse("secret:acme/key").unwrap();
+    let mut stored = Custodian::in_memory();
+    stored
+        .set(&reference, Zeroizing::new("stored".to_owned()))
+        .unwrap();
+    let mut custodian = stored.with_env_reader(Box::new(|key| {
+        (key == "SPRAWLING_SECRET_ACME_KEY")
+            .then(|| "from-env".to_owned())
+            .ok_or(std::env::VarError::NotPresent)
+    }));
+    let refused = custodian.forget(&reference).unwrap_err();
+    assert_eq!(
+        (
+            *refused.code(),
+            refused.action().to_owned(),
+            refused.subject().to_owned(),
+            refused.recovery().to_owned()
+        ),
+        (
+            AxCode::ConfigInvalid,
+            "forget credential".to_owned(),
+            "secret:acme/key is supplied by the environment variable SPRAWLING_SECRET_ACME_KEY"
+                .to_owned(),
+            "unset SPRAWLING_SECRET_ACME_KEY in the environment the city starts from; \
+             the stored copy is kept until then"
+                .to_owned()
+        )
+    );
+    let mut unshaded = custodian.with_env_reader(Box::new(|_| Err(std::env::VarError::NotPresent)));
+    assert!(unshaded.resolve(&reference).is_ok());
+    unshaded.forget(&reference).unwrap();
+}

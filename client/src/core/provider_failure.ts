@@ -24,6 +24,8 @@ export function providerClause(lang: Lang, failure: ProviderFailureKind, retry: 
       return fill(say(lang, retry === "yes" ? "provider_refused_busy" : "provider_refused"), {
         status: String(failure.status),
       });
+    case "quota":
+      return fill(say(lang, "provider_quota"), { status: String(failure.status) });
     case "overflow":
       return fill(say(lang, "provider_overflow"), { status: String(failure.status) });
     case "reported":

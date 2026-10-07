@@ -96,12 +96,17 @@ pub enum AxCode {
     // subject is always `<building address>: <goal>`, which is the shape
     // the client's form recovery reads.
     PlanMissing,
+    // Accounts (1). Every redeemable account of a provider was tried in
+    // one round and none answered; the carrier is `E_PROVIDER`'s, because
+    // the fact is the same one, said by every account
+    // (`crates/kernel/spec/AccountRecovery.lean` §8-86).
+    ProviderAccountsExhausted,
 }
 
 impl AxCode {
     /// Every code, in the order the SPEC table lists them. Data face for tests and
     /// `xtask specalign`.
-    pub const ALL: [AxCode; 41] = [
+    pub const ALL: [AxCode; 42] = [
         AxCode::PathNotFound,
         AxCode::ToolUnknown,
         AxCode::ToolUnavailable,
@@ -143,6 +148,7 @@ impl AxCode {
         AxCode::BackpressureShed,
         AxCode::ToolOutcomeUnknown,
         AxCode::PlanMissing,
+        AxCode::ProviderAccountsExhausted,
     ];
 
     /// The wire spelling. Sole spelling authority; serde and Display reuse it.
@@ -189,6 +195,7 @@ impl AxCode {
             AxCode::DiscardIrreversible => "E_DISCARD_IRREVERSIBLE",
             AxCode::ToolOutcomeUnknown => "E_TOOL_OUTCOME_UNKNOWN",
             AxCode::PlanMissing => "E_PLAN_MISSING",
+            AxCode::ProviderAccountsExhausted => "E_PROVIDER_ACCOUNTS_EXHAUSTED",
         }
     }
 
@@ -216,7 +223,9 @@ impl AxCode {
             AxCode::ApprovalDenied => Carrier::Event(EventKind::ApprovalResolved),
             AxCode::BudgetExhausted => Carrier::Event(EventKind::BudgetLimit),
             AxCode::LoopSuspected => Carrier::Event(EventKind::WatchdogFired),
-            AxCode::Provider => Carrier::Event(EventKind::ProviderDegraded),
+            AxCode::Provider | AxCode::ProviderAccountsExhausted => {
+                Carrier::Event(EventKind::ProviderDegraded)
+            }
             AxCode::EndpointDialectUnsupported => Carrier::Event(EventKind::EndpointLost),
             AxCode::ConfigInvalid
             | AxCode::CasCorrupt
@@ -287,9 +296,9 @@ mod tests {
         // The length is the close of the table, so it is stated once:
         // a code added without a spelling, or two codes sharing one,
         // fails here rather than at a caller.
-        assert_eq!(AxCode::ALL.len(), 41);
+        assert_eq!(AxCode::ALL.len(), 42);
         let spellings: BTreeSet<&str> = AxCode::ALL.iter().map(AxCode::as_str).collect();
-        assert_eq!(spellings.len(), 41);
+        assert_eq!(spellings.len(), 42);
         for s in &spellings {
             assert!(s.starts_with("E_"));
         }

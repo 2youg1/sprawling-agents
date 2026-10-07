@@ -9,6 +9,7 @@
 // and a page of commits.
 import type { Answer, Call, CommitAnswer, Query, Turn } from "../../wire";
 import { Address, GitOid, RunId, Seq, TimeMs, Tokens, UsdMicros } from "../../wire";
+import { SEARCH } from "./configured";
 import { FIRST_POLICY } from "../../core/commands";
 import { ENDPOINTS } from "./served";
 
@@ -104,7 +105,8 @@ export function answering(calling: boolean): (query: Query) => Answer | undefine
           addr: query.config.addr,
           first: 30,
           second: { percent: 65, domain: { min: 31, max: 90 }, from: "city" },
-          tuning: { from: "default", proxying: "except_local", timeout_ms: 600_000 },
+          tuning: { from: "default", proxying: "except_local", timeout_ms: 600_000, account_retries: "two" },
+          search: SEARCH,
         },
       };
     }

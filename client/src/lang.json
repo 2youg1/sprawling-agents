@@ -2331,6 +2331,10 @@
     "en": "the conversation no longer fits this model's window (the provider answered {status}); start a new session that keeps the summary, or choose a model with a larger window",
     "zh": "对话已经放不进这个模型的窗口（供应方回答 {status}）：开一个带摘要的新会话，或换一个窗口更大的模型"
   },
+  "provider_quota": {
+    "en": "this account's quota is used up (the provider answered {status}); add credit to it, or add another account to this provider",
+    "zh": "这个账号的额度已经用完（供应方回答 {status}）：给它充值，或给这个 Provider 再添一个账号"
+  },
   "provider_refused": {
     "en": "the provider refused with {status}; check this endpoint's model name, key and dialect",
     "zh": "供应方以 {status} 拒绝了请求：检查这个接口的模型名、密钥和接口形态"
@@ -3274,6 +3278,290 @@
   "sandbox_what": {
     "en": "What a run in this building may touch. The card is written whole: every face below is what the building's sandbox will say.",
     "zh": "这栋楼里的 run 能碰到什么。整张卡一起写入：下面每一项都是这栋楼的沙箱将要说的。"
+  },
+  "setup_account_add": {
+    "en": "add an account",
+    "zh": "添加账号"
+  },
+  "setup_account_busy": {
+    "en": "a key is being filed",
+    "zh": "正在存入密钥"
+  },
+  "setup_account_cancel": {
+    "en": "cancel",
+    "zh": "取消"
+  },
+  "setup_account_down": {
+    "en": "move down",
+    "zh": "下移"
+  },
+  "setup_account_edit": {
+    "en": "edit",
+    "zh": "编辑"
+  },
+  "setup_account_editing": {
+    "en": "edit account {id}",
+    "zh": "编辑账号 {id}"
+  },
+  "setup_account_first": {
+    "en": "already first",
+    "zh": "已经是第一个"
+  },
+  "setup_account_header": {
+    "en": "header name",
+    "zh": "header 名"
+  },
+  "setup_account_id": {
+    "en": "account id",
+    "zh": "账号 id"
+  },
+  "setup_account_id_shape": {
+    "en": "lowercase letters and digits only",
+    "zh": "只能用小写字母和数字"
+  },
+  "setup_account_id_taken": {
+    "en": "this id is already listed; edit that account instead",
+    "zh": "这个 id 已在列表里，请改为编辑那个账号"
+  },
+  "setup_account_key_anonymous": {
+    "en": "no key",
+    "zh": "不用密钥"
+  },
+  "setup_account_key_environment": {
+    "en": "key from an environment variable, read-only",
+    "zh": "密钥来自环境变量，只读"
+  },
+  "setup_account_key_environment_help": {
+    "en": "this key is read from an environment variable; change it there",
+    "zh": "这个密钥从环境变量读取，请在那里修改"
+  },
+  "setup_account_key_environment_unusable": {
+    "en": "environment variable set, key unusable",
+    "zh": "环境变量已设，但密钥不可用"
+  },
+  "setup_account_key_kept": {
+    "en": "leave blank to keep the stored key",
+    "zh": "留空即保留已存的密钥"
+  },
+  "setup_account_key_missing": {
+    "en": "key missing",
+    "zh": "缺密钥"
+  },
+  "setup_account_key_route": {
+    "en": "The key goes straight to the vault; this page keeps only the reference the city answers with.",
+    "zh": "密钥直接存进密钥库，本页只保留城返回的引用。"
+  },
+  "setup_account_key_stored": {
+    "en": "key stored",
+    "zh": "密钥已存入"
+  },
+  "setup_account_key_unread": {
+    "en": "key not checked yet",
+    "zh": "还没查看密钥"
+  },
+  "setup_account_last": {
+    "en": "already last",
+    "zh": "已经是最后一个"
+  },
+  "setup_account_more": {
+    "en": "reference and header",
+    "zh": "引用与 header"
+  },
+  "setup_account_not_sent": {
+    "en": "not sent: the link to the city is down; the draft is kept",
+    "zh": "没有发出：与城的连接断了，草稿保留"
+  },
+  "setup_account_only": {
+    "en": "a provider keeps at least one account",
+    "zh": "供应方至少要留一个账号"
+  },
+  "setup_account_reference": {
+    "en": "existing reference",
+    "zh": "已有引用"
+  },
+  "setup_account_remove": {
+    "en": "remove",
+    "zh": "移除"
+  },
+  "setup_account_save": {
+    "en": "save account",
+    "zh": "保存账号"
+  },
+  "setup_account_up": {
+    "en": "move up",
+    "zh": "上移"
+  },
+  "setup_accounts": {
+    "en": "accounts",
+    "zh": "账号"
+  },
+  "setup_accounts_legacy": {
+    "en": "This provider still uses the one key it was attached with. Saving an account replaces that key with this list, so enter the same key again as the first account.",
+    "zh": "这个供应方还在用接入时填的那一个密钥。保存账号后，这个列表会取代它，所以请把同一个密钥再填一次，作为第一个账号。"
+  },
+  "setup_accounts_order": {
+    "en": "A new session takes the first usable account in this list and stays on it while it answers; the order decides only new sessions and where a request goes after an account fails.",
+    "zh": "新会话取列表里第一个可用的账号，只要它还在回答就一直用它；顺序只决定新会话用哪个，以及一个账号出错后换到哪个。"
+  },
+  "setup_accounts_order_search": {
+    "en": "Each search starts from the first usable account in this list; the order decides which account is asked first and where a search goes after an account fails.",
+    "zh": "每次搜索都从列表里第一个可用的账号开始；顺序决定先问哪个账号，以及一个账号出错后换到哪个。"
+  },
+  "setup_account_forget_offer": {
+    "en": "the key of {id} is still in the vault",
+    "zh": "{id} 的 Key 还在 vault 里"
+  },
+  "setup_account_forget": {
+    "en": "delete the key too",
+    "zh": "同时删除 Key"
+  },
+  "setup_account_forget_sent": {
+    "en": "deleting the key; the city refuses while something else still names it",
+    "zh": "正在删除 Key；还有别处在用它时城会拒绝"
+  },
+  "setup_account_retries": {
+    "en": "retries on one account",
+    "zh": "同一账号的重试次数"
+  },
+  "setup_account_retries_one": {
+    "en": "once",
+    "zh": "1 次"
+  },
+  "setup_account_retries_two": {
+    "en": "twice",
+    "zh": "2 次"
+  },
+  "setup_account_retries_fallback": {
+    "en": "nothing chosen: the city retries an account {n} before it moves to the next",
+    "zh": "未选择：城在一个账号上重试 {n} 后再换下一个"
+  },
+  "search_card": {
+    "en": "web search",
+    "zh": "网络搜索"
+  },
+  "search_card_note": {
+    "en": "which outside service the web_search tool of every run sends its queries to; written to the city's CONFIG.toml",
+    "zh": "每个 run 的 web_search 工具把查询发给哪一家外部服务；写进城的 CONFIG.toml"
+  },
+  "search_choice_default": {
+    "en": "default",
+    "zh": "默认"
+  },
+  "search_choice_custom": {
+    "en": "custom",
+    "zh": "自定义"
+  },
+  "search_choice_off": {
+    "en": "off",
+    "zh": "关闭"
+  },
+  "search_default_at": {
+    "en": "Exa, free and needs no key: {url}",
+    "zh": "Exa，免费，无需 Key：{url}"
+  },
+  "search_no_fallback": {
+    "en": "when the selected service fails, the query is not sent to Exa or to another service instead",
+    "zh": "选中的服务失败时，查询不会改发给 Exa 或另一家"
+  },
+  "search_confidential": {
+    "en": "a confidential building is never offered web search, so nothing a run there reads is sent to an outside service as a query",
+    "zh": "confidential 楼不提供网络搜索，那里的 run 读到的内容不会作为查询发给外部服务"
+  },
+  "search_override": {
+    "en": "the hall's own files state a different [search] ({choice}, from the {layer} layer); this card edits the city's file and does not change that",
+    "zh": "hall 自己的文件另有 [search]（{choice}，来自 {layer} 一层）；本卡只改城的文件，不改它"
+  },
+  "search_layer_building": {
+    "en": "building",
+    "zh": "楼"
+  },
+  "search_layer_resident": {
+    "en": "room",
+    "zh": "房间"
+  },
+  "search_layer_city": {
+    "en": "city",
+    "zh": "城"
+  },
+  "search_layer_default": {
+    "en": "default",
+    "zh": "缺省"
+  },
+  "search_suppliers": {
+    "en": "services",
+    "zh": "服务"
+  },
+  "search_use": {
+    "en": "use this one",
+    "zh": "使用这一家"
+  },
+  "search_edit": {
+    "en": "edit",
+    "zh": "编辑"
+  },
+  "search_remove": {
+    "en": "remove",
+    "zh": "移除"
+  },
+  "search_in_use": {
+    "en": "this is the service in use",
+    "zh": "正在使用这一家"
+  },
+  "search_only": {
+    "en": "the only service; choose default or off to stop using it",
+    "zh": "只剩这一家；要停用请选默认或关闭"
+  },
+  "search_remove_in_use": {
+    "en": "in use; choose another service first",
+    "zh": "正在使用；先选另一家"
+  },
+  "search_add": {
+    "en": "add a service",
+    "zh": "添加服务"
+  },
+  "search_editing": {
+    "en": "editing {id}",
+    "zh": "编辑 {id}"
+  },
+  "search_id": {
+    "en": "service id",
+    "zh": "服务 id"
+  },
+  "search_url": {
+    "en": "MCP address",
+    "zh": "MCP 地址"
+  },
+  "search_remote": {
+    "en": "remote tool name",
+    "zh": "远端工具名"
+  },
+  "search_query": {
+    "en": "query parameter",
+    "zh": "query 参数名"
+  },
+  "search_count": {
+    "en": "result count parameter, optional",
+    "zh": "结果数参数名，可空"
+  },
+  "search_objective": {
+    "en": "objective parameter, optional",
+    "zh": "objective 参数名，可空"
+  },
+  "search_save": {
+    "en": "save service",
+    "zh": "保存服务"
+  },
+  "search_required": {
+    "en": "the address, the remote tool name and the query parameter are required",
+    "zh": "地址、远端工具名与 query 参数名必填"
+  },
+  "search_id_taken": {
+    "en": "another service has this id; edit that one instead",
+    "zh": "已有一家用这个 id；改为编辑那一家"
+  },
+  "setup_accounts_toggle": {
+    "en": "accounts · {n}",
+    "zh": "账号 · {n}"
   },
   "setup_add_row": {
     "en": "add a row",
@@ -4999,6 +5287,10 @@
     "en": "the provider failed to answer",
     "zh": "供应商没有答上来"
   },
+  "err_e_provider_accounts_exhausted": {
+    "en": "every account of this provider failed",
+    "zh": "这个供应方的每个账号都没答上来"
+  },
   "err_e_evidence_missing": {
     "en": "the city needs to see the work first",
     "zh": "城需要先看到证据"
@@ -6138,6 +6430,10 @@
   "recover_e_provider": {
     "en": "Check the provider's key and status on the model settings page, then send again.",
     "zh": "在模型设置页面检查供应方的密钥和状态，然后再发一次。"
+  },
+  "recover_e_provider_accounts_exhausted": {
+    "en": "On the model settings page, file a key or add credit for one of this provider's accounts, or add another account, then send again.",
+    "zh": "在模型设置页面为这个供应方的某个账号补存密钥或充值，或者新增一个账号，然后再发一次。"
   },
   "recover_e_evidence_missing": {
     "en": "Let the run show the work first: a test, a diff or a file it wrote.",

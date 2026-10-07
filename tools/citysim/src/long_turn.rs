@@ -148,6 +148,7 @@ fn scenario(steps: u32, pauses: Pauses) -> Result<Scenario, AxError> {
             mcp: Vec::new(),
             effort: None,
             second_threshold: None,
+            search: kernel::config::SearchConfiguration::Default,
         },
         checkpoint: None,
         cancel: None,

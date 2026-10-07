@@ -168,8 +168,12 @@ impl<C: FnMut() -> Result<TimeMs, AxError>> Model for Warmed<C> {
         self.model.provider_account()
     }
 
-    fn select_account(&mut self, selection: kernel::model::AccountSelection) {
-        self.model.select_account(selection);
+    fn account_roster(&self) -> Option<kernel::model::AccountRoster> {
+        self.model.account_roster()
+    }
+
+    fn select_account(&mut self, account: &kernel::ServerLabel) {
+        self.model.select_account(account);
     }
 
     fn call(&mut self, req: &ModelRequest) -> Result<ModelReturn, AxError> {

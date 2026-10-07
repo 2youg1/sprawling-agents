@@ -27,6 +27,7 @@ pub struct AxError { code: AxCode, detail: Box<ErrorDetail> }   // 线上是扁�
 struct ErrorDetail {
     action: String, subject: String, nearby: Vec<String>, recovery: String, retry: Retry,
     retry_after_ms: Option<u64>,        // 缺省即不写出；只随 Retry::Yes 出现
+    account: AccountDisposition,        // 缺省 Keep 即不写出；Advance 只随 Retry::No 出现（D53）
     gate: Option<GateRefusal>,
     provider: Option<ProviderFailureKind>, // 缺席时不上线
 }
@@ -37,8 +38,15 @@ pub enum Retry {
     No,       // 同一请求再发一次注定同样失败：不可以
     Unknown,  // 请求已经发出而回答丢了，效果是否落地无从得知：不知道
 }
+/// 当前账号还能不能接这个请求；线上拼作 "keep"／"advance"，Keep 不写出（D53）。
+pub enum AccountDisposition {
+    Keep,     // 换不换号与这次失败无关：是否再发由 retry 决定
+    Advance,  // 这个账号接不了这个请求：换下一个账号
+}
 pub enum ProviderFailureKind {  // 携 serde，内标签 kind
-    Exchange, Cut, Silence, Refused { status: u32 }, Overflow { status: u32 }, Unreadable, Reported, Unbuilt,
+    Exchange, Cut, Silence, Refused { status: u32 },
+    Quota { status: u32 },      // 额度用尽的拒绝：gateway D32 的 AccountUnavailable，恢复语指向补额度或加账号
+    Overflow { status: u32 }, Unreadable, Reported, Unbuilt,
 }
 
 pub enum Carrier { Event(EventKind), Loadtime }
@@ -60,6 +68,7 @@ impl AxError {
     pub fn provider(kind: ProviderFailureKind, action: impl Into<String>, subject: impl Into<String>) -> ErrorDraft;
     pub fn code(&self) -> &AxCode;  pub fn gate(&self) -> Option<&GateRefusal>;
     pub fn retry(&self) -> Retry;
+    pub fn account(&self) -> AccountDisposition;
     pub fn provider_failure(&self) -> Option<ProviderFailureKind>;
     /// 改写下层抛上来的恢复语；与 `ErrorDraft::with_recovery` 分名，因为它毁掉一句而不是补上第一句。
     #[must_use] pub fn rewrite_recovery(self, recovery: impl Into<String>) -> Self;
@@ -72,6 +81,7 @@ impl ErrorDraft {
     pub fn retriable(self) -> Self;     // Retry::Yes，显式声明，默认 No
     pub fn retriable_after(self, wait_ms: u64) -> Self; // Retry::Yes，且对端说了最早何时再问
     pub fn effect_unknown(self) -> Self; // Retry::Unknown：请求已发出，回答丢了
+    pub fn account_unusable(self) -> Self; // AccountDisposition::Advance，同时置 Retry::No、清掉等待（D53）
     pub fn with_recovery(self, recovery: impl Into<String>) -> AxError;   // 唯一出口
 }
 ```
@@ -159,6 +169,8 @@ inductive AxCode where
   | ToolOutcomeUnknown
   -- 计划
   | PlanMissing
+  -- 账号
+  | ProviderAccountsExhausted
   deriving DecidableEq, Repr
 
 /-- carrier 的唯一声明位（`AxCode::carrier`，C9）：穷尽，没有通配臂，所以新增一个码而不给它 carrier 是编译错误。每一臂一行，`specalign` 逐臂与 kernel 编译出来的 `carrier()` 对账。
@@ -213,6 +225,8 @@ def AxCode.carrier : AxCode → Carrier
   | .ToolOutcomeUnknown => .Event .ToolResult
   -- 计划
   | .PlanMissing => .Event .ToolResult
+  -- 账号：与 `E_PROVIDER` 同一个 carrier，因为它说的是同一件事——供应方没有答上来——只是每个账号都试过了（kernel D54）
+  | .ProviderAccountsExhausted => .Event .ProviderDegraded
 
 /-- 每个码，依 `AxCode::ALL` 的次序。 -/
 def AxCode.all : List AxCode := [
@@ -256,7 +270,8 @@ def AxCode.all : List AxCode := [
   .DiscardIrreversible,
   .BackpressureShed,
   .ToolOutcomeUnknown,
-  .PlanMissing
+  .PlanMissing,
+  .ProviderAccountsExhausted
 ]
 
 theorem AxCode.all_complete : ∀ code : AxCode, code ∈ AxCode.all := by
@@ -308,26 +323,46 @@ inductive Retry where
   | Unknown
   deriving DecidableEq, Repr
 
-/-- `ErrorDraft` 上与重试有关的两个字段：`retry` 与 `retry_after_ms`。 -/
+/-! D53 「这个账号还能不能接这个请求」是 `AxError` 上与 `retry` 并列的第二格：`AccountDisposition`
+
+**决定**：`AxError` 带一格 `account: AccountDisposition`，两臂 `Keep`（换不换号与这次失败无关）与 `Advance`（这个账号接不了这个请求，同一请求在它上面再发一次注定同样失败，换下一个账号可能成功）。它只经 `ErrorDraft::account_unusable` 写入，该方法同时置 `Retry::No` 并清掉等待；`retriable`、`retriable_after`、`effect_unknown` 都把它放回 `Keep`。所以不论构造器按什么次序调用，`Advance` 恒与 `No` 同行（下面的 `no_order_of_calls_advances_a_resendable_failure`）：一个说「换号」的失败从不同时说「在原号上稍后再问」或「效果不明」。缺省 `Keep` 不上线、不入账（`skip_serializing_if`），账本里没有这个键的行读作 `Keep`，旧行字节不变；`Advance` 线上拼作 `"account": "advance"`。
+
+**理由**：判定在产错处（gateway 的 `ProviderFailure::account_disposition` 与端点的凭据兑付），读它的在 runtime 与 accounting（`spec/AccountRecovery.lean`），两边不互相依赖，事实只能随错误本身跨过去，与 `retry` 同理（§8-72 说过同样的话）。`Retry` 回答「同一请求在同一个账号上能否再发」，换号回答的是另一问：401 与额度用尽都是 `No`，而 `No` 里也有 400、403、422 这些换号也修不好的请求错误，所以不能从 `retry` 推出换号。
+
+**被否**：①让 runtime 按状态码与错误码自己判换号——同一事实的第二个权威，而且 runtime 看不见流里报错帧的类型；②在 `ProviderFailureKind` 上加一臂——它只在模型调用的 `E_PROVIDER` 上在场，而端点兑付凭据失败的 `E_CREDENTIAL_MISSING` 也要能说「换号」；③一个 `bool`——「换号」与「留号」以外日后若出现第三种（例如「整个供应方都不可用」），布尔拼不出，调用点也不会被穷尽 `match` 逼着表态。
+
+**重开参数**：出现一种失败，换号能修而同一账号稍后再问也能修（`Advance` 与 `Yes` 同时为真）。
+-/
+
+/-- 当前账号还能不能接这个请求。与 Rust 的 `AccountDisposition` 逐变体同名（D53）。 -/
+inductive AccountDisposition where
+  | Keep
+  | Advance
+  deriving DecidableEq, Repr
+
+/-- `ErrorDraft` 上与重试和换号有关的三个字段：`retry`、`retry_after_ms` 与 `account`。 -/
 structure Draft where
   retry : Retry
   retry_after_ms : Option Nat
+  account : AccountDisposition
   deriving DecidableEq, Repr
 
-/-- `AxError::failure`／`refusal`／`provider` 造出的 draft：`retry` 起于 `No`（fail-closed），不带等待。 -/
-def Draft.fresh : Draft := { retry := .No, retry_after_ms := none }
+/-- `AxError::failure`／`refusal`／`provider` 造出的 draft：`retry` 起于 `No`（fail-closed），不带等待，不换号。 -/
+def Draft.fresh : Draft := { retry := .No, retry_after_ms := none, account := .Keep }
 
-/-- `ErrorDraft` 上改重试的三个方法。 -/
+/-- `ErrorDraft` 上改重试与换号的四个方法。 -/
 inductive Step where
   | retriable
   | retriable_after (wait_ms : Nat)
   | effect_unknown
+  | account_unusable
 
-/-- 三个方法各自做的事，照 `error::shape` 的实现：`retriable_after` 记下等待再置 `Yes`；`effect_unknown` 置 `Unknown` 并清掉等待；`retriable` 只置 `Yes`。 -/
+/-- 四个方法各自做的事，照 `error::shape` 的实现：`retriable_after` 记下等待再置 `Yes`；`effect_unknown` 置 `Unknown` 并清掉等待；`retriable` 只置 `Yes`；三者都把换号放回 `Keep`。`account_unusable` 置 `Advance`，同时置 `No` 并清掉等待（D53）。 -/
 def Draft.apply (draft : Draft) : Step → Draft
-  | .retriable => { draft with retry := .Yes }
-  | .retriable_after wait => { retry := .Yes, retry_after_ms := some wait }
-  | .effect_unknown => { retry := .Unknown, retry_after_ms := none }
+  | .retriable => { draft with retry := .Yes, account := .Keep }
+  | .retriable_after wait => { retry := .Yes, retry_after_ms := some wait, account := .Keep }
+  | .effect_unknown => { retry := .Unknown, retry_after_ms := none, account := .Keep }
+  | .account_unusable => { retry := .No, retry_after_ms := none, account := .Advance }
 
 /-- 「带着等待」蕴含「可以再试」。 -/
 def Draft.coherent (draft : Draft) : Prop :=
@@ -342,6 +377,7 @@ theorem no_order_of_calls_waits_without_retrying (steps : List Step) :
     | retriable => intro _; rfl
     | retriable_after _ => intro _; rfl
     | effect_unknown => intro waits; simp [Draft.apply] at waits
+    | account_unusable => intro waits; simp [Draft.apply] at waits
   have start : Draft.fresh.coherent := by
     intro waits
     simp [Draft.fresh] at waits
@@ -352,7 +388,32 @@ theorem no_order_of_calls_waits_without_retrying (steps : List Step) :
   | cons step rest ih => intro draft held; exact ih _ (keep draft step held)
 
 /-- 正常路径可实现：一次 `retriable_after` 之后，draft 可以再试且带着那段等待。 -/
-example : Draft.fresh.apply (.retriable_after 500) = { retry := .Yes, retry_after_ms := some 500 } :=
+example : Draft.fresh.apply (.retriable_after 500) =
+    { retry := .Yes, retry_after_ms := some 500, account := .Keep } :=
+  rfl
+
+/-- 「换号」蕴含「同一请求在原号上不再发、也不等」（D53）。 -/
+def Draft.advances_only_when_refused (draft : Draft) : Prop :=
+  draft.account = .Advance → draft.retry = .No ∧ draft.retry_after_ms = none
+
+/-- **不论构造器按什么次序调用，一个说「换号」的失败都不同时说「稍后再问」或「效果不明」。** 这是 `account` 只能经 `account_unusable` 写入、其余三个方法把它放回 `Keep` 这两条实现选择要买的性质；`spec/AccountRecovery.lean` 因此不必为「`Advance` 且 `Unknown`」另设一臂之外的语义。 -/
+theorem no_order_of_calls_advances_a_resendable_failure (steps : List Step) :
+    (steps.foldl Draft.apply Draft.fresh).advances_only_when_refused := by
+  have keep : ∀ (draft : Draft) (step : Step),
+      draft.advances_only_when_refused → (draft.apply step).advances_only_when_refused := by
+    intro draft step _
+    cases step <;> simp [Draft.advances_only_when_refused, Draft.apply]
+  have start : Draft.fresh.advances_only_when_refused := by
+    simp [Draft.advances_only_when_refused, Draft.fresh]
+  suffices ∀ (draft : Draft), draft.advances_only_when_refused →
+      (steps.foldl Draft.apply draft).advances_only_when_refused from this _ start
+  induction steps with
+  | nil => intro draft held; exact held
+  | cons step rest ih => intro draft held; exact ih _ (keep draft step held)
+
+/-- 正常路径可实现：一次 `account_unusable` 之后，draft 换号、不再发、不等。 -/
+example : Draft.fresh.apply .account_unusable =
+    { retry := .No, retry_after_ms := none, account := .Advance } :=
   rfl
 
 end Kernel.Error

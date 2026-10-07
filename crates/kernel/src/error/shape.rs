@@ -11,7 +11,7 @@
 use serde::{Deserialize, Serialize};
 
 use super::code::AxCode;
-use super::provider::ProviderFailureKind;
+use super::provider::{AccountDisposition, ProviderFailureKind};
 use super::refusal::GateRefusal;
 
 /// The unified error shape: seven wire fields and two that are left out
@@ -42,6 +42,8 @@ struct ErrorDetail {
     retry: Retry,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     retry_after_ms: Option<u64>,
+    #[serde(skip_serializing_if = "AccountDisposition::is_keep", default)]
+    account: AccountDisposition,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     gate: Option<GateRefusal>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
@@ -120,6 +122,7 @@ impl AxError {
                     recovery: String::new(),
                     retry: Retry::No,
                     retry_after_ms: None,
+                    account: AccountDisposition::Keep,
                     gate: None,
                     provider: None,
                 }),
@@ -185,6 +188,12 @@ impl AxError {
         self.detail.retry_after_ms
     }
 
+    /// Whether the account this request went out on can still take it;
+    /// `Advance` comes only with `Retry::No` (D53).
+    pub fn account(&self) -> AccountDisposition {
+        self.detail.account
+    }
+
     pub fn gate(&self) -> Option<&GateRefusal> {
         self.detail.gate.as_ref()
     }
@@ -213,17 +222,33 @@ impl ErrorDraft {
     }
 
     /// Declares the action safe to retry as-is. Explicit opt-in only.
+    /// Puts the account back to `Keep`: a request worth sending again
+    /// on this account is no reason to leave it.
     pub fn retriable(mut self) -> Self {
         self.pending.detail.retry = Retry::Yes;
+        self.pending.detail.account = AccountDisposition::Keep;
         self
     }
 
     /// Declares that the request went out and its answer was lost, so
     /// whether its effect landed is not known. Drops any wait set
-    /// before it, because a wait belongs to `Retry::Yes` alone.
+    /// before it, because a wait belongs to `Retry::Yes` alone, and keeps
+    /// the account, because a lost answer is no evidence against it.
     pub fn effect_unknown(mut self) -> Self {
         self.pending.detail.retry = Retry::Unknown;
         self.pending.detail.retry_after_ms = None;
+        self.pending.detail.account = AccountDisposition::Keep;
+        self
+    }
+
+    /// Declares that the account the request went out on cannot take it,
+    /// so the next account should (D53). Sets `Retry::No` and drops any
+    /// wait in the same step: the same request on the same account would
+    /// fail the same way, however long it waited.
+    pub fn account_unusable(mut self) -> Self {
+        self.pending.detail.retry = Retry::No;
+        self.pending.detail.retry_after_ms = None;
+        self.pending.detail.account = AccountDisposition::Advance;
         self
     }
 
@@ -309,6 +334,82 @@ mod tests {
         );
         let plain = AxError::failure(AxCode::Provider, "call model", "503").with_recovery("r");
         assert_eq!(plain.provider_failure(), None);
+    }
+
+    /// A switch is never said beside a resend: whatever order the
+    /// builders run in, `Advance` comes with `Retry::No` and no wait, and
+    /// a wait comes with `Retry::Yes` alone. Derived from
+    /// `crates/kernel/spec/Error.lean`
+    /// (`no_order_of_calls_advances_a_resendable_failure`,
+    /// `no_order_of_calls_waits_without_retrying`).
+    #[derive(Debug, Clone)]
+    enum Builder {
+        Retriable,
+        RetriableAfter(u64),
+        EffectUnknown,
+        AccountUnusable,
+    }
+
+    fn builder() -> impl proptest::strategy::Strategy<Value = Builder> {
+        use proptest::prelude::*;
+        prop_oneof![
+            Just(Builder::Retriable),
+            any::<u64>().prop_map(Builder::RetriableAfter),
+            Just(Builder::EffectUnknown),
+            Just(Builder::AccountUnusable),
+        ]
+    }
+
+    proptest::proptest! {
+        #[test]
+        fn no_order_of_calls_advances_a_resendable_failure(
+            steps in proptest::collection::vec(builder(), 0..12)
+        ) {
+            let draft = steps.into_iter().fold(
+                AxError::failure(AxCode::Provider, "call model", "s"),
+                |draft, step| match step {
+                    Builder::Retriable => draft.retriable(),
+                    Builder::RetriableAfter(wait_ms) => draft.retriable_after(wait_ms),
+                    Builder::EffectUnknown => draft.effect_unknown(),
+                    Builder::AccountUnusable => draft.account_unusable(),
+                },
+            );
+            let err = draft.with_recovery("r");
+            if err.account() == AccountDisposition::Advance {
+                proptest::prop_assert_eq!((err.retry(), err.retry_after_ms()), (Retry::No, None));
+            }
+            if err.retry_after_ms().is_some() {
+                proptest::prop_assert_eq!(err.retry(), Retry::Yes);
+            }
+        }
+    }
+
+    /// `Keep` is the absence of the field, so a ledger line written
+    /// before the field existed keeps its bytes and reads back as `Keep`;
+    /// `Advance` is spelled `"advance"`.
+    #[test]
+    fn only_a_switch_is_written_and_an_old_record_reads_as_keep() {
+        let kept = AxError::failure(AxCode::Provider, "call model", "s").with_recovery("r");
+        let advanced = AxError::failure(AxCode::Provider, "call model", "s")
+            .retriable_after(500)
+            .account_unusable()
+            .with_recovery("r");
+        let old = serde_json::json!({"code": "E_PROVIDER", "action": "call model",
+            "subject": "s", "nearby": [], "recovery": "r", "retry": "no"});
+        assert_eq!(
+            (
+                serde_json::to_value(&kept).unwrap(),
+                serde_json::to_value(&advanced).unwrap()["account"].clone(),
+                serde_json::from_value::<AxError>(old.clone())
+                    .unwrap()
+                    .account(),
+            ),
+            (old, serde_json::json!("advance"), AccountDisposition::Keep)
+        );
+        assert_eq!(
+            serde_json::from_value::<AxError>(serde_json::to_value(&advanced).unwrap()).unwrap(),
+            advanced
+        );
     }
 
     #[test]

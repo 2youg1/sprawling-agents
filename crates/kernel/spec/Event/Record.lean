@@ -136,6 +136,7 @@ pub struct AttachedTuning { pub label: Option<String>, pub timeout_ms: Option<u6
                             pub stream_idle_timeout_ms: Option<u64>, pub request_max_retries: Option<u32>,
                             pub proxying: Option<Proxying>,        // 默认值省略
                             pub max_in_flight: Option<u32>,        // 没人定过就省略；1 到 256 之外读作未设
+                            pub account_retries: Option<AccountRetries>, // 同一账号上再发几次（one｜two，§8-86）；没人定过就省略
                             pub extra_headers: Vec<(String, String)>, pub overrides: Vec<(String, String)> }
 // AttachedTuning 的每个键缺席读作未设、在而读不懂也读作未设（行不被拒）：编造一个期限比没有期限更难解释。
 // EndpointAttached 顶层的键则不然：probed、auth、connection_kind 在而读不懂，整行读不成（E_WIRE_MISMATCH），
@@ -204,6 +205,7 @@ pub struct WatchdogFired { #[serde(flatten)] pub action: FiredAction,
 #[serde(tag = "action", rename_all = "snake_case")]
 pub enum FiredAction { Steer { text: String },
                        BackOff { until_ms: u64, code: String, subject: String },
+                       Switch { to: ServerLabel, code: String, subject: String },   // 换到名册里的另一个账号，不等（§8-86）
                        Freeze { reason: String } }
 pub struct GateChecked {}               // 无生产写方：结构是决定
 pub struct PolicyChanged { pub id: String }   // policy_created／policy_revoked，无写方：结构是决定

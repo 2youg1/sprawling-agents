@@ -88,6 +88,9 @@ const RECOVERIES: Readonly<Record<AxCode, readonly Recovery[]>> = {
   // branch would meet the same refusal, and the settings page is where
   // a provider is attached and a model picked.
   E_MODEL_UNCHOSEN: [SETTINGS],
+  // Every account of a provider failed; keys, credit and accounts are
+  // filed on the settings page.
+  E_PROVIDER_ACCOUNTS_EXHAUSTED: [SETTINGS],
   // Something is occupying the place this refusal is about, and the
   // only way past it is to stop what is running there.
   E_BUSY: [STOP],

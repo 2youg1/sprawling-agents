@@ -268,6 +268,8 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 | 8-81 | `crates/wire/spec/Answer/DocumentBytes.lean` |
 | 8-82 | `crates/wire/spec/Answer/Find.lean` |
 | 8-84 | `crates/wire/spec/Preference.lean` |
+| 8-85 | `crates/wire/spec/Answer/Endpoints.lean` |
+| 8-86 | `crates/wire/spec/Answer/Config.lean` |
 | 19 | `crates/wire/spec/Command/Kind.lean` |
 | 19-1 | `crates/wire/spec/Command/Kind.lean` |
 | 19-2 | `crates/wire/spec/Command/Kind.lean` |
@@ -358,6 +360,7 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 | D46 | 采样节拍是 `Monitoring` 的第四个变体，按城记住 | `crates/wire/spec/Frames/Monitor.lean` |
 | D47 | `Answer::Unavailable` 带上没看成的原因 | `crates/wire/spec/Server.lean` |
 | D48 | 每个 shell 解释器的读数是一个查询，与 skill、MCP 的使用同一遍折叠 | `crates/wire/spec/Reading.lean` |
+| D49 | 设置页靠读回的 tuning 整份重发一次挂接，Key 状态按账号 id 答 | `crates/wire/spec/Answer/Endpoints.lean` |
 -/
 
 /-! ## 13 依赖选型

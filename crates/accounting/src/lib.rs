@@ -40,6 +40,7 @@ pub mod plan_view;
 pub mod playback;
 pub mod toolkit_broker;
 pub mod trace;
+mod tuning;
 pub mod views;
 pub mod worker;
 

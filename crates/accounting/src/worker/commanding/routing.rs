@@ -10,10 +10,10 @@ use kernel::event::record::Admittance;
 use kernel::{AxCode, AxError};
 
 use crate::guide;
+use crate::tuning::tuning_of;
 
 use super::super::{
     Assignment, Chosen, Credential, Entered, Owing, RunWorker, Stated, Unasked, not_built,
-    tuning_of,
 };
 
 /// What a Cancel or a Steer is told when no run answers to the id it
@@ -211,6 +211,7 @@ impl RunWorker {
                 value,
                 crate::worker::credentials::signing::Arrival::Enrolment,
             ),
+            wire::Command::ForgetSecret(forgetting) => self.forget_secret(&forgetting.reference),
             wire::Command::CreateBuilding { addr, template, .. } => {
                 self.create_building(addr, template.as_str())
             }
@@ -248,9 +249,7 @@ impl RunWorker {
             }
             wire::Command::RestoreFile { ref at, point, .. } => self.take_back(at, point),
             wire::Command::PutGuide { progress, .. } => guide::put(&self.city_root, &progress),
-            wire::Command::ConfigureCity(settings) => {
-                self.configure_city(settings.keep_warm, settings.effort)
-            }
+            wire::Command::ConfigureCity(settings) => self.configure_city(settings),
             wire::Command::PutSpine {
                 building: ref at,
                 which,

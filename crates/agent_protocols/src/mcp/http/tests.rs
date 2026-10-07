@@ -110,6 +110,40 @@ fn a_server_wanting_an_account_refuses_with_the_credential_code() {
     let _ = server.join();
 }
 
+/// What a refused status tells the caller about its account and about
+/// asking again: a rejected key moves to the next account, a server that
+/// did not handle the request now may handle it later, and every other
+/// status keeps the fail-closed answer.
+#[test]
+fn a_refused_status_says_whether_to_switch_accounts_or_ask_again() {
+    use kernel::AccountDisposition::{Advance, Keep};
+    use kernel::Retry::{No, Yes};
+    let mut seen = Vec::new();
+    for status in [401, 403, 404, 408, 429, 500, 502, 503, 504] {
+        let (url, server) = fake_server(status, String::new());
+        let mut held = HttpServer::open(&url, &[], &vault()).unwrap();
+        let err = held
+            .call("{\"id\":1}", crate::EXTERNAL_CALL_PATIENCE)
+            .unwrap_err();
+        seen.push((status, err.retry(), err.account()));
+        let _ = server.join();
+    }
+    assert_eq!(
+        seen,
+        [
+            (401, No, Advance),
+            (403, No, Keep),
+            (404, No, Keep),
+            (408, Yes, Keep),
+            (429, Yes, Keep),
+            (500, No, Keep),
+            (502, Yes, Keep),
+            (503, Yes, Keep),
+            (504, Yes, Keep),
+        ]
+    );
+}
+
 /// A server that answers `rounds` requests, each with `body`, and
 /// hands out `session` on the first. Returns everything it was sent.
 fn sessioned_server(

@@ -36,7 +36,7 @@ pub use step::SpineDocument;
 pub use step::{
     Carry, CitySettings, DoorAnswer, DoorOpening, DoorStep, GovernedDocument, HaltScope,
     IdentityCard, PolicyChange, ProposalDecision, ProposalDecisions, RangeWrite, RulesWrite,
-    SessionNaming,
+    SecretForgetting, SessionNaming,
 };
 pub use tuning::{BodyOverride, EndpointTuning, HeaderPair};
 pub use wire::WireCommand;

@@ -19,10 +19,9 @@
 
 use std::path::Path;
 
-use kernel::config::SecondThreshold;
+use kernel::config::{SearchConfiguration, SecondThreshold};
 use kernel::{
     Address, AxCode, AxError, B3Hash, Effort, KeepWarm, McpServer, McpTransport, SandboxLimits,
-    SecretRef, ServerLabel,
 };
 
 use super::{ConfigLayer, Layer, path};
@@ -77,9 +76,10 @@ pub fn write_second_threshold(
 /// person who removed the last server did not mean to inherit one.
 ///
 /// # Errors
-/// Refuses with `E_CONFIG_INVALID` when one environment value or one
-/// header of one server carries a credential instead of a reference to
-/// the vault, before any byte is written. Propagates a file that exists
+/// Refuses with `E_CONFIG_INVALID`, before any byte is written, every
+/// row the reader would refuse for the same reason: an environment value
+/// or a header that carries a credential instead of a reference to the
+/// vault, and a url that is not a plain http or https address. Propagates a file that exists
 /// and cannot be read or parsed, and a directory that cannot be
 /// written.
 pub fn write_mcp(
@@ -88,77 +88,8 @@ pub fn write_mcp(
     layer: Layer,
     servers: &[McpServer],
 ) -> Result<(), AxError> {
-    for server in servers {
-        match &server.transport {
-            McpTransport::Stdio { env, .. } => vaulted(&server.label, Carried::Env, env)?,
-            McpTransport::Http { headers, .. } | McpTransport::Sse { headers, .. } => {
-                vaulted(&server.label, Carried::Header, headers)?;
-            }
-        }
-    }
+    super::mcp::validate(servers)?;
     change(city_root, addr, layer, Change::Mcp(servers))
-}
-
-/// Which table a value sits in, so a refusal names the line a person
-/// has to go and edit.
-#[derive(Clone, Copy)]
-enum Carried {
-    Env,
-    Header,
-}
-
-impl Carried {
-    fn noun(self) -> &'static str {
-        match self {
-            Carried::Env => "environment value",
-            Carried::Header => "header",
-        }
-    }
-}
-
-/// Refuses one pair at a time, so the refusal names which value is the
-/// problem rather than which server.
-///
-/// A `secret:realm/name` reference is what this file is for: the value
-/// on disk says where the secret is kept, and the assembly layer
-/// redeems it when a server is started. Anything else that reads as a
-/// credential — by the name in front of it or by the shape of the value
-/// itself — is refused here, at the one place that writes this file,
-/// because a building's `CONFIG.toml` is committed with the project and
-/// a key written into it is a key in every clone of that repository.
-/// The same judgment `EnvVarName::parse` already applies to a declared
-/// environment name, applied to the value beside it.
-fn vaulted(
-    label: &ServerLabel,
-    carried: Carried,
-    pairs: &[(String, String)],
-) -> Result<(), AxError> {
-    for (name, value) in pairs {
-        if SecretRef::parse(value).is_ok() {
-            continue;
-        }
-        let named = kernel::secret::names_a_credential(name);
-        let shaped = !kernel::secret::scan(value.as_bytes()).is_empty();
-        let violation = match (named, shaped) {
-            (true, _) => "the name reads as a credential",
-            (false, true) => "the value has the shape of a credential",
-            (false, false) => continue,
-        };
-        return Err(AxError::failure(
-            AxCode::ConfigInvalid,
-            "write the servers this scope reaches",
-            format!(
-                "{}: {} `{name}`: {violation}",
-                label.as_str(),
-                carried.noun()
-            ),
-        )
-        .with_recovery(
-            "keep the secret in the vault and write its `secret:realm/name` reference here; \
-             this file is committed with the project",
-        ));
-    }
-    Ok(())
 }
 
 /// What one edit states. Exhaustive, so the section a value is written
@@ -186,6 +117,9 @@ pub(super) enum Change<'a> {
     /// session that does not choose. Only the city's own layer is written
     /// this way: a room's `[model]` is a session's record (8-14).
     Effort(Effort),
+    /// Which supplier `web_search` reaches (§8-4c), already judged by the
+    /// reader's own check.
+    Search(&'a SearchConfiguration),
 }
 
 impl Change<'_> {
@@ -229,6 +163,12 @@ impl Change<'_> {
                 let spelled = toml::Value::try_from(*limits)
                     .map_err(|err| refuse_file(file, &err.to_string()))?;
                 document.insert("sandbox".to_owned(), spelled);
+            }
+            Change::Search(configuration) => {
+                document.insert(
+                    "search".to_owned(),
+                    super::search::spelled(configuration, file)?,
+                );
             }
             Change::Mcp(servers) => {
                 document.insert("mcp".to_owned(), toml::Value::Array(rows(servers)));

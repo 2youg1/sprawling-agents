@@ -48,6 +48,7 @@
   import EffortSection from "./shared/effort.svelte";
   import GovernedSection from "./setup/governed.svelte";
   import ProviderDoor from "./shared/provider.svelte";
+  import SearchCard from "./setup/search/search.svelte";
   import HarnessList from "./setup/harnesses.svelte";
   import { HEADING, HINT, PREFERRED, WIDTH } from "./setup/groups";
   import type { SetupGroup } from "../core/route";
@@ -222,6 +223,9 @@ costs the cards their width (client/Spec.lean §4-30, §4-36). -->
             4-36). -->
         <div class="min-w-0 max-w-talk">
           <ProviderDoor />
+        </div>
+        <div class="min-w-0 max-w-talk">
+          <SearchCard />
         </div>
         <div class="flex flex-col gap-base">
           <h3 class="text-label font-label text-text-quiet">{say($lang, "setup_models")}</h3>

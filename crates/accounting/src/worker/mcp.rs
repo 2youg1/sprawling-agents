@@ -53,6 +53,43 @@ impl crate::Connectors for Residents {
     ) -> Result<(Vec<agent_protocols::McpTool>, Reached), AxError> {
         self.tools(server, write_root, confidential, resolve)
     }
+
+    fn invalidate(&self, reference: &kernel::SecretRef) {
+        // A poisoned lock is cleared rather than skipped: what it guards
+        // is a connection that may hold the replaced value, and dropping
+        // it is the one outcome that is right whatever the panic left.
+        let keys = self
+            .keys
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        for keyed in keys.iter().filter(|keyed| keyed.carries(reference)) {
+            *keyed
+                .connected
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner) = None;
+        }
+    }
+}
+
+impl Keyed {
+    fn carries(&self, reference: &kernel::SecretRef) -> bool {
+        names(&self.server, reference)
+    }
+}
+
+/// Whether one of the pairs `server` is started or reached with names
+/// `reference`, read by the grammar redemption reads it with. The one
+/// answer for a connection to drop and for a key to stay in the vault.
+pub(in crate::worker) fn names(server: &kernel::McpServer, reference: &kernel::SecretRef) -> bool {
+    let pairs = match &server.transport {
+        kernel::McpTransport::Stdio { env, .. } => env,
+        kernel::McpTransport::Http { headers, .. } | kernel::McpTransport::Sse { headers, .. } => {
+            headers
+        }
+    };
+    pairs.iter().any(|(_, value)| {
+        kernel::SecretRef::parse(value.trim()).is_ok_and(|named| named == *reference)
+    })
 }
 
 impl Residents {

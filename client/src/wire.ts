@@ -9,13 +9,69 @@
 import { Schema } from "effect";
 
 /** The wire version both ends compare on connect. */
-export const WIRE_V = 59 as const;
+export const WIRE_V = 61 as const;
 /** The schema hash the server checks: `wire::schema_hash()`. */
-export const WIRE_HASH = "16ae067ba128afe3e02a2ce2681a0e6e551ab4efcfb1bc5f6ebbeff24aee4c8e" as const;
+export const WIRE_HASH = "10526bff82e01bc6e440ed9f21ac581dd4e7d77f294275c00d61d66dd74335e3" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 /** The body sizes a person may ask for: `wire::BODY_PX_MIN` and `BODY_PX_MAX`. */
 export const BODY_PX = { min: 12, max: 20 } as const;
+
+/**
+ * Whether the account a request went out on can still take it
+ * (`crates/kernel/spec/Error.lean` D53).
+ * 
+ * A second answer beside `Retry` rather than a reading of it:
+ * a rejected key and a request the provider calls malformed are both
+ * `Retry::No`, and only the first is mended by another account. On the
+ * wire `"keep"` or `"advance"`; `Keep` is left out, so a record written
+ * before this field existed reads as `Keep` and keeps its bytes.
+ */
+export const AccountDisposition = Schema.Union([
+  Schema.Literal("keep"),
+  Schema.Literal("advance"),
+]).annotate({ identifier: "AccountDisposition" });
+export type AccountDisposition = typeof AccountDisposition.Type;
+
+/**
+ * How many more times one account is asked the same request before the
+ * round moves on. A person picks one or two on the provider's advanced
+ * form; it is read only where the roster has two accounts or more. On
+ * the wire and in the ledger `"one"` or `"two"`; the default lives in
+ * gateway's `EndpointTuning::DEFAULTS` alone.
+ */
+export const AccountRetries = Schema.Literals(["one", "two"]).annotate({ identifier: "AccountRetries" });
+export type AccountRetries = typeof AccountRetries.Type;
+
+/**
+ * Where one account's key stands, decided by the city so a page draws a
+ * word rather than reading two flags.
+ */
+export const KeyState = Schema.Union([
+  Schema.Literal("anonymous"),
+  Schema.Literal("stored"),
+  Schema.Literal("missing"),
+  Schema.Literal("environment"),
+  Schema.Literal("environment_unusable"),
+  Schema.Literal("unread"),
+]).annotate({ identifier: "KeyState" });
+export type KeyState = typeof KeyState.Type;
+
+/**
+ * How one external tool server is named inside this city: ascii lowercase letters and digits, at least one, as `kernel::ServerLabel::parse` accepts it.
+ */
+export const ServerLabel = Schema.String.check(Schema.isPattern(new RegExp("^[a-z0-9]+$", "u"))).pipe(Schema.brand("ServerLabel"));
+export type ServerLabel = typeof ServerLabel.Type;
+
+/**
+ * Whether one account's key is there, by the account's id. Says nothing
+ * of the key's value.
+ */
+export const AccountStatus = Schema.Struct({
+  id: ServerLabel,
+  key: KeyState,
+}).annotate({ identifier: "AccountStatus" });
+export type AccountStatus = typeof AccountStatus.Type;
 
 /**
  * A canonical relative path inside the city: `/`-separated segments, none empty, none `.` or `..`, no backslash, no `:`, no control character, and no segment ending in a dot or whitespace, as `kernel::Address::parse` accepts it.
@@ -275,12 +331,6 @@ export const McpTransport = Schema.Union([
   }),
 ]).annotate({ identifier: "McpTransport" });
 export type McpTransport = typeof McpTransport.Type;
-
-/**
- * How one external tool server is named inside this city: ascii lowercase letters and digits, at least one, as `kernel::ServerLabel::parse` accepts it.
- */
-export const ServerLabel = Schema.String.check(Schema.isPattern(new RegExp("^[a-z0-9]+$", "u"))).pipe(Schema.brand("ServerLabel"));
-export type ServerLabel = typeof ServerLabel.Type;
 
 /**
  * One external tool server this run may reach, as its configuration
@@ -883,6 +933,74 @@ export const SettledEffort = Schema.Struct({
 export type SettledEffort = typeof SettledEffort.Type;
 
 /**
+ * One ordered account declaration; plaintext credentials stay in the vault.
+ */
+export const ProviderAccount = Schema.Struct({
+  header: Schema.optional(Schema.NullOr(Schema.String)),
+  id: ServerLabel,
+  reference: Schema.optional(Schema.NullOr(Schema.String)),
+}).annotate({ identifier: "ProviderAccount" });
+export type ProviderAccount = typeof ProviderAccount.Type;
+
+/**
+ * One search service reached over MCP streamable HTTP.
+ */
+export const SearchSupplier = Schema.Struct({
+  accounts: Schema.Array(ProviderAccount),
+  count_field: Schema.optional(Schema.NullOr(Schema.String)),
+  id: ServerLabel,
+  objective_field: Schema.optional(Schema.NullOr(Schema.String)),
+  query_field: Schema.String,
+  remote: Schema.String,
+  url: Schema.String,
+}).annotate({ identifier: "SearchSupplier" });
+export type SearchSupplier = typeof SearchSupplier.Type;
+
+/**
+ * What a layer says about web search. Three arms and no `enabled`
+ * switch, so each of the three intents has one spelling: the default
+ * supplier, this supplier, none. `Default` is a stated value, not an
+ * absence: a layer that states it covers a farther layer's `Custom`.
+ */
+export const SearchConfiguration = Schema.Union([
+  Schema.Literal("default"),
+  Schema.Struct({
+    custom: Schema.Struct({
+      selected: ServerLabel,
+      suppliers: Schema.Array(SearchSupplier),
+    }),
+  }),
+  Schema.Literal("off"),
+]).annotate({ identifier: "SearchConfiguration" });
+export type SearchConfiguration = typeof SearchConfiguration.Type;
+
+/**
+ * The key of each account of one listed search supplier.
+ */
+export const SupplierAccounts = Schema.Struct({
+  accounts: Schema.Array(AccountStatus),
+  supplier: ServerLabel,
+}).annotate({ identifier: "SupplierAccounts" });
+export type SupplierAccounts = typeof SupplierAccounts.Type;
+
+/**
+ * `[search]` at one address, beside the city's own statement of it.
+ * 
+ * The value in force and the value the page edits are answered apart:
+ * the page edits the city's file only, and a building that states its
+ * own `[search]` would otherwise hand the page the building's value to
+ * edit as the city's.
+ */
+export const SettledSearch = Schema.Struct({
+  account_status: Schema.Array(SupplierAccounts),
+  city: Schema.optional(Schema.NullOr(SearchConfiguration)),
+  configuration: SearchConfiguration,
+  default_url: Schema.String,
+  from: ConfigLayer,
+}).annotate({ identifier: "SettledSearch" });
+export type SettledSearch = typeof SettledSearch.Type;
+
+/**
  * The whole percents a file may state for the second rung, both ends
  * included: the two figures `kernel::config::SecondThreshold`'s one
  * construction point reads, answered so a page that states the span
@@ -935,6 +1053,7 @@ export type Proxying = typeof Proxying.Type;
  * draws what this carries, and the numbers have one home.
  */
 export const TuningDefaults = Schema.Struct({
+  account_retries: AccountRetries,
   from: ConfigLayer,
   proxying: Proxying,
   request_max_retries: Schema.optional(Schema.NullOr(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)))),
@@ -956,6 +1075,7 @@ export const ConfigAnswer = Schema.Struct({
   addr: Address,
   effort: Schema.optional(Schema.NullOr(SettledEffort)),
   first: Schema.optional(Schema.NullOr(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)))),
+  search: SettledSearch,
   second: SettledSecond,
   tuning: TuningDefaults,
 }).annotate({ identifier: "ConfigAnswer" });
@@ -1615,6 +1735,56 @@ export const DialectKind = Schema.Union([
 export type DialectKind = typeof DialectKind.Type;
 
 /**
+ * One field written into every request body this endpoint receives.
+ * 
+ * `pointer` is a JSON pointer (`/temperature`, `/reasoning/effort`),
+ * and missing object segments along it are created. `value` is the
+ * text a person typed, never a parsed number: a float in a frame is a
+ * float in the record that frame produces, and this city keeps floats
+ * out of its ledger.
+ */
+export const BodyOverride = Schema.Struct({
+  pointer: Schema.String,
+  value: Schema.String,
+}).annotate({ identifier: "BodyOverride" });
+export type BodyOverride = typeof BodyOverride.Type;
+
+/**
+ * One header every request to this endpoint carries.
+ * 
+ * The value may be a `secret:realm/name` reference, which the vault
+ * redeems at the moment the header is written; anything else is sent
+ * as it stands. Plaintext credentials never reach this type — the
+ * enrolment door is the only way a secret enters the city.
+ */
+export const HeaderPair = Schema.Struct({
+  name: Schema.String,
+  value: Schema.String,
+}).annotate({ identifier: "HeaderPair" });
+export type HeaderPair = typeof HeaderPair.Type;
+
+/**
+ * Everything a person settles about one endpoint beyond its address.
+ * 
+ * `Default` is "nothing was settled", which is what a form that never
+ * opened its advanced section means, and what every caller that has no
+ * opinion sends.
+ */
+export const EndpointTuning = Schema.Struct({
+  account_retries: Schema.optional(Schema.NullOr(AccountRetries)),
+  accounts: Schema.optional(Schema.NullOr(Schema.Array(ProviderAccount))),
+  headers: Schema.Array(HeaderPair),
+  label: Schema.optional(Schema.NullOr(Schema.String)),
+  max_in_flight: Schema.optional(Schema.NullOr(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)))),
+  overrides: Schema.Array(BodyOverride),
+  proxying: Schema.optional(Schema.NullOr(Proxying)),
+  request_max_retries: Schema.optional(Schema.NullOr(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)))),
+  stream_idle_timeout_ms: Schema.optional(Schema.NullOr(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)))),
+  timeout_ms: Schema.optional(Schema.NullOr(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)))),
+}).annotate({ identifier: "EndpointTuning" });
+export type EndpointTuning = typeof EndpointTuning.Type;
+
+/**
  * The most tokens one model reads in a single call, prompt and reply
  * together.
  * 
@@ -1666,6 +1836,7 @@ export type ModelFactsSummary = typeof ModelFactsSummary.Type;
  * needs, which is whether one was enrolled at all.
  */
 export const EndpointSummary = Schema.Struct({
+  account_status: Schema.Array(AccountStatus),
   base_url: Schema.String,
   connection_kind: Schema.String,
   dialect: DialectKind,
@@ -1674,6 +1845,7 @@ export const EndpointSummary = Schema.Struct({
   local: Schema.Boolean,
   models: Schema.Array(ModelFactsSummary),
   name: Schema.String,
+  tuning: EndpointTuning,
 }).annotate({ identifier: "EndpointSummary" });
 export type EndpointSummary = typeof EndpointSummary.Type;
 
@@ -2388,7 +2560,7 @@ export type ListingAnswer = typeof ListingAnswer.Type;
 /**
  * One of the closed set of error codes, as `AxCode::as_str` spells it.
  */
-export const AxCode = Schema.Literals(["E_PATH_NOT_FOUND", "E_TOOL_UNKNOWN", "E_TOOL_UNAVAILABLE", "E_INVALID_ARGS", "E_OUTSIDE_WRITE_DOMAIN", "E_VERSION_CONFLICT", "E_GATE_DENIED", "E_BUDGET_EXHAUSTED", "E_TIMEOUT", "E_PROVIDER", "E_EVIDENCE_MISSING", "E_LOOP_SUSPECTED", "E_LOCATOR_INVALID", "E_SANDBOX_DENIED", "E_BUSY", "E_DRAFT_STALE", "E_GOAL_CONFLICT", "E_TAINTED_ACTION", "E_REPAIR_BUSY", "E_DELEGATION_DEPTH", "E_APPROVAL_PENDING", "E_APPROVAL_DENIED", "E_CROSS_BUILDING_DENIED", "E_DIGEST_SUSPECT", "E_CREDENTIAL_MISSING", "E_MODEL_UNCHOSEN", "E_CONFIG_INVALID", "E_CAS_CORRUPT", "E_STORAGE_FATAL", "E_WORKTREE_BUSY", "E_BROWSER_UNAVAILABLE", "E_ENDPOINT_DIALECT_UNSUPPORTED", "E_WIRE_MISMATCH", "E_LOG_VERSION_UNSUPPORTED", "E_LEDGER_HELD", "E_HISTORY_UNPROVEN", "E_SECRET_EGRESS", "E_DISCARD_IRREVERSIBLE", "E_BACKPRESSURE_SHED", "E_TOOL_OUTCOME_UNKNOWN", "E_PLAN_MISSING"]).annotate({ identifier: "AxCode" });
+export const AxCode = Schema.Literals(["E_PATH_NOT_FOUND", "E_TOOL_UNKNOWN", "E_TOOL_UNAVAILABLE", "E_INVALID_ARGS", "E_OUTSIDE_WRITE_DOMAIN", "E_VERSION_CONFLICT", "E_GATE_DENIED", "E_BUDGET_EXHAUSTED", "E_TIMEOUT", "E_PROVIDER", "E_EVIDENCE_MISSING", "E_LOOP_SUSPECTED", "E_LOCATOR_INVALID", "E_SANDBOX_DENIED", "E_BUSY", "E_DRAFT_STALE", "E_GOAL_CONFLICT", "E_TAINTED_ACTION", "E_REPAIR_BUSY", "E_DELEGATION_DEPTH", "E_APPROVAL_PENDING", "E_APPROVAL_DENIED", "E_CROSS_BUILDING_DENIED", "E_DIGEST_SUSPECT", "E_CREDENTIAL_MISSING", "E_MODEL_UNCHOSEN", "E_CONFIG_INVALID", "E_CAS_CORRUPT", "E_STORAGE_FATAL", "E_WORKTREE_BUSY", "E_BROWSER_UNAVAILABLE", "E_ENDPOINT_DIALECT_UNSUPPORTED", "E_WIRE_MISMATCH", "E_LOG_VERSION_UNSUPPORTED", "E_LEDGER_HELD", "E_HISTORY_UNPROVEN", "E_SECRET_EGRESS", "E_DISCARD_IRREVERSIBLE", "E_BACKPRESSURE_SHED", "E_TOOL_OUTCOME_UNKNOWN", "E_PLAN_MISSING", "E_PROVIDER_ACCOUNTS_EXHAUSTED"]).annotate({ identifier: "AxCode" });
 export type AxCode = typeof AxCode.Type;
 
 /**
@@ -2419,6 +2591,10 @@ export const ProviderFailureKind = Schema.Union([
   }),
   Schema.Struct({
     kind: Schema.Literal("refused"),
+    status: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  }),
+  Schema.Struct({
+    kind: Schema.Literal("quota"),
     status: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   }),
   Schema.Struct({
@@ -2461,6 +2637,7 @@ export type Retry = typeof Retry.Type;
  * wire shape flat and the field order unchanged.
  */
 export const AxError = Schema.Struct({
+  account: Schema.optional(AccountDisposition),
   action: Schema.String,
   code: AxCode,
   gate: Schema.optional(Schema.NullOr(GateRefusal)),
@@ -4355,21 +4532,6 @@ export const BeatMs = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)).pipe(Sc
 export type BeatMs = typeof BeatMs.Type;
 
 /**
- * One field written into every request body this endpoint receives.
- * 
- * `pointer` is a JSON pointer (`/temperature`, `/reasoning/effort`),
- * and missing object segments along it are created. `value` is the
- * text a person typed, never a parsed number: a float in a frame is a
- * float in the record that frame produces, and this city keeps floats
- * out of its ledger.
- */
-export const BodyOverride = Schema.Struct({
-  pointer: Schema.String,
-  value: Schema.String,
-}).annotate({ identifier: "BodyOverride" });
-export type BodyOverride = typeof BodyOverride.Type;
-
-/**
  * The deduplication key of one outward action: `idem1-` then 32 lowercase hex digits.
  */
 export const IdemKey = Schema.String.check(Schema.isPattern(new RegExp("^idem1-[0-9a-f]{32}$", "u"))).pipe(Schema.brand("IdemKey"));
@@ -4392,6 +4554,7 @@ export const CitySettings = Schema.Struct({
   effort: Schema.optional(Schema.NullOr(Effort)),
   idem: IdemKey,
   keep_warm: Schema.optional(Schema.NullOr(KeepWarm)),
+  search: Schema.optional(Schema.NullOr(SearchConfiguration)),
 }).annotate({ identifier: "CitySettings" });
 export type CitySettings = typeof CitySettings.Type;
 
@@ -4425,50 +4588,6 @@ export const DoorStep = Schema.Struct({
   idem: IdemKey,
 }).annotate({ identifier: "DoorStep" });
 export type DoorStep = typeof DoorStep.Type;
-
-/**
- * One header every request to this endpoint carries.
- * 
- * The value may be a `secret:realm/name` reference, which the vault
- * redeems at the moment the header is written; anything else is sent
- * as it stands. Plaintext credentials never reach this type — the
- * enrolment door is the only way a secret enters the city.
- */
-export const HeaderPair = Schema.Struct({
-  name: Schema.String,
-  value: Schema.String,
-}).annotate({ identifier: "HeaderPair" });
-export type HeaderPair = typeof HeaderPair.Type;
-
-/**
- * One ordered account declaration; plaintext credentials stay in the vault.
- */
-export const ProviderAccount = Schema.Struct({
-  header: Schema.optional(Schema.NullOr(Schema.String)),
-  id: ServerLabel,
-  reference: Schema.optional(Schema.NullOr(Schema.String)),
-}).annotate({ identifier: "ProviderAccount" });
-export type ProviderAccount = typeof ProviderAccount.Type;
-
-/**
- * Everything a person settles about one endpoint beyond its address.
- * 
- * `Default` is "nothing was settled", which is what a form that never
- * opened its advanced section means, and what every caller that has no
- * opinion sends.
- */
-export const EndpointTuning = Schema.Struct({
-  accounts: Schema.optional(Schema.NullOr(Schema.Array(ProviderAccount))),
-  headers: Schema.Array(HeaderPair),
-  label: Schema.optional(Schema.NullOr(Schema.String)),
-  max_in_flight: Schema.optional(Schema.NullOr(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)))),
-  overrides: Schema.Array(BodyOverride),
-  proxying: Schema.optional(Schema.NullOr(Proxying)),
-  request_max_retries: Schema.optional(Schema.NullOr(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)))),
-  stream_idle_timeout_ms: Schema.optional(Schema.NullOr(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)))),
-  timeout_ms: Schema.optional(Schema.NullOr(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)))),
-}).annotate({ identifier: "EndpointTuning" });
-export type EndpointTuning = typeof EndpointTuning.Type;
 
 /**
  * One identity card's values (`crates/wire/spec/Answer/Identity.lean` §8-59).
@@ -4669,6 +4788,18 @@ export const RulesWrite = Schema.Struct({
   idem: IdemKey,
 }).annotate({ identifier: "RulesWrite" });
 export type RulesWrite = typeof RulesWrite.Type;
+
+/**
+ * What `ForgetSecret` carries: the vault reference whose key is deleted, spelled
+ * `secret:realm/name`. Refused while an attached endpoint or a configuration still names the
+ * reference, and for a key the environment supplies (gateway D33); writes nothing to the ledger
+ * (`crates/accounting/spec/Worker.lean` §8-37).
+ */
+export const SecretForgetting = Schema.Struct({
+  idem: IdemKey,
+  reference: Schema.String,
+}).annotate({ identifier: "SecretForgetting" });
+export type SecretForgetting = typeof SecretForgetting.Type;
 
 /**
  * A display name for the session of `room` that began at `began`; an
@@ -4990,6 +5121,9 @@ export const Command = Schema.Union([
   }),
   Schema.Struct({
     close_remote_door: DoorStep,
+  }),
+  Schema.Struct({
+    forget_secret: SecretForgetting,
   }),
   Schema.Struct({
     auth: Schema.Struct({

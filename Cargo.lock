@@ -2912,6 +2912,7 @@ dependencies = [
  "sprawling-kernel",
  "tempfile",
  "toml",
+ "url",
 ]
 
 [[package]]

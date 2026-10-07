@@ -3,7 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What kind of provider failure an `E_PROVIDER` error reports.
+//! What kind of provider failure an `E_PROVIDER` error reports, and
+//! whether the account that met a failure can still take the request.
 //! The part `crates/kernel/spec/Error.lean` specifies this module with the
 //! rest of `kernel::error`.
 
@@ -28,6 +29,10 @@ pub enum ProviderFailureKind {
     /// as `u32` because the wire's schema subset has no upper bound to
     /// spell a `u16` with.
     Refused { status: u32 },
+    /// The provider refused the request because this account's quota is
+    /// used up (gateway D32). Asked again it answers the same; another
+    /// account, or credit added to this one, is the way out.
+    Quota { status: u32 },
     /// The provider refused the request because it no longer fits the
     /// model's context window.
     Overflow { status: u32 },
@@ -38,4 +43,33 @@ pub enum ProviderFailureKind {
     Reported,
     /// The request could not be built on this side.
     Unbuilt,
+}
+
+/// Whether the account a request went out on can still take it
+/// (`crates/kernel/spec/Error.lean` D53).
+///
+/// A second answer beside `Retry` rather than a reading of it:
+/// a rejected key and a request the provider calls malformed are both
+/// `Retry::No`, and only the first is mended by another account. On the
+/// wire `"keep"` or `"advance"`; `Keep` is left out, so a record written
+/// before this field existed reads as `Keep` and keeps its bytes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub enum AccountDisposition {
+    /// This failure says nothing about the account: whether the request
+    /// goes out again is `retry`'s answer alone.
+    #[default]
+    Keep,
+    /// This account cannot take the request - its key was rejected, its
+    /// quota is used up, or its credential is missing - and the next
+    /// account may.
+    Advance,
+}
+
+impl AccountDisposition {
+    /// The serde skip test: `Keep` is the absence of the field.
+    pub(crate) fn is_keep(&self) -> bool {
+        *self == AccountDisposition::Keep
+    }
 }
