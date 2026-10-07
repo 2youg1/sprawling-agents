@@ -10,10 +10,11 @@
   // `parts/table`'s own behaviour and not a second sort written here
   // (client/Spec.lean §4-24).
 
-  import { MAYOR, toFragment } from "../../core/route";
+  import { toFragment } from "../../core/route";
   import { clock } from "../../core/time";
   import { say } from "../../core/lang";
   import { ui } from "../../ui";
+  import AskMayor from "../city/ask_mayor.svelte";
   import type { RegistryLine } from "../../wire";
   import EmptyState from "../parts/empty.svelte";
   import { Table } from "../parts/table";
@@ -53,7 +54,7 @@
   when the column is narrower than the address, never broken. -->
   <a
     href={toFragment({ kind: "building", address: line.addr })}
-    class="block truncate font-mono text-note text-text-quiet underline decoration-edge underline-offset-2 hover:decoration-accent"
+    class="block truncate font-mono text-note text-text-quiet underline decoration-edge underline-offset-2 transition-colors ease-leave hover:decoration-accent hover:ease-arrive"
   >
     {line.addr}
   </a>
@@ -109,12 +110,7 @@
     conversation with the Mayor. -->
     <EmptyState missing="registry_empty" seat="inset">
       {#snippet action()}
-        <a
-          href={toFragment({ kind: "talk", address: MAYOR })}
-          class="inline-flex h-control items-center rounded-control bg-accent px-base text-label text-on-accent hover:bg-accent-hover"
-        >
-          {say($lang, "city_ask_mayor")}
-        </a>
+        <AskMayor />
       {/snippet}
     </EmptyState>
   {/snippet}

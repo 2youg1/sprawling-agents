@@ -15,11 +15,6 @@
   // **Only the rows on screen are drawn.** A city of a thousand runs is
   // a thousand rows; the list keeps the viewport's rows and a margin,
   // and pads the rest, so the cost of the board is its height.
-  //
-  // **The bar draws what the belief knows.** A run's life runs from its
-  // start to its end (or now), and its phase is known only as it stands,
-  // so the life is one quiet stretch and the phase is the cap at its
-  // right-hand end.
 
   import type { BoardRun } from "./lineage";
 
@@ -31,19 +26,21 @@
 </script>
 
 <script lang="ts">
+  // The seat (client D95): it owns the tree's state - which rows are
+  // folded, where the cursor stands, which rows are drawn - and the keys
+  // that change it, asks `lookOf` (`./board`) for the whole value, and
+  // draws whatever `./board.look.svelte` is.
   import { Option } from "effect";
+  import { SvelteSet } from "svelte/reactivity";
+  import { createAttachmentKey } from "svelte/attachments";
 
   import { lineWalker } from "../../core/lines";
   import { pressedOf } from "../../core/press";
-  import { fill, say } from "../../core/lang";
-  import { SvelteSet } from "svelte/reactivity";
-
   import { ui } from "../../ui";
-  import Glyph from "../parts/glyph.svelte";
-  import { FOLDS, along } from "./fold";
+  import { lookOf } from "./board";
+  import Look from "./board.look.svelte";
   import type { Row } from "./lineage";
   import { phaseOf, rowsOf, viewOf, windowOf } from "./lineage";
-  import { PHASES, PHASE_FILL as FILL, PHASE_MARK as MARK, PHASE_WORD as WORD, phaseSaid } from "./phase";
 
   const { runs, now, level = 1 }: RunsBoardProps = $props();
   const u = ui();
@@ -53,13 +50,11 @@
   // drawn rows rather than padding.
   const MARGIN = 12;
 
-  const INK = { quiet: "text-text-quiet", live: "text-accent", alert: "text-alert" } as const;
-
   const folded = new SvelteSet<string>();
   let scrolled = $state(0);
   let viewport = $state(0);
   let rowPx = $state(0);
-  let list = $state<HTMLUListElement | undefined>();
+  let list = $state<HTMLElement | undefined>();
 
   const rows = $derived(rowsOf(runs, folded));
   const waiting = $derived(runs.filter((run) => phaseOf(run.doing) === "person"));
@@ -75,10 +70,6 @@
     if (rowPx === 0) rowPx = list.querySelector("li")?.getBoundingClientRect().height ?? 0;
     viewport = list.clientHeight;
   });
-
-  function levelOf(row: Row): number {
-    return row.kind === "building" ? 1 : row.kind === "room" ? 2 : 3;
-  }
 
   function moveTo(at: number): void {
     const row = rows[Math.min(Math.max(at, 0), rows.length - 1)];
@@ -146,6 +137,7 @@
 
   // A row opens the page of what it names (S07 E36).
   function open(row: Row): void {
+    cursorKey = row.key;
     Option.map(viewOf(row), u.go);
   }
 
@@ -156,110 +148,25 @@
     list?.focus();
   }
 
-  // A run is titled by what the person asked of it, else by what
-  // finishing looks like; one dispatched with neither written down is
-  // named by where it works instead, so two such runs in one list are
-  // still two different lines.
-  function titleOf(run: BoardRun): string {
-    const words = [run.task, run.goal].find((said) => said !== null && said.trim() !== "");
-    if (words !== undefined && words !== null) return words;
-    return run.addr === null ? say($lang, "runs_untitled") : fill(say($lang, "runs_untitled_in"), { addr: run.addr });
-  }
+  const hands = {
+    tree: {
+      onkeydown: pressed,
+      onscroll: (event: Event & { readonly currentTarget: EventTarget & HTMLElement }) => {
+        scrolled = event.currentTarget.scrollTop;
+        viewport = event.currentTarget.clientHeight;
+      },
+      [createAttachmentKey()]: (node: HTMLElement) => {
+        list = node;
+        return () => {
+          if (list === node) list = undefined;
+        };
+      },
+    },
+    open,
+    pick,
+  };
 
-  function bar(run: BoardRun): { readonly left: string; readonly width: string } {
-    const from = along(run.started ?? now, now);
-    const to = along(run.ended ?? now, now);
-    return { left: `${from.toFixed(3)}%`, width: `${Math.max(to - from, 0).toFixed(3)}%` };
-  }
+  const look = $derived(lookOf({ runs, now, lang: $lang, level, rows, folded, cursor, shown, rowPx }, hands));
 </script>
 
-<div class="flex min-w-0 flex-col gap-base">
-  <header class="flex flex-wrap items-baseline gap-x-base gap-y-snug">
-    <svelte:element this={level === 1 ? "h1" : "h2"} class="text-title font-title" tabindex="-1">{say($lang, "runs_title")}</svelte:element>
-    <p class="figure text-note text-text-quiet">{fill(say($lang, "runs_counts"), { asking: String(waiting.length), runs: String(runs.length) })}</p>
-  </header>
-
-  {#if waiting.length > 0}
-    <!-- The word stands above the runs rather than in their row, so a
-    row that wraps starts every line at the same edge with a run. -->
-    <nav class="flex flex-col gap-tight text-note" aria-label={say($lang, "runs_asking")}>
-      <span class="text-alert">{say($lang, "runs_asking")}</span>
-      <div class="flex flex-wrap items-center gap-snug">
-        {#each waiting as run (run.run)}
-          <button type="button" class="inline-flex items-center gap-tight rounded-pill border border-edge-input px-snug font-mono text-text" onclick={() => { pick(run); }}>
-            <Glyph name="hand" size="sm" class="text-alert" />{run.run.slice(0, 8)}
-          </button>
-        {/each}
-      </div>
-    </nav>
-  {/if}
-
-  <ul class="flex flex-wrap gap-x-wide gap-y-tight text-note text-text-quiet" aria-label={say($lang, "runs_legend")}>
-    {#each PHASES as phase (phase)}
-      <li class="flex items-center gap-snug"><span class={["inline-block h-snug w-base rounded-pill", FILL[phase]]} aria-hidden="true"></span>{say($lang, WORD[phase])}</li>
-    {/each}
-  </ul>
-
-  <div class="flex min-w-0 items-end gap-snug border-b border-edge pb-tight font-mono figure text-note text-text-quiet" aria-hidden="true">
-    <span class="min-w-0 flex-1"></span>
-    <span class="relative h-base w-[40%] shrink-0">
-      {#each FOLDS.filter((fold) => fold.minutes > 0) as fold (fold.minutes)}
-        <span class={["absolute top-0 border-l border-edge-input pl-tight", fold.at === 0 ? "" : "hidden @lg/page:inline"]} style:left="{String(fold.at)}%">{fill(say($lang, "runs_minus"), { n: String(fold.minutes) })}</span>
-      {/each}
-      <span class="absolute top-0 right-0 font-sans text-text">{say($lang, "runs_now")}</span>
-    </span>
-  </div>
-
-  <ul
-    bind:this={list}
-    class="max-h-[70dvh] min-w-0 overflow-y-auto border-b border-edge"
-    style:padding-top="{String(shown.from * rowPx)}px"
-    style:padding-bottom="{String((rows.length - shown.to) * rowPx)}px"
-    role="tree"
-    tabindex="0"
-    aria-label={say($lang, "runs_tree")}
-    aria-activedescendant={rows[cursor] === undefined ? undefined : `runs-row-${rows[cursor].key}`}
-    onscroll={(event) => { scrolled = event.currentTarget.scrollTop; viewport = event.currentTarget.clientHeight; }}
-    onkeydown={pressed}
-  >
-    {#each rows.slice(shown.from, shown.to) as row, at (row.key)}
-      {@const current = shown.from + at === cursor}
-      <!-- svelte-ignore a11y_click_events_have_key_events (the tree owns the keys: Enter opens the row the keyboard holds, through `pressed`) -->
-      <li
-        id="runs-row-{row.key}"
-        role="treeitem"
-        aria-level={levelOf(row)}
-        aria-expanded={row.kind === "run" ? undefined : !folded.has(row.key)}
-        aria-selected={current}
-        class={["flex h-step min-w-0 cursor-pointer items-center gap-snug pr-snug text-note hover:wash", current ? "bg-raised shadow-[inset_2px_0_0_var(--color-accent)]" : ""]}
-        onclick={() => {
-          cursorKey = row.key;
-          open(row);
-        }}
-      >
-        <span class="shrink-0 pl-snug font-mono whitespace-pre text-text-quiet" aria-hidden="true">{row.guide}</span>
-        {#if row.kind === "building"}
-          <span class="min-w-0 flex-1 truncate font-mono font-label text-text">{row.name}</span>
-          <span class={["inline-flex shrink-0 items-center gap-tight font-mono figure", row.asking === 0 ? "text-text-quiet" : "text-alert"]}><Glyph name="hand" size="sm" />{String(row.asking)}</span>
-          <span class="shrink-0 font-mono figure text-text-quiet">{String(row.runs)}</span>
-        {:else if row.kind === "room"}
-          <span class="min-w-0 flex-1 truncate font-mono text-text-quiet">{row.name}</span>
-        {:else if row.kind === "run"}
-          {@const phase = phaseOf(row.run.doing)}
-          {@const look = MARK[phase]}
-          {@const span = bar(row.run)}
-          <Glyph name={look.glyph} size="sm" class={["shrink-0", INK[look.weight]]} />
-          <span class="hidden shrink-0 font-mono text-text-quiet @lg/page:inline">{row.run.run.slice(0, 8)}</span>
-          <span class="min-w-0 flex-1 truncate text-text">{titleOf(row.run)}</span>
-          <span class={["hidden max-w-[30%] shrink-0 truncate text-note @lg/page:inline", INK[look.weight]]}>{phaseSaid($lang, row.run.doing, now)}</span>
-          <span class="relative h-snug w-[40%] shrink-0" aria-hidden="true">
-            <span class="absolute inset-y-0 rounded-pill bg-edge" style:left={span.left} style:width={span.width}></span>
-            <span class={["absolute inset-y-0 w-snug rounded-pill", FILL[phase]]} style:left="clamp(0px, calc({span.left} + {span.width} - var(--spacing-snug)), calc(100% - var(--spacing-snug)))"></span>
-          </span>
-        {/if}
-      </li>
-    {/each}
-  </ul>
-
-  <p class="text-note text-text-quiet">{say($lang, "runs_keys")}</p>
-</div>
+<Look {...look} />

@@ -6,9 +6,9 @@
 import { describe, expect, test } from "bun:test";
 
 import { Address, Tokens, UsdMicros } from "../../wire";
-import type { BuildingProgress } from "../../wire";
+import type { BuildingProgress, CityAnswer } from "../../wire";
 import type { BoardRun } from "../runs/lineage";
-import { tableOf } from "./table";
+import { lookOf, tableOf } from "./table";
 
 const IDLE = { unplanned: { budget: { tokens: Tokens.make(0), usd: UsdMicros.make(0) }, steps: 0 } };
 
@@ -65,5 +65,22 @@ describe("building table", () => {
       },
       { addr: Address.make("hall"), guide: "└─", waiting: 0, working: 0, done: 0, latest: null, since: null, starts: [] },
     ]);
+  });
+
+  // A row is a toggle of the panel beside the table: pressed while its
+  // building is the one picked, and a press picks it.
+  test("a row's button picks its building and says whether it is the one picked", () => {
+    const city: CityAnswer = { active: 0, frozen: 0, halted: [], pursuits: [], runs: [], buildings: [building("hall"), building("docs")] };
+    const picks: string[] = [];
+    const look = lookOf(
+      { city, runs: [run("r1", "docs/zh", 1_000, { kind: "waiting" })], now: 1_000, picked: Address.make("docs"), lang: "en" },
+      (addr) => picks.push(addr),
+    );
+    expect(look.rows.map((row) => [row.name, row.wire["aria-pressed"]])).toEqual([
+      ["docs", true],
+      ["City Hall", false],
+    ]);
+    look.rows[1]?.wire.onclick();
+    expect(picks).toEqual(["hall"]);
   });
 });

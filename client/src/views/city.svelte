@@ -14,22 +14,21 @@
   // the drawing at a phone's width is a band too thin to read. In
   // results mode all of it gives way to the runs' outcomes alone.
   //
-  // The legend is folded behind one control under the drawing: a city
-  // drawn in glyphs that nothing names is a picture, and the legend is
-  // the set of labels that makes it readable. Its five marks are the
-  // drawing's own art rather than icons, so they stay hand-drawn here
-  // (4-12).
+  // The legend is folded behind one control under the drawing
+  // (`city/legend.ts`).
 
   import { QUERIES } from "../core/asking";
   import { readAnswer } from "../core/answered";
   import { say } from "../core/lang";
   import { RELEASE_ALL } from "../core/slash";
   import { halt, release } from "../core/commands";
-  import { MAYOR, toFragment } from "../core/route";
   import { cityIsShut, CITY } from "../core/scope";
   import type { Address } from "../wire";
   import { ui } from "../ui";
+  import AskMayor from "./city/ask_mayor.svelte";
   import Bar from "./city/bar.svelte";
+  import { legendOf } from "./city/legend";
+  import Legend from "./city/legend.look.svelte";
   import Panel from "./city/panel.svelte";
   import Results from "./city/results.svelte";
   import Skyline from "./city/skyline.svelte";
@@ -42,10 +41,6 @@
   import Board from "./runs/board.svelte";
   import { boardRuns } from "./runs/lineage";
   import Showing from "./shared/showing.svelte";
-
-  // The five marks the drawing carries, and the order a reader meets
-  // them in.
-  const MARKS = ["window", "figure", "flag", "lamp", "plinth"] as const;
 
   // The two ways the page draws the city's buildings, the first the one
   // it opens on.
@@ -136,33 +131,7 @@
             picked = addr;
           }}
         />
-        <details class="text-note text-text-faint">
-          <summary class="cursor-pointer text-text-quiet">{say($lang, "city_legend")}</summary>
-          <ul class="mt-snug flex flex-wrap items-center gap-wide">
-          {#each MARKS as mark (mark)}
-            <li class="flex items-center gap-tight">
-              <svg viewBox="0 0 16 16" class="size-glyph shrink-0" aria-hidden="true">
-                {#if mark === "window"}
-                  <rect x="5" y="3" width="6" height="8" rx="1" class="fill-accent-solid" />
-                {:else if mark === "figure"}
-                  <circle cx="8" cy="5" r="2.4" class="fill-drawn-figure" />
-                  <path d="M4.6 13 q3.4 -6 6.8 0 z" class="fill-drawn-figure" />
-                {:else if mark === "flag"}
-                  <line x1="5" y1="2" x2="5" y2="14" class="stroke-drawn-stem" stroke-width="1.2" />
-                  <path d="M5 3 l7 1.8 l-7 2.2 z" class="fill-accent" />
-                {:else if mark === "lamp"}
-                  <line x1="8" y1="6" x2="8" y2="14" class="stroke-drawn-part" stroke-width="1.2" />
-                  <circle cx="8" cy="4.4" r="2.6" class="fill-alert" />
-                {:else if mark === "plinth"}
-                  <rect x="1" y="6" width="14" height="4" rx="2" class="fill-drawn-line" />
-                  <rect x="1" y="6" width="8" height="4" rx="2" class="fill-accent" />
-                {/if}
-              </svg>
-              <span>{say($lang, `legend_${mark}`)}</span>
-            </li>
-          {/each}
-          </ul>
-        </details>
+        <Legend {...legendOf($lang)} />
       {:else}
         <!-- A city with no buildings is a city nobody has asked for
         anything yet, and the Mayor is where a person asks: raising a
@@ -170,12 +139,7 @@
         this page could press. -->
         <EmptyState missing="city_no_buildings">
           {#snippet action()}
-            <a
-              href={toFragment({ kind: "talk", address: MAYOR })}
-              class="inline-flex h-control items-center rounded-control bg-accent px-base text-label text-on-accent hover:bg-accent-hover"
-            >
-              {say($lang, "city_ask_mayor")}
-            </a>
+            <AskMayor />
           {/snippet}
         </EmptyState>
       {/if}

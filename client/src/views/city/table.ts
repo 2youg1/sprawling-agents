@@ -12,7 +12,11 @@
 // each run it holds, never a run's history, so a table of a city that
 // has run for a week costs what its runs' starts cost.
 
-import type { Address, BuildingProgress } from "../../wire";
+import type { Lang } from "../../core/lang";
+import { fill, say } from "../../core/lang";
+import { ago } from "../../core/time";
+import type { Address, BuildingProgress, CityAnswer } from "../../wire";
+import { FOLDS, along } from "../runs/fold";
 import type { BoardRun, Phase } from "../runs/lineage";
 import { ended, guide, phaseOf, placeByNeed, placeOf } from "../runs/lineage";
 
@@ -63,5 +67,87 @@ function rowOf(addr: Address, runs: readonly BoardRun[], place: string): Buildin
     latest: starts.at(-1)?.at ?? null,
     since: going[0]?.at ?? null,
     starts,
+  };
+}
+
+// What `table.look.svelte` is handed: the scale over the bars, and each
+// row with its words said and its moments placed along the folded
+// clock, in per cent of the bar (client D95).
+export interface TableLook {
+  readonly label: string;
+  readonly folds: readonly { readonly minutes: number; readonly at: number; readonly label: string }[];
+  readonly now: string;
+  readonly rows: readonly TableRowLook[];
+}
+
+export interface TableRowLook {
+  readonly key: string;
+  readonly guide: string;
+  readonly name: string;
+  readonly picked: boolean;
+  readonly waiting: number;
+  readonly working: number;
+  readonly done: number;
+  readonly latest: string;
+  // The live stretch from the oldest run still going to now.
+  readonly live: { readonly left: number; readonly width: number } | null;
+  readonly starts: readonly { readonly key: string; readonly at: number; readonly phase: Phase }[];
+  // Spread on the row's button: picking a row opens the building's
+  // panel, as picking its tower in the drawing does.
+  readonly wire: {
+    readonly type: "button";
+    readonly "aria-pressed": boolean;
+    readonly "aria-label": string;
+    readonly onclick: () => void;
+  };
+}
+
+export interface TableSeat {
+  readonly city: CityAnswer;
+  readonly runs: readonly BoardRun[];
+  readonly now: number;
+  readonly picked: Address | null;
+  readonly lang: Lang;
+}
+
+export function lookOf(seat: TableSeat, onPick: (addr: Address) => void): TableLook {
+  const { lang, now } = seat;
+  return {
+    label: say(lang, "city_table"),
+    folds: FOLDS.filter((fold) => fold.minutes > 0).map((fold) => ({
+      minutes: fold.minutes,
+      at: fold.at,
+      label: fill(say(lang, "runs_minus"), { n: String(fold.minutes) }),
+    })),
+    now: say(lang, "runs_now"),
+    rows: tableOf(seat.city.buildings, seat.runs).map((row) => {
+      const name = row.addr === "hall" ? say(lang, "city_hall") : row.addr;
+      const from = row.since === null ? null : along(row.since, now);
+      return {
+        key: row.addr,
+        guide: row.guide,
+        name,
+        picked: row.addr === seat.picked,
+        waiting: row.waiting,
+        working: row.working,
+        done: row.done,
+        latest: row.latest === null ? say(lang, "city_table_none") : ago(lang, row.latest, now),
+        live: from === null ? null : { left: from, width: 100 - from },
+        starts: row.starts.map((start) => ({ key: start.run, at: along(start.at, now), phase: start.phase })),
+        wire: {
+          type: "button",
+          "aria-pressed": row.addr === seat.picked,
+          "aria-label": fill(say(lang, "city_table_row"), {
+            name,
+            waiting: String(row.waiting),
+            working: String(row.working),
+            done: String(row.done),
+          }),
+          onclick: () => {
+            onPick(row.addr);
+          },
+        },
+      };
+    }),
   };
 }

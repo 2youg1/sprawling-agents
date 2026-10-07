@@ -42,10 +42,10 @@ const TITLES: Record<Cut, Key> = {
 <script lang="ts">
   import { QUERIES } from "../core/asking";
   import { readAnswer } from "../core/answered";
-  import { MAYOR, toFragment } from "../core/route";
   import { fill, say } from "../core/lang";
   import { count, usd } from "../core/time";
   import { ui } from "../ui";
+  import AskMayor from "./city/ask_mayor.svelte";
   import EmptyState from "./parts/empty.svelte";
   import Page from "./parts/page.svelte";
   import Unanswered from "./parts/unanswered.svelte";
@@ -121,12 +121,7 @@ width in as many columns as it holds. -->
     with a run, and a run starts in the conversation with the Mayor. -->
     <EmptyState missing="cost_empty" seat="region">
       {#snippet action()}
-        <a
-          href={toFragment({ kind: "talk", address: MAYOR })}
-          class="inline-flex h-control items-center rounded-control bg-accent px-base text-label text-on-accent hover:bg-accent-hover"
-        >
-          {say($lang, "city_ask_mayor")}
-        </a>
+        <AskMayor />
       {/snippet}
     </EmptyState>
   {:else}
