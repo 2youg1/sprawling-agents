@@ -446,6 +446,29 @@ mod tests {
         assert_eq!(chosen.tier, Some(Tier::Panorama));
     }
 
+    /// The body size has a floor and no ceiling (`crates/wire/spec/Preference.lean`
+    /// D51): a size under the floor is refused where it is read, so the
+    /// person's file and a frame meet the rule the page's box states,
+    /// and any size above it reads back as the number it was.
+    #[test]
+    fn a_body_size_under_the_floor_is_refused_and_any_size_above_it_reads() {
+        let appearance = |px: u32| {
+            serde_json::json!({ "appearance": {
+                "lighting": "dark", "sans": "geist", "mono": "geist",
+                "sans_stack": "", "mono_stack": "", "body_px": px,
+                "density": "compact", "chroma": "full", "motion": "system",
+            }})
+        };
+        assert!(serde_json::from_value::<PreferencesAnswer>(appearance(11)).is_err());
+        for px in [12, 24, 96] {
+            let held: PreferencesAnswer = serde_json::from_value(appearance(px)).unwrap();
+            assert_eq!(
+                serde_json::to_value(&held).unwrap()["appearance"]["body_px"],
+                serde_json::json!(px)
+            );
+        }
+    }
+
     /// A key this build does not read is refused where it is written.
     /// Ignoring it produces the one state nobody can diagnose: the
     /// setting is in the file, and nothing happens.
