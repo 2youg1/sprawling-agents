@@ -25,8 +25,14 @@
   // outside a room do nothing rather than guess (`SlashHands`), and a
   // list that omits them teaches that the verb does not exist. The
   // reason is drawn where the row's hint is (`palette/rows.svelte`).
+  //
+  // **The box is a modal the platform owns** (`modal.ts`), as the file
+  // finder is: the focus stays inside while it stands and goes back
+  // where it was when it closes (client/Spec.lean §4-64b). The box is an
+  // APG Combobox over the rows, so the row under the cursor is the one
+  // a screen reader hears. What the box and the list look like is
+  // `palette.look.svelte` and `palette/rows.look.svelte`.
   import { Option, Schema } from "effect";
-  import { onMount } from "svelte";
   import { heldIn } from "../core/belief/rooms";
   import { runInFront } from "../core/in_front";
 
@@ -34,19 +40,21 @@
   import { halt, release } from "../core/commands";
   import { LABELS } from "../core/keys";
   import type { Action } from "../core/keys";
-  import type { Key } from "../core/lang";
   import { canRecord } from "../core/speaking";
   import { LANGS, endonym, say } from "../core/lang";
   import { MAYOR, current, toFragment } from "../core/route";
   import type { View } from "../core/route";
   import { cityIsShut, CITY } from "../core/scope";
-  import { completed } from "../core/completion";
   import { RELEASE_ALL, offered } from "../core/slash";
   import { SECTIONS, reached } from "../core/slash_hands";
   import type { Reached, Slash, SlashHands } from "../core/slash_hands";
   import { ui } from "../ui";
   import { Address } from "../wire";
-  import Empty from "./parts/empty.svelte";
+  import { modalHold, modalWire } from "./modal";
+  import type { Seat } from "./modal";
+  import Modal from "./modal.look.svelte";
+  import { boxOf, whyFor } from "./palette";
+  import Look from "./palette.look.svelte";
   import type { Entry, Group } from "./palette/entry";
   import { nothingFound } from "./palette/nothing_found";
   import { openFinder } from "./finding.svelte";
@@ -61,16 +69,34 @@
   const effort = u.effort;
   const policy = u.policy;
 
-  const { onClose }: { readonly onClose: () => void } = $props();
+  interface Props {
+    readonly onClose: () => void;
+    // `specimen` draws the box open in the page's flow, for `#/gallery`.
+    readonly seat?: Seat | undefined;
+  }
+
+  const { onClose, seat = "modal" }: Props = $props();
 
   let query = $state("");
   let cursor = $state(0);
 
-  let box = $state<HTMLInputElement | undefined>(undefined);
-
-  onMount(() => {
-    box?.focus();
-  });
+  const uid = $props.id();
+  const listId = `${uid}-list`;
+  // Where the box stands is fixed for its life, so the attachment that
+  // opens it is made once.
+  // svelte-ignore state_referenced_locally
+  const hold = modalHold(seat);
+  const sheet = $derived(
+    modalWire({
+      seat,
+      named: { "aria-label": say($lang, "nav_palette") },
+      backdrop: "closes",
+      hold,
+      onClose: () => {
+        onClose();
+      },
+    }),
+  );
 
   const city = u.conn.asking.ask(QUERIES.city);
   const endpoints = u.conn.asking.ask(QUERIES.endpoints);
@@ -163,31 +189,6 @@
     return reached(heldIn($belief, room).at(-1));
   }
 
-  // Why a verb cannot run from this box, as a `lang.json` key. Every
-  // verb is reachable; the ones missing a capability say which.
-  const NEEDS_ROOM: Key = "palette_needs_room";
-  const NEEDS_RUN: Key = "no_run_in_front";
-  const NEEDS_MODEL: Key = "palette_needs_model";
-
-  function whyFor(spelling: string): Key | undefined {
-    switch (spelling) {
-      case "/dispatch":
-      case "/new":
-      case "/compact": case "/tag": case "/untag":
-        return here === null ? NEEDS_ROOM : undefined;
-      // The run in hand, or else the newest run of the room in hand.
-      case "/diff":
-        return live === null && here === null ? NEEDS_ROOM : undefined;
-      case "/steer":
-      case "/stop":
-        return live === null ? NEEDS_RUN : undefined;
-      case "/model":
-        return models.length === 0 ? NEEDS_MODEL : undefined;
-      default:
-        return undefined;
-    }
-  }
-
   // A verb runs, and the box closes once it has done something. It stays
   // open when the verb put words back in it - which is what `/help`
   // does - and when it did nothing at all, as a verb given an address it
@@ -255,7 +256,7 @@
         .map((each) => ({
           label: each.grammar === "" ? each.spelling : `${each.spelling} ${each.grammar}`,
           hint: say($lang, each.about),
-          why: whyFor(each.spelling),
+          why: whyFor(each.spelling, { here, live: live !== null, models: models.length }),
           act: () => {
             runSlash(each);
           },
@@ -286,57 +287,39 @@
   }
 </script>
 
-<!-- Escape, answered by the shell's key handler, closes this box; the
-click on the scrim is the pointer's extra way out, not the only one. -->
-<div
-  class="fixed inset-0 z-20 flex items-start justify-center bg-page/70 px-snug pt-section"
-  role="presentation"
-  onclick={(event) => {
-    if (event.target === event.currentTarget) onClose();
-  }}
->
-  <div
-    class="w-full max-w-measure rounded-panel bg-raised p-snug shadow-float"
-    role="dialog"
-    aria-label={say($lang, "nav_palette")}
-  >
-    <input
-      bind:this={box}
-      class="w-full rounded-control bg-raised px-base py-snug text-body placeholder:text-text-faint"
-      placeholder={say($lang, "palette_placeholder")}
-      value={query}
-      oninput={(event) => {
-        query = event.currentTarget.value;
-        cursor = 0;
-      }}
-      onkeydown={(event) => {
-        if (event.key === "Tab" && query.trim().startsWith("/")) {
-          event.preventDefault();
-          query = completed(query.trim());
+<!-- Escape reaches the box as a cancel request and the shell's key
+handler as a key; both close it. A click on the dimmed page is the
+pointer's extra way out, not the only one. -->
+<Modal wire={sheet} {seat}>
+  <Look
+    box={boxOf(
+      { query, cursor, count: shown.length, list: listId, lang: $lang },
+      {
+        write: (line) => {
+          query = line;
           cursor = 0;
-        } else if (event.key === "ArrowDown") {
-          event.preventDefault();
-          cursor = Math.min(cursor + 1, shown.length - 1);
-        } else if (event.key === "ArrowUp") {
-          event.preventDefault();
-          cursor = Math.max(cursor - 1, 0);
-        } else if (event.key === "Enter") {
-          event.preventDefault();
+        },
+        point: (at) => {
+          cursor = at;
+        },
+        pick: () => {
           pick(shown.at(cursor));
-        }
-      }}
-    />
-    <Rows
-      listing={query.trim().startsWith("/") ? { kind: "verbs", groups: grouped } : { kind: "places" }}
-      {shown}
-      {cursor}
-      onHover={(at) => {
-        cursor = at;
-      }}
-      onPick={pick}
-    />
-    {#if shown.length === 0}
-      <Empty missing={nothingFound(query)} />
-    {/if}
-  </div>
-</div>
+        },
+      },
+    )}
+    nothing={shown.length === 0 ? nothingFound(query) : undefined}
+  >
+    {#snippet list()}
+      <Rows
+        id={listId}
+        listing={query.trim().startsWith("/") ? { kind: "verbs", groups: grouped } : { kind: "places" }}
+        {shown}
+        {cursor}
+        onHover={(at) => {
+          cursor = at;
+        }}
+        onPick={pick}
+      />
+    {/snippet}
+  </Look>
+</Modal>

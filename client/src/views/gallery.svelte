@@ -41,6 +41,7 @@
   import Doc from "./gallery/doc.svelte";
   import Filed from "./gallery/filed.svelte";
   import FirstRun from "./gallery/first_run.svelte";
+  import Entrances from "./gallery/entrances.svelte";
   import G2 from "./gallery/g2.svelte";
   import Gd from "./gallery/gd.svelte";
   import G6 from "./gallery/g6.svelte";
@@ -136,6 +137,7 @@
   <h1 class="mb-wide text-heading text-text">{say($lang, "gallery_title")}</h1>
   <Hints />
   <FirstRun />
+  <Entrances />
   <Pgb />
   <Shell />
   <Mob />
