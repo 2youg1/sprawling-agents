@@ -773,22 +773,34 @@ code is written, not a platform call.
 | macOS | no ideal-processor call exists, so the seat table is not built; the topology is read for the doctor only | no EcoQoS; the hot threads keep the default QoS class | commands run under `taskpolicy -c utility`, which moves them toward efficiency cores |
 | Linux | no soft ideal-processor call exists (`sched_setaffinity` is hard affinity), so the seat table is not built; the topology is read for the doctor only | nothing to opt out of: frequency policy is machine-wide | commands run under `nice -n 10` |
 
-No platform sets a per-run memory limit, and Linux sets no cgroup
-`cpu.weight` per run; `crates/runtime/spec/Tools/Exec.lean` D29 states both
-as open.
+On Linux, when the harness's own cgroup is delegated, each run also gets
+a child cgroup with `cpu.weight` 100; without delegation the `nice` above
+is the only share (`crates/runtime/spec/Tools/Exec.lean` D29 and D33).
+No run has a memory ceiling by default, and none is derived from the
+machine's memory. A run's commands get one only when the User enters a
+number of bytes in `[core] memory_bytes` and chooses `"soft_shares"`;
+all commands of one run share it, a Windows Job Object or a delegated
+Linux cgroup enforces it, and macOS has no mechanism that can. When a
+command reaches the ceiling, or the ceiling could not be applied or read
+back, the command's result says so instead of the failure passing
+silently (`crates/runtime/spec/Tools/Exec.lean` D95).
 
 **One setting turns it off, and the doctor says what it did.** The
-User's configuration `[core] placement` takes `"soft"`, the default,
-`"none"`, which reads no topology, takes no seat and makes no platform
-call, or `"pinned"`, the hard-affinity comparison arm: on Windows the
-harness process is taken into a Job Object whose affinity limit is the
-plan's mask, on Linux the arm names the `taskset -c` list the whole
-binary is started under, and on macOS it does nothing and says so
-(sprawling D41 and D49). The third arm of the planned comparison,
-`"soft_shares"`, is refused as unreadable until it is built (sprawling
-D47). `sprawling doctor` prints one line, written only in
-`placement::report`, naming the classes it read and whether hot threads
-prefer the top class or are left to the operating system.
+User's configuration `[core] placement` takes `"soft"`, the default;
+`"none"`, which reads no topology, takes no seat, sets no per-run share
+and makes no platform call; `"soft_shares"`, which is `"soft"` plus the
+memory ceiling the User entered, and only the processor share when
+`[core] memory_bytes` is empty; or `"pinned"`, the hard-affinity
+comparison arm: on Windows the harness process is taken into a Job
+Object whose affinity limit is the plan's mask, on Linux the arm names
+the `taskset -c` list the whole binary is started under, and on macOS it
+does nothing and says so (sprawling D41 and D49). Any other spelling is
+refused as unreadable. **settings** → **performance** edits both fields,
+and they apply when the city server restarts (sprawling D47).
+`sprawling doctor` prints one line, written only in `placement::report`,
+naming the classes it read, whether hot threads prefer the top class or
+are left to the operating system, how runs share the processors, and an
+entered ceiling that does not apply.
 
 **Where it is proved.** `crates/sprawling/spec/Serving/Placement/Plan.lean`
 proves the plan's rules over every topology (a planned processor is usable,
