@@ -14,6 +14,9 @@
   // and the earlier one folds behind its heading by the rule the whole
   // thread's divider reads (client D80).
   import Result from "./result.svelte";
+  import Fold from "./fold.look.svelte";
+  import { foldWire } from "./fold";
+  import { motherName } from "./forking";
   import type { Boundary } from "./forking";
   import { earlierDrawn } from "./earlier";
   import { fill, say } from "../../core/lang";
@@ -27,7 +30,8 @@
   }
 
   const { shown, earlier, boundary }: Props = $props();
-  const { lang } = ui();
+  const { lang, conn } = ui();
+  const belief = conn.belief;
 
   let pressed = $state<boolean | null>(null);
   const open = $derived(pressed ?? earlierDrawn(shown.length, earlier.length) === "open");
@@ -35,7 +39,7 @@
   const heading = $derived(
     boundary?.kind === "forked"
       ? fill(say($lang, "results_session_forked"), {
-          mother: boundary.mother.slice(0, 8),
+          mother: motherName($belief.runs[boundary.mother]?.task ?? "") ?? say($lang, "fork_mother"),
           turn: String(boundary.turn),
         })
       : say($lang, "results_session_this"),
@@ -62,16 +66,12 @@
 {#if earlier.length > 0}
   <section class="mb-section" aria-label={earlierHeading}>
     <h2 class="mb-base text-note text-text-quiet">
-      <button
-        type="button"
-        class="rounded-control px-tight hover:bg-chrome hover:text-text-quiet"
-        aria-expanded={open}
-        onclick={() => {
+      <Fold
+        label={`${earlierHeading} · ${say($lang, open ? "session_collapse" : "session_expand")}`}
+        wire={foldWire(open, () => {
           pressed = !open;
-        }}
-      >
-        {earlierHeading} · {open ? say($lang, "session_collapse") : say($lang, "session_expand")}
-      </button>
+        })}
+      />
     </h2>
     {#if open}
       <ul>

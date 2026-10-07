@@ -69,11 +69,12 @@
   import { WaitingCards } from "../talk/waiting.svelte";
   import Asked from "../talk/asked.svelte";
   import Person from "../talk/person.svelte";
+  import { foldWire } from "../talk/fold";
+  import Rule from "../talk/rule.look.svelte";
   import Case from "./case.svelte";
   import { CHOSEN, MODELS } from "./served";
 
   const { lang } = ui();
-  const uid = $props.id();
   // The previous segment is folded away until somebody asks for it.
   let open = $state(false);
 </script>
@@ -90,14 +91,6 @@
       <div class="whitespace-pre-wrap leading-relaxed">{line.text}</div>
     </div>
   {/if}
-{/snippet}
-
-{#snippet divider(word: string)}
-  <div class="my-wide flex items-center gap-base text-note text-text-faint">
-    <span class="h-px flex-1 bg-raised"></span>
-    <span>{word}</span>
-    <span class="h-px flex-1 bg-raised"></span>
-  </div>
 {/snippet}
 
 <!-- A line of a thread that can be branched from: a person's words are
@@ -282,46 +275,51 @@ time somebody sends, so both landings are on this page. -->
 keeps the fold one press away: the rounds are still the room's
 history, and five of them is not what the person came back for. -->
 <Case label="session divider · the previous segment folded away">
-  <button
-    type="button"
-    class="flex items-center gap-tight rounded-control px-tight text-note text-text-faint hover:bg-chrome hover:text-text-quiet"
-    aria-expanded={open}
-    aria-controls="{uid}-earlier"
-    onclick={() => {
-      open = !open;
-    }}
-  >
-    <!-- wording-ok: a fold triangle is a mark, not a word -->
-    <span class="inline-block w-pane" aria-hidden="true">{open ? "▾" : "▸"}</span>
-    <span>{fill(say($lang, "session_previous"), { n: "5" })}</span>
-  </button>
   {#if open}
-    <div id="{uid}-earlier" class="border-l border-edge-panel pl-base">
+    <div class="fade">
       {#each EARLIER_SEGMENT as line (line.text)}
         <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
         {@render utterance(line)}
       {/each}
     </div>
   {/if}
-  <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
-  {@render divider(fill(say($lang, "session_new_divider"), { at: "12:04" }))}
+  <div class="my-snug flex flex-col gap-snug">
+    <Rule
+      parts={[
+        {
+          kind: "fold",
+          fold: {
+            label: `${fill(say($lang, "session_previous"), { n: "5" })} · ${say($lang, open ? "session_collapse" : "session_expand")}`,
+            wire: foldWire(open, () => {
+              open = !open;
+            }),
+          },
+        },
+      ]}
+      mark="none"
+      wire={{}}
+    />
+    <Rule parts={[{ kind: "text", text: fill(say($lang, "session_new_divider"), { at: "12:04" }) }]} mark="none" wire={{}} />
+  </div>
   {#each ROUND as line (line.text)}
     <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
     {@render utterance(line)}
   {/each}
 </Case>
 
-<!-- The forked reading of the same divider: which turn it branched
-from, and the mother run a person can open to see where the words
-came from. -->
+<!-- The branched reading of the same rule: which turn of which
+conversation the branch came from, and the way back to that
+conversation, which stays as it was. -->
 <Case label="talk · forked from turn 3, with the mother run linked">
-  <div class="my-wide flex items-center gap-base text-note text-text-faint">
-    <span class="h-px flex-1 bg-raised"></span>
-    <a href={toFragment({ kind: "run", run: MOTHER })} class="hover:text-text-quiet">
-      {fill(say($lang, "session_forked_divider"), { turn: "3", at: motherName(MOTHER_TASK) ?? say($lang, "fork_mother") })} · 11:47
-    </a>
-    <span class="h-px flex-1 bg-raised"></span>
-  </div>
+  <Rule
+    parts={[
+      { kind: "text", text: fill(say($lang, "session_forked_divider"), { turn: "3", at: motherName(MOTHER_TASK) ?? say($lang, "fork_mother") }) },
+      { kind: "text", text: "11:47" },
+      { kind: "link", text: say($lang, "fork_back"), href: toFragment({ kind: "run", run: MOTHER }) },
+    ]}
+    mark="branch"
+    wire={{}}
+  />
   {#each ROUND as line (line.text)}
     <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
     {@render branchable(line)}

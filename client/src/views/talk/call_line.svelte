@@ -6,6 +6,9 @@ Copyright (c) 2026 2youg1 and the sprawling contributors -->
 <!-- One tool call, pressed to one line: `kind  subject  time  result`
 (refrain §3-4, client/Spec.lean §4-44). A send and a delegation read their
 subject and result from the call itself (`call_kind.ts`, client D85).
+This file is the line's seat: it reads the call, the clock, the right
+side and the line keys, and `call_line.look.svelte` draws what it hands
+over (`call_line.ts`).
 
 **The time cell is at least nine characters and grows past that** rather
 than spilling over the subject: a long running reading pushes the subject
@@ -35,11 +38,11 @@ third layer). -->
   import { lineWalker } from "../../core/lines";
   import { pressedOf } from "../../core/press";
   import { ui } from "../../ui";
-  import { Kbd } from "../parts/kbd.svelte";
-  import Tip from "../parts/tip.svelte";
   import { closeRight, openCall, rightItem } from "../inspect/open.svelte";
   import { kindOf, lineOf, outcomeOf } from "./call_kind";
   import { NAMED_AFTER_MS, callTime, runningWords, tookWords, ticker } from "./timing";
+  import type { CallLineLook, CallFigure, CallVerdict } from "./call_line";
+  import Look from "./call_line.look.svelte";
 
   interface Props {
     readonly call: Call;
@@ -118,66 +121,45 @@ third layer). -->
       next.focus();
     }
   }
+
+  const shownTime = $derived.by((): CallFigure => {
+    switch (time.kind) {
+      case "landed":
+        return { kind: "landed", text: tookWords(time.took, $lang) };
+      case "running":
+        return { kind: "running", text: runningWords(time.ms) };
+      case "starting":
+      case "unmeasured":
+        return { kind: "none" };
+    }
+  });
+  const verdict = $derived.by((): CallVerdict | null => {
+    if (call.outcome === "failed") return { tone: "alert", text: say($lang, "talk_call_failed") };
+    if (outcome !== null) return { tone: "quiet", text: say($lang, outcome) };
+    if (waitsForYou) return { tone: "alert", text: say($lang, "talk_waiting_you") };
+    return null;
+  });
+
+  const look = $derived<CallLineLook>({
+    kind: kind.kind === "registered" ? say($lang, kind.word) : kind.tool,
+    subject: line.kind === "worded" ? fill(say($lang, line.word), line.fills) : line.subject,
+    running: call.outcome === "waiting",
+    time: shownTime,
+    verdict,
+    moves: MOVES_DRAWN,
+    opened,
+    pinned,
+    hint,
+    wire: {
+      type: "button",
+      "data-call-line": "",
+      "aria-pressed": opened,
+      onclick: () => {
+        openCall({ run, at: call.at });
+      },
+      onkeydown: onKeydown,
+    },
+  });
 </script>
 
-<Tip text={hint}>
-  {#snippet children(id)}
-    <button
-      type="button"
-      data-call-line=""
-      aria-describedby={id}
-      aria-pressed={opened}
-      class={[
-        "group relative grid h-control w-full grid-cols-[8ch_minmax(0,1fr)_minmax(9ch,max-content)_auto] items-center gap-x-pane rounded-control px-snug text-left text-note narrow:grid-cols-[6ch_minmax(0,1fr)_auto_auto] narrow:gap-x-snug",
-        "before:absolute before:inset-y-snug before:left-0 before:w-hair before:rounded-pill",
-        opened ? "bg-raised text-text before:bg-accent" : "text-text-quiet hover:wash",
-      ]}
-      onclick={() => {
-        openCall({ run, at: call.at });
-      }}
-      onkeydown={onKeydown}
-    >
-      <span class="truncate text-text-faint">
-        {kind.kind === "registered" ? say($lang, kind.word) : kind.tool}
-      </span>
-      <span class={["min-w-0 truncate", call.outcome === "waiting" ? "text-text" : ""]}>
-        {line.kind === "worded" ? fill(say($lang, line.word), line.fills) : line.subject}
-      </span>
-      <span class="figure flex items-center justify-end gap-tight whitespace-nowrap text-text-faint">
-        {#if call.outcome === "waiting"}
-          <span class="inline-block size-dot shrink-0 pulse rounded-pill bg-accent" aria-hidden="true"></span>
-        {/if}
-        {#if time.kind === "landed"}
-          {tookWords(time.took, $lang)}
-        {:else if time.kind === "running"}
-          <span class="text-text">{runningWords(time.ms)}</span>
-        {/if}
-      </span>
-      <span class="flex items-center gap-tight">
-        {#if call.outcome === "failed"}
-          <span class="text-alert">{say($lang, "talk_call_failed")}</span>
-        {:else if outcome !== null}
-          <span class="whitespace-nowrap text-text-faint">{say($lang, outcome)}</span>
-        {:else if waitsForYou}
-          <span class="text-alert">{say($lang, "talk_waiting_you")}</span>
-        {/if}
-        <span
-          data-line-keys
-          class={["items-center gap-hair narrow:hidden", opened ? "inline-flex" : "hidden group-focus-visible:inline-flex"]}
-          aria-hidden="true"
-        >
-          {#each MOVES_DRAWN as move (move)}
-            <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression, @typescript-eslint/no-unsafe-call (a snippet call is the render itself; typescript-eslint does not resolve exports of another .svelte module) -->
-            {@render Kbd({ move })}
-          {/each}
-        </span>
-        {#if pinned}
-          <!-- The steer pin: a small accent wedge pointing at this line.
-          It repeats what the coin's name already says (client/Spec.lean
-          §4-13), so it is drawn for the eye and hidden from a reader. -->
-          <span class="steer-pin" aria-hidden="true"></span>
-        {/if}
-      </span>
-    </button>
-  {/snippet}
-</Tip>
+<Look {...look} />

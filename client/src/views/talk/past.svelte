@@ -21,6 +21,7 @@
   import type { Stretch } from "../../core/stretches";
   import { ui } from "../../ui";
   import type { Address } from "../../wire";
+  import AsideLink from "./aside_link.look.svelte";
   import Scroller from "./scroller.svelte";
   import type { ForkPlan } from "./forking";
   import Thread from "./thread.svelte";
@@ -56,8 +57,8 @@
   {/if}
   <div class="flex shrink-0 flex-col gap-snug border-t border-edge-panel pt-base">
     <p class="text-note text-text-quiet">{fill(say($lang, "talk_past"), { room: who })}</p>
-    <a class="self-start text-note text-text-quiet underline-offset-2 hover:text-text hover:underline" href={toFragment({ kind: "talk", address })}>
-      {say($lang, "talk_current")}
-    </a>
+    <p class="text-note text-text-quiet">
+      <AsideLink text={say($lang, "talk_current")} href={toFragment({ kind: "talk", address })} />
+    </p>
   </div>
 </div>

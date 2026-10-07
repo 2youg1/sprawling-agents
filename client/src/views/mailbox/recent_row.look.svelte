@@ -12,6 +12,7 @@
   // fork key, always drawn rather than on hover, and the digit that
   // reaches the row. The fork key names itself in a hint, or says there
   // why it cannot fork.
+  import Glyph from "../parts/glyph.svelte";
   import Tip from "../parts/tip.svelte";
   import type { RecentRowLook } from "./recent_row";
 
@@ -34,8 +35,9 @@
         {...look.fork.wire}
         aria-describedby={hint}
       >
-        <!-- wording-ok: a drawing in type, not a word; the action's name is the aria-label beside it. -->
-        ⑂
+        <!-- The same mark the thread's branch action carries, so the
+        two doors to one act look alike. -->
+        <Glyph name="branch" size="sm" />
       </button>
     {/snippet}
   </Tip>

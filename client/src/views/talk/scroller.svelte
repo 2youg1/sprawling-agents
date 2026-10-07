@@ -35,10 +35,10 @@ the following state the view is at the foot either way. -->
 
   import { fill, say } from "../../core/lang";
   import { ui } from "../../ui";
-  import Glyph from "../parts/glyph.svelte";
   import { anchorAt, footOf } from "./anchoring";
   import type { Anchoring } from "./anchoring";
   import { keepReading, readingAt } from "./standing";
+  import Unread from "./unread.look.svelte";
   import Wear from "./wear.svelte";
 
   interface Props {
@@ -175,7 +175,9 @@ the following state the view is at the foot either way. -->
     tabindex="-1"
     class={[
       "h-full overflow-y-auto px-wide [scrollbar-width:none] narrow:px-0 narrow:[scrollbar-width:auto] [mask-image:linear-gradient(to_bottom,transparent_0,black_160px)] transition-opacity duration-panel",
-      empty ? "opacity-0" : "",
+      // The thread arrives with the first send and leaves when the room
+      // empties: each way takes its own curve (docs/frontend-method.md §4-43).
+      empty ? "opacity-0 ease-leave" : "ease-arrive",
     ]}
     onscroll={(event) => {
       if (pending !== null) return;
@@ -191,19 +193,20 @@ the following state the view is at the foot either way. -->
     <Wear {scroller} {column} />
   {/if}
   {#if unread > 0}
-    <button
-      type="button"
-      class="absolute bottom-snug left-1/2 inline-flex h-control-sm -translate-x-1/2 items-center gap-tight rounded-pill border border-edge-panel bg-raised px-base text-note text-text shadow-float hover:bg-raised-hover"
-      aria-label={`${fill(say($lang, "talk_unread"), { n: String(unread) })} · ${say($lang, "talk_unread_follow")}`}
-      onclick={() => {
-        follow();
-        // The button leaves with the count; the focus stays in the
-        // column it was about rather than falling to the page.
-        scroller?.focus({ preventScroll: true });
-      }}
-    >
-      <Glyph name="chevron" size="sm" class="rotate-90" />
-      {fill(say($lang, "talk_unread"), { n: String(unread) })}
-    </button>
+    <!-- The button leaves with the count; the focus stays in the column
+    it was about rather than falling to the page. -->
+    <div class="absolute bottom-snug left-1/2 -translate-x-1/2">
+      <Unread
+        text={fill(say($lang, "talk_unread"), { n: String(unread) })}
+        wire={{
+          type: "button",
+          "aria-label": `${fill(say($lang, "talk_unread"), { n: String(unread) })} · ${say($lang, "talk_unread_follow")}`,
+          onclick: () => {
+            follow();
+            scroller?.focus({ preventScroll: true });
+          },
+        }}
+      />
+    </div>
   {/if}
 </div>

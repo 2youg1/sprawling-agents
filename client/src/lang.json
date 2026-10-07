@@ -4300,12 +4300,12 @@
     "zh": "新开，带交接"
   },
   "mailbox_start_forked": {
-    "en": "forked",
-    "zh": "分叉"
+    "en": "branched",
+    "zh": "分支"
   },
   "mailbox_fork_last": {
-    "en": "fork from the last turn",
-    "zh": "从最后一轮分叉"
+    "en": "branch from the last turn",
+    "zh": "从最后一轮开分支"
   },
   "mailbox_fork_unheld": {
     "en": "the last run of this session is older than what this page holds",
@@ -5120,8 +5120,8 @@
     "zh": "楼"
   },
   "palette_fork": {
-    "en": "fork {addr}",
-    "zh": "分出 {addr}"
+    "en": "branch {addr}",
+    "zh": "从 {addr} 开分支"
   },
   "palette_placeholder": {
     "en": "go to…",
@@ -5376,8 +5376,8 @@
     "zh": "一次 run 开始了"
   },
   "event_run_forked": {
-    "en": "a run was forked from another",
-    "zh": "从另一次 run 分叉出一次 run"
+    "en": "a run was branched from another",
+    "zh": "从另一次 run 开出一个分支"
   },
   "event_prompt_assembled": {
     "en": "a prompt was put together",
@@ -7460,8 +7460,8 @@
     "zh": "模型作答前想得多用力"
   },
   "slash_fork": {
-    "en": "start a second line from the newest run in a room",
-    "zh": "从房间里最新的 run 分出第二条线"
+    "en": "branch this conversation from a turn you pick, or from the newest run of [addr]; the original stays as it is",
+    "zh": "从你选的一轮开分支，带地址时从那个房间最新的 run 开；原对话保持不变"
   },
   "slash_go": {
     "en": "open a page by name",
@@ -8136,8 +8136,8 @@
     "zh": "本页说 wire v{ours}，服务端说 v{theirs}"
   },
   "act_fork": {
-    "en": "fork this run",
-    "zh": "从这次运行分叉"
+    "en": "branch this run",
+    "zh": "从这次运行开分支"
   },
   "act_open_session": {
     "en": "open a new session",
@@ -8164,24 +8164,24 @@
     "zh": "第 {turn} 轮"
   },
   "fork_here": {
-    "en": "fork from here",
-    "zh": "从这里分叉"
+    "en": "branch from here",
+    "zh": "从这里开分支"
   },
   "fork_here_hint": {
-    "en": "Fork from here: a new session that keeps the conversation up to this point",
-    "zh": "从这里分叉：开一个新会话，保留到这里为止的对话"
+    "en": "Branch from here: a new session carries the conversation up to this point, and this conversation stays as it is",
+    "zh": "从这里开分支：新会话带着到这里为止的对话，原对话保持不变"
   },
   "fork_pick_title": {
-    "en": "choose a point to fork from",
-    "zh": "选择分叉点"
+    "en": "choose where to branch from",
+    "zh": "选择从哪里开分支"
   },
   "notices_yesterday": {
     "en": "yesterday",
     "zh": "昨天"
   },
   "session_forked_divider": {
-    "en": "forked from turn {turn} · {at}",
-    "zh": "从第 {turn} 轮分叉 · {at}"
+    "en": "branch from turn {turn} · {at}",
+    "zh": "分支自第 {turn} 轮 · {at}"
   },
   "session_new_divider": {
     "en": "new session · {at}",
@@ -8352,12 +8352,20 @@
     "zh": "已复制"
   },
   "fork_pending": {
-    "en": "forked from turn {turn} · what you send next opens the branch",
-    "zh": "分叉自第 {turn} 轮 · 下一句会在分叉出的新会话里发出"
+    "en": "branch from turn {turn} · what you send next starts it, and the original conversation stays as it is",
+    "zh": "分支自第 {turn} 轮 · 下一句会在这条分支里发出，原对话保持不变"
   },
   "fork_mother": {
-    "en": "mother run",
-    "zh": "母 run"
+    "en": "the original conversation",
+    "zh": "原对话"
+  },
+  "fork_back": {
+    "en": "back to the original",
+    "zh": "回到原对话"
+  },
+  "fork_keeps": {
+    "en": "the original conversation stays as it is",
+    "zh": "原对话保持不变"
   },
   "fork_turns": {
     "en": "turns",
@@ -8376,8 +8384,8 @@
     "zh": "只看我说的"
   },
   "fork_safe_point": {
-    "en": "that call is still open · forking from the last safe point",
-    "zh": "这次调用还没有回话 · 从最近的安全点分叉"
+    "en": "that call is still open · branching from the last safe point",
+    "zh": "这次调用还没有回话 · 从最近的安全点开分支"
   },
   "session_expand": {
     "en": "expand",
@@ -9076,8 +9084,8 @@
     "zh": "这段会话"
   },
   "results_session_forked": {
-    "en": "session forked from {mother} at turn {turn}",
-    "zh": "从 {mother} 第 {turn} 轮分出的会话"
+    "en": "branch from turn {turn} · {mother}",
+    "zh": "分支自第 {turn} 轮 · {mother}"
   },
   "results_session_earlier": {
     "en": "earlier sessions",
