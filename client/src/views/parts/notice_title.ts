@@ -14,15 +14,9 @@
 // its unfilled slots visible for the same reason).
 
 import { askedIn } from "../../core/asking";
-import { fill, say } from "../../core/lang";
-import type { Key, Lang } from "../../core/lang";
-import table from "../../lang.json";
+import { fill, isKey, say } from "../../core/lang";
+import type { Lang } from "../../core/lang";
 
-function isKey(raw: string): raw is Key {
-  return Object.hasOwn(table, raw);
-}
-
-//
 // One heading is more specific than its code: a question this page
 // asked and never heard back on names that question, because a page
 // asks several at once and a person reading the same words twice cannot
