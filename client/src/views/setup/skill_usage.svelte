@@ -14,7 +14,7 @@
   // new one in the alert tone (`SkillAudit::Stale`, wire D33).
   import type { Key } from "../../core/lang";
   import type { HeldSkill, SkillAudit, SkillUse } from "../../wire";
-  import type { UseRow } from "../parts/usage_uses.svelte";
+  import type { UseRow } from "../parts/usage_uses";
 
   function rows(uses: readonly SkillUse[]): UseRow[] {
     return uses.map((one) => ({ run: one.run, resident: one.resident ?? null, at: one.at, part: one.part, outcome: one.outcome }));

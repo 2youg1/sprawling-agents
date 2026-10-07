@@ -138,7 +138,7 @@
 </script>
 
 <script lang="ts">
-  import Copy from "../machine/copy.svelte";
+  import Copy from "../parts/copy.svelte";
   import Scanning from "../machine/scanning.svelte";
   import ReleaseAnswerView from "../release/answer.svelte";
   import HarnessCards from "../setup/harness_cards.svelte";

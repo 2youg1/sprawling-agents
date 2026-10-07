@@ -60,6 +60,8 @@
   import Md from "./gallery/md.svelte";
   import Monitor from "./gallery/monitor.svelte";
   import Parts from "./gallery/parts.svelte";
+  import PartsBadge from "./gallery/parts/badge.svelte";
+  import PartsCopy from "./gallery/parts/copy.svelte";
   import Mailbox from "./gallery/mailbox.svelte";
   import Mob from "./gallery/mob.svelte";
   import Pga from "./gallery/pga.svelte";
@@ -158,6 +160,8 @@
   <PartRow />
   <Monitor />
   <Parts />
+  <PartsBadge />
+  <PartsCopy />
   <Switches />
   <TabsCases />
   <Monitored />

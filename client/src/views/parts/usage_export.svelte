@@ -5,28 +5,22 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 -->
 
-<script lang="ts" module>
-  // The two export buttons of a usage panel. The city writes the rows
-  // (`Query::UsageExport`, wire D33) so the columns have one author; the
-  // page asks again on every press, because a held answer would hand the
-  // User the uses as they stood when the panel first opened, and gives
-  // the text to the browser's own download. Nothing is written in the
-  // city's folder.
-  import type { ExportFormat, UsageKind } from "../../wire";
-
-  const TYPES: Record<ExportFormat, string> = {
-    jsonl: "application/x-ndjson",
-    csv: "text/csv",
-  };
-</script>
-
 <script lang="ts">
+  // The seat of the export buttons (`./usage_export`): it asks the city
+  // on each press, hands a fresh answer to the browser's download, and
+  // draws whatever `./usage_export.look.svelte` is. A wait still open
+  // when the panel goes away is dropped, so no download starts from a
+  // page the person already left.
+  import { onDestroy } from "svelte";
   import { get } from "svelte/store";
-  import { say } from "../../core/lang";
+
+  import { fill, say } from "../../core/lang";
   import { ui } from "../../ui";
-  import type { Query } from "../../wire";
-  import Button from "./button.svelte";
+  import type { ExportFormat, Query, UsageKind } from "../../wire";
   import { saveFile } from "../refrain/saved_file";
+  import { exportedOf, FORMATS, TYPES } from "./usage_export";
+  import type { Exported } from "./usage_export";
+  import Look from "./usage_export.look.svelte";
 
   interface Props {
     readonly what: UsageKind;
@@ -36,26 +30,50 @@
   const u = ui();
   const lang = u.lang;
   let waiting = $state<ExportFormat | null>(null);
+  let missed = $state<Exported | null>(null);
+  // The open wait of each format; the button's busy state allows one.
+  const waits: Record<ExportFormat, (() => void) | undefined> = { jsonl: undefined, csv: undefined };
+  onDestroy(() => {
+    for (const format of FORMATS) waits[format]?.();
+  });
 
   function press(format: ExportFormat): void {
     const query: Query = { usage_export: { what, format } };
     waiting = format;
+    missed = null;
     const held = u.conn.asking.ask(query);
     // The answer a press before this one left: the press is answered by
     // the next one to arrive, never by that.
     const before = get(held);
     u.conn.asking.refresh(query);
     const off = held.subscribe((answer) => {
-      if (answer === undefined || answer === before || !("usage_export" in answer)) return;
+      if (answer === undefined || answer === before) return;
+      const exported = exportedOf(answer);
+      if (exported === undefined) return;
       // wording-ok: a file name, spelled the same in every language.
-      saveFile(`${what}-usage.${format}`, TYPES[format], answer.usage_export.body);
+      if (exported.kind === "file") saveFile(`${what}-usage.${format}`, TYPES[format], exported.body);
+      else missed = exported;
       waiting = null;
+      waits[format] = undefined;
       queueMicrotask(off);
     });
+    waits[format] = off;
   }
+
+  const unavailable = $derived.by(() => {
+    if (missed?.kind !== "unavailable") return undefined;
+    return { said: fill(say($lang, "answer_unavailable"), { query: missed.query }), reason: missed.reason };
+  });
 </script>
 
-<div class="flex flex-wrap items-center gap-snug">
-  <Button label={say($lang, "usage_export_jsonl")} tone="quiet" loading={waiting === "jsonl"} onPress={() => { press("jsonl"); }} />
-  <Button label={say($lang, "usage_export_csv")} tone="quiet" loading={waiting === "csv"} onPress={() => { press("csv"); }} />
-</div>
+<Look
+  buttons={FORMATS.map((format) => ({
+    format,
+    label: say($lang, format === "jsonl" ? "usage_export_jsonl" : "usage_export_csv"),
+    loading: waiting === format,
+    press: () => {
+      press(format);
+    },
+  }))}
+  {unavailable}
+/>

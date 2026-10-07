@@ -39,7 +39,7 @@ const DOCTOR = "sprawling doctor --install";
   import { answered, plan, refused, running, started, type Walk } from "./setup/installing";
   import { stillAsking } from "./setup/versions";
   import Button from "./parts/button.svelte";
-  import Copy from "./machine/copy.svelte";
+  import Copy from "./parts/copy.svelte";
   import Report from "./machine/report.svelte";
   import Skeleton from "./machine/skeleton.svelte";
   import Unchecked from "./machine/unchecked.svelte";

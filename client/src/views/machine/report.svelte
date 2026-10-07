@@ -86,7 +86,7 @@ const STEP: Record<StepState, { readonly key: Key; readonly weight: Weight }> = 
   import Button from "../parts/button.svelte";
   import Progress from "../parts/progress.svelte";
   import Tip from "../parts/tip.svelte";
-  import Copy from "./copy.svelte";
+  import Copy from "../parts/copy.svelte";
   import Pack from "./pack.svelte";
   import Scanning from "./scanning.svelte";
   import Versions from "./versions.svelte";

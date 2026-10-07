@@ -17,7 +17,7 @@
   import { fill, say } from "../../core/lang";
   import { ui } from "../../ui";
   import type { RegistryNewest, ReleaseAnswer, UpdateHint } from "../../wire";
-  import Copy from "../machine/copy.svelte";
+  import Copy from "../parts/copy.svelte";
   import { confirmedCommand, registryLineOf, updateOf } from "./reading";
 
   interface Props {

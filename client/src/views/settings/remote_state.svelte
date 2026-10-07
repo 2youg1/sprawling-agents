@@ -23,7 +23,7 @@
   import Button from "../parts/button.svelte";
   import Dialog from "../parts/dialog.svelte";
   import type { DoctorCustodyLifetime } from "../../wire";
-  import Copy from "../machine/copy.svelte";
+  import Copy from "../parts/copy.svelte";
   import { LACKS, STEPS, VERBS, grouped, restartOf, toldKey, type Standing } from "./remote";
 
   interface Props {
