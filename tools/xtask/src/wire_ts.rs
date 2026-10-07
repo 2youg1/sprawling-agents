@@ -25,7 +25,7 @@ const TARGET: &str = concat!(crate::walk::client_src!(), "/wire.ts");
 
 /// What the generated file states before any type: the wire version
 /// both ends compare, the schema hash the server checks, and the run
-/// identity a city-level record carries, and the body size range. Values that always
+/// identity a city-level record carries, and the body size floor. Values that always
 /// travel together and are never chosen independently, so they travel
 /// as one.
 pub(super) struct Constants {
@@ -35,16 +35,10 @@ pub(super) struct Constants {
     /// out by hand, and a client that spells this identity differently
     /// folds every city-level record into a run that does not exist.
     pub(super) city_run: String,
-    /// `wire::BODY_PX_MIN` and `BODY_PX_MAX`, the body sizes the
-    /// `[ui]` writer accepts; the appearance page offers this range
-    /// rather than a copy of its own.
-    pub(super) body_px: BodyPx,
-}
-
-/// The smallest and the largest body size a person may ask for.
-pub(super) struct BodyPx {
-    pub(super) min: u32,
-    pub(super) max: u32,
+    /// `wire::BODY_PX_MIN`, the smallest body size `wire::BodyPx`
+    /// admits; the appearance page's box reads this floor rather than a
+    /// copy of its own.
+    pub(super) body_px_min: u32,
 }
 
 /// The text the wire produces now.
@@ -58,10 +52,7 @@ fn render() -> Result<String, XtaskError> {
         wire_v: wire::WIRE_V,
         hash: wire::schema_hash().to_string(),
         city_run: kernel::RunId::CITY.to_string(),
-        body_px: BodyPx {
-            min: wire::BODY_PX_MIN,
-            max: wire::BODY_PX_MAX,
-        },
+        body_px_min: wire::BODY_PX_MIN,
     };
     emit::emit(&wire::wire_schema(), &constants).map_err(|refused| XtaskError::Doc {
         file: format!("wire::wire_schema at {}", refused.at),
