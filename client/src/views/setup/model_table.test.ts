@@ -10,7 +10,8 @@
 import { describe, expect, test } from "bun:test";
 
 import type { ModelFact } from "../../core/probed";
-import { chosenRows, freshTable, lookOf } from "./model_table";
+import { chosenRows, freshTable } from "./model_rows";
+import { lookOf } from "./model_table";
 import type { ModelRowLook, ModelTableLook } from "./model_table";
 
 const fact = (id: string, over: Partial<ModelFact> = {}): ModelFact => ({

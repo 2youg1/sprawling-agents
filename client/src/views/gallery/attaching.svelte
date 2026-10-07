@@ -18,7 +18,8 @@
   // does on the page.
   import { ui } from "../../ui";
   import type { EndpointsAnswer } from "../../wire";
-  import { freshTable, lookOf } from "../setup/model_table";
+  import { freshTable } from "../setup/model_rows";
+  import { lookOf } from "../setup/model_table";
   import TableLook from "../setup/model_table.look.svelte";
   import Advanced from "../setup/providers/advanced.svelte";
   import { freshDraft } from "../setup/providers/draft";

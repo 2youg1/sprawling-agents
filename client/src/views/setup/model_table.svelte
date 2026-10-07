@@ -14,11 +14,13 @@
   //
   // The seat holds what the person typed and ticked, hands the ticked
   // rows back, and draws whatever `./model_table.look.svelte` is. Which
-  // rows are offered, what each figure means and what a press writes
-  // are decided in `./model_table` and nowhere here.
+  // rows are offered and what each figure means are decided in
+  // `./model_rows`, what a press writes in `./model_table`, and nowhere
+  // here.
   import { ui } from "../../ui";
-  import { chosenRows, freshTable, lookOf } from "./model_table";
-  import type { TableState } from "./model_table";
+  import { chosenRows, freshTable } from "./model_rows";
+  import type { TableState } from "./model_rows";
+  import { lookOf } from "./model_table";
   import Look from "./model_table.look.svelte";
   import type { ModelTableProps } from "./models";
 
