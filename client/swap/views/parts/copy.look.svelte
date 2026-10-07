@@ -28,13 +28,18 @@
 </span>
 
 <style>
+  /* The note is a whole line of text, so the key and its note take at
+     most half the row: the words the key copies, drawn beside it, keep
+     the other half instead of folding a glyph to a line. */
   .copy {
     display: inline-flex;
     align-items: baseline;
     gap: var(--spacing-tight);
     min-width: 0;
+    max-width: 50%;
   }
   .key {
+    flex-shrink: 0;
     min-height: var(--spacing-control-sm);
     padding: 0 var(--spacing-snug);
     border: 1px solid var(--color-edge-input);

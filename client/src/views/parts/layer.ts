@@ -59,7 +59,9 @@ export function sideFor(layer: HTMLElement, preferred: Side): Side {
     preferred === "below"
       ? layer.offsetTop + layer.offsetHeight - anchor.offsetHeight
       : -layer.offsetTop;
-  const seen = box.bottom > clip.top && box.top < clip.bottom;
+  // Inclusive, because an anchor is often a positioned box of no height
+  // standing on the clipping box's very edge, and that anchor is inside.
+  const seen = box.bottom >= clip.top && box.top <= clip.bottom;
   const opening =
     preferred === "below" ? opensOn(seen, below, above, reach) : opensOn(seen, above, below, reach);
   if (opening === "preferred") return preferred;

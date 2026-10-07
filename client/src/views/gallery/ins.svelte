@@ -270,7 +270,7 @@ impl Document {
 <Case label="inspector · the strip, the line, the worded keys and a chosen patch line" width={720}>
   <div class="flex flex-col bg-chrome">
     <StripLook {...STRIP} />
-    <div id="fixture-terminal" class="flex items-center gap-base px-wide py-snug">
+    <div id="fixture-terminal" class="flex flex-wrap items-center gap-base px-wide py-snug">
       {#each KEYS as key, at (at)}
         <TextKey {...key} />
       {/each}

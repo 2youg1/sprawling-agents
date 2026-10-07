@@ -8,7 +8,9 @@
 <!-- How the recycle bin is drawn (`./bin`, `BinLook`): a row per
 discard, what and when on the first line with whether it is back, and
 the way back under it. The press that restores is the client's one
-button, in its quiet tone, at the end of the line it acts on. -->
+button, in its quiet tone, at the end of the line it acts on. A row is
+two lines, so it is not a `settled-row`, whose deferral reserves one
+step and lets the second line spill out of the row until it is in view. -->
 <script lang="ts">
   import Button from "../parts/button.svelte";
   import Path from "../parts/path.svelte";
@@ -24,7 +26,7 @@ button, in its quiet tone, at the end of the line it acts on. -->
 
 <ul class="text-note">
   {#each look.rows as row (row.key)}
-    <li class="settled-row flex flex-col gap-tight border-b border-edge py-snug">
+    <li class="flex flex-col gap-tight border-b border-edge py-snug">
       <div class="flex min-h-control items-center gap-base">
         <span class="min-w-0 flex-1">
           <Path path={row.path} />
