@@ -96,7 +96,7 @@
 
 `segmented.svelte` 的 `aria-*`：轨道 `role="radiogroup"` ＋ `aria-label`；每格 `role="radio"`、`aria-checked` 等于「这一格就是 `held`」、`why` 在场时 `aria-disabled="true"` 并 `aria-describedby` 指向 `Tip`。**Tab 序列里的那一站由 `tabStop` 独家决定**：选中格；无选中时第一个可选格；全部被拒时第 0 格（那格的原因还得读得到）；空控件一站都没有。选择跟随焦点，所以不可选的格被 `nextStop` 跳过——落在上面就等于选中它。
 
-`tabs.svelte` 的 `aria-*`：`role="tablist"` ＋ `aria-label`；每个 `role="tab"`、`aria-selected` 等于「这就是 `current`」、`tabindex` 只给当前那个 `0`。自动激活是 APG 对「面板内容已在本地、切换无可察延迟」的推荐读法，本客户端三个使用者都满足它。
+`tabs.svelte` 的 `aria-*`：`role="tablist"` ＋ `aria-label`；每个 `role="tab"`、`aria-selected` 等于「这就是 `current`」、`tabindex` 只给当前那个 `0`（`current` 不在透镜里时给第一个，页签带不会没有入口）。每个透镜都有一个 `role="tabpanel"` 包装，`aria-labelledby` 指向它的页签，页签的 `aria-controls` 指回它；只有当前那个不带 `hidden`。**显示着的面板里没有 Tab 能到达的元素时，面板自己带 `tabindex="0"`**（APG Tabs 的建议）：一段纯文字的面板仍能被键盘走到并读出；面板里一出现控件，下一站就是那个控件，面板不再占一站。这些取值都由 `tabs.ts` 的 `lookOf` 写进接线包，外观只展开它们。自动激活是 APG 对「面板内容已在本地、切换无可察延迟」的推荐读法，本客户端三个使用者都满足它。
 -/
 
 /-!
