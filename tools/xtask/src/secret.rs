@@ -99,8 +99,15 @@ const EXPOSE_WHITELIST: [&str; 5] = [
 ///   `Win32` beside the underscores are what trip the mixed-alphabet
 ///   rule. Only the six names of twenty bytes or more are listed, since
 ///   a shorter one never reaches the entropy detector.
-const NOT_CREDENTIALS: [&str; 7] = [
+///
+/// The shields.io badge path `io/badge/Ask-DeepWiki-2B6CB0` — the words
+/// on the DeepWiki badge and its colour, carried in the badge URLs of
+/// both READMEs. A badge path is public by construction and can never
+/// hold a value; the colour's hex beside the mixed case is what trips
+/// the mixed-alphabet rule. Exact and whole, like every other entry.
+const NOT_CREDENTIALS: [&str; 8] = [
     "CC_x86_64_unknown_linux_musl",
+    "io/badge/Ask-DeepWiki-2B6CB0",
     "Win32_System_DataExchange",
     "Win32_System_Threading",
     "Win32_System_Variant",
@@ -392,6 +399,27 @@ resolver = \"3\"
         let found = check(&root).unwrap();
         let places: Vec<&str> = found.iter().map(|v| v.location.as_str()).collect();
         assert_eq!(places, ["src/key.rs:byte 1", "src/sk.rs:byte 1"]);
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    /// A shields.io badge URL is not a credential: its path carries the
+    /// badge's words and its colour, and the colour's hex is what trips
+    /// the mixed-alphabet rule. Assembled from fragments so the sample
+    /// below is data, not a second copy of a reviewed name.
+    #[test]
+    fn a_shields_badge_url_is_not_reported_and_a_key_still_is() {
+        let root = std::env::temp_dir().join(format!("secret-badge-{}", std::process::id()));
+        empty_workspace(&root);
+        let badge = ["badge/Ask-Deep", "Wiki-2B6CB0"].concat();
+        let body = format!("src=\"https://img.shields.io/{badge}?labelColor=171717\"");
+        let path = root.join("README.md");
+        std::fs::write(&path, &body).unwrap();
+
+        let found = check(&root).unwrap();
+        assert!(
+            found.is_empty(),
+            "a badge URL is not a place a credential can enter: {found:?}"
+        );
         std::fs::remove_dir_all(&root).unwrap();
     }
 
