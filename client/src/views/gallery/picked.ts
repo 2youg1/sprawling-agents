@@ -13,7 +13,7 @@
 import type { Effort, EndpointSummary, ModelFactsSummary } from "../../wire";
 import { Window } from "../../wire";
 import type { Names } from "../talk/composer";
-import type { PickerFacts } from "../talk/picker_look";
+import type { PickerFacts } from "../talk/picker_scene";
 import { UNTUNED } from "./configured";
 
 interface Said {

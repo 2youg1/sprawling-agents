@@ -32,9 +32,7 @@
   import Popover from "../parts/popover.svelte";
   import type { PopoverBinding } from "../parts/popover";
   import Unkept from "../parts/unkept.svelte";
-  import { boxKey, completedAt, menuColumns, pickSlash, picksFor, roomsKnown, sessionModel, slashHands, workspacePill } from "./composer";
-  import { offersOf } from "./picker";
-  import type { PickerFacts } from "./picker_look";
+  import { boxKey, completedAt, configLevel, menuColumns, offeredBy, pickSlash, picksFor, roomsKnown, sessionModel, slashHands, workspacePill } from "./composer";
   import type { BoxKey, ComposerLook } from "./composer";
   import Look from "./composer.look.svelte";
   import { draftAt } from "./draft";
@@ -187,14 +185,6 @@
   const answer = $derived(
     $endpoints !== undefined && "endpoints" in $endpoints ? $endpoints.endpoints : undefined,
   );
-  // The id a command carries next to the name a person reads.
-  const models = $derived(
-    (answer?.endpoints ?? []).flatMap((endpoint) =>
-      endpoint.models.map((row) => ({ endpoint: endpoint.name, label: endpoint.label, model: row.id })),
-    ),
-  );
-  const main = $derived(answer?.chosen.find((each) => each.tag === "main"));
-
   // The room this box speaks to: the page's word for it, or the address bar's.
   const shown = $derived(room === undefined ? Option.getOrNull(current(u.bar)) : { kind: "talk" as const, address: room });
   const here = $derived(shown !== null && shown.kind === "talk" ? shown.address : null);
@@ -213,29 +203,14 @@
   const session = $derived(here === null ? null : sessionModel(heldIn($belief, here), $belief.sessions[here] ?? null));
   const picks = $derived(picksFor(u, session));
   const workspace = $derived(workspacePill($lang, { rooms, here }, picks.workspace));
-  // The level this room inherits when the page states none: the room's
-  // own configuration ladder answers it.
+  // The level this room inherits when the page states none, and what
+  // the picker and the `/` menu offer from the endpoints answer.
   const roomConfig = $derived(here === null ? readable(undefined) : u.conn.asking.ask({ config: { addr: here } }));
-  const inherited = $derived.by(() => {
-    const held = $roomConfig;
-    return held !== undefined && "config" in held ? (held.config.effort?.effort ?? null) : null;
-  });
-  const picker: PickerFacts = $derived({
-    endpoints: answer?.endpoints ?? [],
-    chosen: main,
-    stated: $effort ?? inherited,
-    pick: { model: picks.model, level: picks.effort },
-  });
-  // What `/model` and `/effort` complete their argument from: every
-  // model the city serves, and the levels the model in force offers.
-  const argued = $derived({
-    models,
-    levels: offersOf(picker.endpoints).find((each) => each.endpoint === main?.endpoint && each.model === main.model)?.facts.thinking.levels ?? [],
-  });
+  const offered = $derived(offeredBy(answer, $effort ?? configLevel($roomConfig), picks));
 
   // ------------------------------------------------------- the `/` menu
 
-  const showing = $derived(open ? menuColumns($lang, text, argued) : []);
+  const showing = $derived(open ? menuColumns($lang, text, offered.argued) : []);
 
   function closeMenu(): void {
     open = false;
@@ -252,7 +227,7 @@
         here,
         live,
         belief: get(belief),
-        models,
+        models: offered.models,
         effort: get(effort),
         setEffort: u.chooseEffort,
         policy: get(u.policy),
@@ -415,7 +390,7 @@
     <Unkept words={() => text} />
   {/if}
   <DropRefused refused={zone.refused} />
-  <SettingsRow {workspace} {picker} room={here} draws={band !== undefined || started || startedHere ? "notice" : "everything"} {kept} />
+  <SettingsRow {workspace} picker={offered.picker} room={here} draws={band !== undefined || started || startedHere ? "notice" : "everything"} {kept} />
 {/snippet}
 
 <Look {...look} />

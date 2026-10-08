@@ -14,7 +14,8 @@ import type { Effort, EndpointSummary, ModelFactsSummary } from "../../wire";
 import { Window } from "../../wire";
 import type { Entry, Section } from "./picker";
 import { SECTION, SHOWN, drawnRows, firstLevel, offersOf, orderOf, roomOf, usedLevel, windowed } from "./picker";
-import type { PickerHands, PickerHeld } from "./picker_look";
+import type { PickerHands } from "./picker_look";
+import type { PickerHeld } from "./picker_scene";
 import { pickerOf } from "./picker_look";
 
 const entries = (count: number): readonly Entry[] => Array.from({ length: count }, (_unused, at) => ({ id: `e${String(at)}`, offers: [] }));

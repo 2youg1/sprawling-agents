@@ -26,9 +26,11 @@ import { reached } from "../../core/slash_hands";
 import type { SessionHands, Slash, SlashHands } from "../../core/slash_hands";
 import type { Sending } from "../../core/doing";
 import { Address } from "../../wire";
-import type { Command, Effort, RunPolicy, Seq } from "../../wire";
+import type { Answer, Command, Effort, EndpointsAnswer, RunPolicy, Seq } from "../../wire";
 import type { View } from "../../core/route";
 import type { PopoverColumn } from "../parts/popover";
+import { offersOf } from "./picker";
+import type { PickerFacts } from "./picker_scene";
 
 // What the send control is spelled, for each of the three places a
 // message can land. `queued` is the one a streaming page would
@@ -170,6 +172,34 @@ export function workspacePill(lang: Lang, around: Around, pick: (value: string) 
     value: around.here,
     pick,
   };
+}
+
+// What the endpoints answer offers this box: every model by the id a
+// command carries next to the name a person reads, the facts the model
+// picker is drawn from, and what `/model` and `/effort` complete their
+// argument from - the levels being those the model in force offers.
+export interface Offered {
+  readonly models: readonly Served[];
+  readonly picker: PickerFacts;
+  readonly argued: Arguments;
+}
+
+export function offeredBy(answer: EndpointsAnswer | undefined, stated: Effort | null, picks: Picks): Offered {
+  const endpoints = answer?.endpoints ?? [];
+  const main = answer?.chosen.find((each) => each.tag === "main");
+  const models = endpoints.flatMap((endpoint) => endpoint.models.map((row) => ({ endpoint: endpoint.name, label: endpoint.label, model: row.id })));
+  const inForce = offersOf(endpoints).find((each) => each.endpoint === main?.endpoint && each.model === main.model);
+  return {
+    models,
+    picker: { endpoints, chosen: main, stated, pick: { model: picks.model, level: picks.effort } },
+    argued: { models, levels: inForce?.facts.thinking.levels ?? [] },
+  };
+}
+
+// The level a room inherits from its configuration ladder, when the
+// room's answer has arrived and states one.
+export function configLevel(answer: Answer | undefined): Effort | null {
+  return answer !== undefined && "config" in answer ? (answer.config.effort?.effort ?? null) : null;
 }
 
 // ---------------------------------------------------------- the `/` menu

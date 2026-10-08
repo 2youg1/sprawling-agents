@@ -13,6 +13,10 @@ open picker stands in a box as tall as the page's foot gives it. -->
   import { Address } from "../../wire";
   import Tier from "../setup/tier.svelte";
   import { workspacePill } from "../talk/composer";
+  import { SECTION } from "../talk/picker";
+  import Picker from "../talk/picker.svelte";
+  import { pickerOf } from "../talk/picker_look";
+  import type { PickerHands } from "../talk/picker_look";
   import SettingsRow from "../talk/settings_row.svelte";
   import Case from "./case.svelte";
   import { AT_DEEPSEEK, AT_OLLAMA, AT_OPENROUTER, MANY_MODELS, MANY_PROVIDERS, ONE_PROVIDER, pickerFacts } from "./picked";
@@ -26,6 +30,17 @@ open picker stands in a box as tall as the page's foot gives it. -->
   const alone = pickerFacts(ONE_PROVIDER, AT_OLLAMA, null);
   const aggregated = pickerFacts(MANY_MODELS, AT_OPENROUTER, "medium");
   const none = pickerFacts([], undefined, null);
+  // The open picker alone, as its seat draws it once "more…" opened the
+  // aggregator's models in full: the list scrolls inside the room it
+  // had, so the picker is as tall as before.
+  const still = (): (() => void) => () => undefined;
+  const HANDS: PickerHands = { open: still, close: still, hold: still, keep: still, bound: still, cursor: still, focusFilter: still, holdToken: still, holdFilter: still, holdFrame: still };
+  const opened = $derived(
+    pickerOf($lang, aggregated, {
+      open: true, segment: "model", pick: null, parent: null, pinned: { first: undefined, second: undefined },
+      query: "", whole: [SECTION.second], kept: [], binding: null, active: null,
+    }, HANDS)?.menu,
+  );
 </script>
 
 <Case label="settings row · before a session · workspace, picker and permissions">
@@ -67,6 +82,14 @@ open picker stands in a box as tall as the page's foot gives it. -->
 <Case label="picker · more models than providers · providers first, five models and more">
   <div class="flex min-h-[50rem] flex-col justify-end">
     <SettingsRow {workspace} picker={aggregated} room={null} draws="everything" kept={false} menu="model" />
+  </div>
+</Case>
+<Case label="picker · the aggregator's models opened in full · scrolling in their room">
+  <div class="flex min-h-[50rem] flex-col justify-end">
+    <!-- The row the picker opens above. -->
+    <div class="relative h-touch">
+      {#if opened !== undefined}<Picker menu={opened} />{/if}
+    </div>
   </div>
 </Case>
 <Case label="settings row · after a session starts · no controls">

@@ -27,7 +27,7 @@ already on the screen; a list opened in full scrolls inside that room. -->
 
   const QUIET: SectionLook = { heading: "", aside: undefined, spare: 0, band: false, scrolls: false, empty: "", heard: {} };
   const HEADING = "flex h-control-sm items-center justify-between gap-base px-snug text-note text-text-faint";
-  const ROW = "relative flex h-touch min-w-0 cursor-pointer items-center gap-snug rounded-control px-base text-body outline-1 -outline-offset-1 outline-transparent";
+  const ROW = "relative flex h-touch min-w-0 shrink-0 cursor-pointer items-center gap-snug rounded-control px-base text-body outline-1 -outline-offset-1 outline-transparent";
   const NOTE = "line-clamp-2 min-h-[2lh] px-snug text-note text-text-quiet";
 
   const tone = (item: RowLook): string[] => [
@@ -42,7 +42,7 @@ already on the screen; a list opened in full scrolls inside that room. -->
 
 {#snippet spareRows(count: number)}
   {#each { length: count } as _unused, at (at)}
-    <li role="presentation" aria-hidden="true" class="h-touch"></li>
+    <li role="presentation" aria-hidden="true" class="h-touch shrink-0"></li>
   {/each}
 {/snippet}
 

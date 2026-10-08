@@ -10,15 +10,12 @@ hangs one padding outside the row's edges, so the words line up with
 the composer's line above them on a wide column; on one column the row
 keeps its padding. The token is one control in three segments - model,
 provider, thinking level - each marked with the section a press on it
-opens; the picker is the shared popover seat drawn by
-`picker.look.svelte`. Every word arrives translated and every role, key
+opens; the open picker is its own seat, `picker.svelte`. Every word arrives translated and every role, key
 handler and `aria-*` value arrives in a wire bag spread on the element
 it is for. -->
 <script lang="ts">
-  import { Popover } from "../parts/popover";
-  import type { PopoverLook } from "../parts/popover_wiring";
   import Fact from "./fact.look.svelte";
-  import PickerLook from "./picker.look.svelte";
+  import Picker from "./picker.svelte";
   import type { SettingsRowLook } from "./settings_row";
 
   const look: SettingsRowLook = $props();
@@ -35,12 +32,7 @@ it is for. -->
       {#if look.model !== undefined}
         {@const picker = look.model}
         <div class="contents" {...picker.frame}>
-          {#if picker.menu !== undefined}
-            {@const menu = picker.menu}
-            {#snippet drawn(popover: PopoverLook)}<PickerLook look={popover} {menu} />{/snippet}
-            <Popover label="picker_title" columns={menu.columns} onApply={menu.onApply} onClose={menu.onClose}
-              bind={menu.bind} onCursorChange={menu.onCursorChange} look={drawn} />
-          {/if}
+          {#if picker.menu !== undefined}<Picker menu={picker.menu} />{/if}
           <button type="button"
             class="token inline-flex h-touch min-w-0 max-w-full items-center rounded-control text-note text-text-quiet hover:text-text aria-expanded:text-text"
             {...picker.token}>

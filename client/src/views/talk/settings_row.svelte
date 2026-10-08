@@ -26,7 +26,7 @@ the value `settings_row.look.svelte` draws. It writes no class. -->
   import { childOf, offersOf, orderOf, parentOf } from "./picker";
   import type { Section, Segment } from "./picker";
   import { pickerOf, startOf } from "./picker_look";
-  import type { PickerFacts, PickerHeld } from "./picker_look";
+  import type { PickerFacts, PickerHeld } from "./picker_scene";
   import { permissionsOf } from "./policy";
   import { RECENT_COMBINATIONS } from "./recent.svelte";
   import Sandbox from "./sandbox.svelte";
