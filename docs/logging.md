@@ -44,7 +44,7 @@ Levels here answer **who reads this, and when**, which is a question with a chec
 
 A level admits itself and every level above it in the table. **`effect` is the default**, so `refuse` and `effect` are on unless you ask otherwise: together they answer most of what a person asks — why it declined, and what it actually did — and they are small enough to leave on permanently.
 
-`sprawling serve <city> --log <level>` sets the level, `--log off` writes nothing, and `serve` prints the level it runs at under its banner. A word that is not a level is refused with the list of levels.
+`sprawling serve <city> --log <level>` sets the level, `--log off` writes nothing, and the CLI states the level it runs at on its first line, beside the address. <!-- v0.0.11-verify --> A word that is not a level is refused with the list of levels.
 
 ## 4 Structured, and anchored to a run
 
@@ -52,7 +52,7 @@ Every line carries three required fields: `run`, `seq` (the Ledger position at t
 
 `seq` is the one the design rests on: **it anchors the log to the only history**. From a surprising log line, go to that position in the Ledger and read what happened; from a surprising event, pull the logs around it. Two timelines line up on one integer, with no guessing from timestamps.
 
-The format is one JSON object per line, for the same reason the wire format is: the receiver may be a browser, and a person can still read it. `runtime::diagnostics::render` is the one place a line becomes text. A served city sends its lines to the terminal it runs in and to **the log** lens of **the record**. A line at `effect` names what was done and where, such as a command's name or a file's path, and never carries the text of a message or a reply: those are in the Ledger, and the terminal is not a place to keep them ([`operating.md`](operating.md), *What the console prints*).
+The format is one JSON object per line, for the same reason the wire format is: the receiver may be a browser, and a person can still read it. `runtime::diagnostics::render` is the one place a line becomes text. A served city sends its lines to **the log** lens of **the record**, and to the terminal only where the terminal is not the console: a city served with no terminal writes them to stderr, while the CLI and the quiet host keep the terminal for the conversation and for the address and pairing code, and print no log line. <!-- v0.0.11-verify --> A line at `effect` names what was done and where, such as a command's name or a file's path, and never carries the text of a message or a reply: those are in the Ledger, and the terminal is not a place to keep them ([`operating.md`](operating.md), *What the terminal shows*).
 
 ## 5 Secrets and logs
 
