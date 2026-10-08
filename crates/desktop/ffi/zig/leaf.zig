@@ -115,7 +115,7 @@ extern "shcore" fn GetProcessDpiAwareness(process: ?HANDLE, awareness: *u32) cal
 /// The calling thread's last error, read immediately after the call that
 /// failed and before any other call can overwrite it.
 fn lastError() u32 {
-    return @intFromEnum(windows.GetLastError());
+    return @backingInt(windows.GetLastError());
 }
 
 /// One operation's end: the step it stopped at and the code it read.
@@ -131,7 +131,7 @@ pub const Ended = struct {
 
     pub fn answer(self: Ended, code: *u32) u32 {
         code.* = self.code;
-        return @intFromEnum(self.step);
+        return @backingInt(self.step);
     }
 };
 
@@ -328,23 +328,23 @@ export fn sprawling_desktop_keep(stream: [*]const usize, len: usize, into: [*]us
     var kept: boundary.Kept(usize) = .{ .into = into[0..capacity] };
     for (stream[0..len]) |item| kept.keep(item);
     found.* = kept.count;
-    return @intFromEnum(kept.step());
+    return @backingInt(kept.step());
 }
 
 export fn sprawling_desktop_text_copy(block: [*]const u16, len: usize, into: [*]u16, capacity: usize, found: *usize) u32 {
     const copied = boundary.textCopy(block[0..len], into[0..capacity]);
     found.* = copied.count;
-    return @intFromEnum(copied.step);
+    return @backingInt(copied.step);
 }
 
 export fn sprawling_desktop_text_fill(units: [*]const u16, len: usize, block: [*]u16, block_len: usize) u32 {
-    return @intFromEnum(boundary.textFill(units[0..len], block[0..block_len]));
+    return @backingInt(boundary.textFill(units[0..len], block[0..block_len]));
 }
 
 export fn sprawling_desktop_bitmap_bytes(width: i32, height: i32, bytes: *usize) u32 {
-    const measured = boundary.bitmapBytes(width, height) orelse return @intFromEnum(Step.Measuring);
+    const measured = boundary.bitmapBytes(width, height) orelse return @backingInt(Step.Measuring);
     bytes.* = measured;
-    return @intFromEnum(Step.Finished);
+    return @backingInt(Step.Finished);
 }
 
 // The processor and job exports live in `cpu.zig`; naming it here is

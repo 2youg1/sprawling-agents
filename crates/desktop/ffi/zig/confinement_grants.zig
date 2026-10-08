@@ -15,7 +15,7 @@ const mutex_access: u32 = api.synchronize | 1;
 const mutex_name = wideText("Global\\sprawling.native.acl");
 
 fn lastError() u32 {
-    return @intFromEnum(std.os.windows.GetLastError());
+    return @backingInt(std.os.windows.GetLastError());
 }
 
 fn update(path: [*:0]const u16, sid: *anyopaque, mode: u32, declared: bool) u32 {

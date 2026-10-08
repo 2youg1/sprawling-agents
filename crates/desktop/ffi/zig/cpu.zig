@@ -213,14 +213,14 @@ test "the layouts the processor and job calls lend match the SDK's sizes" {
 
 test "a job share without a job is refused before any call" {
     var code: u32 = 0;
-    try std.testing.expectEqual(@intFromEnum(Step.JobShare), sprawling_desktop_job_share(null, 5, 0, &code));
+    try std.testing.expectEqual(@backingInt(Step.JobShare), sprawling_desktop_job_share(null, 5, 0, &code));
 }
 
 test "a watch without a job or a port is refused before any call" {
     var code: u32 = 0;
     var port: usize = 0;
     var hits: u32 = 0;
-    try std.testing.expectEqual(@intFromEnum(Step.JobWatch), sprawling_desktop_job_watch(null, &port, &code));
-    try std.testing.expectEqual(@intFromEnum(Step.JobWatch), sprawling_desktop_job_memory_hits(0, &hits, &code));
-    try std.testing.expectEqual(@intFromEnum(Step.JobWatch), sprawling_desktop_job_unwatch(0, &code));
+    try std.testing.expectEqual(@backingInt(Step.JobWatch), sprawling_desktop_job_watch(null, &port, &code));
+    try std.testing.expectEqual(@backingInt(Step.JobWatch), sprawling_desktop_job_memory_hits(0, &hits, &code));
+    try std.testing.expectEqual(@backingInt(Step.JobWatch), sprawling_desktop_job_unwatch(0, &code));
 }

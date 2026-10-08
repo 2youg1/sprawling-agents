@@ -45,7 +45,7 @@ fn handle(raw: usize) api.HANDLE {
     return @ptrFromInt(raw);
 }
 fn lastError() u32 {
-    return @intFromEnum(w.GetLastError());
+    return @backingInt(w.GetLastError());
 }
 fn close(raw: *usize) u32 {
     if (raw.* == 0) return 0;
