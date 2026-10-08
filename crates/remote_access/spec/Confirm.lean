@@ -96,9 +96,9 @@ theorem step_done {ttl : Time} {s : Option Pending} {e : Event} {v : Guarded}
     | none => simp [step] at h
     | some p =>
       by_cases hc : a = p.secret ∧ now < p.expires
-      · simp only [step, if_pos hc] at h
+      · simp only [step, ite_eq_left hc] at h
         exact ⟨a, now, p, rfl, rfl, Outcome.done.inj h, hc.1, hc.2⟩
-      · simp only [step, if_neg hc] at h
+      · simp only [step, ite_eq_right hc] at h
         cases h
 
 theorem step_pending {ttl : Time} {s : Option Pending} {e : Event} {p : Pending}
@@ -114,8 +114,8 @@ theorem step_pending {ttl : Time} {s : Option Pending} {e : Event} {p : Pending}
     | none => simp [step] at h
     | some q =>
       by_cases hc : a = q.secret ∧ now < q.expires
-      · simp [step, if_pos hc] at h
-      · simp [step, if_neg hc] at h
+      · simp [step, ite_eq_left hc] at h
+      · simp [step, ite_eq_right hc] at h
 
 /-- The first event of a trace from rest never does a verb. -/
 theorem nothing_done_first (ttl : Time) (es : List Event) (v : Guarded) :

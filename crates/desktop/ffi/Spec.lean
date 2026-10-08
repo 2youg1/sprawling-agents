@@ -280,7 +280,7 @@ theorem textPrefix_length_le : ∀ (l : List Nat), (textPrefix l).length ≤ l.l
     by_cases h : x = 0
     · simp [textPrefix, h]
     · have := textPrefix_length_le l
-      simp only [textPrefix, if_neg h, List.length_cons]
+      simp only [textPrefix, ite_eq_right h, List.length_cons]
       omega
 
 /-- 文本的终点恒在块内：叶子恒不读过 `GlobalSize` 量出的界。 -/
@@ -292,7 +292,7 @@ theorem textPrefix_no_zero : ∀ (l : List Nat), 0 ∉ textPrefix l
   | x :: l => by
     by_cases h : x = 0
     · simp [textPrefix, h]
-    · simp only [textPrefix, if_neg h, List.mem_cons, not_or]
+    · simp only [textPrefix, ite_eq_right h, List.mem_cons, not_or]
       exact ⟨fun e => h e.symm, textPrefix_no_zero l⟩
 
 theorem take_text_end : ∀ (block : List Nat), block.take (textEnd block) = textPrefix block
@@ -302,7 +302,7 @@ theorem take_text_end : ∀ (block : List Nat), block.take (textEnd block) = tex
     · simp [textEnd, textPrefix, h]
     · have ih := take_text_end l
       simp only [textEnd] at ih ⊢
-      rw [textPrefix, if_neg h, List.length_cons, List.take_succ_cons, ih]
+      rw [textPrefix, ite_eq_right h, List.length_cons, List.take_succ_cons, ih]
 
 /-- 写下的恰放得进缓冲。 -/
 theorem copied_fits (block : List Nat) (capacity : Nat) (written : List Nat)
@@ -371,7 +371,7 @@ theorem textPrefix_append_zero : ∀ (units : List Nat), 0 ∉ units → textPre
   | x :: l, h => by
     have hx : x ≠ 0 := fun e => h (by simp [e])
     have hl : 0 ∉ l := fun m => h (List.mem_cons_of_mem x m)
-    rw [List.cons_append, textPrefix, if_neg hx, textPrefix_append_zero l hl]
+    rw [List.cons_append, textPrefix, ite_eq_right hx, textPrefix_append_zero l hl]
 
 /-- 填写与复制互逆：一段不含零的文本写进块、再读出来，恰是它自己。剪贴板的往返靠的就是这一条。 -/
 theorem fill_then_copy_is_the_text (units : List Nat) (h : 0 ∉ units) (capacity : Nat)
@@ -383,7 +383,7 @@ theorem fill_then_copy_is_the_text (units : List Nat) (h : 0 ∉ units) (capacit
     unfold textEnd
     rw [textPrefix_append_zero units h]
   unfold textCopy
-  rw [hend, if_pos room, List.take_left' rfl]
+  rw [hend, ite_eq_left room, List.take_left' rfl]
 
 /-- 位图的字节数恰是行数乘每行的字节数，且恒不超过上界：Rust 借出的缓冲正是 `GetDIBits` 写的那么长。 -/
 theorem bitmap_bytes_are_rows_of_four_byte_pixels (most : Nat) (width height : Int) (bytes : Nat)
@@ -531,7 +531,7 @@ theorem walk_fuel_suffices (sizeAt : Nat → Nat) (len : Nat) :
       · contradiction
       · split
         · rename_i hok
-          rw [if_pos hok] at hw
+          rw [ite_eq_left hok] at hw
           intro hnone
           apply hw
           cases hr : walk sizeAt len fuel (off + sizeAt off) with
@@ -543,7 +543,7 @@ theorem walk_fuel_suffices (sizeAt : Nat → Nat) (len : Nat) :
             simp only [Option.map_eq_none_iff] at hnone
             exact this hnone
         · rename_i hok
-          rw [if_neg hok] at hw
+          rw [ite_eq_right hok] at hw
           exact absurd rfl hw
 
 /-- 反例：不要求 `Size` 至少一条记录时，一条 `Size` 为零的记录让走法停在原地。 -/

@@ -335,7 +335,7 @@ theorem a_landing_hands_back {r : Room} {x : Nat} (back : Back)
     (step r (.land x back)).backs = r.backs ++ [x] := by
   show (r.land x back).backs = _
   unfold Room.land
-  rw [if_pos ⟨handed, fresh⟩]
+  rw [ite_eq_left ⟨handed, fresh⟩]
   split
   · rw [(settle_fields _).2.2.1]; exact (receive_fields r x back).2.2.2
   all_goals exact (receive_fields r x back).2.2.2
@@ -344,7 +344,7 @@ theorem a_second_landing_adds_nothing {r : Room} {x : Nat} (back : Back) (h : x 
     step r (.land x back) = r := by
   show r.land x back = r
   unfold Room.land
-  rw [if_neg (fun c => c.2 h)]
+  rw [ite_eq_right (fun c => c.2 h)]
 
 theorem closed_step {r : Room} (h : r.status = .closed) :
     ∀ a, (step r a).status = .closed ∧ (step r a).handed = r.handed
@@ -394,7 +394,7 @@ theorem an_early_child_hands_down {r : Room} (h : Inv r) {x : Nat} (opened : r.s
   have settled : step r (.land x .finished) = (r.receive x .finished).settle := by
     show r.land x .finished = _
     unfold Room.land
-    rw [if_pos ⟨out, fresh⟩, opened]
+    rw [ite_eq_left ⟨out, fresh⟩, opened]
   rw [settled]
   intro y hy
   obtain ⟨ids', hd', b', bh'⟩ := receive_inv h ⟨out, fresh⟩ .finished

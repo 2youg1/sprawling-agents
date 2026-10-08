@@ -241,7 +241,7 @@ theorem a_swap_moves_only_what_it_read (s : Repo) (w : Writer) (read : Option Oi
   by_cases h : (s.head == read && s.store (s.index w)) = true
   · simp only [Bool.and_eq_true, beq_iff_eq] at h
     exact h.1
-  · rw [if_neg h] at moved
+  · rw [ite_eq_right h] at moved
     exact absurd rfl moved
 
 /-- 两个写者从同一个读数 `read` 出发：先到的那个改了 HEAD，后到的那个被拒，先到者的更新不会丢。 -/
@@ -338,21 +338,21 @@ theorem a_step_keeps_references_sound (st : Step) (s : Repo) (ok : s.sound) :
   | pin w =>
     simp only [Step.apply]
     by_cases held : s.store (s.index w) = true
-    · rw [if_pos held]
+    · rw [ite_eq_left held]
       refine ⟨fun u o h => ?_, hh⟩
       simp only [Bool.or_eq_true, Bool.and_eq_true, beq_iff_eq] at h
       rcases h with ⟨_, rfl⟩ | h
       · exact held
       · exact hp u o h
-    · rw [if_neg held]
+    · rw [ite_eq_right held]
       exact ⟨hp, hh⟩
   | swap w read =>
     simp only [Step.apply]
     by_cases held : (s.head == read && s.store (s.index w)) = true
-    · rw [if_pos held]
+    · rw [ite_eq_left held]
       simp only [Bool.and_eq_true] at held
       exact ⟨hp, fun o h => by cases h; exact held.2⟩
-    · rw [if_neg held]
+    · rw [ite_eq_right held]
       exact ⟨hp, hh⟩
 
 /-- 任何交错之后，每个引用仍指向库里的对象：没有一个引用是坏的。 -/

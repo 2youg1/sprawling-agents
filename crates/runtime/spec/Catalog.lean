@@ -170,7 +170,7 @@ theorem pack_whole_when_it_fits : ∀ (room : Nat) (es : List Entry),
     have ih := pack_whole_when_it_fits (room - e.hinted) rest (by omega)
     have hle : e.hinted ≤ room := by omega
     unfold pack
-    rw [if_pos hle]
+    rw [ite_eq_left hle]
     exact ⟨by simp [ih.1], ih.2⟩
 
 /-- 一份索引的字节：段头、装进去的行、有件没列出时的 `+N more` 行。`marker n` 是那一行在 N＝n 时的长度；预算先扣掉 N 取全部件数时的长度。 -/
@@ -286,7 +286,7 @@ theorem unadmitted_is_unreachable {α σ : Type} (schemaOf : String → Option �
     (fits : σ → α → Bool) (o : Outer α) (h : schemaOf o.target = none) (hn : o.target ≠ callName) :
     resolveCall schemaOf fits o = .error .unknown := by
   unfold resolveCall
-  rw [if_neg hn, h]
+  rw [ite_eq_right hn, h]
 
 /-- 一个可实现的实例：一件常驻、两件休眠、一件没准入时，工具表只有一件，索引只列两件。 -/
 example :

@@ -84,7 +84,7 @@ def «prefix» {Line : Type} (mother : List Line) (at_seq : Nat) : Except Code (
 theorem a_fork_past_the_tail_is_refused {Line : Type} (mother : List Line) (at_seq : Nat)
     (past : mother.length ≤ at_seq) : «prefix» mother at_seq = .error .InvalidArgs := by
   unfold «prefix»
-  rw [if_neg (by omega)]
+  rw [ite_eq_right (by omega)]
 
 /-- 分叉前缀恰好是母序列的头 `at_seq + 1` 行，一行不多一行不少。 -/
 theorem a_fork_is_the_mothers_first_lines {Line : Type} (mother : List Line) (at_seq : Nat)

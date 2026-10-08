@@ -184,7 +184,7 @@ theorem batch_appends_nothing_unless_proved (p : Proof) (h : p ≠ .whole)
   induction batch generalizing ledger with
   | nil => rfl
   | cons m rest ih =>
-    simp only [List.foldl_cons, serveUnder, if_neg h]
+    simp only [List.foldl_cons, serveUnder, ite_eq_right h]
     exact ih ledger
 
 /-- 证明完成之前，一次醒来什么也不写。 -/

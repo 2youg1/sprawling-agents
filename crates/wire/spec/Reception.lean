@@ -171,10 +171,10 @@ theorem a_lagged_range_fills_the_gap (last next first to : Nat)
     first = last + 1 ∧ to + 1 = next ∧ first ≤ to := by
   unfold decideLag at lagged
   by_cases bounds : 1 ≤ next ∧ lagStart (some last) ≤ next - 1
-  · rw [if_pos bounds] at lagged
+  · rw [ite_eq_left bounds] at lagged
     simp only [lagStart, Option.some.injEq, Prod.mk.injEq] at lagged bounds
     omega
-  · rw [if_neg bounds] at lagged
+  · rw [ite_eq_right bounds] at lagged
     cases lagged
 
 /-- 没有断口就不报区间。 -/
@@ -184,7 +184,7 @@ theorem consecutive_records_owe_nothing (last : Nat) :
   have closed : ¬ (1 ≤ last + 1 ∧ lagStart (some last) ≤ last + 1 - 1) := by
     simp only [lagStart]
     omega
-  rw [if_neg closed]
+  rw [ite_eq_right closed]
 
 /-- 发出一条之后，会话总是 `Even`，且记住刚发的那一条。 -/
 theorem sending_leaves_the_stream_even (stream : Stream) (next : Nat) :

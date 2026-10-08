@@ -90,12 +90,12 @@ theorem gatedFold {σ α : Type} (step : σ → α → σ) (k : Nat) (xs : List 
     by_cases hk : k ≤ i
     · have h1 : k - i = 0 := by omega
       have h2 : k - (i + 1) = 0 := by omega
-      simp only [gatedStep, if_pos hk]
+      simp only [gatedStep, ite_eq_left hk]
       rw [ih, h1, h2]
       simp [fold, List.length_cons]
       omega
     · have h1 : k - i = (k - (i + 1)) + 1 := by omega
-      simp only [gatedStep, if_neg hk]
+      simp only [gatedStep, ite_eq_right hk]
       rw [ih, h1]
       simp [List.length_cons]
       omega

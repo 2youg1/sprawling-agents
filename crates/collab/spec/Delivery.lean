@@ -282,9 +282,9 @@ theorem step_inv {patience : Nat} {c : City} (h : Inv patience c) (a : Act) :
         simp only [List.mem_filter] at hw
         exact waitsBounded w hw.1
       by_cases hq : (c.vacate r).queue r = []
-      · rw [if_pos hq]
+      · rw [ite_eq_left hq]
         exact ⟨order, once, fresh', sent', running', knocksOnce, idle', waits'⟩
-      · rw [if_neg hq]
+      · rw [ite_eq_right hq]
         exact ⟨order, once, fresh', sent', running', knock_nodup knocksOnce,
           knock_idle idle', waits'⟩
     · exact ⟨order, once, heldFresh, heldSent, heldRunning, knocksOnce, knocksIdle, waitsBounded⟩

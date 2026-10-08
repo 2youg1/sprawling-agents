@@ -198,7 +198,7 @@ theorem before_tells (s : Stream) (d n k : Nat) (hd : s.delivered = some d)
   · apply told_append_left
     have gap : decideLag (some d) n = [.lagged (d + 1) (n - 1)] := by
       simp only [decideLag, lagFrom]
-      exact if_pos (by omega)
+      exact ite_eq_left (by omega)
     exact ⟨.lagged (d + 1) (n - 1), by simp [gap], by simp only [Said.covers]; omega⟩
 
 /-- 一个已经说到 `d` 的会话，之后说到的最后一条是 `e` 时，`d` 与 `e` 之间的每个 seq
