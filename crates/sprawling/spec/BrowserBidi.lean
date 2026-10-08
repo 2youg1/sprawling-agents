@@ -80,3 +80,28 @@ impl RunWorker {
 | browser_tool | 录制适配器上重放 open→snapshot→act→screenshot 一整条；截图后 CAS 里有字节、载荷里有定位符与尺寸、attachments 里有一个 `ImageRef` |
 | RULES.toml | 不写 `browser` 即没有；confidential 楼写 `browser = true` 即拒 |
 -/
+
+/-!
+### 8-45-6 居民的浏览器不碰城自己的源（`bin::browser_tool::guarding`）
+
+城在哪些地址上监听，由装配层在监听绑定之后登记：城自己的监听在 `bin::assembly::listening` 绑定之后登记一次，远程监听在 `bin::outside::listener` 开门时登记、关门时撤销。两件浏览器工具（`browser` 与 `usersbrowser`）每一次调用都先读这份登记，得到一个 `browser::OwnListeners`，再按它判：
+
+```rust
+pub(crate) fn serve(at: SocketAddr) -> Served;        // bin::browser_tool::guarding；Served 被丢掉时撤销
+pub(crate) fn own() -> Result<OwnListeners, AxError>;  // 此刻的登记
+```
+
+- `open` 与 `fetch` 的地址是城自己的源，拒（`E_GATE_DENIED`），不发任何一帧；
+- 每一个动作之前读这个 tab 此刻的地址（一帧 `browsingContext.getTree`），它是城自己的源，拒；
+- `open` 之后再读一次：一次跳转把 tab 带到了城自己的源上，这一次也拒，下一次动作照样被前一条拒住。
+
+拒词说的是动作与地址，恢复语是「城自己的页面是 User 的，打开工作所服务的那个地址」。
+-/
+
+/-! D74 居民的两种浏览器都不碰城自己的源；守卫读 tab 的地址，不装 BiDi 拦截
+
+决定：§8-45-6 的三条判断落在 `bin::browser_tool`，对 `browser` 与 `usersbrowser` 一样，判定本身（一个地址是不是城的某个监听）在 `browser::OwnListeners`。理由：`usersbrowser` 驱动的是人自己的 profile，城的页面在那个 profile 里存着人的设备钥，一个居民把它带到城的源上，就能以人的身份操作这座城；`browser` 的 profile 是楼自己的，没有设备钥，可它照样能打开配对页。两件工具一条规则，比只守一件少一处要记住的差别。出网门不改：`kernel::gate` 的出网判定只按主机，回环一律放行（居民要看自己起的开发服务器），它不知道城监听在哪个端口，而登记只有装配层知道。被否：①让出网门长出「本城的监听」这一判定——要把端口带进 kernel 的门，而门的输入今天只有主机；②拦所有回环——居民的开发循环就是在回环上看自己造的东西。
+
+现状：页面自己发起的子资源请求与脚本里的 `fetch` 不经这条守卫。sec.md E.6 要的 BiDi `network.addIntercept` 需要 `BidiSocket` 在等答复的循环里答 `network.beforeRequestSent` 事件（`network.failRequest`），并用一段不与 `Session` 相撞的帧 id；今天的端口跳过一切事件，装上拦截而不答，被拦的请求就挂到下一次调用为止。挡住这类请求的是本机端口的入口判定：Origin 不在名单里的请求在升级之前就被拒（`crates/wire/Spec.lean` 的入口判定）。重开参数：BiDi 端口开始处理事件时，加上这一道拦截。
+-/
+

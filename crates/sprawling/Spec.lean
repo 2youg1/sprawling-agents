@@ -130,6 +130,11 @@ import crates.sprawling.spec.WireClient
 **重开参数**：吞吐台（roadmap TP1）在 N = 64 时量到线程栈或调度本身成了等待的来源时，重议 lane 是否改为任务而不是线程。
 -/
 
+/-! D73 本 crate 起的子进程从 `child::command` 起，三类例外各有它们自己的一节
+
+决定：居民浏览器的引擎（`bin::browser_bidi::engine`）、doctor 的探测、安装配方与查询（`bin::doctor::probe`、`bin::doctor::asking`、`bin::doctor::running`、`bin::doctor::github`、`bin::doctor::registry`、`bin::doctor::scanning`）、skill 审计问客户端版本（`bin::assembly::skill_audit::clients`）、主机隐私控件与它们的 PowerShell（`bin::privacy::windows`、`bin::privacy::windows::task`、`bin::privacy::identity`、`bin::privacy::elevation`）、环境变量广播（`bin::environment_broadcast`）、安装时写 `PATH`（`bin::install::search_path_windows`）、放置读 `sysctl`（`bin::serving::placement::reading`）、在文件管理器里显示（`bin::revealing`），都由 `child::command(program)` 造出它们的 `Command`（`crates/child/Spec.lean`）：Windows 上不附着在城的控制台上，Unix 上在自己的进程组里，`SPRAWLING_SECRET_*` 与 `SPRAWLING_PAIRING_TOKEN` 不进它们的环境。文件管理器另把三路 stdio 接空：它比城活得久，继承城的终端就会在城关掉之后往一块已经不归它的屏上写。理由：这些进程都不需要城的秘密；附着在城的控制台上的进程能经 `CONOUT$` 读屏上的配对码、经 `CONIN$` 读人敲进 CLI 的键；与城同一个进程组的进程在终端挂断时随城一起收到 `SIGHUP`。三类例外不走它，各在自己那一节写明理由：守护进程起的那个子进程（它就是城，§8 的 `bin::supervising`）、CLI 交出终端完成 agent 登录的那一段（`crates/agent_protocols/Spec.lean`）、打开人的浏览器（`bin::firstrun`）。`sprawling gauge` 量的命令是人在自己终端里跑的另一个动词，不是城的子进程，也不在此列（`crates/sprawling/src/main/gauge/running.rs`）。被否：各起点自己设平台标志与 `env_remove`——十几处各写一份，下一个新起点就会漏掉；`creation_flags` 改的是全部标志，一处设了优先级就会把另一处的 `NO_WINDOW` 盖掉。重开参数：某个起点要把城的一个秘密交给它的子进程（今天没有），那时由调用点显式 `env` 递过去。
+-/
+
 /-! ## 4 现状分析
 
 各节的「本节接口的当前状态」写该接口还没做完的部分，本节不另列。

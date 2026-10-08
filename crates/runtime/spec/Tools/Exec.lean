@@ -185,6 +185,13 @@ pub fn new(setup: ExecSetup, sandbox: Box<dyn Sandbox>, backlog: Backlog) -> Res
 **验收**：声明了名字的楼里，`exec` 的子进程恰好看到那几个（加地板四个）；没声明的楼里只看到地板四个；凭据形状的名字在配置解析处被拒。以及一次真实演示：声明了名字的楼里 `exec` 跑得动 `cargo build`。
 -/
 
+/-! D96 exec 起的每一个进程都从 `child::command` 起（`crates/child/Spec.lean`）
+
+决定：Host 臂与 CopiedTree 臂的程序与 shell 行（`exec`、`exec::shell`）、降级的外层（`exec::yielding` 的 `nice`、`ionice`、`taskpolicy`）、Linux 的 `bwrap` 外层与它的探测（`exec::confinement::placing`）、macOS 的 seatbelt 外层（`exec::native_macos`）、容器 CLI 的每一条命令（`exec::container` 与它的 `cleanup`、`guardian`），都由 `child::command(program)` 造出，不写 `Command::new`。于是 Windows 上这些子进程不在城的控制台上（`CREATE_NO_WINDOW`），Unix 上在它们自己的进程组里（`process_group(0)`），城的秘密键不进它们的环境。Windows 上 `yielding::one_level_down` 写 `creation_flags(child::NO_WINDOW | BELOW_NORMAL_PRIORITY_CLASS)`：`creation_flags` 是覆盖不是累加，只写优先级就把 `NO_WINDOW` 盖掉，子进程又回到城的控制台上。Unix 上外层是新造的命令，内层的进程组不随它走，所以外层也从 `child::command` 起，起动的那个进程才在自己的组里。Host 臂随后照旧 `env_clear` 再放白名单（§8-13-3 的次序），去秘密在这里多余而无害；容器 CLI、`bwrap` 与 seatbelt 外层不清环境，去秘密就是它们唯一的那一道。原生 Windows 臂经 `desktop_ffi` 的 Zig 叶子起进程，本来就不继承控制台与环境（`crates/desktop/ffi/src/confinement/packet.rs`），不经 `Command` 起，不在此列。
+
+被否：只在 Host 臂加标志——容器 CLI 与沙箱外层同样附着在城的控制台上、继承城的全部环境；在 backlog 的 spawn 处统一加标志——backlog 收的是一个已经造好的 `Command`，探测与清理的命令（`container::control`、`cleanup`）不经它起。重开参数：标准库让 `creation_flags` 变成累加，或 `setsid` 稳定到能完全脱离控制终端（`child` D2）。
+-/
+
 /-! D10 沙箱副本按工具一份、每条命令前同步，而不是每条命令新建一份
 
 **决定**：`Confined` 留着一份副本，`place()` 把它同步成工作目录此刻的样子：不同的文件删掉再复制，多出来的项删掉，相同的文件不动（§8-13-2）。

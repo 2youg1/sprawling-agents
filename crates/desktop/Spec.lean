@@ -573,6 +573,8 @@ D10 树经 `uiautomation` 读、按文档序铸 ref、折成文字；COM 公寓�
 
 D16 截图 schema 的 `quality` 上限经 `IMAGE_QUALITY.admit` 读出。
 
+D17 录制起的两个 ffmpeg（`windows::record::sink` 编码画面、`windows::record::hearing` 录声音）从 `child::command` 起（`crates/child/Spec.lean`）：不附着在城的控制台上，`SPRAWLING_SECRET_*` 与 `SPRAWLING_PAIRING_TOKEN` 不进它们的环境。理由：ffmpeg 只读 stdin 与一个设备，用不着城的秘密；附着在城的控制台上的进程能读屏上的配对码与人敲进 CLI 的键。被否：本 package 自己设 `CREATE_NO_WINDOW`——那是第二份定义，`child` 是唯一的一份。
+
 - **决定**：`desktop.screenshot` 的 `inputSchema` 里 `quality.maximum` 是 `kernel::consts_policy::IMAGE_QUALITY` 收下的最大值，由 `tools::largest_quality` 在 `admit` 上二分找出：`admit` 的域是 `0..=max`（`crates/kernel/spec/PolicyLimit.lean` §8-73），所以「收下」对质量单调，三十二次判定之内找到边界。一次调用的质量仍在解析点经 `admit` 判（`platform::windows::reading`）。
 - **理由**：schema 是模型读到的域，`admit` 是本 server 执行的域。schema 里写死的 100 是同一个事实的第二份定义：城里的域一挪，模型照旧按旧域发，server 按新域拒。kernel 的 `ImageQuality` 没有 getter，那是 kernel D3 的定规（拒因只由类型说出，调用方读不出裸数去拼自己的句子）；schema 的上界不是一句拒因，经类型唯一的门读出它，定规不动。
 - **击败的备选**：①在 `consts_policy` 加一个公开常量 `IMAGE_QUALITY_MAX`，`IMAGE_QUALITY` 由它构造——一个数一个家，代码最短，但它正是 12.3 这条定规关上的那扇门；②留 100、由评审盯着；③由 `xtask guard` 比对两处（设计九已否：抄件加比对只让漂移看得见）。

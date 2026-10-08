@@ -100,7 +100,7 @@ D2 后量子放在三处：TLS、设备认证、帧封装。TLS 负责传输层�
 
 - 帧的类型、编码与握手版本归 `wire::frames`；本 crate 只在帧外封一层，不认识任何一个帧。
 - 一帧属于哪个动词类（`Read`／`Act`／`LocalOnly`）的对照表住在 `crates/wire/Spec.lean` §19-2，是 reach 旁边的 `class` 一列，`xtask wiring` 读那一张表并对照代码；逐帧查表、再问 `door::permits` 的中继在装配层，因为只有 `sprawling` 同时依赖 wire 与本 crate。本 crate 只给出 `door::permits(Authority, VerbClass)` 这条判定。
-- 随机字节、时钟、远程监听与它的路径、设备表的落盘与城钥匙种子的存取（何时生成、写进 vault、取回、更换）归装配层，种子的解封与派生归本 crate 的 `keys`（D23）（`bin::assembly` 取时钟与熵，`bin::outside` 持有门、远程监听与设备表，`crates/sprawling/Spec.lean` §8-139）；本 crate 只收参数、只给判定。通路是唯一的例外：通路缝（§8-7）与它的三个实现都在本 crate，两个生产实现在这里起子进程（`cloudflared`、人写的命令）、读它们的输出、在回环上问就绪（D14）。它们只用标准库的 `std::process` 与 `std::net`，本 crate 仍只依赖 kernel、aws-lc-rs 与清零用的 zeroize。装配层选哪一条通路、把配置读成类型化的参数交给它。
+- 随机字节、时钟、远程监听与它的路径、设备表的落盘与城钥匙种子的存取（何时生成、写进 vault、取回、更换）归装配层，种子的解封与派生归本 crate 的 `keys`（D23）（`bin::assembly` 取时钟与熵，`bin::outside` 持有门、远程监听与设备表，`crates/sprawling/Spec.lean` §8-139）；本 crate 只收参数、只给判定。通路是唯一的例外：通路缝（§8-7）与它的三个实现都在本 crate，两个生产实现在这里起子进程（`cloudflared`、人写的命令）、读它们的输出、在回环上问就绪（D14）。它们只用标准库的 `std::process` 与 `std::net`，子进程从 `child::command` 起（D24），本 crate 仍只依赖 kernel、child、aws-lc-rs 与清零用的 zeroize。装配层选哪一条通路、把配置读成类型化的参数交给它。
 
 依赖：`remote_access: kernel`（ARCHITECTURE §3 的 depmap）。`sprawling` 是唯一消费者。
 
@@ -108,7 +108,7 @@ D8 局域网那一面不是通路。wire 的局域网面（绑定非回环地址
 
 D10 页面由通路送达，这是通路上剩下的一件信任。页面脚本经通路到达设备，改写页面的通路能读到页面读到的一切：片段里的配对码、设备的种子、解开的帧。浏览器目前没有办法让一个页面钉住自己下一次加载的字节：service worker 的脚本变了，浏览器就装上新版本，旧版本拦不住。落选的做法：只在这台电脑旁边配对（手机要先到电脑边上，而局域网不是安全上下文，D8）；另做一个原生外壳（多一种发行件和一条签名链）。浏览器提供钉住顶层页面字节的办法时，重新考虑这一条。
 
-D14 通路缝的三个实现与缝同在本 crate。一条缝要带着它的第二个实现落地才是真的（ARCHITECTURE §4），而装配层要到接上中继时才链接本 crate；通路的策略——哪种地址算安全上下文、通路何时算就绪、人写的命令要印什么——又都属于声明它的接口。两个生产实现只用标准库起子进程、读一个管道、在回环上问一次 HTTP，所以本 crate 的依赖仍是 kernel、aws-lc-rs 与 zeroize，装配层只选一条通路、把配置读成类型化的参数交给它。落选的做法是把 `cloudflare` 与 `command` 放进装配层、脚本化通路放进 `crates/sprawling/tests/`：缝在链接之前就无从证明，装配层还要多管两个与组装无关的子进程。
+D14 通路缝的三个实现与缝同在本 crate。一条缝要带着它的第二个实现落地才是真的（ARCHITECTURE §4），而装配层要到接上中继时才链接本 crate；通路的策略——哪种地址算安全上下文、通路何时算就绪、人写的命令要印什么——又都属于声明它的接口。两个生产实现只用标准库起子进程、读一个管道、在回环上问一次 HTTP，所以本 crate 的依赖仍是 kernel、child（D24）、aws-lc-rs 与 zeroize，装配层只选一条通路、把配置读成类型化的参数交给它。落选的做法是把 `cloudflare` 与 `command` 放进装配层、脚本化通路放进 `crates/sprawling/tests/`：缝在链接之前就无从证明，装配层还要多管两个与组装无关的子进程。
 -/
 
 /-! ## 8 接口先行
@@ -199,6 +199,8 @@ pub struct Signature(Box<[u8; SIGNATURE_BYTES]>);   // from_bytes／as_bytes
 - **城钥匙**（D23）：城自己的 `SigningKey` 由 vault 里的一份种子派生。`written` 把装配层新取的种子写成 vault 收的正文：§8-2 的小写 base32，不带填充，52 个字符，交出时已是 `Zeroizing`。`from_sealed` 读回这份正文；它是本 crate 唯一一处 `.expose(`，明文种子只活在这个函数里，派生完即随 `Zeroizing` 清掉。只认 `written` 写得出的那一种正文（解码后再编码要逐字相同），所以多一个字符、少一个字符、末位多出的位不为零、不在字母表里的字符都读不成 → `E_CONFIG_INVALID`，恢复语是在城的控制台上用 `/remote replace-key` 更换城钥匙、再重新配对设备。
 
 D23 城钥匙的种子存进城已有的 vault，兑现点在本 crate 的 `keys`（定规）。引用的 realm 是 `remote`，name 是 `city-key.` 接这座城的创世 id，即 Ledger 创世行的链哈希（wire 的 `Welcome.epoch` 读的同一个值）的小写十六进制，由 `SecretRef::new` 在装配层一处造出，所以两座城不共用一把，`sprawling export` 打的包里没有 vault 条目，也就带不走它。「更换城钥匙」（今天是城的控制台上的 `/remote replace-key`，设置里的按钮随它的 wire 命令到来）生成新种子盖过旧的，再撤销每一台已配对的设备、各写一行 `device_revoked`：设备钉住的是旧钥匙，留在表里的设备既连不上，又占着名字让同名的重新配对被拒，所以每台设备都要重新配对；已撤销的设备不在表里，换钥匙也不把它带回来。门开着时拒绝更换，因为开着的会话是用旧钥匙握的手。每个平台上种子能留多久，就是 vault 在那个平台上能留多久（`crates/gateway/spec/Credential.lean` §8-4 的平台表）：Windows 凭据管理器与 macOS 钥匙串跨重启保留；macOS 上二进制更新之后，种子仍在钥匙串里，但钥匙串对新二进制的第一次读取弹出一次对话框：那一项的访问列表只认写它的那个二进制的 cdhash，而这个仓库不给发行件签 Developer ID，链接器给的 ad-hoc 签名每次构建都换一个 cdhash（`on-demand.yml` 的 `keychain` 作业，run 37120203124 的判词逐字是 `verdict: a prompt: the second build's read of the key in the login Keychain waited on a Keychain dialog`；两次 serve 之后那一项的 `mdat` 相同，访问列表里唯一的应用条目是第一个构建路径上的一条 `requirement: cdhash H"…"`）。User 在对话框里允许之后城读到同一把种子，已配对的设备不必重新配对；拒绝时城读不到钥匙，门不发邀请、不答握手。推断：发行件签上 Developer ID 后，访问列表认的是签名者而不是 cdhash，更新就不再弹框；那时用同一个作业重读这一条。没有图形会话时这个对话框让城停住，见 §3。Linux 的内核 keyutils 只留到这次开机结束，重启电脑后设备要重新配对，除非这座城用加密的 vault 文件（`crates/gateway/Spec.lean` §8-21）；vault 退回进程内时每次城重启都要重新配对，`/remote open` 照实说出这一句。局限：同一个系统用户下运行的程序都能读这个用户的凭据存放处，与 provider key 相同。落选的两种：兑现点放在装配层（`bin::outside::keeper`），明文种子会出现在组装根里，而 `EXPOSE_WHITELIST` 的注释写明它存在就是为了不让明文出现在那里；种子写进保留子树里的一份文件，明文凭据落在 vault 之外，`sprawling export` 也会把它带走，一份拷贝的城就能冒充原来那座。vault 有了跨机同步时重新考虑这一条，因为那时「两座城不共用一把」要由同步来守。
+
+D24 通路起的两种子进程（`route::cloudflare` 的 `cloudflared`、`route::command` 的人写的命令）都从 `child::command` 起（`crates/child/Spec.lean`）：Windows 上不附着在城的控制台上，Unix 上在自己的进程组里，`SPRAWLING_SECRET_*` 与 `SPRAWLING_PAIRING_TOKEN` 不进它们的环境；人写的命令照旧另收 `SPRAWLING_REMOTE_LOCAL`。理由：通路是一个长时间开着、对外网说话的进程，它不需要城的任何秘密，而附着在城的控制台上的进程能读屏上的配对码与人敲进 CLI 的键。被否：在本 crate 里自己设平台标志与去秘密——那是全城每个起点各写一份的规则，`child` 是它唯一的定义处。重开参数：某条通路需要城的一个秘密（今天没有），那时由调用点显式 `env` 递给它。
 
 D6 设备密钥在设备上生成。城只存公钥，城的存储泄露不让任何人登录；人要保存的恢复种子是设备自己的，城从未见过它。
 
