@@ -63,7 +63,7 @@ fn change(path: [*:0]const u16, sid: *anyopaque, mode: u32, declared: bool) u32 
 
 pub fn grant(roots: []const u16, sid: *anyopaque, record: *api.Record) u32 {
     if (roots.len == 0) return 0;
-    const owned = allocator.dupeZ(u16, roots) catch return 8;
+    const owned = allocator.dupeSentinel(u16, roots, 0) catch return 8;
     record.grant_paths = @intFromPtr(owned.ptr);
     record.grant_units = owned.len;
     return each(owned, sid, 1, record.grant_roots);
@@ -74,7 +74,7 @@ fn each(roots: []const u16, sid: *anyopaque, mode: u32, declared: usize) u32 {
     var paths = std.mem.splitScalar(u16, roots, 10);
     while (paths.next()) |path| {
         if (path.len == 0) return api.invalid_parameter;
-        const terminated = allocator.dupeZ(u16, path) catch return 8;
+        const terminated = allocator.dupeSentinel(u16, path, 0) catch return 8;
         defer allocator.free(terminated);
         const result = update(terminated.ptr, sid, mode, index < declared);
         index = std.math.add(usize, index, 1) catch return api.invalid_parameter;

@@ -154,7 +154,7 @@ export fn sprawling_native_may_resume(record: *const api.Record, bytes: usize) u
 
 fn start(parts: Packet, sid: *anyopaque, record: *api.Record) u32 {
     phase(record, @src().fn_name);
-    const command = allocator.dupeZ(u16, parts.strings[1]) catch return 8;
+    const command = allocator.dupeSentinel(u16, parts.strings[1], 0) catch return 8;
     defer allocator.free(command);
     phase(record, "stdin");
     const input = file(api.nul, api.file_read, api.open_existing) orelse return lastError();
