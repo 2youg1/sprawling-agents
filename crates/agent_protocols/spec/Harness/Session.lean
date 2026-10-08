@@ -7,8 +7,8 @@
 # A run whose resident is an official harness.
 
 Specifies the harness run the dispatch path starts for a room whose resident
-is one of the five official harnesses (`crates/sprawling/Spec.lean` §8-4e and
-8-124). Three Rust modules hold it between them, and the Rust code is the
+is an ACP agent the person consented to, the five official harnesses among
+them as built-in entries (`crates/sprawling/Spec.lean` §8-4e and 8-124). Three Rust modules hold it between them, and the Rust code is the
 authority on how these properties hold; this model is the authority on which
 properties must hold:
 

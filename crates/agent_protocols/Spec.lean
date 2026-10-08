@@ -4,6 +4,7 @@
 -- Copyright (c) 2026 2youg1 and the sprawling contributors
 
 import crates.agent_protocols.spec.Acp
+import crates.agent_protocols.spec.Harness.Consent
 import crates.agent_protocols.spec.Harness.Session
 import crates.agent_protocols.spec.Mcp.Link
 import crates.agent_protocols.spec.Mcp.Reading
@@ -25,7 +26,7 @@ import crates.agent_protocols.spec.Mcp.Tools
 | `mcp::stdio`、`mcp::http`、`mcp::sse`、`mcp::link`、`mcp::redeeming` | 字节经哪种传输到一台 server，丢了答时能不能再问（§8-17、`spec/Mcp/Link.lean`） |
 | `mcp::broker` | 哪家 broker 替人持外部应用的 OAuth（§8-18） |
 | `acp` | 一个外部编辑器把这座城当 agent 驱动，请求变成一次普通 Dispatch（§8-2、`spec/Acp.lean`） |
-| `harness`（`roster`、`process`、`session`） | 城作为 ACP 的 client 驱动五家官方 harness 之一（§8-19、`spec/Harness/Session.lean`） |
+| `harness`（`entry`、`catalog`、`roster`、`paste`、`environment`、`process`、`session`） | 城作为 ACP 的 client 驱动任何一个人同意过的 ACP agent，五家官方 harness 是内置条目（§8-19、`spec/Harness/Session.lean`、`spec/Harness/Consent.lean`） |
 -/
 
 /-! ## 2 验收标准
@@ -36,7 +37,7 @@ import crates.agent_protocols.spec.Mcp.Tools
 | mcp::reading | 恰在上限内的消息照常读，超限的整条拒且拒词报出上限与是哪台 server；拒绝之后不再从同一个 source 读；HTTP 答复的 body 受同一个上限 |
 | 传输 | 请求交出之后丢了答，效果未知、不自动再发；交出之前的失败不可重试；带会话 id 的 404 返回可重试拒词但不自动重发，下一次派活完整重握手与 listing，克隆共享失效；无 id 的 404 不重开 |
 | acp | 已配对请求变成 Dispatch 三字段；`Incoming::parse` 是入站文法的唯一入口（字段私有，本 crate 之外无第二种造法）；配对令牌恒不进入 `Incoming`；持有效令牌也够不到 reserved prefix；回给编辑器的只有 progress 三字段 |
-| harness | 停摆先变成一次 `session/cancel`，第二次什么也不发；停止原因之后不再读；读到输入结束而没有答，效果未知 |
+| harness | 没有同意就起不了进程，同意过的摘要与重算的不等即拒；停摆先变成一次 `session/cancel`，第二次什么也不发；停止原因之后不再读；读到输入结束而没有答，效果未知；`-32000` 读成 `E_AUTH_REQUIRED` 并列出登录方法；随版本附带的 registry 索引读成目录 |
 
 分部里的定理是模型对这些性质的证明，每个分部各有一条「拿掉守卫即反例」的定理（§16）。Rust 实现对模型的一致性由测试检查，不由证明：每个模块旁的 `#[cfg(test)]` 经生产入口断言它在本文件 §8 或分部里的规则（§16 列出）。
 -/
@@ -47,12 +48,18 @@ import crates.agent_protocols.spec.Mcp.Tools
 - **歧义已定**：`2026-07-28` 修订版删除了协议级 session（本客户端协商的是 `2025-06-18`，那一版的会话住传输层，见 §8-3），`tools/list` 恒不因连接而异。因此工具表随 Run 冻结与它的规则同向，本库不实现任何会话恢复；需要跨调用状态的 server 自铸句柄，当普通入参传。
 - 模型的边界写在各分部的文件头：`spec/Mcp/Reading.lean` 逐字节读而 Rust 按块读（判决相同，内存多一块），不是 UTF-8 与读不出不在模型里；`spec/Mcp/Tools.lean` 不表示 JSON 怎样摊平成叶子；地址文法与 reserved 判定写成 `spec/Acp.lean` 的参数，权威在 `kernel::address`。
 
-本 crate 当前没有未决的接口问题。
+**现状：登录、添加与检测还没有执行器。** 本版已建的是开放名单、同意、目录快照、粘贴文法、环境白名单与 `initialize`／`-32000` 的读法；以下几件的接口已在 `wire` 与 IF-0 定下，代码还没有，`AddAgent` 与 `AgentLogin` 今天答 `not_built`：
+- `AddAgent` 的执行：重算摘要、把程序解析成绝对路径、写一行 `[[agent]]`、`seat_here` 时写房间的 `[resident] harness`；
+- 登录执行器：收到 `-32000` 之后，`agent` 类型发 `authenticate`，`terminal` 类型在 CLI 里交出终端或经 `sprawling acp-login <ticket>` 跳板开新窗口（Windows `CREATE_NEW_CONSOLE`，macOS `.command` 加 `open`，Linux 终端列表），成功后重新 `initialize` 并重发原请求；
+- 不执行任何东西的检测：别的 ACP 客户端的配置、npm 与 bun 的 shim、厂商目录、PATH 上的名字（只作线索），`detected` 今天是空表；
+- CLI 的 `/acp` 列表，与 `run_started` 上的 `agent` 身份（`crates/kernel/spec/Event/Record.lean` 定的那个字段：版本要在会话打开之后才知道，所以要挪动 `run_started` 的落账时刻）；
+- url elicitation 的声明（D14）。
+能判定它们完成的证据是：一次派活收到 `-32000` 之后不经人重打就重发成功，且 `run_started` 带着 agent 的 id、版本与同意的摘要。
 -/
 
 /-! ## 4 现状分析
 
-三组模块：`mcp`（出站：握手、工具表、三种传输、消息上限、broker）、`acp`（入站：外部编辑器的请求文法）与 `harness`（ACP 出站：五家官方 harness）。生产消费者是 `crates/sprawling` 与 `crates/accounting`：`accounting::worker::mcp` 按楼的配置连 server 并把连接留给后来的派活（常驻连接，§8-16），`accounting::worker::workbench::servers` 把工具注册进 bench，`views::mcp_health` 用同一个 `McpLink` 探一台 server 的健康，`accounting::worker::driving::harness` 起一家 harness 并开会话（§8-19）。
+三组模块：`mcp`（出站：握手、工具表、三种传输、消息上限、broker）、`acp`（入站：外部编辑器的请求文法）与 `harness`（ACP 出站：任何一个人同意过的 ACP agent）。生产消费者是 `crates/sprawling` 与 `crates/accounting`：`accounting::worker::mcp` 按楼的配置连 server 并把连接留给后来的派活（常驻连接，§8-16），`accounting::worker::workbench::servers` 把工具注册进 bench，`views::mcp_health` 用同一个 `McpLink` 探一台 server 的健康，`accounting::worker::driving::harness` 起一个同意过的 agent 并开会话，`accounting::views` 回答 agent 目录与粘贴（§8-19）。
 
 stdio、HTTP、SSE 三种传输与 harness 会话读外部输入都受 `MESSAGE_CEILING` 约束：stdio 与 harness 经同一个 `Lines`，SSE 的每一行经 `read_one_message`，HTTP 的整段 body 经 `read_whole_message`（§8-15）。一次连接的开销由 `mcp::handshake` 的计数测试钉住（§8-16）。
 -/
@@ -68,7 +75,8 @@ stdio、HTTP、SSE 三种传输与 harness 会话读外部输入都受 `MESSAGE_
 | 会话住传输层、`Mcp-Session-Id`、404 重开、`CallToolResult` 与 `isError` | 2025-06-18 修订版的 Transports、Lifecycle 与 Tools 三篇（§8-3、§8-1c） |
 | ACP 第 1 版的线：请求、`session/update` 的变体、许可的四种选项、停止原因（§8-19） | `agentclientprotocol/agent-client-protocol` 的 `schema/v1/` 目录里稳定的那份 `schema.json`（不是旁边的 unstable 那份），读到的提交记在 docs/third-party.md §1 |
 | ACP 里工具由 agent 自己执行，许可请求 agent 可以不发 | <https://agentclientprotocol.com/protocol/tool-calls> |
-| 五家 harness 怎么起 | ACP registry（<https://cdn.agentclientprotocol.com/registry/v1/latest/registry.json>），逐家的 `agent.json` 在 `agentclientprotocol/registry`，被看路径见 docs/third-party.md §1 |
+| 一个 registry 条目怎么起、随版本附带的目录快照 | ACP registry 的索引（<https://cdn.agentclientprotocol.com/registry/v1/latest/registry.json>），条目格式是 `agentclientprotocol/registry` 的 `FORMAT.md` 与 `agent.schema.json`，被看路径见 docs/third-party.md §1 |
+| 认证方法只有 `agent` 与 `terminal` 两种，`-32000` 是「要登录」，`auth.terminal` 能力 | 同一份稳定 `schema.json` 的 `AuthMethod`、`ErrorCode`、`AuthCapabilities`；<https://agentclientprotocol.com/protocol/v1/authentication> |
 -/
 
 /-! ## 6 命名统一
@@ -258,75 +266,109 @@ pub enum Connection { Absent, Awaiting { consent_url: String }, Connected { alia
 
 D11 broker 住 `agent_protocols::mcp`，不住 `gateway`：它回答的是「连哪台 MCP server 上的哪个应用」，与三种传输同属一件事；出网的两条政策（代理规则、HTTP 客户端的构造）仍只在 `gateway::client_for` 一处，broker 经它取客户端，测试的 `Broker::at` 也一样（`Proxying::ExceptLocal` 对回环地址不走代理），所以本库之内没有第二个构造点。被否的另一方案是留在 `gateway`：那样 MCP 一分为二，`gateway` 要知道一家 MCP 服务的目录形状。(b) 只有一家 broker，所以没有 trait：第二家外包服务才是这条缝的第二个实现。
 
-### 8-19 官方 harness 出站：五家与一场 ACP 会话（`agent_protocols::harness`；`roster` 形状 6 数据面，`session` 形状 4 适配器）
+### 8-19 ACP agent 出站：开放名单、同意与一场 ACP 会话（`agent_protocols::harness`；`entry`、`roster` 形状 6 数据面，`catalog`、`paste` 形状 2 文法，`environment` 形状 1 判定，`process`、`session` 形状 4 适配器）
 
-订阅额度由厂商自己的 harness 带进城（`crates/gateway/Spec.lean` §8-5）。本节是这条路的传输半：认得哪几家、怎么把一家起成一个说 ACP 的子进程、怎么跟它开一场会话并把它说的话读回来。本城是 ACP 的 client，与 §8-2 的入站方向相反。
+订阅额度由厂商自己的 agent 带进城（`crates/gateway/Spec.lean` §8-5）。本节是这条路的传输半：一个 agent 条目是什么、人怎样同意它、怎么把它起成一个说 ACP 的子进程、怎么跟它开一场会话并把它说的话读回来。本城是 ACP 的 client，与 §8-2 的入站方向相反。
 
 ```rust
-// harness::roster —— 数据面，定规：只有这五家
-pub enum Harness { Codex, ClaudeCode, GrokBuild, KimiCode, Pi }   // as_str(): codex|claude_code|grok_build|kimi_code|pi
-impl Harness {
-    pub const ALL: [Harness; 5];
-    pub const fn launch(self) -> Launch;          // 起一个说 ACP 的进程：程序与参数
-    pub const fn registry_id(self) -> &'static str;   // ACP registry 里的 id
-    pub const fn docs(self) -> &'static str;      // 这家自己写的登录说明
-    pub fn parse(word: &str) -> Option<Harness>;  // as_str 的逆；不认识的词答 None，拒词由调用方按它的场合写
-    pub const fn set_up(self) -> &'static [SetUpDir];   // 装好或登录后这家写下的目录，逐行引厂商文档；空表读作「没查」
+// harness::entry —— 一个 agent 条目（数据面）
+pub struct AgentId(/* 私有 String */);
+impl AgentId { pub fn parse(text: &str) -> Result<AgentId, AxError>; pub fn as_str(&self) -> &str; }
+pub enum AgentSource { Registry, Detected, Pasted }
+pub struct AgentEntry {
+    pub id: AgentId, pub name: String, pub source: AgentSource, pub launch: Launch,
+    pub version: Option<String>, pub licence: Option<String>,
 }
+pub struct Launch { pub program: String, pub args: Vec<String>, pub env: Vec<(String, String)> }
+impl Launch {
+    pub fn digest(&self) -> B3Hash;    // 同意绑定的摘要（D16）
+    pub fn preview(&self) -> String;   // 同意卡片上那一行命令，原样
+    pub fn pin(&self) -> Pin;          // 版本钉没钉住
+}
+pub enum Pin { Exact, Floating, Unknown }
+pub struct Consented { /* 私有：AgentEntry */ }
+impl Consented {
+    pub fn given(entry: AgentEntry, digest: &B3Hash) -> Result<Consented, AxError>;   // 摘要不等即拒
+    pub fn written_by_hand(entry: AgentEntry) -> Consented;                           // 人亲手写进 CONFIG.toml 的那一行
+    pub fn entry(&self) -> &AgentEntry;
+}
+
+// harness::catalog —— ACP registry 的索引，与随版本附带的快照（文法）
+pub struct Catalog { pub entries: Vec<AgentEntry>, pub date: String, pub etag: String }
+impl Catalog {
+    pub fn bundled() -> Result<Catalog, AxError>;                                  // 随版本附带的快照
+    pub fn read(index: &str, date: String, etag: String) -> Result<Catalog, AxError>;  // 一份 registry.json
+}
+pub fn registry_entry(value: &serde_json::Value) -> Result<Option<AgentEntry>, AxError>;   // 一份 agent.json；本平台起不了的答 None
+
+// harness::roster —— 内置条目：五家官方 harness（数据面）
+pub struct Official { pub word: &'static str, pub registry_id: &'static str, pub set_up: &'static [SetUpDir], pub docs: &'static str }
+pub const OFFICIAL: [Official; 5];
+pub struct Roster { /* 私有：人加的行、快照 */ }
+impl Roster {
+    pub fn new(rows: Vec<(AgentEntry, Option<B3Hash>)>, catalog: Catalog) -> Roster;
+    pub fn builtin(&self, official: &Official) -> Option<AgentEntry>;
+    pub fn seat(&self, word: &str) -> Result<Consented, Unseated>;   // [resident] harness 的值
+    pub fn words(&self) -> Vec<String>;                              // 拒词的 nearby
+}
+pub enum Unseated { Unknown, Refused(AxError) }
 pub struct SetUpDir { pub variable: Option<&'static str>, pub under_home: &'static [&'static str], pub source: &'static str }
-impl SetUpDir { pub fn on(&self, home: Option<&Path>, variable: Option<OsString>) -> Option<PathBuf>; }   // 非空变量优先，否则家目录下；两者都没有答 None
-pub struct Launch { pub program: Program, pub args: &'static [&'static str] }
-pub enum Program { Npx, Kimi }
-impl Program { pub const fn name(self) -> &'static str; }   // Windows 上 npx 是 npx.cmd，kimi 是 kimi.exe 由搜索路径补
+impl SetUpDir { pub fn on(&self, home: Option<&Path>, variable: Option<OsString>) -> Option<PathBuf>; }
 
-// 读端是 mcp::reading::Lines（§8-1b），与 mcp::stdio 同一个；会话带期限地等它
+// harness::paste —— 粘贴文法（文法）
+pub fn pasted(text: &str) -> Result<AgentEntry, AxError>;
 
-// harness::process —— 把一家 harness 起成子进程（形状 4 适配器）；落地即杀
+// harness::environment —— 子进程见到的环境（判定）
+pub fn passed(city: impl Iterator<Item = (OsString, OsString)>) -> Vec<(OsString, OsString)>;
+
+// harness::process —— 把一个同意过的 agent 起成子进程（适配器）；落地即杀
 pub struct HarnessProcess { /* 私有：Child */ }
 impl HarnessProcess {
-    pub fn start(harness: Harness, cwd: &Path) -> Result<(HarnessProcess, AcpSession<ChildStdin>), AxError>;
+    pub fn start(agent: &Consented, cwd: &Path) -> Result<(HarnessProcess, AcpSession<ChildStdin>), AxError>;
 }
 
-// harness::session —— 一场 ACP 会话，JSON-RPC 2.0，按行分帧
-pub struct AcpSession<W: Write> { /* 私有：lines、writer、下一个请求 id、session id、harness 名、是否已取消 */ }
+// harness::session —— 一场 ACP 会话，JSON-RPC 2.0，按行分帧（适配器）
 impl<W: Write> AcpSession<W> {
     pub fn open(lines: Lines, writer: W, name: &str, cwd: &Path) -> Result<Self, AxError>;   // initialize ＋ session/new
+    pub fn introduced(&self) -> &Introduced;
     pub fn prompt(&mut self, text: &str, listener: &mut Listener<'_>) -> Result<Answer, AxError>;
 }
-pub struct Listener<'a> {
-    pub halted: &'a mut dyn FnMut() -> bool,                    // 每条消息到达前、对侧每沉默满 HALT_TICK_MS 时各问一次
-    pub cancelling: &'a mut dyn FnMut() -> Result<(), AxError>, // 头一次答「停了」时调一次，在 session/cancel 发出之前
-    pub report: &'a mut dyn FnMut(Update) -> Result<(), AxError>,
-    pub permit: &'a mut dyn FnMut(&PermissionAsk) -> Permit,    // 取消之后不再问它，一律答 cancelled
-}
-pub struct Answer { pub stop: StopReason, pub text: String }    // text：这一回合的 agent_message_chunk 依次拼起来
-pub enum Update { Text(String), Thought(String), ToolCall { id: String, title: String, kind: String },
-                  ToolCallStatus { id: String, status: String }, Other { variant: String } }
-pub struct PermissionAsk { pub title: String, pub options: Vec<PermitOption> }
-pub struct PermitOption { pub id: String, pub name: String, pub kind: PermitKind }
-pub enum PermitKind { AllowOnce, AllowAlways, RejectOnce, RejectAlways }
-pub enum Permit { Chosen(String), Cancelled }
-pub enum StopReason { EndTurn, MaxTokens, MaxTurnRequests, Refusal, Cancelled }
+pub struct Introduced { pub version: Option<String>, pub auth_methods: Vec<AuthMethod> }
+pub struct AuthMethod { pub id: String, pub name: String, pub kind: LoginKind }
+pub enum LoginKind { Agent, Terminal }
+// Listener、Answer、Update、PermissionAsk、PermitOption、PermitKind、Permit、StopReason 不变
 ```
 
-- **名单是定规（ruling）**：Codex、Claude Code、Grok Build、Kimi Code、Pi 五家是人认可的全部 harness。增一家要人另定，不因为 ACP registry 里多了一行就跟着加。
-- **怎么起一家，读 ACP registry**（§5）：Claude Code 与 Codex 各经 registry 组织发布的适配器包，Pi 经第三方的适配器包，Grok Build 经它自己的包并带 `agent stdio` 两个参数，这四家都由 `npx -y <包>@<版本>` 起；Kimi Code 是人装好的 `kimi acp`。包名、版本与参数只写在 `Harness::launch`（D12），取 `agent.json` 里 `distribution` 那一项（D13）。版本钉死：`npx` 不带版本会在每次起进程时向 npm 取最新的包，一个没人看过的版本就进了城；`every_package_a_harness_is_fetched_as_is_pinned_to_a_version` 要求每个 `npx` 包都带版本。
-- **登录是人在 harness 里做的**：本城不起登录流程、不读 harness 的凭据文件。`docs` 是每家自己写的登录说明，页面只把它交给人。
+- **名单是开放的**：任何说 ACP 的 agent 都可以当居民。`[resident] harness` 的值点名城 `CONFIG.toml` 里的一行 `[[agent]]`（`crates/city/spec/ConfigLayers.lean` §8-4），或者一个内置条目。五家官方 harness（Claude Code、Codex、Grok Build、Kimi Code、Pi）是内置条目：`OFFICIAL` 只记它们的词（0.0.10 写下的 `[resident] harness` 原样读得回来）、registry id、装好或登录后写下的目录（D23）和厂商的登录说明；怎么起它们取自快照里同一个 registry id 的那一行（D12）。`Roster::seat` 先找人加的行，再找内置条目：一行与内置条目同名时，人加的那一行胜，它是人为这台电脑写下的那一条。
+- **同意先于任何执行**（D16，性质在 `spec/Harness/Consent.lean`）：`HarnessProcess::start` 只收 `Consented`，`Consented` 的字段私有，只有两扇门：`given` 收一份条目和同意时记下的摘要，摘要与 `Launch::digest` 重算的不等就拒（`E_CONFIG_INVALID`）；`written_by_hand` 收一行人亲手写下、没有摘要的条目，以及内置条目，那份文件就是人的同意，与 `[[mcp]]`、`[remote]` 同一条理由。目录、检测与粘贴只产出 `AgentEntry`，产出不了 `Consented`，所以页面上看见的东西在人同意之前起不了任何进程。
+- **快照随版本附带，只在人按下时刷新**（D13）：`Catalog::bundled` 读 `crates/agent_protocols/catalog/registry.json`，这份文件由 `cargo xtask acp-catalog` 从 registry 的 CDN 索引生成并提交，带索引的 `Date` 与 `ETag`；生成时只保留城读的字段（`id`、`name`、`version`、`license`、`distribution`，`binary` 目标只留 `cmd`、`args`、`env`），作者、图标、链接与下载地址不进快照。`Catalog::read` 读的是同一种形状，所以一份完整的 CDN 索引与快照经同一个读者。读法：`npx` 起 `npx -y <package> <args…>`，`uvx` 起 `uvx <package> <args…>`，`env` 原样带上（它们会关掉 agent 的自更新）；`binary` 本版不下载（推迟，见 §3），读成本平台那一项 `cmd` 的文件名经搜索路径起，参数照抄，钉不住版本（`Pin::Unknown`）；本平台没有一项能起的条目不进目录。
+- **粘贴文法只在 Rust 里**（`paste::pasted`，WebUI 与 CLI 经 `Query::ParseAgentSpec` 共用）：接受一行命令、Zed 或 JetBrains 的 `agent_servers` 块（恰好一项）、registry 的 `agent.json`。一行命令按空白分词，双引号括住的一段是一个参数，不解释任何 shell 元字符；出现 `|`、`&`、`;`、`<`、`>` 中的任何一个就拒，恢复语说「只粘贴一个程序和它的参数」。条目的 id 取 `agent_servers` 的键、`agent.json` 的 `id`，或程序的文件名，经 `AgentId::parse` 规范成小写。
+- **钉住**：`Pin::Exact` 是包串带一个确切版本（`pkg@1.2.3`、`pkg==1.2.3`）；包串不带版本或带 `latest` 是 `Floating`；不是 `npx`、`uvx` 起的程序是 `Unknown`。同意卡片照实显示这一格，不替人拒一个浮动的版本：粘贴的那一行是人自己写的。
+- **子进程只见白名单里的环境**（`environment::passed`，D17）：先清空，再放行白名单里的名字，最后放行条目自己的 `env`。白名单是系统与终端需要的那些（`PATH`、家目录、临时目录、语言、Windows 的系统目录与 `PATHEXT`、XDG 目录、显示、代理），加上 `SSH_CONNECTION`、`SSH_CLIENT`、`SSH_TTY` 与 `NO_BROWSER`：agent 靠它们判断自己是否在远程主机上、该给哪种登录；再加上 `OFFICIAL` 里每家的目录变量，它们的名字只写在 `SetUpDir::variable` 一处。Windows 上名字不分大小写。
+- **`initialize`**（D14）：发 `protocolVersion: 1`、`clientInfo {name: "sprawling", version}`、`fs` 两项与 `terminal` 为 `false`、`auth.terminal: true`。对方答的 `protocolVersion` 不是 1 就拒（`E_WIRE_MISMATCH`，恢复语说这家说的是哪一版），规范要求客户端这时断开并告诉人。`agentInfo.version` 与 `authMethods` 读进 `Introduced`；方法的 `type` 缺省是 `agent`，`terminal` 是另一种，其余拒而不猜。
+- **`-32000` 是「要登录」**：对方对任何请求答 JSON-RPC `-32000`，拒词是 `E_AUTH_REQUIRED`，`nearby` 列出可用的登录方法 id，恢复语逐个说出方法名。claude.ai 订阅登录（`claude-agent-acp` 声明的方法 `claude-ai-login`）从 `Introduced` 与这份列表里拿掉：本城不替人启动订阅登录（D18）。其余错误码仍是 `E_PROVIDER`。
+- **登录推迟到 `-32000`**：添加 agent 时不登录；派活时 `session/new` 或 `prompt` 答 `-32000`，才轮到登录（§3 记着登录执行器的现状）。
 - **一条消息的上限与 MCP 同一个**：`read_one_message` 与 `MESSAGE_CEILING`（§8-15）。ACP 与 MCP 同是按行分帧的 JSON-RPC，一个图片加信封的上限对两者是同一个事实。
 - **`prompt` 在对方答出 `StopReason` 时返回**；读到输入结束而没有答，是 `E_PROVIDER` 并标 `Retry::Unknown`：对方也许已经做了事。`StopReason` 未知的词拒而不猜。
-- **停摆在对侧沉默时也要变成取消**：`BufRead` 的读没有期限，一家在跑长命令的 harness 可以几分钟一行不写，而一次停摆不能等它开口。所以读端在自己的线程上（`Lines::over`），把行交进通道；`prompt` 每次最多等 `HALT_TICK_MS` 就回头问一次 `halted`。线程在对侧关闭输出（子进程被杀）或会话丢掉通道时结束，不会泄漏。ARCHITECTURE §10 规则 3 把它列为库 crate 起线程的一处。
-- **取消的次序是 `spec/Harness/Session.lean` 定的**：`halted` 头一次答真，先调 `cancelling`（调用方在这里把 `cancel_received` 落账），再发 `session/cancel`，此后的汇报排在它后面；第二次答真什么也不发。取消之后 agent 再问 permission，一律答 `cancelled`（ACP 要求客户端这样答取消后的每一个 permission 请求），不再问调用方。
+- **停摆在对侧沉默时也要变成取消**：`BufRead` 的读没有期限，一家在跑长命令的 agent 可以几分钟一行不写，而一次停摆不能等它开口。所以读端在自己的线程上（`Lines::over`），把行交进通道；`prompt` 每次最多等 `HALT_TICK_MS` 就回头问一次 `halted`。线程在对侧关闭输出（子进程被杀）或会话丢掉通道时结束，不会泄漏。ARCHITECTURE §10 规则 3 把它列为库 crate 起线程的一处。
+- **取消的次序是 `spec/Harness/Session.lean` 定的**：`halted` 头一次答真，先调 `cancelling`（调用方在这里把 `cancel_received` 落账），再发 `session/cancel`，此后的汇报排在它后面；第二次答真什么也不发。取消之后 agent 再问 permission，一律答 `cancelled`，不再问调用方。
 - **`Answer.text` 是 agent 这一回合对城说的话**：`agent_message_chunk` 依次拼起来，每一块同时照常交给 `report`。它是城那次请求的回答，汇报是一路上的事，两者由调用方分别记（`crates/sprawling/Spec.lean` §8-4e 第 8 条）。
-- **`HarnessProcess::start` 起 `Launch` 的程序与参数**：程序名由搜索路径补（`Program::name`），工作目录是调用方给的那棵 worktree，stderr 丢弃（与 `mcp::stdio` 同理：那是它的诊断，不是答案）。起不来答 `E_TOOL_UNAVAILABLE`，恢复语给出这家自己的 `docs()`。进程句柄落地时杀掉并收尸，所以「谁回收它」不需要第二份名单。
+- **`HarnessProcess::start` 起同意过的那条 `Launch`**：经 `child::command`（不挂城的控制台、自成进程组），程序名由搜索路径补，工作目录是调用方给的那棵 worktree，stderr 丢弃（与 `mcp::stdio` 同理）。起不来答 `E_TOOL_UNAVAILABLE`，恢复语给出预览的那一行命令。进程句柄落地时杀掉并收尸。
 - **测试走同一扇门**：测试用 `Lines::over` 读一条内存管道，在另一头用一条线程扮演 agent，与生产读子进程的输出是同一段代码，不另立 trait。
 
-D12 五家的版本钉子只有一个家：`Harness::launch`。本文件写怎么选版本（读 registry、钉死、跟正式版），不写五家的包名与版本号。两处都写时没有门把它们绑在一起，上游每发一次版要改两个文件，漏改的那一份读起来仍然像真的。被否的方案是在本节保留五个版本号作说明，这正是会漏改的那一份。
+D12 内置条目怎么起只有一个家：快照里同一个 registry id 的那一行。`OFFICIAL` 不写包名与版本，`docs/third-party.md` §1 也不写；新版本随下一次 `cargo xtask acp-catalog` 进来。被否的方案是在 `roster` 里保留五个钉死的启动命令：那是快照之外的第二份版本号，上游每发一次版要改两处，漏改的那一份读起来仍然像真的。
 
-D13 跟 `agent.json` 的 `distribution`，不跟 `preview`。registry 为同一家同时给出正式版（`distribution`）与预览版（`preview`），本城钉正式版：预览版比正式版发得勤，每发一次看守就开一个 issue，而它还没有被发布方当作正式版交出。被否的方案是跟 `preview`，它只让本城更早拿到发布方自己还没定稿的适配器。
+D13 目录随版本附带快照，不在打开页面时拉取。快照同时是离线首次运行时的目录、内置条目的启动命令和默认钉住的版本，首次运行不发任何请求；刷新只在人按下时发生，与 `crates/wire/spec/Answer/Release.lean` 的「人按下才联网」同一条规则。添加时用快照里的版本，不顺带刷新：刷新出的新版本要人再同意一次，这违背最少操作。快照只记 `distribution`，registry 在已发布的索引里本来就剥掉了 `preview`。被否：像 Zed 那样打开页面就拉取并缓存一小时，它让每次打开 ACP 页都向 CDN 发一次请求。
 
-D14 本城不向 harness 提供文件与终端：`initialize` 声明 `fs.readTextFile`、`fs.writeTextFile`、`terminal` 全为 `false`，harness 用它自己的工具。ACP 规格里工具由 agent 自己执行，`session/request_permission` 是 agent 可以不发的请求，工具名 "do not advertise a capability or grant authorization"（§5）；本城因此只能记录一家 harness 做了什么，不能管辖它。被否：声明这些能力并由城实现它们；agent 仍可用自己的工具，声明只多出一条城要实现、却管不住 harness 的路。harness 发来的其余请求（`fs/*`、`terminal/*`）以 JSON-RPC `-32601` 回答，不静默：不答的请求会把 agent 挂住。
+D14 本城不向 agent 提供文件与终端：`initialize` 声明 `fs.readTextFile`、`fs.writeTextFile`、`terminal` 全为 `false`，agent 用它自己的工具。ACP 规格里工具由 agent 自己执行，本城因此只能记录一家 agent 做了什么，不能管辖它。`auth.terminal: true` 与 `terminal` 是两回事：它只说本城能在一个交互终端里重现这条启动命令，好让 agent 列出 terminal 类型的登录；不声明它时 `claude-agent-acp` 答一份空的方法列表。`elicitation` 本版不声明：声明了而答不了 `elicitation/create` 的请求，会让 agent 给出一种本城完不成的登录（codex 的设备码登录依赖 url elicitation），能把 url 交给人的页面落地时再声明。agent 发来的其余请求以 JSON-RPC `-32601` 回答，不静默：不答的请求会把 agent 挂住。
 
-**谁用它**：派活路径上的 harness run（`crates/sprawling/Spec.lean` §8-4e、§8-124）。`accounting::worker::driving::harness` 在房间的 worktree 里经 `HarnessProcess::start` 起一家、开会话，把 `Listener` 接到 `runtime::run::harness::HarnessRun`：`cancelling` 落 `cancel_received`，`report` 落 `harness_reported`，`permit` 照 `crates/sprawling/Spec.lean` §8-4e 第 9 条答；会话与子进程在驱动返回时一起丢掉。它必须守住的性质在 `spec/Harness/Session.lean`，本 crate 这一侧守其中的会话半：截断先变成 `session/cancel`、第二次什么也不发、停止原因之后不再读。设置页的 harness 页说明五家在这台电脑上够不够得着、怎么起、去哪里登录。
+D16 同意绑定启动规格的摘要，而不是绑定条目的 id。摘要是 `Launch` 的程序、每个参数、每个 env 的名与值依次写成「长度＋字节」再取 BLAKE3（`kernel::B3Hash::digest`，城唯一的内容散列）；带长度前缀，所以 `["a b"]` 与 `["a", "b"]` 不会撞成同一个摘要。同意卡片显示的那一行与城执行的那一行由同一个摘要绑定：目录刷新之后同一个 id 换了命令，旧的同意不再适用。被否：绑 id 加版本号，它让 `env` 或参数的改动不经同意就生效。
+
+D17 子进程的环境是白名单，不是黑名单。开放名单之后，起的是任何人写的程序；它继承城的全部环境时，城自己的秘密（`SPRAWLING_SECRET_*`）、别的厂商的 key 与任何恰好在环境里的凭据都交给了它。`child::command` 拿掉的是城自己的秘密，这里再清空其余的，只放行 agent 运行与判断登录方式所需的名字。被否：只靠 `child::command` 的黑名单，它挡不住人自己 shell 里导出的其他厂商的 key。
+
+D18 claude.ai 订阅登录不由本城启动，Console 登录可以。`claude-agent-acp` 的注释原文是 "this integration must never bill a claude.ai subscription"，Anthropic 也不允许第三方应用提供 Claude.ai 登录；本城替人启动它就是在提供它。拿掉的地方是读 `authMethods` 的那一处，所以页面、拒词与将来的登录执行器都看不见它。被否：保留它并在页面上警告，那仍然是本城在提供这种登录。
+
+**谁用它**：派活路径上的 harness run（`crates/sprawling/Spec.lean` §8-4e、§8-124）。`accounting::worker::driving::harness` 在房间的 worktree 里经 `HarnessProcess::start` 起一个同意过的 agent、开会话，把 `Listener` 接到 `runtime::run::harness::HarnessRun`；会话与子进程在驱动返回时一起丢掉。`accounting::views` 用 `Catalog::bundled`、`Roster` 与 `paste::pasted` 回答 `Query::AgentCatalog`、`Query::ParseAgentSpec` 与 harness 页。
 -/
 
 /-! ## 9 工作流程
@@ -403,14 +445,14 @@ D15 请求行与 id 是本 crate 的契约，不是序列化器的：行由 `for
 
 /-! ## 15 影响面
 
-改 `Outbound`、`McpLink` 或 `tools_from` 的签名，波及 `crates/accounting` 的 `accounting::worker::mcp`、`accounting::worker::workbench::servers` 与 `views::mcp_health`；改 `Incoming`／`admit` 波及入站路由与 `wire::auth` 的配对比对；改 `Harness`、`HarnessProcess`、`AcpSession`、`Listener` 或 `Lines` 波及 `accounting::worker::driving::harness` 与它的测试（`agent_protocols::Lines` 是它们扮演 agent 时读内存管道的门）；改 `PROTOCOL_VERSION` 或 `EFFECT_META_KEY` 波及 `crates/desktop/` 的抄本。改分部里的模型，先改本文件对应的要求，再改 Rust 与它的测试。
+改 `Outbound`、`McpLink` 或 `tools_from` 的签名，波及 `crates/accounting` 的 `accounting::worker::mcp`、`accounting::worker::workbench::servers` 与 `views::mcp_health`；改 `Incoming`／`admit` 波及入站路由与 `wire::auth` 的配对比对；改 `AgentEntry`、`Consented`、`Roster`、`Catalog`、`HarnessProcess`、`AcpSession`、`Listener` 或 `Lines` 波及 `accounting::worker::driving::harness`、`accounting::worker::dispatching::agreeing`、`accounting::views` 与它们的测试（`agent_protocols::Lines` 是它们扮演 agent 时读内存管道的门）；改 `PROTOCOL_VERSION` 或 `EFFECT_META_KEY` 波及 `crates/desktop/` 的抄本。改分部里的模型，先改本文件对应的要求，再改 Rust 与它的测试。
 -/
 
 /-! ## 16 测试与约束
 
 证明：分部里的定理由 `just models`（`lake build Spec`）证明，无 `sorry`、`admit`、`axiom`，`spec` 门判后两条的文本形状。咬得动的演示：`AgentProtocols.Mcp.Reading.withoutCeiling_reads_past_it`、`AgentProtocols.Mcp.Reading.withoutStopping_reads_a_tail_as_a_message`、`AgentProtocols.Mcp.Tools.withUnderscoredLabels_two_servers_collide`、`AgentProtocols.Mcp.Tools.strictReading_repeats_a_misspelled_flag`、`AgentProtocols.Mcp.Link.eagerRetry_performs_twice`、`AgentProtocols.Acp.withoutReserved_reaches_the_citys_own_subtree`，各自说明拿掉哪条守卫后对应的性质不再成立。
 
-实现一致性：逐模块 `#[cfg(test)]`，`cargo nextest run -p sprawling-agent-protocols`。「单行无换行」「同名不合并」「浮点按位置拒」「confidential 构造即拒」「未配对只泄一位」「重放同答案」六条各有一条断言；「恰在上限内的消息照常解析」「超限的消息被整条拒且拒词报出上限与是哪台 server」「stdio 与 SSE 的 server 答出超限的一条时，那次调用被拒且标效果未知」「HTTP 答复的 body 恰在上限内照常读，超过即拒且标效果未知」四条（§8-15）；「`isError` 读成失败」「`_meta` 效果未知」「stdio 超时与断流、SSE 断流标效果未知」三条；harness 会话的取消次序、停止原因与未知词各有断言（`harness::session::tests`），每个 `npx` 包带版本由 `every_package_a_harness_is_fetched_as_is_pinned_to_a_version` 判。读端的交接无队列（D6 (d)）是并发的事实，由 `Lines::over` 用 `sync_channel(0)` 的构造守住，模型不表示线程。
+实现一致性：逐模块 `#[cfg(test)]`，`cargo nextest run -p sprawling-agent-protocols`。「单行无换行」「同名不合并」「浮点按位置拒」「confidential 构造即拒」「未配对只泄一位」「重放同答案」六条各有一条断言；「恰在上限内的消息照常解析」「超限的消息被整条拒且拒词报出上限与是哪台 server」「stdio 与 SSE 的 server 答出超限的一条时，那次调用被拒且标效果未知」「HTTP 答复的 body 恰在上限内照常读，超过即拒且标效果未知」四条（§8-15）；「`isError` 读成失败」「`_meta` 效果未知」「stdio 超时与断流、SSE 断流标效果未知」三条；harness 会话的取消次序、停止原因与未知词各有断言（`harness::session::tests`），同意的性质由 `harness::entry::tests` 里从 `spec/Harness/Consent.lean` 派生的 proptest 判（任一同意过的规格、任一改动），随版本附带的快照与一份录下的 CDN 索引由 `harness::catalog::tests` 读成目录，内置五家都在快照里且 `npx` 包都钉了确切版本。读端的交接无队列（D6 (d)）是并发的事实，由 `Lines::over` 用 `sync_channel(0)` 的构造守住，模型不表示线程。
 
 模型的证明不是 Rust 实现的证明：两者之间由这些测试连着。
 

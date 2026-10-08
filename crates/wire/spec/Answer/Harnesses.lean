@@ -22,8 +22,8 @@ pub struct HarnessLine { pub name: String, pub launch: Vec<String>, pub state: H
 pub enum HarnessState { LauncherMissing { program: String }, NotSetUp { looked: Vec<String> }, Ready { at: String } }
 ```
 
-- **provider 页与 harness 页分开**（定规）：provider 页收 API key，harness 页说明五家官方 harness（`crates/agent_protocols/Spec.lean` §8-19）。
-- `name` 是 `agent_protocols::Harness::as_str` 的词；`launch` 是起它说 ACP 的那条命令，逐词；`state` 是这台电脑能不能用它（D23 的三态）：启动程序不在搜索路径上答 `LauncherMissing`，`program` 是那个程序名；启动程序在时，按 `agent_protocols::Harness::set_up` 那张表逐行查：第一个存在的目录答 `Ready { at }`；一个都不在答 `NotSetUp`，`looked` 是查过的路径，已展开；这家的表是空的（厂商文档没写这样一个目录），`looked` 为空，读作「没有查过任何目录」，而不是「查过都不在」。`docs` 是这家自己写的登录说明。**登录是人在 harness 里做的**，这一问不答任何凭据的事。
+- **provider 页与 harness 页分开**（定规）：provider 页收 API key，harness 页说明五个内置条目，也就是五家官方 harness（`crates/agent_protocols/Spec.lean` §8-19）；任意 ACP agent 的添加在 ACP 页（`Answer/Agents.lean` §8-90）。
+- `name` 是 `agent_protocols::Official::word`；`launch` 是起它说 ACP 的那条命令，逐词，取自随版本附带的目录快照；`state` 是这台电脑能不能用它（D23 的三态）：启动程序不在搜索路径上答 `LauncherMissing`，`program` 是那个程序名；启动程序在时，按 `agent_protocols::Official::set_up` 那张表逐行查：第一个存在的目录答 `Ready { at }`；一个都不在答 `NotSetUp`，`looked` 是查过的路径，已展开；这家的表是空的（厂商文档没写这样一个目录），`looked` 为空，读作「没有查过任何目录」，而不是「查过都不在」。`docs` 是这家自己写的登录说明。**登录是人在 harness 里做的**，这一问不答任何凭据的事。
 - 名字表多一项，schema 哈希因此而变，`WIRE_V` 不为此进位。
 -/
 
@@ -39,7 +39,7 @@ pub enum HarnessState {
 }
 ```
 
-当前的表（`agent_protocols::Harness::set_up`），每行的出处就是行里的那页：
+当前的表（`agent_protocols::OFFICIAL` 的 `set_up`），每行的出处就是行里的那页：
 
 | harness | 变量 | 家目录下 | 出处 |
 |---|---|---|---|
@@ -55,7 +55,7 @@ pub enum HarnessState {
 
 **理由**：四家 harness 的启动程序都是 `npx.cmd`，装了 Node 就都显示「找到」（roadmap A5）。人要做的三件事不同：装 Node、装或登录这家 harness、直接用，所以要三态而不是两态；带上查过的路径，页面才能说「我们在这里找过」。
 
-**被否**：①真的起一次 harness 问它版本：慢，且没登录的 harness 会弹登录；②只多一个 `installed: bool`：两个布尔有一种组合（没启动程序却装了）没有意义。
+**被否**：①真的起一次 harness 问它版本：慢，而且那是在人同意之前执行它的程序，违反「同意先于任何执行」（`crates/agent_protocols/Spec.lean` D16）；按 ACP，`initialize` 在认证之前，不会弹登录，所以否掉它的理由只剩这两条；②只多一个 `installed: bool`：两个布尔有一种组合（没启动程序却装了）没有意义。
 
 **重开参数**：某家 harness 提供了稳定的「是否已登录」命令时，`Ready` 改用它来判。
 -/
