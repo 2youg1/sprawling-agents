@@ -18,8 +18,8 @@
 pub fn reach(client: &reqwest::blocking::Client, rule: Proxying, base_url: &str, elapsed_ms: u64) -> kernel::Reach;
 pub fn client_for(rule: Proxying, base_url: &str) -> reqwest::blocking::ClientBuilder;   // reach::proxy
 pub fn through(rule: Proxying, base_url: &str) -> kernel::Through;                       // reach::proxy
-pub enum Locality { Machine, Private, Public }                                            // reach::proxy
-pub fn locality(base_url: &str) -> Locality;                                             // reach::proxy
+pub(crate) enum Locality { Machine, Private, Public }                                     // reach::proxy
+pub(crate) fn locality(base_url: &str) -> Locality;                                      // reach::proxy
 pub fn is_local(base_url: &str) -> bool;                                                 // reach::proxy：locality == Machine
 ```
 
