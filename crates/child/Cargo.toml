@@ -1,0 +1,16 @@
+[package]
+name = "sprawling-child"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+homepage.workspace = true
+publish.workspace = true
+description = "The one constructor of a sprawling city's child processes: off the city's console, in a process group of their own, the city's secrets out of their environment."
+
+[lib]
+name = "child"
+
+[lints]
+workspace = true
