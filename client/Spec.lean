@@ -3,6 +3,7 @@
 -- file, You can obtain one at https://mozilla.org/MPL/2.0/.
 -- Copyright (c) 2026 2youg1 and the sprawling contributors
 
+import client.spec.Core.Link
 import client.spec.Core.Workbench
 import client.spec.Views.Door
 import client.spec.Views.Fold
@@ -51,6 +52,7 @@ import client.spec.Views.Workspace
 | `client/spec/Views/Workspace.lean` | 外壳的控件：图层键、硬币键、信箱的走法 | §7-11 |
 | `client/spec/Views/Inspect/Open.lean` | 检视面的页签带与它至多留几项 | （§7-11、§4-45） |
 | `client/spec/Core/Workbench.lean` | 工作台分隔线的宽度 | （§7-11、D24） |
+| `client/spec/Core/Link.lean` | 人用 `/quit` 关掉的城：链路停在 `closed`，只有 `retry` 让它重连 | （4-57c、D98） |
 | `client/spec/Views/Fold.lean` | 设置树的枝与上手指南的步骤一次只展开一项 | （§7L、§7G、D53、D55） |
 | `client/spec/Views/Guide.lean` | 启动时进不进上手指南，跳过之后落在哪 | （§7G、D54） |
 | `client/spec/Views/Door.lean` | 远程组的门开关、「更换城钥匙」与确认码输入框：焦点、Escape 与拒绝 | （4-57） |

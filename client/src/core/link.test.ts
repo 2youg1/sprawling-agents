@@ -172,7 +172,7 @@ describe("the backoff ladder", () => {
 
 // The person closed the city on purpose (`/quit`): every event the link
 // can meet after that leaves it stopped, and only the person's retry
-// starts it again, with the close forgotten.
+// starts it again, with the close forgotten (client/spec/Core/Link.lean).
 describe("a city the person closed", () => {
   const EVENTS: readonly LinkEvent[] = [
     { kind: "opened", credential: null },
