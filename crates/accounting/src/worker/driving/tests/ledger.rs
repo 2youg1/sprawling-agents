@@ -255,13 +255,13 @@ fn a_commit_the_city_made_says_which_run_wrote_it() {
     let dir = tempfile::tempdir().unwrap();
     let report = crate::worker::fixture::init_city(dir.path()).unwrap();
     let (base_url, _provider) = fake_openai(
-        &["m-local"],
+        &["m-thinks"],
         vec![
             completion("editing", Some(("tu_1", "lab/room1/notes.md"))),
             completion("done", None),
         ],
     );
-    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
+    let mut worker = worker_with_provider(dir.path(), &base_url, "m-thinks").unwrap();
     worker
         .handle(wire::Command::Dispatch {
             addr: Address::parse("lab/room1").unwrap(),
@@ -303,7 +303,7 @@ fn a_commit_the_city_made_says_which_run_wrote_it() {
     assert_eq!(said.run, announced.run(), "the run that checkpointed it");
     assert_eq!(said.seq, announced.seq(), "where the history says so");
     assert_eq!(said.actor.as_str(), "lab/room1");
-    assert_eq!(said.model, "m-local", "the model the trailers carry");
+    assert_eq!(said.model, "m-thinks", "the model the trailers carry");
     assert_eq!(said.effort, Some(kernel::Effort::High));
     assert_eq!(
         said.session.map(|name| name.as_str().to_owned()),

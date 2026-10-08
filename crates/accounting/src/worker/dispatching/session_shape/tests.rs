@@ -134,14 +134,14 @@ fn a_session_keeps_the_shape_it_froze_and_refuses_a_different_effort() {
     let dir = tempfile::tempdir().unwrap();
     open_lab(dir.path());
     let (base_url, _provider) = fake_openai(
-        &["m-local"],
+        &["m-thinks"],
         vec![
             completion("done", None),
             completion("done", None),
             completion("done", None),
         ],
     );
-    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
+    let mut worker = worker_with_provider(dir.path(), &base_url, "m-thinks").unwrap();
     let room = Address::parse("lab/room1").unwrap();
     let seen: Prefixes = Arc::new(Mutex::new(Vec::new()));
     watch(&mut worker, &seen);
