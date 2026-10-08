@@ -52,6 +52,19 @@ fn block(value: &Value) -> Result<AgentEntry, AxError> {
     let (Some((name, server)), None) = (named.next(), named.next()) else {
         return Err(refused("paste one agent at a time"));
     };
+    server_entry(name, server, AgentSource::Pasted)
+}
+
+/// One `agent_servers` item read as an entry from `source`.
+///
+/// # Errors
+/// `E_INVALID_ARGS` for an item with no command and a name that makes no
+/// agent id.
+pub(super) fn server_entry(
+    name: &str,
+    server: &Value,
+    source: AgentSource,
+) -> Result<AgentEntry, AxError> {
     let program = server
         .get("command")
         .and_then(Value::as_str)
@@ -70,8 +83,8 @@ fn block(value: &Value) -> Result<AgentEntry, AxError> {
         .unwrap_or_default();
     Ok(AgentEntry {
         id: AgentId::parse(&id_of(name))?,
-        name: name.clone(),
-        source: AgentSource::Pasted,
+        name: name.to_owned(),
+        source,
         launch: Launch {
             program: program.to_owned(),
             args,

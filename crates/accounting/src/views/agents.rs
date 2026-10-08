@@ -11,14 +11,28 @@ use std::path::Path;
 
 use agent_protocols::{AgentEntry, AgentSource, Pin};
 
+use super::holding::Views;
+use super::lines::HarnessReach;
 use super::prepared::{Prepared, unavailable_because};
 
+/// The catalog page's paths, copied out so the files are read with the
+/// snapshot let go.
+pub(super) fn catalog_ask(views: &Views) -> Prepared {
+    Prepared::Agents(views.city_root.clone(), views.reach.programs)
+}
+
 /// The catalog page, read from the shipped snapshot and the city's own
-/// `CONFIG.toml`; nothing on this machine is run or looked for.
-pub(super) fn catalog_answer(city_root: &Path) -> wire::Answer {
+/// `CONFIG.toml`, with the agents this machine shows evidence of when the
+/// served city handed in where to look; nothing is run.
+pub(super) fn catalog_answer(city_root: &Path, reach: Option<HarnessReach>) -> wire::Answer {
     match crate::roster::roster(city_root) {
         Ok(roster) => wire::Answer::AgentCatalog(Box::new(wire::AgentCatalogAnswer {
-            detected: Vec::new(),
+            detected: reach
+                .map(|reach| evidence(&roster, reach))
+                .unwrap_or_default()
+                .iter()
+                .map(offer_of)
+                .collect(),
             catalog: roster.catalog().entries.iter().map(offer_of).collect(),
             added: roster.rows().map(line_of).collect(),
             snapshot: wire::CatalogSnapshot {
@@ -28,6 +42,25 @@ pub(super) fn catalog_answer(city_root: &Path) -> wire::Answer {
         })),
         Err(stopped) => unavailable_because("AgentCatalog".to_owned(), &stopped),
     }
+}
+
+/// What this machine shows: the other clients' files that exist and read,
+/// and the vendor directories that exist.
+fn evidence(roster: &agent_protocols::Roster, reach: HarnessReach) -> Vec<AgentEntry> {
+    let configs: Vec<String> = agent_protocols::CLIENT_CONFIGS
+        .iter()
+        .filter_map(reach.place)
+        // A client that is not installed has no file, and one that cannot
+        // be read shows nothing: evidence only orders and hints, so a file
+        // that does not read is no evidence rather than a refused page.
+        .flat_map(std::fs::read_to_string)
+        .collect();
+    let place = reach.place;
+    agent_protocols::detected(
+        roster,
+        |dir| place(dir).is_some_and(|at| at.is_dir()),
+        &configs,
+    )
 }
 
 /// One pasted agent as its consent card shows it, or the paste's refusal.

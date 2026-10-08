@@ -11,6 +11,7 @@
 //! (`crates/agent_protocols/Spec.lean` §8-19).
 
 mod catalog;
+mod detect;
 mod entry;
 mod environment;
 mod paste;
@@ -19,6 +20,7 @@ mod roster;
 mod session;
 
 pub use catalog::{Catalog, registry_entry};
+pub use detect::{CLIENT_CONFIGS, configured, detected};
 pub use entry::{AgentEntry, AgentId, AgentSource, Consented, Launch, Pin};
 pub use environment::passed;
 pub use paste::pasted;
