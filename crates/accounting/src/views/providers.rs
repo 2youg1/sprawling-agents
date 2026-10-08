@@ -86,7 +86,7 @@ pub(super) fn endpoints_answer(book: &gateway::EndpointBook) -> wire::EndpointsA
                     input_modalities: row.input_modalities.clone(),
                     input_price: row.input_price.clone(),
                     output_price: row.output_price.clone(),
-                    thinking: wire::ThinkingOffer::unknown(),
+                    thinking: thinking_summary(gateway::thinking_offer(endpoint, &row.id)),
                     canonical: gateway::canonical_model(row),
                 })
                 .collect(),
@@ -106,6 +106,29 @@ pub(super) fn endpoints_answer(book: &gateway::EndpointBook) -> wire::EndpointsA
         })
         .collect();
     wire::EndpointsAnswer { endpoints, chosen }
+}
+
+/// The gateway's offer as the wire spells it: the ladder is climbed
+/// once, by `gateway::provider::thinking`, and this only renames.
+fn thinking_summary(offer: gateway::ThinkingOffer) -> wire::ThinkingOffer {
+    wire::ThinkingOffer {
+        levels: offer.levels.iter().collect(),
+        on: match offer.on {
+            gateway::Switch::Allowed => wire::Switch::Allowed,
+            gateway::Switch::Refused => wire::Switch::Refused,
+            gateway::Switch::Unknown => wire::Switch::Unknown,
+        },
+        default: offer.default,
+        default_on: offer.default_on,
+        words: Vec::new(),
+        from: match offer.from {
+            gateway::OfferSource::Person => wire::OfferSource::Person,
+            gateway::OfferSource::Upstream => wire::OfferSource::Upstream,
+            gateway::OfferSource::Preset => wire::OfferSource::Preset,
+            gateway::OfferSource::Unknown => wire::OfferSource::Unknown,
+        },
+        source: offer.source.map(str::to_owned),
+    }
 }
 
 /// The book's rows with each listed account's key read, in the order

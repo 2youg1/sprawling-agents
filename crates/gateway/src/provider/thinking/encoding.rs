@@ -22,7 +22,11 @@ use crate::provider::preset::EffortField;
 /// Empty where the face has no field for it: the responses face and the
 /// specification's own chat spelling have no switch, so thinking on is
 /// written nowhere there and the provider's own default answers.
-pub(crate) fn fields(ask: Ask, dialect: DialectKind, field: EffortField) -> Vec<(&'static str, Value)> {
+pub(crate) fn fields(
+    ask: Ask,
+    dialect: DialectKind,
+    field: EffortField,
+) -> Vec<(&'static str, Value)> {
     match dialect {
         // `effort` hangs under `output_config` and nowhere else; thinking
         // on is the adaptive mode the model list states.

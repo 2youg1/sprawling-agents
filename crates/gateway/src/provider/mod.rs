@@ -36,7 +36,7 @@ pub mod input;
 pub mod modality;
 pub mod preset;
 pub mod registry;
-pub mod thinking;
 /// The guard on the system prefix this city sends.
 #[cfg(test)]
 mod stability;
+pub mod thinking;

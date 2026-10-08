@@ -303,6 +303,22 @@ pub(in crate::worker) fn fake_openai_with(
     serve(models, script, first_chat, unpaced())
 }
 
+/// One row of the fake's model list. A model whose id ends in
+/// `-thinks` states the levels it offers the way DeepSeek's list does,
+/// so a test can follow a level from a configuration layer to the wire;
+/// every other row states nothing but its id, and is offered no level.
+#[cfg(test)]
+fn listed_row(id: &str) -> serde_json::Value {
+    if id.ends_with("-thinks") {
+        serde_json::json!({
+            "id": id,
+            "effort": { "supported_levels": ["low", "medium", "high", "xhigh", "max"] },
+        })
+    } else {
+        serde_json::json!({ "id": id })
+    }
+}
+
 /// One listener serving `script`, on a port of its own.
 #[cfg(test)]
 fn serve(
@@ -317,7 +333,8 @@ fn serve(
     let list = serde_json::json!({
         "data": models
             .iter()
-            .map(|id| serde_json::json!({ "id": id }))
+            .copied()
+            .map(listed_row)
             .collect::<Vec<_>>(),
     })
     .to_string();

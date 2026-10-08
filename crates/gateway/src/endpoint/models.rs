@@ -142,7 +142,10 @@ fn openrouter(row: &Value) -> Option<ThinkingStatement> {
     let said = row.get("reasoning").filter(|said| said.is_object())?;
     let levels = match said.get("supported_efforts") {
         Some(Value::Array(words)) => levels(words),
-        Some(Value::Null) => Effort::ALL.into_iter().filter(|level| *level != Effort::None).collect(),
+        Some(Value::Null) => Effort::ALL
+            .into_iter()
+            .filter(|level| *level != Effort::None)
+            .collect(),
         Some(Value::Bool(_) | Value::Number(_) | Value::String(_) | Value::Object(_)) | None => {
             Vec::new()
         }
@@ -174,7 +177,9 @@ fn xai(row: &Value) -> Option<ThinkingStatement> {
 /// `capabilities.thinking.types.adaptive.supported`.
 fn anthropic(row: &Value) -> Option<ThinkingStatement> {
     let capabilities = row.get("capabilities")?;
-    let effort = capabilities.get("effort").filter(|effort| effort.is_object());
+    let effort = capabilities
+        .get("effort")
+        .filter(|effort| effort.is_object());
     let adaptive = capabilities
         .pointer("/thinking/types/adaptive/supported")
         .and_then(Value::as_bool);
@@ -267,8 +272,8 @@ pub(crate) fn facts_of(row: &Value) -> Option<ModelFacts> {
         input_modalities: modalities(row),
         input_price: price(row, ["input_price", "prompt"]),
         output_price: price(row, ["output_price", "completion"]),
-        thinking: None.filter(|_: &ThinkingStatement| thinking(row).is_some()),
-        canonical: None.filter(|_: &String| canonical(row).is_some()),
+        thinking: thinking(row),
+        canonical: canonical(row),
     })
 }
 
@@ -367,7 +372,11 @@ mod tests {
                 .map(|row| {
                     let facts = facts_of(row).unwrap();
                     let offer = ThinkingOffer::climb(facts.thinking.as_ref(), None);
-                    (facts.id.clone(), crate::provider::identity::canonical(&facts), offer)
+                    (
+                        facts.id.clone(),
+                        crate::provider::identity::canonical(&facts),
+                        offer,
+                    )
                 })
                 .collect()
         };
@@ -407,12 +416,21 @@ mod tests {
                         "step-5-preview",
                         said(&[Low, Medium, High], Switch::Allowed, Some(Medium), None),
                     ),
-                    row("unbiased/pareto-26.10-preview", "pareto-26.10-preview", unknown),
+                    row(
+                        "unbiased/pareto-26.10-preview",
+                        "pareto-26.10-preview",
+                        unknown
+                    ),
                 ],
                 vec![row(
                     "claude-opus-5",
                     "claude-opus-5",
-                    said(&[Low, Medium, High, XHigh, Max], Switch::Allowed, None, None),
+                    said(
+                        &[Low, Medium, High, XHigh, Max],
+                        Switch::Allowed,
+                        None,
+                        None
+                    ),
                 )],
                 vec![
                     row(
@@ -431,7 +449,12 @@ mod tests {
                     row(
                         "grok-420-reasoning",
                         "grok-420-reasoning",
-                        said(&[Low, Medium, High, XHigh], Switch::Unknown, Some(High), None),
+                        said(
+                            &[Low, Medium, High, XHigh],
+                            Switch::Unknown,
+                            Some(High),
+                            None
+                        ),
                     ),
                     row("grok-imagine-image", "grok-imagine-image", unknown),
                 ],

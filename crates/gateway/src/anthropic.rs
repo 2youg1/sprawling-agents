@@ -16,7 +16,8 @@
 //! - Request and response: <https://platform.claude.com/docs/en/api/messages>
 //! - Thinking blocks, `signature`, preservation across tool use:
 //!   <https://platform.claude.com/docs/en/build-with-claude/thinking>
-//! - Effort levels: <https://platform.claude.com/docs/en/build-with-claude/effort>
+//! - Effort levels: <https://platform.claude.com/docs/en/build-with-claude/effort>;
+//!   written by `provider::thinking::encoding`, not here (gateway D35)
 //! - What invalidates a cache breakpoint:
 //!   <https://platform.claude.com/docs/en/build-with-claude/prompt-caching>
 //! - The 400 that a modified thinking block earns:
@@ -25,8 +26,8 @@
 //!   <https://platform.claude.com/docs/en/build-with-claude/vision>
 
 use kernel::{
-    AxError, CacheCount, ChatRequest, ChatResponse, ContentBlock, DialectKind, ModelUsage,
-    Role, StopReason, Tokens,
+    AxError, CacheCount, ChatRequest, ChatResponse, ContentBlock, DialectKind, ModelUsage, Role,
+    StopReason, Tokens,
 };
 use serde_json::{Map, Value, json};
 
@@ -329,4 +330,3 @@ pub(crate) fn response_wire(resp: &ChatResponse) -> Result<Value, AxError> {
         },
     }))
 }
-

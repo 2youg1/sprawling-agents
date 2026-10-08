@@ -126,9 +126,10 @@ impl Endpoint {
                     .get("last_id")
                     .and_then(Value::as_str)
                     .map(str::to_owned),
-                (DialectKind::Anthropic | DialectKind::OpenAi | DialectKind::OpenAiResponses, _) => {
-                    None
-                }
+                (
+                    DialectKind::Anthropic | DialectKind::OpenAi | DialectKind::OpenAiResponses,
+                    _,
+                ) => None,
             };
             if after.is_none() {
                 break;
@@ -312,9 +313,11 @@ impl Endpoint {
         // Before the cache key and the overrides, so a person who named
         // one of these paths wins (gateway D35).
         if let (Some(ask), Value::Object(root)) = (self.thinking.ask(chat.effort), &mut wire) {
-            for (field, value) in
-                crate::provider::thinking::encoding::fields(ask, self.config.dialect, spelling.effort)
-            {
+            for (field, value) in crate::provider::thinking::encoding::fields(
+                ask,
+                self.config.dialect,
+                spelling.effort,
+            ) {
                 root.insert(field.to_owned(), value);
             }
         }

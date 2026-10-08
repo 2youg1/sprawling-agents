@@ -163,9 +163,7 @@ impl ThinkingOffer {
     #[must_use]
     pub fn ask(&self, stored: Option<Effort>) -> Option<Ask> {
         match stored {
-            Some(level) if self.levels.contains(level) && level == Effort::None => {
-                Some(Ask::Level(level))
-            }
+            Some(level) if self.levels.contains(level) => Some(Ask::Level(level)),
             Some(_) | None => self.fallback(),
         }
     }
@@ -223,10 +221,7 @@ pub fn offer_for(endpoint: &AttachedEndpoint, model: &str) -> ThinkingOffer {
         .iter()
         .find(|row| row.id == model)
         .and_then(|row| row.thinking.as_ref());
-    ThinkingOffer::climb(
-        said,
-        super::preset::thinking_for(&endpoint.base_url, model),
-    )
+    ThinkingOffer::climb(said, super::preset::thinking_for(&endpoint.base_url, model))
 }
 
 #[cfg(test)]

@@ -14,7 +14,9 @@
 //!   <https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create/>
 //! - `reasoning_effort` and its accepted values: `ReasoningEffort` in
 //!   `openai/openai-openapi`'s `openapi.yaml`, and
-//!   <https://developers.openai.com/api/docs/guides/reasoning>
+//!   <https://developers.openai.com/api/docs/guides/reasoning>. The
+//!   thinking fields are written by `provider::thinking::encoding`, not
+//!   here (gateway D35).
 //!
 //! **Loss accounting is explicit, because this dialect is not the
 //! canonical shape.** This wire has no explicit cache breakpoints
@@ -29,8 +31,8 @@
 //! asserted in tests.
 
 use kernel::{
-    AxCode, AxError, CacheCount, ChatRequest, ChatResponse, ContentBlock, DialectKind,
-    ModelUsage, Role, StopReason,
+    AxCode, AxError, CacheCount, ChatRequest, ChatResponse, ContentBlock, DialectKind, ModelUsage,
+    Role, StopReason,
 };
 use serde_json::{Map, Value, json};
 

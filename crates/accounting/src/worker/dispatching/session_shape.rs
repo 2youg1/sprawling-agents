@@ -59,15 +59,31 @@ impl RunWorker {
     /// properties of the model, so a copy of them in this file would be
     /// a second answer to what the book already answers.
     ///
+    /// A level this dispatch names explicitly is first held against
+    /// what the (Endpoint, model) offers, so a level the model does not
+    /// offer is refused rather than sent or moved to a neighbour; a
+    /// stored level is never refused, the gateway sends the default rule's
+    /// level instead (`crates/gateway/spec/Provider/Thinking.lean` §8-39).
+    ///
     /// # Errors
     /// Propagates the room's own configuration failing to read or
-    /// write, and refuses `E_CONFIG_INVALID` for a dispatch that would
-    /// move the model, the ceiling or the effort the session froze.
+    /// write, and refuses `E_CONFIG_INVALID` for an explicit level the
+    /// model does not offer and for a dispatch that would move the
+    /// model, the ceiling or the effort the session froze.
     pub(super) fn choose_shape(
         &mut self,
         at: &Assignment,
         model: &gateway::ModelEntry,
+        provider: &str,
     ) -> Result<(), AxError> {
+        if let Some(endpoint) = self
+            .credentials
+            .book
+            .endpoints()
+            .find(|endpoint| endpoint.name == provider)
+        {
+            gateway::thinking_offer(endpoint, &model.id).admit(at.effort, &model.id)?;
+        }
         let own = city::own_layer(&self.city_root, &at.addr)?;
         let Some(frozen_model) = own.model() else {
             return city::write_session(&self.city_root, &at.addr, &model.id, at.effort);

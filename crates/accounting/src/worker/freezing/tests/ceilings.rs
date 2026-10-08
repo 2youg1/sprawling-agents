@@ -25,8 +25,11 @@ fn the_effort_a_config_layer_states_is_what_goes_out_on_the_wire() {
     std::fs::create_dir_all(building_layer.parent().unwrap()).unwrap();
     std::fs::write(&building_layer, "[model]\neffort = \"xhigh\"\n").unwrap();
 
-    let (base_url, provider) = fake_openai(&["m-local"], vec![completion("done", None)]);
-    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
+    // The model's list states the levels it offers, so the level the
+    // layers resolve is sent rather than left to the provider; the list
+    // reaches the call through the facts the attach kept in the CAS.
+    let (base_url, provider) = fake_openai(&["m-thinks"], vec![completion("done", None)]);
+    let mut worker = worker_with_provider(dir.path(), &base_url, "m-thinks").unwrap();
     worker
         .handle(wire::Command::Dispatch {
             addr: room,
