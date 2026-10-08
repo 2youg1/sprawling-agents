@@ -79,6 +79,13 @@ pub(crate) enum Event {
     /// `SIGINT`, or `CTRL_C_EVENT`, as a signal rather than a key.
     InterruptSignal,
     /// Windows' Ctrl+Break, which is always a signal.
+    #[cfg_attr(
+        all(not(windows), not(test)),
+        expect(
+            dead_code,
+            reason = "only Windows has Ctrl+Break; the variant stays so the model's table is one table on every platform"
+        )
+    )]
     BreakSignal,
     /// `SIGTERM`.
     #[cfg_attr(
