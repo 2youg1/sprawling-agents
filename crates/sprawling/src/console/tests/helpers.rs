@@ -92,5 +92,17 @@ pub(super) fn inside() -> super::super::terminal::Inside {
             "this test keeps none",
         )
         .with_recovery("nothing to do")),
+        door: wire::LocalDoor::new(
+            Vec::new(),
+            wire::DoorSenses {
+                clock: Arc::new(|| Ok(kernel::TimeMs::new(0))),
+                entropy: Arc::new(|bytes: &mut [u8]| {
+                    bytes.fill(7);
+                    Ok(())
+                }),
+            },
+            Arc::new(|_: &[wire::PairedBrowser]| Ok(())),
+        )
+        .unwrap(),
     }
 }

@@ -73,6 +73,8 @@ pub const RUN_ID_PATTERN: &str = "????????-????-????-????-????????????";
 pub const REMOTE_DIR: &str = "remote";
 /// The devices paired to reach the city from outside the machine.
 pub const DEVICES_FILE: &str = "devices.toml";
+/// The browsers paired at this machine's own door, by public key.
+pub const BROWSERS_FILE: &str = "browsers.toml";
 /// Where residents' playback exports land, under the city's reserved
 /// subtree, one directory per building.
 pub const PLAYBACK_DIR: &str = "playback";
@@ -256,6 +258,16 @@ impl CityLayout {
     #[must_use]
     pub fn devices(&self) -> PathBuf {
         self.governed_root().join(REMOTE_DIR).join(DEVICES_FILE)
+    }
+
+    /// The browsers paired at this machine's own door, kept as public
+    /// keys (`crates/wire/spec/Server.lean` §8-93).
+    ///
+    /// Under the city's reserved subtree for the reason [`Self::devices`]
+    /// is: the table decides who may reach the city.
+    #[must_use]
+    pub fn browsers(&self) -> PathBuf {
+        self.governed_root().join(BROWSERS_FILE)
     }
 
     /// Where residents' playback exports land, one directory per

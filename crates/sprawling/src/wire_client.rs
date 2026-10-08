@@ -57,6 +57,27 @@ pub(crate) enum Unheard {
     Broken(AxError),
 }
 
+/// The credential a call presents: the token given with `--token`, or
+/// else the key the city at `at` keeps in its key file on this machine
+/// (`crates/sprawling/spec/Keying.lean` §8-22). A key file that cannot be
+/// read is said once and the greeting goes without; the city's refusal
+/// then says how to get in.
+fn credential(at: &str, given: Option<&str>) -> Option<String> {
+    if let Some(given) = given {
+        return Some(given.to_owned());
+    }
+    let port = at
+        .rsplit_once(':')
+        .and_then(|(_, port)| port.parse::<u16>().ok())?;
+    match sprawling::serving::key_file::read_key(port) {
+        Ok(key) => key,
+        Err(unread) => {
+            eprintln!("{}: {}", unread.action(), unread.recovery());
+            None
+        }
+    }
+}
+
 /// The greeting this build sends, computed rather than transcribed.
 fn hello(token: Option<&str>) -> wire::ClientFrame {
     wire::ClientFrame::Hello(wire::Hello {
@@ -127,7 +148,7 @@ pub(crate) fn send(
     let body = serde_json::to_string(outgoing).map_err(|err| {
         Unheard::Unreadable(malformed("encode the frame to send", &err.to_string()))
     })?;
-    let greeting = serde_json::to_string(&hello(token))
+    let greeting = serde_json::to_string(&hello(credential(at, token).as_deref()))
         .map_err(|err| Unheard::Broken(malformed("encode the greeting", &err.to_string())))?;
 
     let runtime = tokio::runtime::Builder::new_current_thread()

@@ -62,12 +62,13 @@ fn a_configured_token_is_adopted_rather_than_replaced() {
     );
 }
 
-/// Loopback stays frictionless: nothing is minted and nothing is
-/// asked for, which is the property `decide_bind` is written to keep.
+/// A loopback listener holds a key too, and nobody is shown it: the
+/// loopback port is no credential (wire D54).
 #[test]
-fn a_loopback_listener_is_handed_nothing_to_present() {
+fn a_loopback_listener_mints_a_key_nobody_is_shown() {
     let local = "127.0.0.1:8787".parse().expect("a literal address");
-    let keyed = key_for(local, None).expect("no entropy is drawn");
-    assert_eq!(keyed, Keyed::NothingToPresent);
-    assert_eq!(keyed.code(), None);
+    let keyed = key_for(local, None).expect("this machine has entropy");
+    assert!(matches!(keyed, Keyed::Unshown(_)));
+    assert_eq!(keyed.shown(), None);
+    assert!(!keyed.code().is_empty());
 }

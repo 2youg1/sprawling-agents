@@ -62,8 +62,9 @@ pub(crate) struct Reaching {
     pub(crate) runtime: tokio::runtime::Handle,
     /// The city's own listener, as a client on this machine reaches it.
     pub(crate) city: SocketAddr,
-    /// The pairing token the city's port asks for, if it asks for one.
-    pub(crate) token: Option<String>,
+    /// The key the city's port asks every caller for, presented in
+    /// process rather than read from the key file.
+    pub(crate) token: String,
     /// The client bundle the city's port serves, served here too.
     pub(crate) page: Arc<wire::ClientAssets>,
 }
@@ -119,10 +120,25 @@ struct Serving {
 
 /// Serves the two paths and the page until the door says its time is up.
 async fn answer(listener: tokio::net::TcpListener, doorway: Doorway, reaching: Reaching) {
+    // The public name the device reaches this listener by is the route's,
+    // not known here, so the page's socket is allowed to its own origin.
+    let page = match wire::bundle_routes(
+        Arc::clone(&reaching.page),
+        &wire::PageHeaders::same_origin(),
+    ) {
+        Ok(page) => page,
+        Err(unspelt) => {
+            eprintln!(
+                "  the remote listener cannot serve the page: {}",
+                unspelt.recovery()
+            );
+            return;
+        }
+    };
     let routes = Router::new()
         .route(PAIR_PATH, get(pair_upgrade))
         .route(SESSION_PATH, get(session_upgrade))
-        .merge(wire::bundle_routes(Arc::clone(&reaching.page)))
+        .merge(page)
         .with_state(Serving {
             doorway: doorway.clone(),
             reaching,

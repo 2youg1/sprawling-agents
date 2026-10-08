@@ -171,7 +171,7 @@ fn serving_at(city_root: &std::path::Path, addr: std::net::SocketAddr) -> super:
     super::Serving {
         city_root: city_root.to_path_buf(),
         addr,
-        token: None,
+        token: "a-key-for-this-test-serve".to_owned(),
         client: wire::ClientAssets::Disk(city_root.to_path_buf()),
         vault: gateway::Custodian::in_memory(),
         vault_notice: None,

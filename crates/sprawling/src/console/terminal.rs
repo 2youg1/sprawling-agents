@@ -27,9 +27,10 @@ use super::language::{Line, help, parse};
 
 /// What a console needs from the process that started it.
 ///
-/// The pairing token arrives as a copy of the one `serve` already read,
-/// so `/web` can carry it and nobody has to transcribe a secret. It is
-/// not re-read from the environment here: one read, one authority.
+/// The pairing token is the key a person may be shown - only one minted
+/// for a serve beyond this machine - so `/web` can print the address a
+/// browser on another machine opens. It is not re-read from the
+/// environment here: one read, one authority.
 ///
 /// The other three are what the startup banner printed and the event
 /// stream then scrolled away. A person watching a city from somewhere
@@ -64,6 +65,9 @@ pub(crate) struct Inside {
     pub(crate) desk: Arc<accounting::worker::CommandDesk>,
     pub(crate) answering: Answering,
     pub(crate) remote: Result<crate::outside::console::Remote, kernel::AxError>,
+    /// This machine's door for a browser, which `/web` asks for an open
+    /// code (`crates/sprawling/spec/Firstrun.lean` §8-8).
+    pub(crate) door: wire::LocalDoor,
 }
 
 /// What this process is doing, in one screen.
@@ -92,13 +96,11 @@ pub(crate) fn serving(
     } else {
         "one interface, reachable from the network"
     };
+    // Every face demands a key (wire D54); what differs is who holds it.
     let door = match (terminal.token.is_some(), terminal.bind.ip().is_loopback()) {
         (true, _) => "a pairing key is required",
-        (false, true) => "none - a loopback listener asks for nothing",
-        // Worth saying plainly rather than leaving to be discovered: an
-        // unkeyed listener beyond loopback is a city that anyone able to
-        // route to it may drive.
-        (false, false) => "NONE - anyone who can reach this address can drive this city",
+        (false, true) => "a key - this machine's key file, or a paired browser's session",
+        (false, false) => "the pairing token you configured, or a paired browser's session",
     };
     let counts = match vitals {
         Some(v) => format!(
@@ -185,7 +187,10 @@ pub(super) fn drive<R: BufRead, W: Write>(
     out: &mut W,
 ) {
     let Inside {
-        desk, answering, ..
+        desk,
+        answering,
+        door,
+        ..
     } = inside;
     let mut keys = match LineKeys::drawn() {
         Ok(keys) => keys,
@@ -217,8 +222,15 @@ pub(super) fn drive<R: BufRead, W: Write>(
             Line::OpenWeb => {
                 let url = web_url(terminal);
                 say(out, &format!("  {url}"));
-                // Never fatal: the URL is on the screen either way.
-                drop(crate::firstrun::open_in_browser(&url));
+                // Never fatal: the URL is on the screen either way. The
+                // browser is handed an open code through a file only this
+                // account reads, never a key on its command line.
+                if let Err(unopened) = crate::firstrun::open_paired(&terminal.url, door) {
+                    say(
+                        out,
+                        &format!("  {}: {}", unopened.action(), unopened.recovery()),
+                    );
+                }
             }
             Line::Serving => {
                 // The counts come from the one question that already

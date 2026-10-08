@@ -33,7 +33,10 @@ mod pairing;
 
 pub use admission::{Admission, Door, Keys, decide_admission, offered_pairing};
 pub use entry::{Arrival, Entry, ListenerOrigins, PageHeaders, Presented, decide_entry};
-pub use pairing::{BrowserDoor, DeviceKey, Guess, LABEL_MAX, PairedBrowser, Sessions, decode_hex};
+pub use pairing::{
+    BrowserDoor, DeviceKey, Guess, LABEL_MAX, OPEN_CODE_LIFETIME_MS, PairedBrowser, Sessions,
+    decode_hex,
+};
 
 use std::net::SocketAddr;
 

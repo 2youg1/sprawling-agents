@@ -179,21 +179,6 @@ fn strip_quotes(answer: &str) -> &str {
         .unwrap_or(answer)
 }
 
-/// The URL a person on this machine can open.
-///
-/// A city bound to every interface still has to be reachable from the
-/// browser in front of it, and `http://0.0.0.0:8787` is not an address a
-/// browser can use.
-#[must_use]
-pub fn local_url(bind: SocketAddr) -> String {
-    let addr = reachable(bind);
-    let port = addr.port();
-    match addr.ip() {
-        std::net::IpAddr::V4(v4) => format!("http://{v4}:{port}"),
-        std::net::IpAddr::V6(v6) => format!("http://[{v6}]:{port}"),
-    }
-}
-
 /// The address something on this machine can actually connect to. A city
 /// bound to every interface is still opened from the browser in front of
 /// it, and `0.0.0.0` is not an address any client can dial.
@@ -211,14 +196,16 @@ fn reachable(bind: SocketAddr) -> SocketAddr {
 /// Waits for the port to accept rather than guessing when the bind will
 /// happen, and gives up in silence when it never does - the URL was
 /// printed before this started, so nothing is lost but the convenience.
-pub fn open_when_ready(bind: SocketAddr, url: String) {
+pub fn open_when_ready(bind: SocketAddr, url: String, door: wire::LocalDoor) {
     let addr = reachable(bind);
     std::thread::spawn(move || {
         for _ in 0..PROBE_ATTEMPTS {
             if std::net::TcpStream::connect_timeout(&addr, PROBE_INTERVAL).is_ok() {
                 // Never fatal: a machine with no handler for URLs still
                 // has a working city, and its address is on the screen.
-                drop(open_in_browser(&url));
+                if let Err(unopened) = open_paired(&url, &door) {
+                    eprintln!("  {}: {}", unopened.action(), unopened.recovery());
+                }
                 return;
             }
             std::thread::sleep(PROBE_INTERVAL);
@@ -226,7 +213,73 @@ pub fn open_when_ready(bind: SocketAddr, url: String) {
     });
 }
 
-/// Hands a URL to whatever this desktop opens URLs with.
+/// Opens `url` in this desktop's browser already paired: an open code
+/// from `door` goes into a page only this account can read, and the
+/// browser is handed that file's path, never the code
+/// (`crates/sprawling/spec/Firstrun.lean` §8-8). The file is removed once
+/// the page redeems the code, or once the code expires.
+///
+/// Under WSL a `file:` page cannot reach the Windows browser, so the bare
+/// address opens and the pairing code on the terminal pairs it.
+///
+/// # Errors
+/// No open code could be minted, the redirect file could not be written,
+/// or the desktop's handler could not be started.
+pub(crate) fn open_paired(url: &str, door: &wire::LocalDoor) -> Result<(), kernel::AxError> {
+    let unhandled = |source: std::io::Error| {
+        kernel::AxError::failure(
+            kernel::AxCode::ToolUnavailable,
+            "open the WebUI in a browser",
+            source.to_string(),
+        )
+        .with_recovery("open the address the city printed, and type the pairing code it shows")
+    };
+    if std::env::var_os("WSL_DISTRO_NAME").is_some() {
+        return open_in_browser(url).map_err(unhandled);
+    }
+    let wire::OpenCode { code, redeemed } = door.issue_open_code()?;
+    let page =
+        crate::serving::key_file::runtime_dir()?.join(format!("open-{}.html", std::process::id()));
+    let target = format!("{}/#open={code}", url.trim_end_matches('/'));
+    let redirect = format!(
+        "<!doctype html><meta charset=\"utf-8\"><meta http-equiv=\"refresh\" content=\"0;url={target}\">\
+         <script>location.replace({target:?})</script>\n"
+    );
+    write_private(&page, &redirect).map_err(unhandled)?;
+    let opened = open_in_browser(&page.to_string_lossy()).map_err(unhandled);
+    std::thread::spawn(move || {
+        // Either answer ends the wait: redeemed, expired, or the door gone.
+        match redeemed.recv_timeout(Duration::from_millis(wire::OPEN_CODE_LIFETIME_MS)) {
+            Ok(())
+            | Err(
+                std::sync::mpsc::RecvTimeoutError::Timeout
+                | std::sync::mpsc::RecvTimeoutError::Disconnected,
+            ) => {}
+        }
+        if let Err(left) = std::fs::remove_file(&page) {
+            eprintln!(
+                "  remove the browser's redirect page {}: {left}",
+                page.display()
+            );
+        }
+    });
+    opened
+}
+
+/// A new file only this account reads, in the runtime directory made
+/// private to it.
+fn write_private(path: &Path, text: &str) -> std::io::Result<()> {
+    let mut options = std::fs::OpenOptions::new();
+    options.write(true).create(true).truncate(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt as _;
+        options.mode(0o600);
+    }
+    options.open(path)?.write_all(text.as_bytes())
+}
+
+/// Hands a URL or a file path to whatever this desktop opens them with.
 ///
 /// # Errors
 /// Propagates the failure of starting the handler. Callers treat this as
@@ -272,7 +325,7 @@ fn handler(url: &str) -> std::process::Command {
     reason = "test code"
 )]
 mod tests {
-    use super::{BesideBinary, FirstScreen, Home, ask, default_city, local_url};
+    use super::{BesideBinary, FirstScreen, Home, ask, default_city};
     use std::path::{Path, PathBuf};
 
     fn screen(answer: &str) -> (FirstScreen, String) {
@@ -376,17 +429,5 @@ mod tests {
     fn end_of_input_quits_rather_than_acting_on_silence() {
         let (outcome, _) = screen("");
         assert!(matches!(outcome, FirstScreen::Quit));
-    }
-
-    #[test]
-    fn a_city_bound_to_every_interface_is_shown_as_loopback() {
-        let every: std::net::SocketAddr = "0.0.0.0:8787".parse().unwrap();
-        assert_eq!(local_url(every), "http://127.0.0.1:8787");
-    }
-
-    #[test]
-    fn a_city_bound_to_one_address_is_shown_at_that_address() {
-        let one: std::net::SocketAddr = "192.168.1.9:8787".parse().unwrap();
-        assert_eq!(local_url(one), "http://192.168.1.9:8787");
     }
 }

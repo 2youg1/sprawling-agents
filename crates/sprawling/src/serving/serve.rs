@@ -28,10 +28,10 @@ use kernel::Payload;
 pub struct Serving {
     pub city_root: std::path::PathBuf,
     pub addr: SocketAddr,
-    /// The pairing token in plaintext, read once by the caller. It gets
-    /// no further than the digest this takes from it, except into the
-    /// console's `/web`, which is the one place it has to travel.
-    pub token: Option<String>,
+    /// This serve's key in plaintext (`serving::key_for`). It gets no
+    /// further than the digest the listener demands, the key file native
+    /// clients read, and the remote relay, which presents it in process.
+    pub token: String,
     pub client: wire::ClientAssets,
     pub vault: gateway::Custodian,
     pub vault_notice: Option<Payload>,

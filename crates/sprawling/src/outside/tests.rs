@@ -134,13 +134,13 @@ fn pair(doorway: &Doorway, name: &str, authority: Authority, seed: u8) -> Device
 }
 
 /// Opens a session for a paired device, and the device's half of it.
-fn admit(doorway: &Doorway, device: &Device, token: Option<&str>) -> (Conduit, Session) {
+fn admit(doorway: &Doorway, device: &Device, token: &str) -> (Conduit, Session) {
     let waiting = handshake::device_hello(device.id, [7; 32]).unwrap();
     let (reply, city_side) = doorway.session_reply(waiting.hello()).unwrap();
     let (finish, mine) = waiting.finish(&reply, &device.city, &device.key).unwrap();
     let admitted = doorway.admit(city_side, &finish).unwrap();
     (
-        Conduit::new(doorway.clone(), admitted, token.map(str::to_owned)),
+        Conduit::new(doorway.clone(), admitted, token.to_owned()),
         mine,
     )
 }
@@ -185,7 +185,7 @@ fn the_door_writes_its_five_lines_in_the_order_they_happen() {
     let doorway = kept(dir.path(), &written);
     doorway.open(local(), lasting("2h")).unwrap();
     let phone = pair(&doorway, "phone", Authority::Act, 1);
-    drop(admit(&doorway, &phone, None));
+    drop(admit(&doorway, &phone, "city-key"));
     doorway
         .revoke(&Revoking::Named("phone".to_owned()))
         .unwrap();
@@ -210,7 +210,7 @@ fn a_local_only_frame_is_refused_and_reaches_no_city() {
     let doorway = kept(dir.path(), &Written::default());
     doorway.open(local(), lasting("1h")).unwrap();
     let laptop = pair(&doorway, "laptop", Authority::Act, 2);
-    let (mut conduit, mut mine) = admit(&doorway, &laptop, None);
+    let (mut conduit, mut mine) = admit(&doorway, &laptop, "city-key");
     let reveal = command(wire::WireCommand::Reveal {
         at: kernel::Address::parse("lab").unwrap(),
         idem: idem(),
@@ -229,7 +229,7 @@ fn the_privacy_page_is_refused_to_a_device_that_may_act() {
     let doorway = kept(dir.path(), &Written::default());
     doorway.open(local(), lasting("1h")).unwrap();
     let laptop = pair(&doorway, "laptop", Authority::Act, 2);
-    let (mut conduit, mut mine) = admit(&doorway, &laptop, None);
+    let (mut conduit, mut mine) = admit(&doorway, &laptop, "city-key");
     let ask = wire::ClientFrame::Ask(wire::Ask {
         ask_id: wire::AskId(1),
         query: wire::Query::Privacy,
@@ -258,7 +258,7 @@ fn a_watching_device_is_refused_a_verb_that_acts_and_may_still_ask() {
     let doorway = kept(dir.path(), &Written::default());
     doorway.open(local(), lasting("1h")).unwrap();
     let tablet = pair(&doorway, "tablet", Authority::Watch, 3);
-    let (mut conduit, mut mine) = admit(&doorway, &tablet, Some("city-token"));
+    let (mut conduit, mut mine) = admit(&doorway, &tablet, "city-token");
     let cancel = command(wire::WireCommand::Cancel {
         run: kernel::RunId::CITY,
         idem: idem(),

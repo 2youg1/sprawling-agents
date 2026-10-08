@@ -17,7 +17,7 @@ use sprawling::monitor::top::screen;
 use sprawling::monitor::{CAPACITY, Sample};
 use tokio_tungstenite::tungstenite::Message;
 
-use super::{Unheard, hello, malformed, next_frame, unreachable_city};
+use super::{Unheard, credential, hello, malformed, next_frame, unreachable_city};
 use crate::gauge::lines::city_line;
 
 /// Five empty beats: the city has stopped, or stopped sending.
@@ -40,7 +40,7 @@ const REDRAW: &str = "\u{1b}[H\u{1b}[2J";
 /// opening frames; `Unheard::Broken` when a frame breaks mid-read,
 /// writing to stdout fails, or this process cannot start the runtime.
 pub(crate) fn top(at: &str, token: Option<&str>, audience: Audience) -> Result<(), Unheard> {
-    let greeting = serde_json::to_string(&hello(token))
+    let greeting = serde_json::to_string(&hello(credential(at, token).as_deref()))
         .map_err(|err| Unheard::Broken(malformed("encode the greeting", &err.to_string())))?;
     let watch = serde_json::to_string(&wire::ClientFrame::Monitor(wire::Monitoring::Watch))
         .map_err(|err| Unheard::Broken(malformed("encode the watch frame", &err.to_string())))?;

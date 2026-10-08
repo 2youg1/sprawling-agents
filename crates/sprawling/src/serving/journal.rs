@@ -53,6 +53,19 @@ impl Journal {
         }
     }
 
+    /// A second writer at `log`'s floor, into this journal, for a thread
+    /// or a moment `log` itself does not reach; off when `log` is off.
+    #[must_use]
+    pub fn beside(
+        &self,
+        log: &runtime::diagnostics::Diagnostics,
+    ) -> runtime::diagnostics::Diagnostics {
+        log.floor()
+            .map_or_else(runtime::diagnostics::Diagnostics::off, |floor| {
+                runtime::diagnostics::Diagnostics::new(floor, self.sink())
+            })
+    }
+
     /// The sink a `Diagnostics` is built with: every admitted line to
     /// standard error, and the same line to whoever is watching.
     ///

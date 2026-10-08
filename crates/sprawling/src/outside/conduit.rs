@@ -46,16 +46,13 @@ pub(super) struct Conduit {
     session: SessionId,
     opener: Opener,
     sealer: Sealer,
-    /// The city's own pairing token, which the greeting carries in.
-    token: Option<String>,
+    /// The city's own key, which the greeting carries in: every face of
+    /// the city demands one (`crates/wire/Spec.lean` §8-41).
+    token: String,
 }
 
 impl Conduit {
-    pub(super) fn new(
-        doorway: Doorway,
-        session: (SessionId, Session),
-        token: Option<String>,
-    ) -> Conduit {
+    pub(super) fn new(doorway: Doorway, session: (SessionId, Session), token: String) -> Conduit {
         let (id, Session { sealer, opener }) = session;
         Conduit {
             doorway,
@@ -115,7 +112,7 @@ impl Conduit {
     /// whether the page speaks its wire.
     fn greeting(&self, said: wire::Hello) -> Result<Step, AxError> {
         let city = wire::ClientFrame::Hello(wire::Hello {
-            token: self.token.clone(),
+            token: Some(self.token.clone()),
             ..said
         });
         serde_json::to_string(&city)

@@ -253,7 +253,7 @@ pub(super) fn serve_city(
         Ok(keyed) => keyed,
         Err(err) => return report(err),
     };
-    let token = keyed.code().map(str::to_owned);
+    let token = keyed.code().to_owned();
     // The socket's workers stand above the commands the city dispatches
     // (`crates/sprawling/spec/Serving/Standing.lean` §8-93).
     let core = serving::setting_telling_a_refusal();
@@ -307,10 +307,10 @@ pub(super) fn serve_city(
     // Read from the listener, not from `bind`: a city asked for port 0
     // listens on the port the operating system gave (wire D16).
     let at = listening.local_addr();
-    let url = firstrun::local_url(at);
+    let url = listening.origins().url().to_owned();
     let console = wanted.then(|| console::Terminal {
         url: url.clone(),
-        token: keyed.code().map(str::to_owned),
+        token: keyed.shown().map(str::to_owned),
         // The three facts the banner below prints. `/serving`
         // reprints them on demand, because the event stream scrolls
         // them away within seconds of a city getting busy.
@@ -320,6 +320,9 @@ pub(super) fn serve_city(
         records: super::verbs::records(args),
     });
     print_banner(city, &url, &client_line, &keyed);
+    // Each try replaces it; the console shows the one in force.
+    let pairing = listening.door().pairing_code().borrow().clone();
+    println!("  A second browser pairs with the code {pairing}.");
     if let Some(level) = floor {
         println!("log: {level}");
     }
@@ -329,7 +332,7 @@ pub(super) fn serve_city(
         println!();
     }
     match open {
-        Open::Browser => firstrun::open_when_ready(at, url),
+        Open::Browser => firstrun::open_when_ready(at, url, listening.door().clone()),
         Open::Nothing => {}
     }
     match runtime.block_on(listening.serve(console)) {
@@ -349,19 +352,18 @@ fn print_banner(city: &std::path::Path, url: &str, client_line: &str, keyed: &se
     println!("    client   {client_line}");
     println!();
     match keyed {
-        serving::Keyed::NothingToPresent => {}
+        serving::Keyed::Unshown(_) => {}
         serving::Keyed::Adopted(_) => {
             println!("    key      the one you configured; this city will ask for it");
             println!();
         }
-        // Shown here and nowhere else, for as long as this process
-        // lives. Nothing writes it down, so a person who loses it stops
-        // and starts the city again rather than looking for a file.
+        // Shown here and nowhere else a person reads; the key file this
+        // account alone reads holds it for programs on this machine.
         serving::Keyed::Minted(code) => {
             println!("    key      {code}");
             println!();
             println!("  This address reaches past this machine, so the city minted a key.");
-            println!("  It is shown once, kept nowhere, and replaced the next time you start.");
+            println!("  It is shown once and replaced the next time you start.");
             println!("  Open:    {}/?token={code}", url.trim_end_matches('/'));
             println!();
         }

@@ -57,8 +57,8 @@ pub(super) struct Outdoors {
 pub(super) struct CityPort {
     /// The address that listener holds.
     pub(super) at: SocketAddr,
-    /// The pairing token it asks for, if it asks.
-    pub(super) token: Option<String>,
+    /// The key it asks every caller for.
+    pub(super) token: String,
     /// The client bundle it serves, which the remote listener serves too.
     pub(super) page: Arc<wire::ClientAssets>,
 }
