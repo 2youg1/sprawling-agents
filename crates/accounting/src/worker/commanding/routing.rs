@@ -12,9 +12,8 @@ use kernel::{AxCode, AxError};
 use crate::guide;
 use crate::tuning::tuning_of;
 
-use super::super::{
-    Assignment, Chosen, Credential, Entered, Owing, RunWorker, Stated, Unasked, not_built,
-};
+use super::super::{Assignment, Chosen, Credential, Entered, Owing, RunWorker, Stated, Unasked};
+use super::unbuilt::Unbuilt;
 
 /// What a Cancel or a Steer is told when no run answers to the id it
 /// names.
@@ -126,9 +125,8 @@ impl RunWorker {
                 ..
             } => self.dispatch_asked(
                 Assignment {
-                    // Read from the room's own history rather than sent
-                    // by the page: a session that branched off another
-                    // said so once, at the moment it began.
+                    // Read from the room's own history rather than sent by the page: a session
+                    // that branched off another said so once, at the moment it began.
                     origin: self.origins.get(&addr),
                     // The session's last change, on the ledger, outranks
                     // the copy the page sent (`crates/sprawling/spec/Accounting/Worker.lean` §8-133).
@@ -224,12 +222,15 @@ impl RunWorker {
                 crate::worker::credentials::signing::Arrival::Enrolment,
             ),
             wire::Command::ForgetSecret(forgetting) => self.forget_secret(&forgetting.reference),
+            wire::Command::CloseCity(_) => Err(Unbuilt::CloseCity.not_built()),
+            wire::Command::AddAgent(_) => Err(Unbuilt::AddAgent.not_built()),
+            wire::Command::AgentLogin(it) => Err(Unbuilt::AgentLogin(it.agent).not_built()),
+            wire::Command::ForgetDevice(it) => Err(Unbuilt::ForgetDevice(&it.device).not_built()),
             wire::Command::CreateBuilding { addr, template, .. } => {
                 self.create_building(addr, template.as_str())
             }
             wire::Command::RemoveBuilding { addr, .. } => self.remove_building(&addr),
-            // The person's entrance, so the answerer is a human by
-            // construction; a delegate arrives through its own tool.
+            // The person's entrance, so the answerer is a human; a delegate has its own tool.
             wire::Command::Approve { item, verdict, .. } => {
                 self.answer_approval(&item, verdict, &kernel::Answerer::Human)
             }
@@ -237,8 +238,8 @@ impl RunWorker {
                 scope, autonomy, ..
             } => self.set_autonomy(&scope, autonomy),
             wire::Command::HandOff { item, .. } => Err(Unbuilt::HandOff(&item).not_built()),
-            // Not recorded: the person's own layer, which no run observes
-            // and a copied city must not carry to another machine.
+            // Not recorded: the person's own layer, which no run observes and a copied city
+            // must not carry to another machine.
             wire::Command::PutPreferences { patch, .. } => crate::person::put(patch),
             wire::Command::PutShelved { name, .. } => Err(Unbuilt::PutShelved(name).not_built()),
             wire::Command::Pursue { addr, step, .. } => self.set_pursuit(&addr, step),
@@ -284,10 +285,9 @@ impl RunWorker {
             wire::Command::Release { scope, .. } => {
                 self.set_admission(&scope, Admittance::Released)
             }
-            // Cancel and Steer have a second door. `Desk::interrupt_for`
-            // lifts them off the queue at the next safe point of the run
-            // they name, so arriving here means no run answered - which
-            // is what the refusal says, instead of naming the verb.
+            // Cancel and Steer have a second door. `Desk::interrupt_for` lifts them off the
+            // queue at the next safe point of the run they name, so arriving here means no run
+            // answered - which is what the refusal says, instead of naming the verb.
             wire::Command::Cancel { run, .. } => Err(Unanswered::Cancel.refusal(run)),
             wire::Command::Steer { run, .. } => Err(Unanswered::Steer.refusal(run)),
             wire::Command::OpenRemoteDoor { .. }
@@ -354,46 +354,5 @@ impl RunWorker {
         reveal: fn(&std::path::Path, &kernel::Address) -> Result<(), AxError>,
     ) {
         self.reveal = reveal;
-    }
-}
-
-/// A verb the wire spells and this city cannot perform, with what the
-/// refusal names. Each is answered by its own arm of `run_command`, so a
-/// command added without an executor stops the build there.
-enum Unbuilt<'a> {
-    HandOff(&'a kernel::ApprovalId),
-    PutShelved(String),
-    BatchByBuilding(&'a kernel::Address),
-    Auth,
-}
-
-impl Unbuilt<'_> {
-    /// The `not_built` refusal the city owes a peer that asks for this
-    /// verb anyway; each arm of `run_command` names it, which is how the
-    /// wiring gate reads that the verb has no executor.
-    fn not_built(self) -> AxError {
-        match self {
-            Unbuilt::HandOff(item) => not_built(
-                "hand a question to somebody else",
-                item.as_str().to_owned(),
-                "answer it yourself, or appoint that resident as the delegate; handing one \
-                 question on is not built",
-            ),
-            Unbuilt::PutShelved(name) => not_built(
-                "write a shelved document",
-                name,
-                "edit the file under the shelf by hand; writing it from the page is not built",
-            ),
-            Unbuilt::BatchByBuilding(addr) => not_built(
-                "run a building's work as one batch",
-                addr.as_str().to_owned(),
-                "dispatch the rooms one at a time; batching a building is not built",
-            ),
-            Unbuilt::Auth => not_built(
-                "authenticate over the command channel",
-                "Auth".to_owned(),
-                "the pairing token is proved in the handshake, not in a command",
-            ),
-        }
     }
 }

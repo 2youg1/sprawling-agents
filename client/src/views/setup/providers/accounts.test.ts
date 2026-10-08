@@ -38,7 +38,7 @@ const ENDPOINT: EndpointSummary = {
   has_credential: true,
   label: "house",
   local: false,
-  models: [{ id: "fable", input_modalities: [] }],
+  models: [{ id: "fable", input_modalities: [], canonical: "fable", thinking: { levels: [], on: "unknown", from: "unknown", words: [] } }],
   name: "house",
   tuning: {
     headers: [{ name: "x-team", value: "blue" }],

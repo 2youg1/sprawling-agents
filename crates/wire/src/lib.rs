@@ -41,6 +41,10 @@ pub use answer::TuningDefaults;
 pub use answer::Used;
 pub use answer::VersionAuthor;
 pub use answer::{AccountStatus, EndpointSummary, EndpointsAnswer, KeyState, UnpricedCalls};
+pub use answer::{
+    AgentCatalogAnswer, AgentLine, AgentOffer, AgentSource, AuthMethod, CatalogSnapshot, LoginKind,
+    LoginState, PinState,
+};
 pub use answer::{Answer, ApprovalsAnswer, ArchiveLine, BlockedLine, BuildingProgress};
 pub use answer::{ArchiveAnswer, ArchiveHit, DiscardAnswer, DiscardLine};
 pub use answer::{AutomationAnswer, Cadence, ScheduledJob, WatchedSource};
@@ -55,6 +59,7 @@ pub use answer::{CostOfAnswer, EvidenceAnswer, RUN_COSTS_MAX, RunCostsAnswer};
 pub use answer::{Coverage, DocumentAnswer, DocumentBody, DocumentState, HeldDocument};
 pub use answer::{DayCount, ExportFormat, HeldSkill, McpServerUsage, McpToolUsage, McpUse};
 pub use answer::{Decision, GovernanceAnswer};
+pub use answer::{DeviceId, DeviceLine, DevicesAnswer};
 pub use answer::{DoctorAbsence, DoctorAnswer, DoctorCore, DoctorFault, DoctorInstall, DoctorItem};
 pub use answer::{DoctorCoverage, DoctorCustody, DoctorCustodyLifetime, DoctorCustodyStore};
 pub use answer::{DoctorDrive, DoctorExclusion, DoctorScanning, DoctorUntold};
@@ -62,6 +67,7 @@ pub use answer::{DoctorGuarantee, DoctorGuaranteeAxis, DoctorSandbox, DoctorSand
 pub use answer::{DoctorNeed, DoctorState, DoctorTier, DoctorVerdict, DoctorVersion};
 pub use answer::{DoctorNewest, DoctorPack, DoctorUnread, DoctorUpstream};
 pub use answer::{DoctorSandboxMissing, SandboxArm};
+pub use answer::{EffortWord, OfferSource, Switch, ThinkingOffer};
 pub use answer::{Entry, EntryKind, ListingAnswer, PreviewAnswer, RangeAnswer};
 pub use answer::{EvidenceItem, EvidenceKind, Picture};
 pub use answer::{FIND_MAX, FIND_WALK_MAX, FindAnswer, Walked};
@@ -90,6 +96,7 @@ pub use assets::{AssetReply, ClientAssets, EmbeddedFile};
 pub use auth::{Pairing, PairingToken, verify};
 pub use carried_name::{ProviderName, TemplateName, ToolkitSlug};
 pub use command::COMMAND_NAMES;
+pub use command::{AgentAdding, AgentLoginStart, CityClosing, CloseMode, DeviceForgetting};
 pub use command::{BodyOverride, EndpointTuning, HeaderPair};
 pub use command::{Carry, Command, WireCommand};
 pub use command::{CitySettings, GovernedDocument, HaltScope, IdentityCard, NoSecret, RulesWrite};
@@ -134,6 +141,8 @@ pub use reply::{AcpProgress, Delivered, Reply};
 pub use server::{AcpSink, Answering, MonitorFeed, TranscribeSink};
 #[cfg(feature = "server")]
 pub use server::{Bound, Committed, LedgerHead, ServeConfig};
+#[cfg(feature = "server")]
+pub use server::{ChallengeAnswer, PairAnswer, PairBody, PairProof, SessionAnswer, SessionBody};
 #[cfg(feature = "server")]
 pub use server::{DROP_BYTES_MAX, DropSink};
 #[cfg(feature = "server")]

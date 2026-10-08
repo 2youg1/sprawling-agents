@@ -19,6 +19,7 @@ import crates.gateway.spec.Market
 import crates.gateway.spec.Ocr
 import crates.gateway.spec.Provider
 import crates.gateway.spec.Provider.Ceiling
+import crates.gateway.spec.Provider.Identity
 import crates.gateway.spec.Provider.Input
 import crates.gateway.spec.Provider.Preset
 import crates.gateway.spec.Provider.Registry
@@ -175,6 +176,7 @@ market／cost：纯判定与数据面，被 endpoint 与 runtime 回合层消费
 | 8-34 | `crates/gateway/spec/Ocr.lean` |
 | 8-35 | `crates/gateway/spec/Endpoint/Transport.lean` |
 | 8-37 | `crates/gateway/spec/Provider/Input.lean` |
+| 8-38 | `crates/gateway/spec/Provider/Identity.lean` |
 
 §8-36 不用。下面四节不属于任何一个模块：两件本 crate 不做的事，目录化的形状，以及重试上限住在哪里。
 -/

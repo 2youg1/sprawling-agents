@@ -69,13 +69,11 @@ pub enum Command<Secret = Sealed<String>> {
     },
     /// Asks a base URL what it serves, and attaches nothing.
     ///
-    /// A person cannot choose from a list they have not seen, so the
-    /// list is asked for apart from attaching; the answer lands as
-    /// `endpoint_probed`, which the page folds like any other fact.
+    /// A person cannot choose from a list they have not seen, so the list is asked for apart from
+    /// attaching; the answer lands as `endpoint_probed`, which the page folds like any other fact.
     ///
-    /// It carries the same `tuning` the attachment will, because a
-    /// probe that reached a gateway without the header that gateway
-    /// requires answers 401 for a key that is in fact good.
+    /// It carries the same `tuning` the attachment will, because a probe that reached a gateway
+    /// without the header that gateway requires answers 401 for a key that is in fact good.
     ProbeEndpoint {
         name: ProviderName,
         base_url: String,
@@ -85,18 +83,15 @@ pub enum Command<Secret = Sealed<String>> {
         tuning: EndpointTuning,
         idem: IdemKey,
     },
-    /// What a building's runs may reach: the sandbox's limits, the
-    /// external servers its tools come from, and the windows on this
-    /// person's own machine its desktop connector may touch.
+    /// What a building's runs may reach: the sandbox's limits, the external servers its tools come
+    /// from, and the windows on this person's own machine its desktop connector may touch.
     ///
-    /// Each field is optional and an absent one leaves that section
-    /// alone; an empty `mcp` list is a building that reaches no server,
-    /// which is a different statement from not saying.
+    /// Each field is optional and an absent one leaves that section alone; an empty `mcp` list is a
+    /// building that reaches no server, which is a different statement from not saying.
     ///
-    /// `desktop` is the allowlist's text and not a parsed value: the
-    /// connector that reads that file at start-up is the authority on
-    /// its syntax and fails closed, and a second parser here would be a
-    /// second authority (`crates/city/Spec.lean` §8-26).
+    /// `desktop` is the allowlist's text and not a parsed value: the connector that reads that file
+    /// at start-up is the authority on its syntax and fails closed, and a second parser here would
+    /// be a second authority (`crates/city/Spec.lean` §8-26).
     ConfigureBuilding {
         addr: Address,
         sandbox: Option<SandboxLimits>,
@@ -211,25 +206,21 @@ pub enum Command<Secret = Sealed<String>> {
         restoration: Restoration,
         idem: IdemKey,
     },
-    /// Install one thing this machine lacks, named as the doctor's
-    /// answer names it.
+    /// Install one thing this machine lacks, named as the doctor's answer names it.
     ///
-    /// Only a recipe this city may run is run. A recipe that has to be
-    /// printed, and one that has no command at all, are refused with
-    /// what the person does instead: a script piped into a shell is
-    /// code nobody read, and that rule does not soften because the
-    /// request arrived from a page rather than from a terminal.
+    /// Only a recipe this city may run is run. A recipe that has to be printed, and one that has no
+    /// command at all, are refused with what the person does instead: a script piped into a shell
+    /// is code nobody read, and that rule does not soften because the request arrived from a page
+    /// rather than from a terminal.
     DoctorInstall {
         item: String,
         idem: IdemKey,
     },
-    /// Look at this machine again, in place of the snapshot taken when
-    /// the city was served.
+    /// Look at this machine again, in place of the snapshot taken when the city was served.
     ///
-    /// [`Query::Doctor`](crate::Query::Doctor) answers that snapshot,
-    /// which a page that has just installed something must not be given.
-    /// Probing starts programs for seconds, so it runs here, where the
-    /// city already serialises work, rather than inside a read.
+    /// [`Query::Doctor`](crate::Query::Doctor) answers that snapshot, which a page that has just
+    /// installed something must not be given. Probing starts programs for seconds, so it runs here,
+    /// where the city already serialises work, rather than inside a read.
     DoctorRefresh {
         idem: IdemKey,
     },
@@ -387,6 +378,11 @@ pub enum Command<Secret = Sealed<String>> {
     PrivacyOperation(crate::PrivacyRequest),
     /// Deletes the vault's value of one reference ([`SecretForgetting`]).
     ForgetSecret(SecretForgetting),
+    /// Closes the city; `Command/Kind.lean` §19-2 has the four rows below.
+    CloseCity(crate::CityClosing),
+    AddAgent(crate::AgentAdding),
+    AgentLogin(crate::AgentLoginStart),
+    ForgetDevice(crate::DeviceForgetting),
     /// Presenting a pairing token. Read-only, hence no `IdemKey`; the token is plain here because a
     /// token that must cross a wire has, by definition, no secrecy left to protect in transit - it
     /// is sealed the moment it lands (see `server::decide_handshake`).

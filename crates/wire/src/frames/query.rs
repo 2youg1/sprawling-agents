@@ -141,6 +141,14 @@ pub enum Query {
     /// The official harnesses, the command that starts each as an ACP
     /// agent, and whether this machine can run it: the harness page.
     Harnesses,
+    /// The ACP page's catalog, detected agents and added agents
+    /// (`crates/wire/spec/Answer/Agents.lean` §8-90).
+    AgentCatalog,
+    /// One pasted launch spec read as an agent entry, or refused; the paste
+    /// grammar lives in the city alone (§8-90).
+    ParseAgentSpec { text: String },
+    /// The browsers paired at this machine's door (`crates/wire/spec/Answer/Devices.lean` §8-91).
+    Devices,
     /// One building's own files and its archive - the pages an agent
     /// writes for the next agent, which are also the pages a person
     /// reads to know what happened in there.

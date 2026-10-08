@@ -35,6 +35,7 @@ pub use endpoint::{WarmUp, adapter_for};
 pub use market::{InputKinds, MarketSnapshot, ModelEntry};
 pub use ocr::{Picture, Recogniser, recogniser_for};
 pub use provider::ceiling::{CeilingSource, OutputCeiling, Stated, Target};
+pub use provider::identity::canonical as canonical_model;
 pub use provider::input::accepted_input;
 pub use provider::modality::call::{Ranks, Vectors};
 pub use provider::modality::embedding::{EmbeddingRequest, Embeddings};

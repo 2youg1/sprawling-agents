@@ -105,7 +105,7 @@ every week.
 | Serialisation | `serde`, `serde_json`, `toml` | JSON on the wire and in the Ledger because the receiver may be a browser and a person still has to read it. TOML for configuration a person edits. |
 | Errors | `thiserror` | One error shape, `AxError`, defined in `kernel::error` and mapped at every crate boundary. |
 | Release profile | `opt-level = 3`, `lto = "fat"`, one codegen unit, symbols stripped, `panic = "abort"` | Crash-only delivery: there is no unwinding path to maintain, because there is nothing to catch. `3` rather than `"z"` or `"s"` because it is the fastest of the three on the product's common operations, and runtime speed comes before size; the criterion and the readings sit beside the setting in `Cargo.toml`. |
-| Dependency count | <!-- xtask:begin dependency_count -->464<!-- xtask:end --> packages in `Cargo.lock` | The one number in this table that is a fact about the whole graph rather than about one choice. Listed by `sprawling status --deps`, licence-checked one by one by `cargo deny` against `deny.toml`. |
+| Dependency count | <!-- xtask:begin dependency_count -->465<!-- xtask:end --> packages in `Cargo.lock` | The one number in this table that is a fact about the whole graph rather than about one choice. Listed by `sprawling status --deps`, licence-checked one by one by `cargo deny` against `deny.toml`. |
 
 **Verification tools**, kept out of the shipped binary: `proptest`
 (properties before examples), `insta` (golden output), `trybuild` (proof
@@ -558,12 +558,12 @@ branch's work is its children.
 
 One WebSocket, three kinds of frame, and a schema hash that both ends check
 on connect: a page from a different build refuses rather than misreads.
-`WIRE_V` is <!-- xtask:begin wire_v -->64<!-- xtask:end -->.
+`WIRE_V` is <!-- xtask:begin wire_v -->65<!-- xtask:end -->.
 
 | Frame | Count | What it is |
 |---|---|---|
-| `Command` | <!-- xtask:begin command_frames -->44<!-- xtask:end --> | something a person wants done: dispatch, steer, cancel, approve, halt, raise a building, attach an endpoint, set a goal the city works towards, write a document that governs the city |
-| `Query` | <!-- xtask:begin query_frames -->57<!-- xtask:end --> | something a page wants to know: the city, one run, approvals, cost, the ledger, archive, discards, inboxes, which run wrote a commit, who answers and what was answered for the person, and one file's patch text |
+| `Command` | <!-- xtask:begin command_frames -->48<!-- xtask:end --> | something a person wants done: dispatch, steer, cancel, approve, halt, raise a building, attach an endpoint, set a goal the city works towards, write a document that governs the city |
+| `Query` | <!-- xtask:begin query_frames -->60<!-- xtask:end --> | something a page wants to know: the city, one run, approvals, cost, the ledger, archive, discards, inboxes, which run wrote a commit, who answers and what was answered for the person, and one file's patch text |
 | `Delta` | — | what a model is saying while it is still saying it: no sequence number, never written down, and a client that missed one has lost nothing |
 | `Event` | the Ledger's own kinds | what happened, pushed as it happens |
 
@@ -848,7 +848,7 @@ do not overlap: overlapping verification reads as more coverage than it is.
 |---|---|---|
 | V0 unrepresentable | a whole class of error moved out of what can be written | <!-- xtask:begin compile_fail_cases -->19<!-- xtask:end --> compile-failure counterexamples |
 | V1 types and lints | null, overflow, silent truncation, hidden panics | workspace lints, `-D warnings`, `--all-features` |
-| V2 unit and property | a function wrong across a class of inputs | <!-- xtask:begin test_functions -->3653<!-- xtask:end --> test functions, properties before examples |
+| V2 unit and property | a function wrong across a class of inputs | <!-- xtask:begin test_functions -->3654<!-- xtask:end --> test functions, properties before examples |
 | V3 conformance | a second adapter behaving unlike the first | one suite per port, except `browser::port`, whose suite only ever ran against the replay it was written beside (decision D1 of `crates/browser/Spec.lean`) |
 | V4 fuzz | parsers meeting hostile bytes | <!-- xtask:begin fuzz_targets -->6<!-- xtask:end --> targets under `tools/fuzz/fuzz_targets` |
 | V5 formal | termination, absence of overflow and monotonicity in the code; a design rule false on some input nobody tried | 3 of 3 kani harnesses proved, Linux CI — every proposition in the roster has an unbounded domain and a solvable shape; the Lean specifications under `crates/`, proved by `just models` in every `just check` |
@@ -1146,20 +1146,26 @@ flowchart TD
     accounting --> runtime
     accounting --> storage
     accounting --> wire
+    agent_protocols --> child
     agent_protocols --> gateway
     agent_protocols --> kernel
     browser --> kernel
+    child
     city --> kernel
     collab --> kernel
     collab --> storage
     desktop --> agent_protocols
+    desktop --> child
     desktop --> desktop_ffi
     desktop --> kernel
-    desktop_ffi
+    desktop_ffi --> child
     documents --> kernel
+    gateway --> child
     gateway --> kernel
     kernel
+    remote_access --> child
     remote_access --> kernel
+    runtime --> child
     runtime --> desktop_ffi
     runtime --> gateway
     runtime --> kernel
@@ -1167,6 +1173,7 @@ flowchart TD
     sprawling --> accounting
     sprawling --> agent_protocols
     sprawling --> browser
+    sprawling --> child
     sprawling --> city
     sprawling --> collab
     sprawling --> desktop
@@ -1177,6 +1184,7 @@ flowchart TD
     sprawling --> runtime
     sprawling --> storage
     sprawling --> wire
+    storage --> child
     storage --> kernel
     wire --> documents
     wire --> kernel

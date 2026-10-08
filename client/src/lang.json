@@ -619,6 +619,10 @@
     "en": "medium",
     "zh": "medium"
   },
+  "effort_minimal": {
+    "en": "minimal",
+    "zh": "minimal"
+  },
   "effort_none": {
     "en": "none",
     "zh": "none"
@@ -638,6 +642,10 @@
   "effort_note_medium": {
     "en": "the balance between what an answer costs and how far it reasons.",
     "zh": "在回答的开销与推理的深度之间取平衡。"
+  },
+  "effort_note_minimal": {
+    "en": "the least reasoning a thinking model still does before it answers.",
+    "zh": "会思考的模型在作答前做的最少一点推理。"
   },
   "effort_note_none": {
     "en": "thinking off: the model answers from the prompt without reasoning first.",

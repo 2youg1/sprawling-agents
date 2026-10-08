@@ -33,6 +33,7 @@ pub use no_secret::NoSecret;
 pub use shelf::Shelf;
 pub use step::PursuitStep;
 pub use step::SpineDocument;
+pub use step::{AgentAdding, AgentLoginStart, CityClosing, CloseMode, DeviceForgetting};
 pub use step::{
     Carry, CitySettings, DoorAnswer, DoorOpening, DoorStep, GovernedDocument, HaltScope,
     IdentityCard, PolicyChange, ProposalDecision, ProposalDecisions, RangeWrite, RulesWrite,

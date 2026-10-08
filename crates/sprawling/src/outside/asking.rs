@@ -255,7 +255,11 @@ fn door_verb(command: WireCommand) -> Result<Verb, Box<WireCommand>> {
         | Command::ForgetSecret(_)
         | Command::NameSession(_)
         | Command::ChangeRunPolicy(_)
-        | Command::PrivacyOperation { .. } => Err(Box::new(command)),
+        | Command::PrivacyOperation { .. }
+        | Command::CloseCity(_)
+        | Command::AddAgent(_)
+        | Command::AgentLogin(_)
+        | Command::ForgetDevice(_) => Err(Box::new(command)),
     }
 }
 

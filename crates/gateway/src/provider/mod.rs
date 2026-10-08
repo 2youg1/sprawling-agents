@@ -24,6 +24,7 @@
 //! one that bills.
 
 pub mod ceiling;
+pub mod identity;
 pub mod input;
 // Both are re-exported by the crate root, so the attach path in
 // `bin::assembly` reaches them by name the day `WIRE_V` carries

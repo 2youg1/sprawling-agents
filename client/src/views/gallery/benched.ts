@@ -182,6 +182,8 @@ const ENDPOINTS: EndpointsAnswer = {
           input_modalities: ["text"],
           input_price: "$3/M",
           output_price: "$15/M",
+          thinking: { levels: [], on: "unknown", from: "unknown", words: [] },
+          canonical: "claude-fable-5.1",
         },
       ],
       name: "zenmux",

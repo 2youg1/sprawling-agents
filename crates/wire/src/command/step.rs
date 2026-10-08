@@ -249,3 +249,57 @@ pub enum PursuitStep {
     Resume,
     Clear,
 }
+
+/// What `CloseCity` carries: how the runs under way end
+/// (`crates/wire/spec/Command/Kind.lean` §19-2).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct CityClosing {
+    pub mode: CloseMode,
+    pub idem: IdemKey,
+}
+
+/// How a closing city treats the runs it still has.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub enum CloseMode {
+    /// Let every run under way finish, then close.
+    Drain,
+    /// Stop every run now, then close.
+    Interrupt,
+}
+
+/// What `AddAgent` carries: the consent to one agent entry the city
+/// offered, named by the digest of its launch spec. The city recomputes
+/// the digest of the spec it would offer now and refuses on a mismatch,
+/// so what is written is what the person saw (`crates/wire/spec/Answer/Agents.lean` §8-90).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct AgentAdding {
+    pub spec_digest: B3Hash,
+    pub source: crate::answer::AgentSource,
+    /// The room whose resident this agent becomes as well, when the person
+    /// chose "add and use here".
+    pub seat_here: Option<Address>,
+    pub idem: IdemKey,
+}
+
+/// What `AgentLogin` carries: which agent, and which of the auth methods
+/// it declared in `initialize`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct AgentLoginStart {
+    pub agent: String,
+    pub method: String,
+    pub idem: IdemKey,
+}
+
+/// What `ForgetDevice` carries: the paired browser whose key the city
+/// deletes (`crates/wire/spec/Answer/Devices.lean` §8-91).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct DeviceForgetting {
+    pub device: crate::answer::DeviceId,
+    pub idem: IdemKey,
+}
