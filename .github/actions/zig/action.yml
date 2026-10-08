@@ -34,7 +34,7 @@ runs:
       if: runner.os == 'Windows'
       shell: bash
       run: echo "version=$(tr -d '[:space:]' < "$GITHUB_WORKSPACE/crates/desktop/ffi/zig-version")" >> "$GITHUB_OUTPUT"
-    - uses: mlugg/setup-zig@v2
+    - uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2
       if: runner.os == 'Windows'
       with:
         version: ${{ steps.pin.outputs.version }}

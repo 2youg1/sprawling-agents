@@ -108,19 +108,19 @@ jobs:
     steps:
       # The whole history and every tag, so the merge base with `base` is
       # in the clone whether `base` names a branch, a tag or a commit.
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
           fetch-tags: true
       - name: install pinned toolchain
         run: rustup show
       - uses: ./.github/actions/zig
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c # v2
         with:
           shared-key: mutants
           key: ${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
           save-if: false
-      - uses: taiki-e/install-action@v2
+      - uses: taiki-e/install-action@f7e5d7c961414b23f5b25b2da9294395d08513ad # v2
         with:
           tool: cargo-mutants,cargo-nextest,just
       - uses: ./.github/actions/client-artifacts
@@ -132,7 +132,7 @@ jobs:
         env:
           BASE: ${{ inputs.base }}
         run: just mutants-diff "$BASE" "${{ strategy.job-index }}/${{ strategy.job-total }}"
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
           name: mutants-${{ strategy.job-index }}
@@ -149,16 +149,16 @@ jobs:
       matrix:
         shard: [0, 1, 2, 3, 4, 5, 6, 7]
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: install pinned toolchain
         run: rustup show
       - uses: ./.github/actions/zig
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c # v2
         with:
           shared-key: mutants
           key: ${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
           save-if: false
-      - uses: taiki-e/install-action@v2
+      - uses: taiki-e/install-action@f7e5d7c961414b23f5b25b2da9294395d08513ad # v2
         with:
           tool: cargo-mutants,cargo-nextest,just
       - uses: ./.github/actions/client-artifacts
@@ -166,7 +166,7 @@ jobs:
         shell: bash
         timeout-minutes: 320
         run: just mutants-modules "${{ strategy.job-index }}/${{ strategy.job-total }}"
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
           name: mutants-modules-${{ strategy.job-index }}
@@ -181,11 +181,11 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v7
-      - uses: taiki-e/install-action@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: taiki-e/install-action@f7e5d7c961414b23f5b25b2da9294395d08513ad # v2
         with:
           tool: just
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           pattern: mutants-modules-*
           path: mutants-shards
@@ -198,16 +198,16 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: install pinned toolchain
         run: rustup show
       - uses: ./.github/actions/zig
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c # v2
         with:
           shared-key: sim
           key: ${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
           save-if: false
-      - uses: taiki-e/install-action@v2
+      - uses: taiki-e/install-action@f7e5d7c961414b23f5b25b2da9294395d08513ad # v2
         with:
           tool: just
       - name: the citysim scenarios
@@ -223,10 +223,10 @@ jobs:
     # keeps the same headroom the 60 gave the smaller run.
     timeout-minutes: 90
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: install pinned toolchain
         run: rustup show
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c # v2
         with:
           shared-key: gates
           key: ${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
@@ -251,7 +251,7 @@ jobs:
         run: just shots
       # Uploaded on a failed run too: target/shots/engine holds each
       # case's engine stderr, which is what a stalled case is read from.
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
           name: shots-${{ steps.tree.outputs.sha }}
@@ -263,11 +263,11 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 90
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: install pinned toolchain
         run: rustup show
       - uses: ./.github/actions/zig
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c # v2
         with:
           shared-key: release
           key: ${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
@@ -278,7 +278,7 @@ jobs:
         run: echo "sha=$(git rev-parse 'HEAD^{tree}')" >> "$GITHUB_OUTPUT"
       - name: the binary and the archive a person downloads
         run: just package
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: release-${{ steps.tree.outputs.sha }}
           path: |
@@ -303,19 +303,19 @@ jobs:
     env:
       TRIPLE: x86_64-pc-windows-msvc
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: install pinned toolchain and llvm-profdata
         shell: bash
         run: |
           rustup show
           rustup component add llvm-tools
       - uses: ./.github/actions/zig
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c # v2
         with:
           shared-key: release
           key: ${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
           save-if: false
-      - uses: taiki-e/install-action@v2
+      - uses: taiki-e/install-action@f7e5d7c961414b23f5b25b2da9294395d08513ad # v2
         with:
           tool: just
       - uses: ./.github/actions/client-artifacts
@@ -366,7 +366,7 @@ jobs:
           rustc --version --verbose > "$out/toolchain.txt"
           sha256sum target/release/sprawling.exe > "$out/sprawling.exe.sha256"
           cp -r "$out" target/pgo-out
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: release-pgo-${{ steps.tree.outputs.sha }}
           path: |
@@ -418,7 +418,7 @@ jobs:
     env:
       CC_x86_64_unknown_linux_musl: musl-gcc
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: install pinned toolchain
         run: rustup show
       - uses: ./.github/actions/zig
@@ -429,7 +429,7 @@ jobs:
           rustup target add x86_64-unknown-linux-musl
           sudo apt-get update
           sudo apt-get install --yes --no-install-recommends musl-tools
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c # v2
         with:
           shared-key: fresh
           key: ${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
@@ -621,7 +621,7 @@ jobs:
           binary="$(find "${{ steps.fresh.outputs.dir }}/unpacked" -type f \( -name sprawling -o -name sprawling.exe \))"
           ! command -v cygpath > /dev/null 2>&1 || binary="$(cygpath -m "$binary")"
           SPRAWLING_BIN="$binary" lake exe acceptance client-ui .github/workflows/acceptance-ui.mjs "${{ steps.fresh.outputs.dir }}/logs/ui"
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
           name: fresh-${{ matrix.os }}-${{ steps.tree.outputs.sha }}
@@ -676,10 +676,10 @@ jobs:
     runs-on: macos-latest
     timeout-minutes: 90
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: install pinned toolchain
         run: rustup show
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c # v2
         with:
           shared-key: keychain
           key: ${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
@@ -752,7 +752,7 @@ jobs:
           security dump-keychain -a 2> /dev/null | python3 -c 'import sys; print("".join("keychain: " + b for b in sys.stdin.read().split("keychain: ") if "sprawling/remote" in b))' > "$out/access-list.txt"
           cat "$out/reading.txt"
           test -s "$out/first.err" && test -s "$out/second.err"
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
           name: keychain-${{ steps.tree.outputs.sha }}
@@ -771,14 +771,14 @@ jobs:
       CARGO_INCREMENTAL: "0"
       SPRAWLING_CONTAINER_TEST_ENGINE: ${{ matrix.engine }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: pinned toolchain
         run: rustup show
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c # v2
         with:
           shared-key: core
           save-if: false
-      - uses: taiki-e/install-action@v2
+      - uses: taiki-e/install-action@f7e5d7c961414b23f5b25b2da9294395d08513ad # v2
         with:
           tool: cargo-nextest
       - name: prepare the disposable daemon and immutable local image
@@ -808,7 +808,7 @@ jobs:
           mkdir -p target/container-evidence
           git rev-parse HEAD 'HEAD^{tree}' > target/container-evidence/source.txt
           cargo nextest run -p sprawling-runtime --test-threads 1 --run-ignored only -E 'test(a_real_daemon)' 2>&1 | tee target/container-evidence/isolation.log
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
           name: container-${{ matrix.engine }}-${{ github.sha }}
@@ -823,21 +823,21 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 120
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
       - name: install pinned toolchain
         run: rustup show
       - uses: ./.github/actions/zig
         if: runner.os == 'Windows'
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c # v2
         with:
           shared-key: bench
           key: ${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
           save-if: false
       - uses: ./.github/actions/client-artifacts
         if: runner.os == 'Windows'
-      - uses: taiki-e/install-action@v2
+      - uses: taiki-e/install-action@f7e5d7c961414b23f5b25b2da9294395d08513ad # v2
         with:
           tool: cargo-nextest
       - name: Linux allocation profiler
@@ -933,7 +933,7 @@ jobs:
               heaptrack_print "$profile" > "$out/$arm-$size-summary.txt"
             done
           done
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
           name: bench-${{ runner.os }}-${{ steps.tree.outputs.sha }}
