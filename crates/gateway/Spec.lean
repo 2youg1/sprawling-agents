@@ -24,6 +24,7 @@ import crates.gateway.spec.Provider.Input
 import crates.gateway.spec.Provider.Preset
 import crates.gateway.spec.Provider.Registry
 import crates.gateway.spec.Provider.Stability
+import crates.gateway.spec.Provider.Thinking
 import crates.gateway.spec.Reach
 import crates.gateway.spec.Reach.Resolve
 import crates.gateway.spec.Router
@@ -37,7 +38,7 @@ import crates.gateway.spec.Transcribe.Recording
 
 本文件是 crate 的规格入口，分部在 `spec/` 下，布局见 ARCHITECTURE.md §11「Specifications in Lean」。接口一节一节写在规定它的那个模块的分部里，每一节保留它的标签 §8-n，别处引作 `crates/gateway/Spec.lean §8-n`；本文件 §8 列出每个标签住在哪个分部，并写下四节不属于任何一个模块的 crate 级接口。决定写作 `D<n>`，放在它所管的声明正上方，或它所管主题的那个分部里，别处引作 `gateway D<n>`；D1 到 D15 是这份规格在 Markdown 时 §12 各段按出现顺序的编号，D16 起是迁到 Lean 之后的决定，§12 末尾列出每条住在哪里。
 
-能写成定理的规则在分部里证明，Lean 模型是「必须守住哪些性质」的权威，Rust 代码是「怎样守住」的权威：输出上限的事实梯（`spec/Provider/Ceiling.lean`）、一个模型收得下什么（`spec/Provider/Input.lean`）、预置表里哪一行为一个模型 id 作答（`spec/Provider/Preset.lean`）、一次失败能不能再试（`spec/Endpoint/Failure.lean`）、一次调用的结算（`spec/Cost.lean`）、一个端点的并发名额与排队（`spec/Concurrency.lean`）、Responses 流的 EOF 结算（`spec/Dialect/Responses.lean`）。其余分部只有节注释：它们写的是接口的形状、取舍与被否的备选，由 Rust 的类型与各模块旁的测试守住（§16）。
+能写成定理的规则在分部里证明，Lean 模型是「必须守住哪些性质」的权威，Rust 代码是「怎样守住」的权威：输出上限的事实梯（`spec/Provider/Ceiling.lean`）、思考档的梯子（`spec/Provider/Thinking.lean`）、一个模型收得下什么（`spec/Provider/Input.lean`）、预置表里哪一行为一个模型 id 作答（`spec/Provider/Preset.lean`）、一次失败能不能再试（`spec/Endpoint/Failure.lean`）、一次调用的结算（`spec/Cost.lean`）、一个端点的并发名额与排队（`spec/Concurrency.lean`）、Responses 流的 EOF 结算（`spec/Dialect/Responses.lean`）。其余分部只有节注释：它们写的是接口的形状、取舍与被否的备选，由 Rust 的类型与各模块旁的测试守住（§16）。
 -/
 
 /-! ## 1 需求分解
@@ -49,7 +50,7 @@ import crates.gateway.spec.Transcribe.Recording
 | `credential` | Custody 效果半（scan 命中→入 Vault→原位替换 SecretRef）；兑付（组请求末格 expose，credential_lent）；describe；持久性探测。凭证只有人交出的 API key，订阅额度不经本 crate（§8-5） |
 | `market`＋`cost` | 模型目录快照＋钉版回滚；per-call 入账（权威计费额优先）。本 crate 不设 provider 侧准入与备用端点（§8-6、§8-11） |
 | `router` | Endpoint 簿：从 Ledger 重建的已登记端点与每个标签的选择；一次取模型只答一问（§8-9） |
-| `provider` | 厂商文档写下来一次：host 预设、输出上限的事实梯、一个模型收得下什么的梯子、一个端点怎么连（§8-17、§8-37、§8-18） |
+| `provider` | 厂商文档写下来一次：host 预设、输出上限的事实梯、一个模型收得下什么的梯子、思考档的梯子、一个端点怎么连（§8-17、§8-37、§8-39、§8-18） |
 | `reach` | 哪些调用走这台电脑的代理，与一次分段读数（§8-15） |
 | `transcribe` | 把一段录音变成一行字的可选设施（§8-12） |
 | `ocr` | 把一张图变成一行字的可选设施（§8-34） |
@@ -70,6 +71,7 @@ import crates.gateway.spec.Transcribe.Recording
 
 - `spec/Provider/Ceiling.lean`：要这个字段的一面上恒有一个数（`a_face_that_needs_a_figure_always_gets_one`），本城钉下的数与策略缺省只在这一面要一个数时作答（`the_city_states_a_figure_only_where_the_face_needs_one`）；每一档压过下一档是 `resolve` 的一条臂。
 - `spec/Provider/Input.lean`：答案要么是一个说过的事实（人、目录、预置表，先说者胜），要么是 `Text`（`every_answer_is_a_stated_fact_or_text`）。
+- `spec/Provider/Thinking.lean`：发出的档一定在提供之列（`the_sent_level_is_offered`），什么都不提供的 offer 什么都不发（`an_offer_of_nothing_sends_nothing`），存下的档被提供时原样发出（`an_offered_level_is_sent_as_stored`），明说的档恰在不被提供时被拒、放行即原样发出（`admit_refuses_exactly_what_is_not_offered`），「开启思考」只发给没有档位的模型（`thinking_on_is_sent_only_where_no_level_is_offered`）。
 - `spec/Provider/Preset.lean`：这台电脑上的服务不借厂商的行（`a_server_on_this_machine_borrows_no_vendor_row`）；host 有自己的行时只由它们作答（`a_host_with_rows_of_its_own_answers_from_them`）；作答的行的前缀是这个 id 的前缀（`the_answer_is_a_prefix_of_the_id`）。
 - `spec/Endpoint/Failure.lean`：没发出去的请求再发，发出去丢了回答的效果不明；非 2xx 恰在 408、429 与 5xx 时再问（`a_refusal_is_asked_again_exactly_when_the_provider_is_busy`、`the_status_table`）；溢出恰是 400 或 413 且拒词说窗口满了（`a_refusal_is_an_overflow_exactly_when_it_names_the_window`），从不再试；换账号恰在 401、结构化额度用尽的 429 与流内的 `insufficient_quota`（`a_refusal_advances_exactly_for_a_rejected_key_or_an_exhausted_quota`、`a_reported_error_advances_exactly_for_an_exhausted_quota`），效果不明的失败从不换账号（`unknown_keeps_account`），换账号的失败都不再发（`an_advance_is_never_asked_again`）。
 - `spec/Cost.lean`：权威计费额在场恒胜（`the_authoritative_amount_always_wins`）；价目推算答出的数是精确的和、装得进 `u64`（`a_settled_sheet_is_the_exact_sum`）。
@@ -90,6 +92,7 @@ import crates.gateway.spec.Transcribe.Recording
 
 - **开城时预热值不值，读数未齐。** D26 定下开城时为每个已登记端点发一次不带凭据的 `GET models_url`（§8-35）；它能藏住的只是开城后 90 s 之内的第一次调用（空闲上限），所以它的重开要两样证据：开城到第一次调用的间隔分布（多数落在 90 s 之外时这批请求白发），与这批不带凭据的请求在 provider 一侧是否被计数或限流。池按端点保持（§8-3），reqwest 0.13 的缺省在三个平台上给每条连接开 TCP keepalive（15 s 起、每 15 s 一探、3 次），所以池里一条对端已断的空闲连接在约一分钟内被操作系统认出，不必本 crate 再设。
 - **Responses API 的 WebSocket 模式，未做。** 证据只有一句厂商说法：20 次以上工具调用的长循环上最多快约 40%，与 `store=false` 兼容；本 crate 尚未读到厂商当前文档里这条连接的地址、帧的形状与断线语义，所以形状未定。已知的约束有三条：①本 crate 没有同步的 WebSocket 客户端，锁里的 `tungstenite` 只经 axum 的 `ws` 带进来，作为 gateway 的依赖要改根 `Cargo.toml` 的 workspace 依赖与 `deny.toml` 的审视；②它绕开 `reach::proxy::client_for`，而 §8-15 要求全城的出站连接都在那里造，所以要么为 WebSocket 另写一处代理判定（第二个权威），要么只在 `through` 答「不走代理」时启用；③它是每个端点的一项设置（wire 的 `EndpointTuning` 一个字段、`endpoint_attached` 载荷一个键），HTTP 是它连不上或断线时的退路。要定下它：厂商文档的那一页（地址、帧、断线后怎样续上一次 response），与一次在回环替身上可见的往返。
+- **Ollama 与 LM Studio 的思考档，未读。** 两家把档位写在各自的原生端点（Ollama 的 `POST /api/show` 的 `thinking`，LM Studio 的 `GET /api/v1/models` 的 `reasoning.allowed_options`），不在 `/v1/models` 里；读它们要为 `reach::is_local` 的端点各加一步不带凭据的探测，并把 Ollama 由模型自定的档名映射或排除。要定下它：两家各一份真实答复的记录，与这一步在登记时多花的时间。在那之前这些端点的 offer 落到无人说，请求里不写思考字段。
 - **`prompt_cache_key` 的长度上限，未核。** D25 写进的键是 64 个十六进制字符；若厂商文档给这个字段定了更低的上限，换成摘要的前缀（D25 的重开参数）。
 
 模型自己的假设写在各分部的定义与定理假设里，不写成公理：`InputKinds`、`DialectKind`、`Ceiling` 是 kernel 的类型，kernel 的 Lean 规格不定义它们，所以分部照它们的变体与不变量各写一份模型里的类型，拼写与 Rust 相同；预置表按 host 与前缀查到的答案、`reach::is_local` 的判断、拒词里有没有窗口标记，都当作参数交给模型，它们各自的读法由 Rust 的测试检查。
@@ -115,6 +118,7 @@ Lean 里的名字与 Rust 的对应：
 
 - `Gateway.Provider.Ceiling.resolve` ↔ `OutputCeiling::resolve`，其参数 `preset` ↔ `preset::ceiling_for(target.base_url, target.id)`，`policy` ↔ `OUTPUT_CEILING_DEFAULT`，`wire` ↔ `Target.wire`；`field_on`、`Field` ↔ 同名的私有函数与枚举；`Ceiling.new` ↔ `kernel::Ceiling::new`。
 - `Gateway.Provider.Input.accepted_input` ↔ `provider::input::first_stated`（私有），`accepted_input` 用 `preset::input_for(base_url, id)` 的答案作它的参数 `preset`。
+- `Gateway.Provider.Thinking.ask`、`admit` ↔ `ThinkingOffer::ask`、`ThinkingOffer::admit`（`admit` 的 `true` 即 `Ok(())`）；`Offer.levels` ↔ `ThinkingOffer.levels`（`EffortSet`），`noneAbsent` ↔ `EffortSet` 不收 `Effort::None`；`fallback`、`switchOn` ↔ `ask` 里存档不被提供时的那一段。
 - `Gateway.Provider.Preset.model_for` ↔ `preset::row_for`（私有；`preset::model_for` 交给它真实的表），`own` ↔ host 自己那一行的 `models`，`vendors` ↔ `PRESETS` 全部的模型行，`isLocal` ↔ `reach::is_local(base_url)`；`longest` ↔ `max_by_key(|row| row.id_prefix.len())`。
 - `Gateway.Endpoint.Failure.retry`、`refusal`、`account_disposition` ↔ `ProviderFailure::retry`、`ProviderFailure::refusal`、`ProviderFailure::account_disposition`；`busy` ↔ `retry` 里 408、429、`is_server_error` 那一臂的条件；`RETRIABLE_KINDS` ↔ `Reported` 那一臂的 `matches!` 列表；`Exchange` 的参数 ↔ `reqwest::Error::is_connect`。
 - `Gateway.Cost.settle`、`share` ↔ `cost::settle`、`cost::share`；`settle_from` ↔ `settle` 里逐项 `checked_add` 的循环；`checked` ↔ `u64` 的 `checked_mul`／`checked_add`；`exact` 是模型里不回绕的份额，Rust 没有对应。
@@ -177,6 +181,7 @@ market／cost：纯判定与数据面，被 endpoint 与 runtime 回合层消费
 | 8-35 | `crates/gateway/spec/Endpoint/Transport.lean` |
 | 8-37 | `crates/gateway/spec/Provider/Input.lean` |
 | 8-38 | `crates/gateway/spec/Provider/Identity.lean` |
+| 8-39 | `crates/gateway/spec/Provider/Thinking.lean` |
 
 §8-36 不用。下面四节不属于任何一个模块：两件本 crate 不做的事，目录化的形状，以及重试上限住在哪里。
 -/
@@ -351,6 +356,7 @@ kernel 已有码，语义照 Custody 一节；不新增码。
 - D32 「这个账号还能不能接这个请求」与「能否再试」同住 `endpoint::failure`：`crates/gateway/spec/Endpoint/Failure.lean`，在 `account_disposition` 正上方
 - D33 删一把 Key 只删库里那一份，环境变量提供的 Key 拒删；端点用哪些 Key 由 `AttachedEndpoint::references` 一处回答：`crates/gateway/spec/Credential.lean`
 - D34 隐私 owner 的绑定只写一个新引用，经平台 Vault 而不经 Custodian：`crates/gateway/spec/Credential.lean`
+- D35 思考档由（Endpoint，模型）的 offer 决定，编码在发出前一处完成，dialect 不再写思考字段：`crates/gateway/spec/Provider/Thinking.lean`
 -/
 
 /-! ## 13 依赖选型
@@ -383,6 +389,7 @@ golden：两 Dialect 各一请求一响应（insta）；proptest：响应往返�
 
 - 输出上限的梯子：`provider::ceiling` 的 proptest `the_ceiling_ladder_keeps_the_lean_properties` 与测试（`the_higher_rung_wins_and_says_that_it_did`、`on_a_face_that_takes_no_figure_the_provider_picks_when_nobody_stated_one`、`a_relay_forwarding_a_vendors_id_is_called_at_the_vendors_ceiling`、`an_unknown_model_at_an_unknown_host_is_still_callable`）。
 - 收得下什么：`provider::input` 的 `the_first_rung_that_states_a_fact_answers` 与 `every_answer_is_a_stated_fact_or_text_on_every_combination`（27 种组合），与 accounting 的 `a_preset_model_that_reads_pictures_is_registered_as_reading_them`（选型点的生产路径）。
+- 思考档：`provider::thinking` 的 proptest `the_ladder_keeps_the_lean_properties`；读上游陈述的是 `endpoint::models` 的 `recorded_listings_are_read_into_offers`（OpenRouter、Anthropic、DeepSeek、xAI 与 Ollama 各一份记录下来的列表，经梯子读成 offer）。
 - 预置表的行：`provider::preset` 的 proptest `the_row_rule_keeps_the_lean_properties` 与测试（`a_documented_model_is_matched_by_the_longest_prefix_that_fits`、`a_relay_forwarding_a_vendors_id_reads_the_vendors_row_and_a_local_server_does_not`、`no_pinned_catalogue_row_is_also_matched_by_this_table`）。
 - 能否再试：`endpoint::failure` 的测试（`what_never_completed_is_asked_again_and_what_was_refused_is_not`、`a_provider_that_says_busy_or_broken_is_asked_again_and_one_that_refuses_is_not`、`a_request_that_outgrew_the_window_is_told_how_to_fit_again`）。
 - 名额：`concurrency` 的 proptest `permits_keep_the_lean_properties` 与 `a_trace_without_narrowing_keeps_in_use_within_the_limit`，`endpoint::permit` 的 `grants_follow_arrival`。

@@ -17,11 +17,11 @@
 城内规范会话类型住 `kernel::model`（缝上类型）；canonical↔wire 翻译入口是纯函数，无 I/O。crate 内的 `StreamFrames` 持有流帧，保留与 EOF 结算契约由 `crates/gateway/spec/Endpoint/Stream.lean` §8-13 规定。
 
 **两家 provider 的字段知识各住各家。** 切缝是**变化的理由**：一家 provider 改了它的形状，只有它那一个文件动；而本模块顶上那句「改之前先读 provider 自己的文档」只有跟它指的那堆字段同居一处才真的被读到，所以两张文档链接表各自跟着它的 dialect 走。
-- `dialect` 的每个入口是一条 `match kind`，对 `DialectKind` 穷尽；不认得的 dialect 恒拒而不拿较近的那一家近似。跨 dialect 的断言（两向往返、两种强度拼写、float 拒收）留在这里，因为它们测的就是路由的契约。
+- `dialect` 的每个入口是一条 `match kind`，对 `DialectKind` 穷尽；不认得的 dialect 恒拒而不拿较近的那一家近似。跨 dialect 的断言（两向往返、float 拒收）留在这里，因为它们测的就是路由的契约。
 - `mismatch` 是两家共用的四个读取器（`require`／`as_str`／`tokens_or_zero`／`payload_from`）与拒词（`mismatch`／`mismatch_found`／`stream_cut`）。**依赖是单向的**：dialect → 两家 → mismatch，谁都不回头指。
 **两家各自把流的拼接放进自己的 `stream.rs`。** 切的仍是变化的理由：`increment_of`／`settled` 回答的是「一串 SSE 帧如何合成一份完整答案」，与「一个请求如何写上线」是两件事，且两家的流帧形状各自变。归 `anthropic/stream.rs` 与 `openai/stream.rs`，父文件各以一行 `pub(crate) use stream::{increment_of, settled};` 再导出。
 
-- 只属一家的东西跟着它：`empty_answer`（空答案）、`joined_text`与 `effort_field` 入 openai；`role_str`、`stop_from`／`stop_str`、`block_wire`／`block_from`、`effort_fields` 入 anthropic。
+- 只属一家的东西跟着它：`empty_answer`（空答案）、`joined_text` 入 openai；`role_str`、`stop_from`／`stop_str`、`block_wire`／`block_from` 入 anthropic。思考字段两家都不写（下文「思考块与思考强度的两侧翻译」）。
 
 **每一条形状不匹配都带出路，而空答案不是形状不匹配**。`AxError` 的契约写着 `recovery` 必须是可直接执行的信息，所以：
 
@@ -50,17 +50,23 @@ pub(crate) fn response_wire(kind: DialectKind, resp: &ChatResponse) -> Result<se
 
 Chat 面的思考块由主机的拼法决定（`ChatSpelling.reasoning`，§8-17）。OpenAI 自己的规格里 assistant 消息没有推理字段，未登记的主机因此**记录性丢弃**思考块（与断点位同一规则：文档声明，不静默）。DeepSeek、Moonshot／Kimi、智谱与 OpenRouter 的文档则要求或接受把上一轮的推理原样放回 assistant 消息的 `reasoning_content`：DeepSeek 的思考模式默认开启，文档写明带 `tools` 的请求必须回传全部历史 `reasoning_content`，否则答 400——本城的每一次派活都带工具，所以在这几家主机上丢弃思考块就是第二轮必然失败。回传的只有思考文本，`signature` 恒不上这条线。canonical 记录不受影响，重放仍能从 canonical 重推出当时实发字节（dialect 是纯函数，拼法是它的参数）。入向：`reasoning` 与 `reasoning_content` 两种拼法都读成签名为空的 `Thinking`。
 
-强度映射表（`ChatRequest.effort`，缺席即不写字段）：
+思考字段不由 dialect 写。`ChatRequest.effort` 是城存下或这一次明说的档，实发什么由思考档的梯子（`crates/gateway/spec/Provider/Thinking.lean` §8-39）按这个（Endpoint，模型）的 offer 算出一个 `Ask`（一档，或「开启思考」，或缺席），再由 `provider::thinking::encoding` 按这一面与主机的 `EffortField`（§8-17）写进正文顶层（gateway D35）：
 
-| `Effort` | Anthropic wire | OpenAI wire |
-|---|---|---|
-| 缺席（`Option::None`） | 不写（等价于 `high`，官方明言） | 不写 |
-| `None` | `thinking:{type:"disabled"}` | `reasoning_effort:"none"` |
-| `Low`／`Medium`／`High`／`XHigh`／`Max` | `output_config:{effort:"…"}` | `reasoning_effort:"…"` |
+| 这一面（`EffortField`） | `Ask::Level(l)` | `Ask::On` | 主机 |
+|---|---|---|---|
+| messages | `output_config:{effort:l}` | `thinking:{type:"adaptive"}` | Anthropic 与各家 Anthropic 兼容面 |
+| responses | `reasoning:{effort:l}` | 不写 | OpenAI、xAI、DeepSeek 的 responses 面 |
+| chat，`ReasoningEffort` | `reasoning_effort:l` | 不写 | OpenAI、xAI、Gemini 兼容面、未登记主机 |
+| chat，`ReasoningObject` | `reasoning:{effort:l}` | `reasoning:{enabled:true}` | OpenRouter |
+| chat，`ThinkingToggle` | `thinking:{type:"enabled"}` 与 `reasoning_effort:l` | `thinking:{type:"enabled"}` | DeepSeek、Moonshot／Kimi、智谱 |
+| chat，`EnableThinking` | `enable_thinking:true` 与 `reasoning_effort:l` | `enable_thinking:true` | 阿里 DashScope |
 
-两种兼容格式都拼得出全部七级（`minimal` 照原词写；发不发某一级给某个模型，归 gateway 的思考档梯子（`gateway::provider` 下的 `thinking` 模块） 的 offer，不归兼容格式），**差别是「不思考」写在哪个字段**：Anthropic 的 `output_config.effort` 只收五级，无 `none`。Messages API 参考页里 `effort` 只挂在 `output_config` 之下，顶层写 `effort` 是一个对侧不认的字段。Chat 面的 `reasoning_effort` 是 OpenAI 规格（`openai-openapi` 的 `CreateChatCompletionRequest`）的拼法，DeepSeek、Gemini 的兼容面、xAI、Moonshot 与 OpenRouter 的文档都收它；`reasoning:{effort}` 是 OpenRouter 自己的统一参数，也是只有它的文档写着收 `max` 的拼法，所以只有 `openrouter.ai` 一行按它拼。responses 面的 `reasoning:{effort}` 不变。`Effort` 是闭的，映射对每一级写出真实的臂，新增一级即在两种兼容格式里同时编译失败。
+- **缺席即不写**：offer 什么都不提供时梯子答缺席，正文里没有任何思考字段，由供应方按模型取它自己的缺省；这不再等价于某一档，因为 Anthropic 各模型的缺省已经不同（多数为 `high`，Opus 5.5 与 Haiku 5.5 为 `medium`，<https://platform.claude.com/docs/en/build-with-claude/effort>）。
+- **「关闭思考」恒不写**：`Effort::None` 只为读回旧账保留，梯子恒不提供它，于是它走默认规则；DeepSeek、Kimi、智谱与 DashScope 的文档里关闭思考写在 `thinking.type` 或 `enable_thinking`，从前在 chat 面上写的 `reasoning_effort:"none"` 是这几家文档都不认的拼法。
+- **一档写成哪个词只有 `Effort::as_str` 一处**：七个词与 serde 拼写相同，`minimal` 照原词写；发不发某一档给某个模型归 offer，不归兼容格式。
+- Messages API 参考页里 `effort` 只挂在 `output_config` 之下，顶层写 `effort` 是一个对侧不认的字段。Chat 面的 `reasoning_effort` 是 OpenAI 规格（`openai-openapi` 的 `CreateChatCompletionRequest`）的拼法；`reasoning:{effort}` 与 `reasoning:{enabled}` 是 OpenRouter 自己的统一参数（<https://openrouter.ai/docs/guides/best-practices/reasoning-tokens>）。
 
-**缓存后果写在这里，因为它是选型理由**：官方排错文档记明「switching thinking modes, changing the effort value, and changing `budget_tokens` all invalidate message cache breakpoints」。故强度住 `FrozenConfig`（`crates/kernel/Spec.lean` §8-22），Run 内不可变；本模块只负责把已冻结的值翻上线。
+**缓存后果写在这里，因为它是选型理由**：官方排错文档记明「switching thinking modes, changing the effort value, and changing `budget_tokens` all invalidate message cache breakpoints」。故强度住 `FrozenConfig`（`crates/kernel/Spec.lean` §8-22），Run 内不可变；实发的档由 §8-39 从已冻结的值与登记的 offer 算出，两者在 Run 内都不变。
 
 **两种缓存失效是两件事，不要合成一件。** ① **供应商侧的 message cache breakpoints**：同一个前缀字节不变，仅因请求形状变了（思考模式、effort、思考预算），对方就把已缓存的**消息**断点作废——本模块与 §8-19 守的是这一条，故强度与模型在 Run 内不得改；② **本城冻结的 system 前缀本身**：四段字节任一段变了，后续请求读到的就是另一份前缀，缓存自然落空——守它的是 runtime 侧的重算对拍（`FrozenPrefix::verified_segment_hashes`，本 crate 不参与）。一句区分：**effort 变了前缀没变，缓存仍会失效；前缀变了哪怕形状一字未改，缓存也已不同。** 顾问之所以可以动窗口而不能动模型与 effort，正是因为窗口属易变半，而这两件属①。
 
