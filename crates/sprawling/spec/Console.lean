@@ -65,6 +65,13 @@ pub(crate) fn step(face: Face, event: Event) -> (Face, Option<Cause>);
 
 **写不出去的一行归一处**：`console::ui` 是唯一决定「终端写失败怎么办」的地方——写不进去的终端是没人在读的终端，UI 线程把它当作终端没了，交给生命周期。
 
+**本节接口的当前状态。**
+
+- `/model` 与 `/effort` 的参数补全还没有做：Tab 只补全斜杠动词本身。参数要从当前（Endpoint，模型）的 offer 取（`Query::Endpoints` 答复里每个模型的 `thinking`），不另列一份档位表。
+- 别的模块里直接写标准错误的那些行（`serving::standing`、`serving::placement`、`monitor::beat`、`supervising::children` 等的一次性通知）还没有改走诊断：控制台拥有终端时，它们会写进 raw 模式下的 CLI 或安静宿主。改法是逐个改成 `Diagnostics` 的 `refuse` 级，诊断随之只进 log 透镜。
+- worker 里 `CloseCity` 那一臂仍答 `not_built`：`xtask wiring` 不许一个 `reach = client` 的动词已经做好却没有客户端画出它，而 WebUI 的 `/quit` 还没画。画出它的那次改动同时把这一臂改成「城在别处关闭」。执行者不受影响，它在命令到达台子之前就截下了这一帧。
+- 粘贴多行文本时每个换行都是一次 Enter，粘贴会被拆成几次发送；终端的 bracketed paste 在 Windows 上不可用，要统一处理需要另一种判断。
+
 **本章测试**：`bin::console::lifecycle` 逐行回放 `Console/Lifecycle.lean` §5 的转移向量；`/wire` 的投影含每个可经 socket 带的 Command 与每个 Query；行控制台把一行答在那一行之后，同一行敲两次是两次派活。
 -/
 
