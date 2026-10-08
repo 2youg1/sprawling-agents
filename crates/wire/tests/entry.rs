@@ -69,6 +69,18 @@ fn config() -> ServeConfig {
         city: None,
         head: Arc::default(),
         epoch: None,
+        door: wire::LocalDoor::new(
+            Vec::new(),
+            wire::DoorSenses {
+                clock: Arc::new(|| Ok(kernel::TimeMs::new(0))),
+                entropy: Arc::new(|bytes: &mut [u8]| {
+                    bytes.fill(7);
+                    Ok(())
+                }),
+            },
+            Arc::new(|_: &[wire::PairedBrowser]| Ok(())),
+        )
+        .unwrap(),
     }
 }
 
@@ -82,7 +94,9 @@ async fn status(method: &str, path: &str, headers: &[(&str, &str)]) -> u16 {
     else {
         panic!("a loopback address with a key is served");
     };
-    let app = wire::router(&config(), face).layer(MockConnectInfo(at));
+    let app = wire::router(&config(), face, &wire::ListenerOrigins::of(at))
+        .unwrap()
+        .layer(MockConnectInfo(at));
     let mut request = Request::builder().method(method).uri(path);
     for (name, value) in headers {
         request = request.header(*name, *value);

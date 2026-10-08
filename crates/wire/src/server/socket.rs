@@ -30,7 +30,7 @@ use tokio::sync::broadcast::error::TryRecvError;
 use super::committed::Committed;
 use crate::frames::{Answered, Ask, AskOutcome, Lagged, Sample, ServerFrame};
 use crate::reception::inbound::Inbound;
-use crate::reception::{SessionState, SessionStep, Stream, WelcomeFacts, decide_frame};
+use crate::reception::{Keys, SessionState, SessionStep, Stream, WelcomeFacts, decide_frame};
 use crate::reply::{Delivered, Reply};
 
 use super::config::{Answering, ShellState};
@@ -70,7 +70,10 @@ async fn session(mut socket: WebSocket, state: Arc<ShellState>) {
                 // reaches the peer by one path whichever produced it.
                 let step = match inbound.read(&text) {
                     Ok(frame) => {
-                        decide_frame(phase, frame, &state.face, WelcomeFacts { city: state.city.as_ref(), head: state.head.read(), epoch: state.epoch })
+                        let standing = WelcomeFacts { city: state.city.as_ref(), head: state.head.read(), epoch: state.epoch };
+                        state.door.with_sessions(|sessions| {
+                            decide_frame(phase, frame, &Keys { face: &state.face, sessions }, standing)
+                        })
                     }
                     Err(unreadable) => unreadable,
                 };

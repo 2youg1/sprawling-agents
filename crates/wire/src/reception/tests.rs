@@ -8,18 +8,25 @@
 
 use super::*;
 
-/// The face a test session is judged against when no credential is
-/// configured: a city on this machine with nobody to distinguish.
-fn unpaired() -> BindFace {
-    BindFace::Loopback { token: None }
+/// The key a test city holds, as a caller on this machine presents it.
+const KEY: &str = "native-key";
+
+/// The credentials a test session is judged against: a loopback face
+/// holding [`KEY`], and no browser session.
+fn keys() -> Keys<'static> {
+    let face: &'static BindFace = Box::leak(Box::new(BindFace::Loopback {
+        key: B3Hash::digest(KEY.as_bytes()),
+    }));
+    let sessions: &'static Sessions = Box::leak(Box::default());
+    Keys { face, sessions }
 }
 
 #[test]
 fn an_ipv6_loopback_is_also_loopback() {
     let addr: SocketAddr = "[::1]:8787".parse().unwrap();
     assert!(matches!(
-        decide_bind(&addr, None),
-        BindVerdict::Serve(BindFace::Loopback { token: None })
+        decide_bind(&addr, Some(B3Hash::digest(KEY.as_bytes()))),
+        BindVerdict::Serve(BindFace::Loopback { .. })
     ));
 }
 
@@ -53,49 +60,34 @@ fn an_ipv4_mapped_loopback_peer_may_enrol_and_a_mapped_stranger_may_not() {
 
 #[test]
 fn a_pairing_token_does_not_buy_the_right_to_enrol() {
-    // An exposed bind is legal with a token; enrolment still is not.
+    // An exposed bind is legal with a key; enrolment still is not.
     let exposed: SocketAddr = "203.0.113.7:8787".parse().unwrap();
     let digest = B3Hash::digest(b"pairing-code");
     let BindVerdict::Serve(face) = decide_bind(&exposed, Some(digest)) else {
-        panic!("an exposed bind with a token is served");
+        panic!("an exposed bind with a key is served");
     };
-    assert_eq!(face.token_digest(), Some(&digest));
+    assert_eq!(face.key(), &digest);
     assert!(matches!(decide_enroll(&exposed), EnrollVerdict::Refuse(_)));
 }
 
-/// The face is the whole of what a session must present, and an
-/// exposed one carries the digest: there is no exposed face that
-/// demands nothing, so no shell can be built with one.
+/// The face is the whole of what a session must present, and both faces
+/// carry the key: no face demands nothing, so no shell can be built with
+/// one, on loopback either (wire D54).
 #[test]
-fn a_city_reachable_from_elsewhere_never_serves_without_a_credential() {
-    let exposed: SocketAddr = "203.0.113.7:8787".parse().unwrap();
-    let BindVerdict::Refuse(err) = decide_bind(&exposed, None) else {
-        panic!("an exposed bind with no token refuses to start");
-    };
-    assert_eq!(*err.code(), AxCode::ConfigInvalid);
-    assert!(!err.recovery().is_empty());
-
+fn no_face_is_served_without_a_key() {
     let digest = B3Hash::digest(b"pairing-code");
-    let BindVerdict::Serve(opened) = decide_bind(&exposed, Some(digest)) else {
-        panic!("an exposed bind with a token is served");
-    };
-    assert_eq!(
-        opened.token_digest(),
-        Some(&digest),
-        "the digest the exposed face demands comes back inside the verdict"
-    );
-
-    // Loopback is served with or without a token, and a token a person
-    // configured there is still demanded.
-    let local: SocketAddr = "127.0.0.1:8787".parse().unwrap();
-    let BindVerdict::Serve(paired) = decide_bind(&local, Some(digest)) else {
-        panic!("a loopback bind is served");
-    };
-    assert_eq!(paired.token_digest(), Some(&digest));
-    let BindVerdict::Serve(alone) = decide_bind(&local, None) else {
-        panic!("a loopback bind needs no token");
-    };
-    assert_eq!(alone.token_digest(), None);
+    for raw in ["203.0.113.7:8787", "127.0.0.1:8787", "0.0.0.0:8787"] {
+        let addr: SocketAddr = raw.parse().unwrap();
+        let BindVerdict::Refuse(err) = decide_bind(&addr, None) else {
+            panic!("{raw} with no key refuses to start");
+        };
+        assert_eq!(*err.code(), AxCode::ConfigInvalid);
+        assert!(!err.recovery().is_empty());
+        let BindVerdict::Serve(face) = decide_bind(&addr, Some(digest)) else {
+            panic!("{raw} with a key is served");
+        };
+        assert_eq!(face.key(), &digest, "the key comes back inside the verdict");
+    }
 }
 
 fn hello(wire_v: u32, token: Option<&str>) -> ClientFrame {
@@ -117,8 +109,8 @@ fn a_command() -> ClientFrame {
 fn a_matching_hello_opens_the_session() {
     let step = decide_frame(
         SessionState::AwaitingHello,
-        hello(WIRE_V, None),
-        &unpaired(),
+        hello(WIRE_V, Some(KEY)),
+        &keys(),
         WelcomeFacts::default(),
     );
     let SessionStep::Welcome(welcome) = step else {
@@ -133,7 +125,7 @@ fn a_different_wire_closes_the_session_rather_than_negotiating() {
     let step = decide_frame(
         SessionState::AwaitingHello,
         hello(WIRE_V.saturating_add(1), None),
-        &unpaired(),
+        &keys(),
         WelcomeFacts::default(),
     );
     let SessionStep::Refuse { error, close } = step else {
@@ -148,7 +140,7 @@ fn a_command_before_the_hello_is_refused_rather_than_queued() {
     let step = decide_frame(
         SessionState::AwaitingHello,
         a_command(),
-        &unpaired(),
+        &keys(),
         WelcomeFacts::default(),
     );
     let SessionStep::Refuse { close, .. } = step else {
@@ -163,7 +155,7 @@ fn a_live_session_delivers_commands_and_answers_queries() {
         decide_frame(
             SessionState::Live,
             a_command(),
-            &unpaired(),
+            &keys(),
             WelcomeFacts::default()
         ),
         SessionStep::Deliver(_)
@@ -175,7 +167,7 @@ fn a_live_session_delivers_commands_and_answers_queries() {
                 ask_id: crate::frames::AskId(1),
                 query: crate::frames::Query::CityView,
             }),
-            &unpaired(),
+            &keys(),
             WelcomeFacts::default()
         ),
         SessionStep::Answer(_)
@@ -187,7 +179,7 @@ fn a_second_hello_is_refused_without_ending_the_session() {
     let step = decide_frame(
         SessionState::Live,
         hello(WIRE_V, None),
-        &unpaired(),
+        &keys(),
         WelcomeFacts::default(),
     );
     let SessionStep::Refuse { close, .. } = step else {
@@ -197,15 +189,12 @@ fn a_second_hello_is_refused_without_ending_the_session() {
 }
 
 #[test]
-fn an_exposed_session_needs_the_pairing_token() {
-    let exposed = BindFace::Exposed {
-        token: B3Hash::digest(b"pairing-code"),
-    };
+fn a_session_needs_the_key_or_a_live_session_token() {
     assert!(matches!(
         decide_frame(
             SessionState::AwaitingHello,
             hello(WIRE_V, None),
-            &exposed,
+            &keys(),
             WelcomeFacts::default()
         ),
         SessionStep::Refuse { close: true, .. }
@@ -213,11 +202,11 @@ fn an_exposed_session_needs_the_pairing_token() {
     assert!(matches!(
         decide_frame(
             SessionState::AwaitingHello,
-            hello(WIRE_V, Some("pairing-code")),
-            &exposed,
+            hello(WIRE_V, Some("guess")),
+            &keys(),
             WelcomeFacts::default()
         ),
-        SessionStep::Welcome(_)
+        SessionStep::Refuse { close: true, .. }
     ));
 }
 
@@ -316,7 +305,6 @@ fn an_unspecified_address_is_not_loopback() {
     // 0.0.0.0 reaches every interface; treating it as local would be the
     // exact mistake this judgement exists to prevent.
     let addr: SocketAddr = "0.0.0.0:8787".parse().unwrap();
-    assert!(matches!(decide_bind(&addr, None), BindVerdict::Refuse(_)));
     assert!(matches!(
         decide_bind(&addr, Some(B3Hash::digest(b"pairing-code"))),
         BindVerdict::Serve(BindFace::Exposed { .. })
@@ -327,8 +315,8 @@ fn an_unspecified_address_is_not_loopback() {
 fn the_welcome_names_the_ledger_head_so_a_reconnect_fetches_only_what_it_missed() {
     let step = decide_frame(
         SessionState::AwaitingHello,
-        hello(WIRE_V, None),
-        &unpaired(),
+        hello(WIRE_V, Some(KEY)),
+        &keys(),
         WelcomeFacts {
             city: None,
             head: Some(kernel::Seq::new(60)),
@@ -351,25 +339,25 @@ fn a_live_session_watches_and_releases_the_monitor() {
         decide_frame(
             SessionState::Live,
             watch.clone(),
-            &unpaired(),
+            &keys(),
             WelcomeFacts::default(),
         ),
         decide_frame(
             SessionState::Live,
             summary,
-            &unpaired(),
+            &keys(),
             WelcomeFacts::default(),
         ),
         decide_frame(
             SessionState::Live,
             release,
-            &unpaired(),
+            &keys(),
             WelcomeFacts::default(),
         ),
         decide_frame(
             SessionState::AwaitingHello,
             watch,
-            &unpaired(),
+            &keys(),
             WelcomeFacts::default(),
         ),
     );

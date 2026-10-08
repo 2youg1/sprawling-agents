@@ -16,7 +16,7 @@ use std::net::SocketAddr;
 
 use kernel::{AxCode, AxError, B3Hash};
 
-use crate::reception::{BindFace, BindVerdict, decide_bind};
+use crate::reception::{BindFace, BindVerdict, ListenerOrigins, decide_bind};
 
 use super::config::{ServeConfig, router};
 
@@ -33,6 +33,7 @@ pub struct Bound {
     listener: tokio::net::TcpListener,
     local: SocketAddr,
     face: BindFace,
+    origins: ListenerOrigins,
 }
 
 impl Bound {
@@ -44,20 +45,29 @@ impl Bound {
     pub fn local_addr(&self) -> SocketAddr {
         self.local
     }
+
+    /// The names and origins this listener answers to, computed once from
+    /// the address it holds (`crates/wire/spec/Reception/Entry.lean`
+    /// §8-94): the URL a person opens, and what the residents' browser
+    /// guard keeps them away from.
+    #[must_use]
+    pub fn origins(&self) -> &ListenerOrigins {
+        &self.origins
+    }
 }
 
 /// Judges the bind face, then binds the listener.
 ///
 /// # Errors
 /// `E_CONFIG_INVALID` from [`decide_bind`], without touching the
-/// network, when an exposed address has no pairing token; the same code
+/// network, when no key is given; the same code
 /// when the operating system refuses the address, most often because
 /// another process holds the port, or cannot say which address it gave.
-pub async fn bind(addr: SocketAddr, token_digest: Option<B3Hash>) -> Result<Bound, AxError> {
+pub async fn bind(addr: SocketAddr, key: Option<B3Hash>) -> Result<Bound, AxError> {
     // The face that comes back is the whole of what this listener
     // presents and what it demands; it goes into the shell, where every
     // door reads it rather than reading the configuration again.
-    let face = match decide_bind(&addr, token_digest) {
+    let face = match decide_bind(&addr, key) {
         BindVerdict::Serve(face) => face,
         BindVerdict::Refuse(err) => return Err(err),
     };
@@ -75,6 +85,7 @@ pub async fn bind(addr: SocketAddr, token_digest: Option<B3Hash>) -> Result<Boun
         listener,
         local,
         face,
+        origins: ListenerOrigins::of(local),
     })
 }
 
@@ -86,8 +97,13 @@ pub async fn bind(addr: SocketAddr, token_digest: Option<B3Hash>) -> Result<Boun
 /// # Errors
 /// Propagates the accept failures the operating system reports.
 pub async fn serve(bound: Bound, config: ServeConfig) -> Result<(), AxError> {
-    let Bound { listener, face, .. } = bound;
-    let app = router(&config, face).into_make_service_with_connect_info::<SocketAddr>();
+    let Bound {
+        listener,
+        face,
+        origins,
+        ..
+    } = bound;
+    let app = router(&config, face, &origins)?.into_make_service_with_connect_info::<SocketAddr>();
     axum::serve(listener, app).await.map_err(|source| {
         AxError::failure(
             AxCode::StorageFatal,

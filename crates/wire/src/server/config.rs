@@ -3,19 +3,10 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The listening end, and the humble half of it (ARCHITECTURE section
-//! 9). Every branch here is a send, a receive, or the end of a session;
-//! the judgements it applies are `wire::reception`'s and the bytes
-//! it serves are `wire::assets`'.
-//!
-//! Four jobs and no policy: serve the client bundle, upgrade a
-//! WebSocket, take a credential from a caller on this machine, and let
-//! an outside editor drive the city.
-//!
-//! A refusal made minutes later has no way home, which is why a command
-//! carries the [`Reply`] address of whoever sent it.
-
-//! Serving configuration: routes and bodies.
+//! Serving configuration: routes and bodies. The judgements the routes
+//! apply are `wire::reception`'s; a refusal made minutes later has no way
+//! home, which is why a command carries the [`Reply`] address of whoever
+//! sent it.
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -35,7 +26,9 @@ use crate::assets::ClientAssets;
 use crate::auth::Pairing;
 use crate::command::{Command, WireCommand};
 use crate::frames::Query;
-use crate::reception::{Admission, BindFace, Door, decide_admission, offered_pairing};
+use crate::reception::{
+    Admission, Arrival, BindFace, Door, Keys, ListenerOrigins, decide_admission, offered_pairing,
+};
 use crate::reply::{AcpProgress, Reply};
 
 use super::committed::Committed;
@@ -43,6 +36,8 @@ use super::committed::Committed;
 mod enrolment;
 
 use super::bundle::bundle_routes;
+use super::door::LocalDoor;
+use super::guard::{Stamp, Stored, enter, preflight, stamp};
 use super::pairing::{accept_pairing, offer_challenge, open_session};
 use super::socket::upgrade;
 use super::uploads::{accept_acp, accept_drop, accept_recording};
@@ -150,6 +145,9 @@ pub struct ServeConfig {
     /// The chain hash of the Ledger's first line, read once at startup:
     /// a ledger keeps its epoch for its whole life.
     pub epoch: Option<B3Hash>,
+    /// This machine's door for a browser: its pairing code, open codes,
+    /// paired device keys and live session tokens (`crates/wire/spec/Server.lean` §8-93).
+    pub door: LocalDoor,
 }
 
 /// The seq of the last record the city has broadcast, readable without a
@@ -207,6 +205,7 @@ pub(crate) struct ShellState {
     ///
     /// [`decide_bind`]: crate::reception::decide_bind
     pub(crate) face: BindFace,
+    pub(crate) door: LocalDoor,
     pub(crate) city: Option<Address>,
     pub(crate) head: Arc<LedgerHead>,
     pub(crate) epoch: Option<B3Hash>,
@@ -273,10 +272,19 @@ pub struct EnrollBody {
 /// Builds the route table. Split from `serve` so a test can exercise the
 /// routes over an in-process transport without owning a port.
 ///
-/// `face` is the binding verdict's, so the credential every door judges
-/// against is decided once, before the socket exists, and cannot differ
-/// from the face the listener presents.
-pub fn router(config: &ServeConfig, face: BindFace) -> Router {
+/// `face` is the binding verdict's, so the key every door judges against
+/// is decided once, before the socket exists; `origins` are the names the
+/// same address answers to, so the entry decision in front of every route
+/// (`crates/wire/spec/Reception/Entry.lean` §8-94) and the headers every
+/// answer carries come from the address that was bound.
+///
+/// # Errors
+/// The listener's own headers cannot be spelled as HTTP headers.
+pub fn router(
+    config: &ServeConfig,
+    face: BindFace,
+    origins: &ListenerOrigins,
+) -> Result<Router, AxError> {
     let state = Arc::new(ShellState {
         commands: Arc::clone(&config.commands),
         events: config.events.clone(),
@@ -291,43 +299,58 @@ pub fn router(config: &ServeConfig, face: BindFace) -> Router {
         transcribe_sink: Arc::clone(&config.transcribe_sink),
         drop_sink: Arc::clone(&config.drop_sink),
         face,
+        door: config.door.clone(),
         city: config.city.clone(),
         head: Arc::clone(&config.head),
         epoch: config.epoch,
     });
-    Router::new()
-        .route("/ws", get(upgrade))
+    let names = Arc::new(origins.clone());
+    let headers = origins.page_headers();
+    let entered = |arrival: Arrival, handler: MethodRouter<Arc<ShellState>>| {
+        handler.route_layer(from_fn_with_state((arrival, Arc::clone(&names)), enter))
+    };
+    let door = |door: Door, handler| entered(Arrival::Door(door), paired(door, &state, handler));
+    let answers = Router::new()
+        .route("/ws", entered(Arrival::Socket, get(upgrade)))
         .route(
             "/transcribe",
-            paired(Door::Transcribe, &state, post(accept_recording)),
+            door(Door::Transcribe, post(accept_recording)),
         )
-        .route(
-            "/enroll",
-            paired(Door::Enroll, &state, post(accept_enrolment)),
-        )
+        .route("/enroll", door(Door::Enroll, post(accept_enrolment)))
         .route(
             "/drop",
-            paired(
+            door(
                 Door::Drop,
-                &state,
                 post(accept_drop).layer(DefaultBodyLimit::max(DROP_BYTES_MAX)),
             ),
         )
-        // `/acp` judges the same token through the same function, from
+        // `/acp` judges the same credential through the same function, from
         // inside the handler: an editor offers it as a body key rather
         // than as a header, and an unpaired editor is answered by
         // `agent_protocols::admit` rather than at the door.
-        .route("/acp", post(accept_acp))
+        .route("/acp", entered(Arrival::Door(Door::Acp), post(accept_acp)))
         // This machine's door for a browser (`crates/wire/spec/Server.lean` §8-93):
         // the routes a browser reaches before it holds a credential.
-        .route("/pair", post(accept_pairing))
-        .route("/session/challenge", post(offer_challenge))
-        .route("/session", post(open_session))
-        // The client bundle is the page itself: a browser that has not
-        // been given the pairing code yet still has to load the form it
-        // types the code into, so these two doors stay open by design.
-        .merge(bundle_routes(Arc::clone(&config.client)))
-        .with_state(state)
+        .route("/pair", entered(Arrival::Pairing, post(accept_pairing)))
+        .route(
+            "/session/challenge",
+            entered(Arrival::Pairing, post(offer_challenge)),
+        )
+        .route("/session", entered(Arrival::Pairing, post(open_session)))
+        .layer(from_fn_with_state(
+            Arc::new(Stamp::of(&headers, Stored::Never)?),
+            stamp,
+        ))
+        .with_state(state);
+    // The client bundle is the page itself: a browser that has not paired
+    // yet still has to load the page it pairs from, so these two routes
+    // ask for no credential, and still for this listener's Host.
+    let page = bundle_routes(Arc::clone(&config.client), &headers)?.route_layer(
+        from_fn_with_state((Arrival::Page, Arc::clone(&names)), enter),
+    );
+    Ok(answers
+        .merge(page)
+        .layer(from_fn_with_state(names, preflight)))
 }
 
 /// The body a refused HTTP request is answered with: what failed, and
@@ -336,7 +359,7 @@ pub(crate) fn refusal_text(err: &AxError) -> String {
     format!("{}: {}", err.action(), err.recovery())
 }
 
-/// One door with the pairing judgement in front of it.
+/// One door with the credential judgement in front of it.
 ///
 /// The door is baked into the layer rather than read back off the
 /// request path, so the route table above is the only place a path is
@@ -349,7 +372,7 @@ fn paired(
     handler.route_layer(from_fn_with_state((door, Arc::clone(state)), admit_request))
 }
 
-/// The layer in front of every acting door: read the offered token,
+/// The layer in front of every acting door: read the offered credential,
 /// hand it to the one judgement, and pass or refuse.
 async fn admit_request(
     State((door, state)): State<(Door, Arc<ShellState>)>,
@@ -360,8 +383,22 @@ async fn admit_request(
         .headers()
         .get(header::AUTHORIZATION)
         .and_then(|value| value.to_str().ok());
-    match decide_admission(door, offered_pairing(offered), &state.face) {
+    let pairing = state.keys(offered_pairing(offered));
+    match decide_admission(door, pairing) {
         Admission::Admit(Pairing::Held | Pairing::Absent) => next.run(request).await,
         Admission::Refuse(err) => (StatusCode::FORBIDDEN, refusal_text(&err)).into_response(),
+    }
+}
+
+impl ShellState {
+    /// Whether `offered` is this city's key or a live session token.
+    pub(crate) fn keys(&self, offered: Option<&str>) -> Pairing {
+        self.door.with_sessions(|sessions| {
+            Keys {
+                face: &self.face,
+                sessions,
+            }
+            .pairing(offered)
+        })
     }
 }

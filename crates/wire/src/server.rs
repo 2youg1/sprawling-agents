@@ -8,9 +8,10 @@
 //! the judgements it applies are `wire::reception`'s and the bytes
 //! it serves are `wire::assets`'.
 //!
-//! Five jobs and no policy: serve the client bundle, upgrade a
+//! Six jobs and no policy: serve the client bundle, upgrade a
 //! WebSocket, accept an upload, take a credential from a caller on this
-//! machine, and let an outside editor drive the city.
+//! machine, pair a browser, and let an outside editor drive the city;
+//! every route stands behind the entry decision.
 //!
 //! A refusal made minutes later has no way home, which is why a command
 //! carries the [`Reply`](crate::Reply) address of whoever sent it.
@@ -18,6 +19,8 @@
 mod bundle;
 mod committed;
 mod config;
+mod door;
+mod guard;
 mod listener;
 mod pairing;
 mod socket;
@@ -29,5 +32,6 @@ pub use config::{
     AcpSink, Answering, DROP_BYTES_MAX, DropSink, LedgerHead, MonitorFeed, ServeConfig,
     TranscribeSink, router,
 };
+pub use door::{DoorSenses, KeepBrowsers, LocalDoor, OpenCode};
 pub use listener::{Bound, bind, serve};
 pub use pairing::{ChallengeAnswer, PairAnswer, PairBody, PairProof, SessionAnswer, SessionBody};

@@ -159,39 +159,34 @@ const WIRE_SHAPE_GOLDEN: &str = "eec4323deb17c18692128b53778a7cc837518212dc78709
 
 #[cfg(feature = "server")]
 #[test]
-fn the_binding_face_has_exactly_one_refusing_cell() {
-    // Constitution 8.3: loopback by default; exposed requires a pairing token;
-    // no token configured means refuse to *start*, not refuse to connect. The
-    // credential the served face demands comes back inside the verdict, so the
-    // shell that carries it cannot demand something else than the face it is.
+fn the_binding_face_refuses_exactly_when_no_key_is_given() {
+    // Loopback by default; every face demands a key, loopback included
+    // (wire D54); no key means refuse to *start*, not refuse to connect.
+    // The key the served face demands comes back inside the verdict, so
+    // the shell that carries it cannot demand something else.
     let secret = kernel::B3Hash::digest(b"pair-me-during-binding");
-    assert!(matches!(
-        decide_bind(&loopback(), None),
-        BindVerdict::Serve(BindFace::Loopback { token: None })
-    ));
+    for addr in [loopback(), exposed()] {
+        let BindVerdict::Refuse(err) = decide_bind(&addr, None) else {
+            panic!("{addr} with no key must refuse to start");
+        };
+        assert_eq!(*err.code(), AxCode::ConfigInvalid);
+        assert!(
+            !err.recovery().is_empty(),
+            "a refusal names an executable alternative"
+        );
+        let BindVerdict::Serve(face) = decide_bind(&addr, Some(secret)) else {
+            panic!("{addr} with a key is served");
+        };
+        assert_eq!(face.key(), &secret);
+    }
     assert!(matches!(
         decide_bind(&loopback(), Some(secret)),
-        BindVerdict::Serve(BindFace::Loopback { token: Some(_) })
+        BindVerdict::Serve(BindFace::Loopback { .. })
     ));
-    let BindVerdict::Serve(exposed_face) = decide_bind(&exposed(), Some(secret)) else {
-        panic!("an exposed bind with a token is served");
-    };
-    assert_eq!(exposed_face.token_digest(), Some(&secret));
-
-    let BindVerdict::Refuse(err) = decide_bind(&exposed(), None) else {
-        panic!("an exposed bind with no token must refuse to start");
-    };
-    assert_eq!(*err.code(), AxCode::ConfigInvalid);
-    assert!(
-        !err.recovery().is_empty(),
-        "a refusal names an executable alternative"
-    );
-    // The one pair of cells that differ: a token is demanded beyond this
-    // machine and optional on it.
-    assert_ne!(
-        BindFace::Loopback { token: None }.token_digest(),
-        BindFace::Exposed { token: secret }.token_digest()
-    );
+    assert!(matches!(
+        decide_bind(&exposed(), Some(secret)),
+        BindVerdict::Serve(BindFace::Exposed { .. })
+    ));
 }
 
 // ------------------------------------------------------------------ handshake
@@ -202,7 +197,7 @@ fn a_mismatched_schema_hash_is_rejected_before_anything_else() {
     let good = Hello {
         wire_v: WIRE_V,
         schema: schema_hash(),
-        token: None,
+        token: Some(LOOSE_KEY.to_owned()),
     };
     let expected = Welcome {
         wire_v: WIRE_V,
@@ -227,11 +222,25 @@ fn a_mismatched_schema_hash_is_rejected_before_anything_else() {
     assert_eq!(*err.code(), AxCode::WireMismatch);
 }
 
-/// The face of a city nobody configured a token for: reachable from this
-/// machine only, demanding nothing.
+/// The key a loopback test city holds.
 #[cfg(feature = "server")]
-fn loose() -> BindFace {
-    BindFace::Loopback { token: None }
+const LOOSE_KEY: &str = "native-key-0123456789";
+
+/// A loopback city holding [`LOOSE_KEY`], and no browser session; the
+/// two are leaked once, which a test process can afford.
+#[cfg(feature = "server")]
+fn loose() -> wire::Keys<'static> {
+    keys_of(BindFace::Loopback {
+        key: kernel::B3Hash::digest(LOOSE_KEY.as_bytes()),
+    })
+}
+
+#[cfg(feature = "server")]
+fn keys_of(face: BindFace) -> wire::Keys<'static> {
+    wire::Keys {
+        face: Box::leak(Box::new(face)),
+        sessions: Box::leak(Box::default()),
+    }
 }
 
 #[cfg(feature = "server")]
@@ -245,7 +254,7 @@ fn an_exposed_server_rejects_a_wrong_token_and_accepts_the_right_one() {
         epoch: None,
     };
     let secret = kernel::B3Hash::digest(b"pair-me-0123456789");
-    let paired = BindFace::Exposed { token: secret };
+    let paired = keys_of(BindFace::Exposed { key: secret });
 
     let wrong = Hello {
         wire_v: WIRE_V,
@@ -279,11 +288,11 @@ fn an_exposed_server_rejects_a_wrong_token_and_accepts_the_right_one() {
         ),
         "a missing token is not an empty token"
     );
-    // The same hello, on the face of a city that configured no token, is
-    // admitted: what differs is the face, and nothing else decides.
+    // The same hello on a loopback face is refused too: no face demands
+    // nothing (wire D54).
     assert!(matches!(
         decide_handshake(&absent, &expected, &loose()),
-        HandshakeVerdict::Accept
+        HandshakeVerdict::Reject(_)
     ));
 }
 

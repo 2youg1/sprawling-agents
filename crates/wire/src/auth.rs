@@ -4,9 +4,9 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Pairing tokens: minting, the one form a person may read, and the
-//! comparison. Local use is frictionless - a loopback listener asks for
-//! nothing. A listener reachable from elsewhere on the network asks for a
-//! token, and `server::decide_bind` refuses to start without one.
+//! comparison. Every listener asks for a key (`reception::decide_bind`
+//! refuses to start without one); a listener reachable from elsewhere on
+//! the network shows its key once as a pairing token.
 //!
 //! The token's whole life is here so that no other module needs its
 //! plaintext: callers hand [`PairingToken::digest`] to the server and keep
@@ -70,22 +70,7 @@ impl PairingToken {
     /// generator, never a sample taken here.
     #[must_use]
     pub fn mint(entropy: [u8; 32]) -> (Self, String) {
-        let mut text = String::new();
-        for (index, byte) in entropy
-            .iter()
-            .take(GROUP_LEN.saturating_mul(GROUP_COUNT))
-            .enumerate()
-        {
-            if index != 0 && index.checked_rem(GROUP_LEN) == Some(0) {
-                text.push('-');
-            }
-            let slot = usize::from(*byte)
-                .checked_rem(ALPHABET.len())
-                .unwrap_or_default();
-            if let Some(symbol) = ALPHABET.get(slot) {
-                text.push(char::from(*symbol));
-            }
-        }
+        let text = spell(&entropy, GROUP_LEN, GROUP_COUNT);
         let token = Self(B3Hash::digest(text.as_bytes()));
         (token, text)
     }
@@ -111,6 +96,30 @@ impl PairingToken {
     pub fn digest(&self) -> B3Hash {
         self.0
     }
+}
+
+/// Spells `entropy` in the alphabet a person reads aloud: `groups` groups
+/// of `group_len` symbols joined by `-`, one symbol a byte. The one
+/// spelling of every code a person types: the pairing token above and
+/// the pairing code of this machine's door (`reception::pairing`).
+pub(crate) fn spell(entropy: &[u8], group_len: usize, groups: usize) -> String {
+    let mut text = String::new();
+    for (index, byte) in entropy
+        .iter()
+        .take(group_len.saturating_mul(groups))
+        .enumerate()
+    {
+        if index != 0 && index.checked_rem(group_len) == Some(0) {
+            text.push('-');
+        }
+        let slot = usize::from(*byte)
+            .checked_rem(ALPHABET.len())
+            .unwrap_or_default();
+        if let Some(symbol) = ALPHABET.get(slot) {
+            text.push(char::from(*symbol));
+        }
+    }
+    text
 }
 
 /// Compares a presented token against a stored digest in constant time.
