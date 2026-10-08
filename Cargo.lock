@@ -2831,6 +2831,7 @@ dependencies = [
  "sprawling-accounting",
  "sprawling-agent-protocols",
  "sprawling-browser",
+ "sprawling-child",
  "sprawling-city",
  "sprawling-collab",
  "sprawling-desktop",
@@ -2900,6 +2901,10 @@ dependencies = [
  "serde_json",
  "sprawling-kernel",
 ]
+
+[[package]]
+name = "sprawling-child"
+version = "0.0.10"
 
 [[package]]
 name = "sprawling-city"
@@ -2983,6 +2988,7 @@ dependencies = [
  "rustls",
  "serde",
  "serde_json",
+ "sprawling-child",
  "sprawling-kernel",
  "windows-native-keyring-store",
  "zeroize",

@@ -74,15 +74,17 @@ pub fn message_payload(content: &[ContentBlock]) -> Result<Payload, AxError>;  /
 **思考记录与思考强度**（思考记录原样保留，消息往返恒按 provider 官方规定处理）
 
 ```rust
-pub enum Effort { None, Low, Medium, High, XHigh, Max }   // 全序；Ord 按声明序
+pub enum Effort { None, Minimal, Low, Medium, High, XHigh, Max }   // 全序；Ord 按声明序
+pub const DEFAULT_EFFORT: Effort = Effort::High;   // kernel::consts_policy（§8-8）：内置的默认档
 pub fn content_from_message(message: &Payload) -> Result<Vec<ContentBlock>, AxError>;  // 契约变更，见下
 ```
 
 - **两个思考块，逐字保留**。provider 官方规定：「During tool use, you must pass thinking blocks back to the API for the last assistant message. Include the complete unmodified block back」；改动即 400 `invalid_request_error`，报文为「`thinking` or `redacted_thinking` blocks in the latest assistant message cannot be modified」。故 canonical 侧两个变体缺一不可，字段名与线上同名（`thinking`／`signature`／`data`），使翻译无重命名、使 Ledger 载荷可直接对照官方文档校读。`signature` 是「an encrypted copy of the full reasoning」，由 provider 验签，城内恒不解析、不截断、不重排。
 - **为何不是「可选保留」**：两条独立理由各自足以定案。其一，丢弃即违约（上一条）。其二，`message_payload` 是 `model_returned` 载荷的唯一成形处，脱机重建窗口靠它；入账前剥掉思考块，重建出的窗口就是一个从未发送过的窗口——那是判负条件三（历史失真），而它一旦成立，本设计的一切保证同时作废。**第三条理由是缓存**：改写助手消息即换缓存前缀。
 - **`content_from_message` 返回 `Result<Vec<ContentBlock>, AxError>`**：`content` 键缺席折为空块表（脚本载荷的行为）；`content` 键在场就必须解出，否则 `E_WIRE_MISMATCH`。静默折为空会让一个未知块类型把整条助手消息从窗口里抹掉，而 Ledger 里它还在。
-- **`Effort` 六级**：两家实际在用的就是 `none/low/medium/high/xhigh/max`，不另列其他方案。一处差别写清楚：**Anthropic 的 `effort` 只收五级**（官方 SDK 类型 `Literal["low","medium","high","xhigh","max"]`），`none` 不是它的取值，关思考在另一个字段 `thinking:{type:"disabled"}`；官方另记「Setting `effort` to `"high"` produces exactly the same behavior as omitting the `effort` parameter entirely」。OpenAI 侧六级同名（其 `minimal` 属 gpt-5 旧拼写，不入城内梯子）。故**两种兼容格式都拼得出全部六级**，否决「兼容格式拼不出就拒」这条路径；dialect 里只留 fail-closed 通配臂，含义改为「日后新增的级别尚未教会写」，恒不夹取到邻级。
-- **不建每模型强度支持表**：任何 provider API 都不返回「本模型支持哪几级」。造一张我们填不满的表，就是给 provider 的真实行为立第二个权威；模型自己拒的原样透出。
+- **`Effort` 七级，闭枚举**：`none/minimal/low/medium/high/xhigh/max`，城内拼写即上游的词。托管上游用的都是这七个词的子集：OpenAI 的 `ReasoningEffort` 与 OpenRouter 的 effort 枚举都是这七个，vLLM 的 schema 也是；Gemini 兼容面映射 `minimal/low/medium/high`，而 gemini-3.5-flash-lite 的默认档就是 `minimal`，没有这一格就说不出它的默认档。闭枚举保住两件事：`CONFIG.toml` 里拼错的值在解码时就被拒，而不是等到请求发出；新增一级在每一种兼容格式的编码里同时编译失败。`None` 只为读回旧账保留：关闭思考不是一档，没有选择器提供它（这是人定下的）。不加「开，档位由上游定」这一态：只有开关、没有档位的模型，默认档 `High` 编码成「开启思考」即可。Anthropic 的 `effort` 只收五级，`none` 在另一个字段 `thinking:{type:"disabled"}`；每种兼容格式怎样写一级、发不发它，归 gateway 的思考档梯子（`gateway::provider` 下的 `thinking` 模块），恒不夹取到邻级。
+- **每个（Endpoint，模型）提供哪几级是上游说出的事实，由 gateway 回答**：Anthropic（`capabilities.effort.*`）、DeepSeek（`effort.supported_levels`）、OpenRouter（`reasoning.supported_efforts`）、xAI（`capabilities.reasoning_effort`）的模型列表逐模型列出档位，Ollama 与 LM Studio 的原生端点也列。这一集合的唯一权威是 gateway 的思考档梯子（`gateway::provider` 下的 `thinking` 模块）（梯子 Person → Upstream → Preset → Unknown），kernel 只定义词汇与默认档。单位是（Endpoint，模型）而不是模型：同一个模型在不同 face、不同中转站上收的档位不同。
+- **默认档 `High` 只定义一次**：`kernel::consts_policy::DEFAULT_EFFORT`。一次请求实际用哪一档由 gateway 的思考档梯子（`gateway::provider` 下的 `thinking` 模块） 解出：这次明说的档（`/effort <level>` 或 `Dispatch.effort`）当前（Endpoint，模型）不提供就在派活前拒绝；否则用存下或继承的档（提供时），再不然用 `High`（提供时），再不然用上游说的默认档，都没有就不写字段。
 - **`max_tokens` 是模型的事实，不是调用方的偏好**：Anthropic 要求每请求必带 `max_tokens`，且开思考时它是「思考＋回答」的总上限；OpenAI 则可缺席。两家的 `GET /v1/models` 都不返回该上限，所以它探不到，只能随模型登记。权威定在 `gateway::market::ModelEntry.max_output_tokens`，`CallShape.max_tokens` 由选型点从那一行解出；**任何调用处手写数字即错**——截断会发生在一个账上找不到理由的地方。
 - **没人登记过的上限，载为「没人登记过」**：`Ceiling` 包 `NonZeroU64`，`ChatRequest.max_tokens` 是 `Option<Ceiling>`，于是「零」在类型上不存在，「缺席」也不等于零。缺席时 OpenAI 形不写该字段、取供应方自己的默认；Anthropic 形写不出请求，于是**拒**（`E_CONFIG_INVALID`，恢复语指向模型登记处），绝不在兼容格式那一层现编一个数。理由是实测：一个目录不认识的模型曾以 `max_tokens: 0` 上线，供应方答空、`stop` 记 `end_turn`、那次 run 冻结为「做完了」——**一个零上限造出的是一条看起来完成了的假历史**。
 
@@ -248,6 +250,17 @@ pub enum ModelTag { Main, Digest, Transcribe, Ocr }   // 线上 "main" | "digest
 **被否**：①保留六词、加一个「只新建」旗标：写入限制与 mode 的组合仍是固定的，而布尔旗标不是穷尽枚举；②先以六词入账、再写一段有版本的历史读法：那段读法只为本批未推送的开发账本服务，没有别的读者；③证据要求用 `Option`：缺席会被读成免检，而缺省的意思是「按楼的规矩」，它值得一个名字。
 
 **重开参数**：出现第三种落地方式（例如合并到别的分支）时，`LandingPolicy` 加一臂；出现一种 mode 需要自己的证据规则时，重议「mode 不参与准入」。
+-/
+
+/-! D56 `Effort` 是七级的闭枚举；每个（Endpoint，模型）提供哪几级是上游的陈述，由 gateway 回答
+
+**决定**：`Effort` 保留闭枚举，在 `None` 与 `Low` 之间加 `Minimal`（拼写 `minimal`），不加 `On`；内置默认档是 `High`，唯一定义在 `kernel::consts_policy::DEFAULT_EFFORT`；某个（Endpoint，模型）提供哪几级、请求里怎样写、这一次用哪一级，唯一权威是 gateway 的思考档梯子（`gateway::provider` 下的 `thinking` 模块）。旧的六个词含义不变，所以 0.0.10 写下的账本、`CONFIG.toml` 与 git trailer 照原义读回；0.0.10 读 0.0.11 写下的 `minimal` 会解析失败，向前兼容不在承诺之内。
+
+**理由**：先前的记录以「任何 provider API 都不返回本模型支持哪几级」为前提，否决了逐模型的档位集合；这个前提不成立：Anthropic（`GET /v1/models` 的 `capabilities.effort`，https://platform.claude.com/docs/en/api/models/list.md ）、DeepSeek（`effort.supported_levels` 与 `default_level`，https://api-docs.deepseek.com/api/list-models ）、OpenRouter（`reasoning.supported_efforts`，https://openrouter.ai/docs/guides/best-practices/reasoning-tokens.md ）、xAI（`capabilities.reasoning_effort`，https://docs.x.ai/developers/rest-api-reference/inference/models.md ）都逐模型说出。很多上游把不支持的档位静默改成别的档位（DeepSeek、xAI、OpenRouter、Ollama），所以页面只列上游列出的档位，而不是一张全局的六级表。`minimal` 是 OpenAI、OpenRouter 与 Gemini 兼容面都透传的词，gemini-3.5-flash-lite 的默认档就是它。默认档定为 `High` 是人定下的：人忘了设置时也落在一个均衡的档位上。
+
+**被否**：①把 `Effort` 换成上游原样的字符串：`effort = "hihg"` 会成为合法配置，一直到请求发出才出错，而上游的词本来就几乎是同一套；②加 `On`（「开，档位由上游定」）：只有开关、没有档位的模型把默认档 `High` 编码成「开启思考」即可，多一个值只多一种要每个编码点回答的状态；③把「关闭思考」作为一档提供：关闭思考极少用，人定下不提供，`None` 只为读回旧账保留。
+
+**重开参数**：某个上游的档位越出这七个词且有人要选它（今天只有 Ollama 由模型自定义的名字与 ACP agent 的任意值，后者走 agent 自己的 config option，不进 `Effort`）；或人要在选择器里提供「关闭思考」。
 -/
 
 /-! Model 的账号面：适配器答出它当前的账号与它的账号名册，并按名选号。选择只换后续请求所用的凭据引用，不发请求、不兑现 Vault，因此不返回错误；没有具名账号的适配器答 `None`，行为不变。`ModelCalled` 记录每一次尝试用的账号，`ModelReturned` 才提交 Session 的绑定（`crates/gateway/spec/Router.lean` D30）。

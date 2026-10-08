@@ -55,6 +55,8 @@ export const QUERIES = {
   endpoints: "endpoint_view",
   knownHosts: "known_hosts",
   harnesses: "harnesses",
+  agentCatalog: "agent_catalog",
+  devices: "devices",
   governance: "governance",
   doctor: "doctor",
   toolkits: "toolkits",

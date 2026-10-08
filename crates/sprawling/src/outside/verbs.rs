@@ -99,6 +99,10 @@ pub(super) fn command_class(command: &wire::WireCommand) -> VerbClass {
         | wire::Command::ConfirmRemoteDoor { .. }
         | wire::Command::CloseRemoteDoor { .. }
         | wire::Command::PrivacyOperation { .. }
+        | wire::Command::CloseCity(_)
+        | wire::Command::AddAgent(_)
+        | wire::Command::AgentLogin(_)
+        | wire::Command::ForgetDevice(_)
         | wire::Command::Auth { .. } => VerbClass::LocalOnly,
     }
 }

@@ -173,6 +173,14 @@ pub fn classify(command: &Command) -> ControlVerdict {
         // A run that already redeemed a key holds the value it read, and
         // the next one finds the vault without it; no turn is cut.
         | Command::ForgetSecret(_)
+        // Closing the city ends every run, but not by cutting a turn here:
+        // the assembly's ordered close stops them, and owes each its
+        // handoff there. Adding an agent, starting its login and revoking
+        // a browser reach no run.
+        | Command::CloseCity(_)
+        | Command::AddAgent(_)
+        | Command::AgentLogin(_)
+        | Command::ForgetDevice(_)
         | Command::Auth { .. } => ControlVerdict::NotAnIntervention,
     }
 }

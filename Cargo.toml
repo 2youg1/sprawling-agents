@@ -2,6 +2,7 @@
 resolver = "3"
 members = [
     "crates/kernel",
+    "crates/child",
     "crates/storage",
     "crates/gateway",
     "crates/runtime",
@@ -21,6 +22,7 @@ members = [
 ]
 default-members = [
     "crates/kernel",
+    "crates/child",
     "crates/storage",
     "crates/gateway",
     "crates/runtime",
@@ -259,6 +261,7 @@ comrak = { version = "0.55", default-features = false }
 # exactly, because a path dependency without one cannot be published;
 # Cargo refuses to resolve a pin that disagrees with it.
 kernel = { package = "sprawling-kernel", path = "crates/kernel", version = "=0.0.10" }
+child = { package = "sprawling-child", path = "crates/child", version = "=0.0.10" }
 storage = { package = "sprawling-storage", path = "crates/storage", version = "=0.0.10" }
 gateway = { package = "sprawling-gateway", path = "crates/gateway", version = "=0.0.10" }
 runtime = { package = "sprawling-runtime", path = "crates/runtime", version = "=0.0.10" }

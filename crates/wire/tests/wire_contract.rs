@@ -45,18 +45,18 @@ fn exposed() -> SocketAddr {
 #[test]
 fn the_command_and_query_tables_hold_their_declared_counts() {
     // The counts are the wire's closed surface, not a style choice.
-    assert_eq!(COMMAND_NAMES.len(), 44, "command table");
-    assert_eq!(QUERY_NAMES.len(), 57, "query table");
+    assert_eq!(COMMAND_NAMES.len(), 48, "command table");
+    assert_eq!(QUERY_NAMES.len(), 60, "query table");
 
     let mut sorted = COMMAND_NAMES.to_vec();
     sorted.sort_unstable();
     sorted.dedup();
-    assert_eq!(sorted.len(), 44, "command names are distinct");
+    assert_eq!(sorted.len(), 48, "command names are distinct");
 
     let mut sorted = QUERY_NAMES.to_vec();
     sorted.sort_unstable();
     sorted.dedup();
-    assert_eq!(sorted.len(), 57, "query names are distinct");
+    assert_eq!(sorted.len(), 60, "query names are distinct");
 }
 
 #[test]
@@ -89,7 +89,7 @@ fn the_schema_hash_is_stable_across_calls_and_covers_the_wire_version() {
         "schema hash changed - update `crates/wire/spec/Frames.lean` §8-1 in the same commit"
     );
     assert_eq!(
-        WIRE_V, 64,
+        WIRE_V, 65,
         "WIRE_V rises once between two pushes, for a shape change under names that stay (wire D1)"
     );
 }
@@ -113,7 +113,7 @@ fn the_schema_hash_covers_every_event_kind_name() {
 
 /// A function of WIRE_V, the two frame name tables and the event kind
 /// names, so any change to the protocol surface lands here first.
-const WIRE_SCHEMA_GOLDEN: &str = "4eb1568c2ccf64c11d9ac7e8c1afc0da2e9724675d3b1725d79f9b3cfb9408d1";
+const WIRE_SCHEMA_GOLDEN: &str = "a9979637188f7b07ad210817268e441fc642702284a3080b9266b9c5fd3e657d";
 
 /// The schema hash reads names only, so a field added under names that
 /// stay leaves it where it was. This digest reads the whole shape with the
@@ -153,7 +153,7 @@ fn strip_prose(value: &mut serde_json::Value) {
 
 /// The digest of `wire_schema()` with its prose removed.
 #[cfg(feature = "schema")]
-const WIRE_SHAPE_GOLDEN: &str = "fea9d6de873332e9b4730777eb29dda32ea765f9aadef0457ddafc841c65e5d5";
+const WIRE_SHAPE_GOLDEN: &str = "eec4323deb17c18692128b53778a7cc837518212dc7870955dab2f028bd5e536";
 
 // -------------------------------------------------------------- binding face
 
@@ -637,6 +637,25 @@ title = \"a window\"
         }),
         Command::ForgetSecret(wire::SecretForgetting {
             reference: "secret:search/brave.main".to_owned(),
+            idem,
+        }),
+        Command::CloseCity(wire::CityClosing {
+            mode: wire::CloseMode::Drain,
+            idem,
+        }),
+        Command::AddAgent(wire::AgentAdding {
+            spec_digest: kernel::B3Hash::digest(b"launch"),
+            source: wire::AgentSource::Detected,
+            seat_here: None,
+            idem,
+        }),
+        Command::AgentLogin(wire::AgentLoginStart {
+            agent: "pi".to_owned(),
+            method: "terminal".to_owned(),
+            idem,
+        }),
+        Command::ForgetDevice(wire::DeviceForgetting {
+            device: wire::DeviceId::new("browser".to_owned()),
             idem,
         }),
     ]

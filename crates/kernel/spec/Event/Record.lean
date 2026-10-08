@@ -26,7 +26,9 @@ pub struct RunStarted {                 // 字段全部 #[serde(default)]
     pub dispatched_by: Option<Who>,     // 由谁派来：person／city／派活的居民地址；缺键为 None
     pub policy: Option<RunPolicy>,      // 这次 run 的运行策略（§8-77）；缺键即这一行早于策略入账
     pub effort: Option<Effort>,         // §8-85
+    pub agent: Option<AgentRunIdentity>, // §8-87：harness run 由哪一个 ACP agent 接手
 }
+pub struct AgentRunIdentity { pub id: String, pub version: Option<String>, pub launch_digest: B3Hash }
 pub struct RunForked { pub from: RunId, pub at_seq: Seq }
 pub struct PromptSource { pub addr: Address, pub kept: u64, pub marker: bool, pub dropped: u64 }
     // prompt_assembled 的一行来源；不带摘要生产者指纹：没有路径产出摘要（runtime D1）。旧行里多出的 producer 键读时忽略；本结构没有方法，读者直接读字段
@@ -131,7 +133,8 @@ pub struct EndpointAttached { pub name: String, pub base_url: String, pub dialec
                               pub models: Vec<String>,              // 空亦写出
                               pub connection_kind: Option<String>,  // 旧行没有，读者按 dialect 回推
                               #[serde(default = true)] pub probed: bool,
-                              pub tuning: Option<AttachedTuning> }  // 什么都没设就省略；不是对象读作未设
+                              pub tuning: Option<AttachedTuning>,   // 什么都没设就省略；不是对象读作未设
+                              pub facts_blob: Option<B3Hash> }      // §8-88：登记时读到的 ModelFacts 在 CAS 里的那一份；缺席即省略
 pub struct AttachedTuning { pub label: Option<String>, pub timeout_ms: Option<u64>,
                             pub stream_idle_timeout_ms: Option<u64>, pub request_max_retries: Option<u32>,
                             pub proxying: Option<Proxying>,        // 默认值省略
@@ -378,6 +381,55 @@ pub struct RunStarted {
 - **缺席有两种来历，读法相同。** 一是这次派活没有说强度，提供方自定——这与 `Effort::None`（请它不思考）是两件事，所以不写成 `none`；二是这一行早于这个键。页面两种都不画强度，不猜。harness run 没有本城的请求，恒缺席。
 - **被否：读这次 run 的第一个提交的 `effort`**（`CommitAttribution`）。还没提交过的 run 说不出强度，而提交上的那个值写的是 `Effort::None` 兼指「没说」，读回来分不清。**被否：读 `model_selected`**：那是房间的选择，后来的派活可以在帧上另带强度，房间的选择不等于这次 run 用的那一个。
 - 验收：`record::run` 的 `a_run_started_line_records_the_effort_it_froze`（写出、读回、缺席不写）。
+-/
+
+/-!
+### 8-87 `run_started` 记下接手这次 harness run 的 ACP agent（`kernel::event::record::run`，形状 2 值类型）
+
+```rust
+pub struct RunStarted {
+    // …既有字段…
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent: Option<AgentRunIdentity>,
+}
+pub struct AgentRunIdentity {
+    pub id: String,                       // agent 条目的 id：`[[agent]]` 一行的 `id`，或内置条目的 id
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub version: Option<String>,          // agent 在 `initialize` 里报出的版本；没报就缺席
+    pub launch_digest: B3Hash,            // 人同意的那份启动说明的摘要
+}
+```
+
+- **只记身份，不记命令行**：命令行与路径是一台机器的事实，可能带着用户名与目录（`crates/kernel/src/config.rs` 对 `[[mcp]]` 的同一条规矩），账本可以被任何人重放与导出。`id` 说是哪一个条目，`version` 说 agent 自己报的版本，`launch_digest` 说人同意的是哪一份启动说明；三者合起来足以回答「这次 run 是谁跑的、跑的是不是人同意的那一份」，而不带出任何路径。
+- **摘要的来源只有一个**：人同意时（`AddAgent` 的 `spec_digest`）城重算的那一份，同意之后启动说明改了，摘要就不同，读账的人能看出这次 run 用的不是当初同意的那一份。
+- **缺席读作「不是 ACP agent 接手的 run」**：本城自己调模型的 run 与早于这个键的行都没有它，按 `default` 加、缺席不写，旧账本照读；0.0.10 读到带这个键的行按未知键拒（§8-40 的方向门照旧）。
+-/
+
+/-!
+### 8-88 `endpoint_attached` 带上登记时读到的模型事实（`kernel::event::record::endpoint`，形状 2 值类型）
+
+```rust
+pub struct EndpointAttached {
+    // …既有字段…
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub facts_blob: Option<B3Hash>,       // CAS 里一份 `Vec<ModelFacts>` 的摘要
+}
+```
+
+- **上游说过的话跨过重启**：登记时或人点「刷新模型」重新探测时读到的 `ModelFacts`（只含城读的那几格）写进 CAS，这一行只记它的摘要。replay 由摘要取回事实，于是上游说出的思考档位、窗口与价格在重启之后仍在，而不是只剩模型 id。
+- **缺席读作「这一行没带事实」**：早于这个键的行与没有读到列表的登记都没有它；读者照旧只按 `models` 的 id 重建，不编造历史里没有的事实。
+- **warm-up 不读任何东西**：开城时不带凭据重新拉列表（gateway D26）；事实只在人发起的登记或刷新时更新，写下新的一行。
+-/
+
+/-! D57 登记时的模型事实进 CAS，账本行只记摘要
+
+**决定**：`endpoint_attached` 加一个可缺的 `facts_blob: Option<B3Hash>`，指向 CAS 里那一份事实；不把事实平铺进行里。
+
+**理由**：OpenRouter 一次列出四百多个模型，连同推理陈述的事实有上百 KB，平铺进行里会让每次 replay 与每个读这一种行的视图都搬运它，而读它的只有端点簿的重建。CAS 已经是城存大块内容的地方（`kernel::locator` 的 `cas:`），摘要让一行保持几十字节，事实只在需要时取回一次。
+
+**被否**：①在行里平铺 `facts`：行变大，每次 replay 都付出代价；②开城时带凭据重新拉列表：每次开城多一次带凭据的网络调用，与隐私优先相悖，也破坏 warm-up 不带密钥的性质（gateway D26）。
+
+**重开参数**：CAS 的读取成为 replay 的瓶颈，或事实缩到几百字节以内。
 -/
 
 /-!

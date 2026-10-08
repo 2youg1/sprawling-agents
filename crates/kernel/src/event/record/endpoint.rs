@@ -12,6 +12,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 
 use crate::budget::UsdMicros;
+use crate::locator::B3Hash;
 use crate::model::{Ceiling, DialectKind, ModelTag};
 use crate::reach::Proxying;
 use crate::secret::SecretRef;
@@ -51,6 +52,13 @@ pub struct EndpointAttached {
         deserialize_with = "readable_tuning"
     )]
     pub tuning: Option<AttachedTuning>,
+    /// The model facts read at attach or re-probe time, as one CAS blob
+    /// (`crates/kernel/spec/Event/Record.lean` §8-88, kernel D57). Absent on a line
+    /// written before the key existed and on an attach that read no list;
+    /// a replay then rebuilds from `models` alone.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "schema", schemars(with = "Option<String>"))]
+    pub facts_blob: Option<B3Hash>,
 }
 
 /// How the person set an endpoint up, as the line keeps it.
@@ -291,6 +299,7 @@ mod tests {
                         extra_headers: vec![("x-team".to_owned(), "secret:house/team".to_owned())],
                         ..AttachedTuning::default()
                     }),
+                    facts_blob: None,
                 })
                 .unwrap(),
                 "{\"auth\":\"secret:house/key\",\"auth_header\":\"x-api-key\",\"base_url\":\"https://api.example.test/v1\",\"connection_kind\":\"openai_compat\",\"dialect\":\"open_ai\",\"models\":[\"opus-nine\"],\"name\":\"house\",\"probed\":false,\"tuning\":{\"extra_headers\":[[\"x-team\",\"secret:house/team\"]],\"label\":\"House\",\"proxying\":\"never\",\"request_max_retries\":2,\"timeout_ms\":30000}}",
@@ -306,6 +315,7 @@ mod tests {
                     connection_kind: Some("openai_compat".to_owned()),
                     probed: true,
                     tuning: None,
+                    facts_blob: None,
                 })
                 .unwrap(),
                 "{\"base_url\":\"http://127.0.0.1:11434/v1\",\"connection_kind\":\"openai_compat\",\"dialect\":\"open_ai\",\"models\":[],\"name\":\"local\",\"probed\":true}",

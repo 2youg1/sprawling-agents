@@ -42,7 +42,7 @@ pub fn freeze(stated: &StatedConfig) -> FrozenConfig;
 
 **时钟分区（config）**：`ClockZone { id, offset_min }`（已解析偏移，恒不记时区名——重解会随时区库版本分叉重放历史）；`FrozenConfig.clock_zones` 由 `freeze` 的同名梯解析；zones 梯整表覆盖（下层写即替换上层全表）。本段属 kernel::config（§8-22），就近登记于此避免拆章。
 
-**思考强度（config）**：`FrozenConfig.effort: Option<Effort>`（类型住 §8-24），缺省 `None`＝不写该字段、由 provider 自行决定。
+**思考强度（config）**：`FrozenConfig.effort: Option<Effort>`（类型住 §8-24），缺省 `None`＝没有人为这一层说过，这次请求用哪一档由 gateway 的思考档梯子（`gateway::provider` 下的 `thinking` 模块） 按默认规则解出（`DEFAULT_EFFORT`，§8-24 D56）。
 
 **沙箱限额（config）**：`SandboxLimits { shell: bool, interpreter: Interpreter, fuel: u64, mounts: Vec<Address>, env_passthrough: Vec<EnvVarName>, trusted: Vec<ServerLabel>, container: Option<ContainerLimits>, arm: Option<SandboxArm> }`，即 `FrozenConfig.sandbox`。三条口径：①**整值解析而非逐字段合并**——一层说到 sandbox 就说全部，于是欠说的层只会收窄而恒不会悄悄放开上层没提过的能力；②**主机事实不入城**（CPython 工件路径、shell 可执行文件位置走环境变量）——一座城被搬到另一台机器时不该带着运行中的机器的路径；③冻结的理由与工具表相同：**能改变可达范围的东西恒不在回合中变宽**，否则变宽的那一刻没有人审过。缺省 `fuel = SANDBOX_FUEL_DEFAULT`（`consts_policy`，2×10⁸），`shell = false`——shell 是唯一一条从参数读不出可达范围的臂。
 
@@ -87,7 +87,7 @@ pub enum SearchConfiguration {
 **上下文提醒的第二道阈值（config）**：`SecondThreshold`（形状 2 值）回答「上下文提醒第二道阈值响在窗口的哪一格」，是整数百分比，唯一构造点 `SecondThreshold::parse`，读数是 `percent()`，合法域 31–90（含端点，三个端点数落 `consts_policy`；下端为何是 31 见 D19）。域外的值在解析点拒（`E_INVALID_ARGS`，动作/主体/码/恢复语四段由类型给出，恢复语带合法域），**不钳位**——一个写下 30 的人必须被告知这不被接受，而不是被悄悄改成 31。`FrozenConfig.second_threshold: Option<SecondThreshold>`，缺省 `None`＝没有一层说话，读它的地方（`runtime::reminder`）取 `CTX_REMINDER_SECOND_DEFAULT`。口径与 `trusted`／`mounts` 同形：整值上梯、Run 起点冻结、解析点拒。**冻结的理由是提醒自己的记账**：第二道阈值决定一个 run 何时被告知该写 handoff，而「每道阈值一跑恰响一次」不能取决于有人在哪一刻改了文件。文件与线上的边界同样只过这一个构造点：`TryFrom<u64>`（serde 的 `try_from`）直接委派 `parse`，`From<SecondThreshold> for u64` 只取内层那一个数——域的判定在整棵库里因此只有一处。
 
 - **为何必须冻结**：provider 官方文档记明「switching thinking modes, changing the effort value, and changing `budget_tokens` all invalidate message cache breakpoints」——强度是缓存前缀的一部分。Run 内可变的强度＝Run 内自毁的缓存，故它落 `FrozenConfig` 而非 `LiveConfig`；设置面改它对**下一个 Run** 生效。
-- `None` 与 `Some(Effort::None)` 是两件事：前者不写字段（provider 缺省，Anthropic 新模型即 adaptive thinking），后者显式关闭思考。不用 `Effort::None` 兼任「未声明」，否则「没设过」与「设成关」在类型上不可分辨。
+- `None` 与 `Some(Effort::None)` 是两件事：前者没有人说过，由默认规则解出（默认档随（Endpoint，模型）的 offer 而定，可能是 `High`、上游说的默认档或不写字段），后者是旧账里显式关闭思考的那个值。不用 `Effort::None` 兼任「未声明」，否则「没设过」与「设成关」在类型上不可分辨。
 -/
 
 /-! D7 定规：上下文提醒第二道阈值的缺省与合法域只有一个家，可选覆盖走既有配置梯子

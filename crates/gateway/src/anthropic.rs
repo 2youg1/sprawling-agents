@@ -342,6 +342,11 @@ fn effort_fields(effort: Option<Effort>) -> Vec<(&'static str, Value)> {
     };
     let level = match effort {
         Effort::None => return vec![("thinking", json!({ "type": "disabled" }))],
+        // Not one of this dialect's five words; written as asked so the
+        // provider's own refusal reaches the person instead of a level
+        // this city moved to a neighbour. The thinking offer is what keeps
+        // it from being asked for.
+        Effort::Minimal => "minimal",
         Effort::Low => "low",
         Effort::Medium => "medium",
         Effort::High => "high",

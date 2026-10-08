@@ -18,6 +18,7 @@ use crate::mismatch::mismatch;
 fn effort_field(effort: Effort) -> &'static str {
     match effort {
         Effort::None => "none",
+        Effort::Minimal => "minimal",
         Effort::Low => "low",
         Effort::Medium => "medium",
         Effort::High => "high",

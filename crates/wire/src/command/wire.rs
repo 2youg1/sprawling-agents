@@ -28,8 +28,9 @@ use kernel::IdemKey;
 use super::kind::Command;
 use super::no_secret::NoSecret;
 use super::step::{
-    CitySettings, DoorAnswer, DoorOpening, DoorStep, PolicyChange, ProposalDecisions, RangeWrite,
-    RulesWrite, SecretForgetting, SessionNaming,
+    AgentAdding, AgentLoginStart, CityClosing, CitySettings, DeviceForgetting, DoorAnswer,
+    DoorOpening, DoorStep, PolicyChange, ProposalDecisions, RangeWrite, RulesWrite,
+    SecretForgetting, SessionNaming,
 };
 
 /// The Command set a socket can carry. `PutSecret` is unreachable because
@@ -83,7 +84,11 @@ impl<Secret> Command<Secret> {
             | Self::ReplaceCityKey(DoorStep { ref idem })
             | Self::CloseRemoteDoor(DoorStep { ref idem })
             | Self::PrivacyOperation(crate::PrivacyRequest { ref idem, .. })
-            | Self::ForgetSecret(SecretForgetting { ref idem, .. }) => Some(idem),
+            | Self::ForgetSecret(SecretForgetting { ref idem, .. })
+            | Self::CloseCity(CityClosing { ref idem, .. })
+            | Self::AddAgent(AgentAdding { ref idem, .. })
+            | Self::AgentLogin(AgentLoginStart { ref idem, .. })
+            | Self::ForgetDevice(DeviceForgetting { ref idem, .. }) => Some(idem),
             Self::PutSecret { .. } | Self::Auth { .. } => None,
         }
     }
@@ -273,6 +278,10 @@ impl From<WireCommand> for Command {
             Command::CloseRemoteDoor(step) => Self::CloseRemoteDoor(step),
             Command::PrivacyOperation(request) => Self::PrivacyOperation(request),
             Command::ForgetSecret(forgetting) => Self::ForgetSecret(forgetting),
+            Command::CloseCity(closing) => Self::CloseCity(closing),
+            Command::AddAgent(adding) => Self::AddAgent(adding),
+            Command::AgentLogin(login) => Self::AgentLogin(login),
+            Command::ForgetDevice(forgetting) => Self::ForgetDevice(forgetting),
             Command::PutShelved {
                 shelf,
                 name,

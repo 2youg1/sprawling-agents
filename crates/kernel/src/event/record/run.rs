@@ -95,6 +95,32 @@ pub struct RunStarted {
     /// in a record written before the key existed.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub effort: Option<Effort>,
+    /// The ACP agent that took this harness run (`crates/kernel/spec/Event/Record.lean`
+    /// §8-87). Absent on a run this city's own model loop drives, and in a
+    /// record written before the key existed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent: Option<AgentRunIdentity>,
+}
+
+/// Which ACP agent ran a harness run, said without a command line or a
+/// path: those are one machine's facts, and a ledger is exported and
+/// replayed by anybody.
+///
+/// The digest is the one the city recomputed when the person consented,
+/// so a run started from a launch spec that changed after consent shows
+/// a different digest than the consent did.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct AgentRunIdentity {
+    /// The agent entry's id: an `[[agent]]` row's, or a built-in entry's.
+    pub id: String,
+    /// The version the agent reported in `initialize`; absent when it
+    /// reported none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub version: Option<String>,
+    /// The digest of the launch spec the person consented to.
+    #[cfg_attr(feature = "schema", schemars(with = "String"))]
+    pub launch_digest: B3Hash,
 }
 
 /// How a run's first user message opens.

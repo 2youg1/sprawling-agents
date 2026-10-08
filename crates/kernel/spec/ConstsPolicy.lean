@@ -46,6 +46,7 @@ pub const CREDENTIAL_NAME_MARKERS: [&str; 11];                       // §8-22 �
 pub const OUTPUT_CEILING_DEFAULT: u64 = 8_192;                       // messages 面输出上限梯的最后一档（token；`crates/gateway/Spec.lean` §8-17）
 pub const CLOCK_STAMP_DEFAULT: ClockStampGranularity = ClockStampGranularity::Minute;   // runtime D8
 pub const AUTONOMY_DEFAULT: Autonomy = Autonomy::Owner;
+pub const DEFAULT_EFFORT: Effort = Effort::High;                    // 没有人说过强度时内置的默认档（§8-24 D56）；用不用它由 gateway 的思考档梯子（`gateway::provider` 下的 `thinking` 模块） 按 offer 解出
 pub const DEFAULT_AT: &str = "127.0.0.1:8787";                       // 服务缺省监听地址
 ```
 
@@ -65,7 +66,7 @@ pub const IMAGE_QUALITY: ImageQuality = ImageQuality::new(100);            // �
 
 `WORKTREE_MAX_BYTES` 是上限而非磁盘余量探测：余量是一台机器当下的事实，上限则是一句拒绝说得出、一个人改得动的数；建树前校，故一座过大的城是被拒而不是被拷到一半（`storage::worktree`）。
 
-`AUTONOMY_DEFAULT` 与 `CLOCK_STAMP_DEFAULT` 带类型（分别是 `Autonomy` 与 `ClockStampGranularity`）；`IMAGE_MAX_BYTES`／`IMAGES_PER_TURN`／`IMAGE_QUALITY`／`CLOCK_ZONES_MAX` 带 `policy_limit` 类型（§8-73），其余为数。`SUBAGENT_CTX_LOCK_DEFAULT` 永不落地——子代理上下文锁不存在。
+`AUTONOMY_DEFAULT`、`CLOCK_STAMP_DEFAULT` 与 `DEFAULT_EFFORT` 带类型（分别是 `Autonomy`、`ClockStampGranularity` 与 `Effort`）；`IMAGE_MAX_BYTES`／`IMAGES_PER_TURN`／`IMAGE_QUALITY`／`CLOCK_ZONES_MAX` 带 `policy_limit` 类型（§8-73），其余为数。`SUBAGENT_CTX_LOCK_DEFAULT` 永不落地——子代理上下文锁不存在。
 
 按 D1「默认 YOLO」，规模不改变删除的判决（§8-26），所以没有字节上限常量；`DISCARD_FILES_MAX` 的读者是 `sprawling` 的清扫阈值。
 -/

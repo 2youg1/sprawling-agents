@@ -34,6 +34,8 @@ function facts(id: string, context: number | null, ceiling: number | null): Mode
     input_modalities: [],
     input_price: null,
     output_price: null,
+    thinking: { levels: [], on: "unknown", from: "unknown", words: [] },
+    canonical: id,
   };
 }
 

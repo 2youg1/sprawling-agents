@@ -19,6 +19,7 @@ mod bundle;
 mod committed;
 mod config;
 mod listener;
+mod pairing;
 mod socket;
 mod uploads;
 
@@ -29,3 +30,4 @@ pub use config::{
     TranscribeSink, router,
 };
 pub use listener::{Bound, bind, serve};
+pub use pairing::{ChallengeAnswer, PairAnswer, PairBody, PairProof, SessionAnswer, SessionBody};

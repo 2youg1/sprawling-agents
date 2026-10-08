@@ -15,13 +15,17 @@ use serde::{Deserialize, Serialize};
 /// model accepts, what it costs — is what a person chooses a model by.
 /// This is that statement, carried to the page that shows the list.
 ///
-/// **Every field is what the upstream said, not what this city
-/// concluded.** Absence means the row said nothing; it never means
-/// zero, and it is never filled in from the preset table here. The
-/// ladder that picks a figure — the person's own entry, then the
+/// **Every field from `id` to `output_price` is what the upstream said,
+/// not what this city concluded.** Absence means the row said nothing; it
+/// never means zero, and it is never filled in from the preset table here.
+/// The ladder that picks a figure — the person's own entry, then the
 /// upstream's statement, then the preset table, then the policy default
 /// — runs where the call is made, and a summary that had already
 /// climbed it would be a second answer to which figure won.
+///
+/// The last two fields are the city's answers, each from its one
+/// authority: `thinking` names the rung it came from, and `canonical` is
+/// `gateway::provider::identity`'s (`crates/wire/spec/Answer/Endpoints.lean` §8-92).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ModelFactsSummary {
@@ -40,4 +44,10 @@ pub struct ModelFactsSummary {
     pub input_price: Option<String>,
     /// The provider's own output price, verbatim. See `input_price`.
     pub output_price: Option<String>,
+    /// The thinking levels this (Endpoint, model) offers, and the rung of
+    /// the gateway's thinking ladder that said so.
+    pub thinking: super::ThinkingOffer,
+    /// This model's identity across providers: two rows are one model
+    /// exactly when these are equal.
+    pub canonical: String,
 }

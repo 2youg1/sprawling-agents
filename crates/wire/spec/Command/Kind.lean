@@ -67,6 +67,18 @@
 - **四行都是 `LocalOnly`**：一台远程设备开不了门、换不了钥匙，不论它的权限，因为门要保护的正是从城外来的那一端；远程设备锁门走封装的锁门字节（remote_access D13），不走 `CloseRemoteDoor`。
 - **配对不在这张表里**：邀请是持有即用的秘密，显示在页面上就会被驱动页面的工具读到（remote_access D4），所以配对留在控制台，页面给分步说明与可复制的一行。
 
+**本版的四个命令**：关闭城市、添加 agent、开始一个 agent 的登录、撤销一台配对过的浏览器。四个都带 `idem`，Rust 一侧的载荷在 `command::step`：`wire::CityClosing`、`wire::AgentAdding`、`wire::AgentLoginStart` 与 `wire::DeviceForgetting`。
+
+| Command | 载荷 | reach | class | 守卫 | 执行者做的事 |
+|---|---|---|---|---|---|
+| `CloseCity` | `mode: CloseMode`（`drain` 等跑着的 run 做完，`interrupt` 立刻停下它们）、`idem` | `client` | `LocalOnly` | 对端是回环、会话已认证 | 装配层 `bin::assembly` 的收口：与信号、`/quit` 走同一条有序收口；worker 的那一臂答「城在别处关闭」 |
+| `AddAgent` | `spec_digest: B3Hash`、`source: AgentSource`、`seat_here: Option<Address>`、`idem` | `client` | `LocalOnly` | 摘要相符 | 城重算它此刻会给出的那份启动说明的摘要，不相等即拒；相等就写一行 `[[agent]]`，`seat_here` 在场时把那个房间的 `[resident] harness` 指向它（§8-90） |
+| `AgentLogin` | `agent: String`（agent 条目的 id）、`method: String`（它声明的认证方法的 id）、`idem` | `client` | `LocalOnly` | 无 | 开始 agent 自己的登录：terminal 类型经跳板或 CLI 交出终端，agent 类型经 `authenticate` |
+| `ForgetDevice` | `device: DeviceId`、`idem` | `client` | `LocalOnly` | 无 | 删掉那台浏览器的公钥，它下次只能重新配对（§8-91） |
+
+- **四行都是 `LocalOnly`**：关闭城市、让一个程序以人的账户权限跑进城里、替人启动一个登录、撤销一台设备，都是治理这座城的动作，一台远程设备不论权限都做不了。
+- **现状**：四个命令今天由 `not_built` 作答，执行者分别随生命周期、ACP 接入与本地门落地；客户端在那之前不画它们。
+
 **`client` 而尚未落地的三个**（`HandOff`／`PutShelved`／`BatchByBuilding`）今天由 `not_built` 作答，
 所以门对它们要求的是**客户端不画**——`not_built` 的 rustdoc 说的就是这件事，现在有机器看着了。
 它们的 reach 仍写 `client`，因为那是它们做完之后该去的地方；写成别的取值等于把「还没做」记成「不该做」。
@@ -142,6 +154,10 @@ inductive Command where
   | CloseRemoteDoor
   | PrivacyOperation
   | ForgetSecret
+  | CloseCity
+  | AddAgent
+  | AgentLogin
+  | ForgetDevice
   deriving DecidableEq, Repr
 
 /-- §19-1 的四个取值：城里谁该够得到一个动词。 -/
@@ -249,6 +265,14 @@ def Command.reach : Command → Reach
   | .PrivacyOperation => .client
   -- 从 vault 删掉一个引用的 Key：载荷 `wire::SecretForgetting` 带 `reference: String`（`secret:realm/name`）与 `idem`。还有端点或配置在用它就拒，环境变量提供的拒并说要 unset 哪个（gateway D33）；不写账本。控件是账号编辑器移除账号之后的「同时删除 Key」（client D93）
   | .ForgetSecret => .client
+  -- 关闭城市：`drain` 等跑着的 run 做完，`interrupt` 立刻停下；只收回环上已认证的会话，执行者在装配层
+  | .CloseCity => .client
+  -- 添加一个 ACP agent：带回同意卡上那份启动说明的摘要，城重算不符即拒；可同时让当前房间用它（§8-90）
+  | .AddAgent => .client
+  -- 开始一个 agent 自己的登录，在它以 `-32000` 答过之后
+  | .AgentLogin => .client
+  -- 撤销一台配对过的浏览器（§8-91）
+  | .ForgetDevice => .client
 
 /-! D6 动词类是 §19-2 的一列，由中继的穷尽匹配实现、门机器对照
 
@@ -307,6 +331,10 @@ def Command.verbClass : Command → VerbClass
   | .CloseRemoteDoor => .LocalOnly
   | .PrivacyOperation => .LocalOnly
   | .ForgetSecret => .LocalOnly
+  | .CloseCity => .LocalOnly
+  | .AddAgent => .LocalOnly
+  | .AgentLogin => .LocalOnly
+  | .ForgetDevice => .LocalOnly
 
 /-- **没有一个 Command 属 `Read`**：读城的是 `Ask` 与 `Monitor` 两种帧，不是命令（§19-3）。一行写成 `Read` 的命令就是一个改东西的动词被当成只读放进了城。 -/
 theorem no_command_is_a_read (c : Command) : c.verbClass ≠ .Read := by

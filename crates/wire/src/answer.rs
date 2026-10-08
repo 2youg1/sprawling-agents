@@ -23,12 +23,14 @@ use crate::command::HaltScope;
 use crate::guide::GuideProgress;
 use crate::preference::PreferencesAnswer;
 
+mod agents;
 mod automation;
 mod building;
 mod commits;
 mod config;
 mod cost;
 mod cost_of;
+mod devices;
 mod doctor;
 mod document;
 mod document_bytes;
@@ -58,9 +60,14 @@ mod run_summary;
 mod scanning;
 mod sessions;
 mod skills;
+mod thinking;
 mod toolkits;
 mod usage;
 
+pub use agents::{
+    AgentCatalogAnswer, AgentLine, AgentOffer, AgentSource, AuthMethod, CatalogSnapshot, LoginKind,
+    LoginState, PinState,
+};
 pub use automation::{AutomationAnswer, Cadence, ScheduledJob, WatchedSource};
 pub use building::{ArchiveLine, BlockedLine, BuildingAnswer, BuildingDoc};
 pub use building::{BuildingProgress, PlanRow, PursuitLine};
@@ -71,6 +78,7 @@ pub use config::{
 };
 pub use cost::{CostAnswer, UnpricedCalls};
 pub use cost_of::{CostOfAnswer, RUN_COSTS_MAX, RunCostsAnswer};
+pub use devices::{DeviceId, DeviceLine, DevicesAnswer};
 pub use doctor::{DoctorAbsence, DoctorAnswer, DoctorCore, DoctorFault, DoctorInstall, DoctorItem};
 pub use doctor::{DoctorCoverage, DoctorCustody, DoctorCustodyLifetime, DoctorCustodyStore};
 pub use doctor::{DoctorGuarantee, DoctorGuaranteeAxis, DoctorSandbox, DoctorSandboxArm};
@@ -108,6 +116,7 @@ pub use run_summary::{RunSummary, Waiting};
 pub use scanning::{DoctorDrive, DoctorExclusion, DoctorScanning, DoctorUntold};
 pub use sessions::{SESSION_PREVIEW_MAX, SESSIONS_MAX, SessionLine, SessionStart, SessionsAnswer};
 pub use skills::{SkillLine, SkillShelf, SkillsAnswer};
+pub use thinking::{EffortWord, OfferSource, Switch, ThinkingOffer};
 pub use toolkits::{Standing, ToolkitLine, ToolkitsAnswer};
 pub use usage::VersionAuthor;
 pub use usage::{
@@ -201,6 +210,10 @@ pub enum Answer {
     Endpoints(EndpointsAnswer),
     KnownHosts(KnownHostsAnswer),
     Harnesses(HarnessesAnswer),
+    AgentCatalog(Box<AgentCatalogAnswer>),
+    /// One pasted spec read as an agent entry (`crates/wire/spec/Answer/Agents.lean` §8-90).
+    AgentSpec(Box<AgentOffer>),
+    Devices(Box<DevicesAnswer>),
     Building(Box<BuildingAnswer>),
     Inbox(InboxAnswer),
     Discards(DiscardAnswer),

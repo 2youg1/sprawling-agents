@@ -171,6 +171,9 @@ inductive AxCode where
   | PlanMissing
   -- 账号
   | ProviderAccountsExhausted
+  -- 接入：一个 ACP agent 要先登录；一次配对或开页码被拒
+  | AuthRequired
+  | PairingRefused
   deriving DecidableEq, Repr
 
 /-- carrier 的唯一声明位（`AxCode::carrier`，C9）：穷尽，没有通配臂，所以新增一个码而不给它 carrier 是编译错误。每一臂一行，`specalign` 逐臂与 kernel 编译出来的 `carrier()` 对账。
@@ -227,6 +230,9 @@ def AxCode.carrier : AxCode → Carrier
   | .PlanMissing => .Event .ToolResult
   -- 账号：与 `E_PROVIDER` 同一个 carrier，因为它说的是同一件事——供应方没有答上来——只是每个账号都试过了（kernel D54）
   | .ProviderAccountsExhausted => .Event .ProviderDegraded
+  -- 接入：两码都在本进程能写账本时产生，答给提出请求的那一方，与其余被拒的请求同一个 carrier
+  | .AuthRequired => .Event .ToolResult
+  | .PairingRefused => .Event .ToolResult
 
 /-- 每个码，依 `AxCode::ALL` 的次序。 -/
 def AxCode.all : List AxCode := [
@@ -271,7 +277,9 @@ def AxCode.all : List AxCode := [
   .BackpressureShed,
   .ToolOutcomeUnknown,
   .PlanMissing,
-  .ProviderAccountsExhausted
+  .ProviderAccountsExhausted,
+  .AuthRequired,
+  .PairingRefused
 ]
 
 theorem AxCode.all_complete : ∀ code : AxCode, code ∈ AxCode.all := by

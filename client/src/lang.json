@@ -619,6 +619,10 @@
     "en": "medium",
     "zh": "medium"
   },
+  "effort_minimal": {
+    "en": "minimal",
+    "zh": "minimal"
+  },
   "effort_none": {
     "en": "none",
     "zh": "none"
@@ -638,6 +642,10 @@
   "effort_note_medium": {
     "en": "the balance between what an answer costs and how far it reasons.",
     "zh": "在回答的开销与推理的深度之间取平衡。"
+  },
+  "effort_note_minimal": {
+    "en": "the least reasoning a thinking model still does before it answers.",
+    "zh": "会思考的模型在作答前做的最少一点推理。"
   },
   "effort_note_none": {
     "en": "thinking off: the model answers from the prompt without reasoning first.",
@@ -9518,6 +9526,14 @@
   "recover_e_plan_missing": {
     "en": "Ask the Mayor to write a plan for this goal in the building's Roadmap.md.",
     "zh": "请市长在这栋楼的 Roadmap.md 里为这个目标写一份计划。"
+  },
+  "recover_e_auth_required": {
+    "en": "Sign in to this agent with one of the methods it offers, then send again.",
+    "zh": "用这个 agent 提供的一种方式登录它，然后再发一次。"
+  },
+  "recover_e_pairing_refused": {
+    "en": "Read the current pairing code in the terminal the city runs in, and enter it again.",
+    "zh": "到城市运行的那个终端里读出当前的配对码，再输入一次。"
   },
   "tier_zen": {
     "en": "zen",

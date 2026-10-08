@@ -208,9 +208,8 @@ impl Views {
                     state: *state,
                 };
             }
-            // What an agent was told, and the store read that recovers
-            // it. A run with no prompt yet and an object this city no
-            // longer holds are both "I could not look".
+            // What an agent was told, and the store read that recovers it. A run with no prompt
+            // yet and an object this city no longer holds are both "I could not look".
             wire::Query::Prefix { run } => return Prepared::Prefix(self.prefix_ask(*run)),
             // Read at every asking rather than held: each file is one a person also edits or
             // another page also writes, and a copy kept in this fold would answer with what it
@@ -262,6 +261,9 @@ impl Views {
             }
             wire::Query::KnownHosts => known_hosts_answer(),
             wire::Query::Harnesses => return Prepared::Harnesses(self.reach.programs),
+            wire::Query::AgentCatalog
+            | wire::Query::ParseAgentSpec { .. }
+            | wire::Query::Devices => unavailable(query.name().to_owned()),
             wire::Query::Doctor => self.doctor_or_unavailable(),
             wire::Query::McpHealth { addr } => {
                 return Prepared::McpHealth {
@@ -275,9 +277,8 @@ impl Views {
             wire::Query::UsageExport { what, format } => return self.usage(Export(*what, *format)),
             wire::Query::Shells => return self.usage(Shells),
             wire::Query::NewestRelease => return Prepared::Release(self.reach.registry),
-            // The host's privacy page is read by the serving binary's own
-            // listener (`crates/sprawling/spec/Privacy/Service.lean`); the
-            // views hold nothing of the host.
+            // The host's privacy page is read by the serving binary's own listener
+            // (`crates/sprawling/spec/Privacy/Service.lean`); the views hold nothing of the host.
             wire::Query::Privacy => unavailable_because(
                 "Privacy".to_owned(),
                 &kernel::AxError::failure(

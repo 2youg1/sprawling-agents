@@ -9,9 +9,9 @@
 import { Schema } from "effect";
 
 /** The wire version both ends compare on connect. */
-export const WIRE_V = 64 as const;
+export const WIRE_V = 65 as const;
 /** The schema hash the server checks: `wire::schema_hash()`. */
-export const WIRE_HASH = "4eb1568c2ccf64c11d9ac7e8c1afc0da2e9724675d3b1725d79f9b3cfb9408d1" as const;
+export const WIRE_HASH = "a9979637188f7b07ad210817268e441fc642702284a3080b9266b9c5fd3e657d" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 /** The smallest body size a person may ask for: `wire::BODY_PX_MIN`. */
@@ -93,6 +93,144 @@ export const AdmissionRequirement = Schema.Union([
   Schema.Literal("double_validated"),
 ]).annotate({ identifier: "AdmissionRequirement" });
 export type AdmissionRequirement = typeof AdmissionRequirement.Type;
+
+/**
+ * Where an agent entry came from.
+ */
+export const AgentSource = Schema.Union([
+  Schema.Literal("registry"),
+  Schema.Literal("detected"),
+  Schema.Literal("pasted"),
+]).annotate({ identifier: "AgentSource" });
+export type AgentSource = typeof AgentSource.Type;
+
+/**
+ * A BLAKE3 digest: exactly 64 lowercase hex digits.
+ */
+export const B3Hash = Schema.String.check(Schema.isPattern(new RegExp("^[0-9a-f]{64}$", "u"))).pipe(Schema.brand("B3Hash"));
+export type B3Hash = typeof B3Hash.Type;
+
+/**
+ * The deduplication key of one outward action: `idem1-` then 32 lowercase hex digits.
+ */
+export const IdemKey = Schema.String.check(Schema.isPattern(new RegExp("^idem1-[0-9a-f]{32}$", "u"))).pipe(Schema.brand("IdemKey"));
+export type IdemKey = typeof IdemKey.Type;
+
+/**
+ * What `AddAgent` carries: the consent to one agent entry the city
+ * offered, named by the digest of its launch spec. The city recomputes
+ * the digest of the spec it would offer now and refuses on a mismatch,
+ * so what is written is what the person saw (`crates/wire/spec/Answer/Agents.lean` §8-90).
+ */
+export const AgentAdding = Schema.Struct({
+  idem: IdemKey,
+  seat_here: Schema.optional(Schema.NullOr(Address)),
+  source: AgentSource,
+  spec_digest: B3Hash,
+}).annotate({ identifier: "AgentAdding" });
+export type AgentAdding = typeof AgentAdding.Type;
+
+/**
+ * The two auth method types of ACP's stable schema.
+ */
+export const LoginKind = Schema.Union([
+  Schema.Literal("agent"),
+  Schema.Literal("terminal"),
+]).annotate({ identifier: "LoginKind" });
+export type LoginKind = typeof LoginKind.Type;
+
+/**
+ * One auth method an agent declared.
+ */
+export const AuthMethod = Schema.Struct({
+  id: Schema.String,
+  kind: LoginKind,
+  name: Schema.String,
+}).annotate({ identifier: "AuthMethod" });
+export type AuthMethod = typeof AuthMethod.Type;
+
+/**
+ * Where an added agent stands on signing in.
+ */
+export const LoginState = Schema.Union([
+  Schema.Literal("unasked"),
+  Schema.Literal("ready"),
+  Schema.Literal("required"),
+]).annotate({ identifier: "LoginState" });
+export type LoginState = typeof LoginState.Type;
+
+/**
+ * How exactly the launch spec names the agent's version.
+ */
+export const PinState = Schema.Union([
+  Schema.Literal("exact"),
+  Schema.Literal("floating"),
+  Schema.Literal("unknown"),
+]).annotate({ identifier: "PinState" });
+export type PinState = typeof PinState.Type;
+
+/**
+ * One agent this city added.
+ */
+export const AgentLine = Schema.Struct({
+  auth_methods: Schema.Array(AuthMethod),
+  id: Schema.String,
+  login_state: LoginState,
+  name: Schema.String,
+  pinned: PinState,
+  seated_in: Schema.Array(Address),
+  source: AgentSource,
+  version: Schema.optional(Schema.NullOr(Schema.String)),
+}).annotate({ identifier: "AgentLine" });
+export type AgentLine = typeof AgentLine.Type;
+
+/**
+ * One agent the person may consent to, as the consent card shows it.
+ */
+export const AgentOffer = Schema.Struct({
+  env_names: Schema.Array(Schema.String),
+  id: Schema.String,
+  launch_preview: Schema.String,
+  licence: Schema.optional(Schema.NullOr(Schema.String)),
+  login: Schema.Array(LoginKind),
+  name: Schema.String,
+  pinned: PinState,
+  source: AgentSource,
+  spec_digest: B3Hash,
+  version: Schema.optional(Schema.NullOr(Schema.String)),
+}).annotate({ identifier: "AgentOffer" });
+export type AgentOffer = typeof AgentOffer.Type;
+
+/**
+ * When the shipped catalog was read from the registry.
+ */
+export const CatalogSnapshot = Schema.Struct({
+  date: Schema.String,
+  etag: Schema.String,
+}).annotate({ identifier: "CatalogSnapshot" });
+export type CatalogSnapshot = typeof CatalogSnapshot.Type;
+
+/**
+ * Everything the ACP page draws from one question.
+ */
+export const AgentCatalogAnswer = Schema.Struct({
+  added: Schema.Array(AgentLine),
+  catalog: Schema.Array(AgentOffer),
+  detected: Schema.Array(AgentOffer),
+  snapshot: CatalogSnapshot,
+}).annotate({ identifier: "AgentCatalogAnswer" });
+export type AgentCatalogAnswer = typeof AgentCatalogAnswer.Type;
+
+/**
+ * What `AgentLogin` carries: which agent, and which of the auth methods
+ * it declared in `initialize`.
+ */
+export const AgentLoginStart = Schema.Struct({
+  agent: Schema.String,
+  idem: IdemKey,
+  method: Schema.String,
+}).annotate({ identifier: "AgentLoginStart" });
+export type AgentLoginStart = typeof AgentLoginStart.Type;
 
 /**
  * How a table column is aligned.
@@ -541,12 +679,6 @@ export const BuildingAnswer = Schema.Struct({
 export type BuildingAnswer = typeof BuildingAnswer.Type;
 
 /**
- * A BLAKE3 digest: exactly 64 lowercase hex digits.
- */
-export const B3Hash = Schema.String.check(Schema.isPattern(new RegExp("^[0-9a-f]{64}$", "u"))).pipe(Schema.brand("B3Hash"));
-export type B3Hash = typeof B3Hash.Type;
-
-/**
  * A half-open byte interval `[start, end)` of one document version.
  * 
  * Half-open, so an empty span - an insertion point, the whole of an
@@ -833,20 +965,18 @@ export const CommitAt = Schema.Struct({
 export type CommitAt = typeof CommitAt.Type;
 
 /**
- * How hard the provider should think before answering, ordered from
- * least to most. Both dialects accept every level; they disagree only
- * on where `None` is written (an effort value on one wire, a separate
- * thinking field on the other).
- * 
- * The ladder mirrors the providers' own vocabularies; check theirs
- * before changing it:
- * <https://platform.claude.com/docs/en/build-with-claude/effort> and
+ * How hard the provider should think, least to most, in the upstreams' words. Which levels one
+ * (Endpoint, model) offers is the upstream's statement, answered by the gateway's thinking
+ * ladder and never by a table here (`crates/kernel/spec/Model.lean` D56); a level outside the
+ * offer is refused, never moved to a neighbour. Check the vendors before changing the ladder:
+ * <https://platform.claude.com/docs/en/build-with-claude/effort>,
  * <https://developers.openai.com/api/docs/guides/reasoning>.
  * 
- * Absence (`Option::None`) is not `Effort::None`: absence leaves the
- * choice to the provider, `Effort::None` asks it not to think.
+ * Absence (`Option::None`) is not `Effort::None`: absence means nobody stated a level and the
+ * default rule resolves one ([`crate::consts_policy::DEFAULT_EFFORT`]). `Effort::None` survives
+ * only so ledgers that asked a provider not to think read back; no picker offers it.
  */
-export const Effort = Schema.Literals(["none", "low", "medium", "high", "xhigh", "max"]).annotate({ identifier: "Effort" });
+export const Effort = Schema.Literals(["none", "minimal", "low", "medium", "high", "xhigh", "max"]).annotate({ identifier: "Effort" });
 export type Effort = typeof Effort.Type;
 
 /**
@@ -1135,6 +1265,36 @@ export const CostOfAnswer = Schema.Struct({
   spent: UsdMicros,
 }).annotate({ identifier: "CostOfAnswer" });
 export type CostOfAnswer = typeof CostOfAnswer.Type;
+
+/**
+ * A paired browser, by the id the city gave it when it paired.
+ * 
+ * The text as the city wrote it; the wire does not read it. An id the
+ * city does not know and a misspelt one get the same refusal, because for
+ * the door both mean there is no such device.
+ */
+export const DeviceId = Schema.String.pipe(Schema.brand("DeviceId"));
+export type DeviceId = typeof DeviceId.Type;
+
+/**
+ * One paired browser, as a person recognises and revokes it. Its public
+ * key and its sessions stay in the city.
+ */
+export const DeviceLine = Schema.Struct({
+  id: DeviceId,
+  label: Schema.String,
+  last_seen: Schema.optional(Schema.NullOr(TimeMs)),
+  paired_at: TimeMs,
+}).annotate({ identifier: "DeviceLine" });
+export type DeviceLine = typeof DeviceLine.Type;
+
+/**
+ * Every paired browser.
+ */
+export const DevicesAnswer = Schema.Struct({
+  devices: Schema.Array(DeviceLine),
+}).annotate({ identifier: "DevicesAnswer" });
+export type DevicesAnswer = typeof DevicesAnswer.Type;
 
 /**
  * Tracked rides git (`file:`), Interred rides CAS (`cas:`), Rebuildable
@@ -1785,6 +1945,51 @@ export const EndpointTuning = Schema.Struct({
 export type EndpointTuning = typeof EndpointTuning.Type;
 
 /**
+ * The upstream's own word for one level.
+ */
+export const EffortWord = Schema.Struct({
+  effort: Effort,
+  word: Schema.String,
+}).annotate({ identifier: "EffortWord" });
+export type EffortWord = typeof EffortWord.Type;
+
+/**
+ * The rung of the ladder an offer came from.
+ */
+export const OfferSource = Schema.Union([
+  Schema.Literal("person"),
+  Schema.Literal("upstream"),
+  Schema.Literal("preset"),
+  Schema.Literal("unknown"),
+]).annotate({ identifier: "OfferSource" });
+export type OfferSource = typeof OfferSource.Type;
+
+/**
+ * Whether one setting is accepted.
+ */
+export const Switch = Schema.Literals(["allowed", "refused", "unknown"]).annotate({ identifier: "Switch" });
+export type Switch = typeof Switch.Type;
+
+/**
+ * The thinking levels one (Endpoint, model) offers, as the gateway's
+ * thinking ladder resolved them.
+ * 
+ * Sourced rather than said: `from` names the rung of the ladder that
+ * answered, so a page never mistakes this for the upstream's own words,
+ * which are the other fields of the model row.
+ */
+export const ThinkingOffer = Schema.Struct({
+  default: Schema.optional(Schema.NullOr(Effort)),
+  default_on: Schema.optional(Schema.NullOr(Schema.Boolean)),
+  from: OfferSource,
+  levels: Schema.Array(Effort),
+  on: Switch,
+  source: Schema.optional(Schema.NullOr(Schema.String)),
+  words: Schema.Array(EffortWord),
+}).annotate({ identifier: "ThinkingOffer" });
+export type ThinkingOffer = typeof ThinkingOffer.Type;
+
+/**
  * The most tokens one model reads in a single call, prompt and reply
  * together.
  * 
@@ -1812,21 +2017,27 @@ export type Window = typeof Window.Type;
  * model accepts, what it costs — is what a person chooses a model by.
  * This is that statement, carried to the page that shows the list.
  * 
- * **Every field is what the upstream said, not what this city
- * concluded.** Absence means the row said nothing; it never means
- * zero, and it is never filled in from the preset table here. The
- * ladder that picks a figure — the person's own entry, then the
+ * **Every field from `id` to `output_price` is what the upstream said,
+ * not what this city concluded.** Absence means the row said nothing; it
+ * never means zero, and it is never filled in from the preset table here.
+ * The ladder that picks a figure — the person's own entry, then the
  * upstream's statement, then the preset table, then the policy default
  * — runs where the call is made, and a summary that had already
  * climbed it would be a second answer to which figure won.
+ * 
+ * The last two fields are the city's answers, each from its one
+ * authority: `thinking` names the rung it came from, and `canonical` is
+ * `gateway::provider::identity`'s (`crates/wire/spec/Answer/Endpoints.lean` §8-92).
  */
 export const ModelFactsSummary = Schema.Struct({
+  canonical: Schema.String,
   context_tokens: Schema.optional(Schema.NullOr(Window)),
   id: Schema.String,
   input_modalities: Schema.Array(Schema.String),
   input_price: Schema.optional(Schema.NullOr(Schema.String)),
   max_output_tokens: Schema.optional(Schema.NullOr(Ceiling)),
   output_price: Schema.optional(Schema.NullOr(Schema.String)),
+  thinking: ThinkingOffer,
 }).annotate({ identifier: "ModelFactsSummary" });
 export type ModelFactsSummary = typeof ModelFactsSummary.Type;
 
@@ -2560,7 +2771,7 @@ export type ListingAnswer = typeof ListingAnswer.Type;
 /**
  * One of the closed set of error codes, as `AxCode::as_str` spells it.
  */
-export const AxCode = Schema.Literals(["E_PATH_NOT_FOUND", "E_TOOL_UNKNOWN", "E_TOOL_UNAVAILABLE", "E_INVALID_ARGS", "E_OUTSIDE_WRITE_DOMAIN", "E_VERSION_CONFLICT", "E_GATE_DENIED", "E_BUDGET_EXHAUSTED", "E_TIMEOUT", "E_PROVIDER", "E_EVIDENCE_MISSING", "E_LOOP_SUSPECTED", "E_LOCATOR_INVALID", "E_SANDBOX_DENIED", "E_BUSY", "E_DRAFT_STALE", "E_GOAL_CONFLICT", "E_TAINTED_ACTION", "E_REPAIR_BUSY", "E_DELEGATION_DEPTH", "E_APPROVAL_PENDING", "E_APPROVAL_DENIED", "E_CROSS_BUILDING_DENIED", "E_DIGEST_SUSPECT", "E_CREDENTIAL_MISSING", "E_MODEL_UNCHOSEN", "E_CONFIG_INVALID", "E_CAS_CORRUPT", "E_STORAGE_FATAL", "E_WORKTREE_BUSY", "E_BROWSER_UNAVAILABLE", "E_ENDPOINT_DIALECT_UNSUPPORTED", "E_WIRE_MISMATCH", "E_LOG_VERSION_UNSUPPORTED", "E_LEDGER_HELD", "E_HISTORY_UNPROVEN", "E_SECRET_EGRESS", "E_DISCARD_IRREVERSIBLE", "E_BACKPRESSURE_SHED", "E_TOOL_OUTCOME_UNKNOWN", "E_PLAN_MISSING", "E_PROVIDER_ACCOUNTS_EXHAUSTED"]).annotate({ identifier: "AxCode" });
+export const AxCode = Schema.Literals(["E_PATH_NOT_FOUND", "E_TOOL_UNKNOWN", "E_TOOL_UNAVAILABLE", "E_INVALID_ARGS", "E_OUTSIDE_WRITE_DOMAIN", "E_VERSION_CONFLICT", "E_GATE_DENIED", "E_BUDGET_EXHAUSTED", "E_TIMEOUT", "E_PROVIDER", "E_EVIDENCE_MISSING", "E_LOOP_SUSPECTED", "E_LOCATOR_INVALID", "E_SANDBOX_DENIED", "E_BUSY", "E_DRAFT_STALE", "E_GOAL_CONFLICT", "E_TAINTED_ACTION", "E_REPAIR_BUSY", "E_DELEGATION_DEPTH", "E_APPROVAL_PENDING", "E_APPROVAL_DENIED", "E_CROSS_BUILDING_DENIED", "E_DIGEST_SUSPECT", "E_CREDENTIAL_MISSING", "E_MODEL_UNCHOSEN", "E_CONFIG_INVALID", "E_CAS_CORRUPT", "E_STORAGE_FATAL", "E_WORKTREE_BUSY", "E_BROWSER_UNAVAILABLE", "E_ENDPOINT_DIALECT_UNSUPPORTED", "E_WIRE_MISMATCH", "E_LOG_VERSION_UNSUPPORTED", "E_LEDGER_HELD", "E_HISTORY_UNPROVEN", "E_SECRET_EGRESS", "E_DISCARD_IRREVERSIBLE", "E_BACKPRESSURE_SHED", "E_TOOL_OUTCOME_UNKNOWN", "E_PLAN_MISSING", "E_PROVIDER_ACCOUNTS_EXHAUSTED", "E_AUTH_REQUIRED", "E_PAIRING_REFUSED"]).annotate({ identifier: "AxCode" });
 export type AxCode = typeof AxCode.Type;
 
 /**
@@ -3349,12 +3560,6 @@ export const PrivacyNotWrittenEntry = Schema.Struct({
   reason: PrivacyNotWritten,
 }).annotate({ identifier: "PrivacyNotWrittenEntry" });
 export type PrivacyNotWrittenEntry = typeof PrivacyNotWrittenEntry.Type;
-
-/**
- * The deduplication key of one outward action: `idem1-` then 32 lowercase hex digits.
- */
-export const IdemKey = Schema.String.check(Schema.isPattern(new RegExp("^idem1-[0-9a-f]{32}$", "u"))).pipe(Schema.brand("IdemKey"));
-export type IdemKey = typeof IdemKey.Type;
 
 /**
  * One change the person confirmed on the page. `expected` is the value
@@ -4495,6 +4700,15 @@ export const Answer = Schema.Union([
     harnesses: HarnessesAnswer,
   }),
   Schema.Struct({
+    agent_catalog: AgentCatalogAnswer,
+  }),
+  Schema.Struct({
+    agent_spec: AgentOffer,
+  }),
+  Schema.Struct({
+    devices: DevicesAnswer,
+  }),
+  Schema.Struct({
     building: BuildingAnswer,
   }),
   Schema.Struct({
@@ -4747,6 +4961,13 @@ export const Query = Schema.Union([
   Schema.Literal("endpoint_view"),
   Schema.Literal("known_hosts"),
   Schema.Literal("harnesses"),
+  Schema.Literal("agent_catalog"),
+  Schema.Struct({
+    parse_agent_spec: Schema.Struct({
+      text: Schema.String,
+    }),
+  }),
+  Schema.Literal("devices"),
   Schema.Struct({
     building_view: Schema.Struct({
       addr: Address,
@@ -4919,6 +5140,25 @@ export const BeatMs = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)).pipe(Sc
 export type BeatMs = typeof BeatMs.Type;
 
 /**
+ * How a closing city treats the runs it still has.
+ */
+export const CloseMode = Schema.Union([
+  Schema.Literal("drain"),
+  Schema.Literal("interrupt"),
+]).annotate({ identifier: "CloseMode" });
+export type CloseMode = typeof CloseMode.Type;
+
+/**
+ * What `CloseCity` carries: how the runs under way end
+ * (`crates/wire/spec/Command/Kind.lean` §19-2).
+ */
+export const CityClosing = Schema.Struct({
+  idem: IdemKey,
+  mode: CloseMode,
+}).annotate({ identifier: "CityClosing" });
+export type CityClosing = typeof CityClosing.Type;
+
+/**
  * Whether this city renews a warm prompt cache before it expires.
  */
 export const KeepWarm = Schema.Union([
@@ -4938,6 +5178,16 @@ export const CitySettings = Schema.Struct({
   search: Schema.optional(Schema.NullOr(SearchConfiguration)),
 }).annotate({ identifier: "CitySettings" });
 export type CitySettings = typeof CitySettings.Type;
+
+/**
+ * What `ForgetDevice` carries: the paired browser whose key the city
+ * deletes (`crates/wire/spec/Answer/Devices.lean` §8-91).
+ */
+export const DeviceForgetting = Schema.Struct({
+  device: DeviceId,
+  idem: IdemKey,
+}).annotate({ identifier: "DeviceForgetting" });
+export type DeviceForgetting = typeof DeviceForgetting.Type;
 
 /**
  * What `ConfirmRemoteDoor` carries: the code the city's console printed, read however it was
@@ -5520,6 +5770,18 @@ export const Command = Schema.Union([
   }),
   Schema.Struct({
     forget_secret: SecretForgetting,
+  }),
+  Schema.Struct({
+    close_city: CityClosing,
+  }),
+  Schema.Struct({
+    add_agent: AgentAdding,
+  }),
+  Schema.Struct({
+    agent_login: AgentLoginStart,
+  }),
+  Schema.Struct({
+    forget_device: DeviceForgetting,
   }),
   Schema.Struct({
     auth: Schema.Struct({

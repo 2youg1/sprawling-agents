@@ -43,6 +43,7 @@ use super::committed::Committed;
 mod enrolment;
 
 use super::bundle::bundle_routes;
+use super::pairing::{accept_pairing, offer_challenge, open_session};
 use super::socket::upgrade;
 use super::uploads::{accept_acp, accept_drop, accept_recording};
 use enrolment::accept_enrolment;
@@ -317,6 +318,11 @@ pub fn router(config: &ServeConfig, face: BindFace) -> Router {
         // than as a header, and an unpaired editor is answered by
         // `agent_protocols::admit` rather than at the door.
         .route("/acp", post(accept_acp))
+        // This machine's door for a browser (`crates/wire/spec/Server.lean` §8-93):
+        // the routes a browser reaches before it holds a credential.
+        .route("/pair", post(accept_pairing))
+        .route("/session/challenge", post(offer_challenge))
+        .route("/session", post(open_session))
         // The client bundle is the page itself: a browser that has not
         // been given the pairing code yet still has to load the form it
         // types the code into, so these two doors stay open by design.
