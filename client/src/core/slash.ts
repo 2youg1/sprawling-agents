@@ -322,6 +322,19 @@ export const SLASH: readonly Slash[] = [
     },
   },
   {
+    // The ACP agents page; a launch spec typed after the verb is pasted
+    // into the page's box by hand, because the box is where the city's
+    // reading of it is shown before anything is added.
+    spelling: "/acp",
+    grammar: "",
+    about: "slash_acp",
+    section: "navigation",
+    run: (hands) => {
+      hands.go({ kind: "setup", group: "agents" });
+      hands.write("");
+    },
+  },
+  {
     spelling: "/doctor",
     grammar: "",
     about: "slash_doctor",
