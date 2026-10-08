@@ -9,7 +9,7 @@ import {
   advance,
   backoffMs,
   connect,
-  isRefused,
+  isStopped,
   newLink,
   type Link,
   type LinkEvent,
@@ -19,8 +19,8 @@ import { B3Hash, WIRE_HASH, WIRE_V, type AxError } from "../wire";
 // A link that has been greeted, which is where every frame below
 // arrives.
 function live(): Link {
-  const [opening] = connect(newLink(null, "en"));
-  const [handshaking] = advance(opening, { kind: "opened" });
+  const [opening] = connect(newLink("en"));
+  const [handshaking] = advance(opening, { kind: "opened", credential: null });
   const [settled] = advance(handshaking, {
     kind: "received",
     frame: {
@@ -53,7 +53,7 @@ describe("a frame this build cannot read", () => {
   // wire is permanent, and only the person can act on it.
   test("stops the link instead of retreating down the ladder", () => {
     const [stopped, action] = advance(live(), { kind: "undecodable" });
-    expect(isRefused(stopped)).toBe(true);
+    expect(isStopped(stopped)).toBe(true);
     expect(action).toEqual({
       kind: "report",
       error: {
@@ -96,7 +96,7 @@ describe("a refusal the server sent", () => {
       kind: "received",
       frame: { refusal: refusalOf("E_WIRE_MISMATCH") },
     });
-    expect(isRefused(stopped)).toBe(true);
+    expect(isStopped(stopped)).toBe(true);
   });
 
   // Everything else is one answer going wrong. The link carried it
@@ -126,7 +126,7 @@ describe("the backoff ladder", () => {
       expect(wait).toEqual({ kind: "wait", ms: backoffMs(attempt) });
       waits.push(backoffMs(attempt));
       const [opening] = advance(dropped, { kind: "wait_elapsed" });
-      const [handshaking] = advance(opening, { kind: "opened" });
+      const [handshaking] = advance(opening, { kind: "opened", credential: null });
       const [greeted] = advance(handshaking, {
         kind: "received",
         frame: {
@@ -146,7 +146,7 @@ describe("the backoff ladder", () => {
   test("returns to its first rung once a frame arrives", () => {
     const [dropped] = advance(live(), { kind: "closed" });
     const [opening] = advance(dropped, { kind: "wait_elapsed" });
-    const [handshaking] = advance(opening, { kind: "opened" });
+    const [handshaking] = advance(opening, { kind: "opened", credential: null });
     const [greeted] = advance(handshaking, {
       kind: "received",
       frame: {
@@ -166,6 +166,57 @@ describe("the backoff ladder", () => {
     expect(advance(flowing, { kind: "closed" })[1]).toEqual({
       kind: "wait",
       ms: 250,
+    });
+  });
+});
+
+// The person closed the city on purpose (`/quit`): every event the link
+// can meet after that leaves it stopped, and only the person's retry
+// starts it again, with the close forgotten.
+describe("a city the person closed", () => {
+  const EVENTS: readonly LinkEvent[] = [
+    { kind: "opened", credential: null },
+    { kind: "closed" },
+    { kind: "wait_elapsed" },
+    { kind: "undecodable" },
+    { kind: "closing", mode: "drain" },
+  ];
+
+  for (const mode of ["drain", "interrupt"] as const) {
+    test(`stays closed after a ${mode} close, whatever arrives, until the person retries`, () => {
+      const [asked, quiet] = advance(live(), { kind: "closing", mode });
+      expect(quiet).toEqual({ kind: "nothing" });
+      const [ended, action] = advance(asked, { kind: "closed" });
+      expect({ state: ended.state, action }).toEqual({ state: { kind: "closed" }, action: { kind: "nothing" } });
+      for (const event of EVENTS) {
+        const [after, done] = advance(ended, event);
+        expect({ state: after.state, done, stopped: isStopped(after) }).toEqual({
+          state: { kind: "closed" },
+          done: { kind: "nothing" },
+          stopped: true,
+        });
+      }
+      const [again, opens] = advance(ended, { kind: "retry" });
+      expect({ state: again.state, closing: again.closing, opens }).toEqual({
+        state: { kind: "opening" },
+        closing: null,
+        opens: { kind: "open" },
+      });
+    });
+  }
+
+  test("a link the person did not close climbs the ladder as before", () => {
+    expect(advance(live(), { kind: "closed" })[1]).toEqual({ kind: "wait", ms: 250 });
+  });
+});
+
+describe("the hello", () => {
+  test("shows the credential the line was opened under", () => {
+    const [opening] = connect(newLink("en"));
+    const [, said] = advance(opening, { kind: "opened", credential: "session-token" });
+    expect(said).toEqual({
+      kind: "send",
+      frame: { hello: { wire_v: WIRE_V, schema: B3Hash.make(WIRE_HASH), token: "session-token" } },
     });
   });
 });

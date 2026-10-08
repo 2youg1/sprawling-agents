@@ -34,7 +34,7 @@ export class DropZone {
 
   readonly drop = (event: DragEvent): void => {
     this.over = false;
-    const drop = dropped(event.dataTransfer, this.ui.origin, this.ui.pairing);
+    const drop = dropped(event.dataTransfer, this.ui.origin, this.ui.credential());
     if (drop.kind === "nothing") return;
     event.preventDefault();
     this.refused = [];

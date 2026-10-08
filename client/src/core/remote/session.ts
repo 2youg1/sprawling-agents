@@ -17,6 +17,8 @@
 // sealed, and the frames it receives are opened one after another.
 
 import { plainDial, socketUrl } from "../line";
+import { renewing } from "../local/dial";
+import type { Credential } from "../local/entering";
 import type { Dial, Hearing, Line } from "../line";
 import { remoteUrl, sessionOver } from "./connect";
 import type { Door } from "./connect";
@@ -24,9 +26,15 @@ import { kept } from "./device";
 import type { Session } from "./handshake";
 import { payloadBytes, payloadOf } from "./seal";
 
-// The line for each connection the link opens from `location`.
-export function dialFor(location: Pick<Location, "protocol" | "host">): Dial {
-  const plain = plainDial(socketUrl(location));
+// The line for each connection the link opens from `location`. A plain
+// line renews `credential` before each attempt, and `forgotten` is
+// called when the city no longer knows this browser's device key.
+export function dialFor(
+  location: Pick<Location, "protocol" | "host">,
+  credential: Credential,
+  forgotten: () => void,
+): Dial {
+  const plain = renewing(plainDial(socketUrl(location)), credential, forgotten);
   const url = remoteUrl(location, "/remote/session");
   if (url === null) return plain;
   return (hearing) => {
@@ -82,7 +90,7 @@ export function talk(door: Door, session: Session, hearing: Hearing): Line {
     door.close();
     hearing.closed();
   };
-  hearing.opened();
+  hearing.opened(null);
   void (async () => {
     for (let sealed = await door.next(); sealed !== null && isOpen(); sealed = await door.next()) {
       const bytes = await session.opener.open(sealed);

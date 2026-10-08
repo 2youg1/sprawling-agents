@@ -70,11 +70,10 @@ export interface Ui {
   readonly approvals: Readable<readonly ApprovalItem[] | undefined>;
   readonly bar: AddressBar;
   readonly origin: string;
-  // The pairing code this page was opened with, as the city's HTTP
-  // doors ask for it (`core/socket.ts` reads it off the address bar
-  // and spells the header). `null` on a city that configured none,
-  // which is a city on loopback.
-  readonly pairing: string | null;
+  // The session token in force, read at the moment an HTTP door is
+  // called, because it is renewed before every socket attempt
+  // (`core/local/entering.ts`); null for a page that holds none.
+  readonly credential: () => string | null;
   // Milliseconds now, read where a view needs a relative time.
   readonly now: () => number;
   readonly chooseEffort: (level: Effort | null) => void;
@@ -97,7 +96,7 @@ export interface Opening {
   readonly prefs: PreferenceDoor;
   readonly bar: AddressBar;
   readonly origin: string;
-  readonly pairing: string | null;
+  readonly credential: () => string | null;
   readonly now: () => number;
 }
 
@@ -169,6 +168,8 @@ export function ui(): Ui {
       unsent: readable(0),
       command: () => false,
       retry: () => undefined,
+      closeCity: () => false,
+      closing: readable(null),
       dismissRefusal: () => undefined,
       markNoticesSeen: () => undefined,
       monitor: { samples: readable([]), watch: () => () => undefined, watchSummary: () => () => undefined, setBeat: () => undefined },
@@ -176,7 +177,7 @@ export function ui(): Ui {
     prefs: loadPreferences(memory(), ""),
     bar: { hash: "" },
     origin: "",
-    pairing: null,
+    credential: () => null,
     now: () => 0,
   });
 }

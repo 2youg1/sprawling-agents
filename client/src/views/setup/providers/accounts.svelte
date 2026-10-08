@@ -53,7 +53,7 @@
   const hands: Hands = {
     roster: () => roster,
     lang: () => $lang,
-    reach: () => ({ origin: u.origin, token: u.pairing }),
+    reach: () => ({ origin: u.origin, token: u.credential() }),
     send: (command) => u.send(command),
     enrol,
     follow: (id, step) => {

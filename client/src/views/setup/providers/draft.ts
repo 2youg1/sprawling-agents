@@ -104,9 +104,16 @@ export interface Line {
   value: string;
 }
 
+// How many rows this page has made. A row's name only has to differ
+// from its neighbours' for the life of the page, and a count does that
+// everywhere: `crypto.randomUUID` exists only in a secure context, and
+// a page reached by a LAN address over plain http is not one.
+let made = 0;
+
 // A row nobody has typed into yet, carrying a name it will keep.
 export function blankLine(): Line {
-  return { key: crypto.randomUUID(), name: "", value: "" };
+  made += 1;
+  return { key: `line-${String(made)}`, name: "", value: "" };
 }
 
 // Everything the form holds. One value rather than a dozen signals:
