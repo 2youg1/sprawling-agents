@@ -31,6 +31,7 @@ mod reception;
 mod reply;
 #[cfg(feature = "server")]
 mod server;
+mod slash;
 
 pub use aggregate::{Aggregate, CityLabel, Forwarded, Sighting, Upstream};
 pub use answer::HistoryAnswer;
@@ -145,6 +146,7 @@ pub use server::{ChallengeAnswer, PairAnswer, PairBody, PairProof, SessionAnswer
 pub use server::{DROP_BYTES_MAX, DropSink};
 #[cfg(feature = "server")]
 pub use server::{bind, bundle_routes, router, serve};
+pub use slash::{Offered, Slash};
 
 pub use kernel::WriteLimit;
 pub use kernel::model::{AdmissionRequirement, LandingPolicy, Mode, RunPolicy, Window};

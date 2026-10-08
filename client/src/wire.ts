@@ -17,6 +17,26 @@ export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 /** The smallest body size a person may ask for: `wire::BODY_PX_MIN`. */
 export const BODY_PX = { min: 12 } as const;
 
+/** The slash verbs a person types: `wire::Slash::ALL`. */
+export const SLASH = [
+  { spelling: "/help", takes: "", offered: "both", says: "list these verbs" },
+  { spelling: "/room", takes: "<addr>", offered: "both", says: "choose the room plain lines go to" },
+  { spelling: "/new", takes: "", offered: "both", says: "start a new session in this room" },
+  { spelling: "/stop", takes: "", offered: "both", says: "stop the run working in this room" },
+  { spelling: "/halt", takes: "[--all]", offered: "both", says: "hold this room's building, or with --all the whole city" },
+  { spelling: "/release", takes: "[--all]", offered: "both", says: "let this room's building work again, or with --all the whole city" },
+  { spelling: "/model", takes: "[<id>]", offered: "both", says: "show the model, or choose one the city's endpoints offer" },
+  { spelling: "/effort", takes: "[<level>]", offered: "both", says: "show the thinking level, or choose one the model offers" },
+  { spelling: "/approve", takes: "[<id>]", offered: "cli", says: "approve the waiting request, or the one with this id" },
+  { spelling: "/deny", takes: "[<id>]", offered: "cli", says: "deny the waiting request, or the one with this id" },
+  { spelling: "/web", takes: "", offered: "cli", says: "open the WebUI and quiet this terminal; Esc comes back" },
+  { spelling: "/quit", takes: "", offered: "both", says: "close the city" },
+  { spelling: "/serving", takes: "", offered: "cli", says: "where this city listens, and what is running in it" },
+  { spelling: "/remote", takes: "<verb>", offered: "cli", says: "open|pair|close|devices|revoke: the door a device reaches the city through" },
+  { spelling: "/acp", takes: "[<text>]", offered: "both", says: "find an ACP agent, or read a pasted launch line" },
+  { spelling: "/wire", takes: "<verb> [<json>]", offered: "cli", says: "send any wire command or question, its body as JSON" },
+] as const;
+
 /**
  * Whether the account a request went out on can still take it
  * (`crates/kernel/spec/Error.lean` D53).
