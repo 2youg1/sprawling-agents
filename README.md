@@ -78,7 +78,9 @@ Whichever way you installed it, one command starts it:
 sprawling up ./cities/first
 ```
 
-The terminal becomes this city's console and prints the serving address, and your browser opens the page. On the page, connect a provider or a local model, choose a model for `main`, then tell the Mayor what result you want and how far counts as done. The Mayor plans and the residents of the buildings carry the work out; on your side, you follow the progress, answer their questions and check the results. To stop the city, press `Ctrl-C` in the console.
+The terminal becomes the city's CLI: you can talk to the Mayor and run every slash command there, and `/help` lists them. Type `/web` to open the page in your browser. The terminal then shows only two lines, the serving address and a pairing code; Enter opens the page again, and Esc returns to the CLI. <!-- v0.0.11-verify --> On the page, connect a provider or a local model, choose a model for `main`, then tell the Mayor what result you want and how far counts as done. Where the model offers thinking levels, the city asks for `high` until you choose another. The Mayor plans and the residents of the buildings carry the work out; on your side, you follow the progress, answer their questions and check the results.
+
+Closing the browser stops nothing: the city keeps working, and the address opens the page again. To close the city, type `/quit` in the CLI or on the page; with runs still going, it asks whether to wait for them or stop them now. Ctrl+C and Ctrl+V keep their terminal meanings, copy and paste, and never close the city.
 
 sprawling does not update itself; when you want to, check the version in Settings and follow the [update guide](docs/getting-started.md#updating).
 
@@ -100,7 +102,7 @@ The page and the whole city are served and run by one process, with no database 
 
 ### Privacy
 
-A key you paste into a message goes into the vault first, and the model sees only a reference to it ([custody](crates/accounting/src/worker/dispatching/custody.rs)). Values in model replies and tool results that look like secrets are replaced with a marker before they are written into the permanent history ([redact](crates/runtime/src/redact.rs)). Apart from the model calls and tools you connect, plus the web search that is on by default (until you turn it off, it sends the search words to Exa), nothing leaves your machine; a confidential building calls no remote provider. On Windows, Settings has 88 optional privacy controls, ranging from diagnostic data and speech input to app permissions and Windows AI features. Each one shows its current value, what it changes and what it costs; you apply or restore them one at a time, and each write is read back to check it ([Windows privacy controls](docs/operating.md#windows-privacy-controls)). Privacy is not security, and it is not always at odds with convenience, but many of these settings do cost some convenience; the page lays out each one so that you can weigh it yourself.
+A key you paste into a message goes into the vault first, and the model sees only a reference to it ([custody](crates/accounting/src/worker/dispatching/custody.rs)). Values in model replies and tool results that look like secrets are replaced with a marker before they are written into the permanent history ([redact](crates/runtime/src/redact.rs)). Apart from the model calls and tools you connect, plus the web search that is on by default (until you turn it off, it sends the search words to Exa), nothing leaves your machine; a confidential building calls no remote provider. The port on your own machine asks every caller for a credential, so a web page in another tab cannot drive the city: the browser `/web` opens is paired without typing, a second browser asks for the pairing code the terminal shows, and a script on this machine reads a key file that only your account can read ([SECURITY.md](SECURITY.md)). The programs the city starts, such as ACP agents, MCP servers and browsers, do not inherit the city's credentials from its environment. On Windows, Settings has 88 optional privacy controls, ranging from diagnostic data and speech input to app permissions and Windows AI features. Each one shows its current value, what it changes and what it costs; you apply or restore them one at a time, and each write is read back to check it ([Windows privacy controls](docs/operating.md#windows-privacy-controls)). Privacy is not security, and it is not always at odds with convenience, but many of these settings do cost some convenience; the page lays out each one so that you can weigh it yourself.
 
 ### A history you can replay
 
@@ -108,7 +110,7 @@ Every decision the city makes is a line in the Ledger, and replaying those lines
 
 ### Customisation and development
 
-How agents work is defined by role documents, project rules and skills; connect whatever models and MCP tools you need (one provider can hold several accounts, used in the priority order you set), or bring in a supported harness over ACP. You can build your own interface on the wire, or change the runtime along the seams in the architecture. If your workflow or AgentOS needs standing project teams, handoffs through documents and a shared history on one machine, these parts are there to build it with; [integrations](docs/integrations.md) covers the existing connections, and [architecture](ARCHITECTURE.md#8-where-to-change-what) shows where to change the runtime.
+How agents work is defined by role documents, project rules and skills; connect whatever models and MCP tools you need (one provider can hold several accounts, used in the priority order you set), or bring in any agent that speaks ACP: the ACP page lists the agents found on this machine and the ACP registry's catalog, and takes a pasted command or configuration block. You can build your own interface on the wire, or change the runtime along the seams in the architecture. If your workflow or AgentOS needs standing project teams, handoffs through documents and a shared history on one machine, these parts are there to build it with; [integrations](docs/integrations.md) covers the existing connections, and [architecture](ARCHITECTURE.md#8-where-to-change-what) shows where to change the runtime.
 
 ## Why I built this
 
@@ -126,7 +128,7 @@ Honestly, no multi-agent scheme yet delivers performance gains that justify the 
 
 Agent memory is indeed an important path toward RSI, but not via harness-level injection. Your files, code, and document libraries *are* the memory. Attempts to make an agent truly grow with you are, before LLMs leave the stateless regime, mostly a drag on the model.
 
-If you want to keep a harness you already like, sprawling can bring it in over ACP ([integrations](docs/integrations.md)). kasanagi, which I am preparing now, helps build chat software; later it will work as an MCP server for remote collaboration between several sprawling instances. sprawling is aimed at persistent operations for small teams and at research platforms (computer science or the humanities/social sciences). It is still in R&D. Contributions and conversations are both welcome.
+If you want to keep a harness you already like, any harness that speaks ACP can join the city as a resident ([integrations](docs/integrations.md)). kasanagi, which I am preparing now, helps build chat software; later it will work as an MCP server for remote collaboration between several sprawling instances. sprawling is aimed at persistent operations for small teams and at research platforms (computer science or the humanities/social sciences). It is still in R&D. Contributions and conversations are both welcome.
 
 Apart from migrating the necessary business skills / MCP / ACP pieces, I recommend staying lean for now and only adding things manually when you hit a concrete problem. Even the same model behaves completely differently under different harnesses.
 
@@ -145,7 +147,7 @@ Apart from the two READMEs, the two getting-started guides and the comments in t
 | [`docs/glossary.md`](docs/glossary.md) | Every word the code, the page and the documents use, each with exactly one meaning |
 | [`LLM.md`](LLM.md) | For a model that introduces sprawling: what it can do, where its limits are, and in what order to read |
 | [`docs/wire.md`](docs/wire.md) | The CLI, frames, answers and exit codes for controlling the city from a program |
-| [`docs/integrations.md`](docs/integrations.md) | ACP harnesses, MCP tool servers, and controlling the city through the CLI from an existing agent |
+| [`docs/integrations.md`](docs/integrations.md) | Any ACP agent as a resident, MCP tool servers, and controlling the city through the CLI from an existing agent |
 | [`docs/performance.md`](docs/performance.md) | Monitor readings, reproducible workloads and where the measurements come from |
 | [`ARCHITECTURE.md`](ARCHITECTURE.md) | The crates and the dependency rules between them, the seams, one dispatch from start to finish, what is on disk, how it is verified, and where each kind of change goes |
 | [`AGENTS.md`](AGENTS.md) | The rules every change keeps and the commands that check them; people and agents both read it first |
@@ -161,7 +163,7 @@ Apart from the two READMEs, the two getting-started guides and the comments in t
 
 ## Sources and credits
 
-Provider interfaces and harness launch commands follow the ACP registry and vendor documentation; where a fact needs checking precisely, it is read from the vendor's client without copying the client's code. This repository implements its interface controls itself, with keyboard behaviour following the W3C ARIA Authoring Practices, Kobalte and Ark UI documentation. Source versions and full licences are in [third-party](docs/third-party.md).
+Provider interfaces follow vendor documentation, and ACP agent launch commands follow the ACP registry, whose catalog ships with each release; where a fact needs checking precisely, it is read from the vendor's client without copying the client's code. This repository implements its interface controls itself, with keyboard behaviour following the W3C ARIA Authoring Practices, Kobalte and Ark UI documentation. Source versions and full licences are in [third-party](docs/third-party.md).
 
 The shipped `sdd`, `tutor` and `translation` are English adaptations of the author's Chinese skills; `why`, `how` and `blast-radius` are adapted from Lauren Tan (poteto)'s [pstack](https://github.com/cursor/plugins/tree/main/pstack), and `authority-review` from Thermos in the same repository; all four keep the MIT licence. Each skill's credit and licence are in [skills/LICENSES.md](crates/city/skills/LICENSES.md).
 

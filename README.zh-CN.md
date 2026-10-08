@@ -16,9 +16,9 @@
 
 </div>
 
-在sprawling里，一座城就是你电脑上的一个目录，项目是城里的一栋栋楼，Agent作为居民住在楼里，互相发消息、分工，做到哪一步会向你汇报。背后只有一个在本地运行的Rust二进制，它给浏览器提供界面，也把城的历史记进一个只追加的Ledger。
+在sprawling里，一座城市就是你电脑上的一个目录，项目是城市里的一栋栋楼，Agent作为居民住在楼里，互相发消息、分工，做到哪一步会向你汇报。背后只有一个在本地运行的Rust二进制，它给浏览器提供界面，也把城市的历史记进一个只追加的Ledger。
 
-这座城不只是个比喻：楼、楼层和房间就是目录树本身，所以一个地址（比如`lab/room1`）同时决定了三件事，Agent能写哪些文件、开工时带着哪些文档、向谁汇报，这三件事本来就是同一个事实，不需要另外的规则让它们保持一致（[词汇表](docs/glossary.md)）。居民是跨run一直存在的身份，真正花钱的是它被派去干活的那一次run，所以城里住着再多居民，闲着的也不花钱。
+这座城市不只是个比喻：楼、楼层和房间就是目录树本身，所以一个地址（比如`lab/room1`）同时决定了三件事，Agent能写哪些文件、开工时带着哪些文档、向谁汇报，这三件事本来就是同一个事实，不需要另外的规则让它们保持一致（[词汇表](docs/glossary.md)）。居民是跨run一直存在的身份，真正花钱的是它被派去干活的那一次run，所以城市里住着再多居民，闲着的也不花钱。
 
 sprawling尽量少打断你。Agent在自己的楼里默认拥有全部权限，用`minimal`模板盖的楼里每个文件它都能写，干完的活不经审查直接落地（想打开审查或者限制写入，见[一栋你自己的楼](docs/getting-started.zh-CN.md#一栋你自己的楼)），送到你面前等你拍板的，是居民凭楼的规则定不下来的设计问题。计划、决定和交接都写成能直接读的文件，Agent换了会话就从这些记录接着干，记忆就在你的文件、代码和文档库里。目前也不内置workflow，工作流由你用角色、skills和工具接入来定义。
 
@@ -78,7 +78,9 @@ irm https://raw.githubusercontent.com/2youg1/sprawling-agents/main/install.ps1 |
 sprawling up ./cities/first
 ```
 
-终端会变成这座城的控制台并打印服务地址，浏览器会打开页面。在页面上接一个provider或者本地模型，给`main`选一个模型，然后告诉Mayor你要什么结果、做到什么程度算完。Mayor负责规划，楼里的居民负责执行，你这边看进展、回答它们的提问、检查结果。想停城就在控制台按`Ctrl-C`。
+终端会变成这座城市的CLI：可以直接在里面和Mayor对话、执行所有斜杠命令，`/help`列出全部命令。输入`/web`，浏览器就会打开页面，终端随后只留两行：服务地址和一个配对码；按Enter再打开一次页面，按Esc回到CLI。<!-- v0.0.11-verify --> 在页面上接一个provider或者本地模型，给`main`选一个模型，然后告诉Mayor你要什么结果、做到什么程度算完。模型提供思考档位时，城市默认用`high`，你另选之后按你选的来。Mayor负责规划，楼里的居民负责执行，你这边看进展、回答它们的提问、检查结果。
+
+关掉浏览器不会停下任何工作，城市照常运行，用那个地址就能再打开页面。要关闭城市，在CLI或页面里输入`/quit`；还有run在跑时，它会问你是等它们完成还是立刻停下。Ctrl+C和Ctrl+V在终端里仍是复制和粘贴，不会关闭城市。
 
 sprawling不会自动更新，需要的时候在设置里检查版本，再按[更新指南](docs/getting-started.zh-CN.md#更新)操作。
 
@@ -96,19 +98,19 @@ Agent之间可以互相找到对方、发消息、协调任务、等回复，不
 
 ### 性能
 
-提供页面和运行整座城的是同一个进程，没有数据库，也没有另外的服务，城的历史就是磁盘上一个只追加的Ledger。在设置→性能里可以选CPU怎么放置、核心优先级多高，也可以给每个run设一个内存上限；这个上限默认没有，只能由你自己填（[城怎样使用你的硬件](docs/performance.md#choose-how-the-city-uses-the-machine)）。命令以比城本身更低的优先级启动，所以跑一次构建不会把页面拖慢。命令的输出在交给模型之前，会按产生它的那条命令来裁剪，完整的原文之后仍然取得回来（[sieve](crates/runtime/spec/Sieve.lean)）。监视器和`sprawling gauge`会在你自己的硬件上显示run的耗时、模型调用、token、成本和资源占用，项目的预算和已有读数记在[性能登记表](tools/xtask/budgets.toml)里（[性能文档](docs/performance.md)）。
+提供页面和运行整座城市的是同一个进程，没有数据库，也没有另外的服务，城市的历史就是磁盘上一个只追加的Ledger。在设置→性能里可以选CPU怎么放置、核心优先级多高，也可以给每个run设一个内存上限；这个上限默认没有，只能由你自己填（[城市怎样使用你的硬件](docs/performance.md#choose-how-the-city-uses-the-machine)）。命令以比城市本身更低的优先级启动，所以跑一次构建不会把页面拖慢。命令的输出在交给模型之前，会按产生它的那条命令来裁剪，完整的原文之后仍然取得回来（[sieve](crates/runtime/spec/Sieve.lean)）。监视器和`sprawling gauge`会在你自己的硬件上显示run的耗时、模型调用、token、成本和资源占用，项目的预算和已有读数记在[性能登记表](tools/xtask/budgets.toml)里（[性能文档](docs/performance.md)）。
 
 ### 隐私
 
-你在消息里贴的Key会先进Vault，模型看到的只是它的引用（[custody](crates/accounting/src/worker/dispatching/custody.rs)）。模型回复和工具结果里长得像密钥的值，写进永久历史之前会被换成一个标记（[redact](crates/runtime/src/redact.rs)）。除了你接入的模型调用和工具，再加上默认开着的网页搜索（关掉之前它会把搜索词发给Exa），没有东西会离开你的电脑；保密楼则不调用任何远程provider。在Windows上，设置里有88项可选的隐私控制，从诊断数据、语音输入到应用权限和Windows AI功能都有。每一项都显示当前值、它改什么、代价是什么，可以一项一项应用或恢复，每次写入后都会读回来核对（[Windows隐私控制](docs/operating.md#windows-privacy-controls)）。隐私不等于安全，也不一定和便利冲突，但这里面很多设置确实要牺牲一些便利，页面把每一项的信息都摆出来，由你自己逐项权衡。
+你在消息里贴的Key会先进Vault，模型看到的只是它的引用（[custody](crates/accounting/src/worker/dispatching/custody.rs)）。模型回复和工具结果里长得像密钥的值，写进永久历史之前会被换成一个标记（[redact](crates/runtime/src/redact.rs)）。除了你接入的模型调用和工具，再加上默认开着的网页搜索（关掉之前它会把搜索词发给Exa），没有东西会离开你的电脑；保密楼则不调用任何远程provider。你电脑上的端口对每个调用方都要凭据，所以别的标签页里的网页驱动不了城市：`/web`打开的那个浏览器自动完成配对，不用输入；第二个浏览器要输入终端上显示的配对码；同一台电脑上的脚本读一个只有你的账户能读的密钥文件（[SECURITY.md](SECURITY.md)）。城市启动的程序，比如ACP agent、MCP server和浏览器，不会从环境变量里继承城市的凭据。在Windows上，设置里有88项可选的隐私控制，从诊断数据、语音输入到应用权限和Windows AI功能都有。每一项都显示当前值、它改什么、代价是什么，可以一项一项应用或恢复，每次写入后都会读回来核对（[Windows隐私控制](docs/operating.md#windows-privacy-controls)）。隐私不等于安全，也不一定和便利冲突，但这里面很多设置确实要牺牲一些便利，页面把每一项的信息都摆出来，由你自己逐项权衡。
 
 ### 可重放的历史
 
-城做的每一个决定都是Ledger里的一行，这些行拿到任何一台机器上重放，结果都逐字节相同，因为决策路径把时间当作参数传进来、不用随机源、顺序也固定（[确定性](ARCHITECTURE.md#10-determinism-and-hardening)）。重放时不会再执行一遍工具或调用模型，而是把当时记下的结果读回来。城只负责给出事实和边界，具体怎么做交给模型（[LLM First](ARCHITECTURE.md#llm-first-mechanism-from-the-city-method-from-the-model)）。
+城市做的每一个决定都是Ledger里的一行，这些行拿到任何一台机器上重放，结果都逐字节相同，因为决策路径把时间当作参数传进来、不用随机源、顺序也固定（[确定性](ARCHITECTURE.md#10-determinism-and-hardening)）。重放时不会再执行一遍工具或调用模型，而是把当时记下的结果读回来。城市只负责给出事实和边界，具体怎么做交给模型（[LLM First](ARCHITECTURE.md#llm-first-mechanism-from-the-city-method-from-the-model)）。
 
 ### 定制与二次开发
 
-Agent怎么工作，由角色文档、项目规则和skills来定义；需要什么模型和MCP工具就接什么（同一个provider可以登记多个账号，按你定的优先顺序使用），也可以通过ACP接入支持的Harness。你可以基于wire做一套自己的界面，也可以沿着架构里的seams去改运行机制。如果你的工作流或AgentOS需要常驻的项目团队、靠文档交接、在同一台电脑上共享历史，这些部件都可以拿来搭；现有的接入方式见[接入文档](docs/integrations.md)，运行机制该改哪里见[架构](ARCHITECTURE.md#8-where-to-change-what)。
+Agent怎么工作，由角色文档、项目规则和skills来定义；需要什么模型和MCP工具就接什么（同一个provider可以登记多个账号，按你定的优先顺序使用），也可以接入任何支持ACP的agent：ACP页面列出你电脑上已检测到的agent和ACP registry的目录，也接受粘贴的一条命令或一段配置。你可以基于wire做一套自己的界面，也可以沿着架构里的seams去改运行机制。如果你的工作流或AgentOS需要常驻的项目团队、靠文档交接、在同一台电脑上共享历史，这些部件都可以拿来搭；现有的接入方式见[接入文档](docs/integrations.md)，运行机制该改哪里见[架构](ARCHITECTURE.md#8-where-to-change-what)。
 
 ## 为什么做它
 
@@ -126,7 +128,7 @@ Agent的能力和规模越强，人的注意力就越贵，我不想sprawling成
 
 Agent记忆的确是实现RSI很重要的途径，但不是依靠Harness做注入，你的文件、代码，文档库就是记忆，Agent真正和你一起成长的尝试在LLM脱离无状态之前大多是对模型的拖累。
 
-如果你想继续用自己喜欢的Harness，sprawling已经支持通过ACP接入（[接入文档](docs/integrations.md)）。我正在准备开发的kasanagi是一个辅助搭建聊天软件的项目，以后会作为MCP解决多个sprawling实例之间的远程协作。sprawling主要面向为小团队持久化运营和学术（无论计算机还是人文社科）研究平台，目前还处于研究与开发阶段，欢迎一起开发，也欢迎和我联系/讨论。
+如果你想继续用自己喜欢的Harness，只要它支持ACP，就能作为居民接入城市（[接入文档](docs/integrations.md)）。我正在准备开发的kasanagi是一个辅助搭建聊天软件的项目，以后会作为MCP解决多个sprawling实例之间的远程协作。sprawling主要面向为小团队持久化运营和学术（无论计算机还是人文社科）研究平台，目前还处于研究与开发阶段，欢迎一起开发，也欢迎和我联系/讨论。
 
 除了迁移必要的业务skill/MCP/ACP之外，推荐暂时保持精简，在使用中遇到问题时再手动追加内容，即使是相同的模型搭配不同的Harness都会有完全不同的行为。
 
@@ -144,15 +146,15 @@ Agent记忆的确是实现RSI很重要的途径，但不是依靠Harness做注�
 | [`docs/operating.md`](docs/operating.md) | 日常使用：引导和停下工作、回答居民、换provider和MCP server、远程访问，以及出了问题怎么办 |
 | [`docs/glossary.md`](docs/glossary.md) | 代码、页面和文档里用到的每个词，每个词只有一个意思 |
 | [`LLM.md`](LLM.md) | 写给要介绍sprawling的模型：能做什么、边界在哪、按什么顺序读 |
-| [`docs/wire.md`](docs/wire.md) | 用程序控制城时的CLI、帧、回答和退出码 |
-| [`docs/integrations.md`](docs/integrations.md) | ACP Harness、MCP工具服务，以及从已有Agent通过CLI控制城 |
+| [`docs/wire.md`](docs/wire.md) | 用程序控制城市时的CLI、帧、回答和退出码 |
+| [`docs/integrations.md`](docs/integrations.md) | 把任意ACP agent接作居民、MCP工具服务，以及从已有Agent通过CLI控制城市 |
 | [`docs/performance.md`](docs/performance.md) | 监视器的读数、可复现的负载和测量数据的来源 |
 | [`ARCHITECTURE.md`](ARCHITECTURE.md) | 各个crate和它们之间的依赖规则、seams、一次派活从头到尾怎么走、磁盘上有什么、怎么验证、每类改动该去哪里 |
 | [`AGENTS.md`](AGENTS.md) | 每次改动都要守的规则和检查它们的命令，人和Agent都先读它 |
 | [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) | 贡献前的准备、功能准入和提交流程，以及仓库规则的入口 |
 | [`docs/frontend-method.md`](docs/frontend-method.md) | 一个屏怎么搭、怎么验收，以及已经批准的视觉设计 |
 | [`crates/README.md`](crates/README.md) | 每个crate管什么、规格在哪；规格`crates/<dir>/Spec.lean`写着这个crate的接口、决定和证明，注释用中文 |
-| [`crates/city/templates/`](crates/city/templates/) | 城写进每栋楼的文档，Agent会读，你也可以读 |
+| [`crates/city/templates/`](crates/city/templates/) | 城市写进每栋楼的文档，Agent会读，你也可以读 |
 | [`crates/city/skills/`](crates/city/skills/) | 随发行一起分发的skill |
 | [`docs/logging.md`](docs/logging.md) | 什么进诊断日志、什么进Ledger，以及两者为什么要分开 |
 | [`docs/third-party.md`](docs/third-party.md) | 本仓库跟随的上游事实、致谢和许可义务 |
@@ -161,7 +163,7 @@ Agent记忆的确是实现RSI很重要的途径，但不是依靠Harness做注�
 
 ## 来源与致谢
 
-厂商接口和Harness的启动方式跟随ACP registry和厂商文档；需要精确核对的地方，从厂商客户端里读取事实，但不复制它们的代码。界面控件由本仓库自己实现，键盘行为参照W3C ARIA Authoring Practices、Kobalte和Ark UI的文档。来源版本和完整许可见[third-party](docs/third-party.md)。
+厂商接口跟随厂商文档，ACP agent的启动命令跟随ACP registry，它的目录随每个版本一起发布；需要精确核对的地方，从厂商客户端里读取事实，但不复制它们的代码。界面控件由本仓库自己实现，键盘行为参照W3C ARIA Authoring Practices、Kobalte和Ark UI的文档。来源版本和完整许可见[third-party](docs/third-party.md)。
 
 随附的`sdd`、`tutor`、`translation`是作者中文skills的英文改编版；`why`、`how`、`blast-radius`改编自Lauren Tan（poteto）的[pstack](https://github.com/cursor/plugins/tree/main/pstack)，`authority-review`改编自同一仓库的Thermos，这四个都保留MIT许可。每个skill的署名和许可见[skills/LICENSES.md](crates/city/skills/LICENSES.md)。
 
