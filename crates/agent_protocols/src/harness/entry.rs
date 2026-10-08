@@ -195,13 +195,20 @@ impl Launcher {
     }
 }
 
+/// A program's file name without its extension, whichever platform's
+/// separators the path was written with: a pasted Windows path is read the
+/// same on every machine.
+pub(super) fn program_stem(program: &str) -> &str {
+    let name = program.rsplit(['/', '\\']).next().unwrap_or(program);
+    match name.rsplit_once('.') {
+        Some((stem, _)) if !stem.is_empty() => stem,
+        Some(_) | None => name,
+    }
+}
+
 /// The package runner a program is, read from its file name.
 fn launcher(program: &str) -> Option<Launcher> {
-    let name = std::path::Path::new(program)
-        .file_stem()
-        .and_then(|stem| stem.to_str())?
-        .to_ascii_lowercase();
-    match name.as_str() {
+    match program_stem(program).to_ascii_lowercase().as_str() {
         "npx" => Some(Launcher::Npx),
         "uvx" => Some(Launcher::Uvx),
         _ => None,

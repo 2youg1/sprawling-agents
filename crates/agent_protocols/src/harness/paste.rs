@@ -16,7 +16,7 @@ use kernel::{AxCode, AxError};
 use serde_json::Value;
 
 use super::catalog::{pairs, registry_entry};
-use super::entry::{AgentEntry, AgentId, AgentSource, Launch};
+use super::entry::{AgentEntry, AgentId, AgentSource, Launch, program_stem};
 
 /// The characters a shell reads as plumbing.
 const SHELL_OPERATORS: [char; 5] = ['|', '&', ';', '<', '>'];
@@ -90,11 +90,7 @@ fn command_line(text: &str) -> Result<AgentEntry, AxError> {
     }
     let mut words = words(text)?.into_iter();
     let program = words.next().ok_or_else(|| refused("nothing was pasted"))?;
-    let name = std::path::Path::new(&program)
-        .file_stem()
-        .and_then(|stem| stem.to_str())
-        .unwrap_or(program.as_str())
-        .to_owned();
+    let name = program_stem(&program).to_owned();
     Ok(AgentEntry {
         id: AgentId::parse(&id_of(&name))?,
         name,

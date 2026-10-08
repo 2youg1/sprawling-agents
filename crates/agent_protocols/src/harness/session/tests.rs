@@ -191,7 +191,11 @@ fn a_turn_hands_back_what_the_agent_reported_and_answers_what_it_asked() {
     let wire = agent.join().unwrap();
     assert_eq!(
         wire[0]["params"]["clientCapabilities"],
-        json!({ "fs": { "readTextFile": false, "writeTextFile": false }, "terminal": false })
+        json!({
+            "fs": { "readTextFile": false, "writeTextFile": false },
+            "terminal": false,
+            "auth": { "terminal": true }
+        })
     );
     assert_eq!(
         wire[1]["params"],
