@@ -164,21 +164,27 @@ number appears in this sentence.
 
 ```depmap
 kernel:
-storage: kernel
-gateway: kernel
-runtime: kernel, storage, gateway, desktop_ffi
+child:
+storage: kernel, child
+gateway: kernel, child
+runtime: kernel, storage, gateway, desktop_ffi, child
 collab: kernel, storage
 city: kernel
 browser: kernel
 documents: kernel
-agent_protocols: kernel, gateway
+agent_protocols: kernel, gateway, child
 wire: kernel, documents
-remote_access: kernel
+remote_access: kernel, child
 accounting: kernel, storage, gateway, runtime, collab, city, agent_protocols, wire, documents
-sprawling: kernel, storage, gateway, runtime, collab, city, browser, agent_protocols, wire, accounting, desktop, desktop_ffi, remote_access
-desktop: kernel, agent_protocols, desktop_ffi
-desktop_ffi:
+sprawling: kernel, storage, gateway, runtime, collab, city, browser, agent_protocols, wire, accounting, desktop, desktop_ffi, remote_access, child
+desktop: kernel, agent_protocols, desktop_ffi, child
+desktop_ffi: child
 ```
+
+The `child` row is empty on purpose: `child::command` is the one place a
+child process is configured (detached from the city's console, in its own
+process group, the city's secrets removed from its environment), so every
+unit that starts one may name it and it names nothing (`crates/child/Spec.lean`).
 
 The `desktop_ffi` row is the desktop server's FFI seam (`crates/desktop/ffi`),
 the one member whose lint table is its own: it is the workspace's table with
