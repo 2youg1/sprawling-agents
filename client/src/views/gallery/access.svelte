@@ -7,8 +7,9 @@
   // The ways in and the agents that come in, in every state they take:
   // the ACP agents page at rest, with a paste read by the city, and with
   // no detected agent; the pairing page for a first browser and after a
-  // used link; and the paired browsers on this machine, from the remote
-  // door, and with none.
+  // used link; the paired browsers on this machine, from the remote
+  // door, and with none; and the /quit question with no run going, with
+  // runs going, and from the remote door.
 
   import type { AgentCatalogAnswer, AgentOffer, DeviceLine } from "../../wire";
   import { B3Hash, DeviceId, TimeMs } from "../../wire";
@@ -100,6 +101,8 @@
   import type { Lang } from "../../core/lang";
   import { ui } from "../../ui";
   import Pairing from "../pairing.svelte";
+  import { quitOf } from "../quit";
+  import QuitSheet from "../quit_sheet.svelte";
   import Devices from "../settings/devices_list.svelte";
   import { readingOf } from "../setup/agents";
   import Agents from "../setup/agents_page.svelte";
@@ -167,4 +170,13 @@
 </Case>
 <Case label="paired browsers · none">
   <Devices devices={[]} here={null} now={NOW} local onForget={still} />
+</Case>
+<Case label="quit · no run going">
+  <QuitSheet look={quitOf({ runs: 0, here: "http://127.0.0.1:8787" })} seat="specimen" open onCancel={still} onClose={still} />
+</Case>
+<Case label="quit · three runs going">
+  <QuitSheet look={quitOf({ runs: 3, here: "http://127.0.0.1:8787" })} seat="specimen" open onCancel={still} onClose={still} />
+</Case>
+<Case label="quit · from the remote door">
+  <QuitSheet look={quitOf({ runs: 3, here: "https://city.example" })} seat="specimen" open onCancel={still} onClose={still} />
 </Case>
