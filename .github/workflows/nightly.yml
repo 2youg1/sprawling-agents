@@ -38,7 +38,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: install pinned toolchain and nightly
         run: |
           rustup show
@@ -46,7 +46,7 @@ jobs:
       # install-action carries no recipe for cargo-fuzz and falls back to
       # cargo-binstall, which fetches the musl build. Which is fine, and
       # is also why the next step names a target.
-      - uses: taiki-e/install-action@v2
+      - uses: taiki-e/install-action@f7e5d7c961414b23f5b25b2da9294395d08513ad # v2
         with:
           tool: cargo-fuzz
       # Three things this loop had to learn, each from a red night.
@@ -131,14 +131,14 @@ jobs:
     timeout-minutes: 60
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: install pinned toolchain
         run: rustup show
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c # v2
         with:
           shared-key: autoharness
           save-if: ${{ github.ref == 'refs/heads/main' }}
-      - uses: actions/cache@v6
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         id: kani-cache
         with:
           path: |
@@ -207,7 +207,7 @@ jobs:
       # The full log, counterexample traces included: the summary holds
       # the headline, and the trace is what a person needs to write the
       # harness that turns a lead into a proposition.
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
           name: autoharness-report
@@ -224,8 +224,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v7
-      - uses: taiki-e/install-action@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: taiki-e/install-action@f7e5d7c961414b23f5b25b2da9294395d08513ad # v2
         with:
           tool: cargo-deny
       - name: what has been published against what we depend on

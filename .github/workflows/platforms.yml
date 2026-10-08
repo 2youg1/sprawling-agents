@@ -58,7 +58,7 @@ jobs:
     outputs:
       verdict: ${{ steps.head.outputs.verdict }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - id: head
         shell: bash
         run: |
@@ -91,12 +91,12 @@ jobs:
     steps:
       # `guard` reads one commit and its parent; ci.yml
       # gives the reasoning.
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 2
       - name: install pinned toolchain
         run: rustup show
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c # v2
         with:
           workspaces: . -> target
       # What the npm and render gates judge. This job repeats the commands
@@ -144,7 +144,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: the release rust-version names
         id: floor
         shell: bash
@@ -187,18 +187,18 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: install pinned toolchain
         run: rustup show
       # The Zig the desktop's leaf is built with; every Windows build of
       # `sprawling` compiles it (`crates/desktop/Spec.lean` section 8-12).
       - uses: ./.github/actions/zig
-      - uses: Swatinem/rust-cache@v2
-      - uses: oven-sh/setup-bun@v2
-      - uses: taiki-e/install-action@v2
+      - uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c # v2
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+      - uses: taiki-e/install-action@f7e5d7c961414b23f5b25b2da9294395d08513ad # v2
         with:
           tool: just
-      - uses: actions/cache@v6
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ~/.bun/install/cache
           key: bun-${{ runner.os }}-${{ hashFiles('client/bun.lock') }}
@@ -230,8 +230,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v7
-      - uses: cachix/install-nix-action@v31
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: cachix/install-nix-action@b85815f71a6de0ddee80b8a80a98d43f4bcc66c7 # v31
         with:
           extra_nix_config: |
             experimental-features = nix-command flakes
@@ -274,7 +274,7 @@ jobs:
           program=$(jq -r .mainProgram "$NIX_LAYOUT")
           SPRAWLING_BIN="$PWD/result/bin/$program" nix develop --command lake exe acceptance version "$name" "$version"
           nix develop --command just acceptance target/nix-acceptance.zip
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
           name: nix-acceptance

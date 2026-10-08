@@ -24,13 +24,13 @@ jobs:
       CARGO_INCREMENTAL: "0"
       SPRAWLING_DISPOSABLE_NATIVE: "1"
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: ./.github/actions/zig
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c # v2
         with:
           shared-key: windows-native-runtime
           save-if: false
-      - uses: taiki-e/install-action@v2
+      - uses: taiki-e/install-action@f7e5d7c961414b23f5b25b2da9294395d08513ad # v2
         with:
           tool: cargo-nextest
       - name: Record exact source
@@ -133,7 +133,7 @@ jobs:
         shell: pwsh
         run: |
           Get-ChildItem target/debug/deps/runtime-*.exe,target/debug/deps/exec_builds-*.exe | Get-FileHash -Algorithm SHA256 | Select-Object Hash,Path | ConvertTo-Json | Out-File -Encoding utf8 native-evidence/binaries.json
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
           name: native-windows-${{ github.sha }}

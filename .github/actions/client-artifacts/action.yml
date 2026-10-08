@@ -20,7 +20,7 @@ description: >-
 runs:
   using: composite
   steps:
-    - uses: oven-sh/setup-bun@v2
+    - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
     # On Windows bun downloads into the work drive that holds the checkout
     # and restores no cache. Unpacking the 88 MB cache entry into the user
     # profile on the system drive took 30 s; on the work drive it took
@@ -32,7 +32,7 @@ runs:
       run: '"BUN_INSTALL_CACHE_DIR=$(Join-Path $env:RUNNER_TEMP bun-cache)" >> $env:GITHUB_ENV'
     # bun's global download directory, keyed by the lockfile: the same
     # lockfile wants the same bytes, so an exact hit skips the registry.
-    - uses: actions/cache@v6
+    - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
       if: runner.os != 'Windows'
       with:
         path: ~/.bun/install/cache
@@ -40,7 +40,7 @@ runs:
         restore-keys: bun-${{ runner.os }}-
     # The recipe runner, because the command below is a recipe. Jobs that
     # already install it pay nothing: the action is a no-op on a hit.
-    - uses: taiki-e/install-action@v2
+    - uses: taiki-e/install-action@f7e5d7c961414b23f5b25b2da9294395d08513ad # v2
       with:
         tool: just
     - name: build the client bundle the render and npm gates judge

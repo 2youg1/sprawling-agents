@@ -128,8 +128,8 @@ jobs:
     outputs:
       proof: ${{ steps.filter.outputs.proof }}
     steps:
-      - uses: actions/checkout@v7
-      - uses: dorny/paths-filter@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4
         id: filter
         with:
           filters: |
@@ -151,7 +151,7 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
       - uses: ./.github/actions/toolchain
@@ -161,11 +161,11 @@ jobs:
       - uses: ./.github/actions/zig
         with:
           cache: true
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c # v2
         with:
           shared-key: gates
           save-if: ${{ github.ref == 'refs/heads/main' }}
-      - uses: taiki-e/install-action@v2
+      - uses: taiki-e/install-action@f7e5d7c961414b23f5b25b2da9294395d08513ad # v2
         with:
           tool: just
       - name: native payloads in system channel validation
@@ -247,8 +247,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v7
-      - uses: taiki-e/install-action@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: taiki-e/install-action@f7e5d7c961414b23f5b25b2da9294395d08513ad # v2
         with:
           tool: just
       - uses: ./.github/actions/lean
@@ -259,7 +259,7 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: ./.github/actions/toolchain
       # The Zig the desktop's leaf is built with; every Windows build of
       # `sprawling` compiles it (`crates/desktop/Spec.lean` section 8-12).
@@ -268,11 +268,11 @@ jobs:
       # aws-lc-sys and libgit2, which are C. A key per job, because
       # check-mode metadata and real rlibs are different artifacts and one
       # key would make two jobs overwrite each other's cache all day.
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c # v2
         with:
           shared-key: clippy
           save-if: ${{ github.ref == 'refs/heads/main' }}
-      - uses: taiki-e/install-action@v2
+      - uses: taiki-e/install-action@f7e5d7c961414b23f5b25b2da9294395d08513ad # v2
         with:
           tool: just
       - name: clippy
@@ -307,16 +307,16 @@ jobs:
       CARGO_PROFILE_TEST_DEBUG: line-tables-only
       CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER: rust-lld.exe
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: ./.github/actions/toolchain
       # The Zig the desktop's leaf is built with; every Windows build of
       # `sprawling` compiles it (`crates/desktop/Spec.lean` section 8-12).
       - uses: ./.github/actions/zig
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c # v2
         with:
           shared-key: test
           save-if: ${{ github.ref == 'refs/heads/main' }}
-      - uses: taiki-e/install-action@v2
+      - uses: taiki-e/install-action@f7e5d7c961414b23f5b25b2da9294395d08513ad # v2
         with:
           tool: cargo-nextest,just
       # The binary embeds the bundle, so the archive carries the one a
@@ -331,14 +331,14 @@ jobs:
           set -euo pipefail
           just test-slice-plan target/nextest-archive.tar.zst target/test-slices
           echo "slices=$(cat target/test-slices/matrix.json)" >> "$GITHUB_OUTPUT"
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
           name: test-slice-coverage
           path: target/test-slices
           retention-days: 1
           if-no-files-found: error
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: nextest-archive
           path: target/nextest-archive.tar.zst
@@ -359,12 +359,12 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJSON(needs.test-build.outputs.slices) }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: ./.github/actions/toolchain
       # trybuild compiles `sprawling-runtime`, which builds the Zig leaf.
       - uses: ./.github/actions/zig
         if: matrix.environment == 'compile'
-      - uses: taiki-e/install-action@v2
+      - uses: taiki-e/install-action@f7e5d7c961414b23f5b25b2da9294395d08513ad # v2
         with:
           tool: cargo-nextest,just
       # The trybuild suites are cold rather than slow: one suite is 21.4s
@@ -372,7 +372,7 @@ jobs:
       # scratch is cached on its own. trybuild gives every suite one
       # target directory, `target/tests/trybuild`, so the one slice that
       # runs them all keeps one entry.
-      - uses: actions/cache/restore@v6
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         if: matrix.environment == 'compile'
         id: trybuild-scratch
         with:
@@ -383,7 +383,7 @@ jobs:
       # refuse when it is missing, which is what a bare runner has.
       - uses: ./.github/actions/client-artifacts
         if: matrix.environment == 'client'
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: nextest-archive
           path: target
@@ -393,7 +393,7 @@ jobs:
           TEST_FILTER: ${{ matrix.filter }}
         shell: bash
         run: just test-slice target/nextest-archive.tar.zst "$TEST_ENVIRONMENT" "$TEST_FILTER"
-      - uses: actions/cache/save@v6
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         if: ${{ matrix.environment == 'compile' && github.ref == 'refs/heads/main' && steps.trybuild-scratch.outputs.cache-hit != 'true' }}
         with:
           path: target/tests
@@ -426,13 +426,13 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest]
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: ./.github/actions/toolchain
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c # v2
         with:
           shared-key: core
           save-if: ${{ github.ref == 'refs/heads/main' }}
-      - uses: taiki-e/install-action@v2
+      - uses: taiki-e/install-action@f7e5d7c961414b23f5b25b2da9294395d08513ad # v2
         with:
           tool: cargo-nextest,just
       - name: the macOS sandbox mechanism supplied by this runner
@@ -445,7 +445,7 @@ jobs:
           command -v sandbox-exec > target/platform-evidence/sandbox-exec-path.txt
           MANPAGER=cat PAGER=cat man sandbox-exec | col -b > target/platform-evidence/sandbox-exec.txt
           test -s target/platform-evidence/sandbox-exec.txt
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always() && runner.os == 'macOS'
         with:
           name: macos-mechanism-${{ github.sha }}-${{ github.run_attempt }}
@@ -455,7 +455,7 @@ jobs:
       # reason: cold, the five trybuild suites are most of this job's
       # test run (219 s for one of them on macOS). Restored after the
       # Rust cache, which never holds `target/tests` (see below).
-      - uses: actions/cache/restore@v6
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         id: trybuild-scratch
         with:
           path: target/tests
@@ -463,7 +463,7 @@ jobs:
           restore-keys: trybuild-${{ runner.os }}-core-
       - name: clippy and the suite of the core packages
         run: just check-core
-      - uses: actions/cache/save@v6
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         if: ${{ github.ref == 'refs/heads/main' && steps.trybuild-scratch.outputs.cache-hit != 'true' }}
         with:
           path: target/tests
@@ -484,8 +484,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v7
-      - uses: taiki-e/install-action@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: taiki-e/install-action@f7e5d7c961414b23f5b25b2da9294395d08513ad # v2
         with:
           tool: cargo-deny,just
       - name: licences, bans and sources
@@ -498,12 +498,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v7
-      - uses: oven-sh/setup-bun@v2
-      - uses: taiki-e/install-action@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+      - uses: taiki-e/install-action@f7e5d7c961414b23f5b25b2da9294395d08513ad # v2
         with:
           tool: just
-      - uses: actions/cache@v6
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ~/.bun/install/cache
           key: bun-${{ runner.os }}-${{ hashFiles('client/bun.lock') }}
@@ -528,20 +528,20 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       # Not `./.github/actions/toolchain`: the kani cache below was
       # written against the image's own rustup and Cargo homes, and
       # moving them under kani is a change nobody has measured.
       - name: install pinned toolchain
         run: rustup show
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c # v2
         with:
           shared-key: proof
           save-if: ${{ github.ref == 'refs/heads/main' }}
       # kani's own toolchain is hundreds of megabytes and changes when the
       # pin changes and at no other time, so the pin file is the whole key.
       # `nightly.yml` reads the same pin.
-      - uses: actions/cache@v6
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         id: kani-cache
         with:
           path: |

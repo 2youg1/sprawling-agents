@@ -44,7 +44,7 @@ jobs:
       SPRAWLING_BIN: ${{ github.workspace }}/target/debug/sprawling
       SPRAWLING_SEED: ${{ inputs.seed || github.run_number }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       # `sprawling` reaches `keyring`, whose Linux backend is secret-service and
       # whose build wants dbus headers this runner does not carry. nightly.yml
