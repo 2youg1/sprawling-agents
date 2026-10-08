@@ -3,55 +3,88 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The official harnesses this city drives, and how each is started as
-//! an ACP agent (`crates/agent_protocols/Spec.lean` §8-19).
+//! Which agent a word names: the rows the person added, and the five
+//! official harnesses as built-in entries (`crates/agent_protocols/Spec.lean`
+//! §8-19, D12).
 //!
-//! **The roster is the person's ruling.** Five harnesses and no more: a
-//! sixth is added by a ruling, not because the ACP registry grew a row.
-//!
-//! **How each starts is read from the ACP registry**
-//! (`agentclientprotocol/registry`, one `agent.json` per agent, watched
-//! in `docs/third-party.md` section 1), with every version pinned: an
-//! unpinned `npx` fetches whatever npm holds on the day it runs.
+//! A built-in entry records what the registry does not: the word it has
+//! always travelled under, the directories its vendor documents and the
+//! vendor's sign-in page. How it starts is the catalog snapshot's row for
+//! its registry id, so a version is pinned in one place.
 
-/// One official harness.
+use kernel::{AxError, B3Hash};
+
+use super::catalog::Catalog;
+use super::entry::{AgentEntry, AgentId, Consented};
+
+/// One official harness: a built-in catalog entry.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Harness {
-    /// OpenAI's Codex, through the registry's `codex-acp` adapter.
-    Codex,
-    /// Anthropic's Claude Code, through the registry's `claude-acp`
-    /// adapter.
-    ClaudeCode,
-    /// xAI's Grok Build, which speaks ACP itself.
-    GrokBuild,
-    /// Moonshot's Kimi Code CLI, which speaks ACP itself.
-    KimiCode,
-    /// Pi, through the registry's `pi-acp` adapter.
-    Pi,
+pub struct Official {
+    /// The word `[resident] harness` names it by.
+    pub word: &'static str,
+    /// Its id in the ACP registry, whose row says how it starts.
+    pub registry_id: &'static str,
+    /// The directories whose presence says it is installed or signed in
+    /// (`crates/wire/spec/Answer/Harnesses.lean` D23). Each row cites its
+    /// vendor page; an empty table reads as "not looked for".
+    pub set_up: &'static [SetUpDir],
+    /// Where its vendor says how a person signs in.
+    pub docs: &'static str,
 }
 
-/// The program an ACP agent is started with.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Program {
-    /// Node's package runner, which fetches the pinned package.
-    Npx,
-    /// Kimi Code's own binary, installed by the person.
-    Kimi,
-}
-
-impl Program {
-    /// The name the search path is asked for. Node installs `npx` as a
-    /// batch file on Windows, which a process cannot be started from
-    /// under its bare name.
-    #[must_use]
-    pub const fn name(self) -> &'static str {
-        match self {
-            Program::Npx if cfg!(windows) => "npx.cmd",
-            Program::Npx => "npx",
-            Program::Kimi => "kimi",
-        }
-    }
-}
+/// The five official harnesses, in the order the harness page shows them.
+pub const OFFICIAL: [Official; 5] = [
+    Official {
+        word: "claude_code",
+        registry_id: "claude-acp",
+        set_up: &[SetUpDir {
+            variable: Some("CLAUDE_CONFIG_DIR"),
+            under_home: &[".claude"],
+            source: "https://code.claude.com/docs/en/settings",
+        }],
+        docs: "https://code.claude.com/docs/en/authentication",
+    },
+    Official {
+        word: "codex",
+        registry_id: "codex-acp",
+        set_up: &[SetUpDir {
+            variable: Some("CODEX_HOME"),
+            under_home: &[".codex"],
+            source: "https://developers.openai.com/codex/auth",
+        }],
+        docs: "https://developers.openai.com/codex/auth",
+    },
+    Official {
+        word: "grok_build",
+        registry_id: "grok-build",
+        set_up: &[SetUpDir {
+            variable: Some("GROK_HOME"),
+            under_home: &[".grok"],
+            source: "https://docs.x.ai/build/settings/reference",
+        }],
+        docs: "https://docs.x.ai/build/overview",
+    },
+    Official {
+        word: "kimi_code",
+        registry_id: "kimi",
+        set_up: &[SetUpDir {
+            variable: Some("KIMI_CODE_HOME"),
+            under_home: &[".kimi-code"],
+            source: "https://moonshotai.github.io/kimi-code/en/configuration/data-locations",
+        }],
+        docs: "https://www.kimi.com/en/help/kimi-code/membership-guide",
+    },
+    Official {
+        word: "pi",
+        registry_id: "pi-acp",
+        set_up: &[SetUpDir {
+            variable: Some("PI_CODING_AGENT_DIR"),
+            under_home: &[".pi", "agent"],
+            source: "https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/environment-variables.md",
+        }],
+        docs: "https://github.com/svkozak/pi-acp",
+    },
+];
 
 /// One directory a harness writes once it is installed or signed in, as
 /// its vendor documents it.
@@ -94,133 +127,87 @@ impl SetUpDir {
     }
 }
 
-/// One command that starts a harness as an ACP agent on stdio.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Launch {
-    pub program: Program,
-    pub args: &'static [&'static str],
+/// Every agent a word can name in this city: the city's `[[agent]]` rows,
+/// each with the digest its consent recorded, and the catalog the
+/// built-in entries start from.
+#[derive(Debug, Clone)]
+pub struct Roster {
+    rows: Vec<(AgentEntry, Option<B3Hash>)>,
+    catalog: Catalog,
 }
 
-impl Harness {
-    /// Every harness, in the order the page shows them.
-    pub const ALL: [Harness; 5] = [
-        Harness::ClaudeCode,
-        Harness::Codex,
-        Harness::GrokBuild,
-        Harness::KimiCode,
-        Harness::Pi,
-    ];
+/// Why a word seats nobody.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Unseated {
+    /// No row and no built-in entry travels under the word; the caller
+    /// writes the refusal, because it knows where the word was written.
+    Unknown,
+    /// A row whose launch changed after its consent.
+    Refused(AxError),
+}
 
-    /// The word this harness travels under.
+impl Roster {
     #[must_use]
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Harness::Codex => "codex",
-            Harness::ClaudeCode => "claude_code",
-            Harness::GrokBuild => "grok_build",
-            Harness::KimiCode => "kimi_code",
-            Harness::Pi => "pi",
-        }
+    pub fn new(rows: Vec<(AgentEntry, Option<B3Hash>)>, catalog: Catalog) -> Roster {
+        Roster { rows, catalog }
     }
 
-    /// The command that starts this harness as an ACP agent.
+    /// A built-in entry as the catalog starts it, under its own word.
+    /// `None` when the snapshot has no row this platform can start.
     #[must_use]
-    pub const fn launch(self) -> Launch {
-        match self {
-            Harness::ClaudeCode => Launch {
-                program: Program::Npx,
-                args: &["-y", "@agentclientprotocol/claude-agent-acp@0.86.0"],
-            },
-            Harness::Codex => Launch {
-                program: Program::Npx,
-                args: &["-y", "@agentclientprotocol/codex-acp@2.1.1"],
-            },
-            Harness::GrokBuild => Launch {
-                program: Program::Npx,
-                args: &["-y", "@xai-official/grok@1.0.50", "agent", "stdio"],
-            },
-            Harness::KimiCode => Launch {
-                program: Program::Kimi,
-                args: &["acp"],
-            },
-            Harness::Pi => Launch {
-                program: Program::Npx,
-                args: &["-y", "pi-acp@0.0.34"],
-            },
-        }
+    pub fn builtin(&self, official: &Official) -> Option<AgentEntry> {
+        let row = self.catalog.find(official.registry_id)?;
+        Some(AgentEntry {
+            id: AgentId::official(official.word),
+            ..row.clone()
+        })
     }
 
-    /// The directories whose presence says this harness is installed or
-    /// signed in on this machine (`crates/wire/spec/Answer/Harnesses.lean`
-    /// D23).
+    /// The consented agent `word` names: a row the person added first,
+    /// then a built-in entry.
     ///
-    /// Each row is read from the vendor page it cites. A harness whose
-    /// vendor documents no such directory has an empty table, which the
-    /// harness page reads as "not looked for" rather than "not there".
-    #[must_use]
-    pub const fn set_up(self) -> &'static [SetUpDir] {
-        match self {
-            Harness::ClaudeCode => &[SetUpDir {
-                variable: Some("CLAUDE_CONFIG_DIR"),
-                under_home: &[".claude"],
-                source: "https://code.claude.com/docs/en/settings",
-            }],
-            Harness::Codex => &[SetUpDir {
-                variable: Some("CODEX_HOME"),
-                under_home: &[".codex"],
-                source: "https://developers.openai.com/codex/auth",
-            }],
-            Harness::Pi => &[SetUpDir {
-                variable: Some("PI_CODING_AGENT_DIR"),
-                under_home: &[".pi", "agent"],
-                source: "https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/environment-variables.md",
-            }],
-            Harness::GrokBuild => &[SetUpDir {
-                variable: Some("GROK_HOME"),
-                under_home: &[".grok"],
-                source: "https://docs.x.ai/build/settings/reference",
-            }],
-            Harness::KimiCode => &[SetUpDir {
-                variable: Some("KIMI_CODE_HOME"),
-                under_home: &[".kimi-code"],
-                source: "https://moonshotai.github.io/kimi-code/en/configuration/data-locations",
-            }],
+    /// # Errors
+    /// [`Unseated::Unknown`] for a word nothing travels under, and
+    /// [`Unseated::Refused`] for a row whose recorded digest is not its
+    /// launch's.
+    pub fn seat(&self, word: &str) -> Result<Consented, Unseated> {
+        if let Some((entry, digest)) = self
+            .rows
+            .iter()
+            .find(|(entry, _)| entry.id.as_str() == word)
+        {
+            return match digest {
+                Some(digest) => Consented::given(entry.clone(), digest).map_err(Unseated::Refused),
+                None => Ok(Consented::written_by_hand(entry.clone())),
+            };
         }
+        OFFICIAL
+            .iter()
+            .find(|official| official.word == word)
+            .and_then(|official| self.builtin(official))
+            .map(Consented::written_by_hand)
+            .ok_or(Unseated::Unknown)
     }
 
-    /// This harness's id in the ACP registry.
+    /// Every word that seats an agent, rows first, for a refusal's
+    /// `nearby`.
     #[must_use]
-    pub const fn registry_id(self) -> &'static str {
-        match self {
-            Harness::ClaudeCode => "claude-acp",
-            Harness::Codex => "codex-acp",
-            Harness::GrokBuild => "grok-build",
-            Harness::KimiCode => "kimi",
-            Harness::Pi => "pi-acp",
-        }
+    pub fn words(&self) -> Vec<String> {
+        self.rows
+            .iter()
+            .map(|(entry, _)| entry.id.as_str().to_owned())
+            .chain(OFFICIAL.iter().map(|official| official.word.to_owned()))
+            .collect()
     }
 
-    /// The harness a word names, the inverse of [`Harness::as_str`]. A
-    /// word no harness travels under is `None`; the caller writes the
-    /// refusal, because it knows where the word was written.
-    #[must_use]
-    pub fn parse(word: &str) -> Option<Harness> {
-        Harness::ALL
-            .into_iter()
-            .find(|harness| harness.as_str() == word)
+    /// The rows the person added.
+    pub fn rows(&self) -> impl Iterator<Item = &AgentEntry> {
+        self.rows.iter().map(|(entry, _)| entry)
     }
 
-    /// Where this harness's own vendor says how a person signs in. The
-    /// person signs in inside the harness; the city never does.
     #[must_use]
-    pub const fn docs(self) -> &'static str {
-        match self {
-            Harness::ClaudeCode => "https://code.claude.com/docs/en/authentication",
-            Harness::Codex => "https://developers.openai.com/codex/auth",
-            Harness::GrokBuild => "https://docs.x.ai/build/overview",
-            Harness::KimiCode => "https://www.kimi.com/en/help/kimi-code/membership-guide",
-            Harness::Pi => "https://github.com/svkozak/pi-acp",
-        }
+    pub fn catalog(&self) -> &Catalog {
+        &self.catalog
     }
 }
 
@@ -229,33 +216,11 @@ impl Harness {
 mod tests {
     use super::*;
 
-    /// Every `npx` launch names a version: without one, npm hands over
-    /// whatever it holds on the day the harness starts.
-    #[test]
-    fn every_package_a_harness_is_fetched_as_is_pinned_to_a_version() {
-        for harness in Harness::ALL {
-            let launch = harness.launch();
-            if launch.program == Program::Npx {
-                let package = launch
-                    .args
-                    .iter()
-                    .find(|arg| !arg.starts_with('-'))
-                    .unwrap();
-                let (_, version) = package.rsplit_once('@').unwrap();
-                assert!(
-                    version.chars().next().unwrap().is_ascii_digit(),
-                    "{} starts {package}",
-                    harness.as_str()
-                );
-            }
-        }
-    }
-
     /// A variable the vendor documents moves the directory; an empty one
     /// is unset, and with neither a variable nor a home there is no path.
     #[test]
     fn a_set_up_directory_is_moved_by_its_variable_and_otherwise_under_home() {
-        let row = Harness::Pi.set_up()[0];
+        let row = OFFICIAL[4].set_up[0];
         let home = std::path::Path::new("home");
         assert_eq!(
             [
@@ -271,21 +236,5 @@ mod tests {
                 None,
             ]
         );
-    }
-
-    #[test]
-    fn every_word_names_its_harness_and_no_other_word_names_one() {
-        for harness in Harness::ALL {
-            assert_eq!(Harness::parse(harness.as_str()), Some(harness));
-        }
-        assert_eq!(Harness::parse("claude"), None);
-    }
-
-    #[test]
-    fn every_harness_travels_under_its_own_word() {
-        let mut words: Vec<&str> = Harness::ALL.iter().map(|h| h.as_str()).collect();
-        words.sort_unstable();
-        words.dedup();
-        assert_eq!(words.len(), Harness::ALL.len());
     }
 }

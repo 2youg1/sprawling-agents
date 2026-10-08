@@ -50,6 +50,7 @@ pub use check::{Finding, Position, Report, check};
 pub use city_tool::CityTool;
 pub use config_layers::path as config_path;
 pub use config_layers::write_second_threshold;
+pub use config_layers::{AgentRow, AgentRowSource, agent_rows};
 pub use config_layers::{CitySetting, write_city_setting};
 pub use config_layers::{ConfigLayer, Layer, load as load_config};
 pub use config_layers::{HostPermanence, RemoteRoute, remote_route};

@@ -18,7 +18,7 @@ use std::path::{Path, PathBuf};
 use std::process::ChildStdin;
 use std::sync::Arc;
 
-use agent_protocols::{AcpSession, Answer, Harness, HarnessProcess, Listener};
+use agent_protocols::{AcpSession, Answer, Consented, HarnessProcess, Listener};
 use kernel::event::Who;
 use kernel::{Address, AxError, Completion, Ledger, Locator, Payload, RunId, TimeMs};
 use runtime::run::{Charter, Conclusion, HarnessRun};
@@ -39,14 +39,14 @@ pub(crate) type Prompting =
 /// A closure rather than a trait: the second implementation is the
 /// tests', which play the agent over a pipe.
 pub(crate) type StartHarness =
-    Arc<dyn Fn(Harness, &Path) -> Result<Prompting, AxError> + Send + Sync>;
+    Arc<dyn Fn(&Consented, &Path) -> Result<Prompting, AxError> + Send + Sync>;
 
 /// The harnesses this machine starts: the vendor's own program, in the
 /// room's tree, through `agent_protocols::HarnessProcess`.
 pub(in crate::worker) fn on_this_machine() -> StartHarness {
     Arc::new(
-        |harness: Harness, cwd: &Path| -> Result<Prompting, AxError> {
-            let (process, session) = HarnessProcess::start(harness, cwd)?;
+        |agent: &Consented, cwd: &Path| -> Result<Prompting, AxError> {
+            let (process, session) = HarnessProcess::start(agent, cwd)?;
             let mut seated = Seated {
                 session,
                 _process: process,
@@ -116,7 +116,7 @@ impl Chartered {
 /// What one harness drive is handed, owned so it can leave the thread
 /// that staged it.
 pub(in crate::worker) struct HarnessHalf {
-    pub(in crate::worker) harness: Harness,
+    pub(in crate::worker) harness: Consented,
     pub(in crate::worker) start: StartHarness,
     pub(in crate::worker) chartered: Chartered,
     pub(in crate::worker) building: city::Building,
@@ -241,7 +241,7 @@ fn drive_turn<L: Ledger>(
     )?;
     let root = tree.path().to_path_buf();
     *lease = Some(tree);
-    let mut prompting = (half.start)(half.harness, &root)?;
+    let mut prompting = (half.start)(&half.harness, &root)?;
     let mut now = || clock.now();
     let run = HarnessRun::open(half.chartered.charter(), &mut *ledger, &mut now)?;
     let deadline = TimeMs::new(clock.now()?.value().saturating_add(half.ceiling_ms));

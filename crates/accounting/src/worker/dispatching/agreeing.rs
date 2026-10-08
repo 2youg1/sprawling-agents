@@ -146,7 +146,12 @@ impl RunWorker {
         };
         if let Some((word, layer)) = city::settled_harness(&self.city_root, judged)? {
             let file = city::config_path(&self.city_root, judged, layer)?;
-            let harness = seated_harness(at, &word, &rules, &file)?;
+            let roster = crate::roster::roster(&self.city_root)?;
+            let named = Named {
+                word: &word,
+                file: &file,
+            };
+            let harness = seated_harness(at, named, &rules, &roster)?;
             return Ok(Seat::Harness(HarnessSeat {
                 building,
                 rules,
@@ -299,38 +304,45 @@ impl RunWorker {
     }
 }
 
-/// The harness a room's configuration names, or the refusal a dispatch
-/// to it is owed before anything is written: a spelling that names none
-/// of the five, a confidential building, and a dispatch that named a
-/// model (`crates/sprawling/Spec.lean` §8-124). `file` is the layer that named it,
-/// which is where a person changes it.
+/// The word a room's configuration names its resident by, and the layer
+/// file that wrote it, which is where a person changes it.
+struct Named<'a> {
+    word: &'a str,
+    file: &'a std::path::Path,
+}
+
+/// The agent a room's configuration names, or the refusal a dispatch to
+/// it is owed before anything is written: a word that names no agent, a
+/// row changed after its consent, a confidential building, and a dispatch
+/// that named a model (`crates/sprawling/Spec.lean` §8-124).
 fn seated_harness(
     at: &Assignment,
-    word: &str,
+    named: Named<'_>,
     rules: &city::BuildingRules,
-    file: &std::path::Path,
-) -> Result<agent_protocols::Harness, AxError> {
+    roster: &agent_protocols::Roster,
+) -> Result<agent_protocols::Consented, AxError> {
+    let Named { word, file } = named;
     let subject = |named: &str| format!("{}: {named}", at.addr.as_str());
-    let Some(harness) = agent_protocols::Harness::parse(word) else {
-        return Err(
-            AxError::failure(AxCode::ConfigInvalid, "dispatch work", subject(word))
-                .with_nearby(
-                    agent_protocols::Harness::ALL
-                        .iter()
-                        .map(|known| known.as_str().to_owned())
-                        .collect(),
-                )
-                .with_recovery(format!(
-                    "write one of the five official harnesses under `[resident] harness` in {}",
-                    file.display()
-                )),
-        );
+    let harness = match roster.seat(word) {
+        Ok(agent) => agent,
+        Err(agent_protocols::Unseated::Refused(refusal)) => return Err(refusal),
+        Err(agent_protocols::Unseated::Unknown) => {
+            return Err(
+                AxError::failure(AxCode::ConfigInvalid, "dispatch work", subject(word))
+                    .with_nearby(roster.words())
+                    .with_recovery(format!(
+                        "write the id of an `[[agent]]` row or of a built-in entry under \
+                         `[resident] harness` in {}",
+                        file.display()
+                    )),
+            );
+        }
     };
     if rules.policy().confidential {
         return Err(AxError::failure(
             AxCode::GateDenied,
             "dispatch work",
-            subject(harness.as_str()),
+            subject(harness.entry().id.as_str()),
         )
         .with_recovery(format!(
             "a harness sends the room to its own vendor and a confidential building's data \
@@ -344,7 +356,7 @@ fn seated_harness(
             "dispatch work",
             subject(&format!(
                 "{model} into a room whose resident is {}",
-                harness.as_str()
+                harness.entry().id.as_str()
             )),
         )
         .with_recovery(format!(

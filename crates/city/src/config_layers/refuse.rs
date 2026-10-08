@@ -13,6 +13,7 @@ use std::path::Path;
 use kernel::layout::CONFIG_FILE;
 use kernel::{AxCode, AxError, RESERVED_PREFIX};
 
+use super::agents::AGENT_KEY;
 use super::ladder::Layer;
 use super::remote::REMOTE_KEY;
 use super::resident::{HARNESS_KEY, MODEL_NAME_KEY};
@@ -73,13 +74,17 @@ pub(super) enum Confined {
     /// building's, so a room's choice would govern runs without
     /// appearing anywhere a person looks (`crates/city/spec/ConfigLayers.lean` §8-4c).
     Search,
+    /// An agent row names a program this machine runs as the person, so a
+    /// building or a room that added one would start it for every room
+    /// below (`crates/city/spec/ConfigLayers.lean` §8-4f).
+    Agents,
 }
 
 impl Confined {
     /// The nearest rung this table may be stated on.
     pub(super) fn nearest(self) -> Layer {
         match self {
-            Confined::Shelves | Confined::Remote => Layer::City,
+            Confined::Shelves | Confined::Remote | Confined::Agents => Layer::City,
             Confined::Search => Layer::Building,
         }
     }
@@ -95,6 +100,7 @@ impl Confined {
             Confined::Shelves => SHELVES_KEY,
             Confined::Remote => REMOTE_KEY,
             Confined::Search => SEARCH_KEY,
+            Confined::Agents => AGENT_KEY,
         }
     }
 
@@ -102,6 +108,7 @@ impl Confined {
         match self {
             Confined::Shelves => "a shelf is mounted for every building at once",
             Confined::Remote => "the remote door opens onto the whole city",
+            Confined::Agents => "an agent runs as the person, for every room that names it",
             Confined::Search => {
                 "the settings page shows the city's and each building's choice, and a room's                  would govern runs it never shows"
             }

@@ -120,7 +120,7 @@ fn played(script: Vec<Step>, heard: Arc<Mutex<Heard>>) -> StartHarness {
                 agent_out.flush().unwrap();
             }
         });
-        let name = harness.as_str();
+        let name = harness.entry().id.as_str();
         let lines = agent_protocols::Lines::over(BufReader::new(from_agent), name)?;
         let mut session = agent_protocols::AcpSession::open(lines, to_agent, name, cwd)?;
         Ok(Box::new(
@@ -202,10 +202,10 @@ fn records(ledger: &Path) -> Vec<EventRecord> {
         .collect()
 }
 
-/// A spelling that names none of the five is refused naming the five,
+/// A word that names no agent is refused naming every word that does,
 /// before the room exists.
 #[test]
-fn an_unknown_harness_is_refused_naming_the_five_and_leaves_no_room_behind() {
+fn an_unknown_harness_is_refused_naming_the_known_words_and_leaves_no_room_behind() {
     let (dir, file, _) = city_with("claude");
     let mut worker = worker(dir.path(), never());
 
@@ -219,7 +219,8 @@ fn an_unknown_harness_is_refused_naming_the_five_and_leaves_no_room_behind() {
                         .to_vec()
                 )
                 .with_recovery(format!(
-                    "write one of the five official harnesses under `[resident] harness` in {}",
+                    "write the id of an `[[agent]]` row or of a built-in entry under \
+                     `[resident] harness` in {}",
                     file.display()
                 ))
         )

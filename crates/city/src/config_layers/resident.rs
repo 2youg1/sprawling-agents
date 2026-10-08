@@ -3,12 +3,12 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The `[resident]` table: which official harness a layer names as the
-//! resident of the rooms below it, and which one a room runs.
+//! The `[resident]` table: which ACP agent a layer names as the resident
+//! of the rooms below it, and which one a room runs.
 //!
-//! The five spellings are `agent_protocols::Harness`'s to answer, and
-//! this crate sees only `kernel`, so a name is read as written and
-//! judged where a dispatch is agreed (`crates/sprawling/Spec.lean` §8-4e, rule 10).
+//! Which agent a word names is `agent_protocols::Roster::seat`'s to
+//! answer, and this crate sees only `kernel`, so a name is read as written
+//! and judged where a dispatch is agreed (`crates/sprawling/Spec.lean` §8-4e, rule 10).
 //! This module owns how one layer states it, the rule that a layer
 //! names a model or a harness and never both, and the rule that a
 //! session which opened on a model keeps it until `/new`

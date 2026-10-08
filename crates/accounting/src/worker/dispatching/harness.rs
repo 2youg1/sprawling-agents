@@ -76,7 +76,10 @@ impl RunWorker {
             vec![given.job.clone()],
             given.task.clone(),
             "what the harness did is the run's harness_reported lines".to_owned(),
-            format!("{} took this turn in the room's own tree", harness.as_str()),
+            format!(
+                "{} took this turn in the room's own tree",
+                harness.entry().id.as_str()
+            ),
             "read the request the city opened for the tree, or the tree itself".to_owned(),
         )?;
         let half = HarnessHalf {
