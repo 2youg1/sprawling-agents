@@ -166,9 +166,7 @@ impl BrowserDoor {
             return Guess::TooSoon;
         }
         let paired = auth::verify(Some(word.trim()), &B3Hash::digest(self.code.as_bytes()));
-        if paired {
-            self.code = code_of(&entropy);
-        }
+        self.code = code_of(&entropy);
         self.next_guess = TimeMs::new(now.value().saturating_add(GUESS_INTERVAL_MS));
         if paired { Guess::Paired } else { Guess::Wrong }
     }
