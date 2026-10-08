@@ -8,8 +8,8 @@
 //! explicit ruling. Data only — zero branches by charter.
 //! The part `crates/kernel/spec/ConstsPolicy.lean` specifies this module.
 //!
-//! Five entries carry a type rather than a plain number (`crates/kernel/spec/ConstsPolicy.lean`
-//! §8-8): AUTONOMY_DEFAULT, CLOCK_STAMP_DEFAULT, and the three limits
+//! Six entries carry a type rather than a plain number (`crates/kernel/spec/ConstsPolicy.lean`
+//! §8-8): AUTONOMY_DEFAULT, CLOCK_STAMP_DEFAULT, DEFAULT_EFFORT, and the three limits
 //! whose refusal derives from their type (`crates/kernel/spec/PolicyLimit.lean` §8-73).
 
 /// Exact ratio as an integer pair: kernel decision paths never touch
@@ -216,6 +216,13 @@ pub const CLOCK_STAMP_DEFAULT: crate::config::ClockStampGranularity =
 /// question is the kind a person wants. What a run may *do* is settled
 /// by the gates, which answer from the rules and never ask.
 pub const AUTONOMY_DEFAULT: crate::approval::Autonomy = crate::approval::Autonomy::Owner;
+
+/// The thinking level a request takes when nobody stated one, if the
+/// (Endpoint, model) offers it: a balanced level for a person who never
+/// opened the setting. Whether it is used is `gateway::provider::thinking`'s
+/// answer, which falls back to the upstream's own default when this level
+/// is not offered (`crates/kernel/spec/Model.lean` D56).
+pub const DEFAULT_EFFORT: crate::model::Effort = crate::model::Effort::High;
 
 /// Where a city listens when nobody says otherwise: the loopback
 /// interface, so a city started by a double-click is reachable from the

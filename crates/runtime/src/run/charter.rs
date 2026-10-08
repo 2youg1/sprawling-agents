@@ -112,6 +112,7 @@ impl Charter<'_> {
             naming: self.naming,
             opening: self.opening,
             effort: self.effort,
+            agent: None,
         };
         ledger.append(EventDraft {
             run: self.run,

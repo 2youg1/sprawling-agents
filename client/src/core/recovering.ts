@@ -128,6 +128,8 @@ const RECOVERIES: Readonly<Record<AxCode, readonly Recovery[]>> = {
   E_TAINTED_ACTION: [],
   E_DELEGATION_DEPTH: [],
   E_APPROVAL_PENDING: [],
+  E_AUTH_REQUIRED: [],
+  E_PAIRING_REFUSED: [],
   E_APPROVAL_DENIED: [],
   E_CROSS_BUILDING_DENIED: [],
   E_DIGEST_SUSPECT: [],

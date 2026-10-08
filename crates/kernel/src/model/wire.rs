@@ -175,22 +175,27 @@ impl std::fmt::Display for ModelTag {
 }
 
 /// How hard the provider should think before answering, ordered from
-/// least to most. Both dialects accept every level; they disagree only
-/// on where `None` is written (an effort value on one wire, a separate
-/// thinking field on the other).
+/// least to most, in the upstreams' own words.
 ///
-/// The ladder mirrors the providers' own vocabularies; check theirs
-/// before changing it:
+/// Which of these one (Endpoint, model) offers is the upstream's
+/// statement, answered by `gateway::provider::thinking` and never by a
+/// table here (`crates/kernel/spec/Model.lean` D56); a level outside that
+/// offer is refused, never moved to a neighbour. The ladder mirrors the
+/// providers' vocabularies; check theirs before changing it:
 /// <https://platform.claude.com/docs/en/build-with-claude/effort> and
 /// <https://developers.openai.com/api/docs/guides/reasoning>.
 ///
-/// Absence (`Option::None`) is not `Effort::None`: absence leaves the
-/// choice to the provider, `Effort::None` asks it not to think.
+/// Absence (`Option::None`) is not `Effort::None`: absence means nobody
+/// stated a level and the default rule resolves one
+/// ([`crate::consts_policy::DEFAULT_EFFORT`]). `Effort::None` survives
+/// only so ledgers that asked a provider not to think read back; no
+/// picker offers it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum Effort {
     None,
+    Minimal,
     Low,
     Medium,
     High,
@@ -204,10 +209,11 @@ impl Effort {
     ///
     /// The one list. A refusal that spells the allowed values, a form
     /// that offers them and a document that names them all read this,
-    /// so a seventh setting cannot appear in one of the three and be
+    /// so an eighth setting cannot appear in one of the three and be
     /// missing from the other two.
-    pub const ALL: [Effort; 6] = [
+    pub const ALL: [Effort; 7] = [
         Effort::None,
+        Effort::Minimal,
         Effort::Low,
         Effort::Medium,
         Effort::High,
@@ -220,6 +226,7 @@ impl Effort {
     pub fn as_str(self) -> &'static str {
         match self {
             Effort::None => "none",
+            Effort::Minimal => "minimal",
             Effort::Low => "low",
             Effort::Medium => "medium",
             Effort::High => "high",

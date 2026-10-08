@@ -75,6 +75,7 @@ fn typed_started(parent: Option<RunId>, predecessor: Option<RunId>) -> RunStarte
         naming: None,
         opening: None,
         effort: None,
+        agent: None,
         skills: vec![
             SkillPin {
                 name: "read".to_owned(),

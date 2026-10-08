@@ -347,6 +347,7 @@ fn a_line_a_run_writes_reaches_the_book_the_worker_holds() {
         connection_kind: None,
         probed: false,
         tuning: None,
+        facts_blob: None,
     };
     worker
         .record_for(

@@ -67,10 +67,12 @@ fn empty_answer() -> AxError {
     )
 }
 
-/// This dialect writes every level in one field, `none` included.
+/// This dialect writes every level in one field, `none` and `minimal`
+/// included; which levels a model is sent is the thinking offer's answer.
 fn effort_field(effort: Effort) -> &'static str {
     match effort {
         Effort::None => "none",
+        Effort::Minimal => "minimal",
         Effort::Low => "low",
         Effort::Medium => "medium",
         Effort::High => "high",

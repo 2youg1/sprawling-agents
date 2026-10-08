@@ -56,6 +56,10 @@ const URGENCY: Readonly<Record<AxCode, Urgency>> = {
   E_LOG_VERSION_UNSUPPORTED: "needs_you",
   E_HISTORY_UNPROVEN: "needs_you",
   E_DIGEST_SUSPECT: "needs_you",
+  // An agent waits for its own login, and a door waits for the code
+  // the person reads off the terminal: both are the person's hand.
+  E_AUTH_REQUIRED: "needs_you",
+  E_PAIRING_REFUSED: "needs_you",
   // A refused step inside a run that goes on, or a person's request the
   // city answered: the run or the page carries on without the person.
   E_PATH_NOT_FOUND: "ordinary",

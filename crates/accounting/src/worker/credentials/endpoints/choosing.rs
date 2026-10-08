@@ -180,6 +180,7 @@ mod tests {
             connection_kind: None,
             probed: false,
             tuning: None,
+            facts_blob: None,
         };
         worker
             .record(EventKind::EndpointAttached, Payload::of(&attached).unwrap())
@@ -231,6 +232,7 @@ mod tests {
             connection_kind: None,
             probed: false,
             tuning: None,
+            facts_blob: None,
         };
         worker
             .record(EventKind::EndpointAttached, Payload::of(&attached).unwrap())

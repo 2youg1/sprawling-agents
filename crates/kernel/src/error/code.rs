@@ -101,12 +101,16 @@ pub enum AxCode {
     // the fact is the same one, said by every account
     // (`crates/kernel/spec/AccountRecovery.lean` §8-86).
     ProviderAccountsExhausted,
+    // Admission (2). An ACP agent answered that it needs a login first;
+    // a pairing or open code was refused at this machine's door.
+    AuthRequired,
+    PairingRefused,
 }
 
 impl AxCode {
     /// Every code, in the order the SPEC table lists them. Data face for tests and
     /// `xtask specalign`.
-    pub const ALL: [AxCode; 42] = [
+    pub const ALL: [AxCode; 44] = [
         AxCode::PathNotFound,
         AxCode::ToolUnknown,
         AxCode::ToolUnavailable,
@@ -149,6 +153,8 @@ impl AxCode {
         AxCode::ToolOutcomeUnknown,
         AxCode::PlanMissing,
         AxCode::ProviderAccountsExhausted,
+        AxCode::AuthRequired,
+        AxCode::PairingRefused,
     ];
 
     /// The wire spelling. Sole spelling authority; serde and Display reuse it.
@@ -196,6 +202,8 @@ impl AxCode {
             AxCode::ToolOutcomeUnknown => "E_TOOL_OUTCOME_UNKNOWN",
             AxCode::PlanMissing => "E_PLAN_MISSING",
             AxCode::ProviderAccountsExhausted => "E_PROVIDER_ACCOUNTS_EXHAUSTED",
+            AxCode::AuthRequired => "E_AUTH_REQUIRED",
+            AxCode::PairingRefused => "E_PAIRING_REFUSED",
         }
     }
 
@@ -254,7 +262,9 @@ impl AxCode {
             | AxCode::BrowserUnavailable
             | AxCode::ToolOutcomeUnknown
             | AxCode::BackpressureShed
-            | AxCode::PlanMissing => Carrier::Event(EventKind::ToolResult),
+            | AxCode::PlanMissing
+            | AxCode::AuthRequired
+            | AxCode::PairingRefused => Carrier::Event(EventKind::ToolResult),
         }
     }
 }
@@ -296,9 +306,9 @@ mod tests {
         // The length is the close of the table, so it is stated once:
         // a code added without a spelling, or two codes sharing one,
         // fails here rather than at a caller.
-        assert_eq!(AxCode::ALL.len(), 42);
+        assert_eq!(AxCode::ALL.len(), 44);
         let spellings: BTreeSet<&str> = AxCode::ALL.iter().map(AxCode::as_str).collect();
-        assert_eq!(spellings.len(), 42);
+        assert_eq!(spellings.len(), 44);
         for s in &spellings {
             assert!(s.starts_with("E_"));
         }
