@@ -6,7 +6,7 @@
 /-!
 # wire::reception::pairing
 
-规定 `reception::pairing`（`crates/wire/src/` 下同名的文件）。本机这扇门对浏览器的状态：终端上的配对码、`/web` 交出的开页码、挑战用的 nonce、配过对的设备钥与活着的会话令牌。本文件是 `crates/wire/Spec.lean` 的一个分部；下面每一节保留它在 wire 规格里的标签 §8-n，别处引作 `crates/wire/Spec.lean §8-n`，决定引作 `wire D<n>`。
+规定 `reception::pairing`（`crates/wire/src/` 下同名的文件）。这台电脑上的这扇门对浏览器的状态：终端上的配对码、`/web` 交出的开页码、挑战用的 nonce、配过对的设备钥与活着的会话令牌。本文件是 `crates/wire/Spec.lean` 的一个分部；下面每一节保留它在 wire 规格里的标签 §8-n，别处引作 `crates/wire/Spec.lean §8-n`，决定引作 `wire D<n>`。
 -/
 
 /-!
@@ -14,14 +14,13 @@
 
 ```rust
 pub struct BrowserDoor { … }                       // 纯：熵与时间都是入参
-pub struct Fresh { pub code: [u8; 32], pub device: … }
 impl BrowserDoor {
     pub fn new(devices: Vec<PairedBrowser>, code_entropy: [u8; 32]) -> Self;
     pub fn pairing_code(&self) -> &str;            // 终端显示的那一个，`abcd-efgh`
     pub fn guess(&mut self, word: &str, now: TimeMs, entropy: [u8; 32]) -> Guess;
     pub fn issue_open_code(&mut self, entropy: [u8; 16], now: TimeMs) -> String;
-    pub fn redeem_open_code(&mut self, code: &str, now: TimeMs) -> bool;
-    pub fn pair(&mut self, key: DeviceKey, label: String, now: TimeMs) -> DeviceId;
+    pub fn redeem_open_code(&mut self, code: &str, now: TimeMs) -> Option<B3Hash>;   // 兑掉的码的摘要，用来找到等它的人
+    pub fn pair(&mut self, line: PairedBrowser) -> DeviceId;                      // PairedBrowser::new(key, label, now)
     pub fn challenge(&mut self, entropy: [u8; 32], now: TimeMs) -> String;
     pub fn take_nonce(&mut self, nonce: &str, now: TimeMs) -> bool;
     pub fn device_key(&self, device: &DeviceId) -> Option<&DeviceKey>;
@@ -29,6 +28,7 @@ impl BrowserDoor {
     pub fn sessions(&self) -> &Sessions;
     pub fn forget(&mut self, device: &DeviceId) -> bool;
     pub fn browsers(&self) -> Vec<PairedBrowser>;
+    pub fn devices(&self) -> DevicesAnswer;
 }
 pub enum Guess { Paired, Wrong, TooSoon }
 ```

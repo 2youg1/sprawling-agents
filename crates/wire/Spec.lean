@@ -399,7 +399,7 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 | `kernel` | AxError／EventRecord／IdemKey／Sealed／Address | 唯一上游 |
 | `aws-lc-rs` | `/session` 验设备钥的 Ed25519 签名（只在 `server` feature 里） | 已在 workspace（`remote_access` 用它）；替代（自写或另引一个 Ed25519 库）是同一件事的第二个实现 |
 
-**不引**：任何通用 RPC 框架（wire 是一组具名 variant，不是一个可扩展的服务定义）；任何 session 中间件（鉴权面是本机钥匙加会话令牌两件，都在 `reception` 里判）；任何穿透／中继库。**WebTransport／QUIC 同此**：重开条件写在 §8-41 末节（城真的在回环之外且实测有队头阻塞，两条都成立才重开），此前它不因「需要第二种协议」而回来。
+**不引**：任何通用 RPC 框架（wire 是一组具名 variant，不是一个可扩展的服务定义）；任何 session 中间件（鉴权面是native key加会话令牌两件，都在 `reception` 里判）；任何穿透／中继库。**WebTransport／QUIC 同此**：重开条件写在 §8-41 末节（城真的在回环之外且实测有队头阻塞，两条都成立才重开），此前它不因「需要第二种协议」而回来。
 
 规格本身只 import 工具链的库与本 crate 的分部：ARCHITECTURE.md §3 的 `depmap` 允许 wire 依赖 kernel，今天的模型不需要 kernel 的分部。
 -/

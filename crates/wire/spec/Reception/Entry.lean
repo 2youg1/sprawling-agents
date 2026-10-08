@@ -19,8 +19,8 @@ impl ListenerOrigins {
     pub fn url(&self) -> &str;                          // 终端印的、`/web` 开的那一个：http://127.0.0.1:<p>
     pub fn admits_host(&self, host: &str) -> bool;
     pub fn admits_origin(&self, origin: &str, host: &str) -> bool;
-    pub fn page_headers(&self) -> PageHeaders;          // §8-94 末节
 }
+impl PageHeaders { pub fn every_listener() -> Self; }   // §8-94 末节
 pub struct Presented<'a> { pub host: Option<&'a str>, pub origin: Option<&'a str>, pub sec_fetch_site: Option<&'a str> }
 pub enum Arrival { Page, Preflight, Socket, Door(Door), Pairing }
 pub enum Caller { Native, Browser }
@@ -36,10 +36,10 @@ pub fn decide_entry(origins: &ListenerOrigins, presented: Presented<'_>, arrival
 3. `OPTIONS`：拒，不回任何 `Access-Control-*`。不开 CORS，所以没有一次预检该成功。
 4. 没有 Origin：原生客户端（`Caller::Native`，tungstenite 与 reqwest 都不发）。Origin 在名单里：浏览器（`Caller::Browser`）。别的值，包括 `null`：拒（`ForeignOrigin`）。WS 在 `on_upgrade` 之前就回 403（RFC 6455 §10.2），所以被拒的会话根本不存在。
 5. 有 `Sec-Fetch-Site` 而不是 `same-origin`：拒（`CrossSite`）。同站另一个端口给的是 `same-site`，正好拒掉。没有这个头不管：原生客户端不发，三家浏览器在 WS 握手上发不发也没有定论。
-6. `/pair` 与 `/session/*` 只收浏览器（`NativePairing`）：设备钥只在页面里生成，原生客户端有本机钥匙，不需要配对。
+6. `/pair` 与 `/session/*` 只收浏览器（`NativePairing`）：设备钥只在页面里生成，原生客户端有native key，不需要配对。
 7. 之后才是凭据（§8-40）：入口判定只说「谁在敲门」，不说「门开不开」。
 
-**名单从绑定后的地址算一次**，读它的有五处：Host 判定、Origin 判定、响应头、`firstrun::local_url`、居民浏览器守卫。没有第二份拼写。
+**名单从绑定后的地址算一次**，读它的有四处：Host 判定、Origin 判定、`firstrun` 开浏览器与终端印的地址（`ListenerOrigins::url`）、居民浏览器守卫。没有第二份拼写。
 
 | 绑定 | Host 名单 | Origin 名单 | `url` |
 |---|---|---|---|
@@ -50,11 +50,14 @@ pub fn decide_entry(origins: &ListenerOrigins, presented: Presented<'_>, arrival
 端口 80 时，Host 与 Origin 也认不带端口的写法，因为浏览器对默认端口不写端口。
 
 D54 每个调用方都要非环境凭据，入口先判 Host 与 Origin。
-回环端口不是凭据：跨站页面、同站另一个端口的页面、DNS rebinding、同机另一个 OS 用户、居民的两种浏览器都到得了它（`SECURITY.md`）。所以面总带一把钥匙（§8-41），浏览器靠按源存放、不可导出的设备钥换来的会话令牌，原生客户端靠只给本用户读的钥匙文件（`crates/sprawling/spec/Keying.lean` §8-22）。浏览器不会自动附带这两样里的任何一样，所以 Origin 与 Host 的判定是纵深防御，不是唯一一道。被否：会话 cookie——cookie 不按端口隔离（RFC 6265 §8.5），SameSite 不看端口，Safari 在 `http://localhost` 上不发 `Secure` cookie，另一个端口还能写同名 cookie；只判 Origin——挡得住网页，挡不住同机另一个用户与居民的工具。未指定地址的 Origin 必须等于请求自己的 Host，而不是「任何 IP 字面量」：后者让局域网里另一台机器上的页面以浏览器的身份进门（webpack-dev-server CVE-2025-30360 正是这样）。重开条件：浏览器给本机页面一种按源、按端口隔离且不可被脚本读出的凭据。
+回环端口不是凭据：跨站页面、同站另一个端口的页面、DNS rebinding、同机另一个 OS 用户、居民的两种浏览器都到得了它（`SECURITY.md`）。所以面总带一把钥匙（§8-41），浏览器靠按源存放、不可导出的设备钥换来的会话令牌，原生客户端靠只给本用户读的钥匙文件（`crates/sprawling/spec/Keying.lean` §8-22）。浏览器不会自动附带这两样里的任何一样，所以 Origin 与 Host 的判定是纵深防御，不是唯一一道。被否：会话 cookie——cookie 不按端口隔离（RFC 6265 §8.5），SameSite 不看端口，Safari 在 `http://localhost` 上不发 `Secure` cookie，另一个端口还能写同名 cookie；只判 Origin——挡得住网页，挡不住同机另一个用户与居民的工具。未指定地址的 Origin 必须等于请求自己的 Host，而不是「任何 IP 字面量」：后者让局域网里另一台机器上的页面以浏览器的身份进门（webpack-dev-server CVE-2025-30360 正是这样）。重开条件：浏览器给这台电脑上的页面一种按源、按端口隔离且不可被脚本读出的凭据。
 
 #### 响应头
 
-每个监听器生成一次，静态字节，作为参数交给 `bundle_routes`：`Content-Security-Policy`（`default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' <每个 Host 的 ws://>; img-src 'self' data: blob:; worker-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`）、`X-Frame-Options: DENY`、`X-Content-Type-Options: nosniff`、`Referrer-Policy: no-referrer`、`Cross-Origin-Opener-Policy: same-origin`、`Cross-Origin-Resource-Policy: same-origin`；不是页面字节的答复另加 `Cache-Control: no-store`。未指定地址的监听器列不出 Host，`connect-src` 写 `'self' ws:`。远程监听器（`bin::outside`）经隧道的公网名到达，名字在这里不可知，用 `PageHeaders::same_origin()`，`connect-src 'self'`。`'wasm-unsafe-eval'` 给 pdf.js 的 wasm 解码器，`'unsafe-inline'` 给 Svelte 写在元素上的样式；页面不再需要它们时删掉。
+一套头，每个监听器把它转成 HTTP 头一次、作为参数交给 `bundle_routes`：`Content-Security-Policy`（`default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data: blob:; worker-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`）、`X-Frame-Options: DENY`、`X-Content-Type-Options: nosniff`、`Referrer-Policy: no-referrer`、`Cross-Origin-Opener-Policy: same-origin`、`Cross-Origin-Resource-Policy: same-origin`；不是页面字节的答复另加 `Cache-Control: no-store`。
+
+- **`connect-src 'self'`，不逐个列 `ws://<Host>`**：CSP Level 3 让 `'self'` 在 `http:` 页上认同一主机与端口的 `ws:`、在 `https:` 页上认 `wss:`，配对要用的 WebCrypto Ed25519 在 Chromium 137、Gecko 129、WebKit 17 才有，这几版都按这条规则匹配。于是城自己的端口与远程监听器（经隧道的公网名到达，名字在这里不可知）送的是同一套头，D20「同样的字节、同样的头」仍成立。被否：按监听器列出每个 Host 的 `ws://`——远程监听器列不出，未指定地址的监听器也列不出，两张表只会让同一个页面在两扇门后受两种策略。
+- `'wasm-unsafe-eval'` 给 pdf.js 的 wasm 解码器，`'unsafe-inline'` 给 Svelte 写在元素上的样式；页面不再需要它们时删掉。
 -/
 
 namespace Wire.Reception.Entry
@@ -148,7 +151,7 @@ theorem pairing_admits_only_a_browser (host : Bool) (origin : OriginSeen) (site 
   cases host <;> cases origin <;> cases site <;> simp_all [decideEntry, callerOf] <;>
     first | exact entered.symm | (cases entered)
 
-/-- 一条可以实现的正常路径：本机页面的 hello 进门，原生客户端的 POST 进门。 -/
+/-- 一条可以实现的正常路径：这台电脑上的页面的 hello 进门，原生客户端的 POST 进门。 -/
 example : decideEntry true .listed .sameOrigin .socket = .caller .browser := rfl
 example : decideEntry true .absent .absent .door = .caller .native := rfl
 

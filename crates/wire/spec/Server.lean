@@ -170,7 +170,7 @@ pub commands: Arc<dyn Fn(WireCommand, Reply) -> Result<(), AxError> + Send + Syn
 
 **`DiscardLine.restoration` 携 `Option<Restoration>` 而非一个句子**。回收站那一行的「怎么拿回来」的唯一措辞处在客户端（`client/src/views/record/bin.svelte` 按 `tracked`／`interred`／`rebuildable` 三臂措辞）；服务端若把它拼成一句话，就是**一件事两个渲染权威**，而服务端那句还拼不出可执行的那句话。所以计划以它自己的形状上线（载荷本来就是 `Restoration` 序列化出来的，故读得回去）；`None` 的意思是**这一条记录用了本构建读不懂的方案**，界面据此画一行而不给动作——行恒不隐藏，因为藏起一件被删的东西比承认读不懂它的方案更糟。这类「语法换形而名字没换」的改动不动 `QUERY_NAMES` 与 `COMMAND_NAMES`，故只能由 `WIRE_V` 进位让旧页面在握手期被拒。
 
-**`POST /acp` 与 `AcpSink`**。外来编辑器的请求走自己的路由，不挤 Command 面：它自带鉴权、要一个当场的回答，而 Command 面的回答是事件流。三条口径：①**令牌在本 crate 判**（配对令牌住这里，常数时间比对也就住这里），只把 `authentic` 一位传进去——拒词由 `agent_protocols::admit` 措辞，「未配对者只学到一位」因此只有一个权威；②回给编辑器的只有 `AcpProgress` 三字段，run id 是工人接单时才铸的，故受理那一刻诚实的答案是「已受理、未完成」；③编辑器出示本机钥匙（读钥匙文件，`crates/sprawling/spec/Keying.lean` §8-22）或一个会话令牌，与 control surface 同一条规矩。
+**`POST /acp` 与 `AcpSink`**。外来编辑器的请求走自己的路由，不挤 Command 面：它自带鉴权、要一个当场的回答，而 Command 面的回答是事件流。三条口径：①**令牌在本 crate 判**（配对令牌住这里，常数时间比对也就住这里），只把 `authentic` 一位传进去——拒词由 `agent_protocols::admit` 措辞，「未配对者只学到一位」因此只有一个权威；②回给编辑器的只有 `AcpProgress` 三字段，run id 是工人接单时才铸的，故受理那一刻诚实的答案是「已受理、未完成」；③编辑器出示native key（读钥匙文件，`crates/sprawling/spec/Keying.lean` §8-22）或一个会话令牌，与 control surface 同一条规矩。
 
 **三帧登记面**（§8-1 golden 同集更新）——`AttachEndpoint`（人刚输入的 URL＋兼容格式＋`secret:` 引用；**引用有字节形，凭证没有**）、`SelectModel`（标签→模型＋两个探不到的 token 数＋人说的「收得下什么」；输出上限是 `Option<Ceiling>`，缺席即「没人登记过」，零在类型上不存在；`input: Option<kernel::InputKinds>` 紧接在 `max_output_tokens` 之后，出现时是 `gateway::accepted_input` 的第一档，缺席时梯子从目录开始，`crates/gateway/Spec.lean` §8-37、gateway D16）、`EndpointView`（设置页的读；`EndpointsAnswer` 里 `has_credential` 是关于凭证能回答的全部）。
 
@@ -271,7 +271,7 @@ pub struct SessionBody { pub device: DeviceId, pub nonce: String, pub signature:
 pub struct SessionAnswer { pub token: String }               // 页面只把它放在内存里
 ```
 
-- **会话令牌是凭据**：页面以 hello 的 `token` 或 POST 的 `Authorization: Bearer` 出示它；`/ws`、`/transcribe`、`/enroll`、`/drop`、`/acp` 对每一个调用方都要求一份凭据——浏览器的会话令牌，或同一台机器上的原生客户端的本机钥匙（§8-40）。
+- **会话令牌是凭据**：页面以 hello 的 `token` 或 POST 的 `Authorization: Bearer` 出示它；`/ws`、`/transcribe`、`/enroll`、`/drop`、`/acp` 对每一个调用方都要求一份凭据——浏览器的会话令牌，或同一台机器上的原生客户端的native key（§8-40）。
 - **两种码，一个入口**：`open` 是 `/web` 经只给本用户读的跳转文件交给浏览器的开页码，`code` 是终端上显示的配对码；错、用过或太早一律 `E_PAIRING_REFUSED`，403。状态与它的规则在 `spec/Reception/Pairing.lean` §8-95。
 - **字节怎么写**：`public_key` 是 Ed25519 公钥的 32 字节，`nonce` 是 32 字节，`signature` 是 64 字节，`token` 是 32 字节，线上一律写成小写十六进制；`label` 至多 `LABEL_MAX`（64）个字符，空或含控制字符即 422。页面用 `crypto.subtle.exportKey("raw", publicKey)` 得到公钥。签的字节是 `sprawling local session v1
 <nonce>
@@ -279,7 +279,7 @@ pub struct SessionAnswer { pub token: String }               // 页面只把它�
 - **答复**：`/pair` 200 `{ device }`；`/session/challenge` 200 `{ nonce }`；`/session` 200 `{ token }`，nonce 过期或用过、设备不认识、签名不对都是 403 `E_GATE_DENIED`。三条路只收浏览器（§8-94 第 6 步），不问凭据——它们就是换凭据的地方。
 
 ```rust
-// 本机这扇门的句柄：装配层建一次，交给 ServeConfig，也交给控制台与开浏览器的那一方。
+// 这台电脑上的这扇门的句柄：装配层建一次，交给 ServeConfig，也交给控制台与开浏览器的那一方。
 pub struct LocalDoor { … }                                        // Clone，内部一把锁
 pub struct DoorSenses { pub clock: Arc<dyn Fn() -> Result<TimeMs, AxError> + Send + Sync>,
                         pub entropy: Arc<dyn Fn(&mut [u8]) -> Result<(), AxError> + Send + Sync> }
