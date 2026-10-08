@@ -39,7 +39,7 @@ impl KeyFile {
     pub(crate) fn write(port: u16, key: &str) -> Result<Self, AxError>;   // 先写临时文件再改名
     pub(crate) fn remove(self) -> Result<(), AxError>;                     // 收口时
 }
-pub(crate) fn read_key(port: u16) -> Result<Option<String>, AxError>;      // 原生客户端没给 --token 时读
+pub fn read_key(port: u16) -> Result<Option<String>, AxError>;             // 原生客户端没给 --token 时读（二进制里的 `wire_client` 经库的公开面读它）
 pub(crate) fn runtime_dir() -> Result<PathBuf, AxError>;                   // <每用户运行目录>/sprawling
 ```
 
