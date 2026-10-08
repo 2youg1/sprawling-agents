@@ -13,6 +13,10 @@
 //! default (`ceiling`). *What may one model be sent* — the same ladder
 //! for the input a registration carries (`input`).
 //!
+//! *Which thinking levels one (Endpoint, model) offers, and which one a
+//! request is sent* — the ladder from the upstream's model list down to
+//! nobody, and the fields each face writes a level in (`thinking`).
+//!
 //! *How one attached endpoint is connected* — resolved once at attach
 //! and recorded, so that no call path derives it again (`registry`),
 //! together with the faces beyond a conversation that connection
@@ -32,6 +36,7 @@ pub mod input;
 pub mod modality;
 pub mod preset;
 pub mod registry;
+pub mod thinking;
 /// The guard on the system prefix this city sends.
 #[cfg(test)]
 mod stability;

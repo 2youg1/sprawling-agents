@@ -25,7 +25,7 @@
 //!   <https://platform.claude.com/docs/en/build-with-claude/vision>
 
 use kernel::{
-    AxError, CacheCount, ChatRequest, ChatResponse, ContentBlock, DialectKind, Effort, ModelUsage,
+    AxError, CacheCount, ChatRequest, ChatResponse, ContentBlock, DialectKind, ModelUsage,
     Role, StopReason, Tokens,
 };
 use serde_json::{Map, Value, json};
@@ -153,9 +153,6 @@ pub(crate) fn request(req: &ChatRequest, images: &ImageBytes) -> Result<Value, A
         messages.push(json!({ "role": role, "content": blocks }));
     }
     root.insert("messages".to_owned(), Value::Array(messages));
-    for (key, value) in effort_fields(req.effort) {
-        root.insert(key.to_owned(), value);
-    }
     if !req.tools.is_empty() {
         let tools: Result<Vec<Value>, AxError> = req
             .tools
@@ -333,27 +330,3 @@ pub(crate) fn response_wire(resp: &ChatResponse) -> Result<Value, AxError> {
     }))
 }
 
-/// The request field that states how hard to think. This dialect spells
-/// the five working levels in `output_config.effort`, and spells "do not
-/// think" in a different field entirely - `effort` has no `none`.
-fn effort_fields(effort: Option<Effort>) -> Vec<(&'static str, Value)> {
-    let Some(effort) = effort else {
-        return Vec::new();
-    };
-    let level = match effort {
-        Effort::None => return vec![("thinking", json!({ "type": "disabled" }))],
-        // Not one of this dialect's five words; written as asked so the
-        // provider's own refusal reaches the person instead of a level
-        // this city moved to a neighbour. The thinking offer is what keeps
-        // it from being asked for.
-        Effort::Minimal => "minimal",
-        Effort::Low => "low",
-        Effort::Medium => "medium",
-        Effort::High => "high",
-        Effort::XHigh => "xhigh",
-        Effort::Max => "max",
-    };
-    // The reference hangs `effort` under `output_config` and nowhere
-    // else, so a top-level `effort` is a field the provider refuses.
-    vec![("output_config", json!({ "effort": level }))]
-}

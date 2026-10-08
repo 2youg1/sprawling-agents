@@ -90,7 +90,7 @@ pub use harness::{
 pub use history::{FileRestored, WentBack};
 pub use log::LogTruncated;
 pub use modality::{EmbeddingCalled, RerankCalled};
-pub use probe::{EndpointProbed, ModelFacts, ProbeFailure};
+pub use probe::{EndpointProbed, ModelFacts, ProbeFailure, ThinkingStatement};
 pub use provider::{
     ProviderAccount, ProviderAccountBinding, ProviderDegraded, VaultFellBack,
     validate_provider_accounts,

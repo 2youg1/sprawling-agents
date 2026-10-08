@@ -57,9 +57,24 @@ pub struct AttachedEndpoint {
     /// registration so a call made a week later is made the way they
     /// set it up.
     pub tuning: EndpointTuning,
+    /// The CAS blob holding `models` as the attach read them, which a
+    /// replay learns back through [`super::EndpointBook::learn`]; the
+    /// line itself carries ids only (kernel D57).
+    pub facts_blob: Option<kernel::B3Hash>,
 }
 
 impl AttachedEndpoint {
+    /// `models` as the bytes of the CAS blob `facts_blob` names: the one
+    /// writer of the format [`super::EndpointBook::learn`] reads.
+    ///
+    /// # Errors
+    /// `E_WIRE_MISMATCH` when the facts do not encode, which no
+    /// `ModelFacts` built here produces.
+    pub fn facts_bytes(&self) -> Result<Vec<u8>, kernel::AxError> {
+        serde_json::to_vec(&self.models)
+            .map_err(|err| crate::mismatch::mismatch("model facts", &err.to_string()))
+    }
+
     /// Validates submitted legacy fields against the settled account list.
     ///
     /// Account retention is settled by the caller before this check. Only
@@ -254,11 +269,7 @@ mod tests {
     fn facts(id: &str) -> ModelFacts {
         ModelFacts {
             id: id.to_owned(),
-            context_tokens: None,
-            max_output_tokens: None,
-            input_modalities: Vec::new(),
-            input_price: None,
-            output_price: None,
+            ..ModelFacts::default()
         }
     }
 
@@ -272,6 +283,7 @@ mod tests {
             models: vec![facts("m-small"), facts("m-large")],
             probed: true,
             tuning: EndpointTuning::default(),
+            facts_blob: None,
         }
     }
 

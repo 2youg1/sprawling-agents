@@ -15,9 +15,22 @@ use kernel::DialectKind;
 
 use crate::market::InputKinds;
 
+use kernel::Effort;
+
 use super::{
-    CeilingField, ChatSpelling, EffortField, Face, HostPreset, ModelPreset, ReasoningReturn,
+    CeilingField, ChatSpelling, EffortField, Face, HostPreset, ModelPreset, PresetThinking,
+    ReasoningReturn,
 };
+
+/// `low` to `max`, the set every current OpenAI reasoning model page
+/// prints once `none` is left out.
+const LOW_TO_MAX: [Effort; 5] = [
+    Effort::Low,
+    Effort::Medium,
+    Effort::High,
+    Effort::XHigh,
+    Effort::Max,
+];
 
 /// The hosts this city knows without asking.
 ///
@@ -91,7 +104,9 @@ pub const PRESETS: [HostPreset; 13] = [
         models: DEEPSEEK_MODELS,
         // Thinking is on by default, and a request with tools whose
         // history lacks the earlier `reasoning_content` answers 400.
+        // and the switch is `thinking.type`, with the level beside it.
         chat: ChatSpelling {
+            effort: EffortField::ThinkingToggle,
             reasoning: ReasoningReturn::AsReasoningContent,
             ..ChatSpelling::DOCUMENTED
         },
@@ -172,12 +187,7 @@ pub const PRESETS: [HostPreset; 13] = [
             path: "/api/paas/v4",
         }],
         models: &[],
-        // The assistant message takes `reasoning_content`, which
-        // `clear_thinking: false` keeps in context.
-        chat: ChatSpelling {
-            reasoning: ReasoningReturn::AsReasoningContent,
-            ..ChatSpelling::DOCUMENTED
-        },
+        chat: ZHIPU_CHAT,
         session_header: None,
         cache_key_field: None,
         source: "https://docs.bigmodel.cn/api-reference/%E6%A8%A1%E5%9E%8B-api/%E5%AF%B9%E8%AF%9D%E8%A1%A5%E5%85%A8",
@@ -189,10 +199,7 @@ pub const PRESETS: [HostPreset; 13] = [
             path: "/api/paas/v4",
         }],
         models: &[],
-        chat: ChatSpelling {
-            reasoning: ReasoningReturn::AsReasoningContent,
-            ..ChatSpelling::DOCUMENTED
-        },
+        chat: ZHIPU_CHAT,
         session_header: None,
         cache_key_field: None,
         source: "https://docs.z.ai/api-reference/llm/chat-completion",
@@ -294,7 +301,12 @@ pub const PRESETS: [HostPreset; 13] = [
             path: "/compatible-mode/v1",
         }],
         models: &[],
-        chat: ChatSpelling::DOCUMENTED,
+        // Thinking is switched by `enable_thinking`, and several models
+        // default to off (<https://help.aliyun.com/zh/model-studio/deep-thinking>).
+        chat: ChatSpelling {
+            effort: EffortField::EnableThinking,
+            ..ChatSpelling::DOCUMENTED
+        },
         session_header: None,
         cache_key_field: None,
         source: "https://help.aliyun.com/zh/model-studio/compatibility-of-openai-with-dashscope",
@@ -307,9 +319,23 @@ pub const PRESETS: [HostPreset; 13] = [
 /// <https://platform.moonshot.ai/docs/api/chat>. The Kimi Code
 /// membership API serves the same models, and `kimi-k2.7-code` keeps
 /// every earlier `reasoning_content` whatever the request says.
+///
+/// K2 models switch thinking by `thinking.type` and K3 takes a level in
+/// `reasoning_effort`, so both are written.
 const MOONSHOT_CHAT: ChatSpelling = ChatSpelling {
     ceiling: CeilingField::MaxCompletionTokens,
-    effort: EffortField::ReasoningEffort,
+    effort: EffortField::ThinkingToggle,
+    reasoning: ReasoningReturn::AsReasoningContent,
+};
+
+/// Zhipu's chat face, read at
+/// <https://docs.z.ai/api-reference/llm/chat-completion>: the assistant
+/// message takes `reasoning_content`, which `clear_thinking: false`
+/// keeps in context, and thinking is switched by `thinking.type` with
+/// the level in `reasoning_effort`.
+const ZHIPU_CHAT: ChatSpelling = ChatSpelling {
+    ceiling: CeilingField::MaxTokens,
+    effort: EffortField::ThinkingToggle,
     reasoning: ReasoningReturn::AsReasoningContent,
 };
 
@@ -328,6 +354,7 @@ const ANTHROPIC_MODELS: &[ModelPreset] = &[
         context_tokens: 1_000_000,
         max_output_tokens: 128_000,
         input: InputKinds::TextImage,
+        thinking: None,
         source: "https://platform.claude.com/docs/en/about-claude/models/overview",
     },
     ModelPreset {
@@ -335,6 +362,7 @@ const ANTHROPIC_MODELS: &[ModelPreset] = &[
         context_tokens: 1_000_000,
         max_output_tokens: 128_000,
         input: InputKinds::TextImage,
+        thinking: None,
         source: "https://platform.claude.com/docs/en/about-claude/models/overview",
     },
     ModelPreset {
@@ -342,6 +370,7 @@ const ANTHROPIC_MODELS: &[ModelPreset] = &[
         context_tokens: 1_000_000,
         max_output_tokens: 128_000,
         input: InputKinds::TextImage,
+        thinking: None,
         source: "https://platform.claude.com/docs/en/about-claude/models/overview",
     },
     ModelPreset {
@@ -349,6 +378,7 @@ const ANTHROPIC_MODELS: &[ModelPreset] = &[
         context_tokens: 200_000,
         max_output_tokens: 64_000,
         input: InputKinds::TextImage,
+        thinking: None,
         source: "https://platform.claude.com/docs/en/about-claude/models/overview",
     },
     ModelPreset {
@@ -356,6 +386,7 @@ const ANTHROPIC_MODELS: &[ModelPreset] = &[
         context_tokens: 200_000,
         max_output_tokens: 32_000,
         input: InputKinds::TextImage,
+        thinking: None,
         source: "https://platform.claude.com/docs/en/about-claude/models/overview",
     },
     ModelPreset {
@@ -363,6 +394,7 @@ const ANTHROPIC_MODELS: &[ModelPreset] = &[
         context_tokens: 200_000,
         max_output_tokens: 64_000,
         input: InputKinds::TextImage,
+        thinking: None,
         source: "https://platform.claude.com/docs/en/about-claude/models/overview",
     },
     ModelPreset {
@@ -370,6 +402,7 @@ const ANTHROPIC_MODELS: &[ModelPreset] = &[
         context_tokens: 200_000,
         max_output_tokens: 64_000,
         input: InputKinds::TextImage,
+        thinking: None,
         source: "https://platform.claude.com/docs/en/about-claude/models/overview",
     },
     ModelPreset {
@@ -377,17 +410,107 @@ const ANTHROPIC_MODELS: &[ModelPreset] = &[
         context_tokens: 200_000,
         max_output_tokens: 8_192,
         input: InputKinds::TextImage,
+        thinking: None,
         source: "https://platform.claude.com/docs/en/about-claude/models/overview",
     },
 ];
 
-/// OpenAI's documented ceilings.
+/// OpenAI's documented ceilings, and for the current reasoning models
+/// the levels each model page states: OpenAI's model list states no
+/// level, so this table is the only source for them. Each page prints a
+/// `1,050,000` window and `128,000` output tokens; `none` is left out of
+/// every set, because turning thinking off is not a level.
 const OPENAI_MODELS: &[ModelPreset] = &[
+    ModelPreset {
+        id_prefix: "gpt-6.1-sol",
+        context_tokens: 1_050_000,
+        max_output_tokens: 128_000,
+        input: InputKinds::TextImage,
+        thinking: Some(PresetThinking {
+            levels: &LOW_TO_MAX,
+            default: Some(Effort::Medium),
+            source: "https://developers.openai.com/api/docs/models/gpt-6.1-sol",
+        }),
+        source: "https://developers.openai.com/api/docs/models/gpt-6.1-sol",
+    },
+    ModelPreset {
+        id_prefix: "gpt-6-astra",
+        context_tokens: 1_050_000,
+        max_output_tokens: 128_000,
+        input: InputKinds::TextImage,
+        thinking: Some(PresetThinking {
+            levels: &LOW_TO_MAX,
+            default: None,
+            source: "https://developers.openai.com/api/docs/models/gpt-6-astra",
+        }),
+        source: "https://developers.openai.com/api/docs/models/gpt-6-astra",
+    },
+    ModelPreset {
+        id_prefix: "gpt-6-sol",
+        context_tokens: 1_050_000,
+        max_output_tokens: 128_000,
+        input: InputKinds::TextImage,
+        thinking: Some(PresetThinking {
+            levels: &LOW_TO_MAX,
+            default: Some(Effort::Medium),
+            source: "https://developers.openai.com/api/docs/models/gpt-6-sol",
+        }),
+        source: "https://developers.openai.com/api/docs/models/gpt-6-sol",
+    },
+    ModelPreset {
+        id_prefix: "gpt-6-luna",
+        context_tokens: 1_050_000,
+        max_output_tokens: 128_000,
+        input: InputKinds::TextImage,
+        thinking: Some(PresetThinking {
+            levels: &LOW_TO_MAX,
+            default: Some(Effort::Medium),
+            source: "https://developers.openai.com/api/docs/models/gpt-6-luna",
+        }),
+        source: "https://developers.openai.com/api/docs/models/gpt-6-luna",
+    },
+    ModelPreset {
+        id_prefix: "gpt-5.6-sol",
+        context_tokens: 1_050_000,
+        max_output_tokens: 128_000,
+        input: InputKinds::TextImage,
+        thinking: Some(PresetThinking {
+            levels: &LOW_TO_MAX,
+            default: Some(Effort::Medium),
+            source: "https://developers.openai.com/api/docs/models/gpt-5.6-sol",
+        }),
+        source: "https://developers.openai.com/api/docs/models/gpt-5.6-sol",
+    },
+    ModelPreset {
+        id_prefix: "gpt-5.6-luna",
+        context_tokens: 1_050_000,
+        max_output_tokens: 128_000,
+        input: InputKinds::TextImage,
+        thinking: Some(PresetThinking {
+            levels: &LOW_TO_MAX,
+            default: Some(Effort::Medium),
+            source: "https://developers.openai.com/api/docs/models/gpt-5.6-luna",
+        }),
+        source: "https://developers.openai.com/api/docs/models/gpt-5.6-luna",
+    },
+    ModelPreset {
+        id_prefix: "gpt-5.6-terra",
+        context_tokens: 1_050_000,
+        max_output_tokens: 128_000,
+        input: InputKinds::TextImage,
+        thinking: Some(PresetThinking {
+            levels: &LOW_TO_MAX,
+            default: Some(Effort::Medium),
+            source: "https://developers.openai.com/api/docs/models/gpt-5.6-terra",
+        }),
+        source: "https://developers.openai.com/api/docs/models/gpt-5.6-terra",
+    },
     ModelPreset {
         id_prefix: "gpt-4.1",
         context_tokens: 1_047_576,
         max_output_tokens: 32_768,
         input: InputKinds::TextImage,
+        thinking: None,
         source: "https://platform.openai.com/docs/models/gpt-4.1",
     },
     ModelPreset {
@@ -395,6 +518,7 @@ const OPENAI_MODELS: &[ModelPreset] = &[
         context_tokens: 128_000,
         max_output_tokens: 16_384,
         input: InputKinds::TextImage,
+        thinking: None,
         source: "https://platform.openai.com/docs/models/gpt-4o",
     },
     ModelPreset {
@@ -402,6 +526,7 @@ const OPENAI_MODELS: &[ModelPreset] = &[
         context_tokens: 200_000,
         max_output_tokens: 100_000,
         input: InputKinds::TextImage,
+        thinking: None,
         source: "https://platform.openai.com/docs/models/o3",
     },
     ModelPreset {
@@ -409,6 +534,7 @@ const OPENAI_MODELS: &[ModelPreset] = &[
         context_tokens: 200_000,
         max_output_tokens: 100_000,
         input: InputKinds::TextImage,
+        thinking: None,
         source: "https://platform.openai.com/docs/models/o4-mini",
     },
 ];
@@ -425,6 +551,7 @@ const DEEPSEEK_MODELS: &[ModelPreset] = &[
         context_tokens: 1_000_000,
         max_output_tokens: 393_216,
         input: InputKinds::TextImage,
+        thinking: None,
         source: "https://api-docs.deepseek.com/api/create-chat-completion",
     },
     ModelPreset {
@@ -432,6 +559,7 @@ const DEEPSEEK_MODELS: &[ModelPreset] = &[
         context_tokens: 1_000_000,
         max_output_tokens: 393_216,
         input: InputKinds::Text,
+        thinking: None,
         source: "https://api-docs.deepseek.com/api/create-chat-completion",
     },
 ];

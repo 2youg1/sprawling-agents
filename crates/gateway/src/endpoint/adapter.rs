@@ -66,7 +66,11 @@ pub fn adapter_for(
             proxying,
         },
         redemption,
-    )?;
+    )?
+    .offering(crate::provider::thinking::offer_for(
+        chosen.endpoint,
+        &chosen.entry.id,
+    ));
     Ok(Box::new(
         endpoint.gated(chosen.transport, monotonic).with_accounts(
             chosen.endpoint.name.clone(),
@@ -158,6 +162,7 @@ mod tests {
             models: Vec::new(),
             probed: false,
             tuning: EndpointTuning::default(),
+            facts_blob: None,
         };
         let entry = crate::market::MarketSnapshot::builtin()
             .unwrap()
@@ -222,6 +227,7 @@ mod tests {
                 account_retries: Some(kernel::account_recovery::AccountRetries::One),
                 ..EndpointTuning::default()
             },
+            facts_blob: None,
         };
         let entry = crate::market::MarketSnapshot::builtin()
             .unwrap()
@@ -358,6 +364,7 @@ mod tests {
             models: Vec::new(),
             probed: false,
             tuning: EndpointTuning::default(),
+            facts_blob: None,
         };
         let entry = crate::market::MarketSnapshot::builtin()
             .unwrap()

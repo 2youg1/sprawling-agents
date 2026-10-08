@@ -54,7 +54,7 @@ pub fn attached_payload(endpoint: &AttachedEndpoint) -> Result<Payload, AxError>
         connection_kind: Some(endpoint.connection_kind.as_str().to_owned()),
         probed: endpoint.probed,
         tuning: settled(&endpoint.tuning),
-        facts_blob: None,
+        facts_blob: endpoint.facts_blob,
     })
 }
 

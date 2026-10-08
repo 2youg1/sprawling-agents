@@ -27,6 +27,11 @@ use super::header::HeaderValue;
 use super::models::facts_of;
 use kernel::event::record::ModelFacts;
 
+/// The most pages one model list is followed for. A thousand rows to a
+/// page, so this bounds a list at sixteen thousand models rather than
+/// trusting a far side whose `has_more` never turns false.
+const MODEL_LIST_PAGES: usize = 16;
+
 /// Every picture one conversation refers to, in the order the blocks
 /// name them: the blocks a person attached and the ones a tool produced
 /// are the same value, so they are collected the same way.
@@ -80,6 +85,12 @@ impl Endpoint {
     /// nothing it does not; a row this city cannot name is left out
     /// rather than given an invented one.
     ///
+    /// The messages face pages its list, twenty rows to a page unless
+    /// asked for more, so it is asked for a thousand and followed by
+    /// `after_id` while `has_more` holds, up to [`MODEL_LIST_PAGES`]
+    /// pages (`crates/gateway/spec/Endpoint/Models.lean` §8-10). The
+    /// other faces take no paging parameter.
+    ///
     /// Rows come back ordered by id and without repeats, so a person
     /// reading the table twice reads it in the same order.
     ///
@@ -87,6 +98,49 @@ impl Endpoint {
     /// Transport failure, a non-success status, or a body without a
     /// readable `data` array; each carries the URL that was asked.
     pub fn list_models(&self, url: &str) -> Result<Vec<ModelFacts>, AxError> {
+        let mut facts = Vec::new();
+        let mut after: Option<String> = None;
+        for _ in 0..MODEL_LIST_PAGES {
+            let asked = match (self.config.dialect, &after) {
+                (DialectKind::Anthropic, None) => format!("{url}?limit=1000"),
+                (DialectKind::Anthropic, Some(last)) => format!("{url}?limit=1000&after_id={last}"),
+                (DialectKind::OpenAi | DialectKind::OpenAiResponses, _) => url.to_owned(),
+            };
+            let body = self.model_page(&asked)?;
+            let rows = body.get("data").and_then(Value::as_array).ok_or_else(|| {
+                provider_err(
+                    "read the model list",
+                    &ProviderFailure::Unreadable(format!("{url}: no data array")),
+                )
+            })?;
+            for row in rows {
+                facts.push(facts_of(row).ok_or_else(|| {
+                    provider_err(
+                        "read the model list",
+                        &ProviderFailure::Unreadable("a row has no id".to_owned()),
+                    )
+                })?);
+            }
+            after = match (self.config.dialect, body.get("has_more")) {
+                (DialectKind::Anthropic, Some(Value::Bool(true))) => body
+                    .get("last_id")
+                    .and_then(Value::as_str)
+                    .map(str::to_owned),
+                (DialectKind::Anthropic | DialectKind::OpenAi | DialectKind::OpenAiResponses, _) => {
+                    None
+                }
+            };
+            if after.is_none() {
+                break;
+            }
+        }
+        facts.sort_by(|left, right| left.id.cmp(&right.id));
+        facts.dedup_by(|left, right| left.id == right.id);
+        Ok(facts)
+    }
+
+    /// One page of a model list, read as JSON.
+    fn model_page(&self, url: &str) -> Result<Value, AxError> {
         let request = self.authorize(self.client.get(url))?;
         let response = request
             .send()
@@ -102,27 +156,9 @@ impl Endpoint {
                 },
             ));
         }
-        let body: Value = response
+        response
             .json()
-            .map_err(|err| provider_err("read the model list", &ProviderFailure::Exchange(&err)))?;
-        let rows = body.get("data").and_then(Value::as_array).ok_or_else(|| {
-            provider_err(
-                "read the model list",
-                &ProviderFailure::Unreadable(format!("{url}: no data array")),
-            )
-        })?;
-        let mut facts = Vec::new();
-        for row in rows {
-            facts.push(facts_of(row).ok_or_else(|| {
-                provider_err(
-                    "read the model list",
-                    &ProviderFailure::Unreadable("a row has no id".to_owned()),
-                )
-            })?);
-        }
-        facts.sort_by(|left, right| left.id.cmp(&right.id));
-        facts.dedup_by(|left, right| left.id == right.id);
-        Ok(facts)
+            .map_err(|err| provider_err("read the model list", &ProviderFailure::Exchange(&err)))
     }
 
     /// The POST one chat request leaves in: every header this endpoint
@@ -271,12 +307,17 @@ impl Endpoint {
         let mut chat = req.chat.clone();
         chat.model = self.config.model.clone();
         let images = self.pictures_for(&chat)?;
-        let mut wire = request_wire(
-            self.config.dialect,
-            &chat,
-            &images,
-            crate::provider::preset::chat_spelling(&self.config.base_url),
-        )?;
+        let spelling = crate::provider::preset::chat_spelling(&self.config.base_url);
+        let mut wire = request_wire(self.config.dialect, &chat, &images, spelling)?;
+        // Before the cache key and the overrides, so a person who named
+        // one of these paths wins (gateway D35).
+        if let (Some(ask), Value::Object(root)) = (self.thinking.ask(chat.effort), &mut wire) {
+            for (field, value) in
+                crate::provider::thinking::encoding::fields(ask, self.config.dialect, spelling.effort)
+            {
+                root.insert(field.to_owned(), value);
+            }
+        }
         // Before the overrides, so a person who named this path wins.
         if let Some(field) = self.cache_key_field() {
             apply_override(

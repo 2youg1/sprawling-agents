@@ -10,7 +10,7 @@
 
 模型证明五条跨过所有输入的性质：发出的档一定在提供之列（`the_sent_level_is_offered`）；什么都不提供的 offer 什么都不发（`an_offer_of_nothing_sends_nothing`）；存下的档被提供时原样发出、恒不夹到邻档（`an_offered_level_is_sent_as_stored`）；明说的档恰在不被提供时被拒（`admit_refuses_exactly_what_is_not_offered`）；「开启思考」只发给没有档位的模型（`thinking_on_is_sent_only_where_no_level_is_offered`）。
 
-派生检查：`provider::thinking` 的 proptest `the_ladder_keeps_the_lean_properties` 走遍模型的输入空间——七个词的任意子集（`none` 由类型挡在集合之外）、开关三态、默认档缺席或七词之一、存下的档与明说的档各缺席或七词之一——对每个输入断言这五条；它先对一个把不被提供的存档夹到 `high` 之外邻档的 `ask` 变红过。平台：纯判定，三个平台相同。
+派生检查：`provider::thinking` 的 proptest `the_ladder_keeps_the_lean_properties` 走遍模型的输入空间——七个词的任意子集（`none` 由类型挡在集合之外）、开关三态、默认档缺席或七词之一、存下的档与明说的档各缺席或七词之一——对每个输入断言这五条；它先对一个不看存档、一律走默认规则的 `ask` 变红过。平台：纯判定，三个平台相同。
 -/
 
 /-!
@@ -31,10 +31,10 @@ pub enum Switch { Allowed, Refused, Unknown }
 pub enum OfferSource { Person, Upstream, Preset, Unknown }
 pub enum Ask { Level(Effort), On }  // 一次请求实际发的；缺席即不写任何思考字段
 impl ThinkingOffer {
-    pub fn climb(person: Option<ThinkingOffer>, upstream: Option<&ThinkingStatement>,
+    pub fn climb(upstream: Option<&ThinkingStatement>,
                  preset: Option<&'static PresetThinking>) -> ThinkingOffer;   // 先说者胜
     pub fn ask(&self, stored: Option<Effort>) -> Option<Ask>;
-    pub fn admit(&self, explicit: Option<Effort>) -> Result<(), AxError>;     // E_CONFIG_INVALID
+    pub fn admit(&self, explicit: Option<Effort>, model: &str) -> Result<(), AxError>;   // E_CONFIG_INVALID
 }
 pub fn offer_for(endpoint: &AttachedEndpoint, model: &str) -> ThinkingOffer;  // 读这一行的 ModelFacts 与预置表
 
@@ -43,7 +43,7 @@ pub(crate) fn fields(ask: Ask, dialect: DialectKind, field: EffortField) -> Vec<
 ```
 
 - **梯子有四档，先说者胜**：人（Person）→ 上游的模型列表（Upstream，`ModelFacts.thinking`，`endpoint::models` 读）→ 预置表的 `thinking` 列（Preset，厂商文档，每行带地址）→ 无人说（Unknown）。与输出上限的梯子（§8-17）同一个次序与同一个理由：人的话不是推断，上游列表是对这一个（Endpoint，模型）最直接的陈述，文档其次。一档「说了」即整份作答，不跨档拼字段：把上游的档位与文档的默认档拼成一份，就是一个谁都没说过的组合。
-- **人这一档今天没有录入面**：`climb` 的 `person` 参数在生产里恒为 `None`，因为登记面还没有让人写下一个模型的档位集合的字段；它留在签名里，是为了让次序由类型钉住，而录入面加进 `AttachedTuning` 的那一次改动只填这个参数。
+- **人这一档今天没有录入面**：登记面还没有让人写下一个模型的档位集合的字段，所以 `climb` 从上游一档起；`OfferSource::Person` 是线上已有的词，录入面加进 `AttachedTuning` 的那一次改动给 `climb` 加上第一个参数与第一条臂。不先留一个恒为 `None` 的参数：一个从不被填的参数读起来像一档在作答。
 - **集合的单位是（Endpoint，模型）**：同一个模型在两家供应方、或同一家的两面上提供的档可以不同，所以 offer 由一行登记与一个模型 id 算出，不按模型名全局查。
 - **`levels` 在类型上不含 `none`**：关闭思考不是一档（IF-0 2.2）；`Effort::None` 只为读回旧账保留，它恒不被提供，于是一个存成 `none` 的旧值按默认规则处理。
 - **实发的档（`ask`）**：存下的或继承来的档被提供时原样发出；否则 `high` 被提供时发 `high`（`kernel::consts_policy::DEFAULT_EFFORT`）；否则上游或文档说的默认档被提供时发它；否则一个没有档位、开关为 `Allowed` 的模型收到「开启思考」；否则什么都不写。恒不夹到邻档：不被提供的档不变成离它最近的那一档，而是走默认规则，因为「最近」在两家厂商那里深浅不同。

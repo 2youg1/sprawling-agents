@@ -46,24 +46,22 @@ pub(crate) fn read_attached(payload: &Payload) -> Result<AttachedEndpoint, AxErr
         dialect: attached.dialect,
         connection_kind,
         auth,
-        // The line carries ids, because that is all a probe ever wrote
-        // into it. What the provider said about each row is read from
-        // the market when the row is used, so a replay does not invent
-        // facts the history never held.
+        // The line carries ids. What the provider said about each row is
+        // in the CAS blob `facts_blob` names, which whoever holds the CAS
+        // hands to `EndpointBook::learn`; until then, and for a line
+        // without one, a replay does not invent facts the history never
+        // held.
         models: attached
             .models
             .into_iter()
             .map(|id| ModelFacts {
                 id,
-                context_tokens: None,
-                max_output_tokens: None,
-                input_modalities: Vec::new(),
-                input_price: None,
-                output_price: None,
+                ..ModelFacts::default()
             })
             .collect(),
         probed: attached.probed,
         tuning: tuning_of(attached.tuning.unwrap_or_default())?,
+        facts_blob: attached.facts_blob,
     })
 }
 

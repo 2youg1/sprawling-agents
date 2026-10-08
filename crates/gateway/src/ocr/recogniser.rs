@@ -286,6 +286,7 @@ mod tests {
             models: Vec::new(),
             probed: false,
             tuning: EndpointTuning::default(),
+            facts_blob: None,
         };
         let entry = seeing_model();
         let transport = crate::endpoint::Transport::default();

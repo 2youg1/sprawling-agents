@@ -298,6 +298,31 @@ impl EndpointBook {
         self.endpoints.values().map(|held| &held.endpoint)
     }
 
+    /// Puts back what an attach read about each model, from the bytes
+    /// of the CAS blob `blob` (written by
+    /// [`AttachedEndpoint::facts_bytes`]). Only an endpoint whose latest
+    /// line names this blob learns it, and only for the ids that line
+    /// admitted, so a later attach is never overwritten by an earlier
+    /// reading.
+    ///
+    /// # Errors
+    /// `E_WIRE_MISMATCH` when the bytes are not a list of model facts.
+    pub fn learn(&mut self, blob: &kernel::B3Hash, bytes: &[u8]) -> Result<(), AxError> {
+        let read: Vec<kernel::event::record::ModelFacts> = serde_json::from_slice(bytes)
+            .map_err(|err| crate::mismatch::mismatch("model facts", &err.to_string()))?;
+        for held in self.endpoints.values_mut() {
+            if held.endpoint.facts_blob.as_ref() != Some(blob) {
+                continue;
+            }
+            for row in &mut held.endpoint.models {
+                if let Some(stated) = read.iter().find(|stated| stated.id == row.id) {
+                    row.clone_from(stated);
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// What is chosen, tag by tag.
     pub fn choices(&self) -> impl Iterator<Item = (ModelTag, &str, &ModelEntry)> {
         self.chosen
@@ -356,11 +381,7 @@ mod tests {
     fn facts(id: &str) -> ModelFacts {
         ModelFacts {
             id: id.to_owned(),
-            context_tokens: None,
-            max_output_tokens: None,
-            input_modalities: Vec::new(),
-            input_price: None,
-            output_price: None,
+            ..ModelFacts::default()
         }
     }
 
@@ -374,6 +395,7 @@ mod tests {
             models: vec![facts("m-small"), facts("m-large")],
             probed: true,
             tuning: EndpointTuning::default(),
+            facts_blob: None,
         }
     }
     fn entry(id: &str) -> ModelEntry {

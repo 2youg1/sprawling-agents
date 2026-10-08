@@ -65,7 +65,7 @@ pub struct EndpointConfig {
 
 /// One endpoint, ready to call.
 ///
-/// The three fields are reachable inside this module tree and nowhere
+/// The fields are reachable inside this module tree and nowhere
 /// else: a caller that could take the transport out could also decide
 /// for itself what a non-2xx means and whether the provider's own body
 /// is quoted back, which would put those two answers under two
@@ -75,6 +75,9 @@ pub struct Endpoint {
     pub(super) config: EndpointConfig,
     pub(super) client: reqwest::blocking::Client,
     pub(super) redemption: Redemption,
+    /// What the model this endpoint calls offers to think at, which
+    /// decides the thinking fields of every request (gateway D35).
+    pub(super) thinking: crate::provider::thinking::ThinkingOffer,
 }
 
 impl Endpoint {

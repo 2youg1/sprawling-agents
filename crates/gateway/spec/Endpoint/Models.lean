@@ -35,7 +35,7 @@ impl Endpoint { pub fn list_models(&self, url: &str) -> Result<Vec<ModelFacts>, 
 | DeepSeek | `effort.{supported_levels,default_level}` | 那几档与默认档 |
 | xAI | `capabilities.{reasoning_effort,default_reasoning_effort}` | 那几档与默认档；同名两键也在行的顶层读 |
 | Moonshot | `supports_reasoning` | 只有开关：真即能开启，假即不能 |
-| OpenRouter | `canonical_slug`，再是 `hugging_face_id` | 规范 id（`provider::identity`，§8-38） |
+| OpenRouter | `hugging_face_id`（非空时） | 规范 id（`provider::identity`，§8-38） |
 
 - **上游的词照 `Effort` 的 serde 拼写读**：七个词以外的词（`ultra`、Ollama 由模型自定的名字）不入集合，`none` 也不入，因为关闭思考不是一档；一个说了档位却一个都读不懂的陈述读作只有开关。
 - **Ollama 的 `/v1/models` 不带这些信息**：它的行只有 `id/object/created/owned_by`，读成没说，梯子落到下一档；`/api/show` 的 `thinking` 对象要逐模型另发一次请求，今天不读（§3）。
