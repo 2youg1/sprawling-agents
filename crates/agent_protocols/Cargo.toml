@@ -18,6 +18,9 @@ name = "agent_protocols"
 conformance = []
 
 [dependencies]
+# An MCP stdio server starts from `child::command`: off the city's
+# console, without the city's secret keys (`crates/agent_protocols/Spec.lean` D16).
+child = { workspace = true }
 kernel = { workspace = true }
 # An MCP server reached over HTTP gets its client from
 # `gateway::client_for`, and a `secret:realm/name` reference beside a

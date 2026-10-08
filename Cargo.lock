@@ -2886,6 +2886,7 @@ version = "0.0.10"
 dependencies = [
  "reqwest",
  "serde_json",
+ "sprawling-child",
  "sprawling-gateway",
  "sprawling-kernel",
  "tempfile",
@@ -2942,6 +2943,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sprawling-agent-protocols",
+ "sprawling-child",
  "sprawling-desktop-ffi",
  "sprawling-kernel",
  "tempfile",
@@ -3017,6 +3019,7 @@ name = "sprawling-remote-access"
 version = "0.0.10"
 dependencies = [
  "aws-lc-rs",
+ "sprawling-child",
  "sprawling-kernel",
  "zeroize",
 ]
@@ -3033,6 +3036,7 @@ dependencies = [
  "same-file",
  "serde",
  "serde_json",
+ "sprawling-child",
  "sprawling-desktop-ffi",
  "sprawling-kernel",
  "sprawling-storage",
