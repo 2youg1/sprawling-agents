@@ -5,9 +5,11 @@
 
 import crates.wire.spec.Aggregate
 import crates.wire.spec.Answer
+import crates.wire.spec.Answer.Agents
 import crates.wire.spec.Answer.Automation
 import crates.wire.spec.Answer.Commits
 import crates.wire.spec.Answer.Config
+import crates.wire.spec.Answer.Devices
 import crates.wire.spec.Answer.Doctor
 import crates.wire.spec.Answer.Document
 import crates.wire.spec.Answer.DocumentBytes
@@ -275,6 +277,10 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 | 8-87 | `crates/wire/spec/Privacy.lean` |
 | 8-88 | `crates/wire/spec/Privacy.lean` |
 | 8-89 | `crates/wire/spec/Privacy.lean` |
+| 8-90 | `crates/wire/spec/Answer/Agents.lean` |
+| 8-91 | `crates/wire/spec/Answer/Devices.lean` |
+| 8-92 | `crates/wire/spec/Answer/Endpoints.lean` |
+| 8-93 | `crates/wire/spec/Server.lean` |
 | 19 | `crates/wire/spec/Command/Kind.lean` |
 | 19-1 | `crates/wire/spec/Command/Kind.lean` |
 | 19-2 | `crates/wire/spec/Command/Kind.lean` |
@@ -369,6 +375,7 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 | D50 | 线上的值是主机读到的原样，页面原样送回作 expected | `crates/wire/spec/Privacy.lean` |
 | D51 | 正文字号的下限是类型 `BodyPx`，没有上限 | `crates/wire/spec/Preference.lean` |
 | D52 | 没有「全部恢复」的帧：页面为每个仍拥有的控制各发一次 Restore | `crates/wire/spec/Privacy.lean` |
+| D53 | V0.0.11 的线上改形一次进位，由第一条车道落地 | `crates/wire/spec/Frames.lean` |
 -/
 
 /-! ## 13 依赖选型

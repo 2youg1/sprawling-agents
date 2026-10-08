@@ -64,3 +64,34 @@ pub enum KeyState {                            // 线上拼作 snake_case
 
 **重开参数**：tuning 里出现读回时必须隐去的字段（例如一个不是引用的凭据）时，(a) 要改成按字段读回。
 -/
+
+/-!
+### 8-92 端点上每个模型带出它的思考档 offer 与跨供应方的身份
+
+```rust
+pub struct ModelFactsSummary {
+    // …既有字段：id、context_tokens、max_output_tokens、input_modalities、input_price、output_price…
+    pub thinking: ThinkingOffer,       // 这个（Endpoint，模型）提供的思考档，带来源
+    pub canonical: String,             // 这个模型跨供应方的身份
+}
+pub struct ThinkingOffer {
+    pub levels: Vec<Effort>,           // 城的固定升序；只含提供的档，恒不含 `none`
+    pub on: Switch,                    // 只有开关、没有档位的模型能不能「开启思考」
+    pub default: Option<Effort>,       // 上游说的默认档
+    pub default_on: Option<bool>,      // 上游说的：什么都不发时是否在想
+    pub words: Vec<EffortWord>,        // 只在上游的词与城的拼写不同时出现
+    pub from: OfferSource,
+    pub source: Option<String>,        // Preset 一级的文档地址
+}
+pub enum Switch { Allowed, Refused, Unknown }               // 线上 snake_case
+pub enum OfferSource { Person, Upstream, Preset, Unknown }   // 线上 snake_case
+pub struct EffortWord { pub effort: Effort, pub word: String }
+```
+
+- **两类字段，两种来历**：`id` 到 `output_price` 是上游的原话，缺席就是没说，恒不从预置表或梯子补上；`thinking` 是 `gateway::provider::thinking` 沿 Person → Upstream → Preset → Unknown 的梯子解出的答案，它自己用 `from` 说出是哪一级给的，`source` 给出那一级的出处，所以页面读到的每一档都说得出它从哪里来，不会被当成上游的原话。
+- **单位是（Endpoint，模型）**：同一个模型在不同供应方、不同 face 上提供的档位不同，所以 offer 挂在端点的模型行上；换供应方，页面画的思考档带跟着换，人存下的档位不变（人的裁定：模型与档位分开存）。
+- **`levels` 为空就没有思考控制**：页面不画思考档带，也不画令牌上的档位一段；只有开关的模型 `levels` 为空而 `on` 是 `Allowed`，默认档 `High` 编码成「开启思考」。`none` 恒不在 `levels` 里，关闭思考不是一档。
+- **`canonical` 只由 `gateway::provider::identity` 算**：上游说出它自己的规范 id 时用它，否则用模型 id 去掉最后一个 `/` 之前的组织前缀后转成小写；两行是同一个模型，当且仅当两个字符串相等，不做模糊匹配。页面按它把选择器里的模型合并成一行，旁边列出每个供应方自己的 id。
+- **现状**：`canonical` 今天只走第二条（上游的规范 id 在 `ModelFacts` 读出它之后接上）；`thinking` 今天是 `from: Unknown` 的空 offer，直到梯子落地。
+- `WIRE_V` 随本版的改形进一位（D53）。
+-/
