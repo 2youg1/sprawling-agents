@@ -17,6 +17,8 @@ export function linkWord(lang: Lang, link: LinkState): string {
       return say(lang, "link_live");
     case "refused":
       return say(lang, "link_refused");
+    case "closed":
+      return say(lang, "link_closed");
     case "idle":
     case "opening":
     case "handshaking":

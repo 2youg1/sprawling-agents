@@ -71,6 +71,7 @@ function footOf(link: LinkState): Foot {
     case "live":
       return NO_FOOT;
     case "refused":
+    case "closed":
       return { kind: "link", link: "refused" };
     case "idle":
     case "opening":

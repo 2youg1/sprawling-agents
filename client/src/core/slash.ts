@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 // The verbs a person can type. One table, read by both places that
-// offer them - the `/` menu above the composer and the Ctrl-K palette -
+// offer them - the `/` menu above the composer and the Accel-/ palette -
 // so a button spelled `/stop` and a line somebody types cannot drift
 // into meaning two different things.
 //
@@ -34,6 +34,7 @@ import {
 } from "./commands";
 import type { Template } from "./commands";
 import { askFork } from "./forking";
+import { askQuit } from "./quitting";
 import { PAGES, page } from "./route";
 import { given, stripped } from "./tags";
 import type { View } from "./route";
@@ -329,6 +330,18 @@ export const SLASH: readonly Slash[] = [
       // The machine report is the welcome's first step, and that page
       // asks the `doctor` query again when it opens.
       hands.go({ kind: "welcome" });
+      hands.write("");
+    },
+  },
+  {
+    // Closing the city is a question first: with runs going, whether to
+    // wait for them (`views/quit.svelte`).
+    spelling: "/quit",
+    grammar: "",
+    about: "slash_quit",
+    section: "actions",
+    run: (hands) => {
+      askQuit();
       hands.write("");
     },
   },
