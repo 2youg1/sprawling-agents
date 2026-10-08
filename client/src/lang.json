@@ -4391,6 +4391,10 @@
     "en": "refused",
     "zh": "被拒绝"
   },
+  "link_closed": {
+    "en": "closed",
+    "zh": "已关闭"
+  },
   "link_send_action": {
     "en": "send a command to the city",
     "zh": "把一条命令发给城市"
