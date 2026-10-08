@@ -34,7 +34,7 @@ The city gives models **roles**, so that the expensive model is not used for che
 | `digest` | reads long documents and search results on `main`'s behalf, and follows `main` until you point it elsewhere |
 | `transcribe` | turns a recording of speech into text; optional, and a city with none draws no microphone |
 
-**Effort** is how long a model reasons before it answers, on the scale `none`, `low`, `medium`, `high`, `xhigh`, `max`, or **unstated**, which leaves the field out and lets the provider decide. More effort costs more per answer and helps planning and work that must be right the first time.
+**Effort**, the thinking level, is how long a model reasons before it answers, on the scale `minimal`, `low`, `medium`, `high`, `xhigh`, `max`. Which of these a model takes is the provider's fact, not the city's: the city offers only the levels the provider states for that model, read from the provider's model list when it says, otherwise from the vendor's documentation, and a model without thinking control is offered no level at all. The city asks for `high` until you choose another level, because a forgotten setting should still give a balanced answer. When the model does not offer `high`, the city leaves the choice to the provider's own default. More effort costs more per answer and takes longer, and it helps planning and work that must be right the first time; on a provider whose own default was lower, the `high` default costs more than leaving the field out did.
 
 ## The city
 
@@ -101,19 +101,19 @@ To stop work, you have three verbs. **`/steer <text>`** adds an instruction to a
 
 | In Claude Code | In sprawling |
 |---|---|
-| the terminal session | a page in your browser, served by the binary; the terminal becomes the city's console |
+| the terminal session | the city's CLI in your terminal, or a page in your browser after `/web`; both are served by the one binary |
 | the working folder | a room in a building; its address sets where the agent may write |
 | `CLAUDE.md` | a building's `SPEC.md` and `RULES.toml`, a resident's `URBANITE.md`, and a project's own `AGENTS.md`, which the city hands to agents working in that project |
 | `/clear`, `/compact` | `/new` starts a fresh session; `/compact`, the same as `/new --carry`, carries the room's `Handoff.md` across |
-| `/model` | `/model <id>`, the **model** pill under the box, or the model table in settings |
-| thinking budget | the **effort** pill, from `none` to `max` |
+| `/model` | `/model <id>`, the model part of the control under the box, or the model table in settings |
+| thinking budget | `/effort <level>`, or the level part of the same control; only the levels the model offers are listed |
 | plan mode | asking the Mayor, whose job is planning |
 | subagents | other residents: a run can `delegate`, speak to a neighbour, or wake one, and every one of them is a run you can open |
 | permission prompts | `RULES.toml` decides; only design questions reach you, on **waiting on you** |
 | skills in `~/.claude/skills` | the same folders, mounted as a shelf and admitted per building |
 | MCP servers | the same servers, per building, in `CONFIG.toml` or on the **MCP** page |
 | `git` history of what the agent did | the Ledger, plus git trailers on every commit the city makes |
-| Esc to interrupt | `/stop`, or Ctrl+. |
+| Esc to interrupt | Esc in the CLI; `/stop` or the stop face of the send key on the page |
 
 The largest difference is that nothing here is one conversation. The Mayor plans, buildings work in parallel, and you move between them.
 
@@ -135,7 +135,7 @@ Choose one channel:
 |---|---|---|
 | npm | `npm install --global sprawling@latest` | Node.js and npm; downloads a prebuilt binary. |
 | Bun | `bun install --global sprawling@latest` | Bun; downloads a prebuilt binary. Put Bun's global bin directory, reported by `bun pm bin --global`, on PATH. |
-| crates.io | `cargo install sprawling --locked` | Rust supported by the published package and native build tools for the platform; compiles locally. The package includes the built browser client. |
+| crates.io | `cargo install sprawling --locked` | Rust supported by the published package and native build tools for the platform; on Windows also Zig 0.17.0 on PATH, which builds the desktop leaf of `sprawling-desktop-ffi` and refuses any other version. Compiles locally. The package includes the built browser client. |
 | cargo-binstall | `cargo binstall sprawling` | [cargo-binstall](https://github.com/cargo-bins/cargo-binstall); downloads the release archive using the published crate's metadata. |
 | Manual archive | Select your platform in the [release list](https://github.com/2youg1/sprawling-agents/releases) | Windows x86-64, macOS on Apple silicon or Linux x86-64; unpack and run the included binary. |
 
@@ -226,7 +226,7 @@ The version line comes from the binary. A checkout built without release provena
 
 Updates are manual. Check in Settings or with `sprawling status --check`, and use the channel that installed this copy. Verify the reported channel before following its command; a copied binary or ambiguous bin directory may not identify the installer. Read the selected release's CHANGELOG on its tag or release page, especially changes to data formats, configuration and the wire. The main branch's prepared changelog is not evidence that that version has been published.
 
-Before replacing the binary, finish or cancel active work and stop the city with `Ctrl-C` in its console. Keep the old binary or enough package-version information to reinstall it, and write down `sprawling version`. Export with that old version, into a new directory outside the city, then restore into a separate unused directory:
+Before replacing the binary, finish or cancel active work and close the city with `/quit`. Keep the old binary or enough package-version information to reinstall it, and write down `sprawling version`. Export with that old version, into a new directory outside the city, then restore into a separate unused directory:
 
 ```sh
 sprawling version
@@ -252,13 +252,15 @@ Update through the original channel:
 | AUR sprawling-bin | In the original checkout: `git pull --ff-only && makepkg -si` | Inspect and build the PKGBUILD revision for the selected release. |
 | Repository Nix flake | Check out the selected tag or commit, then run the [Nix commands](#with-nix). | Use the original pinned checkout and lockfile. A fixed commit does not follow newer releases. |
 
-After updating, run `sprawling version` and `sprawling help`, check the intended executable is the one on PATH, then reopen the city with `sprawling up ./cities/first`. Confirm the page connects, configuration loads, project files and history are present and a small task works. Keep the old version and backup until this check succeeds.
+After updating, run `sprawling version` and `sprawling help`, check the intended executable is the one on PATH, then reopen the city with `sprawling up ./cities/first` and `/web`. Confirm the page connects, configuration loads, project files and history are present and a small task works. Keep the old version and backup until this check succeeds.
+
+From 0.0.10 to 0.0.11 nothing has to be converted by hand. A city written by 0.0.10 opens as it is, and the effort it stored, in the Ledger, in `CONFIG.toml` and in git trailers, keeps its meaning. A level the city stored for a room is used where the model offers it; where it does not, the room's runs take the default rule until you move back to a model that offers it. A browser that worked with 0.0.10 is paired again once, the first time `/web` opens it, and a script that called the loopback port without a token now reads the key file the city writes for its port (see [Driving a city from a terminal or a script](#driving-a-city-from-a-terminal-or-a-script)). <!-- v0.0.11-verify -->
 
 From 0.0.9 to 0.0.10 nothing has to be converted by hand. A city written by 0.0.9 opens as it is: on the first open the views and the standing are folded again from the start of the Ledger, because the snapshot format changed, and the console says so; the history is proved as before. Provider keys that 0.0.9 stored in the vault are used as they are, so an endpoint registered with a `secret:providers/<name>` reference works without entering the key again. The personal configuration `~/.sprawling/config.toml` is read without being rewritten, and settings it does not name take this version's defaults, for example 15 px body text and Geist Mono for reading text.
 
 ### Roll back safely
 
-Stop the updated city. Restore the previous binary through its original channel, verify its version, then use that previous binary to restore the pre-update bundle into a fresh city directory and run `replay` on its Ledger. Reapply any separately backed-up host configuration, enroll credentials where needed, and start this restored city. Do not ask an older binary to read a city that the newer version migrated unless the selected release explicitly documents that compatibility. Preserve the updated city separately for inspection; rollback to the backup does not retain work performed after it was taken.
+Stop the updated city. Restore the previous binary through its original channel, verify its version, then use that previous binary to restore the pre-update bundle into a fresh city directory and run `replay` on its Ledger. Reapply any separately backed-up host configuration, enroll credentials where needed, and start this restored city. Do not ask an older binary to read a city that the newer version migrated unless the selected release explicitly documents that compatibility; 0.0.10 is not promised to read a Ledger that 0.0.11 has written. Preserve the updated city separately for inspection; rollback to the backup does not retain work performed after it was taken.
 
 ## 2 Raise a city, and open it
 
@@ -266,7 +268,15 @@ Stop the updated city. Restore the previous binary through its original channel,
 sprawling up ./cities/first
 ```
 
-This raises the city if the directory does not hold one, serves it on `127.0.0.1:8787`, and opens the page in the browser your operating system opens links with. The terminal becomes the city's console: `/help` lists what it takes, `/serving` repeats where the city listens, and `Ctrl-C` stops the city. The console prints one line for each record the city commits — its position, its kind and its address — and never what you typed or what a model answered, because a terminal is seen by whoever stands nearby; `sprawling up --whole-records` prints each record whole. It prints the same on Windows, macOS and Linux. `sprawling` with no arguments shows the folder it would start a city in, and Enter starts it there.
+This raises the city if the directory does not hold one and serves it on `127.0.0.1:8787`. The terminal becomes the city's CLI: its first line names the city's folder, the room you speak to and the serving address, and below it you write to that room or type a slash command. <!-- v0.0.11-verify --> `/help` lists the commands, `/room <addr>` changes the room you speak to, `/serving` repeats where the city listens, and `/quit` closes the city. When a resident asks you something and the line is empty, `y` allows and `n` denies. The CLI shows the conversation of the room you speak to, because you chose to work in the terminal; it never shows a credential.
+
+`/web` opens the page in the browser your operating system opens links with, and the terminal becomes the quiet host: two lines, the address and a pairing code, and nothing else however much the city does. Enter opens the page again; Esc returns to the CLI with its scrollback as you left it. Closing the browser stops no work, because the city keeps the port open: open the address again, or press Enter in the quiet host.
+
+The browser `/web` opens is paired without typing. `/web` hands it a one-time open code through a file that only your account can read, and the page keeps a device key in that browser's own storage, so the plain address opens the city in that browser from then on. <!-- v0.0.11-verify --> A second browser, or one whose storage was cleared, shows a box for the pairing code: type the code the terminal shows. Each code takes one try, right or wrong, and the terminal then shows a new one. **settings** lists the paired browsers and forgets any of them. <!-- v0.0.11-verify -->
+
+`/quit` closes the city in order, typed in the CLI or on a page this machine opened. With runs going it asks once: Enter waits for them to finish, `n` stops them now, and Esc keeps the city serving. Ctrl+C and Ctrl+V belong to the terminal: Ctrl+C copies the selected text, and a Ctrl+C that reaches the city only prints, once per session, that `/quit` closes the city. Esc closes a menu, else clears the line, else interrupts the run in the room you speak to. A line that ends in `\` goes on to a new line when you press Enter, and so does Shift+Enter where the terminal tells the two apart. Closing the terminal window stops the runs at their next safe point and closes the city within a few seconds. The keys behave the same on Windows, macOS and Linux. <!-- v0.0.11-verify -->
+
+`sprawling` with no arguments shows the folder it would start a city in, and Enter starts it there. <!-- v0.0.11-verify -->
 
 To work on projects you already have, raise the city in the folder that holds them, or move a project into the city's folder, and take it in as a building with `sprawling adopt ./cities/first myproject`. Adopting overwrites no file; it adds the city's forms beside your work and a `.gitignore` entry that keeps the city's notes out of your project's history.
 
@@ -276,7 +286,7 @@ To work on projects you already have, raise the city in the folder that holds th
 
 A city with no model to call opens on **welcome**, whose first card, **connect a provider**, leads to **settings** → **accounts and providers**.
 
-**official harnesses**, the next group, is where a subscription comes in: the city never signs in to one itself. The page lists Claude Code, Codex, Grok Build, Kimi Code and Pi, whether this computer can run the command that starts each, that command, and a link to the vendor's own sign-in instructions; you sign in inside the harness.
+**ACP agents**, the next group, is where a subscription comes in: an agent that speaks ACP runs as a resident with its own login, and the city never signs in to a subscription itself. <!-- v0.0.11-verify --> One box searches the agents found on this machine and the catalog of the ACP registry that ships with this release, and turns a pasted command line, an `agent_servers` block from Zed or JetBrains, or a registry `agent.json` into a preview. Each agent is shown as a consent card: the exact command line, its version and whether that version is pinned, where the entry came from, its licence, the names of the environment variables it sets, and the sentence that it runs with your account's rights, including over this city. One button adds it and seats it in the room you are in, and another only adds it. <!-- v0.0.11-verify --> The agent signs in when it first says it must: the page then offers the agent's own login methods, and the agent's own program does the signing in. The city never starts a claude.ai subscription login; it can start the Console login of Claude Code's ACP adapter. [`integrations.md`](integrations.md) walks through every way in.
 
 The form above the list of what is attached takes a key. Its first control lists the providers the city knows by host: pick one and the base URL and the format are filled in for you. The three boxes below it are:
 
@@ -296,20 +306,21 @@ A local server can also be named before the city starts: with `SPRAWLING_MODEL_U
 
 **the Mayor** is the conversation with `hall/mayor`, and the page the city opens on once a model is chosen. Enter sends a message; Shift+Enter starts a new line.
 
-Under the box, four pills say how the message runs, and a click changes each:
+Under the box, the settings row says how the message runs, and a click changes each control:
 
-| Pill | What it sets |
+| Control | What it sets |
 |---|---|
-| **model** | the model that answers; a session keeps the model it started on, so choosing another opens a new session |
 | **workspace** | the room that hears the message |
-| **effort** | how long the model reasons first |
-| **mode** | what the run does with your message: **chat** answers what you say and changes nothing else; **work** carries out the task towards the goal you state |
+| **model · provider · level** | one control in three parts: the model that answers, the provider that serves it, and the thinking level. Activating a part opens one panel at that part's list, and the recent combinations at its top apply all three parts at once. A model that several providers serve is listed once, and each provider shows its price and context window. The level list holds only the levels this provider states for this model, marks the one that will be used, and says `high (default)` while you have chosen none; a model without thinking control shows no level part. A session keeps the model it started on, so choosing another opens a new session <!-- v0.0.11-verify --> |
+| **permissions** | what the run does with your message: **chat** answers what you say and changes nothing else; **work** carries out the task towards the goal you state; and the write limit |
+
+Choosing another model or provider keeps the level you stored: the level is a preference of its own, used whenever the model in force offers it, so moving back to a model restores it.
 
 Write the idea in one sentence — *rewrite the ledger reader so a cold read of a million events stays under a second, and write down the numbers you measured* — leave the workspace at `hall/mayor`, and press Enter.
 
 The Mayor reads every building's `Roadmap.md`, `Memo.md` and `Handoff.md` first. It writes the city's plan into `<city>/hall/Roadmap.md` through its `plan` tool, one row per line of work. It raises a building through its `city` tool when no existing building should hold the work, or adopts a directory you point it at, and never raises two buildings for one project. It hands each building its part, keeps each building working through `pursue` until the part runs out, and records what it decided in `<city>/hall/Memo.md` before it reports back.
 
-You can also skip the Mayor. `/raise lab` raises a building named `lab` from the `minimal` template (`/raise vault confidential` raises a confidential one), and switching the **workspace** pill to a room of that building sends your message straight to it.
+You can also skip the Mayor. `/raise lab` raises a building named `lab` from the `minimal` template (`/raise vault confidential` raises a confidential one), and switching the **workspace** chip to a room of that building sends your message straight to it.
 
 ## 5 Watch the city work
 
@@ -348,7 +359,7 @@ No page merges for you, and none rejects work already merged. Your recourse is g
 
 ## 9 Stop, and start again
 
-`Ctrl-C` in the console stops the city. `/halt --all` stops the work and leaves the city serving. After a crash:
+`/quit`, in the CLI or on a page this machine opened, closes the city. `/halt --all` stops the work and leaves the city serving. After a crash:
 
 ```bash
 sprawling resume ./cities/first
@@ -373,10 +384,11 @@ A line that begins with `/` is a command, and the menu above the box lists them:
 | `/raise <addr> [minimal\|confidential\|hall]` | raises a building from a template |
 | `/new [--carry]` | start a fresh session in this room; `--carry` brings the room's `Handoff.md` |
 | `/fork [addr]` | starts a second line of conversation from the newest run in a room |
-| `/model <id>`, `/effort <level>` | point `main` at another model; set the effort |
+| `/model <id>`, `/effort <level>` | point `main` at another model; set the thinking level. Both complete their argument from what the model in force offers, and `/effort` with a level that model does not offer is refused before the run starts, naming the levels it does offer |
+| `/web`, `/quit` | in the CLI, open the page; on either face, close the city. A paired remote device cannot close the city <!-- v0.0.11-verify --> |
 | `/diff`, `/go <page>`, `/mcp`, `/doctor`, `/help` | open changes, a page, the MCP page, the machine check, the list |
 
-Ctrl+K (⌘K on a Mac) offers every command with every page, building and room beside it. The keys that ship: Ctrl+1 to Ctrl+6 for the Mayor, city, MCP, the record, cost and the registry; Ctrl+, for settings; Ctrl+Shift+A for **waiting on you**; Ctrl+B for the mailbox; Ctrl+J for the inspector; Ctrl+P to find a file; Ctrl+\ to change how much of the city the page draws; Ctrl+. to stop the run in front of you, which on a page with no run going stops nothing and names `/halt --all`, the verb that stops the whole city; Ctrl+/ for the key list; Ctrl+Shift+F to fork from the entry under the pointer; Ctrl+Shift+Y, Ctrl+Shift+E and Ctrl+Shift+X to answer the decide card that holds the focus; and `/` outside a text box to focus the box. Every key that changes something holds Ctrl, so a letter typed while the focus is outside the box changes nothing. **settings** → **keybindings** changes any of them.
+<!-- v0.0.11-verify --> Ctrl+K (⌘K on a Mac) offers every command with every page, building and room beside it. No key the page binds takes a browser's own shortcut for printing, downloads, bookmarks, search or switching tabs, and what is new in this release has no key of its own: reach it through its slash command or Ctrl+K. The keys that ship: Ctrl+1 to Ctrl+6 for the Mayor, city, MCP, the record, cost and the registry; Ctrl+, for settings; Ctrl+Shift+A for **waiting on you**; Ctrl+B for the mailbox; Ctrl+J for the inspector; Ctrl+P to find a file; Ctrl+\ to change how much of the city the page draws; Ctrl+. to stop the run in front of you, which on a page with no run going stops nothing and names `/halt --all`, the verb that stops the whole city; Ctrl+/ for the key list; Ctrl+Shift+F to fork from the entry under the pointer; Ctrl+Shift+Y, Ctrl+Shift+E and Ctrl+Shift+X to answer the decide card that holds the focus; and `/` outside a text box to focus the box. Every key that changes something holds Ctrl, so a letter typed while the focus is outside the box changes nothing. **settings** → **keybindings** changes any of them.
 
 ## Sessions
 
@@ -420,7 +432,7 @@ sprawling top                                                      # the monitor
 sprawling call '{"ask":{"ask_id":1,"query":"city_view"}}'          # one frame of the wire
 ```
 
-`sprawling call` with no frame lists every command and query the wire carries. Its exit code is the answer — 0 answered, 1 refused, 2 your command line, 3 nothing came back in time, 4 no city at that address — so a script branches on it without parsing JSON. [`wire.md`](wire.md) is the whole wire, written for an agent that drives a city from outside.
+None of these takes a token on this machine: the served city writes a key file for its port, readable only by your account and deleted when the city closes, and `call`, `dispatch`, `gauge` and `enrol` read it when no `--token` is given. <!-- v0.0.11-verify --> `sprawling call` with no frame lists every command and query the wire carries. Its exit code is the answer — 0 answered, 1 refused, 2 your command line, 3 nothing came back in time, 4 no city at that address — so a script branches on it without parsing JSON. [`wire.md`](wire.md) is the whole wire, written for an agent that drives a city from outside.
 
 ## Another machine on your network
 
@@ -428,7 +440,7 @@ sprawling call '{"ask":{"ask_id":1,"query":"city_view"}}'          # one frame o
 sprawling serve ./cities/first 0.0.0.0:8787
 ```
 
-An address that reaches past this machine needs a pairing key. If `SPRAWLING_PAIRING_TOKEN` is set, the city adopts it and never prints it; otherwise the city mints a key for this serve alone and prints it once in the banner, with an address that carries it. The next start replaces it. From outside your network, a device reaches the city through the remote door and a route you choose. Settings > Remote opens the door for a time you pick, closes it, and replaces the city key; opening and replacing the key print a code on the terminal that runs `sprawling serve`, which you type into the page within two minutes, the same on Windows, macOS and Linux. Pairing a device stays at the console: [operating.md](operating.md), *Reaching the city from another device*, says how, and what the route is trusted with.
+An address that reaches past this machine needs a pairing key, as the loopback address does. If `SPRAWLING_PAIRING_TOKEN` is set, the city adopts it and never prints it; otherwise the city mints a key for this serve alone and prints it once in the banner, with an address that carries it. <!-- v0.0.11-verify --> The next start replaces it. The programs the city starts never see `SPRAWLING_PAIRING_TOKEN`: it is removed from their environment, as every `SPRAWLING_SECRET_*` variable is. From outside your network, a device reaches the city through the remote door and a route you choose. Settings > Remote opens the door for a time you pick, closes it, and replaces the city key; opening and replacing the key print a code on the terminal that runs `sprawling serve`, as a third line in the quiet host, which you type into the page within two minutes, the same on Windows, macOS and Linux. Pairing a device stays at the console: [operating.md](operating.md), *Reaching the city from another device*, says how, and what the route is trusted with.
 
 ## Moving a city
 
@@ -453,6 +465,9 @@ Restore compares the chain with the bundle's manifest before it reports success,
 | A file is missing | **the recycle bin**: every row states how to get that file back. |
 | A setting does not take effect | `sprawling check <city>` prints each error in the city's TOML files. |
 | An editor link does nothing | The editor chosen under **settings** → **advanced** is not the one registered on this computer, or the city's folder there is not this machine's absolute path. |
+| The page asks for a pairing code | This browser holds no device key for this city yet, or its storage was cleared. Type the code the terminal shows, or type `/web` in the CLI, which pairs the browser it opens. |
+| A script on this machine is refused for a missing credential | No key file exists for that port: the city is not served on this machine at that port, or it was served by another account. Start it, or pass `--token`. <!-- v0.0.11-verify --> |
+| A thinking level is refused before the run starts | The model in force does not offer the level `/effort` or the dispatch named; `E_CONFIG_INVALID` lists the levels it offers. |
 | This machine lacks something the city needs | `sprawling doctor` lists it, and `--install` offers each missing item, one at a time. |
 
 More of these, with what to do about each, are in [`operating.md`](operating.md).
