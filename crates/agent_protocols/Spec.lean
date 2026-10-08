@@ -51,7 +51,7 @@ import crates.agent_protocols.spec.Mcp.Tools
 **现状：登录、添加与检测还没有执行器。** 本版已建的是开放名单、同意、目录快照、粘贴文法、环境白名单与 `initialize`／`-32000` 的读法；以下几件的接口已在 `wire` 与 IF-0 定下，代码还没有，`AddAgent` 与 `AgentLogin` 今天答 `not_built`：
 - `AddAgent` 的执行：重算摘要、把程序解析成绝对路径、写一行 `[[agent]]`、`seat_here` 时写房间的 `[resident] harness`；
 - 登录执行器：收到 `-32000` 之后，`agent` 类型发 `authenticate`，`terminal` 类型在 CLI 里交出终端或经 `sprawling acp-login <ticket>` 跳板开新窗口（Windows `CREATE_NEW_CONSOLE`，macOS `.command` 加 `open`，Linux 终端列表），成功后重新 `initialize` 并重发原请求；
-- 不执行任何东西的检测：别的 ACP 客户端的配置、npm 与 bun 的 shim、厂商目录、PATH 上的名字（只作线索），`detected` 今天是空表；
+- 检测的另两种线索：npm 与 bun 的全局 shim 反查包目录、PATH 上的名字（只作线索）；
 - CLI 的 `/acp` 列表；
 - url elicitation 的声明（D14）。
 能判定它们完成的证据是：一次派活收到 `-32000` 之后不经人重打就重发成功。`run_started` 已经带着 agent 的 id、它在 `initialize` 里报的版本与同意的摘要（会话在 `HarnessRun::open` 之前打开，所以版本在落账时已知）。
@@ -318,6 +318,11 @@ impl SetUpDir { pub fn on(&self, home: Option<&Path>, variable: Option<OsString>
 // harness::paste —— 粘贴文法（文法）
 pub fn pasted(text: &str) -> Result<AgentEntry, AxError>;
 
+// harness::detect —— 不执行任何东西的检测（判定）
+pub const CLIENT_CONFIGS: [SetUpDir; 2];                                   // 别的 ACP 客户端写下的配置文件
+pub fn configured(text: &str) -> Vec<AgentEntry>;                          // 一份 agent_servers 配置里的每一个 agent，env 不带
+pub fn detected(roster: &Roster, set_up: impl Fn(&SetUpDir) -> bool, configs: &[String]) -> Vec<AgentEntry>;
+
 // harness::environment —— 子进程见到的环境（判定）
 pub fn passed(city: impl Iterator<Item = (OsString, OsString)>) -> Vec<(OsString, OsString)>;
 
@@ -343,6 +348,7 @@ pub enum LoginKind { Agent, Terminal }
 - **同意先于任何执行**（D16，性质在 `spec/Harness/Consent.lean`）：`HarnessProcess::start` 只收 `Consented`，`Consented` 的字段私有，只有两扇门：`given` 收一份条目和同意时记下的摘要，摘要与 `Launch::digest` 重算的不等就拒（`E_CONFIG_INVALID`）；`written_by_hand` 收一行人亲手写下、没有摘要的条目，以及内置条目，那份文件就是人的同意，与 `[[mcp]]`、`[remote]` 同一条理由。目录、检测与粘贴只产出 `AgentEntry`，产出不了 `Consented`，所以页面上看见的东西在人同意之前起不了任何进程。
 - **快照随版本附带，只在人按下时刷新**（D13）：`Catalog::bundled` 读 `crates/agent_protocols/catalog/registry.json`，这份文件由 `cargo xtask acp-catalog` 从 registry 的 CDN 索引生成并提交，带索引的 `Date` 与 `ETag`；生成时只保留城读的字段（`id`、`name`、`version`、`license`、`distribution`，`binary` 目标只留 `cmd`、`args`、`env`），作者、图标、链接与下载地址不进快照。`Catalog::read` 读的是同一种形状，所以一份完整的 CDN 索引与快照经同一个读者。读法：`npx` 起 `npx -y <package> <args…>`，`uvx` 起 `uvx <package> <args…>`，`env` 原样带上（它们会关掉 agent 的自更新）；`binary` 本版不下载（推迟，见 §3），读成本平台那一项 `cmd` 的文件名经搜索路径起，参数照抄，钉不住版本（`Pin::Unknown`）；本平台没有一项能起的条目不进目录。
 - **粘贴文法只在 Rust 里**（`paste::pasted`，WebUI 与 CLI 经 `Query::ParseAgentSpec` 共用）：接受一行命令、Zed 或 JetBrains 的 `agent_servers` 块（恰好一项）、registry 的 `agent.json`。一行命令按空白分词，双引号括住的一段是一个参数，不解释任何 shell 元字符；出现 `|`、`&`、`;`、`<`、`>` 中的任何一个就拒，恢复语说「只粘贴一个程序和它的参数」。条目的 id 取 `agent_servers` 的键、`agent.json` 的 `id`，或程序的文件名，经 `AgentId::parse` 规范成小写。
+- **检测不执行任何东西**（`detect`）：两种证据，都只读文件。一是别的 ACP 客户端里人亲手写下的配置：JetBrains 的 `~/.jetbrains/acp.json` 与 Zed 的 `~/.config/zed/settings.json`（`CLIENT_CONFIGS`，各引厂商文档），其中 `agent_servers` 的每一项读成一个 `Detected` 条目，`env` 不带：别处的 `env` 可能有密钥，值要人另行写进 Vault；读不成 JSON 的文件（Zed 的文件允许注释）不算证据，不拒整页。二是内置条目的厂商目录（`Official::set_up`，D23）存在：那个内置条目以 `Detected` 列出。检测只决定排序与提示，证明它能用的只有同意之后的 `initialize`。npm 与 bun 的 shim、PATH 上的名字本版不读（§3）。查哪个路径由服务中的城经 `Views` 的 `programs` 入口交进来（`crates/accounting/spec/Views.lean`），本模块只判。
 - **钉住**：`Pin::Exact` 是包串带一个确切版本（`pkg@1.2.3`、`pkg==1.2.3`）；包串不带版本或带 `latest` 是 `Floating`；不是 `npx`、`uvx` 起的程序是 `Unknown`。同意卡片照实显示这一格，不替人拒一个浮动的版本：粘贴的那一行是人自己写的。
 - **子进程只见白名单里的环境**（`environment::passed`，D17）：先清空，再放行白名单里的名字，最后放行条目自己的 `env`。白名单是系统与终端需要的那些（`PATH`、家目录、临时目录、语言、Windows 的系统目录与 `PATHEXT`、XDG 目录、显示、代理），加上 `SSH_CONNECTION`、`SSH_CLIENT`、`SSH_TTY` 与 `NO_BROWSER`：agent 靠它们判断自己是否在远程主机上、该给哪种登录；再加上 `OFFICIAL` 里每家的目录变量，它们的名字只写在 `SetUpDir::variable` 一处。Windows 上名字不分大小写。
 - **`initialize`**（D14）：发 `protocolVersion: 1`、`clientInfo {name: "sprawling", version}`、`fs` 两项与 `terminal` 为 `false`、`auth.terminal: true`。对方答的 `protocolVersion` 不是 1 就拒（`E_WIRE_MISMATCH`，恢复语说这家说的是哪一版），规范要求客户端这时断开并告诉人。`agentInfo.version` 与 `authMethods` 读进 `Introduced`；方法的 `type` 缺省是 `agent`，`terminal` 是另一种，其余拒而不猜。
