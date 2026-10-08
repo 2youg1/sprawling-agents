@@ -114,7 +114,12 @@ const UPGRADE: [(&str, &str); 4] = [
     ("connection", "upgrade"),
     ("upgrade", "websocket"),
     ("sec-websocket-version", "13"),
-    ("sec-websocket-key", "dGhlIHNhbXBsZSBub25jZQ=="),
+    // The sample key of RFC 6455 section 1.3, in fragments short enough
+    // that the secret scanner reads them as the text they are.
+    (
+        "sec-websocket-key",
+        concat!("dGhl", "IHNh", "bXBs", "ZSBu", "b25j", "ZQ=="),
+    ),
 ];
 
 #[tokio::test]

@@ -27,7 +27,8 @@ use crate::auth::Pairing;
 use crate::command::{Command, WireCommand};
 use crate::frames::Query;
 use crate::reception::{
-    Admission, Arrival, BindFace, Door, Keys, ListenerOrigins, decide_admission, offered_pairing,
+    Admission, Arrival, BindFace, Door, Keys, ListenerOrigins, PageHeaders, decide_admission,
+    offered_pairing,
 };
 use crate::reply::{AcpProgress, Reply};
 
@@ -197,13 +198,9 @@ pub(crate) struct ShellState {
     pub(crate) acp: AcpSink,
     pub(crate) transcribe_sink: TranscribeSink,
     pub(crate) drop_sink: DropSink,
-    /// Which face this listener presents, and the credential it demands.
-    /// The value comes from [`decide_bind`] and is the only thing any
-    /// door reads to judge a caller: a shell that held the configured
-    /// digest beside a separate idea of the face could serve an exposed
-    /// one with nothing to demand.
-    ///
-    /// [`decide_bind`]: crate::reception::decide_bind
+    /// Which face this listener presents, and the key it demands: the
+    /// verdict of [`crate::reception::decide_bind`], and the only thing
+    /// besides the live sessions any door reads to judge a caller.
     pub(crate) face: BindFace,
     pub(crate) door: LocalDoor,
     pub(crate) city: Option<Address>,
@@ -274,9 +271,8 @@ pub struct EnrollBody {
 ///
 /// `face` is the binding verdict's, so the key every door judges against
 /// is decided once, before the socket exists; `origins` are the names the
-/// same address answers to, so the entry decision in front of every route
-/// (`crates/wire/spec/Reception/Entry.lean` §8-94) and the headers every
-/// answer carries come from the address that was bound.
+/// same address answers to, read by the entry decision in front of every
+/// route (`crates/wire/spec/Reception/Entry.lean` §8-94).
 ///
 /// # Errors
 /// The listener's own headers cannot be spelled as HTTP headers.
@@ -305,7 +301,7 @@ pub fn router(
         epoch: config.epoch,
     });
     let names = Arc::new(origins.clone());
-    let headers = origins.page_headers();
+    let headers = PageHeaders::every_listener();
     let entered = |arrival: Arrival, handler: MethodRouter<Arc<ShellState>>| {
         handler.route_layer(from_fn_with_state((arrival, Arc::clone(&names)), enter))
     };
@@ -324,10 +320,9 @@ pub fn router(
                 post(accept_drop).layer(DefaultBodyLimit::max(DROP_BYTES_MAX)),
             ),
         )
-        // `/acp` judges the same credential through the same function, from
-        // inside the handler: an editor offers it as a body key rather
-        // than as a header, and an unpaired editor is answered by
-        // `agent_protocols::admit` rather than at the door.
+        // `/acp` judges the same credential from inside the handler: an
+        // editor offers it as a body key, and an unpaired editor is
+        // answered by `agent_protocols::admit` rather than at the door.
         .route("/acp", entered(Arrival::Door(Door::Acp), post(accept_acp)))
         // This machine's door for a browser (`crates/wire/spec/Server.lean` §8-93):
         // the routes a browser reaches before it holds a credential.
@@ -342,9 +337,8 @@ pub fn router(
             stamp,
         ))
         .with_state(state);
-    // The client bundle is the page itself: a browser that has not paired
-    // yet still has to load the page it pairs from, so these two routes
-    // ask for no credential, and still for this listener's Host.
+    // The page itself: a browser has to load it before it can pair, so
+    // these routes ask for no credential, and still for this Host.
     let page = bundle_routes(Arc::clone(&config.client), &headers)?.route_layer(
         from_fn_with_state((Arrival::Page, Arc::clone(&names)), enter),
     );

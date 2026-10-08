@@ -311,7 +311,7 @@ pub fn encode_hex(bytes: &[u8]) -> String {
     const DIGITS: &[u8; 16] = b"0123456789abcdef";
     let mut text = String::new();
     for byte in bytes {
-        for nibble in [byte >> 4, byte & 0x0f] {
+        for nibble in [byte.wrapping_shr(4), byte & 0x0f] {
             if let Some(digit) = DIGITS.get(usize::from(nibble)) {
                 text.push(char::from(*digit));
             }
@@ -327,9 +327,12 @@ pub fn decode_hex<const N: usize>(text: &str) -> Option<[u8; N]> {
     if digits.len() != N.checked_mul(2)? {
         return None;
     }
+    let (pairs, rest) = digits.as_chunks::<2>();
+    if !rest.is_empty() {
+        return None;
+    }
     let mut bytes = [0u8; N];
-    for (slot, pair) in bytes.iter_mut().zip(digits.chunks_exact(2)) {
-        let [high, low] = pair else { return None };
+    for (slot, [high, low]) in bytes.iter_mut().zip(pairs) {
         let value = |digit: u8| {
             char::from(digit)
                 .to_digit(16)

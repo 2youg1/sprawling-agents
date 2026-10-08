@@ -9,8 +9,8 @@
 //!
 //! The names and origins a listener answers to are computed once, from
 //! the address it holds, into [`ListenerOrigins`]; the Host check, the
-//! Origin check, the response headers, the URL a person is given and the
-//! residents' browser guard all read that one value.
+//! Origin check, the URL a person is given and the residents' browser
+//! guard all read that one value.
 
 use std::net::{IpAddr, SocketAddr};
 
@@ -31,7 +31,6 @@ const DEFAULT_HTTP_PORT: u16 = 80;
 pub struct ListenerOrigins {
     hosts: Hosts,
     url: String,
-    connect_src: String,
 }
 
 /// Which `Host` values a listener admits.
@@ -74,17 +73,9 @@ impl ListenerOrigins {
             let name = literal(ip);
             (Hosts::Named(spelled(&name, port)), name)
         };
-        let connect_src = match &hosts {
-            Hosts::Named(names) => names
-                .iter()
-                .map(|name| format!(" ws://{name}"))
-                .collect::<String>(),
-            Hosts::AnyAddress { .. } => " ws:".to_owned(),
-        };
         Self {
             hosts,
             url: format!("http://{url_host}:{port}"),
-            connect_src: format!("'self'{connect_src}"),
         }
     }
 
@@ -127,12 +118,6 @@ impl ListenerOrigins {
             Hosts::AnyAddress { .. } => named.eq_ignore_ascii_case(host) && self.admits_host(named),
         }
     }
-
-    /// The headers every answer of this listener carries.
-    #[must_use]
-    pub fn page_headers(&self) -> PageHeaders {
-        PageHeaders::with_connect_src(&self.connect_src)
-    }
 }
 
 /// The name `host:port`, and the bare name too when the port is the one a
@@ -170,32 +155,29 @@ fn ip_literal_on(host: &str, port: u16) -> bool {
     address.is_some_and(|address| address.port() == port && !address.ip().is_unspecified())
 }
 
-/// The response headers one listener answers with, as names and values;
-/// the shell turns them into HTTP headers once.
+/// The response headers a listener answers with, as names and values;
+/// the shell turns them into HTTP headers once per listener.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PageHeaders {
     lines: Vec<(&'static str, String)>,
 }
 
 impl PageHeaders {
-    /// The headers of a listener whose public name is not known here (the
-    /// remote listener, reached through a tunnel): the socket is allowed to
-    /// its own origin only.
+    /// The headers every listener answers with: the city's own port and
+    /// the remote listener serve the same page under the same headers
+    /// (wire D20). `connect-src 'self'` admits the page's socket on its
+    /// own host and port, `ws:` from an `http:` page and `wss:` from an
+    /// `https:` one, in every engine that has the WebCrypto Ed25519 a
+    /// paired browser needs.
     #[must_use]
-    pub fn same_origin() -> Self {
-        Self::with_connect_src("'self'")
-    }
-
-    fn with_connect_src(connect_src: &str) -> Self {
-        let policy = format!(
-            "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; \
-             style-src 'self' 'unsafe-inline'; connect-src {connect_src}; \
-             img-src 'self' data: blob:; worker-src 'self' blob:; object-src 'none'; \
-             base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
-        );
+    pub fn every_listener() -> Self {
+        let policy = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; \
+                      style-src 'self' 'unsafe-inline'; connect-src 'self'; \
+                      img-src 'self' data: blob:; worker-src 'self' blob:; object-src 'none'; \
+                      base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
         Self {
             lines: vec![
-                ("content-security-policy", policy),
+                ("content-security-policy", policy.to_owned()),
                 ("x-frame-options", "DENY".to_owned()),
                 ("x-content-type-options", "nosniff".to_owned()),
                 ("referrer-policy", "no-referrer".to_owned()),

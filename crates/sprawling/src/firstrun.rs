@@ -248,14 +248,10 @@ pub(crate) fn open_paired(url: &str, door: &wire::LocalDoor) -> Result<(), kerne
     write_private(&page, &redirect).map_err(unhandled)?;
     let opened = open_in_browser(&page.to_string_lossy()).map_err(unhandled);
     std::thread::spawn(move || {
-        // Either answer ends the wait: redeemed, expired, or the door gone.
-        match redeemed.recv_timeout(Duration::from_millis(wire::OPEN_CODE_LIFETIME_MS)) {
-            Ok(())
-            | Err(
-                std::sync::mpsc::RecvTimeoutError::Timeout
-                | std::sync::mpsc::RecvTimeoutError::Disconnected,
-            ) => {}
-        }
+        // Every answer ends the wait the same way - redeemed, expired, or
+        // the door gone - so which one it was is owed to nobody.
+        let _waited: Result<(), std::sync::mpsc::RecvTimeoutError> =
+            redeemed.recv_timeout(Duration::from_millis(wire::OPEN_CODE_LIFETIME_MS));
         if let Err(left) = std::fs::remove_file(&page) {
             eprintln!(
                 "  remove the browser's redirect page {}: {left}",

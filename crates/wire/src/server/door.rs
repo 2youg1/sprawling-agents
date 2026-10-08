@@ -34,12 +34,18 @@ const SIGNED_LABEL: &str = "sprawling local session v1";
 /// Where the door keeps its table: the whole table, after every change.
 pub type KeepBrowsers = Arc<dyn Fn(&[PairedBrowser]) -> Result<(), AxError> + Send + Sync>;
 
+/// The clock the door reads the time from.
+pub type DoorClock = Arc<dyn Fn() -> Result<TimeMs, AxError> + Send + Sync>;
+
+/// The random source the door fills its codes, nonces and tokens from.
+pub type DoorEntropy = Arc<dyn Fn(&mut [u8]) -> Result<(), AxError> + Send + Sync>;
+
 /// The clock and the random source the door is handed; it samples neither
 /// itself.
 #[derive(Clone)]
 pub struct DoorSenses {
-    pub clock: Arc<dyn Fn() -> Result<TimeMs, AxError> + Send + Sync>,
-    pub entropy: Arc<dyn Fn(&mut [u8]) -> Result<(), AxError> + Send + Sync>,
+    pub clock: DoorClock,
+    pub entropy: DoorEntropy,
 }
 
 /// An open code on its way to a browser, and the signal that it arrived.
@@ -180,11 +186,9 @@ impl LocalDoor {
                     ));
                 };
                 if let Some(tell) = held.waiting.remove(&digest) {
-                    match tell.send(()) {
-                        Ok(()) => {}
-                        // The opener stopped waiting; its file went with it.
-                        Err(mpsc::SendError(())) => {}
-                    }
+                    // A send that finds nobody means the opener stopped
+                    // waiting, and its file went with it: nothing is owed.
+                    let _unheard: Result<(), mpsc::SendError<()>> = tell.send(());
                 }
             }
         }

@@ -120,11 +120,9 @@ struct Serving {
 
 /// Serves the two paths and the page until the door says its time is up.
 async fn answer(listener: tokio::net::TcpListener, doorway: Doorway, reaching: Reaching) {
-    // The public name the device reaches this listener by is the route's,
-    // not known here, so the page's socket is allowed to its own origin.
     let page = match wire::bundle_routes(
         Arc::clone(&reaching.page),
-        &wire::PageHeaders::same_origin(),
+        &wire::PageHeaders::every_listener(),
     ) {
         Ok(page) => page,
         Err(unspelt) => {
