@@ -25,7 +25,7 @@ use kernel::{Address, AxCode, AxError, EventKind, EventRecord};
 use serde_json::{Value, json};
 
 use crate::worker::RunWorker;
-use crate::worker::driving::harness::{Prompting, StartHarness};
+use crate::worker::driving::harness::{StartHarness, Started};
 
 /// What the played agent does once the session has sent it a request.
 #[derive(Clone)]
@@ -60,7 +60,7 @@ struct Heard {
 /// A harness that is an agent played over pipes, following `script`,
 /// with what it heard kept in `heard`.
 fn played(script: Vec<Step>, heard: Arc<Mutex<Heard>>) -> StartHarness {
-    Arc::new(move |harness, cwd: &Path| -> Result<Prompting, AxError> {
+    Arc::new(move |harness, cwd: &Path| -> Result<Started, AxError> {
         let (from_agent, mut agent_out) = std::io::pipe().unwrap();
         let (agent_in, to_agent) = std::io::pipe().unwrap();
         let script = script.clone();
@@ -123,18 +123,26 @@ fn played(script: Vec<Step>, heard: Arc<Mutex<Heard>>) -> StartHarness {
         let name = harness.entry().id.as_str();
         let lines = agent_protocols::Lines::over(BufReader::new(from_agent), name)?;
         let mut session = agent_protocols::AcpSession::open(lines, to_agent, name, cwd)?;
-        Ok(Box::new(
-            move |text: &str, listener: &mut agent_protocols::Listener<'_>| {
-                session.prompt(text, listener)
-            },
-        ))
+        let version = session.introduced().version.clone();
+        Ok(Started {
+            prompting: Box::new(
+                move |text: &str, listener: &mut agent_protocols::Listener<'_>| {
+                    session.prompt(text, listener)
+                },
+            ),
+            version,
+        })
     })
 }
 
 /// The agent's side of opening a session.
 fn opening() -> Vec<Step> {
     vec![
-        Step::Answer(json!({ "protocolVersion": 1, "agentCapabilities": {} })),
+        Step::Answer(json!({
+            "protocolVersion": 1,
+            "agentCapabilities": {},
+            "agentInfo": { "name": "pi-acp", "version": "0.0.34" }
+        })),
         Step::Read,
         Step::Answer(json!({ "sessionId": "s1" })),
         Step::Read,
@@ -187,7 +195,7 @@ fn dispatch(addr: &str, model: Option<&str>) -> wire::Command {
 
 /// A harness that must never start: the dispatch is refused first.
 fn never() -> StartHarness {
-    Arc::new(|_, _: &Path| -> Result<Prompting, AxError> {
+    Arc::new(|_, _: &Path| -> Result<Started, AxError> {
         panic!("a refused dispatch started a harness")
     })
 }
@@ -289,7 +297,7 @@ fn a_harness_that_will_not_start_is_refused_before_its_run_exists() {
     let refused = refusal.clone();
     let mut worker = worker(
         dir.path(),
-        Arc::new(move |_, _: &Path| -> Result<Prompting, AxError> { Err(refused.clone()) }),
+        Arc::new(move |_, _: &Path| -> Result<Started, AxError> { Err(refused.clone()) }),
     );
 
     assert_eq!(

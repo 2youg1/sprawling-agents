@@ -52,9 +52,9 @@ import crates.agent_protocols.spec.Mcp.Tools
 - `AddAgent` 的执行：重算摘要、把程序解析成绝对路径、写一行 `[[agent]]`、`seat_here` 时写房间的 `[resident] harness`；
 - 登录执行器：收到 `-32000` 之后，`agent` 类型发 `authenticate`，`terminal` 类型在 CLI 里交出终端或经 `sprawling acp-login <ticket>` 跳板开新窗口（Windows `CREATE_NEW_CONSOLE`，macOS `.command` 加 `open`，Linux 终端列表），成功后重新 `initialize` 并重发原请求；
 - 不执行任何东西的检测：别的 ACP 客户端的配置、npm 与 bun 的 shim、厂商目录、PATH 上的名字（只作线索），`detected` 今天是空表；
-- CLI 的 `/acp` 列表，与 `run_started` 上的 `agent` 身份（`crates/kernel/spec/Event/Record.lean` 定的那个字段：版本要在会话打开之后才知道，所以要挪动 `run_started` 的落账时刻）；
+- CLI 的 `/acp` 列表；
 - url elicitation 的声明（D14）。
-能判定它们完成的证据是：一次派活收到 `-32000` 之后不经人重打就重发成功，且 `run_started` 带着 agent 的 id、版本与同意的摘要。
+能判定它们完成的证据是：一次派活收到 `-32000` 之后不经人重打就重发成功。`run_started` 已经带着 agent 的 id、它在 `initialize` 里报的版本与同意的摘要（会话在 `HarnessRun::open` 之前打开，所以版本在落账时已知）。
 -/
 
 /-! ## 4 现状分析
