@@ -30,6 +30,8 @@ pub(crate) fn enrol(at: &str, realm: &str, name: &str, value: &str) -> Result<St
 pub(crate) fn split_reference(raw: &str) -> Option<(&str, &str)>;   // "realm/name"
 ```
 
+- **没给 `--token` 时读钥匙文件**：`call`、`send`、`top` 与 `enrol` 都经 `credential(at, given)` 取凭据：给了 `--token` 就用它，否则按 `at` 的端口读本机这座城的钥匙文件（`crates/sprawling/spec/Keying.lean` §8-22）。读不到不是错：问候照常发出，城以握手拒绝作答，拒词说怎样拿到钥匙。`enrol` 把它放进 `Authorization: Bearer`，因为 `/enroll` 与别的门一样要凭据。
+
 - **握手在进程内算，不手抄**。`WIRE_V` 与 `schema_hash()` 直接取自 `wire`，故改一条命令名字时本客户端**不可能**落后。因此删掉了那个一次性的 Python 探针——它在工作区外复刻了 `schema_hash()` 与 `IdemKey::derive()`，那本身就是第二个权威。
 - **一个查询恰好一个答复，收到就走**。发出的是 `Ask` 时，`call` 在收到第一帧 `Answered`（其 `AskOutcome` 是答复或拒绝）或 `Refusal` 时打印它并退出，之前推来的 `Event`／`Log`／`Delta` 照样逐行打印；城的答复在十几毫秒内到达，再等一整段安静窗口只是让进程白占两秒。安静窗口在这里只剩上限的作用：答复迟迟不来时，`call` 退 3——什么都没回来是 `Quiet`，只回来了别的帧是 `Unfinished`。
 - **一条命令收到城安静为止，或收到调用方点名的那种事件为止**。发出的是 `Command` 时，“安静”是一段无帧的时长（`--quiet-ms`，默认 2000），而不是帧数：一条 Dispatch 会产生多少事件是城的事，客户端猜不到。调用方知道自己在等哪件事时，写 `--until <kind>`（`kind` 取 `EventKind` 的 snake_case 拼写，由 serde 读，不另立名表）：`call` 在打印第一条该种类的 `Event` 或一条 `Refusal`（被拒的命令不会再产生事件）后退出，不再白等一整段安静窗口。窗口此时仍是两帧之间的上限；窗口先到而点名的事件没来，`Heard.awaited` 为 `Missing`，`spoken()` 给 `Unfinished`，退出码是 3 而不是 0——在等的事没发生，读成成功就是把失败读成成功。查询只有一个答复，`--until` 对查询不起作用。

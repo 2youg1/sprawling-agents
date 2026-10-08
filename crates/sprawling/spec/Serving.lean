@@ -18,6 +18,8 @@
 
 写者线程由 `assembly::attending::spawn_worker(opening: Opening, outward: Outward)` 开，账本在它里面打开且从不离开。两个参数各是一个值：`Opening`（一个写者是用什么打开的：城根、金库、金库探测的发现、日志、serve 线程在写锁下已经折好的账本与 `Standing`、审计的日志、核心线程的档位）与 `Outward`（它的活从哪来、结果到哪去：命令台、发布出去的视图与备用的一份、给页面与观察者的广播、账本头、还在跑的命令的输出）。两个值代替一长串参数，没有 `#[expect(clippy::too_many_arguments)]`。
 
+**本机这扇门对浏览器的句柄由装配点建一次**：`assembly::listen` 用 `bin::serving::browsers::load` 读城的 `.sprawling/browsers.toml`（`kernel::layout::CityLayout::browsers`，只存公钥、标签与时刻），把时钟、随机源与写回那张表的闭包交给 `wire::LocalDoor::new`，再把同一个句柄交给 `ServeConfig.door`、控制台与 `firstrun::open_paired`。表写失败时那次配对不算数（`crates/wire/spec/Server.lean` §8-93）。`Query::Devices` 由 `LocalDoor::devices` 作答，在问城的视图之前截下，因为设备表不在账本里。钥匙文件（`bin::serving::key_file`，`crates/sprawling/spec/Keying.lean` §8-22）在绑定之后、写者开始之前写，收口时删。
+
 `CITY_VERIFIER`（`accounting::worker::workbench`）与 `local_model_facts`（`accounting::worker::credentials`）住在 `assembly`，因为它们是 `RunWorker` 在一轮活里用的东西，不是端城用的；执行引擎由 `doctor::host::execution_engine` 按平台选出。
 -/
 

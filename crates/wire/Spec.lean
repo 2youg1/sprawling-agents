@@ -46,7 +46,9 @@ import crates.wire.spec.Privacy
 import crates.wire.spec.Reading
 import crates.wire.spec.Reception
 import crates.wire.spec.Reception.Admission
+import crates.wire.spec.Reception.Entry
 import crates.wire.spec.Reception.Inbound
+import crates.wire.spec.Reception.Pairing
 import crates.wire.spec.Reply
 import crates.wire.spec.Server
 import crates.wire.spec.Server.Committed
@@ -68,10 +70,10 @@ import crates.wire.spec.Server.Socket
 |---|---|
 | `frames` | Command／Query／Event 三分的类型与 JSON 编码；版本＋schema 哈希握手帧 |
 | `server` | WebSocket 服务；静态资源；绑定面判定（默认只绑回环） |
-| `auth` | 回环零摩擦；非回环要求配对令牌且常数时间比较；未配置令牌即拒绝启动 |
+| `auth` | 令牌的铸造、展示形与常数时间比较；每一面都要一把钥匙，没有钥匙即拒绝启动（D54） |
 | `control` | 人的干预动词入口；自持鉴权与幂等（做不到则并入 `server`——ARCHITECTURE §6 已写明这条退路） |
 | `aggregate` | 多 City 只读聚合：只转发 Query 与 Event，恒不转发 Command |
-| `reception` | 一帧进来之后的判定：读不出的帧、会动作的门先问配对（§8-37、§8-40） |
+| `reception` | 一个请求进不进门（§8-94）、配对与会话的状态（§8-95）、一帧进来之后的判定：读不出的帧、会动作的门先问凭据（§8-37、§8-40） |
 | `preference` | 客户端读的那几张偏好枚举，值集在这里生成 |
 | `privacy` | 主机隐私页与城共享的名字闭集（§8-87）、`Query::Privacy` 的答复（§8-88）与 `Command::PrivacyOperation` 的载荷和结果（§8-89） |
 | `reading` | 一次回合的读法回到服务端（§8-21） |
@@ -95,15 +97,17 @@ import crates.wire.spec.Server.Socket
 **`earlier` 的含义**：「从这条之前接着问」，`None` 即「到头了」；「答是空的而 `earlier` 是 `Some`」这一态**不存在**——服务端不需要把「我这一段没扫到」告诉客户端。
 
 **建 run→seq 的索引**：不建索引，一次 `RunHistory` 要扫整本账，扫描量与账本长度同阶，而这是「打开一个较早的会话」这个动作的全部延迟。那份要随账本同步的派生状态已经存在：`storage::LedgerIndex` 常驻于 `Views` 并每次查询 `refresh`，run 表只是它多一个字段，搭同一趟刷新、同一份 cache、同一条「存疑即重建」的反射，不新增同步义务。至于「第二个权威」：索引回答的是「在哪」，从不回答「是什么」，它可弃且存疑即重建；账本仍是唯一权威。接面与内存代价见 `crates/storage/Spec.lean` §8-4。
-- **server**：默认绑定回环；绑非回环且 `auth` 未配置令牌时**拒绝启动**并回 `E_CONFIG_INVALID`（不是启动后再拒连——这是绑定面判定，不是请求面判定）。**暴露面必须有凭证是一条不变量，不是一句注释**：绑定判定把凭证本身装进 `BindFace::Exposed`，壳只持有这个面，于是「暴露着却不要求任何东西」是一个类型上不存在的状态（§8-41）。
+- **server**：默认绑定回环；没有给钥匙时**拒绝启动**并回 `E_CONFIG_INVALID`（不是启动后再拒连——这是绑定面判定，不是请求面判定）。**每一面都有凭据是一条不变量，不是一句注释**：绑定判定把钥匙装进 `BindFace` 的两个臂，壳只持有这个面，于是「回环而什么都不要」与「暴露着却不要求任何东西」都是类型上不存在的状态（§8-41）。每个请求先过入口判定（Host、Origin、`Sec-Fetch-Site`，§8-94），跨站的 Origin 与不在名单的 Host 在升级之前就回 403。
 - **auth**：令牌比较恒为常数时间（不早退）；比较函数以「逐字节差异位置不影响耗时」的性质测试看守。地基是 `server::constant_time_eq` 与 `decide_handshake`；`auth` 模块接令牌的生成、展示与持久化。
 - **aggregate**：**类型化保证**——聚合上游连接的发送面在类型上只接受 `Query`，没有一个能塞进 `Command` 的方法（不是运行时 `if`，是类型上不存在该入口）；以 trybuild 反例钉死。
 
 分部里的定理是模型对性质的证明：
 
 - `spec/Frames.lean`：哈希对名字表单射、名字不变而改形的两份构建 `WIRE_V` 不同时，语法不同的两份构建握不上手（`distinct_grammars_never_handshake`）；不进位有反例（`a_reshaped_grammar_meets_the_old_one_without_a_bump`）；两次推送之间 `WIRE_V` 至多进一位，有改形就进（`numbered_moves_at_most_once`、`a_reshaping_commit_is_numbered_past_the_push`、`no_reshaping_keeps_the_number`）。
-- `spec/Reception.lean`：`decide_bind` 恰在「从别处够得到而没配令牌」一格拒绝（`decideBind_refuses_exactly_an_exposed_address_without_a_token`），给出的面索要的恰是配置的摘要（`a_served_face_demands_the_configured_digest`、`an_exposed_city_always_demands_a_token`）；`Lagged` 的区间恰好补上断口（`a_lagged_range_fills_the_gap`、`consecutive_records_owe_nothing`），还没发过记录或还没被欢迎的会话不欠区间。
-- `spec/Reception/Admission.lean`：从回环之外够得到的城不让没配对的来者转写、录凭证或落文件（`no_door_acts_unpaired_beyond_loopback`）；`/acp` 从不拒绝（`the_acp_door_never_refuses`）。
+- `spec/Reception.lean`：`decide_bind` 恰在没有钥匙时拒绝（`decideBind_refuses_exactly_without_a_key`），给出的面索要的恰是给它的那把（`a_served_face_demands_the_given_key`）；`Lagged` 的区间恰好补上断口（`a_lagged_range_fills_the_gap`、`consecutive_records_owe_nothing`），还没发过记录或还没被欢迎的会话不欠区间。
+- `spec/Reception/Admission.lean`：空手的来者不论面在回环还是暴露都不能转写、录凭证或落文件（`no_door_acts_unpaired`）；`/acp` 从不拒绝（`the_acp_door_never_refuses`）。
+- `spec/Reception/Entry.lean`：Host 不在名单的请求从不进门（`a_foreign_host_never_enters`），Origin 不在名单的、跨站的与预检除了取页面都不进门（`a_foreign_origin_never_enters`、`a_cross_site_fetch_never_enters`、`a_preflight_never_enters`），配对的路只进浏览器（`pairing_admits_only_a_browser`）。
+- `spec/Reception/Pairing.lean`：任何一条猜测序列里，被判的猜测彼此隔一秒（`judged_guesses_are_a_second_apart`），每次都对着上一次换上的码（`each_code_is_judged_once`），只有猜中当时的码才配对（`only_the_current_code_pairs`）。
 - `spec/Command.lean`：`WireCommand` 拼不出 `PutSecret`，从线上来的命令进城后也不是它（`a_socket_cannot_spell_put_secret`、`nothing_from_the_wire_enrols_a_secret`）。
 - `spec/Command/Kind.lean`：没有一个 Command 属 `Read`（`no_command_is_a_read`）；class 为 `Act` 的动词 reach 都是 `client`（`what_a_device_may_do_a_person_may_draw`）；不由人点的动词都 `LocalOnly`（`a_verb_no_person_draws_stays_local`）；只有 `PutSecret` 是 `sealed`（`only_put_secret_is_sealed`）。
 - `spec/Command/Step.lean`：拒绝之后盘上不动（`a_refused_save_leaves_the_file`），保留子树先判（`the_reserved_subtree_is_refused_first`），两个同基线的保存只落先到的那个（`two_saves_from_one_version_land_once`）。
@@ -148,7 +152,9 @@ Lean 里的名字与 Rust 的对应（门比的是同一个拼写，tools/xtask/
 - `Wire.Command.Kind.Command` 的构造子 ↔ `command::kind` 里 `enum Command` 的变体，逐字相同；`Reach` 的四个取值 ↔ §19-1 的 `client`／`push`／`handshake`／`sealed`；`VerbClass` ↔ `remote_access::door::VerbClass`；`Command.reach`、`Command.verbClass` ↔ §19-2 的两列。
 - `Wire.Command.Carrying` ↔ `Command<Secret>`，`WireCommand` ↔ `Command<NoSecret>`（`NoSecret` 在模型里是 `Empty`），`fromWire` ↔ `impl From<WireCommand> for Command`。
 - `Wire.Reception.BindFace`／`BindVerdict`／`decideBind` ↔ `BindFace`／`BindVerdict`／`decide_bind`；`Address` 是模型对 `SocketAddr` 只取「是不是回环」的那一位；`decideLag`／`Stream` ↔ `decide_lag`／`reception::Stream`。
-- `Wire.Reception.Admission.Door`／`Pairing`／`Admission`／`decideAdmission` ↔ 同名的 Rust 类型与 `decide_admission`。
+- `Wire.Reception.Admission.Door`／`Pairing`／`Admission`／`decideAdmission` ↔ 同名的 Rust 类型与 `decide_admission`；`judge` ↔ `Keys::pairing`。
+- `Wire.Reception.Entry.Arrival`／`Caller`／`Entry`／`Refusal`／`decideEntry` ↔ `Arrival`／`Caller`／`Entry`／`EntryRefusal`／`decide_entry`；`OriginSeen` 与 `FetchSite` 是模型对 Origin 与 `Sec-Fetch-Site` 只取「相对名单是哪一种」的那几位。
+- `Wire.Reception.Pairing.guess`／`Guess` ↔ `BrowserDoor::guess`／`Guess`；码在模型里是一个抽象的值。
 - `Wire.Control.Intervention`／`ControlVerdict`／`classify` ↔ `control` 的同名类型与函数。
 - `Wire.Command.Step.Refusal` 的三个构造子 ↔ `E_OUTSIDE_WRITE_DOMAIN`、`E_VERSION_CONFLICT`、`E_INVALID_ARGS`；`putRange` ↔ 城对 `Command::PutRange` 的判定（`accounting::worker::commanding::saving`）。
 - `Wire.CarriedName.parse` ↔ `carried_name!` 生成的构造点；`Wire.Frames.Ask.asOf` ↔ `Answered.as_of`。
@@ -281,6 +287,8 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 | 8-91 | `crates/wire/spec/Answer/Devices.lean` |
 | 8-92 | `crates/wire/spec/Answer/Endpoints.lean` |
 | 8-93 | `crates/wire/spec/Server.lean` |
+| 8-94 | `crates/wire/spec/Reception/Entry.lean` |
+| 8-95 | `crates/wire/spec/Reception/Pairing.lean` |
 | 19 | `crates/wire/spec/Command/Kind.lean` |
 | 19-1 | `crates/wire/spec/Command/Kind.lean` |
 | 19-2 | `crates/wire/spec/Command/Kind.lean` |
@@ -325,7 +333,8 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 本 crate 不新增错误码，它用的码与「为什么不能把它定义掉」：
 
 - **`E_WIRE_MISMATCH`**：不可——它是装载期六码之一（封闭白名单），且它的存在理由就是「浏览器缓存旧前端」这一 WebUI 特有错配。类型无法定义掉跨版本的字节。握手之后解不出的帧同归此码、两侧的处置见 §8-37。
-- **`E_CONFIG_INVALID`**：不可——绑定非回环而无令牌必须在**启动时**拒绝，这是配置判定不是请求判定。
+- **`E_CONFIG_INVALID`**：不可——没有钥匙的绑定必须在**启动时**拒绝，这是配置判定不是请求判定。
+- **`E_PAIRING_REFUSED`**（kernel 的码）：配对码或开页码不对、用过或太早，§8-95。
 - **没有 signal-unknown 码**：握手的 schema 哈希保证同一连接的两端共享同一份词汇，一个本版本不认的 Signal 种类只能来自更新的二进制写的 Ledger，而那已由版本方向门拒在外面（`crates/collab/Spec.lean` §8 的 `collab::inbox` 一条）。
 
 失败之后什么保持不变是各接口的一部分：绑定判定在套接字存在之前拒绝（§8-2、§8-46）；握手失败即断连（§10「两个设计」），握手之后读不出的帧答一次带计数的拒绝而不关连接（§8-37）；一次保存或一次提案的决定被拒时盘上不动（§8-72、§8-73，`spec/Command/Step.lean`）；`Committed::new` 拼不出帧时那条记录不推，下一条到达时会话发出 `Lagged`（§8-47）。
@@ -376,6 +385,7 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 | D51 | 正文字号的下限是类型 `BodyPx`，没有上限 | `crates/wire/spec/Preference.lean` |
 | D52 | 没有「全部恢复」的帧：页面为每个仍拥有的控制各发一次 Restore | `crates/wire/spec/Privacy.lean` |
 | D53 | V0.0.11 的线上改形一次进位，由第一条车道落地 | `crates/wire/spec/Frames.lean` |
+| D54 | 每个调用方都要非环境凭据，入口先判 Host 与 Origin | `crates/wire/spec/Reception/Entry.lean` |
 -/
 
 /-! ## 13 依赖选型
@@ -387,8 +397,9 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 | `tokio-tungstenite` | WS 协议 | 经 axum 传递依赖；**不直接依赖**，避免两处版本权威 |
 | `serde`／`serde_json` | 帧编码 | 已在 workspace |
 | `kernel` | AxError／EventRecord／IdemKey／Sealed／Address | 唯一上游 |
+| `aws-lc-rs` | `/session` 验设备钥的 Ed25519 签名（只在 `server` feature 里） | 已在 workspace（`remote_access` 用它）；替代（自写或另引一个 Ed25519 库）是同一件事的第二个实现 |
 
-**不引**：任何通用 RPC 框架（wire 是一组具名 variant，不是一个可扩展的服务定义）；任何 session 中间件（鉴权面只有配对令牌一件）；任何穿透／中继库。**WebTransport／QUIC 同此**：重开条件写在 §8-41 末节（城真的在回环之外且实测有队头阻塞，两条都成立才重开），此前它不因「需要第二种协议」而回来。
+**不引**：任何通用 RPC 框架（wire 是一组具名 variant，不是一个可扩展的服务定义）；任何 session 中间件（鉴权面是本机钥匙加会话令牌两件，都在 `reception` 里判）；任何穿透／中继库。**WebTransport／QUIC 同此**：重开条件写在 §8-41 末节（城真的在回环之外且实测有队头阻塞，两条都成立才重开），此前它不因「需要第二种协议」而回来。
 
 规格本身只 import 工具链的库与本 crate 的分部：ARCHITECTURE.md §3 的 `depmap` 允许 wire 依赖 kernel，今天的模型不需要 kernel 的分部。
 -/
@@ -411,7 +422,8 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 - trybuild 两反例：远程 `PutSecret`（含 `Sealed` 的帧不可序列化）；`aggregate` 发 Command（发送面无该入口）。
 - 常数时间比较的性质测试：差异位置不影响比较耗时。
 - 握手 golden：schema 哈希入快照；改 wire 类型必须同时改快照与本规格。
-- 绑定面判定的单元测试：回环／非回环×有令牌／无令牌四格，只有「非回环＋无令牌」拒绝启动；并断言判定给出 `BindFace::Exposed` 时里面的摘要就是判定的那一个（凭证属于面的这一条因此有测试，而不只有形状）。
+- 绑定面判定的单元测试：回环／非回环×有钥匙／无钥匙四格，恰是两格「无钥匙」拒绝启动；并断言判定给出的面里的摘要就是给它的那一个。
+- 入口判定的回归测试：`tests/entry.rs` 在进程内对路由表发请求，跨站的 Origin 与外来的 Host 在升级之前就得到 403。
 - 约束：非测试代码遵守 C3 硬化全条；全库禁裸 spawn（确定性第 3 条）——**本 crate 的并发必须是结构化的，带取消令牌**，这是引入 tokio 后第一条要守住的线。
 
 形式化的义务由证明清偿：`lake build crates.wire.Spec`（`just models` 在 `just check` 里构建全部规格），不留 `sorry`、`admit` 与 `axiom`，`cargo xtask gates spec` 检查这一点。模型与生产实现的对应由这些检查守住，它们是行为比对，不是精化证明：
@@ -419,6 +431,8 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 - 握手与 `WIRE_V`：`tests/wire_contract.rs` 的 schema 哈希 golden 与 `the_wire_shape_is_pinned_so_a_change_meets_the_version_rule`。
 - 绑定面与丢帧区间：`tests/wire_contract.rs` 的 `the_binding_face_has_exactly_one_refusing_cell`；`reception::tests` 里 `decide_lag` 与 `Stream` 的测试。
 - HTTP 门：`reception::admission` 旁的测试与 `tests/enrolment.rs`。
+- 入口判定：`reception::entry` 旁的穷尽表测试 `every_entry_property_holds_over_every_input`，逐格对照 `spec/Reception/Entry.lean` 的五条性质；`tests/entry.rs` 的回归。
+- 配对：`reception::pairing` 旁的 proptest `every_trace_judges_each_code_once_and_a_second_apart`，生成器覆盖 `spec/Reception/Pairing.lean` 的猜测序列（到达时刻、猜对或猜错、每步的熵）。
 - 按帧写出：`server::socket::tests` 的 proptest `framing_tells_every_record_once_in_order`，生成器覆盖 `spec/Server/Socket.lean` 的到达序列与切帧方式。
 - `PutSecret`：`tests/trybuild.rs` 的两个反例与 `put_secret_has_no_byte_form_in_either_direction`。
 - reach 与 class：`cargo xtask gates wiring` 把 `Command.reach`、`Command.verbClass` 的臂与 `enum Command`、`run_command`、`client/src`、`command_class` 逐个动词对照；Lean 侧的 `def` 漏一个构造子即编不过。
