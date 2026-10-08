@@ -84,11 +84,11 @@ impl RunWorker {
 /-!
 ### 8-45-6 居民的浏览器不碰城自己的源（`bin::browser_tool::guarding`）
 
-城在哪些地址上监听，由装配层在监听绑定之后登记：城自己的监听在 `bin::assembly::listening` 绑定之后登记一次，远程监听在 `bin::outside::listener` 开门时登记、关门时撤销。两件浏览器工具（`browser` 与 `usersbrowser`）每一次调用都先读这份登记，得到一个 `browser::OwnListeners`，再按它判：
+城在哪些地址上监听，由装配层登记：城自己的监听在 `bin::assembly::listening` 的 `Listening::serve` 开始答时登记、答完撤销，远程监听在 `bin::outside::listener` 开门时登记、关门时撤销。两件浏览器工具（`browser` 与 `usersbrowser`）每一次调用都先读这份登记，得到一个 `browser::OwnListeners`，再按它判：
 
 ```rust
 pub(crate) fn serve(at: SocketAddr) -> Served;        // bin::browser_tool::guarding；Served 被丢掉时撤销
-pub(crate) fn own() -> Result<OwnListeners, AxError>;  // 此刻的登记
+pub(super) fn own() -> OwnListeners;                   // 此刻的登记；死线程留下的锁照接（表在每次增删之后都是完整的）
 ```
 
 - `open` 与 `fetch` 的地址是城自己的源，拒（`E_GATE_DENIED`），不发任何一帧；

@@ -97,12 +97,21 @@ pub(super) fn open(
     let task = reaching
         .runtime
         .spawn(answer(listener, doorway.clone(), reaching.clone()));
-    doorway.attend(Box::new(Answering(task.abort_handle())))?;
+    let served = crate::browser_tool::serve(local);
+    doorway.attend(Box::new(Answering(task.abort_handle(), served)))?;
     Ok(opened)
 }
 
-/// The listener's task, ended when the door drops it.
-struct Answering(tokio::task::AbortHandle);
+/// The listener's task, ended when the door drops it, and its place among
+/// the addresses the browser tools refuse (sprawling D74).
+struct Answering(
+    tokio::task::AbortHandle,
+    #[expect(
+        dead_code,
+        reason = "held for its drop, which takes the address back when the door drops the listener"
+    )]
+    crate::browser_tool::Served,
+);
 
 impl Drop for Answering {
     fn drop(&mut self) {

@@ -327,6 +327,8 @@ impl Listening {
             outdoors,
             front,
         } = self;
+        // Registered while it answers, so neither browser tool opens it (sprawling D74).
+        let _served = crate::browser_tool::serve(bound.local_addr());
         // The terminal this city is running in, if it was asked for. It gets
         // the same desk the socket posts to and the same event stream the
         // browser reads, so nothing here is a second control surface - it is

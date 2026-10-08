@@ -121,8 +121,19 @@ impl Verb {
     /// Refuses an authority this build cannot read, which would leave an
     /// egress unjudged.
     pub fn destination(&self) -> Result<Option<String>, AxError> {
+        self.address()
+            .map(kernel::gate::host_of)
+            .transpose()
+            .map(Option::flatten)
+    }
+
+    /// The whole address `Open` and `Fetch` name, port included, which is
+    /// what the guard against the city's own listeners reads (D13); the
+    /// other verbs act on the page the tab is already on.
+    #[must_use]
+    pub fn address(&self) -> Option<&str> {
         match self {
-            Verb::Open { url } | Verb::Fetch { url } => kernel::gate::host_of(url),
+            Verb::Open { url } | Verb::Fetch { url } => Some(url.as_str()),
             Verb::Snapshot
             | Verb::Act { .. }
             | Verb::Screenshot(_)
@@ -130,7 +141,7 @@ impl Verb {
             | Verb::Survey
             | Verb::Console
             | Verb::Viewport { .. }
-            | Verb::Close => Ok(None),
+            | Verb::Close => None,
         }
     }
 

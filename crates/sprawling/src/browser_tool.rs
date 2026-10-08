@@ -14,8 +14,8 @@
 use std::sync::Mutex;
 
 use browser::{
-    BrowserPort, ContextId, DevLoop, PageSnapshot, ResolvedOrigin, SHOT_MAX_EDGE_PX, Session,
-    SessionRequest, Shot, Verb,
+    BrowserPort, ContextId, DevLoop, OwnListeners, PageSnapshot, ResolvedOrigin, SHOT_MAX_EDGE_PX,
+    Session, SessionRequest, Shot, Verb,
 };
 use kernel::{
     AxCode, AxError, CostTier, Effect, GateSubject, Payload, RenderIntent, Temporal, Tool,
@@ -26,12 +26,14 @@ use storage::Cas;
 
 mod answering;
 mod building;
+mod guarding;
 mod person;
 mod storing;
 mod surveying;
 
 use building::BUILDING_DISCLOSURE;
 pub(crate) use building::for_rules;
+pub(crate) use guarding::{Served, serve};
 
 use person::PERSON_DISCLOSURE;
 pub(crate) use person::Role;
@@ -179,11 +181,25 @@ impl Browser {
     /// One call against the tab, after `invoke` has checked the name.
     fn drive(&mut self, call: &ToolCall) -> Result<ToolOutcome, AxError> {
         let verb = Verb::read(&call.args)?;
-        let context = self.tab()?;
+        // Neither browser acts on the city's own pages (sprawling D74):
+        // the address an action names, the page it would act on, and the
+        // page an `open` lands on are each checked.
+        let own = guarding::own();
+        if let Some(address) = verb.address() {
+            own.refuse("drive a browser", address)?;
+        }
+        let context = self.tab(&own)?;
+        let opens = matches!(verb, Verb::Open { .. });
+        if !opens {
+            self.refuse_own_page(&own, &context)?;
+        }
         let frames = verb.frames(&mut self.session, &context, self.snapshot.as_ref())?;
         let mut last = Value::Null;
         for frame in &frames {
             last = self.port.send(frame)?.into_result()?;
+        }
+        if opens {
+            self.refuse_own_page(&own, &context)?;
         }
         // The frames that produced `last`, kept for the one case that has to
         // ask the same thing twice: a picture past the cap.
@@ -231,7 +247,27 @@ impl Browser {
 }
 
 impl Browser {
-    /// The tab this tool drives, opening the session the first time.
+    /// Refuses when the tab is on one of the city's own pages, read from
+    /// the browser's own account of where the tab is. Nothing to read
+    /// when no listener is registered.
+    ///
+    /// # Errors
+    /// `E_GATE_DENIED` for the city's own page; propagates a tree the
+    /// browser will not give.
+    fn refuse_own_page(&mut self, own: &OwnListeners, context: &ContextId) -> Result<(), AxError> {
+        if own.is_empty() {
+            return Ok(());
+        }
+        let tree = self.session.tree()?;
+        let answered = self.port.send(&tree)?.into_result()?;
+        match browser::page_address(&answered, context) {
+            Some(address) => own.refuse("act on a browser tab", &address),
+            None => Ok(()),
+        }
+    }
+
+    /// The tab this tool drives, opening the session the first time: the
+    /// first one that is not on one of the city's own pages.
     ///
     /// Both frames are minted by this tool's own `Session`, so the ids
     /// on one socket stay unique: a second counter would send two
@@ -240,8 +276,9 @@ impl Browser {
     /// # Errors
     /// Propagates a session the engine refuses to open, and a browser
     /// with no tab in it - which is a browser that is closing, and is
-    /// not a page anybody can act on.
-    fn tab(&mut self) -> Result<ContextId, AxError> {
+    /// not a page anybody can act on - or with every tab on one of the
+    /// city's own pages.
+    fn tab(&mut self, own: &OwnListeners) -> Result<ContextId, AxError> {
         if let Some(open) = &self.context {
             return Ok(open.clone());
         }
@@ -251,14 +288,18 @@ impl Browser {
         let answered = self.port.send(&tree)?.into_result()?;
         let context = Session::read_tree(&answered)?
             .into_iter()
-            .next()
+            .find(|context| {
+                browser::page_address(&answered, context).is_none_or(|address| !own.holds(&address))
+            })
             .ok_or_else(|| {
                 AxError::failure(
                     AxCode::BrowserUnavailable,
                     "open a browser tab",
-                    "the browser has no tab open",
+                    "the browser has no tab open other than this city's own pages",
                 )
-                .with_recovery("start the browser again; a window with no tab is one closing")
+                .with_recovery(
+                    "open another tab, or start the browser again; a window with no tab is closing",
+                )
             })?;
         self.context = Some(context.clone());
         Ok(context)
