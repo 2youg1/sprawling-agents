@@ -15,14 +15,11 @@ export { providerName };
 import type {
   Address,
   AdmissionRequirement,
-  AgentOffer,
   ApprovalId,
   Autonomy,
   Carry,
   Ceiling,
-  CloseMode,
   Command,
-  DeviceId,
   Mode,
   Origin,
   SpineDocument,
@@ -149,27 +146,6 @@ export function release(scope: HaltScope): Command {
   return { release: { scope, idem: mintIdem() } };
 }
 
-// Forget a paired browser: its key is dropped, and it pairs again to
-// come back.
-export function forgetDevice(device: DeviceId): Command {
-  return { forget_device: { device, idem: mintIdem() } };
-}
-
-// Consent to one agent entry the city offered, named by the digest of
-// the launch spec the card showed; `seatHere` also seats it in that room.
-export function addAgent(offer: Pick<AgentOffer, "spec_digest" | "source">, seatHere: Address | null): Command {
-  return { add_agent: { spec_digest: offer.spec_digest, source: offer.source, seat_here: seatHere, idem: mintIdem() } };
-}
-
-// Start an added agent's own sign-in, by one of the methods it declared.
-export function agentLogin(agent: string, method: string): Command {
-  return { agent_login: { agent, method, idem: mintIdem() } };
-}
-
-// Close the whole city: wait for the runs under way, or stop them now.
-export function closeCity(mode: CloseMode): Command {
-  return { close_city: { mode, idem: mintIdem() } };
-}
 
 // Show a path where the person keeps their files. The address grammar is
 // the guard on the other side: nothing outside the city can be spelled.

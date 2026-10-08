@@ -40,7 +40,7 @@ import { createUnsent, isSpeech } from "./unsent";
 import { langOf, say } from "./lang";
 import { createGapWalk } from "./gap_walk";
 import { advance, connect as start, isLive, isStopped, newLink, unreadableRecord, unsentCommand } from "./link";
-import { closeCity } from "./commands";
+import { closeCity } from "./access";
 import type { Link, LinkAction, LinkEvent, LinkState } from "./link";
 import type { Dial, Line } from "./line";
 import { AskId } from "../wire";

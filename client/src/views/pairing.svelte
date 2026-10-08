@@ -90,11 +90,11 @@
         id={`${uid}-code`}
         bind:value={code}
         autocomplete="one-time-code"
-        autocapitalize="characters"
+        autocapitalize="none"
         spellcheck="false"
         aria-invalid={failed !== null}
         aria-describedby={failed === null ? undefined : `${uid}-failed`}
-        class="h-[4.5rem] w-full rounded-card border border-edge-input bg-raised px-pane text-center font-mono text-figure tracking-[0.2em] text-text uppercase"
+        class="h-[4.5rem] w-full rounded-card border border-edge-input bg-raised px-pane text-center font-mono text-figure tracking-[0.2em] text-text"
       />
       {#if failed !== null}
         <p id={`${uid}-failed`} role="alert" class="text-note text-alert">{failed}</p>

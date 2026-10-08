@@ -41,26 +41,28 @@ export async function makeKey(): Promise<MadeKey | null> {
   const pair = await crypto.subtle.generateKey({ name: "Ed25519" }, false, ["sign"]).catch(() => null);
   if (pair === null || !("privateKey" in pair)) return null;
   const raw = await crypto.subtle.exportKey("raw", pair.publicKey).catch(() => null);
-  return raw === null ? null : { key: pair.privateKey, public: base64url(new Uint8Array(raw)) };
+  return raw === null ? null : { key: pair.privateKey, public: hex(new Uint8Array(raw)) };
 }
 
 // The signature `/session` asks for, over the message `challenged` spells.
 export async function signed(device: LocalDevice, message: Uint8Array<ArrayBuffer>): Promise<string | null> {
   const signature = await crypto.subtle.sign({ name: "Ed25519" }, device.key, message).catch(() => null);
-  return signature === null ? null : base64url(new Uint8Array(signature));
+  return signature === null ? null : hex(new Uint8Array(signature));
 }
 
-// The bytes a device signs to open a session: a label that names this
-// protocol, the page's origin, and the nonce the city just handed out,
-// one per line. The origin binds the signature to the listener that
-// asked, so a page on another port cannot replay it.
+// The bytes a device signs to open a session, as the door verifies them
+// (`crates/wire/spec/Server.lean` §8-93): a label that names this
+// protocol, the nonce the city just handed out, and the page's origin,
+// one per line. The
+// origin binds the signature to the listener that asked, so a page on
+// another port cannot replay it.
 export function challenged(origin: string, nonce: string): Uint8Array<ArrayBuffer> {
-  return new TextEncoder().encode(`sprawling local session v1\n${origin}\n${nonce}`);
+  return new TextEncoder().encode(`sprawling local session v1\n${nonce}\n${origin}`);
 }
 
-// Unpadded base64url, the form a JWK writes a key in.
-export function base64url(bytes: Uint8Array): string {
-  return btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+// Lowercase hex, the form the door reads a key and a signature in.
+export function hex(bytes: Uint8Array): string {
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
 function opened(): Promise<IDBDatabase | null> {

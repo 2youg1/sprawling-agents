@@ -109,10 +109,10 @@ export function folded(key: string): string {
 function plain(key: string): Chord {
   return { accel: false, shift: false, key };
 }
-function accel(key: string): Chord {
+export function accel(key: string): Chord {
   return { accel: true, shift: false, key };
 }
-function accelShift(key: string): Chord {
+export function accelShift(key: string): Chord {
   return { accel: true, shift: true, key };
 }
 
@@ -122,29 +122,17 @@ function accelShift(key: string): Chord {
 // verb in the palette and after `/`, its button.
 export type Bound = Chord | null;
 
-// The chords this client ships with.
-//
-// **No default sits on a chord a browser gives a function of its
-// own** (`BROWSER_KEEPS` below, the audit of the four browsers' official
-// shortcut lists). A page can often take such a chord first, and that
-// is the harm: the person who pressed Accel-P to print, Accel-J for
-// downloads or Accel-1 for the first tab got the city's page instead.
-// So the six page digits, settings on the comma, the waiting list, the
-// mailbox, the right pane, the stop, the branch, the three decide
-// letters and the file finder ship with no chord; each keeps the route
-// it already had, and the person may bind any of them.
-//
-// The palette moved from K, which three of the four browsers give to
-// their search box, to the slash beside the accelerator, which none of
-// the four lists; it is the one door to every page and every verb, so
-// it keeps a chord. The key list, which used to sit there, is the keys
-// section of settings and has no chord of its own. The tier stays on
-// the backslash, which no browser lists outside a PDF viewer.
-//
-// `/` alone holds no modifier; the paragraph at the top of this file
-// says why, and `matches` below keeps it out of a text box. Firefox's
-// Quick Find answers `/` too, but only outside a text field, and its
-// find bar keeps Accel-F.
+// The chords this client ships with. **No default sits on a chord a
+// browser gives a function of its own** (`browser_keys.ts`, D96): the
+// person who pressed Accel-P to print or Accel-1 for the first tab must
+// get the browser, not this page. So most actions ship unbound and keep
+// the route they already had (settings tree, palette and `/` verbs,
+// buttons), and the person may bind any of them. The palette is the
+// one door to every page and verb, so it keeps a chord, on the slash
+// beside the accelerator, which none of the four browsers lists; the
+// tier keeps the backslash. `/` alone holds no modifier; the paragraph
+// at the top of this file says why, and `matches` keeps it out of a
+// text box.
 export const DEFAULTS: Readonly<Record<Action, Bound>> = {
   "go.talk": null,
   "go.city": null,
@@ -168,43 +156,6 @@ export const DEFAULTS: Readonly<Record<Action, Bound>> = {
   finder: null,
 };
 
-// The chords a browser gives a function of its own, from the official
-// shortcut lists of Chrome (support.google.com/chrome/answer/157179),
-// Edge (support.microsoft.com, "Keyboard shortcuts in Microsoft Edge"),
-// Firefox (the `<key>` table of `browser/base/content/browser-sets.inc.xhtml`,
-// which its support page is written from) and Safari
-// (support.apple.com/guide/safari/cpsh003). No default may sit on one;
-// a person may still bind one, because a person who never prints may
-// want Accel-P for the finder.
-const BROWSER_KEEPS: readonly Chord[] = [
-  // Select a tab: all four.
-  ...["1", "2", "3", "4", "5", "6", "7", "8", "9"].map(accel),
-  // Settings on macOS: Chrome, Firefox, Safari.
-  accel(","),
-  // Search from the address bar: Chrome, Edge, Firefox.
-  accel("k"),
-  // Downloads: Chrome, Edge, Firefox.
-  accel("j"),
-  // Bookmarks sidebar: Firefox.
-  accel("b"),
-  // Print: all four.
-  accel("p"),
-  // Stop loading on macOS: Firefox, Safari.
-  accel("."),
-  // Search open tabs: Firefox; add-ons: Firefox on Windows and Linux,
-  // and on macOS under E; search in the sidebar: Edge; Collections:
-  // Edge; switch text direction: Firefox.
-  accelShift("a"),
-  accelShift("f"),
-  accelShift("e"),
-  accelShift("y"),
-  accelShift("x"),
-];
-
-// Whether a browser gives this chord a function of its own.
-export function browserKeeps(held: Bound): boolean {
-  return held !== null && BROWSER_KEEPS.some((kept) => spell(kept) === spell(held));
-}
 
 // The word each action is called by, which is a phrase key rather than
 // a phrase: this file holds no words.

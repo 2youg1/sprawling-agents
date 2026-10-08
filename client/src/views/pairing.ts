@@ -17,9 +17,10 @@ export const WHY: Readonly<Record<PairWhy, Key | undefined>> = {
   session_lost: "pair_session_lost",
 };
 
-// The code as typed, the way a person copies it from a terminal: the
-// spaces and dashes a terminal groups it with are not part of it, and
-// case is not either.
+// The code as typed, the way a person copies it from a terminal: a
+// space a copy picked up is not part of it, and the terminal prints it
+// in lower case, so a person who typed capitals meant the same code.
+// The dash between its two groups is part of it.
 export function codeOf(typed: string): string {
-  return typed.replace(/[\s-]/g, "").toUpperCase();
+  return typed.replace(/\s/g, "").toLowerCase();
 }

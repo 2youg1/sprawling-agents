@@ -5,7 +5,8 @@
 
 import { describe, expect, test } from "bun:test";
 
-import { ACTIONS, DEFAULTS, browserKeeps, conflictsOf, loadKeys, reserved } from "./keys";
+import { browserKeeps } from "./browser_keys";
+import { ACTIONS, DEFAULTS, conflictsOf, loadKeys, reserved } from "./keys";
 import type { Pressed } from "./press";
 import { loadPreferences } from "./prefs";
 import { memory } from "./rows";

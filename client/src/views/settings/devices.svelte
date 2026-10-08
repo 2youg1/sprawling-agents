@@ -15,7 +15,7 @@
 
   import { QUERIES } from "../../core/asking";
   import { readAnswer } from "../../core/answered";
-  import { forgetDevice } from "../../core/commands";
+  import { forgetDevice } from "../../core/access";
   import { kept } from "../../core/local/device";
   import { ui } from "../../ui";
   import type { DeviceId } from "../../wire";

@@ -16,7 +16,7 @@
   // the person's eyes; signing in is `AgentLogin`.
   import { QUERIES } from "../../core/asking";
   import { readAnswer } from "../../core/answered";
-  import { addAgent, agentLogin } from "../../core/commands";
+  import { addAgent, agentLogin } from "../../core/access";
   import { ui } from "../../ui";
   import type { AgentOffer } from "../../wire";
   import Unanswered from "../parts/unanswered.svelte";
