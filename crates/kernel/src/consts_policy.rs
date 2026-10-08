@@ -219,9 +219,9 @@ pub const AUTONOMY_DEFAULT: crate::approval::Autonomy = crate::approval::Autonom
 
 /// The thinking level a request takes when nobody stated one, if the
 /// (Endpoint, model) offers it: a balanced level for a person who never
-/// opened the setting. Whether it is used is `gateway::provider::thinking`'s
-/// answer, which falls back to the upstream's own default when this level
-/// is not offered (`crates/kernel/spec/Model.lean` D56).
+/// opened the setting. Whether it is used is the answer of the gateway's
+/// thinking ladder, which falls back to the upstream's own default when
+/// this level is not offered (`crates/kernel/spec/Model.lean` D56).
 pub const DEFAULT_EFFORT: crate::model::Effort = crate::model::Effort::High;
 
 /// Where a city listens when nobody says otherwise: the loopback

@@ -45,7 +45,7 @@ pub struct ModelFactsSummary {
     /// The provider's own output price, verbatim. See `input_price`.
     pub output_price: Option<String>,
     /// The thinking levels this (Endpoint, model) offers, and the rung of
-    /// `gateway::provider::thinking`'s ladder that said so.
+    /// the gateway's thinking ladder that said so.
     pub thinking: super::ThinkingOffer,
     /// This model's identity across providers: two rows are one model
     /// exactly when these are equal.

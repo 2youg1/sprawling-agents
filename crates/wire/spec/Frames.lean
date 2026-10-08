@@ -309,7 +309,7 @@ wire shape golden 与客户端协议。-/
 
 /-! D53 V0.0.11 的线上改形一次进位，由第一条车道落地
 
-**决定**：V0.0.11 的线上改形在一个变更集里落地，`WIRE_V` 从 64 进到 65，只进这一次：`Effort` 多一级 `minimal`（kernel D56）；四个新命令 `CloseCity`、`AddAgent`、`AgentLogin`、`ForgetDevice`，class 都是 `LocalOnly`（§19-2）；三个新查询 `AgentCatalog`、`ParseAgentSpec`、`Devices`（§8-90、§8-91）；端点的模型行多 `thinking` 与 `canonical`（§8-92）；本机门的三条配对与会话路由（§8-93）；`AxCode` 多两个码。同一个变更集重生 schema golden、wire shape golden、`client/src/wire.ts`（`cargo xtask wire-ts`）与 docnum。其余车道照这些形状实现执行者，不再改形；确有一处必须改时，由整合者在合并时重生上面这几样，`WIRE_V` 在两次推送之间仍至多进一位。
+**决定**：V0.0.11 的线上改形在一个变更集里落地，`WIRE_V` 从 64 进到 65，只进这一次：`Effort` 多一级 `minimal`（kernel D56）；四个新命令 `CloseCity`、`AddAgent`、`AgentLogin`、`ForgetDevice`，class 都是 `LocalOnly`（§19-2）；三个新查询 `AgentCatalog`、`ParseAgentSpec`、`Devices`（§8-90、§8-91）；端点的模型行多 `thinking` 与 `canonical`（§8-92）；本地门的三条配对与会话路由（§8-93）；`AxCode` 多两个码。同一个变更集重生 schema golden、wire shape golden、`client/src/wire.ts`（`cargo xtask wire-ts`）与 docnum。其余车道照这些形状实现执行者，不再改形；确有一处必须改时，由整合者在合并时重生上面这几样，`WIRE_V` 在两次推送之间仍至多进一位。
 
 **理由**：与 D22 相同：升版的代价是 `wire.ts` 重生与客户端同改，与改动的数量无关；九条车道同时改帧表，每次合并都会冲突。帧先落地、执行者后到，靠的是 `not_built` 与 `Answer::Unavailable` 两种现成的回答：它们让一个还没有执行者的动词在线上可拼、被问时如实回绝，而 `xtask wiring` 保证客户端在执行者落地之前不画它。
 

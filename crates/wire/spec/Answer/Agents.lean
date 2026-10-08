@@ -18,7 +18,7 @@
 Query::AgentCatalog                                  // 无参数
 Answer::AgentCatalog(Box<AgentCatalogAnswer>)
 pub struct AgentCatalogAnswer {
-    pub detected: Vec<AgentOffer>,     // 本机上找到的 agent，一项一张同意卡
+    pub detected: Vec<AgentOffer>,     // 城所在的电脑上找到的 agent，一项一张同意卡
     pub catalog: Vec<AgentOffer>,      // 随版本附带的目录快照（含五个内置条目）
     pub added: Vec<AgentLine>,         // 城里已添加的 agent
     pub snapshot: CatalogSnapshot,
@@ -61,8 +61,8 @@ pub struct AuthMethod { pub id: String, pub name: String, pub kind: LoginKind }
 - **同意就是摘要**：`AgentOffer.spec_digest` 是城对它给出的那份启动说明算的摘要，`AddAgent` 把它带回来；城重算它此刻会给出的那一份，不相等就拒，所以人同意的那一行命令就是城写进 `[[agent]]` 的那一行（`crates/wire/spec/Command/Kind.lean` §19-2）。
 - **`launch_preview` 照原样显示**：同意卡上显示的是确切的命令行，页面不改写、不截断；路径与命令行只在答复与 `CONFIG.toml` 里，不进账本（`crates/kernel/Spec.lean` §8-87）。
 - **只给名字，不给值**：`env_names` 只列它设的环境变量的名字；值可能是 `secret:realm/name` 引用，也可能是 registry 写的关掉自更新的开关，页面都不需要。
-- **`PinState` 三态**：`Exact` 是启动说明钉在一个确切的版本上（`pkg@1.2.3`）；`Floating` 是交给启动程序去解析版本（`@latest` 或不写）；`Unknown` 是本机上找到的一个程序，城没有执行它，所以不知道它是哪一版。
-- **登录只在需要时出现**：`LoginState::Unasked` 是城还没有与它开过会话；`Required` 是它以 `-32000` 答过（`E_AUTH_REQUIRED`），页面这时才给登录入口；`Ready` 是它接过一次会话而没有要求登录。`auth_methods` 是 agent 在 `initialize` 里声明的方法，已滤掉城不代为启动的那一种（claude.ai 订阅登录，人的裁定）。
+- **`PinState` 三态**：`Exact` 是启动说明钉在一个确切的版本上（`pkg@1.2.3`）；`Floating` 是交给启动程序去解析版本（`@latest` 或不写）；`Unknown` 是城所在的电脑上找到的一个程序，城没有执行它，所以不知道它是哪一版。
+- **登录只在需要时出现**：`LoginState::Unasked` 是城还没有与它开过会话；`Required` 是它以 `-32000` 答过（`E_AUTH_REQUIRED`），页面这时才给登录入口；`Ready` 是它接过一次会话而没有要求登录。`auth_methods` 是 agent 在 `initialize` 里声明的方法，已滤掉城不代为启动的那一种（claude.ai 订阅登录，这是人定下的）。
 - **粘贴的文法只在 Rust 里**：`ParseAgentSpec` 读一行命令（空白与双引号分词，含 `|`、`&`、`;`、`<`、`>` 的拒绝）、Zed 或 JetBrains 的 `agent_servers` 块，或 registry 的 `agent.json`，WebUI 与 CLI 都经它，页面不另写一份。
 - **现状**：三问在线上，城以 `Answer::Unavailable` 答 `AgentCatalog` 与 `ParseAgentSpec`，直到目录、检测与粘贴的读法落地（`crates/agent_protocols/Spec.lean`）。`Query::Harnesses` 与 `HarnessLine`（§8-52）仍在线上，供今天的 harness 页读；ACP 页改读 `AgentCatalog` 的那个变更集删去它们，五个官方 harness 从那时起是 `catalog` 里的内置条目。
 -/

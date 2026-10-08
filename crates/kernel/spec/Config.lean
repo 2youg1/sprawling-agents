@@ -42,7 +42,7 @@ pub fn freeze(stated: &StatedConfig) -> FrozenConfig;
 
 **时钟分区（config）**：`ClockZone { id, offset_min }`（已解析偏移，恒不记时区名——重解会随时区库版本分叉重放历史）；`FrozenConfig.clock_zones` 由 `freeze` 的同名梯解析；zones 梯整表覆盖（下层写即替换上层全表）。本段属 kernel::config（§8-22），就近登记于此避免拆章。
 
-**思考强度（config）**：`FrozenConfig.effort: Option<Effort>`（类型住 §8-24），缺省 `None`＝没有人为这一层说过，这次请求用哪一档由 `gateway::provider::thinking` 按默认规则解出（`DEFAULT_EFFORT`，§8-24 D56）。
+**思考强度（config）**：`FrozenConfig.effort: Option<Effort>`（类型住 §8-24），缺省 `None`＝没有人为这一层说过，这次请求用哪一档由 gateway 的思考档梯子（`gateway::provider` 下的 `thinking` 模块） 按默认规则解出（`DEFAULT_EFFORT`，§8-24 D56）。
 
 **沙箱限额（config）**：`SandboxLimits { shell: bool, interpreter: Interpreter, fuel: u64, mounts: Vec<Address>, env_passthrough: Vec<EnvVarName>, trusted: Vec<ServerLabel>, container: Option<ContainerLimits>, arm: Option<SandboxArm> }`，即 `FrozenConfig.sandbox`。三条口径：①**整值解析而非逐字段合并**——一层说到 sandbox 就说全部，于是欠说的层只会收窄而恒不会悄悄放开上层没提过的能力；②**主机事实不入城**（CPython 工件路径、shell 可执行文件位置走环境变量）——一座城被搬到另一台机器时不该带着运行中的机器的路径；③冻结的理由与工具表相同：**能改变可达范围的东西恒不在回合中变宽**，否则变宽的那一刻没有人审过。缺省 `fuel = SANDBOX_FUEL_DEFAULT`（`consts_policy`，2×10⁸），`shell = false`——shell 是唯一一条从参数读不出可达范围的臂。
 

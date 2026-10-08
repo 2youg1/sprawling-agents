@@ -255,7 +255,7 @@ pub enum Door { Transcribe, Enroll, Acp, Drop }
 -/
 
 /-!
-### 8-93 本机门的配对与会话：三条路由的形状
+### 8-93 本地门的配对与会话：三条路由的形状
 
 ```rust
 // POST /pair                  { "open": "<开页码>" | "code": "<配对码>", "public_key": "<设备公钥>", "label": "<名字>" }
@@ -271,7 +271,7 @@ pub struct SessionBody { pub device: DeviceId, pub nonce: String, pub signature:
 pub struct SessionAnswer { pub token: String }               // 页面只把它放在内存里
 ```
 
-- **会话令牌是凭据**：页面以 hello 的 `token` 或 POST 的 `Authorization: Bearer` 出示它；`/ws`、`/transcribe`、`/enroll`、`/drop`、`/acp` 对每一个调用方都要求一份凭据——浏览器的会话令牌，或本机原生客户端的钥匙文件。
+- **会话令牌是凭据**：页面以 hello 的 `token` 或 POST 的 `Authorization: Bearer` 出示它；`/ws`、`/transcribe`、`/enroll`、`/drop`、`/acp` 对每一个调用方都要求一份凭据——浏览器的会话令牌，或同一台机器上的原生客户端的钥匙文件。
 - **两种码，一个入口**：`open` 是 `/web` 经只给本用户读的跳转文件交给浏览器的开页码，`code` 是终端上显示的配对码；两者都是一次一猜，错了以 `E_PAIRING_REFUSED` 拒，不说是哪一种原因。
-- **现状**：三条路由在路由表里，请求体按上面的形状读；处理器今天以 `501` 与一个 `E_TOOL_UNAVAILABLE` 的拒绝作答，直到本机门的配对、挑战与入口判定落地（`crates/sprawling/Spec.lean`）。
+- **现状**：三条路由在路由表里，请求体按上面的形状读；处理器今天以 `501` 与一个 `E_TOOL_UNAVAILABLE` 的拒绝作答，直到本地门的配对、挑战与入口判定落地（`crates/sprawling/Spec.lean`）。
 -/

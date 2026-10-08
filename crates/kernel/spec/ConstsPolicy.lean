@@ -46,7 +46,7 @@ pub const CREDENTIAL_NAME_MARKERS: [&str; 11];                       // §8-22 �
 pub const OUTPUT_CEILING_DEFAULT: u64 = 8_192;                       // messages 面输出上限梯的最后一档（token；`crates/gateway/Spec.lean` §8-17）
 pub const CLOCK_STAMP_DEFAULT: ClockStampGranularity = ClockStampGranularity::Minute;   // runtime D8
 pub const AUTONOMY_DEFAULT: Autonomy = Autonomy::Owner;
-pub const DEFAULT_EFFORT: Effort = Effort::High;                    // 没有人说过强度时内置的默认档（§8-24 D56）；用不用它由 `gateway::provider::thinking` 按 offer 解出
+pub const DEFAULT_EFFORT: Effort = Effort::High;                    // 没有人说过强度时内置的默认档（§8-24 D56）；用不用它由 gateway 的思考档梯子（`gateway::provider` 下的 `thinking` 模块） 按 offer 解出
 pub const DEFAULT_AT: &str = "127.0.0.1:8787";                       // 服务缺省监听地址
 ```
 

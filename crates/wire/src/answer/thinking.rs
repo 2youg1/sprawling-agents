@@ -9,8 +9,8 @@
 use kernel::Effort;
 use serde::{Deserialize, Serialize};
 
-/// The thinking levels one (Endpoint, model) offers, as
-/// `gateway::provider::thinking` resolved them.
+/// The thinking levels one (Endpoint, model) offers, as the gateway's
+/// thinking ladder resolved them.
 ///
 /// Sourced rather than said: `from` names the rung of the ladder that
 /// answered, so a page never mistakes this for the upstream's own words,

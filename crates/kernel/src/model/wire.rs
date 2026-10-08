@@ -174,22 +174,16 @@ impl std::fmt::Display for ModelTag {
     }
 }
 
-/// How hard the provider should think before answering, ordered from
-/// least to most, in the upstreams' own words.
-///
-/// Which of these one (Endpoint, model) offers is the upstream's
-/// statement, answered by `gateway::provider::thinking` and never by a
-/// table here (`crates/kernel/spec/Model.lean` D56); a level outside that
-/// offer is refused, never moved to a neighbour. The ladder mirrors the
-/// providers' vocabularies; check theirs before changing it:
-/// <https://platform.claude.com/docs/en/build-with-claude/effort> and
+/// How hard the provider should think, least to most, in the upstreams' words. Which levels one
+/// (Endpoint, model) offers is the upstream's statement, answered by the gateway's thinking
+/// ladder and never by a table here (`crates/kernel/spec/Model.lean` D56); a level outside the
+/// offer is refused, never moved to a neighbour. Check the vendors before changing the ladder:
+/// <https://platform.claude.com/docs/en/build-with-claude/effort>,
 /// <https://developers.openai.com/api/docs/guides/reasoning>.
 ///
-/// Absence (`Option::None`) is not `Effort::None`: absence means nobody
-/// stated a level and the default rule resolves one
-/// ([`crate::consts_policy::DEFAULT_EFFORT`]). `Effort::None` survives
-/// only so ledgers that asked a provider not to think read back; no
-/// picker offers it.
+/// Absence (`Option::None`) is not `Effort::None`: absence means nobody stated a level and the
+/// default rule resolves one ([`crate::consts_policy::DEFAULT_EFFORT`]). `Effort::None` survives
+/// only so ledgers that asked a provider not to think read back; no picker offers it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
