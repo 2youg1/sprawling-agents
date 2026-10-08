@@ -164,7 +164,7 @@ jobs:
       # reads false, because it reports an exact key only. Only what cargo
       # would build identically is reused: workspace crates are cleaned
       # before the save, and the fat-LTO link of the binary always runs here.
-      - uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c # v2
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
         id: archive-cache
         with:
           shared-key: release
@@ -291,7 +291,7 @@ jobs:
       # `gh attestation verify` cannot vouch for. The glob is word for word
       # the one `gh release create` attaches below.
       - name: attest where each archive was built
-        uses: actions/attest-build-provenance@8beda2b7ed98355c0e97c0a63bec38ae472e66c4 # v4
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4
         with:
           subject-path: assets/*.zip
       - name: attach the archives to the tag
