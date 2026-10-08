@@ -102,6 +102,6 @@ pub(super) fn own() -> OwnListeners;                   // 此刻的登记；死�
 
 决定：§8-45-6 的三条判断落在 `bin::browser_tool`，对 `browser` 与 `usersbrowser` 一样，判定本身（一个地址是不是城的某个监听）在 `browser::OwnListeners`。理由：`usersbrowser` 驱动的是人自己的 profile，城的页面在那个 profile 里存着人的设备钥，一个居民把它带到城的源上，就能以人的身份操作这座城；`browser` 的 profile 是楼自己的，没有设备钥，可它照样能打开配对页。两件工具一条规则，比只守一件少一处要记住的差别。出网门不改：`kernel::gate` 的出网判定只按主机，回环一律放行（居民要看自己起的开发服务器），它不知道城监听在哪个端口，而登记只有装配层知道。被否：①让出网门长出「本城的监听」这一判定——要把端口带进 kernel 的门，而门的输入今天只有主机；②拦所有回环——居民的开发循环就是在回环上看自己造的东西。
 
-现状：页面自己发起的子资源请求与脚本里的 `fetch` 不经这条守卫。sec.md E.6 要的 BiDi `network.addIntercept` 需要 `BidiSocket` 在等答复的循环里答 `network.beforeRequestSent` 事件（`network.failRequest`），并用一段不与 `Session` 相撞的帧 id；今天的端口跳过一切事件，装上拦截而不答，被拦的请求就挂到下一次调用为止。挡住这类请求的是本机端口的入口判定：Origin 不在名单里的请求在升级之前就被拒（`crates/wire/Spec.lean` 的入口判定）。重开参数：BiDi 端口开始处理事件时，加上这一道拦截。
+现状：页面自己发起的子资源请求与脚本里的 `fetch` 不经这条守卫。sec.md E.6 要的 BiDi `network.addIntercept` 需要 `BidiSocket` 在等答复的循环里答 `network.beforeRequestSent` 事件（`network.failRequest`），并用一段不与 `Session` 相撞的帧 id；今天的端口跳过一切事件，装上拦截而不答，被拦的请求就挂到下一次调用为止。挡住这类请求的是城在这台电脑上那个端口的入口判定：Origin 不在名单里的请求在升级之前就被拒（`crates/wire/Spec.lean` 的入口判定）。重开参数：BiDi 端口开始处理事件时，加上这一道拦截。
 -/
 
