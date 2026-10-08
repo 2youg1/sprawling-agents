@@ -17,7 +17,6 @@
   import { say } from "../../core/lang";
   import { markEndAtFrame, markStart } from "../../core/timing";
   import { current } from "../../core/route";
-  import { completed } from "../../core/completion";
   import { find, parse } from "../../core/slash";
   import type { Slash } from "../../core/slash_hands";
   import type { Address } from "../../wire";
@@ -33,7 +32,9 @@
   import Popover from "../parts/popover.svelte";
   import type { PopoverBinding } from "../parts/popover";
   import Unkept from "../parts/unkept.svelte";
-  import { boxKey, menuColumns, pickSlash, picksFor, pills, roomsKnown, sessionModel, slashHands } from "./composer";
+  import { boxKey, completedAt, menuColumns, pickSlash, picksFor, roomsKnown, sessionModel, slashHands, workspacePill } from "./composer";
+  import { offersOf } from "./picker";
+  import type { PickerFacts } from "./picker_look";
   import type { BoxKey, ComposerLook } from "./composer";
   import Look from "./composer.look.svelte";
   import { draftAt } from "./draft";
@@ -210,12 +211,31 @@
 
   const startedHere = $derived(here !== null && heldIn($belief, here).some((run) => run.lastSeq > ($belief.sessions[here] ?? 0)));
   const session = $derived(here === null ? null : sessionModel(heldIn($belief, here), $belief.sessions[here] ?? null));
-  const offered = $derived({ served: models, chosen: main, session, rooms, here, effort: $effort });
-  const specs = $derived(pills($lang, offered, picksFor(u, session)));
+  const picks = $derived(picksFor(u, session));
+  const workspace = $derived(workspacePill($lang, { rooms, here }, picks.workspace));
+  // The level this room inherits when the page states none: the room's
+  // own configuration ladder answers it.
+  const roomConfig = $derived(here === null ? readable(undefined) : u.conn.asking.ask({ config: { addr: here } }));
+  const inherited = $derived.by(() => {
+    const held = $roomConfig;
+    return held !== undefined && "config" in held ? (held.config.effort?.effort ?? null) : null;
+  });
+  const picker: PickerFacts = $derived({
+    endpoints: answer?.endpoints ?? [],
+    chosen: main,
+    stated: $effort ?? inherited,
+    pick: { model: picks.model, level: picks.effort },
+  });
+  // What `/model` and `/effort` complete their argument from: every
+  // model the city serves, and the levels the model in force offers.
+  const argued = $derived({
+    models,
+    levels: offersOf(picker.endpoints).find((each) => each.endpoint === main?.endpoint && each.model === main.model)?.facts.thinking.levels ?? [],
+  });
 
   // ------------------------------------------------------- the `/` menu
 
-  const showing = $derived(open ? menuColumns($lang, text) : []);
+  const showing = $derived(open ? menuColumns($lang, text, argued) : []);
 
   function closeMenu(): void {
     open = false;
@@ -261,7 +281,7 @@
     switch (key) {
       case "complete":
         event.preventDefault();
-        write(completed(text, pointed));
+        write(completedAt(text, pointed));
         return;
       case "recall": {
         // ↑ in an empty box brings back what was last sent here.
@@ -350,8 +370,13 @@
     label="talk_commands"
     columns={showing}
     onApply={(_column, row: { readonly id: string }) => {
-      const chosen = find(row.id);
-      if (chosen !== undefined) pick(chosen);
+      // A verb row's id is its spelling; an argument row's is the whole
+      // line it runs, which goes into the box before the verb reads it.
+      const call = parse(row.id);
+      const chosen = call === null ? undefined : find(call.verb);
+      if (chosen === undefined) return;
+      if (row.id !== chosen.spelling) write(row.id);
+      pick(chosen);
     }}
     onClose={closeMenu}
     bind={(binding: PopoverBinding) => { menuBinding = binding; }}
@@ -390,7 +415,7 @@
     <Unkept words={() => text} />
   {/if}
   <DropRefused refused={zone.refused} />
-  <SettingsRow {specs} room={here} draws={band !== undefined || started || startedHere ? "notice" : "everything"} {kept} />
+  <SettingsRow {workspace} {picker} room={here} draws={band !== undefined || started || startedHere ? "notice" : "everything"} {kept} />
 {/snippet}
 
 <Look {...look} />

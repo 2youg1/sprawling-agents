@@ -29,55 +29,19 @@
   class={[
     "absolute left-0 w-max min-w-full max-w-full rounded-panel border border-edge-panel bg-raised p-snug shadow-float",
     look.side === "above" ? "bottom-full mb-snug rise" : "top-full mt-snug drop",
-    // The table is one surface, so it is the surface that scrolls: a
-    // row that wraps to more lines than a narrow window holds moves the
-    // whole table rather than trapping the pointer in a second
-    // scroller. Laid beside their names the lists keep their own cap.
-    look.layout === "rows" && "max-h-palette overflow-y-auto",
   ]}
   {...look.dialog}
 >
   {#if look.header !== undefined}{@render look.header()}{/if}
-  <div
-    class={[
-      "gap-snug",
-      look.layout === "equal"
-        ? "grid auto-cols-fr grid-flow-col"
-        : look.layout === "rows"
-          ? "flex flex-col"
-          : "flex",
-    ]}
-  >
+  <div class={["gap-snug", look.layout === "equal" ? "grid auto-cols-fr grid-flow-col" : "flex"]}>
     {#each look.lists as list (list.key)}
-      <!-- One list, either a column of pickable rows or the cell row of
-           the table: what changes with the layout is where its name
-           stands and whether its rows stack or wrap. -->
-      <div
-        class={[
-          look.layout === "rows"
-            ? "grid min-w-0 grid-cols-[auto_1fr] items-baseline gap-snug"
-            : "flex min-w-0 flex-col",
-          look.layout === "rows" && list.apart && "border-t border-edge-panel pt-snug",
-        ]}
-      >
-        {#if look.layout === "rows"}
-          <div class="text-note text-text-faint">{list.label}</div>
-        {:else}
-          <div class="mb-tight px-snug text-note text-text-faint">{list.label}</div>
-        {/if}
-        <ul
-          class={look.layout === "rows"
-            ? "flex min-w-0 flex-wrap content-start gap-tight"
-            : "max-h-palette overflow-y-auto"}
-          {...list.wire}
-        >
+      <div class="flex min-w-0 flex-col">
+        <div class="mb-tight px-snug text-note text-text-faint">{list.label}</div>
+        <ul class="max-h-palette overflow-y-auto" {...list.wire}>
           {#each list.rows as item (item.key)}
             <li
               class={[
-                "relative cursor-pointer rounded-control px-snug py-tight text-body",
-                look.layout === "rows"
-                  ? "flex min-w-0 items-center gap-tight"
-                  : "flex items-center justify-between gap-snug",
+                "relative flex cursor-pointer items-center justify-between gap-snug rounded-control px-snug py-tight text-body",
                 item.chosen
                   ? "applied wash-strong text-text"
                   : item.cursor
@@ -93,16 +57,8 @@
                 <!-- The name never shrinks; the secondary cell does.
                      Both are capped rather than one holding its width
                      against the other, so a one-word hint beside a long
-                     label survives whole. A cell of the table wraps
-                     instead of truncating, because a column is as wide
-                     as its own name and a row as wide as the dialog. -->
-                <span
-                  class={look.layout === "rows"
-                    ? "min-w-0 max-w-[24ch] wrap-anywhere"
-                    : "min-w-0 max-w-[24ch] truncate"}
-                >
-                  {item.row.label}
-                </span>
+                     label survives whole. -->
+                <span class="min-w-0 max-w-[24ch] truncate">{item.row.label}</span>
                 {#if item.row.secondary !== undefined}
                   <span class="min-w-0 max-w-[20ch] line-clamp-2 text-note text-text-faint"
                     >{item.row.secondary}</span

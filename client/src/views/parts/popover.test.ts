@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 // The popover's wiring, without a look: the key table checked against
-// `press` and `pressRow` in `client/spec/Views/Parts/Popover.lean` over
+// `press` in `client/spec/Views/Parts/Popover.lean` over
 // every place in every shape of up to three lists of up to four rows,
 // and the value a look is given checked for what a screen reader is
 // told - which list holds the Tab stop, which row is applied, which
@@ -14,7 +14,7 @@ import { describe, expect, test } from "bun:test";
 
 import type { PopoverColumn, PopoverRow } from "./popover";
 import { keysOf, listId, lookOf, pressed, rowId } from "./popover_wiring";
-import type { Hands, Keyed, Layout, Place, PopoverLook, PopoverView } from "./popover_wiring";
+import type { Hands, Keyed, Place, PopoverLook, PopoverView } from "./popover_wiring";
 
 const key = (name: string, shiftKey = false): Keyed => ({ key: name, shiftKey, preventDefault: () => undefined });
 
@@ -42,14 +42,14 @@ function places(rows: readonly number[]): readonly Place[] {
   );
 }
 
-function check(layout: Layout, names: readonly string[], holds: (rows: readonly number[], from: Place, to: Place, name: string) => boolean): string[] {
+function check(names: readonly string[], holds: (rows: readonly number[], from: Place, to: Place, name: string) => boolean): string[] {
   const wrong: string[] = [];
   for (const rows of shapes())
     for (const from of places(rows))
       for (const name of names) {
-        const answer = pressed(layout, from, key(name), rows);
+        const answer = pressed(from, key(name), rows);
         if (answer.kind !== "move" || !holds(rows, from, answer.to, name))
-          wrong.push(`${layout} ${name} at ${JSON.stringify(from)} in ${JSON.stringify(rows)}`);
+          wrong.push(`${name} at ${JSON.stringify(from)} in ${JSON.stringify(rows)}`);
       }
   return wrong;
 }
@@ -60,33 +60,24 @@ const inside = (rows: readonly number[], to: Place): boolean =>
 describe("the key table", () => {
   test("a move stays inside its list (a_move_stays_inside)", () => {
     expect(
-      check("content", ["ArrowDown", "ArrowUp", "Home", "End"], (rows, from, to) => inside(rows, to) && to.column === from.column),
+      check(["ArrowDown", "ArrowUp", "Home", "End"], (rows, from, to) => inside(rows, to) && to.column === from.column),
     ).toEqual([]);
   });
 
   test("Tab changes list and starts at its top (a_new_column_starts_at_its_top)", () => {
     expect(
-      check("content", ["Tab"], (rows, from, to) => inside(rows, to) && to.cursor === 0 && to.column === (from.column + 1) % rows.length),
+      check(["Tab"], (rows, from, to) => inside(rows, to) && to.cursor === 0 && to.column === (from.column + 1) % rows.length),
     ).toEqual([]);
-    expect(pressed("content", { column: 0, cursor: 2 }, key("Tab", true), [3, 3, 3])).toEqual({
+    expect(pressed({ column: 0, cursor: 2 }, key("Tab", true), [3, 3, 3])).toEqual({
       kind: "move",
       to: { column: 2, cursor: 0 },
     });
   });
 
-  test("in a table the side arrows stay in their row (a_side_step_stays_in_its_row)", () => {
-    expect(check("rows", ["ArrowLeft", "ArrowRight"], (rows, from, to) => inside(rows, to) && to.column === from.column)).toEqual([]);
-  });
-
-  test("in a table the up and down arrows change row and start at its top (a_step_between_rows_starts_at_its_top)", () => {
-    expect(check("rows", ["ArrowDown", "ArrowUp"], (rows, from, to, name) =>
-          inside(rows, to) && to.cursor === 0 && to.column === (from.column + (name === "ArrowDown" ? 1 : rows.length - 1)) % rows.length)).toEqual([]);
-  });
-
   test("beside each other the side arrows are left to the caller's caret", () => {
-    expect(pressed("content", { column: 0, cursor: 0 }, key("ArrowRight"), [3, 3])).toEqual({ kind: "pass" });
-    expect(pressed("equal", { column: 0, cursor: 0 }, key("ArrowLeft"), [3, 3])).toEqual({ kind: "pass" });
-    expect(pressed("content", { column: 0, cursor: 0 }, key("a"), [3, 3])).toEqual({ kind: "pass" });
+    expect(pressed({ column: 0, cursor: 0 }, key("ArrowRight"), [3, 3])).toEqual({ kind: "pass" });
+    expect(pressed({ column: 0, cursor: 0 }, key("ArrowLeft"), [3, 3])).toEqual({ kind: "pass" });
+    expect(pressed({ column: 0, cursor: 0 }, key("a"), [3, 3])).toEqual({ kind: "pass" });
   });
 });
 

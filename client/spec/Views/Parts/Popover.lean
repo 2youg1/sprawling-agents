@@ -10,7 +10,7 @@ import client.spec.Views.Parts
 
 规定 `client/src/views/parts/popover.svelte`（多列 listbox，装在 `role="dialog"` 里），键表在 `client/spec/Views/Parts.lean` §7-5。本部件在这里覆盖平台的 Tab：Tab／Shift+Tab 换列（环绕）。
 
-**两个方向共用一张状态（列号＋游标），键表按方向取一份**：`layout="rows"` 把各列堆成一张表的各行（行首是列名），于是 ←／→ 在行内走、↓／↑ 换行（与 Tab 同一动作）；默认方向下 ↓／↑ 在列内走、←／→ 不被本部件接管，留给调用方的光标。
+**一张状态（列号＋游标），一张键表**：↓／↑ 在列内走，←／→ 不被本部件接管，留给调用方的光标。调用方可以用自己的外观（`look`）把同一组列表排成别的样子——设置行的模型选择器（`client/spec/Views/Picker.lean`）把它们从上到下排成几节——键表与焦点规则仍是这里的。调用方经 `bind` 把游标指到某一列时，游标落在那一列生效的一行，没有生效的一行时落在第 0 行。
 
 性质：
 
@@ -19,10 +19,8 @@ import client.spec.Views.Parts
 3. **Enter 应用的是当前列的游标行**（`enter_applies_the_cursor_of_this_column`）。
 4. **能装进视口的活动行完整可见**（`a_fitting_row_is_visible`）。
 5. **非空视口与非空活动行相交**（`a_nonempty_viewport_reaches_the_row`）。
-6. **表的行内走法留在本行**（`a_side_step_stays_in_its_row`）。
-7. **换行把游标复位到第 0 行，行号留在表内**（`a_step_between_rows_starts_at_its_top`）。
-8. **首选一侧放得下，弹层就开在那一侧**（`a_fitting_side_is_kept`）。
-9. **换到另一侧只为更多的空间**（`a_flip_gains_room`）。
+6. **首选一侧放得下，弹层就开在那一侧**（`a_fitting_side_is_kept`）。
+7. **换到另一侧只为更多的空间**（`a_flip_gains_room`）。
 
 列表持焦与 `bind` 文本框持焦共用活动行的可见性规则，滚动不取焦、不移动其他列或外层页面。坐标模型使用有序的非负离散单位；浏览器检查负责 DOM 的实际行高、亚像素坐标、焦点保持与按键到滚动的接线。
 
@@ -62,17 +60,6 @@ def press (columns : Nat) (rows : Nat → Nat) (s : State) : Key → State
   | .finish => { s with cursor := rows s.column - 1 }
   | .tab => ⟨wrap columns s.column .forward, 0⟩
   | .shiftTab => ⟨wrap columns s.column .backward, 0⟩
-
-/-- 堆成表的那个方向的键表：←／→ 在行内走，↓／↑ 换行并复位到第 0 行。 -/
-def pressRow (lists : Nat) (rows : Nat → Nat) (s : State) : Key → State
-  | .left => { s with cursor := clamp (rows s.column) s.cursor .backward }
-  | .right => { s with cursor := clamp (rows s.column) s.cursor .forward }
-  | .down => ⟨wrap lists s.column .forward, 0⟩
-  | .up => ⟨wrap lists s.column .backward, 0⟩
-  | .home => { s with cursor := 0 }
-  | .finish => { s with cursor := rows s.column - 1 }
-  | .tab => ⟨wrap lists s.column .forward, 0⟩
-  | .shiftTab => ⟨wrap lists s.column .backward, 0⟩
 
 /-- D1：DOM 更新后让活动行可见，只滚动当前列；最近的可见边界保留其余行的位置，过高的行露出行首。
 `top` 与 `bottom` 是行在列内容中的边界，`scroll` 是视口起点，`height` 是视口高度。 -/
@@ -151,22 +138,6 @@ theorem a_move_stays_inside (columns : Nat) (rows : Nat → Nat) (s : State)
   | finish => simp only [press]; omega
   | tab => exact absurd rfl vertical.1
   | shiftTab => exact absurd rfl vertical.2
-
-/-- 表的方向下，左右键只在当前行里走：游标仍在本行内。 -/
-theorem a_side_step_stays_in_its_row (lists : Nat) (rows : Nat → Nat) (s : State)
-    (inside : s.cursor < rows s.column) (key : Key) (side : key = .left ∨ key = .right) :
-    (pressRow lists rows s key).cursor < rows (pressRow lists rows s key).column := by
-  rcases side with rfl | rfl
-  · exact clamp_stays (rows s.column) s.cursor .backward inside
-  · exact clamp_stays (rows s.column) s.cursor .forward inside
-
-/-- 表的方向下，上下键换行：游标复位到第 0 行，行号留在表内。 -/
-theorem a_step_between_rows_starts_at_its_top (lists : Nat) (rows : Nat → Nat) (s : State)
-    (h : 0 < lists) (key : Key) (step : key = .down ∨ key = .up) :
-    (pressRow lists rows s key).cursor = 0 ∧ (pressRow lists rows s key).column < lists := by
-  rcases step with rfl | rfl
-  · exact ⟨rfl, wrap_stays lists s.column .forward h⟩
-  · exact ⟨rfl, wrap_stays lists s.column .backward h⟩
 
 theorem enter_applies_the_cursor_of_this_column (s : State) : applied s = (s.column, s.cursor) := rfl
 

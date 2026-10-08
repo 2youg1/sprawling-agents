@@ -25,10 +25,9 @@
 
   import type { Doing } from "../../core/doing";
   import { sendingInto } from "../../core/doing";
-  import { EFFORTS } from "../../core/commands";
   import { fill, say } from "../../core/lang";
   import { toFragment } from "../../core/route";
-  import { UNSTATED, offered } from "../../core/slash";
+  import { offered } from "../../core/slash";
   import type { Turn } from "../../wire";
   import { RunId, Seq, TimeMs } from "../../wire";
   import { motherName } from "../talk/forking";
@@ -72,7 +71,6 @@
   import { foldWire } from "../talk/fold";
   import Rule from "../talk/rule.look.svelte";
   import Case from "./case.svelte";
-  import { CHOSEN, MODELS } from "./served";
 
   const { lang } = ui();
   // The previous segment is folded away until somebody asks for it.
@@ -190,54 +188,6 @@ of padding that stand in for the page under them. -->
                   each.grammar === ""
                     ? say($lang, each.about)
                     : `${each.grammar} · ${say($lang, each.about)}`,
-              })),
-            },
-          ]}
-          onApply={() => undefined}
-          onClose={() => undefined}
-        />
-      </div>
-    </div>
-  </div>
-</Case>
-
-<Case label="selector · model, workspace and effort in one list">
-  <div class="pt-palette">
-    <div class="pt-output">
-      <div class="relative">
-        <Popover
-          label="talk_choose"
-          columns={[
-            {
-              id: "model",
-              label: "talk_column_model",
-              rows: MODELS.map((each) => ({
-                id: each.id,
-                label: each.id,
-                secondary: "zenmux",
-                chosen: each.id === CHOSEN.id,
-              })),
-            },
-            {
-              id: "workspace",
-              label: "talk_column_workspace",
-              rows: [
-                { id: "hall/mayor", label: "hall/mayor", chosen: true },
-                { id: "lab/east", label: "lab/east" },
-              ],
-            },
-            {
-              id: "effort",
-              label: "talk_column_effort",
-              // The column the composer draws: nobody having chosen
-              // leads it and is the row marked, because that is the
-              // state a city nobody has told starts in, and each level
-              // carries what it costs.
-              rows: [UNSTATED, ...EFFORTS].map((level) => ({
-                id: level,
-                label: say($lang, `effort_${level}`),
-                secondary: say($lang, `effort_note_${level}`),
-                chosen: level === UNSTATED,
               })),
             },
           ]}
