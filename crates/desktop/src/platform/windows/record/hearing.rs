@@ -22,7 +22,7 @@
 
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::process::{Child, ChildStdin, Command, Stdio};
+use std::process::{Child, ChildStdin, Stdio};
 
 use super::sink::{FFMPEG_FINISH_POLLS, MOST_SECONDS, POLL_EVERY};
 use crate::refusal::{Refusal, RefusalCode};
@@ -62,7 +62,7 @@ impl Hearing {
     /// Refuses a machine with no ffmpeg — the frame sequence a recording
     /// falls back to has no sound — and an ffmpeg that will not start.
     pub(super) fn open(device: &str, into: &Path) -> Result<Hearing, Refusal> {
-        let spawned = Command::new("ffmpeg")
+        let spawned = child::command("ffmpeg")
             .args(arguments(device, into))
             .stdin(Stdio::piped())
             .stdout(Stdio::null())

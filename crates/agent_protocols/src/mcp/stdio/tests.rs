@@ -260,7 +260,10 @@ const PLANTED: &str = "SPRAWLING_SECRET_PROBE_KEY";
 fn a_server_inherits_none_of_the_city_secret_keys() {
     match std::env::var(PLANTED) {
         Ok(planted) => {
-            assert_eq!(planted, "planted", "the copy runs with the key it was given");
+            assert_eq!(
+                planted, "planted",
+                "the copy runs with the key it was given"
+            );
             assert_eq!(seen_by_a_server(PLANTED), "");
         }
         Err(_) => {

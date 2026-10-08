@@ -21,7 +21,7 @@
 use std::io::{BufRead, BufReader};
 use std::net::SocketAddr;
 use std::path::PathBuf;
-use std::process::{ChildStdout, Command, Stdio};
+use std::process::{ChildStdout, Stdio};
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError};
 use std::time::Duration;
 
@@ -74,7 +74,7 @@ impl Route for CommandRoute {
     fn open(&mut self, local: SocketAddr) -> Result<Opened, AxError> {
         self.close()?;
         let mut running = Running::start(
-            Command::new(&self.command.program)
+            child::command(&self.command.program)
                 .args(&self.command.args)
                 .env(LOCAL_ENV, local.to_string())
                 .stdin(Stdio::null())

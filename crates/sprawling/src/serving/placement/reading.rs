@@ -273,8 +273,6 @@ mod linux {
 
 #[cfg(target_os = "macos")]
 mod macos {
-    use std::process::Command;
-
     use super::{PerfLevel, Topology, Unread, from_perf_levels};
 
     pub(super) fn read() -> Result<Topology, Unread> {
@@ -298,7 +296,7 @@ mod macos {
     }
 
     fn sysctl(name: &str) -> Result<u32, Unread> {
-        let out = Command::new("/usr/sbin/sysctl")
+        let out = child::command("/usr/sbin/sysctl")
             .args(["-n", name])
             .output()
             .map_err(|err| Unread(format!("sysctl did not start: {err}")))?;

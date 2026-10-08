@@ -322,7 +322,7 @@ enum Wanted {
 /// Starts the program with `args` and takes the line `wanted` names,
 /// under a deadline; `ask_version` is the first-line case.
 fn ask(program: &Path, args: &[&str], wanted: Wanted, patience: Duration) -> Presence {
-    let spawned = std::process::Command::new(program)
+    let spawned = child::command(program)
         .args(args)
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::piped())

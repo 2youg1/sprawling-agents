@@ -20,6 +20,8 @@ path = "src/lib.rs"
 # (`crates/desktop/Spec.lean` D14).
 kernel = { workspace = true }
 agent_protocols = { workspace = true }
+# A recording's ffmpeg starts from `child::command` (`crates/desktop/Spec.lean` D17).
+child = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 toml = { workspace = true }

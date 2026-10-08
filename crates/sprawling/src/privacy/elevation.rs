@@ -89,23 +89,21 @@ pub(in crate::privacy) fn write(write: &MachineWrite) -> Result<(), ElevationFau
         .map_err(|source| ElevationFault::Unavailable(refused(&source.to_string())))?;
     let this = std::env::current_exe()
         .map_err(|source| ElevationFault::Unavailable(refused(&source.to_string())))?;
-    let status = std::process::Command::new(
-        super::windows::powershell().map_err(ElevationFault::Unavailable)?,
-    )
-    .args([
-        "-NoLogo",
-        "-NoProfile",
-        "-NonInteractive",
-        "-Command",
-        ELEVATE,
-    ])
-    .env("SPRAWLING_SELF", this)
-    .env("SPRAWLING_WRITE", hex(&encoded))
-    .stdin(std::process::Stdio::null())
-    .stdout(std::process::Stdio::null())
-    .stderr(std::process::Stdio::null())
-    .status()
-    .map_err(|source| ElevationFault::Unavailable(refused(&source.to_string())))?;
+    let status = child::command(super::windows::powershell().map_err(ElevationFault::Unavailable)?)
+        .args([
+            "-NoLogo",
+            "-NoProfile",
+            "-NonInteractive",
+            "-Command",
+            ELEVATE,
+        ])
+        .env("SPRAWLING_SELF", this)
+        .env("SPRAWLING_WRITE", hex(&encoded))
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .map_err(|source| ElevationFault::Unavailable(refused(&source.to_string())))?;
     judged(status.code())
 }
 

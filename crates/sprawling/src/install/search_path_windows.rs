@@ -56,7 +56,7 @@ fn powershell(
     carrier: &std::path::Path,
     kind: Option<&str>,
 ) -> Result<String, AxError> {
-    let mut command = std::process::Command::new("powershell");
+    let mut command = child::command("powershell");
     command
         .args([
             "-NoProfile",

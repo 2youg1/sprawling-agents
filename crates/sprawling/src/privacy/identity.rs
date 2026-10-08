@@ -19,7 +19,7 @@ pub(super) fn read() -> Result<Zeroizing<String>, AxError> {
     use super::windows::{PATIENCE, powershell};
     use crate::doctor::asking::{self, Ended};
 
-    let mut command = std::process::Command::new(powershell()?);
+    let mut command = child::command(powershell()?);
     command.args([
         "-NoLogo",
         "-NoProfile",

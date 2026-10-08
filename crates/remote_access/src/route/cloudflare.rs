@@ -15,7 +15,7 @@
 use std::io::{Read, Write};
 use std::net::{Ipv4Addr, SocketAddr, TcpListener, TcpStream};
 use std::path::PathBuf;
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 use std::time::Duration;
 
 use kernel::{AxCode, AxError, TimeoutMs};
@@ -109,7 +109,7 @@ impl Route for NamedTunnel {
         self.close()?;
         let metrics = free_loopback_address()?;
         let mut running = Running::start(
-            Command::new(&self.tunnel.program)
+            child::command(&self.tunnel.program)
                 .args(["tunnel", "--no-autoupdate", "--metrics"])
                 .arg(metrics.to_string())
                 .arg("--url")

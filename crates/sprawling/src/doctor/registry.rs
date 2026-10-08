@@ -52,7 +52,7 @@ pub(super) fn installed_at(program: &str, start_menu: &str) -> Option<PathBuf> {
 
 /// The default value of one key, as `reg.exe` prints it.
 fn default_value(key: &str) -> Option<String> {
-    let output = std::process::Command::new("reg")
+    let output = child::command("reg")
         .args(["query", key, "/ve"])
         .stdin(std::process::Stdio::null())
         .output()

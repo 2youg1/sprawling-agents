@@ -30,7 +30,7 @@
 
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::process::{Child, ChildStdin, Command, Stdio};
+use std::process::{Child, ChildStdin, Stdio};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -124,7 +124,7 @@ impl Sink {
         bounds: Bounds,
         into: &Path,
     ) -> Result<Sink, Refusal> {
-        let writer = match Command::new("ffmpeg")
+        let writer = match child::command("ffmpeg")
             .args(command_line(bounds, into))
             .stdin(Stdio::piped())
             .stdout(Stdio::null())

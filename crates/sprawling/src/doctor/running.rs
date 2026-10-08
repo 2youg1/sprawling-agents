@@ -37,7 +37,7 @@
 //! be spelled as this type (`Recipe::command`).
 
 use std::path::Path;
-use std::process::{Child, Command, Stdio};
+use std::process::{Child, Stdio};
 use std::time::Duration;
 
 use accounting::Runnable;
@@ -94,7 +94,7 @@ pub(crate) fn run(
     log: &Path,
 ) -> Result<(), AxError> {
     let (stdout, stderr) = log_streams(item, log)?;
-    let mut child = Command::new(runnable.program())
+    let mut child = child::command(runnable.program())
         .args(runnable.args())
         .env("PATH", super::host::search_path())
         .stdin(Stdio::null())

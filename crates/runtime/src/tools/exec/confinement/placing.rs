@@ -140,7 +140,7 @@ impl Confined {
                              or ask the User to choose `where: host`",
                         )
                     };
-                    let probe = namespaced(wrapper, workdir, workdir, &Command::new("/bin/true"))
+                    let probe = namespaced(wrapper, workdir, workdir, &child::command("/bin/true"))
                         .output()
                         .map_err(|err| denied(err.to_string()))?;
                     if !probe.status.success() {
@@ -319,7 +319,7 @@ use copy::{Budget, Stage, fresh, mirror, remove};
 /// readable, the copy bound over the working directory, and every
 /// namespace the wrapper knows how to separate.
 fn namespaced(wrapper: &Path, copy: &Path, workdir: &Path, command: &Command) -> Command {
-    let mut wrapped = Command::new(wrapper);
+    let mut wrapped = child::command(wrapper);
     wrapped
         .current_dir(workdir)
         .arg("--ro-bind")

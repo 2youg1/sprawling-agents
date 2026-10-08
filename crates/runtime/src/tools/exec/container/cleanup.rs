@@ -6,7 +6,6 @@
 //! Confirmed resource deletion (`crates/runtime/spec/Tools/Exec/Container.lean`, D52).
 
 use std::path::PathBuf;
-use std::process::Command;
 
 use kernel::AxError;
 use serde::{Deserialize, Serialize};
@@ -38,7 +37,7 @@ impl Cleanup {
     }
 
     pub(super) fn remove(&self, confirmation: Confirmation) -> Result<(), AxError> {
-        let mut remove = Command::new(&self.program);
+        let mut remove = child::command(&self.program);
         remove.args(["rm", "--force", "--volumes"]);
         match self.engine {
             ContainerEngine::Docker => {}
@@ -55,7 +54,7 @@ impl Cleanup {
                     &self.name,
                 ));
             }
-            let mut inventory = Command::new(&self.program);
+            let mut inventory = child::command(&self.program);
             inventory.args(["container", "ls", "--all", "--format", "{{.Names}}"]);
             let names = control::checked(&mut inventory)?;
             let names = std::str::from_utf8(&names)

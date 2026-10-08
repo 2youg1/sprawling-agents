@@ -39,7 +39,7 @@ $r = [UIntPtr]::Zero
 pub fn announce() -> Result<(), AxError> {
     use crate::doctor::asking::{self, Ended};
 
-    let mut command = std::process::Command::new(crate::privacy::windows::powershell()?);
+    let mut command = child::command(crate::privacy::windows::powershell()?);
     command.args([
         "-NoLogo",
         "-NoProfile",
