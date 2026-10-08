@@ -537,7 +537,7 @@ deny:
 # members, so clippy, the suite and the licence read judge them with
 # everything else.
 check-desktop:
-    {{ if os() == "windows" { "zig test crates/desktop/ffi/zig/leaf.zig --cache-dir target/zig-test" } else { "echo 'zig test: the Zig leaf is built on Windows only'" } }}
+    {{ if os() == "windows" { "zig test -O ReleaseSafe crates/desktop/ffi/zig/leaf.zig --cache-dir target/zig-test" } else { "echo 'zig test: the Zig leaf is built on Windows only'" } }}
 
 # The Rust side's fuzz of crates/desktop/ffi's Zig leaf: its four buffer rules
 # against their Rust reference, for `rounds` drawn inputs from `seed`

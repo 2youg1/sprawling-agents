@@ -46,7 +46,7 @@
 
         # Zig's version lives in `crates/desktop/ffi/zig-version` and
         # nowhere else, as Rust's lives in `rust-toolchain.toml`. nixpkgs
-        # carries one attribute per Zig series (`zig_0_16` for 0.16.x), so
+        # carries one attribute per Zig series (`zig_0_17` for 0.17.x), so
         # the attribute is derived from that file rather than named here.
         # The doctor's `zig` row probes for the exact pin, and
         # `checks.devshell-covers-just-check` below runs that probe, so a

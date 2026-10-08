@@ -61,7 +61,7 @@ jobs:
       # header yields an empty list and a green step, so "no fuzz target
       # ran at all" would have looked exactly like success.
       #
-      # `+nightly` explicitly: rust-toolchain.toml pins 1.97.1, and
+      # `+nightly` explicitly: rust-toolchain.toml pins a stable release, and
       # cargo-fuzz needs the nightly-only sanitizer flags.
       #
       # The ceiling is inside the step rather than on the job: a job that
