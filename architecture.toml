@@ -725,6 +725,8 @@ module = [
   { name = "browser::survey::sheet::tagged", file = "crates/browser/src/survey/sheet/tagged.rs", owns = "the same readings as named fields, for something that will act on them", shape = "decision", since = "V6", status = "built", spec = "crates.browser.Spec" },
   { name = "browser::survey::source", file = "crates/browser/src/survey/source.rs", owns = "from a box on the screen back to the line that drew it", shape = "decision", since = "V6", status = "built", spec = "crates.browser.Spec" },
   { name = "browser::survey::tests", file = "crates/browser/src/survey/tests.rs", owns = "a page judged: what is reported, what is not, and in which order", shape = "decision", since = "V6", status = "built", spec = "crates.browser.Spec" },
+  { name = "child::command", file = "crates/child/src/command.rs", owns = "the one constructor of a child process: off the city's console, in its own process group, the city's secrets out of its environment", shape = "adapter", since = "V0.0.11", status = "built", spec = "crates.child.Spec" },
+  { name = "child::environment", file = "crates/child/src/environment.rs", owns = "which environment keys hold the city's secrets, and the rule that removes them from a child's environment", shape = "decision", since = "V0.0.11", status = "built", spec = "crates.child.Spec" },
   { name = "documents::span", file = "crates/documents/src/span.rs", owns = "a stretch of one document version, as a half-open byte interval read back through one constructor", shape = "value", since = "V0.0.8", status = "built", spec = "crates.documents.Spec" },
   { name = "documents::encoding", file = "crates/documents/src/encoding.rs", owns = "which characters a version's bytes spell: the byte-order mark first, then UTF-8 without a NUL, else not text", shape = "decision", since = "V0.0.8", status = "built", spec = "crates.documents.spec.Encoding" },
   { name = "documents::encoding::tests", file = "crates/documents/src/encoding/tests.rs", owns = "UTF-16 behind its mark is text whatever NUL it holds, and decoded text encodes back to its own bytes", shape = "test", since = "V0.0.8", status = "built", spec = "crates.documents.spec.Encoding" },
@@ -1406,6 +1408,9 @@ duty = "the remote door, and the routes that carry its bytes and decide nothing"
 
 [family.browser]
 duty = "a browser driven over WebDriver BiDi, and what a model may see of a page and do to it"
+
+[family.child]
+duty = "the one constructor of a child process, and which environment keys a child never inherits"
 
 [family.documents]
 duty = "the rules of a document a person reads and edits through a page: its version, its characters, its windows, and what one save changes"
