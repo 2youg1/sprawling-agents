@@ -62,6 +62,20 @@ pub(super) fn emit(document: &Value, constants: &Constants) -> Result<String, Re
          export const BODY_PX = {{ min: {} }} as const;\n\n",
         constants.wire_v, constants.hash, constants.city_run, constants.body_px_min
     );
+    out.push_str(
+        "/** The slash verbs a person types: `wire::Slash::ALL`. */\nexport const SLASH = [\n",
+    );
+    for [spelling, takes, offered, says] in &constants.slash {
+        let _ = writeln!(
+            out,
+            "  {{ spelling: {}, takes: {}, offered: {}, says: {} }},",
+            quoted(spelling),
+            quoted(takes),
+            quoted(offered),
+            quoted(says)
+        );
+    }
+    out.push_str("] as const;\n\n");
     let edges = edges(&defs);
     let recursive = recursive(&edges);
     for name in ordered(&edges)? {
@@ -258,4 +272,10 @@ fn is_bare_primitive(schema: &Value) -> bool {
         Some("string" | "integer" | "number" | "boolean")
     ) && !map.contains_key("enum")
         && !map.contains_key("const")
+}
+
+/// A string as a TypeScript literal: the JSON spelling is a valid one,
+/// so the escaping rule is serde_json's rather than a second one here.
+fn quoted(text: &str) -> String {
+    Value::String(text.to_owned()).to_string()
 }
