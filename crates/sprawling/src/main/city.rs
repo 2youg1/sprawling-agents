@@ -249,7 +249,7 @@ pub(super) fn serve_city(
     // adopted; an address that reaches past this machine and has none
     // gets one minted for this serve alone. Read once here and never
     // stored - `serve` is handed a digest.
-    let keyed = match serving::key_for(bind, std::env::var("SPRAWLING_PAIRING_TOKEN").ok()) {
+    let keyed = match serving::key_for(bind, std::env::var(child::PAIRING_TOKEN).ok()) {
         Ok(keyed) => keyed,
         Err(err) => return report(err),
     };

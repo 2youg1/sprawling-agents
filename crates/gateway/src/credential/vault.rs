@@ -216,7 +216,8 @@ pub(crate) fn env_key(reference: &SecretRef) -> String {
             .collect()
     };
     format!(
-        "SPRAWLING_SECRET_{}_{}",
+        "{}{}_{}",
+        child::SECRET_PREFIX,
         sanitize(reference.realm()),
         sanitize(reference.name())
     )

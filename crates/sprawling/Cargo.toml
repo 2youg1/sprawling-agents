@@ -21,6 +21,9 @@ include = ["build.rs", "src/**", "web-dist/**"]
 [dependencies]
 accounting = { workspace = true }
 kernel = { workspace = true }
+# The name of the pairing token's environment key, defined once beside the
+# rule that keeps it out of every child process (`crates/child/Spec.lean`).
+child = { workspace = true }
 storage = { workspace = true }
 runtime = { workspace = true }
 gateway = { workspace = true }

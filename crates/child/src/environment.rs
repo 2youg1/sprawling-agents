@@ -18,9 +18,33 @@ pub const SECRET_PREFIX: &str = "SPRAWLING_SECRET_";
 pub const PAIRING_TOKEN: &str = "SPRAWLING_PAIRING_TOKEN";
 
 /// `command` with every key of `inherited` that holds a secret removed.
-pub(crate) fn scrubbed(command: Command, inherited: impl Iterator<Item = OsString>) -> Command {
-    let _ = inherited;
+pub(crate) fn scrubbed(mut command: Command, inherited: impl Iterator<Item = OsString>) -> Command {
+    for key in inherited.filter(|key| is_secret(key.as_encoded_bytes())) {
+        command.env_remove(key);
+    }
     command
+}
+
+/// Whether an environment key holds one of the city's secrets: the
+/// pairing token, or a key under [`SECRET_PREFIX`]. Read as bytes, so a key
+/// that is not Unicode is judged rather than skipped.
+fn is_secret(key: &[u8]) -> bool {
+    same_name(key, PAIRING_TOKEN.as_bytes())
+        || key
+            .get(..SECRET_PREFIX.len())
+            .is_some_and(|head| same_name(head, SECRET_PREFIX.as_bytes()))
+}
+
+/// Windows reads environment names without regard to ASCII case, so
+/// `sprawling_secret_acme_key` is the variable the vault reads.
+#[cfg(windows)]
+fn same_name(a: &[u8], b: &[u8]) -> bool {
+    a.eq_ignore_ascii_case(b)
+}
+
+#[cfg(not(windows))]
+fn same_name(a: &[u8], b: &[u8]) -> bool {
+    a == b
 }
 
 #[cfg(test)]

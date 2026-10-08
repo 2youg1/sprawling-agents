@@ -14,6 +14,9 @@ name = "gateway"
 
 [dependencies]
 kernel = { workspace = true }
+# The prefix of the environment keys the vault reads, defined once where
+# every child process's environment is scrubbed of them (`crates/child/Spec.lean`).
+child = { workspace = true }
 serde.workspace = true
 serde_json.workspace = true
 # Constitution B.7: HTTP with rustls; the wire format stays self-written,
