@@ -244,7 +244,7 @@ theorem reopenFromVerifiedPrefix (disk : List Cell) (L : Nat)
     | cons c rest =>
       simp only [List.take_succ_cons, List.all_cons, Bool.and_eq_true] at verified
       obtain ⟨hc, hrest⟩ := verified
-      simp only [List.takeWhile_cons, hc, if_true, List.take_succ_cons, List.drop_succ_cons,
+      simp only [List.takeWhile_cons, hc, ite_true, List.take_succ_cons, List.drop_succ_cons,
         List.cons_append]
       rw [ih rest hrest]
 

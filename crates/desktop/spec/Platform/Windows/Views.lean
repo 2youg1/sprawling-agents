@@ -99,7 +99,7 @@ theorem acted_on_what_was_seen [DecidableEq β] {v : Views β} {aim : Nat} {boun
       · simp [stale, moved] at h
       · by_cases unknown : ref = 0 ∨ ref > s.refs
         · simp [stale, moved, unknown] at h
-        · simp only [stale, moved, unknown, if_false, Except.ok.injEq] at h
+        · simp only [stale, moved, unknown, ite_false, Except.ok.injEq] at h
           subst h
           exact ⟨s, seen, by simpa using stale, by simpa using moved, by omega, by omega⟩
 

@@ -86,7 +86,7 @@ theorem a_refusal_is_an_overflow_exactly_when_it_names_the_window (status : Nat)
     refusal status outgrew quota = .Overflow status ↔ ((status = 400 ∨ status = 413) ∧ outgrew = true) := by
   unfold refusal
   by_cases window : (status == 400 || status == 413) && outgrew
-  · simp only [window, if_true]
+  · simp only [window, ite_true]
     simp [Bool.and_eq_true, Bool.or_eq_true, beq_iff_eq] at window
     simp [window]
   · simp only [window]

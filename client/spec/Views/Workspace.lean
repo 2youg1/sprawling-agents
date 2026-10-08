@@ -269,14 +269,14 @@ theorem step_holds_focus (mail : Mail) (input : MailInput) (h : FocusHeld mail) 
   | toggle =>
     unfold stepMail
     by_cases s : mail.shown = true
-    · simp only [s, if_true]; exact stow_holds_focus mail
+    · simp only [s, ite_true]; exact stow_holds_focus mail
     · simp only [s]; left; rfl
   | escape => exact stow_holds_focus mail
   | outside => right; simp [stepMail]
   | enter =>
     unfold stepMail
     by_cases s : mail.shown = true
-    · simp only [s, if_true]; left; rfl
+    · simp only [s, ite_true]; left; rfl
     · simp only [s]; exact h
   | follow => exact stow_holds_focus mail
 

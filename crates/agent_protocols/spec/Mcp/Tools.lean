@@ -70,7 +70,7 @@ theorem floatAt_names_a_fractional_leaf :
   | leaf :: rest, path, h => by
     unfold floatAt at h
     by_cases frac : leaf.fractional = true
-    · simp only [frac, if_true, Option.some.injEq] at h
+    · simp only [frac, ite_true, Option.some.injEq] at h
       exact ⟨leaf, List.mem_cons_self .., h, frac⟩
     · simp only [frac] at h
       obtain ⟨found, mem, p, f⟩ := floatAt_names_a_fractional_leaf rest path h

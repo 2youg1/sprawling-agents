@@ -451,7 +451,7 @@ theorem leave_requeues (patience : Nat) (as : List Act) (r : Nat) (s : Signal)
     simp [City.vacate, room]
   have ne : ((run patience as).vacate r).queue r ≠ [] := List.ne_nil_of_mem hv
   have idle : r ∉ ((run patience as).vacate r).running := by simp [City.vacate]
-  simp only [c', step, hr, if_true, ne, if_false]
+  simp only [c', step, hr, ite_true, ne, ite_false]
   exact ⟨hv, knock_mem idle⟩
 
 /-- 已消费的不再回来：`signal_consumed` 行只追加。 -/
@@ -573,10 +573,10 @@ theorem kept_is_first_reply (o : Nat) (q : List Sig) (ss : List Sig) :
   | nil => rfl
   | cons s rest ih =>
     by_cases hs : s.sender = o
-    · simp only [arrive, List.foldl_cons, collect, hs, if_true, List.find?_cons, decide_true]
+    · simp only [arrive, List.foldl_cons, collect, hs, ite_true, List.find?_cons, decide_true]
       exact kept_stays o s rest _ rfl rfl
     · have := ih (q ++ [s])
-      simp only [arrive, List.foldl_cons, collect, hs, if_false, List.find?_cons] at *
+      simp only [arrive, List.foldl_cons, collect, hs, ite_false, List.find?_cons] at *
       simpa [hs] using this
 
 end Early

@@ -218,10 +218,10 @@ theorem every_seq_up_to_the_last_is_told (as : List Arrival) :
     intro s d e k hd he lo hi
     cases a with
     | skipped =>
-      simp only [framed, step, if_true] at he ⊢
+      simp only [framed, step, ite_true] at he ⊢
       exact told_append_right _ (ih _ d e k hd he lo hi)
     | record n =>
-      simp only [framed, step, if_true] at he ⊢
+      simp only [framed, step, ite_true] at he ⊢
       by_cases near : k ≤ n
       · exact told_append_left _ (before_tells s d n k hd lo near)
       · have moved : (before s n).2.delivered = some n := rfl

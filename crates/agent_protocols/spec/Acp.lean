@@ -78,7 +78,7 @@ theorem text_ok {key : String} {raw : Option String} {value : String}
   | some v =>
     by_cases e : v = ""
     · simp [text, e] at h
-    · simp only [text, e, if_false, Except.ok.injEq] at h
+    · simp only [text, e, ite_false, Except.ok.injEq] at h
       rw [← h]; exact e
 
 /-- `parse` 造出的请求，地址过了文法，task 与 goal 不空。 -/

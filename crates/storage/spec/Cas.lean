@@ -172,14 +172,14 @@ theorem step_sound (hash : Bytes → H) (name : H → Put → N) (bytesOf : Put 
       · exact ⟨objs, fun q hq => by
           by_cases e : q = p
           · subst e; simp [update] at hq
-          · simp only [update, e, if_false] at hq; exact tmps q hq⟩
+          · simp only [update, e, ite_false] at hq; exact tmps q hq⟩
       · refine ⟨objs, fun q hq => ?_⟩
         by_cases e : q = p
         · subst e; simp [update] at hq
-        · simp only [update, e, if_false] at hq
+        · simp only [update, e, ite_false] at hq
           have ne : name (hash (bytesOf q)) q ≠ name (hash (bytesOf p)) p :=
             fun h => e (distinct _ _ _ _ h)
-          simp only [update, ne, if_false]
+          simp only [update, ne, ite_false]
           exact tmps q hq
     · exact ⟨objs, tmps⟩
   | write p =>
@@ -188,10 +188,10 @@ theorem step_sound (hash : Bytes → H) (name : H → Put → N) (bytesOf : Put 
     · refine ⟨objs, fun q hq => ?_⟩
       by_cases e : q = p
       · subst e; simp [update]
-      · simp only [update, e, if_false] at hq
+      · simp only [update, e, ite_false] at hq
         have ne : name (hash (bytesOf q)) q ≠ name (hash (bytesOf p)) p :=
           fun h => e (distinct _ _ _ _ h)
-        simp only [update, ne, if_false]
+        simp only [update, ne, ite_false]
         exact tmps q hq
     · exact ⟨objs, tmps⟩
   | rename p =>
@@ -205,19 +205,19 @@ theorem step_sound (hash : Bytes → H) (name : H → Put → N) (bytesOf : Put 
         subst hc'
         refine ⟨fun h c' hh => ?_, fun q hq => ?_⟩
         · by_cases e : h = hash (bytesOf p)
-          · subst e; simp only [update, if_true, Option.some.injEq] at hh; subst hh; rfl
-          · simp only [update, e, if_false] at hh; exact objs h c' hh
+          · subst e; simp only [update, ite_true, Option.some.injEq] at hh; subst hh; rfl
+          · simp only [update, e, ite_false] at hh; exact objs h c' hh
         · by_cases e : q = p
           · subst e; simp [update] at hq
-          · simp only [update, e, if_false] at hq
+          · simp only [update, e, ite_false] at hq
             have ne : name (hash (bytesOf q)) q ≠ name (hash (bytesOf p)) p :=
               fun h => e (distinct _ _ _ _ h)
-            simp only [update, ne, if_false]
+            simp only [update, ne, ite_false]
             exact tmps q hq
       · refine ⟨objs, fun q hq => ?_⟩
         by_cases e : q = p
         · subst e; simp [update] at hq
-        · simp only [update, e, if_false] at hq; exact tmps q hq
+        · simp only [update, e, ite_false] at hq; exact tmps q hq
     · exact ⟨objs, tmps⟩
   | crash =>
     refine ⟨objs, fun q hq => ?_⟩

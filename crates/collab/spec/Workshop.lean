@@ -403,7 +403,7 @@ theorem an_early_child_hands_down {r : Room} (h : Inv r) {x : Nat} (opened : r.s
   | false =>
     have live : (r.receive x .finished).settle.status = .live := by
       unfold Room.settle
-      simp only [j, Bool.false_eq_true, if_false]
+      simp only [j, Bool.false_eq_true, ite_false]
       exact (receive_fields r x .finished).2.2.1.trans opened
     exact (settle_inv ids' hd' b' bh').ready_handed live y hy
   | true =>

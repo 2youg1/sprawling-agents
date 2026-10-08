@@ -161,7 +161,7 @@ theorem settled_take {d : Desk} {e : Effect} {held : Option Nat} (hs : Settled d
   refine ⟨fun n hn => ?_, fun n x hx => ?_⟩
   · have := hheld n hn
     subst this
-    simp only [Desk.take, firstTouch_append, beq_self_eq_true, if_true]
+    simp only [Desk.take, firstTouch_append, beq_self_eq_true, ite_true]
     cases firstTouch e.node d.effects <;> simp
   · simp only [Desk.take, firstTouch_append] at hx
     cases hf : firstTouch n d.effects with

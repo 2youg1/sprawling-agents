@@ -39,7 +39,7 @@ theorem of_shape {b p : Path} (h : of b = some p) :
     refine ⟨name, rfl, ?_⟩
     by_cases r : name = reserved
     · simp [of, r] at h
-    · simp only [of, r, if_false, Option.some.injEq] at h
+    · simp only [of, r, ite_false, Option.some.injEq] at h
       exact h.symm
   | [], h => simp [of] at h
   | _ :: _ :: _, h => simp [of] at h

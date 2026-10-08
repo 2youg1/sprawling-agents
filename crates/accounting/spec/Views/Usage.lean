@@ -120,7 +120,7 @@ theorem step_keeps_pinned (t : Table) (l : Line) (h : Pinned t) : Pinned (step t
     · have pins : (step t (.read r s d)).pins = t.pins := by simp [step, hp]
       intro u hu
       rw [pins]
-      simp only [step, hp, if_true, List.mem_append, List.mem_singleton] at hu
+      simp only [step, hp, ite_true, List.mem_append, List.mem_singleton] at hu
       rcases hu with hu | hu
       · exact h u hu
       · subst hu; exact ⟨r, hp⟩

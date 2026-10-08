@@ -194,7 +194,7 @@ theorem a_steer_is_heard_only_at_its_wave (point : SafePoint) (cancel : Option C
         obtain ⟨at_, said⟩ := given
         by_cases same : at_ = turn
         · subst same
-          simp only [answer_at, hit, if_false, if_true, Interrupt.Steer.injEq] at heard
+          simp only [answer_at, hit, ite_false, ite_true, Interrupt.Steer.injEq] at heard
           exact ⟨at_, rfl, by rw [heard]⟩
         · simp [answer_at, hit, same] at heard
   | BeforeToolCall turn call => simp [answer_at] at heard

@@ -50,7 +50,7 @@ theorem verified_not_by_producer {c : Claim} {passed : Bool} {v : String} {a : A
   · simp [self] at h
   · cases passed
     · simp [self] at h
-    · simp only [self, if_false, if_true, Except.ok.injEq] at h
+    · simp only [self, ite_false, ite_true, Except.ok.injEq] at h
       rw [← h]
       exact self
 
@@ -76,7 +76,7 @@ theorem merge_needs_another {node : Nat} {implementer by_ : String} {a : Artifac
   · simp [other] at h
   · by_cases self : a.verifiedBy = implementer
     · simp [other, self] at h
-    · simp only [other, self, if_false, Except.ok.injEq] at h
+    · simp only [other, self, ite_false, Except.ok.injEq] at h
       rw [← h]
       exact ⟨self, Decidable.of_not_not other⟩
 

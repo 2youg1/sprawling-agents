@@ -63,12 +63,12 @@ theorem readFrom_message_bounded (ceiling : Nat) :
   | b :: source, held, m, rest, within, h => by
     unfold readFrom at h
     by_cases nl : b = newline
-    · simp only [nl, if_true, Prod.mk.injEq, Outcome.message.injEq] at h
+    · simp only [nl, ite_true, Prod.mk.injEq, Outcome.message.injEq] at h
       rw [← h.1]; exact within
-    · simp only [nl, if_false] at h
+    · simp only [nl, ite_false] at h
       by_cases over : ceiling < held.length + 1
       · simp [over] at h
-      · simp only [over, if_false] at h
+      · simp only [over, ite_false] at h
         exact readFrom_message_bounded ceiling source (held ++ [b]) m rest
           (by simp; omega) h
 
@@ -86,7 +86,7 @@ theorem readFrom_within (ceiling : Nat) (rest : List Nat) :
     have clean' : newline ∉ m := fun e => clean (List.mem_cons_of_mem _ e)
     have room : ¬ ceiling < held.length + 1 := by simp at fits; omega
     have fits' : (held ++ [b]).length + m.length ≤ ceiling := by simp at fits ⊢; omega
-    simp only [List.cons_append, readFrom, nl, if_false, room]
+    simp only [List.cons_append, readFrom, nl, ite_false, room]
     rw [readFrom_within ceiling rest m (held ++ [b]) clean' fits']
     simp
 
@@ -105,10 +105,10 @@ theorem readFrom_past (ceiling : Nat) (rest : List Nat) :
   | b :: m, held, clean, within, sum => by
     have nl : b ≠ newline := fun e => clean (by simp [e])
     have clean' : newline ∉ m := fun e => clean (List.mem_cons_of_mem _ e)
-    simp only [List.cons_append, readFrom, nl, if_false]
+    simp only [List.cons_append, readFrom, nl, ite_false]
     by_cases over : ceiling < held.length + 1
     · simp [over]
-    · simp only [over, if_false]
+    · simp only [over, ite_false]
       exact readFrom_past ceiling rest m (held ++ [b]) clean' (by simp; omega)
         (by simp at sum ⊢; omega)
 
@@ -175,7 +175,7 @@ theorem readWhole_within (ceiling : Nat) :
   | [], held, _ => by simp [readWhole]
   | b :: body, held, fits => by
     have room : ¬ ceiling < held.length + 1 := by simp at fits; omega
-    simp only [readWhole, room, if_false]
+    simp only [readWhole, room, ite_false]
     rw [readWhole_within ceiling body (held ++ [b]) (by simp at fits ⊢; omega)]
     simp
 
@@ -187,7 +187,7 @@ theorem readWhole_past (ceiling : Nat) :
     simp only [readWhole]
     by_cases over : ceiling < held.length + 1
     · simp [over]
-    · simp only [over, if_false]
+    · simp only [over, ite_false]
       exact readWhole_past ceiling body (held ++ [b]) (by simp; omega) (by simp at past ⊢; omega)
 
 /-- 上限之内的 body 原样读出。 -/

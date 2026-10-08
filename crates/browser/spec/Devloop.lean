@@ -68,9 +68,9 @@ theorem observe_counts {l l' : Loop} {o : Observation} {s : Step}
   by_cases spent : l.looks ≥ LOOKS_MAX
   · simp [spent] at h
   · by_cases c : o.complained = true
-    · simp only [spent, c, if_false, if_true, Option.some.injEq, Prod.mk.injEq] at h
+    · simp only [spent, c, ite_false, ite_true, Option.some.injEq, Prod.mk.injEq] at h
       rw [← h.2]
-    · simp only [spent, c, Bool.false_eq_true, if_false, Option.some.injEq, Prod.mk.injEq] at h
+    · simp only [spent, c, Bool.false_eq_true, ite_false, Option.some.injEq, Prod.mk.injEq] at h
       rw [← h.2]
 
 theorem verdict_lookAgain {looks same n : Nat} (h : verdict looks same = .lookAgain n) :
@@ -80,7 +80,7 @@ theorem verdict_lookAgain {looks same n : Nat} (h : verdict looks same = .lookAg
   · simp [quiet] at h
   · by_cases full : looks ≥ LOOKS_MAX
     · simp [quiet, full] at h
-    · simp only [quiet, full, if_false, Step.lookAgain.injEq] at h
+    · simp only [quiet, full, ite_false, Step.lookAgain.injEq] at h
       omega
 
 theorem lookAgain_within_budget {l l' : Loop} {o : Observation} {n : Nat}
@@ -90,7 +90,7 @@ theorem lookAgain_within_budget {l l' : Loop} {o : Observation} {n : Nat}
   · simp [spent] at h
   · by_cases c : o.complained = true
     · simp [spent, c] at h
-    · simp only [spent, c, Bool.false_eq_true, if_false, Option.some.injEq, Prod.mk.injEq] at h
+    · simp only [spent, c, Bool.false_eq_true, ite_false, Option.some.injEq, Prod.mk.injEq] at h
       have := verdict_lookAgain h.1
       omega
 

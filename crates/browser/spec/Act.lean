@@ -67,7 +67,7 @@ theorem acted_on_the_seen_page {s : Seen} {g : Nat} {a : Action} {r : Nat}
   · simp [stale] at h
   · by_cases unknown : a.ref = 0 ∨ a.ref > s.refs
     · simp [stale, unknown] at h
-    · simp only [stale, unknown, if_false, Except.ok.injEq] at h
+    · simp only [stale, unknown, ite_false, Except.ok.injEq] at h
       subst h
       omega
 

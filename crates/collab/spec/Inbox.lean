@@ -84,8 +84,8 @@ theorem deliver_sorted (q : Inbox) (s : Signal) (h : q.Sorted) : (q.deliver s).S
   obtain ⟨u, o⟩ := h
   unfold Inbox.deliver
   by_cases seen : s.id ∈ q.seen
-  · simp only [seen, if_true]; exact ⟨u, o⟩
-  · simp only [seen, if_false]
+  · simp only [seen, ite_true]; exact ⟨u, o⟩
+  · simp only [seen, ite_false]
     cases hl : lane s.kind with
     | urgent =>
       have steer := (lane_urgent_iff s.kind).mp hl
