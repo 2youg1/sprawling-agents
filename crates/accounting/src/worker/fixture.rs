@@ -27,6 +27,14 @@ pub(super) use provider::{
 
 /// A worker with one endpoint attached and one model chosen, exactly
 /// as the settings page would leave it.
+/// A close the person chose at the console, waiting for the runs.
+pub(super) fn by_hand() -> Closing {
+    Closing::Chosen {
+        by: ClosedBy::Console,
+        mode: wire::CloseMode::Drain,
+    }
+}
+
 pub(super) fn worker_with_provider(
     city_root: &Path,
     base_url: &str,

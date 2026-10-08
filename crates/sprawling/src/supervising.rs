@@ -8,15 +8,15 @@
 //! properties are proved in `crates/sprawling/spec/Supervising.lean`).
 //!
 //! The decision alone: no process, no clock. `children` runs the
-//! processes and samples the time; how an ending reads is
-//! `Closing::of`, so this module never classifies an exit itself.
+//! processes, samples the time and reads a child's exit code as served
+//! or failed; who closed the city and how is written in the child's own
+//! handoff, which this module never needs to read.
 
 mod children;
 
 pub use children::{Child, Console, Ended, Window, supervise};
 
-use accounting::worker::Closing;
-use kernel::TimeMs;
+use kernel::{AxError, TimeMs};
 
 /// How long a crash counts against the budget.
 pub(crate) const CRASH_WINDOW_MS: u64 = 60_000;
@@ -51,17 +51,17 @@ impl CrashBudget {
     }
 
     /// Spends this budget on one ending observed at `at`.
-    pub(crate) fn after(mut self, closing: &Closing, at: TimeMs) -> Next {
-        match closing {
-            Closing::Chosen => Next::Stop,
-            Closing::Broken { cause } => {
+    pub(crate) fn after(mut self, served: &Result<(), AxError>, at: TimeMs) -> Next {
+        match served {
+            Ok(()) => Next::Stop,
+            Err(failure) => {
                 self.crashes
                     .retain(|crash| at.value().saturating_sub(crash.value()) < CRASH_WINDOW_MS);
                 self.crashes.push(at);
                 if self.crashes.len() >= CRASH_LIMIT {
                     Next::Degraded {
                         crashes: self.crashes.len(),
-                        cause: cause.clone(),
+                        cause: failure.to_string(),
                     }
                 } else {
                     Next::Restart(self)
@@ -80,13 +80,15 @@ impl CrashBudget {
 )]
 mod tests {
     use super::{CrashBudget, Next};
-    use accounting::worker::Closing;
-    use kernel::TimeMs;
+    use kernel::{AxCode, AxError, TimeMs};
 
-    fn crash() -> Closing {
-        Closing::Broken {
-            cause: "exit code: 101".to_owned(),
-        }
+    fn crash() -> Result<(), AxError> {
+        Err(AxError::failure(
+            AxCode::StorageFatal,
+            "serve a supervised city",
+            "exit code: 101",
+        )
+        .with_recovery("start it again"))
     }
 
     /// Feeds crashes at the given seconds and returns every verdict.
@@ -113,13 +115,13 @@ mod tests {
     fn three_crashes_inside_a_minute_degrade_and_older_ones_expire() {
         let degraded = Next::Degraded {
             crashes: 3,
-            cause: "exit code: 101".to_owned(),
+            cause: crash().unwrap_err().to_string(),
         };
         assert_eq!(
             (
                 verdicts(&[0, 10, 20]),
                 verdicts(&[0, 10, 60]),
-                CrashBudget::fresh().after(&Closing::Chosen, TimeMs::new(5)),
+                CrashBudget::fresh().after(&Ok(()), TimeMs::new(5)),
             ),
             (
                 vec![restart(&[0]), restart(&[0, 10]), degraded],

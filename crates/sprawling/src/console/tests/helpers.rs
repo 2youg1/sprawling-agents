@@ -17,7 +17,7 @@
     reason = "test code"
 )]
 
-use super::super::terminal::drive;
+use super::super::terminal::{Inside, drive};
 use super::super::*;
 use kernel::Address;
 use std::sync::Arc;
@@ -30,14 +30,14 @@ pub(super) fn room() -> Address {
 
 /// A terminal whose facts are synthetic on purpose: nothing here may
 /// name a real machine's directories, which `xtask release` refuses.
-pub(super) fn terminal(bind: &str, token: Option<&str>) -> Terminal {
+pub(super) fn terminal(bind: &str, pairing: Option<&str>) -> Terminal {
     Terminal {
         url: "http://127.0.0.1:8787".to_owned(),
-        token: token.map(str::to_owned),
+        pairing: pairing.map(str::to_owned),
         city: "/tmp/a-city".to_owned(),
         client: "embedded, 3 file(s), 558419 gzipped byte(s)".to_owned(),
         bind: bind.parse().unwrap(),
-        records: Records::Summary,
+        surface: Surface::Headless,
     }
 }
 pub(super) fn vitals() -> wire::MetricsAnswer {
@@ -71,19 +71,29 @@ pub(super) fn answering() -> Answering {
 /// Runs the console loop over a scripted script and returns what a
 /// person would have seen.
 pub(super) fn typed(script: &str, terminal: &Terminal) -> String {
-    let mut out: Vec<u8> = Vec::new();
+    driven(script, terminal, &inside())
+}
+
+/// The line console over a script, with what it said collected in order.
+pub(super) fn driven(script: &str, terminal: &Terminal, inside: &Inside) -> String {
+    let said = Arc::new(std::sync::Mutex::new(Vec::<String>::new()));
+    let into = Arc::clone(&said);
+    let say: super::super::cli::Say = Arc::new(move |line: String| {
+        into.lock().unwrap().push(line);
+    });
     drive(
         terminal,
-        &inside(),
+        inside,
         &mut std::io::Cursor::new(script.as_bytes().to_vec()),
-        &mut out,
+        &say,
     );
-    String::from_utf8(out).unwrap()
+    said.lock().unwrap().join("\n")
 }
 
 /// The console's reach into a city with no remote door.
-pub(super) fn inside() -> super::super::terminal::Inside {
-    super::super::terminal::Inside {
+pub(super) fn inside() -> Inside {
+    Inside {
+        lifecycle: tokio::sync::mpsc::channel(8).0,
         desk: Arc::new(accounting::worker::CommandDesk::default()),
         answering: answering(),
         remote: Err(kernel::AxError::failure(

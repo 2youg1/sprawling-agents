@@ -243,8 +243,8 @@ impl StorageError {
                 dir.display().to_string(),
             )
             .with_recovery(
-                "another sprawling process is serving or changing this city; stop it \
-                 (Ctrl-C in its terminal, or /quit in its console), then run this again",
+                "another sprawling process is serving or changing this city; close it \
+                 (/quit in its terminal, or Ctrl-C where it runs with no console), then run this again",
             ),
             StorageError::LedgerBroken { dir, at } => AxError::failure(
                 AxCode::StorageFatal,

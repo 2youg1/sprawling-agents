@@ -26,6 +26,8 @@
 //! that a mistyped path becomes a refusal rather than an empty city at a
 //! location nobody looked at.
 
+#[path = "city/banner.rs"]
+mod banner;
 #[path = "city/opening.rs"]
 mod opening;
 
@@ -38,14 +40,16 @@ use kernel::consts_policy::DEFAULT_AT;
 use sprawling::{assembly, console, firstrun, serving};
 use std::process::ExitCode;
 
-use opening::{Open, opening};
+use banner::print_banner;
+pub(super) use opening::Entrance;
+use opening::{Interactive, Open, opening};
 
 pub(super) fn up(read: &Arguments, args: &[String]) -> ExitCode {
     let city = read
         .positional(1)
         .map_or_else(default_city_location, std::path::PathBuf::from);
     let addr = read.positional(2).map_or(DEFAULT_AT, String::as_str);
-    up_at(&city, addr, args)
+    up_at(&city, addr, args, Entrance::Up)
 }
 
 /// A folder the person already works in becomes a city around their
@@ -68,12 +72,12 @@ pub(super) fn use_folder(folder: &std::path::Path) -> ExitCode {
     };
     if history == city::History::Present {
         println!("{} is already a city; opening it", folder.display());
-        return serve_city(folder, DEFAULT_AT, &[], opening(&[], Open::Browser));
+        return serve_city(folder, DEFAULT_AT, &[], Entrance::Bare);
     }
     match assembly::form_city(folder, accounting::worker::Adopt::EveryFolder) {
         Ok(report) => {
             report_standing(&report);
-            serve_city(folder, DEFAULT_AT, &[], opening(&[], Open::Browser))
+            serve_city(folder, DEFAULT_AT, &[], Entrance::Bare)
         }
         Err(err) => report(err),
     }
@@ -107,10 +111,15 @@ pub(super) fn report_standing(report: &accounting::worker::InitReport) {
 }
 
 /// The one command that makes a city run: raise it when it is not there,
-/// serve it, and open the WebUI once the port answers. The first screen
-/// and the launcher in the release archive both arrive here, so the
-/// sequence has exactly one definition and `init` and `serve` keep theirs.
-pub(super) fn up_at(city: &std::path::Path, raw: &str, args: &[String]) -> ExitCode {
+/// then serve it on the face its entrance opens. The first screen and
+/// the launcher in the release archive both arrive here, so the sequence
+/// has exactly one definition and `init` and `serve` keep theirs.
+pub(super) fn up_at(
+    city: &std::path::Path,
+    raw: &str,
+    args: &[String],
+    entrance: Entrance,
+) -> ExitCode {
     let history = match city::has_history(city) {
         Ok(history) => history,
         Err(err) => return report(err),
@@ -125,7 +134,7 @@ pub(super) fn up_at(city: &std::path::Path, raw: &str, args: &[String]) -> ExitC
             Err(err) => return report(err),
         }
     }
-    serve_city(city, raw, args, opening(args, Open::Browser))
+    serve_city(city, raw, args, entrance)
 }
 
 /// The genesis write: a city is born when city_initialized becomes line
@@ -165,8 +174,7 @@ pub(super) fn serve(dir: Option<&String>, addr: Option<&String>, args: &[String]
         return ExitCode::from(2);
     };
     let raw = addr.map_or(DEFAULT_AT, String::as_str);
-    let open = opening(args, Open::Nothing);
-    serve_city(std::path::Path::new(dir), raw, args, open)
+    serve_city(std::path::Path::new(dir), raw, args, Entrance::Serve)
 }
 
 /// The child `serve` of a supervised run, from the decisions made above.
@@ -190,8 +198,9 @@ pub(super) fn serve_city(
     city: &std::path::Path,
     raw: &str,
     args: &[String],
-    open: Open,
+    entrance: Entrance,
 ) -> ExitCode {
+    let open = opening(args, entrance.opens());
     // A directory with no history is not a city, and saying so beats the
     // storage layer's report that it could not list a ledger directory -
     // which is true, unhelpful, and names a path nobody chose.
@@ -219,11 +228,14 @@ pub(super) fn serve_city(
     // After the refusals a restart could not cure, so a mistyped line
     // is refused once here rather than spending the crash budget
     // (`crates/sprawling/spec/Supervising.lean` §8-109).
-    // The terminal this city runs in becomes its console when `up`
-    // started it, or when `serve` was asked. `--no-console` is the way
-    // out for a supervisor that wants the old blocking shape.
-    let wanted = (open == Open::Browser || args.iter().any(|a| a == "--console"))
-        && !args.iter().any(|a| a == "--no-console");
+    // The face the terminal opens on is the entrance's; `--no-console`
+    // is the way out for a supervisor that wants the old blocking shape.
+    let surface = entrance.surface(args, Interactive::here());
+    let wanted = surface.is_some();
+    let owns_the_terminal = matches!(
+        surface,
+        Some(console::Surface::Cli | console::Surface::QuietHost)
+    );
     if args.iter().any(|a| a == "--supervise") {
         return match sprawling::supervising::supervise(city, raw, &child(args, open, wanted)) {
             Ok(sprawling::supervising::Ended::Chosen) => ExitCode::SUCCESS,
@@ -274,6 +286,11 @@ pub(super) fn serve_city(
     // terminal, and the page that has the log lens open. Made before
     // the `Diagnostics` because the sink is what writes into it.
     let journal = serving::Journal::new(std::sync::Arc::new(assembly::SystemClock));
+    let journal = if owns_the_terminal {
+        journal.lens_only()
+    } else {
+        journal
+    };
     let floor = match log_floor(args) {
         Ok(floor) => floor,
         Err(unknown) => {
@@ -308,25 +325,32 @@ pub(super) fn serve_city(
     // listens on the port the operating system gave (wire D16).
     let at = listening.local_addr();
     let url = firstrun::local_url(at);
-    let console = wanted.then(|| console::Terminal {
+    let console = surface.map(|surface| console::Terminal {
         url: url.clone(),
-        token: keyed.code().map(str::to_owned),
-        // The three facts the banner below prints. `/serving`
-        // reprints them on demand, because the event stream scrolls
-        // them away within seconds of a city getting busy.
+        // The code this serve minted, shown on the quiet host's second
+        // line; a configured one is the person's and is never shown.
+        pairing: match &keyed {
+            serving::Keyed::Minted(code) => Some(code.clone()),
+            serving::Keyed::NothingToPresent | serving::Keyed::Adopted(_) => None,
+        },
         city: city.display().to_string(),
         client: client_line.clone(),
         bind: at,
-        records: super::verbs::records(args),
+        surface,
     });
-    print_banner(city, &url, &client_line, &keyed);
-    if let Some(level) = floor {
-        println!("log: {level}");
-    }
-    if wanted {
-        println!("  This terminal is the console. `/help` lists what it takes,");
-        println!("  and `/serving` says where this city listens and what is running in it.");
-        println!();
+    // The banner is for a city with no face of its own: a harness reads
+    // the URL from it. The CLI prints one header line, the quiet host
+    // its two lines (`crates/sprawling/spec/Firstrun.lean` §8-8).
+    if !owns_the_terminal {
+        print_banner(city, &url, &client_line, &keyed);
+        if let Some(level) = floor {
+            println!("log: {level}");
+        }
+        if wanted {
+            println!("  This terminal reads one line at a time. `/help` lists what it takes,");
+            println!("  and `/serving` says where this city listens and what is running in it.");
+            println!();
+        }
     }
     match open {
         Open::Browser => firstrun::open_when_ready(at, url),
@@ -336,38 +360,6 @@ pub(super) fn serve_city(
         Ok(()) => ExitCode::SUCCESS,
         Err(err) => report(err),
     }
-}
-
-/// What a person reads once the city listens: where it is, where to
-/// open it, what client it serves, and the key when one was minted.
-fn print_banner(city: &std::path::Path, url: &str, client_line: &str, keyed: &serving::Keyed) {
-    println!();
-    println!("  sprawling is running.");
-    println!();
-    println!("    city     {}", city.display());
-    println!("    WebUI    {url}");
-    println!("    client   {client_line}");
-    println!();
-    match keyed {
-        serving::Keyed::NothingToPresent => {}
-        serving::Keyed::Adopted(_) => {
-            println!("    key      the one you configured; this city will ask for it");
-            println!();
-        }
-        // Shown here and nowhere else, for as long as this process
-        // lives. Nothing writes it down, so a person who loses it stops
-        // and starts the city again rather than looking for a file.
-        serving::Keyed::Minted(code) => {
-            println!("    key      {code}");
-            println!();
-            println!("  This address reaches past this machine, so the city minted a key.");
-            println!("  It is shown once, kept nowhere, and replaced the next time you start.");
-            println!("  Open:    {}/?token={code}", url.trim_end_matches('/'));
-            println!();
-        }
-    }
-    println!("  Open the WebUI in a browser. Ctrl-C stops the city.");
-    println!();
 }
 
 /// The startup scan: verify the chain, close every tool call whose

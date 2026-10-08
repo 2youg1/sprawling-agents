@@ -24,6 +24,7 @@ use kernel::{AxCode, AxError};
 
 use super::attending::{Opening, Outward, Started, spawn_worker};
 use super::remote_door::{CityPort, Outdoors};
+use crate::console::lifecycle::{Event, Face};
 use crate::doctor::host;
 use crate::monitor::sampler::Gauges;
 use crate::outside::keeper::CityKey;
@@ -32,7 +33,8 @@ use crate::serving::output_ring::OutputRing;
 use crate::serving::standing::monotonic_now;
 use accounting::views::Published;
 use accounting::worker::opening_cost::{OpeningCost, Phase};
-use accounting::worker::{Closing, CommandDesk, acp_dispatch, start_served_views};
+use accounting::worker::{CommandDesk, acp_dispatch, start_served_views};
+use lifetime::{EVENTS, Living, closing_from_a_page, live};
 use monitor_feed::watched;
 
 /// One recording in, one line of text back.
@@ -54,26 +56,6 @@ fn hearing(
     })
 }
 
-/// Waits for the person to stop the city from the keyboard.
-///
-/// A Windows console delivers two of these - Ctrl-C and Ctrl-Break - and
-/// a city that closed on one and died on the other would be two
-/// behaviours for one gesture, decided by which key a person happened to
-/// press. Elsewhere there is one.
-#[cfg(windows)]
-async fn closed_by_hand() -> std::io::Result<()> {
-    let mut broken = tokio::signal::windows::ctrl_break()?;
-    tokio::select! {
-        result = tokio::signal::ctrl_c() => result,
-        _ = broken.recv() => Ok(()),
-    }
-}
-
-#[cfg(not(windows))]
-async fn closed_by_hand() -> std::io::Result<()> {
-    tokio::signal::ctrl_c().await
-}
-
 /// A city that has taken its port and opened its one writer, and does
 /// not answer yet.
 ///
@@ -90,6 +72,12 @@ pub struct Listening {
     worker: std::thread::JoinHandle<()>,
     outdoors: Outdoors,
     front: crate::outside::asking::Front,
+    /// The lifecycle's events, and the sender the console and a page's
+    /// `CloseCity` reach it through.
+    lifecycle: (
+        tokio::sync::mpsc::Sender<Event>,
+        tokio::sync::mpsc::Receiver<Event>,
+    ),
 }
 
 /// Takes the city's port, then opens its one writer.
@@ -202,8 +190,7 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
     let desk = Arc::new(CommandDesk::default());
     let secrets_desk = Arc::clone(&desk);
     let acp_desk = Arc::clone(&desk);
-    // Taken before `log` moves into the worker: the opening line is said
-    // after the worker runs, at the same floor and through the same sink.
+    // Taken before `log` moves into the worker, to say the opening line.
     let mut opening_log = beside(&log, &journal);
     // The one sanctioned thread besides the runtime's own, running by
     // the time this returns.
@@ -252,9 +239,14 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
     let audio_vault = city_vault;
     let page = Arc::new(client);
     let front = crate::outside::asking::Front::default();
+    let lifecycle = tokio::sync::mpsc::channel(EVENTS);
     let config = wire::ServeConfig {
         client: Arc::clone(&page),
-        commands: super::privacy::commands(&front, Arc::clone(&desk), privacy),
+        commands: closing_from_a_page(
+            at,
+            lifecycle.0.clone(),
+            super::privacy::commands(&front, Arc::clone(&desk), privacy),
+        ),
         events,
         deltas,
         logs,
@@ -296,6 +288,7 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
         worker: worker_thread,
         outdoors: Outdoors::new(city_root, relay, CityPort { at, token, page }, remote_key),
         front,
+        lifecycle,
     })
 }
 
@@ -308,15 +301,16 @@ impl Listening {
         self.bound.local_addr()
     }
 
-    /// Answers until the person stops the city, and returns once the
-    /// writer thread has written its handoff and ended. `console` is the
+    /// Answers until the city is closed, and returns once the writer
+    /// thread has written its handoff and ended. `console` is the
     /// terminal this city runs in, when it was asked for one; it is made
     /// from [`Listening::local_addr`], so it is handed in here rather
     /// than before the port exists.
     ///
     /// # Errors
-    /// Propagates the accept failures the listener reports, and a
-    /// signal handler that cannot be installed.
+    /// Propagates the accept failures the listener reports, a worker
+    /// that ended abnormally, and a close that ended the process without
+    /// its handoff.
     pub async fn serve(self, console: Option<crate::console::Terminal>) -> Result<(), AxError> {
         let Listening {
             bound,
@@ -326,56 +320,55 @@ impl Listening {
             worker,
             outdoors,
             front,
+            lifecycle: events,
         } = self;
-        // The terminal this city is running in, if it was asked for. It gets
-        // the same desk the socket posts to and the same event stream the
-        // browser reads, so nothing here is a second control surface - it is
-        // the first one, reached from the keyboard that started the city.
+        let (faces, face) = tokio::sync::watch::channel(Face::Opening);
+        let surface = console
+            .as_ref()
+            .map_or(crate::console::Surface::Headless, |terminal| {
+                terminal.surface
+            });
+        // The console's writer, once it starts, so the terminal is put
+        // back before this process ends.
+        let writer = Arc::new(std::sync::Mutex::new(None));
         if let Some(terminal) = console {
             let watching = config.events.subscribe();
             let (desk, answering) = (Arc::clone(&desk), Arc::clone(&answering));
+            let (lifecycle, kept) = (events.0.clone(), Arc::clone(&writer));
             outdoors.keep_aside(move |remote| {
-                front.attend(&remote, Arc::new(|line: &str| println!("{line}")));
                 let inside = crate::console::Inside {
                     desk,
                     answering,
-                    remote,
+                    remote: remote.clone(),
+                    lifecycle,
                 };
-                crate::console::start(terminal, inside, watching);
+                let started = crate::console::start(terminal, inside, watching, face);
+                let notice = started.notice;
+                front.attend(&remote, Arc::new(move |line: &str| notice(line.to_owned())));
+                if let Ok(mut kept) = kept.lock() {
+                    *kept = started.writer;
+                }
             });
         }
-        // Ctrl-C is an orderly close, so a stop somebody chose and a stop
-        // that was a crash do not leave the same silence in the record.
-        // The listener stops accepting first,
-        // then the worker is told - it reads that where it reads its queue,
-        // so whatever command is running finishes and the handoff is the
-        // last line rather than a line in the middle of one.
-        let mut serving = std::pin::pin!(wire::serve(bound, config));
-        let served = tokio::select! {
-            result = &mut serving => result,
-            signal = closed_by_hand() => match signal {
-                Ok(()) => Ok(()),
-                // A signal handler that cannot be installed is worth saying
-                // out loud, and not worth closing the city over: it keeps
-                // serving, and the person now knows that Ctrl-C will be the
-                // hard stop it always was.
-                Err(source) => {
-                    eprintln!(
-                        "an orderly close cannot be listened for ({source}); the city keeps \
-                         serving, and Ctrl-C ends it without a handoff"
-                    );
-                    serving.await
-                }
+        let (_keep_open, events) = events;
+        let lived = live(
+            wire::serve(bound, config),
+            events,
+            Living {
+                desk,
+                worker,
+                faces,
+                surface,
             },
-        };
-        desk.close(Closing::of(&served));
-        // Joined rather than left to the process exit: the handoff is
-        // written by that thread, and a main that returned first would end
-        // the process before the line it exists to write.
-        if let Err(panicked) = worker.join() {
-            eprintln!("the run worker ended abnormally: {panicked:?}");
+        )
+        .await;
+        let writer = writer.lock().ok().and_then(|mut kept| kept.take());
+        if let Some(writer) = writer {
+            // The writer puts the terminal back once it sees the process
+            // gone; a writer that panicked already did, in its hook.
+            drop(tokio::task::spawn_blocking(move || writer.join()).await);
         }
-        served
+        lived
     }
 }
 
@@ -391,6 +384,7 @@ fn beside(
         })
 }
 
+mod lifetime;
 mod monitor_feed;
 #[cfg(test)]
 mod tests;

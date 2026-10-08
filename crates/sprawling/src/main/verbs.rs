@@ -59,6 +59,9 @@ pub(super) enum Effect {
 pub(super) enum Takes {
     Nothing,
     Value(&'static str),
+    /// A diagnostics floor: its help lists the levels from
+    /// `runtime::diagnostics::Level::ALL`, the one list `--log` reads.
+    Level,
 }
 
 /// One flag a verb reads.
@@ -110,13 +113,9 @@ const fn flag(name: &'static str, takes: Takes, says: &'static str) -> Flag {
 }
 
 use Need::{Optional, Required};
-use Takes::{Nothing, Value};
+use Takes::{Level, Nothing, Value};
 
-const LOG: Flag = flag(
-    "--log",
-    Value("level"),
-    "trace, debug, effect, notice, warn, or off",
-);
+const LOG: Flag = flag("--log", Level, "the floor of what the diagnostics write");
 const OPEN: Flag = flag("--open", Nothing, "open the WebUI once the port answers");
 const NO_OPEN: Flag = flag(
     "--no-open",
@@ -132,29 +131,16 @@ const INCLUDE_CONFIDENTIAL: Flag = flag(
     Nothing,
     "read confidential buildings too; the bundle and stderr say so",
 );
-/// The switch that widens the console's event stream from one line per
-/// record to the record whole.
-const WHOLE_RECORDS: &str = "--whole-records";
-
-/// How much of each record the console of a served line prints.
-pub(super) fn records(args: &[String]) -> sprawling::console::Records {
-    if args.iter().any(|arg| arg == WHOLE_RECORDS) {
-        sprawling::console::Records::Whole
-    } else {
-        sprawling::console::Records::Summary
-    }
-}
 /// `up` forwards its line to the same `serve_city` that `serve` runs, so the
 /// two rows share one flag set and cannot drift apart.
 const SERVED: &[Flag] = &[
     OPEN,
     NO_OPEN,
-    flag("--console", Nothing, "enter the city's console"),
-    flag("--no-console", Nothing, "do not enter the console"),
+    flag("--console", Nothing, "open the CLI in this terminal"),
     flag(
-        WHOLE_RECORDS,
+        "--no-console",
         Nothing,
-        "print each record whole in the console, message and reply bodies included",
+        "leave this terminal out of the city",
     ),
     flag(
         "--supervise",
@@ -190,8 +176,9 @@ pub(super) fn forwarded(args: &[String]) -> Vec<String> {
             continue;
         }
         kept.push(word.clone());
-        if let Takes::Value(_) = flag.takes {
-            kept.extend(words.next().cloned());
+        match flag.takes {
+            Takes::Value(_) | Takes::Level => kept.extend(words.next().cloned()),
+            Takes::Nothing => {}
         }
     }
     kept
@@ -663,6 +650,7 @@ pub(super) fn usage(row: &Row) -> String {
     let flags = row.flags.iter().map(|flag| match flag.takes {
         Nothing => format!(" [{}]", spelled(flag)),
         Value(what) => format!(" [{} <{what}>]", spelled(flag)),
+        Level => format!(" [{} <level>]", spelled(flag)),
     });
     let command = match row.after_dashes {
         AfterDashes::Refused => "",
@@ -680,7 +668,15 @@ pub(super) fn help(row: &Row) -> String {
     let flags: String = row
         .flags
         .iter()
-        .map(|flag| format!("\n  {:<16}{}", flag.name, flag.says))
+        .map(|flag| match flag.takes {
+            Level => format!(
+                "\n  {:<16}{}: {}",
+                flag.name,
+                flag.says,
+                super::router::level_names()
+            ),
+            Nothing | Value(_) => format!("\n  {:<16}{}", flag.name, flag.says),
+        })
         .collect();
     let effect = match row.effect {
         Effect::ReadsOnly => "reads only; changes nothing",

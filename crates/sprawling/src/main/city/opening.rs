@@ -21,9 +21,71 @@
 //! pressing a key. A refusal beats a request, because whoever added one
 //! was answering a command line they did not write.
 //!
-//! That the console keys off this same answer is deliberate rather than
-//! incidental: a run told to leave the screen alone is not one to take
-//! the screen over. `--console` restores it for the narrower case.
+//! Which face the console opens on is the entrance's, not this answer's:
+//! `up` opens the quiet host, the bare binary the CLI, and `serve` none
+//! unless `--console`.
+
+/// Which door a city was started through, which decides the face its
+/// terminal opens on (`crates/sprawling/spec/Console.lean` §8-11).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Entrance {
+    /// `sprawling` with no command: the CLI, and no browser until `/web`.
+    Bare,
+    /// `sprawling up` and the release archive's launcher: the quiet host
+    /// and the browser.
+    Up,
+    /// `sprawling serve`: no console unless `--console`.
+    Serve,
+}
+
+impl Entrance {
+    /// Whether the browser opens unless refused.
+    pub(crate) fn opens(self) -> Open {
+        match self {
+            Entrance::Up => Open::Browser,
+            Entrance::Bare | Entrance::Serve => Open::Nothing,
+        }
+    }
+
+    /// The face the console opens on, or `None` for no console at all.
+    /// A terminal that is not the city's - a pipe, a service - gets the
+    /// line console instead of either face.
+    pub(crate) fn surface(self, args: &[String], interactive: Interactive) -> Option<Surface> {
+        if args.iter().any(|a| a == "--no-console") {
+            return None;
+        }
+        let face = match self {
+            Entrance::Bare => Surface::Cli,
+            Entrance::Up => Surface::QuietHost,
+            Entrance::Serve if args.iter().any(|a| a == "--console") => Surface::Cli,
+            Entrance::Serve => return None,
+        };
+        Some(match interactive {
+            Interactive::Terminal => face,
+            Interactive::Pipe => Surface::Headless,
+        })
+    }
+}
+
+/// Whether standard input and output are both a terminal.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Interactive {
+    Terminal,
+    Pipe,
+}
+
+impl Interactive {
+    pub(crate) fn here() -> Interactive {
+        use std::io::IsTerminal;
+        if std::io::stdin().is_terminal() && std::io::stdout().is_terminal() {
+            Interactive::Terminal
+        } else {
+            Interactive::Pipe
+        }
+    }
+}
+
+use sprawling::console::Surface;
 
 /// What serving does with the person's browser.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

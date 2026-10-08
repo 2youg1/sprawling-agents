@@ -117,7 +117,10 @@ fn a_close_lands_between_commands_and_never_inside_one() {
         },
         wire::Reply::nowhere(),
     );
-    desk.close(Closing::Chosen);
+    desk.close(Closing::Chosen {
+        by: crate::worker::ClosedBy::Console,
+        mode: wire::CloseMode::Drain,
+    });
 
     assert!(
         matches!(desk.next(|_| false), DeskWait::Command(..)),
@@ -125,7 +128,7 @@ fn a_close_lands_between_commands_and_never_inside_one() {
     );
     assert!(matches!(
         desk.next(|_| false),
-        DeskWait::Close(Closing::Chosen)
+        DeskWait::Close(Closing::Chosen { .. })
     ));
 }
 

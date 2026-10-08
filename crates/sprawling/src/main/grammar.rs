@@ -216,10 +216,12 @@ fn arguments(row: &Row, words: &[String]) -> Result<Arguments, LineError> {
         })?;
         let value = match flag.takes {
             Takes::Nothing => None,
-            Takes::Value(_) => Some(words.next().cloned().ok_or(LineError::MissingValue {
-                verb: row.name,
-                flag: flag.name,
-            })?),
+            Takes::Value(_) | Takes::Level => {
+                Some(words.next().cloned().ok_or(LineError::MissingValue {
+                    verb: row.name,
+                    flag: flag.name,
+                })?)
+            }
         };
         read.flags.push((flag.name, value));
     }

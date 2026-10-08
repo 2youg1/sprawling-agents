@@ -101,15 +101,14 @@ pub fn writability(dir: &Path) -> BesideBinary {
 /// because a machine that refuses the removal leaves it behind.
 const WRITE_PROBE: &str = ".sprawling-write-probe";
 
-/// Draws the first screen and reads the one answer it asks for.
+/// Draws the first two lines of the CLI when no city is there yet, and
+/// reads the one answer they ask for (`crates/sprawling/spec/Firstrun.lean` §8-8).
 ///
 /// The path is on the screen before the question, so nobody consents to a
 /// location they were not shown. End of input is `Quit`: a piped or
 /// unattended stdin has nobody to ask, and creating a city would be
 /// acting on silence.
 ///
-/// # Errors
-/// Propagates the failure of writing the screen or reading the answer.
 /// # Errors
 /// Propagates what the terminal reports: a screen nobody can be shown,
 /// or an answer that cannot be read, is not an answer to guess at.
@@ -118,31 +117,17 @@ pub fn ask<R: BufRead, W: Write>(
     input: &mut R,
     out: &mut W,
 ) -> std::io::Result<FirstScreen> {
+    writeln!(out, "sprawling  no city yet")?;
     writeln!(
         out,
-        "\n  sprawling - an agent city that runs on this machine.\n"
-    )?;
-    writeln!(out, "  No city was named. Start one here?\n")?;
-    writeln!(out, "      {}\n", city.display())?;
-    writeln!(out, "      [Enter]  start it, and open the WebUI")?;
-    writeln!(
-        out,
-        "      [path]   use a folder you already work in: the city forms"
+        "start one at {}?   Enter yes   type a folder to use it   q quit",
+        city.display()
     )?;
     writeln!(
         out,
-        "               around it, every folder inside becomes a building,"
+        "  a folder you type becomes a city around your work, and your files stay as they are"
     )?;
-    writeln!(
-        out,
-        "               and your files stay as they are: a .gitignore"
-    )?;
-    writeln!(
-        out,
-        "               only gains the lines that keep the city out of git"
-    )?;
-    writeln!(out, "      [q]      quit, and print the command list\n")?;
-    write!(out, "  > ")?;
+    write!(out, "> ")?;
     out.flush()?;
 
     let mut answer = String::new();

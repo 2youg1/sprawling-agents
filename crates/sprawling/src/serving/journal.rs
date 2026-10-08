@@ -42,6 +42,19 @@ const DEPTH: usize = 512;
 pub struct Journal {
     lines: tokio::sync::broadcast::Sender<wire::LogLine>,
     clock: Clock,
+    mouth: Mouth,
+}
+
+/// Whether a line also leaves by standard error.
+///
+/// A console that owns the terminal draws the CLI or the quiet host
+/// there, and a diagnostic written over either is a line nobody asked
+/// for (`crates/sprawling/spec/Console.lean` §8-11); a city with no
+/// terminal of its own keeps standard error, which harnesses read.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Mouth {
+    StandardError,
+    LensOnly,
 }
 
 impl Journal {
@@ -50,11 +63,23 @@ impl Journal {
         Journal {
             lines: tokio::sync::broadcast::Sender::new(DEPTH),
             clock,
+            mouth: Mouth::StandardError,
+        }
+    }
+
+    /// The same journal with standard error closed: every line reaches
+    /// the log lens and nothing reaches the terminal.
+    #[must_use]
+    pub fn lens_only(self) -> Journal {
+        Journal {
+            mouth: Mouth::LensOnly,
+            ..self
         }
     }
 
     /// The sink a `Diagnostics` is built with: every admitted line to
-    /// standard error, and the same line to whoever is watching.
+    /// standard error unless the console owns the terminal, and the same
+    /// line to whoever is watching.
     ///
     /// A city with no page open still writes to the terminal, because
     /// the send failing means nobody subscribed and that is what a city
@@ -62,8 +87,11 @@ impl Journal {
     pub fn sink(&self) -> Sink {
         let lines = self.lines.clone();
         let clock = std::sync::Arc::clone(&self.clock);
+        let mouth = self.mouth;
         Box::new(move |entry: Entry<'_>| {
-            eprintln!("{}", runtime::diagnostics::render(entry));
+            if mouth == Mouth::StandardError {
+                eprintln!("{}", runtime::diagnostics::render(entry));
+            }
             drop(lines.send(carried(entry, clock.now().ok())));
         })
     }

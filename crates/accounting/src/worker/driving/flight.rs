@@ -370,4 +370,24 @@ impl RunWorker {
         }
         Ok(())
     }
+
+    /// Stops every background command, as a close that interrupts does.
+    ///
+    /// Unlike a halt this records nothing: `city_halted` would keep the
+    /// city frozen when it is next served, and nobody asked for that.
+    pub(in crate::worker) fn stop_the_backlog(&mut self) {
+        match self.flight.backlog.halt(None) {
+            Ok(0) => {}
+            Ok(reached) => self.note(
+                runtime::diagnostics::Level::Effect,
+                "runtime::backlog",
+                &format!("{reached} background commands were stopped as the city closed"),
+            ),
+            Err(err) => self.note(
+                runtime::diagnostics::Level::Refuse,
+                "runtime::backlog",
+                &format!("the background commands could not be stopped as the city closed: {err}"),
+            ),
+        }
+    }
 }

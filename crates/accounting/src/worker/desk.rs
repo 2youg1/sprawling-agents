@@ -30,6 +30,10 @@ pub struct CommandDesk {
     /// they stopped it. Read at the same point the queue is read, so a
     /// close lands between commands and never inside one.
     closing: std::sync::OnceLock<Closing>,
+    /// Set by a close that stops the runs under way, or by a second
+    /// request that escalates a drain; never cleared, because a close
+    /// that stops runs does not start draining again.
+    interrupting: std::sync::atomic::AtomicBool,
 }
 
 /// What the desk holds, under one lock.
@@ -122,15 +126,37 @@ pub(super) const SCHEDULE_TICK_MS: u64 = 20_000;
 impl CommandDesk {
     /// Says the city is stopping, and wakes the worker so it hears.
     ///
-    /// Not a Command: closing is not something a peer asks the city for,
-    /// it is the process's own end, and a wire frame that could spell it
-    /// would be a stranger's way to stop somebody's city. The worker
-    /// reads it where it reads the queue, so whatever is running
-    /// finishes first. The first reason given stands: a second close
-    /// does not rewrite why the city stopped.
+    /// Called by the process's own lifecycle, which alone decides that
+    /// the city closes (`crates/sprawling/spec/Console/Lifecycle.lean`);
+    /// a page's `CloseCity` reaches it only through that lifecycle. The
+    /// worker reads it where it reads the queue, so whatever is running
+    /// finishes first, or stops at its next safe point when the close
+    /// interrupts. The first reason given stands: a second close does
+    /// not rewrite why the city stopped.
     pub fn close(&self, why: Closing) {
+        if let Closing::Chosen {
+            mode: wire::CloseMode::Interrupt,
+            ..
+        } = &why
+        {
+            self.interrupt();
+        }
         self.closing.get_or_init(|| why);
         self.ring(Wake::Close);
+    }
+
+    /// Stops the runs under way: from now on every lane reads `Cancel`
+    /// at its next safe point. A close that was draining becomes one
+    /// that interrupts; the reason it was closed for stays the first.
+    pub fn interrupt(&self) {
+        self.interrupting
+            .store(true, std::sync::atomic::Ordering::SeqCst);
+        self.ring(Wake::Close);
+    }
+
+    /// Whether the close under way stops the runs rather than waiting.
+    pub fn interrupting(&self) -> bool {
+        self.interrupting.load(std::sync::atomic::Ordering::SeqCst)
     }
 
     /// Rings `bell` from now on whenever a command is posted or the city
@@ -236,6 +262,9 @@ impl CommandDesk {
     /// course are mutually exclusive, and stopping is the one that cannot
     /// be taken back. Commands for other runs keep their place in line.
     pub fn interrupt_for(&self, run: RunId) -> Interrupt {
+        if self.interrupting() {
+            return Interrupt::Cancel;
+        }
         let Ok(mut waiting) = self.waiting.lock() else {
             return Interrupt::None;
         };

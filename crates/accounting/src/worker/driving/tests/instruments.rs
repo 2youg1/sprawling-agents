@@ -136,7 +136,10 @@ fn instrument_dispatch_gap() {
     let attending = attending(worker, &desk);
     desk.post(dispatch("lab/east", A_TASK, b"a"), nowhere());
     let lines = until_frozen(dir.path(), 2);
-    desk.close(Closing::Chosen);
+    desk.close(Closing::Chosen {
+        by: crate::worker::ClosedBy::Console,
+        mode: wire::CloseMode::Drain,
+    });
     attending.join().unwrap();
     drop(provider);
 
@@ -231,7 +234,10 @@ fn relay_round_trips(store: Store) -> Vec<Duration> {
         })
         .collect();
     release.send(()).unwrap();
-    desk.close(Closing::Chosen);
+    desk.close(Closing::Chosen {
+        by: crate::worker::ClosedBy::Console,
+        mode: wire::CloseMode::Drain,
+    });
     attending.join().unwrap();
     drop(provider);
     taken
