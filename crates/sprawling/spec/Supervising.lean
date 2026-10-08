@@ -111,20 +111,20 @@ end Sprawling.Supervising
   pub(crate) enum Next { Stop, Restart(CrashBudget), Degraded { crashes: usize, cause: String } }
   impl CrashBudget {
       pub(crate) fn fresh() -> Self;
-      pub(crate) fn after(self, closing: &Closing, at: TimeMs) -> Next;
+      pub(crate) fn after(self, served: &Result<(), AxError>, at: TimeMs) -> Next;
   }
   ```
 
-  `Closing::Chosen` → `Stop`；`Closing::Broken` 记下这一刻，丢掉距今已满 `CRASH_WINDOW_MS` 的旧崩溃，窗口里凑满 `CRASH_LIMIT` 次即 `Degraded`，否则 `Restart`。
-- `bin::supervising::children`（形状 4 adapter）：`pub fn supervise(city: &Path, addr: &str, child: &Child) -> Result<Ended, AxError>`，`pub enum Ended { Chosen, Degraded }`。它起子进程、等它退出、按退出状态造一个 `Result<(), AxError>` 交给 `Closing::of`，再把结果交给 `CrashBudget::after`，自己不做判断。交给 `after` 的时刻是守护起步以来经过的毫秒数，取自单调时钟 `serving::standing::monotonic_now`，不是墙钟：系统把墙钟往回拨会让一次旧崩溃一直留在窗口里，往前拨会让一次新崩溃提前出窗口。
+  `Ok` → `Stop`；`Err` 记下这一刻，丢掉距今已满 `CRASH_WINDOW_MS` 的旧崩溃，窗口里凑满 `CRASH_LIMIT` 次即 `Degraded`，否则 `Restart`。
+- `bin::supervising::children`（形状 4 adapter）：`pub fn supervise(city: &Path, addr: &str, child: &Child) -> Result<Ended, AxError>`，`pub enum Ended { Chosen, Degraded }`。它起子进程、等它退出、按退出状态造一个 `Result<(), AxError>` 交给 `CrashBudget::after`，自己不做判断。交给 `after` 的时刻是守护起步以来经过的毫秒数，取自单调时钟 `serving::standing::monotonic_now`，不是墙钟：系统把墙钟往回拨会让一次旧崩溃一直留在窗口里，往前拨会让一次新崩溃提前出窗口。
 
-**子进程怎么读成 `Closing`。** 退出码 0 是 `serve` 在人按 Ctrl-C 后有序收口的结果，读作 `Chosen`，守护随之结束；其余一切（非零码、被信号杀掉而没有码）读作 `Broken`，`cause` 是退出状态的文字。这一次读法只有 `Closing::of` 一处，守护不另造一套分类。
+**子进程的退出怎么读。** 退出码 0 是 `serve` 有序收口、写完交接的结果，读作 `Ok`，守护随之结束；其余一切（非零码、被信号杀掉而没有码、收口中不写交接就退出）读作 `Err`，文字是退出状态。是谁关的城、怎样关的写在子进程自己的交接里（`accounting::worker::Closing`），守护只读退出码，不另造一套分类。
 
 **degraded 要人显式解除。** 窗口里第三次崩溃后守护不再重启，打印最后一次的 `cause` 与崩溃次数，然后等标准输入的一行：人按 Enter 即解除（预算清零，`resume` 后再 `serve`）；读到 EOF（没有人在）即以失败退出；终端读不了时先打印读失败的原因，再同样以失败退出。**原因**：一个 60 s 内崩了三次的服务，再拉起来多半还是崩，且每次崩溃都可能留下一条悬空调用；让它无限重启是把一个需要人看的故障藏进循环里。**否决的方案**：指数退避后永远重试——那样故障永远不会被人看见。
 
-**子进程的那一行。** 开不开浏览器（`opening()`）与进不进控制台（`wanted`）都由 `serve_city` 算一次，守护只把结果变成 flag：`pub struct Child { forwarded, first: Window, console: Console }`。只有第一次起的子进程带 `--open`（当 `opening()` 判为 `Open::Browser`），之后每次都带 `--no-open`，因为重启不该每次弹一个新窗口；子进程带 `--console` 当且仅当不带 `--supervise` 的同一行会进控制台，否则带 `--no-console`。其余 flag 由 bin 的 `verbs::forwarded` 按 `SERVED` 表的 `Takes::Value` 连同其值原样转给 `serve`，守护不再解析 argv。子进程继承这个终端。
+**子进程的那一行。** 开不开浏览器（`opening()`）与进不进控制台（`wanted`）都由 `serve_city` 算一次，守护只把结果变成 flag：`pub struct Child { forwarded, first: Window, console: Console }`。只有第一次起的子进程带 `--open`（当 `opening()` 判为 `Open::Browser`），之后每次都带 `--no-open`，因为重启不该每次弹一个新窗口；子进程带 `--console` 当且仅当不带 `--supervise` 的同一行会进控制台，否则带 `--no-console`。其余 flag 由 bin 的 `verbs::forwarded` 按 `SERVED` 表的 `Takes::Value` 连同其值原样转给 `serve`，守护不再解析 argv。子进程继承这个终端，所以终端的面（CLI 或安静宿主，§8-11）属于子进程；守护自己不进 raw 模式，也不印事件。
 
-**不做的事。** 不接管开机启动：守护活在人起它的那个终端里，终端关了它就走。锁（S5.02 的单写者锁）由子进程持有、随子进程死亡释放，守护本身不碰城的锁，所以 `resume` 与下一个 `serve` 都拿得到它。Ctrl-C 同时落到守护与子进程：子进程照 §8-11 有序收口写 handoff，守护不拦截信号。
+**不做的事。** 不接管开机启动：守护活在人起它的那个终端里，终端关了它就走。锁（S5.02 的单写者锁）由子进程持有、随子进程死亡释放，守护本身不碰城的锁，所以 `resume` 与下一个 `serve` 都拿得到它。子进程拥有终端时，敲出来的 Ctrl+C 是子进程的一个键，不是信号，两个进程都不停；信号形式的 Ctrl-C 与 Ctrl+Break 同时落到守护与子进程：子进程照 §8-11 收口写 handoff，守护不拦截信号。
 
 **决定。**
 

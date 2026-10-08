@@ -12,6 +12,7 @@ import crates.sprawling.spec.Assembly.ChainWatch
 import crates.sprawling.spec.Assembly.Listening
 import crates.sprawling.spec.BrowserBidi
 import crates.sprawling.spec.Console
+import crates.sprawling.spec.Console.Lifecycle
 import crates.sprawling.spec.Doctor
 import crates.sprawling.spec.Firstrun
 import crates.sprawling.spec.Install
@@ -63,6 +64,7 @@ import crates.sprawling.spec.WireClient
 | `spec/Assembly/Listening.lean` | `bin::assembly::listening` |
 | `spec/BrowserBidi.lean` | `bin::browser_bidi` |
 | `spec/Console.lean` | `bin::console` |
+| `spec/Console/Lifecycle.lean` | `bin::console::lifecycle` |
 | `spec/Doctor.lean` | `bin::doctor` |
 | `spec/Firstrun.lean` | `bin::firstrun` |
 | `spec/Install.lean` | `bin::install` |
@@ -90,6 +92,7 @@ import crates.sprawling.spec.WireClient
 
 分部里的定理是模型对性质的证明，每个模型都带 `example` 走到每一条分支，所以这些保证不是从一个无法满足的前提推出来的：
 
+- `spec/Console/Lifecycle.lean`：只有停城请求进入收口，交互面上信号形式的 `SIGINT` 不停城，先到的缘由作数，一条轨迹至多写一次交接且交接带着缘由，装上的时限一直装着直到进程退出、时限到了一定退出（§8-11）。
 - `spec/Install.lean`：追加幂等、追加不遮挡、追加再移除回到原值、移除只动那一个目录（§8-9）。
 - `spec/Main/Exit.lean`：五个退出码两两不同，`Unheard` 的三种原因各落到一个码（§8-103）。
 - `spec/Main/Grammar.lean`：版本先于一切，帮助先于任何动词运行，`--` 之后的词不参与这两个判断，空行是首屏（§8-89）。
