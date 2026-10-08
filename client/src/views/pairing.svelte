@@ -108,11 +108,13 @@
         named = value;
       }}
     />
-    <Button
-      label={say($lang, busy ? "pair_pairing" : "pair_action")}
-      tone="primary"
-      type="submit"
-      loading={busy}
-    />
+    <div class="flex justify-end">
+      <Button
+        label={say($lang, busy ? "pair_pairing" : "pair_action")}
+        tone="primary"
+        type="submit"
+        loading={busy}
+      />
+    </div>
   </form>
 </svelte:element>

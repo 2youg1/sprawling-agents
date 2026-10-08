@@ -31,7 +31,7 @@ export const LENSES: readonly Lens[] = ["ledger", "archive", "bin", "log"];
 // The order the settings tree offers them in is the tree's own
 // (`views/settings/tree.ts`); this is only the set the address bar reads.
 export const SETUP_GROUPS = [
-  "you", "accounts", "harnesses", "network", "remote", "run", "rules", "automation",
+  "you", "accounts", "agents", "network", "remote", "devices", "run", "rules", "automation",
   "skills", "tools", "performance", "appearance", "colours", "keys", "advanced", "privacy", "about",
 ] as const;
 

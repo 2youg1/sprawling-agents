@@ -68,8 +68,8 @@ export const TREE: readonly Branch[] = [
   },
   {
     word: "settings_branch_access",
-    entries: [group("accounts"), group("harnesses")],
-    more: [group("network"), group("remote")],
+    entries: [group("accounts"), group("agents")],
+    more: [group("network"), group("remote"), group("devices")],
   },
   {
     word: "settings_branch_running",

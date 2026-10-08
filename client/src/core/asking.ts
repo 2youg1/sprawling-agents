@@ -54,7 +54,6 @@ export const QUERIES = {
   discards: "discard_view",
   endpoints: "endpoint_view",
   knownHosts: "known_hosts",
-  harnesses: "harnesses",
   agentCatalog: "agent_catalog",
   devices: "devices",
   governance: "governance",
