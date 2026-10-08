@@ -58,7 +58,7 @@ Chat 面的思考块由主机的拼法决定（`ChatSpelling.reasoning`，§8-17
 | `None` | `thinking:{type:"disabled"}` | `reasoning_effort:"none"` |
 | `Low`／`Medium`／`High`／`XHigh`／`Max` | `output_config:{effort:"…"}` | `reasoning_effort:"…"` |
 
-两种兼容格式都拼得出全部六级，**差别是「不思考」写在哪个字段**：Anthropic 的 `output_config.effort` 只收五级，无 `none`。Messages API 参考页里 `effort` 只挂在 `output_config` 之下，顶层写 `effort` 是一个对侧不认的字段。Chat 面的 `reasoning_effort` 是 OpenAI 规格（`openai-openapi` 的 `CreateChatCompletionRequest`）的拼法，DeepSeek、Gemini 的兼容面、xAI、Moonshot 与 OpenRouter 的文档都收它；`reasoning:{effort}` 是 OpenRouter 自己的统一参数，也是只有它的文档写着收 `max` 的拼法，所以只有 `openrouter.ai` 一行按它拼。responses 面的 `reasoning:{effort}` 不变。`Effort` 是闭的，映射对每一级写出真实的臂，新增一级即在两种兼容格式里同时编译失败。
+两种兼容格式都拼得出全部七级（`minimal` 照原词写；发不发某一级给某个模型，归 `gateway::provider::thinking` 的 offer，不归兼容格式），**差别是「不思考」写在哪个字段**：Anthropic 的 `output_config.effort` 只收五级，无 `none`。Messages API 参考页里 `effort` 只挂在 `output_config` 之下，顶层写 `effort` 是一个对侧不认的字段。Chat 面的 `reasoning_effort` 是 OpenAI 规格（`openai-openapi` 的 `CreateChatCompletionRequest`）的拼法，DeepSeek、Gemini 的兼容面、xAI、Moonshot 与 OpenRouter 的文档都收它；`reasoning:{effort}` 是 OpenRouter 自己的统一参数，也是只有它的文档写着收 `max` 的拼法，所以只有 `openrouter.ai` 一行按它拼。responses 面的 `reasoning:{effort}` 不变。`Effort` 是闭的，映射对每一级写出真实的臂，新增一级即在两种兼容格式里同时编译失败。
 
 **缓存后果写在这里，因为它是选型理由**：官方排错文档记明「switching thinking modes, changing the effort value, and changing `budget_tokens` all invalidate message cache breakpoints」。故强度住 `FrozenConfig`（`crates/kernel/Spec.lean` §8-22），Run 内不可变；本模块只负责把已冻结的值翻上线。
 

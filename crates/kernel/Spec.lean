@@ -238,6 +238,8 @@ ARCHITECTURE.md §3「nothing here is published」是这条判定成立的前提
 | 8-81 | `crates/kernel/spec/Event/Record.lean` |
 | 8-83 | `crates/kernel/spec/Event/Record.lean` |
 | 8-85 | `crates/kernel/spec/Event/Record.lean` |
+| 8-87 | `crates/kernel/spec/Event/Record.lean` |
+| 8-88 | `crates/kernel/spec/Event/Record.lean` |
 | 8-5 | `crates/kernel/spec/Version.lean` |
 | 8-6 | `crates/kernel/spec/Idem.lean` |
 | 8-7 | `crates/kernel/spec/ConstsExternal.lean` |
@@ -366,6 +368,9 @@ ARCHITECTURE.md §3「nothing here is published」是这条判定成立的前提
 - `E_EVIDENCE_MISSING`：部分定义掉——无证据 Done 已不可构造（类型半）；构造时拒绝仍需此码（运行时半，A6 双守）。
 - `E_PLAN_MISSING`：不可——没有计划的楼上设常设目标，pursuit 找不到一步可做就当场「完成」，人看到的是一句 `finished` 而什么也没发生。这一码只在计划缺席或为空时于设目标处拒绝：`Roadmap.md` 读不出来保留它自己的码（`E_STORAGE_FATAL`），表格不成形是 `E_INVALID_ARGS` 并列出坏行——那份计划是人写的，恢复动作不该请市长另写一份盖掉它。`subject` 恒为 `<楼地址>: <常设目标>`，客户端据此给出「让市长写计划」的预填表单（client/Spec.lean §4-35a），由人提交。人定的是拒绝加按钮，胜过「先让市长自动写计划」：后者替人派出一次有成本的 run，而人只是想设一个目标。
 - `E_PROVIDER_ACCOUNTS_EXHAUSTED`：不可——一个 Provider 登记了两个以上账号，一次逻辑请求把每个可兑付的账号都试过而无一作答（`spec/AccountRecovery.lean` §8-86，D54 第 7 条），或开轮时名册里一个可兑付的都没有。只报最后一个账号的 401 会让人去修一个账号，而出路是补录凭据、补额度或新增账号。carrier 与 `E_PROVIDER` 相同（`provider_degraded`）：说的是同一件事，只是每个账号都说了；run 以 `Cancelled` 冻住，所以外层不会再开一轮。`subject` 写 Provider 与每个到过的账号 id 及它最后一次失败的码与种类，不写 Key，也不写引用；生产者只有模型路径的 `runtime::run::drive`，`web_search` 把同一个码作为失败的工具结果交给模型。单账号的端点不产生它：那里只有原来的 `E_PROVIDER`。
+- `E_AUTH_REQUIRED`（一个 ACP agent 以 `-32000` 答复，要先登录）：不可——登录在 agent 自己那里，城收到这一答复之前不知道它要不要登录。`subject` 写 agent 的 id；`recovery` 列出 agent 在 `initialize` 里声明的认证方法的 id，页面据此给出登录入口，城登录后重新 `initialize` 并重发原请求（`crates/agent_protocols/Spec.lean`）。它不借 `E_CREDENTIAL_MISSING`：那一码的出路是在本城的 vault 里补一个 Key，而这里本城不持有任何凭据，出路是 agent 自己的登录流程。
+- `E_PAIRING_REFUSED`（本机门上一次配对或开页码被拒：码不对、已用过，或全局限速已到）：不可——配对码与开页码由人从终端或跳转文件抄到浏览器，抄错是人可达的状态。三种原因用同一码、同一句恢复语，不告诉对方是哪一种，因为区分「码不对」与「已用过」就是告诉猜码的一方它离对的码有多近；`recovery` 说去终端读当前的配对码再试一次。它不借 `E_GATE_DENIED`：那一码说的是一个门按规矩拦下了一个已认证的请求，这里请求者还没有任何身份。
+- 远程设备发来的 `LocalOnly` 动词不另设码：`E_GATE_DENIED` 已经是远程中继拒它们时用的码（`crates/wire/spec/Command/Kind.lean` §8-66），恢复语说在城自己的机器上做。
 - `E_SECRET_EGRESS`／`E_DISCARD_IRREVERSIBLE`：不可——两门存在的理由即这两类越界可发生；类型已把「无 Restoration 的 Discard 值」定义掉，Unplanned 请求（exec 预判路）是剩余不可消部分。
 - `E_CONFIG_INVALID`：不可——SecretRef 形状非法与明文入配置必须在反序列化即拒。
 - `E_MODEL_UNCHOSEN`（这一类模型还没有人选定）：不可——城在没接供应方、没选模型时也要能开，所以「这一类没有模型」是人可达的状态。它不并进 `E_CONFIG_INVALID`：那一码还答「会话中途换了模型」「端点已不在」等情形，出路各不相同（去设置 对 开新对话），而客户端只能按码给出路。生产者只有 `gateway::router` 的 `EndpointBook::select`；账本此刻可写，所以 carrier 是 `tool_result`，不进装载期白名单。
@@ -410,6 +415,8 @@ ARCHITECTURE.md §3「nothing here is published」是这条判定成立的前提
 | D53 | 「这个账号还能不能接这个请求」是 `AxError` 上与 `retry` 并列的第二格 | `crates/kernel/spec/Error.lean` |
 | D54 | 选号与恢复只有一个家：`AccountRound` | `crates/kernel/spec/AccountRecovery.lean` |
 | D55 | 凭据能否兑付在开轮时读一次；一个账号的凭据缺失只让这个账号出局，vault 本身的故障让整轮停下 | `crates/kernel/spec/AccountRecovery.lean` |
+| D56 | `Effort` 是七级的闭枚举；每个（Endpoint，模型）提供哪几级是上游的陈述，由 gateway 回答 | `crates/kernel/spec/Model.lean` |
+| D57 | 登记时的模型事实进 CAS，账本行只记摘要 | `crates/kernel/spec/Event/Record.lean` |
 -/
 
 /-! ## 13 依赖选型
