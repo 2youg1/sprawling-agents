@@ -161,7 +161,7 @@ jobs:
       - uses: ./.github/actions/zig
         with:
           cache: true
-      - uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c # v2
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
         with:
           shared-key: gates
           save-if: ${{ github.ref == 'refs/heads/main' }}
@@ -268,7 +268,7 @@ jobs:
       # aws-lc-sys and libgit2, which are C. A key per job, because
       # check-mode metadata and real rlibs are different artifacts and one
       # key would make two jobs overwrite each other's cache all day.
-      - uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c # v2
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
         with:
           shared-key: clippy
           save-if: ${{ github.ref == 'refs/heads/main' }}
@@ -312,7 +312,7 @@ jobs:
       # The Zig the desktop's leaf is built with; every Windows build of
       # `sprawling` compiles it (`crates/desktop/Spec.lean` section 8-12).
       - uses: ./.github/actions/zig
-      - uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c # v2
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
         with:
           shared-key: test
           save-if: ${{ github.ref == 'refs/heads/main' }}
@@ -428,7 +428,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: ./.github/actions/toolchain
-      - uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c # v2
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
         with:
           shared-key: core
           save-if: ${{ github.ref == 'refs/heads/main' }}
@@ -534,7 +534,7 @@ jobs:
       # moving them under kani is a change nobody has measured.
       - name: install pinned toolchain
         run: rustup show
-      - uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c # v2
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
         with:
           shared-key: proof
           save-if: ${{ github.ref == 'refs/heads/main' }}

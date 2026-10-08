@@ -115,7 +115,7 @@ jobs:
       - name: install pinned toolchain
         run: rustup show
       - uses: ./.github/actions/zig
-      - uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c # v2
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
         with:
           shared-key: mutants
           key: ${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
@@ -153,7 +153,7 @@ jobs:
       - name: install pinned toolchain
         run: rustup show
       - uses: ./.github/actions/zig
-      - uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c # v2
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
         with:
           shared-key: mutants
           key: ${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
@@ -202,7 +202,7 @@ jobs:
       - name: install pinned toolchain
         run: rustup show
       - uses: ./.github/actions/zig
-      - uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c # v2
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
         with:
           shared-key: sim
           key: ${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
@@ -226,7 +226,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: install pinned toolchain
         run: rustup show
-      - uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c # v2
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
         with:
           shared-key: gates
           key: ${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
@@ -267,7 +267,7 @@ jobs:
       - name: install pinned toolchain
         run: rustup show
       - uses: ./.github/actions/zig
-      - uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c # v2
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
         with:
           shared-key: release
           key: ${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
@@ -310,7 +310,7 @@ jobs:
           rustup show
           rustup component add llvm-tools
       - uses: ./.github/actions/zig
-      - uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c # v2
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
         with:
           shared-key: release
           key: ${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
@@ -429,7 +429,7 @@ jobs:
           rustup target add x86_64-unknown-linux-musl
           sudo apt-get update
           sudo apt-get install --yes --no-install-recommends musl-tools
-      - uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c # v2
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
         with:
           shared-key: fresh
           key: ${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
@@ -679,7 +679,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: install pinned toolchain
         run: rustup show
-      - uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c # v2
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
         with:
           shared-key: keychain
           key: ${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
@@ -774,7 +774,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: pinned toolchain
         run: rustup show
-      - uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c # v2
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
         with:
           shared-key: core
           save-if: false
@@ -830,7 +830,7 @@ jobs:
         run: rustup show
       - uses: ./.github/actions/zig
         if: runner.os == 'Windows'
-      - uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c # v2
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
         with:
           shared-key: bench
           key: ${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}

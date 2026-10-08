@@ -48,7 +48,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: ./.github/actions/zig
-      - uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c # v2
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
         with:
           shared-key: privacy-windows-${{ matrix.os }}
           save-if: ${{ github.ref == 'refs/heads/main' }}
@@ -168,7 +168,7 @@ jobs:
       - name: install pinned toolchain
         run: rustup show
       - uses: ./.github/actions/zig
-      - uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c # v2
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
         with:
           shared-key: privacy-page
           save-if: ${{ github.ref == 'refs/heads/main' }}
