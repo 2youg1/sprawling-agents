@@ -4,7 +4,7 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts" module>
-  // The ways into a page that are not the page: the palette (Accel-K),
+  // The ways into a page that are not the page: the palette (Accel-/),
   // the file finder in its box (Accel-P), the back key every page but
   // the conversation stands under, and the stack of refusals over the
   // composer. The palette and the finder are drawn as specimens - the

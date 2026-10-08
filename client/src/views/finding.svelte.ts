@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 // Whether the file finder stands open, and which building it looks in
-// (client/Spec.lean §4-62). Module state, so the shell's Accel-P and the
+// (client/Spec.lean §4-62). Module state, so the shell's finder key and the
 // palette's entry of the same name open the one finder.
 
 import { MAYOR, buildingOf } from "../core/route";

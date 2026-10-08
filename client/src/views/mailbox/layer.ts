@@ -9,7 +9,7 @@
 // The mailbox is an ordinary layer under the three edge keys rather than
 // a popover, so the platform no longer decides what closes it and where
 // the focus goes: this step does. `mailbox.svelte` feeds it the key and
-// Accel-B (`toggle`), Escape, a press outside the column (the other two
+// The mailbox key (`toggle`), Escape, a press outside the column (the other two
 // edge keys are outside), the focus entering the column, and a followed
 // row; it reads back whether the column is shown and whether the focus
 // belongs on the key.

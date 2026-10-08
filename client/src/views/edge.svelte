@@ -33,7 +33,7 @@
     readonly onTier: () => void;
     // Holding the layers key shows the blend tier until it is let go.
     readonly onPeek: (peeking: boolean) => void;
-    // How many times Accel-B asked for the mailbox.
+    // How many times the mailbox key asked for the mailbox.
     readonly mailboxAsked: number;
   }
 
@@ -46,7 +46,10 @@
   // The words a key's hint carries: its name, then the chord that
   // reaches it as this platform writes it.
   function named(action: Action): (words: string) => string {
-    return (words) => `${words}  ${marks($bound[action], keys.platform).join(" ")}`;
+    return (words) => {
+      const drawn = marks($bound[action], keys.platform);
+      return drawn.length === 0 ? words : `${words}  ${drawn.join(" ")}`;
+    };
   }
 
   // A press on the layers key is a change of tier unless it was held
