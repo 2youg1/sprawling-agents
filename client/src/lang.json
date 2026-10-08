@@ -1,7 +1,7 @@
 {
   "answer_unavailable": {
     "en": "the city could not answer {query}",
-    "zh": "城答不上 {query}"
+    "zh": "城市答不上 {query}"
   },
   "appearance_body": {
     "en": "body size",
@@ -153,7 +153,7 @@
   },
   "appearance_sample": {
     "en": "The city keeps 1 ledger, and reads both 中文 and English from it.",
-    "zh": "这座城只有 1 本 ledger，中文与 English 都从那里读出来。"
+    "zh": "这座城市只有 1 本 ledger，中文与 English 都从那里读出来。"
   },
   "appearance_stack": {
     "en": "font-family stack",
@@ -337,7 +337,7 @@
   },
   "city_bar": {
     "en": "how the city stands",
-    "zh": "这座城的状态栏"
+    "zh": "这座城市的状态栏"
   },
   "city_done_percent": {
     "en": "{percent}% done",
@@ -357,11 +357,11 @@
   },
   "city_layer": {
     "en": "the city's own layer",
-    "zh": "城层配置"
+    "zh": "城市层配置"
   },
   "city_layer_note": {
     "en": "what every run in this city starts with unless its building or session says otherwise; written to CONFIG.toml",
-    "zh": "城里每个 run 开始时的默认，楼或会话另有设定时以它们为准；写进 CONFIG.toml"
+    "zh": "城市里每个 run 开始时的默认，楼或会话另有设定时以它们为准；写进 CONFIG.toml"
   },
   "city_effort": {
     "en": "standing thinking level",
@@ -517,7 +517,7 @@
   },
   "cost_total": {
     "en": "spent in all",
-    "zh": "全城共花"
+    "zh": "整座城市共花"
   },
   "cost_unpriced": {
     "en": "{calls} model calls came back with no price; they used {tokens} tokens",
@@ -545,7 +545,7 @@
   },
   "context_second_range": {
     "en": "a whole percent of the window from {min} to {max}; an empty box is the city's default",
-    "zh": "窗口的整数百分比，{min} 到 {max}；留空即城的默认值"
+    "zh": "窗口的整数百分比，{min} 到 {max}；留空即用城市的默认值"
   },
   "desktop_allowlist": {
     "en": "windows this building may touch",
@@ -639,21 +639,21 @@
     "en": "the most this provider will spend on one answer: slowest, and dearest.",
     "zh": "这家供应方肯为一次回答花的上限：最慢，也最贵。"
   },
+  "effort_note_minimal": {
+    "en": "almost no reasoning, for the quickest answer.",
+    "zh": "几乎不推理，换来最快的回答。"
+  },
   "effort_note_medium": {
     "en": "the balance between what an answer costs and how far it reasons.",
     "zh": "在回答的开销与推理的深度之间取平衡。"
-  },
-  "effort_note_minimal": {
-    "en": "the least reasoning a thinking model still does before it answers.",
-    "zh": "会思考的模型在作答前做的最少一点推理。"
   },
   "effort_note_none": {
     "en": "thinking off: the model answers from the prompt without reasoning first.",
     "zh": "关掉思考：模型不先推理，直接依提示作答。"
   },
   "effort_note_unstated": {
-    "en": "nobody has chosen: the field is left out and this provider decides.",
-    "zh": "还没有人选过：请求不写这个字段，由这家供应方自己决定。"
+    "en": "nobody has chosen: the request uses high where this model offers it, otherwise the level the provider states as its default, and leaves the field out only when the provider states no default.",
+    "zh": "还没有人选过：这个模型提供 high 就用 high，否则用供应方声明的默认档；供应方什么都没声明时，请求才不写这个字段。"
   },
   "effort_note_xhigh": {
     "en": "longer reasoning, for work that has to be right the first time.",
@@ -669,11 +669,11 @@
   },
   "enrol_city_said_nothing": {
     "en": "the city did not say why",
-    "zh": "这座城没有说明理由"
+    "zh": "这座城市没有说明理由"
   },
   "enrol_unreachable": {
     "en": "this browser could not reach the city",
-    "zh": "这个浏览器联系不上这座城"
+    "zh": "这个浏览器联系不上这座城市"
   },
   "evidence_finished": {
     "en": "finished",
@@ -749,7 +749,7 @@
   },
   "refrain_save_nothing": {
     "en": "nothing changed since the city's version",
-    "zh": "与城里的版本相比没有改动"
+    "zh": "与城市里的版本相比没有改动"
   },
   "refrain_save_locked": {
     "en": "this text is read only",
@@ -801,19 +801,19 @@
   },
   "refrain_lost": {
     "en": "the city can no longer read version {version}",
-    "zh": "城已读不到版本 {version}"
+    "zh": "城市已读不到版本 {version}"
   },
   "refrain_unreadable": {
     "en": "the city cannot read this file: {reason}",
-    "zh": "城读不了这份文件：{reason}"
+    "zh": "城市读不了这份文件：{reason}"
   },
   "refrain_conflict": {
     "en": "the file is version {version} in the city now; your draft is kept",
-    "zh": "城里的这份文件已经是版本 {version}；草稿留着"
+    "zh": "城市里的这份文件已经是版本 {version}；草稿留着"
   },
   "refrain_conflict_unknown": {
     "en": "the city refused the save because the file moved; your draft is kept",
-    "zh": "文件已经变了，城拒绝了这次保存；草稿留着"
+    "zh": "文件已经变了，城市拒绝了这次保存；草稿留着"
   },
   "refrain_compare": {
     "en": "compare",
@@ -833,11 +833,11 @@
   },
   "refrain_discard_detail": {
     "en": "the editor shows the city's version and the unsaved changes are gone",
-    "zh": "编辑器改显城里的版本，未保存的改动不再保留"
+    "zh": "编辑器改显城市里的版本，未保存的改动不再保留"
   },
   "refrain_draft_lost": {
     "en": "a draft kept for version {version} cannot be restored: the city can no longer read that version",
-    "zh": "为版本 {version} 留的草稿恢复不了：城已读不到那一版"
+    "zh": "为版本 {version} 留的草稿恢复不了：城市已读不到那一版"
   },
   "refrain_preview_draft": {
     "en": "the preview is version {version}; unsaved changes are not in it",
@@ -873,7 +873,7 @@
   },
   "refrain_versions_one": {
     "en": "the city knows one version of this file",
-    "zh": "城只知道这份文件的一个版本"
+    "zh": "城市只知道这份文件的一个版本"
   },
   "refrain_version_on_disk": {
     "en": "on disk now, written outside the page",
@@ -885,7 +885,7 @@
   },
   "refrain_version_not_kept": {
     "en": "not kept by the city",
-    "zh": "城没有存下"
+    "zh": "城市没有存下"
   },
   "refrain_versions_more": {
     "en": "Older versions are not listed.",
@@ -893,7 +893,7 @@
   },
   "refrain_versions_asking": {
     "en": "asking the city for this file's versions…",
-    "zh": "正在问城这份文件的各版…"
+    "zh": "正在问城市这份文件的各版…"
   },
   "refrain_version_reading": {
     "en": "reading the two versions…",
@@ -901,7 +901,7 @@
   },
   "refrain_version_lost": {
     "en": "The city can no longer read one of these versions.",
-    "zh": "城读不出其中一版了。"
+    "zh": "城市读不出其中一版了。"
   },
   "refrain_export_comparison": {
     "en": "Export comparison",
@@ -917,11 +917,11 @@
   },
   "refrain_export_asking": {
     "en": "the city is writing the export",
-    "zh": "城正在写导出的文件"
+    "zh": "城市正在写导出的文件"
   },
   "refrain_export_refused": {
     "en": "The city could not export this version.",
-    "zh": "城没能导出这一版。"
+    "zh": "城市没能导出这一版。"
   },
   "refrain_cm_find": {
     "en": "Find",
@@ -1097,11 +1097,11 @@
   },
   "format_lost": {
     "en": "The city no longer holds this version, so it is not drawn. The file itself is unchanged.",
-    "zh": "城不再存有这一版，所以不画。文件本身不动。"
+    "zh": "城市不再存有这一版，所以不画。文件本身不动。"
   },
   "format_fetching": {
     "en": "reading {format} from the city: {through} of {kib}…",
-    "zh": "正在从城里读 {format}：{through} / {kib}…"
+    "zh": "正在从城市里读 {format}：{through} / {kib}…"
   },
   "compared_title": {
     "en": "Comparison of {name}",
@@ -3773,7 +3773,7 @@
   },
   "privacy_host_title": {
     "en": "The machine these entries belong to: the one running this city",
-    "zh": "这些条目属于运行这座城的那台机器"
+    "zh": "这些条目属于运行这座城市的那台机器"
   },
   "privacy_host_version": {
     "en": "Windows version",
@@ -3801,11 +3801,11 @@
   },
   "privacy_host_not_windows": {
     "en": "These controls exist only on Windows. This city runs on another system, so nothing is read or written.",
-    "zh": "这些控制只在 Windows 上存在。这座城运行在别的系统上，所以什么都不读、不写。"
+    "zh": "这些控制只在 Windows 上存在。这座城市运行在别的系统上，所以什么都不读、不写。"
   },
   "privacy_history_withheld": {
     "en": "This app's earlier changes are not shown: the account running the city is not the one that made them. Nothing can be applied or restored until that account runs the city.",
-    "zh": "不显示本应用以前的改动：运行这座城的账户不是做出改动的那个账户。在那个账户运行这座城之前，什么都不能应用或恢复。"
+    "zh": "不显示本应用以前的改动：运行这座城市的账户不是做出改动的那个账户。在那个账户运行这座城市之前，什么都不能应用或恢复。"
   },
   "privacy_history_unreadable": {
     "en": "This app's record of its changes could not be read: another operation holds it, or it is damaged. Nothing can be written until it can be read.",
@@ -3861,7 +3861,7 @@
   },
   "privacy_open_note": {
     "en": "Settings on the machine running this city that decide what data Windows and apps may collect. Each entry states its cost and is changed only when you press it.",
-    "zh": "运行这座城的机器上的设置，决定 Windows 与应用能收集哪些数据。每一项都写明代价，只有你按下才会改动。"
+    "zh": "运行这座城市的机器上的设置，决定 Windows 与应用能收集哪些数据。每一项都写明代价，只有你按下才会改动。"
   },
   "privacy_lines": {
     "en": "your lines",
@@ -4021,7 +4021,7 @@
   },
   "privacy_unsent": {
     "en": "not sent: the link to the city is down; press again when it is back",
-    "zh": "没有发出：与城的连接断了；恢复后再按一次"
+    "zh": "没有发出：与城市的连接断了；恢复后再按一次"
   },
   "privacy_result_applied": {
     "en": "applied, and the value read back matches",
@@ -4109,7 +4109,7 @@
   },
   "proposal_pending": {
     "en": "The link dropped before the city answered. The same decision goes again when the link is back, and the city answers it once.",
-    "zh": "城回答之前链路断了。链路恢复后同一个决定再发一次，城只答一次。"
+    "zh": "城市回答之前链路断了。链路恢复后同一个决定再发一次，城市只答一次。"
   },
   "proposal_nothing_taken": {
     "en": "nothing is taken, which is a rejection",
@@ -4189,7 +4189,7 @@
   },
   "git_unavailable": {
     "en": "this city has no repository to read",
-    "zh": "这座城没有可读的仓库"
+    "zh": "这座城市没有可读的仓库"
   },
   "halt_frozen": {
     "en": "{n} runs frozen",
@@ -4197,7 +4197,7 @@
   },
   "halt_title": {
     "en": "the city is stopped",
-    "zh": "城已暂停"
+    "zh": "城市已暂停"
   },
   "keys_change": {
     "en": "change this key",
@@ -4393,7 +4393,7 @@
   },
   "link_send_action": {
     "en": "send a command to the city",
-    "zh": "把一条命令发给城"
+    "zh": "把一条命令发给城市"
   },
   "link_send_when_connected": {
     "en": "wait until the page says it is connected, then do it again",
@@ -4529,7 +4529,7 @@
   },
   "machine_enables_gecko": {
     "en": "the browser tool, with no driver between the city and the browser; Firefox, Zen, LibreWolf, Waterfox, Floorp and Firefox Developer answer here, and Tor Browser answers too but wants confirming by hand",
-    "zh": "浏览器工具，城与浏览器之间不隔驱动；Firefox、Zen、LibreWolf、Waterfox、Floorp 与 Firefox Developer 都算，Tor Browser 也算，但要 User 亲手确认"
+    "zh": "浏览器工具，城市与浏览器之间不隔驱动；Firefox、Zen、LibreWolf、Waterfox、Floorp 与 Firefox Developer 都算，Tor Browser 也算，但要 User 亲手确认"
   },
   "machine_enables_git": {
     "en": "version control for this repository, and restoring a discarded file from its checkpoint",
@@ -4589,7 +4589,7 @@
   },
   "machine_source_powershell": {
     "en": "the official elan-init.ps1 script, run by this city without a prompt",
-    "zh": "elan 官方的 elan-init.ps1 脚本，由城直接运行，不需要你粘贴"
+    "zh": "elan 官方的 elan-init.ps1 脚本，由城市直接运行，不需要你粘贴"
   },
   "machine_pack_rust_tools": {
     "en": "Rust tools",
@@ -4653,7 +4653,7 @@
   },
   "machine_unread_unknown_item": {
     "en": "this city does not know the item",
-    "zh": "城不认得这一项"
+    "zh": "城市不认得这一项"
   },
   "machine_enables_uv": {
     "en": "the Python this repository's probes and maintenance scripts run on",
@@ -4741,11 +4741,11 @@
   },
   "machine_tier_use": {
     "en": "to run a city",
-    "zh": "运行一座城"
+    "zh": "运行一座城市"
   },
   "machine_unasked": {
     "en": "not checked yet",
-    "zh": "城还没有检查过机器"
+    "zh": "城市还没有检查过机器"
   },
   "machine_verdicts": {
     "en": "what is missing",
@@ -4929,7 +4929,7 @@
   },
   "mcp_scope_city": {
     "en": "the whole city",
-    "zh": "整座城"
+    "zh": "整座城市"
   },
   "mcp_scope_machine": {
     "en": "this machine only",
@@ -5089,7 +5089,7 @@
   },
   "notices_detail": {
     "en": "the city's own words",
-    "zh": "城的原话"
+    "zh": "城市的原话"
   },
   "notices_mark_all": {
     "en": "mark all as read",
@@ -5225,7 +5225,7 @@
   },
   "part_why_halted": {
     "en": "the city is stopped",
-    "zh": "城已暂停，改不了"
+    "zh": "城市已暂停，改不了"
   },
   "path_reveal": {
     "en": "show in the file manager",
@@ -5233,7 +5233,7 @@
   },
   "path_reveal_inert": {
     "en": "this build cannot open a path outside the city",
-    "zh": "城外的路径打不开"
+    "zh": "城市之外的路径打不开"
   },
   "plan_empty": {
     "en": "no plan yet: the Mayor hands each building its part of the city's plan",
@@ -5313,7 +5313,7 @@
   },
   "provider_unreadable": {
     "en": "the provider answered in a shape the city cannot read; check this endpoint's dialect",
-    "zh": "供应方的回答城读不懂：检查这个接口的接口形态"
+    "zh": "供应方的回答城市读不懂：检查这个接口的接口形态"
   },
   "rec_archive": {
     "en": "the archive",
@@ -5373,7 +5373,7 @@
   },
   "event_city_initialized": {
     "en": "the city was raised",
-    "zh": "城建起来了"
+    "zh": "城市建起来了"
   },
   "event_building_created": {
     "en": "a building was raised",
@@ -5697,7 +5697,7 @@
   },
   "event_harness_answered": {
     "en": "a harness answered the city",
-    "zh": "harness 回答了城"
+    "zh": "harness 回答了城市"
   },
   "event_remote_opened": {
     "en": "the remote door opened",
@@ -5805,11 +5805,11 @@
   },
   "remote_about": {
     "en": "The remote door lets a phone or a second computer reach this city from outside its network. It is opened, and devices are paired and revoked, at the city's own console and nowhere else: no page, device or resident can do it.",
-    "zh": "远程门让手机或另一台电脑从这座城的网络之外够到它。开门、配对与撤销设备只在城自己的控制台上做，别处都做不了：页面、设备与居民都不能。"
+    "zh": "远程门让手机或另一台电脑从这座城市的网络之外够到它。开门、配对与撤销设备只在城市自己的控制台上做，别处都做不了：页面、设备与居民都不能。"
   },
   "remote_console": {
     "en": "At the city's console",
-    "zh": "在城的控制台上"
+    "zh": "在城市的控制台上"
   },
   "remote_verb_open": {
     "en": "opens the door for a while and prints the address a device opens",
@@ -5821,7 +5821,7 @@
   },
   "remote_verb_devices": {
     "en": "lists the devices paired with this city",
-    "zh": "列出与这座城配对过的设备"
+    "zh": "列出与这座城市配对过的设备"
   },
   "remote_verb_revoke": {
     "en": "forgets a device; its sessions end",
@@ -5833,11 +5833,11 @@
   },
   "remote_route": {
     "en": "The door needs an https:// route, named in the [remote] table of the city's own CONFIG.toml; docs/operating.md shows the two kinds.",
-    "zh": "门要一条 https:// 的通路，写在城自己的 CONFIG.toml 的 [remote] 表里；docs/operating.md 写了两种通路的写法。"
+    "zh": "门要一条 https:// 的通路，写在城市自己的 CONFIG.toml 的 [remote] 表里；docs/operating.md 写了两种通路的写法。"
   },
   "remote_not_paired": {
     "en": "This browser holds no device for this city. On a phone, scan the code /remote pair prints.",
-    "zh": "这个浏览器里没有这座城的设备。在手机上扫 /remote pair 印出的码。"
+    "zh": "这个浏览器里没有这座城市的设备。在手机上扫 /remote pair 印出的码。"
   },
   "remote_invited": {
     "en": "Pair this device",
@@ -5845,11 +5845,11 @@
   },
   "remote_invited_city": {
     "en": "city {fingerprint}…",
-    "zh": "城 {fingerprint}…"
+    "zh": "城市 {fingerprint}…"
   },
   "remote_invited_about": {
     "en": "This device makes its own key and proves it to the city. The code in the link is used once; the city never sees this device's private key.",
-    "zh": "这台设备自己生成密钥，并向城证明它持有这把钥匙。链接里的码只用一次；城从不见到这台设备的私钥。"
+    "zh": "这台设备自己生成密钥，并向城市证明它持有这把钥匙。链接里的码只用一次；城市从不见到这台设备的私钥。"
   },
   "remote_pair": {
     "en": "Pair this device",
@@ -5861,7 +5861,7 @@
   },
   "remote_unreadable": {
     "en": "This link does not read as an invitation. Scan the code on the city's console again.",
-    "zh": "这个链接读不成一份邀请。在城的控制台上重新扫码。"
+    "zh": "这个链接读不成一份邀请。在城市的控制台上重新扫码。"
   },
   "remote_lacks_insecure": {
     "en": "Pairing needs an https:// address, and this page was opened at another kind.",
@@ -5897,7 +5897,7 @@
   },
   "remote_device_city": {
     "en": "city",
-    "zh": "城"
+    "zh": "城市"
   },
   "remote_device_id": {
     "en": "device id",
@@ -5929,7 +5929,7 @@
   },
   "remote_forget_detail": {
     "en": "This browser drops its key. The city still knows the device until /remote revoke at its console.",
-    "zh": "这个浏览器丢掉它的钥匙。在城的控制台上 /remote revoke 之前，城仍记着这台设备。"
+    "zh": "这个浏览器丢掉它的钥匙。在城市的控制台上 /remote revoke 之前，城市仍记着这台设备。"
   },
   "remote_forget_confirm": {
     "en": "Forget",
@@ -5941,15 +5941,15 @@
   },
   "remote_refused_fingerprint": {
     "en": "The city that answered is not the one the code names, so the code never left this device. Scan again; if this repeats, the route is changing what it forwards.",
-    "zh": "答话的城不是码里指的那一座，所以码没有离开这台设备。重新扫码；反复出现说明通路在改动它转发的内容。"
+    "zh": "答话的城市不是码里指的那一座，所以码没有离开这台设备。重新扫码；反复出现说明通路在改动它转发的内容。"
   },
   "remote_refused_signature": {
     "en": "The city's answer is not signed by its key, so the code never left this device. Scan again; if this repeats, the route is changing what it forwards.",
-    "zh": "城的回答不是它的钥匙签的，所以码没有离开这台设备。重新扫码；反复出现说明通路在改动它转发的内容。"
+    "zh": "城市的回答不是它的钥匙签的，所以码没有离开这台设备。重新扫码；反复出现说明通路在改动它转发的内容。"
   },
   "remote_refused_length": {
     "en": "The city speaks another version of the remote door. Reload the page.",
-    "zh": "城说的是另一个版本的远程门。重新载入这一页。"
+    "zh": "城市说的是另一个版本的远程门。重新载入这一页。"
   },
   "remote_refused_agreement": {
     "en": "The key exchange did not agree. Start again; if it repeats, pair again.",
@@ -6181,7 +6181,7 @@
   },
   "sandbox_inherited": {
     "en": "This building has no sandbox of its own, so the city's holds. Saving writes one, whole.",
-    "zh": "这栋楼没有自己的沙箱，由城那一层管。保存会写下完整的一份。"
+    "zh": "这栋楼没有自己的沙箱，由城市那一层管。保存会写下完整的一份。"
   },
   "sandbox_mounts": {
     "en": "readable mounts",
@@ -6189,7 +6189,7 @@
   },
   "sandbox_mounts_help": {
     "en": "One city address per line, readable on top of the building. Where a run may write is decided elsewhere.",
-    "zh": "每行一个城内地址，在这栋楼之外额外可读。run 能写哪里另有规定。"
+    "zh": "每行一个城市内的地址，在这栋楼之外额外可读。run 能写哪里另有规定。"
   },
   "sandbox_save": {
     "en": "save the sandbox",
@@ -6221,7 +6221,7 @@
   },
   "sandbox_trusted_help": {
     "en": "One MCP server label per line that may reach what no checkpoint puts back, such as the desktop of the computer the city runs on.",
-    "zh": "每行一个 MCP 服务器标签，允许它碰到检查点放不回去的东西，例如运行这座城的电脑的桌面。"
+    "zh": "每行一个 MCP 服务器标签，允许它碰到检查点放不回去的东西，例如运行这座城市的电脑的桌面。"
   },
   "sandbox_unchanged": {
     "en": "nothing changed",
@@ -6229,7 +6229,7 @@
   },
   "sandbox_unknown": {
     "en": "the city has not answered yet",
-    "zh": "城还没有回答"
+    "zh": "城市还没有回答"
   },
   "sandbox_what": {
     "en": "What a run in this building may touch. The card is written whole: every face below is what the building's sandbox will say.",
@@ -6305,7 +6305,7 @@
   },
   "setup_account_key_route": {
     "en": "The key goes straight to the vault; this page keeps only the reference the city answers with.",
-    "zh": "密钥直接存进密钥库，本页只保留城返回的引用。"
+    "zh": "密钥直接存进密钥库，本页只保留城市返回的引用。"
   },
   "setup_account_key_stored": {
     "en": "key stored",
@@ -6325,7 +6325,7 @@
   },
   "setup_account_not_sent": {
     "en": "not sent: the link to the city is down; the draft is kept",
-    "zh": "没有发出：与城的连接断了，草稿保留"
+    "zh": "没有发出：与城市的连接断了，草稿保留"
   },
   "setup_account_only": {
     "en": "a provider keeps at least one account",
@@ -6373,7 +6373,7 @@
   },
   "setup_account_forget_sent": {
     "en": "deleting the key; the city refuses while something else still names it",
-    "zh": "正在删除 Key；还有别处在用它时城会拒绝"
+    "zh": "正在删除 Key；还有别处在用它时城市会拒绝"
   },
   "setup_account_retries": {
     "en": "retries on one account",
@@ -6389,7 +6389,7 @@
   },
   "setup_account_retries_fallback": {
     "en": "nothing chosen: the city retries an account {n} before it moves to the next",
-    "zh": "未选择：城在一个账号上重试 {n} 后再换下一个"
+    "zh": "未选择：城市在一个账号上重试 {n} 后再换下一个"
   },
   "search_card": {
     "en": "web search",
@@ -6397,7 +6397,7 @@
   },
   "search_card_note": {
     "en": "which outside service the web_search tool of every run sends its queries to; written to the city's CONFIG.toml",
-    "zh": "每个 run 的 web_search 工具把查询发给哪一家外部服务；写进城的 CONFIG.toml"
+    "zh": "每个 run 的 web_search 工具把查询发给哪一家外部服务；写进城市的 CONFIG.toml"
   },
   "search_choice_default": {
     "en": "default",
@@ -6425,7 +6425,7 @@
   },
   "search_override": {
     "en": "the hall's own files state a different [search] ({choice}, from the {layer} layer); this card edits the city's file and does not change that",
-    "zh": "hall 自己的文件另有 [search]（{choice}，来自 {layer} 一层）；本卡只改城的文件，不改它"
+    "zh": "hall 自己的文件另有 [search]（{choice}，来自 {layer} 一层）；本卡只改城市的文件，不改它"
   },
   "search_layer_building": {
     "en": "building",
@@ -6437,7 +6437,7 @@
   },
   "search_layer_city": {
     "en": "city",
-    "zh": "城"
+    "zh": "城市"
   },
   "search_layer_default": {
     "en": "default",
@@ -6545,7 +6545,7 @@
   },
   "setup_base_url_normalised": {
     "en": "normalised from {entered}; the city calls the URL above",
-    "zh": "已从 {entered} 归一；城调用的是上面那个地址"
+    "zh": "已从 {entered} 归一；城市调用的是上面那个地址"
   },
   "setup_copy": {
     "en": "copy",
@@ -6573,11 +6573,11 @@
   },
   "setup_effort_city": {
     "en": "the city's own [model] effort in CONFIG.toml holds until a dispatch states a level for the session it opens",
-    "zh": "城自己的 CONFIG.toml [model] effort 一直生效，直到某次派活为它开的那一场另说一个档位"
+    "zh": "城市自己的 CONFIG.toml [model] effort 一直生效，直到某次派活为它开的那一场另说一个档位"
   },
   "setup_effort_essay": {
-    "en": "A run freezes its effort when it starts, so a change made now reaches the next run and never the one already going, and each change invalidates the prompt cache the provider built for this conversation. The two wire formats spell the six levels alike but put none in different places: Anthropic disables thinking through a field of its own, OpenAI passes none as the effort itself. Choosing nothing is not the same as choosing none - an unstated effort leaves the decision to the provider, and none turns thinking off.",
-    "zh": "一次 run 在起点冻结它的强度，此刻的改动因此只到下一次 run，永远到不了正在跑的那一次；每改一次，供应方为这段对话建好的 prompt 缓存都会作废。两种兼容格式的六档拼写一致，none 的位置却不同：Anthropic 用一个自己的字段关掉思考，OpenAI 把 none 当作强度本身传过去。不选与选 none 是两件事——不选是把决定权留给供应方，选 none 是把思考关掉。"
+    "en": "A run freezes its effort when it starts, so a change made now reaches the next run and never the one already going, and each change invalidates the prompt cache the provider built for this conversation. Each model offers its own levels and the picker lists only those; none, which turns thinking off, is never among them. Choosing nothing does not leave the decision to the provider: an unstated effort means high where the model offers it, otherwise the level the provider states as its default.",
+    "zh": "一次 run 在起点冻结它的强度，此刻的改动因此只到下一次 run，永远到不了正在跑的那一次；每改一次，供应方为这段对话建好的 prompt 缓存都会作废。每个模型提供的档位各不相同，选择器只列出它提供的那几档；关掉思考的 none 不在其中。不选也不等于把决定权留给供应方：没写档位时，模型提供 high 就用 high，否则用供应方声明的默认档。"
   },
   "setup_group_accounts": {
     "en": "accounts and providers",
@@ -6601,7 +6601,7 @@
   },
   "setup_group_hint_tools": {
     "en": "the programs this city must find",
-    "zh": "这座城必须找到的程序"
+    "zh": "这座城市必须找到的程序"
   },
   "setup_group_hint_skills": {
     "en": "what the residents have been taught",
@@ -6617,7 +6617,7 @@
   },
   "setup_group_hint_remote": {
     "en": "Pairing a phone or a second computer with this city through the remote door.",
-    "zh": "经远程门，让手机或另一台电脑与这座城配对。"
+    "zh": "经远程门，让手机或另一台电脑与这座城市配对。"
   },
   "setup_group_hint_keys": {
     "en": "the keyboard, and what each key does",
@@ -6633,19 +6633,19 @@
   },
   "setup_group_hint_privacy": {
     "en": "Windows settings on the machine running this city that decide what data Windows and apps may collect, upload or read. Nothing is preselected; an entry changes only when you press it, and the value it wrote can be put back; what an entry says Windows deletes on apply does not come back.",
-    "zh": "运行这座城的机器上、决定 Windows 与应用能收集、上传或读取哪些数据的设置。没有任何预选；只有你按下某一项才会改动，它写入的值可以恢复；条目注明 Windows 在应用时删除的数据不会回来。"
+    "zh": "运行这座城市的机器上、决定 Windows 与应用能收集、上传或读取哪些数据的设置。没有任何预选；只有你按下某一项才会改动，它写入的值可以恢复；条目注明 Windows 在应用时删除的数据不会回来。"
   },
   "setup_group_hint_accounts": {
     "en": "who the city may call, and with which key",
-    "zh": "城能调用谁，用哪把钥匙"
+    "zh": "城市能调用谁，用哪把钥匙"
   },
   "setup_group_hint_harnesses": {
     "en": "a subscription reaches the city through its vendor's own harness, signed in there",
-    "zh": "订阅经厂商自己的 harness 进城，在那里登录"
+    "zh": "订阅经厂商自己的 harness 进入城市，在那里登录"
   },
   "setup_group_hint_you": {
     "en": "what the city calls you and the Mayor; a change takes effect in the next session",
-    "zh": "城怎么称呼你与市长；改动在下一个会话生效"
+    "zh": "城市怎么称呼你与市长；改动在下一个会话生效"
   },
   "setup_group_hint_rules": {
     "en": "what a building's runs are allowed, in its RULES.toml",
@@ -6653,7 +6653,7 @@
   },
   "setup_group_hint_automation": {
     "en": "what the city starts by itself, from SCHEDULE.toml and WATCH.toml",
-    "zh": "城自己开始的事，来自 SCHEDULE.toml 与 WATCH.toml"
+    "zh": "城市自己开始的事，来自 SCHEDULE.toml 与 WATCH.toml"
   },
   "setup_group_keys": {
     "en": "keybindings",
@@ -6705,7 +6705,7 @@
   },
   "settings_branch_city": {
     "en": "city",
-    "zh": "城"
+    "zh": "城市"
   },
   "settings_branch_access": {
     "en": "access",
@@ -6749,7 +6749,7 @@
   },
   "saving_refused": {
     "en": "not saved: the city refused it",
-    "zh": "未保存：城拒绝了"
+    "zh": "未保存：城市拒绝了"
   },
   "saving_unverified": {
     "en": "sent, but no receipt came back; check before saving again",
@@ -6769,7 +6769,7 @@
   },
   "you_person_note": {
     "en": "what the city calls you, and what you want its agents to know about you; kept in PREFERENCES.md",
-    "zh": "城怎么称呼你，以及你希望 Agent 知道的背景；存在 PREFERENCES.md"
+    "zh": "城市怎么称呼你，以及你希望 Agent 知道的背景；存在 PREFERENCES.md"
   },
   "you_user_id": {
     "en": "User ID",
@@ -6809,7 +6809,7 @@
   },
   "you_unreadable_open": {
     "en": "fix it in the documents that govern the city",
-    "zh": "到治理城的文档里改正"
+    "zh": "到治理城市的文档里改正"
   },
   "you_import": {
     "en": "import from the GitHub CLI",
@@ -6817,7 +6817,7 @@
   },
   "you_import_note": {
     "en": "runs gh on the machine the city runs on, not on this browser's; only the login is read, and nothing is kept until you save the card",
-    "zh": "在运行城的那台机器上执行 gh，不是这个浏览器所在的机器；只读登录名，保存这张卡之前什么都不写"
+    "zh": "在运行城市的那台机器上执行 gh，不是这个浏览器所在的机器；只读登录名，保存这张卡之前什么都不写"
   },
   "you_import_host": {
     "en": "GitHub host",
@@ -6833,11 +6833,11 @@
   },
   "you_import_no_cli": {
     "en": "gh is not installed on the city's machine; type your ID instead",
-    "zh": "城的机器上没有装 gh；请直接输入你的 ID"
+    "zh": "城市的机器上没有装 gh；请直接输入你的 ID"
   },
   "you_import_signed_out": {
     "en": "gh is not signed in to {host} on the city's machine; sign in there, or type your ID",
-    "zh": "城的机器上 gh 没有登录 {host}；到那里登录，或直接输入 ID"
+    "zh": "城市的机器上 gh 没有登录 {host}；到那里登录，或直接输入 ID"
   },
   "you_import_not_a_host": {
     "en": "{host} is not a host gh knows",
@@ -6861,7 +6861,7 @@
   },
   "rules_note": {
     "en": "the whole file, written at once; the city reads it before it lands and refuses one it cannot read",
-    "zh": "整份文件一次写入；城先读过再落盘，读不懂的会被拒绝"
+    "zh": "整份文件一次写入；城市先读过再落盘，读不懂的会被拒绝"
   },
   "automation_jobs": {
     "en": "scheduled jobs",
@@ -6889,7 +6889,7 @@
   },
   "automation_tells": {
     "en": "tells the city",
-    "zh": "告知城"
+    "zh": "告知城市"
   },
   "automation_no_jobs": {
     "en": "SCHEDULE.toml lists no jobs",
@@ -6901,7 +6901,7 @@
   },
   "automation_by_hand": {
     "en": "SCHEDULE.toml and WATCH.toml are edited by hand at the city's root; this page only reads them",
-    "zh": "SCHEDULE.toml 与 WATCH.toml 在城的根目录手改；这一页只读"
+    "zh": "SCHEDULE.toml 与 WATCH.toml 在城市的根目录手改；这一页只读"
   },
   "admission_title": {
     "en": "what bounds a run's work",
@@ -7077,7 +7077,7 @@
   },
   "setup_input_unstated": {
     "en": "as the city finds",
-    "zh": "由城判断"
+    "zh": "由城市判断"
   },
   "setup_input_text": {
     "en": "text",
@@ -7089,7 +7089,7 @@
   },
   "setup_model_needed": {
     "en": "An empty ceiling is safe to leave empty. Where the provider's model list states one, the city uses it. Otherwise, on the OpenAI-compatible formats the request carries no ceiling and the provider applies its own default for that model, usually the largest it allows; on the Anthropic-compatible format, which needs a number, the city takes the vendor's documented figure, then its policy default. Type a number here only to set your own.",
-    "zh": "上限可以留空。供应方的模型列表写了上限，城就用它；没写时，OpenAI 兼容格式的请求不带上限，由供应方按这个模型取它自己的缺省，通常就是它允许的最大值；Anthropic 兼容格式必须带一个数，城先取厂商文档写的上限，再落到策略缺省。只有想自己定时才在这里填数。"
+    "zh": "上限可以留空。供应方的模型列表写了上限，城市就用它；没写时，OpenAI 兼容格式的请求不带上限，由供应方按这个模型取它自己的缺省，通常就是它允许的最大值；Anthropic 兼容格式必须带一个数，城市先取厂商文档写的上限，再落到策略缺省。只有想自己定时才在这里填数。"
   },
   "setup_model_output": {
     "en": "output ceiling",
@@ -7121,7 +7121,7 @@
   },
   "setup_next_config": {
     "en": "one field above is not a shape the city accepts",
-    "zh": "上面某个字段的写法这座城不接受"
+    "zh": "上面某个字段的写法这座城市不接受"
   },
   "setup_next_credential": {
     "en": "no key is stored under this id: type one, then look again",
@@ -7181,7 +7181,7 @@
   },
   "setup_probe_read": {
     "en": "what the city found at {host}",
-    "zh": "城在 {host} 上读到的"
+    "zh": "城市在 {host} 上读到的"
   },
   "setup_proxying": {
     "en": "proxy",
@@ -7349,7 +7349,7 @@
   },
   "setup_governed": {
     "en": "documents that govern the city",
-    "zh": "治理这座城的文件"
+    "zh": "治理这座城市的文件"
   },
   "setup_governed_note": {
     "en": "each run reads these when it starts; a run already going keeps what it was given",
@@ -7373,7 +7373,7 @@
   },
   "governed_preferences": {
     "en": "how you want the city run",
-    "zh": "你希望城怎么运转"
+    "zh": "你希望城市怎么运转"
   },
   "setup_toml": {
     "en": "the same in config.toml",
@@ -7381,11 +7381,11 @@
   },
   "setup_toml_toggle": {
     "en": "the city's CONFIG.toml",
-    "zh": "城的 CONFIG.toml"
+    "zh": "城市的 CONFIG.toml"
   },
   "setup_toml_unread": {
     "en": "the city's CONFIG.toml states nothing yet",
-    "zh": "城的 CONFIG.toml 还什么都没写"
+    "zh": "城市的 CONFIG.toml 还什么都没写"
   },
   "setup_transcribe": {
     "en": "transcribe · hears (needs an ASR model such as whisper; a text model cannot go here)",
@@ -7409,7 +7409,7 @@
   },
   "setup_wire_api_unsupported": {
     "en": "this city speaks chat and messages; it cannot call a responses endpoint",
-    "zh": "这座城会说 chat 与 messages，还不能调用 responses 端点"
+    "zh": "这座城市会说 chat 与 messages，还不能调用 responses 端点"
   },
   "skills_admitted": {
     "en": "in the reading room",
@@ -7417,7 +7417,7 @@
   },
   "skills_empty": {
     "en": "no shelf in this city holds anything: a skill is a folder with a SKILL.md placed on a shelf",
-    "zh": "这座城的书架上还什么都没有：技能是放在书架上、带 SKILL.md 的文件夹"
+    "zh": "这座城市的书架上还什么都没有：技能是放在书架上、带 SKILL.md 的文件夹"
   },
   "skills_external": {
     "en": "shelf {n} · {path}",
@@ -7425,7 +7425,7 @@
   },
   "skills_library": {
     "en": "the city's library",
-    "zh": "城的库"
+    "zh": "城市的库"
   },
   "skills_missing": {
     "en": "admitted but not on any shelf",
@@ -7513,7 +7513,7 @@
   },
   "slash_release": {
     "en": "let a stopped building or city work again",
-    "zh": "让停下的楼或城重新开工"
+    "zh": "让停下的楼或城市重新开工"
   },
   "slash_steer": {
     "en": "say this into the run that is going",
@@ -7529,7 +7529,7 @@
   },
   "slot_city": {
     "en": "city",
-    "zh": "城"
+    "zh": "城市"
   },
   "slot_resident": {
     "en": "resident",
@@ -7573,7 +7573,7 @@
   },
   "take_back_not_in_tree": {
     "en": "this path is not a file of the city",
-    "zh": "这个路径不是城里的文件"
+    "zh": "这个路径不是城市里的文件"
   },
   "take_back_title": {
     "en": "Take {path} back to checkpoint {oid}?",
@@ -7637,19 +7637,19 @@
   },
   "talk_delivery_held": {
     "en": "not connected - sent when the city is back",
-    "zh": "未连接，城回来后发出"
+    "zh": "未连接，城市回来后发出"
   },
   "talk_delivery_pending": {
     "en": "sent - waiting for the city",
-    "zh": "已发出，等城接收"
+    "zh": "已发出，等城市接收"
   },
   "talk_delivery_accepted": {
     "en": "received by the city",
-    "zh": "城已接收"
+    "zh": "城市已接收"
   },
   "talk_delivery_unknown": {
     "en": "the connection dropped before the city answered - not sent again",
-    "zh": "城回答之前连接断了，不会重发"
+    "zh": "城市回答之前连接断了，不会重发"
   },
   "talk_ttft": {
     "en": "TTFT",
@@ -7725,7 +7725,7 @@
   },
   "talk_failed_refused": {
     "en": "the city did not take this message",
-    "zh": "城没有接下这条消息"
+    "zh": "城市没有接下这条消息"
   },
   "talk_failed_cancelled": {
     "en": "stopped before it answered",
@@ -7749,7 +7749,7 @@
   },
   "talk_room_note_mayor": {
     "en": "the Mayor: plans the city and hands out work",
-    "zh": "市长：给整座城做计划、派活"
+    "zh": "市长：给整座城市做计划、派活"
   },
   "talk_room_note_building": {
     "en": "the building itself: a message opens a new room in it",
@@ -7765,7 +7765,7 @@
   },
   "talk_goal": {
     "en": "read the city, answer, and plan where planning is needed",
-    "zh": "读完这座城，回答，需要计划的地方写计划"
+    "zh": "读完这座城市，回答，需要计划的地方写计划"
   },
   "talk_handed": {
     "en": "handed to {room}",
@@ -7773,7 +7773,7 @@
   },
   "talk_halted": {
     "en": "city paused",
-    "zh": "城已暂停"
+    "zh": "城市已暂停"
   },
   "talk_hearing": {
     "en": "hearing…",
@@ -7801,7 +7801,7 @@
   },
   "talk_opening_mayor": {
     "en": "plans, work to hand out, and what the city should do next",
-    "zh": "计划、派活，以及这座城接下来做什么"
+    "zh": "计划、派活，以及这座城市接下来做什么"
   },
   "inspect_label": {
     "en": "inspector",
@@ -7865,7 +7865,7 @@
   },
   "inspect_line_beyond": {
     "en": "line {n} is past the head the city sent of this {bytes} file",
-    "zh": "第 {n} 行在城发来的开头之外，文件共 {bytes}"
+    "zh": "第 {n} 行在城市发来的开头之外，文件共 {bytes}"
   },
   "inspect_shot": {
     "en": "a {media} picture, {width} × {height}",
@@ -7873,11 +7873,11 @@
   },
   "inspect_shot_reading": {
     "en": "reading the picture from the city…",
-    "zh": "正在从城里读这张图…"
+    "zh": "正在从城市里读这张图…"
   },
   "inspect_shot_lost": {
     "en": "The city no longer holds this picture, so it is not drawn.",
-    "zh": "城不再存有这张图，所以画不出。"
+    "zh": "城市不再存有这张图，所以画不出。"
   },
   "inspect_call_gone": {
     "en": "This call is not in its run's rounds.",
@@ -7997,7 +7997,7 @@
   },
   "wait_tainted": {
     "en": "outside content",
-    "zh": "城外内容"
+    "zh": "城市之外的内容"
   },
   "wait_title": {
     "en": "waiting on you",
@@ -8029,7 +8029,7 @@
   },
   "guide_step_dependencies_about": {
     "en": "What the machine running the city has and lacks for its work. Installs run there, one item at a time, and a failed one blocks nothing else.",
-    "zh": "运行城市的主机为城里的工作装了什么、缺什么。安装就在那台主机上一项一项进行，某一项失败不拦住别的。"
+    "zh": "运行城市的主机为城市里的工作装了什么、缺什么。安装就在那台主机上一项一项进行，某一项失败不拦住别的。"
   },
   "guide_step_texts": {
     "en": "texts and names",
@@ -8045,7 +8045,7 @@
   },
   "guide_step_skills_about": {
     "en": "Skills sit on shelves: the city library, a building's own shelf, or an outside folder mounted read-only. A skill on a shelf is not yet one a building may use.",
-    "zh": "skill 放在书架上：城库、某栋楼自己的书架，或只读挂载的外部目录。上了书架，不等于某栋楼已经允许使用。"
+    "zh": "skill 放在书架上：城市的书库、某栋楼自己的书架，或只读挂载的外部目录。上了书架，不等于某栋楼已经允许使用。"
   },
   "guide_step_mcp": {
     "en": "connect MCP",
@@ -8105,7 +8105,7 @@
   },
   "whose_unknown": {
     "en": "this city wrote no commit {oid}",
-    "zh": "这座城没有写过提交 {oid}"
+    "zh": "这座城市没有写过提交 {oid}"
   },
   "wire_frame_undecodable": {
     "en": "this page speaks wire v{ours} and the server sent a frame it cannot read",
@@ -8113,7 +8113,7 @@
   },
   "wire_join_action": {
     "en": "join this city's control surface",
-    "zh": "接入这座城的控制面"
+    "zh": "接入这座城市的控制面"
   },
   "wire_out_of_order": {
     "en": "the server streamed frames before completing the handshake",
@@ -8121,15 +8121,15 @@
   },
   "wire_read_frame_action": {
     "en": "read a frame from this city",
-    "zh": "读取这座城发来的一帧"
+    "zh": "读取这座城市发来的一帧"
   },
   "wire_read_record_action": {
     "en": "read a record from this city",
-    "zh": "读取这座城写下的一条记录"
+    "zh": "读取这座城市写下的一条记录"
   },
   "wire_record_undecodable": {
     "en": "this page cannot read the {at} field of a record the city wrote",
-    "zh": "本页读不出这座城写下的记录里的 {at} 字段"
+    "zh": "本页读不出这座城市写下的记录里的 {at} 字段"
   },
   "wire_reload_for_client": {
     "en": "reload the page to fetch the client this server was built with",
@@ -8161,11 +8161,11 @@
   },
   "err_e_config_invalid": {
     "en": "the city cannot use a model here",
-    "zh": "城在这里用不了模型"
+    "zh": "城市在这里用不了模型"
   },
   "err_e_link_refused": {
     "en": "the city refused this connection",
-    "zh": "城拒绝了这次连接"
+    "zh": "城市拒绝了这次连接"
   },
   "fork_from_turn": {
     "en": "turn {turn}",
@@ -8201,7 +8201,7 @@
   },
   "ui_browser_found": {
     "en": "the browser the doctor found",
-    "zh": "城找到的那个浏览器"
+    "zh": "城市找到的那个浏览器"
   },
   "ui_browser_path": {
     "en": "a browser at a path I name",
@@ -8225,7 +8225,7 @@
   },
   "err_e_invalid_args": {
     "en": "the city could not make sense of this request",
-    "zh": "城看不懂这个请求"
+    "zh": "城市看不懂这个请求"
   },
   "err_e_outside_write_domain": {
     "en": "this write falls outside the allowed ground",
@@ -8257,11 +8257,11 @@
   },
   "err_e_evidence_missing": {
     "en": "the city needs to see the work first",
-    "zh": "城需要先看到证据"
+    "zh": "城市需要先看到证据"
   },
   "err_e_loop_suspected": {
     "en": "the city suspected a loop and stopped",
-    "zh": "城怀疑陷入循环，已停手"
+    "zh": "城市怀疑陷入循环，已停手"
   },
   "err_e_locator_invalid": {
     "en": "this cannot be pointed at",
@@ -8305,7 +8305,7 @@
   },
   "err_e_digest_suspect": {
     "en": "the city cannot vouch for these bytes",
-    "zh": "城无法为这些字节背书"
+    "zh": "城市无法为这些字节背书"
   },
   "err_e_credential_missing": {
     "en": "a credential is missing",
@@ -8317,7 +8317,7 @@
   },
   "err_e_storage_fatal": {
     "en": "the city cannot write anything down",
-    "zh": "城写不下任何东西了"
+    "zh": "城市写不下任何东西了"
   },
   "err_e_worktree_busy": {
     "en": "the worktree is busy",
@@ -8333,15 +8333,15 @@
   },
   "err_e_wire_mismatch": {
     "en": "the client and the city disagree on the wire",
-    "zh": "客户端与城的协议版本对不上"
+    "zh": "客户端与城市的协议版本对不上"
   },
   "err_e_log_version_unsupported": {
     "en": "this ledger is written in a version this city cannot read",
-    "zh": "这本账本的版本这座城读不了"
+    "zh": "这本账本的版本这座城市读不了"
   },
   "err_e_secret_egress": {
     "en": "a secret would have left the city",
-    "zh": "这会把密钥送出城外"
+    "zh": "这会把密钥送到城市之外"
   },
   "err_e_discard_irreversible": {
     "en": "this discard cannot be undone",
@@ -8349,7 +8349,7 @@
   },
   "err_e_backpressure_shed": {
     "en": "the city shed this to stay live",
-    "zh": "城丢掉了它以保持运转"
+    "zh": "城市丢掉了它以保持运转"
   },
   "err_e_tool_outcome_unknown": {
     "en": "the outcome is unknown",
@@ -8417,7 +8417,7 @@
   },
   "setup_autonomy_note": {
     "en": "who answers what this city puts in front of the User",
-    "zh": "这座城递给 User 决定的事由谁答复"
+    "zh": "这座城市递给 User 决定的事由谁答复"
   },
   "appearance_lighting_note": {
     "en": "which palette carries the page",
@@ -8473,7 +8473,7 @@
   },
   "setup_known_host": {
     "en": "a provider the city knows",
-    "zh": "城认得的供应方"
+    "zh": "城市认得的供应方"
   },
   "setup_known_host_pick": {
     "en": "pick a provider",
@@ -8549,11 +8549,11 @@
   },
   "stop_whole_city": {
     "en": "To stop the whole city, type /halt --all; /release --all lets it go on.",
-    "zh": "要停下整座城，输入 /halt --all；/release --all 放行。"
+    "zh": "要停下整座城市，输入 /halt --all；/release --all 放行。"
   },
   "palette_no_harvey": {
     "en": "no command called harvey. The city is still yours to change.",
-    "zh": "没有叫 harvey 的命令。不过这座城，仍由你来改变。"
+    "zh": "没有叫 harvey 的命令。不过这座城市，仍由你来改变。"
   },
   "palette_no_tafuri": {
     "en": "no command called tafuri. There is no design here, only its critique.",
@@ -8581,7 +8581,7 @@
   },
   "link_lost": {
     "en": "lost the city",
-    "zh": "和城断开了"
+    "zh": "和城市断开了"
   },
   "link_lost_detail": {
     "en": "reconnecting · attempt {n}",
@@ -8621,7 +8621,7 @@
   },
   "setup_editor_note": {
     "en": "A file the monitor shows opens at its line in the editor this computer has. The browser hands the link to the editor; the city starts nothing.",
-    "zh": "监视器里的文件会在这台电脑的编辑器里打开，并跳到那一行。链接由浏览器交给编辑器，城不启动任何程序。"
+    "zh": "监视器里的文件会在这台电脑的编辑器里打开，并跳到那一行。链接由浏览器交给编辑器，城市不启动任何程序。"
   },
   "setup_editor_none": {
     "en": "None",
@@ -8653,7 +8653,7 @@
   },
   "setup_editor_folder": {
     "en": "The city's folder on this computer",
-    "zh": "城在这台电脑上的文件夹"
+    "zh": "城市在这台电脑上的文件夹"
   },
   "setup_editor_folder_help": {
     "en": "An absolute path. Only a file inside it gets a link.",
@@ -8697,7 +8697,7 @@
   },
   "runs_title": {
     "en": "runs",
-    "zh": "全城 run"
+    "zh": "整座城市的 run"
   },
   "runs_counts": {
     "en": "{asking} waiting for you · {runs} runs",
@@ -8713,7 +8713,7 @@
   },
   "runs_tree": {
     "en": "every run in the city, by building and room",
-    "zh": "全城的 run，按楼与房间排"
+    "zh": "整座城市的 run，按楼与房间排"
   },
   "runs_phase_idle": {
     "en": "idle",
@@ -8749,15 +8749,15 @@
   },
   "gallery_runs_board": {
     "en": "the runs board, with runs waiting for the User",
-    "zh": "全城 run 板，有 run 在等 User"
+    "zh": "整座城市的 run 板，有 run 在等 User"
   },
   "gallery_runs_many": {
     "en": "the runs board with 1,200 runs: only the rows on screen are drawn",
-    "zh": "1200 个 run 的全城 run 板：只画屏幕上的行"
+    "zh": "1200 个 run 的整座城市 run 板：只画屏幕上的行"
   },
   "slash_halt": {
     "en": "stop one building, or the whole city, until released",
-    "zh": "停下某栋楼或整座城，直到放行"
+    "zh": "停下某栋楼或整座城市，直到放行"
   },
   "slash_diff": {
     "en": "open the changes of the run in this room",
@@ -8813,11 +8813,11 @@
   },
   "bld_remove_title": {
     "en": "Remove {addr} from the city?",
-    "zh": "把 {addr} 移出城？"
+    "zh": "把 {addr} 移出城市？"
   },
   "bld_remove_detail": {
     "en": "Its files move to .sprawling/removed and its history stays in the ledger. Move the folder back to the city root and adopt it to bring it back.",
-    "zh": "它的文件搬到 .sprawling/removed，历史留在 ledger 里。把文件夹搬回城的根目录再收编，就能找回。"
+    "zh": "它的文件搬到 .sprawling/removed，历史留在 ledger 里。把文件夹搬回城市的根目录再收编，就能找回。"
   },
   "bld_sandbox": {
     "en": "sandbox",
@@ -8872,12 +8872,12 @@
     "zh": "{addr} 现在的档位：{effort}，来自{from}"
   },
   "setup_effort_unstated": {
-    "en": "in force at {addr}: no level stated, so the provider decides",
-    "zh": "{addr} 现在没有写档位，由供应方决定"
+    "en": "in force at {addr}: no level stated, so high where the model offers it, otherwise the provider's stated default",
+    "zh": "{addr} 现在没有写档位：模型提供 high 就用 high，否则用供应方声明的默认档"
   },
   "setup_effort_from_city": {
     "en": "the city's CONFIG.toml",
-    "zh": "城的 CONFIG.toml"
+    "zh": "城市的 CONFIG.toml"
   },
   "setup_effort_from_building": {
     "en": "this building's own file",
@@ -8885,7 +8885,7 @@
   },
   "setup_effort_from_default": {
     "en": "the city's built-in default",
-    "zh": "城的内置默认值"
+    "zh": "城市的内置默认值"
   },
   "setup_effort_from_resident": {
     "en": "the room's own file",
@@ -8973,7 +8973,7 @@
   },
   "showing_note": {
     "en": "Results only draws your words in a room, the answers, the endings and what they produced, and the city's waiting, failed and finished runs. The switch on either page changes this too.",
-    "zh": "只看结果时，房间只画你的话、回答、结局与产出，城只列等你、失败、刚完成三类。两页上的开关也会改这一项。"
+    "zh": "只看结果时，房间只画你的话、回答、结局与产出，城市只列等你、失败、刚完成三类。两页上的开关也会改这一项。"
   },
   "run_time": {
     "en": "time",
@@ -9121,7 +9121,7 @@
   },
   "mon_ceiling_why_not_delegated": {
     "en": "this machine does not delegate its cgroup to the city",
-    "zh": "城所在机器的 cgroup 没有委派给城"
+    "zh": "城市所在机器的 cgroup 没有委派给城市"
   },
   "mon_ceiling_why_platform": {
     "en": "this platform has no memory ceiling for a run",
@@ -9217,7 +9217,7 @@
   },
   "ask_unfiled": {
     "en": "reload the page to fetch the client this city was built with; report it if a reload does not settle it",
-    "zh": "刷新页面，取回这座城配套的客户端；若刷新后依旧如此，请把它报上来"
+    "zh": "刷新页面，取回这座城市配套的客户端；若刷新后依旧如此，请把它报上来"
   },
   "city_buildings": {
     "en": "buildings",
@@ -9325,7 +9325,7 @@
   },
   "city_view": {
     "en": "what the city page shows",
-    "zh": "城页显示"
+    "zh": "城市页显示"
   },
   "city_view_table": {
     "en": "table",
@@ -9353,15 +9353,15 @@
   },
   "gallery_city_table": {
     "en": "city · the building table",
-    "zh": "城 · 楼表"
+    "zh": "城市 · 楼表"
   },
   "gallery_city_table_narrow": {
     "en": "city · the building table at a phone's width",
-    "zh": "城 · 手机宽度下的楼表"
+    "zh": "城市 · 手机宽度下的楼表"
   },
   "recover_e_path_not_found": {
     "en": "Check the path against the city's tree; paths are relative to the city root.",
-    "zh": "对照城里的目录树核对这条路径；路径从城的根目录算起。"
+    "zh": "对照城市里的目录树核对这条路径；路径从城市的根目录算起。"
   },
   "recover_e_tool_unknown": {
     "en": "Use one of the tools this building lists for its residents.",
@@ -9413,7 +9413,7 @@
   },
   "recover_e_locator_invalid": {
     "en": "Point at a file by its path in the city, or at a stored block by its full name.",
-    "zh": "用城里的路径指向一个文件，或者用完整的名字指向一个已存的块。"
+    "zh": "用城市里的路径指向一个文件，或者用完整的名字指向一个已存的块。"
   },
   "recover_e_sandbox_denied": {
     "en": "Run it on the host instead, or allow it in the building's sandbox rules.",
@@ -9433,7 +9433,7 @@
   },
   "recover_e_tainted_action": {
     "en": "The User has to confirm this step: its input came from outside the city.",
-    "zh": "这一步要由 User 确认：它的输入来自城外。"
+    "zh": "这一步要由 User 确认：它的输入来自城市之外。"
   },
   "recover_e_repair_busy": {
     "en": "Wait for the running repair to finish, then try again.",
@@ -9477,7 +9477,7 @@
   },
   "recover_e_storage_fatal": {
     "en": "Free disk space or fix the folder's permissions, then restart the city.",
-    "zh": "腾出磁盘空间或修好这个目录的权限，然后重启这座城。"
+    "zh": "腾出磁盘空间或修好这个目录的权限，然后重启这座城市。"
   },
   "recover_e_worktree_busy": {
     "en": "Wait for the other run working in this tree to finish, then try again.",
@@ -9485,7 +9485,7 @@
   },
   "recover_e_browser_unavailable": {
     "en": "Install a browser the city can drive; the dependencies page lists them.",
-    "zh": "装一个城能驱动的浏览器；依赖项页面列出了可用的几种。"
+    "zh": "装一个城市能驱动的浏览器；依赖项页面列出了可用的几种。"
   },
   "recover_e_endpoint_dialect_unsupported": {
     "en": "Pick the format this provider speaks on the model settings page.",
@@ -9493,19 +9493,19 @@
   },
   "recover_e_wire_mismatch": {
     "en": "Reload the page to get the client this city was built with.",
-    "zh": "重新加载页面，取回这座城配套的客户端。"
+    "zh": "重新加载页面，取回这座城市配套的客户端。"
   },
   "recover_e_log_version_unsupported": {
     "en": "Open this city with the newer sprawling that wrote its ledger.",
-    "zh": "用写下这本账的较新版本的 sprawling 打开这座城。"
+    "zh": "用写下这本账的较新版本的 sprawling 打开这座城市。"
   },
   "recover_e_ledger_held": {
     "en": "Another sprawling process holds this city's ledger; stop it, then start this one.",
-    "zh": "另一个 sprawling 进程占着这座城的账本；先停下它，再启动这一个。"
+    "zh": "另一个 sprawling 进程占着这座城市的账本；先停下它，再启动这一个。"
   },
   "recover_e_history_unproven": {
     "en": "The city is still proving the history it opened from; send it again once the log says the history is proved.",
-    "zh": "城还在证明它打开时读到的历史；等日志说历史已证明，再发一次。"
+    "zh": "城市还在证明它打开时读到的历史；等日志说历史已证明，再发一次。"
   },
   "recover_e_secret_egress": {
     "en": "Keep the key in the vault and pass it as a secret: reference instead of its value.",
@@ -9526,14 +9526,6 @@
   "recover_e_plan_missing": {
     "en": "Ask the Mayor to write a plan for this goal in the building's Roadmap.md.",
     "zh": "请市长在这栋楼的 Roadmap.md 里为这个目标写一份计划。"
-  },
-  "recover_e_auth_required": {
-    "en": "Sign in to this agent with one of the methods it offers, then send again.",
-    "zh": "用这个 agent 提供的一种方式登录它，然后再发一次。"
-  },
-  "recover_e_pairing_refused": {
-    "en": "Read the current pairing code in the terminal the city runs in, and enter it again.",
-    "zh": "到城市运行的那个终端里读出当前的配对码，再输入一次。"
   },
   "tier_zen": {
     "en": "zen",
@@ -9617,11 +9609,11 @@
   },
   "world_tags_offline": {
     "en": "Tags are kept by the city, and the city is not connected",
-    "zh": "标签由城保管，而城没有连上"
+    "zh": "标签由城市保管，而城市没有连上"
   },
   "talk_past": {
     "en": "An earlier session of {room}. It is read-only: the city goes on with the room's current session.",
-    "zh": "{room} 较早的一段对话，只读：城只接着这个房间当前的一段说下去。"
+    "zh": "{room} 较早的一段对话，只读：城市只接着这个房间当前的一段说下去。"
   },
   "talk_current": {
     "en": "Back to the current session",
@@ -9661,7 +9653,7 @@
   },
   "world_city": {
     "en": "city",
-    "zh": "城"
+    "zh": "城市"
   },
   "world_files": {
     "en": "files",
@@ -9733,7 +9725,7 @@
   },
   "world_cost_city": {
     "en": "city {usd}",
-    "zh": "全城 {usd}"
+    "zh": "整座城市 {usd}"
   },
   "world_unreadable": {
     "en": "could not read",
@@ -9853,7 +9845,7 @@
   },
   "mailbox_why_failure": {
     "en": "Here because of the refusal {code}: the work stays stopped until the User acts, and the city does not retry it.",
-    "zh": "在这里是因为拒绝 {code}：User 动手之前工作一直停着，城不会自己重试。"
+    "zh": "在这里是因为拒绝 {code}：User 动手之前工作一直停着，城市不会自己重试。"
   },
   "mailbox_why_question": {
     "en": "Here because of the event approval_requested: a resident asks the User to approve a step it may not take alone.",
@@ -9889,7 +9881,7 @@
   },
   "skills_empty_next": {
     "en": "no shelf this building reads holds a skill yet: put a folder with a SKILL.md into the city's library or this building's shelf - Settings, Skills shows both folders - and it appears here",
-    "zh": "这栋楼读的书架上还没有技能：把带 SKILL.md 的文件夹放进城的书库或这栋楼的书架（两个文件夹在「设置 → 技能」里），它就会出现在这里"
+    "zh": "这栋楼读的书架上还没有技能：把带 SKILL.md 的文件夹放进城市的书库或这栋楼的书架（两个文件夹在「设置 → 技能」里），它就会出现在这里"
   },
   "world_rename": {
     "en": "rename",
@@ -9953,7 +9945,7 @@
   },
   "setup_group_hint_colours": {
     "en": "Your own colours laid over the built-in theme. They are kept in your preferences, so every browser that opens this city draws them.",
-    "zh": "在内置主题之上换用你自己的颜色。它们存在你的偏好里，打开这座城的每个浏览器都会用上。"
+    "zh": "在内置主题之上换用你自己的颜色。它们存在你的偏好里，打开这座城市的每个浏览器都会用上。"
   },
   "colours_tokens": {
     "en": "theme colours",
@@ -10061,11 +10053,11 @@
   },
   "machine_scan_title": {
     "en": "Scanning in front of the city",
-    "zh": "城目录前的扫描"
+    "zh": "城市目录前的扫描"
   },
   "machine_scan_city": {
     "en": "city directory",
-    "zh": "城目录"
+    "zh": "城市目录"
   },
   "machine_scan_city_read": {
     "en": "read for",
@@ -10089,11 +10081,11 @@
   },
   "machine_scan_stopped": {
     "en": "off on this computer, so nothing slows the city's writes",
-    "zh": "这台电脑上关着，城的写入不会被拖慢"
+    "zh": "这台电脑上关着，城市的写入不会被拖慢"
   },
   "machine_scan_drive_trusted": {
     "en": "the city is on a trusted Dev Drive",
-    "zh": "城在一个受信任的 Dev Drive 上"
+    "zh": "城市在一个受信任的 Dev Drive 上"
   },
   "machine_scan_drive_untrusted": {
     "en": "a Dev Drive that is not trusted, so Defender still scans it:",
@@ -10105,15 +10097,15 @@
   },
   "machine_scan_outside": {
     "en": "no exclusion holds the city, so Defender scans each write",
-    "zh": "没有排除项覆盖城，Defender 会扫描每次写入"
+    "zh": "没有排除项覆盖城市，Defender 会扫描每次写入"
   },
   "machine_scan_inside": {
     "en": "the city is inside an exclusion:",
-    "zh": "城在一个排除项之内："
+    "zh": "城市在一个排除项之内："
   },
   "machine_untold_no_disk": {
     "en": "not read: the city's directory is on no local disk",
-    "zh": "没读到：城目录不在本地磁盘上"
+    "zh": "没读到：城市目录不在本地磁盘上"
   },
   "machine_untold_admin_only": {
     "en": "not read: only an administrator can ask",
@@ -10161,7 +10153,7 @@
   },
   "release_registry_unasked": {
     "en": "not asked: the city has no rule yet for comparing its versions with this one",
-    "zh": "没问：城还没有拿它的版本与这一版比较的规则"
+    "zh": "没问：城市还没有拿它的版本与这一版比较的规则"
   },
   "release_registry_refused": {
     "en": "could not be read:",
@@ -10189,7 +10181,7 @@
   },
   "remote_step_open": {
     "en": "At the city's console, open the door. The console prints the address the device opens.",
-    "zh": "在城的控制台上开门。控制台印出设备要打开的地址。"
+    "zh": "在城市的控制台上开门。控制台印出设备要打开的地址。"
   },
   "remote_step_pair": {
     "en": "At the console, name the device. The console prints a QR code and a link, good once for ten minutes.",
@@ -10205,23 +10197,23 @@
   },
   "remote_restart_unknown": {
     "en": "When the city's computer restarts: on Windows and macOS the pairing stays, kept by Credential Manager or the Keychain; on Linux it lasts until the computer reboots, unless the city uses the encrypted vault file. Open the dependencies page to see which this city has.",
-    "zh": "城所在的电脑重启时：Windows 与 macOS 上配对仍在，由凭据管理器或钥匙串保管；Linux 上只到这次开机结束，除非这座城用加密的 vault 文件。打开依赖项页能看到这座城是哪一种。"
+    "zh": "城市所在的电脑重启时：Windows 与 macOS 上配对仍在，由凭据管理器或钥匙串保管；Linux 上只到这次开机结束，除非这座城市用加密的 vault 文件。打开依赖项页能看到这座城市是哪一种。"
   },
   "remote_restart_kept": {
     "en": "When the city's computer restarts, paired devices stay paired: the system's credential store keeps the city key.",
-    "zh": "城所在的电脑重启后，配对过的设备仍是配对的：系统的凭据存放处保管着城钥匙。"
+    "zh": "城市所在的电脑重启后，配对过的设备仍是配对的：系统的凭据存放处保管着城市密钥。"
   },
   "remote_restart_passphrase": {
     "en": "When the city's computer restarts, paired devices stay paired once you type the vault's passphrase at start.",
-    "zh": "城所在的电脑重启后，启动时输入 vault 口令，配对过的设备就仍是配对的。"
+    "zh": "城市所在的电脑重启后，启动时输入 vault 口令，配对过的设备就仍是配对的。"
   },
   "remote_restart_until_reboot": {
     "en": "When the city's computer reboots, every device pairs again: the kernel keyring keeps the city key only until then. An encrypted vault file keeps it across reboots.",
-    "zh": "城所在的电脑重启后，每台设备都要重新配对：内核的 keyring 只保管城钥匙到那时。用加密的 vault 文件就能跨重启保留。"
+    "zh": "城市所在的电脑重启后，每台设备都要重新配对：内核的 keyring 只保管城市密钥到那时。用加密的 vault 文件就能跨重启保留。"
   },
   "remote_restart_process": {
     "en": "When the city restarts, every device pairs again: no system credential store answered, so the city key lives only in the city's memory.",
-    "zh": "城重启后，每台设备都要重新配对：没有系统凭据存放处应答，城钥匙只在城的内存里。"
+    "zh": "城市重启后，每台设备都要重新配对：没有系统凭据存放处应答，城市密钥只在城市的内存里。"
   },
   "copy_note": {
     "en": "Puts this on the clipboard exactly as written: {text}",
@@ -10249,7 +10241,7 @@
   },
   "remote_verb_replace_key": {
     "en": "makes a new city key; every device pairs again",
-    "zh": "换一把新的城钥匙，每台设备都要重新配对"
+    "zh": "换一把新的城市密钥，每台设备都要重新配对"
   },
   "release_check_registries": {
     "en": "check npm and crates.io",
@@ -10265,7 +10257,7 @@
   },
   "remote_door_about": {
     "en": "Opening the door and replacing the city key each ask for a one-time code that the city prints on its own console, the terminal where sprawling serve runs; a page or a resident's tool cannot read it. Closing needs no code.",
-    "zh": "开门与更换城钥匙都要一个只用一次的确认码，城把它印在自己的控制台上，也就是跑着 sprawling serve 的那个终端；页面和居民的工具都读不到它。关门不要码。"
+    "zh": "开门与更换城市密钥都要一个只用一次的确认码，城市把它印在自己的控制台上，也就是跑着 sprawling serve 的那个终端；页面和居民的工具都读不到它。关门不要码。"
   },
   "remote_door_lasting": {
     "en": "open for",
@@ -10277,7 +10269,7 @@
   },
   "remote_door_open_note": {
     "en": "asks the city to open the remote door for the time chosen beside it; the city then prints a code on its console",
-    "zh": "请城把远程门开到旁边选的时长；城随后在控制台上印一个确认码"
+    "zh": "请城市把远程门开到旁边选的时长；城市随后在控制台上印一个确认码"
   },
   "remote_door_close": {
     "en": "close the door",
@@ -10289,15 +10281,15 @@
   },
   "remote_key_replace": {
     "en": "replace the city key",
-    "zh": "更换城钥匙"
+    "zh": "更换城市密钥"
   },
   "remote_key_replace_note": {
     "en": "makes a new city key; every paired device must pair again, and revoked devices stay revoked",
-    "zh": "换一把新的城钥匙；每台配对过的设备都要重新配对，撤销过的设备仍是撤销的"
+    "zh": "换一把新的城市密钥；每台配对过的设备都要重新配对，撤销过的设备仍是撤销的"
   },
   "remote_key_where": {
     "en": "The city key rests in the city's vault: Windows Credential Manager and the macOS Keychain keep it across restarts; on Linux the kernel keyring keeps it until the computer reboots, unless the city uses the encrypted vault file.",
-    "zh": "城钥匙放在城的 vault 里：Windows 凭据管理器与 macOS 钥匙串跨重启保管；Linux 的内核密钥环只保管到这次开机结束，除非城用加密的 vault 文件。"
+    "zh": "城市密钥放在城市的 vault 里：Windows 凭据管理器与 macOS 钥匙串跨重启保管；Linux 的内核密钥环只保管到这次开机结束，除非城市用加密的 vault 文件。"
   },
   "remote_door_code": {
     "en": "code from the city's console",
@@ -10305,7 +10297,7 @@
   },
   "remote_door_code_help": {
     "en": "type the eight-character code the city has just printed on its console; Esc cancels",
-    "zh": "输入城刚在控制台上印出的 8 个字符；Esc 取消"
+    "zh": "输入城市刚在控制台上印出的 8 个字符；Esc 取消"
   },
   "remote_door_confirm": {
     "en": "confirm",
@@ -10313,7 +10305,7 @@
   },
   "remote_door_confirm_note": {
     "en": "sends the code back to the city, which then does what was pressed",
-    "zh": "把确认码交回城，城随后做按下的那件事"
+    "zh": "把确认码交回城市，城市随后做按下的那件事"
   },
   "remote_door_denied": {
     "en": "the code was wrong, already used, or expired; press again and type the new code the console prints",
@@ -10321,27 +10313,27 @@
   },
   "remote_door_no_console": {
     "en": "the city has no console to print a code on; run sprawling serve in the city's own terminal",
-    "zh": "城没有可以印码的控制台；在城自己的终端里跑 sprawling serve"
+    "zh": "城市没有可以印码的控制台；在城市自己的终端里跑 sprawling serve"
   },
   "remote_door_unknown": {
     "en": "this city does not carry the door commands yet; update the city, or use the console",
-    "zh": "这座城还不认识门的命令；更新城，或在控制台上做"
+    "zh": "这座城市还不认识门的命令；更新城市，或在控制台上做"
   },
   "remote_door_refused": {
     "en": "the city refused: {code}",
-    "zh": "城拒绝了：{code}"
+    "zh": "城市拒绝了：{code}"
   },
   "remote_door_done_door": {
     "en": "the code was sent; the city's console says whether the door opened",
-    "zh": "确认码已送出；门开没开，城的控制台上写着"
+    "zh": "确认码已送出；门开没开，城市的控制台上写着"
   },
   "remote_door_done_key": {
     "en": "the code was sent; the city's console says whether the key was replaced",
-    "zh": "确认码已送出；钥匙换没换，城的控制台上写着"
+    "zh": "确认码已送出；钥匙换没换，城市的控制台上写着"
   },
   "remote_door_closing": {
     "en": "the close was sent; the city's console says when the door closed",
-    "zh": "关门已送出；门何时关上，城的控制台上写着"
+    "zh": "关门已送出；门何时关上，城市的控制台上写着"
   },
   "context_second_building": {
     "en": "the building whose second reminder is shown",
@@ -10349,7 +10341,7 @@
   },
   "remote_door_unsent": {
     "en": "the page is not connected to the city, so nothing was sent; try again once it reconnects",
-    "zh": "页面没有连上城，所以什么也没送出；重新连上后再试"
+    "zh": "页面没有连上城市，所以什么也没送出；重新连上后再试"
   },
   "run_head_cached_unknown": {
     "en": "cache not reported",
@@ -10397,7 +10389,7 @@
   },
   "talk_dispatched_city": {
     "en": "dispatched by the city",
-    "zh": "由城派来"
+    "zh": "由城市派来"
   },
   "mon_files_one": {
     "en": "1 file changed",
@@ -10761,7 +10753,7 @@
   },
   "performance_restart": {
     "en": "Restart the city server to apply these settings.",
-    "zh": "重启城服务以应用设置。"
+    "zh": "重启城市服务以应用设置。"
   },
   "performance_soft": {
     "en": "soft",
@@ -10781,10 +10773,486 @@
   },
   "setup_group_hint_performance": {
     "en": "Core threads and per-run resources. Changes take effect after restarting the city server.",
-    "zh": "核心线程与每个 run 的资源；重启城服务后生效。"
+    "zh": "核心线程与每个 run 的资源；重启城市服务后生效。"
   },
   "setup_group_performance": {
     "en": "performance",
     "zh": "性能"
+  },
+  "picker_title": {
+    "en": "model, provider and thinking",
+    "zh": "模型、供应商与思考"
+  },
+  "picker_recent": {
+    "en": "recent",
+    "zh": "最近"
+  },
+  "picker_recent_name": {
+    "en": "recent: {choice}",
+    "zh": "最近：{choice}"
+  },
+  "picker_providers": {
+    "en": "providers",
+    "zh": "供应商"
+  },
+  "picker_providers_of": {
+    "en": "providers · {model}",
+    "zh": "供应商 · {model}"
+  },
+  "picker_models_at": {
+    "en": "models · {provider}",
+    "zh": "模型 · {provider}"
+  },
+  "picker_filter_providers": {
+    "en": "filter providers",
+    "zh": "筛选供应商"
+  },
+  "picker_more": {
+    "en": "more…",
+    "zh": "更多…"
+  },
+  "picker_more_count": {
+    "en": "{n} more…",
+    "zh": "还有 {n} 个…"
+  },
+  "picker_no_model_match": {
+    "en": "no model matches",
+    "zh": "没有匹配的模型"
+  },
+  "picker_no_provider_match": {
+    "en": "no provider matches",
+    "zh": "没有匹配的供应商"
+  },
+  "picker_provider_count": {
+    "en": "{n} providers",
+    "zh": "{n} 家"
+  },
+  "picker_only_provider": {
+    "en": "the only provider",
+    "zh": "唯一供应商"
+  },
+  "picker_price_head": {
+    "en": "per million tokens in/out · context",
+    "zh": "每百万 token 入/出 · 上下文"
+  },
+  "picker_price_local": {
+    "en": "local",
+    "zh": "本地"
+  },
+  "picker_price_unstated": {
+    "en": "price not stated",
+    "zh": "价格未写明"
+  },
+  "picker_thinking_of": {
+    "en": "thinking · {provider}",
+    "zh": "思考 · {provider}"
+  },
+  "picker_effort_default": {
+    "en": "{effort} (default)",
+    "zh": "{effort}（默认）"
+  },
+  "picker_effort_in_use": {
+    "en": "in use",
+    "zh": "本次使用"
+  },
+  "picker_agent_room": {
+    "en": "{agent} runs this room and chooses its own model and thinking",
+    "zh": "这个房间由 {agent} 接手，模型与思考档由它自己定"
+  },
+  "slash_effort_offered": {
+    "en": "levels this model offers: {levels}",
+    "zh": "这个模型提供的档位：{levels}"
+  },
+  "slash_effort_none_offered": {
+    "en": "this model has no thinking level to choose",
+    "zh": "这个模型没有可选的思考档"
+  },
+  "slash_quit": {
+    "en": "close the city; with runs going, asks whether to wait for them",
+    "zh": "关闭城市；有 run 在跑时先问要不要等它们"
+  },
+  "slash_approve": {
+    "en": "approve the request that is waiting, or the one named",
+    "zh": "批准正在等的请求，或点名的那一个"
+  },
+  "slash_deny": {
+    "en": "refuse the request that is waiting, or the one named",
+    "zh": "拒绝正在等的请求，或点名的那一个"
+  },
+  "slash_acp": {
+    "en": "open the ACP agents page, or add the agent this text describes",
+    "zh": "打开 ACP agent 页，或添加这段文字描述的 agent"
+  },
+  "acp_title": {
+    "en": "ACP agents",
+    "zh": "ACP agent"
+  },
+  "acp_about": {
+    "en": "Any harness that speaks the Agent Client Protocol can work in the city.",
+    "zh": "会说 Agent Client Protocol 的 harness 都能进入城市。"
+  },
+  "acp_room": {
+    "en": "current room: {room}",
+    "zh": "当前房间：{room}"
+  },
+  "acp_search": {
+    "en": "search the ACP registry, or paste a command line / JSON",
+    "zh": "搜索 ACP 注册表，或粘贴命令行 / JSON"
+  },
+  "acp_paste": {
+    "en": "paste",
+    "zh": "粘贴"
+  },
+  "acp_clear": {
+    "en": "clear",
+    "zh": "清空"
+  },
+  "acp_pasted": {
+    "en": "the pasted command",
+    "zh": "粘贴的命令"
+  },
+  "acp_detected": {
+    "en": "found on this computer",
+    "zh": "这台电脑上找到的"
+  },
+  "acp_detected_none": {
+    "en": "no ACP agent was found on PATH",
+    "zh": "PATH 上没有找到 ACP agent"
+  },
+  "acp_catalog": {
+    "en": "ACP registry",
+    "zh": "ACP 注册表"
+  },
+  "acp_catalog_snapshot": {
+    "en": "snapshot of {date}",
+    "zh": "{date} 的快照"
+  },
+  "acp_catalog_refresh": {
+    "en": "refresh",
+    "zh": "刷新"
+  },
+  "acp_catalog_refresh_note": {
+    "en": "asks the registry for its current list; the city asks nothing until you press this",
+    "zh": "向注册表取一次最新列表；不按这里，城市不会去问"
+  },
+  "acp_catalog_none": {
+    "en": "no agent in the registry matches",
+    "zh": "注册表里没有匹配的 agent"
+  },
+  "acp_added": {
+    "en": "added",
+    "zh": "已添加"
+  },
+  "acp_added_summary": {
+    "en": "added: {names}",
+    "zh": "已添加：{names}"
+  },
+  "acp_show": {
+    "en": "show {name}",
+    "zh": "展开 {name}"
+  },
+  "acp_hide": {
+    "en": "hide {name}",
+    "zh": "收起 {name}"
+  },
+  "acp_source": {
+    "en": "source",
+    "zh": "来源"
+  },
+  "acp_source_registry": {
+    "en": "ACP registry",
+    "zh": "ACP 注册表"
+  },
+  "acp_source_detected": {
+    "en": "detected here",
+    "zh": "在这台电脑上找到"
+  },
+  "acp_source_pasted": {
+    "en": "pasted",
+    "zh": "粘贴"
+  },
+  "acp_on_path": {
+    "en": "{program} on PATH",
+    "zh": "{program} 在 PATH 上"
+  },
+  "acp_version": {
+    "en": "version",
+    "zh": "版本"
+  },
+  "acp_version_unknown": {
+    "en": "unknown",
+    "zh": "未知"
+  },
+  "acp_pinned": {
+    "en": "pinned",
+    "zh": "固定"
+  },
+  "acp_unpinned": {
+    "en": "not pinned",
+    "zh": "不固定"
+  },
+  "acp_licence": {
+    "en": "licence",
+    "zh": "许可"
+  },
+  "acp_licence_proprietary": {
+    "en": "proprietary",
+    "zh": "专有"
+  },
+  "acp_licence_unstated": {
+    "en": "not stated",
+    "zh": "未写明"
+  },
+  "acp_env": {
+    "en": "environment variables",
+    "zh": "环境变量"
+  },
+  "acp_env_none": {
+    "en": "none",
+    "zh": "无"
+  },
+  "acp_login": {
+    "en": "sign-in",
+    "zh": "登录"
+  },
+  "acp_login_terminal": {
+    "en": "in a terminal",
+    "zh": "在终端"
+  },
+  "acp_login_agent": {
+    "en": "inside the agent",
+    "zh": "在 agent 里"
+  },
+  "acp_login_none": {
+    "en": "not needed",
+    "zh": "不需要"
+  },
+  "acp_consent": {
+    "en": "It runs with your account's permissions, including over this city.",
+    "zh": "它以你的账户权限运行，包括对这座城市。"
+  },
+  "acp_add_and_use": {
+    "en": "add and use here",
+    "zh": "添加并在此使用"
+  },
+  "acp_add_only": {
+    "en": "add only",
+    "zh": "只添加"
+  },
+  "acp_adding": {
+    "en": "adding…",
+    "zh": "正在添加…"
+  },
+  "acp_changed": {
+    "en": "This entry changed after it was shown. Read it again, then add it.",
+    "zh": "这个条目在展示之后变了。重新看一遍再添加。"
+  },
+  "acp_use_here": {
+    "en": "use in this room",
+    "zh": "在此房间使用"
+  },
+  "acp_in_use_here": {
+    "en": "in use in this room",
+    "zh": "此房间在用"
+  },
+  "acp_seated_in": {
+    "en": "in use in {rooms}",
+    "zh": "在 {rooms} 使用"
+  },
+  "acp_signed_in": {
+    "en": "signed in",
+    "zh": "已登录"
+  },
+  "acp_needs_login": {
+    "en": "needs sign-in",
+    "zh": "需要登录"
+  },
+  "acp_ready": {
+    "en": "ready",
+    "zh": "可用"
+  },
+  "acp_sign_in": {
+    "en": "sign in",
+    "zh": "登录"
+  },
+  "acp_sign_in_terminal": {
+    "en": "sign in in a terminal",
+    "zh": "在终端登录"
+  },
+  "acp_terminal_opened": {
+    "en": "A terminal is open, running {command}.",
+    "zh": "终端已打开，正在运行 {command}。"
+  },
+  "acp_browser_opened": {
+    "en": "The sign-in page is open in the browser.",
+    "zh": "登录页已在浏览器打开。"
+  },
+  "acp_console_handover": {
+    "en": "Sign in at the terminal where sprawling runs: {command}",
+    "zh": "到运行 sprawling 的终端里登录：{command}"
+  },
+  "acp_subscription_elsewhere": {
+    "en": "The city does not start a claude.ai subscription sign-in. Sign in inside Claude Code itself, or use a Console sign-in here.",
+    "zh": "城市不代为启动 claude.ai 订阅登录。请在 Claude Code 里自己登录，或在这里用 Console 登录。"
+  },
+  "acp_parse_refused": {
+    "en": "This is not a command line, an agent_servers block or an agent.json: {reason}",
+    "zh": "这不是命令行、agent_servers 块或 agent.json：{reason}"
+  },
+  "acp_parse_shell": {
+    "en": "A command line here cannot carry | & ; < or >. Write the program and its arguments only.",
+    "zh": "这里的命令行不能带 | & ; < 或 >。只写程序和它的参数。"
+  },
+  "err_e_auth_required": {
+    "en": "the agent asks you to sign in",
+    "zh": "这个 agent 要你先登录"
+  },
+  "recover_e_auth_required": {
+    "en": "Sign in with one of the methods the detail below names, on the ACP agents page or in a terminal, then send again.",
+    "zh": "用下面详情里列出的某种方式登录（在 ACP agent 页或终端里），然后再发一次。"
+  },
+  "pair_title": {
+    "en": "Pair this browser",
+    "zh": "配对这个浏览器"
+  },
+  "pair_where": {
+    "en": "The pairing code is in the terminal of the computer that runs sprawling.",
+    "zh": "配对码在运行 sprawling 的那台电脑的终端里。"
+  },
+  "pair_code": {
+    "en": "pairing code",
+    "zh": "配对码"
+  },
+  "pair_label": {
+    "en": "name for this browser",
+    "zh": "这个浏览器的名字"
+  },
+  "pair_label_note": {
+    "en": "shown in the city's list of paired browsers",
+    "zh": "显示在城市的已配对浏览器列表里"
+  },
+  "pair_action": {
+    "en": "pair",
+    "zh": "配对"
+  },
+  "pair_pairing": {
+    "en": "pairing…",
+    "zh": "正在配对…"
+  },
+  "pair_opening": {
+    "en": "opening the city…",
+    "zh": "正在打开城市…"
+  },
+  "pair_open_used": {
+    "en": "This link has been used. Enter the pairing code from the terminal instead.",
+    "zh": "这个链接已经用过。改为输入终端里的配对码。"
+  },
+  "pair_session_lost": {
+    "en": "The city no longer knows this browser. Pair it again.",
+    "zh": "城市已经不认这个浏览器了。重新配对。"
+  },
+  "err_e_pairing_refused": {
+    "en": "the pairing was refused",
+    "zh": "配对被拒绝了"
+  },
+  "recover_e_pairing_refused": {
+    "en": "The code was wrong, already used, or tried too often. Read the current code in the terminal where sprawling runs, wait a little after several wrong tries, and enter it again.",
+    "zh": "码不对、已用过，或试得太频繁。到运行 sprawling 的终端里看当前的码；连续输错几次后稍等一会儿，再输入一次。"
+  },
+  "devices_title": {
+    "en": "paired browsers",
+    "zh": "已配对的浏览器"
+  },
+  "devices_note": {
+    "en": "Each browser that paired with this city keeps its own key. Forgetting one ends its sessions, and it has to pair again.",
+    "zh": "每个与这座城市配对过的浏览器都持有自己的密钥。忘掉一个，它的会话随即结束，要重新配对才能再用。"
+  },
+  "devices_none": {
+    "en": "no browser is paired",
+    "zh": "还没有配对过的浏览器"
+  },
+  "devices_label": {
+    "en": "name",
+    "zh": "名字"
+  },
+  "devices_paired_at": {
+    "en": "paired",
+    "zh": "配对于"
+  },
+  "devices_last_seen": {
+    "en": "last seen",
+    "zh": "最近一次出现"
+  },
+  "devices_never_seen": {
+    "en": "not since pairing",
+    "zh": "配对后没再出现"
+  },
+  "devices_this": {
+    "en": "this browser",
+    "zh": "这个浏览器"
+  },
+  "devices_forget": {
+    "en": "forget {label}",
+    "zh": "忘掉 {label}"
+  },
+  "devices_forget_title": {
+    "en": "Forget {label}?",
+    "zh": "忘掉 {label}？"
+  },
+  "devices_forget_detail": {
+    "en": "Its sessions end now; it has to pair again to come back.",
+    "zh": "它的会话立刻结束；要再用就得重新配对。"
+  },
+  "devices_local_only": {
+    "en": "Only a browser on the computer that runs the city can forget a device.",
+    "zh": "只有运行城市的那台电脑上的浏览器才能忘掉设备。"
+  },
+  "quit_title": {
+    "en": "Close the city?",
+    "zh": "关闭城市？"
+  },
+  "quit_about": {
+    "en": "Closing ends every run and stops serving this page. Run sprawling in a terminal to start the city again.",
+    "zh": "关闭后每个 run 都会结束，这个页面也不再可用。要再用，在终端里运行 sprawling 启动城市。"
+  },
+  "quit_runs": {
+    "en": "runs still going: {n}",
+    "zh": "还有 {n} 个 run 在跑"
+  },
+  "quit_wait": {
+    "en": "wait for them, then close",
+    "zh": "等它们完成再关闭"
+  },
+  "quit_now": {
+    "en": "stop them now and close",
+    "zh": "立刻停下并关闭"
+  },
+  "quit_close": {
+    "en": "close the city",
+    "zh": "关闭城市"
+  },
+  "quit_cancel": {
+    "en": "cancel",
+    "zh": "取消"
+  },
+  "quit_local_only": {
+    "en": "Only a browser on the computer that runs the city can close it.",
+    "zh": "只有运行城市的那台电脑上的浏览器才能关闭城市。"
+  },
+  "close_draining": {
+    "en": "closing the city: waiting for runs still going: {n}",
+    "zh": "正在关闭城市：等还在跑的 {n} 个 run 完成"
+  },
+  "close_interrupting": {
+    "en": "closing the city: stopping every run",
+    "zh": "正在关闭城市：正在停下每个 run"
+  },
+  "close_done": {
+    "en": "The city is closed. Run sprawling in a terminal to start it again.",
+    "zh": "城市已关闭。在终端里运行 sprawling 即可再次启动城市。"
+  },
+  "close_elsewhere": {
+    "en": "the city is already being closed",
+    "zh": "城市已经在关闭了"
   }
 }
