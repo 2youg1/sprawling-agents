@@ -18,7 +18,7 @@
 //! question and a second answer to it would drift.
 
 use std::path::{Path, PathBuf};
-use std::process::{Child, Command, Stdio};
+use std::process::{Child, Stdio};
 
 use kernel::{AxCode, AxError};
 
@@ -125,7 +125,7 @@ impl Engine {
     /// the browser was found and then could not be run — a different
     /// fact from not having one, and the recovery says so.
     pub(crate) fn launch(plan: &LaunchPlan) -> Result<Engaged, AxError> {
-        let child = Command::new(&plan.program)
+        let child = child::command(&plan.program)
             .args(&plan.args)
             .stdin(Stdio::null())
             .stdout(Stdio::null())

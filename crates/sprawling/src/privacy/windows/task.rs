@@ -97,8 +97,7 @@ pub(in crate::privacy) fn write(path: &str, name: &str, switch: Switch) -> Resul
 fn asked(script: &str, path: &str, name: &str, switch: Option<&str>) -> Result<String, TaskFault> {
     use crate::doctor::asking::{self, Ended};
 
-    let mut command =
-        std::process::Command::new(super::powershell().map_err(TaskFault::Unavailable)?);
+    let mut command = child::command(super::powershell().map_err(TaskFault::Unavailable)?);
     command
         .args([
             "-NoLogo",

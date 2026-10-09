@@ -41,10 +41,18 @@ pub(crate) fn reveal(city_root: &Path, at: &Address) -> Result<(), AxError> {
         )
         .with_recovery("this city holds no such file; the page may be older than the tree"));
     }
-    manager(&path).status().map(drop).map_err(|err| {
-        AxError::failure(AxCode::ToolUnavailable, "reveal a path", err.to_string())
-            .with_recovery("this desktop has no file manager to hand a path to")
-    })
+    // The file manager outlives the city, so it is handed no terminal to
+    // write on after the city has gone (`crates/sprawling/Spec.lean` D73).
+    manager(&path)
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .map(drop)
+        .map_err(|err| {
+            AxError::failure(AxCode::ToolUnavailable, "reveal a path", err.to_string())
+                .with_recovery("this desktop has no file manager to hand a path to")
+        })
 }
 
 /// What selects a path in this platform's file manager.
@@ -61,7 +69,7 @@ pub(crate) fn reveal(city_root: &Path, at: &Address) -> Result<(), AxError> {
 fn manager(path: &Path) -> std::process::Command {
     match Platform::current() {
         Some(Platform::Windows) => {
-            let mut command = std::process::Command::new("explorer");
+            let mut command = child::command("explorer");
             // No space after the comma: `explorer` parses
             // `/select,<path>` as one argument and opens the person's
             // home directory when it is two.
@@ -69,12 +77,12 @@ fn manager(path: &Path) -> std::process::Command {
             command
         }
         Some(Platform::MacOs) => {
-            let mut command = std::process::Command::new("open");
+            let mut command = child::command("open");
             command.args(["-R", &path.display().to_string()]);
             command
         }
         Some(Platform::Linux) | None => {
-            let mut command = std::process::Command::new("xdg-open");
+            let mut command = child::command("xdg-open");
             command.arg(path.parent().unwrap_or(path).display().to_string());
             command
         }

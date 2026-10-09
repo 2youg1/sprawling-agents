@@ -67,14 +67,14 @@ impl ContainerRuntime {
     }
 
     fn command(&self) -> Command {
-        Command::new(&self.program)
+        child::command(&self.program)
     }
 
     /// Builds the daemon question for the host's bounded probe runner.
     /// Unlike `--version`, `info` contacts the server and tests access.
     #[must_use]
     pub fn info_command(engine: ContainerEngine, program: &Path) -> Command {
-        let mut command = Command::new(program);
+        let mut command = child::command(program);
         command.arg("info").arg("--format");
         match engine {
             ContainerEngine::Docker => command.arg("{{json .}}"),
@@ -184,7 +184,7 @@ impl ContainerRuntime {
                     "millicpu conversion failed",
                 )
             })?;
-        let mut command = Command::new(&self.program);
+        let mut command = child::command(&self.program);
         command
             .args(["create", "--pull", "never", "--name"])
             .arg(launch.name)

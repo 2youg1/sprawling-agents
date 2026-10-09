@@ -15,7 +15,6 @@
 //! reaches the city.
 
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 use super::asking::Ended;
 
@@ -94,7 +93,7 @@ fn first_line() -> impl FnMut(&str) -> bool + Send + 'static {
 /// Starts `gh api --hostname <host> user --jq .login` and waits for it.
 fn ask(gh: &Path, host: &str) -> Ended {
     super::asking::ask(
-        Command::new(gh)
+        child::command(gh)
             .args(["api", "--hostname", host, "user", "--jq", ".login"])
             .env("GH_PROMPT_DISABLED", "1"),
         PATIENCE,

@@ -155,7 +155,7 @@ impl ExecTool {
         args: &[String],
         placement: Placement,
     ) -> Result<ToolOutcome, AxError> {
-        let mut command = std::process::Command::new(path);
+        let mut command = child::command(path);
         command.current_dir(&self.setup.workdir).args(args);
         let what = if args.is_empty() {
             path.to_owned()

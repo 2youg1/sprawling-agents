@@ -52,7 +52,7 @@ pub(super) fn audit(request: &city::AuditRequest) -> city::AuditReport {
 
 pub(super) fn scan(program: &Path, path: &Path) -> Result<ScannerAudit, AuditFetchError> {
     let (version_code, version) = answered(
-        Command::new(program).arg("--version"),
+        child::command(program).arg("--version"),
         crate::doctor::PATIENCE,
     )?;
     if version_code != Some(0) {
@@ -61,7 +61,7 @@ pub(super) fn scan(program: &Path, path: &Path) -> Result<ScannerAudit, AuditFet
         )));
     }
     let (code, body) = answered(
-        Command::new(program)
+        child::command(program)
             .arg("scan")
             .arg(path)
             .args(["--no-llm", "--format", "json"]),

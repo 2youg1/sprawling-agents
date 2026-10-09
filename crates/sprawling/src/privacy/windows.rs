@@ -147,7 +147,7 @@ pub(crate) fn parses(script: &str) -> bool {
     let Ok(executable) = powershell() else {
         return false;
     };
-    let mut command = std::process::Command::new(executable);
+    let mut command = child::command(executable);
     command
         .args([
             "-NoLogo",

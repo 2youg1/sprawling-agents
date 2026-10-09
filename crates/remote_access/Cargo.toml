@@ -14,6 +14,8 @@ name = "remote_access"
 
 [dependencies]
 aws-lc-rs = { workspace = true }
+# A route's child process starts from `child::command` (`crates/remote_access/Spec.lean` D24).
+child = { workspace = true }
 kernel = { workspace = true }
 zeroize = { workspace = true }
 

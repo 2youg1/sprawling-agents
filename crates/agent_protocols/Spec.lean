@@ -349,6 +349,8 @@ D14 本城不向 harness 提供文件与终端：`initialize` 声明 `fs.readTex
 
 D15 请求行与 id 是本 crate 的契约，不是序列化器的：行由 `format!` 拼、id 由 `Rpc` 铸。被否：交给 `serde_json::to_string` 并让传输层编号，那样「单行」取决于一个库的换行策略，重放的键里混进一个每次都变的数。
 
+D16 MCP stdio 的 server 从 `child::command` 起（`crates/child/Spec.lean`）：Windows 上不附着在城的控制台上，Unix 上在自己的进程组里，`SPRAWLING_SECRET_*` 与 `SPRAWLING_PAIRING_TOKEN` 不进它的环境；`[[mcp]]` 里声明、经 vault 兑现的那几个名字在之后由 `env` 递给它，那是人交给这台 server 的值。其余的环境照旧继承，因为 server 要找得到 `PATH` 与家目录（`mcp::stdio::StdioServer::start`）。理由：stdio server 多半是 `npx` 拉下来的第三方包，继承整个环境就等于把城的全部密钥交给它的每一个传递依赖；附着在城的控制台上的进程能读屏上的配对码与人敲进 CLI 的键。被否：清空环境再放白名单——`[[mcp]]` 没有声明环境变量名的那一栏，一份白名单会让今天能起的 server 起不来，是一个配置面的变化而不是一处修补。钉住它的测试是 `mcp::stdio::tests::a_server_inherits_none_of_the_city_secret_keys`：测试进程带着一个秘密键把自己再起一次，那一次起的 server 读回自己的环境，那个键不在其中。
+
 **两对设计各有被否的一方**，写作 D4、D5，住在 `spec/Mcp/Tools.lean` 的 `floatAt` 与 `construct` 上方：浮点入参拒这一次调用而不是拒整个工具；confidential 楼在构造时就没有这件工具，而不是等 egress 门在调用时拒。
 
 **成本与模型体验**：工具名恒是 `{server}_{action}`，模型一眼看得出它在跟谁说话。浮点拒词报出 JSON 路径而不是「参数非法」，因为模型下一步要改的是那一个字段。工具自己报的错整段进 subject（4 KiB 以内，D1），模型读到的是 server 的原话与它给的恢复。

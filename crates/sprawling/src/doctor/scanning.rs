@@ -25,7 +25,6 @@
 //! module reads.
 
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 use super::Platform;
 use super::asking::{self, Ended};
@@ -137,7 +136,7 @@ pub(crate) fn read(platform: Option<Platform>, city: &Path) -> Scanning {
     }
     let city = crate::monitor::volume::resolved(city).unwrap_or_else(|| city.to_path_buf());
     let exclusions = asking::ask(
-        Command::new("powershell")
+        child::command("powershell")
             .args(["-NoProfile", "-NonInteractive", "-Command"])
             .arg(LIST_EXCLUSIONS),
         PATIENCE,
@@ -171,7 +170,7 @@ fn drive(city: &Path) -> Drive {
         };
     }
     let asked = asking::ask(
-        Command::new("fsutil").args(["devdrv", "query", volume.as_str()]),
+        child::command("fsutil").args(["devdrv", "query", volume.as_str()]),
         PATIENCE,
         |line: &str| line.trim().to_ascii_lowercase().starts_with("this is"),
     );

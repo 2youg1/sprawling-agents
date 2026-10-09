@@ -46,7 +46,7 @@ pub(super) fn wrap(wrapper: &Path, copy: &Path, command: &Command) -> Result<Com
     if command.get_program().is_empty() {
         return Err(denied("target program is empty".to_owned()));
     }
-    let mut wrapped = Command::new(wrapper);
+    let mut wrapped = child::command(wrapper);
     wrapped
         .env_clear()
         .current_dir(&canonical)
@@ -73,7 +73,7 @@ pub(super) fn wrap(wrapper: &Path, copy: &Path, command: &Command) -> Result<Com
 /// Checks this exact policy before a caller launches its target under it.
 /// Every invocation still carries the profile if permissions change after this probe.
 pub(super) fn probe(wrapper: &Path, copy: &Path) -> Result<(), AxError> {
-    let output = wrap(wrapper, copy, &Command::new("/usr/bin/true"))?
+    let output = wrap(wrapper, copy, &child::command("/usr/bin/true"))?
         .output()
         .map_err(|error| denied(format!("{}: {error}", wrapper.display())))?;
     if output.status.success() {

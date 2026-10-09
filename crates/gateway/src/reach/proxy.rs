@@ -14,10 +14,13 @@
 //! describe a path the request does not take, which is the one thing a
 //! person reading that report cannot check.
 //!
-//! The default takes an address on this machine off the proxy, because a
-//! proxy that intercepts loopback answers 502 for a local inference
-//! server, for an MCP server a person started themselves, and for the
-//! city's own enrolment door. That is a rule about the common machine
+//! The default takes an address on this machine or on its private network
+//! off the proxy, because a proxy that intercepts loopback answers 502 for
+//! a local inference server, for an MCP server a person started
+//! themselves, and for the city's own enrolment door, and a proxy handed
+//! a call to a model server on the local network reads the prompt in
+//! plain text on a path the call never needed (gateway D35). That is a
+//! rule about the common machine
 //! rather than a fact about every machine, so it is a setting with a
 //! default and not a constant: an organisation that audits every request
 //! through a relay on loopback sets `always`, and a machine whose
@@ -26,20 +29,67 @@
 
 use kernel::{Proxying, Through};
 
-/// Whether this base URL points at the machine the city runs on.
+/// Where an address is, as far as a call to it is concerned.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Locality {
+    /// The machine the city runs on: a loopback address, `localhost`, or
+    /// a name under `.localhost`.
+    Machine,
+    /// The private network this machine is on: an RFC 1918 or link-local
+    /// IPv4 address, a unique-local or link-local IPv6 address, or a name
+    /// under `.local` (mDNS) or `.home.arpa`.
+    Private,
+    /// Anywhere else, and a URL this cannot split.
+    Public,
+}
+
+/// Where this base URL points.
 ///
-/// One authority city-wide: the local adapter refuses a URL that is not
-/// local by this test, the proxy decision is made by this test, and the
-/// settings page reports "local" from this test, so the three can never
-/// mean three different things.
+/// One authority city-wide (gateway D35): the proxy decision reads it,
+/// and so does [`is_local`], which the local adapter, the settings page's
+/// "local" mark and the confidential building's rule read, so none of
+/// them can mean something different by "local". A name is judged by
+/// its spelling and never resolved: a lookup would make the answer
+/// depend on the network and send every endpoint's name to a resolver.
 #[must_use]
-pub fn is_local(base_url: &str) -> bool {
+pub(crate) fn locality(base_url: &str) -> Locality {
     let Some((host, _, _)) = super::split(base_url) else {
-        return false;
+        return Locality::Public;
     };
     match host.parse::<std::net::IpAddr>() {
-        Ok(address) => address.is_loopback(),
-        Err(_) => host == "localhost" || host.ends_with(".localhost"),
+        Ok(address) => locality_of(address.to_canonical()),
+        Err(_) => locality_of_name(&host.to_ascii_lowercase()),
+    }
+}
+
+/// Whether this base URL points at the machine the city runs on.
+#[must_use]
+pub fn is_local(base_url: &str) -> bool {
+    locality(base_url) == Locality::Machine
+}
+
+fn locality_of(address: std::net::IpAddr) -> Locality {
+    use std::net::IpAddr;
+    let private = match address {
+        _ if address.is_loopback() => return Locality::Machine,
+        IpAddr::V4(v4) => v4.is_private() || v4.is_link_local(),
+        IpAddr::V6(v6) => v6.is_unique_local() || v6.is_unicast_link_local(),
+    };
+    if private {
+        Locality::Private
+    } else {
+        Locality::Public
+    }
+}
+
+fn locality_of_name(host: &str) -> Locality {
+    let under = |domain: &str| host == domain || host.ends_with(&format!(".{domain}"));
+    if under("localhost") {
+        Locality::Machine
+    } else if under("local") || under("home.arpa") {
+        Locality::Private
+    } else {
+        Locality::Public
     }
 }
 
@@ -56,8 +106,13 @@ pub fn through(rule: Proxying, base_url: &str) -> Through {
     };
     match rule {
         Proxying::Never => Through::Disabled,
-        Proxying::ExceptLocal if is_local(base_url) => Through::LocalAddress,
-        Proxying::ExceptLocal | Proxying::Always => named_by_environment(&host, tls),
+        Proxying::ExceptLocal => match locality(base_url) {
+            // The private network is kept off the proxy with this machine
+            // (gateway D35); `Through` has one arm for both.
+            Locality::Machine | Locality::Private => Through::LocalAddress,
+            Locality::Public => named_by_environment(&host, tls),
+        },
+        Proxying::Always => named_by_environment(&host, tls),
     }
 }
 

@@ -46,7 +46,7 @@ const IO_BELOW_THE_CORE: [&str; 4] = ["-c", "2", "-n", "7"];
 /// backlog reports it; the `Result` is the Unix arm's.
 pub(super) fn one_level_down(mut command: Command, _shares: Shares) -> Result<Command, AxError> {
     use std::os::windows::process::CommandExt;
-    command.creation_flags(BELOW_NORMAL_PRIORITY_CLASS);
+    command.creation_flags(child::NO_WINDOW | BELOW_NORMAL_PRIORITY_CLASS);
     Ok(command)
 }
 
@@ -102,7 +102,7 @@ pub(super) fn require_executable(command: &Command) -> Result<(), AxError> {
 #[cfg(target_os = "linux")]
 fn start_below_the_core(_shares: Shares) -> Command {
     if is_executable_on_path(std::ffi::OsStr::new("ionice"), None) {
-        let mut both = Command::new("ionice");
+        let mut both = child::command("ionice");
         both.args(IO_BELOW_THE_CORE).arg("nice");
         both.args(["-n", NICENESS_BELOW_THE_CORE, "--"]);
         return both;
@@ -127,7 +127,7 @@ fn start_below_the_core(shares: Shares) -> Command {
         Shares::Cpu | Shares::CpuAndMemory { .. } => true,
     };
     if shared && is_executable_on_path(std::ffi::OsStr::new(TASKPOLICY), None) {
-        let mut both = Command::new(TASKPOLICY);
+        let mut both = child::command(TASKPOLICY);
         both.args(["-c", "utility", "nice"]);
         both.args(["-n", NICENESS_BELOW_THE_CORE, "--"]);
         return both;
@@ -145,7 +145,7 @@ fn start_below_the_core(_shares: Shares) -> Command {
 /// dash is started rather than read as an option of `nice`.
 #[cfg(unix)]
 fn nice_below_the_core() -> Command {
-    let mut nice = Command::new("nice");
+    let mut nice = child::command("nice");
     nice.args(["-n", NICENESS_BELOW_THE_CORE, "--"]);
     nice
 }

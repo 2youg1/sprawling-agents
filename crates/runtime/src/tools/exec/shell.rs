@@ -53,7 +53,7 @@ impl Shell {
                 program,
                 interpreter,
             } => {
-                let mut command = Command::new(program);
+                let mut command = child::command(program);
                 command.args(flags(*interpreter)).arg(text);
                 Ok((command, interpreter_name(program)))
             }
@@ -71,7 +71,7 @@ impl Shell {
                     Interpreter::System => ("/bin/sh", &["-c"][..]),
                     Interpreter::Pwsh => ("pwsh", flags(Interpreter::Pwsh)),
                 };
-                let mut command = Command::new(program);
+                let mut command = child::command(program);
                 command.args(arguments).arg(text);
                 Ok((command, interpreter_name(Path::new(program))))
             }

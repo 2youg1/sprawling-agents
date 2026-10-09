@@ -69,7 +69,7 @@ impl Guard {
             .map_err(|err| denied("keep container guardian ownership", err))?;
         let output = std::fs::File::create(ready)
             .map_err(|err| denied("prepare container guardian readiness", err))?;
-        let child = Command::new(harness)
+        let child = child::command(harness)
             .arg(ARGUMENT)
             .arg(ownership)
             .stdin(Stdio::piped())
@@ -216,7 +216,7 @@ fn run(args: &[String]) -> Result<(), AxError> {
     let request = read_command(&mut input);
     match request {
         Ok(answer) if answer == CREATE => {
-            let mut create = Command::new(&ownership.cleanup.program);
+            let mut create = child::command(&ownership.cleanup.program);
             create.args(&ownership.arguments);
             let created =
                 control::output(&mut create, control::Wait::Creation).and_then(|answer| {

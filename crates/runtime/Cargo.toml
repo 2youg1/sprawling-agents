@@ -16,6 +16,10 @@ name = "runtime"
 # An MCP image block carries its picture base64-encoded, and the
 # connector step decodes it once to store the bytes (8-27-10).
 base64.workspace = true
+# Every process exec starts is configured by `child::command`: off the
+# city's console, in a process group of its own, without the city's
+# secrets (`crates/runtime/spec/Tools/Exec.lean` D96).
+child = { workspace = true }
 kernel = { workspace = true }
 storage = { workspace = true }
 # A picture a tool answers with travels only if its sides are read from

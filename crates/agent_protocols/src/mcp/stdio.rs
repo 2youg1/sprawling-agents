@@ -69,7 +69,10 @@ impl StdioServer {
     ///
     /// `env` is added to what this process already has, name by name, so
     /// a server still finds the search path and the home directory it
-    /// needs. **A name handed to a child cannot be taken back**, which
+    /// needs; what it does not get is any key that holds one of the
+    /// city's own secrets, which `child::command` removes
+    /// (`crates/agent_protocols/Spec.lean` D16). **A name handed to a child
+    /// cannot be taken back**, which
     /// is why a credential arrives here already redeemed and exists as
     /// plaintext only inside this call.
     ///
@@ -82,7 +85,7 @@ impl StdioServer {
         env: &[Redeemed],
         cwd: &Path,
     ) -> Result<StdioServer, AxError> {
-        let mut child = std::process::Command::new(command)
+        let mut child = child::command(command)
             .args(args)
             .envs(env.iter().map(|pair| (pair.name(), pair.plaintext())))
             .current_dir(cwd)

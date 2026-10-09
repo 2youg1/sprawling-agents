@@ -188,7 +188,7 @@ fn two_handles_are_two_tools_talking_to_one_process() {
 #[test]
 fn what_a_building_writes_beside_a_server_reaches_the_child() {
     let dir = tempfile::tempdir().unwrap();
-    let (command, args) = reporting_its_environment();
+    let (command, args) = reporting_its_environment("SPRAWLING_TEST_KEY");
     let refuse_every_reference: gateway::SecretResolver =
         Box::new(|reference: &kernel::SecretRef| {
             Err(AxError::failure(
@@ -215,19 +215,20 @@ fn what_a_building_writes_beside_a_server_reaches_the_child() {
     );
 }
 
-/// A child that answers every message with the one variable it was
-/// started with.
-fn reporting_its_environment() -> (String, Vec<String>) {
+/// A child that answers every message with the value of the variable
+/// `name` in its own environment, empty when it has none.
+fn reporting_its_environment(name: &str) -> (String, Vec<String>) {
     if cfg!(windows) {
         (
             "powershell".to_owned(),
             vec![
                 "-NoProfile".to_owned(),
                 "-Command".to_owned(),
-                "while($l=[Console]::In.ReadLine()){Write-Output \
-                     ('{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"seen\":\"'\
-                     +$env:SPRAWLING_TEST_KEY+'\"}}')}"
-                    .to_owned(),
+                format!(
+                    "while($l=[Console]::In.ReadLine()){{Write-Output \
+                     ('{{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{{\"seen\":\"'\
+                     +$env:{name}+'\"}}}}')}}"
+                ),
             ],
         )
     } else {
@@ -235,11 +236,69 @@ fn reporting_its_environment() -> (String, Vec<String>) {
             "sh".to_owned(),
             vec![
                 "-c".to_owned(),
-                "while IFS= read -r l; do printf \
-                     '{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"seen\":\"%s\"}}\n' \
-                     \"$SPRAWLING_TEST_KEY\"; done"
-                    .to_owned(),
+                format!(
+                    "while IFS= read -r l; do printf \
+                     '{{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{{\"seen\":\"%s\"}}}}\n' \
+                     \"${name}\"; done"
+                ),
             ],
         )
     }
+}
+
+/// The name of the secret the test below plants: a key under the vault's
+/// prefix, so it is one of the city's secrets by the rule every child
+/// process is started under.
+const PLANTED: &str = "SPRAWLING_SECRET_PROBE_KEY";
+
+/// Found in the security scan: an MCP server inherited the city's whole
+/// environment, so every `SPRAWLING_SECRET_*` key the vault reads reached
+/// whatever package the server's command pulled in. A test cannot set a
+/// variable in its own process without `unsafe`, so it starts its own
+/// binary again with the key set, and that copy starts the server.
+#[test]
+fn a_server_inherits_none_of_the_city_secret_keys() {
+    match std::env::var(PLANTED) {
+        Ok(planted) => {
+            assert_eq!(
+                planted, "planted",
+                "the copy runs with the key it was given"
+            );
+            assert_eq!(seen_by_a_server(PLANTED), "");
+        }
+        Err(_) => {
+            let ran = std::process::Command::new(std::env::current_exe().unwrap())
+                .args([
+                    "--exact",
+                    "mcp::stdio::tests::a_server_inherits_none_of_the_city_secret_keys",
+                    "--nocapture",
+                ])
+                .env(PLANTED, "planted")
+                .output()
+                .unwrap();
+            let said = String::from_utf8_lossy(&ran.stdout);
+            assert!(
+                ran.status.success(),
+                "{said}{}",
+                String::from_utf8_lossy(&ran.stderr)
+            );
+            assert!(said.contains("1 passed"), "the copy ran no test: {said}");
+        }
+    }
+}
+
+/// What a server started by this process finds in `name`.
+fn seen_by_a_server(name: &str) -> String {
+    let dir = tempfile::tempdir().unwrap();
+    let (command, args) = reporting_its_environment(name);
+    let mut server = StdioServer::start(&command, &args, &[], dir.path()).unwrap();
+    let answer = server
+        .call("{\"id\":1}", crate::EXTERNAL_CALL_PATIENCE)
+        .unwrap();
+    crate::Rpc::read(&answer)
+        .unwrap()
+        .get("seen")
+        .and_then(serde_json::Value::as_str)
+        .unwrap()
+        .to_owned()
 }
