@@ -234,6 +234,11 @@ jobs:
           artifact-configuration-slug: ${{ vars.SIGNPATH_ARTIFACT_CONFIGURATION_SLUG }}
           github-artifact-id: ${{ steps.unsigned.outputs.artifact-id }}
           wait-for-completion: true
+          # The Foundation requires a person to approve each signing request, so
+          # this step waits on somebody reading their mail: ten minutes, the
+          # action's default, is a window a release can miss, and thirty stays
+          # inside the job's ninety.
+          wait-for-completion-timeout-in-seconds: 1800
           # Paired with `archive: false` above, and the reason the returned
           # artifact is one executable rather than a ZIP to unpack.
           skip-decompress: true
