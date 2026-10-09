@@ -20,11 +20,11 @@ release notes and their commits.
 
 ---
 
-## v0.0.11
+## v0.0.11-Alpha-261009
 
 **sprawling 0.0.11 signature**
 
-Alpha, not cut yet: the tag and its date are set when the release is cut. It records what landed after `v0.0.10-Alpha-261008`. The wire moves once, from WIRE_V 64 to 65, because frames changed shape in this release (`crates/wire/Spec.lean` D1): four local-only commands, three queries, the thinking offer and the model identity on each model, and `AgentLine`, which replaces the `harnesses` query and its `HarnessLine`. A city written by 0.0.10 opens unchanged, and the effort it stored in the Ledger, in `CONFIG.toml` and in git trailers keeps its meaning; 0.0.10 is not promised to read a Ledger that 0.0.11 has written, so keep the backup the [update guide](docs/getting-started.md#updating) asks for before updating.
+Alpha, cut on 2026-10-09 (UTC+8) as `v0.0.11-Alpha-261009`. The workspace manifest carries 0.0.11; `kernel::release::MATURITY` owns maturity, and the release workflow supplies the tag to a released binary. It records what landed after `v0.0.10-Alpha-261008`. The wire moves once, from WIRE_V 64 to 65, because frames changed shape in this release (`crates/wire/Spec.lean` D1): four local-only commands, three queries, the thinking offer and the model identity on each model, and `AgentLine`, which replaces the `harnesses` query and its `HarnessLine`. A city written by 0.0.10 opens unchanged, and the effort it stored in the Ledger, in `CONFIG.toml` and in git trailers keeps its meaning; 0.0.10 is not promised to read a Ledger that 0.0.11 has written, so keep the backup the [update guide](docs/getting-started.md#updating) asks for before updating.
 
 ### Behaviour changes
 
