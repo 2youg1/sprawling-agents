@@ -332,6 +332,7 @@ mod tests {
     /// observes the running process rather than just a job's limit record.
     #[cfg(windows)]
     #[test]
+    #[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
     fn a_run_child_reads_the_requested_affinity() {
         let available = desktop_ffi::cpu::thread_group().unwrap().mask;
         let mask = std::num::NonZeroUsize::new(
@@ -393,6 +394,7 @@ mod tests {
     /// joined the run's job.
     #[cfg(windows)]
     #[test]
+    #[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
     fn a_command_refused_at_the_ceiling_reports_the_hit() {
         let limit = std::num::NonZeroU64::new(512 << 20).unwrap();
         let owner = kernel::RunId::from_bytes([13; 16]);
@@ -466,6 +468,7 @@ mod tests {
     /// The same value seam compiles elsewhere without claiming affinity.
     #[cfg(not(windows))]
     #[test]
+    #[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
     fn a_run_affinity_request_elsewhere_keeps_the_command_result() {
         let backlog = Backlog::with_window(crate::PollBudget::new(1, 1)).with_affinity(
             super::RunAffinity::Mask(std::num::NonZeroUsize::new(1).unwrap()),
@@ -504,6 +507,7 @@ mod tests {
     /// failed start or dropping the independently accepted CPU share.
     #[cfg(windows)]
     #[test]
+    #[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
     fn a_refused_run_affinity_keeps_the_command_result_and_share() {
         let available = usize::try_from(desktop_ffi::cpu::thread_group().unwrap().mask).unwrap();
         if available == usize::MAX {

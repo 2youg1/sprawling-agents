@@ -231,6 +231,7 @@ impl<'a> Camera<'a> {
 
     /// The engine in one window and one colour scheme, with its own
     /// profile, before the page.
+    #[expect(clippy::disallowed_methods, reason = "developer tool (child D4)")]
     fn engine(&self, frame: Frame, scheme: u8, profile: &Path) -> Command {
         let mut command = Command::new(self.browser);
         command

@@ -57,6 +57,7 @@ fn two_members_of_one_backlog_name_different_directories() {
 }
 
 /// A command that outlives the window by `seconds`, started for `owner`.
+#[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
 fn a_background_command(backlog: &Backlog, owner: kernel::RunId, seconds: u8) {
     let mut slow = if cfg!(windows) {
         let mut command = std::process::Command::new("ping");
@@ -119,6 +120,7 @@ fn a_release_terminates_what_the_ended_run_left_running() {
 /// runs, in pieces no larger than one poll reads, so a page can show a
 /// build's first line before the build is handed to the background.
 #[test]
+#[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
 fn a_watched_command_hands_its_output_to_the_sink_while_it_runs() {
     let window = crate::PollBudget::new(40, 10);
     let pieces = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
@@ -167,6 +169,7 @@ fn a_watched_command_hands_its_output_to_the_sink_while_it_runs() {
 /// Past its window, a command's output keeps reaching the sink through
 /// its own run's harvest, from where the window stopped reading.
 #[test]
+#[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
 fn a_backgrounded_command_keeps_reaching_the_sink_through_harvest() {
     let pieces = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
     let seen = pieces.clone();
@@ -221,6 +224,7 @@ fn a_backgrounded_command_keeps_reaching_the_sink_through_harvest() {
 /// follows a command into what it starts, so `cmd /C ping` is two
 /// processes of one run, and no command is read as itself only.
 #[test]
+#[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
 fn a_run_owns_the_processes_its_commands_started() {
     let backlog = Backlog::with_window(crate::PollBudget::new(1, 1));
     let (mine, other) = (

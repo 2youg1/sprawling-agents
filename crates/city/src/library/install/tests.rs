@@ -63,6 +63,7 @@ fn counted() -> (
 /// privilege: Windows gets a junction, which `symlink_metadata` reports
 /// through the same name-surrogate predicate a symlink is reported by.
 #[cfg(windows)]
+#[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
 fn make_link(link: &Path, target: &Path) {
     let made = std::process::Command::new("cmd")
         .args(["/c", "mklink", "/J"])

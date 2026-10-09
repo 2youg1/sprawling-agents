@@ -74,6 +74,7 @@ fn build_and_hash(root: &Path, full_clean_first: bool) -> Result<String, XtaskEr
     Ok(kernel::B3Hash::digest(&bytes).to_string())
 }
 
+#[expect(clippy::disallowed_methods, reason = "developer tool (child D4)")]
 fn drive(root: &Path, args: &[&str]) -> Result<(), XtaskError> {
     let status = Command::new("cargo")
         .args(args)

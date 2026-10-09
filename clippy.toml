@@ -22,4 +22,8 @@ disallowed-methods = [
     { path = "reqwest::Client::builder", reason = "build clients through gateway::client_for", allow-invalid = true },
     { path = "reqwest::ClientBuilder::new", reason = "build clients through gateway::client_for", allow-invalid = true },
     { path = "rustls::crypto::CryptoProvider::install_default", reason = "the one provider is installed by gateway::reach::tls", allow-invalid = true },
+    # Every child process of the city starts from `child::command`
+    # (`crates/child/Spec.lean` D4); a spawn point that is not the city's
+    # child says which kind it is in its own `#[expect(..., reason = "...")]`.
+    { path = "std::process::Command::new", reason = "start a child process through child::command, which detaches it from the city's console and removes the city's secrets from its environment" },
 ]

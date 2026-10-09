@@ -19,6 +19,7 @@ const RULING: &str = "Verdict: user-approved";
 ///
 /// # Errors
 /// When git cannot be started or refuses the range.
+#[expect(clippy::disallowed_methods, reason = "developer tool (child D4)")]
 pub(crate) fn check(root: &Path, range: &str) -> Result<Vec<Violation>, XtaskError> {
     let cmd = format!("git log --no-merges {range}");
     let output = Command::new("git")

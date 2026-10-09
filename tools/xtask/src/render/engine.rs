@@ -140,6 +140,7 @@ pub(super) struct Measured {
     pub(super) reported: Reported,
 }
 
+#[expect(clippy::disallowed_methods, reason = "developer tool (child D4)")]
 pub(super) fn measure(opening: &Opening, pass: &Pass) -> Result<Measured, XtaskError> {
     let Opening {
         root,

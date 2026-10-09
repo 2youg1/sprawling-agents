@@ -191,6 +191,7 @@ fn a_refused_cleanup_keeps_the_identity_and_copy_until_retry() {
 #[cfg(test)]
 #[test]
 #[ignore = "requires a disposable Linux daemon and a prepared immutable image with python3 and /bin/sh"]
+#[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
 fn a_real_daemon_executes_and_cleans_the_production_container() {
     let program = PathBuf::from(std::env::var("SPRAWLING_CONTAINER_TEST_PROGRAM").unwrap());
     let engine = match std::env::var("SPRAWLING_CONTAINER_TEST_ENGINE")
@@ -479,6 +480,7 @@ fn guardian_parent_process() {
 
 #[cfg(unix)]
 #[test]
+#[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
 fn guardian_eof_waits_for_late_create_and_reaps_its_client() {
     use std::process::{Command, Stdio};
 
@@ -575,6 +577,7 @@ fn wait_for_fixture(path: &std::path::Path) {
 
 #[cfg(unix)]
 #[test]
+#[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
 fn guardian_timeout_retains_the_member_until_harvest() {
     use std::process::Command;
     use std::time::Duration;

@@ -26,6 +26,7 @@ const RUN: RunId = RunId::CITY;
 /// A program every supported host has, which does not stop on its own
 /// and starts no grandchild — so terminating it terminates the whole of
 /// what was started.
+#[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
 fn never_ends() -> Command {
     let mut command = if cfg!(windows) {
         let mut command = Command::new("ping");
@@ -40,6 +41,7 @@ fn never_ends() -> Command {
     command
 }
 
+#[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
 fn finishes_now(code: i32) -> Command {
     let mut command = if cfg!(windows) {
         let mut command = Command::new("cmd");
@@ -140,6 +142,7 @@ fn a_command_that_outlives_the_window_keeps_running_where_halt_can_reach_it() {
 /// nobody: another run's harvest lets it go once it stops, and never
 /// reads its output back to that other run.
 #[test]
+#[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
 fn a_released_command_is_let_go_without_reaching_another_run() {
     let backlog = Backlog::with_window(runtime::PollBudget::new(1, 1));
     let addr = Address::parse("vault/room1").unwrap();

@@ -21,6 +21,7 @@ fn native_tool(source: &std::path::Path, scratch: &std::path::Path, backlog: Bac
     ))
 }
 
+#[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
 fn invoke_python(tool: &ExecTool, script: &str, args: &[String]) -> Value {
     let python = Command::new("/usr/bin/xcrun")
         .args(["--find", "python3"])
@@ -83,6 +84,7 @@ fn native_macos_exec_writes_only_the_copy_and_preserves_output_and_exit() {
 }
 
 #[test]
+#[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
 fn native_macos_exec_rejects_absolute_and_new_symlink_escape_writes() {
     let source = tempfile::tempdir().unwrap();
     let outside = tempfile::tempdir().unwrap();
@@ -121,6 +123,7 @@ fn native_macos_exec_rejects_absolute_and_new_symlink_escape_writes() {
 }
 
 #[test]
+#[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
 fn native_macos_exec_denies_tcp_udp_and_descendant_network_with_successful_controls() {
     let source = tempfile::tempdir().unwrap();
     let scratch = tempfile::tempdir().unwrap();

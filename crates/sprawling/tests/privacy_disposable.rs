@@ -124,6 +124,7 @@ impl Cli {
         }
     }
 
+    #[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
     fn run(&self, args: &[&str]) -> Answer {
         // boundary-ok: the elevated child that writes machine scope is this executable, so the production write path runs only through the built binary
         let output = Command::new(env!("CARGO_BIN_EXE_sprawling"))
@@ -204,6 +205,7 @@ fn done(answer: &Answer) -> Value {
 }
 
 /// What the witness reads now, as `reg.exe` or `Get-ScheduledTask` says it.
+#[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
 fn witnessed(witness: &Witness) -> String {
     match witness.place {
         Place::Registry { key, name, .. } => {
@@ -230,6 +232,7 @@ fn witnessed(witness: &Witness) -> String {
 }
 
 /// Puts the witness to `value` (`None` deletes it) behind the product's back.
+#[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
 fn set_outside(witness: &Witness, value: Option<&str>) {
     match (&witness.place, value) {
         (Place::Registry { key, name, kind }, Some(data)) => run_tool(
@@ -257,11 +260,13 @@ fn set_outside(witness: &Witness, value: Option<&str>) {
     }
 }
 
+#[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
 fn run_tool(program: &str, args: &[&str]) {
     let status = Command::new(program).args(args).status().unwrap();
     assert!(status.success(), "{program} {args:?} failed");
 }
 
+#[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
 fn powershell(script: &str) -> String {
     let output = Command::new("powershell")
         .args([

@@ -113,6 +113,7 @@ fn render(what: &str, pid: u32, reading: &Reading) -> String {
 
 /// Serves the fixture city on loopback, waits for it to accept, lets it
 /// settle, reads it, and stops it - whichever of those fails.
+#[expect(clippy::disallowed_methods, reason = "developer tool (child D4)")]
 fn serve_and_measure(root: &Path, fixture: &Fixture) -> Result<String, XtaskError> {
     let binary = binary_path(root, &ReleaseTarget::Host).ok_or_else(|| XtaskError::Cmd {
         cmd: "mem".to_owned(),
@@ -160,6 +161,7 @@ fn serve_and_measure(root: &Path, fixture: &Fixture) -> Result<String, XtaskErro
     Ok(render(&what, pid, &reading))
 }
 
+#[expect(clippy::disallowed_methods, reason = "developer tool (child D4)")]
 fn raise(binary: &Path, city: &Path) -> Result<(), XtaskError> {
     let out = Command::new(binary)
         .arg("init")
@@ -325,6 +327,7 @@ fn parse(value: &str, program: &str) -> Result<u64, XtaskError> {
 }
 
 #[cfg(any(target_os = "macos", target_os = "windows"))]
+#[expect(clippy::disallowed_methods, reason = "developer tool (child D4)")]
 fn capture(program: &str, args: &[&str]) -> Result<String, XtaskError> {
     let out = Command::new(program)
         .args(args)

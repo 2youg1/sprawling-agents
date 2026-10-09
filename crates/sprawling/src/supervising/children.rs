@@ -123,6 +123,10 @@ fn lifted() -> bool {
 }
 
 /// Runs one child to its end and reads its exit as served or failed.
+#[expect(
+    clippy::disallowed_methods,
+    reason = "the supervising parent's child is the city itself and keeps this console on purpose (child §3)"
+)]
 fn run(exe: &Path, args: &[String]) -> Result<Result<(), AxError>, AxError> {
     let status = Command::new(exe).args(args).status().map_err(|err| {
         AxError::failure(

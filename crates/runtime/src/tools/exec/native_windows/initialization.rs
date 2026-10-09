@@ -10,6 +10,7 @@ use kernel::{Address, RunId};
 
 #[test]
 #[ignore = "writes AppContainer profiles and disposable ACLs; explicit Windows Actions acceptance only"]
+#[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
 fn native_windows_disposable_pwsh_initializes_network_types() {
     assert_eq!(std::env::var("SPRAWLING_DISPOSABLE_NATIVE").unwrap(), "1");
     let copy = tempfile::tempdir().unwrap();
@@ -62,6 +63,7 @@ fn native_windows_disposable_pwsh_initializes_network_types() {
     }
 }
 
+#[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
 fn diagnose_framework(backlog: &crate::Backlog, directory: &Path) {
     let source = directory.join("framework.cs");
     let exe = directory.join("framework.exe");

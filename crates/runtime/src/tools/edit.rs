@@ -386,4 +386,8 @@ fn common_suffix(old: &[&str], new: &[&str], prefix: usize) -> usize {
     clippy::indexing_slicing,
     reason = "test code"
 )]
+#[cfg_attr(
+    windows,
+    expect(clippy::disallowed_methods, reason = "test fixture (child D4)")
+)]
 mod tests;

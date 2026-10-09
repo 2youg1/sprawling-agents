@@ -19,6 +19,7 @@ fn only_lab() -> ReadBound {
     })
 }
 
+#[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
 fn git(root: &Path, args: &[&str]) -> String {
     let out = std::process::Command::new("git")
         .args([

@@ -237,6 +237,7 @@ mod tests {
     /// counts that refusal once. The child waits for the gate file, so
     /// it allocates only after it joined the job.
     #[test]
+    #[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
     fn a_watched_job_counts_a_refusal_at_its_memory_limit() {
         use std::os::windows::io::AsRawHandle;
         let job = win32job::Job::create().unwrap();

@@ -29,6 +29,7 @@ use crate::report::XtaskError;
 /// expect.
 pub(crate) const SBOM: &str = "target/sbom.cdx.json";
 
+#[expect(clippy::disallowed_methods, reason = "developer tool (child D4)")]
 pub(crate) fn run(root: &Path) -> Result<String, XtaskError> {
     let out = Command::new("cargo")
         .args(["metadata", "--format-version", "1", "--locked"])

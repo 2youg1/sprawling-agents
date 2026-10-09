@@ -27,6 +27,10 @@ pub const NO_WINDOW: u32 = 0x0800_0000;
 /// secrets. A key the caller sets with `env` afterwards is passed on: that
 /// is a value the caller chose to hand over.
 #[must_use]
+#[expect(
+    clippy::disallowed_methods,
+    reason = "the one constructor every other spawn point is sent to"
+)]
 pub fn command(program: impl AsRef<OsStr>) -> Command {
     let mut built = Command::new(program);
     detach(&mut built);

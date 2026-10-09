@@ -161,6 +161,7 @@ fn native_macos_tool_release_reaps_the_owned_primary_and_copy() {
     assert_eq!(std::fs::read_dir(scratch.path()).unwrap().count(), 0);
 }
 
+#[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
 fn assert_primary_reaped(pid: u32) {
     assert!(
         !Command::new("/bin/kill")
@@ -174,6 +175,7 @@ fn assert_primary_reaped(pid: u32) {
 }
 
 #[test]
+#[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
 fn native_macos_release_leaves_another_owners_background_command_alive() {
     let source = tempfile::tempdir().unwrap();
     let scratch = tempfile::tempdir().unwrap();

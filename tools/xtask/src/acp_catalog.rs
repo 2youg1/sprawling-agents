@@ -36,6 +36,7 @@ const KEPT: [&str; 5] = ["distribution", "id", "license", "name", "version"];
 /// out until the city installs them.
 const KEPT_BINARY: [&str; 3] = ["args", "cmd", "env"];
 
+#[expect(clippy::disallowed_methods, reason = "developer tool (child D4)")]
 pub(crate) fn write(root: &Path) -> Result<String, XtaskError> {
     let fetched = Command::new("curl")
         .args(["--silent", "--show-error", "--fail", "--include", INDEX])

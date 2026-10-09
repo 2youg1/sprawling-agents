@@ -89,6 +89,7 @@ fn rendered() -> String {
 }
 
 /// Refuses a missing `zig`, or one of another version than the pin.
+#[expect(clippy::disallowed_methods, reason = "build script (child D4)")]
 fn pinned_zig(pinned: &str) -> Result<(), String> {
     let install = format!(
         "install Zig {pinned} (`winget install --id zig.zig -e --version {pinned}`), which \
@@ -128,6 +129,7 @@ fn target() -> Result<(String, String), String> {
 /// `zig build-lib` of `zig/leaf.zig`. `ReleaseSafe` keeps every bounds
 /// and overflow check of the leaf in the shipped binary, where a failed
 /// one traps.
+#[expect(clippy::disallowed_methods, reason = "build script (child D4)")]
 fn compiled(here: &Path, out: &Path, triple: &str, file: &str) -> Result<(), String> {
     let built = Command::new("zig")
         .current_dir(here)

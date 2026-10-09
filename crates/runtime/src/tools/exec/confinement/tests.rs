@@ -105,6 +105,7 @@ fn every_sandbox_arm_states_what_it_does_not_hold() {
 /// bounding it, and past it the copy refuses by name rather than
 /// running until the process dies.
 #[test]
+#[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
 fn a_sandbox_refuses_a_tree_deeper_than_its_walk_can_end() {
     let source = tempfile::tempdir().unwrap();
     let mut path = source.path().to_path_buf();
@@ -143,6 +144,7 @@ fn source_tree(files: u64) -> tempfile::TempDir {
 /// the whole tree again. Judged at two sizes: a copy made afresh would
 /// create as many files as the tree holds.
 #[test]
+#[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
 fn a_sandbox_copy_is_synced_rather_than_made_again() {
     for files in [32, 64] {
         let scratch = tempfile::tempdir().unwrap();
@@ -221,6 +223,7 @@ fn a_sandbox_copy_is_synced_rather_than_made_again() {
 /// copy goes when the tool does: a scratch root that grew one tree per
 /// command would be a leak nothing reports.
 #[test]
+#[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
 fn a_sandbox_copy_goes_with_the_tool() {
     let scratch = tempfile::tempdir().unwrap();
     let source = source_tree(2);
@@ -249,6 +252,7 @@ fn a_sandbox_copy_goes_with_the_tool() {
     clippy::permissions_set_readonly_false,
     reason = "the working directory's file is changed between two commands"
 )]
+#[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
 fn a_read_only_file_is_synced_like_any_other() {
     let scratch = tempfile::tempdir().unwrap();
     let source = source_tree(1);
@@ -286,6 +290,7 @@ fn a_read_only_file_is_synced_like_any_other() {
 
 #[cfg(target_os = "linux")]
 #[test]
+#[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
 fn a_namespaced_command_requires_a_user_namespace() {
     let source = tempfile::tempdir().unwrap();
     let scratch = tempfile::tempdir().unwrap();
@@ -308,6 +313,7 @@ fn a_namespaced_command_requires_a_user_namespace() {
 
 #[cfg(target_os = "linux")]
 #[test]
+#[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
 fn a_namespace_setup_failure_refuses_before_copying() {
     let source = tempfile::tempdir().unwrap();
     let scratch = tempfile::tempdir().unwrap();
