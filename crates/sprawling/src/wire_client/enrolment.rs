@@ -55,7 +55,7 @@ pub(crate) fn enrol(at: &str, realm: &str, name: &str, value: &str) -> Result<St
     // `/enroll` asks for a credential like every door: the city's key
     // from its key file on this machine.
     let mut request = client.post(format!("http://{at}/enroll")).json(&body);
-    if let Some(key) = credential(at, None) {
+    if let Some(key) = credential(at, None)? {
         request = request.bearer_auth(key);
     }
     let answer = request

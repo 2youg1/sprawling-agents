@@ -40,7 +40,8 @@ const REDRAW: &str = "\u{1b}[H\u{1b}[2J";
 /// opening frames; `Unheard::Broken` when a frame breaks mid-read,
 /// writing to stdout fails, or this process cannot start the runtime.
 pub(crate) fn top(at: &str, token: Option<&str>, audience: Audience) -> Result<(), Unheard> {
-    let greeting = serde_json::to_string(&hello(credential(at, token).as_deref()))
+    let key = credential(at, token).map_err(Unheard::Unkeyed)?;
+    let greeting = serde_json::to_string(&hello(key.as_deref()))
         .map_err(|err| Unheard::Broken(malformed("encode the greeting", &err.to_string())))?;
     let watch = serde_json::to_string(&wire::ClientFrame::Monitor(wire::Monitoring::Watch))
         .map_err(|err| Unheard::Broken(malformed("encode the watch frame", &err.to_string())))?;

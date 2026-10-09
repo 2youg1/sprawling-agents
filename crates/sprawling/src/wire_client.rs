@@ -49,6 +49,9 @@ pub(crate) struct Listen {
 pub(crate) enum Unheard {
     /// The frame is not one this wire can carry; nothing was sent.
     Unreadable(AxError),
+    /// `--at` names another machine and no `--token` was given: this
+    /// machine's key file does not answer for it, so nothing was sent.
+    Unkeyed(AxError),
     /// Nothing at the address completed the greeting, so no city heard
     /// the frame.
     NoCity(AxError),
@@ -57,24 +60,59 @@ pub(crate) enum Unheard {
     Broken(AxError),
 }
 
+/// Where `--at` points, as far as this machine's key file is concerned
+/// (`crates/sprawling/spec/WireClient.lean`).
+#[derive(Debug, PartialEq, Eq)]
+enum Reach {
+    /// A loopback literal or `localhost`, on this port: the key file of
+    /// the city at that port may answer.
+    ThisMachine(u16),
+    /// This machine, with no port this client can read, so no key file
+    /// names it.
+    Portless,
+    /// Any other host. Its key is not this machine's to hand over.
+    Elsewhere,
+}
+
+/// Reads the host and port of `at`.
+fn reach(at: &str) -> Reach {
+    at.rsplit_once(':')
+        .and_then(|(_, port)| port.parse::<u16>().ok())
+        .map_or(Reach::Portless, Reach::ThisMachine)
+}
+
 /// The credential a call presents: the token given with `--token`, or
-/// else the key the city at `at` keeps in its key file on this machine
+/// else, for a city on this machine, the key it keeps in its key file
 /// (`crates/sprawling/spec/Keying.lean` §8-22). A key file that cannot be
 /// read is said once and the greeting goes without; the city's refusal
 /// then says how to get in.
-fn credential(at: &str, given: Option<&str>) -> Option<String> {
+///
+/// # Errors
+/// `CredentialMissing` when `at` names another machine and no token was
+/// given: that city's key is not in a file here, and this machine's key
+/// must not travel to it.
+fn credential(at: &str, given: Option<&str>) -> Result<Option<String>, AxError> {
     if let Some(given) = given {
-        return Some(given.to_owned());
+        return Ok(Some(given.to_owned()));
     }
-    let port = at
-        .rsplit_once(':')
-        .and_then(|(_, port)| port.parse::<u16>().ok())?;
-    match sprawling::serving::key_file::read_key(port) {
-        Ok(key) => key,
-        Err(unread) => {
-            eprintln!("{}: {}", unread.action(), unread.recovery());
-            None
-        }
+    match reach(at) {
+        Reach::ThisMachine(port) => Ok(match sprawling::serving::key_file::read_key(port) {
+            Ok(key) => key,
+            Err(unread) => {
+                eprintln!("{}: {}", unread.action(), unread.recovery());
+                None
+            }
+        }),
+        Reach::Portless => Ok(None),
+        Reach::Elsewhere => Err(AxError::failure(
+            AxCode::CredentialMissing,
+            "find a credential for the city",
+            format!("{at} is not on this machine, and no --token was given"),
+        )
+        .with_recovery(
+            "pass --token <key>: the city's pairing token, or the key its banner showed; \
+             this machine's key file answers only for 127.0.0.1, [::1] or localhost",
+        )),
     }
 }
 
@@ -148,7 +186,8 @@ pub(crate) fn send(
     let body = serde_json::to_string(outgoing).map_err(|err| {
         Unheard::Unreadable(malformed("encode the frame to send", &err.to_string()))
     })?;
-    let greeting = serde_json::to_string(&hello(credential(at, token).as_deref()))
+    let key = credential(at, token).map_err(Unheard::Unkeyed)?;
+    let greeting = serde_json::to_string(&hello(key.as_deref()))
         .map_err(|err| Unheard::Broken(malformed("encode the greeting", &err.to_string())))?;
 
     let runtime = tokio::runtime::Builder::new_current_thread()
@@ -298,7 +337,9 @@ fn report(text: &str, reply: &Reply, echo: &Echo, heard: &mut Heard) {
     reason = "test code: how long a call waited is read off the wall clock"
 )]
 mod tests {
-    use super::{Duration, Listen, Message, SinkExt, Spoken, StreamExt, Until, hello};
+    use super::{
+        Duration, Listen, Message, Reach, SinkExt, Spoken, StreamExt, Until, hello, reach,
+    };
     use kernel::{EventDraft, EventKind, EventRecord, GENESIS_PREV, Payload, RunId, Seq, TimeMs};
 
     /// A city double at a fresh port: it answers the greeting with a
@@ -380,6 +421,39 @@ mod tests {
     /// exit code read a refusal it never received as a success - which
     /// the out-of-tree checker measured against a real city
     /// (`tools/adversary/Spec.lean` section 4).
+    /// The key file answers only for a host on this machine: a loopback
+    /// literal, with or without brackets, or `localhost` in any case. A
+    /// name that only starts like one is another machine, and so is a
+    /// LAN address or the unspecified address. A regression: the key of
+    /// the city at a port here once went to whatever host `--at` named.
+    #[test]
+    fn only_a_host_on_this_machine_is_answered_from_the_key_file() {
+        for at in [
+            "127.0.0.1:8787",
+            "127.8.9.1:8787",
+            "[::1]:8787",
+            "localhost:8787",
+            "LocalHost:8787",
+        ] {
+            assert_eq!(reach(at), Reach::ThisMachine(8787), "{at}");
+        }
+        for at in [
+            "other-host:8787",
+            "192.168.1.5:8787",
+            "10.0.0.2:8787",
+            "0.0.0.0:8787",
+            "example.com:8787",
+            "localhost.example.com:8787",
+            "127.0.0.1.example.com:8787",
+            "[2001:db8::1]:8787",
+        ] {
+            assert_eq!(reach(at), Reach::Elsewhere, "{at}");
+        }
+        for at in ["127.0.0.1", "localhost:", "localhost:http"] {
+            assert_eq!(reach(at), Reach::Portless, "{at}");
+        }
+    }
+
     #[test]
     fn a_city_that_says_nothing_inside_the_window_is_not_a_success() {
         let (at, scripted) = city_saying(Vec::new(), Duration::from_millis(1_500));
