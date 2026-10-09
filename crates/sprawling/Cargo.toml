@@ -36,6 +36,9 @@ agent_protocols = { workspace = true }
 # port (crates/remote_access/Spec.lean §8-10).
 axum = { workspace = true, features = ["ws"] }
 crossterm = { workspace = true }
+# The one line a program status report carries is base64 of UTF-8, as
+# the protocol requires (`crates/sprawling/spec/Console/ProgramStatus.lean`).
+base64 = { workspace = true }
 futures-util = { workspace = true }
 getrandom = { workspace = true }
 reqwest = { workspace = true }
