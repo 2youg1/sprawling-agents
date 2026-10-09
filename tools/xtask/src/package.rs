@@ -16,7 +16,11 @@
 //! What the archive carries is `contents`; this module is the packing.
 //!
 //! Entry timestamps are fixed rather than taken from the file system, so
-//! two builds of one tree produce the same archive bytes.
+//! two builds of one tree produce the same archive bytes. The Windows
+//! archive a release publishes is the exception, and deliberately so:
+//! `release.yml` replaces the binary with the one the signing request
+//! returned before this packing runs, so that archive differs from a local
+//! rebuild of the same tree only in the signature it carries.
 
 use std::io::Write as _;
 use std::path::{Path, PathBuf};

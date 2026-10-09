@@ -169,7 +169,7 @@ jobs:
         with:
           shared-key: release
           save-if: ${{ github.ref == 'refs/heads/main' }}
-      - name: build the client, the binary, and the archive
+      - name: build the client and the binary
         shell: bash
         env:
           RELEASE_EVENT: ${{ github.event_name }}
@@ -195,9 +195,77 @@ jobs:
           # same command, and `wait` reports it too.
           cargo build --locked -p xtask > target/release-evidence/xtask-build.log 2>&1 &
           xtask_build=$!
-          just package "$ARCHIVE_TARGET"
+          just dist "$ARCHIVE_TARGET"
           wait "$xtask_build"
-          echo "package_seconds=$((SECONDS - start))" > target/release-evidence/timing.txt
+          echo "build_seconds=$((SECONDS - start))" > target/release-evidence/timing.txt
+      # Signing sits between the build and the packing, on the one row whose
+      # artifact a person's operating system judges before running it: the
+      # certificate is what Windows SmartScreen weighs, and a signature is
+      # only worth anything on the bytes the whole pipeline vouches for, so
+      # the signed binary is what `xtask package` puts in the archive. The
+      # other two rows carry nothing to sign.
+      #
+      # The Foundation's conditions decide this shape: the unsigned artifact
+      # is a GitHub workflow artifact before the request for it, every job
+      # runs on a GitHub-hosted runner, the connector verifies the request
+      # against this repository's own build, and the request waits for a
+      # person's approval in SignPath before it answers.
+      - name: upload the unsigned Windows binary
+        if: runner.os == 'Windows'
+        id: unsigned
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          # `archive: false` stores the executable itself rather than a ZIP
+          # of it, so the artifact configuration names one `<pe-file>` and
+          # enforces the product name and version on it, instead of reaching
+          # that file through a wrapper this step invented.
+          name: unsigned-windows-${{ github.sha }}-${{ github.run_attempt }}
+          path: target/release/sprawling.exe
+          archive: false
+          if-no-files-found: error
+      - name: sign the Windows binary through SignPath
+        if: runner.os == 'Windows'
+        uses: signpath/github-action-submit-signing-request@f6d04783b4569d051e0c80105fe66e82819d0092 # v3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
+          artifact-configuration-slug: ${{ vars.SIGNPATH_ARTIFACT_CONFIGURATION_SLUG }}
+          github-artifact-id: ${{ steps.unsigned.outputs.artifact-id }}
+          wait-for-completion: true
+          # Paired with `archive: false` above, and the reason the returned
+          # artifact is one executable rather than a ZIP to unpack.
+          skip-decompress: true
+          output-artifact-directory: target/signed
+      - name: vouch for the returned signature before it is packed
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $returned = @(Get-ChildItem -LiteralPath target/signed -Recurse -File)
+          if ($returned.Count -ne 1) {
+            throw "The signing request returned $($returned.Count) files; expected one signed executable."
+          }
+          Copy-Item -LiteralPath $returned[0].FullName -Destination target/release/sprawling.exe -Force
+          $signature = Get-AuthenticodeSignature -LiteralPath target/release/sprawling.exe
+          if ($signature.Status.ToString() -ne 'Valid') {
+            throw "The returned executable carries a $($signature.Status) signature; a release does not ship that."
+          }
+          if ($null -eq $signature.TimeStamperCertificate) {
+            throw 'The returned signature carries no timestamp; it would expire with the certificate.'
+          }
+          @{ status = $signature.Status.ToString(); subject = $signature.SignerCertificate.Subject
+             thumbprint = $signature.SignerCertificate.Thumbprint
+             timestamped = $null -ne $signature.TimeStamperCertificate } |
+            ConvertTo-Json -Depth 3 | Set-Content -LiteralPath target/release-evidence/windows-signature.json -Encoding utf8
+          ($signature | Format-List | Out-String) | Add-Content -LiteralPath target/release-evidence/windows-signature.log
+      - name: assemble the archive
+        shell: bash
+        env:
+          ARCHIVE_TARGET: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+          cargo xtask package "$ARCHIVE_TARGET"
           if [ "$RUNNER_OS" = macOS ]; then
             shasum -a 256 target/package/*.zip > target/release-evidence/archives.sha256
           else
