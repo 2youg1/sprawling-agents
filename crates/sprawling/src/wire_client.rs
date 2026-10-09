@@ -74,11 +74,20 @@ enum Reach {
     Elsewhere,
 }
 
-/// Reads the host and port of `at`.
+/// Reads the host and port of `at`. The host is judged by
+/// `kernel::gate::target_of`, which names `localhost`, `127.0.0.0/8` and
+/// `::1` loopback without resolving anything: a name is only as local as
+/// the resolver says, and `localhost.example.com` can point anywhere.
 fn reach(at: &str) -> Reach {
-    at.rsplit_once(':')
-        .and_then(|(_, port)| port.parse::<u16>().ok())
-        .map_or(Reach::Portless, Reach::ThisMachine)
+    let (host, port) = at.rsplit_once(':').unwrap_or((at, ""));
+    match kernel::gate::target_of(host) {
+        kernel::gate::EgressTarget::Loopback => port
+            .parse::<u16>()
+            .map_or(Reach::Portless, Reach::ThisMachine),
+        kernel::gate::EgressTarget::Private
+        | kernel::gate::EgressTarget::Public { .. }
+        | kernel::gate::EgressTarget::Connector { .. } => Reach::Elsewhere,
+    }
 }
 
 /// The credential a call presents: the token given with `--token`, or
