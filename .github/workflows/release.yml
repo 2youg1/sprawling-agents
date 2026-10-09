@@ -212,8 +212,14 @@ jobs:
       # runs on a GitHub-hosted runner, the connector verifies the request
       # against this repository's own build, and the request waits for a
       # person's approval in SignPath before it answers.
+      #
+      # The repository variable naming the signing policy is the one switch:
+      # while it is unset, as it is until the Foundation has issued the
+      # project's certificate, the three steps are skipped and the row packs
+      # the binary `just dist` built, unsigned; once it names a policy, every
+      # run signs, and a tag push accepts only a Valid, timestamped signature.
       - name: upload the unsigned Windows binary
-        if: runner.os == 'Windows'
+        if: runner.os == 'Windows' && vars.SIGNPATH_SIGNING_POLICY_SLUG != ''
         id: unsigned
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
@@ -226,7 +232,7 @@ jobs:
           archive: false
           if-no-files-found: error
       - name: sign the Windows binary through SignPath
-        if: runner.os == 'Windows'
+        if: runner.os == 'Windows' && vars.SIGNPATH_SIGNING_POLICY_SLUG != ''
         uses: signpath/github-action-submit-signing-request@f6d04783b4569d051e0c80105fe66e82819d0092 # v3
         with:
           api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
@@ -246,7 +252,7 @@ jobs:
           skip-decompress: true
           output-artifact-directory: target/signed
       - name: vouch for the returned signature before it is packed
-        if: runner.os == 'Windows'
+        if: runner.os == 'Windows' && vars.SIGNPATH_SIGNING_POLICY_SLUG != ''
         shell: pwsh
         env:
           # Only a tag push publishes, and only it may demand a trusted chain:
