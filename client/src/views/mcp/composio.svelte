@@ -96,7 +96,7 @@
     refused = false;
     void enrol({
       origin: u.origin,
-      token: u.pairing,
+      token: u.credential(),
       realm: "mcp",
       name: "composio",
       value,

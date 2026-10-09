@@ -42,6 +42,7 @@
   import LooksPages from "./gallery/looks_pages.svelte";
   import LooksParts from "./gallery/looks_parts.svelte";
   import LooksTalk from "./gallery/looks_talk.svelte";
+  import Access from "./gallery/access.svelte";
   import Doc from "./gallery/doc.svelte";
   import Filed from "./gallery/filed.svelte";
   import FirstRun from "./gallery/first_run.svelte";
@@ -133,7 +134,7 @@
       prefs: real.prefs,
       bar: real.bar,
       origin: real.origin,
-      pairing: real.pairing,
+      credential: real.credential,
       now: real.now,
     });
   });
@@ -187,6 +188,7 @@
   <TalkRow />
   <R3 />
   <Doc />
+  <Access />
   <Tables />
   <PartRow />
   <Monitor />

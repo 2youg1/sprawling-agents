@@ -22,7 +22,7 @@
 
   const u = ui();
   const { lang } = u;
-  const heard = dictation(u.origin, u.pairing, (words) => {
+  const heard = dictation(u.origin, u.credential, (words) => {
     onWords(words);
   });
   const taking = heard.taking;

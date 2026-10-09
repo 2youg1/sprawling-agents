@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The box a key opens over the page - the palette (Accel-K) and the file
+// The box a key opens over the page - the palette (Accel-/) and the file
 // finder (Accel-P) - as one wiring that both seats build and one look
 // draws (`modal.look.svelte`).
 //

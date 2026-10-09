@@ -163,7 +163,7 @@
     prefs: outer.prefs,
     bar: outer.bar,
     origin: outer.origin,
-    pairing: outer.pairing,
+    credential: outer.credential,
     now: outer.now,
   });
 </script>

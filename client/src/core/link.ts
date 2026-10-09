@@ -12,6 +12,7 @@ import type {
   Answered,
   AxError,
   ClientFrame,
+  CloseMode,
   Delta,
   EventRecord,
   LiveOutput,
@@ -38,17 +39,24 @@ export type LinkState =
   | { readonly kind: "handshaking" }
   | { readonly kind: "live"; readonly city: string | null }
   | { readonly kind: "backoff"; readonly attempt: number }
-  | { readonly kind: "refused"; readonly error: AxError };
+  | { readonly kind: "refused"; readonly error: AxError }
+  // The person closed the city and its socket has ended. The page does
+  // not reconnect: nothing is coming back until somebody starts the
+  // city again, and a ladder would only knock on a closed port.
+  | { readonly kind: "closed" };
 
 export type LinkEvent =
-  | { readonly kind: "opened" }
+  // The line is open; `credential` is the token its hello shows.
+  | { readonly kind: "opened"; readonly credential: string | null }
   | { readonly kind: "received"; readonly frame: ServerFrame }
   // A frame arrived that this build cannot read. Its own event, because
   // it is not an outage: reconnecting meets the same frame again.
   | { readonly kind: "undecodable" }
   | { readonly kind: "closed" }
   | { readonly kind: "wait_elapsed" }
-  | { readonly kind: "retry" };
+  | { readonly kind: "retry" }
+  // The person asked the city to close, and the command went out.
+  | { readonly kind: "closing"; readonly mode: CloseMode };
 
 // Exhaustive, so the browser half cannot invent an action the machine
 // never authorised.
@@ -79,31 +87,34 @@ export type LinkAction =
 
 export interface Link {
   readonly state: LinkState;
-  readonly token: string | null;
   // Which language this page reads. On the link because the refusals
   // it mints are sentences a person meets, and `lang.json` is where
   // every one of those lives; a reducer that built them in English
   // would be a second place the client's words come from.
   readonly lang: Lang;
+  // How the person asked the city to close, once they have; the next
+  // time the socket ends, the link stops instead of reconnecting.
+  readonly closing: CloseMode | null;
   // Failures since frames last flowed. On the link rather than in the
   // backoff state: every retry passes through `opening` on its way back
   // to `backoff`, and a counter living in the phase never climbs.
   readonly failures: number;
 }
 
-export function newLink(token: string | null, lang: Lang): Link {
-  return { state: { kind: "idle" }, token, lang, failures: 0 };
+export function newLink(lang: Lang): Link {
+  return { state: { kind: "idle" }, lang, closing: null, failures: 0 };
 }
 
 export function isLive(link: Link): boolean {
   return link.state.kind === "live";
 }
 
-// Whether this link has stopped. A refused link never reconnects by
+// Whether this link has stopped: refused, or ended by a deliberate
+// close. A stopped link never reconnects by
 // itself: the socket half reads this to cancel a scheduled attempt and
 // to drop the socket, and only the person's retry starts it again.
-export function isRefused(link: Link): boolean {
-  return link.state.kind === "refused";
+export function isStopped(link: Link): boolean {
+  return link.state.kind === "refused" || link.state.kind === "closed";
 }
 
 // The wait for one attempt number, clamped to the end of the ladder.
@@ -306,9 +317,9 @@ function unhandled(link: Link, _frame: never): [Link, LinkAction] {
 // Advances the machine by one event.
 export function advance(link: Link, event: LinkEvent): [Link, LinkAction] {
   const { state } = link;
-  if (state.kind === "refused") {
+  if (state.kind === "refused" || state.kind === "closed") {
     return event.kind === "retry"
-      ? connect({ ...link, failures: 0 })
+      ? connect({ ...link, closing: null, failures: 0 })
       : [link, { kind: "nothing" }];
   }
   switch (event.kind) {
@@ -321,7 +332,7 @@ export function advance(link: Link, event: LinkEvent): [Link, LinkAction] {
         {
           kind: "send",
           frame: {
-            hello: { wire_v: WIRE_V, schema: SCHEMA, token: link.token },
+            hello: { wire_v: WIRE_V, schema: SCHEMA, token: event.credential },
           },
         },
       ];
@@ -330,7 +341,9 @@ export function advance(link: Link, event: LinkEvent): [Link, LinkAction] {
     case "undecodable":
       return refuse(link, unreadable(link.lang));
     case "closed":
-      return retreat(link);
+      return link.closing === null ? retreat(link) : [{ ...link, state: { kind: "closed" } }, { kind: "nothing" }];
+    case "closing":
+      return [{ ...link, closing: event.mode }, { kind: "nothing" }];
     case "wait_elapsed":
       return state.kind === "backoff"
         ? connect(link)

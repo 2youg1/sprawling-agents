@@ -68,6 +68,7 @@ export function linkOf(link: LinkState, lang: Lang, recover: (lever: Recovery, e
     case "opening":
     case "handshaking":
     case "backoff":
+    case "closed":
       return { word: linkWord(lang, link), recovery: undefined };
   }
 }

@@ -80,11 +80,12 @@ const look = $derived(
       title: say($lang, "keys_title"),
       dismiss: say($lang, "dismiss"),
       where: say($lang, "keys_where"),
+      // An action no key reaches has nothing to list here.
       rows: ACTIONS.map((action) => ({
         key: action,
         label: say($lang, LABELS[action]),
         marks: chordMarks({ action }),
-      })),
+      })).filter((row) => row.marks.length > 0),
     },
   ),
 );

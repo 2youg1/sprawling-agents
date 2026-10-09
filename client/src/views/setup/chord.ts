@@ -58,9 +58,11 @@ export interface ChordLook {
   // The chord in force, spelled; it changes exactly when the drawn
   // chord must be drawn again.
   readonly spelled: string;
-  // What the button says while it listens, already in the person's
-  // language; `undefined` while it does not.
-  readonly listening: string | undefined;
+  // The word the button draws in place of a chord, already in the
+  // person's language: the prompt while it listens, the unbound word
+  // while no chord reaches the action, `undefined` while a chord does.
+  // Without it the button would be an empty box with no accessible name.
+  readonly word: string | undefined;
   // The tooltip that names what the button does, already in the
   // person's language.
   readonly tip: string;
@@ -80,6 +82,8 @@ export interface ChordProps {
   readonly listening: boolean;
   // The word drawn while it listens, already in the person's language.
   readonly prompt: string;
+  // The word drawn while no chord reaches the action (`spelled` empty).
+  readonly unbound: string;
   readonly tip: string;
 }
 
@@ -88,7 +92,7 @@ export function chordOf(props: ChordProps, hands: ChordHands): ChordLook {
   return {
     action,
     spelled: props.spelled,
-    listening: listening ? props.prompt : undefined,
+    word: wordOf(props),
     tip: props.tip,
     wire: {
       type: "button",
@@ -118,4 +122,9 @@ export function chordOf(props: ChordProps, hands: ChordHands): ChordLook {
       },
     },
   };
+}
+
+function wordOf(props: ChordProps): string | undefined {
+  if (props.listening) return props.prompt;
+  return props.spelled === "" ? props.unbound : undefined;
 }

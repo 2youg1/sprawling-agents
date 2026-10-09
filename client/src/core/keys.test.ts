@@ -5,6 +5,7 @@
 
 import { describe, expect, test } from "bun:test";
 
+import { browserKeeps } from "./browser_keys";
 import { ACTIONS, DEFAULTS, conflictsOf, loadKeys, reserved } from "./keys";
 import type { Pressed } from "./press";
 import { loadPreferences } from "./prefs";
@@ -22,26 +23,31 @@ describe("the shell's own keys", () => {
     expect([keys.acting(press("\\")), keys.acting(press("\\", { target: "field" }))]).toEqual([null, null]);
   });
 
-  test("Accel-B opens the mailbox and Accel-J the right pane, from a text box too", () => {
-    expect(keys.acting(press("b", { ctrlKey: true, target: "field" }))).toBe("mailbox");
-    expect(keys.acting(press("j", { ctrlKey: true }))).toBe("inspect");
-  });
-
-  // The chord was once dropped with the fork button; branching is its
-  // own feature and keeps its key (client/Spec.lean D44).
-  test("Accel-Shift-F branches from the entry under the hand, and f alone is typed", () => {
-    expect([keys.acting(press("F", { ctrlKey: true, shiftKey: true })), keys.acting(press("f"))]).toEqual(["fork.here", null]);
+  test("Accel-slash opens the palette, from a text box too", () => {
+    expect(keys.acting(press("/", { ctrlKey: true, target: "field" }))).toBe("palette");
   });
 
   // A letter pressed while the focus sat on a message or a card forked
   // the conversation or answered the card for the person; only the key
   // that moves the focus into the message box stays a single key.
-  test("every action but focusing the message box holds the accelerator", () => {
-    expect(ACTIONS.filter((action) => !DEFAULTS[action].accel)).toEqual(["composer.focus"]);
+  test("every bound action but focusing the message box holds the accelerator", () => {
+    expect(ACTIONS.filter((action) => DEFAULTS[action]?.accel === false)).toEqual(["composer.focus"]);
   });
 
   test("no action ships on a chord the browser keeps for itself", () => {
     expect(ACTIONS.filter((action) => reserved(DEFAULTS[action]))).toEqual([]);
+  });
+
+  // The audit of the four browsers' shortcut lists (client/Spec.lean D-keys):
+  // a default that a browser gives a function of its own is moved or dropped.
+  test("no action ships on a chord a browser gives a function of its own", () => {
+    expect(ACTIONS.filter((action) => browserKeeps(DEFAULTS[action]))).toEqual([]);
+  });
+
+  test("a chord the person binds reaches its action even where a browser uses it", () => {
+    const kept = loadKeys(loadPreferences(memory(), "en"), "Windows");
+    kept.bind("finder", { accel: true, shift: false, key: "p" });
+    expect(kept.acting(press("p", { ctrlKey: true }))).toBe("finder");
   });
 
   test("no two actions ship on one chord", () => {

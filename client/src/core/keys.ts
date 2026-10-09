@@ -109,62 +109,53 @@ export function folded(key: string): string {
 function plain(key: string): Chord {
   return { accel: false, shift: false, key };
 }
-function accel(key: string): Chord {
+export function accel(key: string): Chord {
   return { accel: true, shift: false, key };
 }
-function accelShift(key: string): Chord {
+export function accelShift(key: string): Chord {
   return { accel: true, shift: true, key };
 }
 
-// The chords this client ships with.
-//
-// **Six pages sit on the six digits**, with settings taken out:
-// settings is on the comma that every browser and every editor puts it
-// on, which leaves the sixth digit for the registry. The settings tree
-// reaches the same pages (client/Spec.lean §7L); the digits are the fast way.
-//
-// The three edge keys borrow their chords from the habits a person
-// already has: the mailbox is the side panel on B, the right pane is
-// the panel on J, as in the editors that taught both, and the tier is
-// the backslash, the one key here with no borrowed meaning. The key
-// list is on the slash beside the accelerator, where the web
-// applications that taught the habit put it.
-//
-// `/` alone holds no modifier; the paragraph at the top of this file
-// says why, and `matches` below keeps it out of a text box.
-export const DEFAULTS: Readonly<Record<Action, Chord>> = {
-  "go.talk": accel("1"),
-  "go.city": accel("2"),
-  "go.mcp": accel("3"),
-  "go.record": accel("4"),
-  "go.cost": accel("5"),
-  "go.registry": accel("6"),
-  "go.setup": accel(","),
-  "go.waiting": accelShift("a"),
-  palette: accel("k"),
+// What an action is reached by: a chord, or `null` for an action no key
+// reaches until the person binds one in settings. An unbound action
+// keeps every other way in it had - its page in the settings tree, its
+// verb in the palette and after `/`, its button.
+export type Bound = Chord | null;
+
+// The chords this client ships with. **No default sits on a chord a
+// browser gives a function of its own** (`browser_keys.ts`, D96): the
+// person who pressed Accel-P to print or Accel-1 for the first tab must
+// get the browser, not this page. So most actions ship unbound and keep
+// the route they already had (settings tree, palette and `/` verbs,
+// buttons), and the person may bind any of them. The palette is the
+// one door to every page and verb, so it keeps a chord, on the slash
+// beside the accelerator, which none of the four browsers lists; the
+// tier keeps the backslash. `/` alone holds no modifier; the paragraph
+// at the top of this file says why, and `matches` keeps it out of a
+// text box.
+export const DEFAULTS: Readonly<Record<Action, Bound>> = {
+  "go.talk": null,
+  "go.city": null,
+  "go.mcp": null,
+  "go.record": null,
+  "go.cost": null,
+  "go.registry": null,
+  "go.setup": null,
+  "go.waiting": null,
+  palette: accel("/"),
   "tier.cycle": accel("\\"),
-  mailbox: accel("b"),
-  inspect: accel("j"),
-  help: accel("/"),
+  mailbox: null,
+  inspect: null,
+  help: null,
   "composer.focus": plain("/"),
-  "run.stop": accel("."),
-  // Branch the conversation from the entry under the hand: read only
-  // where a thread entry is hovered or focused (roadmap 4.5). Shift
-  // because the accelerator with F alone is the browser's find.
-  "fork.here": accelShift("f"),
-  // Answer the decide card that holds the focus, on the letters
-  // `git add -p` answers a hunk with, and read only by the card itself
-  // (`parts/decide.svelte`). Shift because the accelerator with Y or E
-  // alone is a browser's history or search; refusing takes X, because
-  // N with the accelerator, with or without Shift, opens a window
-  // before the page hears it (`RESERVED` below).
-  "decide.yes": accelShift("y"),
-  "decide.edit": accelShift("e"),
-  "decide.no": accelShift("x"),
-  // Where the editors that taught the habit put it; the palette's entry
-  // of the same name is the way in where a browser keeps it for printing.
-  finder: accel("p"),
+  "run.stop": null,
+  "fork.here": null,
+  "decide.yes": null,
+  "decide.edit": null,
+  "decide.no": null,
+  finder: null,
 };
+
 
 // The word each action is called by, which is a phrase key rather than
 // a phrase: this file holds no words.
@@ -198,15 +189,17 @@ export const LABELS: Readonly<Record<Action, Key>> = {
 // refused, for the same reason a collision is.
 const RESERVED: readonly string[] = ["n", "t", "w"];
 
-export function reserved(held: Chord): boolean {
-  return held.accel && RESERVED.includes(folded(held.key));
+export function reserved(held: Bound): boolean {
+  return held !== null && held.accel && RESERVED.includes(folded(held.key));
 }
 
 // ------------------------------------------------------------- spelling
 
 // The one written form of a chord: what is stored, and what a chord
-// read back from storage is compared against.
-export function spell(held: Chord): string {
+// read back from storage is compared against. An unbound action is
+// spelled as nothing.
+export function spell(held: Bound): string {
+  if (held === null) return "";
   const accelMark = held.accel ? ACCEL_MARK : "";
   const shiftMark = held.shift ? SHIFT_MARK : "";
   return `${accelMark}${shiftMark}${folded(held.key)}`;
@@ -253,8 +246,9 @@ export function face(key: string): string {
 }
 
 // The marks a chord is drawn as, in the order they are pressed, each
-// the way this platform writes it.
-export function marks(held: Chord, platform: Platform): readonly string[] {
+// the way this platform writes it; none for an unbound action.
+export function marks(held: Bound, platform: Platform): readonly string[] {
+  if (held === null) return [];
   const mac = platform === "mac";
   const out: string[] = [];
   if (held.accel) {
@@ -276,8 +270,8 @@ export function platformOf(userAgent: string): Platform {
 
 // ------------------------------------------------------------- matching
 
-export function matches(held: Chord, pressed: Pressed): boolean {
-  if (pressed.altKey) {
+export function matches(held: Bound, pressed: Pressed): boolean {
+  if (held === null || pressed.altKey) {
     return false;
   }
   if (held.accel !== (pressed.ctrlKey || pressed.metaKey)) {
@@ -307,10 +301,11 @@ export interface Conflict {
 // prevented: the person deciding which of the two they meant needs to
 // see both, and a binding that silently refuses to take teaches
 // nothing.
-export function conflictsOf(bound: Readonly<Record<Action, Chord>>): readonly Conflict[] {
+export function conflictsOf(bound: Readonly<Record<Action, Bound>>): readonly Conflict[] {
   const byChord = new Map<string, Action[]>();
   for (const action of ACTIONS) {
     const spelled = spell(bound[action]);
+    if (spelled === "") continue;
     const held = byChord.get(spelled);
     if (held === undefined) {
       byChord.set(spelled, [action]);
@@ -331,8 +326,8 @@ export function conflictsOf(bound: Readonly<Record<Action, Chord>>): readonly Co
 
 export interface Keymap {
   readonly platform: Platform;
-  readonly bound: Readable<Readonly<Record<Action, Chord>>>;
-  readonly chord: (action: Action) => Chord;
+  readonly bound: Readable<Readonly<Record<Action, Bound>>>;
+  readonly chord: (action: Action) => Bound;
   readonly bind: (action: Action, chord: Chord) => void;
   // Back to what this client ships with.
   readonly reset: (action: Action) => void;
@@ -343,8 +338,8 @@ export interface Keymap {
   readonly acting: (pressed: Pressed) => Action | null;
 }
 
-function stored(kept: PreferenceDoor): Record<Action, Chord> {
-  const out: Record<string, Chord> = {};
+function stored(kept: PreferenceDoor): Record<Action, Bound> {
+  const out: Record<string, Bound> = {};
   for (const action of ACTIONS) {
     out[action] = readChord(kept.chord(action)) ?? DEFAULTS[action];
   }
@@ -356,8 +351,8 @@ function stored(kept: PreferenceDoor): Record<Action, Chord> {
 
 export function loadKeys(kept: PreferenceDoor, userAgent: string): Keymap {
   const platform = platformOf(userAgent);
-  const held = writable<Readonly<Record<Action, Chord>>>(stored(kept));
-  const put = (action: Action, chord: Chord) => {
+  const held = writable<Readonly<Record<Action, Bound>>>(stored(kept));
+  const put = (action: Action, chord: Bound) => {
     held.update((was) => ({ ...was, [action]: chord }));
   };
   return {

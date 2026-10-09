@@ -4,34 +4,12 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts" module>
-  // The doctor page's three readings in every state they take: a
-  // harness card in each of its three states, the release answer with
-  // both registries and the update command for each channel, and the
-  // scan in front of the city's directory read on Windows, stopped, and
+  // The doctor page's readings in every state they take: the release
+  // answer with both registries and the update command for each
+  // channel, and the scan in front of the city's directory read on Windows, stopped, and
   // on macOS or Linux where it does not apply.
 
-  import type { AxError, DoctorScanning, HarnessLine, ReleaseAnswer } from "../../wire";
-
-  const HARNESSES: readonly HarnessLine[] = [
-    {
-      name: "claude_code",
-      docs: "https://docs.anthropic.com/en/docs/claude-code",
-      launch: ["npx.cmd", "-y", "@anthropic-ai/claude-code"],
-      state: { not_set_up: { looked: ["~/.claude", "%APPDATA%/claude"] } },
-    },
-    {
-      name: "codex",
-      docs: "https://developers.openai.com/codex",
-      launch: ["npx.cmd", "-y", "@openai/codex"],
-      state: { ready: { at: "~/.codex" } },
-    },
-    {
-      name: "kimi_code",
-      docs: "https://www.kimi.com/coding",
-      launch: ["uvx", "kimi-cli"],
-      state: { launcher_missing: { program: "uvx" } },
-    },
-  ];
+  import type { AxError, DoctorScanning, ReleaseAnswer } from "../../wire";
 
   const MINE = { version: "0.0.8", released: "2026-09-01" };
   const NEWEST = { version: "0.0.9", released: "2026-10-02" };
@@ -141,15 +119,9 @@
   import Copy from "../parts/copy.svelte";
   import Scanning from "../machine/scanning.svelte";
   import ReleaseAnswerView from "../release/answer.svelte";
-  import HarnessCards from "../setup/harness_cards.svelte";
   import Case from "./case.svelte";
 </script>
 
-{#each WIDTHS as width (width)}
-  <Case label={`doctor · harnesses, three states at ${String(width)}`} {width}>
-    <HarnessCards lines={HARNESSES} />
-  </Case>
-{/each}
 {#each RELEASES as [name, answer] (name)}
   {#each WIDTHS as width (width)}
     <Case label={`doctor · release, ${name} at ${String(width)}`} {width}>

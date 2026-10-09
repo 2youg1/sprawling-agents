@@ -39,6 +39,7 @@
   import Notifier from "./views/notifier.svelte";
   import Pages from "./views/pages.svelte";
   import Palette from "./views/palette.svelte";
+  import Quit from "./views/quit.svelte";
   import Refusal from "./views/refusal.svelte";
   import Workspace from "./views/workspace.svelte";
   import SettingsPanel from "./views/settings/panel.svelte";
@@ -219,7 +220,7 @@
   // Command is held.
   function letGo(event: KeyboardEvent): void {
     if (event.key === "Control" || event.key === "Meta") expose(false);
-    const tierKey = folded(event.key) === folded(bindings.chord("tier.cycle").key);
+    const tierKey = folded(event.key) === folded(bindings.chord("tier.cycle")?.key ?? "");
     if (tierHeld !== null && (tierKey || !(event.ctrlKey || event.metaKey))) releaseTier();
   }
 
@@ -372,6 +373,7 @@
     <Edge {tier} onTier={cycleTier} onPeek={(on: boolean) => (peeking = on)} {mailboxAsked} />
   {/if}
   <Refusal {stopsWithoutRun} />
+  <Quit />
   {#if paletteOpen}
     <Palette onClose={() => (paletteOpen = false)} />
   {/if}

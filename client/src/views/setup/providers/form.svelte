@@ -222,7 +222,7 @@
     };
     void enrol({
       origin: u.origin,
-      token: u.pairing,
+      token: u.credential(),
       realm,
       name,
       value: typed,

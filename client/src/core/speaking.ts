@@ -116,7 +116,7 @@ export interface Dictation {
 // typing while a recording is being transcribed.
 export function dictation(
   origin: string,
-  pairing: string | null,
+  credential: () => string | null,
   into: (heard: string) => void,
 ): Dictation {
   const taking = writable<Recording | null>(null);
@@ -126,7 +126,7 @@ export function dictation(
     const going = get(taking);
     if (going === null) {
       refused.set(false);
-      void record(origin, pairing).then((started) => {
+      void record(origin, credential()).then((started) => {
         taking.set(started);
         refused.set(started === null);
       });

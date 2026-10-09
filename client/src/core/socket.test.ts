@@ -116,7 +116,7 @@ describe("the browser half", () => {
   // books nothing, and whatever it had booked is cancelled.
   test("cancels the reconnect when a frame cannot be read", () => {
     install();
-    const conn = openConnection(plainDial("ws://city.invalid/ws"), null, "en");
+    const conn = openConnection(plainDial("ws://city.invalid/ws"), "en");
     const first = FakeSocket.opened[0];
     expect(first).toBeDefined();
     first?.onopen?.();
@@ -132,7 +132,7 @@ describe("the browser half", () => {
   // is booked and it opens a second socket when it fires.
   test("books a reconnect when the socket drops", () => {
     install();
-    openConnection(plainDial("ws://city.invalid/ws"), null, "en");
+    openConnection(plainDial("ws://city.invalid/ws"), "en");
     const first = FakeSocket.opened[0];
     first?.onopen?.();
     first?.onclose?.();
@@ -151,7 +151,7 @@ describe("the browser half", () => {
     Object.assign(globalThis, {
       requestAnimationFrame: (run: () => void): number => painting.push(run),
     });
-    const conn = openConnection(plainDial("ws://city.invalid/ws"), null, "en");
+    const conn = openConnection(plainDial("ws://city.invalid/ws"), "en");
     const first = FakeSocket.opened[0];
     first?.onopen?.();
     const welcome = { wire_v: WIRE_V, schema: WIRE_HASH, resume_from: null, city: null };
@@ -178,7 +178,7 @@ describe("the browser half", () => {
   test("drains on a timer while the page is hidden", () => {
     install();
     hide();
-    const conn = openConnection(plainDial("ws://city.invalid/ws"), null, "en");
+    const conn = openConnection(plainDial("ws://city.invalid/ws"), "en");
     const first = FakeSocket.opened[0];
     first?.onopen?.();
     const welcome = { wire_v: WIRE_V, schema: WIRE_HASH, resume_from: null, city: null };
@@ -196,7 +196,7 @@ describe("the browser half", () => {
   test("retries at once when a hidden page in backoff is shown", () => {
     install();
     const page = hide();
-    openConnection(plainDial("ws://city.invalid/ws"), null, "en");
+    openConnection(plainDial("ws://city.invalid/ws"), "en");
     const first = FakeSocket.opened[0];
     first?.onopen?.();
     first?.onclose?.();
@@ -210,7 +210,7 @@ describe("the browser half", () => {
   // and the banner counts them meanwhile.
   test("holds words said off the link and sends them on the welcome", () => {
     install();
-    const conn = openConnection(plainDial("ws://city.invalid/ws"), null, "en");
+    const conn = openConnection(plainDial("ws://city.invalid/ws"), "en");
     const welcome = JSON.stringify({ welcome: { wire_v: WIRE_V, schema: WIRE_HASH, resume_from: null, city: null } });
     FakeSocket.opened[0]?.onopen?.();
     FakeSocket.opened[0]?.onclose?.();
@@ -234,7 +234,7 @@ describe("the browser half", () => {
   // so the words are not taken, and the composer keeps the draft.
   test("refuses to hold words while the link is refused", () => {
     install();
-    const conn = openConnection(plainDial("ws://city.invalid/ws"), null, "en");
+    const conn = openConnection(plainDial("ws://city.invalid/ws"), "en");
     FakeSocket.opened[0]?.onopen?.();
     FakeSocket.opened[0]?.onmessage?.({ data: "{\"welcome\":" });
     const accepted = conn.command(steer(RunId.make("00000000-0000-4000-8000-000000000001"), "and the tests"));
@@ -247,7 +247,7 @@ describe("the browser half", () => {
   // so where every refusal lands, instead of a button that does nothing.
   test("says in the corner that a command made off the link was not sent", () => {
     install();
-    const conn = openConnection(plainDial("ws://city.invalid/ws"), null, "en");
+    const conn = openConnection(plainDial("ws://city.invalid/ws"), "en");
     FakeSocket.opened[0]?.onopen?.();
     FakeSocket.opened[0]?.onclose?.();
     const sent = conn.command(doctorRefresh());
@@ -271,7 +271,7 @@ describe("the browser half", () => {
   // high-water mark and that head.
   test("fetches the records written while it was away rather than a snapshot", () => {
     install();
-    const conn = openConnection(plainDial("ws://city.invalid/ws"), null, "en");
+    const conn = openConnection(plainDial("ws://city.invalid/ws"), "en");
     const first = FakeSocket.opened[0];
     first?.onopen?.();
     const welcome = { wire_v: WIRE_V, schema: WIRE_HASH, resume_from: 10, city: null };
@@ -315,7 +315,7 @@ describe("the browser half", () => {
   // folded and asks everything again rather than fetching a range.
   test("rebuilds from a snapshot when the ledger's epoch changed", () => {
     install();
-    const conn = openConnection(plainDial("ws://city.invalid/ws"), null, "en");
+    const conn = openConnection(plainDial("ws://city.invalid/ws"), "en");
     const first = FakeSocket.opened[0];
     first?.onopen?.();
     const welcome = { wire_v: WIRE_V, schema: WIRE_HASH, resume_from: 10, city: null, epoch: "a".repeat(64) };

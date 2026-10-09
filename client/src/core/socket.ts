@@ -39,11 +39,12 @@ import { decodeFrame, encodeFrame } from "./frames";
 import { createUnsent, isSpeech } from "./unsent";
 import { langOf, say } from "./lang";
 import { createGapWalk } from "./gap_walk";
-import { advance, connect as start, isLive, isRefused, newLink, unreadableRecord, unsentCommand } from "./link";
+import { advance, connect as start, isLive, isStopped, newLink, unreadableRecord, unsentCommand } from "./link";
+import { closeCity } from "./access";
 import type { Link, LinkAction, LinkEvent, LinkState } from "./link";
 import type { Dial, Line } from "./line";
 import { AskId } from "../wire";
-import type { Command, Query, RunId, ServerFrame } from "../wire";
+import type { CloseMode, Command, Query, RunId, ServerFrame } from "../wire";
 
 export interface Connection {
   readonly state: Readable<LinkState>;
@@ -59,26 +60,27 @@ export interface Connection {
   // told rather than left to wonder.
   readonly command: (command: Command) => boolean;
   readonly retry: () => void;
+  // Asks the city to close (`/quit`), and stops this link from
+  // reconnecting once the city ends the socket; false when the command
+  // could not be sent, because the link is not live.
+  readonly closeCity: (mode: CloseMode) => boolean;
+  // How the person asked the city to close, from the moment the command
+  // went out; null until then, and again after a retry.
+  readonly closing: Readable<CloseMode | null>;
   readonly dismissRefusal: () => void;
   // Everything in the bell has now been looked at.
   readonly markNoticesSeen: () => void;
   readonly monitor: Pick<Watching, "samples" | "watch" | "watchSummary" | "setBeat">;
 }
 
-// The pairing code the host put on the URL that opened this page. An
-// empty value is not a value.
-export function tokenIn(search: string): string | null {
-  const value = new URLSearchParams(search).get("token");
-  return value === null || value === "" ? null : value;
-}
-
-// How a POST offers this city's pairing token.
+// How a POST offers this page's credential - the session token
+// (`core/local/entering.ts`).
 //
 // The socket offers it inside the hello frame, where the frame type
 // names the field; a POST has no frame, so it carries the standard
 // bearer header, which `wire::reception::offered_pairing` reads.
-// A page opened without a code sends no header at all: a city with no
-// token configured is a city on loopback, and it admits every door.
+// A page that holds no token sends no header at all, and the city
+// judges the request as one that showed nothing.
 export function bearing(token: string | null): Readonly<Record<string, string>> {
   return token === null ? {} : { authorization: `Bearer ${token}` };
 }
@@ -87,12 +89,8 @@ function hidden(): boolean {
   return typeof document !== "undefined" && document.visibilityState === "hidden";
 }
 
-export function openConnection(
-  dial: Dial,
-  token: string | null,
-  lang: Lang,
-): Connection {
-  let link: Link = newLink(token, lang);
+export function openConnection(dial: Dial, lang: Lang): Connection {
+  let link: Link = newLink(lang);
   let line: Line | null = null;
   // One clock for this connection: the asking measures its patience by
   // it and the belief stamps each refusal with it, so a question and its
@@ -102,6 +100,7 @@ export function openConnection(
   const store = createBelief(now);
   const unsent = createUnsent();
   const live = writable<Readonly<Partial<Record<RunId, Tail>>>>({});
+  const closing = writable<CloseMode | null>(null);
 
   const queue: ServerFrame[] = [];
   let scheduled = false;
@@ -224,7 +223,7 @@ export function openConnection(
       state.set(next.state);
     }
     perform(action);
-    if (isRefused(link)) {
+    if (isStopped(link)) {
       // The machine has stopped this link. Nothing here decides that:
       // the socket half only carries it out, by cancelling the attempt
       // the ladder booked and dropping the line the refusal came in
@@ -254,8 +253,8 @@ export function openConnection(
     // line the link has dropped may still be closing.
     const mine = () => line === opened;
     const opened: Line = dial({
-      opened: () => {
-        if (mine()) step({ kind: "opened" });
+      opened: (credential) => {
+        if (mine()) step({ kind: "opened", credential });
       },
       heard: (text) => {
         if (mine()) heard(text);
@@ -336,6 +335,7 @@ export function openConnection(
         // person, and an idle one has not been started.
         case "idle":
         case "refused":
+        case "closed":
           return false;
         case "opening":
         case "handshaking":
@@ -349,8 +349,16 @@ export function openConnection(
       }
     },
     retry() {
+      closing.set(null);
       step(unbook({ kind: "retry" }));
     },
+    closeCity(mode) {
+      if (!isLive(link) || !sendText(encodeFrame({ command: closeCity(mode) }))) return false;
+      step({ kind: "closing", mode });
+      closing.set(mode);
+      return true;
+    },
+    closing,
     dismissRefusal() {
       store.refused(null);
     },

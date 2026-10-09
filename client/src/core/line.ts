@@ -26,7 +26,10 @@ export interface Line {
 // What a line tells the link. `closed` comes once per line, whether the
 // line never opened or opened and ended.
 export interface Hearing {
-  readonly opened: () => void;
+  // The line is open. `credential` is what the hello shows the city:
+  // the session token the line was opened under, or null for a line
+  // that shows none (`core/local/entering.ts`).
+  readonly opened: (credential: string | null) => void;
   readonly heard: (text: string) => void;
   readonly closed: () => void;
 }
@@ -43,7 +46,9 @@ export function plainDial(url: string): Dial {
       ended = true;
       hearing.closed();
     };
-    socket.onopen = hearing.opened;
+    socket.onopen = () => {
+      hearing.opened(null);
+    };
     socket.onmessage = (message: MessageEvent) => {
       if (typeof message.data === "string") hearing.heard(message.data);
     };

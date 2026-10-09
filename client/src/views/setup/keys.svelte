@@ -75,6 +75,7 @@
               spelled: spell($bound[action]),
               listening: recording === action,
               prompt: say($lang, "keys_press"),
+              unbound: say($lang, "keys_unbound"),
               tip: say($lang, "keys_change"),
             },
             hands,

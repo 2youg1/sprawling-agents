@@ -61,8 +61,8 @@
           dismiss: say($lang, "dismiss"),
           where: say($lang, "keys_where"),
           rows: [
-            { key: "palette", label: "palette", marks: ["Ctrl", "K"] },
-            { key: "finder", label: "find a file", marks: ["Ctrl", "P"] },
+            { key: "palette", label: "palette", marks: ["Ctrl", "/"] },
+            { key: "tier.cycle", label: "layers", marks: ["Ctrl", "\\"] },
           ],
         },
       )}

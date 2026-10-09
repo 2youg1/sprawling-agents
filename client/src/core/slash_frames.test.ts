@@ -189,6 +189,10 @@ const CASES: Readonly<Record<string, readonly Case[]>> = {
   "/mcp": [{ line: "/mcp", done: going({ kind: "mcp" }) }],
   "/doctor": [{ line: "/doctor", done: going({ kind: "welcome" }) }],
   "/help": [{ line: "/help", done: { ...NOTHING, written: ["/"] } }],
+  "/acp": [{ line: "/acp", done: going({ kind: "setup", group: "agents" }) }],
+  // The question is the shell's (`views/quit.svelte`); the verb sends no
+  // frame and only empties the line.
+  "/quit": [{ line: "/quit", done: { ...NOTHING, written: [""] } }],
   "/diff": [{ line: "/diff", done: going({ kind: "run", run: LIVE, lens: "changes" }) }],
 };
 

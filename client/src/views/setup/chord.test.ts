@@ -44,7 +44,7 @@ function press(heard: Heard, key: string, held: Partial<Omit<ChordPress, "key" |
   };
 }
 
-const PROPS = { action: ACTION, spelled: "accel+k", prompt: "press a chord", tip: "change" } as const;
+const PROPS = { action: ACTION, spelled: "accel+k", prompt: "press a chord", unbound: "no shortcut", tip: "change" } as const;
 
 describe("chordOf", () => {
   test("a click starts listening and a blur stops it", () => {
@@ -94,7 +94,14 @@ describe("chordOf", () => {
     const { hands } = record();
     const listening = chordOf({ ...PROPS, listening: true }, hands);
     const idle = chordOf({ ...PROPS, listening: false }, hands);
-    expect([listening.wire["aria-pressed"], listening.listening]).toEqual([true, "press a chord"]);
-    expect([idle.wire["aria-pressed"], idle.listening]).toEqual([false, undefined]);
+    expect([listening.wire["aria-pressed"], listening.word]).toEqual([true, "press a chord"]);
+    expect([idle.wire["aria-pressed"], idle.word]).toEqual([false, undefined]);
+  });
+
+  test("a row no chord reaches draws the unbound word, so the button is never empty", () => {
+    const { hands } = record();
+    const unbound = chordOf({ ...PROPS, spelled: "", listening: false }, hands);
+    const listening = chordOf({ ...PROPS, spelled: "", listening: true }, hands);
+    expect([unbound.word, listening.word]).toEqual(["no shortcut", "press a chord"]);
   });
 });

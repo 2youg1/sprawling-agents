@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 // The verbs a person can type. One table, read by both places that
-// offer them - the `/` menu above the composer and the Ctrl-K palette -
+// offer them - the `/` menu above the composer and the Accel-/ palette -
 // so a button spelled `/stop` and a line somebody types cannot drift
 // into meaning two different things.
 //
@@ -34,9 +34,9 @@ import {
 } from "./commands";
 import type { Template } from "./commands";
 import { askFork } from "./forking";
-import { PAGES, page } from "./route";
+import { askQuit } from "./quitting";
+import { PAGE_VERBS } from "./slash_pages";
 import { given, stripped } from "./tags";
-import type { View } from "./route";
 import { CITY } from "./scope";
 import type { Slash, SlashCall, SlashHands } from "./slash_hands";
 import { compact, fresh, retag } from "./slash_session";
@@ -77,15 +77,6 @@ function addressed(raw: string | undefined): Address | null {
     return null;
   }
   return Option.getOrNull(Schema.decodeOption(Address)(raw));
-}
-
-// Only what `/go` advertises, resolved by the router: a page this
-// build cannot name is not a page this verb opens.
-function paged(name: string | undefined): View | null {
-  if (name === undefined || !PAGES.includes(name)) {
-    return null;
-  }
-  return Option.getOrNull(page(name));
 }
 
 // `/halt` and `/release` take the same three shapes, and the pair would
@@ -299,36 +290,14 @@ export const SLASH: readonly Slash[] = [
     },
   },
   {
-    spelling: "/go",
-    grammar: PAGES.join("|"),
-    about: "slash_go",
-    section: "navigation",
-    run: (hands, call) => {
-      const to = paged(call.words.at(0));
-      if (to === null) return;
-      hands.go(to);
-      hands.write("");
-    },
-  },
-  {
-    spelling: "/mcp",
+    // Closing the city is a question first: with runs going, whether to
+    // wait for them (`views/quit.svelte`).
+    spelling: "/quit",
     grammar: "",
-    about: "slash_mcp",
-    section: "navigation",
+    about: "slash_quit",
+    section: "actions",
     run: (hands) => {
-      hands.go({ kind: "mcp" });
-      hands.write("");
-    },
-  },
-  {
-    spelling: "/doctor",
-    grammar: "",
-    about: "slash_doctor",
-    section: "navigation",
-    run: (hands) => {
-      // The machine report is the welcome's first step, and that page
-      // asks the `doctor` query again when it opens.
-      hands.go({ kind: "welcome" });
+      askQuit();
       hands.write("");
     },
   },
@@ -343,19 +312,7 @@ export const SLASH: readonly Slash[] = [
       hands.write("/");
     },
   },
-  {
-    // The changes are a lens of the run page: open this run's, or the newest here.
-    spelling: "/diff",
-    grammar: "",
-    about: "slash_diff",
-    section: "navigation",
-    run: (hands) => {
-      const shown = hands.live ?? (hands.here === null ? null : hands.newest(hands.here));
-      if (shown === null) return;
-      hands.go({ kind: "run", run: shown.run, lens: "changes" });
-      hands.write("");
-    },
-  },
+  ...PAGE_VERBS,
 ];
 
 // A line that begins with a slash, cut into verb and arguments. `null`

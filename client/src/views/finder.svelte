@@ -4,7 +4,7 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // Accel-P: find a file of the building in front by a part of its name
+  // The file finder: find a file of the building in front by a part of its name
   // (refrain 3-11, client/Spec.lean §4-62). What it holds is
   // `finder/search.svelte`; this file is the modal around it, whose
   // wiring is `modal.ts`'s and whose drawing is `modal.look.svelte`'s.

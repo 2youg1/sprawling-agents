@@ -50,7 +50,8 @@
   import GovernedSection from "./setup/governed.svelte";
   import ProviderDoor from "./shared/provider.svelte";
   import SearchCard from "./setup/search/search.svelte";
-  import HarnessList from "./setup/harnesses.svelte";
+  import Agents from "./setup/agents.svelte";
+  import Devices from "./settings/devices.svelte";
   import { HEADING, HINT, PREFERRED, WIDTH } from "./setup/groups";
   import type { SetupGroup } from "../core/route";
 
@@ -244,8 +245,10 @@ costs the cards their width (client/Spec.lean §4-30, §4-36). -->
           <CityLayer />
         </div>
       </div>
-    {:else if shown === "harnesses"}
-      <HarnessList />
+    {:else if shown === "agents"}
+      <Agents />
+    {:else if shown === "devices"}
+      <Devices />
     {:else if shown === "run"}
       <div class="grid grid-fit items-start gap-base">
         <GovernedSection />
