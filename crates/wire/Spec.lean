@@ -393,6 +393,7 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 | D53 | V0.0.11 的线上改形一次进位，由第一条车道落地 | `crates/wire/spec/Frames.lean` |
 | D54 | 每个调用方都要非环境凭据，入口先判 Host 与 Origin | `crates/wire/spec/Reception/Entry.lean` |
 | D55 | 会话令牌在最后一条 socket 结束后空闲 60 s 失效 | `crates/wire/spec/Server/Sessions.lean` |
+| D56 | 远程监听有自己的 Host 与 Origin 名单，由同一个 `decide_entry` 判 | `crates/wire/spec/Reception/Entry.lean` |
 -/
 
 /-! ## 13 依赖选型
