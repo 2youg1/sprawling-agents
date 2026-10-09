@@ -104,6 +104,16 @@ The page and the whole city are served and run by one process, with no database 
 
 A key you paste into a message goes into the vault first, and the model sees only a reference to it ([custody](crates/accounting/src/worker/dispatching/custody.rs)). Values in model replies and tool results that look like secrets are replaced with a marker before they are written into the permanent history ([redact](crates/runtime/src/redact.rs)). Apart from the model calls and tools you connect, plus the web search that is on by default (until you turn it off, it sends the search words to Exa), nothing leaves your machine; a confidential building calls no remote provider. The port on your own machine asks every caller for a credential, so a web page in another tab cannot drive the city: the browser `/web` opens is paired without typing, a second browser asks for the pairing code the terminal shows, and a script on this machine reads a key file that only your account can read ([SECURITY.md](SECURITY.md)). The programs the city starts, such as ACP agents, MCP servers and browsers, do not inherit the city's credentials from its environment. On Windows, Settings has 88 optional privacy controls, ranging from diagnostic data and speech input to app permissions and Windows AI features. Each one shows its current value, what it changes and what it costs; you apply or restore them one at a time, and each write is read back to check it ([Windows privacy controls](docs/operating.md#windows-privacy-controls)). Privacy is not security, and it is not always at odds with convenience, but many of these settings do cost some convenience; the page lays out each one so that you can weigh it yourself.
 
+### Code signing policy
+
+Free code signing provided by [SignPath.io](https://signpath.io), certificate by [SignPath Foundation](https://signpath.org). The Windows binary inside a release archive carries that signature, and the archive's SHA-256 is published beside it; `install.ps1` refuses an archive whose digest does not match.
+
+- **Authors** — [@2youg1](https://github.com/2youg1) may change the source directly.
+- **Reviewers** — a change proposed by anyone outside the project is reviewed in its pull request before it merges.
+- **Approvers** — [@2youg1](https://github.com/2youg1) approves every signing request before a binary is signed.
+
+Privacy policy: [Privacy](#privacy) in this file, and [SECURITY.md](SECURITY.md).
+
 ### A history you can replay
 
 Every decision the city makes is a line in the Ledger, and replaying those lines on any machine gives a byte-for-byte identical result, because decision paths take time as a parameter, use no random source and keep a fixed order ([determinism](ARCHITECTURE.md#10-determinism-and-hardening)). A replay does not run tools or call models again; it reads back the results recorded at the time. The city supplies only the facts and the limits, and leaves how to do the work to the model ([LLM First](ARCHITECTURE.md#llm-first-mechanism-from-the-city-method-from-the-model)).

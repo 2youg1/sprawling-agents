@@ -104,6 +104,16 @@ Agent之间可以互相找到对方、发消息、协调任务、等回复，不
 
 你在消息里贴的Key会先进Vault，模型看到的只是它的引用（[custody](crates/accounting/src/worker/dispatching/custody.rs)）。模型回复和工具结果里长得像密钥的值，写进永久历史之前会被换成一个标记（[redact](crates/runtime/src/redact.rs)）。除了你接入的模型调用和工具，再加上默认开着的网页搜索（关掉之前它会把搜索词发给Exa），没有东西会离开你的电脑；保密楼则不调用任何远程provider。你电脑上的端口对每个调用方都要凭据，所以别的标签页里的网页驱动不了城市：`/web`打开的那个浏览器自动完成配对，不用输入；第二个浏览器要输入终端上显示的配对码；同一台电脑上的脚本读一个只有你的账户能读的密钥文件（[SECURITY.md](SECURITY.md)）。城市启动的程序，比如ACP agent、MCP server和浏览器，不会从环境变量里继承城市的凭据。在Windows上，设置里有88项可选的隐私控制，从诊断数据、语音输入到应用权限和Windows AI功能都有。每一项都显示当前值、它改什么、代价是什么，可以一项一项应用或恢复，每次写入后都会读回来核对（[Windows隐私控制](docs/operating.md#windows-privacy-controls)）。隐私不等于安全，也不一定和便利冲突，但这里面很多设置确实要牺牲一些便利，页面把每一项的信息都摆出来，由你自己逐项权衡。
 
+### 代码签名政策
+
+本项目的免费代码签名由 [SignPath.io](https://signpath.io) 提供，证书由 [SignPath Foundation](https://signpath.org) 签发（Code signing policy）。发布压缩包里的 Windows 二进制带着这个签名，压缩包的 SHA-256 与它一同公布；摘要对不上时 `install.ps1` 拒绝安装。
+
+- **作者（Authors）**——[@2youg1](https://github.com/2youg1) 可以直接改动源码。
+- **审查者（Reviewers）**——项目之外提出的改动在它的 PR 里审查通过后才合并。
+- **批准者（Approvers）**——每次签名请求都由 [@2youg1](https://github.com/2youg1) 批准后才会签名。
+
+隐私政策见本文件的[隐私](#隐私)一节，以及 [SECURITY.md](SECURITY.md)。
+
 ### 可重放的历史
 
 城市做的每一个决定都是Ledger里的一行，这些行拿到任何一台机器上重放，结果都逐字节相同，因为决策路径把时间当作参数传进来、不用随机源、顺序也固定（[确定性](ARCHITECTURE.md#10-determinism-and-hardening)）。重放时不会再执行一遍工具或调用模型，而是把当时记下的结果读回来。城市只负责给出事实和边界，具体怎么做交给模型（[LLM First](ARCHITECTURE.md#llm-first-mechanism-from-the-city-method-from-the-model)）。
