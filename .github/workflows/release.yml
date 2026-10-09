@@ -215,20 +215,39 @@ jobs:
       #
       # The repository variable naming the signing policy is the one switch:
       # while it is unset, as it is until the Foundation has issued the
-      # project's certificate, the three steps are skipped and the row packs
+      # project's certificate, the signing steps are skipped and the row packs
       # the binary `just dist` built, unsigned; once it names a policy, every
       # run signs, and a tag push accepts only a Valid, timestamped signature.
+      # The artifact configuration enforces `product-name="sprawling"` and
+      # `product-version="${version}"` on the one `<pe-file>`, so this step
+      # reads the version from the workspace manifest, the version's one
+      # authority, and never from the binary it is about to vouch for. An
+      # artifact uploaded with `archive: false` takes its file's name and
+      # ignores `name:`, and a second upload of the same name in one run
+      # fails, so the file carries the commit and the attempt and a re-run
+      # can upload again.
+      - name: name the unsigned Windows binary for this attempt
+        if: runner.os == 'Windows' && vars.SIGNPATH_SIGNING_POLICY_SLUG != ''
+        id: unsigned-name
+        shell: pwsh
+        run: |
+          $meta = cargo metadata --format-version 1 --no-deps | ConvertFrom-Json
+          $version = @($meta.packages | Where-Object { $_.name -eq 'sprawling' })[0].version
+          if (-not $version) { throw 'cargo metadata names no sprawling package version' }
+          $file = "target/unsigned/sprawling-$version-$env:GITHUB_SHA-$env:GITHUB_RUN_ATTEMPT.exe"
+          New-Item -ItemType Directory -Force -Path target/unsigned | Out-Null
+          Copy-Item -LiteralPath target/release/sprawling.exe -Destination $file
+          "version=$version" | Add-Content -LiteralPath $env:GITHUB_OUTPUT
+          "path=$file" | Add-Content -LiteralPath $env:GITHUB_OUTPUT
       - name: upload the unsigned Windows binary
         if: runner.os == 'Windows' && vars.SIGNPATH_SIGNING_POLICY_SLUG != ''
         id: unsigned
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           # `archive: false` stores the executable itself rather than a ZIP
-          # of it, so the artifact configuration names one `<pe-file>` and
-          # enforces the product name and version on it, instead of reaching
-          # that file through a wrapper this step invented.
-          name: unsigned-windows-${{ github.sha }}-${{ github.run_attempt }}
-          path: target/release/sprawling.exe
+          # of it, so the artifact configuration's root is that `<pe-file>`
+          # rather than a wrapper this step invented.
+          path: ${{ steps.unsigned-name.outputs.path }}
           archive: false
           if-no-files-found: error
       - name: sign the Windows binary through SignPath
@@ -241,6 +260,10 @@ jobs:
           signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
           artifact-configuration-slug: ${{ vars.SIGNPATH_ARTIFACT_CONFIGURATION_SLUG }}
           github-artifact-id: ${{ steps.unsigned.outputs.artifact-id }}
+          # The value the artifact configuration's `product-version` checks
+          # the binary against.
+          parameters: |
+            version: ${{ toJSON(steps.unsigned-name.outputs.version) }}
           wait-for-completion: true
           # The Foundation requires a person to approve each signing request, so
           # this step waits on somebody reading their mail: ten minutes, the
