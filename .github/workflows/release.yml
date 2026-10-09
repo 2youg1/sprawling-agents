@@ -145,11 +145,13 @@ jobs:
       - uses: taiki-e/install-action@f7e5d7c961414b23f5b25b2da9294395d08513ad # v2
         with:
           tool: just
-      # One step for all three rows. `just package` takes the triple the
-      # matrix names and passes it down to `cargo xtask package`, which
-      # reads `target/<triple>/release` and puts the triple in the archive
-      # name (tools/xtask/Spec.lean §8-11). An empty triple is the host
-      # build, whose two archive names are what they always were.
+      # The same two recipes for all three rows: `just dist` here and
+      # `just archive` after the Windows row signs, the two halves of
+      # `just package`. Both take the triple the matrix names, and only the
+      # justfile turns it into the `--target` that `cargo xtask package`
+      # reads to find `target/<triple>/release` and name the archive
+      # (tools/xtask/Spec.lean §8-11). An empty triple is the host build,
+      # whose two archive names are what they always were.
       # Only main saves, and a tag push never runs on main, so the tag run
       # is warm only when a build-only dispatch of this workflow on main ran
       # first on the commit about to be tagged: a tag ref restores caches its
@@ -285,7 +287,7 @@ jobs:
           ARCHIVE_TARGET: ${{ matrix.target }}
         run: |
           set -euo pipefail
-          cargo xtask package "$ARCHIVE_TARGET"
+          just archive "$ARCHIVE_TARGET"
           if [ "$RUNNER_OS" = macOS ]; then
             shasum -a 256 target/package/*.zip > target/release-evidence/archives.sha256
           else

@@ -324,7 +324,7 @@ D19（人的定规）：彩色令牌照旧只落在主轴与它的补色上，�
 - **`binary_path` 住 `package`**。「产物住哪里」与「产物叫什么」是同一个事实的两半，分住两个模块就是两个权威；`budget` 反过来向 `package` 要路径，因为它的活是称重而不是定位。
 - **三元组进名字**。不进名字的话，musl 归档会叫 `sprawling-<version>-linux-x86_64.zip`，既不说静态也不说 musl，且**在出现第二份 Linux 产物（gnu）的那一天静默相撞**。主机构建的名字不带三元组。
 - **`--target <triple>` 由 `main` 解析**，与 `release` 的 `--tag`／`--assets`／`--out` 共用一个取值函数：两个旗标两份解析就是两种取值语义。
-- **`release.yml` 不重抄打包步骤**，三行矩阵走同一步 `just package ${{ matrix.target }}`；`just dist` 收下同一个可选参数。
+- **`release.yml` 不重抄打包步骤**。`just package` 是 `just dist` 与 `just archive` 两半的组合，两半收下同一个可选参数；三行矩阵各走 `just dist ${{ matrix.target }}` 与 `just archive ${{ matrix.target }}`，Windows 一行在两者之间签名。三元组变成 `--target` 的写法只在 `archive` 配方里有一处：`cargo xtask package` 不认裸三元组，会静默按 `Host` 读 `target/release`，所以 v0.0.11 接入签名时绕过 justfile 直调它，musl 一行就找不到二进制。
 - **本节属门禁机具，与产品代码分开提交。**
 
 **`skills/` 随归档走，整树收录（形状 2 行）。** 发布物是人解压即用的那一份：一座城对着解压出来的目录找 skill，zip 里没有 `skills/`，拿到发布物的人就测不了 skill 相关的一切。故归档内容表加一个变体 `Packaged::Skills`，**按相对路径排序整树收录**——skill 的名单归那个目录管，逐文件抄一张清单就是给它安第二个家；目录缺失即拒，恢复语与 `Document` 同形。随树同行的是 `skills/LICENSES.md`：MIT 要求版权与许可全文随副本走，CC BY-NC 要求署名，两者都由它承载，于是义务跟着文件走到树外的任何一份副本。

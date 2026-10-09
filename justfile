@@ -855,7 +855,13 @@ dist target="": build-web
 # never out of whatever happened to be in target/ from an earlier build.
 # The same optional triple: one recipe packages every row of the release
 # matrix, so a cross-built artifact cannot be assembled by other steps.
-package target="": (dist target)
+package target="": (dist target) (archive target)
+
+# The packing half of `package` alone, for release.yml, whose Windows row
+# signs the binary `dist` built before it is packed. This recipe is the
+# only place a triple becomes the `--target` the packer reads: a bare
+# triple is ignored there, and the packer then looks in target/release.
+archive target="":
     cargo xtask package {{ if target == "" { "" } else { "--target " + target } }}
 
 # Offline chain verification (A2); strictly read-only.
