@@ -13,6 +13,7 @@ import crates.sprawling.spec.Assembly.Listening
 import crates.sprawling.spec.BrowserBidi
 import crates.sprawling.spec.Console
 import crates.sprawling.spec.Console.Lifecycle
+import crates.sprawling.spec.Console.ProgramStatus
 import crates.sprawling.spec.Doctor
 import crates.sprawling.spec.Firstrun
 import crates.sprawling.spec.Install
@@ -65,6 +66,7 @@ import crates.sprawling.spec.WireClient
 | `spec/BrowserBidi.lean` | `bin::browser_bidi` |
 | `spec/Console.lean` | `bin::console` |
 | `spec/Console/Lifecycle.lean` | `bin::console::lifecycle` |
+| `spec/Console/ProgramStatus.lean` | `bin::console::program_status` |
 | `spec/Doctor.lean` | `bin::doctor` |
 | `spec/Firstrun.lean` | `bin::firstrun` |
 | `spec/Install.lean` | `bin::install` |
@@ -93,6 +95,7 @@ import crates.sprawling.spec.WireClient
 分部里的定理是模型对性质的证明，每个模型都带 `example` 走到每一条分支，所以这些保证不是从一个无法满足的前提推出来的：
 
 - `spec/Console/Lifecycle.lean`：只有停城请求进入收口，交互面上信号形式的 `SIGINT` 不停城，先到的缘由作数，一条轨迹至多写一次交接且交接带着缘由，装上的时限一直装着直到进程退出、时限到了一定退出（§8-11）。
+- `spec/Console/ProgramStatus.lean`：写出的报告总与终端此刻存着的不同，写出的就是此后终端存着的那条，每次计数之后终端存着的就是判出的状态，清掉之后再没有报告（§8-11、D77）。
 - `spec/Install.lean`：追加幂等、追加不遮挡、追加再移除回到原值、移除只动那一个目录（§8-9）。
 - `spec/Main/Exit.lean`：五个退出码两两不同，`Unheard` 的三种原因各落到一个码（§8-103）。
 - `spec/Main/Grammar.lean`：版本先于一切，帮助先于任何动词运行，`--` 之后的词不参与这两个判断，空行是首屏（§8-89）。
@@ -469,6 +472,7 @@ pub struct SystemClock;   // 墙钟的唯一采样点（clippy.toml 的 disallow
 | D71 | `crates/sprawling/spec/Privacy/Service.lean` |
 | D72 | `crates/sprawling/spec/Privacy/Service.lean` |
 | D75 | `crates/sprawling/spec/Console/Lifecycle.lean` |
+| D77 | `crates/sprawling/spec/Console/ProgramStatus.lean` |
 -/
 
 /-! D15 不从别的工具的配置里读 provider 表（人的决定）

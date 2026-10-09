@@ -8,7 +8,7 @@
 
 规定 `crates/sprawling/src/console.rs` 与 `crates/sprawling/src/console/`：服务中的那个终端（`bin::console`）。本文件是 `crates/sprawling/Spec.lean` 的一个分部；下面每一节保留它的标签 §8-n，别处引作 `crates/sprawling/Spec.lean §8-n`，决定引作 `sprawling D<n>`。
 
-这一分部只有文字：它是说明文档，不是形式规格。生命周期的状态机与它的性质在 `crates/sprawling/spec/Console/Lifecycle.lean`，那里的转移向量由 `bin::console::lifecycle` 的测试逐行回放；其余接口形状与取舍由 Rust 的类型与 `bin::console::tests::helpers`、`bin::console::tests::parsing`、`bin::console::tests::terminal` 守住。
+这一分部只有文字：它是说明文档，不是形式规格。生命周期的状态机与它的性质在 `crates/sprawling/spec/Console/Lifecycle.lean`，那里的转移向量由 `bin::console::lifecycle` 的测试逐行回放；报告给终端的程序状态（OSC 7501）的模型在 `crates/sprawling/spec/Console/ProgramStatus.lean`，由 `bin::console::program_status` 的测试回放；其余接口形状与取舍由 Rust 的类型与 `bin::console::tests::helpers`、`bin::console::tests::parsing`、`bin::console::tests::terminal` 守住。
 -/
 
 /-!
@@ -60,7 +60,9 @@ pub(crate) fn step(face: Face, event: Event) -> (Face, Option<Cause>);
 - 斜杠词表是 `wire::Slash`（§8-21），控制台不再有自己的一份；`/wire <verb> [<json>]` 收起其余 wire 动词，它们是 `wire::COMMAND_NAMES` 与 `QUERY_NAMES` 的投影，JSON 体缺 `idem` 时由控制台补上这一行的键。
 - **每一行一把幂等键，由控制台铸**：`LineKeys::drawn` 取 16 字节 OS 熵作 `origin`，`next` 按行计数，键 = `IdemKey::derive(RunId::CITY, 行号, origin)`。城把见过的键连同第一次的答复跨重启记住，所以只由文字派生的键会吞掉第二次敲的同一行。熵取不到时控制台说出原因并关闭，城照跑。
 
-**安静宿主（`QuietHost`）**：备用屏、raw 模式，恰好两行：地址，与配对码（本地门给出时；没有就只有地址），外加至多一行临时行：远程门的确认码，或收口进度。监听超出这台电脑、城为这次 serve 现铸了 key 时（`Terminal.token`），key 跟在第二行的配对码后面：备用屏是它唯一出现的地方，CLI 里要看它就 `/web`。主屏、回滚、地址栏与行控制台都不出现 key，`/web` 印出的地址不带 `?token=`，浏览器经 open code 配对（`firstrun::open_paired`）。Enter 再开一次浏览器，Esc 回到 `Cli`，主屏的回滚原样都在。离开备用屏之前先擦掉它（`Clear(All)` 再 `LeaveAlternateScreen`），因为用户设置可以让备用屏进回滚；真正的保证是配对码寿命短。窗口标题写「sprawling · closing this window stops it」，标题里不放配对码。安静宿主不订阅事件流。
+**安静宿主（`QuietHost`）**：备用屏、raw 模式，恰好两行：地址，与配对码（本地门给出时；没有就只有地址），外加至多一行临时行：远程门的确认码，或收口进度。监听超出这台电脑、城为这次 serve 现铸了 key 时（`Terminal.token`），key 跟在第二行的配对码后面：备用屏是它唯一出现的地方，CLI 里要看它就 `/web`。主屏、回滚、地址栏与行控制台都不出现 key，`/web` 印出的地址不带 `?token=`，浏览器经 open code 配对（`firstrun::open_paired`）。Enter 再开一次浏览器，Esc 回到 `Cli`，主屏的回滚原样都在。离开备用屏之前先擦掉它（`Clear(All)` 再 `LeaveAlternateScreen`），因为用户设置可以让备用屏进回滚；真正的保证是配对码寿命短。窗口标题写「sprawling · closing this window stops it」，标题里不放配对码。安静宿主不印事件流。
+
+**程序状态**（`bin::console::program_status`，模型、性质与取舍见 `Console/ProgramStatus.lean` D77）：CLI 与安静宿主两个面以 Program Status Protocol（OSC 7501）向终端报告整座城一条根记录：有请求待批是 `blocked`，有 run 在跑是 `working`，都没有时由最后一个结束的 run 决定 `done`、`error` 或 `idle`。UI 线程在开控制台、换面、读到 `run_started`、`run_frozen`、`approval_requested`、`approval_resolved` 时问一次 `Query::Metrics`，与终端存着的那条相同就不写，交还终端之前写 `state=clear`。报告只带计数，记录里的字到不了终端。`SPRAWLING_PROGRAM_STATUS=never` 关掉它；`Headless` 没有终端，不报告。
 
 **终端只有一个写者**（`bin::console::ui`）：一条 UI 线程拥有终端，别的线程经一个有界通道（`UI_DEPTH`，256 条）交给它一行；满了就丢，与诊断可丢同义，worker 与记账线程因此从不在终端上阻塞（旧 conhost 在选中文字时会暂停输出）。读键在另一条线程上，经同一个通道交进来。生命周期的面经 `tokio::sync::watch` 告诉 UI 线程，UI 线程按面切屏；面到了 `Stopping(_, Cut)` 时终端已经没了，UI 线程不再写任何东西。进入 raw 模式时装一个 panic hook：先擦掉备用屏、退出备用屏与 raw 模式，再交给原来的 hook，然后照常 abort。
 
