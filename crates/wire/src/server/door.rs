@@ -30,6 +30,7 @@ use crate::reception::{
 };
 
 use super::pairing::{PairProof, SessionBody};
+use super::seat::Seat;
 
 /// The label every session signature starts with, so a signature made
 /// for this door is not one any other protocol accepts.
@@ -269,6 +270,19 @@ impl LocalDoor {
         Ok(held.door.pair(line))
     }
 
+    /// One socket seated on `token` has ended; the last one to leave
+    /// starts the token's idle allowance now.
+    pub(super) fn unseat(&self, token: &B3Hash) {
+        let now = (self.0.senses.clock)();
+        let mut held = self.held();
+        match now {
+            Ok(now) => held.door.sessions_mut().unseat(token, now),
+            // Without a time the idle allowance cannot start, so the
+            // token ends now; the page signs a new one before it dials.
+            Err(_) => held.door.sessions_mut().end(token),
+        }
+    }
+
     /// A nonce for a paired browser to sign.
     pub(crate) fn challenge(&self) -> Result<String, AxError> {
         let entropy: [u8; 32] = drawn(&self.0.senses)?;
@@ -311,49 +325,6 @@ impl LocalDoor {
     /// whole, so a poisoned lock holds nothing half-written.
     fn held(&self) -> MutexGuard<'_, Held> {
         self.0.held.lock().unwrap_or_else(PoisonError::into_inner)
-    }
-}
-
-/// One socket's place at the door: the credential its hello showed, the
-/// session token it holds when that credential was one, and the signal
-/// that the door has since ended a token. Dropping it leaves the seat.
-pub(crate) struct Seat {
-    door: LocalDoor,
-    presented: Option<String>,
-    token: Option<B3Hash>,
-    ended: watch::Receiver<()>,
-}
-
-impl Seat {
-    /// The credential the socket's hello showed.
-    pub(crate) fn presented(&self) -> Option<&str> {
-        self.presented.as_deref()
-    }
-
-    /// Resolves when the door may have ended this socket's token; the
-    /// socket then judges [`Seat::presented`] again.
-    pub(crate) async fn ended(&mut self) {
-        // The sender lives in the door this seat holds, so it cannot be
-        // dropped first; a closed channel would mean nothing can end.
-        if self.ended.changed().await.is_err() {
-            std::future::pending::<()>().await;
-        }
-    }
-}
-
-impl Drop for Seat {
-    fn drop(&mut self) {
-        let Some(token) = self.token else {
-            return;
-        };
-        let now = (self.door.0.senses.clock)();
-        let mut held = self.door.held();
-        match now {
-            Ok(now) => held.door.sessions_mut().unseat(&token, now),
-            // Without a time the idle allowance cannot start, so the
-            // token ends now; the page signs a new one before it dials.
-            Err(_) => held.door.sessions_mut().end(&token),
-        }
     }
 }
 

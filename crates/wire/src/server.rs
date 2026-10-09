@@ -23,6 +23,7 @@ mod door;
 mod guard;
 mod listener;
 mod pairing;
+mod seat;
 mod socket;
 mod uploads;
 

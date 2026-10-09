@@ -41,7 +41,7 @@ use crate::reception::{
 use crate::reply::{Delivered, Reply};
 
 use super::config::{Answering, ShellState};
-use super::door::Seat;
+use super::seat::Seat;
 
 pub(crate) async fn upgrade(
     State(state): State<Arc<ShellState>>,
