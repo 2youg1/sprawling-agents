@@ -54,7 +54,7 @@ impl Session {
     fn live(&self, now: TimeMs) -> bool {
         match self.hold {
             Hold::Seated(_) => true,
-            Hold::Idle(_) => true,
+            Hold::Idle(since) => now.value() < since.value().saturating_add(SESSION_IDLE_MS),
         }
     }
 }
