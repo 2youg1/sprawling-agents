@@ -1072,7 +1072,7 @@ pgo-train archive:
     for _ in $(seq 1 100); do taken && break; sleep 0.1; done
     taken || { cat "$city/../serve.err" >&2; echo "pgo-train: the served city took no command within ten seconds" >&2; exit 1; }
     ask() { "$binary" call "$1" --at "$at" --quiet-ms 300 > /dev/null 2>&1; }
-    for query in city_view endpoint_view preferences metrics known_hosts approval_queue cost_view registry_view governance harnesses toolkits; do
+    for query in city_view endpoint_view preferences metrics known_hosts approval_queue cost_view registry_view governance agent_catalog toolkits; do
         ask "{\"ask\":{\"ask_id\":1,\"query\":\"$query\"}}"
     done
     ask '{"ask":{"ask_id":1,"query":{"building_view":{"addr":"hall"}}}}'

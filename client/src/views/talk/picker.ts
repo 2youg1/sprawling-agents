@@ -11,7 +11,7 @@
 // (`settings_row.svelte`) holds what is open and typed; `picker_look.ts`
 // turns this into the value `picker.look.svelte` draws.
 
-import type { Effort, EndpointSummary, ModelFactsSummary, ThinkingOffer } from "../../wire";
+import { DEFAULT_EFFORT, type Effort, type EndpointSummary, type ModelFactsSummary, type ThinkingOffer } from "../../wire";
 import type { Names } from "./composer";
 
 // One model one provider serves: the pair a selection names, and what
@@ -152,17 +152,12 @@ export function matches(entry: Entry, query: string): boolean {
 
 // ------------------------------------------------------------ thinking
 
-// The level a request uses when nobody stated one that this model
-// offers. The kernel's `consts_policy::DEFAULT_EFFORT` is the authority;
-// the wire carries no constant for it yet, so this is its one copy on
-// the client side.
-export const DEFAULT_EFFORT: Effort = "high";
-
 // The level a request would use, and why: the stated or inherited level
-// when this (Endpoint, model) offers it, else the default when offered,
-// else the upstream's own stated default; `null` when the field is left
-// out. IF-0 §2.6 and `gateway::provider::thinking` hold the rule; this
-// reads it for the mark, and the request itself is resolved there.
+// when this (Endpoint, model) offers it, else the default when offered
+// (`DEFAULT_EFFORT`, generated from the kernel's constant), else the
+// upstream's own stated default; `null` when the field is left out.
+// `gateway::provider::thinking` holds the rule; this reads it for the
+// mark, and the request itself is resolved there.
 export interface Used {
   readonly level: Effort;
   readonly by: "stated" | "default";

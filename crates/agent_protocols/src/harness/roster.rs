@@ -25,14 +25,14 @@ pub struct Official {
     /// Its id in the ACP registry, whose row says how it starts.
     pub registry_id: &'static str,
     /// The directories whose presence says it is installed or signed in
-    /// (`crates/wire/spec/Answer/Harnesses.lean` D23). Each row cites its
+    /// (`crates/agent_protocols/Spec.lean` D19). Each row cites its
     /// vendor page; an empty table reads as "not looked for".
     pub set_up: &'static [SetUpDir],
     /// Where its vendor says how a person signs in.
     pub docs: &'static str,
 }
 
-/// The five official harnesses, in the order the harness page shows them.
+/// The five official harnesses, in the order detection lists those it finds.
 pub const OFFICIAL: [Official; 5] = [
     Official {
         word: "claude_code",

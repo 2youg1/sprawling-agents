@@ -11,11 +11,13 @@ import { Schema } from "effect";
 /** The wire version both ends compare on connect. */
 export const WIRE_V = 65 as const;
 /** The schema hash the server checks: `wire::schema_hash()`. */
-export const WIRE_HASH = "a9979637188f7b07ad210817268e441fc642702284a3080b9266b9c5fd3e657d" as const;
+export const WIRE_HASH = "f600d096e924265f00a664d83ab6b49b4fc6f884bb547403aeeb4e410511e7c6" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 /** The smallest body size a person may ask for: `wire::BODY_PX_MIN`. */
 export const BODY_PX = { min: 12 } as const;
+/** The default thinking level: `kernel::consts_policy::DEFAULT_EFFORT`. */
+export const DEFAULT_EFFORT = "high" as const;
 
 /** The slash verbs a person types: `wire::Slash::ALL`. */
 export const SLASH = [
@@ -2325,48 +2327,6 @@ export const GuideProgress = Schema.Struct({
   texts: Schema.optional(Schema.NullOr(GuideMark)),
 }).annotate({ identifier: "GuideProgress" });
 export type GuideProgress = typeof GuideProgress.Type;
-
-/**
- * What a person does next about one harness: install its launcher,
- * install or sign in to the harness, or use it.
- */
-export const HarnessState = Schema.Union([
-  Schema.Struct({
-    launcher_missing: Schema.Struct({
-      program: Schema.String,
-    }),
-  }),
-  Schema.Struct({
-    not_set_up: Schema.Struct({
-      looked: Schema.Array(Schema.String),
-    }),
-  }),
-  Schema.Struct({
-    ready: Schema.Struct({
-      at: Schema.String,
-    }),
-  }),
-]).annotate({ identifier: "HarnessState" });
-export type HarnessState = typeof HarnessState.Type;
-
-/**
- * One harness as the page draws it.
- */
-export const HarnessLine = Schema.Struct({
-  docs: Schema.String,
-  launch: Schema.Array(Schema.String),
-  name: Schema.String,
-  state: HarnessState,
-}).annotate({ identifier: "HarnessLine" });
-export type HarnessLine = typeof HarnessLine.Type;
-
-/**
- * Every official harness, in the roster's order.
- */
-export const HarnessesAnswer = Schema.Struct({
-  harnesses: Schema.Array(HarnessLine),
-}).annotate({ identifier: "HarnessesAnswer" });
-export type HarnessesAnswer = typeof HarnessesAnswer.Type;
 
 /**
  * Ledger payload: a JSON object with every float refused, at construction
@@ -4717,9 +4677,6 @@ export const Answer = Schema.Union([
     known_hosts: KnownHostsAnswer,
   }),
   Schema.Struct({
-    harnesses: HarnessesAnswer,
-  }),
-  Schema.Struct({
     agent_catalog: AgentCatalogAnswer,
   }),
   Schema.Struct({
@@ -4980,7 +4937,6 @@ export const Query = Schema.Union([
   }),
   Schema.Literal("endpoint_view"),
   Schema.Literal("known_hosts"),
-  Schema.Literal("harnesses"),
   Schema.Literal("agent_catalog"),
   Schema.Struct({
     parse_agent_spec: Schema.Struct({

@@ -24,10 +24,10 @@ mod emit;
 const TARGET: &str = concat!(crate::walk::client_src!(), "/wire.ts");
 
 /// What the generated file states before any type: the wire version
-/// both ends compare, the schema hash the server checks, and the run
-/// identity a city-level record carries, and the body size floor. Values that always
-/// travel together and are never chosen independently, so they travel
-/// as one.
+/// both ends compare, the schema hash the server checks, the run
+/// identity a city-level record carries, the body size floor, the default
+/// thinking level and the slash verbs. Values that always travel together
+/// and are never chosen independently, so they travel as one.
 pub(super) struct Constants {
     pub(super) wire_v: u32,
     pub(super) hash: String,
@@ -39,6 +39,11 @@ pub(super) struct Constants {
     /// admits; the appearance page's box reads this floor rather than a
     /// copy of its own.
     pub(super) body_px_min: u32,
+    /// `kernel::consts_policy::DEFAULT_EFFORT` as the wire spells it: the
+    /// level a request uses when nobody stated one the model offers. The
+    /// picker marks the level a request would use, and a copy of its own
+    /// would mark a level the city no longer sends.
+    pub(super) default_effort: &'static str,
     /// `wire::Slash::ALL`, one row per verb: spelling, argument, where it
     /// is offered, and the sentence that explains it. The client's own
     /// table reads these rather than spelling a verb a second time.
@@ -57,6 +62,7 @@ fn render() -> Result<String, XtaskError> {
         hash: wire::schema_hash().to_string(),
         city_run: kernel::RunId::CITY.to_string(),
         body_px_min: wire::BODY_PX_MIN,
+        default_effort: kernel::consts_policy::DEFAULT_EFFORT.as_str(),
         slash: wire::Slash::ALL
             .into_iter()
             .map(|verb| {

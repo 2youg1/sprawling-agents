@@ -113,9 +113,10 @@ impl RunWorker {
     ///
     /// # Errors
     /// Refuses a halted scope, the reserved subtree, and rules that will
-    /// not load; for a room whose resident is a harness, a spelling that
-    /// names none of the five, a confidential building and a dispatch
-    /// that names a model; otherwise a tag with no model behind it, an
+    /// not load; for a room whose resident is an ACP agent, a word that
+    /// names neither an `[[agent]]` row nor a built-in entry, a row changed
+    /// after its consent, a confidential building and a dispatch that
+    /// names a model; otherwise a tag with no model behind it, an
     /// endpoint that is no longer attached, and a confidential building
     /// whose model would leave this machine.
     pub(super) fn agree_to_work(&mut self, at: &Assignment) -> Result<Seat, AxError> {

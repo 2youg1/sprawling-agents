@@ -40,7 +40,6 @@ mod evidence;
 mod find;
 mod git_status;
 mod github;
-mod harnesses;
 mod history;
 mod hunks;
 mod identity;
@@ -93,7 +92,6 @@ pub use evidence::{EvidenceAnswer, EvidenceItem, EvidenceKind, Picture};
 pub use find::{FIND_MAX, FIND_WALK_MAX, FindAnswer, Walked};
 pub use git_status::{Drift, GitStatusAnswer};
 pub use github::{GithubLoginAnswer, GithubReading};
-pub use harnesses::{HarnessLine, HarnessState, HarnessesAnswer};
 pub use history::{HistoryAnswer, HistoryRangeAnswer};
 pub use hunks::{HunksAnswer, PatchLine, Withheld};
 pub use identity::{IdentityAnswer, StatedIdentity};
@@ -209,7 +207,6 @@ pub enum Answer {
     Cost(Box<CostAnswer>),
     Endpoints(EndpointsAnswer),
     KnownHosts(KnownHostsAnswer),
-    Harnesses(HarnessesAnswer),
     AgentCatalog(Box<AgentCatalogAnswer>),
     /// One pasted spec read as an agent entry (`crates/wire/spec/Answer/Agents.lean` §8-90).
     AgentSpec(Box<AgentOffer>),

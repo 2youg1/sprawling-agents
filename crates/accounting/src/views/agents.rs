@@ -12,14 +12,13 @@ use std::path::PathBuf;
 use agent_protocols::{AgentEntry, AgentSource, Pin};
 
 use super::holding::Views;
-use super::lines::HarnessReach;
 use super::prepared::{Prepared, unavailable_because};
 
 /// What the catalog page is read from, copied out of the views so the
 /// files are read with the snapshot let go.
 pub struct CatalogAsk {
     city_root: PathBuf,
-    reach: Option<HarnessReach>,
+    place: Option<fn(&agent_protocols::SetUpDir) -> Option<PathBuf>>,
     offered: Option<crate::offered::Offered>,
 }
 
@@ -27,7 +26,7 @@ pub struct CatalogAsk {
 pub(super) fn catalog_ask(views: &Views) -> Prepared {
     Prepared::Agents(CatalogAsk {
         city_root: views.city_root.clone(),
-        reach: views.reach.programs,
+        place: views.reach.places,
         offered: views.offered.clone(),
     })
 }
@@ -41,8 +40,8 @@ impl CatalogAsk {
         match crate::roster::roster(&self.city_root) {
             Ok(roster) => {
                 let detected = self
-                    .reach
-                    .map(|reach| evidence(&roster, reach))
+                    .place
+                    .map(|place| evidence(&roster, place))
                     .unwrap_or_default();
                 if let Some(offered) = &self.offered {
                     offered.remember(&detected);
@@ -69,16 +68,18 @@ fn catalog_of(roster: &agent_protocols::Roster, detected: &[AgentEntry]) -> wire
 
 /// What this machine shows: the other clients' files that exist and read,
 /// and the vendor directories that exist.
-fn evidence(roster: &agent_protocols::Roster, reach: HarnessReach) -> Vec<AgentEntry> {
+fn evidence(
+    roster: &agent_protocols::Roster,
+    place: fn(&agent_protocols::SetUpDir) -> Option<PathBuf>,
+) -> Vec<AgentEntry> {
     let configs: Vec<String> = agent_protocols::CLIENT_CONFIGS
         .iter()
-        .filter_map(reach.place)
+        .filter_map(place)
         // A client that is not installed has no file, and one that cannot
         // be read shows nothing: evidence only orders and hints, so a file
         // that does not read is no evidence rather than a refused page.
         .flat_map(std::fs::read_to_string)
         .collect();
-    let place = reach.place;
     agent_protocols::detected(
         roster,
         |dir| place(dir).is_some_and(|at| at.is_dir()),

@@ -17,7 +17,6 @@ import crates.wire.spec.Answer.DocumentVersions
 import crates.wire.spec.Answer.Endpoints
 import crates.wire.spec.Answer.Find
 import crates.wire.spec.Answer.Github
-import crates.wire.spec.Answer.Harnesses
 import crates.wire.spec.Answer.Hunks
 import crates.wire.spec.Answer.Identity
 import crates.wire.spec.Answer.KnownHosts
@@ -250,7 +249,6 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 | 8-49 | `crates/wire/spec/Server.lean` |
 | 8-50 | `crates/wire/spec/Answer/Doctor.lean` |
 | 8-51 | `crates/wire/spec/Answer/KnownHosts.lean` |
-| 8-52 | `crates/wire/spec/Answer/Harnesses.lean` |
 | 8-53 | `crates/wire/spec/Reading.lean` |
 | 8-54 | `crates/wire/spec/Answer/Commits.lean` |
 | 8-55 | `crates/wire/spec/Reading.lean` |
@@ -371,7 +369,6 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 | D20 | 送页面的两条路由是一个公开函数，城的端口与远程监听各把它并进自己的路由表 | `crates/wire/spec/Server.lean` |
 | D21 | session 的标签住在人的偏好文件里，按 `(city, room, began)` 存 | `crates/wire/spec/Preference.lean` |
 | D22 | V0.0.9 的线上改形一次进位，由一个变更集落地 | `crates/wire/spec/Frames.lean` |
-| D23 | harness 一行说三态：启动程序缺失、harness 没装或没登录、可用 | `crates/wire/spec/Answer/Harnesses.lean` |
 | D24 | 更新检查同时问 npm 与 crates.io，按这份二进制的安装方式给出更新命令 | `crates/wire/spec/Answer/Release.lean` |
 | D25 | 依赖项页逐行已够；城目录前的扫描上页面，是 `DoctorAnswer` 的一件 | `crates/wire/spec/Answer/Doctor.lean` |
 | D26 | 沙箱臂按机制族命名，每个名字在三个平台上都有可填的臂 | `crates/wire/spec/Answer/Doctor.lean` |

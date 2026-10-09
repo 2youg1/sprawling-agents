@@ -32,7 +32,7 @@ impl Views {
     pub fn lend_the_vault(&mut self, vault: Arc<Mutex<gateway::Custodian>>);
     pub fn ask_the_registry_through(&mut self, newest: fn() -> wire::ReleaseAnswer);
     pub fn ask_upstream_through(&mut self, newest: fn(&str) -> wire::DoctorUpstream);
-    pub fn look_for_harnesses_through(&mut self, find: fn(&str) -> Option<PathBuf>, place: fn(&agent_protocols::SetUpDir) -> Option<PathBuf>);
+    pub fn look_for_agents_through(&mut self, place: fn(&agent_protocols::SetUpDir) -> Option<PathBuf>);
 }
 pub enum Prepared { /* 锁放开之后还要做的那一步 */ }
 impl Prepared { pub fn finish(self) -> wire::Answer; }
@@ -51,8 +51,7 @@ pub fn lineage_of(ledger_dir: &Path) -> Result<Lineage, AxError>;
 ```
 
 - **读面对这台电脑只有五个入口，都经 `views::served` 交进来。** `machine` 是城启动后 doctor 看到的那一眼；`vault` 是 worker 打开的那一个；`registry` 与 `upstream` 各问一次网络；`programs` 回答「这台电脑的搜索路径上有没有这个程序」。五个都是服务中的城交的，所以一份没人 serve 的 `Views`（重建、`ask`、测试）对它们一律答 `Unavailable`，不去碰这台电脑。
-- **harness 页经 `Views.programs` 找程序。** `Query::Harnesses` 在快照放开之后作答：`Some(find)` 时对 `agent_protocols::OFFICIAL` 里每一个内置条目的启动程序（取自随版本附带的目录快照）调一次 `find`，`found` 是它有没有交回一条路径；`None` 时答 `Unavailable { query: "Harnesses" }`。生产交的是 `bin::doctor::host::find_program`，它读的是 doctor 读的同一条搜索路径（`host::search_path` 加 `probe::on_search_path`），所以 harness 页与 doctor 对同一个程序给同一个答案。钉住它的测试是 `a_harness_is_looked_for_through_the_search_the_views_were_handed` 与 `a_harness_page_nobody_served_answers_unavailable`（`accounting::views::served::tests`）。
-- **ACP 页的两问不碰这台电脑。** `Query::AgentCatalog` 答 `AgentCatalogAnswer`：`catalog` 是 `agent_protocols::Catalog::bundled` 的每一项，`added` 是城 `CONFIG.toml` 的 `[[agent]]` 行（`city::agent_rows`），`seated_in` 是今天就能读到的那一部分：城层或楼层的 `[resident] harness` 点名它的地址；`snapshot` 是快照的 `Date` 与 `ETag`；`detected` 是 `agent_protocols::detected` 的答案，读的路径经 `Views.programs` 的 `place` 交进来（与 harness 页同一个入口），没人 serve 的 `Views` 答空表，不碰这台电脑。每个 offer 的 `spec_digest` 是 `Launch::digest`，`AddAgent` 把它带回来作同意。`Query::ParseAgentSpec { text }` 答 `agent_protocols::pasted` 读出的那一个 offer，读不出的整问以它的拒词作答（`AskOutcome::Refusal`）。两问都在快照放开之后作答，不经 `Views` 的五个入口。**答出去的 offer 记在 `accounting::offered::Offered`**：serve 的城经 `Views::remember_offers_in` 交进来一份，`detected` 的每一项与 `ParseAgentSpec` 读出的那一项各记一次（按启动说明的摘要，最多 64 项，满了丢最旧的），因为 `AddAgent` 只带回摘要，粘贴的原文与这台电脑上的线索都不在命令里；注册表的条目不记，同意时从附带的快照重取。`Offered::consented` 按摘要与来源取回那一项，没有就以 `E_CONFIG_INVALID` 拒，恢复语让人重开 ACP 页、从此刻的卡片再加一次。没人 serve 的 `Views` 不记。
+- **ACP 页的两问不碰这台电脑。** `Query::AgentCatalog` 答 `AgentCatalogAnswer`：`catalog` 是 `agent_protocols::Catalog::bundled` 的每一项，`added` 是城 `CONFIG.toml` 的 `[[agent]]` 行（`city::agent_rows`），`seated_in` 是今天就能读到的那一部分：城层或楼层的 `[resident] harness` 点名它的地址；`snapshot` 是快照的 `Date` 与 `ETag`；`detected` 是 `agent_protocols::detected` 的答案，读的路径经 `Views.places` 交进来（`look_for_agents_through`，D13），没人 serve 的 `Views` 答空表，不碰这台电脑。每个 offer 的 `spec_digest` 是 `Launch::digest`，`AddAgent` 把它带回来作同意。`Query::ParseAgentSpec { text }` 答 `agent_protocols::pasted` 读出的那一个 offer，读不出的整问以它的拒词作答（`AskOutcome::Refusal`）。两问都在快照放开之后作答，不经 `Views` 的五个入口。**答出去的 offer 记在 `accounting::offered::Offered`**：serve 的城经 `Views::remember_offers_in` 交进来一份，`detected` 的每一项与 `ParseAgentSpec` 读出的那一项各记一次（按启动说明的摘要，最多 64 项，满了丢最旧的），因为 `AddAgent` 只带回摘要，粘贴的原文与这台电脑上的线索都不在命令里；注册表的条目不记，同意时从附带的快照重取。`Offered::consented` 按摘要与来源取回那一项，没有就以 `E_CONFIG_INVALID` 拒，恢复语让人重开 ACP 页、从此刻的卡片再加一次。没人 serve 的 `Views` 不记。
 - **对 `sprawling` 公开的是这一节列出的面。** 模块在 `sprawling` 里时 `pub(crate)` 的条目，搬过来以后是 `pub`：装配根、服务面与二进制照原样读它们。`Views::answer` 仍只在本 crate 的测试里存在；`sprawling` 的测试写 `prepare(&query).finish()`，那是生产走的同一条路。
 - **`lineage` 与 `views` 同住本 crate，因为读者跨两处。** `sprawling view` 的 run 列表在二进制里，playback 的共享投影在本 crate 的读面里；二进制够得到本 crate，本 crate 够不到二进制。
 - **依赖**：`views` 折叠 `storage::HotView`、`storage::Attribution` 与 `storage::LedgerIndex`，快照起步经 `runtime::replay::fold_ledger_dir`，所以本 crate 依赖 `storage` 与 `runtime`（ARCHITECTURE.md §3 的 `depmap`，D14）。
@@ -79,9 +78,9 @@ pub(crate) fn config_answer(city_root: &Path, addr: &Address, vault: Option<&Arc
 - 验收：`accounting::views::providers::tests` 的 `every_key_state_is_read_from_what_the_vault_describes`、`the_search_answer_names_the_city_value_apart_from_a_building_override`；`accounting::worker::credentials::tests::accounts::readback` 的 `each_account_reads_its_key_state_and_the_tuning_reads_back_as_attached`（真实 worker 挂上三个账号，金库借出前全是 `Unread`，借出后按次序读出）；`accounting::tuning::tests` 的 `a_tuning_read_back_attaches_to_the_same_tuning`；`accounting::worker::commanding::tests::configuring` 的两条（城一级 `[search]` 写下并读回、被拒的一帧什么都不落）。
 -/
 
-/-! D13 harness 页找程序经 `Views.programs` 这个 `fn` 指针，不经 `Machine`，也不在开城时算好
+/-! D13 ACP 页的检测找厂商目录经 `Views.places` 这个 `fn` 指针，不经 `Machine`，也不在开城时算好
 
-理由：这一问读的是此刻的搜索路径，与 `registry`、`upstream` 同形——没有状态、服务中的城交一次、`None` 就答 `Unavailable`（D10）；它不启动任何程序，所以不必等 `DoctorRefresh`。被否决的做法：给 `Machine` 加一个方法——`Machine` 属于 worker，读面拿不到它，而且 doctor 的逐项查法已经在 `bin::doctor::Machine::look` 里，再加一个方法就是第二条查法；在开城时把 harness 的有无算进 `DoctorAnswer`——那是一个线上的形状改动，而且人在 harness 页上装完一个程序，要等到下一次 `DoctorRefresh` 才看得到它。
+理由：这一问读的是此刻这台电脑上的目录与文件，与 `registry`、`upstream` 同形——没有状态、服务中的城交一次（生产交 `bin::doctor::host::place_set_up`，读厂商文档写的变量与家目录，`crates/agent_protocols/Spec.lean` D19）、`None` 就答空的 `detected`（D10）；它不启动任何程序，所以不必等 `DoctorRefresh`。被否决的做法：给 `Machine` 加一个方法——`Machine` 属于 worker，读面拿不到它，而且 doctor 的逐项查法已经在 `bin::doctor::Machine::look` 里，再加一个方法就是第二条查法；在开城时把检测的结果算进 `DoctorAnswer`——那是一个线上的形状改动，而且人装完一个 agent，要等到下一次 `DoctorRefresh` 才看得到它。
 -/
 
 /-! D14 `views` 搬进来时，本 crate 加 `storage` 与 `runtime` 两条边

@@ -59,8 +59,14 @@ pub(super) fn emit(document: &Value, constants: &Constants) -> Result<String, Re
          /** The run a city-level record carries: `kernel::RunId::CITY`. */\n\
          export const CITY_RUN = \"{}\" as const;\n\
          /** The smallest body size a person may ask for: `wire::BODY_PX_MIN`. */\n\
-         export const BODY_PX = {{ min: {} }} as const;\n\n",
-        constants.wire_v, constants.hash, constants.city_run, constants.body_px_min
+         export const BODY_PX = {{ min: {} }} as const;\n\
+         /** The default thinking level: `kernel::consts_policy::DEFAULT_EFFORT`. */\n\
+         export const DEFAULT_EFFORT = {} as const;\n\n",
+        constants.wire_v,
+        constants.hash,
+        constants.city_run,
+        constants.body_px_min,
+        quoted(constants.default_effort)
     );
     out.push_str(
         "/** The slash verbs a person types: `wire::Slash::ALL`. */\nexport const SLASH = [\n",

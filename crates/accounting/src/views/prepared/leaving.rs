@@ -87,15 +87,6 @@ impl Prepared {
         Err(refusal)
     }
 
-    pub(super) fn harnesses_answer(
-        reach: Option<crate::views::lines::HarnessReach>,
-    ) -> wire::Answer {
-        match reach {
-            Some(reach) => crate::views::lines::harnesses_answer(reach),
-            None => unavailable("Harnesses".to_owned()),
-        }
-    }
-
     /// One item's publisher, asked for the newest version of a named
     /// item, which leaves this machine too.
     pub(super) fn upstream_answer(

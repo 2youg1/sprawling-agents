@@ -28,9 +28,9 @@ pub(super) struct Reach {
     pub(super) registry: Option<fn() -> wire::ReleaseAnswer>,
     /// Asks one item's publisher for its newest release.
     pub(super) upstream: Option<fn(&str) -> wire::DoctorUpstream>,
-    /// Asks this machine's search path for a launcher, and where one
-    /// harness's set-up directory is.
-    pub(super) programs: Option<super::lines::HarnessReach>,
+    /// Places a vendor's set-up directory or another ACP client's
+    /// configuration file on this machine.
+    pub(super) places: Option<fn(&agent_protocols::SetUpDir) -> Option<std::path::PathBuf>>,
     /// Asks the GitHub CLI which login one host is signed in as.
     pub(super) github: Option<fn(&str) -> wire::GithubReading>,
 }
@@ -71,16 +71,15 @@ impl Views {
         self.reach.upstream = Some(newest);
     }
 
-    /// Takes the one way this city asks its search path for a program,
-    /// and the one way it places a harness's set-up directory on this
-    /// machine, so the harness page reads this machine only through what
-    /// the served city handed in (`crates/accounting/spec/Views.lean` §8-10).
-    pub fn look_for_harnesses_through(
+    /// Takes the one way this city places a vendor's set-up directory or
+    /// another ACP client's file on this machine, so the ACP page's
+    /// detection reads this machine only through what the served city
+    /// handed in (`crates/accounting/spec/Views.lean` D13).
+    pub fn look_for_agents_through(
         &mut self,
-        find: fn(&str) -> Option<std::path::PathBuf>,
         place: fn(&agent_protocols::SetUpDir) -> Option<std::path::PathBuf>,
     ) {
-        self.reach.programs = Some(super::lines::HarnessReach { find, place });
+        self.reach.places = Some(place);
     }
 
     /// Takes the memory the ACP page's offers are kept in, which the served
@@ -130,89 +129,6 @@ mod tests {
         assert_eq!(
             views.prepare(&wire::Query::NewestRelease).finish(),
             wire::Answer::Release(Box::new(scripted()))
-        );
-    }
-
-    /// The fake home directory the scripted placement puts every
-    /// set-up directory under.
-    static HOME: std::sync::OnceLock<tempfile::TempDir> = std::sync::OnceLock::new();
-
-    /// A search that finds every program.
-    fn found_everywhere(program: &str) -> Option<std::path::PathBuf> {
-        Some(std::path::PathBuf::from(program))
-    }
-
-    /// A placement under the fake home, with no variable set.
-    fn under_the_fake_home(dir: &agent_protocols::SetUpDir) -> Option<std::path::PathBuf> {
-        dir.on(HOME.get().map(tempfile::TempDir::path), None)
-    }
-
-    /// A5: a launcher on the search path is not a harness set up. With
-    /// Claude Code's directory under the home and nothing else, Claude
-    /// Code is ready and every other harness names the path looked at.
-    #[test]
-    fn a_harness_is_set_up_only_where_its_vendor_directory_exists() {
-        let home = HOME.get_or_init(|| tempfile::tempdir().unwrap()).path();
-        std::fs::create_dir_all(home.join(".claude")).unwrap();
-        let dir = tempfile::tempdir().unwrap();
-        let mut views = Views::new(dir.path());
-        views.look_for_harnesses_through(found_everywhere, under_the_fake_home);
-
-        let wire::Answer::Harnesses(page) = views.prepare(&wire::Query::Harnesses).finish() else {
-            panic!("Harnesses answers with the harness page");
-        };
-        let shown = |path: std::path::PathBuf| path.display().to_string();
-        assert_eq!(
-            page.harnesses
-                .into_iter()
-                .map(|line| (line.name, line.state))
-                .collect::<Vec<_>>(),
-            vec![
-                (
-                    "claude_code".to_owned(),
-                    wire::HarnessState::Ready {
-                        at: shown(home.join(".claude"))
-                    }
-                ),
-                (
-                    "codex".to_owned(),
-                    wire::HarnessState::NotSetUp {
-                        looked: vec![shown(home.join(".codex"))]
-                    }
-                ),
-                (
-                    "grok_build".to_owned(),
-                    wire::HarnessState::NotSetUp {
-                        looked: vec![shown(home.join(".grok"))]
-                    }
-                ),
-                (
-                    "kimi_code".to_owned(),
-                    wire::HarnessState::NotSetUp {
-                        looked: vec![shown(home.join(".kimi-code"))]
-                    }
-                ),
-                (
-                    "pi".to_owned(),
-                    wire::HarnessState::NotSetUp {
-                        looked: vec![shown(home.join(".pi").join("agent"))]
-                    }
-                ),
-            ],
-        );
-    }
-
-    #[test]
-    fn a_harness_page_nobody_served_answers_unavailable() {
-        let dir = tempfile::tempdir().unwrap();
-        assert_eq!(
-            Views::new(dir.path())
-                .prepare(&wire::Query::Harnesses)
-                .finish(),
-            wire::Answer::Unavailable {
-                query: "Harnesses".to_owned(),
-                reason: None,
-            },
         );
     }
 }

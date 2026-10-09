@@ -30,5 +30,5 @@ pub struct DeviceLine {
 - **一台浏览器一行**：配对时页面在自己的源里生成一把不可导出的设备钥，城只存公钥（城的 `.sprawling/` 里），并给它一个 id；之后每次建会话都以这把钥签一次挑战（§8-93）。`ForgetDevice { device, idem }` 删掉那一行，那台浏览器下次只能重新配对。
 - **`DeviceId` 只是正文**：线上的 id 是城在配对时给出的那串字，`wire` 不解析它；一个城不认识的 id 与一个拼错的 id 得到同一个拒绝，因为对 `ForgetDevice` 来说两者是同一件事：没有这台设备。
 - **答复里没有公钥，也没有会话**：页面要的是认出与撤销，公钥与会话令牌对它没有用，放进答复只多一处可以被读走的地方。
-- **现状**：`Devices` 在线上，城以 `Answer::Unavailable` 作答，`ForgetDevice` 以 `not_built` 作答，直到本地门的配对落地（`crates/sprawling/Spec.lean`）。
+- **谁作答**：`Devices` 与 `ForgetDevice` 都由服务中的城的本地门回答（`bin::assembly::listening::doorstep`），因为配对过的浏览器是门的状态，不是账本折出的事实；没人 serve 的 `Views` 答 `Unavailable`。
 -/
