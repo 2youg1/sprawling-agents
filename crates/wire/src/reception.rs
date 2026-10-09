@@ -190,7 +190,8 @@ pub fn decide_handshake(hello: &Hello, expected: &Welcome, keys: &Keys<'_>) -> H
                 "the greeting carries neither this city's key nor a live session token",
             )
             .with_recovery(
-                "reload the page to sign in again; a program on this machine reads the key                  from the city's key file, or takes --token",
+                "reload the page to sign in again; a program on this machine reads the key \
+                 from the city's key file, or takes --token",
             ),
         ),
     }

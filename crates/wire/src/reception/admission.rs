@@ -67,7 +67,8 @@ pub fn decide_standing(pairing: Pairing) -> Standing {
                 "this browser was forgotten, or its session token has ended",
             )
             .with_recovery(
-                "pair this browser again with the pairing code the terminal shows; a browser                  the city still knows reconnects by itself",
+                "pair this browser again with the pairing code the terminal shows; a browser \
+                 the city still knows reconnects by itself",
             ),
         )),
     }
@@ -126,7 +127,8 @@ pub fn decide_admission(door: Door, pairing: Pairing) -> Admission {
             "the request carried neither this city's key nor a live session token",
         )
         .with_recovery(
-            "send the session token or the city's key as an `Authorization: Bearer` header;              a program on this machine reads the key from the city's key file",
+            "send the session token or the city's key as an `Authorization: Bearer` header; \
+             a program on this machine reads the key from the city's key file",
         ),
     )
 }
