@@ -34,6 +34,14 @@ already on the screen; a list opened in full scrolls inside that room. -->
     item.chosen ? "wash-strong text-text" : item.cursor ? "bg-raised-hover text-text-quiet" : "text-text-quiet",
     item.cursor ? "chosen" : "",
   ];
+  // The window's height caps the panel, and so does the room on the side
+  // it opened on: a box standing in the middle of an empty room leaves
+  // less above it than the panel wants, and the panel then scrolls
+  // inside that room rather than rising past the window's top. The gap
+  // it keeps from its anchor, and as much again from the edge, comes off.
+  const cap = $derived(
+    look.room === null ? undefined : `min(85dvh, calc(${String(look.room)}px - var(--spacing-snug) * 2))`,
+  );
   // The sentence under the band: the level the cursor is on, else the
   // level in use.
   const noteOf = (list: ListLook): string | undefined =>
@@ -54,6 +62,7 @@ already on the screen; a list opened in full scrolls inside that room. -->
     "absolute right-0 flex max-h-[85dvh] w-[34rem] max-w-full flex-col gap-snug overflow-y-auto rounded-panel border border-edge-panel bg-raised py-snug pl-snug shadow-float",
     look.side === "above" ? "bottom-full mb-snug rise" : "top-full mt-snug drop",
   ]}
+  style:max-height={cap}
   {...look.dialog}
 >
   {#each look.lists as list (list.key)}

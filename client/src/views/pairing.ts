@@ -15,6 +15,7 @@ export const WHY: Readonly<Record<PairWhy, Key | undefined>> = {
   first: undefined,
   open_used: "pair_open_used",
   session_lost: "pair_session_lost",
+  keyless: "pair_keyless",
 };
 
 // The code as typed, the way a person copies it from a terminal: a

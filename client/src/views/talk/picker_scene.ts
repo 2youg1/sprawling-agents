@@ -44,6 +44,10 @@ export interface PickerHeld {
   readonly parent: string | null;
   // The entries chosen when the picker opened, kept inside the first five.
   readonly pinned: { readonly first: string | undefined; readonly second: string | undefined };
+  // The combination in force when the picker opened, which heads the
+  // recent section for as long as it stays open: a choice made inside
+  // this opening adds no row there, so the popover keeps its height.
+  readonly opened: Combination | null;
   readonly query: string;
   readonly whole: readonly Section[];
   readonly kept: readonly Combination[];
@@ -78,6 +82,20 @@ export function sceneOf(lang: Lang, facts: PickerFacts, held: PickerHeld): Scene
     first,
     parent: first.find((entry) => entry.id === parentId),
   };
+}
+
+// The combination a scene shows: its pair, and the level a request
+// there would use.
+export function combinationOf(scene: Pick<Scene, "offer" | "used">): Combination | null {
+  const { offer, used } = scene;
+  return offer === undefined ? null : { endpoint: offer.endpoint, model: offer.model, level: used?.level ?? null };
+}
+
+// The combination in force before anything is chosen: the city's `main`
+// and the level a request to it would use.
+export function inForce(facts: PickerFacts): Combination | null {
+  const offer = offersOf(facts.endpoints).find((each) => each.endpoint === facts.chosen?.endpoint && each.model === facts.chosen.model);
+  return combinationOf({ offer, used: offer === undefined ? null : usedLevel(offer.facts.thinking, facts.stated) });
 }
 
 // A level as the upstream words it, else as the city does.

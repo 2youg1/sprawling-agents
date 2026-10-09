@@ -68,6 +68,19 @@ export function sideFor(layer: HTMLElement, preferred: Side): Side {
   return preferred === "below" ? "above" : "below";
 }
 
+// How tall `layer` may stand on `side` of its anchor without leaving the
+// box that clips it, in pixels: the room between the anchor's edge and
+// the clipping box's edge. A layer whose own side was too short and the
+// other no better keeps its side (`opensOn`), so this is what stops it
+// at the window's edge rather than past it.
+export function roomOn(layer: HTMLElement, side: Side): number | null {
+  const anchor = layer.offsetParent;
+  if (!(anchor instanceof HTMLElement)) return null;
+  const box = anchor.getBoundingClientRect();
+  const clip = clipOf(anchor);
+  return Math.max(0, side === "above" ? box.top - clip.top : clip.bottom - box.bottom);
+}
+
 // Scrolls `list` so `row` is in view, by `reveal`. Neither the focus
 // nor any other scroller moves.
 export function revealIn(list: HTMLElement, row: HTMLElement): void {

@@ -16,7 +16,7 @@ import type { HTMLFormAttributes, HTMLTextareaAttributes } from "svelte/elements
 
 import type { Belief, RunBelief } from "../../core/belief";
 import { heldIn } from "../../core/belief/rooms";
-import { selectModel } from "../../core/commands";
+import { configureCity, selectModel } from "../../core/commands";
 import type { Key, Lang } from "../../core/lang";
 import { fill, say } from "../../core/lang";
 import { MAYOR } from "../../core/route";
@@ -139,6 +139,13 @@ export interface PickHands {
 }
 
 // Picks configure the next dispatch; session creation belongs to slash commands.
+// A level picked here is the stored level: it goes to the city's own
+// `[model] effort`, the one key the settings card writes too, and the
+// page drops the level `/effort` stated, so the frame carries none.
+// The city then sends the stored level when the model offers it and
+// the default rule's level when it does not
+// (`gateway::provider::thinking` `ThinkingOffer::ask`);
+// only a level stated for the request is refused before dispatch.
 export function picksFor(hands: PickHands, session: string | null): Picks {
   return {
     model: (names) => {
@@ -151,7 +158,7 @@ export function picksFor(hands: PickHands, session: string | null): Picks {
       if (address !== null) hands.go({ kind: "talk", address });
     },
     effort: (level) => {
-      hands.chooseEffort(level);
+      if (hands.send(configureCity(null, level))) hands.chooseEffort(null);
     },
   };
 }

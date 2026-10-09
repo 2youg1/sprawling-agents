@@ -24,8 +24,9 @@ the value `settings_row.look.svelte` draws. It writes no class. -->
   import Listening from "./listening.svelte";
   import PillView from "./pill.svelte";
   import { childOf, offersOf, orderOf, parentOf } from "./picker";
-  import type { Section, Segment } from "./picker";
+  import type { Combination, Section, Segment } from "./picker";
   import { pickerOf, startOf } from "./picker_look";
+  import { inForce } from "./picker_scene";
   import type { PickerFacts, PickerHeld } from "./picker_scene";
   import { permissionsOf } from "./policy";
   import { RECENT_COMBINATIONS } from "./recent.svelte";
@@ -84,6 +85,11 @@ the value `settings_row.look.svelte` draws. It writes no class. -->
     return offer === undefined ? { first: undefined, second: undefined } : { first: parentOf(order, offer), second: childOf(order, offer) };
   };
   let pinned = $state<PickerHeld["pinned"]>(untrack(pinnedNow));
+  let opened = $state<Combination | null>(untrack(() => inForce(picker)));
+  // The combination this opening ended on, written to the tab's recent
+  // list once the picker has closed: a row added while it is open would
+  // grow it under the pointer.
+  let ended: Combination | null = null;
 
   // The elements no draw reads: a plain record, so the attachments that
   // fill it never write during a derivation.
@@ -142,6 +148,8 @@ the value `settings_row.look.svelte` draws. It writes no class. -->
     menu = null;
     binding = null;
     query = "";
+    if (ended !== null) RECENT_COMBINATIONS.keep(ended);
+    ended = null;
     if (focus === "token") queueMicrotask(() => drawn.token?.focus());
   };
 
@@ -153,7 +161,7 @@ the value `settings_row.look.svelte` draws. It writes no class. -->
         ? pickerOf(
             $lang,
             picker,
-            { open: menu === "model", segment, pick, parent, pinned, query, whole, kept: RECENT_COMBINATIONS.kept, binding, active },
+            { open: menu === "model", segment, pick, parent, pinned, opened, query, whole, kept: RECENT_COMBINATIONS.kept, binding, active },
             {
               open: (from) => {
                 preview = false;
@@ -164,6 +172,8 @@ the value `settings_row.look.svelte` draws. It writes no class. -->
                 query = "";
                 whole = [];
                 pinned = pinnedNow();
+                opened = inForce(picker);
+                ended = null;
                 menu = "model";
               },
               close: closePicker,
@@ -174,7 +184,7 @@ the value `settings_row.look.svelte` draws. It writes no class. -->
                 if (change.whole !== undefined) whole = change.whole;
               },
               keep: (combination) => {
-                RECENT_COMBINATIONS.keep(combination);
+                ended = combination;
               },
               bound: (next) => {
                 if (untrack(() => sameBinding(binding, next))) return;

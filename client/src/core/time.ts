@@ -30,13 +30,22 @@ export function ago(lang: Lang, at: number, now: number): string {
   return lang === "zh" ? `${String(days)} 天前` : `${String(days)} d ago`;
 }
 
+// The locale each language the page speaks writes its dates in.
+const LOCALE: Readonly<Record<Lang, string>> = { en: "en-GB", zh: "zh-CN" };
+
 export function clock(lang: Lang, at: number): string {
-  return new Date(at).toLocaleString(lang === "zh" ? "zh-CN" : "en-GB", {
+  return new Intl.DateTimeFormat(LOCALE[lang], {
     month: "short",
     day: "numeric",
     hour: "2-digit",
     minute: "2-digit",
-  });
+  }).format(at);
+}
+
+// A day of the calendar in the reader's language, for a date that names
+// a day rather than a moment, such as the day a snapshot was taken.
+export function calendarDay(lang: Lang, at: number): string {
+  return new Intl.DateTimeFormat(LOCALE[lang], { year: "numeric", month: "long", day: "numeric" }).format(at);
 }
 
 // The time of day alone, for a column where the day is the same on

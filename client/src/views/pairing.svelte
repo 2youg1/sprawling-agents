@@ -63,6 +63,9 @@
         code = "";
         failed = say($lang, "recover_e_pairing_refused");
         return;
+      case "keyless":
+        failed = say($lang, "pair_keyless");
+        return;
       case "unreachable":
         failed = say($lang, "enrol_unreachable");
         return;

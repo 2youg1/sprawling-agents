@@ -120,6 +120,7 @@ function wired(place: Place, holder: "list" | "caller"): { look: PopoverLook; re
     place,
     holder,
     side: "above",
+    room: null,
     title: "fork_pick_title",
     say: (word) => word,
   };
