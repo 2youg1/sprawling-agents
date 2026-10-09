@@ -85,6 +85,7 @@ The Chinese README and the Chinese getting-started guide call the City 城市 th
 - Registry agents distributed as binary archives are not downloaded, verified or installed by the city, and the ACP page has no refresh.
 - An upstream that refuses a thinking level it stated is not remembered; the next request asks for the same level again. Ollama's and LM Studio's own model listings are not read, so their models offer no levels.
 - Widgets other than `/model` and `/effort` completion are unchanged.
+- OpenAI's `gpt-6-sol` and `gpt-6-luna` are sent no thinking level, because their Chat Completions take tools only with `reasoning_effort` set to `none` and the city does not call the responses face.
 - `Entrance.refused` and `seen` have no bound, and the copies of the `Authorization` header are not zeroed after use.
 - A crash can leave child processes running; no Job object or process-group sweep ends them yet.
 - A process running as the User's account can read the native key file, and an ACP agent is such a process.

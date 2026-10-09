@@ -419,7 +419,11 @@ const ANTHROPIC_MODELS: &[ModelPreset] = &[
 /// the levels each model page states: OpenAI's model list states no
 /// level, so this table is the only source for them. Each page prints a
 /// `1,050,000` window and `128,000` output tokens; `none` is left out of
-/// every set, because turning thinking off is not a level.
+/// every set, because turning thinking off is not a level. `gpt-6-sol`
+/// and `gpt-6-luna` state no level here although their pages list
+/// `low` to `max`: the same pages say Chat Completions takes tools only
+/// with `reasoning_effort` `none`, and every dispatch carries tools on
+/// the chat face.
 const OPENAI_MODELS: &[ModelPreset] = &[
     ModelPreset {
         id_prefix: "gpt-6.1-sol",
@@ -450,11 +454,7 @@ const OPENAI_MODELS: &[ModelPreset] = &[
         context_tokens: 1_050_000,
         max_output_tokens: 128_000,
         input: InputKinds::TextImage,
-        thinking: Some(PresetThinking {
-            levels: &LOW_TO_MAX,
-            default: Some(Effort::Medium),
-            source: "https://developers.openai.com/api/docs/models/gpt-6-sol",
-        }),
+        thinking: None,
         source: "https://developers.openai.com/api/docs/models/gpt-6-sol",
     },
     ModelPreset {
@@ -462,11 +462,7 @@ const OPENAI_MODELS: &[ModelPreset] = &[
         context_tokens: 1_050_000,
         max_output_tokens: 128_000,
         input: InputKinds::TextImage,
-        thinking: Some(PresetThinking {
-            levels: &LOW_TO_MAX,
-            default: Some(Effort::Medium),
-            source: "https://developers.openai.com/api/docs/models/gpt-6-luna",
-        }),
+        thinking: None,
         source: "https://developers.openai.com/api/docs/models/gpt-6-luna",
     },
     ModelPreset {
