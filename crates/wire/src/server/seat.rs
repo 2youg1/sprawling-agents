@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! One socket's place at this machine's door for a browser
-//! (`crates/wire/spec/Server.lean` §8-93): the credential its hello
+//! (`crates/wire/spec/Server/Sessions.lean` §8-93s): the credential its hello
 //! showed, the session token it holds while it lives, and the signal
 //! that the door has since ended a token.
 

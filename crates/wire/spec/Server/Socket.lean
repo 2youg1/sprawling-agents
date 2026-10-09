@@ -6,12 +6,12 @@
 /-!
 # wire::server::socket：一帧一次写出
 
-规定 `server::socket`（`crates/wire/src/server/socket.rs`）把订阅到的记录怎样按帧写给一个会话。本文件是 `crates/wire/Spec.lean` 的一个分部；下面一节保留它在 wire 规格里的标签 §8-47h，别处引作 `crates/wire/Spec.lean §8-47h`，决定引作 `wire D45`。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
+规定 `server::socket::framing`（`crates/wire/src/server/socket/framing.rs`）把订阅到的记录怎样按帧写给一个会话。本文件是 `crates/wire/Spec.lean` 的一个分部；下面一节保留它在 wire 规格里的标签 §8-47h，别处引作 `crates/wire/Spec.lean §8-47h`，决定引作 `wire D45`。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
 
 ### 8-47h 视图广播按帧合并（形状 4 adapter 里的一个纯函数）
 
 ```rust
-// wire::server::socket
+// wire::server::socket::framing
 /// 一条会话一次从订阅里取到的东西：一条记录，或订阅报的一次跳过。
 pub(crate) enum Arrival<R> { Record(Seq, R), Skipped }
 /// 一条会话对它说的话：一段要补拉的区间，或一条记录。

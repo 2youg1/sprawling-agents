@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The live session tokens of this machine's door for a browser, as a
-//! state machine (`crates/wire/spec/Server.lean` §8-93): whose each token
+//! state machine (`crates/wire/spec/Server/Sessions.lean` §8-93s): whose each token
 //! is, how many sockets hold it, and when one that no socket holds
 //! lapses.
 //!
@@ -191,7 +191,7 @@ mod tests {
     }
 
     proptest! {
-        /// `crates/wire/spec/Server.lean` §8-93 over random traces that
+        /// `crates/wire/spec/Server/Sessions.lean` §8-93s over random traces that
         /// never fill the table: a token no socket holds admits for
         /// `idle` and no longer (`Session.live`); a forgotten device that is not paired
         /// again has no token that admits (`a_forgotten_device_keeps_no_session`);

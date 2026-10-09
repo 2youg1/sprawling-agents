@@ -26,7 +26,7 @@ impl BrowserDoor {
     pub fn device_key(&self, device: &DeviceId) -> Option<&DeviceKey>;
     pub fn open_session(&mut self, device: &DeviceId, entropy: [u8; 32], now: TimeMs) -> Option<String>;
     pub fn sessions(&self) -> &Sessions;
-    pub fn sessions_mut(&mut self) -> &mut Sessions;  // socket 入座与离座（spec/Server.lean §8-93）
+    pub fn sessions_mut(&mut self) -> &mut Sessions;  // socket 入座与离座（spec/Server/Sessions.lean §8-93s）
     pub fn forget(&mut self, device: &DeviceId) -> bool;
     pub fn browsers(&self) -> Vec<PairedBrowser>;
     pub fn devices(&self) -> DevicesAnswer;
@@ -39,7 +39,7 @@ pub enum Guess { Paired, Wrong, TooSoon }
 - **设备钥**：页面生成的不可导出 Ed25519 钥的公钥半边，32 字节，线上写成 64 个小写十六进制字符。设备 id 是公钥 BLAKE3 摘要的前 16 个十六进制字符，所以同一把钥再配一次得到同一个 id、覆盖旧的一行。只存公钥。
 - **nonce**：`/session/challenge` 给的 32 字节，十六进制；`NONCE_LIFETIME_MS`（60 s）内一次有效，最多 `NONCES_MAX` 个在外，满了丢最旧的。不论签名对不对，交上来就作废。
 - **签的是什么**：`sprawling local session v1\n<nonce>\n<origin>` 的 UTF-8 字节，`origin` 是这次请求过了入口判定的 Origin。带标签与源，签名就不能挪到别的协议或别的源去用。
-- **会话令牌**：32 字节，十六进制，只存摘要，属于签出它的那台设备；表与它的寿命住 `reception::sessions`（`spec/Server.lean` §8-93）：被 socket 占着时一直有效，没有 socket 占着时空闲 `SESSION_IDLE_MS` 即失效，设备被忘掉或进程结束即失效，忘掉时占着它的 socket 也被关掉。页面只把它放在内存里，每次拨号前再签一次。
+- **会话令牌**：32 字节，十六进制，只存摘要，属于签出它的那台设备；表与它的寿命住 `reception::sessions`（`spec/Server/Sessions.lean` §8-93s）：被 socket 占着时一直有效，没有 socket 占着时空闲 `SESSION_IDLE_MS` 即失效，设备被忘掉或进程结束即失效，忘掉时占着它的 socket 也被关掉。页面只把它放在内存里，每次拨号前再签一次。
 - **失败**：配对码错、太早、开页码错或过期一律 `E_PAIRING_REFUSED`，不说是哪一种原因（太早除外：恢复办法写「等一秒」，因为对手已经知道限速存在）；会话的 nonce、设备或签名不对是 `E_GATE_DENIED`。
 
 下面的模型只写配对码那一半，因为它是唯一一个对手能反复试的部分：开页码 128 bit，nonce 与会话令牌都由城铸出、一次有效。性质对每一条猜测序列成立，由 `reception::pairing` 旁的 proptest `every_trace_judges_each_code_once_and_a_second_apart` 在随机序列上对照 Rust。

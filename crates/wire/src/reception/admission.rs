@@ -7,7 +7,7 @@
 //!
 //! The socket's peer is judged at the hello frame, and judged again
 //! whenever the door ends a session token, so a forgotten browser loses
-//! the sockets it already opened (`crates/wire/spec/Server.lean` §8-93);
+//! the sockets it already opened (`crates/wire/spec/Server/Sessions.lean` §8-93s);
 //! a POST has no session, so every request is judged on its own. Both
 //! judgements are [`Keys::pairing`], and they live in `reception` rather
 //! than in the shell that calls them.

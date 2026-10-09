@@ -13,7 +13,7 @@
 //! for them, checking a signature, telling whoever handed out an open code
 //! that it was redeemed, and telling every socket when a session token may
 //! have ended, so a forgotten browser loses the sockets it holds
-//! (`crates/wire/spec/Server.lean` §8-93).
+//! (`crates/wire/spec/Server/Sessions.lean` §8-93s).
 
 use std::collections::BTreeMap;
 use std::sync::mpsc;

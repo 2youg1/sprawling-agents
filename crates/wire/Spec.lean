@@ -53,6 +53,7 @@ import crates.wire.spec.Reply
 import crates.wire.spec.Server
 import crates.wire.spec.Server.Committed
 import crates.wire.spec.Server.Listener
+import crates.wire.spec.Server.Sessions
 import crates.wire.spec.Server.Socket
 import crates.wire.spec.Slash
 
@@ -62,7 +63,7 @@ import crates.wire.spec.Slash
 
 本文件是 crate 的规格入口，分部在 `spec/` 下，布局见 ARCHITECTURE.md §11「Specifications in Lean」。接口一节一节写在规定它的那个模块的分部里，每一节保留它的标签 §8-n，别处引作 `crates/wire/Spec.lean §8-n`；本文件 §8 列出每个标签住在哪个分部。标签被模块图的旧锚点与别的规格里的引用锚住，所以不重排，也不补空号。「每个动词从哪里够得到」那一节保留它的标签 §19 与 §19-1 到 §19-3，住在 `spec/Command/Kind.lean`，`xtask wiring` 读它。决定写作 `D<n>`，放在它所管的声明正上方，或它所管主题的那个分部里，别处引作 `wire D<n>`；D1 到 D12 沿用这份规格在 Markdown 时 §12 的条目号，§12 末尾列出每条住在哪里。
 
-能写成定理的规则在分部里证明，Lean 模型是「必须守住哪些性质」的权威，Rust 代码是「怎样守住」的权威：握手与 `WIRE_V` 的进位（`spec/Frames.lean`）、绑定面与丢帧之后的区间（`spec/Reception.lean`）、HTTP 门的配对判定（`spec/Reception/Admission.lean`）、套接字拼不出 `PutSecret`（`spec/Command.lean`）、reach 与 class 两张表的性质（`spec/Command/Kind.lean`）、带基线的保存（`spec/Command/Step.lean`）、干预欠不欠 Handoff（`spec/Control.lean`）、携带的名字只拒空与控制字符（`spec/CarriedName.lean`）、答复反映到哪一条（`spec/Frames/Ask.lean`）、事件按帧写出时每条记录按 seq 次序到达且不重复、没说到的都被 `Lagged` 点名（`spec/Server/Socket.lean`）、撤销设备与会话令牌的寿命（`spec/Server.lean` §8-93）。其余分部只有节注释：它们写的是线上的形状、取舍与被否的备选，由 Rust 的类型、trybuild 反例、`tests/wire_contract.rs` 的 golden 与各模块旁的测试守住（§16）。
+能写成定理的规则在分部里证明，Lean 模型是「必须守住哪些性质」的权威，Rust 代码是「怎样守住」的权威：握手与 `WIRE_V` 的进位（`spec/Frames.lean`）、绑定面与丢帧之后的区间（`spec/Reception.lean`）、HTTP 门的配对判定（`spec/Reception/Admission.lean`）、套接字拼不出 `PutSecret`（`spec/Command.lean`）、reach 与 class 两张表的性质（`spec/Command/Kind.lean`）、带基线的保存（`spec/Command/Step.lean`）、干预欠不欠 Handoff（`spec/Control.lean`）、携带的名字只拒空与控制字符（`spec/CarriedName.lean`）、答复反映到哪一条（`spec/Frames/Ask.lean`）、事件按帧写出时每条记录按 seq 次序到达且不重复、没说到的都被 `Lagged` 点名（`spec/Server/Socket.lean`）、撤销设备与会话令牌的寿命（`spec/Server/Sessions.lean`）。其余分部只有节注释：它们写的是线上的形状、取舍与被否的备选，由 Rust 的类型、trybuild 反例、`tests/wire_contract.rs` 的 golden 与各模块旁的测试守住（§16）。
 -/
 
 /-! ## 1 需求分解
@@ -109,7 +110,7 @@ import crates.wire.spec.Slash
 - `spec/Reception/Admission.lean`：空手的来者不论面在回环还是暴露都不能转写、录凭证或落文件（`no_door_acts_unpaired`）；`/acp` 从不拒绝（`the_acp_door_never_refuses`）。
 - `spec/Reception/Entry.lean`：Host 不在名单的请求从不进门（`a_foreign_host_never_enters`），Origin 不在名单的、跨站的与预检除了取页面都不进门（`a_foreign_origin_never_enters`、`a_cross_site_fetch_never_enters`、`a_preflight_never_enters`），配对的路只进浏览器（`pairing_admits_only_a_browser`）。
 - `spec/Reception/Pairing.lean`：任何一条猜测序列里，被判的猜测彼此隔一秒（`judged_guesses_are_a_second_apart`），每次都对着上一次换上的码（`each_code_is_judged_once`），只有猜中当时的码才配对（`only_the_current_code_pairs`）。
-- `spec/Server.lean` §8-93：忘掉一台设备之后，只要它没有重新配对，它就没有一个会话（`a_forgotten_device_keeps_no_session`）；一个令牌不认了就不再被认（`an_expired_token_never_admits_again`）；被 socket 占着的令牌不过期（`a_seated_token_outlasts_its_idle_time`）。
+- `spec/Server/Sessions.lean`：忘掉一台设备之后，只要它没有重新配对，它就没有一个会话（`a_forgotten_device_keeps_no_session`）；一个令牌不认了就不再被认（`an_expired_token_never_admits_again`）；被 socket 占着的令牌不过期（`a_seated_token_outlasts_its_idle_time`）。
 - `spec/Command.lean`：`WireCommand` 拼不出 `PutSecret`，从线上来的命令进城后也不是它（`a_socket_cannot_spell_put_secret`、`nothing_from_the_wire_enrols_a_secret`）。
 - `spec/Command/Kind.lean`：没有一个 Command 属 `Read`（`no_command_is_a_read`）；class 为 `Act` 的动词 reach 都是 `client`（`what_a_device_may_do_a_person_may_draw`）；不由人点的动词都 `LocalOnly`（`a_verb_no_person_draws_stays_local`）；只有 `PutSecret` 是 `sealed`（`only_put_secret_is_sealed`）。
 - `spec/Command/Step.lean`：拒绝之后盘上不动（`a_refused_save_leaves_the_file`），保留子树先判（`the_reserved_subtree_is_refused_first`），两个同基线的保存只落先到的那个（`two_saves_from_one_version_land_once`）。
@@ -290,6 +291,7 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 | 8-91 | `crates/wire/spec/Answer/Devices.lean` |
 | 8-92 | `crates/wire/spec/Answer/Endpoints.lean` |
 | 8-93 | `crates/wire/spec/Server.lean` |
+| 8-93s | `crates/wire/spec/Server/Sessions.lean` |
 | 8-94 | `crates/wire/spec/Reception/Entry.lean` |
 | 8-95 | `crates/wire/spec/Reception/Pairing.lean` |
 | 8-96 | `crates/wire/spec/Slash.lean` |
@@ -390,7 +392,7 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 | D52 | 没有「全部恢复」的帧：页面为每个仍拥有的控制各发一次 Restore | `crates/wire/spec/Privacy.lean` |
 | D53 | V0.0.11 的线上改形一次进位，由第一条车道落地 | `crates/wire/spec/Frames.lean` |
 | D54 | 每个调用方都要非环境凭据，入口先判 Host 与 Origin | `crates/wire/spec/Reception/Entry.lean` |
-| D55 | 会话令牌在最后一条 socket 结束后空闲 60 s 失效 | `crates/wire/spec/Server.lean` |
+| D55 | 会话令牌在最后一条 socket 结束后空闲 60 s 失效 | `crates/wire/spec/Server/Sessions.lean` |
 -/
 
 /-! ## 13 依赖选型
@@ -438,7 +440,8 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 - HTTP 门：`reception::admission` 旁的测试与 `tests/enrolment.rs`。
 - 入口判定：`reception::entry` 旁的穷尽表测试 `every_entry_property_holds_over_every_input`，逐格对照 `spec/Reception/Entry.lean` 的五条性质；`tests/entry.rs` 的回归。
 - 配对：`reception::pairing` 旁的 proptest `every_trace_judges_each_code_once_and_a_second_apart`，生成器覆盖 `spec/Reception/Pairing.lean` 的猜测序列（到达时刻、猜对或猜错、每步的熵）。
-- 按帧写出：`server::socket::tests` 的 proptest `framing_tells_every_record_once_in_order`，生成器覆盖 `spec/Server/Socket.lean` 的到达序列与切帧方式。
+- 按帧写出：`server::socket::framing::tests` 的 proptest `framing_tells_every_record_once_in_order`，生成器覆盖 `spec/Server/Socket.lean` 的到达序列与切帧方式。
+- 会话令牌的寿命：`reception::sessions::tests` 的 proptest `forgotten_and_lapsed_tokens_stay_ended_and_seated_ones_stay_good`，生成器覆盖 `spec/Server/Sessions.lean` 的步骤，只是从不把表填满。
 - `PutSecret`：`tests/trybuild.rs` 的两个反例与 `put_secret_has_no_byte_form_in_either_direction`。
 - reach 与 class：`cargo xtask gates wiring` 把 `Command.reach`、`Command.verbClass` 的臂与 `enum Command`、`run_command`、`client/src`、`command_class` 逐个动词对照；Lean 侧的 `def` 漏一个构造子即编不过。
 - 带基线的保存：accounting 的 `worker::commanding::tests::saving`。
