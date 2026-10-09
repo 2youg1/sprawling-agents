@@ -106,7 +106,7 @@ Agent之间可以互相找到对方、发消息、协调任务、等回复，不
 
 ### 代码签名政策
 
-本项目的免费代码签名由 [SignPath.io](https://signpath.io) 提供，证书由 [SignPath Foundation](https://signpath.org) 签发（Code signing policy）。发布压缩包里的 Windows 二进制带着这个签名，压缩包的 SHA-256 与它一同公布；摘要对不上时 `install.ps1` 拒绝安装。
+本项目的免费代码签名由 [SignPath.io](https://signpath.io) 提供，证书由 [SignPath Foundation](https://signpath.org) 签发（Code signing policy）。SignPath Foundation 为本项目签发证书之后，发布压缩包里的 Windows 二进制带着这个签名，每个版本的发布说明写明它是否已签名；压缩包的 SHA-256 与它一同公布，摘要对不上时 `install.ps1` 拒绝安装。
 
 - **作者（Authors）**——[@2youg1](https://github.com/2youg1) 可以直接改动源码。
 - **审查者（Reviewers）**——项目之外提出的改动在它的 PR 里审查通过后才合并。

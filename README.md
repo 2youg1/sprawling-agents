@@ -106,7 +106,7 @@ A key you paste into a message goes into the vault first, and the model sees onl
 
 ### Code signing policy
 
-Free code signing provided by [SignPath.io](https://signpath.io), certificate by [SignPath Foundation](https://signpath.org). The Windows binary inside a release archive carries that signature, and the archive's SHA-256 is published beside it; `install.ps1` refuses an archive whose digest does not match.
+Free code signing provided by [SignPath.io](https://signpath.io), certificate by [SignPath Foundation](https://signpath.org). Once SignPath Foundation has issued the project's certificate, the Windows binary inside a release archive carries that signature, and each release's notes say whether it is signed; the archive's SHA-256 is published beside it, and `install.ps1` refuses an archive whose digest does not match.
 
 - **Authors** — [@2youg1](https://github.com/2youg1) may change the source directly.
 - **Reviewers** — a change proposed by anyone outside the project is reviewed in its pull request before it merges.

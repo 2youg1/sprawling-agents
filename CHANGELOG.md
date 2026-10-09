@@ -22,7 +22,7 @@ release notes and their commits.
 
 ## v0.0.11-Alpha-261009
 
-**sprawling 0.0.11 signature**
+**sprawling 0.0.11 interlinked**
 
 Alpha, cut on 2026-10-09 (UTC+8) as `v0.0.11-Alpha-261009`. The workspace manifest carries 0.0.11; `kernel::release::MATURITY` owns maturity, and the release workflow supplies the tag to a released binary. It records what landed after `v0.0.10-Alpha-261008`. The wire moves once, from WIRE_V 64 to 65, because frames changed shape in this release (`crates/wire/Spec.lean` D1): four local-only commands, three queries, the thinking offer and the model identity on each model, and `AgentLine`, which replaces the `harnesses` query and its `HarnessLine`. A city written by 0.0.10 opens unchanged, and the effort it stored in the Ledger, in `CONFIG.toml` and in git trailers keeps its meaning; 0.0.10 is not promised to read a Ledger that 0.0.11 has written, so keep the backup the [update guide](docs/getting-started.md#updating) asks for before updating.
 
@@ -90,6 +90,7 @@ The Chinese README and the Chinese getting-started guide call the City 城市 th
 - `Entrance.refused` and `seen` have no bound, and the copies of the `Authorization` header are not zeroed after use.
 - A crash can leave child processes running; no Job object or process-group sweep ends them yet.
 - A process running as the User's account can read the native key file, and an ACP agent is such a process.
+- The Windows binary is not signed. `release.yml` signs it through SignPath between the build and the pack while the repository names a signing policy, and a tag push then accepts only a Valid, timestamped signature; the SignPath Foundation has not issued the project's certificate yet, so this release names no policy and ships the binary unsigned. The README's code signing policy is in place for the release that is signed.
 
 ---
 
