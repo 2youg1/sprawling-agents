@@ -94,11 +94,7 @@ pub enum Prepared {
     Harnesses(Option<super::lines::HarnessReach>),
     /// The ACP page's catalog, read from the city's `CONFIG.toml`, with
     /// this machine's evidence when the served city handed its paths in.
-    Agents(
-        PathBuf,
-        Option<super::lines::HarnessReach>,
-        Option<crate::offered::Offered>,
-    ),
+    Agents(super::agents::CatalogAsk),
     /// A question the views refused outright, which [`Prepared::answer`]
     /// carries as the refusal.
     Refused(kernel::AxError),
@@ -306,9 +302,7 @@ impl Prepared {
             Self::Provider(ask) => ask.answer(),
             Self::Release(newest) => Self::release_answer(newest),
             Self::Harnesses(reach) => Self::harnesses_answer(reach),
-            Self::Agents(city_root, reach, offered) => {
-                super::agents::catalog_answer(&city_root, reach, offered.as_ref())
-            }
+            Self::Agents(asked) => asked.answer(),
             Self::Refused(refusal) => unavailable_because(refusal.action().to_owned(), &refusal),
             Self::Upstream { ask, item } => Self::upstream_answer(ask, item),
             Self::Listing { city_root, at } => {

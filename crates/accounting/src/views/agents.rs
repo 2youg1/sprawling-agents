@@ -7,7 +7,7 @@
 //! city added, and one pasted agent (`crates/accounting/spec/Views.lean`,
 //! `crates/wire/spec/Answer/Agents.lean` §8-90).
 
-use std::path::Path;
+use std::path::PathBuf;
 
 use agent_protocols::{AgentEntry, AgentSource, Pin};
 
@@ -15,36 +15,42 @@ use super::holding::Views;
 use super::lines::HarnessReach;
 use super::prepared::{Prepared, unavailable_because};
 
-/// The catalog page's paths, copied out so the files are read with the
-/// snapshot let go.
-pub(super) fn catalog_ask(views: &Views) -> Prepared {
-    Prepared::Agents(
-        views.city_root.clone(),
-        views.reach.programs,
-        views.offered.clone(),
-    )
+/// What the catalog page is read from, copied out of the views so the
+/// files are read with the snapshot let go.
+pub struct CatalogAsk {
+    city_root: PathBuf,
+    reach: Option<HarnessReach>,
+    offered: Option<crate::offered::Offered>,
 }
 
-/// The catalog page, read from the shipped snapshot and the city's own
-/// `CONFIG.toml`, with the agents this machine shows evidence of when the
-/// served city handed in where to look; nothing is run. The detected
-/// entries are remembered in `offered`, for the consent that names one.
-pub(super) fn catalog_answer(
-    city_root: &Path,
-    reach: Option<HarnessReach>,
-    offered: Option<&crate::offered::Offered>,
-) -> wire::Answer {
-    match crate::roster::roster(city_root) {
-        Ok(roster) => {
-            let detected = reach
-                .map(|reach| evidence(&roster, reach))
-                .unwrap_or_default();
-            if let Some(offered) = offered {
-                offered.remember(&detected);
+/// The catalog page's question, prepared.
+pub(super) fn catalog_ask(views: &Views) -> Prepared {
+    Prepared::Agents(CatalogAsk {
+        city_root: views.city_root.clone(),
+        reach: views.reach.programs,
+        offered: views.offered.clone(),
+    })
+}
+
+impl CatalogAsk {
+    /// The catalog page, read from the shipped snapshot and the city's own
+    /// `CONFIG.toml`, with the agents this machine shows evidence of when
+    /// the served city handed in where to look; nothing is run. The
+    /// detected entries are remembered, for the consent that names one.
+    pub(super) fn answer(self) -> wire::Answer {
+        match crate::roster::roster(&self.city_root) {
+            Ok(roster) => {
+                let detected = self
+                    .reach
+                    .map(|reach| evidence(&roster, reach))
+                    .unwrap_or_default();
+                if let Some(offered) = &self.offered {
+                    offered.remember(&detected);
+                }
+                catalog_of(&roster, &detected)
             }
-            catalog_of(&roster, &detected)
+            Err(stopped) => unavailable_because("AgentCatalog".to_owned(), &stopped),
         }
-        Err(stopped) => unavailable_because("AgentCatalog".to_owned(), &stopped),
     }
 }
 
@@ -84,10 +90,10 @@ fn evidence(roster: &agent_protocols::Roster, reach: HarnessReach) -> Vec<AgentE
 /// The grammar is pure and reads nothing, so it is settled with the
 /// snapshot held. The entry is remembered in `offered`, because the
 /// consent carries only its digest and the text is not in it.
-pub(super) fn pasted_ask(text: &str, offered: Option<&crate::offered::Offered>) -> Prepared {
+pub(super) fn pasted_ask(views: &Views, text: &str) -> Prepared {
     match agent_protocols::pasted(text) {
         Ok(entry) => {
-            if let Some(offered) = offered {
+            if let Some(offered) = &views.offered {
                 offered.remember([&entry]);
             }
             Prepared::Held(wire::Answer::AgentSpec(Box::new(offer_of(&entry))))

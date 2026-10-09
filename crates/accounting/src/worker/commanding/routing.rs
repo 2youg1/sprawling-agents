@@ -55,13 +55,34 @@ fn the_door_is_held_elsewhere() -> AxError {
     .with_recovery("send it to the city's own listener, which serves the remote door")
 }
 
-/// The serving binary closes the city, takes the consent to an ACP agent
-/// and forgets a paired browser on its own listener, ahead of the desk
-/// (`crates/sprawling/spec/Serving.lean`), so one arriving here came by a
-/// path that skipped it.
-fn the_listener_does_it(action: &str, subject: &str) -> AxError {
-    AxError::failure(AxCode::ToolUnavailable, action, subject)
-        .with_recovery("send it to the city's own listener, which carries it out")
+/// A verb the serving binary carries out on its own listener, ahead of
+/// the desk (`crates/sprawling/spec/Serving.lean`), so one arriving here
+/// came by a path that skipped it.
+#[derive(Clone, Copy)]
+enum OnTheListener {
+    CloseCity,
+    AddAgent,
+    ForgetDevice,
+}
+
+impl OnTheListener {
+    fn refusal(self) -> AxError {
+        let (action, subject) = match self {
+            OnTheListener::CloseCity => {
+                ("close the city", "the run worker does not close the city")
+            }
+            OnTheListener::AddAgent => (
+                "add an ACP agent",
+                "the run worker does not hold the offers a consent names",
+            ),
+            OnTheListener::ForgetDevice => (
+                "forget a paired browser",
+                "the run worker does not hold the paired browsers",
+            ),
+        };
+        AxError::failure(AxCode::ToolUnavailable, action, subject)
+            .with_recovery("send it to the city's own listener, which carries it out")
+    }
 }
 
 /// The serving binary answers host privacy operations on its own listener
@@ -231,19 +252,10 @@ impl RunWorker {
                 crate::worker::credentials::signing::Arrival::Enrolment,
             ),
             wire::Command::ForgetSecret(forgetting) => self.forget_secret(&forgetting.reference),
-            wire::Command::CloseCity(_) => Err(the_listener_does_it(
-                "close the city",
-                "the run worker does not close the city",
-            )),
-            wire::Command::AddAgent(_) => Err(the_listener_does_it(
-                "add an ACP agent",
-                "the run worker does not hold the offers a consent names",
-            )),
+            wire::Command::CloseCity(_) => Err(OnTheListener::CloseCity.refusal()),
+            wire::Command::AddAgent(_) => Err(OnTheListener::AddAgent.refusal()),
             wire::Command::AgentLogin(it) => Err(Unbuilt::AgentLogin(it.agent).not_built()),
-            wire::Command::ForgetDevice(_) => Err(the_listener_does_it(
-                "forget a paired browser",
-                "the run worker does not hold the paired browsers",
-            )),
+            wire::Command::ForgetDevice(_) => Err(OnTheListener::ForgetDevice.refusal()),
             wire::Command::CreateBuilding { addr, template, .. } => {
                 self.create_building(addr, template.as_str())
             }
