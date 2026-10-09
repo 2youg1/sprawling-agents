@@ -138,9 +138,6 @@ pub enum Query {
     /// face they document, so a person picks a vendor rather than
     /// pasting its address.
     KnownHosts,
-    /// The official harnesses, the command that starts each as an ACP
-    /// agent, and whether this machine can run it: the harness page.
-    Harnesses,
     /// The ACP page's catalog, detected agents and added agents
     /// (`crates/wire/spec/Answer/Agents.lean` §8-90).
     AgentCatalog,

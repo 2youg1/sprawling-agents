@@ -86,19 +86,20 @@ pub(crate) fn search_path() -> OsString {
     }
 }
 
-/// Where this machine's search path finds `program`: the one reading
-/// the harness page and the doctor share (`crates/accounting/Spec.lean` §8-10).
+/// Where this machine's search path finds `program`: the one reading the
+/// doctor, the consent to an ACP agent and every optional program share.
 pub(crate) fn find_program(program: &str) -> Option<PathBuf> {
     super::on_search_path(&search_path(), program)
 }
 
-/// Where one harness's set-up directory is on this machine: the
-/// variable its vendor documents when that is set, else the directory
-/// under the User's home (`crates/wire/spec/Answer/Harnesses.lean` D23).
+/// Where one vendor's set-up directory, or another ACP client's file, is
+/// on this machine: the variable its vendor documents when that is set,
+/// else the path under the User's home (`crates/agent_protocols/Spec.lean`
+/// D19).
 pub(crate) fn place_set_up(dir: &agent_protocols::SetUpDir) -> Option<PathBuf> {
     // A machine with no home directory can still name a directory a
     // variable moved; a row under the home is then nowhere to look, and
-    // the page lists what it could look at.
+    // detection looks only where it can.
     let variable = dir.variable.and_then(std::env::var_os);
     match accounting::home::Home::detect() {
         Ok(home) => dir.on(Some(home.path()), variable),

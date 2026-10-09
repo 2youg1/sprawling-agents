@@ -22,7 +22,7 @@
 //! queue answers by being consumed and a view that consumed what it
 //! showed would change the thing it reports on.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use kernel::event::record::{AssetArchived, DiscardRestored, FileDiscarded};
 use kernel::{Address, AxError, EventRecord, RunId};
@@ -51,66 +51,6 @@ pub(crate) fn known_hosts_answer() -> wire::Answer {
             })
             .collect(),
     })
-}
-
-/// How the harness page reads this machine, as the served city hands it
-/// in: the search path for a launcher, and where one set-up directory
-/// sits on this machine.
-#[derive(Debug, Clone, Copy)]
-pub struct HarnessReach {
-    pub(crate) find: fn(&str) -> Option<PathBuf>,
-    pub(crate) place: fn(&agent_protocols::SetUpDir) -> Option<PathBuf>,
-}
-
-/// The harness page: every built-in entry, the command that starts it as
-/// the shipped catalog says, and how far this machine has it set up
-/// (`crates/wire/spec/Answer/Harnesses.lean` §8-52 and D23,
-/// `crates/accounting/spec/Views.lean` §8-10).
-pub(crate) fn harnesses_answer(reach: HarnessReach) -> wire::Answer {
-    let catalog = match agent_protocols::Catalog::bundled() {
-        Ok(catalog) => catalog,
-        Err(stopped) => {
-            return super::prepared::unavailable_because("Harnesses".to_owned(), &stopped);
-        }
-    };
-    let roster = agent_protocols::Roster::new(Vec::new(), catalog);
-    wire::Answer::Harnesses(wire::HarnessesAnswer {
-        harnesses: agent_protocols::OFFICIAL
-            .iter()
-            .filter_map(|official| {
-                let launch = roster.builtin(official)?.launch;
-                Some(wire::HarnessLine {
-                    name: official.word.to_owned(),
-                    state: match (reach.find)(&launch.program) {
-                        None => wire::HarnessState::LauncherMissing {
-                            program: launch.program.clone(),
-                        },
-                        Some(_) => set_up_state(official, reach.place),
-                    },
-                    launch: std::iter::once(launch.program).chain(launch.args).collect(),
-                    docs: official.docs.to_owned(),
-                })
-            })
-            .collect(),
-    })
-}
-
-/// A harness whose launcher is present: the first of its set-up
-/// directories that exists, or every path looked at. An empty table
-/// gives an empty `looked`, which the page reads as "not looked for".
-fn set_up_state(
-    official: &agent_protocols::Official,
-    place: fn(&agent_protocols::SetUpDir) -> Option<PathBuf>,
-) -> wire::HarnessState {
-    let looked: Vec<PathBuf> = official.set_up.iter().filter_map(place).collect();
-    match looked.iter().find(|dir| dir.is_dir()) {
-        Some(at) => wire::HarnessState::Ready {
-            at: at.display().to_string(),
-        },
-        None => wire::HarnessState::NotSetUp {
-            looked: looked.iter().map(|dir| dir.display().to_string()).collect(),
-        },
-    }
 }
 
 /// The building a `pursuit_changed` record is about.

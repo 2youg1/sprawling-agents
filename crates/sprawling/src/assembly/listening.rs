@@ -302,7 +302,7 @@ fn handed(
 ) -> Result<(accounting::views::Views, Offered, storage::ChainHalt), AxError> {
     rebuilt.ask_the_registry_through(crate::release::answer);
     rebuilt.ask_upstream_through(crate::doctor::newest);
-    rebuilt.look_for_harnesses_through(host::find_program, host::place_set_up);
+    rebuilt.look_for_agents_through(host::place_set_up);
     // Shared with the listener's consent (`crates/sprawling/spec/Serving.lean`).
     let offered = Offered::default();
     rebuilt.remember_offers_in(offered.clone());

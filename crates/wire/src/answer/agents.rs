@@ -120,7 +120,7 @@ pub enum LoginState {
     Unasked,
     /// It took a session without asking for a login.
     Ready,
-    /// It answered `-32000`: the page offers its login.
+    /// It answered `-32000` (`E_AUTH_REQUIRED`).
     Required,
 }
 

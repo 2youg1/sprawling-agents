@@ -90,8 +90,6 @@ pub enum Prepared {
     Provider(super::providers::ProviderAsk),
     /// The release page, which leaves this machine.
     Release(Option<fn() -> wire::ReleaseAnswer>),
-    /// The harness page, which walks this machine's search path.
-    Harnesses(Option<super::lines::HarnessReach>),
     /// The ACP page's catalog, read from the city's `CONFIG.toml`, with
     /// this machine's evidence when the served city handed its paths in.
     Agents(super::agents::CatalogAsk),
@@ -301,7 +299,6 @@ impl Prepared {
             Self::Guide(city_root) => Self::guide_answer(city_root),
             Self::Provider(ask) => ask.answer(),
             Self::Release(newest) => Self::release_answer(newest),
-            Self::Harnesses(reach) => Self::harnesses_answer(reach),
             Self::Agents(asked) => asked.answer(),
             Self::Refused(refusal) => unavailable_because(refusal.action().to_owned(), &refusal),
             Self::Upstream { ask, item } => Self::upstream_answer(ask, item),

@@ -72,7 +72,6 @@ pub use answer::{EvidenceItem, EvidenceKind, Picture};
 pub use answer::{FIND_MAX, FIND_WALK_MAX, FindAnswer, Walked};
 pub use answer::{GithubLoginAnswer, GithubReading};
 pub use answer::{HandbackNote, ReplyEnd, ReplyEnded, Speaker};
-pub use answer::{HarnessLine, HarnessState, HarnessesAnswer};
 pub use answer::{HunksAnswer, PatchLine, Withheld};
 pub use answer::{IdentityAnswer, StatedIdentity};
 pub use answer::{InboxAnswer, MetricsAnswer, RegistryAnswer, RegistryLine, SignalLine};
