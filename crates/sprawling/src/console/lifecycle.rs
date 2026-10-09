@@ -17,8 +17,19 @@
 //! the signal form reaches this table, and on an interactive face it
 //! changes nothing.
 
+use std::time::Duration;
+
 use accounting::worker::ClosedBy;
 use wire::CloseMode;
+
+/// How long a close that interrupts waits for its runs before the
+/// process ends without a handoff (`crates/sprawling/spec/Console/Lifecycle.lean`
+/// D75). An in-flight provider call is not a safe point, so without a
+/// limit "stop them now" waits for the call's own timeout. Windows ends
+/// a process five seconds after its console window closes; four leaves
+/// the handoff a second there, and every other interrupt takes the same
+/// number so the platforms and the ways in behave alike.
+pub(crate) const INTERRUPT_GRACE: Duration = Duration::from_secs(4);
 
 /// What the process is showing, from opening to gone.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -32,17 +43,20 @@ pub(crate) enum Face {
     QuietHost,
     /// No terminal is the city's: a pipe, a service, a harness.
     Headless,
-    /// The desk is closed; the runs under way land or are stopped.
-    Stopping { mode: CloseMode, deadline: Deadline },
+    /// The desk is closed; the runs under way land or are stopped. A
+    /// close that interrupts has a time limit, [`INTERRUPT_GRACE`].
+    Stopping { mode: CloseMode, sinks: Sinks },
     /// The process ends, with or without its handoff.
     Gone(Handoff),
 }
 
-/// Whether a close has a time limit. Only a lost terminal arms one.
+/// Whether the terminal still takes writes while the city closes. Only a
+/// lost terminal cuts them, and the model proves a cut only happens
+/// while interrupting.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum Deadline {
-    Unarmed,
-    Armed,
+pub(crate) enum Sinks {
+    Held,
+    Cut,
 }
 
 /// Whether the process wrote its handoff before it ended.
@@ -114,6 +128,26 @@ pub(crate) enum Cause {
 }
 
 impl Face {
+    /// Whether this face has a time limit: every close that interrupts
+    /// has one (D75).
+    pub(crate) fn armed(self) -> bool {
+        match self {
+            Face::Stopping {
+                mode: CloseMode::Interrupt,
+                ..
+            } => true,
+            Face::Stopping {
+                mode: CloseMode::Drain,
+                ..
+            }
+            | Face::Opening
+            | Face::Cli
+            | Face::QuietHost
+            | Face::Headless
+            | Face::Gone(_) => false,
+        }
+    }
+
     /// Whether the keyboard is the city's on this face.
     fn interactive(self) -> bool {
         match self {
@@ -127,39 +161,39 @@ impl Face {
 /// the step entering `Stopping` does.
 pub(crate) fn step(face: Face, event: Event) -> (Face, Option<Cause>) {
     match face {
-        Face::Stopping { mode, deadline } => (stopping(mode, deadline, event), None),
+        Face::Stopping { mode, sinks } => (stopping(mode, sinks, event), None),
         Face::Gone(handoff) => (Face::Gone(handoff), None),
         Face::Opening | Face::Cli | Face::QuietHost | Face::Headless => serving(face, event),
     }
 }
 
-/// A face that still serves meets a request to close: which mode, with
-/// or without a time limit, and why.
-fn asked(face: Face, event: Event) -> Option<(CloseMode, Deadline, Cause)> {
-    let unarmed = |mode, by| Some((mode, Deadline::Unarmed, Cause::Closed(by)));
+/// A face that still serves meets a request to close: which mode,
+/// whether the terminal's sinks are cut, and why.
+fn asked(face: Face, event: Event) -> Option<(CloseMode, Sinks, Cause)> {
+    let held = |mode, by| Some((mode, Sinks::Held, Cause::Closed(by)));
     match event {
-        Event::Quit(Asker::Console, mode) => unarmed(mode, ClosedBy::Console),
-        Event::Quit(Asker::Page, mode) => unarmed(mode, ClosedBy::Page),
+        Event::Quit(Asker::Console, mode) => held(mode, ClosedBy::Console),
+        Event::Quit(Asker::Page, mode) => held(mode, ClosedBy::Page),
         // On an interactive face the keyboard is the city's, so this
         // signal came from some other process and is not a request.
         Event::InterruptSignal if face.interactive() => None,
-        Event::InterruptSignal => unarmed(CloseMode::Drain, ClosedBy::InterruptSignal),
-        Event::BreakSignal => unarmed(CloseMode::Drain, ClosedBy::BreakSignal),
-        Event::Terminate => unarmed(CloseMode::Interrupt, ClosedBy::Terminate),
+        Event::InterruptSignal => held(CloseMode::Drain, ClosedBy::InterruptSignal),
+        Event::BreakSignal => held(CloseMode::Drain, ClosedBy::BreakSignal),
+        Event::Terminate => held(CloseMode::Interrupt, ClosedBy::Terminate),
         Event::TerminalLost if face.interactive() => Some((
             CloseMode::Interrupt,
-            Deadline::Armed,
+            Sinks::Cut,
             Cause::Closed(ClosedBy::TerminalLost),
         )),
         Event::TerminalLost => None,
-        Event::Failed => Some((CloseMode::Drain, Deadline::Unarmed, Cause::Failed)),
+        Event::Failed => Some((CloseMode::Drain, Sinks::Held, Cause::Failed)),
         Event::Ready(_) | Event::Web | Event::Back | Event::Landed | Event::Deadline => None,
     }
 }
 
 fn serving(face: Face, event: Event) -> (Face, Option<Cause>) {
-    if let Some((mode, deadline, cause)) = asked(face, event) {
-        return (Face::Stopping { mode, deadline }, Some(cause));
+    if let Some((mode, sinks, cause)) = asked(face, event) {
+        return (Face::Stopping { mode, sinks }, Some(cause));
     }
     let next = match (face, event) {
         (Face::Opening, Event::Ready(Surface::Cli)) | (Face::QuietHost, Event::Back) => Face::Cli,
@@ -173,37 +207,40 @@ fn serving(face: Face, event: Event) -> (Face, Option<Cause>) {
 }
 
 /// A second explicit stop while closing: a drain becomes an interrupt,
-/// and an interrupt ends the process without its handoff.
-fn again(mode: CloseMode, deadline: Deadline) -> Face {
+/// which arms the limit, and an interrupt ends the process without its
+/// handoff.
+fn again(mode: CloseMode, sinks: Sinks) -> Face {
     match mode {
         CloseMode::Drain => Face::Stopping {
             mode: CloseMode::Interrupt,
-            deadline,
+            sinks,
         },
         CloseMode::Interrupt => Face::Gone(Handoff::Skipped),
     }
 }
 
-fn stopping(mode: CloseMode, deadline: Deadline, event: Event) -> Face {
+fn stopping(mode: CloseMode, sinks: Sinks, event: Event) -> Face {
     match event {
-        Event::Quit(..) | Event::InterruptSignal | Event::BreakSignal => again(mode, deadline),
-        // The time limit belongs to whoever sent it, so a second one ends
-        // the process.
+        Event::Quit(..) | Event::InterruptSignal | Event::BreakSignal => again(mode, sinks),
+        // Whoever sent it has a limit of their own, and a second one says
+        // it has run out.
         Event::Terminate => Face::Gone(Handoff::Skipped),
         // Not an escalation: the terminal is gone and the platform ends
-        // the process within seconds, so the runs are stopped and the
-        // limit is armed.
+        // the process within seconds, so its sinks are cut and the runs
+        // are stopped under the limit.
         Event::TerminalLost => Face::Stopping {
             mode: CloseMode::Interrupt,
-            deadline: Deadline::Armed,
+            sinks: Sinks::Cut,
         },
         Event::Landed => Face::Gone(Handoff::Written),
-        Event::Deadline => match deadline {
-            Deadline::Armed => Face::Gone(Handoff::Skipped),
-            Deadline::Unarmed => Face::Stopping { mode, deadline },
+        // The limit belongs to every close that interrupts (D75), so it is
+        // the mode that decides, not why the city is closing.
+        Event::Deadline => match mode {
+            CloseMode::Interrupt => Face::Gone(Handoff::Skipped),
+            CloseMode::Drain => Face::Stopping { mode, sinks },
         },
         Event::Ready(_) | Event::Web | Event::Back | Event::Failed => {
-            Face::Stopping { mode, deadline }
+            Face::Stopping { mode, sinks }
         }
     }
 }
@@ -216,7 +253,7 @@ fn stopping(mode: CloseMode, deadline: Deadline, event: Event) -> Face {
     reason = "test code"
 )]
 mod tests {
-    use super::{Asker, Cause, Deadline, Event, Face, Handoff, Surface, step};
+    use super::{Asker, Cause, Event, Face, Handoff, Sinks, Surface, step};
     use accounting::worker::ClosedBy;
     use wire::CloseMode;
 
@@ -228,15 +265,15 @@ Opening Ready/QuietHost QuietHost -
 Opening Ready/Headless Headless -
 Opening Web Opening -
 Opening Back Opening -
-Opening Quit/Console/Drain Stopping/Drain/Unarmed Console
-Opening Quit/Console/Interrupt Stopping/Interrupt/Unarmed Console
-Opening Quit/Page/Drain Stopping/Drain/Unarmed Page
-Opening Quit/Page/Interrupt Stopping/Interrupt/Unarmed Page
-Opening InterruptSignal Stopping/Drain/Unarmed InterruptSignal
-Opening BreakSignal Stopping/Drain/Unarmed BreakSignal
-Opening Terminate Stopping/Interrupt/Unarmed Terminate
+Opening Quit/Console/Drain Stopping/Drain/Held Console
+Opening Quit/Console/Interrupt Stopping/Interrupt/Held Console
+Opening Quit/Page/Drain Stopping/Drain/Held Page
+Opening Quit/Page/Interrupt Stopping/Interrupt/Held Page
+Opening InterruptSignal Stopping/Drain/Held InterruptSignal
+Opening BreakSignal Stopping/Drain/Held BreakSignal
+Opening Terminate Stopping/Interrupt/Held Terminate
 Opening TerminalLost Opening -
-Opening Failed Stopping/Drain/Unarmed Failed
+Opening Failed Stopping/Drain/Held Failed
 Opening Landed Opening -
 Opening Deadline Opening -
 Cli Ready/Cli Cli -
@@ -244,15 +281,15 @@ Cli Ready/QuietHost Cli -
 Cli Ready/Headless Cli -
 Cli Web QuietHost -
 Cli Back Cli -
-Cli Quit/Console/Drain Stopping/Drain/Unarmed Console
-Cli Quit/Console/Interrupt Stopping/Interrupt/Unarmed Console
-Cli Quit/Page/Drain Stopping/Drain/Unarmed Page
-Cli Quit/Page/Interrupt Stopping/Interrupt/Unarmed Page
+Cli Quit/Console/Drain Stopping/Drain/Held Console
+Cli Quit/Console/Interrupt Stopping/Interrupt/Held Console
+Cli Quit/Page/Drain Stopping/Drain/Held Page
+Cli Quit/Page/Interrupt Stopping/Interrupt/Held Page
 Cli InterruptSignal Cli -
-Cli BreakSignal Stopping/Drain/Unarmed BreakSignal
-Cli Terminate Stopping/Interrupt/Unarmed Terminate
-Cli TerminalLost Stopping/Interrupt/Armed TerminalLost
-Cli Failed Stopping/Drain/Unarmed Failed
+Cli BreakSignal Stopping/Drain/Held BreakSignal
+Cli Terminate Stopping/Interrupt/Held Terminate
+Cli TerminalLost Stopping/Interrupt/Cut TerminalLost
+Cli Failed Stopping/Drain/Held Failed
 Cli Landed Cli -
 Cli Deadline Cli -
 QuietHost Ready/Cli QuietHost -
@@ -260,15 +297,15 @@ QuietHost Ready/QuietHost QuietHost -
 QuietHost Ready/Headless QuietHost -
 QuietHost Web QuietHost -
 QuietHost Back Cli -
-QuietHost Quit/Console/Drain Stopping/Drain/Unarmed Console
-QuietHost Quit/Console/Interrupt Stopping/Interrupt/Unarmed Console
-QuietHost Quit/Page/Drain Stopping/Drain/Unarmed Page
-QuietHost Quit/Page/Interrupt Stopping/Interrupt/Unarmed Page
+QuietHost Quit/Console/Drain Stopping/Drain/Held Console
+QuietHost Quit/Console/Interrupt Stopping/Interrupt/Held Console
+QuietHost Quit/Page/Drain Stopping/Drain/Held Page
+QuietHost Quit/Page/Interrupt Stopping/Interrupt/Held Page
 QuietHost InterruptSignal QuietHost -
-QuietHost BreakSignal Stopping/Drain/Unarmed BreakSignal
-QuietHost Terminate Stopping/Interrupt/Unarmed Terminate
-QuietHost TerminalLost Stopping/Interrupt/Armed TerminalLost
-QuietHost Failed Stopping/Drain/Unarmed Failed
+QuietHost BreakSignal Stopping/Drain/Held BreakSignal
+QuietHost Terminate Stopping/Interrupt/Held Terminate
+QuietHost TerminalLost Stopping/Interrupt/Cut TerminalLost
+QuietHost Failed Stopping/Drain/Held Failed
 QuietHost Landed QuietHost -
 QuietHost Deadline QuietHost -
 Headless Ready/Cli Headless -
@@ -276,81 +313,81 @@ Headless Ready/QuietHost Headless -
 Headless Ready/Headless Headless -
 Headless Web Headless -
 Headless Back Headless -
-Headless Quit/Console/Drain Stopping/Drain/Unarmed Console
-Headless Quit/Console/Interrupt Stopping/Interrupt/Unarmed Console
-Headless Quit/Page/Drain Stopping/Drain/Unarmed Page
-Headless Quit/Page/Interrupt Stopping/Interrupt/Unarmed Page
-Headless InterruptSignal Stopping/Drain/Unarmed InterruptSignal
-Headless BreakSignal Stopping/Drain/Unarmed BreakSignal
-Headless Terminate Stopping/Interrupt/Unarmed Terminate
+Headless Quit/Console/Drain Stopping/Drain/Held Console
+Headless Quit/Console/Interrupt Stopping/Interrupt/Held Console
+Headless Quit/Page/Drain Stopping/Drain/Held Page
+Headless Quit/Page/Interrupt Stopping/Interrupt/Held Page
+Headless InterruptSignal Stopping/Drain/Held InterruptSignal
+Headless BreakSignal Stopping/Drain/Held BreakSignal
+Headless Terminate Stopping/Interrupt/Held Terminate
 Headless TerminalLost Headless -
-Headless Failed Stopping/Drain/Unarmed Failed
+Headless Failed Stopping/Drain/Held Failed
 Headless Landed Headless -
 Headless Deadline Headless -
-Stopping/Drain/Unarmed Ready/Cli Stopping/Drain/Unarmed -
-Stopping/Drain/Unarmed Ready/QuietHost Stopping/Drain/Unarmed -
-Stopping/Drain/Unarmed Ready/Headless Stopping/Drain/Unarmed -
-Stopping/Drain/Unarmed Web Stopping/Drain/Unarmed -
-Stopping/Drain/Unarmed Back Stopping/Drain/Unarmed -
-Stopping/Drain/Unarmed Quit/Console/Drain Stopping/Interrupt/Unarmed -
-Stopping/Drain/Unarmed Quit/Console/Interrupt Stopping/Interrupt/Unarmed -
-Stopping/Drain/Unarmed Quit/Page/Drain Stopping/Interrupt/Unarmed -
-Stopping/Drain/Unarmed Quit/Page/Interrupt Stopping/Interrupt/Unarmed -
-Stopping/Drain/Unarmed InterruptSignal Stopping/Interrupt/Unarmed -
-Stopping/Drain/Unarmed BreakSignal Stopping/Interrupt/Unarmed -
-Stopping/Drain/Unarmed Terminate Gone/Skipped -
-Stopping/Drain/Unarmed TerminalLost Stopping/Interrupt/Armed -
-Stopping/Drain/Unarmed Failed Stopping/Drain/Unarmed -
-Stopping/Drain/Unarmed Landed Gone/Written -
-Stopping/Drain/Unarmed Deadline Stopping/Drain/Unarmed -
-Stopping/Drain/Armed Ready/Cli Stopping/Drain/Armed -
-Stopping/Drain/Armed Ready/QuietHost Stopping/Drain/Armed -
-Stopping/Drain/Armed Ready/Headless Stopping/Drain/Armed -
-Stopping/Drain/Armed Web Stopping/Drain/Armed -
-Stopping/Drain/Armed Back Stopping/Drain/Armed -
-Stopping/Drain/Armed Quit/Console/Drain Stopping/Interrupt/Armed -
-Stopping/Drain/Armed Quit/Console/Interrupt Stopping/Interrupt/Armed -
-Stopping/Drain/Armed Quit/Page/Drain Stopping/Interrupt/Armed -
-Stopping/Drain/Armed Quit/Page/Interrupt Stopping/Interrupt/Armed -
-Stopping/Drain/Armed InterruptSignal Stopping/Interrupt/Armed -
-Stopping/Drain/Armed BreakSignal Stopping/Interrupt/Armed -
-Stopping/Drain/Armed Terminate Gone/Skipped -
-Stopping/Drain/Armed TerminalLost Stopping/Interrupt/Armed -
-Stopping/Drain/Armed Failed Stopping/Drain/Armed -
-Stopping/Drain/Armed Landed Gone/Written -
-Stopping/Drain/Armed Deadline Gone/Skipped -
-Stopping/Interrupt/Unarmed Ready/Cli Stopping/Interrupt/Unarmed -
-Stopping/Interrupt/Unarmed Ready/QuietHost Stopping/Interrupt/Unarmed -
-Stopping/Interrupt/Unarmed Ready/Headless Stopping/Interrupt/Unarmed -
-Stopping/Interrupt/Unarmed Web Stopping/Interrupt/Unarmed -
-Stopping/Interrupt/Unarmed Back Stopping/Interrupt/Unarmed -
-Stopping/Interrupt/Unarmed Quit/Console/Drain Gone/Skipped -
-Stopping/Interrupt/Unarmed Quit/Console/Interrupt Gone/Skipped -
-Stopping/Interrupt/Unarmed Quit/Page/Drain Gone/Skipped -
-Stopping/Interrupt/Unarmed Quit/Page/Interrupt Gone/Skipped -
-Stopping/Interrupt/Unarmed InterruptSignal Gone/Skipped -
-Stopping/Interrupt/Unarmed BreakSignal Gone/Skipped -
-Stopping/Interrupt/Unarmed Terminate Gone/Skipped -
-Stopping/Interrupt/Unarmed TerminalLost Stopping/Interrupt/Armed -
-Stopping/Interrupt/Unarmed Failed Stopping/Interrupt/Unarmed -
-Stopping/Interrupt/Unarmed Landed Gone/Written -
-Stopping/Interrupt/Unarmed Deadline Stopping/Interrupt/Unarmed -
-Stopping/Interrupt/Armed Ready/Cli Stopping/Interrupt/Armed -
-Stopping/Interrupt/Armed Ready/QuietHost Stopping/Interrupt/Armed -
-Stopping/Interrupt/Armed Ready/Headless Stopping/Interrupt/Armed -
-Stopping/Interrupt/Armed Web Stopping/Interrupt/Armed -
-Stopping/Interrupt/Armed Back Stopping/Interrupt/Armed -
-Stopping/Interrupt/Armed Quit/Console/Drain Gone/Skipped -
-Stopping/Interrupt/Armed Quit/Console/Interrupt Gone/Skipped -
-Stopping/Interrupt/Armed Quit/Page/Drain Gone/Skipped -
-Stopping/Interrupt/Armed Quit/Page/Interrupt Gone/Skipped -
-Stopping/Interrupt/Armed InterruptSignal Gone/Skipped -
-Stopping/Interrupt/Armed BreakSignal Gone/Skipped -
-Stopping/Interrupt/Armed Terminate Gone/Skipped -
-Stopping/Interrupt/Armed TerminalLost Stopping/Interrupt/Armed -
-Stopping/Interrupt/Armed Failed Stopping/Interrupt/Armed -
-Stopping/Interrupt/Armed Landed Gone/Written -
-Stopping/Interrupt/Armed Deadline Gone/Skipped -
+Stopping/Drain/Held Ready/Cli Stopping/Drain/Held -
+Stopping/Drain/Held Ready/QuietHost Stopping/Drain/Held -
+Stopping/Drain/Held Ready/Headless Stopping/Drain/Held -
+Stopping/Drain/Held Web Stopping/Drain/Held -
+Stopping/Drain/Held Back Stopping/Drain/Held -
+Stopping/Drain/Held Quit/Console/Drain Stopping/Interrupt/Held -
+Stopping/Drain/Held Quit/Console/Interrupt Stopping/Interrupt/Held -
+Stopping/Drain/Held Quit/Page/Drain Stopping/Interrupt/Held -
+Stopping/Drain/Held Quit/Page/Interrupt Stopping/Interrupt/Held -
+Stopping/Drain/Held InterruptSignal Stopping/Interrupt/Held -
+Stopping/Drain/Held BreakSignal Stopping/Interrupt/Held -
+Stopping/Drain/Held Terminate Gone/Skipped -
+Stopping/Drain/Held TerminalLost Stopping/Interrupt/Cut -
+Stopping/Drain/Held Failed Stopping/Drain/Held -
+Stopping/Drain/Held Landed Gone/Written -
+Stopping/Drain/Held Deadline Stopping/Drain/Held -
+Stopping/Drain/Cut Ready/Cli Stopping/Drain/Cut -
+Stopping/Drain/Cut Ready/QuietHost Stopping/Drain/Cut -
+Stopping/Drain/Cut Ready/Headless Stopping/Drain/Cut -
+Stopping/Drain/Cut Web Stopping/Drain/Cut -
+Stopping/Drain/Cut Back Stopping/Drain/Cut -
+Stopping/Drain/Cut Quit/Console/Drain Stopping/Interrupt/Cut -
+Stopping/Drain/Cut Quit/Console/Interrupt Stopping/Interrupt/Cut -
+Stopping/Drain/Cut Quit/Page/Drain Stopping/Interrupt/Cut -
+Stopping/Drain/Cut Quit/Page/Interrupt Stopping/Interrupt/Cut -
+Stopping/Drain/Cut InterruptSignal Stopping/Interrupt/Cut -
+Stopping/Drain/Cut BreakSignal Stopping/Interrupt/Cut -
+Stopping/Drain/Cut Terminate Gone/Skipped -
+Stopping/Drain/Cut TerminalLost Stopping/Interrupt/Cut -
+Stopping/Drain/Cut Failed Stopping/Drain/Cut -
+Stopping/Drain/Cut Landed Gone/Written -
+Stopping/Drain/Cut Deadline Stopping/Drain/Cut -
+Stopping/Interrupt/Held Ready/Cli Stopping/Interrupt/Held -
+Stopping/Interrupt/Held Ready/QuietHost Stopping/Interrupt/Held -
+Stopping/Interrupt/Held Ready/Headless Stopping/Interrupt/Held -
+Stopping/Interrupt/Held Web Stopping/Interrupt/Held -
+Stopping/Interrupt/Held Back Stopping/Interrupt/Held -
+Stopping/Interrupt/Held Quit/Console/Drain Gone/Skipped -
+Stopping/Interrupt/Held Quit/Console/Interrupt Gone/Skipped -
+Stopping/Interrupt/Held Quit/Page/Drain Gone/Skipped -
+Stopping/Interrupt/Held Quit/Page/Interrupt Gone/Skipped -
+Stopping/Interrupt/Held InterruptSignal Gone/Skipped -
+Stopping/Interrupt/Held BreakSignal Gone/Skipped -
+Stopping/Interrupt/Held Terminate Gone/Skipped -
+Stopping/Interrupt/Held TerminalLost Stopping/Interrupt/Cut -
+Stopping/Interrupt/Held Failed Stopping/Interrupt/Held -
+Stopping/Interrupt/Held Landed Gone/Written -
+Stopping/Interrupt/Held Deadline Gone/Skipped -
+Stopping/Interrupt/Cut Ready/Cli Stopping/Interrupt/Cut -
+Stopping/Interrupt/Cut Ready/QuietHost Stopping/Interrupt/Cut -
+Stopping/Interrupt/Cut Ready/Headless Stopping/Interrupt/Cut -
+Stopping/Interrupt/Cut Web Stopping/Interrupt/Cut -
+Stopping/Interrupt/Cut Back Stopping/Interrupt/Cut -
+Stopping/Interrupt/Cut Quit/Console/Drain Gone/Skipped -
+Stopping/Interrupt/Cut Quit/Console/Interrupt Gone/Skipped -
+Stopping/Interrupt/Cut Quit/Page/Drain Gone/Skipped -
+Stopping/Interrupt/Cut Quit/Page/Interrupt Gone/Skipped -
+Stopping/Interrupt/Cut InterruptSignal Gone/Skipped -
+Stopping/Interrupt/Cut BreakSignal Gone/Skipped -
+Stopping/Interrupt/Cut Terminate Gone/Skipped -
+Stopping/Interrupt/Cut TerminalLost Stopping/Interrupt/Cut -
+Stopping/Interrupt/Cut Failed Stopping/Interrupt/Cut -
+Stopping/Interrupt/Cut Landed Gone/Written -
+Stopping/Interrupt/Cut Deadline Gone/Skipped -
 Gone/Written Ready/Cli Gone/Written -
 Gone/Written Ready/QuietHost Gone/Written -
 Gone/Written Ready/Headless Gone/Written -
@@ -400,12 +437,12 @@ Gone/Skipped Deadline Gone/Skipped -
             ["Cli"] => Face::Cli,
             ["QuietHost"] => Face::QuietHost,
             ["Headless"] => Face::Headless,
-            ["Stopping", m, d] => Face::Stopping {
+            ["Stopping", m, k] => Face::Stopping {
                 mode: mode(m),
-                deadline: match *d {
-                    "Unarmed" => Deadline::Unarmed,
-                    "Armed" => Deadline::Armed,
-                    other => panic!("no deadline {other}"),
+                sinks: match *k {
+                    "Held" => Sinks::Held,
+                    "Cut" => Sinks::Cut,
+                    other => panic!("no sinks {other}"),
                 },
             },
             ["Gone", "Written"] => Face::Gone(Handoff::Written),
