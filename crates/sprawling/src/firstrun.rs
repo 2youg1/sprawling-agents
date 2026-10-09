@@ -220,18 +220,20 @@ pub(crate) fn open_paired(url: &str, door: &wire::LocalDoor) -> Result<(), kerne
         .with_recovery("open the address the city printed, and type the pairing code it shows")
     };
     if std::env::var_os("WSL_DISTRO_NAME").is_some() {
-        return open_in_browser(url).map_err(unhandled);
+        return open_in_browser(url, unhandled);
     }
     let wire::OpenCode { code, redeemed } = door.issue_open_code()?;
-    let page =
-        crate::serving::key_file::runtime_dir()?.join(format!("open-{}.html", std::process::id()));
+    let page = crate::serving::key_file::runtime_dir()?.join(format!(
+        "{REDIRECT_PREFIX}{}{REDIRECT_SUFFIX}",
+        std::process::id()
+    ));
     let target = format!("{}/#open={code}", url.trim_end_matches('/'));
     let redirect = format!(
         "<!doctype html><meta charset=\"utf-8\"><meta http-equiv=\"refresh\" content=\"0;url={target}\">\
          <script>location.replace({target:?})</script>\n"
     );
     write_private(&page, &redirect).map_err(unhandled)?;
-    let opened = open_in_browser(&page.to_string_lossy()).map_err(unhandled);
+    let opened = open_in_browser(&page.to_string_lossy(), unhandled);
     std::thread::spawn(move || {
         // Every answer ends the wait the same way - redeemed, expired, or
         // the door gone - so which one it was is owed to nobody.
@@ -260,38 +262,101 @@ fn write_private(path: &Path, text: &str) -> std::io::Result<()> {
     options.open(path)?.write_all(text.as_bytes())
 }
 
-/// Hands a URL or a file path to whatever this desktop opens them with.
+/// What the redirect pages `open_paired` writes are named: the prefix,
+/// this process's id, the suffix. The sweep at start reads the same two.
+const REDIRECT_PREFIX: &str = "open-";
+const REDIRECT_SUFFIX: &str = ".html";
+
+/// Removes the redirect pages a city ended by force left behind: every
+/// `open-*.html` in the runtime directory last written more than an open
+/// code's lifetime before `now`, so its code has expired. A younger page
+/// stays, because another city of this account may have just written it
+/// for a browser that has not read it yet.
 ///
 /// # Errors
-/// Propagates the failure of starting the handler. Callers treat this as
-/// a notice rather than a fault: the URL is printed before this runs, so
-/// a machine with no handler still has a working city.
-fn open_in_browser(url: &str) -> std::io::Result<()> {
-    let mut command = handler(url);
-    command.status().map(|_| ())
+/// The runtime directory cannot be found or listed, or an expired page
+/// cannot be removed.
+pub fn sweep_expired_redirects(now: kernel::TimeMs) -> Result<(), kernel::AxError> {
+    let dir = crate::serving::key_file::runtime_dir()?;
+    let unswept = |source: std::io::Error| {
+        kernel::AxError::failure(
+            kernel::AxCode::StorageFatal,
+            "remove the expired browser redirect pages",
+            format!("{}: {source}", dir.display()),
+        )
+        .with_recovery("delete the open-*.html files in that directory; their codes have expired")
+    };
+    let age = Duration::from_millis(now.value())
+        .saturating_sub(Duration::from_millis(wire::OPEN_CODE_LIFETIME_MS));
+    // Past the end of the platform's time, no page can be older.
+    let Some(cutoff) = std::time::UNIX_EPOCH.checked_add(age) else {
+        return Ok(());
+    };
+    for entry in std::fs::read_dir(&dir).map_err(unswept)? {
+        let entry = entry.map_err(unswept)?;
+        let name = entry.file_name();
+        let name = name.to_string_lossy();
+        if !(name.starts_with(REDIRECT_PREFIX) && name.ends_with(REDIRECT_SUFFIX)) {
+            continue;
+        }
+        let written = entry
+            .metadata()
+            .and_then(|m| m.modified())
+            .map_err(unswept)?;
+        if written < cutoff {
+            std::fs::remove_file(entry.path()).map_err(unswept)?;
+        }
+    }
+    Ok(())
 }
 
+/// Hands a URL or a file path to whatever this desktop opens them with,
+/// started as every other child of the city is (`child::command`): none
+/// of the city's secrets in its environment, which the browser it starts
+/// inherits and outlives the city with, and no standard stream of the
+/// city's, so nothing it prints lands on the CLI or the quiet host.
+///
+/// # Errors
+/// The handler could not be found or started, in `unhandled`'s words.
+/// Callers treat this as a notice rather than a fault: the URL is
+/// printed before this runs, so a machine with no handler still has a
+/// working city.
+fn open_in_browser(
+    target: &str,
+    unhandled: impl Fn(std::io::Error) -> kernel::AxError,
+) -> Result<(), kernel::AxError> {
+    handler(target)?
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .map(|_| ())
+        .map_err(unhandled)
+}
+
+/// `cmd.exe` from `System32`, never one the search order finds first in
+/// this binary's folder (`crates/sprawling/spec/Firstrun.lean` §8-8).
 #[cfg(target_os = "windows")]
-fn handler(url: &str) -> std::process::Command {
-    let mut command = std::process::Command::new("cmd");
+fn handler(target: &str) -> Result<std::process::Command, kernel::AxError> {
+    let mut command = child::command(crate::privacy::windows::system32("cmd.exe")?);
     // The empty argument is `start`'s title slot: without it a quoted URL
     // becomes the window title and nothing opens.
-    command.args(["/C", "start", "", url]);
-    command
+    command.args(["/C", "start", "", target]);
+    Ok(command)
 }
 
 #[cfg(target_os = "macos")]
-fn handler(url: &str) -> std::process::Command {
-    let mut command = std::process::Command::new("open");
-    command.arg(url);
-    command
+fn handler(target: &str) -> Result<std::process::Command, kernel::AxError> {
+    let mut command = child::command("open");
+    command.arg(target);
+    Ok(command)
 }
 
 #[cfg(not(any(target_os = "windows", target_os = "macos")))]
-fn handler(url: &str) -> std::process::Command {
-    let mut command = std::process::Command::new("xdg-open");
-    command.arg(url);
-    command
+fn handler(target: &str) -> Result<std::process::Command, kernel::AxError> {
+    let mut command = child::command("xdg-open");
+    command.arg(target);
+    Ok(command)
 }
 
 #[cfg(test)]

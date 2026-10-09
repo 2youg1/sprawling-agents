@@ -40,7 +40,7 @@ use kernel::consts_policy::DEFAULT_AT;
 use sprawling::{assembly, console, firstrun, serving};
 use std::process::ExitCode;
 
-use banner::print_banner;
+use banner::{Reader, print_banner, print_pairing};
 pub(super) use opening::Entrance;
 use opening::{Interactive, Open, opening};
 
@@ -258,6 +258,14 @@ pub(super) fn serve_city(
              package's {CLIENT_BUNDLE_DIR} directory"
         );
     }
+    // A city ended by force could not remove its redirect pages; their
+    // open codes have expired, so the next start does it. Said, not
+    // fatal: an expired code opens nothing.
+    if let Err(unswept) =
+        accounting::Clock::now(&assembly::SystemClock).and_then(firstrun::sweep_expired_redirects)
+    {
+        eprintln!("{}: {}", unswept.action(), unswept.recovery());
+    }
     // The key is settled before anything binds. A configured token is
     // adopted; an address that reaches past this machine and has none
     // gets one minted for this serve alone. Read once here and never
@@ -339,17 +347,14 @@ pub(super) fn serve_city(
     // its two lines (`crates/sprawling/spec/Firstrun.lean` §8-8).
     if !owns_the_terminal {
         print_banner(city, &url, &client_line, &keyed);
-        // Each try replaces it; the console shows the one in force.
-        let pairing = listening.door().pairing_code().borrow().clone();
-        println!("  A second browser pairs with the code {pairing}.");
         if let Some(level) = floor {
             println!("log: {level}");
         }
-        if wanted {
-            println!("  This terminal reads one line at a time. `/help` lists what it takes,");
-            println!("  and `/serving` says where this city listens and what is running in it.");
-            println!();
-        }
+        print_pairing(if wanted {
+            Reader::LineConsole
+        } else {
+            Reader::Log
+        });
     }
     match open {
         Open::Browser => firstrun::open_when_ready(at, url, listening.door().clone()),
