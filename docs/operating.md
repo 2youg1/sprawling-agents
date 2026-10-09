@@ -20,7 +20,9 @@ Steering is not interruption. The instruction lands at the end of the next tool 
 
 A session's menu renames the session and changes its run policy — the mode and the write limit — while a run works there. The change is recorded as `run_policy_changed` and reaches that run before its next wave of tool calls, so no wave runs under two policies. A change made while no run works there is kept for the session: its next dispatch starts under the session's last change, whatever policy the page or a script put in the dispatch frame, and a frame's policy applies only to a session whose policy nobody changed. Every mode offers the same tools and the mode is asked at the call, so the change keeps the prompt cache; in chat mode `edit` and `exec` are refused with a note that names the way to switch. A run that sent a signal with `wait` stops at its next safe point and spends nothing until the reply comes, the run leaves its room, or 240 seconds pass; its run summary on the wire carries `waiting`, which tells it apart from a stuck run.
 
-The rest of the `/` menu starts and shapes work: `/dispatch <task>` opens a run in the room the box speaks to, `/new` starts a fresh session at the same address (`/new --carry` brings the room's handoff along), `/fork` starts a second line from the newest run in a room, `/raise <addr>` raises a building from a template, `/model <id>` points `main` at another model, and `/effort` sets how hard the model thinks. `/diff` opens the changes of the run in this room, `/go` opens a page by name, `/mcp` opens the tool servers page, `/doctor` checks this machine again, and `/help` lists every command. `Ctrl-K` offers the same list with every page and session beside it.
+The rest of the `/` menu starts and shapes work: `/dispatch <task>` opens a run in the room the box speaks to, `/new` starts a fresh session at the same address (`/new --carry` brings the room's handoff along), `/fork` starts a second line from the newest run in a room, `/raise <addr>` raises a building from a template, `/model <id>` points `main` at another model, and `/effort` sets how hard the model thinks; both complete their argument from what the model in force offers, and `/effort <level>` with a level that model does not offer is refused before dispatch with `E_CONFIG_INVALID`, naming the levels it offers. `/diff` opens the changes of the run in this room, `/go` opens a page by name, `/mcp` opens the tool servers page, `/acp` opens the ACP page, `/doctor` checks this machine again, and `/help` lists every command. `/quit` closes the city, and is offered only to the CLI and to a page this machine opened. `Ctrl-K` offers the same list with every page and session beside it. <!-- v0.0.11-verify -->
+
+The CLI takes the same commands, and `/web` besides, which opens the page and leaves the terminal to the quiet host. In the CLI, `y` and `n` on an empty line answer the question waiting in the room you speak to, and Esc closes a menu, else clears the line, else interrupts that room's run.
 
 ## What each page answers
 
@@ -34,7 +36,7 @@ A run's page has seven lenses: **time**, **turns**, **monitor**, **prompt**, **c
 
 **the record** is the history through four lenses. **the ledger** is the event stream, with filters that say how many rows they hid. **the archive** searches every building's shelves at the moment you ask. **the recycle bin** is every discarded file with the way back. **the log** is the diagnostic log of this process, at the level it was started with.
 
-**cost** is money and tokens, cut five ways, each cut summing exactly to what was billed. **the registry** lists what residents filed for keeping, by kind, building and date. **MCP** is where tool servers are added, by command, by URL or from a pasted JSON block. **settings** is providers and models, who answers approvals, the network rule a new endpoint starts with, the programs this city needs, skills, appearance, keybindings, and which release this is.
+**cost** is money and tokens, cut five ways, each cut summing exactly to what was billed. **the registry** lists what residents filed for keeping, by kind, building and date. **MCP** is where tool servers are added, by command, by URL or from a pasted JSON block. **settings** is providers and models, the ACP agents this city has added, the browsers paired with it, who answers approvals, the network rule a new endpoint starts with, the programs this city needs, skills, appearance, keybindings, and which release this is.
 
 Looking at a room does not empty its queue: the queue is folded from the Ledger, and only a run that takes a signal removes it.
 
@@ -60,6 +62,10 @@ The cost page shows shares against the billed total rather than normalising its 
 **by skill** is one bucket. A tool call does not happen "under" a skill — a skill is a line of disclosure in the prefix, not a calling context — so nothing in the Ledger names the skill a call was made under, and every call lands in `no_skill`. The cut stays, reporting what it can defend.
 
 ## When something breaks
+
+**The page asks for a pairing code.** This browser holds no device key for this city: it is a second browser, a private window, or one whose storage was cleared. Type the code the terminal shows; each code takes one try, right or wrong, and the terminal then shows a new one. Or type `/web` in the CLI, which pairs the browser it opens with no typing. A Safari profile that has not opened the page for seven days may have dropped the key, and pairs again the same way. <!-- v0.0.11-verify -->
+
+**An ACP agent asks to sign in.** The agent answered that it needs a login. The page or the CLI offers the agent's own login methods, and the agent's own program performs the login, in the CLI's terminal or in a new terminal window; once it exits, the city opens the session again and resends the task. A login that keeps failing is a matter for the agent's vendor: the city never holds the agent's credentials. <!-- v0.0.11-verify -->
 
 **A run ended and nothing is waiting.** Its outcome is on its page: **done**, **stopped**, **hit a limit**, or **ended**, with the reason. An ended run does not restart itself; dispatch again, or open the run's page and fork from the step before the problem.
 
@@ -102,7 +108,7 @@ A building whose `RULES.toml` says `browser = true` gets the **browser** tool, s
 **Raise the two cities.** One port serves one city, so the second one gets another.
 
 ```bash
-sprawling up ~/cities/first                         # 127.0.0.1:8787, and it opens the page
+sprawling up ~/cities/first                         # 127.0.0.1:8787; /web opens its page
 sprawling up ~/cities/watcher 127.0.0.1:8788        # in a second shell
 ```
 
@@ -128,15 +134,17 @@ sprawling dispatch watchtower 'open http://127.0.0.1:8787/, take a snapshot, pre
 
 A city with no model chosen for `main` answers that in one frame, `E_MODEL_UNCHOSEN`, so choose one on the second city's settings page first. Otherwise the second city's own page shows the browser's actions going out one at a time.
 
+The first city treats the watcher's browser as any other second browser: its page asks for a pairing code, because that browser holds no device key for the first city. Add the code the first city's terminal shows to the task, and the watchtower's browser pairs once; the code is spent by that one try, so the copy left in the watcher's Ledger opens nothing afterwards. Settings on the first city lists the watchtower's browser among the paired ones and forgets it when the watching is over. A building's browser is refused its own city's address, so a city cannot watch itself this way. <!-- v0.0.11-verify -->
+
 **What the resident is holding.** The browser starts on the first action and stops when the run ends. Firefox is preferred because it speaks WebDriver BiDi itself and needs no driver; Chromium works when `chromedriver` is on the search path, and `sprawling doctor` says which of the two this machine has. The profile is `~/cities/watcher/.sprawling/browser-profiles/watchtower`, so a login the watchtower performs belongs to the watchtower and to no other building, and it sits in the reserved subtree, which no write domain reaches, so a run cannot edit its own stored credentials.
 
 **A screenshot is not a picture in a log.** Its bytes go into the content store, the tool result carries the `cas:` locator and the picture's size in pixels, and the picture is attached to what the model reads, so the resident that took it can look at it on the next turn, and so can you, from the ledger row, afterwards.
 
-**Stopping.** `Ctrl-C` in either console stops that city and closes the browser it started. The two share nothing but a machine: two directories, two Ledgers, two ports.
+**Stopping.** `/quit` in either city's CLI closes that city and the browser it started. The two share nothing but a machine: two directories, two Ledgers, two ports.
 
 ## Reaching the city from another device
 
-The remote door lets a phone or a second computer reach a city that runs on this machine, through a route that makes a loopback port reachable from outside. The console drives all of it. Settings > Remote on the page can also open the door for a time you pick, close it, and replace the city key, but opening and replacing the key take a second step: the request prints a code on the terminal running `sprawling serve`, beside the verb it would perform, and the city performs the verb only when that code is typed into the page within two minutes. The code never reaches a page or a frame, so a browser tool or a command that drives the page cannot open the door or replace the key; closing needs no code, because it only takes access away. A city started without a console refuses opening, replacing and confirming with `E_TOOL_UNAVAILABLE`; run `sprawling serve` in a terminal of its own. This is the same on Windows, macOS and Linux. Pairing and revoking a device stay at the console, because a pairing code shown on a page could be read by whatever drives that page. Where `exec` runs in the `copied_tree` arm, a command has your account's network and credential store, so the code protects the door from the browser tools and not from `exec`.
+The remote door lets a phone or a second computer reach a city that runs on this machine, through a route that makes a loopback port reachable from outside. The console drives all of it. Settings > Remote on the page can also open the door for a time you pick, close it, and replace the city key, but opening and replacing the key take a second step: the request prints a code on the terminal running `sprawling serve`, beside the verb it would perform (in the quiet host, as its one transient third line), and the city performs the verb only when that code is typed into the page within two minutes. The code never reaches a page or a frame, so a browser tool or a command that drives the page cannot open the door or replace the key; closing needs no code, because it only takes access away. A city started without a console refuses opening, replacing and confirming with `E_TOOL_UNAVAILABLE`; run `sprawling serve` in a terminal of its own. This is the same on Windows, macOS and Linux. Pairing and revoking a device stay at the console, because a pairing code shown on a page could be read by whatever drives that page. Where `exec` runs in the `copied_tree` arm, a command has your account's network and credential store, so the code protects the door from the browser tools and not from `exec`.
 
 | Typed at the console | What happens |
 |---|---|
@@ -176,7 +184,7 @@ url = "https://city.example.org"
 # command = "C:/tools/cloudflared.exe"   # when cloudflared is not on PATH
 ```
 
-A command you write. The city starts it with the loopback address in `SPRAWLING_REMOTE_LOCAL`; once that address is reachable from outside, the command prints one line `{"url": "https://host"}` and keeps running until the door closes. `permanence` says whether the host name stays the same after the command restarts (`"fixed"`) or changes each time (`"per_start"`); a device keeps its key under the host name, so on a `per_start` route it pairs again after each restart.
+A command you write. The city starts it with the loopback address in `SPRAWLING_REMOTE_LOCAL`, and without the city's own `SPRAWLING_SECRET_*` variables and `SPRAWLING_PAIRING_TOKEN`, which no program the city starts inherits; once that address is reachable from outside, the command prints one line `{"url": "https://host"}` and keeps running until the door closes. `permanence` says whether the host name stays the same after the command restarts (`"fixed"`) or changes each time (`"per_start"`); a device keeps its key under the host name, so on a `per_start` route it pairs again after each restart.
 
 ```toml
 [remote]
@@ -212,13 +220,29 @@ The manifest is the integrity test: restore walks the chain and compares it with
 
 **Let the agents keep their own notes.** `Memo.md` for what needs recording and has no other home, `Handoff.md` for the next session, the archive for what was worth keeping. They are ordinary files: readable in the browser, editable in your editor, and the same bytes either way.
 
-## What the console prints
+## What the terminal shows
 
-The terminal a city runs in prints one line for each record the city commits: its position in the Ledger, its event kind and its address, such as `  seq 42  steer_received  lab/room1`, with `city` where a record has no address. It never prints a payload by default, because a record holds what the User typed and what a model answered, and a terminal is seen by people nearby, recorded on screen and kept in scrollback. `sprawling up --whole-records` (or `serve --whole-records`) prints each record whole instead, in the shape `sprawling call` prints. The page, `sprawling call` and `sprawling view` still show every record in full. The console prints the same lines on Windows, macOS and Linux.
+The console has two faces. The **CLI** shows the conversation of the room you speak to — what you wrote, what the resident answered, its tool lines and the questions waiting for you — because choosing to work in the terminal is choosing to see the work there. It never shows a credential. The **quiet host**, which `/web` switches to, shows two lines, the address and the pairing code, and at most one transient line: a remote-door confirmation code, or how far closing has got. It shows nothing the city records, so no word a model wrote reaches the terminal's scrollback, and it clears its screen before it hands the terminal back to the CLI. Every write to the terminal goes through one bounded channel the console owns, so a slow terminal never holds up a run. <!-- v0.0.11-verify -->
+
+A city served without a terminal — `sprawling serve` under a service manager, in CI, or with stdin not a terminal — has no console. It closes in order on SIGINT, on SIGTERM and, on Windows, on Ctrl+Break, so a supervisor or a test harness stops it the way it stops any service. <!-- v0.0.11-verify --> The page, `sprawling call` and `sprawling view` show every record in full. Both faces behave the same on Windows, macOS and Linux.
+
+## Closing the city
+
+`/quit` is the one command that closes the city, typed in the CLI or on a page this machine opened; a device paired through the remote door is refused it, and closing the browser closes nothing. With no run going, the city closes at once: it lands what is open, writes its handoff and exits. With runs going, it asks once: Enter waits for them to finish, `n` stops them now at their next safe point, and Esc keeps the city serving. A second `/quit` while the city waits turns waiting into stopping. <!-- v0.0.11-verify -->
+
+Ctrl+C does not close the city: the terminal keeps it for copying, and the CLI only reminds you, once per session, that `/quit` does. When the terminal itself goes away — its window closed, its session hung up — the city stops writing to it, stops its runs at their next safe point and closes within about four seconds, because Windows ends a process five seconds after its console window closes and the handoff has to be written before that. <!-- v0.0.11-verify -->
 
 ## Which browser the page opens in
 
-`sprawling up` hands the address to whatever your operating system opens links with, once the port answers — the browser you already use, with its profile and its logins. `sprawling serve` opens nothing unless given `--open`. `--no-open`, or `SPRAWLING_OPEN=never` in the environment, keeps the screen alone; a refusal beats a request. When nothing can be opened, the address is already in the console.
+`/web` hands the page to whatever your operating system opens links with — the browser you already use, with its profile and its logins. What it opens is a small file in your per-user runtime directory, readable only by your account, that sends the browser on to the address with a one-time open code; the page redeems the code, takes it out of the address bar, and the city deletes the file. The terminal never prints that code, so the address it shows carries no secret and can be copied or opened any number of times. <!-- v0.0.11-verify --> `sprawling serve` opens nothing unless given `--open`. `--no-open`, or `SPRAWLING_OPEN=never` in the environment, keeps the screen alone; a refusal beats a request. When nothing can be opened, or a `file:` page cannot reach the address, as under WSL, the quiet host already shows the address and the pairing code, and the pairing code pairs that browser instead.
+
+## Pairing a browser, and forgetting one
+
+Every browser the page runs in holds a device key for this city: a key that browser generated in its own storage for the address it opened and cannot export, with the public half kept in the city's `.sprawling/`. Opening the address signs a challenge with that key, and the city answers with a session token that lives only in the page's memory. Nothing the browser attaches by itself, such as a cookie, admits anything. Restarting the city keeps every paired browser paired. <!-- v0.0.11-verify -->
+
+The browser `/web` opens pairs without typing. Any other browser shows a box for the pairing code, the second of the quiet host's two lines. Each code takes one try, right or wrong, and the terminal then shows a new one; tries share one rate limit across every browser, so guessing does not pay. **settings** lists each paired browser with when it was paired and last seen, and forgets one: its key stops opening anything, and that browser pairs again the next time. <!-- v0.0.11-verify -->
+
+A script or another program on this machine reads the key file the city writes for its port in the per-user runtime directory — `$XDG_RUNTIME_DIR` on Linux, `%LOCALAPPDATA%` on Windows, `$TMPDIR` on macOS — created readable only by your account and deleted when the city closes. `sprawling call`, `dispatch`, `gauge` and `enrol` read it when no `--token` is given; an editor that posts to `/acp` reads the same file or goes through `sprawling call`. <!-- v0.0.11-verify -->
 
 `SPRAWLING_BROWSER` is a different setting. It names the browser engine this city drives — the one the **browser** tool starts and `sprawling doctor` reports — and it takes precedence over every engine the doctor finds. It has no effect on which browser shows you the page.
 
@@ -236,7 +260,7 @@ A run's `exec` call runs in a sandbox arm, and the tool's own description tells 
 
 Without an explicit choice, [Confinement::choose](../crates/runtime/src/tools/exec/confinement.rs) selects `copied_tree` on Windows and macOS, and `native` on Linux when `bwrap` is present, otherwise `copied_tree`. Windows keeps this fallback until the native conformance requirements in [Exec SB1 item 3](../crates/runtime/spec/Tools/Exec.lean) pass. Set `[sandbox] arm` in the configuration layer's `.sprawling/CONFIG.toml` to select an arm explicitly; a missing requested mechanism refuses instead of silently weakening the choice. The run's tool disclosure describes the configured route, whereas doctor reports detected machine capabilities.
 
-A copied working tree alone does not restrict absolute host paths, network access or credentials. The copy is made from the directory of the room the run works in, so files elsewhere in the building are not in it; a task about them should name their paths, and a model that cannot find them may read them through absolute host paths instead. Linux namespaces expose the host filesystem read-only outside the writable copy; host-file confidentiality is not provided. Explicit macOS `native` permits writes only in the copy and denies network operations, but provides no independent identity, tree termination or aggregate resource ceiling. Its `sandbox-exec` dependency is deprecated; [NativeMacos](../crates/runtime/spec/Tools/Exec/NativeMacos.lean) records support assumptions and failure behavior. These command boundaries do not contain the whole city or an external ACP harness; see [SECURITY.md](../SECURITY.md).
+A copied working tree alone does not restrict absolute host paths, network access or credentials. The copy is made from the directory of the room the run works in, so files elsewhere in the building are not in it; a task about them should name their paths, and a model that cannot find them may read them through absolute host paths instead. Linux namespaces expose the host filesystem read-only outside the writable copy; host-file confidentiality is not provided. Explicit macOS `native` permits writes only in the copy and denies network operations, but provides no independent identity, tree termination or aggregate resource ceiling. Its `sandbox-exec` dependency is deprecated; [NativeMacos](../crates/runtime/spec/Tools/Exec/NativeMacos.lean) records support assumptions and failure behavior. These command boundaries do not contain the whole city or an ACP agent; see [SECURITY.md](../SECURITY.md).
 
 The shell arm is off until a building's `CONFIG.toml` sets `[sandbox] shell = true`. It runs the interpreter `COMSPEC` names on Windows (`cmd.exe` when it is unset) with `/C`, and the one `SHELL` names on macOS and Linux (`/bin/sh` when it is unset) with `-c`; when no interpreter is found the call is refused and names the program arm instead. Python runs as a wasip1 guest and reaches only its configured preopened directories. Set `[sandbox] interpreter = "pwsh"` to use PowerShell 7 on any supported platform; if it is missing, the tool refuses rather than interpreting its syntax with the system shell. [Exec D30](../crates/runtime/spec/Tools/Exec.lean) defines interpreter selection and error reporting.
 
@@ -244,11 +268,13 @@ The shell arm is off until a building's `CONFIG.toml` sets `[sandbox] shell = tr
 
 Privacy here means what leaves your machine and what stays in the city's records; it is not the same thing as security. Many of the settings below cost some convenience, and only you can weigh that cost.
 
+**The local port and the programs the city starts.** The port on this machine asks every caller for a credential, as [Pairing a browser, and forgetting one](#pairing-a-browser-and-forgetting-one) describes, and [SECURITY.md](../SECURITY.md) lists the layers in front of it. Every program the city starts — an ACP agent, an MCP server, a browser, a host command, a remote route — starts without the city's `SPRAWLING_SECRET_*` variables and `SPRAWLING_PAIRING_TOKEN`, and on Windows without the city's console window. <!-- v0.0.11-verify -->
+
 **Keys you type into a conversation.** A provider-shaped key in a message you send to a room goes to the vault before the run sees it, and the message carries its `secret:pasted/<name>` reference instead ([custody](../crates/accounting/src/worker/dispatching/custody.rs)). The model never reads the key. Only keys that match the provider shape table are taken, because a long random-looking string is as often a commit hash the agent has to read.
 
 **Keys in model replies and tool results.** Before a model reply, a tool call or a tool result is written to the Ledger, every secret-shaped span in it is replaced by a `secret:redacted/<16 hex>` marker ([redact](../crates/runtime/src/redact.rs)). The marker shows that two occurrences are the same value without being the value. The conversation the model works in keeps the original bytes, so replacing them cannot break a reply's signature or the model's train of thought; the Ledger is permanent and exportable, so that is where the value is removed.
 
-**What reaches the network.** Model calls go only to the providers you connect. A building that is not confidential offers its runs `web_search`, which by default sends the search words to Exa's hosted service; `choice = "off"` under `[search]` removes the tool. A confidential building (`/raise vault confidential`) makes no call to a remote provider and starts no MCP server ([getting started](getting-started.md#a-building-of-your-own)).
+**What reaches the network.** Model calls go only to the providers you connect. The ACP page's catalog ships with the release, and the city asks the ACP registry's server for a newer index only when you press refresh on that page; an ACP agent started through `npx` or `uvx` fetches its package from npm or PyPI, and then reaches whatever its own vendor reaches. A model server on this machine or on your private network is called directly, never through a proxy named in the environment, so a prompt to a server on your network does not pass a proxy operator in plain text. <!-- v0.0.11-verify --> A building that is not confidential offers its runs `web_search`, which by default sends the search words to Exa's hosted service; `choice = "off"` under `[search]` removes the tool. A confidential building (`/raise vault confidential`) makes no call to a remote provider and starts no MCP server ([getting started](getting-started.md#a-building-of-your-own)).
 
 ### Windows privacy controls
 
@@ -276,7 +302,7 @@ The city calls a provider with an API key, on the OpenAI-compatible face or the 
 | add or correct a known host | `gateway::provider::preset`, a table with data and no branches |
 | attach a provider | the settings page: base URL, wire API, key |
 | speak a third dialect | `gateway::dialect`, a pure two-way translation with the canonical shape in the middle |
-| run a local model | the settings page: a loopback base URL and the chat face; `gateway::endpoint` takes a loopback address off the proxy and streams it like any other |
+| run a local model | the settings page: a loopback or private-network base URL and the chat face; `gateway::endpoint` takes such an address off the proxy and streams it like any other <!-- v0.0.11-verify --> |
 
 **What you cannot move out**: credential custody. Configuration holds a `secret:realm/name` reference; the Vault resolves it only for authentication. Its platform-service probe can fall back to process memory, and credentials are plaintext in memory and at authorized provider or tool sinks. [SECURITY.md](../SECURITY.md) states the trust boundary; [credential custody](../crates/gateway/spec/Credential.lean) defines each backend and its lifetime.
 
@@ -290,6 +316,7 @@ Mail, GitHub, Figma, Discord: writing an integration for each is a weekly chore 
 | point at a different provider of the same tools | the same URL field. Nothing else changes |
 | add a transport | `agent_protocols::mcp::stdio`, `agent_protocols::mcp::http` and `agent_protocols::mcp::sse` are the three adapters behind `agent_protocols::mcp`'s `Outbound` seam |
 | drive this city from an editor | `agent_protocols::acp` accepts an outside request as an ordinary dispatch |
+| run another agent as a resident | the ACP page: an agent found on this machine, the bundled catalog, or a pasted command; each becomes an `[[agent]]` row in the city's `CONFIG.toml` once you consent ([integrations](integrations.md)) |
 
 A confidential building constructs none of them: data may enter and may not leave.
 

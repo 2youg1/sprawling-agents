@@ -18,7 +18,7 @@ A terminal can watch the same feed:
 sprawling gauge --at <address>
 ```
 
-Use the address printed by `serve`; `top` is an alias for `gauge`. Redirect stdout to keep JSON lines outside the city's history:
+Use the address the CLI or the quiet host shows; `top` is an alias for `gauge`. On the machine that serves the city, `gauge` reads the key file the city writes for that port, so it needs no `--token`. <!-- v0.0.11-verify --> Redirect stdout to keep JSON lines outside the city's history:
 
 ```sh
 sprawling gauge --at <address> > city.jsonl
@@ -35,6 +35,8 @@ Settings → Performance holds three choices, kept in `[core]` of `~/.sprawling/
 - **Per-run memory ceiling**, in bytes. There is no default ceiling: an empty field means none. A number applies only with `soft_shares`, and all commands of one run share it. Windows jobs and delegated Linux cgroups enforce it; elsewhere each command says the ceiling did not apply. An allocation above it fails inside that run, and the command's result and the monitor and inspector terminals say the ceiling was reached, or that it could not be applied or read back ([`Tools/Exec.lean`](../crates/runtime/spec/Tools/Exec.lean) D95).
 
 The four placement arms were not measured against each other for this release; `soft` is the default by design, not by a reading.
+
+Nor were the console and the local door measured for this release. The quiet host writes nothing to the terminal per record, and the CLI writes through one bounded channel, so neither should add work per event; a page visit adds one loopback round trip and one signature check when it obtains its session token, and each WebSocket upgrade or POST adds a header comparison and one digest lookup, with nothing added per frame. These are expectations from the design, not readings: the register holds no figure for them yet.
 
 ## Interpret the fields
 

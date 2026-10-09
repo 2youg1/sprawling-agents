@@ -43,8 +43,14 @@ recorded exchanges let a researcher inspect how the group interacts. This is a
 mechanism for running and observing agent groups, not evidence that a group
 validly models a human society.
 
-**Starting work.** The browser offers conversations, model selection, skills and
-tool connections familiar to existing agent users. The getting-started guide
+**Starting work.** `sprawling` opens a CLI in the terminal, and `/web` opens
+the browser page and leaves the terminal showing only the address and a
+pairing code. The browser offers conversations, model selection, skills and
+tool connections familiar to existing agent users; the CLI offers the
+conversation and the slash commands. `/quit` is the one way to close the
+city: closing the browser stops no work, and Ctrl+C keeps its terminal meaning.
+A model's thinking levels are the ones its provider states, and the default
+is `high` where the model offers it. The getting-started guide
 covers both a first setup and moving from another agent. It aims at a short
 route to the first task; completion time depends on installation, credentials
 and the reader's experience. Providers are configured explicitly, rather than
@@ -83,7 +89,9 @@ not better in itself.
 
 **Customisation and development.** Role documents, project rules and skills
 control how agents work. Models connect through provider endpoints; external
-tools connect through MCP, and supported vendor harnesses run through ACP.
+tools connect through MCP, and any agent that speaks ACP runs as a resident
+once the User consents to its exact launch command, chosen from the agents
+found on the machine, the bundled ACP registry catalog, or a pasted command.
 A provider can hold several accounts in a chosen order; a Session stays on the
 account that first answered it, and a rejected key or a used-up quota moves the
 request to the next account. Another client can use the wire, and the
@@ -132,8 +140,12 @@ selected platform mechanism. Built-in taint gates do not control all external
 programs. Use [execution boundaries](docs/operating.md#how-exec-is-confined) and
 [the security policy](SECURITY.md) when those conditions affect the reader's task.
 
-The wire serves both the browser and scripts, but a paired remote device does
-not receive all local permissions. Credential enrollment and changes that
+The wire serves both the browser and scripts, and every caller presents a
+credential, on loopback too: a browser pairs once and then signs in with a
+device key, and a script on the same machine reads a key file only the
+User's account can read. That stops other web pages and other accounts, not
+a program running as the same account, which includes an ACP agent the User
+added. A paired remote device does not receive all local permissions. Credential enrollment and changes that
 widen access or alter governance remain on the host. Configuration carries
 `secret:realm/name` references. The vault redeems values at authentication
 sinks; its startup probe can select session memory if the platform service
@@ -149,7 +161,7 @@ long-running work as unlimited execution or guaranteed completion.
 
 <references>
 
-Use [integrations](docs/integrations.md) for ACP harnesses, MCP tool servers and CLI control.
+Use [integrations](docs/integrations.md) for ACP agents, MCP tool servers and CLI control.
 Use [performance](docs/performance.md) for monitoring, reproducible workloads and measurements tied to a version and machine class.
 
 Use [getting started](docs/getting-started.md) for installation, first work,
@@ -178,7 +190,7 @@ progress in a browser. Start with one building and one task, then add the roles
 and tools that work needs.”
 
 For a workflow author: “You can shape a team through role documents, project
-rules and skills, connect models and MCP tools, or run a supported ACP harness.
+rules and skills, connect models and MCP tools, or run any agent that speaks ACP.
 The wire lets your own client dispatch work and read its results; the reference
 also explains which operations must stay local.”
 

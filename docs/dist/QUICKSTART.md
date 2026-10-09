@@ -9,7 +9,9 @@ You have unpacked a folder. Nothing was installed and no service was registered.
 
 An operating-system warning is not proof of a safe or unsafe download. Verify the selected release's checksum and build provenance, and inspect its code-signing status before deciding whether to run it. The [installation guide](https://github.com/2youg1/sprawling-agents/blob/main/docs/getting-started.md#select-and-verify-a-version) explains these separate checks.
 
-Started with no command, it asks one question before it creates anything, and shows you the folder it is about to create. Answer it and a console window opens and stays open. **That window is the city**: closing it, or pressing `Ctrl-C` in it, stops the city. Your browser opens at <http://127.0.0.1:8787>; if it does not, open that address yourself.
+Started with no command, it asks one question before it creates anything, and shows you the folder it is about to create. Answer it and the window becomes the city's CLI, where you can already talk to the Mayor. Type `/web` to open the page at <http://127.0.0.1:8787> in your browser; the window then shows only the address and a pairing code. <!-- v0.0.11-verify --> **That window keeps the city running**: closing the browser stops nothing, and the address opens the page again. Type `/quit` to close the city; closing the window closes it too, after its runs stop at their next safe point. Ctrl+C copies selected text and never closes the city.
+
+The browser `/web` opens is paired with the city without typing anything. In another browser, the page asks for the pairing code the window shows; each code takes one try, and the window then shows a new one.
 
 To make `sprawling` a word your shell resolves from anywhere, run `sprawling install` once. It copies this binary into your own program directory and puts that directory on your PATH; `sprawling install --uninstall` reverses both. Nothing there needs administrator rights.
 
@@ -18,16 +20,16 @@ To make `sprawling` a word your shell resolves from anywhere, run `sprawling ins
 This program schedules agents, records what they do, and shows it to you. **It does not think by itself**, so before it can do anything you need one of:
 
 - an API key from a provider that speaks the OpenAI dialect or the Anthropic dialect,
-- a supported official harness you sign in to with your own subscription, or
+- an agent that speaks ACP, such as a vendor's coding agent, which signs in with your own subscription, or
 - a local server that speaks the OpenAI dialect.
 
 ## 3 Three steps in the page
 
-1. **connect a provider**, on the welcome page, opens **settings** → **accounts and providers**. Fill in the provider's `base_url`, which face it answers in (`wire_api`), and the key, then **list models** and **attach**. The key goes straight into your operating system's credential service; the page only ever shows a `secret:realm/name` reference afterwards. For a subscription, use **official harnesses** and follow the vendor's sign-in instructions; the city itself does not sign in.
+1. **connect a provider**, on the welcome page, opens **settings** → **accounts and providers**. Fill in the provider's `base_url`, which face it answers in (`wire_api`), and the key, then **list models** and **attach**. The key goes straight into your operating system's credential service; the page only ever shows a `secret:realm/name` reference afterwards. For a subscription, use **ACP agents**: pick an agent found on this machine or in the bundled catalog, or paste its command, read the exact command line on its consent card, and add it. The agent signs in with its own program the first time it asks; the city itself does not sign in to a subscription. <!-- v0.0.11-verify -->
 2. Under **which model thinks**, choose the model for **main · thinks**. **digest · reads**, which reads long documents on `main`'s behalf, follows it until you choose another.
 3. **the Mayor**, the page the city opens on, is the conversation with the city's planner. Write what you want done and press Enter. The Mayor plans the work, raises the buildings it needs, and hands each one its part.
 
-Then **city** shows the buildings working, a count on the mailbox key says how many questions wait for you, and **cost** is what it spent. A line that begins with `/` is a command: `/help` lists them.
+Then **city** shows the buildings working, a count on the mailbox key says how many questions wait for you, and **cost** is what it spent. A line that begins with `/` is a command, on the page and in the CLI alike: `/help` lists them, and `/quit` closes the city.
 
 ## Where your data is
 

@@ -30,7 +30,9 @@ own tools and model calls.
 | You are | Use |
 |---|---|
 | a shell tool or a script | `sprawling call '<frame>'` — one JSON frame in, every frame the city says back on stdout, one object per line. `-` reads the frame from stdin |
-| a program holding a socket | `ws://127.0.0.1:8787/ws` — the same frames, after a `hello` that names the wire version and schema hash |
+| a program holding a socket | `ws://127.0.0.1:8787/ws` — the same frames, after a `hello` that names the wire version and schema hash and carries a credential in its `token` field |
+
+Every caller presents a credential, on loopback too. A program on the machine that serves the city reads the native key the city writes for its port, in a file under the per-user runtime directory (`$XDG_RUNTIME_DIR`, `%LOCALAPPDATA%` or `$TMPDIR`) that only the User's account can read; `sprawling call`, `dispatch`, `gauge` and `enrol` read that file when no `--token` is given, so a shell script passes nothing. A POST to `/transcribe`, `/enroll`, `/drop` or `/acp` carries the same credential as `Authorization: Bearer`. A socket opened with no `Origin` header is a native client; one whose `Origin` is not exactly the listener's own, port included, is refused before the upgrade with HTTP 403, and so is a `Host` the listener does not answer to. A browser obtains a session token through `POST /pair` once and `POST /session/challenge` and `POST /session` on each visit; those three routes take browsers only. <!-- v0.0.11-verify -->
 
 Both are the same wire. `sprawling call` with no frame prints every command
 and query name this binary knows, in their Rust spelling. The browser and
@@ -43,7 +45,7 @@ the server, or pass it to `call` with `--at`.
 Start here:
 
 ```
-sprawling up <dir>                    # raise the city if it is not there, serve it
+sprawling up <dir>                    # raise the city if it is not there, serve it, open the CLI
 sprawling doctor                      # what this machine has against what a city needs
 sprawling enrol openai/main           # a credential from stdin, into the vault
 sprawling dispatch lab "<task>"       # one task, its events printed until the run ends
@@ -86,10 +88,14 @@ The ones whose arguments need saying:
 
 | Command | What it does |
 |---|---|
-| `dispatch {addr, task, goal, policy, idem, session, effort, model}` | put a room to work. `session: "name"` opens a room of that name under a building; `session: null` continues the room `addr` already names. `policy` states four keys, all required: `mode` (`chat` or `work`; `chat` tells the resident to converse with the person and changes nothing else), `write` (`full`, or `create`, which lets the run add files and change none that exist), `admit` (`standing`, `tested`, `contract_kept` or `double_validated`: the evidence a merge needs beyond the building's own rules) and `landing` (`ordinary`, or `experiment`, which works in a tree of its own). A session whose policy was changed with `change_run_policy` keeps its last change, and that change, not the frame's `policy`, rules the dispatch. `model: null` continues on the room's model, or takes `main`'s for a new room; an id names one registered model, and an id the city never registered is refused before anything is written. A dispatch carries no spending limit |
+| `dispatch {addr, task, goal, policy, idem, session, effort, model}` | put a room to work. `session: "name"` opens a room of that name under a building; `session: null` continues the room `addr` already names. `policy` states four keys, all required: `mode` (`chat` or `work`; `chat` tells the resident to converse with the person and changes nothing else), `write` (`full`, or `create`, which lets the run add files and change none that exist), `admit` (`standing`, `tested`, `contract_kept` or `double_validated`: the evidence a merge needs beyond the building's own rules) and `landing` (`ordinary`, or `experiment`, which works in a tree of its own). A session whose policy was changed with `change_run_policy` keeps its last change, and that change, not the frame's `policy`, rules the dispatch. `model: null` continues on the room's model, or takes `main`'s for a new room; an id names one registered model, and an id the city never registered is refused before anything is written. `effort: null` takes the room's stored level when the model offers it, else `high` when offered, else the provider's stated default, else sends no level; a level named here that the model does not offer is refused before dispatch with `E_CONFIG_INVALID`, naming the offered levels, and is never moved to a neighbouring one. A dispatch carries no spending limit |
 | `pursue {addr, step, idem}` | `step` is `{"set": {"goal": "…"}}`, `"pause"`, `"resume"` or `"clear"`: a goal the building keeps working towards until the work runs out |
 | `steer {run, text, idem}` | add an instruction to a run without stopping it; it lands after the next tool result |
 | `cancel {run, idem}` | stop one run |
+| `close_city {mode, idem}` | close the city: `mode` is `drain`, which lets the runs going land first, or `interrupt`, which stops them at their next safe point; a second `close_city` during `drain` turns it into `interrupt`. Local-only, and accepted only from a loopback peer on an authenticated session, because it is what the CLI's and the page's `/quit` send <!-- v0.0.11-verify --> |
+| `add_agent {spec_digest, source, seat_here, idem}` | add the ACP agent whose consent card the city offered: `spec_digest` is the digest of the launch specification shown, which the city recomputes and refuses on a mismatch; `seat_here`, when given, seats it in that room. Local-only <!-- v0.0.11-verify --> |
+| `agent_login {agent, method, idem}` | start one of an added agent's own login methods. Local-only <!-- v0.0.11-verify --> |
+| `forget_device {device, idem}` | revoke a paired browser; its key opens nothing afterwards. Local-only <!-- v0.0.11-verify --> |
 | `halt {scope, idem}` · `release {scope, idem}` | stop, or let go on: `scope` is `"city"`, `{"building": "<addr>"}` or `{"workshop": "<addr>"}` |
 | `approve {item, verdict, idem}` | answer a design question a resident asked; `verdict` is `"allow"` or `"deny"` |
 | `hand_off {item, to, idem}` | give one waiting question to a resident to answer |
@@ -132,6 +138,8 @@ Queries, every one the city answers (<!-- xtask:begin query_frames -->60<!-- xta
 <!-- xtask:begin query_names -->
 `city_view`, `approval_queue`, `metrics`, `cost_view`, `registry_view`, `discard_view`, `history`, `run_history`, `history_range`, `sessions`, `changes`, `hunks`, `commit`, `run_view`, `inbox_view`, `archive_search`, `endpoint_view`, `known_hosts`, `harnesses`, `agent_catalog`, `parse_agent_spec`, `devices`, `building_view`, `identity`, `automation`, `github_login`, `guide`, `governance`, `rounds`, `evidence`, `cost_of`, `listing`, `find`, `document`, `proposals`, `open_proposals`, `range`, `versions`, `bytes`, `export`, `preview`, `reply`, `commits`, `doctor`, `prefix`, `content`, `skills`, `git_status`, `mcp_health`, `toolkits`, `newest_release`, `privacy`, `preferences`, `config`, `run_costs`, `upstream_version`, `skill_usage`, `mcp_usage`, `usage_export`, `shells`
 <!-- xtask:end -->
+
+Four answers carry what this release added. <!-- v0.0.11-verify --> `agent_catalog` gives the ACP agents detected on this machine, the catalog bundled with the release with the date and ETag of its snapshot, and the agents this city has added, each with where it came from, its version and whether that version is pinned, its login state and the rooms it is seated in. `parse_agent_spec {text}` turns one pasted command line, a Zed or JetBrains `agent_servers` block, or a registry `agent.json` into one offer with the digest `add_agent` needs; it splits on whitespace and double quotes, interprets no shell syntax, and refuses `|`, `&`, `;`, `<` and `>`. `devices` lists the paired browsers. In `endpoint_view`, each model carries `canonical`, its identity across providers, which is equal for two entries only when they are the same model, and `thinking`, the levels that provider offers for it, its default and the source of those facts: the person, the upstream, the vendor's documentation, or unknown. `thinking.levels` never contains `none`, because turning thinking off is not offered as a level.
 
 A bounded answer says how many rows it left out. `city_view` and `cost_view`
 name the active runs and a recent or top-billed few; `run_view` and

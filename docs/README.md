@@ -7,7 +7,7 @@ The documents for people who use, run or change sprawling, grouped by who reads 
 | Someone starting | [`getting-started.md`](getting-started.md), in Chinese [`getting-started.zh-CN.md`](getting-started.zh-CN.md) | From nothing installed to a city that does work, with every idea met on the way |
 | Someone using a city every day | [`operating.md`](operating.md) | Steering and stopping work, answering residents, driving a city from a script, and the ways out of what goes wrong |
 | An agent or script author | [`wire.md`](wire.md) | CLI, frames, answers, exit codes and generated protocol rosters |
-| Someone integrating tools | [`integrations.md`](integrations.md) | ACP harnesses, MCP servers and CLI control from an existing agent |
+| Someone integrating tools | [`integrations.md`](integrations.md) | Any ACP agent as a resident, MCP servers and CLI control from an existing agent |
 | Someone measuring work | [`performance.md`](performance.md) | Monitor counters, reproducible workloads and measurement provenance |
 | Someone debugging | [`logging.md`](logging.md) | What goes in the diagnostic log and what goes in the Ledger, and why the two stay apart |
 | Anyone | [`glossary.md`](glossary.md) | What each word means; the `lexicon` gate holds the code and the documents to these words |
