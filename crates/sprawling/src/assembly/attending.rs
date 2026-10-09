@@ -253,14 +253,10 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
                 kept.settle(record);
                 folding(record);
             }));
-            // After the observer, so each freeze reaches the page, and
-            // before the desk is read, so no run is driving yet
-            // (`crates/accounting/spec/Worker/Genesis/Lost.lean` §8-18-1).
             worker.take_back_the_lost();
             accounting::worker::attend::attend(&mut worker, &worker_desk);
-            // Dropping the worker drops the observer, which closes the
-            // fold's channel; what is still in it is folded and
-            // broadcast before the thread ends.
+            // Dropping the worker drops the observer, which closes the fold's channel;
+            // what is still in it is folded and broadcast before the thread ends.
             drop(worker);
             if fold_thread.join().is_err() {
                 eprintln!(

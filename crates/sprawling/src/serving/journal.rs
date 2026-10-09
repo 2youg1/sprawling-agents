@@ -148,6 +148,9 @@ impl Journal {
 
     /// Makes this journal, at `log`'s floor, where every [`notice`] goes
     /// from now on, placed at `at`, the position serving starts from.
+    /// Called by `assembly::listen` before any console exists, so a
+    /// console that takes the terminal later never has a notice written
+    /// over it (`crates/sprawling/spec/Console.lean` §8-11).
     pub(crate) fn hears_the_process(&self, log: &Diagnostics, at: Seq) {
         let writer = self.beside(log);
         *PROCESS.lock().unwrap_or_else(PoisonError::into_inner) = Some((writer, at));
