@@ -16,6 +16,7 @@
 //! free to take the processors the plan did not.
 
 use super::plan::Processor;
+use super::{MODULE, notice};
 
 /// What the arm does with this machine, or why it does nothing.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -56,15 +57,18 @@ static TAKEN: std::sync::OnceLock<Did> = std::sync::OnceLock::new();
 #[cfg(windows)]
 static JOB: std::sync::OnceLock<win32job::Job> = std::sync::OnceLock::new();
 
-/// Takes this process into the arm's mechanism, once, and says on stderr
-/// what happened when that is not [`Did::Pinned`]; the answer is kept for
-/// [`clause`].
+/// Takes this process into the arm's mechanism, once, and says as a
+/// process notice what happened when that is not [`Did::Pinned`]; the
+/// answer is kept for [`clause`].
 pub(crate) fn take(seats: &[Processor]) -> Did {
     let did = TAKEN.get_or_init(|| acted(seats)).clone();
     if !matches!(did, Did::Pinned { .. }) {
-        eprintln!(
-            "[core] placement = \"pinned\": {}",
-            words(&did, seats.len())
+        notice(
+            MODULE,
+            &format!(
+                "[core] placement = \"pinned\": {}",
+                words(&did, seats.len())
+            ),
         );
     }
     did
@@ -136,7 +140,10 @@ fn acted(seats: &[Processor]) -> Did {
         };
     }
     if runs == runtime::backlog::RunAffinity::Os {
-        eprintln!("[core] placement = \"pinned\": no remaining processors for run affinity");
+        notice(
+            MODULE,
+            "[core] placement = \"pinned\": no remaining processors for run affinity",
+        );
     }
     Did::Pinned { group, mask, runs }
 }

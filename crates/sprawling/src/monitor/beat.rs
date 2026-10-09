@@ -32,7 +32,7 @@ impl Beat {
     /// The beat this city kept, or the default when it kept none.
     ///
     /// A file that does not read, or holds a beat out of range, gives
-    /// the default and says so on stderr: the beat shapes a curve a
+    /// the default and says so as a process notice: the beat shapes a curve a
     /// person reads and decides nothing, so a broken file must not stop
     /// a city from serving.
     pub(crate) fn open(city_root: &Path) -> Beat {
@@ -40,7 +40,7 @@ impl Beat {
         let kept = match read(&file) {
             Ok(kept) => kept.unwrap_or(BeatMs::DEFAULT),
             Err(error) => {
-                eprintln!("{error}");
+                said(&error);
                 BeatMs::DEFAULT
             }
         };
@@ -61,14 +61,19 @@ impl Beat {
     }
 
     /// Samples at `beat` from the next wake on, and keeps it for the
-    /// city. A file that cannot be written is said on stderr; the new
-    /// beat holds until the city stops either way.
+    /// city. A file that cannot be written is said as a process notice;
+    /// the new beat holds until the city stops either way.
     pub(crate) fn set(&self, beat: BeatMs) {
         self.ms.store(beat.ms(), Ordering::Relaxed);
         if let Err(error) = write(&self.file, beat) {
-            eprintln!("{error}");
+            said(&error);
         }
     }
+}
+
+/// A beat file that failed, told with its recovery, which carries why.
+fn said(error: &AxError) {
+    crate::serving::journal::notice("bin::monitor", &format!("{error}; {}", error.recovery()));
 }
 
 /// The kept beat; `None` when the city never set one.

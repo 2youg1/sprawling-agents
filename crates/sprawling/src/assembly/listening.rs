@@ -170,6 +170,10 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
     let city_name = started_from.city();
     let epoch = started_from.epoch();
     let started_at = started_from.head();
+    // From here the process's one-time notices leave as diagnostics, so
+    // a console that takes the terminal later never has one written
+    // over it (`crates/sprawling/spec/Console.lean` §8-11).
+    journal.hears_the_process(&log, started_at.unwrap_or(kernel::Seq::FIRST));
     let head = Arc::new(wire::LedgerHead::at(started_at));
     drop(started_from);
     // The in-process Command set, not the wire one: the enrolment

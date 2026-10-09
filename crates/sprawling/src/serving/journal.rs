@@ -23,8 +23,10 @@
 //! the line, because the ledger position is what anchors it and the
 //! diagnostic is what the reader came for.
 
-use kernel::TimeMs;
-use runtime::diagnostics::{Entry, Sink};
+use std::sync::{Mutex, PoisonError};
+
+use kernel::{Seq, TimeMs};
+use runtime::diagnostics::{Diagnostics, Entry, Level, Sink, Site};
 
 /// Where a line's time comes from: the assembly point's clock
 /// (`crates/accounting/Spec.lean` §8-3), shared with every sink this journal makes.
@@ -37,6 +39,41 @@ pub type Clock = std::sync::Arc<dyn accounting::Clock + Send + Sync>;
 /// city at the `wire` floor writes faster than a person reads, and what
 /// is lost here is a diagnostic rather than history.
 const DEPTH: usize = 512;
+
+/// Where a process notice goes once serving has begun: a writer into the
+/// serving journal at the city's floor, and the ledger position serving
+/// started from, which places every notice.
+///
+/// Process-wide because the code that says these notices runs where no
+/// `Diagnostics` reaches: a runtime worker's first wake, a hot thread
+/// taking its seat through a hook `accounting` holds as a function
+/// pointer, the monitor's beat file.
+static PROCESS: Mutex<Option<(Diagnostics, Seq)>> = Mutex::new(None);
+
+/// Says one notice about this process at the `refuse` level: what the
+/// platform refused, or a setting that does not read, which the city
+/// works around and the person may want to fix.
+///
+/// Once [`Journal::hears_the_process`] has run, the notice leaves the way
+/// every diagnostic does, so it reaches only the log lens while the
+/// console owns the terminal (`crates/sprawling/spec/Console.lean`
+/// §8-11). Before that it goes to standard error, because no console
+/// owns the terminal until serving has begun.
+pub(crate) fn notice(module: &'static str, message: &str) {
+    let mut process = PROCESS.lock().unwrap_or_else(PoisonError::into_inner);
+    match process.as_mut() {
+        Some((log, seq)) => log.write(
+            Level::Refuse,
+            Site {
+                run: kernel::RunId::CITY,
+                seq: *seq,
+                module,
+            },
+            message,
+        ),
+        None => eprintln!("{message}"),
+    }
+}
 
 /// Where the process log goes on its way out of this process.
 pub struct Journal {
@@ -107,6 +144,13 @@ impl Journal {
             }
             drop(lines.send(carried(entry, clock.now().ok())));
         })
+    }
+
+    /// Makes this journal, at `log`'s floor, where every [`notice`] goes
+    /// from now on, placed at `at`, the position serving starts from.
+    pub(crate) fn hears_the_process(&self, log: &Diagnostics, at: Seq) {
+        let writer = self.beside(log);
+        *PROCESS.lock().unwrap_or_else(PoisonError::into_inner) = Some((writer, at));
     }
 
     /// The broadcast the socket subscribes to.
