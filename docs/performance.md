@@ -18,7 +18,7 @@ A terminal can watch the same feed:
 sprawling gauge --at <address>
 ```
 
-Use the address the CLI or the quiet host shows; `top` is an alias for `gauge`. On the machine that serves the city, `gauge` reads the key file the city writes for that port, so it needs no `--token`. <!-- v0.0.11-verify --> Redirect stdout to keep JSON lines outside the city's history:
+Use the address the CLI or the quiet host shows; `top` is an alias for `gauge`. On the machine that serves the city, `gauge` reads the key file the city writes for that port, so it needs no `--token`. Redirect stdout to keep JSON lines outside the city's history:
 
 ```sh
 sprawling gauge --at <address> > city.jsonl
