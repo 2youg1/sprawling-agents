@@ -52,8 +52,9 @@ pub(crate) fn step(face: Face, event: Event) -> (Face, Option<Cause>);
 
 - 第一行是表头：`sprawling  <城目录>  <房间>  <地址>   /web opens the page`。默认房间是 `kernel::consts_policy::HALL_MAYOR`。
 - 普通一行派给当前房间（`Dispatch`，`Mode::Work`），带 `/effort` 设下的档位。选中房间里提交的记录印在 CLI 上：模型的答复印正文，工具调用一行，待批的请求一行并给出 `y approve  n deny`。别的房间与城级的记录不印。拒绝印在那一行下面。
-- 键（全部不用 Ctrl 组合键：Ctrl+C 与 Ctrl+V 是几乎所有人都会的两个键，归终端；Alt 在 macOS 默认终端里输入特殊字符、在 Windows Terminal 里是全屏与窗格）：Enter 发送；行尾的 `\` 加 Enter，或终端分得清时的 Shift+Enter，是换行；Esc 依次关菜单、清空输入、中断当前房间的 run（发 `Cancel`）；Tab 补全斜杠动词；↑/↓ 是本次会话的历史；←/→、Home、End 移动；Alt+Backspace 删一个词，Alt+←/→ 按词移动；输入为空且有待批请求时 y、n 答它。
+- 键（全部不用 Ctrl 组合键：Ctrl+C 与 Ctrl+V 是几乎所有人都会的两个键，归终端；Alt 在 macOS 默认终端里输入特殊字符、在 Windows Terminal 里是全屏与窗格）：Enter 发送；行尾的 `\` 加 Enter，或终端分得清时的 Shift+Enter，是换行；Esc 依次关菜单、清空输入、中断当前房间的 run（发 `Cancel`）；Tab 补全斜杠动词，以及 `/model` 与 `/effort` 的参数；↑/↓ 是本次会话的历史；←/→、Home、End 移动；Alt+Backspace 删一个词，Alt+←/→ 按词移动；输入为空且有待批请求时 y、n 答它。
 - `/quit` 是关闭城市唯一的键盘路径。没有 run 在跑：`Stopping(Drain)`。有 run 在跑：同一行问 `N runs are going   Enter wait for them   n stop them now   Esc keep serving`，Enter 是 `Drain`，n 是 `Interrupt`，Esc 取消。
+- **参数补全从当前的 offer 取**（`Session::arguments`）：每按一次 Tab 问一次 `Query::EndpointView`，不另列一份模型表或档位表，也不缓存，因为接上或卸下一个 endpoint 之后，下一次 Tab 就该看见。`/model` 补全每个 endpoint 所服务的模型 id，去重后按字母排；`/effort` 补全当前（Endpoint，模型）的 `thinking.levels`。当前模型是 `/model` 选下的那个，没选就是 `main` 标签指向的那个；`/model` 选下的 id 先在 `main` 所在的 endpoint 上找，找不到才取第一个服务它的 endpoint。模型没有思考控制、或答询答不出来时，`/effort` 什么也不补。
 - 斜杠词表是 `wire::Slash`（§8-21），控制台不再有自己的一份；`/wire <verb> [<json>]` 收起其余 wire 动词，它们是 `wire::COMMAND_NAMES` 与 `QUERY_NAMES` 的投影，JSON 体缺 `idem` 时由控制台补上这一行的键。
 - **每一行一把幂等键，由控制台铸**：`LineKeys::drawn` 取 16 字节 OS 熵作 `origin`，`next` 按行计数，键 = `IdemKey::derive(RunId::CITY, 行号, origin)`。城把见过的键连同第一次的答复跨重启记住，所以只由文字派生的键会吞掉第二次敲的同一行。熵取不到时控制台说出原因并关闭，城照跑。
 
@@ -67,7 +68,6 @@ pub(crate) fn step(face: Face, event: Event) -> (Face, Option<Cause>);
 
 **本节接口的当前状态。**
 
-- `/model` 与 `/effort` 的参数补全还没有做：Tab 只补全斜杠动词本身。参数要从当前（Endpoint，模型）的 offer 取（`Query::Endpoints` 答复里每个模型的 `thinking`），不另列一份档位表。
 - 别的模块里直接写标准错误的那些行（`serving::standing`、`serving::placement`、`monitor::beat`、`supervising::children` 等的一次性通知）还没有改走诊断：控制台拥有终端时，它们会写进 raw 模式下的 CLI 或安静宿主。改法是逐个改成 `Diagnostics` 的 `refuse` 级，诊断随之只进 log 透镜。
 - worker 里 `CloseCity` 那一臂仍答 `not_built`：`xtask wiring` 不许一个 `reach = client` 的动词已经做好却没有客户端画出它，而 WebUI 的 `/quit` 还没画。画出它的那次改动同时把这一臂改成「城在别处关闭」。执行者不受影响，它在命令到达台子之前就截下了这一帧。
 - 粘贴多行文本时每个换行都是一次 Enter，粘贴会被拆成几次发送；终端的 bracketed paste 在 Windows 上不可用，要统一处理需要另一种判断。
