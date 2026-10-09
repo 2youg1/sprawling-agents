@@ -46,7 +46,7 @@ pub(crate) fn powershell() -> Result<std::path::PathBuf, AxError> {
 /// current directory or this binary's own folder would find it: any
 /// process of this user can change the first three, and the city's
 /// default place is beside the binary (Privacy.Cli D55; `cmd.exe` and
-/// `icacls.exe`, `crates/sprawling/spec/Keying.lean` D75).
+/// `icacls.exe`, `crates/sprawling/spec/Keying.lean` D76).
 ///
 /// # Errors
 /// `ToolUnavailable` when the record is unreadable or names a relative

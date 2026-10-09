@@ -136,7 +136,7 @@ fn make_private(dir: &Path) -> Result<(), AxError> {
 /// control, through `icacls`: a direct DACL call needs `unsafe`, which
 /// this crate forbids (`crates/sprawling/spec/Keying.lean` §8-22). The
 /// program is `System32`'s, never one the search order finds first in
-/// this binary's folder (Keying D75).
+/// this binary's folder (Keying D76).
 #[cfg(windows)]
 fn make_private(dir: &Path) -> Result<(), AxError> {
     let user = match (std::env::var("USERDOMAIN"), std::env::var("USERNAME")) {
