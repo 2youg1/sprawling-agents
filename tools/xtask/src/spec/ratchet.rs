@@ -40,7 +40,8 @@ impl Ratchet {
     fn fix(self) -> &'static str {
         match self {
             Self::PartsWithoutTheorem => {
-                "state the part's transitions and prove a property over every trace, or leave                  the count where it was"
+                "state the part's transitions and prove a property over every trace, or leave \
+                the count where it was"
             }
             Self::UnresolvedPaths => {
                 "point the path at the item that exists now, or say what replaced it"

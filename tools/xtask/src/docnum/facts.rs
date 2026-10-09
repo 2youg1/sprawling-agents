@@ -245,7 +245,8 @@ fn workspace_version(root: &Path) -> Result<String, XtaskError> {
         .map(str::to_owned)
         .ok_or_else(|| XtaskError::Doc {
             file: "Cargo.toml".to_owned(),
-            msg: "no `[workspace.package] version`, so the release a document names cannot be                   recounted"
+            msg: "no `[workspace.package] version`, so the release a document names cannot be \
+            recounted"
                 .to_owned(),
         })
 }
@@ -260,7 +261,8 @@ fn maturity(maturity: kernel::Maturity, spelling: &str) -> Result<String, XtaskE
         other => Err(XtaskError::Doc {
             file: "kernel::release::MATURITY".to_owned(),
             msg: format!(
-                "`maturity:{other}` names no spelling; write `maturity:word` for a sentence                  or `maturity:titled` for a tag or a heading"
+                "`maturity:{other}` names no spelling; write `maturity:word` for a sentence \
+                or `maturity:titled` for a tag or a heading"
             ),
         }),
     }
