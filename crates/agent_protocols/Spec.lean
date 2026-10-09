@@ -343,11 +343,11 @@ pub enum LoginKind { Agent, Terminal }
 // Listener、Answer、Update、PermissionAsk、PermitOption、PermitKind、Permit、StopReason 不变
 ```
 
-- **名单是开放的**：任何说 ACP 的 agent 都可以当居民。`[resident] harness` 的值点名城 `CONFIG.toml` 里的一行 `[[agent]]`（`crates/city/spec/ConfigLayers.lean` §8-4），或者一个内置条目。五家官方 harness（Claude Code、Codex、Grok Build、Kimi Code、Pi）是内置条目：`OFFICIAL` 只记它们的词（0.0.10 写下的 `[resident] harness` 原样读得回来）、registry id、装好或登录后写下的目录（D23）和厂商的登录说明；怎么起它们取自快照里同一个 registry id 的那一行（D12）。`Roster::seat` 先找人加的行，再找内置条目：一行与内置条目同名时，人加的那一行胜，它是人为这台电脑写下的那一条。
+- **名单是开放的**：任何说 ACP 的 agent 都可以当居民。`[resident] harness` 的值点名城 `CONFIG.toml` 里的一行 `[[agent]]`（`crates/city/spec/ConfigLayers.lean` §8-4），或者一个内置条目。五家官方 harness（Claude Code、Codex、Grok Build、Kimi Code、Pi）是内置条目：`OFFICIAL` 只记它们的词（0.0.10 写下的 `[resident] harness` 原样读得回来）、registry id、装好或登录后写下的目录（D19）和厂商的登录说明；怎么起它们取自快照里同一个 registry id 的那一行（D12）。`Roster::seat` 先找人加的行，再找内置条目：一行与内置条目同名时，人加的那一行胜，它是人为这台电脑写下的那一条。
 - **同意先于任何执行**（D16，性质在 `spec/Harness/Consent.lean`）：`HarnessProcess::start` 只收 `Consented`，`Consented` 的字段私有，只有两扇门：`given` 收一份条目和同意时记下的摘要，摘要与 `Launch::digest` 重算的不等就拒（`E_CONFIG_INVALID`）；`written_by_hand` 收一行人亲手写下、没有摘要的条目，以及内置条目，那份文件就是人的同意，与 `[[mcp]]`、`[remote]` 同一条理由。目录、检测与粘贴只产出 `AgentEntry`，产出不了 `Consented`，所以页面上看见的东西在人同意之前起不了任何进程。
 - **快照随版本附带，只在人按下时刷新**（D13）：`Catalog::bundled` 读 `crates/agent_protocols/catalog/registry.json`，这份文件由 `cargo xtask acp-catalog` 从 registry 的 CDN 索引生成并提交，带索引的 `Date` 与 `ETag`；生成时只保留城读的字段（`id`、`name`、`version`、`license`、`distribution`，`binary` 目标只留 `cmd`、`args`、`env`），作者、图标、链接与下载地址不进快照。`Catalog::read` 读的是同一种形状，所以一份完整的 CDN 索引与快照经同一个读者。读法：`npx` 起 `npx -y <package> <args…>`，`uvx` 起 `uvx <package> <args…>`，`env` 原样带上（它们会关掉 agent 的自更新）；`binary` 本版不下载（推迟，见 §3），读成本平台那一项 `cmd` 的文件名经搜索路径起，参数照抄，钉不住版本（`Pin::Unknown`）；本平台没有一项能起的条目不进目录。
 - **粘贴文法只在 Rust 里**（`paste::pasted`，WebUI 与 CLI 经 `Query::ParseAgentSpec` 共用）：接受一行命令、Zed 或 JetBrains 的 `agent_servers` 块（恰好一项）、registry 的 `agent.json`。一行命令按空白分词，双引号括住的一段是一个参数，不解释任何 shell 元字符；出现 `|`、`&`、`;`、`<`、`>` 中的任何一个就拒，恢复语说「只粘贴一个程序和它的参数」。条目的 id 取 `agent_servers` 的键、`agent.json` 的 `id`，或程序的文件名，经 `AgentId::parse` 规范成小写。
-- **检测不执行任何东西**（`detect`）：两种证据，都只读文件。一是别的 ACP 客户端里人亲手写下的配置：JetBrains 的 `~/.jetbrains/acp.json` 与 Zed 的 `~/.config/zed/settings.json`（`CLIENT_CONFIGS`，各引厂商文档），其中 `agent_servers` 的每一项读成一个 `Detected` 条目，`env` 不带：别处的 `env` 可能有密钥，值要人另行写进 Vault；读不成 JSON 的文件（Zed 的文件允许注释）不算证据，不拒整页。二是内置条目的厂商目录（`Official::set_up`，D23）存在：那个内置条目以 `Detected` 列出。检测只决定排序与提示，证明它能用的只有同意之后的 `initialize`。npm 与 bun 的 shim、PATH 上的名字本版不读（§3）。查哪个路径由服务中的城经 `Views` 的 `programs` 入口交进来（`crates/accounting/spec/Views.lean`），本模块只判。
+- **检测不执行任何东西**（`detect`）：两种证据，都只读文件。一是别的 ACP 客户端里人亲手写下的配置：JetBrains 的 `~/.jetbrains/acp.json` 与 Zed 的 `~/.config/zed/settings.json`（`CLIENT_CONFIGS`，各引厂商文档），其中 `agent_servers` 的每一项读成一个 `Detected` 条目，`env` 不带：别处的 `env` 可能有密钥，值要人另行写进 Vault；读不成 JSON 的文件（Zed 的文件允许注释）不算证据，不拒整页。二是内置条目的厂商目录（`Official::set_up`，D19）存在：那个内置条目以 `Detected` 列出。检测只决定排序与提示，证明它能用的只有同意之后的 `initialize`。npm 与 bun 的 shim、PATH 上的名字本版不读（§3）。查哪个路径由服务中的城经 `Views` 的 `places` 入口交进来（`crates/accounting/spec/Views.lean`），本模块只判。
 - **钉住**：`Pin::Exact` 是包串带一个确切版本（`pkg@1.2.3`、`pkg==1.2.3`）；包串不带版本或带 `latest` 是 `Floating`；不是 `npx`、`uvx` 起的程序是 `Unknown`。同意卡片照实显示这一格，不替人拒一个浮动的版本：粘贴的那一行是人自己写的。
 - **子进程只见白名单里的环境**（`environment::passed`，D17）：先清空，再放行白名单里的名字，最后放行条目自己的 `env`。白名单是系统与终端需要的那些（`PATH`、家目录、临时目录、语言、Windows 的系统目录与 `PATHEXT`、XDG 目录、显示、代理），加上 `SSH_CONNECTION`、`SSH_CLIENT`、`SSH_TTY` 与 `NO_BROWSER`：agent 靠它们判断自己是否在远程主机上、该给哪种登录；再加上 `OFFICIAL` 里每家的目录变量，它们的名字只写在 `SetUpDir::variable` 一处。Windows 上名字不分大小写。
 - **`initialize`**（D14）：发 `protocolVersion: 1`、`clientInfo {name: "sprawling", version}`、`fs` 两项与 `terminal` 为 `false`、`auth.terminal: true`。对方答的 `protocolVersion` 不是 1 就拒（`E_WIRE_MISMATCH`，恢复语说这家说的是哪一版），规范要求客户端这时断开并告诉人。`agentInfo.version` 与 `authMethods` 读进 `Introduced`；方法的 `type` 缺省是 `agent`，`terminal` 是另一种，其余拒而不猜。
@@ -372,6 +372,18 @@ D16 同意绑定启动规格的摘要，而不是绑定条目的 id。摘要是 
 D17 子进程的环境是白名单，不是黑名单。开放名单之后，起的是任何人写的程序；它继承城的全部环境时，城自己的秘密（`SPRAWLING_SECRET_*`）、别的厂商的 key 与任何恰好在环境里的凭据都交给了它。`child::command` 拿掉的是城自己的秘密，这里再清空其余的，只放行 agent 运行与判断登录方式所需的名字。被否：只靠 `child::command` 的黑名单，它挡不住人自己 shell 里导出的其他厂商的 key。
 
 D18 claude.ai 订阅登录不由本城启动，Console 登录可以。`claude-agent-acp` 的注释原文是 "this integration must never bill a claude.ai subscription"，Anthropic 也不允许第三方应用提供 Claude.ai 登录；本城替人启动它就是在提供它。拿掉的地方是读 `authMethods` 的那一处，所以页面、拒词与将来的登录执行器都看不见它。被否：保留它并在页面上警告，那仍然是本城在提供这种登录。
+
+D19 内置条目装好或登录过，看的是厂商文档写的那个目录在不在（`Official::set_up`）。当前的表，每行的出处就是行里的那页：
+
+| 内置条目 | 变量 | 家目录下 | 出处 |
+|---|---|---|---|
+| `claude_code` | `CLAUDE_CONFIG_DIR` | `.claude` | https://code.claude.com/docs/en/settings |
+| `codex` | `CODEX_HOME` | `.codex` | https://developers.openai.com/codex/auth |
+| `pi` | `PI_CODING_AGENT_DIR` | `.pi/agent` | https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/environment-variables.md |
+| `grok_build` | `GROK_HOME` | `.grok` | https://docs.x.ai/build/settings/reference |
+| `kimi_code` | `KIMI_CODE_HOME` | `.kimi-code` | https://moonshotai.github.io/kimi-code/en/configuration/data-locations |
+
+这五家的文档对三个平台写的是同一个位置：家目录（Windows 的 `%USERPROFILE%`，macOS 与 Linux 的 `$HOME`）下的一个目录，设了变量就换成变量的值；某家给某个平台另写了位置时，这一行按平台分开。家目录与变量由 `bin::doctor::host::place_set_up` 读（`accounting::home::Home::detect`，先 `USERPROFILE` 后 `HOME`），`accounting::views` 只经服务中的城交进来的那个函数读这台电脑。判定是只读的文件存在检查，表里的每一行引这家的官方文档，不猜。`detect` 读它排序与提示（§8-19 检测一条），`environment::passed` 读它放行每家的目录变量。被否：真的起一次 agent 问它版本——慢，而且那是在人同意之前执行它的程序，违反 D16。重开参数：某家提供了稳定的「是否已登录」命令，而且执行它不需要先同意。
 
 **谁用它**：派活路径上的 harness run（`crates/sprawling/Spec.lean` §8-4e、§8-124）。`accounting::worker::driving::harness` 在房间的 worktree 里经 `HarnessProcess::start` 起一个同意过的 agent、开会话，把 `Listener` 接到 `runtime::run::harness::HarnessRun`；会话与子进程在驱动返回时一起丢掉。`accounting::views` 用 `Catalog::bundled`、`Roster` 与 `paste::pasted` 回答 `Query::AgentCatalog`、`Query::ParseAgentSpec` 与 harness 页。
 -/

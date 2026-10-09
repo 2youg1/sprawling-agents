@@ -77,7 +77,7 @@
 | `ForgetDevice` | `device: DeviceId`、`idem` | `client` | `LocalOnly` | 无 | 删掉那台浏览器的公钥，它下次只能重新配对（§8-91） |
 
 - **四行都是 `LocalOnly`**：关闭城市、让一个程序以人的账户权限跑进城里、替人启动一个登录、撤销一台设备，都是治理这座城的动作，一台远程设备不论权限都做不了。
-- **现状**：四个命令今天由 `not_built` 作答，执行者分别随生命周期、ACP 接入与本地门落地；客户端在那之前不画它们。
+- **现状**：`CloseCity`、`AddAgent` 与 `ForgetDevice` 由服务中的城的监听器执行（`bin::assembly::listening`），worker 那一臂以「这一条只在城的监听器上执行」拒绝。`AgentLogin` 仍由 `not_built` 作答：登录执行器没有建成（`crates/agent_protocols/Spec.lean` §3），客户端不画它。
 
 **`client` 而尚未落地的三个**（`HandOff`／`PutShelved`／`BatchByBuilding`）今天由 `not_built` 作答，
 所以门对它们要求的是**客户端不画**——`not_built` 的 rustdoc 说的就是这件事，现在有机器看着了。
