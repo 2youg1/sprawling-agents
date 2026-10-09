@@ -11031,9 +11031,9 @@
     "en": "inside the agent",
     "zh": "在 agent 里"
   },
-  "acp_login_none": {
-    "en": "not needed",
-    "zh": "不需要"
+  "acp_login_unknown": {
+    "en": "known once the agent starts",
+    "zh": "agent 启动后才知道"
   },
   "acp_consent": {
     "en": "It runs with your account's permissions, including over this city.",
@@ -11159,6 +11159,10 @@
     "en": "The city no longer knows this browser. Pair it again.",
     "zh": "城市已经不认这个浏览器了。重新配对。"
   },
+  "pair_keyless": {
+    "en": "This browser cannot make the device key that pairing needs, so no code can pair it. Open this address in Chrome or Edge 137 or later, Firefox 129 or later, or Safari 17 or later.",
+    "zh": "这个浏览器做不出配对要用的设备密钥，输入什么码都配不上。请改用 Chrome 或 Edge 137 及以上、Firefox 129 及以上，或 Safari 17 及以上打开这个地址。"
+  },
   "err_e_pairing_refused": {
     "en": "the pairing was refused",
     "zh": "配对被拒绝了"
@@ -11250,6 +11254,10 @@
   "close_draining": {
     "en": "closing the city: waiting for runs still going: {n}",
     "zh": "正在关闭城市：等还在跑的 {n} 个 run 完成"
+  },
+  "close_closing": {
+    "en": "closing the city",
+    "zh": "正在关闭城市"
   },
   "close_interrupting": {
     "en": "closing the city: stopping every run",
