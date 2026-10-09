@@ -34,7 +34,7 @@
   import type { PopoverBinding, PopoverColumn, PopoverRow } from "./popover";
   import Look from "./popover.look.svelte";
   import { keysOf, listId, lookOf, rowId } from "./popover_wiring";
-  import type { Hands, Keyed, Layout, Place, PopoverView } from "./popover_wiring";
+  import type { Hands, Keyed, Layout, Place, PopoverLook, PopoverView } from "./popover_wiring";
 
   interface Props {
     // The accessible name of the dialog, a lang.json key.
@@ -63,6 +63,11 @@
     readonly row?: Snippet<[PopoverRow]> | undefined;
     // An owned input or toolbar above the columns.
     readonly header?: Snippet | undefined;
+    // A caller's own drawing of the whole value, in place of
+    // `./popover.look.svelte`: the same lists, rows and wire bags, laid
+    // out as that caller's sections. The key table and the focus rules
+    // stay this seat's.
+    readonly look?: Snippet<[PopoverLook]> | undefined;
   }
 
   const {
@@ -76,6 +81,7 @@
     onCursorRow,
     row,
     header,
+    look: drawing,
   }: Props = $props();
 
   // A popover opens over the box or the button below it, where the
@@ -161,11 +167,14 @@
   const keys = (key: Keyed): boolean => keysOf(view, hands)(key);
   const look = $derived(lookOf(view, hands, { header, row }));
 
+  // The caller points the cursor at one list: it lands on the row in
+  // force there, else on the list's top, so a person who opened a list
+  // to change one value starts from that value.
   const pointColumn = (columnId: string): void => {
     const at = columns.findIndex((pane) => pane.id === columnId);
     if (at < 0) return;
     column = at;
-    cursor = 0;
+    cursor = Math.max(0, columns.at(at)?.rows.findIndex((each) => each.chosen === true) ?? 0);
   };
 
   // Measured once, on the side it was first drawn on: a side that
@@ -216,4 +225,8 @@
   });
 </script>
 
-<Look {...look} />
+{#if drawing === undefined}
+  <Look {...look} />
+{:else}
+  {@render drawing(look)}
+{/if}

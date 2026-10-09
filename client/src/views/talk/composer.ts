@@ -16,18 +16,21 @@ import type { HTMLFormAttributes, HTMLTextareaAttributes } from "svelte/elements
 
 import type { Belief, RunBelief } from "../../core/belief";
 import { heldIn } from "../../core/belief/rooms";
-import { EFFORTS, selectModel } from "../../core/commands";
+import { selectModel } from "../../core/commands";
 import type { Key, Lang } from "../../core/lang";
 import { fill, say } from "../../core/lang";
 import { MAYOR } from "../../core/route";
-import { UNSTATED, offered, parse } from "../../core/slash";
+import { completed } from "../../core/completion";
+import { offered, parse } from "../../core/slash";
 import { reached } from "../../core/slash_hands";
 import type { SessionHands, Slash, SlashHands } from "../../core/slash_hands";
 import type { Sending } from "../../core/doing";
 import { Address } from "../../wire";
-import type { Command, Effort, RunPolicy, Seq } from "../../wire";
+import type { Answer, Command, Effort, EndpointsAnswer, RunPolicy, Seq } from "../../wire";
 import type { View } from "../../core/route";
 import type { PopoverColumn } from "../parts/popover";
+import { offersOf } from "./picker";
+import type { PickerFacts } from "./picker_scene";
 
 // What the send control is spelled, for each of the three places a
 // message can land. `queued` is the one a streaming page would
@@ -53,24 +56,8 @@ export interface Served extends Names {
   readonly label: string;
 }
 
-// A model's two names travel as one row id, joined by a character no
-// endpoint or model id may hold. The join and the split live here
-// together, so the chooser and the command cannot disagree about where
-// the seam is.
-const MID = "\u0000";
-
 /** The list size after which a chooser offers filtering. */
 export const FILTER_AFTER = 8;
-
-export function modelValue(chosen: Names | undefined): string | null {
-  return chosen === undefined ? null : `${chosen.endpoint}${MID}${chosen.model}`;
-}
-
-export function splitModel(value: string): Names | null {
-  const [endpoint, model] = value.split(MID);
-  if (endpoint === undefined || model === undefined || model === "") return null;
-  return { endpoint, model };
-}
 
 // The model the session open in a room answers with: the model of the
 // newest run since the session began that has called one, read from the
@@ -87,39 +74,8 @@ export type ModelMove =
   | { readonly kind: "select"; readonly names: Names }
   | { readonly kind: "stay" };
 
-export function modelMove(value: string, session: string | null): ModelMove {
-  const names = splitModel(value);
-  return names === null || session !== null ? { kind: "stay" } : { kind: "select", names };
-}
-
-// The rows and the value of the model pill. While a session model is
-// known the pill shows it, marked as kept by the session, and a model
-// the city no longer serves still gets its row, so the pill never reads
-// as naming no model while one answers.
-function modelRows(lang: Lang, around: Around): { choices: Choice[]; value: string | null } {
-  const session = around.session;
-  const kept = say(lang, "talk_model_kept");
-  const served = around.served.find((each) => each.model === session);
-  const unserved = session === null || served !== undefined ? [] : [{ endpoint: "", model: session, label: kept }];
-  const rows = [...unserved, ...around.served];
-  return {
-    choices: rows.map((each) => ({
-      value: `${each.endpoint}${MID}${each.model}`,
-      label: each.model === session ? `${each.model} · ${kept}` : each.model,
-      note: each.label,
-    })),
-    value: modelValue(session === null ? around.chosen : (served ?? unserved.at(0))),
-  };
-}
-
-// The level in force, spelled as the row that offers it: nobody having
-// chosen is a row of its own (`core/slash.ts`'s `UNSTATED`), so the pill
-// and the `/effort` line name the states the same way (client/Spec.lean
-// §4-28). An id that is no level this build offers reads as unstated
-// rather than as a level the frame would refuse.
-export function effortLevel(value: string): Effort | null {
-  if (value === UNSTATED) return null;
-  return EFFORTS.find((known) => known === value) ?? null;
+export function modelMove(names: Names, session: string | null): ModelMove {
+  return session !== null ? { kind: "stay" } : { kind: "select", names };
 }
 
 // What sending to a room means, in one line: the Mayor's own room, a
@@ -167,12 +123,12 @@ export interface Pill {
   readonly pick: (value: string) => void;
 }
 
-// What a pick does for each pill, named by the pill rather than passed
-// in a row order only the builder could read.
+// What a pick on the settings row does: the model picker's two choices,
+// and the workspace chip's.
 export interface Picks {
-  readonly model: (value: string) => void;
+  readonly model: (names: Names) => void;
   readonly workspace: (value: string) => void;
-  readonly effort: (value: string) => void;
+  readonly effort: (level: Effort) => void;
 }
 
 // The page's hands a pick reaches for.
@@ -185,8 +141,8 @@ export interface PickHands {
 // Picks configure the next dispatch; session creation belongs to slash commands.
 export function picksFor(hands: PickHands, session: string | null): Picks {
   return {
-    model: (value) => {
-      const move = modelMove(value, session);
+    model: (names) => {
+      const move = modelMove(names, session);
       if (move.kind === "stay") return;
       hands.send(selectModel(move.names.endpoint, move.names.model, "main"));
     },
@@ -194,69 +150,84 @@ export function picksFor(hands: PickHands, session: string | null): Picks {
       const address = decodeRoom(value);
       if (address !== null) hands.go({ kind: "talk", address });
     },
-    effort: (value) => {
-      hands.chooseEffort(effortLevel(value));
+    effort: (level) => {
+      hands.chooseEffort(level);
     },
   };
 }
 
-// Everything the pills read off the page and the city, gathered so the
-// three rows are built in one place.
+// The rooms the workspace chip offers, and the one this box speaks to.
 export interface Around {
-  readonly served: readonly Served[];
-  readonly chosen: Names | undefined;
-  // The model the session open here answers with (`sessionModel`).
-  readonly session: string | null;
   readonly rooms: readonly string[];
   readonly here: Address | null;
-  readonly effort: Effort | null;
 }
 
-// The three pill values - model, workspace, effort - shared by the entries
-// in the row. The effort rows carry what a level costs beside the level
-// itself, because this is where a person decides (client/Spec.lean §4-28).
-export function pills(lang: Lang, around: Around, picks: Picks): readonly [Pill, Pill, Pill] {
-  const levels: readonly (typeof UNSTATED | Effort)[] = [UNSTATED, ...EFFORTS];
-  return [
-    {
-      label: say(lang, "talk_column_model"),
-      placeholder: say(lang, "talk_no_model"),
-      ...modelRows(lang, around),
-      pick: picks.model,
-    },
-    {
-      label: say(lang, "talk_column_workspace"),
-      placeholder: say(lang, "talk_column_workspace"),
-      choices: around.rooms.map((room) => ({ value: room, label: room, note: roomNote(lang, room) })),
-      value: around.here,
-      pick: picks.workspace,
-    },
-    {
-      label: say(lang, "talk_column_effort"),
-      placeholder: say(lang, "effort_unstated"),
-      choices: levels.map((level) => ({
-        value: level,
-        label: say(lang, `effort_${level}`),
-        note: say(lang, `effort_note_${level}`),
-      })),
-      value: around.effort ?? UNSTATED,
-      pick: picks.effort,
-    },
-  ];
+// The workspace chip: every room a conversation could move to, each
+// with one line saying what sending there means.
+export function workspacePill(lang: Lang, around: Around, pick: (value: string) => void): Pill {
+  return {
+    label: say(lang, "talk_column_workspace"),
+    placeholder: say(lang, "talk_column_workspace"),
+    choices: around.rooms.map((room) => ({ value: room, label: room, note: roomNote(lang, room) })),
+    value: around.here,
+    pick,
+  };
+}
+
+// What the endpoints answer offers this box: every model by the id a
+// command carries next to the name a person reads, the facts the model
+// picker is drawn from, and what `/model` and `/effort` complete their
+// argument from - the levels being those the model in force offers.
+export interface Offered {
+  readonly models: readonly Served[];
+  readonly picker: PickerFacts;
+  readonly argued: Arguments;
+}
+
+export function offeredBy(answer: EndpointsAnswer | undefined, stated: Effort | null, picks: Picks): Offered {
+  const endpoints = answer?.endpoints ?? [];
+  const main = answer?.chosen.find((each) => each.tag === "main");
+  const models = endpoints.flatMap((endpoint) => endpoint.models.map((row) => ({ endpoint: endpoint.name, label: endpoint.label, model: row.id })));
+  const inForce = offersOf(endpoints).find((each) => each.endpoint === main?.endpoint && each.model === main.model);
+  return {
+    models,
+    picker: { endpoints, chosen: main, stated, pick: { model: picks.model, level: picks.effort } },
+    argued: { models, levels: inForce?.facts.thinking.levels ?? [] },
+  };
+}
+
+// The level a room inherits from its configuration ladder, when the
+// room's answer has arrived and states one.
+export function configLevel(answer: Answer | undefined): Effort | null {
+  return answer !== undefined && "config" in answer ? (answer.config.effort?.effort ?? null) : null;
 }
 
 // ---------------------------------------------------------- the `/` menu
 
 const COMMANDS = "commands";
 
+// What `/model` and `/effort` complete their argument from: the models
+// the city serves, and the levels the model in force offers.
+export interface Arguments {
+  readonly models: readonly Served[];
+  readonly levels: readonly Effort[];
+}
+
+// The two verbs whose argument the menu completes, each with its rows.
+const COMPLETED = { model: "/model", effort: "/effort" } as const;
+
 // The menu's one column, built from the same table the Ctrl-K palette
 // reads: a spelling, and beside it the shape its arguments take. A line
 // no verb matches - a message that begins with a path - gets no menu at
 // all, so the box's own Enter sends it rather than an empty list taking
-// the key.
-export function menuColumns(lang: Lang, line: string): readonly PopoverColumn[] {
+// the key. `/model` and `/effort` typed in full list their arguments
+// instead, from what the city offers now; each row's id is the whole
+// line it runs.
+export function menuColumns(lang: Lang, line: string, offers: Arguments): readonly PopoverColumn[] {
   const verbs = offered(line);
   if (verbs.length === 0) return [];
+  const argued = argumentRows(lang, line, offers);
+  if (argued !== null) return [argued];
   return [
     {
       id: COMMANDS,
@@ -264,13 +235,55 @@ export function menuColumns(lang: Lang, line: string): readonly PopoverColumn[] 
       rows: verbs.map((each) => ({
         id: each.spelling,
         label: each.spelling,
-        secondary:
-          each.grammar === ""
-            ? say(lang, each.about)
-            : `${each.grammar} · ${say(lang, each.about)}`,
+        secondary: each.spelling === COMPLETED.effort ? levelsNote(lang, offers.levels) : grammarNote(lang, each),
       })),
     },
   ];
+}
+
+function grammarNote(lang: Lang, verb: Slash): string {
+  return verb.grammar === "" ? say(lang, verb.about) : `${verb.grammar} · ${say(lang, verb.about)}`;
+}
+
+// `/effort` says which levels the model in force offers, rather than
+// every level the city can spell.
+function levelsNote(lang: Lang, levels: readonly Effort[]): string {
+  return levels.length === 0 ? say(lang, "slash_effort_none_offered") : fill(say(lang, "slash_effort_offered"), { levels: levels.join(" · ") });
+}
+
+function argumentRows(lang: Lang, line: string, offers: Arguments): PopoverColumn | null {
+  const call = parse(line);
+  if (call === null || !/\s/.test(line) || call.words.length > 1) return null;
+  const typed = (call.words.at(0) ?? "").toLowerCase();
+  switch (call.verb) {
+    case COMPLETED.model:
+      return {
+        id: COMMANDS,
+        label: "talk_column_model",
+        rows: offers.models
+          .filter((each, at, all) => each.model.toLowerCase().includes(typed) && all.findIndex((other) => other.model === each.model) === at)
+          .map((each) => ({ id: `${COMPLETED.model} ${each.model}`, label: each.model, secondary: each.label })),
+      };
+    case COMPLETED.effort:
+      return offers.levels.length === 0
+        ? null
+        : {
+            id: COMMANDS,
+            label: "talk_column_effort",
+            rows: offers.levels
+              .filter((level) => level.startsWith(typed))
+              .map((level) => ({ id: `${COMPLETED.effort} ${level}`, label: level, secondary: say(lang, `effort_note_${level}`) })),
+          };
+    default:
+      return null;
+  }
+}
+
+// What Tab makes of the line when the menu's cursor is on a row: an
+// argument row is the whole line it runs, so Tab takes it as written;
+// a verb row goes to the verb table's own completion.
+export function completedAt(line: string, pointed: string | undefined): string {
+  return pointed !== undefined && /\s/.test(pointed) ? `${pointed} ` : completed(line, pointed);
 }
 
 // A verb the menu offered, once. A verb that still needs its argument

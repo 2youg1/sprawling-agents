@@ -44,10 +44,5 @@ export interface PopoverColumn {
   // The one word this column is known by, a lang.json key: it names
   // both the heading and the list for a screen reader.
   readonly label: Key;
-  // This list is its own section of a `rows` layout: a rule stands
-  // above it, because what it lists is not a step of the table above
-  // but a separate choice (the model's thinking beside provider and
-  // model, which are two steps of one table).
-  readonly apart?: boolean | undefined;
   readonly rows: readonly PopoverRow[];
 }

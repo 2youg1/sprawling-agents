@@ -119,9 +119,6 @@
 | | | Tab／Shift+Tab | **换列**（环绕）并把游标复位到第 0 行——本部件在此覆盖平台的 Tab |
 | | | Enter | 应用当前列的游标行，回调 `onApply` |
 | | | Escape | 回调 `onClose` |
-| `popover.svelte`（`layout="rows"`：一张表，每列一行，行首是列名） | 同上，装成两行的表 | ←／→ | 当前行的游标左移／右移，钳在两端 |
-| | | ↓／↑ | **换行**（环绕）并把游标复位到第 0 行，与 Tab 同一动作 |
-| | | Tab／Shift+Tab、Home／End、Enter、Escape | 同上（换行／行内两端／应用／关闭） |
 
 `combobox.svelte` 的 `aria-*`（规格）：文本框是 `role="combobox"`，带 `aria-expanded`、`aria-controls` 指向列表、`aria-activedescendant` 指向游标行；列表 `role="listbox"` ＋ `aria-label`；每行 `role="option"`，`aria-selected` 只标**已选中的那个值**，不标游标。
 

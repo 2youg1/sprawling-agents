@@ -10,40 +10,28 @@ a filter, in a box tall enough to hold the whole menu with its filter. -->
 <script lang="ts">
   import { ui } from "../../ui";
   import { Address } from "../../wire";
-  import { FILTER_AFTER, pills } from "../talk/composer";
+  import { FILTER_AFTER, workspacePill } from "../talk/composer";
   import PillView from "../talk/pill.svelte";
   import SettingsRow from "../talk/settings_row.svelte";
   import Case from "./case.svelte";
-  import { CHOSEN, MODELS } from "./served";
+  import { AT_DEEPSEEK, MANY_PROVIDERS, pickerFacts } from "./picked";
 
   const { lang } = ui();
   const ignore = (): void => undefined;
   const HERE = Address.make("hall/mayor");
   const ROOMS = ["hall/mayor", ...Array.from({ length: FILTER_AFTER + 2 }, (_unused, index) => `atlas/room-${String(index)}`)];
-  const specs = $derived(
-    pills(
-      $lang,
-      {
-        served: MODELS.map((each) => ({ endpoint: "gallery", model: each.id, label: "gallery" })),
-        chosen: { endpoint: "gallery", model: CHOSEN.id },
-        session: null,
-        rooms: ROOMS,
-        here: HERE,
-        effort: null,
-      },
-      { model: ignore, workspace: ignore, effort: ignore },
-    ),
-  );
+  const workspace = $derived(workspacePill($lang, { rooms: ROOMS, here: HERE }, ignore));
+  const picker = pickerFacts(MANY_PROVIDERS, AT_DEEPSEEK, null);
 </script>
 
 <Case label="settings row · after a session starts · a sentence the link did not take">
-  <SettingsRow {specs} room={HERE} draws="notice" kept={true} />
+  <SettingsRow {workspace} {picker} room={HERE} draws="notice" kept={true} />
 </Case>
 <Case label="settings row · before a session · a sentence the link did not take">
-  <SettingsRow {specs} room={null} draws="everything" kept={true} />
+  <SettingsRow {workspace} {picker} room={null} draws="everything" kept={true} />
 </Case>
 <Case label="settings row · the workspace chip open on a long list · filter">
   <div class="flex min-h-[48rem] items-end">
-    <PillView spec={specs[1]} starts="open" />
+    <PillView spec={workspace} starts="open" />
   </div>
 </Case>

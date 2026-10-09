@@ -35,9 +35,8 @@
 
 <script lang="ts">
   import { say } from "../../core/lang";
-  import { EFFORTS } from "../../core/commands";
   import { ui } from "../../ui";
-  import { pills } from "../talk/composer";
+  import { workspacePill } from "../talk/composer";
   import PillView from "../talk/pill.svelte";
   import Failed from "../talk/failed.svelte";
   import Coin from "../talk/coin.svelte";
@@ -46,25 +45,11 @@
   import { lookOf as recordLook } from "../talk/record";
   import Record from "../talk/record.look.svelte";
   import Case from "./case.svelte";
-  import { CHOSEN, MODELS } from "./served";
 
   const { lang } = ui();
 
   const ignore = (): void => undefined;
-  const specs = $derived(
-    pills(
-      $lang,
-      {
-        served: MODELS.map((each) => ({ endpoint: "gallery", model: each.id, label: "gallery" })),
-        chosen: { endpoint: "gallery", model: CHOSEN.id },
-        session: null,
-        rooms: ["hall/mayor", "atlas/api", "atlas/web"],
-        here: HERE,
-        effort: EFFORTS[2] ?? null,
-      },
-      { model: ignore, workspace: ignore, effort: ignore },
-    ),
-  );
+  const workspace = $derived(workspacePill($lang, { rooms: ["hall/mayor", "atlas/api", "atlas/web"], here: HERE }, ignore));
   const NAMES = ["workspace"] as const;
   const FACES = ["send", "stop", "idle"] as const;
   // The microphone is drawn from its look: its seat records through the
@@ -83,15 +68,12 @@
   ];
 </script>
 
-{#each NAMES as name, index (name)}
-  {@const spec = specs[index + 1]}
-  {#if spec !== undefined}
-    <Case label={`composer pill · the ${name} menu open`}>
-      <div class="flex min-h-[36rem] items-end">
-        <PillView {spec} starts="open" />
-      </div>
-    </Case>
-  {/if}
+{#each NAMES as name (name)}
+  <Case label={`composer pill · the ${name} menu open`}>
+    <div class="flex min-h-[36rem] items-end">
+      <PillView spec={workspace} starts="open" />
+    </div>
+  </Case>
 {/each}
 
 <Case label="coin key · send, stop and the faint face that says why">

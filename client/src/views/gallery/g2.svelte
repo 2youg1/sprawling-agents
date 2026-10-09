@@ -3,60 +3,97 @@
      file, You can obtain one at https://mozilla.org/MPL/2.0/.
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
+<!-- The settings row before a session, and the model picker in each of
+its states: at rest, opened from each segment of its token, on a model
+with no thinking control, on a city whose models have none, and on an
+aggregator that serves more models than the city has providers. Each
+open picker stands in a box as tall as the page's foot gives it. -->
 <script lang="ts">
-  import { EFFORTS } from "../../core/commands";
   import { ui } from "../../ui";
+  import { Address } from "../../wire";
   import Tier from "../setup/tier.svelte";
-  import { FILTER_AFTER, pills } from "../talk/composer";
+  import { workspacePill } from "../talk/composer";
+  import { SECTION } from "../talk/picker";
+  import Picker from "../talk/picker.svelte";
+  import { pickerOf } from "../talk/picker_look";
+  import type { PickerHands } from "../talk/picker_look";
   import SettingsRow from "../talk/settings_row.svelte";
   import Case from "./case.svelte";
-  import { CHOSEN, MODELS } from "./served";
-  import { Address } from "../../wire";
+  import { AT_DEEPSEEK, AT_OLLAMA, AT_OPENROUTER, MANY_MODELS, MANY_PROVIDERS, ONE_PROVIDER, pickerFacts } from "./picked";
 
   const { lang } = ui();
   const ignore = (): void => undefined;
-  const specs = $derived(pills($lang, {
-    served: MODELS.map((each, index) => ({ endpoint: index === 0 ? "gallery" : "alternate", model: each.id, label: index === 0 ? "gallery" : "alternate" })),
-    chosen: { endpoint: "gallery", model: CHOSEN.id },
-    session: null,
-    rooms: ["hall/mayor"],
-    here: Address.make("hall/mayor"),
-    effort: EFFORTS[2] ?? null,
-  }, { model: ignore, workspace: ignore, effort: ignore }));
-  const many = $derived(pills($lang, {
-    served: [{ endpoint: "gallery", model: CHOSEN.id, label: "gallery" }, ...Array.from({ length: FILTER_AFTER + 4 }, (_unused, index) => ({ endpoint: "gallery", model: `gallery/model-${String(index)}`, label: "gallery" })), { endpoint: "alternate", model: "alternate/small", label: "alternate" }],
-    chosen: { endpoint: "gallery", model: CHOSEN.id }, session: null,
-    rooms: ["hall/mayor"], here: Address.make("hall/mayor"), effort: null,
-  }, { model: ignore, workspace: ignore, effort: ignore }));
-  const empty = $derived(pills($lang, {
-    served: [], chosen: undefined, session: null, rooms: ["hall/mayor"],
-    here: Address.make("hall/mayor"), effort: null,
-  }, { model: ignore, workspace: ignore, effort: ignore }));
+  const workspace = $derived(workspacePill($lang, { rooms: ["hall/mayor"], here: Address.make("hall/mayor") }, ignore));
+  const served = pickerFacts(MANY_PROVIDERS, AT_DEEPSEEK, null);
+  const stated = pickerFacts(MANY_PROVIDERS, AT_DEEPSEEK, "xhigh");
+  const local = pickerFacts(MANY_PROVIDERS, AT_OLLAMA, null);
+  const alone = pickerFacts(ONE_PROVIDER, AT_OLLAMA, null);
+  const aggregated = pickerFacts(MANY_MODELS, AT_OPENROUTER, "medium");
+  const none = pickerFacts([], undefined, null);
+  // The open picker alone, as its seat draws it once "more…" opened the
+  // aggregator's models in full: the list scrolls inside the room it
+  // had, so the picker is as tall as before.
+  const still = (): (() => void) => () => undefined;
+  const HANDS: PickerHands = { open: still, close: still, hold: still, keep: still, bound: still, cursor: still, focusFilter: still, holdToken: still, holdFilter: still, holdFrame: still };
+  const opened = $derived(
+    pickerOf($lang, aggregated, {
+      open: true, segment: "model", pick: null, parent: null, pinned: { first: undefined, second: undefined },
+      query: "", whole: [SECTION.second], kept: [], binding: null, active: null,
+    }, HANDS)?.menu,
+  );
 </script>
 
-<Case label="settings row · before a session · workspace, model and permissions">
-  <SettingsRow {specs} room={null} draws="everything" kept={false} />
+<Case label="settings row · before a session · workspace, picker and permissions">
+  <SettingsRow {workspace} picker={served} room={null} draws="everything" kept={false} />
 </Case>
-<Case label="settings row · no offered model · model entry hidden">
-  <SettingsRow specs={empty} room={null} draws="everything" kept={false} />
+<Case label="settings row · no offered model · picker hidden">
+  <SettingsRow {workspace} picker={none} room={null} draws="everything" kept={false} />
 </Case>
 <Case label="settings row · the run policy's menu open">
   <div class="flex min-h-[14rem] flex-col justify-end">
-    <SettingsRow {specs} room={null} draws="everything" kept={false} menu="open" />
+    <SettingsRow {workspace} picker={served} room={null} draws="everything" kept={false} menu="open" />
   </div>
 </Case>
-<Case label="settings row · provider with its model and thinking">
-  <div class="flex min-h-[36rem] flex-col justify-end">
-    <SettingsRow {specs} room={null} draws="everything" kept={false} menu="model" />
+<Case label="picker · opened from the model · models first, providers of the chosen one">
+  <div class="flex min-h-[46rem] flex-col justify-end">
+    <SettingsRow {workspace} picker={served} room={null} draws="everything" kept={false} menu="model" />
   </div>
 </Case>
-<Case label="settings row · provider with many models · search">
-  <div class="flex min-h-[36rem] flex-col justify-end">
-    <SettingsRow specs={many} room={null} draws="everything" kept={false} menu="model" />
+<Case label="picker · opened from the provider · a stated level this provider does not offer">
+  <div class="flex min-h-[46rem] flex-col justify-end">
+    <SettingsRow {workspace} picker={stated} room={null} draws="everything" kept={false} menu="provider" />
+  </div>
+</Case>
+<Case label="picker · opened from the level">
+  <div class="flex min-h-[46rem] flex-col justify-end">
+    <SettingsRow {workspace} picker={served} room={null} draws="everything" kept={false} menu="level" />
+  </div>
+</Case>
+<Case label="picker · a model with no thinking control · the band's room kept for the others">
+  <div class="flex min-h-[46rem] flex-col justify-end">
+    <SettingsRow {workspace} picker={local} room={null} draws="everything" kept={false} menu="model" />
+  </div>
+</Case>
+<Case label="picker · one provider, no thinking control anywhere · no band, no room for one">
+  <div class="flex min-h-[30rem] flex-col justify-end">
+    <SettingsRow {workspace} picker={alone} room={null} draws="everything" kept={false} menu="model" />
+  </div>
+</Case>
+<Case label="picker · more models than providers · providers first, five models and more">
+  <div class="flex min-h-[50rem] flex-col justify-end">
+    <SettingsRow {workspace} picker={aggregated} room={null} draws="everything" kept={false} menu="model" />
+  </div>
+</Case>
+<Case label="picker · the aggregator's models opened in full · scrolling in their room">
+  <div class="flex min-h-[50rem] flex-col justify-end">
+    <!-- The row the picker opens above. -->
+    <div class="relative h-touch">
+      {#if opened !== undefined}<Picker menu={opened} />{/if}
+    </div>
   </div>
 </Case>
 <Case label="settings row · after a session starts · no controls">
-  <SettingsRow {specs} room={null} draws="notice" kept={false} />
+  <SettingsRow {workspace} picker={served} room={null} draws="notice" kept={false} />
 </Case>
 <Case label="appearance · the tier card" width={390}>
   <Tier />

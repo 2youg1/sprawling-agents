@@ -7,43 +7,19 @@ import { describe, expect, test } from "bun:test";
 
 import type { RunBelief } from "../../core/belief";
 import { Address, RunId, Seq, TimeMs } from "../../wire";
-import { boxKey, menuColumns, modelMove, picksFor, pills, sessionModel } from "./composer";
-import type { Around, BoxKey, Picks } from "./composer";
+import { boxKey, menuColumns, modelMove, picksFor, sessionModel } from "./composer";
+import type { BoxKey } from "./composer";
 
 const ignore = (): void => undefined;
-const picks: Picks = { model: ignore, workspace: ignore, effort: ignore };
-
-const around: Around = {
-  served: [
-    { endpoint: "local", model: "fake-small", label: "Local" },
-    { endpoint: "local", model: "fake-chat", label: "Local" },
-  ],
-  chosen: { endpoint: "local", model: "fake-chat" },
-  session: "fake-small",
-  rooms: [],
-  here: null,
-  effort: null,
-};
+const offers = { models: [], levels: [] };
 
 describe("the `/` menu", () => {
   test("a line no verb matches opens no menu, so Enter reaches the box", () => {
-    expect(menuColumns("en", "/etc/hosts is broken")).toEqual([]);
-    expect(menuColumns("en", "/st").flatMap((column) => column.rows.map((row) => row.id))).toEqual([
+    expect(menuColumns("en", "/etc/hosts is broken", offers)).toEqual([]);
+    expect(menuColumns("en", "/st", offers).flatMap((column) => column.rows.map((row) => row.id))).toEqual([
       "/steer",
       "/stop",
     ]);
-  });
-});
-
-describe("the model pill", () => {
-  test("a session's model is what the pill shows, not the city's next pick", () => {
-    const [model] = pills("en", around, picks);
-    expect(model.value).toBe("local\u0000fake-small");
-  });
-
-  test("with no session in the room the pill shows the chosen main model", () => {
-    const [model] = pills("en", { ...around, session: null }, picks);
-    expect(model.value).toBe("local\u0000fake-chat");
   });
 });
 
@@ -83,19 +59,19 @@ describe("the session's model", () => {
 describe("picking a model", () => {
   test("never changes the model of an existing session", () => {
     const names = { endpoint: "local", model: "fake-chat" };
-    expect(modelMove("local\u0000fake-chat", null)).toEqual({ kind: "select", names });
-    expect(modelMove("local\u0000fake-chat", "fake-small")).toEqual({ kind: "stay" });
-    expect(modelMove("local\u0000fake-chat", "fake-chat")).toEqual({ kind: "stay" });
+    expect(modelMove(names, null)).toEqual({ kind: "select", names });
+    expect(modelMove(names, "fake-small")).toEqual({ kind: "stay" });
+    expect(modelMove(names, "fake-chat")).toEqual({ kind: "stay" });
   });
 });
 
 test("a model pick sends selection alone, never a session command", () => {
   const sent: unknown[] = [];
   const hands = { send: (command: unknown) => { sent.push(command); return true; }, go: ignore, chooseEffort: ignore };
-  picksFor(hands, null).model("local\u0000fake-chat");
+  picksFor(hands, null).model({ endpoint: "local", model: "fake-chat" });
   expect(sent).toHaveLength(1);
   expect(sent).toMatchObject([{ select_model: { endpoint: "local", model: "fake-chat", tag: "main" } }]);
-  picksFor(hands, "fake-small").model("local\u0000fake-chat");
+  picksFor(hands, "fake-small").model({ endpoint: "local", model: "fake-chat" });
   expect(sent).toHaveLength(1);
 });
 

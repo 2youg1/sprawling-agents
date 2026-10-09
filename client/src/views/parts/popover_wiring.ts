@@ -6,8 +6,8 @@
 // What a popover decides before anything is drawn - where each key
 // moves the cursor, which ids name its lists and rows - and the whole
 // value its look is given (`PopoverLook`). The key table is
-// `client/spec/Views/Parts.lean` §7-5, modelled as `press` and
-// `pressRow` in `client/spec/Views/Parts/Popover.lean`.
+// `client/spec/Views/Parts.lean` §7-5, modelled as `press` in
+// `client/spec/Views/Parts/Popover.lean`.
 //
 // It sits apart from `./popover`, which keeps the shapes callers hand a
 // popover and re-exports the component beside them: this file is what
@@ -22,11 +22,11 @@ import type { Key } from "../../core/lang";
 import type { Side } from "./layer";
 import type { PopoverColumn, PopoverRow } from "./popover";
 
-// `content` and `equal` lay the lists side by side, so the arrows walk
-// one list and Tab changes it. `rows` stacks them as a table - each list
-// one row, its label the leading cell - so the left and right arrows
-// walk one row and the up and down arrows change it, as Tab does.
-export type Layout = "content" | "equal" | "rows";
+// `content` sizes each list to its rows and `equal` gives every list
+// the same width, both laid side by side: the arrows walk one list and
+// Tab changes it. A caller drawing its own look (`look`) lays the same
+// lists out as it likes and keeps this key table.
+export type Layout = "content" | "equal";
 
 // The list the cursor is in and the row it is on.
 export interface Place {
@@ -51,10 +51,9 @@ export interface Keyed {
 const PASS: Pressed = { kind: "pass" };
 
 // The key table. `place` is already clamped to the lists, `rows` is
-// how many rows each list holds. Left and right are claimed only where
-// there is a row to walk; elsewhere they are left to a caller's caret.
-export function pressed(layout: Layout, place: Place, key: Keyed, rows: readonly number[]): Pressed {
-  const asRow = layout === "rows";
+// how many rows each list holds. Left and right are left to a caller's
+// caret.
+export function pressed(place: Place, key: Keyed, rows: readonly number[]): Pressed {
   const here = rows.at(place.column) ?? 0;
   const walk = (by: number): Pressed =>
     here === 0
@@ -67,14 +66,10 @@ export function pressed(layout: Layout, place: Place, key: Keyed, rows: readonly
       ? { kind: "move", to: place }
       : { kind: "move", to: { column: (place.column + by + rows.length) % rows.length, cursor: 0 } };
   switch (key.key) {
-    case "ArrowRight":
-      return asRow ? walk(1) : PASS;
-    case "ArrowLeft":
-      return asRow ? walk(-1) : PASS;
     case "ArrowDown":
-      return asRow ? turn(1) : walk(1);
+      return walk(1);
     case "ArrowUp":
-      return asRow ? turn(-1) : walk(-1);
+      return walk(-1);
     case "Home":
       return { kind: "move", to: { column: place.column, cursor: 0 } };
     case "End":
@@ -131,7 +126,6 @@ export interface Hands {
 export function keysOf(view: PopoverView, hands: Hands): (key: Keyed) => boolean {
   return (key) => {
     const answer = pressed(
-      view.layout,
       view.place,
       key,
       view.columns.map((pane) => pane.rows.length),
@@ -193,8 +187,6 @@ export interface RowLook {
 export interface ListLook {
   readonly key: string;
   readonly label: string;
-  // A rule stands above this list in the `rows` layout.
-  readonly apart: boolean;
   readonly wire: ListWire;
   readonly rows: readonly RowLook[];
 }
@@ -232,7 +224,6 @@ export function lookOf(view: PopoverView, hands: Hands, slots: Slots): PopoverLo
       return {
         key: pane.id,
         label: view.say(pane.label),
-        apart: pane.apart === true,
         wire: {
           id: listId(seat, column),
           role: "listbox",

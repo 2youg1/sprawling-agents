@@ -17,7 +17,6 @@
   import { say } from "../../core/lang";
   import { markEndAtFrame, markStart } from "../../core/timing";
   import { current } from "../../core/route";
-  import { completed } from "../../core/completion";
   import { find, parse } from "../../core/slash";
   import type { Slash } from "../../core/slash_hands";
   import type { Address } from "../../wire";
@@ -33,7 +32,7 @@
   import Popover from "../parts/popover.svelte";
   import type { PopoverBinding } from "../parts/popover";
   import Unkept from "../parts/unkept.svelte";
-  import { boxKey, menuColumns, pickSlash, picksFor, pills, roomsKnown, sessionModel, slashHands } from "./composer";
+  import { boxKey, completedAt, configLevel, menuColumns, offeredBy, pickSlash, picksFor, roomsKnown, sessionModel, slashHands, workspacePill } from "./composer";
   import type { BoxKey, ComposerLook } from "./composer";
   import Look from "./composer.look.svelte";
   import { draftAt } from "./draft";
@@ -186,14 +185,6 @@
   const answer = $derived(
     $endpoints !== undefined && "endpoints" in $endpoints ? $endpoints.endpoints : undefined,
   );
-  // The id a command carries next to the name a person reads.
-  const models = $derived(
-    (answer?.endpoints ?? []).flatMap((endpoint) =>
-      endpoint.models.map((row) => ({ endpoint: endpoint.name, label: endpoint.label, model: row.id })),
-    ),
-  );
-  const main = $derived(answer?.chosen.find((each) => each.tag === "main"));
-
   // The room this box speaks to: the page's word for it, or the address bar's.
   const shown = $derived(room === undefined ? Option.getOrNull(current(u.bar)) : { kind: "talk" as const, address: room });
   const here = $derived(shown !== null && shown.kind === "talk" ? shown.address : null);
@@ -210,12 +201,16 @@
 
   const startedHere = $derived(here !== null && heldIn($belief, here).some((run) => run.lastSeq > ($belief.sessions[here] ?? 0)));
   const session = $derived(here === null ? null : sessionModel(heldIn($belief, here), $belief.sessions[here] ?? null));
-  const offered = $derived({ served: models, chosen: main, session, rooms, here, effort: $effort });
-  const specs = $derived(pills($lang, offered, picksFor(u, session)));
+  const picks = $derived(picksFor(u, session));
+  const workspace = $derived(workspacePill($lang, { rooms, here }, picks.workspace));
+  // The level this room inherits when the page states none, and what
+  // the picker and the `/` menu offer from the endpoints answer.
+  const roomConfig = $derived(here === null ? readable(undefined) : u.conn.asking.ask({ config: { addr: here } }));
+  const offered = $derived(offeredBy(answer, $effort ?? configLevel($roomConfig), picks));
 
   // ------------------------------------------------------- the `/` menu
 
-  const showing = $derived(open ? menuColumns($lang, text) : []);
+  const showing = $derived(open ? menuColumns($lang, text, offered.argued) : []);
 
   function closeMenu(): void {
     open = false;
@@ -232,7 +227,7 @@
         here,
         live,
         belief: get(belief),
-        models,
+        models: offered.models,
         effort: get(effort),
         setEffort: u.chooseEffort,
         policy: get(u.policy),
@@ -261,7 +256,7 @@
     switch (key) {
       case "complete":
         event.preventDefault();
-        write(completed(text, pointed));
+        write(completedAt(text, pointed));
         return;
       case "recall": {
         // ↑ in an empty box brings back what was last sent here.
@@ -350,8 +345,13 @@
     label="talk_commands"
     columns={showing}
     onApply={(_column, row: { readonly id: string }) => {
-      const chosen = find(row.id);
-      if (chosen !== undefined) pick(chosen);
+      // A verb row's id is its spelling; an argument row's is the whole
+      // line it runs, which goes into the box before the verb reads it.
+      const call = parse(row.id);
+      const chosen = call === null ? undefined : find(call.verb);
+      if (chosen === undefined) return;
+      if (row.id !== chosen.spelling) write(row.id);
+      pick(chosen);
     }}
     onClose={closeMenu}
     bind={(binding: PopoverBinding) => { menuBinding = binding; }}
@@ -390,7 +390,7 @@
     <Unkept words={() => text} />
   {/if}
   <DropRefused refused={zone.refused} />
-  <SettingsRow {specs} room={here} draws={band !== undefined || started || startedHere ? "notice" : "everything"} {kept} />
+  <SettingsRow {workspace} picker={offered.picker} room={here} draws={band !== undefined || started || startedHere ? "notice" : "everything"} {kept} />
 {/snippet}
 
 <Look {...look} />
