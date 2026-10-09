@@ -153,10 +153,12 @@ pub struct ModelFacts { pub id: String, pub context_tokens: Option<u64>, pub max
                         pub output_price: Option<String>,        // 缺席写 null，行没说就是没说
                         pub thinking: Option<ThinkingStatement>, // 缺席即省略：列表没说思考档
                         pub canonical: Option<String> }          // 上游自己的规范 id；缺席即省略
-pub struct ThinkingStatement { pub levels: Vec<Effort>,         // 列表点名的档，城的升序；恒不含 none
+pub struct ThinkingStatement { pub levels: Vec<Effort>,         // 列表点名的档，城的升序；恒不含 none；空即省略
                                pub default: Option<Effort>,     // 列表说的默认档
                                pub on: Option<bool>,            // 列表说能否要求它「开启思考」
                                pub default_on: Option<bool> }   // 列表说什么都不发时想不想；三者缺席即省略
+// 这两个类型的「缺席即省略」只在人读的格式里成立（D58）：端点簿把 ModelFacts 带进 views 与 standing
+// 的 postcard 快照，二进制格式里每一格照写，缺席写 Option 的 0 标签。Serialize 因此手写，问 is_human_readable()。
 // 两个新键由 gateway::endpoint::models 读出、gateway::provider::thinking 与 provider::identity 读（gateway §8-39、§8-38）；
 // 早于它们的行读作没说，所以 0.0.10 写下的 endpoint_probed 照原样读回。
 pub struct EndpointProbed { pub name: String, pub base_url: String, pub reach: Reach,
@@ -438,6 +440,17 @@ pub struct EndpointAttached {
 **被否**：①在行里平铺 `facts`：行变大，每次 replay 都付出代价；②开城时带凭据重新拉列表：每次开城多一次带凭据的网络调用，与隐私优先相悖，也破坏 warm-up 不带密钥的性质（gateway D26）。
 
 **重开参数**：CAS 的读取成为 replay 的瓶颈，或事实缩到几百字节以内。
+-/
+
+/-! D58 快照也带的记录类型：缺席的键只在人读的格式里省略
+
+**决定**：`ModelFacts` 与 `ThinkingStatement` 的 `Serialize` 手写，按 `is_human_readable()` 分两臂，与 §8-84 的两种摘要同一个问题。人读的格式（账本行、CAS 里那份 JSON 事实、`serde_json::Value`）照旧省略缺席的 `Option` 与空的 `levels`，写出的字节与省略规则落地时逐字相同，不多一个 `null`；二进制格式（views 与 standing 快照的 postcard）每一格都写，缺席写 `Option` 的 0 标签、空列表写长度 0。`Deserialize` 仍是派生的：人读的格式缺键读作 `default`，二进制格式按声明序逐格读回。
+
+**理由**：postcard 不自描述，读方按声明序数格子。`skip_serializing_if` 在二进制格式里省掉一格，后面每一格都错位一格，读方把下一个值的首字节当作 `Option` 的标签，报 `Found an Option discriminant that wasn't 0 or 1`；端点簿只要登记过一个列出模型的端点就带着 `ModelFacts`，于是每次开城都报 `E_CAS_CORRUPT` 并从 genesis 重折。`skip_serializing_if` 只看值，看不到格式，所以省略与否要在 `Serialize` 里问格式。
+
+**被否**：①去掉 `skip_serializing_if`：账本行与 CAS 事实里多出 `"thinking":null` 一类的键，0.0.11 已写下的字节变了；②gateway 里给快照另设一个行类型：同一行的形状有两处定义，加一格时只改一处的那一次就是下一次错位；③快照改用自描述格式：views 快照的大小与解码时间都要重新量过，而错的只是两个类型。
+
+**重开参数**：`record::probe` 之外又有一个带 `skip_serializing_if` 的类型进了 postcard 快照（那时把 `Absence` 从 `record::probe` 移到两处共用的地方），或快照换成自描述格式。
 -/
 
 /-!
