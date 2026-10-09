@@ -289,8 +289,12 @@ fn a_city_that_is_closed_says_so_before_it_stops() {
         .expect("the ledger has a last line");
     assert!(last.contains("handoff_written"), "{last}");
     assert!(
-        last.contains("closed by the User"),
-        "the record does not say the stop was chosen: {last}"
+        last.contains("the city was closed with /quit in its terminal"),
+        "the record does not say who chose the stop: {last}"
+    );
+    assert!(
+        last.contains("every run under way landed before this line"),
+        "the record does not say the runs were waited for: {last}"
     );
     assert!(
         last.contains("cas:b3-"),
