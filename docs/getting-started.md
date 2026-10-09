@@ -127,7 +127,7 @@ You need a desktop browser and a callable model: a compatible provider or a loca
 
 ## 1 Install
 
-This guide describes sprawling <!-- xtask:begin workspace_version -->0.0.10<!-- xtask:end -->, in <!-- xtask:begin maturity:word -->alpha<!-- xtask:end -->. Data formats, configuration, the wire and the interface may change between versions; keep a recoverable backup before an update. Commands below install the version actually available through that channel, which may differ from the source version described here.
+This guide describes sprawling <!-- xtask:begin workspace_version -->0.0.11<!-- xtask:end -->, in <!-- xtask:begin maturity:word -->alpha<!-- xtask:end -->. Data formats, configuration, the wire and the interface may change between versions; keep a recoverable backup before an update. Commands below install the version actually available through that channel, which may differ from the source version described here.
 
 Choose one channel:
 

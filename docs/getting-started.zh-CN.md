@@ -127,7 +127,7 @@ shelves = ["~/.claude/skills"]
 
 ## 1 安装
 
-本指南讲的是 sprawling <!-- xtask:begin workspace_version -->0.0.10<!-- xtask:end -->，处于 <!-- xtask:begin maturity:word -->alpha<!-- xtask:end --> 阶段。数据格式、配置、wire 和界面在版本之间仍可能改变；更新前保留可恢复的备份。下列命令安装该渠道实际提供的版本，可能与本指南描述的源码版本不同。
+本指南讲的是 sprawling <!-- xtask:begin workspace_version -->0.0.11<!-- xtask:end -->，处于 <!-- xtask:begin maturity:word -->alpha<!-- xtask:end --> 阶段。数据格式、配置、wire 和界面在版本之间仍可能改变；更新前保留可恢复的备份。下列命令安装该渠道实际提供的版本，可能与本指南描述的源码版本不同。
 
 选择一种渠道：
 

@@ -418,7 +418,7 @@ dependencies = [
 
 [[package]]
 name = "citysim"
-version = "0.0.10"
+version = "0.0.11"
 dependencies = [
  "serde_json",
  "sha2 0.11.0",
@@ -2813,7 +2813,7 @@ dependencies = [
 
 [[package]]
 name = "sprawling"
-version = "0.0.10"
+version = "0.0.11"
 dependencies = [
  "axum",
  "cpu-time",
@@ -2856,7 +2856,7 @@ dependencies = [
 
 [[package]]
 name = "sprawling-accounting"
-version = "0.0.10"
+version = "0.0.11"
 dependencies = [
  "base64 0.23.1",
  "cssparser",
@@ -2882,7 +2882,7 @@ dependencies = [
 
 [[package]]
 name = "sprawling-agent-protocols"
-version = "0.0.10"
+version = "0.0.11"
 dependencies = [
  "proptest",
  "reqwest",
@@ -2895,7 +2895,7 @@ dependencies = [
 
 [[package]]
 name = "sprawling-browser"
-version = "0.0.10"
+version = "0.0.11"
 dependencies = [
  "base64 0.23.1",
  "png",
@@ -2906,11 +2906,11 @@ dependencies = [
 
 [[package]]
 name = "sprawling-child"
-version = "0.0.10"
+version = "0.0.11"
 
 [[package]]
 name = "sprawling-city"
-version = "0.0.10"
+version = "0.0.11"
 dependencies = [
  "cap-fs-ext",
  "cap-std",
@@ -2924,7 +2924,7 @@ dependencies = [
 
 [[package]]
 name = "sprawling-collab"
-version = "0.0.10"
+version = "0.0.11"
 dependencies = [
  "proptest",
  "serde",
@@ -2937,7 +2937,7 @@ dependencies = [
 
 [[package]]
 name = "sprawling-desktop"
-version = "0.0.10"
+version = "0.0.11"
 dependencies = [
  "base64 0.23.1",
  "image",
@@ -2956,7 +2956,7 @@ dependencies = [
 
 [[package]]
 name = "sprawling-desktop-ffi"
-version = "0.0.10"
+version = "0.0.11"
 dependencies = [
  "proptest",
  "win32job",
@@ -2966,7 +2966,7 @@ dependencies = [
 
 [[package]]
 name = "sprawling-documents"
-version = "0.0.10"
+version = "0.0.11"
 dependencies = [
  "comrak",
  "schemars",
@@ -2976,7 +2976,7 @@ dependencies = [
 
 [[package]]
 name = "sprawling-gateway"
-version = "0.0.10"
+version = "0.0.11"
 dependencies = [
  "apple-native-keyring-store",
  "argon2",
@@ -2999,7 +2999,7 @@ dependencies = [
 
 [[package]]
 name = "sprawling-kernel"
-version = "0.0.10"
+version = "0.0.11"
 dependencies = [
  "blake3",
  "insta",
@@ -3017,7 +3017,7 @@ dependencies = [
 
 [[package]]
 name = "sprawling-remote-access"
-version = "0.0.10"
+version = "0.0.11"
 dependencies = [
  "aws-lc-rs",
  "sprawling-child",
@@ -3027,7 +3027,7 @@ dependencies = [
 
 [[package]]
 name = "sprawling-runtime"
-version = "0.0.10"
+version = "0.0.11"
 dependencies = [
  "base64 0.23.1",
  "find-msvc-tools",
@@ -3052,7 +3052,7 @@ dependencies = [
 
 [[package]]
 name = "sprawling-storage"
-version = "0.0.10"
+version = "0.0.11"
 dependencies = [
  "blake3",
  "git2",
@@ -3068,7 +3068,7 @@ dependencies = [
 
 [[package]]
 name = "sprawling-wire"
-version = "0.0.10"
+version = "0.0.11"
 dependencies = [
  "aws-lc-rs",
  "axum",
@@ -4601,7 +4601,7 @@ checksum = "3ad82d2a33cdc9674dc7465672f271e096168fcdbe0f799d9e6db8c5892679dc"
 
 [[package]]
 name = "xtask"
-version = "0.0.10"
+version = "0.0.11"
 dependencies = [
  "flate2",
  "proc-macro2",

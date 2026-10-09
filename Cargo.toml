@@ -48,7 +48,7 @@ default-members = [
 # published unless its own manifest says `publish = false`, which the
 # two tools of this repository do (`crates/sprawling/Spec.lean` §8-157).
 [workspace.package]
-version = "0.0.10"
+version = "0.0.11"
 description = "A local multi-agent harness for persistent agent teams: long-running project work, agent communication, and experiments in coordination and social simulation."
 edition = "2024"
 license = "MPL-2.0"
@@ -260,25 +260,25 @@ comrak = { version = "0.55", default-features = false }
 # names are written. Each version pins `[workspace.package] version`
 # exactly, because a path dependency without one cannot be published;
 # Cargo refuses to resolve a pin that disagrees with it.
-kernel = { package = "sprawling-kernel", path = "crates/kernel", version = "=0.0.10" }
-child = { package = "sprawling-child", path = "crates/child", version = "=0.0.10" }
-storage = { package = "sprawling-storage", path = "crates/storage", version = "=0.0.10" }
-gateway = { package = "sprawling-gateway", path = "crates/gateway", version = "=0.0.10" }
-runtime = { package = "sprawling-runtime", path = "crates/runtime", version = "=0.0.10" }
-collab = { package = "sprawling-collab", path = "crates/collab", version = "=0.0.10" }
-city = { package = "sprawling-city", path = "crates/city", version = "=0.0.10" }
-documents = { package = "sprawling-documents", path = "crates/documents", version = "=0.0.10" }
+kernel = { package = "sprawling-kernel", path = "crates/kernel", version = "=0.0.11" }
+child = { package = "sprawling-child", path = "crates/child", version = "=0.0.11" }
+storage = { package = "sprawling-storage", path = "crates/storage", version = "=0.0.11" }
+gateway = { package = "sprawling-gateway", path = "crates/gateway", version = "=0.0.11" }
+runtime = { package = "sprawling-runtime", path = "crates/runtime", version = "=0.0.11" }
+collab = { package = "sprawling-collab", path = "crates/collab", version = "=0.0.11" }
+city = { package = "sprawling-city", path = "crates/city", version = "=0.0.11" }
+documents = { package = "sprawling-documents", path = "crates/documents", version = "=0.0.11" }
 # `wire` turns its default features off here because accounting and
 # xtask take it without its listener; sprawling and citysim name `server`
 # themselves, so a feature later added to its default reaches neither.
-wire = { package = "sprawling-wire", path = "crates/wire", version = "=0.0.10", default-features = false }
-browser = { package = "sprawling-browser", path = "crates/browser", version = "=0.0.10" }
-agent_protocols = { package = "sprawling-agent-protocols", path = "crates/agent_protocols", version = "=0.0.10" }
-remote_access = { package = "sprawling-remote-access", path = "crates/remote_access", version = "=0.0.10" }
-accounting = { package = "sprawling-accounting", path = "crates/accounting", version = "=0.0.10" }
-sprawling = { path = "crates/sprawling", version = "=0.0.10" }
-desktop = { package = "sprawling-desktop", path = "crates/desktop", version = "=0.0.10" }
-desktop_ffi = { package = "sprawling-desktop-ffi", path = "crates/desktop/ffi", version = "=0.0.10" }
+wire = { package = "sprawling-wire", path = "crates/wire", version = "=0.0.11", default-features = false }
+browser = { package = "sprawling-browser", path = "crates/browser", version = "=0.0.11" }
+agent_protocols = { package = "sprawling-agent-protocols", path = "crates/agent_protocols", version = "=0.0.11" }
+remote_access = { package = "sprawling-remote-access", path = "crates/remote_access", version = "=0.0.11" }
+accounting = { package = "sprawling-accounting", path = "crates/accounting", version = "=0.0.11" }
+sprawling = { path = "crates/sprawling", version = "=0.0.11" }
+desktop = { package = "sprawling-desktop", path = "crates/desktop", version = "=0.0.11" }
+desktop_ffi = { package = "sprawling-desktop-ffi", path = "crates/desktop/ffi", version = "=0.0.11" }
 
 # C3 hardening: panicking constructs and silent numeric
 # corruption are compile-time errors everywhere; tests relax locally.
