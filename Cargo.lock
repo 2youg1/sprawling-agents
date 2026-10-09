@@ -3069,6 +3069,7 @@ dependencies = [
 name = "sprawling-wire"
 version = "0.0.10"
 dependencies = [
+ "aws-lc-rs",
  "axum",
  "futures-util",
  "proptest",

@@ -176,10 +176,13 @@ fn a_page_opens_the_door_only_with_the_code_the_console_printed() {
         let mut page = connect(&home, "/ws").await;
         let mut refusals = Vec::new();
         let mut printed = Vec::new();
+        // A program on this machine presents the city's key from its key
+        // file: every face demands one (wire D54).
+        let port = home.rsplit_once(':').unwrap().1.parse::<u16>().unwrap();
         let hello = wire::ClientFrame::Hello(wire::Hello {
             wire_v: wire::WIRE_V,
             schema: wire::schema_hash(),
-            token: None,
+            token: sprawling::serving::key_file::read_key(port).unwrap(),
         });
         page.send(Message::Text(serde_json::to_string(&hello).unwrap().into()))
             .await

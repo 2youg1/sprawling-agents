@@ -121,7 +121,7 @@ pub struct Sample {
 #[allow(clippy::unwrap_used, clippy::panic, reason = "test code")]
 mod tests {
     use crate::frames::ClientFrame;
-    use crate::reception::{BindFace, SessionState, SessionStep, WelcomeFacts, decide_frame};
+    use crate::reception::{BindFace, Keys, SessionState, SessionStep, WelcomeFacts, decide_frame};
 
     /// A beat inside the range reaches the shell as the step that sets it;
     /// one outside it is not a frame at all, so the shell never holds a
@@ -130,8 +130,15 @@ mod tests {
     fn a_beat_in_range_is_a_step_and_one_outside_is_no_frame() {
         let read = |text: &str| serde_json::from_str::<ClientFrame>(text);
         let frame = read(r#"{"monitor":{"beat":250}}"#).unwrap();
-        let face = BindFace::Loopback { token: None };
-        let step = decide_frame(SessionState::Live, frame, &face, WelcomeFacts::default());
+        let face = BindFace::Loopback {
+            key: kernel::B3Hash::digest(b"native-key"),
+        };
+        let sessions = crate::reception::Sessions::default();
+        let keys = Keys {
+            face: &face,
+            sessions: &sessions,
+        };
+        let step = decide_frame(SessionState::Live, frame, &keys, WelcomeFacts::default());
         let SessionStep::Beat(beat) = step else {
             panic!("a live session's beat is a step: {step:?}");
         };

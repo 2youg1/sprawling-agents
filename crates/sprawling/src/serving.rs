@@ -20,9 +20,11 @@
 //! this crate draws entropy in one place, and a key a third party can
 //! predict is a door a third party can open.
 
+pub(crate) mod browsers;
 pub(super) mod door;
 pub(crate) mod folding;
 pub(crate) mod journal;
+pub mod key_file;
 pub(crate) mod output_ring;
 pub(crate) mod placement;
 pub(super) mod serve;

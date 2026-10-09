@@ -14,7 +14,7 @@ use std::time::Duration;
 
 use kernel::{AxCode, AxError};
 
-use super::unreachable_city;
+use super::{credential, unreachable_city};
 
 /// Splits `realm/name` into its two halves.
 ///
@@ -52,9 +52,13 @@ pub(crate) fn enrol(at: &str, realm: &str, name: &str, value: &str) -> Result<St
                      and no proxy is consulted for it",
                 )
         })?;
-    let answer = client
-        .post(format!("http://{at}/enroll"))
-        .json(&body)
+    // `/enroll` asks for a credential like every door: the city's key
+    // from its key file on this machine.
+    let mut request = client.post(format!("http://{at}/enroll")).json(&body);
+    if let Some(key) = credential(at, None) {
+        request = request.bearer_auth(key);
+    }
+    let answer = request
         .send()
         .map_err(|err| unreachable_city(at, &err.to_string()))?;
     let status = answer.status();

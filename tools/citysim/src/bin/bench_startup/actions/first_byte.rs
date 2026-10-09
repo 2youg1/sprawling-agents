@@ -134,8 +134,12 @@ fn first_answer(child: &mut Child, at: SocketAddr) -> Result<(), AxError> {
     while started.elapsed() < WITHIN {
         if let Ok(mut stream) = TcpStream::connect_timeout(&at, POLL) {
             let mut byte = [0u8; 1];
+            // The Host names the listener with its port, as a browser
+            // writes it: any other is refused at the entry
+            // (`crates/wire/spec/Reception/Entry.lean` §8-94).
+            let request = format!("GET / HTTP/1.1\r\nHost: {at}\r\nConnection: close\r\n\r\n");
             let asked = stream
-                .write_all(b"GET / HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n")
+                .write_all(request.as_bytes())
                 .and_then(|()| stream.set_read_timeout(Some(WITHIN)))
                 .and_then(|()| stream.read(&mut byte));
             if matches!(asked, Ok(1)) {

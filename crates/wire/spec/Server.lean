@@ -83,20 +83,20 @@ pub enum AssetReply {
 }
 impl ClientAssets { pub fn lookup(&self, request_path: &str) -> AssetReply; }
 // 送页面的两条路由：`/` 与同一张表里没有别的路由认领的每一条路径。
-pub fn bundle_routes<S: Clone + Send + Sync + 'static>(client: Arc<ClientAssets>) -> Router<S>;
+pub fn bundle_routes<S: Clone + Send + Sync + 'static>(client: Arc<ClientAssets>, headers: &PageHeaders) -> Router<S>;
 ```
 
 **客户端是一张资产表，不是一个文件**：`ServeConfig` 携 `client: Arc<ClientAssets>`，因为 `client/` 的构建产物是 `index.html` 加它引用的脚本、样式与字体，只携一个文件的形状会让页面壳引用一条服务端没有的路由。资产表是封闭清单：路径穿越（`..`、空段、盘符、点头文件）在判定层拒，miss 报文件名并给出重建口令。`Disk` 臂逐请求读盘，专供开发回路（改前端刷新即见），发布路径恒不构造它。
 
-**送页面的路由只有一张表**（D20）：城自己的端口把 `bundle_routes` 并进 `router`，远程监听（`crates/remote_access/Spec.lean` §8-10）也并进它自己的那张表，所以设备打开远程地址拿到的字节与响应头，与这台电脑上的浏览器拿到的相同。
+**送页面的路由只有一张表**（D20）：城自己的端口把 `bundle_routes` 并进 `router`，远程监听（`crates/remote_access/Spec.lean` §8-10）也并进它自己的那张表，所以设备打开远程地址拿到的字节与这台电脑上的浏览器拿到的相同；响应头按监听器生成、作为参数交进来（§8-94 末节）。
 
 **公开签名不携传输层的类型**：sink 收 `Vec<u8>` 而不是 `axum::body::Bytes`。**一个泄露自己传输层的公开签名，会把「换掉 HTTP 库」变成对每一个从未选过它的调用方的破坏性变更**。
 
 **令牌只以摘要形式进入本 crate**：拿令牌的一方自己摘一次，边界只比摘要；`expose` 只得出现在兑付点（`xtask secret`）。代价为零（常数时间比较本来就要先摘），收益是 `wire` 在类型上根本拿不到配对令牌的明文。常数时间比较因此退化为定长 32 字节的无早退异或，**既无内容侧道也无长度侧道**。
 
-`decide_bind` 的四格真值表是全部行为：回环×无令牌＝`Serve(Loopback)`；回环×有令牌＝`Serve(Loopback)`；非回环×有令牌＝`Serve(Exposed)`；**非回环×无令牌＝`Refuse(E_CONFIG_INVALID)`**。拒绝发生在**启动时**，不是启动后拒连——它是配置判定。
+`decide_bind` 的四格真值表是全部行为：回环×有钥匙＝`Serve(Loopback)`；非回环×有钥匙＝`Serve(Exposed)`；**两面×无钥匙＝`Refuse(E_CONFIG_INVALID)`**。拒绝发生在**启动时**，不是启动后拒连——它是配置判定。
 
-**三个平台上同一条规则**：「回环」由 `IpAddr::is_loopback` 判（IPv4 的 `127.0.0.0/8` 与 IPv6 的 `::1`），标准库在 Windows、macOS、Linux 上给同一个答案，所以 `decide_bind` 与 `decide_enroll` 不分平台。一个 IPv4 映射地址（`::ffff:127.0.0.1`）不算回环：绑定在这样的地址上按暴露面判，要求配对令牌，比需要的更严而不更松。对端地址不同：监听在 `[::]` 上时，Linux 与 macOS 缺省接收 IPv4 连接并把对端报成映射地址，Windows 缺省不接收（三者 `IPV6_V6ONLY` 的系统缺省值不同，本 crate 不设它）；于是在 Linux 与 macOS 上，同机经 IPv4 连到 `[::]` 监听器的 `/enroll` 报来的对端是 `::ffff:127.0.0.1`。规则的本意是「只认同一台机器」，所以 `decide_enroll` 先取 `IpAddr::to_canonical` 再判 `is_loopback`（`crates/wire/src/reception.rs` 的 `decide_enroll`）：映射回环被接受，映射的外部地址（`::ffff:203.0.113.7`）仍被拒，三个平台给同一个答案。**被否掉的做法**：在监听器上设 `IPV6_V6ONLY`——那改的是哪些连接进得来，不是谁算同一台机器，且要在每个平台上各设一次。
+**三个平台上同一条规则**：「回环」由 `IpAddr::is_loopback` 判（IPv4 的 `127.0.0.0/8` 与 IPv6 的 `::1`），标准库在 Windows、macOS、Linux 上给同一个答案，所以 `decide_bind` 与 `decide_enroll` 不分平台。一个 IPv4 映射地址（`::ffff:127.0.0.1`）不算回环：绑定在这样的地址上按暴露面判，比需要的更严而不更松。对端地址不同：监听在 `[::]` 上时，Linux 与 macOS 缺省接收 IPv4 连接并把对端报成映射地址，Windows 缺省不接收（三者 `IPV6_V6ONLY` 的系统缺省值不同，本 crate 不设它）；于是在 Linux 与 macOS 上，同机经 IPv4 连到 `[::]` 监听器的 `/enroll` 报来的对端是 `::ffff:127.0.0.1`。规则的本意是「只认同一台机器」，所以 `decide_enroll` 先取 `IpAddr::to_canonical` 再判 `is_loopback`（`crates/wire/src/reception.rs` 的 `decide_enroll`）：映射回环被接受，映射的外部地址（`::ffff:203.0.113.7`）仍被拒，三个平台给同一个答案。**被否掉的做法**：在监听器上设 `IPV6_V6ONLY`——那改的是哪些连接进得来，不是谁算同一台机器，且要在每个平台上各设一次。
 
 薄壳的职责恒为三件：静态资源（前端产物，`bundle_routes`）｜WS 升级（`/ws`）｜四条 HTTP 路由（`/enroll`、`/transcribe`、`/drop`、`/acp`）。它不持业务状态，不做策略判断：`/enroll`、`/transcribe`、`/drop` 由 `decide_admission` 在门前判配对，`/acp` 在处理器里经同一个函数判，因为编辑器把令牌放在正文的一个键里而不是请求头里；送页面的两条路由不设配对，因为还没拿到配对码的浏览器也得先载入输入配对码的那张表单。
 
@@ -170,7 +170,7 @@ pub commands: Arc<dyn Fn(WireCommand, Reply) -> Result<(), AxError> + Send + Syn
 
 **`DiscardLine.restoration` 携 `Option<Restoration>` 而非一个句子**。回收站那一行的「怎么拿回来」的唯一措辞处在客户端（`client/src/views/record/bin.svelte` 按 `tracked`／`interred`／`rebuildable` 三臂措辞）；服务端若把它拼成一句话，就是**一件事两个渲染权威**，而服务端那句还拼不出可执行的那句话。所以计划以它自己的形状上线（载荷本来就是 `Restoration` 序列化出来的，故读得回去）；`None` 的意思是**这一条记录用了本构建读不懂的方案**，界面据此画一行而不给动作——行恒不隐藏，因为藏起一件被删的东西比承认读不懂它的方案更糟。这类「语法换形而名字没换」的改动不动 `QUERY_NAMES` 与 `COMMAND_NAMES`，故只能由 `WIRE_V` 进位让旧页面在握手期被拒。
 
-**`POST /acp` 与 `AcpSink`**。外来编辑器的请求走自己的路由，不挤 Command 面：它自带鉴权、要一个当场的回答，而 Command 面的回答是事件流。三条口径：①**令牌在本 crate 判**（配对令牌住这里，常数时间比对也就住这里），只把 `authentic` 一位传进去——拒词由 `agent_protocols::admit` 措辞，「未配对者只学到一位」因此只有一个权威；②回给编辑器的只有 `AcpProgress` 三字段，run id 是工人接单时才铸的，故受理那一刻诚实的答案是「已受理、未完成」；③没配对令牌的城即回环独占，与 control surface 同一条规矩。
+**`POST /acp` 与 `AcpSink`**。外来编辑器的请求走自己的路由，不挤 Command 面：它自带鉴权、要一个当场的回答，而 Command 面的回答是事件流。三条口径：①**令牌在本 crate 判**（配对令牌住这里，常数时间比对也就住这里），只把 `authentic` 一位传进去——拒词由 `agent_protocols::admit` 措辞，「未配对者只学到一位」因此只有一个权威；②回给编辑器的只有 `AcpProgress` 三字段，run id 是工人接单时才铸的，故受理那一刻诚实的答案是「已受理、未完成」；③编辑器出示native key（读钥匙文件，`crates/sprawling/spec/Keying.lean` §8-22）或一个会话令牌，与 control surface 同一条规矩。
 
 **三帧登记面**（§8-1 golden 同集更新）——`AttachEndpoint`（人刚输入的 URL＋兼容格式＋`secret:` 引用；**引用有字节形，凭证没有**）、`SelectModel`（标签→模型＋两个探不到的 token 数＋人说的「收得下什么」；输出上限是 `Option<Ceiling>`，缺席即「没人登记过」，零在类型上不存在；`input: Option<kernel::InputKinds>` 紧接在 `max_output_tokens` 之后，出现时是 `gateway::accepted_input` 的第一档，缺席时梯子从目录开始，`crates/gateway/Spec.lean` §8-37、gateway D16）、`EndpointView`（设置页的读；`EndpointsAnswer` 里 `has_credential` 是关于凭证能回答的全部）。
 
@@ -271,7 +271,29 @@ pub struct SessionBody { pub device: DeviceId, pub nonce: String, pub signature:
 pub struct SessionAnswer { pub token: String }               // 页面只把它放在内存里
 ```
 
-- **会话令牌是凭据**：页面以 hello 的 `token` 或 POST 的 `Authorization: Bearer` 出示它；`/ws`、`/transcribe`、`/enroll`、`/drop`、`/acp` 对每一个调用方都要求一份凭据——浏览器的会话令牌，或同一台机器上的原生客户端的钥匙文件。
-- **两种码，一个入口**：`open` 是 `/web` 经只给本用户读的跳转文件交给浏览器的开页码，`code` 是终端上显示的配对码；两者都是一次一猜，错了以 `E_PAIRING_REFUSED` 拒，不说是哪一种原因。
-- **现状**：三条路由在路由表里，请求体按上面的形状读；处理器今天以 `501` 与一个 `E_TOOL_UNAVAILABLE` 的拒绝作答，直到本地门的配对、挑战与入口判定落地（`crates/sprawling/Spec.lean`）。
+- **会话令牌是凭据**：页面以 hello 的 `token` 或 POST 的 `Authorization: Bearer` 出示它；`/ws`、`/transcribe`、`/enroll`、`/drop`、`/acp` 对每一个调用方都要求一份凭据——浏览器的会话令牌，或同一台机器上的原生客户端的native key（§8-40）。
+- **两种码，一个入口**：`open` 是 `/web` 经只给本用户读的跳转文件交给浏览器的开页码，`code` 是终端上显示的配对码；错、用过或太早一律 `E_PAIRING_REFUSED`，403。状态与它的规则在 `spec/Reception/Pairing.lean` §8-95。
+- **字节怎么写**：`public_key` 是 Ed25519 公钥的 32 字节，`nonce` 是 32 字节，`signature` 是 64 字节，`token` 是 32 字节，线上一律写成小写十六进制；`label` 至多 `LABEL_MAX`（64）个字符，空或含控制字符即 422。页面用 `crypto.subtle.exportKey("raw", publicKey)` 得到公钥。签的字节是 `sprawling local session v1
+<nonce>
+<origin>`，`origin` 是页面自己的 `location.origin`，服务端取这次请求过了入口判定的 Origin 头去验。
+- **答复**：`/pair` 200 `{ device }`；`/session/challenge` 200 `{ nonce }`；`/session` 200 `{ token }`，nonce 过期或用过、设备不认识、签名不对都是 403 `E_GATE_DENIED`。三条路只收浏览器（§8-94 第 6 步），不问凭据——它们就是换凭据的地方。
+
+```rust
+// 这台电脑上的这扇门的句柄：装配层建一次，交给 ServeConfig，也交给控制台与开浏览器的那一方。
+pub struct LocalDoor { … }                                        // Clone，内部一把锁
+pub struct DoorSenses { pub clock: Arc<dyn Fn() -> Result<TimeMs, AxError> + Send + Sync>,
+                        pub entropy: Arc<dyn Fn(&mut [u8]) -> Result<(), AxError> + Send + Sync> }
+pub type KeepBrowsers = Arc<dyn Fn(&[PairedBrowser]) -> Result<(), AxError> + Send + Sync>;
+impl LocalDoor {
+    pub fn new(browsers: Vec<PairedBrowser>, senses: DoorSenses, keep: KeepBrowsers) -> Result<Self, AxError>;
+    pub fn pairing_code(&self) -> tokio::sync::watch::Receiver<String>;   // 换码时推一次，控制台据此原地刷新
+    pub fn issue_open_code(&self) -> Result<OpenCode, AxError>;           // OpenCode { code, redeemed: mpsc::Receiver<()> }
+    pub fn devices(&self) -> DevicesAnswer;
+    pub fn forget(&self, device: &DeviceId) -> Result<bool, AxError>;
+}
+```
+
+- **熵与时间都是入参**：`LocalDoor` 不采样，装配层（`bin::assembly`）交进来的 `DoorSenses` 是它唯一的时钟与随机源，所以状态机（§8-95）可以在测试里逐步驱动。
+- **设备表的落盘是一个闭包**：配对与忘掉之后，整张表交给 `keep`；装配层把它写进城的 `.sprawling/browsers.toml`。wire 不知道城目录在哪。写失败时这次配对答 500 并保持未登记，因为一把重启就丢的设备钥会让人以为配上了。
+- **兑掉的开页码通知交出它的人**：`OpenCode.redeemed` 在兑掉时收到一次，交出它的那一方据此删跳转文件；过期没兑也删（`OPEN_CODE_LIFETIME_MS`）。
 -/

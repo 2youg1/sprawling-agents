@@ -84,16 +84,37 @@ async fn send(hearing: Hearing, media: Option<&str>, bytes: &[u8]) -> (u16, Stri
         city: None,
         head: Arc::default(),
         epoch: None,
+        door: wire::LocalDoor::new(
+            Vec::new(),
+            wire::DoorSenses {
+                clock: Arc::new(|| Ok(kernel::TimeMs::new(0))),
+                entropy: Arc::new(|bytes: &mut [u8]| {
+                    bytes.fill(7);
+                    Ok(())
+                }),
+            },
+            Arc::new(|_: &[wire::PairedBrowser]| Ok(())),
+        )
+        .unwrap(),
     };
     // The face comes from the same verdict the listener uses, so the
     // route under test judges a caller by the rule the served city does.
-    let wire::BindVerdict::Serve(face) = wire::decide_bind(&"127.0.0.1:0".parse().unwrap(), None)
-    else {
+    let wire::BindVerdict::Serve(face) = wire::decide_bind(
+        &"127.0.0.1:8787".parse().unwrap(),
+        Some(kernel::B3Hash::digest(b"native-key")),
+    ) else {
         panic!("this test serves a loopback address");
     };
     let peer: SocketAddr = "127.0.0.1:40000".parse().unwrap();
-    let app = wire::router(&config, face).layer(MockConnectInfo(peer));
-    let mut request = Request::builder().method("POST").uri("/transcribe");
+    let origins = wire::ListenerOrigins::of("127.0.0.1:8787".parse().unwrap());
+    let app = wire::router(&config, face, &origins)
+        .unwrap()
+        .layer(MockConnectInfo(peer));
+    let mut request = Request::builder()
+        .method("POST")
+        .uri("/transcribe")
+        .header("host", "127.0.0.1:8787")
+        .header("authorization", "Bearer native-key");
     if let Some(kind) = media {
         request = request.header("content-type", kind);
     }

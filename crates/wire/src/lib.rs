@@ -127,7 +127,11 @@ pub use privacy::{PrivacyScope, PrivacySettlement};
 pub use reading::{OUTPUT_LINES, arguments_in, note_of, output_in, said_in};
 pub use reading::{text, thought_in, used_in};
 #[cfg(feature = "server")]
-pub use reception::{Admission, BindFace, BindVerdict, Door, HandshakeVerdict};
+pub use reception::OPEN_CODE_LIFETIME_MS;
+#[cfg(feature = "server")]
+pub use reception::{Admission, BindFace, BindVerdict, Door, HandshakeVerdict, Keys};
+#[cfg(feature = "server")]
+pub use reception::{DeviceKey, ListenerOrigins, PageHeaders, PairedBrowser, Sessions};
 #[cfg(feature = "server")]
 pub use reception::{SessionState, SessionStep, WelcomeFacts, decide_frame};
 #[cfg(feature = "server")]
@@ -143,6 +147,8 @@ pub use server::{Bound, Committed, LedgerHead, ServeConfig};
 pub use server::{ChallengeAnswer, PairAnswer, PairBody, PairProof, SessionAnswer, SessionBody};
 #[cfg(feature = "server")]
 pub use server::{DROP_BYTES_MAX, DropSink};
+#[cfg(feature = "server")]
+pub use server::{DoorSenses, KeepBrowsers, LocalDoor, OpenCode};
 #[cfg(feature = "server")]
 pub use server::{bind, bundle_routes, router, serve};
 

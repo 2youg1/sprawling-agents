@@ -58,9 +58,8 @@ fn the_serving_screen_names_the_port_what_runs_and_this_process() {
     assert!(screen.contains("cargo xtask mem 24188"), "{screen}");
 }
 
-/// Reach and key are two facts, and the dangerous cell is the one
-/// worth shouting about: reachable from the network, nothing asked
-/// of whoever arrives.
+/// Reach and key are two facts; every cell demands a key (wire D54),
+/// and the line says who holds it.
 #[test]
 fn the_door_line_tells_the_four_cells_apart() {
     let door = |bind: &str, token: Option<&str>| {
@@ -69,16 +68,13 @@ fn the_door_line_tells_the_four_cells_apart() {
             .find_map(|line| line.trim().strip_prefix("door      ").map(str::to_owned))
             .expect("every screen states its door")
     };
-    assert!(door("127.0.0.1:8787", None).starts_with("none"));
+    assert!(door("127.0.0.1:8787", None).contains("key file"));
     assert_eq!(
         door("127.0.0.1:8787", Some("k")),
         "a pairing key is required"
     );
     assert_eq!(door("0.0.0.0:8787", Some("k")), "a pairing key is required");
-    assert!(
-        door("0.0.0.0:8787", None).starts_with("NONE"),
-        "an unkeyed listener beyond loopback is the cell to shout about"
-    );
+    assert!(door("0.0.0.0:8787", None).contains("you configured"));
 }
 
 /// A city too busy to answer still has a port, and that half is the

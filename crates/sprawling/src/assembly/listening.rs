@@ -90,6 +90,7 @@ pub struct Listening {
     worker: std::thread::JoinHandle<()>,
     outdoors: Outdoors,
     front: crate::outside::asking::Front,
+    doorstep: doorstep::Doorstep,
 }
 
 /// Takes the city's port, then opens its one writer.
@@ -116,14 +117,13 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
         core,
     } = serving;
     let city_root = city_root.as_path();
-    let configured = token.as_deref().map(wire::PairingToken::from_configured);
-    let token_digest = configured.transpose()?.map(|token| token.digest());
+    let key = wire::PairingToken::from_configured(&token)?.digest();
     // Each phase of opening is lapped on the monotonic sampling point,
     // and said in one line once the writer runs (`crates/sprawling/spec/Assembly/Listening.lean` §8-121).
     let mut cost = OpeningCost::begin(monotonic_now);
     // The port first: a serve refused here has opened nothing and
     // written nothing.
-    let bound = wire::bind(addr, token_digest).await?;
+    let bound = wire::bind(addr, Some(key)).await?;
     // Every reader past this point is handed the address the listener
     // holds, which differs from `addr` when `addr` asked for port 0
     // (`crates/wire/Spec.lean` §8-46, wire D16).
@@ -178,12 +178,8 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
     rebuilt.watch_proof(halt.clone());
     let spare = rebuilt.twin()?;
     cost.lap(Phase::Twin);
-    // This machine is not asked here (`crates/sprawling/spec/Doctor.lean` §8-54): the
-    // table is thirty-two items, most of them a program started and
-    // asked its version, and a serve that waited for all of them holds
-    // the socket shut for seconds to answer a question only one page
-    // asks. The answer stays `None` until `DoctorRefresh` fills it,
-    // which is the one verb that asks this machine.
+    // This machine is not asked here (`crates/sprawling/spec/Doctor.lean` §8-54): asking
+    // holds the socket shut for seconds, so the answer waits for `DoctorRefresh`.
     let views = Arc::new(Published::new(rebuilt));
     let privacy = super::privacy::page();
     // Built once and handed to both surfaces below. The socket and the
@@ -204,7 +200,7 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
     let acp_desk = Arc::clone(&desk);
     // Taken before `log` moves into the worker: the opening line is said
     // after the worker runs, at the same floor and through the same sink.
-    let mut opening_log = beside(&log, &journal);
+    let mut opening_log = journal.beside(&log);
     // The one sanctioned thread besides the runtime's own, running by
     // the time this returns.
     let Started {
@@ -218,7 +214,7 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
             city_root: city_root.to_path_buf(),
             vault,
             notice: vault_notice,
-            audit_log: beside(&log, &journal),
+            audit_log: journal.beside(&log),
             began: cost.began(),
             log,
             held,
@@ -252,9 +248,14 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
     let audio_vault = city_vault;
     let page = Arc::new(client);
     let front = crate::outside::asking::Front::default();
+    let (door, commands, queries) = doorstep::wired(
+        city_root,
+        super::privacy::commands(&front, Arc::clone(&desk), privacy),
+        Arc::clone(&answering),
+    )?;
     let config = wire::ServeConfig {
         client: Arc::clone(&page),
-        commands: super::privacy::commands(&front, Arc::clone(&desk), privacy),
+        commands,
         events,
         deltas,
         logs,
@@ -279,7 +280,8 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
             secrets_desk.post(command, reply);
             Ok(())
         }),
-        queries: Arc::clone(&answering),
+        queries,
+        door: door.clone(),
         // An outside editor's request becomes an ordinary Dispatch on
         // the same desk a person's does. It is not a second control
         // surface: the admission decides what a stranger may learn, and
@@ -288,6 +290,8 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
         transcribe_sink: hearing(audio_views, audio_vault),
         drop_sink: super::dropping::dropping(city_root.to_path_buf()),
     };
+    // Last, so a serve refused above leaves no key file behind.
+    let doorstep = doorstep::Doorstep::kept(door, at.port(), &token)?;
     Ok(Listening {
         bound,
         config,
@@ -296,6 +300,7 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
         worker: worker_thread,
         outdoors: Outdoors::new(city_root, relay, CityPort { at, token, page }, remote_key),
         front,
+        doorstep,
     })
 }
 
@@ -326,6 +331,7 @@ impl Listening {
             worker,
             outdoors,
             front,
+            doorstep,
         } = self;
         // Registered while it answers, so neither browser tool opens it (sprawling D74).
         let _served = crate::browser_tool::serve(bound.local_addr());
@@ -336,12 +342,14 @@ impl Listening {
         if let Some(terminal) = console {
             let watching = config.events.subscribe();
             let (desk, answering) = (Arc::clone(&desk), Arc::clone(&answering));
+            let door = doorstep.door.clone();
             outdoors.keep_aside(move |remote| {
                 front.attend(&remote, Arc::new(|line: &str| println!("{line}")));
                 let inside = crate::console::Inside {
                     desk,
                     answering,
                     remote,
+                    door,
                 };
                 crate::console::start(terminal, inside, watching);
             });
@@ -371,6 +379,7 @@ impl Listening {
             },
         };
         desk.close(Closing::of(&served));
+        doorstep.close();
         // Joined rather than left to the process exit: the handoff is
         // written by that thread, and a main that returned first would end
         // the process before the line it exists to write.
@@ -381,18 +390,7 @@ impl Listening {
     }
 }
 
-/// A second writer at `log`'s floor, into the same journal, for a thread
-/// or a moment `log` itself does not reach; off when `log` is off.
-fn beside(
-    log: &runtime::diagnostics::Diagnostics,
-    journal: &crate::serving::Journal,
-) -> runtime::diagnostics::Diagnostics {
-    log.floor()
-        .map_or_else(runtime::diagnostics::Diagnostics::off, |floor| {
-            runtime::diagnostics::Diagnostics::new(floor, journal.sink())
-        })
-}
-
+mod doorstep;
 mod monitor_feed;
 #[cfg(test)]
 mod tests;

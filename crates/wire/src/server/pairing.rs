@@ -6,19 +6,24 @@
 //! This machine's door for a browser: pairing, and the challenge and
 //! signature that open a session (`crates/wire/spec/Server.lean` §8-93).
 //!
-//! The bodies are read in their final shape; every route answers that the
-//! door is not built yet, until the pairing, the challenge and the entry
-//! decision land behind them.
+//! The entry decision has already let only a browser of this listener's
+//! own origin through (`crates/wire/spec/Reception/Entry.lean` §8-94);
+//! the rules of what each route then decides are the door's
+//! (`server::door`, `reception::pairing`).
+
+use std::sync::Arc;
 
 use axum::Json;
-use axum::http::StatusCode;
+use axum::extract::State;
+use axum::http::header::ORIGIN;
+use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use kernel::{AxCode, AxError};
 use serde::{Deserialize, Serialize};
 
 use crate::answer::DeviceId;
 
-use super::config::refusal_text;
+use super::config::{ShellState, refusal_text};
 
 /// `POST /pair`: one of the two codes, the browser's public device key,
 /// and the name the page gives itself.
@@ -68,26 +73,56 @@ pub struct SessionAnswer {
     pub token: String,
 }
 
-pub(super) async fn accept_pairing(Json(body): Json<PairBody>) -> Response {
-    let PairBody { proof, .. } = body;
-    let action = match proof {
-        PairProof::Open(_) => "pair a browser with an open code",
-        PairProof::Code(_) => "pair a browser with a pairing code",
+pub(super) async fn accept_pairing(
+    State(state): State<Arc<ShellState>>,
+    Json(body): Json<PairBody>,
+) -> Response {
+    match state.door.pair(&body.proof, &body.public_key, &body.label) {
+        Ok(device) => (StatusCode::OK, Json(PairAnswer { device })).into_response(),
+        Err(err) => refusal(&err),
+    }
+}
+
+pub(super) async fn offer_challenge(State(state): State<Arc<ShellState>>) -> Response {
+    match state.door.challenge() {
+        Ok(nonce) => (StatusCode::OK, Json(ChallengeAnswer { nonce })).into_response(),
+        Err(err) => refusal(&err),
+    }
+}
+
+pub(super) async fn open_session(
+    State(state): State<Arc<ShellState>>,
+    headers: HeaderMap,
+    Json(body): Json<SessionBody>,
+) -> Response {
+    // The entry decision admitted only a browser of this listener's own
+    // origin, and a browser is a request that carried one; the signature
+    // is checked over the origin it was made on.
+    let Some(origin) = headers.get(ORIGIN).and_then(|value| value.to_str().ok()) else {
+        return refusal(
+            &AxError::failure(
+                AxCode::GateDenied,
+                "open a browser session",
+                "the request carried no Origin",
+            )
+            .with_recovery("open a session from the city's own page"),
+        );
     };
-    not_built(action, "/pair")
+    match state.door.open_session(&body, origin) {
+        Ok(token) => (StatusCode::OK, Json(SessionAnswer { token })).into_response(),
+        Err(err) => refusal(&err),
+    }
 }
 
-pub(super) async fn offer_challenge() -> Response {
-    not_built("offer a session challenge", "/session/challenge")
-}
-
-pub(super) async fn open_session(Json(body): Json<SessionBody>) -> Response {
-    not_built("open a browser session", body.device.as_str())
-}
-
-/// The answer a route owes until the local door is built behind it.
-fn not_built(action: &'static str, subject: &str) -> Response {
-    let refused = AxError::failure(AxCode::ToolUnavailable, action, subject.to_owned())
-        .with_recovery("this build does not pair browsers at its own door yet");
-    (StatusCode::NOT_IMPLEMENTED, refusal_text(&refused)).into_response()
+/// The status a refusal of the door is answered with.
+fn refusal(err: &AxError) -> Response {
+    let code = err.code();
+    let status = if matches!(code, AxCode::PairingRefused | AxCode::GateDenied) {
+        StatusCode::FORBIDDEN
+    } else if matches!(code, AxCode::InvalidArgs) {
+        StatusCode::UNPROCESSABLE_ENTITY
+    } else {
+        StatusCode::INTERNAL_SERVER_ERROR
+    };
+    (status, refusal_text(err)).into_response()
 }

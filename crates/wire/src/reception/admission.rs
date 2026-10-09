@@ -14,7 +14,32 @@
 use kernel::{AxCode, AxError};
 
 use super::BindFace;
+use super::pairing::Sessions;
 use crate::auth::{self, Pairing};
+
+/// Every credential this city accepts at this moment: the face's key,
+/// and the browsers' live session tokens. One value, because the two are
+/// one question (`crates/wire/spec/Reception/Admission.lean` §8-40).
+#[derive(Debug, Clone, Copy)]
+pub struct Keys<'a> {
+    pub face: &'a BindFace,
+    pub sessions: &'a Sessions,
+}
+
+impl Keys<'_> {
+    /// Whether `offered` is this city's key or a live session token.
+    #[must_use]
+    pub fn pairing(&self, offered: Option<&str>) -> Pairing {
+        let Some(offered) = offered else {
+            return Pairing::Absent;
+        };
+        if auth::verify(Some(offered), self.face.key()) || self.sessions.holds(offered) {
+            Pairing::Held
+        } else {
+            Pairing::Absent
+        }
+    }
+}
 
 /// Which HTTP door a request arrived at.
 ///
@@ -43,47 +68,33 @@ pub enum Admission {
     Refuse(AxError),
 }
 
-/// Decides whether one HTTP request may reach the work behind a door.
+/// Decides whether one HTTP request may reach the work behind a door,
+/// once [`Keys::pairing`] has judged what it offered.
 ///
-/// **The one place an HTTP caller's pairing token is judged.** A door
-/// that judged nothing would let anyone who could reach the port of an
-/// exposed city spend money at a provider.
+/// **The one place an HTTP caller's credential decides a door.** Every
+/// face demands a key, so a caller with nothing is turned away from the
+/// three doors that act wherever the city listens.
 ///
-/// The rule is the face's, which is why the face is what arrives: a face
-/// that demands no credential is the loopback face of a city nobody
-/// configured a token for, and it came from [`decide_bind`], which
-/// refuses to serve an exposed one. There is nobody to distinguish on
-/// such a city, so every door admits as paired.
-///
-/// [`Door::Acp`] is admitted unpaired on purpose: what an
-/// unauthenticated editor may learn is `agent_protocols::admit`'s to word, and
-/// it words it so that a stranger learns exactly one bit. The other three
-/// doors act, so they refuse here.
-///
-/// [`decide_bind`]: super::decide_bind
+/// [`Door::Acp`] is admitted without one on purpose: what an
+/// unauthenticated editor may learn is `agent_protocols::admit`'s to
+/// word, and it words it so that a stranger learns exactly one bit.
 #[must_use]
-pub fn decide_admission(door: Door, offered: Option<&str>, face: &BindFace) -> Admission {
-    let Some(expected) = face.token_digest() else {
-        return Admission::Admit(Pairing::Held);
-    };
-    if auth::verify(offered, expected) {
-        return Admission::Admit(Pairing::Held);
-    }
-    let action = match door {
-        Door::Transcribe => "transcribe a recording",
-        Door::Enroll => "enrol a credential",
-        Door::Drop => "keep a dropped file",
-        Door::Acp => return Admission::Admit(Pairing::Absent),
+pub fn decide_admission(door: Door, pairing: Pairing) -> Admission {
+    let action = match (pairing, door) {
+        (Pairing::Held, _) => return Admission::Admit(Pairing::Held),
+        (Pairing::Absent, Door::Acp) => return Admission::Admit(Pairing::Absent),
+        (Pairing::Absent, Door::Transcribe) => "transcribe a recording",
+        (Pairing::Absent, Door::Enroll) => "enrol a credential",
+        (Pairing::Absent, Door::Drop) => "keep a dropped file",
     };
     Admission::Refuse(
         AxError::failure(
             AxCode::GateDenied,
             action,
-            "the request did not carry this city's pairing token",
+            "the request carried neither this city's key nor a live session token",
         )
         .with_recovery(
-            "open the control surface from the link that carries the pairing code, or send the \
-             code as an `Authorization: Bearer` header",
+            "send the session token or the city's key as an `Authorization: Bearer` header;              a program on this machine reads the key from the city's key file",
         ),
     )
 }
@@ -110,51 +121,34 @@ pub fn offered_pairing(header: Option<&str>) -> Option<&str> {
 #[allow(clippy::panic, reason = "test code")]
 mod tests {
     use super::*;
-    use kernel::B3Hash;
-
-    /// The face of a city reachable beyond this machine: it demands the
-    /// token by construction.
-    fn exposed() -> BindFace {
-        BindFace::Exposed {
-            token: B3Hash::digest(b"pairing-code"),
-        }
-    }
-
-    /// The face of a city nobody configured a token for, which is only
-    /// ever a city on this machine.
-    fn unpaired() -> BindFace {
-        BindFace::Loopback { token: None }
-    }
 
     #[test]
-    fn the_acting_doors_refuse_a_stranger_and_the_editor_door_carries_the_bit() {
+    fn the_acting_doors_refuse_an_empty_hand_and_the_editor_door_carries_the_bit() {
         for door in [Door::Transcribe, Door::Enroll, Door::Drop] {
-            let Admission::Refuse(err) = decide_admission(door, None, &exposed()) else {
+            let Admission::Refuse(err) = decide_admission(door, Pairing::Absent) else {
                 panic!("{door:?} acts on a request, so it refuses an unpaired one");
             };
             assert_eq!(*err.code(), AxCode::GateDenied);
         }
         assert!(matches!(
-            decide_admission(Door::Acp, None, &exposed()),
+            decide_admission(Door::Acp, Pairing::Absent),
             Admission::Admit(Pairing::Absent)
-        ));
-        assert!(matches!(
-            decide_admission(Door::Transcribe, Some("pairing-code"), &exposed()),
-            Admission::Admit(Pairing::Held)
         ));
     }
 
     #[test]
-    fn a_city_with_no_token_configured_admits_every_door() {
-        for door in [Door::Transcribe, Door::Enroll, Door::Acp, Door::Drop] {
-            assert!(
-                matches!(
-                    decide_admission(door, None, &unpaired()),
-                    Admission::Admit(Pairing::Held)
-                ),
-                "{door:?} on a loopback-only city"
-            );
-        }
+    fn the_key_and_nothing_else_is_held_on_a_loopback_face() {
+        let face = BindFace::Loopback {
+            key: kernel::B3Hash::digest(b"native-key"),
+        };
+        let sessions = Sessions::default();
+        let keys = Keys {
+            face: &face,
+            sessions: &sessions,
+        };
+        assert_eq!(keys.pairing(Some("native-key")), Pairing::Held);
+        assert_eq!(keys.pairing(Some("guess")), Pairing::Absent);
+        assert_eq!(keys.pairing(None), Pairing::Absent);
     }
 
     #[test]

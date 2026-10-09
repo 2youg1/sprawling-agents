@@ -91,7 +91,7 @@ fn an_open_door_closes_itself_as_expired_when_the_clock_passes_its_time() {
     let reaching = Reaching {
         runtime: runtime.handle().clone(),
         city: local(),
-        token: None,
+        token: "city-key".to_owned(),
         page: Arc::new(wire::ClientAssets::Embedded(&[])),
     };
     let lasting = Lasting::of_ms(60_000).unwrap();

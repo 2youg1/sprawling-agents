@@ -22,14 +22,21 @@
 //! send, a receive, or the end of a session.
 //!
 //! Binding is loopback by default, and the face that comes back from
-//! [`decide_bind`] carries the credential it demands: a listener
-//! reachable beyond this machine refuses to start without one, and no
-//! shell can be built with an exposed face that demands nothing.
+//! [`decide_bind`] carries the key it demands: a listener refuses to
+//! start without one, loopback included, so no shell can be built with a
+//! face that demands nothing (wire D54).
 
 mod admission;
+mod entry;
 pub(crate) mod inbound;
+mod pairing;
 
-pub use admission::{Admission, Door, decide_admission, offered_pairing};
+pub use admission::{Admission, Door, Keys, decide_admission, offered_pairing};
+pub use entry::{Arrival, Entry, ListenerOrigins, PageHeaders, Presented, decide_entry};
+pub use pairing::{
+    BrowserDoor, DeviceKey, Guess, LABEL_MAX, OPEN_CODE_LIFETIME_MS, PairedBrowser, Sessions,
+    decode_hex,
+};
 
 use std::net::SocketAddr;
 
@@ -41,32 +48,29 @@ use crate::frames::{
     Ask, ClientFrame, Hello, Lagged, Monitoring, WIRE_V, Watched, Welcome, schema_hash,
 };
 
-/// Which face the listener presents, and the credential it demands.
+/// Which face the listener presents, and the key it demands.
 ///
-/// **The digest travels inside the exposed face rather than beside it.**
-/// A listener reachable beyond this machine with no credential is not a
-/// state this type can hold, and [`decide_bind`] is the only producer of
-/// one: it refuses that configuration before the socket exists. A
-/// `token_configured: bool` argument said the same thing and left every
-/// shell free to disagree with the verdict it was handed.
+/// **The key travels inside both faces rather than beside them.** A
+/// listener that demands nothing is not a state this type can hold,
+/// loopback included: the loopback port is reachable by every page in a
+/// browser on this machine, by every other account on it and by the
+/// residents' own tools (`crates/wire/spec/Reception/Entry.lean` wire
+/// D54). [`decide_bind`] is the only producer of one.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BindFace {
-    /// Reachable from this machine only. A token may still be configured - a
-    /// person set one on a city they serve to nobody - and the doors then
-    /// demand it exactly as the exposed face does.
-    Loopback { token: Option<B3Hash> },
-    /// Reachable from elsewhere, and never served without a credential.
-    Exposed { token: B3Hash },
+    /// Reachable from this machine only.
+    Loopback { key: B3Hash },
+    /// Reachable from elsewhere.
+    Exposed { key: B3Hash },
 }
 
 impl BindFace {
-    /// The digest this face demands of every caller. `None` only on the
-    /// loopback face of a city nobody configured a token for.
+    /// The digest of the key this face demands of every caller that holds
+    /// no session.
     #[must_use]
-    pub fn token_digest(&self) -> Option<&B3Hash> {
+    pub fn key(&self) -> &B3Hash {
         match self {
-            BindFace::Loopback { token } => token.as_ref(),
-            BindFace::Exposed { token } => Some(token),
+            BindFace::Loopback { key } | BindFace::Exposed { key } => key,
         }
     }
 }
@@ -81,29 +85,22 @@ pub enum BindVerdict {
 /// Decides whether the listener may bind `addr`, and which face it then
 /// presents.
 ///
-/// Pure. Four cells, one of which refuses: an address reachable from outside
-/// this machine with no pairing token configured. The refusal happens before
-/// the socket exists, so there is no window in which the port is open and
-/// unauthenticated - and the credential the exposed face demands comes back
-/// inside the verdict, so there is no second way to learn it.
+/// Pure. Refuses exactly when no key is given, on either face, before
+/// the socket exists - so there is no window in which the port is open
+/// and unauthenticated - and the key the face demands comes back inside
+/// the verdict, so there is no second way to learn it.
 #[must_use]
-pub fn decide_bind(addr: &SocketAddr, token: Option<B3Hash>) -> BindVerdict {
-    if addr.ip().is_loopback() {
-        return BindVerdict::Serve(BindFace::Loopback { token });
-    }
-    match token {
-        Some(token) => BindVerdict::Serve(BindFace::Exposed { token }),
-        None => BindVerdict::Refuse(
+pub fn decide_bind(addr: &SocketAddr, key: Option<B3Hash>) -> BindVerdict {
+    match (key, addr.ip().is_loopback()) {
+        (Some(key), true) => BindVerdict::Serve(BindFace::Loopback { key }),
+        (Some(key), false) => BindVerdict::Serve(BindFace::Exposed { key }),
+        (None, _) => BindVerdict::Refuse(
             AxError::failure(
                 AxCode::ConfigInvalid,
                 "bind the control surface",
-                format!(
-                    "{addr} is reachable beyond this machine and no pairing token is configured"
-                ),
+                format!("{addr} was given no key to demand of its callers"),
             )
-            .with_recovery(
-                "configure a pairing token before exposing the port, or bind a loopback address",
-            ),
+            .with_recovery("configure a pairing token, or let the host mint a key for this serve"),
         ),
     }
 }
@@ -154,12 +151,12 @@ pub enum HandshakeVerdict {
 ///
 /// Order is deliberate: protocol agreement is settled before credentials.
 /// A browser holding a cached older client is the common case and deserves
-/// "refresh", not "wrong password". Pure - `expected` and `face` are
+/// "refresh", not "wrong password". Pure - `expected` and `keys` are
 /// parameters, never read from ambient state.
 ///
-/// The credential a caller must present is the face's, which means an
-/// exposed face cannot be served without one: [`BindFace::Exposed`] holds
-/// the digest, and there is no other way to reach this function.
+/// The credential a caller must present is the face's key or a live
+/// session token ([`Keys::pairing`]); neither face can be served without
+/// a key, so there is no greeting this accepts empty-handed.
 ///
 /// The digest is a digest, not the token. This crate never holds the
 /// plaintext of a pairing token: the side that owns the token digests it
@@ -167,7 +164,7 @@ pub enum HandshakeVerdict {
 /// at the redemption points where it is audited, and it costs nothing here
 /// because the comparison hashes both sides anyway.
 #[must_use]
-pub fn decide_handshake(hello: &Hello, expected: &Welcome, face: &BindFace) -> HandshakeVerdict {
+pub fn decide_handshake(hello: &Hello, expected: &Welcome, keys: &Keys<'_>) -> HandshakeVerdict {
     if hello.wire_v != expected.wire_v || hello.schema != expected.schema {
         return HandshakeVerdict::Reject(
             AxError::failure(
@@ -181,20 +178,19 @@ pub fn decide_handshake(hello: &Hello, expected: &Welcome, face: &BindFace) -> H
             .with_recovery("reload the page to fetch the client this server was built with"),
         );
     }
-    let Some(expected_digest) = face.token_digest() else {
-        return HandshakeVerdict::Accept;
-    };
-    if auth::verify(hello.token.as_deref(), expected_digest) {
-        return HandshakeVerdict::Accept;
+    match keys.pairing(hello.token.as_deref()) {
+        auth::Pairing::Held => HandshakeVerdict::Accept,
+        auth::Pairing::Absent => HandshakeVerdict::Reject(
+            AxError::failure(
+                AxCode::ConfigInvalid,
+                "accept a client connection",
+                "the greeting carries neither this city's key nor a live session token",
+            )
+            .with_recovery(
+                "reload the page to sign in again; a program on this machine reads the key                  from the city's key file, or takes --token",
+            ),
+        ),
     }
-    HandshakeVerdict::Reject(
-        AxError::failure(
-            AxCode::ConfigInvalid,
-            "accept a client connection",
-            "the pairing token does not match",
-        )
-        .with_recovery("re-enter the pairing code shown on the host machine"),
-    )
 }
 /// How far a socket session has got. Two states, because there are two:
 /// a peer that has not identified itself, and one that has.
@@ -246,7 +242,7 @@ pub struct WelcomeFacts<'a> {
 pub fn decide_frame(
     state: SessionState,
     frame: ClientFrame,
-    face: &BindFace,
+    keys: &Keys<'_>,
     standing: WelcomeFacts<'_>,
 ) -> SessionStep {
     let expected = Welcome {
@@ -258,7 +254,7 @@ pub fn decide_frame(
     };
     match (state, frame) {
         (SessionState::AwaitingHello, ClientFrame::Hello(hello)) => {
-            match decide_handshake(&hello, &expected, face) {
+            match decide_handshake(&hello, &expected, keys) {
                 HandshakeVerdict::Accept => SessionStep::Welcome(Box::new(expected)),
                 HandshakeVerdict::Reject(error) => SessionStep::Refuse {
                     error: Box::new(error),

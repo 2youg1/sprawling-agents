@@ -11,30 +11,43 @@ use std::sync::Arc;
 use axum::Router;
 use axum::extract::State;
 use axum::http::{StatusCode, header};
+use axum::middleware::from_fn_with_state;
 use axum::response::{IntoResponse, Response};
 use axum::routing::get;
+use kernel::AxError;
 
 use crate::assets::{AssetReply, ClientAssets};
+use crate::reception::PageHeaders;
 
 use super::config::refusal_text;
+use super::guard::{Stamp, Stored, stamp};
 
 /// The two routes that answer the client bundle: `/` and every path
 /// below it that no other route of the same table claims.
 ///
 /// The city's own port and the remote listener (`bin::outside`) serve
 /// the page through this one table, so a device that opens the remote
-/// address gets the same bytes, under the same headers, as a browser on
-/// this machine (`crates/wire/Spec.lean` §8-2). The routes take no
-/// pairing token: a browser has to load the page before it has
-/// anywhere to type the code.
-pub fn bundle_routes<S>(client: Arc<ClientAssets>) -> Router<S>
+/// address gets the same bytes as a browser on this machine
+/// (`crates/wire/Spec.lean` §8-2); `headers` are the listener's own,
+/// generated once per listener (`crates/wire/spec/Reception/Entry.lean`
+/// §8-94). The routes take no credential: a browser has to load the page
+/// before it has anywhere to pair.
+///
+/// # Errors
+/// `headers` cannot be spelled as HTTP headers.
+pub fn bundle_routes<S>(
+    client: Arc<ClientAssets>,
+    headers: &PageHeaders,
+) -> Result<Router<S>, AxError>
 where
     S: Clone + Send + Sync + 'static,
 {
-    Router::new()
+    let stamped = Arc::new(Stamp::of(headers, Stored::AsPage)?);
+    Ok(Router::new()
         .route("/", get(serve_index))
         .route("/{*asset}", get(serve_asset))
         .with_state(client)
+        .layer(from_fn_with_state(stamped, stamp)))
 }
 
 async fn serve_index(State(client): State<Arc<ClientAssets>>) -> Response {

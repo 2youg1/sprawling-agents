@@ -6,13 +6,13 @@
 /-!
 # wire::reception
 
-规定 `reception`、`reception::tests`、`answer::history`（`crates/wire/src/` 下同名的文件）。能不能绑、这个对端能不能录凭证、能不能欢迎它、它的帧此刻是什么意思，以及丢帧之后的区间。本文件是 `crates/wire/Spec.lean` 的一个分部；下面每一节保留它在 wire 规格里的标签 §8-n，别处引作 `crates/wire/Spec.lean §8-n`，决定引作 `wire D<n>`。
+规定 `reception`、`reception::tests`、`answer::history`（`crates/wire/src/` 下同名的文件）。能不能绑、这个对端能不能录凭证、能不能欢迎它、它的帧此刻是什么意思，以及丢帧之后的区间。一个请求进不进得了门住在 `spec/Reception/Entry.lean`，浏览器的配对与会话住在 `spec/Reception/Pairing.lean`。本文件是 `crates/wire/Spec.lean` 的一个分部；下面每一节保留它在 wire 规格里的标签 §8-n，别处引作 `crates/wire/Spec.lean §8-n`，决定引作 `wire D<n>`。
 -/
 
 /-!
-### 8-41 丢帧可见、区间补拉、暴露面凭证
+### 8-41 丢帧可见、区间补拉、每一面的凭据
 
-三件事同一集落地，因为它们是同一条链上的三个断点：慢会话丢掉的记录没有人说、丢了之后也没有一句话能把那一段要回来、以及「暴露面必须有凭证」当时只是一句注释加一个 bool。
+三件事写在一节里，因为它们是同一条链上的三处：慢会话丢掉的记录要说出来、丢了之后要能把那一段要回来、以及每一面都要凭据。
 
 #### 一 丢掉的记录要说出来：`ServerFrame::Lagged { from, to }`
 
@@ -57,23 +57,23 @@ pub enum ServerFrame { …, Lagged(Lagged) }
 
 **客户端的 socket 半边**因此是本层唯一会「问一句、等一句、再问」的地方：`client/src/core/socket.ts` 的 `askGap()` 与 `filled()` 两小段，判断仍全在 `link.ts`。
 
-#### 三 暴露面必须有凭证：把凭证装进面里
+#### 三 每一面都要凭据：把凭据装进面里
 
 ```rust
 pub enum BindFace {
-    Loopback { token: Option<B3Hash> },   // 只从回环可达；配了令牌就照样要
-    Exposed { token: B3Hash },            // 能从别处可达，且从不无凭证服务
+    Loopback { key: B3Hash },   // 只从回环可达，照样要钥匙
+    Exposed { key: B3Hash },    // 能从别处可达
 }
-pub fn decide_bind(addr: &SocketAddr, token: Option<B3Hash>) -> BindVerdict;
-impl BindFace { pub fn token_digest(&self) -> Option<&B3Hash>; }
+pub fn decide_bind(addr: &SocketAddr, key: Option<B3Hash>) -> BindVerdict;  // 没有钥匙即拒，两面都一样
+impl BindFace { pub fn key(&self) -> &B3Hash; }
 ```
 
-**强制点：`decide_bind` 是 `BindFace` 的唯一生产者，`bind` 是它的唯一调用者，`serve` 把 `Bound` 里的面经 `router(config, face)` 交给壳。** 壳（`ShellState.face`）此后是「这一面要求什么」的唯一读者：`decide_frame`、`decide_admission` 都拿 `&BindFace`，不再拿一个 `Option<&B3Hash>`。
+**强制点：`decide_bind` 是 `BindFace` 的唯一生产者，`bind` 是它的唯一调用者，`serve` 把 `Bound` 里的面经 `router` 交给壳。** 壳（`ShellState.face`）此后是「这一面要求什么」的唯一读者：`decide_frame` 与各扇门都经 `reception::Keys` 读它。
 
-- **以前是什么样**：`decide_bind` 收一个 `token_configured: bool`，`serve` 只 `match` 掉 `Refuse` 而把 `Serve(BindFace)` 丢掉；然后每一道门各自去读 `config.token_digest`。「暴露面必须有凭证」因此靠一句话与一个 bool 维持，而 `router()` 是 pub：第二个入口可以造出一个暴露着却不要求任何东西的壳。
-- **现在是什么样**：`Exposed` 里**没有** `Option`——「暴露着却不要求任何东西」是一个类型上不存在的状态。这个不变量在测试里以四种格钉住（回环有无令牌、暴露有无令牌、以及 `BindingFace` 索要的摘要是不是判定它的那一个）。
-- **令牌摘要是 `bind` 的入参**：它是配置说的话（谁配了令牌），面是绑定判定给出的判决。判决只在 `bind` 里产生一次，面随 `Bound` 走到壳里，故这不是同一个事实的两个家。
-- **`decide_admission` 的那句注释同时兑现**：「没有配令牌的城只可能是回环城」由面的形状保证——它拿到的是一个不可能要求空的东西。
+- **两个臂里的钥匙都不是 `Option`**：「回环而什么都不要」与「暴露着却不要求任何东西」都是类型上不存在的状态。回环面也要凭据，理由是 wire D54：同一台机器上的另一个用户、另一个端口上的页面、居民的工具都能到达回环端口，回环本身不是凭据。
+- **钥匙是 `bind` 的入参**：它是这次服务的native key（`crates/sprawling/spec/Keying.lean` §8-22：配置过就采纳，否则当场铸）。判决只在 `bind` 里产生一次，面随 `Bound` 走到壳里，故这不是同一个事实的两个家。
+- **拒绝只剩一格**：调用方没给钥匙。产品二进制总会给一把；拒绝臂留给第三方 embedder，回 `E_CONFIG_INVALID` 与恢复办法，在套接字存在之前。
+- **面之外还认会话令牌**：浏览器配对之后经挑战签名换来的会话令牌（§8-93）是动态的，住在本地门的状态里；`Keys { face, sessions }` 把两者合成一次判定，`Keys::pairing` 是 hello 与每个 POST 共用的那一问。
 
 #### 四 `/enroll` 等待里的第四个静默臂
 
@@ -92,16 +92,16 @@ inductive Address where
   | beyond
   deriving DecidableEq, Repr
 
-/-- 绑定判定给出的面，携着它向每个来者索要的配对令牌摘要。`Exposed` 的摘要不是 `Option`：「暴露着却不要求任何东西」在类型上不存在（§8-41 第三件）。 -/
+/-- 绑定判定给出的面，携着它向每个来者索要的native key摘要。两臂的钥匙都不是 `Option`：「什么都不要」的面在类型上不存在（§8-41 第三件）。 -/
 inductive BindFace (Digest : Type) where
-  | Loopback (token : Option Digest)
-  | Exposed (token : Digest)
+  | Loopback (key : Digest)
+  | Exposed (key : Digest)
   deriving DecidableEq, Repr
 
-/-- `BindFace::token_digest`：这一面向每个来者索要的摘要。 -/
-def BindFace.tokenDigest {Digest : Type} : BindFace Digest → Option Digest
-  | .Loopback token => token
-  | .Exposed token => some token
+/-- `BindFace::key`：这一面向每个来者索要的摘要。 -/
+def BindFace.key {Digest : Type} : BindFace Digest → Digest
+  | .Loopback key => key
+  | .Exposed key => key
 
 /-- 绑定判定的结论；拒绝时的码是 `E_CONFIG_INVALID`。 -/
 inductive BindVerdict (Digest : Type) where
@@ -109,31 +109,23 @@ inductive BindVerdict (Digest : Type) where
   | Refuse
   deriving DecidableEq, Repr
 
-/-- `decide_bind` 的四格：只有「从别处够得到而没配令牌」一格拒绝。 -/
+/-- `decide_bind`：没有钥匙就拒，有钥匙就按地址给出面。 -/
 def decideBind {Digest : Type} : Address → Option Digest → BindVerdict Digest
-  | .loopback, token => .Serve (.Loopback token)
-  | .beyond, some token => .Serve (.Exposed token)
-  | .beyond, none => .Refuse
+  | _, none => .Refuse
+  | .loopback, some key => .Serve (.Loopback key)
+  | .beyond, some key => .Serve (.Exposed key)
 
-/-- **拒绝恰在一格。** -/
-theorem decideBind_refuses_exactly_an_exposed_address_without_a_token {Digest : Type}
-    (address : Address) (token : Option Digest) :
-    decideBind address token = .Refuse ↔ address = .beyond ∧ token = none := by
-  cases address <;> cases token <;> simp [decideBind]
+/-- **拒绝恰在没有钥匙时，回环与暴露一样。** -/
+theorem decideBind_refuses_exactly_without_a_key {Digest : Type}
+    (address : Address) (key : Option Digest) :
+    decideBind address key = .Refuse ↔ key = none := by
+  cases address <;> cases key <;> simp [decideBind]
 
-/-- **一个面索要的恰是配置给的那个摘要**：判定把凭证装进面里，面之外没有第二处读它。 -/
-theorem a_served_face_demands_the_configured_digest {Digest : Type}
-    (address : Address) (token : Option Digest) (face : BindFace Digest)
-    (served : decideBind address token = .Serve face) : face.tokenDigest = token := by
-  cases address <;> cases token <;> simp [decideBind] at served <;> subst served <;> rfl
-
-/-- **从回环之外够得到的面总要一样东西。** -/
-theorem an_exposed_city_always_demands_a_token {Digest : Type}
-    (token : Option Digest) (face : BindFace Digest)
-    (served : decideBind .beyond token = .Serve face) : face.tokenDigest.isSome := by
-  cases token <;> simp [decideBind] at served
-  subst served
-  rfl
+/-- **一个面索要的恰是给它的那把钥匙**：判定把凭据装进面里，面之外没有第二处读它。 -/
+theorem a_served_face_demands_the_given_key {Digest : Type}
+    (address : Address) (key : Option Digest) (face : BindFace Digest)
+    (served : decideBind address key = .Serve face) : some face.key = key := by
+  cases address <;> cases key <;> simp [decideBind] at served <;> subst served <;> rfl
 
 /-- 区间的近端：上一条已发之后的那一条；什么都没发过时是 `Seq::FIRST`，即 1。 -/
 def lagStart : Option Nat → Nat
