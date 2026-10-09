@@ -83,6 +83,13 @@ impl Views {
         self.reach.programs = Some(super::lines::HarnessReach { find, place });
     }
 
+    /// Takes the memory the ACP page's offers are kept in, which the served
+    /// city's listener reads when a person consents to one
+    /// (`crates/accounting/spec/Views.lean`).
+    pub fn remember_offers_in(&mut self, offered: crate::offered::Offered) {
+        self.offered = Some(offered);
+    }
+
     /// Takes the one way this city asks the GitHub CLI on this machine for
     /// the login a host is signed in as, so a `GithubLogin` query starts a
     /// program only through what the served city handed in

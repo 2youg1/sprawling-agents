@@ -13,10 +13,10 @@
   // to the page (`agents_page.svelte`), which the gallery draws from a
   // fixture. Adding is `AddAgent`, carrying the digest of the launch
   // spec the card showed, so the city refuses a card that changed under
-  // the person's eyes; signing in is `AgentLogin`.
+  // the person's eyes.
   import { QUERIES } from "../../core/asking";
   import { readAnswer } from "../../core/answered";
-  import { addAgent, agentLogin } from "../../core/access";
+  import { addAgent } from "../../core/access";
   import { ui } from "../../ui";
   import type { AgentOffer } from "../../wire";
   import Unanswered from "../parts/unanswered.svelte";
@@ -64,10 +64,6 @@
     u.conn.asking.refresh(QUERIES.agentCatalog);
   }
 
-  function login(agent: string, method: string): void {
-    if (u.send(agentLogin(agent, method))) u.conn.asking.refresh(QUERIES.agentCatalog);
-  }
-
   // The paste key, for a person who cannot hold a chord: what the
   // clipboard holds, if the browser lets the page read it.
   function paste(): void {
@@ -91,7 +87,6 @@
     }}
     onPaste={paste}
     onAdd={add}
-    onLogin={login}
   />
 {:else if read.kind === "unavailable"}
   <Unanswered query={read.query} asked={QUERIES.agentCatalog} />

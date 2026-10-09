@@ -262,7 +262,9 @@ impl Views {
             wire::Query::KnownHosts => known_hosts_answer(),
             wire::Query::Harnesses => return Prepared::Harnesses(self.reach.programs),
             wire::Query::AgentCatalog => return super::agents::catalog_ask(self),
-            wire::Query::ParseAgentSpec { text } => return super::agents::pasted_ask(text),
+            wire::Query::ParseAgentSpec { text } => {
+                return super::agents::pasted_ask(text, self.offered.as_ref());
+            }
             wire::Query::Devices => unavailable(query.name().to_owned()),
             wire::Query::Doctor => self.doctor_or_unavailable(),
             wire::Query::McpHealth { addr } => {

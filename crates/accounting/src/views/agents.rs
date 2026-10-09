@@ -18,30 +18,47 @@ use super::prepared::{Prepared, unavailable_because};
 /// The catalog page's paths, copied out so the files are read with the
 /// snapshot let go.
 pub(super) fn catalog_ask(views: &Views) -> Prepared {
-    Prepared::Agents(views.city_root.clone(), views.reach.programs)
+    Prepared::Agents(
+        views.city_root.clone(),
+        views.reach.programs,
+        views.offered.clone(),
+    )
 }
 
 /// The catalog page, read from the shipped snapshot and the city's own
 /// `CONFIG.toml`, with the agents this machine shows evidence of when the
-/// served city handed in where to look; nothing is run.
-pub(super) fn catalog_answer(city_root: &Path, reach: Option<HarnessReach>) -> wire::Answer {
+/// served city handed in where to look; nothing is run. The detected
+/// entries are remembered in `offered`, for the consent that names one.
+pub(super) fn catalog_answer(
+    city_root: &Path,
+    reach: Option<HarnessReach>,
+    offered: Option<&crate::offered::Offered>,
+) -> wire::Answer {
     match crate::roster::roster(city_root) {
-        Ok(roster) => wire::Answer::AgentCatalog(Box::new(wire::AgentCatalogAnswer {
-            detected: reach
+        Ok(roster) => {
+            let detected = reach
                 .map(|reach| evidence(&roster, reach))
-                .unwrap_or_default()
-                .iter()
-                .map(offer_of)
-                .collect(),
-            catalog: roster.catalog().entries.iter().map(offer_of).collect(),
-            added: roster.rows().map(line_of).collect(),
-            snapshot: wire::CatalogSnapshot {
-                date: roster.catalog().date.clone(),
-                etag: roster.catalog().etag.clone(),
-            },
-        })),
+                .unwrap_or_default();
+            if let Some(offered) = offered {
+                offered.remember(&detected);
+            }
+            catalog_of(&roster, &detected)
+        }
         Err(stopped) => unavailable_because("AgentCatalog".to_owned(), &stopped),
     }
+}
+
+/// The catalog page itself, from the roster and what this machine shows.
+fn catalog_of(roster: &agent_protocols::Roster, detected: &[AgentEntry]) -> wire::Answer {
+    wire::Answer::AgentCatalog(Box::new(wire::AgentCatalogAnswer {
+        detected: detected.iter().map(offer_of).collect(),
+        catalog: roster.catalog().entries.iter().map(offer_of).collect(),
+        added: roster.rows().map(line_of).collect(),
+        snapshot: wire::CatalogSnapshot {
+            date: roster.catalog().date.clone(),
+            etag: roster.catalog().etag.clone(),
+        },
+    }))
 }
 
 /// What this machine shows: the other clients' files that exist and read,
@@ -65,10 +82,16 @@ fn evidence(roster: &agent_protocols::Roster, reach: HarnessReach) -> Vec<AgentE
 
 /// One pasted agent as its consent card shows it, or the paste's refusal.
 /// The grammar is pure and reads nothing, so it is settled with the
-/// snapshot held.
-pub(super) fn pasted_ask(text: &str) -> Prepared {
+/// snapshot held. The entry is remembered in `offered`, because the
+/// consent carries only its digest and the text is not in it.
+pub(super) fn pasted_ask(text: &str, offered: Option<&crate::offered::Offered>) -> Prepared {
     match agent_protocols::pasted(text) {
-        Ok(entry) => Prepared::Held(wire::Answer::AgentSpec(Box::new(offer_of(&entry)))),
+        Ok(entry) => {
+            if let Some(offered) = offered {
+                offered.remember([&entry]);
+            }
+            Prepared::Held(wire::Answer::AgentSpec(Box::new(offer_of(&entry))))
+        }
         Err(refusal) => Prepared::Refused(refusal),
     }
 }

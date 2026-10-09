@@ -50,6 +50,14 @@ impl Doorstep {
 }
 
 impl super::Listening {
+    /// The address the city's listener holds: the port the operating
+    /// system gave when `serve` was asked for port 0. The banner, the
+    /// console and the browser this process opens all read this one.
+    #[must_use]
+    pub fn local_addr(&self) -> std::net::SocketAddr {
+        self.bound.local_addr()
+    }
+
     /// The names the listener answers to; its `url` is the one a person
     /// opens (`crates/wire/spec/Reception/Entry.lean` §8-94).
     #[must_use]

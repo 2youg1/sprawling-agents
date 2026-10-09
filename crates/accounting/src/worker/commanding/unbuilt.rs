@@ -18,10 +18,7 @@ pub(super) enum Unbuilt<'a> {
     PutShelved(String),
     BatchByBuilding(&'a kernel::Address),
     Auth,
-    CloseCity,
-    AddAgent,
     AgentLogin(String),
-    ForgetDevice(&'a wire::DeviceId),
 }
 
 impl Unbuilt<'_> {
@@ -51,25 +48,10 @@ impl Unbuilt<'_> {
                 "Auth".to_owned(),
                 "the pairing token is proved in the handshake, not in a command",
             ),
-            Unbuilt::CloseCity => not_built(
-                "close the city",
-                "CloseCity".to_owned(),
-                "close it from the terminal it runs in; closing it from a page is not built",
-            ),
-            Unbuilt::AddAgent => not_built(
-                "add an ACP agent",
-                "AddAgent".to_owned(),
-                "write the agent's row in the city's CONFIG.toml; adding it from a page is not                  built",
-            ),
             Unbuilt::AgentLogin(agent) => not_built(
                 "start an agent's login",
                 agent,
                 "sign in inside the agent itself; starting its login from the city is not built",
-            ),
-            Unbuilt::ForgetDevice(device) => not_built(
-                "forget a paired browser",
-                device.as_str().to_owned(),
-                "revoking a paired browser is not built",
             ),
         }
     }

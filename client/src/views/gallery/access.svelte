@@ -125,7 +125,6 @@
     onText={still}
     onPaste={still}
     onAdd={still}
-    onLogin={still}
   />
 </Case>
 <Case label="acp agents · a pasted command line, read by the city">
@@ -139,7 +138,6 @@
     onText={still}
     onPaste={still}
     onAdd={still}
-    onLogin={still}
   />
 </Case>
 <Case label="acp agents · nothing found here, nothing added, no room">
@@ -153,7 +151,6 @@
     onText={still}
     onPaste={still}
     onAdd={still}
-    onLogin={still}
   />
 </Case>
 <Case label="pairing · a first browser">

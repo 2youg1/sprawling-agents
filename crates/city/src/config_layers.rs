@@ -48,7 +48,7 @@ mod settled;
 mod shelves;
 mod write;
 
-pub use agents::{AgentRow, AgentRowSource, agent_rows};
+pub use agents::{AgentRow, AgentRowSource, agent_rows, seat_agent, write_agent};
 pub use cache::keep_warm;
 pub use city_layer::{CitySetting, write_city_setting};
 pub use ladder::Layer;

@@ -177,6 +177,11 @@ pub struct Views {
     /// The ways past the history a served city hands in (`views::served`).
     #[serde(skip)]
     pub(super) reach: super::served::Reach,
+    /// Where the ACP page's detected and pasted offers are remembered for
+    /// the consent that names them by digest; `None` in views nobody
+    /// served, which remember nothing.
+    #[serde(skip)]
+    pub(super) offered: Option<crate::offered::Offered>,
     /// The halt a served city's writer refuses lines by until the proof
     /// of its history has a verdict (`crates/wire/Spec.lean` §8-63); `None` for views
     /// that started from a history proved before they folded it.
@@ -237,6 +242,7 @@ impl Views {
             machine: None,
             vault: None,
             reach: super::served::Reach::default(),
+            offered: None,
             proof: None,
         }
     }

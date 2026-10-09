@@ -120,6 +120,12 @@ pub(super) enum Change<'a> {
     /// Which supplier `web_search` reaches (§8-4c), already judged by the
     /// reader's own check.
     Search(&'a SearchConfiguration),
+    /// One `[[agent]]` row the consent card wrote (§8-4f), replacing the
+    /// row with its id.
+    Agent(&'a super::AgentRow),
+    /// A room's resident named as this agent: the session record taken
+    /// out as [`Change::Forget`] takes it, then `[resident] harness`.
+    Seat(&'a str),
 }
 
 impl Change<'_> {
@@ -187,6 +193,30 @@ impl Change<'_> {
             Change::Effort(effort) => {
                 table(document, "model", file)?
                     .insert("effort".to_owned(), spelled(*effort, file)?);
+            }
+            Change::Agent(row) => {
+                let rows = document
+                    .entry("agent".to_owned())
+                    .or_insert_with(|| toml::Value::Array(Vec::new()));
+                let toml::Value::Array(rows) = rows else {
+                    return Err(refuse_file(
+                        file,
+                        "`agent` is not a list of `[[agent]]` rows",
+                    ));
+                };
+                let spelled = toml::Value::Table(super::agents::spelled(row));
+                let same = |held: &toml::Value| {
+                    held.get("id").and_then(toml::Value::as_str) == Some(row.id.as_str())
+                };
+                match rows.iter_mut().find(|held| same(held)) {
+                    Some(held) => *held = spelled,
+                    None => rows.push(spelled),
+                }
+            }
+            Change::Seat(id) => {
+                Change::Forget.state(document, file)?;
+                table(document, "resident", file)?
+                    .insert("harness".to_owned(), toml::Value::String((*id).to_owned()));
             }
             Change::Naming(version) => {
                 table(document, "identity", file)?.insert(

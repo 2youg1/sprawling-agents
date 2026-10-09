@@ -31,6 +31,7 @@ use crate::outside::keeper::CityKey;
 use crate::serving::Serving;
 use crate::serving::output_ring::OutputRing;
 use crate::serving::standing::monotonic_now;
+use accounting::offered::Offered;
 use accounting::views::Published;
 use accounting::worker::opening_cost::{OpeningCost, Phase};
 use accounting::worker::{CommandDesk, acp_dispatch, start_served_views};
@@ -109,8 +110,7 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
     // Each phase of opening is lapped on the monotonic sampling point,
     // and said in one line once the writer runs (`crates/sprawling/spec/Assembly/Listening.lean` §8-121).
     let mut cost = OpeningCost::begin(monotonic_now);
-    // The port first: a serve refused here has opened nothing and
-    // written nothing.
+    // The port first: a serve refused here has opened and written nothing.
     let bound = wire::bind(addr, Some(key)).await?;
     // Every reader past this point is handed the address the listener
     // holds, which differs from `addr` when `addr` asked for port 0
@@ -155,16 +155,7 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
         &mut log,
         &mut cost,
     )?;
-    // The fold thread alternates between two copies, so the second is
-    // made here from the first (`crates/sprawling/spec/Assembly/Listening.lean` §8-99).
-    rebuilt.ask_the_registry_through(crate::release::answer);
-    rebuilt.ask_upstream_through(crate::doctor::newest);
-    rebuilt.look_for_harnesses_through(host::find_program, host::place_set_up);
-    rebuilt.ask_github_through(crate::doctor::github::login);
-    // One verdict for the writer and the views (`crates/sprawling/spec/Assembly.lean` §8-134).
-    let halt = storage::ChainHalt::awaiting_proof();
-    rebuilt.watch_proof(halt.clone());
-    let spare = rebuilt.twin()?;
+    let (spare, offered, halt) = handed(&mut rebuilt)?;
     cost.lap(Phase::Twin);
     // This machine is not asked here (`crates/sprawling/spec/Doctor.lean` §8-54): asking
     // holds the socket shut for seconds, so the answer waits for `DoctorRefresh`.
@@ -239,10 +230,14 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
     let lifecycle = tokio::sync::mpsc::channel(EVENTS);
     let (door, commands, queries) = doorstep::wired(
         city_root,
-        closing_from_a_page(
-            at,
-            lifecycle.0.clone(),
-            super::privacy::commands(&front, Arc::clone(&desk), privacy),
+        consenting::taking(
+            city_root.to_path_buf(),
+            offered,
+            closing_from_a_page(
+                at,
+                lifecycle.0.clone(),
+                super::privacy::commands(&front, Arc::clone(&desk), privacy),
+            ),
         ),
         Arc::clone(&answering),
     )?;
@@ -298,15 +293,28 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
     })
 }
 
-impl Listening {
-    /// The address the city's listener holds: the port the operating
-    /// system gave when `serve` was asked for port 0. The banner, the
-    /// console and the browser this process opens all read this one.
-    #[must_use]
-    pub fn local_addr(&self) -> std::net::SocketAddr {
-        self.bound.local_addr()
-    }
+/// What the views are handed before the fold thread's second copy is
+/// made from them, so both copies hold it: the ways past the history,
+/// the memory of the ACP page's offers, and the halt the writer obeys.
+fn handed(
+    rebuilt: &mut accounting::views::Views,
+) -> Result<(accounting::views::Views, Offered, storage::ChainHalt), AxError> {
+    rebuilt.ask_the_registry_through(crate::release::answer);
+    rebuilt.ask_upstream_through(crate::doctor::newest);
+    rebuilt.look_for_harnesses_through(host::find_program, host::place_set_up);
+    // Shared with the listener's consent (`crates/sprawling/spec/Serving.lean`).
+    let offered = Offered::default();
+    rebuilt.remember_offers_in(offered.clone());
+    rebuilt.ask_github_through(crate::doctor::github::login);
+    // One verdict for the writer and the views (`crates/sprawling/spec/Assembly.lean` §8-134).
+    let halt = storage::ChainHalt::awaiting_proof();
+    rebuilt.watch_proof(halt.clone());
+    // The fold thread alternates between the two copies
+    // (`crates/sprawling/spec/Assembly/Listening.lean` §8-99).
+    Ok((rebuilt.twin()?, offered, halt))
+}
 
+impl Listening {
     /// Answers until the city is closed, and returns once the writer
     /// thread has written its handoff and ended. `console` is the
     /// terminal this city runs in, when it was asked for one; it is made
@@ -373,8 +381,6 @@ impl Listening {
             },
         )
         .await;
-        // After the handoff, so the key file outlives no serve and no
-        // program on this machine reads a key for a city that is gone.
         doorstep.close();
         let writer = writer.lock().ok().and_then(|mut kept| kept.take());
         if let Some(writer) = writer {
@@ -386,6 +392,7 @@ impl Listening {
     }
 }
 
+mod consenting;
 mod doorstep;
 mod lifetime;
 mod monitor_feed;

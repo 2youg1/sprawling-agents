@@ -27,7 +27,6 @@
     readonly onText: (text: string) => void;
     readonly onPaste: () => void;
     readonly onAdd: (offer: AgentOffer, here: boolean) => void;
-    readonly onLogin: (agent: string, method: string) => void;
   }
 </script>
 
@@ -35,12 +34,11 @@
   import { fill, say } from "../../core/lang";
   import { ui } from "../../ui";
   import Badge from "../parts/badge.svelte";
-  import Button from "../parts/button.svelte";
   import Glyph from "../parts/glyph.svelte";
   import { shownOf, standingOf, signsInElsewhere } from "./agents";
   import Consent from "./consent.svelte";
 
-  const { answer, text, reading, parsed, room, adding, onText, onPaste, onAdd, onLogin }: AgentsLookProps = $props();
+  const { answer, text, reading, parsed, room, adding, onText, onPaste, onAdd }: AgentsLookProps = $props();
   const { lang } = ui();
   const uid = $props.id();
 
@@ -83,17 +81,6 @@
                   </span>
                 {/if}
               </span>
-              {#if line.login_state === "required"}
-                {#each line.auth_methods as method (method.id)}
-                  <Button
-                    label={method.kind === "terminal" ? say($lang, "acp_sign_in_terminal") : say($lang, "acp_sign_in")}
-                    tone="secondary"
-                    onPress={() => {
-                      onLogin(line.id, method.id);
-                    }}
-                  />
-                {/each}
-              {/if}
             </li>
             {#if signsInElsewhere(line)}
               <li class="px-snug py-tight text-note text-text-quiet">{say($lang, "acp_subscription_elsewhere")}</li>

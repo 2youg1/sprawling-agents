@@ -5,8 +5,10 @@
 
 // The commands about who and what reaches the city, each a LocalOnly
 // verb (`crates/wire/spec/Command/Kind.lean` §19-2): closing it,
-// forgetting a paired browser, adding an ACP agent and starting its
-// sign-in. Each carries its own idempotency key, as every command does.
+// forgetting a paired browser and adding an ACP agent. Each carries its
+// own idempotency key, as every command does. Starting an agent's
+// sign-in has no sender until the city can run one
+// (`crates/agent_protocols/Spec.lean` §3).
 
 import type { Address, AgentOffer, CloseMode, Command, DeviceId } from "../wire";
 import { mintIdem } from "./idem";
@@ -21,11 +23,6 @@ export function forgetDevice(device: DeviceId): Command {
 // the launch spec the card showed; `seatHere` also seats it in that room.
 export function addAgent(offer: Pick<AgentOffer, "spec_digest" | "source">, seatHere: Address | null): Command {
   return { add_agent: { spec_digest: offer.spec_digest, source: offer.source, seat_here: seatHere, idem: mintIdem() } };
-}
-
-// Start an added agent's own sign-in, by one of the methods it declared.
-export function agentLogin(agent: string, method: string): Command {
-  return { agent_login: { agent, method, idem: mintIdem() } };
 }
 
 // Close the whole city: wait for the runs under way, or stop them now.

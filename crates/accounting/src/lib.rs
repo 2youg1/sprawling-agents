@@ -36,6 +36,7 @@ pub mod lineage;
 mod listed_facts;
 mod machine;
 mod models;
+pub mod offered;
 pub mod person;
 pub mod plan_view;
 pub mod playback;

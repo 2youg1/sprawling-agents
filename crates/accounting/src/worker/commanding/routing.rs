@@ -55,6 +55,15 @@ fn the_door_is_held_elsewhere() -> AxError {
     .with_recovery("send it to the city's own listener, which serves the remote door")
 }
 
+/// The serving binary closes the city, takes the consent to an ACP agent
+/// and forgets a paired browser on its own listener, ahead of the desk
+/// (`crates/sprawling/spec/Serving.lean`), so one arriving here came by a
+/// path that skipped it.
+fn the_listener_does_it(action: &str, subject: &str) -> AxError {
+    AxError::failure(AxCode::ToolUnavailable, action, subject)
+        .with_recovery("send it to the city's own listener, which carries it out")
+}
+
 /// The serving binary answers host privacy operations on its own listener
 /// (`crates/sprawling/spec/Privacy/Service.lean`), so one arriving here came
 /// by a path that skipped it.
@@ -222,10 +231,19 @@ impl RunWorker {
                 crate::worker::credentials::signing::Arrival::Enrolment,
             ),
             wire::Command::ForgetSecret(forgetting) => self.forget_secret(&forgetting.reference),
-            wire::Command::CloseCity(_) => Err(Unbuilt::CloseCity.not_built()),
-            wire::Command::AddAgent(_) => Err(Unbuilt::AddAgent.not_built()),
+            wire::Command::CloseCity(_) => Err(the_listener_does_it(
+                "close the city",
+                "the run worker does not close the city",
+            )),
+            wire::Command::AddAgent(_) => Err(the_listener_does_it(
+                "add an ACP agent",
+                "the run worker does not hold the offers a consent names",
+            )),
             wire::Command::AgentLogin(it) => Err(Unbuilt::AgentLogin(it.agent).not_built()),
-            wire::Command::ForgetDevice(it) => Err(Unbuilt::ForgetDevice(&it.device).not_built()),
+            wire::Command::ForgetDevice(_) => Err(the_listener_does_it(
+                "forget a paired browser",
+                "the run worker does not hold the paired browsers",
+            )),
             wire::Command::CreateBuilding { addr, template, .. } => {
                 self.create_building(addr, template.as_str())
             }
