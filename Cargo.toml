@@ -255,7 +255,7 @@ qrcodegen = "1.8"
 # Unicode categories through finl_unicode, whose licence adds
 # Unicode-DFS-2016, which deny.toml admits (crates/documents/Spec.lean
 # section 13).
-comrak = { version = "0.55", default-features = false }
+comrak = { version = "0.56", default-features = false }
 # The workspace's own packages: the one place their paths and published
 # names are written. Each version pins `[workspace.package] version`
 # exactly, because a path dependency without one cannot be published;
