@@ -287,19 +287,14 @@ fn a_city_that_is_closed_says_so_before_it_stops() {
         .last()
         .map(|line| String::from_utf8_lossy(line).into_owned())
         .expect("the ledger has a last line");
-    assert!(last.contains("handoff_written"), "{last}");
-    assert!(
-        last.contains("the city was closed with /quit in its terminal"),
-        "the record does not say who chose the stop: {last}"
-    );
-    assert!(
-        last.contains("every run under way landed before this line"),
-        "the record does not say the runs were waited for: {last}"
-    );
-    assert!(
-        last.contains("cas:b3-"),
-        "the next session is not told what to read first: {last}"
-    );
+    for said in [
+        "handoff_written",
+        "the city was closed with /quit in its terminal",
+        "every run under way landed before this line",
+        "cas:b3-",
+    ] {
+        assert!(last.contains(said), "no {said:?} in the close: {last}");
+    }
 }
 
 #[test]
