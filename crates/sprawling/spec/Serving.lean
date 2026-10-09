@@ -20,6 +20,8 @@
 
 **这台电脑上的这扇门对浏览器的句柄由装配点建一次**：`assembly::listen` 经 `assembly::listening::doorstep` 用 `bin::serving::browsers::load` 读城的 `.sprawling/browsers.toml`（`kernel::layout::CityLayout::browsers`，只存公钥、标签与时刻），把时钟、随机源与写回那张表的闭包交给 `wire::LocalDoor::new`，再把同一个句柄交给 `ServeConfig.door`、控制台与 `firstrun::open_paired`。表写失败时那次配对不算数（`crates/wire/spec/Server.lean` §8-93）。`Query::Devices` 由 `LocalDoor::devices` 作答，在问城的视图之前截下，因为设备表不在账本里。钥匙文件（`bin::serving::key_file`，`crates/sprawling/spec/Keying.lean` §8-22）在 `listen` 的最后一步写，所以一次被拒的服务不留钥匙；收口时删。`ForgetDevice` 也在那里截下，由 `LocalDoor::forget` 执行，因为设备表不在账本里。
 
+**同意一个 ACP agent 在装配层执行**（`assembly::listening::consenting`）：`AddAgent { spec_digest, source, seat_here }` 在进命令台之前截下，因为它要的两样东西只有 serve 的城有：城答出去的 offer（`accounting::offered::Offered`，与视图共用一份；注册表的条目从 `agent_protocols::Catalog::bundled` 重取）与这台电脑的搜索路径（与 harness 页同一个 `find`）。按摘要与来源取回那一项，摘要不等即拒，所以写下的就是卡片上人看见的；程序不是绝对路径就在搜索路径上找，找不到以 `E_TOOL_UNAVAILABLE` 拒，恢复语让人装上它或把它放上 PATH，因为解析成绝对路径之后，PATH 上后来出现的同名程序换不掉人同意过的那一个。写下的行带解析后那份启动说明的摘要（`launch_digest`），派活时由 `Consented::given` 对着它判。`seat_here` 在场时再写那个房间的 `[resident] harness`（`city::seat_agent`）。写路径是 `city::write_agent` 的 `change`，与 worker 写配置走同一把持有。run worker 收到 `AddAgent`，说明它绕过了这一步，答「同意在城自己的监听上取」。
+
 `CITY_VERIFIER`（`accounting::worker::workbench`）与 `local_model_facts`（`accounting::worker::credentials`）住在 `assembly`，因为它们是 `RunWorker` 在一轮活里用的东西，不是端城用的；执行引擎由 `doctor::host::execution_engine` 按平台选出。
 -/
 

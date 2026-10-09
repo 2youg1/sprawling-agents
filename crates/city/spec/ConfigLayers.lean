@@ -117,7 +117,7 @@ pub fn write_mcp(city_root: &Path, addr: &Address, layer: Layer, servers: &[McpS
 - **`env` 与 `headers` 逐值判定凭据，落盘之前就拒**：一个值只要不是 `SecretRef::parse` 认得的 `secret:realm/name`，名字命中 `kernel::secret::scan::names_a_credential` 或值命中 `kernel::secret::scan::scan` 即以 `AxCode::ConfigInvalid` 拒，恢复语指向金库。判定在 `write_mcp` 进 `change` 之前逐对做，因此一次被拒的写入一个字节都没落；拒绝文字报出是哪一台服务器、哪一张表、哪一个名字，因为人手里只有那句话。**理由是这份文件进版本库**：楼的 `CONFIG.toml` 由 `city::gitignore` 放行进历史（§8-21），写进去的 key 就在这个项目的每一次克隆里。**判定不重建**：「什么叫凭据」是 `kernel::secret` 的答案，与 `[sandbox] env_passthrough` 走 `EnvVarName::parse` 是同一个权威的两次调用。
 - **读面用同一个判定**：`config_layers::mcp` 把一张 `[[mcp]]` 表解成 `McpServer` 之后、交出之前，对每一台调同一个 `validate`（`pub(crate)`，实现只有一处；`write_mcp` 进 `change` 之前调的也是它）。所以手写进 `CONFIG.toml` 的明文 key 在读这份文件时以 `E_CONFIG_INVALID` 拒，拒绝文字与写面那一句相同，只在 subject 前多一个文件（梯子加的，D8 (a)）；`secret:realm/name` 引用与不像凭据的字面值照旧读得回来。理由同写面：这份文件进版本库，读得回来的明文 key 等于这座城认可了它留在每一次克隆里。手写明文的旧配置因此第一次读就被拒，这是一次行为变化，恢复语指向金库：把值存进 vault，在原处写它的引用。
 - **url 的判定**：`Http` 与 `Sse` 的 `url` 在同一个 `validate` 里判，读写两面一起。用 `url::Url` 解析，scheme 只收 `http`／`https`；带 userinfo（`user:pass@`）、host 为空、query 里有一个参数的名字命中 `names_a_credential` 或值命中 `scan`（都按 percent 解码之后判）、或 url 原文任何一处命中 `scan`（path 里的 key 也算）即拒。拒绝文字只写服务器、原因和参数名，不写 url 本身，因为被拒的 url 正带着一个 key。这一段判定是 `config_layers::mcp` 的 `check_url`，`validate` 与 `[search]` 的解析都调它。不像凭据的 query 与 fragment 照原字节保留，已有配置里的这类 url 照旧读得回来；凭据要走的路是带引用的 header。用 `url::Url` 而不是自己切字符串的理由见 D26。
-- **所有写面只有一条写路径**：各自把要说的话包成 `Change`（穷尽：`Session` / `Forget` / `Sandbox` / `Mcp` / `Search` / `SecondThreshold` / `Naming` / `KeepWarm` / `Effort`），同走内部的 `change`——取 `city::document` 对这份文件的持有、读、改一个键、整份原子换上去。各自读写时，两个会话改同一份 `CONFIG.toml` 会各自从同一份原件出发，后写的那一个抄掉先写的那一个的改动。`[model]` 那一节的三个值由同一条 `table` 找到或建出，免得三处对「该写进哪张表」各有各的说法。
+- **所有写面只有一条写路径**：各自把要说的话包成 `Change`（穷尽：`Session` / `Forget` / `Sandbox` / `Mcp` / `Search` / `SecondThreshold` / `Naming` / `KeepWarm` / `Effort` / `Agent` / `Seat`），同走内部的 `change`——取 `city::document` 对这份文件的持有、读、改一个键、整份原子换上去。各自读写时，两个会话改同一份 `CONFIG.toml` 会各自从同一份原件出发，后写的那一个抄掉先写的那一个的改动。`[model]` 那一节的三个值由同一条 `table` 找到或建出，免得三处对「该写进哪张表」各有各的说法。
 -/
 
 /-!
@@ -131,13 +131,15 @@ pub struct AgentRow {
 }
 pub enum AgentRowSource { Registry, Detected, Pasted }      // 文件里写 "registry" | "detected" | "pasted"
 pub fn agent_rows(city_root: &Path) -> Result<Vec<AgentRow>, AxError>;   // 城那一级的行；没有就是空表
+pub fn write_agent(city_root: &Path, row: &AgentRow) -> Result<(), AxError>;   // 同 id 的行换掉，没有就加在最后
+pub fn seat_agent(city_root: &Path, room: &Address, id: &str) -> Result<(), AxError>;   // 房间那一层的 `[resident] harness`
 ```
 
 - **文法照 `[[mcp]]` 的 stdio 一支**：每行 `id`、`command` 必填，`name`、`args`、`env`、`version`、`launch_digest` 可缺，`source` 必填且是三种拼写之一；不认的键拒（`deny_unknown_fields`）。`env` 是一张表，一名一次；值可以是 `secret:realm/name` 引用，明文凭据在解析时拒，判定与 `[[mcp]]` 的 `env` 是同一个 `vaulted`（§8-4b），拒词点名那一行的 `id` 与那个名字，恒不带值。
 - **只写在城那一级**（`Confined::Agents`，`spec/ConfigLayers/Ladder.lean`）：一行 agent 点名这台电脑以人的身份运行的程序，楼或房间加一行，就替它下面的每个房间起了它。楼或房间写它即拒，拒词让人把它挪进城根的 `CONFIG.toml`，与 `[remote]`、`[skills]` 同一条理由。
 - **解析时拒**（`E_CONFIG_INVALID`）：`id` 或 `command` 为空；两行同 `id`；`env` 的值是明文凭据；`source` 拼错；`launch_digest` 读不成一个 BLAKE3 摘要。`id` 合不合 agent id 的文法、`launch_digest` 与重算的摘要等不等，归 `agent_protocols`（`AgentId::parse`、`Consented::given`），派活时判：本 crate 只见 `kernel`。
 - **`launch_digest` 缺席是人亲手写的行**：那份文件就是人的同意，与 `[[mcp]]`、`[remote]` 相同；写了它的行是同意卡片写下的，之后被改过就在派活时拒（`crates/agent_protocols/Spec.lean` D16）。命令与参数是这台电脑的事实，恒不进账本（`crates/kernel/src/config.rs` 的 `McpServer` 同理）。
-- **写面**：同意卡片经 `AddAgent` 写这一行；那条写路径还没有建（`crates/agent_protocols/Spec.lean` §3），今天的行由人手写。
+- **写面**：同意卡片经 `AddAgent` 写这一行（`crates/sprawling/spec/Serving.lean` 的同意一条）。`write_agent` 只写城那一级，同 `id` 的行整行换掉、别的行原样留下，所以再加一次同一个 agent 是更新它的同意而不是第二行（第二行在解析时就拒）。`seat_agent` 在房间那一层写 `[resident] harness = <id>`，同时去掉这一层的会话记录（`[model] name`、`effort` 与 `[identity]`，与 `Forget` 去掉的相同）：一层不能同时点名模型与 harness，而「添加并在此使用」说的正是这个房间从下一段会话起换成这个 agent。两条都走 `change`，落盘前读回一遍。
 
 ### 8-4c `[search]`：网络搜索接哪一家（`config_layers::search`，形状 1 判定／求值）
 

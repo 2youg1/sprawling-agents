@@ -72,7 +72,7 @@
 | Command | 载荷 | reach | class | 守卫 | 执行者做的事 |
 |---|---|---|---|---|---|
 | `CloseCity` | `mode: CloseMode`（`drain` 等跑着的 run 做完，`interrupt` 立刻停下它们）、`idem` | `client` | `LocalOnly` | 对端是回环、会话已认证 | 装配层 `bin::assembly` 的收口：与信号、`/quit` 走同一条有序收口；worker 的那一臂答「城在别处关闭」 |
-| `AddAgent` | `spec_digest: B3Hash`、`source: AgentSource`、`seat_here: Option<Address>`、`idem` | `client` | `LocalOnly` | 摘要相符 | 城重算它此刻会给出的那份启动说明的摘要，不相等即拒；相等就写一行 `[[agent]]`，`seat_here` 在场时把那个房间的 `[resident] harness` 指向它（§8-90） |
+| `AddAgent` | `spec_digest: B3Hash`、`source: AgentSource`、`seat_here: Option<Address>`、`idem` | `client` | `LocalOnly` | 摘要相符 | 城取回它答出去的那份启动说明（注册表的从附带快照重取，找到的与粘贴的从它记下的 offer 取），摘要不等即拒；相等就写一行 `[[agent]]`，`seat_here` 在场时把那个房间的 `[resident] harness` 指向它（§8-90） |
 | `AgentLogin` | `agent: String`（agent 条目的 id）、`method: String`（它声明的认证方法的 id）、`idem` | `client` | `LocalOnly` | 无 | 开始 agent 自己的登录：terminal 类型经跳板或 CLI 交出终端，agent 类型经 `authenticate` |
 | `ForgetDevice` | `device: DeviceId`、`idem` | `client` | `LocalOnly` | 无 | 删掉那台浏览器的公钥，它下次只能重新配对（§8-91） |
 

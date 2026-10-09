@@ -48,8 +48,7 @@ import crates.agent_protocols.spec.Mcp.Tools
 - **歧义已定**：`2026-07-28` 修订版删除了协议级 session（本客户端协商的是 `2025-06-18`，那一版的会话住传输层，见 §8-3），`tools/list` 恒不因连接而异。因此工具表随 Run 冻结与它的规则同向，本库不实现任何会话恢复；需要跨调用状态的 server 自铸句柄，当普通入参传。
 - 模型的边界写在各分部的文件头：`spec/Mcp/Reading.lean` 逐字节读而 Rust 按块读（判决相同，内存多一块），不是 UTF-8 与读不出不在模型里；`spec/Mcp/Tools.lean` 不表示 JSON 怎样摊平成叶子；地址文法与 reserved 判定写成 `spec/Acp.lean` 的参数，权威在 `kernel::address`。
 
-**现状：登录、添加与检测还没有执行器。** 本版已建的是开放名单、同意、目录快照、粘贴文法、环境白名单与 `initialize`／`-32000` 的读法；以下几件的接口已在 `wire` 与 IF-0 定下，代码还没有，`AddAgent` 与 `AgentLogin` 今天答 `not_built`：
-- `AddAgent` 的执行：重算摘要、把程序解析成绝对路径、写一行 `[[agent]]`、`seat_here` 时写房间的 `[resident] harness`；
+**现状：登录与检测的一部分还没有执行器。** 本版已建的是开放名单、同意、目录快照、粘贴文法、环境白名单、`initialize`／`-32000` 的读法，以及 `AddAgent` 的执行（`crates/sprawling/spec/Serving.lean` 的同意一条）；以下几件的接口已在 `wire` 与 IF-0 定下，代码还没有，`AgentLogin` 今天答 `not_built`，ACP 页也不画登录键：
 - 登录执行器：收到 `-32000` 之后，`agent` 类型发 `authenticate`，`terminal` 类型在 CLI 里交出终端或经 `sprawling acp-login <ticket>` 跳板开新窗口（Windows `CREATE_NEW_CONSOLE`，macOS `.command` 加 `open`，Linux 终端列表），成功后重新 `initialize` 并重发原请求；
 - 检测的另两种线索：npm 与 bun 的全局 shim 反查包目录、PATH 上的名字（只作线索）；
 - CLI 的 `/acp` 列表；
