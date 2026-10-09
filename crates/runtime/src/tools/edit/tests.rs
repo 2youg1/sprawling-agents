@@ -255,6 +255,7 @@ fn a_documents_tool_writes_markdown_and_refuses_code_by_name() {
 /// Places a junction at `to` leading to `from` (a symlink off
 /// Windows). `false` when this machine hands out no link at all.
 #[cfg(windows)]
+#[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
 fn place_link(_file: bool, from: &Path, to: &Path) -> bool {
     std::process::Command::new("cmd")
         .args([

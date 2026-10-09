@@ -122,6 +122,7 @@ const USAGE: &str = "usage: cargo xtask members --owning [<path>...] | --dir <pa
 /// field this reader needs, when a package sits outside the checkout
 /// (`member-outside-checkout`), and when a manifest declares a role
 /// that is not one (`unknown-role`).
+#[expect(clippy::disallowed_methods, reason = "developer tool (child D4)")]
 pub(crate) fn members(root: &Path) -> Result<Vec<Member>, XtaskError> {
     // `cargo xtask` and `cargo nextest` both set CARGO, so the gates run
     // the toolchain this checkout pins rather than whatever is on PATH.

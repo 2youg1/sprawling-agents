@@ -131,6 +131,7 @@ fn a_halt_on_the_building_stops_the_run_a_resident_handed_down() {
 /// it still writes it (`crates/runtime/Spec.lean` §8-28-3), through the same backlog a
 /// halt reaches.
 #[test]
+#[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
 fn a_served_city_hands_a_running_commands_output_to_the_page() {
     let dir = tempfile::tempdir().unwrap();
     crate::worker::fixture::init_city(dir.path()).unwrap();

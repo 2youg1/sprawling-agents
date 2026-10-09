@@ -111,6 +111,7 @@ fn native_windows_disposable_production_axes_and_cleanup() {
 
 #[test]
 #[ignore = "child probe entered only by native_windows_disposable_production_axes_and_cleanup"]
+#[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
 fn native_windows_child_axes() {
     use std::os::windows::process::CommandExt;
     let input: Value =
@@ -164,6 +165,7 @@ fn native_windows_child_waits() {
 
 #[test]
 #[ignore = "writes AppContainer profiles and disposable ACLs; explicit Windows Actions acceptance only"]
+#[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
 fn native_windows_disposable_cancellation_owns_the_tree() {
     assert_eq!(std::env::var("SPRAWLING_DISPOSABLE_NATIVE").unwrap(), "1");
     let copy = tempfile::tempdir().unwrap();
@@ -203,6 +205,7 @@ fn native_memory_is_unrequested_without_a_user_ceiling() {
 
 #[test]
 #[ignore = "writes AppContainer profiles and disposable ACLs; explicit Windows Actions acceptance only"]
+#[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
 fn native_windows_disposable_argv_and_unrequested_memory() {
     use std::os::windows::ffi::OsStringExt;
     assert_eq!(std::env::var("SPRAWLING_DISPOSABLE_NATIVE").unwrap(), "1");

@@ -54,6 +54,7 @@ fn rank(printed: &str) -> i64 {
 }
 
 #[test]
+#[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
 fn a_dispatched_command_runs_below_the_core() {
     let (path, args, needs) = reads_its_own_priority();
     let mut direct = std::process::Command::new(&path);

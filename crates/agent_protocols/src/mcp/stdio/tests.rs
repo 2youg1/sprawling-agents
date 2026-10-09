@@ -257,6 +257,7 @@ const PLANTED: &str = "SPRAWLING_SECRET_PROBE_KEY";
 /// variable in its own process without `unsafe`, so it starts its own
 /// binary again with the key set, and that copy starts the server.
 #[test]
+#[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
 fn a_server_inherits_none_of_the_city_secret_keys() {
     match std::env::var(PLANTED) {
         Ok(planted) => {

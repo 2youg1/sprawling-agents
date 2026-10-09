@@ -105,6 +105,7 @@ mod tests {
     /// declared spelling `Path` and the linker's `PATH` are one variable, the
     /// linker directory comes first and the declared directory is kept last.
     #[test]
+    #[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
     fn the_linker_directory_precedes_the_declared_search_path() {
         let mut command = Command::new("cmd.exe");
         command.env_clear().env("Path", r"C:\declared");
@@ -124,6 +125,7 @@ mod tests {
     }
 
     #[test]
+    #[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
     fn a_declared_developer_prompt_is_left_alone() {
         let mut command = Command::new("cmd.exe");
         command

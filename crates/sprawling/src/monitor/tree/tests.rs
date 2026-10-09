@@ -14,6 +14,7 @@ use super::{Tree, TreeReading};
 use crate::monitor::counters::Reads;
 
 /// A child that waits about half a minute and does nothing else.
+#[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
 fn sleeper() -> Child {
     let mut command = if cfg!(windows) {
         let mut ping = Command::new("ping");

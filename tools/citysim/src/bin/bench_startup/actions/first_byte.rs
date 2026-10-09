@@ -55,6 +55,7 @@ pub fn first_byte(
     Ok(Samples::of(head, tail))
 }
 
+#[expect(clippy::disallowed_methods, reason = "developer tool (child D4)")]
 fn one(binary: &Path, city: &Path, log: &Path) -> Result<Duration, AxError> {
     let said = std::fs::File::create(log)
         .map_err(|err| refused("keep the serve's log", &log.display().to_string(), &err))?;

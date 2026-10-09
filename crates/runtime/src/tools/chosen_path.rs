@@ -376,6 +376,7 @@ pub(crate) fn walked(
 /// a symlink is reported by.
 #[cfg(all(test, windows))]
 #[expect(clippy::unwrap_used, reason = "test fixture")]
+#[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
 pub(super) fn make_link(link: &std::path::Path, target: &std::path::Path) {
     let made = std::process::Command::new("cmd")
         .args(["/c", "mklink", "/J"])

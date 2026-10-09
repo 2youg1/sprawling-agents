@@ -542,6 +542,7 @@ struct Served {
 impl Served {
     /// Starts the city and returns once its log says the history is
     /// proved, so the first line typed is not refused as unproven.
+    #[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
     fn start(city_root: &Path) -> Served {
         // `:0`, so the relay reaches the city only at the port its
         // listener was given, never at the one `serve` was asked for

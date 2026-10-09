@@ -64,6 +64,7 @@ impl std::fmt::Display for Failure {
     }
 }
 
+#[expect(clippy::disallowed_methods, reason = "developer tool (child D4)")]
 fn serve(arguments: Vec<std::ffi::OsString>) -> Result<ExitCode, Failure> {
     let (program, rest) = arguments.split_first().ok_or(Failure::Usage)?;
     let (mut city, _group) = grouped::start(Command::new(program).args(rest))?;
@@ -121,6 +122,7 @@ mod grouped {
     /// behind a safe surface and this workspace forbids `unsafe`
     /// (tools/adversary/Spec.lean D8). `powershell` shares the launcher's console
     /// and is not in the city's group, so the event reaches the city alone.
+    #[expect(clippy::disallowed_methods, reason = "developer tool (child D4)")]
     pub(super) fn close(city: &Child) -> Result<(), Failure> {
         let id = city.id();
         let script = format!(
@@ -155,6 +157,7 @@ mod grouped {
     }
 
     /// Sends `SIGINT` through `kill`, the same request the walk sends directly.
+    #[expect(clippy::disallowed_methods, reason = "developer tool (child D4)")]
     pub(super) fn close(city: &Child) -> Result<(), Failure> {
         let id = city.id();
         let sent = Command::new("kill")

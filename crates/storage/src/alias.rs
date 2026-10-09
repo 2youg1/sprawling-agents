@@ -245,6 +245,7 @@ pub(crate) mod tests {
     /// Windows). `false` when this machine hands out no link at all -
     /// in that arm nothing on the disk has changed.
     #[cfg(windows)]
+    #[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
     pub(crate) fn place_link(_file: bool, from: &Path, to: &Path) -> bool {
         std::process::Command::new("cmd")
             .args([

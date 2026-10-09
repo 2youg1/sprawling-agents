@@ -216,6 +216,7 @@ fn windows_uninstall_removes_a_dangling_file_link() {
 }
 
 #[cfg(target_os = "windows")]
+#[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
 fn run_removal_fixture(exe: &Path, dir: &Path, scratch: &Path) {
     let done = std::process::Command::new(exe)
         .args([

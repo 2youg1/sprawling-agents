@@ -237,6 +237,7 @@ mod tests {
     /// remaining mask after enrolment, independently of the run window.
     #[cfg(windows)]
     #[test]
+    #[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
     fn the_job_reports_the_mask_the_arm_asked_for() {
         let group = desktop_ffi::cpu::thread_group().unwrap();
         let seats: Vec<Processor> = (0..64)

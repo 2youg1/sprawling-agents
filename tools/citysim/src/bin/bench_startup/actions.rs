@@ -276,6 +276,7 @@ fn collected(times: Vec<Duration>) -> Result<Samples, AxError> {
 /// Answers how long the spawn call took - process creation - and how
 /// long the program then ran. The command is `version` because it is the
 /// lightest one that still proves the process accepts commands.
+#[expect(clippy::disallowed_methods, reason = "developer tool (child D4)")]
 fn spawn_version(binary: &Path) -> Result<(Duration, Duration), AxError> {
     let create = stamp();
     let mut child = Command::new(binary)

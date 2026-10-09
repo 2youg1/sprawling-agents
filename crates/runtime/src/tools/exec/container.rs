@@ -341,6 +341,7 @@ mod tests {
     }
 
     #[test]
+    #[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
     fn container_entrypoint_keeps_exactly_the_requested_program() {
         let dir = tempfile::tempdir().unwrap();
         for engine in [ContainerEngine::Docker, ContainerEngine::Podman] {
@@ -389,6 +390,7 @@ mod tests {
 
     #[cfg(unix)]
     #[test]
+    #[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
     fn podman_non_utf8_program_refuses_before_create() {
         use std::ffi::OsString;
         use std::os::unix::ffi::OsStringExt;
@@ -418,6 +420,7 @@ mod tests {
     }
 
     #[test]
+    #[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
     fn ambiguous_mount_and_removed_environment_are_refused_before_create() {
         let runtime = admit(ContainerEngine::Docker, &docker_info()).unwrap();
         let dir = tempfile::tempdir().unwrap();
@@ -453,6 +456,7 @@ mod tests {
 
     #[test]
     #[ignore = "requires a Linux Docker/Podman daemon and an explicitly prepared local image ID"]
+    #[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
     fn a_real_daemon_retains_the_requested_limits_on_a_stopped_container() {
         let engine = std::env::var("SPRAWLING_CONTAINER_TEST_ENGINE").unwrap();
         let engine = match engine.as_str() {
@@ -577,6 +581,7 @@ mod tests {
             let runtime = admit(ContainerEngine::Docker, &docker_info()).unwrap();
             let dir = tempfile::tempdir().unwrap();
             let limits = limits();
+            #[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
             let mut target = Command::new("/bin/printf");
             target.args(&args).env("LANG", "C");
             let command = runtime.create_command(&limits, &ContainerLaunch {

@@ -117,6 +117,7 @@ pub(crate) fn list(root: &Path) -> Result<String, XtaskError> {
 /// the absence of a tool it cannot install is a command people stop
 /// running. CI's Linux job is where the absence is a defect, and there
 /// the install step fails before this one runs.
+#[expect(clippy::disallowed_methods, reason = "developer tool (child D4)")]
 pub(crate) fn run(root: &Path) -> Result<String, XtaskError> {
     if !installed(root) {
         return Ok(format!(
@@ -298,6 +299,7 @@ fn job_lines<'a>(text: &'a str, job: &str) -> Vec<(usize, &'a str)> {
 }
 
 /// Whether this machine can prove anything at all.
+#[expect(clippy::disallowed_methods, reason = "developer tool (child D4)")]
 fn installed(root: &Path) -> bool {
     Command::new("cargo")
         .current_dir(root)

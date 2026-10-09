@@ -52,6 +52,10 @@ pub(super) fn run(
 /// One run, from before the spawn until `wait` sees the exit. The
 /// command reads nothing and writes to this process's stderr, so stdout
 /// carries readings alone.
+#[expect(
+    clippy::disallowed_methods,
+    reason = "gauge runs the person's command in the foreground of the person's terminal, where Ctrl+C must reach it (child D4)"
+)]
 fn run_once(running: &Running, index: u32) -> Result<Run, AxError> {
     let began = monotonic_now();
     let mut child = Command::new(&running.program)

@@ -264,6 +264,7 @@ fn kill_tree(child: &mut Child) -> Result<(), String> {
 }
 
 #[cfg(windows)]
+#[expect(clippy::disallowed_methods, reason = "developer tool (child D4)")]
 fn tree_kill_command(pid: &str) -> Command {
     let mut command = Command::new("taskkill");
     command.args(["/T", "/F", "/PID", pid]);
@@ -271,6 +272,7 @@ fn tree_kill_command(pid: &str) -> Command {
 }
 
 #[cfg(not(windows))]
+#[expect(clippy::disallowed_methods, reason = "developer tool (child D4)")]
 fn tree_kill_command(pid: &str) -> Command {
     let mut command = Command::new("kill");
     command.args(["-KILL", "--", &format!("-{pid}")]);

@@ -291,6 +291,7 @@ fn head_len(root: &Path) -> usize {
 /// whichever of them raised the checkpoint. Each checkpoint stays pinned, so a
 /// `git gc` that prunes every unreachable object keeps them both.
 #[test]
+#[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
 fn every_checkpoint_a_run_raises_survives_git_gc_whichever_handle_raised_it() {
     let tmp = tempfile::tempdir().unwrap();
     let of = resident();

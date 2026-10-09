@@ -9,6 +9,7 @@ use std::process::Command;
 use super::wrap;
 
 #[test]
+#[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
 fn native_macos_path_and_target_arguments_cannot_become_profile_source() {
     let copy = tempfile::tempdir().unwrap();
     let mut target = Command::new("target-program");
@@ -46,6 +47,7 @@ fn native_macos_path_and_target_arguments_cannot_become_profile_source() {
 }
 
 #[test]
+#[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
 fn native_macos_bad_copy_or_empty_program_refuses_before_command_construction() {
     let copy = tempfile::tempdir().unwrap();
     let wrapper = std::path::Path::new("sandbox-exec");
@@ -66,6 +68,7 @@ fn native_macos_bad_copy_or_empty_program_refuses_before_command_construction() 
 
 proptest::proptest! {
     #[test]
+    #[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
     fn native_macos_every_argument_sequence_preserves_target_argv(arguments in proptest::collection::vec("[^\x00]{0,100}", 0..20)) {
         let copy = tempfile::tempdir().unwrap();
         let mut target = Command::new("target");
@@ -79,6 +82,7 @@ proptest::proptest! {
 }
 
 #[test]
+#[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
 fn native_macos_program_named_like_an_option_remains_the_target() {
     let copy = tempfile::tempdir().unwrap();
     let target = Command::new("-p");
