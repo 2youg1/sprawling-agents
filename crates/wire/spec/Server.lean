@@ -6,9 +6,9 @@
 /-!
 # wire::server
 
-规定 `server`、`server::config`、`server::config::enrolment`、`server::socket`、`server::bundle`、`server::uploads`、`assets`、`answer::cost`（`crates/wire/src/` 下同名的文件）。监听的一端：判定是纯函数，套接字一个也不做；客户端资产、几扇 HTTP 门与 Query 的答面。本文件是 `crates/wire/Spec.lean` 的一个分部；下面每一节保留它在 wire 规格里的标签 §8-n，别处引作 `crates/wire/Spec.lean §8-n`，决定引作 `wire D<n>`。
+规定 `server`、`server::config`、`server::config::enrolment`、`server::socket`、`server::seat`、`server::bundle`、`server::uploads`、`assets`、`answer::cost` 与 `reception::sessions`（`crates/wire/src/` 下同名的文件）。监听的一端：判定是纯函数，套接字一个也不做；客户端资产、几扇 HTTP 门与 Query 的答面。本文件是 `crates/wire/Spec.lean` 的一个分部；下面每一节保留它在 wire 规格里的标签 §8-n，别处引作 `crates/wire/Spec.lean §8-n`，决定引作 `wire D<n>`。
 
-这一分部几乎只有文字：除了 §8-93 末尾的会话寿命模型，它是说明文档，不是形式规格；它写下的接口形状与取舍由 Rust 的类型与 `wire::assets` 旁的测试守住。§8-93 的模型规定 `reception::sessions` 与 `server::door`、`server::socket` 里让会话结束的那几行，它的三条性质被证明，并由 `reception::sessions` 旁的 proptest 对照 Rust。
+这一分部几乎只有文字：除了 §8-93 末尾的会话寿命模型，它是说明文档，不是形式规格；它写下的接口形状与取舍由 Rust 的类型与 `wire::assets` 旁的测试守住。§8-93 的模型规定 `reception::sessions`，以及 `server::door`、`server::seat`、`server::socket` 里让会话结束的那几行，它的三条性质被证明，并由 `reception::sessions` 旁的 proptest 对照 Rust。
 -/
 
 /-!
