@@ -28,8 +28,8 @@
 /-! ## 3 假设与歧义
 
 - **假设**：城的秘密只经这两种环境变量进到城的进程里。别的路（文件、命令行参数）不归本 crate。
-- **例外**：有三类子进程不走 `command` 的全部规则，每一处在它自己的 crate 的规格里写明理由：守护进程起的那个子进程（它就是城，有意留在同一个控制台上）；CLI 交出终端给某个 agent 的登录流程（登录期间那个程序占着终端）；浏览器与文件管理器（它们比城活得久，stdio 全 null）。这三类今天仍直接写 `Command::new`，并在调用点带 `#[expect(clippy::disallowed_methods, reason = "…")]`。
-- **现状**：`clippy.toml` 的那一条禁令要等每一个起点都改用 `command` 之后才能落下，否则整个工作区的 clippy 立即变红；落下它的那一个提交与各起点的迁移同属一个变更集。
+- **例外**：只有一类子进程不走 `command`：守护进程起的那个子进程（它就是城，有意留在同一个控制台上），理由写在 `crates/sprawling/spec/Supervising.lean` 的「子进程的那一行」：子进程继承这个终端，终端的面属于它。CLI 交出终端给某个 agent 的登录流程还没有建成（`crates/agent_protocols/Spec.lean` §3）；建成时它是第二类，因为登录期间那个程序占着终端。浏览器与文件管理器不是例外：它们比城活得久，正因为如此才要去掉城的秘密，所以打开器与文件管理器都经 `command` 起，调用点再把三路 stdio 设成 null（`crates/sprawling/spec/Firstrun.lean` §8-8）。
+- **现状**：`clippy.toml` 还没有禁 `std::process::Command::new`，所以例外的调用点今天也还没有带 `#[expect(clippy::disallowed_methods, reason = "…")]`。禁令要等每一个起点都改用 `command` 或成为具名的例外之后才能落下，否则整个工作区的 clippy 立即变红；`clippy.toml` 那一条是门机制，放在它自己的提交里，与各起点的迁移同属一个变更集。
 -/
 
 /-! ## 4 现状分析

@@ -32,23 +32,36 @@ const CURRENT_VERSION: &str = r"SOFTWARE\Microsoft\Windows NT\CurrentVersion";
 /// a query only waits while a person waits (Privacy.Cli D55).
 pub(crate) const PATIENCE: u32 = 1200;
 
-/// Windows PowerShell under `SystemRoot` as HKLM records it, rather than
-/// as PATH, the `SystemRoot` variable or the current directory say, all
-/// of which any process of this user can change (Privacy.Cli D55).
+/// Windows PowerShell under `SystemRoot` as HKLM records it (Privacy.Cli
+/// D55).
+///
+/// # Errors
+/// As [`system32`].
+pub(crate) fn powershell() -> Result<std::path::PathBuf, AxError> {
+    system32(r"WindowsPowerShell\v1.0\powershell.exe")
+}
+
+/// `program`, a path under `System32`, in the `SystemRoot` that HKLM
+/// records, rather than where PATH, the `SystemRoot` variable, the
+/// current directory or this binary's own folder would find it: any
+/// process of this user can change the first three, and the city's
+/// default place is beside the binary (Privacy.Cli D55; `cmd.exe` and
+/// `icacls.exe`, `crates/sprawling/spec/Keying.lean` D75).
 ///
 /// # Errors
 /// `ToolUnavailable` when the record is unreadable or names a relative
 /// path; nothing is started then.
-pub(crate) fn powershell() -> Result<std::path::PathBuf, AxError> {
+pub(crate) fn system32(program: &str) -> Result<std::path::PathBuf, AxError> {
     let installation = current_version()
         .and_then(|key| key.get_value::<std::ffi::OsString, _>("SystemRoot"))
-        .map_err(|_| unavailable("protected Windows installation path unavailable"))?;
+        .map_err(|_| unlocated("protected Windows installation path unavailable"))?;
     let executable = std::path::PathBuf::from(installation)
-        .join(r"System32\WindowsPowerShell\v1.0\powershell.exe");
+        .join("System32")
+        .join(program);
     if executable.is_absolute() {
         Ok(executable)
     } else {
-        Err(unavailable("Windows installation path is not absolute"))
+        Err(unlocated("Windows installation path is not absolute"))
     }
 }
 
@@ -166,6 +179,15 @@ pub(crate) fn parses(script: &str) -> bool {
 fn current_version() -> std::io::Result<RegKey> {
     RegKey::predef(HKEY_LOCAL_MACHINE)
         .open_subkey_with_flags(CURRENT_VERSION, KEY_QUERY_VALUE | KEY_WOW64_64KEY)
+}
+
+fn unlocated(subject: &str) -> AxError {
+    AxError::failure(
+        AxCode::ToolUnavailable,
+        "find a Windows system program",
+        subject,
+    )
+    .with_recovery("run on Windows with a readable system installation record; nothing was started")
 }
 
 fn unavailable(subject: &str) -> AxError {

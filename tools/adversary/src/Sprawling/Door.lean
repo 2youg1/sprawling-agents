@@ -491,6 +491,18 @@ structure Serving where
   closing : Closing
   said : IO String
 
+/-- The variable that keeps a served city's key file where this process's
+`sprawling call` looks for it, when the home override would otherwise move it:
+only on Linux, and only when the runtime directory is the home's cache. -/
+private def runtimePinned : IO (Array (String × Option String)) := do
+  if System.Platform.isWindows || System.Platform.isOSX then
+    return #[]
+  if (← IO.getEnv "XDG_RUNTIME_DIR").isSome || (← IO.getEnv "XDG_CACHE_HOME").isSome then
+    return #[]
+  match ← IO.getEnv "HOME" with
+  | some own => return #[("XDG_CACHE_HOME", some s!"{own}/.cache")]
+  | none => return #[]
+
 /-- Starts serving a city, and hands back the process still running.
 
 The caller owns its death. `--no-console` matters: without it the process reads
@@ -502,7 +514,17 @@ What a person settles about their own reading of the city lives in
 reading `USERPROFILE` and then `HOME`. Both are pointed at a throwaway
 directory here, so a property about the person's layer writes into the ground
 it was raised on rather than into the configuration of whoever is running this
-suite. Overriding only one of the two would leave the answer to the platform. -/
+suite. Overriding only one of the two would leave the answer to the platform.
+
+**Moving the home must not move the key file.** Every caller presents a
+credential, on loopback too, and this door presents none of its own: `call`
+reads the native key the served city wrote for its port, as a program a person
+runs on that machine does. So the city and this process must agree on the
+per-user runtime directory. `%LOCALAPPDATA%` and `$TMPDIR` are inherited and do
+not move; on Linux the city falls back to `$HOME/.cache` when neither
+`XDG_RUNTIME_DIR` nor `XDG_CACHE_HOME` is set, and the home override would then
+move it away from the one `call` reads, so `runtimePinned` names this process's
+own cache directory for it. -/
 def Door.serve (door : Door) (city : System.FilePath) (port : Port)
     (home : System.FilePath) : IO Serving := do
   let served := #["serve", city.toString, s!"127.0.0.1:{port}", "--no-console"]
@@ -512,6 +534,7 @@ def Door.serve (door : Door) (city : System.FilePath) (port : Port)
   let child ← IO.Process.spawn
     { cmd, args
     , env := #[("USERPROFILE", some home.toString), ("HOME", some home.toString)]
+        ++ (← runtimePinned)
     , stdin := servedStdio.stdin
     , stdout := servedStdio.stdout
     , stderr := servedStdio.stderr }

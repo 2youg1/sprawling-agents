@@ -30,7 +30,15 @@ pub(crate) fn enrol(at: &str, realm: &str, name: &str, value: &str) -> Result<St
 pub(crate) fn split_reference(raw: &str) -> Option<(&str, &str)>;   // "realm/name"
 ```
 
-- **没给 `--token` 时读钥匙文件**：`call`、`send`、`top` 与 `enrol` 都经 `credential(at, given)` 取凭据：给了 `--token` 就用它，否则按 `at` 的端口读这台电脑这座城的钥匙文件（`crates/sprawling/spec/Keying.lean` §8-22）。读不到不是错：问候照常发出，城以握手拒绝作答，拒词说怎样拿到钥匙。`enrol` 把它放进 `Authorization: Bearer`，因为 `/enroll` 与别的门一样要凭据。
+- **没给 `--token` 时，只为这台电脑上的城读钥匙文件**：`call`、`send`、`top` 与 `enrol` 都经 `credential(at, given)` 取凭据：给了 `--token` 就用它；否则由 `reach(at)` 判 `at` 的主机，主机是回环字面量（`127.0.0.0/8`、`::1`，带不带方括号都算）或 `localhost` 时（`Reach::ThisMachine(port)`），按端口读这台电脑这座城的钥匙文件（`crates/sprawling/spec/Keying.lean` §8-22）；别的主机（`Reach::Elsewhere`）一律拒绝，`E_CREDENTIAL_MISSING`，恢复语要人给 `--token`，什么都不发。主机的判定取 `kernel::gate::target_of`，它把 `localhost`、`127.x.y.z` 与 `::1` 判为 `Loopback`，与出网门同一处权威，不解析名字。**原因**：钥匙文件给的是这台电脑上的程序；按端口找文件而不看主机，`--at other-host:8787` 就会经明文 `ws://` 在问候里把这台电脑上那座城的钥匙交给别的机器和链路上的任何人。被否：别的主机也读钥匙文件、只在连上之后再判（钥匙已经发出去了）；按名字解析后判回环（解析结果由 DNS 说了算，`localhost.example.com` 之类的名字可以指向任何地方）。主机在这台电脑上却没有读得出的端口（`Reach::Portless`）时不读文件，问候不带凭据，连接自己会失败。读不到钥匙文件也不是错：问候照常发出，城以握手拒绝作答，拒词说怎样拿到钥匙。`enrol` 把它放进 `Authorization: Bearer`，因为 `/enroll` 与别的门一样要凭据。
+
+  ```rust
+  enum Reach { ThisMachine(u16), Portless, Elsewhere }   // 穷尽；`reach(at)` 是唯一判定
+  fn reach(at: &str) -> Reach;
+  fn credential(at: &str, given: Option<&str>) -> Result<Option<String>, AxError>;   // Elsewhere 且没给 --token 即 Err
+  ```
+
+  **本节测试**：`wire_client::tests::only_a_host_on_this_machine_is_answered_from_the_key_file`——回环字面量、方括号里的 `::1` 与不分大小写的 `localhost` 得 `ThisMachine`；局域网地址、公网名字、`0.0.0.0`、`localhost.example.com` 与 `127.0.0.1.example.com` 得 `Elsewhere`；没有端口得 `Portless`。
 
 - **握手在进程内算，不手抄**。`WIRE_V` 与 `schema_hash()` 直接取自 `wire`，故改一条命令名字时本客户端**不可能**落后。因此删掉了那个一次性的 Python 探针——它在工作区外复刻了 `schema_hash()` 与 `IdemKey::derive()`，那本身就是第二个权威。
 - **一个查询恰好一个答复，收到就走**。发出的是 `Ask` 时，`call` 在收到第一帧 `Answered`（其 `AskOutcome` 是答复或拒绝）或 `Refusal` 时打印它并退出，之前推来的 `Event`／`Log`／`Delta` 照样逐行打印；城的答复在十几毫秒内到达，再等一整段安静窗口只是让进程白占两秒。安静窗口在这里只剩上限的作用：答复迟迟不来时，`call` 退 3——什么都没回来是 `Quiet`，只回来了别的帧是 `Unfinished`。

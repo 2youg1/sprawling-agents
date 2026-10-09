@@ -118,7 +118,7 @@ pub(super) fn exit_of(spoken: &Spoken) -> Exit {
 /// tells the three failures apart, for `call` and `dispatch` alike.
 pub(super) fn tell_unheard(unheard: &Unheard, form: Form) -> Exit {
     let (exit, err) = match unheard {
-        Unheard::Unreadable(err) => (Exit::Line, err),
+        Unheard::Unreadable(err) | Unheard::Unkeyed(err) => (Exit::Line, err),
         Unheard::NoCity(err) => (Exit::NoCity, err),
         Unheard::Broken(err) => (Exit::Refused, err),
     };

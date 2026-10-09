@@ -546,6 +546,7 @@ D3 **一个会应答的 provider 从 justfile 接收，不在本目录里起。*
 | 种子 `<!-- xtask:begin adversary_seed -->20260912<!-- xtask:end -->` | 本地运行必须可复现：一次反例只有在它能被重跑时才值得渲染成 Rust 测试。**`SPRAWLING_SEED` 读成三态**：给了且能解成数、没给、给了但解不成。第三态以退码 `2` 在起城之前停住，而不是静默换成默认值：拼错的种子不是关于产品的证据，而报告里那句复现命令必须是这一跑真用过的那一个（B-81）。每一跑开头打印 `seed <值>` | 定时任务经 `SPRAWLING_SEED` 用会变的种子，于是「每晚探索新轨迹」与「本地可复现」各得其所。**这一格的数是受管区段**：`cargo xtask docnum` 每次都去 `test/Main.lean` 的 `defaultSeed` 重读一遍，两处不同即红，改法只有 `cargo xtask docnum --write` |
 | 人那一层的路径 `<home>/.sprawling/config.toml` | 第四种世界要按它找到那份磁盘上的读数，而它不在任何一座城里，`document` 查询读不到 | 布局改变时本目录报错，属预期 |
 | 环境变量 `USERPROFILE` 与 `HOME` | 被服务的城按这两个变量找家目录，两个都指向一次性目录；**只覆写其中一个就把答案交给了平台**，而一跑对抗不得动跑它的人自己的偏好 | 产品改读家目录的方式时同步改 `Door.serve` |
+| 原生钥匙文件 `<每用户运行目录>/sprawling/<port>.key` | 回环上每个调用方也要凭据；门不带自己的凭据，`call` 读被服务的城为这个端口写下的钥匙文件，所以城与本进程要落在同一个运行目录。Linux 上既没有 `XDG_RUNTIME_DIR` 也没有 `XDG_CACHE_HOME` 时，城退到 `$HOME/.cache`，覆写 `HOME` 会把它搬走，`Door.serve` 于是把本进程自己的缓存目录交给城作 `XDG_CACHE_HOME` | 产品改钥匙文件的位置或回退次序时同步改 `Door.serve` 的 `runtimePinned` |
 | 指令预算 `7001` 等七个四位数 | 写回性质靠子串判断问文件陈述了什么，互不为子串是这一判断成立的前提 | 加值时要保持该性质；否则「旧值还在文件里」会被包含关系伪造 |
 | 两个层的路径 一个楼自己的 `.sprawling/CONFIG.toml` 与 `.sprawling/CONFIG.toml` | 写回性质要按层分别读 | 布局改变时本目录报错，属预期 |
 | 三个地址 `acme` / `beta` / `gamma` | 固定的演员表，让反例可读 | 加人时同步改 `Regression.lean` 的模板 |

@@ -42,6 +42,14 @@ impl KeyFile {
         let staged = dir.join(format!("{port}.key.{}", std::process::id()));
         let unwritten =
             |source: std::io::Error| refused("write the city's key file", &staged, &source);
+        // A staging file an earlier process of this pid left behind is
+        // removed rather than reused: the new one is created fresh, so
+        // its permissions are the ones set here and not the old file's.
+        match std::fs::remove_file(&staged) {
+            Ok(()) => {}
+            Err(source) if source.kind() == std::io::ErrorKind::NotFound => {}
+            Err(source) => return Err(unwritten(source)),
+        }
         let mut file = private_file(&staged).map_err(unwritten)?;
         file.write_all(key.as_bytes()).map_err(unwritten)?;
         file.sync_all().map_err(unwritten)?;
@@ -126,7 +134,9 @@ fn make_private(dir: &Path) -> Result<(), AxError> {
 
 /// Removes the inherited entries and grants the current User alone full
 /// control, through `icacls`: a direct DACL call needs `unsafe`, which
-/// this crate forbids (`crates/sprawling/spec/Keying.lean` §8-22).
+/// this crate forbids (`crates/sprawling/spec/Keying.lean` §8-22). The
+/// program is `System32`'s, never one the search order finds first in
+/// this binary's folder (Keying D75).
 #[cfg(windows)]
 fn make_private(dir: &Path) -> Result<(), AxError> {
     let user = match (std::env::var("USERDOMAIN"), std::env::var("USERNAME")) {
@@ -134,7 +144,7 @@ fn make_private(dir: &Path) -> Result<(), AxError> {
         (Err(_), Ok(name)) => name,
         (_, Err(_)) => return Err(unnamed("USERNAME")),
     };
-    let status = child::command("icacls")
+    let status = child::command(crate::privacy::windows::system32("icacls.exe")?)
         .arg(dir)
         .args(["/inheritance:r", "/grant:r"])
         .arg(format!("{user}:(OI)(CI)F"))
@@ -154,25 +164,25 @@ fn make_private(dir: &Path) -> Result<(), AxError> {
     .with_recovery("check that this account may change the permissions of its own LOCALAPPDATA"))
 }
 
-/// A file only the User may read, created new.
+/// A file only the User may read, created new: the mode applies only to
+/// a file this call creates, so a file already there is refused rather
+/// than opened with whatever permissions it had.
 #[cfg(unix)]
 fn private_file(path: &Path) -> std::io::Result<std::fs::File> {
     use std::os::unix::fs::OpenOptionsExt as _;
     std::fs::OpenOptions::new()
         .write(true)
-        .create(true)
-        .truncate(true)
+        .create_new(true)
         .mode(0o600)
         .open(path)
 }
 
-/// A file that inherits the directory's User-only entry.
+/// A file created new, which inherits the directory's User-only entry.
 #[cfg(windows)]
 fn private_file(path: &Path) -> std::io::Result<std::fs::File> {
     std::fs::OpenOptions::new()
         .write(true)
-        .create(true)
-        .truncate(true)
+        .create_new(true)
         .open(path)
 }
 
