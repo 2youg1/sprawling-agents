@@ -270,7 +270,8 @@ pub(crate) const REQUIREMENTS: &[Requirement] = &[
         name: PWSH,
         tier: Tier::Use,
         need: Need::Optional,
-        enables: "the exec tool's shell arm under PowerShell 7, where a building's CONFIG.toml                   sets `[sandbox] interpreter = \"pwsh\"`",
+        enables: "the exec tool's shell arm under PowerShell 7, where a building's CONFIG.toml \
+        sets `[sandbox] interpreter = \"pwsh\"`",
         detect: Detection::Program {
             program: "pwsh",
             version_arg: "--version",

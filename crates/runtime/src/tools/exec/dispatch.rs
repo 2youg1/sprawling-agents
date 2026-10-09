@@ -35,7 +35,11 @@ impl ExecTool {
         self.program_route = ProgramRoute::Confined;
         self.container = Some((limits, runtime));
         self.meta.disclosure = format!(
-            "Run a program, Python snippet, or shell line. Program and shell sandbox calls use              an explicitly configured Linux container: writes land on a copy, network is closed,              a non-root user and CPU/memory/process limits are inspected before start.              Daemon cleanup failures are reported and retained for retry. `where: host` asks              for host execution.{}",
+            "Run a program, Python snippet, or shell line. Program and shell sandbox calls use \
+            an explicitly configured Linux container: writes land on a copy, network is closed, \
+            a non-root user and CPU/memory/process limits are inspected before start. \
+            Daemon cleanup failures are reported and retained for retry. `where: host` asks \
+            for host execution.{}",
             match self.setup.shell {
                 Shell::Absent => "",
                 Shell::Missing {

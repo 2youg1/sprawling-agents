@@ -110,7 +110,8 @@ impl Confined {
             Confined::Remote => "the remote door opens onto the whole city",
             Confined::Agents => "an agent runs as the person, for every room that names it",
             Confined::Search => {
-                "the settings page shows the city's and each building's choice, and a room's                  would govern runs it never shows"
+                "the settings page shows the city's and each building's choice, and a room's \
+                would govern runs it never shows"
             }
         }
     }
