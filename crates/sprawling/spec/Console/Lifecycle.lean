@@ -16,7 +16,8 @@
 * 交互的两个面（`Cli`、`QuietHost`）收到信号形式的 `SIGINT` 不进入 `Stopping`，面也不变（`a_signalled_interrupt_leaves_an_interactive_face`）；
 * 先到的缘由作数，之后的事件不改写它（`the_first_cause_stands`）；
 * 一条轨迹至多写一次交接（`at_most_one_handoff`），写了交接的轨迹带着缘由（`a_handoff_names_its_cause`）；
-* 时限一旦装上就一直装着，直到进程退出；时限到了，一定到达 `Gone`（`an_armed_deadline_stays_armed`、`an_armed_deadline_ends_the_process`）。
+* 时限一旦装上就一直装着，直到进程退出；时限到了，一定到达 `Gone`（`an_armed_deadline_stays_armed`、`an_armed_deadline_ends_the_process`）；
+* 终端的出口只在 `interrupt` 里切断：一条不从「drain 且切断」出发的轨迹永远到不了那里（`a_cut_terminal_interrupts`）。
 
 派生的检查：§5 的 `#eval` 打印每一个面与每一个事件的转移，`bin::console::lifecycle` 的测试逐行回放；实现一旦离开模型，那条测试变红。
 -/
@@ -31,10 +32,10 @@ inductive Mode where
   | interrupt
   deriving DecidableEq, Repr
 
-/-- 收口有没有时限：只有终端没了才装上（Rust：`Deadline`）。 -/
-inductive Deadline where
-  | unarmed
-  | armed
+/-- 收口时终端的出口还在不在：只有终端没了才切断，切断之后 UI 线程不再写任何东西（Rust：`Sinks`）。 -/
+inductive Sinks where
+  | held
+  | cut
   deriving DecidableEq, Repr
 
 /-- 进程退出时交接写没写（Rust：`Handoff`）。 -/
@@ -49,7 +50,7 @@ inductive Face where
   | cli
   | quietHost
   | headless
-  | stopping (mode : Mode) (deadline : Deadline)
+  | stopping (mode : Mode) (sinks : Sinks)
   | gone (handoff : Handoff)
   deriving DecidableEq, Repr
 
@@ -114,8 +115,14 @@ def Face.isGone : Face → Bool
   | .gone _ => true
   | _ => false
 
+/-! D75 每一次 interrupt 都有时限，时限由档位决定，不是面上的一个独立字段
+
+决定：收口处在 `interrupt` 就有时限（`INTERRUPT_GRACE`，4 s），不论这次 interrupt 来自 `/quit` 后的 n、页面的「立刻停下并关闭」、`SIGTERM`、收口中的第二次请求还是终端没了；时限到了，进程不写交接退出，下一次 `serve` 的启动扫描冻结留下的 run（`crates/accounting/Spec.lean` §8-18-1）。理由：进行中的 provider 调用不是安全点，只等安全点的 interrupt 要等到调用超时（默认 120 s）才结束，人按下「立刻停下」却等了近两分钟；时限从档位得出，「interrupt 却没有时限」就写不出来。被否：①只给终端没了装时限——就是上面那两分钟；②在 interrupt 时取消进行中的 provider 调用——要改 lane 与 gateway 的取消路径，不在这一层；③给 `SIGTERM` 留给发信号的一方去限时——服务管理器的时限通常是几十秒，城卡在一次调用里时它照样等满，而 4 s 内落地的 run 照常写交接。重开参数：lane 在 interrupt 时能取消进行中的 provider 调用之后，时限只剩兜底，那时再看 4 s 是否该放长。
+-/
+
+/-- 收口有没有时限：每一次 interrupt 都有，drain 没有（D75）。 -/
 def Face.armed : Face → Bool
-  | .stopping _ .armed => true
+  | .stopping .interrupt _ => true
   | _ => false
 
 /-- 这个事件是不是一次停城请求。 -/
@@ -125,21 +132,21 @@ def Event.closes : Event → Bool
 
 /-! ## 2 转移 -/
 
-/-- 一个还在服务的面收到的停城请求：进入哪一档、有没有时限、缘由是什么。
+/-- 一个还在服务的面收到的停城请求：进入哪一档、终端的出口切不切、缘由是什么。
 `SIGINT` 在交互面上不是请求（键盘在城手里，它只能来自别的进程）；终端没了只在有终端的面上是请求。 -/
-def asked (face : Face) : Event → Option (Mode × Deadline × Cause)
-  | .quit asker mode => some (mode, .unarmed, asker.cause)
-  | .interruptSignal => if face.interactive then none else some (.drain, .unarmed, .interruptSignal)
-  | .breakSignal => some (.drain, .unarmed, .breakSignal)
-  | .terminate => some (.interrupt, .unarmed, .terminate)
-  | .terminalLost => if face.interactive then some (.interrupt, .armed, .terminalLost) else none
-  | .failed => some (.drain, .unarmed, .failed)
+def asked (face : Face) : Event → Option (Mode × Sinks × Cause)
+  | .quit asker mode => some (mode, .held, asker.cause)
+  | .interruptSignal => if face.interactive then none else some (.drain, .held, .interruptSignal)
+  | .breakSignal => some (.drain, .held, .breakSignal)
+  | .terminate => some (.interrupt, .held, .terminate)
+  | .terminalLost => if face.interactive then some (.interrupt, .cut, .terminalLost) else none
+  | .failed => some (.drain, .held, .failed)
   | .ready _ | .web | .back | .landed | .deadline => none
 
 /-- 服务中的面（`opening`、`cli`、`quietHost`、`headless`）怎样走。 -/
 def serving (face : Face) (event : Event) : Face × Option Cause :=
   match asked face event with
-  | some (mode, deadline, cause) => (.stopping mode deadline, some cause)
+  | some (mode, sinks, cause) => (.stopping mode sinks, some cause)
   | none =>
     match face, event with
     | .opening, .ready surface => (surface.face, none)
@@ -147,27 +154,27 @@ def serving (face : Face) (event : Event) : Face × Option Cause :=
     | .quietHost, .back => (.cli, none)
     | face, _ => (face, none)
 
-/-- 收口中再来一次显式停止：`drain` 升到 `interrupt`，`interrupt` 里再来一次就不写交接立刻退出。 -/
-def again (mode : Mode) (deadline : Deadline) : Face :=
+/-- 收口中再来一次显式停止：`drain` 升到 `interrupt`（于是装上时限），`interrupt` 里再来一次就不写交接立刻退出。 -/
+def again (mode : Mode) (sinks : Sinks) : Face :=
   match mode with
-  | .drain => .stopping .interrupt deadline
+  | .drain => .stopping .interrupt sinks
   | .interrupt => .gone .skipped
 
-/-- 收口中的面怎样走。`SIGTERM` 第二次到达即退出，时限归发信号的一方；终端没了只装上时限，不算一次升档。 -/
-def stopping (mode : Mode) (deadline : Deadline) : Event → Face
-  | .quit _ _ | .interruptSignal | .breakSignal => again mode deadline
+/-- 收口中的面怎样走。第二个 `SIGTERM` 即退出；终端没了切断出口并升到 `interrupt`，不算一次升档；时限只在 `interrupt` 里作数。 -/
+def stopping (mode : Mode) (sinks : Sinks) : Event → Face
+  | .quit _ _ | .interruptSignal | .breakSignal => again mode sinks
   | .terminate => .gone .skipped
-  | .terminalLost => .stopping .interrupt .armed
+  | .terminalLost => .stopping .interrupt .cut
   | .landed => .gone .written
   | .deadline =>
-    match deadline with
-    | .armed => .gone .skipped
-    | .unarmed => .stopping mode deadline
-  | .ready _ | .web | .back | .failed => .stopping mode deadline
+    match mode with
+    | .interrupt => .gone .skipped
+    | .drain => .stopping mode sinks
+  | .ready _ | .web | .back | .failed => .stopping mode sinks
 
 /-- 一步：下一个面，以及这一步新给出的缘由（只在进入 `Stopping` 的那一步有）。 -/
 def step : Face → Event → Face × Option Cause
-  | .stopping mode deadline, event => (stopping mode deadline event, none)
+  | .stopping mode sinks, event => (stopping mode sinks event, none)
   | .gone handoff, _ => (.gone handoff, none)
   | face, event => serving face event
 
@@ -193,11 +200,11 @@ inductive Reaches : State → State → Prop where
 /-! ## 3 穷举：每一个面与每一个事件 -/
 
 def allModes : List Mode := [.drain, .interrupt]
-def allDeadlines : List Deadline := [.unarmed, .armed]
+def allSinks : List Sinks := [.held, .cut]
 
 def allFaces : List Face :=
   [.opening, .cli, .quietHost, .headless] ++
-  allModes.flatMap (fun m => allDeadlines.map (fun d => Face.stopping m d)) ++
+  allModes.flatMap (fun m => allSinks.map (fun k => Face.stopping m k)) ++
   [.gone .written, .gone .skipped]
 
 def allEvents : List Event :=
@@ -207,7 +214,7 @@ def allEvents : List Event :=
 
 theorem every_face_is_listed (face : Face) : face ∈ allFaces := by
   cases face with
-  | stopping mode deadline => cases mode <;> cases deadline <;> decide
+  | stopping mode sinks => cases mode <;> cases sinks <;> decide
   | gone handoff => cases handoff <;> decide
   | _ => decide
 
@@ -390,6 +397,21 @@ theorem an_armed_deadline_ends_the_process (face : Face) (armed : face.armed = t
     (by decide) face .web
   simp_all
 
+/-- 一步到不了「drain 且切断」，除非本来就在那里：切断总伴着一次升到 `interrupt`。 -/
+theorem cut_steps (face : Face) (event : Event) (before : face ≠ .stopping .drain .cut) :
+    (step face event).1 ≠ .stopping .drain .cut := by
+  have h := everywhere (p := fun f e =>
+    decide (f = .stopping .drain .cut) || !decide ((step f e).1 = .stopping .drain .cut))
+    (by decide) face event
+  simp_all
+
+/-- 终端的出口只在 `interrupt` 里切断：于是切断出口的面总有时限，UI 线程停写之后进程最迟在时限到时退出。 -/
+theorem a_cut_terminal_interrupts {s t : State} (trace : Reaches s t)
+    (fresh : s.face ≠ .stopping .drain .cut) : t.face ≠ .stopping .drain .cut := by
+  induction trace with
+  | here => exact fresh
+  | next event _ ih => exact cut_steps _ event ih
+
 /-! ## 5 转移向量
 
 每一行是「面 事件 下一个面 缘由」，名字是 Rust 的变体名；`bin::console::lifecycle` 的测试逐行回放这张表。 -/
@@ -398,16 +420,16 @@ def Mode.code : Mode → String
   | .drain => "Drain"
   | .interrupt => "Interrupt"
 
-def Deadline.code : Deadline → String
-  | .unarmed => "Unarmed"
-  | .armed => "Armed"
+def Sinks.code : Sinks → String
+  | .held => "Held"
+  | .cut => "Cut"
 
 def Face.code : Face → String
   | .opening => "Opening"
   | .cli => "Cli"
   | .quietHost => "QuietHost"
   | .headless => "Headless"
-  | .stopping m d => s!"Stopping/{m.code}/{d.code}"
+  | .stopping m k => s!"Stopping/{m.code}/{k.code}"
   | .gone .written => "Gone/Written"
   | .gone .skipped => "Gone/Skipped"
 

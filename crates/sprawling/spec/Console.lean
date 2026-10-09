@@ -30,8 +30,9 @@
 **生命周期**（`bin::console::lifecycle`，形状 2 state machine，模型与性质见 `Console/Lifecycle.lean`）：
 
 ```rust
-pub(crate) enum Face { Opening, Cli, QuietHost, Headless, Stopping { mode: wire::CloseMode, deadline: Deadline }, Gone(Handoff) }
-pub(crate) enum Deadline { Unarmed, Armed }
+pub(crate) enum Face { Opening, Cli, QuietHost, Headless, Stopping { mode: wire::CloseMode, sinks: Sinks }, Gone(Handoff) }
+pub(crate) enum Sinks { Held, Cut }
+pub(crate) const INTERRUPT_GRACE: Duration = Duration::from_secs(4);
 pub(crate) enum Handoff { Written, Skipped }
 pub(crate) enum Surface { Cli, QuietHost, Headless }
 pub(crate) enum Asker { Console, Page }
@@ -41,10 +42,11 @@ pub(crate) fn step(face: Face, event: Event) -> (Face, Option<Cause>);
 ```
 
 - 只有停城请求进入 `Stopping`：CLI 的 `/quit`、同一台电脑上的页面发来的 `CloseCity`、信号、终端没了、`wire::serve` 失败。进入的那一步给出缘由，`CommandDesk::close` 记下它；先到的缘由作数。
-- **键与信号是两件事**。CLI 与安静宿主在 raw 模式里读键，敲出来的 Ctrl+C 是一个键，不是信号，城只在每个会话里第一次收到它时印一行「复制请先选中文字；关闭城市用 /quit」，此外什么都不做；Ctrl+C 与 Ctrl+V 归终端（有选区时复制、粘贴）。信号形式的 `SIGINT`（Windows 的 `CTRL_C_EVENT`）在交互面上面不变，在 `Opening` 与 `Headless` 里是 `Stopping(Drain)`，工装与服务管理器靠它。Windows 的 Ctrl+Break 始终是信号，处处是 `Stopping(Drain)`；`SIGTERM` 处处是 `Stopping(Interrupt)`，不设我们自己的时限。
-- **终端没了**（Windows 的 `CTRL_CLOSE_EVENT`，Unix 的 `SIGHUP`，raw 模式下读键出错）：先切断所有终端出口，再 `Stopping(Interrupt)` 并装上时限 `LOST_TERMINAL_GRACE`（4 s）。Windows 在关窗 5 s 后结束进程，4 s 给交接留出余量；Unix 取同一个数，三个平台行为相同。
-- **升档**：收口中再来一次显式停止（`/quit`、页面的 `CloseCity`、`SIGINT`、Ctrl+Break）从 `Drain` 升到 `Interrupt`；`Interrupt` 中再来一次，或第二个 `SIGTERM`，或时限到了，进程不写交接立刻退出，并说一行「the city exits without a handoff; `sprawling resume` will close what was open」。终端没了不算一次升档，只装上时限。
-- `Interrupt` 怎样停：台子记下 `interrupting`，每条 lane 在下一个安全点从 `CommandDesk::interrupt_for` 读到 `Cancel`，后台命令经 `Backlog::halt(None)` 停下，不写 `city_halted`（否则下次开城这座城仍冻着）；然后照常 `land_the_rest` 并写交接。
+- **键与信号是两件事**。CLI 与安静宿主在 raw 模式里读键，敲出来的 Ctrl+C 是一个键，不是信号，城只在每个会话里第一次收到它时印一行「复制请先选中文字；关闭城市用 /quit」，此外什么都不做；Ctrl+C 与 Ctrl+V 归终端（有选区时复制、粘贴）。信号形式的 `SIGINT`（Windows 的 `CTRL_C_EVENT`）在交互面上面不变，在 `Opening` 与 `Headless` 里是 `Stopping(Drain)`，工装与服务管理器靠它。Windows 的 Ctrl+Break 始终是信号，处处是 `Stopping(Drain)`；`SIGTERM` 处处是 `Stopping(Interrupt)`，与其他 interrupt 一样带时限。
+- **每一次 interrupt 都有时限**（`Console/Lifecycle.lean` D75）：面进入 `Stopping(Interrupt)` 的那一步，外壳装上 `INTERRUPT_GRACE`（4 s），不论这次 interrupt 来自 `/quit` 后的 n、页面的「立刻停下并关闭」、`SIGTERM`、收口中的第二次请求还是终端没了。进行中的 provider 调用不是安全点，没有时限的 interrupt 要等到调用超时；时限到了，进程不写交接退出，留下的 run 由下一次 `serve` 的启动扫描冻结（`crates/accounting/Spec.lean` §8-18-1）。
+- **终端没了**（Windows 的 `CTRL_CLOSE_EVENT`，Unix 的 `SIGHUP`，raw 模式下读键出错）：切断所有终端出口（`Sinks::Cut`），进入 `Stopping(Interrupt)`，于是带着同一个时限。Windows 在关窗 5 s 后结束进程，4 s 给交接留出余量；Unix 取同一个数，三个平台行为相同。
+- **升档**：收口中再来一次显式停止（`/quit`、页面的 `CloseCity`、`SIGINT`、Ctrl+Break）从 `Drain` 升到 `Interrupt`，时限从这一步起算；`Interrupt` 中再来一次，或第二个 `SIGTERM`，或时限到了，进程不写交接立刻退出，并说一行「the city exits without a handoff; `sprawling resume` will close what was open」。终端没了不算一次升档，只切断出口。
+- `Interrupt` 怎样停：台子记下 `interrupting`，每条 lane 在下一个安全点从 `CommandDesk::interrupt_for` 读到 `Cancel`，后台命令经 `Backlog::halt(None)` 停下，不写 `city_halted`（否则下次开城这座城仍冻着）；然后照常 `land_the_rest` 并写交接；时限到时还没落地的 run，进程不等它。
 
 **`/quit` 是一条线上命令**：`CloseCity { mode, idem }`（`crates/wire/spec/Command/Kind.lean`，`LocalOnly`）。执行者在 `bin::assembly`：`Listening::serve` 的 `select!` 里与信号同一条事件通道，`Front::commands` 在命令到达台子之前截下它，变成 `Event::Quit(Asker::Page, mode)`；worker 那一臂答「城在别处关闭」。只在监听绑在回环上时接受，绑在别的地址上一律以 `E_GATE_DENIED` 拒，因为 `/ws` 的命令出口不带对端地址，而回环绑定是「对端是回环」唯一不必另取对端地址就成立的条件；会话已认证由本地门的入场判定负责（`crates/wire/spec/Reception.lean`）。**推翻的记录**：此前「收口不是一条 Command，能被拼出来的线上帧就是陌生人停掉别人城市的一条路」。本地门要求每个调用者都带凭据之后，回环上不再有陌生人；剩下的本地调用者（居民的 `exec`、浏览器工具）本来就能发 `PutRules`、`RemoveBuilding` 这类更重的命令，停城对它们不是新增的能力。远程设备由 class 列的 `LocalOnly` 挡在中继上。
 
@@ -58,9 +60,9 @@ pub(crate) fn step(face: Face, event: Event) -> (Face, Option<Cause>);
 - 斜杠词表是 `wire::Slash`（§8-21），控制台不再有自己的一份；`/wire <verb> [<json>]` 收起其余 wire 动词，它们是 `wire::COMMAND_NAMES` 与 `QUERY_NAMES` 的投影，JSON 体缺 `idem` 时由控制台补上这一行的键。
 - **每一行一把幂等键，由控制台铸**：`LineKeys::drawn` 取 16 字节 OS 熵作 `origin`，`next` 按行计数，键 = `IdemKey::derive(RunId::CITY, 行号, origin)`。城把见过的键连同第一次的答复跨重启记住，所以只由文字派生的键会吞掉第二次敲的同一行。熵取不到时控制台说出原因并关闭，城照跑。
 
-**安静宿主（`QuietHost`）**：备用屏、raw 模式，恰好两行：地址，与配对码（本地门给出时；没有就只有地址），外加至多一行临时行：远程门的确认码，或收口进度。Enter 再开一次浏览器，Esc 回到 `Cli`，主屏的回滚原样都在。离开备用屏之前先擦掉它（`Clear(All)` 再 `LeaveAlternateScreen`），因为用户设置可以让备用屏进回滚；真正的保证是配对码寿命短。窗口标题写「sprawling · closing this window stops it」，标题里不放配对码。安静宿主不订阅事件流。
+**安静宿主（`QuietHost`）**：备用屏、raw 模式，恰好两行：地址，与配对码（本地门给出时；没有就只有地址），外加至多一行临时行：远程门的确认码，或收口进度。监听超出这台电脑、城为这次 serve 现铸了 key 时（`Terminal.token`），key 跟在第二行的配对码后面：备用屏是它唯一出现的地方，CLI 里要看它就 `/web`。主屏、回滚、地址栏与行控制台都不出现 key，`/web` 印出的地址不带 `?token=`，浏览器经 open code 配对（`firstrun::open_paired`）。Enter 再开一次浏览器，Esc 回到 `Cli`，主屏的回滚原样都在。离开备用屏之前先擦掉它（`Clear(All)` 再 `LeaveAlternateScreen`），因为用户设置可以让备用屏进回滚；真正的保证是配对码寿命短。窗口标题写「sprawling · closing this window stops it」，标题里不放配对码。安静宿主不订阅事件流。
 
-**终端只有一个写者**（`bin::console::ui`）：一条 UI 线程拥有终端，别的线程经一个有界通道（`UI_DEPTH`，256 条）交给它一行；满了就丢，与诊断可丢同义，worker 与记账线程因此从不在终端上阻塞（旧 conhost 在选中文字时会暂停输出）。读键在另一条线程上，经同一个通道交进来。生命周期的面经 `tokio::sync::watch` 告诉 UI 线程，UI 线程按面切屏；面到了 `Stopping(_, Armed)` 时终端已经没了，UI 线程不再写任何东西。进入 raw 模式时装一个 panic hook：先擦掉备用屏、退出备用屏与 raw 模式，再交给原来的 hook，然后照常 abort。
+**终端只有一个写者**（`bin::console::ui`）：一条 UI 线程拥有终端，别的线程经一个有界通道（`UI_DEPTH`，256 条）交给它一行；满了就丢，与诊断可丢同义，worker 与记账线程因此从不在终端上阻塞（旧 conhost 在选中文字时会暂停输出）。读键在另一条线程上，经同一个通道交进来。生命周期的面经 `tokio::sync::watch` 告诉 UI 线程，UI 线程按面切屏；面到了 `Stopping(_, Cut)` 时终端已经没了，UI 线程不再写任何东西。进入 raw 模式时装一个 panic hook：先擦掉备用屏、退出备用屏与 raw 模式，再交给原来的 hook，然后照常 abort。
 
 **事件流与诊断行不再印到终端**（sprawling D44）。服务中的城每提交一行账本、每写一条诊断，终端零写入：诊断只进页面的 log 透镜（`serving::Journal` 的终端出口在控制台拥有终端时关掉），CLI 只印选中房间的记录。标准输入输出不是终端时（`Headless`），诊断照旧写标准错误，工装读它。**原因**：一条记录里有人打的字与模型的回复，终端会被旁人看到、被录屏、留在回滚里；CLI 印正文是因为人选了 CLI，这正是「正文只在人要时才印」本来的条件。**被否掉的做法**：保留默认每条记录一行的事件流——它在 CLI 里与答复抢屏，在安静宿主里违背「只有两行」，而 1024 条的广播通道订阅了却不读会让带正文的记录一直驻留。
 
@@ -68,8 +70,7 @@ pub(crate) fn step(face: Face, event: Event) -> (Face, Option<Cause>);
 
 **本节接口的当前状态。**
 
-- 别的模块里直接写标准错误的那些行（`serving::standing`、`serving::placement`、`monitor::beat`、`supervising::children` 等的一次性通知）还没有改走诊断：控制台拥有终端时，它们会写进 raw 模式下的 CLI 或安静宿主。改法是逐个改成 `Diagnostics` 的 `refuse` 级，诊断随之只进 log 透镜。
-- worker 里 `CloseCity` 那一臂仍答 `not_built`：`xtask wiring` 不许一个 `reach = client` 的动词已经做好却没有客户端画出它，而 WebUI 的 `/quit` 还没画。画出它的那次改动同时把这一臂改成「城在别处关闭」。执行者不受影响，它在命令到达台子之前就截下了这一帧。
+- 进程级的一次性通知（`serving::standing` 的优先级、`serving::placement` 的座位与节流、`monitor::beat` 的节拍文件）走 `serving::journal::notice`，是 `Diagnostics` 的 `refuse` 级一行：控制台拥有终端时只进 log 透镜。`assembly::listen` 装上这个出口之前（这时还没有控制台）它们写标准错误。`supervising::children` 的几行不在其中：它们在子进程退出之后、由监护进程写在终端上，「按 Enter 再试」要人读到，那时没有控制台占着终端。
 - 粘贴多行文本时每个换行都是一次 Enter，粘贴会被拆成几次发送；终端的 bracketed paste 在 Windows 上不可用，要统一处理需要另一种判断。
 
 **本章测试**：`bin::console::lifecycle` 逐行回放 `Console/Lifecycle.lean` §5 的转移向量；`/wire` 的投影含每个可经 socket 带的 Command 与每个 Query；行控制台把一行答在那一行之后，同一行敲两次是两次派活。
@@ -84,7 +85,7 @@ pub(crate) fn step(face: Face, event: Event) -> (Face, Option<Cause>);
 // bin::console::terminal（渲染是纯函数，I/O 在 UI 线程）
 pub struct Terminal {
     pub url: String,
-    pub pairing: Option<String>,  // 安静宿主第二行印的配对码
+    pub token: Option<String>,    // 为超出这台电脑的 serve 现铸的 key，只印在安静宿主的第二行
     pub city: String,
     pub client: String,
     pub bind: SocketAddr,
