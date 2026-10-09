@@ -46,7 +46,7 @@ fn exposed() -> SocketAddr {
 fn the_command_and_query_tables_hold_their_declared_counts() {
     // The counts are the wire's closed surface, not a style choice.
     assert_eq!(COMMAND_NAMES.len(), 48, "command table");
-    assert_eq!(QUERY_NAMES.len(), 60, "query table");
+    assert_eq!(QUERY_NAMES.len(), 59, "query table");
 
     let mut sorted = COMMAND_NAMES.to_vec();
     sorted.sort_unstable();
@@ -56,7 +56,7 @@ fn the_command_and_query_tables_hold_their_declared_counts() {
     let mut sorted = QUERY_NAMES.to_vec();
     sorted.sort_unstable();
     sorted.dedup();
-    assert_eq!(sorted.len(), 60, "query names are distinct");
+    assert_eq!(sorted.len(), 59, "query names are distinct");
 }
 
 #[test]

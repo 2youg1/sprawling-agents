@@ -92,7 +92,7 @@
   $effect(() => {
     if (group === drawn) return;
     drawn = group;
-    if (nav === null || !nav.contains(document.activeElement)) return;
+    if (!nav?.contains(document.activeElement)) return;
     nav.querySelector<HTMLElement>("[aria-current=true]")?.focus();
   });
 
