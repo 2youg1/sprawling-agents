@@ -1528,7 +1528,7 @@ fn serve_flight(&mut self, wait: Duration) -> Result<Landed, AxError>;
 ——有活在飞时 `DeskWait::Idle` 随每次 relay 往返而来，而一座每次都打开排程文件的城把时间花在开文件上。
 
 **关城要把车道等回来**：`DeskWait::Close` 之后不再接新活，但口子照服务、回家的照落账，直到没有活在飞，
-然后才写交接。一条停在 append 上的车道被丢下，丢掉的是城已经答应它耐久的那些行。
+然后才写交接。一条停在 append 上的车道被丢下，丢掉的是城已经答应它耐久的那些行。`Interrupt` 收口不等 lane 自己跑完：每条 lane 在下一个安全点读到 `Cancel`，落地后照样写交接（`crates/accounting/spec/Worker.lean` §8-11）。
 
 **七个入口全部进车道，`dispatch_in` 退出生产（H-04）**。此前只有 `Command::Dispatch` 走车道，
 而排程（`tick`）、外部到达（`wake`）、敲门（`answer_knocks`）、委派子活与继任（`conclude`）、

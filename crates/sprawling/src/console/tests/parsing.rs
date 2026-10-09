@@ -18,34 +18,20 @@
 )]
 
 use super::super::language::Line;
-use super::super::language::{CONTROL, carried_commands, help, parse, snake, verbs};
+use super::super::language::{carried_commands, help, parse, snake, wire_verbs};
 use super::helpers::*;
 
-/// The load-bearing property of this whole module: the verb table is
-/// a projection of the wire's vocabulary. A hand-written list would
-/// drift, and nothing would say so.
+/// The load-bearing property of `/wire`: its verbs are a projection
+/// of the wire's vocabulary. A hand-written list would drift, and
+/// nothing would say so.
 #[test]
 fn every_wire_verb_is_a_verb_this_console_answers_to() {
-    let known = verbs();
+    let known = wire_verbs();
     for name in carried_commands().chain(wire::QUERY_NAMES.iter().copied()) {
         assert!(
             known.contains(&snake(name)),
             "{name} is on the wire and not in the console"
         );
-    }
-}
-
-/// A name that meant one thing on the wire and another in the
-/// console would make `/cancel` ambiguous to a person and to this
-/// parser at once.
-#[test]
-fn no_control_verb_shares_a_name_with_a_wire_verb() {
-    for control in CONTROL {
-        let clash = wire::COMMAND_NAMES
-            .iter()
-            .chain(&wire::QUERY_NAMES)
-            .any(|name| snake(name) == control);
-        assert!(!clash, "{control} means two things");
     }
 }
 #[test]
@@ -56,40 +42,30 @@ fn the_wire_spelling_becomes_the_typed_spelling() {
 }
 #[test]
 fn an_empty_line_is_not_a_question() {
-    assert_eq!(parse("   ", Some(&room()), key()), Line::Nothing);
+    assert_eq!(parse("   ", key()), Line::Nothing);
 }
 #[test]
 fn plain_text_is_work_for_the_chosen_room() {
     assert_eq!(
-        parse("  measure the beam  ", Some(&room()), key()),
+        parse("  measure the beam  ", key()),
         Line::Work("measure the beam".to_owned())
     );
 }
-
-/// With nowhere for the work to go, the console says what to type
-/// rather than guessing a room on somebody's behalf.
 #[test]
-fn plain_text_with_no_room_chosen_says_what_to_type() {
-    let Line::Unknown { nearest, .. } = parse("measure the beam", None, key()) else {
-        panic!("work with no room is refused");
-    };
-    assert_eq!(nearest, vec!["at".to_owned()]);
-}
-#[test]
-fn the_control_verbs_are_the_six_it_owns() {
-    assert_eq!(parse("/help", None, key()), Line::Help);
-    assert_eq!(parse("/web", None, key()), Line::OpenWeb);
-    assert_eq!(parse("/serving", None, key()), Line::Serving);
-    assert_eq!(parse("/quit", None, key()), Line::Quit);
-    assert_eq!(parse("/at lab/room1", None, key()), Line::Select(room()));
+fn the_slash_verbs_are_the_tables() {
+    assert_eq!(parse("/help", key()), Line::Help);
+    assert_eq!(parse("/web", key()), Line::OpenWeb);
+    assert_eq!(parse("/serving", key()), Line::Serving);
+    assert_eq!(parse("/quit", key()), Line::Quit);
+    assert_eq!(parse("/room lab/room1", key()), Line::Select(room()));
     assert_eq!(
-        parse("/remote close", None, key()),
+        parse("/remote close", key()),
         Line::Remote(crate::outside::console::RemoteLine::Close)
     );
 }
 #[test]
 fn a_query_with_no_arguments_is_the_bare_name() {
-    let Line::Frame(frame) = parse("/city_view", None, key()) else {
+    let Line::Frame(frame) = parse("/wire city_view", key()) else {
         panic!("city_view is a query");
     };
     assert!(matches!(
@@ -102,7 +78,7 @@ fn a_query_with_no_arguments_is_the_bare_name() {
 }
 #[test]
 fn a_query_that_needs_an_argument_takes_it_as_json() {
-    let Line::Frame(frame) = parse("/archive_search {\"needle\":\"beam\"}", None, key()) else {
+    let Line::Frame(frame) = parse("/wire archive_search {\"needle\":\"beam\"}", key()) else {
         panic!("archive_search takes a needle");
     };
     match *frame {
@@ -117,10 +93,10 @@ fn a_query_that_needs_an_argument_takes_it_as_json() {
 }
 #[test]
 fn an_unknown_verb_comes_back_with_the_ones_that_start_like_it() {
-    let Line::Unknown { verb, nearest } = parse("/carn", None, key()) else {
+    let Line::Unknown { verb, nearest } = parse("/wire carn", key()) else {
         panic!("carn is nobody's verb");
     };
-    assert_eq!(verb, "carn");
+    assert_eq!(verb, "wire carn");
     assert!(nearest.contains(&"cancel".to_owned()), "{nearest:?}");
 }
 
@@ -128,16 +104,17 @@ fn an_unknown_verb_comes_back_with_the_ones_that_start_like_it() {
 /// verb problem, and the answer says so.
 #[test]
 fn a_known_verb_with_an_unreadable_body_is_told_apart_from_an_unknown_one() {
-    let Line::Malformed { verb, .. } = parse("/dispatch not json", None, key()) else {
+    let Line::Malformed { verb, .. } = parse("/wire dispatch not json", key()) else {
         panic!("dispatch needs a body it can read");
     };
     assert_eq!(verb, "dispatch");
 }
 #[test]
 fn help_names_every_verb_the_parser_answers_to() {
-    let text = help(Some(&room()));
+    let text = help(&room());
     for name in carried_commands().chain(wire::QUERY_NAMES.iter().copied()) {
         assert!(text.contains(&snake(name)), "{name} is missing from help");
     }
     assert!(text.contains("lab/room1"), "help says where work goes");
+    assert!(text.contains("/room"), "help lists the slash verbs");
 }

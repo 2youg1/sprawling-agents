@@ -39,6 +39,10 @@ pub(super) struct Constants {
     /// admits; the appearance page's box reads this floor rather than a
     /// copy of its own.
     pub(super) body_px_min: u32,
+    /// `wire::Slash::ALL`, one row per verb: spelling, argument, where it
+    /// is offered, and the sentence that explains it. The client's own
+    /// table reads these rather than spelling a verb a second time.
+    pub(super) slash: Vec<[&'static str; 4]>,
 }
 
 /// The text the wire produces now.
@@ -53,6 +57,17 @@ fn render() -> Result<String, XtaskError> {
         hash: wire::schema_hash().to_string(),
         city_run: kernel::RunId::CITY.to_string(),
         body_px_min: wire::BODY_PX_MIN,
+        slash: wire::Slash::ALL
+            .into_iter()
+            .map(|verb| {
+                [
+                    verb.spelling(),
+                    verb.takes(),
+                    verb.offered().as_str(),
+                    verb.says(),
+                ]
+            })
+            .collect(),
     };
     emit::emit(&wire::wire_schema(), &constants).map_err(|refused| XtaskError::Doc {
         file: format!("wire::wire_schema at {}", refused.at),

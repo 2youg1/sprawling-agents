@@ -54,6 +54,7 @@ import crates.wire.spec.Server
 import crates.wire.spec.Server.Committed
 import crates.wire.spec.Server.Listener
 import crates.wire.spec.Server.Socket
+import crates.wire.spec.Slash
 
 /-! # wire 的规格
 
@@ -289,6 +290,7 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 | 8-93 | `crates/wire/spec/Server.lean` |
 | 8-94 | `crates/wire/spec/Reception/Entry.lean` |
 | 8-95 | `crates/wire/spec/Reception/Pairing.lean` |
+| 8-96 | `crates/wire/spec/Slash.lean` |
 | 19 | `crates/wire/spec/Command/Kind.lean` |
 | 19-1 | `crates/wire/spec/Command/Kind.lean` |
 | 19-2 | `crates/wire/spec/Command/Kind.lean` |

@@ -196,7 +196,10 @@ fn scenario(runs: usize, latency: Latency) -> Taken {
         .collect();
     done.store(true, Ordering::SeqCst);
     let relay = sampler.join().unwrap();
-    desk.close(Closing::Chosen);
+    desk.close(Closing::Chosen {
+        by: crate::worker::ClosedBy::Console,
+        mode: wire::CloseMode::Drain,
+    });
     attending.join().unwrap();
     drop(provider);
     Taken {
@@ -275,7 +278,10 @@ fn relay_idle() -> Vec<Duration> {
     std::thread::sleep(Duration::from_secs(4));
     done.store(true, Ordering::SeqCst);
     let taken = sampler.join().unwrap();
-    desk.close(Closing::Chosen);
+    desk.close(Closing::Chosen {
+        by: crate::worker::ClosedBy::Console,
+        mode: wire::CloseMode::Drain,
+    });
     attending.join().unwrap();
     drop(provider);
     taken

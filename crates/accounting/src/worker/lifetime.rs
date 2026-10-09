@@ -14,7 +14,7 @@
 
 mod closing;
 
-pub use closing::Closing;
+pub use closing::{ClosedBy, Closing};
 
 use super::{
     Collaborating, Credentials, Doorstep, Flight, GatewayModels, Hands, Planning, RoomQueues,

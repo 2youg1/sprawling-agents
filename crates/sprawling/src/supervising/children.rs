@@ -6,13 +6,12 @@
 //! The processes a supervised city runs as: `serve` in a child, and
 //! `resume` in a child after each crash (`crates/sprawling/spec/Supervising.lean` §8-109).
 //!
-//! Thin on purpose. The exit a child leaves is read by `Closing::of`
+//! Thin on purpose. The exit a child leaves is read as served or failed
 //! and judged by `CrashBudget::after`; this file only spawns, waits,
 //! measures elapsed time, and prints what the person needs to see.
 
 use super::{CrashBudget, Next};
 use crate::serving::standing::monotonic_now;
-use accounting::worker::Closing;
 use kernel::{AxCode, AxError, TimeMs};
 use std::path::Path;
 use std::process::Command;
@@ -84,7 +83,7 @@ pub fn supervise(city: &Path, addr: &str, child: &Child) -> Result<Ended, AxErro
         launch = Launch::Again;
         let since = monotonic_now().saturating_duration_since(supervised);
         let at = TimeMs::new(u64::try_from(since.as_millis()).unwrap_or(u64::MAX));
-        match budget.after(&Closing::of(&served), at) {
+        match budget.after(&served, at) {
             Next::Stop => return Ok(Ended::Chosen),
             Next::Restart(kept) => {
                 budget = kept;

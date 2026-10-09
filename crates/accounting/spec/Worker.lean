@@ -71,6 +71,20 @@ pub fn init_city(city_root: &Path) -> Result<InitReport, AxError>;          // f
 pub fn form_city(city_root: &Path, adopt: Adopt) -> Result<InitReport, AxError>;
 ```
 
+**收口带着它是怎样停的**（`accounting::worker::lifetime::closing`、`accounting::worker::desk`）：
+
+```rust
+pub enum Closing { Chosen { by: ClosedBy, mode: wire::CloseMode }, Broken { cause: String } }
+pub enum ClosedBy { Console, Page, InterruptSignal, BreakSignal, Terminate, TerminalLost }
+impl CommandDesk {
+    pub fn close(&self, why: Closing);   // 先到的缘由作数；mode 为 Interrupt 时同时记下 interrupting
+    pub fn interrupt(&self);             // 收口中升档：从此每条 lane 在下一个安全点读到 Cancel
+    pub fn interrupting(&self) -> bool;
+}
+```
+
+`Chosen` 带上谁关的城与怎样对待还在跑的 run，交接照实写：`Drain` 写「every run under way landed before this line」，`Interrupt` 写「runs still under way were stopped at their next safe point」，`overview` 点名 `by`（控制台的 `/quit`、同一台电脑上的页面、哪一种信号、终端没了）。**原因**：一份把 `Interrupt` 写成「nothing was interrupted mid-command」的交接会让下一任以为每条 run 都按自己的步调落了地；一份把信号写成人主动选择的交接同样说了没发生的事。**否决的方案**：只给 `Chosen` 加一个布尔 `interrupted`——它说不出是谁关的，而服务管理器的 `SIGTERM` 与人的 `/quit` 对下一任是两件事。`Interrupt` 不写 `city_halted`：后台命令经 `Backlog::halt(None)` 停下，lane 在安全点经 `CommandDesk::interrupt_for` 读到 `Cancel`，下次开城这座城不是冻着的。从哪一面、由哪个事件进入收口的权威是 `crates/sprawling/spec/Console/Lifecycle.lean`；本 crate 只照 `Closing` 写交接，不判断缘由。关城路径上的失败经诊断写出，不直接写终端：终端此刻可能已经没了，而写一个没了的终端会 panic。
+
 - **`Hands` 只装直接碰这台电脑的东西。** 墙钟、doctor、内存与卷的计数器、文件管理器、浏览器、正在运行的可执行文件、需求表、exec 的解释器与引擎，以及 vault。它们各自的生产实现住在 `sprawling`，由 `bin::assembly::production::hands` 一处装好。`ModelFactory` 与 `Connectors` 的生产实现不在里面：`GatewayModels` 与 `Residents` 随 worker 住在本 crate，由 `new` 装上（D18）。
 - **构造器收一个值，不收九个参数。** 生产的调用方写 `RunWorker::new(root, log, bin::assembly::hands(vault))`；换掉一只手写 `Hands { clock: …, ..hands(vault) }`，或者构造之后调原有的 `with_*` 门。
 - **worker 读的每一个时刻都经 `hands.clock`**，包括打开账本、`holding` 为 `last_tick` 取起点、`form` 写创世两行的时刻（§8-3）。

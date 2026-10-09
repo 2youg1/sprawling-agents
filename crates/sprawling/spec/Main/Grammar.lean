@@ -121,6 +121,8 @@ pub(super) enum LineError {
 
 **本节接口的当前状态。** `call`、`enrol`、`install`、`fork`、`status`、`serve` 的标志值与 `doctor` 的全部参数，仍由各自的函数从原始 argv 读（`router::flag_value`、`args.iter().any`），解析器只替它们校验；改为只读 `Arguments` 之后 `flag_value` 删除。README、README.zh-CN、`docs/wire.md`、`docs/operating.md` 里的命令语法块还是手写的，改由 `cargo xtask docnum` 从这张表生成（一个名为 `cli_verbs` 的受管区块）是下一步；`nearest` 与 `console::language` 里找近似动词的那一份是同一条规则的两份，合并到一处也是下一步。
 
+**服务的几个标志。** `up` 与 `serve` 共用一张标志表。`--console` 让 `serve` 落到 CLI（标准输入输出不是终端时落到行控制台），`--no-console` 让任何起法落到 `Headless`；落到哪一面的唯一定义是 §8-11 的那张表，标志只是它的输入。事件流不再印到终端（sprawling D44），所以没有放宽它的标志：`--whole-records` 删除。`--log <level>` 的帮助由 `runtime::diagnostics::Level::ALL` 生成（`refuse`、`effect`、`decide`、`trace`、`wire`，或 `off`），与拒绝一个未知级别时印的那句同出一处，不再手写一份。
+
 **决定。**
 
 1. 不用 clap。命令表是数据，解析器约两百行；启动时间几乎全是操作系统的开销（Windows x86-64 桌面级机器上，`--version` 首字节 7.98 ms，空进程下限 5.40 ms），没有给一个参数库的依赖、编译时间与体积留出位置。重新考虑的条件：动词需要子动词或 shell 补全以外的、这张表表达不了的结构。命令表的一行可以叫两个词（`playback export`），解析先试头两个词，这是子动词在这张表里的全部写法（§8-126）。

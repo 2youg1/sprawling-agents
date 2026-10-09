@@ -16,7 +16,7 @@ use sprawling::assembly::SystemClock;
 use sprawling::firstrun;
 
 use super::calling::call;
-use super::city::{init, resume, serve, up, up_at, use_folder};
+use super::city::{Entrance, init, resume, serve, up, up_at, use_folder};
 use super::data::{adopt, enrol, export, fork, install, replay, restore, status};
 use super::grammar::{Arguments, Invocation, parse};
 use super::verbs::{self, Verb};
@@ -170,9 +170,16 @@ fn answered(result: Result<String, kernel::AxError>, args: &[String]) -> ExitCod
 /// path out of here holds the window until somebody has read it.
 pub(super) fn first_screen() -> ExitCode {
     let city = default_city_location();
+    // A city already there is opened rather than asked about: the
+    // question exists so that genesis has somebody behind it.
+    if city::has_history(&city).is_ok_and(|history| history == city::History::Present) {
+        let code = up_at(&city, DEFAULT_AT, &[], Entrance::Bare);
+        hold();
+        return code;
+    }
     let answered = firstrun::ask(&city, &mut std::io::stdin().lock(), &mut std::io::stdout());
     let code = match answered {
-        Ok(firstrun::FirstScreen::Start(city)) => up_at(&city, DEFAULT_AT, &[]),
+        Ok(firstrun::FirstScreen::Start(city)) => up_at(&city, DEFAULT_AT, &[], Entrance::Bare),
         Ok(firstrun::FirstScreen::Use(folder)) => use_folder(&folder),
         Ok(firstrun::FirstScreen::Quit) => {
             println!("{}", verbs::overview());
@@ -248,9 +255,15 @@ pub(super) fn log_floor(args: &[String]) -> Result<Option<runtime::diagnostics::
 }
 
 pub(super) fn log_levels() -> String {
+    format!("use --log with one of {}", level_names())
+}
+
+/// The words `--log` takes, from the one list of levels: what its help
+/// shows and what its refusal names.
+pub(super) fn level_names() -> String {
     let names: Vec<&str> = runtime::diagnostics::Level::ALL
         .into_iter()
         .map(|level| level.as_str())
         .collect();
-    format!("use --log with one of {}, or off", names.join(", "))
+    format!("{}, or off", names.join(", "))
 }

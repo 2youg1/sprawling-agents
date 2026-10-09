@@ -132,14 +132,30 @@ pub fn attend(worker: &mut RunWorker, desk: &CommandDesk) {
                 // writes its handoff once the proof has a verdict, rather
                 // than having it refused (`crates/sprawling/Spec.lean` §8-90).
                 worker.await_proof();
+                // A close that interrupts stops the background commands
+                // too, without writing `city_halted`: the next serve opens
+                // a city that works.
+                if desk.interrupting() {
+                    worker.stop_the_backlog();
+                }
                 // The lanes are waited for rather than abandoned: a lane
                 // left blocked on an append loses lines this city had
-                // already told it were durable.
+                // already told it were durable. Failures here go to the
+                // diagnostics rather than the terminal, which may already
+                // be gone.
                 if let Err(err) = worker.land_the_rest() {
-                    eprintln!("a run could not be landed as the city closed: {err}");
+                    worker.note(
+                        runtime::diagnostics::Level::Refuse,
+                        "accounting::worker",
+                        &format!("a run could not be landed as the city closed: {err}"),
+                    );
                 }
                 if let Err(err) = worker.close_city(why) {
-                    eprintln!("the city could not write its handoff: {err}");
+                    worker.note(
+                        runtime::diagnostics::Level::Refuse,
+                        "accounting::worker",
+                        &format!("the city could not write its handoff: {err}"),
+                    );
                 }
                 break;
             }

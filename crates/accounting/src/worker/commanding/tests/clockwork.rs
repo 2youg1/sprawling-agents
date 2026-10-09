@@ -117,7 +117,10 @@ fn a_close_lands_between_commands_and_never_inside_one() {
         },
         wire::Reply::nowhere(),
     );
-    desk.close(Closing::Chosen);
+    desk.close(Closing::Chosen {
+        by: crate::worker::ClosedBy::Console,
+        mode: wire::CloseMode::Drain,
+    });
 
     assert!(
         matches!(desk.next(|_| false), DeskWait::Command(..)),
@@ -125,12 +128,12 @@ fn a_close_lands_between_commands_and_never_inside_one() {
     );
     assert!(matches!(
         desk.next(|_| false),
-        DeskWait::Close(Closing::Chosen)
+        DeskWait::Close(Closing::Chosen { .. })
     ));
 }
 
 /// A serve that failed closes the city as `Broken`, not through the door
-/// Ctrl-C uses: a handoff saying the person closed it would record a
+/// `/quit` uses: a handoff saying the person closed it would record a
 /// choice nobody made and a failure the next session never heard of.
 #[test]
 fn a_city_that_serving_brought_down_does_not_say_the_person_closed_it() {
@@ -156,7 +159,7 @@ fn a_city_that_serving_brought_down_does_not_say_the_person_closed_it() {
         .expect("the ledger has a last line");
     assert!(last.contains("handoff_written"), "{last}");
     assert!(
-        !last.contains("closed by the User"),
+        !last.contains("the city was closed"),
         "a failure is recorded as a choice: {last}"
     );
     assert!(

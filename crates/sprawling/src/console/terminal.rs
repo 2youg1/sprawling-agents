@@ -3,42 +3,40 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The console itself: the listener's own facts, and the loop that
-//! carries judged lines into the city (`crates/sprawling/spec/Console.lean` §8-11).
+//! The listener's own facts, and the line console a harness drives
+//! (`crates/sprawling/spec/Console.lean` §8-11, §8-21).
 //!
-//! [`Terminal`] is the one home of what the startup banner printed —
-//! URL, bound address, city directory, client source, pairing token.
-//! Those are facts about this process rather than about a history, so no
-//! query can answer them and `/serving` reprints them from here, beside
-//! counts that come from the `Metrics` query a browser also asks.
+//! [`Terminal`] is the one home of what this process knows about its
+//! listener - URL, bound address, city directory, client source,
+//! pairing code, the face it opens on. Those are facts about this
+//! process rather than about a history, so no query can answer them and
+//! `/serving` reprints them from here.
 //!
-//! The loop runs on threads of its own ([`start`]) because reading a
-//! keyboard blocks while the reactor serves a city, and [`drive`] takes
-//! any reader and writer so a test drives exactly the loop a person
-//! does. A command goes onto the `CommandDesk` a browser's frames land
-//! on and a question goes into the `Answering` function the socket
-//! calls, so this console decides nothing the server does not.
+//! [`start`] gives the console its face: the raw CLI or the quiet host
+//! when the terminal is the city's (`bin::console::ui`), or, when it is
+//! a pipe, the line console that reads whole lines and answers each on
+//! standard output, which is how a harness drives `/remote`.
 //!
-//! The point a reader most often gets wrong: end of input ends the
-//! console and not the city — a city that stopped answering because
+//! The point a reader most often gets wrong: end of input ends the line
+//! console and not the city - a city that stopped answering because
 //! nobody was typing would have made interaction a condition of service.
 
-use super::language::{Line, help, parse};
+use std::io::BufRead;
+use std::net::SocketAddr;
+use std::sync::Arc;
+
+use super::cli::{Next, Say, Session};
+use super::lifecycle::{Asker, Event, Face, Surface};
+pub(crate) use wire::Answering;
 
 /// What a console needs from the process that started it.
-///
-/// The pairing token is the key a person may be shown - only one minted
-/// for a serve beyond this machine - so `/web` can print the address a
-/// browser on another machine opens. It is not re-read from the
-/// environment here: one read, one authority.
-///
-/// The other three are what the startup banner printed and the event
-/// stream then scrolled away. A person watching a city from somewhere
-/// else needs them back on demand, and this process is the only thing
-/// that knows them - they are facts about a listener, not about a
-/// history, so no query can answer them.
 pub struct Terminal {
     pub url: String,
+    /// The key a person may be shown - only the one minted for a serve
+    /// beyond this machine - so `/web` can print the address a browser
+    /// on another machine opens. The pairing code a second browser on
+    /// this machine types is the door's (`Inside::door`), because each
+    /// guess replaces it.
     pub token: Option<String>,
     /// The city directory being served, as a person would type it.
     pub city: String,
@@ -49,25 +47,32 @@ pub struct Terminal {
     /// `0.0.0.0` is opened at `127.0.0.1` and the difference is exactly
     /// what decides whether strangers can reach it.
     pub bind: SocketAddr,
-    /// How much of each committed record the event stream prints.
-    pub records: super::stream::Records,
+    /// The face the console opens on.
+    pub surface: Surface,
 }
 
-use kernel::Address;
-use std::io::{BufRead, Write};
-use std::net::SocketAddr;
-use std::sync::Arc;
-pub(crate) use wire::Answering;
-
 /// What the console reaches the city through: the socket's own desk and
-/// answering function, and the remote door or why this serve has none.
+/// answering function, the remote door or why this serve has none, and
+/// the lifecycle it tells about `/web`, `/quit` and a lost terminal.
 pub(crate) struct Inside {
     pub(crate) desk: Arc<accounting::worker::CommandDesk>,
     pub(crate) answering: Answering,
     pub(crate) remote: Result<crate::outside::console::Remote, kernel::AxError>,
-    /// This machine's door for a browser, which `/web` asks for an open
-    /// code (`crates/sprawling/spec/Firstrun.lean` §8-8).
+    /// This machine's door for a browser: `/web` asks it for an open
+    /// code, and the quiet host shows its pairing code
+    /// (`crates/sprawling/spec/Firstrun.lean` §8-8).
     pub(crate) door: wire::LocalDoor,
+    pub(crate) lifecycle: tokio::sync::mpsc::Sender<Event>,
+}
+
+impl Inside {
+    /// Tells the lifecycle what happened. A lifecycle that stopped
+    /// listening belongs to a process that is ending, so nothing is lost.
+    pub(crate) fn tell(&self, event: Event) {
+        match self.lifecycle.blocking_send(event) {
+            Ok(()) | Err(_) => {}
+        }
+    }
 }
 
 /// What this process is doing, in one screen.
@@ -133,12 +138,8 @@ pub(crate) fn serving(
     )
 }
 
-/// The URL `/web` opens, with the pairing token on it when there is one.
-///
-/// A token in a query string is a token in the browser's history, and
-/// that is the trade this makes deliberately: the alternative is a
-/// person copying a secret by hand between two windows, which they will
-/// do wrongly and then paste somewhere worse.
+/// The address `/web` prints: the listener's, carrying the key when a
+/// person may be shown one, so a browser on another machine opens it.
 pub(crate) fn web_url(terminal: &Terminal) -> String {
     match &terminal.token {
         None => terminal.url.clone(),
@@ -146,212 +147,87 @@ pub(crate) fn web_url(terminal: &Terminal) -> String {
     }
 }
 
-/// Runs the console on threads of its own until the input ends.
+/// A console that has started: the writer whose end means the terminal
+/// is put back, when the terminal is the city's, and where a line meant
+/// for the person wherever they are goes, which the remote door's
+/// confirmation codes use.
+pub(crate) struct Started {
+    pub(crate) writer: Option<std::thread::JoinHandle<()>>,
+    pub(crate) notice: Say,
+}
+
+/// Starts the console on its face.
 ///
 /// Spawned rather than awaited because reading a keyboard blocks and the
-/// reactor is serving a city. Ending the input ends the console and
-/// **not** the city: one that stopped answering because nobody was
-/// typing would have made interaction a condition of service.
+/// reactor is serving a city.
 pub(crate) fn start(
     terminal: Terminal,
     inside: Inside,
     watching: tokio::sync::broadcast::Receiver<wire::Committed>,
-) {
-    super::stream::print(terminal.records, watching);
-    std::thread::spawn(move || {
-        let stdin = std::io::stdin();
-        drive(
-            &terminal,
-            &inside,
-            &mut stdin.lock(),
-            &mut std::io::stdout(),
-        );
-    });
+    face: tokio::sync::watch::Receiver<Face>,
+) -> Started {
+    match terminal.surface {
+        Surface::Cli | Surface::QuietHost => {
+            let (writer, notice) = super::ui::start(terminal, inside, watching, face);
+            Started {
+                writer: Some(writer),
+                notice,
+            }
+        }
+        Surface::Headless => {
+            let say = super::ui::lines_to_stdout();
+            let notice = Arc::clone(&say);
+            std::thread::spawn(move || {
+                drive(&terminal, &inside, &mut std::io::stdin().lock(), &say);
+            });
+            Started {
+                writer: None,
+                notice,
+            }
+        }
+    }
 }
 
-/// One line to the console.
-///
-/// A console whose writes fail is a console nobody is reading, and the
-/// city is not the console's to stop, so the failure ends here — stated
-/// once rather than at every line this file prints.
-fn say<W: Write>(out: &mut W, line: &str) {
-    drop(out.write_all(line.as_bytes()));
-    drop(out.write_all(b"\n"));
-}
-
-/// The loop, over any reader and writer so a test can drive it.
-pub(super) fn drive<R: BufRead, W: Write>(
-    terminal: &Terminal,
-    inside: &Inside,
-    input: &mut R,
-    out: &mut W,
-) {
-    let Inside {
-        desk,
-        answering,
-        door,
-        ..
-    } = inside;
-    let mut keys = match LineKeys::drawn() {
-        Ok(keys) => keys,
+/// The line console, over any reader so a test can drive it: each whole
+/// line carried by the same [`Session`] the CLI uses, each answer one
+/// line through `say`.
+pub(super) fn drive<R: BufRead>(terminal: &Terminal, inside: &Inside, input: &mut R, say: &Say) {
+    let mut session = match Session::begin() {
+        Ok(session) => session,
         Err(err) => {
-            say(out, &format!("  {err}"));
-            say(out, &format!("  {}", err.recovery()));
+            say(format!("  {err}"));
+            say(format!("  {}", err.recovery()));
             return;
         }
     };
-    let mut selected: Option<Address> = None;
     let mut typed = String::new();
     loop {
         typed.clear();
-        if write!(out, "> ").is_err() || out.flush().is_err() {
-            return;
-        }
         match input.read_line(&mut typed) {
             // End of input: a pipe, a service, a machine with nobody at
             // it. The console stops; the city does not.
             Ok(0) | Err(_) => return,
             Ok(_) => {}
         }
-        let idem = keys.next();
-        match parse(&typed, selected.as_ref(), idem) {
-            Line::Nothing => {}
-            Line::Help => {
-                say(out, &help(selected.as_ref()));
-            }
-            Line::OpenWeb => {
-                let url = web_url(terminal);
-                say(out, &format!("  {url}"));
+        match session.carry(terminal, inside, &typed, say) {
+            Next::Stay => {}
+            Next::Web => {
+                say(format!("  {}", web_url(terminal)));
                 // Never fatal: the URL is on the screen either way. The
                 // browser is handed an open code through a file only this
                 // account reads, never a key on its command line.
-                if let Err(unopened) = crate::firstrun::open_paired(&terminal.url, door) {
-                    say(
-                        out,
-                        &format!("  {}: {}", unopened.action(), unopened.recovery()),
-                    );
+                if let Err(unopened) = crate::firstrun::open_paired(&terminal.url, &inside.door) {
+                    say(format!("  {}: {}", unopened.action(), unopened.recovery()));
                 }
             }
-            Line::Serving => {
-                // The counts come from the one question that already
-                // owns them, so this screen renders a number it never
-                // computes. A city too busy to answer still has a port.
-                let vitals = match answering(wire::Query::Metrics) {
-                    (_, Ok(wire::Answer::Metrics(vitals))) => Some(*vitals),
-                    (_, Ok(_) | Err(_)) => None,
-                };
-                say(out, &serving(terminal, vitals.as_ref(), std::process::id()));
-            }
-            Line::Select(addr) => {
-                say(out, &format!("  work goes to {}", addr.as_str()));
-                selected = Some(addr);
-            }
-            Line::Remote(line) => {
-                say(out, &crate::outside::console::carry(&inside.remote, line));
-            }
-            Line::Quit => {
-                say(out, "  the console is closing; the city keeps serving");
-                return;
-            }
-            Line::Unknown { verb, nearest } => {
-                say(out, &format!("  no verb `{verb}`"));
-                if !nearest.is_empty() {
-                    say(out, &format!("  did you mean: {}", nearest.join(", ")));
-                }
-            }
-            Line::Malformed { verb, reason } => {
-                say(out, &format!("  `/{verb}` cannot be read: {reason}"));
-                say(
-                    out,
-                    "  the body is the wire's own JSON; `idem` may be left out",
-                );
-            }
-            Line::Frame(frame) => post(desk, answering, *frame, out),
-            Line::Work(task) => {
-                let Some(addr) = selected.clone() else {
-                    continue;
-                };
-                post(desk, answering, dispatch(&addr, &task, idem), out);
+            // Nobody is asked here: a line console has no keys to answer
+            // with, so the runs under way are waited for.
+            Next::Quit | Next::AskBeforeQuit(_) => {
+                say("  the city is closing; the runs under way finish first".to_owned());
+                inside.tell(Event::Quit(Asker::Console, wire::CloseMode::Drain));
             }
         }
     }
-}
-
-/// One frame, onto the same desk a browser's frames land on, or into the
-/// same answering function a browser's questions reach.
-fn post<W: Write>(
-    desk: &accounting::worker::CommandDesk,
-    answering: &Answering,
-    frame: wire::ClientFrame,
-    out: &mut W,
-) {
-    match frame {
-        wire::ClientFrame::Command(command) => {
-            // A refusal comes back here rather than into a log file, over
-            // the reply address the socket path already uses.
-            desk.post(
-                (*command).into(),
-                wire::Reply::to(move |error: kernel::AxError| {
-                    eprintln!("  {error}");
-                    eprintln!("  {}", error.recovery());
-                    wire::Delivered::ToThePeer
-                }),
-            );
-        }
-        // A question is not desk work: nothing is queued and nothing is
-        // refused later. It goes to the same function the socket calls,
-        // so a person inside a city stops being told to open a second
-        // terminal and ask it from outside.
-        wire::ClientFrame::Ask(ask) => answer(answering, ask.query, out),
-        wire::ClientFrame::Hello(_) | wire::ClientFrame::Monitor(_) => {
-            say(out, "  this console is already inside the city");
-        }
-    }
-}
-
-/// One question, answered where it was asked.
-///
-/// JSONL, one object per line - the shape `sprawling call` prints and
-/// the shape the event stream above already uses. Tables and diagrams
-/// belong to the browser; a console that drew them would be serving two
-/// masters at once.
-fn answer<W: Write>(answering: &Answering, query: wire::Query, out: &mut W) {
-    // The console prints each answer where it was asked, so it pairs
-    // nothing and has no use for the date the answer was read at.
-    let (_as_of, answered) = answering(query);
-    match answered {
-        Ok(answer) => match serde_json::to_string(&answer) {
-            Ok(text) => {
-                say(out, &text);
-            }
-            // An answer this build can produce but not spell is a defect
-            // in the wire type, and hiding it would make the console
-            // silently lossy about the one thing it exists to show.
-            Err(err) => {
-                say(out, &format!("  the answer could not be rendered: {err}"));
-            }
-        },
-        Err(error) => {
-            say(out, &format!("  {error}"));
-            say(out, &format!("  {}", error.recovery()));
-        }
-    }
-}
-
-/// A line of work, as the Command a browser would have sent for it.
-fn dispatch(addr: &Address, task: &str, idem: kernel::IdemKey) -> wire::ClientFrame {
-    wire::ClientFrame::Command(Box::new(wire::WireCommand::Dispatch {
-        addr: addr.clone(),
-        task: task.to_owned(),
-        goal: String::new(),
-        policy: wire::RunPolicy::of(wire::Mode::Work),
-        idem,
-        // `/at` already chose the room; a line typed after it
-        // continues what is working there.
-        session: None,
-        effort: None,
-        model: None,
-    }))
 }
 
 /// One idempotency key per typed line.
@@ -362,13 +238,13 @@ fn dispatch(addr: &Address, task: &str, idem: kernel::IdemKey) -> wire::ClientFr
 /// was fixed. The line count separates two lines of one console; the
 /// origin, drawn from OS entropy, separates two consoles that reach the
 /// same count.
-struct LineKeys {
+pub(crate) struct LineKeys {
     origin: [u8; 16],
     lines: kernel::Seq,
 }
 
 impl LineKeys {
-    fn drawn() -> Result<LineKeys, kernel::AxError> {
+    pub(crate) fn drawn() -> Result<LineKeys, kernel::AxError> {
         let mut origin = [0u8; 16];
         getrandom::fill(&mut origin).map_err(|err| {
             kernel::AxError::failure(
@@ -387,7 +263,7 @@ impl LineKeys {
     }
 
     /// The key for the line just read, advancing to the next line.
-    fn next(&mut self) -> kernel::IdemKey {
+    pub(crate) fn next(&mut self) -> kernel::IdemKey {
         let key = kernel::IdemKey::derive(&kernel::RunId::CITY, self.lines, &self.origin);
         // A console that has read 2^64 lines reuses its last key; no
         // person reaches it, and wrapping would reuse the first one.

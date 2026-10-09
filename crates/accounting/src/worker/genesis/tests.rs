@@ -28,7 +28,7 @@ fn a_city_whose_norms_cannot_be_read_refuses_to_say_it_wrote_them_down() {
     std::fs::create_dir_all(&norms).unwrap();
 
     let err = worker
-        .close_city(&Closing::Chosen)
+        .close_city(&by_hand())
         .expect_err("a close that cannot name the norms is not an orderly close");
     assert!(
         err.to_string().contains(city::CITY_FILE),
@@ -279,7 +279,7 @@ fn a_city_that_is_closed_says_so_before_it_stops() {
         hands(),
     )
     .unwrap();
-    worker.close_city(&Closing::Chosen).unwrap();
+    worker.close_city(&by_hand()).unwrap();
 
     let verified = runtime::replay::verify_ledger_dir(&report.ledger_dir).unwrap();
     let last = verified
@@ -287,15 +287,14 @@ fn a_city_that_is_closed_says_so_before_it_stops() {
         .last()
         .map(|line| String::from_utf8_lossy(line).into_owned())
         .expect("the ledger has a last line");
-    assert!(last.contains("handoff_written"), "{last}");
-    assert!(
-        last.contains("closed by the User"),
-        "the record does not say the stop was chosen: {last}"
-    );
-    assert!(
-        last.contains("cas:b3-"),
-        "the next session is not told what to read first: {last}"
-    );
+    for said in [
+        "handoff_written",
+        "the city was closed with /quit in its terminal",
+        "every run under way landed before this line",
+        "cas:b3-",
+    ] {
+        assert!(last.contains(said), "no {said:?} in the close: {last}");
+    }
 }
 
 #[test]

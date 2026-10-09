@@ -3,32 +3,24 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What a line typed into a serving city means (`crates/sprawling/spec/Console.lean`
-//! §8-11).
+//! What a served city says to the terminal it runs in, and what a line
+//! typed there means (`crates/sprawling/spec/Console.lean` §8-11).
 //!
-//! The terminal `sprawling up` blocks in is a surface of its own: on a
-//! machine with no browser it is the only surface there is.
-//!
-//! Everything here is a pure judgement over one line of text. What the
-//! judgement produces is either a control action the terminal carries
-//! out or a `ClientFrame` that goes to the same desk a browser's frames
-//! go to, so the console decides nothing the server does not.
+//! The console has two faces, the CLI and the quiet host, and a third
+//! for a pipe, the line console; which one shows is the lifecycle's
+//! (`lifecycle`), what is drawn is the one writer's (`ui`), and what a
+//! line does is the session's (`cli`), so the console decides nothing
+//! the server does not.
 
-/// The console's own verbs, which are not on the wire.
-///
-/// Exhaustive, and checked against the wire's vocabulary so a name can
-/// never mean two things. `serving` rather than `status`: the glossary
-/// already gives `status` to the tool that answers what one run's
-/// situation is, and one name per concept is a gate.
-/// `AttachEndpoint` becomes `attach_endpoint`.
-///
-/// The wire names itself in the shape Rust variants take; a terminal is
-/// typed in lower case. One conversion, so the two spellings cannot
-/// become two lists.
-pub(super) mod language;
+pub(super) mod cli;
+pub(super) mod editor;
+pub(crate) mod language;
+pub(crate) mod lifecycle;
+pub(super) mod screen;
 pub(super) mod stream;
 pub(super) mod terminal;
-pub use stream::Records;
+pub(super) mod ui;
+pub use lifecycle::Surface;
 pub use terminal::Terminal;
 pub(crate) use terminal::{Answering, Inside, start};
 #[cfg(test)]

@@ -74,7 +74,10 @@ fn f8_a_reply_taken_by_a_run_that_leaves_reaches_the_rooms_next_run() {
     let consumed = wait_for(&ledger_dir, |lines| {
         lines.iter().any(|line| line["kind"] == "signal_consumed")
     });
-    desk.close(accounting::worker::Closing::Chosen);
+    desk.close(accounting::worker::Closing::Chosen {
+        by: accounting::worker::ClosedBy::Console,
+        mode: wire::CloseMode::Drain,
+    });
     attending.join().unwrap();
 
     let ito_runs: Vec<String> = consumed

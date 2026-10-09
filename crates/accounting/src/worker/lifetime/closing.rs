@@ -19,25 +19,50 @@ use kernel::{AxError, EventKind, Locator};
 /// Exhaustive rather than a flag, because the handoff says a different
 /// thing for each: a close the person chose and a close serving forced
 /// are different facts for the next session, and a record that spelled
-/// both as the first would claim a choice nobody made.
+/// both as the first would claim a choice nobody made. Which event
+/// becomes which closing is decided by the console's lifecycle
+/// (`crates/sprawling/spec/Console/Lifecycle.lean`); this type only
+/// carries the answer.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Closing {
-    /// The person stopped the city from the keyboard.
-    Chosen,
+    /// Somebody or something asked the city to close: who, and what
+    /// becomes of the runs under way.
+    Chosen { by: ClosedBy, mode: wire::CloseMode },
     /// Serving failed and took the city down; `cause` is what failed.
     Broken { cause: String },
 }
 
-impl Closing {
-    /// The one reading of how serving ended: a serve that returned cleanly
-    /// was ended by the person's Ctrl-C, and a serve that failed names its
-    /// failure, so a failed serve is never recorded as the person's choice.
-    pub fn of(served: &Result<(), AxError>) -> Self {
-        match served {
-            Ok(()) => Self::Chosen,
-            Err(failure) => Self::Broken {
-                cause: failure.to_string(),
-            },
+/// Who asked the city to close.
+///
+/// A service manager's `SIGTERM` and a person's `/quit` are different
+/// facts for whoever reads the handoff next, so each way in is named.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ClosedBy {
+    /// `/quit` typed in the city's own terminal.
+    Console,
+    /// `CloseCity` sent from a page on this machine.
+    Page,
+    /// `SIGINT` or `CTRL_C_EVENT`, as a signal, to a city with no
+    /// terminal of its own.
+    InterruptSignal,
+    /// Windows' Ctrl+Break.
+    BreakSignal,
+    /// `SIGTERM`.
+    Terminate,
+    /// The terminal the city ran in went away.
+    TerminalLost,
+}
+
+impl ClosedBy {
+    /// Who closed it, as the handoff's overview says it.
+    fn said(self) -> &'static str {
+        match self {
+            Self::Console => "with /quit in its terminal",
+            Self::Page => "from a page on this machine",
+            Self::InterruptSignal => "by an interrupt signal",
+            Self::BreakSignal => "by Ctrl+Break",
+            Self::Terminate => "by a terminate signal",
+            Self::TerminalLost => "because its terminal went away",
         }
     }
 }
@@ -72,9 +97,17 @@ impl RunWorker {
         must_read.push(Locator::cas(hash));
         let standing = self.ledger.position();
         let (overview, context, next_step) = match why {
-            Closing::Chosen => (
-                "the city was closed by the User running it".to_owned(),
-                "an orderly close, not a crash: nothing was interrupted mid-command".to_owned(),
+            Closing::Chosen { by, mode } => (
+                format!("the city was closed {}", by.said()),
+                match mode {
+                    wire::CloseMode::Drain => {
+                        "an orderly close, not a crash: every run under way landed before this line"
+                    }
+                    wire::CloseMode::Interrupt => {
+                        "an interrupted close, not a crash: runs still under way were stopped at their next safe point"
+                    }
+                }
+                .to_owned(),
                 "`sprawling serve` on this directory continues from here".to_owned(),
             ),
             Closing::Broken { cause } => (
@@ -97,27 +130,5 @@ impl RunWorker {
             "the city is closing; its handoff is on the ledger",
         );
         self.record(EventKind::HandoffWritten, handoff.payload()?)
-    }
-}
-
-#[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
-mod tests {
-    use super::Closing;
-    use kernel::{AxCode, AxError};
-
-    #[test]
-    fn a_failed_serve_closes_broken_and_a_clean_one_closes_chosen() {
-        let failure = AxError::failure(AxCode::StorageFatal, "serve the city", "port taken")
-            .with_recovery("choose another port");
-        assert_eq!(
-            [Closing::of(&Err(failure.clone())), Closing::of(&Ok(()))],
-            [
-                Closing::Broken {
-                    cause: failure.to_string()
-                },
-                Closing::Chosen
-            ]
-        );
     }
 }

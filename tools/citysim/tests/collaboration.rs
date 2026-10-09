@@ -642,7 +642,10 @@ fn serve_in_turn(
         desk.post(command, wire::Reply::nowhere());
     }
     look_until(ledger, &done);
-    desk.close(Closing::Chosen);
+    desk.close(Closing::Chosen {
+        by: accounting::worker::ClosedBy::Console,
+        mode: wire::CloseMode::Drain,
+    });
     attending.join().unwrap();
     let lines = read(ledger);
     let trace: Vec<String> = lines
