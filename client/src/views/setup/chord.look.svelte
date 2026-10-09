@@ -8,7 +8,7 @@
   import Tip from "../parts/tip.svelte";
   import type { ChordLook } from "./chord";
 
-  const { wire, action, spelled, listening, tip }: ChordLook = $props();
+  const { wire, action, spelled, word, tip }: ChordLook = $props();
 </script>
 
 <!-- `Tip` hands out the id of the line it draws, and the button names it
@@ -21,8 +21,8 @@ takes the id from its caller. -->
       aria-describedby={hint}
       class="h-control-sm rounded-control border border-edge px-snug transition-colors duration-short ease-leave hover:bg-raised hover:ease-arrive aria-pressed:bg-raised-hover"
     >
-      {#if listening !== undefined}
-        <span class="font-mono text-note text-text-faint">{listening}</span>
+      {#if word !== undefined}
+        <span class="font-mono text-note text-text-faint">{word}</span>
       {:else}
         <!-- The chord is redrawn whenever it changes: the marks read
              `core/keys` outside the reactive surface, so the key here is

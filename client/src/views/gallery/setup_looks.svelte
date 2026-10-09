@@ -8,7 +8,8 @@
 <script lang="ts" module>
   // The local looks of the setup groups, each in the states its seat
   // hands it: a card whose change just landed beside one at rest, the
-  // blend slider stated and unstated, a shortcut row listening and idle,
+  // blend slider stated and unstated, a shortcut row listening, idle and
+  // reached by no chord,
   // colour tokens with and without an override, a door off the advanced
   // group, the governed document's box, and the folded `CONFIG.toml`.
   // The words are the ones the seats translate, so the fixture follows
@@ -32,7 +33,7 @@
 </script>
 
 <script lang="ts">
-  import { LABELS } from "../../core/keys";
+  import { DEFAULTS, LABELS, spell } from "../../core/keys";
   import { fill, say } from "../../core/lang";
   import { ui } from "../../ui";
   import EmptyState from "../parts/empty.svelte";
@@ -54,7 +55,11 @@
       step: String(BLEND_PERCENT.step),
     }),
   );
-  const chord = $derived({ spelled: "accel+k", prompt: say($lang, "keys_press"), tip: say($lang, "keys_change") });
+  const chord = $derived({
+    prompt: say($lang, "keys_press"),
+    unbound: say($lang, "keys_unbound"),
+    tip: say($lang, "keys_change"),
+  });
   const reset = (token: string): { readonly word: string; readonly label: string } => ({
     word: say($lang, "colours_token_default"),
     label: fill(say($lang, "colours_token_default_for"), { token }),
@@ -95,15 +100,19 @@
   </Card>
 </Case>
 
-<Case label="setup keys · one row listening, one at rest" width={CARD}>
+<Case label="setup keys · one row listening, one at rest, one with no shortcut" width={CARD}>
   <ul class="flex flex-col">
     <li class="flex items-center gap-base border-b border-edge py-snug text-label">
       <span class="min-w-0 flex-1 truncate text-text-quiet">{say($lang, LABELS.palette)}</span>
-      <ChordLook {...chordOf({ ...chord, action: "palette", listening: true }, HANDS)} />
+      <ChordLook {...chordOf({ ...chord, action: "palette", spelled: spell(DEFAULTS.palette), listening: true }, HANDS)} />
+    </li>
+    <li class="flex items-center gap-base border-b border-edge py-snug text-label">
+      <span class="min-w-0 flex-1 truncate text-text-quiet">{say($lang, LABELS["tier.cycle"])}</span>
+      <ChordLook {...chordOf({ ...chord, action: "tier.cycle", spelled: spell(DEFAULTS["tier.cycle"]), listening: false }, HANDS)} />
     </li>
     <li class="flex items-center gap-base py-snug text-label">
       <span class="min-w-0 flex-1 truncate text-text-quiet">{say($lang, LABELS.finder)}</span>
-      <ChordLook {...chordOf({ ...chord, action: "finder", listening: false }, HANDS)} />
+      <ChordLook {...chordOf({ ...chord, action: "finder", spelled: spell(DEFAULTS.finder), listening: false }, HANDS)} />
     </li>
   </ul>
 </Case>
