@@ -176,7 +176,10 @@ fn a_defaulted_field_is_optional_and_its_default_is_not_translated() {
         text.contains("names: Schema.optional(Schema.Array(Schema.String)),"),
         "{text}"
     );
-    assert!(!text.contains("default"), "{text}");
+    // The constants above the types name the default thinking level, so
+    // only the definition itself is read for a translated default.
+    let (_, definition) = text.split_once("export const Limits").unwrap();
+    assert!(!definition.contains("default"), "{text}");
 }
 
 #[test]
