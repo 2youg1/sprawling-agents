@@ -103,6 +103,7 @@ fn heard(row: &HostPreset, face: &Face) -> Shape {
         models: Vec::new(),
         probed: false,
         tuning: EndpointTuning::default(),
+        facts_blob: None,
     };
     let entry = crate::market::MarketSnapshot::builtin()
         .unwrap()

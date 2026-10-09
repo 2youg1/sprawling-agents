@@ -33,6 +33,7 @@ mod guide;
 pub mod held_vault;
 pub mod home;
 pub mod lineage;
+mod listed_facts;
 mod machine;
 mod models;
 pub mod person;

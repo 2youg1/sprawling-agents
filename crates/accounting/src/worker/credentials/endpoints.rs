@@ -93,6 +93,7 @@ impl RunWorker {
             models: Vec::new(),
             probed: false,
             tuning,
+            facts_blob: None,
         })
     }
 
@@ -181,10 +182,7 @@ impl RunWorker {
             {
                 endpoint.models = kept.models.clone();
                 endpoint.probed = kept.probed;
-                return self.record(
-                    EventKind::EndpointAttached,
-                    gateway::attached_payload(&endpoint)?,
-                );
+                return self.record_attached(endpoint);
             }
         }
         let unprobed = match self.probe(&endpoint) {
@@ -207,11 +205,7 @@ impl RunWorker {
                     .iter()
                     .map(|id| gateway::ModelFacts {
                         id: id.clone(),
-                        context_tokens: None,
-                        max_output_tokens: None,
-                        input_modalities: Vec::new(),
-                        input_price: None,
-                        output_price: None,
+                        ..gateway::ModelFacts::default()
                     })
                     .collect();
                 Some(err.subject().to_owned())
@@ -240,8 +234,19 @@ impl RunWorker {
                 ),
             },
         );
-        let payload = gateway::attached_payload(&endpoint)?;
-        self.record(EventKind::EndpointAttached, payload)
+        self.record_attached(endpoint)
+    }
+
+    /// Writes what the attach read into the CAS, the line that names it,
+    /// and hands the facts back to the worker's own book, which folded
+    /// the line to ids only (`crates/gateway/spec/Endpoint/Models.lean` §8-10).
+    fn record_attached(&mut self, mut endpoint: gateway::AttachedEndpoint) -> Result<(), AxError> {
+        let (blob, bytes) = crate::listed_facts::keep(&mut self.cas, &mut endpoint)?;
+        self.record(
+            EventKind::EndpointAttached,
+            gateway::attached_payload(&endpoint)?,
+        )?;
+        self.credentials.book.learn(&blob, &bytes)
     }
 
     /// What the endpoint says it serves, read for every fact each row

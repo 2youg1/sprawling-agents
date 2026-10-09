@@ -192,7 +192,14 @@ impl Endpoint {
             client: transport.client(&ClientShape::of(&config))?,
             config,
             redemption,
+            thinking: crate::provider::thinking::ThinkingOffer::UNKNOWN,
         })
+    }
+
+    /// This endpoint with the thinking offer its model was attached
+    /// with; without it every request is sent no thinking field.
+    pub(crate) fn offering(self, thinking: crate::provider::thinking::ThinkingOffer) -> Endpoint {
+        Endpoint { thinking, ..self }
     }
 
     /// This endpoint as a model whose every call first takes a permit

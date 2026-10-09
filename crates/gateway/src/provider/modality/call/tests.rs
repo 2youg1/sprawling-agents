@@ -28,6 +28,7 @@ fn attached(url: &str, kind: ConnectionKind) -> AttachedEndpoint {
         models: Vec::new(),
         probed: false,
         tuning: EndpointTuning::default(),
+        facts_blob: None,
     }
 }
 

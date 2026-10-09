@@ -8,7 +8,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::model::Ceiling;
+use crate::model::{Ceiling, Effort};
 use crate::reach::Reach;
 
 /// What a model list said about one model.
@@ -31,6 +31,37 @@ pub struct ModelFacts {
     pub input_price: Option<String>,
     /// The provider's own output price, verbatim.
     pub output_price: Option<String>,
+    /// What the row said about thinking levels, read by the gateway's
+    /// thinking ladder (`crates/gateway/spec/Provider/Thinking.lean`).
+    /// Absent on a row that said nothing and on a line written before
+    /// the key existed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub thinking: Option<ThinkingStatement>,
+    /// The upstream's own identity for this model across providers,
+    /// where it states one (`crates/gateway/spec/Provider/Identity.lean`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub canonical: Option<String>,
+}
+
+/// What one model list said about a model's thinking, in the city's
+/// spelling of each level.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct ThinkingStatement {
+    /// The levels the row named, ascending and without repeats; never
+    /// `none`, because turning thinking off is not a level. Empty when
+    /// the row stated only a switch.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub levels: Vec<Effort>,
+    /// The level the row says it uses when sent none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default: Option<Effort>,
+    /// Whether the row says the model may be asked to think.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub on: Option<bool>,
+    /// Whether the row says the model thinks when sent nothing.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default_on: Option<bool>,
 }
 
 /// `endpoint_probed`: a base URL was asked what it serves, and nothing

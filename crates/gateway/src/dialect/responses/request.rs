@@ -5,27 +5,11 @@
 
 //! One canonical `ChatRequest` onto the responses face.
 
-use kernel::{AxError, ChatRequest, ContentBlock, Effort, ImageRef, Role};
+use kernel::{AxError, ChatRequest, ContentBlock, ImageRef, Role};
 use serde_json::{Map, Value, json};
 
 use crate::dialect::ImageBytes;
 use crate::mismatch::mismatch;
-
-/// The effort word this face takes. The provider's `ReasoningEffort`
-/// accepts `none`, `minimal`, `low`, `medium`, `high`, `xhigh` and
-/// `max`; this city's ladder is a subset of those, so every level is
-/// spelled rather than approximated.
-fn effort_field(effort: Effort) -> &'static str {
-    match effort {
-        Effort::None => "none",
-        Effort::Minimal => "minimal",
-        Effort::Low => "low",
-        Effort::Medium => "medium",
-        Effort::High => "high",
-        Effort::XHigh => "xhigh",
-        Effort::Max => "max",
-    }
-}
 
 /// One picture as this face spells it: a data URL in an `input_image`
 /// part. `detail` is required by the schema, and `auto` is the value
@@ -180,12 +164,6 @@ pub(crate) fn request(req: &ChatRequest, images: &ImageBytes) -> Result<Value, A
             Value::Number(ceiling.get().into()),
         );
     }
-    if let Some(effort) = req.effort {
-        root.insert(
-            "reasoning".to_owned(),
-            json!({ "effort": effort_field(effort) }),
-        );
-    }
     // Nothing this city sends is retrievable later: it keeps its own
     // history, and a copy held by the provider is a second one that
     // outlives the city's decision to forget.
@@ -280,32 +258,6 @@ mod tests {
             .find(|item| item["type"] == "function_call_output")
             .unwrap();
         assert_eq!(answered["call_id"], made["call_id"]);
-    }
-
-    /// Every level of the ladder reaches this wire under the one name
-    /// the provider's `ReasoningEffort` accepts.
-    #[test]
-    fn every_level_of_the_ladder_reaches_this_wire() {
-        let mut req = sample_request();
-        assert!(
-            request(&req, &ImageBytes::default())
-                .unwrap()
-                .get("reasoning")
-                .is_none(),
-            "an unstated effort writes no field: the provider's default is its own business"
-        );
-        for (level, spelling) in [
-            (Effort::None, "none"),
-            (Effort::Low, "low"),
-            (Effort::Medium, "medium"),
-            (Effort::High, "high"),
-            (Effort::XHigh, "xhigh"),
-            (Effort::Max, "max"),
-        ] {
-            req.effort = Some(level);
-            let wire = request(&req, &ImageBytes::default()).unwrap();
-            assert_eq!(wire["reasoning"]["effort"], spelling);
-        }
     }
 
     /// Nothing this city sends is left with the provider to retrieve

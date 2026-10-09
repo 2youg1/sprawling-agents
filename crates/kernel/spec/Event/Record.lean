@@ -150,7 +150,15 @@ pub struct AttachedTuning { pub label: Option<String>, pub timeout_ms: Option<u6
 // 因为账本行的值要用 kernel 自己的类型。
 pub struct ModelFacts { pub id: String, pub context_tokens: Option<u64>, pub max_output_tokens: Option<Ceiling>,
                         pub input_modalities: Vec<String>, pub input_price: Option<String>,
-                        pub output_price: Option<String> }        // 缺席写 null，行没说就是没说
+                        pub output_price: Option<String>,        // 缺席写 null，行没说就是没说
+                        pub thinking: Option<ThinkingStatement>, // 缺席即省略：列表没说思考档
+                        pub canonical: Option<String> }          // 上游自己的规范 id；缺席即省略
+pub struct ThinkingStatement { pub levels: Vec<Effort>,         // 列表点名的档，城的升序；恒不含 none
+                               pub default: Option<Effort>,     // 列表说的默认档
+                               pub on: Option<bool>,            // 列表说能否要求它「开启思考」
+                               pub default_on: Option<bool> }   // 列表说什么都不发时想不想；三者缺席即省略
+// 两个新键由 gateway::endpoint::models 读出、gateway::provider::thinking 与 provider::identity 读（gateway §8-39、§8-38）；
+// 早于它们的行读作没说，所以 0.0.10 写下的 endpoint_probed 照原样读回。
 pub struct EndpointProbed { pub name: String, pub base_url: String, pub reach: Reach,
                             pub models: Vec<String>, pub facts: Vec<ModelFacts>,   // 读不到列表时两者都写空
                             pub failed: Option<ProbeFailure> }                   // 缺席即省略

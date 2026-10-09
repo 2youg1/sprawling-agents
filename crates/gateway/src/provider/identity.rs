@@ -9,15 +9,16 @@
 use crate::endpoint::ModelFacts;
 
 /// The identity two providers' rows share when they serve the same model:
-/// the model id without the organisation prefix up to its last `/`, in
-/// lowercase. Two rows are one model exactly when these strings are equal;
+/// the upstream's own canonical id where its list states one, else the
+/// model id, either without the organisation prefix up to its last `/`,
+/// in lowercase. Two rows are one model exactly when these strings are equal;
 /// nothing here guesses at similar names, because one wrong match would
 /// merge two models with different prices and windows into one row.
 #[must_use]
 pub fn canonical(facts: &ModelFacts) -> String {
-    facts
-        .id
+    let named = facts.canonical.as_deref().unwrap_or(&facts.id);
+    named
         .rsplit_once('/')
-        .map_or(facts.id.as_str(), |(_, model)| model)
+        .map_or(named, |(_, model)| model)
         .to_lowercase()
 }

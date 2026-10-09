@@ -14,7 +14,9 @@
 //!   <https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create/>
 //! - `reasoning_effort` and its accepted values: `ReasoningEffort` in
 //!   `openai/openai-openapi`'s `openapi.yaml`, and
-//!   <https://developers.openai.com/api/docs/guides/reasoning>
+//!   <https://developers.openai.com/api/docs/guides/reasoning>. The
+//!   thinking fields are written by `provider::thinking::encoding`, not
+//!   here (gateway D35).
 //!
 //! **Loss accounting is explicit, because this dialect is not the
 //! canonical shape.** This wire has no explicit cache breakpoints
@@ -29,8 +31,8 @@
 //! asserted in tests.
 
 use kernel::{
-    AxCode, AxError, CacheCount, ChatRequest, ChatResponse, ContentBlock, DialectKind, Effort,
-    ModelUsage, Role, StopReason,
+    AxCode, AxError, CacheCount, ChatRequest, ChatResponse, ContentBlock, DialectKind, ModelUsage,
+    Role, StopReason,
 };
 use serde_json::{Map, Value, json};
 
@@ -38,7 +40,7 @@ use crate::dialect::ImageBytes;
 use crate::mismatch::{
     as_str, cache_count, mismatch, mismatch_found, payload_from, require, tokens_or_zero,
 };
-use crate::provider::preset::{CeilingField, ChatSpelling, EffortField, ReasoningReturn};
+use crate::provider::preset::{CeilingField, ChatSpelling, ReasoningReturn};
 
 mod stream;
 
@@ -65,20 +67,6 @@ fn empty_answer() -> AxError {
         "lower this model's max output tokens - a ceiling above what the model allows is \
          answered this way rather than refused - then dispatch again",
     )
-}
-
-/// This dialect writes every level in one field, `none` and `minimal`
-/// included; which levels a model is sent is the thinking offer's answer.
-fn effort_field(effort: Effort) -> &'static str {
-    match effort {
-        Effort::None => "none",
-        Effort::Minimal => "minimal",
-        Effort::Low => "low",
-        Effort::Medium => "medium",
-        Effort::High => "high",
-        Effort::XHigh => "xhigh",
-        Effort::Max => "max",
-    }
 }
 
 fn joined_text(content: &[ContentBlock]) -> String {
@@ -246,20 +234,6 @@ pub(crate) fn request(
         root.insert(field.to_owned(), Value::Number(ceiling.get().into()));
     }
     root.insert("messages".to_owned(), Value::Array(messages));
-    if let Some(effort) = req.effort {
-        let level = effort_field(effort);
-        match spelling.effort {
-            EffortField::ReasoningEffort => {
-                root.insert(
-                    "reasoning_effort".to_owned(),
-                    Value::String(level.to_owned()),
-                );
-            }
-            EffortField::ReasoningObject => {
-                root.insert("reasoning".to_owned(), json!({ "effort": level }));
-            }
-        }
-    }
     if !req.tools.is_empty() {
         let tools: Result<Vec<Value>, AxError> = req
             .tools

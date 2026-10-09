@@ -172,7 +172,7 @@ pub(crate) fn sample_request() -> ChatRequest<'static> {
 mod tests {
     use super::super::request::{sample_request, sample_seeing};
     use super::*;
-    use kernel::{ContentBlock, Effort};
+    use kernel::ContentBlock;
 
     #[test]
     fn anthropic_sees_a_picture_as_a_base64_source_block() {
@@ -379,72 +379,6 @@ mod tests {
         assert!(out.to_string().contains("reading"));
     }
 
-    #[test]
-    fn effort_rides_the_wire_each_dialect_spells_it_its_own_way() {
-        let mut req = sample_request();
-        assert!(
-            request_wire(
-                DialectKind::Anthropic,
-                &req,
-                &ImageBytes::default(),
-                ChatSpelling::DOCUMENTED
-            )
-            .unwrap()
-            .get("effort")
-            .is_none(),
-            "an unstated effort writes no field: the provider's default is its own business"
-        );
-
-        // The Messages reference hangs `effort` under `output_config`
-        // and nowhere else; the chat face's own field is
-        // `reasoning_effort`, a string at the top level.
-        req.effort = Some(Effort::High);
-        let anthropic = request_wire(
-            DialectKind::Anthropic,
-            &req,
-            &ImageBytes::default(),
-            ChatSpelling::DOCUMENTED,
-        )
-        .unwrap();
-        assert_eq!(
-            anthropic["output_config"],
-            serde_json::json!({ "effort": "high" })
-        );
-        assert!(anthropic.get("effort").is_none(), "{anthropic}");
-        let openai = request_wire(
-            DialectKind::OpenAi,
-            &req,
-            &ImageBytes::default(),
-            ChatSpelling::DOCUMENTED,
-        )
-        .unwrap();
-        assert_eq!(openai["reasoning_effort"], "high");
-        assert!(openai.get("reasoning").is_none(), "{openai}");
-
-        // The one place the two dialects part: not thinking is an effort
-        // value on one wire and a different field on the other.
-        req.effort = Some(Effort::None);
-        let anthropic = request_wire(
-            DialectKind::Anthropic,
-            &req,
-            &ImageBytes::default(),
-            ChatSpelling::DOCUMENTED,
-        )
-        .unwrap();
-        assert_eq!(anthropic["thinking"]["type"], "disabled");
-        assert!(anthropic.get("output_config").is_none());
-        assert_eq!(
-            request_wire(
-                DialectKind::OpenAi,
-                &req,
-                &ImageBytes::default(),
-                ChatSpelling::DOCUMENTED
-            )
-            .unwrap()["reasoning_effort"],
-            "none"
-        );
-    }
-
     fn chat_spelled(spelling: ChatSpelling, req: &ChatRequest) -> Value {
         request_wire(DialectKind::OpenAi, req, &ImageBytes::default(), spelling).unwrap()
     }
@@ -501,55 +435,5 @@ mod tests {
         assert!(!returned.to_string().contains("WaUjzkyp"));
         let dropped = chat_spelled(ChatSpelling::DOCUMENTED, &req);
         assert!(!dropped.to_string().contains("reasoning_content"));
-    }
-
-    #[test]
-    fn a_host_with_its_own_reasoning_object_is_sent_that_object() {
-        use crate::provider::preset::EffortField;
-        let mut req = sample_request();
-        req.effort = Some(Effort::Max);
-        let wire = chat_spelled(
-            ChatSpelling {
-                effort: EffortField::ReasoningObject,
-                ..ChatSpelling::DOCUMENTED
-            },
-            &req,
-        );
-        assert_eq!(wire["reasoning"], serde_json::json!({ "effort": "max" }));
-        assert!(wire.get("reasoning_effort").is_none(), "{wire}");
-    }
-
-    #[test]
-    fn every_level_of_the_ladder_reaches_both_wires() {
-        let mut req = sample_request();
-        for (level, spelling) in [
-            (Effort::Low, "low"),
-            (Effort::Medium, "medium"),
-            (Effort::High, "high"),
-            (Effort::XHigh, "xhigh"),
-            (Effort::Max, "max"),
-        ] {
-            req.effort = Some(level);
-            assert_eq!(
-                request_wire(
-                    DialectKind::Anthropic,
-                    &req,
-                    &ImageBytes::default(),
-                    ChatSpelling::DOCUMENTED
-                )
-                .unwrap()["output_config"]["effort"],
-                spelling
-            );
-            assert_eq!(
-                request_wire(
-                    DialectKind::OpenAi,
-                    &req,
-                    &ImageBytes::default(),
-                    ChatSpelling::DOCUMENTED
-                )
-                .unwrap()["reasoning_effort"],
-                spelling
-            );
-        }
     }
 }

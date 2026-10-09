@@ -112,7 +112,7 @@ impl RunWorker {
         // changed. A dispatch that would move it is refused here,
         // before the brief is written, so a refusal leaves the session
         // exactly as it was.
-        self.choose_shape(&at, &agreed.model)?;
+        self.choose_shape(&at, &agreed.model, &agreed.provider)?;
         let given = self.give(&at, task, goal)?;
         // Kept for the post-drive sweep: an escalation names the work it
         // interrupted, and by then the plan has consumed the original.

@@ -179,14 +179,22 @@ pub enum CeilingField {
     MaxCompletionTokens,
 }
 
-/// Which field carries how hard to think.
+/// Which fields carry a thinking level and thinking on. The fields
+/// each variant writes are `provider::thinking::encoding`'s.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EffortField {
-    /// A string at the top level, as the specification spells it.
+    /// A string at the top level, as the specification spells it, and
+    /// no switch.
     ReasoningEffort,
-    /// `reasoning: { effort }`, OpenRouter's own parameter and the one
-    /// its documentation lets carry `max`.
+    /// `reasoning: { effort }` and `reasoning: { enabled }`, OpenRouter's
+    /// own parameter and the one its documentation lets carry `max`.
     ReasoningObject,
+    /// `thinking: { type: "enabled" }` beside `reasoning_effort`: the
+    /// switch DeepSeek, Moonshot and Zhipu document.
+    ThinkingToggle,
+    /// `enable_thinking: true` beside `reasoning_effort`: DashScope's
+    /// switch, without which a model whose default is off never thinks.
+    EnableThinking,
 }
 
 /// Whether an earlier turn's reasoning goes back to the provider.
@@ -216,7 +224,21 @@ pub struct ModelPreset {
     /// row that cannot state one states nothing instead.
     pub max_output_tokens: u64,
     pub input: InputKinds,
+    /// The thinking levels this vendor documents for the model; `None`
+    /// where its page states none, which is not "no thinking".
+    pub thinking: Option<PresetThinking>,
     /// Where the two figures were read.
+    pub source: &'static str,
+}
+
+/// The thinking levels one vendor page documents for a model.
+pub struct PresetThinking {
+    /// Ascending; never `none`, because turning thinking off is not a
+    /// level.
+    pub levels: &'static [kernel::Effort],
+    /// The level the page says the model uses when sent none.
+    pub default: Option<kernel::Effort>,
+    /// The page the levels were read from.
     pub source: &'static str,
 }
 
@@ -312,6 +334,14 @@ pub fn window_for(base_url: &str, id: &str) -> Option<kernel::Window> {
 #[must_use]
 pub(crate) fn input_for(base_url: &str, id: &str) -> Option<InputKinds> {
     model_for(base_url, id).map(|row| row.input)
+}
+
+/// The thinking levels this table documents for one model. Read only by
+/// the ladder in [`super::thinking`], which decides whether this rung
+/// answers.
+#[must_use]
+pub(crate) fn thinking_for(base_url: &str, id: &str) -> Option<&'static PresetThinking> {
+    model_for(base_url, id)?.thinking.as_ref()
 }
 
 /// The preset table as the host authority the normaliser reads.
@@ -616,6 +646,7 @@ mod tests {
             context_tokens: 1,
             max_output_tokens: 1,
             input: InputKinds::Text,
+            thinking: None,
             source: "test",
         }
     }

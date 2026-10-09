@@ -297,7 +297,7 @@ impl Views {
             let hot = &self.hot;
             self.attribution.retain_runs(|run| !hot.was_evicted(run));
         }
-        self.book.apply(record)?;
+        crate::listed_facts::apply(&mut self.book, &self.city_root, record)?;
         // The one governance fold, shown this line exactly as the
         // worker's own copy is shown it.
         self.governance

@@ -167,6 +167,7 @@ impl RunWorker {
         }
         let cas = Cas::open(&kernel::layout::CityLayout::new(city_root).cas())
             .map_err(storage::StorageError::into_ax)?;
+        let book = crate::listed_facts::learned(book, &cas)?;
         let lane_store = std::sync::Arc::new(std::sync::Mutex::new(
             Cas::open(&kernel::layout::CityLayout::new(city_root).cas())
                 .map_err(storage::StorageError::into_ax)?,

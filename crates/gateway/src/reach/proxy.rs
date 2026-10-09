@@ -19,7 +19,7 @@
 //! a local inference server, for an MCP server a person started
 //! themselves, and for the city's own enrolment door, and a proxy handed
 //! a call to a model server on the local network reads the prompt in
-//! plain text on a path the call never needed (gateway D35). That is a
+//! plain text on a path the call never needed (gateway D36). That is a
 //! rule about the common machine
 //! rather than a fact about every machine, so it is a setting with a
 //! default and not a constant: an organisation that audits every request
@@ -45,7 +45,7 @@ pub(crate) enum Locality {
 
 /// Where this base URL points.
 ///
-/// One authority city-wide (gateway D35): the proxy decision reads it,
+/// One authority city-wide (gateway D36): the proxy decision reads it,
 /// and so does [`is_local`], which the local adapter, the settings page's
 /// "local" mark and the confidential building's rule read, so none of
 /// them can mean something different by "local". A name is judged by
@@ -108,7 +108,7 @@ pub fn through(rule: Proxying, base_url: &str) -> Through {
         Proxying::Never => Through::Disabled,
         Proxying::ExceptLocal => match locality(base_url) {
             // The private network is kept off the proxy with this machine
-            // (gateway D35); `Through` has one arm for both.
+            // (gateway D36); `Through` has one arm for both.
             Locality::Machine | Locality::Private => Through::LocalAddress,
             Locality::Public => named_by_environment(&host, tls),
         },

@@ -26,5 +26,21 @@ impl Endpoint { pub fn list_models(&self, url: &str) -> Result<Vec<ModelFacts>, 
 
 **「路径归兼容格式」也管凭证头**：Anthropic 的 API key 走 `x-api-key`（`Authorization: Bearer` 只发给短时联邦令牌），OpenAI 兼容格式走 `Bearer`；人显式填的头名恒优先。见 §8-9 `AuthSpec::for_dialect`。落选的是「让登记页必填头名」：那把一个兼容格式自己就知道的事推给了人，而人填错的代价是一个 401。
 
+**一行还读两件事：思考档的陈述与模型的规范 id**，读法与窗口、上限一样是「问题→键」，没有键作答即缺席（`ModelFacts.thinking`、`ModelFacts.canonical`，kernel 的 `crates/kernel/spec/Event/Record.lean`）：
+
+| 上游 | 键 | 读成 |
+|---|---|---|
+| OpenRouter | `reasoning.{supported_efforts,default_effort,default_enabled}` | `supported_efforts` 为数组时是那几档；为 `null` 时是全部六档（原文 "When `null`, all gateway effort values are accepted"）；缺这个键时只有开关（"the model does not expose effort selection"）；`reasoning` 整个缺席即没说 |
+| Anthropic | `capabilities.effort.<level>.supported`、`capabilities.thinking.types.adaptive.supported` | `supported` 为真的那几档；`adaptive` 为真即能开启 |
+| DeepSeek | `effort.{supported_levels,default_level}` | 那几档与默认档 |
+| xAI | `capabilities.{reasoning_effort,default_reasoning_effort}` | 那几档与默认档；同名两键也在行的顶层读 |
+| Moonshot | `supports_reasoning` | 只有开关：真即能开启，假即不能 |
+| OpenRouter | `hugging_face_id`（非空时） | 规范 id（`provider::identity`，§8-38） |
+
+- **上游的词照 `Effort` 的 serde 拼写读**：七个词以外的词（`ultra`、Ollama 由模型自定的名字）不入集合，`none` 也不入，因为关闭思考不是一档；一个说了档位却一个都读不懂的陈述读作只有开关。
+- **Ollama 的 `/v1/models` 不带这些信息**：它的行只有 `id/object/created/owned_by`，读成没说，梯子落到下一档；`/api/show` 的 `thinking` 对象要逐模型另发一次请求，今天不读（§3）。
+- **Anthropic 的列表要翻页**：`GET /v1/models` 每页缺省 20 行（<https://platform.claude.com/docs/en/api/models/list>），所以 messages 面的探测带 `limit=1000`，并在答复的 `has_more` 为真时以 `after_id=<last_id>` 接着读，至多 `MODEL_LIST_PAGES`（16）页；第 21 个以后的模型因此也有陈述。别的两面不翻页：OpenAI 兼容的列表没有分页参数，带上一个对端不认的查询参数可能被拒。
+- **读到的事实跨过重启**：登记把这一次读到的 `Vec<ModelFacts>` 以 JSON 写进 CAS，`endpoint_attached.facts_blob` 记它的摘要（kernel D57）；编码与解码只在 `router::attached` 一处（`AttachedEndpoint::facts_bytes`、`EndpointBook::learn`），写 CAS 与读 CAS 的是持有 CAS 的 accounting。簿的折叠不做 I/O：它只记下摘要，由持有 CAS 的一方读出字节交给 `learn`，`learn` 只填进摘要相同的那一行，所以一次更晚的登记不会被较早的事实覆盖。
+
 **`adapter_for` 住 `endpoint/adapter.rs`**：装配线（每个 chosen 造一个 Endpoint，§8-3）读的只有 chosen 与赎回闭包，故它是自由函数而非 `RunWorker` 方法——挂在 worker 上等于说装配需要整座城。调用期限是 `EndpointTuning::DEFAULTS.timeout_ms`（§8-16），`adapter_for` 读 `call_timeout_ms()`——一个默认值该住在它所默认的那个设置旁边。凭据簇只出 `resolver`（赎回闭包是凭据的形状）与 `dialect_headers`（它住装配层的凭据簇 `crates/accounting/src/worker/credentials.rs`；兼容格式要的头按理是兼容格式的事，是否搬进本 crate 未定）。
 -/
