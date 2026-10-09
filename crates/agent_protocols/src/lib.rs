@@ -5,8 +5,8 @@
 
 //! Two protocols, pointing opposite ways: `mcp` lets a resident reach an
 //! outside service, `acp` lets an outside editor ask this city for work,
-//! and `harness` is ACP the other way round - this city asking one of
-//! the official harnesses for work.
+//! and `harness` is ACP the other way round - this city asking an ACP
+//! agent the person consented to for work.
 //!
 //! The asymmetry is the design. Reaching out is something a resident
 //! chose and the egress gate can refuse; reaching in is something a
@@ -19,7 +19,10 @@ mod mcp;
 
 pub use acp::{Admitted, Incoming, Progress, admit};
 pub use harness::{AcpSession, Answer, HarnessProcess, Listener};
-pub use harness::{Harness, Launch, Program, SetUpDir, StopReason, Update};
+pub use harness::{AgentEntry, AgentId, AgentSource, Consented, Launch, Pin};
+pub use harness::{AuthMethod, Introduced, LoginKind, StopReason, Update};
+pub use harness::{CLIENT_CONFIGS, configured, detected, passed, pasted, registry_entry};
+pub use harness::{Catalog, OFFICIAL, Official, Roster, SetUpDir, Unseated};
 pub use harness::{PermissionAsk, Permit, PermitKind, PermitOption};
 pub use mcp::{Broker, Connection, Toolkit};
 pub use mcp::{EFFECT_META_KEY, Rpc, ScriptedOutbound, tools_from};

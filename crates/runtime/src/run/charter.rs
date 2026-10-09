@@ -51,6 +51,10 @@ pub struct Charter<'a> {
     /// the one the run's requests froze; `None` when none was stated, and
     /// for a run that sends this city no requests.
     pub effort: Option<kernel::Effort>,
+    /// The ACP agent `run_started` records for a harness run
+    /// (`crates/kernel/spec/Event/Record.lean` §8-87); `None` for a run this
+    /// city's own model loop drives.
+    pub agent: Option<&'a kernel::event::record::AgentRunIdentity>,
 }
 
 impl RunPlan {
@@ -72,6 +76,7 @@ impl RunPlan {
             naming: self.naming,
             opening: Some(self.opening),
             effort: self.shape.effort,
+            agent: None,
         }
     }
 }
@@ -112,7 +117,7 @@ impl Charter<'_> {
             naming: self.naming,
             opening: self.opening,
             effort: self.effort,
-            agent: None,
+            agent: self.agent.cloned(),
         };
         ledger.append(EventDraft {
             run: self.run,

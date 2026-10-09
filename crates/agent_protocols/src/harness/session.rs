@@ -32,13 +32,13 @@ use serde_json::{Value, json};
 
 use crate::mcp::{Heard, Lines};
 
+mod introduced;
 mod report;
 
+use introduced::{AUTH_REQUIRED, auth_required, initialize_params};
+pub use introduced::{AuthMethod, Introduced, LoginKind};
 pub use report::{PermissionAsk, PermitKind, PermitOption, Update};
 use report::{ask_of, update_of};
-
-/// The protocol version this client speaks.
-const PROTOCOL_VERSION: u64 = 1;
 
 /// JSON-RPC's "method not found".
 const METHOD_NOT_FOUND: i64 = -32_601;
@@ -102,6 +102,8 @@ pub struct AcpSession<W: Write> {
     cancelled: bool,
     /// What the agent said to the city in this turn so far.
     said: String,
+    /// What the agent said about itself in `initialize`.
+    introduced: Introduced,
 }
 
 impl<W: Write> AcpSession<W> {
@@ -119,14 +121,8 @@ impl<W: Write> AcpSession<W> {
             session: String::new(),
             cancelled: false,
             said: String::new(),
+            introduced: Introduced::default(),
         };
-        let capabilities = json!({
-            "protocolVersion": PROTOCOL_VERSION,
-            "clientCapabilities": {
-                "fs": { "readTextFile": false, "writeTextFile": false },
-                "terminal": false
-            }
-        });
         // Nothing is halted before a turn, and nothing the agent says
         // while the session opens is a report.
         let (mut never, mut nothing) = (|| false, || Ok::<(), AxError>(()));
@@ -140,7 +136,8 @@ impl<W: Write> AcpSession<W> {
             report: &mut ignored,
             permit: &mut refused,
         };
-        session.request("initialize", capabilities, &mut quiet)?;
+        let answer = session.request("initialize", initialize_params(), &mut quiet)?;
+        session.introduced = introduced::introduced(&session.name, &answer)?;
         let cwd = cwd.to_str().ok_or_else(|| {
             AxError::failure(
                 AxCode::InvalidArgs,
@@ -158,6 +155,12 @@ impl<W: Write> AcpSession<W> {
             .ok_or_else(|| session.unreadable("session/new", "no sessionId"))?
             .to_owned();
         Ok(session)
+    }
+
+    /// What the agent said about itself when the session opened.
+    #[must_use]
+    pub fn introduced(&self) -> &Introduced {
+        &self.introduced
     }
 
     /// Sends one prompt and reads the turn to its end, asking `listener`
@@ -303,12 +306,19 @@ impl<W: Write> AcpSession<W> {
                 .get("message")
                 .and_then(Value::as_str)
                 .unwrap_or_default();
+            if code == AUTH_REQUIRED {
+                return Err(auth_required(
+                    &self.name,
+                    method,
+                    &self.introduced.auth_methods,
+                ));
+            }
             return Err(AxError::failure(
                 AxCode::Provider,
                 format!("ask {} to {method}", self.name),
-                format!("the harness refused with {code}: {said}"),
+                format!("the agent refused with {code}: {said}"),
             )
-            .with_recovery("sign in inside the harness, then start the session again"));
+            .with_recovery("read the agent's own message, then start the session again"));
         }
         message
             .get("result")

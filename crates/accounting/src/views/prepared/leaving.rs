@@ -74,6 +74,19 @@ impl Prepared {
     /// The harness page, which walks this machine's search path, and so
     /// is read after the views are released (`crates/sprawling/Spec.lean`
     /// §8-100). A city nobody served was handed no reach.
+    /// Does the read the views left for after the snapshot: the answer,
+    /// or the refusal the views settled on.
+    ///
+    /// # Errors
+    /// The refusal of a question the views refused outright, such as a
+    /// paste that reads as no agent.
+    pub fn answer(self) -> Result<wire::Answer, kernel::AxError> {
+        let Prepared::Refused(refusal) = self else {
+            return Ok(self.finish());
+        };
+        Err(refusal)
+    }
+
     pub(super) fn harnesses_answer(
         reach: Option<crate::views::lines::HarnessReach>,
     ) -> wire::Answer {

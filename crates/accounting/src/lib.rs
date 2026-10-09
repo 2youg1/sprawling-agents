@@ -39,6 +39,7 @@ mod models;
 pub mod person;
 pub mod plan_view;
 pub mod playback;
+mod roster;
 pub mod toolkit_broker;
 pub mod trace;
 mod tuning;

@@ -62,30 +62,34 @@ pub struct HarnessReach {
     pub(crate) place: fn(&agent_protocols::SetUpDir) -> Option<PathBuf>,
 }
 
-/// The harness page: every official harness in the roster, the command
-/// that starts it, and how far this machine has it set up
+/// The harness page: every built-in entry, the command that starts it as
+/// the shipped catalog says, and how far this machine has it set up
 /// (`crates/wire/spec/Answer/Harnesses.lean` §8-52 and D23,
 /// `crates/accounting/spec/Views.lean` §8-10).
 pub(crate) fn harnesses_answer(reach: HarnessReach) -> wire::Answer {
+    let catalog = match agent_protocols::Catalog::bundled() {
+        Ok(catalog) => catalog,
+        Err(stopped) => {
+            return super::prepared::unavailable_because("Harnesses".to_owned(), &stopped);
+        }
+    };
+    let roster = agent_protocols::Roster::new(Vec::new(), catalog);
     wire::Answer::Harnesses(wire::HarnessesAnswer {
-        harnesses: agent_protocols::Harness::ALL
+        harnesses: agent_protocols::OFFICIAL
             .iter()
-            .map(|harness| {
-                let launch = harness.launch();
-                wire::HarnessLine {
-                    name: harness.as_str().to_owned(),
-                    launch: std::iter::once(launch.program.name())
-                        .chain(launch.args.iter().copied())
-                        .map(str::to_owned)
-                        .collect(),
-                    state: match (reach.find)(launch.program.name()) {
+            .filter_map(|official| {
+                let launch = roster.builtin(official)?.launch;
+                Some(wire::HarnessLine {
+                    name: official.word.to_owned(),
+                    state: match (reach.find)(&launch.program) {
                         None => wire::HarnessState::LauncherMissing {
-                            program: launch.program.name().to_owned(),
+                            program: launch.program.clone(),
                         },
-                        Some(_) => set_up_state(*harness, reach.place),
+                        Some(_) => set_up_state(official, reach.place),
                     },
-                    docs: harness.docs().to_owned(),
-                }
+                    launch: std::iter::once(launch.program).chain(launch.args).collect(),
+                    docs: official.docs.to_owned(),
+                })
             })
             .collect(),
     })
@@ -95,10 +99,10 @@ pub(crate) fn harnesses_answer(reach: HarnessReach) -> wire::Answer {
 /// directories that exists, or every path looked at. An empty table
 /// gives an empty `looked`, which the page reads as "not looked for".
 fn set_up_state(
-    harness: agent_protocols::Harness,
+    official: &agent_protocols::Official,
     place: fn(&agent_protocols::SetUpDir) -> Option<PathBuf>,
 ) -> wire::HarnessState {
-    let looked: Vec<PathBuf> = harness.set_up().iter().filter_map(place).collect();
+    let looked: Vec<PathBuf> = official.set_up.iter().filter_map(place).collect();
     match looked.iter().find(|dir| dir.is_dir()) {
         Some(at) => wire::HarnessState::Ready {
             at: at.display().to_string(),

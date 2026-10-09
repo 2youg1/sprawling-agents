@@ -34,10 +34,10 @@ pub(crate) fn validate(servers: &[McpServer]) -> Result<(), AxError> {
     servers
         .iter()
         .try_for_each(|server| match &server.transport {
-            McpTransport::Stdio { env, .. } => vaulted(&server.label, Carried::Env, env),
+            McpTransport::Stdio { env, .. } => vaulted(server.label.as_str(), Carried::Env, env),
             McpTransport::Http { url, headers } | McpTransport::Sse { url, headers } => {
                 check_url(&server.label, url)?;
-                vaulted(&server.label, Carried::Header, headers)
+                vaulted(server.label.as_str(), Carried::Header, headers)
             }
         })
 }
@@ -102,7 +102,7 @@ const IN_A_HEADER: &str = "keep the secret in the vault and send it in a header 
 /// Which table a value sits in, so a refusal names the line a person
 /// has to go and edit.
 #[derive(Clone, Copy)]
-enum Carried {
+pub(super) enum Carried {
     Env,
     Header,
 }
@@ -117,7 +117,7 @@ impl Carried {
 }
 
 /// Refuses one pair at a time, so the refusal names which value is the
-/// problem rather than which server.
+/// problem rather than which server or agent `owner` names.
 ///
 /// A `secret:realm/name` reference is what this file is for: the value
 /// on disk says where the secret is kept, and the assembly layer
@@ -126,8 +126,8 @@ impl Carried {
 /// itself — is refused. What reads as a credential is
 /// `kernel::secret`'s answer, the same one `EnvVarName::parse` gives
 /// for a declared environment name.
-fn vaulted(
-    label: &ServerLabel,
+pub(super) fn vaulted(
+    owner: &str,
     carried: Carried,
     pairs: &[(String, String)],
 ) -> Result<(), AxError> {
@@ -145,11 +145,7 @@ fn vaulted(
         return Err(AxError::failure(
             AxCode::ConfigInvalid,
             ACTION,
-            format!(
-                "{}: {} `{name}`: {violation}",
-                label.as_str(),
-                carried.noun()
-            ),
+            format!("{owner}: {} `{name}`: {violation}", carried.noun()),
         )
         .with_recovery(
             "keep the secret in the vault and write its `secret:realm/name` reference here; \

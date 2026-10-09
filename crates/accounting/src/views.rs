@@ -22,6 +22,7 @@
 //! queue answers by being consumed and a view that consumed what it
 //! showed would change the thing it reports on.
 
+mod agents;
 pub mod answered;
 pub mod answering;
 pub mod archives;

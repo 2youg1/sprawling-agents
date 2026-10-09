@@ -26,10 +26,14 @@ kernel = { workspace = true }
 # `gateway::client_for`, and a `secret:realm/name` reference beside a
 # server is redeemed through `gateway::SecretResolver`.
 gateway = { workspace = true }
+# An agent is started through the one constructor every child of the
+# city starts from (`crates/child/Spec.lean`).
+child = { workspace = true }
 reqwest = { workspace = true }
 serde_json = { workspace = true }
 
 [dev-dependencies]
+proptest.workspace = true
 tempfile.workspace = true
 
 [lints]

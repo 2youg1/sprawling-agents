@@ -54,9 +54,10 @@ impl Published {
 /// The answer is dated by the snapshot it is prepared from, so the date
 /// is exactly the first record the answer does not reflect.
 ///
-/// The `Result` is the shape the console's `Answering` takes; this path
-/// refuses nothing itself, because a snapshot is an `Arc` taken whole
-/// and has no poisoned state.
+/// The `Result` is the shape the console's `Answering` takes. The
+/// snapshot refuses nothing, because it is an `Arc` taken whole and has
+/// no poisoned state; a question the views refuse outright, such as a
+/// paste that reads as no agent, is the refusal.
 pub fn answer_outside_the_lock(
     views: &Published,
     query: &wire::Query,
@@ -65,5 +66,5 @@ pub fn answer_outside_the_lock(
     let as_of = snapshot.next_unfolded();
     let prepared = snapshot.prepare(query);
     drop(snapshot);
-    (as_of, Ok(prepared.finish()))
+    (as_of, prepared.answer())
 }

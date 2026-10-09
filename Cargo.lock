@@ -2884,6 +2884,7 @@ dependencies = [
 name = "sprawling-agent-protocols"
 version = "0.0.10"
 dependencies = [
+ "proptest",
  "reqwest",
  "serde_json",
  "sprawling-child",

@@ -18,7 +18,7 @@ use std::path::{Path, PathBuf};
 use std::process::ChildStdin;
 use std::sync::Arc;
 
-use agent_protocols::{AcpSession, Answer, Harness, HarnessProcess, Listener};
+use agent_protocols::{AcpSession, Answer, Consented, HarnessProcess, Listener};
 use kernel::event::Who;
 use kernel::{Address, AxError, Completion, Ledger, Locator, Payload, RunId, TimeMs};
 use runtime::run::{Charter, Conclusion, HarnessRun};
@@ -35,25 +35,35 @@ use turn::{Turning, answered, take_the_turn};
 pub(crate) type Prompting =
     Box<dyn FnMut(&str, &mut Listener<'_>) -> Result<Answer, AxError> + Send>;
 
+/// An open session, and the version the agent reported when it opened.
+pub(crate) struct Started {
+    pub(crate) prompting: Prompting,
+    pub(crate) version: Option<String>,
+}
+
 /// Starts a harness in a directory and opens a session with it there.
 /// A closure rather than a trait: the second implementation is the
 /// tests', which play the agent over a pipe.
 pub(crate) type StartHarness =
-    Arc<dyn Fn(Harness, &Path) -> Result<Prompting, AxError> + Send + Sync>;
+    Arc<dyn Fn(&Consented, &Path) -> Result<Started, AxError> + Send + Sync>;
 
 /// The harnesses this machine starts: the vendor's own program, in the
 /// room's tree, through `agent_protocols::HarnessProcess`.
 pub(in crate::worker) fn on_this_machine() -> StartHarness {
     Arc::new(
-        |harness: Harness, cwd: &Path| -> Result<Prompting, AxError> {
-            let (process, session) = HarnessProcess::start(harness, cwd)?;
+        |agent: &Consented, cwd: &Path| -> Result<Started, AxError> {
+            let (process, session) = HarnessProcess::start(agent, cwd)?;
+            let version = session.introduced().version.clone();
             let mut seated = Seated {
                 session,
                 _process: process,
             };
-            Ok(Box::new(move |text: &str, listener: &mut Listener<'_>| {
-                seated.prompt(text, listener)
-            }))
+            Ok(Started {
+                prompting: Box::new(move |text: &str, listener: &mut Listener<'_>| {
+                    seated.prompt(text, listener)
+                }),
+                version,
+            })
         },
     )
 }
@@ -109,6 +119,9 @@ impl Chartered {
             opening: None,
             // Nor does it send this city's requests, so no effort froze.
             effort: None,
+            // The agent is known once its session opened; the drive fills
+            // it in then.
+            agent: None,
         }
     }
 }
@@ -116,7 +129,7 @@ impl Chartered {
 /// What one harness drive is handed, owned so it can leave the thread
 /// that staged it.
 pub(in crate::worker) struct HarnessHalf {
-    pub(in crate::worker) harness: Harness,
+    pub(in crate::worker) harness: Consented,
     pub(in crate::worker) start: StartHarness,
     pub(in crate::worker) chartered: Chartered,
     pub(in crate::worker) building: city::Building,
@@ -241,9 +254,23 @@ fn drive_turn<L: Ledger>(
     )?;
     let root = tree.path().to_path_buf();
     *lease = Some(tree);
-    let mut prompting = (half.start)(half.harness, &root)?;
+    let Started {
+        mut prompting,
+        version,
+    } = (half.start)(&half.harness, &root)?;
+    // Only the id, the version the agent reported and the consented
+    // digest: the command line is this machine's fact, not history.
+    let agent = kernel::event::record::AgentRunIdentity {
+        id: half.harness.entry().id.as_str().to_owned(),
+        version,
+        launch_digest: half.harness.entry().launch.digest(),
+    };
     let mut now = || clock.now();
-    let run = HarnessRun::open(half.chartered.charter(), &mut *ledger, &mut now)?;
+    let charter = runtime::run::Charter {
+        agent: Some(&agent),
+        ..half.chartered.charter()
+    };
+    let run = HarnessRun::open(charter, &mut *ledger, &mut now)?;
     let deadline = TimeMs::new(clock.now()?.value().saturating_add(half.ceiling_ms));
     let turning = Turning {
         run,

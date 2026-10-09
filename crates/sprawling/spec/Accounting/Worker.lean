@@ -91,7 +91,7 @@ impl Residents {
 /-!
 ## 8-4e harness 居民的一次 run（性质已证明）
 
-一个房间的居民可以是五家官方 harness 之一（`crates/agent_protocols/Spec.lean` §8-19）。派活到这样的房间时，城起那一家的进程，在房间自己的 worktree 里开一场 ACP 会话，把它汇报的东西记进账本，在它答出停止原因时结束这次 run。
+一个房间的居民可以是任何一个人同意过的 ACP agent，五家官方 harness 是其中的内置条目（`crates/agent_protocols/Spec.lean` §8-19）。派活到这样的房间时，城起那一个 agent 的进程，在房间自己的 worktree 里开一场 ACP 会话，把它汇报的东西记进账本，在它答出停止原因时结束这次 run。
 
 **性质的权威是 `crates/agent_protocols/spec/Harness/Session.lean`**，六组定理：
 
@@ -116,9 +116,9 @@ impl Residents {
 
 8. **`end_turn` 由城自己的记录作证**：`session/prompt` 答出停止原因之后，城先把这棵 worktree 提交成自己的检查点（`checkpoint_committed`，harness 改了什么由城记下；五种停止原因都提交，一次被截断的 run 改了什么同样要记），再写一条 record-only 种类 `harness_answered`：载荷携停止原因，与这一回合 harness 回答城的那段文字（`agent_message_chunk` 依次拼起来）。run 冻成 `Completion::Done`，证据引这一行，`kernel::completion::Evidence` 因此在 `tool_result`、`model_returned` 之外多收一种。这与模型 run 的证据同一个标准：模型的 run 以它最后那条 `model_returned` 作证（`runtime::run::lifecycle::concluded`），harness 的 run 以它对城那次请求的回答作证。回答是空的，冻成 `Limit`，与 `concluded` 对空回复的判法相同。**被否**：给 `Completion` 加一个「harness 自称完成」的变体（动 kernel 的公开面与每一个按结局分支的读者）；在 bench 上立一件「harness」工具，把 prompt 包成 `tool_called`／`tool_result`（那是一件没有模型调用过、也没有门判过的工具）。
 9. **permission 一律答它给出的第一个 `allow_once`（定规）**：没有 `allow_once` 就答第一个 `reject_once`，两者都没有就答 `cancelled`。恒不答 `allow_always`：那是替以后的调用做决定。问与答各记成一条 `harness_reported`。理由：城不能按工具名授权（ACP 规格），能兜住的是这棵 worktree（第 5 条）；一律拒绝会让默认要问的 harness 什么都做不成；交给人则要让 Approval Inbox 收动作，而它今天只收设计问题，且一次挂起的 prompt 占着一条车道。**重开参数**：Approval Inbox 开始收动作。
-10. **房间的 harness 由 `CONFIG.toml` 的 `[resident] harness` 点名（定规）**：值是 `agent_protocols::Harness::as_str` 的五个拼写之一，在城／楼／房间的梯子上取最近一级（`city::settled_harness`，`crates/city/Spec.lean` §8-4）。房间在派活时才开，所以这个键实际写在楼层或城层。`city` 只把它当字符串读进来：`city` 只见 `kernel`，五个拼写的权威在 `agent_protocols::harness::roster`。`agree_to_work` 在写任何东西之前用 `agent_protocols::Harness::parse` 判它，不认识的拼写答 `E_CONFIG_INVALID` 并列出五个。`[model] name` 不在梯子上，它是房间自己那一层的会话记录（`crates/city/Spec.lean` §8-14）；房间有这条记录时，这段会话以模型走完，harness 从 `/new` 开的下一段会话起生效。同一层同时写 `[model] name` 与 `[resident] harness` 在解析时即拒：一个房间的居民是模型还是 harness，要读者去猜就是配置写错了；城自己的写路径也写不出这样一份文件（`crates/city/Spec.lean` §8-4b）。**被否**：派活帧上加一个字段，那要动 wire，而居民是一个站着的身份（词汇表 Resident），不是每次派活现选的；梯子上的 harness 压过会话记录，那会让一段会话中途换居民（city D6）。
+10. **房间的 harness 由 `CONFIG.toml` 的 `[resident] harness` 点名（定规）**：值是城 `CONFIG.toml` 里一行 `[[agent]]` 的 `id`，或一个内置条目的词（`agent_protocols::OFFICIAL`），在城／楼／房间的梯子上取最近一级（`city::settled_harness`，`crates/city/Spec.lean` §8-4）。房间在派活时才开，所以这个键实际写在楼层或城层。`city` 只把它当字符串读进来，`[[agent]]` 的行也由 `city` 读（`city::agent_rows`）：`city` 只见 `kernel`，一个词点名的是哪个条目，权威在 `agent_protocols::Roster::seat`。`agree_to_work` 在写任何东西之前用它判，不认识的词答 `E_CONFIG_INVALID` 并列出认得的词；一行 `[[agent]]` 的 `launch_digest` 与重算的摘要不等，同样答 `E_CONFIG_INVALID`，那一行在人同意之后被改过。`[model] name` 不在梯子上，它是房间自己那一层的会话记录（`crates/city/Spec.lean` §8-14）；房间有这条记录时，这段会话以模型走完，harness 从 `/new` 开的下一段会话起生效。同一层同时写 `[model] name` 与 `[resident] harness` 在解析时即拒：一个房间的居民是模型还是 harness，要读者去猜就是配置写错了；城自己的写路径也写不出这样一份文件（`crates/city/Spec.lean` §8-4b）。**被否**：派活帧上加一个字段，那要动 wire，而居民是一个站着的身份（词汇表 Resident），不是每次派活现选的；梯子上的 harness 压过会话记录，那会让一段会话中途换居民（city D6）。
 
-**接线四段**：①`agent_protocols`：`Harness::parse`、会话的取消与起进程的那一半（`crates/agent_protocols/Spec.lean` §8-19）；②`kernel`：`harness_reported`、`harness_answered` 两个种类与 `Evidence` 多收的一种；③`city`：`[resident] harness`（`crates/city/Spec.lean` §8-4）；④派活路径上的 harness run：`runtime::run::harness` 写它的每一行（`crates/runtime/Spec.lean` §8-52），`accounting::worker` 判居民、借树、起 harness、落地（§8-124）。
+**接线四段**：①`agent_protocols`：`Roster::seat` 与 `Consented`、会话的取消与起进程的那一半（`crates/agent_protocols/Spec.lean` §8-19）；②`kernel`：`harness_reported`、`harness_answered` 两个种类与 `Evidence` 多收的一种；③`city`：`[resident] harness`（`crates/city/Spec.lean` §8-4）；④派活路径上的 harness run：`runtime::run::harness` 写它的每一行（`crates/runtime/Spec.lean` §8-52），`accounting::worker` 判居民、借树、起 harness、落地（§8-124）。
 -/
 
 /-!
@@ -142,9 +142,9 @@ impl RunWorker { pub(crate) fn with_harnesses(self, start: StartHarness) -> RunW
 
 - **居民只判一次**：`agree_to_work` 在写任何东西之前得出 `Seat`。`Seat::Model` 带着原来的 `Agreed` 走原来的路；`Seat::Harness` 不选模型、不造适配器、不调 `choose_shape`，所以城恒不把 `[model] name` 写进一个点名了 harness 的层（`crates/city/Spec.lean` §8-4b 的复读仍在，那是第二道）。`Staged`、`Flown` 与 `Continuation` 各是两臂的枚举，池只调 `Staged::fly` 与 `land`，不看居民是谁。
 - **判哪一个地址**：这次派活会开一间新房间时（楼地址，或带会话名），判它所在的楼；否则判地址本身。新房间自己那一层是空的，梯子的答案就是楼的答案；旧房间自己那一层的会话记录说的是那间旧房间，不是新开的这一间。「会不会开新房间」由 `dispatching::session` 一处回答，`session_for` 与这里读同一句。
-- **harness 一臂的三条拒绝**，次序即调用方有权先听到的次序：拼写不是五家之一答 `E_CONFIG_INVALID`，subject 是 `<地址>: <拼写>`，`nearby` 是 `Harness::ALL` 的五个拼写，恢复语给出点名它的那份 `CONFIG.toml`；楼是 confidential 答 `E_GATE_DENIED`（§8-4e 第 4 条）；派活点名了模型（`-m`）答 `E_CONFIG_INVALID`：居民是 harness 的房间不接一个模型，改点名要去 `CONFIG.toml`。三条都在写之前，拒绝之后磁盘与账本一字不动。
-- **程序装没装，不在答应时判**：找程序的权威是 `bin::doctor::host::find_program`，accounting 看不见它，worker 接触宿主只经 `StartHarness`。起不来的 harness 由 `HarnessProcess::start` 在车道里答 `E_TOOL_UNAVAILABLE`，恢复语给出这家自己的 `docs()`；它发生在 `run_started` 之前，账本上只多一条 `worktree_opened`，与模型 run 的准备在车道里失败同形（见本节未决）。
-- **车道里的次序**：先借房间的树（与评审楼同一个 `workbench::standing::lend_tree`，不论 `review`），再在那棵树里起 harness 并开会话，然后 `HarnessRun::open` 写开篇两行，最后以房间的 brief 发出唯一一次 prompt：有 `JOB.md` 时是它的原文，没有目标的派活是任务本身（harness 没有前缀可放 `PRINCIPAL_BRIEF`）。
+- **harness 一臂的三条拒绝**，次序即调用方有权先听到的次序：词不点名任何条目答 `E_CONFIG_INVALID`，subject 是 `<地址>: <词>`，`nearby` 是 `Roster::words` 的词，恢复语给出点名它的那份 `CONFIG.toml`；楼是 confidential 答 `E_GATE_DENIED`（§8-4e 第 4 条）；派活点名了模型（`-m`）答 `E_CONFIG_INVALID`：居民是 harness 的房间不接一个模型，改点名要去 `CONFIG.toml`。三条都在写之前，拒绝之后磁盘与账本一字不动。
+- **程序装没装，不在答应时判**：找程序的权威是 `bin::doctor::host::find_program`，accounting 看不见它，worker 接触宿主只经 `StartHarness`。起不来的 agent 由 `HarnessProcess::start` 在车道里答 `E_TOOL_UNAVAILABLE`，恢复语给出它的那一行命令；它发生在 `run_started` 之前，账本上只多一条 `worktree_opened`，与模型 run 的准备在车道里失败同形（见本节未决）。
+- **车道里的次序**：先借房间的树（与评审楼同一个 `workbench::standing::lend_tree`，不论 `review`），再在那棵树里起 harness 并开会话，然后 `HarnessRun::open` 写开篇两行（`run_started.agent` 是 agent 的 id、它在 `initialize` 里报的版本与同意的摘要，`crates/kernel/spec/Event/Record.lean` §8-87），最后以房间的 brief 发出唯一一次 prompt：有 `JOB.md` 时是它的原文，没有目标的派活是任务本身（harness 没有前缀可放 `PRINCIPAL_BRIEF`）。
 - **`Listener` 的四个回调**：`halted` 读这个 run 的截断：罩住房间的停摆（`driving::lane::scope_stopping`，与模型 run 同一条规则）或人对这个 run 的 `Cancel` 是 `Cut::Halt`，墙钟上限到了是 `Cut::Deadline`，先查墙钟；`cancelling` 调 `HarnessRun::cancel`；`report` 把 `Update` 穷尽映射成 `HarnessReported` 交给 `HarnessRun::report`；`permit` 照 §8-4e 第 9 条选，问与答各记一条 `harness_reported`。记不进账本的问答让这一问答 `cancelled`，失败在回合结束后照会话失败处理。
 - **回合结束**：答出停止原因后，在城的那把 checkpoint 闸下把树 `wave_pre` 成检查点，交给 `HarnessRun::conclude`（`checkpoint_committed`、`harness_answered`、冻结）。会话在答出停止原因之前断了（`E_PROVIDER`、`E_WIRE_MISMATCH`），或检查点提交不了，`HarnessRun::abandon` 冻成 `Cancelled`，原错误照模型 run 的做法向上抛：账本得到判决，调用方得到诊断。会话与子进程在驱动返回时一起丢掉，丢掉即杀（`crates/agent_protocols/Spec.lean` §8-19）。
 - **落地**（账本线程）：离开 backlog；冻成 `Done` 时城替它开请求：把树落成房间分支上的一个 commit，写 `pr_opened`，进请求簿，与居民自己 `pr open` 的那一臂是同一段代码（`reviewing::offer`），核与合并走已有的评审流程；这条分支已有一份请求在等时不开第二份，只记一行诊断；然后归还树，按 `Owing` 付账。模型 run 落地要放回的适配器、工作台与转录，harness run 一样都没有。
@@ -190,7 +190,7 @@ impl Site {
 
 - **旧账本照样折得回**：旧版本写过的 `login_started` 仍是一个事件种类，没有读者；`secret_captured` 行里的 `expires_at` 与 `<provider>-subscription`／`<provider>-renewal` 来源读入时照收，本城不再据此续期。
 - **旧快照不接**：`StandingFolds` 少了到期表，`STANDING_FOLD_RULES` 随之换值，旧快照按版本不符从创世重折（§8-101）。
-- **harness 页读名单与这台电脑**：`accounting::views::lines::harnesses_answer` 把 `agent_protocols::Harness::ALL` 逐家抄成 `wire::HarnessLine`，`found` 经 `Views.programs` 问服务中的城交进来的查找（`crates/accounting/Spec.lean` §8-10）；生产的查找是 `bin::doctor::host::find_program`，与 doctor 找程序读同一条搜索路径（`crates/wire/Spec.lean` §8-52）。
+- **harness 页读名单与这台电脑**：`accounting::views::lines::harnesses_answer` 把 `agent_protocols::OFFICIAL` 的每个内置条目按随版本附带的目录快照抄成 `wire::HarnessLine`，`found` 经 `Views.programs` 问服务中的城交进来的查找（`crates/accounting/Spec.lean` §8-10）；生产的查找是 `bin::doctor::host::find_program`，与 doctor 找程序读同一条搜索路径（`crates/wire/Spec.lean` §8-52）。
 - **provider 页先给厂商表**：`views::lines::known_hosts_answer` 把 `gateway::known_hosts` 逐行抄成 `wire::KnownHostsAnswer`，不加不减（`crates/wire/Spec.lean` §8-51）。
 -/
 
@@ -769,7 +769,7 @@ the work: a halted city that laid a job file down would leave a task in a room n
 **一次派活在城答应之前不写任何东西；城一答应，第一件被写下的就是房间。**
 
 「城答应」由一处回答，穷尽如下，且每一条都只读不写：保留子树（`Building::of`）、停摆
-（`halted_by`）、楼的规矩读得出（`city::load`）、房间的居民是 harness 时它的拼写认得、楼不是 confidential、派活没点名模型（`city::settled_harness` 与 `agent_protocols::Harness::parse`，§8-124；居民是 harness 就不再往下判模型）、tag 后面有模型且端点还在且不违反 confidential
+（`halted_by`）、楼的规矩读得出（`city::load`）、房间的居民是 agent 时它的词认得、楼不是 confidential、派活没点名模型（`city::settled_harness` 与 `agent_protocols::Roster::seat`，§8-124；居民是 harness 就不再往下判模型）、tag 后面有模型且端点还在且不违反 confidential
 （`Router::select`）、适配器造得出（`adapter_for`）。
 
 **留在答应之后的两条拒绝，各有其理由，写在这里而不是被含糊过去**：

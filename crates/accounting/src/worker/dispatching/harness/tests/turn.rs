@@ -58,6 +58,27 @@ fn a_harness_that_ends_its_turn_is_frozen_done_on_its_answer() {
             EventKind::PrOpened,
         ]
     );
+    // The ledger names the agent by its id, the version it reported and
+    // the consented digest, never by its command line (kernel §8-87).
+    let opened: kernel::event::record::RunStarted = run
+        .iter()
+        .find(|record| record.kind() == EventKind::RunStarted)
+        .unwrap()
+        .data()
+        .read()
+        .unwrap();
+    let pi = crate::roster::roster(dir.path())
+        .unwrap()
+        .seat("pi")
+        .unwrap();
+    assert_eq!(
+        opened.agent,
+        Some(kernel::event::record::AgentRunIdentity {
+            id: "pi".to_owned(),
+            version: Some("0.0.34".to_owned()),
+            launch_digest: pi.entry().launch.digest(),
+        })
+    );
     let answer = run
         .iter()
         .find(|record| record.kind() == EventKind::HarnessAnswered)

@@ -15,6 +15,7 @@
 //! A broken gate must fail loudly (code 2): silent passes are the worst
 //! failure mode a gate can have (xtask D1).
 
+mod acp_catalog;
 mod architecture;
 mod artifact;
 mod attestation;
@@ -188,6 +189,13 @@ fn main() -> ExitCode {
             Err(err) => report::internal_failure(&err),
         },
         Some("wire-ts") => report::finish("wire-ts", wire_ts::check(&root)),
+        Some("acp-catalog") => match acp_catalog::write(&root) {
+            Ok(message) => {
+                print!("{message}");
+                ExitCode::SUCCESS
+            }
+            Err(err) => report::internal_failure(&err),
+        },
         Some("wording") => report::finish("wording", wording::check(&root)),
         Some("header") => report::finish("header", header::check(&root)),
         Some("lexicon") => report::finish("lexicon", lexicon::check(&root)),
@@ -277,7 +285,11 @@ struct Tool {
 /// Everything `cargo xtask` answers that is not a gate, plus the flags
 /// that change what a gate does. The dispatcher above and this array are
 /// read together, so a command that grows a flag is printed with it.
-const TOOLS: [Tool; 16] = [
+const TOOLS: [Tool; 17] = [
+    Tool {
+        call: "acp-catalog",
+        gives: "the ACP registry index, written as the catalog snapshot the build ships",
+    },
     Tool {
         call: "gates [<gate>...]",
         gives: "every gate, or only the named ones",

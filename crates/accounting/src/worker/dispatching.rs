@@ -200,7 +200,7 @@ pub(super) enum Seat {
 pub(super) struct HarnessSeat {
     pub(super) building: city::Building,
     pub(super) rules: city::BuildingRules,
-    pub(super) harness: agent_protocols::Harness,
+    pub(super) harness: agent_protocols::Consented,
 }
 
 impl Seat {

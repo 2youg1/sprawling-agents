@@ -29,11 +29,9 @@ use super::snapshot::start::start_audited;
 /// parse. A city whose chain is broken is not one whose views should be
 /// handed to anybody.
 pub fn ask(city_root: &Path, query: &wire::Query) -> Result<wire::Answer, AxError> {
-    Ok(
-        Views::rebuild(&kernel::layout::CityLayout::new(city_root).ledger())?
-            .prepare(query)
-            .finish(),
-    )
+    Views::rebuild(&kernel::layout::CityLayout::new(city_root).ledger())?
+        .prepare(query)
+        .answer()
 }
 
 impl Views {

@@ -142,6 +142,7 @@ inductive Confined where
   | Shelves
   | Remote
   | Search
+  | Agents
   deriving DecidableEq, Repr
 
 /-- 一级离城多远：城 0、楼 1、房间 2。 -/
@@ -155,6 +156,7 @@ def Confined.nearest : Confined → Layer
   | .Shelves => .City
   | .Remote => .City
   | .Search => .Building
+  | .Agents => .City
 
 /-- 这一级够不够得到这张表：不比它最近的那一级更近。 -/
 def reaches (rung : Layer) (table : Confined) : Bool :=

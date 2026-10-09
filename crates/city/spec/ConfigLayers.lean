@@ -16,7 +16,7 @@
 pub use kernel::layout::CONFIG_FILE;               // 文件名的权威在 kernel::layout
 pub enum Layer { City, Building, Resident }        // 穷尽三级，与 kernel::LayeredValue 同形
 pub fn path(city_root: &Path, addr: &Address, layer: Layer) -> Result<PathBuf, AxError>;
-pub struct ConfigLayer { /* model / harness / effort / sandbox / mcp / search / second_threshold / clock_stamp / keep_warm / shelves / naming / remote —— 私有 */ }
+pub struct ConfigLayer { /* model / harness / effort / sandbox / mcp / search / second_threshold / clock_stamp / keep_warm / shelves / naming / remote / agents —— 私有 */ }
 impl ConfigLayer {
     pub fn parse(text: &str) -> Result<ConfigLayer, AxError>;   // 纯函数，无 I/O
     pub fn model(&self) -> Option<&str>;                        // 这一级冻下的模型，照写下的读回
@@ -95,7 +95,7 @@ impl Ladder {
 
 **`[cache]` 一节**：一个字段 `keep_warm`，取 `off` 或 `five_minute`——这一层要不要在提示缓存到期前续期。值的形状与续期判定住 `kernel::keep_warm`（`crates/kernel/spec/KeepWarm.lean` §8-74），本节只管它在 TOML 里怎么写、在哪一层写。拼写由 serde 按闭集读，拼错的词与未知键同样在解析点拒。`city::keep_warm(city_root, addr) -> Result<KeepWarm, AxError>` 爬同一张梯，下层覆盖上层；一层也没说时答 `KeepWarm::Off`——续期是人付钱的请求，默认必须是不发。与 `[context]` 不同，它不进 `FrozenConfig`：续期发生在两次 run 之间。
 
-**`[resident]` 一节**：一个字段 `harness`（字符串），点名这一层以下的房间由哪家官方 harness 当居民。值照写下的读进来：五个拼写的权威是 `agent_protocols::Harness`，本 crate 只见 `kernel`，认不认得由派活路径判（`crates/sprawling/Spec.lean` §8-4e 第 10 条）。空串在解析点拒，与 `[model] name` 走同一条判定：空值什么也没说，写它是笔误。
+**`[resident]` 一节**：一个字段 `harness`（字符串），点名这一层以下的房间由哪个 ACP agent 当居民：城 `CONFIG.toml` 里一行 `[[agent]]` 的 `id`（§8-4f），或一个内置条目的词。值照写下的读进来：一个词点名哪个条目，权威是 `agent_protocols::Roster::seat`，本 crate 只见 `kernel`，认不认得由派活路径判（`crates/sprawling/Spec.lean` §8-4e 第 10 条）。空串在解析点拒，与 `[model] name` 走同一条判定：空值什么也没说，写它是笔误。
 
 - **一层只点名一种居民**：同一层既写 `[model] name` 又写 `[resident] harness`，解析即拒（`E_CONFIG_INVALID`），拒词带两个键和各自的值。居民是模型还是 harness，要读者去猜，就是配置写错了。`ConfigLayer` 的字段私有、`parse` 是唯一构造点，所以两键并存的值构造不出来。地址就是楼时，楼层与房间层是同一个文件；人要在这样一个带着会话记录的文件里写 harness，先 `/new` 清掉会话写下的 `[model] name`。
 - **harness 爬梯子，`[model] name` 不爬**：`settled_harness` 与 `settled_effort` 爬同一条梯子，下层胜上层，连同说出它的那一级一起答。`[model] name` 仍只是地址自己那一层的会话记录（`own_layer`，§8-14），不参与求值。
@@ -121,6 +121,24 @@ pub fn write_mcp(city_root: &Path, addr: &Address, layer: Layer, servers: &[McpS
 -/
 
 /-!
+### 8-4f `[[agent]]`：人加进这座城的 ACP agent（`config_layers::agents`，形状 1 判定）
+
+```rust
+pub struct AgentRow {
+    pub id: String, pub name: Option<String>, pub command: String, pub args: Vec<String>,
+    pub env: Vec<(String, String)>, pub source: AgentRowSource, pub version: Option<String>,
+    pub launch_digest: Option<B3Hash>,
+}
+pub enum AgentRowSource { Registry, Detected, Pasted }      // 文件里写 "registry" | "detected" | "pasted"
+pub fn agent_rows(city_root: &Path) -> Result<Vec<AgentRow>, AxError>;   // 城那一级的行；没有就是空表
+```
+
+- **文法照 `[[mcp]]` 的 stdio 一支**：每行 `id`、`command` 必填，`name`、`args`、`env`、`version`、`launch_digest` 可缺，`source` 必填且是三种拼写之一；不认的键拒（`deny_unknown_fields`）。`env` 是一张表，一名一次；值可以是 `secret:realm/name` 引用，明文凭据在解析时拒，判定与 `[[mcp]]` 的 `env` 是同一个 `vaulted`（§8-4b），拒词点名那一行的 `id` 与那个名字，恒不带值。
+- **只写在城那一级**（`Confined::Agents`，`spec/ConfigLayers/Ladder.lean`）：一行 agent 点名这台电脑以人的身份运行的程序，楼或房间加一行，就替它下面的每个房间起了它。楼或房间写它即拒，拒词让人把它挪进城根的 `CONFIG.toml`，与 `[remote]`、`[skills]` 同一条理由。
+- **解析时拒**（`E_CONFIG_INVALID`）：`id` 或 `command` 为空；两行同 `id`；`env` 的值是明文凭据；`source` 拼错；`launch_digest` 读不成一个 BLAKE3 摘要。`id` 合不合 agent id 的文法、`launch_digest` 与重算的摘要等不等，归 `agent_protocols`（`AgentId::parse`、`Consented::given`），派活时判：本 crate 只见 `kernel`。
+- **`launch_digest` 缺席是人亲手写的行**：那份文件就是人的同意，与 `[[mcp]]`、`[remote]` 相同；写了它的行是同意卡片写下的，之后被改过就在派活时拒（`crates/agent_protocols/Spec.lean` D16）。命令与参数是这台电脑的事实，恒不进账本（`crates/kernel/src/config.rs` 的 `McpServer` 同理）。
+- **写面**：同意卡片经 `AddAgent` 写这一行；那条写路径还没有建（`crates/agent_protocols/Spec.lean` §3），今天的行由人手写。
+
 ### 8-4c `[search]`：网络搜索接哪一家（`config_layers::search`，形状 1 判定／求值）
 
 ```rust
@@ -370,8 +388,17 @@ settings-reason RemoteRoute.Cloudflare.url 通路点名城所在机器上要执�
 settings-reason RemoteRoute.Command.args 通路点名城所在机器上要执行的程序与参数；一个经远程门连进来的设备若能写它，就能让城在它所在的机器上执行任意程序，所以只在城的 CONFIG.toml 里手写。
 settings-reason RemoteRoute.Command.command 通路点名城所在机器上要执行的程序与参数；一个经远程门连进来的设备若能写它，就能让城在它所在的机器上执行任意程序，所以只在城的 CONFIG.toml 里手写。
 settings-reason RemoteRoute.Command.permanence 通路点名城所在机器上要执行的程序与参数；一个经远程门连进来的设备若能写它，就能让城在它所在的机器上执行任意程序，所以只在城的 CONFIG.toml 里手写。
-settings-reason ConfigFile.resident 选 harness 就是把房间的内容交给厂商的外部进程（confidential 楼因此拒 harness 派活）；这一步由 User 在 CONFIG.toml 里有意写下，设置页的 harness 组只说明安装与登录。
-settings-reason ResidentSection.harness 选 harness 就是把房间的内容交给厂商的外部进程（confidential 楼因此拒 harness 派活）；这一步由 User 在 CONFIG.toml 里有意写下，设置页的 harness 组只说明安装与登录。
+settings-reason ConfigFile.agent 一行 agent 点名这台电脑以人的身份运行的程序；它由 ACP 页的同意卡片经 `AddAgent` 写下，同意绑定启动命令的摘要，所以设置里没有逐字段编辑的控件，只在城的 CONFIG.toml 里写。
+settings-reason AgentSection.id 一行 agent 点名这台电脑以人的身份运行的程序；它由 ACP 页的同意卡片经 `AddAgent` 写下，同意绑定启动命令的摘要，所以设置里没有逐字段编辑的控件。
+settings-reason AgentSection.name 一行 agent 点名这台电脑以人的身份运行的程序；它由 ACP 页的同意卡片经 `AddAgent` 写下，同意绑定启动命令的摘要，所以设置里没有逐字段编辑的控件。
+settings-reason AgentSection.command 一行 agent 点名这台电脑以人的身份运行的程序；它由 ACP 页的同意卡片经 `AddAgent` 写下，同意绑定启动命令的摘要，所以设置里没有逐字段编辑的控件。
+settings-reason AgentSection.args 一行 agent 点名这台电脑以人的身份运行的程序；它由 ACP 页的同意卡片经 `AddAgent` 写下，同意绑定启动命令的摘要，所以设置里没有逐字段编辑的控件。
+settings-reason AgentSection.env 一行 agent 点名这台电脑以人的身份运行的程序；它由 ACP 页的同意卡片经 `AddAgent` 写下，同意绑定启动命令的摘要，所以设置里没有逐字段编辑的控件。
+settings-reason AgentSection.source 一行 agent 点名这台电脑以人的身份运行的程序；它由 ACP 页的同意卡片经 `AddAgent` 写下，同意绑定启动命令的摘要，所以设置里没有逐字段编辑的控件。
+settings-reason AgentSection.version 一行 agent 点名这台电脑以人的身份运行的程序；它由 ACP 页的同意卡片经 `AddAgent` 写下，同意绑定启动命令的摘要，所以设置里没有逐字段编辑的控件。
+settings-reason AgentSection.launch_digest 一行 agent 点名这台电脑以人的身份运行的程序；它由 ACP 页的同意卡片经 `AddAgent` 写下，同意绑定启动命令的摘要，所以设置里没有逐字段编辑的控件。
+settings-reason ConfigFile.resident 选 agent 就是把房间的内容交给它的外部进程（confidential 楼因此拒 harness 派活）；这一步由 User 在 CONFIG.toml 里有意写下，设置页的 harness 组只说明安装与登录。
+settings-reason ResidentSection.harness 选 agent 就是把房间的内容交给它的外部进程（confidential 楼因此拒 harness 派活）；这一步由 User 在 CONFIG.toml 里有意写下，设置页的 harness 组只说明安装与登录。
 settings-control ConfigFile.sandbox client/src/views/building/sandbox.svelte
 settings-control SandboxSection.arm client/src/views/building/sandbox.svelte
 settings-control SandboxSection.container client/src/views/building/sandbox.svelte

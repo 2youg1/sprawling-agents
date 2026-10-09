@@ -32,6 +32,7 @@ use serde::Deserialize;
 use cache::CacheSection;
 use clock::ClockSection;
 use context::ContextSection;
+mod agents;
 mod cache;
 mod city_layer;
 mod clock;
@@ -47,6 +48,7 @@ mod settled;
 mod shelves;
 mod write;
 
+pub use agents::{AgentRow, AgentRowSource, agent_rows};
 pub use cache::keep_warm;
 pub use city_layer::{CitySetting, write_city_setting};
 pub use ladder::Layer;
@@ -100,6 +102,8 @@ pub struct ConfigLayer {
     /// The route the city's own layer chooses for the remote door
     /// (`crates/city/spec/ConfigLayers/Remote.lean` §8-39); refused on every other rung.
     remote: Option<RemoteRoute>,
+    /// The ACP agents the person added (§8-4f); refused on every other rung.
+    agents: Option<Vec<AgentRow>>,
 }
 
 impl ConfigLayer {
@@ -190,6 +194,7 @@ impl ConfigLayer {
             shelves: file.skills.map(|section| section.shelves),
             naming: file.identity.map(|section| section.version),
             remote: file.remote.map(remote::stated).transpose()?,
+            agents: file.agent.map(agents::rows).transpose()?,
         })
     }
 
@@ -253,6 +258,12 @@ impl ConfigLayer {
         self.remote.as_ref()
     }
 
+    /// The ACP agents this layer adds, as written.
+    #[must_use]
+    pub fn agents(&self) -> Option<&[AgentRow]> {
+        self.agents.as_deref()
+    }
+
     /// Every table this layer states that only farther rungs may state,
     /// which the ladder refuses on a rung nearer than the table allows.
     fn confined(&self) -> Vec<Confined> {
@@ -260,6 +271,7 @@ impl ConfigLayer {
             self.shelves.as_ref().map(|_| Confined::Shelves),
             self.remote.as_ref().map(|_| Confined::Remote),
             self.search.as_ref().map(|_| Confined::Search),
+            self.agents.as_ref().map(|_| Confined::Agents),
         ]
         .into_iter()
         .flatten()
@@ -318,6 +330,8 @@ pub(crate) struct ConfigFile {
     identity: Option<IdentitySection>,
     #[serde(default)]
     remote: Option<RemoteRoute>,
+    #[serde(default)]
+    agent: Option<Vec<agents::AgentSection>>,
 }
 
 /// The `[identity]` table: the version of the names a session froze,

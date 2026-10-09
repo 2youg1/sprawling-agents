@@ -1,0 +1,205 @@
+{
+  "version": "1.0.0",
+  "agents": [
+    {
+      "id": "claude-acp",
+      "name": "Claude Agent",
+      "version": "0.88.0",
+      "description": "ACP wrapper for Anthropic's Claude",
+      "repository": "https://github.com/agentclientprotocol/claude-agent-acp",
+      "authors": [
+        "Anthropic",
+        "Zed Industries",
+        "JetBrains"
+      ],
+      "license": "proprietary",
+      "license_url": "https://github.com/agentclientprotocol/claude-agent-acp/blob/main/LICENSE",
+      "distribution": {
+        "npx": {
+          "package": "@agentclientprotocol/claude-agent-acp@0.88.0"
+        }
+      }
+    },
+    {
+      "id": "codex-acp",
+      "name": "Codex",
+      "version": "2.1.1",
+      "description": "ACP adapter for OpenAI's coding assistant",
+      "repository": "https://github.com/agentclientprotocol/codex-acp",
+      "authors": [
+        "OpenAI",
+        "JetBrains s.r.o",
+        "Zed Industries"
+      ],
+      "license": "Apache-2.0",
+      "license_url": "https://github.com/agentclientprotocol/codex-acp/blob/main/LICENSE",
+      "distribution": {
+        "npx": {
+          "package": "@agentclientprotocol/codex-acp@2.1.1"
+        }
+      }
+    },
+    {
+      "id": "cursor",
+      "name": "Cursor",
+      "version": "2026.10.01",
+      "description": "Cursor's coding agent",
+      "website": "https://cursor.com/docs/cli/acp",
+      "authors": [
+        "Cursor"
+      ],
+      "license": "proprietary",
+      "license_url": "https://cursor.com/terms-of-service",
+      "distribution": {
+        "binary": {
+          "darwin-aarch64": {
+            "cmd": "./dist-package/cursor-agent",
+            "args": [
+              "acp"
+            ]
+          },
+          "darwin-x86_64": {
+            "cmd": "./dist-package/cursor-agent",
+            "args": [
+              "acp"
+            ]
+          },
+          "linux-aarch64": {
+            "cmd": "./dist-package/cursor-agent",
+            "args": [
+              "acp"
+            ]
+          },
+          "linux-x86_64": {
+            "cmd": "./dist-package/cursor-agent",
+            "args": [
+              "acp"
+            ]
+          },
+          "windows-aarch64": {
+            "cmd": "./dist-package\\cursor-agent.cmd",
+            "args": [
+              "acp"
+            ]
+          },
+          "windows-x86_64": {
+            "cmd": "./dist-package\\cursor-agent.cmd",
+            "args": [
+              "acp"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "fast-agent",
+      "name": "fast-agent",
+      "version": "0.10.1",
+      "description": "Code and build agents with comprehensive multi-provider support",
+      "repository": "https://github.com/evalstate/fast-agent",
+      "website": "https://fast-agent.ai",
+      "authors": [
+        "(removed)"
+      ],
+      "license": "Apache 2.0",
+      "license_url": "https://github.com/evalstate/fast-agent/blob/main/LICENSE",
+      "distribution": {
+        "uvx": {
+          "package": "fast-agent-acp==0.10.1",
+          "args": [
+            "-x"
+          ],
+          "env": {
+            "FAST_AGENT_MODEL": "codexplan"
+          }
+        }
+      }
+    },
+    {
+      "id": "grok-build",
+      "name": "Grok Build",
+      "version": "1.0.50",
+      "description": "xAI's coding agent and CLI",
+      "website": "https://x.ai/cli",
+      "authors": [
+        "xAI"
+      ],
+      "license": "proprietary",
+      "license_url": "https://x.ai/legal/terms-of-service",
+      "distribution": {
+        "npx": {
+          "package": "@xai-official/grok@1.0.50",
+          "args": [
+            "agent",
+            "stdio"
+          ]
+        }
+      }
+    },
+    {
+      "id": "kimi",
+      "name": "Kimi CLI",
+      "version": "1.52.0",
+      "description": "Moonshot AI's coding assistant",
+      "repository": "https://github.com/MoonshotAI/kimi-cli",
+      "website": "https://moonshotai.github.io/kimi-cli/",
+      "authors": [
+        "Moonshot AI"
+      ],
+      "license": "MIT",
+      "license_url": "https://github.com/MoonshotAI/kimi-cli/blob/main/LICENSE",
+      "distribution": {
+        "binary": {
+          "darwin-aarch64": {
+            "cmd": "./kimi",
+            "args": [
+              "acp"
+            ]
+          },
+          "linux-aarch64": {
+            "cmd": "./kimi",
+            "args": [
+              "acp"
+            ]
+          },
+          "linux-x86_64": {
+            "cmd": "./kimi",
+            "args": [
+              "acp"
+            ]
+          },
+          "windows-aarch64": {
+            "cmd": "./kimi.exe",
+            "args": [
+              "acp"
+            ]
+          },
+          "windows-x86_64": {
+            "cmd": "./kimi.exe",
+            "args": [
+              "acp"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "pi-acp",
+      "name": "pi ACP",
+      "version": "0.0.34",
+      "description": "ACP adapter for pi coding agent",
+      "repository": "https://github.com/svkozak/pi-acp",
+      "authors": [
+        "(removed)"
+      ],
+      "license": "MIT",
+      "license_url": "https://github.com/svkozak/pi-acp/blob/main/LICENSE",
+      "distribution": {
+        "npx": {
+          "package": "pi-acp@0.0.34"
+        }
+      }
+    }
+  ],
+  "extensions": []
+}
