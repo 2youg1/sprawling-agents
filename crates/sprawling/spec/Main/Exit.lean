@@ -36,6 +36,8 @@ def Exit.code : Exit → Nat
 inductive Unheard where
   /-- 帧在开 socket 之前就解析失败。 -/
   | unreadable
+  /-- `--at` 指向别的机器，又没给 `--token`：这台电脑的钥匙文件不替别的机器作答，什么都没发。 -/
+  | unkeyed
   /-- 连接、发送问候或等 `Welcome` 失败。 -/
   | noCity
   /-- 握手之后连接断了，或本进程起不了 runtime。 -/
@@ -46,6 +48,8 @@ inductive Unheard where
 def Unheard.exit : Unheard → Exit
   -- §8-103 决定 2：帧写错退 2：错在这条命令行本身，不与城的真实拒绝共用 1。
   | .unreadable => .line
+  -- §8-103 决定 5：缺 `--token` 退 2：错在命令行，帧与凭据都还没发出去。
+  | .unkeyed => .line
   -- §8-103 决定 1：没有城单列为 4，与「城读了这一帧并拒绝」的 1 分开，agent 据此决定是改帧重试还是起城、改 `--at`。
   | .noCity => .noCity
   -- §8-103 决定 3：握手之后断开归 1：那时已经有城答过 `Welcome`。
@@ -77,7 +81,7 @@ end Sprawling.Main.Exit
 ```rust
 pub(super) enum Exit { Done, Refused, Line, Quiet, NoCity }   // 0 1 2 3 4
 impl From<Exit> for std::process::ExitCode;
-pub(crate) enum Unheard { Unreadable(AxError), NoCity(AxError), Broken(AxError) }
+pub(crate) enum Unheard { Unreadable(AxError), Unkeyed(AxError), NoCity(AxError), Broken(AxError) }
 pub(crate) fn call(at: &str, frame: &str, token: Option<&str>, quiet: Duration) -> Result<Heard, Unheard>;
 pub(super) enum Form { Human, Json }
 pub(super) fn written(err: &AxError, form: Form) -> String;
@@ -91,7 +95,7 @@ pub(super) fn written(err: &AxError, form: Form) -> String;
 | 3 | `Quiet` | `call` 与 `dispatch`：帧发出去了，安静窗口内什么都没回来（`Spoken::Quiet`），或城回了话而等的那一帧没来（`Spoken::Unfinished`） |
 | 4 | `NoCity` | `--at` 那里没有城在答：连不上，或连上了却没有回握手 |
 
-`Exit` 是退出码的唯一定义；数字只在 `From<Exit> for ExitCode` 里出现一次。`wire_client::call` 用 `Unheard` 说清没听到回答的原因：帧解析失败是 `Unreadable`（映射到 2），连接、发送问候或等 `Welcome` 失败是 `NoCity`（映射到 4），握手之后连接断了或本进程起不了 runtime 是 `Broken`（映射到 1）。三者都照常在 stderr 上印 `AxError` 的失败行与 recovery 行。
+`Exit` 是退出码的唯一定义；数字只在 `From<Exit> for ExitCode` 里出现一次。`wire_client::call` 用 `Unheard` 说清没听到回答的原因：帧解析失败是 `Unreadable`（映射到 2），`--at` 指向别的机器又没给 `--token` 是 `Unkeyed`（映射到 2，`crates/sprawling/spec/WireClient.lean` 的钥匙文件一条），连接、发送问候或等 `Welcome` 失败是 `NoCity`（映射到 4），握手之后连接断了或本进程起不了 runtime 是 `Broken`（映射到 1）。三者都照常在 stderr 上印 `AxError` 的失败行与 recovery 行。
 
 拒绝怎么写由 `refusal::written` 一处决定，它只管文字，不管写到哪里；调用方把结果写到 stderr。`Form::Human` 是失败行、`recovery:` 行，`AxError` 带 `nearby` 时再加一行 `nearby: a, b`，给人读的拒绝也指出附近能用的名字。`Form::Json` 是一行 `AxError` 的 serde（与 wire 上 `Refusal` 同形），反序列化回来与原值相等。`call` 带 `--json` 时用 `Form::Json`，其余调用方用 `Form::Human`。
 
@@ -103,4 +107,5 @@ pub(super) fn written(err: &AxError, form: Form) -> String;
 2. 帧写错退 2 而不是 1。帧在开 socket 之前解析，错在这条命令行本身，与城无关；被否决的备选是沿用 `WireMismatch` 的 1，它让一个拼错的帧和城的真实拒绝无法区分。
 3. 握手之后断开归 1 而不是 4。那时已经有城答过 `Welcome`，城在；断开是这次对话的失败，不是地址上没有城。
 4. `--json` 的拒绝是 `AxError` 自己的 serde，而不是另起一个命令行专用的 JSON 形状。wire 上的 `Refusal` 已经是这个形状，一个 agent 用同一个反序列化读城的拒绝和命令行的拒绝；另起一种形状，就要在两处维持同一组字段。
+5. 别的机器缺 `--token` 是 `Unkeyed`，退 2，而不并进 `Unreadable`。两者都错在命令行、都什么也没发，所以共用 2；分成两个变体，是因为 `Unreadable` 说的是帧读不懂，把缺凭据也叫它就让这个名字说错了一半。被否：退 1（没有城读过任何东西，1 断言的是城的拒绝）。
 -/
