@@ -130,7 +130,7 @@ pub use reading::{text, thought_in, used_in};
 #[cfg(feature = "server")]
 pub use reception::OPEN_CODE_LIFETIME_MS;
 #[cfg(feature = "server")]
-pub use reception::{Admission, BindFace, BindVerdict, Door, HandshakeVerdict, Keys};
+pub use reception::{Admission, Arrival, BindFace, BindVerdict, Door, HandshakeVerdict, Keys};
 #[cfg(feature = "server")]
 pub use reception::{DeviceKey, ListenerOrigins, PageHeaders, PairedBrowser, Sessions};
 #[cfg(feature = "server")]
@@ -151,7 +151,7 @@ pub use server::{DROP_BYTES_MAX, DropSink};
 #[cfg(feature = "server")]
 pub use server::{DoorSenses, KeepBrowsers, LocalDoor, OpenCode};
 #[cfg(feature = "server")]
-pub use server::{bind, bundle_routes, router, serve};
+pub use server::{bind, bundle_routes, entered, router, serve};
 pub use slash::{Offered, Slash};
 
 pub use kernel::WriteLimit;

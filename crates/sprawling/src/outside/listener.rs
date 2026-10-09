@@ -84,6 +84,7 @@ pub(super) fn open(
         .map_err(|source| unbound(&source))?;
     let local = socket.local_addr().map_err(|source| unbound(&source))?;
     let opened = doorway.open(local, lasting)?;
+    let origins = wire::ListenerOrigins::routed(local, opened.url.as_str());
     let listener = {
         let _entered = reaching.runtime.enter();
         tokio::net::TcpListener::from_std(socket).map_err(|source| unbound(&source))
@@ -97,7 +98,7 @@ pub(super) fn open(
     };
     let task = reaching
         .runtime
-        .spawn(answer(listener, doorway.clone(), reaching.clone()));
+        .spawn(answer(listener, doorway.clone(), reaching.clone(), origins));
     let served = crate::browser_tool::serve(local);
     doorway.attend(Box::new(Answering(task.abort_handle(), served)))?;
     Ok(opened)
@@ -127,13 +128,20 @@ struct Serving {
     reaching: Reaching,
 }
 
-/// Serves the two paths and the page until the door says its time is up.
-async fn answer(listener: tokio::net::TcpListener, doorway: Doorway, reaching: Reaching) {
+/// Serves the two paths and the page until the door says its time is up,
+/// each behind the entry decision for the listener's own names and the
+/// route's public one (wire D56).
+async fn answer(
+    listener: tokio::net::TcpListener,
+    doorway: Doorway,
+    reaching: Reaching,
+    origins: wire::ListenerOrigins,
+) {
     let page = match wire::bundle_routes(
         Arc::clone(&reaching.page),
         &wire::PageHeaders::every_listener(),
     ) {
-        Ok(page) => page,
+        Ok(page) => wire::entered(page, wire::Arrival::Page, &origins),
         Err(unspelt) => {
             eprintln!(
                 "  the remote listener cannot serve the page: {}",
@@ -142,9 +150,10 @@ async fn answer(listener: tokio::net::TcpListener, doorway: Doorway, reaching: R
             return;
         }
     };
-    let routes = Router::new()
+    let sockets = Router::new()
         .route(PAIR_PATH, get(pair_upgrade))
-        .route(SESSION_PATH, get(session_upgrade))
+        .route(SESSION_PATH, get(session_upgrade));
+    let routes = wire::entered(sockets, wire::Arrival::Socket, &origins)
         .merge(page)
         .with_state(Serving {
             doorway: doorway.clone(),

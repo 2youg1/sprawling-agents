@@ -25,6 +25,9 @@ const SAME_ORIGIN: &str = "same-origin";
 /// The port a browser leaves out of `Host` and `Origin`.
 const DEFAULT_HTTP_PORT: u16 = 80;
 
+/// The port a browser leaves out of an `https` address.
+const DEFAULT_HTTPS_PORT: &str = ":443";
+
 /// The names and origins one listener answers to, computed once from
 /// the address it holds.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -36,8 +39,12 @@ pub struct ListenerOrigins {
 /// Which `Host` values a listener admits.
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Hosts {
-    /// The listener's own names, each with its port.
-    Named(Vec<String>),
+    /// The listener's own names, each with its port, and the origins of
+    /// the pages it serves.
+    Named {
+        names: Vec<String>,
+        origins: Vec<String>,
+    },
     /// A listener on every interface: any IP literal with this port, the
     /// unspecified address itself excepted, and the loopback names.
     AnyAddress { port: u16, loopback: Vec<String> },
@@ -60,7 +67,7 @@ impl ListenerOrigins {
                 IpAddr::V4(_) => "127.0.0.1".to_owned(),
                 IpAddr::V6(_) => "[::1]".to_owned(),
             };
-            (Hosts::Named(loopback()), shown)
+            (Hosts::named(loopback()), shown)
         } else if ip.is_unspecified() {
             (
                 Hosts::AnyAddress {
@@ -71,7 +78,7 @@ impl ListenerOrigins {
             )
         } else {
             let name = literal(ip);
-            (Hosts::Named(spelled(&name, port)), name)
+            (Hosts::named(spelled(&name, port)), name)
         };
         Self {
             hosts,
@@ -83,8 +90,15 @@ impl ListenerOrigins {
     /// loopback names, and the host of `public`, the `https://` address
     /// its route gave (wire D56).
     #[must_use]
-    pub fn routed(local: SocketAddr, _public: &str) -> Self {
-        Self::of(local)
+    pub fn routed(local: SocketAddr, public: &str) -> Self {
+        let mut listener = Self::of(local);
+        if let (Some(name), Hosts::Named { names, origins }) =
+            (public_name(public), &mut listener.hosts)
+        {
+            origins.push(format!("https://{name}"));
+            names.push(name);
+        }
+        listener
     }
 
     /// The address a person on this machine opens: `http://127.0.0.1:<port>`
@@ -101,7 +115,7 @@ impl ListenerOrigins {
     #[must_use]
     pub fn admits_host(&self, host: &str) -> bool {
         match &self.hosts {
-            Hosts::Named(names) => names.iter().any(|name| name.eq_ignore_ascii_case(host)),
+            Hosts::Named { names, .. } => names.iter().any(|name| name.eq_ignore_ascii_case(host)),
             Hosts::AnyAddress { port, loopback } => {
                 loopback.iter().any(|name| name.eq_ignore_ascii_case(host))
                     || ip_literal_on(host, *port)
@@ -112,20 +126,43 @@ impl ListenerOrigins {
     /// Whether `origin` is one of this listener's own, for a request whose
     /// admitted `Host` is `host`.
     ///
-    /// A named listener admits any of its names; a listener on every
+    /// A named listener admits any of its origins; a listener on every
     /// interface admits only the origin of the host the request was sent
     /// to, because "any IP literal" would let a page on another machine of
     /// the network in.
     #[must_use]
     pub fn admits_origin(&self, origin: &str, host: &str) -> bool {
-        let Some(named) = origin.strip_prefix("http://") else {
-            return false;
-        };
         match &self.hosts {
-            Hosts::Named(names) => names.iter().any(|name| name.eq_ignore_ascii_case(named)),
-            Hosts::AnyAddress { .. } => named.eq_ignore_ascii_case(host) && self.admits_host(named),
+            Hosts::Named { origins, .. } => origins
+                .iter()
+                .any(|listed| listed.eq_ignore_ascii_case(origin)),
+            Hosts::AnyAddress { .. } => origin
+                .strip_prefix("http://")
+                .is_some_and(|named| named.eq_ignore_ascii_case(host) && self.admits_host(named)),
         }
     }
+}
+
+impl Hosts {
+    /// A listener answering to `names`, whose pages are served over
+    /// `http` under the same names.
+    fn named(names: Vec<String>) -> Self {
+        let origins = names.iter().map(|name| format!("http://{name}")).collect();
+        Self::Named { names, origins }
+    }
+}
+
+/// The host of a route's `https://` address as a browser writes it in
+/// `Host`: lowercase, without `:443`. `None` when the address is not
+/// `https` or has no host (wire D56).
+fn public_name(public: &str) -> Option<String> {
+    let (scheme, rest) = public.split_once("://")?;
+    let authority = rest.split(['/', '?']).next()?.to_ascii_lowercase();
+    let name = authority
+        .strip_suffix(DEFAULT_HTTPS_PORT)
+        .map_or(authority.as_str(), |bare| bare)
+        .to_owned();
+    (scheme.eq_ignore_ascii_case("https") && !name.is_empty()).then_some(name)
 }
 
 /// The name `host:port`, and the bare name too when the port is the one a

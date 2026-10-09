@@ -13,10 +13,11 @@
 
 use std::sync::Arc;
 
+use axum::Router;
 use axum::extract::{Request, State};
 use axum::http::header::{HOST, ORIGIN};
 use axum::http::{HeaderName, HeaderValue, Method, StatusCode};
-use axum::middleware::Next;
+use axum::middleware::{Next, from_fn_with_state};
 use axum::response::{IntoResponse, Response};
 use kernel::{AxCode, AxError};
 
@@ -30,6 +31,22 @@ const SEC_FETCH_SITE: &str = "sec-fetch-site";
 /// What one route's entry layer holds: which arrival the route is, and
 /// the listener's names.
 pub(crate) type Entrance = (Arrival, Arc<ListenerOrigins>);
+
+/// `routes` behind the entry decision of the listener `origins` names:
+/// every route of the table arrives as `arrival`, and an `OPTIONS`
+/// request at any of them is judged as a preflight. The remote listener
+/// puts its sockets and its page behind this (wire D56); the city's own
+/// table layers each route itself, because its routes arrive as
+/// different kinds.
+pub fn entered<S>(routes: Router<S>, arrival: Arrival, origins: &ListenerOrigins) -> Router<S>
+where
+    S: Clone + Send + Sync + 'static,
+{
+    let names = Arc::new(origins.clone());
+    routes
+        .route_layer(from_fn_with_state((arrival, Arc::clone(&names)), enter))
+        .layer(from_fn_with_state(names, preflight))
+}
 
 /// The layer in front of one route: an `OPTIONS` request is a preflight
 /// whatever route it names, anything else is the route's own arrival.
