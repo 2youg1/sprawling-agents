@@ -11,6 +11,8 @@ use kernel::{Address, EventKind, Payload, RunId};
 use super::*;
 use crate::views::tests::{Place, view_record};
 
+mod read_back;
+
 /// A view folded from records that fill the inbox, the discard bin, the
 /// registry, the commits and the governed rules, so a field added,
 /// removed or reordered among them changes the bytes, and so does the
@@ -65,10 +67,21 @@ fn fixture(city_root: &Path) -> Views {
     views
 }
 
-pub(crate) fn provider_registrations() -> [(RunId, EventKind, serde_json::Value); 12] {
+/// Registrations the endpoint book folds, one of them listing a model,
+/// so the encoding of `ModelFacts` in the book is part of the digest
+/// (kernel D58).
+pub(crate) fn provider_registrations() -> [(RunId, EventKind, serde_json::Value); 13] {
     let old = RunId::from_bytes([7; 16]);
     let fresh = RunId::from_bytes([8; 16]);
     [
+        (
+            old,
+            EventKind::EndpointAttached,
+            serde_json::json!({
+                "name": "listed", "base_url": "https://api.example.test/v1",
+                "dialect": kernel::DialectKind::OpenAi, "models": ["m-listed"]
+            }),
+        ),
         (
             old,
             EventKind::EndpointAttached,
