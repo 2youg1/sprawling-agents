@@ -10,30 +10,31 @@
 //! A refusal made minutes later has no way home, which is why a command
 //! carries the [`Reply`] address of whoever sent it.
 //!
-//! The event arm writes in frames (`crates/wire/spec/Server/Socket.lean`
-//! §8-47h): every record already queued when it wakes becomes its own
-//! `Event` frame, and the socket is flushed once. The model there proves
-//! that where the frames are cut changes nothing the page is told, that
-//! records are told in seq order and none twice, and that every seq not
-//! told as a record is inside a told `Lagged` range.
+//! A welcomed session holds a [`Seat`] at the door: the session token its
+//! hello showed stays good while the socket lives, and the session ends
+//! once the door has ended that token (`crates/wire/spec/Server/Sessions.lean`
+//! §8-93s). The event arm writes in frames, as `framing` says.
+
+mod framing;
 
 use std::sync::Arc;
 
 use axum::extract::State;
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::response::Response;
-use futures_util::SinkExt as _;
 use kernel::{AxCode, AxError, Seq};
 use tokio::sync::broadcast;
-use tokio::sync::broadcast::error::TryRecvError;
 
-use super::committed::Committed;
-use crate::frames::{Answered, Ask, AskOutcome, Lagged, Sample, ServerFrame};
+use crate::frames::{Answered, Ask, AskOutcome, ClientFrame, Sample, ServerFrame};
 use crate::reception::inbound::Inbound;
-use crate::reception::{Keys, SessionState, SessionStep, Stream, WelcomeFacts, decide_frame};
+use crate::reception::{
+    Keys, SessionState, SessionStep, Standing, Stream, WelcomeFacts, decide_frame, decide_standing,
+};
 use crate::reply::{Delivered, Reply};
 
 use super::config::{Answering, ShellState};
+use super::seat::Seat;
+use framing::{Arrival, Ending, drained, framed, write_frame};
 
 pub(crate) async fn upgrade(
     State(state): State<Arc<ShellState>>,
@@ -60,25 +61,24 @@ async fn session(mut socket: WebSocket, state: Arc<ShellState>) {
     // What this session has delivered and what it still owes.
     let mut stream = Stream::opening();
     let mut watching: Option<Watching> = None;
+    let mut seat: Option<Seat> = None;
     loop {
         tokio::select! {
             incoming = socket.recv() => {
                 let Some(Ok(message)) = incoming else { return };
                 let Message::Text(text) = message else { continue };
-                // A frame this build cannot read and a frame it can are
-                // judged through the same branch below, so a refusal
-                // reaches the peer by one path whichever produced it.
-                let step = match inbound.read(&text) {
-                    Ok(frame) => {
-                        let standing = WelcomeFacts { city: state.city.as_ref(), head: state.head.read(), epoch: state.epoch };
-                        state.door.with_sessions(|sessions| {
-                            decide_frame(phase, frame, &Keys { face: &state.face, sessions }, standing)
-                        })
-                    }
-                    Err(unreadable) => unreadable,
-                };
+                let (step, presented) = judged(&state, phase, &mut inbound, &text);
                 match step {
                     SessionStep::Welcome(welcome) => {
+                        match state.door.seat(presented) {
+                            Ok(seated) => seat = Some(seated),
+                            Err(error) => {
+                                // A refusal before the close is all that is
+                                // left to say; a failed send changes nothing.
+                                let _unsent: Result<(), ()> = send(&mut socket, &ServerFrame::Refusal(Box::new(error))).await;
+                                return;
+                            }
+                        }
                         phase = SessionState::Live;
                         if send(&mut socket, &ServerFrame::Welcome(*welcome)).await.is_err() {
                             return;
@@ -123,6 +123,21 @@ async fn session(mut socket: WebSocket, state: Arc<ShellState>) {
                         }
                     }
                 }
+            }
+            // The door may have ended the token this session was greeted
+            // with: a session that no longer holds its credential ends.
+            () = seated(&mut seat) => {
+                let presented = seat.as_ref().and_then(Seat::presented);
+                let standing = state.door.pairing(&state.face, presented).map(decide_standing);
+                let error = match standing {
+                    Ok(Standing::Stands) => continue,
+                    Ok(Standing::Ends(error)) => error,
+                    Err(error) => Box::new(error),
+                };
+                // The session ends either way; the refusal says why when
+                // it still arrives.
+                let _unsent: Result<(), ()> = send(&mut socket, &ServerFrame::Refusal(error)).await;
+                return;
             }
             // A refusal the worker made after this socket had already
             // answered. It reaches the peer that caused it and nobody
@@ -218,87 +233,53 @@ async fn session(mut socket: WebSocket, state: Arc<ShellState>) {
     }
 }
 
-/// What one session took from its subscription: a record and its seq,
-/// or a skip the subscription reported.
-pub(crate) enum Arrival<R> {
-    Record(Seq, R),
-    Skipped,
-}
-
-/// What one session tells the page: a range to ask for, or a record.
-#[derive(Debug, PartialEq, Eq)]
-pub(crate) enum Said<R> {
-    Lagged(Lagged),
-    Record(R),
-}
-
-/// The most arrivals one frame takes: a frame this long is written out
-/// first, so a long burst does not starve the session's other arms.
-pub(crate) const FRAME_RECORDS_MAX: usize = 256;
-
-/// Whether the subscription is still open after a frame was drained.
-enum Ending {
-    Open,
-    Closed,
-}
-
-/// `first` and every arrival already queued behind it, at most
-/// [`FRAME_RECORDS_MAX`], and whether the subscription closed meanwhile.
-fn drained(
-    first: Arrival<Committed>,
-    events: &mut broadcast::Receiver<Committed>,
-) -> (Vec<Arrival<Committed>>, Ending) {
-    let mut arrivals = vec![first];
-    while arrivals.len() < FRAME_RECORDS_MAX {
-        match events.try_recv() {
-            Ok(committed) => arrivals.push(Arrival::Record(committed.record().seq(), committed)),
-            Err(TryRecvError::Lagged(_)) => arrivals.push(Arrival::Skipped),
-            Err(TryRecvError::Empty) => break,
-            Err(TryRecvError::Closed) => return (arrivals, Ending::Closed),
-        }
-    }
-    (arrivals, Ending::Open)
-}
-
-/// What a session in `phase` tells the page for one frame of arrivals,
-/// and the stream state after it: each record in turn through
-/// [`Stream::before`], each skip through [`Stream::skipped`]. Pure.
-pub(crate) fn framed<R>(
-    stream: Stream,
+/// What one text frame means in `phase`, and the credential it showed
+/// when it is a hello. A frame this build cannot read and a frame it can
+/// are judged through the same step, so a refusal reaches the peer by one
+/// path whichever produced it.
+fn judged(
+    state: &ShellState,
     phase: SessionState,
-    arrivals: Vec<Arrival<R>>,
-) -> (Vec<Said<R>>, Stream) {
-    let live = phase == SessionState::Live;
-    let mut said = Vec::with_capacity(arrivals.len());
-    let after = arrivals
-        .into_iter()
-        .fold(stream, |stream, arrival| match arrival {
-            Arrival::Record(seq, record) if live => {
-                let (lag, next) = stream.before(seq);
-                said.extend(lag.map(Said::Lagged));
-                said.push(Said::Record(record));
-                next
-            }
-            // A session that has not been welcomed is shown no stream.
-            Arrival::Record(..) => stream,
-            Arrival::Skipped => stream.skipped(live),
+    inbound: &mut Inbound,
+    text: &str,
+) -> (SessionStep, Option<String>) {
+    let frame = match inbound.read(text) {
+        Ok(frame) => frame,
+        Err(unreadable) => return (unreadable, None),
+    };
+    let presented = match &frame {
+        ClientFrame::Hello(hello) => hello.token.clone(),
+        ClientFrame::Command(_) | ClientFrame::Ask(_) | ClientFrame::Monitor(_) => None,
+    };
+    let standing = WelcomeFacts {
+        city: state.city.as_ref(),
+        head: state.head.read(),
+        epoch: state.epoch,
+    };
+    let step = state
+        .door
+        .with_sessions(|sessions, now| {
+            let keys = Keys {
+                face: &state.face,
+                sessions,
+                now,
+            };
+            decide_frame(phase, frame, &keys, standing)
+        })
+        .unwrap_or_else(|error| SessionStep::Refuse {
+            error: Box::new(error),
+            close: true,
         });
-    (said, after)
+    (step, presented)
 }
 
-/// Feeds each thing said to the socket as its own frame, then flushes
-/// once.
-async fn write_frame(socket: &mut WebSocket, said: Vec<Said<Committed>>) -> Result<(), ()> {
-    for each in said {
-        let text = match each {
-            Said::Lagged(lag) => serde_json::to_string(&ServerFrame::Lagged(lag))
-                .map_err(|_| ())?
-                .into(),
-            Said::Record(committed) => committed.frame(),
-        };
-        socket.feed(Message::Text(text)).await.map_err(|_| ())?;
+/// Resolves when the door may have ended this session's token; never for
+/// a session not yet welcomed.
+async fn seated(seat: &mut Option<Seat>) {
+    match seat {
+        Some(seat) => seat.ended().await,
+        None => std::future::pending().await,
     }
-    socket.flush().await.map_err(|_| ())
 }
 
 /// The frame that answers one question, read on the blocking pool.
@@ -360,126 +341,4 @@ async fn send(socket: &mut WebSocket, frame: &ServerFrame) -> Result<(), ()> {
         .send(Message::Text(text.into()))
         .await
         .map_err(|_| ())
-}
-
-#[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::indexing_slicing,
-    clippy::arithmetic_side_effects,
-    reason = "test code"
-)]
-mod tests {
-    use kernel::Seq;
-    use proptest::prelude::*;
-
-    use super::{Arrival, Said, framed};
-    use crate::reception::{SessionState, Stream};
-
-    /// The arrivals a subscription hands over for `ledger` when the
-    /// records `skipped` marks are lost: a run of lost records is one
-    /// `Skipped`, as a lagged `broadcast` reports it.
-    fn arrivals(ledger: &[u64], skipped: &[bool]) -> Vec<Arrival<u64>> {
-        let mut arrivals = Vec::new();
-        let mut lost = false;
-        for (seq, gone) in ledger.iter().zip(skipped) {
-            match (gone, lost) {
-                (true, true) => {}
-                (true, false) => arrivals.push(Arrival::Skipped),
-                (false, _) => arrivals.push(Arrival::Record(Seq::new(*seq), *seq)),
-            }
-            lost = *gone;
-        }
-        arrivals
-    }
-
-    /// `arrivals` cut into frames at `cuts` and told frame by frame.
-    fn told_in_frames(
-        arrivals: Vec<Arrival<u64>>,
-        cuts: &[usize],
-        phase: SessionState,
-    ) -> (Vec<Said<u64>>, Stream) {
-        let mut points: Vec<usize> = cuts.iter().map(|cut| (*cut).min(arrivals.len())).collect();
-        points.sort_unstable();
-        let mut said = Vec::new();
-        let mut stream = Stream::opening();
-        let mut rest = arrivals;
-        let mut taken = 0;
-        for point in points {
-            let tail = rest.split_off(point - taken);
-            let (told, next) = framed(stream, phase, rest);
-            said.extend(told);
-            stream = next;
-            rest = tail;
-            taken = point;
-        }
-        let (told, next) = framed(stream, phase, rest);
-        said.extend(told);
-        (said, next)
-    }
-
-    proptest! {
-        /// `crates/wire/spec/Server/Socket.lean`: cutting the arrivals
-        /// into frames anywhere tells what one frame tells
-        /// (`framing_is_invisible`); a live session tells exactly the
-        /// records it was handed, in seq order (`records_said`,
-        /// `said_in_seq_order`); every seq between its first and last
-        /// told record is a told record or inside a told `Lagged`
-        /// (`every_seq_up_to_the_last_is_told`); a session not yet
-        /// welcomed tells nothing (`nothing_said_before_welcome`).
-        #[test]
-        fn framing_tells_every_record_once_in_order(
-            start in 0u64..3,
-            gaps in proptest::collection::vec(1u64..4, 0..40),
-            skipped in proptest::collection::vec(any::<bool>(), 40),
-            cuts in proptest::collection::vec(0usize..48, 0..6),
-        ) {
-            let ledger: Vec<u64> = gaps
-                .iter()
-                .scan(start, |seq, gap| {
-                    *seq += gap;
-                    Some(*seq)
-                })
-                .collect();
-            let handed = arrivals(&ledger, &skipped);
-            let kept: Vec<u64> = ledger
-                .iter()
-                .zip(&skipped)
-                .filter(|(_, gone)| !**gone)
-                .map(|(seq, _)| *seq)
-                .collect();
-
-            let whole = framed(Stream::opening(), SessionState::Live, arrivals(&ledger, &skipped));
-            let cut = told_in_frames(handed, &cuts, SessionState::Live);
-            prop_assert_eq!(&cut, &whole);
-
-            let records: Vec<u64> = whole
-                .0
-                .iter()
-                .filter_map(|said| match said {
-                    Said::Record(seq) => Some(*seq),
-                    Said::Lagged(_) => None,
-                })
-                .collect();
-            prop_assert_eq!(&records, &kept);
-            prop_assert!(records.windows(2).all(|pair| pair[0] < pair[1]));
-
-            if let (Some(first), Some(last)) = (records.first(), records.last()) {
-                for k in *first..=*last {
-                    let told = whole.0.iter().any(|said| match said {
-                        Said::Record(seq) => *seq == k,
-                        Said::Lagged(lag) => lag.from.value() <= k && k <= lag.to.value(),
-                    });
-                    prop_assert!(told, "seq {} between {} and {} was told nothing", k, first, last);
-                }
-            }
-
-            let unwelcomed = framed(
-                Stream::opening(),
-                SessionState::AwaitingHello,
-                arrivals(&ledger, &skipped),
-            );
-            prop_assert!(unwelcomed.0.is_empty());
-        }
-    }
 }

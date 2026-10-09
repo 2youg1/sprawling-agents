@@ -8,9 +8,12 @@
 //! [`BrowserDoor`], the clock and random source the assembly layer hands
 //! in, and the closure the device table is kept through.
 //!
-//! Every rule is the state machine's (`reception::pairing`); what is left
-//! here is drawing entropy and time for it, checking a signature, and
-//! telling whoever handed out an open code that it was redeemed.
+//! Every rule is the state machines' (`reception::pairing`,
+//! `reception::sessions`); what is left here is drawing entropy and time
+//! for them, checking a signature, telling whoever handed out an open code
+//! that it was redeemed, and telling every socket when a session token may
+//! have ended, so a forgotten browser loses the sockets it holds
+//! (`crates/wire/spec/Server/Sessions.lean` §8-93s).
 
 use std::collections::BTreeMap;
 use std::sync::mpsc;
@@ -21,11 +24,13 @@ use kernel::{AxCode, AxError, B3Hash, TimeMs};
 use tokio::sync::watch;
 
 use crate::answer::{DeviceId, DevicesAnswer};
+use crate::auth::Pairing;
 use crate::reception::{
-    BrowserDoor, DeviceKey, Guess, LABEL_MAX, PairedBrowser, Sessions, decode_hex,
+    BindFace, BrowserDoor, DeviceKey, Guess, Keys, LABEL_MAX, PairedBrowser, Sessions, decode_hex,
 };
 
 use super::pairing::{PairProof, SessionBody};
+use super::seat::Seat;
 
 /// The label every session signature starts with, so a signature made
 /// for this door is not one any other protocol accepts.
@@ -65,6 +70,9 @@ struct Inner {
     senses: DoorSenses,
     keep: KeepBrowsers,
     code: watch::Sender<String>,
+    /// Sent whenever a session token may have ended while a socket held
+    /// it: a device forgotten, or the table full.
+    ended: watch::Sender<()>,
 }
 
 struct Held {
@@ -84,6 +92,7 @@ impl LocalDoor {
     ) -> Result<Self, AxError> {
         let door = BrowserDoor::new(browsers, drawn(&senses)?);
         let (code, _) = watch::channel(door.pairing_code().to_owned());
+        let (ended, _) = watch::channel(());
         Ok(Self(Arc::new(Inner {
             held: Mutex::new(Held {
                 door,
@@ -92,6 +101,7 @@ impl LocalDoor {
             senses,
             keep,
             code,
+            ended,
         })))
     }
 
@@ -121,8 +131,8 @@ impl LocalDoor {
         self.held().door.devices()
     }
 
-    /// Forgets a paired browser and ends its sessions; false when it was
-    /// not paired.
+    /// Forgets a paired browser and ends its sessions, closing every
+    /// socket that holds one of them; false when it was not paired.
     ///
     /// # Errors
     /// The table could not be kept; the browser stays paired.
@@ -135,12 +145,68 @@ impl LocalDoor {
             .filter(|browser| &browser.id != device)
             .collect();
         (self.0.keep)(&table)?;
-        Ok(held.door.forget(device))
+        let forgotten = held.door.forget(device);
+        self.0.ended.send_replace(());
+        Ok(forgotten)
     }
 
-    /// Runs `judge` over the live session tokens.
-    pub(crate) fn with_sessions<R>(&self, judge: impl FnOnce(&Sessions) -> R) -> R {
-        judge(self.held().door.sessions())
+    /// Runs `judge` over the session tokens and the moment they are
+    /// judged at.
+    ///
+    /// # Errors
+    /// The clock refuses; nothing is judged.
+    pub(crate) fn with_sessions<R>(
+        &self,
+        judge: impl FnOnce(&Sessions, TimeMs) -> R,
+    ) -> Result<R, AxError> {
+        let now = (self.0.senses.clock)()?;
+        Ok(judge(self.held().door.sessions(), now))
+    }
+
+    /// Whether `offered` is the key `face` demands or a session token
+    /// that admits now.
+    ///
+    /// # Errors
+    /// The clock refuses.
+    pub(crate) fn pairing(
+        &self,
+        face: &BindFace,
+        offered: Option<&str>,
+    ) -> Result<Pairing, AxError> {
+        self.with_sessions(|sessions, now| {
+            Keys {
+                face,
+                sessions,
+                now,
+            }
+            .pairing(offered)
+        })
+    }
+
+    /// Seats a socket greeted with `presented`: a session token that
+    /// admits now is held for as long as the seat lives, so it does not
+    /// lapse under an open socket; the native key takes no seat.
+    ///
+    /// The seat starts marked as ended, so the socket judges its
+    /// credential once more at once: a token ended between the hello's
+    /// judgement and this seat ends the socket as well.
+    ///
+    /// # Errors
+    /// The clock refuses.
+    pub(crate) fn seat(&self, presented: Option<String>) -> Result<Seat, AxError> {
+        let now = (self.0.senses.clock)()?;
+        let mut held = self.held();
+        let mut ended = self.0.ended.subscribe();
+        ended.mark_changed();
+        let token = presented
+            .as_deref()
+            .and_then(|token| held.door.sessions_mut().seat(token, now));
+        Ok(Seat {
+            door: self.clone(),
+            presented,
+            token,
+            ended,
+        })
     }
 
     /// Pairs a browser that presented one of the two codes.
@@ -204,6 +270,19 @@ impl LocalDoor {
         Ok(held.door.pair(line))
     }
 
+    /// One socket seated on `token` has ended; the last one to leave
+    /// starts the token's idle allowance now.
+    pub(super) fn unseat(&self, token: &B3Hash) {
+        let now = (self.0.senses.clock)();
+        let mut held = self.held();
+        match now {
+            Ok(now) => held.door.sessions_mut().unseat(token, now),
+            // Without a time the idle allowance cannot start, so the
+            // token ends now; the page signs a new one before it dials.
+            Err(_) => held.door.sessions_mut().end(token),
+        }
+    }
+
     /// A nonce for a paired browser to sign.
     pub(crate) fn challenge(&self) -> Result<String, AxError> {
         let entropy: [u8; 32] = drawn(&self.0.senses)?;
@@ -233,9 +312,13 @@ impl LocalDoor {
         UnparsedPublicKey::new(&ED25519, key.bytes())
             .verify(signed.as_bytes(), &signature)
             .map_err(|_| unsigned("pair this browser again: its signature does not verify"))?;
-        held.door
+        let token = held
+            .door
             .open_session(&body.device, entropy, now)
-            .ok_or_else(|| unsigned("pair this browser again: the city does not know it"))
+            .ok_or_else(|| unsigned("pair this browser again: the city does not know it"))?;
+        // A full table ends its oldest token, which a socket may hold.
+        self.0.ended.send_replace(());
+        Ok(token)
     }
 
     /// The state, even after a holder panicked: every transition leaves it

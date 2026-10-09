@@ -8,7 +8,7 @@
 
 规定 `server`、`server::config`、`server::config::enrolment`、`server::socket`、`server::bundle`、`server::uploads`、`assets`、`answer::cost`（`crates/wire/src/` 下同名的文件）。监听的一端：判定是纯函数，套接字一个也不做；客户端资产、几扇 HTTP 门与 Query 的答面。本文件是 `crates/wire/Spec.lean` 的一个分部；下面每一节保留它在 wire 规格里的标签 §8-n，别处引作 `crates/wire/Spec.lean §8-n`，决定引作 `wire D<n>`。
 
-这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与 `wire::assets` 旁的测试守住。
+这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与 `wire::assets` 旁的测试守住。会话令牌的寿命是一个状态机，它的模型在 `spec/Server/Sessions.lean`。
 -/
 
 /-!
@@ -296,4 +296,6 @@ impl LocalDoor {
 - **熵与时间都是入参**：`LocalDoor` 不采样，装配层（`bin::assembly`）交进来的 `DoorSenses` 是它唯一的时钟与随机源，所以状态机（§8-95）可以在测试里逐步驱动。
 - **设备表的落盘是一个闭包**：配对与忘掉之后，整张表交给 `keep`；装配层把它写进城的 `.sprawling/browsers.toml`。wire 不知道城目录在哪。写失败时这次配对答 500 并保持未登记，因为一把重启就丢的设备钥会让人以为配上了。
 - **兑掉的开页码通知交出它的人**：`OpenCode.redeemed` 在兑掉时收到一次，交出它的那一方据此删跳转文件；过期没兑也删（`OPEN_CODE_LIFETIME_MS`）。
+
+- **会话的寿命**：会话记得自己属于哪台设备，socket 记得自己出示的凭据；忘掉设备即关掉它的 socket，没有 socket 占着的令牌空闲一段时间即失效。状态机与它的性质在 `spec/Server/Sessions.lean` §8-93s。
 -/

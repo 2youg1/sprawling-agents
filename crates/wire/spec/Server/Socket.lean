@@ -6,12 +6,12 @@
 /-!
 # wire::server::socket：一帧一次写出
 
-规定 `server::socket`（`crates/wire/src/server/socket.rs`）把订阅到的记录怎样按帧写给一个会话。本文件是 `crates/wire/Spec.lean` 的一个分部；下面一节保留它在 wire 规格里的标签 §8-47h，别处引作 `crates/wire/Spec.lean §8-47h`，决定引作 `wire D45`。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
+规定 `server::socket::framing`（`crates/wire/src/server/socket/framing.rs`）把订阅到的记录怎样按帧写给一个会话。本文件是 `crates/wire/Spec.lean` 的一个分部；下面一节保留它在 wire 规格里的标签 §8-47h，别处引作 `crates/wire/Spec.lean §8-47h`，决定引作 `wire D45`。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
 
 ### 8-47h 视图广播按帧合并（形状 4 adapter 里的一个纯函数）
 
 ```rust
-// wire::server::socket
+// wire::server::socket::framing
 /// 一条会话一次从订阅里取到的东西：一条记录，或订阅报的一次跳过。
 pub(crate) enum Arrival<R> { Record(Seq, R), Skipped }
 /// 一条会话对它说的话：一段要补拉的区间，或一条记录。
@@ -32,7 +32,7 @@ pub(crate) fn framed<R>(stream: Stream, phase: SessionState, arrivals: Vec<Arriv
 
 模型里的 seq 是 `Nat`；Rust 的 `decide_lag` 用 `checked_add` 与 `checked_sub`，`u64` 溢出的那一格是产生过 `next` 的账本到不了的（§8-41），模型不写它。
 
-**派生的 Rust 检查**：`wire::server::socket::tests` 的 `proptest` 生成一条 seq 严格递增的账本（相邻两条之间的间隔取 1..4，模拟拼不出帧的记录），按随机的掩码把一些记录换成跳过（连续被跳过的几条只留一个 `Skipped`，与 `broadcast` 报 `Lagged(n)` 的方式相同），再随机切成帧。每一种切法都断言：按帧算出的话与整条一帧算出的话相同；说出的记录恰是没被跳过的那些，seq 严格递增；第一条说出的记录与最后一条之间的每个 seq 都被一条记录或一段 `Lagged` 覆盖。
+**派生的 Rust 检查**：`wire::server::socket::framing::tests` 的 `proptest` 生成一条 seq 严格递增的账本（相邻两条之间的间隔取 1..4，模拟拼不出帧的记录），按随机的掩码把一些记录换成跳过（连续被跳过的几条只留一个 `Skipped`，与 `broadcast` 报 `Lagged(n)` 的方式相同），再随机切成帧。每一种切法都断言：按帧算出的话与整条一帧算出的话相同；说出的记录恰是没被跳过的那些，seq 严格递增；第一条说出的记录与最后一条之间的每个 seq 都被一条记录或一段 `Lagged` 覆盖。
 
 **三个平台相同**：`try_recv`、`feed`、`flush` 是 tokio 与 axum 的跨平台接口；Windows 上一次 `flush` 对应一次 `WSASend`，Linux 与 macOS 上对应一次 `send`，合并省下的是这几次系统调用，三个平台都一样。
 -/
