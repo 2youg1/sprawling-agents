@@ -318,6 +318,7 @@ impl Checkpoint {
     clippy::indexing_slicing,
     reason = "test code"
 )]
+#[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
 mod tests;
 
 #[cfg(test)]
