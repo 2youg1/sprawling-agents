@@ -35,7 +35,10 @@ export interface Credential {
 export type Renewal = "renewed" | "kept" | "forgotten";
 
 // Why the pairing page is drawn, which picks the sentence under its title.
-export type PairWhy = "first" | "open_used" | "session_lost";
+// `keyless` is a browser that cannot make a device key (no WebCrypto
+// Ed25519): no code it is given can pair it, so the page names the
+// browsers that can rather than blaming the code.
+export type PairWhy = "first" | "open_used" | "session_lost" | "keyless";
 
 export type Entry =
   | { readonly kind: "enter"; readonly credential: Credential }
@@ -45,6 +48,7 @@ export type Entry =
 export type Paired =
   | { readonly kind: "paired"; readonly credential: Credential }
   | { readonly kind: "refused"; readonly said: string }
+  | { readonly kind: "keyless" }
   | { readonly kind: "unreachable" };
 
 // The credential of a page that has no local door to knock on.
@@ -82,11 +86,13 @@ export async function enter(origin: string, open: string | null, label: string):
     const redeemed = await pairWith(origin, { open }, label);
     if (redeemed.kind === "paired") return { kind: "enter", credential: redeemed.credential };
     if (redeemed.kind === "refused") return { kind: "pair", why: "open_used" };
+    if (redeemed.kind === "keyless") return { kind: "pair", why: "keyless" };
   }
   const device = await kept();
   if (device === null) {
     const door = await doorHere(origin);
-    return door.kind === "answered" ? { kind: "pair", why: "first" } : { kind: "enter", credential: NO_CREDENTIAL };
+    if (door.kind !== "answered") return { kind: "enter", credential: NO_CREDENTIAL };
+    return { kind: "pair", why: (await makeKey()) === null ? "keyless" : "first" };
   }
   const credential = credentialOf(origin, device);
   const renewed = await credential.renew();
@@ -99,7 +105,7 @@ export async function enter(origin: string, open: string | null, label: string):
 // pairs again the next time it is opened.
 export async function pairWith(origin: string, proof: PairProof, label: string): Promise<Paired> {
   const made = await makeKey();
-  if (made === null) return { kind: "refused", said: "" };
+  if (made === null) return { kind: "keyless" };
   const answer = await pair(origin, proof, made.public, label);
   switch (answer.kind) {
     case "answered": {

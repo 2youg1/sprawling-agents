@@ -17,6 +17,7 @@ open picker stands in a box as tall as the page's foot gives it. -->
   import Picker from "../talk/picker.svelte";
   import { pickerOf } from "../talk/picker_look";
   import type { PickerHands } from "../talk/picker_look";
+  import { inForce } from "../talk/picker_scene";
   import SettingsRow from "../talk/settings_row.svelte";
   import Case from "./case.svelte";
   import { AT_DEEPSEEK, AT_OLLAMA, AT_OPENROUTER, MANY_MODELS, MANY_PROVIDERS, ONE_PROVIDER, pickerFacts } from "./picked";
@@ -37,7 +38,7 @@ open picker stands in a box as tall as the page's foot gives it. -->
   const HANDS: PickerHands = { open: still, close: still, hold: still, keep: still, bound: still, cursor: still, focusFilter: still, holdToken: still, holdFilter: still, holdFrame: still };
   const opened = $derived(
     pickerOf($lang, aggregated, {
-      open: true, segment: "model", pick: null, parent: null, pinned: { first: undefined, second: undefined },
+      open: true, segment: "model", pick: null, parent: null, pinned: { first: undefined, second: undefined }, opened: inForce(aggregated),
       query: "", whole: [SECTION.second], kept: [], binding: null, active: null,
     }, HANDS)?.menu,
   );

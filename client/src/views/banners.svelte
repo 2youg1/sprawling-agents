@@ -28,11 +28,13 @@
   const unsent = u.conn.unsent;
   const closing = u.conn.closing;
   const closed = $derived($linkState.kind === "closed");
-  const closingWords = $derived(
-    $closing === "drain"
-      ? fill(say($lang, "close_draining"), { n: String($belief.live.length) })
-      : say($lang, "close_interrupting"),
-  );
+  // A drain with nothing going waits for nothing, so it says only that
+  // the city is closing rather than counting zero runs.
+  const closingWords = $derived.by(() => {
+    if ($closing !== "drain") return say($lang, "close_interrupting");
+    const going = $belief.live.length;
+    return going === 0 ? say($lang, "close_closing") : fill(say($lang, "close_draining"), { n: String(going) });
+  });
 
   const halted = $derived(cityIsShut($belief.halted));
   const frozen = $derived($belief.cancelled);
@@ -50,11 +52,10 @@
 {#if lostAttempt !== null || halted || closed || $closing !== null}
   <div class="col-[2/12] row-start-1 flex flex-col gap-snug pb-base narrow:col-span-full">
     {#if closed}
-      <Banner text={say($lang, "close_done")} weight="alert">
-        {#snippet action()}
-          <Button label={say($lang, "link_retry_now")} tone="secondary" onPress={u.conn.retry} />
-        {/snippet}
-      </Banner>
+      <!-- No retry: the person closed the city, and nothing answers
+           until somebody starts it again in a terminal, which the
+           banner says; the page is reloaded then. -->
+      <Banner text={say($lang, "close_done")} weight="alert" />
     {:else if $closing !== null}
       <Banner text={closingWords} weight="notice" />
     {/if}

@@ -26,7 +26,7 @@
 
 <script lang="ts">
   import { fill, say } from "../../core/lang";
-  import { ago } from "../../core/time";
+  import { ago, clock } from "../../core/time";
   import { ui } from "../../ui";
   import Badge from "../parts/badge.svelte";
   import Button from "../parts/button.svelte";
@@ -38,6 +38,16 @@
   const { lang } = ui();
 
   let asking = $state<DeviceLine | null>(null);
+
+  // The name a row is read by. Browsers of one kind pair under one
+  // label ("Edge · Windows"), and a compact list draws only the title,
+  // so a label two rows share carries when that browser paired: the
+  // title and the forget key's name then tell the rows apart.
+  const named = $derived.by(() => {
+    const shared = new Set(devices.filter((device, at) => devices.findIndex((other) => other.label === device.label) !== at).map((device) => device.label));
+    return (device: DeviceLine): string =>
+      shared.has(device.label) ? `${device.label} · ${clock($lang, device.paired_at)}` : device.label;
+  });
 
   function seen(device: DeviceLine): string {
     const paired = `${say($lang, "devices_paired_at")} ${ago($lang, device.paired_at, now)}`;
@@ -51,7 +61,7 @@
 
 {#snippet rows()}
   {#each devices as device (device.id)}
-    <Row primary={device.label} secondary={seen(device)}>
+    <Row primary={named(device)} secondary={seen(device)}>
       {#snippet status()}
         {#if device.id === here}
           <Badge text={say($lang, "devices_this")} dot />
@@ -60,7 +70,7 @@
       {#snippet actions()}
         {#if local}
           <Button
-            label={fill(say($lang, "devices_forget"), { label: device.label })}
+            label={fill(say($lang, "devices_forget"), { label: named(device) })}
             tone="quiet"
             onPress={() => {
               asking = device;
@@ -88,9 +98,9 @@
 
 <Dialog
   open={asking !== null}
-  title={fill(say($lang, "devices_forget_title"), { label: asking?.label ?? "" })}
+  title={fill(say($lang, "devices_forget_title"), { label: asking === null ? "" : named(asking) })}
   detail={say($lang, "devices_forget_detail")}
-  confirmLabel={fill(say($lang, "devices_forget"), { label: asking?.label ?? "" })}
+  confirmLabel={fill(say($lang, "devices_forget"), { label: asking === null ? "" : named(asking) })}
   cancelLabel={say($lang, "quit_cancel")}
   destructive
   onConfirm={() => {

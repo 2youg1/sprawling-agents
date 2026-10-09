@@ -35,7 +35,7 @@
   import { ui } from "../../ui";
   import Badge from "../parts/badge.svelte";
   import Glyph from "../parts/glyph.svelte";
-  import { shownOf, standingOf, signsInElsewhere } from "./agents";
+  import { shownOf, snapshotDay, standingOf, signsInElsewhere } from "./agents";
   import Consent from "./consent.svelte";
 
   const { answer, text, reading, parsed, room, adding, onText, onPaste, onAdd }: AgentsLookProps = $props();
@@ -144,7 +144,7 @@
 
     <section class="flex flex-col gap-tight">
       <h3 class="text-note text-text-quiet">
-        {say($lang, "acp_catalog")} · {fill(say($lang, "acp_catalog_snapshot"), { date: answer.snapshot.date })}
+        {say($lang, "acp_catalog")} · {fill(say($lang, "acp_catalog_snapshot"), { date: snapshotDay($lang, answer.snapshot.date) })}
       </h3>
       <ul class="flex flex-col border-t border-edge">
         {#each shown.catalog as offer (offer.id)}

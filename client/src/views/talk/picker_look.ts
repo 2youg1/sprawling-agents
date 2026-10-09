@@ -18,9 +18,9 @@ import { fill, say } from "../../core/lang";
 import type { PopoverBinding, PopoverColumn, PopoverRow } from "../parts/popover";
 import { HOLD } from "./pill";
 import type { Combination, Entry, Offer, Section, Segment } from "./picker";
-import { SECTION, appliedIn, matches, offersOf, orderOf, recentOf, roomOf, secondLevel, sectionOf, windowed } from "./picker";
+import { SECTION, appliedIn, matches, offersOf, orderOf, recentOf, roomOf, sameCombination, secondLevel, sectionOf, windowed } from "./picker";
 import type { PickerFacts, PickerHeld, Scene } from "./picker_scene";
-import { comboId, comboName, entryWords, levelWord, modelsSection, noMatch, sceneOf } from "./picker_scene";
+import { combinationOf, comboId, comboName, entryWords, levelWord, modelsSection, noMatch, sceneOf } from "./picker_scene";
 
 
 // The row that opens a list in full. No entry id holds a NUL.
@@ -156,8 +156,8 @@ function segmentAt(target: EventTarget | null): Segment | null {
 function menuOf(scene: Scene, facts: PickerFacts, held: PickerHeld, hands: PickerHands): PickerMenu {
   const { lang, order, offers, offer, used, parent } = scene;
   const room = roomOf(order, offers);
-  const now: Combination | null = offer === undefined ? null : { endpoint: offer.endpoint, model: offer.model, level: used?.level ?? null };
-  const recent = recentOf(now, held.kept, offers);
+  const now = combinationOf(scene);
+  const recent = recentOf(held.opened, held.kept, offers);
   const typed = held.query.trim() !== "";
   const narrowed = (section: Section, entries: readonly Entry[]): readonly Entry[] =>
     typed && section === modelsSection(order) ? entries.filter((entry) => matches(entry, held.query)) : entries;
@@ -180,7 +180,7 @@ function menuOf(scene: Scene, facts: PickerFacts, held: PickerHeld, hands: Picke
   const columns: PopoverColumn[] = [
     ...(recent.length === 0
       ? []
-      : [{ id: SECTION.recent, label: "picker_recent" as const, rows: recent.map((combo, at) => ({ id: comboId(combo), label: comboName(scene, combo), chosen: at === 0 && now !== null })) }]),
+      : [{ id: SECTION.recent, label: "picker_recent" as const, rows: recent.map((combo) => ({ id: comboId(combo), label: comboName(scene, combo), chosen: now !== null && sameCombination(combo, now) })) }]),
     { id: SECTION.first, label: order === "models_first" ? "talk_column_model" : "picker_providers", rows: rowsOf(SECTION.first, firstShown, parent?.id) },
     { id: SECTION.second, label: order === "models_first" ? "picker_providers" : "talk_column_model", rows: rowsOf(SECTION.second, secondShown, offer === undefined ? undefined : order === "models_first" ? offer.endpoint : offer.model) },
     ...(thinking.length === 0 ? [] : [{ id: SECTION.thinking, label: "talk_column_effort" as const, rows: thinking }]),

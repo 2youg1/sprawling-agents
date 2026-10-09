@@ -41,15 +41,16 @@ export interface Ui {
   // through `say($lang, key)`, which is the only thing that has to be
   // told when the person picks another language.
   readonly lang: Readable<Lang>;
-  // How hard the model is asked to think in the session the next
-  // dispatch opens, and `null` when nobody has said - which leaves the
-  // field out of the frame, so the city's own `[model] effort` answers
-  // and, failing that, the provider does.
+  // The level `/effort <level>` stated for the next dispatch, which the
+  // frame carries as `Dispatch.effort`; `null` when nobody typed one -
+  // which leaves the field out of the frame, so the city's own
+  // `[model] effort` answers through its default rule.
   //
-  // **It is held for this page and kept nowhere.** A level remembered
-  // in this browser would ride on every dispatch made from it and
-  // overrule the city's file without saying so; what the selector over
-  // the composer states is the session it is about to open.
+  // **It is held for this page and kept nowhere.** A stated level is
+  // refused before dispatch when the model does not offer it, so it
+  // holds only what a person typed for this request: the picker's
+  // level is the stored one, which it writes to the city's layer
+  // (`talk/composer.ts` `picksFor`), and a pick there clears this one.
   readonly effort: Readable<Effort | null>;
   // The run policy the next dispatch runs under - its mode, write
   // limit, admission requirement and landing - held for this page the

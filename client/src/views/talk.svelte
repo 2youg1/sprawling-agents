@@ -207,6 +207,7 @@
       if (steered) {
         sent = null;
         delivery = leftTheBox(text, hear());
+        awaitAnswer(text);
       }
       return steered;
     }
@@ -216,14 +217,22 @@
     if (went) {
       sent = sentFrom(address, text, $belief.runs);
       delivery = leftTheBox(text, hear());
-      refused = null;
-      handing = hand(text, $belief);
-      u.conversing.set({ kind: "waiting", handing });
+      awaitAnswer(text);
     }
     return went;
   }
 
-  // A refused dispatch never becomes a run: its card stands where the reply would have been
+  // Words handed to the city wait for its answer here, a steer's as much
+  // as a dispatch's: a steer the city refuses - the run it named is gone -
+  // is otherwise words that vanish from the box and from the thread.
+  function awaitAnswer(text: string): void {
+    refused = null;
+    handing = hand(text, $belief);
+    u.conversing.set({ kind: "waiting", handing });
+  }
+
+  // A refused dispatch never becomes a run, and a refused steer never
+  // reaches one: its card stands where the reply would have been
   // (`handing.ts` pairs a refusal with its send), and the corner is told the card is ours.
   let handing: Handing = IDLE;
   let refused = $state<{ readonly words: string; readonly error: AxError } | null>(null);

@@ -102,6 +102,10 @@ export interface PopoverView {
   // mode), so no list takes the focus or names the cursor.
   readonly holder: "list" | "caller";
   readonly side: Side;
+  // The room on that side, in pixels, measured when the layer was first
+  // drawn; `null` before then. A look that can grow past it caps its
+  // height there.
+  readonly room: number | null;
   // The accessible name of the dialog, a lang.json key, as each
   // column's label is.
   readonly title: Key;
@@ -195,6 +199,7 @@ export interface PopoverLook {
   readonly dialog: DialogWire;
   readonly layout: Layout;
   readonly side: Side;
+  readonly room: number | null;
   readonly lists: readonly ListLook[];
   readonly empty: string;
   readonly header: Snippet | undefined;
@@ -216,6 +221,7 @@ export function lookOf(view: PopoverView, hands: Hands, slots: Slots): PopoverLo
     dialog: { role: "dialog", "aria-label": view.say(view.title), [HOLD]: hands.holdDialog },
     layout: view.layout,
     side: view.side,
+    room: view.room,
     empty: view.say("part_no_match"),
     header: slots.header,
     row: slots.row,

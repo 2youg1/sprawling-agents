@@ -92,6 +92,7 @@
   const DEVICES: readonly DeviceLine[] = [
     { id: DeviceId.make("d-one"), label: "Firefox · Windows", paired_at: TimeMs.make(NOW - 86_400_000 * 3), last_seen: TimeMs.make(NOW - 120_000) },
     { id: DeviceId.make("d-two"), label: "Safari · macOS", paired_at: TimeMs.make(NOW - 3_600_000) },
+    { id: DeviceId.make("d-three"), label: "Firefox · Windows", paired_at: TimeMs.make(NOW - 86_400_000 * 9) },
   ];
 </script>
 
@@ -158,6 +159,9 @@
 </Case>
 <Case label="pairing · after a used link">
   <Pairing why="open_used" lang={readable<Lang>("zh")} label="Edge · Windows" pair={never} onPaired={still} seat="specimen" />
+</Case>
+<Case label="pairing · a browser with no device keys">
+  <Pairing why="keyless" {lang} label="Safari · Windows" pair={never} onPaired={still} seat="specimen" />
 </Case>
 <Case label="paired browsers · on this machine, this browser marked">
   <Devices devices={DEVICES} here="d-one" now={NOW} local onForget={still} />

@@ -95,6 +95,7 @@ const held = (parent: string | null, pick: PickerHeld["pick"], whole: readonly S
   pick,
   parent,
   pinned: { first: undefined, second: undefined },
+  opened: null,
   query: "",
   whole,
   kept: [],

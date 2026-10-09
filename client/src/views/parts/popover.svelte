@@ -29,7 +29,7 @@
   import type { Key } from "../../core/lang";
   import { say } from "../../core/lang";
   import { ui } from "../../ui";
-  import { revealIn, sideFor } from "./layer";
+  import { revealIn, roomOn, sideFor } from "./layer";
   import type { Side } from "./layer";
   import type { PopoverBinding, PopoverColumn, PopoverRow } from "./popover";
   import Look from "./popover.look.svelte";
@@ -94,6 +94,7 @@
   let column = $state(0);
   let cursor = $state(0);
   let side = $state<Side>(PREFERRED);
+  let room = $state<number | null>(null);
   let dialog = $state<HTMLDivElement | undefined>(undefined);
   const lists = $state<(HTMLUListElement | undefined)[]>([]);
 
@@ -159,6 +160,7 @@
     place,
     holder: bind === undefined ? "list" : "caller",
     side,
+    room,
     title: label,
     say: (key: Key) => say($lang, key),
   });
@@ -185,6 +187,7 @@
     if (measured || dialog === undefined) return;
     measured = true;
     side = sideFor(dialog, PREFERRED);
+    room = roomOn(dialog, side);
   });
 
   // What had the keyboard a moment ago is what gets it back: a person

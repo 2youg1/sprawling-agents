@@ -10,7 +10,8 @@
 // paste grammar itself is the city's (`Query::ParseAgentSpec`); this
 // only decides when to ask it.
 
-import type { Key } from "../../core/lang";
+import type { Key, Lang } from "../../core/lang";
+import { calendarDay } from "../../core/time";
 import type { Weight } from "../parts/glyph";
 import type { AgentCatalogAnswer, AgentLine, AgentOffer, AgentSource, LoginKind, PinState } from "../../wire";
 
@@ -66,12 +67,22 @@ export const PINNED: Readonly<Record<PinState, Key | undefined>> = {
   unknown: undefined,
 };
 
-// How an agent says it signs in, in one word; an agent that declares
-// no method needs none.
+// The day the shipped registry snapshot was taken, in the reader's
+// language. The snapshot states it as an HTTP date; one this build
+// cannot read is shown as the snapshot wrote it.
+export function snapshotDay(lang: Lang, date: string): string {
+  const at = Date.parse(date);
+  return Number.isNaN(at) ? date : calendarDay(lang, at);
+}
+
+// How an agent says it signs in, in one word. An offer that names no
+// method has not been asked: an agent states its methods in its answer
+// to `initialize`, which comes only once the city starts it, so the
+// card says when that is known rather than that none is needed.
 export function loginKey(kinds: readonly LoginKind[]): Key {
   if (kinds.includes("terminal")) return "acp_login_terminal";
   if (kinds.includes("agent")) return "acp_login_agent";
-  return "acp_login_none";
+  return "acp_login_unknown";
 }
 
 // Where an added agent stands. A sign-in is asked for only once the
