@@ -15,6 +15,11 @@ use std::time::{Duration, Instant};
 
 use accounting::person::CorePriority;
 
+use super::journal::notice;
+
+/// Where this module's notices say they come from.
+const MODULE: &str = "bin::serving::standing";
+
 /// The monotonic sampling point: how long a thread stayed busy is a span,
 /// and a wall clock that steps would misstate it (`crates/sprawling/spec/Serving/Standing.lean`
 /// §8-93). Here rather than beside the wall clock in `bin::assembly`,
@@ -78,7 +83,7 @@ pub(crate) struct CoreThread {
 enum Lowering {
     Owed,
     /// The platform refused once; asking every turn would only repeat
-    /// the refusal on stderr.
+    /// the refusal in the log.
     Refused,
 }
 
@@ -88,7 +93,10 @@ impl CoreThread {
     pub(crate) fn raise(name: &'static str, setting: CorePriority, now: Instant) -> Self {
         let standing = raise_this_thread(setting);
         if let Standing::Normal(Held::Refused(reason)) = &standing {
-            eprintln!("thread {name} stays at normal priority: {reason}");
+            notice(
+                MODULE,
+                &format!("thread {name} stays at normal priority: {reason}"),
+            );
         }
         Self {
             name,
@@ -123,23 +131,29 @@ impl CoreThread {
         }
     }
 
-    /// Lowers the calling thread and says so on stderr; a refusal leaves
+    /// Lowers the calling thread and says so in the log; a refusal leaves
     /// it raised and is not asked again.
     fn lower_telling_the_person(&mut self) {
         match (self.lower)() {
             Ok(standing) => {
-                eprintln!(
-                    "thread {} kept a core busy for {} s and is back at normal priority",
-                    self.name,
-                    BUSY_LIMIT.as_secs()
+                notice(
+                    MODULE,
+                    &format!(
+                        "thread {} kept a core busy for {} s and is back at normal priority",
+                        self.name,
+                        BUSY_LIMIT.as_secs()
+                    ),
                 );
                 self.standing = standing;
             }
             Err(err) => {
-                eprintln!(
-                    "thread {} kept a core busy for {} s and could not be lowered: {err}",
-                    self.name,
-                    BUSY_LIMIT.as_secs()
+                notice(
+                    MODULE,
+                    &format!(
+                        "thread {} kept a core busy for {} s and could not be lowered: {err}",
+                        self.name,
+                        BUSY_LIMIT.as_secs()
+                    ),
                 );
                 self.lowering = Lowering::Refused;
             }
@@ -147,12 +161,12 @@ impl CoreThread {
     }
 }
 
-/// The person's setting, or `Normal` with the refusal told on stderr
-/// when it cannot be read: raising has a machine-wide cost, so it waits
+/// The person's setting, or `Normal` with the refusal told as a process
+/// notice when it cannot be read: raising has a machine-wide cost, so it waits
 /// for a reading that allows it.
 pub fn setting_telling_a_refusal() -> CorePriority {
     accounting::person::core_priority().unwrap_or_else(|err| {
-        eprintln!("the core stays at normal priority: {err}");
+        notice(MODULE, &format!("the core stays at normal priority: {err}"));
         CorePriority::Normal
     })
 }

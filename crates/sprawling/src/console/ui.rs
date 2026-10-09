@@ -26,7 +26,7 @@ use crossterm::event::{KeyEvent, KeyEventKind};
 
 use super::cli::{Say, Session};
 use super::editor::Editor;
-use super::lifecycle::{Deadline, Event, Face, Handoff};
+use super::lifecycle::{Event, Face, Handoff, INTERRUPT_GRACE, Sinks};
 use super::screen::{Screen, Written};
 use super::terminal::{Inside, Terminal};
 use wire::CloseMode;
@@ -214,19 +214,23 @@ impl Ui {
                 self.draw_input();
             }
             Face::Stopping {
-                deadline: Deadline::Armed,
-                ..
+                sinks: Sinks::Cut, ..
             } => self.screen.cut(),
-            Face::Stopping { mode, .. } => {
+            Face::Stopping {
+                mode,
+                sinks: Sinks::Held,
+            } => {
                 let progress = match mode {
                     CloseMode::Drain => {
                         "  sprawling is closing; the runs under way finish first (/quit again stops them now)"
+                            .to_owned()
                     }
-                    CloseMode::Interrupt => {
-                        "  sprawling is closing; the runs under way stop at their next safe point"
-                    }
+                    CloseMode::Interrupt => format!(
+                        "  sprawling is closing; the runs under way stop at their next safe point, within {} s",
+                        INTERRUPT_GRACE.as_secs()
+                    ),
                 };
-                self.notice(progress.to_owned());
+                self.notice(progress);
             }
             Face::Gone(handoff) => {
                 let given = self.screen.give_back();
@@ -295,12 +299,17 @@ impl Ui {
         self.drawn(written);
     }
 
-    /// The quiet host: the address, the pairing code, at most one
-    /// transient line, and nothing else.
+    /// The quiet host: the address, the pairing code with the key minted
+    /// for a serve beyond this machine beside it, at most one transient
+    /// line, and nothing else. The alternate screen is the one place the
+    /// minted key is drawn (§8-11).
     fn quiet(&mut self) {
         let mut lines = vec![self.terminal.url.clone()];
         let code = self.pairing.borrow_and_update().clone();
-        lines.push(format!("pairing code  {code}"));
+        lines.push(match &self.terminal.token {
+            Some(key) => format!("pairing code  {code}   key  {key}"),
+            None => format!("pairing code  {code}"),
+        });
         if let Some(transient) = &self.transient {
             lines.push(transient.trim().to_owned());
         }

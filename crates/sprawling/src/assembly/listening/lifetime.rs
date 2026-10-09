@@ -12,8 +12,8 @@
 //! arrives here as one `Event` and is fed to `console::lifecycle::step`,
 //! which alone decides what it means. This file only carries the answer
 //! out: the desk closed with the cause the step gave, the runs
-//! interrupted, the limit armed, the listener dropped, the face
-//! published for the console to draw.
+//! interrupted and the limit armed whenever the face interrupts, the
+//! listener dropped, the face published for the console to draw.
 //!
 //! The point a reader most often gets wrong: the listener stops
 //! accepting the moment the city starts closing, and the worker is
@@ -23,19 +23,14 @@
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
-use std::time::Duration;
 
 use accounting::worker::{Closing, CommandDesk};
 use kernel::{AxCode, AxError};
 use wire::CloseMode;
 
-use crate::console::lifecycle::{self, Asker, Cause, Deadline, Event, Face, Handoff, Surface};
-
-/// How long a city whose terminal went away has to write its handoff.
-/// Windows ends a process five seconds after its console window closes;
-/// four leaves the handoff a second, and the other platforms take the
-/// same number so the three behave alike.
-pub(crate) const LOST_TERMINAL_GRACE: Duration = Duration::from_secs(4);
+use crate::console::lifecycle::{
+    self, Asker, Cause, Event, Face, Handoff, INTERRUPT_GRACE, Surface,
+};
 
 /// How many events may wait for the lifecycle: a person types slower
 /// than this drains, and a signal that finds it full was a repeat.
@@ -106,21 +101,13 @@ pub(crate) async fn live(
                 .take()
                 .map(|worker| tokio::task::spawn_blocking(move || worker.join()));
         }
-        if let Face::Stopping {
-            mode: CloseMode::Interrupt,
-            deadline: armed,
-        } = next
-        {
+        // Every face that interrupts is armed (D75), and the limit runs
+        // from the step that first interrupted: a later step that keeps
+        // interrupting does not push it back.
+        if next.armed() {
             desk.interrupt();
-            let newly_armed = !matches!(
-                face,
-                Face::Stopping {
-                    deadline: Deadline::Armed,
-                    ..
-                }
-            );
-            if armed == Deadline::Armed && newly_armed {
-                deadline = Some(Box::pin(tokio::time::sleep(LOST_TERMINAL_GRACE)));
+            if !face.armed() {
+                deadline = Some(Box::pin(tokio::time::sleep(INTERRUPT_GRACE)));
             }
         }
         face = next;

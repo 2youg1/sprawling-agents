@@ -6,8 +6,10 @@
 //! A worker opened over a history: the LOADING end of one lifetime.
 //!
 //! `RunWorker::new`, `over` and `holding` fold, or are handed, what the
-//! ledger says before the worker acts on anything, and the two sweeps
-//! beside them take back what a crash left. The other end is
+//! ledger says before the worker acts on anything, and the sweeps
+//! beside them take back what a crash left: abandoned trees and
+//! checkpoint indexes as the worker opens, and the runs a death left open
+//! once a served city's history is proved. The other end is
 //! [`closing`], which records why the city stopped. They sit together
 //! because a reader asking "what does a restart find" and "what does a
 //! close leave" is asking one question from two ends.
@@ -275,6 +277,41 @@ impl RunWorker {
             ),
         };
         let level = runtime::diagnostics::Level::Effect;
+        self.note(level, "accounting::worker", &told);
+    }
+
+    /// Freezes the runs the last process left open, and closes the calls
+    /// whose outcome it left unknown, through the scan `sprawling resume`
+    /// runs (`crates/accounting/spec/Worker/Genesis/Lost.lean` §8-18-1,
+    /// D30).
+    ///
+    /// For a served city: call it after the observer is attached and
+    /// before the accounting thread reads the desk, so every freeze
+    /// reaches the views and the page as it is written, and no run this
+    /// process drives exists yet to be taken for a dead one. It waits for
+    /// the proof's verdict first, because until then the writer takes no
+    /// line. A scan the ledger refuses is said and the city goes on
+    /// serving: a city that cannot freeze a dead run is still one the
+    /// person can read.
+    pub fn take_back_the_lost(&mut self) {
+        self.await_proof();
+        let (level, told) = match self.startup_scan() {
+            Ok(report) if report.frozen_runs == 0 && report.closed_calls == 0 => return,
+            Ok(report) => (
+                runtime::diagnostics::Level::Effect,
+                format!(
+                    "froze {} run(s) the last process left open, after closing {} call(s) whose outcome it left unknown",
+                    report.frozen_runs, report.closed_calls
+                ),
+            ),
+            Err(err) => (
+                runtime::diagnostics::Level::Refuse,
+                format!(
+                    "the runs the last process left open were not frozen: {err}; {}",
+                    err.recovery()
+                ),
+            ),
+        };
         self.note(level, "accounting::worker", &told);
     }
 

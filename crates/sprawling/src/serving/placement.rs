@@ -29,6 +29,11 @@ use runtime::{PlatformShares, Shares, platform_shares};
 pub(crate) use seats::Role;
 use seats::{Holder, Seats};
 
+use super::journal::notice;
+
+/// Where this module's notices say they come from.
+const MODULE: &str = "bin::serving::placement";
+
 /// The one seat table every hot thread of this process sits at, built
 /// from the topology read at the first seat.
 static TABLE: Mutex<Option<Seats>> = Mutex::new(None);
@@ -51,8 +56,8 @@ impl Drop for Seat {
 }
 
 /// Takes a seat of `role`'s pool for the calling thread and makes its
-/// processor the thread's soft ideal processor. A refusal is told on
-/// stderr, here, and the thread runs where the scheduler puts it.
+/// processor the thread's soft ideal processor. A refusal is told as a
+/// process notice, here, and the thread runs where the scheduler puts it.
 pub(crate) fn seat_this_thread(name: &'static str, role: Role) -> Seat {
     let holder = Holder(NEXT_HOLDER.fetch_add(1, Ordering::Relaxed));
     let seat = {
@@ -64,9 +69,12 @@ pub(crate) fn seat_this_thread(name: &'static str, role: Role) -> Seat {
     if let Some(seat) = seat
         && let Err(reason) = prefer(seat)
     {
-        eprintln!(
-            "thread {name} runs without an ideal processor (processor {}:{}): {reason}",
-            seat.group, seat.number
+        notice(
+            MODULE,
+            &format!(
+                "thread {name} runs without an ideal processor (processor {}:{}): {reason}",
+                seat.group, seat.number
+            ),
         );
     }
     Seat(Some(holder))
@@ -92,13 +100,13 @@ fn first_table() -> Seats {
 }
 
 /// The person's `[core] placement`, read once for the process. A setting
-/// that does not read is told on stderr once, here, and placement stays
-/// on (D47).
+/// that does not read is told as a process notice once, here, and
+/// placement stays on (D47).
 fn setting() -> CorePlacement {
     static ARM: OnceLock<CorePlacement> = OnceLock::new();
     *ARM.get_or_init(|| {
         accounting::person::core_placement().unwrap_or_else(|err| {
-            eprintln!("CPU placement stays on: {err}");
+            notice(MODULE, &format!("CPU placement stays on: {err}"));
             CorePlacement::Soft
         })
     })
@@ -127,7 +135,7 @@ pub(crate) fn run_affinity() -> runtime::backlog::RunAffinity {
 /// Reads only a User-entered ceiling; invalid settings are reported.
 fn memory_ceiling() -> Option<NonZeroU64> {
     entered_ceiling().unwrap_or_else(|err| {
-        eprintln!("run memory ceiling cannot be read: {err}");
+        notice(MODULE, &format!("run memory ceiling cannot be read: {err}"));
         None
     })
 }
@@ -170,7 +178,10 @@ fn shares_of(arm: CorePlacement, limit: Option<NonZeroU64>) -> Shares {
 /// telling the reason once when the platform refuses (D40).
 fn lift() {
     if let Err(reason) = full_speed() {
-        eprintln!("the city may be power-throttled as background work: {reason}");
+        notice(
+            MODULE,
+            &format!("the city may be power-throttled as background work: {reason}"),
+        );
     }
 }
 
@@ -188,7 +199,10 @@ fn seats_of(read: &Result<Topology, Unread>) -> Vec<Processor> {
 fn planned() -> Vec<Processor> {
     let read = reading::read();
     if let Err(Unread(reason)) = &read {
-        eprintln!("the hot threads are placed by the operating system: {reason}");
+        notice(
+            MODULE,
+            &format!("the hot threads are placed by the operating system: {reason}"),
+        );
     }
     seats_of(&read)
 }

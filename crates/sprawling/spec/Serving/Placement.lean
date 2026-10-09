@@ -314,7 +314,7 @@ pub(crate) struct Seats;                        // 模型的两池：计划末�
 impl Seats { pub(crate) fn new(plan: Vec<Processor>) -> Self; pub(crate) fn start(&mut self, holder: Holder, role: Role); pub(crate) fn exit(&mut self, holder: Holder); pub(crate) fn seat_of(&self, holder: Holder) -> Option<Processor>; }
 pub(crate) const SERIAL_SEATS: usize = 2;       // 模型的 reserved：串行线程的条数
 pub(crate) struct Seat;                         // 析构即交还
-pub(crate) fn seat_this_thread(name: &'static str, role: Role) -> Seat; // 在自己那一池要座位并设理想处理器；平台拒绝时向标准错误说一次
+pub(crate) fn seat_this_thread(name: &'static str, role: Role) -> Seat; // 在自己那一池要座位并设理想处理器；平台拒绝时作为一条进程通知说一次（`serving::journal::notice`，`refuse` 级，§8-11）
 pub(crate) fn seat_lane() -> Box<dyn std::any::Any>; // lane 经 `Hands::seat_lane` 要座位（D46）
 pub(crate) fn report() -> String;               // doctor 的一行：读设置与拓扑，说出计划做了什么（D47）
 pub(crate) fn describe(read: &Result<Topology, Unread>) -> String; // 同一行，对一次已有的读数
@@ -327,7 +327,7 @@ pub(crate) fn describe(read: &Result<Topology, Unread>) -> String; // 同一行�
 - **调度器做主。** harness 只给提示与软偏好：理想处理器是软的，那个核忙时 Windows 立刻把线程放到别的核上；默认从不设硬亲和。座位只从放置计划里来（D45），计划空时谁也不拿座位，线程全由操作系统放。座位比热线程少时，多出来的线程不拿座位（模型的「一座一人」），由操作系统放，而不是两条热线程挤在同一个首选核上。
 - **谁坐哪里。** 计划末尾的 `SERIAL_SEATS` 个座位只给串行线程（账本线程与视图折叠），其余给 lane（模型的「两池」）：串行线程全城各一条，每一次 relay 与广播都等它们，一慢全城都慢，所以它们的座位不让先起动的线程占去；lane 坐其余的，run 结束时交还，座位在 run 之间轮转。串行线程坐计划末尾而不是开头，因为 0 号处理器在 Windows 上通常收更多的中断与 DPC（推断，四臂对照里按处理器号分开计中途换核就能读出）。tokio worker 不要座位：它们是一池可以互相偷任务的线程，一个任务落在哪一条 worker 上不定，给先醒来的几条设偏好只是让这几条永久占着座位，而不是让 socket 的活落在快核上。
 - **(b) 理想处理器，三个平台。**
-  - Windows：热线程起动时向座位表要座位，再调 `thread_priority::windows::set_current_thread_ideal_processor`（`thread-priority` 3.1.1，对外是安全接口，内部是 `SetThreadIdealProcessor`；第一档），退出时交还。理想处理器是线程所在处理器组里的下标，所以计划只含读拓扑那条线程所在组里的处理器（D45）；起动的线程不在那个组里时不设理想处理器，照实向标准错误说一次。
+  - Windows：热线程起动时向座位表要座位，再调 `thread_priority::windows::set_current_thread_ideal_processor`（`thread-priority` 3.1.1，对外是安全接口，内部是 `SetThreadIdealProcessor`；第一档），退出时交还。理想处理器是线程所在处理器组里的下标，所以计划只含读拓扑那条线程所在组里的处理器（D45）；起动的线程不在那个组里时不设理想处理器，照实作为一条进程通知说一次（`serving::journal::notice`，`refuse` 级，§8-11）。
   - macOS：没有理想处理器的接口（`THREAD_AFFINITY_POLICY` 在 Apple 芯片上不受支持），座位表不建；性能核由 D40 与 `crates/runtime/spec/Tools/Exec.lean` D29 的 QoS 分工争取，拓扑只读给 doctor（D45）。
   - Linux：没有软的理想处理器调用，`sched_setaffinity` 是硬亲和（下面的对照臂）；座位表不建。内核调度器在 Intel 混合架构（ITMT）与 ARM（EAS）上本来就把忙线程放到大核上；拓扑只读给 doctor（D45）。
 - **(c) 一步计算从头到尾在一条线程上。** 一步就是 §8-93 的一轮：热线程从一次醒来到下一次阻塞做完的一件事（折叠一条记录、执行一次工具调用、落一次 relay）。一步之内不把工作交给另一条线程：不经 channel 转手、不 spawn 后再 join、async 任务不在一步中途转去阻塞池。lane 本来各是一条 OS 线程；tokio worker 的一步是一次任务轮询，tokio 的偷任务只发生在两次轮询之间。这是代码的写法，不要平台接口，三个平台同一条。它守住了没有，由下面四臂对照的「中途换核次数」读出。
@@ -340,7 +340,7 @@ pub(crate) fn describe(read: &Result<Topology, Unread>) -> String; // 同一行�
 
 /-! D49 第四臂住在 `placement::pinned`：一次读拓扑算出一份计划，Windows 用 job 的亲和限额、Linux 说 `taskset` 列表、macOS 说没有
 
-**决定**：硬亲和臂的机制只写在 `bin::serving::placement::pinned`，它不读设置、不读拓扑，只拿调用者已经算出的计划座位（`plan::Processor` 的切片）回答这一台机器会做什么，结果每进程只取一次（`OnceLock`），做不了就向标准错误说一次，doctor 那一行也说（D47）。
+**决定**：硬亲和臂的机制只写在 `bin::serving::placement::pinned`，它不读设置、不读拓扑，只拿调用者已经算出的计划座位（`plan::Processor` 的切片）回答这一台机器会做什么，结果每进程只取一次（`OnceLock`），做不了就作为一条进程通知说一次（`serving::journal::notice`，`refuse` 级，§8-11），doctor 那一行也说（D47）。
 
 - **Windows**：建一只 job，`limit_affinity` 设成座位所在处理器组的掩码（先读本线程的处理器组与可用掩码，`desktop_ffi::cpu::thread_group`，与 D45 的同一次读数同源；掩码取交集，空则报没做），置 `limit_silent_breakaway_ok`（子进程不继承这只 job，run 自己的 job 才有余下的处理器可拿），`assign_current_process`，并把 job 的句柄活到进程结束：最后一个句柄一关，job 与它的限额就没了，所以句柄放在 `OnceLock` 里，不随本函数返回而析构。
 - **Linux**：硬亲和要 `unsafe` 的 `sched_setaffinity` 或外部的 `taskset`（与 `nice` 同一档），本臂选外部：进程内不设，答出要用的 `taskset -c` 列表，由做测量的人把整个二进制起动在它下面。
@@ -350,7 +350,7 @@ pub(crate) fn describe(read: &Result<Topology, Unread>) -> String; // 同一行�
 
 **被否**：①在 `runtime` 里写第二个掩码权威——座位与掩码就会各说一个处理器，而且 `runtime` 不知道放置计划；②在 `pinned` 里自己再读一次拓扑——两次读数之间机器可以变，座位与掩码就会分开；③让 run 的 job 继承 harness 的亲和限额——那样每个 run 的进程都被按在最快的几个核上，与「run 拿其余处理器」相反。
 
-**run 掩码的权威与传递**：`pinned::would` 在核心入 job 前，用同一次处理器组读数求 `available & !core_mask`，把非零且能转为 `usize` 的结果放进 `Did::Pinned.runs: runtime::backlog::RunAffinity`，`TAKEN` 保存这个结果；空补集不申请 run 亲和，并向标准错误说明。核心 job 创建或加入失败时也不给 run 掩码。`placement::run_affinity` 在 pinned 臂初始化同一座位表，再读这个结果，经 `assembly::production::hands` 的 `Hands.affinity`、accounting 的车队，交进 `Backlog::with_affinity`；其他臂与其他平台交 `Os`。runtime 不读配置、不重读拓扑、不求补集。runtime §8-13-3 规定申请与报告：拒绝记 `affinity: Os`，创建或加入失败计 `unfollowed`，命令照常运行。空补集、平台拒绝或起动窗口漏出的后代使第四臂的树级约束不完整，测量须读实际报告。
+**run 掩码的权威与传递**：`pinned::would` 在核心入 job 前，用同一次处理器组读数求 `available & !core_mask`，把非零且能转为 `usize` 的结果放进 `Did::Pinned.runs: runtime::backlog::RunAffinity`，`TAKEN` 保存这个结果；空补集不申请 run 亲和，并作为一条进程通知说明。核心 job 创建或加入失败时也不给 run 掩码。`placement::run_affinity` 在 pinned 臂初始化同一座位表，再读这个结果，经 `assembly::production::hands` 的 `Hands.affinity`、accounting 的车队，交进 `Backlog::with_affinity`；其他臂与其他平台交 `Os`。runtime 不读配置、不重读拓扑、不求补集。runtime §8-13-3 规定申请与报告：拒绝记 `affinity: Os`，创建或加入失败计 `unfollowed`，命令照常运行。空补集、平台拒绝或起动窗口漏出的后代使第四臂的树级约束不完整，测量须读实际报告。
 
 **重开参数**：跨处理器组的放置进入计划时，单组掩码接口须替换为组与掩码的集合；Windows 有安全的起动前 job 接口时消除起动窗口。
 -/
@@ -374,7 +374,7 @@ pub(crate) fn plan(topology: &Topology) -> Plan;
 
 // bin::serving::placement::reading —— shape: adapter
 pub(crate) fn read() -> Result<Topology, Unread>;  // 每个平台一条臂
-pub(crate) struct Unread(String);                   // 为什么没读到，写给 doctor 与标准错误
+pub(crate) struct Unread(String);                   // 为什么没读到，写给 doctor 与进程通知
 ```
 
 **决定**：
@@ -426,8 +426,8 @@ pub(crate) fn run_shares() -> runtime::Shares;     // 读设置与 User 填写�
 - 份额要的那一半能不能落地按平台与运行中的机器分：Windows 的 job 两半都设；macOS 只有 CPU 一半（`taskpolicy` 是命令外面的一层包装，`RunProcesses.share` 在 macOS 上读作 `Unset`）；Linux 上两半都要 harness 自己的 cgroup 可写（D33），不可写时只剩 `nice 10` 一档。哪一状态由 `runtime::platform_shares` 一处读（`crates/runtime/spec/Tools/Exec.lean` D33）：`backlog` 的接线用这个答案决定建不建 cgroup，doctor 那一行用同一个答案说人话。
 - 缺省带上 CPU 份额，因为份额按权重分：核被抢时每个 run 各得一份，机器空着时什么也不改；它防的正是本节要防的事——一个 run 的构建起几十个编译进程，把别的 run 与核心都挤到后面。内存上限会让超过它的构建因内存不足失败，因此只有 User 选择 `"soft_shares"` 且填写 `[core] memory_bytes` 时才请求。产品约束是不设缺省 run 内存上限，不能从物理内存推导。
 - 份额是一个值 `runtime::Shares`：`bin::assembly` 造 `accounting::worker::hands::Hands` 时调 `run_shares` 一次，`accounting` 打开车队时把它交给 `runtime::Backlog::with_shares`；runtime 不读人的配置，所以一臂开关什么只有这一处定义。`memory_bytes` 缺席时 `"soft_shares"` 只给 CPU 份额；零、负数与非整数在配置读取处拒绝。
-- 设置读不懂时，起动照常、按 `"soft"` 做，并向标准错误说一次；doctor 那一行说出读不懂。内存上限始终只由 User 输入，不随测量改变。
-- doctor 一行，先说拓扑与计划，例：「CPU: 2 classes — 4 performance cores (8 threads), 8 efficiency cores; hot threads prefer the 4 performance cores」；「CPU: one class, 8 cores; left to the operating system」；「CPU: one class, 16 cores in 2 cache groups; left to the operating system and its cache steering」；读不到时「CPU: topology unread (<原因>); left to the operating system」；macOS 与 Linux 上计划有座位时写「this platform has no placement call; its scheduler places threads」。再说每个 run 的份额：「each run's commands share the processors by weight」，`"soft_shares"` 再加「and commit at most <n> bytes」；填了 `memory_bytes` 而臂不是 `"soft_shares"` 时再加「; the entered memory ceiling of <n> bytes is not applied: [core] placement is not "soft_shares"」，人的文件读不懂时再加「; the memory ceiling does not read, so none applies: <原因>」，因为一个填了却没生效的上限不能只留在标准错误里；Linux 上没有委派时写「runs' commands compete thread by thread and run below the core: the cgroup is not delegated」，`"none"` 或别的平台给不了份额时写「runs' commands compete thread by thread」。措辞只在 `placement::report` 一处。
+- 设置读不懂时，起动照常、按 `"soft"` 做，并作为一条进程通知说一次（`serving::journal::notice`，`refuse` 级，§8-11）；doctor 那一行说出读不懂。内存上限始终只由 User 输入，不随测量改变。
+- doctor 一行，先说拓扑与计划，例：「CPU: 2 classes — 4 performance cores (8 threads), 8 efficiency cores; hot threads prefer the 4 performance cores」；「CPU: one class, 8 cores; left to the operating system」；「CPU: one class, 16 cores in 2 cache groups; left to the operating system and its cache steering」；读不到时「CPU: topology unread (<原因>); left to the operating system」；macOS 与 Linux 上计划有座位时写「this platform has no placement call; its scheduler places threads」。再说每个 run 的份额：「each run's commands share the processors by weight」，`"soft_shares"` 再加「and commit at most <n> bytes」；填了 `memory_bytes` 而臂不是 `"soft_shares"` 时再加「; the entered memory ceiling of <n> bytes is not applied: [core] placement is not "soft_shares"」，人的文件读不懂时再加「; the memory ceiling does not read, so none applies: <原因>」，因为一个填了却没生效的上限不能只留在日志里；Linux 上没有委派时写「runs' commands compete thread by thread and run below the core: the cgroup is not delegated」，`"none"` 或别的平台给不了份额时写「runs' commands compete thread by thread」。措辞只在 `placement::report` 一处。
 
 **被否**：①CPU 份额也只在 `"soft_shares"` 打开——缺省就留着一个 run 的构建占满全部核的情形，而份额在机器空着时没有代价；②两个独立的设置，线程放置一个、子进程份额一个——关掉全部要改两处，对照从四格变成九格，而每一臂本来就是一组一起开关的机制；③runtime 自己读人的配置——设置就有了两个读者，一臂开关什么就有了两处定义；④doctor 打出原始的记录表——User 要的是机器被怎样对待，不是 `EfficiencyClass` 的数。
 
