@@ -27,6 +27,7 @@ use crossterm::event::{KeyEvent, KeyEventKind};
 use super::cli::{Say, Session};
 use super::editor::Editor;
 use super::lifecycle::{Event, Face, Handoff, INTERRUPT_GRACE, Sinks};
+use super::program_status::{self, Held, Reporting};
 use super::screen::{Screen, Written};
 use super::terminal::{Inside, Terminal};
 use wire::CloseMode;
@@ -138,6 +139,10 @@ struct Ui {
     /// The door's pairing code, which each guess replaces, so the quiet
     /// host draws the one in force.
     pairing: tokio::sync::watch::Receiver<String>,
+    /// Whether the city reports its state to the terminal, and what the
+    /// terminal holds (`program_status`).
+    reporting: Reporting,
+    held: Held,
 }
 
 impl Ui {
@@ -163,6 +168,8 @@ impl Ui {
             menu: false,
             transient: None,
             pairing,
+            reporting: Reporting::from_environment(),
+            held: Held::OPENING,
         }
     }
 
@@ -206,12 +213,16 @@ impl Ui {
     fn turn_to(&mut self, next: Face) {
         self.shown = next;
         match next {
-            Face::QuietHost => self.quiet(),
+            Face::QuietHost => {
+                self.quiet();
+                self.recount();
+            }
             Face::Cli => {
                 self.transient = None;
                 let left = self.screen.leave_quiet();
                 self.drawn(left);
                 self.draw_input();
+                self.recount();
             }
             Face::Stopping {
                 sinks: Sinks::Cut, ..
@@ -233,6 +244,7 @@ impl Ui {
                 self.notice(progress);
             }
             Face::Gone(handoff) => {
+                self.status(program_status::Event::Closed);
                 let given = self.screen.give_back();
                 self.drawn(given);
                 if handoff == Handoff::Skipped {
@@ -251,6 +263,7 @@ impl Ui {
             Show::Notice(line) => self.notice(line),
             Show::Key(key) => self.key(key),
             Show::Record(committed) => {
+                self.heard(committed.record());
                 let lines = match self.session.as_mut() {
                     Some(session) => {
                         let room = session.room.clone();
@@ -353,3 +366,4 @@ pub(crate) fn lines_to_stdout() -> Say {
 }
 
 mod keys;
+mod reporting;

@@ -357,7 +357,7 @@ impl Session {
 }
 
 /// The city's counts, or nothing when it is too busy to answer.
-fn metrics(inside: &Inside) -> Option<wire::MetricsAnswer> {
+pub(super) fn metrics(inside: &Inside) -> Option<wire::MetricsAnswer> {
     match (inside.answering)(wire::Query::Metrics) {
         (_, Ok(wire::Answer::Metrics(vitals))) => Some(*vitals),
         (_, Ok(_) | Err(_)) => None,

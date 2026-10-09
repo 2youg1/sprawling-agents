@@ -19,6 +19,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use crossterm::{cursor, queue, style::Print, terminal};
 
 use super::editor::{Editor, PROMPT};
+use super::program_status::Report;
 
 /// Whether the alternate screen is showing, for the panic hook, which
 /// has no other way to know whether clearing the screen would wipe the
@@ -145,6 +146,12 @@ impl Screen {
             )
         });
         worst(entered, shown)
+    }
+
+    /// One program status report, which moves no cursor and draws
+    /// nothing on either screen.
+    pub(crate) fn report(&mut self, report: Report) -> Written {
+        self.write(|out| queue!(out, report))
     }
 
     /// Back to the main screen, the alternate one wiped first.

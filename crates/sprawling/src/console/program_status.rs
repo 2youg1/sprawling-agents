@@ -119,8 +119,16 @@ pub(crate) enum State {
 
 /// A request waiting outranks a run going, which outranks how the last
 /// run ended (D77).
-pub(crate) fn judged(_counts: Counts, rest: Rest) -> State {
-    State::Resting(rest)
+pub(crate) fn judged(counts: Counts, rest: Rest) -> State {
+    if counts.approvals > 0 {
+        State::Blocked {
+            approvals: counts.approvals,
+        }
+    } else if counts.runs > 0 {
+        State::Working { runs: counts.runs }
+    } else {
+        State::Resting(rest)
+    }
 }
 
 /// What the city is told about, as the writer meets it.
@@ -167,8 +175,39 @@ impl Held {
 
 /// One step: what the writer holds next, and the report it writes, if
 /// any. Nothing is written twice in a row, and nothing after the clear.
-pub(crate) fn step(held: Held, _event: Event) -> (Held, Option<Report>) {
-    (held, None)
+pub(crate) fn step(held: Held, event: Event) -> (Held, Option<Report>) {
+    match (held.shown, event) {
+        (Shown::Cleared, _) => (held, None),
+        (_, Event::Ended(rest)) => (Held { rest, ..held }, None),
+        (shown, Event::Counted(counts)) => {
+            let state = judged(counts, held.rest);
+            if shown == Shown::Reported(state) {
+                (held, None)
+            } else {
+                (
+                    Held {
+                        shown: Shown::Reported(state),
+                        ..held
+                    },
+                    Some(Report::Of(state)),
+                )
+            }
+        }
+        (Shown::Nothing, Event::Closed) => (
+            Held {
+                shown: Shown::Cleared,
+                ..held
+            },
+            None,
+        ),
+        (Shown::Reported(_), Event::Closed) => (
+            Held {
+                shown: Shown::Cleared,
+                ..held
+            },
+            Some(Report::Cleared),
+        ),
+    }
 }
 
 /// One report, as the writer queues it.
