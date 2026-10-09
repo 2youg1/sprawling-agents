@@ -132,7 +132,7 @@ struct Ui {
     /// `/quit` with runs going, waiting for Enter, n or Esc.
     asking: bool,
     hinted: bool,
-    /// The verbs Tab offered, while their menu is showing.
+    /// What Tab offered, while its menu is showing.
     menu: bool,
     transient: Option<String>,
 }

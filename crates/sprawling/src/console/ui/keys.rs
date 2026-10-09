@@ -120,25 +120,57 @@ impl Ui {
         }
     }
 
-    /// Tab: a slash verb completed, or the ones it could be listed.
+    /// Tab: a slash verb completed, or the argument after `/model` or
+    /// `/effort`; several that fit are listed instead.
     fn complete(&mut self) {
         let typed = self.editor.text();
-        if !typed.starts_with('/') || typed.contains(char::is_whitespace) {
+        if !typed.starts_with('/') {
             return;
         }
-        let fits: Vec<wire::Slash> = super::super::language::slash_verbs()
-            .filter(|verb| verb.spelling().starts_with(&typed))
-            .collect();
-        match fits.as_slice() {
+        match typed.split_once(' ') {
+            None => {
+                let fits: Vec<(String, &str)> = super::super::language::slash_verbs()
+                    .filter(|verb| verb.spelling().starts_with(&typed))
+                    .map(|verb| {
+                        let spaced = if verb.takes().is_empty() { "" } else { " " };
+                        (format!("{}{spaced}", verb.spelling()), verb.spelling())
+                    })
+                    .collect();
+                self.offer(&fits);
+            }
+            Some((spelled, begun)) if !begun.contains(char::is_whitespace) => {
+                let Some(verb) =
+                    super::super::language::slash_verbs().find(|verb| verb.spelling() == spelled)
+                else {
+                    return;
+                };
+                let offered = match self.session.as_ref() {
+                    Some(session) => session.arguments(&self.inside, verb),
+                    None => Vec::new(),
+                };
+                let fits: Vec<(String, &str)> = offered
+                    .iter()
+                    .filter(|argument| argument.starts_with(begun))
+                    .map(|argument| (format!("{spelled} {argument}"), argument.as_str()))
+                    .collect();
+                self.offer(&fits);
+            }
+            Some(_) => {}
+        }
+    }
+
+    /// One fit replaces the line; several are listed as a menu Esc closes.
+    /// Each fit is the line it would leave and the word the menu shows.
+    fn offer(&mut self, fits: &[(String, &str)]) {
+        match fits {
             [] => {}
-            [one] => {
-                let spaced = if one.takes().is_empty() { "" } else { " " };
+            [(line, _)] => {
                 self.erase_input();
-                self.editor.set(&format!("{}{spaced}", one.spelling()));
+                self.editor.set(line);
                 self.draw_input();
             }
             many => {
-                let listed: Vec<&str> = many.iter().map(|verb| verb.spelling()).collect();
+                let listed: Vec<&str> = many.iter().map(|(_, shown)| *shown).collect();
                 self.menu = true;
                 self.line(&format!("  {}", listed.join("   ")));
             }
