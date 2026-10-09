@@ -241,6 +241,13 @@ jobs:
       - name: vouch for the returned signature before it is packed
         if: runner.os == 'Windows'
         shell: pwsh
+        env:
+          # Only a tag push publishes, and only it may demand a trusted chain:
+          # the Foundation hands a project its self-signed test certificate
+          # first and orders the production certificate after reviewing the
+          # setup, so a dispatch run is how the integration is proved while
+          # the chain is still a project-local one.
+          RELEASE_EVENT: ${{ github.event_name }}
         run: |
           $returned = @(Get-ChildItem -LiteralPath target/signed -Recurse -File)
           if ($returned.Count -ne 1) {
@@ -248,17 +255,25 @@ jobs:
           }
           Copy-Item -LiteralPath $returned[0].FullName -Destination target/release/sprawling.exe -Force
           $signature = Get-AuthenticodeSignature -LiteralPath target/release/sprawling.exe
-          if ($signature.Status.ToString() -ne 'Valid') {
-            throw "The returned executable carries a $($signature.Status) signature; a release does not ship that."
+          if ($null -eq $signature.SignerCertificate) {
+            throw 'The signing request returned an executable with no signature at all.'
           }
-          if ($null -eq $signature.TimeStamperCertificate) {
-            throw 'The returned signature carries no timestamp; it would expire with the certificate.'
+          $status = $signature.Status.ToString()
+          $timestamped = $null -ne $signature.TimeStamperCertificate
+          if ($env:RELEASE_EVENT -eq 'push') {
+            if ($status -ne 'Valid') {
+              throw "A release ships only a signature a person's system trusts, and this one is $status."
+            }
+            if (-not $timestamped) {
+              throw 'The returned signature carries no timestamp; it would expire with the certificate.'
+            }
           }
-          @{ status = $signature.Status.ToString(); subject = $signature.SignerCertificate.Subject
+          @{ status = $status; subject = $signature.SignerCertificate.Subject
              thumbprint = $signature.SignerCertificate.Thumbprint
-             timestamped = $null -ne $signature.TimeStamperCertificate } |
+             timestamped = $timestamped; trusted_chain_required = $env:RELEASE_EVENT -eq 'push' } |
             ConvertTo-Json -Depth 3 | Set-Content -LiteralPath target/release-evidence/windows-signature.json -Encoding utf8
           ($signature | Format-List | Out-String) | Add-Content -LiteralPath target/release-evidence/windows-signature.log
+          Write-Host "signature status: $status, timestamped: $timestamped"
       - name: assemble the archive
         shell: bash
         env:
