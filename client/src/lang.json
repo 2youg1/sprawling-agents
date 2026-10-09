@@ -4343,6 +4343,10 @@
     "en": "all back to default",
     "zh": "全部恢复默认"
   },
+  "keys_unbound": {
+    "en": "no shortcut",
+    "zh": "未设快捷键"
+  },
   "keys_title": {
     "en": "keyboard",
     "zh": "键盘快捷键"
