@@ -79,6 +79,14 @@ impl ListenerOrigins {
         }
     }
 
+    /// The names the remote listener bound to `local` answers to: its
+    /// loopback names, and the host of `public`, the `https://` address
+    /// its route gave (wire D56).
+    #[must_use]
+    pub fn routed(local: SocketAddr, _public: &str) -> Self {
+        Self::of(local)
+    }
+
     /// The address a person on this machine opens: `http://127.0.0.1:<port>`
     /// for a loopback or every-interface listener. One spelling, because a
     /// browser keeps its device key per origin and a second spelling of
@@ -423,6 +431,50 @@ mod tests {
         assert!(!origins.admits_host("192.168.1.10:9999"));
         assert!(origins.admits_origin("http://192.168.1.10:8787", "192.168.1.10:8787"));
         assert!(!origins.admits_origin("http://10.0.0.5:8787", "192.168.1.10:8787"));
+    }
+
+    /// Wire D56: a route may pass the browser's `Host` on or rewrite it
+    /// to the loopback port, and the page on the route sends the public
+    /// `https` origin; anything else is another site.
+    #[test]
+    fn a_routed_listener_admits_its_loopback_names_and_the_public_name_only() {
+        let origins = ListenerOrigins::routed(
+            "127.0.0.1:41000".parse().unwrap(),
+            "https://City.example.net:443/remote?x",
+        );
+        let at = |host, origin| {
+            let presented = Presented {
+                host: Some(host),
+                origin,
+                sec_fetch_site: Some("same-origin"),
+            };
+            decide_entry(&origins, presented, Arrival::Socket)
+        };
+        let public = Some("https://city.example.net");
+        let browser = Entry::Caller(Caller::Browser);
+        let seen = [
+            at("city.example.net", public),
+            at("127.0.0.1:41000", public),
+            at("localhost:41000", Some("http://localhost:41000")),
+            at("127.0.0.1:41000", None),
+            at("evil.example", public),
+            at("city.example.net:41000", public),
+            at("city.example.net", Some("https://evil.example")),
+            at("city.example.net", Some("http://city.example.net")),
+        ];
+        assert_eq!(
+            seen,
+            [
+                browser,
+                browser,
+                browser,
+                Entry::Caller(Caller::Native),
+                Entry::Refused(EntryRefusal::ForeignHost),
+                Entry::Refused(EntryRefusal::ForeignHost),
+                Entry::Refused(EntryRefusal::ForeignOrigin),
+                Entry::Refused(EntryRefusal::ForeignOrigin),
+            ]
+        );
     }
 
     #[test]
