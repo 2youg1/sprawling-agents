@@ -47,11 +47,13 @@
   };
 
   // Opening hands the focus to the entry that names the group drawn,
-  // rather than to the first control the platform would pick.
+  // rather than to the first control the platform would pick. A page
+  // entry also carries `aria-current` (`"page"`, the page under the
+  // panel), so the group's own value is the one asked for.
   $effect(() => {
     if (sheet === undefined || sheet.open) return;
     sheet.showModal();
-    sheet.querySelector<HTMLElement>("nav [aria-current]")?.focus();
+    sheet.querySelector<HTMLElement>("nav [aria-current=true]")?.focus();
   });
 </script>
 

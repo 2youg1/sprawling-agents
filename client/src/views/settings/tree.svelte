@@ -84,6 +84,18 @@
 
   const lines = lineWalker();
 
+  // A group drawn by the address rather than by a press here (a link in
+  // the body, the palette, the back button) takes the focus with it while
+  // the focus is in the tree, so the ring never stays on an entry the
+  // body no longer shows.
+  let drawn: SetupGroup | null = null;
+  $effect(() => {
+    if (group === drawn) return;
+    drawn = group;
+    if (nav === null || !nav.contains(document.activeElement)) return;
+    nav.querySelector<HTMLElement>("[aria-current=true]")?.focus();
+  });
+
   function walk(event: KeyboardEvent): void {
     if (nav === null) return;
     const pressed = pressedOf(event);

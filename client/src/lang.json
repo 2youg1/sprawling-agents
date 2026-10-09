@@ -179,10 +179,6 @@
     "en": "me",
     "zh": "我"
   },
-  "bin_empty": {
-    "en": "empty",
-    "zh": "空"
-  },
   "bin_nothing": {
     "en": "the recycle bin is empty: a file a run discards lands here, with the way to bring it back",
     "zh": "回收站是空的：run 丢掉的文件会落在这里，并写明怎样找回"
@@ -402,14 +398,6 @@
   "city_stop": {
     "en": "/halt --all",
     "zh": "/halt --all"
-  },
-  "city_stopped": {
-    "en": "stopped",
-    "zh": "停着"
-  },
-  "city_stopped_line": {
-    "en": "stopped",
-    "zh": "已停"
   },
   "city_stuck": {
     "en": "{n} stuck",
@@ -4215,10 +4203,6 @@
     "en": "these keys",
     "zh": "快捷键速查"
   },
-  "keys_prefix": {
-    "en": "{key} …",
-    "zh": "{key} …"
-  },
   "keys_press": {
     "en": "press keys",
     "zh": "按下组合键"
@@ -4330,10 +4314,6 @@
   "mailbox_new": {
     "en": "something new, nothing waiting for you",
     "zh": "有新消息，没有等你的事"
-  },
-  "keys_reserved": {
-    "en": "the browser takes this key before the page sees it",
-    "zh": "此键被浏览器截走，页面收不到"
   },
   "keys_reset": {
     "en": "default",
@@ -4595,10 +4575,6 @@
     "en": "the compiler, at the version rust-toolchain.toml pins, which rustup fetches on first use",
     "zh": "编译器，版本是 rust-toolchain.toml 钉住的那个，rustup 第一次用到时下载"
   },
-  "machine_source_powershell": {
-    "en": "the official elan-init.ps1 script, run by this city without a prompt",
-    "zh": "elan 官方的 elan-init.ps1 脚本，由城市直接运行，不需要你粘贴"
-  },
   "machine_pack_rust_tools": {
     "en": "Rust tools",
     "zh": "Rust 工具包"
@@ -4695,14 +4671,6 @@
     "en": "one at a time, in the order below, each after the tools it needs",
     "zh": "按下面的顺序逐项安装，先装后面几项要用到的工具"
   },
-  "machine_installed": {
-    "en": "this machine already has it",
-    "zh": "这台电脑已经有了"
-  },
-  "machine_items": {
-    "en": "this machine",
-    "zh": "运行中的机器"
-  },
   "machine_missing": {
     "en": "still missing",
     "zh": "还差"
@@ -4719,29 +4687,13 @@
     "en": "ok",
     "zh": "有"
   },
-  "machine_progress": {
-    "en": "{done} / {total}",
-    "zh": "{done} / {total}"
-  },
   "machine_progress_label": {
     "en": "how many are ready",
     "zh": "已就绪的数量"
   },
-  "machine_ready": {
-    "en": "ready",
-    "zh": "齐备"
-  },
   "machine_recheck": {
     "en": "check again",
     "zh": "重新检查"
-  },
-  "machine_recommended": {
-    "en": "recommended",
-    "zh": "推荐"
-  },
-  "machine_required": {
-    "en": "required",
-    "zh": "必备"
   },
   "machine_tier_develop": {
     "en": "to develop sprawling",
@@ -4755,10 +4707,6 @@
     "en": "not checked yet",
     "zh": "城市还没有检查过机器"
   },
-  "machine_verdicts": {
-    "en": "what is missing",
-    "zh": "缺什么"
-  },
   "mcp_add": {
     "en": "add",
     "zh": "加上"
@@ -4770,14 +4718,6 @@
   "mcp_api_key": {
     "en": "api key",
     "zh": "密钥"
-  },
-  "mcp_auth": {
-    "en": "sign-in",
-    "zh": "登录方式"
-  },
-  "mcp_auth_oauth": {
-    "en": "oauth",
-    "zh": "oauth"
   },
   "mcp_building": {
     "en": "building",
@@ -4987,10 +4927,6 @@
     "en": "MCP",
     "zh": "MCP"
   },
-  "mcp_toolkit": {
-    "en": "toolkit",
-    "zh": "工具箱"
-  },
   "mcp_toolkits": {
     "en": "toolkits Composio offers",
     "zh": "Composio 提供的工具箱"
@@ -5135,17 +5071,9 @@
     "en": "building",
     "zh": "楼"
   },
-  "palette_fork": {
-    "en": "branch {addr}",
-    "zh": "从 {addr} 开分支"
-  },
   "palette_placeholder": {
     "en": "go to…",
     "zh": "去…"
-  },
-  "palette_raise": {
-    "en": "raise {addr}",
-    "zh": "新建 {addr}"
   },
   "palette_room": {
     "en": "room",
@@ -5179,17 +5107,9 @@
     "en": "without a trailing /chat/completions",
     "zh": "末尾不要带 /chat/completions"
   },
-  "part_loading": {
-    "en": "loading",
-    "zh": "加载中"
-  },
   "part_model_id": {
     "en": "model id",
     "zh": "模型 id"
-  },
-  "part_new_building": {
-    "en": "new building",
-    "zh": "新建一栋"
   },
   "part_no_match": {
     "en": "no matches",
@@ -5210,10 +5130,6 @@
   "part_save": {
     "en": "save",
     "zh": "保存"
-  },
-  "part_saved": {
-    "en": "saved",
-    "zh": "已保存"
   },
   "part_search": {
     "en": "search",
@@ -5251,10 +5167,6 @@
     "en": "item",
     "zh": "条目"
   },
-  "plan_node": {
-    "en": "node",
-    "zh": "节点"
-  },
   "plan_node_elsewhere": {
     "en": "{n} more runs claimed a node with this number in another building, or before this page",
     "zh": "另有 {n} 个 run 认领过同号的节点，在别的楼，或早于此页"
@@ -5274,10 +5186,6 @@
   "plan_share": {
     "en": "{percent}% of the plan's weight",
     "zh": "占计划权重的 {percent}%"
-  },
-  "plan_status": {
-    "en": "state",
-    "zh": "状态"
   },
   "plan_unplanned": {
     "en": "no plan to measure against: {steps} steps taken",
@@ -5983,10 +5891,6 @@
     "en": "Nothing answers here. Is the door open, and is this the address the console printed?",
     "zh": "这里没有回答。门开着吗？这是控制台印出的那个地址吗？"
   },
-  "remote_again": {
-    "en": "Try again",
-    "zh": "再试一次"
-  },
   "run_cached": {
     "en": "cached",
     "zh": "缓存命中"
@@ -6535,10 +6439,6 @@
     "en": "advanced",
     "zh": "高级"
   },
-  "setup_again": {
-    "en": "welcome",
-    "zh": "引导"
-  },
   "setup_attach_btn": {
     "en": "attach",
     "zh": "添加"
@@ -6590,10 +6490,6 @@
   "setup_group_accounts": {
     "en": "accounts and providers",
     "zh": "账户与供应方"
-  },
-  "setup_group_harnesses": {
-    "en": "official harnesses",
-    "zh": "官方 harness"
   },
   "setup_group_advanced": {
     "en": "advanced",
@@ -6647,10 +6543,6 @@
     "en": "who the city may call, and with which key",
     "zh": "城市能调用谁，用哪把钥匙"
   },
-  "setup_group_hint_harnesses": {
-    "en": "a subscription reaches the city through its vendor's own harness, signed in there",
-    "zh": "订阅经厂商自己的 harness 进入城市，在那里登录"
-  },
   "setup_group_hint_you": {
     "en": "what the city calls you and the Mayor; a change takes effect in the next session",
     "zh": "城市怎么称呼你与市长；改动在下一个会话生效"
@@ -6698,10 +6590,6 @@
   "setup_group_automation": {
     "en": "automation",
     "zh": "自动化"
-  },
-  "setup_groups": {
-    "en": "settings groups",
-    "zh": "设置分组"
   },
   "settings_tree": {
     "en": "settings tree",
@@ -7051,26 +6939,6 @@
     "en": "model ids this endpoint does not list",
     "zh": "端点没有列出的模型 id"
   },
-  "setup_mcp": {
-    "en": "MCP · City Hall",
-    "zh": "MCP · 市政厅"
-  },
-  "setup_mcp_add": {
-    "en": "add",
-    "zh": "加上"
-  },
-  "setup_mcp_command": {
-    "en": "command",
-    "zh": "命令"
-  },
-  "setup_mcp_label": {
-    "en": "label",
-    "zh": "名字"
-  },
-  "setup_mcp_url": {
-    "en": "http URL",
-    "zh": "http 地址"
-  },
   "setup_model_context": {
     "en": "context window",
     "zh": "上下文窗口"
@@ -7315,25 +7183,9 @@
     "en": "choose all",
     "zh": "全选"
   },
-  "setup_select_none": {
-    "en": "choose none",
-    "zh": "清空"
-  },
   "setup_skills": {
     "en": "shared folder",
     "zh": "共享文件夹"
-  },
-  "setup_skills_note": {
-    "en": "per building: <building>/.sprawling/skills/",
-    "zh": "单栋楼：<building>/.sprawling/skills/"
-  },
-  "setup_skills_title": {
-    "en": "skills",
-    "zh": "技能（skills）"
-  },
-  "setup_slot_pending": {
-    "en": "{what} is not built yet",
-    "zh": "{what} 还没有建好"
   },
   "setup_stream_idle": {
     "en": "stream_idle_timeout_ms",
@@ -7342,10 +7194,6 @@
   "setup_text_only": {
     "en": "text models only",
     "zh": "只看文本模型"
-  },
-  "setup_tick_model": {
-    "en": "choose {model}",
-    "zh": "选择 {model}"
   },
   "setup_ticked_count": {
     "en": "{ticked} of {total} chosen",
@@ -7407,10 +7255,6 @@
     "en": "no key",
     "zh": "未配密钥"
   },
-  "setup_vendor_none": {
-    "en": "no vendor in the id",
-    "zh": "标识里没有厂商"
-  },
   "setup_wire_api": {
     "en": "wire_api",
     "zh": "接口形态"
@@ -7422,10 +7266,6 @@
   "skills_admitted": {
     "en": "in the reading room",
     "zh": "已进阅览室"
-  },
-  "skills_empty": {
-    "en": "no shelf in this city holds anything: a skill is a folder with a SKILL.md placed on a shelf",
-    "zh": "这座城市的书架上还什么都没有：技能是放在书架上、带 SKILL.md 的文件夹"
   },
   "skills_external": {
     "en": "shelf {n} · {path}",
@@ -7494,10 +7334,6 @@
   "slash_model": {
     "en": "point main at another model",
     "zh": "把 main 指向另一个模型"
-  },
-  "slash_new_fresh": {
-    "en": "start a new session with no handoff",
-    "zh": "开新对话，不携带交接摘要"
   },
   "slash_compact": {
     "en": "stop the run here, then start a new session that carries its handoff",
@@ -7691,17 +7527,9 @@
     "en": "Map of this conversation: each tick is a round, coloured by what it did; the darker line is what you have read; press to go there",
     "zh": "这段对话的地图：每个刻点是一个回合，颜色表示它做了什么；较深的线是你读过的部分；按下去就跳到那里"
   },
-  "talk_choose": {
-    "en": "model, workspace and effort",
-    "zh": "模型、工作区与强度"
-  },
   "talk_column_effort": {
     "en": "effort",
     "zh": "强度"
-  },
-  "talk_column_mode": {
-    "en": "mode",
-    "zh": "模式"
   },
   "talk_column_model": {
     "en": "model",
@@ -7727,10 +7555,6 @@
     "en": "{name} was not kept: {why}",
     "zh": "{name} 没有存下：{why}"
   },
-  "talk_failed": {
-    "en": "no reply",
-    "zh": "没有回复"
-  },
   "talk_failed_refused": {
     "en": "the city did not take this message",
     "zh": "城市没有接下这条消息"
@@ -7742,10 +7566,6 @@
   "talk_failed_model": {
     "en": "no model is chosen to answer",
     "zh": "还没有选回答用的模型"
-  },
-  "talk_failed_provider": {
-    "en": "the model provider refused the call",
-    "zh": "模型供应方拒绝了这次调用"
   },
   "talk_open_settings": {
     "en": "open model settings",
@@ -7779,10 +7599,6 @@
     "en": "handed to {room}",
     "zh": "已交给 {room}"
   },
-  "talk_halted": {
-    "en": "city paused",
-    "zh": "城市已暂停"
-  },
   "talk_hearing": {
     "en": "hearing…",
     "zh": "听写中…"
@@ -7806,10 +7622,6 @@
   "talk_listening_note": {
     "en": "what the room's newest run was told, segment by segment; the whole text is on its run page",
     "zh": "房间里最新的 run 被告知的四段；全文在它的 run 页"
-  },
-  "talk_opening_mayor": {
-    "en": "plans, work to hand out, and what the city should do next",
-    "zh": "计划、派活，以及这座城市接下来做什么"
   },
   "inspect_label": {
     "en": "inspector",
@@ -8159,10 +7971,6 @@
     "en": "open a new session",
     "zh": "开新对话"
   },
-  "act_reconnect": {
-    "en": "reconnect",
-    "zh": "重新连接"
-  },
   "err_e_busy": {
     "en": "this room is busy",
     "zh": "这个房间正忙"
@@ -8206,18 +8014,6 @@
   "session_previous": {
     "en": "earlier rounds · {n}",
     "zh": "上一段 · {n} 轮"
-  },
-  "ui_browser_found": {
-    "en": "the browser the doctor found",
-    "zh": "城市找到的那个浏览器"
-  },
-  "ui_browser_path": {
-    "en": "a browser at a path I name",
-    "zh": "我指定的那个浏览器"
-  },
-  "ui_browser_system": {
-    "en": "the system's default browser",
-    "zh": "系统默认浏览器"
   },
   "err_e_path_not_found": {
     "en": "that path is not there",
@@ -8486,10 +8282,6 @@
   "setup_known_host_pick": {
     "en": "pick a provider",
     "zh": "选一家供应方"
-  },
-  "harness_sign_in": {
-    "en": "how to sign in",
-    "zh": "怎么登录"
   },
   "setup_form_incomplete": {
     "en": "finish the fields first",
@@ -8783,17 +8575,9 @@
     "en": "no answer came back to the {query} question",
     "zh": "{query} 这个问题没有等到回答"
   },
-  "talk_model_kept": {
-    "en": "this session",
-    "zh": "本会话"
-  },
   "talk_find_model": {
     "en": "filter models",
     "zh": "筛选模型"
-  },
-  "talk_column_provider": {
-    "en": "provider",
-    "zh": "provider"
   },
   "talk_permissions": {
     "en": "permissions",
@@ -8806,10 +8590,6 @@
   "talk_write_switch": {
     "en": "full write instead of create only",
     "zh": "常规写入（关闭时只读可新建）"
-  },
-  "talk_policy": {
-    "en": "what bounds the run",
-    "zh": "这次 run 的边界"
   },
   "bld_remove": {
     "en": "Remove {addr}",
@@ -9051,10 +8831,6 @@
     "en": "running",
     "zh": "在跑"
   },
-  "run_call_ms": {
-    "en": "{n} ms",
-    "zh": "{n} 毫秒"
-  },
   "run_no_turns": {
     "en": "no turns yet",
     "zh": "还没有回合"
@@ -9222,10 +8998,6 @@
   "run_monitor": {
     "en": "monitor",
     "zh": "监视器"
-  },
-  "ask_unfiled": {
-    "en": "reload the page to fetch the client this city was built with; report it if a reload does not settle it",
-    "zh": "刷新页面，取回这座城市配套的客户端；若刷新后依旧如此，请把它报上来"
   },
   "city_buildings": {
     "en": "buildings",
@@ -10135,22 +9907,6 @@
     "en": "not read: this command did not answer in time:",
     "zh": "没读到：这个命令没有及时回答："
   },
-  "harness_launcher_missing": {
-    "en": "launcher not found",
-    "zh": "没找到启动程序"
-  },
-  "harness_not_set_up": {
-    "en": "not installed or not signed in",
-    "zh": "没装或没登录"
-  },
-  "harness_ready": {
-    "en": "ready",
-    "zh": "可用"
-  },
-  "harness_looked": {
-    "en": "looked in",
-    "zh": "找过这些地方"
-  },
   "release_registry_npm": {
     "en": "npm",
     "zh": "npm"
@@ -10158,10 +9914,6 @@
   "release_registry_crates_io": {
     "en": "crates.io",
     "zh": "crates.io"
-  },
-  "release_registry_unasked": {
-    "en": "not asked: the city has no rule yet for comparing its versions with this one",
-    "zh": "没问：城市还没有拿它的版本与这一版比较的规则"
   },
   "release_registry_refused": {
     "en": "could not be read:",
@@ -10811,14 +10563,6 @@
     "en": "models · {provider}",
     "zh": "模型 · {provider}"
   },
-  "picker_filter_providers": {
-    "en": "filter providers",
-    "zh": "筛选供应商"
-  },
-  "picker_more": {
-    "en": "more…",
-    "zh": "更多…"
-  },
   "picker_more_count": {
     "en": "{n} more…",
     "zh": "还有 {n} 个…"
@@ -10834,10 +10578,6 @@
   "picker_provider_count": {
     "en": "{n} providers",
     "zh": "{n} 家"
-  },
-  "picker_only_provider": {
-    "en": "the only provider",
-    "zh": "唯一供应商"
   },
   "picker_price_head": {
     "en": "per million tokens in/out · context",
@@ -10859,14 +10599,6 @@
     "en": "{effort} (default)",
     "zh": "{effort}（默认）"
   },
-  "picker_effort_in_use": {
-    "en": "in use",
-    "zh": "本次使用"
-  },
-  "picker_agent_room": {
-    "en": "{agent} runs this room and chooses its own model and thinking",
-    "zh": "这个房间由 {agent} 接手，模型与思考档由它自己定"
-  },
   "slash_effort_offered": {
     "en": "levels this model offers: {levels}",
     "zh": "这个模型提供的档位：{levels}"
@@ -10878,14 +10610,6 @@
   "slash_quit": {
     "en": "close the city; with runs going, asks whether to wait for them",
     "zh": "关闭城市；有 run 在跑时先问要不要等它们"
-  },
-  "slash_approve": {
-    "en": "approve the request that is waiting, or the one named",
-    "zh": "批准正在等的请求，或点名的那一个"
-  },
-  "slash_deny": {
-    "en": "refuse the request that is waiting, or the one named",
-    "zh": "拒绝正在等的请求，或点名的那一个"
   },
   "slash_acp": {
     "en": "open the ACP agents page, or add the agent this text describes",
@@ -10935,33 +10659,13 @@
     "en": "snapshot of {date}",
     "zh": "{date} 的快照"
   },
-  "acp_catalog_refresh": {
-    "en": "refresh",
-    "zh": "刷新"
-  },
-  "acp_catalog_refresh_note": {
-    "en": "asks the registry for its current list; the city asks nothing until you press this",
-    "zh": "向注册表取一次最新列表；不按这里，城市不会去问"
-  },
   "acp_catalog_none": {
     "en": "no agent in the registry matches",
     "zh": "注册表里没有匹配的 agent"
   },
-  "acp_added": {
-    "en": "added",
-    "zh": "已添加"
-  },
   "acp_added_summary": {
     "en": "added: {names}",
     "zh": "已添加：{names}"
-  },
-  "acp_show": {
-    "en": "show {name}",
-    "zh": "展开 {name}"
-  },
-  "acp_hide": {
-    "en": "hide {name}",
-    "zh": "收起 {name}"
   },
   "acp_source": {
     "en": "source",
@@ -11002,10 +10706,6 @@
   "acp_licence": {
     "en": "licence",
     "zh": "许可"
-  },
-  "acp_licence_proprietary": {
-    "en": "proprietary",
-    "zh": "专有"
   },
   "acp_licence_unstated": {
     "en": "not stated",
@@ -11051,18 +10751,6 @@
     "en": "adding…",
     "zh": "正在添加…"
   },
-  "acp_changed": {
-    "en": "This entry changed after it was shown. Read it again, then add it.",
-    "zh": "这个条目在展示之后变了。重新看一遍再添加。"
-  },
-  "acp_use_here": {
-    "en": "use in this room",
-    "zh": "在此房间使用"
-  },
-  "acp_in_use_here": {
-    "en": "in use in this room",
-    "zh": "此房间在用"
-  },
   "acp_seated_in": {
     "en": "in use in {rooms}",
     "zh": "在 {rooms} 使用"
@@ -11079,45 +10767,17 @@
     "en": "ready",
     "zh": "可用"
   },
-  "acp_sign_in": {
-    "en": "sign in",
-    "zh": "登录"
-  },
-  "acp_sign_in_terminal": {
-    "en": "sign in in a terminal",
-    "zh": "在终端登录"
-  },
-  "acp_terminal_opened": {
-    "en": "A terminal is open, running {command}.",
-    "zh": "终端已打开，正在运行 {command}。"
-  },
-  "acp_browser_opened": {
-    "en": "The sign-in page is open in the browser.",
-    "zh": "登录页已在浏览器打开。"
-  },
-  "acp_console_handover": {
-    "en": "Sign in at the terminal where sprawling runs: {command}",
-    "zh": "到运行 sprawling 的终端里登录：{command}"
-  },
   "acp_subscription_elsewhere": {
     "en": "The city does not start a claude.ai subscription sign-in. Sign in inside Claude Code itself, or use a Console sign-in here.",
     "zh": "城市不代为启动 claude.ai 订阅登录。请在 Claude Code 里自己登录，或在这里用 Console 登录。"
-  },
-  "acp_parse_refused": {
-    "en": "This is not a command line, an agent_servers block or an agent.json: {reason}",
-    "zh": "这不是命令行、agent_servers 块或 agent.json：{reason}"
-  },
-  "acp_parse_shell": {
-    "en": "A command line here cannot carry | & ; < or >. Write the program and its arguments only.",
-    "zh": "这里的命令行不能带 | & ; < 或 >。只写程序和它的参数。"
   },
   "err_e_auth_required": {
     "en": "the agent asks you to sign in",
     "zh": "这个 agent 要你先登录"
   },
   "recover_e_auth_required": {
-    "en": "Sign in with one of the methods the detail below names, on the ACP agents page or in a terminal, then send again.",
-    "zh": "用下面详情里列出的某种方式登录（在 ACP agent 页或终端里），然后再发一次。"
+    "en": "Sign in with the agent's own program, using one of the methods the detail below names, then send again. This city does not start the sign-in.",
+    "zh": "用 agent 自己的程序、按下面详情里列出的某种方式登录，然后再发一次。城市不替你启动登录。"
   },
   "pair_title": {
     "en": "Pair this browser",
@@ -11146,10 +10806,6 @@
   "pair_pairing": {
     "en": "pairing…",
     "zh": "正在配对…"
-  },
-  "pair_opening": {
-    "en": "opening the city…",
-    "zh": "正在打开城市…"
   },
   "pair_open_used": {
     "en": "This link has been used. Enter the pairing code from the terminal instead.",
@@ -11182,10 +10838,6 @@
   "devices_none": {
     "en": "no browser is paired",
     "zh": "还没有配对过的浏览器"
-  },
-  "devices_label": {
-    "en": "name",
-    "zh": "名字"
   },
   "devices_paired_at": {
     "en": "paired",
@@ -11266,9 +10918,5 @@
   "close_done": {
     "en": "The city is closed. Run sprawling in a terminal to start it again.",
     "zh": "城市已关闭。在终端里运行 sprawling 即可再次启动城市。"
-  },
-  "close_elsewhere": {
-    "en": "the city is already being closed",
-    "zh": "城市已经在关闭了"
   }
 }
