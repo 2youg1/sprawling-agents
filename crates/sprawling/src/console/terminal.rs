@@ -33,8 +33,9 @@ pub(crate) use wire::Answering;
 pub struct Terminal {
     pub url: String,
     /// The key a person may be shown - only the one minted for a serve
-    /// beyond this machine - so `/web` can print the address a browser
-    /// on another machine opens. The pairing code a second browser on
+    /// beyond this machine. It is drawn on the quiet host's alternate
+    /// screen and nowhere else: never in an address, the scrollback or
+    /// a line console's output. The pairing code a second browser on
     /// this machine types is the door's (`Inside::door`), because each
     /// guess replaces it.
     pub token: Option<String>,
@@ -138,15 +139,6 @@ pub(crate) fn serving(
     )
 }
 
-/// The address `/web` prints: the listener's, carrying the key when a
-/// person may be shown one, so a browser on another machine opens it.
-pub(crate) fn web_url(terminal: &Terminal) -> String {
-    match &terminal.token {
-        None => terminal.url.clone(),
-        Some(token) => format!("{}/?token={token}", terminal.url.trim_end_matches('/')),
-    }
-}
-
 /// A console that has started: the writer whose end means the terminal
 /// is put back, when the terminal is the city's, and where a line meant
 /// for the person wherever they are goes, which the remote door's
@@ -212,7 +204,7 @@ pub(super) fn drive<R: BufRead>(terminal: &Terminal, inside: &Inside, input: &mu
         match session.carry(terminal, inside, &typed, say) {
             Next::Stay => {}
             Next::Web => {
-                say(format!("  {}", web_url(terminal)));
+                say(format!("  {}", terminal.url));
                 // Never fatal: the URL is on the screen either way. The
                 // browser is handed an open code through a file only this
                 // account reads, never a key on its command line.

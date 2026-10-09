@@ -299,12 +299,17 @@ impl Ui {
         self.drawn(written);
     }
 
-    /// The quiet host: the address, the pairing code, at most one
-    /// transient line, and nothing else.
+    /// The quiet host: the address, the pairing code with the key minted
+    /// for a serve beyond this machine beside it, at most one transient
+    /// line, and nothing else. The alternate screen is the one place the
+    /// minted key is drawn (§8-11).
     fn quiet(&mut self) {
         let mut lines = vec![self.terminal.url.clone()];
         let code = self.pairing.borrow_and_update().clone();
-        lines.push(format!("pairing code  {code}"));
+        lines.push(match &self.terminal.token {
+            Some(key) => format!("pairing code  {code}   key  {key}"),
+            None => format!("pairing code  {code}"),
+        });
         if let Some(transient) = &self.transient {
             lines.push(transient.trim().to_owned());
         }
