@@ -112,7 +112,7 @@ Free code signing provided by [SignPath.io](https://signpath.io), certificate by
 - **Reviewers** — a change proposed by anyone outside the project is reviewed in its pull request before it merges.
 - **Approvers** — [@2youg1](https://github.com/2youg1) approves every signing request before a binary is signed.
 
-Privacy policy: [Privacy](#privacy) in this file, and [SECURITY.md](SECURITY.md).
+Privacy policy: [Privacy](#privacy) in this file, and [SECURITY.md](SECURITY.md). The services a city reaches keep their own: the model providers you connect, and Exa, which the default web search sends search words to ([Exa privacy policy](https://exa.ai/privacy-policy)).
 
 ### A history you can replay
 

@@ -112,7 +112,7 @@ Agent之间可以互相找到对方、发消息、协调任务、等回复，不
 - **审查者（Reviewers）**——项目之外提出的改动在它的 PR 里审查通过后才合并。
 - **批准者（Approvers）**——每次签名请求都由 [@2youg1](https://github.com/2youg1) 批准后才会签名。
 
-隐私政策见本文件的[隐私](#隐私)一节，以及 [SECURITY.md](SECURITY.md)。
+隐私政策见本文件的[隐私](#隐私)一节，以及 [SECURITY.md](SECURITY.md)。城市访问的外部服务各有自己的隐私政策：你接上的模型服务商，以及默认网页搜索把搜索词发去的 Exa（[Exa 隐私政策](https://exa.ai/privacy-policy)）。
 
 ### 可重放的历史
 

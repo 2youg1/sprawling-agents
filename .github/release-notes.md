@@ -4,7 +4,7 @@
 
 **What this version is for / 这一版做什么** — in the author's words, below in Chinese: from this version the Windows binary carries a code signature, thanks to SignPath; any agent that speaks ACP can join a city; the model · provider · thinking picker is redesigned; the terminal becomes a minimal CLI, and `/web` leaves only the address and a pairing code on screen; the loopback port no longer lets in a caller without a credential. Performance measurement is still open.
 
-**Windows signing / Windows 签名** — The Windows binary of this release is signed through SignPath. 本版 Windows 二进制已通过 SignPath 签名。
+**Windows signing / Windows 签名** — The Windows binary of this release is signed through SignPath; see the [Code signing policy](https://github.com/2youg1/sprawling-agents#code-signing-policy). 本版 Windows 二进制已通过 SignPath 签名，见[代码签名政策（Code signing policy）](https://github.com/2youg1/sprawling-agents#code-signing-policy)。
 
 ---
 
