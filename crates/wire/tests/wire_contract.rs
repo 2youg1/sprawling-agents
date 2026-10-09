@@ -240,6 +240,7 @@ fn keys_of(face: BindFace) -> wire::Keys<'static> {
     wire::Keys {
         face: Box::leak(Box::new(face)),
         sessions: Box::leak(Box::default()),
+        now: kernel::TimeMs::new(0),
     }
 }
 

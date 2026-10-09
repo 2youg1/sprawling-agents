@@ -18,7 +18,11 @@ fn keys() -> Keys<'static> {
         key: B3Hash::digest(KEY.as_bytes()),
     }));
     let sessions: &'static Sessions = Box::leak(Box::default());
-    Keys { face, sessions }
+    Keys {
+        face,
+        sessions,
+        now: kernel::TimeMs::new(0),
+    }
 }
 
 #[test]

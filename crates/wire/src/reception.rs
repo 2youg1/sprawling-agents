@@ -30,13 +30,16 @@ mod admission;
 mod entry;
 pub(crate) mod inbound;
 mod pairing;
+mod sessions;
 
-pub use admission::{Admission, Door, Keys, decide_admission, offered_pairing};
+pub use admission::{
+    Admission, Door, Keys, Standing, decide_admission, decide_standing, offered_pairing,
+};
 pub use entry::{Arrival, Entry, ListenerOrigins, PageHeaders, Presented, decide_entry};
 pub use pairing::{
-    BrowserDoor, DeviceKey, Guess, LABEL_MAX, OPEN_CODE_LIFETIME_MS, PairedBrowser, Sessions,
-    decode_hex,
+    BrowserDoor, DeviceKey, Guess, LABEL_MAX, OPEN_CODE_LIFETIME_MS, PairedBrowser, decode_hex,
 };
+pub use sessions::Sessions;
 
 use std::net::SocketAddr;
 

@@ -10,6 +10,11 @@
 //! A refusal made minutes later has no way home, which is why a command
 //! carries the [`Reply`] address of whoever sent it.
 //!
+//! A welcomed session holds a [`Seat`] at the door: the session token its
+//! hello showed stays good while the socket lives, and the session ends
+//! once the door has ended that token (`crates/wire/spec/Server.lean`
+//! §8-93).
+//!
 //! The event arm writes in frames (`crates/wire/spec/Server/Socket.lean`
 //! §8-47h): every record already queued when it wakes becomes its own
 //! `Event` frame, and the socket is flushed once. The model there proves
@@ -28,12 +33,15 @@ use tokio::sync::broadcast;
 use tokio::sync::broadcast::error::TryRecvError;
 
 use super::committed::Committed;
-use crate::frames::{Answered, Ask, AskOutcome, Lagged, Sample, ServerFrame};
+use crate::frames::{Answered, Ask, AskOutcome, ClientFrame, Lagged, Sample, ServerFrame};
 use crate::reception::inbound::Inbound;
-use crate::reception::{Keys, SessionState, SessionStep, Stream, WelcomeFacts, decide_frame};
+use crate::reception::{
+    Keys, SessionState, SessionStep, Standing, Stream, WelcomeFacts, decide_frame, decide_standing,
+};
 use crate::reply::{Delivered, Reply};
 
 use super::config::{Answering, ShellState};
+use super::door::Seat;
 
 pub(crate) async fn upgrade(
     State(state): State<Arc<ShellState>>,
@@ -60,25 +68,24 @@ async fn session(mut socket: WebSocket, state: Arc<ShellState>) {
     // What this session has delivered and what it still owes.
     let mut stream = Stream::opening();
     let mut watching: Option<Watching> = None;
+    let mut seat: Option<Seat> = None;
     loop {
         tokio::select! {
             incoming = socket.recv() => {
                 let Some(Ok(message)) = incoming else { return };
                 let Message::Text(text) = message else { continue };
-                // A frame this build cannot read and a frame it can are
-                // judged through the same branch below, so a refusal
-                // reaches the peer by one path whichever produced it.
-                let step = match inbound.read(&text) {
-                    Ok(frame) => {
-                        let standing = WelcomeFacts { city: state.city.as_ref(), head: state.head.read(), epoch: state.epoch };
-                        state.door.with_sessions(|sessions| {
-                            decide_frame(phase, frame, &Keys { face: &state.face, sessions }, standing)
-                        })
-                    }
-                    Err(unreadable) => unreadable,
-                };
+                let (step, presented) = judged(&state, phase, &mut inbound, &text);
                 match step {
                     SessionStep::Welcome(welcome) => {
+                        match state.door.seat(presented) {
+                            Ok(seated) => seat = Some(seated),
+                            Err(error) => {
+                                // A refusal before the close is all that is
+                                // left to say; a failed send changes nothing.
+                                let _unsent: Result<(), ()> = send(&mut socket, &ServerFrame::Refusal(Box::new(error))).await;
+                                return;
+                            }
+                        }
                         phase = SessionState::Live;
                         if send(&mut socket, &ServerFrame::Welcome(*welcome)).await.is_err() {
                             return;
@@ -123,6 +130,21 @@ async fn session(mut socket: WebSocket, state: Arc<ShellState>) {
                         }
                     }
                 }
+            }
+            // The door may have ended the token this session was greeted
+            // with: a session that no longer holds its credential ends.
+            () = seated(&mut seat) => {
+                let presented = seat.as_ref().and_then(Seat::presented);
+                let standing = state.door.pairing(&state.face, presented).map(decide_standing);
+                let error = match standing {
+                    Ok(Standing::Stands) => continue,
+                    Ok(Standing::Ends(error)) => error,
+                    Err(error) => Box::new(error),
+                };
+                // The session ends either way; the refusal says why when
+                // it still arrives.
+                let _unsent: Result<(), ()> = send(&mut socket, &ServerFrame::Refusal(error)).await;
+                return;
             }
             // A refusal the worker made after this socket had already
             // answered. It reaches the peer that caused it and nobody
@@ -215,6 +237,55 @@ async fn session(mut socket: WebSocket, state: Arc<ShellState>) {
                 }
             }
         }
+    }
+}
+
+/// What one text frame means in `phase`, and the credential it showed
+/// when it is a hello. A frame this build cannot read and a frame it can
+/// are judged through the same step, so a refusal reaches the peer by one
+/// path whichever produced it.
+fn judged(
+    state: &ShellState,
+    phase: SessionState,
+    inbound: &mut Inbound,
+    text: &str,
+) -> (SessionStep, Option<String>) {
+    let frame = match inbound.read(text) {
+        Ok(frame) => frame,
+        Err(unreadable) => return (unreadable, None),
+    };
+    let presented = match &frame {
+        ClientFrame::Hello(hello) => hello.token.clone(),
+        ClientFrame::Command(_) | ClientFrame::Ask(_) | ClientFrame::Monitor(_) => None,
+    };
+    let standing = WelcomeFacts {
+        city: state.city.as_ref(),
+        head: state.head.read(),
+        epoch: state.epoch,
+    };
+    let step = state
+        .door
+        .with_sessions(|sessions, now| {
+            let keys = Keys {
+                face: &state.face,
+                sessions,
+                now,
+            };
+            decide_frame(phase, frame, &keys, standing)
+        })
+        .unwrap_or_else(|error| SessionStep::Refuse {
+            error: Box::new(error),
+            close: true,
+        });
+    (step, presented)
+}
+
+/// Resolves when the door may have ended this session's token; never for
+/// a session not yet welcomed.
+async fn seated(seat: &mut Option<Seat>) {
+    match seat {
+        Some(seat) => seat.ended().await,
+        None => std::future::pending().await,
     }
 }
 

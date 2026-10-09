@@ -27,7 +27,7 @@ use crate::auth::Pairing;
 use crate::command::{Command, WireCommand};
 use crate::frames::Query;
 use crate::reception::{
-    Admission, Arrival, BindFace, Door, Keys, ListenerOrigins, PageHeaders, decide_admission,
+    Admission, Arrival, BindFace, Door, ListenerOrigins, PageHeaders, decide_admission,
     offered_pairing,
 };
 use crate::reply::{AcpProgress, Reply};
@@ -377,22 +377,12 @@ async fn admit_request(
         .headers()
         .get(header::AUTHORIZATION)
         .and_then(|value| value.to_str().ok());
-    let pairing = state.keys(offered_pairing(offered));
+    let pairing = match state.door.pairing(&state.face, offered_pairing(offered)) {
+        Ok(pairing) => pairing,
+        Err(err) => return (StatusCode::INTERNAL_SERVER_ERROR, refusal_text(&err)).into_response(),
+    };
     match decide_admission(door, pairing) {
         Admission::Admit(Pairing::Held | Pairing::Absent) => next.run(request).await,
         Admission::Refuse(err) => (StatusCode::FORBIDDEN, refusal_text(&err)).into_response(),
-    }
-}
-
-impl ShellState {
-    /// Whether `offered` is this city's key or a live session token.
-    pub(crate) fn keys(&self, offered: Option<&str>) -> Pairing {
-        self.door.with_sessions(|sessions| {
-            Keys {
-                face: &self.face,
-                sessions,
-            }
-            .pairing(offered)
-        })
     }
 }

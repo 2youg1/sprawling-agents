@@ -5,25 +5,28 @@
 
 //! Whether one HTTP request may reach the work behind a door.
 //!
-//! The socket's peer is judged once, at the hello frame, and stays
-//! judged for the life of the session; a POST has no session, so every
-//! request is judged on its own. That is the whole difference between
-//! this file and [`super::decide_handshake`], and it is why both of
-//! them live in `reception` rather than in the shell that calls them.
+//! The socket's peer is judged at the hello frame, and judged again
+//! whenever the door ends a session token, so a forgotten browser loses
+//! the sockets it already opened (`crates/wire/spec/Server.lean` §8-93);
+//! a POST has no session, so every request is judged on its own. Both
+//! judgements are [`Keys::pairing`], and they live in `reception` rather
+//! than in the shell that calls them.
 
-use kernel::{AxCode, AxError};
+use kernel::{AxCode, AxError, TimeMs};
 
 use super::BindFace;
-use super::pairing::Sessions;
+use super::sessions::Sessions;
 use crate::auth::{self, Pairing};
 
 /// Every credential this city accepts at this moment: the face's key,
-/// and the browsers' live session tokens. One value, because the two are
-/// one question (`crates/wire/spec/Reception/Admission.lean` §8-40).
+/// and the browsers' session tokens that admit at `now`. One value,
+/// because the two are one question
+/// (`crates/wire/spec/Reception/Admission.lean` §8-40).
 #[derive(Debug, Clone, Copy)]
 pub struct Keys<'a> {
     pub face: &'a BindFace,
     pub sessions: &'a Sessions,
+    pub now: TimeMs,
 }
 
 impl Keys<'_> {
@@ -33,11 +36,40 @@ impl Keys<'_> {
         let Some(offered) = offered else {
             return Pairing::Absent;
         };
-        if auth::verify(Some(offered), self.face.key()) || self.sessions.holds(offered) {
+        if auth::verify(Some(offered), self.face.key()) || self.sessions.holds(offered, self.now) {
             Pairing::Held
         } else {
             Pairing::Absent
         }
+    }
+}
+
+/// What a live socket does once the door may have ended a session token:
+/// it goes on while the credential its hello showed still admits, and
+/// ends with the refusal once it does not.
+#[derive(Debug)]
+pub enum Standing {
+    Stands,
+    Ends(Box<AxError>),
+}
+
+/// Judges a live socket again, from what [`Keys::pairing`] says now of
+/// the credential its hello showed. The native key always stands; a
+/// session token stands until its device is forgotten.
+#[must_use]
+pub fn decide_standing(pairing: Pairing) -> Standing {
+    match pairing {
+        Pairing::Held => Standing::Stands,
+        Pairing::Absent => Standing::Ends(Box::new(
+            AxError::failure(
+                AxCode::GateDenied,
+                "keep a browser session open",
+                "this browser was forgotten, or its session token has ended",
+            )
+            .with_recovery(
+                "pair this browser again with the pairing code the terminal shows; a browser                  the city still knows reconnects by itself",
+            ),
+        )),
     }
 }
 
@@ -145,6 +177,7 @@ mod tests {
         let keys = Keys {
             face: &face,
             sessions: &sessions,
+            now: kernel::TimeMs::new(0),
         };
         assert_eq!(keys.pairing(Some("native-key")), Pairing::Held);
         assert_eq!(keys.pairing(Some("guess")), Pairing::Absent);

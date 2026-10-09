@@ -7,7 +7,7 @@
 //! (`crates/wire/spec/Reception/Pairing.lean` §8-95): the pairing code the
 //! terminal shows, one guess at a time; the open codes `/web` hands over;
 //! the nonces a session is signed over; the paired device keys; and the
-//! live session tokens.
+//! live session tokens, whose table and lifetime are `reception::sessions`'s.
 //!
 //! Pure: every transition is handed its time and its entropy, so the
 //! rules can be driven step by step. The lock, the clock, the random
@@ -18,6 +18,7 @@ use std::collections::BTreeMap;
 
 use kernel::{B3Hash, TimeMs};
 
+use super::sessions::Sessions;
 use crate::answer::{DeviceId, DeviceLine, DevicesAnswer};
 use crate::auth;
 
@@ -32,8 +33,6 @@ pub const OPEN_CODES_MAX: usize = 4;
 pub const NONCE_LIFETIME_MS: u64 = 60_000;
 /// Challenges outstanding at once; the oldest goes first.
 pub const NONCES_MAX: usize = 16;
-/// Live session tokens at once; the oldest goes first.
-pub const SESSIONS_MAX: usize = 64;
 /// The longest name a page may give itself.
 pub const LABEL_MAX: usize = 64;
 /// The pairing code is two groups of four symbols: about 39 bits, read off
@@ -109,18 +108,6 @@ impl PairedBrowser {
     }
 }
 
-/// The live session tokens, by digest, each belonging to one device.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct Sessions(BTreeMap<B3Hash, (DeviceId, u64)>);
-
-impl Sessions {
-    /// Whether `presented` is a live session token.
-    #[must_use]
-    pub fn holds(&self, presented: &str) -> bool {
-        self.0.contains_key(&B3Hash::digest(presented.as_bytes()))
-    }
-}
-
 /// The door's whole state.
 #[derive(Debug, Clone)]
 pub struct BrowserDoor {
@@ -130,7 +117,6 @@ pub struct BrowserDoor {
     nonces: BTreeMap<String, TimeMs>,
     browsers: BTreeMap<DeviceId, PairedBrowser>,
     sessions: Sessions,
-    opened: u64,
 }
 
 impl BrowserDoor {
@@ -147,7 +133,6 @@ impl BrowserDoor {
                 .map(|browser| (browser.id.clone(), browser))
                 .collect(),
             sessions: Sessions::default(),
-            opened: 0,
         }
     }
 
@@ -231,20 +216,8 @@ impl BrowserDoor {
     ) -> Option<String> {
         let browser = self.browsers.get_mut(device)?;
         browser.last_seen = Some(now);
-        let sessions = &mut self.sessions.0;
-        while sessions.len() >= SESSIONS_MAX {
-            let oldest = sessions
-                .iter()
-                .min_by_key(|(_, (_, opened))| *opened)
-                .map(|(digest, _)| *digest)?;
-            sessions.remove(&oldest);
-        }
-        self.opened = self.opened.saturating_add(1);
         let token = encode_hex(&entropy);
-        sessions.insert(
-            B3Hash::digest(token.as_bytes()),
-            (device.clone(), self.opened),
-        );
+        self.sessions.mint(device.clone(), &token, now);
         Some(token)
     }
 
@@ -254,10 +227,15 @@ impl BrowserDoor {
         &self.sessions
     }
 
+    /// The live session tokens, for a socket to take or leave its seat.
+    pub fn sessions_mut(&mut self) -> &mut Sessions {
+        &mut self.sessions
+    }
+
     /// Forgets a browser and ends its sessions; false when it was not
     /// paired.
     pub fn forget(&mut self, device: &DeviceId) -> bool {
-        self.sessions.0.retain(|_, (owner, _)| owner != device);
+        self.sessions.end_device(device);
         self.browsers.remove(device).is_some()
     }
 
@@ -425,20 +403,6 @@ mod tests {
             door.redeem_open_code(&late, TimeMs::new(OPEN_CODE_LIFETIME_MS))
                 .is_none()
         );
-    }
-
-    #[test]
-    fn a_forgotten_browser_loses_its_sessions() {
-        let mut door = BrowserDoor::new(Vec::new(), [1; 32]);
-        let device = door.pair(PairedBrowser::new(
-            DeviceKey([7; 32]),
-            "laptop".to_owned(),
-            TimeMs::new(0),
-        ));
-        let token = door.open_session(&device, [9; 32], TimeMs::new(1)).unwrap();
-        assert!(door.sessions().holds(&token));
-        assert!(door.forget(&device));
-        assert!(!door.sessions().holds(&token));
     }
 
     #[test]

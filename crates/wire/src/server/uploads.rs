@@ -43,7 +43,13 @@ pub(crate) async fn accept_acp(State(state): State<Arc<ShellState>>, body: Bytes
     // only in where the token is written (a body key, because that is
     // what an editor sends) and in admitting an unpaired caller so the
     // admission can word what it may learn.
-    let offered = state.keys(request.get("token").and_then(serde_json::Value::as_str));
+    let offered = match state.door.pairing(
+        &state.face,
+        request.get("token").and_then(serde_json::Value::as_str),
+    ) {
+        Ok(offered) => offered,
+        Err(err) => return (StatusCode::INTERNAL_SERVER_ERROR, refusal_text(&err)).into_response(),
+    };
     let pairing = match decide_admission(Door::Acp, offered) {
         Admission::Admit(pairing) => pairing,
         Admission::Refuse(err) => {

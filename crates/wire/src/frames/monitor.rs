@@ -137,6 +137,7 @@ mod tests {
         let keys = Keys {
             face: &face,
             sessions: &sessions,
+            now: kernel::TimeMs::new(0),
         };
         let step = decide_frame(SessionState::Live, frame, &keys, WelcomeFacts::default());
         let SessionStep::Beat(beat) = step else {
