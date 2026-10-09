@@ -26,6 +26,7 @@ fn constants() -> Constants {
         hash: "ab12".to_owned(),
         city_run: "00000000-0000-0000-0000-000000000000".to_owned(),
         body_px_min: 12,
+        default_effort: "high",
         slash: Vec::new(),
     }
 }

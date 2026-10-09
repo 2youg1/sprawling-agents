@@ -573,6 +573,8 @@ shebang 和现有运行时选择，不要求二者同时安装。被否：只在
 
 客户端从 `wire.ts` 导入 `CITY_RUN`（`client/src/core/belief.ts`），不自写这个常量。
 
+同一条理由也管默认的思考档：`export const DEFAULT_EFFORT`，取自 `kernel::consts_policy::DEFAULT_EFFORT` 的线上拼法（`Effort::as_str`）。选择器标出一次请求会用的档（`client/src/views/talk/picker.ts` 的 `usedLevel`），一份自写的副本在内核改了默认档之后会标出城已经不发的那一档。它是 `Constants` 的一个字段，与其余几样同处文件开头。
+
 **本节属门禁机具，与产品代码分开提交。**
 -/
 
