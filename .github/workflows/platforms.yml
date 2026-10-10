@@ -99,6 +99,9 @@ jobs:
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
         with:
           workspaces: . -> target
+      # The Zig the console's renderer is built with on every platform
+      # (`crates/console_ffi/Spec.lean` D1).
+      - uses: ./.github/actions/zig
       # What the npm and render gates judge. This job repeats the commands
       # ci.yml runs, and repeated its omission as well: both gates refuse
       # an absent tree rather than skipping it, so without this step the
@@ -145,6 +148,9 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      # The Zig the console's renderer is built with on every platform
+      # (`crates/console_ffi/Spec.lean` D1).
+      - uses: ./.github/actions/zig
       - name: the release rust-version names
         id: floor
         shell: bash

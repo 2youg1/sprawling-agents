@@ -225,6 +225,11 @@ jobs:
       - name: the Zig leaf's own tests
         if: ${{ !cancelled() }}
         run: just check-desktop
+      # The console renderer's own Zig tests, which no cargo command runs
+      # either (`crates/console_ffi/Spec.lean`).
+      - name: the console leaf's own tests
+        if: ${{ !cancelled() }}
+        run: just check-console
       - uses: ./.github/actions/client-artifacts
         if: ${{ !cancelled() }}
       # `--no-deps` because the action above has just run `build-web`,
@@ -428,6 +433,9 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: ./.github/actions/toolchain
+      # The Zig the console's renderer is built with on every platform
+      # (`crates/console_ffi/Spec.lean` D1).
+      - uses: ./.github/actions/zig
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
         with:
           shared-key: core
