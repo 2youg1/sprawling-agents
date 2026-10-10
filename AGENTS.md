@@ -220,7 +220,7 @@ A working record is noise to a contributor and to a model, and signal to an atta
 
 The client is exempt from steps 2 and 3, as *The view layer* says.
 
-Unless the change is mechanical, keep the diff under 800 changed lines, and under 500 when the logic is not obvious. When it is larger, land the smallest coherent stage that holds on its own and name the remaining stages, splitting along the actual diff and its call sites.
+Unless the change is mechanical, keep the lines a diff adds under 800, and under 500 when the logic is not obvious. Deleted lines do not count, because a reviewer reads what arrives, and a clean-up or a cut that removes more than it adds should never be split for its size. When the added lines are more, land the smallest coherent stage that holds on its own and name the remaining stages, splitting along the actual diff and its call sites.
 
 ## Verification
 
