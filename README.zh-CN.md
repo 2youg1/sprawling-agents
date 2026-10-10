@@ -52,7 +52,7 @@ Bun（需要Bun）：
 bun install --global sprawling@latest
 ```
 
-crates.io（需要发布包要求的Rust编译器和对应平台的原生构建工具；装了cargo-binstall的话，可以用`cargo binstall sprawling`直接下载发行归档）：
+crates.io（需要发布包要求的Rust编译器、对应平台的原生构建工具，以及构建控制台渲染器的Zig 0.17.0；装了cargo-binstall的话，可以用`cargo binstall sprawling`直接下载发行归档）：
 
 ```sh
 cargo install sprawling --locked

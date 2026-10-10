@@ -36,6 +36,12 @@ agent_protocols = { workspace = true }
 # port (crates/remote_access/Spec.lean §8-10).
 axum = { workspace = true, features = ["ws"] }
 crossterm = { workspace = true }
+# The console's renderer: the Zig leaf that draws each frame of the CLI
+# and the quiet host (`crates/console_ffi/Spec.lean`).
+console_ffi = { workspace = true }
+# The time of day the console's gutter writes, in this machine's zone
+# (`crates/sprawling/spec/Console.lean` §8-11).
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
 # The one line a program status report carries is base64 of UTF-8, as
 # the protocol requires (`crates/sprawling/spec/Console/ProgramStatus.lean`).
 base64 = { workspace = true }

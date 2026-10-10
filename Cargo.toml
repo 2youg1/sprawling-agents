@@ -14,6 +14,7 @@ members = [
     "crates/browser",
     "crates/desktop",
     "crates/desktop/ffi",
+    "crates/console_ffi",
     "crates/agent_protocols",
     "crates/accounting",
     "crates/sprawling",
@@ -34,6 +35,7 @@ default-members = [
     "crates/browser",
     "crates/desktop",
     "crates/desktop/ffi",
+    "crates/console_ffi",
     "crates/agent_protocols",
     "crates/accounting",
     "crates/sprawling",
@@ -71,9 +73,11 @@ thiserror = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 postcard = { version = "1.1", default-features = false, features = ["alloc"] }
-# The person's face of `sprawling view` reads keys and draws frames in a raw
-# terminal; no colour, clipboard or paste features, so it links the least.
-crossterm = { version = "0.29", default-features = false, features = ["events", "windows"] }
+# The person's face of `sprawling view` and the console read keys and draw
+# frames in a raw terminal; no colour or clipboard features, so it links
+# the least. Paste is on because the console takes a paste whole where the
+# terminal hands it over as one (Unix), instead of sending each line.
+crossterm = { version = "0.29", default-features = false, features = ["events", "windows", "bracketed-paste"] }
 toml = "1.1"
 # A configured MCP or search address is read by the WHATWG URL rules, so a
 # credential hidden in userinfo or in a percent-encoded query parameter is
@@ -88,6 +92,9 @@ uuid = { version = "1", features = ["serde"] }
 # `std` (the regex string strategies need it) and drops fork, timeout
 # and bit-set, which no test here uses; insta drops its coloured diff.
 proptest = { version = "1", default-features = false, features = ["std"] }
+# The terminal the console's frames are read back through in its tests,
+# so a test judges the screen a person sees rather than the bytes.
+vt100 = { version = "0.16", default-features = false }
 insta = { version = "1", default-features = false }
 tempfile = "3"
 # S2: compile-fail proof that "unrepresentable" holds (V0 trybuild cases).
@@ -279,6 +286,7 @@ accounting = { package = "sprawling-accounting", path = "crates/accounting", ver
 sprawling = { path = "crates/sprawling", version = "=0.0.11" }
 desktop = { package = "sprawling-desktop", path = "crates/desktop", version = "=0.0.11" }
 desktop_ffi = { package = "sprawling-desktop-ffi", path = "crates/desktop/ffi", version = "=0.0.11" }
+console_ffi = { package = "sprawling-console-ffi", path = "crates/console_ffi", version = "=0.0.11" }
 
 # C3 hardening: panicking constructs and silent numeric
 # corruption are compile-time errors everywhere; tests relax locally.

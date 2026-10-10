@@ -13,6 +13,11 @@
 //! Keys arrive over the same channel from a reader thread. The face is
 //! the lifecycle's, read from its `watch`; this thread only draws it.
 //!
+//! The CLI is a transcript in the terminal's own scrollback and a live
+//! region under it - what waits for the person, who is working, the
+//! calls under way, and the composer - drawn by the console's renderer
+//! (`console_ffi`) one frame at a time, and only when something changed.
+//!
 //! The point a reader most often gets wrong: a typed Ctrl+C is a key
 //! here, not a signal. The city answers it once per session with a hint
 //! and otherwise leaves it to the terminal, which copies a selection.
@@ -22,14 +27,17 @@ use std::sync::Arc;
 use std::sync::mpsc::{Receiver, RecvTimeoutError, SyncSender};
 use std::time::Duration;
 
-use crossterm::event::{KeyEvent, KeyEventKind};
+use console_ffi::scene::Entry;
+use crossterm::event::KeyEvent;
 
 use super::cli::{Say, Session};
 use super::editor::Editor;
 use super::lifecycle::{Event, Face, Handoff, INTERRUPT_GRACE, Sinks};
+use super::local_time;
 use super::program_status::{self, Held, Reporting};
-use super::screen::{Screen, Written};
+use super::screen::{QuietLines, Screen, Written};
 use super::terminal::{Inside, Terminal};
+use menu::Menu;
 use wire::CloseMode;
 
 /// How many lines may wait for this thread before the next is dropped.
@@ -38,6 +46,14 @@ pub(crate) const UI_DEPTH: usize = 256;
 /// How often the thread looks at the lifecycle's face when nothing
 /// arrives on its channel.
 const FACE_LOOK: Duration = Duration::from_millis(100);
+
+/// How many transcript lines the quiet host keeps for the CLI to show
+/// when the person comes back; older ones are in the WebUI.
+const HELD_BACK: usize = 512;
+
+/// How many calls under way the live region lists; a wave wider than
+/// this shows its newest.
+pub(super) const CALLS_SHOWN: usize = 3;
 
 /// What the once-per-session Ctrl+C hint says.
 pub(super) const CTRL_C_HINT: &str = "  复制请先选中文字；关闭城市用 /quit";
@@ -50,6 +66,8 @@ pub(crate) enum Show {
     /// CLI, the transient third line in the quiet host.
     Notice(String),
     Key(KeyEvent),
+    /// Text the terminal handed over as one paste.
+    Paste(String),
     Record(wire::Committed),
     Resized,
     /// Reading the terminal failed: it is gone.
@@ -72,52 +90,14 @@ pub(crate) fn start(
 ) -> (std::thread::JoinHandle<()>, Say) {
     let (to, from) = std::sync::mpsc::sync_channel(UI_DEPTH);
     let notice = sayer(&to, Show::Notice);
-    read_keys(to.clone());
-    read_records(to.clone(), watching);
+    input::read_keys(to.clone());
+    input::read_records(to.clone(), watching);
     let say = sayer(&to, Show::Line);
     let writer = std::thread::spawn(move || {
         let mut ui = Ui::new(terminal, inside, say);
         ui.run(&from, face);
     });
     (writer, notice)
-}
-
-fn read_keys(to: SyncSender<Show>) {
-    std::thread::spawn(move || {
-        loop {
-            let show = match crossterm::event::read() {
-                Ok(crossterm::event::Event::Key(key)) if key.kind != KeyEventKind::Release => {
-                    Show::Key(key)
-                }
-                Ok(crossterm::event::Event::Resize(..)) => Show::Resized,
-                Ok(_) => continue,
-                Err(_) => Show::Lost,
-            };
-            let lost = matches!(show, Show::Lost);
-            if to.send(show).is_err() || lost {
-                return;
-            }
-        }
-    });
-}
-
-fn read_records(
-    to: SyncSender<Show>,
-    mut watching: tokio::sync::broadcast::Receiver<wire::Committed>,
-) {
-    use tokio::sync::broadcast::error::RecvError;
-    std::thread::spawn(move || {
-        loop {
-            let show = match watching.blocking_recv() {
-                Ok(committed) => Show::Record(committed),
-                Err(RecvError::Lagged(missed)) => Show::Line(format!(
-                    "  {missed} records were not shown here; the WebUI has them"
-                )),
-                Err(RecvError::Closed) => return,
-            };
-            drop(to.try_send(show));
-        }
-    });
 }
 
 /// The writer's state: the terminal, the line being typed, and the face
@@ -130,11 +110,11 @@ struct Ui {
     editor: Editor,
     shown: Face,
     screen: Screen,
-    /// `/quit` with runs going, waiting for Enter, n or Esc.
-    asking: bool,
+    /// `/quit` with runs going, waiting for Enter, n or Esc: how many.
+    asking: Option<u64>,
     hinted: bool,
-    /// What Tab offered, while its menu is showing.
-    menu: bool,
+    /// The slash menu, while Tab has it open.
+    menu: Option<Menu>,
     transient: Option<String>,
     /// The door's pairing code, which each guess replaces, so the quiet
     /// host draws the one in force.
@@ -143,6 +123,10 @@ struct Ui {
     /// terminal holds (`program_status`).
     reporting: Reporting,
     held: Held,
+    /// What plain lines ask, as the composer's settings row writes it.
+    offer: String,
+    /// Transcript lines that arrived while the quiet host showed.
+    held_back: Vec<Entry>,
 }
 
 impl Ui {
@@ -155,6 +139,10 @@ impl Ui {
             }
         };
         let pairing = inside.door.pairing_code();
+        let offer = session
+            .as_ref()
+            .map(|session| session.offer(&inside))
+            .unwrap_or_default();
         Ui {
             terminal,
             inside,
@@ -163,20 +151,22 @@ impl Ui {
             editor: Editor::default(),
             shown: Face::Opening,
             screen: Screen::default(),
-            asking: false,
+            asking: None,
             hinted: false,
-            menu: false,
+            menu: None,
             transient: None,
             pairing,
             reporting: Reporting::from_environment(),
             held: Held::OPENING,
+            offer,
+            held_back: Vec::new(),
         }
     }
 
     fn run(&mut self, from: &Receiver<Show>, mut face: tokio::sync::watch::Receiver<Face>) {
         let taken = self.screen.take();
         self.drawn(taken);
-        self.header();
+        self.print(vec![self.banner()]);
         loop {
             let now = *face.borrow_and_update();
             if now != self.shown {
@@ -196,17 +186,18 @@ impl Ui {
         }
     }
 
-    fn header(&mut self) {
-        let room = self
-            .session
-            .as_ref()
-            .map_or(kernel::consts_policy::HALL_MAYOR, |s| s.room.as_str())
-            .to_owned();
-        let line = format!(
-            "sprawling  {}  {room}  {}   /web opens the page",
-            self.terminal.city, self.terminal.bind
-        );
-        self.line(&line);
+    /// The first line: the city, and where its page is served.
+    fn banner(&self) -> Entry {
+        let url = &self.terminal.url;
+        let address = url
+            .trim_start_matches("http://")
+            .trim_start_matches("https://")
+            .trim_end_matches('/');
+        Entry::Banner {
+            city: self.terminal.city.clone(),
+            address: address.to_owned(),
+            url: url.clone(),
+        }
     }
 
     /// Draws the face the lifecycle moved to.
@@ -221,7 +212,8 @@ impl Ui {
                 self.transient = None;
                 let left = self.screen.leave_quiet();
                 self.drawn(left);
-                self.draw_input();
+                let held = std::mem::take(&mut self.held_back);
+                self.redraw(&held);
                 self.recount();
             }
             Face::Stopping {
@@ -262,22 +254,25 @@ impl Ui {
             Show::Line(line) => self.line(&line),
             Show::Notice(line) => self.notice(line),
             Show::Key(key) => self.key(key),
+            Show::Paste(pasted) => self.paste(&pasted),
             Show::Record(committed) => {
                 self.heard(committed.record());
-                let lines = match self.session.as_mut() {
+                let entries = match self.session.as_mut() {
                     Some(session) => {
                         let room = session.room.clone();
-                        session.seen.read(committed.record(), &room)
+                        session
+                            .seen
+                            .read(committed.record(), &room, local_time::local)
                     }
                     None => Vec::new(),
                 };
-                for line in lines {
-                    self.line(&line);
-                }
+                self.print(entries);
             }
             Show::Resized => {
                 if self.shown == Face::QuietHost {
                     self.quiet();
+                } else {
+                    self.redraw(&[]);
                 }
             }
             Show::Lost => {
@@ -298,17 +293,53 @@ impl Ui {
         }
     }
 
-    /// One line above the prompt, the prompt drawn again below it.
+    /// One line from the console itself, in the transcript.
     fn line(&mut self, line: &str) {
+        self.print(vec![live::note(line)]);
+    }
+
+    /// Transcript lines: drawn into the scrollback, or kept for the CLI
+    /// while the quiet host shows.
+    fn print(&mut self, entries: Vec<Entry>) {
         if self.screen.is_quiet() {
+            self.held_back.extend(entries);
+            let over = self.held_back.len().saturating_sub(HELD_BACK);
+            self.held_back.drain(..over);
             return;
         }
-        let editor = match self.shown {
-            Face::QuietHost => None,
-            Face::Cli | Face::Stopping { .. } => Some(&self.editor),
-            Face::Opening | Face::Headless | Face::Gone(_) => None,
+        self.redraw(&entries);
+    }
+
+    /// One frame: `entries` into the scrollback, the live region drawn
+    /// again under them.
+    fn redraw(&mut self, entries: &[Entry]) {
+        let typed = self.editor.text();
+        let placeholder = live::placeholder(self.session.as_ref());
+        let Ui {
+            screen,
+            session,
+            editor,
+            menu,
+            asking,
+            offer,
+            shown,
+            ..
+        } = self;
+        let live = match shown {
+            Face::Cli | Face::Stopping { .. } => Some(live::live(
+                session.as_ref(),
+                live::Composing {
+                    typed: &typed,
+                    cursor: editor.cursor(),
+                    placeholder: &placeholder,
+                    offer,
+                },
+                menu.as_ref(),
+                *asking,
+            )),
+            Face::QuietHost | Face::Opening | Face::Headless | Face::Gone(_) => None,
         };
-        let written = self.screen.above(line, editor);
+        let written = screen.frame(entries, live, super::screen::size().0);
         self.drawn(written);
     }
 
@@ -317,26 +348,14 @@ impl Ui {
     /// line, and nothing else. The alternate screen is the one place the
     /// minted key is drawn (§8-11).
     fn quiet(&mut self) {
-        let mut lines = vec![self.terminal.url.clone()];
         let code = self.pairing.borrow_and_update().clone();
-        lines.push(match &self.terminal.token {
-            Some(key) => format!("pairing code  {code}   key  {key}"),
-            None => format!("pairing code  {code}"),
+        let transient = self.transient.as_deref().map(str::trim);
+        let written = self.screen.quiet(&QuietLines {
+            url: &self.terminal.url,
+            code: &code,
+            key: self.terminal.token.as_deref(),
+            transient,
         });
-        if let Some(transient) = &self.transient {
-            lines.push(transient.trim().to_owned());
-        }
-        let written = self.screen.quiet(&lines);
-        self.drawn(written);
-    }
-
-    fn erase_input(&mut self) {
-        let written = self.screen.erase_input();
-        self.drawn(written);
-    }
-
-    fn draw_input(&mut self) {
-        let written = self.screen.draw_input(&self.editor);
         self.drawn(written);
     }
 
@@ -365,5 +384,8 @@ pub(crate) fn lines_to_stdout() -> Say {
     Arc::new(move |line: String| drop(to.try_send(line)))
 }
 
+mod input;
 mod keys;
+mod live;
+mod menu;
 mod reporting;

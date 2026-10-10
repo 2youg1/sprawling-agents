@@ -135,7 +135,7 @@ shelves = ["~/.claude/skills"]
 |---|---|---|
 | npm | `npm install --global sprawling@latest` | Node.js 与 npm；下载预编译二进制。 |
 | Bun | `bun install --global sprawling@latest` | Bun；下载预编译二进制。用 `bun pm bin --global` 找到全局 bin 目录，将它加入 PATH。 |
-| crates.io | `cargo install sprawling --locked` | 发布包支持的 Rust 和平台原生构建工具；Windows 上还要 PATH 里有 Zig 0.17.0，它构建 `sprawling-desktop-ffi` 的桌面叶子，版本不对会被拒绝。在本地编译，包内包含构建好的浏览器客户端。 |
+| crates.io | `cargo install sprawling --locked` | 发布包支持的 Rust、平台原生构建工具，以及 PATH 里的 Zig 0.17.0：它在每个平台上构建 `sprawling-console-ffi` 里的控制台渲染器，在 Windows 上还构建 `sprawling-desktop-ffi` 的桌面叶子，版本不对会被拒绝。在本地编译，包内包含构建好的浏览器客户端。 |
 | cargo-binstall | `cargo binstall sprawling` | [cargo-binstall](https://github.com/cargo-bins/cargo-binstall)；按已发布 crate 的元数据下载发行归档。 |
 | 手动归档 | 在[发行列表](https://github.com/2youg1/sprawling-agents/releases)选择平台 | Windows x86-64、Apple 芯片的 macOS 或 Linux x86-64；解开归档并运行其中的二进制。 |
 
@@ -270,11 +270,20 @@ sprawling up ./cities/first
 
 目录里还没有城市时，这一条先把城市建起来，在 `127.0.0.1:8787` 上服务，并用操作系统打开链接的那个浏览器打开页面，已经配对好。终端随即变成安静宿主：只有两行，地址和一个配对码，城市做再多事也不多显示一个字。按 Enter 再打开一次页面。关掉浏览器不会停下任何工作，因为端口一直由城市占着：再打开那个地址，或者在安静宿主里按 Enter 就行。
 
-按 Esc，终端变成城市的 CLI：第一行写着城市的文件夹、你正在对话的房间和服务地址，下面就是输入行，直接写话发给那个房间，或者输入斜杠命令。`/help` 列出全部命令，`/room <addr>` 换一个对话的房间，`/serving` 重报一遍城市在哪里监听，`/web` 再打开一次页面并回到安静宿主，`/quit` 关闭城市。有居民问你事情、输入行又是空的时候，`y` 允许，`n` 拒绝。CLI 会显示你正在对话的那个房间的对话内容，因为是你选了在终端里干活；它从不显示凭据，安静宿主显示期间它的回滚内容原样保留。
+![安静宿主：终端正中只有地址和配对码](images/console-quiet-host.png)
+
+按 Esc，终端变成城市的 CLI：第一行写着城市的文件夹和服务地址，最下面是输入行，直接写话发给输入行下方写着的那个房间，或者输入斜杠命令。Tab 补全斜杠命令；几个都合适时打开一个菜单，光标在第一项，Tab 和方向键在其中移动，Enter 选定，所以 `/w`、Tab、Enter 就会打开页面。
+
+![输入 `/w` 再按 Tab 之后的斜杠菜单：光标在 `/web` 上，下面是 `/wire`，以及在其中移动的按键](images/console-slash-menu.png)`/help` 列出全部命令，`/room <addr>` 换一个对话的房间，`/serving` 重报一遍城市在哪里监听，`/web` 再打开一次页面并回到安静宿主，`/quit` 关闭城市。有居民问你事情、输入行又是空的时候，`y` 允许，`n` 拒绝。CLI 会显示你正在对话的那个房间的对话内容，因为是你选了在终端里干活：你说的话、每个 run 用的模型、每次工具调用花了多久、答复和 run 怎样结束，每一行旁边是你这台电脑上的时刻，下面是等你答复的请求和正在工作的居民。它从不显示凭据，用的是你终端自己的配色，安静宿主显示期间它的回滚内容原样保留。
+
+<p align="center">
+  <img alt="暗色主题下一个 run 之后的 CLI：说过的话、run 的头、带用时的工具调用、答复，以及正在输入的一行" src="images/console-a-session.png" width="49%">
+  <img alt="亮色主题下 run 正在工作时的 CLI：等 y 或 n 的请求、从某个时刻起在工作的 run、进行中的调用，以及空的输入行" src="images/console-waiting-light.png" width="49%">
+</p>
 
 `/web` 打开的那个浏览器不用输入就能配对。`/web` 通过一个只有你的账户能读的文件，把一次性的开页码交给它；页面在这个浏览器自己的存储里保存一把设备钥，此后直接打开那个地址就能进入城市。第二个浏览器，或者存储被清掉的浏览器，会显示一个输入配对码的框：输入终端上显示的那个码。每个码只能试一次，不论对错，终端随后都会换一个新码。**设置** 里列出已配对的浏览器，可以让城市忘掉其中任何一个。
 
-`/quit` 有序地关闭城市，在 CLI 里输入，或者在这台电脑打开的页面里输入都可以。还有 run 在跑时，它只问一次：Enter 等它们做完，`n` 立刻停下，Esc 让城市继续服务。立刻停下最多等四秒，让 run 走到安全点；四秒后城市不写交接就关闭，下次启动时冻结它留下的 run。Ctrl+C 和 Ctrl+V 归终端：Ctrl+C 复制选中的文字，城市收到 Ctrl+C 时什么也不做，每个会话只提示一次「关闭城市用 /quit」。Esc 依次是关掉菜单、清空输入行、打断你正在对话的房间里的 run。行尾输入 `\` 再按 Enter 就换到新的一行，终端分得清 Shift+Enter 时也可以用它。关掉终端窗口时，run 会在下一个安全点停下，城市在几秒内关闭。这些按键在 Windows、macOS、Linux 上都一样。
+`/quit` 有序地关闭城市，在 CLI 里输入，或者在这台电脑打开的页面里输入都可以。还有 run 在跑时，它只问一次：Enter 等它们做完，`n` 立刻停下，Esc 让城市继续服务。立刻停下最多等四秒，让 run 走到安全点；四秒后城市不写交接就关闭，下次启动时冻结它留下的 run。Ctrl+C 和 Ctrl+V 归终端：Ctrl+C 复制选中的文字，城市收到 Ctrl+C 时什么也不做，每个会话只提示一次「关闭城市用 /quit」。Esc 依次是关掉菜单、清空输入行、打断你正在对话的房间里的 run。行尾输入 `\` 再按 Enter 就换到新的一行，终端分得清 Shift+Enter 时也可以用它。在 macOS 和 Linux 上，粘贴的内容整段进入输入行，换行也保留；在 Windows 上，粘贴的每一行到达时就发送。关掉终端窗口时，run 会在下一个安全点停下，城市在几秒内关闭。这些按键在 Windows、macOS、Linux 上都一样。
 
 什么参数都不带地跑 `sprawling`，它先给出打算启动城市的文件夹，按 Enter 就在那里建。它直接进 CLI 而不是安静宿主，输入 `/web` 之前不会打开浏览器。
 

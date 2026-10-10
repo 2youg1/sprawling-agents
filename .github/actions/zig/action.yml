@@ -1,25 +1,27 @@
-# The Zig `crates/desktop/ffi/zig-version` pins, which builds the desktop
-# server's Zig leaf (`crates/desktop/Spec.lean` section 8-12). The leaf is compiled
-# on Windows targets only, so on any other runner this action installs
-# nothing: a Linux or macOS build of the workspace never starts `zig`.
+# The Zig `crates/desktop/ffi/zig-version` pins, which builds the two Zig
+# leaves: the console's renderer, `crates/console_ffi`, on every target
+# (`crates/console_ffi/Spec.lean` D1), and the desktop server's leaf on
+# Windows targets (`crates/desktop/Spec.lean` section 8-12). Every job that
+# builds the `sprawling` crate, on any runner, installs it.
 #
 # The version is read from the pin file at run time, so a new Zig is an
-# edit to that one file; `build.rs` refuses a `zig` of another version,
-# and the last step asks `zig version` so a failed install stops the job
-# here rather than as a build-script error later.
+# edit to that one file (and to `crates/console_ffi/zig-version`, which
+# its build script holds equal to it); `build.rs` refuses a `zig` of
+# another version, and the last step asks `zig version` so a failed
+# install stops the job here rather than as a build-script error later.
 #
 # Zig's global cache is restored and saved only where a job asks for it.
 # setup-zig saves a new entry of about 17 MB on every run, in every job
 # and on every ref, and the repository's cache budget is full, so each
 # entry pushes an older one out. It pays only for `zig test`, which links
 # an executable and builds Zig's runtime for it: about twice as long
-# against an empty global cache. A `build-lib` of the leaf, which is all
-# `crates/desktop/ffi/build.rs` asks for, adds a few seconds against an
-# empty one, which the restore and the save of the entry cost as well.
+# against an empty global cache. A `build-lib` of a leaf, which is all
+# the two build scripts ask for, adds a few seconds against an empty one,
+# which the restore and the save of the entry cost as well.
 name: zig
 description: >-
-  Install the Zig crates/desktop/ffi/zig-version pins on a Windows runner, and
-  prove zig answers with that version.
+  Install the Zig crates/desktop/ffi/zig-version pins, and prove zig
+  answers with that version.
 inputs:
   cache:
     description: >-
@@ -31,15 +33,12 @@ runs:
   steps:
     - name: the pinned version
       id: pin
-      if: runner.os == 'Windows'
       shell: bash
       run: echo "version=$(tr -d '[:space:]' < "$GITHUB_WORKSPACE/crates/desktop/ffi/zig-version")" >> "$GITHUB_OUTPUT"
     - uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2
-      if: runner.os == 'Windows'
       with:
         version: ${{ steps.pin.outputs.version }}
         use-cache: ${{ inputs.cache }}
     - name: zig answers with the pinned version
-      if: runner.os == 'Windows'
       shell: bash
       run: test "$(zig version)" = "${{ steps.pin.outputs.version }}"

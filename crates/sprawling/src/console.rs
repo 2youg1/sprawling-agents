@@ -16,6 +16,7 @@ pub(super) mod cli;
 pub(super) mod editor;
 pub(crate) mod language;
 pub(crate) mod lifecycle;
+pub(super) mod local_time;
 pub(super) mod program_status;
 pub(super) mod screen;
 pub(super) mod stream;

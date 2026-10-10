@@ -24,7 +24,7 @@ default: check
 #
 # `ci.yml` runs the same recipes, one job per slice of this line, so a
 # green pull request implies exactly this and no less.
-check: prereqs fmt-check gates-sources models build-web clippy features test gates check-client check-desktop
+check: prereqs fmt-check gates-sources models build-web clippy features test gates check-client check-desktop check-console
 
 # The merge's whole check: the phases of `check`, but every phase runs
 # even after another has failed, so one run names every red rather than
@@ -57,6 +57,7 @@ check-all *phases:
     { phase models just models; } &
     { phase client just client-checks; } &
     { phase desktop just check-desktop; } &
+    { phase console just check-console; } &
     wait
     touch "$out/phases.tsv"
     column -t -s $'\t' "$out/phases.tsv"
@@ -101,6 +102,7 @@ check-branch base="main":
     step deny just deny
     touched client && step client just client-checks && step artifacts cargo xtask gates render budget npm
     touched crates/desktop/ffi && step desktop just check-desktop
+    touched crates/console_ffi && step console just check-console
     # A Lean specification is proved by `models`, which no other step runs;
     # the Lean package's own three files change what it proves
     # (tools/xtask/Spec.lean §8-43).
@@ -218,12 +220,14 @@ prereqs mode="check":
 fmt:
     cargo fmt --all
 
-# The desktop server's Zig leaf is formatted by `zig fmt`, on Windows,
-# the one platform the leaf is built on and the one where the doctor
-# makes Zig required (`crates/desktop/Spec.lean` section 8-12).
+# Both Zig leaves are formatted by `zig fmt`: the console's renderer on
+# every platform, where it is built (`crates/console_ffi/Spec.lean` D1),
+# and the desktop server's leaf on Windows, the one platform it is built
+# on (`crates/desktop/Spec.lean` section 8-12).
 fmt-check:
     cargo fmt --all --check
-    {{ if os() == "windows" { "zig fmt --check crates/desktop/ffi/zig" } else { "echo 'zig fmt: the Zig leaf is built on Windows only'" } }}
+    zig fmt --check crates/console_ffi/zig
+    {{ if os() == "windows" { "zig fmt --check crates/desktop/ffi/zig" } else { "echo 'zig fmt: the desktop leaf is built on Windows only'" } }}
 
 # --all-features is load-bearing: code behind a feature (runtime/wasm, */conformance)
 # escapes the zero-warning gate without it.
@@ -538,6 +542,12 @@ deny:
 # everything else.
 check-desktop:
     {{ if os() == "windows" { "zig test -O ReleaseSafe crates/desktop/ffi/zig/leaf.zig --cache-dir target/zig-test" } else { "echo 'zig test: the Zig leaf is built on Windows only'" } }}
+
+# The console renderer's own Zig tests, which no cargo command runs; the
+# frames it draws are judged by `console_ffi`'s Rust tests through a
+# terminal emulator (`crates/console_ffi/Spec.lean`).
+check-console:
+    zig test -O ReleaseSafe crates/console_ffi/zig/leaf.zig --cache-dir target/zig-test
 
 # The Rust side's fuzz of crates/desktop/ffi's Zig leaf: its four buffer rules
 # against their Rust reference, for `rounds` drawn inputs from `seed`

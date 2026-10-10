@@ -56,7 +56,7 @@ fn run_loop(face: &mut Face, follow: &mut Follow, out: &mut impl Write) -> Resul
                 }
             }
             Event::Resize(columns, rows) => face.resize(size_of(columns, rows)),
-            Event::FocusGained | Event::FocusLost | Event::Mouse(_) => {}
+            Event::FocusGained | Event::FocusLost | Event::Mouse(_) | Event::Paste(_) => {}
         }
     }
     Ok(())

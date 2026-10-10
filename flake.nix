@@ -143,7 +143,9 @@
           cargoLock = {
             lockFile = ./Cargo.lock;
           };
-          nativeBuildInputs = nativeDeps ++ [ pkgs.bun pkgs.just ];
+          # zig builds the console's renderer, `crates/console_ffi`, on every
+          # platform (`crates/console_ffi/Spec.lean` D1).
+          nativeBuildInputs = nativeDeps ++ [ pkgs.bun pkgs.just zig ];
           # just is a command used by preBuild, not this package's builder.
           dontUseJustBuild = true;
           dontUseJustCheck = true;

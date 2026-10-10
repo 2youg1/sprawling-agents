@@ -6,6 +6,11 @@
 //! What the terminal's one writer draws, and how the terminal is put
 //! back (`crates/sprawling/spec/Console.lean` §8-11).
 //!
+//! A frame is drawn by the console's renderer (`console_ffi`), which
+//! turns a scene into bytes; this module keeps what one frame leaves for
+//! the next - how far below the live region's first row the cursor
+//! stands, and the last transcript line - and writes the bytes.
+//!
 //! Every write the console makes passes [`Screen::write`], the one place
 //! that decides what a failed write means: the terminal is gone, nothing
 //! is written from then on, and the caller hears it once as
@@ -16,9 +21,10 @@
 use std::io::Write;
 use std::sync::atomic::{AtomicBool, Ordering};
 
+use console_ffi::part::Part;
+use console_ffi::scene::{Entry, Inline, Live, Quiet, Scene};
 use crossterm::{cursor, queue, style::Print, terminal};
 
-use super::editor::{Editor, PROMPT};
 use super::program_status::Report;
 
 /// Whether the alternate screen is showing, for the panic hook, which
@@ -35,17 +41,32 @@ pub(crate) enum Written {
     Lost,
 }
 
+/// The quiet host's lines, as the writer hands them over.
+pub(crate) struct QuietLines<'a> {
+    pub(crate) url: &'a str,
+    pub(crate) code: &'a str,
+    pub(crate) key: Option<&'a str>,
+    pub(crate) transient: Option<&'a str>,
+}
+
 /// The terminal as the writer last left it.
 #[derive(Debug, Default)]
 pub(crate) struct Screen {
     lost: bool,
-    /// Rows between the prompt's first row and the cursor, as last drawn.
-    rows: u16,
+    /// Rows between the live region's first row and the cursor, as the
+    /// last frame left them.
+    erase: u16,
+    /// The last transcript line drawn.
+    previous: Option<Part>,
+    /// The bytes of the last frame, kept for their capacity.
+    frame: Vec<u8>,
 }
 
 impl Screen {
-    /// Raw mode on, the window titled, and the terminal put back if
-    /// anything panics from here on.
+    /// Raw mode on, the window titled, the cursor a bar, and the
+    /// terminal put back if anything panics from here on. Where the
+    /// terminal can say so (Unix), keys arrive unambiguous - Shift+Enter
+    /// told from Enter - and a paste arrives whole.
     pub(crate) fn take(&mut self) -> Written {
         if terminal::enable_raw_mode().is_err() {
             self.lost = true;
@@ -55,18 +76,24 @@ impl Screen {
         self.write(|out| {
             queue!(
                 out,
-                terminal::SetTitle("sprawling · closing this window stops it")
-            )
+                terminal::SetTitle("sprawling · closing this window stops it"),
+                cursor::SetCursorStyle::SteadyBar
+            )?;
+            enhance(out)
         })
     }
 
-    /// The terminal handed back: the alternate screen left, a fresh
-    /// line, raw mode off.
+    /// The terminal handed back: the live region erased, the alternate
+    /// screen left, the cursor as the person had it, raw mode off.
     pub(crate) fn give_back(&mut self) -> Written {
         let left = self.leave_quiet();
-        let ended = self.write(|out| queue!(out, Print("\r\n")));
+        let erased = self.frame(&[], None, size().0);
+        let ended = self.write(|out| {
+            plain(out)?;
+            queue!(out, cursor::SetCursorStyle::DefaultUserShape, cursor::Show)
+        });
         drop(terminal::disable_raw_mode());
-        worst(left, ended)
+        worst(worst(left, erased), ended)
     }
 
     /// Whether the alternate screen is showing.
@@ -79,72 +106,70 @@ impl Screen {
         self.lost = true;
     }
 
-    /// One line above the prompt, and the prompt drawn again below it
-    /// when `editor` is given.
-    pub(crate) fn above(&mut self, line: &str, editor: Option<&Editor>) -> Written {
-        let erased = self.erase_input();
-        let text = line.replace('\n', "\r\n");
-        let shown = self.write(|out| queue!(out, Print(&text), Print("\r\n")));
-        let drawn = editor.map_or(Written::Shown, |editor| self.draw_input(editor));
-        worst(worst(erased, shown), drawn)
-    }
-
-    /// The submitted line stays in the scrollback as it was drawn.
-    pub(crate) fn submitted(&mut self) -> Written {
-        self.rows = 0;
-        self.write(|out| queue!(out, Print("\r\n")))
-    }
-
-    pub(crate) fn erase_input(&mut self) -> Written {
-        let rows = std::mem::take(&mut self.rows);
-        self.write(|out| {
-            if rows > 0 {
-                queue!(out, cursor::MoveUp(rows))?;
-            }
-            queue!(
-                out,
-                cursor::MoveToColumn(0),
-                terminal::Clear(terminal::ClearType::FromCursorDown)
-            )
-        })
-    }
-
-    pub(crate) fn draw_input(&mut self, editor: &Editor) -> Written {
-        let width = terminal::size().map_or(80, |(columns, _)| columns);
-        let layout = editor.layout(width);
-        let text = editor.text().replace('\n', "\r\n  ");
-        let written = self.write(|out| {
-            queue!(out, Print(PROMPT), Print(&text))?;
-            let up = layout.end_row.saturating_sub(layout.cursor_row);
-            if up > 0 {
-                queue!(out, cursor::MoveUp(up))?;
-            }
-            queue!(out, cursor::MoveToColumn(layout.cursor_column))
+    /// One frame on the main screen: the live region drawn last time
+    /// erased, `entries` written into the scrollback, and `live` drawn
+    /// under them, `columns` wide.
+    pub(crate) fn frame(
+        &mut self,
+        entries: &[Entry],
+        live: Option<Live<'_>>,
+        columns: u16,
+    ) -> Written {
+        if self.lost || self.is_quiet() {
+            return Written::Shown;
+        }
+        let scene = Scene::inline(&Inline {
+            columns,
+            erase: self.erase,
+            previous: self.previous,
+            entries,
+            live,
         });
-        self.rows = layout.cursor_row;
+        match console_ffi::draw(&scene, &mut self.frame) {
+            Ok(drawn) => {
+                self.erase = drawn.cursor_row;
+                if let Some(last) = entries.last() {
+                    self.previous = Some(last.part());
+                }
+            }
+            // A frame the renderer refused draws nothing; the next one
+            // starts from the same place.
+            Err(_) => return Written::Shown,
+        }
+        let bytes = std::mem::take(&mut self.frame);
+        let written = self.write(|out| out.write_all(&bytes));
+        self.frame = bytes;
         written
     }
 
-    /// The alternate screen, showing `lines` and nothing else.
-    pub(crate) fn quiet(&mut self, lines: &[String]) -> Written {
-        let entered = if ALTERNATE.swap(true, Ordering::SeqCst) {
+    /// The alternate screen, showing the quiet host and nothing else.
+    pub(crate) fn quiet(&mut self, lines: &QuietLines<'_>) -> Written {
+        let entered = if ALTERNATE.load(Ordering::SeqCst) {
             Written::Shown
         } else {
-            let erased = self.erase_input();
+            let erased = self.frame(&[], None, size().0);
+            ALTERNATE.store(true, Ordering::SeqCst);
+            self.erase = 0;
             worst(
                 erased,
-                self.write(|out| queue!(out, terminal::EnterAlternateScreen)),
+                self.write(|out| queue!(out, terminal::EnterAlternateScreen, cursor::Hide)),
             )
         };
-        let text = lines.join("\r\n");
-        let shown = self.write(|out| {
-            queue!(
-                out,
-                terminal::Clear(terminal::ClearType::All),
-                cursor::MoveTo(0, 0),
-                Print(&text)
-            )
+        let (columns, rows) = size();
+        let scene = Scene::quiet(&Quiet {
+            columns,
+            rows,
+            url: lines.url,
+            code: lines.code,
+            key: lines.key,
+            transient: lines.transient,
         });
+        if console_ffi::draw(&scene, &mut self.frame).is_err() {
+            return entered;
+        }
+        let bytes = std::mem::take(&mut self.frame);
+        let shown = self.write(|out| out.write_all(&bytes));
+        self.frame = bytes;
         worst(entered, shown)
     }
 
@@ -163,7 +188,8 @@ impl Screen {
             queue!(
                 out,
                 terminal::Clear(terminal::ClearType::All),
-                terminal::LeaveAlternateScreen
+                terminal::LeaveAlternateScreen,
+                cursor::Show
             )
         })
     }
@@ -184,6 +210,44 @@ impl Screen {
     }
 }
 
+/// The terminal's size, or the size every terminal starts at when it
+/// cannot say.
+pub(crate) fn size() -> (u16, u16) {
+    terminal::size().unwrap_or((80, 24))
+}
+
+/// Unambiguous keys and whole pastes, asked for where crossterm can ask
+/// (Unix); a terminal that knows neither ignores the request.
+#[cfg(unix)]
+fn enhance(out: &mut std::io::Stdout) -> std::io::Result<()> {
+    use crossterm::event::{
+        EnableBracketedPaste, KeyboardEnhancementFlags, PushKeyboardEnhancementFlags,
+    };
+    queue!(
+        out,
+        PushKeyboardEnhancementFlags(KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES),
+        EnableBracketedPaste
+    )
+}
+
+/// Windows reads keys through the console API, which has neither.
+#[cfg(not(unix))]
+fn enhance(_out: &mut std::io::Stdout) -> std::io::Result<()> {
+    Ok(())
+}
+
+/// The keys and pastes as the terminal had them before.
+#[cfg(unix)]
+fn plain(out: &mut std::io::Stdout) -> std::io::Result<()> {
+    use crossterm::event::{DisableBracketedPaste, PopKeyboardEnhancementFlags};
+    queue!(out, PopKeyboardEnhancementFlags, DisableBracketedPaste)
+}
+
+#[cfg(not(unix))]
+fn plain(_out: &mut std::io::Stdout) -> std::io::Result<()> {
+    Ok(())
+}
+
 fn worst(first: Written, second: Written) -> Written {
     match (first, second) {
         (Written::Shown, Written::Shown) => Written::Shown,
@@ -192,8 +256,8 @@ fn worst(first: Written, second: Written) -> Written {
 }
 
 /// Puts the terminal back before a panic is reported: the alternate
-/// screen wiped and left, raw mode off. The process then aborts as the
-/// release profile says.
+/// screen wiped and left, the keys and the cursor as they were, raw mode
+/// off. The process then aborts as the release profile says.
 fn restore_on_panic() {
     let previous = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
@@ -205,6 +269,13 @@ fn restore_on_panic() {
                 terminal::LeaveAlternateScreen
             ));
         }
+        drop(plain(&mut out));
+        drop(crossterm::execute!(
+            out,
+            Print("\x1b[?2026l"),
+            cursor::SetCursorStyle::DefaultUserShape,
+            cursor::Show
+        ));
         drop(terminal::disable_raw_mode());
         previous(info);
     }));

@@ -361,6 +361,7 @@ impl Listening {
                     remote: remote.clone(),
                     door,
                     lifecycle,
+                    clock: Arc::new(|| accounting::Clock::now(&super::SystemClock)),
                 };
                 let started = crate::console::start(terminal, inside, watching, face);
                 let notice = started.notice;
