@@ -52,7 +52,7 @@ Bun (needs Bun):
 bun install --global sprawling@latest
 ```
 
-crates.io (needs the Rust compiler the published package requires and the native build tools for your platform; with cargo-binstall installed, `cargo binstall sprawling` downloads a release archive directly):
+crates.io (needs the Rust compiler the published package requires, the native build tools for your platform and Zig 0.17.0, which builds the console's renderer; with cargo-binstall installed, `cargo binstall sprawling` downloads a release archive directly):
 
 ```sh
 cargo install sprawling --locked
