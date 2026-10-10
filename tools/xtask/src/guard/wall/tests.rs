@@ -3,10 +3,10 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What the one lint table of its own is held to: a lint dropped,
-//! relaxed or added on the leaf's side, a recorded difference that is no
-//! longer a difference, another member writing a table of its own, and a
-//! leaf that is no longer a member at all.
+//! What the leaves' lint tables are held to: a lint dropped, relaxed or
+//! added on a leaf's side, a recorded difference that is no longer a
+//! difference, another member writing a table of its own, and a leaf
+//! that is no longer a member at all.
 
 #![allow(
     clippy::unwrap_used,
@@ -53,12 +53,14 @@ name = "sprawling-k"
 workspace = true
 "#;
 
+/// The desktop leaf as `leaf` writes it, the console leaf as it stands.
 fn judged(leaf: &str, member: &str) -> Vec<Violation> {
     tables(
         &read(WORKSPACE),
         &[
             ("crates/k".to_owned(), read(member)),
-            (LEAF.to_owned(), read(leaf)),
+            (LEAVES[0].to_owned(), read(leaf)),
+            (LEAVES[1].to_owned(), read(LEAF_MANIFEST)),
         ],
     )
 }
@@ -138,8 +140,17 @@ fn another_member_with_a_table_of_its_own_is_named() {
 /// nothing; the exception is struck with it.
 #[test]
 fn a_leaf_that_is_no_longer_a_member_strikes_its_exception() {
-    let found = tables(&read(WORKSPACE), &[("crates/k".to_owned(), read(MEMBER))]);
+    let found = tables(
+        &read(WORKSPACE),
+        &[
+            ("crates/k".to_owned(), read(MEMBER)),
+            (LEAVES[1].to_owned(), read(LEAF_MANIFEST)),
+        ],
+    );
     assert_eq!(found.len(), 1, "{found:#?}");
-    assert!(found[0].location.contains("LEAF"), "{found:#?}");
+    assert!(
+        found[0].location.contains("LEAVES crates/desktop/ffi"),
+        "{found:#?}"
+    );
     assert!(found[0].alternative.contains("RECORDED"), "{found:#?}");
 }

@@ -3,16 +3,17 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The workspace's lint wall, and the one table that stands beside it.
+//! The workspace's lint wall, and the tables that stand beside it.
 //!
 //! Every member inherits `[workspace.lints]` by writing `[lints]
-//! workspace = true`, except the desktop server's FFI seam,
-//! `crates/desktop/ffi`. Each call into its Zig leaf relaxes
-//! `unsafe_code` at that one statement, which `forbid` makes impossible,
-//! so it writes a table of its own: the workspace's, with `unsafe_code`
-//! at `deny` (`crates/desktop/Spec.lean` D14, tools/xtask/Spec.lean §8-46).
-//! Every other line of that table is a **copy**, and a copy is a second
-//! home for a fact.
+//! workspace = true`, except the two FFI seams: the desktop server's,
+//! `crates/desktop/ffi`, and the console renderer's, `crates/console_ffi`.
+//! Each call into a Zig leaf relaxes `unsafe_code` at that one
+//! statement, which `forbid` makes impossible, so each seam writes a
+//! table of its own: the workspace's, with `unsafe_code` at `deny`
+//! (`crates/desktop/Spec.lean` D14, `crates/console_ffi/Spec.lean` D1,
+//! tools/xtask/Spec.lean §8-46). Every other line of those tables is a
+//! **copy**, and a copy is a second home for a fact.
 //!
 //! **This is the shape no rule about commits can see.** One side is
 //! edited, the other is not, and nothing red follows. So the copy is
@@ -32,8 +33,8 @@ use std::collections::BTreeSet;
 use super::{diverged, shown};
 use crate::report::Violation;
 
-/// The one member whose lint table is its own.
-const LEAF: &str = "crates/desktop/ffi";
+/// The members whose lint tables are their own: the two Zig leaves.
+const LEAVES: [&str; 2] = ["crates/desktop/ffi", "crates/console_ffi"];
 
 /// One key the leaf's table is allowed to disagree with the workspace
 /// about, and why.
@@ -53,32 +54,38 @@ struct Recorded {
 const RECORDED: [Recorded; 1] = [Recorded {
     table: "rust",
     key: "unsafe_code",
-    because: "each call into the Zig leaf that carries the Win32 calls relaxes it at that one \
-              statement with a written reason, which `forbid` makes impossible (`crates/desktop/Spec.lean` \
-              section 12.14)",
+    because: "each call into a Zig leaf relaxes it at that one statement with a written \
+              reason, which `forbid` makes impossible (`crates/desktop/Spec.lean` section 12.14, \
+              `crates/console_ffi/Spec.lean` D1)",
 }];
 
-/// Every member's lint table, judged against the workspace's: the leaf
+/// Every member's lint table, judged against the workspace's: each leaf
 /// key by key, every other member for inheriting it.
 pub(super) fn tables(workspace: &toml::Value, members: &[(String, toml::Value)]) -> Vec<Violation> {
     let mut out = Vec::new();
     let wall = workspace.get("workspace").and_then(|it| it.get("lints"));
-    match members.iter().find(|(dir, _)| dir == LEAF) {
-        Some((_, leaf)) => compared(wall, leaf.get("lints"), &mut out),
-        None => out.push(diverged(
-            format!("tools/xtask/src/guard/wall.rs LEAF {LEAF}"),
-            "the one lint table of its own belongs to a workspace member",
-            format!("no workspace member lives at {LEAF}"),
-            "strike `LEAF` and its rows in `RECORDED`: the exception they grant has nothing left \
-             to be granted to"
-                .to_owned(),
-        )),
+    for leaf in LEAVES {
+        match members.iter().find(|(dir, _)| dir == leaf) {
+            Some((_, manifest)) => compared(wall, (leaf, manifest.get("lints")), &mut out),
+            None => out.push(diverged(
+                format!("tools/xtask/src/guard/wall.rs LEAVES {leaf}"),
+                "a lint table of its own belongs to a workspace member",
+                format!("no workspace member lives at {leaf}"),
+                format!(
+                    "strike {leaf} from `LEAVES`, and its rows in `RECORDED` once no leaf is left: \
+                     the exception they grant has nothing left to be granted to"
+                ),
+            )),
+        }
     }
-    for (dir, member) in members.iter().filter(|(dir, _)| dir != LEAF) {
+    for (dir, member) in members
+        .iter()
+        .filter(|(dir, _)| !LEAVES.contains(&dir.as_str()))
+    {
         if !inheriting(member.get("lints")) {
             out.push(diverged(
                 format!("{dir}/Cargo.toml [lints]"),
-                "every member but the leaf inherits the workspace's lint table",
+                "every member but the leaves inherits the workspace's lint table",
                 format!("{} against `workspace = true`", shown(member.get("lints"))),
                 format!(
                     "write `[lints]` in {dir}/Cargo.toml as `workspace = true` and nothing else"
@@ -89,8 +96,13 @@ pub(super) fn tables(workspace: &toml::Value, members: &[(String, toml::Value)])
     out
 }
 
-/// The two tables, key by key, in both directions.
-fn compared(wall: Option<&toml::Value>, copy: Option<&toml::Value>, out: &mut Vec<Violation>) {
+/// The two tables, key by key, in both directions: the workspace's and
+/// one leaf's, named by its directory.
+fn compared(
+    wall: Option<&toml::Value>,
+    (leaf, copy): (&str, Option<&toml::Value>),
+    out: &mut Vec<Violation>,
+) {
     for table in ["rust", "clippy"] {
         let wall = wall.and_then(|it| it.get(table));
         let copy = copy.and_then(|it| it.get(table));
@@ -99,6 +111,7 @@ fn compared(wall: Option<&toml::Value>, copy: Option<&toml::Value>, out: &mut Ve
         for key in named {
             judge(
                 Compared {
+                    leaf,
                     table,
                     key: &key,
                     wall: wall.and_then(|it| it.get(&key)),
@@ -112,6 +125,7 @@ fn compared(wall: Option<&toml::Value>, copy: Option<&toml::Value>, out: &mut Ve
 
 /// One lint key as the two tables spell it.
 struct Compared<'a> {
+    leaf: &'a str,
     table: &'a str,
     key: &'a str,
     wall: Option<&'a toml::Value>,
@@ -121,6 +135,7 @@ struct Compared<'a> {
 /// One lint key, judged against the record of decided differences.
 fn judge(compared: Compared<'_>, out: &mut Vec<Violation>) {
     let Compared {
+        leaf,
         table,
         key,
         wall,
@@ -143,11 +158,11 @@ fn judge(compared: Compared<'_>, out: &mut Vec<Violation>) {
             ),
         )),
         (None, false) => out.push(diverged(
-            format!("{LEAF}/Cargo.toml [lints.{table}] {key}"),
+            format!("{leaf}/Cargo.toml [lints.{table}] {key}"),
             "the leaf's lint table is the workspace's own, key for key",
             format!("{} against the workspace's {}", shown(copy), shown(wall)),
             format!(
-                "copy the workspace's line into {LEAF}/Cargo.toml, or record the difference \
+                "copy the workspace's line into {leaf}/Cargo.toml, or record the difference \
                  and its reason in `RECORDED` (tools/xtask/src/guard/wall.rs) — a difference \
                  nobody wrote down is a wall that fell over quietly"
             ),
