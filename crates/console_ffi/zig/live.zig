@@ -92,15 +92,22 @@ fn waiting(p: *paint.Painter, r: *scene.Reader, grid: Grid) Error!void {
     try right(p, &keys);
 }
 
+/// The run working: who, ` is working`, and then, where the row has
+/// room for them, since when and the key that stops it. The resident's
+/// name gives way only to ` is working`; the time and the key go first.
 fn working(p: *paint.Painter, r: *scene.Reader, grid: Grid) Error!void {
     const resident = try r.text();
     const since = try r.word();
+    const doing = " is working";
+    const since_width = 17;
     try p.to(grid.mark);
     try p.fit(.accent, "●", 1);
     try p.to(grid.words);
-    try p.fit(.plain, resident, p.room() -| 30);
-    try p.fit(.faint, " is working", 11);
-    if (since != scene.no_time) {
+    const named = @min(text.width(resident), p.room() -| doing.len);
+    const timed = since != scene.no_time and p.room() >= named + doing.len + since_width;
+    try p.fit(.plain, resident, named);
+    try p.fit(.faint, doing, doing.len);
+    if (timed) {
         var b: format.Buffer = undefined;
         try p.fit(.faint, " · since ", 9);
         try p.fit(.faint, format.clock(&b, since), 8);

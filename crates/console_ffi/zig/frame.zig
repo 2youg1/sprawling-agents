@@ -46,9 +46,11 @@ pub fn inline_frame(out: *std.Io.Writer, r: *scene.Reader) Error!Left {
         const cursor = try live.region(&p, r, grid);
         const up = p.row - cursor.row;
         if (up > 0) try out.print("\x1b[{d}A", .{up});
-        try out.print("\x1b[{d}G\x1b[?25h", .{cursor.column + 1});
+        try out.print("\x1b[{d}G", .{cursor.column + 1});
         left.cursor_row = cursor.row - top;
     }
-    try out.writeAll("\x1b[?2026l");
+    // The cursor was hidden while the frame was drawn; it is shown again
+    // whether or not a live region put it back in the composer.
+    try out.writeAll("\x1b[?25h\x1b[?2026l");
     return left;
 }

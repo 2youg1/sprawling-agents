@@ -87,7 +87,7 @@ impl Screen {
     /// screen left, the cursor as the person had it, raw mode off.
     pub(crate) fn give_back(&mut self) -> Written {
         let left = self.leave_quiet();
-        let erased = self.frame(&[], None, 80);
+        let erased = self.frame(&[], None, size().0);
         let ended = self.write(|out| {
             plain(out)?;
             queue!(out, cursor::SetCursorStyle::DefaultUserShape, cursor::Show)

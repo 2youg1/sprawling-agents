@@ -42,7 +42,10 @@ pub fn quiet(out: *std.Io.Writer, r: *scene.Reader) Error!void {
         try p.fit(.faint, key_label, key_label.len);
         try p.fit(.bold, key, p.room());
     }
-    if (transient.len > 0) {
+    // The transient goes two rows under the block, and only when that row
+    // is inside the window: a terminal would otherwise put it on the last
+    // row it has, over the pairing code.
+    if (transient.len > 0 and top + 3 < rows) {
         try place(out, top + 3, left);
         p.column = left;
         try p.fit(.faint, transient, p.room());

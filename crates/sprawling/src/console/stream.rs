@@ -254,11 +254,20 @@ impl Room {
         }]
     }
 
+    /// How a run ended: the working run's freeze, timed from its start, or
+    /// the freeze of a run that started before this console was watching,
+    /// whose calls it has shown and whose start it never saw. A freeze of
+    /// another run while one is working here says nothing, because a line
+    /// without the run's identity would read as the working run's end.
     fn frozen(
         &mut self,
         record: &EventRecord,
         at: Option<console_ffi::scene::TimeOfDay>,
     ) -> Vec<Entry> {
+        let working = self.run == Some(record.run());
+        if !working && self.run.is_some() {
+            return Vec::new();
+        }
         let completion = record
             .data()
             .read::<RunFrozen>()
@@ -271,18 +280,16 @@ impl Room {
         } else {
             Ending::Done
         };
-        let took_s = self.since().and_then(|since| {
+        let took_s = self.since().filter(|_| working).and_then(|since| {
             record
                 .t()
                 .value()
                 .checked_sub(since.value())
                 .and_then(|millis| millis.checked_div(1_000))
         });
-        if self.run == Some(record.run()) {
-            self.run = None;
-            self.opening = None;
-            self.calls.clear();
-        }
+        self.run = None;
+        self.opening = None;
+        self.calls.clear();
         vec![Entry::Ended { at, ending, took_s }]
     }
 }

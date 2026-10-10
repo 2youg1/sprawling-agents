@@ -33,7 +33,6 @@ fn main() -> Result<(), String> {
     println!("cargo::rerun-if-changed=zig");
     println!("cargo::rerun-if-changed=src/part.rs");
     println!("cargo::rerun-if-changed={PIN}");
-    println!("cargo::rerun-if-changed={SIBLING_PIN}");
     println!("cargo::rerun-if-env-changed=PATH");
     let here = PathBuf::from(variable("CARGO_MANIFEST_DIR")?);
     spelled_alike(&here)?;
@@ -60,7 +59,11 @@ fn pin(here: &Path) -> Result<String, String> {
     };
     let pinned = read(&here.join(PIN))?;
     let sibling = here.join(SIBLING_PIN);
+    // Named only when it is there: cargo reads a path that does not
+    // exist as changed, and a package built from crates.io, which has no
+    // sibling, would compile the leaf again on every build.
     if sibling.exists() {
+        println!("cargo::rerun-if-changed={SIBLING_PIN}");
         let theirs = read(&sibling)?;
         if theirs != pinned {
             return Err(format!(
