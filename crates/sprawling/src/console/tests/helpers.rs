@@ -94,6 +94,7 @@ pub(super) fn driven(script: &str, terminal: &Terminal, inside: &Inside) -> Stri
 pub(super) fn inside() -> Inside {
     Inside {
         lifecycle: tokio::sync::mpsc::channel(8).0,
+        clock: Arc::new(|| Ok(kernel::TimeMs::new(0))),
         desk: Arc::new(accounting::worker::CommandDesk::default()),
         answering: answering(),
         remote: Err(kernel::AxError::failure(

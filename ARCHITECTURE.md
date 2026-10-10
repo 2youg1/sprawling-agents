@@ -105,7 +105,7 @@ every week.
 | Serialisation | `serde`, `serde_json`, `toml` | JSON on the wire and in the Ledger because the receiver may be a browser and a person still has to read it. TOML for configuration a person edits. |
 | Errors | `thiserror` | One error shape, `AxError`, defined in `kernel::error` and mapped at every crate boundary. |
 | Release profile | `opt-level = 3`, `lto = "fat"`, one codegen unit, symbols stripped, `panic = "abort"` | Crash-only delivery: there is no unwinding path to maintain, because there is nothing to catch. `3` rather than `"z"` or `"s"` because it is the fastest of the three on the product's common operations, and runtime speed comes before size; the criterion and the readings sit beside the setting in `Cargo.toml`. |
-| Dependency count | <!-- xtask:begin dependency_count -->463<!-- xtask:end --> packages in `Cargo.lock` | The one number in this table that is a fact about the whole graph rather than about one choice. Listed by `sprawling status --deps`, licence-checked one by one by `cargo deny` against `deny.toml`. |
+| Dependency count | <!-- xtask:begin dependency_count -->466<!-- xtask:end --> packages in `Cargo.lock` | The one number in this table that is a fact about the whole graph rather than about one choice. Listed by `sprawling status --deps`, licence-checked one by one by `cargo deny` against `deny.toml`. |
 
 **Verification tools**, kept out of the shipped binary: `proptest`
 (properties before examples), `insta` (golden output), `trybuild` (proof
@@ -176,9 +176,10 @@ agent_protocols: kernel, gateway, child
 wire: kernel, documents
 remote_access: kernel, child
 accounting: kernel, storage, gateway, runtime, collab, city, agent_protocols, wire, documents
-sprawling: kernel, storage, gateway, runtime, collab, city, browser, agent_protocols, wire, accounting, desktop, desktop_ffi, remote_access, child
+sprawling: kernel, storage, gateway, runtime, collab, city, browser, agent_protocols, wire, accounting, desktop, desktop_ffi, console_ffi, remote_access, child
 desktop: kernel, agent_protocols, desktop_ffi, child
 desktop_ffi: child
+console_ffi:
 ```
 
 The `child` row is empty on purpose: `child::command` is the one place a
@@ -187,7 +188,7 @@ process group, the city's secrets removed from its environment), so every
 unit that starts one may name it and it names nothing (`crates/child/Spec.lean`).
 
 The `desktop_ffi` row is the desktop server's FFI seam (`crates/desktop/ffi`),
-the one member whose lint table is its own: it is the workspace's table with
+one of the two members whose lint table is their own: it is the workspace's table with
 `unsafe_code` at `deny`, so each call into its Zig leaf can relax the lint at
 that one statement (`crates/desktop/Spec.lean` D14). `sprawling` and `runtime` read it for the
 processor topology, the power-throttling opt-out and a job's CPU weight and
@@ -195,6 +196,13 @@ memory limit, which no safe crate offers (`crates/desktop/ffi/Spec.lean` D4). `d
 and `agent_protocols` for four facts the city defines, the error codes, the
 image quality domain, the MCP revision and the effect-unknown key, and for
 nothing else.
+
+The `console_ffi` row is the other: the console's renderer
+(`crates/console_ffi`), a Zig leaf that turns a scene into the bytes of
+one terminal frame, with the same lint table and its one `unsafe` at the
+call into the leaf (`crates/console_ffi/Spec.lean` D1). Its row is empty
+because the scene is written in its own words: the console decides what
+the screen holds and names `console_ffi`, and the leaf names nothing.
 
 Inside one crate the compiler sees no layering: `sprawling` builds as one
 unit whichever way its modules name each other. The block below is the
@@ -852,7 +860,7 @@ do not overlap: overlapping verification reads as more coverage than it is.
 |---|---|---|
 | V0 unrepresentable | a whole class of error moved out of what can be written | <!-- xtask:begin compile_fail_cases -->19<!-- xtask:end --> compile-failure counterexamples |
 | V1 types and lints | null, overflow, silent truncation, hidden panics | workspace lints, `-D warnings`, `--all-features` |
-| V2 unit and property | a function wrong across a class of inputs | <!-- xtask:begin test_functions -->3667<!-- xtask:end --> test functions, properties before examples |
+| V2 unit and property | a function wrong across a class of inputs | <!-- xtask:begin test_functions -->3679<!-- xtask:end --> test functions, properties before examples |
 | V3 conformance | a second adapter behaving unlike the first | one suite per port, except `browser::port`, whose suite only ever ran against the replay it was written beside (decision D1 of `crates/browser/Spec.lean`) |
 | V4 fuzz | parsers meeting hostile bytes | <!-- xtask:begin fuzz_targets -->6<!-- xtask:end --> targets under `tools/fuzz/fuzz_targets` |
 | V5 formal | termination, absence of overflow and monotonicity in the code; a design rule false on some input nobody tried | 3 of 3 kani harnesses proved, Linux CI — every proposition in the roster has an unbounded domain and a solvable shape; the Lean specifications under `crates/`, proved by `just models` in every `just check` |
@@ -1158,6 +1166,7 @@ flowchart TD
     city --> kernel
     collab --> kernel
     collab --> storage
+    console_ffi
     desktop --> agent_protocols
     desktop --> child
     desktop --> desktop_ffi
@@ -1180,6 +1189,7 @@ flowchart TD
     sprawling --> child
     sprawling --> city
     sprawling --> collab
+    sprawling --> console_ffi
     sprawling --> desktop
     sprawling --> desktop_ffi
     sprawling --> gateway

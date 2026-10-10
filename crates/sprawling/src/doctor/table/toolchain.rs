@@ -366,14 +366,14 @@ macro_rules! winget_zig {
     };
 }
 
-/// The compiler of the desktop server's Zig leaf. Required because a
-/// Windows build of this binary compiles the leaf, and `Need` does not
-/// vary by platform; elsewhere the leaf is not compiled and the tool is
-/// simply unused (`crates/sprawling/spec/Doctor.lean` §8-146).
+/// The compiler of the two Zig leaves. Required on every platform: the
+/// console's renderer, `crates/console_ffi`, is compiled into every build
+/// of this binary, and the desktop server's leaf into every Windows build
+/// (`crates/sprawling/spec/Doctor.lean` §8-146).
 pub(super) const ZIG: Requirement = row(
     "zig",
     Need::Required,
-    "the Zig leaf crates/desktop/ffi builds on Windows, at the version crates/desktop/ffi/zig-version pins",
+    "the Zig leaves: crates/console_ffi on every platform and crates/desktop/ffi on Windows, at the version crates/desktop/ffi/zig-version pins",
     Detection::Listed {
         program: "zig",
         args: &["version"],

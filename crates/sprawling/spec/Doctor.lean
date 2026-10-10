@@ -12,9 +12,9 @@
 -/
 
 /-!
-## 8-146 Windows 上构建这个二进制要有 Zig（`bin::doctor::table::toolchain` 的 `zig` 一行）
+## 8-146 构建这个二进制要有 Zig（`bin::doctor::table::toolchain` 的 `zig` 一行）
 
-`sprawling` 按路径链接 `crates/desktop/`，`crates/desktop/` 在 Windows 上链接它的 FFI 缝 `crates/desktop/ffi`，而那个包的构建脚本用 `zig build-lib` 编一片 Zig 叶子（`crates/desktop/Spec.lean` §8-12）。所以 Windows 上编这个二进制、跑 `just check` 都要一个 Zig，且是 `crates/desktop/ffi/zig-version` 钉住的那一版。
+`sprawling` 链接两片 Zig 叶子：控制台的渲染器 `crates/console_ffi`，在每个平台上编（`crates/console_ffi/Spec.lean` D1）；桌面 server 的 FFI 缝 `crates/desktop/ffi`，经 `crates/desktop/` 在 Windows 上编（`crates/desktop/Spec.lean` §8-12）。两个包的构建脚本都用 `zig build-lib`，所以在任何平台上编这个二进制、跑 `just check` 都要一个 Zig，且是 `crates/desktop/ffi/zig-version` 钉住的那一版；`crates/console_ffi/zig-version` 在仓库里必须与它相同，构建脚本比对两份。
 
 ```rust
 // bin::doctor::table::toolchain（形状 6 数据）
@@ -23,7 +23,7 @@ const ZIG_PIN: &str = crate::doctor::pin::ZIG_VERSION;   // 构建脚本读到�
 ```
 
 - **钉子只在一处**：`ZIG_PIN` 是构建脚本从 `crates/desktop/ffi/zig-version` 读进来的那一行，与 `LEAN_PIN` 读 `lean-toolchain` 同一种写法（§8-58、§8-157）；探测是 `zig version` 的输出以钉子开头，Windows 的装法是 `winget install --id zig.zig -e --version <钉子> --scope user`，macOS 是 `brew install zig`，Linux 印出官方下载页。构建脚本与 CI 的安装步骤读同一个文件。
-- **`Required` 而不是 `Optional`**：Windows 上没有它，`just check` 编不出这个二进制；在别的平台上 Zig 叶子不编，有它也不多花什么，而 `Need` 不按平台分（§8-58），两害取其轻是把它列为必需。
+- **`Required` 而不是 `Optional`**：没有它，任何平台上的 `just check` 都编不出这个二进制。
 - **位置**：表里 `lean` 之后、`uv` 之前：它与 Rust、Lean 同属编译这份代码要的工具，装法不依赖表里更早的任何一行。
 
 **验收**：`prereqs.tsv` 与表渲染出的文本逐字相等（§8-58 的现有测试）；`zig` 一行的探测与装法读的是钉子文件里的那一版。
@@ -786,7 +786,7 @@ pub(crate) fn pinned(pin: Pin) -> Option<String>;   // 文件为空即 None，�
 - **城写下的文档模板归 city。** 模板与 `City.md` 住在 `crates/city/templates/`：它们是城立城、建楼、开会话时写下的第一批字节，`city::spine_files` 与 `city::building` 按包内路径 `include_str!` 它们；accounting 立城时写的 `City.md` 读 `city::CITY_TEMPLATE`，不伸手到别的包目录里（`crates/city/Spec.lean` §8-41）。
 - **工具链钉子由构建脚本找，找不到就不钉。** `doctor` 的 develop 层报「钉住的版本」，读的是检出根上的 `rust-toolchain.toml`、`lean-toolchain` 与 `crates/desktop/ffi/zig-version`。这三份文件不在本包里，从包里构建时它们不存在，所以 `build.rs` 在 `checkout_root` 下找它们，把全文写进 `OUT_DIR` 下的 `pins.rs`；只有「不存在」读成空串，别的读失败仍是 `cargo::error`。空串即不钉：`pinned` 答 `None`，页面不画钉住的版本，探测按空前缀接受任何一版。
 - **`packaged` 门守这条线**（tools/xtask/Spec.lean §8-49）：可发布的包的生产代码里，`include!`、`include_str!`、`include_bytes!` 只指向包目录之内或 `OUT_DIR`。
-- **清单**：`[workspace.package]` 写 `repository`、`homepage`，`publish = true`；每个包写自己的 `description`，本包另写 `readme`、`keywords`、`categories` 与 `include`；`xtask` 与 `citysim` 写 `publish = false`。工作区自己的包在 `[workspace.dependencies]` 里各钉 `version = "=<工作区版本>"`，`guard` 判它们等于 `[workspace.package] version`（tools/xtask/Spec.lean §8-49）。`sprawling-remote-access` 被二进制链接，随之可发布。`sprawling-desktop-ffi` 也可发布：`sprawling-desktop` 在 Windows 上依赖它，而 crates.io 要求依赖的每个包都在 registry 上；它的包里带着 Zig 叶子的源码与 `zig-version`，构建脚本只读包内的文件，所以从 crates.io 在 Windows 上装这个二进制要先装钉住的那一版 Zig（§8-146），别的平台不编叶子。
+- **清单**：`[workspace.package]` 写 `repository`、`homepage`，`publish = true`；每个包写自己的 `description`，本包另写 `readme`、`keywords`、`categories` 与 `include`；`xtask` 与 `citysim` 写 `publish = false`。工作区自己的包在 `[workspace.dependencies]` 里各钉 `version = "=<工作区版本>"`，`guard` 判它们等于 `[workspace.package] version`（tools/xtask/Spec.lean §8-49）。`sprawling-remote-access` 被二进制链接，随之可发布。`sprawling-desktop-ffi` 也可发布：`sprawling-desktop` 在 Windows 上依赖它，而 crates.io 要求依赖的每个包都在 registry 上；它的包里带着 Zig 叶子的源码与 `zig-version`，构建脚本只读包内的文件，所以从 crates.io 在 Windows 上装这个二进制要先装钉住的那一版 Zig（§8-146）。`sprawling-console-ffi` 同理可发布，包里带着渲染器的 Zig 源码与它自己的 `zig-version`，所以从 crates.io 在任何平台上装这个二进制都要先装那一版 Zig。
 - **`sandbox` 是默认 feature。** `cargo install sprawling` 不写 `--features` 时也带执行引擎，与归档一致；不要引擎的构建写 `--no-default-features`，`just features` 编译这一份，因为别的命令都不再编它。
 - **Windows 的产品资源由 Cargo 包信息生成。** `build.rs` 是形状 4 adapter，以 `CARGO_CFG_TARGET_OS` 判断目标平台；目标为 Windows 时调用 `winresource::WindowsResource::new().compile()`，生成物留在 `OUT_DIR` 并交给链接器，其他目标不调用资源编译器。`ProductName` 读 `CARGO_PKG_NAME`，`ProductVersion` 与 `FileVersion` 读 `CARGO_PKG_VERSION`，数字版本也由 Cargo 的版本分量生成；包版本仍只有工作区清单这一处权威。`winresource` 关闭默认的 `toml` feature，不读取 `[package.metadata.winresource]` 中的覆盖项。所需工具是 MSVC 的 Windows SDK `rc.exe`，或 GNU 目标的 MinGW resource toolchain；非 Windows 主机交叉编译 MSVC 时使用 `llvm-rc` 与 `llvm-cvtres`。资源生成失败经 `cargo::error` 使构建失败，错误说明目标资源编译失败并要求检查对应工具链，不能发布一份悄悄缺失产品资源的 Windows 二进制。这些资源描述产品身份，不构成 Authenticode 签名，也不保证 Defender 的分类结果。
 - **发布次序**：`release.yml` 的 `crates` job 在 `channel`（npm）之后跑，也就排在 GitHub release 之后。它用 `rust-lang/crates-io-auth-action` 把这次运行的 OIDC 令牌换成 crates.io 的短期令牌（Trusted Publishing，每个可发布的包在 crates.io 上登记了仓库 `2youg1/sprawling-agents` 与工作流 `release.yml`），然后 `cargo publish --workspace --locked --no-verify --allow-dirty`；cargo 按依赖次序逐个发布，desktop 与它的叶子都是工作区成员，不再单独发。仓库里不存长期令牌。crates.io 的版本不能覆盖，而 `release.yml` 允许同一个 tag 重新发版，所以 crates.io 排在最后；本包这个版本已在 sparse index 上时，job 不再发布、只留一行说明。`--no-verify`：同一棵树已经过 `verify` 调用的共享 CI 验证与 `packaged` 门（D10；调用契约见 `tools/xtask/Spec.lean` D27），验证构建只是重编一遍，还会耗掉短期令牌的时效。`--allow-dirty`：job 改写了 binstall 的下载地址（D32）。
@@ -975,9 +975,9 @@ pub(crate) fn newest(item: &str) -> wire::DoctorUpstream;   // 不失败、不�
 crates.io 上的 `.crate` 只是一个包目录，所以一个构建要读的每一个文件都放进拥有它的那个包：客户端包落在 `crates/sprawling/web-dist`，城写下的模板与 `City.md` 落在 `crates/city/templates/`，构建脚本按 cargo 找锁的规则找 `Cargo.lock`，开发工具链的钉子在包外，找不到就降为不钉。理由：发布的包与仓库里的包是同一份清单、同一组文件，验证构建就是工作区里那次构建换一个目录，`packaged` 门在每一次 `just check` 里就判出包外的引用，不必等到发布。**被否**：①发布时由 xtask 在临时目录里组装一份改过的包，把包体、模板与钉子复制进去（与 `xtask channel` 组装 npm 包同一种做法）——发布出去的清单与源码对不上，`.cargo_vcs_info.json` 指向的提交编不出那份包，而组装器本身要一套自己的测试；②把各 crate 折成一个 crate 再发布——拆掉 ARCHITECTURE 的 crate 拓扑与每个 `pub(crate)` 边界。**重开参数**：一个要发布的文件不能放进任何一个包（例如两个包都要读的一大份数据），那时由一个包交出常量，另一个包读它，`City.md` 交给 accounting 就是这样做的。
 -/
 
-/-! D11 Zig 是在 Windows 上开发这份代码必需的工具（§8-146）
+/-! D11 Zig 是开发这份代码必需的工具（§8-146）
 
-桌面 server 没有准入安全接口的四组 Win32 调用经一片 Zig 叶子（`crates/desktop/Spec.lean` D12），叶子在构建时编译，所以 Windows 上没有 Zig 就编不出这个二进制。`zig` 一行因此是 `required`，版本只读 `crates/desktop/ffi/zig-version`。被否决的备选：把 Zig 叶子预编译成一个提交进树里的静态库——那是一份没人能从源码复现的二进制，`release` 的逐字节重建也就无从谈起。
+控制台的渲染器是一片 Zig 叶子（`crates/console_ffi/Spec.lean` D1），在每个平台上构建时编译；桌面 server 没有准入安全接口的四组 Win32 调用经另一片（`crates/desktop/Spec.lean` D12），在 Windows 上编译。所以没有 Zig 就编不出这个二进制。`zig` 一行因此是 `required`，版本只读 `crates/desktop/ffi/zig-version`。被否决的备选：把 Zig 叶子预编译成一个提交进树里的静态库——那是一份没人能从源码复现的二进制，`release` 的逐字节重建也就无从谈起。
 -/
 
 /-! D12 不钉的构建照列 `lean` 与 `zig`，装不钉的版本（§8-162、§8-157）

@@ -6,13 +6,18 @@
 //! What each key does on each face (`crates/sprawling/spec/Console.lean`
 //! §8-11): no Ctrl chord is bound; Esc closes the menu, else clears the
 //! line, else stops the room's run; a trailing backslash then Enter is a
-//! newline; `y` and `n` on an empty line answer the waiting request.
+//! newline; `y` and `n` on an empty line answer the waiting request; Tab
+//! completes a slash verb or opens the menu of those that fit, and Enter
+//! in the menu takes the one under the cursor.
 
+use console_ffi::scene::Entry;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use super::super::cli::Next;
 use super::super::editor::Edit;
 use super::super::lifecycle::{Asker, Event, Face};
+use super::super::local_time;
+use super::menu::{self, Fit, Menu, Then};
 use super::{CTRL_C_HINT, Ui};
 use wire::CloseMode;
 
@@ -43,24 +48,20 @@ impl Ui {
         }
     }
 
+    /// Text pasted whole, put into the line as it was copied.
+    pub(super) fn paste(&mut self, pasted: &str) {
+        if let Face::Cli | Face::Stopping { .. } = self.shown {
+            self.editor.paste(pasted);
+            self.refilter();
+            self.redraw(&[]);
+        }
+    }
+
     fn typing(&mut self, key: KeyEvent, alt: bool) {
-        if self.asking {
-            let answer = if key.code == KeyCode::Enter {
-                Some(Some(CloseMode::Drain))
-            } else if key.code == KeyCode::Char('n') {
-                Some(Some(CloseMode::Interrupt))
-            } else if key.code == KeyCode::Esc {
-                Some(None)
-            } else {
-                None
-            };
-            if let Some(mode) = answer {
-                self.asking = false;
-                match mode {
-                    Some(mode) => self.inside.tell(Event::Quit(Asker::Console, mode)),
-                    None => self.line("  the city keeps serving"),
-                }
-            }
+        if let Some(going) = self.asking {
+            return self.answer_quit(key, going);
+        }
+        if self.menu.is_some() && self.in_menu(key) {
             return;
         }
         let edit = match (key.code, alt) {
@@ -79,7 +80,7 @@ impl Ui {
                     None => false,
                 };
                 if answered {
-                    return;
+                    return self.redraw(&[]);
                 }
                 Edit::Insert(answer)
             }
@@ -97,95 +98,138 @@ impl Ui {
             (KeyCode::Down, _) => Edit::Newer,
             _ => return,
         };
-        self.erase_input();
         self.editor.apply(edit);
-        self.draw_input();
+        self.refilter();
+        self.redraw(&[]);
     }
 
-    /// Esc, in order: close the menu, else clear the line, else stop the
-    /// run working in this room.
-    fn escape(&mut self) {
-        if self.menu {
-            self.menu = false;
+    /// `/quit` asked how the runs under way end: Enter waits for them, n
+    /// stops them now, Esc keeps serving.
+    fn answer_quit(&mut self, key: KeyEvent, going: u64) {
+        let mode = if key.code == KeyCode::Enter {
+            Some(CloseMode::Drain)
+        } else if key.code == KeyCode::Char('n') {
+            Some(CloseMode::Interrupt)
+        } else if key.code == KeyCode::Esc {
+            None
+        } else {
             return;
+        };
+        self.asking = None;
+        match mode {
+            Some(mode) => {
+                self.redraw(&[]);
+                self.inside.tell(Event::Quit(Asker::Console, mode));
+            }
+            None => self.line(&format!("  the city keeps serving; {going} runs go on")),
         }
-        if !self.editor.is_empty() {
-            self.erase_input();
-            self.editor.apply(Edit::Clear);
-            self.draw_input();
+    }
+
+    /// A key while the menu is open: Tab and Down move on, Shift+Tab and
+    /// Up move back, Enter takes the fit under the cursor, Esc closes it.
+    /// Any other key edits the line, and the menu follows what it says.
+    fn in_menu(&mut self, key: KeyEvent) -> bool {
+        let Some(open) = self.menu.as_mut() else {
+            return false;
+        };
+        if matches!(key.code, KeyCode::Tab | KeyCode::Down) {
+            open.next();
+        } else if matches!(key.code, KeyCode::BackTab | KeyCode::Up) {
+            open.previous();
+        } else if key.code == KeyCode::Esc {
+            self.menu = None;
+        } else if key.code == KeyCode::Enter {
+            self.choose();
+            return true;
+        } else {
+            return false;
+        }
+        self.redraw(&[]);
+        true
+    }
+
+    /// Enter in the menu: the fit under the cursor goes on the line, and
+    /// a line that is complete is carried at once.
+    fn choose(&mut self) {
+        let Some(fit) = self.menu.take().and_then(|open| open.chosen().cloned()) else {
             return;
+        };
+        self.editor.set(&fit.line);
+        match fit.then {
+            Then::Carry => self.enter(),
+            Then::Wait => self.redraw(&[]),
+        }
+    }
+
+    /// Esc with the menu closed: clear the line, else stop the run
+    /// working in this room.
+    fn escape(&mut self) {
+        if !self.editor.is_empty() {
+            self.editor.apply(Edit::Clear);
+            return self.redraw(&[]);
         }
         if let Some(session) = self.session.as_mut() {
             session.interrupt(&self.inside, &self.say);
         }
     }
 
-    /// Tab: a slash verb completed, or the argument after `/model` or
-    /// `/effort`; several that fit are listed instead.
+    /// Tab: the one fit replaces the line, or the menu opens on the first
+    /// of several.
     fn complete(&mut self) {
+        let mut fits = self.fits();
+        if fits.len() == 1 {
+            if let Some(Fit { line, .. }) = fits.pop() {
+                self.editor.set(&line);
+            }
+        } else {
+            self.menu = Menu::of(fits);
+        }
+        self.redraw(&[]);
+    }
+
+    /// While the menu is open, it follows the line as it is edited, and
+    /// closes when nothing fits any more.
+    fn refilter(&mut self) {
+        if self.menu.is_some() {
+            self.menu = Menu::of(self.fits());
+        }
+    }
+
+    /// What fits the line as typed: slash verbs while the verb is being
+    /// typed, the offered arguments after `/model` or `/effort`.
+    fn fits(&self) -> Vec<Fit> {
         let typed = self.editor.text();
         if !typed.starts_with('/') {
-            return;
+            return Vec::new();
         }
         match typed.split_once(' ') {
-            None => {
-                let fits: Vec<(String, &str)> = super::super::language::slash_verbs()
-                    .filter(|verb| verb.spelling().starts_with(&typed))
-                    .map(|verb| {
-                        let spaced = if verb.takes().is_empty() { "" } else { " " };
-                        (format!("{}{spaced}", verb.spelling()), verb.spelling())
-                    })
-                    .collect();
-                self.offer(&fits);
-            }
+            None => menu::verbs(&typed),
             Some((spelled, begun)) if !begun.contains(char::is_whitespace) => {
                 let Some(verb) =
                     super::super::language::slash_verbs().find(|verb| verb.spelling() == spelled)
                 else {
-                    return;
+                    return Vec::new();
                 };
                 let offered = match self.session.as_ref() {
                     Some(session) => session.arguments(&self.inside, verb),
                     None => Vec::new(),
                 };
-                let fits: Vec<(String, &str)> = offered
-                    .iter()
-                    .filter(|argument| argument.starts_with(begun))
-                    .map(|argument| (format!("{spelled} {argument}"), argument.as_str()))
-                    .collect();
-                self.offer(&fits);
+                menu::arguments(spelled, begun, &offered)
             }
-            Some(_) => {}
+            Some(_) => Vec::new(),
         }
     }
 
-    /// One fit replaces the line; several are listed as a menu Esc closes.
-    /// Each fit is the line it would leave and the word the menu shows.
-    fn offer(&mut self, fits: &[(String, &str)]) {
-        match fits {
-            [] => {}
-            [(line, _)] => {
-                self.erase_input();
-                self.editor.set(line);
-                self.draw_input();
-            }
-            many => {
-                let listed: Vec<&str> = many.iter().map(|(_, shown)| *shown).collect();
-                self.menu = true;
-                self.line(&format!("  {}", listed.join("   ")));
-            }
-        }
-    }
-
-    fn enter(&mut self) {
+    pub(super) fn enter(&mut self) {
         let Some(typed) = self.editor.enter() else {
-            self.erase_input();
-            self.draw_input();
-            return;
+            return self.redraw(&[]);
         };
-        self.menu = false;
-        let submitted = self.screen.submitted();
-        self.drawn(submitted);
+        self.menu = None;
+        let at = (self.inside.clock)().ok().and_then(local_time::local);
+        self.print(vec![Entry::You {
+            at,
+            said: typed.clone(),
+        }]);
         if let Face::Stopping { .. } = self.shown {
             if typed.trim() == wire::Slash::Quit.spelling() {
                 self.inside
@@ -193,15 +237,17 @@ impl Ui {
             } else {
                 self.line("  the city is closing; /quit again stops the runs now");
             }
-            self.draw_input();
             return;
         }
         let next = match self.session.as_mut() {
             Some(session) => session.carry(&self.terminal, &self.inside, &typed, &self.say),
             None => Next::Stay,
         };
+        if let Some(session) = self.session.as_ref() {
+            self.offer = session.offer(&self.inside);
+        }
         match next {
-            Next::Stay => {}
+            Next::Stay => self.redraw(&[]),
             Next::Web => {
                 self.open_web();
                 self.inside.tell(Event::Web);
@@ -210,13 +256,10 @@ impl Ui {
                 .inside
                 .tell(Event::Quit(Asker::Console, CloseMode::Drain)),
             Next::AskBeforeQuit(going) => {
-                self.asking = true;
-                self.line(&format!(
-                    "  {going} runs are going   Enter wait for them   n stop them now   Esc keep serving"
-                ));
+                self.asking = Some(going);
+                self.redraw(&[]);
             }
         }
-        self.draw_input();
     }
 
     /// Opens the page already paired: an open code through a file only

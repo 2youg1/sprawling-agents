@@ -8,13 +8,15 @@
 //! (`crates/sprawling/spec/Console.lean` §8-11).
 //!
 //! Pure: no terminal, no clock. `bin::console::ui` turns keys into
-//! [`Edit`]s and draws what [`Editor::layout`] says, so the whole of
-//! line editing is judged here without a terminal.
+//! [`Edit`]s and hands the text and the cursor to the renderer, which
+//! lays them out, so the whole of line editing is judged here without a
+//! terminal.
 //!
 //! The point a reader most often gets wrong: a newline is a trailing
 //! backslash then Enter on every platform, because Shift+Enter reaches a
 //! program only where the terminal reports it, and no Ctrl chord is
-//! bound at all.
+//! bound at all. A paste, where the terminal hands it over whole, keeps
+//! its line breaks instead of sending each line.
 
 /// One change to the line.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -41,21 +43,6 @@ pub(crate) enum Edit {
     Clear,
 }
 
-/// Where the drawn line puts the cursor, counted from the row the
-/// prompt starts on.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct Layout {
-    /// Rows between the prompt's row and the cursor's.
-    pub(crate) cursor_row: u16,
-    pub(crate) cursor_column: u16,
-    /// Rows between the prompt's row and the end of the text.
-    pub(crate) end_row: u16,
-}
-
-/// What the prompt draws before the text, and what a continued line
-/// starts with, so both rows of a two-line message line up.
-pub(crate) const PROMPT: &str = "> ";
-
 /// The line being typed, and the lines typed before it.
 #[derive(Debug, Default)]
 pub(crate) struct Editor {
@@ -75,6 +62,18 @@ impl Editor {
 
     pub(crate) fn text(&self) -> String {
         self.text.iter().collect()
+    }
+
+    /// Where the cursor stands, as a count of characters before it.
+    pub(crate) fn cursor(&self) -> usize {
+        self.cursor
+    }
+
+    /// Text pasted whole, inserted at the cursor with its line breaks.
+    pub(crate) fn paste(&mut self, pasted: &str) {
+        for ch in pasted.chars().filter(|ch| *ch != '\r') {
+            self.insert(ch);
+        }
     }
 
     /// Replaces the line, cursor at its end; Tab completion uses this.
@@ -144,40 +143,6 @@ impl Editor {
         Some(line)
     }
 
-    /// Where the cursor and the end of the text land when the prompt
-    /// and the text are drawn `width` columns wide.
-    pub(crate) fn layout(&self, width: u16) -> Layout {
-        let width = usize::from(width.max(1));
-        let start = PROMPT.chars().count();
-        let (mut row, mut column) = (0usize, start);
-        let mut at_cursor = (row, column);
-        for (index, ch) in self.text.iter().enumerate() {
-            if index == self.cursor {
-                at_cursor = (row, column);
-            }
-            if *ch == '\n' {
-                row = row.saturating_add(1);
-                column = start;
-                continue;
-            }
-            let wide = columns(*ch);
-            if column.saturating_add(wide) > width {
-                row = row.saturating_add(1);
-                column = 0;
-            }
-            column = column.saturating_add(wide);
-        }
-        if self.cursor >= self.text.len() {
-            at_cursor = (row, column);
-        }
-        let narrow = |n: usize| u16::try_from(n).unwrap_or(u16::MAX);
-        Layout {
-            cursor_row: narrow(at_cursor.0),
-            cursor_column: narrow(at_cursor.1),
-            end_row: narrow(row),
-        }
-    }
-
     fn insert(&mut self, ch: char) {
         self.text.insert(self.cursor, ch);
         self.cursor = self.cursor.saturating_add(1);
@@ -225,28 +190,5 @@ impl Editor {
                 .unwrap_or(rest.len());
             self.cursor.saturating_add(first).saturating_add(length)
         })
-    }
-}
-
-/// How many columns a character takes in a terminal: two for the East
-/// Asian wide and fullwidth ranges a person writing Chinese, Japanese or
-/// Korean types, one otherwise.
-pub(crate) fn columns(ch: char) -> usize {
-    match u32::from(ch) {
-        0x1100..=0x115F
-        | 0x2E80..=0x303E
-        | 0x3041..=0x33FF
-        | 0x3400..=0x4DBF
-        | 0x4E00..=0x9FFF
-        | 0xA000..=0xA4CF
-        | 0xAC00..=0xD7A3
-        | 0xF900..=0xFAFF
-        | 0xFE30..=0xFE4F
-        | 0xFF00..=0xFF60
-        | 0xFFE0..=0xFFE6
-        | 0x1F300..=0x1F64F
-        | 0x1F900..=0x1F9FF
-        | 0x20000..=0x3FFFD => 2,
-        _ => 1,
     }
 }

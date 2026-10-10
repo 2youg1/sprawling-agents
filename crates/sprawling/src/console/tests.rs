@@ -5,4 +5,5 @@
 
 mod helpers;
 mod parsing;
+mod stream;
 mod terminal;

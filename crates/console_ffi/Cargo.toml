@@ -1,0 +1,46 @@
+[package]
+name = "sprawling-console-ffi"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+homepage.workspace = true
+publish.workspace = true
+description = "The Zig leaf that draws the console's frames, offered as one safe function."
+# The leaf is built by `build.rs` with the standard library alone, and
+# linked under this one name (`crates/console_ffi/Spec.lean` D1).
+links = "sprawling_console_leaf"
+
+[lib]
+name = "console_ffi"
+path = "src/lib.rs"
+
+[dev-dependencies]
+vt100 = { workspace = true }
+
+# The workspace's lint table, written out because one line differs:
+# `unsafe_code` is `deny` rather than `forbid`, so the one call into the
+# Zig leaf can relax it at that statement, with a written reason. Every
+# other key is the workspace's own, and `xtask guard` holds this table to
+# `[workspace.lints]` key by key (`crates/console_ffi/Spec.lean` D1).
+[lints.rust]
+unsafe_code = "deny"
+unexpected_cfgs = { level = "deny", check-cfg = ["cfg(kani)"] }
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+todo = "deny"
+unimplemented = "deny"
+unreachable = "deny"
+indexing_slicing = "deny"
+string_slice = "deny"
+arithmetic_side_effects = "deny"
+as_conversions = "deny"
+dbg_macro = "deny"
+wildcard_enum_match_arm = "deny"
+let_underscore_must_use = "deny"
+let_underscore_untyped = "deny"
+fn_params_excessive_bools = "deny"

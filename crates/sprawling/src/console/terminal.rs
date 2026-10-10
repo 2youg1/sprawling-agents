@@ -52,6 +52,9 @@ pub struct Terminal {
     pub surface: Surface,
 }
 
+/// A reading of the wall clock, which `bin::assembly` lends.
+pub(crate) type Clock = Arc<dyn Fn() -> Result<kernel::TimeMs, kernel::AxError> + Send + Sync>;
+
 /// What the console reaches the city through: the socket's own desk and
 /// answering function, the remote door or why this serve has none, and
 /// the lifecycle it tells about `/web`, `/quit` and a lost terminal.
@@ -64,6 +67,9 @@ pub(crate) struct Inside {
     /// (`crates/sprawling/spec/Firstrun.lean` §8-8).
     pub(crate) door: wire::LocalDoor,
     pub(crate) lifecycle: tokio::sync::mpsc::Sender<Event>,
+    /// The wall clock, read when a typed line is put in the transcript
+    /// beside the time it was said.
+    pub(crate) clock: Clock,
 }
 
 impl Inside {
