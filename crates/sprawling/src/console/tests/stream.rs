@@ -186,3 +186,34 @@ fn a_request_waits_live_and_reaches_the_transcript_when_answered() {
     );
     assert!(seen.waiting.is_empty());
 }
+
+/// A run of the same resident that freezes while another works here,
+/// say one started from the WebUI, leaves the transcript and the working
+/// run alone: its end line would read as the working run's.
+#[test]
+fn another_run_freezing_while_one_works_here_says_nothing() {
+    let mut seen = Room::default();
+    let started = record(0, EventKind::RunStarted, serde_json::json!({ "task": "t" }));
+    assert_eq!(read(&mut seen, &[started]), Vec::new());
+    let other = EventRecord::from_draft(
+        EventDraft {
+            run: RunId::from_bytes([9u8; 16]),
+            t: TimeMs::new(3_700_000),
+            who: "lab/room1".to_owned(),
+            addr: None,
+            kind: EventKind::RunFrozen,
+            data: Payload::new(
+                serde_json::json!({ "completion": "done" })
+                    .as_object()
+                    .unwrap()
+                    .clone(),
+            )
+            .unwrap(),
+            ig: false,
+        },
+        Seq::new(50),
+        B3Hash::digest(b"prev"),
+    );
+    assert_eq!(read(&mut seen, &[other]), Vec::new());
+    assert_eq!(seen.run, Some(RunId::from_bytes([7u8; 16])));
+}

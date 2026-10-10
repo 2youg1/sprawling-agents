@@ -296,28 +296,6 @@ fn a_narrow_window_drops_the_times_and_keeps_every_line_inside_it() {
 }
 
 #[test]
-fn a_control_sequence_inside_a_reply_reaches_the_screen_as_a_mark() {
-    let entries = vec![Entry::Reply {
-        said: "clear\u{1b}[2Jthe screen".to_owned(),
-    }];
-    let scene = Scene::inline(&Inline {
-        columns: 80,
-        erase: 0,
-        previous: None,
-        entries: &entries,
-        live: None,
-    });
-    let (bytes, _) = drawn(&scene);
-    let written = String::from_utf8(bytes.clone()).unwrap();
-    assert!(
-        written.contains("clear\u{fffd}[2Jthe screen"),
-        "{written:?}"
-    );
-    let (shown, _) = screen(80, 4, &[bytes]);
-    assert!(shown.contains("the screen"), "{shown}");
-}
-
-#[test]
 fn the_quiet_host_is_two_lines_in_the_middle_of_the_window() {
     let scene = Scene::quiet(&Quiet {
         columns: 80,
@@ -345,23 +323,4 @@ fn the_quiet_host_is_two_lines_in_the_middle_of_the_window() {
     assert_eq!(shown, wanted);
 }
 
-#[test]
-fn a_scene_cut_short_is_refused_rather_than_read_past() {
-    let entries = transcript();
-    let scene = Scene::inline(&Inline {
-        columns: 80,
-        erase: 0,
-        previous: None,
-        entries: &entries,
-        live: None,
-    });
-    let bytes = scene.bytes();
-    for cut in [1, 7, bytes.len() / 2, bytes.len() - 1] {
-        let short = Scene::from_bytes_for_tests(&bytes[..cut]);
-        let mut into = Vec::new();
-        assert_eq!(
-            crate::draw(&short, &mut into),
-            Err(crate::Refused::Malformed)
-        );
-    }
-}
+mod edges;
