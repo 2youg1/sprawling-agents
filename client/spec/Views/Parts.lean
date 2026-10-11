@@ -54,7 +54,7 @@
 | `building/plan.svelte` 的计划行 | APG Disclosure | Enter／Space | 展开或收起这个节点的花费（4-50 其六） |
 | `building/sandbox.svelte` 的保存 | APG Button | Enter | 整值发 `configureSandbox`；燃料不是正整数时按不动，`why` 说为什么 |
 
-`button.svelte` 的 `aria-*`：`aria-disabled` 在 `loading` 或 `why` 在场时为 `"true"`，`aria-busy` 只在 `loading` 时为 `"true"`，`why` 在场时 `aria-describedby` 指向 `Tip` 的 id。**用 `aria-disabled` 而不是 `disabled`**：控件因此留在 Tab 序列里，键盘到得了它，读屏也读得到它为什么按不动。
+`button.svelte` 的 `aria-*`：`aria-disabled` 在 `loading` 或 `why` 在场时为 `"true"`，`aria-busy` 只在 `loading` 时为 `"true"`，`why` 在场时 `aria-describedby` 指向 `Tip` 的 id。**用 `aria-disabled` 而不是 `disabled`**：控件因此留在 Tab 序列里，键盘到得了它，读屏也读得到它为什么按不动。调用方给了 `name` 时键的可访问名字是 `name`（写成 `aria-label`），面子仍是 `label`：行内动作的面子可以只是动词（「忘掉」），名字仍带行首文字已指出的对象（「忘掉 Firefox · Windows」），因为行的主文字不在键自己的名字里（4-57b）。
 
 `icon_button.svelte` 的 `aria-*`：名字恒为 `aria-label`，取调用方给的 `label`；它的 `Tip` 在键可用时画同一个名字，不可用时画 `why`；`aria-describedby` 只在 `why` 在场时指向 `Tip`，因为可用时提示与名字是同一句，再读一遍只是重复；`aria-disabled` 恰在 `why` 在场时为 `"true"`。名字经 `Tip` 画出而不是写进 `title`，因为 `title` 键盘到不了、触屏看不见（设计 4-18）。键画在 `control-sm` 的方框里；`pointer: coarse` 下命中区由 `::before` 扩到 `--spacing-touch`（44），画出的方框不变（`docs/frontend-method.md` §4-34）。
 
