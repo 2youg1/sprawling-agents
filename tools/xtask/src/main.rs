@@ -66,6 +66,9 @@ use std::process::ExitCode;
 
 use report::XtaskError;
 
+/// Dispatch the command in the current checkout and report its outcome.
+/// Returns 0 on success, 1 for rule violations, or 2 for usage errors or
+/// internal failures, including failure to identify the checkout.
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let judged = std::env::current_dir()

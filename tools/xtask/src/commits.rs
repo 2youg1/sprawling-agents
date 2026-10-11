@@ -28,8 +28,13 @@ pub(crate) enum Target<'a> {
 
 /// Where the target breaks the message rules of AGENTS.md.
 ///
+/// Reads non-merge commits in the target's range from the repository at
+/// `root`, then checks the title when supplied. Rule violations are returned
+/// as findings; an empty vector means no violations were found.
+///
 /// # Errors
-/// When git cannot be started or refuses the range.
+/// Propagates `XtaskError::Cmd` if reading the range fails; the title is
+/// not checked in that case.
 pub(crate) fn check(root: &Path, target: Target<'_>) -> Result<Vec<Violation>, XtaskError> {
     let (range, title) = match target {
         Target::Range(range) => (range, None),
@@ -48,10 +53,15 @@ pub(crate) fn check(root: &Path, target: Target<'_>) -> Result<Vec<Violation>, X
     Ok(violations)
 }
 
-/// Where the commits in `range` break the message rules of AGENTS.md.
+/// Where the non-merge commits in `range` break the message rules of AGENTS.md.
+///
+/// Reads Git history in `root`, returning each finding with the first ten
+/// characters of its commit hash as the location. A range with no commits
+/// or no violations returns an empty vector.
 ///
 /// # Errors
-/// When git cannot be started or refuses the range.
+/// Returns `XtaskError::Cmd` if running Git or collecting its output fails,
+/// or if Git exits unsuccessfully, including when it refuses the range.
 #[expect(clippy::disallowed_methods, reason = "developer tool (child D4)")]
 fn range_violations(root: &Path, range: &str) -> Result<Vec<Violation>, XtaskError> {
     let cmd = format!("git log --no-merges {range}");
