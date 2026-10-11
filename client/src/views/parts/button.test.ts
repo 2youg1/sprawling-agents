@@ -42,10 +42,16 @@ describe("button wiring", () => {
       "aria-disabled": false,
       "aria-busy": false,
       "aria-describedby": undefined,
+      "aria-label": undefined,
       onclick: undefined,
     });
     wire.onclick();
     expect(hand.presses()).toBe(1);
+  });
+
+  test("a given name is what the control is read by, while the face stays the label", () => {
+    const look = lookOf({ label: "forget", name: "forget Firefox · Windows" });
+    expect([look.label, look.wire(undefined)["aria-label"]]).toEqual(["forget", "forget Firefox · Windows"]);
   });
 
   test("a loading button is disabled and busy, and swallows the press", () => {

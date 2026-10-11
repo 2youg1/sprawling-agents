@@ -146,10 +146,17 @@
           # zig builds the console's renderer, `crates/console_ffi`, on every
           # platform (`crates/console_ffi/Spec.lean` D1).
           nativeBuildInputs = nativeDeps ++ [ pkgs.bun pkgs.just zig ];
-          # just is a command used by preBuild, not this package's builder.
+          # just and zig are commands this package's build calls, not its
+          # builder: each one's nixpkgs setup hook claims every phase still
+          # unclaimed, and a zig build phase at the repository root has no
+          # build.zig to read.
           dontUseJustBuild = true;
           dontUseJustCheck = true;
           dontUseJustInstall = true;
+          dontUseZigConfigure = true;
+          dontUseZigBuild = true;
+          dontUseZigCheck = true;
+          dontUseZigInstall = true;
           preBuild = ''
             export HOME="$TMPDIR/home"
             mkdir -p "$HOME"

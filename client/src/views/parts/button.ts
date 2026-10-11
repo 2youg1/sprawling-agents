@@ -5,9 +5,9 @@
 
 // What the one button decides before anything is drawn: which posture
 // it is in, and everything the element it is drawn as must carry - its
-// type, its two ARIA properties, the relation to the hint that says why
-// it cannot be used, and the guard that keeps a press from landing while
-// it may not. The look (`button.look.svelte`, or any other look that
+// type, its two ARIA properties, its name when that says more than its
+// face, the relation to the hint that says why it cannot be used, and
+// the guard that keeps a press from landing while it may not. The look (`button.look.svelte`, or any other look that
 // takes `ButtonLook`) spreads that bag on its `<button>` and writes no
 // ARIA and no handler of its own, so a look from a component library
 // keeps the same keyboard and screen-reader contract
@@ -32,6 +32,13 @@ export type ButtonState = "idle" | "loading" | "stopped";
 export interface ButtonProps {
   // Already in the person's language: a `say` key resolved by the page.
   readonly label: string;
+  // The name the control is read by, when it must say more than the
+  // face does: a row action whose face is the verb alone is still read
+  // as acting on the object its row names ("forget" on the face,
+  // "forget Firefox · Windows" to a screen reader), because the row's
+  // primary text is not part of the button's own name. Absent means the
+  // label is the name.
+  readonly name?: string;
   readonly tone?: Tone;
   readonly type?: "button" | "submit";
   // The command went out and its acknowledgement has not come back.
@@ -53,6 +60,7 @@ export interface ButtonWire {
   readonly "aria-disabled": boolean;
   readonly "aria-busy": boolean;
   readonly "aria-describedby": string | undefined;
+  readonly "aria-label": string | undefined;
   readonly onclick: () => void;
 }
 
@@ -76,6 +84,15 @@ export function stateOf(props: ButtonProps): ButtonState {
   return props.loading === true ? "loading" : "idle";
 }
 
+/**
+ * Build the button's presentation and element wiring from its current props.
+ * A refusal takes precedence over loading; either state blocks presses.
+ * The visible label stays unchanged when `name` supplies an accessible name.
+ * The look passes its hint id to `wire` and spreads the result on its button.
+ *
+ * @param props - The caller's labels, state, styling choices and press callback.
+ * @returns The presentation and wiring shared by every button look.
+ */
 export function lookOf(props: ButtonProps): ButtonLook {
   const state = stateOf(props);
   return {
@@ -88,6 +105,7 @@ export function lookOf(props: ButtonProps): ButtonLook {
       "aria-disabled": state !== "idle",
       "aria-busy": state === "loading",
       "aria-describedby": hint,
+      "aria-label": props.name,
       onclick: () => {
         if (state !== "idle") return;
         props.onPress?.();

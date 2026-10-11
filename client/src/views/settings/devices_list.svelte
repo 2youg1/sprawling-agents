@@ -70,7 +70,8 @@
       {#snippet actions()}
         {#if local}
           <Button
-            label={fill(say($lang, "devices_forget"), { label: named(device) })}
+            label={say($lang, "devices_forget_verb")}
+            name={fill(say($lang, "devices_forget"), { label: named(device) })}
             tone="quiet"
             onPress={() => {
               asking = device;

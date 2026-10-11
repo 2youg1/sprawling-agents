@@ -10867,6 +10867,10 @@
     "en": "Its sessions end now; it has to pair again to come back.",
     "zh": "它的会话立刻结束；要再用就得重新配对。"
   },
+  "devices_forget_verb": {
+    "en": "forget",
+    "zh": "忘掉"
+  },
   "devices_local_only": {
     "en": "Only a browser on the computer that runs the city can forget a device.",
     "zh": "只有运行城市的那台电脑上的浏览器才能忘掉设备。"
