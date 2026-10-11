@@ -84,6 +84,15 @@ export function stateOf(props: ButtonProps): ButtonState {
   return props.loading === true ? "loading" : "idle";
 }
 
+/**
+ * Build the button's presentation and element wiring from its current props.
+ * A refusal takes precedence over loading; either state blocks presses.
+ * The visible label stays unchanged when `name` supplies an accessible name.
+ * The look passes its hint id to `wire` and spreads the result on its button.
+ *
+ * @param props - The caller's labels, state, styling choices and press callback.
+ * @returns The presentation and wiring shared by every button look.
+ */
 export function lookOf(props: ButtonProps): ButtonLook {
   const state = stateOf(props);
   return {
