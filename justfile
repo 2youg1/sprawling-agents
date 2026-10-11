@@ -504,10 +504,12 @@ models:
     lake build Spec
 
 # Every commit subject and ruling trailer in a range of history
-# (tools/xtask/Spec.lean §8-35). Not in `check`, because a tree has no
+# (tools/xtask/Spec.lean §8-35), and on a pull request its title, which
+# a squash merge of two or more commits turns into the subject main
+# receives. Not in `check`, because a tree has no
 # range: CI names it, and at a desk it is `just commits main..HEAD`.
-commits range:
-    cargo xtask commits --range '{{range}}'
+commits range title='':
+    cargo xtask commits --range '{{range}}' {{ if title == '' { '' } else { '--title ' + quote(title) } }}
 
 # The supply-chain read: licences, banned crates, and where they came
 # from. This recipe is the one place that says which checks the daily

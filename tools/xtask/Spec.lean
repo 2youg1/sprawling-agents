@@ -808,17 +808,19 @@ fn run(root: &Path, args: &[String]) -> Result<String, XtaskError>;
 **不判的**：证明是否真的上传成功、`gh attestation verify` 能否通过——那要一次真实的 tag 推送，由发布流水线自己在服务端失败。
 -/
 
-/-! ### 8-35 `xtask::commits`：一段提交范围里每条提交信息的主题与裁决尾注（形状 1 判定）
+/-! ### 8-35 `xtask::commits`：一段提交范围里每条提交信息的主题与裁决尾注，以及拉取请求的标题（形状 1 判定）
 
 **要判的事实**：AGENTS.md「Commits」一节的两条可机判的规则。其一，主题行匹配 `^card-S\d+\.[0-9A-Z]+: `，即 `card-`、`S`、至少一位数字、`.`、至少一个数字或大写字母，再接冒号与一个空格。其二，以 `Verdict:` 开头的行只能逐字是 `Verdict: user-approved`；拼错的裁决尾注读起来像一次裁决，实际上谁也没裁。
 
-**不是门**：门判树，不判历史（§3 的 guard 一条与 `guard.rs` 的模块文档记着原因：读历史会让每次门运行依赖调用者传的范围）。故这是一条子命令 `cargo xtask commits --range <base>..<tip>`，由 `just commits <range>` 调用，CI 的 `fast` 作业在拉取请求上传 `base..head`、在推送上传 `before..after`。
+**标题同判**：本仓库只允许 squash 合并（仓库设置 `squash_merge_commit_title = COMMIT_OR_PR_TITLE`），GitHub 对有两个及以上提交的拉取请求以请求标题为落地提交的主题。标题因此是 main 会收到的那条主题的来源，而它不住在任何一段历史里，`--range` 够不着它；判它的时机只能是合并之前——之后 main 上的范围检查只剩报告的分，历史已经落地。故 CI 在拉取请求事件上把标题随范围一并传入，触发器含 `edited`，因为标题在打开之后仍可改，改了必须重判。合并人仍可在合并那一刻改写 squash 信息，推送上的范围检查是它最后的绊线。
 
-**接口**：`pub(crate) fn check(root: &Path, range: &str) -> Result<Vec<Violation>, XtaskError>` 跑 `git log --no-merges --format=%H%x1f%B%x1e <range>`，逐条交给纯函数 `fn findings(message: &str) -> Vec<String>`；每条违规的 `location` 是提交的短哈希。失败：git 起不来或返回非零时为 `XtaskError::Cmd`，缺 `--range` 时 main 打印用法并以 2 退出。
+**不是门**：门判树，不判历史（§3 的 guard 一条与 `guard.rs` 的模块文档记着原因：读历史会让每次门运行依赖调用者传的范围）。故这是一条子命令 `cargo xtask commits --range <base>..<tip> [--title <标题>]`，由 `just commits <range> [title]` 调用，CI 的 `gates` 作业在拉取请求上传 `base..head` 与该请求的标题、在推送上传 `before..after`。
+
+**接口**：`pub(crate) enum Target<'a>` 是 `Range(&'a str)` 或 `RangeAndTitle { range, title }`——标题从不单判，没有一个调用点只有标题。`pub(crate) fn check(root: &Path, target: Target<'_>) -> Result<Vec<Violation>, XtaskError>` 对范围跑 `git log --no-merges --format=%H%x1f%B%x1e <range>`，逐条交给纯函数 `fn findings(message: &str) -> Vec<String>`，每条违规的 `location` 是提交的短哈希；标题交给纯函数 `fn title_findings(title: &str) -> Vec<String>`，违规的 `location` 是 `pull request title`。失败：git 起不来或返回非零时为 `XtaskError::Cmd`，缺 `--range` 时 main 打印用法并以 2 退出。
 
 **合并提交不判**：合并提交不带自己的改动，它的主题由 git 或托管平台生成（`Merge branch …`、`Merge pull request …`），要求它带卡号只会让每次合并都红，而它合进来的每条非合并提交照样被判。Dependabot 的提交由 `.github/dependabot.yml` 的 `commit-message.prefix` 定为 `card-S0.DEPS`，Dependabot 在以字母结尾的前缀后自己补 `: `，所以它的主题也落在同一条规则里，不另开豁免。
 
-**败给的方案**：写成第 21 道门并在门里读 `--range`。门名册是树的判定，`just check` 在本地不带范围跑它；一道只在带范围时才判东西的门，在本地永远绿，正是「CI 里有、本地没有」的检查。
+**败给的方案**：写成第 21 道门并在门里读 `--range`。门名册是树的判定，`just check` 在本地不带范围跑它；一道只在带范围时才判东西的门，在本地永远绿，正是「CI 里有、本地没有」的检查。标题判定另有两个被否的写法：在 YAML 里复制这条正则——模式就有了第二个权威，两处之间没有任何东西拉着它们一致；靠合并人记得改写 squash 信息——没有机制兜底的纪律已经失败过一次。
 -/
 
 /-! ### 8-36 `wire-ts` 发出 `BODY_PX`
