@@ -66,6 +66,9 @@ use std::process::ExitCode;
 
 use report::XtaskError;
 
+/// Dispatch the command in the current checkout and report its outcome.
+/// Returns 0 on success, 1 for rule violations, or 2 for usage errors or
+/// internal failures, including failure to identify the checkout.
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let judged = std::env::current_dir()
@@ -208,7 +211,17 @@ fn main() -> ExitCode {
         Some("depmap") => report::finish("depmap", depmap::check(&root)),
         Some("guard") => report::finish("guard", guard::check(&root)),
         Some("commits") => match value_arg(&args, "--range") {
-            Some(range) => report::finish("commits", commits::check(&root, &range)),
+            Some(range) => {
+                let title = value_arg(&args, "--title");
+                let target = match &title {
+                    Some(title) => commits::Target::RangeAndTitle {
+                        range: &range,
+                        title,
+                    },
+                    None => commits::Target::Range(&range),
+                };
+                report::finish("commits", commits::check(&root, target))
+            }
             None => {
                 usage();
                 ExitCode::from(2)
@@ -243,9 +256,9 @@ fn main() -> ExitCode {
 }
 
 /// The value of one named flag anywhere after the subcommand: `--target`
-/// for `package`, `--tag`, `--assets` and `--out` for `release`. One
-/// reader, so two flags cannot end up with two spellings of what "the
-/// value after it" means.
+/// for `package`, `--tag`, `--assets` and `--out` for `release`, and
+/// `--title` for `commits`. One reader, so two flags cannot end up with
+/// two spellings of what "the value after it" means.
 fn value_arg(args: &[String], flag: &str) -> Option<String> {
     let mut it = args.iter();
     while let Some(arg) = it.next() {
@@ -311,8 +324,8 @@ const TOOLS: [Tool; 17] = [
         gives: "the kani harness roster, read from the `#[kani::proof]` attributes",
     },
     Tool {
-        call: "commits --range <base>..<tip>",
-        gives: "every commit subject and ruling trailer in that range, judged",
+        call: "commits --range <base>..<tip> [--title <pr title>]",
+        gives: "every commit subject and ruling trailer in that range, plus the title a squash merge would land, judged",
     },
     Tool {
         call: "spec <crate>",

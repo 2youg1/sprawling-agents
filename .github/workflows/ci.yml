@@ -89,6 +89,10 @@ on:
   push:
     branches: [main]
   pull_request:
+    # `edited`, because the pull request title is judged with its
+    # commits (tools/xtask/Spec.lean §8-35): it can change after
+    # opening, and a squash merge lands it on main as the subject.
+    types: [opened, synchronize, reopened, edited]
   workflow_dispatch:
   workflow_call:
     inputs:
@@ -187,6 +191,10 @@ jobs:
       - name: commit messages
         if: ${{ !cancelled() }}
         shell: bash
+        env:
+          # The title travels by environment, never interpolated into
+          # the script: a title is free text.
+          PR_TITLE: ${{ github.event.pull_request.title }}
         run: |
           set -euo pipefail
           reachable() { git cat-file -e "$1^{commit}" 2>/dev/null; }
@@ -217,7 +225,13 @@ jobs:
               ;;
           esac
           echo "judging $range"
-          just commits "$range"
+          if [ "${{ github.event_name }}" = pull_request ]; then
+            # A squash merge of two or more commits turns the title into
+            # the subject main receives, so it is judged with the range.
+            just commits "$range" "$PR_TITLE"
+          else
+            just commits "$range"
+          fi
       # The desktop server and its FFI seam are workspace members, so
       # clippy and the suite judge them; what is left is the Zig leaf's
       # own tests, which no cargo command runs (`crates/desktop/Spec.lean`

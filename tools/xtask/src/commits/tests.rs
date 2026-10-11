@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-use super::findings;
+use super::{findings, title_findings};
 
 /// A subject with its card and a ruling spelled the one way it may be.
 #[test]
@@ -33,4 +33,17 @@ fn an_uncarded_subject_and_a_misspelt_ruling_are_refused() {
         messages.map(|message| findings(message).len()),
         [1, 1, 1, 1, 1, 1, 1, 1]
     );
+}
+
+/// A pull request title is judged as one subject line, because a
+/// squash merge of two or more commits turns it into the subject main
+/// receives; it has no body, so no ruling trailer is read.
+#[test]
+fn a_pull_request_title_is_judged_as_one_subject() {
+    assert!(title_findings("card-S12.FIXPLAT03: judged before the merge").is_empty());
+    let uncarded = [
+        "card-S12.FIXPLAT01-02: the nightly platform checks, green again",
+        "the nightly platform checks, green again",
+    ];
+    assert_eq!(uncarded.map(|title| title_findings(title).len()), [1, 1]);
 }
