@@ -1,0 +1,66 @@
+# The commits check, in the one place its range is computed: a pull
+# request judges `base.sha..head.sha` and its title beside it, a push
+# judges `before..after`, and a hand-dispatched branch from where it
+# left main (`tools/xtask/Spec.lean` section 8-35).
+#
+# Two callers share it: `ci.yml` runs it with the rest of the matrix on
+# a push and on a pull request's open, synchronize and reopen, and
+# `title-judge.yml` runs it alone on an edit, because a title can
+# change after opening and a squash merge lands it on main as the
+# subject.
+#
+# A push that rewrote history leaves `before` unreachable in a fresh
+# clone, and a first push has no `before` at all; both judge the tip
+# commit alone and say so, because a range that cannot be resolved must
+# not read as a range that was clean.
+name: commit messages
+description: >-
+  Judge every commit subject of the change-set, and on a pull request
+  its title, with `cargo xtask commits` as the single authority for the
+  pattern.
+runs:
+  using: composite
+  steps:
+    - name: judge the change-set's messages
+      shell: bash
+      env:
+        # The title travels by environment, never interpolated into
+        # the script: a title is free text.
+        PR_TITLE: ${{ github.event.pull_request.title }}
+      run: |
+        set -euo pipefail
+        reachable() { git cat-file -e "$1^{commit}" 2>/dev/null; }
+        range='${{ github.sha }}^!'
+        case "${{ github.event_name }}" in
+          pull_request)
+            base='${{ github.event.pull_request.base.sha }}'
+            tip='${{ github.event.pull_request.head.sha }}'
+            if reachable "$base" && reachable "$tip"; then
+              range="$base..$tip"
+            else
+              echo "::error::pull request range $base..$tip is not in this clone"
+              exit 1
+            fi
+            ;;
+          workflow_dispatch)
+            # A branch asked for by hand is judged from where it left
+            # main, which is the range a wave or a fix branch adds.
+            if git rev-parse -q --verify origin/main >/dev/null; then
+              range="$(git merge-base origin/main '${{ github.sha }}')..${{ github.sha }}"
+            fi
+            ;;
+          push)
+            before='${{ github.event.before }}'
+            if reachable "$before"; then
+              range="$before..${{ github.sha }}"
+            fi
+            ;;
+        esac
+        echo "judging $range"
+        if [ "${{ github.event_name }}" = pull_request ]; then
+          # A squash merge of two or more commits turns the title into
+          # the subject main receives, so it is judged with the range.
+          cargo xtask commits --range "$range" --title "$PR_TITLE"
+        else
+          cargo xtask commits --range "$range"
+        fi

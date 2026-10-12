@@ -812,9 +812,9 @@ fn run(root: &Path, args: &[String]) -> Result<String, XtaskError>;
 
 **要判的事实**：AGENTS.md「Commits」一节的两条可机判的规则。其一，主题行匹配 `^card-S\d+\.[0-9A-Z]+: `，即 `card-`、`S`、至少一位数字、`.`、至少一个数字或大写字母，再接冒号与一个空格。其二，以 `Verdict:` 开头的行只能逐字是 `Verdict: user-approved`；拼错的裁决尾注读起来像一次裁决，实际上谁也没裁。
 
-**标题同判**：本仓库只允许 squash 合并（仓库设置 `squash_merge_commit_title = COMMIT_OR_PR_TITLE`），GitHub 对有两个及以上提交的拉取请求以请求标题为落地提交的主题。标题因此是 main 会收到的那条主题的来源，而它不住在任何一段历史里，`--range` 够不着它；判它的时机只能是合并之前——之后 main 上的范围检查只剩报告的分，历史已经落地。故 CI 在拉取请求事件上把标题随范围一并传入，触发器含 `edited`，因为标题在打开之后仍可改，改了必须重判。合并人仍可在合并那一刻改写 squash 信息，推送上的范围检查是它最后的绊线。
+**标题同判**：本仓库只允许 squash 合并（仓库设置 `squash_merge_commit_title = COMMIT_OR_PR_TITLE`），GitHub 对有两个及以上提交的拉取请求以请求标题为落地提交的主题。标题因此是 main 会收到的那条主题的来源，而它不住在任何一段历史里，`--range` 够不着它；判它的时机只能是合并之前——之后 main 上的范围检查只剩报告的分，历史已经落地。故 CI 在拉取请求事件上把标题随范围一并传入；标题在打开之后仍可改、改了必须重判，而这是编辑事件唯一要判的东西，于是它不走整个矩阵：`ci.yml` 管打开、同步与重开，`title-judge.yml` 只判标题、管编辑。合并人仍可在合并那一刻改写 squash 信息，推送上的范围检查是它最后的绊线。
 
-**不是门**：门判树，不判历史（§3 的 guard 一条与 `guard.rs` 的模块文档记着原因：读历史会让每次门运行依赖调用者传的范围）。故这是一条子命令 `cargo xtask commits --range <base>..<tip> [--title <标题>]`，由 `just commits <range> [title]` 调用，CI 的 `gates` 作业在拉取请求上传 `base..head` 与该请求的标题、在推送上传 `before..after`。
+**不是门**：门判树，不判历史（§3 的 guard 一条与 `guard.rs` 的模块文档记着原因：读历史会让每次门运行依赖调用者传的范围）。故这是一条子命令 `cargo xtask commits --range <base>..<tip> [--title <标题>]`，由 `just commits <range> [title]` 调用；判定范围的计算只有一处（`.github/actions/commit-messages/action.yml`，`ci.yml` 与 `title-judge.yml` 共用）：拉取请求判 `base..head` 与该请求的标题，推送判 `before..after`，手工派发从离开 main 处算起。
 
 **接口**：`pub(crate) enum Target<'a>` 是 `Range(&'a str)` 或 `RangeAndTitle { range, title }`——标题从不单判，没有一个调用点只有标题。`pub(crate) fn check(root: &Path, target: Target<'_>) -> Result<Vec<Violation>, XtaskError>` 对范围跑 `git log --no-merges --format=%H%x1f%B%x1e <range>`，逐条交给纯函数 `fn findings(message: &str) -> Vec<String>`，每条违规的 `location` 是提交的短哈希；标题交给纯函数 `fn title_findings(title: &str) -> Vec<String>`，违规的 `location` 是 `pull request title`。失败：git 起不来或返回非零时为 `XtaskError::Cmd`，缺 `--range` 时 main 打印用法并以 2 退出。
 
