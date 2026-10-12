@@ -1,0 +1,43 @@
+# Judge the pull request title alone on an edit, so that a title fix,
+# or a description a review bot appended to, costs one short job rather
+# than the whole `ci` matrix. The title is the subject main receives
+# when a squash merge lands, so it is rejudged whenever it can have
+# changed; `ci.yml` judges it on open, synchronize and reopen and no
+# longer listens for `edited`.
+#
+# The judgment is reached through the same action `ci.yml` uses, so the
+# range, the pattern and the recovery keep one authority
+# (`tools/xtask/Spec.lean` section 8-35).
+name: title-judge
+on:
+  pull_request:
+    types: [edited]
+
+permissions:
+  contents: read
+
+env:
+  # Incremental compilation caches work for the *next* build in the same
+  # tree, and CI throws the tree away; it only makes the cache larger.
+  CARGO_INCREMENTAL: "0"
+  CARGO_TERM_COLOR: always
+
+# A second edit supersedes the first: nobody reads a verdict on a title
+# that has already been replaced.
+concurrency:
+  group: title-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  judge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/toolchain
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+        with:
+          shared-key: title
+      - uses: ./.github/actions/commit-messages

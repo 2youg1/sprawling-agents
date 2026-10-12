@@ -249,7 +249,7 @@ Work handed to several agents at once tends to fail between its steps rather tha
 ## Commits
 
 - The first line is `card-<stage>.<index>: <what>`, for example `card-S4.02: the wire, and the two frames a socket cannot spell`.
-- A pull request's title answers to the same subject rule, and `ci.yml` judges it on the pull request, because a squash merge of two or more commits turns the title into the subject main receives; an uncarded title is reworded before merging, because afterwards the push check can only report a subject that has already landed.
+- A pull request's title answers to the same subject rule, and `ci.yml` judges it on the pull request while `title-judge.yml` rejudges an edit, because a squash merge of two or more commits turns the title into the subject main receives; an uncarded title is reworded before merging, because afterwards the push check can only report a subject that has already landed.
 - The body records what you found, since what you did is already in the diff: a gate that changed your design, a red-to-green transition that exposed a real defect, a choice between two approaches whose reason the result does not show.
 - A commit that loosens a gate under the ruling *The machine gates* requires carries the `Verdict: user-approved` trailer.
 
