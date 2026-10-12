@@ -1,0 +1,33 @@
+# Mark an issue that arrives outside the forms as untriaged, so the
+# reading queue is the issues carrying `status: needs-triage` rather
+# than a memory. The forms apply the same label themselves; this run is
+# the path that catches everything else.
+#
+# An issue is already read when the person who opens it can triage it,
+# and automation has read what it opens for itself; the mark would
+# misstate the queue in both cases, so both are left alone.
+name: issue-triage
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  issues: write
+
+jobs:
+  mark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: >-
+      github.event.issue.user.type != 'Bot' &&
+      github.event.issue.author_association != 'OWNER' &&
+      github.event.issue.author_association != 'MEMBER' &&
+      github.event.issue.author_association != 'COLLABORATOR'
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: add the triage status
+        run: >-
+          gh issue edit "${{ github.event.issue.number }}"
+          --add-label "status: needs-triage"
