@@ -38,9 +38,20 @@ Use [SPECs and Markdown](../AGENTS.md#specs-and-markdown) for current-state spec
 
 ### Languages
 
-For issues, use the [Bug report](../.github/ISSUE_TEMPLATE/bug_report.yml) or [Feature request](../.github/ISSUE_TEMPLATE/feature_request.yml) form. For pull requests and review comments, follow [Language](../AGENTS.md#language).
+For issues, use the [Bug report](../.github/ISSUE_TEMPLATE/bug_report.yml), [Enhancement](../.github/ISSUE_TEMPLATE/enhancement_request.yml) or [Feature request](../.github/ISSUE_TEMPLATE/feature_request.yml) form; [§10](#10-issue-labels-and-triage) covers the labels they apply. For pull requests and review comments, follow [Language](../AGENTS.md#language).
 
 Before committing or submitting text or attachments, apply [Privacy](../AGENTS.md#privacy) to establish their public necessity and inspect what readers will receive. Use [the private security channel](../SECURITY.md) for vulnerabilities.
+
+### Other projects
+
+Name another project only when the issue or the pull request cannot be understood or checked without it, and keep the rule tightest for experimental or unpublished ones: they offer no stable interface to follow and no licence this repository can rely on, and a public reference outlives whatever they become. A reference is read as an endorsement, an affiliation or a comparison, so an unneeded one buys a licence question the change does not answer.
+
+A change that borrows from another project states which of the two cases holds:
+
+- **A borrowed fact** — an interface shape, a protocol, a value read from upstream — is cited, and [`third-party.md`](third-party.md) is updated in the same change: its [§1 table](third-party.md#1-where-the-intelligence-comes-from), with the path followed and the commit read, because `upstream-watch.yml` reads that table and the tracked commit is written nowhere else. Keep a quotation to the short excerpt the citation needs.
+- **Borrowed code** is not pasted in. This repository vendors no upstream code, because every `.rs` file carries the MPL-2.0 notice and a file from another project cannot wear it ([`third-party.md`](third-party.md) §7). Re-implement from the documented facts, or bring the work in as a dependency through the gates: `cargo deny` against the licence allowlist in `deny.toml`, or the client's `RUNTIME` list in `tools/xtask/src/npm.rs`. Copyleft work, GPL-family code among it, is not copied in at all.
+
+If neither case holds, the project is not mentioned. If which case holds is unclear, ask in the issue before opening the pull request.
 
 ## 6 Commit messages
 
@@ -67,3 +78,22 @@ Use [The loop](../AGENTS.md#the-loop) for build-lock and slow-build handling.
 ## 9 Command surface
 
 [The loop](../AGENTS.md#the-loop) lists the repository commands and their purposes; `just --list` prints every recipe available in the checkout.
+
+## 10 Issue labels and triage
+
+Every label — its name, colour and description — has one authority, [`.github/labels.yml`](../.github/labels.yml), and the live set is synchronized from that file; the command is at the end of this section. The labels divide along four axes:
+
+- `type:` — what the issue is, exactly one: `bug`, `enhancement` or `feature`. The forms apply it: [Bug report](../.github/ISSUE_TEMPLATE/bug_report.yml), [Enhancement](../.github/ISSUE_TEMPLATE/enhancement_request.yml), [Feature request](../.github/ISSUE_TEMPLATE/feature_request.yml). An issue about documentation is still one of the three, with `area: docs` naming where it lands.
+- `area:` — where the work lands, one or more: `frontend` (`client/`), `backend` (the Rust binary, `crates/` and `tools/`), `docs`.
+- `aspect:` — a cross-cutting concern, zero or more: `performance`, `security`, `accessibility`. A security bug is `type: bug` plus `aspect: security`, reported through [SECURITY.md](../SECURITY.md) rather than a public issue.
+- `status:` — the triage state, below.
+- `help wanted` and `good first issue` — the contribution labels, below.
+- `duplicate`, `invalid`, `wontfix` and `question` — close out or redirect an issue.
+
+Every issue opened through a form arrives with `status: needs-triage` — 待审核, the mark that the maintainer has not read it yet — and [issue-triage.yml](../.github/workflows/issue-triage.yml) adds the mark to an issue that arrives another way from someone who cannot triage it; an issue the maintainer opens is already read. Triage then ends in one of three ways: `status: accepted` — 待解决, read and wanted, waiting for a fix or an implementation; `status: needs-info`, waiting on the reporter for more; or a close as `duplicate`, `invalid` or `wontfix`, or an answer and close as `question`. `area:` and `aspect:` labels are added during triage. When the work lands the issue is closed and its status label comes off, so an open `status: accepted` issue is unresolved by definition.
+
+`help wanted` is applied by the maintainer to an accepted issue whose need and acceptance criteria are already written down; the label is the endorsement that a pull request meeting those criteria is welcome, and the issue itself is the specification for the work. Comment on the issue to claim it, and link the pull request back to it. `good first issue` marks the subset of those that suit a first-time contributor. A contributor without triage or write access cannot set a label; name the one you believe fits in a comment.
+
+Dependabot applies `dependencies`, `rust` and `github_actions` to its pull requests, and `upstream-watch.yml` applies `upstream-watch` to the issues it opens; leave those labels in place.
+
+To change the set, edit `.github/labels.yml` and synchronize it: `bunx github-label-sync --access-token "$(gh auth token)" --labels .github/labels.yml 2youg1/sprawling-agents` (`--dry-run` previews). A label the file does not carry is removed by the sync, which is the intent: one file decides the set.
