@@ -1,12 +1,15 @@
 name: Feature request / 功能请求
-description: Propose a new capability or a change to existing behavior. 提出新能力或现有行为的改进。
-labels: [enhancement]
+description: Propose a new capability. 提出新的能力。
+labels: ["type: feature"]
 body:
   - type: markdown
     attributes:
       value: |
         Describe a concrete use case and the result you need. Provide matching English and Chinese text in narrative fields, including the same scope, uncertainty, and evidence. Share commands, identifiers, and attachments once, preserving their original text.
         说明具体使用场景与所需结果。叙述字段提供含义一致的中英文，保留相同的范围、不确定性与证据；命令、标识和附件只提供一次，保留原文。
+
+        Name another project only as the *Other projects* section of `docs/CONTRIBUTING.md` allows: a borrowed fact is cited here with a short quotation, and the pull request that uses it updates docs/third-party.md; borrowed code is not pasted in; otherwise the project is not mentioned.
+        按 `docs/CONTRIBUTING.md` 的 *Other projects* 一节提及其它项目：借用的事实要在此附简短引用，使用它的 PR 同时更新 docs/third-party.md；不得粘贴借来的代码；否则不要提及。
 
         Review text and attachments for credentials and personal or machine details before submitting. Use repository-relative paths or `<city>/…` and crop screenshots to the application. Report vulnerabilities through [SECURITY.md](https://github.com/2youg1/sprawling-agents/security/policy).
         提交前检查正文与附件中的凭据、个人信息和机器信息，路径使用仓库相对路径或 `<city>/…`，截图裁到应用范围。漏洞按 [SECURITY.md](https://github.com/2youg1/sprawling-agents/security/policy) 私密报告。

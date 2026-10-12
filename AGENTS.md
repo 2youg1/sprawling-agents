@@ -17,6 +17,7 @@ Read this file to the end before the first edit, and then read what the change t
 - [`ARCHITECTURE.md`](ARCHITECTURE.md) — the crate topology, the seams, the module map, the seven shapes and the determinism rules. Its `depmap` block and its module map are machine authorities.
 - A crate's SPEC — `crates/<dir>/Spec.lean` with its parts under `spec/` once the crate has migrated, `crates/<dir>/<lib>-SPEC.md` until then — holds the crate's interfaces and decisions, written before its code; [`ARCHITECTURE.md`](ARCHITECTURE.md) §11, *Specifications in Lean*, says where each part lives.
 - [`docs/glossary.md`](docs/glossary.md) — one name for each concept, enforced by the `lexicon` gate through `tools/xtask/lexicon.toml`.
+- [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) — how a public contribution is prepared: the language pair its text carries, what it may say about another project, and the labels triage gives it.
 - The source and tests that implement the affected specification, the neighbouring modules and the callers of the interfaces you change; read the relevant Lean parts and identify the properties the implementation must preserve.
 - The official documentation of each tool you use, and the vendor's agent guide or skill when one exists.
 

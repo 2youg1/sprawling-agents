@@ -1,0 +1,88 @@
+name: Enhancement / 改进建议
+description: Propose an improvement to existing behavior, quality or performance. 提出对现有行为、质量或性能的改进。
+labels: ["type: enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe what to improve, what it costs today, and the result you expect. Provide matching English and Chinese text in narrative fields, including the same scope, uncertainty, and evidence. Share commands, identifiers, and attachments once, preserving their original text.
+        说明要改进什么、现在还付出着什么代价、以及你期望的结果。叙述字段提供含义一致的中英文，保留相同的范围、不确定性与证据；命令、标识和附件只提供一次，保留原文。
+
+        Name another project only as the *Other projects* section of `docs/CONTRIBUTING.md` allows: a borrowed fact is cited here with a short quotation, and the pull request that uses it updates docs/third-party.md; borrowed code is not pasted in; otherwise the project is not mentioned.
+        按 `docs/CONTRIBUTING.md` 的 *Other projects* 一节提及其它项目：借用的事实要在此附简短引用，使用它的 PR 同时更新 docs/third-party.md；不得粘贴借来的代码；否则不要提及。
+
+        Review text and attachments for credentials and personal or machine details before submitting. Use repository-relative paths or `<city>/…` and crop screenshots to the application. Report vulnerabilities through [SECURITY.md](https://github.com/2youg1/sprawling-agents/security/policy).
+        提交前检查正文与附件中的凭据、个人信息和机器信息，路径使用仓库相对路径或 `<city>/…`，截图裁到应用范围。漏洞按 [SECURITY.md](https://github.com/2youg1/sprawling-agents/security/policy) 私密报告。
+
+  - type: textarea
+    id: current
+    attributes:
+      label: Current behavior and its cost / 当前行为与代价
+      description: What happens today, and what it costs (time, confusion, resources, latency)? 当前会发生什么，代价是什么（时间、困惑、资源、延迟）？
+      placeholder: |
+        English:
+
+        中文：
+    validations:
+      required: true
+
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Requested behavior / 期望行为
+      description: Describe the behavior the User should observe after the improvement, with an example if useful. 说明改进后 User 应当观察到的行为；必要时给出例子。
+      placeholder: |
+        English:
+
+        中文：
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria / 验收条件
+      description: >-
+        Give at least one observable example of success: starting conditions, the User's action, and the resulting behavior. No implementation plan or test code is required. 至少给出一个可以观察的成功例子：起始条件、User 的操作与结果行为；无需实现计划或测试代码。
+      placeholder: |
+        English:
+
+        中文：
+    validations:
+      required: true
+
+  - type: textarea
+    id: compatibility
+    attributes:
+      label: Scope and compatibility / 范围与兼容性
+      description: Note known effects on existing workflows, configuration, saved data, the wire, or clients, and any behavior that must be preserved. 说明已知的工作流、配置、保存数据、wire 或客户端影响，以及需要保留的行为。
+      placeholder: |
+        English:
+
+        中文：
+    validations:
+      required: false
+
+  - type: textarea
+    id: references
+    attributes:
+      label: References and examples / 参考与例子
+      description: Link related issues, documents, or comparable tools, and attach redacted mockups or examples. Provide each source or attachment once. 链接相关 Issue、文档或类似工具，可附脱敏后的示意图或例子；每份来源或附件只提供一次。
+      placeholder: |
+        English:
+
+        中文：
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting / 提交前确认
+      options:
+        - label: I searched existing open and closed issues for this request. 我已搜索现有的开放及已关闭 Issue。
+          required: true
+        - label: My English and Chinese descriptions match, including uncertainty and evidence. 我的中英文描述含义一致，包括不确定性与证据。
+          required: true
+        - label: I reviewed the text and attachments for private information. 我已检查正文与附件中的私密信息。
+          required: true

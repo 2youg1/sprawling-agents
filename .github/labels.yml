@@ -1,0 +1,88 @@
+# Every label this repository uses, as data: name, colour, description.
+# This file is the authority for the set; the live repository is kept in
+# step with it by github-label-sync, and the command is in
+# docs/CONTRIBUTING.md section 10.
+#
+# The labels automation applies are listed here too, so a sync never
+# deletes them: dependabot applies `dependencies`, `rust` and
+# `github_actions`, and upstream-watch.yml applies `upstream-watch`.
+
+# What the issue is. Exactly one per issue.
+- name: "type: bug"
+  color: "d73a4a"
+  description: "Behavior contradicts the SPEC or a documented promise. 缺陷：行为与 SPEC 或文档承诺不符"
+- name: "type: enhancement"
+  color: "a2eeef"
+  description: "An improvement to existing behavior or quality. 优化：改进现有行为或质量"
+- name: "type: feature"
+  color: "8250df"
+  description: "A capability the city does not have yet. 新功能：城市目前不具备的能力"
+
+# Where the work lands. One or more per issue.
+- name: "area: frontend"
+  color: "1d76db"
+  description: "The browser client under client/. 前端：client/ 下的浏览器客户端"
+- name: "area: backend"
+  color: "0e8a16"
+  description: "The Rust binary, crates/ and tools/. 后端：Rust 二进制、crates/ 与 tools/"
+- name: "area: docs"
+  color: "0075ca"
+  description: "README, ARCHITECTURE.md, docs/ and SPEC text. 文档：README、ARCHITECTURE、docs/ 与 SPEC 文本"
+
+# A cross-cutting concern. Zero or more per issue.
+- name: "aspect: performance"
+  color: "fbca04"
+  description: "Latency, throughput, memory or build time. 性能：延迟、吞吐、内存或构建时间"
+- name: "aspect: security"
+  color: "b60205"
+  description: "Attack surface, hardening or audit; vulnerabilities go through SECURITY.md. 安全：攻击面、加固与审计；漏洞走私密渠道"
+- name: "aspect: accessibility"
+  color: "c5def5"
+  description: "A barrier affecting people with disabilities. 无障碍：影响残障用户的障碍"
+
+# Where triage stands.
+- name: "status: needs-triage"
+  color: "d4c5f9"
+  description: "Not yet read by the maintainer; every new issue starts here. 待审核：维护者尚未审阅，新 Issue 默认带上"
+- name: "status: accepted"
+  color: "8fc951"
+  description: "Wanted and waiting for a fix or an implementation. 待解决：已审阅接受，等待修复或实现"
+- name: "status: needs-info"
+  color: "fef2c0"
+  description: "Waiting for the reporter to add information. 等待补充：需要报告者提供更多信息"
+
+# Contributions.
+- name: "help wanted"
+  color: "008672"
+  description: "Maintainer endorsed and specified; a PR is welcome, comment to claim. 需求已写清、维护者认可，欢迎认领并提交 PR"
+- name: "good first issue"
+  color: "7057ff"
+  description: "A help-wanted issue that suits a first-time contributor. 适合首次贡献者的 help-wanted Issue"
+
+# Closing out or redirecting.
+- name: "duplicate"
+  color: "cfd3d7"
+  description: "This issue or pull request already exists. 与其他 Issue 或 PR 重复"
+- name: "invalid"
+  color: "e4e669"
+  description: "This does not seem right for this project. 不适合本项目的问题"
+- name: "wontfix"
+  color: "ffffff"
+  description: "This will not be worked on. 不会处理"
+- name: "question"
+  color: "d876e3"
+  description: "A question rather than a report or a request. 提问，而非缺陷或请求"
+
+# Applied by automation.
+- name: "dependencies"
+  color: "0366d6"
+  description: "A dependency update opened by automation. 依赖更新，由自动化创建"
+- name: "rust"
+  color: "000000"
+  description: "A Cargo dependency update opened by automation. Cargo 依赖更新，由自动化创建"
+- name: "github_actions"
+  color: "000000"
+  description: "A GitHub Actions dependency update opened by automation. GitHub Actions 依赖更新，由自动化创建"
+- name: "upstream-watch"
+  color: "f9d0c4"
+  description: "Opened by the upstream-watch workflow. 上游监视工作流自动创建"

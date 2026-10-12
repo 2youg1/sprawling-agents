@@ -1,0 +1,62 @@
+# Mark a new issue as untriaged, so the reading queue is the issues
+# carrying `status: needs-triage` rather than a memory, and take the
+# status off when the issue closes, so an open `status: accepted` issue
+# is unresolved by definition. The forms do not apply the mark: this run
+# is its only source, because a form cannot tell who is filling it in.
+#
+# An issue is already read when the person who opens it can triage it,
+# and automation has read what it opens for itself; the mark would
+# misstate the queue in both cases, so both are left alone. The mark is
+# also withheld when the issue was closed or given a status before this
+# run reached it, so a late run cannot undo a triage.
+name: issue-triage
+on:
+  issues:
+    types: [opened, closed]
+
+permissions:
+  issues: write
+
+concurrency:
+  group: issue-triage-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  mark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: >-
+      github.event.action == 'opened' &&
+      github.event.issue.user.type != 'Bot' &&
+      github.event.issue.author_association != 'OWNER' &&
+      github.event.issue.author_association != 'MEMBER' &&
+      github.event.issue.author_association != 'COLLABORATOR'
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      NUMBER: ${{ github.event.issue.number }}
+    steps:
+      - name: add the triage status unless triage has already begun
+        run: |
+          read -r state statuses < <(gh issue view "$NUMBER" --json state,labels \
+            --jq '"\(.state) \([.labels[].name | select(startswith("status: "))] | length)"')
+          if [ "$state" = OPEN ] && [ "$statuses" -eq 0 ]; then
+            gh issue edit "$NUMBER" --add-label "status: needs-triage"
+          fi
+
+  clear:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: github.event.action == 'closed'
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      NUMBER: ${{ github.event.issue.number }}
+    steps:
+      - name: remove the status labels
+        run: |
+          gh issue view "$NUMBER" --json labels \
+            --jq '.labels[].name | select(startswith("status: "))' |
+          while IFS= read -r label; do
+            gh issue edit "$NUMBER" --remove-label "$label"
+          done

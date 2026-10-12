@@ -1,12 +1,15 @@
 name: Bug report / 缺陷报告
 description: Report incorrect behavior, a crash, or a regression. 报告错误行为、崩溃或回归。
-labels: [bug]
+labels: ["type: bug"]
 body:
   - type: markdown
     attributes:
       value: |
         Describe the problem so a maintainer can reproduce or investigate it. Provide matching English and Chinese text in narrative fields, including the same scope, uncertainty, and observed results. Share commands, error codes, logs, and attachments once, preserving their original text.
         在叙述字段中提供含义一致的中英文，保留相同的范围、不确定性与观察结果，以便维护者复现或调查。命令、错误码、日志和附件只提供一次，保留原文。
+
+        Name another project only as the *Other projects* section of `docs/CONTRIBUTING.md` allows: a borrowed fact is cited here with a short quotation, and the pull request that uses it updates docs/third-party.md; borrowed code is not pasted in; otherwise the project is not mentioned.
+        按 `docs/CONTRIBUTING.md` 的 *Other projects* 一节提及其它项目：借用的事实要在此附简短引用，使用它的 PR 同时更新 docs/third-party.md；不得粘贴借来的代码；否则不要提及。
 
         Review text and attachments before submitting: redact credentials and personal or machine details, use repository-relative paths or `<city>/…`, and crop screenshots to the application. Report vulnerabilities through [SECURITY.md](https://github.com/2youg1/sprawling-agents/security/policy).
         提交前检查正文与附件：删去凭据、个人信息和机器信息，路径使用仓库相对路径或 `<city>/…`，截图裁到应用范围。漏洞按 [SECURITY.md](https://github.com/2youg1/sprawling-agents/security/policy) 私密报告。
