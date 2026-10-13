@@ -433,6 +433,70 @@ mod tests {
         assert!(matches!(answered, BenchOutcome::Ran { .. }));
     }
 
+    fn listing(domains: &[&str]) -> kernel::EgressAllowlist {
+        kernel::EgressAllowlist::new(domains.iter().map(|d| (*d).to_owned()).collect())
+    }
+
+    fn page(host: &str) -> GateSubject {
+        GateSubject::Host(host.to_owned())
+    }
+
+    /// The building's list decides which public hosts a browser call
+    /// reaches, its subdomains included; a building that wrote no list
+    /// keeps every host (`crates/city/spec/Policy.lean` D27).
+    #[test]
+    fn a_browser_call_reaches_only_the_hosts_the_building_lists() {
+        let outcomes = [
+            ("pastebin.test", Some(listing(&["example.com"]))),
+            ("docs.example.com", Some(listing(&["example.com"]))),
+            ("example.com", Some(listing(&[]))),
+            ("pastebin.test", None),
+            ("127.0.0.1", Some(listing(&[]))),
+        ]
+        .into_iter()
+        .enumerate()
+        .map(|(n, (host, list))| {
+            let bench = bench_with(stub("webbish", Effect::Egress, page(host)));
+            let mut bench = match list {
+                Some(list) => bench.limit_egress(list),
+                None => bench,
+            };
+            let seq = u64::try_from(n).unwrap() + 10;
+            match bench.invoke(&call("webbish", kernel::Payload::empty()), &key(seq), at()) {
+                Ok(BenchOutcome::Ran { .. }) => "ran".to_owned(),
+                Ok(BenchOutcome::Refused { refusal }) => refusal.code().to_string(),
+                Ok(BenchOutcome::Duplicate { .. }) => "duplicate".to_owned(),
+                Err(failed) => format!("failed {}", failed.code()),
+            }
+        })
+        .collect::<Vec<_>>();
+        assert_eq!(
+            outcomes,
+            ["E_GATE_DENIED", "ran", "E_GATE_DENIED", "ran", "ran"]
+        );
+    }
+
+    /// The person's browser is held to the same list for the page a call
+    /// names, after the door that asks whether it may be attached at all.
+    #[test]
+    fn the_persons_browser_is_held_to_the_same_list() {
+        let effect = Effect::AttachUserBrowser {
+            address: Some("127.0.0.1".to_owned()),
+        };
+        let mut bench = bench_with(stub("drives", effect, page("pastebin.test")))
+            .limit_egress(listing(&["example.com"]));
+        let answered = bench
+            .invoke(&call("drives", kernel::Payload::empty()), &key(30), at())
+            .unwrap();
+        let BenchOutcome::Refused { refusal } = answered else {
+            panic!("expected a refusal, got {answered:?}");
+        };
+        assert_eq!(
+            (refusal.code(), refusal.subject()),
+            (&AxCode::GateDenied, "pastebin.test")
+        );
+    }
+
     #[test]
     fn an_egress_call_that_answers_with_an_area_is_refused_as_a_wiring_defect() {
         let area = Address::parse("work/room").unwrap();

@@ -69,6 +69,11 @@ pub struct ToolBench {
     /// went (`crates/runtime/spec/Bench.lean` §8-35).
     seen: BTreeMap<IdemKey, Result<ToolOutcome, AxError>>,
     prior_public_egress: bool,
+    /// The domains the building wrote in its `egress` list, frozen with
+    /// the run. `None` is a building that wrote no list, and its calls
+    /// are judged on their bytes alone (`crates/city/spec/Policy.lean`
+    /// D27).
+    egress: Option<kernel::EgressAllowlist>,
     /// The checkpoint net. A command the forecast suspects of deleting
     /// things does not get refused — text prediction is obfuscatable, so
     /// refusing on a substring would be security theatre that also
@@ -136,6 +141,7 @@ impl ToolBench {
             sandbox: kernel::SandboxLimits::default(),
             seen: BTreeMap::new(),
             prior_public_egress: false,
+            egress: None,
             net: None,
             job: None,
             asking: None,
@@ -159,6 +165,16 @@ impl ToolBench {
     /// discard is refused rather than run unprotected.
     pub fn with_checkpoint(mut self, net: CheckpointNet) -> ToolBench {
         self.net = Some(net);
+        self
+    }
+
+    /// Hands the bench the egress list the building wrote. A browser
+    /// call to a public host outside it is refused before any byte
+    /// leaves; the judgement is a comparison against this short list,
+    /// so it adds no read, no lookup and no round trip to the call.
+    #[must_use]
+    pub fn limit_egress(mut self, list: kernel::EgressAllowlist) -> ToolBench {
+        self.egress = Some(list);
         self
     }
 
