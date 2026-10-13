@@ -43,6 +43,10 @@ pub const CONFIRM_MISSES_MAX: u32 = 10;
 #[derive(Debug)]
 pub struct Confirm<V> {
     pending: Option<Pending<V>>,
+    /// When the last read answer came; `None` before the first.
+    last: Option<TimeMs>,
+    /// Read answers that missed since the last one that did its verb.
+    misses: u32,
 }
 
 #[derive(Debug)]
@@ -92,7 +96,11 @@ impl Miss {
 
 impl<V> Default for Confirm<V> {
     fn default() -> Self {
-        Self { pending: None }
+        Self {
+            pending: None,
+            last: None,
+            misses: 0,
+        }
     }
 }
 
@@ -110,6 +118,9 @@ impl<V> Confirm<V> {
         entropy: [u8; CONFIRM_BYTES],
         expires: TimeMs,
     ) -> Result<String, AxError> {
+        if self.locked() {
+            return Err(Miss::Locked.refusal());
+        }
         let canonical = encode(&entropy);
         self.pending = Some(Pending {
             verb,
@@ -137,17 +148,33 @@ impl<V> Confirm<V> {
     /// not read; [`Miss::Wrong`] for one it reads that does no verb, which
     /// ends the request and counts toward [`CONFIRM_MISSES_MAX`].
     pub fn confirm(&mut self, answer: &str, now: TimeMs) -> Result<V, Miss> {
+        if self.locked() {
+            return Err(Miss::Locked);
+        }
+        let spaced = self
+            .last
+            .is_none_or(|last| last.value().saturating_add(CONFIRM_SPACING_MS) <= now.value());
+        if !spaced {
+            return Err(Miss::TooSoon);
+        }
+        self.last = Some(now);
         let typed = B3Hash::digest(canonical(answer).as_bytes());
         match self.pending.take() {
-            Some(pending) if pending.code == typed && now < pending.expires => Ok(pending.verb),
-            Some(_) | None => Err(Miss::Wrong),
+            Some(pending) if pending.code == typed && now < pending.expires => {
+                self.misses = 0;
+                Ok(pending.verb)
+            }
+            Some(_) | None => {
+                self.misses = self.misses.saturating_add(1);
+                Err(Miss::Wrong)
+            }
         }
     }
 
     /// Whether the guard refuses every request and answer (D25).
     #[must_use]
     pub fn locked(&self) -> bool {
-        false
+        self.misses >= CONFIRM_MISSES_MAX
     }
 }
 

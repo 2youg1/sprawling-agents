@@ -135,7 +135,32 @@ impl Asking {
     fn confirmed(&self, code: &str) -> Result<Asked, AxError> {
         let senses = self.remote.as_ref().map_err(Clone::clone)?.doorway.senses();
         let now = (senses.clock)()?;
-        self.waiting()?.confirm(code, now).map_err(Miss::refusal)
+        let mut waiting = self.waiting()?;
+        let answered = waiting.confirm(code, now);
+        let locked_now = matches!(answered, Err(Miss::Wrong)) && waiting.locked();
+        drop(waiting);
+        if locked_now {
+            self.lock_out();
+        }
+        answered.map_err(Miss::refusal)
+    }
+
+    /// The answer that locked the guard: something on this machine is
+    /// guessing, so an open door closes and the console says why the
+    /// page's controls stopped answering (remote_access D25). Closing
+    /// only takes access away, so it needs no code.
+    fn lock_out(&self) {
+        (self.show)(
+            "  ten wrong codes were typed into a page since the last right one: the page's \
+             remote-door controls are off until this city restarts, and an open remote door \
+             is closed; /remote at this console still works",
+        );
+        let remote = self.remote.clone();
+        let show = Arc::clone(&self.show);
+        std::thread::spawn(move || match perform(&remote, RemoteLine::Close) {
+            Ok(said) => show(&said),
+            Err(refused) => show(&format!("  {refused}\n  {}", refused.recovery())),
+        });
     }
 
     /// Carries `line` off the listener's task, because opening a route
