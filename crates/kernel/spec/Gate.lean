@@ -24,7 +24,7 @@ pub enum EgressTarget { Loopback, Private, Public { host: String },
                         Connector { label: ServerLabel } }   // 分类由效果层解好址后注入
 pub enum EgressOutcome { Allow { first_public_egress: bool }, Deny { refusal: Box<AxError> } }
 pub fn egress(spans: &[SecretSpan], target: &EgressTarget, prior_public_egress: bool) -> EgressOutcome;
-pub struct EgressAllowlist { /* suffixes —— 私有 */ }    // 楼的出网后缀表；空表＝不出公网（机密楼恰是它）
+pub struct EgressAllowlist { /* suffixes —— 私有 */ }    // 楼的出网后缀表；空表＝不出公网（机密楼恰是它）；楼没写表时 bench 不调这道门（city D27）
 impl EgressAllowlist {
     pub fn new(entries: Vec<String>) -> EgressAllowlist;    // 去首尾空白与开头的点、转小写、排序去重：`.example.com` 与 `example.com` 是同一条
     pub fn is_empty(&self) -> bool;  pub fn entries(&self) -> impl Iterator<Item = &str>;

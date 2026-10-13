@@ -278,6 +278,7 @@ resident 段是模型每回合都读到的四段之一。`URBANITE.md` 建议 30
 | D24 | 房间的封条整张出现：暂存再改名，不用 `create_new` 加写入 | `crates/city/spec/Gitignore.lean` |
 | D25 | `[search]` 是三臂的值，`Custom` 不回落到缺省那一家，缺省那一家只在 `config_layers::search` 声明 | `crates/city/spec/ConfigLayers.lean` |
 | D26 | MCP url 用 `url::Url` 解析，凭据的名字与值仍由 `kernel::secret` 判 | `crates/city/spec/ConfigLayers.lean` |
+| D27 | `egress` 不写是不限主机，写了才判 | `crates/city/spec/Policy.lean` |
 -/
 
 /-! D8 定规：拒词的恢复语归写拒词的那一处
