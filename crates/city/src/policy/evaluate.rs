@@ -211,9 +211,10 @@ pub fn evaluate(addr: &Address, text: &str) -> Result<BuildingRules, AxError> {
         policy: BuildingPolicy::new(confidential),
         write_prefixes,
         reach,
-        egress: match (confidential, written.egress) {
-            (true, _) => Some(EgressAllowlist::default()),
-            (false, written) => written.map(EgressAllowlist::new),
+        egress: if confidential {
+            Some(EgressAllowlist::default())
+        } else {
+            written.egress.map(EgressAllowlist::new)
         },
         review: written.review,
         browser: written.browser,
