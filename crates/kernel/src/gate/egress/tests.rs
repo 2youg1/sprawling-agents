@@ -162,6 +162,23 @@ fn a_loopback_or_private_host_is_not_the_internet() {
     );
 }
 
+/// The host the door judges is the host a browser connects to (D59):
+/// a backslash ends the authority of a special scheme, the host is
+/// percent-decoded, and a number spells an IPv4 address.
+#[test]
+fn host_of_reads_the_host_a_browser_connects_to() {
+    let read = [
+        r"http://evil.test\@allowed.test/",
+        "https://%65xample.com/",
+        "http://2130706433/",
+    ]
+    .map(|url| host_of(url).unwrap());
+    assert_eq!(
+        read,
+        [Some("evil.test"), Some("example.com"), Some("127.0.0.1")].map(|h| h.map(str::to_owned))
+    );
+}
+
 #[test]
 fn host_of_reads_the_authority_and_nothing_else() {
     assert_eq!(
