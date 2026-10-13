@@ -544,6 +544,7 @@ D30 **standalone installer 的仓库默认由根清单生成并核验。** `docn
 `tools/xtask/src/channel/launcher.cmd` 的包接口，不是形式证明。
 `channel::run(root, tag, assets, out) -> Result<String, XtaskError>` 读取平台表与归档，
 将实际二进制字节交给平台包；Unix 的执行权限来自该 ZIP 成员，缺少执行位拒绝打包。
+ZIP 成员名解码失败以 XtaskError::Cmd 返回归档路径与原因，不跳过成员。
 根包描述读取工作区 description，不在打包器重写产品文案。
 
 根包主 bin 指向 `bin/sprawling.js`。同一 `channel::RUNTIME_ENTRY` 常量生成内部运行时
