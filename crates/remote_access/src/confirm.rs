@@ -8,8 +8,10 @@
 //! (`crates/remote_access/spec/Confirm.lean`, remote_access D4).
 //!
 //! At most one request waits. A new request replaces the one before it,
-//! and every answer, right or wrong, ends the request it answers, so one
-//! request gives one guess. The code is kept as the digest of its
+//! and every answer the guard reads, right or wrong, ends the request it
+//! answers, so one request gives one guess; an answer the guard does not
+//! read, too soon after the last or after the guard locked, leaves the
+//! request waiting (remote_access D25). The code is kept as the digest of its
 //! canonical text, for the reason the pairing code is (§8-2). Entropy and
 //! the expiry arrive as parameters, so the assembly layer draws and
 //! samples them.
@@ -151,9 +153,11 @@ impl<V> Confirm<V> {
         if self.locked() {
             return Err(Miss::Locked);
         }
-        let spaced = self
-            .last
-            .is_none_or(|last| last.value().saturating_add(CONFIRM_SPACING_MS) <= now.value());
+        // A clock set back counts as spaced: the miss count bounds a
+        // guesser, and a corrected wall clock must not stall the page.
+        let spaced = self.last.is_none_or(|last| {
+            now < last || last.value().saturating_add(CONFIRM_SPACING_MS) <= now.value()
+        });
         if !spaced {
             return Err(Miss::TooSoon);
         }
@@ -232,7 +236,7 @@ mod tests {
         match e {
             Event::Request(v, a, now) => ((Some((v, a, now + TTL)), last, misses), Said::Shown(a)),
             Event::Confirm(a, now) => {
-                if !last.is_none_or(|t| t + SPACING <= now) {
+                if !last.is_none_or(|t| t + SPACING <= now || now < t) {
                     return (s, Said::TooSoon);
                 }
                 match pending {

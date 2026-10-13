@@ -19,7 +19,7 @@
 //! nobody could read a code, so every verb but closing a door that was
 //! never opened is refused.
 
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock, PoisonError};
 
 use kernel::{AxCode, AxError, TimeMs};
 use remote_access::confirm::{CONFIRM_BYTES, Confirm, Miss};
@@ -43,7 +43,17 @@ pub(crate) struct Front(Arc<OnceLock<Asking>>);
 struct Asking {
     remote: Result<Remote, AxError>,
     waiting: Mutex<Confirm<Asked>>,
+    /// The door verbs carried off the listener, one at a time; an open
+    /// whose turn comes after the guard locked is not carried, so an open
+    /// still on its way cannot undo the close (remote_access D25).
+    carrying: Arc<Mutex<Carrying>>,
     show: Show,
+}
+
+/// What the carried door verbs share.
+#[derive(Default)]
+struct Carrying {
+    locked_out: bool,
 }
 
 /// A verb that waits for its code.
@@ -81,6 +91,7 @@ impl Front {
         self.0.get_or_init(|| Asking {
             remote: remote.clone(),
             waiting: Mutex::new(Confirm::default()),
+            carrying: Arc::default(),
             show,
         });
     }
@@ -157,9 +168,16 @@ impl Asking {
         );
         let remote = self.remote.clone();
         let show = Arc::clone(&self.show);
-        std::thread::spawn(move || match perform(&remote, RemoteLine::Close) {
-            Ok(said) => show(&said),
-            Err(refused) => show(&format!("  {refused}\n  {}", refused.recovery())),
+        let carrying = Arc::clone(&self.carrying);
+        std::thread::spawn(move || {
+            let mut turn = carrying.lock().unwrap_or_else(PoisonError::into_inner);
+            turn.locked_out = true;
+            let closed = perform(&remote, RemoteLine::Close);
+            drop(turn);
+            match closed {
+                Ok(said) => show(&said),
+                Err(refused) => show(&format!("  {refused}\n  {}", refused.recovery())),
+            }
         });
     }
 
@@ -169,14 +187,24 @@ impl Asking {
     fn later(&self, line: RemoteLine, reply: Reply) {
         let remote = self.remote.clone();
         let show = Arc::clone(&self.show);
-        std::thread::spawn(move || match perform(&remote, line) {
-            Ok(said) => show(&said),
-            Err(refused) => match reply.refuse(refused.clone()) {
-                Delivered::ToThePeer => {}
-                Delivered::NobodyAsked | Delivered::PeerGone => {
-                    show(&format!("  {refused}\n  {}", refused.recovery()));
-                }
-            },
+        let carrying = Arc::clone(&self.carrying);
+        std::thread::spawn(move || {
+            let turn = carrying.lock().unwrap_or_else(PoisonError::into_inner);
+            let done = if turn.locked_out && matches!(line, RemoteLine::Open(_)) {
+                Err(Miss::Locked.refusal())
+            } else {
+                perform(&remote, line)
+            };
+            drop(turn);
+            match done {
+                Ok(said) => show(&said),
+                Err(refused) => match reply.refuse(refused.clone()) {
+                    Delivered::ToThePeer => {}
+                    Delivered::NobodyAsked | Delivered::PeerGone => {
+                        show(&format!("  {refused}\n  {}", refused.recovery()));
+                    }
+                },
+            }
         });
     }
 

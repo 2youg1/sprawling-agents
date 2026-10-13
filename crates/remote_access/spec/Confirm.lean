@@ -200,11 +200,13 @@ structure Guard where
 /-- The guard a city starts with. -/
 def Guard.fresh : Guard := ⟨none, 0⟩
 
-/-- Whether an answer at `now` is far enough behind the last judged one. -/
+/-- Whether an answer at `now` is far enough behind the last judged one. A
+clock set back counts as spaced: the miss count bounds a guesser, and a
+corrected wall clock must not stall the User. -/
 def Guard.spaced (spacing : Time) (g : Guard) (now : Time) : Bool :=
   match g.last with
   | none => true
-  | some t => t + spacing ≤ now
+  | some t => t + spacing ≤ now || now < t
 
 /-- What one event comes to behind the guard. `missed` is a judged answer that
 did no verb; `tooSoon` and `lockedOut` are answers the guard did not judge. -/
