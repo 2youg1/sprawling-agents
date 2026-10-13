@@ -47,7 +47,30 @@ fn the_confidential_template_produces_a_building_the_city_treats_as_confidential
     let rules = policy::load(dir.path(), &addr("vault")).unwrap();
     assert!(rules.policy().confidential);
     assert_eq!(rules.model_pool(), ModelPool::LocalOnly);
-    assert!(rules.egress().is_empty());
+    assert!(
+        rules
+            .egress()
+            .is_some_and(kernel::EgressAllowlist::is_empty)
+    );
+}
+
+/// The template writes no `egress` key, so a new building is held to no
+/// domain list until the person writes one; an empty list written by
+/// hand reaches no public host (`crates/city/spec/Policy.lean` D27).
+#[test]
+fn a_new_building_has_no_egress_list_and_an_empty_one_reaches_nothing() {
+    let dir = tempfile::tempdir().unwrap();
+    create(dir.path(), &addr("lab"), BuildingTemplate::Minimal).unwrap();
+    let laid_out = policy::load(dir.path(), &addr("lab")).unwrap();
+    let written = "confidential = false
+write = \"everything\"
+egress = []
+";
+    let emptied = policy::evaluate(&addr("lab"), written).unwrap();
+    assert_eq!(
+        (laid_out.egress(), emptied.egress()),
+        (None, Some(&kernel::EgressAllowlist::default()))
+    );
 }
 
 #[test]

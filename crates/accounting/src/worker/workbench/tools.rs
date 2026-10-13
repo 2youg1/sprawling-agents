@@ -170,6 +170,9 @@ impl Laying {
                 of,
             })
             .for_job(addr.clone(), job_locator.clone());
+        if let Some(listed) = site.rules.egress() {
+            bench = bench.limit_egress(listed.clone());
+        }
         *bench.taint_mut() = at.taint.clone();
         // One registration feeds both. The catalogue is what the model
         // was told exists and the bench is what routes the call it

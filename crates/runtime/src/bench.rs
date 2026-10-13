@@ -69,10 +69,7 @@ pub struct ToolBench {
     /// went (`crates/runtime/spec/Bench.lean` §8-35).
     seen: BTreeMap<IdemKey, Result<ToolOutcome, AxError>>,
     prior_public_egress: bool,
-    /// The domains the building wrote in its `egress` list, frozen with
-    /// the run. `None` is a building that wrote no list, and its calls
-    /// are judged on their bytes alone (`crates/city/spec/Policy.lean`
-    /// D27).
+    /// The building's `egress` list; `None` is a building that wrote none.
     egress: Option<kernel::EgressAllowlist>,
     /// The checkpoint net. A command the forecast suspects of deleting
     /// things does not get refused — text prediction is obfuscatable, so
@@ -165,16 +162,6 @@ impl ToolBench {
     /// discard is refused rather than run unprotected.
     pub fn with_checkpoint(mut self, net: CheckpointNet) -> ToolBench {
         self.net = Some(net);
-        self
-    }
-
-    /// Hands the bench the egress list the building wrote. A browser
-    /// call to a public host outside it is refused before any byte
-    /// leaves; the judgement is a comparison against this short list,
-    /// so it adds no read, no lookup and no round trip to the call.
-    #[must_use]
-    pub fn limit_egress(mut self, list: kernel::EgressAllowlist) -> ToolBench {
-        self.egress = Some(list);
         self
     }
 
@@ -301,7 +288,7 @@ impl ToolBench {
             let payload = net
                 .checkpoint
                 .wave_pre(&net.scope, now, &net.of)
-                .map_err(kernel_error_from_storage)?;
+                .map_err(storage::StorageError::into_ax)?;
             checkpointed = payload
                 .as_map()
                 .get("oid")
@@ -409,11 +396,6 @@ pub struct Ticket {
     wrote: kernel::Writes,
 }
 
-/// The storage crate owns its own error root; the turn layer speaks
-/// AxError, so the conversion happens once, here.
-fn kernel_error_from_storage(err: storage::StorageError) -> AxError {
-    err.into_ax()
-}
 #[cfg(test)]
 #[allow(
     clippy::unwrap_used,

@@ -56,9 +56,12 @@ usersbrowser = false
 # under the allowlist in DESKTOP.toml.
 desktop = false
 
-# The domains work here may reach over the network. Empty is none, and a
-# confidential building may not list any.
-egress = []
+# The domains the browsers here may open, each with its subdomains. Leave
+# the key out and they open any address; list domains and they open only
+# those; an empty list opens no public address. A confidential building
+# opens none and may not list any. Commands run with `exec` are not held
+# to this list.
+# egress = ["api.github.com"]
 
 # Which skills this building admits into its catalog, by name. Name
 # them: a list of names is checkable and "as needed" is not.

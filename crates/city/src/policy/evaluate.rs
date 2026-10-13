@@ -103,8 +103,11 @@ pub(crate) struct Written {
     usersbrowser: Granted,
     #[serde(default)]
     desktop: bool,
+    /// Absent is a building with no domain list, which reaches any host
+    /// its browser keys allow; a list, empty included, is the only hosts
+    /// it reaches (`crates/city/spec/Policy.lean` D27).
     #[serde(default)]
-    egress: Vec<String>,
+    egress: Option<Vec<String>>,
     #[serde(default)]
     reading_room: Vec<String>,
     /// How long a harness run here may take, in minutes; zero is
@@ -172,12 +175,10 @@ pub fn evaluate(addr: &Address, text: &str) -> Result<BuildingRules, AxError> {
         Granted::At(address) => Some(UserBrowser::At(UserBrowserEndpoint::parse(&address)?)),
     };
     let confidential = written.confidential;
-    if confidential && !written.egress.is_empty() {
+    let listed = written.egress.as_ref().map_or(0, Vec::len);
+    if confidential && listed > 0 {
         return Err(contradiction(
-            format!(
-                "a confidential building lists {} egress domain(s)",
-                written.egress.len()
-            ),
+            format!("a confidential building lists {listed} egress domain(s)"),
             "remove the egress list, or drop `confidential = true`; a confidential building's \
              data does not leave, so a domain list beside it contradicts the setting",
         ));
@@ -210,7 +211,10 @@ pub fn evaluate(addr: &Address, text: &str) -> Result<BuildingRules, AxError> {
         policy: BuildingPolicy::new(confidential),
         write_prefixes,
         reach,
-        egress: EgressAllowlist::new(written.egress),
+        egress: match (confidential, written.egress) {
+            (true, _) => Some(EgressAllowlist::default()),
+            (false, written) => written.map(EgressAllowlist::new),
+        },
         review: written.review,
         browser: written.browser,
         usersbrowser,

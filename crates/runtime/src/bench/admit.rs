@@ -9,6 +9,17 @@
 use super::*;
 
 impl ToolBench {
+    /// Hands the bench the egress list the building wrote, frozen with
+    /// the run (`crates/city/spec/Policy.lean` D27). A browser call to a
+    /// public host outside it is refused before any byte leaves; the
+    /// judgement compares against this short list, so it adds no read,
+    /// no lookup and no round trip to the call.
+    #[must_use]
+    pub fn limit_egress(mut self, list: kernel::EgressAllowlist) -> ToolBench {
+        self.egress = Some(list);
+        self
+    }
+
     /// The door this call's declared Effect names.
     ///
     /// `None` means the door is open and the tool may run; `Some` means
@@ -97,6 +108,9 @@ impl ToolBench {
                 // this machine, and the scan still runs: what a model
                 // typed into a page would leave through it.
                 let target = bytes_target(name, subject, "send bytes out")?;
+                if let Some(answered) = self.listed(&target) {
+                    return Ok(Some(answered));
+                }
                 let spans = kernel::secret::scan(&scanned(call, "scan egress args")?);
                 let verdict = kernel::gate::egress(&spans, &target, self.prior_public_egress);
                 if let Some(answered) = self.crossed(verdict) {
@@ -120,6 +134,9 @@ impl ToolBench {
                 // page is the credential this door can see, and a call
                 // that names no page is the attachment itself.
                 let page = bytes_target(name, subject, "drive a browser")?;
+                if let Some(answered) = self.listed(&page) {
+                    return Ok(Some(answered));
+                }
                 let spans = kernel::secret::scan(&scanned(call, "scan browser args")?);
                 let verdict = kernel::gate::egress(&spans, &page, self.prior_public_egress);
                 if let Some(answered) = self.crossed(verdict) {
@@ -194,6 +211,18 @@ impl ToolBench {
             GateOutcome::Allow => None,
             GateOutcome::Deny { refusal } => Some(BenchOutcome::Refused { refusal }),
             GateOutcome::Ask { question } => Some(BenchOutcome::Refused { refusal: question }),
+        }
+    }
+
+    /// The building's egress list, asked about the host one call names
+    /// when the building wrote a list (`crates/city/spec/Policy.lean`
+    /// D27). It stands before the secret scan: a host the building does
+    /// not reach owes no answer about which bytes may go there.
+    fn listed(&self, target: &EgressTarget) -> Option<BenchOutcome> {
+        let list = self.egress.as_ref()?;
+        match kernel::gate::egress_target(list, target) {
+            EgressOutcome::Allow { .. } => None,
+            EgressOutcome::Deny { refusal } => Some(BenchOutcome::Refused { refusal }),
         }
     }
 
