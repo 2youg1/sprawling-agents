@@ -34,6 +34,22 @@ The model has three properties:
   read the console, whatever it sends, never gets a verb done;
 * **an answer in time does the verb** - the User who reads the code and types
   it back gets the verb.
+
+Those three hold for the answers the machine judges. Nothing above limits how
+many answers a local client may send: it can loop request and wrong answer,
+one 40-bit guess per round, as fast as the listener carries frames. So the
+machine the Rust module implements is the one above behind a guard
+(remote_access D25). The guard judges an answer only when the last judged
+answer is at least `spacing` behind it, and once `limit` judged answers have
+missed since the last one that did its verb, it refuses every request and
+every answer. Two more properties hold for the guarded machine:
+
+* **a guesser gets at most `limit` judged answers** - in any trace in which no
+  verb is done, at most `limit` answers are judged and missed, so a client
+  that never read the console wins with chance at most `limit` in 2^40;
+* **the guard lets the User through** - from a guard that is not locked and
+  whose last judged answer is far enough behind, a request answered in time
+  still does the verb.
 -/
 
 namespace RemoteConfirm
@@ -171,5 +187,137 @@ theorem an_answer_in_time_does_the_verb (ttl : Time) (s : Option Pending)
     (v : Guarded) (a t now : Nat) (h : now < t + ttl) :
     run ttl s [.request v a t, .confirm a now] = [.shown a, .done v] := by
   simp [run, step, h]
+
+/-! ## The guard: answers are spaced, and misses are counted -/
+
+/-- What the guard keeps between answers: when the last judged answer came,
+and how many judged answers missed since the last one that did its verb. -/
+structure Guard where
+  last : Option Time
+  misses : Nat
+  deriving DecidableEq, Repr
+
+/-- The guard a city starts with. -/
+def Guard.fresh : Guard := ⟨none, 0⟩
+
+/-- Whether an answer at `now` is far enough behind the last judged one. -/
+def Guard.spaced (spacing : Time) (g : Guard) (now : Time) : Bool :=
+  match g.last with
+  | none => true
+  | some t => t + spacing ≤ now
+
+/-- What one event comes to behind the guard. `missed` is a judged answer that
+did no verb; `tooSoon` and `lockedOut` are answers the guard did not judge. -/
+inductive Said where
+  | shown (secret : Secret)
+  | done (verb : Guarded)
+  | missed
+  | tooSoon
+  | lockedOut
+  deriving DecidableEq, Repr
+
+/-- A judged answer: the machine above decides, the guard counts. -/
+def judge (ttl : Time) (s : Option Pending) (g : Guard) (a now : Nat) :
+    (Option Pending × Guard) × Said :=
+  match step ttl s (.confirm a now) with
+  | (s', .done v) => ((s', ⟨some now, 0⟩), .done v)
+  | (s', _) => ((s', ⟨some now, g.misses + 1⟩), .missed)
+
+/-- One event behind the guard. A locked guard refuses everything, requests
+included, so the console prints no code nobody may answer; an answer too soon
+after the last judged one is refused and leaves the pending request as it was. -/
+def guarded (ttl spacing limit : Time) : Option Pending × Guard → Event →
+    (Option Pending × Guard) × Said
+  | (s, g), e =>
+    if limit ≤ g.misses then ((s, g), .lockedOut) else
+    match e with
+    | .request v a now => ((some ⟨v, a, now + ttl⟩, g), .shown a)
+    | .confirm a now =>
+      if g.spaced spacing now then judge ttl s g a now else ((s, g), .tooSoon)
+
+/-- The outcomes of a trace behind the guard. -/
+def runGuarded (ttl spacing limit : Time) : Option Pending × Guard → List Event → List Said
+  | _, [] => []
+  | s, e :: es =>
+    (guarded ttl spacing limit s e).2 :: runGuarded ttl spacing limit (guarded ttl spacing limit s e).1 es
+
+/-- A judged answer either does the verb or misses. -/
+theorem judge_done_or_missed (ttl : Time) (s : Option Pending) (g : Guard) (a now : Nat) :
+    (∃ v s', judge ttl s g a now = ((s', ⟨some now, 0⟩), .done v)) ∨
+      (∃ s', judge ttl s g a now = ((s', ⟨some now, g.misses + 1⟩), .missed)) := by
+  unfold judge
+  cases s with
+  | none => exact Or.inr ⟨none, by simp [step]⟩
+  | some p =>
+    by_cases hc : a = p.secret ∧ now < p.expires
+    · exact Or.inl ⟨p.verb, none, by simp [step, hc]⟩
+    · exact Or.inr ⟨none, by simp [step, hc]⟩
+
+/-- Without a verb done, the misses a trace adds stop where the guard locks. -/
+theorem misses_stop_at_the_limit (ttl spacing limit : Time) :
+    ∀ (es : List Event) (s : Option Pending) (g : Guard),
+      (∀ v, Said.done v ∉ runGuarded ttl spacing limit (s, g) es) →
+      (runGuarded ttl spacing limit (s, g) es).count .missed + g.misses ≤ max limit g.misses
+  | [], _, g, _ => by simpa [runGuarded] using Nat.le_max_right limit g.misses
+  | e :: es, s, g, none_done => by
+    have rest_none : ∀ v, Said.done v ∉
+        runGuarded ttl spacing limit (guarded ttl spacing limit (s, g) e).1 es := by
+      intro v hv
+      exact none_done v (by simp only [runGuarded]; exact List.mem_cons_of_mem _ hv)
+    by_cases locked : limit ≤ g.misses
+    · have step_is : guarded ttl spacing limit (s, g) e = ((s, g), .lockedOut) := by
+        simp [guarded, locked]
+      have ih := misses_stop_at_the_limit ttl spacing limit es s g (by simpa [step_is] using rest_none)
+      simp only [runGuarded, step_is, List.count_cons]
+      simpa using ih
+    · cases e with
+      | request v a now =>
+        have step_is : guarded ttl spacing limit (s, g) (.request v a now) =
+            ((some ⟨v, a, now + ttl⟩, g), .shown a) := by
+          simp [guarded, locked]
+        have ih := misses_stop_at_the_limit ttl spacing limit es _ g
+          (by simpa [step_is] using rest_none)
+        simp only [runGuarded, step_is, List.count_cons]
+        simpa using ih
+      | confirm a now =>
+        by_cases spaced : g.spaced spacing now = true
+        · rcases judge_done_or_missed ttl s g a now with ⟨v, s', hj⟩ | ⟨s', hj⟩
+          · exfalso
+            apply none_done v
+            simp [runGuarded, guarded, locked, spaced, hj]
+          · have step_is : guarded ttl spacing limit (s, g) (.confirm a now) =
+                ((s', ⟨some now, g.misses + 1⟩), .missed) := by
+              simp [guarded, locked, spaced, hj]
+            have ih := misses_stop_at_the_limit ttl spacing limit es s' ⟨some now, g.misses + 1⟩
+              (by simpa [step_is] using rest_none)
+            have below : g.misses < limit := Nat.lt_of_not_le locked
+            dsimp only at ih
+            rw [Nat.max_eq_left below] at ih
+            simp only [runGuarded, step_is, List.count_cons, Nat.max_eq_left (Nat.le_of_lt below)]
+            simp
+            omega
+        · have step_is : guarded ttl spacing limit (s, g) (.confirm a now) = ((s, g), .tooSoon) := by
+            simp [guarded, locked, spaced]
+          have ih := misses_stop_at_the_limit ttl spacing limit es s g
+            (by simpa [step_is] using rest_none)
+          simp only [runGuarded, step_is, List.count_cons]
+          simpa using ih
+
+/-- A guesser gets at most `limit` judged answers: from the guard a city starts
+with, a trace that does no verb misses at most `limit` times. -/
+theorem a_guesser_gets_at_most_limit_answers (ttl spacing limit : Time) (es : List Event)
+    (s : Option Pending) (none_done : ∀ v, Said.done v ∉ runGuarded ttl spacing limit (s, Guard.fresh) es) :
+    (runGuarded ttl spacing limit (s, Guard.fresh) es).count .missed ≤ limit := by
+  have bound := misses_stop_at_the_limit ttl spacing limit es s Guard.fresh none_done
+  simpa [Guard.fresh] using bound
+
+/-- The guard lets the User through: unlocked and spaced, a request answered in
+time does the verb. -/
+theorem the_guard_lets_the_user_through (ttl spacing limit : Time) (s : Option Pending)
+    (g : Guard) (v : Guarded) (a t now : Nat) (unlocked : g.misses < limit)
+    (spaced : g.spaced spacing now = true) (in_time : now < t + ttl) :
+    runGuarded ttl spacing limit (s, g) [.request v a t, .confirm a now] = [.shown a, .done v] := by
+  have open_ : ¬ limit ≤ g.misses := Nat.not_le.mpr unlocked
+  simp [runGuarded, guarded, open_, spaced, judge, step, in_time]
 
 end RemoteConfirm
