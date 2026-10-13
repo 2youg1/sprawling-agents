@@ -22,7 +22,7 @@
 use std::sync::{Arc, Mutex, OnceLock};
 
 use kernel::{AxCode, AxError, TimeMs};
-use remote_access::confirm::{CONFIRM_BYTES, Confirm};
+use remote_access::confirm::{CONFIRM_BYTES, Confirm, Miss};
 use wire::{Command, Delivered, Reply, WireCommand};
 
 use super::console::{Lasting, Remote, RemoteLine, perform};
@@ -116,7 +116,7 @@ impl Asking {
         let mut entropy = [0u8; CONFIRM_BYTES];
         (senses.entropy)(&mut entropy)?;
         let expires = TimeMs::new((senses.clock)()?.value().saturating_add(CONFIRM_MS));
-        let code = self.waiting()?.request(asked, entropy, expires);
+        let code = self.waiting()?.request(asked, entropy, expires)?;
         (self.show)(&format!(
             "  a page asks to {}; to allow it, type {code} into that page within two minutes",
             asked.what()
@@ -135,7 +135,7 @@ impl Asking {
     fn confirmed(&self, code: &str) -> Result<Asked, AxError> {
         let senses = self.remote.as_ref().map_err(Clone::clone)?.doorway.senses();
         let now = (senses.clock)()?;
-        self.waiting()?.confirm(code, now)
+        self.waiting()?.confirm(code, now).map_err(Miss::refusal)
     }
 
     /// Carries `line` off the listener's task, because opening a route
