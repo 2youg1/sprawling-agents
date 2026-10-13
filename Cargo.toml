@@ -226,7 +226,7 @@ sha2 = "0.11"
 # The release archive's format, written by `cargo xtask package` and
 # read back by citysim's `bench_startup` install action. One version
 # authority for both.
-zip = { version = "8.6.0", default-features = false, features = ["deflate-flate2"] }
+zip = { version = "9.0.1", default-features = false, features = ["deflate-flate2"] }
 # The checkpoint store is git: libgit2, vendored, no system dependency.
 # storage links it; the tests that open the repository a merge landed in
 # read it too. One version authority for all of them.
