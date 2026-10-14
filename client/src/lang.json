@@ -356,8 +356,8 @@
     "zh": "城市层配置"
   },
   "city_layer_note": {
-    "en": "what every run in this city starts with unless its building or session says otherwise; written to CONFIG.toml",
-    "zh": "城市里每个 run 开始时的默认，楼或会话另有设定时以它们为准；写进 CONFIG.toml"
+    "en": "what every run in this city starts with unless its building or room says otherwise; written to CONFIG.toml",
+    "zh": "城市里每个 run 开始时的默认，楼或房间另有设定时以它们为准；写进 CONFIG.toml"
   },
   "city_effort": {
     "en": "standing thinking level",
@@ -372,8 +372,12 @@
     "zh": "关"
   },
   "city_keep_warm_five_minute": {
-    "en": "renew every five minutes",
-    "zh": "每五分钟续一次"
+    "en": "renew once after use",
+    "zh": "用后续一次"
+  },
+  "city_keep_warm_note": {
+    "en": "one renewal after the last real request keeps the cache warm for about five more minutes; each renewal is billed, and the cost page shows it as its own line",
+    "zh": "最后一次真实请求之后续期一次，缓存约多保温五分钟；每次续期都计费，成本页把它单列一行"
   },
   "city_no_buildings": {
     "en": "no buildings",
@@ -506,6 +510,10 @@
   "cost_total": {
     "en": "spent in all",
     "zh": "整座城市共花"
+  },
+  "cost_renewals": {
+    "en": "keep-warm renewals: {spent} of the total; {sent} sent, {late} too late to read the cache",
+    "zh": "其中保温续期 {spent}：共续 {sent} 次，{late} 次到得太晚、没读到缓存"
   },
   "cost_unpriced": {
     "en": "{calls} model calls came back with no price; they used {tokens} tokens",

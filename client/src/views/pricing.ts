@@ -10,7 +10,7 @@
 // lives here so the two pages cannot answer that question differently.
 
 import type { Answered } from "../core/answered";
-import type { CostAnswer, RunId } from "../wire";
+import type { CostAnswer, Renewals, RunId } from "../wire";
 
 export type CostReading =
   | { readonly kind: "idle" }
@@ -39,4 +39,10 @@ export function runSpend(read: Answered<CostAnswer>, run: RunId | null): RunSpen
   if (costReading(read.value).kind === "unpriced") return { kind: "unpriced" };
   const found = read.value.by_run.find(([name]) => name === run);
   return { kind: "spent", micros: found === undefined ? 0 : found[1] };
+}
+
+// How many keep-warm renewals the city sent: the server counts each one
+// under exactly one of the four outcomes, so they sum to it.
+export function renewalsSent(renewals: Renewals): number {
+  return renewals.read + renewals.late + renewals.unreported + renewals.refused;
 }
