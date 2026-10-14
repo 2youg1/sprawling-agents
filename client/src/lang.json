@@ -6484,8 +6484,8 @@
     "zh": "base_url"
   },
   "setup_base_url_normalised": {
-    "en": "normalised from {entered}; the city calls the URL above",
-    "zh": "已从 {entered} 归一；城市调用的是上面那个地址"
+    "en": "the city calls {recorded}",
+    "zh": "城市调用的是 {recorded}"
   },
   "setup_copy": {
     "en": "copy",

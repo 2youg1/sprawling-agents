@@ -43,10 +43,11 @@ export const ID_SHAPE = /^[a-z0-9][a-z0-9-]*$/;
 // is still filling the form in, and `hostOf` below, which is what the
 // look and attach controls are gated on.
 //
-// **`type="url"` is not that rule.** It accepts `mailto:somebody` and
-// every other scheme, so a value this form refuses used to sit in a
-// box the browser had called valid, and the person learnt of it by
-// pressing a control that stayed grey without saying why.
+// **`type="url"` is not that rule, and the box does not carry it.** It
+// accepts `mailto:somebody` and every other scheme, and it refuses
+// `api.openai.com/v1` and `127.0.0.1:11434`, the two spellings a vendor
+// prints that the city takes; a box carrying both rules shows the
+// alert border on text the city would call.
 //
 // A provider states the root of its API and never the full path, so
 // the shape is an optional scheme, an ASCII host, an optional port, an
@@ -62,7 +63,13 @@ export const ID_SHAPE = /^[a-z0-9][a-z0-9-]*$/;
 // `127.0.0.1:11434`, are exactly the text that got refused. This box
 // now makes the widest judgement the city makes and never a narrower
 // one; the scheme a value is called under is settled once, there.
-export const BASE_URL = /^(?:https?:\/\/)?([a-zA-Z0-9.-]+)(?::[0-9]+)?(?:\/[^\s?#]*)?$/;
+//
+// **The hyphen is written `\x2D`.** The browser compiles a `pattern`
+// with the `v` flag and drops one that does not compile, and under `v`
+// a bare `-` in a class is a syntax error; `\-` is what eslint's
+// `no-useless-escape` refuses. `\x2D` compiles with no flag, with `u`
+// and with `v`.
+export const BASE_URL = /^(?:https?:\/\/)?([a-zA-Z0-9.\x2D]+)(?::[0-9]+)?(?:\/[^\s?#]*)?$/;
 
 // The host a base URL names, which is what a person reads a reachability
 // report about. A URL this form would refuse has no host, and the form

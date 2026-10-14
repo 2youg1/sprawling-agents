@@ -53,9 +53,8 @@ export interface ModelFact {
 export interface Probed {
   readonly name: string;
   // The base URL the city wrote down for this endpoint, which is the
-  // URL it will call. It is the city's spelling of what the person
-  // entered, so a form that shows it shows the value that took effect
-  // rather than the one it sent.
+  // URL it will call: the city's spelling of the text the probe was
+  // sent with, under the face it was sent with.
   readonly baseUrl: string | null;
   readonly models: readonly string[];
   readonly facts: readonly ModelFact[];
@@ -164,9 +163,31 @@ export interface Asked {
   readonly wireApi: WireApi;
 }
 
+// The URL the city calls for the text a form sent, when the city wrote
+// it down another way - the line a form draws under its base_url box.
+//
+// **This compares; it never derives.** Normalisation is one algorithm
+// and it lives in `gateway::normalise_entered`, which
+// `accounting::worker::credentials::Entered::resolved` runs on every
+// probe and every attach. A second implementation here would be a
+// second place for the rule to be wrong, so the only questions asked
+// here are whether the answer is to this probe and whether two strings
+// differ.
+//
+// The answer counts only when it is newer than the one that stood when
+// the probe left and is filed under the id the probe was sent under:
+// belief holds one probe answer, and until the new one arrives the slot
+// still holds the last. It counts only while the box text and the face
+// are the ones the probe was sent with, because the city's spelling is
+// a function of those two and nothing a person typed since. The form
+// never writes the answer into the box: the attach runs the same
+// normalisation on the same text and face, so the box needs no help to
+// be right (client/Spec.lean D99).
 export function normalisedFrom(probed: Probed | null, pending: Sent | null, now: Asked): string | null {
-  const recorded = probed?.baseUrl ?? null;
-  return recorded === null || recorded === now.baseUrl.trim() ? null : recorded;
+  if (probed === null || pending === null || probed === pending.before || probed.name !== pending.id) return null;
+  if (now.baseUrl !== pending.baseUrl || now.wireApi !== pending.wireApi) return null;
+  const recorded = probed.baseUrl;
+  return recorded === null || recorded === pending.baseUrl.trim() ? null : recorded;
 }
 
 // Which stage stopped the call, as the one sentence a person can act on.

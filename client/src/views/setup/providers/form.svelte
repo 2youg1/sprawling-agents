@@ -43,6 +43,7 @@
   import { readAnswer } from "../../../core/answered";
   import { fill, say } from "../../../core/lang";
   import { normalisedFrom } from "../../../core/probed";
+  import type { Sent } from "../../../core/probed";
   import type { AxError } from "../../../wire";
   import { ui } from "../../../ui";
   import Button from "../../parts/button.svelte";
@@ -76,9 +77,10 @@
   let attaching = $state.raw<{ readonly id: string; readonly before: unknown } | null>(null);
   let busy = $state(false);
   let chosen = $state<readonly ModelRow[]>([]);
-  // What the URL box held before the city answered with another
-  // spelling of the same endpoint.
-  let rewritten = $state<string | null>(null);
+  // The probe this form sent and the answer that stood when it left:
+  // the line under the URL box speaks only for a newer answer, and only
+  // while the box and the face are what that probe was sent with.
+  let pending = $state.raw<Sent | null>(null);
 
   const id = $derived(idOf(draft));
   const field = $derived(keyField(held, id));
@@ -102,6 +104,10 @@
     return found !== null && found.name === id ? found : null;
   });
   const facts = $derived(answered?.facts ?? []);
+  // The URL the city calls for the text in the box, when it wrote the
+  // text down another way. The box itself stays the person's
+  // (client/Spec.lean D99).
+  const called = $derived(normalisedFrom($belief.probed, pending, draft));
   const complete = $derived(ID_SHAPE.test(id) && hostOf(draft.baseUrl) !== null);
 
   // The vendors the city knows by host. The answer is the city's own
@@ -149,31 +155,13 @@
     draft = freshDraft();
     held = null;
     chosen = [];
-    rewritten = null;
+    pending = null;
     onAttached?.();
   });
   // An endpoint that answered an empty list answered: the wait ends on
   // the answer rather than on its length.
   $effect(() => {
     if (answered !== null) looking = false;
-  });
-  // The city writes down the base URL it will call. When that is not
-  // the text in the box, the box takes the city's spelling and the
-  // line under it names what was replaced, so the person leaves
-  // knowing the URL that took effect. **The rule that produced it is
-  // the city's** (`gateway::normalise_entered`); this compares two
-  // strings and nothing more, which is why the form cannot drift from
-  // the call. Rewriting the box does not move the answer out from
-  // under it: normalisation settles a scheme and a path and never the
-  // host, and the id this probe was filed under is a function of the
-  // host alone.
-  $effect(() => {
-    const found = answered;
-    if (found === null) return;
-    const moved = normalisedFrom(found, null, draft);
-    if (moved === null) return;
-    rewritten = draft.baseUrl.trim();
-    draft.baseUrl = moved;
   });
 
   // Every edit retires the last report: what it said was about the
@@ -182,7 +170,6 @@
     draft[part] = value;
     report = null;
     note = null;
-    if (part === "baseUrl") rewritten = null;
   }
 
   function retire(): void {
@@ -233,7 +220,10 @@
   function probeNow(): void {
     report = null;
     withKey((e) => {
-      if (u.send(probeEndpoint(e))) looking = true;
+      const sent: Sent = { id: e.id, baseUrl: draft.baseUrl, wireApi: draft.wireApi, before: get(belief).probed };
+      if (!u.send(probeEndpoint(e))) return;
+      looking = true;
+      pending = sent;
     });
   }
 
@@ -279,7 +269,6 @@
     <!-- wording-ok: the placeholder is the provider's documented base URL - an address, which no language translates. -->
     <Field placeholder="https://api.openai.com/v1"
       label={say($lang, "setup_base_url")}
-      kind="url"
       pattern={BASE_URL.source}
       mono
       value={draft.baseUrl}
@@ -287,9 +276,9 @@
         edit("baseUrl", value);
       }}
     />
-    {#if rewritten !== null}
+    {#if called !== null}
       <span class="text-note text-text-faint">
-        {fill(say($lang, "setup_base_url_normalised"), { entered: rewritten })}
+        {fill(say($lang, "setup_base_url_normalised"), { recorded: called })}
       </span>
     {/if}
   </div>

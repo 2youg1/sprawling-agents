@@ -77,7 +77,7 @@ describe("field wiring", () => {
 
   test("a number asks for digits, and the other kinds ask for nothing", () => {
     const number = lookOf(recorded({ label: "Window", value: "1", kind: "number", step: 1024 }).props, "f1").box;
-    const url = lookOf(recorded({ label: "Base URL", value: "", kind: "url" }).props, "f1").box;
-    expect([number.type, number.inputmode, number.step, url.type, url.inputmode]).toEqual(["number", "numeric", 1024, "url", undefined]);
+    const key = lookOf(recorded({ label: "Key", value: "", kind: "password" }).props, "f1").box;
+    expect([number.type, number.inputmode, number.step, key.type, key.inputmode]).toEqual(["number", "numeric", 1024, "password", undefined]);
   });
 });
