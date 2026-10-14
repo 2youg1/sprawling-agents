@@ -139,6 +139,16 @@ impl CommandDesk {
 理由：`pool` 与 `relay`、`drive_run`、`RunWorker` 成环，必须一起搬（D11）；lane 的寿命仍然恰好是它驾驶的那个 run。ARCHITECTURE.md 的确定性规则 3 因此把它列为库 crate 起线程的第六处。被否决的做法：经 `Hands` 交一个起线程的 `fn`——它只有一个实现，而且只是把 `std::thread::Builder` 换个名字。
 -/
 
+/-! D53 `delegate` 在调用时问的，是准入里由城的文件判定的那一半（`accounting::worker::dispatching::agreeing` 的 `seat_from_files` 与 `start_check`；collab D18）
+
+`agree_to_work` 先问停摆（记账线程的状态），再经 `seat_from_files` 判房间的文件：地址归哪栋楼（保留子树被拒）、楼规读不读得出、房间点名的 harness 认不认得、confidential 楼与点名模型的派活是否拒绝 harness；然后才选模型、造适配器。`start_check(city_root)` 把同一个 `seat_from_files` 包成 `collab::StartCheck`，以派来的活的样子问（`Asked::handed_down`：不点名 session，也不点名模型，与 `hand_over_at_call` 造的 `Assignment` 一致），交给 `open_desks` 造的 `DelegateDesk`。它只读城根下的文件，所以在 lane 的线程上、工具回答之前就判完，不必等记账线程。停摆、已接入的模型与之后的准备在交接时才判，拒绝按 D54 回到父房间。理由：规则只有一处，派活的门与人的门问的是同一个函数；只读文件的那一半不需要记账线程的状态。被否决的做法：像 `GoalBooking` 那样在调用时把整份准入送到记账线程去判：lane 每次 `delegate` 都要在记账线程的队列上排一次，且交接时照样可能被拒（车道池、会话形状、存储），D54 那条路省不掉。重开参数：交接与调用之间的窗口里，已接入的模型或停摆的变化成为常见的拒绝来源。
+-/
+
+/-! D54 交接时开不起来的子 run，写诊断，并以 `Handback::unstarted` 回到父房间（`accounting::worker::waking::handing` 的 `hand_over_at_call`、`accounting::worker::dispatching::handback` 的 `deliver_unstarted`；collab D19）
+
+`dispatch_into_lane` 拒绝时，`hand_over_at_call` 照旧写那一行 `Refuse` 级诊断，然后 `deliver_unstarted` 把子房间的交代（房间、「没有开起来」、拒绝与恢复语）存进内容库，来源记作父 run 与子房间，由它造 `Stopped` 回程，写在父 run 名下：信的 id 是 `handback-<父 run>-<n>`，`n` 是这次请求在父 run 的 `DelegateDesk` 上的序号（从 0 起），同一 run 两次派往同一个房间也得两个 id，重放得同一个 id；写信的是子房间的地址。之后与 `deliver_sent` 同一条路：进房间表、以子房间为说话者为父房间敲门（父 run 还在跑时敲门推迟，父 run 读过就跳过），写 `signal_landed`。投递本身失败也只写诊断，不打断同一批的其余请求。理由：子 run 从没有过 run id，信只能写在叫它的那个 run 名下；序号来自桌子，桌子是这些请求的唯一记录。被否决的做法：以时钟读数或内容摘要作 id：同一毫秒、同一拒绝的两次请求会得同一个 id，第二封被房间的去重丢掉。图在 handback 落地时派出的后继节点（`dispatching::handback` 的 `hand_down_what_is_ready`）不走这条路：它的拒绝今天仍是那次落地的错误，父房间收不到回程；要接上它，先为这样的节点定一个不靠桌子序号的 id。
+-/
+
 /-! ### 接口仍写在 sprawling 规格里的模块
 
 下面这些模块的接口与取舍今天写在 `crates/sprawling/Spec.lean` 的这几节里，按标签列出；`architecture.toml` 里它们的行指向本分部，这张表把读者带到那一节。它们搬进本 crate 的规格是 D15 记下的下一步。
