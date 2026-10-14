@@ -606,3 +606,52 @@ fn a_typed_id_the_list_does_not_carry_is_registered_as_the_persons_word() {
         })
         .unwrap();
 }
+
+/// What a refused command must leave alone: the book the worker holds
+/// and every line of the ledger.
+fn untouched(worker: &RunWorker, ledger_dir: &std::path::Path) -> (serde_json::Value, String) {
+    (
+        serde_json::to_value(&worker.credentials.book).unwrap(),
+        ledger_text(ledger_dir),
+    )
+}
+
+/// A ticked list that matches nothing the endpoint serves, with no
+/// typed id beside it, would register an endpoint with no models and
+/// leave the next pick to fail for an unrelated reason. It is refused
+/// at the attach, naming the ids that matched nothing and offering the
+/// ones that are served, and nothing is written (gateway D39).
+#[test]
+fn a_ticked_list_that_matches_nothing_served_is_refused_and_writes_nothing() {
+    let dir = tempfile::tempdir().unwrap();
+    let report = crate::worker::fixture::init_city(dir.path()).unwrap();
+    let (base_url, _provider) = fake_openai(&["relay-chat-1", "deepseek-chat"], Vec::new());
+    let mut worker = RunWorker::new(
+        dir.path(),
+        runtime::diagnostics::Diagnostics::off(),
+        crate::worker::fixture::hands(),
+    )
+    .unwrap();
+    attach_relay(&mut worker, &base_url, (&["relay-chat-1"], &[]), b"first").unwrap();
+    let before = untouched(&worker, &report.ledger_dir);
+    let err = attach_relay(
+        &mut worker,
+        &base_url,
+        (&["relay-hidden-1"], &[]),
+        b"second",
+    )
+    .expect_err("a ticked list that matches nothing is refused");
+    assert_eq!(
+        (
+            *err.code(),
+            err.subject().contains("relay-hidden-1"),
+            err.nearby().to_vec(),
+        ),
+        (
+            AxCode::ConfigInvalid,
+            true,
+            vec!["relay-chat-1".to_owned(), "deepseek-chat".to_owned()],
+        )
+    );
+    assert_eq!(untouched(&worker, &report.ledger_dir), before);
+}
