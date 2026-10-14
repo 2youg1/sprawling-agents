@@ -21,6 +21,7 @@ import crates.wire.spec.Answer.Hunks
 import crates.wire.spec.Answer.Identity
 import crates.wire.spec.Answer.KnownHosts
 import crates.wire.spec.Answer.McpHealth
+import crates.wire.spec.Answer.ModelFigures
 import crates.wire.spec.Answer.Prefix
 import crates.wire.spec.Answer.Preview
 import crates.wire.spec.Answer.Proposals
@@ -293,6 +294,7 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 | 8-94 | `crates/wire/spec/Reception/Entry.lean` |
 | 8-95 | `crates/wire/spec/Reception/Pairing.lean` |
 | 8-96 | `crates/wire/spec/Slash.lean` |
+| 8-97 | `crates/wire/spec/Answer/ModelFigures.lean` |
 | 19 | `crates/wire/spec/Command/Kind.lean` |
 | 19-1 | `crates/wire/spec/Command/Kind.lean` |
 | 19-2 | `crates/wire/spec/Command/Kind.lean` |
@@ -392,6 +394,7 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 | D55 | 会话令牌在最后一条 socket 结束后空闲 60 s 失效 | `crates/wire/spec/Server/Sessions.lean` |
 | D56 | 远程监听有自己的 Host 与 Origin 名单，由同一个 `decide_entry` 判 | `crates/wire/spec/Reception/Entry.lean` |
 | D57 | 人打的 id 走 `AttachEndpoint.named`，模型行带 `listing` | `crates/wire/spec/Frames.lean` |
+| D58 | 模型表的占位由城的梯子按行作答，来源是一个闭集的枚举 | `crates/wire/spec/Answer/ModelFigures.lean` |
 -/
 
 /-! ## 13 依赖选型

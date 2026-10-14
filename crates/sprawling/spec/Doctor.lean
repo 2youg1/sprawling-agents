@@ -571,7 +571,7 @@ repository 身份来自 Cargo 继承的根清单，不另写 owner/repo。
 
 - **缺陷**：设置页每次选模型都把整行发上来，于是一个人重选自己已经登记过的模型，就把当初填的上限用一个空框覆盖掉了；下一次 messages 兼容格式的调用因为写不出 `max_tokens` 被拒（A 章 B-01 的第二段）。`None` 从此表示「这次没说」，而不是「这次要清空」。`context_tokens` 同理，`0` 是「这次没说」，因为两个数来自同一个空表单。
 - **梯子只有一架，住 gateway**（`gateway::Figures::resolve`，`crates/gateway/Spec.lean` §8-17 与 gateway D37）：窗口与上限都是人这次填的 → provider 列表里这个 id 的那一行 → 上一次登记 → 钉版目录与 `gateway::provider::preset` 的行 → 策略缺省 `OUTPUT_CEILING_DEFAULT`。窗口没有策略缺省一档，四档都沉默时窗口为 `0`，上下文提醒随之不响；上限的后两档只在 messages 面作答，chat 与 responses 两面在前三档都沉默时答 `ProviderDefault`。
-- **装配层只交上它手里的事实**：人这次填的两个数、端点簿里这个 id 的那一行（`AttachedEndpoint.models`，provider 自己说的）、`book.choices()` 里这个 tag 上一次登记的同一个模型、钉版目录按精确 id 的那一行，与这个端点的 base URL 和兼容格式。**上一次登记按 endpoint 与 model id 读，而不是只按 tag**：把一个 tag 指向另一个模型时，旧模型的数不得跟过去。书是「这座城登记了什么」的唯一陈述，在它旁边另存一份就是第二个权威；梯子的顺序与「上一次登记只拿人说过的数作答」都只写在 gateway，装配层不复写——一条规则两个家，漂开的总是没人看的那个。
+- **装配层只交上它手里的事实**：人这次填的两个数、端点簿里这个 id 的那一行（`AttachedEndpoint.models`，provider 自己说的）、`EndpointBook::registered` 读出的这个 tag 上一次登记的同一个模型、钉版目录按精确 id 的那一行，与这个端点的 base URL 和兼容格式。**上一次登记按 endpoint 与 model id 读，而不是只按 tag**：把一个 tag 指向另一个模型时，旧模型的数不得跟过去。书是「这座城登记了什么」的唯一陈述，在它旁边另存一份就是第二个权威；梯子的顺序与「上一次登记只拿人说过的数作答」都只写在 gateway，装配层不复写——一条规则两个家，漂开的总是没人看的那个。
 - **来源入账**：`model_selected` 带 `window_from: person | upstream | registered | preset`（窗口未知时缺席）与 `ceiling_from: person | upstream | registered | preset | policy | provider`，拼写取 `FigureSource::as_str` 与 `OutputCeiling::word`，载荷由 `gateway::router::payload` 一处写。`provider` 行的 `max_output_tokens` 缺席：请求里没有这个字段。账本里看得见来源，因此一次被截断的跑是读出来的，不是猜出来的；书把两个词读回 `ModelEntry`，下一次登记据此判断上一次的数该不该作答。
 
 ### 8-73 run 标识直接取自摘要，而停不下来的疑问算「停」（`accounting::worker::dispatching::agreeing::run_id_for`、`accounting::worker::driving::lane`）

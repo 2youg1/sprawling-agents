@@ -41,6 +41,7 @@ impl EndpointBook {
         -> Option<Vec<ProviderAccount>>; // 登记与重放共用的缺席保留规则
     pub fn endpoints(&self) -> impl Iterator<Item = &AttachedEndpoint>;
     pub fn choices(&self) -> impl Iterator<Item = (ModelTag, &str, &ModelEntry)>;
+    pub fn registered(&self, tag: ModelTag, endpoint: &str, model: &str) -> Option<&ModelEntry>; // 这个标签此刻指着同一端点、同一模型时的那次登记：梯子「此前登记」一级的唯一读法，选型点与 `Query::ModelFigures` 共用
     pub fn refuse_dropping_a_role(&self, attaching: &AttachedEndpoint) -> Result<(), AxError>; // D40
 }
 pub fn attached_payload(&AttachedEndpoint) -> Result<Payload, AxError>;      // endpoint_attached 唯一成形处
