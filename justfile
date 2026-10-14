@@ -1022,7 +1022,7 @@ acceptance archive:
     SPRAWLING_BIN="$binary" SPRAWLING_PROVIDER="$url" SPRAWLING_LAUNCHER="$launcher" \
         lake exe acceptance walk "$shelf" "$out/script.json" "$out/record.jsonl" "$out/checklist.md"
 
-# The PGO training load (Roadmap P2): what the instrumented release
+# The PGO training load: what the instrumented release
 # binary in `archive` is driven through before its profiles are merged.
 # It is the acceptance walk above - a scripted city on the stand-in
 # provider: an endpoint attached, a building raised, runs that edit,
@@ -1115,7 +1115,7 @@ pgo-train archive:
     "$binary" playback check "$city/../whole.json" --city "$city"
     "$binary" replay "$city/.sprawling/ledger"
 
-# The PGO held-out acceptance load (Roadmap P2), which judges an arm and
+# The PGO held-out acceptance load, which judges an arm and
 # trains nothing: the four-action pressure reading and the first byte over
 # the empty, l100k and l400k cities (`bench_startup`), then a narrow
 # playback export and a tail of the ledger view on the l400k city, each

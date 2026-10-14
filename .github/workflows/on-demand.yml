@@ -26,12 +26,12 @@
 #             the archive, the merged profile, its SHA-256 and the exact
 #             commands, so a reading against `release-<tree>` names both
 #             arms. Dispatch-only: release.yml gains nothing until a
-#             reading judges it (END-READING.md, Roadmap P2).
+#             reading judges it.
 #   fresh     on Windows, macOS and Linux: this tree's archive unpacked
 #             into a new directory and walked from install to the first
 #             dispatch (`just acceptance`) with the environment a new
 #             account has, then `sprawling doctor`; the checklist and
-#             logs are the artifact `fresh-<os>-<tree>` (Roadmap G2, G6)
+#             logs are the artifact `fresh-<os>-<tree>`.
 #   keychain  on macOS: whether the Keychain asks again for the city key
 #             once the binary is replaced; the reading is the artifact
 #             `keychain-<tree>` (crates/remote_access/Spec.lean §3)
