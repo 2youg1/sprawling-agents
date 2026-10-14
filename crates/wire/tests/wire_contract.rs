@@ -46,7 +46,7 @@ fn exposed() -> SocketAddr {
 fn the_command_and_query_tables_hold_their_declared_counts() {
     // The counts are the wire's closed surface, not a style choice.
     assert_eq!(COMMAND_NAMES.len(), 48, "command table");
-    assert_eq!(QUERY_NAMES.len(), 59, "query table");
+    assert_eq!(QUERY_NAMES.len(), 60, "query table");
 
     let mut sorted = COMMAND_NAMES.to_vec();
     sorted.sort_unstable();
@@ -56,7 +56,7 @@ fn the_command_and_query_tables_hold_their_declared_counts() {
     let mut sorted = QUERY_NAMES.to_vec();
     sorted.sort_unstable();
     sorted.dedup();
-    assert_eq!(sorted.len(), 59, "query names are distinct");
+    assert_eq!(sorted.len(), 60, "query names are distinct");
 }
 
 #[test]
@@ -113,7 +113,7 @@ fn the_schema_hash_covers_every_event_kind_name() {
 
 /// A function of WIRE_V, the two frame name tables and the event kind
 /// names, so any change to the protocol surface lands here first.
-const WIRE_SCHEMA_GOLDEN: &str = "19dae1044472da03e883f35fb71edbda076e28b438c709337a9043f11867ec4f";
+const WIRE_SCHEMA_GOLDEN: &str = "4a1196328b7bb9b31e57f5351574b4a078a62f7ce63e048482de91d72ce2c177";
 
 /// The schema hash reads names only, so a field added under names that
 /// stay leaves it where it was. This digest reads the whole shape with the
@@ -153,7 +153,7 @@ fn strip_prose(value: &mut serde_json::Value) {
 
 /// The digest of `wire_schema()` with its prose removed.
 #[cfg(feature = "schema")]
-const WIRE_SHAPE_GOLDEN: &str = "c2843d58c41ddf5dbbfa91d7d1bb5f268919dfdf81827373ca9155139e84eb93";
+const WIRE_SHAPE_GOLDEN: &str = "35d248638cc15bfb0bb723c2a696c5ac86a8024d25f09a0d926bab613e545c5f";
 
 // -------------------------------------------------------------- binding face
 

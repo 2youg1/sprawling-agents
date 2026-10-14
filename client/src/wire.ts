@@ -11,7 +11,7 @@ import { Schema } from "effect";
 /** The wire version both ends compare on connect. */
 export const WIRE_V = 66 as const;
 /** The schema hash the server checks: `wire::schema_hash()`. */
-export const WIRE_HASH = "19dae1044472da03e883f35fb71edbda076e28b438c709337a9043f11867ec4f" as const;
+export const WIRE_HASH = "4a1196328b7bb9b31e57f5351574b4a078a62f7ce63e048482de91d72ce2c177" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 /** The smallest body size a person may ask for: `wire::BODY_PX_MIN`. */
@@ -2999,6 +2999,60 @@ export const MetricsAnswer = Schema.Struct({
 export type MetricsAnswer = typeof MetricsAnswer.Type;
 
 /**
+ * Who stated a figure, spelled as `model_selected` records it
+ * (`window_from`, `ceiling_from`).
+ */
+export const FigureFrom = Schema.Union([
+  Schema.Literal("person"),
+  Schema.Literal("upstream"),
+  Schema.Literal("registered"),
+  Schema.Literal("preset"),
+  Schema.Literal("policy"),
+]).annotate({ identifier: "FigureFrom" });
+export type FigureFrom = typeof FigureFrom.Type;
+
+/**
+ * The ceiling a call would be made with.
+ */
+export const CeilingLine = Schema.Union([
+  Schema.Struct({
+    sent: Schema.Struct({
+      from: FigureFrom,
+      tokens: Ceiling,
+    }),
+  }),
+  Schema.Literal("provider_default"),
+]).annotate({ identifier: "CeilingLine" });
+export type CeilingLine = typeof CeilingLine.Type;
+
+/**
+ * A window and the rung that stated it.
+ */
+export const WindowLine = Schema.Struct({
+  from: FigureFrom,
+  tokens: Window,
+}).annotate({ identifier: "WindowLine" });
+export type WindowLine = typeof WindowLine.Type;
+
+/**
+ * What one row would be registered with.
+ */
+export const FiguresLine = Schema.Struct({
+  ceiling: Schema.optional(Schema.NullOr(CeilingLine)),
+  id: Schema.String,
+  window: Schema.optional(Schema.NullOr(WindowLine)),
+}).annotate({ identifier: "FiguresLine" });
+export type FiguresLine = typeof FiguresLine.Type;
+
+/**
+ * Every row asked about, in the order asked.
+ */
+export const ModelFiguresAnswer = Schema.Struct({
+  models: Schema.Array(FiguresLine),
+}).annotate({ identifier: "ModelFiguresAnswer" });
+export type ModelFiguresAnswer = typeof ModelFiguresAnswer.Type;
+
+/**
  * One open card, by the document it is on and the moment it was
  * offered.
  */
@@ -4830,6 +4884,9 @@ export const Answer = Schema.Union([
     privacy: PrivacyAnswer,
   }),
   Schema.Struct({
+    model_figures: ModelFiguresAnswer,
+  }),
+  Schema.Struct({
     unavailable: Schema.Struct({
       query: Schema.String,
       reason: Schema.optional(Schema.NullOr(Schema.String)),
@@ -4874,6 +4931,23 @@ export const Answered = Schema.Struct({
   outcome: AskOutcome,
 }).annotate({ identifier: "Answered" });
 export type Answered = typeof Answered.Type;
+
+/**
+ * One row of the table, as the page asks about it.
+ */
+export const FiguresAsked = Schema.Struct({
+  context_tokens: Schema.optional(Schema.NullOr(Window)),
+  id: Schema.String,
+  max_output_tokens: Schema.optional(Schema.NullOr(Ceiling)),
+  tag: Schema.optional(Schema.NullOr(ModelTag)),
+}).annotate({ identifier: "FiguresAsked" });
+export type FiguresAsked = typeof FiguresAsked.Type;
+
+/**
+ * A provider name in transit. Authority for the provider set is `gateway`.
+ */
+export const ProviderName = Schema.String.pipe(Schema.brand("ProviderName"));
+export type ProviderName = typeof ProviderName.Type;
 
 /**
  * Whether a model's reply is still arriving (D30).
@@ -5107,6 +5181,14 @@ export const Query = Schema.Union([
     }),
   }),
   Schema.Literal("shells"),
+  Schema.Struct({
+    model_figures: Schema.Struct({
+      base_url: Schema.String,
+      endpoint: ProviderName,
+      face: DialectKind,
+      models: Schema.Array(FiguresAsked),
+    }),
+  }),
 ]).annotate({ identifier: "Query" });
 export type Query = typeof Query.Type;
 
@@ -5360,12 +5442,6 @@ export const ProposalDecisions = Schema.Struct({
   idem: IdemKey,
 }).annotate({ identifier: "ProposalDecisions" });
 export type ProposalDecisions = typeof ProposalDecisions.Type;
-
-/**
- * A provider name in transit. Authority for the provider set is `gateway`.
- */
-export const ProviderName = Schema.String.pipe(Schema.brand("ProviderName"));
-export type ProviderName = typeof ProviderName.Type;
 
 /**
  * What a `Pursue` command does to a pursuit.

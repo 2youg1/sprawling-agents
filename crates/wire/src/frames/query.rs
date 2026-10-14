@@ -6,7 +6,7 @@
 //! Everything a page may ask, and the name table the schema hash is
 //! built from; `frames` says what every Query shares.
 
-use kernel::{Address, B3Hash, GitOid, Locator, NodeId, RunId, Seq};
+use kernel::{Address, B3Hash, DialectKind, GitOid, Locator, NodeId, RunId, Seq};
 use serde::{Deserialize, Serialize};
 
 use crate::named_frames::named_frames;
@@ -374,6 +374,18 @@ pub enum Query {
     /// Every shell interpreter's calls and failures by class, folded from the whole ledger in
     /// the same pass as the usage tables (`crates/wire/spec/Reading.lean` D48).
     Shells,
+    /// The window and the ceiling the city would register for each row
+    /// of one endpoint's model table, were the person to leave both
+    /// boxes empty, each with the rung that answered
+    /// (`crates/wire/spec/Answer/ModelFigures.lean` §8-97). `base_url`
+    /// is the text in the box, which the city normalises the way an
+    /// attach does.
+    ModelFigures {
+        endpoint: crate::ProviderName,
+        base_url: String,
+        face: DialectKind,
+        models: Vec<crate::FiguresAsked>,
+    },
 }
 
 /// The Query surface, in declaration order — the order the handshake
