@@ -24,8 +24,8 @@ pub const BEAT_MAX_MS: u32 = 1_000;
 pub struct BeatMs(u32);
 
 impl BeatMs {
-    /// The beat a city samples at until a page sets another (Roadmap M0
-    /// item 7).
+    /// The beat a city samples at until a page sets another
+    /// (`crates/sprawling/Spec.lean` §8-173, the measurement plan).
     pub const DEFAULT: BeatMs = BeatMs(100);
 
     /// # Errors

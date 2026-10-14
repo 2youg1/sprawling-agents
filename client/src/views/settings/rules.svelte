@@ -4,8 +4,8 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // A building's `RULES.toml`, read and written whole (refrain roadmap
-  // UG, W6's `PutRules`). The city reads the text before it lands and
+  // A building's `RULES.toml`, read and written whole through
+  // `PutRules`. The city reads the text before it lands and
   // refuses one it cannot read, and refuses a write made against text
   // the Mayor has changed since this box read it: the draft stays in the
   // box either way, and saving again writes against what is there now.

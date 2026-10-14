@@ -249,9 +249,9 @@ def Command.reach : Command → Reach
   | .Auth => .handshake
   -- 唯一没有字节形式的 Command；`Sealed<String>` 在线上不可居留
   | .PutSecret => .sealed
-  -- 给一段 session 起显示名，写 `session_named`（Sessions.lean D27）；控件在 W3 FE-SESS
+  -- 给一段 session 起显示名，写 `session_named`（Sessions.lean D27）
   | .NameSession => .client
-  -- 会话中改房间的运行策略，写 `run_policy_changed`（Sessions.lean D27）；控件在 W3 FE-SESS
+  -- 会话中改房间的运行策略，写 `run_policy_changed`（Sessions.lean D27）
   | .ChangeRunPolicy => .client
   -- 请城开远程门：城在自己的控制台印一个确认码，答 `E_APPROVAL_PENDING`（remote_access D4）；控件在设置 → 远程
   | .OpenRemoteDoor => .client

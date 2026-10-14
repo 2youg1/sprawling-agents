@@ -4,8 +4,8 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // What this city does without being asked, read only (refrain roadmap
-  // UG, S06 Q4): the jobs `SCHEDULE.toml` starts on a clock and the
+  // What this city does without being asked, read only: the jobs
+  // `SCHEDULE.toml` starts on a clock and the
   // sources `WATCH.toml` listens to, each in the order its file was
   // written, and a file that did not read with its reason. Both files
   // are edited by hand at the city's root, so this group shows them and

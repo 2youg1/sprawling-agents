@@ -15,7 +15,7 @@
   // column, under the world layer's sheet, is it a band: the last thing
   // said, and the same box (docs/frontend-method.md §7I).
   //
-  // A session is a stretch of the room, not the room (roadmap S1): runs
+  // A session is a stretch of the room, not the room: runs
   // before it fold behind one line, and how it began is drawn where the
   // two meet.
   import { cancel, dispatch, steer } from "../core/commands";
@@ -104,7 +104,7 @@
   const who = $derived(called(address, stated, $lang));
 
   // Where the newest session in this room began. Runs the fold places at
-  // or before it are the earlier stretch, folded away (roadmap S1-3);
+  // or before it are the earlier stretch, folded away;
   // nothing before a boundary is ever a run of this stretch because a
   // session cannot open underneath a run working in the room.
   const began = $derived($belief.sessions[address] ?? null);

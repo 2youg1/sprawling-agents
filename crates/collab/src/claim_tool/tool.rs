@@ -169,7 +169,7 @@ impl Tool for ClaimTool {
 
 impl ClaimDesk {
     /// Writes a top-level row under the plan's root, the one door into
-    /// an empty plan (roadmap F2).
+    /// an empty plan.
     ///
     /// The root's share is held by the building's Mayor (kernel
     /// `Share.lean` D25), so only `hall/mayor` adds here; a run elsewhere

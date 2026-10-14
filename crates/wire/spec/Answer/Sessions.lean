@@ -72,7 +72,7 @@ pub struct SessionLine {
 
 命令面多两帧，都是 `Reach::client`、`VerbClass::Act`：`Command::NameSession { room: Address, began: Seq, name: String, idem }` 写 `session_named`；`Command::ChangeRunPolicy { room: Address, policy: kernel::RunPolicy, idem }` 写 `run_policy_changed`（kernel D21），正在跑的 run 在下一个安全点生效。标签不加帧：它们照旧经 `PutPreferences` 的 `tags`（D21）；没有标签时页面按 `workspace` 给一个默认标签。两帧与上面的五件随 V0.0.9 的那一次 `WIRE_V` 进位（D22）；`Command` 的 `inductive` 由实现它们的变更集同时加臂（`specalign` 逐臂对账），`client/src/wire.ts` 与 `xtask wiring` 的可达表同改。
 
-**理由**：检阅页要每行说出模型、思考强度与工作区，预览要最后一条回复（roadmap A28）；这些都在视图已经折叠的那张按地址的表能读到的行里，所以作答仍在锁内、不读盘。`preview` 设上限，是因为一条回复可以很长，而这一答一次带至多 `SESSIONS_MAX` 段。
+**理由**：检阅页要每行说出模型、思考强度与工作区，预览要最后一条回复；这些都在视图已经折叠的那张按地址的表能读到的行里，所以作答仍在锁内、不读盘。`preview` 设上限，是因为一条回复可以很长，而这一答一次带至多 `SESSIONS_MAX` 段。
 
 **被否**：①页面为每段再问一次 `Rounds` 拼出这几件：一屏几十次往返；②`preview` 带整条回复：答复的大小随回复长度无界。
 
@@ -83,7 +83,7 @@ pub struct SessionLine {
 
 **决定**：`Opening` 多一件 `#[serde(default)] parent: Option<RunId>`，原样读自这个 run 的 `run_started.parent`；`SessionStart::Dispatched` 由单元臂改成 `Dispatched { by: Option<Who> }`，`by` 读自这一段第一个 `run_started` 的 `dispatched_by`。两处都只读账本已经写下的那一行，旧行没有这个键时为 `None`，页面不猜。改形，`WIRE_V` 进一位。
 
-**理由**：被派出的孩子的对话页要链回派它的那个 session，房间信箱的每一段要说出谁派的（roadmap UC6）；`Opening` 只带派活的房间（`dispatched_by`），一个房间里先后有很多 run，从房间猜不出是哪一个 run 派的。信箱若为每一段再问一次 `Rounds` 才知道派活者，一屏是几十次往返（与 D27 被否的①同理）。
+**理由**：被派出的孩子的对话页要链回派它的那个 session，房间信箱的每一段要说出谁派的；`Opening` 只带派活的房间（`dispatched_by`），一个房间里先后有很多 run，从房间猜不出是哪一个 run 派的。信箱若为每一段再问一次 `Rounds` 才知道派活者，一屏是几十次往返（与 D27 被否的①同理）。
 
 **被否**：①页面从 `RunSummary` 的列表里按时间猜父 run：同一房间并发的两个 run 会猜错；②在 `SessionLine` 上另加一个 `dispatched_by` 字段：它只对 `Dispatched` 有意义，挂在 `Opened` 段上永远是 `None`，一个不可能的组合就能写出来。
 

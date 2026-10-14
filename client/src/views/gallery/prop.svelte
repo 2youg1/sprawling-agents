@@ -11,7 +11,7 @@
   // one on the version the plan holds and one on a version it has since
   // left. Each card alone, one opened for editing, both above the
   // document in RefRain, the mailbox's deciding section holding them,
-  // the letter one of them opens on the right side (roadmap A25), and
+  // the letter one of them opens on the right side, and
   // the mailbox key counting them. Three bodies are drawn from the
   // card's look value alone, for states a fixture cannot press its way
   // into: an edit that leaves a removal out and rewrites a sentence, a

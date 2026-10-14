@@ -6,7 +6,7 @@
 <script lang="ts">
   // The advanced group, the developer's: the way back into the welcome
   // walk, the editor a link in the monitor opens a file in, and what
-  // bounds a run's work (refrain roadmap Q6).
+  // bounds a run's work.
   //
   // The editor and the city's folder are kept by this browser, because
   // they are facts of the machine it runs on (client/Spec.lean §4-39). The

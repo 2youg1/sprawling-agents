@@ -309,7 +309,7 @@ end Runtime.Catalog
 
 **决定**：`ChatRequest.tools` 的常驻核心在 session 开始时定成 `Mode::ALL` 各自 `core_tools` 的并集（今天即 `work` 的那一组：`read`、`search`、`status`、`describe`、`call`、`edit`、`exec`，仍只取楼已准入的）；`mode::core_tools(mode)` 继续回答「这个 mode 允许哪些常驻工具真正执行」，不再决定工具表：`mode::mode_admits` 读它，`edit` 与 `exec` 在每次调用的第一道门问它，读的是 run 的策略格（§8-62）；模式之间差的正是这两件，而它们本就持格的读方，所以门不放在 bench——bench 不持格，放那里要再造一个读方。不在任何核心里的工具经 `call` 到达，这道门不判它。会话中改运行策略（kernel D21）只改两件事：门按新策略判，下一段消息末尾追加一句说明新策略。工具表与冻结的前缀一个字节都不动，所以提示缓存不失效。
 
-**理由**：D21 要工具表在 session 里恒不变，因为中途改工具定义会丢掉整份 prompt cache；A15 要权限与模式能在会话中改（roadmap A15）。两者同时成立的唯一办法是工具表从开头就够大，模式的差别落在门上。代价是 `chat` 的 session 多带两件工具的定义字节；它们由同一个前缀缓存，只在 session 的第一次请求付一次。
+**理由**：D21 要工具表在 session 里恒不变，因为中途改工具定义会丢掉整份 prompt cache；权限与模式又要能在会话中改（runtime D28）。两者同时成立的唯一办法是工具表从开头就够大，模式的差别落在门上。代价是 `chat` 的 session 多带两件工具的定义字节；它们由同一个前缀缓存，只在 session 的第一次请求付一次。
 
 **被否**：①改 mode 时换工具表：违反 D21，每次改都整段缓存失效；②`chat` 里 `edit`／`exec` 只经 `call` 走第三档：模型在 `work` 与 `chat` 之间看到同一件工具时有时直调、有时经 `call`，指南要说两套用法。
 

@@ -90,7 +90,8 @@ struct Taken {
     relay: Vec<Duration>,
     /// Relay queue waits and the accounting thread's sleep, µs (§8-98).
     relay_queue: Vec<u64>,
-    /// Pure lane waits: a staged run's wait for its lane, µs (Roadmap M2).
+    /// Pure lane waits: a staged run's wait for its lane, µs
+    /// (`crates/sprawling/Spec.lean` §8-46-3).
     lane_wait: Vec<u64>,
     idle_us: u64,
     posted_ms: u64,

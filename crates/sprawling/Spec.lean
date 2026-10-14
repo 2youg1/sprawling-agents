@@ -129,11 +129,11 @@ import crates.sprawling.spec.WireClient
 
 **决定**：`accounting::worker::pool` 不持有车道数，也没有配置键给它一个；一个准备好的 run 立即得到一条 lane（一个线程）。放行只问两件事：内存（`RESERVE_SHARE`，§8-46-3 的内存闸）与这次模型调用要去的端点的并发名额（`crates/gateway/Spec.lean` D17）。排队于是只发生在 provider 一处，在那里计数并显示；lane 大多阻塞在网络上，每条只多占一个线程栈。三个平台相同：线程栈用标准库的缺省大小；内存读数经 `bin::monitor::memory`（`sysinfo`），Windows 读 `GlobalMemoryStatusEx`，Linux 读 `/proc/meminfo` 的 `MemAvailable`，macOS 读 Mach 的 `vm_statistics64`，可用量的口径在 macOS 上较宽（§8-46-3）。
 
-**理由**：User 定了车道不设上限（roadmap TP2）。写死的四条车道说自己等于一个 provider 准入模块的上限，而那个模块已经不在，于是第五个准备好的 run 在等一个与任何 provider 都无关的名额。
+**理由**：User 定了车道不设上限。写死的四条车道说自己等于一个 provider 准入模块的上限，而那个模块已经不在，于是第五个准备好的 run 在等一个与任何 provider 都无关的名额。
 
 **被否**：①把车道数改成可配置：仍是一个与 provider 无关的闸，只是把选数的事交给人；②按 CPU 核数定车道：lane 的时间几乎都在等网络，核数不是它的约束。
 
-**重开参数**：吞吐台（roadmap TP1）在 N = 64 时量到线程栈或调度本身成了等待的来源时，重议 lane 是否改为任务而不是线程。
+**重开参数**：吞吐台（`tools/citysim/spec/Throughput.lean`）在 N = 64 时量到线程栈或调度本身成了等待的来源时，重议 lane 是否改为任务而不是线程。
 -/
 
 /-! D73 本 crate 起的子进程从 `child::command` 起，三类例外各有它们自己的一节

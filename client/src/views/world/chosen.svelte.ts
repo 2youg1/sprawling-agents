@@ -49,7 +49,7 @@ export function sessionRun(belief: Belief, room: Address): RunId | null {
 
 // The commits the workbench draws beside `room`: the whole city's from
 // the Mayor's room, which is the city's own place, and the building's
-// from any room inside one (refrain roadmap Q10).
+// from any room inside one.
 export function commitsIn(room: Address): Query {
   return commitsQuery(room === MAYOR ? null : buildingOf(room), null);
 }

@@ -5,7 +5,7 @@
 
 <script lang="ts">
   // The building's files, as the world layer draws them beside a room in
-  // it (refrain roadmap Q10, 3-9): the building page's own tree, one
+  // it: the building page's own tree, one
   // `Query::Listing` per open folder, and a file picked here opens on the
   // right side through the one door every opener uses, at the text the
   // worktree holds now.

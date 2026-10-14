@@ -81,7 +81,7 @@ impl<'de> Deserialize<'de> for GitOid { /* 同上，20 个字节 */ }
 
 **决定**：`read` 的答复带这份文件的完整版本，`edit` 的 `E_VERSION_CONFLICT` 也带完整版本，两者都是这份内容完整的 `cas:b3-<hex64>`（`Locator::cas(B3Hash::digest(bytes))` 的规范拼写），模型把它原样交给 `plan finish` 即可，不补不删；`plan finish` 照旧只收本节文法的两种完整形式。工作树里的文件不答 git oid：`file:<address>@<oid>` 的 oid 是一次提交（`storage::blob_at` 按提交取文件），一份尚未落进检查点的文件没有这样一个提交。版本由 `Locator` 的 `Display` 拼出，文法仍只有这一个家。工具答复是自由的 `Payload`，所以没有新的事件种类，也不改信封。
 
-**理由**：测试城里 `plan finish` 四次被拒，因为没有 `exec` 的 run 拿不到 40 位 oid，而 `edit` 只给 16 位前缀（roadmap F4）。让工具给出完整形式，文法仍只有一个家；让 `plan finish` 接受前缀，就要城去解析前缀，前缀在大仓库里不唯一。
+**理由**：测试城里 `plan finish` 四次被拒，因为没有 `exec` 的 run 拿不到 40 位 oid，而 `edit` 只给 16 位前缀。让工具给出完整形式，文法仍只有一个家；让 `plan finish` 接受前缀，就要城去解析前缀，前缀在大仓库里不唯一。
 
 **被否**：`plan finish` 收 16 位前缀、由城补全：文法多一种形式，补全还会遇到歧义。
 

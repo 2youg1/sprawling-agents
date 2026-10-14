@@ -50,7 +50,7 @@ pub enum ModelTag { /* …既有… */ Ocr }      // 线上 "ocr"
 pub enum Monitoring { Watch, WatchSummary, Release, Beat(BeatMs) }   // 线上 {"beat": 250}
 #[serde(try_from = "u32", into = "u32")]
 pub struct BeatMs(u32);                       // BEAT_MIN_MS ..= BEAT_MAX_MS 之内才造得出
-impl BeatMs { pub const DEFAULT: BeatMs;      // 100 ms（Roadmap M0 第 7 条）
+impl BeatMs { pub const DEFAULT: BeatMs;      // 100 ms（`crates/sprawling/spec/Serving/Memory.lean` §8-173 的测量计划）
               pub fn new(ms: u32) -> Result<BeatMs, AxError>; pub fn ms(self) -> u32; }
 pub const BEAT_MIN_MS: u32 = 10;
 pub const BEAT_MAX_MS: u32 = 1_000;

@@ -10,7 +10,7 @@
   // APG Window Splitter that moves in whole lines of the code below it,
   // so the two regions always end on a line rather than through one. A
   // drag starts on the line and nowhere else, so selecting text in either
-  // region never resizes them (roadmap §3-14).
+  // region never resizes them.
   //
   // This file is the seat (client D95): it holds the drawn line to
   // capture a drag's pointer and the drag in progress, and draws whatever

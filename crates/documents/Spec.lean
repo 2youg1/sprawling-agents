@@ -16,7 +16,7 @@ import crates.documents.spec.Window
 
 /-! ## 1 需求分解
 
-来源是 refrain 路线图 §4-8（S7.8）、§4-9（S7.9）、§4-10（S7.10）与 Roadmap U8、U9、U10 的 Rust 一半。九个可独立验收的单元，与模块一一对应：
+九个可独立验收的单元，与模块一一对应：
 
 - 一段字节（`span`）：版本里的一段半开字节区间（D2）。
 - 编码（`encoding`，`spec/Encoding.lean`）：一个版本的字节是哪种编码的文本，或者不是文本（D4、D5）。
@@ -26,7 +26,7 @@ import crates.documents.spec.Window
 - 编辑事务（`edit`，`spec/Edit.lean`）：一次保存是对一个基线版本的一串编辑，落下就交回撤销它的事务（D8、D9）；页面送来的是文本编辑，按那一版的编码写回（D11、D12）。
 - 选区（`selection`）：一个读者的位置怎样跨过一次保存（D10）。
 - 修改提案（`proposal`，`spec/Proposal.lean`）：一次 run 对一份文档一段字节的建议，它的身份、逐句的 diff、按逐句的决定合成，以及几张卡怎样作为一次保存落下（D13–D19），run 在哪一版上提、提案与直接的写怎样分界（D35、D36），迁自 RefRain 的 `review` 与 `decision`。
-- Markdown 文法（`markdown`，`spec/Markdown.lean`）：一个 Markdown 版本的一个窗口读成块与行内标记的树；文档预览、对话流与导出读这一个文法。对话流读的是模型的回复：结算了的整段读，还在说的只读已经不会再变的那几块（refrain 路线图 §4-9、Roadmap U9 的 Rust 一半；D20–D26、D30–D32）。
+- Markdown 文法（`markdown`，`spec/Markdown.lean`）：一个 Markdown 版本的一个窗口读成块与行内标记的树；文档预览、对话流与导出读这一个文法。对话流读的是模型的回复：结算了的整段读，还在说的只读已经不会再变的那几块（D20–D26、D30–D32）。
 
 本 crate 回答「这些字节是什么、能怎样切、能怎样改、一处建议怎样读、怎样决定」；它不读盘、不读内容库、不记账。
 -/

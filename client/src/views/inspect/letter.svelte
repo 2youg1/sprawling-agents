@@ -6,7 +6,7 @@
 -->
 
 <script lang="ts">
-  // A letter on the right side (roadmap A25, client D73): one card
+  // A letter on the right side (client D73): one card
   // offered on a document, read four ways - the card's own diff, the
   // conversation of the run that sent it, the whole document at the
   // version the card was written against, and the whole document as it

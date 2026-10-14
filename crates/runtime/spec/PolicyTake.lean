@@ -63,7 +63,7 @@ variable {P N : Type}
 
 /-- D28 **策略格：会话中换运行策略的唯一写方是 run 的驱动循环，取在 `SafePoint::BeforeWave`；工具只读格。**
 
-格的形状：`PolicyCell` 一个写方（`run::drive` 在 `BeforeWave` 调 `take`）、多个读方（`EditTool` 与 `ExecSetup` 各持一个 `PolicyReader`，每次写时问 `now`）。改动经 `Interrupt::Policy` 到达驱动循环，与 steer 同一扇门，所以「这个 run 看到了哪一条改动」只有信箱一个答案；工具表定成各 mode 常驻核心的并集（D25），mode 只改门与追加的那句说明，于是 `ChatRequest.tools` 在整个会话里逐字节不变（roadmap A15 的定规）。
+格的形状：`PolicyCell` 一个写方（`run::drive` 在 `BeforeWave` 调 `take`）、多个读方（`EditTool` 与 `ExecSetup` 各持一个 `PolicyReader`，每次写时问 `now`）。改动经 `Interrupt::Policy` 到达驱动循环，与 steer 同一扇门，所以「这个 run 看到了哪一条改动」只有信箱一个答案；工具表定成各 mode 常驻核心的并集（D25），mode 只改门与追加的那句说明，于是 `ChatRequest.tools` 在整个会话里逐字节不变。
 被否：①工具直接读信箱里最新的那条——一波里的几次调用会跨两个策略，下面 `eager_reading_splits_a_wave` 给出反例；②在安全点按新策略重建工具——工具说明随之变，前缀缓存失效，而且工具在一处造、在另一处换，「这件工具按什么判」有了两个答案；③任一安全点都取用——`BeforeCall` 取用时模型这一回合已按旧说明出了调用，`BeforeToolCall` 取用会在一波中间换策略，只有 `BeforeWave` 让一波整体落在一个策略里。
 重开参数：一波之内需要立刻收紧（例如人要立刻停写），那时收紧走 `Cancel`，不走本格。 -/
 def step (note : P → N) (s : State P N) : Step P → State P N

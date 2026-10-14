@@ -343,7 +343,7 @@ Ephemeral 段文本（私有常量，改它即改一个 Ephemeral 读到的第�
 
 自带 skill 一条（`accounting::worker::genesis::tests`）：新城成形之后城库的 `shipped` 格恰是包目录 `skills/` 下的每件 skill，二次成形被拒后书架不变（§8-28c）。
 
-审核状态一张轨迹向量表（`library::audit::tests`）：上架、审、改、迟到的旧摘要审核、失败的取，逐行比对 `audit_state` 与 Audit.lean 的 `shown` 在同一条轨迹上的答案（§8-28b，Roadmap §3.3 LV1）。
+审核状态一张轨迹向量表（`library::audit::tests`）：上架、审、改、迟到的旧摘要审核、失败的取，逐行比对 `audit_state` 与 Audit.lean 的 `shown` 在同一条轨迹上的答案（§8-28b）。
 
 读界两条：`kernel::address::tests` 的三类读者矩阵（本楼读本楼、他楼读非机密楼、楼外读机密楼，外加机密楼读自己、规则读不出）逐格判出 `ReadVerdict`，且本楼的读从不调用规则闭包｜bin 侧 `a_run_in_another_building_reads_nothing_of_a_confidential_one`：普通楼里的 run 按路径 `read`、再不带路径 `search` 机密楼里的文件，假 provider 录下的每一份请求体里都没有那份文件的字节，且最后一份带着 `E_GATE_DENIED`。
 

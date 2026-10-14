@@ -4,8 +4,8 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // What bounds a run's work, explained once for the developer (refrain
-  // roadmap Q6): three values that are chosen apart and combine - what a
+  // What bounds a run's work, explained once for the developer: three
+  // values that are chosen apart and combine - what a
   // run may write, what evidence its work must carry before a merge lets
   // it in, and whether that work lands at all. An explanation rather
   // than a control: each is chosen per dispatch on the composer's

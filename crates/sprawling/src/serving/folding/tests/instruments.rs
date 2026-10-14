@@ -10,8 +10,8 @@
 //! with a writer sending a burst through `observer` and a reader asking
 //! the published views between batches. It is ignored by `just check`,
 //! because it reads the wall clock; `just bench` runs it and prints three
-//! reading lines: record to broadcast, then the two halves of that wait
-//! (Roadmap M2): fold lag, from the writer's send to the first answer a
+//! reading lines: record to broadcast, then the two halves of that wait:
+//! fold lag, from the writer's send to the first answer a
 //! reader gets that has folded the record, and broadcast lag, from that
 //! answer to the record reaching a client's channel. The fold instant is
 //! the one a reader sees, so it is late by at most one query. It asserts nothing about time, since the wall clock

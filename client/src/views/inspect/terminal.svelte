@@ -15,7 +15,7 @@
   // whose output names a `pinned` locator offers it at the right of the
   // head, read through `Query::Content`, whether or not the view cut any
   // lines: a sieve can shorten an output without cutting a line, so `cut`
-  // is no test for whether the original says more (roadmap §3-4). With no
+  // is no test for whether the original says more. With no
   // locator the head says what was cut and that no original was kept,
   // rather than calling the view the whole output.
 </script>

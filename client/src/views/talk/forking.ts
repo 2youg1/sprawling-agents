@@ -7,8 +7,7 @@
 // with it, how a stretch of conversation began, and where the way back
 // to the original conversation leads. One home: the hover action in the
 // thread, the picker in `forking.svelte` and the divider all ask this
-// file, so the rules a person reads off three surfaces cannot drift
-// (roadmap S1, S2).
+// file, so the rules a person reads off three surfaces cannot drift.
 //
 // The page calls the act a branch, because that is what a person sees:
 // a new line of the conversation starting at one turn while the line it

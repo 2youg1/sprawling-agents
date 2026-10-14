@@ -916,7 +916,7 @@ has confirmed.
 load-aware or adaptive policy would replace: it takes a reading and returns
 seats, and nothing else decides where a hot thread prefers to run. Such a
 policy would need live inputs the static plan does without: each core's
-run queue, and the waits the M2 instruments split out of every duration
+run queue, and the waits the worker's instruments split out of every duration
 (relay queueing, the accounting thread's busy share, fold and broadcast
 lag). It would also have to keep the seat table's property that a thread does not
 change preference mid-step. The decision re-opens when readings across

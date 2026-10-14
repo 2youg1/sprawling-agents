@@ -130,7 +130,7 @@ pub fn undoable(call: &ConnectorCall<'_>, sandbox: &SandboxLimits, taint: &Taint
 
 **决定**：`kernel::Tool` 多一个带默认实现的方法 `effect_of(&self, call: &ToolCall) -> Result<Effect, AxError>`（与 `subject`、`writes` 同取整条调用，工具用同一份文法读它），默认答登记里的 `ToolMeta.effect`；`rules` 与 `city` 两件治理工具覆写它，`rules read`、`city list` 这类不改规则的操作答 `Effect::Read`，改规则的操作仍答 `Effect::Govern`，在 run 里照旧被拒。`runtime::bench` 按 `effect_of` 的答案选门，也按它判 taint 与写后 checkpoint；`tool_called.effect`（§8-75 (b)）与并行读波的「只读」判定仍读登记的 `ToolMeta.effect`——治理工具登记为 Govern，于是它的只读操作不进并行读波，账本上也照旧记作 Govern，没有新的写面。`Kernel.Gate.GovernReads` 证明：任何一串治理调用里，被放行的恰是只读操作，改写规则的操作一条也不放行。没有新的事件种类。
 
-**理由**：测试城里 `rules read` 与 `city list` 被拒（E_GATE_DENIED，Govern），而 MAYOR.md 说市长持有 rules。拒 Govern 的理由是「一个 run 不得改写审判它自己的规则」（§8 门册的 Governance 行），读规则不改写什么，拒它只是让模型看不到约束它的东西。按调用定效果是推断（roadmap §7：「F3 在 run 里放行 Govern 类工具的只读操作」）。
+**理由**：测试城里 `rules read` 与 `city list` 被拒（E_GATE_DENIED，Govern），而 MAYOR.md 说市长持有 rules。拒 Govern 的理由是「一个 run 不得改写审判它自己的规则」（§8 门册的 Governance 行），读规则不改写什么，拒它只是让模型看不到约束它的东西。按调用定效果，所以 run 里放行的是 Govern 类工具的只读操作。
 
 **被否**：①改 MAYOR.md 的说法、继续全拒：市长看不到自己的规则就只能猜；②把只读操作拆成另一件工具：工具清单多一项，而它与 `rules` 说的是同一个对象。
 

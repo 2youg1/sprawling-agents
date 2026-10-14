@@ -35,7 +35,7 @@
   // Each segment folds on its own: a person compares two segments and
   // should not lose the first while opening the second.
   const open = new SvelteSet<string>();
-  // Which segment's copy receipt is showing right now (ux A7).
+  // Which segment's copy receipt is showing right now.
   let receipt = $state<string | null>(null);
 
   const asked = $derived(u.conn.asking.ask({ prefix: { run } }));
@@ -45,7 +45,7 @@
     return "prefix" in held ? held.prefix.segments : [];
   });
 
-  // A copy receipt lasts long enough to be seen and no longer (ux A7).
+  // A copy receipt lasts long enough to be seen and no longer.
   $effect(() => {
     const at = receipt;
     if (at === null) return;

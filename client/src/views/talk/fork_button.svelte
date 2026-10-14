@@ -3,8 +3,8 @@ License, v. 2.0. If a copy of the MPL was not distributed with this
 file, You can obtain one at https://mozilla.org/MPL/2.0/.
 Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
-<!-- The one branch action, revealed where a hand rests or a focus lands
-(ux A7), on a person's words, a reply and a call alike. This is its
+<!-- The one branch action, revealed where a hand rests or a focus lands,
+on a person's words, a reply and a call alike. This is its
 seat: it owns the words and the wiring (`fork_button.ts`), and
 `fork_button.look.svelte` draws it.
 

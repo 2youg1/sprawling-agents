@@ -23,7 +23,7 @@
   //
   // Removing a server is the one press on this page that cannot be
   // undone from here, so it is confirmed through `parts/dialog` before
-  // anything is sent (ux A10): the cancelling answer is written first
+  // anything is sent: the cancelling answer is written first
   // and lands under the hand.
 
   import type { McpServer, McpServerHealth, McpState } from "../../wire";
