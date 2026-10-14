@@ -658,3 +658,48 @@ fn a_ticked_list_that_matches_nothing_served_is_refused_and_writes_nothing() {
     );
     assert_eq!(untouched(&worker, &report.ledger_dir), before);
 }
+
+/// Unticking the model a role points at is refused, naming the role,
+/// rather than leaving the role on a model the book no longer holds or
+/// clearing it behind the person's back (gateway D40).
+#[test]
+fn a_re_attach_that_drops_the_model_a_role_points_at_is_refused_naming_the_role() {
+    let dir = tempfile::tempdir().unwrap();
+    let report = crate::worker::fixture::init_city(dir.path()).unwrap();
+    let (base_url, _provider) = fake_openai(&["relay-chat-1", "deepseek-chat"], Vec::new());
+    let mut worker = RunWorker::new(
+        dir.path(),
+        runtime::diagnostics::Diagnostics::off(),
+        crate::worker::fixture::hands(),
+    )
+    .unwrap();
+    attach_relay(
+        &mut worker,
+        &base_url,
+        (&["relay-chat-1", "deepseek-chat"], &[]),
+        b"both",
+    )
+    .unwrap();
+    worker
+        .handle(wire::Command::SelectModel {
+            endpoint: wire::ProviderName::parse("relay").unwrap(),
+            model: "deepseek-chat".to_owned(),
+            tag: kernel::ModelTag::Main,
+            context_tokens: None,
+            max_output_tokens: None,
+            input: None,
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"select"),
+        })
+        .unwrap();
+    let before = untouched(&worker, &report.ledger_dir);
+    let err = attach_relay(&mut worker, &base_url, (&["relay-chat-1"], &[]), b"one")
+        .expect_err("dropping the model main points at is refused");
+    assert_eq!(
+        (*err.code(), err.subject()),
+        (
+            AxCode::ConfigInvalid,
+            "deepseek-chat is main; choose another main first"
+        )
+    );
+    assert_eq!(untouched(&worker, &report.ledger_dir), before);
+}
