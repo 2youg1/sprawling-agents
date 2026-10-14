@@ -16,6 +16,7 @@
 // rows state none of them. A reading that filled in a zero would put a
 // number in front of a person that no provider agreed to.
 
+import type { WireApi } from "./commands";
 import type { Key } from "./lang";
 
 // One stage of a staged reading, as `kernel::reach` writes it: a word
@@ -147,36 +148,25 @@ export function readProbed(data: Record<string, unknown>): Probed | null {
   };
 }
 
-// One entered URL and the URL the city recorded for it, when the two
-// differ.
-export interface Normalised {
-  // What the person typed, which the form names in the line it draws
-  // under the box.
-  readonly entered: string;
-  // What the city wrote down, which the box takes.
-  readonly recorded: string;
+// A probe a form sent, as it left: the id it was filed under, the box
+// text and the face it was sent with, and the answer that stood in
+// belief when it left.
+export interface Sent {
+  readonly id: string;
+  readonly baseUrl: string;
+  readonly wireApi: WireApi;
+  readonly before: Probed | null;
 }
 
-// What a probe's answer says about the URL a person entered.
-//
-// **This compares; it never derives.** Normalisation is one algorithm
-// and it lives in `gateway::normalise_entered`, so a second
-// implementation here would be a second place for the rule to be
-// wrong - a provider's URL would normalise one way on the form and
-// another way in the city, and the difference would show up as a 404
-// nobody could read off the form. So the only question asked here is
-// whether the two strings differ.
-//
-// `null` therefore means the city called the URL exactly as it was
-// entered, and the form says nothing. That is what every probe answers
-// today, because `assembly::credentials::endpoints::endpoint_of`
-// stores the entered URL verbatim; the day it passes the URL through
-// `normalise_entered`, this begins to answer and the form needs no
-// change.
-export function normalisedFrom(probed: Probed, typed: string): Normalised | null {
-  const recorded = probed.baseUrl;
-  const entered = typed.trim();
-  return recorded === null || recorded === entered ? null : { entered, recorded };
+// What the form holds now.
+export interface Asked {
+  readonly baseUrl: string;
+  readonly wireApi: WireApi;
+}
+
+export function normalisedFrom(probed: Probed | null, pending: Sent | null, now: Asked): string | null {
+  const recorded = probed?.baseUrl ?? null;
+  return recorded === null || recorded === now.baseUrl.trim() ? null : recorded;
 }
 
 // Which stage stopped the call, as the one sentence a person can act on.

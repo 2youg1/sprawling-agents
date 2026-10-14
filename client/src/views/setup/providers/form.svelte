@@ -170,10 +170,10 @@
   $effect(() => {
     const found = answered;
     if (found === null) return;
-    const moved = normalisedFrom(found, draft.baseUrl);
+    const moved = normalisedFrom(found, null, draft);
     if (moved === null) return;
-    rewritten = moved.entered;
-    draft.baseUrl = moved.recorded;
+    rewritten = draft.baseUrl.trim();
+    draft.baseUrl = moved;
   });
 
   // Every edit retires the last report: what it said was about the
