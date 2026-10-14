@@ -461,8 +461,9 @@ pub(super) fn selected_lines(ledger_dir: &std::path::Path) -> Vec<serde_json::Va
 /// A re-attach while the endpoint's list cannot be read changes nothing
 /// the city already knew (gateway D38): an id registered before keeps
 /// the facts the earlier probe read, and the endpoint keeps its earlier
-/// `probed`; an id named for the first time gets default facts, and
-/// then the list is partly the person's word, so `probed` is false.
+/// `probed`; an id named for the first time gets default facts and is
+/// marked as named, and then the list is partly the person's word, so
+/// `probed` is false.
 #[test]
 fn a_re_attach_whose_list_cannot_be_read_keeps_the_facts_already_registered() {
     let dir = tempfile::tempdir().unwrap();
@@ -512,6 +513,7 @@ fn a_re_attach_whose_list_cannot_be_read_keeps_the_facts_already_registered() {
                 stated,
                 gateway::ModelFacts {
                     id: "m-new".to_owned(),
+                    listing: kernel::event::record::Listing::Named,
                     ..gateway::ModelFacts::default()
                 },
             ],

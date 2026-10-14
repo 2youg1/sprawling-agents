@@ -6,6 +6,9 @@
 //! What this city may call: an endpoint probed before it is attached,
 //! and a model chosen for a tag.
 
+use std::collections::BTreeSet;
+
+use kernel::event::record::Listing;
 use kernel::{AxCode, AxError, EventKind};
 
 use super::super::RunWorker;
@@ -17,7 +20,9 @@ use crate::worker::errand::Answer;
 mod admitting;
 mod choosing;
 
-<<<<<<< HEAD
+pub(in crate::worker) use admitting::Admission;
+use admitting::Remembered;
+
 /// What a `ProbeEndpoint` read off the accounting thread, on its way
 /// back to be recorded: the endpoint as the form named it, and the
 /// staged reading with the model list, or the refusal that stopped the
@@ -30,31 +35,34 @@ pub(crate) struct Probed {
 }
 
 /// What an `AttachEndpoint` asked the endpoint off the accounting
-/// thread, on its way back to be registered: the endpoint, the ids the
-/// person ticked, and the model list or why it could not be read.
+/// thread, on its way back to be registered: the endpoint, the admission
+/// the person gave, and the model list or why it could not be read.
 pub(crate) struct Attaching {
     endpoint: gateway::AttachedEndpoint,
-    admit: Vec<String>,
+    admission: Admission,
+    kept: Option<gateway::AttachedEndpoint>,
     served: Result<Vec<gateway::ModelFacts>, AxError>,
     finishing: Finishing,
 }
 
 /// One request for an endpoint's model list, built on the accounting
 /// thread from what the city holds and sent from a thread of its own.
-struct Listing {
+/// Named apart from the kernel's `Listing`, which says where a model
+/// row came from.
+struct ListRequest {
     probe: gateway::Endpoint,
     url: String,
     attempts_left: u32,
 }
 
-impl Listing {
+impl ListRequest {
     /// What the endpoint says it serves, asked again while the network
     /// dropped the request and a retry is left.
     ///
     /// # Errors
     /// The last refusal: a retry that is not allowed, or none left.
     fn read(self) -> Result<Vec<gateway::ModelFacts>, AxError> {
-        let Listing {
+        let ListRequest {
             probe,
             url,
             mut attempts_left,
@@ -71,16 +79,13 @@ impl Listing {
             }
         }
     }
-=======
-pub(in crate::worker) use admitting::Admission;
->>>>>>> c0610fd (card-S12.ATTACH14: AttachEndpoint carries the typed ids in named, and each model row says where it came from)
+}
 
 /// A re-attach whose probe read no list: why, and how many of the
 /// admitted rows kept what an earlier attach read.
 struct Unread {
     why: String,
     kept: usize,
-}
 }
 
 impl RunWorker {
@@ -122,7 +127,7 @@ impl RunWorker {
         self.flight.errands.send(move || {
             let found = reach_of(&base_url, proxying, monotonic).map(|reach| Probing {
                 reach,
-                served: listing.and_then(Listing::read),
+                served: listing.and_then(ListRequest::read),
             });
             Answer::Probed(Probed {
                 name,
@@ -239,12 +244,14 @@ impl RunWorker {
     /// Registers what the person entered, asking the endpoint what it
     /// serves first.
     ///
-    /// `admit` narrows what is registered to the models the person
-    /// ticked. An empty list admits everything the endpoint serves,
-    /// which is what somebody who never asked for the list meant; a name
-    /// on the list that the endpoint does not serve is left out rather
-    /// than promised, the same answer a reading room gives a skill that
-    /// is not on the shelves.
+    /// `admission` holds the rows the person ticked on the endpoint's
+    /// list and the ids they typed (`crates/gateway/spec/Endpoint/Models.lean`
+    /// D39). Asking for nothing admits everything the endpoint serves,
+    /// which is what somebody who never asked for the list meant; a
+    /// ticked id the endpoint does not serve is left out rather than
+    /// promised, the same answer a reading room gives a skill that is not
+    /// on the shelves; a typed id is registered whether or not the list
+    /// carries it, because it is the person's word.
     ///
     /// A probe that fails does not stop the attachment when the person
     /// named the ids: most compatible endpoints serve no model list at
@@ -270,7 +277,6 @@ impl RunWorker {
         entered: Entered,
         admission: &Admission,
     ) -> Result<(), AxError> {
-        let admit = admission.asked();
         let entered = entered.resolved()?;
         let explicit_accounts = entered.tuning.accounts.is_some();
         let mut endpoint = self.endpoint_of(entered)?;
@@ -283,15 +289,12 @@ impl RunWorker {
         if explicit_accounts && let Some(kept) = &kept {
             let mut comparing = endpoint.tuning.clone();
             comparing.accounts = kept.tuning.accounts.clone();
+            let ids = |ids: Vec<String>| ids.into_iter().collect::<BTreeSet<String>>();
             if endpoint.base_url == kept.base_url
                 && endpoint.dialect == kept.dialect
                 && comparing == kept.tuning
-                && admit
-                    == kept
-                        .models
-                        .iter()
-                        .map(|model| model.id.clone())
-                        .collect::<Vec<_>>()
+                && ids(admission.asked())
+                    == ids(kept.models.iter().map(|model| model.id.clone()).collect())
             {
                 endpoint.models = kept.models.clone();
                 endpoint.probed = kept.probed;
@@ -299,12 +302,13 @@ impl RunWorker {
             }
         }
         let listing = self.listing(&endpoint);
-        let (admit, finishing) = (admit.to_vec(), self.finishing());
+        let (admission, finishing) = (admission.clone(), self.finishing());
         self.flight.errands.send(move || {
-            let served = listing.and_then(Listing::read);
+            let served = listing.and_then(ListRequest::read);
             Answer::Attached(Attaching {
                 endpoint,
-                admit,
+                admission,
+                kept,
                 served,
                 finishing,
             })
@@ -316,12 +320,13 @@ impl RunWorker {
     pub(in crate::worker) fn finish_attach(&mut self, attaching: Attaching) {
         let Attaching {
             endpoint,
-            admit,
+            admission,
+            kept,
             served,
             finishing,
         } = attaching;
         self.finish(finishing, |worker| {
-            worker.attach_served(endpoint, &admit, served)
+            worker.attach_served(endpoint, &admission, kept.as_ref(), served)
         });
     }
 
@@ -334,43 +339,33 @@ impl RunWorker {
     fn attach_served(
         &mut self,
         mut endpoint: gateway::AttachedEndpoint,
-        admit: &[String],
+        admission: &Admission,
+        kept: Option<&gateway::AttachedEndpoint>,
         served: Result<Vec<gateway::ModelFacts>, AxError>,
     ) -> Result<(), AxError> {
         let unprobed = match served {
             Ok(served) => {
-                endpoint.probed = true;
-                endpoint.models = served
-                    .into_iter()
-                    .filter(|row| admit.is_empty() || admit.contains(&row.id))
-                    .collect();
+                endpoint.models = admission.of_the_list(served);
+                endpoint.probed = endpoint
+                    .models
+                    .iter()
+                    .all(|row| row.listing == Listing::Listed);
                 None
             }
-            Err(err) if admit.is_empty() => {
+            Err(err) if admission.asks_nothing() => {
                 return Err(err.rewrite_recovery("name the model ids to admit, then attach again"));
             }
             Err(err) => {
                 // The probe never answered this time. A row registered
-                // before keeps what an earlier probe read; of a new id
-                // the only fact this city has is that a person named
+                // before keeps what an earlier attach recorded; of a new
+                // id the only fact this city has is that a person named
                 // it, and everything else stays unstated rather than
                 // invented.
                 let earlier = kept.as_ref().map_or(&[][..], |kept| kept.models.as_slice());
-                let registered = |id: &String| earlier.iter().find(|row| row.id == *id);
-                endpoint.models = admit
-                    .iter()
-                    .map(|id| {
-                        registered(id)
-                            .cloned()
-                            .unwrap_or_else(|| gateway::ModelFacts {
-                                id: id.clone(),
-                                ..gateway::ModelFacts::default()
-                            })
-                    })
-                    .collect();
-                let still = admit.iter().filter(|id| registered(id).is_some()).count();
+                let Remembered { rows, kept: still } = admission.unread(earlier);
                 endpoint.probed =
-                    kept.as_ref().is_some_and(|kept| kept.probed) && still == admit.len();
+                    kept.as_ref().is_some_and(|kept| kept.probed) && still == rows.len();
+                endpoint.models = rows;
                 Some(Unread {
                     why: err.subject().to_owned(),
                     kept: still,
@@ -431,7 +426,7 @@ impl RunWorker {
     /// §8-16), while a person watching a settings page is waiting on this
     /// one request and a network that dropped it once is worth asking
     /// again.
-    fn listing(&self, endpoint: &gateway::AttachedEndpoint) -> Result<Listing, AxError> {
+    fn listing(&self, endpoint: &gateway::AttachedEndpoint) -> Result<ListRequest, AxError> {
         let tuning = &endpoint.tuning;
         let mut extra_headers = dialect_headers(endpoint.dialect);
         extra_headers.extend(tuning.extra_headers.iter().cloned());
@@ -452,7 +447,7 @@ impl RunWorker {
             // no conversation, so it carries no picture either.
             gateway::Redemption::without_images(self.resolver()),
         )?;
-        Ok(Listing {
+        Ok(ListRequest {
             probe,
             url: endpoint.models_url(),
             attempts_left: tuning.request_max_retries.without_a_brake(),

@@ -29,7 +29,6 @@ impl RunWorker {
     /// else waits behind it.
     fn seed_from_environment(&mut self, base_url: &str, model: &str) -> Result<(), AxError> {
         let facts = local_model_facts(model)?;
-<<<<<<< HEAD
         let (reply, refusal) = KeptRefusal::open();
         let in_hand = InHand {
             name: "attach the endpoint the environment names",
@@ -47,18 +46,6 @@ impl RunWorker {
         })?;
         self.land_the_rest()?;
         refusal.outcome()?;
-=======
-        self.attach_endpoint(
-            Entered {
-                name: ENVIRONMENT_ENDPOINT.to_owned(),
-                base_url: base_url.to_owned(),
-                dialect: kernel::DialectKind::OpenAi,
-                credential: Credential::Absent { header: None },
-                tuning: gateway::EndpointTuning::default(),
-            },
-            &Admission::everything_served(),
-        )?;
->>>>>>> c0610fd (card-S12.ATTACH14: AttachEndpoint carries the typed ids in named, and each model row says where it came from)
         self.select_model(
             Chosen {
                 endpoint: ENVIRONMENT_ENDPOINT.to_owned(),
