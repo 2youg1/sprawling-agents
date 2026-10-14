@@ -74,7 +74,7 @@ import client.spec.Views.Workspace
 
 - `spec/Views/Parts.lean`：环绕一步可逆、走满一圈回到原处、每一格都走得到（`wrap_back_undoes_forward`、`a_full_turn_comes_home`、`every_cell_is_reached`）；钳住不出界、两端是不动点（`clamp_stays`、`clamp_holds_the_last`、`clamp_holds_the_first`）；关上一层把焦点还给打开者，层层关上回到最初（`closing_returns_to_the_opener`、`closing_every_layer_restores_the_page`）；模态外面的事件——Escape 与点背景——从不确认（`escape_never_confirms`）。
 - `spec/Views/Parts/Segmented.lean`：方向键从不落在不能选的格上（`an_arrow_never_lands_on_a_refused_cell`），落点在控件之内（`an_arrow_stays_inside`），Tab 站是一格或没有（`the_stop_is_a_cell`、`an_empty_control_offers_no_stop`、`a_refused_control_offers_its_first_cell`）。
-- `spec/Views/Parts/Tabs.lean`、`Row.lean`、`Combobox.lean`、`Popover.lean`：每个键留在部件之内；行列表两端不环绕、文本框留住自己的键；游标走动不改生效的值；打字复位游标；Escape 关上并清空过滤词而不改值；换列复位游标。
+- `spec/Views/Parts/Tabs.lean`、`Row.lean`、`Combobox.lean`、`Popover.lean`：每个键留在部件之内；行列表两端不环绕、文本框留住自己的键；游标走动不改生效的值；打字复位游标；Escape 关上并清空过滤词而不改值；输入法组字中的键不改组合框的任何状态（`only_settled_keys_act`，D99）；换列复位游标。
 - `spec/Views/Parts/Decide.lean`：门只收「知道了」、过期的提案只能拒绝、不带 accel 的一下按键不是答复。
 - `spec/Views/Workspace.lean`：图层键三下回原档、看一眼不改选定的档；变淡的发送面什么都不做、停止面不发字；信箱的数字只落到画出来的条目。
 - `spec/Views/Privacy.lean`：取消从不发送，只有确认才发、发的是确认框里的那个动作，别的 idem 的结果不改这一项，发送中不再发，没送出的可以再按；轨迹向量由 `views/setup/privacy/entry.test.ts` 回放。
