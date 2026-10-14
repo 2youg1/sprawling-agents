@@ -236,9 +236,8 @@ mod tests {
         assert_eq!(sent["params"]["clientInfo"]["name"], "sprawling");
     }
 
-    /// A notification has no `id`, which is what tells the far end not
-    /// to answer it. An id here would leave a client waiting for a
-    /// reply that a correct server will never send.
+    /// An id here would leave a client waiting for a reply that a
+    /// correct server will never send.
     #[test]
     fn the_initialized_notification_carries_no_id() {
         let sent: Value = serde_json::from_str(&Rpc::initialized()).unwrap();

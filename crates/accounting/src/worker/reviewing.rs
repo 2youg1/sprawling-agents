@@ -35,11 +35,8 @@ impl RunWorker {
         let (addr, who, run_id) = (&at.addr, site.who.as_str(), site.run_id);
         let write_root = site.write_root.as_path();
         let scopes = site.checkpoint_scope()?;
-        // What the run asked of the request register. Opening commits
-        // the run's own tree first, because the record names the commit
-        // a verifier will be judging; checking merges, because that is
-        // what a passed check means and a verified request nobody merged
-        // would be a third state for a person to chase.
+        // What the run asked of the request register; `settle_requests`
+        // says what opening and checking each do.
         let pr_effects = held(pr, "settle the pull request desk")?.take_effects();
         if !pr_effects.is_empty() {
             // What every commit this settlement makes is signed with.

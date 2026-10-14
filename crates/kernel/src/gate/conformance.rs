@@ -6,10 +6,6 @@
 //! One refusal per door, produced by the door itself.
 //! The part `crates/kernel/spec/Gate.lean` specifies this module with the
 //! rest of `kernel::gate`.
-//!
-//! The samples call the real functions with inputs that deny, so
-//! what the matrix judges is the refusal a run would receive rather
-//! than a copy of it written for the test.
 
 use std::collections::BTreeMap;
 

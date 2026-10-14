@@ -5,11 +5,6 @@
 
 //! What one Anthropic stream settles into.
 //!
-//! The provider sends one `content_block_start` per block, then deltas
-//! against it by index, then a `message_delta` carrying the stop reason
-//! and the output count. Rebuilding the blocks in index order is what
-//! keeps a tool call that arrived interleaved with prose where it was.
-//!
 //! A thinking block arrives in two streams: its text in
 //! `thinking_delta` and the provider's `signature_delta` at the end.
 //! The signature is what the provider verifies the reasoning against on

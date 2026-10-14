@@ -83,10 +83,8 @@ impl StandIn {
         }
     }
 
-    /// The step after `client_for`: this host's name resolves to the
-    /// stand-in, the stand-in's certificate is the only one trusted, and
-    /// no proxy takes the request - a proxy would be handed the name and
-    /// do its own resolving.
+    /// The step after `client_for`, for this stand-in's host, address and
+    /// certificate.
     pub(crate) fn toward(
         &self,
     ) -> impl Fn(reqwest::blocking::ClientBuilder) -> reqwest::blocking::ClientBuilder

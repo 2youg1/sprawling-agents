@@ -3,8 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The `[search]` table as a file spells it. The reader and the writer
-//! share these sections, so the file's syntax has one definition; what a
+//! The `[search]` table as a file spells it, in `SearchSection`; what a
 //! value may say is [`super::check`]'s answer.
 //!
 //! Specified by `crates/city/spec/ConfigLayers.lean` §8-4c.

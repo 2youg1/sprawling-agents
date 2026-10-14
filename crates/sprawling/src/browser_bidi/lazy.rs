@@ -4,10 +4,6 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! An engine nobody has started yet, and the port it will answer on.
-//!
-//! A building that admits the browser and never uses it should not have
-//! a browser running, so the process starts on the first frame and stops
-//! when the tool holding it is dropped.
 
 use std::path::{Path, PathBuf};
 

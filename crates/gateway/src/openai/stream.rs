@@ -4,11 +4,6 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! What one OpenAI stream settles into.
-//!
-//! The provider sends one `choices[0].delta` per chunk and the finish
-//! reason on the last one. Tool calls arrive by index with their
-//! arguments split across chunks, which is why they are joined before
-//! anything reads them.
 
 use kernel::{AxError, Increment};
 use serde_json::{Value, json};

@@ -328,9 +328,8 @@ impl PreferencesAnswer {
             PreferencePatch::Theme(theme) => self.theme = theme,
             PreferencePatch::Chord(chord) => {
                 self.chords.retain(|held| held.action != chord.action);
-                // An action returned to the chord this build ships has
-                // no entry, so the list states what was changed rather
-                // than what the keymap holds.
+                // An empty spelling returns the action to the chord this
+                // build ships, which `Chord` keeps no entry for.
                 if !chord.spelled.is_empty() {
                     self.chords.push(chord);
                     // Action order, so two machines that rebound the

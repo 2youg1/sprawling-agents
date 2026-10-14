@@ -6,12 +6,10 @@
 //! The two identity files City Hall's residents are read from.
 //!
 //! They sit in the city's own reserved subtree rather than at the
-//! residents' own addresses, and that placement is the whole design: no
-//! write domain reaches the reserved subtree, so the Mayor cannot edit
-//! who the Mayor is and the clerk cannot edit what it answers by. Every
-//! other resident's `URBANITE.md` sits where that resident works, which
-//! is right for a resident that a person dispatched and wrong for two
-//! that serve the whole city.
+//! residents' own addresses, and that placement is the whole design
+//! (`hall_identity_path` says why). Every other resident's `URBANITE.md`
+//! sits where that resident works, which is right for a resident that a
+//! person dispatched and wrong for two that serve the whole city.
 //!
 //! Specified by `crates/city/spec/SpineFiles.lean` §8-5.
 

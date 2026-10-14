@@ -5,10 +5,8 @@
 
 //! The client the browser downloads, and which bytes answer which path.
 //!
-//! Two sources, one contract: the release binary carries the bundle
-//! inside itself, and a development loop points at the directory the
-//! wasm build writes, read per request so an edit shows on refresh.
-//! Which source is in use changes no policy, which is what makes this
+//! Two sources, one contract (`ClientAssets`). Which source is in use
+//! changes no policy, which is what makes this
 //! an adapter rather than a decision.
 //!
 //! The whole of the path policy is here and none of it is in a handler:

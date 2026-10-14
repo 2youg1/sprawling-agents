@@ -9,9 +9,8 @@
 //! These are read shapes and nothing else. Every one is derived from the
 //! city's own state by a projection above this crate, so nothing here
 //! decides anything; what this module owns is that a page and a server
-//! agree on the field names, and that `Unavailable` is a real answer —
-//! a view this build does not evaluate yet says so by name rather than
-//! returning an empty result a reader would mistake for an empty city.
+//! agree on the field names, and that `Unavailable` is a real answer
+//! (`Answer` says why).
 
 use kernel::{
     Address, ApprovalItem, Autonomy, ClusterKey, FileChange, GitOid, Restoration, Ruling, Seq,
