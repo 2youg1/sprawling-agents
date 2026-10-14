@@ -8,12 +8,12 @@
 # changes touch one or two packages near the top of the graph; on the
 # test build's own configuration and four jobs, a change to `sprawling`
 # alone rebuilt it and `citysim` in 54 s where the whole workspace took
-# 158-191 s.
+# 158-191 s, both with line-table debug information.
 #
-# It is a cache entry of about 1.6 GB. Carried as an artifact instead, it
-# downloaded at 29 MB/s, 54 s, where a cache entry restores at about
-# 170 MB/s. The cache's 10 GB holds it because `cache-prune.yml` deletes
-# the entries a newer one replaced, this one's included. Only main saves,
+# It is a cache entry of about 1.4 GB. Carried as an artifact instead, it
+# downloaded at 29 MB/s, where a cache entry restores at about 170 MB/s.
+# The cache's 10 GB holds it because `cache-prune.yml` deletes the entries
+# a newer one replaced, this one's included. Only main saves,
 # and a pull request's own saves are visible to that pull request alone,
 # so no run reads a target directory a fork wrote.
 #

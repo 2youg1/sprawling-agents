@@ -319,23 +319,31 @@ let_underscore_must_use = "deny"
 let_underscore_untyped = "deny"
 fn_params_excessive_bools = "deny"
 
-# Dependencies carry debug info nobody here reads: a backtrace we act on ends
-# in our own code, and the frames below it cost bytes in every .rlib and in
-# the .pdb of every test binary that links one.
+# A build nobody ships carries no debug information. This is a ruling of the
+# person: a build that never reaches a user may give up whatever leaves the
+# quality of the shipped build where it is. Debug information describes the
+# code and changes nothing it does, so the suite runs the same program
+# without it, and a panic or a failed assertion still prints its file and
+# line, because that location is compiled into the panic itself. What goes
+# is the file and line of each frame in a backtrace, and source-level
+# debugging by default; `CARGO_PROFILE_DEV_DEBUG=2` brings both back for the
+# session that needs them.
 #
-# Measured rather than assumed, on one windows-msvc machine, by building
-# `cargo test -p sprawling-wire --no-run --all-features` into two empty target
-# directories: 1.05 GB without this block against 0.86 GB with it, so 18.4%
-# of what one crate's test build writes. Two thirds of the difference is
-# .rlib and one third is .pdb - the opposite weighting to the one this block
-# first carried. Like every wall-clock and disk figure in this repository the
-# number is reported with the machine that produced it and gated by nothing.
+# Measured on the test build's own configuration (`just test-archive`,
+# rust-lld, no incremental) on one windows-msvc machine, one round each,
+# against `debug = "line-tables-only"`: the workspace's own packages
+# compiled from warm dependencies on four jobs in 136 s against 158 s, and
+# `target/debug`, which the warm target caches, came to 6.45 GB against
+# 8.08 GB, or 1.39 GB against 1.60 GB packed with `zstd -3` as the cache
+# packs it. The nextest archive is 527 MB either way, because windows-msvc
+# writes debug information to .pdb files and the archive carries none.
 #
-# Workspace members stay at `debug = 2`, so source-level debugging and
-# file-and-line backtraces of our own code are unchanged; only a frame inside
-# a dependency loses its line number. The release profile is untouched, so
-# nothing about the shipped binary moves.
-[profile.dev.package."*"]
+# `"line-tables-only"` keeps line numbers in a backtrace at the cost above,
+# and a build that only feeds the suite has more use for the time and the
+# bytes. Reopen this if a CI failure ever cannot be diagnosed without those
+# line numbers. The release profile below is untouched, so nothing about
+# the shipped binary moves.
+[profile.dev]
 debug = false
 
 # crash-only delivery profile

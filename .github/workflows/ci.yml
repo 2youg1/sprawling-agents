@@ -287,9 +287,7 @@ jobs:
   # The suite, compiled once. The archive carries every test binary and
   # the workspace binaries they spawn; the slices below run it on
   # runners whose checkout path is the same as this one, which is what
-  # lets a path cargo baked in at compile time resolve there. Debug
-  # information is cut to line tables: it is most of the archive's bytes,
-  # and a backtrace still names the file and the line.
+  # lets a path cargo baked in at compile time resolve there.
   #
   # The suite links with rust-lld (lld-link) rather than Microsoft's
   # link.exe: the archive holds 78 linked binaries, and on a warm cache
@@ -312,8 +310,6 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 30
     env:
-      CARGO_PROFILE_DEV_DEBUG: line-tables-only
-      CARGO_PROFILE_TEST_DEBUG: line-tables-only
       CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER: rust-lld.exe
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
