@@ -11,6 +11,8 @@
 #             desktop server's Zig leaf (whose tests no cargo command
 #             runs), then the gates that judge the built client bundle;
 #             compiles only xtask
+#   swap      every look under client/swap/ drawn in place of the shipped
+#             one, and judged by render as the shipped bundle is
 #   models    the Lean specifications under `crates/`
 #   clippy    the zero-warning build of every target and feature, and the
 #             feature combinations `just features` runs
@@ -211,12 +213,35 @@ jobs:
         if: ${{ !cancelled() }}
         run: just --no-deps gates-artifacts
 
-      # Every replacement look under client/swap/ drawn in place of the
-      # shipped one, and the client still typechecks, keeps its wiring
-      # tests and passes render (tools/xtask/Spec.lean section 8-13).
+  # Every replacement look under client/swap/ drawn in place of the
+  # shipped one, and the client still typechecks, keeps its wiring tests
+  # and passes render (tools/xtask/Spec.lean section 8-13).
+  #
+  # A job of its own rather than a step of `gates`: its render opens the
+  # five passes again, 159 s of a gates job that ended at 486 s, the
+  # median of 40 runs, and a render pass keeps two to three processors
+  # busy, so the two renders cannot share one four-processor runner
+  # without slowing each other.
+  swap:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: ./.github/actions/toolchain
+      - uses: ./.github/actions/zig
+      # The entry `gates` saves holds what xtask is built from; this job
+      # reads it and writes none of its own.
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+        with:
+          shared-key: gates
+          save-if: false
+      - uses: taiki-e/install-action@ab6895351a88b908e96a4697860d4ffea5e57dbe # v2
+        with:
+          tool: just
+      - uses: ./.github/actions/client-artifacts
       - name: the swap test
-        if: ${{ !cancelled() }}
         run: just swap
+
   # The Lean specifications. The checker in `tools/adversary/` is not built here:
   # it attacks the binary from outside and stays out of every required
   # check (`adversary.yml` runs it nightly).
@@ -570,7 +595,7 @@ jobs:
   # D27 in tools/xtask/Spec.lean: skipped required work is not a green tree.
   # This is the shared verdict, so release has no second list of checks.
   validation:
-    needs: [models, clippy, test, gates, supply, client]
+    needs: [models, clippy, test, gates, swap, supply, client]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
