@@ -689,7 +689,7 @@ fn kept_credential(&self, name: &str, dialect: DialectKind, header: Option<Strin
 
 **本章测试**：`credentials::tests::kept::an_empty_key_keeps_the_credential_this_city_has_archived`——带 key 接上后，再一次空框 probe 与空框 attach，三次模型表请求都带 `authorization: Bearer sk-archived`，且端点的 `auth` 仍是原引用。
 
-- **`attach_endpoint` 不以探测为准入条件（`crates/gateway/Spec.lean` §8-10 是权威，这里只记装配侧）**：鉴权头由 `AuthSpec::for_dialect`（`gateway::endpoint::auth`） 按兼容格式产出（人填的头优先），于是 Anthropic 兼容端点拿到的是 `x-api-key` 而不是必然 401 的 `Authorization: Bearer`。探测失败时，若 `admit` 非空则按人报的型号登记（`probed: false`，另写一条 `effect` 级诊断点名探测的错），`admit` 为空才拒，恢复语是「把要用的 model id 报上来，再登记一次」。落选的是「探测失败即拒、让人先修好 `/models`」：多数兼容端点根本不服务这个接口，那条路等于让人去修一个对端从未承诺过的东西。
+- **`attach_endpoint` 不以探测为准入条件（`crates/gateway/Spec.lean` §8-10 是权威，这里只记装配侧）**：鉴权头由 `AuthSpec::for_dialect`（`gateway::endpoint::auth`） 按兼容格式产出（人填的头优先），于是 Anthropic 兼容端点拿到的是 `x-api-key` 而不是必然 401 的 `Authorization: Bearer`。探测失败时，若 `admit` 非空则按人报的型号登记（早先已登记在这个名下的 id 留下书里那一行，`probed` 只在人报的全是这些 id 时沿用早先的值，否则为 `false`；另写一条 `effect` 级诊断，说这一次没读到列表、点名探测的错，gateway D38），`admit` 为空才拒，恢复语是「把要用的 model id 报上来，再登记一次」。落选的是「探测失败即拒、让人先修好 `/models`」：多数兼容端点根本不服务这个接口，那条路等于让人去修一个对端从未承诺过的东西。
 - **`Credential` 是穷举枚举**：`Absent { header }`／`Key { reference, header }`。「这次没填」与「填了一把 key」是两件事，前者保留城已有的凭证，两个 `Option` 拼不出这个区别。`Credential::entered` 是线上命令的唯一入口。
 
 ### 8-82 同一个地址上的新一段：`/new`（`accounting::worker::commanding::sessions`、`Command::OpenSession`、`EventKind::SessionOpened`）
