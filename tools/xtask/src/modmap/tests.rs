@@ -148,3 +148,45 @@ fn an_unregistered_zig_file_is_named() {
         ])
     );
 }
+
+/// A test module needs no entry, whichever of the three spellings it
+/// takes, and a production module beside it still does.
+#[test]
+fn an_unregistered_test_module_is_not_named() {
+    let root = crate::root::fixture::relocated("modmap-tests");
+    crate::root::fixture::write(
+        &root,
+        MAP,
+        "module = [
+  { name = \"k::a\", file = \"tools/k/src/a.rs\", owns = \"a module\",          shape = \"value\", since = \"T\", status = \"built\", spec = \"k-SPEC.md#8-9\" },
+]
+",
+    );
+    crate::root::fixture::write(
+        &root,
+        "tools/k/src/lib.rs",
+        "mod a;
+",
+    );
+    for rel in [
+        "tools/k/src/a.rs",
+        "tools/k/src/a/tests.rs",
+        "tools/k/src/a/read_tests.rs",
+        "tools/k/src/a/tests/replay.rs",
+        "tools/k/src/b.rs",
+    ] {
+        crate::root::fixture::write(&root, rel, "");
+    }
+    let found = check(&root).map(|all| {
+        all.into_iter()
+            .map(|v| format!("{}: {}", v.location, v.violation))
+            .collect::<Vec<_>>()
+    });
+    std::fs::remove_dir_all(&root).unwrap();
+    assert_eq!(
+        found.map_err(|err| err.to_string()),
+        Ok(vec![
+            "tools/k/src/b.rs: file is not registered in the module map".to_owned()
+        ])
+    );
+}

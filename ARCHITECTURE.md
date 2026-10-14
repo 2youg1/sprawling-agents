@@ -628,7 +628,7 @@ the part worth knowing before starting, not after.
 | the Windows desktop a resident may drive | `crates/desktop` + `crates/desktop/Spec.lean` | `unsafe` only in `crates/desktop/ffi`, under the Zig rule of §2; `xtask guard` holds its lint table |
 | a crate depending on another | the `depmap` block in §3 | actual edges must be a subset; a hidden edge is a red build |
 | a new seam | §4, and the trait's file | `depmap` refuses a `pub trait` outside the files §4 names |
-| a new module, or a deleted one | `architecture.toml` | `modmap` refuses a file with no entry, and an entry whose file is gone |
+| a new module, or a deleted one | `architecture.toml` | `modmap` refuses a production file with no entry, and an entry whose file is gone; a test module needs no entry |
 | a platform the release ships | `xtask::platform`'s `PLATFORMS` | one row per platform; the npm scope and the bare root name are asserted there |
 | the page | `client/` + `client/Spec.lean` | its own lint, typecheck and tests; the bundle is measured against a byte budget |
 | the page's colours, motion or words | `client/src/theme.css` and the parts it imports from `client/src/theme/`, `client/src/lang.json` + `docs/frontend-method.md` | `xtask color`, `xtask motion` and `xtask wording` refuse a colour, curve, duration or word spelled anywhere else |
@@ -1122,7 +1122,8 @@ yet.
   shape set in §9 and the fields of `architecture.toml` change only with an
   explicit ruling, recorded in the commit that changes them.
 - **The module map is `architecture.toml`**, not a section here. It is the
-  machine's data face: one entry per module file, read only by
+  machine's data face: one entry per production module file (a test
+  module may have one and needs none), read only by
   `cargo xtask modmap`, and asked for one module at a time rather than read
   through, so no entry has a position a person maintains.
 - **Adding an entry is the registration step**: it lands in the same change

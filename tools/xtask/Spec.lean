@@ -29,7 +29,7 @@ Markdown 时的标签 `8-n`，别处引作 `tools/xtask/Spec.lean §8-n`。
 |---|---|
 | header | 每个 `.rs` 与 `.zig` 开头恰是 MPL-2.0 通告三行加版权一行，四行逐字节相等，且整份文件只出现这一次（§14、§8-48） |
 | lexicon | Markdown、Rust 源码、Lean 与 `client/src/lang.json` 里的退役词命中即红；退役词表是 `tools/xtask/lexicon.toml` |
-| modmap | 每个包（§8-39，工具包 citysim 在内）目录下的 `src/**/*.rs` 与每个 `.zig`（§8-48）↔ `architecture.toml` 里文件落在这些目录下的条目一一对应；状态一致；`owns` 非空；索引文件零逻辑。本门所在的包 xtask 除外，它的模块由本规格 §7 描述（D9） |
+| modmap | 每个包（§8-39，工具包 citysim 在内）目录下的 `src/**/*.rs` 与每个 `.zig`（§8-48）↔ `architecture.toml` 里文件落在这些目录下的条目一一对应，测试模块无条目也可（D40）；状态一致；`owns` 非空；索引文件零逻辑。本门所在的包 xtask 除外，它的模块由本规格 §7 描述（D9） |
 | depmap | crate 依赖边 ⊆ ARCHITECTURE §3 的 `depmap` 围栏块；一个 crate 之内的模块方向服从 `directions` 块（§8-33）；`pub trait` 只现于缝那一节（ARCHITECTURE §4）列出的文件 |
 | guard | 唯一一张自己的 lint 表（`crates/desktop/ffi` 的）与根 `[workspace.lints]` 逐键相等，例外只在 `RECORDED`；其余每个成员都继承根表（§8-46）；工作区自己的包在 `[workspace.dependencies]` 里各钉 `=` 加工作区版本（§8-49） |
 | wording | 读者拿到的词出自短语表 `client/src/lang.json`：`.svelte` 标记里文本节点与朗读型属性的字面量（`wording::markup`），`.ts` 里拒绝各段的实参（`wording::refusal`，§8-24），去掉插值后不得剩下相邻两个字母；行内 `wording-ok:` 豁免专名；生成的文件由它的生成器作证 |
@@ -139,6 +139,8 @@ gate／Violation／rule／violation／alternative（三段式拒绝的施工侧�
 
 
 D9 **modmap 判每一个包，门自己所在的包除外。**范围是 `members` 列出的全部包（§8-39），减去本门编进去的那个包（`CARGO_PKG_NAME`，与 `boundary` 读同一个事实）。xtask 的模块由本规格 §7 按模块描述，给它的文件另开一张表就是同一份描述的第二个家；其余工具包——今天是 citysim——与产品一样受封闭清单约束，因为它们的文件同样会被顺手新建、同样会忘记翻状态。锚点随之扩大：`specalign` 判 citysim 的 `spec` 列，与判产品的一样（§8-43）。失败的方向是故意的：一个新加的工具包默认受判，第一次提交就看得见一片红，而不是静静少判一个包。被击败的备选：在 citysim 的清单里再写一个 `mapped = true`——同一个包的一个性质分写在 `role` 与 `mapped` 两处；在 `modmap` 里写一张 `MAPPED_TOOLS` 常量表——包的一个性质住进了门里，改包名的那次提交不碰 xtask 也能过编译。
+
+D40 **测试模块不必登记。** 文件名是 `tests.rs` 或 `<名>_tests.rs`、或在 `src/` 下某个 `tests/` 目录里的 `.rs`，盘有表无时不报；这三种拼法就是本仓给 `#[cfg(test)] mod` 起名的方式（`modmap::is_test_module`）。理由：测试模块只在 `cfg(test)` 下编译，不持生产策略，读者从它所测的模块找到它；要它有一行，每个回归测试就先是一次登记，历史上几十个提交只做了这件事，而一个漏登的测试文件从没有让哪个缺陷溜过。已经有一行的测试模块照旧受判（文件不在而状态不是 `planned` 即红），所以表不会点名一个已经没了的文件。被否：①整张表都改为可选——`length` 的 `data` 豁免、`specalign` 的锚点、`spec` 第七条的路径解析与 `docnum` 的 `crate_table` 都读生产模块的行，它们缺了行就判错；②按 `shape = "test"` 认——一个没有行的文件没有形状可读。重开参数：某道门开始读测试模块的行。
 -/
 
 /-! ## 8 接口先行
@@ -1316,7 +1318,7 @@ D3 **判的是哪棵树。** 仓库根取「当前目录往上第一个含 `Carg
 /-! ## 10 实现逻辑
 
 1. **walk**：手写递归（不引 walkdir），跳过 `walk::SKIP_DIRS` 的六个构建目录名（`target`、`node_modules`、`.lake`、`.svelte-check`、`.zig-cache`、`web-dist`），也不进根以下自带 `.git` 条目的目录（另一份检出）；名为 `.git` 的条目按结构跳过，不在表里。输出按路径字符串排序——报告顺序确定，diff 可比。路径统一正斜杠（Windows 反斜杠归一），因为模块表以正斜杠书写。理由见 §8「扫描面」一节。**隔离区**：仓库根 `local/`（gitignore，恒不入库）存一台机器自己的工作记录；从仓库根扫描的四门（header／lexicon／secret／color）排除它——门只对入库对象作证。modmap 扫除本门所在包之外每个包的目录，depmap 扫产品包的目录（§8-39），包目录里嵌套的 `local/` 仍被封闭清单咬住。
-2. **modmap**：读 `architecture.toml` 的 `module` 条目；只判 `name` 含 `::`、`file` 落在某个受判包的目录（§8-39 的全部包减去本门所在的包，D9）之下且以 `.rs` 或 `.zig` 结尾的条目，磁盘一侧遍历同一组目录里 `src/` 下的 `.rs` 与任何位置的 `.zig`（§8-48），嵌套包的文件只判一次，状态取 `planned`／`building`／`built`／`frozen` 之一。双向对账：表有文件无（状态不是 `planned` 才要求在盘）；盘有表无（lib.rs 与索引文件豁免）；盘有而状态仍是 `planned` →「状态未翻转」。同一文件两个条目即红。索引文件的依据：文件名去 `.rs` 后与同目录某子目录同名，且该子目录内有表内文件。
+2. **modmap**：读 `architecture.toml` 的 `module` 条目；只判 `name` 含 `::`、`file` 落在某个受判包的目录（§8-39 的全部包减去本门所在的包，D9）之下且以 `.rs` 或 `.zig` 结尾的条目，磁盘一侧遍历同一组目录里 `src/` 下的 `.rs` 与任何位置的 `.zig`（§8-48），嵌套包的文件只判一次，状态取 `planned`／`building`／`built`／`frozen` 之一。双向对账：表有文件无（状态不是 `planned` 才要求在盘）；盘有表无（lib.rs、索引文件与测试模块豁免，D40）；盘有而状态仍是 `planned` →「状态未翻转」。同一文件两个条目即红。索引文件的依据：文件名去 `.rs` 后与同目录某子目录同名，且该子目录内有表内文件。
 3. **depmap**：ARCHITECTURE §3 的 `depmap` 围栏块是 crate 边的机器权威；包与它的依赖取自 `members`（§8-39），块里的键是包的 lib 名，一条依赖边以被依赖包的 lib 名比对，工具包不进产品图；只查 normal 与 build 依赖（dev 依赖留给测试自由）。断言是子集而不是相等：文档可以先写下一条尚未使用的边。`directions` 块判一个 crate 之内的模块方向（§8-33）。
 4. **guard**：`wall` 把叶子的 `[lints]` 与根 `[workspace.lints]` 逐键比对，再判其余成员都继承根表（`spec/Guard/Wall.lean`）；`version` 判工作区自己的包在 `[workspace.dependencies]` 里各钉 `=` 加 `[workspace.package] version`，且没有成员绕过那张表按路径点名一个工作区包（§8-49）；只读工作树，不调 git。
 5. **vocabulary（挂在 lexicon 门下）**：**退役词必须指向被定义过的词**——`lexicon.toml` 说哪种说法作废，`docs/glossary.md` 说该用哪个词；二者不对账时，一条退役词可以指向一个词汇表从未定义的名字，照门的建议改词的人会落到一个没有释义的词上。依据宽一格：replacement 命中任一词汇表**粗体词**或含 `.md`（指向一份文件也是一种定义）。文档里的门数不在这里对账：`docnum` 的 `gate_count` 从 `gates::COUNT` 重算它，一个数只有一个重算者。重算只到受管标记为止：标记之外用数字或数词写出的门数，没有任何一道门读它，所以文档只在 `gate_count` 标记里写门数，别处写「全部门」，评审守这一条。
@@ -1407,7 +1409,7 @@ CI 与 justfile 调用面；ARCHITECTURE.md §3（`depmap`、`directions` 围栏
 
 /-! ## 16 测试与约束
 
-单测：`members` 读本仓（kernel 在 `crates/kernel`，desktop 与它的叶子都是成员，xtask 是 Tool，仓库根不是一个包）；包目录落在检出之外以 `member-outside-checkout` 拒读；一棵包名、lib 名、目录三种拼法各不相同的夹具检出（`root::fixture::relocated`：`sprawling-k`，lib `k`，住 `tools/k`）上，depmap 按 lib 名判边、`spec` 把骨架写进 `tools/k`、specalign 读到 `tools/` 下的模块行、proof 读到 `tools/k` 的 harness、`root::judged` 从 `tools/xtask` 找到检出根，五条各一个测试；`architecture.toml` 条目解析（正例／状态非法／同一文件两个条目）；索引文件判定；lexicon 命中与 `lexicon-ok:` 豁免；depmap 块解析；header 比对（CRLF）；隔离区前缀判定（`local/` 命中、`localx/` 不命中）；`guard::wall` 五例（叶子的表少一条 lint、放宽一条 lint、多一条 lint、一个别的成员写了自己的表、叶子不在成员里）加一条自清理断言（记下的差异消失即须划掉）；docnum 区段解析（整行形与行内形各保持自己的形状、陈旧区段的拒词带 `--write`、未知事实不写盘、三种坏标记各报一例）；`crate_table` 在 relocated 夹具上画出整张表（`sprawling-j` 的模块名写 `bin::`，于是读 `[family.bin]`；duty 里的竖线被转义；没有边的写 `nothing`），夹具缺 `[family.k]` 时以点名它的 `Doc` 拒读（§8-40）。不写「本仓自身通过」一类的单测：门在 `just check` 里对本仓跑一遍，同一断言再跑一遍只多花时间，不多判一件事。约束：全门无网络；判定路径无写盘，写盘只在带 `--write` 的命令上发生（§7）；输出顺序确定。
+单测：`members` 读本仓（kernel 在 `crates/kernel`，desktop 与它的叶子都是成员，xtask 是 Tool，仓库根不是一个包）；包目录落在检出之外以 `member-outside-checkout` 拒读；一棵包名、lib 名、目录三种拼法各不相同的夹具检出（`root::fixture::relocated`：`sprawling-k`，lib `k`，住 `tools/k`）上，depmap 按 lib 名判边、`spec` 把骨架写进 `tools/k`、specalign 读到 `tools/` 下的模块行、proof 读到 `tools/k` 的 harness、`root::judged` 从 `tools/xtask` 找到检出根，五条各一个测试；`architecture.toml` 条目解析（正例／状态非法／同一文件两个条目）；索引文件判定；三种拼法的测试模块无条目不报、旁边的生产文件照报（D40）；lexicon 命中与 `lexicon-ok:` 豁免；depmap 块解析；header 比对（CRLF）；隔离区前缀判定（`local/` 命中、`localx/` 不命中）；`guard::wall` 五例（叶子的表少一条 lint、放宽一条 lint、多一条 lint、一个别的成员写了自己的表、叶子不在成员里）加一条自清理断言（记下的差异消失即须划掉）；docnum 区段解析（整行形与行内形各保持自己的形状、陈旧区段的拒词带 `--write`、未知事实不写盘、三种坏标记各报一例）；`crate_table` 在 relocated 夹具上画出整张表（`sprawling-j` 的模块名写 `bin::`，于是读 `[family.bin]`；duty 里的竖线被转义；没有边的写 `nothing`），夹具缺 `[family.k]` 时以点名它的 `Doc` 拒读（§8-40）。不写「本仓自身通过」一类的单测：门在 `just check` 里对本仓跑一遍，同一断言再跑一遍只多花时间，不多判一件事。约束：全门无网络；判定路径无写盘，写盘只在带 `--write` 的命令上发生（§7）；输出顺序确定。
 
 **证明的性质**（`lake build Spec`，经 `just models`；不依赖 `sorry`、`admit`、`axiom`）：
 

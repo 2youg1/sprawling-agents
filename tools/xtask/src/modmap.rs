@@ -3,10 +3,11 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Module-map gate (redline C4). `architecture.toml` is a closed list:
-//! every `.rs` under the `src/` of every package but the gates' own is
-//! either a registered module, a `lib.rs`, or a pure index file, and
-//! every `.zig` anywhere in such a package is a registered module. Status coherence
+//! Module-map gate (redline C4). `architecture.toml` is a closed list of
+//! production modules: every `.rs` under the `src/` of every package but
+//! the gates' own is either a registered module, a test module, a
+//! `lib.rs`, or a pure index file, and every `.zig` anywhere in such a
+//! package is a registered module. Status coherence
 //! is checked both ways — a file that exists while its entry still says
 //! planned means the builder skipped the "flip the status" leg of the
 //! completion evidence.
@@ -20,6 +21,13 @@
 //! **`lib.rs` and pure index files are exempt, and that exemption is
 //! checked** rather than trusted: an index file may hold declarations and
 //! nothing else, so exempting it costs no coverage.
+//!
+//! **A test module needs no entry** (tools/xtask/Spec.lean D40). It
+//! compiles only under `cfg(test)`, holds no production policy, and is
+//! found from the module it tests; requiring a row for it made every
+//! regression test a registration edit. A test module that has a row is
+//! still judged like any other row, so the map never names a file that
+//! is gone.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
@@ -230,6 +238,9 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
             continue;
         }
         on_disk.insert(rel.clone());
+        if is_test_module(&rel) && !table.contains_key(rel.as_str()) {
+            continue;
+        }
         if let Some(row) = table.get(rel.as_str()) {
             if row.status == STATUS_PLANNED {
                 violations.push(Violation {
@@ -359,6 +370,20 @@ fn is_source(file: &str) -> bool {
         .extension()
         .and_then(|extension| extension.to_str())
         .is_some_and(|extension| SOURCES.contains(&extension))
+}
+
+/// Whether a Rust file is a test module by its name: a file named
+/// `tests.rs` or `<name>_tests.rs`, or any file in a `tests/` directory
+/// under `src/`, the spellings this tree gives a `#[cfg(test)] mod`.
+fn is_test_module(rel: &str) -> bool {
+    let Some((_, inside)) = rel.split_once("/src/") else {
+        return false;
+    };
+    let Some(stem) = inside.strip_suffix(".rs") else {
+        return false;
+    };
+    let (dirs, file) = stem.rsplit_once('/').unwrap_or(("", stem));
+    file == "tests" || file.ends_with("_tests") || dirs.split('/').any(|dir| dir == "tests")
 }
 
 /// Whether a source file found in a package is a module. A Zig file is,

@@ -89,7 +89,7 @@ just check                    # the whole check: fmt, source gates, Lean specifi
 
 ## Where code goes
 
-- One module is one file, named for what it owns. Register the file in the module map, then create it. Keep `lib.rs` and index files free of logic, and give this repository no `utils`, `helpers` or `common` module.
+- One module is one file, named for what it owns. Register a production module in the module map, then create it; a test module (`tests.rs`, `<name>_tests.rs`, or a file under a `tests/` directory in `src/`) needs no entry. Keep `lib.rs` and index files free of logic, and give this repository no `utils`, `helpers` or `common` module.
 - Keep a production function within 200 lines and 4 parameters; a function in a top-level `#[cfg(test)]` item is not measured. `tools/xtask/budgets.toml` names each older signature that exceeds the parameter cap, and its entry is struck once it fits the cap. A file has no length cap: split a file when it holds two responsibilities, not when it reaches a number.
 - Every register in `budgets.toml` is a ratchet. A number may improve freely and drift only within its slack, so a regression cannot arrive one commit at a time. Record the new reading and its reason beside it, and keep the slack where it is.
 - Prefer a new module over growing an existing one. When you extract from a large module, move its tests and type docs with it, so the invariants stay next to what owns them.
@@ -139,7 +139,7 @@ A violation turns the check red with a message that names the rule, the violatio
 | The Rust rules above: no panics, checked arithmetic, `unsafe` only in `crates/desktop/ffi`. | workspace lints, `-D warnings` |
 | The MPL-2.0 notice, then the copyright line, at the top of every `.rs` file. | `xtask header` |
 | One name per concept, taken from the glossary. | `xtask lexicon` |
-| Module map registered; production functions within 200 lines and 4 parameters. | `xtask modmap`, `xtask length` |
+| Production modules registered in the module map; production functions within 200 lines and 4 parameters. | `xtask modmap`, `xtask length` |
 | A white-box check written in Rust beside the code it judges; a check that enters the way a stranger does written in Lean under `tools/adversary/`. | `xtask boundary` |
 | Nothing written for a test compiled into the binary a person downloads. | `xtask artifact` |
 | Every file a publishable package compiles in production, through `include!`, `include_str!` or `include_bytes!`, inside that package's own directory or its build script's `OUT_DIR`, because crates.io carries the package directory and nothing else. | `xtask packaged` |
