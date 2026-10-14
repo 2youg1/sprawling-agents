@@ -119,6 +119,8 @@ impl Scene { pub fn inline(&Inline) -> Scene; pub fn quiet(&Quiet) -> Scene; }
 
 代价：Zig 0.17 成为在每个平台上构建工作区的前提，CI 的每个构建作业都装它（`.github/actions/zig`）。
 
+`build.rs` 只在 `zig/`、`src/part.rs` 或两份钉变了时重跑，不随 `PATH` 重跑：叶子由钉住的那个版本编出，Zig 换了目录不改变它，而 CI 每个作业把 Zig 解到一个随机目录，桌面上编辑器与终端的 `PATH` 也不同，随 `PATH` 重跑就是每次重编叶子与依赖它的每个包。被否：跟踪 `PATH`——它只在 Zig 换目录时触发，同一目录里换了版本照样察觉不到；版本由钉与重跑时的版本检查守。
+
 重开参数：Zig 换版本时两份钉一起改；一个平台的 Rust 目标 Zig 不能交叉编译时。
 -/
 

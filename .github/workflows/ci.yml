@@ -11,6 +11,8 @@
 #             desktop server's Zig leaf (whose tests no cargo command
 #             runs), then the gates that judge the built client bundle;
 #             compiles only xtask
+#   swap      every look under client/swap/ drawn in place of the shipped
+#             one, and judged by render as the shipped bundle is
 #   models    the Lean specifications under `crates/`
 #   clippy    the zero-warning build of every target and feature, and the
 #             feature combinations `just features` runs
@@ -210,11 +212,36 @@ jobs:
       - name: the gates that judge the client bundle
         if: ${{ !cancelled() }}
         run: just --no-deps gates-artifacts
-      # Every replacement look under client/swap/ drawn in place of the
-      # shipped one, and the client still typechecks, keeps its wiring
-      # tests and passes render (tools/xtask/Spec.lean section 8-13).
+
+  # Every replacement look under client/swap/ drawn in place of the
+  # shipped one, and the client still typechecks, keeps its wiring tests
+  # and passes render (tools/xtask/Spec.lean section 8-13).
+  #
+  # A job of its own rather than a step of `gates`: its render opens the
+  # five passes again, 159 s of a gates job that ended at 486 s, the
+  # median of 40 runs, and a render pass keeps two to three processors
+  # busy, so the two renders cannot share one four-processor runner
+  # without slowing each other.
+  swap:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/toolchain
+      - uses: ./.github/actions/zig
+      # The entry `gates` saves holds what xtask is built from; this job
+      # reads it and writes none of its own.
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+        with:
+          shared-key: gates
+          save-if: false
+      - uses: taiki-e/install-action@ab6895351a88b908e96a4697860d4ffea5e57dbe # v2
+        with:
+          tool: just
+      - uses: ./.github/actions/client-artifacts
       - name: the swap test
-        if: ${{ !cancelled() }}
         run: just swap
 
   # The Lean specifications. The checker in `tools/adversary/` is not built here:
@@ -262,9 +289,7 @@ jobs:
   # The suite, compiled once. The archive carries every test binary and
   # the workspace binaries they spawn; the slices below run it on
   # runners whose checkout path is the same as this one, which is what
-  # lets a path cargo baked in at compile time resolve there. Debug
-  # information is cut to line tables: it is most of the archive's bytes,
-  # and a backtrace still names the file and the line.
+  # lets a path cargo baked in at compile time resolve there.
   #
   # The suite links with rust-lld (lld-link) rather than Microsoft's
   # link.exe: the archive holds 78 linked binaries, and on a warm cache
@@ -273,6 +298,13 @@ jobs:
   # test build that nobody downloads;
   # `release.yml` builds what ships with link.exe, so the linker of a
   # released binary is not this one (`tools/xtask/Spec.lean` D27).
+  #
+  # The target directory starts warm: `./.github/actions/warm-target`
+  # restores the one the newest push to main left and ages every input
+  # that has not changed since, so cargo compiles the packages a change
+  # reached and nothing else. Rust cache keeps only Cargo's registry here,
+  # because the warm target carries the dependencies' artifacts too, and
+  # the bundle comes from its own cache entry when `client/` is unchanged.
   test-build:
     name: test build
     outputs:
@@ -280,8 +312,6 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 30
     env:
-      CARGO_PROFILE_DEV_DEBUG: line-tables-only
-      CARGO_PROFILE_TEST_DEBUG: line-tables-only
       CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER: rust-lld.exe
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -291,7 +321,8 @@ jobs:
       - uses: ./.github/actions/zig
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
         with:
-          shared-key: test
+          shared-key: test-registry
+          cache-targets: false
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: taiki-e/install-action@ab6895351a88b908e96a4697860d4ffea5e57dbe # v2
         with:
@@ -299,6 +330,13 @@ jobs:
       # The binary embeds the bundle, so the archive carries the one a
       # person runs rather than the placeholder page.
       - uses: ./.github/actions/client-artifacts
+        with:
+          want: bundle
+      # After the bundle, because the bundle is one of the inputs the warm
+      # target compares.
+      - uses: ./.github/actions/warm-target
+        with:
+          mode: restore
       - name: the suite, compiled once
         run: just test-archive target/nextest-archive.tar.zst
       - name: prove every test belongs to exactly one slice
@@ -321,6 +359,10 @@ jobs:
           path: target/nextest-archive.tar.zst
           retention-days: 1
           if-no-files-found: error
+      - uses: ./.github/actions/warm-target
+        if: github.ref == 'refs/heads/main'
+        with:
+          mode: save
 
   # Disjoint slices, whose union is checked before the matrix starts.
   # Every slice installs the toolchain, because nextest runs as a cargo
@@ -551,7 +593,7 @@ jobs:
   # D27 in tools/xtask/Spec.lean: skipped required work is not a green tree.
   # This is the shared verdict, so release has no second list of checks.
   validation:
-    needs: [models, clippy, test, gates, supply, client]
+    needs: [models, clippy, test, gates, swap, supply, client]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5

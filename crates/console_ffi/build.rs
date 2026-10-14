@@ -33,7 +33,6 @@ fn main() -> Result<(), String> {
     println!("cargo::rerun-if-changed=zig");
     println!("cargo::rerun-if-changed=src/part.rs");
     println!("cargo::rerun-if-changed={PIN}");
-    println!("cargo::rerun-if-env-changed=PATH");
     let here = PathBuf::from(variable("CARGO_MANIFEST_DIR")?);
     spelled_alike(&here)?;
     let pinned = pin(&here)?;
