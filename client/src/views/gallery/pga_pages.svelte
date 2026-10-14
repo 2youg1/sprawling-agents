@@ -44,6 +44,7 @@
   const COST: CostAnswer = {
     total: usd(18.42),
     unpriced: { calls: 3, tokens: 41_200 },
+    renewals: { billed: usd(0.42), late: 1, read: 5, refused: 0, unreported: 0 },
     by_run: [["a1f0c2d9", usd(6.1)], ["7be410aa", usd(4.75)], ["c09d33e1", usd(2.2)]],
     by_actor: [["lab/parser", usd(9.4)], ["hall/mayor", usd(5.1)], ["docs/tidy", usd(2.9)]],
     by_segment: [["model", usd(16.9)], ["tools", usd(1.52)]],

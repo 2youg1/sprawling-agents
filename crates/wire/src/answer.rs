@@ -75,7 +75,7 @@ pub use config::{
     ConfigAnswer, ConfigLayer, SecondDomain, SettledEffort, SettledSearch, SettledSecond,
     SupplierAccounts, TuningDefaults,
 };
-pub use cost::{CostAnswer, UnpricedCalls};
+pub use cost::{CostAnswer, Renewals, UnpricedCalls};
 pub use cost_of::{CostOfAnswer, RUN_COSTS_MAX, RunCostsAnswer};
 pub use devices::{DeviceId, DeviceLine, DevicesAnswer};
 pub use doctor::{DoctorAbsence, DoctorAnswer, DoctorCore, DoctorFault, DoctorInstall, DoctorItem};
