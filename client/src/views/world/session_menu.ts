@@ -28,7 +28,7 @@ export interface FieldWire {
   readonly maxlength: number;
   readonly value: string;
   readonly oninput: (event: Event & { readonly currentTarget: EventTarget & HTMLInputElement }) => void;
-  readonly onkeydown: (event: KeyPress) => void;
+  readonly onkeydown: (event: KeyPress & Pick<KeyboardEvent, "isComposing">) => void;
   readonly [hold: symbol]: Attachment<HTMLElement>;
 }
 
@@ -133,8 +133,10 @@ export function sessionMenuLookOf(state: SessionMenuState, hands: SessionMenuHan
               oninput: (event) => {
                 hands.type(event.currentTarget.value);
               },
+              // Escape during a composition abandons the composition,
+              // not the name being typed (client D99).
               onkeydown: (event) => {
-                if (event.key !== "Escape") return;
+                if (event.key !== "Escape" || event.isComposing) return;
                 event.preventDefault();
                 hands.close();
               },

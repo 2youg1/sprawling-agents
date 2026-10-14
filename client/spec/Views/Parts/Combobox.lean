@@ -79,7 +79,7 @@ def moves : Key → Bool
 
 /-! D99 输入法组字时，文本框里的每一个键都归输入法，键表一律不答
 
-- **决策**：键事件带着 `isComposing` 为真时，组合框的键表（`parts/combobox.ts` 的 `answer`，`talk/pill.ts` 的菜单读同一张表）答「不接」：不移游标、不采纳、不关弹层、不 `preventDefault`。规则写在键表函数里，不写在调用点：一个读这张表的新座位因此不必记得再查一遍。palette 与文件查找共用的 `views/cursor.ts` 是另一张表，开头查同一个字段；composer（`talk/composer.ts` 的 `boxKey`）与模型选择器的筛选框（`talk/picker_look.ts`）原本就先查它。
+- **决策**：键事件带着 `isComposing` 为真时，组合框的键表（`parts/combobox.ts` 的 `answer`，`talk/pill.ts` 的菜单读同一张表）答「不接」：不移游标、不采纳、不关弹层、不 `preventDefault`。规则写在键表函数里，不写在调用点：一个读这张表的新座位因此不必记得再查一遍。palette 与文件查找共用的 `views/cursor.ts` 是另一张表，开头查同一个字段；composer（`talk/composer.ts` 的 `boxKey`）与模型选择器的筛选框（`talk/picker_look.ts`）原本就先查它。文本框上只答 Escape 的处理——会话行菜单的命名框（`world/session_menu.ts`）与配对码框（`settings/remote_door.svelte`）——同样先查，与信箱和检视面在窗口上的 Escape 一致。
 - **理由**：组字时 Enter 确认候选，方向键在候选之间走，Escape 放弃这次组字；三个键都已经有输入法给的意思。只放过 Enter 时，人用方向键挑一个候选，游标跟着在列表里走；用 Escape 放弃一段拼音，弹层连同过滤词一起关掉。读中文界面的人正是用输入法打字的人。
 - **被击败的备选**：①只在 Enter 上查 `isComposing`——见理由；②每个调用点在调用键表之前各查一次（composer 与选择器今天的写法）——组合框与芯片两个座位已经各写过一份键表，规则再分到每个调用点，下一个座位漏掉它时没有任何东西会变红；③听 `compositionstart`／`compositionend` 自己记一个状态——平台已经在每个键事件上给出这个事实，第二份状态只会在两个事件之间与它不一致。
 - **重开参数**：某个引擎确认候选的那一下 keydown 给出 `isComposing` 为假（有报告说 WebKit 在 `compositionend` 之后才发这个 keydown，`keyCode` 为 229）；那时这个判定连同 composer 与选择器的一起改读同一个更宽的事实。
