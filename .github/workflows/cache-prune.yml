@@ -1,0 +1,68 @@
+# The Actions cache holds 10 GB per repository, and a save beyond that
+# evicts whatever was read least recently, which here was a cache the next
+# run needed. Two kinds of entry hold space and serve no run, and this
+# workflow deletes both:
+#
+#   - an entry another entry of the same family replaced on the same ref.
+#     A family is a key without its trailing hashes, run id and attempt,
+#     so the clippy entries saved before and after a lockfile change are
+#     one family, and only the newer is ever restored: an exact key names
+#     the newest lockfile, and a prefix match picks the newest entry.
+#   - an entry saved for a pull request that has closed, which nothing can
+#     read again.
+#
+# It runs after every main run of `ci`, which is when main saves, and once
+# a day for the pull requests that closed in between.
+name: cache prune
+on:
+  workflow_run:
+    workflows: [ci]
+    types: [completed]
+    branches: [main]
+  schedule:
+    - cron: "41 4 * * *"
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  pull-requests: read
+
+concurrency:
+  group: cache-prune
+  cancel-in-progress: false
+
+jobs:
+  prune:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: delete replaced entries and entries of closed pull requests
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          gh cache list --limit 1000 --json id,key,ref,createdAt,sizeInBytes > caches.json
+          jq -r '
+            map(. + {family: (.key | sub("(-[0-9a-f]{8,}|-[0-9]+)+$"; ""))})
+            | group_by([.ref, .family])
+            | map(sort_by(.createdAt) | reverse | .[1:])
+            | flatten | .[] | [.id, .sizeInBytes, .ref, .key] | @tsv' caches.json > replaced.tsv
+          jq -r '.[] | select(.ref | test("^refs/pull/[0-9]+/merge$")) | [.id, .sizeInBytes, .ref, .key] | @tsv' caches.json > pulls.tsv
+          : > doomed.tsv
+          cat replaced.tsv >> doomed.tsv
+          for pr in $(cut -f3 pulls.tsv | cut -d/ -f3 | sort -u); do
+            state=$(gh pr view "$pr" --json state --jq .state)
+            if [ "$state" != OPEN ]; then
+              awk -F'\t' -v ref="refs/pull/$pr/merge" '$3 == ref' pulls.tsv >> doomed.tsv
+            fi
+          done
+          sort -u doomed.tsv -o doomed.tsv
+          freed=0
+          while IFS=$'\t' read -r id size ref key; do
+            if gh cache delete "$id"; then
+              freed=$((freed + size))
+              echo "deleted $ref $key"
+            fi
+          done < doomed.tsv
+          echo "freed $((freed / 1048576)) MiB in $(wc -l < doomed.tsv) entries" | tee -a "$GITHUB_STEP_SUMMARY"
