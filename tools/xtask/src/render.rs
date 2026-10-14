@@ -169,9 +169,8 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
         bundle: &bundle,
         route: &route,
     };
-    for pass in pass::wanted()? {
+    for (pass, measured) in measure_every(&opening, pass::wanted()?)? {
         let at = format!("{route} {}", pass.called());
-        let measured = measure(&opening, pass)?;
         if let Some(refused) = unusable(pass, &measured, &at) {
             violations.push(refused);
             continue;
@@ -220,6 +219,50 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
         }
     }
     Ok(violations)
+}
+
+/// The processors one pass keeps busy.
+///
+/// A pass is a browser drawing the whole gallery: on one machine it held
+/// 130 CPU seconds over 54 s, about two and a half processors. Opened
+/// beyond what the machine can draw, a pass's lazy views outlast the
+/// virtual budget (`engine::BUDGET_MS`): five at once on a four-processor
+/// runner refused with `a lazily loaded view was still pending`.
+const PROCESSORS_PER_PASS: usize = 3;
+
+/// Every wanted pass measured, as many at a time as the machine can draw,
+/// handed back in the order the passes are named, so a run's findings
+/// read the same whichever engine finished first.
+fn measure_every<'p>(
+    opening: &Opening,
+    passes: Vec<&'p Pass>,
+) -> Result<Vec<(&'p Pass, Measured)>, XtaskError> {
+    // A machine that cannot say how many processors it has opens one
+    // pass at a time, which is what a four-processor runner gets anyway.
+    let at_once = match std::thread::available_parallelism() {
+        Ok(processors) => (processors.get() / PROCESSORS_PER_PASS).max(1),
+        Err(_) => 1,
+    };
+    let mut measured = Vec::with_capacity(passes.len());
+    for group in passes.chunks(at_once) {
+        measured.extend(std::thread::scope(|scope| {
+            let running: Vec<_> = group
+                .iter()
+                .map(|&pass| (pass, scope.spawn(move || measure(opening, pass))))
+                .collect();
+            running
+                .into_iter()
+                .map(|(pass, handle)| {
+                    let opened = handle.join().map_err(|_| XtaskError::Cmd {
+                        cmd: format!("cargo xtask render, {}", pass.called()),
+                        msg: "the thread that opened this pass panicked".to_owned(),
+                    })??;
+                    Ok((pass, opened))
+                })
+                .collect::<Result<Vec<_>, XtaskError>>()
+        })?);
+    }
+    Ok(measured)
 }
 
 /// Whether a reading this instrument took is one this gate refuses.

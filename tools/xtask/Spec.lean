@@ -472,6 +472,8 @@ D30 **standalone installer 的仓库默认由根清单生成并核验。** `docn
 
 **一次运行开五次页**：三个宽度各一次（按客户端发出去的样子），外加**亮色一次、强制色一次**，两者都在 `1280` 下开——亮色与强制色改的是涂装与描边，不是哪一栏活下来，而「哪一栏活下来」正是上面三档在问的事。每次开页各起一个 `--dump-dom` 进程，无套接字。
 
+**开页按处理器数分批同时进行**：一批 `处理器数 / 3` 次，至少一次；每次开页写自己的插桩副本与浏览器 profile（名字取自 `Pass::slug`），判读仍按 `PASSES` 的顺序，所以报告不随哪个引擎先结束而变。理由：一次开页让浏览器占两到三个处理器（一台机器上 54 s 里用了 130 CPU 秒，xtask 自己用 0.4 s），十六个处理器上五次同开，本门从 275 s 降到 70 s。被否：不问处理器数、五次全部同开——四处理器的 runner 上那样开，懒加载的视图在虚拟时间预算用完时仍未就绪，本门无法判读。重开参数：一次开页占用的处理器数变了。
+
 **`--width <px>` 把一次运行收窄到一个宽度**，供改样式表时的短循环用；给出的不是那三个宽度之一即红，拒词列出那三个。**这个开关由 `pass.rs` 自己读进程参数，不由 `main.rs` 的分发器解析**：开关的名字、它接受的宽度、第四个宽度换来的拒绝，三件都是本门的事实，分发器解析它就是给这三件事第二个家。
 
 **强制色用引擎自己的开关，不是夹具。** 判据是在本仓自己的引擎上量出来的，不是从文档抄来的：headless 加 `--force-high-contrast` 时 `matchMedia('(forced-colors: active)')` 为真（`prefers-contrast: more` 同时为真），不加时为假（在 Edge/Chromium 的 `--headless=new --dump-dom` 上实测）。另一条路——devtools 协议的 `Emulation.setEmulatedMedia`——要一条套接字，而 §8-13 已经裁定本门不开套接字，故不走。
@@ -488,7 +490,7 @@ D30 **standalone installer 的仓库默认由根清单生成并核验。** `docn
 
 | 文件 | 它回答什么 |
 |---|---|
-| `tools/xtask/src/render/pass.rs` | 一次开页是什么：三个宽度与高度（`NARROW`、`READING`、`WIDE`、`WIDTHS`、`PAINTED_AT`、`HEIGHT`）、亮度与强制色两个枚举（`Lighting`、`Colours`）、五次开页的名单与它们的自称（`Pass`、`PASSES`、`called`）、页面回报的条件与对账（`Reported`、`disagrees`）、`--width` 的读法（`wanted`、`asked_for`） |
+| `tools/xtask/src/render/pass.rs` | 一次开页是什么：三个宽度与高度（`NARROW`、`READING`、`WIDE`、`WIDTHS`、`PAINTED_AT`、`HEIGHT`）、亮度与强制色两个枚举（`Lighting`、`Colours`）、五次开页的名单与它们的自称（`Pass`、`PASSES`、`called`、`slug`）、页面回报的条件与对账（`Reported`、`disagrees`）、`--width` 的读法（`wanted`、`asked_for`） |
 | `tools/xtask/src/render/pass/tests.rs` | 五次开页的名单、自称，以及两条对账各自的正反例 |
 | `tools/xtask/src/render/probe.rs` | 那段量页面的脚本与它写读数的两个元素（`SINK`、`CONDITIONS`、`SETTLE_MS`、`PENDING`、`script`）；`engine.rs` 因此只管找引擎、开进程、把读数读回来 |
 | `tools/xtask/src/render/announced.rs` | 屏幕阅读器遇到的那三条：`every_control_is_announceable`、`every_landmark_is_named`、`one_first_heading` |

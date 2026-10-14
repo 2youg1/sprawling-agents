@@ -156,8 +156,9 @@ pub(super) fn measure(opening: &Opening, pass: &Pass) -> Result<Measured, XtaskE
     let page = bundle.join("index.html");
     let body = walk::read_text(&page)?;
     // Beside the bundle, so that `./assets/…` still resolves: the copy is
-    // named for the gate, and `just dist` writes the directory fresh.
-    let instrumented = bundle.join("sprawling-render.html");
+    // named for the gate and the pass, because the passes of one run open
+    // at the same time, and `just dist` writes the directory fresh.
+    let instrumented = bundle.join(format!("sprawling-render-{}.html", pass.slug()));
     let chunks = walk::files_with_ext(&bundle.join("assets"), &["js"])?;
     let names = chunks
         .iter()
@@ -169,7 +170,7 @@ pub(super) fn measure(opening: &Opening, pass: &Pass) -> Result<Measured, XtaskE
             source,
         }
     })?;
-    let profile = work.join("profile");
+    let profile = work.join(format!("profile-{}", pass.slug()));
     let mut command = Command::new(browser);
     if pass.draws_forced_colours() {
         command.arg(FORCED_COLOURS);
