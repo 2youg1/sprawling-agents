@@ -330,6 +330,40 @@ impl EndpointBook {
             .map(|(tag, choice)| (*tag, choice.endpoint.as_str(), &choice.entry))
     }
 
+    /// Refuses an attachment whose rows leave out a model a tag points
+    /// at on this endpoint (`crates/gateway/spec/Router.lean` D40). The
+    /// fold never clears a choice when an endpoint is attached again, so
+    /// this is where a role stays on a model the endpoint still holds.
+    ///
+    /// # Errors
+    /// `E_CONFIG_INVALID`, naming each such model and its tag, with the
+    /// models this attachment would register as `nearby`.
+    pub fn refuse_dropping_a_role(&self, attaching: &AttachedEndpoint) -> Result<(), AxError> {
+        let dropped: Vec<String> = self
+            .chosen
+            .iter()
+            .filter(|(_, choice)| {
+                choice.endpoint == attaching.name
+                    && !attaching.models.iter().any(|row| row.id == choice.entry.id)
+            })
+            .map(|(tag, choice)| {
+                format!("{} is {tag}; choose another {tag} first", choice.entry.id)
+            })
+            .collect();
+        if dropped.is_empty() {
+            return Ok(());
+        }
+        Err(AxError::failure(
+            AxCode::ConfigInvalid,
+            "attach an endpoint",
+            dropped.join("; "),
+        )
+        .with_nearby(attaching.models.iter().map(|row| row.id.clone()).collect())
+        .with_recovery(
+            "choose another model for that role, then attach again with the model left out",
+        ))
+    }
+
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.endpoints.is_empty() && self.chosen.is_empty()

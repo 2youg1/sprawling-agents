@@ -271,9 +271,10 @@ impl RunWorker {
     /// # Errors
     /// A thread that will not start. Once the probe answers: a probe
     /// that failed with nothing declared - the city would have no model
-    /// id to call - and a ticked list none of whose ids the endpoint
-    /// serves, with nothing typed (gateway D47). Each refusal comes
-    /// before anything is written.
+    /// id to call - a ticked list none of whose ids the endpoint serves
+    /// with nothing typed (gateway D47), and rows that leave out a model
+    /// a tag points at (gateway D48). Each refusal comes before anything
+    /// is written.
     pub(in crate::worker) fn attach_endpoint(
         &mut self,
         entered: Entered,
@@ -374,6 +375,7 @@ impl RunWorker {
                 })
             }
         };
+        self.credentials.book.refuse_dropping_a_role(&endpoint)?;
         // One line either way, and it says which of the two happened.
         // The unprobed attachment is degraded rather than refused - the
         // registration went through - so it stays at `effect`, where a
