@@ -42,7 +42,8 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
-          gh cache list --limit 1000 --json id,key,ref,createdAt,sizeInBytes > caches.json
+          gh api --paginate 'repos/{owner}/{repo}/actions/caches?per_page=100' \
+            | jq -s '[.[].actions_caches[] | {id, key, ref, createdAt: .created_at, sizeInBytes: .size_in_bytes}]' > caches.json
           jq -r '
             map(. + {family: (.key | sub("(-[0-9a-f]{8,}|-[0-9]+)+$"; ""))})
             | group_by([.ref, .family])
