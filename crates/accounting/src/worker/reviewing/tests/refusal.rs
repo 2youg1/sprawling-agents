@@ -117,6 +117,7 @@ fn a_merge_the_history_refused_leaves_the_building_where_it_was() {
             secret: None,
             auth_header: None,
             admit: Vec::new(),
+            named: Vec::new(),
             tuning: wire::EndpointTuning::default(),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"attach"),
         })

@@ -219,6 +219,7 @@ fn attach(
         secret: None,
         auth_header: None,
         admit: vec!["opus-nine".to_owned()],
+        named: Vec::new(),
         tuning: wire::EndpointTuning::default(),
         idem: IdemKey::derive(&RunId::CITY, Seq::FIRST, name.as_bytes()),
     })

@@ -71,6 +71,7 @@ pub(crate) fn city_with_models(
             secret: None,
             auth_header: None,
             admit: vec![MODEL.to_owned()],
+            named: Vec::new(),
             // One try, briefly: a worker that called the dead port
             // should fail at once rather than retry into it.
             tuning: wire::EndpointTuning {

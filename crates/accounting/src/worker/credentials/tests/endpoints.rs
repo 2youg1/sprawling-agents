@@ -46,6 +46,7 @@ fn an_endpoint_with_no_model_list_attaches_on_the_ids_the_person_named() {
             secret: None,
             auth_header: None,
             admit: vec!["m-1".to_owned()],
+            named: Vec::new(),
             tuning: wire::EndpointTuning::default(),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"attach"),
         })
@@ -94,6 +95,7 @@ fn an_endpoint_with_neither_a_model_list_nor_a_declared_id_is_refused() {
             secret: None,
             auth_header: None,
             admit: Vec::new(),
+            named: Vec::new(),
             tuning: wire::EndpointTuning::default(),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"attach"),
         })
@@ -163,6 +165,7 @@ fn a_loopback_endpoint_with_a_credential_sends_it_on_every_call() {
             secret: Some("secret:proxy/key".to_owned()),
             auth_header: None,
             admit: Vec::new(),
+            named: Vec::new(),
             tuning: wire::EndpointTuning::default(),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"attach"),
         })
@@ -399,6 +402,7 @@ fn a_pick_that_states_nothing_registers_what_the_providers_list_states() {
             secret: None,
             auth_header: None,
             admit: Vec::new(),
+            named: Vec::new(),
             tuning: wire::EndpointTuning::default(),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"attach"),
         })
@@ -479,6 +483,7 @@ fn a_re_attach_whose_list_cannot_be_read_keeps_the_facts_already_registered() {
                 secret: None,
                 auth_header: None,
                 admit: admit.iter().map(|id| (*id).to_owned()).collect(),
+                named: Vec::new(),
                 tuning: wire::EndpointTuning::default(),
                 idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, idem),
             })

@@ -17,6 +17,8 @@ pub(super) mod held;
 mod probing;
 pub(super) mod signing;
 
+pub(super) use endpoints::Admission;
+
 /// The name the environment-configured endpoint is attached under, so a
 /// person reading the settings page can see where it came from.
 pub(super) const ENVIRONMENT_ENDPOINT: &str = "environment";

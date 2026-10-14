@@ -88,6 +88,7 @@ pub(super) fn endpoints_answer(book: &gateway::EndpointBook) -> wire::EndpointsA
                     output_price: row.output_price.clone(),
                     thinking: thinking_summary(gateway::thinking_offer(endpoint, &row.id)),
                     canonical: gateway::canonical_model(row),
+                    listing: row.listing,
                 })
                 .collect(),
             local: endpoint.is_local(),

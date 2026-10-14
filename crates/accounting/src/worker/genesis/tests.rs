@@ -71,6 +71,7 @@ fn deleting_every_log_line_leaves_the_history_byte_identical() {
                 secret: None,
                 auth_header: None,
                 admit: Vec::new(),
+                named: Vec::new(),
                 tuning: wire::EndpointTuning::default(),
                 idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"attach"),
             })

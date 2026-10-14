@@ -232,7 +232,10 @@
     withKey((e) => {
       const rows = chosen;
       const before = get(attached);
-      if (!u.send(attachEndpoint(e, rows.map((row) => row.id)))) return;
+      const listed = (id: string) => facts.some((row) => row.id === id);
+      const admit = rows.filter((row) => listed(row.id)).map((row) => row.id);
+      const named = rows.filter((row) => !listed(row.id)).map((row) => row.id);
+      if (!u.send(attachEndpoint(e, admit, named))) return;
       for (const row of rows) {
         if (row.tag !== null) u.send(selectModel(e.id, row.id, row.tag, row.stated));
       }

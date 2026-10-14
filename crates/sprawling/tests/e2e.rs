@@ -230,6 +230,7 @@ fn settled(round: &Round, key: &str, city_root: &Path) -> Result<RunWorker, AxEr
         secret: Some(SECRET_LOCATOR.to_owned()),
         auth_header: None,
         admit: Vec::new(),
+        named: Vec::new(),
         tuning: wire::EndpointTuning {
             timeout_ms: Some(REQUEST_TIMEOUT_MS),
             request_max_retries: Some(NO_RETRY),

@@ -182,6 +182,7 @@ fn a_run_is_offered_the_tools_the_worker_was_handed() {
             secret: None,
             auth_header: None,
             admit: vec![MODEL.to_owned()],
+            named: Vec::new(),
             tuning: wire::EndpointTuning::default(),
             idem: idem(b"attach"),
         })
@@ -355,6 +356,7 @@ fn a_long_connector_answer_reaches_the_model_packaged() {
             secret: None,
             auth_header: None,
             admit: vec![MODEL.to_owned()],
+            named: Vec::new(),
             tuning: wire::EndpointTuning::default(),
             idem: idem(b"attach"),
         })

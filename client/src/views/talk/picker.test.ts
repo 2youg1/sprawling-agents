@@ -40,6 +40,7 @@ function facts(id: string, canonical: string, levels: readonly Effort[]): ModelF
   return {
     id,
     canonical,
+    listing: "listed",
     context_tokens: Window.make(128_000),
     input_modalities: [],
     input_price: null,

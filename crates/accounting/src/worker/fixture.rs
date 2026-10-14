@@ -66,6 +66,7 @@ pub(super) fn attach_provider(
         secret: None,
         auth_header: None,
         admit: Vec::new(),
+        named: Vec::new(),
         tuning: wire::EndpointTuning::default(),
         idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"attach"),
     })?;

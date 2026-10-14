@@ -33,7 +33,7 @@ export const ACCOUNTED: EndpointSummary = {
   has_credential: true,
   label: "ZenMux",
   local: false,
-  models: [{ id: "fable", input_modalities: [], canonical: "fable", thinking: { levels: [], on: "unknown", from: "unknown", words: [] } }],
+  models: [{ id: "fable", input_modalities: [], canonical: "fable", listing: "listed", thinking: { levels: [], on: "unknown", from: "unknown", words: [] } }],
   name: "zenmux",
   tuning: {
     ...UNTUNED,

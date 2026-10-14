@@ -159,7 +159,8 @@ inductive Verb where
 
   The ids are named rather than left empty because a probe that reached nothing
   refuses an attachment that declared none: the city would have no model id to
-  call, and this adversary attaches to endpoints nothing answers on. -/
+  call, and this adversary attaches to endpoints nothing answers on. They travel
+  as ticked rows, and the typed ids the wire carries beside them are empty. -/
   | attachEndpoint (name : String) (baseUrl : String) (dialect : Dialect)
       (admit : List String) (idem : IdemKey)
   /-- Point the `main` tag at one model of an attached endpoint.
@@ -320,7 +321,9 @@ def Verb.frame : Verb → String
   | .attachEndpoint name baseUrl dialect admit idem =>
     command "attach_endpoint"
       ([("name", .str name)] ++ entered baseUrl dialect
-        ++ [("admit", .arr (admit.map Json.str).toArray), ("idem", .str idem.value)])
+        ++ [ ("admit", .arr (admit.map Json.str).toArray)
+           , ("named", .arr #[])
+           , ("idem", .str idem.value) ])
   | .selectModel endpoint model ceiling idem =>
     command "select_model"
       [ ("endpoint", .str endpoint)

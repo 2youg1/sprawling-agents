@@ -143,6 +143,7 @@ fn city(dir: &Path) -> RunWorker {
             secret: None,
             auth_header: None,
             admit: vec!["scripted".to_owned()],
+            named: Vec::new(),
             tuning: wire::EndpointTuning {
                 timeout_ms: Some(2_000),
                 request_max_retries: Some(0),

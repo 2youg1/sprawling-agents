@@ -73,6 +73,7 @@ fn a_building_given_the_desktop_is_offered_its_six_tools_from_this_binary() {
             secret: None,
             auth_header: None,
             admit: vec![MODEL.to_owned()],
+            named: Vec::new(),
             tuning: wire::EndpointTuning::default(),
             idem: idem(b"attach"),
         })

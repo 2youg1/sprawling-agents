@@ -780,6 +780,7 @@ pub(crate) fn choose(
             secret: None,
             auth_header: None,
             admit: vec![model.to_owned()],
+            named: Vec::new(),
             // One brief try, so an endpoint that is not there fails the
             // model list at once rather than retrying into it.
             tuning: wire::EndpointTuning {

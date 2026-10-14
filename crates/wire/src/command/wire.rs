@@ -160,6 +160,7 @@ impl From<WireCommand> for Command {
                 secret,
                 auth_header,
                 admit,
+                named,
                 tuning,
                 idem,
             } => Self::AttachEndpoint {
@@ -169,6 +170,7 @@ impl From<WireCommand> for Command {
                 secret,
                 auth_header,
                 admit,
+                named,
                 tuning,
                 idem,
             },

@@ -44,6 +44,7 @@ fn an_empty_key_keeps_the_credential_this_city_has_archived() {
         secret: secret.map(str::to_owned),
         auth_header: None,
         admit: Vec::new(),
+        named: Vec::new(),
         tuning: wire::EndpointTuning::default(),
         idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, mark),
     };

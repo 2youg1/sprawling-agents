@@ -14,8 +14,10 @@ use super::{Credential, Entered, PROBE_TIMEOUT_MS, dialect_headers};
 use crate::worker::commanding::door::Finishing;
 use crate::worker::errand::Answer;
 
+mod admitting;
 mod choosing;
 
+<<<<<<< HEAD
 /// What a `ProbeEndpoint` read off the accounting thread, on its way
 /// back to be recorded: the endpoint as the form named it, and the
 /// staged reading with the model list, or the refusal that stopped the
@@ -69,6 +71,9 @@ impl Listing {
             }
         }
     }
+=======
+pub(in crate::worker) use admitting::Admission;
+>>>>>>> c0610fd (card-S12.ATTACH14: AttachEndpoint carries the typed ids in named, and each model row says where it came from)
 
 /// A re-attach whose probe read no list: why, and how many of the
 /// admitted rows kept what an earlier attach read.
@@ -263,8 +268,9 @@ impl RunWorker {
     pub(in crate::worker) fn attach_endpoint(
         &mut self,
         entered: Entered,
-        admit: &[String],
+        admission: &Admission,
     ) -> Result<(), AxError> {
+        let admit = admission.asked();
         let entered = entered.resolved()?;
         let explicit_accounts = entered.tuning.accounts.is_some();
         let mut endpoint = self.endpoint_of(entered)?;
@@ -542,6 +548,7 @@ mod tests {
                 secret,
                 auth_header: header,
                 admit: vec!["m-1".to_owned()],
+                named: Vec::new(),
                 tuning: wire::EndpointTuning { accounts: incoming, ..Default::default() },
                 idem: IdemKey::derive(&RunId::CITY, Seq::FIRST, marker),
             };
@@ -600,6 +607,7 @@ mod tests {
                 secret: None,
                 auth_header: None,
                 admit: vec!["m-1".to_owned()],
+                named: Vec::new(),
                 tuning: wire::EndpointTuning {
                     accounts: Some(
                         ["a", "b"]
@@ -807,6 +815,7 @@ mod tests {
                         secret: None,
                         auth_header: None,
                         admit: vec!["m-1".to_owned()],
+                        named: Vec::new(),
                         tuning: wire::EndpointTuning {
                             accounts: Some(order),
                             ..wire::EndpointTuning::default()

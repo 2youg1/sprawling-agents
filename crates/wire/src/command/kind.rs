@@ -115,10 +115,18 @@ pub enum Command<Secret = Sealed<String>> {
         secret: Option<String>,
         /// Header name for providers that do not take a bearer token.
         auth_header: Option<String>,
-        /// Which of the models this endpoint serves the city admits. An
-        /// empty list admits everything it serves, which is what a
-        /// person who did not look at the list meant.
+        /// Which of the models this endpoint serves the city admits: the
+        /// rows the person ticked on the list. When this and `named` are
+        /// both empty the city admits everything the endpoint serves,
+        /// which is what a person who did not look at the list meant; a
+        /// ticked id the endpoint does not serve is left out
+        /// (`crates/gateway/spec/Endpoint/Models.lean` D39).
         admit: Vec<String>,
+        /// The ids the person typed. Each is admitted whether or not the
+        /// endpoint's list carries it, and one the list does not carry is
+        /// registered on the person's word and marked `named`
+        /// (`crates/wire/spec/Frames.lean` D57).
+        named: Vec<String>,
         /// What this endpoint is called, how long it may take, and what
         /// every request to it carries, kept beside the registration so a
         /// call made a week later is made the way the person set it up.
