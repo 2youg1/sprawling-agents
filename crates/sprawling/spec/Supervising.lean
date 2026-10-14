@@ -263,7 +263,7 @@ impl RunWorker {
 }
 ```
 
-`dispatching::agreeing` 选定适配器后，用 `city::keep_warm(city_root, building)` 读到的设置、worker 的 `clock`（`accounting::Clock`）与 `Kept::lead_of` 按所选 endpoint 名给出的提前量，把它包成 `Door`；连同一 endpoint 的门共用一个提前量，因为网络路径与名额门属于 endpoint，而一扇门每次真实使用只见到一次续期（runtime D98）；`Agreed`、`Site`、`Driving`、`Driven` 与 `driving::lane` 带的都是这扇门，所以 run 发出的每个请求都进了保温账（`crates/runtime/Spec.lean` §8-4-2），转向循环不知道保温存在。`settling::landing` 在 run 结束时把门交给 `Kept`，按房间地址存：同一房间后来的 run 换掉前一扇门，因为后一个前缀才是下一次会用到的。`next_due` 为 `None` 的门（设置为 `Off`，或已续过一次）不留，所以默认设置下 `Kept` 一直是空的，worker 不多占一个字节，也不多发一个请求。
+`dispatching::agreeing` 选定适配器后，用 `city::keep_warm(city_root, judged)` 读到的设置——`judged` 是判 harness 的同一个地址：派进已开的房间时是房间地址，城→楼→房间三层都读到；开房间的派活是楼（D80）——、worker 的 `clock`（`accounting::Clock`）与 `Kept::lead_of` 按所选 endpoint 名给出的提前量，把它包成 `Door`；连同一 endpoint 的门共用一个提前量，因为网络路径与名额门属于 endpoint，而一扇门每次真实使用只见到一次续期（runtime D98）；`Agreed`、`Site`、`Driving`、`Driven` 与 `driving::lane` 带的都是这扇门，所以 run 发出的每个请求都进了保温账（`crates/runtime/Spec.lean` §8-4-2），转向循环不知道保温存在。`settling::landing` 在 run 结束时把门交给 `Kept`，按房间地址存：同一房间后来的 run 换掉前一扇门，因为后一个前缀才是下一次会用到的。`next_due` 为 `None` 的门（设置为 `Off`，或已续过一次）不留，所以默认设置下 `Kept` 一直是空的，worker 不多占一个字节，也不多发一个请求。
 
 `accounting::worker::attend` 的空闲分支先读日程，再调用 `renew_warm(now)`，下一次睡眠取「距下次读日程」与「距 `warm_due`」中较短者，所以一次续期不会等到日程的整点之后。续期不在记账线程上发（D78）：`renew_warm` 经 `take_due` 取出每扇到期的门，各交给 `accounting::worker::errand` 的一条线程，那条线程调门的 `renew_due`，把门连同回执作为 `Answer::Renewed` 送回记账线程的队列；该不该续、续哪个前缀仍由门里的 `kernel::keep_warm::renewal_due` 判。门在外面时不在 `next_due` 里，所以同一扇门不会被交出去两次，记账线程也不为它空醒。回答回来时 `record_renewal` 在房间地址下为每次续期写一条 `cache_renewed`（`crates/kernel/Spec.lean` §8-4）：成功时是 provider 自报的用量与账单额，失败时是它的拒绝原样，所以人从账本上读得出保温花了多少、哪个 provider 拒了续期。门续完还欠续期就回家；它在外面时同一房间落地了一个新 run，新门已经换掉它，回来的这扇被丢弃。续期失败不停城；只有这条记录本身写不进账本时才写进诊断日志，与日程读取失败同样处理。
 
@@ -377,4 +377,9 @@ impl Drop for DrivingPool { /* join 每条 trailing 里的 lane */ }
 /-! D22 一座城一次只有一条 lane 补备树，后来的跳过，表放在进程里按城根分键（§8-155）
 
 两次 `stock` 同时见到「没有备树」时，后一次的失败会收回前一次的登记，正在接管的一次放置因此失败，那次派活带着存储错误回到人那里；`crates/storage/Spec.lean` §8-35 只保证了放置与放置、刷新与接管这两种并发。跳过而不等，因为等另一条 lane 的全量检出就是让自己的落地再晚一次全量检出，而正在补的那一条补完城里就有备树。表在进程里，因为一座城只有一个写者进程，「这个进程里谁在补这座城」就是「谁在补这座城」；与 `city::document` 按路径分键的写锁表是同一种做法。**被否**：在 storage 的 `stock` 里补上这个窗口——storage 的公开契约本轮不改（`crates/storage/Spec.lean` §8-35 已定）；`Flight` 持一把补树的锁、经 `DriveContext` 交给 lane——与进程表判的是同一件事，却要多一条从 `RunWorker` 穿过 `drive_context` 到两条 `fly` 臂的传递路径；跳过换成等——理由见上。**重开参数**：一个进程同时为同一座城开两个 worker，或 storage 的 `stock` 自己在「没有备树」时先占住 `+spare`。
+-/
+
+/-! D80 保温设置在 run 所在房间的地址上读，开房间的派活读楼（§8-112）
+
+`agree_to_work` 用判 harness 的同一个地址 `judged` 读 `city::keep_warm`。派进一个已开的房间时它是房间地址，所以城、楼、房间三层梯都被读到，房间自己 `CONFIG.toml` 的 `[cache]` 压过楼与城，这正是 `crates/kernel/spec/KeepWarm.lean` §8-74 与设置页说的梯子；开房间的派活（发给一栋楼，或点名一个会话）读楼，因为新房间自己那层此刻是空的，而派活地址若是另一个房间，它那层属于那个房间。理由：只读楼时，写在房间那一层的值不起作用，按房间开关保温也就无处可写。**被否**：在 `room_for` 开出房间之后再造门——门要从 `agree_to_work` 挪进 `stage_dispatch` 模型一臂，而新房间那一层在它第一次 run 之前没有人写过 `[cache]`，读到的与读楼相同；为保温另写一条「在哪一层判」——那是 `session::opens_a_room` 的第二份定义。**重开参数**：开房间的派活能同时给新房间写一层设置（例如派活帧带上保温）时，改在开出的房间上读。
 -/
