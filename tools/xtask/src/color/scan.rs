@@ -111,7 +111,7 @@ pub(super) fn scan_for_literals(root: &Path) -> Result<Vec<Violation>, XtaskErro
             continue;
         }
         let text = walk::read_text(&path)?;
-        if rel == PLAYBACK_PAGE && crate::length::generated(&text) {
+        if rel == PLAYBACK_PAGE && walk::generated(&text) {
             continue;
         }
         for line in sheet::lines(&rel, &text) {

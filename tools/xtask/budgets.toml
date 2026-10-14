@@ -152,9 +152,9 @@ best_bytes = 26819584
 measured_by = "just build-web, just dist, then cargo xtask budget, on windows-x86_64"
 status = "reported, not gated: the person's ruling that runtime speed comes before size. This version's reading is owed, because the User ruled to skip measurement in this version: the figures above were taken on an earlier tree, and just build-web, just dist, then cargo xtask budget retakes it"
 
-# The unit is a production function because the alternative was measured:
-# any honest file threshold lights up eight files across four crates at
-# once, which is a project rather than a gate. Across 1,800 production
+# The unit is a production function. A file is not measured: a cap on
+# file length forced a correct file to be split and removed no defect
+# (tools/xtask/Spec.lean §10-7). Across 1,800 production
 # functions the median is 9 lines, p90 is 39 and p99 is 145, so 200 sits
 # well above where the repository actually writes; what it catches is a
 # whole flow of control written into one body. `dispatch_in` was 1,069
@@ -169,16 +169,6 @@ budget_lines = 200
 measured_by = "cargo xtask length (syn spans, not brace counting)"
 status = "gated"
 
-# A long function hides a flow of control; a long file hides where
-# anything is. The second is what the person asked for on 2026-09-02,
-# after the largest file reached 12,078 lines and iteration on it began
-# costing more than the split would.
-#
-# Tests count. A `#[cfg(test)] mod tests` is exempt from the *function*
-# rule, because a long test is a different question from a long body -
-# but a reader looking for one thing pays for every line above it either
-# way, and in the file that prompted this rule the tests were 6,133 of
-# the 12,078.
 # "The ideal number of arguments for a function is zero. Next comes one,
 # followed closely by two. Three arguments should be avoided where
 # possible. More than three requires very special justification - and
@@ -208,18 +198,15 @@ status = "gated, with a register of the signatures that predate the rule"
 #
 # The register cleans itself. `cargo xtask length` reports a name that
 # has come back inside the budget, and a name that is no longer in the
-# tree, in the same words the file register and `boundary`'s use — so an
+# tree, in the same words `boundary`'s register uses — so an
 # exception disappears when it is spent instead of silently re-excusing
 # whatever is written at that address next.
 #
 # Sixteen of the original forty-two were in `bin::assembly`, and so were
-# the worst six. That was the file rule's finding reached from another
-# direction: the module is declared `adapter` - "thin, no policy" - and
+# the worst six: the module is declared `adapter` - "thin, no policy" - and
 # held the city's dispatch policy instead, and an eleven-parameter
 # private method is what policy looks like when it has no object to live
-# in. Fifteen of them were spent splitting that file, because putting it
-# `assembly/` would otherwise have carried each excuse to a new address -
-# which is the one budgets.toml edit `guard` will not treat as a strike.
+# in. Fifteen of them were spent splitting that file.
 [argument_count.predating]
 names = [
   "crates/collab/src/workshop.rs::new",            # 9
@@ -237,61 +224,6 @@ names = [
   "crates/runtime/src/run.rs::drive",              # 5
   "crates/runtime/src/turn.rs::call",              # 5
 ]
-
-# **Re-priced from 1000 to 400 on the person's ruling, 2026-09-05.** The
-# 1000-line line was drawn against a tree whose largest file was 12,078
-# lines, and it did what it was drawn to do: the register it arrived with
-# emptied, and `bin::assembly` went from 10,695 lines to an `assembly/`
-# directory. A budget whose register is empty has stopped being a budget -
-# it now permits every file in the tree - and the reader it was drawn for
-# is no longer only a person. A file is read into a model's context whole,
-# and 400 lines is where a module still arrives as one unit next to the
-# other files a change has to be read against.
-#
-# The new line lights up 97 of the 250 files it measures. That is the
-# project the previous re-pricing named and deferred, and it is deferred
-# again on the same ruling: **the register below is the backlog, worst
-# first, and working it off is the next version's P0.** What is bought
-# today is the ratchet - nothing new may be born over 400 lines, and
-# nothing already over it may grow.
-[file_length]
-what = "one source file under a crate's src/, any .zig in a package, or any file of a file-face-only language in the tree, Rust and Zig counting production lines and the rest every line"
-budget_lines = 400
-measured_by = "cargo xtask length"
-status = "gated, with a register of the files that predate the rule"
-
-# The files that were already over the line on the day it was re-drawn
-# (2026-09-05), each pinned at the length it had that day, worst first.
-# Ninety-seven of them on that day; the last row was struck on
-# 2026-09-08, and the Rust half of the table below is empty by
-# construction - it keeps its three properties over nothing.
-#
-# **The client arrived on 2026-09-19**, when `xtask length` reached
-# `client/src`. The 400-line rule had been stated for the whole
-# repository and executed on Rust only, so 18,000 lines of TypeScript
-# were read by the same two readers with nothing holding the line. The
-# rows that cost were pinned at the length each file had on the day the
-# gate reached it, carried the same three properties every other row
-# does, and were worked off the same way: by splitting the file, never
-# by raising its number.
-#
-# `client/src/wire.ts` is not here and never will be.
-# `cargo xtask wire-ts` writes it from the Rust wire, so its length is a
-# fact about the generator; the gate reads the exemption from the banner
-# the generator puts at the top rather than from a path written here.
-#
-# `tools/xtask/src/length.rs` is on this list, which is correct: the gate that
-# states the rule is not exempt from it.
-#
-# This list has three properties, and it needs all three to be an
-# honest debt rather than a licence. A file it does not name is refused
-# at budget_lines outright, so **it cannot grow**. A file it does name
-# may not exceed its pin, so **no offender grows**. And a file that comes
-# back under budget_lines must be struck from the list, so **it removes
-# itself** as the work gets done.
-#
-# Delete a row by doing the split, never by raising its number.
-[file_length.predating]
 
 # White box is Rust, black box is Lean (the person's ruling).
 # `cargo xtask boundary` refuses a Rust check that reaches this product

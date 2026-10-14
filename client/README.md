@@ -45,7 +45,7 @@ See `docs/frontend-method.md` for how a screen is built and accepted.
 |---|---|
 | `src/core/` | plain `.ts`: the socket, the belief folds, the keymap, the phrase table's reader, preferences. Store-shaped values from `svelte/store`; `bun test` runs against these directly. |
 | `src/ui.ts` | the one gate out of `core/` to components: `setUi` at startup, `ui()` everywhere else. |
-| `src/views/` | one route or region per file, runes, under 400 lines each. |
+| `src/views/` | one route or region per file, runes. |
 | `src/views/parts/` | the controls this repository draws itself — the only home for a button, a field, a badge, a dialog, a tooltip. Adding one means `client/Spec.lean` §9 first. |
 | `src/views/gallery/` | the fixtures `#/gallery` serves and `cargo xtask render` measures. |
 | `src/theme.css` | the theme's entry: it imports the parts in `src/theme/` in cascade order, and the theme is the only place allowed a colour literal. |

@@ -3,8 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! How long a Zig function is, and how many of a Zig file's lines are
-//! production, read from Zig's tokens (tools/xtask/Spec.lean §8-48 and
+//! How long a Zig function is, read from Zig's tokens (tools/xtask/Spec.lean §8-48 and
 //! xtask D15).
 //!
 //! **Counting braces is exact in Zig once four kinds of token are
@@ -87,28 +86,6 @@ pub(super) fn measure(text: &str) -> Vec<Body> {
             })
         })
         .collect()
-}
-
-/// The lines of a Zig file the file budget counts: every line, less the
-/// lines each `test` declaration spans, because a test is not
-/// production code the budget prices.
-pub(super) fn production_lines(text: &str) -> usize {
-    let tokens = tokens(text);
-    let spans = test_spans(&tokens);
-    let test_lines = spans
-        .iter()
-        .filter(|span| {
-            !spans
-                .iter()
-                .any(|outer| outer != *span && outer.contains(span.start()))
-        })
-        .filter_map(|span| {
-            let first = tokens.get(*span.start())?.line;
-            let last = tokens.get(*span.end())?.line;
-            Some(last.saturating_sub(first).saturating_add(1))
-        })
-        .fold(0_usize, usize::saturating_add);
-    text.lines().count().saturating_sub(test_lines)
 }
 
 /// The token that ends the body of the function whose parameter list
@@ -244,7 +221,7 @@ fn past_literal(chars: &mut Peekable<Chars<'_>>, quote: char) {
 
 #[cfg(test)]
 mod tests {
-    use super::{measure, production_lines};
+    use super::measure;
 
     fn measured(text: &str) -> Vec<(String, usize, usize)> {
         measure(text)
@@ -286,13 +263,12 @@ mod tests {
         assert!(measured(text).is_empty());
     }
 
-    /// A `test` declaration, named or not, is neither counted into the
-    /// file nor measured, as a `#[cfg(test)]` item is not.
+    /// A function inside a `test` declaration, named or not, is not
+    /// measured, as a `#[cfg(test)]` item is not.
     #[test]
-    fn a_test_declaration_is_neither_counted_nor_measured() {
+    fn a_function_in_a_test_declaration_is_not_measured() {
         let text = "const a = 0;\ntest \"named\" {\n    const S = struct {\n        \
                     fn inner() void {}\n    };\n    _ = S;\n}\ntest {\n}\n";
         assert!(measured(text).is_empty());
-        assert_eq!(production_lines(text), 1);
     }
 }
