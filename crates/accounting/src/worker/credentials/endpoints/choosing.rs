@@ -9,8 +9,10 @@
 //! Separate from attaching because the two fail for different reasons:
 //! an attach fails when a machine cannot be reached, and a choice fails
 //! when the endpoint this city already reached does not serve what was
-//! asked for. The ceiling ladder runs here and nowhere else, so a run
-//! cannot be called with a figure invented at the call site.
+//! asked for. The ladder for the window and the ceiling is
+//! `gateway::Figures::resolve`, called here with the facts this city
+//! holds, so a run cannot be called with a figure invented at the call
+//! site and a query about a model cannot answer with a different one.
 
 use kernel::event::EventKind;
 use kernel::{AxCode, AxError};
@@ -26,8 +28,11 @@ impl RunWorker {
     /// an already registered model with an empty box must not overwrite
     /// its ceiling with nothing: the next call on the Anthropic wire
     /// would be refused for a field it could not write (`crates/sprawling/Spec.lean`
-    /// §8-71). An empty box keeps what this same model was registered
-    /// with, read back by `registered_as`.
+    /// §8-71). An empty box leaves the figure to the ladder in
+    /// `gateway::Figures::resolve`, which this method hands the facts it
+    /// holds: what the person sent, the provider's own row for this id in
+    /// the book, and what this same model was registered with, read back
+    /// by `registered_as`.
     pub(in crate::worker) fn select_model(
         &mut self,
         chosen: Chosen,
@@ -56,7 +61,7 @@ impl RunWorker {
                 )
                 .with_recovery("attach the endpoint first, then choose one of the models it lists")
             })?;
-        if !known.models.iter().any(|row| row.id == model) {
+        let Some(listed) = known.models.iter().find(|row| row.id == model) else {
             return Err(AxError::failure(
                 AxCode::ConfigInvalid,
                 "choose a model",
@@ -70,80 +75,54 @@ impl RunWorker {
                     .collect::<Vec<String>>(),
             )
             .with_recovery("choose one of the models the endpoint listed"));
-        }
-        let priced = gateway::MarketSnapshot::builtin()?.lookup(&model).cloned();
+        };
+        let catalogue = gateway::MarketSnapshot::builtin()?;
+        let priced = catalogue.lookup(&model);
         let registered = registered_as(&self.credentials.book, tag, &endpoint, &model);
-        // What the person stated outranks what they stated before, which
-        // outranks the catalogue, which outranks the vendor's documented
-        // window, and what none of the four states stays unstated. **An
-        // unknown window is not zero**: a window this city cannot name
-        // is carried as one it cannot name, and the context reminder
-        // stays quiet rather than counting against a guess.
-        let context_tokens = context_tokens.or_else(|| {
-            registered
-                .as_ref()
-                .and_then(|row| kernel::Window::new(row.context_tokens))
-                .or_else(|| {
-                    priced
-                        .as_ref()
-                        .and_then(|row| kernel::Window::new(row.context_tokens))
-                })
-                .or_else(|| gateway::window_for(&known.base_url, &model))
-        });
-        // The ladder answers, and says which rung answered. The person's
-        // figure outranks the one they entered before; on the messages
-        // face, which needs a figure in every request, the pinned
-        // catalogue, the preset table and the policy default follow, and
-        // on the chat and responses faces nobody's statement leaves the
-        // figure to the provider (`crates/gateway/Spec.lean` §8-17).
-        let resolved = gateway::OutputCeiling::resolve(
-            gateway::Stated {
-                person: max_output_tokens,
-                upstream: registered.as_ref().and_then(|row| row.max_output_tokens),
+        let figures = gateway::Figures::resolve(
+            gateway::Statements {
+                window: context_tokens,
+                ceiling: max_output_tokens,
+                listed: Some(listed),
+                registered: registered.as_ref(),
             },
-            priced.as_ref().and_then(|row| row.max_output_tokens),
+            priced,
             gateway::Target {
                 base_url: &known.base_url,
                 id: &model,
                 wire: known.dialect,
             },
         );
-        let max_output_tokens = resolved.and_then(gateway::OutputCeiling::tokens);
         // What a model accepts is what the person said, else the
         // vendor's fact read off the catalogue or the preset table
         // (`crates/gateway/Spec.lean` §8-37, gateway D16).
         let input = gateway::accepted_input(
             stated_input,
-            priced.as_ref().map(|row| row.input),
+            priced.map(|row| row.input),
             &known.base_url,
             &model,
         );
+        // Prices come from the pinned catalog when it knows the model
+        // and are zero when it does not: an unpriced call is reported as
+        // unpriced rather than as free-looking guesswork.
+        let price =
+            |of: fn(&gateway::ModelEntry) -> kernel::UsdMicros| priced.map(of).unwrap_or_default();
         let entry = gateway::ModelEntry {
             id: model,
             // The catalogue row carries a plain figure; a window nobody
             // stated is zero there and `None` on the wire, and this is
             // the one place the two spellings meet.
-            context_tokens: context_tokens.map_or(0, kernel::Window::get),
-            max_output_tokens,
+            context_tokens: figures.window.map_or(0, |window| window.tokens.get()),
+            window_from: figures.window.map(|window| window.from),
+            max_output_tokens: figures.ceiling.and_then(gateway::OutputCeiling::tokens),
+            ceiling_from: figures.ceiling.and_then(gateway::OutputCeiling::source),
             input,
-            // Prices come from the pinned catalog when it knows the
-            // model and are zero when it does not: an unpriced call is
-            // reported as unpriced rather than as free-looking guesswork.
-            input_price: priced
-                .as_ref()
-                .map(|row| row.input_price)
-                .unwrap_or_default(),
-            output_price: priced
-                .as_ref()
-                .map(|row| row.output_price)
-                .unwrap_or_default(),
-            cache_read_price: priced
-                .as_ref()
-                .map(|row| row.cache_read_price)
-                .unwrap_or_default(),
-            cache_write_price: priced.map(|row| row.cache_write_price).unwrap_or_default(),
+            input_price: price(|row| row.input_price),
+            output_price: price(|row| row.output_price),
+            cache_read_price: price(|row| row.cache_read_price),
+            cache_write_price: price(|row| row.cache_write_price),
         };
-        let payload = gateway::selected_payload(tag, &endpoint, &entry, resolved)?;
+        let payload = gateway::selected_payload(tag, &endpoint, &entry)?;
         self.record(EventKind::ModelSelected, payload)
     }
 }

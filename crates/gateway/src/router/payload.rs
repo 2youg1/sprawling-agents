@@ -96,11 +96,13 @@ pub(crate) fn auth_reference(auth: &AuthSpec) -> Option<&SecretRef> {
 
 /// The one place a `model_selected` payload is formed.
 ///
-/// `ceiling` says which rung of the ladder supplied the output ceiling,
-/// or that the provider picks it: `anthropic.rs` once carried the note
-/// that a ceiling invented at the call site truncates runs for a reason
-/// that appears nowhere in the account, and this is where that reason
-/// appears, in the spelling [`crate::OutputCeiling::word`] owns.
+/// The entry carries the rung each figure came from (gateway D37), and
+/// this is where those rungs reach the account: `anthropic.rs` once
+/// carried the note that a ceiling invented at the call site truncates
+/// runs for a reason that appears nowhere in the account, and here the
+/// reason appears, in the spellings [`crate::FigureSource::as_str`] and
+/// [`crate::OutputCeiling::word`] own. An entry with no ceiling is
+/// called with none, which is the provider's own default.
 ///
 /// # Errors
 /// Propagates payload construction failure.
@@ -108,15 +110,23 @@ pub fn selected_payload(
     tag: ModelTag,
     endpoint: &str,
     entry: &ModelEntry,
-    ceiling: Option<crate::OutputCeiling>,
 ) -> Result<Payload, AxError> {
+    let ceiling_from = match (entry.max_output_tokens, entry.ceiling_from) {
+        (Some(_), Some(from)) => Some(from.as_str()),
+        (None, Some(_) | None) => Some(crate::OutputCeiling::ProviderDefault.word()),
+        (Some(_), None) => None,
+    };
     Payload::of(&ModelSelected {
         tag,
         endpoint: endpoint.to_owned(),
         model: entry.id.clone(),
         context_tokens: entry.context_tokens,
+        window_from: entry
+            .window_from
+            .filter(|_| entry.context_tokens > 0)
+            .map(|from| from.as_str().to_owned()),
         max_output_tokens: entry.max_output_tokens.map(kernel::Ceiling::get),
-        ceiling_from: ceiling.map(|rung| rung.word().to_owned()),
+        ceiling_from: ceiling_from.map(str::to_owned),
         input: entry.input,
         input_price: entry.input_price,
         output_price: entry.output_price,

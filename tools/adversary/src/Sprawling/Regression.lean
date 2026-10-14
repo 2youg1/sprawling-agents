@@ -349,7 +349,7 @@ private def ceilingRegistered : List String :=
      , "    );"
      , "    assert_eq!("
      , "        rungs.first().and_then(serde_json::Value::as_str),"
-     , "        Some(gateway::CeilingSource::Policy.as_str())"
+     , "        Some(gateway::FigureSource::Policy.as_str())"
      , "    );"
      , "}" ]
 

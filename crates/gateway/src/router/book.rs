@@ -402,7 +402,9 @@ mod tests {
         ModelEntry {
             id: id.to_owned(),
             context_tokens: 128_000,
+            window_from: Some(crate::FigureSource::Person),
             max_output_tokens: kernel::Ceiling::new(8_192),
+            ceiling_from: Some(crate::FigureSource::Person),
             input: crate::market::InputKinds::Text,
             input_price: UsdMicros::new(1_000_000),
             output_price: UsdMicros::new(2_000_000),
@@ -420,7 +422,7 @@ mod tests {
         .unwrap();
         book.apply(&record(
             EventKind::ModelSelected,
-            selected_payload(ModelTag::Main, "house", &entry("m-large"), None).unwrap(),
+            selected_payload(ModelTag::Main, "house", &entry("m-large")).unwrap(),
         ))
         .unwrap();
         book
@@ -524,7 +526,7 @@ mod tests {
             attached_payload(&attached("house", "https://api.example.test/v1")).unwrap(),
         ))
         .unwrap();
-        let mut map = selected_payload(ModelTag::Main, "house", &entry("m-large"), None)
+        let mut map = selected_payload(ModelTag::Main, "house", &entry("m-large"))
             .unwrap()
             .as_map()
             .clone();

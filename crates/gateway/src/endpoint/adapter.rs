@@ -383,8 +383,7 @@ mod tests {
             kernel::EventKind::ModelSelected,
             kernel::RunId::CITY,
             None,
-            &crate::router::selected_payload(kernel::ModelTag::Main, "local", &entry, None)
-                .unwrap(),
+            &crate::router::selected_payload(kernel::ModelTag::Main, "local", &entry).unwrap(),
         )
         .unwrap();
         for _ in 0..4 {

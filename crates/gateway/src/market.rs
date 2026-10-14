@@ -12,14 +12,26 @@ use std::collections::BTreeMap;
 
 use kernel::{AxCode, AxError, Ceiling, UsdMicros};
 
+use crate::provider::ceiling::FigureSource;
+
 pub use kernel::event::record::InputKinds;
 
-/// One catalog row. Prices are USD micros per one million tokens —
-/// integers end to end (decision paths ban floats).
+/// One catalog row, and the row a registration holds. Prices are USD
+/// micros per one million tokens — integers end to end (decision paths
+/// ban floats).
+///
+/// Each figure travels with the rung of the ladder in
+/// `provider::ceiling` that stated it: `Some` exactly when the figure is
+/// present, so the next registration of the same model can tell a
+/// figure a person stated from one this city's tables supplied
+/// (gateway D37). A catalogue row's figures are the `Preset` rung's.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct ModelEntry {
     pub id: String,
+    /// The window; zero where no rung stated one.
     pub context_tokens: u64,
+    #[serde(default)]
+    pub window_from: Option<FigureSource>,
     /// What this model may be sent. A picture reaching a `Text` row is
     /// refused at the endpoint rather than dropped on the wire.
     pub input: InputKinds,
@@ -29,11 +41,13 @@ pub struct ModelEntry {
     /// `None` says this catalogue row states none, which is one rung of
     /// the ladder in `provider::ceiling` rather than the end of the
     /// question: a registration reaches the wire with the person's
-    /// figure, the provider's own, this row, or the city's policy
-    /// default, and it records which. Lookup here stays exact by id;
+    /// figure, the provider's own, an earlier registration's, this row,
+    /// or the city's policy default, and it records which. Lookup here stays exact by id;
     /// prefix matching happens in `provider::preset`, and a test keeps
     /// the two indexes from answering for one id.
     pub max_output_tokens: Option<Ceiling>,
+    #[serde(default)]
+    pub ceiling_from: Option<FigureSource>,
     pub input_price: UsdMicros,
     pub output_price: UsdMicros,
     pub cache_read_price: UsdMicros,
@@ -79,8 +93,10 @@ impl MarketSnapshot {
             ModelEntry {
                 id: "claude-sonnet".to_owned(),
                 context_tokens: 200_000,
+                window_from: Some(FigureSource::Preset),
                 input: InputKinds::TextImage,
                 max_output_tokens: Ceiling::new(64_000),
+                ceiling_from: Some(FigureSource::Preset),
                 input_price: UsdMicros::new(3_000_000),
                 output_price: UsdMicros::new(15_000_000),
                 cache_read_price: UsdMicros::new(300_000),
@@ -89,11 +105,13 @@ impl MarketSnapshot {
             ModelEntry {
                 id: "local".to_owned(),
                 context_tokens: 32_768,
+                window_from: Some(FigureSource::Preset),
                 // Local inference here is text-only until a row says
                 // otherwise: what a local server can see is that
                 // server's fact, and this table does not guess it.
                 input: InputKinds::Text,
                 max_output_tokens: Ceiling::new(4_096),
+                ceiling_from: Some(FigureSource::Preset),
                 input_price: UsdMicros::new(0),
                 output_price: UsdMicros::new(0),
                 cache_read_price: UsdMicros::new(0),

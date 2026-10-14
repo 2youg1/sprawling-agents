@@ -385,7 +385,7 @@ fn states_the_ceilings_source(round: &Round) {
         });
     assert_eq!(
         stated.as_deref(),
-        Some(gateway::CeilingSource::Person.as_str()),
+        Some(gateway::FigureSource::Person.as_str()),
         "{label}: `model_selected` does not name the person's figure as the ceiling this city \
          registered"
     );
