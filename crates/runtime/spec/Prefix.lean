@@ -104,7 +104,7 @@ impl<C: FnMut() -> Result<TimeMs, AxError>> Model for Warmed<C> { /* call、call
 ```
 
 - `lead_ms` 不是常量：`Warmed` 把每次经它发出的调用（真实请求与续期）的往返时长记为下一次续期的提前量，所以提前量跟着所连的 provider 与链路走，不按某一类机器调校。流式调用的往返含生成时长，只会让续期提前，不会让它晚于缓存过期。
-- 未接线（§3）：run 结束后把 `Warmed` 留在 worker 上、在唯一 spawn 点的 attend 循环里按 `next_due` 醒来发续期、把续期的 usage 记成事件。
+- 谁调 `renew_due`：run 落地后 `Warmed` 按房间留在 accounting 的 worker 上，记账线程按 `next_due` 醒来，把到期的门整扇交给一条自己的线程，那条线程调 `renew_due`，门连同回执回到记账线程，续期的 usage 记成 `cache_renewed`（`crates/sprawling/Spec.lean` §8-112、§8-42-9）。所以 `Warmed` 要能整扇移到另一条线程上：它的 adapter 是 `Box<dyn Model + Send>`，时钟由调用方给，accounting 交的是 `Send` 的那一种。
 -/
 
 /-! D97 保温门转发 `Model` 的每一扇调用门，不让任何一扇落到 trait 的缺省实现
