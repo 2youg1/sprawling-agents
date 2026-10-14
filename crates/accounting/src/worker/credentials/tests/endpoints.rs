@@ -641,16 +641,19 @@ fn a_ticked_list_that_matches_nothing_served_is_refused_and_writes_nothing() {
         b"second",
     )
     .expect_err("a ticked list that matches nothing is refused");
+    // `nearby` follows the order the endpoint lists its models in.
+    let mut offered = err.nearby().to_vec();
+    offered.sort();
     assert_eq!(
         (
             *err.code(),
             err.subject().contains("relay-hidden-1"),
-            err.nearby().to_vec(),
+            offered
         ),
         (
             AxCode::ConfigInvalid,
             true,
-            vec!["relay-chat-1".to_owned(), "deepseek-chat".to_owned()],
+            vec!["deepseek-chat".to_owned(), "relay-chat-1".to_owned()],
         )
     );
     assert_eq!(untouched(&worker, &report.ledger_dir), before);

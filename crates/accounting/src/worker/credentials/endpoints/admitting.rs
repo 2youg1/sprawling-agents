@@ -7,6 +7,7 @@
 //! §8-10, D38 and D39).
 
 use kernel::event::record::Listing;
+use kernel::{AxCode, AxError};
 
 /// What the person asked an attach to admit: the rows they ticked on
 /// the endpoint's list, and the ids they typed.
@@ -55,22 +56,41 @@ impl Admission {
     /// facts; a typed id the list does not carry follows them on the
     /// person's word. A ticked id the list does not carry is left out:
     /// it was picked from a list, and the list no longer offers it.
-    pub(super) fn of_the_list(&self, served: Vec<gateway::ModelFacts>) -> Vec<gateway::ModelFacts> {
+    ///
+    /// # Errors
+    /// `E_CONFIG_INVALID` when ticked ids were sent, none of them is
+    /// served, and nothing was typed: registering that would leave the
+    /// endpoint with no models, and the next pick would fail for a
+    /// reason that names something else.
+    pub(super) fn of_the_list(
+        &self,
+        endpoint: &str,
+        served: Vec<gateway::ModelFacts>,
+    ) -> Result<Vec<gateway::ModelFacts>, AxError> {
         if self.asks_nothing() {
-            return served;
+            return Ok(served);
         }
         let asked = self.asked();
-        let mut rows: Vec<gateway::ModelFacts> = served
-            .into_iter()
-            .filter(|row| asked.contains(&row.id))
-            .collect();
+        let (mut rows, offered): (Vec<gateway::ModelFacts>, Vec<gateway::ModelFacts>) =
+            served.into_iter().partition(|row| asked.contains(&row.id));
+        if rows.is_empty() && self.named.is_empty() {
+            return Err(AxError::failure(
+                AxCode::ConfigInvalid,
+                "attach an endpoint",
+                format!("{endpoint} does not serve {}", self.ticked.join(", ")),
+            )
+            .with_nearby(offered.into_iter().map(|row| row.id).collect())
+            .with_recovery(
+                "tick a model the endpoint lists, or type the id into the box for ids it does                  not list, then attach again",
+            ));
+        }
         let unlisted: Vec<gateway::ModelFacts> = asked
             .iter()
             .filter(|id| self.named.contains(id) && !rows.iter().any(|row| row.id == **id))
             .map(|id| named_row(id))
             .collect();
         rows.extend(unlisted);
-        rows
+        Ok(rows)
     }
 
     /// The rows an attach registers when no list could be read (D38):

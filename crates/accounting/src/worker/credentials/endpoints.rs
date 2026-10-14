@@ -269,9 +269,11 @@ impl RunWorker {
     /// once.
     ///
     /// # Errors
-    /// A thread that will not start; and, once the probe answers, a
-    /// probe that failed with nothing declared: the city would have no
-    /// model id to call.
+    /// A thread that will not start. Once the probe answers: a probe
+    /// that failed with nothing declared - the city would have no model
+    /// id to call - and a ticked list none of whose ids the endpoint
+    /// serves, with nothing typed (gateway D47). Each refusal comes
+    /// before anything is written.
     pub(in crate::worker) fn attach_endpoint(
         &mut self,
         entered: Entered,
@@ -345,7 +347,7 @@ impl RunWorker {
     ) -> Result<(), AxError> {
         let unprobed = match served {
             Ok(served) => {
-                endpoint.models = admission.of_the_list(served);
+                endpoint.models = admission.of_the_list(&endpoint.name, served)?;
                 endpoint.probed = endpoint
                     .models
                     .iter()
