@@ -217,7 +217,7 @@ impl RunWorker {
                 dialect,
                 secret,
                 auth_header,
-                admit,
+                admit: ticked,
                 named,
                 tuning,
                 ..
@@ -229,10 +229,7 @@ impl RunWorker {
                     credential: Credential::entered(secret, auth_header),
                     tuning: tuning_of(tuning)?,
                 },
-                &super::super::credentials::Admission {
-                    ticked: admit,
-                    named,
-                },
+                &super::super::credentials::Admission { ticked, named },
             ),
             wire::Command::SelectModel {
                 endpoint,
