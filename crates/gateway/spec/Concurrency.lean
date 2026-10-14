@@ -422,28 +422,37 @@ pub(crate) enum Arrival {
     Wait { on: Prewarm, until: Instant },          // 等这一次 pre-warm，至多到 until
     Send { prewarm: Prewarm, until: Instant },     // 自己发这一次 pre-warm，再等它
 }
-pub(crate) struct Holds { /* warm: BTreeMap<PrefixKey, Instant>, warming: BTreeMap<PrefixKey, (Prewarm, Instant)> */ }
+pub(crate) struct Holds { /* warm: BTreeMap<PrefixKey, Warm>, warming: BTreeMap<PrefixKey, (Prewarm, Instant)> */ }
+struct Warm { until: Instant, by: Option<(Prewarm, PrewarmEnd)> }  // 热到何时；最近放行它的那次 pre-warm 与结局
 impl Holds {
     pub(crate) fn arrive(&mut self, key: PrefixKey, now: Instant) -> Arrival;  // 模型的 arrive (some k)
-    pub(crate) fn settle(&mut self, prewarm: Prewarm, now: Instant);            // 模型的 settle；不收结局
+    pub(crate) fn settle(&mut self, prewarm: Prewarm, ended: PrewarmEnd, now: Instant); // 模型的 settle
     pub(crate) fn expire(&mut self, now: Instant);                             // 模型的 tick
     pub(crate) fn waits(&self, prewarm: Prewarm) -> bool;                      // 这次 pre-warm 还挡着人吗
+    pub(crate) fn ended(&self, key: &PrefixKey, prewarm: Prewarm) -> Option<PrewarmEnd>; // 它怎样结束的
 }
 
 // endpoint 下的 prewarm 模块（endpoint 目录里的 prewarm.rs）—— pre-warm 请求与键（D38、D39、D42）
 impl Endpoint {
     /// 这次调用该等的那段前缀：键与要发的 pre-warm；D39 说不等时 `None`。
     pub(super) fn prewarm_for(&self, account: Option<&kernel::ServerLabel>, req: &ModelRequest)
-        -> Option<(PrefixKey, ModelRequest<'static>)>;
+        -> Option<Prewarming>;
+    /// 发一次 pre-warm：同 `call` 的那条阻塞的路，请求超时是 `timeout`。
+    pub(super) fn prewarm(&mut self, prewarm: &Prewarming, timeout: Duration) -> Result<ModelReturn, AxError>;
 }
+pub(super) struct Prewarming { key: PrefixKey, request: ModelRequest<'static>, body: serde_json::Value }
 ```
 
-接线在 `endpoint::permit`：`Holds` 与 `Queue` 住在 `Gate` 的同一把锁里，同一个 `Condvar` 唤醒两种等待者。`Gated::through` 依次做五件事：①清掉上一次调用留下的等待记录（D43）；②`prewarm_for` 求键，`None` 时直接到⑤；③进锁、`expire(now)`、`arrive(key, now)`；④`Wait` 时在 `Condvar` 上等到 `waits(on)` 为假或过了 `until`（过了就再 `expire` 一次），`Send` 时出锁发 pre-warm（D42：取号的期限是 `until`，请求超时取 `timeout_ms` 与 `until` 剩下的较短者，守卫在 `Drop` 里 `settle`），回来后进锁 `settle`、`notify_all`；⑤照旧 `Gate::admit` 取号。`Gate::admit` 因此多一个期限参数：真调用传拿号时刻加 `QUEUE_WAIT_MAX`，pre-warm 传 `until`。
+`settle` 收下结局只为记账：放行谁不读它（模型的 `settle` 不读 `Ending`），结局记在键的热度旁，被放行的调用醒来用 `ended` 读出自己那一行该写什么。热度至少留 `CACHE_LIFETIME`，远长于 `HOLD_MAX`，所以醒来的调用读得到；读不到时（它醒得比缓存寿命还晚）记作 `timed_out`，因为它至少等满了一次 `HOLD_MAX`。`expire` 同时丢掉已过 `until` 的热度，表的大小以五分钟里用过的键为界。
+
+接线在 `endpoint::permit`：`Holds` 与 `Queue` 住在 `Gate` 的同一把锁里，同一个 `Condvar` 唤醒两种等待者。`Gated::through` 依次做五件事：①清掉上一次调用留下的等待记录（D43）；②`prewarm_for` 求键，`None` 时直接到⑤；③进锁、`expire(now)`、`arrive(key, now)`；④`Wait` 时在 `Condvar` 上等到 `waits(on)` 为假或过了 `until`（过了就再 `expire` 一次），`Send` 时出锁发 pre-warm（D42：取号的期限是 `until`，请求超时取 `timeout_ms` 与 `until` 剩下的较短者，守卫在 `Drop` 里以 `abandoned` `settle`），回来后进锁 `settle`、`notify_all`；发的那个调用的结局：答了是 `answered`，回来时已到 `until`（请求超时或取不到号）是 `timed_out`，其余的失败是 `refused`；⑤照旧 `Gate::admit` 取号。`Gate::admit` 因此多一个期限参数：真调用传拿号时刻加 `QUEUE_WAIT_MAX`，pre-warm 传 `until`。
 
 派生检查（与实现同一次改动写下，各自先对一个故意写错的实现变红一次）：
 - `hold::tests` 的 proptest `holds_keep_the_lean_properties`：生成器在 0 到 3 的四个键上随机走 `Arrive(Option<key>)`、`Settle(任一在飞的 Prewarm)`、`Tick`，每步时钟前进 0 到 `HOLD_MAX` 的一半（单调，与 `clock` 取 `max` 同义），驱动 `Holds` 的四个方法；测试自己记下每个在等的调用（它拿到的 `Prewarm`）与到达号队的次序，每一步断言：性质 7（每个键在飞的 pre-warm 至多一次，且 `Send` 只在键不热时答）、性质 8（`settle` 之后等它的调用 `waits` 全为假；`expire(now)` 之后每个仍在等的调用 `now < 到达 + HOLD_MAX`）、性质 9（一个在等的调用只在它的 `Prewarm` 被结掉或过期时离开，离开即算到达号队）与性质 10（到达即走的调用按到达次序进号队）。错的实现：对每个冷键的到达都答 `Send`，它让性质 7 变红。
-- `endpoint::permit` 的 `a_cold_wave_sends_one_prewarm_and_then_every_call`：在回环假 provider（`endpoint::fakes`）上，三条线程带同一段冷前缀同时调同一个 `Gated`，记下的交换是一次 pre-warm（`max_tokens` 为 1、只带共享的 system 块）再三次真请求，三次都在 pre-warm 答了之后发出；`a_refused_prewarm_releases_every_call`：假 provider 拒 pre-warm（429），三次真调用照样发出、各自成功。
-- 端到端的验收（issue #85）：替身 provider（`just provider`）上一波三件委派进同一栋楼、母 run 前缀不同时一次 pre-warm 在前；与母 run 前缀相同时没有 pre-warm、没有等待；pre-warm 被拒时三个子 run 立即放行并各自完成。它们经真实的 `RunWorker` 驱动，写在 `crates/sprawling/tests/` 下。
+- `endpoint::permit` 的三例，在回环假 provider 上，经一个把名字 `provider.test` 解析到回环端口的 `Transport::detoured` 去够它：回环地址是 `reach::is_local`，D39 第 1 条在那里从不等，所以假 provider 要以一个不在这台电脑上的名字出现。`a_cold_wave_sends_one_prewarm_and_then_every_call`：三条线程带同一段冷前缀同时调同一个端点，记下的交换是一次 pre-warm（`max_tokens` 为 1、只带共享的 system 块、一条 `"."` 消息）再三次真请求；`a_prefix_just_used_is_not_held`：一次调用之后同键的一波三个调用不等、不再 pre-warm；`a_refused_prewarm_releases_every_call`：假 provider 拒 pre-warm（429），三次真调用照样发出、各自成功，每个跟随者的 `prefix_held` 都答 `refused`。
+- `runtime::turn` 的 `a_held_attempt_is_recorded_between_its_call_and_its_return`：模型端口答出一次等待时，`prefix_held` 紧跟那次尝试的 `model_called`，在 `model_returned` 之前。
+
+**现状**：issue #85 的端到端验收（替身 provider 上一波三件委派进同一栋楼，经真实的 `RunWorker`，写在 `crates/sprawling/tests/` 下）还没有。`just provider` 的替身在回环端口上听，D39 第 1 条让发往这台电脑的调用从不等，所以它在今天的替身上看不见任何 pre-warm；它要等替身能以一个不在这台电脑上的名字被够到（例如 assembly 接受一个只在测试里用的解析表）。上面 `endpoint::permit` 的三例在门这一层覆盖同样的三种结局。
 -/
 
 /-! D42 pre-warm 只带共享部分与一条最小的消息，消息上不打断点，只要一个输出 token
@@ -459,7 +468,7 @@ impl Endpoint {
 
 /-! D43 一次等待是 `prefix_held` 这一行，经模型端口交给回合层写下
 
-**决定**：一次等待是一行 record-only 的 `prefix_held`（载荷与种类见 kernel D60），写在等的那个 run 的房间下，紧跟在那次尝试的 `model_called` 之后、在 `model_returned` 或那次调用的失败之前。gateway 不持 Ledger 句柄（§7），所以 `Gated` 把这次调用的等待记在自己身上，经模型端口的只读方法 `prefix_held`（kernel D59）交给回合层，回合层在每次尝试返回之后（成功与失败两臂）问一次，有就写；每次调用开始时记录清空，不等的调用答 `None`、不写行。行里有：从到门前到被放行的整数微秒（注入的单调时钟）；等的那次 pre-warm 怎样结束（`answered`、`refused`、`timed_out`、`abandoned`）；发 pre-warm 的那个调用的行另带它的花费（provider 报的四个 token 数与账单额）或它的拒绝原样。`model_returned` 的 `took_us` 从尝试发出算起，包含这段等待，读者减去 `waited_us` 得到对端用的时间。
+**决定**：一次等待是一行 record-only 的 `prefix_held`（载荷与种类见 kernel D60），记在等的那个 run 的名下（与 `model_called` 一样不带 `addr`），紧跟在那次尝试的 `model_called` 之后、在 `model_returned` 或那次调用的失败之前。拒绝原样里可能有 provider 自己写的字，所以它走回合层携带别人内容的那条路（`Carried`），进账前扫一遍凭据的形状。gateway 不持 Ledger 句柄（§7），所以 `Gated` 把这次调用的等待记在自己身上，经模型端口的只读方法 `prefix_held`（kernel D59）交给回合层，回合层在每次尝试返回之后（成功与失败两臂）问一次，有就写；每次调用开始时记录清空，不等的调用答 `None`、不写行。行里有：从到门前到被放行的整数微秒（注入的单调时钟）；等的那次 pre-warm 怎样结束（`answered`、`refused`、`timed_out`、`abandoned`）；发 pre-warm 的那个调用的行另带它的花费（provider 报的四个 token 数与账单额）或它的拒绝原样。`model_returned` 的 `took_us` 从尝试发出算起，包含这段等待，读者减去 `waited_us` 得到对端用的时间。
 
 **理由**：人看见一个子 run 晚出发几秒，要能在它自己的历史里读到为什么；pre-warm 是一次真请求，它的写价要出现在城的历史里，否则这一波的花费少记一份。花费只记在发它的那一行，因为一笔钱只入一次账。
 
@@ -582,7 +591,7 @@ def join (s : Holds) (k t : Nat) : Holds :=
 /-! D39 什么时候不等
 
 **决定**：下面任一条成立，调用不进等待，直接取号（模型里的 `arrive none`，或 `isWarm` 那一臂）：
-1. 端点不是 Anthropic 面，或 `reach::is_local(base_url)`：只有 Anthropic 面按显式断点缓存并收写价，这台电脑上的服务器的缓存是它自己的 KV。
+1. 端点不是 Anthropic 面，或 `reach::is_local(base_url)`：只有 Anthropic 面按显式断点缓存并收写价，这台电脑上的服务器的缓存是它自己的 KV。机密楼（`policy.confidential`）的请求也不等：真调用会在门后被拒，而 pre-warm 带的正是这栋楼不许离开这台电脑的字节。
 2. 请求说没有共享部分（`SharedPrefix::Unshared`：顾问、OCR、探测与测试造的请求），或 `shared` 指的块数超过 `system` 的长度。
 3. 共享部分短于模型的最小可缓存长度：pre-warm 请求体的字节数除以 `kernel::consts_policy::BYTES_PER_TOKEN`（4）小于 `cache_min_tokens`。`cache_min_tokens` 是预置表 `ModelPreset` 的一列，从厂商页面读（页面按模型给 512 到 4,096），行里没有时取 `CACHE_MIN_TOKENS_DEFAULT`（4,096，页面列出的最大值），常量住在 `provider::preset`。
 4. 编不出 pre-warm 请求体（`wire_request` 拒）：真调用会以同一个错报出来，等待不替它报。
@@ -591,6 +600,8 @@ def join (s : Holds) (k t : Nat) : Holds :=
 **理由**：等待只在能省下写价时才值得它的延迟。1 与 3 之下没有可读的缓存；5 之下缓存已经在，或者这一波已经出发，再挡只会更晚。按字节估 token 对中文偏少（一个汉字三个字节、约一个 token），所以估错的方向是少等，不是白等。缺省取最大值而不是最小值：取小了，一段模型缓存不了的前缀也会被 pre-warm 一次，付的是全价输入。
 
 **被否**：①缺省取页面上最小的 512：见上；②不论长短都等：短前缀的 pre-warm 只花钱不省钱；③把 3 交给 provider（先发 pre-warm，再看 usage 里有没有写）：每段短前缀都多一次往返。
+
+**现状**：预置表还没有一行写下 `cache_min_tokens`：这次改动没有重读各模型的厂商页面，而一个没有出处的数字不进表，所以今天每个模型都用缺省值 4,096，宁可少等。
 
 **重开参数**：provider 在模型列表里给出最小可缓存长度时，这一列改读它；OpenAI 面的自动前缀缓存开始收写价，或它的读价折扣大到值得一次往返时，重议 1。
 -/

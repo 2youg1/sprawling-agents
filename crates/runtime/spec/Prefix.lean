@@ -33,7 +33,10 @@ impl FrozenPrefix {
     /// 从 `bytes()` 重算四段哈希并与构造时记录的对拍；不等即拒绝。
     pub fn verified_segment_hashes(&self) -> Result<[B3Hash; 4], AxError>;
     pub fn prompt_payload(&self, plan: &BreakpointPlan) -> Result<Payload, AxError>;   // prompt_assembled 载荷
+    /// 一栋楼里每个居民逐字节带着的前几块：`SegmentSlot::shared_by_building` 为真的那几格（D97）。
+    pub fn shared_part(&self) -> SharedPrefix;
 }
+impl SegmentSlot { pub fn shared_by_building(self) -> bool; }   // City、Building 为真
 /// 同一断言作用在请求携带的四块上（`turn::call`）：四块、逐块 cache=true、逐块哈希对拍。
 pub fn verified_system_hashes(system: &[SystemBlock], frozen: &[B3Hash; 4]) -> Result<[B3Hash; 4], AxError>;
 // 载荷的键由 `kernel::event::record::PromptAssembled` 一处拼写，写读两端各经 `Payload::of` 与
@@ -97,7 +100,7 @@ impl<C: FnMut() -> Result<TimeMs, AxError>> Warmed<C> {
     /// 经自己拥有的 adapter 发出 now_ms 已到期的续期。
     pub fn renew_due(&mut self, now_ms: u64) -> Result<Vec<ModelReturn>, AxError>;
 }
-impl<C: FnMut() -> Result<TimeMs, AxError>> Model for Warmed<C> { /* call、call_streaming */ }
+impl<C: FnMut() -> Result<TimeMs, AxError>> Model for Warmed<C> { /* call、call_streaming；prefix_held 原样转交它包着的模型 */ }
 ```
 
 - `lead_ms` 不是常量：`Warmed` 把每次经它发出的调用（真实请求与续期）的往返时长记为下一次续期的提前量，所以提前量跟着所连的 provider 与链路走，不按某一类机器调校。流式调用的往返含生成时长，只会让续期提前，不会让它晚于缓存过期。
@@ -153,4 +156,15 @@ impl FrozenSegment {
 **被否**：保留字段与 `mint` 等将来接上——死机制照样要维护、要进公开面，而接上时的口径（谁写的、第几代）应由那时真实的摘要生产者决定，不是预先猜好。
 
 **重开参数**：出现一条把模型写的摘要放进前缀的生产路径时，重开本条，指纹随那条路径一起设计。
+-/
+
+/-! D97 一栋楼共享前缀的哪几块，由段格说出
+
+**决定**：`SegmentSlot::shared_by_building` 是唯一的答案：City 与 Building 为真，Resident 与 Run 为假，穷尽地写在格上。`FrozenPrefix::shared_part` 数出前面连续为真的格，交给回合请求的 `ChatRequest.shared`（kernel D59）作 `SharedPrefix::Leading(n)`，今天 n 是 2。回合之外造的请求（探测、顾问、OCR、测试）写 `Unshared`。
+
+**理由**：Resident 段由身份与目录拼成（`prefix::segment`），同一栋楼的两个居民不同；Run 段属于一次 run。四段的次序与内容是本 crate 的事实，gateway 只读这个数，不自己去数带断点的块，否则同一件事在两个 crate 里各拼一次。
+
+**被否**：①写一个常量 2：段格改了次序或多了一格，常量不跟着变；②按每块的 `cache` 标记数：Resident 段也带标记，标记说的是「在这里打断点」，不是「这一段是共享的」。
+
+**重开参数**：一栋楼里的居民开始共享 Resident 段的一部分（例如共同的目录），或段格多出一格。
 -/

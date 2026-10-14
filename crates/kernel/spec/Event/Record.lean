@@ -645,7 +645,7 @@ pub enum WaitEnd { Reply { reply: SignalId }, Timeout, Left }   // 回信到了�
 
 /-! D60 一次端点门前的等待是一行 record-only 的 `prefix_held`，种类表的行与实现同一次改动落地
 
-**决定**：一个种类（追加在 `ALL` 末尾，只入账），写方是 runtime 的回合层：一次尝试返回之后（成功与失败两臂），它问模型端口的 `prefix_held`（`crates/kernel/spec/Model.lean` D59），有就写这一行，`run` 是那次尝试的 run，`addr` 是它的房间，位置紧跟那次尝试的 `model_called`、在 `model_returned` 或那次失败之前：
+**决定**：一个种类（追加在 `ALL` 末尾，只入账），写方是 runtime 的回合层：一次尝试返回之后（成功与失败两臂），它问模型端口的 `prefix_held`（`crates/kernel/spec/Model.lean` D59），有就写这一行，`run` 是那次尝试的 run，`addr` 缺席（与 `model_called` 相同：回合层的行由 run 说明是谁的），位置紧跟那次尝试的 `model_called`、在 `model_returned` 或那次失败之前：
 
 ```rust
 pub struct PrefixHeld {
@@ -663,9 +663,7 @@ pub enum PrewarmSent {               // 先试 Refused，同 CacheRenewed：Answ
 }
 ```
 
-载荷住 `crates/kernel/src/event/record/renewal.rs` 旁的一个新文件，与 `CacheRenewed` 同族；窗类是 `RecordOnly`，因为等待不改任何一次请求的字节。`model_returned.took_us` 从尝试发出算起，包含这段等待。
-
-**现状**：这一行由 gateway D43 定下，种类、载荷与 `spec/Event/Kind.lean` 的表的行都还没有；它们与写方在同一次改动里落地（D32 的做法），因为一张写着没有变体的行的表会让 `xtask specalign` 红。
+载荷住 `crates/kernel/src/event/record/prefix_held.rs`，在 `renewal.rs` 旁，与 `CacheRenewed` 同族；窗类是 `RecordOnly`，因为等待不改任何一次请求的字节。`model_returned.took_us` 从尝试发出算起，包含这段等待。
 
 **理由**：人看见一个子 run 晚出发几秒，要能在它自己的历史里读到为什么；pre-warm 是一次真请求，它的写价要进城的历史。花费只在发它的那一行，一笔钱只入一次账。
 
