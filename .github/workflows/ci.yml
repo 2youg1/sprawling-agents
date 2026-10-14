@@ -210,13 +210,13 @@ jobs:
       - name: the gates that judge the client bundle
         if: ${{ !cancelled() }}
         run: just --no-deps gates-artifacts
+
       # Every replacement look under client/swap/ drawn in place of the
       # shipped one, and the client still typechecks, keeps its wiring
       # tests and passes render (tools/xtask/Spec.lean section 8-13).
       - name: the swap test
         if: ${{ !cancelled() }}
         run: just swap
-
   # The Lean specifications. The checker in `tools/adversary/` is not built here:
   # it attacks the binary from outside and stays out of every required
   # check (`adversary.yml` runs it nightly).
@@ -273,6 +273,13 @@ jobs:
   # test build that nobody downloads;
   # `release.yml` builds what ships with link.exe, so the linker of a
   # released binary is not this one (`tools/xtask/Spec.lean` D27).
+  #
+  # The target directory starts warm: `./.github/actions/warm-target`
+  # restores the one the newest push to main left and ages every input
+  # that has not changed since, so cargo compiles the packages a change
+  # reached and nothing else. Rust cache keeps only Cargo's registry here,
+  # because the warm target carries the dependencies' artifacts too, and
+  # the bundle comes from its own cache entry when `client/` is unchanged.
   test-build:
     name: test build
     outputs:
@@ -291,7 +298,8 @@ jobs:
       - uses: ./.github/actions/zig
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
         with:
-          shared-key: test
+          shared-key: test-registry
+          cache-targets: false
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: taiki-e/install-action@ab6895351a88b908e96a4697860d4ffea5e57dbe # v2
         with:
@@ -301,6 +309,11 @@ jobs:
       - uses: ./.github/actions/client-artifacts
         with:
           want: bundle
+      # After the bundle, because the bundle is one of the inputs the warm
+      # target compares.
+      - uses: ./.github/actions/warm-target
+        with:
+          mode: restore
       - name: the suite, compiled once
         run: just test-archive target/nextest-archive.tar.zst
       - name: prove every test belongs to exactly one slice
@@ -323,6 +336,10 @@ jobs:
           path: target/nextest-archive.tar.zst
           retention-days: 1
           if-no-files-found: error
+      - uses: ./.github/actions/warm-target
+        if: github.ref == 'refs/heads/main'
+        with:
+          mode: save
 
   # Disjoint slices, whose union is checked before the matrix starts.
   # Every slice installs the toolchain, because nextest runs as a cargo
