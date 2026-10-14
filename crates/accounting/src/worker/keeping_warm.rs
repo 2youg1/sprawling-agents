@@ -172,7 +172,7 @@ mod tests {
     }
 
     /// A door that sent one real request at `USED_AT`.
-    fn door_after_one_run(setting: KeepWarm, provider: Provider) -> Door {
+    fn door_after_one_run(setting: KeepWarm, provider: impl Model + Send + 'static) -> Door {
         let clock: DoorClock = Box::new(|| Ok(TimeMs::new(USED_AT)));
         let mut door = Door::new(Box::new(provider), setting, clock);
         door.call(&ModelRequest {
@@ -252,5 +252,107 @@ mod tests {
                 (refusing, CacheRenewed::Refused { refused: refusal() }),
             ]
         );
+    }
+
+    /// How long a stand-in provider stays silent when nobody releases
+    /// it: long enough that an accounting thread waiting on it is seen
+    /// waiting, short enough that a red run ends on its assertion.
+    const SILENCE: std::time::Duration = std::time::Duration::from_secs(5);
+
+    /// Answers the first call at once, as the run's real request; every
+    /// later call, a renewal, waits until released or until [`SILENCE`]
+    /// has passed, and says so when it answers.
+    struct Silent {
+        calls: usize,
+        release: std::sync::mpsc::Receiver<()>,
+        said: std::sync::mpsc::Sender<&'static str>,
+    }
+
+    impl Model for Silent {
+        fn call(&mut self, req: &ModelRequest) -> Result<ModelReturn, AxError> {
+            self.calls += 1;
+            if self.calls > 1 {
+                drop(self.release.recv_timeout(SILENCE));
+                self.said.send("provider answered").unwrap();
+            }
+            Provider {
+                calls: Arc::new(AtomicUsize::new(0)),
+                refuses_from: usize::MAX,
+            }
+            .call(req)
+        }
+    }
+
+    /// A line a lane writes through its relay.
+    fn lane_line() -> kernel::EventDraft {
+        kernel::EventDraft {
+            run: kernel::RunId::CITY,
+            t: TimeMs::new(USED_AT),
+            who: "city".to_owned(),
+            addr: None,
+            kind: EventKind::CityInitialized,
+            data: Payload::empty(),
+            ig: false,
+        }
+    }
+
+    /// A renewal waits on its provider off the accounting thread: while
+    /// the provider is silent, a relay request from another lane is
+    /// still answered, and the renewal's line is written under its room
+    /// once the provider answers.
+    #[test]
+    fn a_renewal_held_by_a_silent_provider_leaves_a_relay_answered() {
+        let dir = tempfile::tempdir().unwrap();
+        let report = crate::worker::fixture::init_city(dir.path()).unwrap();
+        let mut worker = RunWorker::new(
+            dir.path(),
+            runtime::diagnostics::Diagnostics::off(),
+            crate::worker::fixture::hands(),
+        )
+        .unwrap();
+        let (release, held) = std::sync::mpsc::channel();
+        let (said, heard) = std::sync::mpsc::channel();
+        let room = Address::parse("city/room").unwrap();
+        let provider = Silent {
+            calls: 0,
+            release: held,
+            said: said.clone(),
+        };
+        let door = door_after_one_run(KeepWarm::FiveMinute, provider);
+        worker.warm.keep(room.clone(), door);
+        let due = worker.warm_due().unwrap();
+
+        let mut relay = worker.relay();
+        let lane = std::thread::spawn(move || {
+            kernel::Ledger::append(&mut relay, lane_line()).unwrap();
+            said.send("relay answered").unwrap();
+        });
+        worker.renew_warm(TimeMs::new(due));
+        let mut heard_first = Vec::new();
+        while heard_first.is_empty() && !lane.is_finished() {
+            worker
+                .serve_flight(crate::worker::relay::Patience::For(
+                    std::time::Duration::from_millis(20),
+                ))
+                .unwrap();
+            heard_first.extend(heard.try_recv());
+        }
+        // A provider that already stopped waiting has dropped its end.
+        drop(release.send(()));
+        worker.land_the_rest().unwrap();
+        lane.join().unwrap();
+        let heard_in_order: Vec<&str> = heard_first.into_iter().chain(heard.try_iter()).collect();
+
+        assert_eq!(heard_in_order, vec!["relay answered", "provider answered"]);
+        let renewed: Vec<serde_json::Value> =
+            runtime::replay::verify_ledger_dir(&report.ledger_dir)
+                .unwrap()
+                .raw_lines()
+                .iter()
+                .map(|line| serde_json::from_slice::<serde_json::Value>(line).unwrap())
+                .filter(|record| record["kind"] == "cache_renewed")
+                .map(|record| record["addr"].clone())
+                .collect();
+        assert_eq!(renewed, vec![serde_json::json!(room.as_str())]);
     }
 }
