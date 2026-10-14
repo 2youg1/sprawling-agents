@@ -453,3 +453,64 @@ pub(super) fn selected_lines(ledger_dir: &std::path::Path) -> Vec<serde_json::Va
         })
         .collect()
 }
+
+/// A re-attach while the endpoint's list cannot be read changes nothing
+/// the city already knew (gateway D38): an id registered before keeps
+/// the facts the earlier probe read, and the endpoint keeps its earlier
+/// `probed`; an id named for the first time gets default facts, and
+/// then the list is partly the person's word, so `probed` is false.
+#[test]
+fn a_re_attach_whose_list_cannot_be_read_keeps_the_facts_already_registered() {
+    let dir = tempfile::tempdir().unwrap();
+    crate::worker::fixture::init_city(dir.path()).unwrap();
+    let (base_url, provider) = fake_openai(&["m-stated", "m-plain"], Vec::new());
+    let mut worker = RunWorker::new(
+        dir.path(),
+        runtime::diagnostics::Diagnostics::off(),
+        crate::worker::fixture::hands(),
+    )
+    .unwrap();
+    let attach = |worker: &mut RunWorker, admit: &[&str], idem: &[u8]| {
+        worker
+            .handle(wire::Command::AttachEndpoint {
+                name: wire::ProviderName::parse("house").unwrap(),
+                base_url: base_url.clone(),
+                dialect: kernel::DialectKind::OpenAi,
+                secret: None,
+                auth_header: None,
+                admit: admit.iter().map(|id| (*id).to_owned()).collect(),
+                tuning: wire::EndpointTuning::default(),
+                idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, idem),
+            })
+            .unwrap();
+        let held = worker.credentials.book.endpoints().next().unwrap().clone();
+        (held.models, held.probed)
+    };
+    let (read, probed) = attach(&mut worker, &[], b"listed");
+    assert!(probed);
+    let stated = read
+        .iter()
+        .find(|row| row.id == "m-stated")
+        .unwrap()
+        .clone();
+    assert_eq!(stated.context_tokens, Some(LISTED_WINDOW));
+    provider.stop_listing();
+    assert_eq!(
+        attach(&mut worker, &["m-stated"], b"unread, nothing new"),
+        (vec![stated.clone()], true),
+        "a failed probe reset what the earlier one read"
+    );
+    assert_eq!(
+        attach(&mut worker, &["m-stated", "m-new"], b"unread, one new"),
+        (
+            vec![
+                stated,
+                gateway::ModelFacts {
+                    id: "m-new".to_owned(),
+                    ..gateway::ModelFacts::default()
+                },
+            ],
+            false,
+        )
+    );
+}
