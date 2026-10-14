@@ -212,7 +212,7 @@ import client.spec.Views.Workspace
 | `slash_pages.ts` | 6 数据面 | `PAGE_VERBS`：只打开一页的斜杠动词（`/go`、`/mcp`、`/acp`、`/doctor`、`/diff`），由 `slash.ts` 展开进 `SLASH`，菜单只读那一张表 |
 | `remote/device.ts` | 4 适配器 | `kept() -> Promise<Device \| null>`、`keep(device) -> Promise<boolean>`、`forget() -> Promise<boolean>`：这台设备配对的结果存在这个源的 IndexedDB 里，`Device { city, fingerprint, id, key, at }`；`key.ed25519` 以 `CryptoKey` 原样存入，浏览器不让任何脚本导出它。种子不存 |
 
-`src/ui.ts` 是视图拿到的一切，一个上下文、一个取法：`setUi(value)` 由 `app.svelte` 挂载时调一次；后代组件在初始化期调 `ui(): Ui` 拿到 `Ui { conn, prefs, tags, lang, effort, policy, conversing, approvals, bar, origin, pairing, now, chooseEffort, choosePolicy, go, send, hearing }`。旧的 `useUi`／`useSay`／`useGo`／`useCommand`／`useHearing`／`useApprovals` 等透传壳收敛成这一个门（AGENTS：不做只改名的壳）。**词不是上下文**：`core/lang.ts` 的 `say(lang, key)` 保持纯函数，插槽由 `fill(pattern, slots)` 填，模板写 `say($lang, key)`，`$lang` 的订阅就是换语言时重画的来源。`pairing` 是开这一页的地址栏上的配对码，两扇会动作的 HTTP 门要它。
+`src/ui.ts` 是视图拿到的一切，一个上下文、一个取法：`setUi(value)` 由 `app.svelte` 挂载时调一次；后代组件在初始化期调 `ui(): Ui` 拿到 `Ui { conn, prefs, tags, lang, effort, policy, conversing, branches, approvals, bar, origin, pairing, now, chooseEffort, choosePolicy, go, send, hearing }`。旧的 `useUi`／`useSay`／`useGo`／`useCommand`／`useHearing`／`useApprovals` 等透传壳收敛成这一个门（AGENTS：不做只改名的壳）。**词不是上下文**：`core/lang.ts` 的 `say(lang, key)` 保持纯函数，插槽由 `fill(pattern, slots)` 填，模板写 `say($lang, key)`，`$lang` 的订阅就是换语言时重画的来源。`pairing` 是开这一页的地址栏上的配对码，两扇会动作的 HTTP 门要它。`branches` 是全页唯一的分支门（`views/talk/branching.ts` 的 `keepBranches`，D100）：每个分支入口都经它的 `open` 发 `OpenSession`，角落读它的 `held` 认出哪条拒绝由发起分支的那一行说。
 
 ### 视图（免 SPEC，列出以便定位）
 

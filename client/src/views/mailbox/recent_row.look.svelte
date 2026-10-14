@@ -11,7 +11,10 @@
   // written, in three columns that line up from row to row; then the
   // fork key, always drawn rather than on hover, and the digit that
   // reaches the row. The fork key names itself in a hint, or says there
-  // why it cannot fork.
+  // why it cannot fork. A branch waiting on the city is said in the
+  // middle column, which a screen reader hears as it changes, and a
+  // refused one keeps `/stop` after the fork key.
+  import Button from "../parts/button.svelte";
   import Glyph from "../parts/glyph.svelte";
   import Tip from "../parts/tip.svelte";
   import type { RecentRowLook } from "./recent_row";
@@ -25,7 +28,7 @@
     {...look.link}
   >
     <span class="min-w-0 truncate">{look.room}</span>
-    <span class="truncate text-note text-text-faint">{look.began}</span>
+    <span class="truncate text-note text-text-faint" aria-live="polite">{look.began}</span>
     <span class="figure text-right text-note text-text-faint">{look.ago}</span>
   </a>
   <Tip text={look.fork.why ?? look.fork.name}>
@@ -41,6 +44,9 @@
       </button>
     {/snippet}
   </Tip>
+  {#if look.stop !== null}
+    <Button label={look.stop.label} name={look.stop.name} onPress={look.stop.onPress} />
+  {/if}
   <kbd class="entry-n" aria-hidden="true"></kbd>
 </li>
 

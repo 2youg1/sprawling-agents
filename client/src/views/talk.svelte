@@ -18,7 +18,7 @@
   // A session is a stretch of the room, not the room (roadmap S1): runs
   // before it fold behind one line, and how it began is drawn where the
   // two meet.
-  import { cancel, dispatch, openSession, steer } from "../core/commands";
+  import { cancel, dispatch, steer } from "../core/commands";
   import { sendingInto } from "../core/doing";
   import { newestWorking } from "../core/belief/live";
   import { heldIn } from "../core/belief/rooms";
@@ -36,6 +36,9 @@
   import Composer from "./talk/composer.svelte";
   import Divider from "./talk/divider.svelte";
   import Forking from "./talk/forking.svelte";
+  import Button from "./parts/button.svelte";
+  import { branchInto } from "./talk/branching";
+  import { noteOf } from "./talk/branch_note";
   import Landed from "./talk/landed.svelte";
   import type { Boundary, ForkPlan } from "./talk/forking";
   import Thread from "./talk/thread.svelte";
@@ -74,6 +77,20 @@
   // known is not shown here rather than shown in the wrong room.
   const runs = $derived(heldIn($belief, address));
   const live = $derived(newestWorking($belief, address));
+  // A branch from this room while the city has not opened it: said
+  // above the box, which still speaks to the session that is running,
+  // with `/stop` for that run beside a refusal (client D100).
+  const branching = u.branches.held;
+  const branchNote = $derived.by(() => {
+    const going = live;
+    const stop =
+      going === undefined
+        ? null
+        : () => {
+            u.send(cancel(going.run));
+          };
+    return noteOf(branchInto($branching, address), address, $lang, stop);
+  });
   const isMayor = $derived(address === MAYOR);
   // Whom the next session here will speak with: the name a new session
   // would freeze, which is today's (refrain §3-13). A session already
@@ -248,19 +265,23 @@
   });
   $effect(() => () => { u.conversing.set(NOT_CONVERSING); });
 
-  // One branch, from wherever a person pointed: the words a message
-  // carries go back to the box through the draft door - the composer
-  // reads that door when it mounts and this page remounts it below - and
-  // the line it cut at travels in the one frame `/fork` sends (roadmap
-  // S2-3).
+  // One branch, from wherever a person pointed, through the page's one
+  // branch door (`talk/branching.ts`, client D100): the line it cut at
+  // travels in the one frame `/fork` sends (roadmap S2-3), and only once
+  // the city has opened the branch do the words a message carries go
+  // back to the box through the draft door - the composer reads that
+  // door when it mounts and this page remounts it below. Before then
+  // the box still speaks to the session that is running, and a refused
+  // branch must leave it so.
   function doFork(plan: ForkPlan): void {
-    if (!u.send(openSession(address, "nothing", plan.origin))) return;
-    if (plan.draft !== null) u.prefs.setDraft(address, plan.draft);
-    ours = true;
-    story = { kind: "forked", at: u.now(), turn: plan.turn, mother: plan.mother };
     picking = false;
-    // The branch is where the person just went.
-    rejoined += 1;
+    u.branches.open(address, plan.origin, () => {
+      if (plan.draft !== null) u.prefs.setDraft(address, plan.draft);
+      ours = true;
+      story = { kind: "forked", at: u.now(), turn: plan.turn, mother: plan.mother };
+      // The branch is where the person just went.
+      rejoined += 1;
+    });
   }
 
   // `/fork` with no argument cannot name a line from inside the verb
@@ -379,6 +400,14 @@ composition is rebuilt on the way. -->
     class="relative shrink-0 transition-transform duration-page"
     style:transform={!band && blank ? "translateY(calc(-50cqh + 50% + var(--spacing-margin)))" : undefined}
   >
+    {#if branchNote !== null}
+      <div class="mb-tight flex flex-wrap items-center gap-base">
+        <p class="text-note text-text-faint" role="status">{branchNote.said}</p>
+        {#if branchNote.stop !== null}
+          <Button label={branchNote.stop.label} name={branchNote.stop.name} onPress={branchNote.stop.onPress} />
+        {/if}
+      </div>
+    {/if}
     {#if story?.kind === "forked" && shown.length === 0}
       <p class="mb-tight text-note text-text-faint" role="status">
         {fill(say($lang, "fork_pending"), { turn: String(story.turn) })}

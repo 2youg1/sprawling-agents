@@ -98,7 +98,10 @@ describe("branching, then going", () => {
   test("main stays until the belief holds the room's new session", () => {
     const at = page(seen(3, 0));
     at.press(true);
-    expect(at.sent).toEqual([{ open_session: { addr: ROOM, carry: "nothing", from: ORIGIN, idem: expect.any(String) } }]);
+    // The idem is minted afresh per frame, so the frame is read without it.
+    expect(at.sent.map((command) => ("open_session" in command ? { ...command.open_session, idem: null } : command))).toEqual([
+      { addr: ROOM, carry: "nothing", from: ORIGIN, idem: null },
+    ]);
     expect(at.views).toEqual([]);
     expect(at.went()).toBe(0);
     expect(get(at.branches.held)).toEqual({ kind: "opening", room: ROOM, origin: ORIGIN, session: Seq.make(3), refusal: null });

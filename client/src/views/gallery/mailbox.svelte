@@ -13,6 +13,7 @@
   // fixture hands them one through `Stand`.
   import type { Answer, AxError, EventRecord, Query, SessionLine } from "../../wire";
   import { Address, B3Hash, RunId, Seq, TimeMs } from "../../wire";
+  import type { BranchHere } from "../talk/branching";
 
   function refusal(code: AxError["code"], action: string, subject: string, recovery: string): AxError {
     return { action, code, gate: null, nearby: [], recovery, retry: "no", subject };
@@ -28,6 +29,9 @@
   );
   const STOPS = refusal("E_MODEL_UNCHOSEN", "dispatch to hall/mayor", "main", "choose a main model in settings");
   const ORDINARY = refusal("E_PATH_NOT_FOUND", "read a file", "lab/east/docs/SPEC.md", "check the path and ask again");
+  // A branch the city would not open under the run working in its room.
+  const BUSY = refusal("E_BUSY", "start a new session", "hall/mayor: a run is running there", "stop that run first");
+  const BRANCHES: readonly BranchHere[] = [{ kind: "opening" }, { kind: "refused", error: BUSY }];
 
   // The city turned the page away: a page built for another wire, which
   // only a reload mends.
@@ -175,17 +179,37 @@ the alert's and does not pulse. -->
 
 <!-- One row of each list on its own, at the column's width: a session
 the page can still fork, one whose last turn is older than the page,
-and a room calling a tool and one waiting on the person. -->
+a branch waiting on the city and one the city refused under a working
+run, and a room calling a tool and one waiting on the person. -->
 <Case label="mailbox rows · recent sessions, one that forks and one that cannot" width={440}>
   <ul class="bg-raised px-base">
     {#each [true, false] as forkable (forkable)}
       {@const line = SESSIONS[MAYOR]?.[forkable ? 0 : 1]}
       {#if line !== undefined}
         <RecentRow
-          {...recentRow({ room: MAYOR, line, forkable }, $lang, ago($lang, line.at, NOW), {
+          {...recentRow({ room: MAYOR, line, forkable, branch: { kind: "none" } }, $lang, ago($lang, line.at, NOW), {
             href: "#/gallery",
             follow: ignore,
             fork: ignore,
+            stop: null,
+          })}
+        />
+      {/if}
+    {/each}
+  </ul>
+</Case>
+
+<Case label="mailbox rows · a branch opening and one refused under a working run" width={440}>
+  <ul class="bg-raised px-base">
+    {#each BRANCHES as branch (branch.kind)}
+      {@const line = SESSIONS[MAYOR]?.[0]}
+      {#if line !== undefined}
+        <RecentRow
+          {...recentRow({ room: MAYOR, line, forkable: true, branch }, $lang, ago($lang, line.at, NOW), {
+            href: "#/gallery",
+            follow: ignore,
+            fork: ignore,
+            stop: ignore,
           })}
         />
       {/if}

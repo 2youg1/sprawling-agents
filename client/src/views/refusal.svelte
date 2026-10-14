@@ -56,6 +56,7 @@
   import type { Refused } from "./notice_recovery";
   import { recover, recoveryLabel, recoveryWhy } from "./notice_recovery";
   import type { AxError } from "../wire";
+  import { branchClaims } from "./talk/branching";
   import { claims } from "./talk/handing";
   import { attending } from "./mailbox/attention";
   import Button from "./parts/button.svelte";
@@ -191,8 +192,9 @@
 
   // Every refusal the city comes back with is toasted once, except the
   // one the open conversation draws as a card where its reply would
-  // have been (`talk/handing.ts`): the same refusal in two places is
-  // one refusal said twice. The belief hands out a new value per
+  // have been (`talk/handing.ts`) and the one a branch row draws beside
+  // its fork key (`talk/branching.ts`): the same refusal in two places
+  // is one refusal said twice. The belief hands out a new value per
   // arrival, so identity is the arrival.
   $effect(() => {
     const refusal = $belief.refusal;
@@ -200,7 +202,7 @@
       return;
     }
     heard = refusal;
-    if (claims(get(u.conversing), refusal, $belief)) return;
+    if (claims(get(u.conversing), refusal, $belief) || branchClaims(get(u.branches.held), refusal)) return;
     const refused: Refused = { error: refusal, about: aboutOf(refusal) };
     if (deliverable(urgencyOf(refusal), attention.read(), u.now())) {
       push({ kind: "refused", refused });

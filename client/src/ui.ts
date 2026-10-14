@@ -29,6 +29,8 @@ import type { Connection } from "./core/socket";
 import { keepTags } from "./core/tags";
 import type { Tagging } from "./core/tags";
 import type { Answer, ApprovalItem, Command, Effort, RunPolicy } from "./wire";
+import { keepBranches } from "./views/talk/branching";
+import type { Branches } from "./views/talk/branching";
 import { NOT_CONVERSING } from "./views/talk/handing";
 import type { Conversing } from "./views/talk/handing";
 
@@ -60,6 +62,10 @@ export interface Ui {
   // refusal the conversation draws to the conversation
   // (`views/talk/handing.ts`). Written by the talk page alone.
   readonly conversing: Writable<Conversing>;
+  // The branch this page has asked the city for, and the one door every
+  // fork entry sends it through: main moves once the city opened it
+  // (`views/talk/branching.ts`, client D100).
+  readonly branches: Branches;
   // The questions this city is holding for the person, as one reading
   // the views share: the mailbox key's badge and its deciding section,
   // the notifier, and the tab's mark. Before this each of them folded
@@ -108,12 +114,16 @@ function readied(value: Opening): Ui {
   const effort = writable<Effort | null>(null);
   const policy = writable<RunPolicy>(FIRST_POLICY);
   const hearing = value.conn.asking.ask(QUERIES.endpoints);
+  const going = (view: View): void => {
+    go(value.bar, view);
+  };
   return {
     ...value,
     lang: derived(value.prefs.held, (held) => held.lang),
     effort,
     policy,
     conversing: writable<Conversing>(NOT_CONVERSING),
+    branches: keepBranches({ belief: value.conn.belief, send: value.conn.command, go: going }),
     tags: keepTags(value.conn),
     approvals: derived(
       value.conn.asking.ask(QUERIES.approvals),
@@ -121,9 +131,7 @@ function readied(value: Opening): Ui {
     ),
     chooseEffort: effort.set,
     choosePolicy: policy.set,
-    go: (view) => {
-      go(value.bar, view);
-    },
+    go: going,
     send: value.conn.command,
     hearing: () => {
       const answer: Answer | undefined = get(hearing);
