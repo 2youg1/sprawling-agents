@@ -17,15 +17,104 @@
 
 use std::collections::BTreeSet;
 
-use kernel::{Address, EventKind, Locator};
+use kernel::event::record::SignalId;
+use kernel::{Address, AxError, EventKind, Locator, RunId};
 
 use crate::effect;
 
 use super::super::waking::landing::Arrival;
-use super::super::{Assignment, CITY_VERIFIER, Owing, RunWorker};
+use super::super::{Assignment, CITY_VERIFIER, KnockChain, Owing, RunWorker};
 use super::Dispatched;
 
+/// Work the hand-over could not start, and the run that asked for it
+/// (accounting D54).
+pub(in crate::worker) struct Unstarted<'a> {
+    /// The room that asked, where the handback goes.
+    pub(in crate::worker) parent: &'a Address,
+    /// The run that asked. The child never had a run, so its handback is
+    /// written under this one.
+    pub(in crate::worker) asker: RunId,
+    /// Which request on the asker's delegate desk this was, counted from
+    /// zero: two requests for one room are two handbacks.
+    pub(in crate::worker) place: usize,
+    pub(in crate::worker) child: &'a Address,
+    pub(in crate::worker) refusal: &'a AxError,
+}
+
 impl RunWorker {
+    /// Tells the room that asked for the work that its child could not
+    /// start, through the door a child that ran comes back by: the child's
+    /// account pinned in the store, a stopped handback carrying the
+    /// refusal recorded and then put in the room, a knock for a parent
+    /// room nobody is working in, and where the letter landed (collab D19,
+    /// accounting D54).
+    ///
+    /// The letter carries no sender state (collab D10): the child never
+    /// had one.
+    ///
+    /// # Errors
+    /// Propagates the store's refusal of the account, a room address that
+    /// does not name a node, the ledger's refusal of the lines, the room's
+    /// refusal of the letter, and a resident description that cannot be
+    /// read.
+    pub(in crate::worker) fn deliver_unstarted(
+        &mut self,
+        unstarted: Unstarted<'_>,
+        policy: kernel::RunPolicy,
+        chain: &KnockChain,
+    ) -> Result<(), AxError> {
+        let Unstarted {
+            parent,
+            asker,
+            place,
+            child,
+            refusal,
+        } = unstarted;
+        let account = format!(
+            "room: {}
+ending: not started
+refusal: {refusal}
+recovery: {}
+",
+            child.as_str(),
+            refusal.recovery()
+        );
+        let digest = self
+            .cas
+            .put_for(
+                account.as_bytes(),
+                &storage::BlockOrigin {
+                    run: asker,
+                    building: child.clone(),
+                },
+            )
+            .map_err(storage::StorageError::into_ax)?;
+        let by = child.as_str();
+        let claim = collab::Claim::new(
+            collab::NodeId::parse(by)?,
+            Locator::cas(digest),
+            digest,
+            by.to_owned(),
+        );
+        let signal = collab::Handback::unstarted(claim, refusal).signal(
+            SignalId::parse(&format!("handback-{asker}-{place}"))?,
+            parent.clone(),
+            self.clock.now()?,
+        )?;
+        self.record_for(
+            asker,
+            effect::Line {
+                who: by.to_owned(),
+                addr: parent.clone(),
+                kind: EventKind::SignalEnqueued,
+                data: signal.enqueued_payload()?,
+            },
+        )?;
+        let arrival = self.arrive(signal)?;
+        self.knock(arrival.signal(), child, policy, chain)?;
+        self.record_landing(arrival, asker, by)
+    }
+
     /// Tells the run that asked for the work how it came back.
     ///
     /// The child's account is pinned in the store before it is judged,

@@ -61,6 +61,18 @@ impl Handback {
         }
     }
 
+    /// A child the city could not start. It comes back stopped, the way a
+    /// child that stopped does, and the reason is the refusal's code,
+    /// subject and recovery, which is what the parent needs to correct
+    /// the room or tell the person (collab D19).
+    #[must_use]
+    pub fn unstarted(claim: Claim, refusal: &AxError) -> Handback {
+        Handback::Stopped {
+            claim,
+            because: format!("it could not start: {refusal}; {}", refusal.recovery()),
+        }
+    }
+
     /// Which room the work was done in. The node id is that room's
     /// address: a delegate's identity is where it worked.
     #[must_use]
@@ -297,6 +309,33 @@ mod tests {
         )
         .unwrap();
         assert_eq!(Handback::from_signal(&ordinary).unwrap(), None);
+    }
+
+    /// collab D19: the parent reads the refusal's code and recovery, and
+    /// the line reads back as the stop it is.
+    #[test]
+    fn a_child_that_could_not_start_comes_back_stopped_with_the_refusal() {
+        let refusal = AxError::failure(
+            AxCode::ModelUnchosen,
+            "choose the main model",
+            "no model is chosen for this tag",
+        )
+        .with_recovery("pick a model for this tag");
+        let back = Handback::unstarted(claim("lab/helper"), &refusal);
+        let signal = back
+            .signal(
+                SignalId::parse("handback-5").unwrap(),
+                Address::parse("lab/room1").unwrap(),
+                TimeMs::new(95),
+            )
+            .unwrap();
+        let text = signal.payload().as_map()["text"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        assert!(text.contains("E_MODEL_UNCHOSEN"), "{text}");
+        assert!(text.contains("pick a model for this tag"), "{text}");
+        assert_eq!(Handback::from_signal(&signal).unwrap(), Some(back));
     }
 
     /// The rule `Claim::verified` holds, reached through this door: the

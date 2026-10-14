@@ -20,6 +20,7 @@ fn tool() -> (
     let delegates = std::sync::Arc::new(std::sync::Mutex::new(DelegateDesk::new(
         Depth::Root,
         Address::parse("lab").unwrap(),
+        crate::delegate_tool::StartCheck::new(|_room: &Address| Ok(())),
     )));
     let tool = WorkshopTool::new(
         std::sync::Arc::clone(&desk),

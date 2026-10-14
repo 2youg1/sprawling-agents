@@ -119,6 +119,15 @@ fn ledger_lines(ledger_dir: &std::path::Path) -> Vec<serde_json::Value> {
         .collect()
 }
 
+/// Whether a run started in `room` itself. The letter a refused child
+/// sends names it as the sender, so a run it wakes in the parent's room
+/// mentions it too.
+fn started_in(lines: &[serde_json::Value], room: &str) -> bool {
+    lines
+        .iter()
+        .any(|line| line["kind"] == "run_started" && line["addr"] == room)
+}
+
 fn dispatch_lead(model: Option<&str>) -> wire::Command {
     wire::Command::Dispatch {
         addr: Address::parse("lab/lead").unwrap(),
@@ -205,15 +214,12 @@ fn a_child_no_attached_model_may_serve_comes_back_to_its_parent_as_a_stopped_han
     worker.land_the_rest().unwrap();
 
     let lines = ledger_lines(&report.ledger_dir);
-    assert_eq!(
-        position_of(&lines, "run_started", "lab/helper"),
-        None,
-        "the child never started"
-    );
+    assert!(!started_in(&lines, "lab/helper"), "the child never started");
     let handback = lines
         .iter()
         .find(|line| {
-            line["kind"] == "signal_enqueued" && line.to_string().contains("\"handback\":\"stopped\"")
+            line["kind"] == "signal_enqueued"
+                && line.to_string().contains("\"handback\":\"stopped\"")
         })
         .map(ToString::to_string);
     let Some(handback) = handback else {
@@ -264,11 +270,18 @@ fn a_delegation_to_a_malformed_room_or_an_unknown_resident_is_refused_as_the_too
             .map(ToString::to_string)
             .unwrap_or_default()
     };
-    assert!(answer("tu_1").contains("E_INVALID_ARGS"), "{}", answer("tu_1"));
-    assert!(answer("tu_2").contains("E_CONFIG_INVALID"), "{}", answer("tu_2"));
-    assert_eq!(
-        position_of(&lines, "run_started", "lab/helper"),
-        None,
+    assert!(
+        answer("tu_1").contains("E_INVALID_ARGS"),
+        "{}",
+        answer("tu_1")
+    );
+    assert!(
+        answer("tu_2").contains("E_CONFIG_INVALID"),
+        "{}",
+        answer("tu_2")
+    );
+    assert!(
+        !started_in(&lines, "lab/helper"),
         "nothing started in the refused room"
     );
 }

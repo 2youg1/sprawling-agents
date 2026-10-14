@@ -17,6 +17,7 @@ use std::sync::{Arc, Mutex};
 
 use kernel::{Address, AxError, RunId};
 
+use super::super::dispatching::handback::Unstarted;
 use super::super::{Assignment, Continuation, Owing, RunWorker, held};
 
 const DELEGATE_DESK: &str = "read the delegate desk";
@@ -113,7 +114,9 @@ impl RunWorker {
     ///
     /// A child that cannot be started is noted rather than returned: the
     /// call already answered the model, and failing the relay over it
-    /// would punish every other lane's lines.
+    /// would punish every other lane's lines. The room that asked is told
+    /// all the same, by a stopped handback that carries the refusal
+    /// (collab D19, accounting D54).
     ///
     /// # Errors
     /// A desk left locked by a thread that died.
@@ -127,10 +130,17 @@ impl RunWorker {
                 .workshops
                 .insert(handing.room.clone(), underway);
         }
-        let fresh = held(&handing.delegates, DELEGATE_DESK)?.hand_over();
+        // Where the fresh requests start on the desk: a request's place
+        // there names its handback when it cannot start.
+        let (first, fresh) = {
+            let mut desk = held(&handing.delegates, DELEGATE_DESK)?;
+            let fresh = desk.hand_over();
+            (desk.asked().len().saturating_sub(fresh.len()), fresh)
+        };
         let (room, policy, taint) = (handing.room.clone(), handing.policy, handing.taint.clone());
+        let chain = handing.owing.knock_chain().clone();
         let owing = handing.owing.child(room.clone());
-        for work in fresh {
+        for (offset, work) in fresh.into_iter().enumerate() {
             let child = work.room.clone();
             self.note(
                 runtime::diagnostics::Level::Effect,
@@ -158,7 +168,7 @@ impl RunWorker {
                     owing.child(room.clone()),
                 )
             });
-            if let Err(err) = started {
+            if let Err(refusal) = started {
                 self.note(
                     runtime::diagnostics::Level::Refuse,
                     "collab::delegate",
@@ -166,9 +176,28 @@ impl RunWorker {
                         "{} handed work to {} and it could not start: {}",
                         room.as_str(),
                         child.as_str(),
-                        err.subject()
+                        refusal.subject()
                     ),
                 );
+                let unstarted = Unstarted {
+                    parent: &room,
+                    asker: run,
+                    place: first.saturating_add(offset),
+                    child: &child,
+                    refusal: &refusal,
+                };
+                if let Err(err) = self.deliver_unstarted(unstarted, policy, &chain) {
+                    self.note(
+                        runtime::diagnostics::Level::Refuse,
+                        "collab::delegate",
+                        &format!(
+                            "{} was not told that {} could not start: {}",
+                            room.as_str(),
+                            child.as_str(),
+                            err.subject()
+                        ),
+                    );
+                }
             }
         }
         Ok(())

@@ -139,6 +139,7 @@ fn a_refused_ask_in_the_middle_of_hand_next_counts_nothing_as_handed() {
         crate::delegate_tool::DelegateDesk::new(
             kernel::Depth::Root,
             Address::parse("lab").unwrap(),
+            crate::delegate_tool::StartCheck::new(|_room: &Address| Ok(())),
         ),
     );
     let err = underway.hand_next(&BTreeSet::new()).unwrap_err();
