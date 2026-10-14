@@ -168,7 +168,7 @@ impl CommandDesk {
 | §8-50 | `accounting::worker::credentials::tests::endpoints`、`accounting::worker::workbench::engine` |
 | §8-55 | `accounting::worker::commanding::configure` |
 | §8-60 | `accounting::worker::commanding::tests::revealing` |
-| §8-62 | `accounting::worker::credentials::probing`、`accounting::worker::credentials::tests::probing`、`accounting::tuning`、`accounting::tuning::tests` |
+| §8-62 | `accounting::worker::credentials::endpoints::admitting`、`accounting::worker::credentials::probing`、`accounting::worker::credentials::tests::probing`、`accounting::tuning`、`accounting::tuning::tests` |
 | §8-64 | `accounting::worker::commanding::machine` |
 | §8-71 | `accounting::worker::credentials::endpoints::choosing` |
 | §8-79 | `accounting::worker::dispatching::session_shape`、`accounting::worker::dispatching::session_shape::tests` |
