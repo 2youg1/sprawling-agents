@@ -43,7 +43,7 @@ impl EndpointBook {
     pub fn choices(&self) -> impl Iterator<Item = (ModelTag, &str, &ModelEntry)>;
 }
 pub fn attached_payload(&AttachedEndpoint) -> Result<Payload, AxError>;      // endpoint_attached 唯一成形处
-pub fn selected_payload(ModelTag, &str, &ModelEntry, Option<CeilingSource>) -> Result<Payload, AxError>;  // model_selected 同上
+pub fn selected_payload(ModelTag, &str, &ModelEntry) -> Result<Payload, AxError>;  // model_selected 同上；window_from 与 ceiling_from 取自 ModelEntry（§8-17、D37）
 ```
 
 - **一次取模型只答一问**：用哪个模型、在哪个端点上。「不答时怎么办」不是本 crate 的问题（§8-11）。
@@ -60,7 +60,7 @@ pub fn selected_payload(ModelTag, &str, &ModelEntry, Option<CeilingSource>) -> R
 /-!
 ### 8-11 不设备用端点
 
-一个标签只选一个端点与一个模型；`selected_payload` 直接收 `ceiling_from: Option<CeilingSource>`。线上没有设备用端点的字段，而一个在生产里只有一臂的「两臂的值」，另一臂就是给一个还不存在的设置面预留的权威。**带 `fallback_endpoint`／`fallback_model` 键的记录照样读得回**：`read_choice` 不取这两个键，与它对待任何本书不拥有的键同一口径，测试钉住「带着这两个键的 `model_selected` 仍读成它所述的那次选择」。
+一个标签只选一个端点与一个模型；`selected_payload` 只收这一个选择，两个数的来处随 `ModelEntry` 一起到达。线上没有设备用端点的字段，而一个在生产里只有一臂的「两臂的值」，另一臂就是给一个还不存在的设置面预留的权威。**带 `fallback_endpoint`／`fallback_model` 键的记录照样读得回**：`read_choice` 不取这两个键，与它对待任何本书不拥有的键同一口径，测试钉住「带着这两个键的 `model_selected` 仍读成它所述的那次选择」。
 
 **重开的参数**：设置面上有人能为一个标签指定备用端点与备用模型，且 `runtime` 侧有一处在失败时读它。那时备用端点与 §8-6 的准入一起设计，因为何时改投备用端点只能由退避节奏回答。
 -/

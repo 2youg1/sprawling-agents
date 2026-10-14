@@ -6,13 +6,13 @@
 /-!
 # gateway::provider::ceiling
 
-规定 `provider::ceiling`（`crates/gateway/src/provider/ceiling.rs`）：关于一次调用输出上限的几种说法谁胜、是谁说的。本文件是 `crates/gateway/Spec.lean` 的一个分部；别处引它的决定作 `gateway D<n>`。
+规定 `provider::ceiling`（`crates/gateway/src/provider/ceiling.rs`）：关于一个模型的上下文窗口与输出上限的几种说法谁胜、是谁说的。本文件是 `crates/gateway/Spec.lean` 的一个分部；别处引它的决定作 `gateway D<n>`。
 
-§8-17（`crates/gateway/spec/Provider.lean`）写这架梯子的接口与理由；本分部是它的模型：人填 → 上游陈述 → 钉版目录与预置表 → 策略缺省，后两档只在这一面要一个数时作答。
+§8-17（`crates/gateway/spec/Provider.lean`）写这架梯子的接口与理由；本分部是上限那一半的模型：人填 → provider 的列表 → 上一次登记 → 钉版目录与预置表 → 策略缺省，后两档只在这一面要一个数时作答。窗口走同一架梯子，只是没有策略缺省一档、也不看是哪一面（§8-17），它没有跨臂的性质，所以不另建模。
 
-这里没有状态机：`resolve` 是一架梯子，每一档压过下一档是它的一条 `match` 臂，读定义即可，不另写定理。证明的是两条跨过所有臂的性质：要这个字段的一面恒得到一个数（`a_face_that_needs_a_figure_always_gets_one`），本城钉下的数与策略缺省只在那样的一面上作答（`the_city_states_a_figure_only_where_the_face_needs_one`）。Rust 的 `resolve` 取 `Target`（`base_url`、`id`、`wire`），在梯子走到那一档时才问预置表；模型把预置表的答案当作一个值传进来，结果相同。平台：纯判定，三个平台相同。
+这里没有状态机：`resolve` 是一架梯子，每一档压过下一档是它的一条 `match` 臂，读定义即可，不另写定理。证明的是三条跨过所有臂的性质：要这个字段的一面恒得到一个数（`a_face_that_needs_a_figure_always_gets_one`），本城钉下的数与策略缺省只在那样的一面上作答（`the_city_states_a_figure_only_where_the_face_needs_one`），上一次登记里不是人说的数不在「上一次登记」那一档作答（`an_earlier_figure_nobody_stated_never_answers`，gateway D37）。Rust 的 `Figures::resolve` 取 `Target`（`base_url`、`id`、`wire`），在梯子走到那一档时才问预置表；模型把预置表的答案当作一个值传进来，结果相同。平台：纯判定，三个平台相同。
 
-派生检查：`provider::ceiling` 的 proptest `the_ceiling_ladder_keeps_the_lean_properties` 走遍模型的输入空间——人、上游、钉版目录各沉默或说一个数，预置表答或不答（厂商主机、中转站、这台电脑、谁都没写过的 id），三面——对每个输入断言两条性质；它先对一个在可选字段的面上也以策略缺省作答的 `resolve` 变红过。`the_higher_rung_wins_and_says_that_it_did` 等测试各判一个输入，钉住每一档的答案。
+派生检查：`provider::ceiling` 的 proptest `the_ceiling_ladder_keeps_the_lean_properties` 走遍模型的输入空间——人、provider 的列表、上一次登记（五种来处）、钉版目录各沉默或说一个数，预置表答或不答（厂商主机、中转站、这台电脑、谁都没写过的 id），三面——对每个输入断言三条性质；它先对一个在可选字段的面上也以策略缺省作答的 `resolve` 变红过。`the_higher_rung_wins_and_says_that_it_did` 等测试各判一个输入，钉住每一档的答案。
 -/
 
 namespace Gateway.Provider.Ceiling
@@ -26,13 +26,22 @@ structure Ceiling where
 def Ceiling.new (tokens : Nat) : Option Ceiling :=
   if h : 0 < tokens then some ⟨tokens, h⟩ else none
 
-/-- 谁说出了一次调用所带的上限（`provider::ceiling::CeilingSource`），从高到低。 -/
-inductive CeilingSource where
+/-- 谁说出了一个模型的一个数（`provider::ceiling::FigureSource`），从高到低。 -/
+inductive FigureSource where
   | Person
   | Upstream
+  | Registered
   | Preset
   | Policy
   deriving DecidableEq, Repr
+
+/-- 一个登记过的数是不是人说的（`FigureSource::carried`）：只有人这次说的与上一次登记沿下来的数在「上一次登记」那一档作答；provider 的列表与本城的表说的数，下一次登记时再去问那一档。 -/
+def FigureSource.carried : FigureSource → Bool
+  | .Person => true
+  | .Registered => true
+  | .Upstream => false
+  | .Preset => false
+  | .Policy => false
 
 /-- 请求写在哪一面（`kernel::DialectKind`）。kernel 的 Lean 规格（`crates/kernel/Spec.lean`）不定义这个类型，这里照它的三个变体写一份模型里的类型。 -/
 inductive DialectKind where
@@ -55,22 +64,35 @@ def field_on : DialectKind → Field
 
 /-- 一次调用所带的上限（`provider::ceiling::OutputCeiling`）：一个数字与说出它的那一档，或者不写这个字段、由供应方按模型取缺省。 -/
 inductive OutputCeiling where
-  | Sent (tokens : Ceiling) (source : CeilingSource)
+  | Sent (tokens : Ceiling) (source : FigureSource)
   | ProviderDefault
 
-/-- 人与上游说过的话（`provider::ceiling::Stated`）。 -/
+/-- 上一次登记的那个数与它当时的来处（`ModelEntry.max_output_tokens` 与 `ModelEntry.ceiling_from`）。 -/
+structure Registration where
+  tokens : Ceiling
+  source : FigureSource
+
+/-- 上一次登记在梯子上作答的那个数：来处是人时才有（`provider::ceiling` 里的 `carried`）。 -/
+def Registration.answer (earlier : Option Registration) : Option Ceiling :=
+  match earlier with
+  | some reg => if reg.source.carried then some reg.tokens else none
+  | none => none
+
+/-- 本城的表之上的三档（`provider::ceiling` 里私有的 `Stated`）：人这次填的、provider 列表的那一行、上一次登记里作答的那个数。 -/
 structure Stated where
   person : Option Ceiling
   upstream : Option Ceiling
+  registered : Option Ceiling
 
 /-- `OutputCeiling::resolve`。`pinned` 是钉版目录按精确 id 的那一行；`preset` 是 `preset::ceiling_for(target.base_url, target.id)` 的答案，与 `pinned` 是同一档的两个索引；`policy` 是 `kernel::consts_policy::OUTPUT_CEILING_DEFAULT`。答 `none` 只在这一面要一个数而 `policy` 本身是零时，而 policy 模块自己的测试禁止那个状态。 -/
 def resolve (stated : Stated) (pinned preset : Option Ceiling) (policy : Nat)
     (wire : DialectKind) : Option OutputCeiling :=
-  match stated.person, stated.upstream, field_on wire with
-  | some tokens, _, _ => some (.Sent tokens .Person)
-  | none, some tokens, _ => some (.Sent tokens .Upstream)
-  | none, none, .Optional => some .ProviderDefault
-  | none, none, .Required =>
+  match stated.person, stated.upstream, stated.registered, field_on wire with
+  | some tokens, _, _, _ => some (.Sent tokens .Person)
+  | none, some tokens, _, _ => some (.Sent tokens .Upstream)
+  | none, none, some tokens, _ => some (.Sent tokens .Registered)
+  | none, none, none, .Optional => some .ProviderDefault
+  | none, none, none, .Required =>
     match pinned.or preset with
     | some tokens => some (.Sent tokens .Preset)
     | none => (Ceiling.new policy).map (fun tokens => .Sent tokens .Policy)
@@ -87,27 +109,44 @@ theorem a_face_that_needs_a_figure_always_gets_one (stated : Stated)
     cases hu : stated.upstream with
     | some tokens => exact ⟨tokens, .Upstream, rfl⟩
     | none =>
-      rw [required]
-      cases hr : pinned.or preset with
-      | some tokens => exact ⟨tokens, .Preset, rfl⟩
-      | none => exact ⟨⟨policy, positive⟩, .Policy, by simp [Ceiling.new, positive]⟩
+      cases hr : stated.registered with
+      | some tokens => exact ⟨tokens, .Registered, rfl⟩
+      | none =>
+        rw [required]
+        cases hc : pinned.or preset with
+        | some tokens => exact ⟨tokens, .Preset, rfl⟩
+        | none => exact ⟨⟨policy, positive⟩, .Policy, by simp [Ceiling.new, positive]⟩
 
 /-- 本城钉下的数与策略缺省只在这一面要一个数时作答。 -/
 theorem the_city_states_a_figure_only_where_the_face_needs_one (stated : Stated)
     (pinned preset : Option Ceiling) (policy : Nat) (wire : DialectKind) (tokens : Ceiling)
-    (source : CeilingSource)
+    (source : FigureSource)
     (answered : resolve stated pinned preset policy wire = some (.Sent tokens source))
     (fromCity : source = .Preset ∨ source = .Policy) :
     field_on wire = .Required := by
   unfold resolve at answered
-  cases hp : stated.person <;> cases hu : stated.upstream <;> cases hf : field_on wire <;>
-    simp_all
+  cases hp : stated.person <;> cases hu : stated.upstream <;> cases hr : stated.registered <;>
+    cases hf : field_on wire <;> simp_all
   all_goals
     cases fromCity <;> simp_all
 
+/-- 上一次登记里不是人说的数——provider 当时的陈述、本城的表或策略缺省——不在「上一次登记」那一档作答：梯子答的与没有那次登记时一样，于是一个旧的缺省压不过本城如今的表，更压不过 provider 后来说的数。 -/
+theorem an_earlier_figure_nobody_stated_never_answers (person upstream : Option Ceiling)
+    (earlier : Registration) (pinned preset : Option Ceiling) (policy : Nat)
+    (wire : DialectKind) (derived : earlier.source.carried = false) :
+    resolve ⟨person, upstream, Registration.answer (some earlier)⟩ pinned preset policy wire
+      = resolve ⟨person, upstream, none⟩ pinned preset policy wire := by
+  simp [Registration.answer, derived]
+
 /-- 一个目录与预置表都不认识的模型，在 messages 面上以策略缺省叫得通。 -/
-example : resolve ⟨none, none⟩ none none 8192 .Anthropic
+example : resolve ⟨none, none, none⟩ none none 8192 .Anthropic
     = some (.Sent ⟨8192, by decide⟩ .Policy) := by
   simp [resolve, field_on, Ceiling.new]
+
+/-- 人在上一次登记时填的数，在人这次没填、provider 也没说时作答，并记作「上一次登记」。 -/
+example (tokens : Ceiling) :
+    resolve ⟨none, none, Registration.answer (some ⟨tokens, .Person⟩)⟩ none none 8192 .OpenAi
+      = some (.Sent tokens .Registered) := by
+  simp [resolve, Registration.answer, FigureSource.carried]
 
 end Gateway.Provider.Ceiling

@@ -121,7 +121,8 @@ pub enum InputKinds { #[default] Text, TextImage }
 pub struct ModelSelected { pub tag: ModelTag, pub endpoint: String, pub model: String,
                            pub context_tokens: u64,
                            #[serde(default)] pub max_output_tokens: Option<u64>, // 总是写出，缺席写 null
-                           pub ceiling_from: Option<String>,   // person|upstream|preset|policy；缺席即省略
+                           pub window_from: Option<String>,    // person|upstream|registered|preset；窗口未知时缺席，缺席即省略
+                           pub ceiling_from: Option<String>,   // person|upstream|registered|preset|policy|provider；缺席即省略
                            #[serde(default)] pub input: InputKinds, // 旧行没有这个键，读作 Text
                            pub input_price: UsdMicros, pub output_price: UsdMicros,
                            pub cache_read_price: UsdMicros, pub cache_write_price: UsdMicros }
