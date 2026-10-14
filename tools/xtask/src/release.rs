@@ -301,14 +301,16 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
                     gate: "release",
                     location: format!("{rel}:{}", number.saturating_add(1)),
                     rule: "a published file states the decision, never the occasion: not one \
-                           machine, not one sitting, not a message to a person"
+                           machine, not one sitting, not a plan's label, not a message to a \
+                           person"
                         .to_owned(),
                     violation: format!("says `{shape}`"),
                     alternative: "report a measurement against the machine class it came \
                                   from; give a ruling and its reason without the sitting \
-                                  that produced it; and where a question is open, say what \
-                                  about the interface is undecided rather than who is to \
-                                  decide it"
+                                  that produced it; write the reason or the criterion a \
+                                  plan's label stood for, or cite the SPEC section that \
+                                  holds it; and where a question is open, say what about \
+                                  the interface is undecided rather than who is to decide it"
                         .to_owned(),
                 });
             }

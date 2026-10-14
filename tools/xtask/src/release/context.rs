@@ -12,9 +12,9 @@
 //! them closely.
 //!
 //! What can be checked mechanically is collected into two closed tables
-//! of literal shapes and one rule about a digit. What cannot is said out
-//! loud at the bottom of this file rather than left for somebody to
-//! discover.
+//! of literal shapes, one rule about a digit and one about the word a
+//! plan's label follows. What cannot is said out loud at the bottom of
+//! this file rather than left for somebody to discover.
 
 /// The spellings that turn a product document into a working record.
 ///
@@ -98,6 +98,9 @@ pub(super) fn working_record(line: &str) -> Option<&'static str> {
     if numbered_sitting(&swallowed) {
         return Some("会话 <n>");
     }
+    if plan_label(line) {
+        return Some("roadmap <label>");
+    }
     WORKING_SHAPES
         .iter()
         .chain(ADDRESSEE_SHAPES.iter())
@@ -125,6 +128,58 @@ fn numbered_sitting(line: &str) -> bool {
             matches!(window, ['会', '话', ' ', first, second]
             if first.is_ascii_digit() && second.is_ascii_digit())
         })
+}
+
+/// The word a plan label follows, lower-cased.
+const PLAN_WORD: &str = "roadmap";
+
+/// Whether a line cites a plan's label: the word `roadmap` in any case,
+/// not inside a longer word, then one or more spaces, then a section
+/// sign or one to three capitals and a digit.
+///
+/// **A plan label is an index into a document this tree does not
+/// have**, as a numbered sitting is: it tells a reader the plan exists
+/// and leaves the sentence unreadable without it.
+///
+/// Anchored on the word because a label alone has no shape: `M2` is a
+/// startup milestone one specification defines, `TF1` a durability
+/// order another defines, and `W3` a revision of APCA. The city's own
+/// `Roadmap.md` is followed by a dot rather than a space, so naming the
+/// file is not a citation of a plan.
+fn plan_label(line: &str) -> bool {
+    let glyphs: Vec<char> = line.chars().collect();
+    (0..glyphs.len()).any(|at| {
+        let inside_a_word = at
+            .checked_sub(1)
+            .and_then(|before| glyphs.get(before))
+            .is_some_and(char::is_ascii_alphanumeric);
+        !inside_a_word && glyphs.get(at..).is_some_and(opens_with_a_plan_label)
+    })
+}
+
+/// Whether `rest` opens with [`PLAN_WORD`], spaces, and a label.
+fn opens_with_a_plan_label(rest: &[char]) -> bool {
+    let (Some(word), Some(after)) = (rest.get(..PLAN_WORD.len()), rest.get(PLAN_WORD.len()..))
+    else {
+        return false;
+    };
+    let named = word
+        .iter()
+        .zip(PLAN_WORD.chars())
+        .all(|(glyph, letter)| glyph.to_ascii_lowercase() == letter);
+    let spaces = after.iter().take_while(|glyph| **glyph == ' ').count();
+    named && spaces > 0 && after.get(spaces..).is_some_and(is_a_plan_label)
+}
+
+/// Whether `label` opens with a section sign, or with one to three
+/// capitals and a digit.
+fn is_a_plan_label(label: &[char]) -> bool {
+    let capitals = label
+        .iter()
+        .take_while(|glyph| glyph.is_ascii_uppercase())
+        .count();
+    label.first() == Some(&'\u{a7}')
+        || ((1..=3).contains(&capitals) && label.get(capitals).is_some_and(char::is_ascii_digit))
 }
 
 #[cfg(test)]
