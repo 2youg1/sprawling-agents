@@ -100,7 +100,7 @@ pub use provider::{
 pub use remote::{
     DevicePaired, DeviceRevoked, RemoteClosed, RemoteClosing, RemoteOpened, RemoteSessionStarted,
 };
-pub use renewal::CacheRenewed;
+pub use renewal::{CacheRenewed, RenewalOutcome};
 pub use roadmap::{RoadmapMoved, RoadmapStep};
 pub use run::{
     AgentRunIdentity, EvalRun, EvidenceCite, FreezeCause, Opening, RunForked, RunFrozen,

@@ -24,4 +24,4 @@
 mod report;
 mod split;
 
-pub use report::{Attribution, AttributionReport, Unpriced};
+pub use report::{Attribution, AttributionReport, Renewals, Unpriced};

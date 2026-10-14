@@ -34,6 +34,7 @@ pub(crate) const WINDOW_SLOT: &str = "window";
 
 use std::collections::BTreeMap;
 
+use kernel::event::record::{CacheRenewed, RenewalOutcome};
 use kernel::{EventKind, EventRecord, RunId, UsdMicros};
 use serde_json::Value;
 
@@ -55,6 +56,8 @@ pub struct Attribution {
     tool_weights: BTreeMap<String, u64>,
     skill_weights: BTreeMap<String, u64>,
     unpriced: Unpriced,
+    #[serde(default)]
+    renewals: Renewals,
 }
 
 pub struct AttributionReport {
@@ -65,6 +68,7 @@ pub struct AttributionReport {
     pub by_tool: Vec<(String, UsdMicros)>,
     pub by_skill: Vec<(String, UsdMicros)>,
     pub unpriced: Unpriced,
+    pub renewals: Renewals,
 }
 
 /// The model calls that came back with no authoritative amount. They
@@ -77,20 +81,55 @@ pub struct Unpriced {
     pub tokens: u64,
 }
 
+/// The keep-warm renewals the ledger holds, by what each showed about
+/// the cache it was sent to keep (`RenewalOutcome`). They move no money
+/// here: `total` reads `model_returned` alone, and these counts are what
+/// lets a cost view say how many renewals arrived too late (storage D35).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Renewals {
+    pub read: u64,
+    pub late: u64,
+    pub unreported: u64,
+    pub refused: u64,
+}
+
+impl Renewals {
+    fn count(&mut self, outcome: RenewalOutcome) {
+        let slot = match outcome {
+            RenewalOutcome::Read => &mut self.read,
+            RenewalOutcome::Late => &mut self.late,
+            RenewalOutcome::Unreported => &mut self.unreported,
+            RenewalOutcome::Refused => &mut self.refused,
+        };
+        *slot = slot.saturating_add(1);
+    }
+}
+
 impl Attribution {
     pub fn new() -> Attribution {
         Attribution::default()
     }
 
     /// Folds one record in. Only `model_returned` moves money; two other
-    /// kinds set the basis on which the next call is split, and
-    /// `run_frozen` drops the basis of a run that makes no further call.
+    /// kinds set the basis on which the next call is split,
+    /// `run_frozen` drops the basis of a run that makes no further call,
+    /// and `cache_renewed` is counted in `renewals`.
     #[expect(
         clippy::wildcard_enum_match_arm,
-        reason = "four kinds carry money or its basis; the rest of the vocabulary is silent here"
+        reason = "five kinds carry money, its basis or a renewal; the rest of the vocabulary is silent here"
     )]
     pub fn apply(&mut self, record: &EventRecord) -> Result<(), StorageError> {
         match record.kind() {
+            EventKind::CacheRenewed => {
+                // A line this build cannot read still records a renewal
+                // that was sent; what cannot be read is its usage, which
+                // is what `unreported` counts (storage D35).
+                let outcome = match record.data().read::<CacheRenewed>() {
+                    Ok(line) => line.outcome(),
+                    Err(_unreadable) => RenewalOutcome::Unreported,
+                };
+                self.renewals.count(outcome);
+            }
             EventKind::PromptAssembled => {
                 self.segment_weights
                     .insert(record.run(), segment_weights(record.data().as_map()));
@@ -205,6 +244,7 @@ impl Attribution {
             by_tool: quantify(&self.by_tool),
             by_skill: quantify(&self.by_skill),
             unpriced: self.unpriced,
+            renewals: self.renewals,
         }
     }
 }

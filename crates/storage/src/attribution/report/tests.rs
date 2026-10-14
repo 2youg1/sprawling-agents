@@ -205,6 +205,58 @@ fn a_call_with_no_amount_is_counted_as_unpriced_with_its_tokens() {
 }
 
 #[test]
+fn every_renewal_is_counted_by_what_it_showed_and_moves_no_money() {
+    use kernel::event::record::CacheRenewed;
+    use kernel::{CacheCount, ModelUsage, Tokens};
+    let answered = |written: u64| CacheRenewed::Answered {
+        usage: Some(ModelUsage {
+            cache_write_tokens: CacheCount::Reported(Tokens::new(written)),
+            ..ModelUsage::default()
+        }),
+        billed_usd_micros: Some(UsdMicros::new(900)),
+    };
+    let refused = CacheRenewed::Refused {
+        refused: kernel::AxError::failure(
+            kernel::AxCode::Provider,
+            "renew a cached prefix",
+            "rate limited",
+        )
+        .with_recovery("renewal is skipped until the next real request"),
+    };
+    let lines = [
+        serde_json::to_value(answered(0)).unwrap(),
+        serde_json::to_value(answered(4096)).unwrap(),
+        serde_json::to_value(refused).unwrap(),
+        serde_json::json!({ "usage": "not a usage" }),
+    ];
+    let mut attribution = Attribution::new();
+    for (seq, data) in lines.into_iter().enumerate() {
+        attribution
+            .apply(&record(
+                RunId::CITY,
+                "city",
+                seq as u64,
+                EventKind::CacheRenewed,
+                data,
+            ))
+            .unwrap();
+    }
+    let report = attribution.report();
+    assert_eq!(
+        (report.renewals, report.total.get()),
+        (
+            Renewals {
+                read: 1,
+                late: 1,
+                unreported: 1,
+                refused: 1,
+            },
+            0
+        )
+    );
+}
+
+#[test]
 fn tool_weights_belong_to_one_wave_only() {
     let run = RunId::from_bytes([4u8; 16]);
     let mut attribution = Attribution::new();
