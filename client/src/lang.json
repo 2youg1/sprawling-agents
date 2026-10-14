@@ -7115,6 +7115,10 @@
     "en": "{host} did not answer",
     "zh": "{host} 没有答复"
   },
+  "setup_form_refused": {
+    "en": "the city refused this form",
+    "zh": "城市拒绝了这张表单"
+  },
   "setup_probe_read": {
     "en": "what the city found at {host}",
     "zh": "城市在 {host} 上读到的"

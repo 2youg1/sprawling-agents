@@ -16,6 +16,7 @@
 // rows state none of them. A reading that filled in a zero would put a
 // number in front of a person that no provider agreed to.
 
+import type { AxCode } from "../wire";
 import type { WireApi } from "./commands";
 import type { Key } from "./lang";
 
@@ -240,4 +241,17 @@ function byStatus(status: number | null, listed: Probed["failure"]): Key {
   if (status === 404) return "setup_reach_path";
   if (status >= 200 && status < 400) return "setup_reach_ok";
   return "setup_reach_status";
+}
+
+// The codes that say the far side was not reached or did not answer in
+// time. Every other refusal is the city refusing what the form asked
+// for, and saying "did not answer" over it sends a person to look at a
+// network that answered (client D101).
+const UNREACHED: readonly AxCode[] = ["E_PROVIDER", "E_TIMEOUT"];
+
+// Which kind of refusal a code is: one of reachability, drawn beside
+// the probe's reading, or the city's refusal of the form, drawn with its
+// subject under the model table whose rows it is about.
+export function refusalOf(code: AxCode): "reach" | "form" {
+  return UNREACHED.includes(code) ? "reach" : "form";
 }

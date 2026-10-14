@@ -42,7 +42,7 @@
   import type { Enrolment, StoredKey } from "../../../core/enrol";
   import { readAnswer } from "../../../core/answered";
   import { fill, say } from "../../../core/lang";
-  import { normalisedFrom } from "../../../core/probed";
+  import { normalisedFrom, refusalOf } from "../../../core/probed";
   import type { Sent } from "../../../core/probed";
   import type { AxError } from "../../../wire";
   import { ui } from "../../../ui";
@@ -118,6 +118,11 @@
     const sent = endpointOf(draft, null);
     return { endpoint: sent.id, baseUrl: sent.baseUrl, face: sent.dialect };
   });
+  // A refusal of reachability stands beside the probe's reading; the
+  // city's refusal of the form stands under the table whose rows it is
+  // about (client D101).
+  const unreached = $derived(report !== null && refusalOf(report.code) === "reach" ? report : null);
+  const refused = $derived(report !== null && refusalOf(report.code) === "form" ? report : null);
 
   // The vendors the city knows by host. The answer is the city's own
   // table, so the picker offers no address and no face the city would
@@ -367,7 +372,7 @@
   {#if note !== null}
     <p class="text-note text-alert">{note}</p>
   {/if}
-  <Reach probed={answered} error={report} host={hostOf(draft.baseUrl) ?? draft.baseUrl} />
+  <Reach probed={answered} error={unreached} host={hostOf(draft.baseUrl) ?? draft.baseUrl} />
   {#if looking}
     <p class="text-note text-text-quiet">
       {fill(say($lang, "setup_probe_busy"), { host: hostOf(draft.baseUrl) ?? "" })}
@@ -383,6 +388,7 @@
       chosen = rows;
     }}
   />
+  <Reach probed={null} error={refused} host={hostOf(draft.baseUrl) ?? draft.baseUrl} />
 
   <Previews draft={draft} reference={reference} model={chosen[0]?.id ?? facts[0]?.id ?? "<model>"} />
 </form>
