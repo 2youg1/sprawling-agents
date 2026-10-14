@@ -78,10 +78,14 @@ pub fn renewal_due(setting: KeepWarm, cache: CacheUse, lead_ms: u64) -> Option<u
 }
 
 #[cfg(test)]
+#[allow(clippy::arithmetic_side_effects, reason = "test code")]
 mod tests {
     use super::*;
+    use crate::consts_external::PROMPT_CACHE_RENEWAL_MARGIN_SECS;
+    use proptest::prelude::*;
 
     const TTL_MS: u64 = PROMPT_CACHE_TTL_SECS * 1000;
+    const MARGIN_MS: u64 = PROMPT_CACHE_RENEWAL_MARGIN_SECS * 1000;
     const LEAD_MS: u64 = 2_000;
 
     #[test]
@@ -104,5 +108,68 @@ mod tests {
         assert_eq!(first, Some(use_at + TTL_MS - LEAD_MS));
         let renewed = CacheUse::sent(use_at).renewed(use_at + TTL_MS - LEAD_MS);
         assert_eq!(renewal_due(KeepWarm::FiveMinute, renewed, LEAD_MS), None);
+    }
+
+    /// What a door meets, as `Event` in `crates/kernel/spec/KeepWarm.lean`:
+    /// a real request carrying the prefix sent at an instant, or a wake at
+    /// an instant with the lead its endpoint reads then.
+    #[derive(Debug, Clone, Copy)]
+    enum Event {
+        Used { at_ms: u64 },
+        Woke { now_ms: u64, lead_ms: u64 },
+    }
+
+    /// Instants within a few lifetimes of each other, and leads from none
+    /// to longer than a lifetime, so a wake can fall before, at or after
+    /// any renewal's due instant.
+    fn event() -> impl Strategy<Value = Event> {
+        prop_oneof![
+            (0..4 * TTL_MS).prop_map(|at_ms| Event::Used { at_ms }),
+            (0..4 * TTL_MS, 0..2 * TTL_MS)
+                .prop_map(|(now_ms, lead_ms)| Event::Woke { now_ms, lead_ms }),
+        ]
+    }
+
+    fn setting() -> impl Strategy<Value = KeepWarm> {
+        prop_oneof![Just(KeepWarm::Off), Just(KeepWarm::FiveMinute)]
+    }
+
+    proptest! {
+        /// `at_most_one_renewal_per_use`, `every_renewal_leaves_the_margin`
+        /// and `off_sends_nothing` of `crates/kernel/spec/KeepWarm.lean`,
+        /// on any trace of uses and wakes with any lead at each wake. The
+        /// door is driven here as `Door.step` drives it, and the renewals
+        /// are counted from the ones this driver sends.
+        #[test]
+        fn every_trace_keeps_the_lean_properties(
+            setting in setting(),
+            events in proptest::collection::vec(event(), 0..40),
+        ) {
+            let mut cache = None;
+            let mut since_use = 0_u32;
+            for event in events {
+                match event {
+                    Event::Used { at_ms } => {
+                        cache = Some((at_ms, CacheUse::sent(at_ms)));
+                        since_use = 0;
+                    }
+                    Event::Woke { now_ms, lead_ms } => {
+                        let Some((used_ms, kept)) = cache else { continue };
+                        let Some(due) = renewal_due(setting, kept, lead_ms) else { continue };
+                        if due > now_ms {
+                            continue;
+                        }
+                        prop_assert_eq!(setting, KeepWarm::FiveMinute, "Off sent a renewal");
+                        prop_assert!(
+                            due <= (used_ms + TTL_MS).saturating_sub(MARGIN_MS),
+                            "a renewal due at {due} for a use at {used_ms} leaves no margin"
+                        );
+                        since_use += 1;
+                        prop_assert!(since_use <= 1, "a second renewal for the use at {used_ms}");
+                        cache = Some((used_ms, kept.renewed(now_ms)));
+                    }
+                }
+            }
+        }
     }
 }
