@@ -299,6 +299,8 @@ jobs:
       # The binary embeds the bundle, so the archive carries the one a
       # person runs rather than the placeholder page.
       - uses: ./.github/actions/client-artifacts
+        with:
+          want: bundle
       - name: the suite, compiled once
         run: just test-archive target/nextest-archive.tar.zst
       - name: prove every test belongs to exactly one slice

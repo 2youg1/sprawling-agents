@@ -13,27 +13,46 @@
 # workflows used to spell those lines themselves; two were never updated
 # when the gates stopped skipping, and v0.0.6 was cut on a verify job
 # that had never installed the tree it judged.
+#
+# A job that only embeds the bundle asks for `bundle`: the bundle is a
+# function of `client/`, so a cache entry keyed by every file there
+# stands in for `bun install` and the Vite build, which cost the test
+# build 27 s before its compile could start. Only main writes the entry.
 name: client artefacts
 description: >-
   Install the client's dependencies and build the bundle, so the npm and
   render gates judge an artefact instead of refusing its absence.
+inputs:
+  want:
+    description: >-
+      'tree' for the installed dependencies and the bundle, 'bundle' for
+      the bundle alone.
+    default: tree
 runs:
   using: composite
   steps:
+    - name: the bundle, when only the bundle is wanted
+      if: inputs.want == 'bundle'
+      id: bundle
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+      with:
+        path: crates/sprawling/web-dist
+        key: web-dist-${{ runner.os }}-${{ hashFiles('client/**', '!client/node_modules/**') }}
     - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+      if: steps.bundle.outputs.cache-hit != 'true'
     # On Windows bun downloads into the work drive that holds the checkout
     # and restores no cache. Unpacking the 88 MB cache entry into the user
     # profile on the system drive took 30 s; on the work drive it took
     # 6-7 s, and a `bun install` with no cache at all took 7 s, so the
     # entry bought nothing there (`tools/xtask/Spec.lean` D27).
     - name: bun's download directory on the work drive
-      if: runner.os == 'Windows'
+      if: runner.os == 'Windows' && steps.bundle.outputs.cache-hit != 'true'
       shell: pwsh
       run: '"BUN_INSTALL_CACHE_DIR=$(Join-Path $env:RUNNER_TEMP bun-cache)" >> $env:GITHUB_ENV'
     # bun's global download directory, keyed by the lockfile: the same
     # lockfile wants the same bytes, so an exact hit skips the registry.
     - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
-      if: runner.os != 'Windows'
+      if: runner.os != 'Windows' && steps.bundle.outputs.cache-hit != 'true'
       with:
         path: ~/.bun/install/cache
         key: bun-${{ runner.os }}-${{ hashFiles('client/bun.lock') }}
@@ -41,8 +60,15 @@ runs:
     # The recipe runner, because the command below is a recipe. Jobs that
     # already install it pay nothing: the action is a no-op on a hit.
     - uses: taiki-e/install-action@f7e5d7c961414b23f5b25b2da9294395d08513ad # v2
+      if: steps.bundle.outputs.cache-hit != 'true'
       with:
         tool: just
     - name: build the client bundle the render and npm gates judge
+      if: steps.bundle.outputs.cache-hit != 'true'
       shell: bash
       run: just build-web
+    - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+      if: inputs.want == 'bundle' && steps.bundle.outputs.cache-hit != 'true' && github.ref == 'refs/heads/main'
+      with:
+        path: crates/sprawling/web-dist
+        key: web-dist-${{ runner.os }}-${{ hashFiles('client/**', '!client/node_modules/**') }}
