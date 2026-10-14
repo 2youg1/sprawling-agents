@@ -368,6 +368,7 @@ kernel 已有码，语义照 Custody 一节；不新增码。
 - D41 一次等待至多 `HOLD_MAX`（30 s），pre-warm 不论怎样结束都放行等它的调用：`crates/gateway/spec/Concurrency.lean`，在 `HOLD_MAX` 正上方
 - D42 pre-warm 只带共享部分与一条最小的消息，消息上不打断点，只要一个输出 token：`crates/gateway/spec/Concurrency.lean`，§8-40 之后
 - D43 一次等待是 `prefix_held` 这一行，经模型端口交给回合层写下：`crates/gateway/spec/Concurrency.lean`，§8-40 之后
+- D44 委派出的子 run 的第一轮账号从母 run 房间的绑定开始：`crates/gateway/spec/Router.lean`，在 D30 之后
 -/
 
 /-! ## 13 依赖选型
