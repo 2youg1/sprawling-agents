@@ -4,8 +4,9 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 // What a pill under the box decides before anything is drawn: which
-// rows a filter keeps, where a key moves the cursor, which edge the
-// menu hangs from, and the whole value its look draws. The pill is a
+// edge the menu hangs from, what the menu does with the answer of the
+// combobox's filter and key table (`../parts/combobox.ts`, client/spec/
+// Views/Parts.lean §7-5), and the whole value its look draws. The pill is a
 // seat and a look (client D95): `pill.svelte` holds the state and the
 // drawn elements, `pill.look.svelte` draws, and `lookOf` builds the
 // value between them, every role, `aria-*` value and key handler of
@@ -17,7 +18,9 @@ import type { Snippet } from "svelte";
 import { createAttachmentKey } from "svelte/attachments";
 import type { Attachment } from "svelte/attachments";
 
-import type { Choice, Pill } from "./composer";
+import { answer, claims, matching } from "../parts/combobox";
+import type { Keyed } from "../parts/combobox";
+import type { Pill } from "./composer";
 import { FILTER_AFTER } from "./composer";
 
 // One key for every element a seat holds. Svelte keeps one attachment
@@ -28,6 +31,10 @@ export const HOLD = createAttachmentKey();
 // What a key handler reads from the event, and nothing more, so a
 // wiring test presses a key without a DOM.
 export type KeyPress = Pick<KeyboardEvent, "key" | "preventDefault" | "stopPropagation">;
+
+// What the menu's key handler reads: a key as the combobox's table
+// reads it, and the stop that keeps Escape from the window.
+export type MenuPress = Keyed & Pick<KeyboardEvent, "stopPropagation">;
 
 // Where focus went when it left an element, read the same way.
 export interface Left {
@@ -57,8 +64,9 @@ export interface FrameWire {
 // Which edge of the trigger the menu hangs from.
 export type Edge = "left" | "right";
 
-// The bag spread on the filter box of a long list (client/Spec.lean
-// §7-4, the combobox): it keeps the focus and points into the list.
+// The bag spread on the filter box of a long list (client/spec/Views/
+// Parts.lean §7-5, the combobox): it keeps the focus and points into
+// the list.
 export interface FilterWire {
   readonly role: "combobox";
   readonly "aria-label": string;
@@ -69,7 +77,7 @@ export interface FilterWire {
   readonly placeholder: string;
   readonly value: string;
   readonly oninput: (event: { readonly currentTarget: { readonly value: string } }) => void;
-  readonly onkeydown: (event: KeyPress) => void;
+  readonly onkeydown: (event: MenuPress) => void;
   readonly [hold: symbol]: Attachment<HTMLElement>;
 }
 
@@ -83,7 +91,7 @@ export interface ListWire {
   readonly "aria-label": string;
   readonly "aria-describedby": string | undefined;
   readonly "aria-activedescendant": string | undefined;
-  readonly onkeydown: (event: KeyPress) => void;
+  readonly onkeydown: (event: MenuPress) => void;
   readonly onmousedown: (event: Pick<MouseEvent, "preventDefault">) => void;
   readonly [hold: symbol]: Attachment<HTMLElement>;
 }
@@ -177,48 +185,9 @@ export function filtered(spec: Pill): boolean {
   return spec.choices.length > FILTER_AFTER;
 }
 
-// The rows a filter keeps: those whose name, note or value hold the
-// typed text, ignoring case.
-export function rowsOf(choices: readonly Choice[], query: string): readonly Choice[] {
-  const needle = query.trim().toLowerCase();
-  if (needle === "") return choices;
-  return choices.filter((each) => `${each.label} ${each.note ?? ""} ${each.value}`.toLowerCase().includes(needle));
-}
-
 // The cursor inside a list of `total` rows; 0 for an empty list.
 export function cursorOf(at: number, total: number): number {
   return Math.max(0, Math.min(at, total - 1));
-}
-
-// What a key does in the open menu (client/Spec.lean §7-4, the listbox
-// of a combobox): the arrows and Home and End move the cursor, Enter
-// takes the row under it, Escape closes and gives focus back to the
-// trigger, and Tab closes and lets focus go on.
-export type PillKey =
-  | { readonly kind: "move"; readonly to: number }
-  | { readonly kind: "take" }
-  | { readonly kind: "close" }
-  | { readonly kind: "leave" };
-
-export function keyOf(key: string, cursor: number, total: number): PillKey | undefined {
-  switch (key) {
-    case "ArrowDown":
-      return { kind: "move", to: cursorOf(cursor + 1, total) };
-    case "ArrowUp":
-      return { kind: "move", to: cursorOf(cursor - 1, total) };
-    case "Home":
-      return { kind: "move", to: 0 };
-    case "End":
-      return { kind: "move", to: cursorOf(total - 1, total) };
-    case "Enter":
-      return { kind: "take" };
-    case "Escape":
-      return { kind: "close" };
-    case "Tab":
-      return { kind: "leave" };
-    default:
-      return undefined;
-  }
 }
 
 // The edge a menu of `width` hangs from, under a trigger whose left
@@ -264,7 +233,7 @@ export function lookOf(drawing: PillDrawing, held: PillHeld, hands: PillHands): 
 
 function menuOf(drawing: PillDrawing, held: PillHeld, hands: PillHands): MenuLook {
   const { spec, uid, told } = drawing;
-  const rows = rowsOf(spec.choices, held.query);
+  const rows = matching(spec.choices, held.query);
   const cursor = cursorOf(held.at, rows.length);
   const toldId = told === undefined ? undefined : `${uid}-told`;
   const active = rows.length > 0 ? rowId(uid, cursor) : undefined;
@@ -274,25 +243,25 @@ function menuOf(drawing: PillDrawing, held: PillHeld, hands: PillHands): MenuLoo
     spec.pick(value);
     hands.close("opener");
   };
-  const onkeydown = (event: KeyPress): void => {
-    const pressed = keyOf(event.key, cursor, rows.length);
-    if (pressed === undefined) return;
-    switch (pressed.kind) {
-      case "move":
-        event.preventDefault();
-        hands.point(pressed.to);
+  // The filter and the list both hold the focus as the combobox's
+  // search box does, so both answer as its field. Escape back to the
+  // trigger stops here, so the window's Escape - the shell closing a
+  // sheet, the inspector folding - does not answer it too.
+  const onkeydown = (event: MenuPress): void => {
+    const answered = answer(event, "field", cursor, rows.length);
+    if (claims(answered)) event.preventDefault();
+    switch (answered.kind) {
+      case "cursor":
+        hands.point(answered.at);
         return;
       case "take":
-        event.preventDefault();
         take(rows[cursor]?.value);
         return;
       case "close":
-        event.preventDefault();
-        event.stopPropagation();
-        hands.close("opener");
+        if (answered.focus === "opener") event.stopPropagation();
+        hands.close(answered.focus);
         return;
-      case "leave":
-        hands.close("leave");
+      case "pass":
         return;
     }
   };

@@ -14,7 +14,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { answer, claims, lookOf, matching, rowId } from "./combobox";
-import type { Answer, Choice, ComboboxLook, ComboboxView, Hands, Layer } from "./combobox";
+import type { Answer, Choice, ComboboxLook, ComboboxView, Hands, Layer, Pressed } from "./combobox";
 
 const CHOICES: readonly Choice[] = [
   { value: "deepseek-v4", label: "deepseek-v4", note: "128k" },
@@ -23,6 +23,11 @@ const CHOICES: readonly Choice[] = [
 ];
 
 const MOVES = ["ArrowDown", "ArrowUp", "Home", "End"] as const;
+
+// Every key the table answers, and one it leaves to the box.
+const KEYS = [...MOVES, "Enter", "Escape", "Tab", "a"] as const;
+
+const settled = (key: string): Pressed => ({ key, isComposing: false });
 
 interface Record {
   readonly acted: Answer[];
@@ -93,7 +98,7 @@ describe("the key table", () => {
     for (let count = 1; count < 7; count += 1)
       for (let cursor = 0; cursor < count; cursor += 1)
         for (const key of MOVES) {
-          const answered = answer(key, "field", cursor, count);
+          const answered = answer(settled(key), "field", cursor, count);
           if (answered.kind !== "cursor" || answered.at < 0 || answered.at >= count || !claims(answered))
             wrong.push(`${key} at ${String(cursor)} of ${String(count)}`);
         }
@@ -101,26 +106,38 @@ describe("the key table", () => {
   });
 
   test("the arrows clamp at both ends rather than wrapping", () => {
-    expect(answer("ArrowDown", "field", 2, 3)).toEqual({ kind: "cursor", at: 2 });
-    expect(answer("ArrowUp", "field", 0, 3)).toEqual({ kind: "cursor", at: 0 });
-    expect(answer("End", "field", 0, 3)).toEqual({ kind: "cursor", at: 2 });
+    expect(answer(settled("ArrowDown"), "field", 2, 3)).toEqual({ kind: "cursor", at: 2 });
+    expect(answer(settled("ArrowUp"), "field", 0, 3)).toEqual({ kind: "cursor", at: 0 });
+    expect(answer(settled("End"), "field", 0, 3)).toEqual({ kind: "cursor", at: 2 });
   });
 
   test("Enter takes the cursor row and Escape closes back to the trigger (enter_adopts_the_cursor, escape_closes_and_keeps_the_value)", () => {
-    expect(answer("Enter", "field", 1, 3)).toEqual({ kind: "take" });
-    expect(answer("Escape", "field", 1, 3)).toEqual({ kind: "close", focus: "opener" });
-    expect(claims(answer("Escape", "field", 1, 3))).toBe(true);
+    expect(answer(settled("Enter"), "field", 1, 3)).toEqual({ kind: "take" });
+    expect(answer(settled("Escape"), "field", 1, 3)).toEqual({ kind: "close", focus: "opener" });
+    expect(claims(answer(settled("Escape"), "field", 1, 3))).toBe(true);
   });
 
   test("Tab closes and lets the focus leave, unclaimed (tab_lets_the_focus_leave)", () => {
-    const tab = answer("Tab", "field", 1, 3);
+    const tab = answer(settled("Tab"), "field", 1, 3);
     expect(tab).toEqual({ kind: "close", focus: "leave" });
     expect(claims(tab)).toBe(false);
   });
 
   test("the trigger answers Escape alone", () => {
-    expect(answer("Escape", "trigger", 0, 3)).toEqual({ kind: "close", focus: "opener" });
-    for (const key of [...MOVES, "Enter", "Tab", "a"]) expect(answer(key, "trigger", 0, 3)).toEqual({ kind: "pass" });
+    expect(answer(settled("Escape"), "trigger", 0, 3)).toEqual({ kind: "close", focus: "opener" });
+    for (const key of KEYS.filter((each) => each !== "Escape")) expect(answer(settled(key), "trigger", 0, 3)).toEqual({ kind: "pass" });
+  });
+
+  test("every key an input method is composing passes unclaimed, wherever it lands (only_settled_keys_act)", () => {
+    const taken: string[] = [];
+    for (const origin of ["trigger", "field"] as const)
+      for (let count = 0; count < 7; count += 1)
+        for (let cursor = 0; cursor < Math.max(1, count); cursor += 1)
+          for (const key of KEYS) {
+            const answered = answer({ key, isComposing: true }, origin, cursor, count);
+            if (answered.kind !== "pass" || claims(answered)) taken.push(`${key} on the ${origin} at ${String(cursor)} of ${String(count)}`);
+          }
+    expect(taken).toEqual([]);
   });
 });
 
