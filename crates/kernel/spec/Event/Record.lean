@@ -643,6 +643,37 @@ pub enum WaitEnd { Reply { reply: SignalId }, Timeout, Left }   // 回信到了�
 **重开参数**：一个 run 可以同时等两封回信时，重议「至多一个未配对的 `started`」。
 -/
 
+/-! D60 一次端点门前的等待是一行 record-only 的 `prefix_held`，种类表的行与实现同一次改动落地
+
+**决定**：一个种类（追加在 `ALL` 末尾，只入账），写方是 runtime 的回合层：一次尝试返回之后（成功与失败两臂），它问模型端口的 `prefix_held`（`crates/kernel/spec/Model.lean` D59），有就写这一行，`run` 是那次尝试的 run，`addr` 是它的房间，位置紧跟那次尝试的 `model_called`、在 `model_returned` 或那次失败之前：
+
+```rust
+pub struct PrefixHeld {
+    pub waited_us: u64,              // 从到门前到被放行，注入的单调时钟上的整数微秒
+    pub ended: PrewarmEnd,           // 等的那次 pre-warm 怎样结束
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sent: Option<PrewarmSent>,   // 只在发 pre-warm 的那次调用的行上
+}
+#[serde(rename_all = "snake_case")]
+pub enum PrewarmEnd { Answered, Refused, TimedOut, Abandoned }
+#[serde(untagged)]
+pub enum PrewarmSent {               // 先试 Refused，同 CacheRenewed：Answered 的字段全可缺
+    Refused { refused: AxError },
+    Answered { usage: Option<ModelUsage>, billed_usd_micros: Option<UsdMicros> },
+}
+```
+
+载荷住 `crates/kernel/src/event/record/renewal.rs` 旁的一个新文件，与 `CacheRenewed` 同族；窗类是 `RecordOnly`，因为等待不改任何一次请求的字节。`model_returned.took_us` 从尝试发出算起，包含这段等待。
+
+**现状**：这一行由 gateway D43 定下，种类、载荷与 `spec/Event/Kind.lean` 的表的行都还没有；它们与写方在同一次改动里落地（D32 的做法），因为一张写着没有变体的行的表会让 `xtask specalign` 红。
+
+**理由**：人看见一个子 run 晚出发几秒，要能在它自己的历史里读到为什么；pre-warm 是一次真请求，它的写价要进城的历史。花费只在发它的那一行，一笔钱只入一次账。
+
+**被否**：①挂在 `model_returned` 上作一个可缺席的键（D20 的做法）：调用失败时没有那一行，等待与花费却发生了；②复用 `cache_renewed`：续期重发一段已缓存的前缀、不让它过期，pre-warm 在调用之前写一段冷前缀，一个种类两种意思；③每个跟随者的行都带花费：同一笔钱记 N 次。
+
+**重开参数**：一次调用能等两次 pre-warm（例如共享部分分两层各自 pre-warm）时，重议一次尝试一行。
+-/
+
 /-! D38 一封信落在哪里是一行 record-only 的 `signal_landed`，紧跟在它的 `signal_enqueued` 之后
 
 **决定**：一个种类（追加在 `ALL` 末尾，只入账），写方是记账线程把信投进房间的每一处，三处读同一个判定（`accounting::worker::waking::landing`）：lane 经 relay 发出的信（`waking` 的 `deliver_sent`），子房间交接回父房间的信（`dispatching::handback` 经 `settling::landing::discharging`），以及一次落定里投递的信（`settling::landing` 的 `Then::Deliver`，例如计划节点变红时的阻塞通知）。它在投递、决定敲不敲门之后写；`run` 与 `who` 同那一行 `signal_enqueued`，`addr` 是收信房间：
