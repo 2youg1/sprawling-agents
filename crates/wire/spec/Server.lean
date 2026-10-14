@@ -153,6 +153,7 @@ pub commands: Arc<dyn Fn(WireCommand, Reply) -> Result<(), AxError> + Send + Syn
 - **`CityAnswer.buildings: Vec<BuildingProgress>`**：每栋楼一行，携 `Progress` 与 `problems`。解析不出的行进 `problems` 并照显——悄悄丢掉读不懂的行，等于按一个没人选过的分母报进度。
 - **五维成本携权威总额**：`CostAnswer.total` 与 actor、segment、tool、skill 四个维度各自求和相等；`by_run` 只带活跃的跑与花得最多的前几个（`crates/sprawling/Spec.lean` §8-90），和可以小于 `total`。界面按 `total` 算占比而不自己归一，未归因余额与列表之外的跑因此都看得见。
 - **无报价的调用单独报数**：`CostAnswer.unpriced: UnpricedCalls { calls, tokens }` 是账本上没有权威计费额的模型调用次数与它们的 token 总数（`storage::Attribution` 的 `unpriced` 原样上线）。它们不进 `total`，所以缺了这一项，一座只用订阅登录或本地模型的城跑了多少次都读作「没花钱」；界面据 `calls > 0` 说「有调用没有报价」并给出 token 数，而不是把 `$0.00` 当作量出来的数。
+- **保温续期在总额里单列一行**：`CostAnswer.renewals: Renewals { billed, read, late, unreported, refused }` 是 `storage::Attribution` 的 `renewals` 原样上线（storage D35、D36）。`billed` 已在 `total` 与各维度里（维度里记在房间与 `keep_warm` 桶下），界面把它画成总额之内带标签的一行，而不是再加一次；四格的和是续期的次数，`late` 是到得太晚、按写价重建了前缀的次数。
 
 - **采用 `broadcast` 而非每连接一个队列**：多个标签页是常态；慢客户端被拉下而不拖住写入方。**丢下的那一段不再静默**：事件流慢过城的会话收到 `ServerFrame::Lagged { from, to }`，按这个区间向账本补拉（§8-41）。三路语义不同，故这三节分开陈述：事件可补、增量与日志恒不可补、会话自己的拒绝根本不走广播。
 

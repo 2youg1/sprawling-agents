@@ -37,7 +37,7 @@ pub fn renewal_due(setting: KeepWarm, cache: CacheUse, lead_ms: u64) -> Option<u
 - 余量防的是 `lead_ms` 量不到的延迟：到期那一刻定时器醒得晚一点、交出续期的线程起得晚一点。
 - 花费只观察、不设门限：续期请求照常记 usage，本模块不读余额也不拦。一次续期的 usage 报出非零的 `cache_write_tokens`，就是它到得太晚、provider 重写了前缀；这条读法住 `kernel::event::record::CacheRenewed` 的 `outcome`，成本视图从 `storage::Attribution` 的 `renewals` 读到次数（`crates/storage/Spec.lean` §8-7）。
 - 设置按城→楼→居民三层梯解析，下层覆盖上层，一层也没说＝`Off`（`crates/city/Spec.lean` §8-4 `[cache]` 一节）。它不进 `FrozenConfig`：续期发生在两次 run 之间，不属于任何一次 run 的冻结面。
-- 记账并经 `kernel::Model` 发出续期的是 `runtime::prefix::warmth`（`crates/runtime/Spec.lean` §8-4-2）。续期由 `accounting::worker::keeping_warm` 在房间落地后按 `renewal_due` 发出，每次续期写一行 `cache_renewed`（`crates/sprawling/Spec.lean` §8-93、§8-112）。
+- 记账并经 `kernel::Model` 发出续期的是 `runtime::prefix::warmth`（`crates/runtime/Spec.lean` §8-4-2）。续期由 `accounting::worker::keeping_warm` 在房间落地后按 `renewal_due` 发出，每次续期写一行 `cache_renewed`（`crates/sprawling/Spec.lean` §8-93、§8-112）；它报出的账单额进成本总额，并在总额里单列一行（`crates/storage/Spec.lean` D36）。
 -/
 
 namespace Kernel.KeepWarm
