@@ -52,6 +52,7 @@
   import Segmented from "../../parts/segmented.svelte";
   import type { Choice } from "../../parts/segmented";
   import { ModelTable, type ModelRow } from "../models";
+  import type { TableAbout } from "../model_rows";
   import Advanced from "./advanced.svelte";
   import { BASE_URL, ID_SHAPE, endpointOf, freshDraft, hostOf, idOf, referenceOf, wireChoices } from "./draft";
   import type { Draft } from "./draft";
@@ -109,6 +110,14 @@
   // (client/Spec.lean D99).
   const called = $derived(normalisedFrom($belief.probed, pending, draft));
   const complete = $derived(ID_SHAPE.test(id) && hostOf(draft.baseUrl) !== null);
+  // What the model table asks the city about each row: the attach this
+  // form would send, so its placeholders are what that attach and the
+  // picks after it register (client D100).
+  const about = $derived.by((): TableAbout | null => {
+    if (!complete) return null;
+    const sent = endpointOf(draft, null);
+    return { endpoint: sent.id, baseUrl: sent.baseUrl, face: sent.dialect };
+  });
 
   // The vendors the city knows by host. The answer is the city's own
   // table, so the picker offers no address and no face the city would
@@ -369,6 +378,7 @@
 
   <ModelTable
     served={facts}
+    {about}
     onChosen={(rows: readonly ModelRow[]) => {
       chosen = rows;
     }}

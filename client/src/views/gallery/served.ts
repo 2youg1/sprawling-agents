@@ -17,7 +17,7 @@
 
 import type { Key } from "../../core/lang";
 import type { ModelFact } from "../../core/probed";
-import type { AxCode, ApprovalClass, ApprovalItem, EndpointsAnswer, ModelFactsSummary } from "../../wire";
+import type { AxCode, ApprovalClass, ApprovalItem, EndpointsAnswer, FiguresLine, ModelFactsSummary } from "../../wire";
 import { ApprovalId, Ceiling, Locator, ServerLabel, TimeMs, Window } from "../../wire";
 import { UNTUNED } from "./configured";
 
@@ -102,6 +102,29 @@ export const PROBED: readonly ModelFact[] = [
     inputModalities: [],
     inputPrice: null,
     outputPrice: null,
+  },
+];
+
+// An id a person typed beside the list, which the endpoint does not
+// list.
+export const TYPED = "house/hidden-1";
+
+// What the city answers for the probed rows and the typed one when the
+// table asks what an untouched box registers (`Query::ModelFigures`):
+// every kind a box can say - a figure with the rung that stated it, the
+// provider's own default ceiling, and a window no rung knows.
+export const FIGURED: readonly FiguresLine[] = [
+  {
+    id: FABLE,
+    window: { tokens: Window.make(204_800), from: "upstream" },
+    ceiling: { sent: { tokens: Ceiling.make(64_000), from: "upstream" } },
+  },
+  { id: NUCLEUS, window: { tokens: Window.make(400_000), from: "upstream" }, ceiling: "provider_default" },
+  { id: MUSE, window: null, ceiling: "provider_default" },
+  {
+    id: TYPED,
+    window: { tokens: Window.make(200_000), from: "preset" },
+    ceiling: { sent: { tokens: Ceiling.make(8192), from: "registered" } },
   },
 ];
 

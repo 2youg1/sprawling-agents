@@ -18,7 +18,7 @@
   import Combobox from "../parts/combobox.svelte";
   import Field from "../parts/field.svelte";
   import { Table, type Column } from "../parts/table";
-  import type { ChoiceLook, ColumnKey, ModelRowLook, ModelTableLook } from "./model_table";
+  import type { ChoiceLook, ColumnKey, FigureLook, ModelRowLook, ModelTableLook } from "./model_table";
 
   const look: ModelTableLook = $props();
 
@@ -68,34 +68,45 @@
   />
 {/snippet}
 
+<!-- The id, and under it, on a row the person named and the
+     endpoint's list does not carry, the sentence that says so. -->
 {#snippet renderId(row: ModelRowLook)}
-  <span class="block whitespace-nowrap font-mono text-note text-text">{row.id}</span>
+  <div class="flex flex-col gap-hair">
+    <span class="block whitespace-nowrap font-mono text-note text-text">{row.id}</span>
+    {#if row.named !== undefined}
+      <span class="whitespace-nowrap text-note text-text-faint">{row.named}</span>
+    {/if}
+  </div>
+{/snippet}
+
+<!-- A figure box, and under it the rung the city answered its
+     placeholder from. -->
+{#snippet figureBox(box: FigureLook)}
+  <div class="flex flex-col gap-hair">
+    <Field
+      label={box.label}
+      labelling="hidden"
+      kind="number"
+      step={1024}
+      mono
+      value={box.value}
+      placeholder={box.placeholder}
+      onInput={box.input}
+    />
+    {#if box.value === "" && box.source !== ""}
+      <span class="whitespace-nowrap text-note text-text-faint">{box.source}</span>
+    {/if}
+  </div>
 {/snippet}
 
 {#snippet renderWindow(row: ModelRowLook)}
-  <Field
-    label={row.window.label}
-    labelling="hidden"
-    kind="number"
-    step={1024}
-    mono
-    value={row.window.value}
-    placeholder={row.window.placeholder}
-    onInput={row.window.input}
-  />
+  <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
+  {@render figureBox(row.window)}
 {/snippet}
 
 {#snippet renderCeiling(row: ModelRowLook)}
-  <Field
-    label={row.ceiling.label}
-    labelling="hidden"
-    kind="number"
-    step={1024}
-    mono
-    value={row.ceiling.value}
-    placeholder={row.ceiling.placeholder}
-    onInput={row.ceiling.input}
-  />
+  <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
+  {@render figureBox(row.ceiling)}
 {/snippet}
 
 <!-- The person's statement first, and under it the provider's own
@@ -160,9 +171,6 @@
       empty={emptyRows}
       selection={table.tick}
     />
-  {/if}
-  {#if look.needed !== undefined}
-    <p class="text-text-faint">{look.needed}</p>
   {/if}
   <Field
     label={look.manual.label}

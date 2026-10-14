@@ -292,14 +292,14 @@ export const UNSTATED: Stated = { contextTokens: null, maxOutputTokens: null, in
 // else is nobody's figure, and absence is what the city reads as "take
 // the catalogue's": a zero would reach the provider as `max_tokens: 0`,
 // which answers with nothing.
-function ceiling(stated: number | null): Ceiling | null {
+export function wireCeiling(stated: number | null): Ceiling | null {
   return stated !== null && Number.isInteger(stated) && stated > 0 ? CeilingSchema.make(stated) : null;
 }
 
 // A window reaches the wire only as a whole positive number, and zero
 // is not one: a window nobody stated and a window of zero used to be
 // the same byte, and the context reminder read every session as full.
-function window(stated: number | null): Window | null {
+export function wireWindow(stated: number | null): Window | null {
   return stated !== null && Number.isInteger(stated) && stated > 0 ? WindowSchema.make(stated) : null;
 }
 
@@ -314,8 +314,8 @@ export function selectModel(
       endpoint: providerName(endpoint),
       model,
       tag,
-      context_tokens: window(stated.contextTokens),
-      max_output_tokens: ceiling(stated.maxOutputTokens),
+      context_tokens: wireWindow(stated.contextTokens),
+      max_output_tokens: wireCeiling(stated.maxOutputTokens),
       input: stated.input,
       idem: mintIdem(),
     },
