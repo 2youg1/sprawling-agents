@@ -226,6 +226,10 @@ pub struct PolicyChanged { pub id: String }   // policy_created／policy_revoked
     Refused { refused: AxError },
     Answered { usage: Option<ModelUsage>, billed_usd_micros: Option<UsdMicros> },
 }
+impl CacheRenewed { pub fn outcome(&self) -> RenewalOutcome; }
+/// 一次续期对它要保住的缓存说明了什么：Read＝读到了；Late＝usage 报出非零的 cache_write_tokens，
+/// 前缀被重写（到得太晚）；Unreported＝回答了但没报写入数；Refused＝provider 拒了。
+pub enum RenewalOutcome { Read, Late, Unreported, Refused }
 ```
 
 结构按族住 `crates/kernel/src/event/record/` 下；哪个 kind 有结构，以那里的类型为准。

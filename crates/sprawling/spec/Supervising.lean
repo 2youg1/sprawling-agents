@@ -246,8 +246,9 @@ pub(in crate::assembly) struct Flight {
 pub(crate) type Door = runtime::prefix::warmth::Warmed<DoorClock>;
 pub(crate) type DoorClock = Box<dyn FnMut() -> Result<TimeMs, AxError> + Send>;
 #[derive(Default)]
-pub(in crate::worker) struct Kept { /* 每个房间一扇在家的门，与门正在外面续期的房间 */ }
+pub(in crate::worker) struct Kept { /* 每个房间一扇在家的门，门正在外面续期的房间，与每个 endpoint 的提前量 */ }
 impl Kept {
+    pub(in crate::worker) fn lead_of(&mut self, endpoint: &str) -> runtime::prefix::warmth::Lead; // 这个 endpoint 的那一个读数，没有就开一个
     pub(in crate::worker) fn keep(&mut self, room: Address, door: Door); // next_due 为 None 的门直接丢弃；这个房间在外面的门作废
     pub(in crate::worker) fn next_due(&self) -> Option<u64>;            // 在家的门里最早的一次续期
     pub(in crate::worker) fn take_due(&mut self, now_ms: u64) -> Vec<(Address, Door)>; // 取出到期的门，记下房间在外面
@@ -262,13 +263,13 @@ impl RunWorker {
 }
 ```
 
-`dispatching::agreeing` 选定适配器后，用 `city::keep_warm(city_root, building)` 读到的设置和 worker 的 `clock`（`accounting::Clock`），把它包成 `Door`；`Agreed`、`Site`、`Driving`、`Driven` 与 `driving::lane` 带的都是这扇门，所以 run 发出的每个请求都进了保温账（`crates/runtime/Spec.lean` §8-4-2），转向循环不知道保温存在。`settling::landing` 在 run 结束时把门交给 `Kept`，按房间地址存：同一房间后来的 run 换掉前一扇门，因为后一个前缀才是下一次会用到的。`next_due` 为 `None` 的门（设置为 `Off`，或已续过一次）不留，所以默认设置下 `Kept` 一直是空的，worker 不多占一个字节，也不多发一个请求。
+`dispatching::agreeing` 选定适配器后，用 `city::keep_warm(city_root, building)` 读到的设置、worker 的 `clock`（`accounting::Clock`）与 `Kept::lead_of` 按所选 endpoint 名给出的提前量，把它包成 `Door`；连同一 endpoint 的门共用一个提前量，因为网络路径与名额门属于 endpoint，而一扇门每次真实使用只见到一次续期（runtime D98）；`Agreed`、`Site`、`Driving`、`Driven` 与 `driving::lane` 带的都是这扇门，所以 run 发出的每个请求都进了保温账（`crates/runtime/Spec.lean` §8-4-2），转向循环不知道保温存在。`settling::landing` 在 run 结束时把门交给 `Kept`，按房间地址存：同一房间后来的 run 换掉前一扇门，因为后一个前缀才是下一次会用到的。`next_due` 为 `None` 的门（设置为 `Off`，或已续过一次）不留，所以默认设置下 `Kept` 一直是空的，worker 不多占一个字节，也不多发一个请求。
 
 `accounting::worker::attend` 的空闲分支先读日程，再调用 `renew_warm(now)`，下一次睡眠取「距下次读日程」与「距 `warm_due`」中较短者，所以一次续期不会等到日程的整点之后。续期不在记账线程上发（D78）：`renew_warm` 经 `take_due` 取出每扇到期的门，各交给 `accounting::worker::errand` 的一条线程，那条线程调门的 `renew_due`，把门连同回执作为 `Answer::Renewed` 送回记账线程的队列；该不该续、续哪个前缀仍由门里的 `kernel::keep_warm::renewal_due` 判。门在外面时不在 `next_due` 里，所以同一扇门不会被交出去两次，记账线程也不为它空醒。回答回来时 `record_renewal` 在房间地址下为每次续期写一条 `cache_renewed`（`crates/kernel/Spec.lean` §8-4）：成功时是 provider 自报的用量与账单额，失败时是它的拒绝原样，所以人从账本上读得出保温花了多少、哪个 provider 拒了续期。门续完还欠续期就回家；它在外面时同一房间落地了一个新 run，新门已经换掉它，回来的这扇被丢弃。续期失败不停城；只有这条记录本身写不进账本时才写进诊断日志，与日程读取失败同样处理。
 
 失败：续期不传回 `Err`，每扇交出去的门各得一条结果，模型的失败原样放进 `CacheRenewed::Refused`；一扇门失败不妨碍其他门续期，失败的门被丢弃，所以拒绝续期的 provider 不会在每次醒来时再被问一遍。起不了线程时同样写一条 `Refused`，那扇门被丢弃。
 
-当前状态：保温已完整：设置默认关、默认下不发任何额外请求，打开后到期前续期一次，每次续期在自己的线程上发，用量或拒绝都记在账本上；lead 由门在每次调用前后量出（`crates/runtime/Spec.lean` §8-4-2）。
+当前状态：保温已完整：设置默认关、默认下不发任何额外请求，打开后每次真实使用在到期前续期一次，每次续期在自己的线程上发，用量或拒绝都记在账本上；提前量按 endpoint 存，取续期的往返或真实调用到第一个增量的时间（`crates/runtime/Spec.lean` §8-4-2）。
 
 决定：门按房间存，而不是按 run 存。按 run 存时，一个房间连续跑十次会留下十扇门，其中九扇续的是已经被下一个前缀覆盖的缓存，花的钱没有用处；按房间存时门的数目以房间数为上限。重新考虑的条件：同一房间里并行的会话各有自己的前缀。续期一扇门一条线程，所以不同房间的续期互不等待（`crates/sprawling/spec/Accounting/Worker.lean` D78）。
 

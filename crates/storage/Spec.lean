@@ -296,6 +296,7 @@ error ◀──使用── 其余模块（StorageError 与 into_ax 的唯一定
 | D32 | 索引的刷新逐窗向前读，在预分配段的零尾那一窗停 | `crates/storage/spec/Index.lean` |
 | D33 | 建表的那一遍扫描与刷新共用同一支窗读，在预分配段的零尾那一窗停 | `crates/storage/spec/Index.lean` |
 | D34 | JSONL 的三条整段读路径使用有界内存的流式扫描 | `crates/storage/spec/Jsonl.lean` |
+| D35 | 保温续期在归因里单独报数，按 kernel 的一条读法分四格 | `crates/storage/spec/Attribution.lean` |
 -/
 
 /-! ## 13 依赖选型
