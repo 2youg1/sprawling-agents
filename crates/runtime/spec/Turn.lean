@@ -325,7 +325,7 @@ inductive Line where
 
 /-! D5 一回合里等来的四个时刻各采各的，钟交给回合的账本门
 
-**决定**：`model_called`、`model_returned`、`tool_called`、`tool_result` 的信封 `t` 记各自那一刻，每条工具调用采开始与答复两次。时钟在 `Turn::begin` 交给 `turn::ledger::Journal`；`Authored::ModelCalled`、`Carried::ModelReturned`、`Carried::ToolCalled`、`Carried::ToolResult` 四个变体各带一个读数，其余变体只能带回合时间戳。
+**决定**：`model_called`、`model_returned`、`tool_called`、`tool_result` 的信封 `t` 记各自那一刻，每条工具调用采开始与答复两次。时钟在 `Turn::begin` 交给 `turn::ledger::Journal`；`Authored::ModelCalled`、`Carried::ModelReturned`、`Carried::ToolCalled`、`Carried::ToolResult` 四个变体各带一个读数，其余变体只能带回合时间戳；一次尝试在端点门前等过时，它的 `Carried::PrefixHeld` 也带尝试返回那一刻的读数（D98）。
 
 **理由**：结果上的 UTC 戳（§8-10）、`view --since` 与 `--until` 的时间窗与 run 页的调用用时读的是同一个值，一行只有一个时间。只采答复不采开始，调用用时只能推算，会把准入里的检查点提交算进工具用时。钟放在 `Journal` 里，`call` 与 `execute_concurrent` 的参数表不动，采样只发生在回合自己那一道账本门后面。
 
