@@ -14,16 +14,26 @@
 //! proptest below checks this queue against it. The clock is the
 //! injected `fn() -> Instant`, so the gate behaves the same on Windows,
 //! macOS and Linux.
+//!
+//! Before a call takes its ticket it passes the prefix hold
+//! (`crates/gateway/spec/Concurrency.lean` §8-40): the first call to
+//! reach a cold shared prefix sends one pre-warm of it, the calls with
+//! the same key wait for that one, and all of them then take tickets
+//! like any other call. The hold lives under the queue's lock and wakes
+//! its waiters on the queue's condition variable.
 
 use std::collections::VecDeque;
 use std::sync::{Arc, Condvar, Mutex, MutexGuard, PoisonError};
 use std::time::{Duration, Instant};
 
+use kernel::event::record::{PrefixHeld, PrewarmEnd, PrewarmSent};
 use kernel::{AxCode, AxError, ModelRequest, ModelReturn, ProviderFailureKind};
 
 use crate::concurrency::{IN_FLIGHT_DEFAULT, MaxInFlight, Permits, Take};
+use crate::hold::{Arrival, Holds, PrefixKey, Prewarm};
 
 use super::config::Endpoint;
+use super::prewarm::Prewarming;
 
 /// The longest a call waits in an endpoint's queue before it is refused.
 pub(crate) const QUEUE_WAIT_MAX: Duration = Duration::from_secs(600);
@@ -35,8 +45,16 @@ const TOO_MANY_REQUESTS: u32 = 429;
 /// every clone of its transport.
 #[derive(Debug)]
 pub(crate) struct Gate {
-    queue: Mutex<Queue>,
+    state: Mutex<Admission>,
     turn: Condvar,
+}
+
+/// What the gate's one lock guards: the ticket queue, and the prefix
+/// hold a call passes before it takes a ticket.
+#[derive(Debug)]
+struct Admission {
+    queue: Queue,
+    holds: Holds,
 }
 
 impl Default for Gate {
@@ -49,40 +67,42 @@ impl Gate {
     /// A gate that lets `ceiling` calls be in flight at once.
     pub(crate) fn admitting(ceiling: MaxInFlight) -> Gate {
         Gate {
-            queue: Mutex::new(Queue::over(Permits::new(ceiling))),
+            state: Mutex::new(Admission {
+                queue: Queue::over(Permits::new(ceiling)),
+                holds: Holds::default(),
+            }),
             turn: Condvar::new(),
         }
     }
 
     /// Waits in arrival order for a permit and returns the guard that
-    /// holds it.
+    /// holds it. `bound` is how long the call may wait: [`QUEUE_WAIT_MAX`]
+    /// for a call, what is left of its hold for a pre-warm (gateway D41).
     ///
     /// # Errors
-    /// `E_BACKPRESSURE_SHED` once the call has waited [`QUEUE_WAIT_MAX`];
-    /// its ticket leaves the queue and the next one moves up.
+    /// `E_BACKPRESSURE_SHED` once the call has waited `bound`; its ticket
+    /// leaves the queue and the next one moves up.
     fn admit(
         self: &Arc<Gate>,
         monotonic: fn() -> Instant,
+        bound: Duration,
         endpoint: &str,
     ) -> Result<Admitted, AxError> {
         let arrived = monotonic();
-        let mut queue = self.lock();
-        let ticket = queue.arrive();
+        let mut state = self.lock();
+        let ticket = state.queue.arrive();
         loop {
             let now = monotonic();
             let waited = now.saturating_duration_since(arrived);
-            let Some(left) = QUEUE_WAIT_MAX
-                .checked_sub(waited)
-                .filter(|left| !left.is_zero())
-            else {
-                queue.shed(ticket);
-                drop(queue);
+            let Some(left) = bound.checked_sub(waited).filter(|left| !left.is_zero()) else {
+                state.queue.shed(ticket);
+                drop(state);
                 self.turn.notify_all();
                 return Err(shed(endpoint, waited));
             };
-            match queue.try_take(ticket, now) {
+            match state.queue.try_take(ticket, now) {
                 Turn::Granted => {
-                    drop(queue);
+                    drop(state);
                     self.turn.notify_all();
                     return Ok(Admitted {
                         gate: Arc::clone(self),
@@ -92,25 +112,78 @@ impl Gate {
                 Turn::Wait(until) => {
                     let wait =
                         until.map_or(left, |until| until.saturating_duration_since(now).min(left));
-                    queue = self
-                        .turn
-                        .wait_timeout(queue, wait)
-                        .map_or_else(|poisoned| poisoned.into_inner().0, |(queue, _)| queue);
+                    state = self.sleep(state, wait);
                 }
             }
         }
     }
 
-    #[cfg(test)]
-    pub(crate) fn limit(&self) -> u32 {
-        self.lock().permits.limit()
+    /// A call carrying `key` reached the hold at `now`. Lapsed pre-warms
+    /// are taken off first, and the calls they held are woken.
+    fn arrive(&self, key: PrefixKey, now: Instant) -> Arrival {
+        let mut state = self.lock();
+        state.holds.expire(now);
+        let arrival = state.holds.arrive(key, now);
+        drop(state);
+        self.turn.notify_all();
+        arrival
     }
 
-    /// The queue, recovered from a holder that panicked: it holds only
-    /// counters and tickets, and refusing every later call to the
-    /// endpoint would turn one panic into an outage.
-    fn lock(&self) -> MutexGuard<'_, Queue> {
-        self.queue.lock().unwrap_or_else(PoisonError::into_inner)
+    /// Waits until pre-warm `on` of `key` no longer holds, at most until
+    /// `until`, and answers how it ended.
+    fn wait_for(
+        &self,
+        key: &PrefixKey,
+        on: Prewarm,
+        until: Instant,
+        monotonic: fn() -> Instant,
+    ) -> PrewarmEnd {
+        let mut state = self.lock();
+        loop {
+            let now = monotonic();
+            state.holds.expire(now);
+            if !state.holds.waits(on) {
+                // A waiter woken later than the cache lifetime finds its
+                // pre-warm's mark gone; it waited at least `HOLD_MAX`.
+                let ended = state.holds.ended(key, on).unwrap_or(PrewarmEnd::TimedOut);
+                drop(state);
+                self.turn.notify_all();
+                return ended;
+            }
+            // `expire` took off every pre-warm sent `HOLD_MAX` ago, so
+            // `until` is still ahead of `now`.
+            state = self.sleep(state, until.saturating_duration_since(now));
+        }
+    }
+
+    /// Pre-warm `prewarm` ended as `ended` at `now`: every call it held
+    /// goes on.
+    fn settle_prewarm(&self, prewarm: Prewarm, ended: PrewarmEnd, now: Instant) {
+        self.lock().holds.settle(prewarm, ended, now);
+        self.turn.notify_all();
+    }
+
+    /// Sleeps on the gate's condition variable for at most `wait`.
+    fn sleep<'g>(
+        &self,
+        state: MutexGuard<'g, Admission>,
+        wait: Duration,
+    ) -> MutexGuard<'g, Admission> {
+        self.turn
+            .wait_timeout(state, wait)
+            .map_or_else(|poisoned| poisoned.into_inner().0, |(state, _)| state)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn limit(&self) -> u32 {
+        self.lock().queue.permits.limit()
+    }
+
+    /// The queue and the hold, recovered from a holder that panicked:
+    /// they hold only counters, tickets and marks, and refusing every
+    /// later call to the endpoint would turn one panic into an outage.
+    fn lock(&self) -> MutexGuard<'_, Admission> {
+        self.state.lock().unwrap_or_else(PoisonError::into_inner)
     }
 }
 
@@ -194,16 +267,17 @@ impl Admitted {
     /// `Retry-After` instant.
     fn settle(&self, outcome: &Result<ModelReturn, AxError>) {
         let now = (self.monotonic)();
-        let mut queue = self.gate.lock();
+        let mut state = self.gate.lock();
         match outcome {
-            Ok(_) => queue.permits.succeeded(now),
+            Ok(_) => state.queue.permits.succeeded(now),
             Err(err)
                 if err.provider_failure()
                     == Some(ProviderFailureKind::Refused {
                         status: TOO_MANY_REQUESTS,
                     }) =>
             {
-                queue
+                state
+                    .queue
                     .permits
                     .rate_limited(now, err.retry_after_ms().map(Duration::from_millis));
             }
@@ -214,8 +288,37 @@ impl Admitted {
 
 impl Drop for Admitted {
     fn drop(&mut self) {
-        self.gate.lock().permits.give_back();
+        self.gate.lock().queue.permits.give_back();
         self.gate.turn.notify_all();
+    }
+}
+
+/// The pre-warm one call sent, settled exactly once: by the call when it
+/// comes back, or as abandoned when the thread that sent it unwinds, so
+/// no call is left held behind a pre-warm nobody will settle (gateway
+/// D41).
+#[must_use = "dropping the guard releases the held calls before the pre-warm came back"]
+struct Sending {
+    gate: Option<Arc<Gate>>,
+    prewarm: Prewarm,
+    monotonic: fn() -> Instant,
+}
+
+impl Sending {
+    fn settle(mut self, ended: PrewarmEnd) {
+        self.release(ended);
+    }
+
+    fn release(&mut self, ended: PrewarmEnd) {
+        if let Some(gate) = self.gate.take() {
+            gate.settle_prewarm(self.prewarm, ended, (self.monotonic)());
+        }
+    }
+}
+
+impl Drop for Sending {
+    fn drop(&mut self) {
+        self.release(PrewarmEnd::Abandoned);
     }
 }
 
@@ -232,6 +335,9 @@ pub(crate) struct Gated {
     active: usize,
     /// How many more times one account is asked before the next one.
     retries: kernel::account_recovery::AccountRetries,
+    /// The wait the last call took at the prefix hold (kernel D59);
+    /// cleared as each call begins.
+    held: Option<PrefixHeld>,
 }
 
 impl Gated {
@@ -244,6 +350,7 @@ impl Gated {
             accounts: Vec::new(),
             active: 0,
             retries: crate::EndpointTuning::DEFAULTS.account_retries,
+            held: None,
         }
     }
 
@@ -275,16 +382,93 @@ impl Gated {
         }
     }
 
+    /// Passes the prefix hold, takes a permit, and calls through `door`
+    /// (`crates/gateway/spec/Concurrency.lean` §8-40, steps one to five).
     fn through(
         &mut self,
+        req: &ModelRequest,
         door: impl FnOnce(&mut Endpoint) -> Result<ModelReturn, AxError>,
     ) -> Result<ModelReturn, AxError> {
-        let admitted = self
-            .gate
-            .admit(self.monotonic, &self.endpoint.config.base_url)?;
+        self.held = None;
+        let account = self.accounts.get(self.active).map(|(account, _)| account);
+        if let Some(prewarming) = self.endpoint.prewarm_for(account, req) {
+            self.held = self.hold(&prewarming);
+        }
+        let admitted = self.gate.admit(
+            self.monotonic,
+            QUEUE_WAIT_MAX,
+            &self.endpoint.config.base_url,
+        )?;
         let outcome = door(&mut self.endpoint);
         admitted.settle(&outcome);
         outcome
+    }
+
+    /// Waits at the hold for `prewarming`'s key, sending the pre-warm
+    /// when this call is the first to reach the key cold (gateway D37);
+    /// the wait it took, or `None` when the key was warm.
+    fn hold(&mut self, prewarming: &Prewarming) -> Option<PrefixHeld> {
+        let arrived = (self.monotonic)();
+        let (ended, sent) = match self.gate.arrive(prewarming.key, arrived) {
+            Arrival::Go => return None,
+            Arrival::Wait { on, until } => (
+                self.gate
+                    .wait_for(&prewarming.key, on, until, self.monotonic),
+                None,
+            ),
+            Arrival::Send { prewarm, until } => {
+                let (ended, sent) = self.send(prewarming, prewarm, until);
+                (ended, Some(sent))
+            }
+        };
+        let waited = (self.monotonic)().saturating_duration_since(arrived);
+        Some(PrefixHeld {
+            waited_us: u64::try_from(waited.as_micros()).unwrap_or(u64::MAX),
+            ended,
+            sent,
+        })
+    }
+
+    /// Sends the pre-warm this call was chosen to send, bounded by
+    /// `until` both in the queue and on the wire (gateway D41, D42), and
+    /// releases every call behind it however it ends.
+    fn send(
+        &mut self,
+        prewarming: &Prewarming,
+        prewarm: Prewarm,
+        until: Instant,
+    ) -> (PrewarmEnd, PrewarmSent) {
+        let sending = Sending {
+            gate: Some(Arc::clone(&self.gate)),
+            prewarm,
+            monotonic: self.monotonic,
+        };
+        let left = until.saturating_duration_since((self.monotonic)());
+        let outcome = self
+            .gate
+            .admit(self.monotonic, left, &self.endpoint.config.base_url)
+            .and_then(|admitted| {
+                let timeout = until
+                    .saturating_duration_since((self.monotonic)())
+                    .min(Duration::from_millis(self.endpoint.config.timeout_ms));
+                let outcome = self.endpoint.prewarm(prewarming, timeout);
+                admitted.settle(&outcome);
+                outcome
+            });
+        let ended = match &outcome {
+            Ok(_) => PrewarmEnd::Answered,
+            Err(_) if until <= (self.monotonic)() => PrewarmEnd::TimedOut,
+            Err(_) => PrewarmEnd::Refused,
+        };
+        sending.settle(ended);
+        let sent = match outcome {
+            Ok(answer) => PrewarmSent::Answered {
+                usage: answer.usage,
+                billed_usd_micros: answer.billed_usd_micros,
+            },
+            Err(refused) => PrewarmSent::Refused { refused },
+        };
+        (ended, sent)
     }
 }
 
@@ -329,8 +513,12 @@ impl kernel::Model for Gated {
         }
     }
 
+    fn prefix_held(&self) -> Option<PrefixHeld> {
+        self.held.clone()
+    }
+
     fn call(&mut self, req: &ModelRequest) -> Result<ModelReturn, AxError> {
-        self.through(|endpoint| endpoint.call(req))
+        self.through(req, |endpoint| endpoint.call(req))
     }
 
     fn call_streaming(
@@ -338,7 +526,7 @@ impl kernel::Model for Gated {
         req: &ModelRequest,
         onto: kernel::Increments<'_>,
     ) -> Result<ModelReturn, AxError> {
-        self.through(|endpoint| endpoint.call_streaming(req, onto))
+        self.through(req, |endpoint| endpoint.call_streaming(req, onto))
     }
 
     fn call_speculating(
@@ -347,7 +535,7 @@ impl kernel::Model for Gated {
         onto: kernel::Increments<'_>,
         early: kernel::EarlyCalls<'_>,
     ) -> Result<ModelReturn, AxError> {
-        self.through(|endpoint| endpoint.call_speculating(req, onto, early))
+        self.through(req, |endpoint| endpoint.call_speculating(req, onto, early))
     }
 }
 
@@ -355,6 +543,7 @@ impl kernel::Model for Gated {
 #[allow(
     clippy::unwrap_used,
     clippy::indexing_slicing,
+    clippy::arithmetic_side_effects,
     clippy::disallowed_methods,
     reason = "test code: a loopback provider and threads that call at once"
 )]
@@ -370,13 +559,13 @@ mod hold_tests;
 )]
 mod tests {
     use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-    use std::sync::{Arc, Condvar, Mutex, OnceLock};
+    use std::sync::{Arc, OnceLock};
     use std::time::{Duration, Instant};
 
     use kernel::{AxCode, AxError, ModelReturn, Payload, ProviderFailureKind};
     use proptest::prelude::*;
 
-    use super::{Gate, Queue, Turn};
+    use super::{Gate, QUEUE_WAIT_MAX, Queue, Turn};
     use crate::concurrency::{MaxInFlight, Permits, WIDEN_AFTER};
 
     /// One step of a trace over the ticket queue (the Lean model's
@@ -457,12 +646,7 @@ mod tests {
     }
 
     fn gate_of(cap: u32) -> Arc<Gate> {
-        Arc::new(Gate {
-            queue: Mutex::new(Queue::over(Permits::new(
-                MaxInFlight::try_from(cap).unwrap(),
-            ))),
-            turn: Condvar::new(),
-        })
+        Arc::new(Gate::admitting(MaxInFlight::try_from(cap).unwrap()))
     }
 
     const URL: &str = "http://127.0.0.1:1/v1/messages";
@@ -473,7 +657,7 @@ mod tests {
     #[test]
     fn a_call_that_waits_past_the_bound_is_shed_and_the_next_one_gets_the_permit() {
         let gate = gate_of(1);
-        let held = gate.admit(counted, URL).unwrap();
+        let held = gate.admit(counted, QUEUE_WAIT_MAX, URL).unwrap();
         let done = Arc::new(AtomicBool::new(false));
         // The counted clock moves only when read, so a waker stands in for
         // the minutes a real condvar wait would sleep through.
@@ -486,13 +670,17 @@ mod tests {
                 }
             })
         };
-        let refused = gate.admit(counted, URL).unwrap_err();
+        let refused = gate.admit(counted, QUEUE_WAIT_MAX, URL).unwrap_err();
         done.store(true, Ordering::SeqCst);
         waker.join().unwrap();
         drop(held);
-        let next = gate.admit(counted, URL);
+        let next = gate.admit(counted, QUEUE_WAIT_MAX, URL);
         assert_eq!(
-            (*refused.code(), gate.lock().waiting.len(), next.is_ok()),
+            (
+                *refused.code(),
+                gate.lock().queue.waiting.len(),
+                next.is_ok()
+            ),
             (AxCode::BackpressureShed, 0, true),
             "{refused}"
         );
@@ -506,14 +694,16 @@ mod tests {
         let limited = AxError::provider(ProviderFailureKind::Refused { status: 429 }, "call", URL)
             .retriable_after(0)
             .with_recovery("wait");
-        gate.admit(still, URL).unwrap().settle(&Err(limited));
-        let narrowed = gate.lock().permits.clone();
+        gate.admit(still, QUEUE_WAIT_MAX, URL)
+            .unwrap()
+            .settle(&Err(limited));
+        let narrowed = gate.lock().queue.permits.clone();
         for _ in 0..WIDEN_AFTER {
-            gate.admit(still, URL)
+            gate.admit(still, QUEUE_WAIT_MAX, URL)
                 .unwrap()
                 .settle(&Ok(ModelReturn::bare(Payload::empty(), vec![])));
         }
-        let widened = gate.lock().permits.clone();
+        let widened = gate.lock().queue.permits.clone();
         assert_eq!(
             (narrowed.limit(), widened.limit(), widened.in_use()),
             (2, 3, 0)
@@ -536,7 +726,9 @@ mod tests {
                     let gate = Arc::clone(&gate);
                     std::thread::spawn(move || {
                         let asked = Instant::now();
-                        let held = gate.admit(crate::endpoint::fakes::monotonic, URL).unwrap();
+                        let held = gate
+                            .admit(crate::endpoint::fakes::monotonic, QUEUE_WAIT_MAX, URL)
+                            .unwrap();
                         let waited = asked.elapsed();
                         std::thread::sleep(HOLD);
                         drop(held);

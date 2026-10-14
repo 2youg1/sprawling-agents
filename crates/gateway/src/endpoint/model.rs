@@ -56,9 +56,32 @@ impl Endpoint {
         }
         self.refuse_pictures_a_blind_model_cannot_read(req)?;
         let wire = self.wire_request(req)?;
+        self.post_settled(
+            req,
+            &wire,
+            std::time::Duration::from_millis(self.config.timeout_ms),
+        )
+    }
+}
+
+impl Endpoint {
+    /// One blocking POST of `wire`, the body built for `req`, read whole
+    /// within `timeout`. The one settled exchange: a call and a pre-warm
+    /// both go out and come back through it.
+    ///
+    /// # Errors
+    /// `E_PROVIDER` on transport failure, a non-success status or a body
+    /// cut short; a redemption failure from the headers.
+    pub(super) fn post_settled(
+        &self,
+        req: &ModelRequest,
+        wire: &Value,
+        timeout: std::time::Duration,
+    ) -> Result<ModelReturn, AxError> {
         let request = self.chat_post(req)?;
         let response = request
-            .json(&wire)
+            .json(wire)
+            .timeout(timeout)
             .send()
             .map_err(|err| provider_err("call provider", &ProviderFailure::Exchange(&err)))?;
         let status = response.status();

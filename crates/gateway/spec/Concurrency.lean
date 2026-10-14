@@ -438,14 +438,14 @@ impl Endpoint {
     pub(super) fn prewarm_for(&self, account: Option<&kernel::ServerLabel>, req: &ModelRequest)
         -> Option<Prewarming>;
     /// 发一次 pre-warm：同 `call` 的那条阻塞的路，请求超时是 `timeout`。
-    pub(super) fn prewarm(&mut self, prewarm: &Prewarming, timeout: Duration) -> Result<ModelReturn, AxError>;
+    pub(super) fn prewarm(&self, prewarm: &Prewarming, timeout: Duration) -> Result<ModelReturn, AxError>;
 }
 pub(super) struct Prewarming { key: PrefixKey, request: ModelRequest<'static>, body: serde_json::Value }
 ```
 
 `settle` 收下结局只为记账：放行谁不读它（模型的 `settle` 不读 `Ending`），结局记在键的热度旁，被放行的调用醒来用 `ended` 读出自己那一行该写什么。热度至少留 `CACHE_LIFETIME`，远长于 `HOLD_MAX`，所以醒来的调用读得到；读不到时（它醒得比缓存寿命还晚）记作 `timed_out`，因为它至少等满了一次 `HOLD_MAX`。`expire` 同时丢掉已过 `until` 的热度，表的大小以五分钟里用过的键为界。
 
-接线在 `endpoint::permit`：`Holds` 与 `Queue` 住在 `Gate` 的同一把锁里，同一个 `Condvar` 唤醒两种等待者。`Gated::through` 依次做五件事：①清掉上一次调用留下的等待记录（D43）；②`prewarm_for` 求键，`None` 时直接到⑤；③进锁、`expire(now)`、`arrive(key, now)`；④`Wait` 时在 `Condvar` 上等到 `waits(on)` 为假或过了 `until`（过了就再 `expire` 一次），`Send` 时出锁发 pre-warm（D42：取号的期限是 `until`，请求超时取 `timeout_ms` 与 `until` 剩下的较短者，守卫在 `Drop` 里以 `abandoned` `settle`），回来后进锁 `settle`、`notify_all`；发的那个调用的结局：答了是 `answered`，回来时已到 `until`（请求超时或取不到号）是 `timed_out`，其余的失败是 `refused`；⑤照旧 `Gate::admit` 取号。`Gate::admit` 因此多一个期限参数：真调用传拿号时刻加 `QUEUE_WAIT_MAX`，pre-warm 传 `until`。
+接线在 `endpoint::permit`：`Holds` 与 `Queue` 住在 `Gate` 的同一把锁里，同一个 `Condvar` 唤醒两种等待者。`Gated::through` 依次做五件事：①清掉上一次调用留下的等待记录（D43）；②`prewarm_for` 求键，`None` 时直接到⑤；③进锁、`expire(now)`、`arrive(key, now)`；④`Wait` 时在 `Condvar` 上等到 `waits(on)` 为假或过了 `until`（过了就再 `expire` 一次），`Send` 时出锁发 pre-warm（D42：取号的期限是 `until`，请求超时取 `timeout_ms` 与 `until` 剩下的较短者，守卫在 `Drop` 里以 `abandoned` `settle`），回来后进锁 `settle`、`notify_all`；发的那个调用的结局：答了是 `answered`，回来时已到 `until`（请求超时或取不到号）是 `timed_out`，其余的失败是 `refused`；⑤照旧 `Gate::admit` 取号。`Gate::admit` 因此多一个上限参数 `bound: Duration`，一张号至多等这么久：真调用传 `QUEUE_WAIT_MAX`，pre-warm 传此刻到 `until` 剩下的时间。
 
 派生检查（与实现同一次改动写下，各自先对一个故意写错的实现变红一次）：
 - `hold::tests` 的 proptest `holds_keep_the_lean_properties`：生成器在 0 到 3 的四个键上随机走 `Arrive(Option<key>)`、`Settle(任一在飞的 Prewarm)`、`Tick`，每步时钟前进 0 到 `HOLD_MAX` 的一半（单调，与 `clock` 取 `max` 同义），驱动 `Holds` 的四个方法；测试自己记下每个在等的调用（它拿到的 `Prewarm`）与到达号队的次序，每一步断言：性质 7（每个键在飞的 pre-warm 至多一次，且 `Send` 只在键不热时答）、性质 8（`settle` 之后等它的调用 `waits` 全为假；`expire(now)` 之后每个仍在等的调用 `now < 到达 + HOLD_MAX`）、性质 9（一个在等的调用只在它的 `Prewarm` 被结掉或过期时离开，离开即算到达号队）与性质 10（到达即走的调用按到达次序进号队）。错的实现：对每个冷键的到达都答 `Send`，它让性质 7 变红。
@@ -555,7 +555,7 @@ inductive Ending where
 
 **被否**：①字段表（端点、账号、模型、工具摘要、system 摘要、思考、effort、speed）：同一件事的第二份定义，见上；②`ModelRequest.segments` 的前两个哈希加模型：不含工具与思考设置；③gateway 自己数 `system` 里第几个带断点的块：那是 runtime 的布局在 gateway 里的第二份拼写。
 
-**代价**：Anthropic 面上每次调用多编一次 pre-warm 请求体（共享的 system 与工具，不含对话）并算一次摘要；实现时用一个 `#[ignore]` 的 `instrument_` 测试量它，读数与机器档次一起记。
+**代价**：Anthropic 面上每次调用多编一次 pre-warm 请求体（共享的 system 与工具，不含对话）并算一次摘要；`endpoint::permit::hold_tests` 的 `#[ignore]` 测试 `instrument_prewarm_for` 量它：共享部分约一万 token 时，未优化的测试构建上 p50 约 1.7 ms、p99 约 2.2 ms（x86_64 Windows，16 线程的台式机）；与一次往返相比很小，发布构建上更小。
 
 **重开参数**：某个 provider 的缓存还取决于请求体之外的东西（例如一个请求头）时，那样东西进键。
 -/

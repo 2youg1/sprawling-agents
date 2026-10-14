@@ -225,3 +225,37 @@ fn a_refused_prewarm_releases_every_call() {
         )
     );
 }
+
+/// What gateway D38 costs each call on the messages face: building the
+/// pre-warm's body and its key for a turn whose shared part is about
+/// ten thousand tokens. It asserts nothing about time, since the wall
+/// clock differs by machine.
+#[test]
+#[ignore = "a wall-clock instrument: run it by name with --run-ignored only --no-capture"]
+#[allow(clippy::print_stdout, reason = "an instrument prints its reading")]
+fn instrument_prewarm_for() {
+    const ROUNDS: usize = 1_000;
+    let endpoint = Endpoint::new(
+        config(&format!("http://{NAME}:1/v1/messages")),
+        redemption(),
+    )
+    .unwrap();
+    let req = shared_request();
+    let mut took: Vec<Duration> = (0..ROUNDS)
+        .map(|_| {
+            let started = std::time::Instant::now();
+            let prewarming = endpoint.prewarm_for(None, &req);
+            let took = started.elapsed();
+            assert!(prewarming.is_some());
+            took
+        })
+        .collect();
+    took.sort_unstable();
+    println!(
+        "instrument_prewarm_for rounds={ROUNDS} p50_us={} p99_us={} machine={}-{}",
+        took[ROUNDS / 2].as_micros(),
+        took[ROUNDS * 99 / 100].as_micros(),
+        std::env::consts::OS,
+        std::env::consts::ARCH
+    );
+}

@@ -103,6 +103,15 @@ impl Holds {
             }
             return Arrival::Go;
         }
+        if let Some(warming) = self.warming.get(&key) {
+            return warming
+                .since
+                .checked_add(HOLD_MAX)
+                .map_or(Arrival::Go, |until| Arrival::Wait {
+                    on: warming.prewarm,
+                    until,
+                });
+        }
         let Some(until) = now.checked_add(HOLD_MAX) else {
             return Arrival::Go;
         };

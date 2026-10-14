@@ -227,6 +227,10 @@ pub struct ModelPreset {
     /// The thinking levels this vendor documents for the model; `None`
     /// where its page states none, which is not "no thinking".
     pub thinking: Option<PresetThinking>,
+    /// The shortest prompt prefix this vendor's page says the model
+    /// caches, in tokens; `None` where the page was not read for it,
+    /// and [`CACHE_MIN_TOKENS_DEFAULT`] answers instead (gateway D39).
+    pub cache_min_tokens: Option<u64>,
     /// Where the two figures were read.
     pub source: &'static str,
 }
@@ -313,6 +317,20 @@ fn row_for<'rows>(
         .chain(vendors.filter(|_| relayed))
         .filter(|row| id.starts_with(row.id_prefix))
         .max_by_key(|row| row.id_prefix.len())
+}
+
+/// The shortest prefix a model is taken to cache when its row states
+/// none: the largest minimum the vendor's prompt-caching page lists, so a
+/// prefix the model cannot cache is not pre-warmed for nothing (gateway
+/// D39).
+pub(crate) const CACHE_MIN_TOKENS_DEFAULT: u64 = 4_096;
+
+/// The shortest prefix, in tokens, one model at one base URL caches.
+#[must_use]
+pub(crate) fn cache_min_tokens_for(base_url: &str, id: &str) -> u64 {
+    model_for(base_url, id)
+        .and_then(|row| row.cache_min_tokens)
+        .unwrap_or(CACHE_MIN_TOKENS_DEFAULT)
 }
 
 /// The ceiling this table states for one model, as a ceiling rather
@@ -647,6 +665,7 @@ mod tests {
             max_output_tokens: 1,
             input: InputKinds::Text,
             thinking: None,
+            cache_min_tokens: None,
             source: "test",
         }
     }

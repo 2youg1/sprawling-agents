@@ -355,6 +355,7 @@ const ANTHROPIC_MODELS: &[ModelPreset] = &[
         max_output_tokens: 128_000,
         input: InputKinds::TextImage,
         thinking: None,
+        cache_min_tokens: None,
         source: "https://platform.claude.com/docs/en/about-claude/models/overview",
     },
     ModelPreset {
@@ -363,6 +364,7 @@ const ANTHROPIC_MODELS: &[ModelPreset] = &[
         max_output_tokens: 128_000,
         input: InputKinds::TextImage,
         thinking: None,
+        cache_min_tokens: None,
         source: "https://platform.claude.com/docs/en/about-claude/models/overview",
     },
     ModelPreset {
@@ -371,6 +373,7 @@ const ANTHROPIC_MODELS: &[ModelPreset] = &[
         max_output_tokens: 128_000,
         input: InputKinds::TextImage,
         thinking: None,
+        cache_min_tokens: None,
         source: "https://platform.claude.com/docs/en/about-claude/models/overview",
     },
     ModelPreset {
@@ -379,6 +382,7 @@ const ANTHROPIC_MODELS: &[ModelPreset] = &[
         max_output_tokens: 64_000,
         input: InputKinds::TextImage,
         thinking: None,
+        cache_min_tokens: None,
         source: "https://platform.claude.com/docs/en/about-claude/models/overview",
     },
     ModelPreset {
@@ -387,6 +391,7 @@ const ANTHROPIC_MODELS: &[ModelPreset] = &[
         max_output_tokens: 32_000,
         input: InputKinds::TextImage,
         thinking: None,
+        cache_min_tokens: None,
         source: "https://platform.claude.com/docs/en/about-claude/models/overview",
     },
     ModelPreset {
@@ -395,6 +400,7 @@ const ANTHROPIC_MODELS: &[ModelPreset] = &[
         max_output_tokens: 64_000,
         input: InputKinds::TextImage,
         thinking: None,
+        cache_min_tokens: None,
         source: "https://platform.claude.com/docs/en/about-claude/models/overview",
     },
     ModelPreset {
@@ -403,6 +409,7 @@ const ANTHROPIC_MODELS: &[ModelPreset] = &[
         max_output_tokens: 64_000,
         input: InputKinds::TextImage,
         thinking: None,
+        cache_min_tokens: None,
         source: "https://platform.claude.com/docs/en/about-claude/models/overview",
     },
     ModelPreset {
@@ -411,6 +418,7 @@ const ANTHROPIC_MODELS: &[ModelPreset] = &[
         max_output_tokens: 8_192,
         input: InputKinds::TextImage,
         thinking: None,
+        cache_min_tokens: None,
         source: "https://platform.claude.com/docs/en/about-claude/models/overview",
     },
 ];
@@ -435,6 +443,7 @@ const OPENAI_MODELS: &[ModelPreset] = &[
             default: Some(Effort::Medium),
             source: "https://developers.openai.com/api/docs/models/gpt-6.1-sol",
         }),
+        cache_min_tokens: None,
         source: "https://developers.openai.com/api/docs/models/gpt-6.1-sol",
     },
     ModelPreset {
@@ -447,6 +456,7 @@ const OPENAI_MODELS: &[ModelPreset] = &[
             default: None,
             source: "https://developers.openai.com/api/docs/models/gpt-6-astra",
         }),
+        cache_min_tokens: None,
         source: "https://developers.openai.com/api/docs/models/gpt-6-astra",
     },
     ModelPreset {
@@ -455,6 +465,7 @@ const OPENAI_MODELS: &[ModelPreset] = &[
         max_output_tokens: 128_000,
         input: InputKinds::TextImage,
         thinking: None,
+        cache_min_tokens: None,
         source: "https://developers.openai.com/api/docs/models/gpt-6-sol",
     },
     ModelPreset {
@@ -463,6 +474,7 @@ const OPENAI_MODELS: &[ModelPreset] = &[
         max_output_tokens: 128_000,
         input: InputKinds::TextImage,
         thinking: None,
+        cache_min_tokens: None,
         source: "https://developers.openai.com/api/docs/models/gpt-6-luna",
     },
     ModelPreset {
@@ -475,6 +487,7 @@ const OPENAI_MODELS: &[ModelPreset] = &[
             default: Some(Effort::Medium),
             source: "https://developers.openai.com/api/docs/models/gpt-5.6-sol",
         }),
+        cache_min_tokens: None,
         source: "https://developers.openai.com/api/docs/models/gpt-5.6-sol",
     },
     ModelPreset {
@@ -487,6 +500,7 @@ const OPENAI_MODELS: &[ModelPreset] = &[
             default: Some(Effort::Medium),
             source: "https://developers.openai.com/api/docs/models/gpt-5.6-luna",
         }),
+        cache_min_tokens: None,
         source: "https://developers.openai.com/api/docs/models/gpt-5.6-luna",
     },
     ModelPreset {
@@ -499,6 +513,7 @@ const OPENAI_MODELS: &[ModelPreset] = &[
             default: Some(Effort::Medium),
             source: "https://developers.openai.com/api/docs/models/gpt-5.6-terra",
         }),
+        cache_min_tokens: None,
         source: "https://developers.openai.com/api/docs/models/gpt-5.6-terra",
     },
     ModelPreset {
@@ -507,6 +522,7 @@ const OPENAI_MODELS: &[ModelPreset] = &[
         max_output_tokens: 32_768,
         input: InputKinds::TextImage,
         thinking: None,
+        cache_min_tokens: None,
         source: "https://platform.openai.com/docs/models/gpt-4.1",
     },
     ModelPreset {
@@ -515,6 +531,7 @@ const OPENAI_MODELS: &[ModelPreset] = &[
         max_output_tokens: 16_384,
         input: InputKinds::TextImage,
         thinking: None,
+        cache_min_tokens: None,
         source: "https://platform.openai.com/docs/models/gpt-4o",
     },
     ModelPreset {
@@ -523,6 +540,7 @@ const OPENAI_MODELS: &[ModelPreset] = &[
         max_output_tokens: 100_000,
         input: InputKinds::TextImage,
         thinking: None,
+        cache_min_tokens: None,
         source: "https://platform.openai.com/docs/models/o3",
     },
     ModelPreset {
@@ -531,6 +549,7 @@ const OPENAI_MODELS: &[ModelPreset] = &[
         max_output_tokens: 100_000,
         input: InputKinds::TextImage,
         thinking: None,
+        cache_min_tokens: None,
         source: "https://platform.openai.com/docs/models/o4-mini",
     },
 ];
@@ -548,6 +567,7 @@ const DEEPSEEK_MODELS: &[ModelPreset] = &[
         max_output_tokens: 393_216,
         input: InputKinds::TextImage,
         thinking: None,
+        cache_min_tokens: None,
         source: "https://api-docs.deepseek.com/api/create-chat-completion",
     },
     ModelPreset {
@@ -556,6 +576,7 @@ const DEEPSEEK_MODELS: &[ModelPreset] = &[
         max_output_tokens: 393_216,
         input: InputKinds::Text,
         thinking: None,
+        cache_min_tokens: None,
         source: "https://api-docs.deepseek.com/api/create-chat-completion",
     },
 ];
