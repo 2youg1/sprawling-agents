@@ -22,6 +22,57 @@ use kernel::AxError;
 use super::super::RunWorker;
 use crate::worker::Posted;
 
+/// A command that sent a provider request off the accounting thread and
+/// left the door before the answer came back: what finishing it takes,
+/// so its answer is recorded and its refusal delivered the way the door
+/// would have done at once.
+///
+/// The three travel together because the answer arrives on a later
+/// pass of the loop, after the door has settled the key and the command
+/// has left the desk.
+pub(in crate::worker) struct Finishing {
+    name: &'static str,
+    key: Option<kernel::IdemKey>,
+    reply: wire::Reply,
+}
+
+/// The command the door holds while it is carried out: its name, and
+/// where its refusal goes.
+pub(in crate::worker) struct InHand {
+    pub(in crate::worker) name: &'static str,
+    pub(in crate::worker) reply: wire::Reply,
+}
+
+/// The far end of a reply address for a caller with no peer: it keeps
+/// the first refusal handed back, for that caller to return once what
+/// it started is over.
+pub(in crate::worker) struct KeptRefusal(std::sync::mpsc::Receiver<AxError>);
+
+impl KeptRefusal {
+    /// A reply address, and where the refusals sent to it are kept.
+    pub(in crate::worker) fn open() -> (wire::Reply, KeptRefusal) {
+        let (keep, kept) = std::sync::mpsc::channel();
+        let reply = wire::Reply::to(move |refusal| match keep.send(refusal) {
+            Ok(()) => wire::Delivered::ToThePeer,
+            Err(_) => wire::Delivered::PeerGone,
+        });
+        (reply, KeptRefusal(kept))
+    }
+
+    /// The first refusal handed back, or `Ok` when none was.
+    ///
+    /// # Errors
+    /// That refusal.
+    pub(in crate::worker) fn outcome(self) -> Result<(), AxError> {
+        match self.0.try_recv() {
+            Ok(refusal) => Err(refusal),
+            Err(
+                std::sync::mpsc::TryRecvError::Empty | std::sync::mpsc::TryRecvError::Disconnected,
+            ) => Ok(()),
+        }
+    }
+}
+
 impl RunWorker {
     /// Carries out one command and waits for whatever it started.
     ///
@@ -34,32 +85,100 @@ impl RunWorker {
     /// Refuses a command this stage does not run yet, naming what does,
     /// and propagates the failure of landing whatever the command
     /// started.
+    ///
+    /// A refusal the command hands back later, once a provider request
+    /// it sent off this thread has answered, is returned here too, so a
+    /// caller with no loop hears what a page would
+    /// (`crates/sprawling/Spec.lean` §8-42-9).
     pub fn handle(&mut self, command: wire::Command) -> Result<(), AxError> {
         self.history_admits(&command)?;
-        let carried = self.carry_out(command, wire::Reply::nowhere());
+        let (reply, refused_later) = KeptRefusal::open();
+        let carried = self.carry_out(command, reply);
         // The lanes are landed even when the command was refused: a
         // refusal raised after take-off leaves a run driving, and this
         // caller is the only one that will ever finish it.
         let landed = self.land_the_rest();
-        carried.and(landed)
+        carried.and(landed).and(refused_later.outcome())
     }
 
     /// # Errors
     /// Refuses a command this stage does not run yet, naming what does.
     fn carry_out(&mut self, command: wire::Command, reply: wire::Reply) -> Result<(), AxError> {
         let name = command.name();
-        let outcome = self.run_command(command, reply);
+        let in_hand = InHand {
+            name,
+            reply: reply.clone(),
+        };
+        let outcome = self.with_in_hand(in_hand, |worker| worker.run_command(command, reply));
         if let Err(err) = &outcome {
-            // A refused command is the first thing a person asks about,
-            // so it is written at the default floor. It is written here
-            // rather than at the caller, because every caller wants it.
-            self.note(
-                runtime::diagnostics::Level::Refuse,
-                "accounting::worker",
-                &format!("{name} refused: {err}; {}", err.recovery()),
-            );
+            self.note_refused(name, err);
         }
         outcome
+    }
+
+    /// Writes that the command `name` was refused, and why.
+    ///
+    /// A refused command is the first thing a person asks about, so it
+    /// is written at the default floor. It is written here rather than
+    /// at the caller, because every caller wants it.
+    fn note_refused(&mut self, name: &str, err: &AxError) {
+        self.note(
+            runtime::diagnostics::Level::Refuse,
+            "accounting::worker",
+            &format!("{name} refused: {err}; {}", err.recovery()),
+        );
+    }
+
+    /// Runs `work` with `in_hand` as the command the door holds, and
+    /// puts back whatever it held before.
+    pub(in crate::worker) fn with_in_hand<R>(
+        &mut self,
+        in_hand: InHand,
+        work: impl FnOnce(&mut RunWorker) -> R,
+    ) -> R {
+        let outer = self.doorstep.in_hand.replace(in_hand);
+        let done = work(self);
+        self.doorstep.in_hand = outer;
+        done
+    }
+
+    /// What the command in hand needs in order to be finished later,
+    /// once a provider request it sends off this thread answers. With no
+    /// command in hand nobody asked, and a refusal is only noted.
+    pub(in crate::worker) fn finishing(&self) -> Finishing {
+        let (name, reply) = match &self.doorstep.in_hand {
+            Some(InHand { name, reply }) => (*name, reply.clone()),
+            None => ("a request the city made itself", wire::Reply::nowhere()),
+        };
+        Finishing {
+            name,
+            key: self.doorstep.entrance.carrying(),
+            reply,
+        }
+    }
+
+    /// Finishes a command whose provider request has answered: `work`
+    /// records the answer under the command's key, and a refusal is
+    /// noted, remembered as that key's answer and handed back, as
+    /// [`Self::serve_one`] does for a command refused at once
+    /// (`crates/sprawling/Spec.lean` §8-42-9).
+    pub(in crate::worker) fn finish(
+        &mut self,
+        finishing: Finishing,
+        work: impl FnOnce(&mut RunWorker) -> Result<(), AxError>,
+    ) {
+        let Finishing { name, key, reply } = finishing;
+        let outer = self.doorstep.entrance.carrying();
+        self.doorstep.entrance.carry(key);
+        let outcome = work(self);
+        self.doorstep.entrance.carry(outer);
+        if let Err(err) = outcome {
+            self.note_refused(name, &err);
+            if let Some(key) = key {
+                self.doorstep.entrance.refused_later(key, &err);
+            }
+            self.hand_back(&reply, err);
+        }
     }
 
     /// Runs one command from the desk, refusal included.

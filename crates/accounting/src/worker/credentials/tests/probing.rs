@@ -89,7 +89,7 @@ fn a_probe_held_by_a_silent_provider_leaves_the_next_command_answered() {
     let endpoint_said = said.clone();
     let pace: Pace = std::sync::Arc::new(move |_: &str| {
         if let Some(held) = silence.lock().unwrap().take() {
-            drop(held.recv_timeout(SILENCE));
+            held.recv_timeout(SILENCE).unwrap_or(());
             endpoint_said.send("provider answered").unwrap();
         }
     });
@@ -124,7 +124,7 @@ fn a_probe_held_by_a_silent_provider_leaves_the_next_command_answered() {
         }),
     });
     // A provider that already stopped waiting has dropped its end.
-    drop(release.send(()));
+    release.send(()).unwrap_or(());
     worker.land_the_rest().unwrap();
     let heard_in_order: Vec<&str> = (0..2)
         .map(|_| heard.recv_timeout(SILENCE).unwrap())

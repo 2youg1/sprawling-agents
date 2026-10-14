@@ -5,12 +5,18 @@
 
 //! The keep-warm door a run's model calls go through, and the doors a
 //! worker keeps once the run has landed (`crates/sprawling/Spec.lean` §8-112).
+//!
+//! Which prefix is due is decided inside each door by
+//! `kernel::keep_warm`, and the `cache_renewed` lines are written on the
+//! accounting thread; the renewal itself is sent from a thread of its
+//! own, so a silent provider holds up nothing but its own door.
 
 use super::RunWorker;
+use super::errand::Answer;
 use kernel::event::Payload;
 use kernel::event::record::CacheRenewed;
 use kernel::{Address, AxError, EventKind, ModelReturn, TimeMs};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// The chosen adapter, wrapped so every request a run sends enters the
 /// keep-warm account (`crates/runtime/Spec.lean` §8-4-2), timed on the worker's own
@@ -29,13 +35,26 @@ pub(crate) type DoorClock = Box<dyn FnMut() -> Result<TimeMs, AxError> + Send>;
 #[derive(Default)]
 pub(in crate::worker) struct Kept {
     doors: BTreeMap<Address, Door>,
+    /// The rooms whose door is out on a renewal. A room leaves this set
+    /// when its door comes back or when a newer door is kept for it, so
+    /// a door that comes back to a room no longer here was superseded.
+    away: BTreeSet<Address>,
+}
+
+/// A door back from its renewal: whose room it keeps, the door itself,
+/// and what the provider answered to each renewal it sent.
+pub(crate) struct Renewed {
+    pub(in crate::worker) room: Address,
+    pub(in crate::worker) door: Door,
+    pub(in crate::worker) answers: Result<Vec<ModelReturn>, AxError>,
 }
 
 impl Kept {
     /// Keeps `door` for `room` when it owes a renewal, replacing that
-    /// room's earlier door; a door that owes none is dropped here, which
-    /// is why the default setting leaves this empty.
+    /// room's earlier door, at home or out; a door that owes none is
+    /// dropped here, which is why the default setting leaves this empty.
     pub(in crate::worker) fn keep(&mut self, room: Address, door: Door) {
+        self.away.remove(&room);
         if door.next_due().is_some() {
             self.doors.insert(room, door);
         } else {
@@ -43,38 +62,61 @@ impl Kept {
         }
     }
 
-    /// The earliest instant any kept door is due.
+    /// The earliest instant any door at home is due. A door out on a
+    /// renewal is not counted, so nothing wakes for it twice.
     pub(in crate::worker) fn next_due(&self) -> Option<u64> {
         self.doors.values().filter_map(Door::next_due).min()
     }
 
-    /// Sends every renewal due by `now_ms` and returns what each one
-    /// cost or why it was refused, by room; then lets go of the doors
-    /// that owe nothing more and of the doors whose renewal failed: a
-    /// provider that refused a renewal is not asked again every wake.
-    pub(in crate::worker) fn renew_due(&mut self, now_ms: u64) -> Vec<(Address, CacheRenewed)> {
-        let mut renewals = Vec::new();
-        self.doors.retain(|room, door| {
-            let renewed = match door.next_due() {
-                Some(due) if due <= now_ms => door.renew_due(now_ms),
-                Some(_) | None => Ok(Vec::new()),
-            };
-            match renewed {
-                Ok(answers) => {
-                    renewals.extend(
-                        answers
-                            .into_iter()
-                            .map(|answer| (room.clone(), answered(answer))),
-                    );
-                    door.next_due().is_some()
+    /// Takes out every door due by `now_ms`, each to renew on a thread
+    /// of its own, and remembers its room as away.
+    pub(in crate::worker) fn take_due(&mut self, now_ms: u64) -> Vec<(Address, Door)> {
+        let due: Vec<Address> = self
+            .doors
+            .iter()
+            .filter(|(_, door)| door.next_due().is_some_and(|due| due <= now_ms))
+            .map(|(room, _)| room.clone())
+            .collect();
+        due.into_iter()
+            .filter_map(|room| {
+                let door = self.doors.remove(&room)?;
+                self.away.insert(room.clone());
+                Some((room, door))
+            })
+            .collect()
+    }
+
+    /// Takes a door back from its renewal and returns its room with what
+    /// each renewal cost or why it was refused. The door comes home when
+    /// it still owes a renewal and no newer door replaced it meanwhile; a
+    /// door whose renewal failed is let go, so a provider that refused a
+    /// renewal is not asked again every wake.
+    pub(in crate::worker) fn came_back(
+        &mut self,
+        renewed: Renewed,
+    ) -> (Address, Vec<CacheRenewed>) {
+        let Renewed {
+            room,
+            door,
+            answers,
+        } = renewed;
+        let still_ours = self.away.remove(&room);
+        let lines = match answers {
+            Ok(answers) => {
+                if still_ours && door.next_due().is_some() {
+                    self.doors.insert(room.clone(), door);
                 }
-                Err(refused) => {
-                    renewals.push((room.clone(), CacheRenewed::Refused { refused }));
-                    false
-                }
+                answers.into_iter().map(answered).collect()
             }
-        });
-        renewals
+            Err(refused) => vec![CacheRenewed::Refused { refused }],
+        };
+        (room, lines)
+    }
+
+    /// Forgets that `room`'s door is out: it never left, because its
+    /// thread would not start.
+    pub(in crate::worker) fn lost(&mut self, room: &Address) {
+        self.away.remove(room);
     }
 }
 
@@ -87,26 +129,56 @@ fn answered(answer: ModelReturn) -> CacheRenewed {
 }
 
 impl RunWorker {
-    /// When the next kept door is due, if any is kept.
+    /// When the next kept door is due, if any is kept at home.
     pub(crate) fn warm_due(&self) -> Option<u64> {
         self.warm.next_due()
     }
 
-    /// Renews whatever is due at `now` and writes one `cache_renewed`
-    /// line per renewal under its room, answered or refused. Only a line
-    /// the ledger would not take goes to the diagnostic log, and it does
-    /// not stop the city, as a schedule that cannot be read does not.
+    /// Hands every door due at `now` to a thread of its own, which sends
+    /// its renewals; the answers are recorded by [`Self::record_renewal`]
+    /// when they come back (`crates/sprawling/Spec.lean` §8-112, D78).
+    ///
+    /// A door whose thread will not start is recorded as refused and let
+    /// go, as a door the provider refused is.
     pub(crate) fn renew_warm(&mut self, now: TimeMs) {
-        for (room, renewed) in self.warm.renew_due(now.value()) {
-            let written = Payload::of(&renewed)
-                .and_then(|line| self.record_at(EventKind::CacheRenewed, room, line));
-            if let Err(err) = written {
-                self.note(
-                    runtime::diagnostics::Level::Effect,
-                    "crate::worker::keeping_warm",
-                    &format!("a keep-warm renewal was not recorded: {err}"),
-                );
+        for (room, mut door) in self.warm.take_due(now.value()) {
+            let at = room.clone();
+            let sent = self.flight.errands.send(move || {
+                let answers = door.renew_due(now.value());
+                Answer::Renewed(Renewed {
+                    room: at,
+                    door,
+                    answers,
+                })
+            });
+            if let Err(refused) = sent {
+                self.warm.lost(&room);
+                self.write_renewal(room, CacheRenewed::Refused { refused });
             }
+        }
+    }
+
+    /// Takes a door back from its renewal and writes one `cache_renewed`
+    /// line per renewal under its room, answered or refused.
+    pub(in crate::worker) fn record_renewal(&mut self, renewed: Renewed) {
+        let (room, lines) = self.warm.came_back(renewed);
+        for line in lines {
+            self.write_renewal(room.clone(), line);
+        }
+    }
+
+    /// Writes one `cache_renewed` line. Only a line the ledger would not
+    /// take goes to the diagnostic log, and it does not stop the city,
+    /// as a schedule that cannot be read does not.
+    fn write_renewal(&mut self, room: Address, renewed: CacheRenewed) {
+        let written = Payload::of(&renewed)
+            .and_then(|line| self.record_at(EventKind::CacheRenewed, room, line));
+        if let Err(err) = written {
+            self.note(
+                runtime::diagnostics::Level::Effect,
+                "crate::worker::keeping_warm",
+                &format!("a keep-warm renewal was not recorded: {err}"),
+            );
         }
     }
 }
@@ -184,12 +256,29 @@ mod tests {
         door
     }
 
+    /// Sends every renewal due at `now_ms` on this thread, as each
+    /// door's own thread would, and takes every door back.
+    fn renew_here(kept: &mut Kept, now_ms: u64) -> Vec<(Address, CacheRenewed)> {
+        kept.take_due(now_ms)
+            .into_iter()
+            .flat_map(|(room, mut door)| {
+                let answers = door.renew_due(now_ms);
+                let (room, lines) = kept.came_back(Renewed {
+                    room,
+                    door,
+                    answers,
+                });
+                lines.into_iter().map(move |line| (room.clone(), line))
+            })
+            .collect()
+    }
+
     /// Wakes `kept` at every second through two cache lifetimes and
     /// returns every renewal it reported.
     fn renewals_through_two_lifetimes(kept: &mut Kept) -> Vec<(Address, CacheRenewed)> {
         let renewals = (USED_AT..=USED_AT + 2 * TTL_MS)
             .step_by(1_000)
-            .flat_map(|now| kept.renew_due(now))
+            .flat_map(|now| renew_here(kept, now))
             .collect();
         assert_eq!(kept.next_due(), None);
         renewals
@@ -270,9 +359,9 @@ mod tests {
 
     impl Model for Silent {
         fn call(&mut self, req: &ModelRequest) -> Result<ModelReturn, AxError> {
-            self.calls += 1;
+            self.calls = self.calls.saturating_add(1);
             if self.calls > 1 {
-                drop(self.release.recv_timeout(SILENCE));
+                self.release.recv_timeout(SILENCE).unwrap_or(());
                 self.said.send("provider answered").unwrap();
             }
             Provider {
@@ -338,21 +427,21 @@ mod tests {
             heard_first.extend(heard.try_recv());
         }
         // A provider that already stopped waiting has dropped its end.
-        drop(release.send(()));
+        release.send(()).unwrap_or(());
         worker.land_the_rest().unwrap();
         lane.join().unwrap();
         let heard_in_order: Vec<&str> = heard_first.into_iter().chain(heard.try_iter()).collect();
 
         assert_eq!(heard_in_order, vec!["relay answered", "provider answered"]);
-        let renewed: Vec<serde_json::Value> =
+        let renewed: Vec<Option<serde_json::Value>> =
             runtime::replay::verify_ledger_dir(&report.ledger_dir)
                 .unwrap()
                 .raw_lines()
                 .iter()
                 .map(|line| serde_json::from_slice::<serde_json::Value>(line).unwrap())
-                .filter(|record| record["kind"] == "cache_renewed")
-                .map(|record| record["addr"].clone())
+                .filter(|record| record.get("kind") == Some(&serde_json::json!("cache_renewed")))
+                .map(|record| record.get("addr").cloned())
                 .collect();
-        assert_eq!(renewed, vec![serde_json::json!(room.as_str())]);
+        assert_eq!(renewed, vec![Some(serde_json::json!(room.as_str()))]);
     }
 }

@@ -40,6 +40,7 @@ mod desk;
 mod dispatching;
 mod doorstep;
 mod driving;
+mod errand;
 pub mod folds;
 mod freezing;
 pub mod genesis;
