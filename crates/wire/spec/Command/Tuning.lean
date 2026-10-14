@@ -29,7 +29,7 @@ pub struct EndpointTuning {
 }
 
 ProbeEndpoint  { name, base_url, dialect, secret, auth_header, tuning: EndpointTuning, idem }
-AttachEndpoint { name, base_url, dialect, secret, auth_header, admit, tuning: EndpointTuning, idem }
+AttachEndpoint { name, base_url, dialect, secret, auth_header, admit, named, tuning: EndpointTuning, idem }   // admit 与 named 见 §8 形状决定、D57
 EndpointSummary { name, label, base_url, dialect, connection_kind, models, local, has_credential, tuning, account_status }   // 后两件见 §8-85
 ```
 

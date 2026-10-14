@@ -63,7 +63,7 @@ pub struct Welcome { pub wire_v: u32, pub schema: B3Hash, pub resume_from: Optio
 - **`/enroll` 答的是凭据的下场，不是请求的下场**：命令一进桌就回 201，vault 拒收就谁也不知道，人盯着一条成功消息而密钥根本没存。所以路由**先订阅事件流再投递命令**（顺序是承载的：先投递会让完成得快的 worker 把那一行写进没人在读的流里），然后等三选一——`secret_captured` 且 `ref` 与所投的引用相符即 **201**，正文就是那条记录里的 `ref`（答出去的就是存进去的那句），`Reply` 回来的拒绝即 **422**，两者都没有即 **202 并在正文里说明为什么是 202**。`SecretSink` 因此长出 `Reply` 参数：worker 在另一条线程上几分钟后拒绝，没有地址的拒绝到不了任何人。
 - **回复通道关闭不等于成功**：worker 成功时不调用 `reply.refuse`，`Reply` 随之析构，于是 `recv()` 立即返回 `None`。若把它读成一个答案，它会与 `secret_captured` 赛跑并经常赢——所以关闭只熄灭那条分支，201 仍然只由事件给出。
 - **`ConfigureBuilding` 写的是楼自己那一级**：`[sandbox]` 与 `[mcp]` 沿城→楼→房间解析；没有写面，一个人就读得到自己被什么治理却改不动它。答复里回的是**楼自己那一级的值**而不是解析后的值——用解析值填表，第一次按保存就会把城一级的设置抄进楼里。两个字段各自可缺省，缺省即不动那一节；`mcp` 为空表是「这栋楼一个服务器都不够到」，与「没说」不是一回事。
-- **`ProbeEndpoint` 与 `AttachEndpoint` 是两条命令而不是一个开关**：模型清单若只作为 attach 的副产物到达，「看看这把 key 买到了什么」就必须先注册。两者的 `IdemKey` 由不同素材派生（`probe:` 前缀），因为问与登记是两件事，一件不得把另一件去重掉。`AttachEndpoint.admit` 空表即全部准入——没看过清单的人本就是这个意思；表里有而 endpoint 不供应的名字被略去而不是被承诺，与阅览室对不在书架上的 skill 的答复同形。
+- **`ProbeEndpoint` 与 `AttachEndpoint` 是两条命令而不是一个开关**：模型清单若只作为 attach 的副产物到达，「看看这把 key 买到了什么」就必须先注册。两者的 `IdemKey` 由不同素材派生（`probe:` 前缀），因为问与登记是两件事，一件不得把另一件去重掉。`AttachEndpoint` 带两张单子（D57）：`admit` 是人在端点列出的模型里勾的，`named` 是人自己打的 id。两张都空即全部准入——没看过清单的人本就是这个意思；不全空就只登记点到的。`admit` 里有而 endpoint 不供应的名字被略去而不是被承诺，与阅览室对不在书架上的 skill 的答复同形；`named` 里的 id 列表里没有也照登，行上标 `named`。非空的 `admit` 一个都对不上而 `named` 为空时整次拒绝（gateway D39）。
 
 2. **`name()` 的穷尽 match 是计数断言的真机制**。光有一条计数断言拦不住「加 variant 但不改表」；`name()` 穷尽后，新 variant 必须在 `name()` 里现身，测试再断言它必在名表内。三道连环：编译 → 名表 → schema 哈希 golden → SPEC 同集变更。
 3. **`Command` 泛型于 secret 携带者，远端实例把它钉成不可居住类型**（强于「手写 Serialize 在该臂报错」的写法）：
@@ -316,4 +316,15 @@ wire shape golden 与客户端协议。-/
 **被否**：每条车道改自己的帧——帧表、golden 与 `wire.ts` 是共享的热点文件，`WIRE_V` 还会在一次推送里进好几位；把执行者与帧放在同一条车道——那一条车道就成了其余八条的串行前提。
 
 **重开参数**：下一版若只有一两处线上改动，按 D1 照常各自进位即可。
+-/
+
+/-! D57 人打的 id 走 `AttachEndpoint.named`，模型行带 `listing`
+
+**决定**：`AttachEndpoint` 多一个必填的 `named: Vec<String>`，装人在「端点没有列出的模型 id」框里打的 id，与 `admit`（人在端点列出的模型里勾的）分开；城读到列表时也收下它们（gateway D39）。`ModelFactsSummary` 多一个必填的 `listing: Listing`（`listed`｜`named`，kernel D59），页面据此标出人点名、端点没列出的行。`WIRE_V` 从 65 进到 66，同一个变更集重生 schema golden、wire shape golden、`client/src/wire.ts`（`cargo xtask wire-ts`），并改 `tools/adversary/src/Sprawling/Door.lean` 的帧与 `tools/adversary/src/Sprawling/Regression.lean` 的渲染。
+
+**理由**：`admit` 的定义是「这个端点供应的模型里城收哪些」；人打的 id 也塞进这一张，城就分不出哪个该从列表里挑、哪个该照人的话登记，读到列表时人打的 id 被当作列表外的勾选略去，一次登记登记出零个模型。中转站常常服务列表里没有的 id，人打一个 id 就是要它被用上（裁定）。标记由城写在行上，不让页面拿自己手里的列表去比：页面的列表是上一次探测读到的，登记时城读的可能是另一份。
+
+**被否**：①读到列表时客户端不放人打的 id：人打的 id 用不上；②仍是一张单子、城对列表外的 id 一律照登：端点不再列出的一行勾选会悄悄变成人的话；③`named` 可缺省：线上命令的字段一律必填（§8 的形状决定），缺省会替旧页面做一个选择，而帧本来就因改形要进一位。
+
+**重开参数**：人打的 id 需要带上自己的事实（窗口、上限）一起登记时，`named` 由 id 表改成行表。
 -/

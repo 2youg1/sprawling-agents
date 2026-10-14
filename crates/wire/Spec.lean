@@ -391,6 +391,7 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 | D54 | 每个调用方都要非环境凭据，入口先判 Host 与 Origin | `crates/wire/spec/Reception/Entry.lean` |
 | D55 | 会话令牌在最后一条 socket 结束后空闲 60 s 失效 | `crates/wire/spec/Server/Sessions.lean` |
 | D56 | 远程监听有自己的 Host 与 Origin 名单，由同一个 `decide_entry` 判 | `crates/wire/spec/Reception/Entry.lean` |
+| D57 | 人打的 id 走 `AttachEndpoint.named`，模型行带 `listing` | `crates/wire/spec/Frames.lean` |
 -/
 
 /-! ## 13 依赖选型

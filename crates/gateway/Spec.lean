@@ -370,6 +370,10 @@ kernel 已有码，语义照 Custody 一节；不新增码。
 - D42 pre-warm 只带共享部分与一条最小的消息，消息上不打断点，只要一个输出 token：`crates/gateway/spec/Concurrency.lean`，§8-40 之后
 - D43 一次等待是 `prefix_held` 这一行，经模型端口交给回合层写下：`crates/gateway/spec/Concurrency.lean`，§8-40 之后
 - D44 委派出的子 run 的第一轮账号从母 run 房间的绑定开始：`crates/gateway/spec/Router.lean`，在 D30 之后
+- D45 窗口与上限的梯子是 `Figures::resolve` 一个函数，上一次登记只拿人说过的数作答，每个数记下它的来处：`crates/gateway/spec/Provider.lean`
+- D46 探测失败的再登记沿用书里已登记的行，只给新报的 id 缺省事实：`crates/gateway/spec/Endpoint/Models.lean`
+- D47 人打的 id 经 `named` 登记，读到列表时也收；勾的一个都对不上就拒：`crates/gateway/spec/Endpoint/Models.lean`
+- D48 一次再登记若去掉一个占着角色的模型，就拒绝，并点名那个角色：`crates/gateway/spec/Router.lean`
 -/
 
 /-! ## 13 依赖选型

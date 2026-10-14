@@ -73,6 +73,7 @@ pub struct ModelFactsSummary {
     // …既有字段：id、context_tokens、max_output_tokens、input_modalities、input_price、output_price…
     pub thinking: ThinkingOffer,       // 这个（Endpoint，模型）提供的思考档，带来源
     pub canonical: String,             // 这个模型跨供应方的身份
+    pub listing: Listing,              // 端点列出的（listed），还是人点名、端点没列出的（named）；kernel D59、D57
 }
 pub struct ThinkingOffer {
     pub levels: Vec<Effort>,           // 城的固定升序；只含提供的档，恒不含 `none`
@@ -92,6 +93,7 @@ pub struct EffortWord { pub effort: Effort, pub word: String }
 - **单位是（Endpoint，模型）**：同一个模型在不同供应方、不同 face 上提供的档位不同，所以 offer 挂在端点的模型行上；换供应方，页面画的思考档带跟着换，人存下的档位不变（人定下的规矩：模型与档位分开存）。
 - **`levels` 为空就没有思考控制**：页面不画思考档带，也不画令牌上的档位一段；只有开关的模型 `levels` 为空而 `on` 是 `Allowed`，默认档 `High` 编码成「开启思考」。`none` 恒不在 `levels` 里，关闭思考不是一档。
 - **`canonical` 只由 `gateway::provider::identity` 算**：上游说出它自己的规范 id 时用它，否则用模型 id 去掉最后一个 `/` 之前的组织前缀后转成小写；两行是同一个模型，当且仅当两个字符串相等，不做模糊匹配。页面按它把选择器里的模型合并成一行，旁边列出每个供应方自己的 id。
+- **`listing` 是城登记时写下的来历，不是页面的推断**：`named` 的行其余事实都缺席，因为没人问过 provider；页面在这一行上写「你点名的，端点没列出」，而不是把缺席读成 provider 没说（gateway D39）。
 - **现状**：`canonical` 今天只走第二条（上游的规范 id 在 `ModelFacts` 读出它之后接上）；`thinking` 今天是 `from: Unknown` 的空 offer，直到梯子落地。
 - `WIRE_V` 随本版的改形进一位（D53）。
 -/
