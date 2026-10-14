@@ -60,10 +60,17 @@ function wired(layer: Layer, cursor: number, value: string | null = null): { loo
   return { look: lookOf(view, hands), record };
 }
 
-function pressing(key: string): { readonly key: string; readonly prevented: () => boolean; preventDefault(): void } {
+// Whether an input method is composing when the key is pressed.
+type Typing = "settled" | "composing";
+
+function pressing(
+  key: string,
+  typing: Typing = "settled",
+): { readonly key: string; readonly isComposing: boolean; readonly prevented: () => boolean; preventDefault(): void } {
   let prevented = false;
   return {
     key,
+    isComposing: typing === "composing",
     prevented: () => prevented,
     preventDefault: () => {
       prevented = true;
@@ -129,6 +136,14 @@ describe("the value a look is given", () => {
       { kind: "close", focus: "leave" },
     ]);
     expect([down.prevented(), tab.prevented()]).toEqual([true, false]);
+  });
+
+  test("a key pressed while an input method composes is the input method's, so the confirming Enter takes no row (only_settled_keys_act)", () => {
+    const { look, record } = wired("open", 1);
+    const presses = ["Enter", "ArrowDown", "Escape"].map((key) => pressing(key, "composing"));
+    for (const each of presses) look.search.onkeydown(each);
+    expect(record.acted.map((each) => each.kind)).toEqual(["pass", "pass", "pass"]);
+    expect(presses.map((each) => each.prevented())).toEqual([false, false, false]);
   });
 
   test("a closed popup answers no key", () => {

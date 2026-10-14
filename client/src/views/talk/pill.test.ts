@@ -56,10 +56,14 @@ function drawn(choices: readonly Choice[], held: Partial<PillHeld>): { readonly 
 
 const INSIDE = new EventTarget();
 
-function press(key: string): KeyPress & { readonly marks: string[] } {
+// Whether an input method is composing when the key is pressed.
+type Typing = "settled" | "composing";
+
+function press(key: string, typing: Typing = "settled"): KeyPress & { readonly isComposing: boolean; readonly marks: string[] } {
   const marks: string[] = [];
   return {
     key,
+    isComposing: typing === "composing",
     marks,
     preventDefault: () => marks.push("prevented"),
     stopPropagation: () => marks.push("stopped"),
@@ -96,6 +100,18 @@ test("the list's keys move the cursor, take the row under it, close, and let Tab
     calls: ["point 2", "point 0", "point 0", "point 2", "close opener", "close opener", "close leave"],
     picked: ["atlas/api"],
   });
+});
+
+test("a key pressed while an input method composes in the filter is the input method's: the confirming Enter takes no row", () => {
+  const many = Array.from({ length: FILTER_AFTER + 1 }, (_unused, index) => ({ value: `room-${String(index)}`, label: `room ${String(index)}` }));
+  const { look, heard } = drawn(many, { at: 3 });
+  const keys = ["Enter", "ArrowDown", "Escape"].map((key) => {
+    const event = press(key, "composing");
+    look.menu?.filter?.onkeydown(event);
+    return event.marks;
+  });
+  expect(keys).toEqual([[], [], []]);
+  expect(heard).toEqual({ calls: [], picked: [] });
 });
 
 test("the cursor stays inside the list at both ends", () => {
