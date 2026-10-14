@@ -16,6 +16,7 @@ use super::errand::Answer;
 use kernel::event::Payload;
 use kernel::event::record::CacheRenewed;
 use kernel::{Address, AxError, EventKind, ModelReturn, TimeMs};
+use runtime::prefix::warmth::Lead;
 use std::collections::{BTreeMap, BTreeSet};
 
 /// The chosen adapter, wrapped so every request a run sends enters the
@@ -27,7 +28,8 @@ pub(crate) type Door = runtime::prefix::warmth::Warmed<DoorClock>;
 /// the lane the run is driven on.
 pub(crate) type DoorClock = Box<dyn FnMut() -> Result<TimeMs, AxError> + Send>;
 
-/// The doors that still owe a renewal, one per room.
+/// The doors that still owe a renewal, one per room, and the lead each
+/// endpoint's renewals leave with.
 ///
 /// One per room rather than one per run: a later run in the same room
 /// sent the prefix the next run will use, so the earlier door would only
@@ -35,6 +37,10 @@ pub(crate) type DoorClock = Box<dyn FnMut() -> Result<TimeMs, AxError> + Send>;
 #[derive(Default)]
 pub(in crate::worker) struct Kept {
     doors: BTreeMap<Address, Door>,
+    /// One reading per endpoint name, shared by every door that reaches
+    /// it, so a renewal's round trip times every room on that endpoint
+    /// (`crates/runtime/spec/Prefix.lean` D98).
+    leads: BTreeMap<String, Lead>,
     /// The rooms whose door is out on a renewal. A room leaves this set
     /// when its door comes back or when a newer door is kept for it, so
     /// a door that comes back to a room no longer here was superseded.
@@ -50,6 +56,12 @@ pub(crate) struct Renewed {
 }
 
 impl Kept {
+    /// The lead of the endpoint named `endpoint`, opened at no reading
+    /// the first time a door reaches it.
+    pub(in crate::worker) fn lead_of(&mut self, endpoint: &str) -> Lead {
+        self.leads.entry(endpoint.to_owned()).or_default().clone()
+    }
+
     /// Keeps `door` for `room` when it owes a renewal, replacing that
     /// room's earlier door, at home or out; a door that owes none is
     /// dropped here, which is why the default setting leaves this empty.
@@ -246,7 +258,7 @@ mod tests {
     /// A door that sent one real request at `USED_AT`.
     fn door_after_one_run(setting: KeepWarm, provider: impl Model + Send + 'static) -> Door {
         let clock: DoorClock = Box::new(|| Ok(TimeMs::new(USED_AT)));
-        let mut door = Door::new(Box::new(provider), setting, clock);
+        let mut door = Door::new(Box::new(provider), setting, clock, Lead::default());
         door.call(&ModelRequest {
             policy: BuildingPolicy::default(),
             segments: [B3Hash::digest(b"prefix"); 4],

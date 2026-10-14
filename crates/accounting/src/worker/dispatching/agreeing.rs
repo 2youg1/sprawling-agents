@@ -154,6 +154,7 @@ impl RunWorker {
             adapter,
             city::keep_warm(&self.city_root, building.addr())?,
             Box::new(move || clock.now()),
+            self.warm.lead_of(&provider),
         );
         let retries = chosen.endpoint.tuning.request_max_retries;
         Ok(Seat::Model(Agreed {

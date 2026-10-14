@@ -1576,6 +1576,7 @@ fn a_read_handed_over_behind_the_keep_warm_door_starts_before_the_model_returns(
         Box::new(model),
         kernel::keep_warm::KeepWarm::default(),
         || Ok(TimeMs::new(0)),
+        runtime::prefix::warmth::Lead::default(),
     );
     let mut invoke = Placed::of(Box::new(AnnouncedRead {
         happened: happened.clone(),

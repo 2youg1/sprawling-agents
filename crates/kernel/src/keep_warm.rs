@@ -12,7 +12,7 @@
 //! is observed where every request's usage is recorded; this decision
 //! reads no balance and refuses nothing.
 
-use crate::consts_external::PROMPT_CACHE_TTL_SECS;
+use crate::consts_external::{PROMPT_CACHE_RENEWAL_MARGIN_SECS, PROMPT_CACHE_TTL_SECS};
 use serde::{Deserialize, Serialize};
 
 /// Whether this city renews a warm prompt cache before it expires.
@@ -28,30 +28,41 @@ pub enum KeepWarm {
     FiveMinute,
 }
 
-/// One prefix's cache as last seen, in milliseconds: when a real request
-/// carried it, and when the provider last refreshed it. A renewal moves
-/// only the second, which is what bounds renewals to one per real use.
+/// One prefix's cache as last seen: when a real request carried it, in
+/// milliseconds, and whether that use still owes its one renewal.
+///
+/// The renewal is recorded rather than inferred from the times, so the
+/// bound of one renewal per real use holds whatever lead a caller
+/// passes (kernel D59).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CacheUse {
     used_ms: u64,
-    refreshed_ms: u64,
+    renewal: Renewal,
+}
+
+/// Whether a real use has had its renewal.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Renewal {
+    Owed,
+    Spent,
 }
 
 impl CacheUse {
-    /// A real request carrying the prefix was sent at `at_ms`.
+    /// A real request carrying the prefix was sent at `at_ms`; the use
+    /// owes one renewal.
     pub fn sent(at_ms: u64) -> CacheUse {
         CacheUse {
             used_ms: at_ms,
-            refreshed_ms: at_ms,
+            renewal: Renewal::Owed,
         }
     }
 
-    /// A renewal request refreshed the cache at `at_ms`; the last real
-    /// use stays where it was.
+    /// The renewal this use owed has been sent; the use owes none until
+    /// the next real request.
     #[must_use]
-    pub fn renewed(self, at_ms: u64) -> CacheUse {
+    pub fn renewed(self) -> CacheUse {
         CacheUse {
-            refreshed_ms: self.refreshed_ms.max(at_ms),
+            renewal: Renewal::Spent,
             ..self
         }
     }
@@ -59,21 +70,23 @@ impl CacheUse {
 
 /// The instant the next renewal request is sent, or `None` when none is.
 ///
-/// `lead_ms` is the round trip to the provider as the caller measured it:
-/// the renewal leaves that long before the cache expires, so the provider
-/// reads it while the entry is still alive. A renewal whose instant lies
-/// more than one cache lifetime after the last real use is not sent.
+/// `lead_ms` is how long a request to the caller's endpoint takes from
+/// leaving the city to the provider starting it, as the caller measured
+/// it. The renewal is due that long, plus
+/// [`PROMPT_CACHE_RENEWAL_MARGIN_SECS`], before the lifetime the real
+/// use started ends, so a renewal no slower than the lead starts while
+/// the entry is still alive. A use whose renewal was sent plans none.
 pub fn renewal_due(setting: KeepWarm, cache: CacheUse, lead_ms: u64) -> Option<u64> {
-    match setting {
-        KeepWarm::Off => None,
-        KeepWarm::FiveMinute => {
-            let ttl_ms = PROMPT_CACHE_TTL_SECS.checked_mul(1000)?;
-            let due = cache
-                .refreshed_ms
-                .checked_add(ttl_ms)?
-                .saturating_sub(lead_ms);
-            (due.saturating_sub(cache.used_ms) <= ttl_ms).then_some(due)
-        }
+    match (setting, cache.renewal) {
+        (KeepWarm::Off, Renewal::Owed | Renewal::Spent)
+        | (KeepWarm::FiveMinute, Renewal::Spent) => None,
+        (KeepWarm::FiveMinute, Renewal::Owed) => Some(
+            cache
+                .used_ms
+                .checked_add(PROMPT_CACHE_TTL_SECS.checked_mul(1000)?)?
+                .saturating_sub(PROMPT_CACHE_RENEWAL_MARGIN_SECS.checked_mul(1000)?)
+                .saturating_sub(lead_ms),
+        ),
     }
 }
 
@@ -81,7 +94,6 @@ pub fn renewal_due(setting: KeepWarm, cache: CacheUse, lead_ms: u64) -> Option<u
 #[allow(clippy::arithmetic_side_effects, reason = "test code")]
 mod tests {
     use super::*;
-    use crate::consts_external::PROMPT_CACHE_RENEWAL_MARGIN_SECS;
     use proptest::prelude::*;
 
     const TTL_MS: u64 = PROMPT_CACHE_TTL_SECS * 1000;
@@ -93,7 +105,7 @@ mod tests {
         let use_at = 1_000_000;
         let cases = [
             CacheUse::sent(use_at),
-            CacheUse::sent(use_at).renewed(use_at + TTL_MS - LEAD_MS),
+            CacheUse::sent(use_at).renewed(),
             CacheUse::sent(0),
         ];
         for cache in cases {
@@ -105,8 +117,8 @@ mod tests {
     fn five_minute_renews_a_used_prefix_once_just_before_it_expires() {
         let use_at = 1_000_000;
         let first = renewal_due(KeepWarm::FiveMinute, CacheUse::sent(use_at), LEAD_MS);
-        assert_eq!(first, Some(use_at + TTL_MS - LEAD_MS));
-        let renewed = CacheUse::sent(use_at).renewed(use_at + TTL_MS - LEAD_MS);
+        assert_eq!(first, Some(use_at + TTL_MS - MARGIN_MS - LEAD_MS));
+        let renewed = CacheUse::sent(use_at).renewed();
         assert_eq!(renewal_due(KeepWarm::FiveMinute, renewed, LEAD_MS), None);
     }
 
@@ -166,7 +178,7 @@ mod tests {
                         );
                         since_use += 1;
                         prop_assert!(since_use <= 1, "a second renewal for the use at {used_ms}");
-                        cache = Some((used_ms, kept.renewed(now_ms)));
+                        cache = Some((used_ms, kept.renewed()));
                     }
                 }
             }
