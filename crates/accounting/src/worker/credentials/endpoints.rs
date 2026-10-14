@@ -697,11 +697,11 @@ mod tests {
         );
     }
 
-    /// The two rungs this layer owns: what the person sends now, and
-    /// what the book already holds for the same model. The rungs above
-    /// and below them - the provider's own model list and the city's
-    /// policy default - are decided in `gateway::provider::ceiling`,
-    /// where all four are tested together.
+    /// The two facts this layer hands the ladder that matter here: what
+    /// the person sends now, and what the book already holds for the
+    /// same model. Every rung is decided in `gateway::provider::ceiling`
+    /// and tested together there; this test is the production path that
+    /// carries a figure the person stated into the next empty pick.
     #[test]
     fn an_empty_ceiling_keeps_the_one_this_model_was_registered_with() {
         let dir = tempfile::tempdir().unwrap();
