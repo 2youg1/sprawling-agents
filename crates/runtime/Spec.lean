@@ -337,6 +337,7 @@ envelope 探查与全解共用 kernel 的解析（Value 探查仅取五键，不
 | D89 | `Watchdog` 执行 `AccountRound` 的处置，不持有模型、不另写换号循环 | `crates/runtime/spec/Watchdog.lean` |
 | D97 | 一栋楼共享前缀的哪几块，由段格说出 | `crates/runtime/spec/Prefix.lean` |
 | D98 | 每次尝试之后问一次端点门前的等待，有就记一行 `prefix_held` | `crates/runtime/spec/Turn/Recovery.lean` |
+| D99 | 保温门转发 `Model` 的每一扇调用门，不让任何一扇落到 trait 的缺省实现 | `crates/runtime/spec/Prefix.lean`（§8-4-2） |
 -/
 
 /-! ## 13 依赖选型

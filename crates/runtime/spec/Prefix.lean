@@ -89,7 +89,7 @@ impl Warmth {
 - 续期请求是该前缀最近一次真实请求原样重发，只把 `max_tokens` 压到 1：缓存按前缀字节命中，与输出上限无关，所以 1 个输出 token 是续期能付的最低价。
 - 一个前缀只留最近一条请求：同一前缀后来的请求覆盖前一条，内存随前缀数而非请求数增长。
 - 何时续、续几次全由 `kernel::keep_warm::renewal_due` 判定，本模块不另写第二个 TTL。
-- 真实请求进账的门是 `Warmed`：它拥有一次 run 调用的 adapter，本身也是 `kernel::Model`，所以 turn loop 照旧只见 `&mut dyn Model`，每一次成功的调用（阻塞门或流式门）都在返回后按发出时刻记进 `Warmth`。失败的调用不记：provider 没有读到的前缀没有可续的缓存。
+- 真实请求进账的门是 `Warmed`：它拥有一次 run 调用的 adapter，本身也是 `kernel::Model`，所以 turn loop 照旧只见 `&mut dyn Model`，每一次成功的调用（阻塞门、流式门或推测门）都在返回后按发出时刻记进 `Warmth`。失败的调用不记：provider 没有读到的前缀没有可续的缓存。
 
 ```rust
 /// 拥有 adapter 的保温门；clock 取自 bin::assembly 的唯一采样点。
@@ -100,11 +100,22 @@ impl<C: FnMut() -> Result<TimeMs, AxError>> Warmed<C> {
     /// 经自己拥有的 adapter 发出 now_ms 已到期的续期。
     pub fn renew_due(&mut self, now_ms: u64) -> Result<Vec<ModelReturn>, AxError>;
 }
-impl<C: FnMut() -> Result<TimeMs, AxError>> Model for Warmed<C> { /* call、call_streaming；prefix_held 原样转交它包着的模型 */ }
+impl<C: FnMut() -> Result<TimeMs, AxError>> Model for Warmed<C> { /* call、call_streaming、call_speculating 三扇门都转发给 adapter；prefix_held 原样转交它包着的模型 */ }
 ```
 
 - `lead_ms` 不是常量：`Warmed` 把每次经它发出的调用（真实请求与续期）的往返时长记为下一次续期的提前量，所以提前量跟着所连的 provider 与链路走，不按某一类机器调校。流式调用的往返含生成时长，只会让续期提前，不会让它晚于缓存过期。
 - 未接线（§3）：run 结束后把 `Warmed` 留在 worker 上、在唯一 spawn 点的 attend 循环里按 `next_due` 醒来发续期、把续期的 usage 记成事件。
+-/
+
+/-! D97 保温门转发 `Model` 的每一扇调用门，不让任何一扇落到 trait 的缺省实现
+
+**决定**：`Warmed` 自己实现 `call`、`call_streaming`、`call_speculating`，每一扇都经同一个 `recorded` 转发给它拥有的 adapter，并照同一口径记账；`provider_account`、`account_roster`、`select_account` 也照样转发。turn loop 走哪扇门由 `turn::speculation::Generating` 决定，门只管把那扇门原样交给 adapter。
+
+**理由**：`kernel::Model` 的缺省方法对「没有流」「说不出调用何时完整」的 adapter 是诚实的，所以一扇门漏转发时什么都不失败，只是变慢：缺省的 `call_speculating` 丢掉提前调用的接收端、改调 `call_streaming`，生产路径上的只读工具于是全等整段回答写完才开始。漏掉的覆盖没有 lint 或 `#[deny]` 能抓，守住它的是 `crates/runtime/tests/run_driver.rs` 里经 `Warmed` 驱动替身模型、看只读调用在模型返回之前开始的那条测试。
+
+**被否**：只转发阻塞门与流式门、推测门交给缺省——那正是让提前读在城里失效的形状；另造一个包装 trait 列出「必须转发」的方法——它在 `Model` 之外又写一份方法清单，两份会各自漂，而 `Model` 只有这一个包装者。
+
+**重开参数**：`kernel::Model` 增加一扇带行为的调用门时，这扇门同在 `Warmed` 上转发，测试同样补一条；出现第二个包装 `Model` 的门时，重议是否值得一个机械的守卫。
 -/
 
 /-!
