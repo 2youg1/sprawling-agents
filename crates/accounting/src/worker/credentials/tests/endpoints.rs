@@ -519,3 +519,88 @@ fn a_re_attach_whose_list_cannot_be_read_keeps_the_facts_already_registered() {
         )
     );
 }
+
+/// One attach, as the settings page sends it: the rows ticked on the
+/// list and the ids typed beside it, for the endpoint `relay`.
+fn attach_relay(
+    worker: &mut RunWorker,
+    base_url: &str,
+    (ticked, typed): (&[&str], &[&str]),
+    idem: &[u8],
+) -> Result<(), AxError> {
+    let owned = |ids: &[&str]| ids.iter().map(|id| (*id).to_owned()).collect();
+    worker.handle(wire::Command::AttachEndpoint {
+        name: wire::ProviderName::parse("relay").unwrap(),
+        base_url: base_url.to_owned(),
+        dialect: kernel::DialectKind::OpenAi,
+        secret: None,
+        auth_header: None,
+        admit: owned(ticked),
+        named: owned(typed),
+        tuning: wire::EndpointTuning::default(),
+        idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, idem),
+    })
+}
+
+/// Each registered row of `relay` with where it came from, and whether
+/// the endpoint reads as probed.
+fn relay_rows(worker: &RunWorker) -> (Vec<(String, kernel::event::record::Listing)>, bool) {
+    let held = worker
+        .credentials
+        .book
+        .endpoints()
+        .find(|endpoint| endpoint.name == "relay")
+        .unwrap();
+    (
+        held.models
+            .iter()
+            .map(|row| (row.id.clone(), row.listing))
+            .collect(),
+        held.probed,
+    )
+}
+
+/// A typed id is the person's word (gateway D39): an attach after the
+/// list was read registers it beside the ticked row, marked as named
+/// rather than listed, and a role can point at it.
+#[test]
+fn a_typed_id_the_list_does_not_carry_is_registered_as_the_persons_word() {
+    use kernel::event::record::Listing;
+    let dir = tempfile::tempdir().unwrap();
+    crate::worker::fixture::init_city(dir.path()).unwrap();
+    let (base_url, _provider) = fake_openai(&["relay-chat-1", "deepseek-chat"], Vec::new());
+    let mut worker = RunWorker::new(
+        dir.path(),
+        runtime::diagnostics::Diagnostics::off(),
+        crate::worker::fixture::hands(),
+    )
+    .unwrap();
+    attach_relay(
+        &mut worker,
+        &base_url,
+        (&["relay-chat-1"], &["relay-hidden-1"]),
+        b"attach",
+    )
+    .unwrap();
+    assert_eq!(
+        relay_rows(&worker),
+        (
+            vec![
+                ("relay-chat-1".to_owned(), Listing::Listed),
+                ("relay-hidden-1".to_owned(), Listing::Named),
+            ],
+            false,
+        )
+    );
+    worker
+        .handle(wire::Command::SelectModel {
+            endpoint: wire::ProviderName::parse("relay").unwrap(),
+            model: "relay-hidden-1".to_owned(),
+            tag: kernel::ModelTag::Main,
+            context_tokens: None,
+            max_output_tokens: None,
+            input: None,
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"select"),
+        })
+        .unwrap();
+}
