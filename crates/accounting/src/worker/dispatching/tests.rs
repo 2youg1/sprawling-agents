@@ -224,6 +224,54 @@ fn a_bare_building_is_named_by_rule_and_the_run_is_the_first_call() {
     );
 }
 
+/// Keep-warm is read at the room the run works in, so the city,
+/// building, room ladder the settings page describes is the one that
+/// runs: a room whose own `CONFIG.toml` asks for it keeps its door once
+/// the run lands, though the city and the building state nothing
+/// (`crates/sprawling/Spec.lean` D80).
+#[test]
+fn a_room_that_asks_for_keep_warm_keeps_its_door_under_a_city_that_states_nothing() {
+    let dir = tempfile::tempdir().unwrap();
+    crate::worker::fixture::init_city(dir.path()).unwrap();
+    city::create_building(
+        dir.path(),
+        &Address::parse("market").unwrap(),
+        city::BuildingTemplate::Minimal,
+    )
+    .unwrap();
+    let addr = Address::parse("market/ito").unwrap();
+    let room = dir.path().join("market").join("ito");
+    std::fs::create_dir_all(&room).unwrap();
+    std::fs::write(
+        room.join(city::URBANITE_FILE),
+        "# URBANITE.md\n\nKeeps the market's books.\n",
+    )
+    .unwrap();
+    let own = city::config_path(dir.path(), &addr, city::Layer::Resident).unwrap();
+    std::fs::create_dir_all(own.parent().unwrap()).unwrap();
+    std::fs::write(&own, "[cache]\nkeep_warm = \"five_minute\"\n").unwrap();
+
+    let (base_url, _provider) = fake_openai(&["m-local"], vec![completion("done", None)]);
+    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
+    worker
+        .handle(wire::Command::Dispatch {
+            addr,
+            task: "balance the books".to_owned(),
+            goal: "the books balance".to_owned(),
+            policy: kernel::RunPolicy::of(kernel::Mode::Work),
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
+            session: None,
+            effort: None,
+            model: None,
+        })
+        .unwrap();
+
+    assert!(
+        worker.warm_due().is_some(),
+        "the room's own layer asked for keep-warm, so its landed run's door is kept"
+    );
+}
+
 /// The identifier is a function of the job, the address and the
 /// millisecond, and nothing else. Two jobs dispatched into the same
 /// millisecond are two runs. A hexadecimal round trip would add two
