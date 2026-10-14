@@ -373,3 +373,83 @@ fn a_line_a_run_writes_reaches_the_book_the_worker_holds() {
         "the live book and the restart's book are one fold"
     );
 }
+
+/// The provider's own list is the rung below the person: a pick that
+/// states nothing, for a model whose list row states a window and a
+/// ceiling, registers both and names the provider as the rung that
+/// answered (`crates/gateway/Spec.lean` §8-17, gateway D37). The form
+/// no longer has to copy the list's figures into the person's boxes
+/// for the city to use them.
+#[test]
+fn a_pick_that_states_nothing_registers_what_the_providers_list_states() {
+    let dir = tempfile::tempdir().unwrap();
+    let report = crate::worker::fixture::init_city(dir.path()).unwrap();
+    let (base_url, _provider) = fake_openai(&["m-stated"], Vec::new());
+    let mut worker = RunWorker::new(
+        dir.path(),
+        runtime::diagnostics::Diagnostics::off(),
+        crate::worker::fixture::hands(),
+    )
+    .unwrap();
+    worker
+        .handle(wire::Command::AttachEndpoint {
+            name: wire::ProviderName::parse("house").unwrap(),
+            base_url,
+            dialect: kernel::DialectKind::OpenAi,
+            secret: None,
+            auth_header: None,
+            admit: Vec::new(),
+            tuning: wire::EndpointTuning::default(),
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"attach"),
+        })
+        .unwrap();
+    worker
+        .handle(wire::Command::SelectModel {
+            endpoint: wire::ProviderName::parse("house").unwrap(),
+            model: "m-stated".to_owned(),
+            tag: kernel::ModelTag::Main,
+            context_tokens: None,
+            max_output_tokens: None,
+            input: None,
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"select"),
+        })
+        .unwrap();
+    let selected = selected_lines(&report.ledger_dir);
+    assert_eq!(
+        selected,
+        vec![serde_json::json!({
+            "context_tokens": LISTED_WINDOW,
+            "window_from": "upstream",
+            "max_output_tokens": LISTED_CEILING,
+            "ceiling_from": "upstream",
+        })]
+    );
+}
+
+/// The window, the ceiling and the two rungs of every `model_selected`
+/// this city wrote, in order.
+pub(super) fn selected_lines(ledger_dir: &std::path::Path) -> Vec<serde_json::Value> {
+    runtime::replay::verify_ledger_dir(ledger_dir)
+        .unwrap()
+        .raw_lines()
+        .iter()
+        .map(|line| kernel::EventRecord::parse_line(line).unwrap())
+        .filter(|record| record.kind() == kernel::EventKind::ModelSelected)
+        .map(|record| {
+            let data = record.data().as_map();
+            let mut picked = serde_json::Map::new();
+            for key in [
+                "context_tokens",
+                "window_from",
+                "max_output_tokens",
+                "ceiling_from",
+            ] {
+                picked.insert(
+                    key.to_owned(),
+                    data.get(key).cloned().unwrap_or(serde_json::Value::Null),
+                );
+            }
+            serde_json::Value::Object(picked)
+        })
+        .collect()
+}

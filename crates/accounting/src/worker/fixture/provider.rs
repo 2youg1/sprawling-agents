@@ -306,7 +306,9 @@ pub(in crate::worker) fn fake_openai_with(
 /// One row of the fake's model list. A model whose id ends in
 /// `-thinks` states the levels it offers the way DeepSeek's list does,
 /// so a test can follow a level from a configuration layer to the wire;
-/// every other row states nothing but its id, and is offered no level.
+/// one whose id ends in `-stated` states [`LISTED_WINDOW`] and
+/// [`LISTED_CEILING`] the way OpenRouter's list does; every other row
+/// states nothing but its id, and is offered no level.
 #[cfg(test)]
 fn listed_row(id: &str) -> serde_json::Value {
     if id.ends_with("-thinks") {
@@ -314,10 +316,24 @@ fn listed_row(id: &str) -> serde_json::Value {
             "id": id,
             "effort": { "supported_levels": ["low", "medium", "high", "xhigh", "max"] },
         })
+    } else if id.ends_with("-stated") {
+        serde_json::json!({
+            "id": id,
+            "context_length": LISTED_WINDOW,
+            "top_provider": { "max_completion_tokens": LISTED_CEILING },
+        })
     } else {
         serde_json::json!({ "id": id })
     }
 }
+
+/// The window a `-stated` row of the fake's model list states.
+#[cfg(test)]
+pub(in crate::worker) const LISTED_WINDOW: u64 = 131_072;
+
+/// The output ceiling a `-stated` row of the fake's model list states.
+#[cfg(test)]
+pub(in crate::worker) const LISTED_CEILING: u64 = 16_384;
 
 /// One listener serving `script`, on a port of its own.
 #[cfg(test)]
