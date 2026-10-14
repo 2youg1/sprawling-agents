@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "typecheck": "bun scripts/typecheck.ts",
-    "lint": "eslint --max-warnings 0",
+    "lint": "eslint --max-warnings 0 --concurrency=auto",
     "test": "bun test --conditions=browser"
   },
   "dependencies": {
