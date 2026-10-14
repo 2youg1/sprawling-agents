@@ -148,6 +148,36 @@ mod tests {
         assert_eq!(working_record("判据：`cargo xtask gates` 绿"), Some("判据"));
     }
 
+    /// A plan's label is an index into a document this tree does not
+    /// contain, whatever the plan calls its items and in either language
+    /// around it.
+    #[test]
+    fn a_plan_label_is_a_working_record() {
+        let cited = [
+            "oldest first (Roadmap M2, the pure lane wait).",
+            "folded away (roadmap S1-3);",
+            "read and written whole (refrain roadmap Q10, 3-9)",
+            "交给 Mayor（roadmap §7）",
+            "吞吐台（roadmap TP1）",
+        ];
+        assert_eq!(cited.map(working_record), [Some("roadmap <label>"); 5]);
+    }
+
+    /// The city's own plan file, a plan named in prose, and a label a
+    /// specification defines for itself are not a plan label.
+    #[test]
+    fn the_citys_roadmap_and_a_defined_label_are_not_a_plan_label() {
+        let product = [
+            "an empty `Roadmap.md` has no first line",
+            "the roadmap row a building holds",
+            "the roadmaps M2 reads",
+            "| M3 接受命令 | `Whole` |",
+            "TF1 次序",
+            "a Roadmap M without a number",
+        ];
+        assert_eq!(product.map(working_record), [None; 6]);
+    }
+
     /// The four families the rule must not eat, each of which is either a
     /// product concept or a word that swallows a shape.
     #[test]
