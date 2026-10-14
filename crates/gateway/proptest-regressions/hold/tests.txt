@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 251c9b7265dd344cb8beb800c70a76c89f1c4dd1d6eff5078256ff01642a9acc # shrinks to trace = [(Arrive(Some(0)), 0), (Arrive(Some(0)), 0)]

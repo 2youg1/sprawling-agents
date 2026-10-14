@@ -14,6 +14,7 @@ mod cost;
 mod credential;
 mod dialect;
 mod endpoint;
+mod hold;
 mod market;
 mod mismatch;
 mod ocr;

@@ -354,6 +354,15 @@ impl kernel::Model for Gated {
 #[cfg(test)]
 #[allow(
     clippy::unwrap_used,
+    clippy::indexing_slicing,
+    clippy::disallowed_methods,
+    reason = "test code: a loopback provider and threads that call at once"
+)]
+mod hold_tests;
+
+#[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
     clippy::arithmetic_side_effects,
     clippy::indexing_slicing,
     clippy::disallowed_methods,
