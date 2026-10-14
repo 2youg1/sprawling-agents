@@ -205,7 +205,7 @@ fn a_call_with_no_amount_is_counted_as_unpriced_with_its_tokens() {
 }
 
 #[test]
-fn every_renewal_is_counted_by_what_it_showed_and_moves_no_money() {
+fn every_renewal_is_counted_by_what_it_showed() {
     use kernel::event::record::CacheRenewed;
     use kernel::{CacheCount, ModelUsage, Tokens};
     let answered = |written: u64| CacheRenewed::Answered {
@@ -246,12 +246,13 @@ fn every_renewal_is_counted_by_what_it_showed_and_moves_no_money() {
         (report.renewals, report.total.get()),
         (
             Renewals {
+                billed: UsdMicros::new(1_800),
                 read: 1,
                 late: 1,
                 unreported: 1,
                 refused: 1,
             },
-            0
+            1_800
         )
     );
 }

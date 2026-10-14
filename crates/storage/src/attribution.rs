@@ -15,8 +15,9 @@
 //! out one at a time, in a fixed order. What is billed is what is
 //! attributed, to the microdollar.
 //!
-//! The total comes from `model_returned.billed_usd_micros` and nowhere
-//! else. This module never prices a call — that authority is
+//! The total comes from the `billed_usd_micros` a provider reported for
+//! a call (`model_returned`) or a keep-warm renewal (`cache_renewed`),
+//! and nowhere else. This module never prices a call — that authority is
 //! `gateway::cost`, and a second one would be a second answer.
 //!
 //! Specified by `crates/storage/spec/Attribution.lean` §8-7.
