@@ -77,6 +77,7 @@ fn dispatch() -> ChatRequest<'static> {
         .into(),
         tools: std::borrow::Cow::Borrowed(&[]),
         breakpoint: kernel::MessageBreakpoint::Unmarked,
+        shared: kernel::SharedPrefix::Unshared,
         effort: None,
     }
 }

@@ -5627,6 +5627,10 @@
     "en": "a prompt cache was renewed",
     "zh": "续了一次 prompt 缓存"
   },
+  "event_prefix_held": {
+    "en": "a call waited for a pre-warm of its shared prefix",
+    "zh": "一次调用等了共享前缀的 pre-warm"
+  },
   "event_harness_reported": {
     "en": "a harness reported what it was doing",
     "zh": "harness 汇报了它在做的事"

@@ -149,7 +149,11 @@ impl EventKind {
             | EventKind::SignalLanded
             // Who put which version of a skill on a shelf is what the
             // skill page shows; a run reads the skill, never this line.
-            | EventKind::SkillShelved => WindowClass::RecordOnly,
+            | EventKind::SkillShelved
+            // A wait at the gate changes no byte of the request that
+            // waited; the line says why it went out late and what the
+            // pre-warm cost (kernel D60).
+            | EventKind::PrefixHeld => WindowClass::RecordOnly,
         }
     }
 }

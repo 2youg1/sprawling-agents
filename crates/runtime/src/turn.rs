@@ -161,6 +161,7 @@ impl<'h> Turn<'h, Assembling> {
             messages: Cow::Borrowed(conversation.messages()),
             tools: Cow::Borrowed(tools),
             breakpoint: plan.message_breakpoint(),
+            shared: prompt.prefix.shared_part(),
             effort: shape.effort,
         };
         Ok(PhaseOutcome::Advanced(Turn {

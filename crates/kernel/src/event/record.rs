@@ -51,6 +51,7 @@ mod harness;
 mod history;
 mod log;
 mod modality;
+mod prefix_held;
 mod probe;
 mod provider;
 mod remote;
@@ -90,6 +91,7 @@ pub use harness::{
 pub use history::{FileRestored, WentBack};
 pub use log::LogTruncated;
 pub use modality::{EmbeddingCalled, RerankCalled};
+pub use prefix_held::{PrefixHeld, PrewarmEnd, PrewarmSent};
 pub use probe::{EndpointProbed, ModelFacts, ProbeFailure, ThinkingStatement};
 pub use provider::{
     ProviderAccount, ProviderAccountBinding, ProviderDegraded, VaultFellBack,

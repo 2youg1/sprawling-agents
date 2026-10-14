@@ -127,6 +127,7 @@ impl Holding {
             | EventKind::AdviserAnswered
             | EventKind::AdviserFellBack
             | EventKind::CacheRenewed
+            | EventKind::PrefixHeld
             | EventKind::HarnessReported
             | EventKind::HarnessAnswered
             | EventKind::RemoteOpened
@@ -241,6 +242,7 @@ impl Evidence {
             | EventKind::AdviserAnswered
             | EventKind::AdviserFellBack
             | EventKind::CacheRenewed
+            | EventKind::PrefixHeld
             | EventKind::HarnessReported
             | EventKind::HarnessAnswered
             | EventKind::RemoteOpened

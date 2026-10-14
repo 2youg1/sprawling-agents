@@ -224,6 +224,7 @@ fn fold_run<'a>(
             | EventKind::AdviserAnswered
             | EventKind::AdviserFellBack
             | EventKind::CacheRenewed
+            | EventKind::PrefixHeld
             // A fork rebuilds a model run's conversation, and what a
             // harness reported or answered is not one.
             | EventKind::HarnessReported

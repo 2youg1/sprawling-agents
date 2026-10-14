@@ -202,6 +202,7 @@ impl SessionOrigins {
             | EventKind::AdviserAnswered
             | EventKind::AdviserFellBack
             | EventKind::CacheRenewed
+            | EventKind::PrefixHeld
             | EventKind::HarnessReported
             | EventKind::HarnessAnswered
             | EventKind::RemoteOpened

@@ -23,7 +23,8 @@ pub use usage::{CacheCount, ModelUsage};
 pub use window::Window;
 pub use wire::{
     BuildingPolicy, Ceiling, ChatMessage, ChatRequest, ChatResponse, ContentBlock, DialectKind,
-    Effort, Increment, MessageBreakpoint, ModelTag, Role, StopReason, SystemBlock, ToolDef,
+    Effort, Increment, MessageBreakpoint, ModelTag, Role, SharedPrefix, StopReason, SystemBlock,
+    ToolDef,
 };
 
 use crate::error::AxError;
@@ -100,6 +101,14 @@ pub trait Model {
     /// selection as it was. The credential is redeemed at call time, so
     /// selecting cannot fail.
     fn select_account(&mut self, _account: &crate::ServerLabel) {}
+    /// The wait the last call took at its endpoint's gate behind a
+    /// pre-warm of its shared prefix (`crates/kernel/spec/Model.lean`
+    /// D59); `None` when it took none. Asked after every attempt, on
+    /// success and on failure, by the turn that writes the
+    /// `prefix_held` line; an adapter with no gate answers `None`.
+    fn prefix_held(&self) -> Option<crate::event::record::PrefixHeld> {
+        None
+    }
     fn call(&mut self, req: &ModelRequest) -> Result<ModelReturn, AxError>;
 
     /// The same call, reporting text as it arrives.

@@ -132,6 +132,8 @@ inductive EventKind where
   | SignalLanded
   -- 书架
   | SkillShelved
+  -- 前缀等待
+  | PrefixHeld
   deriving DecidableEq, Repr
 
 /-- 一个种类的载荷决不决定模型请求的字节：入窗（`InWindow`）或只入账（`RecordOnly`）。与 `kernel::WindowClass` 逐变体同名。依据唯一，不存在第三类。 -/
@@ -289,6 +291,9 @@ def EventKind.windowClass : EventKind → WindowClass
   -- 书架
   /- 一件 skill 的一个内容版本经城的门落上书架：载荷携 `skill`、`digest`（落下的整份内容的摘要）与 `source`（从哪来：路径、git、skills.sh、自带、页面）。谁把哪一版放上书架不进任何模型请求（`Record.lean` D23） -/
   | .SkillShelved => .RecordOnly
+  -- 前缀等待
+  /- 一次模型调用在端点门前等一段共享前缀的 pre-warm：载荷携 `waited_us`、`ended`（`answered`／`refused`／`timed_out`／`abandoned`），发 pre-warm 的那一次另带 `sent`（它的用量与账单额，或它的拒绝原样）。等待不改那次请求的任何字节（`Record.lean` D60） -/
+  | .PrefixHeld => .RecordOnly
 
 /-- 每个种类，依 `EventKind::ALL` 的次序。 -/
 def EventKind.all : List EventKind := [
@@ -387,7 +392,8 @@ def EventKind.all : List EventKind := [
   .SignalWaitStarted,
   .SignalWaitEnded,
   .SignalLanded,
-  .SkillShelved
+  .SkillShelved,
+  .PrefixHeld
 ]
 
 theorem EventKind.all_complete : ∀ kind : EventKind, kind ∈ EventKind.all := by
