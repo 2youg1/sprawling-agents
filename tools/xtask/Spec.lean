@@ -445,7 +445,7 @@ D37 **替换测试换的是解析后的路径，产物不落在二进制嵌入�
 
 **判据三条**：① 区段的文字等于它的事实当场的读数，不等即红，恢复语是 `cargo xtask docnum --write`；② 区段命名的事实必须在 `FACTS` 数组里，否则红，拒词列出全部已知键；③ 标记不闭合、区段套区段、或多出一个收尾标记，即红——一段读不出来的标记不得被当作没有标记。**`--write` 撞上未知事实时整份文件不写**：跳过它会让文档看起来刚重生过，而其中一个数字仍是旧的。
 
-**权威＝那张数组。** `docnum::FACTS` 的每一行是「键、事实的家、参数、重算函数」。不带参数的：`wire_v`（`wire::WIRE_V`）、`command_frames`／`query_frames`（两张名表的长度）、`command_names`／`query_names`（**线上的 snake_case 标签，取自 `wire::wire_schema()` 而不是由变体名小写而来**——`rename_all` 是 `wire` 的决定，在这里再实现一次就是第二个权威）、`gate_count`（`gates::COUNT`）、`dependency_count`（`Cargo.lock` 的 `[[package]]` 条数）、`kani_harnesses`（`proof::harnesses` 数出的条数）、`compile_fail_cases`、`fuzz_targets`、`citysim_scenarios`、`test_functions`、`workspace_version`（根 `Cargo.toml` 的 `[workspace.package] version`，`CHANGELOG.md` 最新一节的标题引它，于是升了版本号却没写新一节的树会红）、`crate_table`（产品 crate 的整张表，§8-40）。**文档想引一个新数字，就往这张数组里加一行**，没有第二张清单需要同步。
+**权威＝那张数组。** `docnum::FACTS` 的每一行是「键、事实的家、参数、重算函数」。不带参数的：`wire_v`（`wire::WIRE_V`）、`command_frames`／`query_frames`（两张名表的长度）、`command_names`／`query_names`（**线上的 snake_case 标签，取自 `wire::wire_schema()` 而不是由变体名小写而来**——`rename_all` 是 `wire` 的决定，在这里再实现一次就是第二个权威）、`gate_count`（`gates::COUNT`）、`dependency_count`（`Cargo.lock` 的 `[[package]]` 条数）、`kani_harnesses`（`proof::harnesses` 数出的条数）、`compile_fail_cases`、`fuzz_targets`、`citysim_scenarios`、`workspace_version`（根 `Cargo.toml` 的 `[workspace.package] version`，`CHANGELOG.md` 最新一节的标题引它，于是升了版本号却没写新一节的树会红）、`crate_table`（产品 crate 的整张表，§8-40）。**文档想引一个新数字，就往这张数组里加一行**，没有第二张清单需要同步。
 
 **一张图也是一个事实。** `crate_graph` 把 `ARCHITECTURE.md` §3 的 `depmap` 块画成一段 mermaid `flowchart TD`：块里每个 crate 一行，每条允许的边一个箭头（依赖方指向被依赖方），不做传递约简，因为约简掉的边正是 `depmap` 允许、读者要查的那一条。生成函数 `depmap::graph` 与门用同一个 `parse_block` 读块，故图与门不会读出两张依赖表；手画一张依赖图，就是依赖表的第二个权威。值自带 ```` ```mermaid ```` 围栏，标记放在围栏之外，因为 mermaid 不认 HTML 注释。
 
@@ -460,6 +460,8 @@ D30 **standalone installer 的仓库默认由根清单生成并核验。** `docn
 **扫描面＝仓内全部 `.md` 与 `.lean`，排除隔离区 `local/`**：受管区段是给读者的承诺，而隔离区从不入库；Lean 规格也是给读者的文档，一对标记放进它的块注释里照样成立（§8-43）。
 
 **区段持有的数**：`WIRE_V` 与帧表条数、版本表单元格、依赖数、ARCHITECTURE §11 的尺寸读数、验证读数里可数的那几项、`docs/wire.md` 的命令与查询清单。**它不持有的**：§11 的 kani 读数——那一处已经有执行者，`proof` 门读 `#[kani::proof]` 属性并与散文里的总数对账，再圈一段受管区段会让同一个数字有两道门，且 `proof` 的读法要求「数字」与「kani harness」在同一行相邻，一对标记插在中间就把它读没了。**叙事本身也不归它**：一段建立在错误基数上的论证要改写成指路，机器判不了它。
+
+D38 **测试函数的总数不是一个事实，文档不引它。** 每加一个测试，这个数就动一次；它进文档时，几乎每个修缺陷的变更都多出一处只改这个数的编辑，并行开发的分支在同一个单元格上互相冲突，而这个数从没有让哪个读者写错代码——它不是任何接口的一部分。`WIRE_V`、帧表、依赖数这类数字不同：读者按它们写代码或审供应链，所以照旧由本门看守。被否：保留这个事实而只在发版时 `--write`——门照样在每个分支上判红，代价不变。重开参数：某份文档要用测试数做一个读者据以行动的承诺（例如某层验证的覆盖下限）。
 
 **它在 `gates::run` 的数组里**，判定 `ARCHITECTURE.md` 与 `docs/wire.md` 等文档的受管区段。关门判据照旧：**故意把 `WIRE_V` 改成 32 而不动文档，`just check` 必须红。**
 
