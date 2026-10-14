@@ -18,7 +18,7 @@ use kernel::event::EventKind;
 use kernel::{AxCode, AxError};
 
 use crate::worker::RunWorker;
-use crate::worker::credentials::{Chosen, Stated, registered_as};
+use crate::worker::credentials::{Chosen, Stated};
 
 impl RunWorker {
     /// Points one tag at one model.
@@ -32,7 +32,7 @@ impl RunWorker {
     /// `gateway::Figures::resolve`, which this method hands the facts it
     /// holds: what the person sent, the provider's own row for this id in
     /// the book, and what this same model was registered with, read back
-    /// by `registered_as`.
+    /// by `EndpointBook::registered`.
     pub(in crate::worker) fn select_model(
         &mut self,
         chosen: Chosen,
@@ -78,13 +78,13 @@ impl RunWorker {
         };
         let catalogue = gateway::MarketSnapshot::builtin()?;
         let priced = catalogue.lookup(&model);
-        let registered = registered_as(&self.credentials.book, tag, &endpoint, &model);
+        let registered = self.credentials.book.registered(tag, &endpoint, &model);
         let figures = gateway::Figures::resolve(
             gateway::Statements {
                 window: context_tokens,
                 ceiling: max_output_tokens,
                 listed: Some(listed),
-                registered: registered.as_ref(),
+                registered,
             },
             priced,
             gateway::Target {

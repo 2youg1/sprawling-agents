@@ -330,6 +330,22 @@ impl EndpointBook {
             .map(|(tag, choice)| (*tag, choice.endpoint.as_str(), &choice.entry))
     }
 
+    /// What `tag` is registered with while it points at `model` behind
+    /// `endpoint`: the earlier-registration rung of the ladder
+    /// (`crate::Figures::resolve`), read the same way by the pick point
+    /// and by the model table's question.
+    ///
+    /// Read by endpoint and model id rather than by tag alone: pointing
+    /// a tag at another model must not carry the old model's figures
+    /// onto the new one (`crates/sprawling/Spec.lean` §8-71).
+    #[must_use]
+    pub fn registered(&self, tag: ModelTag, endpoint: &str, model: &str) -> Option<&ModelEntry> {
+        self.chosen
+            .get(&tag)
+            .filter(|choice| choice.endpoint == endpoint && choice.entry.id == model)
+            .map(|choice| &choice.entry)
+    }
+
     /// Refuses an attachment whose rows leave out a model a tag points
     /// at on this endpoint (`crates/gateway/spec/Router.lean` D40). The
     /// fold never clears a choice when an endpoint is attached again, so

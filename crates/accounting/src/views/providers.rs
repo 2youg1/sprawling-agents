@@ -5,8 +5,9 @@
 
 //! What the settings page reads back about providers and the
 //! configuration ladder: every attached endpoint with the tuning it was
-//! attached with, the ladder of one address with its `[search]`, and
-//! whether each listed account's key is there.
+//! attached with, the ladder of one address with its `[search]`,
+//! whether each listed account's key is there, and the window and
+//! ceiling the figure ladder answers for each row of the model table.
 //!
 //! Both answers ask the vault, and asking the vault asks the platform's
 //! credential service, so both finish after the snapshot is let go. The
@@ -17,8 +18,8 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 use kernel::config::SearchConfiguration;
-use kernel::event::record::ProviderAccount;
-use kernel::{Address, AxError};
+use kernel::event::record::{ModelFacts, ProviderAccount};
+use kernel::{Address, AxError, DialectKind};
 
 use super::prepared::unavailable_because;
 
@@ -129,6 +130,103 @@ fn thinking_summary(offer: gateway::ThinkingOffer) -> wire::ThinkingOffer {
             gateway::OfferSource::Unknown => wire::OfferSource::Unknown,
         },
         source: offer.source.map(str::to_owned),
+    }
+}
+
+/// What the model table asks about: the endpoint, the text in the base
+/// URL box, the face picked beside it, and the rows of the table.
+pub(super) struct TableRows<'q> {
+    pub(super) endpoint: &'q str,
+    pub(super) base_url: &'q str,
+    pub(super) face: DialectKind,
+    pub(super) models: &'q [wire::FiguresAsked],
+}
+
+/// The window and the ceiling a pick with empty boxes would register for
+/// each row, with the rung that answered (`crates/wire/spec/Answer/ModelFigures.lean`
+/// §8-97). Answered while the snapshot is held: it reads the endpoint
+/// book and tables pinned in this build, and never the vault.
+///
+/// A text the normaliser refuses is "I could not look", with the
+/// refusal, rather than rows computed against a host nobody can call.
+pub(super) fn figures_answer(book: &gateway::EndpointBook, asked: &TableRows<'_>) -> wire::Answer {
+    match figures_of(book, asked) {
+        Ok(models) => wire::Answer::ModelFigures(wire::ModelFiguresAnswer { models }),
+        Err(stopped) => unavailable_because("ModelFigures".to_owned(), &stopped),
+    }
+}
+
+/// Each row through `gateway::Figures::resolve`, the ladder the pick
+/// point climbs, with the facts the pick point would hand it: no figure
+/// from the person, the provider's row as the page read it, what this
+/// row's tag was registered with on this same model, and the pinned
+/// catalogue, built once for the whole table.
+fn figures_of(
+    book: &gateway::EndpointBook,
+    asked: &TableRows<'_>,
+) -> Result<Vec<wire::FiguresLine>, AxError> {
+    let called = gateway::normalise_entered(asked.base_url, gateway::DialectHint::of(asked.face))?;
+    let face = called.face();
+    let catalogue = gateway::MarketSnapshot::builtin()?;
+    Ok(asked
+        .models
+        .iter()
+        .map(|row| {
+            let listed = ModelFacts {
+                id: row.id.clone(),
+                context_tokens: row.context_tokens.map(kernel::Window::get),
+                max_output_tokens: row.max_output_tokens,
+                ..ModelFacts::default()
+            };
+            let figures = gateway::Figures::resolve(
+                gateway::Statements {
+                    listed: Some(&listed),
+                    registered: row
+                        .tag
+                        .and_then(|tag| book.registered(tag, asked.endpoint, &row.id)),
+                    ..gateway::Statements::default()
+                },
+                catalogue.lookup(&row.id),
+                gateway::Target {
+                    base_url: &called.base_url,
+                    id: &row.id,
+                    wire: face,
+                },
+            );
+            wire::FiguresLine {
+                id: row.id.clone(),
+                window: figures.window.map(|window| wire::WindowLine {
+                    tokens: window.tokens,
+                    from: figure_from(window.from),
+                }),
+                ceiling: figures.ceiling.map(ceiling_line),
+            }
+        })
+        .collect())
+}
+
+/// The ceiling as the wire spells it; the decision was taken by
+/// `gateway::OutputCeiling`, and this only renames.
+fn ceiling_line(ceiling: gateway::OutputCeiling) -> wire::CeilingLine {
+    match ceiling {
+        gateway::OutputCeiling::Sent { tokens, from } => wire::CeilingLine::Sent {
+            tokens,
+            from: figure_from(from),
+        },
+        gateway::OutputCeiling::ProviderDefault => wire::CeilingLine::ProviderDefault,
+    }
+}
+
+/// The rung as the wire spells it, one arm per rung, so a rung the
+/// gateway gains is a compile error here rather than a word the page
+/// has no sentence for (wire D58).
+fn figure_from(source: gateway::FigureSource) -> wire::FigureFrom {
+    match source {
+        gateway::FigureSource::Person => wire::FigureFrom::Person,
+        gateway::FigureSource::Upstream => wire::FigureFrom::Upstream,
+        gateway::FigureSource::Registered => wire::FigureFrom::Registered,
+        gateway::FigureSource::Preset => wire::FigureFrom::Preset,
+        gateway::FigureSource::Policy => wire::FigureFrom::Policy,
     }
 }
 
@@ -459,6 +557,88 @@ mod tests {
                     }],
                 }],
             }
+        );
+    }
+
+    /// A catalogue-known id behind a relay the person typed without a
+    /// scheme answers the preset table's window on every face, and the
+    /// vendor's ceiling only on the messages face, which needs one; the
+    /// same id on a server on this machine has no window any rung states
+    /// (gateway D37). Text the normaliser refuses answers nothing, with
+    /// the refusal.
+    #[test]
+    fn a_relay_forwarding_a_vendors_id_answers_the_vendors_window() {
+        let book = gateway::EndpointBook::new();
+        let sonnet = [wire::FiguresAsked {
+            id: "claude-sonnet-4-5".to_owned(),
+            context_tokens: None,
+            max_output_tokens: None,
+            tag: None,
+        }];
+        let ask = |base_url: &str, face| {
+            figures_answer(
+                &book,
+                &TableRows {
+                    endpoint: "relay",
+                    base_url,
+                    face,
+                    models: &sonnet,
+                },
+            )
+        };
+        let line = |window: Option<u64>, ceiling| {
+            wire::Answer::ModelFigures(wire::ModelFiguresAnswer {
+                models: vec![wire::FiguresLine {
+                    id: "claude-sonnet-4-5".to_owned(),
+                    window: window
+                        .and_then(kernel::Window::new)
+                        .map(|tokens| wire::WindowLine {
+                            tokens,
+                            from: wire::FigureFrom::Preset,
+                        }),
+                    ceiling: Some(ceiling),
+                }],
+            })
+        };
+        let vendor = wire::CeilingLine::Sent {
+            tokens: kernel::Ceiling::new(64_000).unwrap(),
+            from: wire::FigureFrom::Preset,
+        };
+        assert_eq!(
+            [
+                ask("relay.example.test/v1", DialectKind::OpenAi),
+                ask("https://relay.example.test/v1", DialectKind::Anthropic),
+                ask("http://127.0.0.1:8811/v1", DialectKind::OpenAi),
+            ],
+            [
+                line(Some(200_000), wire::CeilingLine::ProviderDefault),
+                line(Some(200_000), vendor),
+                line(None, wire::CeilingLine::ProviderDefault),
+            ]
+        );
+        assert!(matches!(
+            ask("mailto:somebody", DialectKind::OpenAi),
+            wire::Answer::Unavailable {
+                reason: Some(_),
+                ..
+            }
+        ));
+    }
+
+    /// The page reads the rung under the word `model_selected` records
+    /// it by, so a person sees the same word in the form and the account.
+    #[test]
+    fn each_rung_travels_under_the_word_the_ledger_records() {
+        let sources = [
+            gateway::FigureSource::Person,
+            gateway::FigureSource::Upstream,
+            gateway::FigureSource::Registered,
+            gateway::FigureSource::Preset,
+            gateway::FigureSource::Policy,
+        ];
+        assert_eq!(
+            sources.map(|source| serde_json::to_value(figure_from(source)).unwrap()),
+            sources.map(|source| serde_json::json!(source.as_str()))
         );
     }
 }

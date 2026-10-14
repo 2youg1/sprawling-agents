@@ -41,7 +41,7 @@ pub(super) mod range;
 pub(super) mod reply;
 pub(super) mod stored;
 use super::lines::known_hosts_answer;
-use super::providers::{ProviderAsk, endpoints_answer};
+use super::providers::{ProviderAsk, TableRows, endpoints_answer, figures_answer};
 
 /// How many runs a cost view names besides every active one: a bound
 /// on the size of an answer on the wire, not a machine reading, so it is
@@ -260,7 +260,20 @@ impl Views {
                 });
             }
             wire::Query::KnownHosts => known_hosts_answer(),
-            wire::Query::ModelFigures { .. } => unavailable(query.name().to_owned()),
+            wire::Query::ModelFigures {
+                endpoint,
+                base_url,
+                face,
+                models,
+            } => figures_answer(
+                &self.book,
+                &TableRows {
+                    endpoint: endpoint.as_str(),
+                    base_url,
+                    face: *face,
+                    models,
+                },
+            ),
             wire::Query::AgentCatalog => return super::agents::catalog_ask(self),
             wire::Query::ParseAgentSpec { text } => return super::agents::pasted_ask(self, text),
             wire::Query::Devices => unavailable(query.name().to_owned()),
