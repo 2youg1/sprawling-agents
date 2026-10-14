@@ -14,7 +14,9 @@
 use std::collections::BTreeMap;
 
 use kernel::keep_warm::{CacheUse, KeepWarm, renewal_due};
-use kernel::{AxError, B3Hash, Ceiling, Increments, Model, ModelRequest, ModelReturn, TimeMs};
+use kernel::{
+    AxError, B3Hash, Ceiling, EarlyCalls, Increments, Model, ModelRequest, ModelReturn, TimeMs,
+};
 
 /// Keep-warm bookkeeping for the prefixes one session has sent.
 #[derive(Debug, Clone)]
@@ -105,6 +107,11 @@ fn renewal_of(request: &ModelRequest<'static>) -> ModelRequest<'static> {
 /// handed, so every request that reached the provider is recorded
 /// without the turn loop knowing keep-warm exists.
 ///
+/// It forwards every call method of [`Model`] rather than inheriting a
+/// default, because a default is correct and only slower: an inherited
+/// `call_speculating` drops the early calls, and no read then starts
+/// while the model writes (`crates/runtime/spec/Prefix.lean` D97).
+///
 /// The clock is the caller's, injected from the one sampling point; the
 /// round trip it measures around each call is the lead the next renewal
 /// leaves with, so the lead follows the provider this door reaches.
@@ -190,6 +197,15 @@ impl<C: FnMut() -> Result<TimeMs, AxError>> Model for Warmed<C> {
         onto: Increments<'_>,
     ) -> Result<ModelReturn, AxError> {
         self.recorded(req, |model| model.call_streaming(req, onto))
+    }
+
+    fn call_speculating(
+        &mut self,
+        req: &ModelRequest,
+        onto: Increments<'_>,
+        early: EarlyCalls<'_>,
+    ) -> Result<ModelReturn, AxError> {
+        self.recorded(req, |model| model.call_speculating(req, onto, early))
     }
 }
 
