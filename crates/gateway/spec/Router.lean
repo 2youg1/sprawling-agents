@@ -195,13 +195,13 @@ Session 边界；SessionOpened 撤销旧 Run 的成员资格，使后续调用�
 
 /-! D44 委派出的子 run 的第一轮账号从母 run 房间的绑定开始
 
-**决定**：派活时（accounting 的 `dispatching::running` 里的 `stage_dispatch`，今天在那里读子房间自己的 `session_account`），子 run 的房间在这个 Provider 上没有绑定、而这次派活有母 run（`Assignment.parent`）时，第一轮账号从母 run 所在房间在同一 Provider 上的绑定开始：`EndpointBook::session_account(母 run 的房间, provider)` 答出的账号经 `Model::select_account` 选上；名册里已没有那个账号时 `select_account` 不动，照旧从第一个可兑付的账号起（kernel D54）。这只是选开头的账号：子房间的绑定仍只由子 run 自己成功的 `model_returned` 提交（D30），继承不写任何一行，所以实时、全重放与 snapshot+tail 读到的仍是同一条规则。分支与 `/new` 照 D30 不继承。这是人定下的：委派出的子 run 继承母 run 的 provider 账号绑定，读得到母 run 写下的缓存。
+**决定**：派活时（accounting 的 `dispatching::running` 里的 `stage_dispatch`，第一轮账号先读子房间自己的 `session_account`），子 run 的房间在这个 Provider 上没有绑定、而这次派活有母 run（`Assignment.parent`）时，第一轮账号从母 run 所在房间在同一 Provider 上的绑定开始：`EndpointBook::session_account(母 run 的房间, provider)` 答出的账号经 `Model::select_account` 选上。母 run 的房间从她的 hand-over 读（accounting `waking::handing` 的 `Handing`，`RunWorker::handing_room`）：城从她进 lane 起、到 `end_hand_over` 为止一直留着它，而她交下的每件活都在这段时间里派出。接班的 run（succession）带着前任的 `parent`，它的房间就是前任的房间，通常已有绑定；没有时它同样从母 run 的绑定开始，因为它是同一件活的继续。名册里已没有那个账号时 `select_account` 不动，照旧从第一个可兑付的账号起（kernel D54）。这只是选开头的账号：子房间的绑定仍只由子 run 自己成功的 `model_returned` 提交（D30），继承不写任何一行，所以实时、全重放与 snapshot+tail 读到的仍是同一条规则。分支与 `/new` 照 D30 不继承。这是人定下的：委派出的子 run 继承母 run 的 provider 账号绑定，读得到母 run 写下的缓存。
 
 **理由**：provider 的缓存按账号分开，母 run 那次调用写下或读过的共享前缀（工具、City 段、Building 段）只在她的账号下可读；子 run 落在别的账号上，就要按写价重写一遍，而且前缀键带着账号（D38），门也不能让它共用母 run 那份热度，一波子 run 反而要先等一次 pre-warm。
 
-**被否**：①照 D30 让子 run 从名册的第一个账号起：母 run 不在第一个账号上时（她换过号，或名单重排过），每个子 run 都错过她的缓存；②派活时直接给子房间写一条绑定：`model_returned` 之外多了一个绑定提交点，D30 的唯一提交点不再成立，重放要多读一种行；③分支也继承：分支开的是一个新 Session，人用它重新开始，人定下的只是委派。
+**被否**：①照 D30 让子 run 从名册的第一个账号起：母 run 不在第一个账号上时（她换过号，或名单重排过），每个子 run 都错过她的缓存；②派活时直接给子房间写一条绑定：`model_returned` 之外多了一个绑定提交点，D30 的唯一提交点不再成立，重放要多读一种行；③分支也继承：分支开的是一个新 Session，人用它重新开始，人定下的只是委派；④从 `EndpointBook` 的 `session_rooms` 读母 run 的房间：`run_frozen` 一到就删掉她那一项，而 `end_hand_over` 在这之后还会派出她最后交下的活，这些子 run 就读不到；⑤在 `Assignment` 上再带一份母 run 的房间：她在哪里工作就多了一处记法，每个 `Assignment` 字面量都要填它。
 
-**重开参数**：人定下把继承扩到分支；母 run 与子 run 常用不同的 Provider，使「同一 Provider 上的绑定」很少答出账号。派生检查：`crates/accounting/src/worker/credentials/tests/accounts/affinity.rs` 经真实 `RunWorker` 驱动一次委派，母 run 绑在名册的第二个账号上时，子 run 的第一次 `model_called` 记的是那个账号。 -/
+**重开参数**：人定下把继承扩到分支；母 run 与子 run 常用不同的 Provider，使「同一 Provider 上的绑定」很少答出账号。派生检查：`crates/accounting/src/worker/credentials/tests/accounts/affinity.rs` 的 `a_delegated_child_opens_on_its_mothers_account` 经真实 `RunWorker` 驱动一次委派，母 run 绑在名册的第二个账号上时，子 run 的 `model_called` 记的是那个账号。 -/
 
 namespace Gateway.Router.Affinity
 
