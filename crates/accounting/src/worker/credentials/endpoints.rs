@@ -69,6 +69,13 @@ impl Listing {
             }
         }
     }
+
+/// A re-attach whose probe read no list: why, and how many of the
+/// admitted rows kept what an earlier attach read.
+struct Unread {
+    why: String,
+    kept: usize,
+}
 }
 
 impl RunWorker {
@@ -237,9 +244,11 @@ impl RunWorker {
     /// A probe that fails does not stop the attachment when the person
     /// named the ids: most compatible endpoints serve no model list at
     /// all, so refusing here would keep a working provider out of the
-    /// city over an interface it never promised. What the failure costs
-    /// is `probed`, which records that this list is the person's word
-    /// rather than the endpoint's.
+    /// city over an interface it never promised. Nor does it change what
+    /// the city already knew (gateway D38): an id already registered
+    /// under this name keeps the row the book holds, and only an id
+    /// named for the first time is registered on the person's word,
+    /// which `probed` then records as false.
     ///
     /// The probe is asked from a thread of its own, and the endpoint is
     /// registered by [`Self::finish_attach`] when it answers
@@ -265,7 +274,7 @@ impl RunWorker {
             .endpoints()
             .find(|kept| kept.name == endpoint.name)
             .cloned();
-        if explicit_accounts && let Some(kept) = kept {
+        if explicit_accounts && let Some(kept) = &kept {
             let mut comparing = endpoint.tuning.clone();
             comparing.accounts = kept.tuning.accounts.clone();
             if endpoint.base_url == kept.base_url
@@ -335,17 +344,31 @@ impl RunWorker {
                 return Err(err.rewrite_recovery("name the model ids to admit, then attach again"));
             }
             Err(err) => {
-                // The probe never answered, so the only fact this city
-                // has about these rows is that a person named them.
-                // Everything else stays unstated rather than invented.
+                // The probe never answered this time. A row registered
+                // before keeps what an earlier probe read; of a new id
+                // the only fact this city has is that a person named
+                // it, and everything else stays unstated rather than
+                // invented.
+                let earlier = kept.as_ref().map_or(&[][..], |kept| kept.models.as_slice());
+                let registered = |id: &String| earlier.iter().find(|row| row.id == *id);
                 endpoint.models = admit
                     .iter()
-                    .map(|id| gateway::ModelFacts {
-                        id: id.clone(),
-                        ..gateway::ModelFacts::default()
+                    .map(|id| {
+                        registered(id)
+                            .cloned()
+                            .unwrap_or_else(|| gateway::ModelFacts {
+                                id: id.clone(),
+                                ..gateway::ModelFacts::default()
+                            })
                     })
                     .collect();
-                Some(err.subject().to_owned())
+                let still = admit.iter().filter(|id| registered(id).is_some()).count();
+                endpoint.probed =
+                    kept.as_ref().is_some_and(|kept| kept.probed) && still == admit.len();
+                Some(Unread {
+                    why: err.subject().to_owned(),
+                    kept: still,
+                })
             }
         };
         // One line either way, and it says which of the two happened.
@@ -363,8 +386,10 @@ impl RunWorker {
                     endpoint.base_url,
                     endpoint.models.len()
                 ),
-                Some(why) => format!(
-                    "{} at {} lists no models ({why}); attached on the {} the User named",
+                Some(Unread { why, kept }) => format!(
+                    "{} at {}: the model list could not be read this time ({why}); attached on \
+                     the {} model(s) the User named, {kept} of them keeping what an earlier \
+                     attach read",
                     endpoint.name,
                     endpoint.base_url,
                     endpoint.models.len()
