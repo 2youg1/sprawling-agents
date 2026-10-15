@@ -1,0 +1,178 @@
+{
+  "scope": "Preliminary fixed-version Windows observations; not a product ranking or project baseline update",
+  "target": {
+    "product_version": "0.0.11",
+    "tag": "v0.0.11-Alpha-261009",
+    "commit": "30aec1142b2da56addc4b41b6dce6a098edc5351",
+    "tree": "3d0c6c45e2aff4db515195f1266669bc63f755d0"
+  },
+  "machine": {
+    "os": "Windows 11",
+    "os_build": "10.0.26200",
+    "architecture": "x86_64",
+    "cpu": "Intel Core i7-14650HX",
+    "physical_cores": 16,
+    "logical_processors": 24,
+    "installed_memory_class": "32 GiB",
+    "disk_class": "NVMe",
+    "power_plan": "Balanced",
+    "background_load": "workloads run serially; background load not continuously characterized"
+  },
+  "agents": [
+    {
+      "id": "sprawling",
+      "package_version": "0.0.11-pre.261009",
+      "sha256": "86AA0427DF52326053DC3C5EABDCDE8A0B27C694F429B52F968D15EFC4EAD886",
+      "source_commit": "30aec1142b2da56addc4b41b6dce6a098edc5351",
+      "version": "sprawling 0.0.11 (alpha), released 2026-10-09",
+      "entrypoint_digest_scope": "entrypoint, not the complete dependency tree",
+      "condition": "fixed executable/package snapshot"
+    },
+    {
+      "id": "codex",
+      "sha256": "D13914CED6C7AF174D8D638DB938284231227312104B06A25E9608C632A7DAEC",
+      "version": "codex-cli 0.162.0-alpha.17.2",
+      "entrypoint_digest_scope": "entrypoint, not the complete dependency tree",
+      "condition": "fixed executable/package snapshot"
+    },
+    {
+      "id": "hermes",
+      "sha256": "78E307551836D33EFF42476977D5511D913917FDB757701C6FE94615277D5460",
+      "source_commit": "745380d4959e4098fb97d981e38d33aa1dc2fa29",
+      "version": "Hermes Agent v0.21.6+767.g745380d (2026.9.24) \u00b7 stable \u00b7 local 745380d4959e",
+      "entrypoint_digest_scope": "entrypoint, not the complete dependency tree",
+      "condition": "existing desktop file modification retained"
+    },
+    {
+      "id": "pi",
+      "package_version": "0.84.4",
+      "sha256": "5406C369954516FB56879D685E082FF9095CD6E06E41AF406F394942377FD4BF",
+      "version": "0.84.4",
+      "entrypoint_digest_scope": "entrypoint, not the complete dependency tree",
+      "condition": "fixed executable/package snapshot"
+    },
+    {
+      "id": "deepseek-harness",
+      "package_version": "0.2.0-rc.2",
+      "sha256": "1A03DEE18683483FF6A1B27B2A1E650230DA6BCCA9A0F55F7D81B3308C3F307F",
+      "version": "0.2.0-rc.2",
+      "entrypoint_digest_scope": "entrypoint, not the complete dependency tree",
+      "condition": "fixed executable/package snapshot"
+    }
+  ],
+  "product_build": {
+    "source_state": "target source clean at measurement",
+    "artifact": "npm distributed Windows x64 package",
+    "toolchain_features_flags": "not independently attested for distributed binary"
+  },
+  "metrics": {
+    "quantile": "nearest rank: sorted(values)[ceil(q*n)-1]",
+    "browser_reload": "paired in-app browser; running city; warm cache; 1440x900; DOM input echo checked; automation overhead included",
+    "first_read_and_create": "first file tool cycle in each fresh process/project; cache warm; 1024 bytes; exact bytes checked",
+    "ax_cycle": "fixed tool arguments emitted to next model request containing actual tool result; includes scheduling, serialization and loopback",
+    "ax_groups": "three independent groups per agent/action; first action separate, 200 following actions each",
+    "ram": "Windows PrivateUsage; 20 fixed history turns; 15s idle and 15s fixed-provider active waiting; 100ms samples",
+    "ram_rows": "per-cohort time-window summary, not raw time-series samples or independent-run quantiles",
+    "io": "observed process-tree counter increments, not physical disk throughput",
+    "task_time": "runner startup through termination; includes model/provider and tools; no task P99"
+  },
+  "workload": {
+    "basic_cases": [
+      "read",
+      "search",
+      "edit",
+      "repair",
+      "recover",
+      "multi"
+    ],
+    "coding_cases": [
+      "cart",
+      "intervals",
+      "overlay",
+      "pagination",
+      "dedupe",
+      "quantile",
+      "toposort",
+      "csv",
+      "redact",
+      "jsonlines",
+      "relative_path",
+      "money"
+    ],
+    "coding_public_probes": 19,
+    "coding_holdout_probes": 44,
+    "coding_contract": "modify only solution.py; preserve inputs and other files; check type distinctions, mutation and aliasing",
+    "ram_session_counts": [
+      1,
+      10,
+      20,
+      40
+    ],
+    "local_upstream_model_requests": 0,
+    "basic_fixture_source_sha256": "89fd6750d8a9774214d97c65aa4e432865b13a13af86becb35b89422ebeb5345",
+    "coding_fixture_manifest_sha256": "ba2cbfbc8f63320ada9a4104756c4a8e6b57cde077430c4adff43d8a3365e312"
+  },
+  "model_conditions": {
+    "deepseek": {
+      "provider": "DeepSeek official",
+      "model_id": "deepseek-flash",
+      "effort": "high",
+      "maximum_output_tokens": 4096,
+      "maximum_requests_per_basic_task": 12,
+      "basic_task_timeout_seconds": 180,
+      "protocol": "DSH Messages; other agents Responses"
+    },
+    "gpt": {
+      "provider": "one third-party Responses endpoint",
+      "model_id": "gpt-6.1-sol",
+      "backend_identity": "provider-supplied label, not independently attested",
+      "effort": "high",
+      "maximum_output_tokens": 4096,
+      "maximum_requests_per_basic_task": 12,
+      "maximum_requests_per_coding_task": 24,
+      "coding_task_deadline_seconds": 300,
+      "native_instructions_and_tools": "retained; Codex code_mode_only; default relay instructions can differ",
+      "sprawling_compatibility": "gateway removes only unsupported prompt_cache_breakpoint; native preflight returned HTTP400"
+    }
+  },
+  "coverage": {
+    "help_trials": 1000,
+    "project_first_answer_trials": 1000,
+    "first_read_trials": 1000,
+    "create_trials": 100,
+    "sprawling_browser_reload_trials": 200,
+    "formal_ax_groups": 60,
+    "formal_ax_actions": 12060,
+    "local_ram_cohorts": 60,
+    "local_ram_states": 120,
+    "deepseek_basic_cells": 30,
+    "gpt_basic_primary_cells": 30,
+    "gpt_basic_raw_attempts": 31,
+    "coding_attempted_cells": 38,
+    "coding_planned_cells": 60,
+    "coding_unattempted_cells": 22,
+    "real_generation_ram_normal_cells": 17,
+    "real_generation_ram_planned_cells": 20,
+    "real_generation_ram_incomplete_cells": [
+      "pi/40",
+      "sprawling/20",
+      "sprawling/40"
+    ],
+    "source_instruments_not_available": [
+      "monitor_beat",
+      "view_backlog"
+    ]
+  },
+  "coding_request_accounting": {
+    "requests": 265,
+    "complete_usage": 260,
+    "known_input_tokens": 2767056,
+    "known_output_tokens": 52990,
+    "unknown_usage_requests": 5
+  },
+  "publication_boundary": "Only numerical observations, outcome records and necessary conditions; no provider credentials, prompts, conversations or personal paths",
+  "reproducibility_boundary": "verify.py recalculates the exported measurements; this subset does not include live-provider runners, generated task artifacts or raw memory time series",
+  "files": {
+    "results.csv": "17a8744790a3b535e057753d254b123be49f57fea2acdfc18301d31a616412a6"
+  }
+}

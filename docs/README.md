@@ -9,6 +9,7 @@ The documents for people who use, run or change sprawling, grouped by who reads 
 | An agent or script author | [`wire.md`](wire.md) | CLI, frames, answers, exit codes and generated protocol rosters |
 | Someone integrating tools | [`integrations.md`](integrations.md) | Any ACP agent as a resident, MCP servers and CLI control from an existing agent |
 | Someone measuring work | [`performance.md`](performance.md) | Monitor counters, reproducible workloads and measurement provenance |
+| Someone reviewing measured workloads | [`benchmarks/v0.0.11/README.md`](benchmarks/v0.0.11/README.md) | Preliminary fixed-version Windows observations, exported samples and comparison limits |
 | Someone debugging | [`logging.md`](logging.md) | What goes in the diagnostic log and what goes in the Ledger, and why the two stay apart |
 | Anyone | [`glossary.md`](glossary.md) | What each word means; the `lexicon` gate holds the code and the documents to these words |
 | Someone changing the code | [`CONTRIBUTING.md`](CONTRIBUTING.md) | Contribution preparation, feature admission and submission, with links to the repository rules |
