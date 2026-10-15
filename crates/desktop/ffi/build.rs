@@ -35,7 +35,6 @@ fn main() -> Result<(), String> {
     println!("cargo::rerun-if-changed=src/step.rs");
     println!("cargo::rerun-if-changed=src/confinement.rs");
     println!("cargo::rerun-if-changed={PIN}");
-    println!("cargo::rerun-if-env-changed=PATH");
     let here = PathBuf::from(variable("CARGO_MANIFEST_DIR")?);
     spelled_alike(&here)?;
     let rust_record = std::fs::read_to_string(here.join("src/confinement.rs"))

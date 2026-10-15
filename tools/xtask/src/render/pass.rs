@@ -81,6 +81,13 @@ impl Colours {
             Colours::Forced => "forced colours",
         }
     }
+
+    fn slug(&self) -> &'static str {
+        match *self {
+            Colours::AsAuthored => "authored",
+            Colours::Forced => "forced",
+        }
+    }
 }
 
 /// One opening of the gallery.
@@ -130,6 +137,12 @@ impl Pass {
     /// the system's.
     pub(super) fn draws_forced_colours(&self) -> bool {
         self.colours == Colours::Forced
+    }
+
+    /// The name a file of this pass carries, so the passes of one run,
+    /// which open at the same time, keep their copies and profiles apart.
+    pub(super) fn slug(&self) -> String {
+        format!("{}-{}-{}", self.width, self.theme(), self.colours.slug())
     }
 
     /// What a violation calls the pass it was found in.

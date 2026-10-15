@@ -1,0 +1,55 @@
+# The test build's target directory, carried from the newest run on main
+# to the next run, so cargo compiles what a change touched rather than
+# the whole workspace.
+#
+# Swatinem/rust-cache keeps the dependencies and drops the workspace's own
+# packages, so every test build compiled all of them and linked every test
+# binary again: 210 s of the job's 344 s, the median of 40 runs. Most
+# changes touch one or two packages near the top of the graph; on the
+# test build's own configuration and four jobs, a change to `sprawling`
+# alone rebuilt it and `citysim` in 54 s where the whole workspace took
+# 158-191 s, both with line-table debug information.
+#
+# It is a cache entry of about 1.4 GB. Carried as an artifact instead, it
+# downloaded at 29 MB/s, where a cache entry restores at about 170 MB/s.
+# The cache's 10 GB holds it because `cache-prune.yml` deletes the entries
+# a newer one replaced, this one's included. Only main saves,
+# and a pull request's own saves are visible to that pull request alone,
+# so no run reads a target directory a fork wrote.
+#
+# `freshen.sh` is what makes the reuse correct; its header says how.
+name: warm target
+description: >-
+  Restore the target directory the newest run on main left and age every
+  unchanged input, or save this run's target directory for the next run.
+inputs:
+  mode:
+    description: "'restore' before the build, 'save' after it."
+    required: true
+runs:
+  using: composite
+  steps:
+    - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+      if: inputs.mode == 'restore'
+      id: restore
+      with:
+        path: |
+          target/debug
+          target/warm-manifest.txt
+        key: warm-target-${{ runner.os }}-${{ hashFiles('rust-toolchain.toml') }}-${{ github.sha }}
+        restore-keys: warm-target-${{ runner.os }}-${{ hashFiles('rust-toolchain.toml') }}-
+    - name: age every input the warm target was built from
+      if: inputs.mode == 'restore' && steps.restore.outputs.cache-matched-key != ''
+      shell: bash
+      run: bash "$GITHUB_ACTION_PATH/freshen.sh" apply target/warm-manifest.txt
+    - name: the manifest of the inputs this target was built from
+      if: inputs.mode == 'save'
+      shell: bash
+      run: bash "$GITHUB_ACTION_PATH/freshen.sh" record target/warm-manifest.txt
+    - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+      if: inputs.mode == 'save'
+      with:
+        path: |
+          target/debug
+          target/warm-manifest.txt
+        key: warm-target-${{ runner.os }}-${{ hashFiles('rust-toolchain.toml') }}-${{ github.sha }}
