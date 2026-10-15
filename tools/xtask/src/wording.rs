@@ -158,7 +158,7 @@ fn judge(
         return Ok(());
     }
     let text = walk::read_text(path)?;
-    if crate::length::generated(&text) {
+    if walk::generated(&text) {
         return Ok(());
     }
     let lines: Vec<&str> = text.lines().collect();

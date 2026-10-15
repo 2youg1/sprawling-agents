@@ -40,7 +40,7 @@ pub(super) struct Fact {
 }
 
 /// Every fact a managed span may name.
-const FACTS: [Fact; 22] = [
+const FACTS: [Fact; 21] = [
     Fact {
         key: "wire_v",
         home: "wire::WIRE_V",
@@ -106,12 +106,6 @@ const FACTS: [Fact; 22] = [
         home: "tools/citysim/tests",
         takes: None,
         recount: |root, _arg| recount::in_directory(root, "tools/citysim/tests", "scenario file"),
-    },
-    Fact {
-        key: "test_functions",
-        home: "the #[test] attributes in the tree",
-        takes: None,
-        recount: |root, _arg| recount::test_functions(root),
     },
     Fact {
         key: "crate_graph",

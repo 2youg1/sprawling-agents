@@ -628,7 +628,7 @@ the part worth knowing before starting, not after.
 | the Windows desktop a resident may drive | `crates/desktop` + `crates/desktop/Spec.lean` | `unsafe` only in `crates/desktop/ffi`, under the Zig rule of §2; `xtask guard` holds its lint table |
 | a crate depending on another | the `depmap` block in §3 | actual edges must be a subset; a hidden edge is a red build |
 | a new seam | §4, and the trait's file | `depmap` refuses a `pub trait` outside the files §4 names |
-| a new module, or a deleted one | `architecture.toml` | `modmap` refuses a file with no entry, and an entry whose file is gone |
+| a new module, or a deleted one | `architecture.toml` | `modmap` refuses a production file with no entry, and an entry whose file is gone; a test module needs no entry |
 | a platform the release ships | `xtask::platform`'s `PLATFORMS` | one row per platform; the npm scope and the bare root name are asserted there |
 | the page | `client/` + `client/Spec.lean` | its own lint, typecheck and tests; the bundle is measured against a byte budget |
 | the page's colours, motion or words | `client/src/theme.css` and the parts it imports from `client/src/theme/`, `client/src/lang.json` + `docs/frontend-method.md` | `xtask color`, `xtask motion` and `xtask wording` refuse a colour, curve, duration or word spelled anywhere else |
@@ -860,7 +860,7 @@ do not overlap: overlapping verification reads as more coverage than it is.
 |---|---|---|
 | V0 unrepresentable | a whole class of error moved out of what can be written | <!-- xtask:begin compile_fail_cases -->19<!-- xtask:end --> compile-failure counterexamples |
 | V1 types and lints | null, overflow, silent truncation, hidden panics | workspace lints, `-D warnings`, `--all-features` |
-| V2 unit and property | a function wrong across a class of inputs | <!-- xtask:begin test_functions -->3684<!-- xtask:end --> test functions, properties before examples |
+| V2 unit and property | a function wrong across a class of inputs | `#[test]` functions beside the code they judge, properties before examples |
 | V3 conformance | a second adapter behaving unlike the first | one suite per port, except `browser::port`, whose suite only ever ran against the replay it was written beside (decision D1 of `crates/browser/Spec.lean`) |
 | V4 fuzz | parsers meeting hostile bytes | <!-- xtask:begin fuzz_targets -->6<!-- xtask:end --> targets under `tools/fuzz/fuzz_targets` |
 | V5 formal | termination, absence of overflow and monotonicity in the code; a design rule false on some input nobody tried | 3 of 3 kani harnesses proved, Linux CI — every proposition in the roster has an unbounded domain and a solvable shape; the Lean specifications under `crates/`, proved by `just models` in every `just check` |
@@ -1122,7 +1122,8 @@ yet.
   shape set in §9 and the fields of `architecture.toml` change only with an
   explicit ruling, recorded in the commit that changes them.
 - **The module map is `architecture.toml`**, not a section here. It is the
-  machine's data face: one entry per module file, read only by
+  machine's data face: one entry per production module file (a test
+  module may have one and needs none), read only by
   `cargo xtask modmap`, and asked for one module at a time rather than read
   through, so no entry has a position a person maintains.
 - **Adding an entry is the registration step**: it lands in the same change

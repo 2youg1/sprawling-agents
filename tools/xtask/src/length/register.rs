@@ -6,13 +6,13 @@
 //! What `tools/xtask/budgets.toml` states about length, read once and handed
 //! to the gate as values.
 //!
-//! The three limits and the two registers of exceptions all arrive from
-//! one file, and every message the gate prints names the row it came
+//! The two limits and the register of exceptions all arrive from one
+//! file, and every message the gate prints names the row it came
 //! from. Keeping the row names and the reader together means a renamed
 //! row is renamed in one place, and the gate above reads as judgement
 //! rather than as table lookup.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 use std::path::Path;
 
 use crate::budget::REGISTER;
@@ -21,12 +21,8 @@ use crate::report::XtaskError;
 /// The register row that states how long a production function may be.
 pub(super) const ROW: &str = "function_length";
 
-/// The register row that states how long a file may be.
-pub(super) const FILE_ROW: &str = "file_length";
-
-/// The sub-table naming what was already over the line when it was
-/// drawn: for files, the length each had that day; for signatures, the
-/// names that were already too wide.
+/// The sub-table naming the signatures that were already too wide when
+/// the parameter rule was drawn.
 pub(super) const PREDATING: &str = "predating";
 
 /// The register row that states how many parameters a function may take.
@@ -52,32 +48,6 @@ pub(super) fn limit(root: &Path, row: &str) -> Result<usize, XtaskError> {
         file: REGISTER.to_owned(),
         msg: format!("{row}.budget_lines is not a line count: {stated}"),
     })
-}
-
-/// The files that were already over the line when it was drawn, each
-/// pinned at the length it had that day.
-pub(super) fn predating(root: &Path) -> Result<BTreeMap<String, usize>, XtaskError> {
-    let register = crate::budget::register(root)?;
-    let Some(table) = register
-        .get(FILE_ROW)
-        .and_then(|row| row.get(PREDATING))
-        .and_then(toml::Value::as_table)
-    else {
-        return Ok(BTreeMap::new());
-    };
-    let mut out = BTreeMap::new();
-    for (rel, value) in table {
-        let stated = value.as_integer().ok_or_else(|| XtaskError::Doc {
-            file: REGISTER.to_owned(),
-            msg: format!("{FILE_ROW}.{PREDATING}.{rel} is not a line count"),
-        })?;
-        let pinned = usize::try_from(stated).map_err(|_| XtaskError::Doc {
-            file: REGISTER.to_owned(),
-            msg: format!("{FILE_ROW}.{PREDATING}.{rel} is not a line count: {stated}"),
-        })?;
-        out.insert(rel.clone(), pinned);
-    }
-    Ok(out)
 }
 
 /// The functions whose parameter lists predate the rule.

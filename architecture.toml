@@ -1,8 +1,10 @@
 # The module map: one entry per module file, and the duty of each crate.
 #
 # This is the machine's data face. `cargo xtask modmap` is its only reader
-# and refuses a `.rs` file under `crates/*/src` that has no entry here, as
-# well as an entry whose file is gone. A reader who wants one module asks
+# and refuses a production `.rs` file under a package's `src/` that has no
+# entry here, as well as an entry whose file is gone. A test module
+# (`tests.rs`, `<name>_tests.rs`, or a file under a `tests/` directory in
+# `src/`) needs no entry (tools/xtask/Spec.lean D40). A reader who wants one module asks
 # for it by name rather than scanning a table.
 #
 # `owns` and `since` are for a person: no gate reads them. Every other

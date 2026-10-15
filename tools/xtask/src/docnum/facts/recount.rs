@@ -116,37 +116,6 @@ pub(super) fn in_directory(root: &Path, dir: &str, what: &str) -> Result<String,
     refuse_if_empty(walk::files_with_ext(&base, &["rs"])?.len(), dir, what)
 }
 
-/// How many test functions the tree declares, across every package.
-///
-/// This counts what a person means by "a test": one `#[test]` or
-/// `#[tokio::test]` function. A property test is one of them and runs a
-/// case list of its own, so the reading is a floor rather than a number
-/// of assertions, and the document that quotes it says so.
-pub(super) fn test_functions(root: &Path) -> Result<String, XtaskError> {
-    let mut found = 0_usize;
-    for member in members(root)? {
-        let base = root.join(&member.dir);
-        if !base.is_dir() {
-            continue;
-        }
-        for file in walk::files_with_ext(&base, &["rs"])? {
-            if walk::in_isolation_zone(&walk::rel(root, &file)) {
-                continue;
-            }
-            let text = walk::read_text(&file)?;
-            found = found.saturating_add(
-                text.lines()
-                    .filter(|line| {
-                        let trimmed = line.trim();
-                        trimmed == "#[test]" || trimmed == "#[tokio::test]"
-                    })
-                    .count(),
-            );
-        }
-    }
-    refuse_if_empty(found, "the tree", "test function")
-}
-
 /// The version this workspace pins for one crate.
 ///
 /// Every manifest is read, and two manifests pinning one crate at two
