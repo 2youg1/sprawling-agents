@@ -48,10 +48,20 @@ def main():
             for state in ['idle', 'active_waiting']:
                 assert sum(a == agent and n == sessions and s == state for a, n, s, _ in ram_keys) == 3
     outcomes = {}
+    selected_coverage = {'deepseek_six': 'deepseek_basic_cells',
+                         'gpt_six': 'gpt_basic_primary_cells',
+                         'gpt_coding': 'coding_attempted_cells'}
     for series in ['deepseek_six', 'gpt_six', 'gpt_coding']:
         outcomes[series] = {}
         selected = [row for row in rows if row['series'] == series and row['selected'] == '1']
+        assert len(selected) == manifest['coverage'][selected_coverage[series]], \
+            f'{series}: selected cells disagree with manifest coverage'
         assert len({(row['agent'], row['case']) for row in selected}) == len(selected)
+        cases = manifest['workload']['coding_cases' if series == 'gpt_coding' else 'basic_cases']
+        assert all(row['case'] in cases for row in selected)
+        if series != 'gpt_coding':
+            assert {(row['agent'], row['case']) for row in selected} == \
+                {(agent, case) for agent in agents for case in cases}
         for agent in sorted(agents):
             group = [row for row in selected if row['agent'] == agent]
             outcomes[series][agent] = {'attempted': len(group),
