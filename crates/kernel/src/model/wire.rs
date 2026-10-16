@@ -317,7 +317,7 @@ pub enum MessageBreakpoint {
 }
 
 /// How many of a request's leading system blocks every resident of one
-/// building carries byte for byte (`crates/kernel/spec/Model.lean` D59).
+/// building carries byte for byte (`crates/kernel/spec/Model.lean` D60).
 ///
 /// A request-side annotation like [`MessageBreakpoint`]: `runtime` sets
 /// it from the frozen prefix, and the gateway's prefix hold reads it

@@ -46,8 +46,9 @@ impl Endpoint {
     /// `None` when gateway D39 holds it for nothing: a face that does not
     /// charge for cache writes, a server on this machine, a confidential
     /// building, a request that shares nothing, a shared part shorter
-    /// than the model caches, or a body this endpoint cannot write - the
-    /// real call then meets the same refusal and reports it.
+    /// than the model caches, a request the real call refuses before
+    /// anything leaves the machine, or a body this endpoint cannot write -
+    /// the real call then meets the same refusal and reports it.
     pub(super) fn prewarm_for(
         &self,
         account: Option<&kernel::ServerLabel>,
@@ -60,6 +61,7 @@ impl Endpoint {
         if !caches_by_breakpoint
             || crate::reach::is_local(&self.config.base_url)
             || req.policy.confidential
+            || self.blind_to_this_request(req)
         {
             return None;
         }

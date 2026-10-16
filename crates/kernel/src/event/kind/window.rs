@@ -152,7 +152,7 @@ impl EventKind {
             | EventKind::SkillShelved
             // A wait at the gate changes no byte of the request that
             // waited; the line says why it went out late and what the
-            // pre-warm cost (kernel D60).
+            // pre-warm cost (kernel D61).
             | EventKind::PrefixHeld => WindowClass::RecordOnly,
         }
     }

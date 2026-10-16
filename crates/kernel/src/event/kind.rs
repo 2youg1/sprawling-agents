@@ -259,7 +259,7 @@ pub enum EventKind {
     /// One wait a model call took at its endpoint's gate behind a
     /// pre-warm of the prefix a building shares, how the pre-warm ended,
     /// and on the call that sent it what it cost
-    /// (`crates/kernel/spec/Event/Record.lean` D60).
+    /// (`crates/kernel/spec/Event/Record.lean` D61).
     PrefixHeld,
 }
 

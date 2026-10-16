@@ -457,7 +457,7 @@ pub(super) struct Prewarming { key: PrefixKey, request: ModelRequest<'static>, b
 
 /-! D42 pre-warm 只带共享部分与一条最小的消息，消息上不打断点，只要一个输出 token
 
-**决定**：pre-warm 是一次普通的阻塞调用（`Endpoint::call`，不走流），用发它的那个调用的端点与账号，请求由 `prewarm_for` 从那个调用的请求造出：`policy`、`segments`、`model`、`tools` 与 `effort` 照抄；`system` 只留 `shared` 指的那几块（kernel D59），`cache` 标记照抄，所以写入落在最后一个共享边界上；`messages` 是一条 user 消息，只有一个文本块 `"."`；`breakpoint` 是 `MessageBreakpoint::Unmarked`；`max_tokens` 是 1，在人写的 overrides 之后写进请求体。#87 让 0 可以表达之后改成 0：provider 页面说 `max_tokens: 0` 的请求不生成任何输出、立刻返回。pre-warm 不写 `model_called`，它的花费与结局写在 `prefix_held` 里（D43）。
+**决定**：pre-warm 是一次普通的阻塞调用（`Endpoint::call`，不走流），用发它的那个调用的端点与账号，请求由 `prewarm_for` 从那个调用的请求造出：`policy`、`segments`、`model`、`tools` 与 `effort` 照抄；`system` 只留 `shared` 指的那几块（kernel D60），`cache` 标记照抄，所以写入落在最后一个共享边界上；`messages` 是一条 user 消息，只有一个文本块 `"."`；`breakpoint` 是 `MessageBreakpoint::Unmarked`；`max_tokens` 是 1，在人写的 overrides 之后写进请求体。#87 让 0 可以表达之后改成 0：provider 页面说 `max_tokens: 0` 的请求不生成任何输出、立刻返回。pre-warm 不写 `model_called`，它的花费与结局写在 `prefix_held` 里（D43）。
 
 **理由**：pre-warm 要写下的正是跟随者要读的那段字节，所以除了必须不同的消息与上限，什么都不改。消息上不打断点，是因为页面说否则缓存条目会以这条占位消息为键，后续请求读不到它；不带对话造的请求本来就得到这个计划（`runtime::prefix::BreakpointPlan`）。`max_tokens` 写在 overrides 之后，是因为一次产出文字的 pre-warm 只多花钱、什么也不多买。
 
@@ -468,7 +468,7 @@ pub(super) struct Prewarming { key: PrefixKey, request: ModelRequest<'static>, b
 
 /-! D43 一次等待是 `prefix_held` 这一行，经模型端口交给回合层写下
 
-**决定**：一次等待是一行 record-only 的 `prefix_held`（载荷与种类见 kernel D60），记在等的那个 run 的名下（与 `model_called` 一样不带 `addr`），紧跟在那次尝试的 `model_called` 之后、在 `model_returned` 或那次调用的失败之前。拒绝原样里可能有 provider 自己写的字，所以它走回合层携带别人内容的那条路（`Carried`），进账前扫一遍凭据的形状。gateway 不持 Ledger 句柄（§7），所以 `Gated` 把这次调用的等待记在自己身上，经模型端口的只读方法 `prefix_held`（kernel D59）交给回合层，回合层在每次尝试返回之后（成功与失败两臂）问一次，有就写；每次调用开始时记录清空，不等的调用答 `None`、不写行。行里有：从到门前到被放行的整数微秒（注入的单调时钟）；等的那次 pre-warm 怎样结束（`answered`、`refused`、`timed_out`、`abandoned`）；发 pre-warm 的那个调用的行另带它的花费（provider 报的四个 token 数与账单额）或它的拒绝原样。`model_returned` 的 `took_us` 从尝试发出算起，包含这段等待，读者减去 `waited_us` 得到对端用的时间。
+**决定**：一次等待是一行 record-only 的 `prefix_held`（载荷与种类见 kernel D61），记在等的那个 run 的名下（与 `model_called` 一样不带 `addr`），紧跟在那次尝试的 `model_called` 之后、在 `model_returned` 或那次调用的失败之前。拒绝原样里可能有 provider 自己写的字，所以它走回合层携带别人内容的那条路（`Carried`），进账前扫一遍凭据的形状。gateway 不持 Ledger 句柄（§7），所以 `Gated` 把这次调用的等待记在自己身上，经模型端口的只读方法 `prefix_held`（kernel D60）交给回合层，回合层在每次尝试返回之后（成功与失败两臂）问一次，有就写；每次调用开始时记录清空，不等的调用答 `None`、不写行。行里有：从到门前到被放行的整数微秒（注入的单调时钟）；等的那次 pre-warm 怎样结束（`answered`、`refused`、`timed_out`、`abandoned`）；发 pre-warm 的那个调用的行另带它的花费（provider 报的四个 token 数与账单额）或它的拒绝原样。`model_returned` 的 `took_us` 从尝试发出算起，包含这段等待，读者减去 `waited_us` 得到对端用的时间。
 
 **理由**：人看见一个子 run 晚出发几秒，要能在它自己的历史里读到为什么；pre-warm 是一次真请求，它的写价要出现在城的历史里，否则这一波的花费少记一份。花费只记在发它的那一行，因为一笔钱只入一次账。
 
@@ -549,7 +549,7 @@ inductive Ending where
 
 **决定**：前缀键 `PrefixKey` 是 BLAKE3（作答账号的 id，接一个零字节，再接 pre-warm 请求体的 JSON 字节）；请求体是 D42 的那条 pre-warm 经 `Endpoint::wire_request` 编出的值。端点不进字节：一个 `Holds` 住在一个端点的 `Gate` 里（§8-6），键只在同一个端点上比。请求体里有端点自己的模型 id（`config.model`）、工具表、到最后一个共享边界为止的 system 块与它们的 `cache_control` 标记、按 offer 编好的思考字段与 effort（D35），以及人写下的 overrides；speed 一进请求体（#71）就进键，每个子 run 自己的 effort（#74）同理。没有命名账号的旧登记，账号那一格是空串。模型里键是一个自然数，只被比较。
 
-共享边界由请求自己说出：`ChatRequest.shared`（kernel D59）说 `system` 的前几块是同一栋楼里每个居民都逐字节带着的。runtime 组回合请求时把它定在 Building 段的边界上，因为 Resident 段由身份与目录拼成（`crates/runtime/src/prefix/segment.rs`），各个子 run 不同。
+共享边界由请求自己说出：`ChatRequest.shared`（kernel D60）说 `system` 的前几块是同一栋楼里每个居民都逐字节带着的。runtime 组回合请求时把它定在 Building 段的边界上，因为 Resident 段由身份与目录拼成（`crates/runtime/src/prefix/segment.rs`），各个子 run 不同。
 
 **理由**：缓存能不能命中由发出去的字节决定，所以键直接取那些字节，而不是列一张字段表：表要与请求体保持一致，每加一个影响缓存的设置就要记得加一格，忘了的那一次，两个缓存不同的调用会共用一次 pre-warm，后一个照样按写价重写。账号进键，是因为 provider 的缓存按账号分开。
 
@@ -596,6 +596,7 @@ def join (s : Holds) (k t : Nat) : Holds :=
 3. 共享部分短于模型的最小可缓存长度：pre-warm 请求体的字节数除以 `kernel::consts_policy::BYTES_PER_TOKEN`（4）小于 `cache_min_tokens`。`cache_min_tokens` 是预置表 `ModelPreset` 的一列，从厂商页面读（页面按模型给 512 到 4,096），行里没有时取 `CACHE_MIN_TOKENS_DEFAULT`（4,096，页面列出的最大值），常量住在 `provider::preset`。
 4. 编不出 pre-warm 请求体（`wire_request` 拒）：真调用会以同一个错报出来，等待不替它报。
 5. 键是热的：一个带这个键的调用在 `CACHE_LIFETIME`（`kernel::consts_external::PROMPT_CACHE_TTL_SECS`）之内离开过门前去取号，常见的是母 run 自己的那次调用。离开门前就算开始：不论 pre-warm 答了、被拒、超时还是被丢下，被放行的调用都在那一刻出发，所以同一波里接着到的调用不再发第二次 pre-warm。
+6. 真调用在门内就会被拒的请求（登记为只读文本的模型收到了图片）：pre-warm 付一次写价，换来的缓存这次调用读不到，所以不等也不写。
 
 **理由**：等待只在能省下写价时才值得它的延迟。1 与 3 之下没有可读的缓存；5 之下缓存已经在，或者这一波已经出发，再挡只会更晚。按字节估 token 对中文偏少（一个汉字三个字节、约一个 token），所以估错的方向是少等，不是白等。缺省取最大值而不是最小值：取小了，一段模型缓存不了的前缀也会被 pre-warm 一次，付的是全价输入。
 

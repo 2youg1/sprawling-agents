@@ -335,7 +335,7 @@ pub(crate) struct Gated {
     active: usize,
     /// How many more times one account is asked before the next one.
     retries: kernel::account_recovery::AccountRetries,
-    /// The wait the last call took at the prefix hold (kernel D59);
+    /// The wait the last call took at the prefix hold (kernel D60);
     /// cleared as each call begins.
     held: Option<PrefixHeld>,
 }

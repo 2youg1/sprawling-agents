@@ -103,7 +103,7 @@ pub trait Model {
     fn select_account(&mut self, _account: &crate::ServerLabel) {}
     /// The wait the last call took at its endpoint's gate behind a
     /// pre-warm of its shared prefix (`crates/kernel/spec/Model.lean`
-    /// D59); `None` when it took none. Asked after every attempt, on
+    /// D60); `None` when it took none. Asked after every attempt, on
     /// success and on failure, by the turn that writes the
     /// `prefix_held` line; an adapter with no gate answers `None`.
     fn prefix_held(&self) -> Option<crate::event::record::PrefixHeld> {

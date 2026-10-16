@@ -6,7 +6,7 @@
 //! One wait a model call took at its endpoint's gate behind a pre-warm
 //! of the prefix a building shares, so a person can read off the history
 //! why a call went out late and what the pre-warm cost
-//! (`crates/kernel/spec/Event/Record.lean` D60, gateway D43).
+//! (`crates/kernel/spec/Event/Record.lean` D61, gateway D43).
 //!
 //! The pre-warm's request is absent for the reason `ModelCalled` carries
 //! no body: its bytes are the shared part of the request that waited,

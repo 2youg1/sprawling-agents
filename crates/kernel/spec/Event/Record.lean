@@ -643,9 +643,9 @@ pub enum WaitEnd { Reply { reply: SignalId }, Timeout, Left }   // 回信到了�
 **重开参数**：一个 run 可以同时等两封回信时，重议「至多一个未配对的 `started`」。
 -/
 
-/-! D60 一次端点门前的等待是一行 record-only 的 `prefix_held`，种类表的行与实现同一次改动落地
+/-! D61 一次端点门前的等待是一行 record-only 的 `prefix_held`，种类表的行与实现同一次改动落地
 
-**决定**：一个种类（追加在 `ALL` 末尾，只入账），写方是 runtime 的回合层：一次尝试返回之后（成功与失败两臂），它问模型端口的 `prefix_held`（`crates/kernel/spec/Model.lean` D59），有就写这一行，`run` 是那次尝试的 run，`addr` 缺席（与 `model_called` 相同：回合层的行由 run 说明是谁的），位置紧跟那次尝试的 `model_called`、在 `model_returned` 或那次失败之前：
+**决定**：一个种类（追加在 `ALL` 末尾，只入账），写方是 runtime 的回合层：一次尝试返回之后（成功与失败两臂），它问模型端口的 `prefix_held`（`crates/kernel/spec/Model.lean` D60），有就写这一行，`run` 是那次尝试的 run，`addr` 缺席（与 `model_called` 相同：回合层的行由 run 说明是谁的），位置紧跟那次尝试的 `model_called`、在 `model_returned` 或那次失败之前：
 
 ```rust
 pub struct PrefixHeld {

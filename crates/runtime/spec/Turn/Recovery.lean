@@ -93,11 +93,11 @@ pub(super) struct Settled {
 
 /-! D98 每次尝试之后问一次端点门前的等待，有就记一行 `prefix_held`
 
-**决定**：`turn::recovery::ModelCall` 的每一次尝试（`ask` 的那一次与 `resend_blocking` 的重发）返回之后，成功与失败两臂都问模型端口一次 `prefix_held`（kernel D59）；答 `Some` 就以回合读到的那一刻写一行 `prefix_held`（kernel D60、gateway D43），走携带别人内容的那条路（`Carried::PrefixHeld`），进账前扫一遍凭据的形状，因为 pre-warm 被拒时行里带着 provider 的拒绝原样。它落在那次尝试的 `model_called` 之后、`model_returned` 之前；失败的尝试同样留下它。`runtime::prefix::warmth::Warmed` 把 `prefix_held` 原样转交它包着的模型。
+**决定**：`turn::recovery::ModelCall` 的每一次尝试（`ask` 的那一次与 `resend_blocking` 的重发）返回之后，成功与失败两臂都问模型端口一次 `prefix_held`（kernel D60）；答 `Some` 就以回合读到的那一刻写一行 `prefix_held`（kernel D61、gateway D43），走携带别人内容的那条路（`Carried::PrefixHeld`），进账前扫一遍凭据的形状，因为 pre-warm 被拒时行里带着 provider 的拒绝原样。它落在那次尝试的 `model_called` 之后、`model_returned` 之前；失败的尝试同样留下它。`runtime::prefix::warmth::Warmed` 把 `prefix_held` 原样转交它包着的模型。
 
 **理由**：等待发生在模型端口里，回合是写账的一方；在尝试返回的那一刻问，读到的正是这一次尝试的等待（gateway 的 `Gated` 在每次调用开始时清掉上一次的记录）。
 
 **被否**：①只在成功臂上问：失败的调用一样等过、pre-warm 一样花了钱；②走 `Authored`：回合不能替 provider 写下的字作保。
 
-**重开参数**：一次尝试能等两次 pre-warm 时（kernel D60 的重开参数），问一次改成取一张表。
+**重开参数**：一次尝试能等两次 pre-warm 时（kernel D61 的重开参数），问一次改成取一张表。
 -/

@@ -133,12 +133,7 @@ impl Endpoint {
     /// the picture instead would send a conversation that refers to
     /// something the model was never given.
     fn refuse_pictures_a_blind_model_cannot_read(&self, req: &ModelRequest) -> Result<(), AxError> {
-        let blind = self
-            .config
-            .pricing
-            .as_ref()
-            .is_some_and(|entry| entry.input == InputKinds::Text);
-        if !blind || super::call::pictures_in(&req.chat).is_empty() {
+        if !self.blind_to_this_request(req) {
             return Ok(());
         }
         Err(AxError::failure(
@@ -150,6 +145,18 @@ impl Endpoint {
             "this model is registered as taking text only; point the tag at a model \
              whose input kind is text_image, or describe the picture in words",
         ))
+    }
+
+    /// Whether the real call refuses this request before anything leaves
+    /// the machine: the model is registered as reading text only, and
+    /// the request carries a picture. `prewarm_for` asks it too, so a
+    /// call that ends here sends no cache write first (gateway D39).
+    pub(super) fn blind_to_this_request(&self, req: &ModelRequest) -> bool {
+        self.config
+            .pricing
+            .as_ref()
+            .is_some_and(|entry| entry.input == InputKinds::Text)
+            && !super::call::pictures_in(&req.chat).is_empty()
     }
 
     /// The one sentence both doors say when a confidential building asks

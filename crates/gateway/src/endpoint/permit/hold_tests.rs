@@ -51,6 +51,38 @@ fn standing(answer: impl Fn(&str) -> (u16, String) + Send + 'static) -> Standing
     }
 }
 
+/// A request the real call refuses before anything leaves the machine
+/// sends no cache write first (D39, item 6): a model registered as
+/// reading text only, given a picture, is not pre-warmed.
+#[test]
+fn a_call_the_gate_refuses_locally_sends_no_prewarm() {
+    let blind = crate::market::MarketSnapshot::builtin()
+        .unwrap()
+        .lookup("local")
+        .unwrap()
+        .clone();
+    assert_eq!(blind.input, crate::market::InputKinds::Text);
+    let endpoint = Endpoint::new(
+        crate::endpoint::config::EndpointConfig {
+            pricing: Some(blind),
+            ..config(&format!("http://{NAME}:1/v1/messages"))
+        },
+        redemption(),
+    )
+    .unwrap();
+    let mut req = shared_request();
+    req.chat.messages.to_mut().push(ChatMessage {
+        role: Role::User,
+        content: vec![ContentBlock::Image(kernel::ImageRef {
+            locator: kernel::Locator::parse(&format!("cas:b3-{}", "ab".repeat(32))).unwrap(),
+            media_type: kernel::ImageType::Png,
+            width: 8,
+            height: 8,
+        })],
+    });
+    assert!(endpoint.prewarm_for(None, &req).is_none());
+}
+
 fn is_prewarm(body: &str) -> bool {
     serde_json::from_str::<Value>(body).unwrap()["max_tokens"] == 1
 }

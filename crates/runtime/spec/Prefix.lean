@@ -160,7 +160,7 @@ impl FrozenSegment {
 
 /-! D97 一栋楼共享前缀的哪几块，由段格说出
 
-**决定**：`SegmentSlot::shared_by_building` 是唯一的答案：City 与 Building 为真，Resident 与 Run 为假，穷尽地写在格上。`FrozenPrefix::shared_part` 数出前面连续为真的格，交给回合请求的 `ChatRequest.shared`（kernel D59）作 `SharedPrefix::Leading(n)`，今天 n 是 2。回合之外造的请求（探测、顾问、OCR、测试）写 `Unshared`。
+**决定**：`SegmentSlot::shared_by_building` 是唯一的答案：City 与 Building 为真，Resident 与 Run 为假，穷尽地写在格上。`FrozenPrefix::shared_part` 数出前面连续为真的格，交给回合请求的 `ChatRequest.shared`（kernel D60）作 `SharedPrefix::Leading(n)`，今天 n 是 2。回合之外造的请求（探测、顾问、OCR、测试）写 `Unshared`。
 
 **理由**：Resident 段由身份与目录拼成（`prefix::segment`），同一栋楼的两个居民不同；Run 段属于一次 run。四段的次序与内容是本 crate 的事实，gateway 只读这个数，不自己去数带断点的块，否则同一件事在两个 crate 里各拼一次。
 
