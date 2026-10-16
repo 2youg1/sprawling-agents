@@ -48,7 +48,7 @@ D2 后量子放在三处：TLS、设备认证、帧封装。TLS 负责传输层�
 - **与浏览器互通**：按 D11，组件级已知答案向量在 Rust 与 TS 两侧都过；一条由 Rust 城生成的单向夹具，TS 设备解出约定的明文。文件与写法见 §8-12：Rust 一侧的测试读回每一份，确定的三份逐字节等于重算的结果，签名在 Rust 里验过，夹具的第一帧在 Rust 设备一侧用同样固定的临时私钥打开、得出约定的明文；文件不在时测试在断言上失败。
 - **正文写法**：设备 id、公钥与权限各自的正文读回原值；短了的 id 与不认识的权限字被拒（§8-11）。
 - **seal**：帧按封的次序打开；被重放、被丢掉前一帧、被改过、方向不对的帧都打不开。负载按首字节读回原样；未知的首字节、锁门后面多出的字节、不是 UTF-8 的帧、空负载都以 `E_WIRE_MISMATCH` 拒。
-- **控制台确认**（D4）：`crates/remote_access/spec/Confirm.lean` 证明三条性质：一个动词只在回答紧挨着它的那次请求时才做，答的是那次请求印出的码、同一个动词、在到期之前；控制台从未印出的回答什么也做不成；按时答回的码做成那个动词。Rust 一侧随模块落地（§3）。
+- **控制台确认**（D4、D25）：`crates/remote_access/spec/Confirm.lean` 证明五条性质：一个动词只在回答紧挨着它的那次请求时才做，答的是那次请求印出的码、同一个动词、在到期之前；控制台从未印出的回答什么也做不成；按时答回的码做成那个动词；守卫之后，一条没做成任何动词的迹至多被判错 `limit` 次（`a_guesser_gets_at_most_limit_answers`）；守卫没锁、间隔够时，按时答回的码仍做成动词（`the_guard_lets_the_user_through`）。Rust 一侧随模块落地（§3）。
 - **Lean**：`just models` 构建 `Spec`；本文件、`crates/remote_access/spec/Door.lean`、`crates/remote_access/spec/Confirm.lean` 与 `crates/remote_access/spec/Handshake.lean` 无 `sorry`、无 `admit`、无 `axiom`。
 -/
 
@@ -153,6 +153,8 @@ impl Door {
 D4 门的动词按它们给出什么分三种走法。**威胁**：城的回环端口上，任何本地客户端都能连 `/ws`、发任何一帧，其中包括居民的两种浏览器工具——`browser` 开的 headless 浏览器能打开回环上的页面（`crates/browser/Spec.lean` 的 `fetch` 一段），`usersbrowser` 经 User 批准后驱动 User 自己的浏览器与 profile（browser D10）——以及居民的 `exec` 跑的命令；所以页面上一个开关能做的，这些工具都能做，执行者从一帧本身分不出发它的是 User 还是工具。**走法**：①**关门**是线上的 `CloseRemoteDoor`，任何本地客户端发来都照做，不要证明，因为关门只减少访问（D5）；远程设备锁门仍走封装的锁门字节（D13）。②**开门与更换城钥匙**是线上的 `OpenRemoteDoor` 与 `ReplaceCityKey`，一帧请求本身什么也不做：城取一个确认码，印在城的控制台上，旁边写明它要做的那个动词，回给页面的只是「有一个码在等」，不带码；只有紧接着的一帧 `ConfirmRemoteDoor` 带回这个码、且在它到期之前，城才做那个动词（`spec/Confirm.lean` 的三条性质）。控制台是 User 自己的终端，它的输出不进任何一帧、不进任何页面，所以一个只能驱动页面或只能说线协议的客户端拿不到码。三个平台上码都印在 `sprawling serve` 的标准输出上（Windows 的控制台窗口，macOS 与 Linux 的终端）；城没有控制台时没有人读得到码，开门、换钥匙与确认以 `E_TOOL_UNAVAILABLE` 拒，恢复语是关掉这座城、在 User 自己的终端里用 `sprawling up` 或 `sprawling serve --console` 再起它（`serve` 只在带 `--console` 或经 `sprawling up` 启动时才有控制台，`crates/sprawling/src/main/city.rs` 的 `wanted`；`bin::outside::asking` 的 `the_recovery_names_a_command_that_has_a_console` 钉住它）。更换城钥匙在三个平台上做的事相同（D23）：新种子盖过旧的，每台已配对的设备被撤销、要重新配对，已撤销的设备仍是撤销的；新钥匙能留多久照 D23 的平台表。③**配对与撤销**只在控制台。配对不上线，是因为邀请是持有即用的秘密：它一旦显示在页面上，驱动这个页面的工具就能读到它，替自己配上一台设备，那是一份比 run、比楼的规则都活得久的访问；页面给出配对的分步说明与可复制的 `/remote pair` 一行（client 的 `remote.ts`）。撤销只减少访问，可以上线，今天没有页面需要它，所以留在控制台。**逐平台的保证**（以 `crates/runtime/spec/Tools/Exec.lean` 今天的 exec 臂为准）：三个平台上，两种浏览器工具都开不了门、换不了钥匙、配不了设备，能关门。`exec` 在 Linux 上 `PATH` 里有 `bwrap` 时跑在 `LinuxNamespaces` 臂里，它够不够得到回环与控制台由那一臂给的命名空间决定；Linux 上没有 `bwrap`、以及 Windows 与 macOS 上，`exec` 恒在 `CopiedTree` 臂里，命令带着这个用户的权限与网络，够得到 `/ws`，也读得到这个用户的凭据存放处（城钥匙的种子在那里，D23），推断在 Windows 上与城共用一个控制台的进程还能读控制台的屏幕缓冲区，所以对这一臂的 `exec`，门不构成边界，与上一版 D4 写明的缺口相同；那个缺口由 exec 沙箱补，不由这扇门补。落选的两种：只留控制台、页面只给可复制的命令与状态——对浏览器工具的保证与选中的一样，但 Roadmap 的 A7 要设置页上的开关，而确认只多要 User 看一眼控制台；线上的门动词对任何本地客户端都照做——浏览器工具就能开门。**重开参数**：控制台的输出不再只给 User 看（例如页面镜像控制台，或某个居民工具读得到它），确认码就失去保证，这一条要重写；三个平台都有切断回环与凭据存放处的 exec 沙箱时，把逐平台的保证改写为对 `exec` 也成立；要让设置页也能配对时，重新论证邀请怎样不经过一个工具驱动得到的页面。
 
 D5 关门可以由任何人做，开门只能由人做。关门只会减少访问，所以远程设备自己也可以「锁门离开」。
+
+D25 控制台确认码的回答按间隔判、按错数锁。**威胁**：D4 防的本地客户端可以循环「请求 → 带随机码的回答」，每一轮按 2^-40 的概率猜中，速率只受监听器转帧的速度限制；猜中就能开门或换城钥匙。**决定**：`Confirm` 之前有一个守卫：两次被判的回答至少相隔 `CONFIRM_SPACING_MS`（一秒，与配对码的 `GUESS_INTERVAL_MS` 相同），自上一次做成动词以来被判错 `CONFIRM_MISSES_MAX`（十）次即锁住，锁住后页面的开门、换钥匙与确认都拒，直到城重启；装配层在锁住的那一刻关上开着的远程门，并在控制台印一行说明；页面的门动词在装配层一次只做一件，锁住之后才轮到的开门不做，所以锁住时正在路上的开门不会在关门之后把门打开。**理由**：一个没读过控制台的客户端，在锁住之前至多被判十次，猜中的机会至多 10/2^40，这一条不依赖速率，由 `spec/Confirm.lean` 证明；一秒的间隔让控制台不被刷屏，也让人在页面上输错一次后照常重来。按 IP 计数在这里不起作用：`ConfirmRemoteDoor` 是 `LocalOnly`，每个回答都来自回环地址，按 IP 拉黑就是拉黑人自己。锁住时关门只减少访问（D5），任何本地客户端本来就能直接关门，所以锁不给攻击者新的能力；人仍可在控制台用 `/remote` 开门，那条路不经页面。**落选**：只加间隔、不计错数——按每秒一次猜，期望要上万年，但这个界取决于速率假设；把码加长到 8 字节——页面上要多输入五个符号，仍不限速；锁住时连回环端口上的页面一起关掉——任何本地进程连错十次就能把人的页面关掉，换来的保护锁已经给了。**重开参数**：确认码的长度、或 `ConfirmRemoteDoor` 的连接类变了（不再是 `LocalOnly`）时。
 
 D19 会话的寿命就是门的寿命。`Door::admit` 取门关上的时刻作会话的到期，会话不另设时长；设备锁门、人关门、门到时，会话都随之结束。落选的是给会话一个比门短的时长：设备每过一段就要重新握手，而握手证明的事——它持有配对时的密钥——在门开着的这段时间里不会变。
 
@@ -415,17 +417,22 @@ fixture.txt           city_public, hello, x25519_private, ml_kem_private, reply,
 
 ```rust
 pub const CONFIRM_BYTES: usize = 5;
-pub struct Confirm<V> { /* 至多一个等待中的请求 —— 私有 */ }   // Default：没有请求
+pub const CONFIRM_SPACING_MS: u64 = 1_000;   // 两次被判的回答至少相隔这么久（D25）
+pub const CONFIRM_MISSES_MAX: u32 = 10;      // 自上一次做成动词以来，被判错这么多次即锁住（D25）
+pub struct Confirm<V> { /* 至多一个等待中的请求，加上守卫：上一次被判的时刻、自上次做成以来的错数 —— 私有 */ }   // Default：没有请求，守卫是新的
+pub enum Miss { Wrong, TooSoon, Locked }      // 一个回答为什么没做成动词
+impl Miss { pub fn refusal(self) -> AxError; }
 impl<V> Confirm<V> {
-    pub fn request(&mut self, verb: V, entropy: [u8; CONFIRM_BYTES], expires: TimeMs) -> String;
-    pub fn confirm(&mut self, answer: &str, now: TimeMs) -> Result<V, AxError>;
+    pub fn request(&mut self, verb: V, entropy: [u8; CONFIRM_BYTES], expires: TimeMs) -> Result<String, AxError>;
+    pub fn confirm(&mut self, answer: &str, now: TimeMs) -> Result<V, Miss>;
+    pub fn locked(&self) -> bool;
 }
 ```
 
 - `request` 换下先前的请求，交回印在控制台上的正文（8 个 base32 符号，四个一组，`abcd-efgh`）；本模块之后只存正文的摘要，与 §8-2 的配对码同一个理由。
-- `confirm` 不论对错都结束等待中的请求：答错、没有请求、`now` 不在到期之前，都以 `E_GATE_DENIED` 拒，恢复语是在页面上再按一次、照控制台上新印的码输入。答案的读法与配对码相同，大小写、空白与连字符不论。
+- `confirm` 先过守卫，再判回答。守卫锁着，答 `Miss::Locked`；距上一次被判的回答不到 `CONFIRM_SPACING_MS`，答 `Miss::TooSoon`（时钟被调回、早于上一次被判的时刻时算作间隔已够：界由错数给出，墙钟被校正不应让页面卡住），这两种都不判、不动等待中的请求。被判的回答不论对错都结束等待中的请求：答错、没有请求、`now` 不在到期之前，答 `Miss::Wrong` 并记一次错；做成动词把错数清零。错数到 `CONFIRM_MISSES_MAX` 时守卫锁住，此后 `request` 也拒，控制台不再印没人能答的码；锁只在城重启时解开。三种 `Miss` 都以 `E_GATE_DENIED` 交给页面，恢复语各说各的：再按一次照新印的码输入；等一秒再输入同一个码；页面上的远程门控件已关，到城的控制台用 `/remote`。答案的读法与配对码相同，大小写、空白与连字符不论。
 - 对动词泛型，是因为开门的载荷（开多久）是装配层的类型。确认码 5 字节熵：一次请求只给一次猜的机会，40 位够。两分钟的期限由装配层给出（`bin::outside::asking`），与配对码的十分钟同一种做法。
-- 迹向量：模块里的测试把 `spec/Confirm.lean` 的 `step` 逐字抄成参照，在十七个事件的字母表上穷举四个事件以内的每一条迹，逐条对照 `Confirm` 的结果；三条性质各另有一条具名向量。
+- 迹向量：模块里的测试把 `spec/Confirm.lean` 的 `guarded`（连同它包着的 `step`）逐字抄成参照，取本模块的两个常量，在一个时刻按 `CONFIRM_SPACING_MS` 排开的字母表上穷举四个事件以内的每一条迹，逐条对照 `Confirm` 的结果；五条性质各另有一条具名向量，其中锁住那一条走满 `CONFIRM_MISSES_MAX` 次错答。
 
 D20 互通的证据是 §8-12 的五份文本文件，由 Rust 的测试写、两侧的测试读。写法是一行一个字段的十六进制，而不是 JSON：本 crate 不依赖 JSON 解析器，为测试加一条 `serde_json` 的开发依赖会让锁文件多一条边，手写一个 JSON 读写器又是为测试多一份文法；TS 一侧两种写法都只要一行代码。固定的设备临时密钥经 `#[cfg(test)]` 的缝进来，生产的 `handshake` 不加可注入随机源的接口：§8-4 的城一侧随机性在 aws-lc-rs 内部，加一个注入点也做不出双向固定的整次握手，只会让发行二进制多一条测试才用的路。带随机的两份只在验不过时重写：每次重写都改字节的夹具，会让与协议无关的重跑在评审里看起来像协议改了。落选的做法是跑测试时起 bun 现场比对（D11 已排除）。
 -/

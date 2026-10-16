@@ -10068,8 +10068,8 @@
     "zh": "把确认码交回城市，城市随后做按下的那件事"
   },
   "remote_door_denied": {
-    "en": "the code was wrong, already used, or expired; press again and type the new code the console prints",
-    "zh": "码不对、已用过或已过期；再按一次，输入控制台上新印的码"
+    "en": "the code was not taken: it was wrong, already used or expired, or it came within a second of the last one; press again and type the new code the console prints. After ten wrong codes the page cannot open the door until the city restarts; use /remote at the console",
+    "zh": "码没有被接受：码不对、已用过或已过期，或者离上一次输入不到一秒；再按一次，输入控制台上新印的码。连错十次之后，页面在城重启之前开不了门；请到控制台用 /remote"
   },
   "remote_door_no_console": {
     "en": "the city has no console to print a code on; run sprawling serve in the city's own terminal",

@@ -153,6 +153,9 @@ fn a_device_reaches_the_city_through_the_door_over_real_sockets() {
     );
 }
 
+/// Just past the confirmation guard's spacing (remote_access D25).
+const SPACED: Duration = Duration::from_millis(remote_access::confirm::CONFIRM_SPACING_MS + 50);
+
 /// The door's wire verbs from a page on the city's own port
 /// (`crates/sprawling/spec/Outside.lean` §8-140, remote_access D4): a
 /// request answers `E_APPROVAL_PENDING` and prints a code only on the
@@ -173,40 +176,21 @@ fn a_page_opens_the_door_only_with_the_code_the_console_printed() {
 
     let runtime = tokio::runtime::Runtime::new().unwrap();
     let (refusals, printed) = runtime.block_on(async {
-        let mut page = connect(&home, "/ws").await;
+        let mut page = page_at(&home).await;
         let mut refusals = Vec::new();
         let mut printed = Vec::new();
-        // A program on this machine presents the city's key from its key
-        // file: every face demands one (wire D54).
-        let port = home.rsplit_once(':').unwrap().1.parse::<u16>().unwrap();
-        let hello = wire::ClientFrame::Hello(wire::Hello {
-            wire_v: wire::WIRE_V,
-            schema: wire::schema_hash(),
-            token: sprawling::serving::key_file::read_key(port).unwrap(),
-        });
-        page.send(Message::Text(serde_json::to_string(&hello).unwrap().into()))
-            .await
-            .unwrap();
-        let open = |n: &[u8]| {
-            door_frame(wire::WireCommand::OpenRemoteDoor(wire::DoorOpening {
-                lasting_ms: 60 * 60 * 1000,
-                idem: IdemKey::derive(&RunId::CITY, Seq::FIRST, n),
-            }))
-        };
-        let confirm = |code: &str, n: &[u8]| {
-            door_frame(wire::WireCommand::ConfirmRemoteDoor(wire::DoorAnswer {
-                code: code.to_owned(),
-                idem: IdemKey::derive(&RunId::CITY, Seq::FIRST, n),
-            }))
-        };
         refusals.push(refused(&mut page, &open(b"open 1")).await);
         let asked = read_until(&city.printed, &["within two minutes"]).0;
         let first = between(&asked, "type ", char::is_whitespace);
         refusals.push(refused(&mut page, &confirm("aaaa-aaaa", b"wrong")).await);
+        // The guard reads one answer a second (remote_access D25); a
+        // person is never faster, and the test waits as one would.
+        tokio::time::sleep(SPACED).await;
         refusals.push(refused(&mut page, &confirm(&first, b"late")).await);
         refusals.push(refused(&mut page, &open(b"open 2")).await);
         let asked = read_until(&city.printed, &["within two minutes"]).0;
         let second = between(&asked, "type ", char::is_whitespace);
+        tokio::time::sleep(SPACED).await;
         send_text(&mut page, &confirm(&second.to_uppercase(), b"right")).await;
         printed.push(
             read_until(&city.printed, &["the remote door is open"])
@@ -249,6 +233,98 @@ fn a_page_opens_the_door_only_with_the_code_the_console_printed() {
             vec![EventKind::RemoteOpened, EventKind::RemoteClosed],
         )
     );
+}
+
+/// Ten wrong codes since the last right one lock the page's door verbs
+/// and close an open door (remote_access D25): the console says why, the
+/// door closes, and the next request is refused without printing a code.
+/// The rounds are a second apart, as the guard reads answers.
+#[test]
+fn ten_wrong_codes_lock_the_pages_door_verbs_and_close_the_door() {
+    let dir = tempfile::tempdir().unwrap();
+    let raised = sprawling::assembly::init_city(dir.path()).unwrap();
+    choose_this_binary_as_the_route(dir.path());
+    let mut city = Served::start(dir.path());
+    let banner = city.type_line("/remote devices", "no device is paired");
+    let home = between(&banner, "WebUI    http://", char::is_whitespace);
+    let home = home.trim_end_matches('/').to_owned();
+    city.type_line("/remote open --for 1h", "the remote door is open");
+
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let (rounds, said, after) = runtime.block_on(async {
+        let mut page = page_at(&home).await;
+        let mut rounds = Vec::new();
+        for round in 0..remote_access::confirm::CONFIRM_MISSES_MAX {
+            let asked = refused(&mut page, &open(format!("open {round}").as_bytes())).await;
+            tokio::time::sleep(SPACED).await;
+            let answered = confirm("aaaa-aaaa", format!("wrong {round}").as_bytes());
+            rounds.push((asked, refused(&mut page, &answered).await));
+        }
+        let said = read_until(&city.printed, &["the remote door is closed"]);
+        let after = refused(&mut page, &open(b"after")).await;
+        (
+            rounds,
+            said.0.contains("remote-door controls are off"),
+            after,
+        )
+    });
+    drop(city);
+
+    let verified = runtime::replay::verify_ledger_dir(&raised.ledger_dir).unwrap();
+    let door: Vec<EventKind> = verified
+        .raw_lines()
+        .iter()
+        .map(|line| EventRecord::parse_line(line).unwrap().kind())
+        .filter(|kind| matches!(kind, EventKind::RemoteOpened | EventKind::RemoteClosed))
+        .collect();
+    let round = (Some(AxCode::ApprovalPending), Some(AxCode::GateDenied));
+    assert_eq!(
+        (
+            rounds.len(),
+            rounds.iter().all(|each| *each == round),
+            said,
+            after,
+            door
+        ),
+        (
+            usize::try_from(remote_access::confirm::CONFIRM_MISSES_MAX).unwrap(),
+            true,
+            true,
+            Some(AxCode::GateDenied),
+            vec![EventKind::RemoteOpened, EventKind::RemoteClosed],
+        )
+    );
+}
+
+/// A page on the city's own port: a program on this machine presents the
+/// city's key from its key file, because every face demands one (wire
+/// D54).
+async fn page_at(home: &str) -> Socket {
+    let mut page = connect(home, "/ws").await;
+    let port = home.rsplit_once(':').unwrap().1.parse::<u16>().unwrap();
+    let hello = wire::ClientFrame::Hello(wire::Hello {
+        wire_v: wire::WIRE_V,
+        schema: wire::schema_hash(),
+        token: sprawling::serving::key_file::read_key(port).unwrap(),
+    });
+    page.send(Message::Text(serde_json::to_string(&hello).unwrap().into()))
+        .await
+        .unwrap();
+    page
+}
+
+fn open(n: &[u8]) -> String {
+    door_frame(wire::WireCommand::OpenRemoteDoor(wire::DoorOpening {
+        lasting_ms: 60 * 60 * 1000,
+        idem: IdemKey::derive(&RunId::CITY, Seq::FIRST, n),
+    }))
+}
+
+fn confirm(code: &str, n: &[u8]) -> String {
+    door_frame(wire::WireCommand::ConfirmRemoteDoor(wire::DoorAnswer {
+        code: code.to_owned(),
+        idem: IdemKey::derive(&RunId::CITY, Seq::FIRST, n),
+    }))
 }
 
 fn door_frame(command: wire::WireCommand) -> String {

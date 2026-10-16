@@ -19,10 +19,10 @@
 //! nobody could read a code, so every verb but closing a door that was
 //! never opened is refused.
 
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock, PoisonError};
 
 use kernel::{AxCode, AxError, TimeMs};
-use remote_access::confirm::{CONFIRM_BYTES, Confirm};
+use remote_access::confirm::{CONFIRM_BYTES, Confirm, Miss};
 use wire::{Command, Delivered, Reply, WireCommand};
 
 use super::console::{Lasting, Remote, RemoteLine, perform};
@@ -43,7 +43,17 @@ pub(crate) struct Front(Arc<OnceLock<Asking>>);
 struct Asking {
     remote: Result<Remote, AxError>,
     waiting: Mutex<Confirm<Asked>>,
+    /// The door verbs carried off the listener, one at a time; an open
+    /// whose turn comes after the guard locked is not carried, so an open
+    /// still on its way cannot undo the close (remote_access D25).
+    carrying: Arc<Mutex<Carrying>>,
     show: Show,
+}
+
+/// What the carried door verbs share.
+#[derive(Default)]
+struct Carrying {
+    locked_out: bool,
 }
 
 /// A verb that waits for its code.
@@ -81,6 +91,7 @@ impl Front {
         self.0.get_or_init(|| Asking {
             remote: remote.clone(),
             waiting: Mutex::new(Confirm::default()),
+            carrying: Arc::default(),
             show,
         });
     }
@@ -116,7 +127,7 @@ impl Asking {
         let mut entropy = [0u8; CONFIRM_BYTES];
         (senses.entropy)(&mut entropy)?;
         let expires = TimeMs::new((senses.clock)()?.value().saturating_add(CONFIRM_MS));
-        let code = self.waiting()?.request(asked, entropy, expires);
+        let code = self.waiting()?.request(asked, entropy, expires)?;
         (self.show)(&format!(
             "  a page asks to {}; to allow it, type {code} into that page within two minutes",
             asked.what()
@@ -135,7 +146,39 @@ impl Asking {
     fn confirmed(&self, code: &str) -> Result<Asked, AxError> {
         let senses = self.remote.as_ref().map_err(Clone::clone)?.doorway.senses();
         let now = (senses.clock)()?;
-        self.waiting()?.confirm(code, now)
+        let mut waiting = self.waiting()?;
+        let answered = waiting.confirm(code, now);
+        let locked_now = matches!(answered, Err(Miss::Wrong)) && waiting.locked();
+        drop(waiting);
+        if locked_now {
+            self.lock_out();
+        }
+        answered.map_err(Miss::refusal)
+    }
+
+    /// The answer that locked the guard: something on this machine is
+    /// guessing, so an open door closes and the console says why the
+    /// page's controls stopped answering (remote_access D25). Closing
+    /// only takes access away, so it needs no code.
+    fn lock_out(&self) {
+        (self.show)(
+            "  ten wrong codes were typed into a page since the last right one: the page's \
+             remote-door controls are off until this city restarts, and an open remote door \
+             is closed; /remote at this console still works",
+        );
+        let remote = self.remote.clone();
+        let show = Arc::clone(&self.show);
+        let carrying = Arc::clone(&self.carrying);
+        std::thread::spawn(move || {
+            let mut turn = carrying.lock().unwrap_or_else(PoisonError::into_inner);
+            turn.locked_out = true;
+            let closed = perform(&remote, RemoteLine::Close);
+            drop(turn);
+            match closed {
+                Ok(said) => show(&said),
+                Err(refused) => show(&format!("  {refused}\n  {}", refused.recovery())),
+            }
+        });
     }
 
     /// Carries `line` off the listener's task, because opening a route
@@ -144,14 +187,24 @@ impl Asking {
     fn later(&self, line: RemoteLine, reply: Reply) {
         let remote = self.remote.clone();
         let show = Arc::clone(&self.show);
-        std::thread::spawn(move || match perform(&remote, line) {
-            Ok(said) => show(&said),
-            Err(refused) => match reply.refuse(refused.clone()) {
-                Delivered::ToThePeer => {}
-                Delivered::NobodyAsked | Delivered::PeerGone => {
-                    show(&format!("  {refused}\n  {}", refused.recovery()));
-                }
-            },
+        let carrying = Arc::clone(&self.carrying);
+        std::thread::spawn(move || {
+            let turn = carrying.lock().unwrap_or_else(PoisonError::into_inner);
+            let done = if turn.locked_out && matches!(line, RemoteLine::Open(_)) {
+                Err(Miss::Locked.refusal())
+            } else {
+                perform(&remote, line)
+            };
+            drop(turn);
+            match done {
+                Ok(said) => show(&said),
+                Err(refused) => match reply.refuse(refused.clone()) {
+                    Delivered::ToThePeer => {}
+                    Delivered::NobodyAsked | Delivered::PeerGone => {
+                        show(&format!("  {refused}\n  {}", refused.recovery()));
+                    }
+                },
+            }
         });
     }
 
