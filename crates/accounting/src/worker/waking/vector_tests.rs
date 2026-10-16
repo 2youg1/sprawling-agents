@@ -92,8 +92,11 @@ fn laid_out(
         })
         .unwrap();
     let parent = Address::parse(PARENT).unwrap();
-    let mut delegates =
-        collab::DelegateDesk::new(kernel::Depth::Root, Address::parse("lab").unwrap());
+    let mut delegates = collab::DelegateDesk::new(
+        kernel::Depth::Root,
+        Address::parse("lab").unwrap(),
+        collab::StartCheck::new(|_room: &Address| Ok(())),
+    );
     let mut workshop =
         collab::WorkshopDesk::new(PARENT.to_owned(), collab::FanIn::new(), BTreeSet::new());
     workshop.lay_out(diamond(), &mut delegates).unwrap();

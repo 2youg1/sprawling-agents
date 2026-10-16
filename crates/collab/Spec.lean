@@ -54,7 +54,7 @@ Rust 实现对模型的一致性由测试检查，不由证明：每个模块旁
 
 十九个模块（§1）。**`send` 在调用时生效，取走的信被拿着直到读过它的回答落账（D7、D8 已落进 Rust）。** `SignalDesk` 经它的 `Post` 写 `signal_enqueued`：城里的 `Post` 经 relay 把那一行交给记账线程，记账线程在把这一行展示给各个 fold 时把信投进收信房间（`accounting::worker::waking` 的 `deliver_sent`）：房间空着就进队列，有 run 在读就进那个 run 的 `Mailslot`，它在下一个安全点经 steer 那扇门或 `pull` 读到。安全点取走的信被 desk 拿着（`held`），run 的下一次 `SafePoint::BeforeWave`（此时这一回合的 `model_returned` 已落盘）才为它们各写一行 `signal_consumed`；run 在那之前离开，`take_inbox` 把它们放回队列最前，落地时为本房间敲一次门（`knock_for_returned`）。
 
-敲门也在投递时：记账线程为每个在跑的 run 记着它说话的身份（房间、run policy、`KnockChain`，`accounting::worker::driving::flight` 的 `Speaker`），`deliver_sent` 投完信就为没人在跑的收信房间敲门，同一次展示之后 `answer_knocks` 开出那一跑，所以收信 run 的 `run_started` 在发信 run 的 `run_frozen` 之前。`delegate` 走同一条路：记账线程为每个在跑的 run 记着它的 `DelegateDesk` 与 `WorkshopDesk`（`accounting::worker::waking::handing` 的 `Handing`），展示那个 run 的 relay 行之后经 `DelegateDesk::hand_over` 取走这次调用新增的请求、当场开子 run，所以子 run 的 `run_started` 在父 run 的 `run_frozen` 之前（`accounting::worker::waking::delegating_tests`）。同步 `send`（D9，`collab::reply_wait`）问出等待之后、停下之前到的回信由等待留着（D15）：发信那一波里后面的安全点把 `Mailslot` 倒进队列时，第一件来自所等房间的信不进队列，停下时它结束等待。D10 的投递时状态由投递处盖在信上（`Signal::delivered`，`SenderState`）：经 relay 投递的信盖 `running`，回程（handback）按子 run 的结局盖 `frozen` 或 `cancelled`；落地文字在 `@<address>` 之后、`pull` 的每一行在 `sender` 里写出它；从账本重建的信不带这个状态，因为账本不记它。失败的子 run 不回程，所以 `failed` 今天无处可盖。一个敲门在房间队列已空时被跳过（`answer_knocks`），因为它要叫醒读的那封信可能已被在场的 run 读过。
+敲门也在投递时：记账线程为每个在跑的 run 记着它说话的身份（房间、run policy、`KnockChain`，`accounting::worker::driving::flight` 的 `Speaker`），`deliver_sent` 投完信就为没人在跑的收信房间敲门，同一次展示之后 `answer_knocks` 开出那一跑，所以收信 run 的 `run_started` 在发信 run 的 `run_frozen` 之前。`delegate` 走同一条路：记账线程为每个在跑的 run 记着它的 `DelegateDesk` 与 `WorkshopDesk`（`accounting::worker::waking::handing` 的 `Handing`），展示那个 run 的 relay 行之后经 `DelegateDesk::hand_over` 取走这次调用新增的请求、当场开子 run，所以子 run 的 `run_started` 在父 run 的 `run_frozen` 之前（`accounting::worker::waking::delegating_tests`）。桌子在答应一次请求之前问装配层交来的 `StartCheck`，装配层判为开不起来的房间当场以工具结果拒绝（D18）；调用时判不了的拒绝在交接时到来：子房间开不起来，记账线程照旧写一行 `Refuse` 级诊断，并把一封 `Handback::unstarted` 的回程投进父房间，带着拒绝的码、主体与恢复语（D19）。同步 `send`（D9，`collab::reply_wait`）问出等待之后、停下之前到的回信由等待留着（D15）：发信那一波里后面的安全点把 `Mailslot` 倒进队列时，第一件来自所等房间的信不进队列，停下时它结束等待。D10 的投递时状态由投递处盖在信上（`Signal::delivered`，`SenderState`）：经 relay 投递的信盖 `running`，回程（handback）按子 run 的结局盖 `frozen` 或 `cancelled`；落地文字在 `@<address>` 之后、`pull` 的每一行在 `sender` 里写出它；从账本重建的信不带这个状态，因为账本不记它。失败的子 run 不回程，所以 `failed` 今天无处可盖。一个敲门在房间队列已空时被跳过（`answer_knocks`），因为它要叫醒读的那封信可能已被在场的 run 读过。
 
 workshop 与 `spec/Workshop.lean` 的整段 trace 模型（性质 4–7，D14）在 Rust 里的样子：`lay_out` 那一刻摆出的图，记账线程在展示这次调用的行时经 `WorkshopDesk::take_underway` 收走、登记进 `Collaborating.workshops`，就绪的节点经同一张 `DelegateDesk` 当场派出；节点与父 run 谁先落地都行。父 run 落地时 `GraphAfter::of` 读它的结局：`Cancelled` 或失败关图（从 `workshops` 删去），在飞的节点照跑完、照回程，回程各自为父房间敲门。`take_underway` 只交出一次，交出之后同一个 run 的第二次 `lay_out` 仍被拒。`Underway::hand_next` 全有或全无：中途一个节点被桌子拒绝时，这一次调用不交出任何节点，也不把任何节点记为已派，桌子不留请求，因为模型里「已派」就是「已派出」（`workshop::tests` 的 `a_refused_ask_in_the_middle_of_hand_next_counts_nothing_as_handed`）。
 
@@ -130,8 +130,9 @@ Signal、Inbox、Steer、Workshop、NodeContract、fan-in、Artifact、arbitrati
 - 深度是被携入的，不是推算的：一个自己推算深度的 run，错一次就是一个孙代理。
 - 一次请求不是一个 run：工具答的是在哪个房间开，派活在调用时生效：记账线程展示这次调用写下的行时就为子房间开 run，不等父回合落定（D7）；开的是一个带着 task、goal 与父 run 的派活，而不是敲门，因为敲门开的 run 只读到「有人给你来信」，读不到它要做的事，也不带一层深要的 `parent`；子 run 的 `run_started` 携着那个房间。不新增 EventKind：父的 `tool_called{name:"delegate"}` 与子的 `run_started{addr}` 已经记了两遍。
 - 代理不出楼：房间必须 `is_within` 父的楼，否则 `E_CROSS_BUILDING_DENIED`，并告知跨楼的正路是 `signal`。回程归 `handback`。
+- 开得起来才答应：`StartCheck::new(judge)` 是装配层交给桌子的判定，`DelegateDesk::new(depth, building, check)` 收下它，`beside` 带着同一个判定。`ask` 依次问派生门、楼界、`StartCheck`，三者任一拒绝，拒绝原样成为工具结果，桌子不留请求（D18）。图的节点经同一个 `ask`，所以 `lay_out` 摆出的节点同样在调用时被判。
 
-**`collab::handback`**（形状 1 判定）。`Handback::Finished(Artifact)` 与 `Stopped { claim, because }`；`of`、`by`、`node`（即子房间的地址）、`signal`、`from_signal`（`signal` 的唯一逆）。
+**`collab::handback`**（形状 1 判定）。`Handback::Finished(Artifact)` 与 `Stopped { claim, because }`；`of`、`unstarted`（开不起来的子房间：`Stopped`，`because` 是拒绝的码、主体与恢复语，D19）、`by`、`node`（即子房间的地址）、`signal`、`from_signal`（`signal` 的唯一逆）。
 
 - 父拿得到子的结果，经房间的 Inbox：回程走一件 `thread` 类的 `Signal`，父房间有 run 在读，信在它下一个安全点进它借来的队列，由 `pull` 读到；没有，信留在房间队列里，装配层在这个房间的图删去之后才为它敲门（`crates/accounting/src/worker/settling/landing/discharging.rs` 的 `discharge`）：还有节点在外时每个节点各自回程，图汇合时叫醒一次，父 run 读到的是全部结果，而不是每回一个节点就开一跑。父房间没有图（单个 `delegate`）时，每次回程都敲门。`status.signals_pending` 自动报数。
 - 城市做验证者，不是子自己：`Claim::verified` 拒生产者自验，而 `Completion::Done(Evidence)` 是城市观察到的事实。
@@ -226,12 +227,16 @@ D16 居民说的每一句进到窗口里，都装在同一个信封里：`<lette
 
 D17 `signal` 登记 `RenderIntent::Signal`，`delegate` 登记 `RenderIntent::Delegate`（kernel `spec/Tool.lean` D37）。两件工具原先登记 `Generic`，页面只能按 `effect` 读成「写入 send」与「派生 <goal>」；登记了自己的意图之后，页面从这一次调用的 `args` 读出 `to` 与 `text`、`room` 与 `task`，一行读作「发给 <地址>：<正文开头>」与「交给 <房间>：<任务>」，`pull` 读作「取信」。信落进正在跑的 run（`delivered`）、进队列（`queued`）、还是敲门开一个新 run（`knocked`），在工具答复的那一刻还不知道，是记账线程投递时定的，所以投递的每一条路径（relay 的 `deliver_sent`、子房间的交接、一次落定里投递的信）经 `accounting::worker::waking::landing` 的同一个判定，在定的那一刻写一行 `signal_landed`（kernel `spec/Event/Record.lean` D38），rounds 折叠按 `SignalId` 把这一行配到发信那一次调用上，结果一栏画落点；配不上（这一行出现之前的账本）就画工具自己答的东西：`send` 答 `delivered` 与（同步时）`waiting`，`delegate` 答子房间与 `starts`。每封信恰一行落点、`knocked` 与 `knock_once` 的敲门同义，由 `spec/Delivery.lean` 性质 8 证明。被否决的是让工具答一个猜的投递结果：桌子在调用时不知道收信房间有没有 run，猜的答案会在敲门推迟时说错。判定只读进程里的房间表与敲门队列，Windows、macOS、Linux 上同一段 trace 得同一行。重开参数：一封信可以同时落进几个房间。
 
+D18 能在调用时判的，在调用时判（`delegate` 的 `StartCheck`）。`DelegateDesk::ask` 在派生门与楼界之后问装配层交来的 `StartCheck`：它答一个房间此刻能不能开一个派来的 run，拒绝原样成为这次调用的工具结果，桌子不留请求，模型在同一回合里就能改房间名或告诉人。判定由装配层交进来，因为本 crate 只依赖 `kernel` 与 `storage`，读不到楼规、居民配置与已接入的模型；装配层用准入本身的那一半来造它（`crates/accounting/spec/Worker.lean` 的 accounting D53），规则只有一处。`StartCheck` 判的是房间的文件说了算的那一半；它判不了的（已接入的模型、停摆、此后的准备与车道）在交接时才知道，由 D19 送回父房间。被否决的有两种。其一是工具照旧答「开始了」，失败只写诊断：父 run 永远不知道，它要是在等这个子 run 的回程，就等一封不会来的信。其二是由桌子自己读城的文件来判：那是准入的第二份规则，两份迟早不一致。重开参数：`kernel` 有了「一个地址能不能开 run」的判定面，或者交接与调用之间不再隔着记账线程的一次展示。
+
+D19 开不起来的子 run，以一封 `Stopped` 回程回到父房间（`Handback::unstarted`）。子 run 在交接时被拒（`accounting::worker::waking::handing` 的 `hand_over_at_call`），记账线程照旧写那一行 `Refuse` 级诊断，再把一封回程投进父房间，走与完成的子 run 同一扇门：先写 `signal_enqueued`，再进房间表，为没人在跑的父房间敲门，写 `signal_landed`。它是 `Stopped`，`because` 写「it could not start」接着拒绝的码、主体与恢复语，模型据此改房间或告诉人；join 不收它，与停下的子 run 一样（§3 的第二个未定问题对它同样成立）。信不盖 D10 的投递时状态，因为子 run 从没有过状态；落地文字因此不写 `sender`。被否决的是第三臂 `Handback::Refused`：父 run 对它与对停下的子 run 能做的事相同（改了再派，或告诉人），join 对两者也相同，而第三臂要改 `wire` 的 `HandbackNote` 与客户端，多出的只是一个读者无从据以行事的区分。模型里它是 `spec/Workshop.lean` 的 `land x .stopped`：派出过的节点恰以一封停下的回程落地一次。重开参数：父 run 或页面需要对「没开起来」与「停下了」做不同的事。
+
 成本：每件工具在 catalog 里占一行，坐在缓存前缀里，一行背后的动词数不增加常驻成本，行数与字节数才增加（§14）。Signal 在 prefix 里占零字节，常驻的只有 `status` 的 `signals_pending`；pull 的 bandwidth 在接收方。拒词报出此刻的状态与一条可执行的下一步，因为只说「不行」的拒绝会让模型换个说法再试。
 -/
 
 /-! ## 11 边界枚举
 
-每个模块在构造点或调用点拒绝的输入写在 §8 与分部里，拒词各自报出三段式：图的重名、悬空依赖与环；空的 goal、owner、done_check、stop；空的 Triage 匹配串；越楼的 Signal 与代理；生产者自验；第二张图；不认的工具动词；无树的 `open`。
+每个模块在构造点或调用点拒绝的输入写在 §8 与分部里，拒词各自报出三段式：图的重名、悬空依赖与环；空的 goal、owner、done_check、stop；空的 Triage 匹配串；越楼的 Signal 与代理；装配层判为开不起来的代理房间（D18）；生产者自验；第二张图；不认的工具动词；无树的 `open`。
 -/
 
 /-! ## 12 错误处理

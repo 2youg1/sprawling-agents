@@ -11,6 +11,7 @@ use kernel::event::Scope;
 use kernel::event::record::{GoverningDocument, RulesChanged};
 use kernel::{Address, AxCode, AxError, EventKind, Payload};
 use kernel::{Locator, RunId, TimeMs};
+use std::path::{Path, PathBuf};
 
 use crate::worker::CommandDesk;
 
@@ -132,33 +133,13 @@ impl RunWorker {
                  unaffected - stopping one is `cancel`"
             )));
         }
-        // The building's own rules decide which models this run may
-        // reach, so they are read before one is chosen.
-        let building = city::Building::of(addr)?;
-        let rules = city::load(&self.city_root, building.addr())?;
-        // Read before a model is chosen: a room a harness runs needs
-        // none. A dispatch that opens a room is judged at its building,
-        // because the new room's own layer is empty and the address's
-        // own session record belongs to another room.
-        let judged = if super::session::opens_a_room(addr, at.session.as_ref()) {
-            building.addr()
-        } else {
-            addr
+        // What the room's files decide comes before a model is chosen,
+        // and the delegate desk asks the same judgement at the call
+        // (accounting D53).
+        let (building, rules) = match seat_from_files(&self.city_root, &Asked::of(at))? {
+            RoomSeat::Harness(seat) => return Ok(Seat::Harness(seat)),
+            RoomSeat::Model { building, rules } => (building, rules),
         };
-        if let Some((word, layer)) = city::settled_harness(&self.city_root, judged)? {
-            let file = city::config_path(&self.city_root, judged, layer)?;
-            let roster = crate::roster::roster(&self.city_root)?;
-            let named = Named {
-                word: &word,
-                file: &file,
-            };
-            let harness = seated_harness(at, named, &rules, &roster)?;
-            return Ok(Seat::Harness(HarnessSeat {
-                building,
-                rules,
-                harness,
-            }));
-        }
         let own = city::own_layer(&self.city_root, addr)?;
         let tag = self.tag_for(at.model.as_deref(), own.model())?;
         let chosen = self.credentials.book.select(tag, rules.policy())?;
@@ -305,6 +286,96 @@ impl RunWorker {
     }
 }
 
+/// What admission reads from a dispatch: where the work goes, the
+/// session it opens there, and the model it names.
+struct Asked<'a> {
+    addr: &'a Address,
+    session: Option<&'a kernel::SessionName>,
+    model: Option<&'a str>,
+}
+
+impl<'a> Asked<'a> {
+    fn of(at: &'a Assignment) -> Asked<'a> {
+        Asked {
+            addr: &at.addr,
+            session: at.session.as_ref(),
+            model: at.model.as_deref(),
+        }
+    }
+
+    /// Work handed down to `room`, which names no session and no model:
+    /// the assignment `hand_over_at_call` dispatches it under.
+    fn handed_down(room: &'a Address) -> Asked<'a> {
+        Asked {
+            addr: room,
+            session: None,
+            model: None,
+        }
+    }
+}
+
+/// Who stands in a room by its files: an ACP agent seated by the room's
+/// configuration, or a model still to be chosen under the building's
+/// rules.
+enum RoomSeat {
+    Harness(HarnessSeat),
+    Model {
+        building: city::Building,
+        rules: city::BuildingRules,
+    },
+}
+
+/// The half of admission the city's files decide, which needs nothing
+/// the accounting thread holds: the building that governs the address,
+/// its rules, and the resident the room's configuration seats
+/// (accounting D53).
+///
+/// # Errors
+/// Refuses the reserved subtree and rules that will not load; for a room
+/// whose resident is an ACP agent, a word that names neither an
+/// `[[agent]]` row nor a built-in entry, a row changed after its consent,
+/// a confidential building and a dispatch that names a model.
+fn seat_from_files(city_root: &Path, asked: &Asked<'_>) -> Result<RoomSeat, AxError> {
+    // The building's own rules decide which models this run may reach,
+    // so they are read before one is chosen.
+    let building = city::Building::of(asked.addr)?;
+    let rules = city::load(city_root, building.addr())?;
+    // A room a harness runs needs no model. A dispatch that opens a room
+    // is judged at its building, because the new room's own layer is
+    // empty and the address's own session record belongs to another
+    // room.
+    let judged = if super::session::opens_a_room(asked.addr, asked.session) {
+        building.addr()
+    } else {
+        asked.addr
+    };
+    let Some((word, layer)) = city::settled_harness(city_root, judged)? else {
+        return Ok(RoomSeat::Model { building, rules });
+    };
+    let file = city::config_path(city_root, judged, layer)?;
+    let roster = crate::roster::roster(city_root)?;
+    let named = Named {
+        word: &word,
+        file: &file,
+    };
+    let harness = seated_harness(asked, named, &rules, &roster)?;
+    Ok(RoomSeat::Harness(HarnessSeat {
+        building,
+        rules,
+        harness,
+    }))
+}
+
+/// What a run's delegate desk asks before it holds a request: whether
+/// the room's files would admit work handed down there, judged by the
+/// same [`seat_from_files`] a dispatch passes through (collab D18,
+/// accounting D53).
+pub(in crate::worker) fn start_check(city_root: PathBuf) -> collab::StartCheck {
+    collab::StartCheck::new(move |room: &Address| {
+        seat_from_files(&city_root, &Asked::handed_down(room)).map(|_seated| ())
+    })
+}
+
 /// The word a room's configuration names its resident by, and the layer
 /// file that wrote it, which is where a person changes it.
 struct Named<'a> {
@@ -317,13 +388,13 @@ struct Named<'a> {
 /// row changed after its consent, a confidential building, and a dispatch
 /// that named a model (`crates/sprawling/Spec.lean` §8-124).
 fn seated_harness(
-    at: &Assignment,
+    asked: &Asked<'_>,
     named: Named<'_>,
     rules: &city::BuildingRules,
     roster: &agent_protocols::Roster,
 ) -> Result<agent_protocols::Consented, AxError> {
     let Named { word, file } = named;
-    let subject = |named: &str| format!("{}: {named}", at.addr.as_str());
+    let subject = |named: &str| format!("{}: {named}", asked.addr.as_str());
     let harness = match roster.seat(word) {
         Ok(agent) => agent,
         Err(agent_protocols::Unseated::Refused(refusal)) => return Err(refusal),
@@ -351,7 +422,7 @@ fn seated_harness(
             file.display()
         )));
     }
-    if let Some(model) = at.model.as_deref() {
+    if let Some(model) = asked.model {
         return Err(AxError::failure(
             AxCode::ConfigInvalid,
             "dispatch work",

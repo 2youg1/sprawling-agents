@@ -12,7 +12,10 @@
 //! kind it asks for.** What
 //! this module adds is the desk that remembers what was asked for, so
 //! the assembly layer - the only thing that can build a run - can start
-//! it at the call (collab D7).
+//! it at the call (collab D7), and the [`StartCheck`] the assembly layer
+//! hands it, so a room the city could not start work in is refused at
+//! the call rather than discovered after the tool has answered (collab
+//! D18).
 //!
 //! **A request is not a run.** The tool answers with the room the work
 //! will happen in, not with a result, because starting a run inside a
@@ -28,6 +31,7 @@ use kernel::{
     RenderIntent, Temporal, Tool, ToolCall, ToolMeta, ToolName, ToolOutcome,
 };
 use serde_json::{Map, Value};
+use std::sync::Arc;
 
 /// One piece of work a run asked somebody else to carry out.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -42,6 +46,32 @@ pub struct Delegated {
     pub kind: DelegateKind,
 }
 
+/// Whether the city could start delegated work in a room, judged at the
+/// call. In the city it is the half of admission the room's files decide
+/// (accounting D53); this crate reads no building's rules, so it is handed
+/// in rather than worked out here.
+#[derive(Clone)]
+pub struct StartCheck(Arc<Judge>);
+
+/// Admits the room, or refuses it in admission's own words.
+type Judge = dyn Fn(&Address) -> Result<(), AxError> + Send + Sync;
+
+impl StartCheck {
+    /// `judge`'s refusal reaches the model unchanged, as the tool result.
+    #[must_use]
+    pub fn new(
+        judge: impl Fn(&Address) -> Result<(), AxError> + Send + Sync + 'static,
+    ) -> StartCheck {
+        StartCheck(Arc::new(judge))
+    }
+}
+
+impl std::fmt::Debug for StartCheck {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("StartCheck")
+    }
+}
+
 /// What a run asked for, held until the city can act on it.
 #[derive(Debug)]
 pub struct DelegateDesk {
@@ -53,6 +83,9 @@ pub struct DelegateDesk {
     /// The building the asking run works in, which bounds where a
     /// delegate may be put.
     building: Address,
+    /// Whether the city could start the work in the room named; asked
+    /// after the two doors above, before anything is held.
+    check: StartCheck,
     asked: Vec<Delegated>,
     /// How many of `asked` the city has already been handed. The rest
     /// are what [`DelegateDesk::hand_over`] gives next, while `asked`
@@ -62,30 +95,32 @@ pub struct DelegateDesk {
 
 impl DelegateDesk {
     #[must_use]
-    pub fn new(depth: Depth, building: Address) -> DelegateDesk {
+    pub fn new(depth: Depth, building: Address, check: StartCheck) -> DelegateDesk {
         DelegateDesk {
             depth,
             building,
+            check,
             asked: Vec::new(),
             handed_over: 0,
         }
     }
 
     /// A desk standing where this one stands - the same depth, the same
-    /// building - with nothing asked, for work this run's graph hands
+    /// building, the same check - with nothing asked, for work this run's graph hands
     /// down when a node's handback lands, which may be after the run is
     /// over.
     #[must_use]
     pub fn beside(&self) -> DelegateDesk {
-        DelegateDesk::new(self.depth, self.building.clone())
+        DelegateDesk::new(self.depth, self.building.clone(), self.check.clone())
     }
 
     /// Admits one request, or refuses it in the gate's own words.
     ///
     /// # Errors
-    /// `E_DELEGATION_DEPTH` when a delegate asks to delegate, and
+    /// `E_DELEGATION_DEPTH` when a delegate asks to delegate,
     /// `E_CROSS_BUILDING_DENIED` when the room named is not inside the
-    /// asking run's building.
+    /// asking run's building, and the [`StartCheck`]'s own refusal when
+    /// the city could not start work in that room.
     pub fn ask(&mut self, work: Delegated) -> Result<&Delegated, AxError> {
         match kernel::gate::spawn(self.depth, &work.kind) {
             GateOutcome::Allow => {}
@@ -106,6 +141,7 @@ impl DelegateDesk {
                 self.building.as_str()
             )));
         }
+        (self.check.0)(&work.room)?;
         self.asked.push(work);
         self.asked.last().ok_or_else(|| {
             AxError::failure(AxCode::InvalidArgs, "delegate work", "the request vanished")
@@ -303,6 +339,7 @@ mod tests {
         std::sync::Arc::new(std::sync::Mutex::new(DelegateDesk::new(
             depth,
             Address::parse("lab").unwrap(),
+            StartCheck::new(|_room: &Address| Ok(())),
         )))
     }
 
@@ -406,6 +443,25 @@ mod tests {
         let err = tool.invoke(&call("shop/helper", None)).unwrap_err();
         assert_eq!(err.code(), &AxCode::CrossBuildingDenied);
         assert!(err.recovery().contains("signal"));
+    }
+
+    /// collab D18: a room the assembly layer would not start work in is
+    /// refused as the tool result, in the check's own words, and the
+    /// desk holds nothing for the city to hand over.
+    #[test]
+    fn a_room_the_city_could_not_start_is_refused_at_the_call() {
+        let refusal =
+            AxError::failure(AxCode::ConfigInvalid, "dispatch work", "lab/helper: claude")
+                .with_recovery("name an agent the city knows");
+        let answer = refusal.clone();
+        let desk = std::sync::Arc::new(std::sync::Mutex::new(DelegateDesk::new(
+            Depth::Root,
+            Address::parse("lab").unwrap(),
+            StartCheck::new(move |_room: &Address| Err(answer.clone())),
+        )));
+        let tool = DelegateTool::new(std::sync::Arc::clone(&desk)).unwrap();
+        assert_eq!(tool.invoke(&call("lab/helper", None)).err(), Some(refusal));
+        assert!(desk.lock().unwrap().hand_over().is_empty());
     }
 
     #[test]

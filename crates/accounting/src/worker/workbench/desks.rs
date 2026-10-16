@@ -154,6 +154,7 @@ impl RunWorker {
             delegates: std::sync::Arc::new(std::sync::Mutex::new(collab::DelegateDesk::new(
                 depth,
                 site.building.addr().clone(),
+                crate::worker::dispatching::agreeing::start_check(self.city_root.clone()),
             ))),
             plan_path,
             waiting,
