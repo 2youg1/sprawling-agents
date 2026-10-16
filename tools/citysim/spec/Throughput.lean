@@ -49,7 +49,7 @@
 
 D23 **吞吐台住在 `sprawling-accounting` 的仪表里，本规格只规定它。** 吞吐路径（pool、lane、relay、账本线程的一次 serve）都是 `accounting::worker` 里 `pub(in crate::worker)` 的件，驱动它们的替身 provider 与造城的夹具也只在该 crate 的测试构型里编译；本 crate 够不到，与 D18 是同一个理由。被否：给 `accounting` 开一扇公共门让 citysim 驱动一座城的 pool——那扇门没有生产调用者。**重开参数**：citysim 的替身 provider（§8-10）能当一座真城的 provider、且 `sprawling` 的二进制能被场景从外面拉起并派活时，场景搬到 citysim 的 bench，从进程外量。
 
-D24 **这一段的等待从账本与仪表外侧读，生产代码不加测量点。** 外侧读数立刻可得、不改 worker 的任何行为；它分不出「等待」与「工作」时，表里写明它是哪几段的和。被否：给 pool 与 relay 加时刻戳——那要改 worker 的生产代码与 `crates/sprawling/spec/Accounting/Worker.lean`。**重开参数**：worker 有了生产测量点时，`lane` 与 `relay_under_load` 两行各拆成纯等待与工作两行，行名不变，多一个 `seg=` 字段。
+D24 **这一段的等待从账本与仪表外侧读。** pool 与 relay 已有各自的等待时点（`lane_waited`、`queue_waited`），但它们只在 accounting 的测试构型里可达（D23），而表要的是端到端的份额——投出到落账、负载往返减空载——所以表从外侧量，不改 worker 的任何行为；外侧读数分不出「等待」与「工作」时，表里写明它是哪几段的和。被否：为这一次测量在 pool 与 relay 上再加时点——两个时点已经在生产里，再加要改 worker 的生产代码与 `crates/sprawling/spec/Accounting/Worker.lean`。**重开参数**：`lane` 与 `relay_under_load` 两行改读那两个时点时（例如 D23 的重开条件成立），行名不变，多一个 `seg=` 字段。
 -/
 
 namespace Citysim.Throughput

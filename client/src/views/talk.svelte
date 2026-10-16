@@ -267,7 +267,7 @@
 
   // One branch, from wherever a person pointed, through the page's one
   // branch door (`talk/branching.ts`, client D100): the line it cut at
-  // travels in the one frame `/fork` sends (roadmap S2-3), and only once
+  // travels in the one frame `/fork` sends, and only once
   // the city has opened the branch do the words a message carries go
   // back to the box through the draft door - the composer reads that
   // door when it mounts and this page remounts it below. Before then
