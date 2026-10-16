@@ -75,7 +75,13 @@ fn extract(archive: &Path, wanted: &str) -> Result<ArchiveBinary, XtaskError> {
         // The archive holds `sprawling-<version>-<platform>/<name>`, and
         // the directory carries the version, so the entry is matched on
         // its file name rather than on a path this would have to rebuild.
-        let is_wanted = entry.name().rsplit('/').next() == Some(wanted);
+        let is_wanted = {
+            let name = entry.name().map_err(|err| XtaskError::Cmd {
+                cmd: format!("read {}", archive.display()),
+                msg: err.to_string(),
+            })?;
+            name.rsplit('/').next() == Some(wanted)
+        };
         if is_wanted {
             let mut bytes = Vec::new();
             entry
