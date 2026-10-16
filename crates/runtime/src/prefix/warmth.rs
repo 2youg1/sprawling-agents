@@ -365,7 +365,10 @@ mod tests {
         assert_eq!(round.answers.len(), 1, "the answered renewal survives");
         assert!(round.refused.is_some(), "the refusal ends the round");
         assert_eq!(calls, 2, "nothing more is sent after the refusal");
-        assert!(warmth.next_due(&lead()).is_some(), "the refused prefix stays");
+        assert!(
+            warmth.next_due(&lead()).is_some(),
+            "the refused prefix stays"
+        );
     }
 
     /// An endpoint's lead that has read [`LEAD_MS`].
