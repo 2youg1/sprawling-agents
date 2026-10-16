@@ -139,7 +139,7 @@ export function fold(held: RunBelief, record: EventRecord): [RunBelief, string |
     case "proposal_withdrawn":
     case "session_named": case "run_policy_changed": case "skill_audited":
     case "skill_shelved":
-    case "signal_landed":
+    case "signal_landed": case "prefix_held":
       return [moved, null];
   }
 }

@@ -418,6 +418,8 @@ ARCHITECTURE.md §3「nothing here is published」是这条判定成立的前提
 | D56 | `Effort` 是七级的闭枚举；每个（Endpoint，模型）提供哪几级是上游的陈述，由 gateway 回答 | `crates/kernel/spec/Model.lean` |
 | D57 | 登记时的模型事实进 CAS，账本行只记摘要 | `crates/kernel/spec/Event/Record.lean` |
 | D59 | url 里的主机按 WHATWG URL 标准读 | `crates/kernel/spec/Gate.lean` |
+| D60 | 请求说出自己哪一段是一栋楼共享的；端点门前的等待经模型端口交回 | `crates/kernel/spec/Model.lean` |
+| D61 | 一次端点门前的等待是一行 record-only 的 `prefix_held`，种类表的行与实现同一次改动落地 | `crates/kernel/spec/Event/Record.lean` |
 -/
 
 /-! ## 13 依赖选型

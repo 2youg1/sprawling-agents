@@ -39,6 +39,17 @@ impl SegmentSlot {
         SegmentSlot::Run,
     ];
 
+    /// Whether every resident of one building carries this slot byte
+    /// for byte (`crates/runtime/spec/Prefix.lean` D97): the Resident
+    /// slot is built from an identity and a catalog, and the Run slot
+    /// belongs to one run.
+    pub fn shared_by_building(self) -> bool {
+        match self {
+            SegmentSlot::City | SegmentSlot::Building => true,
+            SegmentSlot::Resident | SegmentSlot::Run => false,
+        }
+    }
+
     pub(crate) fn as_str(self) -> &'static str {
         match self {
             SegmentSlot::City => "city",

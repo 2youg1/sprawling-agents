@@ -203,6 +203,16 @@ impl RunWorker {
         Ok(())
     }
 
+    /// The room `run` works in, while the city keeps its hand-over: from
+    /// the moment it enters a lane until [`RunWorker::end_hand_over`]
+    /// returns, which is the whole time it can start a child.
+    pub(in crate::worker) fn handing_room(&self, run: RunId) -> Option<&Address> {
+        self.collaborating
+            .handing
+            .get(&run)
+            .map(|handing| &handing.room)
+    }
+
     /// Ends the hand-over for a run that has come home: anything it asked
     /// for that the city has not seen yet starts now, and a graph it
     /// registered is closed when its ending says so.

@@ -87,12 +87,19 @@ impl RunWorker {
         let agreed = match seat {
             Seat::Model(mut agreed) => {
                 use kernel::Model as _;
-                // The Session's binding opens the run's first account round.
-                if let Some(bound) = self
-                    .credentials
-                    .book
+                // The Session's binding opens the run's first account
+                // round. A child whose room has none opens on its
+                // mother's, because the provider keeps the prefix she
+                // wrote under her account alone (gateway D44).
+                let book = &self.credentials.book;
+                let opening = book
                     .session_account(&at.addr, &agreed.provider)
-                {
+                    .or_else(|| {
+                        at.parent
+                            .and_then(|mother| self.handing_room(mother))
+                            .and_then(|room| book.session_account(room, &agreed.provider))
+                    });
+                if let Some(bound) = opening {
                     agreed.adapter.select_account(bound);
                 }
                 agreed

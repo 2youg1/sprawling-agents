@@ -127,6 +127,7 @@ impl AdviserClient {
                 messages: std::borrow::Cow::Owned(messages),
                 tools: std::borrow::Cow::Borrowed(&[]),
                 breakpoint: kernel::MessageBreakpoint::Unmarked,
+                shared: kernel::SharedPrefix::Unshared,
                 effort: None,
             },
         };

@@ -131,6 +131,7 @@ impl Seeing {
                 }]),
                 tools: Cow::Borrowed(&[]),
                 breakpoint: kernel::MessageBreakpoint::Unmarked,
+                shared: kernel::SharedPrefix::Unshared,
                 effort: None,
             },
         }

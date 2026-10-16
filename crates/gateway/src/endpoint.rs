@@ -22,6 +22,7 @@ mod header;
 mod model;
 mod models;
 mod permit;
+mod prewarm;
 pub(crate) mod redemption;
 mod stream;
 mod transport;

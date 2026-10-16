@@ -254,12 +254,19 @@ pub enum EventKind {
     /// One version of a skill landed on a shelf through the city's door,
     /// and where it came from (`crates/kernel/spec/Event/Record.lean` D23).
     SkillShelved,
+
+    // The prefix hold (1).
+    /// One wait a model call took at its endpoint's gate behind a
+    /// pre-warm of the prefix a building shares, how the pre-warm ended,
+    /// and on the call that sent it what it cost
+    /// (`crates/kernel/spec/Event/Record.lean` D61).
+    PrefixHeld,
 }
 
 impl EventKind {
     /// Every kind, in the order the SPEC table lists them. Data face for counting tests
     /// and `xtask specalign`.
-    pub const ALL: [EventKind; 96] = [
+    pub const ALL: [EventKind; 97] = [
         EventKind::CityInitialized,
         EventKind::BuildingCreated,
         EventKind::BuildingConfigured,
@@ -356,6 +363,7 @@ impl EventKind {
         EventKind::SignalWaitEnded,
         EventKind::SignalLanded,
         EventKind::SkillShelved,
+        EventKind::PrefixHeld,
     ];
 }
 

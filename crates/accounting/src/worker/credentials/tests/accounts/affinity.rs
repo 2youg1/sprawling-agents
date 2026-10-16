@@ -3,8 +3,9 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Which account a Session keeps across a restart, and which one a new
-//! or branched Session starts on (`crates/gateway/spec/Router.lean` D30).
+//! Which account a Session keeps across a restart, which one a new or
+//! branched Session starts on (`crates/gateway/spec/Router.lean` D30),
+//! and which one a delegated child starts on (D44).
 
 use super::*;
 
@@ -60,6 +61,57 @@ fn the_binding_outlives_a_restart_and_a_new_or_branched_session_chooses_again() 
         "a new Session chooses again"
     );
     assert_eq!(rig.bound().as_deref(), Some("a"));
+    rig.assert_keys_stay_in_the_vault();
+}
+
+/// The room the mother hands work down to.
+const CHILD: &str = "lab/helper";
+
+/// A mother whose first account refused her is bound to the second one
+/// when she hands work down, and the child, whose room has no binding
+/// yet, calls through that account from its first request, because the
+/// provider keeps the prefix the mother wrote under her account alone.
+#[test]
+fn a_delegated_child_opens_on_its_mothers_account() {
+    let mut rig = Rig::new(
+        vec![rejected(), answer()],
+        vec![
+            Reply::answered(tool_completion(
+                "handing it down",
+                "tu_1",
+                "delegate",
+                serde_json::json!({
+                    "room": CHILD,
+                    "task": "measure the thing",
+                    "goal": "a number, then stop",
+                }),
+            )),
+            answer(),
+        ],
+        unpaced(),
+    );
+    rig.dispatch();
+    rig.worker.land_the_rest().unwrap();
+    let rooms = rig
+        .records("run_started")
+        .iter()
+        .map(|line| (line["run"].clone(), line["addr"].clone()))
+        .collect::<Vec<_>>();
+    let child_accounts = rig
+        .records("model_called")
+        .iter()
+        .filter(|line| {
+            rooms
+                .iter()
+                .any(|(run, addr)| *run == line["run"] && addr == CHILD)
+        })
+        .map(|line| line["data"]["provider_account"]["account"].clone())
+        .collect::<Vec<_>>();
+    assert_eq!(
+        child_accounts,
+        [serde_json::json!("b")],
+        "the child calls through its mother's account"
+    );
     rig.assert_keys_stay_in_the_vault();
 }
 

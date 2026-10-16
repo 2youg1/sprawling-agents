@@ -285,6 +285,22 @@ impl FrozenPrefix {
             .collect()
     }
 
+    /// How many leading system blocks every resident of this building
+    /// carries: the slots [`SegmentSlot::shared_by_building`] answers
+    /// for, counted from the front (`crates/runtime/spec/Prefix.lean` D97).
+    pub fn shared_part(&self) -> kernel::SharedPrefix {
+        std::num::NonZeroUsize::new(
+            self.segments()
+                .iter()
+                .take_while(|segment| segment.slot().shared_by_building())
+                .count(),
+        )
+        .map_or(
+            kernel::SharedPrefix::Unshared,
+            kernel::SharedPrefix::Leading,
+        )
+    }
+
     pub fn segments(&self) -> [&FrozenSegment; 4] {
         [&self.city, &self.building, &self.resident, &self.run]
     }

@@ -131,6 +131,7 @@ impl RunWorker {
                     messages: std::borrow::Cow::Owned(messages),
                     tools: std::borrow::Cow::Borrowed(&[]),
                     breakpoint: kernel::MessageBreakpoint::Unmarked,
+                    shared: kernel::SharedPrefix::Unshared,
                     effort: plan.shape.effort,
                 },
             };
@@ -183,6 +184,7 @@ impl Site {
                     }]),
                     tools: std::borrow::Cow::Borrowed(&[]),
                     breakpoint: kernel::MessageBreakpoint::Unmarked,
+                    shared: kernel::SharedPrefix::Unshared,
                     effort: plan.shape.effort,
                 },
             };

@@ -95,7 +95,7 @@ pub use model::{AdmissionRequirement, LandingPolicy, Mode, RunPolicy, Window};
 pub use model::{BuildingPolicy, Ceiling, ChatMessage, ChatRequest, ChatResponse, ContentBlock};
 pub use model::{CacheCount, ModelRequest, ModelReturn, ModelTag, ModelUsage, Role, StopReason};
 pub use model::{DialectKind, EarlyCalls, Effort, ImageRef, ImageType};
-pub use model::{Increment, Increments, MessageBreakpoint, Model};
+pub use model::{Increment, Increments, MessageBreakpoint, Model, SharedPrefix};
 pub use model::{SystemBlock, ToolDef};
 pub use node_id::{NODE_DEPTH_MAX, NodeId};
 pub use origin::Origin;

@@ -34,11 +34,11 @@ import crates.gateway.spec.Transcribe.Recording
 
 /-! # gateway 的规格
 
-`sprawling-gateway`（库名 `gateway`，目录 `crates/gateway`，依赖 kernel）是模型调用的一切：模型路由；provider 客户端自写，加上认证的两半；Custody；市场快照与成本；`kernel::model` 缝的生产适配器。模块：dialect（及 anthropic／openai／mismatch）／endpoint／credential（内缝 Vault）／market／cost／router／provider／reach／transcribe／ocr／adviser。
+`sprawling-gateway`（库名 `gateway`，目录 `crates/gateway`，依赖 kernel）是模型调用的一切：模型路由；provider 客户端自写，加上认证的两半；Custody；市场快照与成本；端点的并发名额与前缀等待；`kernel::model` 缝的生产适配器。模块：dialect（及 anthropic／openai／mismatch）／endpoint／credential（内缝 Vault）／market／cost／concurrency／hold／router／provider／reach／transcribe／ocr／adviser。
 
 本文件是 crate 的规格入口，分部在 `spec/` 下，布局见 ARCHITECTURE.md §11「Specifications in Lean」。接口一节一节写在规定它的那个模块的分部里，每一节保留它的标签 §8-n，别处引作 `crates/gateway/Spec.lean §8-n`；本文件 §8 列出每个标签住在哪个分部，并写下四节不属于任何一个模块的 crate 级接口。决定写作 `D<n>`，放在它所管的声明正上方，或它所管主题的那个分部里，别处引作 `gateway D<n>`；D1 到 D15 是这份规格在 Markdown 时 §12 各段按出现顺序的编号，D16 起是迁到 Lean 之后的决定，§12 末尾列出每条住在哪里。
 
-能写成定理的规则在分部里证明，Lean 模型是「必须守住哪些性质」的权威，Rust 代码是「怎样守住」的权威：输出上限的事实梯（`spec/Provider/Ceiling.lean`）、思考档的梯子（`spec/Provider/Thinking.lean`）、一个模型收得下什么（`spec/Provider/Input.lean`）、预置表里哪一行为一个模型 id 作答（`spec/Provider/Preset.lean`）、一次失败能不能再试（`spec/Endpoint/Failure.lean`）、一次调用的结算（`spec/Cost.lean`）、一个端点的并发名额与排队（`spec/Concurrency.lean`）、Responses 流的 EOF 结算（`spec/Dialect/Responses.lean`）。其余分部只有节注释：它们写的是接口的形状、取舍与被否的备选，由 Rust 的类型与各模块旁的测试守住（§16）。
+能写成定理的规则在分部里证明，Lean 模型是「必须守住哪些性质」的权威，Rust 代码是「怎样守住」的权威：输出上限的事实梯（`spec/Provider/Ceiling.lean`）、思考档的梯子（`spec/Provider/Thinking.lean`）、一个模型收得下什么（`spec/Provider/Input.lean`）、预置表里哪一行为一个模型 id 作答（`spec/Provider/Preset.lean`）、一次失败能不能再试（`spec/Endpoint/Failure.lean`）、一次调用的结算（`spec/Cost.lean`）、一个端点的并发名额、排队与取号之前的前缀等待（`spec/Concurrency.lean`）、Responses 流的 EOF 结算（`spec/Dialect/Responses.lean`）。其余分部只有节注释：它们写的是接口的形状、取舍与被否的备选，由 Rust 的类型与各模块旁的测试守住（§16）。
 -/
 
 /-! ## 1 需求分解
@@ -49,6 +49,7 @@ import crates.gateway.spec.Transcribe.Recording
 | `endpoint` | 自写线格式 HTTP 客户端（reqwest blocking＋rustls）实现 `kernel::Model`；逐字段请求覆盖；回环与远端同一适配器（§8-3） |
 | `credential` | Custody 效果半（scan 命中→入 Vault→原位替换 SecretRef）；兑付（组请求末格 expose，credential_lent）；describe；持久性探测。凭证只有人交出的 API key，订阅额度不经本 crate（§8-5） |
 | `market`＋`cost` | 模型目录快照＋钉版回滚；per-call 入账（权威计费额优先）。本 crate 不设 provider 侧准入与备用端点（§8-6、§8-11） |
+| `concurrency`＋`hold` | 一个端点的并发名额与排队；取号之前的前缀等待：一段冷的共享前缀先 pre-warm 一次，跟随者等它（§8-6、§8-40） |
 | `router` | Endpoint 簿：从 Ledger 重建的已登记端点与每个标签的选择；一次取模型只答一问（§8-9） |
 | `provider` | 厂商文档写下来一次：host 预设、输出上限的事实梯、一个模型收得下什么的梯子、思考档的梯子、一个端点怎么连（§8-17、§8-37、§8-39、§8-18） |
 | `reach` | 哪些调用走这台电脑的代理，与一次分段读数（§8-15） |
@@ -75,7 +76,7 @@ import crates.gateway.spec.Transcribe.Recording
 - `spec/Provider/Preset.lean`：这台电脑上的服务不借厂商的行（`a_server_on_this_machine_borrows_no_vendor_row`）；host 有自己的行时只由它们作答（`a_host_with_rows_of_its_own_answers_from_them`）；作答的行的前缀是这个 id 的前缀（`the_answer_is_a_prefix_of_the_id`）。
 - `spec/Endpoint/Failure.lean`：没发出去的请求再发，发出去丢了回答的效果不明；非 2xx 恰在 408、429 与 5xx 时再问（`a_refusal_is_asked_again_exactly_when_the_provider_is_busy`、`the_status_table`）；溢出恰是 400 或 413 且拒词说窗口满了（`a_refusal_is_an_overflow_exactly_when_it_names_the_window`），从不再试；换账号恰在 401、结构化额度用尽的 429 与流内的 `insufficient_quota`（`a_refusal_advances_exactly_for_a_rejected_key_or_an_exhausted_quota`、`a_reported_error_advances_exactly_for_an_exhausted_quota`），效果不明的失败从不换账号（`unknown_keeps_account`），换账号的失败都不再发（`an_advance_is_never_asked_again`）。
 - `spec/Cost.lean`：权威计费额在场恒胜（`the_authoritative_amount_always_wins`）；价目推算答出的数是精确的和、装得进 `u64`（`a_settled_sheet_is_the_exact_sum`）。
-- `spec/Concurrency.lean`：一个端点的名额在任意轨迹上上限留在 1 到配置值之间（`run_valid`）、没有收窄时在用数不超过上限（`run_keeps_within`）、`Retry-After` 的时刻之前不放宽（`no_widening_before_hold`）、等到的时刻严格晚于此刻（`wait_is_later`）；排队的号按拿号的次序取到（`grants_follow_arrival`）。
+- `spec/Concurrency.lean`：一个端点的名额在任意轨迹上上限留在 1 到配置值之间（`run_valid`）、没有收窄时在用数不超过上限（`run_keeps_within`）、`Retry-After` 的时刻之前不放宽（`no_widening_before_hold`）、等到的时刻严格晚于此刻（`wait_is_later`）；排队的号按拿号的次序取到（`grants_follow_arrival`）；前缀等待上一个键同一时刻至多一次 pre-warm 在飞（`one_prewarm_per_key`），pre-warm 只为冷键发出（`a_prewarm_starts_only_for_a_cold_key`），它一结束等它的调用全被放行（`a_settled_prewarm_releases_every_call_on_it`），门看过时钟之后没有调用等过 `HOLD_MAX`（`held_within_bound`），在等的调用只会被放行到号队、不会失败（`a_held_call_leaves_only_to_be_sent`、`every_call_is_held_or_sent`），没被挡的调用按到达次序进号队（`unheld_keep_arrival_order`）。
 
 每个模型都带一个可实现的正常路径（`example`：一个两表都不认识的模型在 messages 面上以策略缺省叫得通、转发厂商 id 的中转站读到厂商那一行、`cost` 测试里那一次结算），所以这些保证不是从一个无法满足的前提推出来的。生产实现与模型的对应由 §16 列出的 Rust 测试检查；一条 Lean 定理证明的是模型，不是 Rust。
 -/
@@ -182,6 +183,7 @@ market／cost：纯判定与数据面，被 endpoint 与 runtime 回合层消费
 | 8-37 | `crates/gateway/spec/Provider/Input.lean` |
 | 8-38 | `crates/gateway/spec/Provider/Identity.lean` |
 | 8-39 | `crates/gateway/spec/Provider/Thinking.lean` |
+| 8-40 | `crates/gateway/spec/Concurrency.lean` |
 
 §8-36 不用。下面四节不属于任何一个模块：两件本 crate 不做的事，目录化的形状，以及重试上限住在哪里。
 -/
@@ -207,6 +209,8 @@ market／cost：纯判定与数据面，被 endpoint 与 runtime 回合层消费
 **要接时接在哪**（D20 定接线，D21 定配置与仪表）：名额状态随端点住 `endpoint::transport::Transport`（每个端点一份、所有克隆共享，与 HTTP client 同一个槽），`permit::Gated` 的三扇门（`call`、`call_streaming` 与 `call_speculating`，它是 crate 外唯一的 `kernel::Model`）在发出请求前取、得到结果后还，429 时把 `ProviderFailure::retry_after_ms` 交给 `rate_limited`；时刻来自 `bin::assembly` 注入、经路由簿交给 `Transport` 的单调时钟（D20），`max_in_flight` 经端点的 tuning 与 `endpoint_attached` 的载荷到达（D21）。
 
 **代价**：在接上之前，429 的等待仍只由对端的 `retry-after` 提示与 watchdog 的退避表给出（D2），每条 run 各自退避；`provider_degraded` 事件由 `E_PROVIDER` 的 carrier 产出。
+
+**取号之前的前缀等待**（§8-40，`spec/Concurrency.lean`）：`Gated::through` 在 `Gate::admit` 之前先问同一个 `Gate` 里的 `hold::Holds`：一段冷的共享前缀上第一个到的调用发一次 pre-warm，同键后到的调用等它，结束后一起来取号（D37）。等待的时间不计入 `QUEUE_WAIT_MAX`（D41）。
 -/
 
 /-! D17 每个端点一个并发上限：可配置，缺省取厂商文档的值，遇 429 收窄、恢复后放宽
@@ -358,6 +362,13 @@ kernel 已有码，语义照 Custody 一节；不新增码。
 - D34 隐私 owner 的绑定只写一个新引用，经平台 Vault 而不经 Custodian：`crates/gateway/spec/Credential.lean`
 - D35 思考档由（Endpoint，模型）的 offer 决定，编码在发出前一处完成，dialect 不再写思考字段：`crates/gateway/spec/Provider/Thinking.lean`
 - D36 私网上的地址与这台电脑一样不走代理：`locality` 分三格，代理判定把 `Private` 当作 `Machine`：`crates/gateway/spec/Reach.lean`
+- D37 等待放在端点的门里、取号之前；冷键的第一个调用自己发 pre-warm，同键后到的调用等同一次：`crates/gateway/spec/Concurrency.lean`，在 `Holds` 正上方
+- D38 前缀键是账号与 pre-warm 请求体的摘要；共享边界由请求自己说出：`crates/gateway/spec/Concurrency.lean`，在 `HoldEvent` 正上方
+- D39 什么时候不等：`crates/gateway/spec/Concurrency.lean`，在 `arrive` 正上方
+- D41 一次等待至多 `HOLD_MAX`（30 s），pre-warm 不论怎样结束都放行等它的调用：`crates/gateway/spec/Concurrency.lean`，在 `HOLD_MAX` 正上方
+- D42 pre-warm 只带共享部分与一条最小的消息，消息上不打断点，只要一个输出 token：`crates/gateway/spec/Concurrency.lean`，§8-40 之后
+- D43 一次等待是 `prefix_held` 这一行，经模型端口交给回合层写下：`crates/gateway/spec/Concurrency.lean`，§8-40 之后
+- D44 委派出的子 run 的第一轮账号从母 run 房间的绑定开始：`crates/gateway/spec/Router.lean`，在 D30 之后
 -/
 
 /-! ## 13 依赖选型
@@ -394,6 +405,7 @@ golden：两 Dialect 各一请求一响应（insta）；proptest：响应往返�
 - 预置表的行：`provider::preset` 的 proptest `the_row_rule_keeps_the_lean_properties` 与测试（`a_documented_model_is_matched_by_the_longest_prefix_that_fits`、`a_relay_forwarding_a_vendors_id_reads_the_vendors_row_and_a_local_server_does_not`、`no_pinned_catalogue_row_is_also_matched_by_this_table`）。
 - 能否再试：`endpoint::failure` 的测试（`what_never_completed_is_asked_again_and_what_was_refused_is_not`、`a_provider_that_says_busy_or_broken_is_asked_again_and_one_that_refuses_is_not`、`a_request_that_outgrew_the_window_is_told_how_to_fit_again`）。
 - 名额：`concurrency` 的 proptest `permits_keep_the_lean_properties` 与 `a_trace_without_narrowing_keeps_in_use_within_the_limit`，`endpoint::permit` 的 `grants_follow_arrival`。
+- 前缀等待：`hold` 的 proptest `holds_keep_the_lean_properties`，`endpoint::permit` 的 `a_cold_wave_sends_one_prewarm_and_then_every_call`、`a_prefix_just_used_is_not_held` 与 `a_refused_prewarm_releases_every_call`（`spec/Concurrency.lean` §8-40 写下生成器与断言）。
 - Responses：`spec/Dialect/Responses.lean` 的任意轨迹结算性质，由 `responses_keep_the_lean_trace_properties` 与 endpoint 的 `responses_` 行为检查对拍；后者检查完整 `ModelReturn`、增量在 EOF 前交付、error 后增量以及 cut/silence 优先级。
 - 结算：`cost` 的测试（`the_authoritative_amount_always_wins`、`the_price_sheet_computes_integer_shares`、`overflowing_settlements_are_errors_not_wraps`）。
 

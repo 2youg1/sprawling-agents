@@ -108,6 +108,65 @@ pub(crate) fn fake_provider(
     (format!("http://{addr}/v1/messages"), handle)
 }
 
+/// A loopback provider that answers every request it hears, one at a
+/// time, with what `answer` says for that request's body, and records
+/// each body in the order it arrived. It keeps listening until the test
+/// process ends, so a test that sends fewer requests than it expected
+/// fails on its assertion rather than hanging on a join.
+pub(crate) fn answering_provider(
+    answer: impl Fn(&str) -> (u16, String) + Send + 'static,
+) -> (
+    std::net::SocketAddr,
+    std::sync::Arc<std::sync::Mutex<Vec<String>>>,
+) {
+    use std::io::{Read as _, Write as _};
+    use std::net::TcpListener;
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let addr = listener.local_addr().unwrap();
+    let heard = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let noted = std::sync::Arc::clone(&heard);
+    std::thread::spawn(move || {
+        for stream in listener.incoming() {
+            let Ok(mut stream) = stream else { return };
+            let mut buf = vec![0u8; 65536];
+            let mut request = String::new();
+            let body = loop {
+                let Ok(n) = stream.read(&mut buf) else {
+                    break None;
+                };
+                if n == 0 {
+                    break None;
+                }
+                request.push_str(&String::from_utf8_lossy(&buf[..n]));
+                if let Some(head_end) = request.find("\r\n\r\n") {
+                    let content_length = request[..head_end]
+                        .lines()
+                        .find_map(|l| {
+                            l.to_ascii_lowercase()
+                                .strip_prefix("content-length: ")
+                                .map(|v| v.trim().parse::<usize>().unwrap())
+                        })
+                        .unwrap_or(0);
+                    if request.len() >= head_end + 4 + content_length {
+                        break Some(request[head_end + 4..].to_owned());
+                    }
+                }
+            };
+            let Some(body) = body else { continue };
+            let (status, reply) = answer(&body);
+            noted.lock().unwrap().push(body);
+            let payload = format!(
+                "HTTP/1.1 {status} X\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{reply}",
+                reply.len()
+            );
+            if stream.write_all(payload.as_bytes()).is_err() {
+                continue;
+            }
+        }
+    });
+    (addr, heard)
+}
+
 /// How long the streaming fixture waits to hear that its opening frames
 /// landed. Long enough that a loaded machine is not called a defect,
 /// short enough that a buffering reader fails rather than hangs.

@@ -15,7 +15,7 @@ use kernel::{
     AxCode, AxError, Increment, Ledger, Model, ModelRequest, ModelReturn, Payload, TimeMs,
 };
 
-use super::ledger::{Authored, Journal, Moment};
+use super::ledger::{Authored, Carried, Journal, Moment};
 use super::speculation::{Generating, Speculated, call_ahead};
 
 /// What one segment answered when it was offered a failed call.
@@ -128,7 +128,9 @@ impl<'a, 'h> ModelCall<'a, 'h> {
     /// and a segment answers `SegmentOutcome::Failed` with it.
     pub(super) fn resend_blocking(&mut self) -> Result<ModelReturn, AxError> {
         self.record()?;
-        self.model.call(self.request)
+        let attempt = self.model.call(self.request);
+        self.note_hold()?;
+        attempt
     }
 
     /// Makes the call and runs the recovery pipeline over its failure.
@@ -183,6 +185,7 @@ impl<'a, 'h> ModelCall<'a, 'h> {
             }
         };
         self.streamed = streamed;
+        self.note_hold()?;
         match attempt {
             Ok((returned, speculated)) => {
                 let first = first.moment()?;
@@ -208,6 +211,24 @@ impl<'a, 'h> ModelCall<'a, 'h> {
                 SegmentOutcome::Failed(err) | SegmentOutcome::Skipped(err) => Err(err),
             },
         }
+    }
+
+    /// Appends the wait the attempt just made took at its endpoint's
+    /// gate, when it took one, right after that attempt's `model_called`
+    /// and on either outcome (`crates/runtime/spec/Turn/Recovery.lean`
+    /// D98). Carried, because a refused pre-warm brings the provider's
+    /// own words.
+    ///
+    /// # Errors
+    /// The clock's failure, or a payload the scan cannot rebuild.
+    fn note_hold(&mut self) -> Result<(), AxError> {
+        let Some(held) = self.model.prefix_held() else {
+            return Ok(());
+        };
+        let at = self.journal.read_moment()?.at;
+        self.journal
+            .append_redacted(Carried::PrefixHeld { at }, Payload::of(&held)?)?;
+        Ok(())
     }
 
     /// Appends `model_called` before the effect it announces, at the

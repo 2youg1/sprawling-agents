@@ -176,6 +176,10 @@ impl<C: FnMut() -> Result<TimeMs, AxError>> Model for Warmed<C> {
         self.model.select_account(account);
     }
 
+    fn prefix_held(&self) -> Option<kernel::event::record::PrefixHeld> {
+        self.model.prefix_held()
+    }
+
     fn call(&mut self, req: &ModelRequest) -> Result<ModelReturn, AxError> {
         self.recorded(req, |model| model.call(req))
     }

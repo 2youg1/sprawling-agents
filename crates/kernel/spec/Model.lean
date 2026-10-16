@@ -43,10 +43,13 @@ pub struct ChatMessage { pub role: Role, pub content: Vec<ContentBlock> }
 pub struct ToolDef { pub name: ToolName, pub description: String, pub input_schema: Payload }
 pub struct Ceiling(NonZeroU64);  // 零不可表达：new(0) 即 None
 pub enum MessageBreakpoint { Unmarked, Tail }        // 请求侧注记，不进 serde；缺省 Unmarked
+pub enum SharedPrefix { Unshared, Leading(NonZeroUsize) }   // 请求侧注记，不进 serde：system 的前几块是一栋楼共享的（D60）
 pub struct ChatRequest<'a> { pub model: String, pub max_tokens: Option<Ceiling>, pub system: Vec<SystemBlock>,
                          pub messages: Cow<'a, [ChatMessage]>, pub tools: Cow<'a, [ToolDef]>,
-                         pub breakpoint: MessageBreakpoint, pub effort: Option<Effort> }
-impl ChatRequest<'_> { pub fn carries_breakpoint(&self, index: usize) -> bool; }  // 该下标的消息是否带断点：Tail 且为末条
+                         pub breakpoint: MessageBreakpoint, pub shared: SharedPrefix,
+                         pub effort: Option<Effort> }
+impl ChatRequest<'_> { pub fn carries_breakpoint(&self, index: usize) -> bool;  // 该下标的消息是否带断点：Tail 且为末条
+                       pub fn shared_system(&self) -> Option<&[SystemBlock]>; } // 一栋楼共享的那几块；Unshared 或越过 system 时 None（D60）
 pub struct ModelRequest<'a> { pub policy: BuildingPolicy, pub segments: [B3Hash; 4], pub chat: ChatRequest<'a> }
                                     // segments＝冻结 prefix 分段哈希（与 prompt_assembled 同源）
 pub enum CacheCount { Reported(Tokens), Unreported }  // 缓存读／写的一个数：报了多少，或没报（D36）
@@ -239,6 +242,19 @@ pub enum ModelTag { Main, Digest, Transcribe, Ocr }   // 线上 "main" | "digest
 **被否**：①`Arc<Vec<ChatMessage>>` 共享——保温持有它时，下一次追加消息就要复制整段会话，只是把拷贝挪了地方；②`&'a [ChatMessage]` 纯借用——保温与测试构造的自有请求就写不出来；③在请求里记 `Option<usize>` 下标——能写出一个不存在的消息下标。
 
 **重开参数**：某个兼容格式需要把断点放在非末条消息上。
+-/
+
+/-! D60 请求说出自己哪一段是一栋楼共享的；端点门前的等待经模型端口交回
+
+**决定**：
+- `ChatRequest` 多一个请求侧注记 `shared: SharedPrefix`，与 `breakpoint` 一样 `#[serde(skip)]`，缺省 `Unshared`，`shared_system` 是它唯一的读法，与 `carries_breakpoint` 之于 `breakpoint` 相同：`Leading(n)` 说 `system` 的前 n 块（连同排在它们前面的工具表）是同一栋楼里每个居民都逐字节带着的。runtime 组回合请求时由冻结前缀给出：`SegmentSlot` 的 City 与 Building 两格，因为 Resident 段由身份与目录拼成，各居民不同；顾问、OCR、探测与 `ChatRequest::empty` 写 `Unshared`。读者是 gateway 的前缀等待（gateway D38、D39）。
+- `Model` 多一扇只读的门 `fn prefix_held(&self) -> Option<PrefixHeld> { None }`：最近一次调用在端点门前等过的那一次 pre-warm（gateway D43），没等过时 `None`。gateway 的 `Gated`（`endpoint::permit`）是唯一答 `Some` 的实现，每次调用开始时清掉上一次的记录；runtime 的 `Warmed` 转交给它包着的模型；回合层在每次尝试返回之后问一次，有就写一行 `prefix_held`（`crates/kernel/spec/Event/Record.lean` D61）。
+
+**理由**：哪几段是共享的，是 runtime 组前缀时的事实，它决定段的次序与内容，gateway 只该读它；让 gateway 自己数 `system` 里第几个带断点的块，就是把 runtime 的布局在 gateway 里再拼一遍。等待发生在模型端口里面，而写账的是回合层（gateway 不持 Ledger 句柄），所以要一扇门把它交出来；它与 `provider_account` 一样是缺省 `None` 的只读方法，脚本模型与测试替身不用改。
+
+**被否**：①`ModelReturn` 带上等待：调用失败时没有 `ModelReturn`，而等待与 pre-warm 的花费照样发生了；②`shared` 用裸 `usize`：`0` 与「没有共享部分」成了同一个值的两种读法；③在 `segments` 旁加一个「最后共享的是第几段」的下标：`segments` 是哈希，pre-warm 要的是字节。
+
+**重开参数**：某种请求的共享部分不在 `system` 的开头（例如工具表因居民而异、system 相同）时，重议注记的形状。
 -/
 
 /-! D12 运行策略是四个值，一次以新形状入账

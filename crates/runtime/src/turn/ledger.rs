@@ -23,10 +23,10 @@
 //! phases are a third kind, [`RunLine`]: the run authored them, so they
 //! are not scanned, and they carry the run's address.
 //!
-//! The same variants decide when a line happened. The four lines a turn
-//! waited for - a model attempt sent, its reply whole, a tool call
-//! started, its answer - carry their own reading and cannot be built
-//! without one; every other line carries the turn's stamp. The clock
+//! The same variants decide when a line happened. The lines a turn
+//! waited for - a model attempt sent, the wait it took at its endpoint's
+//! gate, its reply whole, a tool call started, its answer - carry their
+//! own reading and cannot be built without one; every other line carries the turn's stamp. The clock
 //! those readings come from is read in this module and nowhere else in
 //! the turn (`crates/kernel/Spec.lean` §8-4, "what the envelope `t` records").
 
@@ -75,6 +75,9 @@ impl RunLine {
 pub(super) enum Carried {
     /// A model reply, whole at `at`.
     ModelReturned { at: TimeMs },
+    /// The wait an attempt took at its endpoint's gate, read when the
+    /// attempt came back at `at`.
+    PrefixHeld { at: TimeMs },
     /// A tool call, started at `at`.
     ToolCalled { at: TimeMs },
     /// A tool call's answer, recorded at `at`.
@@ -105,6 +108,7 @@ impl Carried {
     fn kind(self) -> EventKind {
         match self {
             Carried::ModelReturned { .. } => EventKind::ModelReturned,
+            Carried::PrefixHeld { .. } => EventKind::PrefixHeld,
             Carried::ToolCalled { .. } => EventKind::ToolCalled,
             Carried::ToolResult { .. } => EventKind::ToolResult,
         }
@@ -115,6 +119,7 @@ impl Carried {
     fn at(self) -> TimeMs {
         match self {
             Carried::ModelReturned { at }
+            | Carried::PrefixHeld { at }
             | Carried::ToolCalled { at }
             | Carried::ToolResult { at } => at,
         }
@@ -332,7 +337,7 @@ impl<'h> Journal<'h> {
     }
 
     /// The turn's stamp: the time every line of this turn carries except
-    /// the four it waited for, and the time a wave's tools are admitted at.
+    /// the ones it waited for, and the time a wave's tools are admitted at.
     pub(super) fn stamp(&self) -> TimeMs {
         self.t
     }

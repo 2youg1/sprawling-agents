@@ -115,6 +115,7 @@ pub(super) fn may_move_plan(kind: EventKind) -> PlanReach {
         | EventKind::AdviserAnswered
         | EventKind::AdviserFellBack
         | EventKind::CacheRenewed
+        | EventKind::PrefixHeld
         | EventKind::HarnessReported
         | EventKind::HarnessAnswered
         // Who may reach the city from outside moves no plan.

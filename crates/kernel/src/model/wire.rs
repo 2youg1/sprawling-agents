@@ -316,6 +316,21 @@ pub enum MessageBreakpoint {
     Tail,
 }
 
+/// How many of a request's leading system blocks every resident of one
+/// building carries byte for byte (`crates/kernel/spec/Model.lean` D60).
+///
+/// A request-side annotation like [`MessageBreakpoint`]: `runtime` sets
+/// it from the frozen prefix, and the gateway's prefix hold reads it
+/// through [`ChatRequest::shared_system`] to build the one pre-warm a
+/// cold wave of calls waits behind. Zero is not a count here: a request
+/// that shares nothing says [`SharedPrefix::Unshared`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum SharedPrefix {
+    #[default]
+    Unshared,
+    Leading(std::num::NonZeroUsize),
+}
+
 /// A tool as the provider sees it; sourced from catalog `tool_defs` only.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ToolDef {
@@ -345,6 +360,9 @@ pub struct ChatRequest<'a> {
     /// ledger or a transcript records are the same with and without it.
     #[serde(skip)]
     pub breakpoint: MessageBreakpoint,
+    /// Outside serde for the same reason as `breakpoint`.
+    #[serde(skip)]
+    pub shared: SharedPrefix,
     /// Frozen at run start: changing it mid-run would start a new cached
     /// prompt prefix, so the value rides in from [`crate::FrozenConfig`].
     pub effort: Option<Effort>,
@@ -369,6 +387,7 @@ impl ChatRequest<'_> {
             messages: Cow::Borrowed(&[]),
             tools: Cow::Borrowed(&[]),
             breakpoint: MessageBreakpoint::Unmarked,
+            shared: SharedPrefix::Unshared,
             effort: None,
         }
     }
@@ -383,6 +402,16 @@ impl ChatRequest<'_> {
         }
     }
 
+    /// The system blocks every resident of one building carries: the
+    /// one reading of [`SharedPrefix`]. `None` when the request shares
+    /// nothing, or names more blocks than it carries.
+    pub fn shared_system(&self) -> Option<&[SystemBlock]> {
+        match self.shared {
+            SharedPrefix::Unshared => None,
+            SharedPrefix::Leading(count) => self.system.get(..count.get()),
+        }
+    }
+
     /// The same request, owning what it borrowed: for a holder that
     /// keeps it past the call it was assembled for.
     pub fn into_owned(self) -> ChatRequest<'static> {
@@ -393,6 +422,7 @@ impl ChatRequest<'_> {
             messages: Cow::Owned(self.messages.into_owned()),
             tools: Cow::Owned(self.tools.into_owned()),
             breakpoint: self.breakpoint,
+            shared: self.shared,
             effort: self.effort,
         }
     }
