@@ -13,7 +13,10 @@
   // the room, and beside it, always visible rather than on hover, the
   // way to fork that session from its last turn: the same frame `/fork`
   // sends, with the session's last run as the mother (4-14 - the
-  // continuation is a fork, not a resume verb).
+  // continuation is a fork, not a resume verb). The fork goes through
+  // the page's one branch door (`talk/branching.ts`, client D100): the
+  // mailbox stays open on the row until the city has opened the branch,
+  // and a refusal stays on the row.
   //
   // **Only the rows in view are mounted**: the list keeps its whole
   // height and draws the rows the column shows plus `OVERSCAN` on each
@@ -26,7 +29,8 @@
   // row the virtual list has not mounted is still found. A room this
   // page never saw a run in was never asked, and the line under the box
   // says so rather than let an empty result read as "no such session".
-  import { openSession } from "../../core/commands";
+  import { newestWorking } from "../../core/belief/live";
+  import { cancel } from "../../core/commands";
   import { fill, say } from "../../core/lang";
   import { toFragment } from "../../core/route";
   import { tailOf } from "../../core/stretches";
@@ -34,6 +38,8 @@
   import { ui } from "../../ui";
   import type { Address, Origin, SessionLine } from "../../wire";
   import { OVERSCAN, windowOf } from "../run/lanes";
+  import { branchFrom } from "../talk/branching";
+  import type { BranchHere } from "../talk/branching";
   import { askStretches } from "../world/stretches.svelte";
   import { rowOf } from "./recent_row";
   import Row from "./recent_row.look.svelte";
@@ -51,6 +57,8 @@
 
   const u = ui();
   const { lang } = u;
+  const { belief } = u.conn;
+  const branching = u.branches.held;
   const uid = $props.id();
 
   interface Session {
@@ -83,9 +91,21 @@
 
   function fork(row: Session): void {
     if (row.origin === null) return;
-    if (!u.send(openSession(row.room, "nothing", row.origin))) return;
-    onLeave();
-    u.go({ kind: "talk", address: row.room });
+    u.branches.open(row.room, row.origin, onLeave);
+  }
+
+  function branchOf(row: Session): BranchHere {
+    return row.origin === null ? { kind: "none" } : branchFrom($branching, row.room, row.origin);
+  }
+
+  // `/stop` beside a refused branch reaches the run the room's box
+  // would stop (`newestWorking`), read when the row is drawn.
+  function stopIn(room: Address): (() => void) | null {
+    const going = newestWorking($belief, room);
+    if (going === undefined) return null;
+    return () => {
+      u.send(cancel(going.run));
+    };
   }
 
   // The window of rows in view, recomputed as the column scrolls or
@@ -133,13 +153,15 @@
     style:padding-top={`${String(shown.first * rowPx)}px`}
   >
     {#each rows.slice(shown.first, shown.end) as row (`${row.room}@${String(row.line.began)}`)}
+      {@const branch = branchOf(row)}
       <Row
-        {...rowOf({ room: row.room, line: row.line, forkable: row.origin !== null }, $lang, ago($lang, row.line.at, u.now()), {
+        {...rowOf({ room: row.room, line: row.line, forkable: row.origin !== null, branch }, $lang, ago($lang, row.line.at, u.now()), {
           href: toFragment({ kind: "talk", address: row.room }),
           follow: onLeave,
           fork: () => {
             fork(row);
           },
+          stop: branch.kind === "refused" ? stopIn(row.room) : null,
         })}
       />
     {/each}

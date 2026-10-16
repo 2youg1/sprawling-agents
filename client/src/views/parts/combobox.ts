@@ -68,14 +68,25 @@ export type Answer =
 // popup closes from there too; every other key there is the platform's.
 export type Origin = "trigger" | "field";
 
+// A key as the table reads it; a `KeyboardEvent` is one.
+export interface Pressed {
+  readonly key: string;
+  // Whether an input method is composing: the key is then the input
+  // method's, which confirms a candidate with Enter, walks candidates
+  // with the arrows and abandons the composition with Escape.
+  readonly isComposing: boolean;
+}
+
 const PASS: Answer = { kind: "pass" };
 
 // The key table: `cursor` is where the cursor stands now, `count` how
-// many rows the filter left. The arrows clamp at both ends.
-export function answer(key: string, origin: Origin, cursor: number, count: number): Answer {
-  if (origin === "trigger") return key === "Escape" ? { kind: "close", focus: "opener" } : PASS;
+// many rows the filter left. The arrows clamp at both ends. A key an
+// input method is composing passes, whatever it is (client D99).
+export function answer(pressed: Pressed, origin: Origin, cursor: number, count: number): Answer {
+  if (pressed.isComposing) return PASS;
+  if (origin === "trigger") return pressed.key === "Escape" ? { kind: "close", focus: "opener" } : PASS;
   const last = Math.max(0, count - 1);
-  switch (key) {
+  switch (pressed.key) {
     case "ArrowDown":
       return { kind: "cursor", at: Math.min(last, cursor + 1) };
     case "ArrowUp":
@@ -110,8 +121,7 @@ export function claims(answered: Answer): boolean {
 }
 
 // A key as the wiring reads it; a `KeyboardEvent` is one.
-export interface Keyed {
-  readonly key: string;
+export interface Keyed extends Pressed {
   preventDefault(): void;
 }
 
@@ -251,7 +261,7 @@ export function lookOf(view: ComboboxView, hands: Hands): ComboboxLook {
     (origin: Origin) =>
     (event: Keyed): void => {
       if (!open) return;
-      const answered = answer(event.key, origin, cursor, rows.length);
+      const answered = answer(event, origin, cursor, rows.length);
       if (claims(answered)) event.preventDefault();
       hands.act(answered);
     };

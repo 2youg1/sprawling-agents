@@ -114,11 +114,14 @@
 | | | Escape | 关闭弹层，清空过滤词，焦点回触发器 |
 | | | Tab | 关闭弹层，焦点照常离开 |
 | | | 可打印字符 | 过滤，并把游标复位到第 0 行 |
+| | | 输入法组字时的任何键（`isComposing` 为真） | 归输入法：键表不答、不 `preventDefault`，游标、弹层与生效的值都不动（D99）|
 | `popover.svelte` | 多列 listbox，装在 `role="dialog"` 里 | ↓／↑ | 当前列的游标下移／上移，钳在两端 |
 | | | Home／End | 当前列的首行／末行 |
 | | | Tab／Shift+Tab | **换列**（环绕）并把游标复位到第 0 行——本部件在此覆盖平台的 Tab |
 | | | Enter | 应用当前列的游标行，回调 `onApply` |
 | | | Escape | 回调 `onClose` |
+
+这张键表只有一处：`parts/combobox.ts` 的 `answer`。输入框下设置行里的芯片（`talk/pill.ts`）是同一种控件，它的过滤与键表都读 `parts/combobox.ts`，自己只多一件事：Escape 关上菜单时不再往外传，免得窗口上的 Escape 处理（外壳关上一栏的面、检视面收起）把同一下 Escape 再答一遍。
 
 `combobox.svelte` 的 `aria-*`（规格）：文本框是 `role="combobox"`，带 `aria-expanded`、`aria-controls` 指向列表、`aria-activedescendant` 指向游标行；列表 `role="listbox"` ＋ `aria-label`；每行 `role="option"`，`aria-selected` 只标**已选中的那个值**，不标游标。
 

@@ -16,7 +16,7 @@ import { boxKey } from "../cursor";
 
 // What a handler reads from an event, and nothing more, so the wiring
 // test presses keys and types without a DOM.
-export type KeyPress = Pick<KeyboardEvent, "key" | "preventDefault">;
+export type KeyPress = Pick<KeyboardEvent, "key" | "isComposing" | "preventDefault">;
 export interface Typed {
   readonly currentTarget: { readonly value: string };
 }
@@ -120,7 +120,7 @@ export function searchLookOf(state: SearchState, hands: SearchHands): SearchLook
         hands.type(event.currentTarget.value);
       },
       onkeydown: (event) => {
-        const move = boxKey(event.key, cursor, paths.length);
+        const move = boxKey(event, cursor, paths.length);
         switch (move.kind) {
           case "move":
             hands.point(move.to);

@@ -194,7 +194,9 @@
             move({ kind: "type", text: event.currentTarget.value });
           }}
           onkeydown={(event) => {
-            if (event.key !== "Escape") return;
+            // Escape during a composition abandons the composition, not
+            // the door (client D99).
+            if (event.key !== "Escape" || event.isComposing) return;
             event.preventDefault();
             move({ kind: "escape" });
           }}

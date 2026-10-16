@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 // The pill's wiring, read off the value its look is given: the menu's
-// key table (client/Spec.lean §7-4, the listbox of a combobox), where
+// key table (client/spec/Views/Parts.lean §7-5, the combobox's), where
 // the focus goes when it closes, and which element carries the
 // cursor's `aria-activedescendant`. No look is imported, so a look
 // taken from a component library is held to the same table.
@@ -13,7 +13,7 @@ import { expect, test } from "bun:test";
 
 import type { Choice, Pill } from "./composer";
 import { FILTER_AFTER } from "./composer";
-import { edgeFor, lookOf, rowsOf } from "./pill";
+import { edgeFor, lookOf } from "./pill";
 import type { KeyPress, PillHands, PillHeld, PillLook } from "./pill";
 
 const ROOMS: readonly Choice[] = [
@@ -56,10 +56,14 @@ function drawn(choices: readonly Choice[], held: Partial<PillHeld>): { readonly 
 
 const INSIDE = new EventTarget();
 
-function press(key: string): KeyPress & { readonly marks: string[] } {
+// Whether an input method is composing when the key is pressed.
+type Typing = "settled" | "composing";
+
+function press(key: string, typing: Typing = "settled"): KeyPress & { readonly isComposing: boolean; readonly marks: string[] } {
   const marks: string[] = [];
   return {
     key,
+    isComposing: typing === "composing",
     marks,
     preventDefault: () => marks.push("prevented"),
     stopPropagation: () => marks.push("stopped"),
@@ -96,6 +100,18 @@ test("the list's keys move the cursor, take the row under it, close, and let Tab
     calls: ["point 2", "point 0", "point 0", "point 2", "close opener", "close opener", "close leave"],
     picked: ["atlas/api"],
   });
+});
+
+test("a key pressed while an input method composes in the filter is the input method's: the confirming Enter takes no row", () => {
+  const many = Array.from({ length: FILTER_AFTER + 1 }, (_unused, index) => ({ value: `room-${String(index)}`, label: `room ${String(index)}` }));
+  const { look, heard } = drawn(many, { at: 3 });
+  const keys = ["Enter", "ArrowDown", "Escape"].map((key) => {
+    const event = press(key, "composing");
+    look.menu?.filter?.onkeydown(event);
+    return event.marks;
+  });
+  expect(keys).toEqual([[], [], []]);
+  expect(heard).toEqual({ calls: [], picked: [] });
 });
 
 test("the cursor stays inside the list at both ends", () => {
@@ -138,8 +154,8 @@ test("focus leaving the pill closes an open menu without taking the focus back",
 });
 
 test("the filter keeps rows by name, note or value, and an empty list names no cursor", () => {
-  expect(rowsOf(ROOMS, " FRONT ").map((row) => row.value)).toEqual(["hall/mayor"]);
-  expect(rowsOf(ROOMS, "atlas/w").map((row) => row.value)).toEqual(["atlas/web"]);
+  const kept = (query: string): readonly string[] => drawn(ROOMS, { query }).look.menu?.options.map((row) => row.key) ?? [];
+  expect([kept(" FRONT "), kept("atlas/w")]).toEqual([["hall/mayor"], ["atlas/web"]]);
   const { look } = drawn(ROOMS, { query: "nowhere" });
   expect([look.menu?.options, look.menu?.list["aria-activedescendant"]]).toEqual([[], undefined]);
 });

@@ -35,9 +35,16 @@ function hands(): { readonly asked: Asked; readonly hands: BoxHands } {
   };
 }
 
-function press(key: string): { readonly key: string; prevented: boolean; readonly preventDefault: () => void } {
+// Whether an input method is composing when the key is pressed.
+type Typing = "settled" | "composing";
+
+function press(
+  key: string,
+  typing: Typing = "settled",
+): { readonly key: string; readonly isComposing: boolean; prevented: boolean; readonly preventDefault: () => void } {
   const event = {
     key,
+    isComposing: typing === "composing",
     prevented: false,
     preventDefault: () => {
       event.prevented = true;
@@ -74,6 +81,14 @@ describe("the palette's box", () => {
     boxOf(AT, enter.hands).onkeydown(pressed);
     expect(enter.asked.picked).toBe(1);
     expect(pressed.prevented).toBe(true);
+  });
+
+  test("a key pressed while an input method composes is the input method's: Enter picks no row, Tab completes no verb", () => {
+    const composing = hands();
+    const keys = [press("Enter", "composing"), press("ArrowDown", "composing"), press("Tab", "composing")];
+    for (const each of keys) boxOf({ ...AT, query: "/hal" }, composing.hands).onkeydown(each);
+    expect(composing.asked).toEqual({ wrote: [], pointed: [], picked: 0 });
+    expect(keys.map((each) => each.prevented)).toEqual([false, false, false]);
   });
 
   test("Tab completes a verb, and is the focus's own key on a place", () => {

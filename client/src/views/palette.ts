@@ -46,7 +46,7 @@ export function whyFor(spelling: string, reach: Reach): Key | undefined {
   }
 }
 
-export type KeyPress = Pick<KeyboardEvent, "key" | "preventDefault">;
+export type KeyPress = Pick<KeyboardEvent, "key" | "isComposing" | "preventDefault">;
 export interface Typed {
   readonly currentTarget: { readonly value: string };
 }
@@ -102,12 +102,14 @@ export function boxOf(state: BoxState, hands: BoxHands): BoxWire {
       hands.write(event.currentTarget.value);
     },
     onkeydown: (event) => {
-      if (event.key === "Tab" && verbs) {
+      // Tab during a composition is the input method's, as every key
+      // in `boxKey` is.
+      if (event.key === "Tab" && verbs && !event.isComposing) {
         event.preventDefault();
         hands.write(completed(query.trim()));
         return;
       }
-      const move = boxKey(event.key, cursor, count);
+      const move = boxKey(event, cursor, count);
       switch (move.kind) {
         case "move":
           hands.point(move.to);

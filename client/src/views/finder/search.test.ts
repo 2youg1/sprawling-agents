@@ -71,6 +71,7 @@ describe("the file finder", () => {
     const prevented: string[] = [];
     const press = (key: string) => ({
       key,
+      isComposing: false,
       preventDefault: () => {
         prevented.push(key);
       },
@@ -82,10 +83,25 @@ describe("the file finder", () => {
     expect([seen.pointed, seen.opened, prevented]).toEqual([[1, 0], ["Makefile"], ["ArrowDown", "ArrowUp", "Enter"]]);
   });
 
+  test("a key pressed while an input method composes is the input method's: the confirming Enter opens no path", () => {
+    const seen = record();
+    const box = searchLookOf(state(FOUND, 1), seen.hands).box;
+    const prevented: string[] = [];
+    for (const key of ["Enter", "ArrowUp"])
+      box.onkeydown({
+        key,
+        isComposing: true,
+        preventDefault: () => {
+          prevented.push(key);
+        },
+      });
+    expect([seen.pointed, seen.opened, prevented]).toEqual([[], [], []]);
+  });
+
   test("with no paths the box names no option, and Enter opens nothing", () => {
     const seen = record();
     const look = searchLookOf(state({ under: LAB, text: "zz", paths: [], walked: "cut" }), seen.hands);
-    look.box.onkeydown({ key: "Enter", preventDefault: () => undefined });
+    look.box.onkeydown({ key: "Enter", isComposing: false, preventDefault: () => undefined });
     expect([look.box["aria-activedescendant"], look.box["aria-expanded"], seen.opened]).toEqual([undefined, false, []]);
     expect(look.notes).toEqual([fill(say("en", "finder_none"), { text: "zz" }), say("en", "finder_cut")]);
   });

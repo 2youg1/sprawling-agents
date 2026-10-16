@@ -17,10 +17,17 @@ import type { PaneMenuHands } from "./pane_menu";
 import { sessionMenuLookOf } from "./session_menu";
 import type { SessionMenuHands } from "./session_menu";
 
-const press = (key: string): { key: string; preventDefault: () => void; prevented: () => boolean } => {
+// Whether an input method is composing when the key is pressed.
+type Typing = "settled" | "composing";
+
+const press = (
+  key: string,
+  typing: Typing = "settled",
+): { key: string; isComposing: boolean; preventDefault: () => void; prevented: () => boolean } => {
   let prevented = false;
   return {
     key,
+    isComposing: typing === "composing",
     preventDefault: () => {
       prevented = true;
     },
@@ -155,7 +162,7 @@ describe("a session row's menu", () => {
     }).toEqual({ described: "s-hint", hint: "s-hint", invalid: true, max: 24 });
   });
 
-  test("Escape in the field closes the menu, and any other key is the field's", () => {
+  test("Escape in the field closes the menu unless an input method is composing, and any other key is the field's", () => {
     const log: string[] = [];
     const look = sessionMenuLookOf(
       {
@@ -168,10 +175,17 @@ describe("a session row's menu", () => {
       },
       sessionHands(log),
     );
+    const composing = press("Escape", "composing");
     const escape = press("Escape");
     const letter = press("a");
+    look.naming?.field.onkeydown(composing);
     look.naming?.field.onkeydown(escape);
     look.naming?.field.onkeydown(letter);
-    expect({ log, escape: escape.prevented(), letter: letter.prevented() }).toEqual({ log: ["close"], escape: true, letter: false });
+    expect({ log, composing: composing.prevented(), escape: escape.prevented(), letter: letter.prevented() }).toEqual({
+      log: ["close"],
+      composing: false,
+      escape: true,
+      letter: false,
+    });
   });
 });

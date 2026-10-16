@@ -4303,6 +4303,26 @@
     "en": "the last run of this session is older than what this page holds",
     "zh": "这段会话的最后一个 run 早于本页持有的范围"
   },
+  "branch_opening": {
+    "en": "opening the branch…",
+    "zh": "正在打开分支…"
+  },
+  "branch_one_at_a_time": {
+    "en": "another branch is opening; this one can start once it has",
+    "zh": "另一个分支正在打开，开好之后才能开这一个"
+  },
+  "branch_busy": {
+    "en": "not branched: a run is working in this room; stop it, then branch again",
+    "zh": "没有开出分支：这个房间里有 run 在工作；先停下它，再开分支"
+  },
+  "branch_refused": {
+    "en": "not branched: {why}",
+    "zh": "没有开出分支：{why}"
+  },
+  "branch_stop": {
+    "en": "stop the run working in {room}",
+    "zh": "停下 {room} 里正在工作的 run"
+  },
   "mailbox_back": {
     "en": "back",
     "zh": "返回"
