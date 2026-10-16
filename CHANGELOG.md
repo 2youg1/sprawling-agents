@@ -20,11 +20,11 @@ release notes and their commits.
 
 ---
 
-## v0.0.12-Alpha-261016
+## v0.0.12-Alpha-261017
 
 **sprawling 0.0.12 daybreak**
 
-Alpha, cut on 2026-10-16 (UTC+8) as `v0.0.12-Alpha-261016`. The workspace manifest carries 0.0.12; `kernel::release::MATURITY` owns maturity, and the release workflow supplies the tag to a released binary. It records what landed after `v0.0.11-Alpha-261009`. The wire moves twice, from WIRE_V 65 to 67, because frames changed shape in this release (`crates/wire/Spec.lean` D1): 66 when `CostAnswer` gained the keep-warm renewals, and 67 when `AttachEndpoint` gained `named` beside `admit` and every model row gained `listing`. `EVENT_LOG_V` stays at 2: a line written by 0.0.11 reads unchanged, and the new `prefix_held` kind is written by 0.0.12 alone. A views or standing snapshot cut by 0.0.11 is refused by version and folded again from the start of the Ledger, because the fold rules moved with the new fields; nothing has to be converted by hand ([updating](docs/getting-started.md#updating)).
+Alpha, cut on 2026-10-17 (UTC+8) as `v0.0.12-Alpha-261017`. The workspace manifest carries 0.0.12; `kernel::release::MATURITY` owns maturity, and the release workflow supplies the tag to a released binary. It records what landed after `v0.0.11-Alpha-261009`. The wire moves twice, from WIRE_V 65 to 67, because frames changed shape in this release (`crates/wire/Spec.lean` D1): 66 when `CostAnswer` gained the keep-warm renewals, and 67 when `AttachEndpoint` gained `named` beside `admit` and every model row gained `listing`. `EVENT_LOG_V` stays at 2: a line written by 0.0.11 reads unchanged, and the new `prefix_held` kind is written by 0.0.12 alone. A views or standing snapshot cut by 0.0.11 is refused by version and folded again from the start of the Ledger, because the fold rules moved with the new fields; nothing has to be converted by hand ([updating](docs/getting-started.md#updating)).
 
 ### Behaviour changes
 
