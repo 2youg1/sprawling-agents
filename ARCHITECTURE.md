@@ -634,6 +634,7 @@ the part worth knowing before starting, not after.
 | the page's colours, motion or words | `client/src/theme.css` and the parts it imports from `client/src/theme/`, `client/src/lang.json` + `docs/frontend-method.md` | `xtask color`, `xtask motion` and `xtask wording` refuse a colour, curve, duration or word spelled anywhere else |
 | what a module must hold on every input | the part under the crate's `spec/` that names the module (§11, *Specifications in Lean*) | `just models` proves it with no `sorry`, `admit` or `axiom`; the module's rustdoc names the part |
 | a gate itself | `tools/xtask/` + `tools/xtask/Spec.lean` | review asks for a `Verdict:` trailer when a gate loosens in the commit it would have refused |
+| how a door handles a filesystem alias or pins content and evidence | [§10, Names, aliases and pins](#names-aliases-and-pins) | review against each door's stated scope and owning SPEC |
 
 Two documents sit beside this one rather than inside it: operating a
 city — swapping a provider, pointing at another MCP server, running a
@@ -739,6 +740,78 @@ handle, one `Instant::now()`, or a bare spawn inside `kernel` disables
 replay, formal verification and deterministic simulation at the same time.
 The gates hold that line so the property survives a builder who has never
 read this file.
+
+### Names, aliases and pins
+
+A name chooses a location; a pin records the identity an approval or piece of
+evidence applies to. Content pins use BLAKE3 over the bytes whose identity
+matters. A use that needs that identity proved reads through the boundary
+that verifies it. Different content cannot inherit the old approval or
+evidence. Surface changes to accepted content as drift; never silently
+advance its approval. Rebuilding a derived proof record follows its SPEC
+and does not change what the person approved. Existing domain identities keep
+their own scope and algorithm; a content digest does not replace a git
+object id or a paired key.
+
+The existing boundaries show what each pin covers:
+
+- A document version is the BLAKE3 of the whole file; a save compares its
+  baseline with the current bytes (documents D3, D8).
+- A Citation compares the review's version: a CAS hash, or a file address and
+  git object id. The caller supplies that version's bytes; the comparison
+  itself does not verify their digest (`collab::citation`).
+- An agent's launch digest covers the program spelling, arguments and
+  environment, not the executable's bytes. Recorded consent is checked
+  against that launch; a row written by hand is the other consent door
+  (`agent_protocols::harness::entry`, D16).
+- A skill audit binds its verdict to the whole content it judged, not merely
+  a package's `SKILL.md`; the verdict is shown, not used for admission
+  (city D19).
+- A verified prefix compares its BLAKE3, length, rule version and entering
+  chain state before reusing the checked exit (storage §8-30).
+- Remote pairing checks the public key's SHA-256 fingerprint, then keeps
+  the paired key for later signature checks (`remote_access::handshake`).
+
+`Cas::get` verifies the whole object; `get_range` and `size` trust
+the stored object. A caller that needs the address proved takes the full read
+(`crates/storage/spec/Cas.lean` §8-3, §8-36).
+
+A filesystem alias is not a content pin. A door states which alias kinds it
+meets and uses a recorded handling: refuse, resolve and judge again, follow
+and copy the content, or skip. Reuse the decision below; a different handling
+needs its own row and reason in the same change.
+
+| Door | Handling and scope | Authority |
+|---|---|---|
+| `storage::alias::WriteTarget` | Refuses symlinks, junctions and hard-linked regular files. `at` checks the name and ancestors; `within` checks below its root. The value records the check at that instant; landing owns the later effect. | `crates/storage/spec/Alias.lean` §8-25, §8-32 |
+| `city::library::install::precheck` | Refuses symbolic links throughout a package and opens its items through directory handles without following links; Windows also refuses every reparse point. Regular hard-linked source files are read into the snapshot. | `crates/city/spec/Library/Install.lean` §8-28 |
+| `runtime::tools::chosen_path` | For model-chosen read/search paths, resolves symlinks and junctions and judges the real address; read and BoundReader check the opened file again. Search skips linked directories. Hard links have no unique original path to resolve. | `crates/runtime/spec/Tools/ChosenPath.lean` §8-30-1 |
+| `runtime::tools::exec::confinement::placing::copy` | Follows source links and copies content. It does not follow links in the copy; differing entries are removed before replacement, equal files may be kept, and the depth bound ends cycles. | `crates/runtime/spec/Tools/Exec.lean` §8-13-2, D10 |
+| `accounting::views::finding` | Does not list or descend into symlinks; regular hard-linked files remain ordinary candidates. | `crates/wire/spec/Answer/Find.lean` §8-82 |
+| `storage::worktree::weight::measure` | Skips symlinks during the measurement walk. Regular hard-linked files are counted per directory entry. | `crates/storage/spec/Worktree.lean` §8-31; `crates/storage/src/worktree/weight.rs` |
+| `accounting::playback::landing` | `Exports` refuses aliases below the city root. The person's `Chosen` output resolves its parent, then judges the resolved target. Both use a staged hard link for no-clobber landing and remove the stage; failed removal is an explicit error. | `crates/accounting/spec/Playback/Check.lean` §8-13, D25 |
+
+An alias the city creates for its own mechanics declares its owner, reader
+boundary and lifetime. It cannot stand in for an isolated copy, and failed
+cleanup is reported explicitly. Playback's temporary stage is one such
+mechanism; its removal can fail after the output has landed.
+
+An isolated copy must not share writable file identity with its source. The
+exec copy uses `std::fs::copy`, not hard links: a write through a hard link
+changes every name of the same file (runtime D10). The
+[standard-library copy](https://doc.rust-lang.org/std/fs/fn.copy.html) may use
+platform and filesystem optimizations, including copy-on-write; neither
+cloning nor zero new data blocks is guaranteed.
+
+Two admission boundaries still lack persistent accepted-content pins.
+The Reading Room records scan hashes, but a city skill is later opened by
+its shelf address; an external skill carries the text from that scan.
+Neither is the persistent accepted package version described in
+[#131](https://github.com/2youg1/sprawling-agents/issues/131). MCP connections
+keep the tool list learned when they connect and reuse it while live;
+there is no comparison with a persistently approved server/tool definition.
+Issue #131 owns those pins, verified reads and drift handling. This table does not
+claim that implementation is present.
 
 ### CPU placement
 

@@ -99,6 +99,8 @@ just check                    # the whole check: fmt, source gates, Lean specifi
 - Default to `pub(crate)`. Declare a `pub` trait only in a file on the seam list.
 - Introduce a trait only at a seam that already has a second implementation — a test clock, a counting store, a second adapter. Similar text and hypothetical reuse are not seams.
 - Give every rule, state transition and decision exactly one authority. Two places that decide the same thing are a defect while they still agree, because nothing holds them together once one of them changes.
+- For approval, evidence and later content reads, follow [Names, aliases and pins](ARCHITECTURE.md#names-aliases-and-pins), including each domain's identity and verification scope.
+- For a door that meets filesystem aliases or makes isolated copies, follow the handling and scope in [Names, aliases and pins](ARCHITECTURE.md#names-aliases-and-pins).
 - Finish a migration inside one change-set: move every reader and writer, exercise the production path, then delete the old authority and its adapters.
 - Trace callers, data flow, invariants and failure paths before you touch a shared interface.
 - `.gitattributes` alone decides line endings (LF on every OS). Give no editor, formatter or script a line-ending setting of its own, because a second rule that disagrees turns a one-line edit into a whole-file diff; `git add --renormalize .` folds such a diff back.
