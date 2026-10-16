@@ -810,7 +810,7 @@ Neither is the persistent accepted package version described in
 [#131](https://github.com/2youg1/sprawling-agents/issues/131). MCP connections
 keep the tool list learned when they connect and reuse it while live;
 there is no comparison with a persistently approved server/tool definition.
-#131 owns those pins, verified reads and drift handling. This table does not
+Issue #131 owns those pins, verified reads and drift handling. This table does not
 claim that implementation is present.
 
 ### CPU placement
