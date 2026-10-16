@@ -93,7 +93,9 @@ description = 'fixture description'
     let mut zip = zip::ZipWriter::new(std::fs::File::create(archive).unwrap());
     zip.start_file(
         format!("archive/{}", row.binary),
-        zip::write::SimpleFileOptions::default().unix_permissions(0o755),
+        zip::write::SimpleFileOptions::default()
+            .system(zip::System::Unix)
+            .unix_permissions(0o755),
     )
     .unwrap();
     zip.write_all(b"archive binary bytes").unwrap();
@@ -151,7 +153,9 @@ description = 'fixture'
         let mut zip = zip::ZipWriter::new(std::fs::File::create(archive).unwrap());
         zip.start_file(
             format!("application/{}", row.binary),
-            zip::write::SimpleFileOptions::default().unix_permissions(0o755),
+            zip::write::SimpleFileOptions::default()
+                .system(zip::System::Unix)
+                .unix_permissions(0o755),
         )
         .unwrap();
         zip.write_all(b"binary").unwrap();

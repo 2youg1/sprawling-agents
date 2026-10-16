@@ -215,6 +215,13 @@ fn write_archive(archive: &Path, stem: &str, entries: &[Entry]) -> Result<(), Xt
             .compression_method(zip::CompressionMethod::Deflated)
             .compression_level(Some(9))
             .last_modified_time(zip::DateTime::default())
+            // zip 9 marks an entry made on Windows as DOS unless the system
+            // is named, and a DOS entry's unix mode is read back as the DOS
+            // interpretation, so the executable bits a person needs after
+            // unpacking would be lost. The archives are built on three
+            // hosts and unpacked on others, so the entry says Unix
+            // wherever it was written.
+            .system(zip::System::Unix)
             .unix_permissions(entry.mode);
         zip.start_file(format!("{stem}/{}", entry.name), options)
             .map_err(|err| XtaskError::Cmd {
