@@ -9,9 +9,9 @@
 import { Schema } from "effect";
 
 /** The wire version both ends compare on connect. */
-export const WIRE_V = 66 as const;
+export const WIRE_V = 67 as const;
 /** The schema hash the server checks: `wire::schema_hash()`. */
-export const WIRE_HASH = "4a1196328b7bb9b31e57f5351574b4a078a62f7ce63e048482de91d72ce2c177" as const;
+export const WIRE_HASH = "7b98fb8cb40a0d101c2f74e218c90f77ef4b94d7cc3cef0d4e1b93be009fa4e0" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 /** The smallest body size a person may ask for: `wire::BODY_PX_MIN`. */
@@ -917,6 +917,7 @@ export const EventKind = Schema.Union([
   Schema.Literal("signal_wait_ended"),
   Schema.Literal("signal_landed"),
   Schema.Literal("skill_shelved"),
+  Schema.Literal("prefix_held"),
 ]).annotate({ identifier: "EventKind" });
 export type EventKind = typeof EventKind.Type;
 
@@ -1251,6 +1252,23 @@ export const ContentAnswer = Schema.Struct({
 export type ContentAnswer = typeof ContentAnswer.Type;
 
 /**
+ * The keep-warm renewals the city sent, as `storage::Renewals` counts
+ * them (storage D35, D36). `billed` is already inside `total` and the
+ * cuts, under the room and the `keep_warm` bucket, so a page draws it
+ * as a line inside the total and never adds it again. The four counts
+ * sum to the renewals sent; `late` ones arrived after the cache had
+ * gone and paid the write price for the prefix.
+ */
+export const Renewals = Schema.Struct({
+  billed: UsdMicros,
+  late: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  read: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  refused: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  unreported: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+}).annotate({ identifier: "Renewals" });
+export type Renewals = typeof Renewals.Type;
+
+/**
  * The model calls that came back with no authoritative amount, and the
  * tokens they used. A city whose provider never prices a call has a
  * zero `total` after any number of runs; this is what tells that city
@@ -1273,6 +1291,7 @@ export const CostAnswer = Schema.Struct({
   by_segment: Schema.Array(Schema.Tuple([Schema.String, UsdMicros])),
   by_skill: Schema.Array(Schema.Tuple([Schema.String, UsdMicros])),
   by_tool: Schema.Array(Schema.Tuple([Schema.String, UsdMicros])),
+  renewals: Renewals,
   total: UsdMicros,
   unpriced: UnpricedCalls,
 }).annotate({ identifier: "CostAnswer" });
@@ -1967,7 +1986,7 @@ export const EndpointTuning = Schema.Struct({
 export type EndpointTuning = typeof EndpointTuning.Type;
 
 /**
- * Where one registered model row came from (kernel D59).
+ * Where one registered model row came from (kernel D63).
  */
 export const Listing = Schema.Union([
   Schema.Literal("listed"),
