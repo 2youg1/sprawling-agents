@@ -33,7 +33,7 @@ pub enum KeepWarm {
 ///
 /// The renewal is recorded rather than inferred from the times, so the
 /// bound of one renewal per real use holds whatever lead a caller
-/// passes (kernel D59).
+/// passes (kernel D62).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CacheUse {
     used_ms: u64,

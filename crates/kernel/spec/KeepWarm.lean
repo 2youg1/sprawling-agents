@@ -31,7 +31,7 @@ impl CacheUse {
 pub fn renewal_due(setting: KeepWarm, cache: CacheUse, lead_ms: u64) -> Option<u64>;
 ```
 
-- 判定：`FiveMinute` 且这次使用还欠续期时，续期时刻＝`used_ms + PROMPT_CACHE_TTL_SECS·1000 − PROMPT_CACHE_RENEWAL_MARGIN_SECS·1000 − lead_ms`（饱和减；`used_ms + TTL` 溢出 `u64` 即不续期）。续期发出后 `CacheUse` 记为 `Spent`，`renewal_due` 对它答 `None`，直到下一次真实使用。所以「一次真实使用至多一次续期」是 `CacheUse` 里记下的事实，而不是从时刻推出来的（D59）。
+- 判定：`FiveMinute` 且这次使用还欠续期时，续期时刻＝`used_ms + PROMPT_CACHE_TTL_SECS·1000 − PROMPT_CACHE_RENEWAL_MARGIN_SECS·1000 − lead_ms`（饱和减；`used_ms + TTL` 溢出 `u64` 即不续期）。续期发出后 `CacheUse` 记为 `Spent`，`renewal_due` 对它答 `None`，直到下一次真实使用。所以「一次真实使用至多一次续期」是 `CacheUse` 里记下的事实，而不是从时刻推出来的（D62）。
 - 「最近用过」与缓存寿命是同一个常数 `consts_external::PROMPT_CACHE_TTL_SECS`，余量是它旁边的 `PROMPT_CACHE_RENEWAL_MARGIN_SECS`；两者只在这里相减，不另立第二个 300。
 - `lead_ms` 的含义：从城发出请求到 provider 开始处理它的时间，按 endpoint 实测，由调用方给（`crates/runtime/Spec.lean` §8-4-2，runtime D98）。provider 的寿命从它开始处理请求时起算，`used_ms` 是城发出的时刻，早于那一刻；所以续期提前 `lead_ms` 发出，只要它自己到达 provider 不比 `lead_ms` 慢，就在保证寿命之内开始。不在这里写死一个网络余量：慢链路与快链路要的提前量不同。
 - 余量防的是 `lead_ms` 量不到的延迟：到期那一刻定时器醒得晚一点、交出续期的线程起得晚一点。
@@ -232,7 +232,7 @@ theorem off_sends_nothing (ttl margin : Nat) (events : List Event) :
 
 end Kernel.KeepWarm
 
-/-! D59 一次真实使用至多一次续期，记在 `CacheUse` 里；续期时刻扣一个固定余量
+/-! D62 一次真实使用至多一次续期，记在 `CacheUse` 里；续期时刻扣一个固定余量
 
 **决定**：`CacheUse` 带一个私有的 `Renewal { Owed, Spent }`：`sent` 置 `Owed`，`renewed` 置 `Spent`，`renewal_due` 对 `Spent` 答 `None`。续期时刻是 `used_ms + TTL − margin − lead_ms`，`margin` 是 `consts_external::PROMPT_CACHE_RENEWAL_MARGIN_SECS`，定义在 `PROMPT_CACHE_TTL_SECS` 旁边，只在 `renewal_due` 里被减。上面两条定理是这条决定要守的性质。
 

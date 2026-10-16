@@ -11,7 +11,7 @@ import { Schema } from "effect";
 /** The wire version both ends compare on connect. */
 export const WIRE_V = 66 as const;
 /** The schema hash the server checks: `wire::schema_hash()`. */
-export const WIRE_HASH = "19dae1044472da03e883f35fb71edbda076e28b438c709337a9043f11867ec4f" as const;
+export const WIRE_HASH = "3cbb9570abdeaac06f8e0d308fbaa774c15eeec6be6f951098a0707f024b2247" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 /** The smallest body size a person may ask for: `wire::BODY_PX_MIN`. */
@@ -917,6 +917,7 @@ export const EventKind = Schema.Union([
   Schema.Literal("signal_wait_ended"),
   Schema.Literal("signal_landed"),
   Schema.Literal("skill_shelved"),
+  Schema.Literal("prefix_held"),
 ]).annotate({ identifier: "EventKind" });
 export type EventKind = typeof EventKind.Type;
 

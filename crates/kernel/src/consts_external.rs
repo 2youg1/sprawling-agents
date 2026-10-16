@@ -26,7 +26,7 @@ pub const PROMPT_CACHE_TTL_SECS: u64 = 300;
 /// and nowhere else, so it lives beside it. It covers the delays the lead
 /// cannot measure - a timer that wakes a little late, a renewal thread
 /// that starts a little late - and costs that many seconds of a warm
-/// window that lasts 300 (`crates/kernel/spec/KeepWarm.lean`, kernel D59).
+/// window that lasts 300 (`crates/kernel/spec/KeepWarm.lean`, kernel D62).
 pub const PROMPT_CACHE_RENEWAL_MARGIN_SECS: u64 = 5;
 
 /// EventRecord `v`: one monotonic integer, no major/minor split (3.1).
