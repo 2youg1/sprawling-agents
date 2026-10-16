@@ -320,7 +320,7 @@ wire shape golden 与客户端协议。-/
 
 /-! D57 人打的 id 走 `AttachEndpoint.named`，模型行带 `listing`
 
-**决定**：`AttachEndpoint` 多一个必填的 `named: Vec<String>`，装人在「端点没有列出的模型 id」框里打的 id，与 `admit`（人在端点列出的模型里勾的）分开；城读到列表时也收下它们（gateway D39）。`ModelFactsSummary` 多一个必填的 `listing: Listing`（`listed`｜`named`，kernel D59），页面据此标出人点名、端点没列出的行。`WIRE_V` 从 65 进到 66，同一个变更集重生 schema golden、wire shape golden、`client/src/wire.ts`（`cargo xtask wire-ts`），并改 `tools/adversary/src/Sprawling/Door.lean` 的帧与 `tools/adversary/src/Sprawling/Regression.lean` 的渲染。
+**决定**：`AttachEndpoint` 多一个必填的 `named: Vec<String>`，装人在「端点没有列出的模型 id」框里打的 id，与 `admit`（人在端点列出的模型里勾的）分开；城读到列表时也收下它们（gateway D47）。`ModelFactsSummary` 多一个必填的 `listing: Listing`（`listed`｜`named`，kernel D63），页面据此标出人点名、端点没列出的行。`WIRE_V` 从 66 进到 67，同一个变更集重生 schema golden、wire shape golden、`client/src/wire.ts`（`cargo xtask wire-ts`），并改 `tools/adversary/src/Sprawling/Door.lean` 的帧与 `tools/adversary/src/Sprawling/Regression.lean` 的渲染。
 
 **理由**：`admit` 的定义是「这个端点供应的模型里城收哪些」；人打的 id 也塞进这一张，城就分不出哪个该从列表里挑、哪个该照人的话登记，读到列表时人打的 id 被当作列表外的勾选略去，一次登记登记出零个模型。收下人打的 id 是人定下的规矩：中转站常常服务列表里没有的 id，人打一个 id 就是要它被用上。标记由城写在行上，不让页面拿自己手里的列表去比：页面的列表是上一次探测读到的，登记时城读的可能是另一份。
 

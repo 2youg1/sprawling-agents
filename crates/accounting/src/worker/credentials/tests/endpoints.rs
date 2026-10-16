@@ -380,7 +380,7 @@ fn a_line_a_run_writes_reaches_the_book_the_worker_holds() {
 /// The provider's own list is the rung below the person: a pick that
 /// states nothing, for a model whose list row states a window and a
 /// ceiling, registers both and names the provider as the rung that
-/// answered (`crates/gateway/Spec.lean` §8-17, gateway D37). The form
+/// answered (`crates/gateway/Spec.lean` §8-17, gateway D45). The form
 /// no longer has to copy the list's figures into the person's boxes
 /// for the city to use them.
 #[test]
@@ -459,7 +459,7 @@ pub(super) fn selected_lines(ledger_dir: &std::path::Path) -> Vec<serde_json::Va
 }
 
 /// A re-attach while the endpoint's list cannot be read changes nothing
-/// the city already knew (gateway D38): an id registered before keeps
+/// the city already knew (gateway D46): an id registered before keeps
 /// the facts the earlier probe read, and the endpoint keeps its earlier
 /// `probed`; an id named for the first time gets default facts and is
 /// marked as named, and then the list is partly the person's word, so
@@ -562,7 +562,7 @@ fn relay_rows(worker: &RunWorker) -> (Vec<(String, kernel::event::record::Listin
     )
 }
 
-/// A typed id is the person's word (gateway D39): an attach after the
+/// A typed id is the person's word (gateway D47): an attach after the
 /// list was read registers it beside the ticked row, marked as named
 /// rather than listed, and a role can point at it.
 #[test]
@@ -620,7 +620,7 @@ fn untouched(worker: &RunWorker, ledger_dir: &std::path::Path) -> (serde_json::V
 /// typed id beside it, would register an endpoint with no models and
 /// leave the next pick to fail for an unrelated reason. It is refused
 /// at the attach, naming the ids that matched nothing and offering the
-/// ones that are served, and nothing is written (gateway D39).
+/// ones that are served, and nothing is written (gateway D47).
 #[test]
 fn a_ticked_list_that_matches_nothing_served_is_refused_and_writes_nothing() {
     let dir = tempfile::tempdir().unwrap();
@@ -661,7 +661,7 @@ fn a_ticked_list_that_matches_nothing_served_is_refused_and_writes_nothing() {
 
 /// Unticking the model a role points at is refused, naming the role,
 /// rather than leaving the role on a model the book no longer holds or
-/// clearing it behind the person's back (gateway D40).
+/// clearing it behind the person's back (gateway D48).
 #[test]
 fn a_re_attach_that_drops_the_model_a_role_points_at_is_refused_naming_the_role() {
     let dir = tempfile::tempdir().unwrap();

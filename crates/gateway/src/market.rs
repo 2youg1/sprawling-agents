@@ -24,7 +24,7 @@ pub use kernel::event::record::InputKinds;
 /// `provider::ceiling` that stated it: `Some` exactly when the figure is
 /// present, so the next registration of the same model can tell a
 /// figure a person stated from one this city's tables supplied
-/// (gateway D37). A catalogue row's figures are the `Preset` rung's.
+/// (gateway D45). A catalogue row's figures are the `Preset` rung's.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct ModelEntry {
     pub id: String,

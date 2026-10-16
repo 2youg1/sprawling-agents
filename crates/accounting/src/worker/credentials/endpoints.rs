@@ -246,7 +246,7 @@ impl RunWorker {
     ///
     /// `admission` holds the rows the person ticked on the endpoint's
     /// list and the ids they typed (`crates/gateway/spec/Endpoint/Models.lean`
-    /// D39). Asking for nothing admits everything the endpoint serves,
+    /// D47). Asking for nothing admits everything the endpoint serves,
     /// which is what somebody who never asked for the list meant; a
     /// ticked id the endpoint does not serve is left out rather than
     /// promised, the same answer a reading room gives a skill that is not
@@ -257,7 +257,7 @@ impl RunWorker {
     /// named the ids: most compatible endpoints serve no model list at
     /// all, so refusing here would keep a working provider out of the
     /// city over an interface it never promised. Nor does it change what
-    /// the city already knew (gateway D38): an id already registered
+    /// the city already knew (gateway D46): an id already registered
     /// under this name keeps the row the book holds, and only an id
     /// named for the first time is registered on the person's word,
     /// which `probed` then records as false.

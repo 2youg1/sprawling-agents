@@ -10,7 +10,7 @@
 
 §8-17（`crates/gateway/spec/Provider.lean`）写这架梯子的接口与理由；本分部是上限那一半的模型：人填 → provider 的列表 → 上一次登记 → 钉版目录与预置表 → 策略缺省，后两档只在这一面要一个数时作答。窗口走同一架梯子，只是没有策略缺省一档、也不看是哪一面（§8-17），它没有跨臂的性质，所以不另建模。
 
-这里没有状态机：`resolve` 是一架梯子，每一档压过下一档是它的一条 `match` 臂，读定义即可，不另写定理。证明的是三条跨过所有臂的性质：要这个字段的一面恒得到一个数（`a_face_that_needs_a_figure_always_gets_one`），本城钉下的数与策略缺省只在那样的一面上作答（`the_city_states_a_figure_only_where_the_face_needs_one`），上一次登记里不是人说的数不在「上一次登记」那一档作答（`an_earlier_figure_nobody_stated_never_answers`，gateway D37）。Rust 的 `Figures::resolve` 取 `Target`（`base_url`、`id`、`wire`），在梯子走到那一档时才问预置表；模型把预置表的答案当作一个值传进来，结果相同。平台：纯判定，三个平台相同。
+这里没有状态机：`resolve` 是一架梯子，每一档压过下一档是它的一条 `match` 臂，读定义即可，不另写定理。证明的是三条跨过所有臂的性质：要这个字段的一面恒得到一个数（`a_face_that_needs_a_figure_always_gets_one`），本城钉下的数与策略缺省只在那样的一面上作答（`the_city_states_a_figure_only_where_the_face_needs_one`），上一次登记里不是人说的数不在「上一次登记」那一档作答（`an_earlier_figure_nobody_stated_never_answers`，gateway D45）。Rust 的 `Figures::resolve` 取 `Target`（`base_url`、`id`、`wire`），在梯子走到那一档时才问预置表；模型把预置表的答案当作一个值传进来，结果相同。平台：纯判定，三个平台相同。
 
 派生检查：`provider::ceiling` 的 proptest `the_ceiling_ladder_keeps_the_lean_properties` 走遍模型的输入空间——人、provider 的列表、上一次登记（五种来处）、钉版目录各沉默或说一个数，预置表答或不答（厂商主机、中转站、这台电脑、谁都没写过的 id），三面——对每个输入断言三条性质；它先对一个在可选字段的面上也以策略缺省作答的 `resolve` 变红过。`the_higher_rung_wins_and_says_that_it_did` 等测试各判一个输入，钉住每一档的答案。
 -/

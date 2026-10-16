@@ -17,7 +17,7 @@
 ```rust
 pub use kernel::event::record::InputKinds;              // 这个模型收得下什么：Text（默认）| TextImage；定义在 kernel，因为 model_selected 行带着它
 pub struct ModelEntry { pub id: String, pub context_tokens: u64,
-                        pub window_from: Option<FigureSource>,    // §8-17、D37：说出窗口的那一档；窗口为 0 时 None
+                        pub window_from: Option<FigureSource>,    // §8-17、D45：说出窗口的那一档；窗口为 0 时 None
                         pub input: InputKinds,
                         pub max_output_tokens: Option<Ceiling>,   // §7、§8-17
                         pub ceiling_from: Option<FigureSource>,   // 说出上限的那一档；上限缺席时 None；目录行的两档都是 Preset

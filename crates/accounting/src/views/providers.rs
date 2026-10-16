@@ -564,7 +564,7 @@ mod tests {
     /// scheme answers the preset table's window on every face, and the
     /// vendor's ceiling only on the messages face, which needs one; the
     /// same id on a server on this machine has no window any rung states
-    /// (gateway D37). Text the normaliser refuses answers nothing, with
+    /// (gateway D45). Text the normaliser refuses answers nothing, with
     /// the refusal.
     #[test]
     fn a_relay_forwarding_a_vendors_id_answers_the_vendors_window() {

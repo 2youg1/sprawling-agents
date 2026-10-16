@@ -42,10 +42,10 @@ impl EndpointBook {
     pub fn endpoints(&self) -> impl Iterator<Item = &AttachedEndpoint>;
     pub fn choices(&self) -> impl Iterator<Item = (ModelTag, &str, &ModelEntry)>;
     pub fn registered(&self, tag: ModelTag, endpoint: &str, model: &str) -> Option<&ModelEntry>; // 这个标签此刻指着同一端点、同一模型时的那次登记：梯子「此前登记」一级的唯一读法，选型点与 `Query::ModelFigures` 共用
-    pub fn refuse_dropping_a_role(&self, attaching: &AttachedEndpoint) -> Result<(), AxError>; // D40
+    pub fn refuse_dropping_a_role(&self, attaching: &AttachedEndpoint) -> Result<(), AxError>; // D48
 }
 pub fn attached_payload(&AttachedEndpoint) -> Result<Payload, AxError>;      // endpoint_attached 唯一成形处
-pub fn selected_payload(ModelTag, &str, &ModelEntry) -> Result<Payload, AxError>;  // model_selected 同上；window_from 与 ceiling_from 取自 ModelEntry（§8-17、D37）
+pub fn selected_payload(ModelTag, &str, &ModelEntry) -> Result<Payload, AxError>;  // model_selected 同上；window_from 与 ceiling_from 取自 ModelEntry（§8-17、D45）
 ```
 
 - **一次取模型只答一问**：用哪个模型、在哪个端点上。「不答时怎么办」不是本 crate 的问题（§8-11）。
@@ -55,7 +55,7 @@ pub fn selected_payload(ModelTag, &str, &ModelEntry) -> Result<Payload, AxError>
 - **两个入口一个读者**：`apply`（重建路径，手里是 record）与 `absorb`（写入路径，手里是刚要写的 kind、run、addr 与 payload）共用同一套载荷读取，于是「写者以为的」与「重建得到的」不可能分岔。
 - **confidential 在选型点再守一次**：非回环 endpoint 对 confidential 楼恒拒（`E_GATE_DENIED`）。`gateway::endpoint` 的兜底拒同期改为**按本地性判定**（而非一律拒）：规则是「字节不出运行中的机器」，不是「不准用这个类型」；否则一个回环的 Anthropic 服务器会被误拒。
 - **路径归兼容格式**：人输入 base URL（provider 文档就是那么印的），`messages`／`chat/completions`／`models` 由兼容格式拼。这与 `EndpointConfig.base_url`「完整端点 URL、不拼路径」并不矛盾：适配器保持字面，拼路径的是上层登记面。
-- **`probed` 是这份 models 的来源，不是端点的健康度**：`true` ＝ `GET .../models` 答了，登记的每一行都是对端自己列出的；`false` ＝ 至少有一行是人点名、城照登的（探测失败时人报的型号，或读到列表时人打的、列表里没有的 id）。哪几行是人点名的，由每一行的 `listing` 说（kernel D59、`crates/gateway/spec/Endpoint/Models.lean` D39）。载荷里缺 `probed` 键读作 `true`，于是没有这个键的 `endpoint_attached` 重放不变。
+- **`probed` 是这份 models 的来源，不是端点的健康度**：`true` ＝ `GET .../models` 答了，登记的每一行都是对端自己列出的；`false` ＝ 至少有一行是人点名、城照登的（探测失败时人报的型号，或读到列表时人打的、列表里没有的 id）。哪几行是人点名的，由每一行的 `listing` 说（kernel D63、`crates/gateway/spec/Endpoint/Models.lean` D47）。载荷里缺 `probed` 键读作 `true`，于是没有这个键的 `endpoint_attached` 重放不变。
 - **`AuthSpec::for_dialect` 是凭证头的唯一产地**：`AuthSpec::for_dialect(dialect: DialectKind, reference: SecretRef, header: Option<String>) -> AuthSpec`，纯函数，住 `endpoint/auth.rs`。人显式填的头名恒胜（`Header`）；否则 Anthropic → `Header{name:"x-api-key"}`，OpenAI 及其余 → `Bearer`。**它不住 `endpoint/config.rs`**：「凭证头归兼容格式」是一个可以自己站着的概念；`AuthSpec` 类型本体留在 config.rs，因为搬它会让同一个名字在 crate 内多出一条 `pub(crate) use` 路径。登记面（`accounting::worker::credentials::endpoints::endpoint_of`）不自己在 Bearer 与具名头之间选，否则「Anthropic 用哪个头」在城里有两个权威，而漂开的总是没人看的那个。
 -/
 
@@ -89,7 +89,7 @@ Accounts 模型以通过账号校验的提交为输入；
 空表、重复引用和非法 header 由 Rust 账户校验回归判断。
 -/
 
-/-! D40 一次再登记若去掉一个占着角色的模型，就拒绝，并点名那个角色
+/-! D48 一次再登记若去掉一个占着角色的模型，就拒绝，并点名那个角色
 
 决定：`attach_endpoint` 在写 `endpoint_attached` 之前问 `EndpointBook::refuse_dropping_a_role`：书里有一个标签（`main`、`digest`、`transcribe`、`ocr`）指着这个端点名下的某个模型，而这次登记的行里没有那个 id，就整次拒绝：`E_CONFIG_INVALID`，subject 对每个这样的标签写一句「`<模型>` is `<标签>`; choose another `<标签>` first」，`nearby` 列出这次会登记的 id，恢复语说先给那个标签另选一个模型、再登记一次；书与账本都不写。取消勾选与端点不再列出它，走的是同一条路：判的是登记之后的行，不问它是怎样少的。`EndpointAttached` 的折叠照旧不动 `chosen`，因为拒绝已经在写之前发生，账本里不会有一行把角色留在一个不存在的模型上。
 

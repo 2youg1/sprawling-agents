@@ -1132,7 +1132,7 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
 
 /-! D101 拒绝的标题按错误码选：可达性的码说「没有答复」，其余说城拒绝了这张表单，并画出 subject
 
-- **决策**：`core/probed.ts` 的 `refusalOf(code)` 是唯一的分法，`setup/providers/reach.svelte` 按它选标题、表单按它选画在哪里：`E_PROVIDER` 与 `E_TIMEOUT` 是 `reach`，标题是 `setup_probe_failed`（「{host} 没有答复」），画在探测读数旁；其余每个码是 `form`，标题是 `setup_form_refused`（「城市拒绝了这张表单」），其下以等宽字画 `error.subject`，画在模型表之下。接入表单能挣到的 `form` 拒绝说的都是表上的行：列表里没有勾选的 id（gateway D39）、去掉了一个占着角色的模型（gateway D40，subject 写「`<模型>` is `<角色>`; choose another `<角色>` first」）。两种拒绝都留着出路一行与复制键。
+- **决策**：`core/probed.ts` 的 `refusalOf(code)` 是唯一的分法，`setup/providers/reach.svelte` 按它选标题、表单按它选画在哪里：`E_PROVIDER` 与 `E_TIMEOUT` 是 `reach`，标题是 `setup_probe_failed`（「{host} 没有答复」），画在探测读数旁；其余每个码是 `form`，标题是 `setup_form_refused`（「城市拒绝了这张表单」），其下以等宽字画 `error.subject`，画在模型表之下。接入表单能挣到的 `form` 拒绝说的都是表上的行：列表里没有勾选的 id（gateway D47）、去掉了一个占着角色的模型（gateway D48，subject 写「`<模型>` is `<角色>`; choose another `<角色>` first」）。两种拒绝都留着出路一行与复制键。
 - **理由**：provider 答了 200 而城拒绝了表单时，「127.0.0.1 没有答复」说的是假话，把人送去查网络；subject 才说出被拒的是什么，原来它只在复制到剪贴板的文字里。角色的拒绝画在表上是人定下的规则，因为人改的是表上的角色或勾选。
 - **被击败的备选**：①按 `action` 的文字分流——`action` 是城写给日志的英文句子，换一句措辞页面就分错；②按 subject 里的模型 id 把拒绝挂到那一行上——要解析城的句子；③所有拒绝仍画在按钮下——角色的拒绝离引起它的控件太远。
 - **重开参数**：城的拒绝带上它关于的字段（一个闭集），那时按字段挂到控件旁。

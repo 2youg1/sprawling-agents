@@ -73,7 +73,7 @@ pub struct ModelFactsSummary {
     // …既有字段：id、context_tokens、max_output_tokens、input_modalities、input_price、output_price…
     pub thinking: ThinkingOffer,       // 这个（Endpoint，模型）提供的思考档，带来源
     pub canonical: String,             // 这个模型跨供应方的身份
-    pub listing: Listing,              // 端点列出的（listed），还是人点名、端点没列出的（named）；kernel D59、D57
+    pub listing: Listing,              // 端点列出的（listed），还是人点名、端点没列出的（named）；kernel D63、D57
 }
 pub struct ThinkingOffer {
     pub levels: Vec<Effort>,           // 城的固定升序；只含提供的档，恒不含 `none`

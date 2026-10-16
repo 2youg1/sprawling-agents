@@ -154,7 +154,7 @@ pub struct ModelFacts { pub id: String, pub context_tokens: Option<u64>, pub max
                         pub output_price: Option<String>,        // 缺席写 null，行没说就是没说
                         pub thinking: Option<ThinkingStatement>, // 缺席即省略：列表没说思考档
                         pub canonical: Option<String>,           // 上游自己的规范 id；缺席即省略
-                        pub listing: Listing }                   // 这一行从哪里来（D59）；listed 即省略
+                        pub listing: Listing }                   // 这一行从哪里来（D63）；listed 即省略
 pub enum Listing { Listed, Named }   // 线上 snake_case；缺键读作 listed
 pub struct ThinkingStatement { pub levels: Vec<Effort>,         // 列表点名的档，城的升序；恒不含 none；空即省略
                                pub default: Option<Effort>,     // 列表说的默认档
@@ -460,9 +460,9 @@ pub struct EndpointAttached {
 **重开参数**：`record::probe` 之外又有一个带 `skip_serializing_if` 的类型进了 postcard 快照（那时把 `Absence` 从 `record::probe` 移到两处共用的地方），或快照换成自描述格式。
 -/
 
-/-! D59 模型行记下它是端点列出的，还是人点名而端点没列出的
+/-! D63 模型行记下它是端点列出的，还是人点名而端点没列出的
 
-**决定**：`ModelFacts` 多一格 `listing: Listing`，两个值：`listed` 是端点自己的 `/models` 列出了这一行，`named` 是人在登记时点名了这个 id、端点这一次没有列出它（列表里没有，或列表没读到），城按人的话登记它，其余事实都是缺席。人读的格式里 `listed` 省略，缺键读作 `listed`，所以 0.0.11 写下的 `endpoint_probed` 行与 CAS 事实逐字不变；postcard 快照照 D58 每格都写。写 `named` 的只有 `accounting` 的登记（gateway D39），探测的行恒是 `listed`。
+**决定**：`ModelFacts` 多一格 `listing: Listing`，两个值：`listed` 是端点自己的 `/models` 列出了这一行，`named` 是人在登记时点名了这个 id、端点这一次没有列出它（列表里没有，或列表没读到），城按人的话登记它，其余事实都是缺席。人读的格式里 `listed` 省略，缺键读作 `listed`，所以 0.0.11 写下的 `endpoint_probed` 行与 CAS 事实逐字不变；postcard 快照照 D58 每格都写。写 `named` 的只有 `accounting` 的登记（gateway D47），探测的行恒是 `listed`。
 
 **理由**：一个人点名的 id 与一行什么都没说的列表行，事实格子一模一样，页面与读这本书的人都分不出「端点列过它」和「只有人说过它」，而前者的缺席是 provider 没说，后者的缺席是没人问过 provider。记在行上而不记在 `endpoint_attached` 行里：事实已经整份进 CAS（D57），书按 id 把它们 `learn` 回来，标记跟着它说明的那一行走，不必在两处按 id 对齐。
 

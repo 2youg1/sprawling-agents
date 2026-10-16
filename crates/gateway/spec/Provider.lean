@@ -53,7 +53,7 @@ pub(crate) fn thinking_for(base_url: &str, id: &str) -> Option<&'static PresetTh
 pub enum FigureSource { Person, Upstream, Registered, Preset, Policy }   // as_str(): person|upstream|registered|preset|policy
 impl FigureSource {
     pub const fn as_str(self) -> &'static str;
-    pub fn read(word: &str) -> FigureSource;     // 账本里的词读回；读不出的词读作 Registered（D37）
+    pub fn read(word: &str) -> FigureSource;     // 账本里的词读回；读不出的词读作 Registered（D45）
 }
 pub struct Statements<'a> { pub window: Option<Window>, pub ceiling: Option<Ceiling>,   // 人这次填的
                             pub listed: Option<&'a ModelFacts>,      // provider 列表里这个 id 的那一行
@@ -77,7 +77,7 @@ impl Figures {
 }
 ```
 
-- **事实梯只有一架，权威从高到低：人填 → provider 的列表 → 上一次登记 → 钉版目录与预设表 → 策略缺省**，窗口与上限各爬一次。人填不是推断，故压过其余各档；provider 的 `/v1/models` 说过的话压过本城钉下的任何数字（Anthropic 自己的 Models API 逐模型给出 `max_tokens` 与 `max_input_tokens`，`endpoint::models` 读这两个键），这一档读的是端点簿里这个 id 的那一行（`AttachedEndpoint.models`，§8-10），不是表单抄进人那一格的数。上一次登记是这个 tag 上一次选同一个端点的同一个模型时登记的那一行（`ModelEntry`），按 endpoint 与 model id 读，把 tag 指向另一个模型时旧模型的数不跟过去；它只拿人说过的数作答（D37）。**上限的后两档只在这一面要求这个字段时作答**：messages 兼容格式的每个请求都必须带 `max_tokens`，于是那里梯子恒有答案，`kernel::consts_policy::OUTPUT_CEILING_DEFAULT = 8_192` 只在前四档全数沉默时作答；chat 与 responses 两面的上限字段是可选的，人、provider 与上一次登记都没说时答 `ProviderDefault`，请求里不写这个字段，由供应方按模型取它自己的缺省。**窗口没有策略缺省一档，也不看是哪一面**：窗口不上线，只用于上下文提醒与会话冻下的形状；四档都沉默时窗口未知（登记为 `0`），上下文提醒随之不响。
+- **事实梯只有一架，权威从高到低：人填 → provider 的列表 → 上一次登记 → 钉版目录与预设表 → 策略缺省**，窗口与上限各爬一次。人填不是推断，故压过其余各档；provider 的 `/v1/models` 说过的话压过本城钉下的任何数字（Anthropic 自己的 Models API 逐模型给出 `max_tokens` 与 `max_input_tokens`，`endpoint::models` 读这两个键），这一档读的是端点簿里这个 id 的那一行（`AttachedEndpoint.models`，§8-10），不是表单抄进人那一格的数。上一次登记是这个 tag 上一次选同一个端点的同一个模型时登记的那一行（`ModelEntry`），按 endpoint 与 model id 读，把 tag 指向另一个模型时旧模型的数不跟过去；它只拿人说过的数作答（D45）。**上限的后两档只在这一面要求这个字段时作答**：messages 兼容格式的每个请求都必须带 `max_tokens`，于是那里梯子恒有答案，`kernel::consts_policy::OUTPUT_CEILING_DEFAULT = 8_192` 只在前四档全数沉默时作答；chat 与 responses 两面的上限字段是可选的，人、provider 与上一次登记都没说时答 `ProviderDefault`，请求里不写这个字段，由供应方按模型取它自己的缺省。**窗口没有策略缺省一档，也不看是哪一面**：窗口不上线，只用于上下文提醒与会话冻下的形状；四档都沉默时窗口未知（登记为 `0`），上下文提醒随之不响。
 - **每个数记下说出它的那一档**：`ModelEntry` 带 `window_from` 与 `ceiling_from`（`Option<FigureSource>`，数缺席时为 `None`），`model_selected` 带同名的两个词，`router::payload` 一处写、`read_choice` 一处读。只拿到数字的读者说不出一次跑为什么停在那里，也说不出下一次登记时这个数该不该在「上一次登记」那一档作答。
 - **为什么 OpenAI 兼容两面不写本城的数字**：本城写下的任何数字，要么低于厂商按模型给的缺省（把一个思考模型截在它还在想的时候，跑以 `limit` 结束，人读到的是体验问题而不是设置问题），要么在对话变长后被拒——Kimi 的文档写明「input plus max_completion_tokens exceeds the model context window」时答 `invalid_request_error`，vLLM 对 `max_tokens` 加输入超过 `max_model_len` 的请求同样答 400。厂商的缺省总被厂商自己接受，并且随模型走：DeepSeek 不写 `max_tokens` 时思考模式缺省 64K（<https://api-docs.deepseek.com/api/create-chat-completion>），Kimi K3 缺省 131072（<https://platform.moonshot.ai/docs/api/chat>）。落选的是「抬高策略缺省」：一个对所有模型都更大的数字正是上面第二种失败，而且它仍是本城替厂商猜的数字。**重开参数**：当某个登记过的主机的文档缺省低到截断一次普通的派活（今天没有一家），在本表给它的模型写行，并让这一面的预设档作答。
 - **`resolve` 的返回值带着是谁答的**（`FigureSource`），因为只拿到数字的调用方说不出一次跑为什么停在那里。这是对 `anthropic.rs` 那句自我反对的回答——「a ceiling invented at the call site truncates runs for a reason that appears nowhere in the account」：它出现在账里（`model_selected.ceiling_from`，见 `crates/sprawling/Spec.lean` §8-52）。
@@ -96,7 +96,7 @@ impl Figures {
 - **主机表只有这一张**：`router::normalise` 的路径与形状缺省从本表取（`openrouter.ai` 是 `/api/v1`、Gemini 的兼容面是 `/v1beta/openai`），`Endpoint::wire_request` 的 chat 面拼法与会话标识头也从本表取，归一化算法与 dialect 自身都不带任何主机名。
 -/
 
-/-! D37 窗口与上限的梯子是 `Figures::resolve` 一个函数，上一次登记只拿人说过的数作答，每个数记下它的来处
+/-! D45 窗口与上限的梯子是 `Figures::resolve` 一个函数，上一次登记只拿人说过的数作答，每个数记下它的来处
 
 决定：人填 → provider 的列表 → 上一次登记 → 钉版目录与预设表 → 策略缺省这架梯子只写在 `provider::ceiling::Figures::resolve`，选型点 `select_model` 与设置页要问的查询都调它，装配层只交上人这次填的两个数、端点簿里这个 id 的那一行与上一次登记的那一行。`ModelEntry` 带 `window_from` 与 `ceiling_from`，`model_selected` 带同名的两个词。上一次登记只在它记下的来处是 `Person` 或 `Registered` 时作答（`FigureSource::carried`），那时这一次记作 `registered`；来处是 `Upstream`、`Preset` 或 `Policy` 的数，下一次登记时回到那一档再问一次。账本里没有来处的数——`ceiling_from` 出现之前写的行，与 `window_from` 出现之前写的每一行——读作 `Registered`；读不出的词也读作 `Registered`，因为这个数确实是这个 tag 上一次登记的，而它是谁说的这个 build 说不出来。
 

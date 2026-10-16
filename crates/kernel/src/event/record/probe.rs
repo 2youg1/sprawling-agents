@@ -46,14 +46,14 @@ pub struct ModelFacts {
     #[serde(default)]
     pub canonical: Option<String>,
     /// Whether the endpoint's own list carried this row, or the person
-    /// named an id the list did not carry (kernel D59). A row the
+    /// named an id the list did not carry (kernel D63). A row the
     /// person named states nothing else, because nobody asked the
     /// provider about it.
     #[serde(default)]
     pub listing: Listing,
 }
 
-/// Where one registered model row came from (kernel D59).
+/// Where one registered model row came from (kernel D63).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]

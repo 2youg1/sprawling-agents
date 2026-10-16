@@ -20,7 +20,7 @@ impl Endpoint { pub fn list_models(&self, url: &str) -> Result<Vec<ModelFacts>, 
 
 两家一方都在 `GET .../models` 返回 `{"data":[{"id":..}]}`，**都不返回价目**——探测取对端报出的事实（`ModelFacts`，§8-16），对端没报的 token 数字由人在登记时确认。探测与正式调用共用同一个兑付路径（`authorize`）：两套认证拼法就是两个权威，而漂开的总是没人看的那个。
 
-**探测不是登记的前提**。上一段的「两家都返回」只对那两家为真：网关与 Anthropic 兼容格式的第三方多半根本不服务 `/models`，于是一条本可用的线路被一个它从未承诺过的接口挡在城外。登记带人的两张单子（D39）：`admit` 是人在端点列出的模型里勾的，`named` 是人自己打的 id；两张都空就是「全要」。三行规则：探测成功→两张都空时登记对端报的每一行，否则只登记点到的：对端列出的 id 带着它那一行，`named` 里对端没列出的 id 按缺省事实登记、行上标 `named`（kernel D59），`admit` 里对端不供应的名字略去；非空的 `admit` 一个都对不上而 `named` 为空时整次拒绝（`E_CONFIG_INVALID`），书与账本都不动；`probed` 在每一行都是对端列出的时为 `true`；探测失败且人报了型号→按人报的登记（`probed=false`，并按 `effect` 级写一条诊断，点名探测的错——**登记确实发生了，被拒的只是探测**，用 `refuse` 级会说成这次登记被门拒了，那是假话）；探测失败且两张单子都空→仍然拒绝，恢复语改为「把要用的 model id 报上来，再登记一次」，因为此时城手里一个可调用的名字都没有。**同名端点再登记一次而探测失败时，城已经知道的不变**（D38）：人报的 id（两张单子合起来）里早先已登记在这个端点名下的，带着书里存的那一行原样留下，只有新报的 id 按缺省事实登记、标 `named`；`probed` 在人报的 id 全是早先登记过的时沿用早先的值，有一个新 id 就是 `false`；那条 `effect` 级诊断说这一次没读到列表，并数出有几行沿用了早先读到的事实。
+**探测不是登记的前提**。上一段的「两家都返回」只对那两家为真：网关与 Anthropic 兼容格式的第三方多半根本不服务 `/models`，于是一条本可用的线路被一个它从未承诺过的接口挡在城外。登记带人的两张单子（D47）：`admit` 是人在端点列出的模型里勾的，`named` 是人自己打的 id；两张都空就是「全要」。三行规则：探测成功→两张都空时登记对端报的每一行，否则只登记点到的：对端列出的 id 带着它那一行，`named` 里对端没列出的 id 按缺省事实登记、行上标 `named`（kernel D63），`admit` 里对端不供应的名字略去；非空的 `admit` 一个都对不上而 `named` 为空时整次拒绝（`E_CONFIG_INVALID`），书与账本都不动；`probed` 在每一行都是对端列出的时为 `true`；探测失败且人报了型号→按人报的登记（`probed=false`，并按 `effect` 级写一条诊断，点名探测的错——**登记确实发生了，被拒的只是探测**，用 `refuse` 级会说成这次登记被门拒了，那是假话）；探测失败且两张单子都空→仍然拒绝，恢复语改为「把要用的 model id 报上来，再登记一次」，因为此时城手里一个可调用的名字都没有。**同名端点再登记一次而探测失败时，城已经知道的不变**（D38）：人报的 id（两张单子合起来）里早先已登记在这个端点名下的，带着书里存的那一行原样留下，只有新报的 id 按缺省事实登记、标 `named`；`probed` 在人报的 id 全是早先登记过的时沿用早先的值，有一个新 id 就是 `false`；那条 `effect` 级诊断说这一次没读到列表，并数出有几行沿用了早先读到的事实。
 
 **四个参照实现一致**：pi、codex、opencode、Claude Code 都让人**声明**模型清单，发现是可选的（Claude Code 默认关闭、3 秒超时、失败静默）。把可选的发现当成必选的准入，是本仓自己加的限制，不是外部事实。
 
@@ -45,7 +45,7 @@ impl Endpoint { pub fn list_models(&self, url: &str) -> Result<Vec<ModelFacts>, 
 **`adapter_for` 住 `endpoint/adapter.rs`**：装配线（每个 chosen 造一个 Endpoint，§8-3）读的只有 chosen 与赎回闭包，故它是自由函数而非 `RunWorker` 方法——挂在 worker 上等于说装配需要整座城。调用期限是 `EndpointTuning::DEFAULTS.timeout_ms`（§8-16），`adapter_for` 读 `call_timeout_ms()`——一个默认值该住在它所默认的那个设置旁边。凭据簇只出 `resolver`（赎回闭包是凭据的形状）与 `dialect_headers`（它住装配层的凭据簇 `crates/accounting/src/worker/credentials.rs`；兼容格式要的头按理是兼容格式的事，是否搬进本 crate 未定）。
 -/
 
-/-! D38 探测失败的再登记沿用书里已登记的行，只给新报的 id 缺省事实
+/-! D46 探测失败的再登记沿用书里已登记的行，只给新报的 id 缺省事实
 
 决定：`attach_endpoint` 探测失败、`admit` 与 `named` 不全空时，对两张单子里的每个 id，书里这个端点名下已有同 id 的行就原样留下那一行（窗口、上限、输入、价目、思考档、规范 id、`listing`，都是早先一次登记记下的），没有才登记 `ModelFacts { id, listing: Named, ..default }`。`probed` 取早先的值，当且仅当人报的 id 全部早先已登记；否则为 `false`，因为这张单子里有人自己的话。按端点名配对，与书按名字替换端点同一口径。留下的行仍是 provider 那一档（§8-17）：它们是 provider 当时说的话，再登记不改变梯子当时会给的答案。
 
@@ -56,9 +56,9 @@ impl Endpoint { pub fn list_models(&self, url: &str) -> Result<Vec<ModelFacts>, 
 重开参数：端点换了 base URL 又读不到列表、而同名同 id 的模型在新地址上事实不同的情况真实出现时，配对改为按名字与 base URL 两者。平台：纯判定，三个平台相同。
 -/
 
-/-! D39 人打的 id 经 `named` 登记，读到列表时也收；勾的一个都对不上就拒
+/-! D47 人打的 id 经 `named` 登记，读到列表时也收；勾的一个都对不上就拒
 
-决定：`AttachEndpoint` 带两张单子（wire D57）：`admit` 是人在端点列出的模型里勾的，`named` 是人自己打的 id。登记的行由 `accounting::worker::credentials::endpoints::admitting` 一处决定：两张都空，登记端点列出的每一行；不全空，登记端点列出的行里 id 在两张单子之一的，次序照列表，再接上 `named` 里列表没有的 id，每个按 `ModelFacts { id, listing: Named, ..default }` 登记，次序照人打的。`admit` 里列表没有的 id 略去。非空的 `admit` 与列表一个都对不上、`named` 又为空时，登记被拒：`E_CONFIG_INVALID`，subject 点名对不上的 id，`nearby` 列出端点列出的 id，书与账本都不写。探测失败时两张单子合起来按 D38 登记。
+决定：`AttachEndpoint` 带两张单子（wire D57）：`admit` 是人在端点列出的模型里勾的，`named` 是人自己打的 id。登记的行由 `accounting::worker::credentials::endpoints::admitting` 一处决定：两张都空，登记端点列出的每一行；不全空，登记端点列出的行里 id 在两张单子之一的，次序照列表，再接上 `named` 里列表没有的 id，每个按 `ModelFacts { id, listing: Named, ..default }` 登记，次序照人打的。`admit` 里列表没有的 id 略去。非空的 `admit` 与列表一个都对不上、`named` 又为空时，登记被拒：`E_CONFIG_INVALID`，subject 点名对不上的 id，`nearby` 列出端点列出的 id，书与账本都不写。探测失败时两张单子合起来按 D46 登记。
 
 理由：收下人打的 id 是人定下的规矩：人打一个 id，就是期望它被用上，而中转站常常服务它列表里没有的 id。人勾的行与人打的 id 来历不同：勾的是从端点的列表里挑，端点不再列出它时略去是对的；打的是人的话，列表里有没有都照登。分成两张单子，城才分得出这两种。一个非空的 `admit` 一行都没对上，登记出来的是一个零模型的端点，紧接着的 `SelectModel` 再以一句不相干的话被拒；在登记处拒绝，说的就是真正的原因。
 

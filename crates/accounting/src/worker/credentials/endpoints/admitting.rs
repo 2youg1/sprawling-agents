@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Which model rows an attach registers (`crates/gateway/spec/Endpoint/Models.lean`
-//! §8-10, D38 and D39).
+//! §8-10, D46 and D47).
 
 use kernel::event::record::Listing;
 use kernel::{AxCode, AxError};
@@ -93,7 +93,7 @@ impl Admission {
         Ok(rows)
     }
 
-    /// The rows an attach registers when no list could be read (D38):
+    /// The rows an attach registers when no list could be read (D46):
     /// an id registered before under this endpoint keeps the row the
     /// book holds, and any other id is registered on the person's word.
     pub(super) fn unread(&self, earlier: &[gateway::ModelFacts]) -> Remembered {

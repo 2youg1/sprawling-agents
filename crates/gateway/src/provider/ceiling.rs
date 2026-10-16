@@ -5,7 +5,7 @@
 
 //! Which statement about one model's context window and output ceiling
 //! wins, and who made it (shape 1 decision; `crates/gateway/spec/Provider/Ceiling.lean`,
-//! interface in `crates/gateway/spec/Provider.lean` §8-17, gateway D37).
+//! interface in `crates/gateway/spec/Provider.lean` §8-17, gateway D45).
 //!
 //! **A model with no registered ceiling could not be called at all.**
 //! The Anthropic wire requires `max_tokens` in every request and refuses
@@ -88,7 +88,7 @@ impl FigureSource {
     /// A word this build cannot name — one a later build wrote — reads
     /// as [`FigureSource::Registered`], as a figure whose line names no
     /// source at all does: the figure was this tag's registration, and
-    /// who stated it is the one thing the line cannot say (gateway D37).
+    /// who stated it is the one thing the line cannot say (gateway D45).
     #[must_use]
     pub fn read(word: &str) -> FigureSource {
         [
@@ -104,7 +104,7 @@ impl FigureSource {
     }
 
     /// Whether an earlier registration's figure from this source still
-    /// answers at the earlier-registration rung (gateway D37).
+    /// answers at the earlier-registration rung (gateway D45).
     ///
     /// Only what a person stated is carried: the provider's list and
     /// this city's tables are asked again at their own rungs, so a
