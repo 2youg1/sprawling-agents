@@ -40,7 +40,7 @@ pub(crate) struct Probed {
 pub(crate) struct Attaching {
     endpoint: gateway::AttachedEndpoint,
     admission: Admission,
-    kept: Option<gateway::AttachedEndpoint>,
+    kept: Option<Box<gateway::AttachedEndpoint>>,
     served: Result<Vec<gateway::ModelFacts>, AxError>,
     finishing: Finishing,
 }
@@ -311,7 +311,7 @@ impl RunWorker {
             Answer::Attached(Attaching {
                 endpoint,
                 admission,
-                kept,
+                kept: kept.map(Box::new),
                 served,
                 finishing,
             })
@@ -329,7 +329,7 @@ impl RunWorker {
             finishing,
         } = attaching;
         self.finish(finishing, |worker| {
-            worker.attach_served(endpoint, &admission, kept.as_ref(), served)
+            worker.attach_served(endpoint, &admission, kept.as_deref(), served)
         });
     }
 

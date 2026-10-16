@@ -195,6 +195,7 @@ fn a_child_no_attached_model_may_serve_comes_back_to_its_parent_as_a_stopped_han
             secret: None,
             auth_header: None,
             admit: Vec::new(),
+            named: Vec::new(),
             tuning: wire::EndpointTuning::default(),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"attach"),
         })
