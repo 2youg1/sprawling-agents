@@ -16,6 +16,8 @@
 // rows state none of them. A reading that filled in a zero would put a
 // number in front of a person that no provider agreed to.
 
+import type { AxCode } from "../wire";
+import type { WireApi } from "./commands";
 import type { Key } from "./lang";
 
 // One stage of a staged reading, as `kernel::reach` writes it: a word
@@ -52,9 +54,8 @@ export interface ModelFact {
 export interface Probed {
   readonly name: string;
   // The base URL the city wrote down for this endpoint, which is the
-  // URL it will call. It is the city's spelling of what the person
-  // entered, so a form that shows it shows the value that took effect
-  // rather than the one it sent.
+  // URL it will call: the city's spelling of the text the probe was
+  // sent with, under the face it was sent with.
   readonly baseUrl: string | null;
   readonly models: readonly string[];
   readonly facts: readonly ModelFact[];
@@ -147,36 +148,47 @@ export function readProbed(data: Record<string, unknown>): Probed | null {
   };
 }
 
-// One entered URL and the URL the city recorded for it, when the two
-// differ.
-export interface Normalised {
-  // What the person typed, which the form names in the line it draws
-  // under the box.
-  readonly entered: string;
-  // What the city wrote down, which the box takes.
-  readonly recorded: string;
+// A probe a form sent, as it left: the id it was filed under, the box
+// text and the face it was sent with, and the answer that stood in
+// belief when it left.
+export interface Sent {
+  readonly id: string;
+  readonly baseUrl: string;
+  readonly wireApi: WireApi;
+  readonly before: Probed | null;
 }
 
-// What a probe's answer says about the URL a person entered.
+// What the form holds now.
+export interface Asked {
+  readonly baseUrl: string;
+  readonly wireApi: WireApi;
+}
+
+// The URL the city calls for the text a form sent, when the city wrote
+// it down another way - the line a form draws under its base_url box.
 //
 // **This compares; it never derives.** Normalisation is one algorithm
-// and it lives in `gateway::normalise_entered`, so a second
-// implementation here would be a second place for the rule to be
-// wrong - a provider's URL would normalise one way on the form and
-// another way in the city, and the difference would show up as a 404
-// nobody could read off the form. So the only question asked here is
-// whether the two strings differ.
+// and it lives in `gateway::normalise_entered`, which
+// `accounting::worker::credentials::Entered::resolved` runs on every
+// probe and every attach. A second implementation here would be a
+// second place for the rule to be wrong, so the only questions asked
+// here are whether the answer is to this probe and whether two strings
+// differ.
 //
-// `null` therefore means the city called the URL exactly as it was
-// entered, and the form says nothing. That is what every probe answers
-// today, because `assembly::credentials::endpoints::endpoint_of`
-// stores the entered URL verbatim; the day it passes the URL through
-// `normalise_entered`, this begins to answer and the form needs no
-// change.
-export function normalisedFrom(probed: Probed, typed: string): Normalised | null {
+// The answer counts only when it is newer than the one that stood when
+// the probe left and is filed under the id the probe was sent under:
+// belief holds one probe answer, and until the new one arrives the slot
+// still holds the last. It counts only while the box text and the face
+// are the ones the probe was sent with, because the city's spelling is
+// a function of those two and nothing a person typed since. The form
+// never writes the answer into the box: the attach runs the same
+// normalisation on the same text and face, so the box needs no help to
+// be right (client/Spec.lean D99).
+export function normalisedFrom(probed: Probed | null, pending: Sent | null, now: Asked): string | null {
+  if (probed === null || pending === null || probed === pending.before || probed.name !== pending.id) return null;
+  if (now.baseUrl !== pending.baseUrl || now.wireApi !== pending.wireApi) return null;
   const recorded = probed.baseUrl;
-  const entered = typed.trim();
-  return recorded === null || recorded === entered ? null : { entered, recorded };
+  return recorded === null || recorded === pending.baseUrl.trim() ? null : recorded;
 }
 
 // Which stage stopped the call, as the one sentence a person can act on.
@@ -229,4 +241,17 @@ function byStatus(status: number | null, listed: Probed["failure"]): Key {
   if (status === 404) return "setup_reach_path";
   if (status >= 200 && status < 400) return "setup_reach_ok";
   return "setup_reach_status";
+}
+
+// The codes that say the far side was not reached or did not answer in
+// time. Every other refusal is the city refusing what the form asked
+// for, and saying "did not answer" over it sends a person to look at a
+// network that answered (client D101).
+const UNREACHED: readonly AxCode[] = ["E_PROVIDER", "E_TIMEOUT"];
+
+// Which kind of refusal a code is: one of reachability, drawn beside
+// the probe's reading, or the city's refusal of the form, drawn with its
+// subject under the model table whose rows it is about.
+export function refusalOf(code: AxCode): "reach" | "form" {
+  return UNREACHED.includes(code) ? "reach" : "form";
 }

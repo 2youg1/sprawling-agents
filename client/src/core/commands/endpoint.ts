@@ -105,7 +105,10 @@ export function probeEndpoint(e: Endpoint): Command {
   };
 }
 
-export function attachEndpoint(e: Endpoint, admit: readonly string[]): Command {
+// `admit` holds the rows ticked on the endpoint's list and `named` the
+// ids the person typed; the city registers a typed id whether or not
+// the list carries it (wire D57).
+export function attachEndpoint(e: Endpoint, admit: readonly string[], named: readonly string[]): Command {
   return {
     attach_endpoint: {
       name: providerName(e.id),
@@ -114,6 +117,7 @@ export function attachEndpoint(e: Endpoint, admit: readonly string[]): Command {
       secret: e.secret,
       auth_header: e.authHeader,
       admit: [...admit],
+      named: [...named],
       tuning: tuningFrame(e.tuning),
       idem: mintIdem(),
     },
@@ -124,7 +128,7 @@ export function attachEndpoint(e: Endpoint, admit: readonly string[]): Command {
 // per-account retry count, nothing else changed. `AttachEndpoint`
 // replaces the whole tuning, so the tuning goes back as the city read it
 // out (`EndpointSummary.tuning`, wire D49) with only those two replaced, and the models it already
-// serves are admitted again: the city then sees the same address, face,
+// serves are admitted again, each on the list it came from: the city then sees the same address, face,
 // tuning and models, and writes the list without asking the endpoint
 // anything. The legacy key and header are not sent, because an explicit
 // list leaves them no account to belong to (gateway Router D29).
@@ -140,7 +144,8 @@ export function reattachEndpoint(
       dialect: summary.dialect,
       secret: null,
       auth_header: null,
-      admit: summary.models.map((model) => model.id),
+      admit: summary.models.filter((model) => model.listing === "listed").map((model) => model.id),
+      named: summary.models.filter((model) => model.listing === "named").map((model) => model.id),
       tuning: { ...summary.tuning, accounts: [...accounts], account_retries: retries },
       idem: mintIdem(),
     },

@@ -127,6 +127,7 @@ impl Rig {
             secret: None,
             auth_header: None,
             admit: vec!["m-1".to_owned()],
+            named: Vec::new(),
             tuning: wire::EndpointTuning {
                 accounts: Some(accounts),
                 account_retries: retries,

@@ -37,9 +37,9 @@ export interface FieldProps {
   // in the mono face so a person can check it.
   readonly mono?: boolean;
   // `number` also asks the on-screen keyboard for digits and gives the
-  // arrow keys a step; `url` lets the browser refuse a value this form
-  // would otherwise send to the city to be refused there.
-  readonly kind?: "text" | "password" | "number" | "url";
+  // arrow keys a step. A box whose value has a shape of its own states
+  // it with `pattern`.
+  readonly kind?: "text" | "password" | "number";
   // How far one arrow key moves a number.
   readonly step?: number;
   // What a valid value looks like, for the browser's first pass.
@@ -68,7 +68,7 @@ export interface LabelWire {
 // Spread on the `<input>`.
 export interface BoxWire {
   readonly id: string;
-  readonly type: "text" | "password" | "number" | "url";
+  readonly type: "text" | "password" | "number";
   readonly inputmode: "numeric" | undefined;
   readonly step: number | undefined;
   readonly pattern: string | undefined;

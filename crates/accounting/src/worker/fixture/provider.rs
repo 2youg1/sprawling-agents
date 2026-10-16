@@ -14,6 +14,7 @@
 /// the one place a claim about the wire can be checked.
 pub(in crate::worker) struct FakeProvider {
     seen: std::sync::Arc<std::sync::Mutex<Vec<String>>>,
+    listing: std::sync::Arc<std::sync::atomic::AtomicBool>,
     _handle: std::thread::JoinHandle<()>,
 }
 
@@ -102,6 +103,13 @@ impl FakeProvider {
 
     pub(in crate::worker) fn exchanges(&self) -> Vec<String> {
         self.seen.lock().unwrap().clone()
+    }
+
+    /// From now on `GET .../models` answers 404, as a server does whose
+    /// list stopped answering while its chat still does.
+    pub(in crate::worker) fn stop_listing(&self) {
+        self.listing
+            .store(false, std::sync::atomic::Ordering::SeqCst);
     }
 }
 
@@ -306,7 +314,9 @@ pub(in crate::worker) fn fake_openai_with(
 /// One row of the fake's model list. A model whose id ends in
 /// `-thinks` states the levels it offers the way DeepSeek's list does,
 /// so a test can follow a level from a configuration layer to the wire;
-/// every other row states nothing but its id, and is offered no level.
+/// one whose id ends in `-stated` states [`LISTED_WINDOW`] and
+/// [`LISTED_CEILING`] the way OpenRouter's list does; every other row
+/// states nothing but its id, and is offered no level.
 #[cfg(test)]
 fn listed_row(id: &str) -> serde_json::Value {
     if id.ends_with("-thinks") {
@@ -314,10 +324,24 @@ fn listed_row(id: &str) -> serde_json::Value {
             "id": id,
             "effort": { "supported_levels": ["low", "medium", "high", "xhigh", "max"] },
         })
+    } else if id.ends_with("-stated") {
+        serde_json::json!({
+            "id": id,
+            "context_length": LISTED_WINDOW,
+            "top_provider": { "max_completion_tokens": LISTED_CEILING },
+        })
     } else {
         serde_json::json!({ "id": id })
     }
 }
+
+/// The window a `-stated` row of the fake's model list states.
+#[cfg(test)]
+pub(in crate::worker) const LISTED_WINDOW: u64 = 131_072;
+
+/// The output ceiling a `-stated` row of the fake's model list states.
+#[cfg(test)]
+pub(in crate::worker) const LISTED_CEILING: u64 = 16_384;
 
 /// One listener serving `script`, on a port of its own.
 #[cfg(test)]
@@ -329,7 +353,8 @@ fn serve(
 ) -> (String, FakeProvider) {
     let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
     let addr = listener.local_addr().unwrap();
-    let serves_a_list = !models.is_empty();
+    let listing = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(!models.is_empty()));
+    let lists = std::sync::Arc::clone(&listing);
     let list = serde_json::json!({
         "data": models
             .iter()
@@ -368,6 +393,7 @@ fn serve(
             let dropping = std::sync::Arc::clone(&dropping);
             let pace = std::sync::Arc::clone(&pace);
             let list = list.clone();
+            let lists = std::sync::Arc::clone(&lists);
             std::thread::spawn(move || {
                 use std::io::ErrorKind;
                 let mut head = String::new();
@@ -429,7 +455,7 @@ fn serve(
                     // Chosen under the lock, so two requests never take
                     // one reply between them.
                     script.lock().unwrap().answer(&head)
-                } else if serves_a_list {
+                } else if lists.load(std::sync::atomic::Ordering::SeqCst) {
                     Reply::answered(list)
                 } else {
                     Reply::refused(404, &serde_json::json!("no such route"))
@@ -458,6 +484,7 @@ fn serve(
         format!("http://{addr}/v1"),
         FakeProvider {
             seen,
+            listing,
             _handle: handle,
         },
     )

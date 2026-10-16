@@ -73,7 +73,9 @@ export function reachOf(name: string, kind: EventKind): Reach {
       return reached(kind === "approval_requested" || kind === "approval_resolved");
     case "governance":
       return reached(GOVERNANCE_MOVED.has(kind));
-    case "endpoint_view":
+    // The model table's question reads the earlier registration of each
+    // row's role, which a pick moves.
+    case "endpoint_view": case "model_figures":
       return reached(PROVIDER_MOVED.has(kind));
     case "inbox_view":
       return reached(kind === "signal_enqueued" || kind === "signal_consumed");

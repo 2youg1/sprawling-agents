@@ -15,7 +15,9 @@
 use kernel::{AxError, EventKind, Payload};
 
 use super::super::RunWorker;
-use super::{Chosen, Credential, ENVIRONMENT_ENDPOINT, Entered, Stated, local_model_facts};
+use super::{
+    Admission, Chosen, Credential, ENVIRONMENT_ENDPOINT, Entered, Stated, local_model_facts,
+};
 use crate::worker::commanding::door::{InHand, KeptRefusal};
 
 impl RunWorker {
@@ -39,7 +41,9 @@ impl RunWorker {
             credential: Credential::Absent { header: None },
             tuning: gateway::EndpointTuning::default(),
         };
-        self.with_in_hand(in_hand, |worker| worker.attach_endpoint(entered, &[]))?;
+        self.with_in_hand(in_hand, |worker| {
+            worker.attach_endpoint(entered, &Admission::everything_served())
+        })?;
         self.land_the_rest()?;
         refusal.outcome()?;
         self.select_model(

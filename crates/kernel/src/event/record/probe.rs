@@ -45,6 +45,25 @@ pub struct ModelFacts {
     /// where it states one (`crates/gateway/spec/Provider/Identity.lean`).
     #[serde(default)]
     pub canonical: Option<String>,
+    /// Whether the endpoint's own list carried this row, or the person
+    /// named an id the list did not carry (kernel D63). A row the
+    /// person named states nothing else, because nobody asked the
+    /// provider about it.
+    #[serde(default)]
+    pub listing: Listing,
+}
+
+/// Where one registered model row came from (kernel D63).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub enum Listing {
+    /// The endpoint's `/models` listed it.
+    #[default]
+    Listed,
+    /// The person named the id at attach and the endpoint did not list
+    /// it this time: its list left it out, or could not be read.
+    Named,
 }
 
 /// What one model list said about a model's thinking, in the city's
@@ -72,7 +91,7 @@ pub struct ThinkingStatement {
 impl Serialize for ModelFacts {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let absence = Absence::of(&serializer);
-        let mut row = serializer.serialize_struct("ModelFacts", 8)?;
+        let mut row = serializer.serialize_struct("ModelFacts", 9)?;
         row.serialize_field("id", &self.id)?;
         row.serialize_field("context_tokens", &self.context_tokens)?;
         row.serialize_field("max_output_tokens", &self.max_output_tokens)?;
@@ -81,6 +100,7 @@ impl Serialize for ModelFacts {
         row.serialize_field("output_price", &self.output_price)?;
         absence.option(&mut row, "thinking", &self.thinking)?;
         absence.option(&mut row, "canonical", &self.canonical)?;
+        absence.listing(&mut row, self.listing)?;
         row.end()
     }
 }
@@ -126,6 +146,19 @@ impl Absence {
             (Absence::Omitted, None) => fields.skip_field(key),
             (Absence::Omitted, Some(_)) | (Absence::Written, None | Some(_)) => {
                 fields.serialize_field(key, value)
+            }
+        }
+    }
+
+    /// `listed` is what a row without the key reads as, so a
+    /// human-readable format leaves it out and the bytes written before
+    /// the key existed stay as they were.
+    fn listing<S: SerializeStruct>(self, fields: &mut S, value: Listing) -> Result<(), S::Error> {
+        match (self, value) {
+            (Absence::Omitted, Listing::Listed) => fields.skip_field("listing"),
+            (Absence::Omitted, Listing::Named)
+            | (Absence::Written, Listing::Listed | Listing::Named) => {
+                fields.serialize_field("listing", &value)
             }
         }
     }

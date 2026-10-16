@@ -12,7 +12,9 @@
   // form's fold and the two readings of a draft that has headers and an
   // override, and the probed-model table in the states its seat reaches
   // only after a person has typed - rows ticked with figures and roles
-  // stated, and an endpoint that served no list, filled in by hand. The
+  // stated, an endpoint that served no list, filled in by hand, and the
+  // city's answer for every untouched box with an id named beside the
+  // list. The
   // table's look is drawn from the wiring's own value over a state
   // written here, which stays live: a press in the fixture redraws as it
   // does on the page.
@@ -27,7 +29,7 @@
   import EndpointList from "../setup/providers/endpoint_list.svelte";
   import Previews from "../setup/providers/preview.svelte";
   import Case from "./case.svelte";
-  import { ENDPOINTS, PROBED } from "./served";
+  import { ENDPOINTS, FIGURED, PROBED, TYPED } from "./served";
 
   const { lang } = ui();
 
@@ -63,8 +65,12 @@
   typed.manual = "house/writer, house/reader";
   typed.ticked["house/writer"] = true;
 
-  const workedLook = $derived(lookOf(worked, PROBED, $lang));
-  const typedLook = $derived(lookOf(typed, [], $lang));
+  const answered = $state(freshTable());
+  answered.manual = TYPED;
+
+  const workedLook = $derived(lookOf(worked, PROBED, [], $lang));
+  const typedLook = $derived(lookOf(typed, [], [], $lang));
+  const answeredLook = $derived(lookOf(answered, PROBED, FIGURED, $lang));
 </script>
 
 <Case label="provider · a long address, and a row with no model listed">
@@ -91,4 +97,8 @@
 
 <Case label="models · no list served, two ids typed by hand">
   <TableLook {...typedLook} />
+</Case>
+
+<Case label="models · what the city will register: a figure and its rung, the provider's default, unknown, and an id named by hand">
+  <TableLook {...answeredLook} />
 </Case>

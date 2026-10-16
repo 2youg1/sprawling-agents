@@ -9,8 +9,8 @@
   // What came back from the far side, drawn beside the fields it is
   // about. Two panels, because a probe and an attachment fail
   // differently: an attachment that was turned away carries the city's
-  // own refusal, and a probe carries a staged reading of how far the
-  // call got. The two slots are filled independently, because both can
+  // own refusal, headed by its code (`core/probed.ts` `refusalOf`), and a probe carries a
+  // staged reading of how far the call got. The two slots are filled independently, because both can
   // be true of one attempt and dropping one would be this file
   // deciding which failure a person needed to see.
   //
@@ -18,7 +18,7 @@
   // because this panel owns which sentence answers which code and the
   // caller owns when the language changes.
 
-  import { stoppedAt } from "../../../core/probed";
+  import { refusalOf, stoppedAt } from "../../../core/probed";
   import type { Probed } from "../../../core/probed";
   import type { Key } from "../../../core/lang";
   import type { AxCode, AxError } from "../../../wire";
@@ -83,9 +83,15 @@
   failed produces. A probe answers with a reading instead, and that is
   the other panel below. -->
   <div role="alert" class="rounded-card border border-alert/50 bg-chrome px-base py-snug text-note">
-    <p class="font-label text-alert">
-      {fill(say($lang, "setup_probe_failed"), { host })}
-    </p>
+    {#if refusalOf(error.code) === "reach"}
+      <p class="font-label text-alert">
+        {fill(say($lang, "setup_probe_failed"), { host })}
+      </p>
+    {:else}
+      <p class="font-label text-alert">{say($lang, "setup_form_refused")}</p>
+      <!-- wording-ok: the city's own account of what it refused, which names models, roles and ids as the city spells them -->
+      <p class="mt-tight font-mono wrap-anywhere text-text">{error.subject}</p>
+    {/if}
     <p class="mt-tight text-text-quiet">{say($lang, nextStep(error.code))}</p>
     <div class="mt-snug flex items-center gap-snug text-text-faint">
       <span class="font-mono">{error.code}</span>

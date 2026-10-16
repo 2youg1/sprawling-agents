@@ -8,9 +8,9 @@
 //! Three questions live here. *What does this host serve, and where* —
 //! the path it answers under, the shape it answers in, and the ceilings
 //! of the models whose names it prints in its own documentation
-//! (`preset`). *Which statement about an output ceiling wins* — the
-//! ladder from the person's own figure down to the city's policy
-//! default (`ceiling`). *What may one model be sent* — the same ladder
+//! (`preset`). *Which statement about a context window and an output
+//! ceiling wins* — the one ladder from the person's own figure down to
+//! the city's policy default (`ceiling`). *What may one model be sent* — the same ladder
 //! for the input a registration carries (`input`).
 //!
 //! *Which thinking levels one (Endpoint, model) offers, and which one a

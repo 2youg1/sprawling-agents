@@ -234,8 +234,10 @@ mod tests {
         ModelEntry {
             id: "eyes-1".to_owned(),
             context_tokens: 32_768,
+            window_from: Some(crate::FigureSource::Person),
             input: InputKinds::TextImage,
             max_output_tokens: Ceiling::new(1_024),
+            ceiling_from: Some(crate::FigureSource::Person),
             input_price: UsdMicros::new(0),
             output_price: UsdMicros::new(0),
             cache_read_price: UsdMicros::new(0),

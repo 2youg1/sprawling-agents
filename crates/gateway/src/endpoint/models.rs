@@ -274,6 +274,7 @@ pub(crate) fn facts_of(row: &Value) -> Option<ModelFacts> {
         output_price: price(row, ["output_price", "completion"]),
         thinking: thinking(row),
         canonical: canonical(row),
+        listing: kernel::event::record::Listing::Listed,
     })
 }
 
@@ -322,6 +323,7 @@ mod tests {
                 output_price: Some("0.0000016".to_owned()),
                 thinking: None,
                 canonical: None,
+                listing: kernel::event::record::Listing::Listed,
             })
         );
     }

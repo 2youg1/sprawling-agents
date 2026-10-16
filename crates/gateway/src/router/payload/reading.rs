@@ -20,6 +20,7 @@ use super::super::tuning::EndpointTuning;
 use crate::concurrency::MaxInFlight;
 use crate::endpoint::{AuthSpec, HeaderValue, ModelFacts};
 use crate::market::ModelEntry;
+use crate::provider::ceiling::FigureSource;
 use crate::provider::registry::ConnectionKind;
 
 pub(crate) fn read_attached(payload: &Payload) -> Result<AttachedEndpoint, AxError> {
@@ -108,6 +109,17 @@ fn tuning_of(kept: AttachedTuning) -> Result<EndpointTuning, AxError> {
 pub(crate) fn read_choice(payload: &Payload) -> Result<(ModelTag, Choice), AxError> {
     let selected: ModelSelected = payload.read()?;
     let max_output_tokens = selected.ceiling();
+    // A figure the line carries names its rung, and a figure on a line
+    // written before the rung's key existed reads as the earlier
+    // registration (gateway D37); a figure the line lacks has no rung.
+    let rung = |present: bool, word: Option<&str>| {
+        present.then(|| word.map_or(FigureSource::Registered, FigureSource::read))
+    };
+    let window_from = rung(selected.context_tokens > 0, selected.window_from.as_deref());
+    let ceiling_from = rung(
+        max_output_tokens.is_some(),
+        selected.ceiling_from.as_deref(),
+    );
     // A record written while this build carried a retreat arm may hold
     // `fallback_endpoint` and `fallback_model`. Nothing ever wrote a
     // value into them and nothing acts on them now, so they are read
@@ -119,7 +131,9 @@ pub(crate) fn read_choice(payload: &Payload) -> Result<(ModelTag, Choice), AxErr
             entry: ModelEntry {
                 id: selected.model,
                 context_tokens: selected.context_tokens,
+                window_from,
                 max_output_tokens,
+                ceiling_from,
                 input: selected.input,
                 input_price: selected.input_price,
                 output_price: selected.output_price,

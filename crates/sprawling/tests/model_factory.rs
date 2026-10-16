@@ -125,6 +125,7 @@ fn city_on(
             secret: None,
             auth_header: None,
             admit: vec![MAIN.to_owned(), DIGEST.to_owned()],
+            named: Vec::new(),
             // One try, briefly: a worker that still calls the dead port
             // should fail its test at once rather than retry into it.
             tuning: wire::EndpointTuning {

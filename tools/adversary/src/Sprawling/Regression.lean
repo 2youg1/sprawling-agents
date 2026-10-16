@@ -349,7 +349,7 @@ private def ceilingRegistered : List String :=
      , "    );"
      , "    assert_eq!("
      , "        rungs.first().and_then(serde_json::Value::as_str),"
-     , "        Some(gateway::CeilingSource::Policy.as_str())"
+     , "        Some(gateway::FigureSource::Policy.as_str())"
      , "    );"
      , "}" ]
 
@@ -378,6 +378,7 @@ private def attachHelper : List String :=
   , "        secret: None,"
   , "        auth_header: None,"
   , s!"        admit: vec![{quoted unlistedModel}.to_owned()],"
+  , "        named: Vec::new(),"
   , "        tuning: wire::EndpointTuning::default(),"
   , "        idem: IdemKey::derive(&RunId::CITY, Seq::FIRST, name.as_bytes()),"
   , "    })"

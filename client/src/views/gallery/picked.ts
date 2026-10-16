@@ -27,6 +27,7 @@ function model(id: string, said: Said): ModelFactsSummary {
   return {
     id,
     canonical: said.canonical,
+    listing: "listed",
     context_tokens: Window.make(said.context),
     input_modalities: ["text"],
     input_price: said.price?.[0] ?? null,

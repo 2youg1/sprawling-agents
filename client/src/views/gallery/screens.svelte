@@ -268,7 +268,7 @@
 </Case>
 
 <Case label="models · the rows a probe answered">
-  <ModelTable served={PROBED} onChosen={() => undefined} />
+  <ModelTable served={PROBED} about={null} onChosen={() => undefined} />
 </Case>
 
 <!-- One state, because this section holds no answer: where the level

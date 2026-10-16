@@ -41,9 +41,11 @@ impl EndpointBook {
         -> Option<Vec<ProviderAccount>>; // 登记与重放共用的缺席保留规则
     pub fn endpoints(&self) -> impl Iterator<Item = &AttachedEndpoint>;
     pub fn choices(&self) -> impl Iterator<Item = (ModelTag, &str, &ModelEntry)>;
+    pub fn registered(&self, tag: ModelTag, endpoint: &str, model: &str) -> Option<&ModelEntry>; // 这个标签此刻指着同一端点、同一模型时的那次登记：梯子「此前登记」一级的唯一读法，选型点与 `Query::ModelFigures` 共用
+    pub fn refuse_dropping_a_role(&self, attaching: &AttachedEndpoint) -> Result<(), AxError>; // D48
 }
 pub fn attached_payload(&AttachedEndpoint) -> Result<Payload, AxError>;      // endpoint_attached 唯一成形处
-pub fn selected_payload(ModelTag, &str, &ModelEntry, Option<CeilingSource>) -> Result<Payload, AxError>;  // model_selected 同上
+pub fn selected_payload(ModelTag, &str, &ModelEntry) -> Result<Payload, AxError>;  // model_selected 同上；window_from 与 ceiling_from 取自 ModelEntry（§8-17、D45）
 ```
 
 - **一次取模型只答一问**：用哪个模型、在哪个端点上。「不答时怎么办」不是本 crate 的问题（§8-11）。
@@ -53,14 +55,14 @@ pub fn selected_payload(ModelTag, &str, &ModelEntry, Option<CeilingSource>) -> R
 - **两个入口一个读者**：`apply`（重建路径，手里是 record）与 `absorb`（写入路径，手里是刚要写的 kind、run、addr 与 payload）共用同一套载荷读取，于是「写者以为的」与「重建得到的」不可能分岔。
 - **confidential 在选型点再守一次**：非回环 endpoint 对 confidential 楼恒拒（`E_GATE_DENIED`）。`gateway::endpoint` 的兜底拒同期改为**按本地性判定**（而非一律拒）：规则是「字节不出运行中的机器」，不是「不准用这个类型」；否则一个回环的 Anthropic 服务器会被误拒。
 - **路径归兼容格式**：人输入 base URL（provider 文档就是那么印的），`messages`／`chat/completions`／`models` 由兼容格式拼。这与 `EndpointConfig.base_url`「完整端点 URL、不拼路径」并不矛盾：适配器保持字面，拼路径的是上层登记面。
-- **`probed` 是这份 models 的来源，不是端点的健康度**：`true` ＝ `GET .../models` 答了，登记的 id 是对端自己说的；`false` ＝ 探测失败而人自己报了型号，城照登。载荷里缺 `probed` 键读作 `true`，于是没有这个键的 `endpoint_attached` 重放不变。
+- **`probed` 是这份 models 的来源，不是端点的健康度**：`true` ＝ `GET .../models` 答了，登记的每一行都是对端自己列出的；`false` ＝ 至少有一行是人点名、城照登的（探测失败时人报的型号，或读到列表时人打的、列表里没有的 id）。哪几行是人点名的，由每一行的 `listing` 说（kernel D63、`crates/gateway/spec/Endpoint/Models.lean` D47）。载荷里缺 `probed` 键读作 `true`，于是没有这个键的 `endpoint_attached` 重放不变。
 - **`AuthSpec::for_dialect` 是凭证头的唯一产地**：`AuthSpec::for_dialect(dialect: DialectKind, reference: SecretRef, header: Option<String>) -> AuthSpec`，纯函数，住 `endpoint/auth.rs`。人显式填的头名恒胜（`Header`）；否则 Anthropic → `Header{name:"x-api-key"}`，OpenAI 及其余 → `Bearer`。**它不住 `endpoint/config.rs`**：「凭证头归兼容格式」是一个可以自己站着的概念；`AuthSpec` 类型本体留在 config.rs，因为搬它会让同一个名字在 crate 内多出一条 `pub(crate) use` 路径。登记面（`accounting::worker::credentials::endpoints::endpoint_of`）不自己在 Bearer 与具名头之间选，否则「Anthropic 用哪个头」在城里有两个权威，而漂开的总是没人看的那个。
 -/
 
 /-!
 ### 8-11 不设备用端点
 
-一个标签只选一个端点与一个模型；`selected_payload` 直接收 `ceiling_from: Option<CeilingSource>`。线上没有设备用端点的字段，而一个在生产里只有一臂的「两臂的值」，另一臂就是给一个还不存在的设置面预留的权威。**带 `fallback_endpoint`／`fallback_model` 键的记录照样读得回**：`read_choice` 不取这两个键，与它对待任何本书不拥有的键同一口径，测试钉住「带着这两个键的 `model_selected` 仍读成它所述的那次选择」。
+一个标签只选一个端点与一个模型；`selected_payload` 只收这一个选择，两个数的来处随 `ModelEntry` 一起到达。线上没有设备用端点的字段，而一个在生产里只有一臂的「两臂的值」，另一臂就是给一个还不存在的设置面预留的权威。**带 `fallback_endpoint`／`fallback_model` 键的记录照样读得回**：`read_choice` 不取这两个键，与它对待任何本书不拥有的键同一口径，测试钉住「带着这两个键的 `model_selected` 仍读成它所述的那次选择」。
 
 **重开的参数**：设置面上有人能为一个标签指定备用端点与备用模型，且 `runtime` 侧有一处在失败时读它。那时备用端点与 §8-6 的准入一起设计，因为何时改投备用端点只能由退避节奏回答。
 -/
@@ -85,6 +87,17 @@ Session 选择，snapshot 保留同一账号列表，
 失败之后原号再发、换号还是停下由 kernel 的 `AccountRound` 决定（`crates/kernel/spec/AccountRecovery.lean`，kernel D54），哪些失败说「换号」由 `endpoint::failure` 决定（D32）；本接口只供名册与按名选号（`crates/kernel/spec/Model.lean`）。
 Accounts 模型以通过账号校验的提交为输入；
 空表、重复引用和非法 header 由 Rust 账户校验回归判断。
+-/
+
+/-! D48 一次再登记若去掉一个占着角色的模型，就拒绝，并点名那个角色
+
+决定：`attach_endpoint` 在写 `endpoint_attached` 之前问 `EndpointBook::refuse_dropping_a_role`：书里有一个标签（`main`、`digest`、`transcribe`、`ocr`）指着这个端点名下的某个模型，而这次登记的行里没有那个 id，就整次拒绝：`E_CONFIG_INVALID`，subject 对每个这样的标签写一句「`<模型>` is `<标签>`; choose another `<标签>` first」，`nearby` 列出这次会登记的 id，恢复语说先给那个标签另选一个模型、再登记一次；书与账本都不写。取消勾选与端点不再列出它，走的是同一条路：判的是登记之后的行，不问它是怎样少的。`EndpointAttached` 的折叠照旧不动 `chosen`，因为拒绝已经在写之前发生，账本里不会有一行把角色留在一个不存在的模型上。
+
+理由：一个角色悄悄指着一个端点已不登记的模型，下一次按这个角色取模型时要么还能调用一个人已经去掉的模型，要么以一句与登记无关的话失败；悄悄清掉角色，则让城在人不知道的时候没有 `main` 可用。拒绝并点名角色、绝不静默清掉，是人定下的规矩：人由此知道该先做哪一步。判定住在书里，因为 `chosen` 是书的私有状态，「哪个角色指着哪个模型」只有它答得出。
+
+被否：①登记时清掉这些角色：城在人不知情时失去 `main`，下一次派活以 `E_MODEL_UNCHOSEN` 失败，而人刚刚只是想去掉一个模型；②照旧不动：角色指着一个书里已不存在的行，`SelectModel` 的检查与调用的事实各说各的；③只在客户端拦：别的写方（重发账号表的那一帧、控制台）照样能把角色留空。
+
+重开参数：一个标签可以指向多个候选模型、去掉其中一个不会让它落空时，改为只拒绝会让标签落空的那一次。
 -/
 
 /-! D28 保持原登记事件与 Vault 格式，以完整有序列表为一次原子替换，避免逐账号命令

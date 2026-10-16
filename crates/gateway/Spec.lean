@@ -94,6 +94,7 @@ import crates.gateway.spec.Transcribe.Recording
 - **开城时预热值不值，读数未齐。** D26 定下开城时为每个已登记端点发一次不带凭据的 `GET models_url`（§8-35）；它能藏住的只是开城后 90 s 之内的第一次调用（空闲上限），所以它的重开要两样证据：开城到第一次调用的间隔分布（多数落在 90 s 之外时这批请求白发），与这批不带凭据的请求在 provider 一侧是否被计数或限流。池按端点保持（§8-3），reqwest 0.13 的缺省在三个平台上给每条连接开 TCP keepalive（15 s 起、每 15 s 一探、3 次），所以池里一条对端已断的空闲连接在约一分钟内被操作系统认出，不必本 crate 再设。
 - **Responses API 的 WebSocket 模式，未做。** 证据只有一句厂商说法：20 次以上工具调用的长循环上最多快约 40%，与 `store=false` 兼容；本 crate 尚未读到厂商当前文档里这条连接的地址、帧的形状与断线语义，所以形状未定。已知的约束有三条：①本 crate 没有同步的 WebSocket 客户端，锁里的 `tungstenite` 只经 axum 的 `ws` 带进来，作为 gateway 的依赖要改根 `Cargo.toml` 的 workspace 依赖与 `deny.toml` 的审视；②它绕开 `reach::proxy::client_for`，而 §8-15 要求全城的出站连接都在那里造，所以要么为 WebSocket 另写一处代理判定（第二个权威），要么只在 `through` 答「不走代理」时启用；③它是每个端点的一项设置（wire 的 `EndpointTuning` 一个字段、`endpoint_attached` 载荷一个键），HTTP 是它连不上或断线时的退路。要定下它：厂商文档的那一页（地址、帧、断线后怎样续上一次 response），与一次在回环替身上可见的往返。
 - **Ollama 与 LM Studio 的思考档，未读。** 两家把档位写在各自的原生端点（Ollama 的 `POST /api/show` 的 `thinking`，LM Studio 的 `GET /api/v1/models` 的 `reasoning.allowed_options`），不在 `/v1/models` 里；读它们要为 `reach::is_local` 的端点各加一步不带凭据的探测，并把 Ollama 由模型自定的档名映射或排除。要定下它：两家各一份真实答复的记录，与这一步在登记时多花的时间。在那之前这些端点的 offer 落到无人说，请求里不写思考字段。
+- **价目走不走窗口与上限那架梯子，未做。** 登记时的价目今天只读钉版目录（§8-7），provider 列表里的价目（`ModelFacts.input_price`／`output_price`）是它原样的文字，单位各家不同，`Figures::resolve` 不读它（D37 的被否④）。要定下它：几家真实 provider 的 `/models` 记录，写明价目的单位与币种，足以写出一个只读这几种写法、其余读作没说的换算。
 - **`prompt_cache_key` 的长度上限，未核。** D25 写进的键是 64 个十六进制字符；若厂商文档给这个字段定了更低的上限，换成摘要的前缀（D25 的重开参数）。
 
 模型自己的假设写在各分部的定义与定理假设里，不写成公理：`InputKinds`、`DialectKind`、`Ceiling` 是 kernel 的类型，kernel 的 Lean 规格不定义它们，所以分部照它们的变体与不变量各写一份模型里的类型，拼写与 Rust 相同；预置表按 host 与前缀查到的答案、`reach::is_local` 的判断、拒词里有没有窗口标记，都当作参数交给模型，它们各自的读法由 Rust 的测试检查。
@@ -117,7 +118,7 @@ Dialect／Endpoint／Custody／Vault／SecretRef／Sealed／Retries／HeaderValu
 
 Lean 里的名字与 Rust 的对应：
 
-- `Gateway.Provider.Ceiling.resolve` ↔ `OutputCeiling::resolve`，其参数 `preset` ↔ `preset::ceiling_for(target.base_url, target.id)`，`policy` ↔ `OUTPUT_CEILING_DEFAULT`，`wire` ↔ `Target.wire`；`field_on`、`Field` ↔ 同名的私有函数与枚举；`Ceiling.new` ↔ `kernel::Ceiling::new`。
+- `Gateway.Provider.Ceiling.resolve` ↔ `OutputCeiling::resolve`（私有，`Figures::resolve` 求上限的那一半），其参数 `preset` ↔ `preset::ceiling_for(target.base_url, target.id)`，`policy` ↔ `OUTPUT_CEILING_DEFAULT`，`wire` ↔ `Target.wire`；`Stated` ↔ 同名的私有结构；`Registration.answer` ↔ `Figures::resolve` 里按 `FigureSource::carried` 取上一次登记的那一步；`field_on`、`Field` ↔ 同名的私有函数与枚举；`Ceiling.new` ↔ `kernel::Ceiling::new`。
 - `Gateway.Provider.Input.accepted_input` ↔ `provider::input::first_stated`（私有），`accepted_input` 用 `preset::input_for(base_url, id)` 的答案作它的参数 `preset`。
 - `Gateway.Provider.Thinking.ask`、`admit` ↔ `ThinkingOffer::ask`、`ThinkingOffer::admit`（`admit` 的 `true` 即 `Ok(())`）；`Offer.levels` ↔ `ThinkingOffer.levels`（`EffortSet`），`noneAbsent` ↔ `EffortSet` 不收 `Effort::None`；`fallback`、`switchOn` ↔ `ask` 里存档不被提供时的那一段。
 - `Gateway.Provider.Preset.model_for` ↔ `preset::row_for`（私有；`preset::model_for` 交给它真实的表），`own` ↔ host 自己那一行的 `models`，`vendors` ↔ `PRESETS` 全部的模型行，`isLocal` ↔ `reach::is_local(base_url)`；`longest` ↔ `max_by_key(|row| row.id_prefix.len())`。
@@ -369,6 +370,10 @@ kernel 已有码，语义照 Custody 一节；不新增码。
 - D42 pre-warm 只带共享部分与一条最小的消息，消息上不打断点，只要一个输出 token：`crates/gateway/spec/Concurrency.lean`，§8-40 之后
 - D43 一次等待是 `prefix_held` 这一行，经模型端口交给回合层写下：`crates/gateway/spec/Concurrency.lean`，§8-40 之后
 - D44 委派出的子 run 的第一轮账号从母 run 房间的绑定开始：`crates/gateway/spec/Router.lean`，在 D30 之后
+- D45 窗口与上限的梯子是 `Figures::resolve` 一个函数，上一次登记只拿人说过的数作答，每个数记下它的来处：`crates/gateway/spec/Provider.lean`
+- D46 探测失败的再登记沿用书里已登记的行，只给新报的 id 缺省事实：`crates/gateway/spec/Endpoint/Models.lean`
+- D47 人打的 id 经 `named` 登记，读到列表时也收；勾的一个都对不上就拒：`crates/gateway/spec/Endpoint/Models.lean`
+- D48 一次再登记若去掉一个占着角色的模型，就拒绝，并点名那个角色：`crates/gateway/spec/Router.lean`
 -/
 
 /-! ## 13 依赖选型

@@ -12,12 +12,12 @@
 // (client D93's cut, applied to a screen of its own).
 
 import { fill, say } from "../../core/lang";
-import type { Lang } from "../../core/lang";
+import type { Key, Lang } from "../../core/lang";
 import type { ModelFact } from "../../core/probed";
 import { InputKinds as InputKindsSchema } from "../../wire";
-import type { InputKinds } from "../../wire";
+import type { FigureFrom, FiguresLine, InputKinds } from "../../wire";
 import type { Min } from "../parts/table";
-import { ceilingOf, everyRow, priceOf, shownRows, tickedRows, windowOf } from "./model_rows";
+import { ceilingOf, everyRow, isNamed, priceOf, shownRows, tickedRows, windowOf } from "./model_rows";
 import type { TableState } from "./model_rows";
 
 // The input kinds a person may state, in the wire's own order.
@@ -33,12 +33,60 @@ function bySize(a: number | null, b: number | null): number {
   return (a ?? 0) - (b ?? 0);
 }
 
-// What an untouched box shows: the figure the provider itself stated,
-// drawn as a placeholder rather than as a value, because a placeholder
-// says "this is what will be sent" where a value would claim a person
-// decided it. A provider that stated nothing leaves the box blank.
-function placeholderOf(figure: number | null): string {
-  return figure === null ? "" : String(figure);
+// The sentence under a figure box for the rung that stated it.
+function fromKey(from: FigureFrom): Key {
+  switch (from) {
+    case "person":
+      return "setup_figure_person";
+    case "upstream":
+      return "setup_figure_upstream";
+    case "registered":
+      return "setup_figure_registered";
+    case "preset":
+      return "setup_figure_preset";
+    case "policy":
+      return "setup_figure_policy";
+  }
+}
+
+// What an untouched box shows: the figure a pick with this box empty
+// registers, drawn as a placeholder rather than as a value, because a
+// placeholder says "this is what the city will use" where a value would
+// claim a person decided it, and under it the rung that stated it. The
+// city answers both (`Query::ModelFigures`, client D100); until it has,
+// the box is blank and says nothing.
+interface Untouched {
+  readonly placeholder: string;
+  readonly source: string;
+}
+
+const UNANSWERED: Untouched = { placeholder: "", source: "" };
+
+function windowShown(line: FiguresLine | undefined, lang: Lang): Untouched {
+  if (line === undefined) return UNANSWERED;
+  const window = line.window ?? null;
+  return window === null
+    ? { placeholder: "", source: say(lang, "setup_window_unknown") }
+    : { placeholder: String(window.tokens), source: say(lang, fromKey(window.from)) };
+}
+
+function ceilingShown(line: FiguresLine | undefined, lang: Lang): Untouched {
+  const ceiling = line?.ceiling ?? null;
+  if (ceiling === null) return UNANSWERED;
+  return ceiling === "provider_default"
+    ? { placeholder: "", source: say(lang, "setup_ceiling_provider") }
+    : { placeholder: String(ceiling.sent.tokens), source: say(lang, fromKey(ceiling.sent.from)) };
+}
+
+// The figure the city answered for a row, which a column orders an
+// untouched row by.
+function cityWindow(line: FiguresLine | undefined): number | null {
+  return line?.window?.tokens ?? null;
+}
+
+function cityCeiling(line: FiguresLine | undefined): number | null {
+  const ceiling = line?.ceiling ?? null;
+  return ceiling === null || ceiling === "provider_default" ? null : ceiling.sent.tokens;
 }
 
 export interface BoxLook {
@@ -46,6 +94,11 @@ export interface BoxLook {
   readonly value: string;
   readonly placeholder: string;
   readonly input: (value: string) => void;
+}
+
+// A figure box, with the rung its placeholder came from.
+export interface FigureLook extends BoxLook {
+  readonly source: string;
 }
 
 export interface ChoiceLook {
@@ -60,8 +113,11 @@ export interface ChoiceLook {
 // One drawn row of the table: every control it holds, already wired.
 export interface ModelRowLook {
   readonly id: string;
-  readonly window: BoxLook;
-  readonly ceiling: BoxLook;
+  // Present on a row the person named and the endpoint's list does not
+  // carry: the city registers it on the person's word.
+  readonly named: string | undefined;
+  readonly window: FigureLook;
+  readonly ceiling: FigureLook;
   readonly input: ChoiceLook;
   // The input modalities the provider itself stated, spelled as the
   // provider spelled them; empty when it stated none.
@@ -103,32 +159,35 @@ export interface ModelTableLook {
         readonly empty: string;
       }
     | undefined;
-  // Present while a ticked row has no output ceiling: not an alarm. The
-  // ceiling ladder in the city always answers
-  // (`gateway::OutputCeiling::resolve`), so an empty box is a decision
-  // left to the city rather than a call that will be refused, and the
-  // line says which rungs will answer it.
-  readonly needed: string | undefined;
   readonly manual: BoxLook;
 }
 
 // The whole value a look draws, built from the state the seat holds,
-// the rows the provider served, and the person's language. Every press
+// the rows the provider served, the city's answer for each row (empty
+// while it has not answered), and the person's language. Every press
 // writes into `state`; the seat's own derivation draws the result.
-export function lookOf(state: TableState, served: readonly ModelFact[], lang: Lang): ModelTableLook {
+export function lookOf(
+  state: TableState,
+  served: readonly ModelFact[],
+  answered: readonly FiguresLine[],
+  lang: Lang,
+): ModelTableLook {
   const every = everyRow(served, state.manual);
   const shown = shownRows(state, served);
   const facts = new Map(every.map((row) => [row.id, row]));
+  const city = new Map(answered.map((line) => [line.id, line]));
   const ticked = tickedRows(state, served);
   const figure = (pick: (row: ModelFact) => number | null) => (a: ModelRowLook, b: ModelRowLook) => {
     const left = facts.get(a.id);
     const right = facts.get(b.id);
     return bySize(left === undefined ? null : pick(left), right === undefined ? null : pick(right));
   };
+  const window = (row: ModelFact) => windowOf(state, row) ?? cityWindow(city.get(row.id));
+  const ceiling = (row: ModelFact) => ceilingOf(state, row) ?? cityCeiling(city.get(row.id));
   const columns: readonly ColumnLook[] = [
     { key: "id", header: say(lang, "setup_model_id"), min: "24ch", compare: (a, b) => a.id.localeCompare(b.id) },
-    { key: "context", header: say(lang, "setup_model_context"), min: "figure", compare: figure((row) => windowOf(state, row)) },
-    { key: "output", header: say(lang, "setup_model_output"), min: "figure", compare: figure((row) => ceilingOf(state, row)) },
+    { key: "context", header: say(lang, "setup_model_context"), min: "figure", compare: figure(window) },
+    { key: "output", header: say(lang, "setup_model_output"), min: "figure", compare: figure(ceiling) },
     { key: "modalities", header: say(lang, "setup_model_modalities"), min: "12ch", compare: undefined },
     { key: "price", header: say(lang, "setup_model_price"), min: "12ch", compare: undefined },
     { key: "role", header: say(lang, "setup_model_role"), min: "figure", compare: undefined },
@@ -156,7 +215,7 @@ export function lookOf(state: TableState, served: readonly ModelFact[], lang: La
         : {
             caption: say(lang, "setup_models"),
             columns,
-            rows: shown.map((row) => rowLook(state, row, lang)),
+            rows: shown.map((row) => rowLook(state, { row, line: city.get(row.id), named: isNamed(served, row) }, lang)),
             tick: {
               picked: (row) => state.ticked[row.id] === true,
               onPick: (row, on) => {
@@ -170,7 +229,6 @@ export function lookOf(state: TableState, served: readonly ModelFact[], lang: La
             },
             empty: say(lang, "setup_no_models"),
           },
-    needed: ticked.some((row) => ceilingOf(state, row) === null) ? say(lang, "setup_model_needed") : undefined,
     manual: {
       label: say(lang, "setup_manual_ids"),
       value: state.manual,
@@ -182,7 +240,15 @@ export function lookOf(state: TableState, served: readonly ModelFact[], lang: La
   };
 }
 
-function rowLook(state: TableState, row: ModelFact, lang: Lang): ModelRowLook {
+// One row as the table draws it: the provider's facts, the city's
+// answer for it, and whether the person named it.
+interface Drawn {
+  readonly row: ModelFact;
+  readonly line: FiguresLine | undefined;
+  readonly named: boolean;
+}
+
+function rowLook(state: TableState, { row, line, named }: Drawn, lang: Lang): ModelRowLook {
   const choice = (header: string) => ({
     label: `${header} ${row.id}`,
     placeholder: say(lang, "part_search"),
@@ -190,10 +256,11 @@ function rowLook(state: TableState, row: ModelFact, lang: Lang): ModelRowLook {
   });
   return {
     id: row.id,
+    named: named ? say(lang, "setup_model_named") : undefined,
     window: {
       label: `${say(lang, "setup_model_context")} ${row.id}`,
       value: state.context[row.id] ?? "",
-      placeholder: placeholderOf(row.contextTokens),
+      ...windowShown(line, lang),
       input: (value) => {
         state.context[row.id] = value;
       },
@@ -201,7 +268,7 @@ function rowLook(state: TableState, row: ModelFact, lang: Lang): ModelRowLook {
     ceiling: {
       label: `${say(lang, "setup_model_output")} ${row.id}`,
       value: state.output[row.id] ?? "",
-      placeholder: placeholderOf(row.maxOutputTokens),
+      ...ceilingShown(line, lang),
       input: (value) => {
         state.output[row.id] = value;
       },

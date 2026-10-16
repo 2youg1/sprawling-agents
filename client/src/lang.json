@@ -6484,8 +6484,8 @@
     "zh": "base_url"
   },
   "setup_base_url_normalised": {
-    "en": "normalised from {entered}; the city calls the URL above",
-    "zh": "已从 {entered} 归一；城市调用的是上面那个地址"
+    "en": "the city calls {recorded}",
+    "zh": "城市调用的是 {recorded}"
   },
   "setup_copy": {
     "en": "copy",
@@ -6995,9 +6995,37 @@
     "en": "text and images",
     "zh": "文本与图片"
   },
-  "setup_model_needed": {
-    "en": "An empty ceiling is safe to leave empty. Where the provider's model list states one, the city uses it. Otherwise, on the OpenAI-compatible formats the request carries no ceiling and the provider applies its own default for that model, usually the largest it allows; on the Anthropic-compatible format, which needs a number, the city takes the vendor's documented figure, then its policy default. Type a number here only to set your own.",
-    "zh": "上限可以留空。供应方的模型列表写了上限，城市就用它；没写时，OpenAI 兼容格式的请求不带上限，由供应方按这个模型取它自己的缺省，通常就是它允许的最大值；Anthropic 兼容格式必须带一个数，城市先取厂商文档写的上限，再落到策略缺省。只有想自己定时才在这里填数。"
+  "setup_model_named": {
+    "en": "named by you, not listed by the endpoint",
+    "zh": "你点名的，端点没列出"
+  },
+  "setup_figure_person": {
+    "en": "as you stated it",
+    "zh": "你填的"
+  },
+  "setup_figure_upstream": {
+    "en": "from the provider's list",
+    "zh": "取自供应方的列表"
+  },
+  "setup_figure_registered": {
+    "en": "as registered before",
+    "zh": "沿用此前的登记"
+  },
+  "setup_figure_preset": {
+    "en": "from the city's catalogue",
+    "zh": "取自城市的目录"
+  },
+  "setup_figure_policy": {
+    "en": "the city's default",
+    "zh": "城市的缺省"
+  },
+  "setup_ceiling_provider": {
+    "en": "the provider's default",
+    "zh": "供应方的缺省"
+  },
+  "setup_window_unknown": {
+    "en": "unknown — the context reminder stays off",
+    "zh": "未知，上下文提醒关闭"
   },
   "setup_model_output": {
     "en": "output ceiling",
@@ -7086,6 +7114,10 @@
   "setup_probe_failed": {
     "en": "{host} did not answer",
     "zh": "{host} 没有答复"
+  },
+  "setup_form_refused": {
+    "en": "the city refused this form",
+    "zh": "城市拒绝了这张表单"
   },
   "setup_probe_read": {
     "en": "what the city found at {host}",

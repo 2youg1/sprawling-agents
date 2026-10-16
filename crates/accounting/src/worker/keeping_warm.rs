@@ -58,7 +58,7 @@ pub(crate) struct Renewed {
     pub(in crate::worker) room: Address,
     pub(in crate::worker) out: u64,
     pub(in crate::worker) door: Door,
-    pub(in crate::worker) round: runtime::prefix::warmth::RenewalRound,
+    pub(in crate::worker) round: Box<runtime::prefix::warmth::RenewalRound>,
 }
 
 impl Kept {
@@ -177,7 +177,7 @@ impl RunWorker {
                     room: at,
                     out,
                     door,
-                    round,
+                    round: Box::new(round),
                 })
             });
             if let Err(refused) = sent {
@@ -296,7 +296,7 @@ mod tests {
                     room,
                     out,
                     door,
-                    round,
+                    round: Box::new(round),
                 });
                 lines.into_iter().map(move |line| (room.clone(), line))
             })
@@ -429,7 +429,7 @@ mod tests {
             room: room.clone(),
             out: out_a,
             door: door_a,
-            round: round_a,
+            round: Box::new(round_a),
         });
         assert!(
             kept.away.contains_key(&room),
@@ -439,7 +439,7 @@ mod tests {
             room: room.clone(),
             out: out_b,
             door: door_b,
-            round: round_b,
+            round: Box::new(round_b),
         });
         assert_eq!(
             kept.next_due(),

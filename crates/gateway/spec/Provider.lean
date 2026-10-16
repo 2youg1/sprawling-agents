@@ -49,25 +49,39 @@ pub fn window_for(base_url: &str, id: &str) -> Option<Window>;               // 
 pub(crate) fn input_for(base_url: &str, id: &str) -> Option<InputKinds>;     // 同一行的 input，只由 §8-37 的梯子读
 pub(crate) fn thinking_for(base_url: &str, id: &str) -> Option<&'static PresetThinking>;   // 同一行的思考列，只由 §8-39 的梯子读
 
-// provider::ceiling —— 判定，先命中者胜；哪几档作答取决于这一面要不要这个字段
-pub enum CeilingSource { Person, Upstream, Preset, Policy }   // as_str(): person|upstream|preset|policy
-pub struct Stated { pub person: Option<Ceiling>, pub upstream: Option<Ceiling> }
+// provider::ceiling —— 判定，先命中者胜；窗口与上限走同一架梯子，上限的后两档只在这一面要这个字段时作答
+pub enum FigureSource { Person, Upstream, Registered, Preset, Policy }   // as_str(): person|upstream|registered|preset|policy
+impl FigureSource {
+    pub const fn as_str(self) -> &'static str;
+    pub fn read(word: &str) -> FigureSource;     // 账本里的词读回；读不出的词读作 Registered（D45）
+}
+pub struct Statements<'a> { pub window: Option<Window>, pub ceiling: Option<Ceiling>,   // 人这次填的
+                            pub listed: Option<&'a ModelFacts>,      // provider 列表里这个 id 的那一行
+                            pub registered: Option<&'a ModelEntry> } // 这个 tag 上一次登记的同一个模型
 pub struct Target<'a> { pub base_url: &'a str, pub id: &'a str, pub wire: DialectKind }
+pub struct WindowFigure { pub tokens: Window, pub from: FigureSource }
 pub enum OutputCeiling {
-    Sent { tokens: Ceiling, from: CeilingSource },   // 每个请求都写出的数字，与说出它的那一档
+    Sent { tokens: Ceiling, from: FigureSource },    // 每个请求都写出的数字，与说出它的那一档
     ProviderDefault,                                 // 无人陈述且这一面不要求：不写该字段，由供应方按模型取缺省
 }
 impl OutputCeiling {
-    pub fn resolve(stated: Stated, pinned: Option<Ceiling>, target: Target<'_>) -> Option<OutputCeiling>;
     pub const fn tokens(self) -> Option<Ceiling>;
-    pub const fn word(self) -> &'static str;     // person|upstream|preset|policy|provider，进 model_selected.ceiling_from
+    pub const fn source(self) -> Option<FigureSource>;   // ProviderDefault 答 None
+    pub const fn word(self) -> &'static str;     // person|upstream|registered|preset|policy|provider，进 model_selected.ceiling_from
+}
+pub struct Figures { pub window: Option<WindowFigure>, pub ceiling: Option<OutputCeiling> }
+impl Figures {
+    // 唯一的梯子：选型点（accounting 的 select_model）与设置页要问的查询都调它；pinned 是钉版目录按精确 id 的那一行，
+    // 目录由调用方建一次，一次查询问很多个 id 时不必每个 id 建一次
+    pub fn resolve(said: Statements<'_>, pinned: Option<&ModelEntry>, target: Target<'_>) -> Figures;
 }
 ```
 
-- **事实梯只有一架，权威从高到低：人填 → 上游陈述 → 本地预设 → 策略缺省**。人填不是推断，故压过其余三档；上游 `/v1/models` 说过的话压过本城钉下的任何数字（Anthropic 自己的 Models API 逐模型给出 `max_tokens` 与 `max_input_tokens`，`endpoint::models` 读这两个键）。**后两档只在这一面要求这个字段时作答**：messages 兼容格式的每个请求都必须带 `max_tokens`，于是那里梯子恒有答案，`kernel::consts_policy::OUTPUT_CEILING_DEFAULT = 8_192` 只在前三档全数沉默时作答；chat 与 responses 两面的上限字段是可选的，人与上游都没说时答 `ProviderDefault`，请求里不写这个字段，由供应方按模型取它自己的缺省。
+- **事实梯只有一架，权威从高到低：人填 → provider 的列表 → 上一次登记 → 钉版目录与预设表 → 策略缺省**，窗口与上限各爬一次。人填不是推断，故压过其余各档；provider 的 `/v1/models` 说过的话压过本城钉下的任何数字（Anthropic 自己的 Models API 逐模型给出 `max_tokens` 与 `max_input_tokens`，`endpoint::models` 读这两个键），这一档读的是端点簿里这个 id 的那一行（`AttachedEndpoint.models`，§8-10），不是表单抄进人那一格的数。上一次登记是这个 tag 上一次选同一个端点的同一个模型时登记的那一行（`ModelEntry`），按 endpoint 与 model id 读，把 tag 指向另一个模型时旧模型的数不跟过去；它只拿人说过的数作答（D45）。**上限的后两档只在这一面要求这个字段时作答**：messages 兼容格式的每个请求都必须带 `max_tokens`，于是那里梯子恒有答案，`kernel::consts_policy::OUTPUT_CEILING_DEFAULT = 8_192` 只在前四档全数沉默时作答；chat 与 responses 两面的上限字段是可选的，人、provider 与上一次登记都没说时答 `ProviderDefault`，请求里不写这个字段，由供应方按模型取它自己的缺省。**窗口没有策略缺省一档，也不看是哪一面**：窗口不上线，只用于上下文提醒与会话冻下的形状；四档都沉默时窗口未知（登记为 `0`），上下文提醒随之不响。
+- **每个数记下说出它的那一档**：`ModelEntry` 带 `window_from` 与 `ceiling_from`（`Option<FigureSource>`，数缺席时为 `None`），`model_selected` 带同名的两个词，`router::payload` 一处写、`read_choice` 一处读。只拿到数字的读者说不出一次跑为什么停在那里，也说不出下一次登记时这个数该不该在「上一次登记」那一档作答。
 - **为什么 OpenAI 兼容两面不写本城的数字**：本城写下的任何数字，要么低于厂商按模型给的缺省（把一个思考模型截在它还在想的时候，跑以 `limit` 结束，人读到的是体验问题而不是设置问题），要么在对话变长后被拒——Kimi 的文档写明「input plus max_completion_tokens exceeds the model context window」时答 `invalid_request_error`，vLLM 对 `max_tokens` 加输入超过 `max_model_len` 的请求同样答 400。厂商的缺省总被厂商自己接受，并且随模型走：DeepSeek 不写 `max_tokens` 时思考模式缺省 64K（<https://api-docs.deepseek.com/api/create-chat-completion>），Kimi K3 缺省 131072（<https://platform.moonshot.ai/docs/api/chat>）。落选的是「抬高策略缺省」：一个对所有模型都更大的数字正是上面第二种失败，而且它仍是本城替厂商猜的数字。**重开参数**：当某个登记过的主机的文档缺省低到截断一次普通的派活（今天没有一家），在本表给它的模型写行，并让这一面的预设档作答。
-- **`resolve` 的返回值带着是谁答的**（`CeilingSource`），因为只拿到数字的调用方说不出一次跑为什么停在那里。这是对 `anthropic.rs` 那句自我反对的回答——「a ceiling invented at the call site truncates runs for a reason that appears nowhere in the account」：它出现在账里（`model_selected.ceiling_from`，见 `crates/sprawling/Spec.lean` §8-52）。
-- **预设表的上下文窗口也是一档**：`window_for` 与 `ceiling_for` 读同一行，装配层的窗口梯（`crates/sprawling/Spec.lean` §8-71）在钉版目录之后读它。窗口不上线，只用于上下文提醒与会话冻下的形状，所以它在三个兼容格式上一样作答。今天登记模型行的是 `api.anthropic.com`（当前四个家族与更早的四行，读自厂商的 models overview）与 `api.deepseek.com`（`deepseek-flash` 与 `deepseek-v4` 两个家族：1M 窗口，上限 393216——API 参考写作「between 1 and 384K (393216)」）。厂商页上写作 `1M`、`128K` 的数按一千进位读：它恒不高于厂商所指的那个数。
+- **`resolve` 的返回值带着是谁答的**（`FigureSource`），因为只拿到数字的调用方说不出一次跑为什么停在那里。这是对 `anthropic.rs` 那句自我反对的回答——「a ceiling invented at the call site truncates runs for a reason that appears nowhere in the account」：它出现在账里（`model_selected.ceiling_from`，见 `crates/sprawling/Spec.lean` §8-52）。
+- **预设表的上下文窗口也是一档**：`window_for` 与 `ceiling_for` 读同一行，窗口梯在钉版目录之后读它，所以它在三个兼容格式上一样作答。今天登记模型行的是 `api.anthropic.com`（当前四个家族与更早的四行，读自厂商的 models overview）与 `api.deepseek.com`（`deepseek-flash` 与 `deepseek-v4` 两个家族：1M 窗口，上限 393216——API 参考写作「between 1 and 384K (393216)」）。厂商页上写作 `1M`、`128K` 的数按一千进位读：它恒不高于厂商所指的那个数。
 - **钉版目录与预设表是同一档的两个索引**：目录按精确 id 查，预设表按 host ＋ id 前缀查，一条测试钉住两个索引不为同一个 id 作答。`MarketSnapshot::lookup` 因此保持精确匹配，前缀匹配只发生在预设表内。
 - **预设表逐行注出处**，每行带厂商文档地址；查不到的行不发明数字，而是让梯子落到下一档——这就是「不补零、不补默认、不补猜测」在登记面上的样子。价目列不在本表：厂商价目随时在动，一个没有复核日期的价目行就是第二个会漂的权威，价目继续住钉版目录（§8-7）。
 - **chat 面的三处拼法随主机走，住本表的 `chat` 列**：输出上限写进 `max_tokens` 还是 `max_completion_tokens`、一档思考与「开启思考」写在哪几个字段（见下文思考档一条）、上一轮的推理是否作为 `reasoning_content` 放回 assistant 消息。三件事都是「同一个 OpenAI 兼容格式，各家文档各写各的」，dialect 本身不带主机名，所以由 `Endpoint::wire_request` 按 base URL 查一次本表、把拼法作为参数交给纯函数。**未登记的主机取 `ChatSpelling::DOCUMENTED`**：`max_tokens`（OpenAI 规格已标 deprecated，但本地推理服务与多数兼容服务只认它，而 `max_completion_tokens` 落在一个不认它的服务上是被静默忽略的上限）、`reasoning_effort`（OpenAI 规格的拼法）、丢弃思考块（OpenAI 规格的 assistant 消息没有这个字段）。`api.openai.com` 必须是 `max_completion_tokens`：规格写明 `max_tokens`「is not compatible with o-series models」，推理模型对它答 400。落选的是「一律 `max_completion_tokens`」：DeepSeek、通义与智谱的文档只写 `max_tokens`，对它们换名就是把人定的上限丢掉。**重开参数**：当本地推理服务普遍改收 `max_completion_tokens` 时，`DOCUMENTED` 的上限列随之改。
@@ -80,6 +94,19 @@ impl OutputCeiling {
 - **中转站转发厂商的 id 时，厂商的行作答，但排在中转站自己的陈述之后**：`model_for` 先查 base URL 所在 host 自己的行；这个 host 在本表没有模型行、且 `reach::is_local` 答否时，再在全表里按最长前缀查发布这个 id 的厂商的行。理由：中转站的模型列表几乎从不陈述上限（上游档因此空着），而 messages 兼容格式非写一个数不可——落到策略缺省的 8192 与中转站的事实毫无关系，比它所转发的那个模型的文档上限更远；一个把上限压得更低的中转站会以一次拒绝说出来，而拒绝的恢复语指向设置页上那一格，这比一次被静默截断、以 `limit` 结束的跑更容易被人看懂。`reach::is_local` 答是的 host 不查厂商的行：本地推理服务上一个同名的量化模型，窗口是那个服务的配置，套用厂商图表就是把一个它放不下的数字发给它。**重开参数**：当中转站普遍在 `/v1/models` 里陈述上限时，这一档对它们沉默也不失什么，可以撤回。
 - **思考档在预置表里是两列**：主机一行的 `chat.effort`（`EffortField`）说这家 chat 面把一档与「开启思考」写在哪几个字段，模型一行的 `thinking`（`PresetThinking`）说文档给这个模型哪几档、默认哪一档。前者按厂商文档：`openrouter.ai` 是 `ReasoningObject`（`reasoning:{effort}` 与 `reasoning:{enabled}`）；`api.deepseek.com`、`api.kimi.com`、`api.moonshot.cn`、`api.moonshot.ai`、`open.bigmodel.cn`、`api.z.ai` 是 `ThinkingToggle`，因为这几家的文档把开关写在 `thinking.type`（<https://api-docs.deepseek.com/guides/thinking_mode>、<https://platform.moonshot.ai/docs/api/chat>、<https://docs.z.ai/api-reference/llm/chat-completion>）；`dashscope-us.aliyuncs.com` 是 `EnableThinking`（<https://help.aliyun.com/zh/model-studio/deep-thinking>）；其余与未登记主机是 `ReasoningEffort`。后者只在上游的模型列表不说档位时有用：OpenAI 的 `Model` 只有 `id/created/object/owned_by`，所以 `api.openai.com` 当前在售的推理模型各有一行，档位与默认档逐字读自各自的模型页（`gpt-6.1-sol` 不收 `none` 与 `minimal`，`gpt-6-astra` 不收 `none` 且不写默认档，`gpt-5.6-sol`／`luna`／`terra` 收 `low` 到 `max`、默认 `medium`；`gpt-6-sol`、`gpt-6-luna` 的模型页也列了这些档，但写明 Chat Completions 只在 `reasoning_effort` 为 `none` 时接受工具，而城市每次派活都带工具、不调用 responses 面，所以这两行的思考列是 `None`，梯子落到无人说、不发档位；`none` 不入集合，因为关闭思考不是一档）。一行的 `thinking` 是 `None` 时梯子落到无人说，不按家族猜。**重开参数**：OpenAI 的模型列表开始逐模型说出档位时，这几行的思考列撤回，由上游一档作答。
 - **主机表只有这一张**：`router::normalise` 的路径与形状缺省从本表取（`openrouter.ai` 是 `/api/v1`、Gemini 的兼容面是 `/v1beta/openai`），`Endpoint::wire_request` 的 chat 面拼法与会话标识头也从本表取，归一化算法与 dialect 自身都不带任何主机名。
+-/
+
+/-! D45 窗口与上限的梯子是 `Figures::resolve` 一个函数，上一次登记只拿人说过的数作答，每个数记下它的来处
+
+决定：人填 → provider 的列表 → 上一次登记 → 钉版目录与预设表 → 策略缺省这架梯子只写在 `provider::ceiling::Figures::resolve`，选型点 `select_model` 与设置页要问的查询都调它，装配层只交上人这次填的两个数、端点簿里这个 id 的那一行与上一次登记的那一行。`ModelEntry` 带 `window_from` 与 `ceiling_from`，`model_selected` 带同名的两个词。上一次登记只在它记下的来处是 `Person` 或 `Registered` 时作答（`FigureSource::carried`），那时这一次记作 `registered`；来处是 `Upstream`、`Preset` 或 `Policy` 的数，下一次登记时回到那一档再问一次。账本里没有来处的数——`ceiling_from` 出现之前写的行，与 `window_from` 出现之前写的每一行——读作 `Registered`；读不出的词也读作 `Registered`，因为这个数确实是这个 tag 上一次登记的，而它是谁说的这个 build 说不出来。
+
+理由：`ModelEntry` 原来只存数，不存来处，于是一次早先选模型时落到的策略缺省 8 192，下一次以「上一次登记」的身份压过 provider 后来说的数，在 `model_selected.ceiling_from` 里还记成 `upstream`，而 glossary 对那一档的定义是 provider 的列表；provider 列表里的数又只在表单把它抄进人那一格时才进城，于是被记成 `person`。上一次登记这一档存在的理由是人重选同一个模型时空着的框不抹掉他当初填的数（`crates/sprawling/Spec.lean` §8-71）；provider 与本城的表随时可以再问，再问一次答的是它们现在说的，所以只有人说的数需要沿下来。
+
+被否：①上一次登记的数一律作答，来处只记账——一个旧的策略缺省压过下一个 build 新加的预设行，messages 面上落到的预设数在端点换到 chat 面后变成一个照发的上限，而那一面本该交给供应方；②来处是 `Upstream` 的数也沿下来——provider 的列表已在它自己那一档读过，沿下来的只会是它已经撤回的数，而且旧 build 写下的 `upstream` 装的正是上一次登记沿下来的数，其中有策略缺省；③梯子留在 `select_model`，查询另抄一份——同一条规则两个家，漂开的总是没人看的那个；④价目也走这个函数——provider 的价目是它原样的文字，单位各家不同（§8-16），换算成 `UsdMicros` 是一个新的读法，不在这一次的范围，见 §3。
+
+代价：旧 build 写下的 `upstream` 行如果装的是人当初填的数，下一次空框重选时这个数不再沿下来，梯子落到本城的表；人再填一次即回到 `person`。
+
+重开参数：provider 的列表普遍说出窗口与上限、而人需要让自己早先填的数压过它时，上一次登记要排到 provider 之前，这个顺序是人的定规，要改先问人。平台：纯判定，三个平台相同。
 -/
 
 /-! D25 `prompt_cache_key` 是预置表的一列，只写给文档说收它的主机，值是会话标识

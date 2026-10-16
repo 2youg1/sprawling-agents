@@ -48,6 +48,7 @@ mod listing;
 mod mcp_health;
 mod metrics;
 mod model_facts;
+mod model_figures;
 mod note;
 mod prefix;
 mod preview;
@@ -100,6 +101,9 @@ pub use listing::{Entry, EntryKind, ListingAnswer};
 pub use mcp_health::{McpHealthAnswer, McpServerHealth, McpState, McpToolLine};
 pub use metrics::MetricsAnswer;
 pub use model_facts::ModelFactsSummary;
+pub use model_figures::{
+    CeilingLine, FigureFrom, FiguresAsked, FiguresLine, ModelFiguresAnswer, WindowLine,
+};
 pub use note::{HandbackNote, Note, ReplyEnd, ReplyEnded, Speaker};
 pub use prefix::{ContentAnswer, PrefixAnswer, PrefixSegment, PrefixSlot, PrefixSource};
 pub use preview::PreviewAnswer;
@@ -257,6 +261,8 @@ pub enum Answer {
     GithubLogin(GithubLoginAnswer),
     Guide(GuideProgress),
     Privacy(Box<crate::PrivacyAnswer>),
+    /// What an empty model table would register (`crates/wire/spec/Answer/ModelFigures.lean` §8-97).
+    ModelFigures(ModelFiguresAnswer),
     /// `reason` is the text of what stopped a view that tried to look
     /// (`crates/wire/spec/Server.lean` D47); absent when the view names
     /// the query alone.

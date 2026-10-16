@@ -92,7 +92,7 @@ pub use history::{FileRestored, WentBack};
 pub use log::LogTruncated;
 pub use modality::{EmbeddingCalled, RerankCalled};
 pub use prefix_held::{PrefixHeld, PrewarmEnd, PrewarmSent};
-pub use probe::{EndpointProbed, ModelFacts, ProbeFailure, ThinkingStatement};
+pub use probe::{EndpointProbed, Listing, ModelFacts, ProbeFailure, ThinkingStatement};
 pub use provider::{
     ProviderAccount, ProviderAccountBinding, ProviderDegraded, VaultFellBack,
     validate_provider_accounts,

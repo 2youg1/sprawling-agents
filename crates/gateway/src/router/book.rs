@@ -330,6 +330,56 @@ impl EndpointBook {
             .map(|(tag, choice)| (*tag, choice.endpoint.as_str(), &choice.entry))
     }
 
+    /// What `tag` is registered with while it points at `model` behind
+    /// `endpoint`: the earlier-registration rung of the ladder
+    /// (`crate::Figures::resolve`), read the same way by the pick point
+    /// and by the model table's question.
+    ///
+    /// Read by endpoint and model id rather than by tag alone: pointing
+    /// a tag at another model must not carry the old model's figures
+    /// onto the new one (`crates/sprawling/Spec.lean` §8-71).
+    #[must_use]
+    pub fn registered(&self, tag: ModelTag, endpoint: &str, model: &str) -> Option<&ModelEntry> {
+        self.chosen
+            .get(&tag)
+            .filter(|choice| choice.endpoint == endpoint && choice.entry.id == model)
+            .map(|choice| &choice.entry)
+    }
+
+    /// Refuses an attachment whose rows leave out a model a tag points
+    /// at on this endpoint (`crates/gateway/spec/Router.lean` D40). The
+    /// fold never clears a choice when an endpoint is attached again, so
+    /// this is where a role stays on a model the endpoint still holds.
+    ///
+    /// # Errors
+    /// `E_CONFIG_INVALID`, naming each such model and its tag, with the
+    /// models this attachment would register as `nearby`.
+    pub fn refuse_dropping_a_role(&self, attaching: &AttachedEndpoint) -> Result<(), AxError> {
+        let dropped: Vec<String> = self
+            .chosen
+            .iter()
+            .filter(|(_, choice)| {
+                choice.endpoint == attaching.name
+                    && !attaching.models.iter().any(|row| row.id == choice.entry.id)
+            })
+            .map(|(tag, choice)| {
+                format!("{} is {tag}; choose another {tag} first", choice.entry.id)
+            })
+            .collect();
+        if dropped.is_empty() {
+            return Ok(());
+        }
+        Err(AxError::failure(
+            AxCode::ConfigInvalid,
+            "attach an endpoint",
+            dropped.join("; "),
+        )
+        .with_nearby(attaching.models.iter().map(|row| row.id.clone()).collect())
+        .with_recovery(
+            "choose another model for that role, then attach again with the model left out",
+        ))
+    }
+
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.endpoints.is_empty() && self.chosen.is_empty()
@@ -402,7 +452,9 @@ mod tests {
         ModelEntry {
             id: id.to_owned(),
             context_tokens: 128_000,
+            window_from: Some(crate::FigureSource::Person),
             max_output_tokens: kernel::Ceiling::new(8_192),
+            ceiling_from: Some(crate::FigureSource::Person),
             input: crate::market::InputKinds::Text,
             input_price: UsdMicros::new(1_000_000),
             output_price: UsdMicros::new(2_000_000),
@@ -420,7 +472,7 @@ mod tests {
         .unwrap();
         book.apply(&record(
             EventKind::ModelSelected,
-            selected_payload(ModelTag::Main, "house", &entry("m-large"), None).unwrap(),
+            selected_payload(ModelTag::Main, "house", &entry("m-large")).unwrap(),
         ))
         .unwrap();
         book
@@ -524,7 +576,7 @@ mod tests {
             attached_payload(&attached("house", "https://api.example.test/v1")).unwrap(),
         ))
         .unwrap();
-        let mut map = selected_payload(ModelTag::Main, "house", &entry("m-large"), None)
+        let mut map = selected_payload(ModelTag::Main, "house", &entry("m-large"))
             .unwrap()
             .as_map()
             .clone();

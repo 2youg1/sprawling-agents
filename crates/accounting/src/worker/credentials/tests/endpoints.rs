@@ -46,6 +46,7 @@ fn an_endpoint_with_no_model_list_attaches_on_the_ids_the_person_named() {
             secret: None,
             auth_header: None,
             admit: vec!["m-1".to_owned()],
+            named: Vec::new(),
             tuning: wire::EndpointTuning::default(),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"attach"),
         })
@@ -94,6 +95,7 @@ fn an_endpoint_with_neither_a_model_list_nor_a_declared_id_is_refused() {
             secret: None,
             auth_header: None,
             admit: Vec::new(),
+            named: Vec::new(),
             tuning: wire::EndpointTuning::default(),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"attach"),
         })
@@ -163,6 +165,7 @@ fn a_loopback_endpoint_with_a_credential_sends_it_on_every_call() {
             secret: Some("secret:proxy/key".to_owned()),
             auth_header: None,
             admit: Vec::new(),
+            named: Vec::new(),
             tuning: wire::EndpointTuning::default(),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"attach"),
         })
@@ -372,4 +375,331 @@ fn a_line_a_run_writes_reaches_the_book_the_worker_holds() {
         names(&rebuilt),
         "the live book and the restart's book are one fold"
     );
+}
+
+/// The provider's own list is the rung below the person: a pick that
+/// states nothing, for a model whose list row states a window and a
+/// ceiling, registers both and names the provider as the rung that
+/// answered (`crates/gateway/Spec.lean` §8-17, gateway D45). The form
+/// no longer has to copy the list's figures into the person's boxes
+/// for the city to use them.
+#[test]
+fn a_pick_that_states_nothing_registers_what_the_providers_list_states() {
+    let dir = tempfile::tempdir().unwrap();
+    let report = crate::worker::fixture::init_city(dir.path()).unwrap();
+    let (base_url, _provider) = fake_openai(&["m-stated"], Vec::new());
+    let mut worker = RunWorker::new(
+        dir.path(),
+        runtime::diagnostics::Diagnostics::off(),
+        crate::worker::fixture::hands(),
+    )
+    .unwrap();
+    worker
+        .handle(wire::Command::AttachEndpoint {
+            name: wire::ProviderName::parse("house").unwrap(),
+            base_url,
+            dialect: kernel::DialectKind::OpenAi,
+            secret: None,
+            auth_header: None,
+            admit: Vec::new(),
+            named: Vec::new(),
+            tuning: wire::EndpointTuning::default(),
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"attach"),
+        })
+        .unwrap();
+    worker
+        .handle(wire::Command::SelectModel {
+            endpoint: wire::ProviderName::parse("house").unwrap(),
+            model: "m-stated".to_owned(),
+            tag: kernel::ModelTag::Main,
+            context_tokens: None,
+            max_output_tokens: None,
+            input: None,
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"select"),
+        })
+        .unwrap();
+    let selected = selected_lines(&report.ledger_dir);
+    assert_eq!(
+        selected,
+        vec![serde_json::json!({
+            "context_tokens": LISTED_WINDOW,
+            "window_from": "upstream",
+            "max_output_tokens": LISTED_CEILING,
+            "ceiling_from": "upstream",
+        })]
+    );
+}
+
+/// The window, the ceiling and the two rungs of every `model_selected`
+/// this city wrote, in order.
+pub(super) fn selected_lines(ledger_dir: &std::path::Path) -> Vec<serde_json::Value> {
+    runtime::replay::verify_ledger_dir(ledger_dir)
+        .unwrap()
+        .raw_lines()
+        .iter()
+        .map(|line| kernel::EventRecord::parse_line(line).unwrap())
+        .filter(|record| record.kind() == kernel::EventKind::ModelSelected)
+        .map(|record| {
+            let data = record.data().as_map();
+            let mut picked = serde_json::Map::new();
+            for key in [
+                "context_tokens",
+                "window_from",
+                "max_output_tokens",
+                "ceiling_from",
+            ] {
+                picked.insert(
+                    key.to_owned(),
+                    data.get(key).cloned().unwrap_or(serde_json::Value::Null),
+                );
+            }
+            serde_json::Value::Object(picked)
+        })
+        .collect()
+}
+
+/// A re-attach while the endpoint's list cannot be read changes nothing
+/// the city already knew (gateway D46): an id registered before keeps
+/// the facts the earlier probe read, and the endpoint keeps its earlier
+/// `probed`; an id named for the first time gets default facts and is
+/// marked as named, and then the list is partly the person's word, so
+/// `probed` is false.
+#[test]
+fn a_re_attach_whose_list_cannot_be_read_keeps_the_facts_already_registered() {
+    let dir = tempfile::tempdir().unwrap();
+    crate::worker::fixture::init_city(dir.path()).unwrap();
+    let (base_url, provider) = fake_openai(&["m-stated", "m-plain"], Vec::new());
+    let mut worker = RunWorker::new(
+        dir.path(),
+        runtime::diagnostics::Diagnostics::off(),
+        crate::worker::fixture::hands(),
+    )
+    .unwrap();
+    let attach = |worker: &mut RunWorker, admit: &[&str], idem: &[u8]| {
+        worker
+            .handle(wire::Command::AttachEndpoint {
+                name: wire::ProviderName::parse("house").unwrap(),
+                base_url: base_url.clone(),
+                dialect: kernel::DialectKind::OpenAi,
+                secret: None,
+                auth_header: None,
+                admit: admit.iter().map(|id| (*id).to_owned()).collect(),
+                named: Vec::new(),
+                tuning: wire::EndpointTuning::default(),
+                idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, idem),
+            })
+            .unwrap();
+        let held = worker.credentials.book.endpoints().next().unwrap().clone();
+        (held.models, held.probed)
+    };
+    let (read, probed) = attach(&mut worker, &[], b"listed");
+    assert!(probed);
+    let stated = read
+        .iter()
+        .find(|row| row.id == "m-stated")
+        .unwrap()
+        .clone();
+    assert_eq!(stated.context_tokens, Some(LISTED_WINDOW));
+    provider.stop_listing();
+    assert_eq!(
+        attach(&mut worker, &["m-stated"], b"unread, nothing new"),
+        (vec![stated.clone()], true),
+        "a failed probe reset what the earlier one read"
+    );
+    assert_eq!(
+        attach(&mut worker, &["m-stated", "m-new"], b"unread, one new"),
+        (
+            vec![
+                stated,
+                gateway::ModelFacts {
+                    id: "m-new".to_owned(),
+                    listing: kernel::event::record::Listing::Named,
+                    ..gateway::ModelFacts::default()
+                },
+            ],
+            false,
+        )
+    );
+}
+
+/// One attach, as the settings page sends it: the rows ticked on the
+/// list and the ids typed beside it, for the endpoint `relay`.
+fn attach_relay(
+    worker: &mut RunWorker,
+    base_url: &str,
+    (ticked, typed): (&[&str], &[&str]),
+    idem: &[u8],
+) -> Result<(), AxError> {
+    let owned = |ids: &[&str]| ids.iter().map(|id| (*id).to_owned()).collect();
+    worker.handle(wire::Command::AttachEndpoint {
+        name: wire::ProviderName::parse("relay").unwrap(),
+        base_url: base_url.to_owned(),
+        dialect: kernel::DialectKind::OpenAi,
+        secret: None,
+        auth_header: None,
+        admit: owned(ticked),
+        named: owned(typed),
+        tuning: wire::EndpointTuning::default(),
+        idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, idem),
+    })
+}
+
+/// Each registered row of `relay` with where it came from, and whether
+/// the endpoint reads as probed.
+fn relay_rows(worker: &RunWorker) -> (Vec<(String, kernel::event::record::Listing)>, bool) {
+    let held = worker
+        .credentials
+        .book
+        .endpoints()
+        .find(|endpoint| endpoint.name == "relay")
+        .unwrap();
+    (
+        held.models
+            .iter()
+            .map(|row| (row.id.clone(), row.listing))
+            .collect(),
+        held.probed,
+    )
+}
+
+/// A typed id is the person's word (gateway D47): an attach after the
+/// list was read registers it beside the ticked row, marked as named
+/// rather than listed, and a role can point at it.
+#[test]
+fn a_typed_id_the_list_does_not_carry_is_registered_as_the_persons_word() {
+    use kernel::event::record::Listing;
+    let dir = tempfile::tempdir().unwrap();
+    crate::worker::fixture::init_city(dir.path()).unwrap();
+    let (base_url, _provider) = fake_openai(&["relay-chat-1", "deepseek-chat"], Vec::new());
+    let mut worker = RunWorker::new(
+        dir.path(),
+        runtime::diagnostics::Diagnostics::off(),
+        crate::worker::fixture::hands(),
+    )
+    .unwrap();
+    attach_relay(
+        &mut worker,
+        &base_url,
+        (&["relay-chat-1"], &["relay-hidden-1"]),
+        b"attach",
+    )
+    .unwrap();
+    assert_eq!(
+        relay_rows(&worker),
+        (
+            vec![
+                ("relay-chat-1".to_owned(), Listing::Listed),
+                ("relay-hidden-1".to_owned(), Listing::Named),
+            ],
+            false,
+        )
+    );
+    worker
+        .handle(wire::Command::SelectModel {
+            endpoint: wire::ProviderName::parse("relay").unwrap(),
+            model: "relay-hidden-1".to_owned(),
+            tag: kernel::ModelTag::Main,
+            context_tokens: None,
+            max_output_tokens: None,
+            input: None,
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"select"),
+        })
+        .unwrap();
+}
+
+/// What a refused command must leave alone: the book the worker holds
+/// and every line of the ledger.
+fn untouched(worker: &RunWorker, ledger_dir: &std::path::Path) -> (serde_json::Value, String) {
+    (
+        serde_json::to_value(&worker.credentials.book).unwrap(),
+        ledger_text(ledger_dir),
+    )
+}
+
+/// A ticked list that matches nothing the endpoint serves, with no
+/// typed id beside it, would register an endpoint with no models and
+/// leave the next pick to fail for an unrelated reason. It is refused
+/// at the attach, naming the ids that matched nothing and offering the
+/// ones that are served, and nothing is written (gateway D47).
+#[test]
+fn a_ticked_list_that_matches_nothing_served_is_refused_and_writes_nothing() {
+    let dir = tempfile::tempdir().unwrap();
+    let report = crate::worker::fixture::init_city(dir.path()).unwrap();
+    let (base_url, _provider) = fake_openai(&["relay-chat-1", "deepseek-chat"], Vec::new());
+    let mut worker = RunWorker::new(
+        dir.path(),
+        runtime::diagnostics::Diagnostics::off(),
+        crate::worker::fixture::hands(),
+    )
+    .unwrap();
+    attach_relay(&mut worker, &base_url, (&["relay-chat-1"], &[]), b"first").unwrap();
+    let before = untouched(&worker, &report.ledger_dir);
+    let err = attach_relay(
+        &mut worker,
+        &base_url,
+        (&["relay-hidden-1"], &[]),
+        b"second",
+    )
+    .expect_err("a ticked list that matches nothing is refused");
+    // `nearby` follows the order the endpoint lists its models in.
+    let mut offered = err.nearby().to_vec();
+    offered.sort();
+    assert_eq!(
+        (
+            *err.code(),
+            err.subject().contains("relay-hidden-1"),
+            offered
+        ),
+        (
+            AxCode::ConfigInvalid,
+            true,
+            vec!["deepseek-chat".to_owned(), "relay-chat-1".to_owned()],
+        )
+    );
+    assert_eq!(untouched(&worker, &report.ledger_dir), before);
+}
+
+/// Unticking the model a role points at is refused, naming the role,
+/// rather than leaving the role on a model the book no longer holds or
+/// clearing it behind the person's back (gateway D48).
+#[test]
+fn a_re_attach_that_drops_the_model_a_role_points_at_is_refused_naming_the_role() {
+    let dir = tempfile::tempdir().unwrap();
+    let report = crate::worker::fixture::init_city(dir.path()).unwrap();
+    let (base_url, _provider) = fake_openai(&["relay-chat-1", "deepseek-chat"], Vec::new());
+    let mut worker = RunWorker::new(
+        dir.path(),
+        runtime::diagnostics::Diagnostics::off(),
+        crate::worker::fixture::hands(),
+    )
+    .unwrap();
+    attach_relay(
+        &mut worker,
+        &base_url,
+        (&["relay-chat-1", "deepseek-chat"], &[]),
+        b"both",
+    )
+    .unwrap();
+    worker
+        .handle(wire::Command::SelectModel {
+            endpoint: wire::ProviderName::parse("relay").unwrap(),
+            model: "deepseek-chat".to_owned(),
+            tag: kernel::ModelTag::Main,
+            context_tokens: None,
+            max_output_tokens: None,
+            input: None,
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"select"),
+        })
+        .unwrap();
+    let before = untouched(&worker, &report.ledger_dir);
+    let err = attach_relay(&mut worker, &base_url, (&["relay-chat-1"], &[]), b"one")
+        .expect_err("dropping the model main points at is refused");
+    assert_eq!(
+        (*err.code(), err.subject()),
+        (
+            AxCode::ConfigInvalid,
+            "deepseek-chat is main; choose another main first"
+        )
+    );
+    assert_eq!(untouched(&worker, &report.ledger_dir), before);
 }

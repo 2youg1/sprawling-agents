@@ -17,6 +17,8 @@ pub(super) mod held;
 mod probing;
 pub(super) mod signing;
 
+pub(super) use endpoints::Admission;
+
 /// The name the environment-configured endpoint is attached under, so a
 /// person reading the settings page can see where it came from.
 pub(super) const ENVIRONMENT_ENDPOINT: &str = "environment";
@@ -54,12 +56,7 @@ impl Entered {
     pub(super) fn resolved(mut self) -> Result<Entered, kernel::AxError> {
         let settled =
             gateway::normalise_entered(&self.base_url, gateway::DialectHint::of(self.dialect))?;
-        // A shape nobody settled is the chat face, the one every
-        // compatible server answers.
-        self.dialect = settled
-            .dialect
-            .dialect()
-            .unwrap_or(kernel::DialectKind::OpenAi);
+        self.dialect = settled.face();
         self.base_url = settled.base_url;
         Ok(self)
     }
@@ -158,25 +155,6 @@ pub(super) fn dialect_headers(dialect: kernel::DialectKind) -> Vec<(String, gate
 /// floating one would change the wire under a replay.
 /// <https://platform.claude.com/docs/en/api/messages>
 pub(super) const ANTHROPIC_VERSION: &str = "2023-06-01";
-
-/// What one tag already points at, when it points at this same model
-/// behind this same endpoint.
-///
-/// The book is the one statement of what this city registered, so an
-/// earlier figure is read back out of it rather than held beside it.
-/// Read by endpoint and model id rather than by tag alone: pointing a
-/// tag at another model must not carry the old model's ceiling onto the
-/// new one (`crates/sprawling/Spec.lean` §8-71).
-pub(super) fn registered_as(
-    book: &gateway::EndpointBook,
-    tag: kernel::ModelTag,
-    endpoint: &str,
-    model: &str,
-) -> Option<gateway::ModelEntry> {
-    book.choices()
-        .find(|(held, at, entry)| *held == tag && *at == endpoint && entry.id == model)
-        .map(|(_, _, entry)| entry.clone())
-}
 
 /// The catalog's `local` row under the name a local server serves it.
 pub(super) fn local_model_facts(model: &str) -> Result<gateway::ModelEntry, AxError> {

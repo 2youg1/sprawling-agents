@@ -90,6 +90,20 @@ pub struct Normalised {
     pub dialect: DialectHint,
 }
 
+impl Normalised {
+    /// The face this city calls: the one settled, or the chat face, the
+    /// one every compatible server answers, when nothing settled it. An
+    /// attach and the model table's question both read it here, so the
+    /// two cannot call one text on two faces.
+    #[must_use]
+    pub const fn face(&self) -> DialectKind {
+        match self.dialect.dialect() {
+            Some(face) => face,
+            None => DialectKind::OpenAi,
+        }
+    }
+}
+
 /// What the provider preset table says about a host.
 ///
 /// Crate-internal on purpose: normalisation stays free of host names,

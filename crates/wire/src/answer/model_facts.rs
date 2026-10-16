@@ -5,6 +5,7 @@
 
 //! What an endpoint said about one model it serves.
 
+use kernel::event::record::Listing;
 use kernel::{Ceiling, model::Window};
 use serde::{Deserialize, Serialize};
 
@@ -23,9 +24,11 @@ use serde::{Deserialize, Serialize};
 /// — runs where the call is made, and a summary that had already
 /// climbed it would be a second answer to which figure won.
 ///
-/// The last two fields are the city's answers, each from its one
-/// authority: `thinking` names the rung it came from, and `canonical` is
-/// `gateway::provider::identity`'s (`crates/wire/spec/Answer/Endpoints.lean` §8-92).
+/// The last three fields are the city's own, each from its one
+/// authority: `thinking` names the rung it came from, `canonical` is
+/// `gateway::provider::identity`'s (`crates/wire/spec/Answer/Endpoints.lean` §8-92),
+/// and `listing` is what the attach recorded about where the row came
+/// from (`crates/wire/spec/Frames.lean` D57).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ModelFactsSummary {
@@ -50,4 +53,9 @@ pub struct ModelFactsSummary {
     /// This model's identity across providers: two rows are one model
     /// exactly when these are equal.
     pub canonical: String,
+    /// Whether the endpoint listed this model, or the person named it
+    /// and the endpoint did not list it. A named row states nothing
+    /// else because nobody asked the provider, which is different from
+    /// a provider that said nothing.
+    pub listing: Listing,
 }

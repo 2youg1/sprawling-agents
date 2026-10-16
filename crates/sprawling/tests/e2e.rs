@@ -230,6 +230,7 @@ fn settled(round: &Round, key: &str, city_root: &Path) -> Result<RunWorker, AxEr
         secret: Some(SECRET_LOCATOR.to_owned()),
         auth_header: None,
         admit: Vec::new(),
+        named: Vec::new(),
         tuning: wire::EndpointTuning {
             timeout_ms: Some(REQUEST_TIMEOUT_MS),
             request_max_retries: Some(NO_RETRY),
@@ -385,7 +386,7 @@ fn states_the_ceilings_source(round: &Round) {
         });
     assert_eq!(
         stated.as_deref(),
-        Some(gateway::CeilingSource::Person.as_str()),
+        Some(gateway::FigureSource::Person.as_str()),
         "{label}: `model_selected` does not name the person's figure as the ceiling this city \
          registered"
     );

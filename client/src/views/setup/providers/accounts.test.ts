@@ -38,7 +38,7 @@ const ENDPOINT: EndpointSummary = {
   has_credential: true,
   label: "house",
   local: false,
-  models: [{ id: "fable", input_modalities: [], canonical: "fable", thinking: { levels: [], on: "unknown", from: "unknown", words: [] } }],
+  models: [{ id: "fable", input_modalities: [], canonical: "fable", listing: "listed", thinking: { levels: [], on: "unknown", from: "unknown", words: [] } }],
   name: "house",
   tuning: {
     headers: [{ name: "x-team", value: "blue" }],
@@ -246,6 +246,7 @@ describe("the order of the accounts", () => {
           secret: null,
           auth_header: null,
           admit: ["fable"],
+          named: [],
           tuning: { ...ENDPOINT.tuning, accounts: [account("spare"), account("main")], account_retries: null },
           idem: "-",
         },

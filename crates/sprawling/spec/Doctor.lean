@@ -400,7 +400,7 @@ pub(crate) fn tuning_as_attached(tuning: &gateway::EndpointTuning) -> wire::Endp
 ```
 
 - **`probe_endpoint` 不再因读不出模型表而拒绝**。它记一条 `endpoint_probed`，里面是分段读数（`gateway::reach` 量出，用时是调用方以 `Hands.monotonic` 前后两读之差，§8-129-2）、模型表、以及读不出时那条拒绝自己的 code 与 subject。理由是这四段对填表的人是四个不同的下一步，而作为一次拒绝返回时它们在界面上塌成传输库的一句话。**它仍会拒绝的两件事**：凭据引用拼不出来、载荷账本不收——两者都没走到发请求那一步，因此没有读数可报。
-- **`attach_endpoint` 的拒绝语义一个字没改**：probe 失败而人没点名任何模型，仍然是拒绝，因为那样的城连一个可调用的模型 id 都没有。
+- **`attach_endpoint` 拒绝三件事**：probe 失败而人既没勾也没打任何模型，因为那样的城连一个可调用的模型 id 都没有；probe 读到列表、人勾的一个都不在列表上、又没打 id（gateway D47）；这次登记的行里少了一个占着角色的模型（gateway D48）。三种拒绝都在写 `endpoint_attached` 之前，书与账本不动。
 - **probe 按调用时的那套头与期限发出**：一个需要自定义请求头的网关，在 probe 不带那个头时答 401，人于是读到「密钥无效」，而那把密钥是好的。`request_max_retries` 在这里被兑现一次——设置页上有人正在等这一个请求；模型调用的那一份由同一个数走另一条路兑现：`dispatching::agreeing` 在选定端点处把这个 `kernel::Retries` 原样冻进 `RunPlan`，`runtime::run::drive` 据此决定一次可重试的失败之后还有没有下一次。
 - **`tuning_of` 是线上词汇与 gateway 词汇之间唯一的翻译点**：零读成缺省（清空一个数字框到达线上是 `Some(0)`，而没有请求能在 0 ms 内完成），空名字的头与不以 `/` 开头的 pointer 被丢掉（表单在人打字时留着空行），头的值读起来像凭据却不是 vault 引用时整次拒绝（`E_CONFIG_INVALID`，subject 是那个头的名字）；`stream_idle_timeout_ms` 两边同名，进 gateway 时仍是闲置界，只经同一条「零读成缺省」。
 - **`tuning_as_attached` 是同一个翻译点的反方向**（`crates/wire/spec/Answer/Endpoints.lean` §8-85，wire D49）：`EndpointView` 把挂上时的 tuning 按线上的形状读回，设置页改完账号整份重发一次挂接。两个方向住同一个模块 `accounting::tuning`，所以加一个字段时两边在同一处改；它不在 worker 里，因为读面（`accounting::views`）也要读它，而读面不点名 worker。往返一次不改变 gateway 那一份：对每一份 `tuning_of` 收下的 tuning，`tuning_of(tuning_as_attached(t)) == t`，由 `accounting::tuning::tests` 的 proptest 守住。`proxying` 读回为 `Some`，`request_max_retries` 读回为 `Retries::stated()`，头的值读回为 `HeaderValue::spelled()`。
@@ -569,11 +569,10 @@ repository 身份来自 Cargo 继承的根清单，不另写 owner/repo。
 
 ### 8-71 空着的上限不是被抹掉的上限（`credentials::endpoints::select_model`）
 
-- **缺陷**：设置页每次选模型都把整行发上来，于是一个人重选自己已经登记过的模型，就把当初填的上限用一个空框覆盖掉了；下一次 messages 兼容格式的调用因为写不出 `max_tokens` 被拒（A 章 B-01 的第二段）。`None` 从此表示「这次没说」，而不是「这次要清空」。
-- **权威从高到低**：人这次填的 → 这个 endpoint 与这个 model id 上一次登记的 → 钉版目录行。**按 endpoint 与 model id 读上一次，而不是只按 tag**：把一个 tag 指向另一个模型时，旧模型的上限不得跟过去。上一次登记从 `book.choices()` 读回——书是「这座城登记了什么」的唯一陈述，在它旁边另存一份就是第二个权威。
-- **`context_tokens` 同理**，`0` 是「这次没说」；两个数字读法一致，因为它们来自同一个空表单。窗口梯是人这次填的 → 上一次登记的 → 钉版目录行 → `gateway::provider::preset::window_for`（`crates/gateway/Spec.lean` §8-17）；四档都沉默时窗口为 `0`，上下文提醒随之不响。
-- **输出上限的其余几档住 gateway**（`provider::ceiling`，`crates/gateway/Spec.lean` §8-17）：上游 `/v1/models` 的陈述、预设表与策略缺省 `OUTPUT_CEILING_DEFAULT`，以及 chat 与 responses 两面在人与上游都沉默时的 `ProviderDefault`。装配层不复写那条规则，只把人层、书里的值与这个端点的兼容格式交给它——一条规则两个家，漂开的总是没人看的那个。
-- **来源入账**：`model_selected` 带 `ceiling_from: person | upstream | preset | policy | provider`，拼写取 `OutputCeiling::word`，载荷由 `gateway::router::payload` 一处写。`provider` 行的 `max_output_tokens` 缺席：请求里没有这个字段。账本里看得见来源，因此一次被截断的跑是读出来的，不是猜出来的。
+- **缺陷**：设置页每次选模型都把整行发上来，于是一个人重选自己已经登记过的模型，就把当初填的上限用一个空框覆盖掉了；下一次 messages 兼容格式的调用因为写不出 `max_tokens` 被拒（A 章 B-01 的第二段）。`None` 从此表示「这次没说」，而不是「这次要清空」。`context_tokens` 同理，`0` 是「这次没说」，因为两个数来自同一个空表单。
+- **梯子只有一架，住 gateway**（`gateway::Figures::resolve`，`crates/gateway/Spec.lean` §8-17 与 gateway D37）：窗口与上限都是人这次填的 → provider 列表里这个 id 的那一行 → 上一次登记 → 钉版目录与 `gateway::provider::preset` 的行 → 策略缺省 `OUTPUT_CEILING_DEFAULT`。窗口没有策略缺省一档，四档都沉默时窗口为 `0`，上下文提醒随之不响；上限的后两档只在 messages 面作答，chat 与 responses 两面在前三档都沉默时答 `ProviderDefault`。
+- **装配层只交上它手里的事实**：人这次填的两个数、端点簿里这个 id 的那一行（`AttachedEndpoint.models`，provider 自己说的）、`EndpointBook::registered` 读出的这个 tag 上一次登记的同一个模型、钉版目录按精确 id 的那一行，与这个端点的 base URL 和兼容格式。**上一次登记按 endpoint 与 model id 读，而不是只按 tag**：把一个 tag 指向另一个模型时，旧模型的数不得跟过去。书是「这座城登记了什么」的唯一陈述，在它旁边另存一份就是第二个权威；梯子的顺序与「上一次登记只拿人说过的数作答」都只写在 gateway，装配层不复写——一条规则两个家，漂开的总是没人看的那个。
+- **来源入账**：`model_selected` 带 `window_from: person | upstream | registered | preset`（窗口未知时缺席）与 `ceiling_from: person | upstream | registered | preset | policy | provider`，拼写取 `FigureSource::as_str` 与 `OutputCeiling::word`，载荷由 `gateway::router::payload` 一处写。`provider` 行的 `max_output_tokens` 缺席：请求里没有这个字段。账本里看得见来源，因此一次被截断的跑是读出来的，不是猜出来的；书把两个词读回 `ModelEntry`，下一次登记据此判断上一次的数该不该作答。
 
 ### 8-73 run 标识直接取自摘要，而停不下来的疑问算「停」（`accounting::worker::dispatching::agreeing::run_id_for`、`accounting::worker::driving::lane`）
 
@@ -690,7 +689,7 @@ fn kept_credential(&self, name: &str, dialect: DialectKind, header: Option<Strin
 
 **本章测试**：`credentials::tests::kept::an_empty_key_keeps_the_credential_this_city_has_archived`——带 key 接上后，再一次空框 probe 与空框 attach，三次模型表请求都带 `authorization: Bearer sk-archived`，且端点的 `auth` 仍是原引用。
 
-- **`attach_endpoint` 不以探测为准入条件（`crates/gateway/Spec.lean` §8-10 是权威，这里只记装配侧）**：鉴权头由 `AuthSpec::for_dialect`（`gateway::endpoint::auth`） 按兼容格式产出（人填的头优先），于是 Anthropic 兼容端点拿到的是 `x-api-key` 而不是必然 401 的 `Authorization: Bearer`。探测失败时，若 `admit` 非空则按人报的型号登记（`probed: false`，另写一条 `effect` 级诊断点名探测的错），`admit` 为空才拒，恢复语是「把要用的 model id 报上来，再登记一次」。落选的是「探测失败即拒、让人先修好 `/models`」：多数兼容端点根本不服务这个接口，那条路等于让人去修一个对端从未承诺过的东西。
+- **`attach_endpoint` 不以探测为准入条件（`crates/gateway/Spec.lean` §8-10 是权威，这里只记装配侧）**：鉴权头由 `AuthSpec::for_dialect`（`gateway::endpoint::auth`） 按兼容格式产出（人填的头优先），于是 Anthropic 兼容端点拿到的是 `x-api-key` 而不是必然 401 的 `Authorization: Bearer`。人打的 id 走 `named`，读到列表时也照登、行上标 `named`（gateway D47）。探测失败时，若 `admit` 与 `named` 不全空则按人报的型号登记（早先已登记在这个名下的 id 留下书里那一行，`probed` 只在人报的全是这些 id 时沿用早先的值，否则为 `false`；另写一条 `effect` 级诊断，说这一次没读到列表、点名探测的错，gateway D46），两张都空才拒，恢复语是「把要用的 model id 报上来，再登记一次」。落选的是「探测失败即拒、让人先修好 `/models`」：多数兼容端点根本不服务这个接口，那条路等于让人去修一个对端从未承诺过的东西。
 - **`Credential` 是穷举枚举**：`Absent { header }`／`Key { reference, header }`。「这次没填」与「填了一把 key」是两件事，前者保留城已有的凭证，两个 `Option` 拼不出这个区别。`Credential::entered` 是线上命令的唯一入口。
 
 ### 8-82 同一个地址上的新一段：`/new`（`accounting::worker::commanding::sessions`、`Command::OpenSession`、`EventKind::SessionOpened`）

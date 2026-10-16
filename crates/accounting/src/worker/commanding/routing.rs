@@ -217,7 +217,8 @@ impl RunWorker {
                 dialect,
                 secret,
                 auth_header,
-                admit,
+                admit: ticked,
+                named,
                 tuning,
                 ..
             } => self.attach_endpoint(
@@ -228,7 +229,7 @@ impl RunWorker {
                     credential: Credential::entered(secret, auth_header),
                     tuning: tuning_of(tuning)?,
                 },
-                &admit,
+                &super::super::credentials::Admission { ticked, named },
             ),
             wire::Command::SelectModel {
                 endpoint,

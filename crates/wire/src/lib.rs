@@ -50,6 +50,7 @@ pub use answer::{BYTES_WINDOW_MAX, BytesAnswer, DocumentVersion, ExportAnswer};
 pub use answer::{BuildingAnswer, BuildingDoc};
 pub use answer::{Call, Closing, FrozenNames, Note, Opening, Outcome, Output};
 pub use answer::{CatalogSnapshot, LoginKind, LoginState, PinState};
+pub use answer::{CeilingLine, FigureFrom, FiguresAsked, FiguresLine};
 pub use answer::{ChangesAnswer, CommitAnswer, CommitAt, CommitsAnswer, HISTORY_MAX};
 pub use answer::{ChosenSummary, CityAnswer, CostAnswer, Renewals};
 pub use answer::{ConfigAnswer, ConfigLayer, ModelFactsSummary};
@@ -78,6 +79,7 @@ pub use answer::{InboxAnswer, MetricsAnswer, RegistryAnswer, RegistryLine, Signa
 pub use answer::{InstallChannel, Registry, RegistryNewest, RegistryReading};
 pub use answer::{KnownFace, KnownHost, KnownHostsAnswer};
 pub use answer::{McpHealthAnswer, McpServerHealth, McpState, McpToolLine, McpUsageAnswer};
+pub use answer::{ModelFiguresAnswer, WindowLine};
 pub use answer::{OfferedCard, OpenProposalsAnswer, ProposalCard, ProposalsAnswer};
 pub use answer::{PrefixSlot, PrefixSource, SkillLine, SkillShelf, SkillsAnswer};
 pub use answer::{ReleaseAnswer, ReleaseLine, UpdateHint};

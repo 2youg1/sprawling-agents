@@ -9,8 +9,9 @@
 // rows, most of them video and speech, is a list somebody filters, so
 // the filter is here and the drawing is `./model_table`.
 
+import { providerName, wireCeiling, wireWindow } from "../../core/commands";
 import type { ModelFact } from "../../core/probed";
-import type { InputKinds, ModelTag } from "../../wire";
+import type { DialectKind, FiguresAsked, InputKinds, ModelTag, Query } from "../../wire";
 import type { ModelRow } from "./models";
 
 // Word fragments that mark a model as something other than text in,
@@ -92,8 +93,9 @@ export function priceOf(row: ModelFact): string {
   return `${row.inputPrice ?? "—"} / ${row.outputPrice ?? "—"}`;
 }
 
-// The ids the person typed for an endpoint that serves no list, or
-// serves one this city could not read.
+// The ids the person typed. The city registers each one on the
+// person's word, whether or not the endpoint's list carries it
+// (wire D57).
 function typed(manual: string): readonly ModelFact[] {
   return manual
     .split(",")
@@ -133,16 +135,48 @@ export function shownRows(state: TableState, served: readonly ModelFact[]): read
     .sort((a, b) => a.id.localeCompare(b.id));
 }
 
-// The figures a row is called with: what the person typed, and
-// otherwise what the provider stated. An empty box therefore means
-// "keep what the provider stated" rather than "state nothing", which is
-// why that figure is drawn as a placeholder and not as a value.
+// The figures the person typed for a row, and nothing else. An empty
+// box is left to the city, which climbs the same ladder for it whether
+// the provider stated a figure or not and records which rung answered;
+// copying the provider's figure in here would record it as the
+// person's (client D100).
 export function windowOf(state: TableState, row: ModelFact): number | null {
-  return stated(state.context[row.id] ?? "") ?? row.contextTokens;
+  return stated(state.context[row.id] ?? "");
 }
 
 export function ceilingOf(state: TableState, row: ModelFact): number | null {
-  return stated(state.output[row.id] ?? "") ?? row.maxOutputTokens;
+  return stated(state.output[row.id] ?? "");
+}
+
+// Whether a row is one the person named and the endpoint's list does
+// not carry: the city registers it on the person's word, and the table
+// says so beside its id.
+export function isNamed(served: readonly ModelFact[], row: ModelFact): boolean {
+  return !served.some((each) => each.id === row.id);
+}
+
+// What the form says the table is about: the endpoint's id, the text in
+// its base URL box and the face picked beside it.
+export interface TableAbout {
+  readonly endpoint: string;
+  readonly baseUrl: string;
+  readonly face: DialectKind;
+}
+
+// The table's question to the city: for every row, what a pick with
+// empty boxes would register (`Query::ModelFigures`, wire D58). Each row
+// carries what the provider's list stated and the role it is to fill,
+// because those are two rungs of the ladder the city climbs for it.
+export function figuresQuery(about: TableAbout, state: TableState, served: readonly ModelFact[]): Query {
+  const models: FiguresAsked[] = everyRow(served, state.manual).map((row) => ({
+    id: row.id,
+    context_tokens: wireWindow(row.contextTokens),
+    max_output_tokens: wireCeiling(row.maxOutputTokens),
+    tag: tagOf(state.role[row.id] ?? ""),
+  }));
+  return {
+    model_figures: { endpoint: providerName(about.endpoint), base_url: about.baseUrl, face: about.face, models },
+  };
 }
 
 export function tickedRows(state: TableState, served: readonly ModelFact[]): readonly ModelFact[] {

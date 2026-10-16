@@ -67,6 +67,8 @@ pub enum ProviderAsk {                                     // 快照握着时拷
 }
 impl ProviderAsk { pub(super) fn answer(self) -> wire::Answer; }            // 快照放开之后
 pub(super) fn endpoints_answer(book: &gateway::EndpointBook) -> wire::EndpointsAnswer;
+pub(super) fn figures_answer(book: &gateway::EndpointBook, endpoint: &ProviderName, base_url: &str,
+    face: DialectKind, models: &[wire::FiguresAsked]) -> wire::Answer;   // 快照握着时作答，不问金库
 pub(crate) fn config_answer(city_root: &Path, addr: &Address, vault: Option<&Arc<Mutex<gateway::Custodian>>>)
     -> Result<wire::ConfigAnswer, AxError>;
 ```
@@ -74,8 +76,9 @@ pub(crate) fn config_answer(city_root: &Path, addr: &Address, vault: Option<&Arc
 - **答两问的一个模块**：`Query::EndpointView` 与 `Query::Config` 都要问金库每个账号的 Key 在不在（`crates/wire/spec/Answer/Endpoints.lean` §8-85，`crates/wire/spec/Answer/Config.lean` §8-86），而 `gateway::Custodian::describe` 会问平台的凭据服务，所以两问都在快照放开之后答，经 `Prepared::Provider`。账号到 `KeyState` 的映射只住这里，两问共用。
 - **端点一问分两半**：快照握着时 `endpoints_answer` 从 endpoint book 写出每一行，`tuning` 由 `accounting::tuning` 的 `tuning_as_attached` 读回，`account_status` 留空；放开之后按每行 `tuning.accounts` 的次序填上。一个不指引用的账号是 `Anonymous`，不去碰金库；没有开着的金库（重建、`ask`、测试里没人 serve 的 `Views`）时每个带引用的账号是 `Unread`，不说成 `Missing`。
 - **配置一问**：梯子照旧由 `city` 爬一次；`search` 的生效值与来源取 `city::settled_search`，城那一级的值取 `city::city_search`，缺省地址取 `city::default_search_supplier`，Key 状态只答城那一级 `Custom` 列出的供应方。
+- **模型表的占位一问**（`Query::ModelFigures`，`crates/wire/spec/Answer/ModelFigures.lean` §8-97、wire D58）：先把框里的文字与兼容格式经 `gateway::normalise_entered` 与 `Normalised::face` 归一化，再建一次 `MarketSnapshot::builtin()`，对每一行调 `gateway::Figures::resolve`：人的两格为空，provider 列表一级是这一行带来的两个数，此前登记一级是 `EndpointBook::registered(tag, endpoint, id)`，目录一级是 `lookup(id)`。`FigureSource` 到 `wire::FigureFrom` 的映射是穷尽的 `match`，住这里，与思考档的 `OfferSource` 同形。它只读端点账本与钉在二进制里的表，所以在快照握着时作答，不走 `Prepared::Provider`。归一化拒绝时整问是带原因的 `Unavailable`。
 - **读不动就说读不动**：梯子、`[search]` 或金库的锁任一处失败，答复是带原因的 `Unavailable`（wire D47），不是一份缺了几项的答复。
-- 验收：`accounting::views::providers::tests` 的 `every_key_state_is_read_from_what_the_vault_describes`、`the_search_answer_names_the_city_value_apart_from_a_building_override`；`accounting::worker::credentials::tests::accounts::readback` 的 `each_account_reads_its_key_state_and_the_tuning_reads_back_as_attached`（真实 worker 挂上三个账号，金库借出前全是 `Unread`，借出后按次序读出）；`accounting::tuning::tests` 的 `a_tuning_read_back_attaches_to_the_same_tuning`；`accounting::worker::commanding::tests::configuring` 的两条（城一级 `[search]` 写下并读回、被拒的一帧什么都不落）。
+- 验收：`accounting::views::providers::tests` 的 `every_key_state_is_read_from_what_the_vault_describes`、`the_search_answer_names_the_city_value_apart_from_a_building_override`；`accounting::worker::credentials::tests::accounts::readback` 的 `each_account_reads_its_key_state_and_the_tuning_reads_back_as_attached`（真实 worker 挂上三个账号，金库借出前全是 `Unread`，借出后按次序读出）；`accounting::tuning::tests` 的 `a_tuning_read_back_attaches_to_the_same_tuning`；`accounting::worker::credentials::tests::endpoints` 的 `the_placeholder_answers_what_a_pick_with_empty_boxes_registers`（真实 worker：问到的窗口、上限与来源，等于随后一次不带数字的 `SelectModel` 登记下的）；`accounting::worker::commanding::tests::configuring` 的两条（城一级 `[search]` 写下并读回、被拒的一帧什么都不落）。
 -/
 
 /-! D13 ACP 页的检测找厂商目录经 `Views.places` 这个 `fn` 指针，不经 `Machine`，也不在开城时算好

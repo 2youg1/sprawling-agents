@@ -121,7 +121,8 @@ pub enum InputKinds { #[default] Text, TextImage }
 pub struct ModelSelected { pub tag: ModelTag, pub endpoint: String, pub model: String,
                            pub context_tokens: u64,
                            #[serde(default)] pub max_output_tokens: Option<u64>, // 总是写出，缺席写 null
-                           pub ceiling_from: Option<String>,   // person|upstream|preset|policy；缺席即省略
+                           pub window_from: Option<String>,    // person|upstream|registered|preset；窗口未知时缺席，缺席即省略
+                           pub ceiling_from: Option<String>,   // person|upstream|registered|preset|policy|provider；缺席即省略
                            #[serde(default)] pub input: InputKinds, // 旧行没有这个键，读作 Text
                            pub input_price: UsdMicros, pub output_price: UsdMicros,
                            pub cache_read_price: UsdMicros, pub cache_write_price: UsdMicros }
@@ -152,7 +153,9 @@ pub struct ModelFacts { pub id: String, pub context_tokens: Option<u64>, pub max
                         pub input_modalities: Vec<String>, pub input_price: Option<String>,
                         pub output_price: Option<String>,        // 缺席写 null，行没说就是没说
                         pub thinking: Option<ThinkingStatement>, // 缺席即省略：列表没说思考档
-                        pub canonical: Option<String> }          // 上游自己的规范 id；缺席即省略
+                        pub canonical: Option<String>,           // 上游自己的规范 id；缺席即省略
+                        pub listing: Listing }                   // 这一行从哪里来（D63）；listed 即省略
+pub enum Listing { Listed, Named }   // 线上 snake_case；缺键读作 listed
 pub struct ThinkingStatement { pub levels: Vec<Effort>,         // 列表点名的档，城的升序；恒不含 none；空即省略
                                pub default: Option<Effort>,     // 列表说的默认档
                                pub on: Option<bool>,            // 列表说能否要求它「开启思考」
@@ -455,6 +458,17 @@ pub struct EndpointAttached {
 **被否**：①去掉 `skip_serializing_if`：账本行与 CAS 事实里多出 `"thinking":null` 一类的键，0.0.11 已写下的字节变了；②gateway 里给快照另设一个行类型：同一行的形状有两处定义，加一格时只改一处的那一次就是下一次错位；③快照改用自描述格式：views 快照的大小与解码时间都要重新量过，而错的只是两个类型。
 
 **重开参数**：`record::probe` 之外又有一个带 `skip_serializing_if` 的类型进了 postcard 快照（那时把 `Absence` 从 `record::probe` 移到两处共用的地方），或快照换成自描述格式。
+-/
+
+/-! D63 模型行记下它是端点列出的，还是人点名而端点没列出的
+
+**决定**：`ModelFacts` 多一格 `listing: Listing`，两个值：`listed` 是端点自己的 `/models` 列出了这一行，`named` 是人在登记时点名了这个 id、端点这一次没有列出它（列表里没有，或列表没读到），城按人的话登记它，其余事实都是缺席。人读的格式里 `listed` 省略，缺键读作 `listed`，所以 0.0.11 写下的 `endpoint_probed` 行与 CAS 事实逐字不变；postcard 快照照 D58 每格都写。写 `named` 的只有 `accounting` 的登记（gateway D47），探测的行恒是 `listed`。
+
+**理由**：一个人点名的 id 与一行什么都没说的列表行，事实格子一模一样，页面与读这本书的人都分不出「端点列过它」和「只有人说过它」，而前者的缺席是 provider 没说，后者的缺席是没人问过 provider。记在行上而不记在 `endpoint_attached` 行里：事实已经整份进 CAS（D57），书按 id 把它们 `learn` 回来，标记跟着它说明的那一行走，不必在两处按 id 对齐。
+
+**被否**：①`endpoint_attached` 加一张 `named` 的 id 表：同一个 id 的来历分在行与 CAS 两处，`learn` 之后还要再对一次；②用 `probed` 一位代表整张单子：一张单子里可以既有列出的也有点名的，一位说不清是哪几行。
+
+**重开参数**：除了「列出」与「点名」之外出现第三种来历（例如从另一个端点抄来的行）时，再加一个值。
 -/
 
 /-!

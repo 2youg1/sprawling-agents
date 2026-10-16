@@ -12,7 +12,7 @@
 
 import { describe, expect, test } from "bun:test";
 
-import { freshDraft, tuningHints, tuningOf } from "./draft";
+import { BASE_URL, freshDraft, hostOf, tuningHints, tuningOf } from "./draft";
 import type { TuningDefaults } from "../../../wire";
 
 // Bun's `navigator` carries no language, and the preference record a
@@ -58,5 +58,20 @@ describe("the figures an empty tuning box shows", () => {
       requestRetries: "until halted",
       streamIdleMs: "30000",
     });
+  });
+});
+
+// The box's `pattern` attribute is compiled with the `v` flag, and a
+// pattern that does not compile there is dropped without a word: the
+// box then checks nothing while the person types.
+describe("the base_url shape", () => {
+  test("compiles under the flag the browser compiles a pattern with", () => {
+    expect(() => new RegExp(BASE_URL.source, "v")).not.toThrow();
+  });
+
+  test("names the same host with a hyphen, a port and a path", () => {
+    expect(
+      ["my-host.example:8080/v1", "http://127.0.0.1:8811/v1", "https://api.deepseek.com/anthropic/v1"].map(hostOf),
+    ).toEqual(["my-host.example", "127.0.0.1", "api.deepseek.com"]);
   });
 });

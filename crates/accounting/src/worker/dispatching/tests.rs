@@ -339,6 +339,7 @@ fn a_dispatch_says_what_it_spent_before_the_drive() {
             secret: None,
             auth_header: None,
             admit: Vec::new(),
+            named: Vec::new(),
             tuning: wire::EndpointTuning::default(),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"attach"),
         })

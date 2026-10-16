@@ -9,9 +9,9 @@
 import { Schema } from "effect";
 
 /** The wire version both ends compare on connect. */
-export const WIRE_V = 66 as const;
+export const WIRE_V = 67 as const;
 /** The schema hash the server checks: `wire::schema_hash()`. */
-export const WIRE_HASH = "3cbb9570abdeaac06f8e0d308fbaa774c15eeec6be6f951098a0707f024b2247" as const;
+export const WIRE_HASH = "7b98fb8cb40a0d101c2f74e218c90f77ef4b94d7cc3cef0d4e1b93be009fa4e0" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 /** The smallest body size a person may ask for: `wire::BODY_PX_MIN`. */
@@ -1986,6 +1986,15 @@ export const EndpointTuning = Schema.Struct({
 export type EndpointTuning = typeof EndpointTuning.Type;
 
 /**
+ * Where one registered model row came from (kernel D63).
+ */
+export const Listing = Schema.Union([
+  Schema.Literal("listed"),
+  Schema.Literal("named"),
+]).annotate({ identifier: "Listing" });
+export type Listing = typeof Listing.Type;
+
+/**
  * The upstream's own word for one level.
  */
 export const EffortWord = Schema.Struct({
@@ -2066,9 +2075,11 @@ export type Window = typeof Window.Type;
  * — runs where the call is made, and a summary that had already
  * climbed it would be a second answer to which figure won.
  * 
- * The last two fields are the city's answers, each from its one
- * authority: `thinking` names the rung it came from, and `canonical` is
- * `gateway::provider::identity`'s (`crates/wire/spec/Answer/Endpoints.lean` §8-92).
+ * The last three fields are the city's own, each from its one
+ * authority: `thinking` names the rung it came from, `canonical` is
+ * `gateway::provider::identity`'s (`crates/wire/spec/Answer/Endpoints.lean` §8-92),
+ * and `listing` is what the attach recorded about where the row came
+ * from (`crates/wire/spec/Frames.lean` D57).
  */
 export const ModelFactsSummary = Schema.Struct({
   canonical: Schema.String,
@@ -2076,6 +2087,7 @@ export const ModelFactsSummary = Schema.Struct({
   id: Schema.String,
   input_modalities: Schema.Array(Schema.String),
   input_price: Schema.optional(Schema.NullOr(Schema.String)),
+  listing: Listing,
   max_output_tokens: Schema.optional(Schema.NullOr(Ceiling)),
   output_price: Schema.optional(Schema.NullOr(Schema.String)),
   thinking: ThinkingOffer,
@@ -3004,6 +3016,60 @@ export const MetricsAnswer = Schema.Struct({
   signals_waiting: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
 }).annotate({ identifier: "MetricsAnswer" });
 export type MetricsAnswer = typeof MetricsAnswer.Type;
+
+/**
+ * Who stated a figure, spelled as `model_selected` records it
+ * (`window_from`, `ceiling_from`).
+ */
+export const FigureFrom = Schema.Union([
+  Schema.Literal("person"),
+  Schema.Literal("upstream"),
+  Schema.Literal("registered"),
+  Schema.Literal("preset"),
+  Schema.Literal("policy"),
+]).annotate({ identifier: "FigureFrom" });
+export type FigureFrom = typeof FigureFrom.Type;
+
+/**
+ * The ceiling a call would be made with.
+ */
+export const CeilingLine = Schema.Union([
+  Schema.Struct({
+    sent: Schema.Struct({
+      from: FigureFrom,
+      tokens: Ceiling,
+    }),
+  }),
+  Schema.Literal("provider_default"),
+]).annotate({ identifier: "CeilingLine" });
+export type CeilingLine = typeof CeilingLine.Type;
+
+/**
+ * A window and the rung that stated it.
+ */
+export const WindowLine = Schema.Struct({
+  from: FigureFrom,
+  tokens: Window,
+}).annotate({ identifier: "WindowLine" });
+export type WindowLine = typeof WindowLine.Type;
+
+/**
+ * What one row would be registered with.
+ */
+export const FiguresLine = Schema.Struct({
+  ceiling: Schema.optional(Schema.NullOr(CeilingLine)),
+  id: Schema.String,
+  window: Schema.optional(Schema.NullOr(WindowLine)),
+}).annotate({ identifier: "FiguresLine" });
+export type FiguresLine = typeof FiguresLine.Type;
+
+/**
+ * Every row asked about, in the order asked.
+ */
+export const ModelFiguresAnswer = Schema.Struct({
+  models: Schema.Array(FiguresLine),
+}).annotate({ identifier: "ModelFiguresAnswer" });
+export type ModelFiguresAnswer = typeof ModelFiguresAnswer.Type;
 
 /**
  * One open card, by the document it is on and the moment it was
@@ -4837,6 +4903,9 @@ export const Answer = Schema.Union([
     privacy: PrivacyAnswer,
   }),
   Schema.Struct({
+    model_figures: ModelFiguresAnswer,
+  }),
+  Schema.Struct({
     unavailable: Schema.Struct({
       query: Schema.String,
       reason: Schema.optional(Schema.NullOr(Schema.String)),
@@ -4881,6 +4950,23 @@ export const Answered = Schema.Struct({
   outcome: AskOutcome,
 }).annotate({ identifier: "Answered" });
 export type Answered = typeof Answered.Type;
+
+/**
+ * One row of the table, as the page asks about it.
+ */
+export const FiguresAsked = Schema.Struct({
+  context_tokens: Schema.optional(Schema.NullOr(Window)),
+  id: Schema.String,
+  max_output_tokens: Schema.optional(Schema.NullOr(Ceiling)),
+  tag: Schema.optional(Schema.NullOr(ModelTag)),
+}).annotate({ identifier: "FiguresAsked" });
+export type FiguresAsked = typeof FiguresAsked.Type;
+
+/**
+ * A provider name in transit. Authority for the provider set is `gateway`.
+ */
+export const ProviderName = Schema.String.pipe(Schema.brand("ProviderName"));
+export type ProviderName = typeof ProviderName.Type;
 
 /**
  * Whether a model's reply is still arriving (D30).
@@ -5114,6 +5200,14 @@ export const Query = Schema.Union([
     }),
   }),
   Schema.Literal("shells"),
+  Schema.Struct({
+    model_figures: Schema.Struct({
+      base_url: Schema.String,
+      endpoint: ProviderName,
+      face: DialectKind,
+      models: Schema.Array(FiguresAsked),
+    }),
+  }),
 ]).annotate({ identifier: "Query" });
 export type Query = typeof Query.Type;
 
@@ -5369,12 +5463,6 @@ export const ProposalDecisions = Schema.Struct({
 export type ProposalDecisions = typeof ProposalDecisions.Type;
 
 /**
- * A provider name in transit. Authority for the provider set is `gateway`.
- */
-export const ProviderName = Schema.String.pipe(Schema.brand("ProviderName"));
-export type ProviderName = typeof ProviderName.Type;
-
-/**
  * What a `Pursue` command does to a pursuit.
  * 
  * `Clear` and `Pause` are different actions and both exist: pausing
@@ -5540,6 +5628,7 @@ export const Command = Schema.Union([
       dialect: DialectKind,
       idem: IdemKey,
       name: ProviderName,
+      named: Schema.Array(Schema.String),
       secret: Schema.optional(Schema.NullOr(Schema.String)),
       tuning: EndpointTuning,
     }),

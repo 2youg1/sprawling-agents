@@ -160,6 +160,7 @@ impl From<WireCommand> for Command {
                 secret,
                 auth_header,
                 admit,
+                named,
                 tuning,
                 idem,
             } => Self::AttachEndpoint {
@@ -169,6 +170,7 @@ impl From<WireCommand> for Command {
                 secret,
                 auth_header,
                 admit,
+                named,
                 tuning,
                 idem,
             },
@@ -282,17 +284,8 @@ impl From<WireCommand> for Command {
             Command::AddAgent(adding) => Self::AddAgent(adding),
             Command::AgentLogin(login) => Self::AgentLogin(login),
             Command::ForgetDevice(forgetting) => Self::ForgetDevice(forgetting),
-            Command::PutShelved {
-                shelf,
-                name,
-                text,
-                idem,
-            } => Self::PutShelved {
-                shelf,
-                name,
-                text,
-                idem,
-            },
+            #[rustfmt::skip]
+            Command::PutShelved { shelf, name, text, idem } => Self::PutShelved { shelf, name, text, idem },
             Command::Auth { token } => Self::Auth { token },
         }
     }

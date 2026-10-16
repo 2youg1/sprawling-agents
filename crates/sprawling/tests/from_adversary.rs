@@ -196,7 +196,7 @@ fn a_model_no_catalogue_prices_is_registered_with_a_ceiling() {
     );
     assert_eq!(
         rungs.first().and_then(serde_json::Value::as_str),
-        Some(gateway::CeilingSource::Policy.as_str())
+        Some(gateway::FigureSource::Policy.as_str())
     );
 }
 
@@ -219,6 +219,7 @@ fn attach(
         secret: None,
         auth_header: None,
         admit: vec!["opus-nine".to_owned()],
+        named: Vec::new(),
         tuning: wire::EndpointTuning::default(),
         idem: IdemKey::derive(&RunId::CITY, Seq::FIRST, name.as_bytes()),
     })

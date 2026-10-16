@@ -213,14 +213,19 @@ pub struct ModelSelected {
     pub model: String,
     /// The context window; zero where nobody stated one.
     pub context_tokens: u64,
+    /// Which rung of the ladder stated the window, in the spelling
+    /// `gateway::FigureSource::as_str` owns. Absent when no rung did,
+    /// and on a line written before the key existed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub window_from: Option<String>,
     /// The output ceiling, written as `null` when none was resolved.
     /// Read it through [`ModelSelected::ceiling`], which owns what a
     /// zero means.
     #[serde(default)]
     pub max_output_tokens: Option<u64>,
     /// Which rung of the ceiling ladder supplied the figure, in the
-    /// spelling `gateway::CeilingSource::as_str` owns. Absent when no
-    /// rung did.
+    /// spelling `gateway::OutputCeiling::word` owns. Absent when no
+    /// rung did, and on a line written before the key existed.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ceiling_from: Option<String>,
     /// Absent on a line written before the key existed, which replays
@@ -265,6 +270,7 @@ mod tests {
             endpoint: "house".to_owned(),
             model: "opus-nine".to_owned(),
             context_tokens: 200_000,
+            window_from: None,
             max_output_tokens,
             ceiling_from: ceiling_from.map(str::to_owned),
             input: InputKinds::TextImage,

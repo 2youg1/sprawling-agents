@@ -42,7 +42,8 @@
   import type { Enrolment, StoredKey } from "../../../core/enrol";
   import { readAnswer } from "../../../core/answered";
   import { fill, say } from "../../../core/lang";
-  import { normalisedFrom } from "../../../core/probed";
+  import { normalisedFrom, refusalOf } from "../../../core/probed";
+  import type { Sent } from "../../../core/probed";
   import type { AxError } from "../../../wire";
   import { ui } from "../../../ui";
   import Button from "../../parts/button.svelte";
@@ -51,6 +52,7 @@
   import Segmented from "../../parts/segmented.svelte";
   import type { Choice } from "../../parts/segmented";
   import { ModelTable, type ModelRow } from "../models";
+  import type { TableAbout } from "../model_rows";
   import Advanced from "./advanced.svelte";
   import { BASE_URL, ID_SHAPE, endpointOf, freshDraft, hostOf, idOf, referenceOf, wireChoices } from "./draft";
   import type { Draft } from "./draft";
@@ -76,9 +78,10 @@
   let attaching = $state.raw<{ readonly id: string; readonly before: unknown } | null>(null);
   let busy = $state(false);
   let chosen = $state<readonly ModelRow[]>([]);
-  // What the URL box held before the city answered with another
-  // spelling of the same endpoint.
-  let rewritten = $state<string | null>(null);
+  // The probe this form sent and the answer that stood when it left:
+  // the line under the URL box speaks only for a newer answer, and only
+  // while the box and the face are what that probe was sent with.
+  let pending = $state.raw<Sent | null>(null);
 
   const id = $derived(idOf(draft));
   const field = $derived(keyField(held, id));
@@ -102,7 +105,24 @@
     return found !== null && found.name === id ? found : null;
   });
   const facts = $derived(answered?.facts ?? []);
+  // The URL the city calls for the text in the box, when it wrote the
+  // text down another way. The box itself stays the person's
+  // (client/Spec.lean D99).
+  const called = $derived(normalisedFrom($belief.probed, pending, draft));
   const complete = $derived(ID_SHAPE.test(id) && hostOf(draft.baseUrl) !== null);
+  // What the model table asks the city about each row: the attach this
+  // form would send, so its placeholders are what that attach and the
+  // picks after it register (client D100).
+  const about = $derived.by((): TableAbout | null => {
+    if (!complete) return null;
+    const sent = endpointOf(draft, null);
+    return { endpoint: sent.id, baseUrl: sent.baseUrl, face: sent.dialect };
+  });
+  // A refusal of reachability stands beside the probe's reading; the
+  // city's refusal of the form stands under the table whose rows it is
+  // about (client D101).
+  const unreached = $derived(report !== null && refusalOf(report.code) === "reach" ? report : null);
+  const refused = $derived(report !== null && refusalOf(report.code) === "form" ? report : null);
 
   // The vendors the city knows by host. The answer is the city's own
   // table, so the picker offers no address and no face the city would
@@ -149,31 +169,13 @@
     draft = freshDraft();
     held = null;
     chosen = [];
-    rewritten = null;
+    pending = null;
     onAttached?.();
   });
   // An endpoint that answered an empty list answered: the wait ends on
   // the answer rather than on its length.
   $effect(() => {
     if (answered !== null) looking = false;
-  });
-  // The city writes down the base URL it will call. When that is not
-  // the text in the box, the box takes the city's spelling and the
-  // line under it names what was replaced, so the person leaves
-  // knowing the URL that took effect. **The rule that produced it is
-  // the city's** (`gateway::normalise_entered`); this compares two
-  // strings and nothing more, which is why the form cannot drift from
-  // the call. Rewriting the box does not move the answer out from
-  // under it: normalisation settles a scheme and a path and never the
-  // host, and the id this probe was filed under is a function of the
-  // host alone.
-  $effect(() => {
-    const found = answered;
-    if (found === null) return;
-    const moved = normalisedFrom(found, draft.baseUrl);
-    if (moved === null) return;
-    rewritten = moved.entered;
-    draft.baseUrl = moved.recorded;
   });
 
   // Every edit retires the last report: what it said was about the
@@ -182,7 +184,6 @@
     draft[part] = value;
     report = null;
     note = null;
-    if (part === "baseUrl") rewritten = null;
   }
 
   function retire(): void {
@@ -233,7 +234,10 @@
   function probeNow(): void {
     report = null;
     withKey((e) => {
-      if (u.send(probeEndpoint(e))) looking = true;
+      const sent: Sent = { id: e.id, baseUrl: draft.baseUrl, wireApi: draft.wireApi, before: get(belief).probed };
+      if (!u.send(probeEndpoint(e))) return;
+      looking = true;
+      pending = sent;
     });
   }
 
@@ -242,7 +246,10 @@
     withKey((e) => {
       const rows = chosen;
       const before = get(attached);
-      if (!u.send(attachEndpoint(e, rows.map((row) => row.id)))) return;
+      const listed = (id: string) => facts.some((row) => row.id === id);
+      const admit = rows.filter((row) => listed(row.id)).map((row) => row.id);
+      const named = rows.filter((row) => !listed(row.id)).map((row) => row.id);
+      if (!u.send(attachEndpoint(e, admit, named))) return;
       for (const row of rows) {
         if (row.tag !== null) u.send(selectModel(e.id, row.id, row.tag, row.stated));
       }
@@ -279,7 +286,6 @@
     <!-- wording-ok: the placeholder is the provider's documented base URL - an address, which no language translates. -->
     <Field placeholder="https://api.openai.com/v1"
       label={say($lang, "setup_base_url")}
-      kind="url"
       pattern={BASE_URL.source}
       mono
       value={draft.baseUrl}
@@ -287,9 +293,9 @@
         edit("baseUrl", value);
       }}
     />
-    {#if rewritten !== null}
+    {#if called !== null}
       <span class="text-note text-text-faint">
-        {fill(say($lang, "setup_base_url_normalised"), { entered: rewritten })}
+        {fill(say($lang, "setup_base_url_normalised"), { recorded: called })}
       </span>
     {/if}
   </div>
@@ -366,7 +372,7 @@
   {#if note !== null}
     <p class="text-note text-alert">{note}</p>
   {/if}
-  <Reach probed={answered} error={report} host={hostOf(draft.baseUrl) ?? draft.baseUrl} />
+  <Reach probed={answered} error={unreached} host={hostOf(draft.baseUrl) ?? draft.baseUrl} />
   {#if looking}
     <p class="text-note text-text-quiet">
       {fill(say($lang, "setup_probe_busy"), { host: hostOf(draft.baseUrl) ?? "" })}
@@ -377,10 +383,12 @@
 
   <ModelTable
     served={facts}
+    {about}
     onChosen={(rows: readonly ModelRow[]) => {
       chosen = rows;
     }}
   />
+  <Reach probed={null} error={refused} host={hostOf(draft.baseUrl) ?? draft.baseUrl} />
 
   <Previews draft={draft} reference={reference} model={chosen[0]?.id ?? facts[0]?.id ?? "<model>"} />
 </form>
