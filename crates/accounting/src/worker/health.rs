@@ -9,8 +9,8 @@
 //! `relay` owns both counts: only it knows when a lane's append enters
 //! the accounting thread's queue, when the accounting thread takes it
 //! into a batch, and when that batch is durable. The monitor's sampler
-//! reads them from here. The two waits roadmap M2 reads at the relay,
-//! the queue wait of each relay request and the time the accounting
+//! reads them from here. The two waits the relay is timed by, the
+//! queue wait of each relay request and the time the accounting
 //! thread slept on its queue, are kept here for the same reason.
 
 use std::collections::VecDeque;
@@ -45,7 +45,8 @@ struct Counts {
     relay_queue: Mutex<VecDeque<u64>>,
     /// Microseconds each staged run waited in the driving pool's queue
     /// before its lane opened, zero for a run that waited for nothing,
-    /// oldest first (Roadmap M2, the pure lane wait).
+    /// oldest first (`crates/sprawling/Spec.lean` §8-46-3, the pure lane
+    /// wait).
     lane_wait: Mutex<VecDeque<u64>>,
 }
 

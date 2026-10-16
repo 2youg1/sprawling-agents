@@ -15,7 +15,7 @@
   // Every entry a person could have branched the conversation at - their
   // own words, a reply, a call - carries the one fork action. Hovering
   // or focusing shows it; the `fork.here` chord answers for the entry
-  // under the hand (roadmap S2, ux A7).
+  // under the hand.
   import { readAnswer } from "../../core/answered";
   import { QUERIES } from "../../core/asking";
   import type { RunBelief } from "../../core/belief";

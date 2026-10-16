@@ -86,7 +86,8 @@ pub(crate) struct DrivingPool {
     /// (`crates/sprawling/Spec.lean` §8-46-3).
     read_memory: fn() -> Memory,
     /// The clock a run's wait in `waiting` is read off, and where the
-    /// wait is kept (Roadmap M2, the pure lane wait).
+    /// wait is kept (`crates/sprawling/Spec.lean` §8-46-3, the pure lane
+    /// wait).
     monotonic: fn() -> Instant,
     /// Called at the top of every lane, on the lane's thread.
     seat_lane: crate::worker::hands::SeatLane,

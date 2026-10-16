@@ -710,7 +710,7 @@ mod tests {
         );
     }
 
-    /// The provider queue's reading (Roadmap M2): `callers` threads at
+    /// The provider queue's reading (gateway D21): `callers` threads at
     /// once against a gate of four permits, each holding its permit for
     /// `HOLD`, and how long each waited from asking to holding. It
     /// asserts nothing about time, since the wall clock differs by

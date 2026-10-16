@@ -120,9 +120,8 @@ export function callTime(call: Call, now: number): CallTime {
   }
 }
 
-// Under this a measured duration is written in microseconds (Roadmap M0
-// item 1, A13): a tool call that the Ledger once wrote as `0 ms` reads as
-// what it was. One constant, so a later change of the threshold is here.
+// Under this a measured duration is written in microseconds, so a tool
+// call that the Ledger once wrote as `0 ms` reads as what it was.
 const MICROS_UNDER_US = 10_000;
 
 // A landed figure: microseconds under ten milliseconds when the Ledger

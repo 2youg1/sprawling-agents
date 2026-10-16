@@ -16,7 +16,7 @@
 //
 // **Every open item stays mounted until it is closed**, which is what
 // keeps its scroll position, its selection and an unsaved RefRain draft
-// when another tab comes forward (roadmap §3-14). That costs one view per
+// when another tab comes forward. That costs one view per
 // tab, so at most `KEPT` are open, and opening one more closes the one
 // touched longest ago.
 //
@@ -54,7 +54,7 @@ export interface ChangesItem {
 
 // One card offered on a document - a letter, as the mailbox shows it -
 // read with the full text before it and the document as it stands, and
-// the run that sent it (roadmap A25).
+// the run that sent it.
 export interface LetterItem {
   readonly doc: Address;
   readonly card: B3Hash;

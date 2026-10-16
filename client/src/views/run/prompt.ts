@@ -129,7 +129,7 @@ function segmentOf(segment: PrefixSegment, held: Held, lang: Lang, hands: Hands)
   };
 }
 
-// The receipt replaces the word for its moment (ux A7): the check is
+// The receipt replaces the word for its moment: the check is
 // what a hand reads after the press, and the word is what it read
 // before.
 function copyOf(segment: PrefixSegment, copied: boolean, lang: Lang, hands: Hands): CopyLook {

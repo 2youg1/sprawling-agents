@@ -1670,7 +1670,7 @@ impl DrivingPool {
 
 **内存紧时计划的下一行排队**：`full` 只在已有 run 在跑、而整机可用内存低于物理内存的十分之一时为真（`admits(in_flight, memory)` 是这一条规则的唯一出处）。三个平台的读数都经 `sysinfo`：Windows 读 `GlobalMemoryStatusEx` 的总物理内存与可用物理内存，Linux 读 `/proc/meminfo` 的 `MemTotal` 与 `MemAvailable`，macOS 读 `hw.memsize` 与 Mach 的 `vm_statistics64`（可用量把 inactive 与 purgeable 页算在内，因此比另两个平台的口径宽）。读数来自 `open` 时交给池的 `read_memory`，池自己不碰主机：生产交 `bin::monitor::memory::read`，worker 搬进 `accounting` 时 `monitor` 留在 `sprawling`、经这个 `fn` 指针进来（`crates/accounting/Spec.lean` §7、accounting D10），脚本场景交一个自己的读数就能造出内存紧的机器。`full` 每次被问都读一次，所以跟着实时的可用内存走；问它的有三处：`DrivingPool::start`（每一轮进车道都经过的门，内存紧就排队）、`start_waiting`（一轮回家后按到达顺序起排着的活）与 `Flight::full`（计划推进循环 `accounting::worker::plans::pursuing` 每次决定是否起下一行）。读一次约 1.6 µs（Windows x86-64 桌面级机器、测试档构建），只发生在起一轮之前。没有 run 在跑时总放一轮进来：否则一台内存一直紧的机器上城永远不动，而一轮自己占的内存远小于它派出的构建。排着的计划行在下一轮回家时再判一次。取物理内存的十分之一而不是一个字节数，是因为一个字节数只适合某一类机器；十分之一留给人的其他程序与页缓存。**被否**：按「每轮估计占用」算出可同时驱动的轮数——一轮的边际内存还没有测过，估计值就是一个没有来源的常数。**重开参数**：测得一轮的边际内存之后，改成「可用内存 ≥ 留给别人的那一份 + 一轮的实测边际」。证据：`crates/accounting/src/worker/pool.rs` 的 `a_new_run_waits_while_memory_is_tight` 与 `a_pool_judges_memory_by_the_reader_it_was_handed`。
 
-**纯车道等待是一份读数**（Roadmap M2）：一轮在 `start` 时排进 `waiting` 就记下 `monotonic()`，在 `start_waiting` 里出队、车道开起时把差值交给 `Health::lane_waited`；不排队就开车道的那一轮记 0 µs 一次，于是「没有一轮等车道」可以被读出而不是被推断。`Health::lane_wait_us` 按到达次序读出（至多 `RELAY_QUEUE_KEPT` 个，最旧的先丢），`instrument_throughput` 把它印成 `wait=lane_pure`。读数是内存里的计数，不进账本；时钟是 worker 的同一个单调时钟，Windows、macOS 与 Linux 上由标准库各选单调源，读法相同。
+**纯车道等待是一份读数**：一轮在 `start` 时排进 `waiting` 就记下 `monotonic()`，在 `start_waiting` 里出队、车道开起时把差值交给 `Health::lane_waited`；不排队就开车道的那一轮记 0 µs 一次，于是「没有一轮等车道」可以被读出而不是被推断。`Health::lane_wait_us` 按到达次序读出（至多 `RELAY_QUEUE_KEPT` 个，最旧的先丢），`instrument_throughput` 把它印成 `wait=lane_pure`。读数是内存里的计数，不进账本；时钟是 worker 的同一个单调时钟，Windows、macOS 与 Linux 上由标准库各选单调源，读法相同。
 
 ### 8-46-4 `pursue` 拿走整个 ready set（`accounting::worker::plans::pursuing`）
 
@@ -1983,14 +1983,14 @@ impl OutputRing {
 - 读：`read(&self, into: Sample) -> Sample`——把此刻的两项填进 `into`，其余字段原样。
 - `RelayGate::open(monotonic)` 开一份新的 `Health`，`RelayGate::health()` 交出它的句柄；worker 起好时把 `Flight` 里那只 gate 的句柄经 `Started.health` 交给 `listening`，`listening` 交给采样线程：`spawn_sampler(monitor, samples, volume, health)`，每一拍的读数都经 `Health::read`，摘要与整页都有，因为读它只是两次原子读。
 - 没有失败路径。减法饱和：计数是给人看的读数，两条线程各自的加减在某一刻读到的先后可以错开，饱和让一个瞬间的错位读成 0 而不是一个巨大的数。
-- 两项等待（roadmap M2），都按整数微秒、都读 worker 注入的单调钟（`Hands.monotonic`，经 `Flight::open` 交给 `RelayGate::open(monotonic)`，再经 `issue` 交给每个 `Relay`）：`relay_queue_us(&self) -> Vec<u64>`——每个 relay 请求从 lane 把它放进队列（`Relay::append_all` 发送之前读一次钟）到记账线程把它取进一批（`RelayGate::serve` 取到它时读一次钟）之间的等待，只留最近的 `RELAY_QUEUE_KEPT` 个，先进先出；`idle_us(&self) -> u64`——记账线程开城以来睡在这一个队列上的累计时长，即 `serve` 里等第一个 wake 的那一段。记账线程的忙占比由读者算：两次读 `idle_us` 之差除以同一段墙钟之外的部分。两项都只由 `accounting::worker::relay` 在记账线程上写，样本表的锁因此只在读者读时有第二个人碰。
+- 两项等待，都按整数微秒、都读 worker 注入的单调钟（`Hands.monotonic`，经 `Flight::open` 交给 `RelayGate::open(monotonic)`，再经 `issue` 交给每个 `Relay`）：`relay_queue_us(&self) -> Vec<u64>`——每个 relay 请求从 lane 把它放进队列（`Relay::append_all` 发送之前读一次钟）到记账线程把它取进一批（`RelayGate::serve` 取到它时读一次钟）之间的等待，只留最近的 `RELAY_QUEUE_KEPT` 个，先进先出；`idle_us(&self) -> u64`——记账线程开城以来睡在这一个队列上的累计时长，即 `serve` 里等第一个 wake 的那一段。记账线程的忙占比由读者算：两次读 `idle_us` 之差除以同一段墙钟之外的部分。两项都只由 `accounting::worker::relay` 在记账线程上写，样本表的锁因此只在读者读时有第二个人碰。
 
 **决定。**
 
 1. 计数放在 relay 进队、取出、答复这三处，而不是去数 `mpsc` 队列的长度：标准库的 `mpsc` 不报长度，而且队列里还有 claim、回家的 run 与命令，它们不是 append。被否：记账线程每一轮开头把自己看到的队列长度写进一个原子数——它只在记账线程醒着时更新，而队列最长的时候正是记账线程在写盘、没醒的时候。
 2. 计数的类型放在 `bin::monitor`，由 assembly 持有并写入：依赖朝 assembly → monitor，与 `monitor::memory` 相同；monitor 不点名 assembly。
 3. 用 `Relaxed` 次序：两项互不约束，读数不参与任何决定（与 §8-96 决定 3 同一个重开条件）。
-4. 等待留原始样本而不是直方图：吞吐台要的是 n 与精确的 p50/p99/p999（M0 的单位），而只留最近 `RELAY_QUEUE_KEPT` 个让内存有界；样本由记账线程写、由读者复制一份再排序，排序的钱付在读者那边。被否：对数分桶的直方图——p999 落在一个桶里只能报桶的边，M0 要的是读数本身。重开参数：要把这项等待送上线（`Sample.relay_p50_nanos`）时，再议在写的一侧维护分位数。
+4. 等待留原始样本而不是直方图：吞吐台要的是 n 与精确的 p50/p99/p999，而只留最近 `RELAY_QUEUE_KEPT` 个让内存有界；样本由记账线程写、由读者复制一份再排序，排序的钱付在读者那边。被否：对数分桶的直方图——p999 落在一个桶里只能报桶的边，吞吐台要的是读数本身。重开参数：要把这项等待送上线（`Sample.relay_p50_nanos`）时，再议在写的一侧维护分位数。
 
 **测试。** `accounting::worker::relay::tests` 的 `the_accounting_queue_counts_what_waits_and_what_is_not_yet_durable`：一条 lane 的 append 进队后，记账线程服务之前读到队列 1、未持久 0；服务之后两项都回到 0，append 拿到了答复。同一处的 `a_relay_request_waits_on_the_gates_clock`：钟是一个每读一次走一微秒的计数钟，一条 append 进队后再服务，`relay_queue_us` 恰好是一个样本，值等于两次读钟之间的步数；读数来自注入的钟而不是墙钟，所以每个平台的 CI 读到同一个数。吞吐台（`driving::tests::throughput` 的 `instrument_throughput`）把 `relay_queue` 与 `ledger_thread_busy` 两行和其余等待一起打出。
 

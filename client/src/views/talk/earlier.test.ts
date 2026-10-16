@@ -7,7 +7,7 @@ import { expect, test } from "bun:test";
 
 import { earlierDrawn } from "./earlier";
 
-// The regression of roadmap A23: one round, then a model change opened a
+// The regression this guards: one round, then a model change opened a
 // new session, so the round became the earlier stretch. "Everything"
 // drew one folded line over an empty session while "results only" drew
 // the round open; both modes now read this one answer.

@@ -6,7 +6,7 @@
 -->
 
 <script lang="ts" module>
-  // Roadmap A23 on the real conversation: one round that froze, then a
+  // On the real conversation: one round that froze, then a
   // later `session_opened` in the same room - what a model change after
   // the round sends - so the round is the earlier stretch and the open
   // session holds no run yet. Both modes draw the round open by the one

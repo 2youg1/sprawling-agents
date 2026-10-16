@@ -378,7 +378,7 @@ describe("the model a session answers with", () => {
 });
 
 describe("the run policy a room holds", () => {
-  // Roadmap A15: a change lands as `run_policy_changed`, and the menu
+  // A change lands as `run_policy_changed`, and the menu
   // and the conversation read the newest one per room. A page that
   // reloads folds an older range after a newer one, so the newest seq
   // holds whatever order the records arrive in; a policy the build

@@ -21,7 +21,7 @@
   // The divider is drawn here, frozen at the state worth looking at;
   // a person's words are the real `talk/person.svelte` with its real
   // fork button, and the picker is the real multi-column `parts`
-  // popover (roadmap S2).
+  // popover.
 
   import type { Doing } from "../../core/doing";
   import { sendingInto } from "../../core/doing";

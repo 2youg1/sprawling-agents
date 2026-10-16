@@ -18,9 +18,8 @@
 //! `crate::plan_view`'s and are read through it; a second parse here
 //! would be a second answer to "what is stuck and why", and only one of
 //! them would be folding the records that say why. What waits in a room
-//! is folded from signal records rather than read off a queue, because a
-//! queue answers by being consumed and a view that consumed what it
-//! showed would change the thing it reports on.
+//! is folded from signal records rather than read off a queue, and the
+//! `waiting` field says why.
 
 use std::path::{Path, PathBuf};
 

@@ -260,9 +260,6 @@ mod tests {
         assert_eq!(answered["call_id"], made["call_id"]);
     }
 
-    /// Nothing this city sends is left with the provider to retrieve
-    /// later: the city keeps its own history, and a copy held upstream
-    /// is a second one that outlives the city's decision to forget.
     #[test]
     fn nothing_this_city_sends_is_stored_upstream() {
         let wire = request(&sample_request(), &ImageBytes::default()).unwrap();

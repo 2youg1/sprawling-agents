@@ -7,7 +7,7 @@
 // through - `parse`, `find`, `run` - and judged as the city would meet
 // it: each frame the verb sends is written the way the socket writes
 // it and read back through the wire's own `ClientFrame` schema, then
-// compared whole (Roadmap G1c). The table is keyed by the verbs `SLASH`
+// compared whole. The table is keyed by the verbs `SLASH`
 // holds, so a verb added there without a case here turns this file red.
 // The finer behaviour of the verbs with a seam of their own - `/new`
 // and `/fork`, `/halt` and `/release`, `/stop` - is `slash.test.ts`'s.

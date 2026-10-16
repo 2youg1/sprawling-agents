@@ -214,7 +214,7 @@ theorem a_digit_reaches_only_a_drawn_entry (count digit entry : Nat)
   · cases h
 
 /-! D60 信箱面是一层普通的 fixed 元素，挂在边缘键的 `<nav>` 里、画在三个键之下，点面外与 Escape 由它自己判。
-理由：User 要信箱从左缘推出、贴左对齐、三个边缘键浮在它上面（Roadmap A19）；`popover="auto"` 把面放进 top layer，top layer 之上只能再是 top layer，键要浮上去就得把三个键也做成 popover，而 popover 离开网格，键在宽屏与手机上的位置都得重拼一份。被否决的另一条路正是这个。
+理由：User 要信箱从左缘推出、贴左对齐、三个边缘键浮在它上面；`popover="auto"` 把面放进 top layer，top layer 之上只能再是 top layer，键要浮上去就得把三个键也做成 popover，而 popover 离开网格，键在宽屏与手机上的位置都得重拼一份。被否决的另一条路正是这个。
 代价是平台不再替它判点面外与 Escape：本模型就是那份判定，`layer.ts` 照它写，测试按迹重放同样的性质。
 重新打开的条件：边缘键本身改成 top layer 里的东西（例如整条边缘层进 popover）时，信箱回到 `popover="auto"`。 -/
 

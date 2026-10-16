@@ -4,8 +4,8 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // The city, as the world layer draws it beside the Mayor's room
-  // (refrain roadmap Q10, 3-9): the city page's skyline at the size the
+  // The city, as the world layer draws it beside the Mayor's room: the
+  // city page's skyline at the size the
   // city page draws it, scrolled sideways to City Hall at its centre. A
   // pane is narrower than the drawing, and the drawing scaled down to a
   // pane's width puts every tower's name under seven pixels, so the

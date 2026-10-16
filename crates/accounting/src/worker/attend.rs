@@ -8,9 +8,7 @@
 //!
 //! The loop looks at three things in this order: every relay request a
 //! lane is blocked on, then at most one run home from a lane, then the
-//! desk (`crates/sprawling/Spec.lean` §8-42-4). The crossing is first because a run
-//! that has already been paid for must not queue behind one that has
-//! not started.
+//! desk (`crates/sprawling/Spec.lean` §8-42-4).
 //!
 //! Which properties the loop must hold - every message served in
 //! finitely many steps, append order equal to seq order, no wake

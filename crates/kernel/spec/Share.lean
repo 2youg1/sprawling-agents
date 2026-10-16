@@ -34,7 +34,7 @@ pub fn gather(parts: &[Share]) -> Share;    // 自由函数，不是 Add
 
 **决定**：计划的根就是计划本身，不是表里的一行：`PlanTree::build` 的 `divide` 把 `Share::WHOLE` 分给顶层各行，空计划的根持有整份而没有一行可分。根的持有者是这栋楼的 Mayor（`hall/mayor`）；`plan` 工具多一个动作 `add`，带 `parts`（与 `split` 同一个参数），每一份在根下成为一个顶层行，编号接在最后一个顶层行之后（`kernel::spine::append_top_level`），新行的份额照旧由 `PlanTree::build` 自根重分。在一个节点下加活就是 `split`：只有握着那一行的 run 能分它（collab D6），所以 `add` 不点名节点。`Kernel.Share.Root` 证明：从空计划出发，任何一串 add／split 之后叶子之和恒为整份。只有根的持有者能 `add`，别的 run 得到的拒词叫它认领一行再 `split`，或给 `hall/mayor` 发信。没有新的事件种类：加出的行不写 `roadmap_*` 行（`collab::ClaimEffect::Added` 的 `kind` 为 `None`），随计划文件的写盘入账。
 
-**理由**：份额只有两种来路——整份计划或分掉另一份（§8-32）——而整份从来没有交给任何一方，所以空的 `Roadmap.md` 写不进第一行（roadmap F2）。交给 Mayor 是推断（roadmap §7：「F2 根份额默认归这栋楼的 Mayor」），理由是 Mayor 持有这栋楼的计划文件，而派活的 JOB 是从计划里分出来的一支，不能先于计划存在。
+**理由**：份额只有两种来路——整份计划或分掉另一份（§8-32）——而整份从来没有交给任何一方，所以空的 `Roadmap.md` 写不进第一行。根份额交给这栋楼的 Mayor，理由是 Mayor 持有这栋楼的计划文件，而派活的 JOB 是从计划里分出来的一支，不能先于计划存在。
 
 **被否**：①根份额归派活的 JOB：空计划里还没有可派的活；②`add` 不经份额、直接写行：守恒就有了一条绕过 `split` 的路。
 

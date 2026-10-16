@@ -34,11 +34,8 @@ impl Laying {
     /// shakes hands holds up that lane and nothing else
     /// (`crates/sprawling/Spec.lean` §8-113).
     ///
-    /// The catalogue and the bench are one phase because they are one
-    /// registration: the catalogue is what the model was told exists,
-    /// the bench is what routes the call it makes, and a name on one
-    /// list and not the other is either a tool nobody can call or a
-    /// call nobody was told about. The delegate desk comes back with
+    /// The catalogue and the bench come from one registration, so a
+    /// name is on both lists or on neither. The delegate desk comes back with
     /// them because two tools hold it and the settlement reads it after
     /// the drive.
     ///

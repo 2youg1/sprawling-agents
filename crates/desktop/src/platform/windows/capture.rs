@@ -19,8 +19,8 @@
 //! `PW_RENDERFULLCONTENT` is what makes a hardware-composited window —
 //! most browsers, most editors — render into the bitmap instead of
 //! arriving blank. It does not always work, and when it does not the
-//! result is a rectangle of pure black. That is checked for and refused:
-//! a model shown a black picture of a window will describe the black.
+//! result is a rectangle of pure black, which is checked for and
+//! refused.
 
 use desktop_ffi::ended::Failure;
 use desktop_ffi::step::Step;

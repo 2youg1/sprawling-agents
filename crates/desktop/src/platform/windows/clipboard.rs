@@ -185,10 +185,9 @@ mod tests {
         panic!("still contended after the last attempt: {last:?}");
     }
 
-    /// A block that will not lock is a refusal to retry, never an empty
-    /// clipboard, which would send a caller off to try something else.
-    /// The leaf answers `Locking` for it (its own test locks no block and
-    /// sees that step); this is what the step becomes.
+    /// The leaf answers `Locking` for a block that will not lock (its own
+    /// test locks no block and sees that step); this is what the step
+    /// becomes.
     #[test]
     fn a_clipboard_block_that_will_not_lock_is_a_refusal_not_an_empty_clipboard() {
         assert_eq!(

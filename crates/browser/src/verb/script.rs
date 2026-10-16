@@ -127,11 +127,8 @@ pub(crate) fn fetch_script(url: &str) -> String {
         .replacen("__URL__", &json!(url).to_string(), 1)
 }
 
-/// Reads what an evaluate came back with.
-///
-/// Every script this module sends returns one JSON string, so there is
-/// one shape to read rather than the driver's whole remote-value
-/// vocabulary.
+/// Reads what an evaluate came back with: the one JSON string every
+/// script in this module returns.
 ///
 /// # Errors
 /// Refuses a reply whose shape this version does not read, and a string

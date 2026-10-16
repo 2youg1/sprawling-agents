@@ -87,11 +87,8 @@ impl CommitFacts {
 }
 
 impl super::holding::Views {
-    /// Files the commit one record announced, when it announced one.
-    ///
-    /// Both kinds of record are asked the same question - does this one
-    /// name a commit - because the line that opens a dispatch is a
-    /// `checkpoint_committed` that checkpoints nothing.
+    /// Files the commit one record announced, when it announced one, as
+    /// [`commit_facts`] reads it.
     ///
     /// # Errors
     /// Propagates [`commit_facts`]'s refusal of a payload that does not
@@ -247,8 +244,6 @@ pub(crate) fn commit_facts(record: &EventRecord) -> Result<Option<(GitOid, Commi
     let data = record.data();
     let (oid, by) = match record.kind() {
         EventKind::CheckpointCommitted => match data.read::<CheckpointCommitted>()? {
-            // The job pin that opens a dispatch names no commit, which
-            // is the one thing this whole enum exists to say out loud.
             CheckpointCommitted::JobPinned { .. } => return Ok(None),
             CheckpointCommitted::Committed(commit) => (commit.oid, commit.by),
         },
@@ -655,10 +650,6 @@ Sprawling-Actor: lab/room1
 
     #[test]
     fn the_line_that_pins_a_job_is_not_a_commit() {
-        // The first thing a dispatch writes is a `checkpoint_committed`
-        // naming the job it pinned. It checkpoints nothing, so a fold that
-        // asked only for the kind would file a commit that does not
-        // exist.
         let mut pin = serde_json::Map::new();
         pin.insert(
             "job".to_owned(),

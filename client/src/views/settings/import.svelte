@@ -4,7 +4,7 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // Taking a user ID from the GitHub CLI (refrain roadmap §3-13). The
+  // Taking a user ID from the GitHub CLI. The
   // read happens on the machine the city runs on, not the one this
   // browser runs on, so the control says so before it is pressed. It is
   // asked only when pressed (`githubLoginQuery`), it shows the host and

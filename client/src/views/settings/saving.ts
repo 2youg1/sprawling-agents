@@ -3,8 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// Where one save of a settings card stands (refrain roadmap §3-14,
-// client/Spec.lean §7L). **Only the city's receipt says saved**: sending the
+// Where one save of a settings card stands (client/Spec.lean §7L).
+// **Only the city's receipt says saved**: sending the
 // frame says saving, the city answering again with a version other than
 // the one the save was made against says saved, a refusal of the write
 // says refused with the draft kept, and silence past the page's patience

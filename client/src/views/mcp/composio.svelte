@@ -287,7 +287,7 @@
 <!-- Four standings, four different next actions and no fifth. The
 connect press is a row's action rather than the screen's one primary:
 many rows stand on this screen at once, and a page with six primaries
-has none (ux A11). -->
+has none. -->
 {#snippet action(line: ToolkitLine)}
   {#if line.standing === "absent"}
     <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->

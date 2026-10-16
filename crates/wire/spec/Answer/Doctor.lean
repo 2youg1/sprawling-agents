@@ -113,7 +113,7 @@ pub enum DoctorUntold { NoDisk, AdminOnly, Unread { command: String }, Failed { 
 
 读法照 §8-166 之一：Windows 上读 Defender 的实时扫描与城目录所在的盘，macOS 与 Linux 答 `DoesNotApply`（这两个平台没有在每次写入前同步扫描的系统组件）；读数只是建议，不拦开城。读它的时刻与其余 doctor 行相同：`Query::Doctor` 作答时与 `Command::DoctorRefresh` 之后。`WIRE_V` 随 V0.0.9 的那一次进位（`crates/wire/Spec.lean` D22）。
 
-**理由**：扫描的读数今天只在终端里，人在页面上看不到「这座城在一块被实时扫描的盘上」（roadmap §7 第 3 条，已并进 CON-DOC）。线上的类型与 `bin::doctor::scanning` 逐臂同形，因为页面要说的正是终端说的那几种情形；路径与命令以已渲染的串上线，`&'static str` 与 `PathBuf` 不是线上的类型。
+**理由**：扫描的读数今天只在终端里，人在页面上看不到「这座城在一块被实时扫描的盘上」。线上的类型与 `bin::doctor::scanning` 逐臂同形，因为页面要说的正是终端说的那几种情形；路径与命令以已渲染的串上线，`&'static str` 与 `PathBuf` 不是线上的类型。
 
 **被否**：另开一个 `Query::Scanning`：同一次 doctor 读两次，答复的时刻也不同。
 
@@ -122,7 +122,7 @@ pub enum DoctorUntold { NoDisk, AdminOnly, Unread { command: String }, Failed { 
 
 /-! D26 沙箱臂按机制族命名，每个名字在三个平台上都有可填的臂
 
-**决定**：设置与线上用来选沙箱臂的名字是一个闭集 `SandboxArm { None, CopiedTree, Native, Container, Python }`，线上拼作 `none｜copied_tree｜native｜container｜python`；`CONFIG.toml` 的键是 `[sandbox] arm = "<名字>"`。缺省按平台取下表的「缺省」一列，这一列是缺省的唯一定义处：调研表与取舍的理由在 `crates/runtime/spec/Tools/Exec.lean` D32，这一列是那里推断出的选择，User 另定时只改这一列的一个值（Roadmap §7 第 1 条）。Windows 的 SB1 第 3 条六项 native 回归通过且 `crates/runtime/spec/Tools/Exec/NativeWindows.lean` D59 的未决解开之前，缺省为 `copied_tree`；macOS 缺省为 `copied_tree`，显式 Seatbelt 的文件写入与网络保证不改变缺省；Linux 有 `bwrap` 时缺省为 `native`，否则为 `copied_tree`。doctor 照实报。各名字在三个平台上的臂：
+**决定**：设置与线上用来选沙箱臂的名字是一个闭集 `SandboxArm { None, CopiedTree, Native, Container, Python }`，线上拼作 `none｜copied_tree｜native｜container｜python`；`CONFIG.toml` 的键是 `[sandbox] arm = "<名字>"`。缺省按平台取下表的「缺省」一列，这一列是缺省的唯一定义处：调研表与取舍的理由在 `crates/runtime/spec/Tools/Exec.lean` D32，这一列是那里推断出的选择，User 另定时只改这一列的一个值。Windows 的 SB1 第 3 条六项 native 回归通过且 `crates/runtime/spec/Tools/Exec/NativeWindows.lean` D59 的未决解开之前，缺省为 `copied_tree`；macOS 缺省为 `copied_tree`，显式 Seatbelt 的文件写入与网络保证不改变缺省；Linux 有 `bwrap` 时缺省为 `native`，否则为 `copied_tree`。doctor 照实报。各名字在三个平台上的臂：
 
 | 名字 | Windows | macOS | Linux |
 |---|---|---|---|

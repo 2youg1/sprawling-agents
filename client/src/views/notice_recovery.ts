@@ -16,7 +16,7 @@
 // (`/new` is `open_session`, `/stop` is `cancel`), so a
 // notice reaches the city without a line passing through a text box.
 // `/fork` is the one exception: a branch is chosen at a point, and the
-// picker that chooses it lives on the talk screen (ux A6), so its deed
+// picker that chooses it lives on the talk screen, so its deed
 // lands on that screen. A spelling this file does not know runs nothing
 // rather than a guess at what it meant.
 //

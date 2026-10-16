@@ -17,9 +17,8 @@
 //! needs no new argument.
 //!
 //! One rule holds the type together: **a variant carries the operation,
-//! the subject and the recovery, and never the bytes**. `SecretEgress`
-//! is where that is load-bearing — proving a credential leaked by
-//! reprinting it would be the leak.
+//! the subject and the recovery, and never the bytes**, and
+//! `SecretEgress` is where that is load-bearing.
 
 use std::io;
 use std::path::{Path, PathBuf};

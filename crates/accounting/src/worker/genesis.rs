@@ -71,8 +71,7 @@ pub(super) fn standing_of(city_root: &Path, history: History) -> city::Standing 
 ///
 /// `Adopt::EveryFolder` is the case a person with a workspace wants:
 /// each top-level folder becomes a building with its own rules, its
-/// files untouched. Adoption happens after genesis, because a building
-/// is recorded against a city and there is no city before line zero.
+/// files untouched.
 ///
 /// The two genesis lines are stamped with the time `hands.clock` reads,
 /// and the worker that raises City Hall is built with the same hands, so

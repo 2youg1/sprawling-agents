@@ -3,12 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What a building's residents may write inside their prefixes.
-//!
-//! One line of `RULES.toml` decides it, and the value is exhaustive
-//! rather than a flag: "every file here" and "the Markdown documents
-//! here" are two policies, and City Hall exists because the second one
-//! had to be sayable.
+//! What a building's residents may write inside their prefixes, as one
+//! line of `RULES.toml` decides it (`DomainReach`).
 //!
 //! Specified by `crates/city/spec/Policy.lean` §8-20.
 

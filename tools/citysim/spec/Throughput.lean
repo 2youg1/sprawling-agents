@@ -28,11 +28,11 @@
 
 吞吐行的 `*_per_s` 是整数部分加三位小数的定点数，由整数运算得出（ledger 载荷之外，但读数仍不经浮点）。尾部规则见下面的 `tail`：n ≥ `P999_FLOOR`（1,000）才印 `p999_us`，否则印 `p999=insufficient`；`max_us` 总是印。分位取最近秩，第 ⌈n·p⌉ 个。
 
-**读到的等待**（M0 第 6 条把每个耗时拆成等待、工作、落盘屏障；下表写明每一行属于哪一段，以及它从哪里读出）：
+**读到的等待**（每个耗时拆成等待、工作、落盘屏障三段；下表写明每一行属于哪一段，以及它从哪里读出）：
 
 | `wait=` | 量的是什么 | 段 | 读法 |
 |---|---|---|---|
-| `lane` | 一个 run 从投出到 `run_started` 落账 | 等待（含准备的工作） | 账本时刻（毫秒）减投出时刻，×1000 记成 µs；毫秒分辨率，M1 落地后换成微秒字段 |
+| `lane` | 一个 run 从投出到 `run_started` 落账 | 等待（含准备的工作） | 账本时刻（毫秒）减投出时刻，×1000 记成 µs；毫秒分辨率，账本给出这一段的微秒字段后换成它 |
 | `first_call` | `run_started` 到第一次 `model_called` | 工作（放置、准备） | 账本时刻差 |
 | `relay_under_load` | 负载期间，仪表经 `measuring_relay` 发出的一次 relay 往返 | 等待＋工作＋屏障 | 单调时钟，测试侧；减去空载的 `relay_idle` 就是排队的份额 |
 | `relay_queue` | 一次 relay 请求从车道把它排进队到账本线程取走 | 纯等待 | worker 注入的单调时钟，在生产代码的测量点上取（`worker::health`） |
@@ -45,11 +45,11 @@
 
 **计数对拍**（`throughput_counts`，在 `just check` 里跑）：N = 4、`zero` 档、M = 4 时，`run_frozen` 恰 N 条，`tool_called` 恰 N·M 条，每个 `tool_called` 都有它的 `tool_result`。计数只取决于脚本，不取决于时钟，所以三个平台的 CI 都能跑它。
 
-**平台**：场景与等待的读法不碰平台接口，Windows、macOS、Linux 上一样跑；`relay_under_load` 的屏障份额随平台的落盘调用不同（TF2），读数照实报告。
+**平台**：场景与等待的读法不碰平台接口，Windows、macOS、Linux 上一样跑；`relay_under_load` 的屏障份额随平台的落盘调用不同，读数照实报告。
 
 D23 **吞吐台住在 `sprawling-accounting` 的仪表里，本规格只规定它。** 吞吐路径（pool、lane、relay、账本线程的一次 serve）都是 `accounting::worker` 里 `pub(in crate::worker)` 的件，驱动它们的替身 provider 与造城的夹具也只在该 crate 的测试构型里编译；本 crate 够不到，与 D18 是同一个理由。被否：给 `accounting` 开一扇公共门让 citysim 驱动一座城的 pool——那扇门没有生产调用者。**重开参数**：citysim 的替身 provider（§8-10）能当一座真城的 provider、且 `sprawling` 的二进制能被场景从外面拉起并派活时，场景搬到 citysim 的 bench，从进程外量。
 
-D24 **这一段的等待从账本与仪表外侧读，生产代码不加测量点。** 外侧读数立刻可得、不改 worker 的任何行为；它分不出「等待」与「工作」时，表里写明它是哪几段的和。被否：在本 wave 给 pool 与 relay 加时刻戳——那要改 `crates/sprawling/spec/Accounting/Worker.lean`，该文件本 wave 归别的 lane。**重开参数**：W2 接手 M2 的生产测量点时，`lane` 与 `relay_under_load` 两行各拆成纯等待与工作两行，行名不变，多一个 `seg=` 字段。
+D24 **这一段的等待从账本与仪表外侧读。** pool 与 relay 已有各自的等待时点（`lane_waited`、`queue_waited`），但它们只在 accounting 的测试构型里可达（D23），而表要的是端到端的份额——投出到落账、负载往返减空载——所以表从外侧量，不改 worker 的任何行为；外侧读数分不出「等待」与「工作」时，表里写明它是哪几段的和。被否：为这一次测量在 pool 与 relay 上再加时点——两个时点已经在生产里，再加要改 worker 的生产代码与 `crates/sprawling/spec/Accounting/Worker.lean`。**重开参数**：`lane` 与 `relay_under_load` 两行改读那两个时点时（例如 D23 的重开条件成立），行名不变，多一个 `seg=` 字段。
 -/
 
 namespace Citysim.Throughput

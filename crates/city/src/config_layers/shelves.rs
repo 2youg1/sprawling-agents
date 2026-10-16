@@ -8,10 +8,8 @@
 //!
 //! A shelf is a directory another program keeps its skills in, and the
 //! city reads it and never writes it. Which directories those are is
-//! the city's own configuration, and only the city's: a shelf is
-//! mounted for every building at once, so a building or a room mounting
-//! one would be a scope admitting a file nobody who keeps this city
-//! chose.
+//! the city's own configuration, and only the city's; `city_shelves`
+//! says why.
 
 use std::path::{Path, PathBuf};
 

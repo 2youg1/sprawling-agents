@@ -138,7 +138,7 @@ fn empty_desk(room: &str) -> Arc<Mutex<ClaimDesk>> {
     )))
 }
 
-/// Roadmap F2: an empty plan had no first line, because every action
+/// An empty plan had no first line, because every action
 /// named a node and the root's share was given to nobody. The root is
 /// the building's Mayor's (kernel `Share.lean` D25), so its `add` with
 /// no node writes a top-level row, and the leaves still gather to the

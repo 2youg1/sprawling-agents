@@ -4,7 +4,7 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // You and the main agent (refrain roadmap §3-13): two cards, each
+  // You and the main agent: two cards, each
   // saved on its own against the document it lives in. The person's ID
   // and the "about you" text live in `PREFERENCES.md`, the Mayor's name
   // in `MAYOR.md`; the city reads both in one place (`city::Naming`)
