@@ -10,6 +10,7 @@ use std::collections::BTreeMap;
 
 use kernel::Address;
 
+use super::commanding::door::InHand;
 use super::{Entrance, Knock};
 
 /// The work that has arrived and is still outside: the commands this
@@ -27,6 +28,10 @@ pub(in crate::worker) struct Doorstep {
     /// Residents spoken to while a run was working in their room, one
     /// knock per room, sent again when that run gives the room back.
     deferred: BTreeMap<Address, Knock>,
+    /// The command the door is carrying out right now, for a verb that
+    /// sends a provider request off the accounting thread and finishes
+    /// once it answers (`commanding::door::Finishing`).
+    pub(in crate::worker) in_hand: Option<InHand>,
 }
 
 impl Doorstep {
@@ -37,6 +42,7 @@ impl Doorstep {
             entrance,
             knocks: Vec::new(),
             deferred: BTreeMap::new(),
+            in_hand: None,
         }
     }
 

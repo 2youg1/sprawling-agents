@@ -18,6 +18,7 @@ use std::time::{Duration, Instant};
 use kernel::{AxCode, AxError, EventDraft, EventRef, Ledger};
 
 use super::booking::{ClaimAsk, ClaimBook};
+use super::errand::Answer;
 use super::health::Health;
 use super::pool::Arrival;
 use super::registering::GoalAsk;
@@ -56,6 +57,9 @@ pub(crate) enum Wake {
     /// A run home from its lane, boxed because it carries a whole
     /// drive's outcome.
     Home(Box<Arrival>),
+    /// What a provider request handed off this thread came back with,
+    /// boxed because a keep-warm door travels in it.
+    Answered(Box<Answer>),
     /// A command was posted; it stays on the desk for a run's safe points.
     Command,
     /// The city is stopping; the desk says so too.
@@ -72,6 +76,9 @@ pub(crate) struct Drained {
     /// goal register: a copy of the register here would be a second
     /// answer to who holds the ground (`crates/sprawling/Spec.lean` §8-42-8).
     pub goals: Vec<GoalAsk>,
+    /// Answers to provider requests handed off, in arrival order, left
+    /// to the thread that records them (`crates/sprawling/Spec.lean` §8-42-9).
+    pub answers: Vec<Answer>,
 }
 
 /// How long one look at the queue may wait for its first wake.
@@ -201,9 +208,9 @@ impl RelayGate {
     /// Waits as `patience` allows for the first wake, then takes every
     /// wake already queued: relay requests are written before anything
     /// lands (`crates/sprawling/Spec.lean` §8-42-2), claims are answered in queue
-    /// order, runs home go on `homes` and goal registrations into the
-    /// returned [`Drained`] in arrival order, and a command or a close
-    /// only ends the wait.
+    /// order, runs home go on `homes`, goal registrations and provider
+    /// answers into the returned [`Drained`] in arrival order, and a
+    /// command or a close only ends the wait.
     ///
     /// **Everything queued rides one disk barrier**, which costs the
     /// same for fifty records as for one. Each answer still goes back
@@ -226,6 +233,7 @@ impl RelayGate {
             .slept((self.monotonic)().saturating_duration_since(asleep));
         let mut written = Vec::new();
         let mut goals = Vec::new();
+        let mut answers = Vec::new();
         let mut drafts = Vec::new();
         let mut senders = Vec::new();
         let mut sizes = Vec::new();
@@ -246,11 +254,16 @@ impl RelayGate {
                 Wake::Claim(ask) => written.extend(self.booked.answer(ask, ledger)),
                 Wake::Goal(ask) => goals.push(ask),
                 Wake::Home(arrival) => homes.push_back(*arrival),
+                Wake::Answered(answer) => answers.push(*answer),
                 Wake::Command | Wake::Close => {}
             }
         }
         if senders.is_empty() {
-            return Drained { written, goals };
+            return Drained {
+                written,
+                goals,
+                answers,
+            };
         }
         let kept = drafts.clone();
         let batch = u64::try_from(senders.len()).unwrap_or(u64::MAX);
@@ -283,7 +296,11 @@ impl RelayGate {
             }
         }
         self.health.answered(batch);
-        Drained { written, goals }
+        Drained {
+            written,
+            goals,
+            answers,
+        }
     }
 }
 

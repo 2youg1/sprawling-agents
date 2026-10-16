@@ -26,6 +26,7 @@ use super::super::{Continuation, Owed, Owing, RunWorker};
 use super::lane::DriveContext;
 use crate::worker::booking::OpenClaims;
 use crate::worker::dispatching::preparing::{Flown, Staged};
+use crate::worker::errand::Errands;
 use crate::worker::pool::{Arrival, DrivingPool};
 use crate::worker::relay::{Drained, Patience, Relay, RelayGate, Wake};
 
@@ -85,6 +86,9 @@ pub(in crate::worker) struct Flight {
     /// and every `exec` gets a handle onto it, so `halt` reaches a
     /// command without knowing which tool started it.
     pub(in crate::worker) backlog: runtime::Backlog,
+    /// The provider requests handed off this thread, whose answers come
+    /// back over the same crossing (`crates/sprawling/Spec.lean` §8-42-9).
+    pub(in crate::worker) errands: Errands,
 }
 
 impl Flight {
@@ -108,6 +112,7 @@ impl Flight {
         };
         Flight {
             pool: DrivingPool::open(gate.bell(), lanes, gate.health()),
+            errands: Errands::open(gate.bell()),
             gate,
             driving: BTreeMap::new(),
             homes: VecDeque::new(),
@@ -258,13 +263,21 @@ impl RunWorker {
         } else {
             Patience::Now
         };
-        let Drained { written, goals } =
-            self.flight
-                .gate
-                .serve(patience, &mut self.ledger, &mut self.flight.homes);
+        let Drained {
+            written,
+            goals,
+            answers,
+        } = self
+            .flight
+            .gate
+            .serve(patience, &mut self.ledger, &mut self.flight.homes);
         self.show_relayed(written);
         for ask in goals {
             self.answer_goal(ask);
+        }
+        for answer in answers {
+            self.flight.errands.answered();
+            self.take_answer(answer);
         }
         let Some(arrival) = self.flight.arrived() else {
             return Ok(Landed::Nothing);
@@ -355,17 +368,20 @@ impl RunWorker {
         self.flight.driving.contains_key(&run)
     }
 
-    /// Serves the crossing and lands runs until no lane is left.
+    /// Serves the crossing and lands runs until no lane is left and no
+    /// provider request handed off is still out.
     ///
     /// What a closing city does before it writes its handoff: a lane
     /// abandoned while it waits on an append loses lines the city had
-    /// already told it were durable.
+    /// already told it were durable, and a renewal whose answer arrives
+    /// after the close is a cost no line records
+    /// (`crates/sprawling/Spec.lean` D79).
     ///
     /// # Errors
     /// Propagates the first landing that fails. The lanes still going
     /// are left to the caller, which is closing anyway.
     pub(in crate::worker) fn land_the_rest(&mut self) -> Result<(), AxError> {
-        while self.driving() {
+        while self.driving() || self.flight.errands.out() {
             self.serve_flight(Patience::Unbounded)?;
         }
         Ok(())

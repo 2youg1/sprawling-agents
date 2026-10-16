@@ -51,7 +51,7 @@ pub use answer::{BuildingAnswer, BuildingDoc};
 pub use answer::{Call, Closing, FrozenNames, Note, Opening, Outcome, Output};
 pub use answer::{CatalogSnapshot, LoginKind, LoginState, PinState};
 pub use answer::{ChangesAnswer, CommitAnswer, CommitAt, CommitsAnswer, HISTORY_MAX};
-pub use answer::{ChosenSummary, CityAnswer, CostAnswer};
+pub use answer::{ChosenSummary, CityAnswer, CostAnswer, Renewals};
 pub use answer::{ConfigAnswer, ConfigLayer, ModelFactsSummary};
 pub use answer::{ContentAnswer, Drift, GitStatusAnswer, PrefixAnswer, PrefixSegment};
 pub use answer::{CostOfAnswer, EvidenceAnswer, RUN_COSTS_MAX, RunCostsAnswer};

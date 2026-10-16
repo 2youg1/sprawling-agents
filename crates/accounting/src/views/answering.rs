@@ -356,6 +356,13 @@ impl Views {
                 calls: report.unpriced.calls,
                 tokens: report.unpriced.tokens,
             },
+            renewals: wire::Renewals {
+                billed: report.renewals.billed,
+                read: report.renewals.read,
+                late: report.renewals.late,
+                unreported: report.renewals.unreported,
+                refused: report.renewals.refused,
+            },
         }
     }
 }

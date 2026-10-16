@@ -12,9 +12,9 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::budget::UsdMicros;
+use crate::budget::{Tokens, UsdMicros};
 use crate::error::AxError;
-use crate::model::ModelUsage;
+use crate::model::{CacheCount, ModelUsage};
 
 /// `cache_renewed`: one renewal a worker sent, answered or refused.
 ///
@@ -49,6 +49,43 @@ pub enum CacheRenewed {
     },
 }
 
+/// What one renewal shows about the cache it was sent to keep.
+///
+/// The one reading of a `cache_renewed` line that a cost view counts by
+/// (`crates/kernel/spec/KeepWarm.lean` §8-74, storage D35).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RenewalOutcome {
+    /// The provider reported no cache write: the renewal reached the
+    /// entry while it was alive.
+    Read,
+    /// The provider reported cache write tokens above zero: the entry
+    /// had expired, and the renewal paid the write price for the prefix
+    /// instead of the read price.
+    Late,
+    /// The provider answered without a cache write count.
+    Unreported,
+    /// The provider refused the renewal.
+    Refused,
+}
+
+impl CacheRenewed {
+    /// What this renewal shows about the cache it was sent to keep.
+    pub fn outcome(&self) -> RenewalOutcome {
+        match self {
+            CacheRenewed::Refused { .. } => RenewalOutcome::Refused,
+            CacheRenewed::Answered { usage, .. } => {
+                match usage.map(|usage| usage.cache_write_tokens) {
+                    None | Some(CacheCount::Unreported) => RenewalOutcome::Unreported,
+                    Some(CacheCount::Reported(written)) if written == Tokens::new(0) => {
+                        RenewalOutcome::Read
+                    }
+                    Some(CacheCount::Reported(_)) => RenewalOutcome::Late,
+                }
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used, reason = "test code")]
 mod tests {
@@ -75,5 +112,43 @@ mod tests {
                 line
             );
         }
+    }
+
+    #[test]
+    fn a_renewal_that_wrote_the_cache_reads_as_late() {
+        let answered = |written: CacheCount| CacheRenewed::Answered {
+            usage: Some(ModelUsage {
+                cache_write_tokens: written,
+                ..ModelUsage::default()
+            }),
+            billed_usd_micros: None,
+        };
+        let lines = [
+            answered(CacheCount::Reported(Tokens::new(0))),
+            answered(CacheCount::Reported(Tokens::new(4096))),
+            answered(CacheCount::Unreported),
+            CacheRenewed::Answered {
+                usage: None,
+                billed_usd_micros: None,
+            },
+            CacheRenewed::Refused {
+                refused: AxError::failure(
+                    crate::error::AxCode::Provider,
+                    "renew a cached prefix",
+                    "rate limited",
+                )
+                .with_recovery("renewal is skipped until the next real request"),
+            },
+        ];
+        assert_eq!(
+            lines.iter().map(CacheRenewed::outcome).collect::<Vec<_>>(),
+            vec![
+                RenewalOutcome::Read,
+                RenewalOutcome::Late,
+                RenewalOutcome::Unreported,
+                RenewalOutcome::Unreported,
+                RenewalOutcome::Refused,
+            ]
+        );
     }
 }

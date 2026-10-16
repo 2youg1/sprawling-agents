@@ -228,6 +228,7 @@ pub struct SystemClock;   // 墙钟的唯一采样点（clippy.toml 的 disallow
 | 8-42-6 | `crates/sprawling/spec/Accounting/Worker.lean` |
 | 8-42-7 | `crates/sprawling/spec/Accounting/Worker.lean` |
 | 8-42-8 | `crates/sprawling/spec/Accounting/Worker.lean` |
+| 8-42-9 | `crates/sprawling/spec/Accounting/Worker.lean` |
 | 8-43 | `crates/sprawling/spec/Accounting/Worker.lean` |
 | 8-44 | `crates/sprawling/spec/Accounting/Worker.lean` |
 | 8-45 | `crates/sprawling/spec/BrowserBidi.lean` |
@@ -473,6 +474,9 @@ pub struct SystemClock;   // 墙钟的唯一采样点（clippy.toml 的 disallow
 | D72 | `crates/sprawling/spec/Privacy/Service.lean` |
 | D75 | `crates/sprawling/spec/Console/Lifecycle.lean` |
 | D77 | `crates/sprawling/spec/Console/ProgramStatus.lean` |
+| D78 | `crates/sprawling/spec/Accounting/Worker.lean` |
+| D79 | `crates/sprawling/spec/Accounting/Worker.lean` |
+| D80 | `crates/sprawling/spec/Supervising.lean` |
 -/
 
 /-! D15 不从别的工具的配置里读 provider 表（人的决定）

@@ -1483,6 +1483,127 @@ fn a_read_handed_over_while_the_model_writes_runs_during_the_writing() {
     assert_eq!(speculated.lines, serial.lines);
 }
 
+/// How long the model behind the keep-warm door keeps writing while it
+/// waits for the read it handed over to start. A door that drops the
+/// early call makes it wait all of this before it answers.
+const READ_START_WAIT: std::time::Duration = std::time::Duration::from_secs(5);
+
+/// What happened behind the keep-warm door, in the order it happened.
+type Happened = std::sync::Arc<std::sync::Mutex<Vec<&'static str>>>;
+
+/// A read-only tool that notes when it starts and tells the model.
+struct AnnouncedRead {
+    happened: Happened,
+    started: std::sync::mpsc::Sender<()>,
+}
+
+impl kernel::Tool for AnnouncedRead {
+    fn meta(&self) -> &kernel::ToolMeta {
+        static META: std::sync::OnceLock<kernel::ToolMeta> = std::sync::OnceLock::new();
+        META.get_or_init(read_meta)
+    }
+
+    fn invoke(&self, _call: &ToolCall) -> Result<ToolOutcome, AxError> {
+        self.happened.lock().unwrap().push("read started");
+        self.started.send(()).unwrap();
+        Ok(ToolOutcome {
+            result: Payload::empty(),
+            attachments: Vec::new(),
+        })
+    }
+}
+
+/// A streaming model that hands each call of its wave over as the call
+/// completes, then keeps writing until the read it handed over has
+/// started or [`READ_START_WAIT`] has passed.
+struct WaitsForItsRead {
+    waves: Vec<Vec<ToolCall>>,
+    happened: Happened,
+    started: std::sync::mpsc::Receiver<()>,
+}
+
+impl Model for WaitsForItsRead {
+    fn call(&mut self, req: &ModelRequest) -> Result<ModelReturn, AxError> {
+        self.call_speculating(req, &mut |_: &kernel::Increment| {}, &mut |_: &ToolCall| {})
+    }
+
+    fn call_speculating(
+        &mut self,
+        _req: &ModelRequest,
+        _onto: kernel::Increments<'_>,
+        early: kernel::EarlyCalls<'_>,
+    ) -> Result<ModelReturn, AxError> {
+        let calls = if self.waves.is_empty() {
+            Vec::new()
+        } else {
+            self.waves.remove(0)
+        };
+        calls.iter().for_each(|call| early(call));
+        if !calls.is_empty() {
+            // Timing out is not a failure here: the order in `happened`
+            // is what the test reads.
+            let _waited = self.started.recv_timeout(READ_START_WAIT);
+        }
+        self.happened.lock().unwrap().push("model returned");
+        Ok(ModelReturn::bare(
+            message_payload(&[ContentBlock::Text {
+                text: "reading".to_owned(),
+            }])
+            .unwrap(),
+            calls,
+        ))
+    }
+}
+
+/// Every run's model is wrapped in the keep-warm door, and the door hands
+/// a read over as early as the model behind it does: the read starts
+/// while the model is still writing, and the turn that follows answers
+/// it from what the early start returned rather than starting it again.
+#[test]
+fn a_read_handed_over_behind_the_keep_warm_door_starts_before_the_model_returns() {
+    let happened = Happened::default();
+    let (started, heard) = std::sync::mpsc::channel();
+    let model = WaitsForItsRead {
+        waves: vec![vec![ToolCall {
+            id: "r1".to_owned(),
+            name: ToolName::parse("read").unwrap(),
+            args: Payload::empty(),
+        }]],
+        happened: happened.clone(),
+        started: heard,
+    };
+    let mut door = runtime::prefix::warmth::Warmed::new(
+        Box::new(model),
+        kernel::keep_warm::KeepWarm::default(),
+        || Ok(TimeMs::new(0)),
+        runtime::prefix::warmth::Lead::default(),
+    );
+    let mut invoke = Placed::of(Box::new(AnnouncedRead {
+        happened: happened.clone(),
+        started,
+    }));
+    let mut ledger = RecordingLedger::new();
+    let mut now = counter();
+    let mut interrupt = |_: SafePoint| Interrupt::None;
+    let mut hooks = RunHooks {
+        now: &mut now,
+        monotonic_us: &mut || 0,
+        interrupt: &mut interrupt,
+        checkpoint: None,
+        writes: &|_: &kernel::ToolCall| kernel::Writes::Domain,
+        invoke: &mut invoke,
+        wait: &mut |_: TimeMs| runtime::NextCall::Allowed,
+        deltas: None,
+    };
+
+    drive(plan(), &mut ledger, &mut door, &mut hooks, &handoff()).unwrap();
+
+    assert_eq!(
+        *happened.lock().unwrap(),
+        vec!["read started", "model returned", "model returned"]
+    );
+}
+
 /// How one account of [`Accounted`] answers every request sent on it.
 #[derive(Clone, Copy)]
 enum Answers {

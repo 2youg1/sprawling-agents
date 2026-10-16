@@ -19,6 +19,16 @@ pub const CACHE_BREAKPOINTS_MAX: u32 = 4;
 /// Prompt-cache lifetime treated as the async-discipline horizon (6.4).
 pub const PROMPT_CACHE_TTL_SECS: u64 = 300;
 
+/// How long before the end of a prompt-cache lifetime a keep-warm
+/// renewal must already be due, beyond the lead the caller measured.
+///
+/// Not an external fact: it is subtracted from [`PROMPT_CACHE_TTL_SECS`]
+/// and nowhere else, so it lives beside it. It covers the delays the lead
+/// cannot measure - a timer that wakes a little late, a renewal thread
+/// that starts a little late - and costs that many seconds of a warm
+/// window that lasts 300 (`crates/kernel/spec/KeepWarm.lean`, kernel D62).
+pub const PROMPT_CACHE_RENEWAL_MARGIN_SECS: u64 = 5;
+
 /// EventRecord `v`: one monotonic integer, no major/minor split (3.1).
 /// 2: the four lines a turn waits for record their own moment
 /// (kernel D10).

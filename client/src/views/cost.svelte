@@ -16,13 +16,18 @@
 // spent it. The figure beside the title is the total and never a sum of
 // the rows below it.
 //
+// Keep-warm renewals are spend the total already holds, under their
+// room and the `keep_warm` bucket of the cuts; the line under the header
+// names that share of the total and how many renewals came too late, and
+// never adds it to the total again (storage D36).
+//
 // The bar under a row is that row's summary: it restates the figure
 // beside the name, so a compact page draws the name and the figure and
 // stops there. Which pages are compact is `theme/preference.css`'s one density
 // attribute, not a switch of this page's own.
 
 import type { Key } from "../core/lang";
-import type { UnpricedCalls, UsdMicros } from "../wire";
+import type { Renewals, UnpricedCalls, UsdMicros } from "../wire";
 
 type Cut = "by_run" | "by_actor" | "by_segment" | "by_tool" | "by_skill";
 const CUTS: readonly Cut[] = ["by_run", "by_actor", "by_segment", "by_tool", "by_skill"];
@@ -49,7 +54,7 @@ const TITLES: Record<Cut, Key> = {
   import EmptyState from "./parts/empty.svelte";
   import Page from "./parts/page.svelte";
   import Unanswered from "./parts/unanswered.svelte";
-  import { costReading } from "./pricing";
+  import { costReading, renewalsSent } from "./pricing";
 
   interface Props {
     // Whether this is the page or a fixture inside one: a document may
@@ -71,6 +76,16 @@ const TITLES: Record<Cut, Key> = {
 {#snippet unpriced(unpaid: UnpricedCalls)}
   <p class="text-note text-text-quiet">
     {fill(say($lang, "cost_unpriced"), { calls: count(unpaid.calls), tokens: count(unpaid.tokens) })}
+  </p>
+{/snippet}
+
+{#snippet renewed(renewals: Renewals)}
+  <p class="text-note text-text-quiet">
+    {fill(say($lang, "cost_renewals"), {
+      spent: usd(renewals.billed),
+      sent: count(renewalsSent(renewals)),
+      late: count(renewals.late),
+    })}
   </p>
 {/snippet}
 
@@ -128,6 +143,10 @@ width in as many columns as it holds. -->
     {#if answer.unpriced.calls > 0}
       <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
       {@render unpriced(answer.unpriced)}
+    {/if}
+    {#if renewalsSent(answer.renewals) > 0}
+      <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
+      {@render renewed(answer.renewals)}
     {/if}
     <!-- The cuts are columns of the page itself, parted by a rule rather
     than lifted onto cards (docs/frontend-method.md §7A-4, client/Spec.lean §4-50). -->

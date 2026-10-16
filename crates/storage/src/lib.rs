@@ -67,6 +67,7 @@ mod attribution;
 
 pub use attribution::Attribution;
 pub use attribution::AttributionReport;
+pub use attribution::Renewals;
 pub use attribution::Unpriced;
 
 mod queue;

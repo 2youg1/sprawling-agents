@@ -15,8 +15,9 @@
 //! out one at a time, in a fixed order. What is billed is what is
 //! attributed, to the microdollar.
 //!
-//! The total comes from `model_returned.billed_usd_micros` and nowhere
-//! else. This module never prices a call — that authority is
+//! The total comes from the `billed_usd_micros` a provider reported for
+//! a call (`model_returned`) or a keep-warm renewal (`cache_renewed`),
+//! and nowhere else. This module never prices a call — that authority is
 //! `gateway::cost`, and a second one would be a second answer.
 //!
 //! Specified by `crates/storage/spec/Attribution.lean` §8-7.
@@ -31,10 +32,16 @@ pub(crate) const NO_TOOL: &str = "no_tool";
 pub(crate) const NO_SKILL: &str = "no_skill";
 pub(crate) const NO_SEGMENT: &str = "unattributed";
 pub(crate) const WINDOW_SLOT: &str = "window";
+/// The bucket a keep-warm renewal's bill takes in every cut but
+/// `by_actor`: a renewal belongs to no run and has no segment basis,
+/// tool wave or skill, and a named bucket keeps its money apart from
+/// the honest buckets of calls that do (storage D36).
+pub(crate) const KEEP_WARM: &str = "keep_warm";
 
 use std::collections::BTreeMap;
 
-use kernel::{EventKind, EventRecord, RunId, UsdMicros};
+use kernel::event::record::{CacheRenewed, RenewalOutcome};
+use kernel::{Address, EventKind, EventRecord, RunId, UsdMicros};
 use serde_json::Value;
 
 use crate::error::StorageError;
@@ -55,6 +62,8 @@ pub struct Attribution {
     tool_weights: BTreeMap<String, u64>,
     skill_weights: BTreeMap<String, u64>,
     unpriced: Unpriced,
+    #[serde(default)]
+    renewals: Renewals,
 }
 
 pub struct AttributionReport {
@@ -65,6 +74,7 @@ pub struct AttributionReport {
     pub by_tool: Vec<(String, UsdMicros)>,
     pub by_skill: Vec<(String, UsdMicros)>,
     pub unpriced: Unpriced,
+    pub renewals: Renewals,
 }
 
 /// The model calls that came back with no authoritative amount. They
@@ -77,20 +87,59 @@ pub struct Unpriced {
     pub tokens: u64,
 }
 
+impl Unpriced {
+    /// Counts one call that came back with no amount, by the usage its
+    /// line `data` carries.
+    fn count(&mut self, data: &serde_json::Map<String, Value>) {
+        self.calls = self.calls.saturating_add(1);
+        self.tokens = self.tokens.saturating_add(usage_tokens(data));
+    }
+}
+
+/// The keep-warm renewals the ledger holds: what the priced ones were
+/// billed, an amount `total` and every cut already hold, so a cost view
+/// draws it as a line inside the total and never adds it again (storage
+/// D36); and how many showed what about the cache each was sent to keep
+/// (`RenewalOutcome`), which is how a cost view says how many arrived
+/// too late (storage D35).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Renewals {
+    #[serde(default)]
+    pub billed: UsdMicros,
+    pub read: u64,
+    pub late: u64,
+    pub unreported: u64,
+    pub refused: u64,
+}
+
+impl Renewals {
+    fn count(&mut self, outcome: RenewalOutcome) {
+        let slot = match outcome {
+            RenewalOutcome::Read => &mut self.read,
+            RenewalOutcome::Late => &mut self.late,
+            RenewalOutcome::Unreported => &mut self.unreported,
+            RenewalOutcome::Refused => &mut self.refused,
+        };
+        *slot = slot.saturating_add(1);
+    }
+}
+
 impl Attribution {
     pub fn new() -> Attribution {
         Attribution::default()
     }
 
-    /// Folds one record in. Only `model_returned` moves money; two other
-    /// kinds set the basis on which the next call is split, and
-    /// `run_frozen` drops the basis of a run that makes no further call.
+    /// Folds one record in. `model_returned` and `cache_renewed` move
+    /// money; two other kinds set the basis on which the next call is
+    /// split, and `run_frozen` drops the basis of a run that makes no
+    /// further call.
     #[expect(
         clippy::wildcard_enum_match_arm,
-        reason = "four kinds carry money or its basis; the rest of the vocabulary is silent here"
+        reason = "five kinds carry money, its basis or a renewal; the rest of the vocabulary is silent here"
     )]
     pub fn apply(&mut self, record: &EventRecord) -> Result<(), StorageError> {
         match record.kind() {
+            EventKind::CacheRenewed => self.renewed(record),
             EventKind::PromptAssembled => {
                 self.segment_weights
                     .insert(record.run(), segment_weights(record.data().as_map()));
@@ -135,11 +184,7 @@ impl Attribution {
                 else {
                     // A call with no authoritative amount attributes
                     // nothing. Estimating here would invent money.
-                    self.unpriced.calls = self.unpriced.calls.saturating_add(1);
-                    self.unpriced.tokens = self
-                        .unpriced
-                        .tokens
-                        .saturating_add(usage_tokens(record.data().as_map()));
+                    self.unpriced.count(record.data().as_map());
                     self.tool_weights.clear();
                     self.skill_weights.clear();
                     return Ok(());
@@ -179,6 +224,53 @@ impl Attribution {
         Ok(())
     }
 
+    /// Folds one `cache_renewed` line: counted by what it showed, and
+    /// its bill, when a provider gave one, added to the total, to the
+    /// room it kept warm in `by_actor`, and to the [`KEEP_WARM`] bucket
+    /// of the other four cuts (storage D36).
+    ///
+    /// A line this build cannot read still records a renewal that was
+    /// sent; what cannot be read is its usage and its bill, so it counts
+    /// as `unreported` and moves no money (storage D35). A renewal
+    /// leaves the tool and skill waves alone: it is no call of the run
+    /// whose wave is open.
+    fn renewed(&mut self, record: &EventRecord) {
+        let line = match record.data().read::<CacheRenewed>() {
+            Ok(line) => line,
+            Err(_unreadable) => {
+                self.renewals.count(RenewalOutcome::Unreported);
+                return;
+            }
+        };
+        self.renewals.count(line.outcome());
+        match line {
+            CacheRenewed::Refused { .. } => {}
+            CacheRenewed::Answered {
+                billed_usd_micros: None,
+                ..
+            } => self.unpriced.count(record.data().as_map()),
+            CacheRenewed::Answered {
+                billed_usd_micros: Some(billed),
+                ..
+            } => {
+                let micros = billed.get();
+                self.total = self.total.saturating_add(micros);
+                self.renewals.billed =
+                    UsdMicros::new(self.renewals.billed.get().saturating_add(micros));
+                let room = record.addr().map_or(record.who(), Address::as_str);
+                add(&mut self.by_actor, room, micros);
+                for cut in [
+                    &mut self.by_run,
+                    &mut self.by_segment,
+                    &mut self.by_tool,
+                    &mut self.by_skill,
+                ] {
+                    add(cut, KEEP_WARM, micros);
+                }
+            }
+        }
+    }
+
     /// What `run` was billed, when this fold holds a row for it: one
     /// lookup rather than a whole `report()` per question.
     pub fn billed_to(&self, run: &RunId) -> Option<UsdMicros> {
@@ -205,23 +297,23 @@ impl Attribution {
             by_tool: quantify(&self.by_tool),
             by_skill: quantify(&self.by_skill),
             unpriced: self.unpriced,
+            renewals: self.renewals,
         }
     }
 }
 
-/// The four token counts of one `model_returned`'s `usage`, summed; a
-/// call that reported no usage used no tokens anyone measured.
+/// The tokens of one call's `usage`: input and output, the only two
+/// disjoint counts — the dialect layer normalizes `input_tokens` to
+/// the whole prompt, cache reads and writes included
+/// (`crates/gateway/spec/Dialect.lean` §8-1), so adding the cache counts
+/// again would count the cached part twice. A call that reported no
+/// usage used no tokens anyone measured.
 fn usage_tokens(data: &serde_json::Map<String, Value>) -> u64 {
     let usage = data.get("usage");
-    [
-        "input_tokens",
-        "output_tokens",
-        "cache_read_tokens",
-        "cache_write_tokens",
-    ]
-    .into_iter()
-    .filter_map(|field| usage.and_then(|u| u.get(field)).and_then(Value::as_u64))
-    .fold(0, u64::saturating_add)
+    ["input_tokens", "output_tokens"]
+        .into_iter()
+        .filter_map(|field| usage.and_then(|u| u.get(field)).and_then(Value::as_u64))
+        .fold(0, u64::saturating_add)
 }
 
 #[cfg(test)]

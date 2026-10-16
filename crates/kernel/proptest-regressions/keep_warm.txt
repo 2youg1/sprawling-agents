@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 6d969a90ce6875838f9543162964637e7fc5e66710b53f9906821f045066aa70 # shrinks to setting = FiveMinute, events = [Used { at_ms: 305606 }, Woke { now_ms: 224912, lead_ms: 380694 }, Woke { now_ms: 263463, lead_ms: 342143 }]

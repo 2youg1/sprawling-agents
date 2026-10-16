@@ -101,5 +101,6 @@
         write(next, null);
       }}
     />
+    <span class="text-note text-text-faint">{say($lang, "city_keep_warm_note")}</span>
   </div>
 </Card>

@@ -11,8 +11,65 @@ use kernel::{AxCode, AxError, EventKind};
 use super::super::RunWorker;
 use super::probing::{Probing, probed_payload, reach_of};
 use super::{Credential, Entered, PROBE_TIMEOUT_MS, dialect_headers};
+use crate::worker::commanding::door::Finishing;
+use crate::worker::errand::Answer;
 
 mod choosing;
+
+/// What a `ProbeEndpoint` read off the accounting thread, on its way
+/// back to be recorded: the endpoint as the form named it, and the
+/// staged reading with the model list, or the refusal that stopped the
+/// reading before any request.
+pub(crate) struct Probed {
+    name: String,
+    base_url: String,
+    found: Result<Probing, AxError>,
+    finishing: Finishing,
+}
+
+/// What an `AttachEndpoint` asked the endpoint off the accounting
+/// thread, on its way back to be registered: the endpoint, the ids the
+/// person ticked, and the model list or why it could not be read.
+pub(crate) struct Attaching {
+    endpoint: gateway::AttachedEndpoint,
+    admit: Vec<String>,
+    served: Result<Vec<gateway::ModelFacts>, AxError>,
+    finishing: Finishing,
+}
+
+/// One request for an endpoint's model list, built on the accounting
+/// thread from what the city holds and sent from a thread of its own.
+struct Listing {
+    probe: gateway::Endpoint,
+    url: String,
+    attempts_left: u32,
+}
+
+impl Listing {
+    /// What the endpoint says it serves, asked again while the network
+    /// dropped the request and a retry is left.
+    ///
+    /// # Errors
+    /// The last refusal: a retry that is not allowed, or none left.
+    fn read(self) -> Result<Vec<gateway::ModelFacts>, AxError> {
+        let Listing {
+            probe,
+            url,
+            mut attempts_left,
+        } = self;
+        loop {
+            match probe.list_models(&url) {
+                Ok(served) => return Ok(served),
+                // Listing models is read-only, so an unknown effect is
+                // asked again as readily as a known one.
+                Err(err) if attempts_left > 0 && err.retry() != kernel::Retry::No => {
+                    attempts_left = attempts_left.saturating_sub(1);
+                }
+                Err(err) => return Err(err),
+            }
+        }
+    }
+}
 
 impl RunWorker {
     /// Asks a base URL what it serves, and attaches nothing.
@@ -30,19 +87,53 @@ impl RunWorker {
     /// The record carries the stage, and the refusal's own code and
     /// subject beside it.
     ///
+    /// **The requests leave the accounting thread.** The reading and the
+    /// model list are asked from a thread of their own, and the record
+    /// is written by [`Self::record_probe`] when they answer, so a slow
+    /// endpoint holds up nothing but this probe
+    /// (`crates/sprawling/Spec.lean` §8-42-9).
+    ///
     /// # Errors
-    /// A payload the ledger will not take, and a base URL whose
-    /// credential reference cannot be parsed - neither of which a probe
-    /// can report on, because neither got as far as a request.
+    /// A base URL whose credential reference cannot be parsed, and a
+    /// thread that will not start - neither of which a probe can report
+    /// on, because neither got as far as a request. A payload the
+    /// ledger will not take, and a transport this machine will not
+    /// build, are handed back once the probe answers.
     pub(in crate::worker) fn probe_endpoint(&mut self, entered: Entered) -> Result<(), AxError> {
         let entered = entered.resolved()?;
         let endpoint = self.endpoint_of(entered)?;
-        let found = Probing {
-            reach: reach_of(&endpoint.base_url, endpoint.tuning.proxying, self.monotonic)?,
-            served: self.probe(&endpoint),
-        };
-        let payload = probed_payload(&endpoint.name, &endpoint.base_url, found)?;
-        self.record(EventKind::EndpointProbed, payload)
+        let listing = self.listing(&endpoint);
+        let monotonic = self.monotonic;
+        let proxying = endpoint.tuning.proxying;
+        let gateway::AttachedEndpoint { name, base_url, .. } = endpoint;
+        let finishing = self.finishing();
+        self.flight.errands.send(move || {
+            let found = reach_of(&base_url, proxying, monotonic).map(|reach| Probing {
+                reach,
+                served: listing.and_then(Listing::read),
+            });
+            Answer::Probed(Probed {
+                name,
+                base_url,
+                found,
+                finishing,
+            })
+        })
+    }
+
+    /// Writes the `endpoint_probed` line a probe answered with, under
+    /// the key of the command that asked for it.
+    pub(in crate::worker) fn record_probe(&mut self, probed: Probed) {
+        let Probed {
+            name,
+            base_url,
+            found,
+            finishing,
+        } = probed;
+        self.finish(finishing, |worker| {
+            let payload = probed_payload(&name, &base_url, found?)?;
+            worker.record(EventKind::EndpointProbed, payload)
+        });
     }
 
     /// The endpoint a form describes, before anybody has asked it
@@ -150,8 +241,15 @@ impl RunWorker {
     /// is `probed`, which records that this list is the person's word
     /// rather than the endpoint's.
     ///
+    /// The probe is asked from a thread of its own, and the endpoint is
+    /// registered by [`Self::finish_attach`] when it answers
+    /// (`crates/sprawling/Spec.lean` §8-42-9). An attachment that
+    /// changes nothing the city keeps asks nothing and is registered at
+    /// once.
+    ///
     /// # Errors
-    /// A probe that fails with nothing declared: the city would have no
+    /// A thread that will not start; and, once the probe answers, a
+    /// probe that failed with nothing declared: the city would have no
     /// model id to call.
     pub(in crate::worker) fn attach_endpoint(
         &mut self,
@@ -185,7 +283,46 @@ impl RunWorker {
                 return self.record_attached(endpoint);
             }
         }
-        let unprobed = match self.probe(&endpoint) {
+        let listing = self.listing(&endpoint);
+        let (admit, finishing) = (admit.to_vec(), self.finishing());
+        self.flight.errands.send(move || {
+            let served = listing.and_then(Listing::read);
+            Answer::Attached(Attaching {
+                endpoint,
+                admit,
+                served,
+                finishing,
+            })
+        })
+    }
+
+    /// Registers the endpoint an `AttachEndpoint` probed, under the key
+    /// of the command that asked for it.
+    pub(in crate::worker) fn finish_attach(&mut self, attaching: Attaching) {
+        let Attaching {
+            endpoint,
+            admit,
+            served,
+            finishing,
+        } = attaching;
+        self.finish(finishing, |worker| {
+            worker.attach_served(endpoint, &admit, served)
+        });
+    }
+
+    /// Registers `endpoint` with the models `served` lists that `admit`
+    /// lets in, or with the ids `admit` names when the list could not be
+    /// read.
+    ///
+    /// # Errors
+    /// A list that could not be read with nothing declared.
+    fn attach_served(
+        &mut self,
+        mut endpoint: gateway::AttachedEndpoint,
+        admit: &[String],
+        served: Result<Vec<gateway::ModelFacts>, AxError>,
+    ) -> Result<(), AxError> {
+        let unprobed = match served {
             Ok(served) => {
                 endpoint.probed = true;
                 endpoint.models = served
@@ -249,8 +386,8 @@ impl RunWorker {
         self.credentials.book.learn(&blob, &bytes)
     }
 
-    /// What the endpoint says it serves, read for every fact each row
-    /// states.
+    /// The request that reads what the endpoint serves, for every fact
+    /// each row states; [`Listing::read`] sends it.
     ///
     /// The request is made the way a call to this endpoint would be -
     /// same headers, same deadline - because a probe that reached a
@@ -263,10 +400,7 @@ impl RunWorker {
     /// §8-16), while a person watching a settings page is waiting on this
     /// one request and a network that dropped it once is worth asking
     /// again.
-    fn probe(
-        &self,
-        endpoint: &gateway::AttachedEndpoint,
-    ) -> Result<Vec<gateway::ModelFacts>, AxError> {
+    fn listing(&self, endpoint: &gateway::AttachedEndpoint) -> Result<Listing, AxError> {
         let tuning = &endpoint.tuning;
         let mut extra_headers = dialect_headers(endpoint.dialect);
         extra_headers.extend(tuning.extra_headers.iter().cloned());
@@ -287,19 +421,11 @@ impl RunWorker {
             // no conversation, so it carries no picture either.
             gateway::Redemption::without_images(self.resolver()),
         )?;
-        let url = endpoint.models_url();
-        let mut attempts_left = tuning.request_max_retries.without_a_brake();
-        loop {
-            match probe.list_models(&url) {
-                Ok(served) => return Ok(served),
-                // Listing models is read-only, so an unknown effect is
-                // asked again as readily as a known one.
-                Err(err) if attempts_left > 0 && err.retry() != kernel::Retry::No => {
-                    attempts_left = attempts_left.saturating_sub(1);
-                }
-                Err(err) => return Err(err),
-            }
-        }
+        Ok(Listing {
+            probe,
+            url: endpoint.models_url(),
+            attempts_left: tuning.request_max_retries.without_a_brake(),
+        })
     }
 
     /// What an adapter redeems at the wire: the credential this city

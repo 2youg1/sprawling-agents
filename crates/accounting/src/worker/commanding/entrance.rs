@@ -79,6 +79,22 @@ impl Entrance {
         self.carrying
     }
 
+    /// Makes `key` the key of the command being carried out, for a
+    /// command finished once a provider request it sent off this thread
+    /// has answered, so the records it writes then carry the key it
+    /// entered with.
+    pub(in crate::worker) fn carry(&mut self, key: Option<IdemKey>) {
+        self.carrying = key;
+    }
+
+    /// Remembers `refusal` as the answer to `key`, which was settled
+    /// before its command's provider request answered: a repeat of the
+    /// frame is owed this refusal, not the silence of a success.
+    pub(in crate::worker) fn refused_later(&mut self, key: IdemKey, refusal: &AxError) {
+        self.seen.insert(key);
+        self.refused.insert(key, refusal.clone());
+    }
+
     /// Folds one line of the history back in.
     ///
     /// Called from the one verified pass a worker already makes over the

@@ -16,20 +16,32 @@ use kernel::{AxError, EventKind, Payload};
 
 use super::super::RunWorker;
 use super::{Chosen, Credential, ENVIRONMENT_ENDPOINT, Entered, Stated, local_model_facts};
+use crate::worker::commanding::door::{InHand, KeptRefusal};
 
 impl RunWorker {
+    /// Attaches the endpoint the environment names and chooses its model.
+    ///
+    /// The probe leaves this thread like any other, and this waits for
+    /// its answer before choosing the model, which needs the endpoint in
+    /// the book: the city is opening and serves nobody yet, so nothing
+    /// else waits behind it.
     fn seed_from_environment(&mut self, base_url: &str, model: &str) -> Result<(), AxError> {
         let facts = local_model_facts(model)?;
-        self.attach_endpoint(
-            Entered {
-                name: ENVIRONMENT_ENDPOINT.to_owned(),
-                base_url: base_url.to_owned(),
-                dialect: kernel::DialectKind::OpenAi,
-                credential: Credential::Absent { header: None },
-                tuning: gateway::EndpointTuning::default(),
-            },
-            &[],
-        )?;
+        let (reply, refusal) = KeptRefusal::open();
+        let in_hand = InHand {
+            name: "attach the endpoint the environment names",
+            reply,
+        };
+        let entered = Entered {
+            name: ENVIRONMENT_ENDPOINT.to_owned(),
+            base_url: base_url.to_owned(),
+            dialect: kernel::DialectKind::OpenAi,
+            credential: Credential::Absent { header: None },
+            tuning: gateway::EndpointTuning::default(),
+        };
+        self.with_in_hand(in_hand, |worker| worker.attach_endpoint(entered, &[]))?;
+        self.land_the_rest()?;
+        refusal.outcome()?;
         self.select_model(
             Chosen {
                 endpoint: ENVIRONMENT_ENDPOINT.to_owned(),

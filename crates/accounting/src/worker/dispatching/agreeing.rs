@@ -136,9 +136,13 @@ impl RunWorker {
         // What the room's files decide comes before a model is chosen,
         // and the delegate desk asks the same judgement at the call
         // (accounting D53).
-        let (building, rules) = match seat_from_files(&self.city_root, &Asked::of(at))? {
+        let (building, rules, judged) = match seat_from_files(&self.city_root, &Asked::of(at))? {
             RoomSeat::Harness(seat) => return Ok(Seat::Harness(seat)),
-            RoomSeat::Model { building, rules } => (building, rules),
+            RoomSeat::Model {
+                building,
+                rules,
+                judged,
+            } => (building, rules, judged),
         };
         let own = city::own_layer(&self.city_root, addr)?;
         let tag = self.tag_for(at.model.as_deref(), own.model())?;
@@ -152,8 +156,9 @@ impl RunWorker {
         let clock = std::sync::Arc::clone(&self.clock);
         let adapter = crate::worker::keeping_warm::Door::new(
             adapter,
-            city::keep_warm(&self.city_root, building.addr())?,
+            city::keep_warm(&self.city_root, &judged)?,
             Box::new(move || clock.now()),
+            self.warm.lead_of(&provider),
         );
         let retries = chosen.endpoint.tuning.request_max_retries;
         Ok(Seat::Model(Agreed {
@@ -322,6 +327,9 @@ enum RoomSeat {
     Model {
         building: city::Building,
         rules: city::BuildingRules,
+        /// The address the room's own settings are read at: the building
+        /// for a dispatch that opens a room, the room itself otherwise.
+        judged: Address,
     },
 }
 
@@ -345,14 +353,18 @@ fn seat_from_files(city_root: &Path, asked: &Asked<'_>) -> Result<RoomSeat, AxEr
     // empty and the address's own session record belongs to another
     // room.
     let judged = if super::session::opens_a_room(asked.addr, asked.session) {
-        building.addr()
+        building.addr().clone()
     } else {
-        asked.addr
+        asked.addr.clone()
     };
-    let Some((word, layer)) = city::settled_harness(city_root, judged)? else {
-        return Ok(RoomSeat::Model { building, rules });
+    let Some((word, layer)) = city::settled_harness(city_root, &judged)? else {
+        return Ok(RoomSeat::Model {
+            building,
+            rules,
+            judged,
+        });
     };
-    let file = city::config_path(city_root, judged, layer)?;
+    let file = city::config_path(city_root, &judged, layer)?;
     let roster = crate::roster::roster(city_root)?;
     let named = Named {
         word: &word,

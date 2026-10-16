@@ -212,6 +212,7 @@ export function answering(query: Query): Answer | undefined {
         by_segment: [],
         by_skill: [],
         by_tool: [],
+        renewals: { billed: UsdMicros.make(0), late: 0, read: 0, refused: 0, unreported: 0 },
         total: UsdMicros.make(1_200_000),
         unpriced: { calls: 0, tokens: 0 },
       },

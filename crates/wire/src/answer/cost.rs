@@ -23,6 +23,9 @@ pub struct CostAnswer {
     pub by_skill: Vec<(String, UsdMicros)>,
     /// The calls no provider priced, which `total` cannot show.
     pub unpriced: UnpricedCalls,
+    /// The keep-warm renewals: their spend, already inside `total`, and
+    /// how many there were by what each showed.
+    pub renewals: Renewals,
 }
 
 /// The model calls that came back with no authoritative amount, and the
@@ -34,4 +37,20 @@ pub struct CostAnswer {
 pub struct UnpricedCalls {
     pub calls: u64,
     pub tokens: u64,
+}
+
+/// The keep-warm renewals the city sent, as `storage::Renewals` counts
+/// them (storage D35, D36). `billed` is already inside `total` and the
+/// cuts, under the room and the `keep_warm` bucket, so a page draws it
+/// as a line inside the total and never adds it again. The four counts
+/// sum to the renewals sent; `late` ones arrived after the cache had
+/// gone and paid the write price for the prefix.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct Renewals {
+    pub billed: UsdMicros,
+    pub read: u64,
+    pub late: u64,
+    pub unreported: u64,
+    pub refused: u64,
 }

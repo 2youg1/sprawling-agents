@@ -198,10 +198,140 @@ fn a_call_with_no_amount_is_counted_as_unpriced_with_its_tokens() {
         report.unpriced,
         Unpriced {
             calls: 2,
-            tokens: 1542
+            // The one usage-bearing call: 1200 input (the whole prompt,
+            // cache parts included) + 300 output; the cache counts are
+            // not added again. The other call reported no usage.
+            tokens: 1500
         }
     );
     assert_eq!(report.total.get(), 700);
+}
+
+#[test]
+fn every_renewal_is_counted_by_what_it_showed() {
+    use kernel::event::record::CacheRenewed;
+    use kernel::{CacheCount, ModelUsage, Tokens};
+    let answered = |written: u64| CacheRenewed::Answered {
+        usage: Some(ModelUsage {
+            cache_write_tokens: CacheCount::Reported(Tokens::new(written)),
+            ..ModelUsage::default()
+        }),
+        billed_usd_micros: Some(UsdMicros::new(900)),
+    };
+    let refused = CacheRenewed::Refused {
+        refused: kernel::AxError::failure(
+            kernel::AxCode::Provider,
+            "renew a cached prefix",
+            "rate limited",
+        )
+        .with_recovery("renewal is skipped until the next real request"),
+    };
+    let lines = [
+        serde_json::to_value(answered(0)).unwrap(),
+        serde_json::to_value(answered(4096)).unwrap(),
+        serde_json::to_value(refused).unwrap(),
+        serde_json::json!({ "usage": "not a usage" }),
+    ];
+    let mut attribution = Attribution::new();
+    for (seq, data) in lines.into_iter().enumerate() {
+        attribution
+            .apply(&record(
+                RunId::CITY,
+                "city",
+                seq as u64,
+                EventKind::CacheRenewed,
+                data,
+            ))
+            .unwrap();
+    }
+    let report = attribution.report();
+    assert_eq!(
+        (report.renewals, report.total.get()),
+        (
+            Renewals {
+                billed: UsdMicros::new(1_800),
+                read: 1,
+                late: 1,
+                unreported: 1,
+                refused: 1,
+            },
+            1_800
+        )
+    );
+}
+
+/// A `cache_renewed` line as the accounting thread writes it: under
+/// the city's run, by the owner, at the room it kept warm.
+fn renewal(seq: u64, room: &str, renewed: &kernel::event::record::CacheRenewed) -> EventRecord {
+    let draft = EventDraft {
+        run: RunId::CITY,
+        t: TimeMs::new(seq),
+        who: "owner".to_owned(),
+        addr: Some(kernel::Address::parse(room).unwrap()),
+        kind: EventKind::CacheRenewed,
+        data: Payload::of(renewed).unwrap(),
+        ig: false,
+    };
+    EventRecord::from_draft(draft, Seq::new(seq), B3Hash::digest(b""))
+}
+
+/// A renewal's bill is money the city spent: it joins the total and
+/// every cut, under the room in `by_actor` and in the `keep_warm`
+/// bucket of the other four, and a renewal no provider priced counts
+/// as an unpriced call (storage D36).
+#[test]
+fn a_renewal_bill_joins_the_total_and_every_cut() {
+    use kernel::event::record::CacheRenewed;
+    use kernel::{ModelUsage, Tokens};
+    let run = RunId::from_bytes([5u8; 16]);
+    let room = "market/ito";
+    let unpriced_usage = ModelUsage {
+        input_tokens: Tokens::new(40),
+        output_tokens: Tokens::new(1),
+        ..ModelUsage::default()
+    };
+    let mut attribution = Attribution::new();
+    attribution
+        .apply(&record(
+            run,
+            room,
+            0,
+            EventKind::ModelReturned,
+            serde_json::json!({ "billed_usd_micros": 1_000u64 }),
+        ))
+        .unwrap();
+    for (seq, billed) in [(1u64, Some(UsdMicros::new(300))), (2, None)] {
+        let renewed = CacheRenewed::Answered {
+            usage: Some(unpriced_usage),
+            billed_usd_micros: billed,
+        };
+        attribution.apply(&renewal(seq, room, &renewed)).unwrap();
+    }
+    let report = attribution.report();
+    let row = |name: &str, micros: u64| (name.to_owned(), UsdMicros::new(micros));
+    assert_eq!(
+        (
+            report.total,
+            report.by_run,
+            report.by_actor,
+            report.by_segment,
+            report.by_tool,
+            report.by_skill,
+            report.unpriced,
+        ),
+        (
+            UsdMicros::new(1_300),
+            vec![row(&run.to_string(), 1_000), row("keep_warm", 300)],
+            vec![row(room, 1_300)],
+            vec![row("keep_warm", 300), row(NO_SEGMENT, 1_000)],
+            vec![row("keep_warm", 300), row(NO_TOOL, 1_000)],
+            vec![row("keep_warm", 300), row(NO_SKILL, 1_000)],
+            Unpriced {
+                calls: 1,
+                tokens: 41
+            },
+        )
+    );
 }
 
 #[test]

@@ -420,6 +420,7 @@ ARCHITECTURE.md §3「nothing here is published」是这条判定成立的前提
 | D59 | url 里的主机按 WHATWG URL 标准读 | `crates/kernel/spec/Gate.lean` |
 | D60 | 请求说出自己哪一段是一栋楼共享的；端点门前的等待经模型端口交回 | `crates/kernel/spec/Model.lean` |
 | D61 | 一次端点门前的等待是一行 record-only 的 `prefix_held`，种类表的行与实现同一次改动落地 | `crates/kernel/spec/Event/Record.lean` |
+| D62 | 一次真实使用至多一次续期，记在 `CacheUse` 里；续期时刻扣一个固定余量 | `crates/kernel/spec/KeepWarm.lean` |
 -/
 
 /-! ## 13 依赖选型

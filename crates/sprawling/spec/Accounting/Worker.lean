@@ -1102,7 +1102,7 @@ impl kernel::Ledger for Relay {
 }
 
 /// 唤醒记账线程的一切，同在一条队列上：每张嘴一个变体，再加关门。
-pub(crate) enum Wake { Relay(RelayRequest), Claim(ClaimAsk), Goal(GoalAsk), Home(Box<Arrival>), Command, Close }
+pub(crate) enum Wake { Relay(RelayRequest), Claim(ClaimAsk), Goal(GoalAsk), Home(Box<Arrival>), Answered(Box<Answer>), Command, Close }
 
 /// 一次看队列最多等多久。
 pub(crate) enum Patience { Now, For(Duration), Unbounded }
@@ -1116,13 +1116,14 @@ impl RelayGate {
     pub(crate) fn bell(&self) -> mpsc::Sender<Wake>;
     /// 按 `patience` 等第一条消息，再用 `try_recv` 把排在后面的一次取尽：relay 请求**合成一道屏障**
     /// 写下去，回家的活按到达次序放进 `homes`，Command 与 Close 只负责唤醒。
-    /// 认领按队列次序当场答复；目标登记不在这里答，按到达次序交回。
+    /// 认领按队列次序当场答复；目标登记与交出去的请求的回答不在这里处理，按到达次序交回。
     pub(crate) fn serve(&mut self, patience: Patience, ledger: &mut impl kernel::Ledger,
                         homes: &mut VecDeque<Arrival>) -> Drained;
 }
 /// 一次看队列留给记账线程的东西：账本收下的每一行（按账本次序，交给各份折叠），
-/// 与等着目标表答复的登记（按到达次序，交给 `RunWorker::answer_goal`）。
-pub(crate) struct Drained { pub(crate) written: Vec<EventDraft>, pub(crate) goals: Vec<GoalAsk> }
+/// 等着目标表答复的登记（按到达次序，交给 `RunWorker::answer_goal`），
+/// 与交出去的 provider 请求的回答（按到达次序，交给 `RunWorker::take_answer`，§8-42-9）。
+pub(crate) struct Drained { pub(crate) written: Vec<EventDraft>, pub(crate) goals: Vec<GoalAsk>, pub(crate) answers: Vec<Answer> }
 ```
 
 **为什么 `append` 阻塞**：`kernel::Ledger` 的契约写着「`Ok(ref)` 意味着这条记录在那个适配器的介质里已经耐久」。
@@ -1170,6 +1171,8 @@ pub(crate) struct Drained { pub(crate) written: Vec<EventDraft>, pub(crate) goal
 
 `settling` 一个字不改：它本来就只在记账线程上跑，触发点从「drive 返回」换成「`Driven` 到达」。
 **敲门仍在 settle 之后发出**。落地的类型、幂等键的落定语义与主循环的等待节奏写在 §8-46-2。
+
+记账线程交出去的 provider 请求（保温续期、端点探测）的回答也送进同一条队列（`Wake::Answered`，§8-42-9），在 relay 请求写下之后、回家的 run 落地之前记账；记账线程自己从不等 provider。
 
 准入计数住在记账线程上：它是「同时有几轮活在跑」的唯一权威，而唯一权威必须在唯一写者那一侧，
 否则两条线程各数各的，就有了两个答案。
@@ -1324,6 +1327,48 @@ pub(crate) fn booking(bell: mpsc::Sender<Wake>, claimant: Claimant) -> collab::B
   那是第二个「这片地归谁」的答案，同一次排空里的第二个登记还会读不到第一个。
 - 验收：`cargo nextest run -p sprawling -E 'test(/second_run_to_ask_for_a_node|two_runs_claiming_one_node_through_the_served_gate|two_runs_landing_different_nodes|a_claim_whose_landing_failed|a_claim_closed_on_the_ledger|a_landing_refused_part_way|a_split_closes_the_claim_on_its_parent|a_claim_booked_through_the_gate|two_runs_registering_one_ground/)'`；
   `cargo nextest run -p sprawling-collab -E 'test(/two_runs_read_as_ready/)'` 在桌子一侧钉住「第二个认领当场被拒、什么都不留」。
+### 8-42-9 `accounting::worker::errand`——记账线程交出去的 provider 请求（形状 4 适配器）
+
+```rust
+// accounting::worker::errand
+/// 一次交出去的 provider 请求的回答，回到记账线程上记账；每一种请求一个变体。
+pub(in crate::worker) enum Answer {
+    Renewed(keeping_warm::Renewed),             // 一扇保温门续完：房间、门、续期的回执或拒绝（§8-112）
+    Probed(credentials::endpoints::Probed),     // ProbeEndpoint：分段读数与模型表
+    Attached(credentials::endpoints::Attaching), // AttachEndpoint：登记前探测到的模型表
+}
+/// 交出去、还没回答的请求，以及回答回来的那一条队列。
+pub(in crate::worker) struct Errands { /* bell: Sender<Wake>、out: u32 —— 私有 */ }
+impl Errands {
+    pub(in crate::worker) fn open(bell: mpsc::Sender<Wake>) -> Errands;
+    /// 在一条自己的线程上跑 request，把它的 Answer 作为 `Wake::Answered` 送上那一条队列。
+    pub(in crate::worker) fn send(&mut self, request: impl FnOnce() -> Answer + Send + 'static) -> Result<(), AxError>;
+    pub(in crate::worker) fn answered(&mut self); // 记账线程取到了一个回答
+    pub(in crate::worker) fn out(&self) -> bool;  // 还有请求没回答
+}
+impl RunWorker {
+    /// 按变体把回答交给拥有那件事的模块记账。
+    pub(in crate::worker) fn take_answer(&mut self, answer: Answer);
+}
+// accounting::worker::commanding::door
+/// 一条命令把 provider 请求交出去就离开了门：它的名字、键与回信地址，回答回来时按门的规矩收尾。
+pub(in crate::worker) struct Finishing { /* name、key、reply —— 私有 */ }
+/// 门正在执行的那条命令：名字与回信地址（键在 `Entrance::carrying`）。
+pub(in crate::worker) struct InHand { pub(in crate::worker) name: &'static str, pub(in crate::worker) reply: wire::Reply }
+impl RunWorker {
+    pub(in crate::worker) fn with_in_hand<R>(&mut self, in_hand: InHand, work: impl FnOnce(&mut RunWorker) -> R) -> R;
+    pub(in crate::worker) fn finishing(&self) -> Finishing; // 手里没有命令时：没有人问，拒绝只记诊断
+    pub(in crate::worker) fn finish(&mut self, finishing: Finishing, work: impl FnOnce(&mut RunWorker) -> Result<(), AxError>);
+}
+```
+
+- **为什么交出去。** 记账线程是城唯一的写者（§8-42-1）。它等 provider 的每一刻，lane 的 relay 请求、回家的 run 与 desk 上的命令都跟着等（ARCHITECTURE §13.4），所以 provider 请求不在记账线程上跑。判定留在记账线程：该不该续、续哪一扇门由 `kernel::keep_warm` 经门的 `next_due` 判，探测哪个端点、用哪份凭据由 `endpoint_of` 读端点书判；记账也留在记账线程。交出去的只有网络那一段：一扇保温门的 `renew_due`，探测的 `gateway::reach` 与列模型表（含 `request_max_retries` 的重试）。
+- **走法。** 记账线程判定之后，把请求要的东西（保温门、已建好的 `gateway::Endpoint`、reach 的参数）移进 `send` 的闭包；`send` 起一条名为 `sprawling-errand` 的线程跑它，把回答作为 `Wake::Answered` 放上那一条队列，然后线程结束。线程不持有账本、端点书或任何一张桌子。`RelayGate::serve` 按到达次序把回答交回（`Drained.answers`），`serve_flight` 在答复目标登记之后逐个交给 `take_answer`。
+- **互不等待。** 一次请求一条线程，所以两扇门的续期、一次续期与一次探测都不排在一起；各自仍过端点的名额门（`crates/gateway/Spec.lean` D17），那是唯一的并发闸。
+- **命令的收尾。** `ProbeEndpoint` 与 `AttachEndpoint` 在请求交出去时就离开了门，门照常落定它的键。回答回来时 `finish` 在同一个键下收尾：这时写的行盖上这条命令的键（`commanding::entrance::stamped` 经 `Entrance` 正在处理的键），失败时与门同一种处理：写诊断（`{name} refused: …`）、把拒绝记进 `Entrance` 作为这个键的回答、交还给回信地址。名字与回信地址由门在执行命令时拿在手里（`carry_out` 经 `with_in_hand`），`probe_endpoint` 与 `attach_endpoint` 经 `finishing` 取用，与正在处理的键由 `Entrance` 拿在手里同一种做法；落选的是把回信地址作为参数穿过 `run_command` 的两臂，那张路由表已经顶着两百行的函数长度上限，而每一个以后要交出请求的动词都得再穿一次。页面看到的与原先一样：探测得到一行 `endpoint_probed`，登记得到一行 `endpoint_attached` 或一条拒绝；同一个键的重发在回答之前与之后都不再做一遍，回答之后得到那条拒绝。线协议不变。
+- **关城与没有循环的调用者。** `land_the_rest` 在还有 lane 在跑、或还有请求没回答时继续服务那一条队列，所以关城在写交接之前把付过钱的续期记上账，`handle`（测试、命令行、启动扫描）返回时它交出的探测已经记账（D79）。`handle` 给命令一个收下拒绝的回信地址，命令后来交还的第一条拒绝成为 `handle` 的返回值，所以登记时探测失败又没有点名模型，`handle` 仍返回那条拒绝。开城时环境变量点名的端点（`credentials::environment` 的 `seed_from_environment`）同样把探测交出去，并在选模型之前等它回答，因为选模型要端点已在端点书里；这时城还没有服务任何人，等待挡不住谁。
+- **失败。** 起不了线程时，探测的命令当场拒绝（`StorageFatal`，恢复语是检查进程的线程上限）；续期写一条 `cache_renewed` 的 `Refused`，那扇门被丢掉，与 provider 拒绝续期同样处理。请求自己的失败原样放进回答，由收尾的那一方处理，与原先在记账线程上得到它时的处理相同。
+- **验收。** `keeping_warm::tests::a_renewal_held_by_a_silent_provider_leaves_a_relay_answered`：一扇到期的门背后是一个放行之前不回答的替身 provider，另一条 lane 经 relay 追加一行；relay 在 provider 放行之前得到答复，续期回答之后 `cache_renewed` 写在门的房间下。`credentials::tests::probing::a_probe_held_by_a_silent_provider_leaves_the_next_command_answered`：一个放行之前不回答任何请求的替身端点，`serve_one` 交出 `ProbeEndpoint` 之后，下一条命令在端点放行之前得到它的答复，`land_the_rest` 之后 `endpoint_probed` 在账上。两条测试的替身在五秒后自己放行，所以一个仍在记账线程上等 provider 的实现让断言失败而不是挂住。
 -/
 
 /-!
@@ -1985,4 +2030,14 @@ impl OutputRing {
 /-! D26 写文档的两条命令在远程门外（§8-152，`crates/wire/Spec.lean` §19-2）
 
 `PutRange` 与 `DecideProposals` 的 `class` 是 `LocalOnly`：一台远程设备即使带着 `Act` 权限也不能经它们写城里的文件。`PutSpine` 是 `Act`，因为它只写一栋楼自己的四份 spine 文档，那是人离开电脑时仍要改的计划；`PutRange` 能写城里保留子树之外的任何一份文件，包括另一栋楼的源码与人的笔记，它比 `Act` 那一组宽。新命令一律 `LocalOnly` 是 §19-3 的规矩，这里写下的是没有例外的理由。**被否掉的**：随 `PutSpine` 定为 `Act`——一台被借走的手机就能改写城里任意一份文件，而撤销配对之前写下的东西只能从检查点里找回。条件变了就重议：人决定在外面也要改文档时，先给 `PutRange` 一个只写某几栋楼的范围，再谈 `Act`。
+-/
+
+/-! D78 记账线程交出的 provider 请求一次一条线程，回答走那一条队列（§8-42-9、§8-112）
+
+保温续期与端点探测各在一条自己的线程上跑，线程由 `accounting::worker::errand` 起（ARCHITECTURE §10 第 3 条点名的地方之一），回答作为 `Wake::Answered` 回到记账线程阻塞的那一条队列，由记账线程记账。续期在自己的线程上跑、不再在记账线程上跑，是定规；探测走同一条路，于是「provider 请求离开记账线程、回答回来记账」只有一个权威。**被否**：①交给驾驶池——lane 是一个 run 的，`in_flight` 数的是 run，追求的停止条件读它，一次续期被数成 run 会让一次排空等它；②一条常驻线程按次序跑所有请求——两扇同时到期的门、一次续期与一次三十秒的探测又排成一列，那正是续期迟到的来源之一，而且常驻线程要一条入口通道与一套关门协议，`pool` 已为同一理由不要它；③回答走第二条通道——记账线程一次只阻塞在一样东西上，第二条通道要靠超时轮询（`crates/accounting/spec/Worker/Attend.lean`）。**重开参数**：同一刻到期的门多到线程数本身成为代价（几百扇以上）时，给交出去的请求设一个上限。
+-/
+
+/-! D79 关城与 `handle` 等交出去的请求回答（§8-42-9）
+
+`land_the_rest` 在 lane 之外也等交出去的请求，所以关城在写交接之前、`handle` 在返回之前，把每个回答都记上账。理由：续期一到 provider 就计费；回答在关城之后才到的线程写不下 `cache_renewed`，那是一笔谁也读不到的花费。`handle` 的调用者紧接着读账本，探测的那一行必须已经在那里。**被否**：让线程脱离、关城时丢掉回答——一笔付了钱却不在账上的续期；关城时取消请求——阻塞的 HTTP 调用只能等它自己的超时结束，取消不了。代价是关城最多等一次请求自己的超时或名额门的排队；打断式的关城仍受 `INTERRUPT_GRACE` 约束（`Console/Lifecycle.lean` D75）。**重开参数**：排空式关城也要有时限时，交出去的请求随 lane 一起受那个时限约束。
 -/

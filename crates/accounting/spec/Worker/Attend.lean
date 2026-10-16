@@ -6,7 +6,7 @@
 /-!
 # 记账线程与它唯一的收件队列
 
-规定 `crates/accounting/src/worker/attend.rs` 里的循环 `attend`：写一座城 Ledger 的唯一线程，以及它服务的三张嘴——一条 lane 的中转请求、一个从 lane 回家的 run、一条来自 desk 的命令——外加 desk 关门。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威（`crates/sprawling/Spec.lean` §8-42-4）。
+规定 `crates/accounting/src/worker/attend.rs` 里的循环 `attend`：写一座城 Ledger 的唯一线程，以及它服务的三张嘴——一条 lane 的中转请求、一个从 lane 回家的 run、一条来自 desk 的命令——外加 desk 关门，和它交出去的 provider 请求带回来的回答（`accounting::worker::errand`，`crates/sprawling/Spec.lean` §8-42-9）。provider 请求本身不在这条线程上跑，所以服务任何一条消息都不等 provider。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威（`crates/sprawling/Spec.lean` §8-42-4）。
 
 每张嘴都送进同一条队列。线程阻塞在第一条消息上（`recv`），取走已经排在它后面的每一条（`try_recv` 直到取空），按到达次序服务这一批。排程欠下的截止时刻到了，与来一条消息一样唤醒它。
 
@@ -26,12 +26,13 @@ inductive Message where
   | relay (records : Nat)
   | home (records : Nat)
   | command (records : Nat)
+  | answer (records : Nat)
   | close
   deriving Repr, DecidableEq
 
 /-- 服务一条消息追加几条记录。 -/
 def Message.records : Message → Nat
-  | .relay n | .home n | .command n => n
+  | .relay n | .home n | .command n | .answer n => n
   | .close => 0
 
 /-- 线程的状态有四项：队列，按到达次序；至今追加过的每条记录的 seq，按追加次序；服务过的每条消息，按服务次序；以及排程的截止时刻是否已到。 -/

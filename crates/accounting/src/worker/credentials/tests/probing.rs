@@ -68,3 +68,77 @@ fn elapsed_ms(value: &serde_json::Value) -> Option<u64> {
         | serde_json::Value::String(_) => None,
     }
 }
+
+/// How long the stand-in endpoint stays silent when nobody releases it:
+/// long enough that an accounting thread waiting on it is seen waiting,
+/// short enough that a red run ends on its assertion.
+const SILENCE: std::time::Duration = std::time::Duration::from_secs(5);
+
+/// A probe waits on its endpoint off the accounting thread: while the
+/// endpoint is silent, the next command is still answered, and the
+/// probe's reading is written once the endpoint answers.
+#[test]
+fn a_probe_held_by_a_silent_provider_leaves_the_next_command_answered() {
+    let dir = tempfile::tempdir().unwrap();
+    let report = crate::worker::fixture::init_city(dir.path()).unwrap();
+    let (release, held) = std::sync::mpsc::channel::<()>();
+    let (said, heard) = std::sync::mpsc::channel();
+    // The first request the endpoint reads waits to be released; the
+    // ones after it pass, so a released probe finishes at once.
+    let silence = std::sync::Mutex::new(Some(held));
+    let endpoint_said = said.clone();
+    let pace: Pace = std::sync::Arc::new(move |_: &str| {
+        if let Some(held) = silence.lock().unwrap().take() {
+            held.recv_timeout(SILENCE).unwrap_or(());
+            endpoint_said.send("provider answered").unwrap();
+        }
+    });
+    let (base_url, _provider) = fake_openai_paced(&["m-small"], Vec::new(), Vec::new(), pace);
+    let mut worker = RunWorker::new(
+        dir.path(),
+        runtime::diagnostics::Diagnostics::off(),
+        crate::worker::fixture::hands(),
+    )
+    .unwrap();
+
+    worker.serve_one(Posted {
+        command: wire::Command::ProbeEndpoint {
+            name: wire::ProviderName::parse("house").unwrap(),
+            base_url,
+            dialect: kernel::DialectKind::OpenAi,
+            secret: None,
+            auth_header: None,
+            tuning: wire::EndpointTuning::default(),
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"probe"),
+        },
+        reply: wire::Reply::nowhere(),
+    });
+    worker.serve_one(Posted {
+        command: wire::Command::CloseCity(wire::CityClosing {
+            mode: wire::CloseMode::Drain,
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"close"),
+        }),
+        reply: wire::Reply::to(move |_| {
+            said.send("command answered").unwrap();
+            wire::Delivered::ToThePeer
+        }),
+    });
+    // A provider that already stopped waiting has dropped its end.
+    release.send(()).unwrap_or(());
+    worker.land_the_rest().unwrap();
+    let heard_in_order: Vec<&str> = (0..2)
+        .map(|_| heard.recv_timeout(SILENCE).unwrap())
+        .collect();
+
+    assert_eq!(
+        heard_in_order,
+        vec!["command answered", "provider answered"]
+    );
+    assert_eq!(
+        ledger_text(&report.ledger_dir)
+            .lines()
+            .filter(|line| line.contains("endpoint_probed"))
+            .count(),
+        1
+    );
+}

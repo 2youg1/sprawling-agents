@@ -17,6 +17,7 @@
 ```rust
 pub const CACHE_BREAKPOINTS_MAX: u32 = 4;
 pub const PROMPT_CACHE_TTL_SECS: u64 = 300;
+pub const PROMPT_CACHE_RENEWAL_MARGIN_SECS: u64 = 5;   // 不是外部事实：从上一行的寿命里扣下的余量，住在它旁边是因为只从它里面减（§8-74、D62）
 pub const EVENT_LOG_V: u32 = 2;                  // EventRecord.v 的唯一来源；2：四种等来的时刻各记各的（§8-4、D10）
 pub enum LogVersion { Current, Older, Ahead, NotAVersion }
 pub fn readable_log_v(v: u64) -> LogVersion;     // 「哪些账本版本读得开」的唯一权威
