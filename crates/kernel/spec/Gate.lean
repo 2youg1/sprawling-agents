@@ -24,7 +24,7 @@ pub enum EgressTarget { Loopback, Private, Public { host: String },
                         Connector { label: ServerLabel } }   // 分类由效果层解好址后注入
 pub enum EgressOutcome { Allow { first_public_egress: bool }, Deny { refusal: Box<AxError> } }
 pub fn egress(spans: &[SecretSpan], target: &EgressTarget, prior_public_egress: bool) -> EgressOutcome;
-pub struct EgressAllowlist { /* suffixes —— 私有 */ }    // 楼的出网后缀表；空表＝不出公网（机密楼恰是它）
+pub struct EgressAllowlist { /* suffixes —— 私有 */ }    // 楼的出网后缀表；空表＝不出公网（机密楼恰是它）；楼没写表时 bench 不调这道门（city D27）
 impl EgressAllowlist {
     pub fn new(entries: Vec<String>) -> EgressAllowlist;    // 去首尾空白与开头的点、转小写、排序去重：`.example.com` 与 `example.com` 是同一条
     pub fn is_empty(&self) -> bool;  pub fn entries(&self) -> impl Iterator<Item = &str>;
@@ -38,7 +38,7 @@ pub fn reaches_the_undoable(call: &ConnectorCall<'_>) -> bool;
 pub fn undoable(call: &ConnectorCall<'_>, sandbox: &SandboxLimits, taint: &TaintSet) -> GateOutcome;
 pub fn command(taint: &TaintSet) -> GateOutcome;                     // exec 的门：非空 taint 恒 Deny
 pub fn attach(endpoint: Option<&EgressTarget>) -> GateOutcome;        // 唯一会 Ask 的门
-pub fn host_of(url: &str) -> Result<Option<String>, AxError>;         // url 里的主机，全库一份
+pub fn host_of(url: &str) -> Result<Option<String>, AxError>;         // url 里的主机，全库一份；按 WHATWG URL 标准读（D59）
 pub fn target_of(host: &str) -> EgressTarget;                         // Loopback／Private／Public 的唯一判定
 
 pub enum DoorId { Domain, Reach, Egress, EgressHost, Discard, Spawn, Undoable, Attach, Command, Replacing }
@@ -113,6 +113,17 @@ pub fn undoable(call: &ConnectorCall<'_>, sandbox: &SandboxLimits, taint: &Taint
 **「tainted → Deny」是真分支**：`gate::undoable`、`gate::discard` 与 `gate::command` 按 taint 改答——同一输入，taint 为空时不拒、非空时拒；`gate::conformance::taint_readers` 对每道门两样都问，是这条的机器面，单测逐门断言。
 
 **重开参数**：出现一类没有 `Restoration` 的效果——那时的正确做法是让它不可拼写，而不是把 `Escalate` 加回来。
+-/
+
+/-! D59 url 里的主机按 WHATWG URL 标准读
+
+**决定**：`host_of` 用 `url` crate 解析整条 url，答它的 `host_str`（IPv6 去掉方括号）。这个 crate 实现浏览器遵循的 WHATWG URL 标准，所以门判的主机就是浏览器连的主机：`http://evil.test\@allowed.test/` 读作 `evil.test`（特殊 scheme 下反斜杠是路径分隔），`https://%65xample.com/` 读作 `example.com`，`http://2130706433/` 读作 `127.0.0.1`。没有 authority 的 url（`about:blank`、`file:` 路径、不带 scheme 的文字）不名任何主机；解析失败照旧以 `E_INVALID_ARGS` 拒，因为一个读不懂的主机会让出网没人判。
+
+**理由**：楼的出网域名表（city D27）按这个答案放行或拒绝。手工切分 authority 的写法与浏览器对同一串文字的读法不同：上面第一例里它答 `allowed.test`，浏览器却去了 `evil.test`，表就被绕过；第二例里它拒了一个表内的主机。判定与执行读同一份文法，是这道门成立的前提。
+
+**被否**：在手工切分上逐条补规则（反斜杠、百分号解码、数字形式的 IPv4）——每补一条都是 WHATWG 解析器里已有的一段，第二份文法迟早又与浏览器分叉。
+
+**重开参数**：浏览器之外出现一个按别的 url 文法连接的出网者（例如经 `exec` 的命令），那时它的主机由它自己的解析器回答，或由 #82 的代理在连接处判。
 -/
 
 /-! D26 Govern 类工具的只读操作在 run 里放行：效果按一次调用定，不按工具定

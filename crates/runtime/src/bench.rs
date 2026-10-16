@@ -69,6 +69,8 @@ pub struct ToolBench {
     /// went (`crates/runtime/spec/Bench.lean` §8-35).
     seen: BTreeMap<IdemKey, Result<ToolOutcome, AxError>>,
     prior_public_egress: bool,
+    /// The building's `egress` list; `None` is a building that wrote none.
+    egress: Option<kernel::EgressAllowlist>,
     /// The checkpoint net. A command the forecast suspects of deleting
     /// things does not get refused — text prediction is obfuscatable, so
     /// refusing on a substring would be security theatre that also
@@ -136,6 +138,7 @@ impl ToolBench {
             sandbox: kernel::SandboxLimits::default(),
             seen: BTreeMap::new(),
             prior_public_egress: false,
+            egress: None,
             net: None,
             job: None,
             asking: None,
@@ -285,7 +288,7 @@ impl ToolBench {
             let payload = net
                 .checkpoint
                 .wave_pre(&net.scope, now, &net.of)
-                .map_err(kernel_error_from_storage)?;
+                .map_err(storage::StorageError::into_ax)?;
             checkpointed = payload
                 .as_map()
                 .get("oid")
@@ -393,11 +396,6 @@ pub struct Ticket {
     wrote: kernel::Writes,
 }
 
-/// The storage crate owns its own error root; the turn layer speaks
-/// AxError, so the conversion happens once, here.
-fn kernel_error_from_storage(err: storage::StorageError) -> AxError {
-    err.into_ax()
-}
 #[cfg(test)]
 #[allow(
     clippy::unwrap_used,

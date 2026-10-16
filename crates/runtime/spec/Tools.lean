@@ -138,13 +138,14 @@ pub fn fingerprint(found: &[u8]) -> String;      // b3 前十六位
 
 pub struct ToolBench { /* tools: BTreeMap<ToolName, Box<dyn Tool>>、domain: WriteDomain、
                           taint: TaintSet、sandbox: kernel::SandboxLimits、seen: BTreeMap<IdemKey, Result<ToolOutcome, AxError>>、
-                          prior_public_egress: bool —— 私有。`seen` 是「这把键答过没有、答了什么」的唯一一张表：键只在工具真正答过之后才写入，门拒/语法拒不留条目，故重试不算重放。 */ }
+                          prior_public_egress: bool、egress: Option<EgressAllowlist>（楼写下的域名表，`None` 即楼没写，city D27）—— 私有。`seen` 是「这把键答过没有、答了什么」的唯一一张表：键只在工具真正答过之后才写入，门拒/语法拒不留条目，故重试不算重放。 */ }
 impl ToolBench {
     pub fn new(domain: WriteDomain) -> ToolBench;
     pub fn register(&mut self, tool: Box<dyn Tool>) -> Result<(), AxError>;
     /// Gate routing by declared Effect（收进回合层，executor 归还薄形）：
     /// exec 先 forecast（Suspected → **强制 checkpoint 先行**，见下）；Write → domain 门；
-    /// Egress → egress 门（subject 由工具从自己的参数读出）；Spend → 门已接，本构建无声明它的工具；
+    /// Egress → 先按楼的域名表判主机（楼写了表时），再过 egress 门（subject 由工具从自己的参数读出）；
+    /// AttachUserBrowser → attach 门，页面目标同样先按域名表判，再过 egress 门；Spend → 门已接，本构建无声明它的工具；
     /// Spawn → 无门（派生深度是类型，`gate::spawn` 在派活处判）；Govern → 恒拒（run 不改写评判它的那些规则，
     /// 规则在 CONFIG.toml 与楼的 RULES.toml 里由人改）；
     /// Deny 与门的提问（E_APPROVAL_PENDING）都以 `Refused` 作 tool_result 回流，不吞掉回合。
@@ -189,6 +190,11 @@ impl ToolBench {
     /// 条目要有 actor（问谁）与 artifact（看什么）；两者都不在一次工具调用里。
     /// 未给即拒（fail-closed）——一个人问不到的派生就是没人批准的派生。
     pub fn for_job(self, asking: Address, job: Locator) -> ToolBench;
+    /// 楼写下的出网域名表，随 run 冻结。只在楼写了表时调用；没调用的 bench 不按主机拒任何调用
+    /// （city D27）。判定是对这张表的内存比对，不读盘、不解析域名，所以这道门不给调用加往返。
+    /// 表外的主机以 `kernel::gate::egress_target` 的 `E_GATE_DENIED` 作 tool_result 回流，
+    /// 排在密钥扫描之前：一个不该去的主机，不必再问它的字节能不能出去。
+    pub fn limit_egress(self, list: EgressAllowlist) -> ToolBench;
 }
 ```
 

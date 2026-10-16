@@ -9,6 +9,17 @@
 use super::*;
 
 impl ToolBench {
+    /// Hands the bench the egress list the building wrote, frozen with
+    /// the run (`crates/city/spec/Policy.lean` D27). A browser call to a
+    /// public host outside it is refused before any byte leaves; the
+    /// judgement compares against this short list, so it adds no read,
+    /// no lookup and no round trip to the call.
+    #[must_use]
+    pub fn limit_egress(mut self, list: kernel::EgressAllowlist) -> ToolBench {
+        self.egress = Some(list);
+        self
+    }
+
     /// The door this call's declared Effect names.
     ///
     /// `None` means the door is open and the tool may run; `Some` means
@@ -97,6 +108,9 @@ impl ToolBench {
                 // this machine, and the scan still runs: what a model
                 // typed into a page would leave through it.
                 let target = bytes_target(name, subject, "send bytes out")?;
+                if let Some(answered) = self.listed(&target) {
+                    return Ok(Some(answered));
+                }
                 let spans = kernel::secret::scan(&scanned(call, "scan egress args")?);
                 let verdict = kernel::gate::egress(&spans, &target, self.prior_public_egress);
                 if let Some(answered) = self.crossed(verdict) {
@@ -120,6 +134,9 @@ impl ToolBench {
                 // page is the credential this door can see, and a call
                 // that names no page is the attachment itself.
                 let page = bytes_target(name, subject, "drive a browser")?;
+                if let Some(answered) = self.listed(&page) {
+                    return Ok(Some(answered));
+                }
                 let spans = kernel::secret::scan(&scanned(call, "scan browser args")?);
                 let verdict = kernel::gate::egress(&spans, &page, self.prior_public_egress);
                 if let Some(answered) = self.crossed(verdict) {
@@ -194,6 +211,18 @@ impl ToolBench {
             GateOutcome::Allow => None,
             GateOutcome::Deny { refusal } => Some(BenchOutcome::Refused { refusal }),
             GateOutcome::Ask { question } => Some(BenchOutcome::Refused { refusal: question }),
+        }
+    }
+
+    /// The building's egress list, asked about the host one call names
+    /// when the building wrote a list (`crates/city/spec/Policy.lean`
+    /// D27). It stands before the secret scan: a host the building does
+    /// not reach owes no answer about which bytes may go there.
+    fn listed(&self, target: &EgressTarget) -> Option<BenchOutcome> {
+        let list = self.egress.as_ref()?;
+        match kernel::gate::egress_target(list, target) {
+            EgressOutcome::Allow { .. } => None,
+            EgressOutcome::Deny { refusal } => Some(BenchOutcome::Refused { refusal }),
         }
     }
 
@@ -431,6 +460,70 @@ mod tests {
             .invoke(&call("webbish", kernel::Payload::empty()), &key(2), at())
             .unwrap();
         assert!(matches!(answered, BenchOutcome::Ran { .. }));
+    }
+
+    fn listing(domains: &[&str]) -> kernel::EgressAllowlist {
+        kernel::EgressAllowlist::new(domains.iter().map(|d| (*d).to_owned()).collect())
+    }
+
+    fn page(host: &str) -> GateSubject {
+        GateSubject::Host(host.to_owned())
+    }
+
+    /// The building's list decides which public hosts a browser call
+    /// reaches, its subdomains included; a building that wrote no list
+    /// keeps every host (`crates/city/spec/Policy.lean` D27).
+    #[test]
+    fn a_browser_call_reaches_only_the_hosts_the_building_lists() {
+        let outcomes = [
+            ("pastebin.test", Some(listing(&["example.com"]))),
+            ("docs.example.com", Some(listing(&["example.com"]))),
+            ("example.com", Some(listing(&[]))),
+            ("pastebin.test", None),
+            ("127.0.0.1", Some(listing(&[]))),
+        ]
+        .into_iter()
+        .enumerate()
+        .map(|(n, (host, list))| {
+            let bench = bench_with(stub("webbish", Effect::Egress, page(host)));
+            let mut bench = match list {
+                Some(list) => bench.limit_egress(list),
+                None => bench,
+            };
+            let seq = u64::try_from(n).unwrap() + 10;
+            match bench.invoke(&call("webbish", kernel::Payload::empty()), &key(seq), at()) {
+                Ok(BenchOutcome::Ran { .. }) => "ran".to_owned(),
+                Ok(BenchOutcome::Refused { refusal }) => refusal.code().to_string(),
+                Ok(BenchOutcome::Duplicate { .. }) => "duplicate".to_owned(),
+                Err(failed) => format!("failed {}", failed.code()),
+            }
+        })
+        .collect::<Vec<_>>();
+        assert_eq!(
+            outcomes,
+            ["E_GATE_DENIED", "ran", "E_GATE_DENIED", "ran", "ran"]
+        );
+    }
+
+    /// The person's browser is held to the same list for the page a call
+    /// names, after the door that asks whether it may be attached at all.
+    #[test]
+    fn the_persons_browser_is_held_to_the_same_list() {
+        let effect = Effect::AttachUserBrowser {
+            address: Some("127.0.0.1".to_owned()),
+        };
+        let mut bench = bench_with(stub("drives", effect, page("pastebin.test")))
+            .limit_egress(listing(&["example.com"]));
+        let answered = bench
+            .invoke(&call("drives", kernel::Payload::empty()), &key(30), at())
+            .unwrap();
+        let BenchOutcome::Refused { refusal } = answered else {
+            panic!("expected a refusal, got {answered:?}");
+        };
+        assert_eq!(
+            (refusal.code(), refusal.subject()),
+            (&AxCode::GateDenied, "pastebin.test")
+        );
     }
 
     #[test]

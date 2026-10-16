@@ -28,7 +28,7 @@ pub struct BuildingRules { /* addr、policy、write_prefixes、reach、egress、
 impl BuildingRules {
     pub fn policy(&self) -> &BuildingPolicy;          // 随每次模型调用出行
     pub fn addr(&self) -> &Address;
-    pub fn egress(&self) -> &EgressAllowlist;         // confidential 楼恒空；它声明的表在 evaluate 处即拒
+    pub fn egress(&self) -> Option<&EgressAllowlist>; // `None`：楼没写这一键，不限主机（D27）；confidential 楼恒 `Some(空表)`，它声明的表在 evaluate 处即拒
     pub fn review(&self) -> bool;                     // 缺这一行读作 false：run 的写由别的居民合并后才可见
     pub fn browser(&self) -> bool;                    // 缺这一行读作 false；confidential 楼恒 false
     pub fn reach(&self) -> DomainReach;               // Building 分部
@@ -61,8 +61,8 @@ impl RulesCache {
 - **confidential 楼声明越界前缀＝拒而不裁剪**：静默裁剪会让文件说一套、城做另一套；拒绝会指出该改哪一行。
 - **无声明写域时默认只写本楼**：一栋楼至少能写自己，且不多。`prefixes` 里一条读不出的地址**传播而不跳过**——在读它的地方丢掉，一栋楼就写得比人授予的少，而这件事没有任何一处说出来。
 - **`review = true` 是楼级开关**：开则每个 Run 得一棵自己的 worktree，写的东西在别人检查并 merge 之前对楼不可见。**默认关**，与 confidential 的「不声明即错」相反——隐私的默认值不得惄悄取宽，而审查纪律的默认值不得惄悄取严：一个人派一个 Agent 去改一行字并盯着看，应当看得到文件变化。拼写不是 `true`／`false` 同样拒。
-- **`## Egress` 列可达域名**：`BuildingRules::egress()` 交 `kernel::gate::egress::egress_target` 判定。类型经 `kernel::EgressAllowlist` 重导出，住哪一簇文件是 kernel 内政（`gate::egress`，公共拼写不变）。**confidential 楼同时列域名＝矛盾，拒**——「数据可入不可出」是那个设置的含义，域名表写在它下面会逼读者自己去调和两句话。
-- **执行点与缺口要分清**：provider 路径由 `endpoint` 的 confidential 拒守住；Agent 自己发起的出网是否被拦，取决于 exec 所在的那一臂 `runtime::tools::exec::Confinement` 是否承诺关网（`Guarantee::Network`，每一臂在工具描述里说出自己不承诺什么），浏览器则没有拦截处。判定在这里，拦截不在——不承诺关网的地方不要说「出网已管住」。
+- **`egress` 是可选的域名表**：不写这一键，楼不限主机；写了表，城的浏览器与人的浏览器只导航到表中域名及其子域；空表是不到任何公网主机（D27）。表随 run 冻结，经 `limit_egress` 交给 `runtime::bench::ToolBench`，由它在每次调用前以 `kernel::gate::egress::egress_target` 判定。类型经 `kernel::EgressAllowlist` 重导出，住哪一簇文件是 kernel 内政（`gate::egress`，公共拼写不变）。**confidential 楼同时列域名＝矛盾，拒**——「数据可入不可出」是那个设置的含义，域名表写在它下面会逼读者自己去调和两句话。
+- **执行点与缺口要分清**：provider 路径由 `endpoint` 的 confidential 拒守住；Agent 自己发起的出网是否被拦，取决于 exec 所在的那一臂 `runtime::tools::exec::Confinement` 是否承诺关网（`Guarantee::Network`，每一臂在工具描述里说出自己不承诺什么），浏览器工具一次调用点名的页面由 bench 按表判，页面里的子资源、重定向与 `exec` 发起的连接不经这张表。判定在这里，拦截只到调用点名的那个主机——不承诺关网的地方不要说「出网已管住」。
 - **`usersbrowser` 一键同时是开关与地址**：值 `"ws://127.0.0.1:<port>/session"` 启用并声明地址，`true` 启用而地址未定（工具每次调用都得到门的问题），absent／`false` 即无此工具。**confidential 楼写这一键即拒**（`E_CONFIG_INVALID`）——附着读的是那个人浏览器里全部登录态，本楼的隔离在那一刻失效。地址的**语法**（`ws://`、主机形状）在此读一次并把 `url`／`host` 一起交出；**loopback 与否是 `kernel::gate::attach` 的政策**，语法不替政策作答。
 - **`browser` 与 `usersbrowser` 是两个键**：前者是城自己拉起的浏览器（profile 按楼隔离），后者是人已经开着的那个（人的真 profile）。`browser` 不是 `usersbrowser` 的前缀截断——TOML 的键是文法给出的整体，两个设置因此互不误读。
 - **`write_rules_against` 先求值再落盘**：一份写到一半就不再求值的治理文档会把它那栋楼一起带走。且**整份文档才是单位**：confidential 楼不得列域名，故两行可以各自合法而合在一起非法。
@@ -180,6 +180,17 @@ pub fn write_city_setting(city_root: &Path, setting: CitySetting) -> Result<(), 
 **重开参数**：出现一栋每次 run 都必须只新建的楼（例如只收稿件的投稿楼），且人要求不依赖每次派活都选对时。
 -/
 
+/-! D27 `egress` 不写是不限主机，写了才判
+
+**决定**：`RULES.toml` 的 `egress` 是可选键。不写，楼不受域名表约束，浏览器到哪里只由 `browser`／`usersbrowser` 两个开关决定；写了，城在每次浏览器调用前按表判它点名的主机，表外的主机以 `E_GATE_DENIED` 作工具结果回流；写成空表，楼不到任何公网主机。机密楼不读这一键，恒取空表。新楼的模板不写这一键，只留一行注释给出写法。
+
+**理由**：域名表是人选择收紧一栋楼的手段，不是每栋楼都要回答的问题。缺省取「空表＝不出公网」时，每一栋开了 `browser = true` 却没列域名的楼都会在升级后失去浏览器，人得先读懂拒绝才知道去补哪一行；缺省取「不限」时，没写这一键的楼行为不变，写了表的楼得到它以为已有的约束。判定是对一张随 run 冻结的短表做后缀比对，不读盘、不解析域名、不多一次往返，所以加这道门不给任何调用加可测的延迟。
+
+**被否**：沿用模板里的 `egress = []` 并把空表读作「不限」——空表读作放行就是隐私设置朝宽松一侧失败，与本文件其余各键的方向相反，也与 `kernel::EgressAllowlist` 写明的「空表＝不出公网」冲突。
+
+**重开参数**：出现一种默认就该关网的楼（例如只读城内资料、从不需要公网的楼），且人要求新楼一律从「不出公网」开始时。
+-/
+
 /-!
 ## 模型：机密楼没有出路，写域止于本楼，治理文件在一切写域之外，留住的规则就是现读的规则
 
@@ -213,7 +224,7 @@ inductive DomainReach where
 structure Written where
   confidential : Option Bool
   write : Option DomainReach
-  egress : List String
+  egress : Option (List String)
   browser : Bool
   usersbrowser : Granted
   desktop : Bool
@@ -224,7 +235,7 @@ structure BuildingRules where
   addr : Address
   confidential : Bool
   reach : DomainReach
-  egress : List String
+  egress : Option (List String)
   browser : Bool
   usersbrowser : Option Granted
   desktop : Bool
@@ -244,7 +255,7 @@ def usersbrowserOf : Granted → Option Granted
 
 /-- 规则要了哪一种出路：出网域名、城的浏览器、人的浏览器、桌面。 -/
 def wayOut (written : Written) : Bool :=
-  !written.egress.isEmpty || written.browser || (usersbrowserOf written.usersbrowser).isSome ||
+  !(written.egress.getD []).isEmpty || written.browser || (usersbrowserOf written.usersbrowser).isSome ||
     written.desktop
 
 /-- `evaluate`：缺键即拒；机密楼要任何一种出路即拒。 -/
@@ -253,7 +264,8 @@ def evaluate (addr : Address) (written : Written) : Except Refused BuildingRules
   | some confidential, some reach =>
     match confidential && wayOut written with
     | true => .error .Contradiction
-    | false => .ok ⟨addr, confidential, reach, written.egress, written.browser,
+    | false => .ok ⟨addr, confidential, reach, if confidential then some [] else written.egress,
+      written.browser,
       usersbrowserOf written.usersbrowser, written.desktop, written.prefixes⟩
   | _, _ => .error .Missing
 
@@ -266,7 +278,8 @@ theorem a_rules_file_that_does_not_say_confidential_is_refused (addr : Address) 
 theorem a_confidential_building_has_no_way_out (addr : Address) (written : Written)
     (rules : BuildingRules) (evaluated : evaluate addr written = .ok rules)
     (confidential : rules.confidential = true) :
-    rules.egress = [] ∧ rules.browser = false ∧ rules.usersbrowser = none ∧ rules.desktop = false := by
+    rules.egress = some [] ∧ rules.browser = false ∧ rules.usersbrowser = none ∧
+      rules.desktop = false := by
   unfold evaluate at evaluated
   split at evaluated
   · rename_i c reach _ _
@@ -280,7 +293,7 @@ theorem a_confidential_building_has_no_way_out (addr : Address) (written : Writt
   · cases evaluated
 
 /-- 一栋普通的楼可以列出网域名：机密楼的拒绝不是拒绝一切换来的。 -/
-example : (evaluate ⟨["lab"]⟩ ⟨some false, some .Everything, ["example.org"], false, .Switch false,
+example : (evaluate ⟨["lab"]⟩ ⟨some false, some .Everything, some ["example.org"], false, .Switch false,
     false, []⟩).toBool = true := rfl
 
 /-- `BuildingRules::write_domain` 的前缀：机密楼的前缀出了本楼即拒；一条都没写就是整栋楼。 -/

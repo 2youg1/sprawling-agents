@@ -80,7 +80,7 @@ pub struct BuildingRules {
     policy: BuildingPolicy,
     write_prefixes: Vec<Address>,
     reach: DomainReach,
-    egress: EgressAllowlist,
+    egress: Option<EgressAllowlist>,
     review: bool,
     /// Whether residents here are given the browser tool.
     browser: bool,
@@ -110,15 +110,18 @@ impl BuildingRules {
         &self.addr
     }
 
-    /// The domains this building may reach.
+    /// The domains this building may reach, when its file lists them;
+    /// `None` is a building that wrote no `egress` key and is held to no
+    /// domain list (`crates/city/spec/Policy.lean` D27).
     ///
-    /// A confidential building has none, whatever its file says: "data
-    /// enters and does not leave" is the meaning of the setting, so a
-    /// declared list under it would be a contradiction the reader would
-    /// have to resolve. The list it declared is refused at evaluation.
+    /// A confidential building has the empty list, whatever its file
+    /// says: "data enters and does not leave" is the meaning of the
+    /// setting, so a declared list under it would be a contradiction the
+    /// reader would have to resolve. The list it declared is refused at
+    /// evaluation.
     #[must_use]
-    pub fn egress(&self) -> &EgressAllowlist {
-        &self.egress
+    pub fn egress(&self) -> Option<&EgressAllowlist> {
+        self.egress.as_ref()
     }
 
     /// Whether work done here has to be checked by someone else before
@@ -350,7 +353,7 @@ pub fn load(city_root: &Path, addr: &Address) -> Result<BuildingRules, AxError> 
                     policy: BuildingPolicy::default(),
                     write_prefixes: Vec::new(),
                     reach: DomainReach::Everything,
-                    egress: EgressAllowlist::default(),
+                    egress: None,
                     review: false,
                     browser: false,
                     usersbrowser: None,

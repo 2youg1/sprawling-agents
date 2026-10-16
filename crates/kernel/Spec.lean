@@ -417,11 +417,12 @@ ARCHITECTURE.md §3「nothing here is published」是这条判定成立的前提
 | D55 | 凭据能否兑付在开轮时读一次；一个账号的凭据缺失只让这个账号出局，vault 本身的故障让整轮停下 | `crates/kernel/spec/AccountRecovery.lean` |
 | D56 | `Effort` 是七级的闭枚举；每个（Endpoint，模型）提供哪几级是上游的陈述，由 gateway 回答 | `crates/kernel/spec/Model.lean` |
 | D57 | 登记时的模型事实进 CAS，账本行只记摘要 | `crates/kernel/spec/Event/Record.lean` |
+| D59 | url 里的主机按 WHATWG URL 标准读 | `crates/kernel/spec/Gate.lean` |
 -/
 
 /-! ## 13 依赖选型
 
-`serde`＋`serde_json`（规范字节与载荷）；`thiserror`（Display/Error derive）；`blake3`（唯一哈希）；`uuid`（v7 仅解析/格式化＋serde 特性，恒不启用生成特性——kernel 禁随机）；`secrecy`＋`zeroize`（Sealed）。版本由根 `Cargo.toml` 与 `Cargo.lock` 给出。dev：`proptest`、`insta`、`trybuild`。不引：hex、rand、chrono/time（时间是入参）、regex（C12：熵与形状判定手写定点算法）。
+`serde`＋`serde_json`（规范字节与载荷）；`thiserror`（Display/Error derive）；`blake3`（唯一哈希）；`uuid`（v7 仅解析/格式化＋serde 特性，恒不启用生成特性——kernel 禁随机）；`url`（WHATWG URL 解析，只在 `gate::host_of` 一处，D59）；`secrecy`＋`zeroize`（Sealed）。版本由根 `Cargo.toml` 与 `Cargo.lock` 给出。dev：`proptest`、`insta`、`trybuild`。不引：hex、rand、chrono/time（时间是入参）、regex（C12：熵与形状判定手写定点算法）。
 
 规格本身不加依赖：分部只 import 工具链的库与本 crate 的分部；kernel 是 ARCHITECTURE.md §3 `depmap` 块的根，它的分部不 import 任何别的 crate 的分部。
 -/

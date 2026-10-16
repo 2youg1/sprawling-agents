@@ -187,8 +187,8 @@ fn a_building_reaches_the_domains_it_names_and_nothing_else() {
         &ordinary("egress = [\"crates.io\", \"docs.rs\"]\n"),
     )
     .unwrap();
-    assert!(rules.egress().admits("static.crates.io"));
-    assert!(!rules.egress().admits("pastebin.test"));
+    let listed = rules.egress().unwrap();
+    assert!(listed.admits("static.crates.io") && !listed.admits("pastebin.test"));
 }
 
 #[test]
@@ -200,8 +200,7 @@ fn a_confidential_building_that_also_lists_domains_is_a_contradiction_and_is_ref
 #[test]
 fn a_confidential_building_reaches_nothing_public() {
     let rules = evaluate(&addr("vault"), &shut("")).unwrap();
-    assert!(rules.egress().is_empty());
-    assert!(!rules.egress().admits("example.com"));
+    assert_eq!(rules.egress(), Some(&EgressAllowlist::default()));
 }
 
 #[test]

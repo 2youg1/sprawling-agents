@@ -152,44 +152,31 @@ impl EgressAllowlist {
 /// One authority for the whole workspace: the browser tool reading a page
 /// address and a building reading the address a person declared for
 /// their browser are the same question, and two parsers would answer it
-/// differently the first time either was corrected. No URL parser: only
-/// the authority component is asked for, and `about:blank` or a `file:`
-/// path names no host.
+/// differently the first time either was corrected. The URL is read by
+/// the WHATWG URL Standard, the parser browsers follow, so the host the
+/// egress door judges is the host a browser connects to (D59): a
+/// backslash ends the authority of a special scheme, the host is
+/// percent-decoded and lowercased, and a number spells an IPv4 address.
+/// A URL with no authority - `about:blank`, a `file:` path, text with no
+/// scheme - names no host.
 ///
 /// # Errors
-/// Refuses an authority this build cannot read, which would leave an
-/// egress unjudged.
+/// Refuses a URL this build cannot read, which would leave an egress
+/// unjudged.
 pub fn host_of(url: &str) -> Result<Option<String>, AxError> {
-    let Some((_scheme, rest)) = url.split_once("://") else {
-        return Ok(None);
+    let parsed = match url::Url::parse(url.trim()) {
+        Ok(parsed) => parsed,
+        Err(url::ParseError::RelativeUrlWithoutBase) => return Ok(None),
+        Err(_) => return Err(malformed_host()),
     };
-    let authority = rest.split(['/', '?', '#']).next().unwrap_or_default();
-    let after_user = authority
-        .rsplit_once('@')
-        .map_or(authority, |(_userinfo, host)| host);
-    if after_user.is_empty() {
-        return Ok(None);
-    }
-    if let Some(bracketed) = after_user.strip_prefix('[') {
-        let (inside, _tail) = bracketed.split_once(']').ok_or_else(malformed_host)?;
-        if inside.is_empty() {
-            return Err(malformed_host());
-        }
-        return Ok(Some(inside.to_ascii_lowercase()));
-    }
-    let host = if let Some((candidate, port)) = after_user.rsplit_once(':') {
-        if !port.is_empty() && port.chars().all(|c| c.is_ascii_digit()) {
-            candidate
-        } else {
-            after_user
-        }
-    } else {
-        after_user
-    };
-    if host.is_empty() || host.contains(':') {
-        return Err(malformed_host());
-    }
-    Ok(Some(host.to_ascii_lowercase()))
+    Ok(parsed
+        .host_str()
+        .filter(|host| !host.is_empty())
+        .map(|host| {
+            host.trim_start_matches('[')
+                .trim_end_matches(']')
+                .to_ascii_lowercase()
+        }))
 }
 
 fn malformed_host() -> AxError {
