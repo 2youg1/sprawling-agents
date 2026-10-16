@@ -198,7 +198,10 @@ fn a_call_with_no_amount_is_counted_as_unpriced_with_its_tokens() {
         report.unpriced,
         Unpriced {
             calls: 2,
-            tokens: 1542
+            // The one usage-bearing call: 1200 input (the whole prompt,
+            // cache parts included) + 300 output; the cache counts are
+            // not added again. The other call reported no usage.
+            tokens: 1500
         }
     );
     assert_eq!(report.total.get(), 700);

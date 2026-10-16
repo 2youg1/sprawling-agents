@@ -67,31 +67,49 @@ impl Warmth {
             .min()
     }
 
-    /// Hands every renewal due by `now_ms` to `send`, one at a time, and
-    /// returns each one's answer, whose usage the caller records like
-    /// any other. A prefix that owes no renewal is let go here.
-    ///
-    /// # Errors
-    /// The failure `send` returned, unchanged; the prefixes not yet
-    /// renewed stay for the next wake.
+    /// Hands every renewal due by `now_ms` to `send`, one at a time.
+    /// Every answer comes back in the round, a refusal beside the
+    /// answers that preceded it rather than instead of them: their usage
+    /// the caller owes the ledger all the same. Nothing more is sent
+    /// after a refusal, and a prefix that owes no renewal is let go
+    /// here.
     pub fn renew_due(
         &mut self,
         lead: &Lead,
         now_ms: u64,
         mut send: impl FnMut(&ModelRequest) -> Result<ModelReturn, AxError>,
-    ) -> Result<Vec<ModelReturn>, AxError> {
+    ) -> RenewalRound {
         let (setting, lead_ms) = (self.setting, lead.ms());
         self.kept
             .retain(|_, kept| renewal_due(setting, kept.cache, lead_ms).is_some());
-        let mut answers = Vec::new();
+        let mut round = RenewalRound::default();
         for kept in self.kept.values_mut() {
             if renewal_due(setting, kept.cache, lead_ms).is_some_and(|due| due <= now_ms) {
-                answers.push(send(&renewal_of(&kept.request))?);
-                kept.cache = kept.cache.renewed();
+                match send(&renewal_of(&kept.request)) {
+                    Ok(answer) => {
+                        round.answers.push(answer);
+                        kept.cache = kept.cache.renewed();
+                    }
+                    Err(refused) => {
+                        round.refused = Some(refused);
+                        break;
+                    }
+                }
             }
         }
-        Ok(answers)
+        round
     }
+}
+
+/// What one wake's renewals came back with: every answer the provider
+/// gave, and the first refusal when one came. The answers survive a
+/// later refusal, because each one's usage is already spent.
+#[derive(Debug, Default)]
+pub struct RenewalRound {
+    /// Each renewal the provider answered, in the order sent.
+    pub answers: Vec<ModelReturn>,
+    /// The refusal that ended the round, if one did.
+    pub refused: Option<AxError>,
 }
 
 /// The last real request, asking for one output token: the cache hits on
@@ -110,7 +128,7 @@ fn renewal_of(request: &ModelRequest<'static>) -> ModelRequest<'static> {
 /// A clone shares the reading, so every door that reaches the endpoint
 /// renews by the same lead: the network path and the permit gate belong
 /// to the endpoint, and one door sees one renewal per real use, too few
-/// to keep a reading of its own (`crates/runtime/spec/Prefix.lean` D98).
+/// to keep a reading of its own (`crates/runtime/spec/Prefix.lean` D100).
 #[derive(Debug, Clone, Default)]
 pub struct Lead(Arc<AtomicU64>);
 
@@ -138,7 +156,7 @@ impl Lead {
 /// The clock is the caller's, injected from the one sampling point. The
 /// door measures its endpoint's [`Lead`] from a renewal's round trip and
 /// from a real call's first increment, never from a whole call, whose
-/// generation the provider's lifetime does not wait for (D98).
+/// generation the provider's lifetime does not wait for (D100).
 pub struct Warmed<C> {
     model: Box<dyn Model + Send>,
     warmth: Warmth,
@@ -166,10 +184,8 @@ impl<C: FnMut() -> Result<TimeMs, AxError>> Warmed<C> {
     /// Sends every renewal due by `now_ms` through the adapter this door
     /// owns, and takes each one's round trip as the endpoint's lead: a
     /// renewal asks for one token, so its answer follows the prefill.
-    ///
-    /// # Errors
-    /// The model's failure, unchanged.
-    pub fn renew_due(&mut self, now_ms: u64) -> Result<Vec<ModelReturn>, AxError> {
+    /// A clock or adapter failure ends the round as its refusal.
+    pub fn renew_due(&mut self, now_ms: u64) -> RenewalRound {
         let Warmed {
             model,
             warmth,
@@ -316,6 +332,42 @@ mod tests {
         }
     }
 
+    #[test]
+    fn a_later_refusal_keeps_the_answers_before_it() {
+        let mut warmth = Warmth::new(KeepWarm::FiveMinute);
+        let mut first = request();
+        first.segments = [B3Hash::digest(b"one"); 4];
+        let mut second = request();
+        second.segments = [B3Hash::digest(b"two"); 4];
+        warmth.sent(&first, USED_AT);
+        warmth.sent(&second, USED_AT);
+        let due = warmth.next_due(&lead()).unwrap();
+        let mut calls = 0;
+        let round = warmth.renew_due(&lead(), due, |_| {
+            calls += 1;
+            if calls == 1 {
+                Ok(ModelReturn::bare(
+                    kernel::model::message_payload(&[ContentBlock::Text {
+                        text: "warm".to_owned(),
+                    }])
+                    .unwrap(),
+                    Vec::new(),
+                ))
+            } else {
+                Err(AxError::failure(
+                    kernel::AxCode::Provider,
+                    "renew a cached prefix",
+                    "rate limited",
+                )
+                .with_recovery("renewal is skipped until the next real request"))
+            }
+        });
+        assert_eq!(round.answers.len(), 1, "the answered renewal survives");
+        assert!(round.refused.is_some(), "the refusal ends the round");
+        assert_eq!(calls, 2, "nothing more is sent after the refusal");
+        assert!(warmth.next_due(&lead()).is_some(), "the refused prefix stays");
+    }
+
     /// An endpoint's lead that has read [`LEAD_MS`].
     fn lead() -> Lead {
         let lead = Lead::default();
@@ -327,9 +379,8 @@ mod tests {
     /// from the real use to well past one cache lifetime.
     fn wake_through_two_lifetimes(warmth: &mut Warmth, provider: &mut Provider) {
         for now in (USED_AT..=USED_AT + 2 * TTL_MS).step_by(1_000) {
-            warmth
-                .renew_due(&lead(), now, |renewal| provider.call(renewal))
-                .unwrap();
+            let round = warmth.renew_due(&lead(), now, |renewal| provider.call(renewal));
+            assert!(round.refused.is_none(), "{:?}", round.refused);
         }
     }
 
@@ -394,7 +445,8 @@ mod tests {
         warmed: &mut Warmed<impl FnMut() -> Result<TimeMs, AxError>>,
     ) {
         for now in (USED_AT..=USED_AT + 2 * TTL_MS).step_by(1_000) {
-            warmed.renew_due(now).unwrap();
+            let round = warmed.renew_due(now);
+            assert!(round.refused.is_none(), "{:?}", round.refused);
         }
     }
 
@@ -492,7 +544,7 @@ mod tests {
         warmed.call(&request()).unwrap();
         let landed = now.load(Ordering::SeqCst);
         assert_eq!(warmed.next_due(), Some(USED_AT + TTL_MS - MARGIN_MS));
-        warmed.renew_due(landed).unwrap();
+        assert!(warmed.renew_due(landed).refused.is_none());
         assert_eq!(
             *seen.lock().unwrap(),
             vec![request()],
@@ -501,7 +553,7 @@ mod tests {
 
         let due = warmed.next_due().unwrap();
         now.store(due, Ordering::SeqCst);
-        warmed.renew_due(due).unwrap();
+        assert!(warmed.renew_due(due).refused.is_none());
         let sent_again = now.load(Ordering::SeqCst);
         warmed.call(&request()).unwrap();
         assert_eq!(
@@ -532,7 +584,7 @@ mod tests {
         renewing.call(&request()).unwrap();
         let due = renewing.next_due().unwrap();
         now.store(due, Ordering::SeqCst);
-        renewing.renew_due(due).unwrap();
+        assert!(renewing.renew_due(due).refused.is_none());
         assert_eq!(
             waiting.next_due(),
             Some(USED_AT + TTL_MS - MARGIN_MS - RENEWAL_MS)

@@ -78,10 +78,14 @@ impl Warmth {
     pub fn sent(&mut self, request: &ModelRequest, at_ms: u64);
     /// 按 lead 读到的提前量，最早一条续期的发出时刻；定时器睡到这一刻。None＝没有要续的，定时器不必醒。
     pub fn next_due(&self, lead: &Lead) -> Option<u64>;
-    /// 把 now_ms 已到期的续期逐条交给 send，返回每条续期的回执（调用方照常记 usage）。
-    /// 不再欠续期的前缀在这里被丢掉。send 失败原样返回，未发的前缀留待下一次。
+    /// 把 now_ms 已到期的续期逐条交给 send；每条已答的回执都收进这一巡（调用方照常记 usage），
+    /// 第一次拒绝跟在它前面的回执之后一起回来，而不是顶替它们。拒绝之后不再发，未发的前缀留待下一次。
+    /// 不再欠续期的前缀在这里被丢掉。
     pub fn renew_due(&mut self, lead: &Lead, now_ms: u64,
-                     send: impl FnMut(&ModelRequest) -> Result<ModelReturn, AxError>) -> Result<Vec<ModelReturn>, AxError>;
+                     send: impl FnMut(&ModelRequest) -> Result<ModelReturn, AxError>) -> RenewalRound;
+}
+/// 一巡续期的收成：provider 已答的每条（按发出序），与结束这一巡的第一次拒绝（若有）。
+pub struct RenewalRound { pub answers: Vec<ModelReturn>, pub refused: Option<AxError> }
 }
 /// 一个 endpoint 的提前量：从城发出请求到 provider 开始处理它的时间，最近一次的读数（毫秒）。
 /// clone 出来的句柄共享同一个读数，所以连同一 endpoint 的每扇门读到的是同一个数。
@@ -95,7 +99,7 @@ impl Lead {
 - **Off 时不记、不发**：`sent` 在 `KeepWarm::Off` 下不克隆请求，所以默认配置下每个 session 不为保温多占一字节，也不会有续期可发。默认配置下城不为保温多发一条请求，本模块的测试钉住这一点。
 - 续期请求是该前缀最近一次真实请求原样重发，只把 `max_tokens` 压到 1：缓存按前缀字节命中，与输出上限无关，所以 1 个输出 token 是续期能付的最低价。
 - 一个前缀只留最近一条请求：同一前缀后来的请求覆盖前一条，内存随前缀数而非请求数增长。
-- 何时续、续几次全由 `kernel::keep_warm::renewal_due` 判定（`crates/kernel/Spec.lean` §8-74，kernel D59），本模块不另写第二个 TTL 或余量；续期发出后前缀的 `CacheUse` 记成 `renewed`，于是它不再欠续期。
+- 何时续、续几次全由 `kernel::keep_warm::renewal_due` 判定（`crates/kernel/Spec.lean` §8-74，kernel D62），本模块不另写第二个 TTL 或余量；续期发出后前缀的 `CacheUse` 记成 `renewed`，于是它不再欠续期。
 - 真实请求进账的门是 `Warmed`：它拥有一次 run 调用的 adapter，本身也是 `kernel::Model`，所以 turn loop 照旧只见 `&mut dyn Model`，每一次成功的调用（阻塞门、流式门或推测门）都在返回后按发出时刻记进 `Warmth`。失败的调用不记：provider 没有读到的前缀没有可续的缓存。
 
 ```rust
@@ -105,18 +109,18 @@ impl<C: FnMut() -> Result<TimeMs, AxError>> Warmed<C> {
     pub fn new(model: Box<dyn Model + Send>, setting: KeepWarm, clock: C, lead: Lead) -> Warmed<C>;
     pub fn next_due(&self) -> Option<u64>;
     /// 经自己拥有的 adapter 发出 now_ms 已到期的续期，每条续期的往返写进 lead。
-    pub fn renew_due(&mut self, now_ms: u64) -> Result<Vec<ModelReturn>, AxError>;
+    pub fn renew_due(&mut self, now_ms: u64) -> RenewalRound;
 }
 impl<C: FnMut() -> Result<TimeMs, AxError>> Model for Warmed<C> { /* call、call_streaming、call_speculating 三扇门都转发给 adapter；prefix_held 原样转交它包着的模型 */ }
 ```
 
-- **提前量量的是它被用来做的事**（D98）：从发出到 provider 开始处理请求。`Warmed` 只在两处读它：一次续期的往返（续期只要 1 个 token，回答紧跟 prefill），与一次真实调用从发出到第一个正文或推理增量的时间。后者还含 prefill 与第一个 token，所以只会偏长、让续期偏早，不会让它晚于寿命。真实调用的整段时长从不当提前量：它含整段生成，一次 200 秒的调用会把续期排到落地之前。阻塞门没有增量，它的调用不改读数。
+- **提前量量的是它被用来做的事**（D100）：从发出到 provider 开始处理请求。`Warmed` 只在两处读它：一次续期的往返（续期只要 1 个 token，回答紧跟 prefill），与一次真实调用从发出到第一个正文或推理增量的时间。后者还含 prefill 与第一个 token，所以只会偏长、让续期偏早，不会让它晚于寿命。真实调用的整段时长从不当提前量：它含整段生成，一次 200 秒的调用会把续期排到落地之前。阻塞门没有增量，它的调用不改读数。
 - 读数按 endpoint 存，不按门存：网络路径与名额门属于 endpoint，而一扇门每次真实使用只见到一次续期，单扇门攒不出读数。门由调用方给它所连 endpoint 的那一个 `Lead`；`next_due` 每次按当时的读数算，所以别的门量出的新读数也挪动这扇门的到期时刻。
 - 谁调 `renew_due`：run 落地后 `Warmed` 按房间留在 accounting 的 worker 上，记账线程按 `next_due` 醒来，把到期的门整扇交给一条自己的线程，那条线程调 `renew_due`，门连同回执回到记账线程，续期的 usage 记成 `cache_renewed`（`crates/sprawling/Spec.lean` §8-112、§8-42-9）。所以 `Warmed` 要能整扇移到另一条线程上：它的 adapter 是 `Box<dyn Model + Send>`，时钟由调用方给，accounting 交的是 `Send` 的那一种；`Lead` 的读数是原子的，lane 上的门与续期线程上的门可以同时写它。
 - **验收**：本模块旁的 `a_long_call_leaves_its_renewal_due_a_lifetime_after_it_was_sent`——provider 的真实调用耗时 200 秒，落地时不发续期，续期排在「发出 + TTL − 续期往返 − 余量」；`a_streamed_call_reads_the_lead_at_its_first_word`——流式调用的提前量是到第一个增量的时间；`doors_to_one_endpoint_share_its_lead`——一扇门续期量出的往返挪动同一 endpoint 另一扇门的到期时刻。
 -/
 
-/-! D98 提前量是「发出到 provider 开始处理」的时间，按 endpoint 存一个读数
+/-! D100 提前量是「发出到 provider 开始处理」的时间，按 endpoint 存一个读数
 
 **决定**：`Lead` 是一个 endpoint 的读数，clone 的句柄共享它；`Warmed` 在续期往返与真实调用的第一个增量两处写它，整段调用不写；accounting 按 endpoint 名给每扇门同一个 `Lead`（`crates/sprawling/Spec.lean` §8-112）。最近一次读数直接覆盖上一次，不留样本窗口。
 
@@ -127,7 +131,7 @@ impl<C: FnMut() -> Result<TimeMs, AxError>> Model for Warmed<C> { /* call、call
 **重开参数**：gateway 把流的第一个事件交出来；或成本视图里迟到续期的次数表明读数偏短。
 -/
 
-/-! D97 保温门转发 `Model` 的每一扇调用门，不让任何一扇落到 trait 的缺省实现
+/-! D99 保温门转发 `Model` 的每一扇调用门，不让任何一扇落到 trait 的缺省实现
 
 **决定**：`Warmed` 自己实现 `call`、`call_streaming`、`call_speculating`，每一扇都经同一个 `recorded` 转发给它拥有的 adapter，并照同一口径记账；`provider_account`、`account_roster`、`select_account` 也照样转发。turn loop 走哪扇门由 `turn::speculation::Generating` 决定，门只管把那扇门原样交给 adapter。
 

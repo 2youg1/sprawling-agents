@@ -302,19 +302,18 @@ impl Attribution {
     }
 }
 
-/// The four token counts of one `model_returned`'s `usage`, summed; a
-/// call that reported no usage used no tokens anyone measured.
+/// The tokens of one call's `usage`: input and output, the only two
+/// disjoint counts — the dialect layer normalizes `input_tokens` to
+/// the whole prompt, cache reads and writes included
+/// (`crates/gateway/spec/Dialect.lean` §8-1), so adding the cache counts
+/// again would count the cached part twice. A call that reported no
+/// usage used no tokens anyone measured.
 fn usage_tokens(data: &serde_json::Map<String, Value>) -> u64 {
     let usage = data.get("usage");
-    [
-        "input_tokens",
-        "output_tokens",
-        "cache_read_tokens",
-        "cache_write_tokens",
-    ]
-    .into_iter()
-    .filter_map(|field| usage.and_then(|u| u.get(field)).and_then(Value::as_u64))
-    .fold(0, u64::saturating_add)
+    ["input_tokens", "output_tokens"]
+        .into_iter()
+        .filter_map(|field| usage.and_then(|u| u.get(field)).and_then(Value::as_u64))
+        .fold(0, u64::saturating_add)
 }
 
 #[cfg(test)]

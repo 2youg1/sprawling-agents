@@ -17,7 +17,7 @@ use kernel::event::Payload;
 use kernel::event::record::CacheRenewed;
 use kernel::{Address, AxError, EventKind, ModelReturn, TimeMs};
 use runtime::prefix::warmth::Lead;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 
 /// The chosen adapter, wrapped so every request a run sends enters the
 /// keep-warm account (`crates/runtime/Spec.lean` §8-4-2), timed on the worker's own
@@ -39,20 +39,26 @@ pub(in crate::worker) struct Kept {
     doors: BTreeMap<Address, Door>,
     /// One reading per endpoint name, shared by every door that reaches
     /// it, so a renewal's round trip times every room on that endpoint
-    /// (`crates/runtime/spec/Prefix.lean` D98).
+    /// (`crates/runtime/spec/Prefix.lean` D100).
     leads: BTreeMap<String, Lead>,
-    /// The rooms whose door is out on a renewal. A room leaves this set
-    /// when its door comes back or when a newer door is kept for it, so
-    /// a door that comes back to a room no longer here was superseded.
-    away: BTreeSet<Address>,
+    /// The rooms whose door is out on a renewal, each with the token the
+    /// door left with: a door that comes back with a token its room no
+    /// longer holds was superseded meanwhile, by a newer door kept for
+    /// the room or by a newer renewal already out.
+    away: BTreeMap<Address, u64>,
+    /// The token the next door to leave takes. It wraps: a room compares
+    /// equal or not, and 2^64 renewals of one city do not happen.
+    next_out: u64,
 }
 
-/// A door back from its renewal: whose room it keeps, the door itself,
-/// and what the provider answered to each renewal it sent.
+/// A door back from its renewal: whose room it keeps, the token it left
+/// with, the door itself, and what the provider answered to each renewal
+/// it sent.
 pub(crate) struct Renewed {
     pub(in crate::worker) room: Address,
+    pub(in crate::worker) out: u64,
     pub(in crate::worker) door: Door,
-    pub(in crate::worker) answers: Result<Vec<ModelReturn>, AxError>,
+    pub(in crate::worker) round: runtime::prefix::warmth::RenewalRound,
 }
 
 impl Kept {
@@ -82,7 +88,7 @@ impl Kept {
 
     /// Takes out every door due by `now_ms`, each to renew on a thread
     /// of its own, and remembers its room as away.
-    pub(in crate::worker) fn take_due(&mut self, now_ms: u64) -> Vec<(Address, Door)> {
+    pub(in crate::worker) fn take_due(&mut self, now_ms: u64) -> Vec<(Address, u64, Door)> {
         let due: Vec<Address> = self
             .doors
             .iter()
@@ -92,8 +98,10 @@ impl Kept {
         due.into_iter()
             .filter_map(|room| {
                 let door = self.doors.remove(&room)?;
-                self.away.insert(room.clone());
-                Some((room, door))
+                let out = self.next_out;
+                self.next_out = self.next_out.wrapping_add(1);
+                self.away.insert(room.clone(), out);
+                Some((room, out, door))
             })
             .collect()
     }
@@ -109,26 +117,34 @@ impl Kept {
     ) -> (Address, Vec<CacheRenewed>) {
         let Renewed {
             room,
+            out,
             door,
-            answers,
+            round,
         } = renewed;
-        let still_ours = self.away.remove(&room);
-        let lines = match answers {
-            Ok(answers) => {
+        let still_ours = if self.away.get(&room) == Some(&out) {
+            self.away.remove(&room);
+            true
+        } else {
+            false
+        };
+        let mut lines: Vec<CacheRenewed> = round.answers.into_iter().map(answered).collect();
+        match round.refused {
+            Some(refused) => lines.push(CacheRenewed::Refused { refused }),
+            None => {
                 if still_ours && door.next_due().is_some() {
                     self.doors.insert(room.clone(), door);
                 }
-                answers.into_iter().map(answered).collect()
             }
-            Err(refused) => vec![CacheRenewed::Refused { refused }],
-        };
+        }
         (room, lines)
     }
 
     /// Forgets that `room`'s door is out: it never left, because its
     /// thread would not start.
-    pub(in crate::worker) fn lost(&mut self, room: &Address) {
-        self.away.remove(room);
+    pub(in crate::worker) fn lost(&mut self, room: &Address, out: u64) {
+        if self.away.get(room) == Some(&out) {
+            self.away.remove(room);
+        }
     }
 }
 
@@ -153,18 +169,19 @@ impl RunWorker {
     /// A door whose thread will not start is recorded as refused and let
     /// go, as a door the provider refused is.
     pub(crate) fn renew_warm(&mut self, now: TimeMs) {
-        for (room, mut door) in self.warm.take_due(now.value()) {
+        for (room, out, mut door) in self.warm.take_due(now.value()) {
             let at = room.clone();
             let sent = self.flight.errands.send(move || {
-                let answers = door.renew_due(now.value());
+                let round = door.renew_due(now.value());
                 Answer::Renewed(Renewed {
                     room: at,
+                    out,
                     door,
-                    answers,
+                    round,
                 })
             });
             if let Err(refused) = sent {
-                self.warm.lost(&room);
+                self.warm.lost(&room, out);
                 self.write_renewal(room, CacheRenewed::Refused { refused });
             }
         }
@@ -210,7 +227,7 @@ mod tests {
         ModelRequest, ModelUsage, Tokens,
     };
     use std::sync::Arc;
-    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 
     const USED_AT: u64 = 1_000_000;
     const TTL_MS: u64 = PROMPT_CACHE_TTL_SECS * 1000;
@@ -273,12 +290,13 @@ mod tests {
     fn renew_here(kept: &mut Kept, now_ms: u64) -> Vec<(Address, CacheRenewed)> {
         kept.take_due(now_ms)
             .into_iter()
-            .flat_map(|(room, mut door)| {
-                let answers = door.renew_due(now_ms);
+            .flat_map(|(room, out, mut door)| {
+                let round = door.renew_due(now_ms);
                 let (room, lines) = kept.came_back(Renewed {
                     room,
+                    out,
                     door,
-                    answers,
+                    round,
                 });
                 lines.into_iter().map(move |line| (room.clone(), line))
             })
@@ -352,6 +370,81 @@ mod tests {
                 ),
                 (refusing, CacheRenewed::Refused { refused: refusal() }),
             ]
+        );
+    }
+
+    /// A door out on a renewal whose room got a newer door meanwhile: the
+    /// old door's return must neither clear the newer door's away marker
+    /// nor take its place, and the newer door comes home with its
+    /// remaining renewals.
+    #[test]
+    fn a_superseded_doors_late_return_drops_neither_the_marker_nor_the_newer_door() {
+        let room = Address::parse("city/room").unwrap();
+        let mut kept = Kept::default();
+        kept.keep(
+            room.clone(),
+            door_after_one_run(
+                KeepWarm::FiveMinute,
+                Provider {
+                    calls: Arc::new(AtomicUsize::new(0)),
+                    refuses_from: usize::MAX,
+                },
+            ),
+        );
+        let due_a = kept.next_due().unwrap();
+        let (_, out_a, mut door_a) = kept.take_due(due_a).into_iter().next().unwrap();
+        let round_a = door_a.renew_due(due_a);
+        assert_eq!(round_a.answers.len(), 1);
+
+        // The newer door: two prefixes used a minute apart, so after the
+        // first renewal one is still owed.
+        let now = Arc::new(AtomicU64::new(USED_AT));
+        let reading = now.clone();
+        let clock: DoorClock = Box::new(move || Ok(TimeMs::new(reading.load(Ordering::SeqCst))));
+        let mut door_b = Door::new(
+            Box::new(Provider {
+                calls: Arc::new(AtomicUsize::new(0)),
+                refuses_from: usize::MAX,
+            }),
+            KeepWarm::FiveMinute,
+            clock,
+            Lead::default(),
+        );
+        let at = |segment: &str| ModelRequest {
+            policy: BuildingPolicy::default(),
+            segments: [B3Hash::digest(segment.as_bytes()); 4],
+            chat: ChatRequest::empty("script", Ceiling::new(512).unwrap()),
+        };
+        door_b.call(&at("b1")).unwrap();
+        now.store(USED_AT + 60_000, Ordering::SeqCst);
+        door_b.call(&at("b2")).unwrap();
+        kept.keep(room.clone(), door_b);
+        let due_b = kept.next_due().unwrap();
+        let (_, out_b, mut door_b) = kept.take_due(due_b).into_iter().next().unwrap();
+        let round_b = door_b.renew_due(due_b);
+        assert_eq!(round_b.answers.len(), 1);
+        let still_owed = door_b.next_due().unwrap();
+
+        let (_, _) = kept.came_back(Renewed {
+            room: room.clone(),
+            out: out_a,
+            door: door_a,
+            round: round_a,
+        });
+        assert!(
+            kept.away.contains_key(&room),
+            "the newer door is still out: its marker survives the old door's return"
+        );
+        let (_, _) = kept.came_back(Renewed {
+            room: room.clone(),
+            out: out_b,
+            door: door_b,
+            round: round_b,
+        });
+        assert_eq!(
+            kept.next_due(),
+            Some(still_owed),
+            "the newer door comes home with the renewal it still owes"
         );
     }
 
