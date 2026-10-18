@@ -82,6 +82,13 @@ toml = { workspace = true }
 # (`crates/sprawling/Spec.lean` §8-139).
 zeroize = { workspace = true }
 
+# The allocator the static Linux build runs on: musl's malloc serialises
+# every thread on one lock, and this binary allocates on all of them
+# (`crates/sprawling/spec/Serving/Memory.lean` D102). Only this target
+# differs; glibc, macOS's libmalloc and the Windows heap keep their own.
+[target.'cfg(target_env = "musl")'.dependencies]
+tikv-jemallocator = { version = "0.7", features = ["background_threads"] }
+
 # The peak memory a command `sprawling gauge` measured reached, read
 # after it exits and before its handle closes (`crates/sprawling/Spec.lean` §8-129-4).
 [target.'cfg(windows)'.dependencies]

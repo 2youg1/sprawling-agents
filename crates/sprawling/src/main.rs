@@ -17,6 +17,14 @@ mod wire_client;
 
 use std::process::ExitCode;
 
+/// The static Linux build's allocator, because musl's `malloc` serialises
+/// every thread on one lock while this binary allocates on all of them
+/// (`crates/sprawling/spec/Serving/Memory.lean` D102). Every other target
+/// keeps the allocator its platform ships.
+#[cfg(target_env = "musl")]
+#[global_allocator]
+static ALLOCATOR: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
+
 // CLIENT_FILES, CLIENT_COMPLETE and CLIENT_BUNDLE_DIR: the gzipped client
 // bundle the build wrote, whether it is the whole client or only the page
 // shell, and where in the sprawling package the build script read it from.
