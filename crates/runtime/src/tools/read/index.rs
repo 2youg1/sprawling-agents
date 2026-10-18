@@ -16,7 +16,7 @@
 //! `edit`'s own whole-file comparison, which refuses it — the chain is
 //! fail-closed.
 
-use std::collections::{BTreeMap, BTreeSet, VecDeque};
+use std::collections::{BTreeMap, VecDeque};
 use std::io::Read as _;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
@@ -60,11 +60,23 @@ struct Locked {
     map: BTreeMap<PathBuf, Entry>,
     /// The paths a fill is on its way for. Apart from `map`, so a stale
     /// entry can be refilled while it still stands.
-    pending: BTreeSet<PathBuf>,
+    pending: BTreeMap<PathBuf, Claim>,
     /// Insertion order of `map`'s keys, for eviction; each key once.
     order: VecDeque<PathBuf>,
     /// The bill of every entry's seek table, in bytes.
     bytes: usize,
+}
+
+/// Whether a running fill still speaks for its path. A fill that started
+/// before an `offer` or a `forget` on the same path read an older file,
+/// or one the index has since learned is not what its table says, so
+/// it settles without touching the entry; neither mtime ordering nor
+/// size could tell, since a file can be replaced by one with an older
+/// mtime and the same size.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Claim {
+    Current,
+    Superseded,
 }
 
 /// The cache itself. One per `ReadTool`, so one per run.
@@ -118,6 +130,7 @@ impl Index {
     /// file anyway (§8-29-7): no I/O was spent for it.
     pub(super) fn offer(&self, real: PathBuf, entry: Entry) {
         if let Ok(mut locked) = self.locked.lock() {
+            supersede(&mut locked, &real);
             insert(&mut locked, real, entry);
         }
     }
@@ -127,6 +140,7 @@ impl Index {
     /// mtime (§8-29-7).
     pub(super) fn forget(&self, real: &Path) {
         if let Ok(mut locked) = self.locked.lock() {
+            supersede(&mut locked, real);
             remove(&mut locked, real);
         }
     }
@@ -145,25 +159,48 @@ impl Index {
     /// will not read simply leaves no entry; the reads that asked for it
     /// were already answered.
     pub(super) fn fill_later(self: &Arc<Index>, real: PathBuf) {
-        {
-            let Ok(mut locked) = self.locked.lock() else {
-                return;
-            };
-            if locked.pending.len() >= PENDING_CAP || !locked.pending.insert(real.clone()) {
-                return;
-            }
+        if !self.claim(&real) {
+            return;
         }
         let index = Arc::clone(self);
         std::thread::spawn(move || {
             let filled = fill(&real);
-            if let Ok(mut locked) = index.locked.lock() {
-                locked.pending.remove(&real);
-                match filled {
-                    Ok(entry) => insert(&mut locked, real, entry),
-                    Err(_) => remove(&mut locked, &real),
-                }
-            }
+            index.settle(real, filled);
         });
+    }
+
+    /// Records a fill for `real` as on its way, unless one already is or
+    /// [`PENDING_CAP`] are.
+    fn claim(&self, real: &Path) -> bool {
+        let Ok(mut locked) = self.locked.lock() else {
+            return false;
+        };
+        if locked.pending.len() >= PENDING_CAP || locked.pending.contains_key(real) {
+            return false;
+        }
+        locked.pending.insert(real.to_path_buf(), Claim::Current);
+        true
+    }
+
+    /// Ends the fill for `real`. A current fill replaces the entry with
+    /// what it read, or removes the stale one when the file would not
+    /// read; a superseded fill changes nothing.
+    fn settle(&self, real: PathBuf, filled: Result<Entry, AxError>) {
+        let Ok(mut locked) = self.locked.lock() else {
+            return;
+        };
+        match (locked.pending.remove(&real), filled) {
+            (Some(Claim::Current), Ok(entry)) => insert(&mut locked, real, entry),
+            (Some(Claim::Current), Err(_)) => remove(&mut locked, &real),
+            (Some(Claim::Superseded) | None, Ok(_) | Err(_)) => {}
+        }
+    }
+}
+
+/// Marks a fill on its way for `real` as no longer speaking for it.
+fn supersede(locked: &mut Locked, real: &Path) {
+    if let Some(claim) = locked.pending.get_mut(real) {
+        *claim = Claim::Superseded;
     }
 }
 
@@ -228,10 +265,10 @@ fn bill(entry: &Entry) -> usize {
 }
 
 /// Inserts or replaces, accounts the table's bytes, and evicts oldest
-/// first while the bill is over the cap. The newest facts win: an entry
-/// that turns out stale misses at `lookup`, whose caller asks for a fill
-/// again, so no ordering by mtime is needed — and none could hold, since
-/// a file can be replaced by one with an older mtime.
+/// first while the bill is over the cap. The latest facts win: a fill
+/// that an `offer` overtook never reaches here ([`Claim`]), and an
+/// entry that turns out stale misses at `lookup`, whose caller asks for
+/// a fill again.
 fn insert(locked: &mut Locked, real: PathBuf, entry: Entry) {
     if entry.line_offsets.len() > TABLE_CAP_LINES {
         remove(locked, &real);
@@ -259,3 +296,13 @@ fn remove(locked: &mut Locked, real: &Path) {
         locked.order.retain(|path| path != real);
     }
 }
+
+#[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing,
+    reason = "test code"
+)]
+mod tests;
