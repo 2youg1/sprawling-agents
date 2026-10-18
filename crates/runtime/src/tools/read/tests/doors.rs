@@ -262,3 +262,69 @@ fn a_document_named_like_a_package_opens_nothing_beside_it() {
         "a skill the reading room did not admit was read beside a document: {refused:?}"
     );
 }
+
+#[test]
+fn a_root_redirected_after_tool_construction_cannot_change_what_city_is_read() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path().join("city");
+    let outside = dir.path().join("outside");
+    for (place, body) in [(&root, "the city\n"), (&outside, "elsewhere\n")] {
+        std::fs::create_dir_all(place.join("lab")).unwrap();
+        std::fs::write(place.join("lab/memo.txt"), body).unwrap();
+    }
+    let (reader, _catalog) = tool(&root);
+    std::fs::rename(&root, dir.path().join("original")).unwrap();
+    make_link(&root, &outside);
+
+    let err = reader.invoke(&call("lab/memo.txt")).unwrap_err();
+    assert_eq!(err.code(), &AxCode::GateDenied);
+    assert!(err.nearby().is_empty());
+}
+
+#[test]
+fn a_root_that_was_already_a_link_anchors_to_the_city_it_named() {
+    let dir = tempfile::tempdir().unwrap();
+    let real = dir.path().join("real");
+    std::fs::create_dir_all(real.join("lab")).unwrap();
+    std::fs::write(real.join("lab/memo.txt"), "the city\n").unwrap();
+    let root = dir.path().join("city");
+    make_link(&root, &real);
+    let (reader, _catalog) = tool(&root);
+
+    let answer = reader.invoke(&call("lab/memo.txt")).unwrap();
+    assert_eq!(answer.result.as_map()["text"], "the city\n");
+}
+
+#[test]
+fn cached_bytes_and_index_facts_do_not_bypass_a_read_bound_that_has_closed() {
+    use std::sync::atomic::{AtomicBool, Ordering};
+
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(dir.path().join("lab")).unwrap();
+    std::fs::write(dir.path().join("lab/memo.txt"), "one\ntwo\n").unwrap();
+    let closed = Arc::new(AtomicBool::new(false));
+    let observed = Arc::clone(&closed);
+    let bound: ReadBound = Arc::new(move |_: &kernel::Address| {
+        if observed.load(Ordering::SeqCst) {
+            kernel::ReadVerdict::Confidential
+        } else {
+            kernel::ReadVerdict::Open
+        }
+    });
+    let reader = ReadTool::new(
+        dir.path(),
+        Arc::new(Mutex::new(Catalog::new())),
+        bound,
+        Path::new("no-store"),
+    )
+    .unwrap();
+    reader
+        .invoke(&interval("lab/memo.txt", 0, Some(1)))
+        .unwrap();
+    closed.store(true, Ordering::SeqCst);
+
+    let err = reader
+        .invoke(&interval("lab/memo.txt", 1, Some(1)))
+        .unwrap_err();
+    assert_eq!(err.code(), &AxCode::GateDenied);
+}

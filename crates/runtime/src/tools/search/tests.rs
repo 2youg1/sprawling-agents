@@ -9,6 +9,28 @@ use super::*;
 
 mod limits;
 
+#[test]
+fn a_search_prefix_cannot_follow_a_root_redirected_after_construction() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path().join("city");
+    let outside = dir.path().join("outside");
+    for place in [&root, &outside] {
+        std::fs::create_dir_all(place.join("lab")).unwrap();
+        std::fs::write(place.join("lab/memo.txt"), "needle\n").unwrap();
+    }
+    let tool = SearchTool::new(&root, everywhere()).unwrap();
+    std::fs::rename(&root, dir.path().join("original")).unwrap();
+    super::super::chosen_path::make_link(&root, &outside);
+
+    let err = tool
+        .invoke(&call(&[
+            ("text", Value::String("needle".to_owned())),
+            ("path", Value::String("lab".to_owned())),
+        ]))
+        .unwrap_err();
+    assert_eq!(err.code(), &AxCode::GateDenied);
+}
+
 /// A bound under which every building is open, so a test about the walk
 /// judges nothing else.
 fn everywhere() -> ReadBound {

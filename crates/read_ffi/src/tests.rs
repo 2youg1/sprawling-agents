@@ -154,3 +154,160 @@ fn a_written_file_gets_a_stamp_of_its_own() {
         );
     }
 }
+
+#[cfg(windows)]
+#[test]
+fn buffered_windows_honor_offsets_counts_and_the_untouched_buffer_tail() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = fixture(dir.path(), "窗口-é.txt", 41);
+    let body = std::fs::read(&path).unwrap();
+    let meta = std::fs::metadata(&path).unwrap();
+    let real = std::fs::canonicalize(&path).unwrap();
+
+    for (start, want) in [(7, 16), (31, 16), (41, 16), (u64::MAX, 16), (0, 0)] {
+        let mut into = vec![0xa5; 64];
+        let window = crate::read(
+            &Ask {
+                path: &path,
+                start,
+                want,
+                direct: false,
+            },
+            &mut into,
+        )
+        .unwrap();
+        let from = usize::try_from(start).unwrap_or(usize::MAX).min(body.len());
+        let expected = &body[from..body.len().min(from + usize::try_from(want).unwrap())];
+        let mut expected_buffer = vec![0xa5; 64];
+        expected_buffer[..expected.len()].copy_from_slice(expected);
+        assert_eq!(
+            (
+                window.final_path,
+                window.size,
+                window.modified,
+                window.written,
+                into,
+            ),
+            (
+                real.clone(),
+                meta.len(),
+                meta.modified().unwrap(),
+                expected.len(),
+                expected_buffer,
+            ),
+            "start {start}, want {want}",
+        );
+    }
+}
+
+#[cfg(windows)]
+#[test]
+fn an_empty_file_answers_facts_without_writing_into_the_buffer() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = fixture(dir.path(), "empty.txt", 0);
+    let mut into = [0xa5; 16];
+    let window = crate::read(
+        &Ask {
+            path: &path,
+            start: 0,
+            want: 16,
+            direct: false,
+        },
+        &mut into,
+    )
+    .unwrap();
+    assert_eq!((window.size, window.written, into), (0, 0, [0xa5; 16]));
+}
+
+#[cfg(windows)]
+#[test]
+fn missing_paths_and_directories_have_distinct_refusals_and_write_nothing() {
+    let dir = tempfile::tempdir().unwrap();
+    for (path, expected) in [
+        (dir.path().join("missing.txt"), crate::Refused::Missing),
+        (dir.path().join("missing/child.txt"), crate::Refused::Missing),
+        (dir.path().to_path_buf(), crate::Refused::Directory),
+    ] {
+        let mut into = [0xa5; 16];
+        let answer = crate::read(
+            &Ask {
+                path: &path,
+                start: 0,
+                want: 16,
+                direct: false,
+            },
+            &mut into,
+        );
+        assert_eq!((answer.err(), into), (Some(expected), [0xa5; 16]));
+    }
+}
+
+#[cfg(windows)]
+#[test]
+fn a_buffer_smaller_than_want_is_refused_before_the_leaf_can_write() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = fixture(dir.path(), "window.txt", 64);
+    for capacity in [0, 15] {
+        let mut into = vec![0xa5; capacity];
+        let answer = crate::read(
+            &Ask {
+                path: &path,
+                start: 0,
+                want: 16,
+                direct: false,
+            },
+            &mut into,
+        );
+        assert_eq!(
+            (answer.err(), into),
+            (Some(crate::Refused::ReadFailed), vec![0xa5; capacity]),
+        );
+    }
+}
+
+#[cfg(windows)]
+#[test]
+fn a_direct_read_clips_the_last_sector_to_the_file_size() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = fixture(dir.path(), "sector.txt", 4_133);
+    let body = std::fs::read(&path).unwrap();
+    let mut into = Aligned::new(4_096);
+    let window = crate::read(
+        &Ask {
+            path: &path,
+            start: 4_096,
+            want: 4_096,
+            direct: true,
+        },
+        into.slice(4_096),
+    )
+    .unwrap();
+    assert_eq!(
+        (window.size, window.written, &into.slice(4_096)[..window.written]),
+        (4_133, 37, &body[4_096..]),
+    );
+}
+
+#[cfg(not(windows))]
+#[test]
+fn an_unsupported_platform_refuses_without_touching_the_callers_buffer() {
+    let dir = tempfile::tempdir().unwrap();
+    let existing = fixture(dir.path(), "window.txt", 16);
+    for path in [
+        existing,
+        dir.path().join("missing.txt"),
+        dir.path().to_path_buf(),
+    ] {
+        let mut into = [0xa5; 16];
+        let answer = crate::read(
+            &Ask {
+                path: &path,
+                start: u64::MAX,
+                want: 16,
+                direct: false,
+            },
+            &mut into,
+        );
+        assert_eq!((answer.err(), into), (Some(Refused::Unsupported), [0xa5; 16]));
+    }
+}

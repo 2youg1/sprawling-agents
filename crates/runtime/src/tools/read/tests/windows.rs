@@ -175,3 +175,291 @@ fn with_deferred_facts(reader: &ReadTool, path: &str) -> ToolOutcome {
     }
     panic!("the fill behind the first answer never arrived for {path}");
 }
+
+#[test]
+fn an_empty_file_has_no_continuation_before_or_after_indexing() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("empty.txt"), "").unwrap();
+    let (reader, _catalog) = tool(dir.path());
+    let expected = serde_json::json!({
+        "path": "empty.txt", "text": "", "bytes": 0, "total_lines": 0,
+        "version": crate::tools::version_of(b""),
+    });
+
+    for _ in 0..2 {
+        let answer = reader.invoke(&call("empty.txt")).unwrap();
+        assert_eq!(answer.result.as_map(), expected.as_object().unwrap());
+    }
+}
+
+#[test]
+fn exactly_the_line_cap_is_a_complete_file_with_or_without_a_final_newline() {
+    let dir = tempfile::tempdir().unwrap();
+    for final_line in ["last\n", "last"] {
+        let body = format!("{}{final_line}", "line\n".repeat(511));
+        std::fs::write(dir.path().join("exact.txt"), &body).unwrap();
+        let (reader, _catalog) = tool(dir.path());
+
+        let answer = reader.invoke(&call("exact.txt")).unwrap();
+        assert_eq!(
+            answer.result.as_map(),
+            serde_json::json!({
+                "path": "exact.txt", "text": body, "bytes": body.len(),
+                "version": crate::tools::version_of(body.as_bytes()),
+            })
+            .as_object()
+            .unwrap(),
+        );
+    }
+}
+
+#[test]
+fn indexed_reads_preserve_blank_crlf_and_unicode_lines_at_sector_boundaries() {
+    let dir = tempfile::tempdir().unwrap();
+    let body = format!("{}\n\na\r\né\ntail", "x".repeat(4_095));
+    std::fs::write(dir.path().join("lines.txt"), &body).unwrap();
+    let (reader, _catalog) = tool(dir.path());
+    reader.invoke(&call("lines.txt")).unwrap();
+
+    for (offset, text, next) in [
+        (1, "\n", Some(2)),
+        (2, "a\r\n", Some(3)),
+        (3, "é\n", Some(4)),
+        (4, "tail", None),
+    ] {
+        let answer = reader
+            .invoke(&interval("lines.txt", offset, Some(1)))
+            .unwrap();
+        let mut expected = serde_json::json!({
+            "path": "lines.txt", "text": text, "bytes": text.len(),
+            "version": crate::tools::version_of(body.as_bytes()),
+        });
+        if let Some(next) = next {
+            expected["total_lines"] = serde_json::json!(5);
+            expected["next_offset"] = serde_json::json!(next);
+        }
+        assert_eq!(answer.result.as_map(), expected.as_object().unwrap());
+    }
+}
+
+#[test]
+fn offsets_at_the_end_and_u64_max_answer_empty_with_and_without_an_index() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("short.txt"), "one\ntwo").unwrap();
+    for indexed in [false, true] {
+        for offset in [2, u64::MAX] {
+            let (reader, _catalog) = tool(dir.path());
+            if indexed {
+                reader.invoke(&call("short.txt")).unwrap();
+            }
+            let answer = reader
+                .invoke(&interval("short.txt", offset, None))
+                .unwrap();
+            let mut expected = serde_json::json!({
+                "path": "short.txt", "text": "", "bytes": 0, "total_lines": 2,
+            });
+            if indexed {
+                expected["version"] = serde_json::json!(crate::tools::version_of(b"one\ntwo"));
+            }
+            assert_eq!(answer.result.as_map(), expected.as_object().unwrap());
+        }
+    }
+}
+
+#[test]
+fn a_utf8_character_split_across_chunks_is_preserved_in_a_whole_read() {
+    let dir = tempfile::tempdir().unwrap();
+    let chunk = kernel::consts_policy::INTERVAL_CAP_BYTES / 2;
+    let body = format!("{}é\r\n\n終", "x".repeat(chunk.saturating_sub(1)));
+    std::fs::write(dir.path().join("unicode.txt"), &body).unwrap();
+    let (reader, _catalog) = tool(dir.path());
+
+    let answer = reader.invoke(&call("unicode.txt")).unwrap();
+    assert_eq!(
+        answer.result.as_map(),
+        serde_json::json!({
+            "path": "unicode.txt", "text": body, "bytes": body.len(),
+            "version": crate::tools::version_of(body.as_bytes()),
+        })
+        .as_object()
+        .unwrap(),
+    );
+}
+
+#[test]
+fn an_unindexed_range_discards_lines_spanning_multiple_chunks() {
+    let dir = tempfile::tempdir().unwrap();
+    let cap = kernel::consts_policy::INTERVAL_CAP_BYTES;
+    let body = format!("{}\n\n終", "x".repeat(cap.saturating_add(17)));
+    std::fs::write(dir.path().join("range.txt"), body).unwrap();
+    let (reader, _catalog) = tool(dir.path());
+
+    let answer = reader.invoke(&interval("range.txt", 1, None)).unwrap();
+    assert_eq!(
+        answer.result.as_map(),
+        serde_json::json!({"path": "range.txt", "text": "\n終", "bytes": 4})
+            .as_object()
+            .unwrap(),
+    );
+}
+
+#[test]
+fn invalid_utf8_outside_the_requested_lines_does_not_refuse_a_text_window() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("mixed.txt"), b"\xff\nvalid\n\xfe\n").unwrap();
+    let (reader, _catalog) = tool(dir.path());
+
+    let answer = reader
+        .invoke(&interval("mixed.txt", 1, Some(1)))
+        .unwrap();
+    assert_eq!(
+        answer.result.as_map(),
+        serde_json::json!({
+            "path": "mixed.txt", "text": "valid\n", "bytes": 6,
+            "total_lines": 3, "next_offset": 2,
+        })
+        .as_object()
+        .unwrap(),
+    );
+}
+
+#[test]
+fn invalid_utf8_in_the_requested_window_is_an_argument_error() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("mixed.txt"), b"valid\n\xff\n").unwrap();
+    let (reader, _catalog) = tool(dir.path());
+
+    let err = reader
+        .invoke(&interval("mixed.txt", 1, Some(1)))
+        .unwrap_err();
+    assert_eq!(err.code(), &AxCode::InvalidArgs);
+    assert!(err.nearby().is_empty());
+    assert!(err.recovery().contains("UTF-8"));
+}
+
+#[test]
+fn a_line_that_exactly_spends_the_byte_budget_does_not_take_the_following_tail() {
+    let dir = tempfile::tempdir().unwrap();
+    let cap = kernel::consts_policy::INTERVAL_CAP_BYTES;
+    let first = format!("{}\n", "x".repeat(cap.saturating_sub(1)));
+    for tail in ["tail\n", "tail"] {
+        std::fs::write(dir.path().join("budget.txt"), format!("{first}{tail}")).unwrap();
+        let (reader, _catalog) = tool(dir.path());
+
+        let answer = reader.invoke(&call("budget.txt")).unwrap();
+        let map = answer.result.as_map();
+        assert_eq!(
+            (
+                map["text"].as_str(),
+                map["bytes"].as_u64(),
+                map.get("next_offset"),
+            ),
+            (
+                Some(first.as_str()),
+                Some(u64::try_from(cap).unwrap()),
+                Some(&serde_json::json!(1)),
+            ),
+            "tail {tail:?} crossed the byte budget",
+        );
+    }
+}
+
+#[test]
+fn a_version_on_a_short_truncated_answer_still_hashes_the_whole_file() {
+    let dir = tempfile::tempdir().unwrap();
+    let body = "one\ntwo\nthree\n";
+    std::fs::write(dir.path().join("version.txt"), body).unwrap();
+    let expected = crate::tools::version_of(body.as_bytes());
+    for indexed in [false, true] {
+        let (reader, _catalog) = tool(dir.path());
+        if indexed {
+            reader.invoke(&call("version.txt")).unwrap();
+        }
+        let answer = reader
+            .invoke(&interval("version.txt", 0, Some(1)))
+            .unwrap();
+        if let Some(version) = answer.result.as_map().get("version") {
+            assert_eq!(version.as_str(), Some(expected.as_str()));
+        } else {
+            assert!(!indexed, "an indexed file already has its whole-file version");
+        }
+    }
+}
+
+#[test]
+fn catalog_intervals_start_at_the_requested_line_and_terminate_at_the_end() {
+    let dir = tempfile::tempdir().unwrap();
+    let (reader, catalog) = tool(dir.path());
+    catalog
+        .lock()
+        .unwrap()
+        .admit_carried_skill(CatalogEntry {
+            name: "carried".to_owned(),
+            disclosure: "a carried document".to_owned(),
+            expansion: "α\r\n\nend".to_owned(),
+            hash: None,
+            package: None,
+        })
+        .unwrap();
+
+    for (offset, limit, text, total, next) in [
+        (0, 1, "α\r\n", Some(3), Some(1)),
+        (1, 1, "\n", Some(3), Some(2)),
+        (2, 10, "end", None, None),
+        (3, 10, "", Some(3), None),
+        (u64::MAX, 10, "", Some(3), None),
+    ] {
+        let answer = reader
+            .invoke(&interval("carried", offset, Some(limit)))
+            .unwrap();
+        let mut expected = serde_json::json!({
+            "path": "carried", "text": text, "bytes": text.len(),
+        });
+        if let Some(total) = total {
+            expected["total_lines"] = serde_json::json!(total);
+        }
+        if let Some(next) = next {
+            expected["next_offset"] = serde_json::json!(next);
+        }
+        assert_eq!(answer.result.as_map(), expected.as_object().unwrap());
+    }
+}
+
+#[test]
+fn a_changed_size_or_stamp_invalidates_both_continuation_bytes_and_index_facts() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("changed.txt");
+    for (replacement, stamp) in [
+        ("new!\nnext\n", 1_600_000_002),
+        ("bigger!\nchanged\n", 1_600_000_000),
+    ] {
+        let write = |body: &str, stamp: u64| {
+            std::fs::write(&path, body).unwrap();
+            std::fs::OpenOptions::new()
+                .write(true)
+                .open(&path)
+                .unwrap()
+                .set_modified(
+                    std::time::UNIX_EPOCH
+                        .checked_add(std::time::Duration::from_secs(stamp))
+                        .unwrap(),
+                )
+                .unwrap();
+        };
+        write("old!\nrest\n", 1_600_000_000);
+        let (reader, _catalog) = tool(dir.path());
+        reader
+            .invoke(&interval("changed.txt", 0, Some(1)))
+            .unwrap();
+        write(replacement, stamp);
+
+        let answer = reader.invoke(&interval("changed.txt", 1, None)).unwrap();
+        let text = replacement.split_inclusive('\n').nth(1).unwrap();
+        assert_eq!(
+            answer.result.as_map(),
+            serde_json::json!({"path": "changed.txt", "text": text, "bytes": text.len()})
+                .as_object()
+                .unwrap(),
+        );
+    }
+}
