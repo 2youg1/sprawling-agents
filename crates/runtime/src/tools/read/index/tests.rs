@@ -73,9 +73,36 @@ fn a_fill_claimed_before_a_forget_installs_nothing() {
     assert!(index.claim(real));
     let seen = index.observe().unwrap();
     index.offer(real.to_path_buf(), entry("A", 10), seen);
-    index.forget(real);
+    index.forget(real, seen);
     index.settle(real.to_path_buf(), Ok(entry("A", 10)));
     assert_eq!(version_at(&index, real, 10), None);
+}
+
+/// A fill claimed after the rejected facts were seen may hold the new
+/// file, so a forget leaves it to land.
+#[test]
+fn a_fill_claimed_after_the_rejected_facts_still_lands() {
+    let index = Index::new();
+    let real = Path::new("/city/a.txt");
+    let seen = index.observe().unwrap();
+    index.offer(real.to_path_buf(), entry("A", 10), seen);
+    assert!(index.claim(real));
+    index.forget(real, seen);
+    index.settle(real.to_path_buf(), Ok(entry("B", 11)));
+    assert_eq!(version_at(&index, real, 11).as_deref(), Some("B"));
+}
+
+/// A forget drops only the entry it rejected, not one that replaced it.
+#[test]
+fn a_forget_leaves_a_newer_entry_standing() {
+    let index = Index::new();
+    let real = Path::new("/city/a.txt");
+    let old = index.observe().unwrap();
+    index.offer(real.to_path_buf(), entry("A", 10), old);
+    let new = index.observe().unwrap();
+    index.offer(real.to_path_buf(), entry("B", 11), new);
+    index.forget(real, old);
+    assert_eq!(version_at(&index, real, 11).as_deref(), Some("B"));
 }
 
 /// A fill replaces a stale entry seen before it, and a failed one

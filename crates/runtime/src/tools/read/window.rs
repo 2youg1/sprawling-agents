@@ -614,8 +614,9 @@ fn settle_seek(
             return assemble_seek(scanned, job, hit);
         }
     }
-    index.forget(&job.real);
-    job.hit = None;
+    if let Some(hit) = job.hit.take() {
+        index.forget(&job.real, hit.seen);
+    }
     let scanned = rescan(job)?;
     assemble(scanned, job)
 }

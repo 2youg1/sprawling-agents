@@ -110,6 +110,8 @@ pub(super) struct Hit {
     pub total_lines: usize,
     pub version: String,
     pub line_start: Option<u64>,
+    /// When the entry's facts were seen, for [`Index::forget`].
+    pub seen: Seen,
 }
 
 impl Index {
@@ -132,7 +134,8 @@ impl Index {
         offset: u64,
     ) -> Option<Hit> {
         let locked = self.locked.lock().ok()?;
-        let entry = &locked.map.get(real)?.entry;
+        let kept = locked.map.get(real)?;
+        let entry = &kept.entry;
         if entry.size != size || entry.modified != modified {
             return None;
         }
@@ -143,6 +146,7 @@ impl Index {
             total_lines: entry.total_lines,
             version: entry.version.clone(),
             line_start,
+            seen: kept.seen,
         })
     }
 
@@ -169,16 +173,28 @@ impl Index {
         }
     }
 
-    /// Drops the entry for `real`: a read found its seek table no longer
-    /// lands on line starts, so the file changed under the same size and
-    /// mtime (§8-29-7). A fill already on its way read the file before
-    /// the rejection, so it is voided too.
-    pub(super) fn forget(&self, real: &Path) {
+    /// Drops the entry seen at `rejected` for `real`: a read found its
+    /// seek table no longer lands on line starts, so the file changed
+    /// under the same size and mtime (§8-29-7). A fill claimed before
+    /// those facts were seen read no newer a file, so it is voided too;
+    /// a later fill, or an entry that has since replaced the rejected
+    /// one, may hold the new file and stands.
+    pub(super) fn forget(&self, real: &Path, rejected: Seen) {
         if let Ok(mut locked) = self.locked.lock() {
-            if let Some(fill) = locked.pending.get_mut(real) {
+            if let Some(fill) = locked
+                .pending
+                .get_mut(real)
+                .filter(|fill| fill.seen < rejected)
+            {
                 fill.claim = Claim::Voided;
             }
-            remove(&mut locked, real);
+            if locked
+                .map
+                .get(real)
+                .is_some_and(|kept| kept.seen == rejected)
+            {
+                remove(&mut locked, real);
+            }
         }
     }
 
