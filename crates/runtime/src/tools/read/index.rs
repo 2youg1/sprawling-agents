@@ -61,7 +61,7 @@ struct Locked {
     /// The paths a fill is on its way for, each with the [`Seen`] taken
     /// when it was claimed. Apart from `map`, so a stale entry can be
     /// refilled while it still stands.
-    pending: BTreeMap<PathBuf, Seen>,
+    pending: BTreeMap<PathBuf, Fill>,
     /// The last [`Seen`] handed out.
     seen: u64,
     /// Insertion order of `map`'s keys, for eviction; each key once.
@@ -78,6 +78,20 @@ struct Locked {
 /// an older mtime and the same size.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(super) struct Seen(u64);
+
+/// One fill on its way: when it was claimed, and whether a `forget`
+/// since then voided it. A table a read rejected must not come back
+/// from a fill that read the file before the rejection.
+struct Fill {
+    seen: Seen,
+    claim: Claim,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Claim {
+    Current,
+    Voided,
+}
 
 /// One entry and when its facts were seen.
 struct Kept {
@@ -144,7 +158,11 @@ impl Index {
     /// entry standing, or the fill on its way, was seen later.
     pub(super) fn offer(&self, real: PathBuf, entry: Entry, seen: Seen) {
         if let Ok(mut locked) = self.locked.lock() {
-            if locked.pending.get(&real).is_some_and(|fill| *fill > seen) {
+            if locked
+                .pending
+                .get(&real)
+                .is_some_and(|fill| fill.seen > seen)
+            {
                 return;
             }
             insert(&mut locked, real, Kept { seen, entry });
@@ -153,9 +171,13 @@ impl Index {
 
     /// Drops the entry for `real`: a read found its seek table no longer
     /// lands on line starts, so the file changed under the same size and
-    /// mtime (§8-29-7).
+    /// mtime (§8-29-7). A fill already on its way read the file before
+    /// the rejection, so it is voided too.
     pub(super) fn forget(&self, real: &Path) {
         if let Ok(mut locked) = self.locked.lock() {
+            if let Some(fill) = locked.pending.get_mut(real) {
+                fill.claim = Claim::Voided;
+            }
             remove(&mut locked, real);
         }
     }
@@ -195,7 +217,13 @@ impl Index {
         }
         locked.seen = locked.seen.saturating_add(1);
         let seen = Seen(locked.seen);
-        locked.pending.insert(real.to_path_buf(), seen);
+        locked.pending.insert(
+            real.to_path_buf(),
+            Fill {
+                seen,
+                claim: Claim::Current,
+            },
+        );
         true
     }
 
@@ -206,8 +234,12 @@ impl Index {
         let Ok(mut locked) = self.locked.lock() else {
             return;
         };
-        let Some(seen) = locked.pending.remove(&real) else {
+        let Some(fill) = locked.pending.remove(&real) else {
             return;
+        };
+        let seen = match fill.claim {
+            Claim::Current => fill.seen,
+            Claim::Voided => return,
         };
         if locked.map.get(&real).is_some_and(|kept| kept.seen > seen) {
             return;

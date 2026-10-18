@@ -64,6 +64,20 @@ fn an_offer_seen_before_a_fill_was_claimed_loses_in_either_order() {
     assert_eq!(version_at(&index, real, 11).as_deref(), Some("B"));
 }
 
+/// A table a seek rejected does not come back from a fill that was on
+/// its way before the rejection.
+#[test]
+fn a_fill_claimed_before_a_forget_installs_nothing() {
+    let index = Index::new();
+    let real = Path::new("/city/a.txt");
+    assert!(index.claim(real));
+    let seen = index.observe().unwrap();
+    index.offer(real.to_path_buf(), entry("A", 10), seen);
+    index.forget(real);
+    index.settle(real.to_path_buf(), Ok(entry("A", 10)));
+    assert_eq!(version_at(&index, real, 10), None);
+}
+
 /// A fill replaces a stale entry seen before it, and a failed one
 /// removes it.
 #[test]
