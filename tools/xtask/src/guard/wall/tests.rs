@@ -53,7 +53,8 @@ name = "sprawling-k"
 workspace = true
 "#;
 
-/// The desktop leaf as `leaf` writes it, the console leaf as it stands.
+/// The desktop leaf as `leaf` writes it, the console and read leaves as
+/// they stand.
 fn judged(leaf: &str, member: &str) -> Vec<Violation> {
     tables(
         &read(WORKSPACE),
@@ -61,6 +62,7 @@ fn judged(leaf: &str, member: &str) -> Vec<Violation> {
             ("crates/k".to_owned(), read(member)),
             (LEAVES[0].to_owned(), read(leaf)),
             (LEAVES[1].to_owned(), read(LEAF_MANIFEST)),
+            (LEAVES[2].to_owned(), read(LEAF_MANIFEST)),
         ],
     )
 }
@@ -145,6 +147,7 @@ fn a_leaf_that_is_no_longer_a_member_strikes_its_exception() {
         &[
             ("crates/k".to_owned(), read(MEMBER)),
             (LEAVES[1].to_owned(), read(LEAF_MANIFEST)),
+            (LEAVES[2].to_owned(), read(LEAF_MANIFEST)),
         ],
     );
     assert_eq!(found.len(), 1, "{found:#?}");

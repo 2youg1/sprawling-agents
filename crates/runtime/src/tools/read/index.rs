@@ -16,7 +16,7 @@
 //! `edit`'s own whole-file comparison, which refuses it — the chain is
 //! fail-closed.
 
-use std::collections::{BTreeMap, VecDeque};
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::io::Read as _;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
@@ -49,18 +49,21 @@ const TOTAL_CAP_BYTES: usize = 32 * 1024 * 1024;
 /// before.
 const ELIGIBLE_SIZE: u64 = 12 * 1024 * 1024;
 
-/// What the map holds for one path: a fill on its way, or the facts.
-enum State {
-    Pending,
-    Ready(Entry),
-}
+/// The most fills one index runs at once. Each holds its whole file
+/// while it hashes it, so this and [`ELIGIBLE_SIZE`] bound the memory
+/// fills take; a fill asked for past it is not started, and the next
+/// truncated read of that file asks again (§8-29-7).
+const PENDING_CAP: usize = 2;
 
 #[derive(Default)]
 struct Locked {
-    map: BTreeMap<PathBuf, State>,
-    /// Insertion order, for eviction.
+    map: BTreeMap<PathBuf, Entry>,
+    /// The paths a fill is on its way for. Apart from `map`, so a stale
+    /// entry can be refilled while it still stands.
+    pending: BTreeSet<PathBuf>,
+    /// Insertion order of `map`'s keys, for eviction; each key once.
     order: VecDeque<PathBuf>,
-    /// The bill of every ready entry's seek table, in bytes.
+    /// The bill of every entry's seek table, in bytes.
     bytes: usize,
 }
 
@@ -97,9 +100,7 @@ impl Index {
         offset: u64,
     ) -> Option<Hit> {
         let locked = self.locked.lock().ok()?;
-        let Some(State::Ready(entry)) = locked.map.get(real) else {
-            return None;
-        };
+        let entry = locked.map.get(real)?;
         if entry.size != size || entry.modified != modified {
             return None;
         }
@@ -121,6 +122,15 @@ impl Index {
         }
     }
 
+    /// Drops the entry for `real`: a read found its seek table no longer
+    /// lands on line starts, so the file changed under the same size and
+    /// mtime (§8-29-7).
+    pub(super) fn forget(&self, real: &Path) {
+        if let Ok(mut locked) = self.locked.lock() {
+            remove(&mut locked, real);
+        }
+    }
+
     /// Whether a file this size is worth filling at all.
     pub(super) fn eligible(size: u64) -> bool {
         size <= ELIGIBLE_SIZE
@@ -129,28 +139,28 @@ impl Index {
     /// Computes the entry behind the answer: one short thread that
     /// reads the file buffered — warming the page cache for the reads
     /// that follow — and writes the entry back. Deduped: one fill per
-    /// path at a time. A file that will not read simply leaves no
-    /// entry; the reads that asked for it were already answered.
+    /// path at a time, and at most [`PENDING_CAP`] at once. A caller asks
+    /// only when its lookup missed, so an entry standing for `real` no
+    /// longer describes the file and the fill replaces it. A file that
+    /// will not read simply leaves no entry; the reads that asked for it
+    /// were already answered.
     pub(super) fn fill_later(self: &Arc<Index>, real: PathBuf) {
         {
             let Ok(mut locked) = self.locked.lock() else {
                 return;
             };
-            if locked.map.contains_key(&real) {
+            if locked.pending.len() >= PENDING_CAP || !locked.pending.insert(real.clone()) {
                 return;
             }
-            locked.map.insert(real.clone(), State::Pending);
-            locked.order.push_back(real.clone());
         }
         let index = Arc::clone(self);
         std::thread::spawn(move || {
             let filled = fill(&real);
             if let Ok(mut locked) = index.locked.lock() {
+                locked.pending.remove(&real);
                 match filled {
                     Ok(entry) => insert(&mut locked, real, entry),
-                    Err(_) => {
-                        locked.map.remove(&real);
-                    }
+                    Err(_) => remove(&mut locked, &real),
                 }
             }
         });
@@ -170,8 +180,20 @@ fn fill(real: &Path) -> Result<Entry, AxError> {
     let mut file = std::fs::File::open(real).map_err(failed)?;
     let meta = file.metadata().map_err(failed)?;
     let mut bytes = Vec::new();
-    file.read_to_end(&mut bytes).map_err(failed)?;
+    // The file may have grown past what a fill is allowed to hold since
+    // the read that asked for it.
+    file.by_ref()
+        .take(ELIGIBLE_SIZE.saturating_add(1))
+        .read_to_end(&mut bytes)
+        .map_err(failed)?;
     let modified = meta.modified().map_err(failed)?;
+    // The facts are the bytes' only when nothing wrote the file while it
+    // was read: the same size and mtime from the same handle afterwards.
+    let after = file.metadata().map_err(failed)?;
+    let read = u64::try_from(bytes.len()).unwrap_or(u64::MAX);
+    if read != meta.len() || after.len() != meta.len() || after.modified().ok() != Some(modified) {
+        return Err(failed(std::io::ErrorKind::Interrupted.into()));
+    }
     let line_offsets = mark(&bytes);
     Ok(Entry {
         size: meta.len(),
@@ -200,38 +222,40 @@ fn mark(bytes: &[u8]) -> Vec<u64> {
     offsets
 }
 
+/// The bill of one entry's seek table, in bytes.
+fn bill(entry: &Entry) -> usize {
+    entry.line_offsets.len().saturating_mul(8)
+}
+
 /// Inserts or replaces, accounts the table's bytes, and evicts oldest
-/// first while the bill is over the cap. An entry older than the one
-/// standing does not replace it: a fill that read the file before the
-/// entry's read does not push the fresher facts out.
+/// first while the bill is over the cap. The newest facts win: an entry
+/// that turns out stale misses at `lookup`, whose caller asks for a fill
+/// again, so no ordering by mtime is needed — and none could hold, since
+/// a file can be replaced by one with an older mtime.
 fn insert(locked: &mut Locked, real: PathBuf, entry: Entry) {
     if entry.line_offsets.len() > TABLE_CAP_LINES {
-        locked.map.remove(&real);
+        remove(locked, &real);
         return;
     }
-    if matches!(&locked.map.get(&real), Some(State::Ready(old)) if old.modified > entry.modified) {
-        return;
-    }
-    if let Some(State::Ready(old)) = locked.map.get(&real) {
-        locked.bytes = locked
-            .bytes
-            .saturating_sub(old.line_offsets.len().saturating_mul(8));
-    }
-    locked.bytes = locked
-        .bytes
-        .saturating_add(entry.line_offsets.len().saturating_mul(8));
-    locked.map.insert(real.clone(), State::Ready(entry));
-    if !locked.order.iter().any(|path| path == &real) {
-        locked.order.push_back(real);
+    locked.bytes = locked.bytes.saturating_add(bill(&entry));
+    match locked.map.insert(real.clone(), entry) {
+        Some(old) => locked.bytes = locked.bytes.saturating_sub(bill(&old)),
+        None => locked.order.push_back(real),
     }
     while locked.bytes > TOTAL_CAP_BYTES {
         let Some(oldest) = locked.order.pop_front() else {
             break;
         };
-        if let Some(State::Ready(old)) = locked.map.remove(&oldest) {
-            locked.bytes = locked
-                .bytes
-                .saturating_sub(old.line_offsets.len().saturating_mul(8));
+        if let Some(old) = locked.map.remove(&oldest) {
+            locked.bytes = locked.bytes.saturating_sub(bill(&old));
         }
+    }
+}
+
+/// Removes the entry for `real`, its bill, and its place in the order.
+fn remove(locked: &mut Locked, real: &Path) {
+    if let Some(old) = locked.map.remove(real) {
+        locked.bytes = locked.bytes.saturating_sub(bill(&old));
+        locked.order.retain(|path| path != real);
     }
 }

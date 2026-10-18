@@ -22,11 +22,18 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::time::SystemTime;
 
+/// The facts that say an open file is still the one a read saw: its
+/// size and its write time, both from the open handle.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) struct Stamp {
+    pub size: u64,
+    pub modified: SystemTime,
+}
+
 /// The bytes one window read left, and the file they belong to.
 struct Held {
     real: PathBuf,
-    size: u64,
-    modified: SystemTime,
+    stamp: Stamp,
     /// The byte the held bytes start at.
     base: u64,
     bytes: Vec<u8>,
@@ -53,8 +60,7 @@ impl Hot {
     pub(super) fn covered(
         &self,
         real: &Path,
-        size: u64,
-        modified: SystemTime,
+        stamp: Stamp,
         start: u64,
         want: usize,
     ) -> Option<Covered> {
@@ -64,7 +70,7 @@ impl Hot {
         let released = {
             let mut held = self.held.lock().ok()?;
             let found = held.as_ref()?;
-            let same = found.real == real && found.size == size && found.modified == modified;
+            let same = found.real == real && found.stamp == stamp;
             if same {
                 let end = start.saturating_add(u64::try_from(want).ok()?);
                 let held_end = found
@@ -95,19 +101,11 @@ impl Hot {
 
     /// Holds the bytes of a file whose answer was truncated: the pass is
     /// still going, so the continuation starts warm.
-    pub(super) fn keep(
-        &self,
-        real: &Path,
-        size: u64,
-        modified: SystemTime,
-        base: u64,
-        bytes: &[u8],
-    ) {
+    pub(super) fn keep(&self, real: &Path, stamp: Stamp, base: u64, bytes: &[u8]) {
         if let Ok(mut held) = self.held.lock() {
             *held = Some(Held {
                 real: real.to_path_buf(),
-                size,
-                modified,
+                stamp,
                 base,
                 bytes: bytes.to_vec(),
             });

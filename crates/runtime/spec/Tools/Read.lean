@@ -122,24 +122,29 @@ pub fn admit_carried_skill(&mut self, entry: CatalogEntry) -> Result<(), AxError
 - **一件 skill 在 catalog 里只有一个名字**：城外的与城内的同名时，书架扫描已经按「近架盖远架」留下城内那一件（`crates/city/Spec.lean` §8-8），catalog 收到的是一件；`admit_skill` 与 `admit_carried_skill` 之间的重名仍拒，与同一扇门里的重名同一个拒词。
 -/
 
+/-!
 #### 8-29-7 全文索引：截断之后补齐（`runtime::tools::read::index`）
 
 ```rust
 // read::index
-pub(super) struct Index { /* Mutex<BTreeMap<PathBuf, Entry>>，键是判过的真实路径 */ }
+pub(super) struct Index { /* Mutex：条目 BTreeMap<PathBuf, Entry>（键是判过的真实路径）与在途回填的路径集 */ }
 pub(super) struct Entry {
     size: u64, modified: SystemTime,       // 命中校验：与本次打开句柄的元数据相等才采信
     total_lines: usize, version: String,   // 截断答案缺的那两个字段
     line_offsets: Vec<u64>,                // 每行的起始字节，选行读的落点表
 }
 // 命中即同步交出 total_lines 与 version；line_offsets 仅供 window 寻址。
-// 装配一次后台回填；同一路径在回填完成前只装配一次。
+// 未命中即装配一次后台回填，回填写回时替换该路径的旧条目；同一路径在回填完成前只装配一次，
+// 在途回填满 2 条时不再装配。forget：选行读发现落点表不再落在行首时丢掉条目。
 ```
 
-- **两个来源**。整读（`offset=0` 且读到末尾）在答复路径上顺手建成条目：行表随扫描得出，`version` 随整文哈希得出，不添一字节 I/O。截断或 `offset>0` 的读在索引未命中时装配一条后台回填：整读该文件（缓冲读，顺带给页缓存预热）、算 `edit::version_of`、数行并记下行偏移，写回索引。回填不在答复路径上，答复先走。
+- **两个来源**。整读（`offset=0` 且读到末尾）在答复路径上顺手建成条目：行表随扫描得出，`version` 随整文哈希得出，不添一字节 I/O。截断或 `offset>0` 的读在索引未命中时装配一条后台回填：整读该文件（缓冲读，D11）、算 `edit::version_of`、数行并记下行偏移，写回索引并替换该路径的旧条目——文件改过之后，旧条目不命中，下一次未命中的读就让它重新回填。回填至多读 `ELIGIBLE_SIZE`（12 MiB）加一字节，读前读后从同一句柄取的 size 与 `modified` 须相等、读到的字节数须等于 size，否则不写条目：读的过程中被改写或长过上限的文件没有条目，而不是半份文件的条目。回填不在答复路径上，答复先走。
 - **命中校验**：`size` 与 `modified` 取自本次打开句柄的元数据，与条目相等才采信。校验不过顶多交出一个陈旧 `version`，而 `edit` 自己重算整文哈希比对（kernel D27），陈旧版本只换来一次 `VersionConflict`——索引是捷径，不是权威，这条链 fail-closed。
+- **落点校验**：size 与 `modified` 都不变也可能已被改写（同长度改写后把时间戳设回去），这时行偏移表会把选行读带到别的字节上。所以选行读不只信元数据：落点的前一字节必须是换行，读到文件末尾时数出的行数必须等于条目的 `total_lines`。任一不符即 `forget` 该条目，本次答复从文件开头流式扫描、不携 `version` 与 `total_lines`，并装配一次回填；交出的永远是所要的那几行。
 - **容量**：条目按行偏移表的字节数计价（单文件表 ≤ 2 MiB、索引总账 ≤ 32 MiB），超出即不收该文件；满时按插入先后弹出。越过上限的文件选行读退回流式扫描，行为仍正确。
-- **线程**：每条回填一个短线程，答复之后开始、写完索引即结束（ARCHITECTURE.md 线程表）。
+- **线程**：每条回填一个短线程，答复之后开始、写完索引即结束；同时在途的回填至多 2 条（`PENDING_CAP`），满了的未命中不装配，由之后的读再装配。一条回填至多握 12 MiB 加一字节的内容，所以并行读再多，回填占的内存也有上界（ARCHITECTURE.md 线程表）。
+
+-/
 
 /-! D10 答复路径只读窗口，version 与 total_lines 改由索引补齐
 
@@ -163,23 +168,25 @@ pub(super) struct Entry {
 **重开参数**：某个部署的文件系统上直通读慢于缓冲读（网络盘、过滤驱动干预），或回退路径在 CI 覆盖不到的平台出错。
 -/
 
-/-! D12 不靠页缓存提速：窗口与回填都直通，读完即放手
+/-! D12 窗口读不靠页缓存提速，读完即放手
 
-**决定**：`read` 的窗口读与后台回填一律走直通 I/O（Windows `FILE_FLAG_NO_BUFFERING`、Linux `O_DIRECT`），不为了后续读而把文件留在页缓存里；回填的整文件读同样直通。回填只是算出 total、version 与行偏移，算完即释放，不把整份文件的内容留在内存里。
+**决定**：`read` 的窗口读走直通 I/O（Windows `FILE_FLAG_NO_BUFFERING`、Linux `O_DIRECT`），不为了后续读而把文件留在页缓存里。后台回填按 D11 走缓冲读；它只算出 total、version 与行偏移，算完即释放，不把整份文件的内容留在内存里，同时在途的条数与每条读入的字节都有上限（§8-29-7）。
 
 **理由**：把文件留在页缓存会让驻留内存随读过的文件规模增长，而一个 run 会读很多文件；这条长尾代价比一次设备往返昂贵得多，且它以「内存里剩下的东西」的形式出现，事后很难归因。直通读不享重复命中，但重复命中的收益换不来这份确定。索引仍然缓存每文件的行偏移表与两个字段，它们按字节计价且总量封顶（§8-29-7），与文件内容无关。
 
-**被否**：①回填用缓冲读以给后续读预热（RAM 长尾）；②索引命中后改走缓冲读（同上，且让同一份文件的延迟随机器状态而变，复测无法归因）；③把文件内容缓存起来供后续选行读（增长速度最快的一种）。
+**被否**：①索引命中后改走缓冲读（RAM 长尾，且让同一份文件的延迟随机器状态而变，复测无法归因）；②把文件内容缓存起来供后续选行读（增长速度最快的一种）。
 
 **重开参数**：某个部署的文件读取次数远高于文件数（每次读同一批大文件很多遗），并且内存预算能明确地跟住这份驻留。
 -/
 
+/-!
 #### 8-29-8 一次阅读的一小段留在手里（`runtime::tools::read::hot`）
 
 ```rust
 // read::hot
 pub(super) struct Hot { /* Mutex<Option<Held>>，全 run 一个槽 */ }
-struct Held { real: PathBuf, size: u64, modified: SystemTime, base: u64, bytes: Vec<u8> }
+pub(super) struct Stamp { size: u64, modified: SystemTime }   // 句柄给的大小与写时刻，总是一起走
+struct Held { real: PathBuf, stamp: Stamp, base: u64, bytes: Vec<u8> }
 // covered：同一个真实位置、同一个大小与戳，且盖住要的那段时才作答；否则不答。
 // keep：一个被截断的作答留下它读过的字节。release：读完或换文件时放手。
 ```
@@ -188,6 +195,8 @@ struct Held { real: PathBuf, size: u64, modified: SystemTime, base: u64, bytes: 
 - **槽只回答字节，不回答判定**：调用方已经打开文件、并且知道它是判过的那个，才来问槽；所以陈旧的槽只可能不命中，不可能把读带到别处。
 - **换文件时释放，但不在锁里释放**：`covered` 与 `release` 都在锁内把旧值 `take` 出来、出了锁再丢（D15）。这样下一次读不会排在「丢上一份文件」后面。
 - **没有时钟**：工具不采样时间（ARCHITECTURE.md 的时间规则），所以不做 N 分钟的过期；模型放弃续读时，那份字节留到下一次读或 run 结束，上界是上面那 1–2 MiB。
+
+-/
 
 /-! D13 一次 open 回答判定、文件事实与窗口
 

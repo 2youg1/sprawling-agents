@@ -23,7 +23,7 @@ use std::time::SystemTime;
 use kernel::{Address, AxCode, AxError};
 use same_file::Handle;
 
-use super::hot::Hot;
+use super::hot::{Hot, Stamp};
 use super::index::{Entry, Hit, Index};
 use super::miss::{self, Floor};
 use super::{Interval, Taken};
@@ -73,6 +73,27 @@ impl FloorPlan {
             FloorPlan::Ready(floor) => floor.clone(),
         }
     }
+}
+
+/// What every step of one read carries: the call's own facts and the
+/// floor its errors are answered from.
+#[derive(Clone, Copy)]
+struct Reading<'a> {
+    asked: &'a str,
+    city: &'a CityRoot,
+    bound: &'a crate::tools::chosen_path::ReadBound,
+    interval: &'a Interval,
+    index: &'a Arc<Index>,
+    hot: &'a Hot,
+    floor: &'a LazyFloor<'a>,
+}
+
+/// Bytes already read from a file, from `base` on; `eof` when the file
+/// ended inside them.
+struct Chunk {
+    base: u64,
+    bytes: Vec<u8>,
+    eof: bool,
 }
 
 /// The floor, computed the first time an error path asks for it.
@@ -171,6 +192,15 @@ pub(super) fn read(call: Call<'_>) -> Result<Window, AxError> {
         root: city.written(),
         cell: OnceCell::new(),
     };
+    let reading = Reading {
+        asked,
+        city,
+        bound,
+        interval,
+        index,
+        hot,
+        floor: &floor,
+    };
     match file {
         FileRef::City(addr) => {
             // The path the model wrote, with the city's spelling of the
@@ -189,7 +219,7 @@ pub(super) fn read(call: Call<'_>) -> Result<Window, AxError> {
             match leaf_open(&written, CHUNK) {
                 Leafed::Absent | Leafed::Refused => {
                     let located = crate::tools::chosen_path::land(city, &addr, "read", &**bound)?;
-                    door_read(asked, located, interval, index, hot, &floor)
+                    door_read(&reading, located)
                 }
                 Leafed::Read {
                     bytes,
@@ -202,14 +232,21 @@ pub(super) fn read(call: Call<'_>) -> Result<Window, AxError> {
                     // nothing this call holds; the address the opened
                     // file really has is admitted before the bytes are
                     // assembled, and a refusal drops them.
-                    let real = admit_landed(asked, city, &addr, final_path, &**bound)?;
+                    let real = admit_landed(&reading, &addr, final_path)?;
                     leaf_then(
-                        asked, &real, size, modified, interval, index, hot, &floor, bytes, eof,
+                        &reading,
+                        &real,
+                        Stamp { size, modified },
+                        Chunk {
+                            base: 0,
+                            bytes,
+                            eof,
+                        },
                     )
                 }
             }
         }
-        FileRef::Landed(at) => door_read(asked, at, interval, index, hot, &floor),
+        FileRef::Landed(at) => door_read(&reading, at),
     }
 }
 
@@ -219,12 +256,13 @@ pub(super) fn read(call: Call<'_>) -> Result<Window, AxError> {
 /// (§8-30-1). The handle pins the file, so there is no window in which
 /// the path could move between the answer and the read.
 fn admit_landed(
-    asked: &str,
-    city: &CityRoot,
+    reading: &Reading<'_>,
     addr: &Address,
     final_path: PathBuf,
-    bound: &dyn Fn(&Address) -> kernel::ReadVerdict,
 ) -> Result<PathBuf, AxError> {
+    let Reading {
+        asked, city, bound, ..
+    } = *reading;
     let outside = || {
         AxError::failure(
             AxCode::GateDenied,
@@ -235,21 +273,22 @@ fn admit_landed(
     };
     let inside = city.spelled_under(&final_path).ok_or_else(outside)?;
     if inside != addr.as_str() {
-        crate::tools::chosen_path::admit(&inside, "read", bound)?;
+        crate::tools::chosen_path::admit(&inside, "read", &**bound)?;
     }
     Ok(final_path)
 }
 
 /// The read once the file's place is settled: the leaf where the
 /// platform has one, the safe door elsewhere.
-fn door_read(
-    asked: &str,
-    at: Located,
-    interval: &Interval,
-    index: &Arc<Index>,
-    hot: &Hot,
-    floor: &LazyFloor,
-) -> Result<Window, AxError> {
+fn door_read(reading: &Reading<'_>, at: Located) -> Result<Window, AxError> {
+    let Reading {
+        asked,
+        interval,
+        index,
+        hot,
+        floor,
+        ..
+    } = *reading;
     let real = match at {
         Located::Present(path) => path,
         Located::Absent(path) => {
@@ -282,7 +321,14 @@ fn door_read(
                 return Err(changed_after_judgement(asked));
             }
             return leaf_then(
-                asked, &real, size, modified, interval, index, hot, floor, bytes, eof,
+                reading,
+                &real,
+                Stamp { size, modified },
+                Chunk {
+                    base: 0,
+                    bytes,
+                    eof,
+                },
             );
         }
     }
@@ -298,27 +344,25 @@ fn door_read(
         .map_err(|err| miss::unread(asked, &real, floor.get(), &err))?;
     // The pass may already hold these bytes: serving them costs no
     // device read at all (D14).
-    if let Some(covered) = hot.covered(&real, size, modified, 0, CHUNK) {
+    let stamp = Stamp { size, modified };
+    if let Some(covered) = hot.covered(&real, stamp, 0, CHUNK) {
         let eof = covered
             .base
             .saturating_add(u64::try_from(covered.bytes.len()).unwrap_or(0))
             >= size;
         return answer_from(
-            asked,
+            reading,
             &real,
-            size,
-            modified,
-            interval,
-            index,
-            hot,
-            floor,
-            covered.base,
-            covered.bytes,
-            eof,
+            stamp,
+            Chunk {
+                base: covered.base,
+                bytes: covered.bytes,
+                eof,
+            },
         );
     }
     let hit = index.lookup(&real, size, modified, interval.offset);
-    let job = Job {
+    let mut job = Job {
         asked,
         interval,
         real,
@@ -343,11 +387,13 @@ fn door_read(
             });
         }
         if let Some(start) = hit.line_start {
-            let scan = scan_with_fallback(door, &job, From::Line(start), floor, Pre::None)?;
-            return assemble_seek(scan, &job, hit);
+            let scan = scan_with_fallback(&door, &job, From::Line(start), floor)?;
+            return settle_seek(scan, &mut job, index, |job| {
+                scan_with_fallback(&door, job, From::Start, floor)
+            });
         }
     }
-    let scan = scan_with_fallback(door, &job, From::Start, floor, Pre::None)?;
+    let scan = scan_with_fallback(&door, &job, From::Start, floor)?;
     assemble(scan, &job)
 }
 
@@ -426,40 +472,29 @@ fn leaf_open(path: &Path, want: usize) -> Leafed {
 /// The answer once the leaf has opened the file: the pass's own bytes
 /// when it holds them, or the window just read. The bytes the first open
 /// read are spent rather than read again.
-#[expect(
-    clippy::too_many_arguments,
-    reason = "one call's facts, each already named at the caller"
-)]
 fn leaf_then(
-    asked: &str,
+    reading: &Reading<'_>,
     real: &Path,
-    size: u64,
-    modified: SystemTime,
-    interval: &Interval,
-    index: &Arc<Index>,
-    hot: &Hot,
-    floor: &LazyFloor,
-    bytes: Vec<u8>,
-    eof: bool,
+    stamp: Stamp,
+    first: Chunk,
 ) -> Result<Window, AxError> {
+    let asked = reading.asked;
+    let Chunk { base, bytes, eof } = first;
     // The pass continues: these bytes cost nothing to serve.
-    if let Some(covered) = hot.covered(real, size, modified, 0, CHUNK) {
+    if let Some(covered) = reading.hot.covered(real, stamp, 0, CHUNK) {
         let eof = covered
             .base
             .saturating_add(u64::try_from(covered.bytes.len()).unwrap_or(0))
-            >= size;
+            >= stamp.size;
         return answer_from(
-            asked,
+            reading,
             real,
-            size,
-            modified,
-            interval,
-            index,
-            hot,
-            floor,
-            covered.base,
-            covered.bytes,
-            eof,
+            stamp,
+            Chunk {
+                base: covered.base,
+                bytes: covered.bytes,
+                eof,
+            },
         );
     }
     // A facts-only open left the window unread: read it now, in one
@@ -482,32 +517,29 @@ fn leaf_then(
     } else {
         (bytes, eof)
     };
-    answer_from(
-        asked, real, size, modified, interval, index, hot, floor, 0, bytes, eof,
-    )
+    answer_from(reading, real, stamp, Chunk { base, bytes, eof })
 }
 
 /// Assembles one answer from bytes that are already in hand, and settles
 /// what the pass holds afterwards: a truncated answer keeps its window,
 /// a finished one releases it (D14).
-#[expect(
-    clippy::too_many_arguments,
-    reason = "one call's facts, each already named at the caller"
-)]
 fn answer_from(
-    asked: &str,
+    reading: &Reading<'_>,
     real: &Path,
-    size: u64,
-    modified: SystemTime,
-    interval: &Interval,
-    index: &Arc<Index>,
-    hot: &Hot,
-    floor: &LazyFloor,
-    base: u64,
-    bytes: Vec<u8>,
-    eof: bool,
+    stamp: Stamp,
+    chunk: Chunk,
 ) -> Result<Window, AxError> {
-    let job = Job {
+    let Reading {
+        asked,
+        interval,
+        index,
+        hot,
+        floor,
+        ..
+    } = *reading;
+    let Stamp { size, modified } = stamp;
+    let Chunk { base, bytes, eof } = chunk;
+    let mut job = Job {
         asked,
         interval,
         real: real.to_path_buf(),
@@ -539,30 +571,53 @@ fn answer_from(
     // Held in case this answer turns out to be a truncated one, in which
     // case these bytes are the head of the pass that follows (D14).
     let held = bytes.clone();
-    let answer = match scan(None, &job, from, Pre::Only { base, bytes, eof }) {
-        Ok(scanned) if scanned.complete => match (&from, job.hit.as_ref()) {
-            (From::Line(_), Some(hit)) => assemble_seek(scanned, &job, hit),
-            _ => assemble(scanned, &job),
-        },
+    let scanned = match scan(None, &job, from, Pre::Only { base, bytes, eof }) {
+        Ok(scanned) if scanned.complete => scanned,
         // The leaf's one window did not answer, or the walk needs a
         // second one: the door carries on, holding a handle.
-        _ => {
+        Ok(_) | Err(_) => {
             let door = door_open(asked, real, floor)?;
-            let scanned = scan(Some(&door), &job, from, Pre::None)
-                .map_err(|err| map_scan_error(asked, real, floor, err))?;
-            match (&from, job.hit.as_ref()) {
-                (From::Line(_), Some(hit)) => assemble_seek(scanned, &job, hit),
-                _ => assemble(scanned, &job),
-            }
+            scan_with_fallback(&door, &job, from, floor)?
         }
+    };
+    let answer = match from {
+        From::Line(_) => settle_seek(scanned, &mut job, index, |job| {
+            let door = door_open(asked, real, floor)?;
+            scan_with_fallback(&door, job, From::Start, floor)
+        }),
+        From::Start => assemble(scanned, &job),
     }?;
     // A truncated answer leaves a pass in flight; a complete one ends it.
     if answer.taken.next_offset.is_some() {
-        hot.keep(real, size, modified, base, &held);
+        hot.keep(real, stamp, base, &held);
     } else {
         hot.release();
     }
     Ok(answer)
+}
+
+/// The answer of a scan that started where the index's seek table put
+/// it, when the table still describes the file. A file rewritten under
+/// the same size and mtime is caught here, where the bytes show it: the
+/// seek did not land after a newline, or the file ended at another line
+/// count than the entry says. The entry is then forgotten and the answer
+/// comes from `rescan`, a scan from the head with no index facts (§8-29-7).
+fn settle_seek(
+    scanned: Scanned,
+    job: &mut Job,
+    index: &Index,
+    rescan: impl FnOnce(&Job) -> Result<Scanned, AxError>,
+) -> Result<Window, AxError> {
+    if let Some(hit) = job.hit.as_ref() {
+        let total = u64::try_from(hit.total_lines).unwrap_or(u64::MAX);
+        if scanned.landed && !(scanned.eof && scanned.doc_lines != total) {
+            return assemble_seek(scanned, job, hit);
+        }
+    }
+    index.forget(&job.real);
+    job.hit = None;
+    let scanned = rescan(job)?;
+    assemble(scanned, job)
 }
 
 /// Opens the judged real path — direct first where the platform spells
@@ -728,6 +783,9 @@ struct Scanned {
     eof: bool,
     delivered: u64,
     scanned: u64,
+    /// A seek's first chunk shows a newline right before the line the
+    /// index said starts there; always true for a scan from the head.
+    landed: bool,
 }
 
 /// Reads chunks, counts lines, keeps the window. Retries buffered once
@@ -735,13 +793,12 @@ struct Scanned {
 /// verified again, because reading happens only from a handle that was
 /// judged.
 fn scan_with_fallback(
-    door: Door,
+    door: &Door,
     job: &Job,
     from: From,
     floor: &LazyFloor,
-    pre: Pre,
 ) -> Result<Scanned, AxError> {
-    match scan(Some(&door), job, from, pre) {
+    match scan(Some(door), job, from, Pre::None) {
         Ok(found) => Ok(found),
         Err(first) => {
             if door.direct == Directness::Buffered {
@@ -767,13 +824,15 @@ fn scan_with_fallback(
 /// still known to be longer than what was delivered.
 fn scan(door: Option<&Door>, job: &Job, from: From, pre: Pre) -> std::io::Result<Scanned> {
     let offset = job.interval.offset;
-    // A seek starts at the sector the wanted line falls in; the bytes
-    // between that boundary and the line itself belong to the line
-    // before it and are dropped below.
+    // A seek starts at the sector the byte before the wanted line falls
+    // in, so that byte — the newline the seek must land after — is in
+    // the first chunk; the bytes up to the line itself belong to the
+    // line before it and are dropped below.
     let (mut pos, mut doc_lines, mut abs_start, mut pending) = match from {
         From::Start => (0u64, 0u64, 0u64, 0usize),
         From::Line(start) => {
-            let aligned = start.saturating_sub(start % SECTOR);
+            let before = start.saturating_sub(1);
+            let aligned = before.saturating_sub(before % SECTOR);
             let skip = usize::try_from(start.saturating_sub(aligned)).unwrap_or(0);
             (aligned, offset, start, skip)
         }
@@ -790,6 +849,8 @@ fn scan(door: Option<&Door>, job: &Job, from: From, pre: Pre) -> std::io::Result
     let mut size = job.size;
     let mut pre = pre;
     let only = matches!(pre, Pre::Only { .. });
+    let mut landed = true;
+    let mut first = true;
     BUFFER.with(|cell| -> std::io::Result<()> {
         let mut held = cell.borrow_mut();
         let buf = held.slice();
@@ -837,6 +898,15 @@ fn scan(door: Option<&Door>, job: &Job, from: From, pre: Pre) -> std::io::Result
             let valid64 = u64::try_from(valid).unwrap_or(u64::MAX);
             let chunk = buf.get(..valid).unwrap_or_default();
             let base = pos;
+            if let (true, From::Line(start)) = (std::mem::replace(&mut first, false), from)
+                && start > 0
+            {
+                let at = usize::try_from(start.saturating_sub(1).saturating_sub(base)).ok();
+                if at.and_then(|at| chunk.get(at)) != Some(&b'\n') {
+                    landed = false;
+                    break;
+                }
+            }
             let was_started = started;
             let mut start_in_chunk = 0usize;
             for at in memchr::memchr_iter(b'\n', chunk) {
@@ -905,8 +975,17 @@ fn scan(door: Option<&Door>, job: &Job, from: From, pre: Pre) -> std::io::Result
         if started {
             // These bytes are already in the window: the chunk that
             // carried them was appended whole because no cut had been
-            // made yet when it passed.
-            cutter.feed(size.saturating_sub(abs_start));
+            // made yet when it passed. A line the cut turns away leaves
+            // the window again.
+            let tail = size.saturating_sub(abs_start);
+            let open = !cutter.cut();
+            let before = cutter.delivered;
+            cutter.feed(tail);
+            if open && cutter.delivered == before {
+                let kept =
+                    usize::try_from(tail).map_or(0, |tail| retained.len().saturating_sub(tail));
+                retained.truncate(kept);
+            }
         }
         if record && !cutter.cut() {
             line_offsets.push(abs_start);
@@ -914,13 +993,14 @@ fn scan(door: Option<&Door>, job: &Job, from: From, pre: Pre) -> std::io::Result
         doc_lines = doc_lines.saturating_add(1);
     }
     Ok(Scanned {
-        complete: cutter.cut() || pos == size,
+        complete: !landed || cutter.cut() || pos == size,
         retained,
         doc_lines,
         line_offsets,
         eof: pos == size,
         delivered: cutter.delivered,
         scanned: cutter.scanned,
+        landed,
     })
 }
 
@@ -1002,13 +1082,14 @@ fn assemble(scan: Scanned, job: &Job) -> Result<Window, AxError> {
     } else {
         None
     };
-    let whole = scan.eof && offset == 0;
+    // The whole file is in the window only when the scan reached its end
+    // from line zero and withheld no line: a cut can see the end of the
+    // file in the chunk it was made in and still keep less than all of it.
+    let whole = scan.eof && offset == 0 && !truncated;
     let line_offsets = scan.line_offsets;
     let doc_lines = scan.doc_lines;
     let text = validated(job.asked, scan.retained)?;
-    // The whole file is in the window exactly when it ended here and
-    // the answer starts at line zero: the one moment the version costs
-    // nothing beyond the bytes already held.
+    // The one moment the version costs nothing beyond the bytes held.
     let version = if whole {
         Some(crate::tools::version_of(text.as_bytes()))
     } else {
@@ -1093,9 +1174,16 @@ pub(super) fn cut_known(text: &str, offset: u64, limit: u16) -> Taken {
         };
     }
     let skip = usize::try_from(offset).unwrap_or(usize::MAX);
+    let mut lines = text.split_inclusive('\n');
+    // The byte the wanted line starts at: the answer is sliced from here,
+    // not from the head of the text.
+    let start = lines
+        .by_ref()
+        .take(skip)
+        .fold(0usize, |at, line| at.saturating_add(line.len()));
     let mut cutter = Cutter::new(limit);
-    let mut delivered_end = 0usize;
-    for line in text.split_inclusive('\n').skip(skip) {
+    let mut delivered_end = start;
+    for line in lines {
         if cutter.cut() {
             break;
         }
@@ -1107,7 +1195,10 @@ pub(super) fn cut_known(text: &str, offset: u64, limit: u16) -> Taken {
     }
     let truncated = delivered_end < text.len();
     Taken {
-        text: text.get(..delivered_end).unwrap_or_default().to_owned(),
+        text: text
+            .get(start..delivered_end)
+            .unwrap_or_default()
+            .to_owned(),
         total_lines: if truncated { Some(total) } else { None },
         next_offset: if truncated {
             usize::try_from(offset.saturating_add(cutter.delivered)).ok()

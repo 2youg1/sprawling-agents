@@ -94,7 +94,6 @@ fn the_leaf_names_the_file_the_safe_path_names() {
 fn the_window_is_the_bytes_that_are_there() {
     let dir = tempfile::tempdir().unwrap_or_else(|e| panic!("tempdir: {e}"));
     let path = fixture(dir.path(), "window.txt", 40);
-    let body = std::fs::read(&path).unwrap_or_else(|e| panic!("read: {e}"));
     let mut into = Aligned::new(8192);
     let asked = Ask {
         path: &path,
@@ -110,6 +109,7 @@ fn the_window_is_the_bytes_that_are_there() {
     }
     #[cfg(windows)]
     {
+        let body = std::fs::read(&path).unwrap_or_else(|e| panic!("read: {e}"));
         let window = answer.unwrap_or_else(|e| panic!("leaf: {e}"));
         let kept = into
             .raw
@@ -225,7 +225,10 @@ fn missing_paths_and_directories_have_distinct_refusals_and_write_nothing() {
     let dir = tempfile::tempdir().unwrap();
     for (path, expected) in [
         (dir.path().join("missing.txt"), crate::Refused::Missing),
-        (dir.path().join("missing/child.txt"), crate::Refused::Missing),
+        (
+            dir.path().join("missing/child.txt"),
+            crate::Refused::Missing,
+        ),
         (dir.path().to_path_buf(), crate::Refused::Directory),
     ] {
         let mut into = [0xa5; 16];
@@ -283,7 +286,11 @@ fn a_direct_read_clips_the_last_sector_to_the_file_size() {
     )
     .unwrap();
     assert_eq!(
-        (window.size, window.written, &into.slice(4_096)[..window.written]),
+        (
+            window.size,
+            window.written,
+            &into.slice(4_096)[..window.written]
+        ),
         (4_133, 37, &body[4_096..]),
     );
 }
@@ -308,6 +315,9 @@ fn an_unsupported_platform_refuses_without_touching_the_callers_buffer() {
             },
             &mut into,
         );
-        assert_eq!((answer.err(), into), (Some(Refused::Unsupported), [0xa5; 16]));
+        assert_eq!(
+            (answer.err(), into),
+            (Some(Refused::Unsupported), [0xa5; 16])
+        );
     }
 }

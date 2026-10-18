@@ -189,7 +189,9 @@ export fn sprawling_read_window(
     const stamp = (@as(u64, info.written.high) << 32) | @as(u64, info.written.low);
     // 100-nanosecond steps since 1601, moved to the Unix epoch.
     const epoch_delta: u64 = 116_444_736_000_000_000;
-    drawn.modified_nanos = if (stamp > epoch_delta) (stamp - epoch_delta) * 100 else 0;
+    // A stamp past what u64 nanoseconds can hold saturates rather than
+    // trapping: the stamp is a staleness check, not a date anyone reads.
+    drawn.modified_nanos = if (stamp > epoch_delta) std.math.mul(u64, stamp - epoch_delta, 100) catch std.math.maxInt(u64) else 0;
     if ((info.attributes & FILE_ATTRIBUTE_DIRECTORY) != 0) {
         return .directory;
     }

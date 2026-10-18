@@ -14,13 +14,14 @@
 //! what address it names there, stays in `runtime::tools::chosen_path`.
 
 use std::fmt;
+use std::path::{Path, PathBuf};
+use std::time::SystemTime;
 #[cfg(windows)]
-use std::path::Path;
-use std::path::PathBuf;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, UNIX_EPOCH};
 
 /// What the leaf answers beside the bytes: the file's own facts and
 /// where the final path was written.
+#[cfg(windows)]
 #[repr(C)]
 #[derive(Debug, Default, Clone, Copy)]
 struct Drawn {
@@ -182,6 +183,7 @@ pub fn read(_ask: &Ask<'_>, _into: &mut [u8]) -> Result<Window, Refused> {
 
 /// The stamp the leaf reports, back as a `SystemTime`: it counts
 /// nanoseconds since the Unix epoch.
+#[cfg(windows)]
 fn epoch_plus(nanos: u64) -> SystemTime {
     UNIX_EPOCH
         .checked_add(Duration::from_nanos(nanos))
