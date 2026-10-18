@@ -252,9 +252,7 @@ fn offsets_at_the_end_and_u64_max_answer_empty_with_and_without_an_index() {
             if indexed {
                 reader.invoke(&call("short.txt")).unwrap();
             }
-            let answer = reader
-                .invoke(&interval("short.txt", offset, None))
-                .unwrap();
+            let answer = reader.invoke(&interval("short.txt", offset, None)).unwrap();
             let mut expected = serde_json::json!({
                 "path": "short.txt", "text": "", "bytes": 0, "total_lines": 2,
             });
@@ -309,9 +307,7 @@ fn invalid_utf8_outside_the_requested_lines_does_not_refuse_a_text_window() {
     std::fs::write(dir.path().join("mixed.txt"), b"\xff\nvalid\n\xfe\n").unwrap();
     let (reader, _catalog) = tool(dir.path());
 
-    let answer = reader
-        .invoke(&interval("mixed.txt", 1, Some(1)))
-        .unwrap();
+    let answer = reader.invoke(&interval("mixed.txt", 1, Some(1))).unwrap();
     assert_eq!(
         answer.result.as_map(),
         serde_json::json!({
@@ -375,13 +371,14 @@ fn a_version_on_a_short_truncated_answer_still_hashes_the_whole_file() {
         if indexed {
             reader.invoke(&call("version.txt")).unwrap();
         }
-        let answer = reader
-            .invoke(&interval("version.txt", 0, Some(1)))
-            .unwrap();
+        let answer = reader.invoke(&interval("version.txt", 0, Some(1))).unwrap();
         if let Some(version) = answer.result.as_map().get("version") {
             assert_eq!(version.as_str(), Some(expected.as_str()));
         } else {
-            assert!(!indexed, "an indexed file already has its whole-file version");
+            assert!(
+                !indexed,
+                "an indexed file already has its whole-file version"
+            );
         }
     }
 }
@@ -448,9 +445,12 @@ fn a_changed_size_or_stamp_invalidates_both_continuation_bytes_and_index_facts()
         };
         write("old!\nrest\n", 1_600_000_000);
         let (reader, _catalog) = tool(dir.path());
-        reader
-            .invoke(&interval("changed.txt", 0, Some(1)))
-            .unwrap();
+        // A whole read offers the index entry synchronously, and the
+        // truncated read after it holds the continuation bytes: both
+        // caches stand before the rewrite, with no fill to race.
+        let whole = reader.invoke(&call("changed.txt")).unwrap();
+        assert!(whole.result.as_map().contains_key("version"));
+        reader.invoke(&interval("changed.txt", 0, Some(1))).unwrap();
         write(replacement, stamp);
 
         let answer = reader.invoke(&interval("changed.txt", 1, None)).unwrap();
@@ -462,4 +462,95 @@ fn a_changed_size_or_stamp_invalidates_both_continuation_bytes_and_index_facts()
                 .unwrap(),
         );
     }
+}
+
+/// The version of a short file read with a limit below its line count
+/// is the whole file's or absent, never the delivered prefix's.
+#[test]
+fn a_limit_below_a_short_files_line_count_offers_no_prefix_version() {
+    let dir = tempfile::tempdir().unwrap();
+    let body = "first\nsecond\n";
+    std::fs::write(dir.path().join("short.txt"), body).unwrap();
+    let (reader, _catalog) = tool(dir.path());
+
+    let answer = reader.invoke(&interval("short.txt", 0, Some(1))).unwrap();
+    let map = answer.result.as_map();
+    assert_eq!(map["text"], "first\n");
+    if let Some(version) = map.get("version") {
+        assert_eq!(
+            version.as_str(),
+            Some(crate::tools::version_of(body.as_bytes()).as_str())
+        );
+    }
+    let whole = with_deferred_facts(&reader, "short.txt");
+    assert_eq!(
+        whole.result.as_map()["version"].as_str(),
+        Some(crate::tools::version_of(body.as_bytes()).as_str())
+    );
+}
+
+/// An indexed file that is written again gets its facts back: the stale
+/// entry is refilled, not kept as a reason to never fill again.
+#[test]
+fn an_edited_indexed_file_regains_its_deferred_facts() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(dir.path().join("work")).unwrap();
+    let path = dir.path().join("work").join("Long.md");
+    std::fs::write(&path, long_body(4_000)).unwrap();
+    let (reader, _catalog) = tool(dir.path());
+    let _first = reader.invoke(&call("work/Long.md")).unwrap();
+    let _warm = with_deferred_facts(&reader, "work/Long.md");
+
+    let edited = long_body(4_001);
+    std::fs::write(&path, &edited).unwrap();
+    let expected = crate::tools::version_of(edited.as_bytes());
+    let again = with_deferred_facts(&reader, "work/Long.md");
+    let map = again.result.as_map();
+    assert_eq!(map["version"].as_str(), Some(expected.as_str()));
+    assert_eq!(map["total_lines"], 4_001);
+}
+
+/// A file rewritten under the same size and mtime moves its line
+/// starts; a ranged read through the stale seek table still answers the
+/// lines it was asked for.
+#[test]
+fn a_stale_seek_table_under_the_same_size_and_stamp_answers_the_asked_lines() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(dir.path().join("work")).unwrap();
+    let path = dir.path().join("work").join("Long.md");
+    let write = |body: &str| {
+        std::fs::write(&path, body).unwrap();
+        std::fs::OpenOptions::new()
+            .write(true)
+            .open(&path)
+            .unwrap()
+            .set_modified(
+                std::time::UNIX_EPOCH
+                    .checked_add(std::time::Duration::from_secs(1_600_000_000))
+                    .unwrap(),
+            )
+            .unwrap();
+    };
+    let old = long_body(4_000);
+    write(&old);
+    let (reader, _catalog) = tool(dir.path());
+    let _first = reader.invoke(&call("work/Long.md")).unwrap();
+    let _warm = with_deferred_facts(&reader, "work/Long.md");
+
+    // One byte more on the first line and one fewer on the last: the
+    // same size, every later line one byte further on.
+    let mut shifted = format!("x{old}");
+    shifted.truncate(shifted.len() - 2);
+    shifted.push('\n');
+    assert_eq!(shifted.len(), old.len());
+    write(&shifted);
+
+    let answer = reader
+        .invoke(&interval("work/Long.md", 1_000, Some(3)))
+        .unwrap();
+    let expected: String = shifted.split_inclusive('\n').skip(1_000).take(3).collect();
+    assert_eq!(
+        answer.result.as_map()["text"].as_str(),
+        Some(expected.as_str())
+    );
 }
