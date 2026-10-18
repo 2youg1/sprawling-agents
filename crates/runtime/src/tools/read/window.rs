@@ -689,6 +689,13 @@ fn open_direct(real: &Path) -> std::io::Result<std::fs::File> {
         .open(real)
 }
 
+/// Elsewhere no unbuffered open is spelled; [`DIRECT_CAPABLE`] is false
+/// there, so this never runs.
+#[cfg(not(any(windows, target_os = "linux")))]
+fn open_direct(_real: &Path) -> std::io::Result<std::fs::File> {
+    Err(std::io::ErrorKind::Unsupported.into())
+}
+
 /// A directory is a question about what is in it: answered with its
 /// entries, which is what a read of one asks for (§8-29-4).
 fn directory(asked: &str, real: &Path, floor: &Floor) -> AxError {
