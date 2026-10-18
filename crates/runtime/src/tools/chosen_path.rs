@@ -156,6 +156,45 @@ fn spelled_under(root: &Path, real: &Path) -> Option<String> {
         .map(|segments| segments.join("/"))
 }
 
+/// The root a tool reads under: the spelling the assembly handed it,
+/// and the real location that spelling resolved to once, when the tool
+/// was built (`crates/runtime/spec/Tools/ChosenPath.lean` D5). A run's
+/// root does not move while the run lives, and comparing against the
+/// anchored location is fail-closed: a root swapped for a link fails
+/// the comparison instead of leading reads out of the city.
+pub(crate) struct CityRoot {
+    written: PathBuf,
+    real: PathBuf,
+}
+
+impl CityRoot {
+    /// Anchors the root's real location once.
+    ///
+    /// # Errors
+    /// Whatever [`real_location`] refuses the root with.
+    pub(crate) fn anchor(written: &Path, action: &'static str) -> Result<CityRoot, AxError> {
+        let real = real_location(written, action, "the city root")?.into_path();
+        Ok(CityRoot {
+            written: written.to_path_buf(),
+            real,
+        })
+    }
+
+    /// The spelling the assembly handed the tool, for joins.
+    pub(crate) fn written(&self) -> &Path {
+        &self.written
+    }
+
+    /// The city spelling of a real path under this root: its segments
+    /// joined by `/`. `None` when the path is not under the root, or a
+    /// segment names no text. The leaf answers where the file it opened
+    /// really is, and this is the address that place has in the city
+    /// (§8-29-9).
+    pub(crate) fn spelled_under(&self, real: &Path) -> Option<String> {
+        spelled_under(&self.real, real)
+    }
+}
+
 /// Where an admitted address really lands on disk, judged again there.
 ///
 /// The grammar judged the address the model wrote, and the disk opens
@@ -172,7 +211,7 @@ fn spelled_under(root: &Path, real: &Path) -> Option<String> {
 /// refuses the address it names; `E_STORAGE_FATAL` when the path exists
 /// and its real location cannot be resolved.
 pub(crate) fn land(
-    city_root: &Path,
+    city: &CityRoot,
     addr: &Address,
     action: &'static str,
     bound: &dyn Fn(&Address) -> ReadVerdict,
@@ -180,9 +219,8 @@ pub(crate) fn land(
     let written = addr
         .as_str()
         .split('/')
-        .fold(city_root.to_path_buf(), |path, segment| path.join(segment));
+        .fold(city.written.clone(), |path, segment| path.join(segment));
     let located = real_location(&written, action, addr.as_str())?;
-    let root = real_location(city_root, action, addr.as_str())?.into_path();
     let outside = || {
         AxError::failure(
             AxCode::GateDenied,
@@ -191,7 +229,7 @@ pub(crate) fn land(
         )
         .with_recovery("name a path whose every link stays inside the city")
     };
-    let inside = spelled_under(&root, located.path()).ok_or_else(outside)?;
+    let inside = spelled_under(&city.real, located.path()).ok_or_else(outside)?;
     // A path with no link on it names the address already admitted, and
     // asking the read bound twice would read a building's rules twice.
     if inside != addr.as_str() {
@@ -348,7 +386,7 @@ pub(crate) enum Walked {
 /// a link whose real location does not resolve is a place the walk
 /// could not look, not a closed building, and the walker reports it.
 pub(crate) fn walked(
-    city_root: &Path,
+    city: &CityRoot,
     path: PathBuf,
     rel: &str,
     bound: &dyn Fn(&Address) -> ReadVerdict,
@@ -362,7 +400,7 @@ pub(crate) fn walked(
     if !kind.is_symlink() {
         return Ok(Walked::File(path));
     }
-    match Address::parse(rel).and_then(|addr| land(city_root, &addr, "search", bound)) {
+    match Address::parse(rel).and_then(|addr| land(city, &addr, "search", bound)) {
         Ok(Located::Present(real)) if real.is_file() => Ok(Walked::File(real)),
         Ok(Located::Present(_) | Located::Absent(_)) => Ok(Walked::Passed),
         Err(refused) if refused.code() == &AxCode::GateDenied => Ok(Walked::Passed),

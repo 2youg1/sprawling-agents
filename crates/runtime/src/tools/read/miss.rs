@@ -14,15 +14,14 @@
 //! `search`, which every building's tool set carries; `exec` is not in
 //! City Hall's.
 
-use std::io::Read;
 use std::path::{Path, PathBuf};
 
 use kernel::{Address, AxCode, AxError};
-use same_file::Handle;
 
-use crate::tools::chosen_path::{Located, real_location, still_judged};
+use crate::tools::chosen_path::real_location;
 
 /// The highest directory a miss may list.
+#[derive(Clone)]
 pub(super) enum Floor {
     /// A catalog entry that names one document: there is no directory
     /// the entry admitted, so a miss offers nothing.
@@ -55,49 +54,20 @@ impl Floor {
 /// so the ones cut are the least likely to be meant.
 const NEARBY_CAP: usize = 16;
 
-/// The text at `at`, or the miss. A directory is not opened: it is
-/// answered with its entries, which is what a read of one asks for. A
-/// location that was absent when it was judged is reported missing
-/// without being opened, so a link placed there since cannot lead the
-/// open past the judgement. A present one is read from the handle the
-/// open returned, and only after [`still_judged`] has found that handle
-/// is the file judged.
-pub(super) fn text_at(asked: &str, at: Located, floor: &Floor) -> Result<String, AxError> {
-    match at {
-        Located::Present(path) if path.is_dir() => Err(AxError::failure(
-            AxCode::InvalidArgs,
-            "read",
-            format!("{asked} is a directory"),
-        )
-        .with_nearby(entries(&path, floor, ""))
-        .with_recovery("read one of the entries in `nearby`, or find a file with `search`")),
-        Located::Present(path) => {
-            let mut opened = std::fs::File::open(&path)
-                .and_then(Handle::from_file)
-                .map_err(|err| unread(asked, &path, floor, &err))?;
-            still_judged(asked, &path, &opened, "read")?;
-            let mut text = String::new();
-            opened
-                .as_file_mut()
-                .read_to_string(&mut text)
-                .map_err(|err| unread(asked, &path, floor, &err))?;
-            Ok(text)
-        }
-        Located::Absent(path) => Err(unread(
-            asked,
-            &path,
-            floor,
-            &std::io::ErrorKind::NotFound.into(),
-        )),
-    }
-}
+// Where a read's bytes come from, and what it answers when they cannot
+// come at all.
+//
+// Reading the window a call needs, and the judgement that must hold
+// before a byte is read, live in `read::window` (`crates/runtime/Spec.lean`
+// §8-29-1, §8-29-4). This module keeps the floors a miss may list up to,
+// and the refusal a read answers with when it cannot deliver a window.
 
 /// The refusal for a file that did not open, with the entries of the
 /// nearest existing directory in `nearby` when the file is not there.
 ///
 /// A file that exists and will not open is storage, and offers nothing:
 /// the caller asked for the right name.
-fn unread(asked: &str, path: &Path, floor: &Floor, err: &std::io::Error) -> AxError {
+pub(super) fn unread(asked: &str, path: &Path, floor: &Floor, err: &std::io::Error) -> AxError {
     #[expect(
         clippy::wildcard_enum_match_arm,
         reason = "std::io::ErrorKind is an upstream open enum; a file that exists and will not open is storage"
@@ -142,7 +112,10 @@ fn nearby(missing: &Path, floor: &Floor) -> Vec<String> {
 /// The entries of `dir`, a real location no higher than `floor`, closest
 /// to `wanted` first and spelled the way the caller reaches them; a
 /// directory above the floor offers none.
-fn entries(dir: &Path, floor: &Floor, wanted: &str) -> Vec<String> {
+/// The entries of `dir`, a real location no higher than `floor`, closest
+/// to `wanted` first and spelled the way the caller reaches them; a
+/// directory above the floor offers none.
+pub(super) fn entries(dir: &Path, floor: &Floor, wanted: &str) -> Vec<String> {
     let Floor::Directory { dir: top, named } = floor else {
         return Vec::new();
     };

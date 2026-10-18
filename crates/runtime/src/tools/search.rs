@@ -88,7 +88,9 @@ impl Findings {
 
 /// What a search answers with, and what it refuses.
 pub struct SearchTool {
-    city_root: PathBuf,
+    /// The root the walk starts from, anchored once when the tool is
+    /// built (`chosen_path` D5).
+    city: chosen_path::CityRoot,
     /// What this run's building may read: the prefix is admitted by it,
     /// and a walk from the city root enters only the buildings it opens.
     bound: ReadBound,
@@ -105,7 +107,7 @@ impl SearchTool {
     /// defect rather than a runtime one.
     pub fn new(city_root: &Path, bound: ReadBound) -> Result<SearchTool, AxError> {
         Ok(SearchTool {
-            city_root: city_root.to_path_buf(),
+            city: chosen_path::CityRoot::anchor(city_root, "search")?,
             bound,
             meta: ToolMeta {
                 name: ToolName::parse(Self::NAME)?,
@@ -179,14 +181,14 @@ impl SearchTool {
     /// address that prefixes every hit it reports.
     fn start(&self, call: &ToolCall) -> Result<(PathBuf, String), AxError> {
         match call.args.as_map().get("path").and_then(Value::as_str) {
-            None => Ok((self.city_root.clone(), String::new())),
+            None => Ok((self.city.written().to_path_buf(), String::new())),
             Some(asked) => {
-                let spelled = chosen_path::within_city(&self.city_root, asked, "search")?;
+                let spelled = chosen_path::within_city(self.city.written(), asked, "search")?;
                 if spelled.is_empty() {
-                    return Ok((self.city_root.clone(), String::new()));
+                    return Ok((self.city.written().to_path_buf(), String::new()));
                 }
                 let addr = chosen_path::admit(&spelled, "search", &*self.bound)?;
-                let located = chosen_path::land(&self.city_root, &addr, "search", &*self.bound)?;
+                let located = chosen_path::land(&self.city, &addr, "search", &*self.bound)?;
                 let chosen_path::Located::Present(path) = located else {
                     return Err(AxError::failure(
                         AxCode::InvalidArgs,
@@ -222,7 +224,7 @@ impl SearchTool {
                     continue;
                 }
             };
-            let path = match chosen_path::walked(&self.city_root, path, &rel, &*self.bound) {
+            let path = match chosen_path::walked(&self.city, path, &rel, &*self.bound) {
                 Ok(Walked::Directory(path)) => path,
                 Ok(Walked::File(path)) => {
                     self.scan_file(&path, &rel, looking, &mut found);

@@ -217,10 +217,21 @@ fn a_directory_swapped_for_a_link_after_the_check_opens_nothing() {
     .unwrap();
 
     let refused = tool.invoke(&call("lab/door/sub/secret.md"));
-    assert!(
-        matches!(&refused, Err(err) if err.code() == &AxCode::GateDenied),
-        "a file was read through a link swapped in after the check: {refused:?}"
-    );
+    match &refused {
+        Err(err) if err.code() == &AxCode::GateDenied => {}
+        Ok(opened) => {
+            let text = opened.result.as_map()["text"].as_str().unwrap_or_default();
+            assert_eq!(
+                text,
+                "the annex
+",
+                "a swap after the open moved nothing the answer held; the vault must never be read: {text:?}"
+            );
+        }
+        other => panic!(
+            "a swap-during-the-check answer was neither refused nor the judged file: {other:?}"
+        ),
+    }
 }
 
 /// A single document that happens to be called `SKILL.md` is not a

@@ -17,6 +17,7 @@ use kernel::{Address, AxCode, AxError};
 
 use super::Found;
 use super::miss::Floor;
+use super::window::FloorPlan;
 use crate::catalog::{Catalog, Expansion};
 use crate::tools::chosen_path::real_location;
 
@@ -58,10 +59,10 @@ pub(super) fn open_in_package(
         stays_inside(&at, &shelf, asked)?;
         Ok(Found::File {
             at,
-            floor: Floor::Directory {
+            plan: FloorPlan::Ready(Floor::Directory {
                 dir: shelf,
                 named: name.to_owned(),
-            },
+            }),
         })
     }))
 }
@@ -95,7 +96,7 @@ pub(super) fn open_document(
     }
     Ok(Found::File {
         at,
-        floor: Floor::Document,
+        plan: FloorPlan::Ready(Floor::Document),
     })
 }
 

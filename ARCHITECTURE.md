@@ -105,7 +105,7 @@ every week.
 | Serialisation | `serde`, `serde_json`, `toml` | JSON on the wire and in the Ledger because the receiver may be a browser and a person still has to read it. TOML for configuration a person edits. |
 | Errors | `thiserror` | One error shape, `AxError`, defined in `kernel::error` and mapped at every crate boundary. |
 | Release profile | `opt-level = 3`, `lto = "fat"`, one codegen unit, symbols stripped, `panic = "abort"` | Crash-only delivery: there is no unwinding path to maintain, because there is nothing to catch. `3` rather than `"z"` or `"s"` because it is the fastest of the three on the product's common operations, and runtime speed comes before size; the criterion and the readings sit beside the setting in `Cargo.toml`. |
-| Dependency count | <!-- xtask:begin dependency_count -->470<!-- xtask:end --> packages in `Cargo.lock` | The one number in this table that is a fact about the whole graph rather than about one choice. Listed by `sprawling status --deps`, licence-checked one by one by `cargo deny` against `deny.toml`. |
+| Dependency count | <!-- xtask:begin dependency_count -->471<!-- xtask:end --> packages in `Cargo.lock` | The one number in this table that is a fact about the whole graph rather than about one choice. Listed by `sprawling status --deps`, licence-checked one by one by `cargo deny` against `deny.toml`. |
 
 **Verification tools**, kept out of the shipped binary: `proptest`
 (properties before examples), `insta` (golden output), `trybuild` (proof
@@ -167,7 +167,7 @@ kernel:
 child:
 storage: kernel, child
 gateway: kernel, child
-runtime: kernel, storage, gateway, desktop_ffi, child
+runtime: kernel, storage, gateway, desktop_ffi, child, read_ffi
 collab: kernel, storage
 city: kernel
 browser: kernel
@@ -180,6 +180,7 @@ sprawling: kernel, storage, gateway, runtime, collab, city, browser, agent_proto
 desktop: kernel, agent_protocols, desktop_ffi, child
 desktop_ffi: child
 console_ffi:
+read_ffi:
 ```
 
 The `child` row is empty on purpose: `child::command` is the one place a
@@ -203,6 +204,14 @@ one terminal frame, with the same lint table and its one `unsafe` at the
 call into the leaf (`crates/console_ffi/Spec.lean` D1). Its row is empty
 because the scene is written in its own words: the console decides what
 the screen holds and names `console_ffi`, and the leaf names nothing.
+
+The `read_ffi` row is the third of the three leaves: the read window's
+door (`crates/read_ffi`), a Zig leaf that opens one file and answers its
+real path, size, stamp and the window's bytes from the one handle, with
+the same lint table and its one `unsafe` at the call into the leaf
+(`crates/read_ffi/Spec.lean` §5). Its row is empty because it decides no
+policy: `runtime` reads it, and whether the place it answers may be read
+stays in `runtime::tools::chosen_path`.
 
 Inside one crate the compiler sees no layering: `sprawling` builds as one
 unit whichever way its modules name each other. The block below is the
@@ -710,7 +719,7 @@ there is no random source in the simulator today to seed.
 |---|---|---|
 | 1 | Decision paths iterate `BTreeMap`; never a hash order | review, plus the citysim determinism scenarios |
 | 2 | Time arrives as a parameter; the one sampling point is `bin::assembly` | `clippy.toml` disallowed methods |
-| 3 | One spawn point | review. A library crate starts a thread in nine places, each bounded by what it serves: `gateway::endpoint::stream` gives each streamed call one detached reader; `runtime::turn::wave::reorder` runs the read-only prefix of a tool wave on scoped threads, all joined before the wave accounts a single result; `runtime::turn::speculation` runs the reads a model hands over while it is still generating on scoped threads, all joined before the model call returns; `agent_protocols::mcp::reading` gives each stdio MCP connection and each harness session one reader that ends when the far side closes its output or the caller drops the channel; `agent_protocols::mcp::sse` gives each SSE connection one reader that ends when the stream closes; `accounting::worker::pool` gives each run one lane that drives it, writes its transcript and reads its checkpoint sweep, and ends when the run comes home; `accounting::worker::errand` gives each provider request the accounting thread hands off, a keep-warm renewal or an endpoint probe, one thread, which ends once the request has answered and the answer is on the accounting thread's queue, so no provider request runs on the accounting thread; `storage::chain_audit` reads a proof's segments in waves of at most eight, one scoped thread each with the calling thread as the first, and joins every wave before it walks the chain through those segments in order; and `remote_access::route::command` gives each command route one reader that ends when the command ends and its output closes. Every other thread starts in the `sprawling` crate and lives exactly as long as the run, connection or probe it serves: the accounting thread in `bin::assembly::attending`, the endpoint warm-ups that `bin::assembly::attending` starts once the city is open, one per attached endpoint, each ending with its one request, the view fold in `bin::serving::folding`, the background chain audit in `bin::assembly::chain_watch`, which proves the history once per open, the console, which `bin::assembly::remote_door` starts on the thread that first reads the city key, so a Keychain dialog nobody answers cannot hold up closing the city, the remote listener's tasks in `bin::outside::listener`, which end when the remote door closes, first run, the doctor's probes, one thread per accepted privacy operation in `bin::privacy::service`, which runs that operation after the ones before it and ends with it, and the `sprawling-gauge` beat thread in `bin::main::gauge::running`, which reads one measured command's process tree and ends when that run does. The hot ones among them, the accounting thread, the view fold, the socket workers and each run's lane, ask the serving placement table for a **seat** as they start and give it back as they exit; *CPU placement* below says where seats come from and what each platform does with them |
+| 3 | One spawn point | review. A library crate starts a thread in ten places, each bounded by what it serves: `gateway::endpoint::stream` gives each streamed call one detached reader; `runtime::turn::wave::reorder` runs the read-only prefix of a tool wave on scoped threads, all joined before the wave accounts a single result; `runtime::turn::speculation` runs the reads a model hands over while it is still generating on scoped threads, all joined before the model call returns; `agent_protocols::mcp::reading` gives each stdio MCP connection and each harness session one reader that ends when the far side closes its output or the caller drops the channel; `agent_protocols::mcp::sse` gives each SSE connection one reader that ends when the stream closes; `accounting::worker::pool` gives each run one lane that drives it, writes its transcript and reads its checkpoint sweep, and ends when the run comes home; `accounting::worker::errand` gives each provider request the accounting thread hands off, a keep-warm renewal or an endpoint probe, one thread, which ends once the request has answered and the answer is on the accounting thread's queue, so no provider request runs on the accounting thread; `storage::chain_audit` reads a proof's segments in waves of at most eight, one scoped thread each with the calling thread as the first, and joins every wave before it walks the chain through those segments in order; and `remote_access::route::command` gives each command route one reader that ends when the command ends and its output closes; `runtime::tools::read::index` gives each file whose answer was truncated one short fill, which reads the file whole, computes the version and the line table the next read will answer from, and ends when they are written. Every other thread starts in the `sprawling` crate and lives exactly as long as the run, connection or probe it serves: the accounting thread in `bin::assembly::attending`, the endpoint warm-ups that `bin::assembly::attending` starts once the city is open, one per attached endpoint, each ending with its one request, the view fold in `bin::serving::folding`, the background chain audit in `bin::assembly::chain_watch`, which proves the history once per open, the console, which `bin::assembly::remote_door` starts on the thread that first reads the city key, so a Keychain dialog nobody answers cannot hold up closing the city, the remote listener's tasks in `bin::outside::listener`, which end when the remote door closes, first run, the doctor's probes, one thread per accepted privacy operation in `bin::privacy::service`, which runs that operation after the ones before it and ends with it, and the `sprawling-gauge` beat thread in `bin::main::gauge::running`, which reads one measured command's process tree and ends when that run does. The hot ones among them, the accounting thread, the view fold, the socket workers and each run's lane, ask the serving placement table for a **seat** as they start and give it back as they exit; *CPU placement* below says where seats come from and what each platform does with them |
 | 4 | No random source on a decision path; OS entropy mints only values a stranger must not guess | review; citysim has no random source to seed |
 | 5 | Execute in parallel, account in series, ordered by `seq` | the Ledger port owns `seq` and `prev` |
 | 6 | Ledger payloads hold integers; timestamps are integer milliseconds; field order is declaration order | cross-OS byte fixtures |
@@ -1250,12 +1259,14 @@ flowchart TD
     gateway --> child
     gateway --> kernel
     kernel
+    read_ffi
     remote_access --> child
     remote_access --> kernel
     runtime --> child
     runtime --> desktop_ffi
     runtime --> gateway
     runtime --> kernel
+    runtime --> read_ffi
     runtime --> storage
     sprawling --> accounting
     sprawling --> agent_protocols

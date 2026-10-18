@@ -30,6 +30,13 @@ png.workspace = true
 # elsewhere): `read` compares the handle it opened with the file now at
 # the judged location, which std exposes only on unstable APIs.
 same-file = "1"
+# One open answers the real path, the size, the stamp and the window
+# (`crates/read_ffi/Spec.lean` D1, `crates/runtime/Spec.lean` D13).
+read_ffi.workspace = true
+# The line ends of a window: `read` counts them as the bytes pass and
+# never builds a table of the whole file (`crates/runtime/Spec.lean`
+# §8-29-1).
+memchr.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 # The sieve's filter table is a TOML file in the reserved

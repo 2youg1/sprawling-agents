@@ -30,23 +30,27 @@
 //! and the offset to continue from, which is the number `search`
 //! reports for a hit.
 
-use std::path::Path;
-use std::sync::{Arc, Mutex};
-
 use kernel::{
     AxCode, AxError, CostTier, Effect, Payload, RenderIntent, Temporal, Tool, ToolCall, ToolMeta,
     ToolName, ToolOutcome,
 };
 use serde_json::{Map, Value};
+use std::path::Path;
+use std::sync::{Arc, Mutex};
 
+mod hot;
+mod index;
 pub(super) mod locator;
 mod miss;
 mod package;
+mod window;
 
 use super::BoundReader;
-use super::chosen_path::{Located, ReadBound};
+use super::chosen_path::{CityRoot, Located, ReadBound};
 use crate::catalog::{Catalog, Expansion};
-use miss::Floor;
+use hot::Hot;
+use index::Index;
+use window::FloorPlan;
 
 /// The most lines one call may bring back, and the default: a default
 /// below the cap would hide the cap from every caller that never sets
@@ -55,10 +59,17 @@ const LINE_CAP: u16 = 512;
 
 /// Where the answer to one call comes from.
 enum Found {
-    /// A place on disk, and the highest directory a miss there may list.
+    /// A path the model chose, admitted as spelled. Where it lands is
+    /// answered by whoever opens it: the leaf at open time, the door by
+    /// `land` (§8-29-9) — so the answer's path pays no resolution twice.
+    City {
+        addr: kernel::Address,
+        plan: FloorPlan,
+    },
+    /// A package's file, landed by the package's own resolution.
     File {
         at: Located,
-        floor: Floor,
+        plan: FloorPlan,
     },
     Text(String),
 }
@@ -123,67 +134,6 @@ impl Interval {
         }
         Ok(Interval { offset, limit })
     }
-
-    /// Cuts on line ends rather than on lines: every line travels with
-    /// its own terminator, so reading a whole short file returns the
-    /// bytes the file holds and `bytes` keeps the meaning it had.
-    ///
-    /// **Two ceilings, and the tighter one decides.** 512 lines bounds
-    /// how much structure an answer carries;
-    /// [`INTERVAL_CAP_BYTES`](kernel::consts_policy::INTERVAL_CAP_BYTES)
-    /// bounds how much of the window it spends, because a line is about
-    /// forty bytes in ordinary source and a whole minified bundle in a
-    /// generated one. The byte ceiling is applied here rather than
-    /// downstream for one reason: `next_offset` is how a caller
-    /// continues, so a cut made after this function had already reported
-    /// one would leave that number pointing past lines nobody delivered,
-    /// and the gap would be silent.
-    fn cut(&self, text: &str) -> Taken {
-        let lines: Vec<&str> = text.split_inclusive('\n').collect();
-        let total = lines.len();
-        // An offset no `usize` holds is past the end of every text this
-        // machine can hold, which is the answer the second arm gives.
-        let start = match usize::try_from(self.offset) {
-            Ok(start) if start < total => start,
-            Ok(_) | Err(_) => {
-                return Taken {
-                    text: String::new(),
-                    total_lines: Some(total),
-                    next_offset: None,
-                };
-            }
-        };
-        let ceiling = start.saturating_add(usize::from(self.limit)).min(total);
-        let budget = kernel::consts_policy::INTERVAL_CAP_BYTES;
-        let mut end = start;
-        let mut spent = 0usize;
-        while end < ceiling {
-            let Some(line) = lines.get(end) else { break };
-            let after = spent.saturating_add(line.len());
-            // The first line travels however long it is. A call that
-            // returned nothing would hand back the offset it was given,
-            // and the caller would ask the same question forever.
-            if after > budget && end > start {
-                break;
-            }
-            spent = after;
-            end = end.saturating_add(1);
-        }
-        let taken = lines.get(start..end).unwrap_or_default().concat();
-        if end < total {
-            Taken {
-                text: taken,
-                total_lines: Some(total),
-                next_offset: Some(end),
-            }
-        } else {
-            Taken {
-                text: taken,
-                total_lines: None,
-                next_offset: None,
-            }
-        }
-    }
 }
 
 /// What a read answers with, and what it refuses.
@@ -191,6 +141,18 @@ pub struct ReadTool {
     /// The same catalog the model was shown, shared: a copy would be a
     /// second authority on what this run may open, and copies drift.
     catalog: Arc<Mutex<Catalog>>,
+    /// The root this run reads under, anchored once when the tool is
+    /// built (`crates/runtime/Spec.lean` D5): a run's root does not move
+    /// while the run lives, and comparing against the anchored location
+    /// fails closed if one ever did.
+    city: CityRoot,
+    /// The one file this run's reading pass is in the middle of, if any
+    /// (`crates/runtime/Spec.lean` §8-29-8, D14).
+    hot: Hot,
+    /// The whole-file facts of the files this run read: the totals and
+    /// versions a window cannot pay for, and the seek tables that make
+    /// a ranged read one chunk's read (`crates/runtime/Spec.lean` §8-29-7).
+    index: Arc<Index>,
     /// The tree this run reads in, what its building may read - asked
     /// of every path the model chooses and of the building a Locator's
     /// bytes belong to - and where this city keeps content blocks, which
@@ -250,13 +212,19 @@ impl ReadTool {
         );
         Ok(ReadTool {
             catalog,
+            city: CityRoot::anchor(city_root, "read")?,
+            hot: Hot::default(),
+            index: Index::new(),
             reader: BoundReader::new(city_root, bound, block_store),
             meta: ToolMeta {
                 name: ToolName::parse(Self::NAME)?,
                 disclosure: "Read a file by its path, or a skill by the name the catalog lists \
-                             it under. A truncated answer states the total and the offset to \
-                             continue from. A file comes back with its `version`, which `edit` \
-                             takes as `base_version` and `plan finish` as evidence. Reading a directory or a missing file is refused."
+                             it under. A truncated answer states the offset to continue from, \
+                             and the total when it is known. A file comes back with its \
+                             `version`, which `edit` takes as `base_version` and `plan finish` \
+                             as evidence; a truncated answer of a large file may leave it out, \
+                             and reading the file again then carries it. Reading a directory \
+                             or a missing file is refused."
                     .to_owned(),
                 params: Payload::new(params)?,
                 effect: Effect::Read,
@@ -325,10 +293,8 @@ impl ReadTool {
         let city_root = &self.reader.city_root;
         let spelled = super::chosen_path::within_city(city_root, asked, "read")?;
         let addr = super::chosen_path::admit(&spelled, "read", &*self.reader.bound)?;
-        Ok(Found::File {
-            at: super::chosen_path::land(city_root, &addr, "read", &*self.reader.bound)?,
-            floor: Floor::of_address(city_root, &addr),
-        })
+        let plan = FloorPlan::Address(addr.clone());
+        Ok(Found::City { addr, plan })
     }
 }
 
@@ -364,21 +330,62 @@ impl Tool for ReadTool {
             })?;
         let mut out = Map::new();
         out.insert("path".to_owned(), Value::String(asked.to_owned()));
-        let text = match self.resolve(asked)? {
-            Found::Text(text) => text,
-            Found::File { at, floor } => {
-                let text = miss::text_at(asked, at, &floor)?;
-                // The whole file's version, whatever interval is cut below:
-                // `edit` guards and `plan finish` cites the file, not the lines.
-                out.insert(
-                    "version".to_owned(),
-                    Value::String(super::version_of(text.as_bytes())),
-                );
-                text
+        let interval = Interval::asked_for(call)?;
+        let taken = match self.resolve(asked)? {
+            // A catalog entry or a Locator is a document already in
+            // memory: its total is known and its cut is a slice.
+            Found::Text(text) => window::cut_known(&text, interval.offset, interval.limit),
+            Found::City { addr, plan } => {
+                let read = window::read(window::Call {
+                    asked,
+                    file: window::FileRef::City(addr),
+                    plan,
+                    city: &self.city,
+                    bound: &self.reader.bound,
+                    interval: &interval,
+                    index: &self.index,
+                    hot: &self.hot,
+                })?;
+                if let Some(version) = read.version {
+                    out.insert("version".to_owned(), Value::String(version));
+                }
+                if let Some((real, entry)) = read.offer {
+                    self.index.offer(real, entry);
+                }
+                if let Some(real) = read.fill {
+                    self.index.fill_later(real);
+                }
+                read.taken
+            }
+            Found::File { at, plan } => {
+                let read = window::read(window::Call {
+                    asked,
+                    file: window::FileRef::Landed(at),
+                    plan,
+                    city: &self.city,
+                    bound: &self.reader.bound,
+                    interval: &interval,
+                    index: &self.index,
+                    hot: &self.hot,
+                })?;
+                // The whole file's version, which `edit` guards and
+                // `plan finish` cites: known when the window held the
+                // whole file, or when the index has it (D10).
+                if let Some(version) = read.version {
+                    out.insert("version".to_owned(), Value::String(version));
+                }
+                // A whole read already holds what the index wants, so
+                // it offers it; a truncated one asks for it behind the
+                // answer (§8-29-7).
+                if let Some((real, entry)) = read.offer {
+                    self.index.offer(real, entry);
+                }
+                if let Some(real) = read.fill {
+                    self.index.fill_later(real);
+                }
+                read.taken
             }
         };
-        let interval = Interval::asked_for(call)?;
-        let taken = interval.cut(&text);
         if let Some(total) = taken.total_lines {
             out.insert("total_lines".to_owned(), Value::Number(total.into()));
         }
