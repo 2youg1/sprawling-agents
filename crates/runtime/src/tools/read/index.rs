@@ -57,26 +57,32 @@ const PENDING_CAP: usize = 2;
 
 #[derive(Default)]
 struct Locked {
-    map: BTreeMap<PathBuf, Entry>,
-    /// The paths a fill is on its way for. Apart from `map`, so a stale
-    /// entry can be refilled while it still stands.
-    pending: BTreeMap<PathBuf, Claim>,
+    map: BTreeMap<PathBuf, Kept>,
+    /// The paths a fill is on its way for, each with the [`Seen`] taken
+    /// when it was claimed. Apart from `map`, so a stale entry can be
+    /// refilled while it still stands.
+    pending: BTreeMap<PathBuf, Seen>,
+    /// The last [`Seen`] handed out.
+    seen: u64,
     /// Insertion order of `map`'s keys, for eviction; each key once.
     order: VecDeque<PathBuf>,
     /// The bill of every entry's seek table, in bytes.
     bytes: usize,
 }
 
-/// Whether a running fill still speaks for its path. A fill that started
-/// before an `offer` or a `forget` on the same path read an older file,
-/// or one the index has since learned is not what its table says, so
-/// it settles without touching the entry; neither mtime ordering nor
-/// size could tell, since a file can be replaced by one with an older
-/// mtime and the same size.
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum Claim {
-    Current,
-    Superseded,
+/// When a reader looked at a file, in the order the index saw readers
+/// start: taken before the file is opened, so a larger `Seen` read a
+/// file no older than a smaller one did. Facts replace an entry only
+/// when they were seen later, whichever finished first; neither mtime
+/// nor size could order them, since a file can be replaced by one with
+/// an older mtime and the same size.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub(super) struct Seen(u64);
+
+/// One entry and when its facts were seen.
+struct Kept {
+    seen: Seen,
+    entry: Entry,
 }
 
 /// The cache itself. One per `ReadTool`, so one per run.
@@ -112,7 +118,7 @@ impl Index {
         offset: u64,
     ) -> Option<Hit> {
         let locked = self.locked.lock().ok()?;
-        let entry = locked.map.get(real)?;
+        let entry = &locked.map.get(real)?.entry;
         if entry.size != size || entry.modified != modified {
             return None;
         }
@@ -126,12 +132,22 @@ impl Index {
         })
     }
 
+    /// The [`Seen`] of a reader about to open a file.
+    pub(super) fn observe(&self) -> Option<Seen> {
+        let mut locked = self.locked.lock().ok()?;
+        locked.seen = locked.seen.saturating_add(1);
+        Some(Seen(locked.seen))
+    }
+
     /// A synchronously built entry, from a read that held the whole
-    /// file anyway (§8-29-7): no I/O was spent for it.
-    pub(super) fn offer(&self, real: PathBuf, entry: Entry) {
+    /// file anyway (§8-29-7): no I/O was spent for it. Kept unless the
+    /// entry standing, or the fill on its way, was seen later.
+    pub(super) fn offer(&self, real: PathBuf, entry: Entry, seen: Seen) {
         if let Ok(mut locked) = self.locked.lock() {
-            supersede(&mut locked, &real);
-            insert(&mut locked, real, entry);
+            if locked.pending.get(&real).is_some_and(|fill| *fill > seen) {
+                return;
+            }
+            insert(&mut locked, real, Kept { seen, entry });
         }
     }
 
@@ -140,7 +156,6 @@ impl Index {
     /// mtime (§8-29-7).
     pub(super) fn forget(&self, real: &Path) {
         if let Ok(mut locked) = self.locked.lock() {
-            supersede(&mut locked, real);
             remove(&mut locked, real);
         }
     }
@@ -178,29 +193,29 @@ impl Index {
         if locked.pending.len() >= PENDING_CAP || locked.pending.contains_key(real) {
             return false;
         }
-        locked.pending.insert(real.to_path_buf(), Claim::Current);
+        locked.seen = locked.seen.saturating_add(1);
+        let seen = Seen(locked.seen);
+        locked.pending.insert(real.to_path_buf(), seen);
         true
     }
 
-    /// Ends the fill for `real`. A current fill replaces the entry with
-    /// what it read, or removes the stale one when the file would not
-    /// read; a superseded fill changes nothing.
+    /// Ends the fill for `real`: what it read replaces the entry, or a
+    /// file that would not read removes it — unless the entry standing
+    /// was seen later than the fill was claimed.
     fn settle(&self, real: PathBuf, filled: Result<Entry, AxError>) {
         let Ok(mut locked) = self.locked.lock() else {
             return;
         };
-        match (locked.pending.remove(&real), filled) {
-            (Some(Claim::Current), Ok(entry)) => insert(&mut locked, real, entry),
-            (Some(Claim::Current), Err(_)) => remove(&mut locked, &real),
-            (Some(Claim::Superseded) | None, Ok(_) | Err(_)) => {}
+        let Some(seen) = locked.pending.remove(&real) else {
+            return;
+        };
+        if locked.map.get(&real).is_some_and(|kept| kept.seen > seen) {
+            return;
         }
-    }
-}
-
-/// Marks a fill on its way for `real` as no longer speaking for it.
-fn supersede(locked: &mut Locked, real: &Path) {
-    if let Some(claim) = locked.pending.get_mut(real) {
-        *claim = Claim::Superseded;
+        match filled {
+            Ok(entry) => insert(&mut locked, real, Kept { seen, entry }),
+            Err(_) => remove(&mut locked, &real),
+        }
     }
 }
 
@@ -265,18 +280,25 @@ fn bill(entry: &Entry) -> usize {
 }
 
 /// Inserts or replaces, accounts the table's bytes, and evicts oldest
-/// first while the bill is over the cap. The latest facts win: a fill
-/// that an `offer` overtook never reaches here ([`Claim`]), and an
-/// entry that turns out stale misses at `lookup`, whose caller asks for
-/// a fill again.
-fn insert(locked: &mut Locked, real: PathBuf, entry: Entry) {
-    if entry.line_offsets.len() > TABLE_CAP_LINES {
+/// first while the bill is over the cap. Facts seen later win: a stale
+/// entry was seen no later than the facts that replace it, unless the
+/// caller already declined them ([`Seen`]); an entry that turns out
+/// stale misses at `lookup`, whose caller asks for a fill again.
+fn insert(locked: &mut Locked, real: PathBuf, kept: Kept) {
+    if locked
+        .map
+        .get(&real)
+        .is_some_and(|old| old.seen > kept.seen)
+    {
+        return;
+    }
+    if kept.entry.line_offsets.len() > TABLE_CAP_LINES {
         remove(locked, &real);
         return;
     }
-    locked.bytes = locked.bytes.saturating_add(bill(&entry));
-    match locked.map.insert(real.clone(), entry) {
-        Some(old) => locked.bytes = locked.bytes.saturating_sub(bill(&old)),
+    locked.bytes = locked.bytes.saturating_add(bill(&kept.entry));
+    match locked.map.insert(real.clone(), kept) {
+        Some(old) => locked.bytes = locked.bytes.saturating_sub(bill(&old.entry)),
         None => locked.order.push_back(real),
     }
     while locked.bytes > TOTAL_CAP_BYTES {
@@ -284,7 +306,7 @@ fn insert(locked: &mut Locked, real: PathBuf, entry: Entry) {
             break;
         };
         if let Some(old) = locked.map.remove(&oldest) {
-            locked.bytes = locked.bytes.saturating_sub(bill(&old));
+            locked.bytes = locked.bytes.saturating_sub(bill(&old.entry));
         }
     }
 }
@@ -292,7 +314,7 @@ fn insert(locked: &mut Locked, real: PathBuf, entry: Entry) {
 /// Removes the entry for `real`, its bill, and its place in the order.
 fn remove(locked: &mut Locked, real: &Path) {
     if let Some(old) = locked.map.remove(real) {
-        locked.bytes = locked.bytes.saturating_sub(bill(&old));
+        locked.bytes = locked.bytes.saturating_sub(bill(&old.entry));
         locked.order.retain(|path| path != real);
     }
 }

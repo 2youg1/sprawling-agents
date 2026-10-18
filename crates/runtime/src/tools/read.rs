@@ -336,6 +336,7 @@ impl Tool for ReadTool {
             // memory: its total is known and its cut is a slice.
             Found::Text(text) => window::cut_known(&text, interval.offset, interval.limit),
             Found::City { addr, plan } => {
+                let seen = self.index.observe();
                 let read = window::read(window::Call {
                     asked,
                     file: window::FileRef::City(addr),
@@ -349,8 +350,8 @@ impl Tool for ReadTool {
                 if let Some(version) = read.version {
                     out.insert("version".to_owned(), Value::String(version));
                 }
-                if let Some((real, entry)) = read.offer {
-                    self.index.offer(real, entry);
+                if let (Some((real, entry)), Some(seen)) = (read.offer, seen) {
+                    self.index.offer(real, entry, seen);
                 }
                 if let Some(real) = read.fill {
                     self.index.fill_later(real);
@@ -358,6 +359,7 @@ impl Tool for ReadTool {
                 read.taken
             }
             Found::File { at, plan } => {
+                let seen = self.index.observe();
                 let read = window::read(window::Call {
                     asked,
                     file: window::FileRef::Landed(at),
@@ -377,8 +379,8 @@ impl Tool for ReadTool {
                 // A whole read already holds what the index wants, so
                 // it offers it; a truncated one asks for it behind the
                 // answer (§8-29-7).
-                if let Some((real, entry)) = read.offer {
-                    self.index.offer(real, entry);
+                if let (Some((real, entry)), Some(seen)) = (read.offer, seen) {
+                    self.index.offer(real, entry, seen);
                 }
                 if let Some(real) = read.fill {
                     self.index.fill_later(real);

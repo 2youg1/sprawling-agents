@@ -24,36 +24,54 @@ fn version_at(index: &Index, real: &Path, stamp: u64) -> Option<String> {
         .map(|hit| hit.version)
 }
 
-/// A fill that read the file before a whole read offered newer facts
-/// leaves those facts standing when it lands.
+/// A fill claimed before a whole read looked at the file leaves that
+/// read's offer standing, whichever of the two finishes first.
 #[test]
-fn a_fill_overtaken_by_an_offer_keeps_the_offered_entry() {
+fn an_offer_seen_after_a_fill_was_claimed_wins_in_either_order() {
     let index = Index::new();
     let real = Path::new("/city/a.txt");
     assert!(index.claim(real));
-    index.offer(real.to_path_buf(), entry("B", 11));
+    let seen = index.observe().unwrap();
+    index.offer(real.to_path_buf(), entry("B", 11), seen);
     index.settle(real.to_path_buf(), Ok(entry("A", 10)));
     assert_eq!(version_at(&index, real, 11).as_deref(), Some("B"));
-    assert_eq!(version_at(&index, real, 10), None);
-}
 
-/// A fill that started before its path was forgotten installs nothing.
-#[test]
-fn a_fill_overtaken_by_a_forget_installs_nothing() {
-    let index = Index::new();
-    let real = Path::new("/city/a.txt");
+    let real = Path::new("/city/b.txt");
     assert!(index.claim(real));
-    index.forget(real);
+    let seen = index.observe().unwrap();
     index.settle(real.to_path_buf(), Ok(entry("A", 10)));
-    assert_eq!(version_at(&index, real, 10), None);
+    index.offer(real.to_path_buf(), entry("B", 11), seen);
+    assert_eq!(version_at(&index, real, 11).as_deref(), Some("B"));
 }
 
-/// A current fill replaces a stale entry, and a failed one removes it.
+/// A whole read that looked at the file before a fill was claimed does
+/// not displace the fill's facts, whichever of the two finishes first.
 #[test]
-fn a_current_fill_replaces_or_removes_the_stale_entry() {
+fn an_offer_seen_before_a_fill_was_claimed_loses_in_either_order() {
     let index = Index::new();
     let real = Path::new("/city/a.txt");
-    index.offer(real.to_path_buf(), entry("A", 10));
+    let seen = index.observe().unwrap();
+    assert!(index.claim(real));
+    index.offer(real.to_path_buf(), entry("A", 10), seen);
+    index.settle(real.to_path_buf(), Ok(entry("B", 11)));
+    assert_eq!(version_at(&index, real, 11).as_deref(), Some("B"));
+
+    let real = Path::new("/city/b.txt");
+    let seen = index.observe().unwrap();
+    assert!(index.claim(real));
+    index.settle(real.to_path_buf(), Ok(entry("B", 11)));
+    index.offer(real.to_path_buf(), entry("A", 10), seen);
+    assert_eq!(version_at(&index, real, 11).as_deref(), Some("B"));
+}
+
+/// A fill replaces a stale entry seen before it, and a failed one
+/// removes it.
+#[test]
+fn a_fill_replaces_or_removes_an_older_entry() {
+    let index = Index::new();
+    let real = Path::new("/city/a.txt");
+    let seen = index.observe().unwrap();
+    index.offer(real.to_path_buf(), entry("A", 10), seen);
     assert!(index.claim(real));
     index.settle(real.to_path_buf(), Ok(entry("B", 11)));
     assert_eq!(version_at(&index, real, 11).as_deref(), Some("B"));
