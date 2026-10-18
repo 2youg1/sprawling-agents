@@ -3029,6 +3029,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "sprawling-read-ffi"
+version = "0.0.12"
+dependencies = [
+ "tempfile",
+]
+
+[[package]]
 name = "sprawling-remote-access"
 version = "0.0.12"
 dependencies = [
@@ -3045,6 +3052,7 @@ dependencies = [
  "base64 0.23.1",
  "find-msvc-tools",
  "insta",
+ "memchr",
  "png",
  "proptest",
  "same-file",
@@ -3053,6 +3061,7 @@ dependencies = [
  "sprawling-child",
  "sprawling-desktop-ffi",
  "sprawling-kernel",
+ "sprawling-read-ffi",
  "sprawling-storage",
  "tempfile",
  "toml",

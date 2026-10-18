@@ -15,6 +15,7 @@ members = [
     "crates/desktop",
     "crates/desktop/ffi",
     "crates/console_ffi",
+    "crates/read_ffi",
     "crates/agent_protocols",
     "crates/accounting",
     "crates/sprawling",
@@ -115,6 +116,12 @@ png = "0.18"
 # hard-link arm of the alias family (`crates/storage/Spec.lean` §8-25). Already in the
 # lock beneath same-file; the unsafe call is inside the crate.
 winapi-util = "0.1.11"
+# Finding a line end inside a window of bytes: `read` scans a file's
+# lines without splitting them into a table first, and this is the one
+# search that the standard library does not vectorise
+# (`crates/runtime/Spec.lean` §8-29-1, §8-29-7). Its public surface is
+# safe.
+memchr = "2.8.3"
 # One Job Object per run in runtime (`crates/runtime/Spec.lean` §8-13-3), and the peak
 # memory a measured command's process reached in `sprawling gauge`
 # (`crates/sprawling/Spec.lean` §8-129-4); the crate's public surface is safe.
@@ -287,6 +294,7 @@ sprawling = { path = "crates/sprawling", version = "=0.0.12" }
 desktop = { package = "sprawling-desktop", path = "crates/desktop", version = "=0.0.12" }
 desktop_ffi = { package = "sprawling-desktop-ffi", path = "crates/desktop/ffi", version = "=0.0.12" }
 console_ffi = { package = "sprawling-console-ffi", path = "crates/console_ffi", version = "=0.0.12" }
+read_ffi = { package = "sprawling-read-ffi", path = "crates/read_ffi", version = "=0.0.12" }
 
 # C3 hardening: panicking constructs and silent numeric
 # corruption are compile-time errors everywhere; tests relax locally.

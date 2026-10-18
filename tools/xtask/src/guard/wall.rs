@@ -6,12 +6,13 @@
 //! The workspace's lint wall, and the tables that stand beside it.
 //!
 //! Every member inherits `[workspace.lints]` by writing `[lints]
-//! workspace = true`, except the two FFI seams: the desktop server's,
-//! `crates/desktop/ffi`, and the console renderer's, `crates/console_ffi`.
-//! Each call into a Zig leaf relaxes `unsafe_code` at that one
-//! statement, which `forbid` makes impossible, so each seam writes a
-//! table of its own: the workspace's, with `unsafe_code` at `deny`
-//! (`crates/desktop/Spec.lean` D14, `crates/console_ffi/Spec.lean` D1,
+//! workspace = true`, except the three FFI seams: the desktop server's,
+//! `crates/desktop/ffi`, the console renderer's, `crates/console_ffi`,
+//! and the read window's, `crates/read_ffi`. Each call into a Zig leaf
+//! relaxes `unsafe_code` at that one statement, which `forbid` makes
+//! impossible, so each seam writes a table of its own: the workspace's,
+//! with `unsafe_code` at `deny` (`crates/desktop/Spec.lean` D14,
+//! `crates/console_ffi/Spec.lean` D1, `crates/read_ffi/Spec.lean` §5,
 //! tools/xtask/Spec.lean §8-46). Every other line of those tables is a
 //! **copy**, and a copy is a second home for a fact.
 //!
@@ -33,8 +34,12 @@ use std::collections::BTreeSet;
 use super::{diverged, shown};
 use crate::report::Violation;
 
-/// The members whose lint tables are their own: the two Zig leaves.
-const LEAVES: [&str; 2] = ["crates/desktop/ffi", "crates/console_ffi"];
+/// The members whose lint tables are their own: the three Zig leaves.
+const LEAVES: [&str; 3] = [
+    "crates/desktop/ffi",
+    "crates/console_ffi",
+    "crates/read_ffi",
+];
 
 /// One key the leaf's table is allowed to disagree with the workspace
 /// about, and why.
