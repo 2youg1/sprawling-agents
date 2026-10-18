@@ -73,7 +73,7 @@
 * 内存节拍：默认每 100 ms 采一次私有字节（上面每个平台的那个数），报 p50、p99、max、高于 p50 的累计时长与每小时斜率，n 与读数绑定的条件随读数写下。
 * 一小时斜率：吞吐台（`tools/citysim/spec/Throughput.lean`）的负载（N 个并发 run，各自做读写与 exec）跑一小时，斜率按最小二乘对时间求；验收标准是斜率在两次空负载一小时读数的差以内。
 * 盘读的延迟峰：在交互路径上（切换 session、打开信箱、滚动）读回被逐出的项时，那个交互的 p99 不超过 16 ms。
-* 分配器对照：系统分配器（Windows 的堆、glibc 或 musl 的 malloc、macOS 的 libmalloc）与 mimalloc 两臂，同一负载，比私有字节的 p99、斜率与工具调用的 p99；mimalloc 只作对照臂，读数明显更好时再交人定默认。Linux 的发行件是静态 musl，musl 的 malloc 慢且归还内存的行为不同，所以 Linux 臂的结论单独写。
+* 分配器（已由 D102 决定）：musl 的发行件用 jemalloc，其余平台用各自的堆。D102 的吞吐读数来自一次临时探针，条件写在那节：16 线程、churn／json／map、5 轮中位数、一次没有真实 Linux 内核的兼容层上的运行。复核方式是在 Linux runner 上按同一负载重跑，并读私有字节的 p99 与一小时斜率。
 
 ### 待做
 
@@ -81,6 +81,7 @@
 2. 清点表里随城增长的三项（视图、墓碑、旁索引）逐一改成经 `storage::resident` 读回，每一项一个上表的常量，读回用上面的定位读。今天没有一项经过它：旁索引已是按列存的紧凑表（`storage::index::fold`），视图是许多小的按 run 摘要；把它们挪到盘上要一份盘上的索引格式与视图快照之外的按需读回，能定下先挪哪一项的是 TP1 负载下一小时私有字节里各项的占比。
 3. playback 导出的 `Document` 改成边走边编码：编码本身已经直接写进 bundle 的那一份缓冲（`crates/accounting/spec/Playback.lean` §8-12），剩下的是 `finish` 给提交找证据时按 seq 查整份 `events`（`crates/accounting/Spec.lean` §3）。
 4. `tools/xtask/budgets.toml` 加内存节拍与一小时斜率的两行（由那一波拥有 budgets.toml 的车道提交）。
+5. D102 的读数在 Linux runner 上复核：同一负载，读私有字节 p99 与一小时斜率，确认换分配器之后斜率仍在上限之内。
 -/
 
 /-! D43 私有字节在三个平台上各读什么：Windows 读提交的私有字节，Linux 读 smaps_rollup，macOS 在有安全接口之前读虚拟大小并标明
@@ -94,6 +95,31 @@
 读数用的是哪一种，由平台决定（Linux 的 `RssAnon` 退路在运行时决定）；`wire::frames::monitor::Sample` 没有携带来源的字段，所以这一点写在这里与 `crates/sprawling/spec/Monitor.lean` §8-96，屏幕上不标。给 `Sample` 加来源字段是一次线上协议的改动，等下一次改监视帧时一起做。
 
 理由：Linux 的两个文件 std 就能读，代价是一次小文件读（smaps_rollup 在内核里按段求和，段多时比 status 慢）；macOS 的 `phys_footprint` 是活动监视器报的那个数，但它要 FFI。被否的做法：三个平台都报 RSS（工作集）：RSS 包括可回收的文件页，缓存交给操作系统的文件缓存之后 RSS 会随读盘上升，而这正是本设计要鼓励的。重开的条件：出现以安全接口读 `phys_footprint` 的 crate。
+-/
+
+/-! D102 静态 Linux 发行件挂 jemalloc，其余平台保持各自的堆
+
+`x86_64-unknown-linux-musl` 是 Linux 用户唯一拿到的二进制，而 musl 的 `malloc` 用一把锁把每个线程串起来。同一个 16 线程探针、同一台机器、每种负载 5 轮中位数：
+
+| 负载 | musl 的 malloc | jemalloc | 倍数 |
+|---|---|---|---|
+| churn（43 字节的短命字符串） | 1747 ms | 174 ms | 10.0 |
+| json（wire 帧序列化再解析） | 10338 ms | 244 ms | 42.4 |
+| map（`BTreeMap` 的键值 churn） | 3454 ms | 247 ms | 14.0 |
+
+单线程跑同一负载，musl 的 `malloc` 只慢 22%（46.2 对 38.0 ms），所以差距几乎全部是锁争用，不是分配的常数开销；纯计算的对照负载两臂相同（1.7–1.9 ms），排除了机器漂移。
+
+决定：`crates/sprawling/Cargo.toml` 只在 `cfg(target_env = "musl")` 上依赖 `tikv-jemallocator` 0.7（vendor 的 jemalloc 5.3.1），并开 `background_threads`，让未用页的归还由 decay 定时器推进，而不是等下一次分配；`crates/sprawling/src/main.rs` 在同一条 cfg 下声明 `#[global_allocator]`。
+
+为什么其余三个平台不换：
+
+* glibc 的 `malloc` 按线程分 arena，没有这把全局锁；本节的 gnu 臂读数被测试机上模拟的 futex 拖慢，不能当作真机读数，而真机上这一层差距消失。
+* macOS 的 libmalloc 同样按线程缓存，本仓库没有它的读数，也没有证据表明 jemalloc 在那里明显更快。
+* Windows 上这个绑定构建不成立：`tikv-jemalloc-sys` 的 build script 运行 `configure` 与 `mingw32-make`，而 Windows MSVC 目标的支持在上游仍是 open issue（tikv/jemallocator #22、#69、#99、#173）。Zig 能替代 C 编译器，替代不了 `make`，且该 build script 只把 `CC` 的程序名交给 `configure`，`zig cc` 的参数会丢。
+
+被否的做法：mimalloc。它在默认配置下比 jemalloc 快 11–18%，但那是用 45 倍常驻内存换的（churn 212 MB 对 4.6 MB，空闲 1.5 s 后不回落），而本节的验收标准是私有字节的斜率；把它的归还调到与 jemalloc 对齐（`MIMALLOC_PURGE_DELAY=0`）之后，churn 与 map 反而慢 12%。它的跨线程释放还要等页被再次访问才回收，稀疏负载下常驻内存就停在峰值。
+
+重开的条件：上游的 Rust 绑定升到 jemalloc 5.4（0.7.1 vendor 的是 5.3.1）；或 macOS 上出现与本探针同形、明显更快的读数；或 `tikv-jemalloc-sys` 在 Windows MSVC 上构建成功。
 -/
 
 namespace Sprawling.Serving.Memory

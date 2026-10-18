@@ -111,6 +111,11 @@ updates:
       # bump often needs the rustls bump beside it.
       rustls:
         patterns: ["rustls", "reqwest"]
+      # tikv-jemallocator names its sys crate at the jemalloc snapshot the
+      # bindings were generated for, so the two move together or the
+      # lockfile carries two jemalloc copies into one static binary.
+      jemalloc:
+        patterns: ["tikv-jemallocator", "tikv-jemalloc-sys"]
       # The Win32 binding moves as one family: windows-core, windows-sys
       # and the rest share one generator release.
       windows:
