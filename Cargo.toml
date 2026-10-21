@@ -94,7 +94,7 @@ uuid = { version = "1", features = ["serde"] }
 proptest = { version = "1", default-features = false, features = ["std"] }
 # The terminal the console's frames are read back through in its tests,
 # so a test judges the screen a person sees rather than the bytes.
-vt100 = { version = "0.16", default-features = false }
+vt100 = { version = "0.17", default-features = false }
 insta = { version = "1", default-features = false }
 tempfile = "3"
 # S2: compile-fail proof that "unrepresentable" holds (V0 trybuild cases).
