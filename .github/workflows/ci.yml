@@ -168,7 +168,7 @@ jobs:
       - uses: ./.github/actions/zig
         with:
           cache: true
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with:
           shared-key: gates
           save-if: ${{ github.ref == 'refs/heads/main' }}
@@ -233,7 +233,7 @@ jobs:
       - uses: ./.github/actions/zig
       # The entry `gates` saves holds what xtask is built from; this job
       # reads it and writes none of its own.
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with:
           shared-key: gates
           save-if: false
@@ -272,7 +272,7 @@ jobs:
       # aws-lc-sys and libgit2, which are C. A key per job, because
       # check-mode metadata and real rlibs are different artifacts and one
       # key would make two jobs overwrite each other's cache all day.
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with:
           shared-key: clippy
           save-if: ${{ github.ref == 'refs/heads/main' }}
@@ -319,7 +319,7 @@ jobs:
       # The Zig the desktop's leaf is built with; every Windows build of
       # `sprawling` compiles it (`crates/desktop/Spec.lean` section 8-12).
       - uses: ./.github/actions/zig
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with:
           shared-key: test-registry
           cache-targets: false
@@ -450,7 +450,7 @@ jobs:
       # The Zig the console's renderer is built with on every platform
       # (`crates/console_ffi/Spec.lean` D1).
       - uses: ./.github/actions/zig
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with:
           shared-key: core
           save-if: ${{ github.ref == 'refs/heads/main' }}
@@ -556,7 +556,7 @@ jobs:
       # moving them under kani is a change nobody has measured.
       - name: install pinned toolchain
         run: rustup show
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with:
           shared-key: proof
           save-if: ${{ github.ref == 'refs/heads/main' }}
