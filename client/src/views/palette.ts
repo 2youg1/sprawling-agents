@@ -11,6 +11,9 @@ import type { Key } from "../core/lang";
 import { say } from "../core/lang";
 import type { Lang } from "../core/lang";
 import { completed } from "../core/completion";
+import type { View } from "../core/route";
+import { ago } from "../core/time";
+import type { Address, SessionLine } from "../wire";
 import { boxKey } from "./cursor";
 import { rowId } from "./palette/rows";
 
@@ -44,6 +47,31 @@ export function whyFor(spelling: string, reach: Reach): Key | undefined {
     default:
       return undefined;
   }
+}
+
+// One session of the room main stands in, as a place the palette goes to
+// (client/Spec.lean §4-64b): the room's current session goes to the room,
+// an earlier one to its read-only view (`#/talk/<room>:<seq>`), because
+// going on from an earlier session is a branch, which a row here does not
+// make. The label leads with the number the address line draws, so the
+// line a person pressed and the row they pick say the same `#<seq>`.
+export interface SessionPlace {
+  readonly label: string;
+  readonly hint: string;
+  readonly to: View;
+}
+
+// `lines` newest first, as `Query::Sessions` answers them; the first is
+// the room's current session.
+export function sessionPlaces(room: Address, lines: readonly SessionLine[], lang: Lang, now: number): SessionPlace[] {
+  return lines.map((line, at) => {
+    const named = line.name ?? line.preview ?? "";
+    return {
+      label: named === "" ? `#${String(line.began)}` : `#${String(line.began)} · ${named}`,
+      hint: at === 0 ? say(lang, "palette_session_current") : `${say(lang, "palette_session")} · ${ago(lang, line.at, now)}`,
+      to: at === 0 ? { kind: "talk", address: room } : { kind: "talk", address: room, session: line.began },
+    };
+  });
 }
 
 export type KeyPress = Pick<KeyboardEvent, "key" | "isComposing" | "preventDefault">;

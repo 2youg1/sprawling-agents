@@ -33,7 +33,10 @@
   import type { Snippet } from "svelte";
   import type { Address, RoundsAnswer, Seq } from "../wire";
   import { ui } from "../ui";
+  import AddressLine from "./talk/address_line.svelte";
+  import type { Head } from "./talk/address_line";
   import Composer from "./talk/composer.svelte";
+  import { startedIn } from "./talk/composer";
   import Divider from "./talk/divider.svelte";
   import Forking from "./talk/forking.svelte";
   import Button from "./parts/button.svelte";
@@ -62,9 +65,13 @@
     // The band under the world layer's sheet on one column: the thread
     // steps aside and the last thing said stands above the box.
     readonly band: boolean;
+    // Whether the column draws the address line at its head
+    // (client/Spec.lean 4-10a): zen and blend do; the panorama workbench
+    // writes the address under the chosen session instead.
+    readonly head: Head;
   }
 
-  const { address, band }: Props = $props();
+  const { address, band, head }: Props = $props();
 
   const u = ui();
   const { lang } = u;
@@ -367,6 +374,9 @@ with the room's name above it, and the first send lets it sink to its seat
 (docs/frontend-method.md §7I), so neither the words being typed nor an input method's
 composition is rebuilt on the way. -->
 <div class={["flex min-h-0 flex-col", band ? "" : "h-full"]} style:container-type={band ? undefined : "size"}>
+  {#if !band && head === "address" && (echo !== null || startedIn(runs, $belief.sessions[address]))}
+    <AddressLine {address} />
+  {/if}
   {#if !band}
     <Scroller empty={blank} {rejoined} place={address}>
       {#if runs.length > 0}

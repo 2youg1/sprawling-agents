@@ -50,10 +50,11 @@
   import type { Reached, Slash, SlashHands } from "../core/slash_hands";
   import { ui } from "../ui";
   import { Address } from "../wire";
+  import type { SessionLine } from "../wire";
   import { modalHold, modalWire } from "./modal";
   import type { Seat } from "./modal";
   import Modal from "./modal.look.svelte";
-  import { boxOf, whyFor } from "./palette";
+  import { boxOf, sessionPlaces, whyFor } from "./palette";
   import Look from "./palette.look.svelte";
   import type { Entry, Group } from "./palette/entry";
   import { nothingFound } from "./palette/nothing_found";
@@ -73,9 +74,12 @@
     readonly onClose: () => void;
     // `specimen` draws the box open in the page's flow, for `#/gallery`.
     readonly seat?: Seat | undefined;
+    // The room the palette stands over; the address bar's unless a
+    // `#/gallery` fixture names one.
+    readonly here?: Address | undefined;
   }
 
-  const { onClose, seat = "modal" }: Props = $props();
+  const { onClose, seat = "modal", here: named }: Props = $props();
 
   let query = $state("");
   let cursor = $state(0);
@@ -107,7 +111,18 @@
   // room, so `here` is the room the address bar names and `live` is
   // the run in front of the person (`core/in_front`).
   const viewed = $derived(Option.getOrNull(current(u.bar)));
-  const here = $derived(viewed !== null && viewed.kind === "talk" ? viewed.address : null);
+  const here = $derived(named ?? (viewed !== null && viewed.kind === "talk" ? viewed.address : null));
+  // The sessions of the room main stands in, asked only on a conversation;
+  // the same question the page's workspace asks, which `asking` merges.
+  let sessionLines = $state.raw<readonly SessionLine[]>([]);
+  $effect(() => {
+    const room = here;
+    sessionLines = [];
+    if (room === null) return;
+    return u.conn.asking.ask({ sessions: { room } }).subscribe((answer) => {
+      sessionLines = answer !== undefined && "sessions" in answer ? answer.sessions.sessions : [];
+    });
+  });
   const live = $derived(reached(viewed === null ? undefined : runInFront($belief, viewed)));
 
   const entries = $derived.by((): Entry[] => {
@@ -123,7 +138,11 @@
     // A page a key reaches is called what the key sheet calls it, and
     // shows the chord rather than its address.
     const page = (action: Action, to: View): Entry => ({ ...goTo(to, say($lang, LABELS[action])), action });
+    // The room main stands in comes first: its sessions are what the
+    // address line was pressed for (client/Spec.lean 4-10a).
+    const sessions = here === null ? [] : sessionPlaces(here, sessionLines, $lang, u.now()).map((place) => goTo(place.to, place.label, place.hint));
     const out: Entry[] = [
+      ...sessions,
       page("go.talk", { kind: "talk", address: MAYOR }),
       page("go.city", { kind: "city" }),
       page("go.setup", { kind: "setup" }),

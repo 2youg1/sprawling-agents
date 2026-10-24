@@ -25,6 +25,8 @@
   import { ui } from "../../ui";
   import type { Address } from "../../wire";
   import Button from "../parts/button.svelte";
+  import AddressLine from "./address_line.svelte";
+  import type { Head } from "./address_line";
   import AsideLink from "./aside_link.look.svelte";
   import { branchInto } from "./branching";
   import { noteOf } from "./branch_note";
@@ -38,9 +40,11 @@
     // answered for it, or no longer lists it.
     readonly stretch: Stretch | null;
     readonly band: boolean;
+    // Whether the column draws the address line at its head (4-10a).
+    readonly head: Head;
   }
 
-  const { address, stretch, band }: Props = $props();
+  const { address, stretch, band, head }: Props = $props();
 
   const u = ui();
   const { lang } = u;
@@ -61,6 +65,9 @@
 </script>
 
 <div class={["flex min-h-0 flex-col", band ? "" : "h-full"]}>
+  {#if !band && head === "address"}
+    <AddressLine {address} session={stretch?.line.began} />
+  {/if}
   {#if !band}
     <Scroller empty={false} rejoined={0} place={stretch === null ? address : `${address}:${String(stretch.line.began)}`}>
       {#each stretch?.runs ?? [] as run, at (run.run)}

@@ -16,11 +16,28 @@
   // reason, the cursor standing on it so the reason is the line read.
 
   import { QUERIES } from "../../core/asking";
-  import { Address } from "../../wire";
-  import type { Answer, FindAnswer, Query } from "../../wire";
+  import { Address, Seq, TimeMs } from "../../wire";
+  import type { Answer, FindAnswer, Query, SessionLine } from "../../wire";
   import { ENDPOINTS } from "./served";
 
   const LAB = Address.make("lab");
+  const HALL = Address.make("hall/mayor");
+  // Fixture data: three sessions of the Mayor's room, newest first.
+  const line = (began: number, name: string | null, preview: string | null, at: number): SessionLine => ({
+    at: TimeMs.make(at),
+    began: Seq.make(began),
+    last: Seq.make(began + 9),
+    runs: 2,
+    name,
+    preview,
+    start: { opened: { carry: "nothing" } },
+  });
+  const NOW = Date.now();
+  const LINES: readonly SessionLine[] = [
+    line(4182, "release notes", null, NOW),
+    line(3990, null, "The ledger closes short by one entry on the first of the month.", NOW - 3_600_000),
+    line(23, null, null, NOW - 86_400_000),
+  ];
 
   const FOUND: readonly Address[] = ["Roadmap.md", "notes/roadmap-review.md", "docs/archive/old-roadmap.txt"].map(
     (path) => Address.make(path),
@@ -31,6 +48,9 @@
     if (typeof query === "object" && "find" in query) {
       const find: FindAnswer = { under: LAB, text: query.find.text, paths: [...FOUND], walked: "whole" };
       return { find };
+    }
+    if (typeof query === "object" && "sessions" in query) {
+      return { sessions: { room: query.sessions.room, sessions: query.sessions.room === HALL ? [...LINES] : [], earlier: 0 } };
     }
     return undefined;
   }
@@ -82,6 +102,12 @@
 <Case label="palette · places, the cursor on the first row" width={640}>
   <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} answers={answering}>
     <Palette seat="specimen" onClose={ignore} />
+  </Stand>
+</Case>
+
+<Case label="palette · opened from the address line: this room's sessions first" width={640}>
+  <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} answers={answering}>
+    <Palette seat="specimen" here={HALL} onClose={ignore} />
   </Stand>
 </Case>
 

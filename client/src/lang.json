@@ -5107,6 +5107,14 @@
     "en": "room",
     "zh": "房间"
   },
+  "palette_session": {
+    "en": "session",
+    "zh": "会话"
+  },
+  "palette_session_current": {
+    "en": "current session",
+    "zh": "当前会话"
+  },
   "palette_transcribe": {
     "en": "speak, transcribed into the message box",
     "zh": "说话，转写进输入框"
@@ -9399,6 +9407,10 @@
     "en": "an earlier session",
     "zh": "较早的会话"
   },
+  "region_address_line": {
+    "en": "where this conversation is",
+    "zh": "这段对话所在的位置"
+  },
   "world_row_name": {
     "en": "{room}, {when}",
     "zh": "{room}，{when}"
@@ -9462,6 +9474,14 @@
   "talk_current": {
     "en": "Back to the current session",
     "zh": "回到当前对话"
+  },
+  "talk_address_line": {
+    "en": "{address} · {session}: open the command palette to change room or session",
+    "zh": "{address} · {session}：打开命令面板，换房间或会话"
+  },
+  "talk_address_line_new": {
+    "en": "{address}: open the command palette to change room or session",
+    "zh": "{address}：打开命令面板，换房间或会话"
   },
   "world_sessions": {
     "en": "sessions",

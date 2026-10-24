@@ -206,7 +206,7 @@
 <Case label="thread · heads, tool lines of every kind with send and delegate, a call running with the steer pin" width={760}>
   <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} {answers} {records}>
     <div class="h-[760px] px-wide">
-      <Talk address={WORKING} band={false} />
+      <Talk address={WORKING} band={false} head="none" />
     </div>
   </Stand>
 </Case>
@@ -214,7 +214,7 @@
 <Case label="thread · a call past ten seconds, waiting on the person" width={760}>
   <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} {answers} {records}>
     <div class="h-[420px] px-wide">
-      <Talk address={ASKING} band={false} />
+      <Talk address={ASKING} band={false} head="none" />
     </div>
   </Stand>
 </Case>

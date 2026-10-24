@@ -56,7 +56,7 @@
 <Case label="conversation · one round, then a new session opened by a model change" width={760}>
   <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} {records}>
     <div class="h-[520px] px-wide">
-      <Talk address={FOLDED} band={false} />
+      <Talk address={FOLDED} band={false} head="none" />
     </div>
   </Stand>
 </Case>

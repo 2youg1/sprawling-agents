@@ -11,7 +11,9 @@ import { describe, expect, test } from "bun:test";
 
 import { completed } from "../core/completion";
 import type { BoxHands, BoxState } from "./palette";
-import { boxOf, whyFor } from "./palette";
+import { boxOf, sessionPlaces, whyFor } from "./palette";
+import { Address, Seq, TimeMs } from "../wire";
+import type { SessionLine } from "../wire";
 import type { Entry } from "./palette/entry";
 import { rowId, rowsLookOf } from "./palette/rows";
 
@@ -148,5 +150,27 @@ describe("why a verb cannot run from the palette", () => {
 
   test("a room or a run in front of the person is enough for /diff", () => {
     expect([whyFor("/diff", room), whyFor("/diff", { ...nowhere, live: true })]).toEqual([undefined, undefined]);
+  });
+});
+
+describe("the sessions of the room main stands in", () => {
+  const ROOM = Address.make("atlas/payments");
+  const line = (began: number, name: string | null, preview: string | null): SessionLine => ({
+    at: TimeMs.make(1_000),
+    began: Seq.make(began),
+    last: Seq.make(began + 5),
+    runs: 1,
+    name,
+    preview,
+    start: { opened: { carry: "nothing" } },
+  });
+
+  test("the current session goes to the room and an earlier one to its read-only view, each led by its number", () => {
+    const places = sessionPlaces(ROOM, [line(40, "reconcile", null), line(23, null, "the ledger is short"), line(9, null, null)], "en", 61_000);
+    expect(places).toEqual([
+      { label: "#40 · reconcile", hint: "current session", to: { kind: "talk", address: ROOM } },
+      { label: "#23 · the ledger is short", hint: "session · 1 min ago", to: { kind: "talk", address: ROOM, session: Seq.make(23) } },
+      { label: "#9", hint: "session · 1 min ago", to: { kind: "talk", address: ROOM, session: Seq.make(9) } },
+    ]);
   });
 });

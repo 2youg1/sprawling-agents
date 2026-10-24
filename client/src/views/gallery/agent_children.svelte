@@ -191,7 +191,7 @@
   <Case {label} width={760}>
     <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} {answers} {records}>
       <div class="h-[320px] px-wide">
-        <Talk address={room} band={false} />
+        <Talk address={room} band={false} head="none" />
       </div>
     </Stand>
   </Case>

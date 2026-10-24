@@ -107,7 +107,7 @@
 <Case label="frozen facts · the Mayor's session under the name it froze, its first head with model · effort · mode, each reply with TTFT and t/s" width={760}>
   <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} answers={answering(now, true)} records={recordsAt(now)}>
     <div class="h-[520px] px-wide">
-      <Talk address={MAYOR} band={false} />
+      <Talk address={MAYOR} band={false} head="none" />
     </div>
   </Stand>
 </Case>
@@ -115,7 +115,7 @@
 <Case label="frozen facts · an empty Mayor's room titled with the name a new session would freeze" width={760}>
   <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} answers={answering(now, false)}>
     <div class="h-[420px] px-wide">
-      <Talk address={MAYOR} band={false} />
+      <Talk address={MAYOR} band={false} head="none" />
     </div>
   </Stand>
 </Case>

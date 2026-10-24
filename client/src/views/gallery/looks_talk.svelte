@@ -11,6 +11,9 @@
   // it, so the roles and boxes each look draws are read on this page.
   import { say } from "../../core/lang";
   import { ui } from "../../ui";
+  import { Seq } from "../../wire";
+  import AddressLine from "../talk/address_line.look.svelte";
+  import { addressLineOf } from "../talk/address_line";
   import AsideLink from "../talk/aside_link.look.svelte";
   import Checkpoint from "../talk/checkpoint.look.svelte";
   import Fact from "../talk/fact.look.svelte";
@@ -29,6 +32,7 @@
   const still = (): void => undefined;
   // Fixture data: what a city would have reported.
   const WORDS = { files: "3 files", asks: "waiting on you" };
+  const LONG = "atlas-payments-reconciliation-service/ledger-close-and-settlement";
   const fork: ForkWire = {
     type: "button",
     onmouseenter: still,
@@ -47,6 +51,18 @@
     <ForkButton label="branch" hint="branch from this turn" wire={fork} />
     <AsideLink text="open the run" href="#/run/7f3a" />
   </div>
+</Case>
+
+<Case label="address line · a session, a long address cut in its building, a room with no session yet">
+  <div class="flex flex-col gap-snug">
+    <AddressLine {...addressLineOf($lang, "hall/mayor", Seq.make(23), still)} />
+    <AddressLine {...addressLineOf($lang, LONG, Seq.make(4182), still)} />
+    <AddressLine {...addressLineOf($lang, "atlas/api", null, still)} />
+  </div>
+</Case>
+
+<Case label="address line · at a phone's width, the room kept whole" width={320}>
+  <AddressLine {...addressLineOf($lang, LONG, Seq.make(4182), still)} />
 </Case>
 
 <Case label="thread inbox · two letters waiting in this room">
