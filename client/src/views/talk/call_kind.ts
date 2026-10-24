@@ -102,8 +102,37 @@ const Pull = Schema.Struct({ action: Schema.Literal("pull") });
 // wording-ok: an argument value the tool reads, never shown to a reader
 const Asked = Schema.Struct({ action: Schema.Literal("send"), to: Schema.String, text: Schema.String });
 const Handed = Schema.Struct({ room: Schema.String, task: Schema.String });
+// The two fields of an `AxError` the line reads, and no more: a code this
+// build does not know yet is still a refusal, and its heading shows the
+// missing key as every notice does (`parts/notice_title.ts`).
+const Refused = Schema.Struct({ code: Schema.String, subject: Schema.String });
 const Sent = Schema.Struct({ delivered: Schema.Boolean, waiting: Schema.optional(Schema.String) });
 const Started = Schema.Struct({ room: Schema.String, starts: Schema.String });
+
+// Why a failed call failed, as its line can say it in a few words
+// (client/Spec.lean §4-44): the city's refusal when the result is one
+// (the Ledger keeps a failed call's `error` as the `AxError` the tool
+// returned), else the first line the tool wrote, else nothing beyond
+// "failed". A refusal cut by the window is no longer JSON and is read as
+// the tool's words, so the line still says something true. The tool's
+// words stop at `SAID_CHARS`, because they also fill the line's hint, and
+// a tool that answers with one line of a page's length would otherwise
+// raise a hint that covers the thread; the right side keeps the whole.
+export type Failure =
+  | { readonly kind: "refused"; readonly code: string; readonly subject: string }
+  | { readonly kind: "said"; readonly text: string }
+  | { readonly kind: "silent" };
+
+export function failureOf(call: Call): Failure {
+  const refused = decoded(call.output, Refused);
+  if (Option.isSome(refused)) return { kind: "refused", code: refused.value.code, subject: refused.value.subject };
+  const text = (call.output?.head ?? "").split("\n").map((each) => each.trim()).find((each) => each !== "") ?? "";
+  if (text === "") return { kind: "silent" };
+  const kept = Array.from(text);
+  return { kind: "said", text: kept.length > SAID_CHARS ? `${kept.slice(0, SAID_CHARS).join("").trimEnd()}…` : text };
+}
+
+const SAID_CHARS = 160;
 
 function decoded<A>(output: Call["arguments"], schema: Schema.Decoder<A>): Option.Option<A> {
   if (output === null || output === undefined || output.cut > 0) return Option.none();

@@ -136,6 +136,7 @@ impl RunWorker {
             seat_lane,
             shares,
             affinity,
+            budget,
         } = hands;
         let now = crate::Clock::now(&*clock)?;
         // Holding the one writer is what makes every worktree lock a
@@ -231,7 +232,8 @@ impl RunWorker {
                 seat_lane,
                 runtime::Backlog::new()
                     .with_shares(shares)
-                    .with_affinity(affinity),
+                    .with_affinity(affinity)
+                    .with_budget(budget),
             ),
             index: storage::LedgerIndex::empty(),
             warm: super::keeping_warm::Kept::default(),

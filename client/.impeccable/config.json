@@ -1,0 +1,18 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "overused-font",
+        "value": "geist",
+        "reason": "The person asked for an OFL face and named Geist; this release keeps Geist Mono (docs/frontend-method.md 4-37). Changing the face is a design choice, and three OFL candidates are offered to the person instead."
+      },
+      {
+        "rule": "overused-font",
+        "value": "geist mono",
+        "reason": "The person asked for an OFL face and named Geist; this release keeps Geist Mono (docs/frontend-method.md 4-37). Changing the face is a design choice, and three OFL candidates are offered to the person instead."
+      }
+    ]
+  }
+}

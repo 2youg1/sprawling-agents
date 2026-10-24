@@ -360,10 +360,10 @@ taller; on one column the second row is the band, as tall as it needs. -->
     ]}
     aria-label={say($lang, past === undefined ? "region_conversation" : "region_past_session")}
   >
-    {#if past === undefined}
-      <Talk {address} band={sheet} />
+    {#if past === undefined || session === undefined}
+      <Talk {address} band={sheet} head={layout.world === "workbench" ? "none" : "address"} />
     {:else}
-      <Past {address} stretch={past} band={sheet} />
+      <Past {address} {session} stretch={past} band={sheet} head={layout.world === "workbench" ? "none" : "address"} />
     {/if}
   </section>
   {#if open}

@@ -51,6 +51,27 @@
     };
   }
 
+  // Fixture data: three failed calls - the city's refusal, a tool's own
+  // long first line, and a failure that said nothing.
+  const REFUSAL = JSON.stringify({
+    code: "E_PATH_NOT_FOUND",
+    action: "read",
+    subject: "crates/nowhere/src/lib.rs",
+    nearby: ["crates/city/src/lib.rs"],
+    recovery: "list the parent directory first",
+    retry: "no",
+  });
+  const FAILED: readonly Call[] = [
+    { ...call(51, "read", "crates/nowhere/src/lib.rs", 4), outcome: "failed", output: { head: REFUSAL, cut: 0 } },
+    {
+      ...call(52, "fetch_docs", "docs.rs/git2/latest/git2/struct.Repository.html", 2_210),
+      effect: "egress",
+      outcome: "failed",
+      output: { head: "upstream answered 503 Service Unavailable after three attempts; the mirror was not tried\nretry later", cut: 0 },
+    },
+    { ...call(53, "browser", "screenshot", 880), effect: "egress", outcome: "failed", output: null },
+  ];
+
   const CALLS: readonly Call[] = [
     call(41, "read", "crates/city/src/document.rs", 31),
     call(42, "search", "edit_against", 140),
@@ -74,6 +95,26 @@
     </Stand>
   </Case>
 {/each}
+
+<Case label="tool lines · failed: the city's refusal, a tool's long first line cut, and no reason">
+  <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]}>
+    <div data-thread class="flex flex-col">
+      {#each FAILED as each (each.at)}
+        <CallLine call={each} run={RUN} />
+      {/each}
+    </div>
+  </Stand>
+</Case>
+
+<Case label="tool lines · failed, at a phone's width" width={360}>
+  <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]}>
+    <div data-thread class="flex flex-col">
+      {#each FAILED as each (each.at)}
+        <CallLine call={each} run={RUN} />
+      {/each}
+    </div>
+  </Stand>
+</Case>
 
 <Case label="tool lines · keys at the row's end">
   <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]}>

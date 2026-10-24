@@ -57,6 +57,7 @@ pub struct Backlog {
     sink: Option<Sink>,
     shares: Shares,
     affinity: RunAffinity,
+    budget: crate::reserve::MachineBudget,
 }
 
 impl Default for Backlog {
@@ -84,6 +85,20 @@ impl Backlog {
     #[must_use]
     pub fn shares(&self) -> Shares {
         self.shares
+    }
+
+    /// The same table, reserving from this machine budget. A table made
+    /// without one is unmetered: every reservation fits.
+    #[must_use]
+    pub fn with_budget(self, budget: crate::reserve::MachineBudget) -> Backlog {
+        Backlog { budget, ..self }
+    }
+
+    /// The machine budget a run's heavy work reserves its ceiling from
+    /// (`crates/runtime/spec/Reserve.lean` D104).
+    #[must_use]
+    pub fn budget(&self) -> &crate::reserve::MachineBudget {
+        &self.budget
     }
 
     /// Enters a run a resident handed down, so a halt on its scope can

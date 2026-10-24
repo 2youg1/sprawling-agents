@@ -22,7 +22,7 @@ use crate::backlog::{BacklogId, Exit, Finished};
 
 mod ceiling;
 use ceiling::memory_ceiling;
-pub(super) use ceiling::with_ceiling;
+pub(super) use ceiling::{with_ceiling, with_wait};
 
 /// Writes how a child stopped into a result, in the one spelling this
 /// file owns.

@@ -44,6 +44,11 @@ const CORE: &str = "core";
 /// The top-level key naming the city a launch with none named opens
 /// (`crates/accounting/spec/Person.lean` §8-8).
 const CITY: &str = "city";
+/// The top-level key giving the machine budget heavy work reserves from
+/// (`crates/accounting/spec/Person.lean` §8-8, `crates/runtime/spec/Reserve.lean` D104).
+const MEMORY: &str = "memory";
+/// The spelling of `memory` that leaves the budget to the city.
+const AUTO: &str = "auto";
 /// Everything this person settled, as their file states it.
 ///
 /// A file nobody has written yet is not a failure: it is somebody who
@@ -167,6 +172,49 @@ fn name_city(file: &Path, city: &Path) -> Result<(), AxError> {
         let text = toml::to_string_pretty(&document).map_err(|err| invalid(file, &err))?;
         held.replace(text.as_bytes())
     })
+}
+
+/// How the machine budget is set: left to the city, or a number of bytes
+/// the person wrote. Zero is a budget too: one piece of heavy work at a
+/// time.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MachineMemory {
+    Auto,
+    Bytes(u64),
+}
+
+/// The person's top-level `memory`, `Auto` when the line is absent.
+///
+/// # Errors
+/// Everything [`read`] returns; `E_CONFIG_INVALID` for a value that is
+/// neither `"auto"` nor a whole number of bytes.
+pub fn machine_memory() -> Result<MachineMemory, AxError> {
+    stated_machine_memory(&file()?)
+}
+
+fn stated_machine_memory(file: &Path) -> Result<MachineMemory, AxError> {
+    let refused = |other: &toml::Value| {
+        AxError::failure(
+            AxCode::ConfigInvalid,
+            "read the machine's memory budget",
+            format!(
+                "{}: {MEMORY} = {other} is neither \"{AUTO}\" nor a number of bytes",
+                file.display()
+            ),
+        )
+        .with_recovery(format!(
+            "write {MEMORY} = \"{AUTO}\" to let the city size it, a whole number of bytes, \
+             or delete the line"
+        ))
+    };
+    match document(file)?.get(MEMORY) {
+        None => Ok(MachineMemory::Auto),
+        Some(toml::Value::String(spelled)) if spelled == AUTO => Ok(MachineMemory::Auto),
+        Some(stated @ toml::Value::Integer(bytes)) => u64::try_from(*bytes)
+            .map(MachineMemory::Bytes)
+            .map_err(|_| refused(stated)),
+        Some(other) => Err(refused(other)),
+    }
 }
 
 /// Whether the core's threads are raised: the setting a person turns
@@ -345,6 +393,34 @@ mod tests {
         assert_eq!(
             stated_city(&file).unwrap_err().code(),
             &AxCode::ConfigInvalid
+        );
+    }
+
+    /// The machine budget reads as the city's to size when absent or
+    /// `"auto"`, as bytes when a number, and refuses anything else.
+    #[test]
+    fn the_machine_memory_is_auto_or_bytes() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("config.toml");
+        let read = |text: &str| {
+            std::fs::write(&file, text).unwrap();
+            stated_machine_memory(&file).map_err(|err| *err.code())
+        };
+        assert_eq!(
+            [
+                read(""),
+                read("memory = \"auto\"\n"),
+                read("memory = 1024\n"),
+                read("memory = -1\n"),
+                read("memory = \"lots\"\n"),
+            ],
+            [
+                Ok(MachineMemory::Auto),
+                Ok(MachineMemory::Auto),
+                Ok(MachineMemory::Bytes(1024)),
+                Err(AxCode::ConfigInvalid),
+                Err(AxCode::ConfigInvalid),
+            ]
         );
     }
 

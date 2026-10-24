@@ -11,6 +11,9 @@ import type { Key } from "../core/lang";
 import { say } from "../core/lang";
 import type { Lang } from "../core/lang";
 import { completed } from "../core/completion";
+import type { View } from "../core/route";
+import { ago } from "../core/time";
+import type { Address, Seq, SessionLine } from "../wire";
 import { boxKey } from "./cursor";
 import { rowId } from "./palette/rows";
 
@@ -44,6 +47,46 @@ export function whyFor(spelling: string, reach: Reach): Key | undefined {
     default:
       return undefined;
   }
+}
+
+// One session of the room main stands in, as a place the palette goes to
+// (client/Spec.lean §4-64b): the room's current session goes to the room,
+// an earlier one to its read-only view (`#/talk/<room>:<seq>`), because
+// going on from an earlier session is a branch, which a row here does not
+// make. The label leads with the number the address line draws, so the
+// line a person pressed and the row they pick say the same `#<seq>`.
+export interface SessionPlace {
+  readonly label: string;
+  readonly hint: string;
+  readonly to: View;
+}
+
+// Where the palette stands: the room, and the earlier session main shows
+// in it, if it shows one, whose row says so, because a person who pressed
+// the address line of an earlier session looks for the row they are in.
+export interface SessionsAt {
+  readonly room: Address;
+  readonly viewing: Seq | undefined;
+}
+
+// How many of the room's sessions the palette lists while nothing is
+// typed. `Query::Sessions` answers up to 64, and listed whole they would
+// push every page and room off the box; typing filters all of them, so
+// `#23` or a word of a name still finds an old one.
+export const SESSIONS_AT_REST = 5;
+
+// `lines` newest first, as `Query::Sessions` answers them; the first is
+// the room's current session.
+export function sessionPlaces(at: SessionsAt, lines: readonly SessionLine[], lang: Lang, now: number): SessionPlace[] {
+  return lines.map((line, index) => {
+    const named = line.name ?? line.preview ?? "";
+    const kind = index === 0 ? "palette_session_current" : line.began === at.viewing ? "palette_session_shown" : "palette_session";
+    return {
+      label: named === "" ? `#${String(line.began)}` : `#${String(line.began)} · ${named}`,
+      hint: index === 0 ? say(lang, kind) : `${say(lang, kind)} · ${ago(lang, line.at, now)}`,
+      to: index === 0 ? { kind: "talk", address: at.room } : { kind: "talk", address: at.room, session: line.began },
+    };
+  });
 }
 
 export type KeyPress = Pick<KeyboardEvent, "key" | "isComposing" | "preventDefault">;

@@ -39,6 +39,7 @@
   import Notifier from "./views/notifier.svelte";
   import Pages from "./views/pages.svelte";
   import Palette from "./views/palette.svelte";
+  import { closePalette, paletteShown, togglePalette } from "./views/palette_door.svelte";
   import Quit from "./views/quit.svelte";
   import Refusal from "./views/refusal.svelte";
   import Workspace from "./views/workspace.svelte";
@@ -80,7 +81,6 @@
   };
 
   let view = $state.raw<View>(DEFAULT_VIEW);
-  let paletteOpen = $state(false);
   let sheetOpen = $state(false);
   // How many times the stop key found no run in front; each is answered.
   let stopsWithoutRun = $state(0);
@@ -248,7 +248,7 @@
         else u.go(GOES[action]);
         return;
       case "palette":
-        paletteOpen = !paletteOpen;
+        togglePalette();
         return;
       case "tier.cycle":
         holdTier();
@@ -295,7 +295,7 @@
     // with it, or an input method's composition, is a chord and not a look.
     expose((event.key === "Control" || event.key === "Meta") && !event.isComposing && !event.repeat);
     if (event.key === "Escape") {
-      if (paletteOpen) paletteOpen = false;
+      if (paletteShown()) closePalette();
       else if (sheetOpen) closeSheet();
       return;
     }
@@ -303,7 +303,7 @@
     // With the palette open, only a chord that holds the accelerator is
     // the shell's; everything else is being typed into its filter. The
     // text-field half of this rule lives in `core/keys`' `matches`.
-    if (paletteOpen && !accel) return;
+    if (paletteShown() && !accel) return;
     const action = bindings.acting(pressedOf(event));
     if (action !== null) {
       event.preventDefault();
@@ -374,8 +374,8 @@
   {/if}
   <Refusal {stopsWithoutRun} />
   <Quit />
-  {#if paletteOpen}
-    <Palette onClose={() => (paletteOpen = false)} />
+  {#if paletteShown()}
+    <Palette onClose={closePalette} />
   {/if}
   {#if sheetOpen}
     <Cheatsheet seat="modal" onClose={closeSheet} />
