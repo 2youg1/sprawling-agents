@@ -51,7 +51,7 @@ pub fn city_prompt_path(city_root: &Path, building: &Address) -> PathBuf;   // <
 - **计划的路径与读法归本模块**：`roadmap_path` 与 `roadmap` 落在这里，因为 `ROADMAP_FILE` 在这里——在别处拼 `city_root/<addr>/Roadmap.md` 就是第二份「计划在哪里」的权威，它会在真正那份搬家后继续跑得好好的。
 - **「还没有」与「读不了」是两件事**：`roadmap` 仅对 `ErrorKind::NotFound` 答空串——一栋还没铺计划的楼确实没有计划；其余任何理由一律以 `E_STORAGE_FATAL` 上报并带上路径。这与同 crate 的 `archive::index` 已有的契约同形（目录不在→`Ok(空)`，真失败→`Err`），不新立一种读法。
 - **交接表单的读法归本模块**：`handoff_sections` 把 `<overall>`、`<current-progress>`、`<context>`、`<next-step>` 四节各读成一段正文；一节缺席、或只剩模板的括号提示行，即 `None`。括号提示行的判断与 `is_blank_form` 共用 `blank::is_guidance` 一处，因为「这一行是不是模板自己的话」只能有一个答案。`<must-read>` 节不读：它是写给下一个 Agent 的散文而不是 Locator，装配层把整份文件入 CAS，作为 must-read 的一条。被否决的备选：在装配层按标签切字符串——那是模板格式的第二个读者，模板改一个标签它就静默读到空。
-- **`City.md` 两层，近者替换远者**：楼可以在自己的保留区（`RULES.toml` 旁）放一份 `City.md`，它在时这栋楼的 run 只读它，城根那份不读；`city_prompt_path` 是「哪份 `City.md` 管这栋楼」唯一的答案，`norms` 与装配层的 City 段都读它。放保留区而不是楼根：楼根常是人的 git 仓库，而保留区没有写域够得到，居民改不了自己被告知的话。替换而不拼接：两份回答的是同一个问题，楼改写了答案，就是说城的那份在这里不成立。被否：楼级那份进 Building 段、城的那份照留 City 段——两份都送，模型读到两个互相矛盾的「这座城怎么工作」。
+- **`City.md` 两层**：`city_prompt_path` 是「哪份 `City.md` 管这栋楼」唯一的答案，`norms` 与装配层的 City 段都读它；放在哪里、为什么替换而不拼接，见 D30。
 - **规范类 must-read 由 `norms` 给路径，不给 Locator**：Locator 需要 CAS 或 git oid，而 city 不认识落盘物（拓扑上也依赖不到 storage）。本模块答「哪几份是规范」，装配层把它们入 CAS 变成 Locator。这也是 must-read 最大失败模式的解：不让模型凭记忆重抄规范清单。
 -/
 
@@ -116,6 +116,17 @@ pub fn follow_defaults(city_root: &Path) -> Result<Vec<Edited>, AxError>;
 **被否**：①全部纪律仍接在人设之后——程序性的说明与禁令混在一段，人设里的风格要求排在程序之前，读起来像程序服从人设；②`<plan>` 留在模板里——改了 `plan`、`edit` 的参数，旧城的副本照旧教已删的参数。
 
 **重开参数**：人要能改 Mayor 的程序（而不只是人设）时，程序变成一份带默认文本的覆盖文件，走 D28。
+-/
+
+/-! D30 楼级 `City.md` 放在楼的保留区，近者替换远者
+
+**决定**：一栋楼自己的 `City.md` 在 `<building>/.sprawling/City.md`（`policy::governed` 给的保留区，与 `RULES.toml` 同处）。它在时这栋楼的 run 只读它，城根的 `<city>/City.md` 不读；它不在时读城根那份。`city_prompt_path` 是唯一的判定处。
+
+**理由**：楼根常是人的 git 仓库，楼根的文件名属于这个项目：放在那里的 `City.md` 会被项目的协作者与他们的工具当成项目文件，也在居民的写域里。保留区是 sprawling 在这个仓库里自己的名字空间，没有写域够得到它，居民改不了自己被告知的话；它进不进楼的版本历史由 `Gitignore` 一节的放行表决定，今天放行表不含 `City.md`，所以它不进楼的版本历史。替换而不拼接，因为两份回答的是同一个问题——在这里工作的 agent 该被告知这座城怎么工作——楼改写了答案，就是说城的那份在这里不成立。
+
+**被否**：①放楼根 `<building>/City.md`，与城根同形——进了人的仓库，居民的写域也够得到它；②楼级那份进 Building 段、城的那份照留 City 段——两份都送，模型读到两个互相矛盾的「这座城怎么工作」。
+
+**重开参数**：楼的保留区进了某个写域时，或人要求楼级只追加几条而不改写整份时。要让楼级 `City.md` 随楼的仓库走，是在 `Gitignore` 的放行表加一行，不改这条决定。
 -/
 
 /-!
