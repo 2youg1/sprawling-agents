@@ -39,12 +39,15 @@ const PERSON_CONFIG_FILE: &str = "config.toml";
 /// machine alone.
 const CITIES_DIR: &str = "sprawling";
 
-/// The directory name of a city nobody named.
+/// The directory name of a city nobody named, under `CITIES_DIR`.
 ///
-/// One name for both placements: `bin::firstrun` decides between the
-/// binary's own directory and the home directory, and a second
-/// spelling there would let the two answers drift apart.
+/// Also the name a city kept beside the binary by an earlier release
+/// sits under, which is where the move home looks for one.
 pub const CITY_DIR: &str = "city";
+
+/// Where the original bytes of a file the format ladder rewrote are
+/// kept (`crates/city/spec/Format.lean` §8-42).
+const BACKUPS_DIR: &str = "backups";
 
 /// What this machine looks like when neither variable is set.
 ///
@@ -123,8 +126,18 @@ impl Home {
         self.product_dir().join(PERSON_CONFIG_FILE)
     }
 
-    /// Where a city goes when the person named none and the binary's
-    /// own directory will not take one.
+    /// Where the format ladder keeps the original of every file it
+    /// rewrites.
+    ///
+    /// Here rather than beside each file: a building's root is often
+    /// the person's own git repository, and a backup written there would
+    /// show up in their working tree.
+    #[must_use]
+    pub fn backups(&self) -> PathBuf {
+        self.product_dir().join(BACKUPS_DIR)
+    }
+
+    /// Where a city goes when the person named none.
     ///
     /// Not under the dot directory: a city is the person's own work
     /// rather than this machine's state, and a city they cannot see in

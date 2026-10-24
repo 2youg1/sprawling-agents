@@ -21,11 +21,15 @@ pub enum CorePriority { Raised, Normal }                   // 人的设置；Nor
 pub fn core_priority() -> Result<CorePriority, AxError>;   // ConfigInvalid：priority 既不是 "raised" 也不是 "normal"
 pub enum CorePlacement { Off, Soft, SoftShares, Pinned }    // [core] placement 的四个解析结果；各臂行为归 `crates/sprawling/spec/Serving/Placement.lean` D41、D47、D49
 pub fn core_placement() -> Result<CorePlacement, AxError>; // 缺省 Soft；不认识的拼写或非字符串值报 ConfigInvalid
+pub fn city() -> Result<Option<PathBuf>, AxError>;         // 顶层 city；不是绝对路径即 ConfigInvalid
+pub fn settle_city(city: &Path) -> Result<(), AxError>;    // 写顶层 city（先取绝对路径），别的行原样留下
 ```
 
 - **文件在每一座城之外**：`<home>/.sprawling/config.toml`，路径由 `accounting::home`（§8-7）给，本模块不拼路径。把城拷到另一台机器，它不跟着走；在同一台机器上换一个浏览器，画出来的仍是这份文件说的样子。
 - **`[ui]` 一节就是 `PreferencesAnswer` 除 `core` 外的序列化**（`crates/wire/Spec.lean` §8-39 第七条）：文件能写的键与答案能说的字段是**同一份声明**，因此本模块只做读与写，不陈述「一项偏好是什么」。一条补丁落在记录上的效果同理，归 `PreferencesAnswer::apply` —— `Chord("")` 是解绑还是绑一个空串，只有一个地方回答。
 - **别的节原样留下**：写是一次读-改-写，经 `city::edit_document`（`crates/city/Spec.lean` §8-27）持锁并整份替换。「要么整份要么不动」只有一份实现，人层与城层共用它；再写一份就是给 B-49 立第二个权威。
+- **顶层 `city` 是没指名城时打开的那一座**（`crates/sprawling/spec/Firstrun.lean` §8-8 的三级优先里的第二级）：值必须是绝对路径，相对路径拒（`E_CONFIG_INVALID`）——个人配置所在目录、进程的工作目录、家目录都可以当基准，猜一个就会有人的城落在另一处；按配置文件所在目录解析还会把城放进 `~/.sprawling/` 这个机器状态目录。第一屏建城或接管文件夹之后由 `settle_city` 写入；`sprawling up <path>` 是一次性的覆盖，不写。上一版只读 `[ui]` 与 `[core]`，顶层的 `city` 不会让它拒这份文件。
+- **`format` 先判**：读整份之前先过 `city::admit_format`（`crates/city/Spec.lean` §8-42，city D28），比本 build 新的文件拒并点名升级；未动的文件不添 `format`。
 - **读不动的文件不覆写**：解析失败报 `E_CONFIG_INVALID`，主题带上文件与是哪一节，恢复语请人手工修或删掉那一节重选。能读回来的才配被改写——写它的人是唯一能修它的人。
 - **不入账**：偏好不属于城的历史，UI 偏好不改变 run 的输入，core 性能配置在 serving 起动时采用。因此这条命令被接受时城无话可播，`adversary` 第四世界据此把「静默」读作接受，而它真正的关门条件是读回来那一组断言（`tools/adversary/src/Sprawling/Person.lean`，叶子 5.6）。
 - **文件缺席不是失败**：那是一个什么都还没定的人，答案是本 build 画的那几档（`PreferencesAnswer::default`）。`lang` 缺席就是缺席，不填 `en`——没人选过之前，只有浏览器自己的语言标签是证据。

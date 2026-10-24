@@ -12,6 +12,7 @@ mod check;
 mod city_tool;
 mod config_layers;
 mod document;
+mod format;
 mod gitignore;
 mod governed;
 mod handoff_form;
@@ -59,6 +60,7 @@ pub use config_layers::{freeze_naming, keep_warm, own_layer, settled_harness, wr
 pub use config_layers::{search_supplier, settled_search, write_search};
 pub use config_layers::{settled_effort, settled_second, write_mcp, write_sandbox};
 pub use document::{Held, edit as edit_document, edit_against, revise as revise_document};
+pub use format::{FORMAT_KEY, Format, FormatFile, Forwarded, Rung, admit_format, bring_forward};
 pub use governed::{Governed, PREFERENCES_FILE, write_governed};
 pub use history::{History, has_history};
 pub use identity::{DisplayName, NAME_MAX_CHARS, Naming, NamingEdit, NamingWritten};
