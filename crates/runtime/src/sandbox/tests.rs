@@ -13,6 +13,7 @@ fn job() -> SandboxJob {
         stdin: b"hello".to_vec(),
         mounts: vec![],
         fuel: Fuel(1000),
+        memory: GuestMemory::Wasm32,
     }
 }
 

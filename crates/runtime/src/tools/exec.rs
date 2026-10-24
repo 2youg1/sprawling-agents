@@ -29,8 +29,9 @@ use kernel::{
 };
 use serde_json::{Map, Value};
 
-use crate::backlog::{Backlog, Exit};
-use crate::sandbox::{Fuel, Mount, Sandbox, SandboxExit, SandboxJob};
+use crate::backlog::{Backlog, Exit, Shares};
+use crate::reserve::Reservation;
+use crate::sandbox::{Fuel, GuestMemory, Mount, Sandbox, SandboxExit, SandboxJob, SandboxOutcome};
 
 mod confinement;
 pub(crate) mod container;
@@ -181,33 +182,29 @@ impl ExecTool {
             stdin: Vec::new(),
             mounts: self.setup.mounts.clone(),
             fuel: self.setup.fuel,
+            memory: GuestMemory::of_shares(self.backlog.shares()),
         };
+        let reservation = self.reservation();
         let result = held(&self.sandbox)?.run(&job)?;
-        let exit = match &result.exit {
-            SandboxExit::Success => Exit::Ended { code: 0 },
-            SandboxExit::Failure { code } => Exit::Ended {
-                code: i32::try_from(*code).unwrap_or(i32::MAX),
-            },
-            // Exhaustion and traps are guest facts the caller must see
-            // as themselves, not flattened into a generic non-zero exit.
-            SandboxExit::FuelExhausted => {
-                return exceptional(&result.stdout, &result.stderr, "fuel_exhausted", None);
-            }
-            SandboxExit::Trap { message } => {
-                return exceptional(
-                    &result.stdout,
-                    &result.stderr,
-                    "trap",
-                    Some(message.clone()),
-                );
-            }
-        };
-        settled(
-            &String::from_utf8_lossy(&result.stdout),
-            &String::from_utf8_lossy(&result.stderr),
-            exit,
-            "python",
+        let waited = reservation.as_ref().and_then(Reservation::waited);
+        drop(reservation);
+        // A guest refused at its run's ceiling says so under the same key
+        // a command does, whichever way it then ended (`Sandbox.lean` D102).
+        with_wait(
+            with_ceiling(python_answer(&result)?, result.ceiling)?,
+            waited,
         )
+    }
+
+    /// One heavy call's reservation from the machine budget: the run's
+    /// ceiling when the run asks for one, and none otherwise
+    /// (`crates/runtime/spec/Reserve.lean` D104). Blocks until the line
+    /// starts it, holding no other lock of this tool while it waits.
+    fn reservation(&self) -> Option<Reservation> {
+        match self.backlog.shares() {
+            Shares::CpuAndMemory { limit } => Some(self.backlog.budget().reserve(limit.get())),
+            Shares::Unset | Shares::Cpu => None,
+        }
     }
 
     fn run_shell(&self, text: &str, placement: Placement) -> Result<ToolOutcome, AxError> {
@@ -221,10 +218,39 @@ impl ExecTool {
     }
 }
 
+/// The python arm's result for how its guest ended.
+fn python_answer(result: &SandboxOutcome) -> Result<ToolOutcome, AxError> {
+    let exit = match &result.exit {
+        SandboxExit::Success => Exit::Ended { code: 0 },
+        SandboxExit::Failure { code } => Exit::Ended {
+            code: i32::try_from(*code).unwrap_or(i32::MAX),
+        },
+        // Exhaustion and traps are guest facts the caller must see as
+        // themselves, not flattened into a generic non-zero exit.
+        SandboxExit::FuelExhausted => {
+            return exceptional(&result.stdout, &result.stderr, "fuel_exhausted", None);
+        }
+        SandboxExit::Trap { message } => {
+            return exceptional(
+                &result.stdout,
+                &result.stderr,
+                "trap",
+                Some(message.clone()),
+            );
+        }
+    };
+    settled(
+        &String::from_utf8_lossy(&result.stdout),
+        &String::from_utf8_lossy(&result.stderr),
+        exit,
+        "python",
+    )
+}
+
 mod disclosure;
 mod outcome;
 
-use outcome::{exceptional, settled, with_backlog, with_interpreter};
+use outcome::{exceptional, settled, with_backlog, with_ceiling, with_interpreter, with_wait};
 
 fn no_host_python() -> AxError {
     AxError::failure(

@@ -25,9 +25,12 @@
 //! failing to run the job at all. The distinction is what lets a
 //! watchdog treat a runaway loop differently from a broken engine.
 
+use std::num::NonZeroU64;
 use std::path::PathBuf;
 
 use kernel::{AxCode, AxError};
+
+use crate::backlog::{Ceiling, Shares};
 
 /// Instruction budget. Exhaustion ends the guest; it does not fail the
 /// host.
@@ -44,6 +47,32 @@ pub struct Mount {
     pub writable: bool,
 }
 
+/// How far a guest's linear memory may grow
+/// (`crates/runtime/spec/Sandbox.lean` D102).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GuestMemory {
+    /// No ceiling of the run's: only wasm32's 4 GiB address space bounds
+    /// the guest, as the ruling behind `Tools/Exec.lean` D95 leaves a run
+    /// with no default ceiling.
+    Wasm32,
+    /// The run's own ceiling, the same bytes its processes may commit
+    /// together; a growth past it is refused and the guest decides how to
+    /// end.
+    Ceiling(NonZeroU64),
+}
+
+impl GuestMemory {
+    /// The ceiling a run's guest runs under: the memory half of the run's
+    /// shares, which is the one place that number is decided.
+    #[must_use]
+    pub fn of_shares(shares: Shares) -> GuestMemory {
+        match shares {
+            Shares::CpuAndMemory { limit } => GuestMemory::Ceiling(limit),
+            Shares::Unset | Shares::Cpu => GuestMemory::Wasm32,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SandboxJob {
     pub wasm: PathBuf,
@@ -52,6 +81,7 @@ pub struct SandboxJob {
     pub stdin: Vec<u8>,
     pub mounts: Vec<Mount>,
     pub fuel: Fuel,
+    pub memory: GuestMemory,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -59,6 +89,11 @@ pub struct SandboxOutcome {
     pub stdout: Vec<u8>,
     pub stderr: Vec<u8>,
     pub exit: SandboxExit,
+    /// `Some(Ceiling::Hit)` when a growth of the guest was refused at
+    /// [`GuestMemory::Ceiling`]; `None` when nothing was refused or no
+    /// ceiling was asked for. No other variant arises here: a guest runs
+    /// inside the process, so its ceiling is always applied and always read.
+    pub ceiling: Option<Ceiling>,
 }
 
 /// How the guest ended. Every variant is a fact about the guest — the
@@ -129,6 +164,7 @@ impl Sandbox for EchoSandbox {
             stdout,
             stderr: Vec::new(),
             exit: SandboxExit::Success,
+            ceiling: None,
         })
     }
 }
@@ -157,6 +193,7 @@ impl Sandbox for FaultSandbox {
             stdout: Vec::new(),
             stderr: Vec::new(),
             exit,
+            ceiling: None,
         })
     }
 }
