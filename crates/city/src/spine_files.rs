@@ -360,16 +360,18 @@ pub fn write_job(
 /// Reads the disk to answer, so the answer is as of this call. Only a
 /// building's file that is not there falls back to the city's: anything
 /// else at that path is the building's answer, and a reader that cannot
-/// open it refuses rather than sends the city's words in its place.
+/// open it refuses rather than sends the city's words in its place. The
+/// entry itself is looked at, not what it points to, so a link whose
+/// target is gone is a broken answer rather than no answer.
 ///
 /// # Errors
 /// `E_STORAGE_FATAL` naming the path when the disk cannot say whether
 /// the building's own file is there.
 pub fn city_prompt_path(city_root: &Path, building: &Address) -> Result<PathBuf, AxError> {
     let own = crate::policy::governed(city_root, building).join(CITY_FILE);
-    match own.try_exists() {
-        Ok(true) => Ok(own),
-        Ok(false) => Ok(city_root.join(CITY_FILE)),
+    match std::fs::symlink_metadata(&own) {
+        Ok(_) => Ok(own),
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(city_root.join(CITY_FILE)),
         Err(err) => Err(AxError::failure(
             AxCode::StorageFatal,
             "find the City.md that governs a building",

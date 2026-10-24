@@ -319,3 +319,17 @@ fn the_hall_reads_its_two_residents_out_of_the_citys_reserved_subtree() {
         "every other resident is described at its own address"
     );
 }
+
+/// A building's `City.md` that is a link to nothing is the building's
+/// answer, broken, so its runs refuse rather than read the city's.
+#[cfg(unix)]
+#[test]
+fn a_dangling_link_for_a_buildings_city_md_is_not_a_missing_one() {
+    let dir = tempfile::tempdir().unwrap();
+    let lab = addr("lab");
+    let own = crate::policy::governed(dir.path(), &lab).join(CITY_FILE);
+    std::fs::create_dir_all(own.parent().unwrap()).unwrap();
+    std::os::unix::fs::symlink(dir.path().join("gone.md"), &own).unwrap();
+
+    assert_eq!(city_prompt_path(dir.path(), &lab).unwrap(), own);
+}
