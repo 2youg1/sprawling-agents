@@ -111,7 +111,13 @@ impl Catalog {
     /// ranked by where `query`'s words were found, grouped by namespace.
     #[must_use]
     pub fn find(&self, query: &str) -> String {
-        let words: Vec<String> = query.split_whitespace().map(str::to_lowercase).collect();
+        // A name joins its words with `_`, so `_` stays inside a word and
+        // every other mark a model writes around one is dropped.
+        let words: Vec<String> = query
+            .split(|c: char| !(c.is_alphanumeric() || c == '_'))
+            .filter(|word| !word.is_empty())
+            .map(str::to_lowercase)
+            .collect();
         let mut ranked: Vec<(u32, Candidate<'_>)> = self
             .candidates()
             .into_iter()
