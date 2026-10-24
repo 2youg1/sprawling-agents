@@ -78,11 +78,17 @@ pub(super) fn text(result: &Payload) -> Option<String> {
     out.push('\n');
     for (at, line) in (offset..).zip(lines) {
         if at == offset || at % MARK_EVERY == 0 {
-            out.push_str(&format!("{at}{MARK_END}"));
+            push_mark(&mut out, at);
         }
         out.push_str(line);
     }
     Some(out)
+}
+
+/// Writes the mark that numbers the line about to be written, in the
+/// one grammar [`without_marks`] takes off again.
+pub(super) fn push_mark(out: &mut String, at: u64) {
+    out.push_str(&format!("{at}{MARK_END}"));
 }
 
 /// A key that is absent reads as `Some(None)`; one that is present and

@@ -23,6 +23,7 @@ use kernel::{AxCode, AxError, Payload, ToolName};
 
 mod read;
 mod refusal;
+mod search;
 
 pub use read::without_marks;
 
@@ -52,6 +53,7 @@ pub fn shown(
             .map_or_else(|_| json(error), |refused| Ok(refusal::line(&refused))),
         (Rendering::V2, ToolAnswer::Answered { result }) => match name.as_str() {
             crate::tools::ReadTool::NAME => read::text(result).map_or_else(|| json(result), Ok),
+            crate::tools::SearchTool::NAME => search::text(result).map_or_else(|| json(result), Ok),
             _ => json(result),
         },
     }
