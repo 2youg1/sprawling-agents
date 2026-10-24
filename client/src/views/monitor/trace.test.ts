@@ -63,8 +63,6 @@ const edit = turn(2, [
       cut: 0,
       head: JSON.stringify({
         path: "src/lib.rs",
-        base_version: "abc",
-        new_version: "def",
         diff: "--- a/src/lib.rs\n+++ b/src/lib.rs\n@@ -4,1 +4,2 @@\n-let a = 1;\n+let a = 2;\n+let b = 3;\n",
       }),
     },
@@ -168,7 +166,7 @@ describe("a run's turns read as a terminal record and a code column", () => {
 
   test("a no-newline marker is neither a line nor a step of either counter", () => {
     const diff = "@@ -1,1 +1,2 @@\n-end\n\\ No newline at end of file\n+end\n+tail\n\\ No newline at end of file\n";
-    const output = { cut: 0, head: JSON.stringify({ path: "a.txt", base_version: "abc", diff }) };
+    const output = { cut: 0, head: JSON.stringify({ path: "a.txt", diff }) };
     const marked = turn(3, [{ at: 31, tool: "edit", outcome: "answered", arguments: { cut: 0, head: "{}" }, output }]);
     expect(traceOf([marked]).files.flatMap((file) => file.hunks)).toEqual([
       {

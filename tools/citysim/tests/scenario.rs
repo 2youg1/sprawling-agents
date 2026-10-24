@@ -355,19 +355,38 @@ fn s3_14_one_resident_closes_the_loop_through_the_real_adapters() {
     std::fs::create_dir_all(city.path().join("sim/lobby/room1")).unwrap();
     let target = city.path().join("sim/lobby/room1/notes.md");
     std::fs::write(&target, "status: draft\n").unwrap();
-    let version = runtime::version_of(b"status: draft\n");
 
     let domain = WriteDomain::new(vec![Address::parse("sim/lobby/room1").unwrap()]).unwrap();
     let mut bench = ToolBench::new(domain.clone());
+    // The run's read stamps, shared by its read and its edit as the
+    // workbench lays them out.
+    let seen = runtime::ReadStamps::default();
     bench
         .register(Box::new(
             EditTool::new(
                 city.path(),
                 Address::parse("sim/lobby/room1").unwrap(),
                 domain,
-                runtime::PolicyCell::new(kernel::RunPolicy::of(kernel::Mode::Work)).reader(),
+                runtime::EditDesk {
+                    policy: runtime::PolicyCell::new(kernel::RunPolicy::of(kernel::Mode::Work))
+                        .reader(),
+                    seen: seen.clone(),
+                    locks: runtime::PathLocks::default(),
+                },
             )
             .unwrap(),
+        ))
+        .unwrap();
+    bench
+        .register(Box::new(
+            runtime::ReadTool::new(
+                city.path(),
+                std::sync::Arc::new(std::sync::Mutex::new(runtime::Catalog::new())),
+                std::sync::Arc::new(|_: &Address| kernel::ReadVerdict::Open),
+                std::path::Path::new("no-store"),
+            )
+            .unwrap()
+            .noting(seen),
         ))
         .unwrap();
     bench
@@ -396,6 +415,9 @@ fn s3_14_one_resident_closes_the_loop_through_the_real_adapters() {
             serde_json::json!({
                 "content": [
                     { "type": "tool_use", "id": "c1", "name": "status", "input": {} },
+                    { "type": "tool_use", "id": "c0", "name": "read", "input": {
+                        "path": "sim/lobby/room1/notes.md",
+                    }},
                 ],
                 "stop_reason": "tool_use",
                 "usage": { "input_tokens": 20, "output_tokens": 8 },
@@ -405,7 +427,6 @@ fn s3_14_one_resident_closes_the_loop_through_the_real_adapters() {
                     { "type": "text", "text": "marking it done" },
                     { "type": "tool_use", "id": "c2", "name": "edit", "input": {
                         "path": "sim/lobby/room1/notes.md",
-                        "base_version": version,
                         "old": "draft",
                         "new": "final",
                     }},

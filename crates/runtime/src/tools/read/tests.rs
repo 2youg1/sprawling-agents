@@ -9,8 +9,8 @@ use crate::catalog::CatalogEntry;
 mod doors;
 mod instruments;
 mod locators;
+mod looks;
 mod same_bytes;
-mod versions;
 
 fn tool(root: &Path) -> (ReadTool, Arc<Mutex<Catalog>>) {
     let catalog = Arc::new(Mutex::new(Catalog::new()));

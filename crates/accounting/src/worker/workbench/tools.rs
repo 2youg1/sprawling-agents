@@ -69,13 +69,21 @@ impl Laying {
         // write gates read it at each write, so a change the run takes
         // mid-way reaches them (`crates/runtime/spec/PolicyTake.lean` §8-62).
         let policy = runtime::PolicyCell::new(at.policy);
+        // What this run has seen: `read` writes it and `edit` is admitted
+        // by it. A new table per run, so a fork, a successor or a child
+        // starts having seen nothing (`crates/runtime/spec/Tools/Edit.lean` §8-64).
+        let stamps = runtime::ReadStamps::default();
         // The building's domain is the ceiling and the run's write
         // limit narrows it; both are asked at every write (`crates/city/Spec.lean` §8-32).
         let edit = EditTool::new(
             &site.write_root,
             addr.clone(),
             site.rules.write_domain()?,
-            policy.reader(),
+            runtime::EditDesk {
+                policy: policy.reader(),
+                seen: stamps.clone(),
+                locks: self.edits.clone(),
+            },
         )?;
         // Every tool shares one keeper, so no two of them keep two keys
         // under one name (`crates/sprawling/Spec.lean` §8-87).
@@ -133,7 +141,8 @@ impl Laying {
             Arc::clone(&catalog),
             Arc::clone(&bound),
             &kernel::layout::CityLayout::new(&self.city_root).cas(),
-        )?;
+        )?
+        .noting(stamps);
         // Reading needs an address, and until this line there was no way
         // to find one: a symbol had to be hunted through `exec`, which
         // means Python this machine may not have or a shell this

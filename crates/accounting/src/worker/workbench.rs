@@ -50,6 +50,8 @@ pub(in crate::worker) struct Laying {
     desktop_program: super::DesktopProgram,
     exec_host: super::hands::ExecHost,
     backlog: runtime::Backlog,
+    /// The city's table of files an edit is landing on (`Flight::edits`).
+    edits: runtime::PathLocks,
     /// The store the lanes share (`RunWorker::lane_store`).
     pub(in crate::worker) store: std::sync::Arc<std::sync::Mutex<storage::Cas>>,
     pub(in crate::worker) notes: super::recording::Notes,
@@ -109,6 +111,7 @@ impl super::RunWorker {
             desktop_program: self.desktop_program,
             exec_host: self.exec_host,
             backlog: self.flight.backlog.clone(),
+            edits: self.flight.edits.clone(),
             store: std::sync::Arc::clone(&self.lane_store),
             notes: self.log.clone(),
             monotonic: self.monotonic,

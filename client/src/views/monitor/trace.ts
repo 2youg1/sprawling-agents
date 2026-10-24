@@ -11,7 +11,7 @@
 // command's exit code is the call's own (`Call.exit_code`, which the city
 // reads off the whole result even where the line here was cut). The
 // runtime writes an exec result as `{stdout, stderr, exit_code}` and an
-// edit result as `{path, base_version, diff}` (crates/runtime/src/tools/
+// edit result as `{path, diff}` (crates/runtime/src/tools/
 // exec/outcome.rs and edit.rs), and the channel hands each over as
 // compact JSON on one line, so the line cut never falls inside one.
 // A result that does not read as that shape is still drawn, as its raw
@@ -105,7 +105,11 @@ export interface Trace {
 
 // `crates/runtime/src/tools/edit.rs` writes this as the base of a file
 // the call created.
-const CREATES = "new";
+// A creation's diff is written from `/dev/null` (`unified_diff` in
+// crates/runtime/src/tools/edit.rs). Results recorded while edits still
+// carried `base_version` mark a creation with the base "new" instead.
+const CREATED_FROM = "--- /dev/null\n";
+const CREATED_BASE = "new";
 
 const Arm = Schema.Struct({
   arm: Schema.Union([
@@ -136,7 +140,7 @@ const Ran = Schema.Struct({
   ),
 });
 
-const Edited = Schema.Struct({ path: Schema.String, base_version: Schema.String, diff: Schema.String });
+const Edited = Schema.Struct({ path: Schema.String, base_version: Schema.optional(Schema.String), diff: Schema.String });
 
 const read = <A>(schema: Schema.Decoder<A>, text: string | undefined): Option.Option<A> =>
   text === undefined ? Option.none() : Schema.decodeUnknownOption(Schema.fromJsonString(schema))(text);
@@ -153,7 +157,7 @@ export function traceOf(turns: readonly Turn[]): Trace {
       const before = files.get(path);
       files.set(path, {
         path,
-        how: before?.how ?? (base === CREATES ? "added" : "modified"),
+        how: before?.how ?? (base === CREATED_BASE || diff.startsWith(CREATED_FROM) ? "added" : "modified"),
         at: call.at,
         hunks: [...(before?.hunks ?? []), ...hunksOf(diff)],
       });

@@ -8,7 +8,7 @@
 
 规定 `tools::read`、`tools::read::engine`、`tools::read::miss`、`tools::read::package`、`tools::read::locator`（`crates/runtime/src/` 下同名的文件）。read 的区间读、包、没命中时的 nearby、打开 Locator，以及城外书架上的 skill。本文件是 `crates/runtime/Spec.lean` 的一个分部；下面每一节保留它在 runtime 规格里的标签 §8-n，别处引作 `crates/runtime/Spec.lean §8-n`。
 
-这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与 `runtime::tools::read::tests`、`runtime::tools::read::tests::locators`、`runtime::tools::read::tests::versions` 守住。
+这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与 `runtime::tools::read::tests`、`runtime::tools::read::tests::locators`、`runtime::tools::read::tests::looks` 守住。
 -/
 
 /-!
@@ -23,7 +23,7 @@
 
 **取 64 KiB 的推导与实测见 `crates/kernel/Spec.lean` §8-8 该常量的 doc**；一句话是：上下文提醒按 30%／65% 排成梯子，没有哪一步可以整级跨过，故单条结果 < 35% 窗口，而 64 KiB 在最坏字节-token 比率下是 128K 窗口的 20.5%。
 
-`ReadTool` 增 `offset`（0 基行号，缺省 0）与 `limit`（缺省与上限**均为 512 行**）。被截断时结果携 `total_lines` 与 `next_offset`，所以「我拿到的是不是全部」不需要猜。`bytes` 字段的语义不变，仍是本次返回文本的长度。读到盘上的一个文件时，结果另携 `version`：整份文件的 `edit::version_of`，与切出哪一段无关，因为 `edit` 守的和 `plan finish` 引的都是整份文件（kernel D27）；catalog 条目与 Locator 读出的字节不携它，前者不是可编辑的文件，后者本身已是一个版本。`version` 就是 `cas:b3-<hex64>`，模型原样把它交给 `edit` 与 `plan finish`。
+`ReadTool` 增 `offset`（0 基行号，缺省 0）与 `limit`（缺省与上限**均为 512 行**）。被截断时结果携 `total_lines` 与 `next_offset`，所以「我拿到的是不是全部」不需要猜。`bytes` 字段的语义不变，仍是本次返回文本的长度。结果不携版本，读也不对内容算哈希：读到盘上的一个文件时，读之前与读之后从同一个句柄各取一次戳（长度、修改时间、文件身份），两次相等且这次读算作「看过」（整份未截断，或调用显式给了 `offset`/`limit`）就记进本 run 的读戳表，`edit` 凭它准入（`crates/runtime/spec/Tools/Edit.lean` §8-64）。catalog 条目、包内文档与 Locator 读出的字节不记戳，因为 `edit` 改不到它们。
 
 理由：整读一份千行级的 SPEC 或数十 KB 的 ARCHITECTURE，要么吃掉整个窗口，要么被管线从中间剪掉，而剪掉的往往正是要改的那一段。512 是选定值。
 
@@ -150,7 +150,7 @@ pub fn admit_carried_skill(&mut self, entry: CatalogEntry) -> Result<(), AxError
 
 **理由**：同机测得 open+close 约 28 µs、canonicalize 约 78 µs（Windows 上过滤驱动让 open 很贵），判定路径一次成功读付 4 次 canonicalize、2 次 open 与 1 次元数据；agent 读的几乎都是热文件，这些固定开销比读本身贵。判句柄自己的位置还关掉了判定与打开之间的换链接窗口，而 `still_judged` 只能把它缩小到「来回换三次」。各候选在同一个 20 KiB 暖文件上逐轮交替 2000 轮（Windows x86_64 桌面机，16 核，旁边有构建在跑），p50 依次是：只 open 30–34 µs，一次 canonicalize 71–85 µs，open 加 `winx` 取位置 89–114 µs，open 加 `filepath` 123–146 µs，`cap-std` 在目录句柄下 open 83–101 µs，判定路径的整套解析与核验 406–479 µs。
 
-**被否**：①直通 I/O 与按文件缓存的行索引、热读缓存、后台回填（曾作为一个 PR 提出）：直通读在暖文件上慢 4–5 倍、在刚写过的文件上慢约 14 倍，三层缓存带来一串一致性缺陷，截断读还要多一个模型回合才拿得到 `version`；②`filepath 0.2`：同一个系统调用，交替测量里比 `winx` 慢约 30 µs，还要再引入一份 `windows 0.58`；③`desktop/ffi` 里的 Zig 函数：同一个系统调用，多一处 `unsafe`，阶梯上排在安全 crate 之后；④`cap-std`：把打开限制在一个目录句柄之内，但不回答文件实际在哪，链接落在城内另一栋楼时读界仍要按落点再判，替不了「句柄在哪」这一问；⑤`rustix::fs::getpath`：只在 Apple 平台上编译（`fcntl(F_GETPATH)`），Windows 与 Linux 用不上。
+**被否**：①直通 I/O 与按文件缓存的行索引、热读缓存、后台回填（曾作为一个 PR 提出）：直通读在暖文件上慢 4–5 倍、在刚写过的文件上慢约 14 倍，三层缓存带来一串一致性缺陷，截断读还要多一个模型回合；②`filepath 0.2`：同一个系统调用，交替测量里比 `winx` 慢约 30 µs，还要再引入一份 `windows 0.58`；③`desktop/ffi` 里的 Zig 函数：同一个系统调用，多一处 `unsafe`，阶梯上排在安全 crate 之后；④`cap-std`：把打开限制在一个目录句柄之内，但不回答文件实际在哪，链接落在城内另一栋楼时读界仍要按落点再判，替不了「句柄在哪」这一问；⑤`rustix::fs::getpath`：只在 Apple 平台上编译（`fcntl(F_GETPATH)`），Windows 与 Linux 用不上。
 
 **重开参数**：`winx` 不再随 wasmtime 进锁文件，或某个候选在同机交替测量里比它快出测量误差之外。
 -/

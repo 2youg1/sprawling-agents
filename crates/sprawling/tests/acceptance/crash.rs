@@ -322,7 +322,6 @@ fn a_run_that_wrote(city_root: &Path) -> std::path::PathBuf {
         tool: "edit",
         args: json!({
             "path": "lab/lead/notes.md",
-            "base_version": "new",
             "old": "",
             "new": "# Notes\n",
         }),

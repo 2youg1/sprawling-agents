@@ -26,7 +26,12 @@ fn bench(root: &std::path::Path) -> ToolBench {
                 root,
                 Address::parse("work").unwrap(),
                 domain,
-                crate::PolicyCell::new(kernel::RunPolicy::of(kernel::Mode::Work)).reader(),
+                crate::tools::EditDesk {
+                    policy: crate::PolicyCell::new(kernel::RunPolicy::of(kernel::Mode::Work))
+                        .reader(),
+                    seen: Default::default(),
+                    locks: Default::default(),
+                },
             )
             .unwrap(),
         ))
@@ -34,14 +39,9 @@ fn bench(root: &std::path::Path) -> ToolBench {
     bench
 }
 
-fn edit_call(path: &str, base: &str, old: &str, new: &str) -> ToolCall {
+fn edit_call(path: &str, old: &str, new: &str) -> ToolCall {
     let mut args = Map::new();
-    for (k, v) in [
-        ("path", path),
-        ("base_version", base),
-        ("old", old),
-        ("new", new),
-    ] {
+    for (k, v) in [("path", path), ("old", old), ("new", new)] {
         args.insert(k.to_owned(), Value::String(v.to_owned()));
     }
     ToolCall {
@@ -55,10 +55,8 @@ fn edit_call(path: &str, base: &str, old: &str, new: &str) -> ToolCall {
 fn dedup_runs_before_the_side_effect() {
     let tmp = tempfile::tempdir().unwrap();
     std::fs::create_dir_all(tmp.path().join("work")).unwrap();
-    std::fs::write(tmp.path().join("work/a.txt"), "one\n").unwrap();
     let mut bench = bench(tmp.path());
-    let version = crate::tools::version_of(b"one\n");
-    let call = edit_call("work/a.txt", &version, "one", "two");
+    let call = edit_call("work/a.txt", "", "two\n");
 
     let first = bench.invoke(&call, &key(1), now()).unwrap();
     assert!(matches!(first, BenchOutcome::Ran { .. }));
@@ -67,8 +65,8 @@ fn dedup_runs_before_the_side_effect() {
         "two\n"
     );
     // The same key again: the tool must not run a second time, and the
-    // file must not change (the second edit would fail on the stale
-    // version anyway — dedup means it is never attempted).
+    // file must not change (a second create would be refused as a file
+    // that already stands - dedup means it is never attempted).
     let second = bench.invoke(&call, &key(1), now()).unwrap();
     // What a replay is owed is the answer the first call gave: telling
     // the model "you already asked" teaches it the call failed when it
@@ -98,13 +96,18 @@ fn a_write_outside_the_domain_flows_back_as_a_refusal_not_a_dead_turn() {
                 tmp.path(),
                 Address::parse("elsewhere").unwrap(),
                 elsewhere,
-                crate::PolicyCell::new(kernel::RunPolicy::of(kernel::Mode::Work)).reader(),
+                crate::tools::EditDesk {
+                    policy: crate::PolicyCell::new(kernel::RunPolicy::of(kernel::Mode::Work))
+                        .reader(),
+                    seen: Default::default(),
+                    locks: Default::default(),
+                },
             )
             .unwrap(),
         ))
         .unwrap();
     let outcome = bench
-        .invoke(&edit_call("elsewhere/x", "v", "a", "b"), &key(2), now())
+        .invoke(&edit_call("elsewhere/x", "a", "b"), &key(2), now())
         .unwrap();
     match outcome {
         BenchOutcome::Refused { refusal } => {
@@ -206,7 +209,7 @@ fn a_suspected_discard_without_a_net_is_refused_and_with_one_is_checkpointed() {
 fn an_unregistered_name_is_refused_rather_than_routed_anywhere() {
     let tmp = tempfile::tempdir().unwrap();
     let mut bench = bench(tmp.path());
-    let mut call = edit_call("work/a", "v", "a", "b");
+    let mut call = edit_call("work/a", "a", "b");
     call.name = kernel::ToolName::parse("status").unwrap();
     let err = match bench.invoke(&call, &key(5), now()) {
         Err(err) => err,
@@ -224,7 +227,11 @@ fn a_second_tool_claiming_a_taken_name_is_refused() {
             tmp.path(),
             Address::parse("work").unwrap(),
             WriteDomain::new(vec![Address::parse("work").unwrap()]).unwrap(),
-            crate::PolicyCell::new(kernel::RunPolicy::of(kernel::Mode::Work)).reader(),
+            crate::tools::EditDesk {
+                policy: crate::PolicyCell::new(kernel::RunPolicy::of(kernel::Mode::Work)).reader(),
+                seen: Default::default(),
+                locks: Default::default(),
+            },
         )
         .unwrap(),
     )) {
@@ -263,23 +270,18 @@ fn a_documents_bench_lets_its_own_room_through_the_door() {
                 tmp.path(),
                 Address::parse("hall/mayor").unwrap(),
                 domain,
-                crate::PolicyCell::new(kernel::RunPolicy::of(kernel::Mode::Work)).reader(),
+                crate::tools::EditDesk {
+                    policy: crate::PolicyCell::new(kernel::RunPolicy::of(kernel::Mode::Work))
+                        .reader(),
+                    seen: Default::default(),
+                    locks: Default::default(),
+                },
             )
             .unwrap(),
         ))
         .unwrap();
     let outcome = bench
-        .invoke(
-            &edit_call(
-                "hall/note.md",
-                "new",
-                "",
-                "# note
-",
-            ),
-            &key(9),
-            now(),
-        )
+        .invoke(&edit_call("hall/note.md", "", "# note\n"), &key(9), now())
         .unwrap();
     match outcome {
         BenchOutcome::Ran { .. } => {}

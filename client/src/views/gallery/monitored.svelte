@@ -40,8 +40,6 @@
           arguments: said({ path: "src/ledger.rs" }),
           output: said({
             path: "src/ledger.rs",
-            base_version: "b1",
-            new_version: "b2",
             diff: "--- a/src/ledger.rs\n+++ b/src/ledger.rs\n@@ -41,2 +41,3 @@\n-    let seq = self.next;\n-    self.next += 1;\n+    // The sequence is checked so a full ledger refuses rather than wraps.\n+    let seq = self.next;\n+    self.next = seq.checked_add(1).ok_or(Full)?;\n",
           }),
         },

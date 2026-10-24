@@ -23,9 +23,14 @@ use kernel::{Address, AxError, ReadVerdict};
 
 use super::miss::{self, Floor};
 use crate::tools::chosen_path::{self, CityRoot};
+use crate::tools::stamp::Stamp;
+
+/// A file's text, and its stamp before and after the bytes were read.
+pub(super) type Looked = (String, Stamp, Stamp);
 
 /// The whole text at the admitted address `addr`, which the model wrote
-/// as `asked`.
+/// as `asked`, with the file's stamp taken on the handle on each side of
+/// the read (`crates/runtime/spec/Tools/Edit.lean` §8-64).
 ///
 /// # Errors
 /// `E_GATE_DENIED` when the file the handle reached lies outside the
@@ -36,9 +41,9 @@ pub(super) fn text_of(
     addr: &Address,
     asked: &str,
     bound: &dyn Fn(&Address) -> ReadVerdict,
-) -> Result<String, AxError> {
+) -> Result<Looked, AxError> {
     match handle_read(city, addr, bound)? {
-        Some(text) => Ok(text),
+        Some(looked) => Ok(looked),
         None => judged_read(city, addr, asked, bound),
     }
 }
@@ -49,7 +54,7 @@ pub(super) fn judged_read(
     addr: &Address,
     asked: &str,
     bound: &dyn Fn(&Address) -> ReadVerdict,
-) -> Result<String, AxError> {
+) -> Result<Looked, AxError> {
     let at = chosen_path::land(city, addr, "read", bound)?;
     miss::text_at(asked, at, &Floor::of_address(city.written(), addr))
 }
@@ -65,7 +70,7 @@ fn handle_read(
     city: &CityRoot,
     addr: &Address,
     bound: &dyn Fn(&Address) -> ReadVerdict,
-) -> Result<Option<String>, AxError> {
+) -> Result<Option<Looked>, AxError> {
     let Ok(file) = std::fs::File::open(city.join(addr)) else {
         return Ok(None);
     };
@@ -87,7 +92,7 @@ fn handle_read(
     city: &CityRoot,
     addr: &Address,
     bound: &dyn Fn(&Address) -> ReadVerdict,
-) -> Result<Option<String>, AxError> {
+) -> Result<Option<Looked>, AxError> {
     use std::os::fd::AsRawFd as _;
 
     let Ok(real) = std::fs::canonicalize(city.join(addr)) else {
@@ -112,15 +117,16 @@ fn handle_read(
     _city: &CityRoot,
     _addr: &Address,
     _bound: &dyn Fn(&Address) -> ReadVerdict,
-) -> Result<Option<String>, AxError> {
+) -> Result<Option<Looked>, AxError> {
     Ok(None)
 }
 
 /// The whole file as text in one read, sized by the length the handle
-/// reports; `None` for a directory, a failed read, or bytes that are
-/// not UTF-8, which the judged path answers.
+/// reports, with its stamp on each side of the read; `None` for a
+/// directory, a failed read or query, or bytes that are not UTF-8, which
+/// the judged path answers.
 #[cfg(any(windows, target_os = "linux"))]
-fn whole_text(mut file: std::fs::File) -> Option<String> {
+fn whole_text(mut file: std::fs::File) -> Option<Looked> {
     use std::io::Read as _;
 
     let meta = file.metadata().ok()?;
@@ -130,7 +136,9 @@ fn whole_text(mut file: std::fs::File) -> Option<String> {
     // One past the reported length, so a file that grew since the query
     // still ends in a single read rather than a reallocation.
     let capacity = usize::try_from(meta.len()).ok()?.checked_add(1)?;
+    let before = Stamp::of_file(&file).ok()?;
     let mut bytes = Vec::with_capacity(capacity);
     file.read_to_end(&mut bytes).ok()?;
-    String::from_utf8(bytes).ok()
+    let after = Stamp::of_file(&file).ok()?;
+    Some((String::from_utf8(bytes).ok()?, before, after))
 }
