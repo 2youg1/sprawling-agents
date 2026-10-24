@@ -15,7 +15,7 @@
 //! files are rewritten here, and only where they name a path under the
 //! folder the city moved from.
 
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf, Prefix};
 
 use super::Worktrees;
 use crate::StorageError;
@@ -41,21 +41,22 @@ impl Worktrees {
                 return Err(io_err("list the city's worktrees", city_root)(err));
             }
         };
+        let from = spellings(moved_from);
         let mut relinked: usize = 0;
         for entry in registrations {
             let registration = entry
                 .map_err(io_err("list the city's worktrees", city_root))?
                 .path();
             let gitdir = registration.join("gitdir");
-            let Some(tree_git) = rewrite(&gitdir, "", moved_from, city_root)? else {
+            let Some(tree_git) = rewrite(&gitdir, "", &from, city_root)? else {
                 continue;
             };
-            rewrite(&tree_git, GITDIR_PREFIX, moved_from, city_root)?;
+            rewrite(&tree_git, GITDIR_PREFIX, &from, city_root)?;
             // Absent or relative as plain git writes it; absolute as
             // libgit2 writes it, and then it names the old folder too.
             let commondir = registration.join("commondir");
             if commondir.exists() {
-                rewrite(&commondir, "", moved_from, city_root)?;
+                rewrite(&commondir, "", &from, city_root)?;
             }
             relinked = relinked.saturating_add(1);
         }
@@ -63,13 +64,65 @@ impl Worktrees {
     }
 }
 
+/// Every spelling git may have recorded the folder `from` under: as
+/// given and as the disk resolves it, each with both slash spellings,
+/// because git spells a Windows path with forward slashes and records
+/// the resolved path. A city reached through a link (macOS puts
+/// temporary folders under `/var`, a link to `/private/var`) or through
+/// a Windows short name (`RUNNER~1`) is named by a path the caller never
+/// spelled. The folder itself is gone after the move, so its parent is
+/// what is resolved; a parent that cannot be resolved leaves only the
+/// spelling as given, and a link under it is then left alone.
+fn spellings(from: &Path) -> Vec<String> {
+    let resolved = match (from.parent(), from.file_name()) {
+        (Some(parent), Some(name)) => match std::fs::canonicalize(parent) {
+            Ok(parent) => Some(without_verbatim_disk(&parent).join(name)),
+            Err(_) => None,
+        },
+        (None, _) | (_, None) => None,
+    };
+    std::iter::once(from.to_path_buf())
+        .chain(resolved)
+        .flat_map(|path| {
+            let given = path.to_string_lossy().into_owned();
+            let forward = given.replace('\\', "/");
+            [given, forward]
+        })
+        .map(|spelling| spelling.trim_end_matches(['/', '\\']).to_owned())
+        .collect()
+}
+
+/// `\?\C:\city` respelled `C:\city`: Windows resolves a path into the
+/// verbatim form, and git records the plain one.
+fn without_verbatim_disk(path: &Path) -> PathBuf {
+    let mut components = path.components();
+    match components.next() {
+        Some(Component::Prefix(prefix)) => match prefix.kind() {
+            Prefix::VerbatimDisk(letter) => {
+                let mut plain = PathBuf::from(format!("{}:", char::from(letter)));
+                plain.extend(components);
+                plain
+            }
+            Prefix::Verbatim(_)
+            | Prefix::VerbatimUNC(..)
+            | Prefix::DeviceNS(_)
+            | Prefix::UNC(..)
+            | Prefix::Disk(_) => path.to_path_buf(),
+        },
+        Some(
+            Component::RootDir | Component::CurDir | Component::ParentDir | Component::Normal(_),
+        )
+        | None => path.to_path_buf(),
+    }
+}
+
 /// Rewrites the one path `file` holds after `prefix` when it lies under
-/// `from`, and answers the path it holds now; `None` when it named a
-/// path outside `from` and was left alone.
+/// one of the spellings in `from`, and answers the path it holds now;
+/// `None` when it named a path outside `from` and was left alone.
 fn rewrite(
     file: &Path,
     prefix: &str,
-    from: &Path,
+    from: &[String],
     to: &Path,
 ) -> Result<Option<PathBuf>, StorageError> {
     let text = std::fs::read_to_string(file).map_err(io_err("read a worktree link", file))?;
@@ -89,14 +142,11 @@ fn rewrite(
     Ok(Some(moved))
 }
 
-/// What follows `from` in `named`, compared with both slash spellings,
-/// because git spells a Windows path with forward slashes.
-fn under<'a>(named: &'a str, from: &Path) -> Option<&'a str> {
-    let from = from.to_string_lossy();
-    [from.to_string(), from.replace('\\', "/")]
-        .iter()
-        .find_map(|spelling| named.strip_prefix(spelling.trim_end_matches(['/', '\\'])))
-        .and_then(|rest| rest.strip_prefix(['/', '\\']))
+/// What follows one of the spellings in `from` in `named`.
+fn under<'a>(named: &'a str, from: &[String]) -> Option<&'a str> {
+    from.iter()
+        .filter_map(|spelling| named.strip_prefix(spelling.as_str()))
+        .find_map(|rest| rest.strip_prefix(['/', '\\']))
 }
 
 #[cfg(test)]
