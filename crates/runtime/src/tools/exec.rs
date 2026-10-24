@@ -30,7 +30,7 @@ use kernel::{
 use serde_json::{Map, Value};
 
 use crate::backlog::{Backlog, Exit};
-use crate::sandbox::{Fuel, GuestMemory, Mount, Sandbox, SandboxExit, SandboxJob};
+use crate::sandbox::{Fuel, GuestMemory, Mount, Sandbox, SandboxExit, SandboxJob, SandboxOutcome};
 
 mod confinement;
 pub(crate) mod container;
@@ -184,31 +184,9 @@ impl ExecTool {
             memory: GuestMemory::of_shares(self.backlog.shares()),
         };
         let result = held(&self.sandbox)?.run(&job)?;
-        let exit = match &result.exit {
-            SandboxExit::Success => Exit::Ended { code: 0 },
-            SandboxExit::Failure { code } => Exit::Ended {
-                code: i32::try_from(*code).unwrap_or(i32::MAX),
-            },
-            // Exhaustion and traps are guest facts the caller must see
-            // as themselves, not flattened into a generic non-zero exit.
-            SandboxExit::FuelExhausted => {
-                return exceptional(&result.stdout, &result.stderr, "fuel_exhausted", None);
-            }
-            SandboxExit::Trap { message } => {
-                return exceptional(
-                    &result.stdout,
-                    &result.stderr,
-                    "trap",
-                    Some(message.clone()),
-                );
-            }
-        };
-        settled(
-            &String::from_utf8_lossy(&result.stdout),
-            &String::from_utf8_lossy(&result.stderr),
-            exit,
-            "python",
-        )
+        // A guest refused at its run's ceiling says so under the same key
+        // a command does, whichever way it then ended (`Sandbox.lean` D102).
+        with_ceiling(python_answer(&result)?, result.ceiling)
     }
 
     fn run_shell(&self, text: &str, placement: Placement) -> Result<ToolOutcome, AxError> {
@@ -222,10 +200,39 @@ impl ExecTool {
     }
 }
 
+/// The python arm's result for how its guest ended.
+fn python_answer(result: &SandboxOutcome) -> Result<ToolOutcome, AxError> {
+    let exit = match &result.exit {
+        SandboxExit::Success => Exit::Ended { code: 0 },
+        SandboxExit::Failure { code } => Exit::Ended {
+            code: i32::try_from(*code).unwrap_or(i32::MAX),
+        },
+        // Exhaustion and traps are guest facts the caller must see as
+        // themselves, not flattened into a generic non-zero exit.
+        SandboxExit::FuelExhausted => {
+            return exceptional(&result.stdout, &result.stderr, "fuel_exhausted", None);
+        }
+        SandboxExit::Trap { message } => {
+            return exceptional(
+                &result.stdout,
+                &result.stderr,
+                "trap",
+                Some(message.clone()),
+            );
+        }
+    };
+    settled(
+        &String::from_utf8_lossy(&result.stdout),
+        &String::from_utf8_lossy(&result.stderr),
+        exit,
+        "python",
+    )
+}
+
 mod disclosure;
 mod outcome;
 
-use outcome::{exceptional, settled, with_backlog, with_interpreter};
+use outcome::{exceptional, settled, with_backlog, with_ceiling, with_interpreter};
 
 fn no_host_python() -> AxError {
     AxError::failure(
