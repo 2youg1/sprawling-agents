@@ -10,8 +10,8 @@
 // **The platform owns the modality**, as it does for `parts/dialog`,
 // the key sheet and the settings panel: `showModal()` puts the box in
 // the top layer, traps the focus, marks the page behind `inert`, and
-// `close()` at teardown gives the focus back to whatever held it before
-// the box opened (client/Spec.lean §4-64b). Escape arrives as a cancel
+// the focus goes back to whatever held it before the box opened
+// (client/Spec.lean §4-64b). Escape arrives as a cancel
 // request, which is handed to the caller, because the caller's state
 // says whether the box stands and the element closing itself would
 // leave that state saying it is open.
@@ -71,15 +71,25 @@ export function modalHold(seat: Seat, first: First = "control"): Attachment<HTML
   return (node) => {
     if (seat === "specimen") return;
     // A dialog that carries `autofocus` takes the focus itself when it
-    // opens, instead of handing it to its first control (HTML's dialog
-    // focusing steps); `tabindex` keeps it focusable in every engine.
+    // opens (HTML's dialog focusing steps), but Chromium still hands it
+    // to the first control, so the sheet also takes it back in the same
+    // task, before a soft keyboard is asked for; `tabindex` keeps the
+    // sheet focusable in every engine.
     if (first === "sheet") {
       node.autofocus = true;
       node.tabIndex = -1;
     }
+    const before = document.activeElement;
     node.showModal();
+    if (first === "sheet") node.focus();
     return () => {
       node.close();
+      // Svelte removes the element before it runs this teardown, and a
+      // dialog closed after it left the document gives the focus to the
+      // body rather than back; the focus is returned here instead, unless
+      // what closed the box already put it somewhere.
+      const lost = document.activeElement === null || document.activeElement === document.body;
+      if (lost && before instanceof HTMLElement && before.isConnected) before.focus();
     };
   };
 }
