@@ -66,7 +66,7 @@ pub(crate) const CITY_TEMPLATE: &str = include_str!("../templates/City.md");   /
 
 - **一个目录装城写下的全部第一批字节**：`crates/city/templates/` 下是 `RULES.toml`、`RULES-hall.toml`、`Roadmap.md`、`Memo.md`、`Handoff.md`、`SPEC.md`、`JOB.md`、`MAYOR.md`、`CLERK.md`、`URBANITE.md`、`City.md`，以及说明每份文件谁写、谁读的 `README.md`。人读的那份与城写出的那份仍是同一串字节（§8-3、§8-5），只是这串字节现在住在把它编进去的包里。
 - **为什么在包里**：crates.io 上的 `.crate` 只装包目录里的文件，验证构建与 `cargo install` 都在解开的包里编译；`include_str!` 指向包外的 `docs/` 时，那里没有这些文件，city 编不出来（`crates/sprawling/Spec.lean` §8-157）。`packaged` 门判这一条（tools/xtask/Spec.lean §8-49）。
-- **`City.md` 由 city 交出，accounting 只读城里那份**：城里的 `City.md`、`MAYOR.md`、`CLERK.md` 由 `defaults::follow_defaults` 铺下与前移（§8-42），这份文件的名字（`CITY_FILE`）与它同目录的模板都归本模块。accounting 不持有默认文本，只读 `city_prompt_path` 答的那份；那份不在时冻结以 `E_STORAGE_FATAL` 拒绝，恢复语请人重开城，开城时 `follow_defaults` 再铺下。所以 `CITY_TEMPLATE` 是 `pub(crate)`，唯一的读者是 `defaults::Shipped::City`：冻结时临时换上内置文本，模型读到的就不是人能打开的那份文件（D28）。
+- **`City.md` 由 city 交出，accounting 只读城里那份**：城里的 `City.md`、`MAYOR.md`、`CLERK.md` 由 `defaults::follow_defaults` 铺下与前移（§8-42），这份文件的名字（`CITY_FILE`）与它同目录的模板都归本模块。accounting 不持有默认文本，只读 `city_prompt_path` 答的那份；那份不在时冻结以 `E_STORAGE_FATAL` 拒绝，恢复语请人重开城，开城时 `follow_defaults` 再铺下。所以 `CITY_TEMPLATE` 是 `pub(crate)`，唯一的读者是 `defaults::Shipped::City`：冻结时若临时换上内置文本，模型读到的就不是人能打开的那份文件（D28）。
 - **失败**：没有运行期失败。模板改名或挪走，`include_str!` 在编译期就红。
 
 **验收**：`cargo xtask gates packaged` 对 city 与 accounting 为绿；§8-3、§8-5、§8-15、§8-20 现有的模板测试照旧通过（它们读的是同一串字节）。
@@ -90,7 +90,7 @@ pub fn follow_defaults(city_root: &Path) -> Result<Vec<Edited>, AxError>;
 
 - **判定只有一处**：`standing` 按字节判。等于本构建的默认是 `Current`；BLAKE3 落在这份文档的历史摘要表里是 `Earlier`；文件不在是 `Absent`；其余是 `Edited`。摘要表收这几份模板在仓库历史里出现过的每一版（`crates/city/templates/`，以及更早住在仓库 docs 目录下的 City.md 与模板），开发构建立过的城也认得出来。
 - **`follow_defaults` 是这三份文档唯一的写者**：`Absent` 与 `Earlier` 写成本构建的默认（经 `document::edit_against`，以判定时读到的字节为底，整份落盘；读与写之间人的编辑器存过这份文件时以 `E_VERSION_CONFLICT` 不写，这份副本照 `Edited` 留下并列进返回值，因为那次保存是人的），`Current` 不动，`Edited` 不动并列进返回值。立城与开城都调它：开城在 `RunWorker::holding`（`crates/accounting/src/worker/lifetime.rs`）里、拿着城的写锁、紧挨 `keep_records_out_of_git`；立城经同一个 `holding`，所以创世不再自己写这三份。
-- **改默认文本的那个改动，把改之前那版的 BLAKE3 加进摘要表**：否则未改的旧副本被判成 `Edited`，旧城会一直读旧文字。测试 `every_default_names_its_earlier_versions` 断言本构建的默认不在自己的摘要表里（在就说明改动忘了换默认）。
+- **改默认文本的那个改动，把改之前那版的 BLAKE3 加进摘要表**：否则未改的旧副本被判成 `Edited`，旧城会一直读旧文字。测试 `no_default_lists_itself_as_earlier` 断言本构建的默认不在自己的摘要表里（在就说明改动忘了换默认）。
 - **失败**：`E_STORAGE_FATAL` 带路径，读不了或写不了任何一份时；改过的副本不是失败。
 
 **验收**：`cargo nextest run -p sprawling-city -E 'test(defaults)'`。
