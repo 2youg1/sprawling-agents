@@ -17,7 +17,7 @@
 
   import { QUERIES } from "../../core/asking";
   import { MAYOR } from "../../core/route";
-  import type { Answer, EventKind, EventRecord, IdentityAnswer, Opening, Query, Turn } from "../../wire";
+  import type { Answer, EventKind, EventRecord, IdentityAnswer, Opening, Query, SessionLine, Turn } from "../../wire";
   import { B3Hash, RunId, Seq, TimeMs, Tokens, UsdMicros } from "../../wire";
 
   const MODEL = "anthropic/claude-sonnet-5";
@@ -89,6 +89,11 @@
     ];
     return (query) => {
       if (query === QUERIES.identity) return { identity: RENAMED };
+      if (named && typeof query === "object" && "sessions" in query) {
+        // The one session the records above open, which the address line numbers.
+        const line: SessionLine = { at: TimeMs.make(now - 60_000), began: Seq.make(1), last: Seq.make(3), runs: 1, name: null, preview: null, start: { opened: { carry: "nothing" } } };
+        return { sessions: { room: query.sessions.room, sessions: [line], earlier: 0 } };
+      }
       if (!named || typeof query !== "object" || !("rounds" in query)) return undefined;
       return { rounds: { run: query.rounds.run, turns, opening } };
     };
@@ -104,18 +109,18 @@
   const now = ui().now();
 </script>
 
-<Case label="frozen facts · the Mayor's session under the name it froze, its first head with model · effort · mode, each reply with TTFT and t/s" width={760}>
+<Case label="frozen facts · the Mayor's session under the name it froze, the address line at its head, its first head with model · effort · mode, each reply with TTFT and t/s" width={760}>
   <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} answers={answering(now, true)} records={recordsAt(now)}>
     <div class="h-[520px] px-wide">
-      <Talk address={MAYOR} band={false} head="none" />
+      <Talk address={MAYOR} band={false} head="address" />
     </div>
   </Stand>
 </Case>
 
-<Case label="frozen facts · an empty Mayor's room titled with the name a new session would freeze" width={760}>
+<Case label="frozen facts · an empty Mayor's room titled with the name a new session would freeze, and no address line until it begins" width={760}>
   <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} answers={answering(now, false)}>
     <div class="h-[420px] px-wide">
-      <Talk address={MAYOR} band={false} head="none" />
+      <Talk address={MAYOR} band={false} head="address" />
     </div>
   </Stand>
 </Case>
