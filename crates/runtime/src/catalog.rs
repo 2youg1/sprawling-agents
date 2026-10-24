@@ -253,7 +253,7 @@ impl Catalog {
     fn dormant_entries(&self) -> Vec<dormant::Entry> {
         self.dormant_namespaces()
             .into_iter()
-            .map(|(namespace, members)| dormant::Entry {
+            .map(|((_, namespace), members)| dormant::Entry {
                 label: format!("{} ({})", namespace.as_str(), members.len()),
                 about: namespace.about(members.iter().copied()),
             })
@@ -264,13 +264,14 @@ impl Catalog {
             .collect()
     }
 
-    /// The tools outside the core, by namespace, each namespace's members
-    /// in name order.
-    fn dormant_namespaces(&self) -> BTreeMap<&Namespace, Vec<&str>> {
-        let mut by_namespace: BTreeMap<&Namespace, Vec<&str>> = BTreeMap::new();
+    /// The tools outside the core, by namespace in the byte order of its
+    /// name, each namespace's members in name order. The name leads the
+    /// key because `Namespace` orders the city's own before any server's.
+    fn dormant_namespaces(&self) -> BTreeMap<(&str, &Namespace), Vec<&str>> {
+        let mut by_namespace: BTreeMap<(&str, &Namespace), Vec<&str>> = BTreeMap::new();
         for (name, filed) in self.tools.iter().filter(|(name, _)| !self.is_core(name)) {
             by_namespace
-                .entry(&filed.namespace)
+                .entry((filed.namespace.as_str(), &filed.namespace))
                 .or_default()
                 .push(name.as_str());
         }
