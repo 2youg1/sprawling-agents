@@ -48,7 +48,8 @@ pub(in crate::tools::exec) fn with_wait(
     entry.insert(
         "detail".to_owned(),
         Value::String(
-            "this call waited until heavy work ahead of it gave back enough of the              machine's memory budget"
+            "this call waited until heavy work ahead of it gave back enough of the \
+             machine's memory budget"
                 .to_owned(),
         ),
     );

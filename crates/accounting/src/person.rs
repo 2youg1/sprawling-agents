@@ -203,7 +203,8 @@ fn stated_machine_memory(file: &Path) -> Result<MachineMemory, AxError> {
             ),
         )
         .with_recovery(format!(
-            "write {MEMORY} = \"{AUTO}\" to let the city size it, a whole number of bytes,              or delete the line"
+            "write {MEMORY} = \"{AUTO}\" to let the city size it, a whole number of bytes, \
+             or delete the line"
         ))
     };
     match document(file)?.get(MEMORY) {
@@ -408,34 +409,18 @@ mod tests {
         assert_eq!(
             [
                 read(""),
-                read(
-                    "memory = \"auto\"
-"
-                ),
-                read(
-                    "memory = 1024
-"
-                )
+                read("memory = \"auto\"\n"),
+                read("memory = 1024\n"),
+                read("memory = -1\n"),
+                read("memory = \"lots\"\n"),
             ],
             [
                 Ok(MachineMemory::Auto),
                 Ok(MachineMemory::Auto),
-                Ok(MachineMemory::Bytes(1024))
+                Ok(MachineMemory::Bytes(1024)),
+                Err(AxCode::ConfigInvalid),
+                Err(AxCode::ConfigInvalid),
             ]
-        );
-        assert_eq!(
-            read(
-                "memory = -1
-"
-            ),
-            Err(AxCode::ConfigInvalid)
-        );
-        assert_eq!(
-            read(
-                "memory = \"lots\"
-"
-            ),
-            Err(AxCode::ConfigInvalid)
         );
     }
 
