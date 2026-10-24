@@ -6,7 +6,24 @@
 /-!
 # runtime 的机器级预约：一份机器预算，按字节预约，超出就按号排队
 
-规定机器级预约的判定（`crates/sprawling/spec/Serving/Memory.lean` §8-173「整台机器」与待做第 6 项）：重活开始前从一份机器预算里预约自己的上界，上界之和超过预算就排队，归还之后按号放行。本文件是 `crates/runtime/Spec.lean` 的一个分部。实现它的 Rust 模块还没有写；本模型先于它，是它必须守住哪些性质的权威，那个模块写成时它的 doc comment 链回本文件，下面「从模型导出的 Rust 检查」是它的派生检查。
+规定机器级预约的判定（`crates/sprawling/spec/Serving/Memory.lean` §8-173「整台机器」与待做第 6 项）：重活开始前从一份机器预算里预约自己的上界，上界之和超过预算就排队，归还之后按号放行。本文件是 `crates/runtime/Spec.lean` 的一个分部，规定 `runtime::reserve`（`crates/runtime/src/reserve.rs`）；那个模块的 doc comment 链回本文件。Rust 代码是「怎样守住」的权威，本模型是「必须守住哪些性质」的权威。
+
+## 接口
+
+```rust
+#[derive(Clone)]
+pub struct MachineBudget;                                  // 克隆共用一本账
+impl MachineBudget {
+    pub fn new(budget_bytes: u64) -> MachineBudget;
+    pub fn unmetered() -> MachineBudget;                   // 预算为 u64::MAX：谁都放得下，没有设预算的地方用它
+    pub fn reserve(&self, bytes: u64) -> Reservation;      // 阻塞到被放行；不会失败
+}
+pub struct Reservation;                                    // 丢弃即归还，并唤醒排着的人
+impl Reservation { pub fn waited(&self) -> Option<Waited>; }   // 拿号时放不下才有
+pub struct Waited { pub ahead: usize, pub held_bytes: u64, pub budget_bytes: u64 }  // 拿号那一刻：前面还有几个、持有多少、预算多少
+```
+
+持有的字节用饱和加法求和：和溢出时读作「放不下」，与模型里的自然数一致。账本的锁中毒时取回里面的值继续用，因为账本的每一步都在锁内一次做完，中毒不会留下做了一半的状态。
 
 ## 模型
 
@@ -25,7 +42,7 @@
 
 ## 从模型导出的 Rust 检查
 
-那个 Rust 模块旁边的 `proptest`：生成 `ask`／`giveBack` 的任意序列（号单调递增，字节取 0..2×预算，让「一份超过预算」那条分支被走到，`giveBack` 的号从已发出的号里取，也取未发出的号），每一步之后断言上面三条：持有的字节不超过预算或只有一份；放行次序等于拿号次序；等待者不空时持有不空。一个「允许小预约越过放不下的队首」（回填）的版本在性质 2 上变红。
+`crates/runtime/src/reserve/tests.rs` 的 `proptest`：生成 `ask`／`giveBack` 的任意序列（号单调递增，字节取 0..2×预算，让「一份超过预算」那条分支被走到，`giveBack` 的号从已发出的号里取，也取未发出的号），每一步之后断言上面三条：持有的字节不超过预算或只有一份；放行次序等于拿号次序；等待者不空时持有不空。一个「允许小预约越过放不下的队首」（回填）的版本在性质 2 上变红。
 -/
 
 /-! D103 机器级预约按号先来后到，不回填；一份超过整份预算的预约在没有别人持有时单独放行
@@ -37,6 +54,17 @@
 **被否**：①回填：见上，大预约的等待没有上界；②比预算大的预约直接拒绝：人填的上限或估计值比机器预算大并不说明这件活做不成，拒绝它只是把决定推给模型；③复用 gateway 的并发名额（`crates/gateway/spec/Concurrency.lean` §8-40）：那是按「一次调用」计数的名额，上限随 429 收窄、随成功放宽，这里是按字节加权、预算不随结果变的预约；借的是它「按号先来后到」的规则与在任意轨迹上量化的证明形状，不共用代码。
 
 **重开参数**：读数显示队首长期被一份大预约占着而机器大半空闲（那时考虑带时限的回填）；或者出现按内存压力信号动态收紧预算的需要。
+-/
+
+/-! D104 只有人填过的上限才预约：run 设了内存上限时，它的前台命令与 python 调用各预约那个数；预约只持有到前台窗口结束
+
+**决定**：`Shares::CpuAndMemory { limit }` 的 run，每条 exec 命令在起动之前预约 `limit`，命令落定或被交给后台时归还；python 臂的每次调用在起 guest 之前预约 `limit`，guest 结束时归还。run 没有内存上限时什么都不预约。一次调用若在拿号时放不下，它的结果多一个键 `memory_wait`，写明拿号时前面还有几份、持有多少字节、预算多少字节。机器预算由人层 `config.toml` 顶层的 `memory` 给：`"auto"`（缺省）是物理内存减去操作系统的保留、界面的估计与城的进程预算，一个整数是字节数（`crates/accounting/spec/Person.lean` §8-8，`crates/sprawling/spec/Serving/Memory.lean` §8-173）。
+
+**理由**：run 的内存没有缺省上限是 ruling（`crates/runtime/spec/Tools/Exec.lean` D95 的「来源」）；没填上限的活要预约多少只能猜，猜大了一条 `ls` 要排在一次编译后面，猜小了预约挡不住换页，所以本版只把人给过的数加起来，没给的照旧。只持有到前台窗口结束，是因为被交给后台的命令可以一直跑到 run 结束（一个开发服务器），持有它的预约会让别的 run 的每条命令一直等下去；代价是后台命令的内存不在账上。
+
+**被否**：①给没填上限的命令一个固定估计（如 1 GiB）：在 4 GB 的机器上一次只能跑一条命令，读、搜之外的每条 exec 都要排队，而这个数没有读数支持；②持有到命令真正结束：后台命令会让队伍等到 run 结束；③按 run 预约一次、持有到 run 结束：run 在等模型的几十秒里也占着预算。
+
+**重开参数**：ruling 给 run 的内存定了缺省上限；或者 4 GB 剖面的读数说明后台命令的内存是换页的主因；或者有了按命令种类估计内存的读数。
 -/
 
 namespace Runtime.Reserve

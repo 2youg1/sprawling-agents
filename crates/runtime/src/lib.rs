@@ -22,6 +22,7 @@ pub mod prefix;
 pub mod redact;
 pub mod reminder;
 pub mod replay;
+pub mod reserve;
 pub mod run;
 pub mod sieve;
 pub mod tools;
@@ -52,6 +53,7 @@ pub mod conversation;
 mod sandbox;
 pub mod turn;
 
+pub use reserve::{MachineBudget, Reservation, Waited};
 pub use sandbox::AbsentSandbox;
 pub use sandbox::EchoSandbox;
 pub use sandbox::FaultSandbox;
