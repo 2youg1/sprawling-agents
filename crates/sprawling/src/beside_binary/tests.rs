@@ -65,3 +65,18 @@ fn a_running_city_and_an_occupied_destination_are_refused_untouched() {
     assert!(from.exists());
     assert_eq!(std::fs::read(to.join("theirs.txt")).unwrap(), b"x");
 }
+
+#[test]
+fn a_city_on_another_volume_than_home_is_kept_where_it_is() {
+    let dir = tempfile::tempdir().unwrap();
+    let from = dir.path().join("unpacked").join(accounting::home::CITY_DIR);
+    lay_city(&from);
+    let to = dir.path().join("home").join("sprawling").join("city");
+
+    let across = std::io::Error::from(std::io::ErrorKind::CrossesDevices);
+    assert!(
+        after_rename(Err(across), from.clone(), &to).is_ok(),
+        "a city on another volume is opened where it is, not refused"
+    );
+    assert_eq!(city::has_history(&from).unwrap(), city::History::Present);
+}

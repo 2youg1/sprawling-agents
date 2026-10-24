@@ -70,6 +70,11 @@ pub fn bring_home(exe_dir: &Path, to: &Path) -> Result<Homing, AxError> {
     let renamed = std::fs::rename(&from, to);
     #[cfg(not(windows))]
     drop(held);
+    after_rename(renamed, from, to)
+}
+
+/// What the rename's outcome means for the city that was at `from`.
+fn after_rename(renamed: std::io::Result<()>, from: PathBuf, to: &Path) -> Result<Homing, AxError> {
     renamed.map_err(|err| {
         if err.kind() == std::io::ErrorKind::CrossesDevices {
             refused(
