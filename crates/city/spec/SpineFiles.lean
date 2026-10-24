@@ -86,8 +86,8 @@ pub struct Edited { pub doc: Shipped, pub path: PathBuf }    // 人改过、保�
 pub fn follow_defaults(city_root: &Path) -> Result<Vec<Edited>, AxError>;
 ```
 
-- **判定只有一处**：`standing` 按字节判。等于本构建的默认是 `Current`；BLAKE3 落在这份文档的历史摘要表里是 `Earlier`；不在是 `Absent`；其余是 `Edited`。摘要表收这几份模板在仓库历史里出现过的每一版（`crates/city/templates/` 与更早的 `docs/City.md`、`docs/templates/`），开发构建立过的城也认得出来。
-- **`follow_defaults` 是这三份文档唯一的写者**：`Absent` 与 `Earlier` 写成本构建的默认（经 `document::replace`，整份落盘），`Current` 不动，`Edited` 不动并列进返回值。立城与开城都调它：开城在 `accounting::worker::lifetime::RunWorker::holding` 里、拿着城的写锁、紧挨 `keep_records_out_of_git`；立城经同一个 `holding`，所以创世不再自己写这三份。
+- **判定只有一处**：`standing` 按字节判。等于本构建的默认是 `Current`；BLAKE3 落在这份文档的历史摘要表里是 `Earlier`；不在是 `Absent`；其余是 `Edited`。摘要表收这几份模板在仓库历史里出现过的每一版（`crates/city/templates/`，以及更早住在仓库 docs 目录下的 City.md 与模板），开发构建立过的城也认得出来。
+- **`follow_defaults` 是这三份文档唯一的写者**：`Absent` 与 `Earlier` 写成本构建的默认（经 `document::replace`，整份落盘），`Current` 不动，`Edited` 不动并列进返回值。立城与开城都调它：开城在 `RunWorker::holding`（`crates/accounting/src/worker/lifetime.rs`）里、拿着城的写锁、紧挨 `keep_records_out_of_git`；立城经同一个 `holding`，所以创世不再自己写这三份。
 - **改默认文本的那个改动，把改之前那版的 BLAKE3 加进摘要表**：否则未改的旧副本被判成 `Edited`，旧城会一直读旧文字。测试 `every_default_names_its_earlier_versions` 断言本构建的默认不在自己的摘要表里（在就说明改动忘了换默认）。
 - **失败**：`E_STORAGE_FATAL` 带路径，读不了或写不了任何一份时；改过的副本不是失败。
 

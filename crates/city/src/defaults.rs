@@ -60,8 +60,8 @@ impl Shipped {
 
     /// The BLAKE3 of every earlier default of this document, as lowercase
     /// hex: each version the repository's history holds under
-    /// `crates/city/templates/` and, before that, `docs/City.md` and
-    /// `docs/templates/`.
+    /// `crates/city/templates/` and, before the templates moved there,
+    /// under the repository's docs directory.
     ///
     /// A change to a default adds the digest of the text it replaces
     /// here, in the same commit; a default missing from this list is
