@@ -69,6 +69,15 @@ export function sessionModel(held: readonly RunBelief[], began: Seq | null): str
   return held.filter((run) => (began === null || run.lastSeq > began) && run.model !== null).at(-1)?.model ?? null;
 }
 
+// Whether the room's current session has begun working: a run of it
+// recorded a line after the session began. Until then the settings row
+// draws its controls and the workspace chip names the room; after, the
+// row draws none and the conversation's address line names it
+// (client/Spec.lean 4-10a), so the room is drawn once either way.
+export function startedIn(held: readonly RunBelief[], began: Seq | undefined): boolean {
+  return held.some((run) => run.lastSeq > (began ?? 0));
+}
+
 // A model pick changes the next main selection and never opens a session.
 export type ModelMove =
   | { readonly kind: "select"; readonly names: Names }

@@ -21,6 +21,12 @@
 //! control that neither scrolls with the thread nor answers a refusal
 //! belongs to the composer when it reaches below the top of that box, and
 //! is a fixed bar when it stands wholly above it.
+//!
+//! **The conversation's head holds one control.** The first standing
+//! control inside a `<header>` of the region is the address line that
+//! opens the palette (client/Spec.lean 4-10a), counted with the composer;
+//! a second control in the head is a bar again (tools/xtask/Spec.lean
+//! §8-51).
 
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -105,8 +111,14 @@ pub(super) fn the_conversation_page_holds_its_controls(
             continue;
         };
         let mut composer: u64 = 0;
-        for held in standing(drawn, region) {
+        let mut headed: u64 = 0;
+        for (index, held) in standing(drawn, region) {
             if held.top.saturating_add(held.height) > line {
+                composer = composer.saturating_add(1);
+                continue;
+            }
+            if headed == 0 && in_head(drawn, region, index) {
+                headed = 1;
                 composer = composer.saturating_add(1);
                 continue;
             }
@@ -236,14 +248,23 @@ fn text_box_top(drawn: &[Drawn], region: usize) -> Option<i64> {
 
 /// The controls in the region that stand still: drawn, operable, not
 /// carried by something that scrolls, and not part of a notice or panel.
-fn standing(drawn: &[Drawn], region: usize) -> impl Iterator<Item = &Drawn> {
+fn standing(drawn: &[Drawn], region: usize) -> impl Iterator<Item = (usize, &Drawn)> {
     drawn.iter().enumerate().filter_map(move |(index, held)| {
         (held.operable()
             && held.drawn()
             && holds(drawn, region, index)
             && !moves_or_answers(drawn, region, index))
-        .then_some(held)
+        .then_some((index, held))
     })
+}
+
+/// Whether a `<header>` stands between `index` and the region: the
+/// conversation's head line.
+fn in_head(drawn: &[Drawn], region: usize, index: usize) -> bool {
+    parents(drawn, index)
+        .take_while(|up| *up != region)
+        .filter_map(|up| drawn.get(up))
+        .any(|up| up.tag == "HEADER")
 }
 
 /// Whether something between `index` and the region scrolls (so the

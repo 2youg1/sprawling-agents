@@ -5,8 +5,10 @@ Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <!-- How a resident's letter is drawn (`LetterLook`, `./note`), as a
 letter rather than as the person's bubble (client D86): left-aligned,
-unfilled, held to the same five sixths of the column, with an accent
-edge on the side it came from, its head a note's row over the words. -->
+unfilled, held to the same five sixths of the column, outlined on all
+four sides and with no coloured bar - the accent says only "moving or
+chosen" (docs/frontend-method.md §7B) - its head a note's row over the
+words. -->
 <script lang="ts">
   import NoteRow from "./note.look.svelte";
   import type { LetterLook } from "./note";
@@ -15,7 +17,7 @@ edge on the side it came from, its head a note's row over the words. -->
 </script>
 
 <article
-  class="mr-auto max-w-5/6 rounded-card border border-edge-panel border-l-2 border-l-accent px-pane py-base"
+  class="mr-auto max-w-5/6 rounded-card border border-edge-panel px-pane py-base"
   aria-label={label}
 >
   <div class="mb-tight">

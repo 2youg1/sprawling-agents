@@ -32,7 +32,7 @@
   import Popover from "../parts/popover.svelte";
   import type { PopoverBinding } from "../parts/popover";
   import Unkept from "../parts/unkept.svelte";
-  import { boxKey, completedAt, configLevel, menuColumns, offeredBy, pickSlash, picksFor, roomsKnown, sessionModel, slashHands, workspacePill } from "./composer";
+  import { boxKey, completedAt, configLevel, menuColumns, offeredBy, pickSlash, picksFor, roomsKnown, sessionModel, slashHands, startedIn, workspacePill } from "./composer";
   import type { BoxKey, ComposerLook } from "./composer";
   import Look from "./composer.look.svelte";
   import { draftAt } from "./draft";
@@ -199,7 +199,7 @@
   // The run in front of the person: what a typed `/stop` and `/steer` reach.
   const live = $derived(shown === null ? undefined : runInFront($belief, shown));
 
-  const startedHere = $derived(here !== null && heldIn($belief, here).some((run) => run.lastSeq > ($belief.sessions[here] ?? 0)));
+  const startedHere = $derived(here !== null && startedIn(heldIn($belief, here), $belief.sessions[here]));
   const session = $derived(here === null ? null : sessionModel(heldIn($belief, here), $belief.sessions[here] ?? null));
   const picks = $derived(picksFor(u, session));
   const workspace = $derived(workspacePill($lang, { rooms, here }, picks.workspace));

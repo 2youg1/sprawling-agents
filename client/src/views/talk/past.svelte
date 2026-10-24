@@ -23,8 +23,10 @@
   import { roomOf, toFragment } from "../../core/route";
   import type { Stretch } from "../../core/stretches";
   import { ui } from "../../ui";
-  import type { Address } from "../../wire";
+  import type { Address, Seq } from "../../wire";
   import Button from "../parts/button.svelte";
+  import AddressLine from "./address_line.svelte";
+  import type { Head } from "./address_line";
   import AsideLink from "./aside_link.look.svelte";
   import { branchInto } from "./branching";
   import { noteOf } from "./branch_note";
@@ -34,13 +36,19 @@
 
   interface Props {
     readonly address: Address;
-    // The session the address bar names; null while the city has not
+    // The session the address bar names, which the address line draws
+    // even while `stretch` is null (4-10a: an earlier session draws its
+    // own number, never the room's current one).
+    readonly session: Seq;
+    // That session as the city answered it; null while the city has not
     // answered for it, or no longer lists it.
     readonly stretch: Stretch | null;
     readonly band: boolean;
+    // Whether the column draws the address line at its head (4-10a).
+    readonly head: Head;
   }
 
-  const { address, stretch, band }: Props = $props();
+  const { address, session, stretch, band, head }: Props = $props();
 
   const u = ui();
   const { lang } = u;
@@ -61,6 +69,9 @@
 </script>
 
 <div class={["flex min-h-0 flex-col", band ? "" : "h-full"]}>
+  {#if !band && head === "address"}
+    <AddressLine {address} {session} />
+  {/if}
   {#if !band}
     <Scroller empty={false} rejoined={0} place={stretch === null ? address : `${address}:${String(stretch.line.began)}`}>
       {#each stretch?.runs ?? [] as run, at (run.run)}
