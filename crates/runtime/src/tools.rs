@@ -11,10 +11,12 @@ mod chosen_path;
 mod describe;
 mod edit;
 mod exec;
+mod path_lock;
 #[cfg(windows)]
 pub(crate) use exec::native_windows;
 mod read;
 mod search;
+mod stamp;
 mod status;
 mod succeed;
 
@@ -24,8 +26,7 @@ pub use chosen_path::ReadBound;
 #[cfg(test)]
 pub(crate) use chosen_path::admit;
 pub use describe::DescribeTool;
-pub use edit::EditTool;
-pub use edit::version_of;
+pub use edit::{EditDesk, EditTool};
 pub(crate) use exec::container::ContainerLease;
 pub use exec::container::run_container_guard;
 pub use exec::parse_arm;
@@ -34,6 +35,10 @@ pub use exec::{ContainerEngine, ContainerLaunch, ContainerRuntime};
 pub use exec::{ExecSetup, ExecTool};
 pub use exec::{FailureClass, Shell, ShellCount, ShellTally};
 pub use exec::{Placed, Placement};
+pub use path_lock::PathLocks;
+pub use stamp::ReadStamps;
+#[cfg(test)]
+pub(crate) use stamp::Stamp;
 // Where a host command runs is public through this module for the two
 // readers outside the tool: the machine's own dependency report, and a
 // caller deciding whether a task can be done here at all.

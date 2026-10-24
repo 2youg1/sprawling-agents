@@ -3,15 +3,18 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The edit tool: optimistic concurrency against a version the caller
-//! must already have seen.
+//! The edit tool: an exact replacement admitted by what this run has
+//! seen, and creation where nothing stands.
 //!
-//! Two refusals carry the design. A `base_version` that no longer
-//! matches means the file moved under the caller — a blind overwrite
-//! would erase whoever moved it, so the edit is refused with the
-//! current version named. And an `old` string that matches zero times
-//! or many times is refused with the count, because "replace the first
-//! one" is a guess about which occurrence was meant.
+//! Two refusals carry the design. A file this run never read, or one
+//! that changed after its last look, is refused - a replacement judged
+//! against an understanding that is out of date is most likely wrong in
+//! a city where many residents edit at once - and the second refusal
+//! carries the passage as it now reads, which counts as a look. And an
+//! `old` string that matches zero times or many times is refused with
+//! the count, because "replace the first one" is a guess about which
+//! occurrence was meant. `crates/runtime/spec/Tools/Edit.lean` §8-64
+//! models the admission and proves it loses no run's update.
 //!
 //! The echo is a unified diff. Per-edit diffs are the restoration
 //! granularity: a checkpoint restores a wave, but a diff restores one
@@ -22,36 +25,38 @@ use std::borrow::Cow;
 use std::path::{Path, PathBuf};
 
 use kernel::{
-    AxCode, AxError, B3Hash, CostTier, Effect, Payload, RenderIntent, Temporal, Tool, ToolCall,
-    ToolMeta, ToolName, ToolOutcome,
+    AxCode, AxError, CostTier, Effect, Payload, RenderIntent, Temporal, Tool, ToolCall, ToolMeta,
+    ToolName, ToolOutcome,
 };
 use serde_json::{Map, Value};
+
+use super::path_lock::PathLocks;
+use super::stamp::{Admission, Intent, ReadStamps, Stamp, admission};
+
+mod passage;
 
 pub struct EditTool {
     city_root: PathBuf,
     /// The run's write domain. Every model-chosen path is judged against
     /// it before the filesystem is touched.
     writable: kernel::WriteDomain,
-    /// The run's policy cell, asked at each write for what the run may do
-    /// to a file that already exists (`crates/runtime/spec/Tools.lean`
-    /// §8-55, `crates/runtime/spec/PolicyTake.lean` §8-62).
-    policy: crate::mode::PolicyReader,
+    desk: EditDesk,
     meta: ToolMeta,
 }
 
-/// The version stamp a caller must present: the content's whole
-/// `cas:b3-<hex64>` Locator. `read` prints the same value and `plan
-/// finish` takes it as evidence, so a model copies one string between
-/// three tools and never shortens or completes it (kernel
-/// `spec/Locator.lean` D27).
-pub fn version_of(bytes: &[u8]) -> String {
-    kernel::Locator::cas(B3Hash::digest(bytes)).to_string()
+/// The live state an edit consults at each call besides the path.
+#[derive(Clone)]
+pub struct EditDesk {
+    /// The run's policy cell, asked at each write for what the run may do
+    /// to a file that already exists (`crates/runtime/spec/Tools.lean`
+    /// §8-55, `crates/runtime/spec/PolicyTake.lean` §8-62).
+    pub policy: crate::mode::PolicyReader,
+    /// What this run has seen; the same table its `read` writes.
+    pub seen: ReadStamps,
+    /// The city's one table of files an edit is landing on, shared by
+    /// every run, so that two runs cannot land on one look.
+    pub locks: PathLocks,
 }
-
-/// The version word that means "I expect this file to not exist yet".
-/// A Locator can never spell it, so it cannot collide with a real
-/// version.
-const CREATES: &str = "new";
 
 impl EditTool {
     /// The name this tool answers to, read by `mode::core_tools` too.
@@ -61,35 +66,34 @@ impl EditTool {
         city_root: &Path,
         domain: kernel::Address,
         writable: kernel::WriteDomain,
-        policy: crate::mode::PolicyReader,
+        desk: EditDesk,
     ) -> Result<EditTool, AxError> {
         let params = Payload::of(&serde_json::json!({
             "type": "object",
             "properties": {
                 "path": { "type": "string",
                     "description": "file to edit, relative to the city root" },
-                "base_version": { "type": "string", "description":
-                    "the `version` read printed for this file; refuses if it moved. Pass \"new\" to create the file" },
                 "old": { "type": "string", "description":
-                    "exact text to replace; must match exactly once. \"\" when creating" },
+                    "exact text to replace; must match exactly once. \"\" creates a file that does not exist" },
                 "new": { "type": "string",
                     "description": "replacement text, or the whole file when creating" },
             },
-            "required": ["path", "base_version", "old", "new"],
+            "required": ["path", "old", "new"],
         }))?;
         Ok(EditTool {
             city_root: city_root.to_path_buf(),
             writable,
-            policy,
+            desk,
             meta: ToolMeta {
                 name: ToolName::parse(Self::NAME)?,
                 // The write limit is not spelled here: it can change
                 // while the run goes, and these bytes are frozen with the
                 // tool list (§8-62); the note a change appends spells it.
-                disclosure: "Replace an exact string in a file, guarded by the version you \
-                             last saw: `old` must match exactly once or the call fails. A file \
-                             that moved under you is refused and not overwritten; read it \
-                             again and retry. A `base_version` of `new` creates the file."
+                disclosure: "Replace an exact string in a file you have read in this run: \
+                             `old` must match exactly once or the call fails. A file that changed \
+                             after your read is refused and not overwritten, and the refusal shows \
+                             the passage as it now reads. `old: \"\"` creates a file that does \
+                             not exist."
                     .to_owned(),
                 params,
                 effect: Effect::Write { domain },
@@ -111,7 +115,7 @@ fn arg<'a>(args: &'a Map<String, Value>, key: &str) -> Result<&'a str, AxError> 
             "edit file",
             format!("missing string argument `{key}`"),
         )
-        .with_recovery("pass path, base_version, old and new - all strings")
+        .with_recovery("pass path, old and new - all strings")
     })
 }
 
@@ -147,13 +151,12 @@ impl Tool for EditTool {
             )));
         }
         // Read once: every door below judges this call under one policy.
-        let policy = self.policy.now();
+        let policy = self.desk.policy.now();
         crate::mode::mode_admits(&policy, Self::NAME)?;
         let args = call.args.as_map();
         let spelled =
             super::chosen_path::within_city(&self.city_root, arg(args, "path")?, "edit file")?;
         let rel: &str = &spelled;
-        let base_version = arg(args, "base_version")?;
         let old = arg(args, "old")?;
         let new = arg(args, "new")?;
 
@@ -180,42 +183,82 @@ impl Tool for EditTool {
         }
 
         let path = self.city_root.join(rel);
-        if base_version == CREATES {
-            return self.create(rel, &path, old, new);
-        }
-        // Every arm below changes a file that is already there.
-        match kernel::gate::replacing(policy.write, &target) {
-            kernel::GateOutcome::Allow => {}
-            kernel::GateOutcome::Deny { refusal } => return Err(*refusal),
-            kernel::GateOutcome::Ask { question } => return Err(*question),
-        }
-        let bytes = std::fs::read(&path).map_err(|err| {
-            AxError::failure(AxCode::InvalidArgs, "edit file", format!("{rel}: {err}"))
-                .with_recovery(
-                    "check the path, relative to the city root; to create a new file pass \
-                     base_version:\"new\"",
+        // A name that is a link lands a write somewhere the gate never
+        // judged - `.git/hooks` through a junction is privilege
+        // escalation (`crates/storage/Spec.lean` §8-25) - so it is
+        // refused before the stamps are asked, and before the creating
+        // arm makes a parent directory through it.
+        storage::WriteTarget::within("edit file", &self.city_root, &path)
+            .map_err(storage::StorageError::into_ax)?;
+        // Inside the lock the stamp, the bytes and the landing are one
+        // step, so two runs cannot both land on one look (§8-64).
+        let _held = self.desk.locks.hold(&path);
+        let intent = if old.is_empty() {
+            Intent::Create
+        } else {
+            Intent::Replace
+        };
+        let (text, current) = match intent {
+            Intent::Create => (
+                String::new(),
+                Stamp::of(&path).map_err(|err| unreadable(rel, &err))?,
+            ),
+            Intent::Replace => {
+                // A replacement changes a file that is already there.
+                match kernel::gate::replacing(policy.write, &target) {
+                    kernel::GateOutcome::Allow => {}
+                    kernel::GateOutcome::Deny { refusal } => return Err(*refusal),
+                    kernel::GateOutcome::Ask { question } => return Err(*question),
+                }
+                read_whole(rel, &path)?
+            }
+        };
+        let seen = self.desk.seen.last(&target);
+        match admission(seen.as_ref(), current.as_ref(), intent) {
+            Admission::Lands => {}
+            Admission::Absent => {
+                return Err(AxError::failure(
+                    AxCode::InvalidArgs,
+                    "edit file",
+                    format!("{rel} does not exist"),
                 )
-        })?;
-        let current_version = version_of(&bytes);
-        if current_version != base_version {
-            return Err(AxError::failure(
-                AxCode::VersionConflict,
-                "edit file",
-                format!("{rel} is at {current_version}, not {base_version}"),
-            )
-            .with_recovery("read the file again, then edit against the version you just saw"));
+                .with_recovery(
+                    "check the path; to create a new file pass old:\"\" and the whole file in `new`",
+                ));
+            }
+            Admission::Unread => {
+                return Err(AxError::failure(
+                    AxCode::InvalidArgs,
+                    "edit file",
+                    format!("{rel} has not been read in this run"),
+                )
+                .with_recovery(format!(
+                    "read {rel} first - a window around the passage you are changing is enough - \
+                     then edit"
+                )));
+            }
+            Admission::Moved => {
+                // The passage is a window read of the file as it stands.
+                self.desk.seen.look(&target, current.clone(), current);
+                let why = match passage::around(&text, old) {
+                    (passage::Opened::AroundOld, window) => {
+                        format!("{rel} changed after this run read it; {window}")
+                    }
+                    (passage::Opened::AtHead, window) => format!(
+                        "{rel} changed after this run read it, and the first line of `old` is no \
+                         longer in it; {window}"
+                    ),
+                };
+                return Err(AxError::failure(AxCode::VersionConflict, "edit file", why)
+                    .with_recovery(
+                        "edit again against the passage as it now reads, or read the file",
+                    ));
+            }
+            Admission::Present => return Err(already_exists(rel)),
         }
-        let text = String::from_utf8(bytes).map_err(|_| {
-            AxError::failure(
-                AxCode::InvalidArgs,
-                "edit file",
-                format!("{rel} is not valid UTF-8"),
-            )
-            .with_recovery(format!(
-                "edit {rel} in a program that reads its bytes; this tool changes text \
-                 files and this one is not text"
-            ))
-        })?;
+        if intent == Intent::Create {
+            return self.create(&target, rel, &path, new);
+        }
         let (old, new) = as_the_file_spells(&text, old, new);
         let (old, new) = (old.as_ref(), new.as_ref());
         let hits = text.matches(old).count();
@@ -228,54 +271,38 @@ impl Tool for EditTool {
             .with_recovery("include enough surrounding text to name exactly one occurrence"));
         }
         let updated = text.replacen(old, new, 1);
-        // A name that is a link lands this write somewhere the gate
-        // never judged - `.git/hooks` through a junction is privilege
-        // escalation (`crates/storage/Spec.lean` §8-25). The replacement lands the way
-        // every city write does: a staging file renamed over the name,
-        // so a failed write leaves the old file and a hard link's other
-        // names keep their bytes (`crates/storage/Spec.lean` §8-32).
+        // The replacement lands the way every city write does: a staging
+        // file renamed over the name, so a failed write leaves the old
+        // file and a hard link's other names keep their bytes
+        // (`crates/storage/Spec.lean` §8-32). The name is cleared of links
+        // again here, because the clearing above came before the wait for
+        // the lock and the read, and a link placed since would carry the
+        // write past the gate.
         storage::WriteTarget::within("edit file", &self.city_root, &path)
             .and_then(|cleared| cleared.replace(updated.as_bytes()))
             .map_err(storage::StorageError::into_ax)?;
-        let new_version = version_of(updated.as_bytes());
-
-        let mut result = Map::new();
-        result.insert("path".to_owned(), Value::String(rel.to_owned()));
-        result.insert(
-            "base_version".to_owned(),
-            Value::String(base_version.to_owned()),
-        );
-        result.insert("new_version".to_owned(), Value::String(new_version));
-        result.insert(
-            "diff".to_owned(),
-            Value::String(unified_diff(rel, &text, &updated)),
-        );
+        self.note_landing(&target, rel, &path)?;
         Ok(ToolOutcome {
-            result: Payload::new(result)?,
+            result: echo(rel, &text, &updated)?,
             attachments: Vec::new(),
         })
     }
 }
 
 impl EditTool {
-    /// The creating arm: the caller declared the file absent, so an
-    /// existing file is a version conflict like any other - it names the
-    /// version the file is really at.
-    fn create(&self, rel: &str, path: &Path, old: &str, new: &str) -> Result<ToolOutcome, AxError> {
-        if !old.is_empty() {
-            return Err(AxError::failure(
-                AxCode::InvalidArgs,
-                "edit file",
-                "creating a file replaces nothing: `old` must be \"\"",
-            )
-            .with_recovery("pass old:\"\" and the whole file in `new`"));
-        }
-        // The alias check runs before any directory is made: making a
-        // parent through a link would land a directory inside the
-        // protected metadata the link reaches, before the write itself
-        // is refused (`crates/storage/Spec.lean` §8-25).
-        storage::WriteTarget::within("edit file", &self.city_root, path)
-            .map_err(|err| err.into_ax())?;
+    /// The creating arm, admitted where nothing stood and cleared of
+    /// links by `invoke` before any parent directory is made. The
+    /// filesystem still claims the name at the write, judged again once
+    /// the parents exist, so a writer outside the lock
+    /// that took it since is refused too, under either write limit
+    /// (`crates/storage/Spec.lean` §8-32).
+    fn create(
+        &self,
+        target: &kernel::Address,
+        rel: &str,
+        path: &Path,
+        new: &str,
+    ) -> Result<ToolOutcome, AxError> {
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent).map_err(|err| {
                 AxError::failure(AxCode::StorageFatal, "edit file", format!("{rel}: {err}"))
@@ -285,23 +312,27 @@ impl EditTool {
                     ))
             })?;
         }
-        // The filesystem claims the name at the write, so of two racing
-        // creates one lands, under either limit (`crates/storage/Spec.lean` §8-32).
         storage::WriteTarget::within("edit file", &self.city_root, path)
             .and_then(|cleared| cleared.create(new.as_bytes()))
-            .map_err(|err| refused_create(err, rel, path))?;
-        let mut result = Map::new();
-        result.insert("path".to_owned(), Value::String(rel.to_owned()));
-        result.insert("base_version".to_owned(), Value::String(CREATES.to_owned()));
-        result.insert(
-            "new_version".to_owned(),
-            Value::String(version_of(new.as_bytes())),
-        );
-        result.insert("diff".to_owned(), Value::String(unified_diff(rel, "", new)));
+            .map_err(|err| refused_create(err, rel))?;
+        self.note_landing(target, rel, path)?;
         Ok(ToolOutcome {
-            result: Payload::new(result)?,
+            result: echo(rel, "", new)?,
             attachments: Vec::new(),
         })
+    }
+
+    /// Records what this run now knows the file to be - its own write -
+    /// so the next edit of it needs no read in between.
+    fn note_landing(
+        &self,
+        target: &kernel::Address,
+        rel: &str,
+        path: &Path,
+    ) -> Result<(), AxError> {
+        let landed = Stamp::of(path).map_err(|err| unreadable(rel, &err))?;
+        self.desk.seen.look(target, landed.clone(), landed);
+        Ok(())
     }
 }
 
@@ -347,22 +378,81 @@ fn begins_on_line(text: &str, passage: &str, line: u64) -> bool {
         })
 }
 
-/// Why a create did not land. A name that stands is a version conflict
-/// naming the version the file is really at; anything else is storage's.
-fn refused_create(err: storage::StorageError, rel: &str, path: &Path) -> AxError {
+/// The file's text and the stamp it was read under, or no stamp when
+/// nothing stands at the path. Stamps taken on each side of the read
+/// that differ mean another writer was in the middle of it, and the
+/// bytes belong to neither side.
+fn read_whole(rel: &str, path: &Path) -> Result<(String, Option<Stamp>), AxError> {
+    let before = Stamp::of(path).map_err(|err| unreadable(rel, &err))?;
+    if before.is_none() {
+        return Ok((String::new(), None));
+    }
+    let bytes = std::fs::read(path).map_err(|err| unreadable(rel, &err))?;
+    let after = Stamp::of(path).map_err(|err| unreadable(rel, &err))?;
+    if before != after {
+        return Err(AxError::failure(
+            AxCode::VersionConflict,
+            "edit file",
+            format!("{rel} was being written while this edit read it"),
+        )
+        .with_recovery("read the file again, then edit"));
+    }
+    let text = String::from_utf8(bytes).map_err(|_| {
+        AxError::failure(
+            AxCode::InvalidArgs,
+            "edit file",
+            format!("{rel} is not valid UTF-8"),
+        )
+        .with_recovery(format!(
+            "edit {rel} in a program that reads its bytes; this tool changes text \
+             files and this one is not text"
+        ))
+    })?;
+    Ok((text, after))
+}
+
+fn unreadable(rel: &str, err: &std::io::Error) -> AxError {
+    AxError::failure(AxCode::InvalidArgs, "edit file", format!("{rel}: {err}"))
+        .with_recovery("check the path; to create a new file pass old:\"\"")
+}
+
+/// The answer: the path and the diff. Per-edit diffs are the
+/// restoration granularity.
+fn echo(rel: &str, before: &str, after: &str) -> Result<Payload, AxError> {
+    let mut result = Map::new();
+    result.insert("path".to_owned(), Value::String(rel.to_owned()));
+    result.insert(
+        "diff".to_owned(),
+        Value::String(unified_diff(rel, before, after)),
+    );
+    Payload::new(result)
+}
+
+/// Why a create did not land. A name another writer took since the
+/// admission is the same refusal as one that already stood; anything
+/// else is storage's.
+fn refused_create(err: storage::StorageError, rel: &str) -> AxError {
     if !matches!(err, storage::StorageError::NameTaken { .. }) {
         return err.into_ax();
     }
-    let standing = match std::fs::read(path) {
-        Ok(existing) => format!("{rel} already exists at {}, not new", version_of(&existing)),
-        Err(err) => format!("{rel} already exists, not new, and its version cannot be read: {err}"),
-    };
-    AxError::failure(AxCode::VersionConflict, "edit file", standing)
-        .with_recovery("read the file and edit against that version, or choose another path")
+    already_exists(rel)
+}
+
+/// A create where a file stands: it is read and changed instead.
+fn already_exists(rel: &str) -> AxError {
+    AxError::failure(
+        AxCode::VersionConflict,
+        "edit file",
+        format!("{rel} already exists, so `old: \"\"` cannot create it"),
+    )
+    .with_recovery("read the file and replace a passage in it, or choose another path")
 }
 
 /// A minimal unified diff: enough to see what changed and where, and no
-/// dependency for the eighty lines it takes.
+/// dependency for the eighty lines it takes. An empty `before` is a
+/// creation - no `old` matches once in an empty text - and is written
+/// from `/dev/null`, the way unified diffs mark a new file, which is how
+/// a reader of the echo tells a creation from a change.
 fn unified_diff(path: &str, before: &str, after: &str) -> String {
     let old_lines: Vec<&str> = before.lines().collect();
     let new_lines: Vec<&str> = after.lines().collect();
@@ -371,7 +461,11 @@ fn unified_diff(path: &str, before: &str, after: &str) -> String {
     let old_end = old_lines.len().saturating_sub(suffix);
     let new_end = new_lines.len().saturating_sub(suffix);
 
-    let mut out = format!("--- a/{path}\n+++ b/{path}\n");
+    let mut out = if before.is_empty() {
+        format!("--- /dev/null\n+++ b/{path}\n")
+    } else {
+        format!("--- a/{path}\n+++ b/{path}\n")
+    };
     let old_count = old_end.saturating_sub(prefix);
     let new_count = new_end.saturating_sub(prefix);
     out.push_str(&format!(

@@ -30,6 +30,7 @@ import crates.runtime.spec.Sieve
 import crates.runtime.spec.Tools
 import crates.runtime.spec.Tools.BoundReader
 import crates.runtime.spec.Tools.ChosenPath
+import crates.runtime.spec.Tools.Edit
 import crates.runtime.spec.Tools.Exec
 import crates.runtime.spec.Tools.Exec.Container
 import crates.runtime.spec.Tools.Exec.NativeMacos
@@ -232,6 +233,7 @@ tools/ ──▶ kernel(tool/version/discard/gate)、sandbox、storage(cas 经 p
 | 8-32 | `crates/runtime/spec/Transcript.lean` |
 | 8-33 | `crates/runtime/spec/Tools/Succeed.lean` |
 | 8-34 | `crates/runtime/spec/Reminder.lean` |
+| 8-64 | `crates/runtime/spec/Tools/Edit.lean` |
 | 8-48 | `crates/runtime/spec/Run.lean` |
 | 8-37 | `crates/runtime/spec/Run.lean` |
 | 8-36 | `crates/runtime/spec/Tools.lean` |
@@ -283,8 +285,8 @@ envelope 探查与全解共用 kernel 的解析（Value 探查仅取五键，不
 
 - **read**：剩余成本是读出所请求的字节与对这些字节的一次扫描。下界是两者各一遍：结果整段进账本，扫描必须看到结果的每个字节，不能按选区跳过。`redact` 接收载荷的所有权并原地改写（D37），零命中时扫描之外不再分配，剩下的就是这两遍。
   read 另有两个仪表，也由 `just bench` 跑。`tools::read` 的 `instrument_read_ab` 在同一进程里逐轮交替四条路：§8-29-4 的判定路径（每次重求城根）、按句柄读（`spec/Tools/Read.lean` D10）、一次 canonicalize 加裸读、裸读，文件 20 KiB 到 8 MiB；`instrument_read_after_write_ab` 在每次读之前写一个字节，读的是刚写过的文件。`turn` 的 `instrument_read_round_trip` 量端到端：从模型回复里拿到一个 `read` 调用，到下一次请求交给模型，经真实的 `ReadTool` 与落在盘上的 `JsonlLedger`，包括准入、读、秘密扫描、`settle`、使本回合可持久的屏障（`append_all` 与它的 sync，D36）和下一次组装；同时单列读本身与每道屏障，看各占多少。墙钟读数属于机器，不当门；CI 守一个比值：`a_read_costs_within_a_bound_of_a_resolved_read` 要求 20 KiB 文件按句柄读的 p50 不超过「一次 canonicalize 加裸读」p50 的 1.5 倍。按句柄读的设计正是一次判定加一次 open，所以这个比值在各台机器上都接近 1；退回 4 次 canonicalize 加再开核验的判定路径就越过它。只在 Windows 与 Linux 上守，因为其他平台上判定路径就是读法。
-- **write**（`edit` 以 `base_version` 为 `new` 新建文件）：剩余成本是写盘，加上结果回显的整份 diff 的扫描——新文件的 diff 就是全文，所以扫描量与文件同长。下界是写一遍、扫一遍回显。回显全文不能省：逐次的 diff 是还原一次改动的粒度（`tools::edit` 的模块说明），只回显长度与版本会让扫描量变成常数，却丢掉这次新建的还原依据。下一步因此在扫描器一侧，即 read 那一段说的不复制未命中的字符串。
-- **edit**：剩余成本在调用一段：为核对 `base_version` 读整个文件并计算 blake3，再整份写回；回显只含改动的行，扫描几乎为零。下界是读一遍、哈希一遍、写一遍文件。下一步看中段读数里读与写哪个占大头；局部改写不改变「整份写回」的下界，因为版本是整份内容的哈希。
+- **write**（`edit` 对不存在的路径以 `old: ""` 新建文件）：剩余成本是写盘，加上结果回显的整份 diff 的扫描——新文件的 diff 就是全文，所以扫描量与文件同长。下界是写一遍、扫一遍回显。回显全文不能省：逐次的 diff 是还原一次改动的粒度（`tools::edit` 的模块说明），只回显长度与版本会让扫描量变成常数，却丢掉这次新建的还原依据。下一步因此在扫描器一侧，即 read 那一段说的不复制未命中的字符串。
+- **edit**：剩余成本在调用一段：在按路径的锁里取两次戳、读整个文件做唯一匹配，再整份写回；不再计算哈希（D106）。回显只含改动的行，扫描几乎为零。下界是读一遍、写一遍文件；局部改写不改变「整份写回」的下界，因为落盘经暂存文件改名。
 - **exec**：剩余成本是起一个进程与沙箱臂的准备，扫描只覆盖 stdout 与 stderr。下界是一次进程创建。下一步属于沙箱臂（`spec/Tools/Exec.lean`），不属于扫描。
 - **search**：剩余成本是在读界内遍历楼的目录并逐文件匹配，扫描只覆盖命中行。下界是读界内每个文件读一遍。下一步是在多次搜索之间复用遍历结果；它需要一个随写入失效的索引，失效规则要先写进 `spec/Tools/Search.lean`。
 
@@ -347,6 +349,7 @@ envelope 探查与全解共用 kernel 的解析（Value 探查仅取五键，不
 | D103 | 机器级预约按号先来后到、不回填，比整份预算大的预约在没有别人持有时单独放行 | `crates/runtime/spec/Reserve.lean` |
 | D104 | 只有人填过的上限才预约，run 的前台命令与 python 调用各预约那个数，只持有到前台窗口结束 | `crates/runtime/spec/Reserve.lean` |
 | D105 | 来源行带它所留字节的哈希，重建时逐行核对 | `crates/runtime/spec/Prefix.lean` |
+| D106 | edit 以每个 run 的读戳准入，读后被改则拒绝并给出当前片段 | `crates/runtime/spec/Tools/Edit.lean` |
 -/
 
 /-! ## 13 依赖选型

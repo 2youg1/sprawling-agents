@@ -69,14 +69,11 @@ impl Laying {
         // write gates read it at each write, so a change the run takes
         // mid-way reaches them (`crates/runtime/spec/PolicyTake.lean` §8-62).
         let policy = runtime::PolicyCell::new(at.policy);
-        // The building's domain is the ceiling and the run's write
-        // limit narrows it; both are asked at every write (`crates/city/Spec.lean` §8-32).
-        let edit = EditTool::new(
-            &site.write_root,
-            addr.clone(),
-            site.rules.write_domain()?,
-            policy.reader(),
-        )?;
+        // What this run has seen: `read` writes it and `edit` is admitted
+        // by it. A new table per run, so a fork, a successor or a child
+        // starts having seen nothing (`crates/runtime/spec/Tools/Edit.lean` §8-64).
+        let stamps = runtime::ReadStamps::default();
+        let edit = self.edit_tool(site, addr, policy.reader(), stamps.clone())?;
         // Every tool shares one keeper, so no two of them keep two keys
         // under one name (`crates/sprawling/Spec.lean` §8-87).
         let keeper = std::sync::Arc::new(kept::Keeper::new(
@@ -107,7 +104,6 @@ impl Laying {
         let signal_tool = collab::SignalTool::new(Arc::clone(&desks.signals))?;
         let goal_tool = collab::GoalTool::new(addr.clone(), Arc::clone(&desks.goals))?;
         let pr_tool = collab::PrTool::new(addr.clone(), Arc::clone(&desks.pr))?;
-        let claim_tool = collab::ClaimTool::new(Arc::clone(&desks.plan))?;
         let archive_tool = desks.archive_tool(&site.write_root)?;
         // The refusal face of the building's own governance. It reaches
         // for the reserved subtree, which no write domain does, and
@@ -133,7 +129,9 @@ impl Laying {
             Arc::clone(&catalog),
             Arc::clone(&bound),
             &kernel::layout::CityLayout::new(&self.city_root).cas(),
-        )?;
+        )?
+        .noting(stamps);
+        let claim_tool = self.plan_tool(site, desks, &bound)?;
         // Reading needs an address, and until this line there was no way
         // to find one: a symbol had to be hunted through `exec`, which
         // means Python this machine may not have or a shell this
@@ -243,6 +241,56 @@ impl Laying {
             succession,
             context,
         })
+    }
+
+    /// The run's `edit`: the building's domain is the ceiling and the
+    /// run's write limit narrows it, both asked at every write
+    /// (`crates/city/Spec.lean` §8-32); `stamps` is the table the run's
+    /// `read` writes, and the path locks are the city's one table.
+    ///
+    /// # Errors
+    /// Propagates a write domain that will not resolve.
+    fn edit_tool(
+        &self,
+        site: &Site,
+        addr: &Address,
+        policy: runtime::PolicyReader,
+        stamps: runtime::ReadStamps,
+    ) -> Result<EditTool, AxError> {
+        EditTool::new(
+            &site.write_root,
+            addr.clone(),
+            site.rules.write_domain()?,
+            runtime::EditDesk {
+                policy,
+                seen: stamps,
+                locks: self.edits.clone(),
+            },
+        )
+    }
+
+    /// The run's `plan`, whose `finish` takes the path of the file that
+    /// shows the work, pinned at that moment through the judgement
+    /// `read` gives it (`crates/collab/Spec.lean` D20).
+    ///
+    /// # Errors
+    /// Propagates a desk left locked by a thread that died.
+    fn plan_tool(
+        &self,
+        site: &Site,
+        desks: &BenchDesks,
+        bound: &runtime::ReadBound,
+    ) -> Result<collab::ClaimTool, AxError> {
+        let pins = runtime::BoundReader::new(
+            &site.write_root,
+            Arc::clone(bound),
+            &kernel::layout::CityLayout::new(&self.city_root).cas(),
+        );
+        Ok(
+            collab::ClaimTool::new(Arc::clone(&desks.plan))?.pinning(collab::Pinner::new(
+                move |asked| pins.pin(asked, "finish a plan node"),
+            )),
+        )
     }
 }
 

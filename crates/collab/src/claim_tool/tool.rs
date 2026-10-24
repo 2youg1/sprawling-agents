@@ -8,7 +8,7 @@
 
 use std::sync::{Arc, Mutex};
 
-use super::ClaimDesk;
+use super::{ClaimDesk, Pinner};
 use crate::claim_effect::ClaimEffect;
 use kernel::spine::check_roadmap_shape;
 use kernel::{
@@ -21,6 +21,9 @@ use serde_json::{Map, Value};
 pub struct ClaimTool {
     meta: ToolMeta,
     desk: Arc<Mutex<ClaimDesk>>,
+    /// Where a path given as `evidence` is pinned; without one, `finish`
+    /// takes a Locator only.
+    pinner: Option<Pinner>,
 }
 
 impl ClaimTool {
@@ -49,7 +52,7 @@ impl ClaimTool {
                  | `split` (parts) | `add` (parts; Mayor, empty plan)",
             ),
             ("node", "string", "dotted index, such as `2.3`"),
-            ("evidence", "string", "a retrievable locator"),
+            ("evidence", "string", "a path or locator"),
             ("reason", "string", "one line: why"),
             ("parts", "array", "the children, each `{item, weight}`"),
         ] {
@@ -84,7 +87,17 @@ impl ClaimTool {
                 temporal: Temporal::Timeless,
             },
             desk,
+            pinner: None,
         })
+    }
+
+    /// This tool, pinning a path given as `evidence` through `pinner`.
+    #[must_use]
+    pub fn pinning(self, pinner: Pinner) -> ClaimTool {
+        ClaimTool {
+            pinner: Some(pinner),
+            ..self
+        }
     }
 }
 
@@ -136,9 +149,11 @@ impl Tool for ClaimTool {
                             "missing string argument `evidence`",
                         )
                         .with_recovery(
-                            "pass a retrievable locator: `cas:<hash>` or `file:<path>@<oid>`",
+                            "pass the path of the file that shows the work, or a locator: \
+                             `cas:<hash>` or `file:<path>@<oid>`",
                         )
                     })?;
+                let evidence = Pinner::evidence(self.pinner.as_ref(), evidence)?;
                 desk.finish(&node_of(args)?, evidence)?
             }
             "block" => {

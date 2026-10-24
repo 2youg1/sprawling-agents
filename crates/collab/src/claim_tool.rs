@@ -78,6 +78,51 @@ impl Booking {
     }
 }
 
+/// Where `finish` turns a path the model wrote into the Locator of the
+/// file's bytes at that moment (`crates/collab/Spec.lean` D20).
+///
+/// The assembly layer hands it in because judging a path for reading
+/// takes the read bound, which this crate cannot see; a desk that judged
+/// paths itself would be a second authority on what a run may read. Its
+/// refusal reaches the model unchanged, and the node stays held.
+pub struct Pinner(Box<Pin>);
+
+/// Judges `asked` as a path the run may read and answers the Locator of
+/// its whole bytes.
+type Pin = dyn Fn(&str) -> Result<Locator, AxError> + Send + Sync;
+
+impl Pinner {
+    #[must_use]
+    pub fn new(pin: impl Fn(&str) -> Result<Locator, AxError> + Send + Sync + 'static) -> Pinner {
+        Pinner(Box::new(pin))
+    }
+
+    /// The Locator `evidence` stands for: itself when it is one, and the
+    /// pin of the file it names when it is a path. A string that starts
+    /// like a Locator and does not parse is refused as one, rather than
+    /// looked for as a file named `cas:...`.
+    ///
+    /// # Errors
+    /// The Locator grammar's refusal, or the pin's.
+    pub(crate) fn evidence(pinner: Option<&Pinner>, evidence: &str) -> Result<Locator, AxError> {
+        let spelled_as_locator = ["cas:", "file:"]
+            .iter()
+            .any(|scheme| evidence.starts_with(scheme));
+        match (Locator::parse(evidence), pinner) {
+            (Ok(locator), _) => Ok(locator),
+            (Err(refused), None) => Err(refused),
+            (Err(refused), Some(_)) if spelled_as_locator => Err(refused),
+            (Err(_), Some(pinner)) => (pinner.0)(evidence),
+        }
+    }
+}
+
+impl std::fmt::Debug for Pinner {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Pinner")
+    }
+}
+
 impl std::fmt::Debug for Booking {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str("Booking")
@@ -255,8 +300,7 @@ impl ClaimDesk {
 
     /// The one door out of a held node that needs a locator; the other
     /// two go through [`Self::put_down`].
-    fn finish(&mut self, id: &NodeId, raw_evidence: &str) -> Result<Payload, AxError> {
-        let evidence = Locator::parse(raw_evidence)?;
+    fn finish(&mut self, id: &NodeId, evidence: Locator) -> Result<Payload, AxError> {
         let held = self.take_held(id)?;
         self.record(held.finish(evidence.clone()))?;
         let mut result = Map::new();

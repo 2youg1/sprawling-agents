@@ -39,10 +39,6 @@ pub(super) fn text(result: &Payload) -> Option<String> {
     let offset = number(map.get("offset"))?.unwrap_or(0);
     let total = number(map.get("total_lines"))?;
     let next = number(map.get("next_offset"))?;
-    let version = match map.get("version") {
-        Some(value) => Some(value.as_str()?),
-        None => None,
-    };
     let lines: Vec<&str> = body.split_inclusive('\n').collect();
     let shown = u64::try_from(lines.len()).ok()?;
     let mut out = String::with_capacity(
@@ -71,9 +67,6 @@ pub(super) fn text(result: &Payload) -> Option<String> {
                 out.push_str(&format!(", next {next}"));
             }
         }
-    }
-    if let Some(version) = version {
-        out.push_str(&format!(", version {version}"));
     }
     out.push('\n');
     for (at, line) in (offset..).zip(lines) {

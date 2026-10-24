@@ -100,6 +100,25 @@ impl BoundReader {
             source: Source::Disk(opened),
         })
     }
+
+    /// The Locator of the whole bytes `asked` names at this moment,
+    /// judged exactly as [`Self::open`] judges it: what `plan finish`
+    /// records when a model names the file that shows its work
+    /// (`crates/collab/Spec.lean` D20, kernel `spec/Locator.lean` D27).
+    ///
+    /// # Errors
+    /// Every refusal of [`Self::open`], and `E_STORAGE_FATAL` when the
+    /// opened bytes cannot be read.
+    pub fn pin(&self, asked: &str, action: &'static str) -> Result<Locator, AxError> {
+        let mut bytes = Vec::new();
+        self.open(asked, action)?
+            .read_to_end(&mut bytes)
+            .map_err(|err| {
+                AxError::failure(AxCode::StorageFatal, action, format!("{asked}: {err}"))
+                    .with_recovery("the User has to make the file readable")
+            })?;
+        Ok(Locator::cas(B3Hash::digest(&bytes)))
+    }
 }
 
 /// The refusal for a file that was not there when it was judged.

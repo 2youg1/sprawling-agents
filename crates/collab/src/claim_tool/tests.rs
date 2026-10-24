@@ -148,6 +148,51 @@ fn a_run_holds_one_node_at_a_time() {
     assert!(refusal.recovery().contains("one node"));
 }
 
+/// A path given as evidence is pinned through the tool's `Pinner`, and a
+/// string spelled as a Locator is judged as one even when a `Pinner`
+/// stands by (`crates/collab/Spec.lean` D20).
+#[test]
+fn a_path_given_as_evidence_is_pinned_and_a_broken_locator_is_not() {
+    let shared = desk();
+    let asked = Arc::new(Mutex::new(Vec::new()));
+    let heard = Arc::clone(&asked);
+    let tool = ClaimTool::new(Arc::clone(&shared))
+        .unwrap()
+        .pinning(Pinner::new(move |path| {
+            heard.lock().unwrap().push(path.to_owned());
+            Locator::parse(&locator())
+        }));
+    tool.invoke(&call(serde_json::json!({ "action": "claim", "node": "1" })))
+        .unwrap();
+    let broken = tool
+        .invoke(&call(serde_json::json!({
+            "action": "finish", "node": "1", "evidence": "cas:b3-short"
+        })))
+        .map(|_| ())
+        .map_err(|err| *err.code());
+    let pinned = tool
+        .invoke(&call(serde_json::json!({
+            "action": "finish", "node": "1", "evidence": "report.md"
+        })))
+        .map(|_| ())
+        .map_err(|err| *err.code());
+    let text = shared.lock().unwrap().roadmap().unwrap().to_owned();
+    assert_eq!(
+        (
+            broken,
+            pinned,
+            asked.lock().unwrap().clone(),
+            evidence_of(&text, &node("1")).map(|l| l.to_string()),
+        ),
+        (
+            Err(AxCode::LocatorInvalid),
+            Ok(()),
+            vec!["report.md".to_owned()],
+            Some(locator()),
+        )
+    );
+}
+
 #[test]
 fn finishing_requires_evidence_that_parses() {
     let shared = desk();

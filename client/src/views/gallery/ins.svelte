@@ -80,7 +80,7 @@ impl Document {
     subject: PATH,
     effect: { write: { domain: ROOM } },
     render: { diff: { locations: [] } },
-    output: { head: JSON.stringify({ path: PATH, base_version: "b3", new_version: "b3", diff: "" }), cut: 0 },
+    output: { head: JSON.stringify({ path: PATH, diff: "" }), cut: 0 },
   });
   const TESTS = call(21, 3_412, {
     tool: "exec",

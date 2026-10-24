@@ -164,7 +164,6 @@ fn edit(setup: &Setup) -> Episode {
             tool: "edit",
             args: json!({
                 "path": notes(setup),
-                "base_version": "new",
                 "old": "",
                 "new": format!("# Notes\n\n{MARK}\n"),
             }),
@@ -172,7 +171,7 @@ fn edit(setup: &Setup) -> Episode {
         holds: |seen| {
             let result = answered(seen.answer)?;
             ensure(
-                result.get("base_version") == Some(&json!("new")),
+                result.get("diff").is_some(),
                 format!("a creation answered {result:?}"),
             )?;
             ensure(
