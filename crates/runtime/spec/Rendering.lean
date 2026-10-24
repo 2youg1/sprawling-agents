@@ -31,7 +31,7 @@ impl Copied<'_> {
 **V1**：载荷的紧凑 JSON（`serde_json::to_string`），对答与拒都是。永久保留：账本里这把键出现之前的每一行都是这样给模型看的。
 
 **V2**：
-- **拒绝是一行**：`E_CODE action: subject; recovery`；`nearby` 非空时接 ` nearby: a, b`；`retry` 为 yes 时接 ` (retry)` 或 ` (retry after N ms)`，unknown 时接 ` (it may have taken effect)`；门拒时接 ` rule: <rule>`。引文里的换行换成空格，码恒在行首。谁为失败付账、哪个 provider 失败留在账本里，模型据以行动的只有上面这些。
+- **拒绝是一行**：`E_CODE action: subject; recovery`，其余部分各以 `; ` 接在同一行：`nearby` 非空时接 `nearby: a, b`；`retry` 为 yes 时接 `retry` 或 `retry after N ms`，unknown 时接 `it may have taken effect`；门拒时接三段式拒绝的全部三段 `rule: <rule>; <violation>; instead: <alternative>`（kernel 的 `GateRefusal`）：只给规则，模型只知道被拦，不知道为什么、还能做什么。引文里的换行换成空格，码恒在行首。谁为失败付账、哪个 provider 失败留在账本里，模型据以行动的只有上面这些。
 - **read 是一行头加正文**：头是 `<path> lines <a>-<b> of <total>`，有续读点时接 `, next <k>`，有版本时接 `, version <v>`；文本为空时是 `<path> is empty`（总行数为 0 或未知）或 `<path> has <total> lines; offset <o> is past the end`。行号 0 基、闭区间，与 `offset` 和 `search` 的 `line` 同一套编号（§8-29-1、§8-30-2），所以头与标记上的数字可以原样递回去。读到末尾的答没有 `total_lines`，总数就是末行号加一。正文逐字节保留，只在 0 基行号是 10 的倍数的行与首行的行首插 `<n>|`。载荷的 `offset` 缺席即 0（§8-29-1）。
 - **search 按文件分组**：头一行说答了什么——content 是 `<n> matches in <f> files`，files 是 `<n> files`，count 是 `<n> files, <m> matches`（单数时写 `1 match`、`1 file`）；停走时接 `; <stopped>`，有没看过的地方时接 `; <k> not searched`。content 下每个文件一组：文件路径独占一行，接着是它的命中块，组与组之间空一行；命中行与（`from` 早于命中行时）上下文首行的行首插与 read 同一语法的 `<n>|`，所以从搜索答里抄进 `edit` 的段落照样能剥掉标记。files 下每行一个路径；count 下每行 `<path>:<count>`。最后，`unread` 每条一行 `<path> not searched: <why>`，与上文空一行。`truncated` 不画：`stopped` 已经说了停在哪。
 - **其余工具**的答本版仍画成 JSON（与 V1 同字节）；某个工具有了自己的读法时在这里加一条。V2 一旦随一个发布版写进过账本，再加读法就要进位到 V3，旧行照旧按 V2 画。

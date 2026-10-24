@@ -159,7 +159,7 @@ fn a_refusal_is_one_line_led_by_its_code() {
     };
     assert_eq!(
         shown(Rendering::V2, &read(), &answer).unwrap(),
-        "E_INVALID_ARGS read: data/x.csv: no such file; check the path nearby: \
+        "E_INVALID_ARGS read: data/x.csv: no such file; check the path; nearby: \
          data/readings.csv, data/y.csv"
     );
     let again = AxError::failure(AxCode::InvalidArgs, "exec", "busy\nnow")
@@ -174,6 +174,35 @@ fn a_refusal_is_one_line_led_by_its_code() {
             }
         )
         .unwrap(),
-        "E_INVALID_ARGS exec: busy now; wait (retry)"
+        "E_INVALID_ARGS exec: busy now; wait; retry"
+    );
+}
+
+/// A door's refusal reaches the model with all three of its parts: the
+/// rule, what broke it, and what is open instead.
+#[test]
+fn a_door_refusal_carries_its_rule_its_violation_and_the_way_open() {
+    let kernel::gate::GateOutcome::Deny { refusal } = kernel::gate::command(&kernel::TaintSet::of(
+        kernel::TaintSource::new("arrival:github").unwrap(),
+    )) else {
+        panic!("a tainted run's command was allowed");
+    };
+    let drawn = shown(
+        Rendering::V2,
+        &ToolName::parse("exec").unwrap(),
+        &ToolAnswer::Failed {
+            error: Payload::of(&*refusal).unwrap(),
+        },
+    )
+    .unwrap();
+    assert_eq!(
+        drawn,
+        format!(
+            "E_TAINTED_ACTION run a command: exec; {recovery}; rule: {rule}; {violation}; instead: {alternative}",
+            recovery = refusal.recovery(),
+            rule = refusal.gate().unwrap().rule(),
+            violation = refusal.gate().unwrap().violation(),
+            alternative = refusal.gate().unwrap().alternative(),
+        )
     );
 }
