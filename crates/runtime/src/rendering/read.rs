@@ -77,18 +77,27 @@ pub(super) fn text(result: &Payload) -> Option<String> {
     }
     out.push('\n');
     for (at, line) in (offset..).zip(lines) {
-        if at == offset || at % MARK_EVERY == 0 {
-            push_mark(&mut out, at);
-        }
-        out.push_str(line);
+        push_line(&mut out, offset, at, line);
     }
     Some(out)
 }
 
-/// Writes the mark that numbers the line about to be written, in the
+/// Writes the line numbered `at` of a passage whose first line is
+/// numbered `first`, behind the mark [`is_marked`] places there, in the
 /// one grammar [`Copied`] takes off again.
-pub(super) fn push_mark(out: &mut String, at: u64) {
-    out.push_str(&format!("{at}{MARK_END}"));
+pub(super) fn push_line(out: &mut String, first: u64, at: u64, line: &str) {
+    if is_marked(first, at) {
+        out.push_str(&format!("{at}{MARK_END}"));
+    }
+    out.push_str(line);
+}
+
+/// Whether the line numbered `at` of a passage drawn from line `first`
+/// carries a mark: the first line does, and so does every line whose
+/// number is a multiple of [`MARK_EVERY`]. Drawing and [`Copied`] both
+/// ask this, so a mark is taken off exactly where one can have been drawn.
+fn is_marked(first: u64, at: u64) -> bool {
+    at == first || at.is_multiple_of(MARK_EVERY)
 }
 
 /// A key that is absent reads as `Some(None)`; one that is present and
@@ -106,10 +115,9 @@ fn number(value: Option<&Value>) -> Option<Option<u64>> {
 /// A line that starts with digits and the separator may be a mark the
 /// renderer drew or text the file holds, and the passage alone cannot
 /// say which. What can say is where the passage sits: a mark is drawn
-/// only on the line whose 0-based number it spells, and only on the
-/// first line of an answer or a line whose number is a multiple of
-/// [`MARK_EVERY`]. [`Copied::drawn_from`] keeps to that rule, and `edit`
-/// checks the result against the file before it trusts it.
+/// only on the line whose 0-based number it spells, and only where
+/// [`is_marked`] places one. [`Copied::drawn_from`] keeps to that rule,
+/// and `edit` checks the result against the file before it trusts it.
 pub struct Copied<'a> {
     lines: Vec<CopiedLine<'a>>,
 }
@@ -154,9 +162,9 @@ impl<'a> Copied<'a> {
             .zip(&self.lines)
             .filter_map(|(at, line)| {
                 let (number, _) = line.mark?;
-                (at == 0 || number % MARK_EVERY == 0)
-                    .then(|| number.checked_sub(at))
-                    .flatten()
+                number
+                    .checked_sub(at)
+                    .filter(|&start| is_marked(start, number))
             })
             .collect()
     }
@@ -170,8 +178,8 @@ impl<'a> Copied<'a> {
         let mut out = String::new();
         let mut taken = std::collections::BTreeSet::new();
         for (at, line) in (0_u64..).zip(&self.lines) {
-            let drawn = line.mark.filter(|(number, _)| {
-                start.checked_add(at) == Some(*number) && (at == 0 || number % MARK_EVERY == 0)
+            let drawn = line.mark.filter(|&(number, _)| {
+                start.checked_add(at) == Some(number) && is_marked(start, number)
             });
             match drawn {
                 Some((number, rest)) => {

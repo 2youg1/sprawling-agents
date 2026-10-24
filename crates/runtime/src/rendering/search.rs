@@ -7,14 +7,15 @@
 //!
 //! The header says what the answer holds before any of it is read, so a
 //! model that asked too broad a question learns that from the first
-//! line. Hit lines carry the marks `read` draws (`super::read`), because
-//! a passage copied out of a search answer goes to `edit` as readily as
-//! one copied out of a read, and `edit` sees through only that grammar.
+//! line. A hit block is marked the way a read answer that starts on the
+//! block's first line is (`super::read`), because a passage copied out of
+//! a search answer goes to `edit` as readily as one copied out of a read,
+//! and `edit` sees through only that grammar.
 
 use kernel::Payload;
 use serde_json::{Map, Value};
 
-use super::read::push_mark;
+use super::read::push_line;
 
 /// The header and the grouped entries of one `search` payload, or `None`
 /// when the payload is not the shape `tools::search` writes.
@@ -43,8 +44,8 @@ pub(super) fn text(result: &Payload) -> Option<String> {
 }
 
 /// Every hit, a group per file: the path on a line of its own, then its
-/// hit blocks, the hit line marked and so is the block's first line when
-/// context starts above it. Groups are parted by an empty line.
+/// hit blocks, each marked from its first line, which is the hit line
+/// unless context starts above it. Groups are parted by an empty line.
 fn content(matches: &[Value], body: &mut String) -> Option<String> {
     let mut files = 0_usize;
     let mut last: Option<&str> = None;
@@ -62,10 +63,7 @@ fn content(matches: &[Value], body: &mut String) -> Option<String> {
             last = Some(path);
         }
         for (at, text) in (from..).zip(hit.get("text")?.as_str()?.split('\n')) {
-            if at == from || at == line {
-                push_mark(body, at);
-            }
-            body.push_str(text);
+            push_line(body, from, at, text);
             body.push('\n');
         }
     }

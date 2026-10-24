@@ -391,8 +391,8 @@ fn drawn(outcome: ToolOutcome) -> String {
 }
 
 /// Hits are drawn a group per file under a header that counts them, and
-/// a hit line and the context line above it carry the marks `read`
-/// draws, so the numbers go back to `read` or `edit` unchanged.
+/// each hit block is marked the way a read answer starting on its first
+/// line is, so the numbers go back to `read` or `edit` unchanged.
 #[test]
 fn hits_are_drawn_grouped_by_file_with_their_lines_marked() {
     let dir = city();
@@ -407,9 +407,9 @@ fn hits_are_drawn_grouped_by_file_with_their_lines_marked() {
     assert_eq!(
         drawn(outcome),
         "2 matches in 2 files\n\
-         lab/Notes.md\n0|before\n1|the ledger again\nafter\n\
+         lab/Notes.md\n0|before\nthe ledger again\nafter\n\
          \n\
-         lab/room1/Memo.md\n0|one decision\n1|the ledger is the history\nnothing else\n"
+         lab/room1/Memo.md\n0|one decision\nthe ledger is the history\nnothing else\n"
     );
 }
 
