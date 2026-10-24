@@ -87,7 +87,7 @@ fn an_edit_by_a_run_that_never_read_the_file_is_refused() {
     );
 }
 
-/// The strict side of D103: a file another writer changed after this
+/// The strict side of D105: a file another writer changed after this
 /// run's read is refused even where `old` still matches once, and the
 /// refusal carries the passage as it now reads, which counts as a look.
 #[test]

@@ -54,7 +54,7 @@ impl Tool for EditTool { /* meta：name=edit、effect=Write{domain}、render=Dif
 // 斜杠／空段，E_INVALID_ARGS）；WriteDomain::admits 杀域外与
 // reserved prefix（E_OUTSIDE_WRITE_DOMAIN，recovery 报可写前缀清单）。工具静态声明的 Effect 只说它会写，
 // 模型选的 path 要在这里判——判定住权威处，而不是 bench 里的第二份判定。
-// args：{path, old, new}；准入按本 run 的读戳（§8-64，D103）：没读过＝E_INVALID_ARGS，读后被改＝E_VERSION_CONFLICT 带当前片段；
+// args：{path, old, new}；准入按本 run 的读戳（§8-64，D105）：没读过＝E_INVALID_ARGS，读后被改＝E_VERSION_CONFLICT 带当前片段；
 // old 必唯一命中（零命中／多命中＝E_INVALID_ARGS 携计数）；回显＝unified diff（逐次 diff 即回档粒度）
 
 // crates/runtime/src/tools/read.rs —— 一个参数，两条路

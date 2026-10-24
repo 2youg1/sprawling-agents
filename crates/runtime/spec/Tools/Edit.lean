@@ -62,7 +62,7 @@ inductive Admission where
   | present
   deriving DecidableEq, Repr
 
-/-- D103 的判定，与 `runtime::tools::stamp::admission` 同构。 -/
+/-- D105 的判定，与 `runtime::tools::stamp::admission` 同构。 -/
 def admission (seen current : Option Nat) (creating : Bool) : Admission :=
   match current with
   | none => if creating then .lands else .absent
@@ -342,7 +342,7 @@ theorem a_refusal_for_a_moved_file_counts_as_a_look (w : World) (r : Nat) (p : N
 
 end Runtime.Tools.Edit
 
-/-! D103 edit 以每个 run 的读戳准入，读后被改则拒绝并给出当前片段
+/-! D105 edit 以每个 run 的读戳准入，读后被改则拒绝并给出当前片段
 
 **决定**：edit 不收模型抄写的版本。运行时为每个 run 记下它看过的每个文件的戳（§8-64），edit 在按路径的锁里取当前戳：没读过拒绝；读后被改拒绝，拒绝里带 `old` 附近的当前片段并把它记作一次窗口读；戳是当前的，`old` 恰好命中一次才落盘。对不存在的路径 `old: ""` 新建，路径已存在拒绝。§8-64-2 证明：一个 run 最后一次观察某路径之后，只要别人落过盘，它对这个路径的 edit 就不落盘；两个 run 在同一份内容上的 edit 只落一次。
 

@@ -79,7 +79,7 @@ impl<'de> Deserialize<'de> for GitOid { /* 同上，20 个字节 */ }
 
 /-! D27 `plan finish` 收一个路径，运行时在完成那一刻把它折成这份内容的 Locator
 
-**决定**：`plan finish` 的 `evidence` 是本节文法的两种完整形式之一，或者一个路径（与 `read` 同一个判定：`runtime::BoundReader::pin`）。是路径时，运行时在完成那一刻读这个文件，记下 `Locator::cas(B3Hash::digest(bytes))` 的规范拼写，计划里存的永远是 Locator。`read` 与 `edit` 都不答版本：edit 的准入靠每个 run 的读戳（`crates/runtime/spec/Tools/Edit.lean` D103），模型没有要抄的哈希。工作树里的文件不答 git oid：`file:<address>@<oid>` 的 oid 是一次提交（`storage::blob_at` 按提交取文件），一份尚未落进检查点的文件没有这样一个提交。
+**决定**：`plan finish` 的 `evidence` 是本节文法的两种完整形式之一，或者一个路径（与 `read` 同一个判定：`runtime::BoundReader::pin`）。是路径时，运行时在完成那一刻读这个文件，记下 `Locator::cas(B3Hash::digest(bytes))` 的规范拼写，计划里存的永远是 Locator。`read` 与 `edit` 都不答版本：edit 的准入靠每个 run 的读戳（`crates/runtime/spec/Tools/Edit.lean` D105），模型没有要抄的哈希。工作树里的文件不答 git oid：`file:<address>@<oid>` 的 oid 是一次提交（`storage::blob_at` 按提交取文件），一份尚未落进检查点的文件没有这样一个提交。
 
 **理由**：版本串在 read 的每次答复里约 62 个 token，模型要把它原样抄进 `plan finish`，没有 `exec` 的 run 又拿不到 40 位 oid。让运行时在完成那一刻算，文法仍只有这一个家，计划里的证据仍可取回，模型只说它指的是哪个文件。
 
