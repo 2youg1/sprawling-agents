@@ -52,6 +52,7 @@ import crates.city.spec.Wizard
 | `building` | 一栋楼怎么被建出来，以及一个地址归哪栋楼管 | `spec/Building.lean` |
 | `config_layers` | 三层配置住哪三个文件，又怎么求成一份 `FrozenConfig` | `spec/ConfigLayers.lean`、`spec/ConfigLayers/Ladder.lean`、`spec/ConfigLayers/Remote.lean` |
 | `spine_files` | 一栋楼开局有哪几份文档，一件活的 JOB.md 落在哪 | `spec/SpineFiles.lean` |
+| `defaults` | 哪几份文档的默认文本归二进制，城里的副本是人改过的还是旧版默认 | `spec/SpineFiles.lean` |
 | `schedule` | 到点发车：谁在什么节奏上自己开始 | `spec/Schedule.lean` |
 | `watch` | 盘上的文件变了，谁该知道 | `spec/Watch.lean` |
 | `library`、`archive` | 书架上有什么、怎么装上去、审过没有；一条记录存哪里、怎么找回来 | `spec/Library.lean`、`spec/Library/Install.lean`、`spec/Library/Audit.lean`、`spec/Archive.lean` |
@@ -189,6 +190,7 @@ workspace 内只依赖 `kernel`（ARCHITECTURE.md §3 的 `depmap`），规格�
 | 8-39 | `crates/city/spec/ConfigLayers/Remote.lean` |
 | 8-40 | `crates/city/spec/Document.lean` |
 | 8-41 | `crates/city/spec/SpineFiles.lean` |
+| 8-42 | `crates/city/spec/SpineFiles.lean` |
 
 `spec/ConfigLayers/Ladder.lean` 没有标签：它是 §8-4 那条梯子的模型。`spec/SpineFiles.lean` 末尾的「模板的写法」一节讲 `crates/city/templates/` 下每份模板的格式，同样没有标签。
 
@@ -279,6 +281,8 @@ resident 段是模型每回合都读到的四段之一。`URBANITE.md` 建议 30
 | D25 | `[search]` 是三臂的值，`Custom` 不回落到缺省那一家，缺省那一家只在 `config_layers::search` 声明 | `crates/city/spec/ConfigLayers.lean` |
 | D26 | MCP url 用 `url::Url` 解析，凭据的名字与值仍由 `kernel::secret` 判 | `crates/city/spec/ConfigLayers.lean` |
 | D27 | `egress` 不写是不限主机，写了才判 | `crates/city/spec/Policy.lean` |
+| D28 | 默认文本归二进制，与某个已发布版本逐字节相同的副本开城时前移到本构建的默认 | `crates/city/spec/SpineFiles.lean` |
+| D29 | City Hall 的纪律分人设之前与人设之后两段，操作说明不留在人设文件里 | `crates/city/spec/SpineFiles.lean` |
 -/
 
 /-! D8 定规：拒词的恢复语归写拒词的那一处

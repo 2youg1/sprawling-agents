@@ -6,7 +6,7 @@
 /-!
 # city::spine_files
 
-规定 `spine_files`、`spine_files::blank`、`spine_files::hall`、`handoff_form`（`crates/city/src/` 下同名的文件）。一栋楼开局有哪几份文档、一件活的 JOB.md 落在哪、交接表单怎么读，以及城写下的模板。本文件是 `crates/city/Spec.lean` 的一个分部；下面每一节保留它在 city 规格里的标签 §8-n，别处引作 `crates/city/Spec.lean §8-n`，决定引作 `city D<n>`。
+规定 `spine_files`、`spine_files::blank`、`spine_files::hall`、`handoff_form`、`defaults`（`crates/city/src/` 下同名的文件）。一栋楼开局有哪几份文档、一件活的 JOB.md 落在哪、交接表单怎么读，城写下的模板，以及哪几份文档的默认文本归二进制。本文件是 `crates/city/Spec.lean` 的一个分部；下面每一节保留它在 city 规格里的标签 §8-n，别处引作 `crates/city/Spec.lean §8-n`，决定引作 `city D<n>`。
 
 这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与 `city::spine_files::tests` 守住。
 -/
@@ -58,16 +58,62 @@ pub fn norms(city_root: &Path, addr: &Address) -> Result<Vec<PathBuf>, AxError>;
 
 ```rust
 // city::spine_files
-pub const CITY_TEMPLATE: &str = include_str!("../templates/City.md");   // 立城时写下的 City.md；accounting 的创世读它
+pub const CITY_TEMPLATE: &str = include_str!("../templates/City.md");   // City.md 的默认文本；defaults::Shipped::City 交出它，accounting 的 city_segment 读它
 // 其余模板仍是本模块与 building::template 的私有常量，各自 include_str!("../templates/<文件>") 或 ("../../templates/<文件>")
 ```
 
 - **一个目录装城写下的全部第一批字节**：`crates/city/templates/` 下是 `RULES.toml`、`RULES-hall.toml`、`Roadmap.md`、`Memo.md`、`Handoff.md`、`SPEC.md`、`JOB.md`、`MAYOR.md`、`CLERK.md`、`URBANITE.md`、`City.md`，以及说明每份文件谁写、谁读的 `README.md`。人读的那份与城写出的那份仍是同一串字节（§8-3、§8-5），只是这串字节现在住在把它编进去的包里。
 - **为什么在包里**：crates.io 上的 `.crate` 只装包目录里的文件，验证构建与 `cargo install` 都在解开的包里编译；`include_str!` 指向包外的 `docs/` 时，那里没有这些文件，city 编不出来（`crates/sprawling/Spec.lean` §8-157）。`packaged` 门判这一条（tools/xtask/Spec.lean §8-49）。
-- **`City.md` 由 city 交出，accounting 来读**：立城时写下 `City.md` 的是 `accounting::worker::genesis`，但这份文件的名字（`CITY_FILE`）与它同目录的模板都归本模块。accounting 的 `CITY_MD` 是 `city::CITY_TEMPLATE`，一份字节、一个家；accounting 不能 `include_str!` 别的包目录里的文件，那在包里同样落空。
+- **`City.md` 由 city 交出，accounting 来读**：城里的 `City.md`、`MAYOR.md`、`CLERK.md` 由 `defaults::follow_defaults` 铺下与前移（§8-42），这份文件的名字（`CITY_FILE`）与它同目录的模板都归本模块。accounting 的 `CITY_MD` 是 `city::CITY_TEMPLATE`，一份字节、一个家；accounting 不能 `include_str!` 别的包目录里的文件，那在包里同样落空。
 - **失败**：没有运行期失败。模板改名或挪走，`include_str!` 在编译期就红。
 
 **验收**：`cargo xtask gates packaged` 对 city 与 accounting 为绿；§8-3、§8-5、§8-15、§8-20 现有的模板测试照旧通过（它们读的是同一串字节）。
+-/
+
+/-!
+### 8-42 city::defaults（形状 6 数据面＋落盘动作）
+
+```rust
+pub enum Shipped { City, Mayor, Clerk }                      // 默认文本归二进制的三份文档；穷尽
+impl Shipped {
+    pub const ALL: [Shipped; 3];
+    pub fn text(self) -> &'static str;                       // 本构建的默认文本
+    pub fn path(self, city_root: &Path) -> PathBuf;          // 城根的 City.md；保留子树里的 MAYOR.md、CLERK.md（Governed::path）
+}
+pub enum CopyStanding { Absent, Current, Earlier, Edited }   // 一份副本相对默认的身份；穷尽
+pub fn standing(doc: Shipped, copy: Option<&[u8]>) -> CopyStanding;
+pub struct Edited { pub doc: Shipped, pub path: PathBuf }    // 人改过、保留不动的一份
+pub fn follow_defaults(city_root: &Path) -> Result<Vec<Edited>, AxError>;
+```
+
+- **判定只有一处**：`standing` 按字节判。等于本构建的默认是 `Current`；BLAKE3 落在这份文档的历史摘要表里是 `Earlier`；不在是 `Absent`；其余是 `Edited`。摘要表收这几份模板在仓库历史里出现过的每一版（`crates/city/templates/` 与更早的 `docs/City.md`、`docs/templates/`），开发构建立过的城也认得出来。
+- **`follow_defaults` 是这三份文档唯一的写者**：`Absent` 与 `Earlier` 写成本构建的默认（经 `document::replace`，整份落盘），`Current` 不动，`Edited` 不动并列进返回值。立城与开城都调它：开城在 `accounting::worker::lifetime::RunWorker::holding` 里、拿着城的写锁、紧挨 `keep_records_out_of_git`；立城经同一个 `holding`，所以创世不再自己写这三份。
+- **改默认文本的那个改动，把改之前那版的 BLAKE3 加进摘要表**：否则未改的旧副本被判成 `Edited`，旧城会一直读旧文字。测试 `every_default_names_its_earlier_versions` 断言本构建的默认不在自己的摘要表里（在就说明改动忘了换默认）。
+- **失败**：`E_STORAGE_FATAL` 带路径，读不了或写不了任何一份时；改过的副本不是失败。
+
+**验收**：`cargo nextest run -p sprawling-city -E 'test(defaults)'`。
+-/
+
+/-! D28 默认文本归二进制，与某个已发布版本逐字节相同的副本开城时前移到本构建的默认
+
+**决定**：`City.md`、`MAYOR.md`、`CLERK.md` 的默认文本由二进制持有（§8-42）。城里的副本与某个已发布版本逐字节相同，就视为人没改过，开城时写成本构建的默认；改过的原样保留，开城时在 diagnostics 里点名；不在的铺下。
+
+**理由**：模板原本只在立城时复制一次，二进制改了文字也到不了旧城，旧城会继续教已删的参数与工具。前移写在盘上而不是在装配前缀时临时替换，因为人打开的那份文件必须就是模型读到的字节。与已发布版本逐字节相同的副本，内容能从摘要表与仓库历史复原，所以前移不需要备份。
+
+**被否**：①装配前缀时按判定把旧副本换成默认，盘上不动——人看到的与模型收到的不再是同一串字节；②按“最像哪一版”的模糊比对判定——会把人改过的副本当作未改而覆盖；③城里不再放副本、只在人想覆盖时才建文件——人没有一份能打开、能照着改的文本，这要等 PANELS 的编辑器显示二进制默认之后再议。
+
+**重开参数**：副本的前移要与配置文件一起走 `format` 迁移阶梯与集中备份时，`follow_defaults` 登记为阶梯的一步。
+-/
+
+/-! D29 City Hall 的纪律分人设之前与人设之后两段，操作说明不留在人设文件里
+
+**决定**：`spine_files::hall` 给每个 hall 席位两段二进制文本：`opening` 放在人设之前（Mayor 是它怎么工作与怎么写计划），`closing` 放在人设之后（绝不做什么、谁读得到什么）。`MAYOR.md`、`CLERK.md` 的模板只留人设各节（`<who>`、`<voice>`、`<stops>`、`<bring>`）；原来模板里的 `<plan>` 与 `<seen>` 原样搬进二进制文本。
+
+**理由**：操作说明会随工具改名、参数增删而变，住在人改的文件里，二进制就改不到它（D28 只能前移没改过的副本）。程序放在人设之前，人设给它上色；禁令放在最后，模型最后读到它，人设压不住它。
+
+**被否**：①全部纪律仍接在人设之后——程序性的说明与禁令混在一段，人设里的风格要求排在程序之前，读起来像程序服从人设；②`<plan>` 留在模板里——改了 `plan`、`edit` 的参数，旧城的副本照旧教已删的参数。
+
+**重开参数**：人要能改 Mayor 的程序（而不只是人设）时，程序变成一份带默认文本的覆盖文件，走 D28。
 -/
 
 /-!
@@ -91,7 +137,7 @@ pub const CITY_TEMPLATE: &str = include_str!("../templates/City.md");   // 立�
 
 **进度条只有一份数据：任务表。** 它是派生值，由脚本唯一写者重画，每格一个任务、顺序即落地顺序，半格表达进行中——不落盘手写，于是「表与条对不上」这件事构造上不可能。`blank.rs::is_blank_form` 的判空从行前缀（跳 `#`、`>`、括号行）改成看标签边界，于是一条以 `(` 开头的正文不再被误判为空。
 
-**人设与纪律不同居**：`MAYOR.md`／`CLERK.md` 的人设留 Markdown（人随便写，想让市长学谁说话都行），纪律（工具清单、绝不做什么、何时停）编译进 `spine_files::hall`，与 `EPHEMERAL_SEGMENT` 同型——人设覆盖不到它，这正是「插得进去但毁不掉」。
+**人设与纪律不同居**：`MAYOR.md`／`CLERK.md` 的人设留 Markdown（人随便写，想让市长学谁说话都行），纪律（工具清单、怎么写计划、谁读得到什么、绝不做什么）编译进 `spine_files::hall`，与 `EPHEMERAL_SEGMENT` 同型——人设覆盖不到它，这正是「插得进去但毁不掉」。纪律分人设之前与人设之后两段（D29）。
 -/
 
 /-! D18 模板与 `City.md` 住进 city 的包目录，不留在 `docs/`
