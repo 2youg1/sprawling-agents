@@ -90,7 +90,11 @@ fn a_rooms_conventions_ride_in_the_resident_slot_after_the_buildings() {
     let lab = dir.path().join("lab");
     std::fs::create_dir_all(lab.join("pkg").join("probe")).unwrap();
     std::fs::write(lab.join("AGENTS.md"), "Measurements are in millivolts.\n").unwrap();
-    std::fs::write(lab.join("pkg").join("AGENTS.md"), "The package logs in kelvin.\n").unwrap();
+    std::fs::write(
+        lab.join("pkg").join("AGENTS.md"),
+        "The package logs in kelvin.\n",
+    )
+    .unwrap();
     std::fs::write(
         lab.join("pkg").join("probe").join("AGENTS.md"),
         "The probe samples at one hertz.\n",
@@ -109,7 +113,10 @@ fn a_rooms_conventions_ride_in_the_resident_slot_after_the_buildings() {
     assert_eq!(seen.len(), 2);
     assert_eq!(
         slot(&seen[0], "resident").2,
-        vec!["lab/pkg/AGENTS.md".to_owned(), "lab/pkg/probe/AGENTS.md".to_owned()]
+        vec![
+            "lab/pkg/AGENTS.md".to_owned(),
+            "lab/pkg/probe/AGENTS.md".to_owned()
+        ]
     );
     assert_eq!(slot(&seen[1], "resident").2, Vec::<String>::new());
     assert_eq!(slot(&seen[0], "building"), slot(&seen[1], "building"));
