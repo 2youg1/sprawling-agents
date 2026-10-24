@@ -163,10 +163,7 @@ fn build_segment(
             }
             text.push_str(body);
             seen.insert(addr.clone());
-            sources.push(SegmentSource::whole(
-                doc.addr.clone(),
-                u64::try_from(body.len()).unwrap_or(u64::MAX),
-            ));
+            sources.push(SegmentSource::whole(doc.addr.clone(), bytes));
             continue;
         }
         let worst_marker = elision::marker_room(body.len());
@@ -184,11 +181,22 @@ fn build_segment(
         }
         text.push_str(&cut.text);
         seen.insert(addr.clone());
-        sources.push(SegmentSource {
-            addr: doc.addr.clone(),
-            kept: u64::try_from(kept).unwrap_or(u64::MAX),
-            dropped: cut.dropped.get(),
-        });
+        // `boundary_before` answers a char boundary inside `body`, so
+        // the span is always there; a refusal names the document if
+        // that contract ever breaks rather than hashing the wrong span.
+        let kept_bytes = body.as_bytes().get(..kept).ok_or_else(|| {
+            AxError::failure(
+                AxCode::InvalidArgs,
+                "build prefix segment",
+                format!("{addr}: cut at {kept} lies outside the document"),
+            )
+            .with_recovery("report this: the elision boundary left the document it was cutting")
+        })?;
+        sources.push(SegmentSource::cut(
+            doc.addr.clone(),
+            kept_bytes,
+            cut.dropped.get(),
+        ));
     }
     Ok((
         FrozenSegment::assembled(slot, text.into_bytes(), sources),

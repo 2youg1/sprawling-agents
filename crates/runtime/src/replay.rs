@@ -236,6 +236,19 @@ pub fn rebuild_prefix(
                      the file on disk today is shorter than the span the run kept"
                 ))
             })?;
+            if let Some(recorded) = source.get("hash").and_then(serde_json::Value::as_str)
+                && recorded != B3Hash::digest(piece.as_bytes()).to_string()
+            {
+                return Err(AxError::failure(
+                    AxCode::CasCorrupt,
+                    "rebuild prefix",
+                    format!("{slot}: {addr_raw}: the kept bytes differ from the ones recorded"),
+                )
+                .with_recovery(format!(
+                    "restore {addr_raw} to the text it held when the run recorded it; the \
+                     model was given those bytes, not the ones on disk today"
+                )));
+            }
             if !text.is_empty() {
                 text.push_str(crate::prefix::DOC_JOIN);
             }
