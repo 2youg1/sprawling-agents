@@ -7,10 +7,11 @@
 // 4-10a): the one place the room's address and the session's number are
 // drawn in zen and blend, and the control that opens the command palette.
 //
-// **The room is never cut.** A long address loses the front of its
-// building, not the room: two rooms of one building differ only in their
-// last segment, so the look truncates `building` and keeps `room` whole
-// (#65's ruling, "the end of a long address stays visible").
+// **The room is cut last.** A long address loses its building before
+// its room: two rooms of one building differ only in their last segment,
+// so the look truncates `building` first and `room` only on a column too
+// narrow for the room alone (#65's ruling, "the end of a long address
+// stays visible"). The whole address is in the button's name.
 
 import { fill, say } from "../../core/lang";
 import type { Lang } from "../../core/lang";

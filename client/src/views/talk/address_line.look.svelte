@@ -7,7 +7,10 @@
   // How the address line is drawn (`./address_line.ts`): one quiet line
   // at the head of the conversation, the building's part in the faint ink
   // and free to shrink, the room in the quiet ink and never cut, the
-  // session's number after it on the figure face. The line is a button
+  // session's number after it on the figure face. The building gives way
+  // a thousand times faster than the room, so the room is cut only once
+  // the building is gone, on a column too narrow for the room alone; the
+  // number is never cut. The line is a button
   // with no ground: under the pointer and the focus the ink lifts one step,
   // which arrives and leaves on the theme's two curves (§4-43), and a
   // press gives by the theme's press ratio. On a touch screen the area
@@ -22,16 +25,16 @@
   <button
     {...look.wire}
     class={[
-      "group relative -mx-snug flex max-w-full min-w-0 items-baseline rounded-control px-snug text-note text-text-faint",
+      "group relative flex max-w-full min-w-0 items-baseline rounded-control text-note text-text-faint",
       "transition-[color,transform] duration-short ease-leave hover:text-text-quiet hover:ease-arrive focus-visible:text-text-quiet",
       "active:scale-(--scale-press) active:ease-arrive still:transition-none still:active:scale-100",
       "pointer-coarse:before:absolute pointer-coarse:before:top-1/2 pointer-coarse:before:left-1/2 pointer-coarse:before:size-touch pointer-coarse:before:-translate-1/2 pointer-coarse:before:content-['']",
     ]}
   >
     {#if look.building !== ""}
-      <span class="min-w-0 truncate">{look.building}</span>
+      <span class="min-w-0 shrink-1000 truncate">{look.building}</span>
     {/if}
-    <span class="shrink-0 text-text-quiet group-hover:text-text">{look.room}</span>
+    <span class="min-w-0 truncate text-text-quiet group-hover:text-text">{look.room}</span>
     {#if look.session !== undefined}
       <!-- wording-ok: a separator glyph, hidden from screen readers, whose name the button's label already says -->
       <span class="shrink-0 px-tight" aria-hidden="true">·</span>

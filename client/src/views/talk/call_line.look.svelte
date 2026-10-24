@@ -8,7 +8,9 @@ four-column grid (client/Spec.lean §4-44), the whole line one button. The
 line the right side holds is raised and carries the accent bar on its
 left; any other line takes the row's wash under the pointer. The time
 cell is at least nine characters and grows past that rather than spilling
-over the subject, which truncates. -->
+over the subject, which truncates. The result cell gives way before the
+subject's first eight characters do: a failure's reason is cut, and the
+whole of it is in the hint. -->
 <script lang="ts">
   import { Kbd } from "../parts/kbd.svelte";
   import Tip from "../parts/tip.svelte";
@@ -24,7 +26,7 @@ over the subject, which truncates. -->
       {...look.wire}
       aria-describedby={id}
       class={[
-        "group relative grid h-control w-full grid-cols-[8ch_minmax(0,1fr)_minmax(9ch,max-content)_auto] items-center gap-x-pane rounded-control px-snug text-left text-note narrow:grid-cols-[6ch_minmax(0,1fr)_auto_auto] narrow:gap-x-snug",
+        "group relative grid h-control w-full grid-cols-[8ch_minmax(8ch,1fr)_minmax(9ch,max-content)_minmax(0,auto)] items-center gap-x-pane rounded-control px-snug text-left text-note narrow:grid-cols-[6ch_minmax(6ch,1fr)_auto_minmax(0,auto)] narrow:gap-x-snug",
         "before:absolute before:inset-y-snug before:left-0 before:w-hair before:rounded-pill",
         look.opened ? "bg-raised text-text before:bg-accent" : "text-text-quiet hover:wash",
       ]}
@@ -41,9 +43,9 @@ over the subject, which truncates. -->
           <span class="text-text">{look.time.text}</span>
         {/if}
       </span>
-      <span class="flex items-center gap-tight">
+      <span class="flex min-w-0 items-center gap-tight">
         {#if look.verdict !== null}
-          <span class={["whitespace-nowrap", look.verdict.tone === "alert" ? "max-w-[24ch] truncate text-alert narrow:max-w-[12ch]" : "text-text-faint"]}>{look.verdict.text}</span>
+          <span class={["min-w-0 truncate", look.verdict.tone === "alert" ? "max-w-[24ch] text-alert narrow:max-w-[12ch]" : "text-text-faint"]}>{look.verdict.text}</span>
         {/if}
         <span
           data-line-keys

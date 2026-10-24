@@ -61,8 +61,11 @@
   </div>
 </Case>
 
-<Case label="address line · at a phone's width, the room kept whole" width={320}>
-  <AddressLine {...addressLineOf($lang, LONG, Seq.make(4182), still)} />
+<Case label="address line · at a phone's width, the room kept whole, and a room too long for the column cut last" width={320}>
+  <div class="flex flex-col gap-snug">
+    <AddressLine {...addressLineOf($lang, LONG, Seq.make(4182), still)} />
+    <AddressLine {...addressLineOf($lang, "atlas/payments-reconciliation-ledger-close-and-settlement-overnight", Seq.make(4182), still)} />
+  </div>
 </Case>
 
 <Case label="thread inbox · two letters waiting in this room">
