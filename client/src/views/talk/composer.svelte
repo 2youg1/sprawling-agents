@@ -32,7 +32,7 @@
   import Popover from "../parts/popover.svelte";
   import type { PopoverBinding } from "../parts/popover";
   import Unkept from "../parts/unkept.svelte";
-  import { boxKey, completedAt, configLevel, menuColumns, offeredBy, pickSlash, picksFor, roomsKnown, sessionModel, slashHands, startedIn, workspacePill } from "./composer";
+  import { boxKey, completedAt, configLevel, menuColumns, offeredBy, pickSlash, picksFor, sessionModel, slashHands, startedIn } from "./composer";
   import type { BoxKey, ComposerLook } from "./composer";
   import Look from "./composer.look.svelte";
   import { draftAt } from "./draft";
@@ -188,21 +188,12 @@
   // The room this box speaks to: the page's word for it, or the address bar's.
   const shown = $derived(room === undefined ? Option.getOrNull(current(u.bar)) : { kind: "talk" as const, address: room });
   const here = $derived(shown !== null && shown.kind === "talk" ? shown.address : null);
-  // Every room a person could move this conversation to.
-  const cityAnswer = u.conn.asking.ask(QUERIES.city);
-  const rooms = $derived(
-    roomsKnown(
-      $cityAnswer !== undefined && "city" in $cityAnswer ? $cityAnswer.city.buildings : [],
-      [...$belief.rooms.keys(), ...(here === null ? [] : [here])],
-    ),
-  );
   // The run in front of the person: what a typed `/stop` and `/steer` reach.
   const live = $derived(shown === null ? undefined : runInFront($belief, shown));
 
   const startedHere = $derived(here !== null && startedIn(heldIn($belief, here), $belief.sessions[here]));
   const session = $derived(here === null ? null : sessionModel(heldIn($belief, here), $belief.sessions[here] ?? null));
   const picks = $derived(picksFor(u, session));
-  const workspace = $derived(workspacePill($lang, { rooms, here }, picks.workspace));
   // The level this room inherits when the page states none, and what
   // the picker and the `/` menu offer from the endpoints answer.
   const roomConfig = $derived(here === null ? readable(undefined) : u.conn.asking.ask({ config: { addr: here } }));
@@ -390,7 +381,7 @@
     <Unkept words={() => text} />
   {/if}
   <DropRefused refused={zone.refused} />
-  <SettingsRow {workspace} picker={offered.picker} room={here} draws={band !== undefined || started || startedHere ? "notice" : "everything"} {kept} />
+  <SettingsRow picker={offered.picker} room={here} draws={band !== undefined || started || startedHere ? "notice" : "everything"} {kept} />
 {/snippet}
 
 <Look {...look} />

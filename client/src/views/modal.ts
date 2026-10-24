@@ -26,6 +26,12 @@ import type { Attachment } from "svelte/attachments";
 
 export type Seat = "modal" | "specimen";
 
+// Where the focus lands when the box opens: on the first control inside
+// it, the platform's choice, or on the sheet itself, which a touch
+// opening asks for so no soft keyboard rises over the list
+// (`palette_door.svelte.ts`, `Arrival`).
+export type First = "control" | "sheet";
+
 // What a click on the dimmed page behind the box does. The palette is a
 // place to go, and missing it is a way of saying "nowhere"; the finder
 // keeps a half-typed name, so a stray click does not throw it away.
@@ -61,9 +67,16 @@ const HOLD = createAttachmentKey();
 // `modalWire`, because Svelte runs an attachment again whenever it is a
 // different function, and that would close the box and open it again
 // on every redraw.
-export function modalHold(seat: Seat): Attachment<HTMLDialogElement> {
+export function modalHold(seat: Seat, first: First = "control"): Attachment<HTMLDialogElement> {
   return (node) => {
     if (seat === "specimen") return;
+    // A dialog that carries `autofocus` takes the focus itself when it
+    // opens, instead of handing it to its first control (HTML's dialog
+    // focusing steps); `tabindex` keeps it focusable in every engine.
+    if (first === "sheet") {
+      node.autofocus = true;
+      node.tabIndex = -1;
+    }
     node.showModal();
     return () => {
       node.close();

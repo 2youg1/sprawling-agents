@@ -18,8 +18,8 @@ import type { Key, Lang } from "../../core/lang";
 import { say } from "../../core/lang";
 import type { RunPolicy } from "../../wire";
 import type { PopoverColumn } from "../parts/popover";
-import { HOLD } from "./pill";
-import type { FrameWire, KeyPress, TriggerWire } from "./pill";
+import { HOLD } from "./fact";
+import type { FrameWire, KeyPress, TriggerWire } from "./fact";
 
 export const POLICY_SWITCHES = {
   mode: { off: "chat", on: "work" },

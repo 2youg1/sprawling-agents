@@ -9,7 +9,7 @@
 // the right pane open, and the two readings of the third pane that
 // follow the workspace - the city beside the Mayor's room and the
 // files beside a building's - and, closer, what the wire's run-level
-// fields draw: the room chip open on who is listening, the session
+// fields draw: who is listening, as the palette's foot draws it, the session
 // pane at the width a panorama gives it, and a picked commit's B3.
 // The panorama is drawn at 1440 and at 1920, and the instrument sheet
 // alone at a phone's 390, because the sheet's two speed cells must

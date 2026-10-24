@@ -11,7 +11,7 @@
   // the right pane open, and the two readings of the third pane that
   // follow the workspace - the city beside the Mayor's room and the
   // files beside a building's - and, closer, what the wire's run-level
-  // fields draw: the room chip open on who is listening, the session
+  // fields draw: who is listening, as the palette's foot draws it, the session
   // pane at the width a panorama gives it, and a picked commit's B3.
   // The panorama is drawn at 1440 and at 1920, and the instrument sheet
   // alone at a phone's 390, because the sheet's two speed cells must
@@ -34,13 +34,11 @@
 </script>
 
 <script lang="ts">
-  import { say } from "../../core/lang";
   import { roomOf } from "../../core/route";
   import type { Tier } from "../../core/prefs";
   import { ui } from "../../ui";
   import Edge from "../edge.svelte";
   import Listening from "../talk/listening.svelte";
-  import PillView from "../talk/pill.svelte";
   import Workspace from "../workspace.svelte";
   import City from "../world/city.svelte";
   import Commits from "../world/commits.svelte";
@@ -52,16 +50,7 @@
   import Stand from "./stand.svelte";
 
   const u = ui();
-  const { lang } = u;
   const records = recordsAt(u.now());
-  // The room chip as the settings row draws it, held open.
-  const chip = $derived({
-    label: say($lang, "talk_column_workspace"),
-    placeholder: say($lang, "talk_column_workspace"),
-    choices: ["hall/mayor", "lab/room1", "lab/room2", "shop/back"].map((room) => ({ value: room, label: room })),
-    value: ROOM,
-    pick: () => undefined,
-  });
 
   interface Shown {
     readonly label: string;
@@ -107,12 +96,9 @@
   </Stand>
 </Case>
 {#snippet bare()}{/snippet}
-{#snippet listening()}<Listening room={ROOM} />{/snippet}
-<Case label="workbench · the room chip open on who is listening">
+<Case label="listening · who hears a message in this room, as the palette's foot draws it">
   <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} answers={answering} {records}>
-    <div class="flex h-[540px] items-end pb-base">
-      <PillView spec={chip} starts="open" told={listening} />
-    </div>
+    <Listening room={ROOM} />
   </Stand>
 </Case>
 <Case label="workbench · the chosen session's pane at its panorama width" width={640}>

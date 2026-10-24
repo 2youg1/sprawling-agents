@@ -27,6 +27,20 @@ test("the building part may be cut and the room is kept whole, with the session'
   expect(opened).toBe(1);
 });
 
+test("a finger's press opens the palette for touch, and a click no press came before is a key's", () => {
+  const arrivals: string[] = [];
+  const look = addressLineOf("en", "hall/mayor", null, (arrival) => {
+    arrivals.push(arrival);
+  });
+  const button = { focus: () => undefined };
+  look.wire.onpointerdown({ currentTarget: button, pointerType: "touch" });
+  look.wire.onclick();
+  look.wire.onclick();
+  look.wire.onpointerdown({ currentTarget: button, pointerType: "mouse" });
+  look.wire.onclick();
+  expect(arrivals).toEqual(["touch", "keys", "keys"]);
+});
+
 test("a room with no session yet draws no number, and an address of one segment has no building part", () => {
   const look = addressLineOf("zh", "atlas", null, () => undefined);
   expect({ building: look.building, room: look.room, session: look.session }).toEqual({ building: "", room: "atlas", session: undefined });
