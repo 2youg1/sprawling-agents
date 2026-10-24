@@ -54,7 +54,7 @@
   import { modalHold, modalWire } from "./modal";
   import type { Seat } from "./modal";
   import Modal from "./modal.look.svelte";
-  import { boxOf, sessionPlaces, whyFor } from "./palette";
+  import { boxOf, SESSIONS_AT_REST, sessionPlaces, whyFor } from "./palette";
   import Look from "./palette.look.svelte";
   import type { Entry, Group } from "./palette/entry";
   import { nothingFound } from "./palette/nothing_found";
@@ -140,7 +140,11 @@
     const page = (action: Action, to: View): Entry => ({ ...goTo(to, say($lang, LABELS[action])), action });
     // The room main stands in comes first: its sessions are what the
     // address line was pressed for (client/Spec.lean 4-10a).
-    const sessions = here === null ? [] : sessionPlaces(here, sessionLines, $lang, u.now()).map((place) => goTo(place.to, place.label, place.hint));
+    // While nothing is typed only the newest few are listed (`SESSIONS_AT_REST`).
+    const viewing = viewed?.kind === "talk" ? viewed.session : undefined;
+    const sessions = (here === null ? [] : sessionPlaces({ room: here, viewing }, sessionLines, $lang, u.now()))
+      .filter((place, at) => at < SESSIONS_AT_REST || query.trim() !== "")
+      .map((place) => goTo(place.to, place.label, place.hint));
     const out: Entry[] = [
       ...sessions,
       page("go.talk", { kind: "talk", address: MAYOR }),

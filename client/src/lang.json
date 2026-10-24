@@ -5115,6 +5115,10 @@
     "en": "current session",
     "zh": "当前会话"
   },
+  "palette_session_shown": {
+    "en": "shown now",
+    "zh": "正在看"
+  },
   "palette_transcribe": {
     "en": "speak, transcribed into the message box",
     "zh": "说话，转写进输入框"

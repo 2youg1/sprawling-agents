@@ -13,7 +13,7 @@ import type { Lang } from "../core/lang";
 import { completed } from "../core/completion";
 import type { View } from "../core/route";
 import { ago } from "../core/time";
-import type { Address, SessionLine } from "../wire";
+import type { Address, Seq, SessionLine } from "../wire";
 import { boxKey } from "./cursor";
 import { rowId } from "./palette/rows";
 
@@ -61,15 +61,30 @@ export interface SessionPlace {
   readonly to: View;
 }
 
+// Where the palette stands: the room, and the earlier session main shows
+// in it, if it shows one, whose row says so, because a person who pressed
+// the address line of an earlier session looks for the row they are in.
+export interface SessionsAt {
+  readonly room: Address;
+  readonly viewing: Seq | undefined;
+}
+
+// How many of the room's sessions the palette lists while nothing is
+// typed. `Query::Sessions` answers up to 64, and listed whole they would
+// push every page and room off the box; typing filters all of them, so
+// `#23` or a word of a name still finds an old one.
+export const SESSIONS_AT_REST = 5;
+
 // `lines` newest first, as `Query::Sessions` answers them; the first is
 // the room's current session.
-export function sessionPlaces(room: Address, lines: readonly SessionLine[], lang: Lang, now: number): SessionPlace[] {
-  return lines.map((line, at) => {
+export function sessionPlaces(at: SessionsAt, lines: readonly SessionLine[], lang: Lang, now: number): SessionPlace[] {
+  return lines.map((line, index) => {
     const named = line.name ?? line.preview ?? "";
+    const kind = index === 0 ? "palette_session_current" : line.began === at.viewing ? "palette_session_shown" : "palette_session";
     return {
       label: named === "" ? `#${String(line.began)}` : `#${String(line.began)} · ${named}`,
-      hint: at === 0 ? say(lang, "palette_session_current") : `${say(lang, "palette_session")} · ${ago(lang, line.at, now)}`,
-      to: at === 0 ? { kind: "talk", address: room } : { kind: "talk", address: room, session: line.began },
+      hint: index === 0 ? say(lang, kind) : `${say(lang, kind)} · ${ago(lang, line.at, now)}`,
+      to: index === 0 ? { kind: "talk", address: at.room } : { kind: "talk", address: at.room, session: line.began },
     };
   });
 }

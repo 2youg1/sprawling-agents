@@ -165,11 +165,11 @@ describe("the sessions of the room main stands in", () => {
     start: { opened: { carry: "nothing" } },
   });
 
-  test("the current session goes to the room and an earlier one to its read-only view, each led by its number", () => {
-    const places = sessionPlaces(ROOM, [line(40, "reconcile", null), line(23, null, "the ledger is short"), line(9, null, null)], "en", 61_000);
+  test("the current session goes to the room and an earlier one to its read-only view, each led by its number, the one shown saying so", () => {
+    const places = sessionPlaces({ room: ROOM, viewing: Seq.make(23) }, [line(40, "reconcile", null), line(23, null, "the ledger is short"), line(9, null, null)], "en", 61_000);
     expect(places).toEqual([
       { label: "#40 · reconcile", hint: "current session", to: { kind: "talk", address: ROOM } },
-      { label: "#23 · the ledger is short", hint: "session · 1 min ago", to: { kind: "talk", address: ROOM, session: Seq.make(23) } },
+      { label: "#23 · the ledger is short", hint: "shown now · 1 min ago", to: { kind: "talk", address: ROOM, session: Seq.make(23) } },
       { label: "#9", hint: "session · 1 min ago", to: { kind: "talk", address: ROOM, session: Seq.make(9) } },
     ]);
   });
