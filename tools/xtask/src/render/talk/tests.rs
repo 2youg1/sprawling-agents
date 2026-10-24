@@ -96,6 +96,21 @@ fn a_bar_standing_above_the_composer_is_refused_and_a_notice_is_not() {
 }
 
 #[test]
+fn the_head_holds_one_control_and_a_second_is_a_bar() {
+    let mut headed = shell();
+    headed.push(el("HEADER", "-", "place", (0, 1)));
+    headed.push(el("BUTTON", "-", "hall/mayor · #23", (0, 11)));
+    assert_eq!(judged(&headed), (Some(7), Vec::new()));
+
+    headed.push(el("BUTTON", "-", "share", (0, 11)));
+    let (_, found) = judged(&headed);
+    assert_eq!(
+        found,
+        ["button `share` at x=100 y=0 neither scrolls with the thread nor belongs to the composer"]
+    );
+}
+
+#[test]
 fn the_inspect_side_counts_when_it_is_open() {
     let mut open = shell();
     open.push(el("ASIDE", "-", "inspect", (0, 0)));
