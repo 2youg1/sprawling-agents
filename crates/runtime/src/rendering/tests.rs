@@ -7,7 +7,7 @@ use kernel::event::record::{Rendering, ToolAnswer};
 use kernel::{AxCode, AxError, Payload, ToolName};
 use serde_json::json;
 
-use super::{shown, without_marks};
+use super::{Copied, shown};
 
 fn payload(value: serde_json::Value) -> Payload {
     Payload::of(&value).unwrap()
@@ -110,14 +110,24 @@ fn a_payload_with_no_reading_is_drawn_as_its_json() {
     );
 }
 
+/// Only a mark that numbers the line it sits on, for one reading of
+/// where the passage starts, comes off; a numbered line the file holds
+/// stays, and so does a replacement line with a number nobody copied.
 #[test]
-fn marks_come_off_what_was_copied_and_nothing_else_changes() {
-    let copied = "10|fn a() {\n    b();\n20|}\n";
+fn only_marks_drawn_where_they_sit_come_off() {
+    let copied = Copied::of("row 9\n10|row 10\n7|kept\n");
+    assert_eq!(copied.starts().into_iter().collect::<Vec<_>>(), vec![9]);
+    let (bare, taken) = copied.drawn_from(9).unwrap();
     assert_eq!(
-        without_marks(copied).as_deref(),
-        Some("fn a() {\n    b();\n}\n")
+        (bare.as_str(), taken.into_iter().collect::<Vec<_>>()),
+        ("row 9\nrow 10\n7|kept\n", vec![10])
     );
-    assert_eq!(without_marks("fn a() {\n|x\n"), None);
+    assert_eq!(Copied::of("fn a() {\n|x\n").starts().len(), 0);
+    let numbers = [10].into_iter().collect();
+    assert_eq!(
+        Copied::of("10|row ten\n12|keep\n").without(&numbers),
+        "row ten\n12|keep\n"
+    );
 }
 
 /// What the read renderer draws, the edit side takes back to the file's
@@ -132,7 +142,7 @@ fn every_drawn_body_unmarks_to_its_text() {
         let answer = answered(json!({"path": "a.rs", "offset": offset, "bytes": 0, "text": body}));
         let drawn = shown(Rendering::V2, &read(), &answer).unwrap();
         let (_, marked) = drawn.split_once('\n').unwrap();
-        assert_eq!(without_marks(marked).unwrap(), body);
+        assert_eq!(Copied::of(marked).drawn_from(offset).unwrap().0, body);
     }
 }
 

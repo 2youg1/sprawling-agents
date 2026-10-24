@@ -437,3 +437,53 @@ fn a_passage_that_matches_as_it_came_keeps_what_looks_like_a_mark() {
         "| a |\n12|c\n"
     );
 }
+
+/// A numbered line the model means to write stays in the file: only the
+/// marks copied from the passage it replaces come off the replacement.
+#[test]
+fn a_numbered_line_added_in_the_replacement_is_written_as_it_came() {
+    let tmp = tempfile::tempdir().unwrap();
+    let tool = tool(tmp.path());
+    let before: String = (0..12).map(|n| format!("row {n}\n")).collect();
+    std::fs::write(tmp.path().join("work/a.txt"), &before).unwrap();
+    let version = version_of(before.as_bytes());
+    tool.invoke(&call(
+        "work/a.txt",
+        &version,
+        "10|row 10\n",
+        "10|row ten\n12|keep\n",
+    ))
+    .unwrap();
+    assert_eq!(
+        std::fs::read_to_string(tmp.path().join("work/a.txt")).unwrap(),
+        before.replace("row 10\n", "row ten\n12|keep\n")
+    );
+}
+
+/// A passage copied with its marks over a line the file itself starts
+/// with digits and a separator edits that line: the file's own text is
+/// not mistaken for a mark, because no read draws a mark there.
+#[test]
+fn a_copied_passage_keeps_a_numbered_line_the_file_holds() {
+    let tmp = tempfile::tempdir().unwrap();
+    let tool = tool(tmp.path());
+    let before: String = (0..13)
+        .map(|n| match n {
+            11 => "7|literal\n".to_owned(),
+            _ => format!("row {n}\n"),
+        })
+        .collect();
+    std::fs::write(tmp.path().join("work/a.txt"), &before).unwrap();
+    let version = version_of(before.as_bytes());
+    tool.invoke(&call(
+        "work/a.txt",
+        &version,
+        "10|row 10\n7|literal\n",
+        "10|row 10\n7|changed\n",
+    ))
+    .unwrap();
+    assert_eq!(
+        std::fs::read_to_string(tmp.path().join("work/a.txt")).unwrap(),
+        before.replace("7|literal\n", "7|changed\n")
+    );
+}
