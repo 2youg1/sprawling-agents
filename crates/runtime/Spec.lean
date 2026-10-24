@@ -339,6 +339,8 @@ envelope 探查与全解共用 kernel 的解析（Value 探查仅取五键，不
 | D98 | 每次尝试之后问一次端点门前的等待，有就记一行 `prefix_held` | `crates/runtime/spec/Turn/Recovery.lean` |
 | D99 | 保温门转发 `Model` 的每一扇调用门，不让任何一扇落到 trait 的缺省实现 | `crates/runtime/spec/Prefix.lean`（§8-4-2） |
 | D100 | 提前量是「发出到 provider 开始处理」的时间，按 endpoint 存一个读数 | `crates/runtime/spec/Prefix.lean`（§8-4-2） |
+| D101 | guest 模块每个进程只读、只编译一次，`WasmtimeSandbox` 的克隆共用一个 Engine 与一格已编译模块 | `crates/runtime/spec/Sandbox.lean` |
+| D102 | guest 的内存上限就是它的 run 的内存上限，撞到时结果带 `memory_ceiling` | `crates/runtime/spec/Sandbox.lean` |
 -/
 
 /-! ## 13 依赖选型

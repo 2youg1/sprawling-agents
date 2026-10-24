@@ -28,8 +28,14 @@
 | 摘要缓存（`DigestCache`） | `storage::digest_cache` | 在盘上，进程里不留 | 无 |
 | playback 导出 | `accounting::playback` | 走账本是流式的，编码直接写进 bundle 的那一份缓冲、到 `BUNDLE_MAX_BYTES`（32 MiB）即停；整份 `Document` 在编码之前仍在内存里（`crates/accounting/Spec.lean` §3） | 选中的记录数 |
 | doctor 扫描 | `bin::doctor` | 子进程的输出逐行读，每行至多 4 KiB，只留调用者选中的行（`doctor::asking`，`crates/sprawling/spec/Doctor.lean` §8-166 之一） | 选中的行数 |
+| 已编译的 guest 模块（`Compiled`） | `runtime::sandbox::engine` | 一格：同一进程里所有 `WasmtimeSandbox` 的克隆共用一份编译产物，换 guest 时替换（`crates/runtime/spec/Sandbox.lean` D101） | 无 |
+| guest 的线性内存 | `runtime::sandbox::engine` | run 的 `[core] memory_bytes`（`soft_shares` 臂时，与这个 run 的子进程同一个数，`crates/runtime/spec/Sandbox.lean` D102）；没填时 wasm32 的 4 GiB；调用结束即释放 | 同时在跑的 python 调用数 |
 
 账本与 CAS 已经在盘上，所以上表里随城增长的几项（视图、墓碑、旁索引）都可以改成「在盘上，按需读回」；它们读回时走下面的缓存模型。
+
+### 整台机器
+
+上表是城的进程。在一台小内存的机器上，进程之外还有三类重活各自吃内存：exec 的子进程（编译器、测试、解释器），每个 run 的进程树已经可以由 `[core] memory_bytes` 设上限（`crates/runtime/spec/Tools/Exec.lean` D29、D95）；python 臂的 guest，在城的进程里，由同一个数设上限（上表）；城起动的浏览器。每一项的上限都有了，缺的是「求和」：没有机制限制同时有多少项在跑，两次编译同时起就会让机器换页，而一旦换页，模型流、界面与编译一起卡住。文件字节不在此列：它们归操作系统的文件缓存，不在进程里留副本，派生数据经 `storage::resident`。机器级的预约与排队是下面待做第 6 项。
 
 ### 模型：一份按字节计预算的缓存
 
@@ -82,6 +88,9 @@
 3. playback 导出的 `Document` 改成边走边编码：编码本身已经直接写进 bundle 的那一份缓冲（`crates/accounting/spec/Playback.lean` §8-12），剩下的是 `finish` 给提交找证据时按 seq 查整份 `events`（`crates/accounting/Spec.lean` §3）。
 4. `tools/xtask/budgets.toml` 加内存节拍与一小时斜率的两行（由那一波拥有 budgets.toml 的车道提交）。
 5. D102 的读数在 Linux runner 上复核：同一负载，读私有字节 p99 与一小时斜率，确认换分配器之后斜率仍在上限之内。
+6. 机器级预约：重活（exec 的子进程、python 的 guest、浏览器实例）开始前从一份机器预算里预约自己的上界，上界之和超过预算就按号排队，结果与界面说出在等谁、等多少；机器预算是物理内存减去操作系统的保留、界面的估计与城的进程预算，人层 `config.toml` 的 `[core] memory` 以 `"auto"` 或字节数覆盖。gateway 的并发名额（`crates/gateway/spec/Concurrency.lean` §8-40）按「一次调用」计数、随 429 收窄，与按字节加权、额度不变的预约不是同一种量，所以只借它的排队规则与证明形状，不共用代码。未定的是没填 `[core] memory_bytes` 的子进程预约多少字节：它是一个估计而不是上限，决定了小内存机器上能同时跑几条命令。
+7. 峰值堆的棘轮：citysim 场景的峰值堆字节，以 `dhat` 作测试构建的全局分配器读出，写成 `tools/xtask/budgets.toml` 的一行；`xtask artifact` 保证它不进发行件。
+8. 4 GB 剖面：TP1 的负载加两个并发编译，在内存上限 4 GB 的 Linux 容器（cgroup `memory.max`）里跑一小时，读有没有进程被杀（`memory.events` 的 `oom_kill`）、换页次数与工具调用 p99；Windows 上的 segment heap（应用清单的 `heapType`）与默认堆按私有字节与斜率对照。
 -/
 
 /-! D43 私有字节在三个平台上各读什么：Windows 读提交的私有字节，Linux 读 smaps_rollup，macOS 在有安全接口之前读虚拟大小并标明

@@ -18,20 +18,24 @@
 ```rust
 pub struct Fuel(pub u64);
 pub struct Mount { pub host: std::path::PathBuf, pub guest: String, pub writable: bool }   // preopen＝mount scope
+pub enum GuestMemory { Wasm32, Ceiling(std::num::NonZeroU64) }   // guest 的线性内存能长到多少字节（D102）
+impl GuestMemory { pub fn of_shares(shares: Shares) -> GuestMemory; }   // CpuAndMemory { limit } 给 Ceiling(limit)，其余给 Wasm32
 pub struct SandboxJob { pub wasm: std::path::PathBuf, pub argv: Vec<String>, pub env: Vec<(String, String)>,
-                        pub stdin: Vec<u8>, pub mounts: Vec<Mount>, pub fuel: Fuel }
-pub struct SandboxOutcome { pub stdout: Vec<u8>, pub stderr: Vec<u8>, pub exit: SandboxExit }
+                        pub stdin: Vec<u8>, pub mounts: Vec<Mount>, pub fuel: Fuel, pub memory: GuestMemory }
+pub struct SandboxOutcome { pub stdout: Vec<u8>, pub stderr: Vec<u8>, pub exit: SandboxExit,
+                            pub ceiling: Option<Ceiling> }   // 只会是 Ceiling::Hit：guest 的增长在上限处被拒过（D102）
 pub enum SandboxExit { Success, Failure { code: u64 }, FuelExhausted, Trap { message: String } }
 pub trait Sandbox { fn run(&mut self, job: &SandboxJob) -> Result<SandboxOutcome, AxError>; }
 
-pub struct WasmtimeSandbox;            // feature = "wasm"；wasip1 直跑（先按 preview1 落地）
+#[derive(Clone)]
+pub struct WasmtimeSandbox;            // feature = "wasm"；wasip1 直跑；克隆共用一个 Engine 与一格已编译模块（D101）
 pub struct EchoSandbox { /* 直通替身：stdout＝stdin 回声＋可注入脚本输出 */ }
 pub struct FaultSandbox { /* 故障替身：逐次弹出预置 SandboxExit／fuel 耗尽／trap */ }
 #[cfg(feature = "conformance")]
 pub fn assert_sandbox_conformance<S: Sandbox>(sandbox: &mut S, job: &SandboxJob);  // 良序两连调不中毒＋outcome 形合法
 ```
 
-- **按五轴说明**（与 §8-13-2 的臂同一套，设置里的 `python` 臂照它说；`crates/wire/spec/Answer/Doctor.lean` D26）：文件——保，guest 只够得到 preopen 的目录，`Mount.writable` 为假的目录只读；网络——保，理由见下文「无出网的机械形」；进程树——保，wasip1 没有起进程的接口；用户——不保，引擎跑在 harness 的进程与身份里；资源——条件：CPU 由 `Fuel` 限，`WasmtimeSandbox` 不设 store 的内存上限，guest 的线性内存只受 wasm32 的地址空间所限，所以「CPU 与内存上限」这一轴整体答不保。它装不下 harness 居民，只跑 Python。
+- **按五轴说明**（与 §8-13-2 的臂同一套，设置里的 `python` 臂照它说；`crates/wire/spec/Answer/Doctor.lean` D26）：文件——保，guest 只够得到 preopen 的目录，`Mount.writable` 为假的目录只读；网络——保，理由见下文「无出网的机械形」；进程树——保，wasip1 没有起进程的接口；用户——不保，引擎跑在 harness 的进程与身份里；资源——条件：CPU 由 `Fuel` 限；内存在 run 有上限时由同一个数限（D102），run 没有上限时 guest 的线性内存只受 wasm32 的地址空间所限，所以「CPU 与内存上限」这一轴整体答不保。它装不下 harness 居民，只跑 Python。
 - 能力面＝wasip1 preopen 集（Mount 逐条）；无网络能力（WASI p1 天然无 socket 宿主实现——Python 臂禁网的机械保证）；fuel 上限即 Fuel（耗尽＝FuelExhausted，不是 Err：宿主无故障）。
 - 未授能力被拒的观察形：guest 内 open 失败→非零退出（Failure）；宿主恒不代 guest 隐藏失败。A10 三断言在真 wasmtime 上以手写 WAT 模块定形（不依赖 CPython 工件）；CPython-WASI 集成测试以环境变量指向工件（住机器本地的忽略目录，恒不入库），缺工件即 skip——`just check` 自足。
 **A10 三断言结论书**（证据＝`crates/runtime/tests/sandbox_a10.rs`，真 wasmtime（版本由 `Cargo.lock` 钉），手写 WAT 不依赖任何外部工件）：
@@ -62,4 +66,26 @@ pub fn assert_sandbox_conformance<S: Sandbox>(sandbox: &mut S, job: &SandboxJob)
 | `sandbox.rs` | 执行边界本身：`Fuel`／`Mount`／`SandboxJob`／`SandboxOutcome`／`SandboxExit`／`Sandbox` 缝，缺席判词 `AbsentSandbox`，两个替身 `EchoSandbox`／`FaultSandbox`，以及 feature `conformance` 下的 `assert_sandbox_conformance`。它声明 `#[cfg(feature = "wasm")] mod engine;` 并原样保留 `pub use engine::WasmtimeSandbox;` |
 | `sandbox/engine.rs` | 唯一会真跑 guest 的适配器：`WasmtimeSandbox`（引擎配置、预开目录、燃料预算、stdio 管道）、host 侧拒词构造 `host_error`，以及把引擎的收场判成 `SandboxExit` 的 `classify` |
 | `sandbox/tests.rs` | 两个替身对调用方的承诺：直通替身回声 stdin 并记下 job、故障替身按序发脚本且发完即止 |
+-/
+
+/-! D101 guest 模块每个进程只读、只编译一次：`WasmtimeSandbox` 的克隆共用一个 `Engine` 与一格已编译模块（`runtime::sandbox::engine`）
+
+**决定**：`WasmtimeSandbox` 是一个可廉价克隆的句柄，克隆共用一个 `wasmtime::Engine` 与一格已编译模块。`run` 先读模块文件的元数据，路径、长度与修改时间都与格里的相同就复用格里的 `Module`（它在 wasmtime 里本来就是共享的引用），否则读整个文件、编译、替换格里的那一份。生产上 `bin::doctor::host::execution_engine` 每次都交出同一个句柄的克隆，所以每个 worker 的 bench 用的是同一个 Engine 与同一格，一次 exec python 不再读、不再编译模块。
+
+**理由**：编译 CPython-WASI 的模块是这条臂时延的大头，编译期的临时内存也是城的进程里最大的一笔临时分配（`crates/sprawling/spec/Serving/Memory.lean` §8-173 清点表）。只留一格：生产上只有一个 guest，一格的上界就是一份编译产物，而且换了 guest 时旧的那份随之释放。身份里带长度与修改时间，是因为重装会就地换掉组件文件，只按路径认会一直跑旧的编译产物；粗时钟下同长度、同修改时间的替换看不出来，这只在重装覆盖时发生，进程重启就恢复，代价小于每次读整个文件算摘要。
+
+**被否**：①wasmtime 自带的盘上编译缓存（`cache` feature）：多一个 feature 与它的依赖、在家目录下多一个缓存目录，每个进程第一次调用仍要读整份产物再反序列化，它多省下的只是每个进程的第一次编译；自己写盘上缓存要 `Module::deserialize`，那是 `unsafe fn`，本工作区禁 `unsafe`。②每个 bench 一格：每个 run 仍各编译一次、各留一份编译产物，内存随活的 run 数增长。③按内容摘要认模块：每次调用都要读整份文件，省下的只剩编译。
+
+**重开参数**：测出每个进程第一次编译在交互路径上可感（城启动后第一次 python 调用超过 1 s）；或者生产上出现第二个 guest。
+-/
+
+/-! D102 guest 的内存上限就是它的 run 的内存上限；撞到时结果带 `memory_ceiling`（`runtime::sandbox::engine`、`runtime::tools::exec`）
+
+**决定**：`SandboxJob.memory` 是 `GuestMemory::Ceiling(limit)` 时，store 挂一个 `ResourceLimiter`：线性内存的增长会超过 `limit` 字节时拒绝，`memory.grow` 答 -1，由 guest 自己决定怎么收场（CPython 抛 `MemoryError`）；拒绝由 wasmtime 的 `StoreLimits` 判，外面包的一层只记下它因为超过 `limit` 拒过（`StoreLimits` 也拒超过模块自己声明的最大值的增长，那不是撞到 run 的上限），于是 `SandboxOutcome.ceiling` 答 `Some(Ceiling::Hit { limit })`。`GuestMemory::Wasm32` 时不设上限。表按元素计数，不在这个字节上限里，只受模块自己声明的最大值限制。exec 从这个 run 的 `Shares` 推出它：`Shares::CpuAndMemory { limit }` 给 `Ceiling(limit)`，其余给 `Wasm32`；python 臂把 `ceiling` 经 `with_ceiling` 写进结果，与命令撞限同一个键、同一种拼写（`crates/runtime/spec/Tools/Exec.lean` D95）。
+
+**理由**：guest 在城的进程里跑，它的线性内存计入城的私有字节；run 的子进程已经受 `[core] memory_bytes` 约束（D29），guest 属于同一个 run，用同一个数就不必让人再填一个，而这个数只在 `crates/sprawling/spec/Serving/Placement.lean` D47 一处定义。run 的内存没有缺省上限是 ruling（D95 的「来源」），guest 照它：没填时只受 wasm32 的地址空间限制，保护小内存机器的是机器级的预约（`crates/sprawling/spec/Serving/Memory.lean` §8-173 待做），而不是一个人没填过的数。
+
+**被否**：①增长失败时 trap（`trap_on_grow_failure`）：guest 失去自己报 `MemoryError` 的机会，模型读到的是引擎的话而不是 Python 的；②guest 另设一个缺省上限：与 D95 的 ruling 冲突，而且人在两处看到两个不同的内存数。
+
+**重开参数**：ruling 给 run 的内存定了缺省上限；或者 wasmtime 的 `StoreLimits` 自己报出拒过（今天只能由外面包一层 limiter 记下）。
 -/

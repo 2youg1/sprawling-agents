@@ -11,6 +11,7 @@ use super::{Fuel, Sandbox, SandboxExit, SandboxJob, SandboxOutcome};
 use kernel::{AxCode, AxError};
 
 /// The real boundary: wasmtime running wasip1 guests.
+#[derive(Clone)]
 pub struct WasmtimeSandbox {
     engine: wasmtime::Engine,
 }
@@ -163,6 +164,7 @@ impl Sandbox for WasmtimeSandbox {
             stdout: stdout.to_vec(),
             stderr: stderr.to_vec(),
             exit,
+            ceiling: None,
         })
     }
 }

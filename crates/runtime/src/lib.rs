@@ -56,6 +56,7 @@ pub use sandbox::AbsentSandbox;
 pub use sandbox::EchoSandbox;
 pub use sandbox::FaultSandbox;
 pub use sandbox::Fuel;
+pub use sandbox::GuestMemory;
 pub use sandbox::Mount;
 pub use sandbox::Sandbox;
 pub use sandbox::SandboxExit;

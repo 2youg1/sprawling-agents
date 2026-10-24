@@ -30,7 +30,7 @@ use kernel::{
 use serde_json::{Map, Value};
 
 use crate::backlog::{Backlog, Exit};
-use crate::sandbox::{Fuel, Mount, Sandbox, SandboxExit, SandboxJob};
+use crate::sandbox::{Fuel, GuestMemory, Mount, Sandbox, SandboxExit, SandboxJob};
 
 mod confinement;
 pub(crate) mod container;
@@ -181,6 +181,7 @@ impl ExecTool {
             stdin: Vec::new(),
             mounts: self.setup.mounts.clone(),
             fuel: self.setup.fuel,
+            memory: GuestMemory::of_shares(self.backlog.shares()),
         };
         let result = held(&self.sandbox)?.run(&job)?;
         let exit = match &result.exit {
