@@ -297,9 +297,20 @@ fn the_hall_reads_its_two_residents_out_of_the_citys_reserved_subtree() {
             "{who} is a standing identity, not an ephemeral worker"
         );
         let segment = String::from_utf8(identity.segment_bytes()).unwrap();
+        let discipline = hall_discipline(&addr).expect("a hall seat has a discipline");
+        let persona_at = segment
+            .find(&format!("# {file}"))
+            .expect("the persona is in the segment");
+        let closing_at = segment
+            .find(discipline.closing)
+            .expect("the closing is in the segment");
         assert!(
-            segment.contains(&format!("# {file}")),
-            "the persona sits inside the discipline"
+            segment.starts_with(discipline.opening),
+            "the procedure comes before the persona"
+        );
+        assert!(
+            persona_at < closing_at,
+            "the prohibitions come after the persona"
         );
     }
 
