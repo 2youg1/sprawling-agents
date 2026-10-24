@@ -20,7 +20,7 @@
 //! is. What a named change does to the record is the patch's own rule
 //! and lives with the patch.
 //!
-//! **Every other section is left as its author left it.** The write is
+//! **Every other section keeps its keys and values.** The write is
 //! a read-modify-write of a file a person also edits by hand, held and
 //! replaced whole through `city::document` — the one implementation of
 //! whole-or-nothing writing in this tree — so a reader arriving during
@@ -139,8 +139,11 @@ fn stated_city(file: &Path) -> Result<Option<PathBuf>, AxError> {
     }
 }
 
-/// Names `city` as the one a launch with none named opens, leaving
-/// every other line of the person's file as they wrote it.
+/// Names `city` as the one a launch with none named opens. Every other
+/// section and key of the person's file keeps its value, but the file is
+/// written back from its parsed form, so comments are dropped and the
+/// order and layout of keys may change
+/// (`crates/accounting/spec/Person.lean` §8-8).
 ///
 /// # Errors
 /// Everything [`read`] returns; `E_CONFIG_INVALID` for a path that is
