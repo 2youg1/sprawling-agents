@@ -19,6 +19,7 @@
 
 pub mod assembly;
 pub mod audience;
+pub mod beside_binary;
 pub mod console;
 pub mod doctor;
 #[cfg(windows)]

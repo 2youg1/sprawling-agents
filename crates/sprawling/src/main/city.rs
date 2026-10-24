@@ -34,9 +34,7 @@ mod opening;
 use super::exit::Exit;
 use super::grammar::Arguments;
 use super::refusal::{Form, written};
-use super::router::{
-    client_summary, default_city_location, flag_value, log_floor, log_levels, name_city,
-};
+use super::router::{city_to_open, client_summary, flag_value, log_floor, log_levels, name_city};
 use super::{CLIENT_BUNDLE_DIR, CLIENT_COMPLETE, CLIENT_FILES};
 use kernel::consts_policy::DEFAULT_AT;
 use sprawling::{assembly, console, firstrun, serving};
@@ -49,7 +47,7 @@ use opening::{Interactive, Open, opening};
 pub(super) fn up(read: &Arguments, args: &[String]) -> ExitCode {
     let city = match read.positional(1) {
         Some(named) => std::path::PathBuf::from(named),
-        None => match default_city_location() {
+        None => match city_to_open() {
             Ok(city) => city,
             Err(err) => return report(err),
         },

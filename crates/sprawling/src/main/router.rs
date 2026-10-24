@@ -169,7 +169,7 @@ fn answered(result: Result<String, kernel::AxError>, args: &[String]) -> ExitCod
 /// manager, where the console closes the moment this returns - so every
 /// path out of here holds the window until somebody has read it.
 pub(super) fn first_screen() -> ExitCode {
-    let city = match default_city_location() {
+    let city = match city_to_open() {
         Ok(city) => city,
         Err(error) => {
             eprint!(
@@ -226,10 +226,52 @@ fn hold() {
 /// The person's file cannot be read or names a relative path, or there
 /// is no home directory: a city is never placed beside the binary,
 /// because the next release unpacks into a directory without it.
-pub(super) fn default_city_location() -> Result<std::path::PathBuf, kernel::AxError> {
+fn default_city_location() -> Result<std::path::PathBuf, kernel::AxError> {
     match accounting::person::city()? {
         Some(named) => Ok(named),
         None => Ok(accounting::home::Home::detect()?.default_city()),
+    }
+}
+
+/// The city a launch that names none opens: [`default_city_location`],
+/// after a city an earlier release kept beside the binary has been
+/// moved there, which happens only while the person's file names no
+/// city (`crates/sprawling/spec/Firstrun.lean` §8-8).
+///
+/// # Errors
+/// Everything [`default_city_location`] refuses, and a move the old
+/// folder or the new one refuses.
+pub(super) fn city_to_open() -> Result<std::path::PathBuf, kernel::AxError> {
+    if accounting::person::city()?.is_none() {
+        move_home_from_beside_the_binary()?;
+    }
+    default_city_location()
+}
+
+/// Moves the city an earlier release kept beside this binary to the
+/// home directory's default, says so, and names it in the person's
+/// file so the move is never looked for again.
+fn move_home_from_beside_the_binary() -> Result<(), kernel::AxError> {
+    let exe_dir = match std::env::current_exe() {
+        Ok(exe) => match exe.parent() {
+            Some(dir) => dir.to_path_buf(),
+            None => return Ok(()),
+        },
+        // A binary that cannot find itself has no folder beside it to
+        // look in, which is the same answer as a folder with no city.
+        Err(_) => return Ok(()),
+    };
+    let to = accounting::home::Home::detect()?.default_city();
+    match sprawling::beside_binary::bring_home(&exe_dir, &to)? {
+        sprawling::beside_binary::Homing::NothingBeside => Ok(()),
+        sprawling::beside_binary::Homing::Moved { from, to, relinked } => {
+            println!(
+                "moved the city from {} to {} ({relinked} worktree(s) re-pointed)",
+                from.display(),
+                to.display()
+            );
+            accounting::person::settle_city(&to)
+        }
     }
 }
 
