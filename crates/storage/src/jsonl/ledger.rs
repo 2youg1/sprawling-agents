@@ -127,6 +127,28 @@ pub(crate) struct WriterLock {
     _held: std::fs::File,
 }
 
+/// A ledger's writer lock, held by a step that writes nothing to the
+/// ledger but must know no city is running from its folder while it
+/// acts — moving that folder (`crates/storage/spec/Jsonl.lean` §8-1).
+/// Released on drop.
+pub struct LedgerHold {
+    _lock: WriterLock,
+}
+
+impl LedgerHold {
+    /// Takes the writer lock of the ledger directory `dir`, exactly as a
+    /// city that opens it for writing would.
+    ///
+    /// # Errors
+    /// `LedgerHeld` when a city is running from it; `Io` when the lock
+    /// file cannot be made or asked for.
+    pub fn take(dir: &Path) -> Result<LedgerHold, StorageError> {
+        Ok(LedgerHold {
+            _lock: WriterLock::take(dir)?,
+        })
+    }
+}
+
 impl WriterLock {
     /// Takes the writer lock of the ledger directory `dir`: the file
     /// `<name>.lock` beside it, named from `dir` alone so that this

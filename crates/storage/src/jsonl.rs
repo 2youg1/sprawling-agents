@@ -41,7 +41,7 @@ mod verify;
 pub(crate) use first_line::{FIRST_WINDOW_BYTES, first_line};
 #[cfg(test)]
 pub(crate) use ledger::segment_file_name;
-pub use ledger::{JsonlLedger, OpenReport, TailTruncation, WriteObserver};
+pub use ledger::{JsonlLedger, LedgerHold, OpenReport, TailTruncation, WriteObserver};
 pub(crate) use ledger::{complete_lines, records_end, segment_first_seq, segment_names};
 pub(crate) use reading::SCAN_WINDOW_BYTES;
 #[cfg(test)]
