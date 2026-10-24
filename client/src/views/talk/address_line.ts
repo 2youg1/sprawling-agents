@@ -27,6 +27,11 @@ export interface AddressLineWire {
   readonly "aria-haspopup": "dialog";
   readonly "aria-label": string;
   readonly onclick: () => void;
+  // WebKit does not focus a button a pointer presses, so the palette's
+  // `<dialog>`, which gives the focus back to whatever held it when it
+  // opened, would return it to the page instead of to this line; the
+  // line takes the focus itself on the press.
+  readonly onpointerdown: (event: Pick<PointerEvent, "currentTarget">) => void;
 }
 
 export interface AddressLineLook {
@@ -58,6 +63,9 @@ export function addressLineOf(lang: Lang, address: string, session: Seq | null, 
           ? fill(say(lang, "talk_address_line_new"), { address })
           : fill(say(lang, "talk_address_line"), { address, session: number }),
       onclick: open,
+      onpointerdown: (event) => {
+        if (event.currentTarget instanceof HTMLElement) event.currentTarget.focus();
+      },
     },
   };
 }
