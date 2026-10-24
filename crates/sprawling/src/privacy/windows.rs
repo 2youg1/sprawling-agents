@@ -44,8 +44,8 @@ pub(crate) fn powershell() -> Result<std::path::PathBuf, AxError> {
 /// `program`, a path under `System32`, in the `SystemRoot` that HKLM
 /// records, rather than where PATH, the `SystemRoot` variable, the
 /// current directory or this binary's own folder would find it: any
-/// process of this user can change the first three, and the city's
-/// default place is beside the binary (Privacy.Cli D55; `cmd.exe` and
+/// process of this user can change the first three, and the binary's
+/// folder is often writable by this user (Privacy.Cli D55; `cmd.exe` and
 /// `icacls.exe`, `crates/sprawling/spec/Keying.lean` D76).
 ///
 /// # Errors
