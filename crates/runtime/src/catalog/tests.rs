@@ -311,6 +311,8 @@ fn detail_answers_a_guide_by_name_and_find_names_by_words() {
 
     let found = catalog.find("service instruction");
     assert!(found.starts_with("apps:\n- apps_mail:"), "{found}");
+    // Punctuation a model writes around its words is not part of them.
+    assert_eq!(catalog.find("\"mail?\""), catalog.find("mail"));
     assert!(catalog.find("zebra").starts_with("Nothing admitted"));
     let unknown = catalog.detail("apps_mai").unwrap_err();
     assert_eq!(*unknown.code(), AxCode::InvalidArgs);
