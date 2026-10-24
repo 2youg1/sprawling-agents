@@ -163,6 +163,11 @@ pub struct Edited {
 /// changed. A copy with an identity area keeps its area; only the body
 /// under it moves.
 ///
+/// A copy is replaced only while it still holds the bytes it was judged
+/// by, through [`crate::document::edit_against`]: a person's editor can
+/// save over the file between the read and the write, and that save is
+/// theirs, so a copy that moved underneath is kept and named as edited.
+///
 /// # Errors
 /// `E_STORAGE_FATAL` naming the path, for a copy that is there and will
 /// not read, and for one that will not write.
@@ -175,7 +180,18 @@ pub fn follow_defaults(city_root: &Path) -> Result<Vec<Edited>, AxError> {
             CopyStanding::Current => {}
             CopyStanding::Edited => edited.push(Edited { doc, path }),
             CopyStanding::Absent | CopyStanding::Earlier => {
-                crate::document::replace(&path, &moved_forward(doc, copy.as_deref()))?;
+                let base = copy.as_deref().unwrap_or_default();
+                match crate::document::edit_against(
+                    &path,
+                    base,
+                    &moved_forward(doc, copy.as_deref()),
+                ) {
+                    Ok(()) => {}
+                    Err(err) if err.code() == &AxCode::VersionConflict => {
+                        edited.push(Edited { doc, path });
+                    }
+                    Err(err) => return Err(err),
+                }
             }
         }
     }
