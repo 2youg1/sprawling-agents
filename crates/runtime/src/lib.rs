@@ -21,6 +21,7 @@ pub mod pipeline;
 pub mod prefix;
 pub mod redact;
 pub mod reminder;
+pub mod rendering;
 pub mod replay;
 pub mod run;
 pub mod sieve;

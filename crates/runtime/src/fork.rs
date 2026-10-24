@@ -15,7 +15,9 @@
 //! index by [`inherited_indexed`], because the ledger's only writer asks
 //! for it and verified the ledger when it opened it.
 
-use kernel::event::record::{ModelReturned, RunStarted, SteerReceived, ToolAnswer, ToolResult};
+use kernel::event::record::{
+    ModelReturned, Rendering, RunStarted, SteerReceived, ToolAnswer, ToolResult,
+};
 use kernel::model::content_from_message;
 use kernel::{AxCode, AxError, ChatMessage, ContentBlock, EventKind, EventRecord, RunId, Seq};
 
@@ -329,7 +331,7 @@ fn commit(conversation: &mut Conversation, wave: Option<Wave>) -> Result<(), AxE
 }
 
 /// One tool result as the model reads it back, rebuilt from the record
-/// through the same printing the live wave used.
+/// by the renderer the live wave drew it with (`crate::rendering`).
 ///
 /// The pictures a tool produced are not rebuilt: the record carries the
 /// payload a tool answered with, and the block's `attachments` are the
@@ -337,24 +339,17 @@ fn commit(conversation: &mut Conversation, wave: Option<Wave>) -> Result<(), AxE
 /// the content store. A fork without them loses what the next call would
 /// have fetched anyway.
 fn result_block(result: &ToolResult) -> Result<ContentBlock, AxError> {
-    let (payload, is_error) = match &result.answer {
-        ToolAnswer::Answered { result } => (result, false),
-        ToolAnswer::Failed { error } => (error, true),
-    };
     Ok(ContentBlock::ToolResult {
         tool_use_id: result.tool_use_id.clone(),
-        content: serde_json::to_string(payload).map_err(|err| {
-            AxError::failure(
-                AxCode::InvalidArgs,
-                "rebuild a tool result for a fork",
-                err.to_string(),
-            )
-            .with_recovery(
-                "report this against runtime::fork: a payload refused JSON after the \
-                 record that holds it was read",
-            )
-        })?,
-        is_error,
+        content: crate::rendering::shown(
+            Rendering::of(result.rendered),
+            &result.name,
+            &result.answer,
+        )?,
+        is_error: match result.answer {
+            ToolAnswer::Answered { .. } => false,
+            ToolAnswer::Failed { .. } => true,
+        },
         attachments: Vec::new(),
     })
 }

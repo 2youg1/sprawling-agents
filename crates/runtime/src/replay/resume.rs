@@ -98,6 +98,10 @@ pub fn outcome_unknown_draft(call: &EventRecord, t: TimeMs) -> Result<EventDraft
         // The call's own end was never seen: this answer is the city's
         // verdict at reopening, so no duration belongs to it.
         took_us: None,
+        // Drawn when a rebuild reads it, by the renderer this build draws
+        // every answer with; nobody was shown it, so nothing was counted.
+        rendered: Some(crate::rendering::CURRENT),
+        shown_bytes: None,
     })?;
     Ok(EventDraft {
         run: call.run(),
