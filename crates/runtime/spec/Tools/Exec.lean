@@ -259,6 +259,7 @@ exec 结果多一个键 `memory_ceiling`，形如 `{"state": "hit" | "unapplied"
 - **Windows**：run 的 job 建成时先挂一个 I/O completion port（`desktop_ffi::cpu::JobWatch`，`crates/desktop/ffi/Spec.lean` D6），读的是 `JOB_OBJECT_MSG_JOB_MEMORY_LIMIT` 消息的条数；读一次就把消息从 port 上取走，所以 run 累计这些条数，一次读失败之后取走的条数已经丢了，这个 run 此后的读数一律是读不出；挂不上就不设内存上限，这个 run 的命令报 `Unapplied::Refused`，于是一个设下的上限总是读得到的上限。native 臂的 command job 不再另设同值的内存上限：它嵌在 run job 里，run job 的上限已经管住整棵树，而两只同值的 job 嵌套时，撞限消息落到内层 job 的 port，外层的 port 一条也收不到（在一台 Windows 11 机器上以两只各挂 port 的嵌套 job 实测：内层设同值上限时内层计 1、外层计 0，内层不设时外层计 1），只设外层就只有一个读处。Microsoft 文档说 job 消息的投递不保证；一条没投递的消息漏报一次撞限，这一缺口按文档原样承认。
 - **Linux**：读 `run-<RunId>/memory.events` 的 `oom` 一行（cgroup v2：用量到了 `memory.max`、分配将要失败时加一）。不用 `max` 一行：它在回收成功、分配并未失败时也加，会把一次正常的回收报成撞限。读不出这个文件时报 `Unread`，而不是当作没撞。
 - **macOS**：没有按 run 的上限（D29），要了上限的每条命令报 `Unapplied::Platform`。
+- **python 臂**：guest 在城的进程里跑，不在 run 的 job 或 cgroup 里；它的线性内存由同一个数在 store 上限住（`crates/runtime/spec/Sandbox.lean` D102），一次增长在上限处被拒即报 `Hit`。没有要上限时不报。
 - **container 臂**：命令跑在容器运行时的进程里，不在 run 的 job 或 cgroup 里，它的内存由 building 的 `[sandbox.container] memory_bytes` 管（`Container.lean`）；要了上限时报 `Unapplied::Unjoined`。
 
 **没落地即报**：要了上限、这条命令却不在上限之内运行时，结果报 `Unapplied`：平台没有这一项（`Platform`）、Linux 的 cgroup 没有委派（`NotDelegated`）、job 或 cgroup 拒了上限或 port（`Refused`）、命令没进 run 的 job 或 cgroup（`Unjoined`）。这些情形下命令照常起动（D29 的退路），但 User 填下的上限没有生效不再是静默的。

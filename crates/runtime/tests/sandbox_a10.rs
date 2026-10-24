@@ -28,7 +28,12 @@
 
 use std::path::{Path, PathBuf};
 
-use runtime::{Fuel, Mount, Sandbox, SandboxExit, SandboxJob, WasmtimeSandbox};
+use std::io::Write;
+use std::num::NonZeroU64;
+
+use runtime::{
+    Ceiling, Fuel, GuestMemory, Mount, Sandbox, SandboxExit, SandboxJob, WasmtimeSandbox,
+};
 
 /// Writes a WAT source out as a .wasm module and returns its path.
 fn build(dir: &Path, name: &str, wat: &str) -> PathBuf {
@@ -109,6 +114,7 @@ fn a10_1_a_guest_inside_its_budget_succeeds() {
             stdin: Vec::new(),
             mounts: vec![],
             fuel: Fuel(1_000_000),
+            memory: GuestMemory::Wasm32,
         })
         .unwrap();
     assert_eq!(outcome.exit, SandboxExit::Success, "{outcome:?}");
@@ -133,6 +139,7 @@ fn a10_2_an_ungranted_capability_is_refused_and_the_guest_sees_it() {
             stdin: Vec::new(),
             mounts: vec![],
             fuel: Fuel(1_000_000),
+            memory: GuestMemory::Wasm32,
         })
         .unwrap();
     assert_eq!(
@@ -155,6 +162,7 @@ fn a10_2_an_ungranted_capability_is_refused_and_the_guest_sees_it() {
                 writable: false,
             }],
             fuel: Fuel(1_000_000),
+            memory: GuestMemory::Wasm32,
         })
         .unwrap();
     assert_eq!(
@@ -177,6 +185,7 @@ fn a10_3_fuel_exhaustion_stops_the_guest_and_is_not_a_host_error() {
             stdin: Vec::new(),
             mounts: vec![],
             fuel: Fuel(10_000),
+            memory: GuestMemory::Wasm32,
         })
         .expect("exhaustion is an outcome, never a host error");
     assert_eq!(outcome.exit, SandboxExit::FuelExhausted, "{outcome:?}");
@@ -212,6 +221,7 @@ fn the_boundary_has_no_network_because_no_socket_can_be_opened() {
         stdin: Vec::new(),
         mounts: vec![],
         fuel: Fuel(1_000_000),
+        memory: GuestMemory::Wasm32,
     });
     let err = match result {
         Err(err) => err,
@@ -232,8 +242,107 @@ fn back_to_back_jobs_do_not_poison_each_other() {
         stdin: Vec::new(),
         mounts: vec![],
         fuel: Fuel(1_000_000),
+        memory: GuestMemory::Wasm32,
     };
     let first = sandbox.run(&job).unwrap();
     let second = sandbox.run(&job).unwrap();
     assert_eq!(first, second, "each job starts from a clean store");
+}
+
+/// Asks for sixteen more pages and exits 9 when the host refuses them.
+const WAT_GROWS: &str = r#"
+(module
+  (import "wasi_snapshot_preview1" "proc_exit" (func $proc_exit (param i32)))
+  (memory (export "memory") 1)
+  (func (export "_start")
+    (if (i32.eq (memory.grow (i32.const 16)) (i32.const -1))
+      (then (call $proc_exit (i32.const 9)))))
+)
+"#;
+
+fn job_for(wasm: PathBuf, memory: GuestMemory) -> SandboxJob {
+    SandboxJob {
+        wasm,
+        argv: vec!["prog".to_owned()],
+        env: vec![],
+        stdin: Vec::new(),
+        mounts: vec![],
+        fuel: Fuel(1_000_000),
+        memory,
+    }
+}
+
+/// The compiled module outlives the call (`crates/runtime/spec/Sandbox.lean`
+/// D101): once a clone has run a guest, another clone runs it again
+/// without reading the file, which is shown by overwriting the file with
+/// bytes that are not WebAssembly while keeping its length and
+/// modification time — the identity the engine recognises a guest by.
+#[test]
+fn a_second_guest_reuses_the_compiled_module() {
+    let tmp = tempfile::tempdir().unwrap();
+    let module = build(tmp.path(), "once", WAT_SUCCEEDS);
+    let job = job_for(module.clone(), GuestMemory::Wasm32);
+    let mut first = WasmtimeSandbox::new().unwrap();
+    let mut second = first.clone();
+    assert_eq!(first.run(&job).unwrap().exit, SandboxExit::Success);
+
+    let mut file = std::fs::File::options().write(true).open(&module).unwrap();
+    let before = file.metadata().unwrap();
+    file.write_all(&vec![0_u8; usize::try_from(before.len()).unwrap()])
+        .unwrap();
+    file.set_modified(before.modified().unwrap()).unwrap();
+    drop(file);
+
+    let again = second.run(&job).map(|outcome| outcome.exit);
+    assert_eq!(
+        again,
+        Ok(SandboxExit::Success),
+        "the second clone read and compiled the file again"
+    );
+}
+
+/// A guest grows no further than its run's ceiling, ends as it chooses
+/// when refused, and the refusal is reported as the run's ceiling being
+/// hit (`crates/runtime/spec/Sandbox.lean` D102). Without a ceiling the
+/// same growth succeeds and nothing is reported.
+#[test]
+fn a_guest_grows_no_further_than_the_run_ceiling() {
+    let tmp = tempfile::tempdir().unwrap();
+    let module = build(tmp.path(), "grows", WAT_GROWS);
+    let limit = NonZeroU64::new(128 * 1024).unwrap();
+    let mut sandbox = WasmtimeSandbox::new().unwrap();
+    let ended = |sandbox: &mut WasmtimeSandbox, memory| {
+        let outcome = sandbox.run(&job_for(module.clone(), memory)).unwrap();
+        (outcome.exit, outcome.ceiling)
+    };
+    assert_eq!(
+        ended(&mut sandbox, GuestMemory::Ceiling(limit)),
+        (
+            SandboxExit::Failure { code: 9 },
+            Some(Ceiling::Hit { limit })
+        )
+    );
+    assert_eq!(
+        ended(&mut sandbox, GuestMemory::Wasm32),
+        (SandboxExit::Success, None)
+    );
+}
+
+/// A guest whose initial memory alone passes the run's ceiling never
+/// starts, and says so as the ceiling it hit, not as a broken build
+/// (`crates/runtime/spec/Sandbox.lean` D102).
+#[test]
+fn a_guest_that_starts_past_the_run_ceiling_reports_the_ceiling() {
+    let tmp = tempfile::tempdir().unwrap();
+    let module = build(tmp.path(), "starts", WAT_SUCCEEDS);
+    let limit = NonZeroU64::new(32 * 1024).unwrap();
+    let outcome = WasmtimeSandbox::new()
+        .unwrap()
+        .run(&job_for(module, GuestMemory::Ceiling(limit)))
+        .unwrap();
+    assert!(
+        matches!(outcome.exit, SandboxExit::Trap { .. }),
+        "{outcome:?}"
+    );
+    assert_eq!(outcome.ceiling, Some(Ceiling::Hit { limit }));
 }

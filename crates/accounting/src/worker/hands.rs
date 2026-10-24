@@ -73,6 +73,11 @@ pub struct Hands {
     /// Placement's run mask (D49), passed unchanged into the backlog.
     /// This crate reads no placement configuration and computes no mask.
     pub affinity: runtime::backlog::RunAffinity,
+    /// The machine budget a run's heavy work reserves its ceiling from
+    /// (`crates/runtime/spec/Reserve.lean` D104). Production sizes it from
+    /// the person's top-level `memory`; this crate only hands it to
+    /// `runtime::Backlog::with_budget`.
+    pub budget: runtime::MachineBudget,
 }
 
 /// The hook a lane takes its seat through; the answer is the seat, and

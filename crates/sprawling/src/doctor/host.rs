@@ -221,7 +221,10 @@ pub(super) fn built(carried: bool) -> Presence {
     }
 }
 
-/// The sandbox this build carries, if it carries one.
+/// The sandbox this build carries, if it carries one: a clone of the
+/// one engine this process starts at the first ask, so every bench shares
+/// one compiled guest (`crates/runtime/spec/Sandbox.lean` D101). An engine
+/// that will not start is not kept, and the next ask starts it again.
 ///
 /// # Errors
 /// Propagates what starting the engine reports. A build that says it
@@ -230,7 +233,16 @@ pub(super) fn built(carried: bool) -> Presence {
 /// sandboxed turns out not to have been.
 #[cfg(feature = "sandbox")]
 pub(crate) fn execution_engine() -> Result<Box<dyn runtime::Sandbox>, AxError> {
-    Ok(Box::new(runtime::WasmtimeSandbox::new()?))
+    static ENGINE: std::sync::Mutex<Option<runtime::WasmtimeSandbox>> = std::sync::Mutex::new(None);
+    let mut slot = ENGINE
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    if let Some(engine) = slot.as_ref() {
+        return Ok(Box::new(engine.clone()));
+    }
+    let engine = runtime::WasmtimeSandbox::new()?;
+    *slot = Some(engine.clone());
+    Ok(Box::new(engine))
 }
 
 /// The engine `exec` runs a program in: none, in a build without one.

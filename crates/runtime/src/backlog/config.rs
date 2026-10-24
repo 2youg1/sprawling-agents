@@ -12,6 +12,7 @@
 //! carries and how it ends, is the module above.
 
 use super::{Backlog, PollBudget, RunAffinity, Scratch, Shares, Sink};
+use crate::reserve::MachineBudget;
 
 impl Backlog {
     /// Requests this affinity for each run's job. Configure before the
@@ -39,6 +40,7 @@ impl Backlog {
             sink: None,
             shares: Shares::Unset,
             affinity: RunAffinity::Os,
+            budget: MachineBudget::unmetered(),
         }
     }
 

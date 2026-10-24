@@ -8,12 +8,13 @@
 use std::collections::BTreeMap;
 use std::sync::Mutex;
 
-use super::outcome::{backgrounded, settled, with_ceiling, with_environment};
+use super::outcome::{backgrounded, settled, with_ceiling, with_environment, with_wait};
 use super::{
     Confined, Confinement, ContainerRuntime, ENV_ALLOWLIST, ExecTool, Placement, Shell, held,
     yielding,
 };
 use crate::backlog::Started;
+use crate::reserve::Reservation;
 use kernel::{AxCode, AxError, EnvVarName, ToolOutcome};
 
 #[derive(Clone, Copy)]
@@ -128,6 +129,7 @@ impl ExecTool {
         for (key, value) in &inherited {
             command.env(key, value);
         }
+        let reservation = self.reservation();
         let (started, placed) = match (placement, &self.container) {
             (Placement::Sandbox, Some((limits, runtime))) => {
                 let mut copy =
@@ -182,6 +184,10 @@ impl ExecTool {
                 None,
             ),
         };
+        // The foreground window has ended: the command settled or went to
+        // the background, and either way it holds no reservation (D104).
+        let waited = reservation.as_ref().and_then(Reservation::waited);
+        drop(reservation);
         let result = match started {
             Started::Settled {
                 exit,
@@ -201,7 +207,7 @@ impl ExecTool {
                 backgrounded(&id, &what, arm)?
             }
         };
-        with_environment(result, &inherited)
+        with_wait(with_environment(result, &inherited)?, waited)
     }
 
     /// The variables this run's children actually get: the floor every
