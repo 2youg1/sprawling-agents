@@ -180,6 +180,61 @@ pub fn bring_forward(path: &Path, file: FormatFile, backups: &Path) -> Result<Fo
     climb(path, file, &ladder, backups)
 }
 
+/// One file opening the city brought forward or could not: its
+/// `outcome` is `Forwarded::Moved` or the refusal, never `Absent` or
+/// `Current`, because a file nothing happened to needs no line.
+#[derive(Debug)]
+pub struct Forwarding {
+    pub path: PathBuf,
+    pub outcome: Result<Forwarded, AxError>,
+}
+
+/// Brings every versioned file the city holds to this build's format:
+/// the city's, each building's and each room's `CONFIG.toml`, and each
+/// building's `RULES.toml`, as [`crate::check`] lists them.
+///
+/// A file that is refused does not stop the others, because its own
+/// reader refuses it again when it is read and the rest should not stay
+/// behind with it. While no rung is registered this reads and writes
+/// nothing beyond the reads.
+///
+/// # Errors
+/// Propagates a failure to list the buildings or rooms; each file's own
+/// refusal is in its [`Forwarding`].
+pub fn bring_city_forward(city_root: &Path, backups: &Path) -> Result<Vec<Forwarding>, AxError> {
+    climb_city(
+        city_root,
+        |file| Ladder {
+            to: file.current(),
+            rungs: RUNGS,
+        },
+        backups,
+    )
+}
+
+/// [`bring_city_forward`] against the ladder `ladder_for` names for each
+/// kind of file.
+fn climb_city<'a>(
+    city_root: &Path,
+    ladder_for: impl Fn(FormatFile) -> Ladder<'a>,
+    backups: &Path,
+) -> Result<Vec<Forwarding>, AxError> {
+    Ok(crate::check::files(city_root)?
+        .into_iter()
+        .filter_map(|(path, kind)| kind.versioned().map(|file| (path, file)))
+        .map(|(path, file)| {
+            let outcome = climb(&path, file, &ladder_for(file), backups);
+            Forwarding { path, outcome }
+        })
+        .filter(|forwarding| {
+            !matches!(
+                forwarding.outcome,
+                Ok(Forwarded::Absent | Forwarded::Current)
+            )
+        })
+        .collect())
+}
+
 /// The format a climb ends at and the rungs it may take: this build's
 /// in production, a test's own where a test needs a format past the
 /// current one.

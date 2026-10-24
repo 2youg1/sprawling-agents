@@ -19,6 +19,7 @@ use kernel::{Address, AxCode, AxError};
 use serde::de::DeserializeOwned;
 
 use crate::config_layers::{ConfigFile, ConfigLayer, Layer};
+use crate::format::FormatFile;
 use crate::policy::{RulesShape, evaluate, rules_path};
 use crate::schedule::{Schedule, ScheduleFile, schedule_path};
 use crate::watch::{Watch, WatchFile, watch_path};
@@ -48,7 +49,7 @@ pub struct Report {
 }
 
 /// The kind of file, which names the parser that reads it.
-enum Kind {
+pub(crate) enum Kind {
     Config,
     Rules(Address),
     Schedule,
@@ -61,6 +62,26 @@ enum Kind {
 /// Propagates a failure to list the buildings or rooms, or to read a
 /// file that exists: then whether the city has an error cannot be told.
 pub fn check(city_root: &Path) -> Result<Report, AxError> {
+    let mut report = Report::default();
+    for (path, kind) in files(city_root)? {
+        let Some(text) = read(&path)? else { continue };
+        report.read = report.read.saturating_add(1);
+        if let Err(error) = kind.parse(&text) {
+            let at = kind.locate(&text);
+            report.findings.push(Finding { path, at, error });
+        }
+    }
+    Ok(report)
+}
+
+/// Every TOML file a city may hold, present or not, with the kind that
+/// reads it: the one list both [`check`] and
+/// [`crate::format::bring_city_forward`] walk, so a layer added later
+/// is checked and brought forward alike.
+///
+/// # Errors
+/// Propagates a failure to list the buildings or rooms.
+pub(crate) fn files(city_root: &Path) -> Result<Vec<(PathBuf, Kind)>, AxError> {
     let mut files = vec![(CityLayout::new(city_root).city_config(), Kind::Config)];
     for building in crate::building::all(city_root)? {
         files.push((Layer::Building.file(city_root, &building)?, Kind::Config));
@@ -74,19 +95,20 @@ pub fn check(city_root: &Path) -> Result<Report, AxError> {
     }
     files.push((schedule_path(city_root), Kind::Schedule));
     files.push((watch_path(city_root), Kind::Watch));
-    let mut report = Report::default();
-    for (path, kind) in files {
-        let Some(text) = read(&path)? else { continue };
-        report.read = report.read.saturating_add(1);
-        if let Err(error) = kind.parse(&text) {
-            let at = kind.locate(&text);
-            report.findings.push(Finding { path, at, error });
-        }
-    }
-    Ok(report)
+    Ok(files)
 }
 
 impl Kind {
+    /// The `format` ladder this kind of file climbs, if it carries one
+    /// (`crates/city/spec/Format.lean` §8-42).
+    pub(crate) fn versioned(&self) -> Option<FormatFile> {
+        match self {
+            Kind::Config => Some(FormatFile::LayerConfig),
+            Kind::Rules(_) => Some(FormatFile::Rules),
+            Kind::Schedule | Kind::Watch => None,
+        }
+    }
+
     fn parse(&self, text: &str) -> Result<(), AxError> {
         match self {
             Kind::Config => ConfigLayer::parse(text).map(drop),

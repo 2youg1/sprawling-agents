@@ -1883,6 +1883,7 @@ impl RunWorker {
 - **在哪里做**：`RunWorker::over` 在开账之后调 `storage::Worktrees::sweep_abandoned(city_root, &[])`。`held` 为空，因为账本的独占锁保证此刻没有别的进程在用这座城，而这个 worker 还没有派出任何一轮；`over` 是 `serve`、`resume` 与 `form_city` 共同的构造点，所以每条开城路径都清扫。
 - **失败不挡开城**：清扫失败（例如 Windows 上一个文件还被别的程序打开）以 `Level::Effect` 写进 `Diagnostics`，城照常打开；留下的树下一次开城再收。一棵收不走的树不该让人进不了自己的城。
 - **收走了什么也说**：收走至少一棵时，同一级别写一行，列出名字；什么都没收时不写。
+- **同一时机前移配置文件**：清扫之后 `holding` 调 `city::bring_city_forward(city_root, Home::backups())`（`crates/city/Spec.lean` §8-42），理由相同——账本的写锁保证此刻没有 run 在读这些文件。每改写一份、每拒一份，以 `Level::Effect` 写一行，点名文件；家目录找不到或楼列不出时也写一行，城照常打开，被拒的文件由它的读者在被读时拒。
 - **不碰的东西**：人加的 worktree、人的分支、带着未进 HEAD 的提交的租约分支、`refs/sprawling/runs/` 下的检查点引用（`crates/storage/Spec.lean` §8-9）。
 
 **本节测试**：`storage::worktree::sweep::tests` 的四条——崩溃留下的租约被收走（`a_crash_left_lease_is_swept_when_the_city_opens`）；检查点引用留下；另一座城的家目录下的树留下；活着的 run 的树与人自己的树留下——以及 `accounting::worker::lifetime` 的 `a_crash_left_worktree_is_gone_once_the_city_opens`，它从开城这一侧看同一件事。

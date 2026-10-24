@@ -171,3 +171,83 @@ fn an_older_file_climbs_and_keeps_its_original() {
         "the file already states format 2"
     );
 }
+
+/// Opening a city brings every versioned file forward and answers only
+/// the files it moved or refused; a refused file holds no other back.
+#[test]
+fn a_city_brings_each_file_forward_and_a_refused_one_holds_none_back() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path().join("city");
+    let lab = kernel::Address::parse("lab").unwrap();
+    crate::building::create(&root, &lab, crate::building::BuildingTemplate::Minimal).unwrap();
+    let city_config = kernel::layout::CityLayout::new(&root).city_config();
+    write_making_parents(&city_config, UNVERSIONED);
+    let lab_config = crate::config_layers::Layer::Building
+        .file(&root, &lab)
+        .unwrap();
+    std::fs::write(&lab_config, "format = 9\n").unwrap();
+    let rules = crate::policy::rules_path(&root, &lab);
+    let two = Format::FIRST.next().unwrap();
+    let rungs = [FormatFile::LayerConfig, FormatFile::Rules].map(|file| Rung {
+        file,
+        from: Format::FIRST,
+        rewrite: to_two,
+    });
+    let ladder = |_| Ladder {
+        to: two,
+        rungs: &rungs,
+    };
+
+    let answered: Vec<(PathBuf, Option<Format>, Option<AxCode>)> =
+        climb_city(&root, ladder, &backups(&dir))
+            .unwrap()
+            .into_iter()
+            .map(|forwarding| match forwarding.outcome {
+                Ok(Forwarded::Moved { to, .. }) => (forwarding.path, Some(to), None),
+                Ok(other) => panic!("{other:?} needs no line"),
+                Err(err) => (forwarding.path, None, Some(*err.code())),
+            })
+            .collect();
+    assert_eq!(
+        answered,
+        vec![
+            (city_config.clone(), Some(two), None),
+            (lab_config.clone(), None, Some(AxCode::ConfigInvalid)),
+            (rules.clone(), Some(two), None),
+        ]
+    );
+    let again: Vec<PathBuf> = climb_city(&root, ladder, &backups(&dir))
+        .unwrap()
+        .into_iter()
+        .map(|forwarding| forwarding.path)
+        .collect();
+    assert_eq!(
+        again,
+        vec![lab_config],
+        "only the refused file is answered again"
+    );
+}
+
+/// This build's own ladder is empty, so opening a city writes nothing.
+#[test]
+fn opening_a_city_on_this_build_writes_nothing() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path().join("city");
+    let lab = kernel::Address::parse("lab").unwrap();
+    crate::building::create(&root, &lab, crate::building::BuildingTemplate::Minimal).unwrap();
+    let rules = crate::policy::rules_path(&root, &lab);
+    let before = std::fs::read(&rules).unwrap();
+
+    assert!(
+        bring_city_forward(&root, &backups(&dir))
+            .unwrap()
+            .is_empty()
+    );
+    assert_eq!(std::fs::read(&rules).unwrap(), before);
+    assert!(!backups(&dir).exists());
+}
+
+fn write_making_parents(path: &Path, text: &str) {
+    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+    std::fs::write(path, text).unwrap();
+}
