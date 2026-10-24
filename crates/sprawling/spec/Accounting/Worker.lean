@@ -223,7 +223,7 @@ fn run_segment(city_root: &Path, building: &Address, brief: &city::RunBrief) -> 
 
 | 槽 | 装什么 | 稳定性依据 |
 |---|---|---|
-| City | 城里那份 `City.md` | 整座城不变 |
+| City | 管这栋楼的那份 `City.md`：楼保留区里的那份在就用它，否则城根那份（`city::city_prompt_path`，近者替换远者） | 没有楼级覆盖时整座城不变；有时整栋楼不变 |
 | Building | 楼的地址 ＋ `.sprawling/RULES.toml` 全文 ＋ 城根与楼根的 `AGENTS.md` | 人写、任何写域够不到、整个 Run 不变、同楼每个居民相同 |
 | Resident | run 所在房间的地址 ＋ 名字行 ＋ `URBANITE.md`（或无身份那 106 字节）＋ catalog ＋ 楼根以下各级 `AGENTS.md` | 同一个 Resident 每次 Run 同样的字节 |
 | Run | `Handoff.md`（写过的话）＋ 本次 brief | 每次 Run 一份 |
