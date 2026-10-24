@@ -13,6 +13,7 @@ mod held;
 mod helpers;
 mod phases;
 mod prefix_held;
+mod read_round;
 mod recovery;
 mod redaction;
 mod resolving;

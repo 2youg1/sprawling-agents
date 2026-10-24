@@ -179,8 +179,10 @@ fn a_file_absent_at_the_check_is_not_opened_later() {
 }
 
 /// A file present at the check is read only while it is still the file
-/// the check judged: a directory on its path swapped for a link between
-/// the check and the open would lead the open wherever the link points.
+/// the check judged: a directory on its path swapped for a link during
+/// the check never leads the read into the vault. A read judged on the
+/// handle it reads from already holds the judged file when the swap
+/// happens, so the answer is that file or a refusal, never the vault.
 #[test]
 fn a_directory_swapped_for_a_link_after_the_check_opens_nothing() {
     let dir = tempfile::tempdir().unwrap();
@@ -216,11 +218,16 @@ fn a_directory_swapped_for_a_link_after_the_check_opens_nothing() {
     )
     .unwrap();
 
-    let refused = tool.invoke(&call("lab/door/sub/secret.md"));
-    assert!(
-        matches!(&refused, Err(err) if err.code() == &AxCode::GateDenied),
-        "a file was read through a link swapped in after the check: {refused:?}"
-    );
+    let answered = tool.invoke(&call("lab/door/sub/secret.md"));
+    match &answered {
+        Err(err) => assert_eq!(err.code(), &AxCode::GateDenied, "{err:?}"),
+        Ok(opened) => assert_eq!(
+            opened.result.as_map()["text"],
+            "the annex
+",
+            "a file was read through a link swapped in during the check"
+        ),
+    }
 }
 
 /// A single document that happens to be called `SKILL.md` is not a
