@@ -247,7 +247,7 @@ D20 `plan finish` 的 `evidence` 可以是一个路径，由装配层交来的 `
 
 D1 仲裁只有两级（ruling）。`Level` 只有 `Serialize` 与 `Arbitrate`，`arbitrate` 收两个入参，这是人的 ruling。第三级「升到人」在生产里不可达：唯一的生产调用点没有能让它成立的输入，门只答 Allow 或 Deny，被门拒掉的 run 不占地盘，也就无从与人相撞；一个不可达的级别仍会散布在公共面、账本载荷与恢复语里。一个居民读不定的冲突是一个设计问题，按设计问题进 Inbox。被否决的是用一个穷尽的 `Occasion` 枚举描述何时升到人：它把一个到不了的级别保留成一个更整齐的到不了的级别。
 
-D2 没有草稿退回机制。房间没有版本，发言不带「作者所见的房间版本」进房间，也就没有退回作者、四路择一与 hold token。它要防的两种冲突各有权威：同一份文件的并发写由 `runtime` 的 `edit` 按每 run 读戳准入、按路径锁落地（`crates/runtime/spec/Tools/Edit.lean` D105）与 worktree 隔离解决；同一件事的并发认领由 `kernel::goal` 的同资源相斥与 `arbiter` 解决，第三套机制就是第三个权威。`Signal` 的 `room_version` 在生产写点（`signal_desk` 的 `send`、`handback`）恒为 `Version::FIRST`。重开参数：出现一个真的会前进的房间版本，即有生产写点把 `room_version` 填成 `Version::FIRST` 以外的值，那时退回从那个写点长出来。
+D2 没有草稿退回机制。房间没有版本，发言不带「作者所见的房间版本」进房间，也就没有退回作者、四路择一与 hold token。它要防的两种冲突各有权威：同一份文件的并发写由 `runtime` 的 `edit` 按每 run 读戳准入、按路径锁落地（`crates/runtime/spec/Tools/Edit.lean` D106）与 worktree 隔离解决；同一件事的并发认领由 `kernel::goal` 的同资源相斥与 `arbiter` 解决，第三套机制就是第三个权威。`Signal` 的 `room_version` 在生产写点（`signal_desk` 的 `send`、`handback`）恒为 `Version::FIRST`。重开参数：出现一个真的会前进的房间版本，即有生产写点把 `room_version` 填成 `Version::FIRST` 以外的值，那时退回从那个写点长出来。
 -/
 
 /-! ## 13 依赖选型
