@@ -26,7 +26,7 @@ impl Copied<'_> {
 }
 ```
 
-**两个调用方，一个渲染器。** 活的回合在 `turn::wave::settle` 里用 `CURRENT` 画出文本推进窗口，并在 `tool_result` 上记 `rendered: Some(CURRENT)` 与 `shown_bytes`（kernel D64）；分支与恢复经 `fork::result_block` 从账本重建对话，用那一行记下的版本再画一次（缺席读作 `V1`）。账本由 `runtime::replay::resume` 补上的「结局不明」那一行也记 `CURRENT`。所以同一行在两处画出的字节相同，跨二进制版本也相同。
+**两个调用方，一个渲染器。** 活的回合在 `turn::wave::settle` 里用 `CURRENT` 画出文本推进窗口，并在 `tool_result` 上记 `rendered: Some(CURRENT)` 与 `shown_bytes`（kernel D64）；分支与恢复经 `fork::result_block` 从账本重建对话，用那一行记下的版本再画一次（缺席读作 `V1`）。账本由 `runtime::replay::resume` 补上的「结局不明」那一行也记 `CURRENT`。所以同一行在两处画出的字节相同，跨二进制版本也相同。对话窗口只存画出的文本：settle 把它作为 `ContentBlock::ToolResult` 的 `content` 推进窗口，结构化载荷只进账本，`runtime::transcript` 冻结的也是这个窗口。
 
 **V1**：载荷的紧凑 JSON（`serde_json::to_string`），对答与拒都是。永久保留：账本里这把键出现之前的每一行都是这样给模型看的。
 
