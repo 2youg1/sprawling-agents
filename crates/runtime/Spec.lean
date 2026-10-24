@@ -20,6 +20,7 @@ import crates.runtime.spec.Pipeline
 import crates.runtime.spec.PolicyTake
 import crates.runtime.spec.Prefix
 import crates.runtime.spec.Reminder
+import crates.runtime.spec.Rendering
 import crates.runtime.spec.Replay
 import crates.runtime.spec.Run
 import crates.runtime.spec.Run.Checkpoint
@@ -250,6 +251,7 @@ tools/ ──▶ kernel(tool/version/discard/gate)、sandbox、storage(cas 经 p
 | 8-47-1 | `crates/runtime/spec/Conversation.lean` |
 | 8-47-2 | `crates/runtime/spec/Conversation.lean` |
 | 8-52 | `crates/runtime/spec/Run.lean` |
+| 8-63 | `crates/runtime/spec/Rendering.lean` |
 -/
 
 /-! ## 9 工作流程

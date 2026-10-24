@@ -18,6 +18,7 @@
 //! change, and that is the difference between undoing a mistake and
 //! undoing an afternoon.
 
+use std::borrow::Cow;
 use std::path::{Path, PathBuf};
 
 use kernel::{
@@ -215,6 +216,8 @@ impl Tool for EditTool {
                  files and this one is not text"
             ))
         })?;
+        let (old, new) = as_the_file_spells(&text, old, new);
+        let (old, new) = (old.as_ref(), new.as_ref());
         let hits = text.matches(old).count();
         if hits != 1 {
             return Err(AxError::failure(
@@ -300,6 +303,48 @@ impl EditTool {
             attachments: Vec::new(),
         })
     }
+}
+
+/// The passage and its replacement as the file spells them.
+///
+/// A passage copied out of a `read` answer may carry the line marks that
+/// answer drew (`crate::rendering::Copied`). It is tried as it came
+/// first, and an exact match is never second-guessed, because a file may
+/// hold lines that look like marks. Only when it matches nothing are its
+/// marks taken off, and only marks the file confirms: the unmarked
+/// passage has to start on the very line its marks number, for exactly
+/// one reading of them. The replacement loses the marks with those
+/// numbers and keeps every other line as it came, because a model that
+/// copied the marks into `old` copied them into `new`, while a numbered
+/// line it adds in `new` is text it means to write.
+fn as_the_file_spells<'a>(text: &str, old: &'a str, new: &'a str) -> (Cow<'a, str>, Cow<'a, str>) {
+    if text.contains(old) {
+        return (Cow::Borrowed(old), Cow::Borrowed(new));
+    }
+    let copied = crate::rendering::Copied::of(old);
+    let mut confirmed = copied.starts().into_iter().filter_map(|start| {
+        let (bare, numbers) = copied.drawn_from(start)?;
+        begins_on_line(text, &bare, start).then_some((bare, numbers))
+    });
+    match (confirmed.next(), confirmed.next()) {
+        (Some((bare, numbers)), None) => (
+            Cow::Owned(bare),
+            Cow::Owned(crate::rendering::Copied::of(new).without(&numbers)),
+        ),
+        (Some(_), Some(_)) | (None, _) => (Cow::Borrowed(old), Cow::Borrowed(new)),
+    }
+}
+
+/// Whether `passage` occurs in `text` starting at the beginning of the
+/// 0-based line `line`, numbered the way `read` numbers lines.
+fn begins_on_line(text: &str, passage: &str, line: u64) -> bool {
+    !passage.is_empty()
+        && text.match_indices(passage).any(|(at, _)| {
+            text.get(..at).is_some_and(|before| {
+                (before.is_empty() || before.ends_with('\n'))
+                    && u64::try_from(before.matches('\n').count()) == Ok(line)
+            })
+        })
 }
 
 /// Why a create did not land. A name that stands is a version conflict

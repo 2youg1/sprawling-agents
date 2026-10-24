@@ -204,9 +204,14 @@ pub struct ToolCalled { pub id: String, pub name: ToolName, pub args: Payload,
                         pub effect: Option<Effect>,       // 调用那一刻的登记（§8-75）；缺席即省略
                         pub render: Option<RenderIntent> }
 pub struct ToolResult { pub tool_use_id: String, pub name: ToolName,
-                        #[serde(flatten)] pub answer: ToolAnswer }
+                        #[serde(flatten)] pub answer: ToolAnswer,
+                        pub took_us: Option<u64>,          // D20；缺席即省略
+                        pub rendered: Option<Rendering>,   // D64；缺席读作 V1
+                        pub shown_bytes: Option<u64> }     // D64；缺席即没有记
 #[serde(untagged)]
 pub enum ToolAnswer { Answered { result: Payload }, Failed { error: Payload } }
+#[serde(rename_all = "lowercase")]
+pub enum Rendering { V1, V2 }   // 画出模型所见文本的渲染器（crates/runtime/spec/Rendering.lean §8-63）
 
 pub struct CityInitialized {}           // 城名在信封的 addr
 pub struct BuildingCreated { pub addr: Address, pub template: String,
@@ -580,6 +585,17 @@ pub struct ProposalWithdrawn { pub proposal: B3Hash }
 **重开参数**：出现一个读者需要工具内部分段（门、路径解析、IO、秘密扫描、检查点）的入账读数时，重议是否在 `tool_result` 里记分段，或只在仪表里记（今天只在仪表里记）。
 
 写方：`runtime::turn` 从 `RunHooks.monotonic_us` 读三次单调读数（工具开始与答复、尝试发出、首个内容、回复收齐），差即这三把键；它与线上的 `Call`、`Used` 帧同一次 `WIRE_V` 进位（`crates/wire/Spec.lean` D22）。
+-/
+
+/-! D64 `tool_result` 记下画出模型所见文本的渲染器，缺席读作 V1
+
+**决定**：`tool_result` 多两把可缺席的键：`rendered: Option<Rendering>` 说出模型读到的那段文本由哪一版渲染器从这一行画出，`shown_bytes: Option<u64>` 是那段文本的字节数。`Rendering` 是 `V1`、`V2`，serde 小写串。缺席的 `rendered` 读作 `V1`（`Rendering::of`），也就是载荷的紧凑 JSON：这把键出现之前的每一行都是这样给模型看的。渲染器本身住 `runtime::rendering`（`crates/runtime/spec/Rendering.lean` §8-63），因为它要知道每个工具的结果形状；kernel 只持有「这一行由哪一版画出」这个事实。
+
+**理由**：账本存结构化的答，模型读的是文本，文本是行与渲染器的函数。从账本重建一段对话（分支、恢复）时，模型要看到它当时看到的字节，否则一个已缓存的前缀从第一条工具结果起就失效，而且模型读到的历史不是它当时据以行动的那一份。版本随行而不随 run：一个 run 可能跨过一次二进制升级，前后两行由不同的渲染器画出。`shown_bytes` 让「模型可见的字节」按工具分账，不必在读者那边重渲染一遍。
+
+**被否**：①只存渲染后的文本：账本失去结构，accounting 的视图与 UI 都读结构；②存文本与结构两份：同一个答两个权威，且文本可从结构算出；③把版本记在 `prompt_assembled` 或 `run_started` 上：一个 run 中途升级时同一 run 的行由两版画出，记在 run 上的版本对一半的行说了假话。
+
+**重开参数**：渲染器变成依赖行以外的输入（例如调用参数、房间）时，这些输入也要随行记下，或改为记文本本身。
 -/
 
 /-! D21 会话中改运行策略是一个入窗的种类 `run_policy_changed`，在下一个 `SafePoint::BeforeWave` 生效

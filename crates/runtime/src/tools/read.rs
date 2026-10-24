@@ -409,6 +409,11 @@ impl Tool for ReadTool {
             Origin::Held => {}
         }
         let interval = Interval::asked_for(call)?;
+        // Where the interval starts, which the drawn header and line marks
+        // number from (`crate::rendering`); absent means line 0.
+        if interval.offset != 0 {
+            out.insert("offset".to_owned(), Value::Number(interval.offset.into()));
+        }
         let taken = interval.cut(&text);
         if let Some(total) = taken.total_lines {
             out.insert("total_lines".to_owned(), Value::Number(total.into()));

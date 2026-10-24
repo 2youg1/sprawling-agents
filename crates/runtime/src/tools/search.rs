@@ -36,8 +36,9 @@ use crate::elision::{self, Elided};
 use descent::{Entry, Step, admissible};
 use hit::{Limit, context_block};
 
-/// How many hits one call may bring back. A search that filled the
-/// window would be a search nobody can afford to run twice.
+/// How many entries one call may bring back: hits in `content`, files in
+/// `files` and `count`. A search that filled the window would be a
+/// search nobody can afford to run twice.
 const MATCH_CAP: usize = 64;
 
 /// How large a file may be before the walk passes over it. Reading a
@@ -58,6 +59,37 @@ const CONTEXT_CAP: u8 = 4;
 struct Predicate {
     needle: String,
     context: usize,
+    mode: Mode,
+}
+
+/// What a call hands back for the files it matched
+/// (`crates/runtime/spec/Tools/Search.lean` D103).
+#[derive(Clone, Copy)]
+enum Mode {
+    /// Every hit, with its line number and context.
+    Content,
+    /// Only the files that hold a hit.
+    Files,
+    /// Each file that holds a hit, with how many lines matched.
+    Count,
+}
+
+impl Mode {
+    /// The spelling a call passes, and the one a refusal offers back.
+    const SPELLED: [(&'static str, Mode); 3] = [
+        ("content", Mode::Content),
+        ("files", Mode::Files),
+        ("count", Mode::Count),
+    ];
+
+    /// The payload key the entries travel under.
+    fn key(self) -> &'static str {
+        match self {
+            Mode::Content => "matches",
+            Mode::Files => "files",
+            Mode::Count => "counts",
+        }
+    }
 }
 
 /// What the walk has found so far, and what it could not open.
@@ -126,6 +158,10 @@ impl SearchTool {
                             or file to search under; everything you may read when omitted" },
                         "context": { "type": "integer", "description": "how many lines to \
                             show each side of a hit, 0 to 4, default 0" },
+                        "mode": { "type": "string", "enum": ["content", "files", "count"],
+                            "description": "content (default): every hit with its line number; \
+                            files: only the files that hold a hit; count: each such file with \
+                            how many lines matched" },
                     },
                     "required": ["text"],
                 }))?,
@@ -175,7 +211,33 @@ impl SearchTool {
         Ok(Predicate {
             needle: needle.to_owned(),
             context,
+            mode: SearchTool::mode(call)?,
         })
+    }
+
+    /// Which answer this call asked for; `content` when it did not say.
+    fn mode(call: &ToolCall) -> Result<Mode, AxError> {
+        let Some(asked) = call.args.as_map().get("mode") else {
+            return Ok(Mode::Content);
+        };
+        Mode::SPELLED
+            .iter()
+            .find(|(spelled, _)| asked.as_str() == Some(*spelled))
+            .map(|(_, mode)| *mode)
+            .ok_or_else(|| {
+                AxError::failure(
+                    AxCode::InvalidArgs,
+                    "search",
+                    format!("`mode` {asked} is not one this tool answers"),
+                )
+                .with_nearby(
+                    Mode::SPELLED
+                        .iter()
+                        .map(|(spelled, _)| (*spelled).to_owned())
+                        .collect(),
+                )
+                .with_recovery("pass one of the nearby modes, or leave `mode` out for content")
+            })
     }
 
     /// Where the walk starts, as an absolute path and as the city
@@ -285,6 +347,27 @@ impl SearchTool {
         let Ok(body) = String::from_utf8(bytes) else {
             return;
         };
+        let mut matching = body.lines().filter(|line| line.contains(&looking.needle));
+        let listed = match looking.mode {
+            Mode::Content => return Self::content_hits(&body, rel, looking, found),
+            Mode::Files => matching.next().map(|_| Value::String(rel.to_owned())),
+            Mode::Count => match matching.count() {
+                0 => None,
+                count => Some(serde_json::json!({ "path": rel, "count": count })),
+            },
+        };
+        let Some(entry) = listed else {
+            return;
+        };
+        if found.hits.len() >= MATCH_CAP {
+            found.stopped = Some(Limit::Files);
+            return;
+        }
+        found.hits.push(entry);
+    }
+
+    /// Every hit in one file's text, with its context, until a cap.
+    fn content_hits(body: &str, rel: &str, looking: &Predicate, found: &mut Findings) {
         let lines: Vec<&str> = body.lines().collect();
         for (at, line) in lines.iter().enumerate() {
             if !line.contains(&looking.needle) {
@@ -300,7 +383,7 @@ impl SearchTool {
             // on a line. The byte budget is the same ceiling `read`
             // keeps, and for the same reason - one result may not spend
             // the window a caller still has to think in.
-            let block = context_block(&lines, at, looking);
+            let (from, block) = context_block(&lines, at, looking);
             let budget = kernel::consts_policy::INTERVAL_CAP_BYTES;
             let fits = found.spent.saturating_add(block.len()) <= budget;
             if !fits && !found.hits.is_empty() {
@@ -318,9 +401,16 @@ impl SearchTool {
                 elision::splice(&block, keep, block.len(), Elided::Tail).text
             };
             found.spent = found.spent.saturating_add(text.len());
-            found
-                .hits
-                .push(serde_json::json!({ "path": rel, "line": at, "text": text }));
+            let mut hit = Map::new();
+            hit.insert("path".to_owned(), Value::String(rel.to_owned()));
+            hit.insert("line".to_owned(), Value::Number(at.into()));
+            if from < at {
+                // Where the context starts, which the drawn answer numbers
+                // its first line from (`crate::rendering`).
+                hit.insert("from".to_owned(), Value::Number(from.into()));
+            }
+            hit.insert("text".to_owned(), Value::String(text));
+            found.hits.push(Value::Object(hit));
             if found.stopped.is_some() {
                 return;
             }
@@ -371,7 +461,7 @@ impl Tool for SearchTool {
             Value::Number(found.unreadable.into()),
         );
         out.insert("unread".to_owned(), Value::Array(found.unread));
-        out.insert("matches".to_owned(), Value::Array(found.hits));
+        out.insert(looking.mode.key().to_owned(), Value::Array(found.hits));
         Ok(ToolOutcome {
             result: Payload::new(out)?,
             attachments: Vec::new(),

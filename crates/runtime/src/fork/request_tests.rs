@@ -109,21 +109,98 @@ fn a_branch_first_request_opens_with_the_bytes_of_the_mothers_last() {
     assert_eq!(first.get(..last.len()), Some(&last[..]));
 }
 
+/// A read the renderer draws as a header and a marked body, and a refusal
+/// it draws as one line, reach a branch as the bytes the mother was
+/// shown: the rebuild draws each line with the renderer it records.
+#[test]
+fn a_branch_is_shown_the_mothers_reads_and_refusals_as_she_was() {
+    let dir = tempfile::tempdir().unwrap();
+    let (mut ledger, _) = storage::JsonlLedger::open(dir.path(), TimeMs::new(0)).unwrap();
+    let call = |id: &str, name: &str| ToolCall {
+        id: id.to_owned(),
+        name: ToolName::parse(name).unwrap(),
+        args: Payload::of(&serde_json::json!({ "path": "lab/a.md" })).unwrap(),
+    };
+    let mut mother = Recorded {
+        replies: vec![
+            says(
+                "reading it",
+                vec![call("tu_1", "read"), call("tu_2", "search")],
+            ),
+            says("done", Vec::new()),
+        ],
+        sent: Vec::new(),
+    };
+    let text: String = (0..14).map(|n| format!("row {n}\n")).collect();
+    let answer = move |call: &ToolCall| match call.name.as_str() {
+        "read" => Ok(ToolOutcome {
+            result: Payload::of(&serde_json::json!({
+                "path": "lab/a.md", "version": "cas:b3-00", "bytes": text.len(), "text": text,
+            }))
+            .unwrap(),
+            attachments: Vec::new(),
+        }),
+        _ => Err(kernel::AxError::failure(
+            kernel::AxCode::InvalidArgs,
+            "search",
+            "missing string argument `text`",
+        )
+        .with_recovery("pass the substring to look for")),
+    };
+    run_answering(
+        &mut ledger,
+        &mut mother,
+        plan(RunId::from_bytes([1; 16]), "read the notes", Vec::new()),
+        &answer,
+    );
+
+    let mut index = storage::LedgerIndex::empty();
+    index.refresh(dir.path()).unwrap();
+    let tail = Seq::new(u64::try_from(index.len()).unwrap() - 1);
+    let inherited = super::inherited_indexed(&index, dir.path(), tail).unwrap();
+    let mut daughter = Recorded {
+        replies: vec![says("and so", Vec::new())],
+        sent: Vec::new(),
+    };
+    run(
+        &mut ledger,
+        &mut daughter,
+        plan(RunId::from_bytes([2; 16]), "go on", inherited.messages),
+    );
+
+    let last = mother.sent.last().unwrap();
+    let first = &daughter.sent[0];
+    assert_eq!(first.get(..last.len()), Some(&last[..]));
+    let shown = last.join("\n");
+    assert!(shown.contains("lab/a.md lines 0-13 of 14, version cas:b3-00"));
+    assert!(shown.contains("E_INVALID_ARGS search: missing string argument"));
+}
+
 /// Drives one run onto `ledger` with nothing interrupting it and every
 /// call answered with the same reading.
 fn run(ledger: &mut storage::JsonlLedger, model: &mut Recorded, plan: RunPlan) {
+    run_answering(ledger, model, plan, &|_: &ToolCall| {
+        Ok(ToolOutcome {
+            result: Payload::of(&serde_json::json!({ "said": "42" })).unwrap(),
+            attachments: Vec::new(),
+        })
+    });
+}
+
+/// Drives one run onto `ledger`, every call answered by `answer`.
+fn run_answering(
+    ledger: &mut storage::JsonlLedger,
+    model: &mut Recorded,
+    plan: RunPlan,
+    answer: &dyn Fn(&ToolCall) -> Result<ToolOutcome, AxError>,
+) {
     let mut clock = 0u64;
     let mut now = || {
         clock = clock.saturating_add(1);
         Ok(TimeMs::new(clock))
     };
     let mut interrupt = |_: SafePoint| Interrupt::None;
-    let mut invoke = |_: &ToolCall, _: TimeMs| {
-        Ok(ToolOutcome {
-            result: Payload::of(&serde_json::json!({ "said": "42" })).unwrap(),
-            attachments: Vec::new(),
-        })
-    };
+    let mut invoke = |call: &ToolCall, _: TimeMs| answer(call);
     let mut hooks = RunHooks {
         now: &mut now,
         monotonic_us: &mut || 0,

@@ -85,6 +85,8 @@ fn a_branch_inherits_the_compacted_exchange_not_the_raw_records() {
                     result: Payload::of(&serde_json::json!({ "note": prose(20_000) })).unwrap(),
                 },
                 took_us: None,
+                rendered: None,
+                shown_bytes: None,
             })
             .unwrap(),
         ),
