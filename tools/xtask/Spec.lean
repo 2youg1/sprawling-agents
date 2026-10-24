@@ -241,6 +241,8 @@ pub(crate) struct Violation {
 - **浅色在哪里被选中不归这份样式表管**：`system` 由客户端读 `prefers-color-scheme` 后写成 `data-theme`，而不是在 CSS 里再写一遍同一套令牌。**败给的方案**：`@media (prefers-color-scheme: light)` 里再声明一遍十一档——那是同一块调色板的第二份定义，两份在他们开始不一致之前都是对的。
 - **改价条件**：参考页改为读城发出的某份样式表时，它的那一行从产地表删去；出现第三个客户端时，它照参考页的样子加一行。
 
+- **上一版写出的城不在扫描面里**：`crates/sprawling/tests/cities/` 下是上一版发行二进制写出的城，逐字节保留，用来测本版能不能打开它（`crates/sprawling/tests/previous_release.rs`）。城里上架的技能带着那一版 playback 的调色板，那是那一版的产物，不是本树的一个客户端，所以门跳过这个目录。被否：从样例城里删掉技能——样例就不再是那一版写出的样子，测的也就不是人手里的城。改价条件：哪天别的门也要跳过它，就把这条挪进 `walk` 的扫描面规则，与 `SKIP_DIRS` 并列。
+
 D34 **主题是一个入口加它按顺序 import 的部分，顺序只住在入口里。** 主题按将来谁拥有它切成连续的几段，每段一个部分文件，入口按原来的顺序 import 它们，层叠因此不变。两种错误各有稳定的码：入口 import 的部分不在盘上（`theme-part-missing`），`client/src/theme/` 里有一个入口没有 import 的 `.css`（`theme-part-unimported`）——后者若放过，就是一份每道门都豁免、却没有页面画它的文件。被击败的备选：①按文件名排序读部分——要给每个文件加编号前缀，顺序就有了入口之外的第二个家；②各部分各判各的——浅色块覆写的令牌与它所覆写的那些声明分在两份文本里，`reading()` 拼不出一种打光的整张表。**重开参数**：Tailwind 不再自己内联 `@import`，或主题回到一个文件之内。
 
 **组件的样式表也在扫描面里**。一个 `.svelte` 文件是标记里装着一份样式表：顶层的 `<style>` 块（行首 `<style` 到行首 `</style>` 之间的行；同一行开合的块整行算）按样式文件的规则判，裸 `#1a2b3c` 即颜色；脚本与模板按 Rust 的规则判，只认颜色函数与带引号的 `"#rrggbb"`。`.css` 与 `.html` 整份是样式文件。哪一行是样式表只由 `tools/xtask/src/sheet.rs` 回答（`sheet::lines`，`Reading::Sheet`／`Reading::Code`），`color` 与 `motion`（§8-51）都读它。角色层（`color/roles.rs`）的第四条规则因此伸进组件样式：它走 `client/src` 与替代外观的目录 `client/swap/`（不在盘上就不走，`walk::client_files`）下每个 `.svelte`、`.ts`、`.html`、`.css`，主题豁免，逐行判三件事：①写档名，`bg-g2` 这类工具类或 `var(--color-g<n>)`，都是视图自己挑亮度；②`var(--color-<名>)` 读的名字主题没有声明——拼错的角色在引擎里安静地取不到值，页面上什么也不说；③样式表行（`Reading::Sheet`）声明 `--color-*`——那是主题之外的第二个颜色产地。第三条规则「每个角色至少有一个读者」仍只数 `client/src`，现在连 `.css` 一起：替代外观不进出货的 bundle，只有它读的角色不算有读者。
