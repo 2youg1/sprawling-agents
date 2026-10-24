@@ -65,8 +65,12 @@ export function listeningOf(lang: Lang, heard: Heard): ListeningLook {
   ];
   return {
     heading: say(lang, "talk_listening"),
-    listeners: listeners.map((listener) => {
+    // A listener with no name and nothing told - the run before any run
+    // was told, a city that has not said its name - is a label over an
+    // empty cell, which reads as a reading that failed, so it is left out.
+    listeners: listeners.flatMap((listener) => {
       const told = heard.segments.find((each) => each.slot === listener.slot);
+      if (listener.who === "" && told === undefined) return [];
       const cut = told === undefined ? 0 : told.sources.reduce((sum, source) => sum + source.dropped, 0);
       return {
         key: listener.slot,
@@ -78,7 +82,7 @@ export function listeningOf(lang: Lang, heard: Heard): ListeningLook {
           told === undefined || told.sources.length === 0
             ? undefined
             : `${say(lang, "run_prompt_sources")} ${told.sources.map((source) => source.addr).join(" · ")}`,
-      };
+      } satisfies ListenerLook;
     }),
     note: heard.told ? say(lang, "talk_listening_note") : undefined,
   };

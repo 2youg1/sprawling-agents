@@ -56,6 +56,14 @@ export interface AddressLineLook {
   readonly wire: AddressLineWire;
 }
 
+// What the line says until this browser has opened the palette once:
+// what a press does, and the chord that does the same, as this machine
+// writes it (empty while the person left the palette unbound).
+export interface Lesson {
+  readonly words: string;
+  readonly chord: string;
+}
+
 export function addressLineOf(lang: Lang, address: string, session: Seq | null, open: (arrival: Arrival) => void): AddressLineLook {
   let pressed: Arrival = "keys";
   const cut = address.lastIndexOf("/") + 1;

@@ -99,6 +99,11 @@
   // opens it is made once.
   // svelte-ignore state_referenced_locally
   const hold = modalHold(seat, arrival === "touch" ? "sheet" : "control");
+  // Opened once, found for good: the address line stops saying what a
+  // press on it does (client/Spec.lean 4-10a). A gallery specimen is
+  // not an opening.
+  // svelte-ignore state_referenced_locally
+  if (seat === "modal") u.prefs.findPalette();
   const sheet = $derived(
     modalWire({
       seat,

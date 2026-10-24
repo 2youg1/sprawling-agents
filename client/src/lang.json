@@ -9475,6 +9475,10 @@
     "en": "{address}: open the command palette to change room or session",
     "zh": "{address}：打开命令面板，换房间或会话"
   },
+  "talk_address_hint": {
+    "en": "change room or session",
+    "zh": "换房间或会话"
+  },
   "world_sessions": {
     "en": "sessions",
     "zh": "会话"

@@ -8,7 +8,10 @@ facts on the left, the model picker's token and the permissions entry
 on the right, and the panel each opens above the row. The facts' text
 hangs one padding outside the row's edges, so the words line up with
 the composer's line above them on a wide column; on one column the row
-keeps its padding. The token is one control in three segments - model,
+keeps its padding. When the token and the permissions entry do not fit
+beside the facts (on one column, beside the three keys), they fold to
+a line of their own on the right rather than cutting the model's name
+to its first letters. The token is one control in three segments - model,
 provider, thinking level - each marked with the section a press on it
 opens; the open picker is its own seat, `picker.svelte`. Every word arrives translated and every role, key
 handler and `aria-*` value arrives in a wire bag spread on the element
@@ -21,7 +24,7 @@ it is for. -->
   const look: SettingsRowLook = $props();
 </script>
 
-<div class="relative flex items-center justify-between gap-tight pt-tight">
+<div class="relative flex flex-wrap items-center justify-between gap-tight pt-tight">
   <div class="edge-slot -ml-snug flex min-w-0 flex-wrap items-center narrow:ml-0">
     <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
     {#if look.facts !== undefined}{@render look.facts()}{/if}
@@ -39,8 +42,8 @@ it is for. -->
             {#each picker.segments as part, at (part.segment)}
               {#if at > 0}<span aria-hidden="true" class="shrink-0 text-text-faint">·</span>{/if}
               <span data-segment={part.segment}
-                class={["inline-flex h-touch min-w-0 items-center rounded-control px-snug hover:wash", part.open && "wash", part.segment === "model" ? "truncate" : "shrink-0"]}
-                >{part.label}</span>
+                class={["inline-flex h-touch min-w-0 items-center rounded-control px-snug hover:wash", part.open && "wash", part.segment === "model" ? "" : "shrink-0"]}
+                ><span class="truncate">{part.label}</span></span>
             {/each}
           </button>
         </div>

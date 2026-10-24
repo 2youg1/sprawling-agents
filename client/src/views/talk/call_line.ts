@@ -16,8 +16,9 @@ export type CallFigure =
   | { readonly kind: "running"; readonly text: string }
   | { readonly kind: "none" };
 
-// How the call came out, in words: a failure or a wait on the person
-// is an alert, any other result is quiet.
+// How the call came out, in words, when it did not fail: a wait on the
+// person is an alert, any other result is quiet. A failure is
+// `CallLineLook.failure`, drawn in another cell.
 export interface CallVerdict {
   readonly tone: "alert" | "quiet";
   readonly text: string;
@@ -43,6 +44,9 @@ export interface CallLineLook {
   readonly running: boolean;
   readonly time: CallFigure;
   readonly verdict: CallVerdict | null;
+  // Why a failed call failed, "failed: <reason>", drawn at the end of
+  // the subject's cell against the time; null for a call that did not fail.
+  readonly failure: string | null;
   // The keys drawn at the line's end, in the order refrain 3-12 names
   // them; shown on the line the right side holds, and on the focused one.
   readonly moves: readonly LineMove[];
