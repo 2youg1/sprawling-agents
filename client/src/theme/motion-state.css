@@ -111,6 +111,13 @@
 main h1 {
   view-transition-name: title;
 }
+/* The whole page's cross-fade, a route change's and light trading
+ * places with dark (`views/setup/appearance.ts`), lasts a `panel`: the
+ * surface turns over where it stands. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: var(--transition-duration-panel);
+}
 [data-motion="off"]::view-transition-group(*),
 [data-motion="off"]::view-transition-old(*),
 [data-motion="off"]::view-transition-new(*) {

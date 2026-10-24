@@ -10,9 +10,7 @@ aggregator that serves more models than the city has providers. Each
 open picker stands in a box as tall as the page's foot gives it. -->
 <script lang="ts">
   import { ui } from "../../ui";
-  import { Address } from "../../wire";
   import Tier from "../setup/tier.svelte";
-  import { workspacePill } from "../talk/composer";
   import { SECTION } from "../talk/picker";
   import Picker from "../talk/picker.svelte";
   import { pickerOf } from "../talk/picker_look";
@@ -23,8 +21,6 @@ open picker stands in a box as tall as the page's foot gives it. -->
   import { AT_DEEPSEEK, AT_OLLAMA, AT_OPENROUTER, MANY_MODELS, MANY_PROVIDERS, ONE_PROVIDER, pickerFacts } from "./picked";
 
   const { lang } = ui();
-  const ignore = (): void => undefined;
-  const workspace = $derived(workspacePill($lang, { rooms: ["hall/mayor"], here: Address.make("hall/mayor") }, ignore));
   const served = pickerFacts(MANY_PROVIDERS, AT_DEEPSEEK, null);
   const stated = pickerFacts(MANY_PROVIDERS, AT_DEEPSEEK, "xhigh");
   const local = pickerFacts(MANY_PROVIDERS, AT_OLLAMA, null);
@@ -44,45 +40,45 @@ open picker stands in a box as tall as the page's foot gives it. -->
   );
 </script>
 
-<Case label="settings row · before a session · workspace, picker and permissions">
-  <SettingsRow {workspace} picker={served} room={null} draws="everything" kept={false} />
+<Case label="settings row · before a session · picker and permissions">
+  <SettingsRow picker={served} room={null} draws="everything" kept={false} />
 </Case>
 <Case label="settings row · no offered model · picker hidden">
-  <SettingsRow {workspace} picker={none} room={null} draws="everything" kept={false} />
+  <SettingsRow picker={none} room={null} draws="everything" kept={false} />
 </Case>
 <Case label="settings row · the run policy's menu open">
   <div class="flex min-h-[14rem] flex-col justify-end">
-    <SettingsRow {workspace} picker={served} room={null} draws="everything" kept={false} menu="open" />
+    <SettingsRow picker={served} room={null} draws="everything" kept={false} menu="open" />
   </div>
 </Case>
 <Case label="picker · opened from the model · models first, providers of the chosen one">
   <div class="flex min-h-[46rem] flex-col justify-end">
-    <SettingsRow {workspace} picker={served} room={null} draws="everything" kept={false} menu="model" />
+    <SettingsRow picker={served} room={null} draws="everything" kept={false} menu="model" />
   </div>
 </Case>
 <Case label="picker · opened from the provider · a stated level this provider does not offer">
   <div class="flex min-h-[46rem] flex-col justify-end">
-    <SettingsRow {workspace} picker={stated} room={null} draws="everything" kept={false} menu="provider" />
+    <SettingsRow picker={stated} room={null} draws="everything" kept={false} menu="provider" />
   </div>
 </Case>
 <Case label="picker · opened from the level">
   <div class="flex min-h-[46rem] flex-col justify-end">
-    <SettingsRow {workspace} picker={served} room={null} draws="everything" kept={false} menu="level" />
+    <SettingsRow picker={served} room={null} draws="everything" kept={false} menu="level" />
   </div>
 </Case>
 <Case label="picker · a model with no thinking control · the band's room kept for the others">
   <div class="flex min-h-[46rem] flex-col justify-end">
-    <SettingsRow {workspace} picker={local} room={null} draws="everything" kept={false} menu="model" />
+    <SettingsRow picker={local} room={null} draws="everything" kept={false} menu="model" />
   </div>
 </Case>
 <Case label="picker · one provider, no thinking control anywhere · no band, no room for one">
   <div class="flex min-h-[30rem] flex-col justify-end">
-    <SettingsRow {workspace} picker={alone} room={null} draws="everything" kept={false} menu="model" />
+    <SettingsRow picker={alone} room={null} draws="everything" kept={false} menu="model" />
   </div>
 </Case>
 <Case label="picker · more models than providers · providers first, five models and more">
   <div class="flex min-h-[50rem] flex-col justify-end">
-    <SettingsRow {workspace} picker={aggregated} room={null} draws="everything" kept={false} menu="model" />
+    <SettingsRow picker={aggregated} room={null} draws="everything" kept={false} menu="model" />
   </div>
 </Case>
 <Case label="picker · the aggregator's models opened in full · scrolling in their room">
@@ -94,7 +90,7 @@ open picker stands in a box as tall as the page's foot gives it. -->
   </div>
 </Case>
 <Case label="settings row · after a session starts · no controls">
-  <SettingsRow {workspace} picker={served} room={null} draws="notice" kept={false} />
+  <SettingsRow picker={served} room={null} draws="notice" kept={false} />
 </Case>
 <Case label="appearance · the tier card" width={390}>
   <Tier />

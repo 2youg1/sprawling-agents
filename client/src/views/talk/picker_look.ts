@@ -16,7 +16,7 @@ import type { Attachment } from "svelte/attachments";
 import type { Lang } from "../../core/lang";
 import { fill, say } from "../../core/lang";
 import type { PopoverBinding, PopoverColumn, PopoverRow } from "../parts/popover";
-import { HOLD } from "./pill";
+import { HOLD } from "./fact";
 import type { Combination, Entry, Offer, Section, Segment } from "./picker";
 import { SECTION, appliedIn, matches, offersOf, orderOf, recentOf, roomOf, sameCombination, secondLevel, sectionOf, windowed } from "./picker";
 import type { PickerFacts, PickerHeld, Scene } from "./picker_scene";

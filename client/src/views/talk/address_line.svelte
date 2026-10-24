@@ -11,10 +11,13 @@
   // `asking` merges), so a reload draws the same number; the palette it
   // opens is the shell's one palette (`palette_door.svelte.ts`), and
   // closing it gives the focus back to this line.
+  import { keymap, marks } from "../../core/keys";
+  import { say } from "../../core/lang";
   import { lineIn } from "../../core/stretches";
   import { ui } from "../../ui";
   import type { Address, Seq } from "../../wire";
   import { openPalette } from "../palette_door.svelte";
+  import type { Arrival } from "../palette_door.svelte";
   import { addressLineOf } from "./address_line";
   import Look from "./address_line.look.svelte";
 
@@ -23,7 +26,7 @@
     // The earlier session main shows; absent is the room's current one.
     readonly session?: Seq | undefined;
     // What a press does; the shell's palette unless a fixture says.
-    readonly onOpen?: (() => void) | undefined;
+    readonly onOpen?: ((arrival: Arrival) => void) | undefined;
   }
 
   const { address, session, onOpen = openPalette }: Props = $props();
@@ -31,7 +34,12 @@
   const u = ui();
   const { lang } = u;
   const lines = $derived(u.conn.asking.ask({ sessions: { room: address } }));
+  const found = u.prefs.paletteFound;
+  const keys = keymap();
   const began = $derived(session ?? lineIn($lines !== undefined && "sessions" in $lines ? $lines.sessions : undefined, undefined)?.began ?? null);
 </script>
 
-<Look {...addressLineOf($lang, address, began, onOpen)} />
+<Look
+  {...addressLineOf($lang, address, began, onOpen)}
+  lesson={$found ? undefined : { words: say($lang, "talk_address_hint"), chord: marks(keys.chord("palette"), keys.platform).join(" ") }}
+/>

@@ -121,7 +121,7 @@
 | | | Enter | 应用当前列的游标行，回调 `onApply` |
 | | | Escape | 回调 `onClose` |
 
-这张键表只有一处：`parts/combobox.ts` 的 `answer`。输入框下设置行里的芯片（`talk/pill.ts`）是同一种控件，它的过滤与键表都读 `parts/combobox.ts`，自己只多一件事：Escape 关上菜单时不再往外传，免得窗口上的 Escape 处理（外壳关上一栏的面、检视面收起）把同一下 Escape 再答一遍。
+这张键表只有一处：`parts/combobox.ts` 的 `answer`。
 
 `combobox.svelte` 的 `aria-*`（规格）：文本框是 `role="combobox"`，带 `aria-expanded`、`aria-controls` 指向列表、`aria-activedescendant` 指向游标行；列表 `role="listbox"` ＋ `aria-label`；每行 `role="option"`，`aria-selected` 只标**已选中的那个值**，不标游标。
 

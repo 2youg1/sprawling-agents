@@ -39,7 +39,7 @@
   import Notifier from "./views/notifier.svelte";
   import Pages from "./views/pages.svelte";
   import Palette from "./views/palette.svelte";
-  import { closePalette, paletteShown, togglePalette } from "./views/palette_door.svelte";
+  import { closePalette, paletteArrival, paletteShown, togglePalette } from "./views/palette_door.svelte";
   import Quit from "./views/quit.svelte";
   import Refusal from "./views/refusal.svelte";
   import Workspace from "./views/workspace.svelte";
@@ -375,7 +375,7 @@
   <Refusal {stopsWithoutRun} />
   <Quit />
   {#if paletteShown()}
-    <Palette onClose={closePalette} />
+    <Palette onClose={closePalette} arrival={paletteArrival()} />
   {/if}
   {#if sheetOpen}
     <Cheatsheet seat="modal" onClose={closeSheet} />

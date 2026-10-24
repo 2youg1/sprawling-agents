@@ -7,7 +7,7 @@
 there takes: no frame and no fill at rest, a wash under the pointer, so
 the row reads as words under a line rather than as a toolbar
 (docs/frontend-method.md §7I). Given a trigger's wire bag it is the
-button that opens the fact's menu - the pill, the model entry, the
+button that opens the fact's menu - the model entry or the
 permissions entry; given none it is a read-only fact - the gate and the
 sandbox. A fact a person must look at (a gate the city could not
 report) carries the `asks` mark, which survives a forced colour mode
@@ -17,7 +17,7 @@ where a colour alone would not (client/Spec.lean §7C). -->
 
   import Glyph from "../parts/glyph.svelte";
   import type { GlyphName } from "../parts/glyph";
-  import type { TriggerWire } from "./pill";
+  import type { TriggerWire } from "./fact";
 
   interface Props {
     readonly wire?: TriggerWire | undefined;

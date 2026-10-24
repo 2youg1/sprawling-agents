@@ -10,8 +10,8 @@
 // **The platform owns the modality**, as it does for `parts/dialog`,
 // the key sheet and the settings panel: `showModal()` puts the box in
 // the top layer, traps the focus, marks the page behind `inert`, and
-// `close()` at teardown gives the focus back to whatever held it before
-// the box opened (client/Spec.lean §4-64b). Escape arrives as a cancel
+// the focus goes back to whatever held it before the box opened
+// (client/Spec.lean §4-64b). Escape arrives as a cancel
 // request, which is handed to the caller, because the caller's state
 // says whether the box stands and the element closing itself would
 // leave that state saying it is open.
@@ -25,6 +25,12 @@ import { createAttachmentKey } from "svelte/attachments";
 import type { Attachment } from "svelte/attachments";
 
 export type Seat = "modal" | "specimen";
+
+// Where the focus lands when the box opens: on the first control inside
+// it, the platform's choice, or on the sheet itself, which a touch
+// opening asks for so no soft keyboard rises over the list
+// (`palette_door.svelte.ts`, `Arrival`).
+export type First = "control" | "sheet";
 
 // What a click on the dimmed page behind the box does. The palette is a
 // place to go, and missing it is a way of saying "nowhere"; the finder
@@ -61,12 +67,29 @@ const HOLD = createAttachmentKey();
 // `modalWire`, because Svelte runs an attachment again whenever it is a
 // different function, and that would close the box and open it again
 // on every redraw.
-export function modalHold(seat: Seat): Attachment<HTMLDialogElement> {
+export function modalHold(seat: Seat, first: First = "control"): Attachment<HTMLDialogElement> {
   return (node) => {
     if (seat === "specimen") return;
+    // A dialog that carries `autofocus` takes the focus itself when it
+    // opens (HTML's dialog focusing steps), but Chromium still hands it
+    // to the first control, so the sheet also takes it back in the same
+    // task, before a soft keyboard is asked for; `tabindex` keeps the
+    // sheet focusable in every engine.
+    if (first === "sheet") {
+      node.autofocus = true;
+      node.tabIndex = -1;
+    }
+    const before = document.activeElement;
     node.showModal();
+    if (first === "sheet") node.focus();
     return () => {
       node.close();
+      // Svelte removes the element before it runs this teardown, and a
+      // dialog closed after it left the document gives the focus to the
+      // body rather than back; the focus is returned here instead, unless
+      // what closed the box already put it somewhere.
+      const lost = document.activeElement === null || document.activeElement === document.body;
+      if (lost && before instanceof HTMLElement && before.isConnected) before.focus();
     };
   };
 }

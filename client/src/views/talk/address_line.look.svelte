@@ -16,9 +16,20 @@
   // press gives by the theme's press ratio. On a touch screen the area
   // that takes the touch reaches `touch` while the drawn line keeps its
   // size (docs/frontend-method.md §4-34).
-  import type { AddressLineLook } from "./address_line";
+  //
+  // Until this browser has opened the palette, the line ends in what a
+  // press on it does, and on a screen with a fine pointer the chord that
+  // does the same (client/Spec.lean 4-10a). The lesson is for the eye:
+  // the button's name already says it. It is one run of text, so it is
+  // the first thing a narrow column cuts, and it is cut with an ellipsis
+  // rather than by pushing a key glyph out of the line.
+  import type { AddressLineLook, Lesson } from "./address_line";
 
-  const look: AddressLineLook = $props();
+  interface Props extends AddressLineLook {
+    readonly lesson?: Lesson | undefined;
+  }
+
+  const { lesson, ...look }: Props = $props();
 </script>
 
 <header aria-label={look.head} class="fade flex h-control shrink-0 items-center">
@@ -39,6 +50,11 @@
       <!-- wording-ok: a separator glyph, hidden from screen readers, whose name the button's label already says -->
       <span class="shrink-0 px-tight" aria-hidden="true">·</span>
       <span class="figure shrink-0">{look.session}</span>
+    {/if}
+    {#if lesson !== undefined}
+      <!-- The gap before the lesson is a space inside it, not a margin, so a column that cuts the lesson to nothing keeps no gap. -->
+      <span class="min-w-0 shrink-10000 truncate text-text-faint" aria-hidden="true"
+        >&emsp;{lesson.words}{#if lesson.chord !== ""}<span class="pointer-coarse:hidden">&ensp;{lesson.chord}</span>{/if}</span>
     {/if}
   </button>
 </header>

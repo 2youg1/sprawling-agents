@@ -6,7 +6,7 @@
 <!-- How who is listening is drawn (client D95): a heading, then one
 term per listener with who it is, the size of its segment, what the
 budget cut off it and the files it was read from. Nothing here is a
-control; the menu's keys belong to its list. -->
+control; the palette's keys belong to its list. -->
 <script lang="ts">
   import type { ListeningLook } from "./listening";
 

@@ -10,7 +10,6 @@
 // this file decides them, so a chooser row and a menu row cannot come to
 // mean two different things. Where unsent words are kept is `draft.ts`.
 
-import { Option, Schema } from "effect";
 import type { Snippet } from "svelte";
 import type { HTMLFormAttributes, HTMLTextareaAttributes } from "svelte/elements";
 
@@ -19,13 +18,12 @@ import { heldIn } from "../../core/belief/rooms";
 import { configureCity, selectModel } from "../../core/commands";
 import type { Key, Lang } from "../../core/lang";
 import { fill, say } from "../../core/lang";
-import { MAYOR } from "../../core/route";
 import { completed } from "../../core/completion";
 import { offered, parse } from "../../core/slash";
 import { reached } from "../../core/slash_hands";
 import type { SessionHands, Slash, SlashHands } from "../../core/slash_hands";
 import type { Sending } from "../../core/doing";
-import { Address } from "../../wire";
+import type { Address } from "../../wire";
 import type { Answer, Command, Effort, EndpointsAnswer, RunPolicy, Seq } from "../../wire";
 import type { View } from "../../core/route";
 import type { PopoverColumn } from "../parts/popover";
@@ -42,7 +40,7 @@ export const SPELLING: Record<Sending, Key> = {
   queued: "talk_steer_queued",
 };
 
-// -------------------------------------------------------- the three pills
+// ------------------------------------------------- the settings row picks
 
 // One model the city could point the `main` face at: the endpoint that
 // serves it and its id.
@@ -56,9 +54,6 @@ export interface Served extends Names {
   readonly label: string;
 }
 
-/** The list size after which a chooser offers filtering. */
-export const FILTER_AFTER = 8;
-
 // The model the session open in a room answers with: the model of the
 // newest run since the session began that has called one, read from the
 // room's runs oldest start first (`heldIn`). A session keeps the model
@@ -71,9 +66,9 @@ export function sessionModel(held: readonly RunBelief[], began: Seq | null): str
 
 // Whether the room's current session has begun working: a run of it
 // recorded a line after the session began. Until then the settings row
-// draws its controls and the workspace chip names the room; after, the
-// row draws none and the conversation's address line names it
-// (client/Spec.lean 4-10a), so the room is drawn once either way.
+// draws its controls; after, it draws none, because the model and the
+// effort are frozen and the first message head states them
+// (docs/frontend-method.md §7D).
 export function startedIn(held: readonly RunBelief[], began: Seq | undefined): boolean {
   return held.some((run) => run.lastSeq > (began ?? 0));
 }
@@ -87,63 +82,15 @@ export function modelMove(names: Names, session: string | null): ModelMove {
   return session !== null ? { kind: "stay" } : { kind: "select", names };
 }
 
-// What sending to a room means, in one line: the Mayor's own room, a
-// bare building (a dispatch there opens a room of its own, client
-// D6), or a room that carries on a conversation.
-function roomNote(lang: Lang, room: string): string {
-  if (room === MAYOR) return say(lang, "talk_room_note_mayor");
-  const slash = room.indexOf("/");
-  return slash < 0
-    ? say(lang, "talk_room_note_building")
-    : fill(say(lang, "talk_room_note_room"), { building: room.slice(0, slash) });
-}
-
-// The room a pill names, in the address spelling the wire brands.
-export function decodeRoom(value: string): Address | null {
-  return Option.getOrNull(Schema.decodeOption(Address)(value));
-}
-
-// Every room a person could move a conversation to: the buildings the
-// city knows, and the rooms runs have already opened (the keys of
-// belief's rooms index).
-export function roomsKnown(buildings: Iterable<{ readonly addr: string }>, opened: Iterable<string>): string[] {
-  const named = new Set<string>([MAYOR, ...opened]);
-  for (const building of buildings) named.add(building.addr);
-  return [...named].sort((a, b) => a.localeCompare(b));
-}
-
-// One row of a pill's menu: the value a pick sends, the short name a
-// person reads, and one line saying what choosing it changes.
-export interface Choice {
-  readonly value: string;
-  readonly label: string;
-  readonly note?: string;
-}
-
-// One pill of the row under the box. `label` is the short name the
-// trigger and a screen reader say; `about`, when there is more to say,
-// heads the menu instead.
-export interface Pill {
-  readonly label: string;
-  readonly about?: string;
-  readonly placeholder: string;
-  readonly choices: readonly Choice[];
-  readonly value: string | null;
-  readonly pick: (value: string) => void;
-}
-
-// What a pick on the settings row does: the model picker's two choices,
-// and the workspace chip's.
+// What a pick on the settings row does: the model picker's two choices.
 export interface Picks {
   readonly model: (names: Names) => void;
-  readonly workspace: (value: string) => void;
   readonly effort: (level: Effort) => void;
 }
 
 // The page's hands a pick reaches for.
 export interface PickHands {
   readonly send: (command: Command) => boolean;
-  readonly go: (view: View) => void;
   readonly chooseEffort: (effort: Effort | null) => void;
 }
 
@@ -162,31 +109,9 @@ export function picksFor(hands: PickHands, session: string | null): Picks {
       if (move.kind === "stay") return;
       hands.send(selectModel(move.names.endpoint, move.names.model, "main"));
     },
-    workspace: (value) => {
-      const address = decodeRoom(value);
-      if (address !== null) hands.go({ kind: "talk", address });
-    },
     effort: (level) => {
       if (hands.send(configureCity(null, level))) hands.chooseEffort(null);
     },
-  };
-}
-
-// The rooms the workspace chip offers, and the one this box speaks to.
-export interface Around {
-  readonly rooms: readonly string[];
-  readonly here: Address | null;
-}
-
-// The workspace chip: every room a conversation could move to, each
-// with one line saying what sending there means.
-export function workspacePill(lang: Lang, around: Around, pick: (value: string) => void): Pill {
-  return {
-    label: say(lang, "talk_column_workspace"),
-    placeholder: say(lang, "talk_column_workspace"),
-    choices: around.rooms.map((room) => ({ value: room, label: room, note: roomNote(lang, room) })),
-    value: around.here,
-    pick,
   };
 }
 

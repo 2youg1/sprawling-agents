@@ -123,6 +123,13 @@ describe("the two families read by name", () => {
     expect(get(loadPreferences(rows, "en").workbench)).toEqual(arranged);
   });
 
+  test("a palette opened once stays found on the next page, so the address line's lesson is not said again", () => {
+    const rows = memory();
+    expect(get(loadPreferences(rows, "en").paletteFound)).toBe(false);
+    loadPreferences(rows, "en").findPalette();
+    expect(get(loadPreferences(rows, "en").paletteFound)).toBe(true);
+  });
+
   test("a draft is kept per place a person writes", () => {
     const door = loadPreferences(memory(), "en");
     door.setDraft("hall/mayor", "half a sentence");

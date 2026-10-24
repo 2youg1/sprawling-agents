@@ -76,7 +76,7 @@ third layer). -->
   const waitsForYou = $derived(
     call.outcome === "waiting" && doing?.kind === "waiting" && time.kind === "running" && time.ms >= NAMED_AFTER_MS,
   );
-  // A failed line says why in the verdict cell, cut to its width; the
+  // A failed line says why against its time, cut to its width; the
   // whole reason is in the hint too, so a cut reason is read on hover and
   // focus, and pressing the line opens the whole result in the right side.
   const failedWords = $derived.by((): string => {
@@ -150,7 +150,7 @@ third layer). -->
     }
   });
   const verdict = $derived.by((): CallVerdict | null => {
-    if (call.outcome === "failed") return { tone: "alert", text: failedWords };
+    if (call.outcome === "failed") return null;
     if (outcome !== null) return { tone: "quiet", text: say($lang, outcome) };
     if (waitsForYou) return { tone: "alert", text: say($lang, "talk_waiting_you") };
     return null;
@@ -162,6 +162,7 @@ third layer). -->
     running: call.outcome === "waiting",
     time: shownTime,
     verdict,
+    failure: call.outcome === "failed" ? failedWords : null,
     moves: MOVES_DRAWN,
     opened,
     pinned,

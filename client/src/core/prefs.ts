@@ -101,6 +101,11 @@ const ROWS = {
   // The panorama workbench's pane order and widths (client/Spec.lean §7K): a
   // fact of this screen, so it stays in this browser (client D24).
   workbench: "sprawling.workbench",
+  // Whether this browser has opened the command palette once; until it
+  // has, the address line says what a press on it does (client/Spec.lean
+  // 4-10a). A fact of this browser, because the lesson is about this
+  // screen's keys and touch, not about the person's city.
+  paletteFound: "sprawling.palette.found",
 } as const;
 
 // ------------------------------------------------------------ the shell
@@ -203,6 +208,11 @@ export interface PreferenceDoor {
   readonly setEditor: (next: Pick<Opening, "editor" | "folder">) => void;
   readonly workbench: Readable<Workbench>;
   readonly setWorkbench: (next: Workbench) => void;
+  // Whether the command palette has been opened in this browser; once
+  // set it stays set, so the address line's lesson is said until it is
+  // used and never again.
+  readonly paletteFound: Readable<boolean>;
+  readonly findPalette: () => void;
 }
 
 function readAppearance(rows: Rows): Appearance {
@@ -276,6 +286,7 @@ export function loadPreferences(rows: Rows, browserLang: string): PreferenceDoor
   const held = writable<Preferences>(readPreferences(rows, browserLang));
   const keeper = writable<Keeper>("browser");
   const workbench = writable<Workbench>(readWorkbench(rows.getItem(ROWS.workbench)));
+  const paletteFound = writable<boolean>(rows.getItem(ROWS.paletteFound) === YES);
   // One write path for every kept change, the city's answer included: the
   // cache and the store move together, so a reader that redraws and a
   // reader that reloads the page never see two different records.
@@ -358,6 +369,12 @@ export function loadPreferences(rows: Rows, browserLang: string): PreferenceDoor
     setWorkbench(next) {
       rows.setItem(ROWS.workbench, spelledWorkbench(next));
       workbench.set(next);
+    },
+    paletteFound,
+    findPalette() {
+      if (get(paletteFound)) return;
+      rows.setItem(ROWS.paletteFound, YES);
+      paletteFound.set(true);
     },
   };
 }

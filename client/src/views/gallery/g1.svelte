@@ -117,7 +117,7 @@
   </Stand>
 </Case>
 
-<Case label="frozen facts · an empty Mayor's room titled with the name a new session would freeze, and no address line until it begins" width={760}>
+<Case label="frozen facts · an empty Mayor's room titled with the name a new session would freeze, the address line at its head with no number yet" width={760}>
   <Stand link={{ kind: "live", city: "sprawling" }} unread={[]} waiting={[]} answers={answering(now, false)}>
     <div class="h-[420px] px-wide">
       <Talk address={MAYOR} band={false} head="address" />
