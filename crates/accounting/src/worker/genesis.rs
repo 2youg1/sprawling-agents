@@ -16,12 +16,6 @@ use storage::JsonlLedger;
 use super::freezing::Assembled;
 use super::{Hands, RunWorker, ScanReport};
 
-/// The city segment of every prefix, and a file the person is meant to
-/// edit: `init` writes it into the city, and every later run reads that
-/// copy. The binary carries the default so a fresh city is complete
-/// without a checkout; its bytes are the city's template.
-pub(super) const CITY_MD: &str = city::CITY_TEMPLATE;
-
 #[derive(Debug)]
 pub struct InitReport {
     pub ledger_dir: PathBuf,
@@ -228,20 +222,16 @@ fn record_shelved(
     Ok(())
 }
 
-/// The city segment as this city has it: the file the person may edit,
-/// falling back to the built-in copy when a city predates it.
+/// The city segment as this city has it: the file on its disk, which
+/// `city::follow_defaults` laid down or kept when the city opened.
 ///
-/// The fallback is for one condition only. A city written before the
-/// file existed does not have it, and the built-in copy is the right
-/// answer there. Every other failure - a directory in its place, a
-/// permission this process does not have - would have this hand a run
-/// the built-in norms while the person's own edited norms sat unread on
-/// the disk, and the run would obey the wrong document without anyone
-/// being told.
+/// There is no built-in fallback. A run handed the binary's text while
+/// the disk held something else, or nothing, would obey bytes no person
+/// can open (`crates/city/spec/SpineFiles.lean` D28).
 ///
 /// # Errors
-/// `E_STORAGE_FATAL` naming the path, for every failure except a file
-/// that is not there.
+/// `E_STORAGE_FATAL` naming the path, for a file that is not there and
+/// for every other failure to read it.
 pub(super) fn city_segment(city_root: &Path) -> Result<Assembled, AxError> {
     prompt_segment(
         &city_root.join(city::CITY_FILE),
@@ -257,20 +247,14 @@ pub(super) fn city_segment(city_root: &Path) -> Result<Assembled, AxError> {
 pub(super) fn prompt_segment(path: &Path, at: Address) -> Result<Assembled, AxError> {
     match std::fs::read(path) {
         Ok(bytes) => Ok(Assembled::of_one(at, bytes)),
-        // The built-in copy names no document: no file on this disk
-        // holds it, and a source row pointing at one that is not there
-        // would send a reader to open nothing.
-        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
-            Ok(Assembled::of_nothing(CITY_MD.as_bytes().to_vec()))
-        }
         Err(err) => Err(AxError::failure(
             AxCode::StorageFatal,
             "read the city's norms",
             format!("{}: {err}", path.display()),
         )
         .with_recovery(
-            "every run under that file is governed by it; make it readable, or take it \
-             away: the city lays its own default down again when it next opens",
+            "every run under that file is governed by it; make it readable, or clear its \
+             place and open the city again, which lays its default down",
         )),
     }
 }

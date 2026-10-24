@@ -92,7 +92,6 @@ pub use room::open as open_room;
 pub use rules_tool::RulesTool;
 pub use schedule::{Cadence, Entry, SCHEDULE_FILE, Schedule, schedule_path};
 pub use session::{clear_session, forget_shape};
-pub use spine_files::CITY_TEMPLATE;
 pub use spine_files::hall_identity_path;
 pub use spine_files::{AGENTS_FILE, CITY_FILE, CLERK_FILE, HANDOFF_FILE, MAYOR_FILE};
 pub use spine_files::{JobBrief, ROADMAP_FILE, RunBrief};

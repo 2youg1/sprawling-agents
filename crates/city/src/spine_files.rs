@@ -55,11 +55,11 @@ pub const HANDOFF_FILE: &str = kernel::layout::HANDOFF_FILE;
 pub const SPEC_FILE: &str = "SPEC.md";
 /// The city's own instructions, read into every prefix.
 pub const CITY_FILE: &str = "City.md";
-/// The bytes a new city's [`CITY_FILE`] starts as. Exported because the
-/// city is formed by `accounting`, which may not reach into this
-/// package's directory for them: a published copy of either package
-/// carries its own directory only (`crates/city/spec/SpineFiles.lean` §8-41).
-pub const CITY_TEMPLATE: &str = include_str!("../templates/City.md");
+/// The bytes this build's default [`CITY_FILE`] holds, handed out only
+/// through `defaults::Shipped::City` so the one writer of the city's
+/// copy is `defaults::follow_defaults` (`crates/city/spec/SpineFiles.lean`
+/// §8-41).
+pub(crate) const CITY_TEMPLATE: &str = include_str!("../templates/City.md");
 /// The conventions a project brings with it. **The city neither writes
 /// this file nor owns it**; it is listed here because a resident is
 /// given it rather than sent to fetch it. How it is matched and where

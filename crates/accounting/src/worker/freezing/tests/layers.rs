@@ -86,10 +86,10 @@ fn both_notes(root: &std::path::Path) {
 fn a_buildings_city_md_replaces_the_citys_there_and_only_there() {
     let lab = system_prompt_at("lab/room1", lab_prompt);
     assert!(lab.starts_with(BUILDING_PROMPT), "{lab}");
-    assert!(!lab.contains(city::CITY_TEMPLATE), "{lab}");
+    assert!(!lab.contains(city::Shipped::City.text()), "{lab}");
 
     let shop = system_prompt_at("shop/room1", lab_prompt);
-    assert!(shop.starts_with(city::CITY_TEMPLATE), "{shop}");
+    assert!(shop.starts_with(city::Shipped::City.text()), "{shop}");
     assert!(!shop.contains("The lab speaks only of voltages."), "{shop}");
 }
 
