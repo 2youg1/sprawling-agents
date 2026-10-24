@@ -86,6 +86,10 @@ pub(in crate::worker) struct Flight {
     /// and every `exec` gets a handle onto it, so `halt` reaches a
     /// command without knowing which tool started it.
     pub(in crate::worker) backlog: runtime::Backlog,
+    /// The files an edit is landing on. One table per city, and every
+    /// run's `edit` holds it, so two runs cannot land on one look
+    /// (`crates/runtime/spec/Tools/Edit.lean` §8-64).
+    pub(in crate::worker) edits: runtime::PathLocks,
     /// The provider requests handed off this thread, whose answers come
     /// back over the same crossing (`crates/sprawling/Spec.lean` §8-42-9).
     pub(in crate::worker) errands: Errands,
@@ -117,6 +121,7 @@ impl Flight {
             driving: BTreeMap::new(),
             homes: VecDeque::new(),
             backlog,
+            edits: runtime::PathLocks::default(),
         }
     }
 

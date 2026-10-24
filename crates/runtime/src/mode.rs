@@ -441,7 +441,11 @@ mod tests {
             tmp.path(),
             work.clone(),
             kernel::WriteDomain::new(vec![work]).unwrap(),
-            crate::PolicyCell::new(kernel::RunPolicy::of(kernel::Mode::Chat)).reader(),
+            crate::tools::EditDesk {
+                policy: crate::PolicyCell::new(kernel::RunPolicy::of(kernel::Mode::Chat)).reader(),
+                seen: Default::default(),
+                locks: Default::default(),
+            },
         )
         .unwrap();
         let refused = kernel::Tool::invoke(&tool, &edit_call());
@@ -454,7 +458,7 @@ mod tests {
 
     fn edit_call() -> kernel::ToolCall {
         let args = serde_json::json!({
-            "path": "work/new.md", "base_version": "new", "old": "", "new": "text",
+            "path": "work/new.md", "old": "", "new": "text",
         });
         kernel::ToolCall {
             id: "call-1".to_owned(),

@@ -8,21 +8,38 @@ use crate::PolicyCell;
 use kernel::{Address, Mode, RunPolicy};
 
 fn tool(root: &Path) -> EditTool {
+    tool_sharing(root, PathLocks::default())
+}
+
+/// A run's edit tool with a table of its own, holding `locks` - the
+/// city's one table - so two of these are two runs in one city.
+fn tool_sharing(root: &Path, locks: PathLocks) -> EditTool {
     let work = Address::parse("work").unwrap();
     let domain = kernel::WriteDomain::new(vec![work.clone()]).unwrap();
     std::fs::create_dir_all(root.join("work")).unwrap();
-    let policy = PolicyCell::new(RunPolicy::of(Mode::Work)).reader();
-    EditTool::new(root, work, domain, policy).unwrap()
+    EditTool::new(root, work, domain, desk(locks)).unwrap()
 }
 
-fn call(path: &str, base: &str, old: &str, new: &str) -> ToolCall {
+fn desk(locks: PathLocks) -> EditDesk {
+    EditDesk {
+        policy: PolicyCell::new(RunPolicy::of(Mode::Work)).reader(),
+        seen: ReadStamps::default(),
+        locks,
+    }
+}
+
+/// What a whole read of `rel` records: the stamp `read` takes off its
+/// handle (`tools::read::tests::looks` drives the read itself).
+fn look(tool: &EditTool, root: &Path, rel: &str) {
+    let stamp = Stamp::of(&root.join(rel)).unwrap();
+    tool.desk
+        .seen
+        .look(&Address::parse(rel).unwrap(), stamp.clone(), stamp);
+}
+
+fn call(path: &str, old: &str, new: &str) -> ToolCall {
     let mut args = Map::new();
-    for (k, v) in [
-        ("path", path),
-        ("base_version", base),
-        ("old", old),
-        ("new", new),
-    ] {
+    for (k, v) in [("path", path), ("old", old), ("new", new)] {
         args.insert(k.to_owned(), Value::String(v.to_owned()));
     }
     ToolCall {
@@ -33,92 +50,134 @@ fn call(path: &str, base: &str, old: &str, new: &str) -> ToolCall {
 }
 
 #[test]
-fn an_edit_against_the_version_it_saw_lands_and_echoes_a_diff() {
+fn an_edit_after_a_read_lands_echoes_a_diff_and_admits_the_next_without_a_read() {
     let tmp = tempfile::tempdir().unwrap();
     let tool = tool(tmp.path());
     std::fs::write(tmp.path().join("work/a.txt"), "one\ntwo\nthree\n").unwrap();
-    let version = version_of(b"one\ntwo\nthree\n");
-    let outcome = tool
-        .invoke(&call("work/a.txt", &version, "two", "TWO"))
-        .unwrap();
+    look(&tool, tmp.path(), "work/a.txt");
+    let outcome = tool.invoke(&call("work/a.txt", "two", "TWO")).unwrap();
     let result = serde_json::to_value(&outcome.result).unwrap();
-    assert_eq!(
-        std::fs::read_to_string(tmp.path().join("work/a.txt")).unwrap(),
-        "one\nTWO\nthree\n"
-    );
     let diff = result["diff"].as_str().unwrap();
     assert!(diff.contains("-two"), "{diff}");
     assert!(diff.contains("+TWO"), "{diff}");
+    assert_eq!(result.get("new_version"), None);
+    // The run's own write is what it now knows the file to be.
+    tool.invoke(&call("work/a.txt", "three", "THREE")).unwrap();
     assert_eq!(
-        result["new_version"].as_str().unwrap(),
-        version_of(b"one\nTWO\nthree\n")
+        std::fs::read_to_string(tmp.path().join("work/a.txt")).unwrap(),
+        "one\nTWO\nTHREE\n"
     );
 }
 
 #[test]
-fn a_file_that_moved_refuses_and_names_the_version_it_is_at_now() {
+fn an_edit_by_a_run_that_never_read_the_file_is_refused() {
     let tmp = tempfile::tempdir().unwrap();
     let tool = tool(tmp.path());
     std::fs::write(tmp.path().join("work/a.txt"), "current\n").unwrap();
-    let err = match tool.invoke(&call("work/a.txt", "0000000000000000", "current", "next")) {
-        Err(err) => err,
-        Ok(_) => panic!("a stale base_version must refuse"),
-    };
-    assert_eq!(*err.code(), AxCode::VersionConflict);
-    assert!(err.subject().contains(&version_of(b"current\n")));
-    // The file is untouched: a refused edit changes nothing.
+    let err = tool
+        .invoke(&call("work/a.txt", "current", "next"))
+        .unwrap_err();
     assert_eq!(
-        std::fs::read_to_string(tmp.path().join("work/a.txt")).unwrap(),
-        "current\n"
+        (
+            *err.code(),
+            err.recovery().contains("read work/a.txt first"),
+            std::fs::read_to_string(tmp.path().join("work/a.txt")).unwrap(),
+        ),
+        (AxCode::InvalidArgs, true, "current\n".to_owned())
+    );
+}
+
+/// The strict side of D103: a file another writer changed after this
+/// run's read is refused even where `old` still matches once, and the
+/// refusal carries the passage as it now reads, which counts as a look.
+#[test]
+fn a_file_changed_after_the_read_is_refused_with_the_passage_as_it_now_reads() {
+    let tmp = tempfile::tempdir().unwrap();
+    let tool = tool(tmp.path());
+    let path = tmp.path().join("work/a.txt");
+    std::fs::write(&path, "alpha\nbeta\ngamma\n").unwrap();
+    look(&tool, tmp.path(), "work/a.txt");
+    let staged = tmp.path().join("work/a.txt.other");
+    std::fs::write(&staged, "alpha\nbeta, said another\ngamma\n").unwrap();
+    std::fs::rename(&staged, &path).unwrap();
+
+    let err = tool
+        .invoke(&call("work/a.txt", "beta", "BETA"))
+        .unwrap_err();
+    assert_eq!(*err.code(), AxCode::VersionConflict);
+    assert!(
+        err.subject()
+            .contains("lines 0-2 as the file now reads:\nalpha\nbeta, said another\ngamma\n"),
+        "{}",
+        err.subject()
+    );
+    assert_eq!(
+        std::fs::read_to_string(&path).unwrap(),
+        "alpha\nbeta, said another\ngamma\n"
+    );
+    tool.invoke(&call("work/a.txt", "beta, said another", "BETA"))
+        .unwrap();
+    assert_eq!(
+        std::fs::read_to_string(&path).unwrap(),
+        "alpha\nBETA\ngamma\n"
+    );
+}
+
+/// Two runs that read one file: the first edit lands, the second is
+/// refused with the passage as the first left it, and its retry lands
+/// on top - neither change is lost (§8-64-2, `two_runs_on_one_look_land_once`).
+#[test]
+fn two_runs_editing_one_file_lose_neither_change() {
+    let tmp = tempfile::tempdir().unwrap();
+    let locks = PathLocks::default();
+    let first = tool_sharing(tmp.path(), locks.clone());
+    let second = tool_sharing(tmp.path(), locks);
+    std::fs::write(tmp.path().join("work/a.txt"), "head\ntail\n").unwrap();
+    look(&first, tmp.path(), "work/a.txt");
+    look(&second, tmp.path(), "work/a.txt");
+
+    first.invoke(&call("work/a.txt", "head", "HEAD")).unwrap();
+    let refused = second
+        .invoke(&call("work/a.txt", "tail", "TAIL"))
+        .unwrap_err();
+    second.invoke(&call("work/a.txt", "tail", "TAIL")).unwrap();
+
+    assert_eq!(
+        (
+            *refused.code(),
+            std::fs::read_to_string(tmp.path().join("work/a.txt")).unwrap(),
+        ),
+        (AxCode::VersionConflict, "HEAD\nTAIL\n".to_owned())
     );
 }
 
 #[test]
-fn base_version_new_creates_the_file_and_parents() {
+fn old_empty_creates_the_file_and_parents() {
     let tmp = tempfile::tempdir().unwrap();
     let tool = tool(tmp.path());
     let outcome = tool
-        .invoke(&call("work/room/notes.md", "new", "", "first line\n"))
+        .invoke(&call("work/room/notes.md", "", "first line\n"))
         .unwrap();
     assert_eq!(
         std::fs::read_to_string(tmp.path().join("work/room/notes.md")).unwrap(),
         "first line\n"
     );
     let result = serde_json::to_value(&outcome.result).unwrap();
-    assert_eq!(
-        result["new_version"].as_str().unwrap(),
-        version_of(b"first line\n")
-    );
     assert!(result["diff"].as_str().unwrap().contains("+first line"));
 }
 
 #[test]
-fn creating_over_an_existing_file_is_a_version_conflict_naming_the_real_version() {
+fn creating_over_an_existing_file_is_refused_and_leaves_it_whole() {
     let tmp = tempfile::tempdir().unwrap();
     let tool = tool(tmp.path());
     std::fs::write(tmp.path().join("work/a.txt"), "already\n").unwrap();
-    let err = match tool.invoke(&call("work/a.txt", "new", "", "other\n")) {
-        Err(err) => err,
-        Ok(_) => panic!("an existing file must refuse creation"),
-    };
+    let err = tool.invoke(&call("work/a.txt", "", "other\n")).unwrap_err();
     assert_eq!(*err.code(), AxCode::VersionConflict);
-    assert!(err.subject().contains(&version_of(b"already\n")));
+    assert!(err.subject().contains("already exists"), "{err}");
     assert_eq!(
         std::fs::read_to_string(tmp.path().join("work/a.txt")).unwrap(),
         "already\n"
     );
-}
-
-#[test]
-fn creating_with_a_nonempty_old_is_refused_with_the_form_to_use() {
-    let tmp = tempfile::tempdir().unwrap();
-    let tool = tool(tmp.path());
-    let err = match tool.invoke(&call("work/b.txt", "new", "something", "content")) {
-        Err(err) => err,
-        Ok(_) => panic!("a create replaces nothing"),
-    };
-    assert_eq!(*err.code(), AxCode::InvalidArgs);
-    assert!(err.recovery().contains("old:\"\""));
 }
 
 #[test]
@@ -129,7 +188,7 @@ fn a_path_outside_the_write_domain_is_refused_before_the_disk_is_touched() {
     std::fs::write(tmp.path().join("outside.txt"), "x").unwrap();
     let tool = tool(tmp.path());
     for hostile in ["outside.txt", "elsewhere/f.md", ".sprawling/ledger/x"] {
-        let err = match tool.invoke(&call(hostile, "new", "", "y")) {
+        let err = match tool.invoke(&call(hostile, "", "y")) {
             Err(err) => err,
             Ok(_) => panic!("{hostile} must be refused"),
         };
@@ -143,7 +202,7 @@ fn a_path_outside_the_write_domain_is_refused_before_the_disk_is_touched() {
         assert!(alternative.contains("work"), "{hostile}: {err}");
     }
     for illegal in ["../evil.txt", "work//x"] {
-        let err = match tool.invoke(&call(illegal, "new", "", "y")) {
+        let err = match tool.invoke(&call(illegal, "", "y")) {
             Err(err) => err,
             Ok(_) => panic!("{illegal} must be refused"),
         };
@@ -152,7 +211,7 @@ fn a_path_outside_the_write_domain_is_refused_before_the_disk_is_touched() {
     // A path this platform calls absolute is an address only inside the
     // city (runtime D4): outside it the refusal points at `exec`,
     // and the create form leaves nothing behind there.
-    let err = match tool.invoke(&call(beyond.to_str().unwrap(), "new", "", "y")) {
+    let err = match tool.invoke(&call(beyond.to_str().unwrap(), "", "y")) {
         Err(err) => err,
         Ok(_) => panic!("{} must be refused", beyond.display()),
     };
@@ -175,12 +234,8 @@ fn a_path_outside_the_write_domain_is_refused_before_the_disk_is_touched() {
 fn a_missing_file_names_the_create_form_in_its_recovery() {
     let tmp = tempfile::tempdir().unwrap();
     let tool = tool(tmp.path());
-    let version = version_of(b"whatever");
-    let err = match tool.invoke(&call("work/absent.md", &version, "a", "b")) {
-        Err(err) => err,
-        Ok(_) => panic!("a missing file must refuse a non-create edit"),
-    };
-    assert!(err.recovery().contains("base_version:\"new\""), "{err}");
+    let err = tool.invoke(&call("work/absent.md", "a", "b")).unwrap_err();
+    assert!(err.recovery().contains("old:\"\""), "{err}");
 }
 
 #[test]
@@ -188,18 +243,12 @@ fn zero_or_many_matches_refuse_with_the_count() {
     let tmp = tempfile::tempdir().unwrap();
     let tool = tool(tmp.path());
     std::fs::write(tmp.path().join("work/a.txt"), "x\nx\n").unwrap();
-    let version = version_of(b"x\nx\n");
-    let err = match tool.invoke(&call("work/a.txt", &version, "x", "y")) {
-        Err(err) => err,
-        Ok(_) => panic!("an ambiguous match must refuse"),
-    };
+    look(&tool, tmp.path(), "work/a.txt");
+    let err = tool.invoke(&call("work/a.txt", "x", "y")).unwrap_err();
     assert_eq!(*err.code(), AxCode::InvalidArgs);
     assert!(err.subject().contains("2 times"), "{}", err.subject());
 
-    let err = match tool.invoke(&call("work/a.txt", &version, "absent", "y")) {
-        Err(err) => err,
-        Ok(_) => panic!("a missing match must refuse"),
-    };
+    let err = tool.invoke(&call("work/a.txt", "absent", "y")).unwrap_err();
     assert!(err.subject().contains("0 times"), "{}", err.subject());
 }
 
@@ -207,7 +256,7 @@ fn zero_or_many_matches_refuse_with_the_count() {
 fn a_call_for_another_tool_is_refused_not_routed() {
     let tmp = tempfile::tempdir().unwrap();
     let tool = tool(tmp.path());
-    let mut wrong = call("work/a.txt", "v", "a", "b");
+    let mut wrong = call("work/a.txt", "a", "b");
     wrong.name = ToolName::parse("exec").unwrap();
     let err = match tool.invoke(&wrong) {
         Err(err) => err,
@@ -226,20 +275,13 @@ fn a_documents_tool_writes_markdown_and_refuses_code_by_name() {
         tmp.path(),
         Address::parse("hall/mayor").unwrap(),
         domain,
-        PolicyCell::new(RunPolicy::of(Mode::Work)).reader(),
+        desk(PathLocks::default()),
     )
     .unwrap();
-    tool.invoke(&call(
-        "hall/note.md",
-        "new",
-        "",
-        "# note
-",
-    ))
-    .unwrap();
+    tool.invoke(&call("hall/note.md", "", "# note\n")).unwrap();
     assert!(tmp.path().join("hall/note.md").is_file());
     let refused = tool
-        .invoke(&call("hall/lex.rs", "new", "", "fn main() {}"))
+        .invoke(&call("hall/lex.rs", "", "fn main() {}"))
         .unwrap_err();
     assert_eq!(*refused.code(), AxCode::OutsideWriteDomain);
     assert!(
@@ -247,7 +289,7 @@ fn a_documents_tool_writes_markdown_and_refuses_code_by_name() {
         "the refusal names the file, not the room"
     );
     let plan = tool
-        .invoke(&call("hall/Roadmap.md", "new", "", "| 0 |"))
+        .invoke(&call("hall/Roadmap.md", "", "| 0 |"))
         .unwrap_err();
     assert_eq!(*plan.code(), AxCode::OutsideWriteDomain);
 }
@@ -293,14 +335,8 @@ fn an_edit_through_a_link_to_a_reserved_path_is_refused() {
         return;
     }
 
-    let version = version_of(b"hook-body");
     let refused = tool
-        .invoke(&call(
-            "work/alias-dir/pre-run",
-            &version,
-            "hook-body",
-            "escalated",
-        ))
+        .invoke(&call("work/alias-dir/pre-run", "hook-body", "escalated"))
         .unwrap_err();
     assert_eq!(*refused.code(), AxCode::OutsideWriteDomain);
     assert_eq!(
@@ -325,7 +361,7 @@ fn creating_below_a_link_leaves_the_link_target_untouched() {
     }
 
     let refused = tool
-        .invoke(&call("work/alias-dir/sub/x.md", CREATES, "", "body"))
+        .invoke(&call("work/alias-dir/sub/x.md", "", "body"))
         .unwrap_err();
     assert_eq!(*refused.code(), AxCode::OutsideWriteDomain);
     assert_eq!(
@@ -349,8 +385,8 @@ fn an_edit_through_a_hard_link_leaves_the_reserved_file_whole() {
         return;
     }
 
-    let version = version_of(b"hook-body");
-    let outcome = tool.invoke(&call("work/a.txt", &version, "hook-body", "escalated"));
+    look(&tool, tmp.path(), "work/a.txt");
+    let outcome = tool.invoke(&call("work/a.txt", "hook-body", "escalated"));
     if outcome.is_ok() {
         assert_eq!(
             std::fs::read_to_string(tmp.path().join("work").join("a.txt")).unwrap(),
@@ -380,13 +416,9 @@ fn a_city_placed_below_a_link_is_edited_like_any_other() {
     let tool = tool(&city);
     std::fs::write(city.join("work/a.txt"), "draft\n").unwrap();
 
-    let edited = tool.invoke(&call(
-        "work/a.txt",
-        &version_of(b"draft\n"),
-        "draft",
-        "final",
-    ));
-    let created = tool.invoke(&call("work/b.txt", "new", "", "made\n"));
+    look(&tool, &city, "work/a.txt");
+    let edited = tool.invoke(&call("work/a.txt", "draft", "final"));
+    let created = tool.invoke(&call("work/b.txt", "", "made\n"));
 
     assert_eq!(
         (
@@ -408,10 +440,9 @@ fn a_passage_copied_with_its_line_marks_edits_the_lines_it_marks() {
     let tool = tool(tmp.path());
     let before: String = (0..12).map(|n| format!("row {n}\n")).collect();
     std::fs::write(tmp.path().join("work/a.txt"), &before).unwrap();
-    let version = version_of(before.as_bytes());
+    look(&tool, tmp.path(), "work/a.txt");
     tool.invoke(&call(
         "work/a.txt",
-        &version,
         "row 9\n10|row 10\n",
         "row 9\n10|row ten\n",
     ))
@@ -429,9 +460,8 @@ fn a_passage_that_matches_as_it_came_keeps_what_looks_like_a_mark() {
     let tmp = tempfile::tempdir().unwrap();
     let tool = tool(tmp.path());
     std::fs::write(tmp.path().join("work/t.md"), "| a |\n12|b\n").unwrap();
-    let version = version_of(b"| a |\n12|b\n");
-    tool.invoke(&call("work/t.md", &version, "12|b\n", "12|c\n"))
-        .unwrap();
+    look(&tool, tmp.path(), "work/t.md");
+    tool.invoke(&call("work/t.md", "12|b\n", "12|c\n")).unwrap();
     assert_eq!(
         std::fs::read_to_string(tmp.path().join("work/t.md")).unwrap(),
         "| a |\n12|c\n"
@@ -446,14 +476,9 @@ fn a_numbered_line_added_in_the_replacement_is_written_as_it_came() {
     let tool = tool(tmp.path());
     let before: String = (0..12).map(|n| format!("row {n}\n")).collect();
     std::fs::write(tmp.path().join("work/a.txt"), &before).unwrap();
-    let version = version_of(before.as_bytes());
-    tool.invoke(&call(
-        "work/a.txt",
-        &version,
-        "10|row 10\n",
-        "10|row ten\n12|keep\n",
-    ))
-    .unwrap();
+    look(&tool, tmp.path(), "work/a.txt");
+    tool.invoke(&call("work/a.txt", "10|row 10\n", "10|row ten\n12|keep\n"))
+        .unwrap();
     assert_eq!(
         std::fs::read_to_string(tmp.path().join("work/a.txt")).unwrap(),
         before.replace("row 10\n", "row ten\n12|keep\n")
@@ -474,10 +499,9 @@ fn a_copied_passage_keeps_a_numbered_line_the_file_holds() {
         })
         .collect();
     std::fs::write(tmp.path().join("work/a.txt"), &before).unwrap();
-    let version = version_of(before.as_bytes());
+    look(&tool, tmp.path(), "work/a.txt");
     tool.invoke(&call(
         "work/a.txt",
-        &version,
         "10|row 10\n7|literal\n",
         "10|row 10\n7|changed\n",
     ))
@@ -497,7 +521,7 @@ fn a_passage_copied_from_a_search_hit_with_context_edits_the_lines_it_marks() {
     let tool = tool(tmp.path());
     let before: String = (0..12).map(|n| format!("row {n}\n")).collect();
     std::fs::write(tmp.path().join("work/a.txt"), &before).unwrap();
-    let version = version_of(before.as_bytes());
+    look(&tool, tmp.path(), "work/a.txt");
     let block = crate::rendering::shown(
         crate::rendering::CURRENT,
         &kernel::ToolName::parse("search").unwrap(),
@@ -519,8 +543,7 @@ fn a_passage_copied_from_a_search_hit_with_context_edits_the_lines_it_marks() {
         .collect();
     assert_eq!(old, "5|row 5\nrow 6\nrow 7\n");
     let new = old.replace("row 7", "row seven");
-    tool.invoke(&call("work/a.txt", &version, &old, &new))
-        .unwrap();
+    tool.invoke(&call("work/a.txt", &old, &new)).unwrap();
     assert_eq!(
         std::fs::read_to_string(tmp.path().join("work/a.txt")).unwrap(),
         before.replace("row 7\n", "row seven\n")

@@ -1094,16 +1094,16 @@ impl Model for Planner {
             )
             .with_recovery("delegate the room again")),
             (Part::Maker, 1) => claim_node_one(),
-            (Part::Maker, 2) => calls(
+            (Part::Maker, 2) => calls("read", json!({ "path": format!("lab/kiln/{NOTES}") })),
+            (Part::Maker, 3) => calls(
                 "edit",
                 json!({
                     "path": format!("lab/kiln/{NOTES}"),
-                    "base_version": runtime::version_of(NOTES_BEFORE.as_bytes()),
                     "old": "before",
                     "new": "after",
                 }),
             ),
-            (Part::Maker, 3) => calls("pr", json!({ "action": "open" })),
+            (Part::Maker, 4) => calls("pr", json!({ "action": "open" })),
             (Part::Checker, 1) => calls(
                 "pr",
                 json!({

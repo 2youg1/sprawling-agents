@@ -523,7 +523,6 @@ pub(in crate::worker) fn completion(text: &str, call: Option<(&str, &str)>) -> S
     if let Some((id, path)) = call {
         let arguments = serde_json::json!({
             "path": path,
-            "base_version": "new",
             "old": "",
             "new": "noted\n",
         })

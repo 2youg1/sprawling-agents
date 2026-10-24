@@ -133,18 +133,22 @@ fn work_in_a_review_building_reaches_it_only_after_someone_else_checks_it() {
     let note = building.join("room1").join("notes.md");
     std::fs::create_dir_all(note.parent().unwrap()).unwrap();
     std::fs::write(&note, b"before\n").unwrap();
-    let version = runtime::version_of(b"before\n");
 
     let (base_url, _provider) = fake_openai(
         &["m-local"],
         vec![
+            tool_completion(
+                "reading",
+                "tu_0",
+                "read",
+                serde_json::json!({ "path": "lab/room1/notes.md" }),
+            ),
             tool_completion(
                 "editing",
                 "tu_1",
                 "edit",
                 serde_json::json!({
                     "path": "lab/room1/notes.md",
-                    "base_version": version,
                     "old": "before",
                     "new": "after",
                 }),

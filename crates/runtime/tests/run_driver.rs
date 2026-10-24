@@ -1320,19 +1320,16 @@ fn a_policy_changed_mid_run_gates_the_next_waves_edit() {
         root,
         room.clone(),
         kernel::WriteDomain::new(vec![room]).unwrap(),
-        plan.run_policy.reader(),
+        runtime::EditDesk {
+            policy: plan.run_policy.reader(),
+            seen: runtime::ReadStamps::default(),
+            locks: runtime::PathLocks::default(),
+        },
     )
     .unwrap();
     let mut args = serde_json::Map::new();
     for (key, value) in [
         ("path", "lab/room1/kept.md".to_owned()),
-        (
-            "base_version",
-            runtime::version_of(
-                b"the User's own
-",
-            ),
-        ),
         ("old", "own".to_owned()),
         ("new", "changed".to_owned()),
     ] {

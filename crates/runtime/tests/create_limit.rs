@@ -19,14 +19,9 @@
 use kernel::{Address, AxCode, Payload, Tool, ToolCall, ToolName};
 use serde_json::{Map, Value};
 
-fn call(path: &str, base: &str, old: &str, new: &str) -> ToolCall {
+fn call(path: &str, old: &str, new: &str) -> ToolCall {
     let mut args = Map::new();
-    for (k, v) in [
-        ("path", path),
-        ("base_version", base),
-        ("old", old),
-        ("new", new),
-    ] {
+    for (k, v) in [("path", path), ("old", old), ("new", new)] {
         args.insert(k.to_owned(), Value::String(v.to_owned()));
     }
     ToolCall {
@@ -53,29 +48,32 @@ fn an_existing_file_is_unchanged_under_create_by_edit_exec_and_link() {
         root,
         work.clone(),
         kernel::WriteDomain::new(vec![work.clone()]).unwrap(),
-        runtime::PolicyCell::new(kernel::RunPolicy {
-            write: kernel::WriteLimit::Create,
-            ..kernel::RunPolicy::of(kernel::Mode::Work)
-        })
-        .reader(),
+        runtime::EditDesk {
+            policy: runtime::PolicyCell::new(kernel::RunPolicy {
+                write: kernel::WriteLimit::Create,
+                ..kernel::RunPolicy::of(kernel::Mode::Work)
+            })
+            .reader(),
+            seen: runtime::ReadStamps::default(),
+            locks: runtime::PathLocks::default(),
+        },
     )
     .unwrap();
-    let seen = runtime::version_of(b"the person's own\n");
 
-    let replaced = tool.invoke(&call("work/kept.md", &seen, "own", "changed"));
+    let replaced = tool.invoke(&call("work/kept.md", "own", "changed"));
     assert_eq!(
         replaced.err().map(|err| *err.code()),
         Some(AxCode::OutsideWriteDomain),
         "edit's replacing arm is refused under create"
     );
-    let created = tool.invoke(&call("work/kept.md", "new", "", "over it"));
+    let created = tool.invoke(&call("work/kept.md", "", "over it"));
     assert_eq!(
         created.err().map(|err| *err.code()),
         Some(AxCode::VersionConflict),
         "a create onto a name that stands is refused"
     );
     if std::fs::hard_link(&kept, root.join("work").join("second.md")).is_ok() {
-        let linked = tool.invoke(&call("work/second.md", &seen, "own", "changed"));
+        let linked = tool.invoke(&call("work/second.md", "own", "changed"));
         assert!(
             linked.is_err(),
             "a second name for the file reaches it no further"

@@ -21,6 +21,7 @@ use kernel::{Address, AxCode, AxError};
 use same_file::Handle;
 
 use crate::tools::chosen_path::{Located, real_location, still_judged};
+use crate::tools::stamp::Stamp;
 
 /// The highest directory a miss may list.
 pub(super) enum Floor {
@@ -61,8 +62,13 @@ const NEARBY_CAP: usize = 16;
 /// without being opened, so a link placed there since cannot lead the
 /// open past the judgement. A present one is read from the handle the
 /// open returned, and only after [`still_judged`] has found that handle
-/// is the file judged.
-pub(super) fn text_at(asked: &str, at: Located, floor: &Floor) -> Result<String, AxError> {
+/// is the file judged; it comes back with the file's stamp taken on each
+/// side of the read.
+pub(super) fn text_at(
+    asked: &str,
+    at: Located,
+    floor: &Floor,
+) -> Result<(String, Stamp, Stamp), AxError> {
     match at {
         Located::Present(path) if path.is_dir() => Err(AxError::failure(
             AxCode::InvalidArgs,
@@ -76,12 +82,19 @@ pub(super) fn text_at(asked: &str, at: Located, floor: &Floor) -> Result<String,
                 .and_then(Handle::from_file)
                 .map_err(|err| unread(asked, &path, floor, &err))?;
             still_judged(asked, &path, &opened, "read")?;
+            // The stamps come off the handle the bytes are read from, on
+            // each side of the read, so they cost no second open.
+            let stamp = |file: &std::fs::File| {
+                Stamp::of_file(file).map_err(|err| unread(asked, &path, floor, &err))
+            };
+            let before = stamp(opened.as_file())?;
             let mut text = String::new();
             opened
                 .as_file_mut()
                 .read_to_string(&mut text)
                 .map_err(|err| unread(asked, &path, floor, &err))?;
-            Ok(text)
+            let after = stamp(opened.as_file())?;
+            Ok((text, before, after))
         }
         Located::Absent(path) => Err(unread(
             asked,

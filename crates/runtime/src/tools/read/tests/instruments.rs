@@ -9,8 +9,8 @@
 //!
 //! The judged side re-resolves the city root on every call, as the
 //! judged path did before the root was anchored, and cuts with the cut
-//! the one-pass cut replaced; both sides hash the whole file, as `read`
-//! does while it prints a `version`. The ratio test holds the handle
+//! the one-pass cut replaced; the handle side also takes the two stamps
+//! `read` records for `edit`. The ratio test holds the handle
 //! read within a bound of one resolution of the path followed by a bare
 //! buffered read of the same bytes, which is the design's claim and a
 //! ratio every machine agrees on: going back to four resolutions and a
@@ -51,46 +51,43 @@ fn open_everywhere() -> ReadBound {
 /// resolved, opened and judged again, every line collected for the cut.
 fn judged(root: &Path, addr: &kernel::Address, bound: &ReadBound) -> usize {
     let city = CityRoot::anchor(root, "read").unwrap();
-    let text = super::engine::judged_read(&city, addr, addr.as_str(), &**bound).unwrap();
-    let version = crate::tools::version_of(text.as_bytes());
+    let (text, _, _) = super::engine::judged_read(&city, addr, addr.as_str(), &**bound).unwrap();
     let (cut, _, _) = reference_cut(0, LINE_CAP, &text);
-    cut.len() + version.len()
+    cut.len()
 }
 
 /// The handle read with the one-pass cut.
 fn by_handle(city: &CityRoot, addr: &kernel::Address, bound: &ReadBound) -> usize {
-    let text = super::engine::text_of(city, addr, addr.as_str(), &**bound).unwrap();
-    let version = crate::tools::version_of(text.as_bytes());
+    let (text, _, _) = super::engine::text_of(city, addr, addr.as_str(), &**bound).unwrap();
     let cut = Interval {
         offset: 0,
         limit: LINE_CAP,
     }
     .cut(&text);
-    cut.text.len() + version.len()
+    cut.text.len()
 }
 
-/// A bare buffered read of the same bytes, hashed and cut: the floor no
+/// A bare buffered read of the same bytes, cut: the floor no
 /// judgement can go under.
 fn bare(root: &Path, addr: &kernel::Address) -> usize {
-    read_hashed_and_cut(&root.join(addr.as_str()))
+    read_and_cut(&root.join(addr.as_str()))
 }
 
 /// One resolution of the path, then a bare read of where it lies: what
 /// the handle read claims to cost, one judgement of the real location
 /// and one open.
 fn resolved(root: &Path, addr: &kernel::Address) -> usize {
-    read_hashed_and_cut(&std::fs::canonicalize(root.join(addr.as_str())).unwrap())
+    read_and_cut(&std::fs::canonicalize(root.join(addr.as_str())).unwrap())
 }
 
-fn read_hashed_and_cut(path: &Path) -> usize {
+fn read_and_cut(path: &Path) -> usize {
     let text = std::fs::read_to_string(path).unwrap();
-    let version = crate::tools::version_of(text.as_bytes());
     let cut = Interval {
         offset: 0,
         limit: LINE_CAP,
     }
     .cut(&text);
-    cut.text.len() + version.len()
+    cut.text.len()
 }
 
 fn timed(work: &mut dyn FnMut() -> usize) -> Duration {

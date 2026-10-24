@@ -403,9 +403,7 @@ mod phases {
     use crate::backlog::{Backlog, PollBudget};
     use crate::catalog::Catalog;
     use crate::sandbox::{EchoSandbox, Fuel};
-    use crate::tools::{
-        EditTool, ExecSetup, ExecTool, ReadBound, ReadTool, SearchTool, version_of,
-    };
+    use crate::tools::{EditTool, ExecSetup, ExecTool, ReadBound, ReadTool, SearchTool};
 
     #[test]
     #[ignore = "an instrument: run it by name with --run-ignored only --no-capture"]
@@ -419,7 +417,7 @@ mod phases {
         report("read", (0..32).map(|_| timed(&tool, &read)));
     }
 
-    /// `write` is `edit` with a `base_version` of `new`: it creates the
+    /// `write` is `edit` with an empty `old` where no file stands: it creates the
     /// file, and its echo is the whole file as a diff.
     #[test]
     #[ignore = "an instrument: run it by name with --run-ignored only --no-capture"]
@@ -428,22 +426,24 @@ mod phases {
         let work = Address::parse("work").unwrap();
         let domain = kernel::WriteDomain::new(vec![work.clone()]).unwrap();
         std::fs::create_dir_all(city.path().join("work")).unwrap();
+        let seen = crate::ReadStamps::default();
         let tool = EditTool::new(
             city.path(),
             work,
             domain,
-            crate::PolicyCell::new(kernel::RunPolicy::of(kernel::Mode::Work)).reader(),
+            crate::tools::EditDesk {
+                policy: crate::PolicyCell::new(kernel::RunPolicy::of(kernel::Mode::Work)).reader(),
+                seen: seen.clone(),
+                locks: Default::default(),
+            },
         )
         .unwrap();
         let text = history_text();
-        let edit = |path: &str, base: &str, old: &str, new: &str| {
-            call(
-                "edit",
-                json!({ "path": path, "base_version": base, "old": old, "new": new }),
-            )
+        let edit = |path: &str, old: &str, new: &str| {
+            call("edit", json!({ "path": path, "old": old, "new": new }))
         };
         let writes: Vec<_> = (0..32)
-            .map(|at| timed(&tool, &edit(&format!("work/h{at}.txt"), "new", "", &text)))
+            .map(|at| timed(&tool, &edit(&format!("work/h{at}.txt"), "", &text)))
             .collect();
         report("write", writes);
         let edited = format!("{text}tail\n");
@@ -451,10 +451,9 @@ mod phases {
             .map(|at| {
                 let path = format!("work/h{at}.txt");
                 std::fs::write(city.path().join(&path), &edited).unwrap();
-                timed(
-                    &tool,
-                    &edit(&path, &version_of(edited.as_bytes()), "tail", "TAIL"),
-                )
+                let stamp = crate::tools::Stamp::of(&city.path().join(&path)).unwrap();
+                seen.look(&Address::parse(&path).unwrap(), stamp.clone(), stamp);
+                timed(&tool, &edit(&path, "tail", "TAIL"))
             })
             .collect();
         report("edit", edits);

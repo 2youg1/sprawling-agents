@@ -46,6 +46,7 @@ mod package;
 
 use super::BoundReader;
 use super::chosen_path::{CityRoot, Located, ReadBound};
+use super::stamp::ReadStamps;
 use crate::catalog::{Catalog, Expansion};
 use miss::Floor;
 
@@ -58,19 +59,14 @@ const LINE_CAP: u16 = 512;
 enum Found {
     /// An admitted address the model chose, read by `engine`.
     Chosen(kernel::Address),
-    /// A place on disk, and the highest directory a miss there may list.
+    /// A document inside a package, and the highest directory a miss
+    /// there may list. The reading room admitted it and no edit reaches
+    /// it by name, so reading it is no look (§8-64).
     File {
         at: Located,
         floor: Floor,
     },
     Text(String),
-}
-
-/// Whether a text was read from a file on disk, which has a version
-/// `edit` guards, or handed over whole by the catalog or a Locator.
-enum Origin {
-    Disk,
-    Held,
 }
 
 /// The interval of one answer: where it starts and how much of it there
@@ -223,6 +219,10 @@ pub struct ReadTool {
     /// The root `reader` reads under, its real location anchored once
     /// (`crates/runtime/spec/Tools/ChosenPath.lean` D5).
     city: CityRoot,
+    /// What this run has seen, written at every read of a file that
+    /// counts as a look and read by `edit` (`crates/runtime/spec/Tools/Edit.lean`
+    /// §8-64).
+    seen: ReadStamps,
     meta: ToolMeta,
 }
 
@@ -280,12 +280,12 @@ impl ReadTool {
             catalog,
             reader: BoundReader::new(city_root, bound, block_store),
             city: CityRoot::anchor(city_root, Self::NAME)?,
+            seen: ReadStamps::default(),
             meta: ToolMeta {
                 name: ToolName::parse(Self::NAME)?,
                 disclosure: "Read a file by its path, or a skill by the name the catalog lists \
                              it under. A truncated answer states the total and the offset to \
-                             continue from. A file comes back with its `version`, which `edit` \
-                             takes as `base_version` and `plan finish` as evidence. Reading a directory or a missing file is refused."
+                             continue from. Reading a directory or a missing file is refused."
                     .to_owned(),
                 params: Payload::new(params)?,
                 effect: Effect::Read,
@@ -355,6 +355,14 @@ impl ReadTool {
         let addr = super::chosen_path::admit(&spelled, "read", &*self.reader.bound)?;
         Ok(Found::Chosen(addr))
     }
+
+    /// This tool, writing what it reads into `seen`: the run's table,
+    /// shared with its `edit`. A tool never given one writes into a
+    /// table of its own that no edit reads.
+    #[must_use]
+    pub fn noting(self, seen: ReadStamps) -> ReadTool {
+        ReadTool { seen, ..self }
+    }
 }
 
 impl Tool for ReadTool {
@@ -389,25 +397,17 @@ impl Tool for ReadTool {
             })?;
         let mut out = Map::new();
         out.insert("path".to_owned(), Value::String(asked.to_owned()));
-        let (text, on_disk) = match self.resolve(asked)? {
-            Found::Text(text) => (text, Origin::Held),
-            Found::Chosen(addr) => (
-                engine::text_of(&self.city, &addr, asked, &*self.reader.bound)?,
-                Origin::Disk,
-            ),
-            Found::File { at, floor } => (miss::text_at(asked, at, &floor)?, Origin::Disk),
-        };
-        match on_disk {
-            // The whole file's version, whatever interval is cut below:
-            // `edit` guards and `plan finish` cites the file, not the lines.
-            Origin::Disk => {
-                out.insert(
-                    "version".to_owned(),
-                    Value::String(super::version_of(text.as_bytes())),
-                );
+        let mut looked = None;
+        let text = match self.resolve(asked)? {
+            Found::Text(text) => text,
+            Found::Chosen(addr) => {
+                let (text, before, after) =
+                    engine::text_of(&self.city, &addr, asked, &*self.reader.bound)?;
+                looked = Some((addr, before, after));
+                text
             }
-            Origin::Held => {}
-        }
+            Found::File { at, floor } => miss::text_at(asked, at, &floor)?.0,
+        };
         let interval = Interval::asked_for(call)?;
         // Where the interval starts, which the drawn header and line marks
         // number from (`crate::rendering`); absent means line 0.
@@ -415,6 +415,17 @@ impl Tool for ReadTool {
             out.insert("offset".to_owned(), Value::Number(interval.offset.into()));
         }
         let taken = interval.cut(&text);
+        // A whole answer is a look, and so is a window the caller asked
+        // for by offset or limit; a whole read the cap truncated is not,
+        // because the caller believes it saw the file (§8-64).
+        let windowed = ["offset", "limit"]
+            .iter()
+            .any(|key| call.args.as_map().contains_key(*key));
+        if let Some((addr, before, after)) = looked
+            && (windowed || taken.next_offset.is_none())
+        {
+            self.seen.look(&addr, Some(before), Some(after));
+        }
         if let Some(total) = taken.total_lines {
             out.insert("total_lines".to_owned(), Value::Number(total.into()));
         }
