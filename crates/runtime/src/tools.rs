@@ -6,9 +6,7 @@
 //! The L0 three. Index only: no logic lives here.
 
 mod bound_reader;
-mod call;
 mod chosen_path;
-mod describe;
 mod edit;
 mod exec;
 mod path_lock;
@@ -19,13 +17,12 @@ mod search;
 mod stamp;
 mod status;
 mod succeed;
+mod tool;
 
 pub use bound_reader::{BoundReader, Named, Opened};
-pub use call::CallTool;
 pub use chosen_path::ReadBound;
 #[cfg(test)]
 pub(crate) use chosen_path::admit;
-pub use describe::DescribeTool;
 pub use edit::{EditDesk, EditTool};
 pub(crate) use exec::container::ContainerLease;
 pub use exec::container::run_container_guard;
@@ -50,3 +47,4 @@ pub use status::ProviderMode;
 pub use status::StatusSnapshot;
 pub use status::StatusTool;
 pub use succeed::{SucceedTool, Succession, SuccessionDesk};
+pub use tool::ToolTool;

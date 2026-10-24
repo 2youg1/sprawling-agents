@@ -41,9 +41,10 @@ fn tool_tables(bodies: &[String]) -> Vec<Vec<String>> {
 }
 
 /// Three successions, no person in the loop. The successor's tool table
-/// equals its predecessor's name for name, and every dormant index names
-/// `delegate`, because succession conserves depth — and the commit the
-/// fourth run checkpoints answers a lineage of four.
+/// equals its predecessor's name for name, and every dormant index files
+/// as many of the city's own tools as the first, `delegate` among them,
+/// because succession conserves depth — and the commit the fourth run
+/// checkpoints answers a lineage of four.
 #[test]
 fn three_successions_keep_the_tools_and_leave_a_lineage_of_four() {
     let dir = tempfile::tempdir().unwrap();
@@ -139,15 +140,25 @@ fn three_successions_keep_the_tools_and_leave_a_lineage_of_four() {
     let tables = tool_tables(&bodies);
     let first = tables.first().expect("the first run called the model");
     let last = tables.last().expect("the fourth run called the model");
-    assert!(first.contains(&"call".to_owned()), "{first:?}");
-    // `delegate` and `succeed` wait in every run's dormant index, which a
-    // successor freezes from the same table (`crates/runtime/Spec.lean`
-    // §8-60).
+    assert!(first.contains(&"tool".to_owned()), "{first:?}");
+    // `delegate` and `succeed` wait in every run's dormant index, under
+    // the city's own namespace, which a successor freezes from the same
+    // table (`crates/runtime/Spec.lean` §8-60).
+    let own = |body: &str| {
+        body.split("- sprawling (")
+            .nth(1)
+            .and_then(|rest| rest.split_once(')'))
+            .map(|(count, _)| count.to_owned())
+    };
+    let counted = bodies
+        .iter()
+        .find_map(|body| own(body))
+        .expect("a request carried an index line");
     let indexed = bodies
         .iter()
-        .filter(|body| body.contains("- delegate") && body.contains("- succeed"))
+        .filter(|body| own(body).as_deref() == Some(counted.as_str()))
         .count();
-    assert!(indexed >= 4, "{indexed} requests named both in their index");
+    assert!(indexed >= 4, "{indexed} requests filed {counted} own tools");
     assert_eq!(
         first, last,
         "the successor's tools equal its predecessor's, name for name"

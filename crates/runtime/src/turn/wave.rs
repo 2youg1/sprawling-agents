@@ -63,7 +63,7 @@ pub trait ConcurrentInvoke {
     /// render (`crates/runtime/spec/Turn.lean` §8-51). `None` is a tool the bench does not
     /// know, which is not read-only.
     fn meta_of(&self, call: &ToolCall) -> Option<&ToolMeta>;
-    /// The call behind a call through `call`, resolved before anything
+    /// The call behind a `tool` `run`, resolved before anything
     /// reads a registration (`crates/runtime/Spec.lean` §8-61).
     fn resolve_call(&self, call: ToolCall) -> ToolCall {
         call

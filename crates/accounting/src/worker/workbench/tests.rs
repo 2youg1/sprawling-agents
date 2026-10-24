@@ -208,7 +208,20 @@ fn the_shell_arm_exists_only_where_a_layer_asked_for_it() {
 fn a_resident_of_the_hall_is_given_no_way_to_build() {
     let dir = tempfile::tempdir().unwrap();
     crate::worker::fixture::init_city(dir.path()).unwrap();
-    let (base_url, provider) = fake_openai(&["m-local"], vec![completion("noted", None)]);
+    // The run opens the city's own namespace once, so the provider sees
+    // what the hall was filed there.
+    let (base_url, provider) = fake_openai(
+        &["m-local"],
+        vec![
+            completion_with(
+                "",
+                runtime::ToolTool::NAME,
+                "tu_1",
+                serde_json::json!({ "op": "list", "namespace": "sprawling" }),
+            ),
+            completion("noted", None),
+        ],
+    );
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     worker
         .handle(wire::Command::Dispatch {
@@ -230,8 +243,8 @@ fn a_resident_of_the_hall_is_given_no_way_to_build() {
             "the hall was offered {absent}; the Mayor plans, it does not build"
         );
     }
-    // Both wait in the dormant index, a line each, and the hall reaches
-    // them through `describe` and `call` (`crates/runtime/Spec.lean` §8-60).
+    // Both wait in the dormant index under the city's own namespace, and
+    // the hall reaches them through `tool` (`crates/runtime/Spec.lean` §8-60).
     let listed = |name: &str| {
         offered.contains(&format!("- {name}:")) || offered.contains(&format!("- {name}\\n"))
     };
@@ -243,7 +256,7 @@ fn a_resident_of_the_hall_is_given_no_way_to_build() {
         listed("plan"),
         "and the plan tool, which is what the hall writes"
     );
-    assert!(offered.contains("\"describe\"") && offered.contains("\"call\""));
+    assert!(offered.contains("\"tool\""));
 }
 
 /// The symptom this pins came out of a live city: the Mayor wrote a

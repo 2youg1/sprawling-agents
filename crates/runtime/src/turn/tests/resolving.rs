@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! A call through `call` accounted as the tool it names
+//! A `tool` `run` accounted as the tool it names
 //! (`crates/runtime/Spec.lean` §8-61).
 
 use super::super::*;
@@ -12,7 +12,7 @@ use super::helpers::*;
 use crate::bench::Ticket;
 use kernel::{Tool, ToolOutcome};
 
-/// A face that resolves a call through `call` the way the lane's face
+/// A face that resolves a `tool` `run` the way the lane's face
 /// does, through a catalog that admitted the bench's `read`.
 struct Resolving {
     placed: Placed,
@@ -25,7 +25,10 @@ impl Resolving {
         let mut catalog = crate::Catalog::new();
         let read = kernel::ToolName::parse("read").unwrap();
         catalog
-            .admit_tool(placed.bench.meta_of(&read).unwrap())
+            .admit_tool(
+                placed.bench.meta_of(&read).unwrap(),
+                crate::Namespace::Own(kernel::ReservedNamespace::Sprawling),
+            )
             .unwrap();
         Resolving { placed, catalog }
     }
@@ -37,10 +40,10 @@ impl ConcurrentInvoke for Resolving {
     }
 
     fn resolve_call(&self, call: ToolCall) -> ToolCall {
-        if call.name.as_str() != crate::tools::CallTool::NAME {
+        if call.name.as_str() != crate::tools::ToolTool::NAME {
             return call;
         }
-        self.catalog.resolve_call(&call).unwrap_or(call)
+        self.catalog.resolve_run(&call).unwrap_or(call)
     }
 
     fn admit(&mut self, call: &ToolCall, t: TimeMs) -> Admitted {
@@ -61,16 +64,16 @@ impl ConcurrentInvoke for Resolving {
     }
 }
 
-/// A call through `call` is accounted as the call it stands for: the
-/// ledger names the tool that ran, with its registration, under the id
-/// the model gave the `call`, so the result still pairs with it.
+/// A `tool` `run` is accounted as the call it stands for: the ledger
+/// names the tool that ran, with its registration, under the id the
+/// model gave the `tool` call, so the result still pairs with it.
 #[test]
-fn a_call_through_call_is_accounted_as_the_tool_it_names() {
+fn a_run_through_tool_is_accounted_as_the_tool_it_names() {
     let mut ledger = TestLedger::new();
     let through = ToolCall {
         id: "c1".to_owned(),
-        name: kernel::ToolName::parse("call").unwrap(),
-        args: Payload::of(&serde_json::json!({ "name": "read", "args": {} })).unwrap(),
+        name: kernel::ToolName::parse("tool").unwrap(),
+        args: Payload::of(&serde_json::json!({ "op": "run", "name": "read", "args": {} })).unwrap(),
     };
     let mut lines = lines();
     let turn = waved(opened_on::<1>(&mut lines), &mut ledger, vec![through]);

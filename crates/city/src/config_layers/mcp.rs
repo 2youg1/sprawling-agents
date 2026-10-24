@@ -8,7 +8,7 @@
 //!
 //! Specified by `crates/city/spec/ConfigLayers.lean` §8-4 and §8-4b.
 
-use kernel::{AxCode, AxError, McpServer, McpTransport, SecretRef, ServerLabel};
+use kernel::{AxCode, AxError, McpServer, McpTransport, ReservedNamespace, SecretRef, ServerLabel};
 use serde::Deserialize;
 
 use super::refuse::refuse;
@@ -31,15 +31,42 @@ const ACTION: &str = "check the servers a layer reaches";
 /// `E_CONFIG_INVALID`, naming the server and the value, never the value's
 /// bytes.
 pub(crate) fn validate(servers: &[McpServer]) -> Result<(), AxError> {
-    servers
-        .iter()
-        .try_for_each(|server| match &server.transport {
+    servers.iter().try_for_each(|server| {
+        unreserved(&server.label)?;
+        match &server.transport {
             McpTransport::Stdio { env, .. } => vaulted(server.label.as_str(), Carried::Env, env),
             McpTransport::Http { url, headers } | McpTransport::Sse { url, headers } => {
                 check_url(&server.label, url)?;
                 vaulted(server.label.as_str(), Carried::Header, headers)
             }
-        })
+        }
+    })
+}
+
+/// Refuses a label the catalog keeps for the city's own tools: the label
+/// is the namespace of every tool the server offers, and a server named
+/// `sprawling` would have its tools listed as the city's own.
+///
+/// # Errors
+/// `E_CONFIG_INVALID`, naming the label and the namespaces kept.
+fn unreserved(label: &ServerLabel) -> Result<(), AxError> {
+    if ReservedNamespace::named(label.as_str()).is_none() {
+        return Ok(());
+    }
+    Err(AxError::failure(
+        AxCode::ConfigInvalid,
+        ACTION,
+        format!(
+            "{}: a namespace the city keeps for its own tools",
+            label.as_str()
+        ),
+    )
+    .with_recovery(format!(
+        "give this server another label; {} are kept for the city's own tools",
+        ReservedNamespace::ALL
+            .map(ReservedNamespace::as_str)
+            .join(", ")
+    )))
 }
 
 /// Judges one configured address. `url::Url` reads it by the WHATWG

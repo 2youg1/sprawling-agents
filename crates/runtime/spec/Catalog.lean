@@ -6,7 +6,7 @@
 /-!
 # runtime::catalog
 
-规定 `catalog`、`catalog::dormant`、`catalog::fit`、`catalog::guide`（`crates/runtime/src/` 下同名的文件）与 `tools::describe`、`tools::call` 两扇门。渐进披露与截断锁：一个 run 被告知哪些工具与 skill，各付多少字节。本文件是 `crates/runtime/Spec.lean` 的一个分部；下面每一节保留它在 runtime 规格里的标签 §8-n，别处引作 `crates/runtime/Spec.lean §8-n`。
+规定 `catalog`、`catalog::dormant`、`catalog::fit`、`catalog::guide`、`catalog::namespace`（`crates/runtime/src/` 下同名的文件）与 `tools::tool` 那一扇门。渐进披露与截断锁：一个 run 被告知哪些工具与 skill，各付多少字节。本文件是 `crates/runtime/Spec.lean` 的一个分部；下面每一节保留它在 runtime 规格里的标签 §8-n，别处引作 `crates/runtime/Spec.lean §8-n`。
 -/
 
 /-!
@@ -21,7 +21,7 @@ pub struct SkillPin { pub name: String, pub hash: B3Hash }
 pub struct Catalog { /* tools: BTreeMap<ToolName,…>、skills: BTreeMap、mode: Option<Mode> —— 私有 */ }
 impl Catalog {
     pub fn new() -> Catalog;
-    pub fn admit_tool(&mut self, meta: &ToolMeta) -> Result<(), AxError>;      // disclosure 非空；重名＝E_INVALID_ARGS
+    pub fn admit_tool(&mut self, meta: &ToolMeta, namespace: Namespace) -> Result<(), AxError>; // disclosure 非空；重名＝E_INVALID_ARGS；命名空间由准入它的装配层说（§8-60）
     pub fn admit_skill(&mut self, entry: CatalogEntry) -> Result<(), AxError>; // 只收阅览室准入者（装配层按楼的 city::policy 规则求值后直供）；expansion 是城内地址
     pub fn admit_carried_skill(&mut self, entry: CatalogEntry) -> Result<(), AxError>; // 城外书架上的一件：expansion 是扫描读到的那份文档正文（§8-29-6）
     pub fn set_mode(&mut self, mode: Mode);                                    // Resident 段的 mode 行：run 开始时的 mode；会话中换 mode 不改它（§8-62）
@@ -44,42 +44,47 @@ impl Catalog {
 -/
 
 /-!
-### 8-60 截断锁（`catalog`、`catalog::dormant`、`catalog::guide`、`mode::core_tools`，形状 1 判定）
+### 8-60 截断锁（`catalog`、`catalog::dormant`、`catalog::guide`、`catalog::namespace`、`mode::core_tools`，形状 1 判定）
 
 一件能力（注册的工具、MCP 工具、阅览室里的 skill、`exec` 能调的命令行程序）对一次 session 处在三档之一，每一档付的字节由本节一处定：
 
-1. **楼没准入**：它不进这栋楼的任何上下文——prefix、`ChatRequest.tools`、休眠索引、`describe` 的答复里都是零字节。准入沿用每一类已有的那道门：工具由装配层按楼的职业、规则与书（`accounting::worker::workbench`）决定登不登记，MCP 由楼的 `[[mcp]]` 行，skill 由楼的阅览室（`crates/city/Spec.lean` §8-8），命令行程序由楼的 exec 规则。catalog 只见到已准入的，所以「没准入＝零字节」是装配层不登记它的直接结果，不是 catalog 再判一次。
-2. **已准入、本 session 不常驻**：它只出现在一份休眠索引里，整份索引（段头、条目、`+N more`）至多 `DORMANT_INDEX_CEILING` 字节。
-3. **要用**：模型经 `describe` 取回它的完整指南（工具的说明与入参 schema；skill 的一行披露与 `read` 它的名字），再经 `call` 调它；工具表在 session 里恒不变（D21）。
+1. **楼没准入**：它不进这栋楼的任何上下文——prefix、`ChatRequest.tools`、休眠索引、`tool` 的答复里都是零字节。准入沿用每一类已有的那道门：工具由装配层按楼的职业、规则与书（`accounting::worker::workbench`）决定登不登记，MCP 由楼的 `[[mcp]]` 行，skill 由楼的阅览室（`crates/city/Spec.lean` §8-8），命令行程序由楼的 exec 规则。catalog 只见到已准入的，所以「没准入＝零字节」是装配层不登记它的直接结果，不是 catalog 再判一次。
+2. **已准入、本 session 不常驻**：工具按命名空间折进休眠索引，一个命名空间一行，不论它有几件；skill 一件一行。整份索引（段头、条目、`+N more`）至多 `DORMANT_INDEX_CEILING` 字节。
+3. **要用**：模型经 `tool` 工具找它、看它、调它：`list` 展开一个命名空间，`find` 按词找，`detail` 取完整指南（工具的说明与入参 schema；skill 的一行披露与 `read` 它的名字），`run` 调它；工具表在 session 里恒不变（D21）。
 
 ```rust
 // runtime::catalog
 pub const DORMANT_INDEX_CEILING: usize = 1024;
+pub const FIND_HITS: usize = 8;                                       // `find` 一次至多列几件（D22）
 impl Catalog {
-    pub fn describe(&self, asked: &str) -> Result<String, AxError>;  // 整名命中＝完整指南；否则按关键词排序的候选；错误只有登记时已打印过的 schema 打印不出
-    pub fn resolve_call(&self, call: &ToolCall) -> Result<ToolCall, AxError>; // `call` 的唯一解包与按 schema 核对（§8-61）
+    pub fn list(&self, namespace: Option<&str>) -> String;            // 不给：每个命名空间一行（名字、件数、提示）；给：该命名空间每件一行，超过 LIST_CEILING 只列名字
+    pub fn find(&self, query: &str) -> String;                        // 按等级匹配的至多 FIND_HITS 件，按命名空间分组
+    pub fn detail(&self, name: &str) -> Result<String, AxError>;      // 整名＝完整指南；不认得的名字＝E_INVALID_ARGS，带最近的名字
+    pub fn resolve_run(&self, call: &ToolCall) -> Result<ToolCall, AxError>; // `tool` 的 `run` 的唯一解包与按 schema 核对（§8-61）
 }
+// runtime::catalog::namespace
+pub enum Namespace { Own(kernel::ReservedNamespace), Server(kernel::ServerLabel) }
+// kernel
+pub enum ReservedNamespace { Computer, Media, Record, Skill, Sprawling, Web } // ALL、as_str、named；city 的配置层拒绝用它们作 label 的 MCP 服务器
 // runtime::mode
-pub fn core_tools(mode: kernel::Mode) -> &'static [&'static str];     // 本 mode 允许执行的常驻工具名，含两扇门
+pub fn core_tools(mode: kernel::Mode) -> &'static [&'static str];     // 本 mode 允许执行的常驻工具名，含 `tool`
 pub fn in_some_core(name: &str) -> bool;                               // 在某个 mode 的核心里：ChatRequest.tools 取的就是它（D25）
 pub fn mode_admits(policy: &kernel::RunPolicy, name: &str) -> Result<(), AxError>; // 在某个核心里而不在生效 mode 的核心里 → E_GATE_DENIED
-// runtime::tools（名字是各自的关联常量，登记与 core_tools 读同一个）
-impl DescribeTool { pub const NAME: &'static str = "describe"; }
-impl CallTool { pub const NAME: &'static str = "call"; }
-pub struct DescribeTool { /* catalog: Arc<Mutex<Catalog>>、meta —— 私有 */ }
-pub struct CallTool { /* catalog: Arc<Mutex<Catalog>>、meta —— 私有 */ }
-impl DescribeTool { pub fn new(catalog: Arc<Mutex<Catalog>>) -> Result<DescribeTool, AxError>; }  // args：{name}；Effect::Read
-impl CallTool { pub fn new(catalog: Arc<Mutex<Catalog>>) -> Result<CallTool, AxError>; }          // args：{name, args}；Effect::Read
+// runtime::tools（名字是关联常量，登记与 core_tools 读同一个）
+impl ToolTool { pub const NAME: &'static str = "tool"; }
+pub struct ToolTool { /* catalog: Arc<Mutex<Catalog>>、meta —— 私有 */ }
+impl ToolTool { pub fn new(catalog: Arc<Mutex<Catalog>>) -> Result<ToolTool, AxError>; } // args：{op, namespace?, query?, name?, args?}；Effect::Read
 ```
 
-- **索引的写法**：一行段头，然后先工具后 skill、各按名字的字节序，一件一行：`- <名>: <提示>`，skill 写作 `- skill <名>: <提示>`。提示是披露的第一句（到第一个 `. ` 或行尾），在 `HINT_MAX_BYTES` 处按字符边界截断。逐件贪心：带提示的那行放得下就放，放不下退到只有名字的那行，再放不下就停，剩下的件数写成末行 `+N more`。预算先扣掉 `+N more` 在 N 取全部件数时的长度，所以那一行恒放得下。没有休眠的件时整块不出现。
-- **每个 mode 允许执行哪些常驻工具，由 `mode::core_tools` 一处回答**：`chat` 是 `read`、`search`、`status`、`describe`、`call`；`work` 再加 `edit` 与 `exec`。`ChatRequest.tools` 的常驻核心是 `Mode::ALL` 各自 `core_tools` 的并集，在 session 开始时定下（D25），所以会话中换 mode 不改工具表，只改门（§8-62）。表里的名字只有已准入的才常驻：楼没登记 `exec`（市政厅），`exec` 就不在任何一档。
+- **一件工具的命名空间由准入它的装配层说**（`accounting::worker::workbench` 把每件工具连同一个 `Namespace` 交给 `admit_tool`）：只有那里知道一件工具是城自己的还是某台服务器的。城自己的工具归预留命名空间（`sprawling`：城与居民之间的协作与自身状态；`computer`：浏览器；`media`：识图与转写；`record`：回看与提案；`web`：联网搜索；`skill`：阅览室的 skill），外部服务器的工具归它的 label——它的每件工具拼作 `{label}_{tool}`，`ServerLabel` 不含 `_`，所以 `tool find` 去掉前缀得到的成员名唯一。预留名由 `kernel::ReservedNamespace` 一处列出，city 的配置层拒绝以它们为 label 的服务器（`crates/city/spec/ConfigLayers.lean` §8-4）：一台 MCP 服务器若叫 `sprawling`，`tool list sprawling` 会把外部工具当作城自己的能力列出。被否：按名字切第一个 `_` 推出命名空间——城自己的工具名（`web_search`）也含 `_`，推出的命名空间会是错的。
+- **索引的写法**：一行段头；然后先工具的命名空间、后 skill，各按名字的字节序，一件一行。命名空间写作 `- <名> (<件数>): <提示>`：预留命名空间的提示是表里那一句，其余是成员去掉 `<label>_` 前缀后的名字，以 `, ` 相连；skill 写作 `- skill <名>: <提示>`，提示是披露的第一句（到第一个 `. ` 或行尾）。提示在 `HINT_MAX_BYTES` 处按字符边界截断。逐件贪心：带提示的那行放得下就放，放不下退到只有名字的那行，再放不下就停，剩下的件数写成末行 `+N more`。预算先扣掉 `+N more` 在 N 取全部件数时的长度，所以那一行恒放得下。没有休眠的件时整块不出现。
+- **每个 mode 允许执行哪些常驻工具，由 `mode::core_tools` 一处回答**：`chat` 是 `read`、`search`、`status`、`tool`；`work` 再加 `edit` 与 `exec`。`ChatRequest.tools` 的常驻核心是 `Mode::ALL` 各自 `core_tools` 的并集，在 session 开始时定下（D25），所以会话中换 mode 不改工具表，只改门（§8-62）。表里的名字只有已准入的才常驻：楼没登记 `exec`（市政厅），`exec` 就不在任何一档。`status` 在派发时冻结的那几行进 Run 段之前留在常驻核心里，因为 `City.md` 让每个居民去调它。
 
-下面的模型是索引装填的长度账与三档的可见性；Rust 的 `catalog::dormant` 按同一贪心拼出字节，`catalog::tests` 对拍上限与三档（§16）。
+下面的模型是索引装填的长度账、命名空间的折叠与三档的可见性；Rust 的 `catalog::dormant` 按同一贪心拼出字节，`catalog::tests` 对拍上限、折叠与三档（§16）。
 -/
 
 /-!
-### 8-61 经 `call` 的一次调用（`catalog::resolve_call`、`catalog::fit`、`turn::wave` 的 `resolve_call`）
+### 8-61 经 `tool` 的 `run` 的一次调用（`catalog::resolve_run`、`catalog::fit`、`turn::wave` 的 `resolve_call`）
 
 ```rust
 pub trait ConcurrentInvoke {
@@ -89,8 +94,8 @@ pub trait ConcurrentInvoke {
 }
 ```
 
-- **换在工具面的入口，一波开始时与推测起跑时各一次**：工具波在判只读前缀之前把每条调用交给 `resolve_call`，推测门在问 `reads_only` 之前同样换一次，所以登记、门、去重键、`tool_called` 与 `tool_result` 读到的都是那件工具本身的调用，它的 Effect 过它自己的门。会话里那条 assistant 消息不动：模型说的是 `call`，下一次请求照原样送回，`tool_result` 按 `id` 配对，所以换出来的调用沿用原 `id`。
-- **`Catalog::resolve_call` 是唯一的解包**：参数缺 `name` 或 `args`、`name` 是 `call` 自己、`name` 不是本 run 已准入的工具，或 `args` 不合那件工具的入参 schema，都拒，`E_INVALID_ARGS`；schema 不合的拒词带着那份 schema，候选名的拒词带最近的几个名字。装配层的工具面拿到拒绝时把原调用交回，它落到 `CallTool`，`CallTool::invoke` 再问同一个 `resolve_call`，把同一个拒绝作为 `tool_result` 交给模型；同一个函数问两次答同一句，所以拒因只有一个作者。
+- **换在工具面的入口，一波开始时与推测起跑时各一次**：工具波在判只读前缀之前把每条调用交给 `resolve_call`，推测门在问 `reads_only` 之前同样换一次，所以登记、门、去重键、`tool_called` 与 `tool_result` 读到的都是那件工具本身的调用，它的 Effect 过它自己的门。只有 `op` 为 `run` 的 `tool` 调用会被换；`list`、`find`、`detail` 由 `ToolTool` 自己答。会话里那条 assistant 消息不动：模型说的是 `tool`，下一次请求照原样送回，`tool_result` 按 `id` 配对，所以换出来的调用沿用原 `id`。
+- **`Catalog::resolve_run` 是唯一的解包**：参数缺 `name`、`name` 是 `tool` 自己、`name` 不是本 run 已准入的工具，或 `args` 不合那件工具的入参 schema，都拒，`E_INVALID_ARGS`；schema 不合的拒词带着那份 schema，候选名的拒词带最近的几个名字。装配层的工具面拿到拒绝时把原调用交回，它落到 `ToolTool`，`ToolTool::invoke` 再问同一个 `resolve_run`，把同一个拒绝作为 `tool_result` 交给模型；同一个函数问两次答同一句，所以拒因只有一个作者。
 - **`fit` 只核顶层**：参数是对象；`required` 的每一项在；`properties` 里声明了 `type` 的每一项类型相符（`string`、`integer`、`number`、`boolean`、`array`、`object`、`null`，或它们的数组）；`additionalProperties: false` 时没有多余的键。更深的形状由那件工具自己的解析判，它照旧拒得了。
 -/
 
@@ -231,7 +236,7 @@ theorem one_standing_one_place (cs : List Capability) (c : Capability) :
   rw [hc] at hd
   exact absurd hd (by decide)
 
-/-- 一次经 `call` 的调用：它的 `id`、它指的那件的名字与交给那件的参数。参数的形状对模型是抽象的。 -/
+/-- 一次经 `tool` 的 `run` 的调用：它的 `id`、它指的那件的名字与交给那件的参数。参数的形状对模型是抽象的。 -/
 structure Outer (α : Type) where
   id : String
   target : String
@@ -243,30 +248,30 @@ structure Routed (α : Type) where
   name : String
   args : α
 
-/-- `resolve_call` 的三种拒绝。 -/
+/-- `resolve_run` 的三种拒绝。 -/
 inductive Refusal where
   | itself
   | unknown
   | misfit
   deriving DecidableEq, Repr
 
-/-- 调度门自己的名字。 -/
-def callName : String := "call"
+/-- 目录那扇门自己的名字。 -/
+def toolName : String := "tool"
 
-/-- `Catalog::resolve_call` 的模型：`schemaOf` 答已准入工具的入参 schema（没准入＝`none`），`fits` 是 `catalog::fit`。
+/-- `Catalog::resolve_run` 的模型：`schemaOf` 答已准入工具的入参 schema（没准入＝`none`），`fits` 是 `catalog::fit`。
 
-D21（推断）：**请求的工具表在 session 里恒不变**，第三档经会话而不经工具表。provider 把工具定义放在缓存前缀的最前（tools、system、messages），session 中途加一件定义会在每次启用时丢掉整份 prompt cache，代价可能大过它省下的字节。所以 `describe` 的答复是一次普通的工具结果，追加在缓存本来就在长的末尾；休眠的工具经一扇调度门 `call` 调用，城按那件的 schema 核参数，不合就带着 schema 拒。两者都是普通的工具调用，账本本来就记，重放与分叉逐字节一致，启用不需要新的事件种类。被否的备选：把启用的定义追加进工具表（毁缓存，还要一种启用事件）；provider 自家的延迟加载（只有一张脸有，而城说三种兼容格式）。重新打开它的参数：某家 provider 让工具表中途增长而不失效缓存。 -/
+D21（推断）：**请求的工具表在 session 里恒不变**，第三档经会话而不经工具表。provider 把工具定义放在缓存前缀的最前（tools、system、messages），session 中途加一件定义会在每次启用时丢掉整份 prompt cache，代价可能大过它省下的字节。所以 `tool` 的 `detail` 答复是一次普通的工具结果，追加在缓存本来就在长的末尾；休眠的工具经 `tool` 的 `run` 调用，城按那件的 schema 核参数，不合就带着 schema 拒。两者都是普通的工具调用，账本本来就记，重放与分叉逐字节一致，启用不需要新的事件种类。被否的备选：把启用的定义追加进工具表（毁缓存，还要一种启用事件）。provider 自家的延迟加载（Anthropic 的 `tool_reference`、OpenAI Responses 的 `tool_search_output`）已让工具表中途增长而不失效缓存，但只有两张脸有，而城说三种兼容格式；它作为 gateway 兼容格式的能力在下一版加在 `tool` 的 `find`／`detail` 之后，`run` 仍是每张脸都能走的路。 -/
 def resolveCall {α σ : Type} (schemaOf : String → Option σ) (fits : σ → α → Bool) (o : Outer α) :
     Except Refusal (Routed α) :=
-  if o.target = callName then .error .itself
+  if o.target = toolName then .error .itself
   else match schemaOf o.target with
     | none => .error .unknown
     | some s => if fits s o.args then .ok ⟨o.id, o.target, o.args⟩ else .error .misfit
 
-/-- **换出来的调用沿用原 `id`、不再是 `call`、参数合它的 schema**：结果按 `id` 与会话里那条 `call` 配对，门判的是那件工具本身。 -/
+/-- **换出来的调用沿用原 `id`、不再是 `tool`、参数合它的 schema**：结果按 `id` 与会话里那条 `tool` 调用配对，门判的是那件工具本身。 -/
 theorem routed_is_the_target {α σ : Type} (schemaOf : String → Option σ) (fits : σ → α → Bool)
     (o : Outer α) (r : Routed α) (h : resolveCall schemaOf fits o = .ok r) :
-    r.id = o.id ∧ r.name = o.target ∧ r.name ≠ callName ∧
+    r.id = o.id ∧ r.name = o.target ∧ r.name ≠ toolName ∧
       ∃ s, schemaOf o.target = some s ∧ fits s r.args = true := by
   unfold resolveCall at h
   split at h
@@ -281,12 +286,48 @@ theorem routed_is_the_target {α σ : Type} (schemaOf : String → Option σ) (f
         exact ⟨rfl, rfl, hne, s, hs, hf⟩
       · exact absurd h (by simp)
 
-/-- 没准入的名字经 `call` 也到不了：第一档对调度门同样成立。 -/
+/-- 没准入的名字经 `run` 也到不了：第一档对目录那扇门同样成立。 -/
 theorem unadmitted_is_unreachable {α σ : Type} (schemaOf : String → Option σ)
-    (fits : σ → α → Bool) (o : Outer α) (h : schemaOf o.target = none) (hn : o.target ≠ callName) :
+    (fits : σ → α → Bool) (o : Outer α) (h : schemaOf o.target = none) (hn : o.target ≠ toolName) :
     resolveCall schemaOf fits o = .error .unknown := by
   unfold resolveCall
   rw [ite_eq_right hn, h]
+
+/-- 休眠索引里工具的件：每个命名空间一件，按第一次出现的次序。`ns` 是各件工具在准入时得到的命名空间。 -/
+def folded : List String → List String
+  | [] => []
+  | n :: rest => if n ∈ folded rest then folded rest else n :: folded rest
+
+/-- 折叠前后认得的命名空间相同。 -/
+theorem mem_folded : ∀ (n : String) (ns : List String), n ∈ folded ns ↔ n ∈ ns
+  | _, [] => by simp [folded]
+  | n, m :: rest => by
+    have ih := mem_folded n rest
+    unfold folded
+    by_cases h : m ∈ folded rest
+    · rw [ite_eq_left h]
+      constructor
+      · intro hn; exact List.mem_cons_of_mem _ (ih.mp hn)
+      · intro hn
+        rcases List.mem_cons.mp hn with rfl | hr
+        · exact h
+        · exact ih.mpr hr
+    · rw [ite_eq_right h]
+      simp only [List.mem_cons]
+      exact or_congr_right ih
+
+/-- **一个命名空间只占一行**：往一个已有的命名空间里再加一件工具，索引的件数不变——一台有两百件工具的 MCP 服务器与一台只有一件的付同样的行。 -/
+theorem one_line_per_namespace (n : String) (ns : List String) (h : n ∈ ns) :
+    folded (n :: ns) = folded ns := by
+  have h' : n ∈ folded ns := (mem_folded n ns).mpr h
+  simp [folded, h']
+
+/-- 同一个命名空间的任意多件折成一件。 -/
+theorem many_members_one_line (n : String) : ∀ k, folded (List.replicate (k + 1) n) = [n]
+  | 0 => by simp [folded]
+  | k + 1 => by
+    rw [List.replicate_succ, one_line_per_namespace n _ (by simp [List.mem_replicate])]
+    exact many_members_one_line n k
 
 /-- 一个可实现的实例：一件常驻、两件休眠、一件没准入时，工具表只有一件，索引只列两件。 -/
 example :
@@ -300,18 +341,29 @@ end Runtime.Catalog
 /-!
 ### runtime 决定 D22、D23（截断锁的另两半）
 
-- **D22（推断）：搜索是城里确定的关键词排序，指南是能力自己的文字、一字不删。** `describe` 把问话切成小写的字母数字词，在每件已准入能力的名字（命中计 3）与完整说明（命中计 1）里计分，按分降序、再按名字排，列出前 `DESCRIBE_HITS` 件；整名命中时直接答那件的完整指南。所以索引可以很小，找回靠搜索而不靠读被截短的提示。skill 的正文仍只经 `read` 交出：`read` 是打开架上文件、核对读界与包目录的唯一一扇门（§8-29），`describe` 对一件 skill 答它的一行披露与「`read` 它的名字」。被否的备选：`describe` 自己读 skill 正文（第二个读架子的地方）；嵌入向量检索（二进制里没有模型，且不确定）。重新打开它的参数：脚本化的 run 显示关键词找不回它要的能力。
+- **D22（推断）：找是城里确定的等级匹配，指南是能力自己的文字、一字不删。** `find` 把问话按空白切成小写的词，每个词在每件已准入能力上取它够到的最高一级：名字（或去掉命名空间前缀的成员名）全等计 8、名字前缀计 4、名字子串计 2、正文子串计 1；正文是说明、入参名与入参说明。各词求和，按分降序、再按名字排，列出前 `FIND_HITS` 件，按命名空间分组。`detail` 按整名答那件的完整指南。所以索引可以很小，找回靠匹配而不靠读被截短的提示。skill 的正文仍只经 `read` 交出：`read` 是打开架上文件、核对读界与包目录的唯一一扇门（§8-29），`detail` 对一件 skill 答它的一行披露与「`read` 它的名字」。被否的备选：BM25（权重取决于语料统计，同一句问话在两栋楼排出两种次序）；`detail` 自己读 skill 正文（第二个读架子的地方）；嵌入向量检索（二进制里没有模型，且不确定）。重新打开它的参数：脚本化的 run 显示等级匹配找不回它要的能力，或问话常以 `/正则/` 写出。
 - **D23（推断）：命令行程序不另立第二份目录。** 楼对命令的准入就是楼已有的 exec 规则；prefix 里没有任何一处列出命令；命令行程序的第三档是 agent 经 `exec` 跑它自己的 `--help`，今天就成立。所以本节对 CLI 只确认零字节：没有要移进休眠索引的列表。重新打开它的参数：某处开始把可用命令写进 prefix。
-- **不在 v1 里（截断锁的现状）**：一件在一栋楼的多数 session 里都被用到的能力，升格为那栋楼的常驻工具——等账本里按能力计的调用次数量出来再定（`tool_called` 记的是换出来的那件，所以计数按能力而不是按 `call`）；派活时点名子 agent 要用的能力，让它一开始就带着它们的指南——今天子 agent 是一次自己的 session，它自己 `describe`。
+- **不在 v1 里（截断锁的现状）**：一件在一栋楼的多数 session 里都被用到的能力，升格为那栋楼的常驻工具——等账本里按能力计的调用次数量出来再定（`tool_called` 记的是换出来的那件，所以计数按能力而不是按 `tool`）；派活时点名子 agent 要用的能力，让它一开始就带着它们的指南——今天子 agent 是一次自己的 session，它自己 `find`。
 -/
 
 /-! D25 会话中可改运行策略之后，常驻核心是各 mode 核心的并集，mode 只改门与追加的一句
 
-**决定**：`ChatRequest.tools` 的常驻核心在 session 开始时定成 `Mode::ALL` 各自 `core_tools` 的并集（今天即 `work` 的那一组：`read`、`search`、`status`、`describe`、`call`、`edit`、`exec`，仍只取楼已准入的）；`mode::core_tools(mode)` 继续回答「这个 mode 允许哪些常驻工具真正执行」，不再决定工具表：`mode::mode_admits` 读它，`edit` 与 `exec` 在每次调用的第一道门问它，读的是 run 的策略格（§8-62）；模式之间差的正是这两件，而它们本就持格的读方，所以门不放在 bench——bench 不持格，放那里要再造一个读方。不在任何核心里的工具经 `call` 到达，这道门不判它。会话中改运行策略（kernel D21）只改两件事：门按新策略判，下一段消息末尾追加一句说明新策略。工具表与冻结的前缀一个字节都不动，所以提示缓存不失效。
+**决定**：`ChatRequest.tools` 的常驻核心在 session 开始时定成 `Mode::ALL` 各自 `core_tools` 的并集（今天即 `work` 的那一组：`read`、`search`、`status`、`tool`、`edit`、`exec`，仍只取楼已准入的）；`mode::core_tools(mode)` 继续回答「这个 mode 允许哪些常驻工具真正执行」，不再决定工具表：`mode::mode_admits` 读它，`edit` 与 `exec` 在每次调用的第一道门问它，读的是 run 的策略格（§8-62）；模式之间差的正是这两件，而它们本就持格的读方，所以门不放在 bench——bench 不持格，放那里要再造一个读方。不在任何核心里的工具经 `tool` 的 `run` 到达，这道门不判它。会话中改运行策略（kernel D21）只改两件事：门按新策略判，下一段消息末尾追加一句说明新策略。工具表与冻结的前缀一个字节都不动，所以提示缓存不失效。
 
 **理由**：D21 要工具表在 session 里恒不变，因为中途改工具定义会丢掉整份 prompt cache；权限与模式又要能在会话中改（runtime D28）。两者同时成立的唯一办法是工具表从开头就够大，模式的差别落在门上。代价是 `chat` 的 session 多带两件工具的定义字节；它们由同一个前缀缓存，只在 session 的第一次请求付一次。
 
-**被否**：①改 mode 时换工具表：违反 D21，每次改都整段缓存失效；②`chat` 里 `edit`／`exec` 只经 `call` 走第三档：模型在 `work` 与 `chat` 之间看到同一件工具时有时直调、有时经 `call`，指南要说两套用法。
+**被否**：①改 mode 时换工具表：违反 D21，每次改都整段缓存失效；②`chat` 里 `edit`／`exec` 只经 `tool` 的 `run` 走第三档：模型在 `work` 与 `chat` 之间看到同一件工具时有时直调、有时经 `run`，指南要说两套用法。
 
 **重开参数**：某个 mode 的核心多出一件定义很大的工具、使并集的字节在小模型的窗口里显著时，重议是否只对能改策略的 session 用并集。
+-/
+
+/-! D110 一个 `tool` 工具、四个 op，取代 `describe` 与 `call` 两扇门；休眠索引一个命名空间一行
+
+**决定**：常驻核心里能力目录只占一件工具 `tool`，`op` 取 `list`、`find`、`detail`、`run` 之一（§8-60）。休眠索引里的工具按命名空间折叠，一个命名空间一行（`one_line_per_namespace`），由 `tool list <命名空间>` 展开；skill 仍一件一行，因为 skill 的名字本身就是「何时用」的线索。
+
+**理由**：两扇门各有一份定义字节、各有一段说明，模型要先学会哪扇门做什么；Claude Code 的 `ToolSearch`、Codex 的 `tool_search` 都是一件工具。索引一件一行时，一台两百件工具的 MCP 服务器就把 1 KiB 的预算吃光，别的命名空间只剩 `+N more`；一个命名空间一行，索引的长度随命名空间数而不随工具数增长。Codex 的延迟命名空间同样一行一个。
+
+**被否**：①保留 `describe` 与 `call`，只改索引：常驻集仍多一件，两扇门的说明互相引用；②四个 op 拆成四件工具：常驻集变大；③索引仍一件一行、只提高上限：上限随最大的那台服务器涨，前缀为每个 run 付这份字节。
+
+**重开参数**：某家 provider 让工具在会话中途原生加载而不失效缓存、且城说的每种兼容格式都支持它时，`find`／`detail` 改为原生加载命中的工具，`run` 留作兜底。
 -/

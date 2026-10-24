@@ -3,8 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What a call through `call` stands for, and whether its arguments fit
-//! the top level of the named tool's input schema
+//! What a `tool` `run` stands for, and whether its arguments fit the top
+//! level of the named tool's input schema
 //! (`crates/runtime/spec/Catalog.lean` `resolveCall`, §8-61).
 //!
 //! Only the top level is checked: the arguments are an object, every
@@ -17,28 +17,33 @@ use std::collections::BTreeMap;
 use kernel::{AxCode, AxError, ErrorDraft, Payload, ToolCall, ToolDef, ToolName};
 use serde_json::{Map, Value};
 
-use crate::tools::CallTool;
+use super::Filed;
+use crate::tools::ToolTool;
 
-const ACTION: &str = "call a dormant tool";
+const ACTION: &str = "run a tool through `tool`";
 
-/// The call `call` stands for, or the one refusal for why it stands for
-/// none.
+/// The call a `tool` `run` stands for, or the one refusal for why it
+/// stands for none.
 pub(super) fn resolve(
-    tools: &BTreeMap<String, ToolDef>,
+    tools: &BTreeMap<String, Filed>,
     call: &ToolCall,
 ) -> Result<ToolCall, AxError> {
     let given = call.args.as_map();
+    if given.get("op").and_then(Value::as_str) != Some(ToolTool::RUN) {
+        return Err(refused("this `tool` call is not a `run`")
+            .with_recovery("pass `op: \"run\"`, the tool's `name` and its `args` to run a tool"));
+    }
     let Some(name) = given.get("name").and_then(Value::as_str) else {
         return Err(refused("missing string argument `name`").with_recovery(
-            "pass `name`, the tool to run as the dormant index or `describe` spells it, \
-             and `args`, an object of its arguments",
+            "pass `name`, the tool to run as `tool` `list` or `find` spells it, and \
+             `args`, an object of its arguments",
         ));
     };
-    if name == CallTool::NAME {
-        return Err(refused("`call` cannot run itself")
-            .with_recovery("name the tool you mean to run; `call` only stands for another tool"));
+    if name == ToolTool::NAME {
+        return Err(refused("`tool` cannot run itself")
+            .with_recovery("name the tool you mean to run; `run` only stands for another tool"));
     }
-    let Some(def) = tools.get(name) else {
+    let Some(def) = tools.get(name).map(|filed| &filed.def) else {
         return Err(refused(format!("no tool named `{name}` is admitted here"))
             .with_nearby(
                 tools
@@ -48,7 +53,7 @@ pub(super) fn resolve(
                     .collect(),
             )
             .with_recovery(
-                "`describe` a few words of what you need: it answers with the names this \
+                "`tool` `find` a few words of what you need: it answers with the names this \
                  building admits",
             ));
     };

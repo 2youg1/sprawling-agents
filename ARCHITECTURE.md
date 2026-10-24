@@ -348,9 +348,10 @@ than any diagram of boxes.
    tools, the collaboration tools this building admits, the skills
    its reading room allows, and any MCP tools discovered from the
    building's `CONFIG.toml`. Of those, only the mode's core travels as
-   tools; the rest is one line each in a dormant index of at most 1 KiB,
-   and a run fetches a guide with `describe` and runs a dormant tool
-   through `call` (the truncation lock, `crates/runtime/Spec.lean` §8-60).
+   tools; the rest waits in a dormant index of at most 1 KiB, one line
+   per namespace and one per skill, and a run lists, finds, details and
+   runs a dormant tool through `tool` (the truncation lock,
+   `crates/runtime/Spec.lean` §8-60).
    `city::neighbourhood` is scanned in the same
    breath, so the run also knows which addresses it can reach and who
    stands at them — without it, `signal` takes an address the model has to
@@ -584,7 +585,7 @@ How often each skill and each tool server was used is a question the
 Ledger answers, not a counter the city keeps: `Query::SkillUsage`,
 `Query::McpUsage` and `Query::UsageExport` fold the whole Ledger when they
 are asked (`accounting::views::usage`, accounting D49). A skill use is a
-`describe` or `read` of a skill that the run's `run_started` pinned by
+`tool` `detail` or `read` of a skill that the run's `run_started` pinned by
 name and hash; a tool server use is a `tool_called` line whose effect
 names the server's label, so a server removed from a building's
 `CONFIG.toml` keeps its history (wire D33). The answer stays cached until

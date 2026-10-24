@@ -62,6 +62,61 @@ impl std::fmt::Display for ToolName {
     }
 }
 
+/// A namespace the catalog files the city's own tools under
+/// (`crates/runtime/spec/Catalog.lean` §8-60).
+///
+/// An external server's label is the namespace of every tool it offers,
+/// so a server labelled with one of these would have its tools listed
+/// as the city's own; the configuration layer refuses such a label.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum ReservedNamespace {
+    /// The browsers and whatever else drives a screen.
+    Computer,
+    /// Reading pictures and recordings.
+    Media,
+    /// Looking back at the city's history and proposing changes to it.
+    Record,
+    /// The skills a building's reading room admits.
+    Skill,
+    /// The city's own capabilities: collaboration and a run's own state.
+    Sprawling,
+    /// The city's own way onto the web.
+    Web,
+}
+
+impl ReservedNamespace {
+    /// Every reserved namespace, in name order.
+    pub const ALL: [ReservedNamespace; 6] = [
+        ReservedNamespace::Computer,
+        ReservedNamespace::Media,
+        ReservedNamespace::Record,
+        ReservedNamespace::Skill,
+        ReservedNamespace::Sprawling,
+        ReservedNamespace::Web,
+    ];
+
+    /// The name a model reads and a `tool list` takes.
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            ReservedNamespace::Computer => "computer",
+            ReservedNamespace::Media => "media",
+            ReservedNamespace::Record => "record",
+            ReservedNamespace::Skill => "skill",
+            ReservedNamespace::Sprawling => "sprawling",
+            ReservedNamespace::Web => "web",
+        }
+    }
+
+    /// The reserved namespace spelled `raw`, if any.
+    #[must_use]
+    pub fn named(raw: &str) -> Option<ReservedNamespace> {
+        Self::ALL
+            .into_iter()
+            .find(|namespace| namespace.as_str() == raw)
+    }
+}
+
 /// How one external server is named inside this city.
 ///
 /// The label is the first segment of every tool that server offers

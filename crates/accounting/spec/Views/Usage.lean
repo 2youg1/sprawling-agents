@@ -32,11 +32,11 @@ pub(super) fn write(rows: &[Row], format: wire::ExportFormat) -> String;
 
 - **一遍读完整本账。** `Query::SkillUsage`、`McpUsage`、`UsageExport` 与 `Shells` 在快照放开之后由 `LedgerAsk` 从第一行读到最后一行，交给 `Usage::fold`；读不下去的一行结束这一遍，已经读到的照答（与 `history` 同一条规则）；账本索引本身打不开时答 `Unavailable`，`reason` 是那个错误（wire D47）。
 - **shell 读数**（wire D48）：同一遍里每一条 `tool_result` 的 `result` 对象交给 `runtime::ShellTally::absorb`，`shells` 照它的 `interpreters` 逐行写出；哪些行算、怎么分类只在 `crates/runtime/spec/Tools/Exec.lean` D30。
-- **skill 的一次使用**照 wire D33：这一行是 `tool_called`，它的 run 的 `run_started` 钉住了这件 skill 的名字；`describe` 的 `name` 是那个名字或 `skill <名字>` 时部分记作 `guide`，`read` 的 `path` 是那个名字时记作 `SKILL.md`，是 `<名字>/<相对路径>` 时记作那个相对路径。使用的版本是钉住时的哈希。
+- **skill 的一次使用**照 wire D33：这一行是 `tool_called`，它的 run 的 `run_started` 钉住了这件 skill 的名字；`tool` 的 `detail`（或更早的构建写下的 `describe`）的 `name` 是那个名字或 `skill <名字>` 时部分记作 `guide`，`read` 的 `path` 是那个名字时记作 `SKILL.md`，是 `<名字>/<相对路径>` 时记作那个相对路径。使用的版本是钉住时的哈希。
 - **一个内容版本**是某件 skill 在账上第一次以某个摘要出现的那一行：一行 `skill_shelved`（kernel D23）或一个钉住它的 `run_started`；摘要、那一行的 `seq`、时刻与 run，以及 wire D33 的 `author`：带同一摘要的 `skill_shelved` 给 `Shelved`（它的 `seq` 与 `source`，晚于版本到达的也补上），否则看钉住那一刻之前这个名字有没有过 `skill_shelved`，有即 `OutsideShelf`，无即 `Unrecorded`。
 - **书架上的每一件都有一行**，没被用过的计数为零；书架上已经没有、但账上用过的名字也有一行，`held` 为空。同名的件在几格书架上时，`held` 每格一项，各带此刻的摘要与审核状态。
 - **审核状态**照 `city::library::audit_state` 判（`crates/city/spec/Library/Audit.lean`），输入是账上这个名字的每一行 `skill_audited`。自有书架的包在答问时经 `city::skill_digest` 读整包摘要，与 `Installed::hash` 及审核行的摘要相同；文档与外部书架仍用扫描给出的正文摘要。只改包内脚本也必须变成 Stale，不能把 SKILL.md 的未变摘要当整包版本。读包或扫架失败沿 `shelved` 的 Result 返回，SkillUsage 与 UsageExport 答 Unavailable 且带原错误原因，不替换成空表。此刻的摘要与任何一次审核都不同、而审核存在时，状态是 `Stale`：页面据此请 User 重新审核。
-- **MCP 的一次使用**是一行 `tool_called`，它记下的 `effect` 是 `Connector { label }`：服务器就是那个 `label`，工具名是行上的名字去掉 `<label>_` 前缀。`call` 一行指名的工具按第一个 `_` 拆（`kernel::ServerLabel` 不收 `_`），拆出的头是已知服务器名（账上见过的与此刻配置的）才归属；否则归在 `server: None` 下，工具写完整的名字。
+- **MCP 的一次使用**是一行 `tool_called`，它记下的 `effect` 是 `Connector { label }`：服务器就是那个 `label`，工具名是行上的名字去掉 `<label>_` 前缀。没有换成目标的 `tool` `run` 一行（或更早的构建写下的 `call` 一行）指名的工具按第一个 `_` 拆（`kernel::ServerLabel` 不收 `_`），拆出的头是已知服务器名（账上见过的与此刻配置的）才归属；否则归在 `server: None` 下，工具写完整的名字。
 - **结果**：同一个 run 里 `tool_use_id` 与它配对的 `tool_result` 答了是 `Ok`，拒了是 `Failed`，没有配对行是 `Unknown`。
 - **按天数**：信封时刻的 UTC 日历日，`YYYY-MM-DD`，由 `runtime::clock::iso` 的前十个字符读出，不另写一份历法。
 - **从没用过的 MCP 服务器**：每栋楼的配置（`city::load_config`）里列出的服务器各有一项，没有用过的工具表为空；此刻提供哪些工具要一次握手，那是 `McpHealth` 的问题。
