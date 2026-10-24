@@ -81,7 +81,7 @@ impl<'de> Deserialize<'de> for GitOid { /* 同上，20 个字节 */ }
 
 **决定**：`plan finish` 的 `evidence` 是本节文法的两种完整形式之一，或者一个路径（与 `read` 同一个判定：`runtime::BoundReader::pin`）。是路径时，运行时在完成那一刻读这个文件，记下 `Locator::cas(B3Hash::digest(bytes))` 的规范拼写，计划里存的永远是 Locator。`read` 与 `edit` 都不答版本：edit 的准入靠每个 run 的读戳（`crates/runtime/spec/Tools/Edit.lean` D106），模型没有要抄的哈希。工作树里的文件不答 git oid：`file:<address>@<oid>` 的 oid 是一次提交（`storage::blob_at` 按提交取文件），一份尚未落进检查点的文件没有这样一个提交。
 
-**理由**：版本串在 read 的每次答复里约 62 个 token，模型要把它原样抄进 `plan finish`，没有 `exec` 的 run 又拿不到 40 位 oid。让运行时在完成那一刻算，文法仍只有这一个家，计划里的证据仍可取回，模型只说它指的是哪个文件。
+**理由**：版本串在 read 的每次答复里约 62 个 token，模型要把它原样抄进 `plan finish`，没有 `exec` 的 run 又拿不到 40 位 oid。让运行时在完成那一刻算，文法仍只有这一个家，计划里的证据仍是这份内容的 Locator，可以拿去与文件核对（字节不进块存储，所以 `read` 这个 `cas:` 取不回它们），模型只说它指的是哪个文件。
 
 **被否**：①read 继续答完整 `cas:b3-` 版本、`plan finish` 原样收——每次读都付哈希与 token，只为少数完成调用；②`plan finish` 收 16 位前缀、由城补全：文法多一种形式，补全还会遇到歧义。
 
