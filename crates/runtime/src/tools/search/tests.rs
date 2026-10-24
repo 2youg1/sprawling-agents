@@ -376,3 +376,106 @@ fn a_name_that_is_no_address_is_named_among_the_unread() {
     let why = format!("its name is not an address: {reason}");
     assert_eq!(named, Some(("lab/a:b".to_owned(), why)));
 }
+
+/// What the model reads for one search, drawn by the renderer the live
+/// wave uses.
+fn drawn(outcome: ToolOutcome) -> String {
+    crate::rendering::shown(
+        crate::rendering::CURRENT,
+        &ToolName::parse(SearchTool::NAME).unwrap(),
+        &kernel::event::record::ToolAnswer::Answered {
+            result: outcome.result,
+        },
+    )
+    .unwrap()
+}
+
+/// Hits are drawn a group per file under a header that counts them, and
+/// each hit block is marked the way a read answer starting on its first
+/// line is, so the numbers go back to `read` or `edit` unchanged.
+#[test]
+fn hits_are_drawn_grouped_by_file_with_their_lines_marked() {
+    let dir = city();
+    let tool = SearchTool::new(dir.path(), everywhere()).unwrap();
+
+    let outcome = tool
+        .invoke(&call(&[
+            ("text", Value::String("ledger".to_owned())),
+            ("context", Value::Number(1.into())),
+        ]))
+        .unwrap();
+    assert_eq!(
+        drawn(outcome),
+        "2 matches in 2 files\n\
+         lab/Notes.md\n0|before\nthe ledger again\nafter\n\
+         \n\
+         lab/room1/Memo.md\n0|one decision\nthe ledger is the history\nnothing else\n"
+    );
+}
+
+/// `files` names the files that hold a hit and nothing else, and
+/// `count` adds how many lines matched in each.
+#[test]
+fn the_files_and_count_modes_answer_without_the_lines() {
+    let dir = city();
+    let tool = SearchTool::new(dir.path(), everywhere()).unwrap();
+    let asked = |mode: &str| {
+        tool.invoke(&call(&[
+            ("text", Value::String("e".to_owned())),
+            ("mode", Value::String(mode.to_owned())),
+        ]))
+        .unwrap()
+    };
+
+    assert_eq!(
+        (drawn(asked("files")), drawn(asked("count"))),
+        (
+            "2 files\nlab/Notes.md\nlab/room1/Memo.md\n".to_owned(),
+            "2 files, 6 matches\nlab/Notes.md:3\nlab/room1/Memo.md:3\n".to_owned()
+        )
+    );
+}
+
+/// A `files` answer is capped by files, not by hits, and says so.
+#[test]
+fn a_files_answer_stops_at_the_cap_counting_files() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(dir.path().join("lab")).unwrap();
+    for n in 0..70 {
+        std::fs::write(dir.path().join("lab").join(format!("f{n:02}.md")), "x\nx\n").unwrap();
+    }
+    let tool = SearchTool::new(dir.path(), everywhere()).unwrap();
+
+    let outcome = tool
+        .invoke(&call(&[
+            ("text", Value::String("x".to_owned())),
+            ("mode", Value::String("files".to_owned())),
+        ]))
+        .unwrap();
+    let map = outcome.result.as_map();
+    assert_eq!(
+        (&map["count"], &map["stopped"]),
+        (&Value::from(64), &Value::String(Limit::Files.said()))
+    );
+}
+
+/// A mode this tool does not answer is refused with the three it does.
+#[test]
+fn an_unknown_mode_is_refused_with_the_modes_nearby() {
+    let dir = city();
+    let tool = SearchTool::new(dir.path(), everywhere()).unwrap();
+
+    let Err(refused) = tool.invoke(&call(&[
+        ("text", Value::String("ledger".to_owned())),
+        ("mode", Value::String("list".to_owned())),
+    ])) else {
+        panic!("an unknown mode was answered");
+    };
+    assert_eq!(
+        (refused.code(), refused.nearby()),
+        (
+            &AxCode::InvalidArgs,
+            &["content".to_owned(), "files".to_owned(), "count".to_owned()][..]
+        )
+    );
+}

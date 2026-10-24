@@ -107,7 +107,7 @@ pub use run::{
     RunPolicyChanged, RunStarted, SessionNamed, SessionOpened, SkillPin,
 };
 pub use skill::{AuditSource, AuditVerdict, ShelvedFrom, SkillAudited, SkillShelved};
-pub use tool::{ToolAnswer, ToolCalled, ToolResult};
+pub use tool::{Rendering, ToolAnswer, ToolCalled, ToolResult};
 pub use turn::{
     ModelCalled, ModelReturned, PartChange, PromptAssembled, PromptSegment, PromptShapeCompared,
     PromptSkip, PromptSource, ShapeChanged, ShapePart, SkipReason, SteerReceived,

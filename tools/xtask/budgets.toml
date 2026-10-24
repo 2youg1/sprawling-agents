@@ -695,6 +695,16 @@ what = "one call of read, write, edit, exec and search in two phases, in microse
 measured_by = "just bench (instrument_read_phases, instrument_write_and_edit_phases, instrument_exec_phases, instrument_search_phases in crates/runtime/src/redact.rs)"
 status = "owed, not gated: no reading exists yet, because the User ruled to skip measurement in this version; `just bench` takes it, and a target waits for that first reading and the User's confirmation of one"
 
+# What a read of a model-chosen file costs against what its design
+# claims, one judgement of the real location and one open
+# (`crates/runtime/spec/Tools/Read.lean` D10). The wall clock is the
+# machine's; the ratio between two reads taken in the same process is
+# not, and a return to four resolutions per read crosses it.
+[read_handle_ratio]
+what = "p50 of one handle read of a 20 KiB file (open, the handle's real location judged, read, BLAKE3, the line cut) over p50 of one canonicalize followed by a bare buffered read of the same file, interleaved 200 rounds; windows and linux only, because elsewhere the judged path is the read"
+measured_by = "cargo nextest run -p sprawling-runtime -E 'test(a_read_costs_within_a_bound_of_a_resolved_read)', which fails above 1.5 (crates/runtime/src/tools/read/tests/instruments.rs); the wall-clock readings come from just bench (instrument_read_ab, instrument_read_after_write_ab, instrument_read_round_trip)"
+status = "gated by that test at 1.5, in the default suite, so every CI run holds it; the wall-clock readings are owed to the version's final measurement"
+
 # What a playback export costs in wall-clock time over histories of
 # growing length; `[playback_export_scan]` holds the line count, which
 # every machine agrees on.

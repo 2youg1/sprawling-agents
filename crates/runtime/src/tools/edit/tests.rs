@@ -398,3 +398,131 @@ fn a_city_placed_below_a_link_is_edited_like_any_other() {
         (Ok(()), Ok(()), "final\n".to_owned(), "made\n".to_owned())
     );
 }
+
+/// A passage copied out of a `read` answer with its line marks lands on
+/// the file's own bytes, and the marks copied into the replacement are
+/// not written into the file.
+#[test]
+fn a_passage_copied_with_its_line_marks_edits_the_lines_it_marks() {
+    let tmp = tempfile::tempdir().unwrap();
+    let tool = tool(tmp.path());
+    let before: String = (0..12).map(|n| format!("row {n}\n")).collect();
+    std::fs::write(tmp.path().join("work/a.txt"), &before).unwrap();
+    let version = version_of(before.as_bytes());
+    tool.invoke(&call(
+        "work/a.txt",
+        &version,
+        "row 9\n10|row 10\n",
+        "row 9\n10|row ten\n",
+    ))
+    .unwrap();
+    assert_eq!(
+        std::fs::read_to_string(tmp.path().join("work/a.txt")).unwrap(),
+        before.replace("row 10\n", "row ten\n")
+    );
+}
+
+/// A file whose own lines look like marks is matched as the passage came:
+/// an exact match is never second-guessed.
+#[test]
+fn a_passage_that_matches_as_it_came_keeps_what_looks_like_a_mark() {
+    let tmp = tempfile::tempdir().unwrap();
+    let tool = tool(tmp.path());
+    std::fs::write(tmp.path().join("work/t.md"), "| a |\n12|b\n").unwrap();
+    let version = version_of(b"| a |\n12|b\n");
+    tool.invoke(&call("work/t.md", &version, "12|b\n", "12|c\n"))
+        .unwrap();
+    assert_eq!(
+        std::fs::read_to_string(tmp.path().join("work/t.md")).unwrap(),
+        "| a |\n12|c\n"
+    );
+}
+
+/// A numbered line the model means to write stays in the file: only the
+/// marks copied from the passage it replaces come off the replacement.
+#[test]
+fn a_numbered_line_added_in_the_replacement_is_written_as_it_came() {
+    let tmp = tempfile::tempdir().unwrap();
+    let tool = tool(tmp.path());
+    let before: String = (0..12).map(|n| format!("row {n}\n")).collect();
+    std::fs::write(tmp.path().join("work/a.txt"), &before).unwrap();
+    let version = version_of(before.as_bytes());
+    tool.invoke(&call(
+        "work/a.txt",
+        &version,
+        "10|row 10\n",
+        "10|row ten\n12|keep\n",
+    ))
+    .unwrap();
+    assert_eq!(
+        std::fs::read_to_string(tmp.path().join("work/a.txt")).unwrap(),
+        before.replace("row 10\n", "row ten\n12|keep\n")
+    );
+}
+
+/// A passage copied with its marks over a line the file itself starts
+/// with digits and a separator edits that line: the file's own text is
+/// not mistaken for a mark, because no read draws a mark there.
+#[test]
+fn a_copied_passage_keeps_a_numbered_line_the_file_holds() {
+    let tmp = tempfile::tempdir().unwrap();
+    let tool = tool(tmp.path());
+    let before: String = (0..13)
+        .map(|n| match n {
+            11 => "7|literal\n".to_owned(),
+            _ => format!("row {n}\n"),
+        })
+        .collect();
+    std::fs::write(tmp.path().join("work/a.txt"), &before).unwrap();
+    let version = version_of(before.as_bytes());
+    tool.invoke(&call(
+        "work/a.txt",
+        &version,
+        "10|row 10\n7|literal\n",
+        "10|row 10\n7|changed\n",
+    ))
+    .unwrap();
+    assert_eq!(
+        std::fs::read_to_string(tmp.path().join("work/a.txt")).unwrap(),
+        before.replace("7|literal\n", "7|changed\n")
+    );
+}
+
+/// A passage copied out of a `search` hit drawn with context lands on the
+/// file's own bytes: a hit block is marked in the grammar a read answer
+/// starting on the block's first line is, so `edit` sees through it.
+#[test]
+fn a_passage_copied_from_a_search_hit_with_context_edits_the_lines_it_marks() {
+    let tmp = tempfile::tempdir().unwrap();
+    let tool = tool(tmp.path());
+    let before: String = (0..12).map(|n| format!("row {n}\n")).collect();
+    std::fs::write(tmp.path().join("work/a.txt"), &before).unwrap();
+    let version = version_of(before.as_bytes());
+    let block = crate::rendering::shown(
+        crate::rendering::CURRENT,
+        &kernel::ToolName::parse("search").unwrap(),
+        &kernel::event::record::ToolAnswer::Answered {
+            result: kernel::Payload::of(&serde_json::json!({
+                "matches": [{"path": "work/a.txt", "line": 7, "from": 5,
+                             "text": "row 5\nrow 6\nrow 7\nrow 8"}],
+                "count": 1, "truncated": false, "unreadable": 0, "unread": []
+            }))
+            .unwrap(),
+        },
+    )
+    .unwrap();
+    let old: String = block
+        .lines()
+        .skip(2)
+        .take(3)
+        .map(|l| format!("{l}\n"))
+        .collect();
+    assert_eq!(old, "5|row 5\nrow 6\nrow 7\n");
+    let new = old.replace("row 7", "row seven");
+    tool.invoke(&call("work/a.txt", &version, &old, &new))
+        .unwrap();
+    assert_eq!(
+        std::fs::read_to_string(tmp.path().join("work/a.txt")).unwrap(),
+        before.replace("row 7\n", "row seven\n")
+    );
+}

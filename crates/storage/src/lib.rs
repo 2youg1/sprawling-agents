@@ -23,6 +23,7 @@ mod reserved;
 
 mod jsonl;
 
+pub use jsonl::LedgerHold;
 pub use jsonl::WriteObserver;
 pub use jsonl::{CheckedLine, LineCheck, LineFault, read_line};
 pub use jsonl::{JsonlLedger, OpenReport, TailTruncation, ledger_segments_at, read_raw_lines_at};

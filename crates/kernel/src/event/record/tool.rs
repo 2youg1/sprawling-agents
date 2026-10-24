@@ -98,6 +98,46 @@ pub struct ToolResult {
     /// difference of the two envelope moments, in milliseconds.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub took_us: Option<u64>,
+    /// The renderer that drew the text the model read for this answer
+    /// (`crates/kernel/spec/Event/Record.lean` D64). Absent on every line
+    /// written before the key existed, which reads as [`Rendering::V1`]:
+    /// those lines were all shown to a model as their payload's JSON.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rendered: Option<Rendering>,
+    /// How many bytes of text the model was shown for this answer, after
+    /// the pipeline shortened it and the renderer drew it. Absent where it
+    /// was not counted, which is every line written before the key
+    /// existed and every answer the city wrote rather than a tool.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub shown_bytes: Option<u64>,
+}
+
+/// Which renderer turned a recorded answer into the text a model read.
+///
+/// The ledger keeps the structured answer and the model reads text, so
+/// the text is a function of the record and of the renderer. A branch
+/// rebuilt from the ledger has to show the model what it was shown when
+/// the line was written, so the line names the renderer and every
+/// version stays drawable for as long as a ledger holds a line it drew.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub enum Rendering {
+    /// The payload's compact JSON, which every answer was shown as before
+    /// a line could name its renderer.
+    V1,
+    /// One header line and a body for the tools that have one, and a
+    /// refusal as one line (`crates/runtime/spec/Rendering.lean` §8-63).
+    V2,
+}
+
+impl Rendering {
+    /// The renderer a line names, reading an absent key as the renderer
+    /// every line was drawn with before the key existed.
+    #[must_use]
+    pub fn of(recorded: Option<Rendering>) -> Rendering {
+        recorded.unwrap_or(Rendering::V1)
+    }
 }
 
 /// A call answers exactly one way, and the enum is what says so: two

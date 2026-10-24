@@ -33,6 +33,9 @@ impl Worktrees {
     /// 开城时收走崩溃留下的树：`held` 之外、住在 `<city>/.sprawling/worktrees/` 下的登记、目录与租约分支。
     /// 城没有仓库时答空。返回收走的名字，排序。
     pub fn sweep_abandoned(city_root: &Path, held: &[WorktreeName]) -> Result<Vec<WorktreeName>, StorageError>;
+    /// 整座城的文件夹搬走之后调用：把 `.git/worktrees/<名>/gitdir` 与树里的 `.git` 两侧记的绝对路径
+    /// 从 `moved_from` 改指 `city_root`；不在 `moved_from` 下的链接不动。返回改了几棵。libgit2 没有 repair，所以直接改这两个文件。
+    pub fn relink_moved(city_root: &Path, moved_from: &Path) -> Result<usize, StorageError>;
     /// 把一个节点已提交的活带进城的 trunk，返回落地的 commit。
     pub fn plan_merge(&self, name: &WorktreeName) -> Result<PlannedMerge<'_>, StorageError>;
 }

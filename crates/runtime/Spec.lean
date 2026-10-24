@@ -20,6 +20,7 @@ import crates.runtime.spec.Pipeline
 import crates.runtime.spec.PolicyTake
 import crates.runtime.spec.Prefix
 import crates.runtime.spec.Reminder
+import crates.runtime.spec.Rendering
 import crates.runtime.spec.Replay
 import crates.runtime.spec.Run
 import crates.runtime.spec.Run.Checkpoint
@@ -250,6 +251,7 @@ tools/ ──▶ kernel(tool/version/discard/gate)、sandbox、storage(cas 经 p
 | 8-47-1 | `crates/runtime/spec/Conversation.lean` |
 | 8-47-2 | `crates/runtime/spec/Conversation.lean` |
 | 8-52 | `crates/runtime/spec/Run.lean` |
+| 8-63 | `crates/runtime/spec/Rendering.lean` |
 -/
 
 /-! ## 9 工作流程
@@ -279,6 +281,7 @@ envelope 探查与全解共用 kernel 的解析（Value 探查仅取五键，不
 每个工具在本 crate 里可测的有两段：经工具自己的面完成一次调用（路径判定、IO 与信封合为一段），以及结果入账前经 `redact` 的秘密扫描。仪表是 `redact::phases` 里的 `instrument_read_phases`、`instrument_write_and_edit_phases`、`instrument_exec_phases`、`instrument_search_phases`——放在 `redact` 旁，因为扫描是每个工具共有的那一段——由 `just bench` 以 `--lib` 跑，读数一行一工具、以微秒计；夹具约 64 KiB，形同城里工具结果的文本（哈希、oid、带凭据名的 hex 键、混合字母 token）。M2 的 gate、checkpoint 与屏障三段不在本 crate：它们在 accounting 的工具面与账本线程里，本 crate 的仪表读不到，那三段的仪表属于 accounting。三个平台上两段的含义相同；exec 在 Windows 上经 `cmd`，在 macOS 与 Linux 上经 `sh`。读数由版本中段的统一测量给出，下面每段只写剩余成本的来源、下界与下一步。
 
 - **read**：剩余成本是读出所请求的字节与对这些字节的一次扫描。下界是两者各一遍：结果整段进账本，扫描必须看到结果的每个字节，不能按选区跳过。`redact` 接收载荷的所有权并原地改写（D37），零命中时扫描之外不再分配，剩下的就是这两遍。
+  read 另有两个仪表，也由 `just bench` 跑。`tools::read` 的 `instrument_read_ab` 在同一进程里逐轮交替四条路：§8-29-4 的判定路径（每次重求城根）、按句柄读（`spec/Tools/Read.lean` D10）、一次 canonicalize 加裸读、裸读，文件 20 KiB 到 8 MiB；`instrument_read_after_write_ab` 在每次读之前写一个字节，读的是刚写过的文件。`turn` 的 `instrument_read_round_trip` 量端到端：从模型回复里拿到一个 `read` 调用，到下一次请求交给模型，经真实的 `ReadTool` 与落在盘上的 `JsonlLedger`，包括准入、读、秘密扫描、`settle`、使本回合可持久的屏障（`append_all` 与它的 sync，D36）和下一次组装；同时单列读本身与每道屏障，看各占多少。墙钟读数属于机器，不当门；CI 守一个比值：`a_read_costs_within_a_bound_of_a_resolved_read` 要求 20 KiB 文件按句柄读的 p50 不超过「一次 canonicalize 加裸读」p50 的 1.5 倍。按句柄读的设计正是一次判定加一次 open，所以这个比值在各台机器上都接近 1；退回 4 次 canonicalize 加再开核验的判定路径就越过它。只在 Windows 与 Linux 上守，因为其他平台上判定路径就是读法。
 - **write**（`edit` 以 `base_version` 为 `new` 新建文件）：剩余成本是写盘，加上结果回显的整份 diff 的扫描——新文件的 diff 就是全文，所以扫描量与文件同长。下界是写一遍、扫一遍回显。回显全文不能省：逐次的 diff 是还原一次改动的粒度（`tools::edit` 的模块说明），只回显长度与版本会让扫描量变成常数，却丢掉这次新建的还原依据。下一步因此在扫描器一侧，即 read 那一段说的不复制未命中的字符串。
 - **edit**：剩余成本在调用一段：为核对 `base_version` 读整个文件并计算 blake3，再整份写回；回显只含改动的行，扫描几乎为零。下界是读一遍、哈希一遍、写一遍文件。下一步看中段读数里读与写哪个占大头；局部改写不改变「整份写回」的下界，因为版本是整份内容的哈希。
 - **exec**：剩余成本是起一个进程与沙箱臂的准备，扫描只覆盖 stdout 与 stderr。下界是一次进程创建。下一步属于沙箱臂（`spec/Tools/Exec.lean`），不属于扫描。

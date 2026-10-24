@@ -134,6 +134,8 @@ fn mother_drafts() -> Vec<EventDraft> {
                     .unwrap(),
                 },
                 took_us: None,
+                rendered: None,
+                shown_bytes: None,
             })
             .unwrap(),
         ),
@@ -228,6 +230,45 @@ fn a_steer_after_assembly_is_inherited_after_the_results() {
         },
     ]);
     assert_eq!(inherited.messages, expected.messages().to_vec());
+}
+
+/// A line written before a result named its renderer is rebuilt as the
+/// JSON its model was shown, and the same answer drawn by version 2 is
+/// rebuilt as version 2 draws it: each line keeps the bytes its model
+/// read, whichever build wrote it.
+#[test]
+fn each_result_line_is_rebuilt_by_the_renderer_it_names() {
+    let read = serde_json::json!({ "path": "lab/a.md", "bytes": 3, "text": "hi\n" });
+    let rebuilt = |rendered: Option<kernel::event::record::Rendering>| {
+        let mut drafts = mother_drafts();
+        drafts[3] = line(
+            EventKind::ToolResult,
+            Payload::of(&ToolResult {
+                tool_use_id: "tu_1".to_owned(),
+                name: kernel::ToolName::parse("read").unwrap(),
+                answer: ToolAnswer::Answered {
+                    result: Payload::of(&read).unwrap(),
+                },
+                took_us: None,
+                rendered,
+                shown_bytes: None,
+            })
+            .unwrap(),
+        );
+        let inherited = verified(drafts).inherited(Seq::new(3)).unwrap();
+        match &inherited.messages[2].content[0] {
+            ContentBlock::ToolResult { content, .. } => content.clone(),
+            other => panic!("expected the result, got {other:?}"),
+        }
+    };
+    assert_eq!(
+        rebuilt(None),
+        r#"{"bytes":3,"path":"lab/a.md","text":"hi\n"}"#
+    );
+    assert_eq!(
+        rebuilt(Some(kernel::event::record::Rendering::V2)),
+        "lab/a.md lines 0-0 of 1\n0|hi\n"
+    );
 }
 
 /// The rebuild is the mother's own window, folded through the same type

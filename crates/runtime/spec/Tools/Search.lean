@@ -26,16 +26,31 @@
 // args：{text, path?, context?}
 // text：子串，必填且非空。**不是正则**。
 // path：城相对前缀，缺省＝本 run 可读的全部：城根下每一栋楼先过读界，关上的整栋不走。走 chosen_path::admit。
-// context：每侧上下文行数，缺省 0，上限 4（更大者夹到 4）。
-const MATCH_CAP: usize = 64;      // 命中上限；到顶即停走，结果自陈 truncated
+// context：每侧上下文行数，缺省 0，上限 4（更大者夹到 4）；只在 content 模式下有意义。
+// mode："content"（缺省）| "files" | "count"；别的值以 E_INVALID_ARGS 拒绝，nearby 列出三个。
+const MATCH_CAP: usize = 64;      // 一次答的条数上限（content 数命中，files 与 count 数文件）；到顶即停走，结果自陈 truncated
 const LINE_CAP: usize = 512;      // 一条命中里每行至多带这么多字节（search::hit）
 const FILE_BYTE_CAP: u64 = 1 << 20; // 单文件上限 1 MiB，越界不读，计入 unreadable
 const UNREAD_SHOWN: usize = 16;     // unread 列出的条数上限
 ```
 
-结果：`{matches: [{path, line, text}], count, truncated, stopped?, unreadable, unread: [{path, why}]}`。**停走要说停在哪道上限**：`truncated` 为真时另带 `stopped`，一句话说是命中数到了 `MATCH_CAP` 还是命中文本到了 `INTERVAL_CAP_BYTES`，并说怎样缩小（收窄 `path`、换更长的 `text`、少要 `context`），措辞只在 `search::hit::Limit::said` 里写；只给一个 `truncated: true`，模型会把上限读成工具的毛病（测试城报告第六节第 8 条）。**一行只带一个窗口**：命中行超过 `LINE_CAP` 时切成围绕第一处匹配的窗口，上下文行从行首切，两端各带被切字节数的记号；测试城里一行 JSON transcript 有几十 KB，整行带着走时四条命中就花光了预算，同一目录里其余的 transcript 一个都没被看。行号仍是续读的凭据，窗口外的字节由 `read` 取。`line` 是 **0 基**，与 `read` 的 `offset` 同一套编号，所以「搜到再读那一段」是把一个数字原样递过去。`unreadable` 是遍历中没能看过的目录与文件数——打不开的，和大于 1 MiB 的：**找不到与看不了是两个答案**，把后者吐成前者就是把一次失败抹掉。`unread` 按遍历次序列出其中前 16 条，各带一句原因：超过单文件上限的那一句指它去按区间 `read`，打不开的那一句带上系统给的错误（措辞只在 `search.rs` 里写）：一个超大文件 `read` 仍能按区间读，模型要知道是哪一个才去读。按策略跳过的（二进制、保留区、机密楼）不计入它。规则读不出的楼（`ReadVerdict::RulesUnreadable`）不是策略而是失败：它照样整栋不走，但计入 `unreadable`，并在 `unread` 里以楼的地址带上规则读不出的原因——静默跳过它，模型会把「这栋楼的规则坏了」读成「这栋楼里没有」，而修规则的只能是人。二进制指读得出而不是 UTF-8；读不出的文件是「打不开」，不再被当成二进制吞掉。
+结果：`{matches: [{path, line, from?, text}] | files: [path] | counts: [{path, count}], count, truncated, stopped?, unreadable, unread: [{path, why}]}`，三把列表键按模式恰出现一把：content 是 `matches`，files 是 `files`（有命中的文件，按遍历次序），count 是 `counts`（每个有命中的文件与它的命中行数）；`count` 是那张列表的条数。`from` 是命中所带上下文首行的行号，只在它早于 `line` 时出现，渲染器据它给上下文首行标号（§8-63）。**停走要说停在哪道上限**：`truncated` 为真时另带 `stopped`，一句话说是命中数到了 `MATCH_CAP` 还是命中文本到了 `INTERVAL_CAP_BYTES`，并说怎样缩小（收窄 `path`、换更长的 `text`、少要 `context`），措辞只在 `search::hit::Limit::said` 里写；只给一个 `truncated: true`，模型会把上限读成工具的毛病（测试城报告第六节第 8 条）。**一行只带一个窗口**：命中行超过 `LINE_CAP` 时切成围绕第一处匹配的窗口，上下文行从行首切，两端各带被切字节数的记号；测试城里一行 JSON transcript 有几十 KB，整行带着走时四条命中就花光了预算，同一目录里其余的 transcript 一个都没被看。行号仍是续读的凭据，窗口外的字节由 `read` 取。`line` 是 **0 基**，与 `read` 的 `offset` 同一套编号，所以「搜到再读那一段」是把一个数字原样递过去。`unreadable` 是遍历中没能看过的目录与文件数——打不开的，和大于 1 MiB 的：**找不到与看不了是两个答案**，把后者吐成前者就是把一次失败抹掉。`unread` 按遍历次序列出其中前 16 条，各带一句原因：超过单文件上限的那一句指它去按区间 `read`，打不开的那一句带上系统给的错误（措辞只在 `search.rs` 里写）：一个超大文件 `read` 仍能按区间读，模型要知道是哪一个才去读。按策略跳过的（二进制、保留区、机密楼）不计入它。规则读不出的楼（`ReadVerdict::RulesUnreadable`）不是策略而是失败：它照样整栋不走，但计入 `unreadable`，并在 `unread` 里以楼的地址带上规则读不出的原因——静默跳过它，模型会把「这栋楼的规则坏了」读成「这栋楼里没有」，而修规则的只能是人。二进制指读得出而不是 UTF-8；读不出的文件是「打不开」，不再被当成二进制吞掉。
 
 **不用正则表达式**，理由是模式引擎会把回溯放在模型和它的下一个回合之间。子串扫描是线性的，且一个模型写错的正则不会变成一次挂死。
+-/
+
+/-! D103 search 有三种模式，缺省仍是 content
+
+**决定**：`mode` 取 `content`（逐条命中带行号与上下文）、`files`（只列有命中的文件）、`count`（每个文件的命中行数）；缺省 `content`。files 与 count 不读上下文、不受命中文本的字节预算约束，`MATCH_CAP` 数的是文件，停在这道上限时 `stopped` 说的是文件数。
+
+**理由**：「这个符号在哪些文件里」与「有多少处」是找代码时最常问的两个问题，用 content 回答要把每处命中连同它的行都送进窗口，命中多时撞上 64 条或字节预算，模型拿到的是一个被截断的局部。Claude Code 的 Grep 以同样的三种输出回答这两个问题。缺省留在 content，是因为今天的提示与模型的习惯都按「搜到就有行号、行号递给 read」来用这个工具，换缺省会让每个不传 `mode` 的调用改变答的形状。
+
+**被否**：①缺省 files（与 Claude Code 同）：改变每个现有调用的答；②只加 files 不加 count：count 的答只比 files 多一个数，而它回答的是另一个问题；③files 与 count 共用一个带可选 count 的列表：模型要靠缺不缺一把键分辨自己问的是哪一个。
+
+**重开参数**：出现模型多数调用都先 content 再缩小 `path` 的读数时，重议缺省。
+-/
+
+/-!
 
 #### 8-30-3 遍历跳过什么，以及为什么
 

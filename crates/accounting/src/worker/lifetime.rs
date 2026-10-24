@@ -249,6 +249,7 @@ impl RunWorker {
             exec_host,
         };
         worker.sweep_abandoned_trees();
+        worker.bring_configuration_forward();
         worker.open_checkpoints();
         Ok(worker)
     }
@@ -280,6 +281,51 @@ impl RunWorker {
             "accounting::worker",
             &told,
         );
+    }
+
+    /// Brings every configuration file the city holds to this build's
+    /// format, its original bytes kept under `~/.sprawling/backups`
+    /// (`crates/sprawling/spec/Accounting/Worker.lean` §8-108).
+    ///
+    /// Under the ledger's writer lock no run reads these files yet. Each
+    /// file rewritten or refused is told; nothing here keeps the person
+    /// out of their city, because a refused file is refused again, in
+    /// its reader's words, when it is read.
+    fn bring_configuration_forward(&mut self) {
+        let told: Vec<String> = match crate::home::Home::detect()
+            .and_then(|home| city::bring_city_forward(&self.city_root, &home.backups()))
+        {
+            Ok(files) => files
+                .into_iter()
+                .map(|forwarding| match forwarding.outcome {
+                    Ok(city::Forwarded::Moved { from, to, backup }) => format!(
+                        "brought {} from format {} to {}; the original is at {}",
+                        forwarding.path.display(),
+                        from.get(),
+                        to.get(),
+                        backup.display()
+                    ),
+                    Ok(city::Forwarded::Absent | city::Forwarded::Current) => format!(
+                        "{} needed nothing brought forward",
+                        forwarding.path.display()
+                    ),
+                    Err(err) => format!(
+                        "could not bring {} forward: {err}",
+                        forwarding.path.display()
+                    ),
+                })
+                .collect(),
+            Err(err) => vec![format!(
+                "could not bring the city's configuration files forward; the next open tries again: {err}"
+            )],
+        };
+        for line in told {
+            self.note(
+                runtime::diagnostics::Level::Effect,
+                "accounting::worker",
+                &line,
+            );
+        }
     }
 
     /// Makes the checkpoint repository before a lane asks for a writer's index, and takes back

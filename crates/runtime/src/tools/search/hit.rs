@@ -24,6 +24,8 @@ pub(super) enum Limit {
     Hits,
     /// The hits' text reached `INTERVAL_CAP_BYTES`.
     Bytes,
+    /// [`MATCH_CAP`] files were already in a `files` or `count` answer.
+    Files,
 }
 
 impl Limit {
@@ -39,18 +41,21 @@ impl Limit {
                 "stopped at {} bytes of match text, the most one search returns; {narrow}, or ask for less `context`",
                 kernel::consts_policy::INTERVAL_CAP_BYTES
             ),
+            Limit::Files => {
+                format!("stopped at {MATCH_CAP} files, the most one search lists; {narrow}")
+            }
         }
     }
 }
 
-/// The lines around a hit, each cut to [`LINE_CAP`], joined as they
-/// were read.
-pub(super) fn context_block(lines: &[&str], at: usize, looking: &Predicate) -> String {
+/// The number of the first line around a hit, and the lines themselves,
+/// each cut to [`LINE_CAP`], joined as they were read.
+pub(super) fn context_block(lines: &[&str], at: usize, looking: &Predicate) -> (usize, String) {
     let first = at.saturating_sub(looking.context);
     let last = at
         .saturating_add(looking.context)
         .min(lines.len().saturating_sub(1));
-    (first..=last)
+    let block = (first..=last)
         .filter_map(|index| {
             let line = lines.get(index)?;
             let centre = if index == at {
@@ -61,10 +66,8 @@ pub(super) fn context_block(lines: &[&str], at: usize, looking: &Predicate) -> S
             Some(windowed(line, centre))
         })
         .collect::<Vec<String>>()
-        .join(
-            "
-",
-        )
+        .join("\n");
+    (first, block)
 }
 
 /// At most [`LINE_CAP`] bytes of `line` around `centre`, each cut end

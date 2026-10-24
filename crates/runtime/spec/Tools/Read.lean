@@ -6,7 +6,7 @@
 /-!
 # runtime::tools::read
 
-规定 `tools::read`、`tools::read::miss`、`tools::read::package`、`tools::read::locator`（`crates/runtime/src/` 下同名的文件）。read 的区间读、包、没命中时的 nearby、打开 Locator，以及城外书架上的 skill。本文件是 `crates/runtime/Spec.lean` 的一个分部；下面每一节保留它在 runtime 规格里的标签 §8-n，别处引作 `crates/runtime/Spec.lean §8-n`。
+规定 `tools::read`、`tools::read::engine`、`tools::read::miss`、`tools::read::package`、`tools::read::locator`（`crates/runtime/src/` 下同名的文件）。read 的区间读、包、没命中时的 nearby、打开 Locator，以及城外书架上的 skill。本文件是 `crates/runtime/Spec.lean` 的一个分部；下面每一节保留它在 runtime 规格里的标签 §8-n，别处引作 `crates/runtime/Spec.lean §8-n`。
 
 这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与 `runtime::tools::read::tests`、`runtime::tools::read::tests::locators`、`runtime::tools::read::tests::versions` 守住。
 -/
@@ -37,7 +37,7 @@
 const LINE_CAP: u16 = 512;
 ```
 
-**上界由类型给，不由换算的失败支给。** `limit` 以 `u16` 携带：大于 `u16::MAX` 的请求与大于 512 的请求是同一件事，都夹到 512，而 `usize::from(u16)` 没有失败支。`offset` 以请求里的 `u64` 携带，在切行处与总行数比较：一个 `usize` 装不下的 offset 越过了内存装得下的任何文本的末尾，于是落进下表「越过末尾」那一行，而不是被换成一个碰巧很大的数。`total_lines`、`next_offset`、`bytes` 都以 `usize` 直接成为 JSON 数。
+**上界由类型给，不由换算的失败支给。** `limit` 以 `u16` 携带：大于 `u16::MAX` 的请求与大于 512 的请求是同一件事，都夹到 512，而 `usize::from(u16)` 没有失败支。`offset` 以请求里的 `u64` 携带，在切行处与总行数比较：一个 `usize` 装不下的 offset 越过了内存装得下的任何文本的末尾，于是落进下表「越过末尾」那一行，而不是被换成一个碰巧很大的数。`total_lines`、`next_offset`、`bytes` 都以 `usize` 直接成为 JSON 数。`offset` 不为 0 时结果另携它（`u64`，即请求里的那个数），缺席即 0：模型读到的头与行号标记从它数起（§8-63），而渲染器只读账本里的这一行。
 
 切行按 `split_inclusive('\n')`：每行连它自己的换行符一起数、一起还，所以 `offset=0, limit>=total` 的返回与整读**逐字节相同**，`bytes` 字段的旧语义因而不动。
 
@@ -82,9 +82,24 @@ const NEARBY_CAP: usize = 16;
 - **文件不在＝`E_INVALID_ARGS`，`nearby` 携最近一层存在的目录里的条目**：从被问路径的真实位置往上找第一个存在的目录，**不高于这次调用被准入的那一层（`Floor`）**：普通路径是它首段的真实位置，包是书架上写的包目录，catalog 里的单份文档没有目录可列（`Floor::Document`）。城根与书架上别的藏品因此不会出现在候选里——它们不是这次调用被准入的东西。条目按调用方够得着的写法拼出：普通路径是城内相对路径，包是 `<名>/<相对路径>`；保留区里的项不列，模型本来就读不到它们。按与缺失文件名的共同前缀长度（不分大小写）降序、再按路径排，截到 `NEARBY_CAP`。上限界定的是一次拒绝花掉多少窗口，不是目录多大；被截掉的是最不像的那些。
 - **路径是目录＝`E_INVALID_ARGS`，`nearby` 携这个目录自己的条目**：`text_at` 在打开之前问判过的真实位置是不是目录，是就不打开，答「这是目录」，候选按上一条的写法、同一个 `NEARBY_CAP` 列出目录里的条目（不按名字远近排，只按路径排）。模型读一个目录，是在问里面有什么；不先问的话，Windows 打开目录得到的是 os error 5（拒绝访问），Unix 读目录得到的是 EISDIR，两者都落进下一条的「在而打不开」，模型拿到 `retry: no` 和一句按操作系统区域设置写成的系统报错，却拿不到它要的条目。
 - **文件在而打不开＝`E_STORAGE_FATAL`，不给 `nearby`**：名字是对的，候选只会误导。
-- **打开之后再核一次，不符＝`E_GATE_DENIED`**：`text_at` 打开判过的真实路径，然后核两件事：这条路径此刻的真实位置仍是它自己（路上没有换进来的链接），此刻这条路径上的文件与打开的句柄是同一个文件（`same-file` 的 `Handle`，比的是卷与文件号）；任一不符即拒，拒因不说出链接指向哪里。之后只从已打开的句柄读。两道核验各挡一种换法：判定之后换进来并一直留着的链接，打开与再开都穿过它而相等，只有重求真实位置看得见；打开时是链接、重求前又换回的，只有句柄比对看得见。剩下的窗口要在打开、重求、再开之间来回换三次。打开放在判定之后而不是之前，因为先打开就会在判定前打开链接背后未经判定的东西，Unix 上一个 FIFO 会让这次打开一直阻塞。catalog 里的单份文档也先经 `real_location`（§8-30-1）求真实位置，所以 `text_at` 的每个调用方交来的都是真实路径，核验对它们一视同仁。
+- **打开之后再核一次，不符＝`E_GATE_DENIED`**：包与单文档的路径，以及 §8-29-4-1 退回的路径，经 `text_at` 打开判过的真实路径，然后核两件事：这条路径此刻的真实位置仍是它自己（路上没有换进来的链接），此刻这条路径上的文件与打开的句柄是同一个文件（`same-file` 的 `Handle`，比的是卷与文件号）；任一不符即拒，拒因不说出链接指向哪里。之后只从已打开的句柄读。两道核验各挡一种换法：判定之后换进来并一直留着的链接，打开与再开都穿过它而相等，只有重求真实位置看得见；打开时是链接、重求前又换回的，只有句柄比对看得见。剩下的窗口要在打开、重求、再开之间来回换三次。打开放在判定之后而不是之前，因为先打开就会在判定前打开链接背后未经判定的东西，Unix 上一个 FIFO 会让这次打开一直阻塞。catalog 里的单份文档也先经 `real_location`（§8-30-1）求真实位置，所以 `text_at` 的每个调用方交来的都是真实路径，核验对它们一视同仁。
 - **列目录是尽力而为**：目录列不出或名字不是 Unicode 时 `nearby` 为空，调用方要的拒因是「没命中」本身。
 - **恢复语指向 `search`，不指向 `exec`**：每栋楼的工具集都有 `search`，而 City Hall 的工具集里没有 `exec`（`crates/city/Spec.lean` §8-22）；一句指向一件不存在的工具的恢复语会让规划者空转一个回合。
+
+#### 8-29-4-1 模型选的路径按句柄判定（`runtime::tools::read::engine`）
+
+```rust
+// read::engine —— 模型选的、已过 admit 的城内地址的整份文本。一次缓冲 open，判定的是读取所用句柄自己的真实位置；
+// 退回时答 land + text_at（§8-29-4）给出的那一个结果，所以每一种拒绝与 main 的判定路径逐字节相同。
+pub(super) fn text_of(city: &CityRoot, addr: &Address, asked: &str,
+    bound: &dyn Fn(&Address) -> ReadVerdict) -> Result<String, AxError>;
+```
+
+- **Windows：先开，再问句柄在哪，再判，再从同一个句柄读。** `File::open` 打开城根拼写下的地址（跟随路上的链接，与 canonicalize 内部那一次 open 相同），问这个句柄的真实位置（`GetFinalPathNameByHandleW`，D10 定由谁来问），交给 `CityRoot::judged_location`（§8-30-1）：不在城根之下即拒，落点的拼写不是所写地址即再 `admit`。判定与读取之间没有可换链接的窗口，所以不需要 `still_judged` 的重求与再开。
+- **Linux：先求真实位置，再判，再开，再核句柄。** Unix 的 canonicalize 不打开文件，所以不在判定前打开链接背后未经判定的东西（FIFO 会让 open 一直阻塞，§8-29-4 的理由照旧）；判过之后打开真实位置，以 `/proc/self/fd/N` 的 `read_link` 核这个句柄的位置仍是判过的位置，不是＝`still_judged` 的那条 `E_GATE_DENIED`。
+- **其他平台走 §8-29-4 的判定路径**，不变。
+- **任何失败都退回判定路径重答一遍**：open、元数据、取真实位置、读出错，句柄是目录，字节不是 UTF-8——这些调用本来就答错误或目录，退回由 `land` + `text_at` 给出与 main 相同的那一句，`nearby` 也在那里算。`Floor` 因此只在退回时求。
+- **整读一次，不缓存**：容量按句柄报的长度预留，一次读入，整份校验 UTF-8 不复制；文件字节归操作系统的文件缓存（`crates/sprawling/spec/Serving/Memory.lean` §8-173）。
 
 #### 8-29-5 打开一个 Locator：`cas:` 与 `file:`（`runtime::tools::read::locator`）
 
@@ -127,4 +142,15 @@ pub fn admit_carried_skill(&mut self, entry: CatalogEntry) -> Result<(), AxError
 **被否**：①给城外持有编一个城内地址或把城外目录映射进城根——那是一个指向并不在那儿的文件的地址，失败落在第一次 `read` 而不在写清单的时候（`crates/city/Spec.lean` §8-8）；②让 `read` 在调用时去城外路径读——读到的可能不是钉住的那份字节，且 `read` 多出一条不经读界判定的打开路径；③改文档，告诉人城外书架只能浏览不能用——书架挂了却用不上，人从 catalog 上看不出为什么。
 
 **重开参数**：城外 skill 的包里附属文件也要按名读到（例如一件 skill 的 `SKILL.md` 指名它目录里的脚本）时，`Holding` 要带整包的字节或一份只读的城内镜像，本条与 city D9 一起重议。
+-/
+
+/-! D10 模型选的路径按句柄判定，一次 open
+
+**决定**：`read` 对模型选的城内路径只开一次文件：Windows 上开了再问句柄的真实位置并判它，Linux 上判过真实位置再开、以 `/proc/self/fd` 核句柄；之后从同一个句柄整读。取句柄真实位置用 `winx::file::get_file_path`：公开面安全，它与它用的 `windows-sys` 已经因 wasmtime 在锁文件里，不增加 crate，是平台调用阶梯的第一档。任何失败与目录、非 UTF-8 都退回 §8-29-4 的判定路径，拒绝的字节不变。
+
+**理由**：同机测得 open+close 约 28 µs、canonicalize 约 78 µs（Windows 上过滤驱动让 open 很贵），判定路径一次成功读付 4 次 canonicalize、2 次 open 与 1 次元数据；agent 读的几乎都是热文件，这些固定开销比读本身贵。判句柄自己的位置还关掉了判定与打开之间的换链接窗口，而 `still_judged` 只能把它缩小到「来回换三次」。各候选在同一个 20 KiB 暖文件上逐轮交替 2000 轮（Windows x86_64 桌面机，16 核，旁边有构建在跑），p50 依次是：只 open 30–34 µs，一次 canonicalize 71–85 µs，open 加 `winx` 取位置 89–114 µs，open 加 `filepath` 123–146 µs，`cap-std` 在目录句柄下 open 83–101 µs，判定路径的整套解析与核验 406–479 µs。
+
+**被否**：①直通 I/O 与按文件缓存的行索引、热读缓存、后台回填（曾作为一个 PR 提出）：直通读在暖文件上慢 4–5 倍、在刚写过的文件上慢约 14 倍，三层缓存带来一串一致性缺陷，截断读还要多一个模型回合才拿得到 `version`；②`filepath 0.2`：同一个系统调用，交替测量里比 `winx` 慢约 30 µs，还要再引入一份 `windows 0.58`；③`desktop/ffi` 里的 Zig 函数：同一个系统调用，多一处 `unsafe`，阶梯上排在安全 crate 之后；④`cap-std`：把打开限制在一个目录句柄之内，但不回答文件实际在哪，链接落在城内另一栋楼时读界仍要按落点再判，替不了「句柄在哪」这一问；⑤`rustix::fs::getpath`：只在 Apple 平台上编译（`fcntl(F_GETPATH)`），Windows 与 Linux 用不上。
+
+**重开参数**：`winx` 不再随 wasmtime 进锁文件，或某个候选在同机交替测量里比它快出测量误差之外。
 -/

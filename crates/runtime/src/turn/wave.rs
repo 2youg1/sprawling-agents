@@ -42,17 +42,6 @@ mod reorder;
 use reorder::all_at_once;
 pub(super) use reorder::lost_answer;
 
-/// What the model reads back as the text of a tool result: the same
-/// payload the ledger keeps, printed once so the two cannot disagree.
-fn printed(payload: &Payload, action: &'static str) -> Result<String, AxError> {
-    serde_json::to_string(payload).map_err(|err| {
-        AxError::failure(AxCode::InvalidArgs, action, err.to_string()).with_recovery(
-            "report this against runtime::turn::wave: a payload refused JSON after \
-             its construction already accepted it",
-        )
-    })
-}
-
 /// A wave's tools in three stages, so the calls that only read can run
 /// at once while everything they decide stays in call order.
 ///
@@ -332,36 +321,34 @@ impl<'h> Turn<'h, ToolWave> {
         answered: Result<ToolOutcome, AxError>,
     ) -> Result<(), AxError> {
         let mut pictures = Vec::new();
-        let (answer, content, is_error) = match answered {
+        let (answer, is_error) = match answered {
             Ok(ToolOutcome {
-                result: outcome,
+                result,
                 attachments,
             }) => {
                 pictures = attachments;
-                (
-                    ToolAnswer::Answered {
-                        result: outcome.clone(),
-                    },
-                    printed(&outcome, "encode tool result")?,
-                    false,
-                )
+                (ToolAnswer::Answered { result }, false)
             }
-            Err(tool_err) => {
-                let error = Payload::of(&tool_err)?;
-                (
-                    ToolAnswer::Failed {
-                        error: error.clone(),
-                    },
-                    printed(&error, "encode tool error")?,
-                    true,
-                )
-            }
+            Err(tool_err) => (
+                ToolAnswer::Failed {
+                    error: Payload::of(&tool_err)?,
+                },
+                true,
+            ),
         };
+        // The text is drawn from the answer the line records, by the one
+        // renderer a rebuild of this line draws it with again.
+        let content = crate::rendering::shown(crate::rendering::CURRENT, &call.name, &answer)?;
         let result = ToolResult {
             tool_use_id: call.id.clone(),
             name: call.name.clone(),
             answer,
             took_us: timing.answered.since(timing.started.us),
+            rendered: Some(crate::rendering::CURRENT),
+            shown_bytes: Some(u64::try_from(content.len()).map_err(|_| {
+                AxError::failure(AxCode::InvalidArgs, "count a shown answer", call.id.clone())
+                    .with_recovery("this machine cannot count the answer's bytes in a u64")
+            })?),
         };
         exchange.push_result(ContentBlock::ToolResult {
             tool_use_id: call.id.clone(),

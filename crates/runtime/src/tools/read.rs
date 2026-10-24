@@ -39,12 +39,13 @@ use kernel::{
 };
 use serde_json::{Map, Value};
 
+mod engine;
 pub(super) mod locator;
 mod miss;
 mod package;
 
 use super::BoundReader;
-use super::chosen_path::{Located, ReadBound};
+use super::chosen_path::{CityRoot, Located, ReadBound};
 use crate::catalog::{Catalog, Expansion};
 use miss::Floor;
 
@@ -55,12 +56,21 @@ const LINE_CAP: u16 = 512;
 
 /// Where the answer to one call comes from.
 enum Found {
+    /// An admitted address the model chose, read by `engine`.
+    Chosen(kernel::Address),
     /// A place on disk, and the highest directory a miss there may list.
     File {
         at: Located,
         floor: Floor,
     },
     Text(String),
+}
+
+/// Whether a text was read from a file on disk, which has a version
+/// `edit` guards, or handed over whole by the catalog or a Locator.
+enum Origin {
+    Disk,
+    Held,
 }
 
 /// The interval of one answer: where it starts and how much of it there
@@ -139,49 +149,63 @@ impl Interval {
     /// one would leave that number pointing past lines nobody delivered,
     /// and the gap would be silent.
     fn cut(&self, text: &str) -> Taken {
-        let lines: Vec<&str> = text.split_inclusive('\n').collect();
-        let total = lines.len();
-        // An offset no `usize` holds is past the end of every text this
-        // machine can hold, which is the answer the second arm gives.
-        let start = match usize::try_from(self.offset) {
-            Ok(start) if start < total => start,
-            Ok(_) | Err(_) => {
+        let mut lines = text.split_inclusive('\n');
+        // Where line `offset` starts. An offset no `usize` holds is past
+        // the end of every text this machine can hold.
+        let start = usize::try_from(self.offset).ok();
+        let mut from = 0usize;
+        let mut skipped = 0usize;
+        while Some(skipped) != start {
+            let Some(line) = lines.next() else {
                 return Taken {
                     text: String::new(),
-                    total_lines: Some(total),
+                    total_lines: Some(skipped),
                     next_offset: None,
                 };
-            }
-        };
-        let ceiling = start.saturating_add(usize::from(self.limit)).min(total);
+            };
+            from = from.saturating_add(line.len());
+            skipped = skipped.saturating_add(1);
+        }
+        let mut lines = lines.peekable();
+        if lines.peek().is_none() {
+            return Taken {
+                text: String::new(),
+                total_lines: Some(skipped),
+                next_offset: None,
+            };
+        }
         let budget = kernel::consts_policy::INTERVAL_CAP_BYTES;
-        let mut end = start;
+        let mut taken = 0usize;
         let mut spent = 0usize;
-        while end < ceiling {
-            let Some(line) = lines.get(end) else { break };
+        while taken < usize::from(self.limit) {
+            let Some(line) = lines.peek() else { break };
             let after = spent.saturating_add(line.len());
             // The first line travels however long it is. A call that
             // returned nothing would hand back the offset it was given,
             // and the caller would ask the same question forever.
-            if after > budget && end > start {
+            if after > budget && taken > 0 {
                 break;
             }
             spent = after;
-            end = end.saturating_add(1);
+            taken = taken.saturating_add(1);
+            lines.next();
         }
-        let taken = lines.get(start..end).unwrap_or_default().concat();
-        if end < total {
-            Taken {
-                text: taken,
-                total_lines: Some(total),
-                next_offset: Some(end),
-            }
-        } else {
-            Taken {
-                text: taken,
+        let text = text
+            .get(from..from.saturating_add(spent))
+            .unwrap_or_default()
+            .to_owned();
+        let end = skipped.saturating_add(taken);
+        match lines.count() {
+            0 => Taken {
+                text,
                 total_lines: None,
                 next_offset: None,
-            }
+            },
+            left => Taken {
+                text,
+                total_lines: Some(end.saturating_add(left)),
+                next_offset: Some(end),
+            },
         }
     }
 }
@@ -196,6 +220,9 @@ pub struct ReadTool {
     /// bytes belong to - and where this city keeps content blocks, which
     /// a worktree does not hold. A Locator's bytes are read through it.
     reader: BoundReader,
+    /// The root `reader` reads under, its real location anchored once
+    /// (`crates/runtime/spec/Tools/ChosenPath.lean` D5).
+    city: CityRoot,
     meta: ToolMeta,
 }
 
@@ -206,7 +233,8 @@ impl ReadTool {
 
     /// # Errors
     /// Propagates a malformed parameter schema, which is a build-time
-    /// defect rather than a runtime one.
+    /// defect rather than a runtime one, and `E_STORAGE_FATAL` when the
+    /// city root's real location does not resolve.
     pub fn new(
         city_root: &Path,
         catalog: Arc<Mutex<Catalog>>,
@@ -251,6 +279,7 @@ impl ReadTool {
         Ok(ReadTool {
             catalog,
             reader: BoundReader::new(city_root, bound, block_store),
+            city: CityRoot::anchor(city_root, Self::NAME)?,
             meta: ToolMeta {
                 name: ToolName::parse(Self::NAME)?,
                 disclosure: "Read a file by its path, or a skill by the name the catalog lists \
@@ -322,13 +351,9 @@ impl ReadTool {
         // it is written. `search` asks the same function the same
         // question, so what is reserved and what is closed have one
         // answer each.
-        let city_root = &self.reader.city_root;
-        let spelled = super::chosen_path::within_city(city_root, asked, "read")?;
+        let spelled = super::chosen_path::within_city(self.city.written(), asked, "read")?;
         let addr = super::chosen_path::admit(&spelled, "read", &*self.reader.bound)?;
-        Ok(Found::File {
-            at: super::chosen_path::land(city_root, &addr, "read", &*self.reader.bound)?,
-            floor: Floor::of_address(city_root, &addr),
-        })
+        Ok(Found::Chosen(addr))
     }
 }
 
@@ -364,20 +389,31 @@ impl Tool for ReadTool {
             })?;
         let mut out = Map::new();
         out.insert("path".to_owned(), Value::String(asked.to_owned()));
-        let text = match self.resolve(asked)? {
-            Found::Text(text) => text,
-            Found::File { at, floor } => {
-                let text = miss::text_at(asked, at, &floor)?;
-                // The whole file's version, whatever interval is cut below:
-                // `edit` guards and `plan finish` cites the file, not the lines.
+        let (text, on_disk) = match self.resolve(asked)? {
+            Found::Text(text) => (text, Origin::Held),
+            Found::Chosen(addr) => (
+                engine::text_of(&self.city, &addr, asked, &*self.reader.bound)?,
+                Origin::Disk,
+            ),
+            Found::File { at, floor } => (miss::text_at(asked, at, &floor)?, Origin::Disk),
+        };
+        match on_disk {
+            // The whole file's version, whatever interval is cut below:
+            // `edit` guards and `plan finish` cites the file, not the lines.
+            Origin::Disk => {
                 out.insert(
                     "version".to_owned(),
                     Value::String(super::version_of(text.as_bytes())),
                 );
-                text
             }
-        };
+            Origin::Held => {}
+        }
         let interval = Interval::asked_for(call)?;
+        // Where the interval starts, which the drawn header and line marks
+        // number from (`crate::rendering`); absent means line 0.
+        if interval.offset != 0 {
+            out.insert("offset".to_owned(), Value::Number(interval.offset.into()));
+        }
         let taken = interval.cut(&text);
         if let Some(total) = taken.total_lines {
             out.insert("total_lines".to_owned(), Value::Number(total.into()));
