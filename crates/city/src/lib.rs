@@ -84,7 +84,7 @@ pub use policy::write_rules_against;
 pub use policy::{BuildingRules, DomainReach, ModelPool, RULES_FILE, RulesCache};
 pub use policy::{DESKTOP_SCOPE_FILE, desktop_scope_path, write_desktop_scope};
 pub use policy::{UserBrowser, UserBrowserEndpoint};
-pub use policy::{agents_path, city_agents_path, evaluate, load, rules_path};
+pub use policy::{agents_path, city_agents_path, evaluate, load, room_agents_paths, rules_path};
 pub use resident::{Dossier, Identity, Resident, urbanite_path};
 pub use room::all as rooms;
 pub use room::claim as claim_room;
@@ -97,8 +97,10 @@ pub use spine_files::hall_identity_path;
 pub use spine_files::{AGENTS_FILE, CITY_FILE, CLERK_FILE, HANDOFF_FILE, MAYOR_FILE};
 pub use spine_files::{JobBrief, ROADMAP_FILE, RunBrief};
 pub use spine_files::{MEMO_FILE, SPEC_FILE};
+pub use spine_files::{
+    city_prompt_path, job_path, norms, roadmap, roadmap_path, write_brief, write_job,
+};
 pub use spine_files::{handoff, handoff_path};
-pub use spine_files::{job_path, norms, roadmap, roadmap_path, write_brief, write_job};
 pub use vocation::{Vocation, vocation_of};
 pub use watch::{Link, Source, WATCH_FILE, Watch, watch_path};
 pub use wizard::{CityPlan, Standing, survey};

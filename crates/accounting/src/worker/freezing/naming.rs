@@ -11,7 +11,7 @@ use std::path::Path;
 
 use kernel::{Address, AxCode, AxError, B3Hash};
 
-use super::{Assembled, NEWLINE, city_segment};
+use super::{Assembled, NEWLINE, addressed, prompt_segment};
 
 /// The names a run is frozen with, and the version a page reads them
 /// back by.
@@ -60,14 +60,21 @@ pub(super) fn session_naming(
 }
 
 impl Frozen {
-    /// The city slot: the city's norms, then who works here, which is the
-    /// same for every resident of the city and so stays in the one slot
-    /// cached across all of them.
+    /// The city slot: the norms that govern `building`, then who works
+    /// here. Without a `City.md` of the building's own, that is the same
+    /// for every resident of the city and so stays in the one slot cached
+    /// across all of them; with one, it is still the same for every
+    /// resident of that building (`crates/runtime/spec/Prefix.lean` D97).
     ///
     /// # Errors
-    /// As `city_segment`.
-    pub(super) fn city_slot(&self, city_root: &Path) -> Result<Assembled, AxError> {
-        let mut slot = city_segment(city_root)?;
+    /// As `prompt_segment`, and a path the address grammar refuses.
+    pub(super) fn city_slot(
+        &self,
+        city_root: &Path,
+        building: &Address,
+    ) -> Result<Assembled, AxError> {
+        let path = city::city_prompt_path(city_root, building);
+        let mut slot = prompt_segment(&path, addressed(city_root, &path)?)?;
         if let Some(context) = self.naming.context() {
             if !slot.bytes.is_empty() {
                 slot.bytes.push(NEWLINE);

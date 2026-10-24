@@ -348,6 +348,26 @@ pub fn write_job(
     Ok(text)
 }
 
+/// Where the `City.md` that governs runs in `building` is: the
+/// building's own, in its reserved subtree beside `RULES.toml`, when it
+/// has one; otherwise the city's, at the city root.
+///
+/// The nearer replaces the farther rather than joining it, because the
+/// two answer one question - what an agent here is told about the city
+/// it works in - and a building that rewrote the answer has said the
+/// city's does not hold there. The reserved subtree, because no write
+/// domain reaches it: a resident cannot rewrite its own instructions.
+/// Reads the disk to answer, so the answer is as of this call.
+#[must_use]
+pub fn city_prompt_path(city_root: &Path, building: &Address) -> PathBuf {
+    let own = crate::policy::governed(city_root, building).join(CITY_FILE);
+    if own.is_file() {
+        own
+    } else {
+        city_root.join(CITY_FILE)
+    }
+}
+
 /// The norm documents a run at `addr` is aligned by, in reading order:
 /// how the city works, then how this building works.
 ///
@@ -360,7 +380,7 @@ pub fn write_job(
 /// has no building norms.
 pub fn norms(city_root: &Path, addr: &Address) -> Result<Vec<PathBuf>, AxError> {
     let building = crate::building::Building::of(addr)?;
-    let mut out = vec![city_root.join(CITY_FILE)];
+    let mut out = vec![city_prompt_path(city_root, building.addr())];
     let rules = rules_path(city_root, building.addr());
     if rules.exists() {
         out.push(rules);

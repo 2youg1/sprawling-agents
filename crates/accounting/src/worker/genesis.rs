@@ -243,9 +243,20 @@ fn record_shelved(
 /// `E_STORAGE_FATAL` naming the path, for every failure except a file
 /// that is not there.
 pub(super) fn city_segment(city_root: &Path) -> Result<Assembled, AxError> {
-    let path = city_root.join(city::CITY_FILE);
-    match std::fs::read(&path) {
-        Ok(bytes) => Ok(Assembled::of_one(Address::parse(city::CITY_FILE)?, bytes)),
+    prompt_segment(
+        &city_root.join(city::CITY_FILE),
+        Address::parse(city::CITY_FILE)?,
+    )
+}
+
+/// One `City.md` read for the city slot, the city's own or a building's
+/// (`city::city_prompt_path` says which), accounted to `at`.
+///
+/// # Errors
+/// As [`city_segment`].
+pub(super) fn prompt_segment(path: &Path, at: Address) -> Result<Assembled, AxError> {
+    match std::fs::read(path) {
+        Ok(bytes) => Ok(Assembled::of_one(at, bytes)),
         // The built-in copy names no document: no file on this disk
         // holds it, and a source row pointing at one that is not there
         // would send a reader to open nothing.
@@ -258,8 +269,7 @@ pub(super) fn city_segment(city_root: &Path) -> Result<Assembled, AxError> {
             format!("{}: {err}", path.display()),
         )
         .with_recovery(
-            "every run in this city is governed by that file; make it readable, \
-             or take it away to fall back on the copy this build carries",
+            "every run under that file is governed by it; make it readable, or take it              away: the city lays its own default down again when it next opens",
         )),
     }
 }

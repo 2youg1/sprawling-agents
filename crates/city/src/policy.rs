@@ -279,6 +279,44 @@ pub fn agents_path(city_root: &Path, addr: &Address) -> PathBuf {
         .join(crate::spine_files::AGENTS_FILE)
 }
 
+/// Where each room on the way from a building's root down to `room`
+/// keeps the conventions it came with, the one nearest the building
+/// first; the building's own root is not among them, because
+/// [`agents_path`] answers for it.
+///
+/// Every level, not only the room itself: a monorepo is one building
+/// whose packages are rooms, and a package two levels down works under
+/// its parent's conventions as well as its own. An address outside
+/// `building` has no levels and answers an empty list.
+///
+/// # Errors
+/// Propagates a level the address grammar refuses, which a `room` that
+/// parsed cannot produce.
+pub fn room_agents_paths(
+    city_root: &Path,
+    building: &Address,
+    room: &Address,
+) -> Result<Vec<(Address, PathBuf)>, AxError> {
+    let Some(below) = room
+        .as_str()
+        .strip_prefix(building.as_str())
+        .and_then(|rest| rest.strip_prefix('/'))
+    else {
+        return Ok(Vec::new());
+    };
+    let mut level = building.as_str().to_owned();
+    below
+        .split('/')
+        .map(|part| {
+            level.push('/');
+            level.push_str(part);
+            let at = Address::parse(&level)?;
+            let path = agents_path(city_root, &at);
+            Ok((at, path))
+        })
+        .collect()
+}
+
 /// Where the workspace this city formed around keeps its conventions:
 /// the city root, which is either the project itself or the folder that
 /// holds the projects its buildings are.

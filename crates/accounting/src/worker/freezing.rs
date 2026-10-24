@@ -12,7 +12,7 @@ use kernel::{Address, AxCode, AxError};
 use runtime::prefix::{FrozenPrefix, FrozenSegment, SegmentSlot, SegmentSource};
 use runtime::run::RunPlan;
 
-use super::{Assignment, Given, Site, Workbench, city_segment, held};
+use super::{Assignment, Given, Site, Workbench, held, prompt_segment};
 use model_note::model_note;
 use run_slot::{Predecessor, run_segment};
 
@@ -75,8 +75,13 @@ impl Assembled {
 /// else.
 pub(super) const NEWLINE: u8 = 10;
 
-/// The building slot: where this run stands, then the rules it stands
+/// The building slot: which building this is, then the rules it stands
 /// under.
+///
+/// The building's address opens it, not the run's room: every resident
+/// of one building carries this slot byte for byte
+/// (`crates/runtime/spec/Prefix.lean` D97), and a room's address here
+/// would split it by room. The room opens the resident slot instead.
 ///
 /// `RULES.toml` is here rather than left for the agent to open because
 /// it is exactly as stable as the resident's own file — a person writes
@@ -90,7 +95,8 @@ pub(super) const NEWLINE: u8 = 10;
 /// reads them after its first edit or never. Matched by exact name in
 /// the building's own root: no parent's copy, no other spelling, nothing
 /// resolved by search — an address a reader cannot predict from the rule
-/// is an address nobody can check.
+/// is an address nobody can check. The rooms below the building's root
+/// bring theirs at the end of the resident slot (`room_conventions`).
 ///
 /// It follows the rules rather than leading them, and says so, because
 /// the two can disagree: `RULES.toml` is what this city enforces, while
@@ -102,47 +108,102 @@ pub(super) const NEWLINE: u8 = 10;
 /// address grammar refuses. The bytes would still be right, but the
 /// account of where they came from would name a file nobody can open,
 /// and a source row a reader cannot follow is worse than a refusal.
-pub(super) fn building_segment(
-    city_root: &Path,
-    addr: &Address,
-    building: &Address,
-) -> Result<Assembled, AxError> {
-    // The room's own address opens the slot and is not a document, so
+pub(super) fn building_segment(city_root: &Path, building: &Address) -> Result<Assembled, AxError> {
+    // The building's address opens the slot and is not a document, so
     // it is accounted to nothing.
-    let mut out = Assembled::of_nothing(addr.as_str().as_bytes().to_vec());
+    let mut out = Assembled::of_nothing(building.as_str().as_bytes().to_vec());
     let rules_at = city::rules_path(city_root, building);
     if let Ok(rules) = std::fs::read(&rules_at) {
         out.extend(addressed(city_root, &rules_at)?, &rules);
     }
-    // Written only when the file is: a heading over nothing would tell a
-    // resident to follow conventions that do not exist. The workspace's
-    // copy first and the building's after it, so the one nearest the
-    // work is read last.
-    let conventions = [
-        (
-            city::city_agents_path(city_root),
-            city::AGENTS_FILE.to_owned(),
-            "How work is done across the workspace this city formed around, from the \
-             workspace itself.",
-        ),
-        (
-            city::agents_path(city_root, building),
-            format!("{}/{}", building.as_str(), city::AGENTS_FILE),
-            "How work is done in this project, from the project itself.",
-        ),
-    ];
-    for (at, heading, whose) in conventions {
-        if let Ok(text) = std::fs::read(&at) {
-            let mut block = format!(
-                "## {heading}\n\n{whose} Where this and the building's rules above disagree, \
-                 the rules decide: they are what the city enforces.\n\n"
-            )
-            .into_bytes();
-            block.extend_from_slice(&text);
-            out.extend(addressed(city_root, &at)?, &block);
-        }
-    }
+    // The workspace's copy first and the building's after it, so the one
+    // nearest the work is read last.
+    out.extend_conventions(
+        city_root,
+        [
+            Convention {
+                path: city::city_agents_path(city_root),
+                heading: city::AGENTS_FILE.to_owned(),
+                whose: "How work is done across the workspace this city formed around, from the \
+                        workspace itself.",
+            },
+            Convention {
+                path: city::agents_path(city_root, building),
+                heading: format!("{}/{}", building.as_str(), city::AGENTS_FILE),
+                whose: "How work is done in this project, from the project itself.",
+            },
+        ],
+    )?;
     Ok(out)
+}
+
+/// The conventions of every room between the building's root and `addr`,
+/// for the end of the resident slot.
+///
+/// Not the building slot, which every resident of one building carries
+/// byte for byte (`crates/runtime/spec/Prefix.lean` D97): a room's file
+/// there would split that slot by room and lose the cache it is shared
+/// for. The resident slot already belongs to one address and is frozen
+/// for the whole run, so a room's conventions cost nothing there that
+/// the identity does not already cost.
+///
+/// # Errors
+/// As [`building_segment`].
+fn room_conventions(
+    city_root: &Path,
+    addr: &Address,
+    building: &Address,
+) -> Result<Vec<Convention>, AxError> {
+    Ok(city::room_agents_paths(city_root, building, addr)?
+        .into_iter()
+        .map(|(room, path)| Convention {
+            path,
+            heading: format!("{}/{}", room.as_str(), city::AGENTS_FILE),
+            whose: "How work is done in this part of the project, from the project itself.",
+        })
+        .collect())
+}
+
+/// One `AGENTS.md` a slot may carry: where it is, the heading it is
+/// given, and whose conventions the heading says they are.
+struct Convention {
+    path: std::path::PathBuf,
+    heading: String,
+    whose: &'static str,
+}
+
+impl Assembled {
+    /// Appends each convention file that is there under its heading, in
+    /// order, and accounts it.
+    ///
+    /// Written only when the file is: a heading over nothing would tell a
+    /// resident to follow conventions that do not exist.
+    ///
+    /// # Errors
+    /// As [`addressed`].
+    fn extend_conventions(
+        &mut self,
+        city_root: &Path,
+        conventions: impl IntoIterator<Item = Convention>,
+    ) -> Result<(), AxError> {
+        for Convention {
+            path,
+            heading,
+            whose,
+        } in conventions
+        {
+            if let Ok(text) = std::fs::read(&path) {
+                let mut block = format!(
+                    "## {heading}\n\n{whose} Where this and the building's rules above disagree, \
+                     the rules decide: they are what the city enforces.\n\n"
+                )
+                .into_bytes();
+                block.extend_from_slice(&text);
+                self.extend(addressed(city_root, &path)?, &block);
+            }
+        }
+        Ok(())
+    }
 }
 
 /// The city's own spelling of a path inside it.
@@ -244,7 +305,12 @@ impl Freezing<'_> {
                 run: at.predecessor().or(self.carried_from),
             },
         )?);
-        if let Some(note) = model_note(self.city_root, &site.provider, &site.model.id)? {
+        if let Some(note) = model_note(
+            self.city_root,
+            site.building.addr(),
+            &site.provider,
+            &site.model.id,
+        )? {
             slot.extend(note.at, &note.bytes);
         }
         Ok(slot)
@@ -285,7 +351,17 @@ impl Freezing<'_> {
         // rather than earlier because the catalog does not exist until
         // the tools, the reading room and the mode are known.
         let names = naming::session_naming(self.city_root, self.cas, addr)?;
-        let mut resident = names.called(addr);
+        // Where this run stands opens the resident slot, which belongs
+        // to one address, rather than the building slot, which the whole
+        // building shares.
+        let mut resident = format!(
+            "{}
+
+",
+            addr.as_str()
+        )
+        .into_bytes();
+        resident.extend_from_slice(&names.called(addr));
         resident.extend_from_slice(&site.identity.segment_bytes());
         resident.push(NEWLINE);
         resident.extend_from_slice(
@@ -293,11 +369,17 @@ impl Freezing<'_> {
                 .render()
                 .as_bytes(),
         );
+        let mut resident = Assembled::of_nothing(resident);
+        resident.extend_conventions(
+            self.city_root,
+            room_conventions(self.city_root, addr, site.building.addr())?,
+        )?;
         let prefix = FrozenPrefix::assemble(
-            names.city_slot(self.city_root)?.freeze(SegmentSlot::City),
-            building_segment(self.city_root, addr, site.building.addr())?
-                .freeze(SegmentSlot::Building),
-            Assembled::of_nothing(resident).freeze(SegmentSlot::Resident),
+            names
+                .city_slot(self.city_root, site.building.addr())?
+                .freeze(SegmentSlot::City),
+            building_segment(self.city_root, site.building.addr())?.freeze(SegmentSlot::Building),
+            resident.freeze(SegmentSlot::Resident),
             self.assemble_run_slot(site, at, &brief)?
                 .freeze(SegmentSlot::Run),
         )?;
