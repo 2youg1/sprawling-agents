@@ -72,7 +72,7 @@ pub struct PromptSource {
     pub kept: u64,
     pub marker: bool,
     pub dropped: u64,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hash: Option<B3Hash>,
 }
 
