@@ -87,6 +87,13 @@ impl Backlog {
         self.shares
     }
 
+    /// The same table, reserving from this machine budget. A table made
+    /// without one is unmetered: every reservation fits.
+    #[must_use]
+    pub fn with_budget(self, budget: crate::reserve::MachineBudget) -> Backlog {
+        Backlog { budget, ..self }
+    }
+
     /// The machine budget a run's heavy work reserves its ceiling from
     /// (`crates/runtime/spec/Reserve.lean` D104).
     #[must_use]
