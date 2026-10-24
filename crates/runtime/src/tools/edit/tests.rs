@@ -398,3 +398,42 @@ fn a_city_placed_below_a_link_is_edited_like_any_other() {
         (Ok(()), Ok(()), "final\n".to_owned(), "made\n".to_owned())
     );
 }
+
+/// A passage copied out of a `read` answer with its line marks lands on
+/// the file's own bytes, and the marks copied into the replacement are
+/// not written into the file.
+#[test]
+fn a_passage_copied_with_its_line_marks_edits_the_lines_it_marks() {
+    let tmp = tempfile::tempdir().unwrap();
+    let tool = tool(tmp.path());
+    let before: String = (0..12).map(|n| format!("row {n}\n")).collect();
+    std::fs::write(tmp.path().join("work/a.txt"), &before).unwrap();
+    let version = version_of(before.as_bytes());
+    tool.invoke(&call(
+        "work/a.txt",
+        &version,
+        "row 9\n10|row 10\n",
+        "row 9\n10|row ten\n",
+    ))
+    .unwrap();
+    assert_eq!(
+        std::fs::read_to_string(tmp.path().join("work/a.txt")).unwrap(),
+        before.replace("row 10\n", "row ten\n")
+    );
+}
+
+/// A file whose own lines look like marks is matched as the passage came:
+/// an exact match is never second-guessed.
+#[test]
+fn a_passage_that_matches_as_it_came_keeps_what_looks_like_a_mark() {
+    let tmp = tempfile::tempdir().unwrap();
+    let tool = tool(tmp.path());
+    std::fs::write(tmp.path().join("work/t.md"), "| a |\n12|b\n").unwrap();
+    let version = version_of(b"| a |\n12|b\n");
+    tool.invoke(&call("work/t.md", &version, "12|b\n", "12|c\n"))
+        .unwrap();
+    assert_eq!(
+        std::fs::read_to_string(tmp.path().join("work/t.md")).unwrap(),
+        "| a |\n12|c\n"
+    );
+}

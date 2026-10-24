@@ -234,6 +234,50 @@ fn a_long_file_answers_with_the_cap_a_total_and_the_next_offset() {
     );
 }
 
+/// A continuation is drawn numbered from where it starts: the answer
+/// carries its `offset`, which is all the renderer has to number the
+/// header and the marks from, so a model that passes a mark back to
+/// `read` or `edit` lands on the line it saw.
+#[test]
+fn a_continuation_is_drawn_numbered_from_where_it_starts() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(dir.path().join("lab")).unwrap();
+    let body: String = (0..700).map(|n| format!("line {n}\n")).collect();
+    std::fs::write(dir.path().join("lab").join("Long.md"), &body).unwrap();
+    let (tool, _catalog) = tool(dir.path());
+
+    let rest = tool
+        .invoke(&interval("lab/Long.md", 515, Some(10)))
+        .unwrap();
+    let drawn = crate::rendering::shown(
+        crate::rendering::CURRENT,
+        &ToolName::parse(ReadTool::NAME).unwrap(),
+        &kernel::event::record::ToolAnswer::Answered {
+            result: rest.result,
+        },
+    )
+    .unwrap();
+    // The version segment is the one part of the header this test does
+    // not judge: whether it is drawn is `edit`'s contract, not the marks'.
+    let first_lines: Vec<&str> = drawn
+        .lines()
+        .take(7)
+        .map(|line| line.split(", version").next().unwrap())
+        .collect();
+    assert_eq!(
+        first_lines,
+        [
+            "lab/Long.md lines 515-524 of 700, next 525",
+            "515|line 515",
+            "line 516",
+            "line 517",
+            "line 518",
+            "line 519",
+            "520|line 520",
+        ]
+    );
+}
+
 /// A caller that asks for more than the cap is served the cap rather
 /// than refused: a refusal would cost it a turn to learn a number the
 /// answer can carry.

@@ -18,6 +18,7 @@
 //! change, and that is the difference between undoing a mistake and
 //! undoing an afternoon.
 
+use std::borrow::Cow;
 use std::path::{Path, PathBuf};
 
 use kernel::{
@@ -215,6 +216,8 @@ impl Tool for EditTool {
                  files and this one is not text"
             ))
         })?;
+        let (old, new) = as_the_file_spells(&text, old, new);
+        let (old, new) = (old.as_ref(), new.as_ref());
         let hits = text.matches(old).count();
         if hits != 1 {
             return Err(AxError::failure(
@@ -299,6 +302,29 @@ impl EditTool {
             result: Payload::new(result)?,
             attachments: Vec::new(),
         })
+    }
+}
+
+/// The passage and its replacement as the file spells them.
+///
+/// A passage copied out of a `read` answer may carry the line marks that
+/// answer drew (`crate::rendering::without_marks`). It is tried as it
+/// came first, and an exact match is never second-guessed, because a file
+/// may hold lines that look like marks. Only when it matches nothing and
+/// the unmarked passage does is it taken without its marks, and the
+/// replacement with them: a model that copied the marks into `old` copied
+/// them into `new`, and leaving them there would write them into the
+/// file.
+fn as_the_file_spells<'a>(text: &str, old: &'a str, new: &'a str) -> (Cow<'a, str>, Cow<'a, str>) {
+    if text.contains(old) {
+        return (Cow::Borrowed(old), Cow::Borrowed(new));
+    }
+    match crate::rendering::without_marks(old) {
+        Some(bare) if !bare.is_empty() && text.contains(bare.as_str()) => (
+            Cow::Owned(bare),
+            crate::rendering::without_marks(new).map_or(Cow::Borrowed(new), Cow::Owned),
+        ),
+        Some(_) | None => (Cow::Borrowed(old), Cow::Borrowed(new)),
     }
 }
 
