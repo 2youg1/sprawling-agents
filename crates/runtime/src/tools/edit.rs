@@ -188,7 +188,7 @@ impl Tool for EditTool {
         // escalation (`crates/storage/Spec.lean` §8-25) - so it is
         // refused before the stamps are asked, and before the creating
         // arm makes a parent directory through it.
-        let cleared = storage::WriteTarget::within("edit file", &self.city_root, &path)
+        storage::WriteTarget::within("edit file", &self.city_root, &path)
             .map_err(storage::StorageError::into_ax)?;
         // Inside the lock the stamp, the bytes and the landing are one
         // step, so two runs cannot both land on one look (§8-64).
@@ -241,10 +241,12 @@ impl Tool for EditTool {
                 // The passage is a window read of the file as it stands.
                 self.desk.seen.look(&target, current.clone(), current);
                 let why = match passage::around(&text, old) {
-                    Some(window) => format!("{rel} changed after this run read it; {window}"),
-                    None => format!(
+                    (passage::Opened::AroundOld, window) => {
+                        format!("{rel} changed after this run read it; {window}")
+                    }
+                    (passage::Opened::AtHead, window) => format!(
                         "{rel} changed after this run read it, and the first line of `old` is no \
-                         longer in it"
+                         longer in it; {window}"
                     ),
                 };
                 return Err(AxError::failure(AxCode::VersionConflict, "edit file", why)
@@ -272,9 +274,12 @@ impl Tool for EditTool {
         // The replacement lands the way every city write does: a staging
         // file renamed over the name, so a failed write leaves the old
         // file and a hard link's other names keep their bytes
-        // (`crates/storage/Spec.lean` §8-32).
-        cleared
-            .replace(updated.as_bytes())
+        // (`crates/storage/Spec.lean` §8-32). The name is cleared of links
+        // again here, because the clearing above came before the wait for
+        // the lock and the read, and a link placed since would carry the
+        // write past the gate.
+        storage::WriteTarget::within("edit file", &self.city_root, &path)
+            .and_then(|cleared| cleared.replace(updated.as_bytes()))
             .map_err(storage::StorageError::into_ax)?;
         self.note_landing(&target, rel, &path)?;
         Ok(ToolOutcome {
