@@ -31,7 +31,7 @@ pub struct RunStarted {                 // 字段全部 #[serde(default)]
 pub struct AgentRunIdentity { pub id: String, pub version: Option<String>, pub launch_digest: B3Hash }
 pub struct RunForked { pub from: RunId, pub at_seq: Seq }
 pub struct PromptSource { pub addr: Address, pub kept: u64, pub marker: bool, pub dropped: u64,
-                          #[serde(default, skip_serializing_if = "Option::is_none")] pub hash: Option<B3Hash> }   // hash：这一行所留字节的 BLAKE3（runtime D101）；旧行没有它，读作 None；缺席即省略
+                          #[serde(default, skip_serializing_if = "Option::is_none")] pub hash: Option<B3Hash> }   // hash：这一行所留字节的 BLAKE3（runtime D105）；旧行没有它，读作 None；缺席即省略
     // prompt_assembled 的一行来源；不带摘要生产者指纹：没有路径产出摘要（runtime D1）。旧行里多出的 producer 键读时忽略；本结构没有方法，读者直接读字段
 pub struct EvalRun { pub probe: String, pub version: u32, pub predecessor: RunId,  // eval_run：交接探针的一次读数
                     pub kept: u32, pub lost: Vec<u32>,       // lost 是答案不同的题号

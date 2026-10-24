@@ -62,7 +62,7 @@ pub struct PromptSegment {
 /// cut off; `marker` says a truncation marker follows the kept bytes,
 /// which the byte counts alone cannot say. `hash` is the BLAKE3 of the
 /// kept bytes, so a rebuild names the one document that changed
-/// (`crates/runtime/spec/Prefix.lean` D101); a row written before rows
+/// (`crates/runtime/spec/Prefix.lean` D105); a row written before rows
 /// carried it reads as `None` and is checked by its segment's hash
 /// alone.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

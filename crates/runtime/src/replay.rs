@@ -237,7 +237,7 @@ pub fn rebuild_prefix(
                 ))
             })?;
             // Read as the typed record reads it: a row without a hash, or
-            // with a null one, predates D101; anything else that is not a
+            // with a null one, predates D105; anything else that is not a
             // string is a row nothing in this tree wrote.
             let recorded = match source.get("hash") {
                 None | Some(serde_json::Value::Null) => None,

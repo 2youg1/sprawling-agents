@@ -206,7 +206,7 @@ fn a15_rebuild_matches_the_recorded_segment_hashes() {
         }
     };
     // The row that drifted is named, not only the segment: a person
-    // looks for a file, and the slot does not say which one (D101).
+    // looks for a file, and the slot does not say which one (D105).
     let err = rebuild_prefix(&payload, &drifted).unwrap_err();
     assert_eq!(
         (err.code(), err.subject()),

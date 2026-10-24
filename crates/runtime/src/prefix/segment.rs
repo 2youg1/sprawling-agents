@@ -150,7 +150,7 @@ impl FrozenSegment {
 /// that fitted whole reports `dropped: 0`, which is a measurement
 /// rather than an absence. `hash` is the BLAKE3 of the kept bytes,
 /// computed from the same bytes as `kept`, so the two cannot describe
-/// different spans (`crates/runtime/spec/Prefix.lean` D101).
+/// different spans (`crates/runtime/spec/Prefix.lean` D105).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SegmentSource {
     pub addr: Address,
