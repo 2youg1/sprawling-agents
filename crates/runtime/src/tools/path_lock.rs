@@ -48,7 +48,7 @@ pub(crate) struct PathGuard {
 impl PathLocks {
     /// Waits until no other edit holds `path`, then holds it.
     pub(crate) fn hold(&self, path: &Path) -> PathGuard {
-        let key = path.to_string_lossy().into_owned();
+        let key = path.to_string_lossy().to_lowercase();
         let mut held = self.table.held();
         while held.contains(&key) {
             held = self
