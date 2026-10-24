@@ -23,6 +23,7 @@ import type { Key } from "../../core/lang";
 import { STACK_SHAPE } from "../../core/appearance";
 import type { Appearance, Chroma, Density, Face, Glass, Lighting, Motion, ReadingFace } from "../../core/appearance";
 import type { PreferenceDoor } from "../../core/prefs";
+import { motionOff } from "../shared/motion";
 
 // The Local Font Access API, which Chromium offers and other engines do
 // not. Declared optional so the capability check is the type check.
@@ -143,7 +144,6 @@ export function watchMachineLighting(root: HTMLElement, kept: PreferenceDoor): v
 }
 
 export function applyAppearance(root: HTMLElement, held: Appearance): void {
-  root.dataset.theme = held.lighting === "system" ? machineLighting() : held.lighting;
   wearFace(root, "sans", held.sans, held.sansStack);
   wearFace(root, "mono", held.mono, held.monoStack);
   root.dataset.read = held.reading;
@@ -161,6 +161,26 @@ export function applyAppearance(root: HTMLElement, held: Appearance): void {
   } else {
     root.style.setProperty(BLEND_PROPERTY, `${String(held.blend)}%`);
   }
+  // Last, so the motion it reads is the one this change asked for.
+  wearLighting(root, held.lighting === "system" ? machineLighting() : held.lighting);
+}
+
+// Light and dark trade places as one cross-fade of the whole page, a
+// `panel` long (docs/frontend-method.md §4-43), rather than every
+// surface snapping at once: a view transition fades the old picture
+// into the new one. The first paint has nothing to fade from, motion
+// off asks for no travel, and an engine without the API swaps in one
+// frame. The page takes no pointer for that quarter second, which a
+// press on the switch that started it does not miss.
+function wearLighting(root: HTMLElement, lighting: "dark" | "light"): void {
+  const was = root.dataset.theme;
+  if (was === undefined || was === lighting || !("startViewTransition" in document) || motionOff(root)) {
+    root.dataset.theme = lighting;
+    return;
+  }
+  void document.startViewTransition(() => {
+    root.dataset.theme = lighting;
+  });
 }
 
 // Whether a stack box holds characters this page may not write into a
