@@ -35,9 +35,7 @@ pub(crate) mod hall;
 pub(crate) mod blank;
 use blank::{empty_roadmap, is_blank_form};
 
-pub use hall::{
-    CLERK_FILE, MAYOR_FILE, hall_discipline, hall_identity_path, lay_out_hall_identities,
-};
+pub use hall::{CLERK_FILE, MAYOR_FILE, hall_discipline, hall_identity_path};
 
 /// The plan: the single denominator for progress in a building.
 ///
@@ -57,11 +55,11 @@ pub const HANDOFF_FILE: &str = kernel::layout::HANDOFF_FILE;
 pub const SPEC_FILE: &str = "SPEC.md";
 /// The city's own instructions, read into every prefix.
 pub const CITY_FILE: &str = "City.md";
-/// The bytes a new city's [`CITY_FILE`] starts as. Exported because the
-/// city is formed by `accounting`, which may not reach into this
-/// package's directory for them: a published copy of either package
-/// carries its own directory only (`crates/city/spec/SpineFiles.lean` §8-41).
-pub const CITY_TEMPLATE: &str = include_str!("../templates/City.md");
+/// The bytes this build's default [`CITY_FILE`] holds, handed out only
+/// through `defaults::Shipped::City` so the one writer of the city's
+/// copy is `defaults::follow_defaults` (`crates/city/spec/SpineFiles.lean`
+/// §8-41).
+pub(crate) const CITY_TEMPLATE: &str = include_str!("../templates/City.md");
 /// The conventions a project brings with it. **The city neither writes
 /// this file nor owns it**; it is listed here because a resident is
 /// given it rather than sent to fetch it. How it is matched and where
@@ -350,6 +348,39 @@ pub fn write_job(
     Ok(text)
 }
 
+/// Where the `City.md` that governs runs in `building` is: the
+/// building's own, in its reserved subtree beside `RULES.toml`, when it
+/// has one; otherwise the city's, at the city root.
+///
+/// The nearer replaces the farther rather than joining it, because the
+/// two answer one question - what an agent here is told about the city
+/// it works in - and a building that rewrote the answer has said the
+/// city's does not hold there. The reserved subtree, because no write
+/// domain reaches it: a resident cannot rewrite its own instructions.
+/// Reads the disk to answer, so the answer is as of this call. Only a
+/// building's file that is not there falls back to the city's: anything
+/// else at that path is the building's answer, and a reader that cannot
+/// open it refuses rather than sends the city's words in its place. The
+/// entry itself is looked at, not what it points to, so a link whose
+/// target is gone is a broken answer rather than no answer.
+///
+/// # Errors
+/// `E_STORAGE_FATAL` naming the path when the disk cannot say whether
+/// the building's own file is there.
+pub fn city_prompt_path(city_root: &Path, building: &Address) -> Result<PathBuf, AxError> {
+    let own = crate::policy::governed(city_root, building).join(CITY_FILE);
+    match std::fs::symlink_metadata(&own) {
+        Ok(_) => Ok(own),
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(city_root.join(CITY_FILE)),
+        Err(err) => Err(AxError::failure(
+            AxCode::StorageFatal,
+            "find the City.md that governs a building",
+            format!("{}: {err}", own.display()),
+        )
+        .with_recovery("make the building's reserved directory readable, then dispatch again")),
+    }
+}
+
 /// The norm documents a run at `addr` is aligned by, in reading order:
 /// how the city works, then how this building works.
 ///
@@ -360,9 +391,11 @@ pub fn write_job(
 /// # Errors
 /// Propagates the reserved-subtree refusal: an address with no building
 /// has no building norms.
+/// As [`city_prompt_path`] when the building's own `City.md` cannot be
+/// looked for.
 pub fn norms(city_root: &Path, addr: &Address) -> Result<Vec<PathBuf>, AxError> {
     let building = crate::building::Building::of(addr)?;
-    let mut out = vec![city_root.join(CITY_FILE)];
+    let mut out = vec![city_prompt_path(city_root, building.addr())?];
     let rules = rules_path(city_root, building.addr());
     if rules.exists() {
         out.push(rules);

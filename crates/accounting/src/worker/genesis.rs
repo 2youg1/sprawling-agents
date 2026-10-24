@@ -16,12 +16,6 @@ use storage::JsonlLedger;
 use super::freezing::Assembled;
 use super::{Hands, RunWorker, ScanReport};
 
-/// The city segment of every prefix, and a file the person is meant to
-/// edit: `init` writes it into the city, and every later run reads that
-/// copy. The binary carries the default so a fresh city is complete
-/// without a checkout; its bytes are the city's template.
-pub(super) const CITY_MD: &str = city::CITY_TEMPLATE;
-
 #[derive(Debug)]
 pub struct InitReport {
     pub ledger_dir: PathBuf,
@@ -128,17 +122,6 @@ pub fn form(city_root: &Path, adopt: Adopt, hands: Hands) -> Result<InitReport, 
     // The city's own records stay out of the workspace's git before
     // anything else is laid beside the project's files.
     city::ignore_city_records(city_root)?;
-    let city_md = city_root.join(city::CITY_FILE);
-    if !city_md.exists() {
-        std::fs::write(&city_md, CITY_MD).map_err(|source| {
-            AxError::failure(
-                AxCode::StorageFatal,
-                "write the city prompt",
-                format!("{}: {source}", city_md.display()),
-            )
-            .with_recovery("check the city directory is writable")
-        })?;
-    }
     // Who answers the approval inbox, written down rather than baked
     // into a default: the person can appoint somebody else, and a
     // change needs a line to change.
@@ -164,9 +147,10 @@ pub fn form(city_root: &Path, adopt: Adopt, hands: Hands) -> Result<InitReport, 
         data: Payload::of(&delegation)?,
         ig: false,
     })?;
-    // City Hall, and the two identity files its residents are read
-    // from. Both happen after line zero, because a building is recorded
-    // against a city and there is no city before then.
+    // City Hall happens after line zero, because a building is recorded
+    // against a city and there is no city before then. The city's own
+    // prompt and the hall's two identity files are laid down by the
+    // worker as it opens (`city::follow_defaults`, city D29).
     // The writer that wrote line zero goes on writing: a second one
     // opened here would be refused the city's writer lock.
     let mut worker = RunWorker::over(
@@ -178,7 +162,6 @@ pub fn form(city_root: &Path, adopt: Adopt, hands: Hands) -> Result<InitReport, 
     let plan = city::CityPlan::new(None)?;
     let (hall, template) = plan.hall();
     worker.create_building(hall.clone(), template.name())?;
-    city::lay_out_hall_identities(city_root)?;
     let mut adopted = Vec::new();
     if let (Adopt::EveryFolder, city::Standing::Work { adoptable, .. }) = (adopt, &standing) {
         // Through the same door `sprawling adopt` uses, so a folder
@@ -239,38 +222,39 @@ fn record_shelved(
     Ok(())
 }
 
-/// The city segment as this city has it: the file the person may edit,
-/// falling back to the built-in copy when a city predates it.
+/// The city segment as this city has it: the file on its disk, which
+/// `city::follow_defaults` laid down or kept when the city opened.
 ///
-/// The fallback is for one condition only. A city written before the
-/// file existed does not have it, and the built-in copy is the right
-/// answer there. Every other failure - a directory in its place, a
-/// permission this process does not have - would have this hand a run
-/// the built-in norms while the person's own edited norms sat unread on
-/// the disk, and the run would obey the wrong document without anyone
-/// being told.
+/// There is no built-in fallback. A run handed the binary's text while
+/// the disk held something else, or nothing, would obey bytes no person
+/// can open (`crates/city/spec/SpineFiles.lean` D29).
 ///
 /// # Errors
-/// `E_STORAGE_FATAL` naming the path, for every failure except a file
-/// that is not there.
+/// `E_STORAGE_FATAL` naming the path, for a file that is not there and
+/// for every other failure to read it.
 pub(super) fn city_segment(city_root: &Path) -> Result<Assembled, AxError> {
-    let path = city_root.join(city::CITY_FILE);
-    match std::fs::read(&path) {
-        Ok(bytes) => Ok(Assembled::of_one(Address::parse(city::CITY_FILE)?, bytes)),
-        // The built-in copy names no document: no file on this disk
-        // holds it, and a source row pointing at one that is not there
-        // would send a reader to open nothing.
-        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
-            Ok(Assembled::of_nothing(CITY_MD.as_bytes().to_vec()))
-        }
+    prompt_segment(
+        &city_root.join(city::CITY_FILE),
+        Address::parse(city::CITY_FILE)?,
+    )
+}
+
+/// One `City.md` read for the city slot, the city's own or a building's
+/// (`city::city_prompt_path` says which), accounted to `at`.
+///
+/// # Errors
+/// As [`city_segment`].
+pub(super) fn prompt_segment(path: &Path, at: Address) -> Result<Assembled, AxError> {
+    match std::fs::read(path) {
+        Ok(bytes) => Ok(Assembled::of_one(at, bytes)),
         Err(err) => Err(AxError::failure(
             AxCode::StorageFatal,
             "read the city's norms",
             format!("{}: {err}", path.display()),
         )
         .with_recovery(
-            "every run in this city is governed by that file; make it readable, \
-             or take it away to fall back on the copy this build carries",
+            "every run under that file is governed by it; make it readable, or clear its \
+             place and open the city again, which lays its default down",
         )),
     }
 }

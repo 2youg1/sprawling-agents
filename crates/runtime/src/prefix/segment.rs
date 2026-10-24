@@ -148,21 +148,31 @@ impl FrozenSegment {
 /// `dropped` is what the slot's budget cut off the end of it, so the
 /// pair states both what the model read and what it did not. A document
 /// that fitted whole reports `dropped: 0`, which is a measurement
-/// rather than an absence.
+/// rather than an absence. `hash` is the BLAKE3 of the kept bytes,
+/// computed from the same bytes as `kept`, so the two cannot describe
+/// different spans (`crates/runtime/spec/Prefix.lean` D105).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SegmentSource {
     pub addr: Address,
     pub kept: u64,
     pub dropped: u64,
+    pub hash: B3Hash,
 }
 
 impl SegmentSource {
     /// A document that reached its segment whole.
-    pub fn whole(addr: Address, kept: u64) -> SegmentSource {
+    pub fn whole(addr: Address, bytes: &[u8]) -> SegmentSource {
+        SegmentSource::cut(addr, bytes, 0)
+    }
+
+    /// A document whose first `kept` bytes reached its segment and whose
+    /// last `dropped` bytes the slot's budget cut off.
+    pub fn cut(addr: Address, kept: &[u8], dropped: u64) -> SegmentSource {
         SegmentSource {
             addr,
-            kept,
-            dropped: 0,
+            kept: u64::try_from(kept.len()).unwrap_or(u64::MAX),
+            dropped,
+            hash: B3Hash::digest(kept),
         }
     }
 
@@ -177,6 +187,7 @@ impl SegmentSource {
             kept: self.kept,
             marker: self.dropped > 0,
             dropped: self.dropped,
+            hash: Some(self.hash),
         }
     }
 }
@@ -263,18 +274,20 @@ pub fn verified_system_hashes(
 mod tests {
     use super::*;
 
-    /// The four keys `replay::rebuild_prefix` reads, by the names it
-    /// reads them under.
+    /// The keys `replay::rebuild_prefix` reads, by the names it reads
+    /// them under.
     #[test]
-    fn a_row_names_the_four_keys_a_rebuild_reads() {
-        let source = SegmentSource {
-            addr: Address::parse("City.md").unwrap(),
-            kept: 12,
-            dropped: 4,
-        };
+    fn a_row_names_the_keys_a_rebuild_reads() {
+        let source = SegmentSource::cut(Address::parse("City.md").unwrap(), b"city rules: ", 4);
         assert_eq!(
             serde_json::to_value(source.row()).unwrap(),
-            serde_json::json!({ "addr": "City.md", "kept": 12, "marker": true, "dropped": 4 })
+            serde_json::json!({
+                "addr": "City.md",
+                "kept": 12,
+                "marker": true,
+                "dropped": 4,
+                "hash": B3Hash::digest(b"city rules: ").to_string(),
+            })
         );
     }
 
@@ -282,10 +295,16 @@ mod tests {
     /// leaving a reader to infer it from a missing key.
     #[test]
     fn a_whole_document_reports_nothing_dropped_and_no_marker() {
-        let source = SegmentSource::whole(Address::parse("City.md").unwrap(), 9);
+        let source = SegmentSource::whole(Address::parse("City.md").unwrap(), b"the city.");
         assert_eq!(
             serde_json::to_value(source.row()).unwrap(),
-            serde_json::json!({ "addr": "City.md", "kept": 9, "marker": false, "dropped": 0 })
+            serde_json::json!({
+                "addr": "City.md",
+                "kept": 9,
+                "marker": false,
+                "dropped": 0,
+                "hash": B3Hash::digest(b"the city.").to_string(),
+            })
         );
     }
 }

@@ -205,8 +205,28 @@ fn a15_rebuild_matches_the_recorded_segment_hashes() {
             docs.get(addr.as_str()).map(|s| s.as_bytes().to_vec())
         }
     };
+    // The row that drifted is named, not only the segment: a person
+    // looks for a file, and the slot does not say which one (D105).
     let err = rebuild_prefix(&payload, &drifted).unwrap_err();
-    assert_eq!(err.code(), &AxCode::CasCorrupt);
+    assert_eq!(
+        (err.code(), err.subject()),
+        (
+            &AxCode::CasCorrupt,
+            "city: city.md: the kept bytes differ from the ones recorded"
+        )
+    );
+    // A row written before rows carried a hash still rebuilds, checked
+    // by the segment hash alone.
+    let mut unhashed = payload.clone();
+    for segment in unhashed["segments"].as_array_mut().unwrap() {
+        for source in segment["sources"].as_array_mut().unwrap() {
+            source.as_object_mut().unwrap().remove("hash");
+        }
+    }
+    assert_eq!(
+        rebuild_prefix(&unhashed, &resolver).unwrap(),
+        prefix.segment_hashes()
+    );
     // A shorter document is caught too, on the span check.
     let shorter = |addr: &Address| {
         if addr.as_str() == "city.md" {

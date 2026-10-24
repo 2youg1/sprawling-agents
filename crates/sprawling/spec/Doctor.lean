@@ -782,7 +782,7 @@ pub(crate) fn pinned(pin: Pin) -> Option<String>;   // 文件为空即 None，�
 
 - **锁按 cargo 的规则找。** cargo 把 `Cargo.lock` 写在工作区根，`cargo package` 把它放进包的根（cargo-package 文档：「Cargo.lock is always included」）。所以「往上第一个含 `Cargo.lock` 的目录」在检出里是工作区根，在 `target/package/sprawling-<版本>/` 与 registry 解开的目录里是包自己，用不着按层数往上数。整条链上都没有锁时 `build.rs` 以 `cargo::error` 失败，与此前读不到锁时一样：没有锁的构建说不出自己由哪些包组成。
 - **包体进包**：见 §8-83。`.crate` 的上限是 10 MB（cargo 的 publishing 文档），包体压缩前约 1.5 MB。
-- **城写下的文档模板归 city。** 模板与 `City.md` 住在 `crates/city/templates/`：它们是城立城、建楼、开会话时写下的第一批字节，`city::spine_files` 与 `city::building` 按包内路径 `include_str!` 它们；accounting 立城时写的 `City.md` 读 `city::CITY_TEMPLATE`，不伸手到别的包目录里（`crates/city/Spec.lean` §8-41）。
+- **城写下的文档模板归 city。** 模板与 `City.md` 住在 `crates/city/templates/`：它们是城立城、建楼、开会话时写下的第一批字节，`city::spine_files` 与 `city::building` 按包内路径 `include_str!` 它们；城里的 `City.md` 由 `city::follow_defaults` 从 `city::defaults::Shipped::City` 铺下，accounting 不伸手到别的包目录里（`crates/city/Spec.lean` §8-41）。
 - **工具链钉子由构建脚本找，找不到就不钉。** `doctor` 的 develop 层报「钉住的版本」，读的是检出根上的 `rust-toolchain.toml`、`lean-toolchain` 与 `crates/desktop/ffi/zig-version`。这三份文件不在本包里，从包里构建时它们不存在，所以 `build.rs` 在 `checkout_root` 下找它们，把全文写进 `OUT_DIR` 下的 `pins.rs`；只有「不存在」读成空串，别的读失败仍是 `cargo::error`。空串即不钉：`pinned` 答 `None`，页面不画钉住的版本，探测按空前缀接受任何一版。
 - **`packaged` 门守这条线**（tools/xtask/Spec.lean §8-49）：可发布的包的生产代码里，`include!`、`include_str!`、`include_bytes!` 只指向包目录之内或 `OUT_DIR`。
 - **清单**：`[workspace.package]` 写 `repository`、`homepage`，`publish = true`；每个包写自己的 `description`，本包另写 `readme`、`keywords`、`categories` 与 `include`；`xtask` 与 `citysim` 写 `publish = false`。工作区自己的包在 `[workspace.dependencies]` 里各钉 `version = "=<工作区版本>"`，`guard` 判它们等于 `[workspace.package] version`（tools/xtask/Spec.lean §8-49）。`sprawling-remote-access` 被二进制链接，随之可发布。`sprawling-desktop-ffi` 也可发布：`sprawling-desktop` 在 Windows 上依赖它，而 crates.io 要求依赖的每个包都在 registry 上；它的包里带着 Zig 叶子的源码与 `zig-version`，构建脚本只读包内的文件，所以从 crates.io 在 Windows 上装这个二进制要先装钉住的那一版 Zig（§8-146）。`sprawling-console-ffi` 同理可发布，包里带着渲染器的 Zig 源码与它自己的 `zig-version`，所以从 crates.io 在任何平台上装这个二进制都要先装那一版 Zig。
@@ -851,23 +851,23 @@ pub(in crate::assembly) fn measuring_relay(&self) -> Relay;   // 与车道同一
 
 ### 8-85 每个模型一段追加提示词（`accounting::worker::freezing::model_note`，形状 4 适配器）
 
-同一套城规、楼规与身份，交给不同的模型时常常要补一两句只对那个模型说的话（例如某个模型爱省略测试输出，某个模型需要被提醒先读再改）。这段话放在城里一处、按 provider 与模型分文件：
+同一套城规、楼规与身份，交给不同的模型时常常要补一两句只对那个模型说的话（例如某个模型爱省略测试输出，某个模型需要被提醒先读再改）。这段话按 provider 与模型分文件，城一层、楼一层：
 
 ```rust
-pub(super) const MODELS_DIR: &str = "models";            // <city>/.sprawling/models/<provider>/<model>.md
+pub(super) const MODELS_DIR: &str = "models";            // <city>/.sprawling/models/… 与 <building>/.sprawling/models/<provider>/<model>.md
 pub(super) struct ModelNote { pub(super) at: Address, pub(super) bytes: Vec<u8> }
-/// 这次派活选中的 endpoint 名与模型 id 下的那段话；文件不在即 None。
-pub(super) fn model_note(city_root: &Path, provider: &str, model: &str) -> Result<Option<ModelNote>, AxError>;
+/// 这次派活选中的 endpoint 名与模型 id 下的那段话：楼的那份在就用楼的，否则城的；都不在即 None。
+pub(super) fn model_note(city_root: &Path, building: &Address, provider: &str, model: &str) -> Result<Option<ModelNote>, AxError>;
 ```
 
-- **位置只有一处，在城一级的保留区里**：`<city>/.sprawling/models/<provider>/<model>.md`，`<provider>` 是派活时选中的 endpoint 名（`AttachEndpoint` 的 `name`），`<model>` 是模型 id 原样。放在保留区而不是城根，是因为城根下的目录名就是楼的地址，一栋叫 `models` 的楼会与它撞名；保留区也是居民写不到的地方，一段约束模型的话不该由被约束的模型改写。楼一级不设第二处：两处就要回答「楼的那段覆盖还是追加城的那段」，而今天没有一个读者需要这个区分。
+- **两处，都在保留区里，近者替换远者**：城的 `<city>/.sprawling/models/<provider>/<model>.md` 与楼的 `<building>/.sprawling/models/<provider>/<model>.md`；楼的那份在，就只送楼的。`<provider>` 是派活时选中的 endpoint 名（`AttachEndpoint` 的 `name`），`<model>` 是模型 id 原样。放在保留区而不是城根或楼根，是因为城根下的目录名就是楼的地址，一栋叫 `models` 的楼会与它撞名，楼根常是人的 git 仓库；保留区也是居民写不到的地方，一段约束模型的话不该由被约束的模型改写。替换而不追加：一栋楼为某个模型写了自己的那段话，就是说了在这里该对这个模型说什么，城的那段跟在旁边就是同一个问题的第二个答案。只有这两层，房间一层不设：这是 ruling，人要每模型提示只分城与楼，房间一层没有读者需要它。
 - **追加在 run 段末尾，因而在整段 system prompt 的末尾。** 与楼段接 `AGENTS.md` 走同一扇门（`Assembled::extend`：空一行接上，记一行来源）。它随 run 段一同冻结、一同入库，整个 run 内字节不动，所以每一回合的缓存前缀都盖得住它；`prompt_assembled` 的 run 段哈希盖住它的字节，来源行写出它的地址与长度，WebUI 的提示词视图（§8-67）因此照原样列出「这个 run 用的是哪个模型的哪一段」。重放读的是账本里那一行，不重新读文件，故逐字节一致。
 - **文件不在，行为逐字节与没有这个功能时相同**：run 段不多一个字节，来源表不多一行。
 - **文件在却读不出**（权限、目录占位、不是文件）是 `E_STORAGE_FATAL`，指名那条路径，派活被拒；不静默跳过，理由与 `city_segment` 相同：人写下的那段话静静躺在盘上没被读，而 run 照着缺了它的提示词干活，没有人会被告知。
 - **地址先于路径。** 位置先按地址文法拼出（`Address::parse`），再落到盘上。模型 id 若含地址文法拒绝的字符（`:`、`\`、`.`／`..` 段），它在城里就没有可指名的那段话，按「没有文件」处理；先拼路径再读则会让一个含 `..` 的 id 读到保留区以外的文件。
 - **被否决的备选**：把它做成第五段。四段恒四是 `FrozenPrefix` 的类型（`crates/runtime/Spec.lean` §8-4），`verified_system_hashes` 与 `rebuild_prefix` 都按四段对拍；为一段随模型而变、随 run 冻结的文字加一个槽位，要改的是三个 crate 的冻结不变量，换来的只是一个本来就能从来源行读出的边界。重开条件：有读者需要按模型单独缓存这段话（例如跨 run 的缓存断点放在它之前）。
 
-**本章测试**：`freezing::tests::model_note::a_note_for_the_chosen_model_ends_the_system_prompt`——为 `house/m-local` 放一个文件，派活发出的请求里最后一条 system 消息以这段文字结尾；`freezing::tests::model_note::a_note_for_another_model_is_not_sent`——别的模型的那段话不出现。
+**本章测试**：`freezing::tests::model_note::a_note_for_the_chosen_model_ends_the_system_prompt`——为 `house/m-local` 放一个文件，派活发出的请求里最后一条 system 消息以这段文字结尾；`freezing::tests::model_note::a_note_for_another_model_is_not_sent`——别的模型的那段话不出现；`freezing::tests::layers::a_buildings_note_for_a_model_replaces_the_citys_there_and_only_there`——楼的那份替换城的，别的楼仍得城的。
 
 ### 8-86 房间名按规则取，起名不调用模型（`accounting::worker::dispatching::session`）
 

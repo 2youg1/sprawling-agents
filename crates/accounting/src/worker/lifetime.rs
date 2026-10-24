@@ -147,6 +147,24 @@ impl RunWorker {
         // reaches it now: no working record of this city enters git,
         // however old the building (city D5).
         city::keep_records_out_of_git(city_root)?;
+        // A default an earlier build laid down and nobody changed reads
+        // as this build's from now on; a copy somebody changed stays
+        // theirs, and is named here so its owner learns it no longer
+        // tracks the binary (city D29).
+        for edited in city::follow_defaults(city_root)? {
+            log.write(
+                runtime::diagnostics::Level::Effect,
+                runtime::diagnostics::Site {
+                    run: kernel::RunId::CITY,
+                    seq: ledger.position(),
+                    module: "accounting::worker",
+                },
+                &format!(
+                    "{} differs from every default a build of sprawling laid down, so it is kept as written and does not follow this build's default; delete it to take the default",
+                    edited.path.display()
+                ),
+            );
+        }
         let Standing {
             book,
             governance,

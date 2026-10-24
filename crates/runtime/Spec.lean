@@ -346,6 +346,7 @@ envelope 探查与全解共用 kernel 的解析（Value 探查仅取五键，不
 | D102 | guest 的内存上限就是它的 run 的内存上限，撞到时结果带 `memory_ceiling` | `crates/runtime/spec/Sandbox.lean` |
 | D103 | 机器级预约按号先来后到、不回填，比整份预算大的预约在没有别人持有时单独放行 | `crates/runtime/spec/Reserve.lean` |
 | D104 | 只有人填过的上限才预约，run 的前台命令与 python 调用各预约那个数，只持有到前台窗口结束 | `crates/runtime/spec/Reserve.lean` |
+| D105 | 来源行带它所留字节的哈希，重建时逐行核对 | `crates/runtime/spec/Prefix.lean` |
 -/
 
 /-! ## 13 依赖选型

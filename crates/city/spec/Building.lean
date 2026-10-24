@@ -83,8 +83,7 @@ pub const MAYOR_FILE: &str = "MAYOR.md";
 pub const CLERK_FILE: &str = "CLERK.md";
 /// hall/mayor 与 hall/clerk 的身份文件位置；别的地址返回 None。
 pub fn hall_identity_path(city_root: &Path, addr: &Address) -> Option<PathBuf>;
-/// 把两份模板写进 <city>/.sprawling/，已存在的不覆盖。
-pub fn lay_out_hall_identities(city_root: &Path) -> Result<(), AxError>;
+// 两份身份文件的默认文本与铺设归 city::defaults::follow_defaults（§8-43，D29）
 
 // city::wizard
 impl CityPlan { pub fn hall(&self) -> &(Address, BuildingTemplate); }   // 恒存在，非 Option

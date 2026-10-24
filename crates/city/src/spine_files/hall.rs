@@ -15,17 +15,16 @@
 
 use std::path::{Path, PathBuf};
 
-use kernel::{Address, AxError};
-
-use super::{storage, write_new};
+use kernel::Address;
 
 /// Who the Mayor is: the identity file of `hall/mayor`.
 pub const MAYOR_FILE: &str = "MAYOR.md";
 /// Who the clerk is: the identity file of `hall/clerk`.
 pub const CLERK_FILE: &str = "CLERK.md";
 
-/// What the Mayor must do for the city to keep its plan.
-const MAYOR_DISCIPLINE: &str = "How the Mayor works. It reads before it writes, taking every building's \
+/// How the Mayor works and how it writes the plan, read before the persona
+/// so the persona colours the procedure rather than replacing it.
+const MAYOR_OPENING: &str = "How the Mayor works. It reads before it writes, taking every building's \
      `Roadmap.md`, `Memo.md` and `Handoff.md` and the hall's own before it decides anything. The \
      city's plan lives in `<city>/hall/Roadmap.md` and `plan` is its only writer, one row per line \
      of work, weighted by what the work is worth to the User rather than by how long it takes. A \
@@ -37,17 +36,30 @@ const MAYOR_DISCIPLINE: &str = "How the Mayor works. It reads before it writes, 
      project. What it decided and why \
      goes in `<city>/hall/Memo.md` before it reports, in the User's own words where the User \
      decided. It reports through `signal` to the room that asked, and to the User only when the \
-     city cannot go on without an answer.\n\nWhat the Mayor never does. It holds `read`, `edit`, \
+     city cannot go on without an answer.\n\n<plan>\nA new plan has a header and no rows, and its first \
+     line is the Mayor's to write: call `plan` with `action: \"add\"` and `parts`, each `{item, \
+     weight}` or a plain string, and each part becomes a top-level row of the hall's `Roadmap.md`. \
+     Every later line hangs under a row somebody holds: `claim` the row, then `split` it into parts. \
+     `read` prints a file's `version`; pass it unchanged to `edit` as `base_version`, and to `plan \
+     finish` as `evidence`.\n</plan>\n";
+
+/// What the Mayor never does and who can read what, read after the
+/// persona so the last word on a prohibition is the city's.
+const MAYOR_CLOSING: &str = "What the Mayor never does. It holds `read`, `edit`, \
      `plan`, `signal`, `neighbours`, `pr` (to read), `rules` and `city` (both to read; a run changes \
      neither), `archive` and `status`, and \
      no `exec`, no `delegate`, no `workshop`: a planner that can run code stops reading the \
      buildings' evidence and starts producing its own. It runs, builds, tests and commits nothing, \
      since evidence comes from the buildings and the Mayor reads it and links it. It answers no \
      approval, that being the clerk's. It spends nothing past the ceiling the User gave the idea, \
-     and when a plan would, it says so and stops.\n";
+     and when a plan would, it says so and stops.\n\n<seen>\nEvery seat of one building reads the \
+     same documents: two seats of one building share a read domain, and a building has no secret \
+     container. Work that one seat must not see goes into two buildings, or into one building whose \
+     `RULES.toml` sets `confidential = true`.\n</seen>\n";
 
-/// What the clerk answers by, which a persona may not soften.
-const CLERK_DISCIPLINE: &str = "What the clerk holds: `read`, `neighbours`, `rules`, `status`, and the \
+/// What the clerk answers by and who can read what, read after the
+/// persona, which may not soften it.
+const CLERK_CLOSING: &str = "What the clerk holds: `read`, `neighbours`, `rules`, `status`, and the \
      answering face of `approve`, and nothing that writes a file, runs a program, or changes a plan. \
      A door never asks: whether an action is allowed is settled by the rules in `RULES.toml`, so \
      what reaches this inbox is only what a resident could not settle by reading them. It answers \
@@ -66,10 +78,18 @@ const CLERK_DISCIPLINE: &str = "What the clerk holds: `read`, `neighbours`, `rul
      guess; an item whose answer would be the clerk's own, since a resident never answers the \
      question it raised.\n\nHow it writes its reason: one sentence, the rule or decision it applied \
      by name and the fact in the item that met it. A reason that only restates the verdict is not a \
-     reason.\n";
+     reason.\n\n<seen>\nEvery seat of one building reads the same documents: two seats of one \
+     building share a read domain, and a building has no secret container. An item that asks to \
+     keep work unseen by another seat of the same building is answered with that fact: such work \
+     goes into two buildings, or into one building whose `RULES.toml` sets `confidential = \
+     true`.\n</seen>\n";
 
-const MAYOR_TEMPLATE: &str = include_str!("../../templates/MAYOR.md");
-const CLERK_TEMPLATE: &str = include_str!("../../templates/CLERK.md");
+/// Who the Mayor is, as this build lays it down; `defaults::Shipped::Mayor`
+/// hands it out.
+pub(crate) const MAYOR_TEMPLATE: &str = include_str!("../../templates/MAYOR.md");
+/// Who the clerk is, as this build lays it down; `defaults::Shipped::Clerk`
+/// hands it out.
+pub(crate) const CLERK_TEMPLATE: &str = include_str!("../../templates/CLERK.md");
 
 /// Where the identity file of a City Hall resident lives, and `None`
 /// for every other address.
@@ -91,15 +111,27 @@ pub fn hall_identity_path(city_root: &Path, addr: &Address) -> Option<PathBuf> {
 /// The discipline the city carries for a City Hall seat, and `None` for
 /// every other address.
 ///
-/// Compiled into this build and appended after the identity file rather
+/// Compiled into this build and set around the identity file rather
 /// than written into it, for the reason the file sits in the reserved
 /// subtree: a person shapes who the Mayor is and how it speaks, and
 /// cannot remove what keeps the city running. A persona that turns the
-/// planner into a character of its own leaves the tool list and the
-/// prohibitions untouched. Same shape as `resident::EPHEMERAL_SEGMENT`.
+/// planner into a character of its own leaves the procedure, the tool
+/// list and the prohibitions untouched. Same shape as
+/// `resident::EPHEMERAL_SEGMENT` (`crates/city/spec/SpineFiles.lean`
+/// D30).
 #[must_use]
-pub fn hall_discipline(addr: &Address) -> Option<&'static str> {
+pub fn hall_discipline(addr: &Address) -> Option<Discipline> {
     Some(seat(addr)?.discipline())
+}
+
+/// The two parts of a seat's discipline: one read before the persona,
+/// one after it. Either may be empty.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Discipline {
+    /// The procedure, which the persona colours.
+    pub opening: &'static str,
+    /// The prohibitions, which the persona cannot override.
+    pub closing: &'static str,
 }
 
 /// A City Hall seat: one dispatch behind both of its files.
@@ -128,25 +160,16 @@ impl Seat {
         }
     }
 
-    fn discipline(self) -> &'static str {
+    fn discipline(self) -> Discipline {
         match self {
-            Seat::Mayor => MAYOR_DISCIPLINE,
-            Seat::Clerk => CLERK_DISCIPLINE,
+            Seat::Mayor => Discipline {
+                opening: MAYOR_OPENING,
+                closing: MAYOR_CLOSING,
+            },
+            Seat::Clerk => Discipline {
+                opening: "",
+                closing: CLERK_CLOSING,
+            },
         }
     }
-}
-
-/// Lays down the two identity files a city raises City Hall with.
-///
-/// Nothing is overwritten: a person who has edited either file keeps
-/// what they wrote, whatever is run against the city afterwards.
-///
-/// # Errors
-/// Propagates a reserved subtree that cannot be created or written.
-pub fn lay_out_hall_identities(city_root: &Path) -> Result<(), AxError> {
-    let governed = city_root.join(kernel::RESERVED_PREFIX);
-    std::fs::create_dir_all(&governed).map_err(|err| storage(&governed, &err))?;
-    write_new(&governed.join(MAYOR_FILE), MAYOR_TEMPLATE)?;
-    write_new(&governed.join(CLERK_FILE), CLERK_TEMPLATE)?;
-    Ok(())
 }

@@ -276,7 +276,7 @@ fn the_reserved_subtree_has_no_norms_to_read() {
 #[test]
 fn the_hall_reads_its_two_residents_out_of_the_citys_reserved_subtree() {
     let dir = tempfile::tempdir().unwrap();
-    lay_out_hall_identities(dir.path()).unwrap();
+    crate::defaults::follow_defaults(dir.path()).unwrap();
 
     for (who, file) in [
         (kernel::consts_policy::HALL_MAYOR, MAYOR_FILE),
@@ -296,7 +296,22 @@ fn the_hall_reads_its_two_residents_out_of_the_citys_reserved_subtree() {
             matches!(identity, crate::resident::Identity::Resident(_)),
             "{who} is a standing identity, not an ephemeral worker"
         );
-        assert!(identity.segment_bytes().starts_with(b"# "));
+        let segment = String::from_utf8(identity.segment_bytes()).unwrap();
+        let discipline = hall_discipline(&addr).expect("a hall seat has a discipline");
+        let persona_at = segment
+            .find(&format!("# {file}"))
+            .expect("the persona is in the segment");
+        let closing_at = segment
+            .find(discipline.closing)
+            .expect("the closing is in the segment");
+        assert!(
+            segment.starts_with(discipline.opening),
+            "the procedure comes before the persona"
+        );
+        assert!(
+            persona_at < closing_at,
+            "the prohibitions come after the persona"
+        );
     }
 
     assert!(
@@ -305,17 +320,16 @@ fn the_hall_reads_its_two_residents_out_of_the_citys_reserved_subtree() {
     );
 }
 
-/// Laying the hall out twice keeps what the person edited.
+/// A building's `City.md` that is a link to nothing is the building's
+/// answer, broken, so its runs refuse rather than read the city's.
+#[cfg(unix)]
 #[test]
-fn a_second_raising_does_not_overwrite_an_edited_identity() {
+fn a_dangling_link_for_a_buildings_city_md_is_not_a_missing_one() {
     let dir = tempfile::tempdir().unwrap();
-    lay_out_hall_identities(dir.path()).unwrap();
-    let mayor = dir.path().join(kernel::RESERVED_PREFIX).join(MAYOR_FILE);
-    std::fs::write(&mayor, "# MAYOR.md\n\nthis city's own Mayor\n").unwrap();
-    lay_out_hall_identities(dir.path()).unwrap();
-    assert!(
-        std::fs::read_to_string(&mayor)
-            .unwrap()
-            .contains("this city's own Mayor")
-    );
+    let lab = addr("lab");
+    let own = crate::policy::governed(dir.path(), &lab).join(CITY_FILE);
+    std::fs::create_dir_all(own.parent().unwrap()).unwrap();
+    std::os::unix::fs::symlink(dir.path().join("gone.md"), &own).unwrap();
+
+    assert_eq!(city_prompt_path(dir.path(), &lab).unwrap(), own);
 }
