@@ -11,7 +11,9 @@
 //! D45-D47). The seats are the plan `plan` makes of the topology
 //! `reading` reports; `tests` checks this table against the seat model.
 //! This module is also the one place that decides what each arm of the
-//! person's `[core] placement` turns on (D47), the runs' shares included.
+//! person's `[core] placement` turns on (D47), the runs' shares included,
+//! and how large the machine budget those shares reserve from is
+//! (`crates/runtime/spec/Reserve.lean` D104).
 
 mod pinned;
 pub(crate) mod plan;
@@ -22,7 +24,7 @@ use std::num::NonZeroU64;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Mutex, OnceLock, PoisonError};
 
-use accounting::person::CorePlacement;
+use accounting::person::{CorePlacement, MachineMemory};
 use plan::{Left, Plan, Processor, Shape, Topology};
 use reading::Unread;
 use runtime::{PlatformShares, Shares, platform_shares};
@@ -116,6 +118,52 @@ fn setting() -> CorePlacement {
 /// handed to the runtime through `Hands`.
 pub(crate) fn run_shares() -> Shares {
     shares_of(setting(), memory_ceiling())
+}
+
+/// What the operating system keeps for itself under `memory = "auto"`:
+/// the 2 to 2.5 GiB a desktop system takes before any application, at
+/// its lower end (`crates/sprawling/spec/Serving/Memory.lean` §8-173).
+const SYSTEM_KEEPS_BYTES: u64 = 2 * 1024 * 1024 * 1024;
+
+/// What the browser tab showing the city is estimated to take under
+/// `memory = "auto"`: the upper end of the 150 to 400 MiB one tab takes.
+const VIEW_KEEPS_BYTES: u64 = 400 * 1024 * 1024;
+
+/// The machine budget every run's heavy work reserves its ceiling from,
+/// one book for the process (`crates/runtime/spec/Reserve.lean` D104). A
+/// `memory` that does not read is told as a process notice once, here,
+/// and the city sizes the budget as if it said `"auto"`.
+pub(crate) fn machine_budget() -> runtime::MachineBudget {
+    static BUDGET: OnceLock<runtime::MachineBudget> = OnceLock::new();
+    BUDGET
+        .get_or_init(|| {
+            let setting = accounting::person::machine_memory().unwrap_or_else(|err| {
+                notice(
+                    MODULE,
+                    &format!("the machine's memory budget is sized by the city: {err}"),
+                );
+                MachineMemory::Auto
+            });
+            runtime::MachineBudget::new(budget_bytes(
+                setting,
+                crate::monitor::memory::read().physical,
+            ))
+        })
+        .clone()
+}
+
+/// The budget's bytes: what the person wrote, or under `"auto"` the
+/// physical memory less what the system, the city's page and the city's
+/// own resident budget keep. A machine smaller than those reads as zero,
+/// which starts one piece of heavy work at a time.
+fn budget_bytes(setting: MachineMemory, physical: u64) -> u64 {
+    match setting {
+        MachineMemory::Bytes(bytes) => bytes,
+        MachineMemory::Auto => physical
+            .saturating_sub(SYSTEM_KEEPS_BYTES)
+            .saturating_sub(VIEW_KEEPS_BYTES)
+            .saturating_sub(u64::try_from(storage::RESIDENT_TOTAL_BYTES).unwrap_or(u64::MAX)),
+    }
 }
 
 /// The pinned arm's remaining processors, saved before the core joins

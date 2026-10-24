@@ -8,10 +8,12 @@
 //! (`crates/runtime/spec/Backlog.lean` §8-28), where a command's output
 //! goes while it is inside that window (the same part, §8-28-3), and what
 //! shares every run it starts asks for
-//! (`crates/runtime/spec/Tools/Exec.lean` D29). The table itself, what it
+//! (`crates/runtime/spec/Tools/Exec.lean` D29), and the machine budget
+//! those runs reserve from (`crates/runtime/spec/Reserve.lean` D104). The table itself, what it
 //! carries and how it ends, is the module above.
 
 use super::{Backlog, PollBudget, RunAffinity, Scratch, Shares, Sink};
+use crate::reserve::MachineBudget;
 
 impl Backlog {
     /// Requests this affinity for each run's job. Configure before the
@@ -21,6 +23,13 @@ impl Backlog {
     #[must_use]
     pub fn with_affinity(self, affinity: RunAffinity) -> Backlog {
         Backlog { affinity, ..self }
+    }
+
+    /// The same table, reserving from this machine budget. A table made
+    /// without one is unmetered: every reservation fits.
+    #[must_use]
+    pub fn with_budget(self, budget: MachineBudget) -> Backlog {
+        Backlog { budget, ..self }
     }
 
     #[must_use]
@@ -39,6 +48,7 @@ impl Backlog {
             sink: None,
             shares: Shares::Unset,
             affinity: RunAffinity::Os,
+            budget: MachineBudget::unmetered(),
         }
     }
 

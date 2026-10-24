@@ -60,7 +60,7 @@ pub struct Waited { pub ahead: usize, pub held_bytes: u64, pub budget_bytes: u64
 
 **决定**：`Shares::CpuAndMemory { limit }` 的 run，每条 exec 命令在起动之前预约 `limit`，命令落定或被交给后台时归还；python 臂的每次调用在起 guest 之前预约 `limit`，guest 结束时归还。run 没有内存上限时什么都不预约。一次调用若在拿号时放不下，它的结果多一个键 `memory_wait`，写明拿号时前面还有几份、持有多少字节、预算多少字节。机器预算由人层 `config.toml` 顶层的 `memory` 给：`"auto"`（缺省）是物理内存减去操作系统的保留、界面的估计与城的进程预算，一个整数是字节数（`crates/accounting/spec/Person.lean` §8-8，`crates/sprawling/spec/Serving/Memory.lean` §8-173）。
 
-**理由**：run 的内存没有缺省上限是 ruling（`crates/runtime/spec/Tools/Exec.lean` D95 的「来源」）；没填上限的活要预约多少只能猜，猜大了一条 `ls` 要排在一次编译后面，猜小了预约挡不住换页，所以本版只把人给过的数加起来，没给的照旧。只持有到前台窗口结束，是因为被交给后台的命令可以一直跑到 run 结束（一个开发服务器），持有它的预约会让别的 run 的每条命令一直等下去；代价是后台命令的内存不在账上。
+**理由**：run 的内存没有缺省上限是 ruling（`crates/runtime/spec/Tools/Exec.lean` D95 的「来源」）；没填上限的活要预约多少只能猜，猜大了一条 `ls` 要排在一次编译后面，猜小了预约挡不住换页，所以本版只把人给过的数加起来，没给的照旧。只持有到前台窗口结束，是因为被交给后台的命令可以一直跑到 run 结束（一个开发服务器），持有它的预约会让别的 run 的每条命令一直等下去；代价是后台命令的内存不在账上。这样每份预约的持有都有上界：一条命令至多持有一个前台窗口（`crates/runtime/spec/Backlog.lean` §8-28），一次 python 调用至多持有到 fuel 用完，所以排在后面的等待也有上界，在等的调用不响应 halt 只会晚这么久看见 run 已停。
 
 **被否**：①给没填上限的命令一个固定估计（如 1 GiB）：在 4 GB 的机器上一次只能跑一条命令，读、搜之外的每条 exec 都要排队，而这个数没有读数支持；②持有到命令真正结束：后台命令会让队伍等到 run 结束；③按 run 预约一次、持有到 run 结束：run 在等模型的几十秒里也占着预算。
 

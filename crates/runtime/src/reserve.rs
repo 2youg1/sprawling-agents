@@ -163,25 +163,38 @@ impl Book {
             .fold(0_u64, |sum, &(_, bytes)| sum.saturating_add(bytes))
     }
 
+    #[cfg(test)]
     pub(crate) fn held_count(&self) -> usize {
         self.held.len()
     }
 
+    #[cfg(test)]
     pub(crate) fn waiting_count(&self) -> usize {
         self.waiting.len()
     }
 
+    #[cfg(test)]
     pub(crate) fn budget(&self) -> u64 {
         self.budget
     }
 
     /// The model's `advance`: from the head of the line, start each ask
-    /// that fits.
+    /// that fits, and stop at the first that does not, so no later ask
+    /// passes it (D103).
     fn advance(&mut self) {
         while let Some(&(ticket, bytes)) = self.waiting.front() {
+            if !self.fits(bytes) {
+                return;
+            }
             self.held.push((ticket, bytes));
             self.waiting.pop_front();
         }
+    }
+
+    /// The model's `fits`: nobody holds, or the held bytes and these stay
+    /// within the budget.
+    fn fits(&self, bytes: u64) -> bool {
+        self.held.is_empty() || self.held_bytes().saturating_add(bytes) <= self.budget
     }
 }
 

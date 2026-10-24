@@ -35,7 +35,7 @@
 
 ### 整台机器
 
-上表是城的进程。在一台小内存的机器上，进程之外还有三类重活各自吃内存：exec 的子进程（编译器、测试、解释器），每个 run 的进程树已经可以由 `[core] memory_bytes` 设上限（`crates/runtime/spec/Tools/Exec.lean` D29、D95）；python 臂的 guest，在城的进程里，由同一个数设上限（上表）；城起动的浏览器。每一项的上限都有了，缺的是「求和」：没有机制限制同时有多少项在跑，两次编译同时起就会让机器换页，而一旦换页，模型流、界面与编译一起卡住。文件字节不在此列：它们归操作系统的文件缓存，不在进程里留副本，派生数据经 `storage::resident`。机器级的预约与排队是下面待做第 6 项。
+上表是城的进程。在一台小内存的机器上，进程之外还有三类重活各自吃内存：exec 的子进程（编译器、测试、解释器），每个 run 的进程树已经可以由 `[core] memory_bytes` 设上限（`crates/runtime/spec/Tools/Exec.lean` D29、D95）；python 臂的 guest，在城的进程里，由同一个数设上限（上表）；城起动的浏览器。每一项的上限都有了，缺的是「求和」：两次编译同时起就会让机器换页，而一旦换页，模型流、界面与编译一起卡住。求和由一份机器预算做：run 设了内存上限时，它的每条前台命令与每次 python 调用在开始前从这份预算里预约那个数，放不下就按号排队，结果里的 `memory_wait` 说出拿号时前面有几份、持有多少、预算多少（判定与性质在 `crates/runtime/spec/Reserve.lean`，什么预约、持有多久见那里的 D104）。预算的字节由 `bin::serving::placement::machine_budget` 定，每个进程一本账：人层 `config.toml` 顶层的 `memory` 写了字节数就用它；`"auto"` 或不写时，是物理内存减去操作系统的保留（`SYSTEM_KEEPS_BYTES`，2 GiB，桌面系统在任何应用之前就占 2 到 2.5 GiB，取低端）、看城的那个浏览器标签页的估计（`VIEW_KEEPS_BYTES`，400 MiB，一个标签页 150 到 400 MiB，取高端）与城的进程的驻留预算（`storage::resident` 的 `RESIDENT_TOTAL_BYTES`），减不够时为 0，即一次只放行一件重活。文件字节不在此列：它们归操作系统的文件缓存，不在进程里留副本，派生数据经 `storage::resident`。
 
 ### 模型：一份按字节计预算的缓存
 
@@ -88,7 +88,7 @@
 3. playback 导出的 `Document` 改成边走边编码：编码本身已经直接写进 bundle 的那一份缓冲（`crates/accounting/spec/Playback.lean` §8-12），剩下的是 `finish` 给提交找证据时按 seq 查整份 `events`（`crates/accounting/Spec.lean` §3）。
 4. `tools/xtask/budgets.toml` 加内存节拍与一小时斜率的两行（由那一波拥有 budgets.toml 的车道提交）。
 5. D102 的读数在 Linux runner 上复核：同一负载，读私有字节 p99 与一小时斜率，确认换分配器之后斜率仍在上限之内。
-6. 机器级预约：重活（exec 的子进程、python 的 guest、浏览器实例）开始前从一份机器预算里预约自己的上界，上界之和超过预算就按号排队，结果与界面说出在等谁、等多少；机器预算是物理内存减去操作系统的保留、界面的估计与城的进程预算，人层 `config.toml` 的 `[core] memory` 以 `"auto"` 或字节数覆盖。放行的判定与它的三条性质（持有不超预算或只有一份、按号先来后到、只在有人持有时才等）在 `crates/runtime/spec/Reserve.lean`，为什么不复用 gateway 的并发名额见那里的 D103；实现它的 Rust 模块、它的派生 proptest、`[core] memory` 的读取与重活的接线还没有写。未定的是没填 `[core] memory_bytes` 的子进程预约多少字节：它是一个估计而不是上限，决定了小内存机器上能同时跑几条命令。
+6. 机器级预约还没有覆盖的部分：城起动的浏览器实例不预约；没有内存上限的 run 什么都不预约（D104 的理由与重开参数）；界面还不显示排队，只有结果里的 `memory_wait`；在等的调用不响应 halt，要等到被放行才看见 run 已停（等待的上界见 D104）。为什么不复用 gateway 的并发名额见 `crates/runtime/spec/Reserve.lean` D103。未定的是没填 `[core] memory_bytes` 的子进程预约多少字节：它是一个估计而不是上限，决定了小内存机器上能同时跑几条命令。
 7. 峰值堆的棘轮：citysim 场景的峰值堆字节，以 `dhat` 作测试构建的全局分配器读出，写成 `tools/xtask/budgets.toml` 的一行；`xtask artifact` 保证它不进发行件。
 8. 4 GB 剖面：TP1 的负载加两个并发编译，在内存上限 4 GB 的 Linux 容器（cgroup `memory.max`）里跑一小时，读有没有进程被杀（`memory.events` 的 `oom_kill`）、换页次数与工具调用 p99；Windows 上的 segment heap（应用清单的 `heapType`）与默认堆按私有字节与斜率对照。
 -/

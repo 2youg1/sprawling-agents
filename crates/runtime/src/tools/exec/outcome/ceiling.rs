@@ -3,14 +3,18 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The `memory_ceiling` entry of an exec result: its keys, its states
-//! and the sentence a reader is given (`crates/runtime/spec/Tools/Exec.lean`
-//! D95). Part of the one file that owns the result's spellings.
+//! The two memory entries of an exec result: `memory_ceiling`, its keys,
+//! its states and the sentence a reader is given
+//! (`crates/runtime/spec/Tools/Exec.lean` D95), and `memory_wait`, what a
+//! call waited behind in the machine budget's line
+//! (`crates/runtime/spec/Reserve.lean` D104). Part of the one file that
+//! owns the result's spellings.
 
 use kernel::{AxError, Payload, ToolOutcome};
 use serde_json::{Map, Value};
 
 use crate::backlog::{Ceiling, Unapplied};
+use crate::reserve::Waited;
 
 /// Adds how the person's memory ceiling fared to a settled result.
 pub(in crate::tools::exec) fn with_ceiling(
@@ -22,6 +26,34 @@ pub(in crate::tools::exec) fn with_ceiling(
     }
     let mut result = outcome.result.as_map().clone();
     memory_ceiling(&mut result, ceiling);
+    Ok(ToolOutcome {
+        result: Payload::new(result)?,
+        attachments: outcome.attachments,
+    })
+}
+
+/// Adds what a call waited behind before it started, under
+/// `memory_wait`. Nothing is written for a call that started at once.
+pub(in crate::tools::exec) fn with_wait(
+    outcome: ToolOutcome,
+    waited: Option<Waited>,
+) -> Result<ToolOutcome, AxError> {
+    let Some(waited) = waited else {
+        return Ok(outcome);
+    };
+    let mut entry = Map::new();
+    entry.insert("ahead".to_owned(), Value::from(waited.ahead));
+    entry.insert("held_bytes".to_owned(), Value::from(waited.held_bytes));
+    entry.insert("budget_bytes".to_owned(), Value::from(waited.budget_bytes));
+    entry.insert(
+        "detail".to_owned(),
+        Value::String(
+            "this call waited until heavy work ahead of it gave back enough of the              machine's memory budget"
+                .to_owned(),
+        ),
+    );
+    let mut result = outcome.result.as_map().clone();
+    result.insert("memory_wait".to_owned(), Value::Object(entry));
     Ok(ToolOutcome {
         result: Payload::new(result)?,
         attachments: outcome.attachments,
