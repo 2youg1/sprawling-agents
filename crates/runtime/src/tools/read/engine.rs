@@ -72,7 +72,7 @@ fn handle_read(
     let Ok(real) = winx::file::get_file_path(&file) else {
         return Ok(None);
     };
-    chosen_path::judged_location(city, addr, &real, "read", bound)?;
+    city.judged_location(addr, &real, "read", bound)?;
     Ok(whole_text(file))
 }
 
@@ -93,7 +93,7 @@ fn handle_read(
     let Ok(real) = std::fs::canonicalize(city.join(addr)) else {
         return Ok(None);
     };
-    chosen_path::judged_location(city, addr, &real, "read", bound)?;
+    city.judged_location(addr, &real, "read", bound)?;
     let Ok(file) = std::fs::File::open(&real) else {
         return Ok(None);
     };

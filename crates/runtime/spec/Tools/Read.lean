@@ -95,7 +95,7 @@ pub(super) fn text_of(city: &CityRoot, addr: &Address, asked: &str,
     bound: &dyn Fn(&Address) -> ReadVerdict) -> Result<String, AxError>;
 ```
 
-- **Windows：先开，再问句柄在哪，再判，再从同一个句柄读。** `File::open` 打开城根拼写下的地址（跟随路上的链接，与 canonicalize 内部那一次 open 相同），问这个句柄的真实位置（`GetFinalPathNameByHandleW`，D10 定由谁来问），交给 `chosen_path::judged_location`（§8-30-1）：不在城根之下即拒，落点的拼写不是所写地址即再 `admit`。判定与读取之间没有可换链接的窗口，所以不需要 `still_judged` 的重求与再开。
+- **Windows：先开，再问句柄在哪，再判，再从同一个句柄读。** `File::open` 打开城根拼写下的地址（跟随路上的链接，与 canonicalize 内部那一次 open 相同），问这个句柄的真实位置（`GetFinalPathNameByHandleW`，D10 定由谁来问），交给 `CityRoot::judged_location`（§8-30-1）：不在城根之下即拒，落点的拼写不是所写地址即再 `admit`。判定与读取之间没有可换链接的窗口，所以不需要 `still_judged` 的重求与再开。
 - **Linux：先求真实位置，再判，再开，再核句柄。** Unix 的 canonicalize 不打开文件，所以不在判定前打开链接背后未经判定的东西（FIFO 会让 open 一直阻塞，§8-29-4 的理由照旧）；判过之后打开真实位置，以 `/proc/self/fd/N` 的 `read_link` 核这个句柄的位置仍是判过的位置，不是＝`still_judged` 的那条 `E_GATE_DENIED`。
 - **其他平台走 §8-29-4 的判定路径**，不变。
 - **任何失败都退回判定路径重答一遍**：open、元数据、取真实位置、读出错，句柄是目录，字节不是 UTF-8——这些调用本来就答错误或目录，退回由 `land` + `text_at` 给出与 main 相同的那一句，`nearby` 也在那里算。`Floor` 因此只在退回时求。

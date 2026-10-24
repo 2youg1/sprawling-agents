@@ -27,8 +27,8 @@ pub(crate) struct CityRoot { written: PathBuf, real: PathBuf }
 pub(crate) fn anchor(written: &Path, action: &'static str) -> Result<CityRoot, AxError>;
 // 一个真实位置在城里的判定，land 与 read 的引擎（§8-29-4）共用这一处：不在锚定的城根之下＝E_GATE_DENIED
 // （恢复语说出链接要留在城里）；它在城里的拼写不是 addr（路上有链接）＝把那个拼写再交给 admit。
-pub(crate) fn judged_location(city: &CityRoot, addr: &Address, real: &Path, action: &'static str,
-    bound: &dyn Fn(&Address) -> ReadVerdict) -> Result<(), AxError>;
+impl CityRoot { pub(crate) fn judged_location(&self, addr: &Address, real: &Path, action: &'static str,
+    bound: &dyn Fn(&Address) -> ReadVerdict) -> Result<(), AxError>; }
 // 已准入的地址在盘上真正落到哪里：解析真实路径（沿途每一个 symlink 或 junction），把它在城里的地址
 // 再交给 admit 判一次，返回真实路径。落在城外＝E_GATE_DENIED；落到保留区或关上的楼＝admit 的那条拒绝；
 // 文件不存在也同样判，真实位置由 real_location 求出，答 Located::Absent；解析失败于别的原因＝E_STORAGE_FATAL。
@@ -207,7 +207,7 @@ end Runtime.Tools.ChosenPath
 
 /-! D5 城根的真实位置在工具立起时锚定一次
 
-- **决定**：`CityRoot::anchor` 在工具立起时把城根的真实位置解析一次（`real_location`），`land`、`walked` 与 `read` 的引擎之后都拿这份锚定的 real 做城内比对（`judged_location`），不再逐次重解析。城根解析不了，工具立不起来（`ReadTool::new`、`SearchTool::new` 返回那条 `E_STORAGE_FATAL`）。
+- **决定**：`CityRoot::anchor` 在工具立起时把城根的真实位置解析一次（`real_location`），`land`、`walked` 与 `read` 的引擎之后都拿这份锚定的 real 做城内比对（`CityRoot::judged_location`），不再逐次重解析。城根解析不了，工具立不起来（`ReadTool::new`、`SearchTool::new` 返回那条 `E_STORAGE_FATAL`）。
 - **理由**：每次 `land` 重解析城根是一次 canonicalize，Windows 上它内部是一次 open，在答复路径上占几十到一百多微秒，而城根在一个 run 里不换位置。锚定之后若城根真被换掉（目录被改名、链接被换上），真实位置与锚定的 real 比对落空，判定即拒绝：比对是 fail-closed 的。
 - **击败的备选**：逐次重解析。它给出的「城根此刻还在原地」并不缩小换窗：判定与打开之间城根同样可能被换，逐次解析只多付一次 canonicalize。
 - **重开的参数**：出现一个需要在 run 进行中更换城根、且对工具可见的机制。

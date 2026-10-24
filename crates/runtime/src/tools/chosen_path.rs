@@ -192,38 +192,38 @@ impl CityRoot {
             .split('/')
             .fold(self.written.clone(), |path, segment| path.join(segment))
     }
-}
 
-/// Judges the place `real` an admitted address really reached on disk:
-/// it must lie under the anchored root, and when its city spelling is
-/// not `addr` a link on the way led elsewhere, so that spelling goes
-/// through [`admit`] in turn. [`land`] and `read`'s engine both ask
-/// this, so where a link may lead has one answer.
-///
-/// # Errors
-/// `E_GATE_DENIED` when `real` is outside the city or [`admit`] refuses
-/// the address it names.
-pub(crate) fn judged_location(
-    city: &CityRoot,
-    addr: &Address,
-    real: &Path,
-    action: &'static str,
-    bound: &dyn Fn(&Address) -> ReadVerdict,
-) -> Result<(), AxError> {
-    let inside = spelled_under(&city.real, real).ok_or_else(|| {
-        AxError::failure(
-            AxCode::GateDenied,
-            action,
-            format!("{} leads out of the city through a link", addr.as_str()),
-        )
-        .with_recovery("name a path whose every link stays inside the city")
-    })?;
-    // A path with no link on it names the address already admitted, and
-    // asking the read bound twice would read a building's rules twice.
-    if inside != addr.as_str() {
-        admit(&inside, action, bound)?;
+    /// Judges the place `real` an admitted address really reached on disk:
+    /// it must lie under the anchored root, and when its city spelling is
+    /// not `addr` a link on the way led elsewhere, so that spelling goes
+    /// through [`admit`] in turn. [`land`] and `read`'s engine both ask
+    /// this, so where a link may lead has one answer.
+    ///
+    /// # Errors
+    /// `E_GATE_DENIED` when `real` is outside the city or [`admit`] refuses
+    /// the address it names.
+    pub(crate) fn judged_location(
+        &self,
+        addr: &Address,
+        real: &Path,
+        action: &'static str,
+        bound: &dyn Fn(&Address) -> ReadVerdict,
+    ) -> Result<(), AxError> {
+        let inside = spelled_under(&self.real, real).ok_or_else(|| {
+            AxError::failure(
+                AxCode::GateDenied,
+                action,
+                format!("{} leads out of the city through a link", addr.as_str()),
+            )
+            .with_recovery("name a path whose every link stays inside the city")
+        })?;
+        // A path with no link on it names the address already admitted, and
+        // asking the read bound twice would read a building's rules twice.
+        if inside != addr.as_str() {
+            admit(&inside, action, bound)?;
+        }
+        Ok(())
     }
-    Ok(())
 }
 
 /// Where an admitted address really lands on disk, judged again there.
@@ -248,7 +248,7 @@ pub(crate) fn land(
     bound: &dyn Fn(&Address) -> ReadVerdict,
 ) -> Result<Located, AxError> {
     let located = real_location(&city.join(addr), action, addr.as_str())?;
-    judged_location(city, addr, located.path(), action, bound)?;
+    city.judged_location(addr, located.path(), action, bound)?;
     Ok(located)
 }
 
