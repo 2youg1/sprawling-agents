@@ -54,6 +54,11 @@ pub fn shown(
         (Rendering::V2, ToolAnswer::Answered { result }) => match name.as_str() {
             crate::tools::ReadTool::NAME => read::text(result).map_or_else(|| json(result), Ok),
             crate::tools::SearchTool::NAME => search::text(result).map_or_else(|| json(result), Ok),
+            crate::tools::ToolTool::NAME => result
+                .as_map()
+                .get("text")
+                .and_then(serde_json::Value::as_str)
+                .map_or_else(|| json(result), |text| Ok(text.to_owned())),
             _ => json(result),
         },
     }
