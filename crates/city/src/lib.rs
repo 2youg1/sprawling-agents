@@ -97,10 +97,9 @@ pub use spine_files::hall_identity_path;
 pub use spine_files::{AGENTS_FILE, CITY_FILE, CLERK_FILE, HANDOFF_FILE, MAYOR_FILE};
 pub use spine_files::{JobBrief, ROADMAP_FILE, RunBrief};
 pub use spine_files::{MEMO_FILE, SPEC_FILE};
-pub use spine_files::{
-    city_prompt_path, job_path, norms, roadmap, roadmap_path, write_brief, write_job,
-};
+pub use spine_files::{city_prompt_path, job_path, norms};
 pub use spine_files::{handoff, handoff_path};
+pub use spine_files::{roadmap, roadmap_path, write_brief, write_job};
 pub use vocation::{Vocation, vocation_of};
 pub use watch::{Link, Source, WATCH_FILE, Watch, watch_path};
 pub use wizard::{CityPlan, Standing, survey};

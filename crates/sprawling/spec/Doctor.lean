@@ -860,7 +860,7 @@ pub(super) struct ModelNote { pub(super) at: Address, pub(super) bytes: Vec<u8> 
 pub(super) fn model_note(city_root: &Path, building: &Address, provider: &str, model: &str) -> Result<Option<ModelNote>, AxError>;
 ```
 
-- **两处，都在保留区里，近者替换远者**：城的 `<city>/.sprawling/models/<provider>/<model>.md` 与楼的 `<building>/.sprawling/models/<provider>/<model>.md`；楼的那份在，就只送楼的。`<provider>` 是派活时选中的 endpoint 名（`AttachEndpoint` 的 `name`），`<model>` 是模型 id 原样。放在保留区而不是城根或楼根，是因为城根下的目录名就是楼的地址，一栋叫 `models` 的楼会与它撞名，楼根常是人的 git 仓库；保留区也是居民写不到的地方，一段约束模型的话不该由被约束的模型改写。替换而不追加：一栋楼为某个模型写了自己的那段话，就是说了在这里该对这个模型说什么，城的那段跟在旁边就是同一个问题的第二个答案。只有这两层（User 的裁定），房间一层不设。
+- **两处，都在保留区里，近者替换远者**：城的 `<city>/.sprawling/models/<provider>/<model>.md` 与楼的 `<building>/.sprawling/models/<provider>/<model>.md`；楼的那份在，就只送楼的。`<provider>` 是派活时选中的 endpoint 名（`AttachEndpoint` 的 `name`），`<model>` 是模型 id 原样。放在保留区而不是城根或楼根，是因为城根下的目录名就是楼的地址，一栋叫 `models` 的楼会与它撞名，楼根常是人的 git 仓库；保留区也是居民写不到的地方，一段约束模型的话不该由被约束的模型改写。替换而不追加：一栋楼为某个模型写了自己的那段话，就是说了在这里该对这个模型说什么，城的那段跟在旁边就是同一个问题的第二个答案。只有这两层，房间一层不设：这是 ruling，人要每模型提示只分城与楼，房间一层没有读者需要它。
 - **追加在 run 段末尾，因而在整段 system prompt 的末尾。** 与楼段接 `AGENTS.md` 走同一扇门（`Assembled::extend`：空一行接上，记一行来源）。它随 run 段一同冻结、一同入库，整个 run 内字节不动，所以每一回合的缓存前缀都盖得住它；`prompt_assembled` 的 run 段哈希盖住它的字节，来源行写出它的地址与长度，WebUI 的提示词视图（§8-67）因此照原样列出「这个 run 用的是哪个模型的哪一段」。重放读的是账本里那一行，不重新读文件，故逐字节一致。
 - **文件不在，行为逐字节与没有这个功能时相同**：run 段不多一个字节，来源表不多一行。
 - **文件在却读不出**（权限、目录占位、不是文件）是 `E_STORAGE_FATAL`，指名那条路径，派活被拒；不静默跳过，理由与 `city_segment` 相同：人写下的那段话静静躺在盘上没被读，而 run 照着缺了它的提示词干活，没有人会被告知。
