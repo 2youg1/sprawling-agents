@@ -85,7 +85,7 @@ import crates.accounting.spec.Worker.Workbench.Tools
 
 | 测试 | 它钉住的事 |
 |---|---|
-| `every_tool_a_builder_is_offered_is_called_and_answered` | 一栋 `Builds` 楼里的 run，第一次请求收到的每一件工具都被脚本调用一次；每条 `tool_called` 恰有一条同 id 的 `tool_result`；每件工具的回答与它自己的 SPEC 一致，逐件的判定在 `episodes.rs`。该调用哪些工具不写名单，取模型收到的工具表加上休眠索引里的工具行（`crates/runtime/Spec.lean` §8-60），`describe` 与 `call` 本身各由脚本调一次：工作台多登记一件工具而脚本里没有它的一段，这条测试点名那件工具变红。 |
+| `every_tool_a_builder_is_offered_is_called_and_answered` | 一栋 `Builds` 楼里的 run，第一次请求收到的每一件工具都被脚本调用一次；每条 `tool_called` 恰有一条同 id 的 `tool_result`；每件工具的回答与它自己的 SPEC 一致，逐件的判定在 `episodes.rs`。该调用哪些工具不写名单，取模型收到的工具表，再把休眠索引的每个命名空间行换成脚本以 `tool` 的 `list` 列出的成员，列出的件数要等于行上的计数（`crates/runtime/Spec.lean` §8-60）；`tool` 本身也在表里，由脚本以 `detail`、`list`、`run` 调用：工作台多登记一件工具而脚本里没有它的一段，这条测试点名那件工具变红。 |
 | `every_tool_city_hall_is_offered_is_called_and_answered` | 同一条验收标准，对 `Plans` 楼（市政厅）。多出的 `city` 和 `rules` 一样在效果层被拒（`crates/city/Spec.lean` §8-2b、§8-23）；判定看的是调用之后城根下的目录与楼的 `RULES.toml` 一字未变，不钉拒绝码。 |
 | `every_shipped_skill_a_building_admits_is_read_by_name_and_pinned` | 仓库 `crates/city/skills/` 下每个技能包经 `city::install_skill` 装进城库、由楼的阅览室按名准入之后：`run_started.skills` 按目录顺序列出每一件，哈希等于装入时 `Installed::holding` 报告的 `SKILL.md` 哈希（整包哈希是 CAS 的键，答的是另一个问题，`crates/city/Spec.lean` §8-28）；`read <名>` 交给模型的就是那份 `SKILL.md`；包内附属文件按 `<名>/<相对路径>` 读得到。技能集合取 `skills/` 目录本身，不另写名单。 |
 

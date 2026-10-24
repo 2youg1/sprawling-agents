@@ -139,11 +139,12 @@ impl Usage {
 
 /// The server one call belongs to and its tool's name under it.
 ///
-/// A call whose record named its server keeps it. A `call` line names
-/// only the whole tool name: a server label holds no `_`
-/// (`kernel::ServerLabel`), so the head before the first `_` is the
-/// server when it is a known one, and otherwise the call is filed under
-/// no server - the city's own tools hold `_` too (wire D33).
+/// A call whose record named its server keeps it. A `tool` `run` line,
+/// or a `call` line an earlier build wrote, names only the whole tool
+/// name: a server label holds no `_` (`kernel::ServerLabel`), so the
+/// head before the first `_` is the server when it is a known one, and
+/// otherwise the call is filed under no server - the city's own tools
+/// hold `_` too (wire D33).
 fn attributed<'a>(call: &'a McpCall, known: &BTreeSet<&'a str>) -> (Option<&'a str>, String) {
     if let Some(label) = call.label.as_deref() {
         return (Some(label), call.tool.clone());
