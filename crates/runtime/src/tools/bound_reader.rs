@@ -75,7 +75,11 @@ impl BoundReader {
         }
         let spelled = chosen_path::within_city(&self.city_root, asked, action)?;
         let addr = chosen_path::admit(&spelled, action, &*self.bound)?;
-        let real = match chosen_path::land(&self.city_root, &addr, action, &*self.bound)? {
+        // Not a hot path: anchoring here costs what re-resolving the
+        // root inside `land` used to cost on every call
+        // (`crates/runtime/spec/Tools/ChosenPath.lean` D5).
+        let city = chosen_path::CityRoot::anchor(&self.city_root, action)?;
+        let real = match chosen_path::land(&city, &addr, action, &*self.bound)? {
             Located::Present(real) if real.is_file() => real,
             Located::Present(_) => {
                 return Err(AxError::failure(

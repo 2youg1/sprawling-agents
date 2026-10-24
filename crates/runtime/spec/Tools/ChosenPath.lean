@@ -21,10 +21,18 @@ pub(crate) fn admit(asked: &str, action: &'static str, bound: &dyn Fn(&Address) 
     -> Result<Address, AxError>;
 // 解析失败＝E_INVALID_ARGS；Address::is_reserved()＝E_GATE_DENIED；
 // 读界答 Confidential 或 RulesUnreadable＝E_GATE_DENIED，后者的 subject 带上规则读不出的原因。
+// 城根：written 是装配交给工具的拼写，real 是它解析过的真实位置。工具立起时锚定一次（D5），
+// 之后 land、walked 与 read 的引擎都拿锚定的 real 做城内比对，不再逐次重解析城根。
+pub(crate) struct CityRoot { written: PathBuf, real: PathBuf }
+pub(crate) fn anchor(written: &Path, action: &'static str) -> Result<CityRoot, AxError>;
+// 一个真实位置在城里的判定，land 与 read 的引擎（§8-29-4）共用这一处：不在锚定的城根之下＝E_GATE_DENIED
+// （恢复语说出链接要留在城里）；它在城里的拼写不是 addr（路上有链接）＝把那个拼写再交给 admit。
+pub(crate) fn judged_location(city: &CityRoot, addr: &Address, real: &Path, action: &'static str,
+    bound: &dyn Fn(&Address) -> ReadVerdict) -> Result<(), AxError>;
 // 已准入的地址在盘上真正落到哪里：解析真实路径（沿途每一个 symlink 或 junction），把它在城里的地址
 // 再交给 admit 判一次，返回真实路径。落在城外＝E_GATE_DENIED；落到保留区或关上的楼＝admit 的那条拒绝；
 // 文件不存在也同样判，真实位置由 real_location 求出，答 Located::Absent；解析失败于别的原因＝E_STORAGE_FATAL。
-pub(crate) fn land(city_root: &Path, addr: &Address, action: &'static str,
+pub(crate) fn land(city: &CityRoot, addr: &Address, action: &'static str,
     bound: &dyn Fn(&Address) -> ReadVerdict) -> Result<Located, AxError>;
 pub(crate) enum Located { Present(PathBuf), Absent(PathBuf) }
 // 一条路径在盘上的真实位置，末尾几段不存在也算：盘解析最深的那个存在的祖先（沿途链接全解开），
@@ -45,7 +53,7 @@ pub(crate) fn within_city<'a>(city_root: &Path, asked: &'a str, action: &'static
 // （盘说不出类型的也交 File，让随后的打开说出看不了的原因）；链接经 land 判，落到文件交 File(真实路径)，
 // 落到目录或不存在交 Passed（走链接可能绕回走过的地方），land 以 E_GATE_DENIED 拒的交 Passed，
 // land 的其余拒绝原样返回，由遍历者计入看不了的项。
-pub(crate) fn walked(city_root: &Path, path: PathBuf, rel: &str,
+pub(crate) fn walked(city: &CityRoot, path: PathBuf, rel: &str,
     bound: &dyn Fn(&Address) -> ReadVerdict) -> Result<Walked, AxError>;
 pub(crate) enum Walked { Directory(PathBuf), File(PathBuf), Passed }
 ```
@@ -58,7 +66,7 @@ pub(crate) enum Walked { Directory(PathBuf), File(PathBuf), Passed }
 
 **判的是盘打开的那个地址，不只是模型写下的那个。** 文法准入的地址仍可能穿过一个链接：开放楼里一条指向机密楼、保留区或城外的链接，打开的是链接的目标，只判字面地址就等于把 admit 拒掉的东西从侧门交出去。所以 `read` 与 `search` 的起点都走 `land`，`search` 遍历中遇到的每一个链接也走 `land`——链接的判定只有这一处。
 
-它是 `read` 原有那段判定的搬家，不是它的第二份。三道判定次序固定：文法、保留区、读界——前两道不碰盘，读界为他楼可能读一次规则，所以排最后。`ReadTool::new(city_root, catalog, bound)` 与 `SearchTool::new(city_root, bound)` 各持同一个 `ReadBound` 的一份 `Arc`；装配层建一次，交给两件工具。`search` 遍历时对每一个候选文件同样只问 `Address::is_reserved()`——kernel 的那个原语——所以「什么是保留区」自始至终一个权威；读界则只在城根那一层问，一栋楼整栋开或整栋关（`crates/city/Spec.lean` §8-3「楼是顶层地址」），楼里的条目继承楼的答案，不为每个文件再读一次规则。
+它是 `read` 原有那段判定的搬家，不是它的第二份。三道判定次序固定：文法、保留区、读界——前两道不碰盘，读界为他楼可能读一次规则，所以排最后。`ReadTool::new` 与 `SearchTool::new` 各持同一个 `ReadBound` 的一份 `Arc`；装配层建一次，交给两件工具，两件工具立起时各自锚定一次 `CityRoot`（D5）。`BoundReader::open` 不在热路径上，每次调用锚定一次，花费与逐次重解析相同。`search` 遍历时对每一个候选文件同样只问 `Address::is_reserved()`——kernel 的那个原语——所以「什么是保留区」自始至终一个权威；读界则只在城根那一层问，一栋楼整栋开或整栋关（`crates/city/Spec.lean` §8-3「楼是顶层地址」），楼里的条目继承楼的答案，不为每个文件再读一次规则。
 -/
 
 namespace Runtime.Tools.ChosenPath
@@ -196,6 +204,14 @@ theorem judging_only_the_written_address_lets_a_link_out :
   exact ⟨rfl, rfl⟩
 
 end Runtime.Tools.ChosenPath
+
+/-! D5 城根的真实位置在工具立起时锚定一次
+
+- **决定**：`CityRoot::anchor` 在工具立起时把城根的真实位置解析一次（`real_location`），`land`、`walked` 与 `read` 的引擎之后都拿这份锚定的 real 做城内比对（`judged_location`），不再逐次重解析。城根解析不了，工具立不起来（`ReadTool::new`、`SearchTool::new` 返回那条 `E_STORAGE_FATAL`）。
+- **理由**：每次 `land` 重解析城根是一次 canonicalize，Windows 上它内部是一次 open，在答复路径上占几十到一百多微秒，而城根在一个 run 里不换位置。锚定之后若城根真被换掉（目录被改名、链接被换上），真实位置与锚定的 real 比对落空，判定即拒绝：比对是 fail-closed 的。
+- **击败的备选**：逐次重解析。它给出的「城根此刻还在原地」并不缩小换窗：判定与打开之间城根同样可能被换，逐次解析只多付一次 canonicalize。
+- **重开的参数**：出现一个需要在 run 进行中更换城根、且对工具可见的机制。
+-/
 
 /-! D4 定规：一条路径算不算绝对路径，由本平台判定
 

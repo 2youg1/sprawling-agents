@@ -3061,6 +3061,7 @@ dependencies = [
  "wasmtime-wasi",
  "wat",
  "win32job",
+ "winx",
 ]
 
 [[package]]

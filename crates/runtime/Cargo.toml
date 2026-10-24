@@ -59,6 +59,12 @@ desktop_ffi = { workspace = true }
 # cannot read Visual Studio's instance state; already in the lock beneath
 # cc (`crates/runtime/spec/Tools/Exec/NativeWindows.lean` D60).
 find-msvc-tools = "0.1.14"
+# Where an open handle really lies (`GetFinalPathNameByHandleW`), which
+# std answers only through `canonicalize`, an open of its own: `read`
+# judges the handle it reads from (`crates/runtime/spec/Tools/Read.lean`
+# D10). Already in the lock beneath wasmtime's cap-primitives, with the
+# windows-sys it calls through; the unsafe call is inside the crate.
+winx = "0.36.4"
 
 [features]
 wasm = ["dep:wasmtime", "dep:wasmtime-wasi"]
