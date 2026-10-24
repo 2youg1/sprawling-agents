@@ -6,7 +6,7 @@
 /-!
 # runtime::tools
 
-规定 `tools`、`tools::edit`、`tools::status`（`crates/runtime/src/` 下同名的文件）。工具面：四件工具的共同约定、edit 的乐观并发、写域的两道闸与「只新建」。本文件是 `crates/runtime/Spec.lean` 的一个分部；下面每一节保留它在 runtime 规格里的标签 §8-n，别处引作 `crates/runtime/Spec.lean §8-n`。
+规定 `tools`、`tools::edit`、`tools::status`（`crates/runtime/src/` 下同名的文件）。工具面：四件工具的共同约定、写域的两道闸与「只新建」；edit 的准入在 `spec/Tools/Edit.lean`（§8-64）。本文件是 `crates/runtime/Spec.lean` 的一个分部；下面每一节保留它在 runtime 规格里的标签 §8-n，别处引作 `crates/runtime/Spec.lean §8-n`。
 
 这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与 `runtime::tools::edit::tests`、`runtime::tools::status::tests` 守住。
 -/
@@ -18,12 +18,12 @@
 ```rust
 impl EditTool {
     pub fn new(city_root: &Path, domain: Address, writable: kernel::WriteDomain,
-               policy: crate::mode::PolicyReader) -> Result<EditTool, AxError>;
+               policy: crate::mode::PolicyReader, desk: EditDesk) -> Result<EditTool, AxError>;
 }
 pub struct ExecSetup { /* …既有字段… */ pub policy: crate::mode::PolicyReader }
 ```
 
-- **edit 的两条臂各走 storage 的一种落盘。** 改写一个已有文件：先过写域（§8-36），再问 `kernel::gate::replacing(policy.now().write, &target)`，`Create` 下在读文件之前就拒，盘面不动；放行后经 `storage::WriteTarget::replace`（暂存文件再 `rename`，取被替换文件的权限，`crates/storage/Spec.lean` §8-32）。新建（`base_version: "new"`）：经 `storage::WriteTarget::create`，名字由文件系统的「仅当不存在才建」原子地占下，已有文件（包括别的调用刚建成的）答 `E_VERSION_CONFLICT`，说出它此刻的版本。新建在两种限制下都这样走，所以竞争的两次新建只成一次，不论限制是什么。
+- **edit 的两条臂各走 storage 的一种落盘。** 改写一个已有文件：先过写域（§8-36），再问 `kernel::gate::replacing(policy.now().write, &target)`，`Create` 下在读文件之前就拒，盘面不动；放行后经 `storage::WriteTarget::replace`（暂存文件再 `rename`，取被替换文件的权限，`crates/storage/Spec.lean` §8-32）。新建（对不存在的路径 `old: ""`）：经 `storage::WriteTarget::create`，名字由文件系统的「仅当不存在才建」原子地占下，已有文件（包括别的调用刚建成的）答 `E_VERSION_CONFLICT`，请先读它。新建在两种限制下都这样走，所以竞争的两次新建只成一次，不论限制是什么。
 - **限制在每次写时读，不写进工具说明**：edit 与 exec 持 run 的策略格的读方（§8-62），每次写时问 `now().write`，所以 run 在中途取用的改动从下一波起就到了写门。工具说明不带写限制：说明随工具表冻结在前缀里，而写限制在一个 run 里会变；模型在 run 中途换策略后从追加的那句说明里读到它（§8-62）；一个开头就在 `Create` 下的 run，在第一次被拒时从拒词里读到，拒词说出限制与可走的路。
 - **exec 在 `Create` 下只在副本里跑。** `where: host` 的 program 与 shell 直接落在人的树上，没有任何东西能让已有文件只读，所以在起进程之前就由 `gate::replacing` 拒，主语是工作目录；`sandbox` 放置照常：写入落在同步来的副本上，副本里的东西不回到树上，所以已有文件不变、命令也新建不了任何东西。python 臂的挂载恒只读，不受影响。确认不了隔离的工具不开放写入（`crates/kernel/Spec.lean` §8-78）。`where: host` 的判在 `Placement::opened_by` 里，读的是同一个策略格。
 - **链接**：写目标与它到城根之间的每一级若是链接（符号链接、junction、硬链接），`WriteTarget::within` 字面拒（`crates/storage/Spec.lean` §8-25），两种限制下一样，所以经链接改旧文件这条路在 `Create` 下同样不通。
@@ -45,8 +45,8 @@ impl Tool for ExecTool { /* meta：name=exec、effect=Write{domain}、temporal=T
 // Python 臂：sandbox.run(python_wasm, argv=["python","-c",code], mounts)；组件缺失→E_TOOL_UNAVAILABLE＋alternative＝Program 臂
 // Shell 臂：探测缺失即拒（E_TOOL_UNAVAILABLE，不是降级；楼要了 pwsh 而没有时点名 pwsh 7）；存在则 sh -c／cmd /C／pwsh -NoLogo -NoProfile -NonInteractive -Command（D30）；placement 与 Program 臂同一权威（§8-13-2）
 
-// crates/runtime/src/tools/edit.rs —— base_version 乐观并发＋写域双闸＋创建臂
-pub struct EditTool { /* city_root、writable: WriteDomain —— 私有 */ }
+// crates/runtime/src/tools/edit.rs —— 读戳准入（§8-64）＋写域双闸＋创建臂
+pub struct EditTool { /* city_root、writable: WriteDomain、policy、desk: EditDesk —— 私有 */ }
 impl Tool for EditTool { /* meta：name=edit、effect=Write{domain}、render=Diff、temporal=Timeless */ }
 // new(city_root, addr, writable: WriteDomain)：writable＝该 Run 的写域（rules.write_domain()）。
 // 每次调用先判路径后碰盘，三道依次：within_city（§8-30-1）把本平台的绝对路径换成城里的拼写，落在城外＝
@@ -54,8 +54,8 @@ impl Tool for EditTool { /* meta：name=edit、effect=Write{domain}、render=Dif
 // 斜杠／空段，E_INVALID_ARGS）；WriteDomain::admits 杀域外与
 // reserved prefix（E_OUTSIDE_WRITE_DOMAIN，recovery 报可写前缀清单）。工具静态声明的 Effect 只说它会写，
 // 模型选的 path 要在这里判——判定住权威处，而不是 bench 里的第二份判定。
-// args：{path, base_version, old, new}；version＝内容的完整 Locator `cas:b3-<hex64>`（`read` 答同一个值，`plan finish` 原样收作证据，kernel D27）；check_base 拒即 E_VERSION_CONFLICT；
-// old 必唯一命中（零命中／多命中＝E_INVALID_ARGS 携计数）；回显＝unified diff＋new_version（逐次 diff 即回档粒度）
+// args：{path, old, new}；准入按本 run 的读戳（§8-64，D103）：没读过＝E_INVALID_ARGS，读后被改＝E_VERSION_CONFLICT 带当前片段；
+// old 必唯一命中（零命中／多命中＝E_INVALID_ARGS 携计数）；回显＝unified diff（逐次 diff 即回档粒度）
 
 // crates/runtime/src/tools/read.rs —— 一个参数，两条路
 pub struct ReadTool { /* city_root、catalog: Arc<Mutex<Catalog>>、bound、block_store —— 私有 */ }
@@ -63,10 +63,9 @@ impl ReadTool { pub fn new(city_root: &Path, catalog: Arc<Mutex<Catalog>>, bound
     -> Result<ReadTool, AxError>; }   // bound 见 §8-29-1，block_store 见 §8-29-5
 impl Tool for ReadTool { /* meta：name=read、effect=Read、cost=Light、render=Generic、temporal=Timeless */ }
 // args：{path}。先问 catalog，再当作地址。
-// 创建臂：base_version=="new"（Locator 永拼不出，无碰撞）→ 文件必不存在（存在＝E_VERSION_CONFLICT 报真实版本），
-// old 必 ""，new＝全文；父目录自动建（域内已证）。缺文件而非创建形的拒词指向创建形；
-// 缺参拒词报四字段契约。理由：没有创建能力的城里，Agent 在空房间里无法开始任何工作；
-// 创建住 edit 而非新工具，因为「文件变更＋乐观并发」已是本工具拥有的唯一权威，“absent”只是版本的一个取值。
+// 创建臂：old=="" → 文件必不存在（存在＝E_VERSION_CONFLICT，请先读），new＝全文；父目录自动建（域内已证）。
+// 路径不存在而 old 非空的拒词指向创建形；缺参拒词报三字段契约。理由：没有创建能力的城里，Agent 在空房间里无法开始任何工作；
+// 创建住 edit 而非新工具，因为「文件变更＋准入」已是本工具拥有的唯一权威，「不存在」只是准入的一个取值。
 
 // crates/runtime/src/tools/status.rs —— 十三字段
 pub struct StatusSnapshot { pub who: String, pub addr: Address, pub policy: RunPolicy,
@@ -214,8 +213,9 @@ impl ToolBench {
 
 | 文件 | 管什么 |
 |---|---|
-| `crates/runtime/src/tools/edit.rs` | `EditTool` 与 `version_of`／`CREATES`：`new` 的参数模式声明、`Tool::invoke` 的判定次序（工具身份→地址→写域→版本→匹配数→落盘），创建臂 `create`，以及 `unified_diff`／`common_prefix`／`common_suffix` |
-| `crates/runtime/src/tools/edit/tests.rs` | edit 拒绝什么、回显什么：版本相符的落盘与 diff、陈旧版本、创建臂两种冲突、写域外、城外的本平台绝对路径（`E_GATE_DENIED`，盘上不留文件）与非法地址、缺文件的恢复话术、零次与多次匹配、错路由 |
+| `crates/runtime/src/tools/edit.rs` | `EditTool` 与 `EditDesk`：`new` 的参数模式声明、`Tool::invoke` 的判定次序（工具身份→地址→写域→锁内准入（§8-64）→匹配数→落盘→记新戳），创建臂 `create`，以及 `unified_diff`／`common_prefix`／`common_suffix` |
+| `crates/runtime/src/tools/edit/passage.rs` | 「读后被改」拒绝里的当前片段：`old` 首行附近的几行，带 0 基行号 |
+| `crates/runtime/src/tools/edit/tests.rs` | edit 拒绝什么、回显什么：读过之后的落盘与 diff、没读过、读后被改带片段、两个 run 争一个文件、创建臂两种冲突、写域外、城外的本平台绝对路径（`E_GATE_DENIED`，盘上不留文件）与非法地址、缺文件的恢复话术、零次与多次匹配、错路由 |
 -/
 
 /-!
