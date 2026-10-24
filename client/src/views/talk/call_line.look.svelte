@@ -43,7 +43,7 @@ over the subject, which truncates. -->
       </span>
       <span class="flex items-center gap-tight">
         {#if look.verdict !== null}
-          <span class={["whitespace-nowrap", look.verdict.tone === "alert" ? "text-alert" : "text-text-faint"]}>{look.verdict.text}</span>
+          <span class={["whitespace-nowrap", look.verdict.tone === "alert" ? "max-w-[24ch] truncate text-alert narrow:max-w-[12ch]" : "text-text-faint"]}>{look.verdict.text}</span>
         {/if}
         <span
           data-line-keys

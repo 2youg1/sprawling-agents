@@ -7503,6 +7503,10 @@
     "en": "failed",
     "zh": "失败"
   },
+  "talk_call_failed_why": {
+    "en": "failed: {why}",
+    "zh": "失败：{why}"
+  },
   "talk_call_finished": {
     "en": "finished {at}",
     "zh": "完成于 {at}"

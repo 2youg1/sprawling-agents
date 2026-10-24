@@ -8,7 +8,7 @@ import { describe, expect, test } from "bun:test";
 import { fill, say } from "../../core/lang";
 import { readingOf } from "../inspect/reading";
 import { Address, Seq, TimeMs, type Call } from "../../wire";
-import { kindOf, lineOf, outcomeOf } from "./call_kind";
+import { failureOf, kindOf, lineOf, outcomeOf } from "./call_kind";
 
 function call(render: Call["render"], args: object, said: object | null, cut = 0): Call {
   return {
@@ -98,5 +98,27 @@ describe("a send reads where its letter landed when the city recorded it (wire D
 
   test("a Ledger written before the landing line reads what the tool answered", () => {
     expect(words({ ...sent, landing: null })).toBe("send | to lab/kiln: glaze is dry | sent");
+  });
+});
+
+describe("why a failed call failed", () => {
+  const failed = (head: string | null, cut = 0): Call => ({
+    ...call("generic", { path: "crates/nowhere" }, {}),
+    outcome: "failed",
+    output: head === null ? null : { head, cut },
+  });
+  const refusal = JSON.stringify({ code: "E_PATH_NOT_FOUND", action: "read", subject: "crates/nowhere", nearby: [], recovery: "list it", retry: "no" });
+
+  test("a refusal is read by its code, whatever code it is, and a cut one by its words", () => {
+    expect(failureOf(failed(refusal))).toEqual({ kind: "refused", code: "E_PATH_NOT_FOUND", subject: "crates/nowhere" });
+    expect(failureOf(failed(JSON.stringify({ code: "E_NEWER_THAN_THIS_PAGE", subject: "x" })))).toEqual({ kind: "refused", code: "E_NEWER_THAN_THIS_PAGE", subject: "x" });
+    expect(failureOf(failed(refusal.slice(0, 20), 400))).toEqual({ kind: "said", text: refusal.slice(0, 20) });
+  });
+
+  test("a tool's own words give their first line that says anything, and silence gives nothing", () => {
+    expect(failureOf(failed("\n  upstream answered 503\nretry later"))).toEqual({ kind: "said", text: "upstream answered 503" });
+    expect(failureOf(failed(`${"x".repeat(159)}  ${"y".repeat(400)}`))).toEqual({ kind: "said", text: `${"x".repeat(159)}\u2026` });
+    expect(failureOf(failed(""))).toEqual({ kind: "silent" });
+    expect(failureOf(failed(null))).toEqual({ kind: "silent" });
   });
 });

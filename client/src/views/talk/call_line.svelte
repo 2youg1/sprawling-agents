@@ -39,7 +39,8 @@ third layer). -->
   import { pressedOf } from "../../core/press";
   import { ui } from "../../ui";
   import { closeRight, openCall, rightItem } from "../inspect/open.svelte";
-  import { kindOf, lineOf, outcomeOf } from "./call_kind";
+  import { failureOf, kindOf, lineOf, outcomeOf } from "./call_kind";
+  import { noticeTitle } from "../parts/notice_title";
   import { NAMED_AFTER_MS, callTime, runningWords, tookWords, ticker } from "./timing";
   import type { CallLineLook, CallFigure, CallVerdict } from "./call_line";
   import Look from "./call_line.look.svelte";
@@ -75,11 +76,26 @@ third layer). -->
   const waitsForYou = $derived(
     call.outcome === "waiting" && doing?.kind === "waiting" && time.kind === "running" && time.ms >= NAMED_AFTER_MS,
   );
-  const hint = $derived(
+  // A failed line says why in the verdict cell, cut to its width; the
+  // whole reason is in the hint too, so a cut reason is read on hover and
+  // focus, and pressing the line opens the whole result in the right side.
+  const failedWords = $derived.by((): string => {
+    const failure = failureOf(call);
+    switch (failure.kind) {
+      case "refused":
+        return fill(say($lang, "talk_call_failed_why"), { why: noticeTitle($lang, failure.code, failure.subject) });
+      case "said":
+        return fill(say($lang, "talk_call_failed_why"), { why: failure.text });
+      case "silent":
+        return say($lang, "talk_call_failed");
+    }
+  });
+  const when = $derived(
     call.answered === null || call.answered === undefined
       ? fill(say($lang, "talk_call_started"), { at: isoInstant(call.called) })
       : fill(say($lang, "talk_call_finished"), { at: isoInstant(call.answered) }),
   );
+  const hint = $derived(call.outcome === "failed" ? `${failedWords} · ${when}` : when);
 
   const walk = lineWalker();
   // The keys the line draws at its end, in the order refrain 3-12 names
@@ -134,7 +150,7 @@ third layer). -->
     }
   });
   const verdict = $derived.by((): CallVerdict | null => {
-    if (call.outcome === "failed") return { tone: "alert", text: say($lang, "talk_call_failed") };
+    if (call.outcome === "failed") return { tone: "alert", text: failedWords };
     if (outcome !== null) return { tone: "quiet", text: say($lang, outcome) };
     if (waitsForYou) return { tone: "alert", text: say($lang, "talk_waiting_you") };
     return null;
