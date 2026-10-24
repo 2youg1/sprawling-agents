@@ -36,7 +36,7 @@ pub(crate) fn lay_out_handoff(room_dir: &Path, room: &Address) -> Result<(), AxE
 pub struct HandoffSections { pub overall: Option<String>, pub progress: Option<String>, pub context: Option<String>, pub next_step: Option<String> }
 pub fn handoff_sections(text: &str) -> HandoffSections;           // city::handoff_form
 pub fn norms(city_root: &Path, addr: &Address) -> Result<Vec<PathBuf>, AxError>;   // 第一份是 city_prompt_path
-pub fn city_prompt_path(city_root: &Path, building: &Address) -> PathBuf;   // <building>/.sprawling/City.md 在就是它，否则 <city>/City.md
+pub fn city_prompt_path(city_root: &Path, building: &Address) -> Result<PathBuf, AxError>;   // <building>/.sprawling/City.md 在就是它（是什么都算在，读不出由读者拒绝），确认不在才是 <city>/City.md；查不了在不在时 E_STORAGE_FATAL
 ```
 
 - **楼级三份由 `lay_out` 写，交接住房间**：`lay_out` 写 Roadmap／Memo／`SPEC.md`；`Handoff.md` 由 `room::open` 经 `lay_out_handoff` 铺在房间里（§8-24）；`RULES.toml` 归 `building::create`（它的含义归 `policy`）——同一份文件有两个写入者就是两个权威。

@@ -212,6 +212,8 @@ fn building_segment(city_root: &Path, building: &Address) -> Vec<u8>;
 // `RULES.toml` **之后**并自述位次：二者会冲突（一份叫你跑测试的 AGENTS.md 遇上一栋
 // 没有 `exec` 的楼），而城执行的是楼规。文件不在就不写标题：空标题会让居民去
 // 遵守一份不存在的约定。
+// 文件在却读不出（权限、是个目录）时冻结以 `E_STORAGE_FATAL` 拒绝并点名路径，不当作不在：
+// 当作不在，run 就带着缺了项目约定的提示词开工，而没有任何一处说出这件事。
 fn room_conventions(city_root: &Path, addr: &Address, building: &Address) -> Vec<Convention>;
 // 楼根以下、到 run 所在房间为止的每一级 `AGENTS.md`（`city::room_agents_paths`，近楼的在前），
 // 接在 Resident 段末尾，同一扇门 `Assembled::extend_conventions`：文件在才写标题，一行一条来源。

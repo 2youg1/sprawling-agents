@@ -99,11 +99,14 @@ pub(super) const NEWLINE: u8 = 10;
 /// the project's file was written for whatever harness its authors had.
 /// A resident told to run a test suite by a building with no `exec` has
 /// to know which of the two to believe.
+///
 /// # Errors
 /// A path inside the city that this platform spells in a way the
 /// address grammar refuses. The bytes would still be right, but the
 /// account of where they came from would name a file nobody can open,
 /// and a source row a reader cannot follow is worse than a refusal.
+/// `E_STORAGE_FATAL` for a convention file that is there and will not
+/// read, as `Assembled::extend_conventions` says.
 pub(super) fn building_segment(city_root: &Path, building: &Address) -> Result<Assembled, AxError> {
     // The building's address opens the slot and is not a document, so
     // it is accounted to nothing.
@@ -173,10 +176,14 @@ impl Assembled {
     /// order, and accounts it.
     ///
     /// Written only when the file is: a heading over nothing would tell a
-    /// resident to follow conventions that do not exist.
+    /// resident to follow conventions that do not exist. A file that is
+    /// there and does not read refuses the freeze instead of being left
+    /// out, because the run would start without conventions its project
+    /// wrote down and nothing would say so.
     ///
     /// # Errors
-    /// As [`addressed`].
+    /// `E_STORAGE_FATAL` naming the path for a convention file that is
+    /// there and will not read; otherwise as [`addressed`].
     fn extend_conventions(
         &mut self,
         city_root: &Path,
@@ -188,15 +195,35 @@ impl Assembled {
             whose,
         } in conventions
         {
-            if let Ok(text) = std::fs::read(&path) {
-                let mut block = format!(
-                    "## {heading}\n\n{whose} Where this and the building's rules above disagree, \
-                     the rules decide: they are what the city enforces.\n\n"
-                )
-                .into_bytes();
-                block.extend_from_slice(&text);
-                self.extend(addressed(city_root, &path)?, &block);
-            }
+            let text = match std::fs::read(&path) {
+                Ok(text) => text,
+                Err(err)
+                    if matches!(
+                        err.kind(),
+                        std::io::ErrorKind::NotFound | std::io::ErrorKind::NotADirectory
+                    ) =>
+                {
+                    continue;
+                }
+                Err(err) => {
+                    return Err(AxError::failure(
+                        AxCode::StorageFatal,
+                        "read a project's conventions",
+                        format!("{}: {err}", path.display()),
+                    )
+                    .with_recovery(
+                        "every run here is sent that file; make it readable, or take it away \
+                         to send the prompt without it",
+                    ));
+                }
+            };
+            let mut block = format!(
+                "## {heading}\n\n{whose} Where this and the building's rules above disagree, \
+                 the rules decide: they are what the city enforces.\n\n"
+            )
+            .into_bytes();
+            block.extend_from_slice(&text);
+            self.extend(addressed(city_root, &path)?, &block);
         }
         Ok(())
     }

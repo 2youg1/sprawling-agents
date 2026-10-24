@@ -67,13 +67,14 @@ impl Frozen {
     /// resident of that building (`crates/runtime/spec/Prefix.lean` D97).
     ///
     /// # Errors
-    /// As `prompt_segment`, and a path the address grammar refuses.
+    /// As `prompt_segment` and `city::city_prompt_path`, and a path the
+    /// address grammar refuses.
     pub(super) fn city_slot(
         &self,
         city_root: &Path,
         building: &Address,
     ) -> Result<Assembled, AxError> {
-        let path = city::city_prompt_path(city_root, building);
+        let path = city::city_prompt_path(city_root, building)?;
         let mut slot = prompt_segment(&path, addressed(city_root, &path)?)?;
         if let Some(context) = self.naming.context() {
             if !slot.bytes.is_empty() {

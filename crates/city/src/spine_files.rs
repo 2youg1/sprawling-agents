@@ -357,14 +357,25 @@ pub fn write_job(
 /// it works in - and a building that rewrote the answer has said the
 /// city's does not hold there. The reserved subtree, because no write
 /// domain reaches it: a resident cannot rewrite its own instructions.
-/// Reads the disk to answer, so the answer is as of this call.
-#[must_use]
-pub fn city_prompt_path(city_root: &Path, building: &Address) -> PathBuf {
+/// Reads the disk to answer, so the answer is as of this call. Only a
+/// building's file that is not there falls back to the city's: anything
+/// else at that path is the building's answer, and a reader that cannot
+/// open it refuses rather than sends the city's words in its place.
+///
+/// # Errors
+/// `E_STORAGE_FATAL` naming the path when the disk cannot say whether
+/// the building's own file is there.
+pub fn city_prompt_path(city_root: &Path, building: &Address) -> Result<PathBuf, AxError> {
     let own = crate::policy::governed(city_root, building).join(CITY_FILE);
-    if own.is_file() {
-        own
-    } else {
-        city_root.join(CITY_FILE)
+    match own.try_exists() {
+        Ok(true) => Ok(own),
+        Ok(false) => Ok(city_root.join(CITY_FILE)),
+        Err(err) => Err(AxError::failure(
+            AxCode::StorageFatal,
+            "find the City.md that governs a building",
+            format!("{}: {err}", own.display()),
+        )
+        .with_recovery("make the building's reserved directory readable, then dispatch again")),
     }
 }
 
@@ -378,9 +389,11 @@ pub fn city_prompt_path(city_root: &Path, building: &Address) -> PathBuf {
 /// # Errors
 /// Propagates the reserved-subtree refusal: an address with no building
 /// has no building norms.
+/// As [`city_prompt_path`] when the building's own `City.md` cannot be
+/// looked for.
 pub fn norms(city_root: &Path, addr: &Address) -> Result<Vec<PathBuf>, AxError> {
     let building = crate::building::Building::of(addr)?;
-    let mut out = vec![city_prompt_path(city_root, building.addr())];
+    let mut out = vec![city_prompt_path(city_root, building.addr())?];
     let rules = rules_path(city_root, building.addr());
     if rules.exists() {
         out.push(rules);
