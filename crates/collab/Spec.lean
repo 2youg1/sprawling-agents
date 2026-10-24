@@ -167,7 +167,7 @@ Signal、Inbox、Steer、Workshop、NodeContract、fan-in、Artifact、arbitrati
 
 **`collab::triage`**（形状 1 判定；性质见 `spec/Triage.lean`）。`Reflex::{Discard, Notify, Light, Full}`、`Arrival`、`Rule`、`Landing { addr, reflex, because }`；`Triage::new(rules, fallback)` 在构造点拒空匹配串。
 
-**`collab::claim_tool`、`collab::claim_effect`**（形状 4 适配器、形状 2 值类型）。`ClaimEffect::{Claimed, PutDown { exit: PlanExit }, Split { children }, Added { id, child }}` 与它的 `id`、`kind`（`Added` 为 `None`）、`line`（种类与载荷一起，载荷形状是 `kernel::event::record::RoadmapMoved`）、`apply`；`ClaimDesk::new(who, room, roadmap, booking)`、`take_effects`、`roadmap`（仅当本次 drive 改过）、`holding`、`abandon`；`Booking` 是调用时判定认领的权威（城里是记账线程）；`still_true(text, effect)`。七个动作：`list`、`claim`、`finish`、`block`、`release`、`split`、`add`。
+**`collab::claim_tool`、`collab::claim_effect`**（形状 4 适配器、形状 2 值类型）。`ClaimEffect::{Claimed, PutDown { exit: PlanExit }, Split { children }, Added { id, child }}` 与它的 `id`、`kind`（`Added` 为 `None`）、`line`（种类与载荷一起，载荷形状是 `kernel::event::record::RoadmapMoved`）、`apply`；`ClaimDesk::new(who, room, roadmap, booking)`、`take_effects`、`roadmap`（仅当本次 drive 改过）、`holding`、`abandon`；`Booking` 是调用时判定认领的权威（城里是记账线程）；`Pinner` 是 `finish` 把一个路径钉成 Locator 的那一扇门（D20），由 `ClaimTool::pinning` 交进来；`still_true(text, effect)`。七个动作：`list`、`claim`、`finish`、`block`、`release`、`split`、`add`。
 
 - `Roadmap.md` 是唯一权威，不另立认领登记表：文件被人读、被 `PlanTree::progress` 数、被这个工具改，一处事实，三个读者。
 - 七个动作长在同一条 catalog 行上：模型每一轮读的行数是成本，一行背后的动词数不是（§14 的字节上限）。
@@ -231,6 +231,8 @@ D18 能在调用时判的，在调用时判（`delegate` 的 `StartCheck`）。`
 
 D19 开不起来的子 run，以一封 `Stopped` 回程回到父房间（`Handback::unstarted`）。子 run 在交接时被拒（`accounting::worker::waking::handing` 的 `hand_over_at_call`），记账线程照旧写那一行 `Refuse` 级诊断，再把一封回程投进父房间，走与完成的子 run 同一扇门：先写 `signal_enqueued`，再进房间表，为没人在跑的父房间敲门，写 `signal_landed`。它是 `Stopped`，`because` 写「it could not start」接着拒绝的码、主体与恢复语，模型据此改房间或告诉人；join 不收它，与停下的子 run 一样（§3 的第二个未定问题对它同样成立）。信不盖 D10 的投递时状态，因为子 run 从没有过状态；落地文字因此不写 `sender`。被否决的是第三臂 `Handback::Refused`：父 run 对它与对停下的子 run 能做的事相同（改了再派，或告诉人），join 对两者也相同，而第三臂要改 `wire` 的 `HandbackNote` 与客户端，多出的只是一个读者无从据以行事的区分。模型里它是 `spec/Workshop.lean` 的 `land x .stopped`：派出过的节点恰以一封停下的回程落地一次。重开参数：父 run 或页面需要对「没开起来」与「停下了」做不同的事。
 
+D20 `plan finish` 的 `evidence` 可以是一个路径，由装配层交来的 `Pinner` 在完成那一刻钉成 Locator。`finish` 先按 Locator 文法解析 `evidence`，成功就原样收；不成功且工具带着 `Pinner`，就把它当作模型写的路径交给 `Pinner`：装配层用 `runtime::BoundReader::open` 判这个路径（与 `read` 同一个判定、同一个读界），读出整份字节，答 `Locator::cas(B3Hash::digest(bytes))`，计划里存的永远是 Locator（kernel `spec/Locator.lean` D27）；`Pinner` 的拒绝原样成为这次调用的结果，节点仍被握着。没带 `Pinner` 的工具（本 crate 的测试、`accounting` 里不读城的桌子）只收 Locator，拒词叫模型交 `cas:` 或 `file:`。判定由装配层交进来，理由同 D18：本 crate 只依赖 `kernel` 与 `storage`，读不到读界，由桌子自己读城就是读界的第二份规则。被否决的是让 `read` 每次答一个完整的版本、模型原样抄进 `finish`：每次读都付一次哈希与几十个 token，只为少数完成调用。重开参数：计划的证据需要指向文件的一个区间，或者 `kernel` 有了不经 `runtime` 判读界的面。
+
 成本：每件工具在 catalog 里占一行，坐在缓存前缀里，一行背后的动词数不增加常驻成本，行数与字节数才增加（§14）。Signal 在 prefix 里占零字节，常驻的只有 `status` 的 `signals_pending`；pull 的 bandwidth 在接收方。拒词报出此刻的状态与一条可执行的下一步，因为只说「不行」的拒绝会让模型换个说法再试。
 -/
 
@@ -245,7 +247,7 @@ D19 开不起来的子 run，以一封 `Stopped` 回程回到父房间（`Handba
 
 D1 仲裁只有两级（ruling）。`Level` 只有 `Serialize` 与 `Arbitrate`，`arbitrate` 收两个入参，这是人的 ruling。第三级「升到人」在生产里不可达：唯一的生产调用点没有能让它成立的输入，门只答 Allow 或 Deny，被门拒掉的 run 不占地盘，也就无从与人相撞；一个不可达的级别仍会散布在公共面、账本载荷与恢复语里。一个居民读不定的冲突是一个设计问题，按设计问题进 Inbox。被否决的是用一个穷尽的 `Occasion` 枚举描述何时升到人：它把一个到不了的级别保留成一个更整齐的到不了的级别。
 
-D2 没有草稿退回机制。房间没有版本，发言不带「作者所见的房间版本」进房间，也就没有退回作者、四路择一与 hold token。它要防的两种冲突各有权威：同一份文件的并发写由 `storage` 的 `base_version` 乐观并发与 worktree 隔离解决；同一件事的并发认领由 `kernel::goal` 的同资源相斥与 `arbiter` 解决，第三套机制就是第三个权威。`Signal` 的 `room_version` 在生产写点（`signal_desk` 的 `send`、`handback`）恒为 `Version::FIRST`。重开参数：出现一个真的会前进的房间版本，即有生产写点把 `room_version` 填成 `Version::FIRST` 以外的值，那时退回从那个写点长出来。
+D2 没有草稿退回机制。房间没有版本，发言不带「作者所见的房间版本」进房间，也就没有退回作者、四路择一与 hold token。它要防的两种冲突各有权威：同一份文件的并发写由 `runtime` 的 `edit` 按每 run 读戳准入、按路径锁落地（`crates/runtime/spec/Tools/Edit.lean` D103）与 worktree 隔离解决；同一件事的并发认领由 `kernel::goal` 的同资源相斥与 `arbiter` 解决，第三套机制就是第三个权威。`Signal` 的 `room_version` 在生产写点（`signal_desk` 的 `send`、`handback`）恒为 `Version::FIRST`。重开参数：出现一个真的会前进的房间版本，即有生产写点把 `room_version` 填成 `Version::FIRST` 以外的值，那时退回从那个写点长出来。
 -/
 
 /-! ## 13 依赖选型

@@ -25,6 +25,8 @@ impl BoundReader {
     pub fn new(city_root: &Path, bound: ReadBound, block_store: &Path) -> BoundReader;
     // asked：城相对路径、城内的绝对路径、`cas:` 或 `file:` Locator。action 是拒词里点名的那件工具。
     pub fn open(&self, asked: &str, action: &'static str) -> Result<Opened, AxError>;
+    // 经 open 同一个判定读出整份字节，答 `Locator::cas(B3Hash::digest(bytes))`：`plan finish` 收路径时的那一扇门（collab D20）。
+    pub fn pin(&self, asked: &str, action: &'static str) -> Result<Locator, AxError>;
 }
 pub struct Opened { /* named、字节的来源 —— 私有 */ }
 impl Opened { pub fn named(&self) -> &Named; }
