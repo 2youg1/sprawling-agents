@@ -340,3 +340,7 @@ replacement = "privacy control"
 [[entry]]
 banned = "隐私目录"
 replacement = "privacy control（控制表）"
+
+[[entry]]
+banned = "DescribeTool"
+replacement = "ToolTool（`tool` 的 `detail`）"
