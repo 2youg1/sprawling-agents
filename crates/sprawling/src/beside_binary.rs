@@ -21,12 +21,15 @@ use kernel::{AxCode, AxError};
 pub enum Homing {
     /// There is no city beside the binary.
     NothingBeside,
-    /// The city at `from` is now at `to`, and `relinked` worktrees were
-    /// pointed at it.
+    /// The city at `from` is now at `to`. `relinked` is how many
+    /// worktrees were pointed at it, or why their links could not be
+    /// rewritten: the move stands either way, because a tree whose links
+    /// git cannot follow is taken back and checked out again the next
+    /// time the city places one (`crates/sprawling/spec/Supervising.lean`).
     Moved {
         from: PathBuf,
         to: PathBuf,
-        relinked: usize,
+        relinked: Result<usize, AxError>,
     },
 }
 
@@ -35,16 +38,20 @@ pub enum Homing {
 ///
 /// The move is one rename, so a reader finds the city whole in one
 /// place or the other. The writer lock is taken first to learn that no
-/// city is running from the old folder, and released before the rename,
-/// because Windows refuses to rename a folder with a file open inside.
+/// city is running from the old folder. Outside Windows it is held
+/// through the rename, so no city can start from the old folder in
+/// between. Windows refuses to rename a folder with a file open inside,
+/// the lock file included, so there it is let go first; that same
+/// refusal turns a city that starts in between into a failed rename
+/// rather than a city moved under a running process.
 ///
 /// # Errors
 /// `E_LEDGER_HELD` when a city is running from the old folder;
 /// `E_INVALID_ARGS` when `to` already holds a city or other files, or
 /// lies on another volume (a copy across volumes is not attempted);
 /// `E_STORAGE_FATAL` when a folder
-/// cannot be read, made or renamed, or a worktree link cannot be
-/// rewritten.
+/// cannot be read, made or renamed. A worktree link that cannot be
+/// rewritten after the rename is answered in [`Homing::Moved`], not here.
 pub fn bring_home(exe_dir: &Path, to: &Path) -> Result<Homing, AxError> {
     let from = exe_dir.join(accounting::home::CITY_DIR);
     match city::has_history(&from)? {
@@ -52,21 +59,26 @@ pub fn bring_home(exe_dir: &Path, to: &Path) -> Result<Homing, AxError> {
         city::History::Present => {}
     }
     vacate(to)?;
-    let ledger = kernel::layout::CityLayout::new(&from).ledger();
-    drop(storage::LedgerHold::take(&ledger).map_err(storage::StorageError::into_ax)?);
     if let Some(parent) = to.parent() {
         std::fs::create_dir_all(parent)
             .map_err(|err| fatal("make the folder cities live in", parent, &err))?;
     }
-    std::fs::rename(&from, to).map_err(|err| {
+    let ledger = kernel::layout::CityLayout::new(&from).ledger();
+    let held = storage::LedgerHold::take(&ledger).map_err(storage::StorageError::into_ax)?;
+    #[cfg(windows)]
+    drop(held);
+    let renamed = std::fs::rename(&from, to);
+    #[cfg(not(windows))]
+    drop(held);
+    renamed.map_err(|err| {
         if err.kind() == std::io::ErrorKind::CrossesDevices {
             refused(
                 to,
                 "is on another volume than the city beside the binary",
                 format!(
-                    "move the folder {} there yourself, or write city = \"{}\" in the person's config.toml",
+                    "move the folder {} there yourself, or write city = {} in the person's config.toml",
                     from.display(),
-                    from.display()
+                    toml::Value::String(from.display().to_string())
                 ),
             )
         } else {
@@ -74,7 +86,7 @@ pub fn bring_home(exe_dir: &Path, to: &Path) -> Result<Homing, AxError> {
         }
     })?;
     let relinked =
-        storage::Worktrees::relink_moved(to, &from).map_err(storage::StorageError::into_ax)?;
+        storage::Worktrees::relink_moved(to, &from).map_err(storage::StorageError::into_ax);
     Ok(Homing::Moved {
         from,
         to: to.to_path_buf(),

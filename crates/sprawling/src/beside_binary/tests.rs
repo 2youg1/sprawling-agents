@@ -27,7 +27,7 @@ fn a_city_beside_the_binary_moves_whole_and_leaves_nothing_behind() {
         Homing::Moved {
             from: from.clone(),
             to: to.clone(),
-            relinked: 0
+            relinked: Ok(0)
         }
     );
     assert!(!from.exists());

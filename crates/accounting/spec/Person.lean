@@ -22,7 +22,7 @@ pub fn core_priority() -> Result<CorePriority, AxError>;   // ConfigInvalid：pr
 pub enum CorePlacement { Off, Soft, SoftShares, Pinned }    // [core] placement 的四个解析结果；各臂行为归 `crates/sprawling/spec/Serving/Placement.lean` D41、D47、D49
 pub fn core_placement() -> Result<CorePlacement, AxError>; // 缺省 Soft；不认识的拼写或非字符串值报 ConfigInvalid
 pub fn city() -> Result<Option<PathBuf>, AxError>;         // 顶层 city；不是绝对路径即 ConfigInvalid
-pub fn settle_city(city: &Path) -> Result<(), AxError>;    // 写顶层 city（先取绝对路径），别的行原样留下
+pub fn settle_city(city: &Path) -> Result<(), AxError>;    // 写顶层 city（先取绝对路径）；别的节与键留下，注释与排版不留，与 [ui] 同一条读-改-写
 ```
 
 - **文件在每一座城之外**：`<home>/.sprawling/config.toml`，路径由 `accounting::home`（§8-7）给，本模块不拼路径。把城拷到另一台机器，它不跟着走；在同一台机器上换一个浏览器，画出来的仍是这份文件说的样子。

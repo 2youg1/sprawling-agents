@@ -265,12 +265,19 @@ fn move_home_from_beside_the_binary() -> Result<(), kernel::AxError> {
     match sprawling::beside_binary::bring_home(&exe_dir, &to)? {
         sprawling::beside_binary::Homing::NothingBeside => Ok(()),
         sprawling::beside_binary::Homing::Moved { from, to, relinked } => {
-            println!(
-                "moved the city from {} to {} ({relinked} worktree(s) re-pointed)",
-                from.display(),
-                to.display()
-            );
-            accounting::person::settle_city(&to)
+            println!("moved the city from {} to {}", from.display(), to.display());
+            match relinked {
+                Ok(count) => println!("{count} worktree(s) re-pointed at the new folder"),
+                Err(error) => eprintln!(
+                    "{}the spare worktree is checked out again when the city next needs one",
+                    super::refusal::written(&error, super::refusal::Form::Human)
+                ),
+            }
+            // The city has moved whatever the person's file says next: a
+            // failed write is told, and the next launch finds the city at
+            // the default, where it now is.
+            name_city(&to);
+            Ok(())
         }
     }
 }

@@ -48,16 +48,21 @@ impl Worktrees {
                 .map_err(io_err("list the city's worktrees", city_root))?
                 .path();
             let gitdir = registration.join("gitdir");
-            let Some(tree_git) = rewrite(&gitdir, "", &from, city_root)? else {
+            let Some(tree_git) = relocated(&gitdir, "", &from, city_root)? else {
                 continue;
             };
-            rewrite(&tree_git, GITDIR_PREFIX, &from, city_root)?;
+            if let Some(moved) = relocated(&tree_git, GITDIR_PREFIX, &from, city_root)? {
+                point(&tree_git, GITDIR_PREFIX, &moved)?;
+            }
             // Absent or relative as plain git writes it; absolute as
             // libgit2 writes it, and then it names the old folder too.
             let commondir = registration.join("commondir");
-            if commondir.exists() {
-                rewrite(&commondir, "", &from, city_root)?;
+            if let Some(moved) = relocated(&commondir, "", &from, city_root)? {
+                point(&commondir, "", &moved)?;
             }
+            // Last, because it is what selects this registration: a pass
+            // that stopped before here finds it again and finishes it.
+            point(&gitdir, "", &tree_git)?;
             relinked = relinked.saturating_add(1);
         }
         Ok(relinked)
@@ -116,30 +121,34 @@ fn without_verbatim_disk(path: &Path) -> PathBuf {
     }
 }
 
-/// Rewrites the one path `file` holds after `prefix` when it lies under
-/// one of the spellings in `from`, and answers the path it holds now;
-/// `None` when it named a path outside `from` and was left alone.
-fn rewrite(
+/// Where the one path `file` holds after `prefix` lies once the city is
+/// at `to`, when it lies under one of the spellings in `from`; `None`
+/// when the file is absent or names a path outside `from`.
+fn relocated(
     file: &Path,
     prefix: &str,
     from: &[String],
     to: &Path,
 ) -> Result<Option<PathBuf>, StorageError> {
-    let text = std::fs::read_to_string(file).map_err(io_err("read a worktree link", file))?;
+    let text = match std::fs::read_to_string(file) {
+        Ok(text) => text,
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(err) => return Err(io_err("read a worktree link", file)(err)),
+    };
     let named = text
         .trim_end()
         .strip_prefix(prefix)
         .unwrap_or(text.trim_end());
-    let Some(rest) = under(named, from) else {
-        return Ok(None);
-    };
-    let moved = to.join(rest);
-    // git writes these with forward slashes on every platform, and reads
-    // either; keeping its spelling keeps the diff to the moved prefix.
-    let spelled = moved.to_string_lossy().replace('\\', "/");
+    Ok(under(named, from).map(|rest| to.join(rest)))
+}
+
+/// Writes `path` into the link file `file` after `prefix`. git writes
+/// these with forward slashes on every platform and reads either, so
+/// keeping its spelling keeps the change to the moved prefix.
+fn point(file: &Path, prefix: &str, path: &Path) -> Result<(), StorageError> {
+    let spelled = path.to_string_lossy().replace('\\', "/");
     std::fs::write(file, format!("{prefix}{spelled}\n"))
-        .map_err(io_err("write a worktree link", file))?;
-    Ok(Some(moved))
+        .map_err(io_err("write a worktree link", file))
 }
 
 /// What follows one of the spellings in `from` in `named`.
