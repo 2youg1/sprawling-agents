@@ -350,6 +350,9 @@ envelope 探查与全解共用 kernel 的解析（Value 探查仅取五键，不
 | D104 | 只有人填过的上限才预约，run 的前台命令与 python 调用各预约那个数，只持有到前台窗口结束 | `crates/runtime/spec/Reserve.lean` |
 | D105 | 来源行带它所留字节的哈希，重建时逐行核对 | `crates/runtime/spec/Prefix.lean` |
 | D106 | edit 以每个 run 的读戳准入，读后被改则拒绝并给出当前片段 | `crates/runtime/spec/Tools/Edit.lean` |
+| D107 | 工具结果的文本由带版本的渲染器画出，每一行记下自己的版本，V1 永久保留 | `crates/runtime/spec/Rendering.lean` |
+| D108 | read 每 10 行标一个行号，edit 原样匹配不到时剥掉抄进来的标记再匹配 | `crates/runtime/spec/Rendering.lean` |
+| D109 | search 有三种模式，缺省仍是 content | `crates/runtime/spec/Tools/Search.lean` |
 | D110 | 一个 `tool` 工具、四个 op 取代 `describe` 与 `call`；休眠索引一个命名空间一行 | `crates/runtime/spec/Catalog.lean` |
 -/
 
