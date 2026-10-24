@@ -72,25 +72,24 @@ impl FormatFile {
         }
     }
 
-    /// The format `text` states, judging nothing else in it.
+    /// The format `text` states, judging nothing else in it; `None`
+    /// for text that is not TOML at all.
+    ///
+    /// Text that does not parse is left to the file's own reader, whose
+    /// refusal names the file and who may change it; a refusal here
+    /// would replace those words with a generic one.
     ///
     /// # Errors
-    /// `E_CONFIG_INVALID` for text that is not TOML and for a `format`
-    /// that is not a positive integer.
-    pub fn stated(self, text: &str) -> Result<Format, AxError> {
+    /// `E_CONFIG_INVALID` for a `format` that is not a positive integer.
+    pub fn stated(self, text: &str) -> Result<Option<Format>, AxError> {
         match self {
             FormatFile::PersonConfig | FormatFile::LayerConfig | FormatFile::Rules => {
-                let table: toml::Table = toml::from_str(text).map_err(|err| {
-                    AxError::failure(
-                        AxCode::ConfigInvalid,
-                        "read a configuration file's format",
-                        err.message().to_owned(),
-                    )
-                    .with_recovery("fix the TOML syntax the message names")
-                })?;
+                let Ok(table) = toml::from_str::<toml::Table>(text) else {
+                    return Ok(None);
+                };
                 match table.get(FORMAT_KEY) {
-                    None => Ok(Format::FIRST),
-                    Some(toml::Value::Integer(n)) => number(*n),
+                    None => Ok(Some(Format::FIRST)),
+                    Some(toml::Value::Integer(n)) => number(*n).map(Some),
                     Some(other) => Err(not_a_number(other)),
                 }
             }
@@ -106,9 +105,12 @@ impl FormatFile {
 /// `E_CONFIG_INVALID` when the file states a format newer than this
 /// build's (the recovery names the upgrade), a format older than this
 /// build's that nothing brought forward, a `format` that is not a
-/// positive integer, or text that is not TOML.
+/// positive integer. Text that is not TOML is admitted here and refused
+/// by the reader in its own words.
 pub fn admit_format(file: FormatFile, text: &str) -> Result<(), AxError> {
-    let stated = file.stated(text)?;
+    let Some(stated) = file.stated(text)? else {
+        return Ok(());
+    };
     match stated.cmp(&file.current()) {
         std::cmp::Ordering::Equal => Ok(()),
         std::cmp::Ordering::Greater => Err(newer(stated, file.current())),
@@ -200,7 +202,11 @@ fn climb(
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(Forwarded::Absent),
         Err(err) => return Err(storage("read a configuration file", path, &err)),
     };
-    let from = file.stated(&original)?;
+    // A file that does not parse is not brought anywhere: its reader
+    // refuses it, in words that name the file, when it is next read.
+    let Some(from) = file.stated(&original)? else {
+        return Ok(Forwarded::Current);
+    };
     match from.cmp(&to) {
         std::cmp::Ordering::Equal => return Ok(Forwarded::Current),
         std::cmp::Ordering::Greater => return Err(newer(from, to)),

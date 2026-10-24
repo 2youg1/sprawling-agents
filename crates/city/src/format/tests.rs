@@ -84,6 +84,10 @@ fn a_format_that_is_not_a_positive_integer_is_refused() {
         &AxCode::ConfigInvalid
     );
     assert!(admit_format(FormatFile::Rules, UNVERSIONED).is_ok());
+    assert!(
+        admit_format(FormatFile::Rules, "nothing declared\n").is_ok(),
+        "text that is not TOML is the reader's to refuse, in its own words"
+    );
     assert!(admit_format(FormatFile::Rules, "format = 1\n").is_ok());
 }
 
@@ -155,7 +159,7 @@ fn an_older_file_climbs_and_keeps_its_original() {
         FormatFile::LayerConfig
             .stated(&std::fs::read_to_string(&path).unwrap())
             .unwrap(),
-        two
+        Some(two)
     );
     assert_eq!(
         climb(&path, FormatFile::LayerConfig, &ladder, &backups(&dir)).unwrap(),

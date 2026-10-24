@@ -24,7 +24,7 @@ impl Format {
 }
 impl FormatFile {
     pub const fn current(self) -> Format;         // 本二进制读写的格式；今天三种都是 FIRST
-    pub fn stated(self, text: &str) -> Result<Format, AxError>;   // 只读 format 一键；E_CONFIG_INVALID
+    pub fn stated(self, text: &str) -> Result<Option<Format>, AxError>;   // 只读 format 一键；不是 TOML 答 None，留给读者用自己的话拒
 }
 pub fn admit_format(file: FormatFile, text: &str) -> Result<(), AxError>;
 pub struct Rung { pub file: FormatFile, pub from: Format, pub rewrite: fn(&str) -> Result<String, AxError> }
@@ -33,7 +33,7 @@ pub fn bring_forward(path: &Path, file: FormatFile, backups: &Path) -> Result<Fo
 ```
 
 - **没写 `format` 就是 1，未动的文件不写 `format`。** 上一版读 `CONFIG.toml` 与 `RULES.toml` 时把 `format` 当未知键整份拒；一份不需要改的文件被写进 `format`，人退回上一版时就读不动它。所以 `bring_forward` 遇到已是当前格式的文件一个字节都不写，`city::document` 的其他写门也不添这一键。
-- **比当前新的整份拒，先于其他键。** 每个读者（`ConfigLayer::parse`、`policy::evaluate`、`accounting::person`）在按自己的结构解析之前调用 `admit_format`：否则新版本加的第一个键会被当成拼错的键拒掉，人读到的是「unknown field」而不是「请升级」。拒词 `E_CONFIG_INVALID`，subject「written by a newer sprawling (format N; this build reads up to M)」，恢复语「upgrade sprawling to the version that wrote this file」。账本的同类拒绝（`E_LOG_VERSION_UNSUPPORTED`，`crates/storage/spec/Jsonl.lean` §8-1）措辞一致。
+- **比当前新的整份拒，先于其他键。** 每个读者（`ConfigLayer::parse`、`policy::evaluate`、`accounting::person`）在按自己的结构解析之前调用 `admit_format`：否则新版本加的第一个键会被当成拼错的键拒掉，人读到的是「unknown field」而不是「请升级」。拒词 `E_CONFIG_INVALID`，subject「written by a newer sprawling (format N; this build reads up to M)」，恢复语「upgrade sprawling to the version that wrote this file」。账本的同类拒绝（`E_LOG_VERSION_UNSUPPORTED`，`crates/storage/spec/Jsonl.lean` §8-1）措辞一致。文本连 TOML 都不是时 `admit_format` 放行、`bring_forward` 答 `Current` 不动它：那份文件由它自己的读者拒，拒词点名文件和谁能改它，换成这里的通用拒词就丢了这两样。
 - **已知格式内的未知键照旧拒。** `format` 在结构里声明成一个不读的字段，于是 `deny_unknown_fields` 仍覆盖其余每一键。
 - **比当前旧的由阶梯前移，读者不前移。** `bring_forward` 逐级套 `Rung`：从 `from` 找 `file` 相同、`from` 相同的那一级，改写成下一格式的整份文本；全部套完先把原字节写进 `backups`，再经 `city::document` 整份替换。读者遇到比当前旧的文件拒并要求重开城，因为前移要写备份、要拿文件的锁，不属于一次读。
 - **备份集中放。** `backups` 由调用方给出，生产上是 `accounting::home::Home::backups()`（`~/.sprawling/backups/`）。文件名是「所在目录的 BLAKE3 前 16 hex」-「文件名」.bak-「原格式」：每栋楼都有 `RULES.toml`，每一层都有 `CONFIG.toml`，一个目录装下全部要靠目录摘要分开。备份以 `create_new` 写；同名已在且字节相同即视为已备，字节不同则拒（`E_STORAGE_FATAL`），不覆盖。
