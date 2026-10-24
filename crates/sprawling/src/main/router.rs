@@ -236,34 +236,41 @@ fn default_city_location() -> Result<std::path::PathBuf, kernel::AxError> {
 /// The city a launch that names none opens: [`default_city_location`],
 /// after a city an earlier release kept beside the binary has been
 /// moved there, which happens only while the person's file names no
-/// city (`crates/sprawling/spec/Firstrun.lean` §8-8).
+/// city; a city that stayed beside the binary because home is on
+/// another volume is opened where it is
+/// (`crates/sprawling/spec/Firstrun.lean` §8-8).
 ///
 /// # Errors
 /// Everything [`default_city_location`] refuses, and a move the old
 /// folder or the new one refuses.
 pub(super) fn city_to_open() -> Result<std::path::PathBuf, kernel::AxError> {
-    if accounting::person::city()?.is_none() {
-        move_home_from_beside_the_binary()?;
+    if accounting::person::city()?.is_none()
+        && let Some(stayed) = move_home_from_beside_the_binary()?
+    {
+        return Ok(stayed);
     }
     default_city_location()
 }
 
 /// Moves the city an earlier release kept beside this binary to the
-/// home directory's default, says so, and names it in the person's
-/// file so the move is never looked for again.
-fn move_home_from_beside_the_binary() -> Result<(), kernel::AxError> {
+/// home directory's default, or leaves it where it is when the home
+/// directory is on another volume; says which, and names the city's
+/// folder in the person's file so the move is never looked for again.
+/// Answers the folder of a city left in place, which this launch opens
+/// whether or not the person's file took its name.
+fn move_home_from_beside_the_binary() -> Result<Option<std::path::PathBuf>, kernel::AxError> {
     let exe_dir = match std::env::current_exe() {
         Ok(exe) => match exe.parent() {
             Some(dir) => dir.to_path_buf(),
-            None => return Ok(()),
+            None => return Ok(None),
         },
         // A binary that cannot find itself has no folder beside it to
         // look in, which is the same answer as a folder with no city.
-        Err(_) => return Ok(()),
+        Err(_) => return Ok(None),
     };
     let to = accounting::home::Home::detect()?.default_city();
     match sprawling::beside_binary::bring_home(&exe_dir, &to)? {
-        sprawling::beside_binary::Homing::NothingBeside => Ok(()),
+        sprawling::beside_binary::Homing::NothingBeside => Ok(None),
         sprawling::beside_binary::Homing::Moved { from, to, relinked } => {
             println!("moved the city from {} to {}", from.display(), to.display());
             match relinked {
@@ -277,7 +284,24 @@ fn move_home_from_beside_the_binary() -> Result<(), kernel::AxError> {
             // failed write is told, and the next launch finds the city at
             // the default, where it now is.
             name_city(&to);
-            Ok(())
+            Ok(None)
+        }
+        sprawling::beside_binary::Homing::OnAnotherVolume { at, home } => {
+            println!(
+                "the city stays at {}: {} is on another volume, and this release does not copy a city across volumes",
+                at.display(),
+                home.display()
+            );
+            println!(
+                "to move it yourself, stop the city, move that folder whole, then change the city line in the person's config.toml"
+            );
+            // Naming the old place is what makes this the only time it is
+            // said: the next launch finds a city in the person's file and
+            // looks beside the binary no more. A failed write is told, and
+            // the city is still opened here rather than at the empty
+            // default, where a launch would start a second, empty city.
+            name_city(&at);
+            Ok(Some(at))
         }
     }
 }

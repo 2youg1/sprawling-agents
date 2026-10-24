@@ -31,6 +31,12 @@ pub enum Homing {
         to: PathBuf,
         relinked: Result<usize, AxError>,
     },
+    /// The city at `at` stays there, because `home` lies on another
+    /// volume and a rename cannot cross one. The city is opened where it
+    /// is; a copy across volumes is not attempted, because a copy that
+    /// stops halfway leaves half a city, while the whole one left in
+    /// place can still be moved by hand.
+    OnAnotherVolume { at: PathBuf, home: PathBuf },
 }
 
 /// Moves the city beside the binary in `exe_dir` to `to`, when there is
@@ -47,11 +53,11 @@ pub enum Homing {
 ///
 /// # Errors
 /// `E_LEDGER_HELD` when a city is running from the old folder;
-/// `E_INVALID_ARGS` when `to` already holds a city or other files, or
-/// lies on another volume (a copy across volumes is not attempted);
+/// `E_INVALID_ARGS` when `to` already holds a city or other files;
 /// `E_STORAGE_FATAL` when a folder
 /// cannot be read, made or renamed. A worktree link that cannot be
-/// rewritten after the rename is answered in [`Homing::Moved`], not here.
+/// rewritten after the rename is answered in [`Homing::Moved`], and a
+/// `to` on another volume in [`Homing::OnAnotherVolume`], not here.
 pub fn bring_home(exe_dir: &Path, to: &Path) -> Result<Homing, AxError> {
     let from = exe_dir.join(accounting::home::CITY_DIR);
     match city::has_history(&from)? {
@@ -70,28 +76,26 @@ pub fn bring_home(exe_dir: &Path, to: &Path) -> Result<Homing, AxError> {
     let renamed = std::fs::rename(&from, to);
     #[cfg(not(windows))]
     drop(held);
-    renamed.map_err(|err| {
-        if err.kind() == std::io::ErrorKind::CrossesDevices {
-            refused(
-                to,
-                "is on another volume than the city beside the binary",
-                format!(
-                    "move the folder {} there yourself, or write city = {} in the person's config.toml",
-                    from.display(),
-                    toml::Value::String(from.display().to_string())
-                ),
-            )
-        } else {
-            fatal("move the city home", &from, &err)
+    after_rename(renamed, from, to)
+}
+
+/// What the rename's outcome means for the city that was at `from`.
+fn after_rename(renamed: std::io::Result<()>, from: PathBuf, to: &Path) -> Result<Homing, AxError> {
+    match renamed {
+        Ok(()) => Ok(Homing::Moved {
+            relinked: storage::Worktrees::relink_moved(to, &from)
+                .map_err(storage::StorageError::into_ax),
+            from,
+            to: to.to_path_buf(),
+        }),
+        Err(err) if err.kind() == std::io::ErrorKind::CrossesDevices => {
+            Ok(Homing::OnAnotherVolume {
+                at: from,
+                home: to.to_path_buf(),
+            })
         }
-    })?;
-    let relinked =
-        storage::Worktrees::relink_moved(to, &from).map_err(storage::StorageError::into_ax);
-    Ok(Homing::Moved {
-        from,
-        to: to.to_path_buf(),
-        relinked,
-    })
+        Err(err) => Err(fatal("move the city home", &from, &err)),
+    }
 }
 
 /// Makes sure `to` can receive a city: absent, or an empty folder,

@@ -29,7 +29,7 @@ pub fn machine_memory() -> Result<MachineMemory, AxError>; // 缺省 Auto；既�
 
 - **文件在每一座城之外**：`<home>/.sprawling/config.toml`，路径由 `accounting::home`（§8-7）给，本模块不拼路径。把城拷到另一台机器，它不跟着走；在同一台机器上换一个浏览器，画出来的仍是这份文件说的样子。
 - **`[ui]` 一节就是 `PreferencesAnswer` 除 `core` 外的序列化**（`crates/wire/Spec.lean` §8-39 第七条）：文件能写的键与答案能说的字段是**同一份声明**，因此本模块只做读与写，不陈述「一项偏好是什么」。一条补丁落在记录上的效果同理，归 `PreferencesAnswer::apply` —— `Chord("")` 是解绑还是绑一个空串，只有一个地方回答。
-- **别的节原样留下**：写是一次读-改-写，经 `city::edit_document`（`crates/city/Spec.lean` §8-27）持锁并整份替换。「要么整份要么不动」只有一份实现，人层与城层共用它；再写一份就是给 B-49 立第二个权威。
+- **别的节与键留下，注释与排版不留**：写是一次读-改-写，把解析后的整份再序列化回去，经 `city::edit_document`（`crates/city/Spec.lean` §8-27）持锁并整份替换。「要么整份要么不动」只有一份实现，人层与城层共用它；再写一份就是给 B-49 立第二个权威。
 - **顶层 `city` 是没指名城时打开的那一座**（`crates/sprawling/spec/Firstrun.lean` §8-8 的三级优先里的第二级）：值必须是绝对路径，相对路径拒（`E_CONFIG_INVALID`）——个人配置所在目录、进程的工作目录、家目录都可以当基准，猜一个就会有人的城落在另一处；按配置文件所在目录解析还会把城放进 `~/.sprawling/` 这个机器状态目录。第一屏建城或接管文件夹之后由 `settle_city` 写入；`sprawling up <path>` 是一次性的覆盖，不写。上一版只读 `[ui]` 与 `[core]`，顶层的 `city` 不会让它拒这份文件。
 - **顶层 `memory` 是重活共用的机器预算**（`crates/runtime/spec/Reserve.lean` D104）：`"auto"` 或不写，由城按物理内存算（`crates/sprawling/spec/Serving/Memory.lean` §8-173「整台机器」）；一个非负整数是字节数，0 即一次只放行一件重活。它与 `[core] memory_bytes` 是两个数：后者是每个 run 的上限，前者是这些上限加起来不得超过的总数。放在顶层而不放进 `[core]`，是因为上一版的 `[core]` 拒不认识的键，而顶层的键它不读，所以写了 `memory` 的文件仍能被上一版打开，不必为它把 `format` 提一级。
 - **`format` 先判**：读整份之前先过 `city::admit_format`（`crates/city/Spec.lean` §8-42，city D28），比本 build 新的文件拒并点名升级；未动的文件不添 `format`。
