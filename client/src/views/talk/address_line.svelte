@@ -15,6 +15,7 @@
   import { ui } from "../../ui";
   import type { Address, Seq } from "../../wire";
   import { openPalette } from "../palette_door.svelte";
+  import type { Arrival } from "../palette_door.svelte";
   import { addressLineOf } from "./address_line";
   import Look from "./address_line.look.svelte";
 
@@ -23,7 +24,7 @@
     // The earlier session main shows; absent is the room's current one.
     readonly session?: Seq | undefined;
     // What a press does; the shell's palette unless a fixture says.
-    readonly onOpen?: (() => void) | undefined;
+    readonly onOpen?: ((arrival: Arrival) => void) | undefined;
   }
 
   const { address, session, onOpen = openPalette }: Props = $props();

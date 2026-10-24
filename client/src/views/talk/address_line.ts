@@ -16,6 +16,7 @@
 import { fill, say } from "../../core/lang";
 import type { Lang } from "../../core/lang";
 import type { Seq } from "../../wire";
+import type { Arrival } from "../palette_door.svelte";
 
 // Whether a conversation column draws the address line at its head: zen
 // and blend do, and the panorama workbench, which writes the address under
@@ -30,8 +31,16 @@ export interface AddressLineWire {
   // WebKit does not focus a button a pointer presses, so the palette's
   // `<dialog>`, which gives the focus back to whatever held it when it
   // opened, would return it to the page instead of to this line; the
-  // line takes the focus itself on the press.
-  readonly onpointerdown: (event: Pick<PointerEvent, "currentTarget">) => void;
+  // line takes the focus itself on the press. The press also says
+  // whether a finger made it, which decides where the palette puts the
+  // focus (`Arrival`); a click no press came before is a key's.
+  readonly onpointerdown: (event: Pressed) => void;
+}
+
+// What the press handler reads: who pressed, and the button it lands on.
+export interface Pressed {
+  readonly pointerType: string;
+  readonly currentTarget: { readonly focus: () => void };
 }
 
 export interface AddressLineLook {
@@ -47,7 +56,8 @@ export interface AddressLineLook {
   readonly wire: AddressLineWire;
 }
 
-export function addressLineOf(lang: Lang, address: string, session: Seq | null, open: () => void): AddressLineLook {
+export function addressLineOf(lang: Lang, address: string, session: Seq | null, open: (arrival: Arrival) => void): AddressLineLook {
+  let pressed: Arrival = "keys";
   const cut = address.lastIndexOf("/") + 1;
   const number = session === null ? undefined : `#${String(session)}`;
   return {
@@ -62,9 +72,14 @@ export function addressLineOf(lang: Lang, address: string, session: Seq | null, 
         number === undefined
           ? fill(say(lang, "talk_address_line_new"), { address })
           : fill(say(lang, "talk_address_line"), { address, session: number }),
-      onclick: open,
+      onclick: () => {
+        const arrival = pressed;
+        pressed = "keys";
+        open(arrival);
+      },
       onpointerdown: (event) => {
-        if (event.currentTarget instanceof HTMLElement) event.currentTarget.focus();
+        pressed = event.pointerType === "touch" || event.pointerType === "pen" ? "touch" : "keys";
+        event.currentTarget.focus();
       },
     },
   };

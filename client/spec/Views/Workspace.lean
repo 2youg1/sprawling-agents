@@ -21,7 +21,7 @@ import client.spec.Views.Parts
 | 硬币键 | APG Button | Enter／Space | 做朝上那一面：发出框里的字，或对眼前的 run 发 `cancel`（D16）；变淡的发送面一按落进空操作 |
 | 上下文环 | `role="meter"`，提示同 `tip.svelte` | Tab | 到达环，提示出现 |
 | | | Escape | 撤下提示 |
-| 房间芯片 | APG Listbox（芯片是 `aria-haspopup="listbox"` 的按钮） | Enter／Space | 打开房间菜单：先读「谁在听」，再列房间；↑／↓ 在房间间走，Enter 选定，Escape 关上，焦点回到芯片 |
+| 地址行 | APG Button（`aria-haspopup="dialog"`） | Enter／Space，或点按 | 打开命令面板（client/Spec.lean 4-10a）：键盘与鼠标打开时焦点进框，手指或笔按下时焦点落在面板本身（4-64b）；先列这个房间的会话，列表下读「谁在听」（D36）；Escape 关上，焦点回到地址行 |
 | 工具行 | APG Button（`aria-pressed`） | Enter／Space | 在右侧打开这次调用（`openCall`）；打开着的那行 `aria-pressed="true"` |
 | | | ↓／↑，j／k | 同一段对话里的下一条或上一条工具行 |
 | | | Escape | 右侧开着这行时收起右侧，焦点留在这行 |

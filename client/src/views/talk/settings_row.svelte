@@ -4,8 +4,8 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <!-- The settings row under the composer's line (docs/frontend-method.md
-§7I, client/Spec.lean §4-60): before a session starts, the workspace
-chip with the sandbox beside it on the left, the model picker's token
+§7I, client/Spec.lean §4-60): before a session starts, the sandbox on
+the left while one restricts the room's building, the model picker's token
 and the permissions entry on the right; once one has, nothing but the
 notice that a sentence the link did not take was kept in the box.
 This file is the seat (client D95): it holds which menu is open, what
@@ -20,9 +20,6 @@ the value `settings_row.look.svelte` draws. It writes no class. -->
   import { ui } from "../../ui";
   import type { Address } from "../../wire";
   import type { PopoverBinding } from "../parts/popover";
-  import type { Pill } from "./composer";
-  import Listening from "./listening.svelte";
-  import PillView from "./pill.svelte";
   import { childOf, offersOf, orderOf, parentOf } from "./picker";
   import type { Combination, Section, Segment } from "./picker";
   import { pickerOf, startOf } from "./picker_look";
@@ -36,7 +33,6 @@ the value `settings_row.look.svelte` draws. It writes no class. -->
   import Look from "./settings_row.look.svelte";
 
   interface Props {
-    readonly workspace: Pill;
     readonly picker: PickerFacts;
     readonly room: Address | null;
     readonly draws: RowDraws;
@@ -46,7 +42,7 @@ the value `settings_row.look.svelte` draws. It writes no class. -->
     readonly menu?: RowStarts;
   }
 
-  const { workspace, picker, room, draws, kept, menu: starts = "closed" }: Props = $props();
+  const { picker, room, draws, kept, menu: starts = "closed" }: Props = $props();
   const u = ui();
   const { lang } = u;
   const policy = u.policy;
@@ -233,14 +229,7 @@ the value `settings_row.look.svelte` draws. It writes no class. -->
 
 <svelte:window onpointerdown={outside} />
 
-{#snippet listening()}
-  {#if room !== null}<Listening {room} />{/if}
-{/snippet}
-
 {#snippet facts()}
-  {#if workspace.choices.length > 0}
-    <PillView spec={workspace} told={room === null ? undefined : listening} />
-  {/if}
   <Sandbox {room} />
 {/snippet}
 

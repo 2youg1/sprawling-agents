@@ -26,6 +26,10 @@
   // list that omits them teaches that the verb does not exist. The
   // reason is drawn where the row's hint is (`palette/rows.svelte`).
   //
+  // **Who is listening stands under the list** while the palette stands
+  // over a room and nothing is typed (client D36): the palette is where
+  // the room is changed, and that is when a person asks who hears it.
+  //
   // **The box is a modal the platform owns** (`modal.ts`), as the file
   // finder is: the focus stays inside while it stands and goes back
   // where it was when it closes (client/Spec.lean §4-64b). The box is an
@@ -52,6 +56,7 @@
   import { Address } from "../wire";
   import type { SessionLine } from "../wire";
   import { modalHold, modalWire } from "./modal";
+  import type { Arrival } from "./palette_door.svelte";
   import type { Seat } from "./modal";
   import Modal from "./modal.look.svelte";
   import { boxOf, SESSIONS_AT_REST, sessionPlaces, whyFor } from "./palette";
@@ -60,6 +65,7 @@
   import { nothingFound } from "./palette/nothing_found";
   import { openFinder } from "./finding.svelte";
   import Rows from "./palette/rows.svelte";
+  import Listening from "./talk/listening.svelte";
   import { askToSpeak } from "./talk/speak_asked";
   import { sessionHands } from "./talk/session_hands";
 
@@ -77,9 +83,12 @@
     // The room the palette stands over; the address bar's unless a
     // `#/gallery` fixture names one.
     readonly here?: Address | undefined;
+    // How the palette was opened (`palette_door.svelte.ts`); a touch
+    // opening leaves the box unfocused, so no soft keyboard covers the list.
+    readonly arrival?: Arrival | undefined;
   }
 
-  const { onClose, seat = "modal", here: named }: Props = $props();
+  const { onClose, seat = "modal", here: named, arrival = "keys" }: Props = $props();
 
   let query = $state("");
   let cursor = $state(0);
@@ -89,7 +98,7 @@
   // Where the box stands is fixed for its life, so the attachment that
   // opens it is made once.
   // svelte-ignore state_referenced_locally
-  const hold = modalHold(seat);
+  const hold = modalHold(seat, arrival === "touch" ? "sheet" : "control");
   const sheet = $derived(
     modalWire({
       seat,
@@ -313,6 +322,10 @@
 <!-- Escape reaches the box as a cancel request and the shell's key
 handler as a key; both close it. A click on the dimmed page is the
 pointer's extra way out, not the only one. -->
+{#snippet listening()}
+  {#if here !== null}<Listening room={here} />{/if}
+{/snippet}
+
 <Modal wire={sheet} {seat}>
   <Look
     box={boxOf(
@@ -331,6 +344,7 @@ pointer's extra way out, not the only one. -->
       },
     )}
     nothing={shown.length === 0 ? nothingFound(query) : undefined}
+    foot={here !== null && query.trim() === "" ? listening : undefined}
   >
     {#snippet list()}
       <Rows

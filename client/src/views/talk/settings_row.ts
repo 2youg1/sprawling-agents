@@ -21,7 +21,7 @@ import type { PermissionsLook } from "./policy";
 // one has (`talk_not_live`).
 export type RowDraws = "everything" | "notice";
 
-// The menu open on the row. The workspace chip's menu is the pill's own.
+// The menu open on the row.
 export type RowMenu = "policy" | "model" | null;
 
 // The menu a fixture draws open; every screen starts closed.
@@ -55,7 +55,7 @@ export function sameBinding(held: PopoverBinding | null, next: PopoverBinding): 
 
 // Everything the look is given.
 export interface SettingsRowLook {
-  // The workspace chip and the sandbox, drawn by their own seats.
+  // The sandbox, drawn by its own seat.
   readonly facts: Snippet | undefined;
   // Said when a sentence the link did not take is kept in the box.
   readonly notLive: string | undefined;

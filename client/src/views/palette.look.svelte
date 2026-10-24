@@ -20,13 +20,19 @@
     readonly list: Snippet;
     // What the empty state says, present only while nothing matches.
     readonly nothing: Key | undefined;
+    // Read under the list, never pressed: who hears a message sent in the
+    // room the palette stands over (client D36).
+    readonly foot?: Snippet | undefined;
   }
 
-  const { box, list, nothing }: Props = $props();
+  const { box, list, nothing, foot }: Props = $props();
 </script>
 
 <input {...box} class="w-full rounded-control bg-page px-base py-snug text-body placeholder:text-text-faint" />
 {@render list()}
 {#if nothing !== undefined}
   <Empty missing={nothing} />
+{/if}
+{#if foot !== undefined}
+  <div class="mt-snug border-t border-edge-panel pt-snug">{@render foot()}</div>
 {/if}

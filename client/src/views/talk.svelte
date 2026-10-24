@@ -36,7 +36,6 @@
   import AddressLine from "./talk/address_line.svelte";
   import type { Head } from "./talk/address_line";
   import Composer from "./talk/composer.svelte";
-  import { startedIn } from "./talk/composer";
   import Divider from "./talk/divider.svelte";
   import Forking from "./talk/forking.svelte";
   import Button from "./parts/button.svelte";
@@ -374,7 +373,7 @@ with the room's name above it, and the first send lets it sink to its seat
 (docs/frontend-method.md §7I), so neither the words being typed nor an input method's
 composition is rebuilt on the way. -->
 <div class={["flex min-h-0 flex-col", band ? "" : "h-full"]} style:container-type={band ? undefined : "size"}>
-  {#if !band && head === "address" && (echo !== null || startedIn(runs, $belief.sessions[address]))}
+  {#if !band && head === "address"}
     <AddressLine {address} />
   {/if}
   {#if !band}
