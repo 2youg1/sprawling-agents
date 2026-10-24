@@ -148,9 +148,9 @@ pub fn admit_carried_skill(&mut self, entry: CatalogEntry) -> Result<(), AxError
 
 **决定**：`read` 对模型选的城内路径只开一次文件：Windows 上开了再问句柄的真实位置并判它，Linux 上判过真实位置再开、以 `/proc/self/fd` 核句柄；之后从同一个句柄整读。取句柄真实位置用 `winx::file::get_file_path`：公开面安全，它与它用的 `windows-sys` 已经因 wasmtime 在锁文件里，不增加 crate，是平台调用阶梯的第一档。任何失败与目录、非 UTF-8 都退回 §8-29-4 的判定路径，拒绝的字节不变。
 
-**理由**：同机测得 open+close 约 28 µs、canonicalize 约 78 µs（Windows 上过滤驱动让 open 很贵），判定路径一次成功读付 4 次 canonicalize、2 次 open 与 1 次元数据；agent 读的几乎都是热文件，这些固定开销比读本身贵。判句柄自己的位置还关掉了判定与打开之间的换链接窗口，而 `still_judged` 只能把它缩小到「来回换三次」。
+**理由**：同机测得 open+close 约 28 µs、canonicalize 约 78 µs（Windows 上过滤驱动让 open 很贵），判定路径一次成功读付 4 次 canonicalize、2 次 open 与 1 次元数据；agent 读的几乎都是热文件，这些固定开销比读本身贵。判句柄自己的位置还关掉了判定与打开之间的换链接窗口，而 `still_judged` 只能把它缩小到「来回换三次」。各候选在同一个 20 KiB 暖文件上逐轮交替 2000 轮（Windows x86_64 桌面机，16 核，旁边有构建在跑），p50 依次是：只 open 30–34 µs，一次 canonicalize 71–85 µs，open 加 `winx` 取位置 89–114 µs，open 加 `filepath` 123–146 µs，`cap-std` 在目录句柄下 open 83–101 µs，判定路径的整套解析与核验 406–479 µs。
 
-**被否**：①直通 I/O 与按文件缓存的行索引、热读缓存、后台回填（曾作为一个 PR 提出）：直通读在暖文件上慢 4–5 倍、在刚写过的文件上慢约 14 倍，三层缓存带来一串一致性缺陷，截断读还要多一个模型回合才拿得到 `version`；②`filepath 0.2`：同一个系统调用，但要再引入一份 `windows 0.58`；③`desktop/ffi` 里的 Zig 函数：同一个系统调用，多一处 `unsafe`，阶梯上排在安全 crate 之后；④`cap-std`：把打开限制在一个目录句柄之内，但不回答文件实际在哪，链接落在城内另一栋楼时读界仍要按落点再判，替不了「句柄在哪」这一问；⑤`rustix::fs::getpath`：只在 Apple 平台上有，Windows 与 Linux 用不上。
+**被否**：①直通 I/O 与按文件缓存的行索引、热读缓存、后台回填（曾作为一个 PR 提出）：直通读在暖文件上慢 4–5 倍、在刚写过的文件上慢约 14 倍，三层缓存带来一串一致性缺陷，截断读还要多一个模型回合才拿得到 `version`；②`filepath 0.2`：同一个系统调用，交替测量里比 `winx` 慢约 30 µs，还要再引入一份 `windows 0.58`；③`desktop/ffi` 里的 Zig 函数：同一个系统调用，多一处 `unsafe`，阶梯上排在安全 crate 之后；④`cap-std`：把打开限制在一个目录句柄之内，但不回答文件实际在哪，链接落在城内另一栋楼时读界仍要按落点再判，替不了「句柄在哪」这一问；⑤`rustix::fs::getpath`：只在 Apple 平台上编译（`fcntl(F_GETPATH)`），Windows 与 Linux 用不上。
 
 **重开参数**：`winx` 不再随 wasmtime 进锁文件，或某个候选在同机交替测量里比它快出测量误差之外。
 -/
