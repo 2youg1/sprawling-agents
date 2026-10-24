@@ -382,11 +382,11 @@ fn a_review_dispatch_freezes_the_prefix_it_froze_on_the_accounting_thread() {
         ),
         (
             "building",
-            "955c58cf462564ab1f9a3194306e53ac7ccc65c2aa8c4ee847b8a15b6d4b48bd",
+            "204ff6ab2fde14dfb3659bebae0a2e2ba4ecb5a538690b76db492ad6b3276913",
         ),
         (
             "resident",
-            "56ec36a1c18255c6b1dd6dd89f11525fcb54ae4ef9bb110da22c102782c2ddc1",
+            "9bd94fcb2b98810da468349ac6f5b2c286c515f4970c8dd72243d1f56f112791",
         ),
         (
             "run",

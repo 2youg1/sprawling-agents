@@ -37,8 +37,8 @@ fn hand_written_prompt(hash: &B3Hash) -> Payload {
     entry.insert(
         "sources".to_owned(),
         Value::Array(vec![
-            json!({ "addr": "City.md", "kept": 12, "marker": true, "dropped": 4 }),
-            json!({ "addr": "lobby/RULES.md", "kept": 25, "marker": false, "dropped": 0 }),
+            json!({ "addr": "City.md", "kept": 12, "marker": true, "dropped": 4, "hash": hash.to_string() }),
+            json!({ "addr": "lobby/RULES.md", "kept": 25, "marker": false, "dropped": 0, "hash": hash.to_string() }),
         ]),
     );
     entry.insert(
@@ -71,12 +71,14 @@ fn a_prompt_line_writes_the_bytes_the_hand_written_map_wrote() {
                     kept: 12,
                     marker: true,
                     dropped: 4,
+                    hash: Some(hash),
                 },
                 PromptSource {
                     addr: rules(),
                     kept: 25,
                     marker: false,
                     dropped: 0,
+                    hash: Some(hash),
                 },
             ],
             skipped: vec![PromptSkip {

@@ -75,6 +75,7 @@ impl RulesCache {
 pub fn rules_path(city_root, addr) -> PathBuf;      // <building>/.sprawling/RULES.toml
 pub fn agents_path(city_root, addr) -> PathBuf;     // <building>/AGENTS.md（项目的，故在保留区之外）
 pub fn city_agents_path(city_root) -> PathBuf;      // <city>/AGENTS.md：城围起来的工作区自己的那份
+pub fn room_agents_paths(city_root, building, room) -> Result<Vec<(Address, PathBuf)>, AxError>;  // 楼根以下到 room 的每一级 <level>/AGENTS.md，近楼的在前；楼根那份不在其中
 pub fn config_layers::path(city_root, addr, layer) -> Result<PathBuf, AxError>;
 // 三层都是 <scope>/.sprawling/CONFIG.toml；city 层与另两层同一个式子
 ```

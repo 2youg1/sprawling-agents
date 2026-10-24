@@ -236,6 +236,36 @@ pub fn rebuild_prefix(
                      the file on disk today is shorter than the span the run kept"
                 ))
             })?;
+            // Read as the typed record reads it: a row without a hash, or
+            // with a null one, predates D101; anything else that is not a
+            // string is a row nothing in this tree wrote.
+            let recorded = match source.get("hash") {
+                None | Some(serde_json::Value::Null) => None,
+                Some(value) => Some(value.as_str().ok_or_else(|| {
+                    AxError::failure(
+                        AxCode::InvalidArgs,
+                        "rebuild prefix",
+                        format!("{slot}: {addr_raw}: the recorded hash is not a string"),
+                    )
+                    .with_recovery(
+                        "replay a run whose source rows were written by sprawling; this \
+                         row's hash was altered after it was recorded",
+                    )
+                })?),
+            };
+            if let Some(recorded) = recorded
+                && recorded != B3Hash::digest(piece.as_bytes()).to_string()
+            {
+                return Err(AxError::failure(
+                    AxCode::CasCorrupt,
+                    "rebuild prefix",
+                    format!("{slot}: {addr_raw}: the kept bytes differ from the ones recorded"),
+                )
+                .with_recovery(format!(
+                    "restore {addr_raw} to the text it held when the run recorded it; the \
+                     model was given those bytes, not the ones on disk today"
+                )));
+            }
             if !text.is_empty() {
                 text.push_str(crate::prefix::DOC_JOIN);
             }

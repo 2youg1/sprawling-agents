@@ -200,8 +200,9 @@ impl Site {
 
 ```rust
 // bin::assembly（形状 4 适配器；四个段的填充点）
-fn building_segment(city_root: &Path, addr: &Address, building: &Address) -> Vec<u8>;
-// Building 段 = 地址 + `RULES.toml` + （若在）`<city>/AGENTS.md` + （若在）
+fn building_segment(city_root: &Path, building: &Address) -> Vec<u8>;
+// Building 段 = 楼的地址（不是 run 所在房间的地址：一栋楼的每个居民逐字节共享这一段，
+// `crates/runtime/spec/Prefix.lean` D97，房间地址会让它按房间分裂）+ `RULES.toml` + （若在）`<city>/AGENTS.md` + （若在）
 // `<building>/AGENTS.md`。后两者是**项目自带的约定**，按同一句理由直接给而不让居民去取：
 // 要先 fetch 才能遵守的规则，要么晚一回合遵守，要么不遵守。**只看两个固定地址**：城根
 // 与楼根。城根是这座城围起来的那个工作区，它要么就是项目本身（楼是项目的一级子目录），
@@ -211,14 +212,22 @@ fn building_segment(city_root: &Path, addr: &Address, building: &Address) -> Vec
 // `RULES.toml` **之后**并自述位次：二者会冲突（一份叫你跑测试的 AGENTS.md 遇上一栋
 // 没有 `exec` 的楼），而城执行的是楼规。文件不在就不写标题：空标题会让居民去
 // 遵守一份不存在的约定。
+// 文件在却读不出（权限、是个目录）时冻结以 `E_STORAGE_FATAL` 拒绝并点名路径，不当作不在：
+// 当作不在，run 就带着缺了项目约定的提示词开工，而没有任何一处说出这件事。
+fn room_conventions(city_root: &Path, addr: &Address, building: &Address) -> Vec<Convention>;
+// 楼根以下、到 run 所在房间为止的每一级 `AGENTS.md`（`city::room_agents_paths`，近楼的在前），
+// 接在 Resident 段末尾，同一扇门 `Assembled::extend_conventions`：文件在才写标题，一行一条来源。
+// 不进 Building 段：那一段同楼逐字节共享（D97）。进 Resident 段而不是 Run 段：Resident 段本就属于
+// 一个地址、整个 run 冻结，同一房间的下一个 run 字节不变，缓存照样盖得住。每一级都读而不只读房间
+// 自己那一份：monorepo 是一栋楼、包是房间，两级深的包同时受上一级的约定管。
 fn run_segment(city_root: &Path, building: &Address, brief: &city::RunBrief) -> Vec<u8>;
 ```
 
 | 槽 | 装什么 | 稳定性依据 |
 |---|---|---|
-| City | 城里那份 `City.md` | 整座城不变 |
-| Building | 地址 ＋ `.sprawling/RULES.toml` 全文 | 人写、任何写域够不到、整个 Run 不变 |
-| Resident | `URBANITE.md`（或无身份那 106 字节）＋ catalog | 同一个 Resident 每次 Run 同样的字节 |
+| City | 管这栋楼的那份 `City.md`：楼保留区里的那份在就用它，否则城根那份（`city::city_prompt_path`，近者替换远者） | 没有楼级覆盖时整座城不变；有时整栋楼不变 |
+| Building | 楼的地址 ＋ `.sprawling/RULES.toml` 全文 ＋ 城根与楼根的 `AGENTS.md` | 人写、任何写域够不到、整个 Run 不变、同楼每个居民相同 |
+| Resident | run 所在房间的地址 ＋ 名字行 ＋ `URBANITE.md`（或无身份那 106 字节）＋ catalog ＋ 楼根以下各级 `AGENTS.md` | 同一个 Resident 每次 Run 同样的字节 |
 | Run | `Handoff.md`（写过的话）＋ 本次 brief | 每次 Run 一份 |
 
 - **注入的依据是稳定性，不是重要性**。`Roadmap.md` 与 `Memo.md` **故意不注入**：Run 自己会改它们（`plan` 工具持有 roadmap 全文），冻进 prefix 就是第二个权威——模型会读到自己刚改过的旧副本。它们的正路是工具，不是 prefix。

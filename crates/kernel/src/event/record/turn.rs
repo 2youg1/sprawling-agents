@@ -60,7 +60,11 @@ pub struct PromptSegment {
 ///
 /// `kept` and `dropped` state both what the model read and what the cap
 /// cut off; `marker` says a truncation marker follows the kept bytes,
-/// which the byte counts alone cannot say.
+/// which the byte counts alone cannot say. `hash` is the BLAKE3 of the
+/// kept bytes, so a rebuild names the one document that changed
+/// (`crates/runtime/spec/Prefix.lean` D101); a row written before rows
+/// carried it reads as `None` and is checked by its segment's hash
+/// alone.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct PromptSource {
@@ -68,6 +72,8 @@ pub struct PromptSource {
     pub kept: u64,
     pub marker: bool,
     pub dropped: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hash: Option<B3Hash>,
 }
 
 /// One document a slot was offered and left out, and why.

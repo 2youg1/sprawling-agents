@@ -89,26 +89,41 @@ impl Identity {
     }
 }
 
-/// The description a resident is known by, with the discipline the city
-/// carries for its seat.
+/// The description a resident is known by, set between the two parts of
+/// the discipline the city carries for its seat.
 ///
 /// Composed at load rather than kept apart, so the content hash over
-/// `Resident::urbanite` covers both: two builds whose disciplines differ
-/// never produce the same digest for the same file.
+/// `Resident::urbanite` covers all three: two builds whose disciplines
+/// differ never produce the same digest for the same file.
 fn described(addr: &Address, written: Vec<u8>) -> Vec<u8> {
     let Some(discipline) = crate::spine_files::hall_discipline(addr) else {
         return written;
     };
+    let mut out = Vec::new();
+    paragraph(&mut out, discipline.opening.as_bytes());
     // The identity area is not who the seat is: the name it holds opens
     // the resident slot on its own line (`crates/city/spec/Identity.lean` §8-33), and one
     // name said twice in one request is two answers to one question.
-    let mut out = crate::identity::persona(written);
-    if !out.is_empty() && !out.ends_with(b"\n") {
-        out.push(b'\n');
-    }
-    out.push(b'\n');
-    out.extend_from_slice(discipline.as_bytes());
+    paragraph(&mut out, &crate::identity::persona(written));
+    paragraph(&mut out, discipline.closing.as_bytes());
     out
+}
+
+/// Appends one part after a blank line, ending it with a line break;
+/// an empty part adds nothing, so a seat with no opening does not open
+/// with a blank line.
+fn paragraph(out: &mut Vec<u8>, part: &[u8]) {
+    const NEWLINE: u8 = 10;
+    if part.is_empty() {
+        return;
+    }
+    if !out.is_empty() {
+        out.push(NEWLINE);
+    }
+    out.extend_from_slice(part);
+    if !part.ends_with(&[NEWLINE]) {
+        out.push(NEWLINE);
+    }
 }
 
 /// A standing identity and the description it is known by.

@@ -159,8 +159,8 @@ impl<C: FnMut() -> Result<TimeMs, AxError>> Model for Warmed<C> { /* call、call
 `FrozenSegment` 自带来源注记，而不由 `build_prefix` 另行拼出；否则同一件事有两个作者——照计划装配出来的 prefix 写一种行，在城里按手边字节装配出来的 prefix 写另一种（或不写）。`replay::rebuild_prefix` 只读得懂前者，而页面要读的恰好是后者。
 
 ```rust
-pub struct SegmentSource { pub addr: Address, pub kept: u64, pub dropped: u64 }
-impl SegmentSource { pub fn whole(addr: Address, kept: u64) -> SegmentSource; }
+pub struct SegmentSource { pub addr: Address, pub kept: u64, pub dropped: u64, pub hash: B3Hash }
+impl SegmentSource { pub fn whole(addr: Address, bytes: &[u8]) -> SegmentSource; }   // kept 与 hash 都从 bytes 算
 
 impl FrozenSegment {
     pub fn new(slot: SegmentSlot, bytes: Vec<u8>) -> FrozenSegment;              // 无来源文档
@@ -172,9 +172,9 @@ impl FrozenSegment {
 
 **三条口径：**
 
-1. **来源行只有一个作者。** `prompt_payload` 的两条分支合成一条：每一行的 `slot`／`hash`／`len`／`sources`／`skipped` 都从段本身取，`breakpoints` 恒上线。由此，在城里装配的 prefix 与照计划装配的 prefix 在同样的键下写同样的行，`rebuild_prefix` 读的仍是它一直在读的那四个键（`addr`／`kept`／`marker`／`dropped`）。
+1. **来源行只有一个作者。** `prompt_payload` 的两条分支合成一条：每一行的 `slot`／`hash`／`len`／`sources`／`skipped` 都从段本身取，`breakpoints` 恒上线。由此，在城里装配的 prefix 与照计划装配的 prefix 在同样的键下写同样的行，`rebuild_prefix` 读的是 `addr`／`kept`／`marker`／`dropped`，以及 `hash`（D101）。
 2. **`marker` 由 `dropped > 0` 派生而不是独立字段。** 两个互相蕴含的字段是两个可以互相矛盾的字段。
-3. **没有来源文档的段写空表而不是省略键。** resident 段由身份与目录拼成，不出自任何文件；空表说的是「它不来自文档」，缺席的键说的是「不知道」。
+3. **不出自文档的字节不记来源行，来源表照写。** 装配层二进制自带或派生的字节（楼地址、房间地址、名字行、身份与 hall 纪律、目录渲染、`run_segment` 的输出、`AGENTS.md` 前的标题句）今天没有来源行；一段全是这种字节就写空表，空表说的是「它不来自文档」，缺席的键说的是「不知道」。所以今天只有全部出自文档的段能经 `rebuild_prefix` 重建，Building、Resident、Run 三段重建不出。未决的是这些字节怎样成为来源行：按 D101 的哈希从对象库取回是一种答法，要定的是行怎样标明它不是文档（`PromptSource` 加一个缺省为文档的字段，旧行读宽容），以及 `rebuild_prefix` 怎样拿到这些字节；能定下它的证据是一条经派发入口冻结、四段都重建一致的测试。
 4. **`breakpoints` 记本次请求实际发出的断点，而不是四个 slot 名。** 行由 `BreakpointPlan::breakpoints()` 拼出，值是段界的 slot 名与 `tail`。类型仍是 `Vec<String>`、键名不变、`#[serde(default)]`，所以写着 `["city","building","resident","run"]` 的记录照读：那是 slot 清单，其中 `run` 段界从未在请求里出现过。**被否**：保留 slot 清单另加一个 `plan` 键——那样账上仍有一行名为断点却不是断点的数据，读者要自己知道该信哪一个。
 
 5. **`prompt_assembled` 每个 run 只写一条。** `turn::prompt::PromptRecord` 记着本 run 最后写下的载荷；`assemble` 照常算出本回合的载荷，与之相等就不写，不等才写并记住。prefix 在 run 内冻结，断点计划只随「对话是否为空」变，所以此后各回合的行是第一条的逐字拷贝；回合间真正会动的请求区域由 `prompt_shape_compared` 逐回合记，尾锚恒落在最后一条消息上，无须逐回合重述。比较的是载荷本身而不是「是不是第一回合」：哪天某个回合的载荷真的变了，账上就多一条，账本不会替一个请求声称它没带的断点。读者据此按 run 取段：`storage::attribution` 以 run 为键保存段权重（`crates/storage/Spec.lean` §8-7），`sprawling::views::prefix` 读一跑的第一条。旧账每回合一条，照读，因为同一 run 的各条相同。**被否**：之后的回合写一条引用首条的短记录——它不携任何读者需要的事实，只多一行链。
@@ -184,13 +184,24 @@ impl FrozenSegment {
 
 /-! D1 定规：来源行不带摘要生产者指纹
 
-**决定**：`prompt_assembled` 的来源行只记 `{addr, kept, marker, dropped}`；没有 `SummaryProducer`，也没有铸印它的 `compaction::producer::mint`。
+**决定**：`prompt_assembled` 的来源行只记 `{addr, kept, marker, dropped, hash}`（`hash` 见 D101）；没有 `SummaryProducer`，也没有铸印它的 `compaction::producer::mint`。
 
 **理由**：本仓库不做 LLM 压缩，没有任何路径产出摘要文档，生产里每个 `SourceDoc` 的指纹恒为缺席；一个没有写入者的字段让读者以为账本记下了一件它从不记的事，而铸印函数只有测试调用。
 
 **被否**：保留字段与 `mint` 等将来接上——死机制照样要维护、要进公开面，而接上时的口径（谁写的、第几代）应由那时真实的摘要生产者决定，不是预先猜好。
 
 **重开参数**：出现一条把模型写的摘要放进前缀的生产路径时，重开本条，指纹随那条路径一起设计。
+-/
+
+/-! D101 来源行带它所留字节的哈希，重建时逐行核对
+
+**决定**：`SegmentSource` 与 `PromptSource` 各带一个 `hash`：这一行留进段里的字节（文档的前 `kept` 个字节，不含截断标记）的 BLAKE3。`SegmentSource::whole(addr, bytes)` 从同一串字节算出 `kept` 与 `hash`，`build_segment` 对截断的文档用所留的那一段算。`replay::rebuild_prefix` 先逐行核对：一行写了 `hash`，而解析器给的文档前 `kept` 个字节算出的哈希与它不同，就以 `E_CAS_CORRUPT` 拒绝并点名这一行的地址与段；行都对上之后再核对整段哈希。`PromptSource::hash` 是 `Option`：旧行没有这个键，读作 `None`，那一行只由整段哈希核对。
+
+**理由**：整段哈希只能说「这一段的某处变了」，人要找的是哪一份文件变了；每行的哈希把答案落到一个人能打开的地址上。哈希的是所留的字节而不是整份文档，因为模型读到的只是这一段：文档在截断点之后改了，模型收到的字节没变，重建也不该报它。二进制自带、不出自任何文档的字节，下一步也用同一个字段在对象库里找回（`crates/runtime/spec/Prefix.lean` §8-39 第 3 条的空表届时改写）。
+
+**被否**：①只记整份文档的哈希——截断的文档在截断点之后被改，重建会误报；②只在重建失败时再逐份比对长度——长度相同、字节不同的改动查不出来（A15 的漂移用例正是这种）。
+
+**重开参数**：来源行改为指向对象库里的不可变副本、不再需要按地址读当前文件时，逐行核对由对象库的寻址本身给出。
 -/
 
 /-! D97 一栋楼共享前缀的哪几块，由段格说出

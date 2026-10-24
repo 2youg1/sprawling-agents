@@ -6,10 +6,10 @@
 //! The note a person keeps for one model, and where the city keeps it
 //! (`crates/sprawling/Spec.lean` §8-85).
 //!
-//! One place, in the city's reserved subtree: a directory at the city
-//! root would share its name space with the buildings, and a resident
-//! cannot write under the reserved prefix, so the model a note governs
-//! cannot rewrite it.
+//! Two places, the city's reserved subtree and a building's: a
+//! directory at the city root would share its name space with the
+//! buildings, and a resident cannot write under a reserved prefix, so
+//! the model a note governs cannot rewrite it.
 
 use std::path::Path;
 
@@ -25,10 +25,16 @@ pub(super) struct ModelNote {
     pub(super) bytes: Vec<u8>,
 }
 
-/// The note for `model` on the endpoint named `provider`, when the city
-/// has one.
+/// The note for `model` on the endpoint named `provider`: the one in
+/// `building`'s reserved subtree when it has one, else the city's, else
+/// none.
 ///
-/// The location is spelled as an address before it becomes a path. A
+/// The nearer replaces the farther rather than joining it: a building
+/// that keeps its own note for a model has said what that model is to
+/// be told there, and the city's note beside it would be a second
+/// answer to the same question.
+///
+/// Each location is spelled as an address before it becomes a path. A
 /// model id the address grammar refuses names no note in this city, and
 /// is answered as a note that is not there; spelling the path first
 /// would let an id with a `..` segment read a file outside the reserved
@@ -40,17 +46,29 @@ pub(super) struct ModelNote {
 /// it would follow a prompt nobody chose, with nobody told.
 pub(super) fn model_note(
     city_root: &Path,
+    building: &Address,
     provider: &str,
     model: &str,
 ) -> Result<Option<ModelNote>, AxError> {
-    let Ok(at) = Address::parse(&format!(
-        "{RESERVED_PREFIX}/{MODELS_DIR}/{provider}/{model}.md"
-    )) else {
-        return Ok(None);
-    };
-    let path = city_root.join(at.as_str());
-    match std::fs::read(&path) {
-        Ok(bytes) => Ok(Some(ModelNote { at, bytes })),
+    let note = format!("{RESERVED_PREFIX}/{MODELS_DIR}/{provider}/{model}.md");
+    for spelled in [format!("{}/{note}", building.as_str()), note.clone()] {
+        let Ok(at) = Address::parse(&spelled) else {
+            return Ok(None);
+        };
+        if let Some(bytes) = read_note(&city_root.join(at.as_str()))? {
+            return Ok(Some(ModelNote { at, bytes }));
+        }
+    }
+    Ok(None)
+}
+
+/// One note's bytes, or `None` when the file is not there.
+///
+/// # Errors
+/// As [`model_note`].
+fn read_note(path: &Path) -> Result<Option<Vec<u8>>, AxError> {
+    match std::fs::read(path) {
+        Ok(bytes) => Ok(Some(bytes)),
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(None),
         Err(err) => Err(AxError::failure(
             AxCode::StorageFatal,

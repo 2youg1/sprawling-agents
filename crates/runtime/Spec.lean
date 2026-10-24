@@ -341,6 +341,7 @@ envelope 探查与全解共用 kernel 的解析（Value 探查仅取五键，不
 | D98 | 每次尝试之后问一次端点门前的等待，有就记一行 `prefix_held` | `crates/runtime/spec/Turn/Recovery.lean` |
 | D99 | 保温门转发 `Model` 的每一扇调用门，不让任何一扇落到 trait 的缺省实现 | `crates/runtime/spec/Prefix.lean`（§8-4-2） |
 | D100 | 提前量是「发出到 provider 开始处理」的时间，按 endpoint 存一个读数 | `crates/runtime/spec/Prefix.lean`（§8-4-2） |
+| D101 | 来源行带它所留字节的哈希，重建时逐行核对 | `crates/runtime/spec/Prefix.lean` |
 -/
 
 /-! ## 13 依赖选型
