@@ -116,6 +116,9 @@ fn shared(setup: &Setup) -> Vec<Episode> {
         proposal(setup),
         detail(),
         run_itself(),
+        list("sprawling"),
+        list("record"),
+        list("web"),
     ]
 }
 
@@ -518,6 +521,24 @@ fn detail() -> Episode {
                 text.starts_with("tool archive (sprawling): run it with `tool`")
                     && text.contains("input schema:"),
                 format!("the guide of a dormant tool read {text:?}"),
+            )
+        },
+    }
+}
+
+/// The members of one namespace the dormant index folded into a line;
+/// the coverage counts them as offered (`catalogue::covered`).
+fn list(namespace: &'static str) -> Episode {
+    Episode {
+        step: Step {
+            tool: "tool",
+            args: json!({ "op": "list", "namespace": namespace }),
+        },
+        holds: |seen| {
+            let text = answered_text(seen.answer)?;
+            ensure(
+                text.lines().all(|line| line.starts_with("- ")),
+                format!("a namespace listed {text:?}"),
             )
         },
     }

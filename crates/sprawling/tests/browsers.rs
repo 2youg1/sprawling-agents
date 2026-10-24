@@ -204,9 +204,11 @@ fn a_run_is_offered_the_browser_the_worker_was_handed() {
         model: None,
     });
 
+    // A browser is filed under `computer`, one line of the dormant
+    // index (`crates/runtime/Spec.lean` §8-60).
     let names = offered.lock().unwrap().clone();
     assert!(
-        names.iter().any(|name| name == HANDED),
-        "the model was never offered {HANDED}: offered {names:?}, and the dispatch answered {dispatched:?}"
+        names.iter().any(|name| name == "computer (1)"),
+        "the model was never offered {HANDED} under `computer`: offered {names:?}, and the dispatch answered {dispatched:?}"
     );
 }

@@ -116,13 +116,13 @@ fn covered(landing: &Landing<'_>, episodes: &[Episode]) -> Vec<String> {
     };
     let calls = history.calls_of(lead);
     let called: BTreeSet<&str> = calls.iter().map(|call| call.called.name.as_str()).collect();
-    let never: Vec<&str> = landing
-        .offered
+    let mut short = Vec::new();
+    let offered = unfolded(landing.offered, &calls, &mut short);
+    let never: Vec<&str> = offered
         .iter()
         .map(String::as_str)
         .filter(|name| !called.contains(name))
         .collect();
-    let mut short = Vec::new();
     if !never.is_empty() {
         short.push(format!("offered and never called: {never:?}"));
     }
@@ -137,9 +137,19 @@ fn covered(landing: &Landing<'_>, episodes: &[Episode]) -> Vec<String> {
         }
     }
     for episode in episodes {
+        // Several episodes call `tool`, with different arguments.
         let Some(result) = calls
             .iter()
-            .find(|call| call.called.name.as_str() == episode.step.tool)
+            .find(|call| {
+                call.called.name.as_str() == episode.step.tool
+                    && serde_json::Value::Object(call.called.args.as_map().clone())
+                        == episode.step.args
+            })
+            .or_else(|| {
+                calls
+                    .iter()
+                    .find(|call| call.called.name.as_str() == episode.step.tool)
+            })
             .and_then(|call| call.results.first())
         else {
             short.push(format!("{}: never answered", episode.step.tool));
@@ -158,4 +168,52 @@ fn covered(landing: &Landing<'_>, episodes: &[Episode]) -> Vec<String> {
         }
     }
     short
+}
+
+/// The offered names with each namespace line of the dormant index
+/// replaced by the members a `tool` `list` of it answered, so a tool
+/// folded into a namespace still has to be called. A namespace nobody
+/// listed, or one that listed a different number of members than its
+/// line counted, is a shortfall.
+fn unfolded(offered: &[String], calls: &[city::Call], short: &mut Vec<String>) -> Vec<String> {
+    let resident: BTreeSet<&str> = offered
+        .iter()
+        .map(String::as_str)
+        .filter(|name| !name.contains(' '))
+        .collect();
+    let mut names: Vec<String> = resident.iter().map(|name| (*name).to_owned()).collect();
+    for line in offered.iter().filter(|name| name.contains(' ')) {
+        let Some((namespace, count)) = line
+            .strip_suffix(')')
+            .and_then(|rest| rest.split_once(" ("))
+        else {
+            short.push(format!("an index line read {line:?}"));
+            continue;
+        };
+        let asked = serde_json::json!({ "op": "list", "namespace": namespace });
+        let Some(text) = calls
+            .iter()
+            .filter(|call| call.called.name.as_str() == "tool")
+            .filter(|call| serde_json::Value::Object(call.called.args.as_map().clone()) == asked)
+            .find_map(|call| call.results.first())
+            .and_then(|result| crate::episodes::answered_text(&result.answer).ok())
+        else {
+            short.push(format!("namespace {namespace} was never listed"));
+            continue;
+        };
+        let members: Vec<String> = text
+            .lines()
+            .filter_map(|member| member.strip_prefix("- "))
+            .map(|member| member.split_once(':').map_or(member, |(name, _)| name))
+            .filter(|name| !resident.contains(name))
+            .map(str::to_owned)
+            .collect();
+        if members.len().to_string() != count {
+            short.push(format!(
+                "namespace {namespace} counted {count} and listed {members:?}"
+            ));
+        }
+        names.extend(members);
+    }
+    names
 }
