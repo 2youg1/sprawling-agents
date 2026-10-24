@@ -67,6 +67,7 @@ pub use identity::{Unreadable, persona, read_naming, write_naming};
 // Where each of these files sits is `kernel::layout`'s answer, and the
 // names are re-exported rather than restated so that a caller reading
 // `city::CONFIG_TOML` and the layout that places it cannot disagree.
+pub use defaults::{CopyStanding, Edited, Shipped, follow_defaults, standing};
 pub use gitignore::place_city as ignore_city_records;
 pub use gitignore::place_everywhere as keep_records_out_of_git;
 pub use handoff_form::{HandoffSections, handoff_sections};
@@ -91,12 +92,11 @@ pub use room::open as open_room;
 pub use rules_tool::RulesTool;
 pub use schedule::{Cadence, Entry, SCHEDULE_FILE, Schedule, schedule_path};
 pub use session::{clear_session, forget_shape};
-pub use defaults::{CopyStanding, Edited, Shipped, follow_defaults, standing};
 pub use spine_files::CITY_TEMPLATE;
+pub use spine_files::hall_identity_path;
 pub use spine_files::{AGENTS_FILE, CITY_FILE, CLERK_FILE, HANDOFF_FILE, MAYOR_FILE};
 pub use spine_files::{JobBrief, ROADMAP_FILE, RunBrief};
 pub use spine_files::{MEMO_FILE, SPEC_FILE};
-pub use spine_files::{hall_identity_path, lay_out_hall_identities};
 pub use spine_files::{handoff, handoff_path};
 pub use spine_files::{job_path, norms, roadmap, roadmap_path, write_brief, write_job};
 pub use vocation::{Vocation, vocation_of};

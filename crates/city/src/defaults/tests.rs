@@ -65,10 +65,7 @@ fn an_edited_copy_is_kept_and_named() {
 #[test]
 fn an_identity_area_stays_while_the_body_follows_the_default() {
     let area = "+++\nmayor_name = \"Ada\"\n+++\n";
-    let dir = city_with(&[(
-        Shipped::Mayor,
-        format!("{area}{V0_0_12_MAYOR}").as_bytes(),
-    )]);
+    let dir = city_with(&[(Shipped::Mayor, format!("{area}{V0_0_12_MAYOR}").as_bytes())]);
 
     follow_defaults(dir.path()).unwrap();
 

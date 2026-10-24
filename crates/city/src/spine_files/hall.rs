@@ -15,9 +15,7 @@
 
 use std::path::{Path, PathBuf};
 
-use kernel::{Address, AxError};
-
-use super::{storage, write_new};
+use kernel::Address;
 
 /// Who the Mayor is: the identity file of `hall/mayor`.
 pub const MAYOR_FILE: &str = "MAYOR.md";
@@ -174,19 +172,4 @@ impl Seat {
             },
         }
     }
-}
-
-/// Lays down the two identity files a city raises City Hall with.
-///
-/// Nothing is overwritten: a person who has edited either file keeps
-/// what they wrote, whatever is run against the city afterwards.
-///
-/// # Errors
-/// Propagates a reserved subtree that cannot be created or written.
-pub fn lay_out_hall_identities(city_root: &Path) -> Result<(), AxError> {
-    let governed = city_root.join(kernel::RESERVED_PREFIX);
-    std::fs::create_dir_all(&governed).map_err(|err| storage(&governed, &err))?;
-    write_new(&governed.join(MAYOR_FILE), MAYOR_TEMPLATE)?;
-    write_new(&governed.join(CLERK_FILE), CLERK_TEMPLATE)?;
-    Ok(())
 }

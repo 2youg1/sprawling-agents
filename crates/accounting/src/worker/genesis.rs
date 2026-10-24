@@ -128,17 +128,6 @@ pub fn form(city_root: &Path, adopt: Adopt, hands: Hands) -> Result<InitReport, 
     // The city's own records stay out of the workspace's git before
     // anything else is laid beside the project's files.
     city::ignore_city_records(city_root)?;
-    let city_md = city_root.join(city::CITY_FILE);
-    if !city_md.exists() {
-        std::fs::write(&city_md, CITY_MD).map_err(|source| {
-            AxError::failure(
-                AxCode::StorageFatal,
-                "write the city prompt",
-                format!("{}: {source}", city_md.display()),
-            )
-            .with_recovery("check the city directory is writable")
-        })?;
-    }
     // Who answers the approval inbox, written down rather than baked
     // into a default: the person can appoint somebody else, and a
     // change needs a line to change.
@@ -164,9 +153,10 @@ pub fn form(city_root: &Path, adopt: Adopt, hands: Hands) -> Result<InitReport, 
         data: Payload::of(&delegation)?,
         ig: false,
     })?;
-    // City Hall, and the two identity files its residents are read
-    // from. Both happen after line zero, because a building is recorded
-    // against a city and there is no city before then.
+    // City Hall happens after line zero, because a building is recorded
+    // against a city and there is no city before then. The city's own
+    // prompt and the hall's two identity files are laid down by the
+    // worker as it opens (`city::follow_defaults`, city D28).
     // The writer that wrote line zero goes on writing: a second one
     // opened here would be refused the city's writer lock.
     let mut worker = RunWorker::over(
@@ -178,7 +168,6 @@ pub fn form(city_root: &Path, adopt: Adopt, hands: Hands) -> Result<InitReport, 
     let plan = city::CityPlan::new(None)?;
     let (hall, template) = plan.hall();
     worker.create_building(hall.clone(), template.name())?;
-    city::lay_out_hall_identities(city_root)?;
     let mut adopted = Vec::new();
     if let (Adopt::EveryFolder, city::Standing::Work { adoptable, .. }) = (adopt, &standing) {
         // Through the same door `sprawling adopt` uses, so a folder

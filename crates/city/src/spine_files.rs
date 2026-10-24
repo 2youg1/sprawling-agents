@@ -35,9 +35,7 @@ pub(crate) mod hall;
 pub(crate) mod blank;
 use blank::{empty_roadmap, is_blank_form};
 
-pub use hall::{
-    CLERK_FILE, MAYOR_FILE, hall_discipline, hall_identity_path, lay_out_hall_identities,
-};
+pub use hall::{CLERK_FILE, MAYOR_FILE, hall_discipline, hall_identity_path};
 
 /// The plan: the single denominator for progress in a building.
 ///

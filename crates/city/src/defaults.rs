@@ -167,12 +167,19 @@ pub struct Edited {
 /// `E_STORAGE_FATAL` naming the path, for a copy that is there and will
 /// not read, and for one that will not write.
 pub fn follow_defaults(city_root: &Path) -> Result<Vec<Edited>, AxError> {
+    let mut edited = Vec::new();
     for doc in Shipped::ALL {
-        let copy = read_copy(&doc.path(city_root))?;
-        let _standing = standing(doc, copy.as_deref());
-        let _forward = moved_forward(doc, copy.as_deref());
+        let path = doc.path(city_root);
+        let copy = read_copy(&path)?;
+        match standing(doc, copy.as_deref()) {
+            CopyStanding::Current => {}
+            CopyStanding::Edited => edited.push(Edited { doc, path }),
+            CopyStanding::Absent | CopyStanding::Earlier => {
+                crate::document::replace(&path, &moved_forward(doc, copy.as_deref()))?;
+            }
+        }
     }
-    Ok(Vec::new())
+    Ok(edited)
 }
 
 /// The copy's identity area, if it has one, over this build's default.
