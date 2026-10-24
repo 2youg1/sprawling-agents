@@ -249,8 +249,9 @@ pub(super) fn city_to_open() -> Result<std::path::PathBuf, kernel::AxError> {
 }
 
 /// Moves the city an earlier release kept beside this binary to the
-/// home directory's default, says so, and names it in the person's
-/// file so the move is never looked for again.
+/// home directory's default, or leaves it where it is when the home
+/// directory is on another volume; says which, and names the city's
+/// folder in the person's file so the move is never looked for again.
 fn move_home_from_beside_the_binary() -> Result<(), kernel::AxError> {
     let exe_dir = match std::env::current_exe() {
         Ok(exe) => match exe.parent() {
@@ -277,6 +278,21 @@ fn move_home_from_beside_the_binary() -> Result<(), kernel::AxError> {
             // failed write is told, and the next launch finds the city at
             // the default, where it now is.
             name_city(&to);
+            Ok(())
+        }
+        sprawling::beside_binary::Homing::OnAnotherVolume { at, home } => {
+            println!(
+                "the city stays at {}: {} is on another volume, and this release does not copy a city across volumes",
+                at.display(),
+                home.display()
+            );
+            println!(
+                "to move it yourself, stop the city, move that folder whole, then change the city line in the person's config.toml"
+            );
+            // Naming the old place is what makes this the only time it is
+            // said: the next launch finds a city in the person's file and
+            // looks beside the binary no more.
+            name_city(&at);
             Ok(())
         }
     }

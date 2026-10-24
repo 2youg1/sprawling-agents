@@ -74,8 +74,12 @@ fn a_city_on_another_volume_than_home_is_kept_where_it_is() {
     let to = dir.path().join("home").join("sprawling").join("city");
 
     let across = std::io::Error::from(std::io::ErrorKind::CrossesDevices);
-    assert!(
-        after_rename(Err(across), from.clone(), &to).is_ok(),
+    assert_eq!(
+        after_rename(Err(across), from.clone(), &to).unwrap(),
+        Homing::OnAnotherVolume {
+            at: from.clone(),
+            home: to.clone()
+        },
         "a city on another volume is opened where it is, not refused"
     );
     assert_eq!(city::has_history(&from).unwrap(), city::History::Present);
