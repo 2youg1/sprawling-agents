@@ -354,13 +354,7 @@ impl Freezing<'_> {
         // Where this run stands opens the resident slot, which belongs
         // to one address, rather than the building slot, which the whole
         // building shares.
-        let mut resident = format!(
-            "{}
-
-",
-            addr.as_str()
-        )
-        .into_bytes();
+        let mut resident = format!("{}\n\n", addr.as_str()).into_bytes();
         resident.extend_from_slice(&names.called(addr));
         resident.extend_from_slice(&site.identity.segment_bytes());
         resident.push(NEWLINE);

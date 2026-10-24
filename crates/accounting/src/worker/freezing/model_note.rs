@@ -76,7 +76,8 @@ fn read_note(path: &Path) -> Result<Option<Vec<u8>>, AxError> {
             format!("{}: {err}", path.display()),
         )
         .with_recovery(
-            "every run on this model is sent that file; make it readable, or take it              away to send the prompt without it",
+            "every run on this model is sent that file; make it readable, or take it \
+             away to send the prompt without it",
         )),
     }
 }

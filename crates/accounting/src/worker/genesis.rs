@@ -269,7 +269,8 @@ pub(super) fn prompt_segment(path: &Path, at: Address) -> Result<Assembled, AxEr
             format!("{}: {err}", path.display()),
         )
         .with_recovery(
-            "every run under that file is governed by it; make it readable, or take it              away: the city lays its own default down again when it next opens",
+            "every run under that file is governed by it; make it readable, or take it \
+             away: the city lays its own default down again when it next opens",
         )),
     }
 }
