@@ -6,7 +6,7 @@
 <script lang="ts">
   // The conversation's address line (client/Spec.lean 4-10a): where main
   // stands, said once, and the way into the command palette that a touch
-  // screen without Accel-K has. The session's number is the city's
+  // screen without Accel-`/` has. The session's number is the city's
   // (`Query::Sessions`, the same question the page's workspace asks, which
   // `asking` merges), so a reload draws the same number; the palette it
   // opens is the shell's one palette (`palette_door.svelte.ts`), and
