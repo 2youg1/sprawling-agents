@@ -176,11 +176,15 @@ impl Limiter {
         }
     }
 
-    /// Whether growing to `desired` bytes passes the run's ceiling.
-    fn past_ceiling(&self, desired: usize) -> bool {
+    /// Whether growing to `desired` bytes was refused for the run's
+    /// ceiling alone: past it, and within the maximum the module itself
+    /// declares, which would refuse the growth with no ceiling at all.
+    fn past_ceiling(&self, desired: usize, maximum: Option<usize>) -> bool {
+        let within_module = maximum.is_none_or(|maximum| desired <= maximum);
         match self.ceiling {
             GuestMemory::Ceiling(limit) => {
-                u64::try_from(desired).map_or(true, |desired| desired > limit.get())
+                within_module
+                    && u64::try_from(desired).map_or(true, |desired| desired > limit.get())
             }
             GuestMemory::Wasm32 => false,
         }
@@ -195,7 +199,7 @@ impl wasmtime::ResourceLimiter for Limiter {
         maximum: Option<usize>,
     ) -> wasmtime::Result<bool> {
         let granted = self.limits.memory_growing(current, desired, maximum)?;
-        self.hit |= !granted && self.past_ceiling(desired);
+        self.hit |= !granted && self.past_ceiling(desired, maximum);
         Ok(granted)
     }
 
@@ -284,14 +288,30 @@ impl Sandbox for WasmtimeSandbox {
                 )
             })?;
 
-        let instance = linker.instantiate(&mut store, &module).map_err(|err| {
-            host_error(
-                "instantiate guest",
-                err.to_string(),
-                "reinstall sprawling: the guest module asks this host for an \
+        let instance = match linker.instantiate(&mut store, &module) {
+            Ok(instance) => instance,
+            // The guest's initial memory alone passes the run's ceiling:
+            // a fact about this guest under this ceiling, told as the
+            // ceiling it hit rather than as a broken build (D102).
+            Err(err) if store.data().limiter.verdict().is_some() => {
+                return Ok(SandboxOutcome {
+                    stdout: Vec::new(),
+                    stderr: Vec::new(),
+                    exit: SandboxExit::Trap {
+                        message: err.to_string(),
+                    },
+                    ceiling: store.data().limiter.verdict(),
+                });
+            }
+            Err(err) => {
+                return Err(host_error(
+                    "instantiate guest",
+                    err.to_string(),
+                    "reinstall sprawling: the guest module asks this host for an \
                      import it does not provide, so the two are different builds",
-            )
-        })?;
+                ));
+            }
+        };
         let start = instance
             .get_typed_func::<(), ()>(&mut store, "_start")
             .map_err(|err| {

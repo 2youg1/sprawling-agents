@@ -81,7 +81,7 @@ pub fn assert_sandbox_conformance<S: Sandbox>(sandbox: &mut S, job: &SandboxJob)
 
 /-! D102 guest 的内存上限就是它的 run 的内存上限；撞到时结果带 `memory_ceiling`（`runtime::sandbox::engine`、`runtime::tools::exec`）
 
-**决定**：`SandboxJob.memory` 是 `GuestMemory::Ceiling(limit)` 时，store 挂一个 `ResourceLimiter`：线性内存的增长会超过 `limit` 字节时拒绝，`memory.grow` 答 -1，由 guest 自己决定怎么收场（CPython 抛出它自己的内存不足异常）；拒绝由 wasmtime 的 `StoreLimits` 判，外面包的一层只记下它因为超过 `limit` 拒过（`StoreLimits` 也拒超过模块自己声明的最大值的增长，那不是撞到 run 的上限），于是 `SandboxOutcome.ceiling` 答 `Some(Ceiling::Hit { limit })`。`GuestMemory::Wasm32` 时不设上限。表按元素计数，不在这个字节上限里，只受模块自己声明的最大值限制。exec 从这个 run 的 `Shares` 推出它：`Shares::CpuAndMemory { limit }` 给 `Ceiling(limit)`，其余给 `Wasm32`；python 臂把 `ceiling` 经 `with_ceiling` 写进结果，与命令撞限同一个键、同一种拼写（`crates/runtime/spec/Tools/Exec.lean` D95）。
+**决定**：`SandboxJob.memory` 是 `GuestMemory::Ceiling(limit)` 时，store 挂一个 `ResourceLimiter`：线性内存的增长会超过 `limit` 字节时拒绝，`memory.grow` 答 -1，由 guest 自己决定怎么收场（CPython 抛出它自己的内存不足异常）；拒绝由 wasmtime 的 `StoreLimits` 判，外面包的一层只记下它因为超过 `limit` 拒过（`StoreLimits` 也拒超过模块自己声明的最大值的增长，那不是撞到 run 的上限），于是 `SandboxOutcome.ceiling` 答 `Some(Ceiling::Hit { limit })`。guest 的初始内存就超过上限时它起不来，结果是 `Trap` 加 `Hit`，而不是一句「重装 sprawling」的宿主拒绝。`GuestMemory::Wasm32` 时不设上限。表按元素计数，不在这个字节上限里，只受模块自己声明的最大值限制。exec 从这个 run 的 `Shares` 推出它：`Shares::CpuAndMemory { limit }` 给 `Ceiling(limit)`，其余给 `Wasm32`；python 臂把 `ceiling` 经 `with_ceiling` 写进结果，与命令撞限同一个键、同一种拼写（`crates/runtime/spec/Tools/Exec.lean` D95）。
 
 **理由**：guest 在城的进程里跑，它的线性内存计入城的私有字节；run 的子进程已经受 `[core] memory_bytes` 约束（D29），guest 属于同一个 run，用同一个数就不必让人再填一个，而这个数只在 `crates/sprawling/spec/Serving/Placement.lean` D47 一处定义。run 的内存没有缺省上限是 ruling（D95 的「来源」），guest 照它：没填时只受 wasm32 的地址空间限制，保护小内存机器的是机器级的预约（`crates/sprawling/spec/Serving/Memory.lean` §8-173 待做），而不是一个人没填过的数。
 

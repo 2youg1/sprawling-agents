@@ -163,6 +163,12 @@ impl Book {
             .fold(0_u64, |sum, &(_, bytes)| sum.saturating_add(bytes))
     }
 
+    /// The held tickets in the order they started.
+    #[cfg(test)]
+    pub(crate) fn held_tickets(&self) -> impl Iterator<Item = u64> + '_ {
+        self.held.iter().map(|&(ticket, _)| ticket)
+    }
+
     #[cfg(test)]
     pub(crate) fn held_count(&self) -> usize {
         self.held.len()

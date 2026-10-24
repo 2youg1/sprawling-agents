@@ -11,8 +11,6 @@
     reason = "test code"
 )]
 
-use std::collections::BTreeSet;
-
 use proptest::prelude::*;
 
 use super::*;
@@ -44,17 +42,17 @@ proptest! {
     fn the_book_keeps_the_lean_properties(events in prop::collection::vec(event(), 0..64)) {
         let mut book = Book::new(BUDGET);
         let mut asked: Vec<u64> = Vec::new();
-        let mut started: BTreeSet<u64> = BTreeSet::new();
+        let mut started: Vec<u64> = Vec::new();
         for event in events {
             match event {
                 Event::Ask(bytes) => asked.push(book.ask(bytes).0),
                 Event::GiveBack(n) => book.give_back(asked.get(n).copied().unwrap_or(u64::MAX)),
             }
-            started.extend(asked.iter().copied().filter(|&ticket| book.holds(ticket)));
+            let newly: Vec<u64> = book.held_tickets().filter(|ticket| !started.contains(ticket)).collect();
+            started.extend(newly);
 
             prop_assert!(book.held_bytes() <= book.budget() || book.held_count() == 1);
-            let prefix: BTreeSet<u64> = asked.iter().copied().take(started.len()).collect();
-            prop_assert_eq!(&started, &prefix);
+            prop_assert_eq!(&started[..], &asked[..started.len()]);
             prop_assert!(book.waiting_count() == 0 || book.held_count() > 0);
         }
     }

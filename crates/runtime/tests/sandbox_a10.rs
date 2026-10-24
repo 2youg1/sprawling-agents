@@ -327,3 +327,22 @@ fn a_guest_grows_no_further_than_the_run_ceiling() {
         (SandboxExit::Success, None)
     );
 }
+
+/// A guest whose initial memory alone passes the run's ceiling never
+/// starts, and says so as the ceiling it hit, not as a broken build
+/// (`crates/runtime/spec/Sandbox.lean` D102).
+#[test]
+fn a_guest_that_starts_past_the_run_ceiling_reports_the_ceiling() {
+    let tmp = tempfile::tempdir().unwrap();
+    let module = build(tmp.path(), "starts", WAT_SUCCEEDS);
+    let limit = NonZeroU64::new(32 * 1024).unwrap();
+    let outcome = WasmtimeSandbox::new()
+        .unwrap()
+        .run(&job_for(module, GuestMemory::Ceiling(limit)))
+        .unwrap();
+    assert!(
+        matches!(outcome.exit, SandboxExit::Trap { .. }),
+        "{outcome:?}"
+    );
+    assert_eq!(outcome.ceiling, Some(Ceiling::Hit { limit }));
+}
