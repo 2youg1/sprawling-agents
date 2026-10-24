@@ -1,0 +1,150 @@
+<!doctype html>
+<!--
+  This Source Code Form is subject to the terms of the Mozilla Public
+  License, v. 2.0. If a copy of the MPL was not distributed with this
+  file, You can obtain one at https://mozilla.org/MPL/2.0/.
+  Copyright (c) 2026 2youg1 and the sprawling contributors
+
+  The playback skill's reference page (skills/playback/SKILL.md). The
+  export puts a bundle into the empty data block near the end of <body>;
+  everything else here is yours to change. What a page owes the bundle -
+  the data contract, the citations, the checks - is in the skill, not
+  here.
+
+  Narration goes in <section id="narration">: plain HTML, each claim
+  citing its evidence on an element with data-seq="<seq>". The page shows
+  the section above the runs, and shows each cited paragraph again beside
+  the line it cites while the playback stands on that line.
+
+  Words are in the WORDS table at the top of the script, English and
+  Chinese; <html lang> chooses. The page draws in the machine's own
+  monospaced face: it embeds no font, so it carries no font's licence.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; connect-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>Playback</title>
+<style>
+<!-- inline:style.css -->
+</style>
+</head>
+<body>
+<div class="frame">
+  <header class="masthead" id="top">
+    <p class="lbl" data-word="playback">Playback</p>
+    <h1 id="title">Playback</h1>
+    <p class="sub" id="subtitle"></p>
+    <dl class="facts" id="facts"></dl>
+  </header>
+
+  <nav class="chapters" aria-label="Chapters" data-word-label="chapters">
+    <p class="lbl" data-word="sections">Sections</p>
+    <ol>
+      <li><a href="#runs" data-word="runs">Runs</a></li>
+      <li><a href="#timeline" data-word="timeline">Timeline</a></li>
+      <li><a href="#moments" data-word="moments">Key moments</a></li>
+      <li><a href="#commits" data-word="commits">Commits</a></li>
+      <li><a href="#messages" data-word="messages">Messages</a></li>
+      <li><a href="#calls" data-word="calls">Calls</a></li>
+      <li><a href="#log" data-word="log">Every line</a></li>
+      <li><a href="#cost" data-word="cost">Cost</a></li>
+      <li><a href="#withheld" data-word="withheld">Withheld</a></li>
+      <li><a href="#source" data-word="source">Source</a></li>
+    </ol>
+    <p class="lbl runs-nav" data-word="chapter_runs">Chapters</p>
+    <ol class="runs-nav" id="chapter-list"></ol>
+  </nav>
+
+  <main>
+    <section id="narration" class="narration" aria-labelledby="narration-title" hidden>
+      <h2 id="narration-title"><b data-word="narration">Narration</b><span data-word="narration_said">written for this page; not a record of the city</span></h2>
+    </section>
+
+    <section id="runs" aria-labelledby="runs-title">
+      <h2 id="runs-title"><b data-word="runs">Runs</b><span id="runs-count"></span></h2>
+      <ul class="attention" id="attention"></ul>
+      <div id="runs-body"></div>
+    </section>
+
+    <section id="timeline" aria-labelledby="timeline-title">
+      <h2 id="timeline-title"><b data-word="timeline">Timeline</b><span id="timeline-span"></span></h2>
+      <div class="controls">
+        <div class="seg" role="group" aria-label="Step" data-word-label="step">
+          <button type="button" id="first" data-word="first">First</button>
+          <button type="button" id="prev" data-word="previous">Previous</button>
+          <button type="button" id="play" aria-pressed="false" data-word="play">Play</button>
+          <button type="button" id="next" data-word="next">Next</button>
+          <button type="button" id="last" data-word="last">Last</button>
+        </div>
+        <div class="seg" role="group" aria-label="Axis" data-word-label="axis">
+          <button type="button" id="axis-order" aria-pressed="true" data-word="axis_order">In order</button>
+          <button type="button" id="axis-time" aria-pressed="false" data-word="axis_time">In time</button>
+        </div>
+        <div class="seg" role="group" aria-label="Speed" data-word-label="speed" id="speeds"></div>
+        <span class="where" id="where" aria-live="off"></span>
+      </div>
+      <div class="lanes">
+        <ol class="lane-names" id="lane-names"></ol>
+        <div class="plot"><canvas id="plot" role="img" tabindex="0" aria-label="Swimlanes"></canvas></div>
+      </div>
+      <p class="legend" id="legend"></p>
+      <p class="note" id="axis-note"></p>
+      <article class="card" id="card" aria-live="polite"></article>
+    </section>
+
+    <section id="moments" aria-labelledby="moments-title">
+      <h2 id="moments-title"><b data-word="moments">Key moments</b><span id="moments-count"></span></h2>
+      <div id="moments-body"></div>
+    </section>
+
+    <section id="commits" aria-labelledby="commits-title">
+      <h2 id="commits-title"><b data-word="commits">Commits</b><span id="commits-count"></span></h2>
+      <div id="commits-body"></div>
+    </section>
+
+    <section id="messages" aria-labelledby="messages-title">
+      <h2 id="messages-title"><b data-word="messages">Messages</b><span id="messages-count"></span></h2>
+      <div id="messages-body"></div>
+    </section>
+
+    <section id="calls" aria-labelledby="calls-title">
+      <h2 id="calls-title"><b data-word="calls">Calls</b><span id="calls-count"></span></h2>
+      <div id="calls-body"></div>
+    </section>
+
+    <section id="log" aria-labelledby="log-title">
+      <h2 id="log-title"><b data-word="log">Every line</b><span id="log-count"></span></h2>
+      <div class="filters" id="filters"></div>
+      <div id="log-body"></div>
+    </section>
+
+    <section id="cost" aria-labelledby="cost-title">
+      <h2 id="cost-title"><b data-word="cost">Cost</b></h2>
+      <div id="cost-body"></div>
+    </section>
+
+    <section id="withheld" aria-labelledby="withheld-title">
+      <h2 id="withheld-title"><b data-word="withheld">Withheld</b></h2>
+      <div id="withheld-body"></div>
+    </section>
+
+    <section id="source" aria-labelledby="source-title">
+      <h2 id="source-title"><b data-word="source">Source</b><span><a class="more" href="#top" data-word="to_top">Back to the top</a></span></h2>
+      <div id="source-body"></div>
+    </section>
+  </main>
+</div>
+<noscript><p class="fail">This page draws its bundle with JavaScript. The bundle itself is the JSON in the element with id playback-bundle.</p></noscript>
+<script type="application/json" id="playback-bundle"></script>
+<script>
+<!-- inline:words.js -->
+<!-- inline:model.js -->
+<!-- inline:evidence.js -->
+<!-- inline:rendering.js -->
+<!-- inline:start.js -->
+</script>
+</body>
+</html>

@@ -10,3 +10,7 @@
 
 # Binary despite text=auto's guess, so no conversion can ever touch them.
 *.woff2 binary
+
+# A city an earlier release wrote, kept byte for byte: its ledger and its
+# content store are judged by digest, so no conversion may touch them.
+crates/sprawling/tests/cities/** -text
