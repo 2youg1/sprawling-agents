@@ -150,7 +150,7 @@ pub fn form(city_root: &Path, adopt: Adopt, hands: Hands) -> Result<InitReport, 
     // City Hall happens after line zero, because a building is recorded
     // against a city and there is no city before then. The city's own
     // prompt and the hall's two identity files are laid down by the
-    // worker as it opens (`city::follow_defaults`, city D28).
+    // worker as it opens (`city::follow_defaults`, city D29).
     // The writer that wrote line zero goes on writing: a second one
     // opened here would be refused the city's writer lock.
     let mut worker = RunWorker::over(
@@ -227,7 +227,7 @@ fn record_shelved(
 ///
 /// There is no built-in fallback. A run handed the binary's text while
 /// the disk held something else, or nothing, would obey bytes no person
-/// can open (`crates/city/spec/SpineFiles.lean` D28).
+/// can open (`crates/city/spec/SpineFiles.lean` D29).
 ///
 /// # Errors
 /// `E_STORAGE_FATAL` naming the path, for a file that is not there and

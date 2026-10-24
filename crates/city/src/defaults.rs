@@ -14,7 +14,7 @@
 //! changed is left as it is and named, so the person learns that their
 //! version no longer tracks the binary.
 //!
-//! Specified by `crates/city/spec/SpineFiles.lean` §8-42 (city D28).
+//! Specified by `crates/city/spec/SpineFiles.lean` §8-43 (city D29).
 
 use std::path::{Path, PathBuf};
 

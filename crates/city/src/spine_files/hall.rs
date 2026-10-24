@@ -118,7 +118,7 @@ pub fn hall_identity_path(city_root: &Path, addr: &Address) -> Option<PathBuf> {
 /// planner into a character of its own leaves the procedure, the tool
 /// list and the prohibitions untouched. Same shape as
 /// `resident::EPHEMERAL_SEGMENT` (`crates/city/spec/SpineFiles.lean`
-/// D29).
+/// D30).
 #[must_use]
 pub fn hall_discipline(addr: &Address) -> Option<Discipline> {
     Some(seat(addr)?.discipline())

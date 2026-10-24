@@ -51,7 +51,7 @@ pub fn city_prompt_path(city_root: &Path, building: &Address) -> Result<PathBuf,
 - **计划的路径与读法归本模块**：`roadmap_path` 与 `roadmap` 落在这里，因为 `ROADMAP_FILE` 在这里——在别处拼 `city_root/<addr>/Roadmap.md` 就是第二份「计划在哪里」的权威，它会在真正那份搬家后继续跑得好好的。
 - **「还没有」与「读不了」是两件事**：`roadmap` 仅对 `ErrorKind::NotFound` 答空串——一栋还没铺计划的楼确实没有计划；其余任何理由一律以 `E_STORAGE_FATAL` 上报并带上路径。这与同 crate 的 `archive::index` 已有的契约同形（目录不在→`Ok(空)`，真失败→`Err`），不新立一种读法。
 - **交接表单的读法归本模块**：`handoff_sections` 把 `<overall>`、`<current-progress>`、`<context>`、`<next-step>` 四节各读成一段正文；一节缺席、或只剩模板的括号提示行，即 `None`。括号提示行的判断与 `is_blank_form` 共用 `blank::is_guidance` 一处，因为「这一行是不是模板自己的话」只能有一个答案。`<must-read>` 节不读：它是写给下一个 Agent 的散文而不是 Locator，装配层把整份文件入 CAS，作为 must-read 的一条。被否决的备选：在装配层按标签切字符串——那是模板格式的第二个读者，模板改一个标签它就静默读到空。
-- **`City.md` 两层**：`city_prompt_path` 是「哪份 `City.md` 管这栋楼」唯一的答案，`norms` 与装配层的 City 段都读它；放在哪里、为什么替换而不拼接，见 D30。
+- **`City.md` 两层**：`city_prompt_path` 是「哪份 `City.md` 管这栋楼」唯一的答案，`norms` 与装配层的 City 段都读它；放在哪里、为什么替换而不拼接，见 D31。
 - **规范类 must-read 由 `norms` 给路径，不给 Locator**：Locator 需要 CAS 或 git oid，而 city 不认识落盘物（拓扑上也依赖不到 storage）。本模块答「哪几份是规范」，装配层把它们入 CAS 变成 Locator。这也是 must-read 最大失败模式的解：不让模型凭记忆重抄规范清单。
 -/
 
@@ -66,14 +66,14 @@ pub(crate) const CITY_TEMPLATE: &str = include_str!("../templates/City.md");   /
 
 - **一个目录装城写下的全部第一批字节**：`crates/city/templates/` 下是 `RULES.toml`、`RULES-hall.toml`、`Roadmap.md`、`Memo.md`、`Handoff.md`、`SPEC.md`、`JOB.md`、`MAYOR.md`、`CLERK.md`、`URBANITE.md`、`City.md`，以及说明每份文件谁写、谁读的 `README.md`。人读的那份与城写出的那份仍是同一串字节（§8-3、§8-5），只是这串字节现在住在把它编进去的包里。
 - **为什么在包里**：crates.io 上的 `.crate` 只装包目录里的文件，验证构建与 `cargo install` 都在解开的包里编译；`include_str!` 指向包外的 `docs/` 时，那里没有这些文件，city 编不出来（`crates/sprawling/Spec.lean` §8-157）。`packaged` 门判这一条（tools/xtask/Spec.lean §8-49）。
-- **`City.md` 由 city 交出，accounting 只读城里那份**：城里的 `City.md`、`MAYOR.md`、`CLERK.md` 由 `defaults::follow_defaults` 铺下与前移（§8-42），这份文件的名字（`CITY_FILE`）与它同目录的模板都归本模块。accounting 不持有默认文本，只读 `city_prompt_path` 答的那份；那份不在时冻结以 `E_STORAGE_FATAL` 拒绝，恢复语请人重开城，开城时 `follow_defaults` 再铺下。所以 `CITY_TEMPLATE` 是 `pub(crate)`，唯一的读者是 `defaults::Shipped::City`：冻结时若临时换上内置文本，模型读到的就不是人能打开的那份文件（D28）。
+- **`City.md` 由 city 交出，accounting 只读城里那份**：城里的 `City.md`、`MAYOR.md`、`CLERK.md` 由 `defaults::follow_defaults` 铺下与前移（§8-43），这份文件的名字（`CITY_FILE`）与它同目录的模板都归本模块。accounting 不持有默认文本，只读 `city_prompt_path` 答的那份；那份不在时冻结以 `E_STORAGE_FATAL` 拒绝，恢复语请人重开城，开城时 `follow_defaults` 再铺下。所以 `CITY_TEMPLATE` 是 `pub(crate)`，唯一的读者是 `defaults::Shipped::City`：冻结时若临时换上内置文本，模型读到的就不是人能打开的那份文件（D29）。
 - **失败**：没有运行期失败。模板改名或挪走，`include_str!` 在编译期就红。
 
 **验收**：`cargo xtask gates packaged` 对 city 与 accounting 为绿；§8-3、§8-5、§8-15、§8-20 现有的模板测试照旧通过（它们读的是同一串字节）。
 -/
 
 /-!
-### 8-42 city::defaults（形状 6 数据面＋落盘动作）
+### 8-43 city::defaults（形状 6 数据面＋落盘动作）
 
 ```rust
 pub enum Shipped { City, Mayor, Clerk }                      // 默认文本归二进制的三份文档；穷尽
@@ -96,9 +96,9 @@ pub fn follow_defaults(city_root: &Path) -> Result<Vec<Edited>, AxError>;
 **验收**：`cargo nextest run -p sprawling-city -E 'test(defaults)'`。
 -/
 
-/-! D28 默认文本归二进制，与某个已发布版本逐字节相同的副本开城时前移到本构建的默认
+/-! D29 默认文本归二进制，与某个已发布版本逐字节相同的副本开城时前移到本构建的默认
 
-**决定**：`City.md`、`MAYOR.md`、`CLERK.md` 的默认文本由二进制持有（§8-42）。城里的副本与某个已发布版本逐字节相同，就视为人没改过，开城时写成本构建的默认；改过的原样保留，开城时在 diagnostics 里点名；不在的铺下。
+**决定**：`City.md`、`MAYOR.md`、`CLERK.md` 的默认文本由二进制持有（§8-43）。城里的副本与某个已发布版本逐字节相同，就视为人没改过，开城时写成本构建的默认；改过的原样保留，开城时在 diagnostics 里点名；不在的铺下。
 
 **理由**：模板原本只在立城时复制一次，二进制改了文字也到不了旧城，旧城会继续教已删的参数与工具。前移写在盘上而不是在装配前缀时临时替换，因为人打开的那份文件必须就是模型读到的字节。与已发布版本逐字节相同的副本，内容能从摘要表与仓库历史复原，所以前移不需要备份。
 
@@ -107,18 +107,18 @@ pub fn follow_defaults(city_root: &Path) -> Result<Vec<Edited>, AxError>;
 **重开参数**：副本的前移要与配置文件一起走 `format` 迁移阶梯与集中备份时，`follow_defaults` 登记为阶梯的一步。
 -/
 
-/-! D29 City Hall 的纪律分人设之前与人设之后两段，操作说明不留在人设文件里
+/-! D30 City Hall 的纪律分人设之前与人设之后两段，操作说明不留在人设文件里
 
 **决定**：`spine_files::hall` 给每个 hall 席位两段二进制文本：`opening` 放在人设之前（Mayor 是它怎么工作与怎么写计划），`closing` 放在人设之后（绝不做什么、谁读得到什么）。`MAYOR.md`、`CLERK.md` 的模板只留人设各节（`<who>`、`<voice>`、`<stops>`、`<bring>`）；原来模板里的 `<plan>` 与 `<seen>` 原样搬进二进制文本。
 
-**理由**：操作说明会随工具改名、参数增删而变，住在人改的文件里，二进制就改不到它（D28 只能前移没改过的副本）。程序放在人设之前，人设给它上色；禁令放在最后，模型最后读到它，人设压不住它。
+**理由**：操作说明会随工具改名、参数增删而变，住在人改的文件里，二进制就改不到它（D29 只能前移没改过的副本）。程序放在人设之前，人设给它上色；禁令放在最后，模型最后读到它，人设压不住它。
 
 **被否**：①全部纪律仍接在人设之后——程序性的说明与禁令混在一段，人设里的风格要求排在程序之前，读起来像程序服从人设；②`<plan>` 留在模板里——改了 `plan`、`edit` 的参数，旧城的副本照旧教已删的参数。
 
-**重开参数**：人要能改 Mayor 的程序（而不只是人设）时，程序变成一份带默认文本的覆盖文件，走 D28。
+**重开参数**：人要能改 Mayor 的程序（而不只是人设）时，程序变成一份带默认文本的覆盖文件，走 D29。
 -/
 
-/-! D30 楼级 `City.md` 放在楼的保留区，近者替换远者
+/-! D31 楼级 `City.md` 放在楼的保留区，近者替换远者
 
 **决定**：一栋楼自己的 `City.md` 在 `<building>/.sprawling/City.md`（`policy::governed` 给的保留区，与 `RULES.toml` 同处）。它在时这栋楼的 run 只读它，城根的 `<city>/City.md` 不读；它不在时读城根那份。`city_prompt_path` 是唯一的判定处。
 
@@ -150,7 +150,7 @@ pub fn follow_defaults(city_root: &Path) -> Result<Vec<Edited>, AxError>;
 
 **进度条只有一份数据：任务表。** 它是派生值，由脚本唯一写者重画，每格一个任务、顺序即落地顺序，半格表达进行中——不落盘手写，于是「表与条对不上」这件事构造上不可能。`blank.rs::is_blank_form` 的判空从行前缀（跳 `#`、`>`、括号行）改成看标签边界，于是一条以 `(` 开头的正文不再被误判为空。
 
-**人设与纪律不同居**：`MAYOR.md`／`CLERK.md` 的人设留 Markdown（人随便写，想让市长学谁说话都行），纪律（工具清单、怎么写计划、谁读得到什么、绝不做什么）编译进 `spine_files::hall`，与 `EPHEMERAL_SEGMENT` 同型——人设覆盖不到它，这正是「插得进去但毁不掉」。纪律分人设之前与人设之后两段（D29）。
+**人设与纪律不同居**：`MAYOR.md`／`CLERK.md` 的人设留 Markdown（人随便写，想让市长学谁说话都行），纪律（工具清单、怎么写计划、谁读得到什么、绝不做什么）编译进 `spine_files::hall`，与 `EPHEMERAL_SEGMENT` 同型——人设覆盖不到它，这正是「插得进去但毁不掉」。纪律分人设之前与人设之后两段（D30）。
 -/
 
 /-! D18 模板与 `City.md` 住进 city 的包目录，不留在 `docs/`

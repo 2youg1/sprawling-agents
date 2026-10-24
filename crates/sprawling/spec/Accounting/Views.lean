@@ -126,7 +126,7 @@ pub fn ask(city_root: &Path, query: &wire::Query) -> Result<wire::Answer, AxErro
 1. 追加一条 `autonomy_changed`，值 `delegate:hall/clerk`。**不改 `AUTONOMY_DEFAULT`**：缺省值说的是「没人说过话时怎么办」，而这里是这座城市作出的一个决定，人可以改它，改它要有一行历史可改。`folds` 读回这条线，重启后 clerk 依旧是代答者，无需第二处记忆。
 2. 用 `city::CityPlan::new(None).hall()` 拿到那栋楼，走 `create_building` 落 `RULES.toml` 与脊柱文档，并记 `building_created`。走这扇门而不是另写一段，是为了让市政厅与任何一栋楼在历史里长得一样。
 
-`MAYOR.md` 与 `CLERK.md`（以及城根的 `City.md`）由 worker 开城时经 `city::follow_defaults` 铺下（`crates/city/spec/SpineFiles.lean` §8-42）：立城也经过同一个 `RunWorker::holding`，所以创世不再自己写它们。
+`MAYOR.md` 与 `CLERK.md`（以及城根的 `City.md`）由 worker 开城时经 `city::follow_defaults` 铺下（`crates/city/spec/SpineFiles.lean` §8-43）：立城也经过同一个 `RunWorker::holding`，所以创世不再自己写它们。
 
 **每座城市至少有两栋楼**：`views::tests` 按地址找楼，不按 `buildings[0]` 取楼。
 
