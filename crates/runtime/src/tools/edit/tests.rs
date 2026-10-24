@@ -487,3 +487,42 @@ fn a_copied_passage_keeps_a_numbered_line_the_file_holds() {
         before.replace("7|literal\n", "7|changed\n")
     );
 }
+
+/// A passage copied out of a `search` hit drawn with context lands on the
+/// file's own bytes: a hit block is marked in the grammar a read answer
+/// starting on the block's first line is, so `edit` sees through it.
+#[test]
+fn a_passage_copied_from_a_search_hit_with_context_edits_the_lines_it_marks() {
+    let tmp = tempfile::tempdir().unwrap();
+    let tool = tool(tmp.path());
+    let before: String = (0..12).map(|n| format!("row {n}\n")).collect();
+    std::fs::write(tmp.path().join("work/a.txt"), &before).unwrap();
+    let version = version_of(before.as_bytes());
+    let block = crate::rendering::shown(
+        crate::rendering::CURRENT,
+        &kernel::ToolName::parse("search").unwrap(),
+        &kernel::event::record::ToolAnswer::Answered {
+            result: kernel::Payload::of(&serde_json::json!({
+                "matches": [{"path": "work/a.txt", "line": 7, "from": 5,
+                             "text": "row 5\nrow 6\nrow 7\nrow 8"}],
+                "count": 1, "truncated": false, "unreadable": 0, "unread": []
+            }))
+            .unwrap(),
+        },
+    )
+    .unwrap();
+    let old: String = block
+        .lines()
+        .skip(2)
+        .take(3)
+        .map(|l| format!("{l}\n"))
+        .collect();
+    assert_eq!(old, "5|row 5\nrow 6\nrow 7\n");
+    let new = old.replace("row 7", "row seven");
+    tool.invoke(&call("work/a.txt", &version, &old, &new))
+        .unwrap();
+    assert_eq!(
+        std::fs::read_to_string(tmp.path().join("work/a.txt")).unwrap(),
+        before.replace("row 7\n", "row seven\n")
+    );
+}
