@@ -172,7 +172,8 @@ fn a_branch_is_shown_the_mothers_reads_and_refusals_as_she_was() {
     let first = &daughter.sent[0];
     assert_eq!(first.get(..last.len()), Some(&last[..]));
     let shown = last.join("\n");
-    assert!(shown.contains("lab/a.md lines 0-13 of 14, version cas:b3-00"));
+    // The version an earlier read recorded is not drawn: edit takes none.
+    assert!(shown.contains("lab/a.md lines 0-13 of 14") && !shown.contains("cas:b3-00"));
     assert!(shown.contains("E_INVALID_ARGS search: missing string argument"));
 }
 

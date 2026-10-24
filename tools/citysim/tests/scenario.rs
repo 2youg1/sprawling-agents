@@ -488,8 +488,8 @@ fn s3_14_one_resident_closes_the_loop_through_the_real_adapters() {
     assert_eq!(ks.last().map(String::as_str), Some("run_frozen"));
     assert_eq!(
         ks.iter().filter(|k| k.as_str() == "tool_result").count(),
-        2,
-        "status then edit: {ks:?}"
+        3,
+        "status and read, then edit: {ks:?}"
     );
 
     // The per-wave checkpoint, read off the event order: every tool_called is
