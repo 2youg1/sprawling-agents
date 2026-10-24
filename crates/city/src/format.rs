@@ -287,7 +287,9 @@ fn climb(
 ///
 /// The name carries a digest of the directory the file lives in, because
 /// every building has a `RULES.toml` and every layer a `CONFIG.toml`,
-/// and one directory of backups holds all of them.
+/// and one directory of backups holds all of them. The backup lands by
+/// one rename, so an interrupted write leaves no partial text under the
+/// backup's name for a retry to mistake for a different backup.
 fn keep(path: &Path, from: Format, bytes: &[u8], backups: &Path) -> Result<PathBuf, AxError> {
     let parent = path.parent().unwrap_or_else(|| Path::new(""));
     let digest = B3Hash::digest(parent.to_string_lossy().as_bytes());
@@ -301,39 +303,18 @@ fn keep(path: &Path, from: Format, bytes: &[u8], backups: &Path) -> Result<PathB
         .file_name()
         .map_or_else(String::new, |name| name.to_string_lossy().into_owned());
     let backup = backups.join(format!("{short}-{name}.bak-{}", from.get()));
-    std::fs::create_dir_all(backups)
-        .map_err(|err| storage("create the backup directory", backups, &err))?;
-    let written = std::fs::OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(&backup)
-        .and_then(|mut out| {
-            use std::io::Write as _;
-            out.write_all(bytes)?;
-            out.sync_all()
-        });
-    match written {
-        Ok(()) => Ok(backup),
-        Err(err) if err.kind() == std::io::ErrorKind::AlreadyExists => {
-            let standing = std::fs::read(&backup)
-                .map_err(|err| storage("read an earlier backup", &backup, &err))?;
-            if standing == bytes {
-                Ok(backup)
-            } else {
-                Err(AxError::failure(
-                    AxCode::StorageFatal,
-                    "keep a configuration file's backup",
-                    format!("{}: a different backup is already there", backup.display()),
-                )
-                .with_recovery("move that backup somewhere else, then start the city again"))
-            }
-        }
-        Err(err) => Err(storage(
-            "write a configuration file's backup",
-            &backup,
-            &err,
-        )),
-    }
+    crate::document::edit(&backup, |held| match std::fs::read(&backup) {
+        Ok(standing) if standing == bytes => Ok(()),
+        Ok(_) => Err(AxError::failure(
+            AxCode::StorageFatal,
+            "keep a configuration file's backup",
+            format!("{}: a different backup is already there", backup.display()),
+        )
+        .with_recovery("move that backup somewhere else, then start the city again")),
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => held.replace(bytes),
+        Err(err) => Err(storage("read an earlier backup", &backup, &err)),
+    })?;
+    Ok(backup)
 }
 
 fn number(raw: i64) -> Result<Format, AxError> {

@@ -39,7 +39,7 @@ pub fn bring_city_forward(city_root: &Path, backups: &Path) -> Result<Vec<Forwar
 - **已知格式内的未知键照旧拒。** `format` 在结构里声明成一个不读的字段，于是 `deny_unknown_fields` 仍覆盖其余每一键。
 - **比当前旧的由阶梯前移，读者不前移。** `bring_forward` 逐级套 `Rung`：从 `from` 找 `file` 相同、`from` 相同的那一级，改写成下一格式的整份文本；全部套完先把原字节写进 `backups`，再经 `city::document` 整份替换。读者遇到比当前旧的文件拒并要求重开城，因为前移要写备份、要拿文件的锁，不属于一次读。
 - **开城时整城前移，一份一份地答。** `bring_city_forward` 对 `city::check`（§8-29）列出的每份被版本化的文件——城层、每栋楼、每个房间的 `CONFIG.toml` 与每栋楼的 `RULES.toml`——调 `bring_forward`，只答被改写的与被拒的，不在的与已是当前格式的不答。文件清单只有 `check` 一处权威：两处各列一遍，新加一层配置时就会有一处漏掉。一份文件被拒不挡其余文件前移，因为那份文件下次被读时由它的读者拒，而其余文件不该陪它停在旧格式；列不出楼或房间（目录读不动）才整体失败。调用方是 `RunWorker::holding`，失败与改写都只记进诊断、不挡开城（`crates/sprawling/spec/Accounting/Worker.lean` §8-108）。阶梯为空时它只读不写。
-- **备份集中放。** `backups` 由调用方给出，生产上是 `accounting::home::Home::backups()`（`~/.sprawling/backups/`）。文件名是「所在目录的 BLAKE3 前 16 hex」-「文件名」.bak-「原格式」：每栋楼都有 `RULES.toml`，每一层都有 `CONFIG.toml`，一个目录装下全部要靠目录摘要分开。备份以 `create_new` 写；同名已在且字节相同即视为已备，字节不同则拒（`E_STORAGE_FATAL`），不覆盖。
+- **备份集中放。** `backups` 由调用方给出，生产上是 `accounting::home::Home::backups()`（`~/.sprawling/backups/`）。文件名是「所在目录的 BLAKE3 前 16 hex」-「文件名」.bak-「原格式」：每栋楼都有 `RULES.toml`，每一层都有 `CONFIG.toml`，一个目录装下全部要靠目录摘要分开。备份在 `city::document::edit` 的锁里先读同名文件：已在且字节相同即视为已备，字节不同则拒（`E_STORAGE_FATAL`），不覆盖；不在才经 `Held::replace` 先写暂存再改名落位。所以一次被打断的写不在备份名下留半份文本——若留下，重试时它会被当成一份不同的备份，拒掉这次前移。
 - **怎样加一个会被上一版拒的新键。** 后续变更给 `CONFIG.toml` 或 `RULES.toml` 加键时，把那种文件的 `current` 提一级并登记一级 `Rung`（通常只把 `format` 改大），这样上一版之后的版本读到它时拒的理由是「newer」而不是「unknown key」。人层 `config.toml` 只读 `[ui]`、`[core]` 与顶层 `city`，其余节与顶层键原样保留、不拒，加新节不必提级。
 -/
 
