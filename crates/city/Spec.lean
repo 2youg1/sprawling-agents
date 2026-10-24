@@ -11,6 +11,7 @@ import crates.city.spec.ConfigLayers
 import crates.city.spec.ConfigLayers.Ladder
 import crates.city.spec.ConfigLayers.Remote
 import crates.city.spec.Document
+import crates.city.spec.Format
 import crates.city.spec.Gitignore
 import crates.city.spec.Governed
 import crates.city.spec.History
@@ -58,6 +59,7 @@ import crates.city.spec.Wizard
 | `wizard` | 建城向导 | `spec/Wizard.lean` |
 | `room` | 一个地址是不是房间，会话没指名时开哪一间 | `spec/Room.lean` |
 | `session` | 一段会话开始时清掉什么 | `spec/Session.lean` |
+| `format` | 一份配置文件是哪一版写的，旧的怎样带到当前格式 | `spec/Format.lean` |
 | `neighbourhood`、`neighbours_tool` | 这座城有哪些地方，我身边站着谁，我该跟谁说话 | `spec/Neighbourhood.lean`、`spec/NeighboursTool.lean` |
 | `rules_tool` | 居民怎么读写自己楼的规则 | `spec/RulesTool.lean` |
 | `gitignore` | 一栋楼的哪些字节进历史 | `spec/Gitignore.lean` |
@@ -189,6 +191,7 @@ workspace 内只依赖 `kernel`（ARCHITECTURE.md §3 的 `depmap`），规格�
 | 8-39 | `crates/city/spec/ConfigLayers/Remote.lean` |
 | 8-40 | `crates/city/spec/Document.lean` |
 | 8-41 | `crates/city/spec/SpineFiles.lean` |
+| 8-42 | `crates/city/spec/Format.lean` |
 
 `spec/ConfigLayers/Ladder.lean` 没有标签：它是 §8-4 那条梯子的模型。`spec/SpineFiles.lean` 末尾的「模板的写法」一节讲 `crates/city/templates/` 下每份模板的格式，同样没有标签。
 
@@ -279,6 +282,7 @@ resident 段是模型每回合都读到的四段之一。`URBANITE.md` 建议 30
 | D25 | `[search]` 是三臂的值，`Custom` 不回落到缺省那一家，缺省那一家只在 `config_layers::search` 声明 | `crates/city/spec/ConfigLayers.lean` |
 | D26 | MCP url 用 `url::Url` 解析，凭据的名字与值仍由 `kernel::secret` 判 | `crates/city/spec/ConfigLayers.lean` |
 | D27 | `egress` 不写是不限主机，写了才判 | `crates/city/spec/Policy.lean` |
+| D28 | 配置的版本是文件里的一个数，缺省为 1，阶梯只在需要时改写 | `crates/city/spec/Format.lean` |
 -/
 
 /-! D8 定规：拒词的恢复语归写拒词的那一处

@@ -34,7 +34,7 @@ mod opening;
 use super::exit::Exit;
 use super::grammar::Arguments;
 use super::refusal::{Form, written};
-use super::router::{client_summary, default_city_location, flag_value, log_floor, log_levels};
+use super::router::{city_to_open, client_summary, flag_value, log_floor, log_levels, name_city};
 use super::{CLIENT_BUNDLE_DIR, CLIENT_COMPLETE, CLIENT_FILES};
 use kernel::consts_policy::DEFAULT_AT;
 use sprawling::{assembly, console, firstrun, serving};
@@ -45,9 +45,13 @@ pub(super) use opening::Entrance;
 use opening::{Interactive, Open, opening};
 
 pub(super) fn up(read: &Arguments, args: &[String]) -> ExitCode {
-    let city = read
-        .positional(1)
-        .map_or_else(default_city_location, std::path::PathBuf::from);
+    let city = match read.positional(1) {
+        Some(named) => std::path::PathBuf::from(named),
+        None => match city_to_open() {
+            Ok(city) => city,
+            Err(err) => return report(err),
+        },
+    };
     let addr = read.positional(2).map_or(DEFAULT_AT, String::as_str);
     up_at(&city, addr, args, Entrance::Up)
 }
@@ -72,11 +76,13 @@ pub(super) fn use_folder(folder: &std::path::Path) -> ExitCode {
     };
     if history == city::History::Present {
         println!("{} is already a city; opening it", folder.display());
+        name_city(folder);
         return serve_city(folder, DEFAULT_AT, &[], Entrance::Bare);
     }
     match assembly::form_city(folder, accounting::worker::Adopt::EveryFolder) {
         Ok(report) => {
             report_standing(&report);
+            name_city(folder);
             serve_city(folder, DEFAULT_AT, &[], Entrance::Bare)
         }
         Err(err) => report(err),

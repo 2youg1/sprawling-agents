@@ -114,6 +114,7 @@ impl ConfigLayer {
     /// not read. Ignoring an unrecognised key produces the one state
     /// nobody can diagnose: the setting is written, and nothing happens.
     pub fn parse(text: &str) -> Result<ConfigLayer, AxError> {
+        crate::format::admit_format(crate::format::FormatFile::LayerConfig, text)?;
         let file: ConfigFile = toml::from_str(text).map_err(|err| unreadable(text, &err))?;
         let sandbox = match file.sandbox {
             None => None,
@@ -308,6 +309,11 @@ pub fn load(city_root: &Path, addr: &Address) -> Result<FrozenConfig, AxError> {
 #[derive(Debug, Default, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ConfigFile {
+    /// Judged by `format::admit_format` before this struct is read, and
+    /// declared so `deny_unknown_fields` still covers every other key.
+    #[serde(default)]
+    #[expect(dead_code, reason = "judged on the text before this struct is read")]
+    format: Option<toml::Value>,
     #[serde(default)]
     model: ModelSection,
     #[serde(default)]

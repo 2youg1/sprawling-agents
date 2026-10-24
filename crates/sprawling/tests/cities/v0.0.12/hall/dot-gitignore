@@ -1,0 +1,18 @@
+# sprawling: what this building promises is history; what one session
+# was thinking is not.
+Roadmap.md
+Memo.md
+Handoff.md
+JOB.md
+URBANITE.md
+????????-????-????-????-????????????.jsonl
+/Archive/
+!SPEC.md
+.sprawling/
+!/.sprawling/
+/.sprawling/*
+!/.sprawling/RULES.toml
+!/.sprawling/CONFIG.toml
+!/.sprawling/FILTERS.toml
+!/.sprawling/DESKTOP.toml
+!/.sprawling/skills/

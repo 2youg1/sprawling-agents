@@ -68,6 +68,11 @@ pub fn write_rules_against(
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct Written {
+    /// Judged by `format::admit_format` before this struct is read, and
+    /// declared so `deny_unknown_fields` still covers every other key.
+    #[serde(default)]
+    #[expect(dead_code, reason = "judged on the text before this struct is read")]
+    format: Option<toml::Value>,
     /// What this building is, in the person's words, and how work is
     /// done here.
     ///
@@ -160,6 +165,7 @@ fn refuse(subject: String) -> AxError {
 /// type — a write prefix that is not an address, and the four settings
 /// a confidential building contradicts by asking for.
 pub fn evaluate(addr: &Address, text: &str) -> Result<BuildingRules, AxError> {
+    crate::format::admit_format(crate::format::FormatFile::Rules, text)?;
     let written: Written = toml::from_str(text).map_err(|err| refuse(err.to_string()))?;
     let reach = DomainReach::parse(&written.write)?;
     let mut write_prefixes = Vec::with_capacity(written.prefixes.len());

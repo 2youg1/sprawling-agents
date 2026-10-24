@@ -370,6 +370,7 @@ settings-reason ConfigFile.clock 时钟行多久出一次只改结果里那一�
 settings-reason ClockSection.stamp 时钟行多久出一次只改结果里那一行的疏密，不改任何保证；缺省 minute 是 kernel 常量，需要改的人在城或楼的 CONFIG.toml 里写，拼错在解析点拒。
 settings-control ConfigFile.context client/src/views/settings/context_rung.svelte
 settings-control ContextSection.second_threshold client/src/views/settings/context_rung.svelte
+settings-reason ConfigFile.format `format` 说这份文件按哪一版的文法读，由格式阶梯在开城时写（`crates/city/Spec.lean` §8-42），不是人的设定；人改它只会让文件被拒，或被当成另一版的文件读。
 settings-reason ConfigFile.identity 城在会话第一次 run 时写下命名版本，`/new` 拿掉它；这是会话的记录，不是 User 的设定，改它会让会话读到另一套名字。
 settings-reason IdentitySection.version 城在会话第一次 run 时写下命名版本，`/new` 拿掉它；这是会话的记录，不是 User 的设定，改它会让会话读到另一套名字。
 settings-control ConfigFile.mcp client/src/views/mcp.svelte

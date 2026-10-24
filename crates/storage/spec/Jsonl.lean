@@ -93,7 +93,14 @@ impl WriterLock {
     /// 锁文件＝`dir` 的同级 `<目录名>.lock`，由 jsonl 自己命名；`dir` 没有目录名（根、`..`）即 `Io`。
     pub(crate) fn take(dir: &Path) -> Result<WriterLock, StorageError>;
 }
+/// 不写账本、却要知道没有城正从这个目录运行的一步（把整座城的文件夹搬走）用它：同一把写者锁，drop 即放。
+pub struct LedgerHold { /* WriterLock —— 私有 */ }
+impl LedgerHold {
+    pub fn take(dir: &Path) -> Result<LedgerHold, StorageError>;   // LedgerHeld / Io，与 open 取锁同一条路
+}
 ```
+
+- **`LedgerHold` 只把锁借出去，不借账本。** 搬城（`bin::beside_binary`，`crates/sprawling/spec/Firstrun.lean` §8-8）要在改名之前确认没有城在用这个目录，而它不写一行账本，也不该为此读一遍链；`WriterLock` 的路径规则仍只在本模块。
 
 - **锁文件在账本目录旁边，不在里面。** 账本目录的读者把目录里的每一项都当历史：`has_history` 问「有没有条目」，`bundle` 逐文件拷贝。锁文件放进去，就会被当成一段历史拷进 bundle，而且 Windows 上另一个句柄读一个被锁住的文件会失败。`.sprawling/` 根是保留子树，本来就不随 bundle 走。
 - **每个账本目录都锁，锁路径只由 `dir` 推出。** `open_faulty` 不取锁：FaultFs 的盘只存在于这个进程里。理由见 D18。

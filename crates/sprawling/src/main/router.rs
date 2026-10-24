@@ -130,7 +130,7 @@ fn run(verb: Verb, read: &Arguments, args: &[String]) -> ExitCode {
         Verb::Init => init(read),
         Verb::Up => up(read, args),
         Verb::Install => install(args),
-        Verb::Doctor => sprawling::doctor::verb(args, default_city_location),
+        Verb::Doctor => sprawling::doctor::verb(args, doctor_city),
         Verb::Desktop => super::desktop::verb(nth(1).map(String::as_str)),
         Verb::Call => call(args).into(),
         Verb::Dispatch => super::dispatch::verb(read),
@@ -169,7 +169,17 @@ fn answered(result: Result<String, kernel::AxError>, args: &[String]) -> ExitCod
 /// manager, where the console closes the moment this returns - so every
 /// path out of here holds the window until somebody has read it.
 pub(super) fn first_screen() -> ExitCode {
-    let city = default_city_location();
+    let city = match city_to_open() {
+        Ok(city) => city,
+        Err(error) => {
+            eprint!(
+                "{}",
+                super::refusal::written(&error, super::refusal::Form::Human)
+            );
+            hold();
+            return ExitCode::FAILURE;
+        }
+    };
     // A city already there is opened rather than asked about: the
     // question exists so that genesis has somebody behind it.
     if city::has_history(&city).is_ok_and(|history| history == city::History::Present) {
@@ -179,7 +189,10 @@ pub(super) fn first_screen() -> ExitCode {
     }
     let answered = firstrun::ask(&city, &mut std::io::stdin().lock(), &mut std::io::stdout());
     let code = match answered {
-        Ok(firstrun::FirstScreen::Start(city)) => up_at(&city, DEFAULT_AT, &[], Entrance::Bare),
+        Ok(firstrun::FirstScreen::Start(city)) => {
+            name_city(&city);
+            up_at(&city, DEFAULT_AT, &[], Entrance::Bare)
+        }
         Ok(firstrun::FirstScreen::Use(folder)) => use_folder(&folder),
         Ok(firstrun::FirstScreen::Quit) => {
             println!("{}", verbs::overview());
@@ -205,26 +218,93 @@ fn hold() {
     drop(std::io::stdin().read_line(&mut ignored));
 }
 
-/// Where `up` and the first screen put a city nobody named.
-pub(super) fn default_city_location() -> std::path::PathBuf {
-    // A missing home is not a refusal here: the city then goes beside
-    // the binary, which `firstrun::default_city` decides.
-    let home = accounting::home::Home::detect().ok();
-    match std::env::current_exe()
-        .ok()
-        .and_then(|exe| exe.parent().map(std::path::Path::to_path_buf))
-    {
-        Some(beside) => {
-            let takes_a_city = firstrun::writability(&beside);
-            firstrun::default_city(&beside, home.as_ref(), takes_a_city)
+/// Where `up` and the first screen put a city nobody named on the
+/// command line: the one the person's file names, else the home
+/// directory's (`crates/sprawling/spec/Firstrun.lean` §8-8).
+///
+/// # Errors
+/// The person's file cannot be read or names a relative path, or there
+/// is no home directory: a city is never placed beside the binary,
+/// because the next release unpacks into a directory without it.
+fn default_city_location() -> Result<std::path::PathBuf, kernel::AxError> {
+    match accounting::person::city()? {
+        Some(named) => Ok(named),
+        None => Ok(accounting::home::Home::detect()?.default_city()),
+    }
+}
+
+/// The city a launch that names none opens: [`default_city_location`],
+/// after a city an earlier release kept beside the binary has been
+/// moved there, which happens only while the person's file names no
+/// city (`crates/sprawling/spec/Firstrun.lean` §8-8).
+///
+/// # Errors
+/// Everything [`default_city_location`] refuses, and a move the old
+/// folder or the new one refuses.
+pub(super) fn city_to_open() -> Result<std::path::PathBuf, kernel::AxError> {
+    if accounting::person::city()?.is_none() {
+        move_home_from_beside_the_binary()?;
+    }
+    default_city_location()
+}
+
+/// Moves the city an earlier release kept beside this binary to the
+/// home directory's default, says so, and names it in the person's
+/// file so the move is never looked for again.
+fn move_home_from_beside_the_binary() -> Result<(), kernel::AxError> {
+    let exe_dir = match std::env::current_exe() {
+        Ok(exe) => match exe.parent() {
+            Some(dir) => dir.to_path_buf(),
+            None => return Ok(()),
+        },
+        // A binary that cannot find itself has no folder beside it to
+        // look in, which is the same answer as a folder with no city.
+        Err(_) => return Ok(()),
+    };
+    let to = accounting::home::Home::detect()?.default_city();
+    match sprawling::beside_binary::bring_home(&exe_dir, &to)? {
+        sprawling::beside_binary::Homing::NothingBeside => Ok(()),
+        sprawling::beside_binary::Homing::Moved { from, to, relinked } => {
+            println!("moved the city from {} to {}", from.display(), to.display());
+            match relinked {
+                Ok(count) => println!("{count} worktree(s) re-pointed at the new folder"),
+                Err(error) => eprintln!(
+                    "{}the spare worktree is checked out again when the city next needs one",
+                    super::refusal::written(&error, super::refusal::Form::Human)
+                ),
+            }
+            // The city has moved whatever the person's file says next: a
+            // failed write is told, and the next launch finds the city at
+            // the default, where it now is.
+            name_city(&to);
+            Ok(())
         }
-        // No directory to ask about is the working directory, which
-        // this process is already running in.
-        None => firstrun::default_city(
-            std::path::Path::new("."),
-            home.as_ref(),
-            firstrun::BesideBinary::Writable,
-        ),
+    }
+}
+
+/// Where the doctor scans when the line names no city. When `up` would
+/// refuse, the refusal is shown and the scan judges an empty path,
+/// which reports that no city is there.
+fn doctor_city() -> std::path::PathBuf {
+    default_city_location().unwrap_or_else(|error| {
+        eprint!(
+            "{}",
+            super::refusal::written(&error, super::refusal::Form::Human)
+        );
+        std::path::PathBuf::new()
+    })
+}
+
+/// Names the city the person chose on the first screen in their file,
+/// so the next launch with no command opens it. A file that refuses
+/// the write is reported and the city still starts: the person is
+/// asked again next time, which is what happened before they chose.
+pub(super) fn name_city(city: &std::path::Path) {
+    if let Err(error) = accounting::person::settle_city(city) {
+        eprint!(
+            "{}",
+            super::refusal::written(&error, super::refusal::Form::Human)
+        );
     }
 }
 

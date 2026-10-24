@@ -41,6 +41,9 @@ use crate::home::Home;
 const UI: &str = "ui";
 /// Performance settings adopted at serving startup (`crates/sprawling/Spec.lean` §8-93).
 const CORE: &str = "core";
+/// The top-level key naming the city a launch with none named opens
+/// (`crates/accounting/spec/Person.lean` §8-8).
+const CITY: &str = "city";
 /// Everything this person settled, as their file states it.
 ///
 /// A file nobody has written yet is not a failure: it is somebody who
@@ -103,6 +106,69 @@ fn land(file: &Path, patch: PreferencePatch) -> Result<(), AxError> {
     })
 }
 
+/// The city this person named for a launch that names none, as their
+/// file states it; `None` when they named none.
+///
+/// # Errors
+/// Everything [`read`] returns, and `E_CONFIG_INVALID` for a `city`
+/// that is not an absolute path: a relative one has no base every
+/// reader would agree on.
+pub fn city() -> Result<Option<PathBuf>, AxError> {
+    stated_city(&file()?)
+}
+
+fn stated_city(file: &Path) -> Result<Option<PathBuf>, AxError> {
+    match document(file)?.get(CITY) {
+        None => Ok(None),
+        Some(toml::Value::String(raw)) if Path::new(raw).is_absolute() => {
+            Ok(Some(PathBuf::from(raw)))
+        }
+        Some(other) => Err(AxError::failure(
+            AxCode::ConfigInvalid,
+            "read the city the User named",
+            format!("{}: {CITY} = {other} is not an absolute path", file.display()),
+        )
+        .with_recovery(format!(
+            "write {CITY} as the whole path of the city's folder, or delete the line to use the default"
+        ))),
+    }
+}
+
+/// Names `city` as the one a launch with none named opens, leaving
+/// every other line of the person's file as they wrote it.
+///
+/// # Errors
+/// Everything [`read`] returns; `E_CONFIG_INVALID` for a path that is
+/// not text; `E_STORAGE_FATAL` for a file that cannot be replaced.
+pub fn settle_city(city: &Path) -> Result<(), AxError> {
+    name_city(&file()?, city)
+}
+
+fn name_city(file: &Path, city: &Path) -> Result<(), AxError> {
+    let whole = std::path::absolute(city).map_err(|err| {
+        AxError::failure(
+            AxCode::StorageFatal,
+            "name the User's city",
+            format!("{}: {err}", city.display()),
+        )
+        .with_recovery("start again from a folder this process can read")
+    })?;
+    let Some(spelled) = whole.to_str() else {
+        return Err(AxError::failure(
+            AxCode::ConfigInvalid,
+            "name the User's city",
+            format!("{} is not text", whole.display()),
+        )
+        .with_recovery("choose a folder whose path has no undecodable characters"));
+    };
+    city::edit_document(file, |held| {
+        let mut document = document(file)?;
+        document.insert(CITY.to_owned(), toml::Value::String(spelled.to_owned()));
+        let text = toml::to_string_pretty(&document).map_err(|err| invalid(file, &err))?;
+        held.replace(text.as_bytes())
+    })
+}
+
 /// Whether the core's threads are raised: the setting a person turns
 /// off. Its words are the wire's, which is what a page writes it with.
 pub use wire::{CorePlacement, CorePriority};
@@ -147,7 +213,10 @@ fn stated(file: &Path) -> Result<PreferencesAnswer, AxError> {
 /// build does not read.
 fn document(file: &Path) -> Result<toml::Table, AxError> {
     match std::fs::read_to_string(file) {
-        Ok(text) => toml::from_str(&text).map_err(|err| invalid(file, &err)),
+        Ok(text) => {
+            city::admit_format(city::FormatFile::PersonConfig, &text)?;
+            toml::from_str(&text).map_err(|err| invalid(file, &err))
+        }
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(toml::Table::new()),
         Err(err) => Err(AxError::failure(
             AxCode::StorageFatal,
@@ -253,6 +322,43 @@ mod tests {
             assert_eq!(stated(&file).unwrap(), expected);
         }
         assert_eq!(expected.lang, Some(Lang::En));
+    }
+
+    /// The city a person named is read back whole, a relative one is
+    /// refused, and naming one leaves every other line alone and adds
+    /// no `format`: the previous release must still read this file.
+    #[test]
+    fn the_named_city_is_absolute_and_naming_it_touches_nothing_else() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("config.toml");
+        std::fs::write(&file, "[mine]\nkept = 1\n").unwrap();
+        assert_eq!(stated_city(&file).unwrap(), None);
+
+        let city = dir.path().join("sprawling").join("city");
+        name_city(&file, &city).unwrap();
+        assert_eq!(stated_city(&file).unwrap(), Some(city));
+        let text = std::fs::read_to_string(&file).unwrap();
+        assert!(text.contains("kept = 1"), "{text}");
+        assert!(!text.contains(city::FORMAT_KEY), "{text}");
+
+        std::fs::write(&file, "city = \"sprawling/city\"\n").unwrap();
+        assert_eq!(
+            stated_city(&file).unwrap_err().code(),
+            &AxCode::ConfigInvalid
+        );
+    }
+
+    /// A person file from a newer build is refused for being newer.
+    #[test]
+    fn a_person_file_from_a_newer_build_names_the_upgrade() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("config.toml");
+        std::fs::write(&file, "format = 2\n[ui]\n").unwrap();
+        let refused = stated(&file).unwrap_err();
+        assert!(
+            refused.recovery().contains("upgrade sprawling"),
+            "{refused}"
+        );
     }
 
     /// A section a person wrote that this build does not read is still
