@@ -98,13 +98,21 @@ fn render_is_deterministic_and_sorted() {
     let mut catalog = Catalog::new();
     catalog.file(&meta("zeta")).unwrap();
     catalog.file(&meta("alpha")).unwrap();
+    catalog.file(&meta("zulu_mail")).unwrap();
+    catalog.file(&meta("apps_mail")).unwrap();
     catalog.admit_skill(skill("review")).unwrap();
     catalog.set_mode(Mode::Work);
     let text = catalog.render();
     let block = dormant_block(&text);
+    let apps = block.find("- apps (1):").unwrap();
     let sprawling = block.find("- sprawling (2):").unwrap();
+    let zulu = block.find("- zulu (1):").unwrap();
     let review = block.find("- skill review:").unwrap();
-    assert!(sprawling < review, "namespaces, then skills");
+    assert!(
+        apps < sprawling && sprawling < zulu,
+        "namespaces by name, a server's beside the city's own: {block}"
+    );
+    assert!(zulu < review, "namespaces, then skills");
     assert!(text.contains("- mode:work:"));
     assert_eq!(text, catalog.render(), "same content, same bytes");
     // One line says the city itself can be changed; the evidence a
