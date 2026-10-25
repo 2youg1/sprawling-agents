@@ -72,11 +72,12 @@ fn slow_then_mark() -> Value {
     } else {
         ("sh", vec!["-c".to_owned(), format!("sleep 1; echo {MARK}")])
     };
-    json!({ "arm": { "program": { "path": path, "args": args } }, "where": "host" })
+    let quoted: Vec<String> = args.iter().map(|arg| format!("\"{arg}\"")).collect();
+    json!({ "command": format!("{path} {}", quoted.join(" ")), "where": "host" })
 }
 
 fn quick_look() -> Value {
-    json!({ "arm": { "python": { "code": "pass" } } })
+    json!({ "python": "pass" })
 }
 
 #[test]

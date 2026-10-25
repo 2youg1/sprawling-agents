@@ -456,7 +456,7 @@ mod tests {
 
     fn edit_call() -> kernel::ToolCall {
         let args = serde_json::json!({
-            "path": "work/new.md", "old": "", "new": "text",
+            "file_path": "work/new.md", "old_string": "", "new_string": "text",
         });
         kernel::ToolCall {
             id: "call-1".to_owned(),

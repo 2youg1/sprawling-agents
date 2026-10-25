@@ -403,3 +403,44 @@ fn a_cut_the_history_does_not_hold_is_refused() {
     assert_eq!(err.code(), &kernel::AxCode::InvalidArgs);
     assert!(err.recovery().contains("ends at seq 3"), "{err}");
 }
+
+/// D115 (`crates/runtime/spec/Tools.lean`): a call an older build
+/// recorded under the argument names it took then reaches the branch as
+/// it was recorded, beside the answer it got; nothing maps it to the
+/// names this build's tools take.
+#[test]
+fn an_old_call_is_rebuilt_as_it_was_recorded() {
+    let older = Payload::of(&serde_json::json!({
+        "path": "lab/notes.md", "old": "draft", "new": "final",
+    }))
+    .unwrap();
+    let mut drafts = mother_drafts();
+    drafts[1] = line(
+        EventKind::ModelReturned,
+        Payload::of(&ModelReturned {
+            message: kernel::model::message_payload(&[ContentBlock::ToolUse {
+                id: "tu_1".to_owned(),
+                name: kernel::ToolName::parse("edit").unwrap(),
+                input: older.clone(),
+            }])
+            .unwrap(),
+            calls: 1,
+            usage: None,
+            stop: None,
+            billed_usd_micros: None,
+            first_at: None,
+            first_us: None,
+            took_us: None,
+        })
+        .unwrap(),
+    );
+    let inherited = verified(drafts).inherited(Seq::new(3)).unwrap();
+    assert_eq!(
+        inherited.messages[1].content,
+        vec![ContentBlock::ToolUse {
+            id: "tu_1".to_owned(),
+            name: kernel::ToolName::parse("edit").unwrap(),
+            input: older,
+        }]
+    );
+}

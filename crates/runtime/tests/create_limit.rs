@@ -21,7 +21,11 @@ use serde_json::{Map, Value};
 
 fn call(path: &str, old: &str, new: &str) -> ToolCall {
     let mut args = Map::new();
-    for (k, v) in [("path", path), ("old", old), ("new", new)] {
+    for (k, v) in [
+        ("file_path", path),
+        ("old_string", old),
+        ("new_string", new),
+    ] {
         args.insert(k.to_owned(), Value::String(v.to_owned()));
     }
     ToolCall {
@@ -100,22 +104,13 @@ fn an_existing_file_is_unchanged_under_create_by_edit_exec_and_link() {
         runtime::Backlog::with_window(runtime::PollBudget::new(6_000, 20)),
     )
     .unwrap();
-    let (program, args) = if cfg!(windows) {
-        (
-            "cmd",
-            vec!["/C".to_owned(), "echo changed> kept.md".to_owned()],
-        )
+    let line = if cfg!(windows) {
+        r#"cmd /C "echo changed> kept.md""#
     } else {
-        (
-            "sh",
-            vec!["-c".to_owned(), "echo changed > kept.md".to_owned()],
-        )
+        r#"sh -c "echo changed > kept.md""#
     };
     let mut exec_args = Map::new();
-    exec_args.insert(
-        "arm".to_owned(),
-        serde_json::json!({ "program": { "path": program, "args": args } }),
-    );
+    exec_args.insert("command".to_owned(), Value::String(line.to_owned()));
     exec_args.insert("where".to_owned(), Value::String("host".to_owned()));
     let hosted = Tool::invoke(
         &exec,

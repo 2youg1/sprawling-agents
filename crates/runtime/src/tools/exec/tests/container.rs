@@ -129,9 +129,7 @@ fn daemon_target_exit_is_not_the_attach_cli_exit() {
     let work = tempfile::tempdir().unwrap();
     let tool = daemon.tool(work.path(), &patient());
     let answer = tool
-        .invoke(&call(
-            json!({"program":{"path":"/image-only/program","args":[]}}),
-        ))
+        .invoke(&call(line_of("/image-only/program", NO_ARGS)))
         .unwrap();
     let result = serde_json::to_value(answer.result).unwrap();
     assert_eq!(
@@ -155,10 +153,7 @@ fn a_lost_create_response_still_removes_the_owned_identity() {
     let work = tempfile::tempdir().unwrap();
     let backlog = patient();
     let tool = daemon.tool(work.path(), &backlog);
-    assert!(
-        tool.invoke(&call(json!({"program":{"path":"/bin/true","args":[]}})))
-            .is_err()
-    );
+    assert!(tool.invoke(&call(line_of("/bin/true", NO_ARGS))).is_err());
     assert!(
         !daemon.exists(),
         "a rejected create response cannot abandon a daemon resource"
@@ -175,10 +170,7 @@ fn a_refused_cleanup_keeps_the_identity_and_copy_until_retry() {
     let work = tempfile::tempdir().unwrap();
     let backlog = patient();
     let tool = daemon.tool(work.path(), &backlog);
-    assert!(
-        tool.invoke(&call(json!({"program":{"path":"/bin/true","args":[]}})))
-            .is_err()
-    );
+    assert!(tool.invoke(&call(line_of("/bin/true", NO_ARGS))).is_err());
     let copy = PathBuf::from(std::fs::read_to_string(daemon.dir.path().join("copy")).unwrap());
     assert!(daemon.exists() && copy.is_dir());
     assert_eq!(backlog.standing(&tool.setup.domain).unwrap().len(), 1);
@@ -242,23 +234,26 @@ assert q*1000==p*1250
 print('filesystem, network, UID and cgroup settings checked')
 "#;
     let answer = tool
-        .invoke(&call(
-            json!({"program":{"path":"python3","args":["-c",probe]}}),
-        ))
+        .invoke(&call(line_of("python3", ["-c", probe])))
         .unwrap();
     let result = serde_json::to_value(answer.result).unwrap();
     assert_eq!(result["exit_code"], json!(0), "{result}");
     assert_eq!(std::fs::read_to_string(source).unwrap(), "source");
     let failure = tool
-        .invoke(&call(json!({"shell":{"text":"exit 23"}})))
+        .invoke(&call(line_of("/bin/sh", ["-c", "exit 23"])))
         .unwrap();
     assert_eq!(
         serde_json::to_value(failure.result).unwrap()["exit_code"],
         json!(23)
     );
     let memory = tool
-        .invoke(&call(json!({"program":{"path":"python3","args":["-c",
-        "import sys; allocation=bytearray(256*1024*1024); sys.exit(0)"]}})))
+        .invoke(&call(line_of(
+            "python3",
+            [
+                "-c",
+                "import sys; allocation=bytearray(256*1024*1024); sys.exit(0)",
+            ],
+        )))
         .unwrap();
     let memory = serde_json::to_value(memory.result).unwrap();
     assert_ne!(
@@ -287,9 +282,7 @@ finally:
  os.close(reader)
 "#;
     let checked = tool
-        .invoke(&call(
-            json!({"program":{"path":"python3","args":["-c",pids]}}),
-        ))
+        .invoke(&call(line_of("python3", ["-c", pids])))
         .unwrap();
     let checked = serde_json::to_value(checked.result).unwrap();
     assert_eq!(checked["exit_code"], json!(0), "{checked}");
@@ -309,11 +302,7 @@ ratio=(used.ru_utime+used.ru_stime)/elapsed
 assert ratio<1.8,ratio
 print('cpu seconds per wall second',ratio)
 "#;
-    let checked = tool
-        .invoke(&call(
-            json!({"program":{"path":"python3","args":["-c",cpu]}}),
-        ))
-        .unwrap();
+    let checked = tool.invoke(&call(line_of("python3", ["-c", cpu]))).unwrap();
     let checked = serde_json::to_value(checked.result).unwrap();
     assert_eq!(checked["exit_code"], json!(0), "{checked}");
     let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
@@ -322,9 +311,7 @@ print('cpu seconds per wall second',ratio)
         "import socket; s=socket.socket(); s.settimeout(.2); assert s.connect_ex(('127.0.0.1',{port})) != 0"
     );
     let checked = tool
-        .invoke(&call(
-            json!({"program":{"path":"python3","args":["-c",network]}}),
-        ))
+        .invoke(&call(line_of("python3", ["-c", network.as_str()])))
         .unwrap();
     assert_eq!(
         serde_json::to_value(checked.result).unwrap()["exit_code"],
@@ -358,9 +345,7 @@ print('cpu seconds per wall second',ratio)
             "import subprocess,time; subprocess.Popen(['python3','-c','import time; time.sleep(600)']); time.sleep({delay})"
         );
         let started = background
-            .invoke(&call(
-                json!({"program":{"path":"python3","args":["-c",target]}}),
-            ))
+            .invoke(&call(line_of("python3", ["-c", target.as_str()])))
             .unwrap();
         assert_eq!(
             serde_json::to_value(started.result).unwrap()["outcome"],
@@ -474,8 +459,7 @@ fn guardian_parent_process() {
     )
     .unwrap()
     .with_container(limits(), runtime);
-    tool.invoke(&call(json!({"program":{"path":"/bin/true","args":[]}})))
-        .unwrap();
+    tool.invoke(&call(line_of("/bin/true", NO_ARGS))).unwrap();
 }
 
 #[cfg(unix)]
@@ -617,7 +601,7 @@ fn guardian_timeout_retains_the_member_until_harvest() {
                 answer
                     .send(
                         invocation
-                            .invoke(&call(json!({"program":{"path":"/bin/true","args":[]}})))
+                            .invoke(&call(line_of("/bin/true", NO_ARGS)))
                             .map(|_| ()),
                     )
                     .unwrap();

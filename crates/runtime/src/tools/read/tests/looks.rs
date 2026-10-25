@@ -28,7 +28,11 @@ fn run(root: &Path) -> (ReadTool, EditTool) {
 
 fn edit(path: &str, old: &str, new: &str) -> ToolCall {
     let mut args = Map::new();
-    for (key, value) in [("path", path), ("old", old), ("new", new)] {
+    for (key, value) in [
+        ("file_path", path),
+        ("old_string", old),
+        ("new_string", new),
+    ] {
         args.insert(key.to_owned(), Value::String(value.to_owned()));
     }
     ToolCall {

@@ -86,11 +86,7 @@ fn a_dispatched_command_runs_below_the_core() {
     let tool = regression_boundary(
         ExecTool::new(declared, Box::new(EchoSandbox::new()), patient()).unwrap(),
     );
-    let outcome = tool
-        .invoke(&call(serde_json::json!({
-            "program": { "path": path, "args": args }
-        })))
-        .unwrap();
+    let outcome = tool.invoke(&call(line_of(path, args))).unwrap();
     let result = serde_json::to_value(&outcome.result).unwrap();
     let dispatched = result["stdout"].as_str().unwrap();
     assert_eq!(
@@ -124,11 +120,7 @@ fn a_dispatched_command_reads_and_writes_at_the_lowest_best_effort_io_level() {
         patient(),
     )
     .unwrap();
-    let outcome = tool
-        .invoke(&call(serde_json::json!({
-            "program": { "path": "ionice", "args": [] }
-        })))
-        .unwrap();
+    let outcome = tool.invoke(&call(line_of("ionice", NO_ARGS))).unwrap();
     let result = serde_json::to_value(&outcome.result).unwrap();
     assert_eq!(
         result["stdout"].as_str().map(str::trim),
@@ -145,9 +137,7 @@ fn a_dispatched_command_reads_and_writes_at_the_lowest_best_effort_io_level() {
 fn a_missing_program_still_refuses_under_nice() {
     let chamber = tempfile::tempdir().unwrap();
     let tool = a_tool(chamber.path(), None, Box::new(EchoSandbox::new()), None);
-    let err = match tool.invoke(&call(serde_json::json!({
-        "program": { "path": "sprawling-no-such-program", "args": [] }
-    }))) {
+    let err = match tool.invoke(&call(line_of("sprawling-no-such-program", NO_ARGS))) {
         Err(err) => err,
         Ok(outcome) => panic!(
             "a missing program must refuse: {}",
