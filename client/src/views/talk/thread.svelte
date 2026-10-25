@@ -41,6 +41,7 @@
   import { heard, landed, lost } from "./arrivals.svelte";
   import { callWord } from "./calls";
   import { firstHeadSaid } from "./frozen";
+  import type { FrozenFacts } from "./seat";
   import { restriction, sandboxQuery, sandboxSaid } from "./sandbox";
   import { called, dispatcherOf } from "./naming";
   import { planFork } from "./forking";
@@ -57,17 +58,18 @@
     // The run came back with no words: say the task again as a new run.
     // Absent for the same reason.
     readonly onRetry?: ((task: string) => void) | undefined;
-    // Whether this run opens the stretch of the room on screen, so its
-    // first head states the model the session froze (docs/frontend-method.md §7D).
-    // A later run of the same session leaves that to the first.
-    readonly opens?: boolean;
+    // Where this run's frozen facts are said (`seat.ts`): on its first
+    // head when it opens the stretch on screen, else elsewhere - a later
+    // run of the same session leaves them to the first, and on the
+    // workbench the chosen session's gauge says them (docs/frontend-method.md §7D).
+    readonly facts?: FrozenFacts;
     // A letter's line in this run: only the turns around it are drawn,
     // with a link to the whole session (client D91). Absent everywhere
     // else, where the thread is the whole session.
     readonly around?: Seq | null;
   }
 
-  const { run, onFork, onRetry, opens = true, around = null }: Props = $props();
+  const { run, onFork, onRetry, facts = "head", around = null }: Props = $props();
 
   const u = ui();
   const { lang } = u;
@@ -178,7 +180,7 @@
   // the model again only where a round answered with a different one.
   // A fact that is not known is left out, never written as "none".
   const firstModel = $derived(turns.at(0)?.model ?? null);
-  const building = $derived(opens && run.addr !== null ? u.conn.asking.ask(sandboxQuery(run.addr)) : readable(undefined));
+  const building = $derived(facts === "head" && run.addr !== null ? u.conn.asking.ask(sandboxQuery(run.addr)) : readable(undefined));
   const bounded = $derived(restriction($building));
   const firstStated = $derived.by(() => {
     const facts = [firstModel ?? "", firstHeadSaid(answer?.opening, $lang), bounded === null ? "" : sandboxSaid(bounded, $lang)]
@@ -189,7 +191,7 @@
   const stated = $derived(
     turns.map((turn, at) => {
       const model = turn.model ?? null;
-      if (at === 0) return opens ? firstStated : null;
+      if (at === 0) return facts === "head" ? firstStated : null;
       return model !== null && model !== (turns[at - 1]?.model ?? null) ? model : null;
     }),
   );

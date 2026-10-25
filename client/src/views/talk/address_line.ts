@@ -5,7 +5,7 @@
 
 // What the conversation's address line is given (client/Spec.lean
 // 4-10a): the one place the room's address and the session's number are
-// drawn in zen and blend, and the control that opens the command palette.
+// drawn in every tier, and the control that opens the command palette.
 //
 // **The room is cut last.** A long address loses its building before
 // its room: two rooms of one building differ only in their last segment,
@@ -17,11 +17,6 @@ import { fill, say } from "../../core/lang";
 import type { Lang } from "../../core/lang";
 import type { Seq } from "../../wire";
 import type { Arrival } from "../palette_door.svelte";
-
-// Whether a conversation column draws the address line: zen and blend do,
-// and the panorama workbench, which writes the address under the chosen
-// session's title (docs/frontend-method.md §7D), does not.
-export type Head = "address" | "none";
 
 // Where one address line stands (client/Spec.lean 4-10a): in the box, in
 // the place of its placeholder, as the words "to <address>…" whose address

@@ -7,7 +7,8 @@
 when rows carry tags, then the groups, each a quiet heading over its
 rows. A row is a state dot, its title with the pin when it is pinned and
 its time, and under them the lines the session has to say; the row in
-main is washed and carries the chosen bar on its leading edge, and the
+main is washed, carries the chosen bar on its leading edge and leaves out
+whatever the seat left out of it (`sessions.ts`), and the
 row's menu key shows on hover, on focus and on the row in main. Every
 link, role and `aria-*` value comes in the bags. -->
 <script lang="ts">
@@ -54,14 +55,16 @@ by that step into the pane's own inset, so the pane clips neither. -->
               {/if}
             </span>
             {#if !look.narrow}
-              <span class="figure text-note text-text-faint">{row.when}</span>
+              <span class="figure text-note text-text-faint">{row.when ?? ""}</span>
               {#if row.phase !== undefined}
                 <span class="col-start-2 col-end-4 truncate text-note text-text-quiet">{row.phase}</span>
               {/if}
               {#if row.delegated !== undefined}
                 <span class="col-start-2 col-end-4 truncate text-note text-text-faint">{row.delegated}</span>
               {/if}
-              <span class="col-start-2 col-end-4 line-clamp-2 text-note text-text-quiet">{row.about}</span>
+              {#if row.about !== undefined}
+                <span class="col-start-2 col-end-4 line-clamp-2 text-note text-text-quiet">{row.about}</span>
+              {/if}
               {#if row.ranOn !== undefined}
                 <span class="col-start-2 col-end-4 truncate text-note text-text-faint">{row.ranOn}</span>
               {/if}

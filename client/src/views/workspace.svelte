@@ -344,7 +344,7 @@ taller; on one column the second row is the band, as tall as it needs. -->
           {#if placed.pane === "sessions"}
             <Sessions here={address} {session} narrow={open} head={sheet ? unnamed : sessionsHead} />
           {:else if placed.pane === "session"}
-            <Session here={address} shown={past === undefined ? undefined : (current?.run ?? null)} {title} head={sheet ? unnamed : sessionHead} />
+            <Session here={address} shown={past === undefined ? undefined : (current?.run ?? null)} head={sheet ? unnamed : sessionHead} />
           {:else}
             <Place here={address} head={sheet ? unnamed : placeHead} />
           {/if}
@@ -361,9 +361,9 @@ taller; on one column the second row is the band, as tall as it needs. -->
     aria-label={say($lang, past === undefined ? "region_conversation" : "region_past_session")}
   >
     {#if past === undefined || session === undefined}
-      <Talk {address} band={sheet} head={layout.world === "workbench" ? "none" : "address"} />
+      <Talk {address} band={sheet} seat={layout.world === "workbench" ? "workbench" : "page"} />
     {:else}
-      <Past {address} {session} stretch={past} band={sheet} head={layout.world === "workbench" ? "none" : "address"} />
+      <Past {address} {session} stretch={past} band={sheet} seat={layout.world === "workbench" ? "workbench" : "page"} />
     {/if}
   </section>
   {#if open}

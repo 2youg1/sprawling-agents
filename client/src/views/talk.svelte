@@ -34,7 +34,8 @@
   import type { Address, RoundsAnswer, Seq } from "../wire";
   import { ui } from "../ui";
   import AddressLine from "./talk/address_line.svelte";
-  import type { Head } from "./talk/address_line";
+  import { drawsAddress, factsAt } from "./talk/seat";
+  import type { Seat } from "./talk/seat";
   import Composer from "./talk/composer.svelte";
   import Divider from "./talk/divider.svelte";
   import Forking from "./talk/forking.svelte";
@@ -64,13 +65,13 @@
     // The band under the world layer's sheet on one column: the thread
     // steps aside and the last thing said stands above the box.
     readonly band: boolean;
-    // Whether the column draws the address line (client/Spec.lean
-    // 4-10a): zen and blend do, in the box's placeholder; the panorama
-    // workbench writes the address under the chosen session instead.
-    readonly head: Head;
+    // Where the column stands (`talk/seat.ts`): it decides whether the
+    // box's placeholder carries the address line (client/Spec.lean 4-10a)
+    // and whether the first message head states the frozen facts.
+    readonly seat: Seat;
   }
 
-  const { address, band, head }: Props = $props();
+  const { address, band, seat }: Props = $props();
 
   const u = ui();
   const { lang } = u;
@@ -224,7 +225,7 @@
   const blank = $derived(runs.length === 0 && echo === null);
   // The address line stands in the box, as the address its placeholder
   // names, so the page names the room once (client/Spec.lean 4-10a).
-  const addressed = $derived(!band && head === "address");
+  const addressed = $derived(!band && drawsAddress(seat));
 
   function send(text: string): boolean {
     const going = live;
@@ -391,7 +392,7 @@ composition is rebuilt on the way. -->
             {#if policyLine !== null && policyAt === at}
               <p class="my-snug text-center text-note text-text-faint">{policyLine}</p>
             {/if}
-            <Thread {run} opens={at === 0} onFork={doFork} onRetry={send} />
+            <Thread {run} facts={factsAt(seat, at)} onFork={doFork} onRetry={send} />
           {/each}
           {#if policyLine !== null && policyAt === -1}
             <p class="my-snug text-center text-note text-text-faint">{policyLine}</p>

@@ -19,19 +19,20 @@
   // pane above it shows the session.
   import { newestWorking } from "../../core/belief/live";
   import { cancel } from "../../core/commands";
-  import { fill, say } from "../../core/lang";
-  import { roomOf, toFragment } from "../../core/route";
+  import { say } from "../../core/lang";
+  import { toFragment } from "../../core/route";
   import type { Stretch } from "../../core/stretches";
   import { ui } from "../../ui";
   import type { Address, Seq } from "../../wire";
   import Button from "../parts/button.svelte";
   import AddressLine from "./address_line.svelte";
-  import type { Head } from "./address_line";
   import AsideLink from "./aside_link.look.svelte";
   import { branchInto } from "./branching";
   import { noteOf } from "./branch_note";
   import Scroller from "./scroller.svelte";
   import type { ForkPlan } from "./forking";
+  import { drawsAddress, factsAt } from "./seat";
+  import type { Seat } from "./seat";
   import Thread from "./thread.svelte";
 
   interface Props {
@@ -44,17 +45,17 @@
     // answered for it, or no longer lists it.
     readonly stretch: Stretch | null;
     readonly band: boolean;
-    // Whether the column draws the address line at its head (4-10a).
-    readonly head: Head;
+    // Where the column stands (`seat.ts`): whether it draws the address
+    // line at its head (4-10a), and who states the frozen facts.
+    readonly seat: Seat;
   }
 
-  const { address, session, stretch, band, head }: Props = $props();
+  const { address, session, stretch, band, seat }: Props = $props();
 
   const u = ui();
   const { lang } = u;
   const { belief } = u.conn;
   const branching = u.branches.held;
-  const who = $derived(roomOf(address));
   const note = $derived.by(() => {
     const here = branchInto($branching, address);
     const going = here.kind === "refused" ? newestWorking($belief, address) : undefined;
@@ -69,7 +70,7 @@
 </script>
 
 <div class={["flex min-h-0 flex-col", band ? "" : "h-full"]}>
-  {#if !band && head === "address"}
+  {#if !band && drawsAddress(seat)}
     <AddressLine {address} {session} />
   {/if}
   {#if !band}
@@ -77,7 +78,7 @@
       {#each stretch?.runs ?? [] as run, at (run.run)}
         <Thread
           {run}
-          opens={at === 0}
+          facts={factsAt(seat, at)}
           onFork={(plan: ForkPlan) => {
             u.branches.open(address, { kind: "branch", origin: plan.origin }, () => {
               if (plan.draft !== null) u.prefs.setDraft(address, plan.draft);
@@ -88,7 +89,7 @@
     </Scroller>
   {/if}
   <div class="flex shrink-0 flex-col gap-snug border-t border-edge-panel pt-base">
-    <p class="text-note text-text-quiet">{fill(say($lang, "talk_past"), { room: who })}</p>
+    <p class="text-note text-text-quiet">{say($lang, "talk_past")}</p>
     <p class="text-note text-text-quiet">
       <AsideLink text={say($lang, "talk_current")} href={toFragment({ kind: "talk", address })} />
     </p>

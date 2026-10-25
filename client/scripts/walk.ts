@@ -33,6 +33,9 @@ import { createBuilding, dispatch } from "../src/core/commands";
 import { encodeFrame } from "../src/core/frames";
 import { LENSES, PAGES, RUN_LENSES, SETUP_GROUPS } from "../src/core/route";
 import phrases from "../src/lang.json";
+import type { Tier } from "../src/core/prefs";
+import type { Pane } from "../src/core/workbench";
+import { layersKey } from "../src/views/edge";
 import { Address } from "../src/wire";
 import type { Command, Mode } from "../src/wire";
 import { DevTools } from "./walk_devtools";
@@ -56,9 +59,18 @@ const FRAMES: readonly Frame[] = [
 ];
 
 // A step taken on a page before its picture: press the control a screen
-// reader calls `name` (a phrase of `lang.json`), or the first element a
-// selector finds where the name is built from data.
-type Step = { readonly press: keyof typeof phrases } | { readonly select: string };
+// reader calls `name` (a phrase of `lang.json`), the first element a
+// selector finds where the name is built from data, the layers key
+// until it names the tier, or the world sheet's tab for a pane, which
+// only one column draws: wider, the workbench shows every pane at once
+// and the step presses nothing. The tier is the tab's and outlives a
+// shot, so a shot names the tier it wants rather than counting presses
+// from whatever tier the shot before it left.
+type Step =
+  | { readonly press: keyof typeof phrases }
+  | { readonly select: string }
+  | { readonly tier: Tier }
+  | { readonly sheet: Pane };
 
 interface Shot {
   readonly name: string;
@@ -256,13 +268,19 @@ function shots(run: string): readonly Shot[] {
     at("talk-work", "#/talk/atlas/notes"),
     at("talk-chat", "#/talk/atlas/review"),
     at("talk-code", "#/talk/garden/sensors"),
-    at("talk-file-beside", "#/talk/atlas/notes?building=atlas&path=notes/README.md"),
+    // The tiers come before any shot opens a file on the right, because
+    // an opened file stays open from room to room and folds the world's
+    // panes away. The blend tier where its panels show: a room whose run
+    // wrote no file, so the right side does not follow it there.
+    at("talk-layers", "#/talk/atlas/review", { tier: "blend" }),
+    // The panorama workbench twice: beside the file the run wrote, which
+    // the right side follows and so folds the place column away, and in a
+    // room with no file, where all three panes stand over the conversation.
+    at("talk-panorama", "#/talk/atlas/notes", { tier: "panorama" }),
+    at("talk-panorama-bench", "#/talk/atlas/review", { tier: "panorama" }, { sheet: "session" }),
+    at("talk-file-beside", "#/talk/atlas/notes?building=atlas&path=notes/README.md", { tier: "zen" }),
     at("talk-palette", "#/talk/atlas/notes", palette),
     at("talk-palette-carry", "#/talk/atlas/notes", palette, { press: "palette_carry" }),
-    at("talk-layers", "#/talk/atlas/notes", { press: "edge_layers" }),
-    // The layers key steps zen, blend, panorama: two presses reach the
-    // panorama workbench, the sessions beside the chosen one's gauges.
-    at("talk-panorama", "#/talk/atlas/notes", { press: "edge_layers" }, { press: "edge_layers" }),
     at("city", "#/city"),
     at("building", "#/building/atlas"),
     at("building-prompts", "#/building/atlas", { press: "bld_prompts" }),
@@ -288,10 +306,32 @@ const PRESS = `(name) => {
   found.click();
 }`;
 
+// Presses the layers key until its name is the wanted one. On one column
+// the key opens and closes the world's sheet, which is the panorama
+// there, and there is no blend: a key back at the name it started from
+// has gone round every tier this width has, and the shot keeps that one.
+const TIERED = `async (wanted, called) => {
+  const key = () => {
+    const found = [...document.querySelectorAll("button[aria-label]")].find((e) => e.getAttribute("aria-label").startsWith(called));
+    if (found === undefined) throw new Error("nothing on the page is called " + called);
+    return found;
+  };
+  const first = key().getAttribute("aria-label");
+  for (let said = first; said !== wanted; said = key().getAttribute("aria-label")) {
+    key().click();
+    await new Promise((done) => setTimeout(done, 400));
+    if (key().getAttribute("aria-label") === first) return;
+  }
+}`;
+
+const NO_HANDS = { press: () => undefined, release: () => undefined, click: () => undefined };
+
 function stepScript(step: Step): string {
-  return "press" in step
-    ? `(${PRESS})(${JSON.stringify(phrase(step.press))})`
-    : `document.querySelector(${JSON.stringify(step.select)}).click()`;
+  if ("press" in step) return `(${PRESS})(${JSON.stringify(phrase(step.press))})`;
+  if ("select" in step) return `document.querySelector(${JSON.stringify(step.select)}).click()`;
+  if ("sheet" in step) return `document.querySelector(${JSON.stringify(`[role=tab][id$="-tab-${step.sheet}"]`)})?.click()`;
+  const wanted = layersKey(step.tier, "en", (words) => words, NO_HANDS).key.wire["aria-label"] ?? "";
+  return `(${TIERED})(${JSON.stringify(wanted)}, ${JSON.stringify(phrase("edge_layers"))})`;
 }
 
 async function pair(tools: DevTools, code: string): Promise<void> {

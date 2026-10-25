@@ -464,8 +464,8 @@
     "zh": "长期目标"
   },
   "bld_goal_placeholder": {
-    "en": "give {addr} a standing goal",
-    "zh": "给 {addr} 一个长期目标"
+    "en": "one sentence this building keeps working toward",
+    "zh": "这栋楼一直朝着去做的一句话"
   },
   "bld_halt": {
     "en": "/halt {addr}",
@@ -492,8 +492,8 @@
     "zh": "{done}/{total}"
   },
   "bld_pursue": {
-    "en": "set as standing goal",
-    "zh": "设为常设目标"
+    "en": "set",
+    "zh": "设定"
   },
   "bld_pursuit_finished": {
     "en": "finished: nothing is ready and nobody is working",
@@ -7608,8 +7608,8 @@
     "zh": "等价的 config.toml"
   },
   "setup_toml_toggle": {
-    "en": "the city's CONFIG.toml",
-    "zh": "城市的 CONFIG.toml"
+    "en": "the city's settings file",
+    "zh": "城市的设置文件"
   },
   "setup_toml_unread": {
     "en": "the city's CONFIG.toml states nothing yet",
@@ -8960,8 +8960,8 @@
     "zh": "整座城市的 run"
   },
   "runs_counts": {
-    "en": "{asking} waiting for you · {runs} runs",
-    "zh": "{asking} 个在等你 · 共 {runs} 个 run"
+    "en": "{runs} runs",
+    "zh": "共 {runs} 个 run"
   },
   "runs_asking": {
     "en": "waiting for you",
@@ -9052,8 +9052,8 @@
     "zh": "常规写入（关闭时只读可新建）"
   },
   "bld_remove": {
-    "en": "Remove {addr}",
-    "zh": "移走 {addr}"
+    "en": "Remove this building",
+    "zh": "移走这栋楼"
   },
   "bld_remove_busy": {
     "en": "stop the runs here before removing this building",
@@ -9856,8 +9856,8 @@
     "zh": "标签由城市保管，而城市没有连上"
   },
   "talk_past": {
-    "en": "An earlier session of {room}. It is read-only: the city goes on with the room's current session.",
-    "zh": "{room} 较早的一段对话，只读：城市只接着这个房间当前的一段说下去。"
+    "en": "An earlier session. It is read-only: the city goes on with the room's current session.",
+    "zh": "较早的一段对话，只读：城市只接着这个房间当前的一段说下去。"
   },
   "talk_current": {
     "en": "Back to the current session",
@@ -9890,10 +9890,6 @@
   "world_waiting": {
     "en": "waiting for you",
     "zh": "等你"
-  },
-  "world_frozen": {
-    "en": "frozen",
-    "zh": "已冻结"
   },
   "world_running": {
     "en": "running",

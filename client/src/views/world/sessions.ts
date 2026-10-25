@@ -84,30 +84,41 @@ export interface MenuProps {
   readonly session: { readonly name: string; readonly run: RunId | null };
 }
 
+// The row of the session in main names it and says nothing else about it
+// that the screen already says once (client/Spec.lean §7K, "one place on
+// a screen"): the thread under it shows the session's state - the live
+// reply, the card that waits for the person, the line that closes a
+// finished run - its last words, its task and who handed it down; the
+// chosen session's gauge, or the first message head beside the blend
+// tier's panel, says what it ran on; and the context ring says how full
+// its window is. What stays is what nothing else on the screen says:
+// its title, its pin, its tags, and how long a running one has run.
 export interface RowLook {
   readonly key: string;
   readonly link: LinkWire;
   // Whether this row's session is the one in main.
   readonly chosen: boolean;
-  readonly dot: Dot;
+  // Absent on the chosen row.
+  readonly dot: Dot | undefined;
   readonly title: string;
   // The room's address, which the title stands for when it is a name.
   readonly room: string;
   // Whether this is its room's current session; a past one is quieter.
   readonly current: boolean;
   readonly pin: PinLook | undefined;
-  // How long it has run, that it waits, or how long ago it ended.
-  readonly when: string;
-  // The lines under the title, each absent when it has nothing to say:
-  // the phase of a run waiting on a reply, who handed the work down,
-  // what the session is about, and what it ran on.
+  // How long it has run, that it waits, or how long ago it ended; on the
+  // chosen row only how long it has run.
+  readonly when: string | undefined;
+  // The lines under the title, each absent when it has nothing to say
+  // and on the chosen row: the phase of a run waiting on a reply, who
+  // handed the work down, what the session is about, and what it ran on.
   readonly phase: string | undefined;
   readonly delegated: string | undefined;
-  readonly about: string;
+  readonly about: string | undefined;
   readonly ranOn: string | undefined;
   readonly tags: readonly Tag[];
   // The run whose context the row's bar reads (`context_bar.svelte`),
-  // for a current session that holds one.
+  // for a current session that holds one and is not the chosen row.
   readonly context: { readonly room: Address; readonly run: RunId } | undefined;
   readonly menu: MenuProps;
 }
@@ -143,24 +154,23 @@ export function rowOf(stretch: Stretch, at: RowContext): RowLook {
   const last = stretch.runs.at(-1);
   const dot = dotOf(stretch);
   const title = titleOf(stretch);
-  const delegated = delegatedBy(stretch, lang);
-  const ranOn = ranOnOf(stretch, lang);
+  const told = at.chosen ? undefined : toldOf(stretch, dot, at);
   return {
     key: `${stretch.room}:${String(stretch.line.began)}`,
     link: { href: hrefOf(stretch), "aria-current": at.chosen ? "page" : undefined },
     chosen: at.chosen,
-    dot,
+    dot: at.chosen ? undefined : dot,
     title,
     room: stretch.room,
     current: stretch.current,
     pin: at.pinning === "none" ? undefined : pinOf(at.pinning, lang),
-    when: whenOf(stretch, dot, lang, now),
-    phase: dot === "run" && last?.doing.kind === "awaiting_reply" ? phaseSaid(lang, last.doing, now) : undefined,
-    delegated: delegated === "" ? undefined : delegated,
-    about: aboutOf(stretch, last, lang),
-    ranOn: ranOn === "" ? undefined : ranOn,
+    when: at.chosen && dot !== "run" ? undefined : whenOf(stretch, dot, lang, now),
+    phase: told?.phase,
+    delegated: told?.delegated,
+    about: told?.about,
+    ranOn: told?.ranOn,
     tags: at.tags.filter((tag) => tag !== PIN),
-    context: stretch.current && last !== undefined ? { room: stretch.room, run: last.run } : undefined,
+    context: told?.context,
     menu: {
       named: at.named,
       label: fill(say(lang, "world_row_name"), { room: title, when: ago(lang, stretch.line.at, now) }),
@@ -168,6 +178,23 @@ export function rowOf(stretch: Stretch, at: RowContext): RowLook {
       pinning: at.pinning,
       session: { name: stretch.line.name ?? "", run: stretch.current ? (last?.run ?? null) : null },
     },
+  };
+}
+
+// The lines a row that is not the chosen one says under its title.
+type Told = Pick<RowLook, "phase" | "delegated" | "about" | "ranOn" | "context">;
+
+function toldOf(stretch: Stretch, dot: Dot, at: RowContext): Told {
+  const { lang, now } = at;
+  const last = stretch.runs.at(-1);
+  const delegated = delegatedBy(stretch, lang);
+  const ranOn = ranOnOf(stretch, lang);
+  return {
+    phase: dot === "run" && last?.doing.kind === "awaiting_reply" ? phaseSaid(lang, last.doing, now) : undefined,
+    delegated: delegated === "" ? undefined : delegated,
+    about: aboutOf(stretch, last, lang),
+    ranOn: ranOn === "" ? undefined : ranOn,
+    context: stretch.current && last !== undefined ? { room: stretch.room, run: last.run } : undefined,
   };
 }
 
