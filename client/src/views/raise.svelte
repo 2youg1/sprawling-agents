@@ -65,22 +65,28 @@
   const raising = $derived(raisingOf(typed, buildings));
   const target = $derived(raising.kind === "build" || raising.kind === "adopt" ? raising.addr : null);
 
-  // The rules the template would write here, asked of the city.
+  // The rules the template would write here, asked of the city, and
+  // whether the city has answered at all: an address it will not lay a
+  // template at is answered without rules, and the press then brings
+  // back its reason.
   let offered = $state<string | null>(null);
+  let answered = $state(false);
   $effect(() => {
     const at = target;
     const picked = template;
     offered = null;
+    answered = false;
     edited = false;
     rules = "";
     if (at === null) return;
     return u.conn.asking.ask({ template: { template: TemplateName.make(picked), addr: at } }).subscribe((answer) => {
       offered = answer !== undefined && "template" in answer ? answer.template.rules : null;
+      answered = answer !== undefined;
     });
   });
   // Whether the press sends rules the person has seen: their own, or the
   // template's once the city has said what those are.
-  const ready = $derived(target !== null && (edited || offered !== null));
+  const ready = $derived(target !== null && (edited || answered));
   $effect(() => {
     const text = offered;
     if (text !== null && !untrack(() => edited)) rules = text;
