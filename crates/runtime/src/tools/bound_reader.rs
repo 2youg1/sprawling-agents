@@ -250,7 +250,7 @@ mod tests {
                     id: "call-1".to_owned(),
                     name: ToolName::parse("read").unwrap(),
                     args: kernel::Payload::new(
-                        serde_json::json!({ "path": asked })
+                        serde_json::json!({ "file_path": asked })
                             .as_object()
                             .cloned()
                             .unwrap(),

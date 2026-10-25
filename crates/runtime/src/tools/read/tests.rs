@@ -27,7 +27,7 @@ fn tool(root: &Path) -> (ReadTool, Arc<Mutex<Catalog>>) {
 
 fn call(path: &str) -> ToolCall {
     let mut args = Map::new();
-    args.insert("path".to_owned(), Value::String(path.to_owned()));
+    args.insert("file_path".to_owned(), Value::String(path.to_owned()));
     ToolCall {
         id: "call-1".to_owned(),
         name: ToolName::parse("read").unwrap(),
@@ -35,10 +35,15 @@ fn call(path: &str) -> ToolCall {
     }
 }
 
-fn interval(path: &str, offset: u64, limit: Option<u64>) -> ToolCall {
+/// A window from the line at 0-based `index`, asked for the way a caller
+/// asks: by its line number, counted from 1 (D119).
+fn interval(path: &str, index: u64, limit: Option<u64>) -> ToolCall {
     let mut args = Map::new();
-    args.insert("path".to_owned(), Value::String(path.to_owned()));
-    args.insert("offset".to_owned(), Value::Number(offset.into()));
+    args.insert("file_path".to_owned(), Value::String(path.to_owned()));
+    args.insert(
+        "offset".to_owned(),
+        Value::Number(index.checked_add(1).unwrap().into()),
+    );
     if let Some(limit) = limit {
         args.insert("limit".to_owned(), Value::Number(limit.into()));
     }
@@ -47,6 +52,68 @@ fn interval(path: &str, offset: u64, limit: Option<u64>) -> ToolCall {
         name: ToolName::parse("read").unwrap(),
         args: Payload::new(args).unwrap(),
     }
+}
+
+/// D119: `offset` is the line number a model reads off an answer, a
+/// compiler or `rg -n`, counted from 1; 0 can only mean the first line.
+/// The answer keeps the 0-based index the renderer numbers from.
+#[test]
+fn an_offset_is_a_line_number_counted_from_one() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(dir.path().join("lab")).unwrap();
+    std::fs::write(dir.path().join("lab/lines.md"), "one\ntwo\nthree\n").unwrap();
+    let (tool, _catalog) = tool(dir.path());
+    let from = |offset: u64| {
+        let mut args = Map::new();
+        args.insert(
+            "file_path".to_owned(),
+            Value::String("lab/lines.md".to_owned()),
+        );
+        args.insert("offset".to_owned(), Value::Number(offset.into()));
+        args.insert("limit".to_owned(), Value::Number(1.into()));
+        let call = ToolCall {
+            id: "call-1".to_owned(),
+            name: ToolName::parse("read").unwrap(),
+            args: Payload::new(args).unwrap(),
+        };
+        let answered = tool.invoke(&call).unwrap();
+        let map = answered.result.as_map();
+        (
+            map["text"].as_str().unwrap().to_owned(),
+            map.get("offset").and_then(Value::as_u64),
+        )
+    };
+    assert_eq!(
+        [from(0), from(1), from(3)],
+        [
+            ("one\n".to_owned(), None),
+            ("one\n".to_owned(), None),
+            ("three\n".to_owned(), Some(2)),
+        ]
+    );
+}
+
+/// D115: a read spelled the way an older build's history spells it is
+/// refused by the name this build takes.
+#[test]
+fn a_read_spelled_the_older_way_is_refused_with_the_name_it_takes() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(dir.path().join("lab")).unwrap();
+    std::fs::write(dir.path().join("lab/Memo.md"), "one decision\n").unwrap();
+    let (tool, _catalog) = tool(dir.path());
+    let mut args = Map::new();
+    args.insert("path".to_owned(), Value::String("lab/Memo.md".to_owned()));
+    let err = tool
+        .invoke(&ToolCall {
+            id: "call-1".to_owned(),
+            name: ToolName::parse("read").unwrap(),
+            args: Payload::new(args).unwrap(),
+        })
+        .unwrap_err();
+    assert_eq!(
+        (*err.code(), err.subject()),
+        (AxCode::InvalidArgs, "missing string argument `file_path`")
+    );
 }
 
 #[test]
@@ -269,13 +336,13 @@ fn a_continuation_is_drawn_numbered_from_where_it_starts() {
     assert_eq!(
         first_lines,
         [
-            "lab/Long.md lines 515-524 of 700, next 525",
-            "515|line 515",
+            "lab/Long.md lines 516-525 of 700, next 526",
+            "516|line 515",
             "line 516",
             "line 517",
             "line 518",
-            "line 519",
-            "520|line 520",
+            "520|line 519",
+            "line 520",
         ]
     );
 }
@@ -335,7 +402,10 @@ fn an_interval_that_cannot_be_counted_is_refused_rather_than_guessed() {
         Value::Number(0.into()),
     ] {
         let mut args = Map::new();
-        args.insert("path".to_owned(), Value::String("lab/Memo.md".to_owned()));
+        args.insert(
+            "file_path".to_owned(),
+            Value::String("lab/Memo.md".to_owned()),
+        );
         args.insert("limit".to_owned(), bad.clone());
         let err = tool
             .invoke(&ToolCall {

@@ -407,9 +407,9 @@ fn hits_are_drawn_grouped_by_file_with_their_lines_marked() {
     assert_eq!(
         drawn(outcome),
         "2 matches in 2 files\n\
-         lab/Notes.md\n0|before\nthe ledger again\nafter\n\
+         lab/Notes.md\n1|before\nthe ledger again\nafter\n\
          \n\
-         lab/room1/Memo.md\n0|one decision\nthe ledger is the history\nnothing else\n"
+         lab/room1/Memo.md\n1|one decision\nthe ledger is the history\nnothing else\n"
     );
 }
 
