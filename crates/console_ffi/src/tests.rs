@@ -16,6 +16,8 @@
 //! into a terminal emulator (`vt100`) and the rows it shows are compared
 //! whole, so a test reads like the screen it checks.
 
+use std::num::NonZeroU16;
+
 use crate::part::{Ending, Outcome, Part, Verdict};
 use crate::scene::{
     Calling, Choice, Composer, Entry, Inline, Live, Menu, Quiet, Scene, TimeOfDay, Waiting, Working,
@@ -28,7 +30,11 @@ fn at(h: u32, m: u32, s: u32) -> Option<TimeOfDay> {
 /// The rows a terminal of this size shows after `frames`, trailing
 /// spaces cut, and the cursor's place.
 fn screen(columns: u16, rows: u16, frames: &[Vec<u8>]) -> (String, (u16, u16)) {
-    let mut parser = vt100::Parser::new(rows, columns, 0);
+    let mut parser = vt100::Parser::new(
+        NonZeroU16::new(rows).unwrap(),
+        NonZeroU16::new(columns).unwrap(),
+        0,
+    );
     for frame in frames {
         parser.process(frame);
     }

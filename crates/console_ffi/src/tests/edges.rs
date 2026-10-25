@@ -14,6 +14,8 @@
 //! scene the leaf refuses, the cursor once no live region is drawn, and
 //! what gives way first in a narrow or a short window.
 
+use std::num::NonZeroU16;
+
 use super::{drawn, live, screen, transcript};
 use crate::scene::{Entry, Inline, Quiet, Scene};
 
@@ -76,7 +78,8 @@ fn a_frame_without_a_live_region_leaves_the_cursor_shown() {
         live: None,
     });
     let (bytes, _) = drawn(&scene);
-    let mut parser = vt100::Parser::new(4, 80, 0);
+    let mut parser =
+        vt100::Parser::new(NonZeroU16::new(4).unwrap(), NonZeroU16::new(80).unwrap(), 0);
     parser.process(&bytes);
     assert!(!parser.screen().hide_cursor());
 }
