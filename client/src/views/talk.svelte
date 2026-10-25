@@ -281,7 +281,7 @@
   // branch must leave it so.
   function doFork(plan: ForkPlan): void {
     picking = false;
-    u.branches.open(address, plan.origin, () => {
+    u.branches.open(address, { kind: "branch", origin: plan.origin }, () => {
       if (plan.draft !== null) u.prefs.setDraft(address, plan.draft);
       ours = true;
       story = { kind: "forked", at: u.now(), turn: plan.turn, mother: plan.mother };

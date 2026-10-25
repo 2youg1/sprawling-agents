@@ -51,7 +51,7 @@ describe("a recent session's row", () => {
   });
 
   test("says the branch is opening, and waits for it", () => {
-    const look = rowOf({ room: ROOM, line: LINE, forkable: true, branch: { kind: "opening" } }, "en", "", HANDS);
+    const look = rowOf({ room: ROOM, line: LINE, forkable: true, branch: { kind: "opening", of: "branch" } }, "en", "", HANDS);
     expect([look.began, look.fork.why, look.fork.wire["aria-disabled"], look.stop]).toEqual([
       say("en", "branch_opening"),
       say("en", "branch_opening"),
@@ -70,7 +70,7 @@ describe("a recent session's row", () => {
   });
 
   test("says why a busy room refused the branch, with /stop for its run, and forks again", () => {
-    const look = rowOf({ room: ROOM, line: LINE, forkable: true, branch: { kind: "refused", error: refused("E_BUSY") } }, "en", "", { ...HANDS, stop: STOP });
+    const look = rowOf({ room: ROOM, line: LINE, forkable: true, branch: { kind: "refused", of: "branch", error: refused("E_BUSY") } }, "en", "", { ...HANDS, stop: STOP });
     expect([look.began, look.fork.wire["aria-disabled"], look.stop]).toEqual([
       say("en", "branch_busy"),
       false,
@@ -79,8 +79,8 @@ describe("a recent session's row", () => {
   });
 
   test("offers no /stop once the room has no run working, nor for another refusal", () => {
-    const busy = rowOf({ room: ROOM, line: LINE, forkable: true, branch: { kind: "refused", error: refused("E_BUSY") } }, "en", "", HANDS);
-    const other = rowOf({ room: ROOM, line: LINE, forkable: true, branch: { kind: "refused", error: refused("E_INVALID_ARGS") } }, "en", "", { ...HANDS, stop: STOP });
+    const busy = rowOf({ room: ROOM, line: LINE, forkable: true, branch: { kind: "refused", of: "branch", error: refused("E_BUSY") } }, "en", "", HANDS);
+    const other = rowOf({ room: ROOM, line: LINE, forkable: true, branch: { kind: "refused", of: "branch", error: refused("E_INVALID_ARGS") } }, "en", "", { ...HANDS, stop: STOP });
     expect([busy.stop, other.stop]).toEqual([null, null]);
     expect(other.began.startsWith("not branched: ")).toBe(true);
   });

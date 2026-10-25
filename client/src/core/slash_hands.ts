@@ -10,7 +10,7 @@
 import type { RunBelief } from "./belief";
 import type { Key } from "./lang";
 import type { View } from "./route";
-import type { Address, Command, Effort, RunId, RunPolicy, Seq, SessionTags } from "../wire";
+import type { Address, Carry, Command, Effort, RunId, RunPolicy, Seq, SessionTags } from "../wire";
 
 // A run a verb can act on: which one, and how far it has got. `/steer`,
 // `/stop` and `/diff` need the first, and a branch needs both.
@@ -35,7 +35,8 @@ export interface Offered {
 }
 
 // What the verbs about the session in main reach for: `/tag` and
-// `/untag` change its tags, `/compact` waits for its run to freeze.
+// `/untag` change its tags, `/compact` waits for its run to freeze, and
+// both `/new` and `/compact` open the next session.
 export interface SessionHands {
   // The session in main as its tags name it, with the tags it holds;
   // null while its stretch is unanswered or the city has no name.
@@ -43,6 +44,11 @@ export interface SessionHands {
   readonly retag: (next: SessionTags) => boolean;
   // Calls `then` once, when the belief holds `run` frozen.
   readonly whenFrozen: (run: RunId, then: () => void) => void;
+  // Opens a new session in `room` through the page's one branch door
+  // and says whether the frame left; main goes to the room once the
+  // city has opened it, and stays put when the city refuses (client
+  // D100).
+  readonly openSession: (room: Address, carry: Carry) => boolean;
 }
 
 // Everything a verb may reach for, and nothing a view could not hand

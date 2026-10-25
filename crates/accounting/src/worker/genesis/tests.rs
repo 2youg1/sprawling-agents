@@ -279,6 +279,54 @@ fn a_folder_raised_from_the_control_surface_is_adopted_and_its_files_kept() {
     );
 }
 
+/// A folder whose base checkpoint is refused, because the staged scan
+/// finds a credential in it, is left waiting to be adopted rather than
+/// half adopted: it has no rules and the history no line, and once the
+/// file is gone the same press adopts it. Before, the rules stayed, the
+/// line never came, and the next press was refused as a building that
+/// already had rules.
+#[test]
+fn a_refused_adoption_leaves_the_folder_waiting_to_be_adopted_again() {
+    let dir = tempfile::tempdir().unwrap();
+    let report = init_city(dir.path()).unwrap();
+    let notes = dir.path().join("notes");
+    std::fs::create_dir_all(&notes).unwrap();
+    let token = ["sk-ant-api03-", "Zx9yQ2mK4pL7", "vB1nC5tR8sD3"].concat();
+    std::fs::write(notes.join("key.env"), format!("KEY={token}")).unwrap();
+    let mut worker = RunWorker::new(
+        dir.path(),
+        runtime::diagnostics::Diagnostics::off(),
+        hands(),
+    )
+    .unwrap();
+    let addr = Address::parse("notes").unwrap();
+    let raise = |press: &[u8]| wire::Command::CreateBuilding {
+        addr: addr.clone(),
+        template: wire::TemplateName::parse("minimal").unwrap(),
+        rules: None,
+        idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, press),
+    };
+
+    let refused = worker.handle(raise(b"first")).unwrap_err();
+    let waiting = city::has_rules(dir.path(), &city::Building::of(&addr).unwrap()).unwrap();
+    std::fs::remove_file(notes.join("key.env")).unwrap();
+    worker.handle(raise(b"second")).unwrap();
+
+    assert_eq!(
+        (
+            refused.code(),
+            waiting,
+            created_line(&report.ledger_dir, "notes")["data"]["adopted"].clone()
+        ),
+        (
+            &kernel::AxCode::SecretEgress,
+            false,
+            serde_json::json!(true)
+        ),
+        "{refused}"
+    );
+}
+
 /// Rules a person wrote on the page are the building's rules, and rules
 /// the city cannot read leave nothing behind: no directory, no file and
 /// no line, so a refused raise can be sent again as it stands.

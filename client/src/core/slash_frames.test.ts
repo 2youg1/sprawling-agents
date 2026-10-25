@@ -16,7 +16,8 @@ import { describe, expect, test } from "bun:test";
 import { Schema } from "effect";
 
 import { Address, ClientFrame, IdemKey, ProviderName, RunId, Seq, TemplateName } from "../wire";
-import type { Effort, RunPolicy } from "../wire";
+import type { Command, Effort, RunPolicy } from "../wire";
+import { openSession } from "./commands";
 import { encodeFrame } from "./frames";
 import type { View } from "./route";
 import { SLASH, find, parse } from "./slash";
@@ -59,11 +60,12 @@ function ran(line: string): Done {
   const written: string[] = [];
   const efforts: (Effort | null)[] = [];
   const policies: RunPolicy[] = [];
+  const command = (frame: Command): boolean => {
+    sent.push(readFrame(JSON.parse(encodeFrame({ command: frame }).replace(IDEM_RE, `"idem":"${IDEM}"`))));
+    return true;
+  };
   const hands: SlashHands = {
-    command: (command) => {
-      sent.push(readFrame(JSON.parse(encodeFrame({ command }).replace(IDEM_RE, `"idem":"${IDEM}"`))));
-      return true;
-    },
+    command,
     go: (view) => went.push(view),
     here: ROOM,
     live: { run: LIVE, at: Seq.make(3) },
@@ -78,6 +80,9 @@ function ran(line: string): Done {
     tagged: null,
     retag: () => false,
     whenFrozen: () => undefined,
+    // The page's branch door sends the frame and moves main only once
+    // the city opens the session (`slash_session.test.ts`).
+    openSession: (room, carry) => command(openSession(room, carry, null)),
   };
   const call = parse(line);
   const verb = find(call?.verb ?? "");
@@ -90,11 +95,9 @@ const sending = (...sent: ClientFrame[]): Done => ({ ...NOTHING, sent, written: 
 const going = (view: View): Done => ({ ...NOTHING, went: [view], written: [""] });
 const setting = (effort: Effort | null): Done => ({ ...NOTHING, efforts: [effort], written: [""] });
 const admitting = (admit: RunPolicy["admit"]): Done => ({ ...NOTHING, policies: [{ ...CHOSEN, admit }], written: [""] });
-// A new session here, and main brought to it.
-const opening = (carry: "nothing" | "handoff"): Done => ({
-  ...sending({ command: { open_session: { addr: ROOM, carry, from: null, idem: IDEM } } }),
-  went: [{ kind: "talk", address: ROOM }],
-});
+// A new session here; main follows once the city has opened it.
+const opening = (carry: "nothing" | "handoff"): Done =>
+  sending({ command: { open_session: { addr: ROOM, carry, from: null, idem: IDEM } } });
 
 const CASES: Readonly<Record<string, readonly Case[]>> = {
   "/dispatch": [

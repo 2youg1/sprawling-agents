@@ -91,7 +91,7 @@
 
   function fork(row: Session): void {
     if (row.origin === null) return;
-    u.branches.open(row.room, row.origin, onLeave);
+    u.branches.open(row.room, { kind: "branch", origin: row.origin }, onLeave);
   }
 
   function branchOf(row: Session): BranchHere {

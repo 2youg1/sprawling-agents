@@ -4335,6 +4335,18 @@
     "en": "not branched: {why}",
     "zh": "没有开出分支：{why}"
   },
+  "session_opening": {
+    "en": "opening a new session…",
+    "zh": "正在打开新的会话…"
+  },
+  "session_busy": {
+    "en": "no new session: a run is working in this room; stop it, then try again",
+    "zh": "没有开出新的会话：这个房间里有 run 在工作；先停下它，再试一次"
+  },
+  "session_refused": {
+    "en": "no new session: {why}",
+    "zh": "没有开出新的会话：{why}"
+  },
   "branch_stop": {
     "en": "stop the run working in {room}",
     "zh": "停下 {room} 里正在工作的 run"
@@ -7550,6 +7562,10 @@
   "raise_build": {
     "en": "raise the building",
     "zh": "建楼"
+  },
+  "raise_rules_waiting": {
+    "en": "waiting for the city to say what this template writes",
+    "zh": "正在等城给出这个模板会写下的规则"
   },
   "raise_adopt": {
     "en": "adopt the folder",

@@ -3,11 +3,12 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// Branching a session, then going to it: the one door every fork entry
-// uses - a mailbox row, a turn of an earlier session, a turn of the
-// conversation in main (client/spec/Views/Talk/Branching.lean, client
-// D100). There is one of it per page (`ui().branches`), so the corner
-// can tell at the moment a refusal lands whether a branch row draws it.
+// Opening a session, then going to it: the one door every entry that
+// opens one uses - a mailbox row, a turn of an earlier session, a turn
+// of the conversation in main, the palette's carry rows, `/new` and
+// `/compact` (client/spec/Views/Talk/Branching.lean, client D100). There
+// is one of it per page (`ui().branches`), so the corner can tell at the
+// moment a refusal lands whether a place draws it.
 //
 // **Main moves once the city has opened the branch.** `send` says only
 // that the frame left the page; the city refuses a new session under a
@@ -25,7 +26,12 @@ import type { Readable } from "svelte/store";
 import type { Belief } from "../../core/belief/shape";
 import { openSession } from "../../core/commands";
 import type { View } from "../../core/route";
-import type { Address, AxError, Command, Origin, Seq } from "../../wire";
+import type { Address, AxError, Carry, Command, Origin, Seq } from "../../wire";
+
+// Where the new session begins: the conversation up to one line of an
+// earlier session, or a fresh start that carries the room's handoff or
+// nothing.
+export type Opening = { readonly kind: "branch"; readonly origin: Origin } | { readonly kind: "fresh"; readonly carry: Carry };
 
 export type Branching =
   | { readonly kind: "idle" }
@@ -34,21 +40,22 @@ export type Branching =
   | {
       readonly kind: "opening";
       readonly room: Address;
-      readonly origin: Origin;
+      readonly opening: Opening;
       readonly session: Seq | null;
       readonly refusal: AxError | null;
     }
-  // Held until the next press, so the row that started it keeps saying
+  // Held until the next press, so the place that started it keeps saying
   // why.
-  | { readonly kind: "refused"; readonly room: Address; readonly origin: Origin; readonly error: AxError };
+  | { readonly kind: "refused"; readonly room: Address; readonly opening: Opening; readonly error: AxError };
 
 export const NOT_BRANCHING: Branching = { kind: "idle" };
 
 export interface Branches {
   readonly held: Readable<Branching>;
-  // Sends the branch unless one is already opening; once the belief
-  // holds it, main goes to the room and `went` runs.
-  readonly open: (room: Address, origin: Origin, went: () => void) => void;
+  // Sends the session unless one is already opening, and says whether
+  // the frame left the page; once the belief holds the session, main
+  // goes to the room and `went` runs.
+  readonly open: (room: Address, opening: Opening, went: () => void) => boolean;
 }
 
 // What the door reaches for: the page's belief, its socket and its
@@ -75,25 +82,28 @@ export function keepBranches(doors: BranchDoors): Branches {
   });
   return {
     held: { subscribe: held.subscribe },
-    open: (room, origin, then) => {
-      const next = pressed(get(held), get(doors.belief), room, origin);
-      if (next === null) return;
-      if (!doors.send(openSession(room, "nothing", origin))) {
+    open: (room, opening, then) => {
+      const next = pressed(get(held), get(doors.belief), room, opening);
+      if (next === null) return false;
+      const sent =
+        opening.kind === "branch" ? openSession(room, "nothing", opening.origin) : openSession(room, opening.carry, null);
+      if (!doors.send(sent)) {
         held.set(NOT_BRANCHING);
-        return;
+        return false;
       }
       went = then;
       held.set(next);
+      return true;
     },
   };
 }
 
-// The branch a press starts, or `null` while another one is opening:
+// The opening a press starts, or `null` while another one is opening:
 // one at a time, because an answer is read by its room and its order,
-// and two branches waiting at once could each take the other's.
-function pressed(held: Branching, belief: Belief, room: Address, origin: Origin): Branching | null {
+// and two sessions waiting at once could each take the other's.
+function pressed(held: Branching, belief: Belief, room: Address, opening: Opening): Branching | null {
   if (held.kind === "opening") return null;
-  return { kind: "opening", room, origin, session: belief.sessions[room] ?? null, refusal: belief.refusal };
+  return { kind: "opening", room, opening, session: belief.sessions[room] ?? null, refusal: belief.refusal };
 }
 
 // The branch after the belief moved; the same value when nothing
@@ -103,30 +113,37 @@ function settled(held: Branching, belief: Belief): Branching {
   if ((belief.sessions[held.room] ?? 0) > (held.session ?? 0)) return NOT_BRANCHING;
   const refusal = belief.refusal;
   if (refusal === null || refusal === held.refusal) return held;
-  return { kind: "refused", room: held.room, origin: held.origin, error: refusal };
+  return { kind: "refused", room: held.room, opening: held.opening, error: refusal };
 }
 
-// Whether a branch row draws this refusal, so the corner lets it pass.
+// Whether a place draws this refusal, so the corner lets it pass.
 export function branchClaims(branching: Branching, refusal: AxError): boolean {
   return branching.kind === "refused" && branching.error === refusal;
 }
 
-// What one place that branches shows of the page's branch: its own,
-// opening or refused; another one opening, which it waits for; or
+// What one place that opens sessions shows of the page's opening: its
+// own, opening or refused, and whether it is a branch or a fresh start,
+// which decides the words; another one opening, which it waits for; or
 // nothing.
 export type BranchHere =
   | { readonly kind: "none" }
-  | { readonly kind: "opening" }
-  | { readonly kind: "refused"; readonly error: AxError }
+  | { readonly kind: "opening"; readonly of: Opening["kind"] }
+  | { readonly kind: "refused"; readonly of: Opening["kind"]; readonly error: AxError }
   | { readonly kind: "elsewhere" };
 
 // For a control that branches from one line, such as a mailbox row.
 export function branchFrom(branching: Branching, room: Address, origin: Origin): BranchHere {
-  return here(branching, branching.kind !== "idle" && branching.room === room && sameOrigin(branching.origin, origin));
+  return here(
+    branching,
+    branching.kind !== "idle" &&
+      branching.room === room &&
+      branching.opening.kind === "branch" &&
+      sameOrigin(branching.opening.origin, origin),
+  );
 }
 
-// For a place that branches from any line of one room, such as an
-// earlier session in main.
+// For a place that opens sessions in one room, such as an earlier
+// session in main or the conversation in it.
 export function branchInto(branching: Branching, room: Address): BranchHere {
   return here(branching, branching.kind !== "idle" && branching.room === room);
 }
@@ -136,9 +153,9 @@ function here(branching: Branching, mine: boolean): BranchHere {
     case "idle":
       return { kind: "none" };
     case "opening":
-      return mine ? { kind: "opening" } : { kind: "elsewhere" };
+      return mine ? { kind: "opening", of: branching.opening.kind } : { kind: "elsewhere" };
     case "refused":
-      return mine ? { kind: "refused", error: branching.error } : { kind: "none" };
+      return mine ? { kind: "refused", of: branching.opening.kind, error: branching.error } : { kind: "none" };
   }
 }
 

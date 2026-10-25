@@ -31,7 +31,7 @@
   const ORDINARY = refusal("E_PATH_NOT_FOUND", "read a file", "lab/east/docs/SPEC.md", "check the path and ask again");
   // A branch the city would not open under the run working in its room.
   const BUSY = refusal("E_BUSY", "start a new session", "hall/mayor: a run is running there", "stop that run first");
-  const BRANCHES: readonly BranchHere[] = [{ kind: "opening" }, { kind: "refused", error: BUSY }];
+  const BRANCHES: readonly BranchHere[] = [{ kind: "opening", of: "branch" }, { kind: "refused", of: "branch", error: BUSY }];
 
   // The city turned the page away: a page built for another wire, which
   // only a reload mends.

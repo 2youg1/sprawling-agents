@@ -329,17 +329,55 @@ impl RunWorker {
 
     /// Takes an adopted directory's base checkpoint, then records that it
     /// was found rather than built.
+    ///
+    /// # Errors
+    /// The base checkpoint's refusal, after the rules the adoption drew
+    /// are taken back so the folder waits to be adopted again
+    /// (`crates/city/Spec.lean` §8-3); and whatever the ledger says about
+    /// the record.
     fn adopted(
         &mut self,
         building: &city::Building,
         template: city::BuildingTemplate,
     ) -> Result<(), AxError> {
-        let addr = building.addr();
         self.note(
             runtime::diagnostics::Level::Effect,
             "city::building",
-            &format!("{} adopted as a building", addr.as_str()),
+            &format!("{} adopted as a building", building.addr().as_str()),
         );
+        if let Err(refused) = self.adoption_base(building) {
+            return Err(self.withdrawn(building, refused));
+        }
+        let payload = city::building_adopted_payload(building, template)?;
+        self.record(EventKind::BuildingCreated, payload)
+    }
+
+    /// `refused`, once the rules the unfinished adoption of `building`
+    /// drew have been taken back; when they cannot be, its recovery also
+    /// names the file the person has to delete before adopting again,
+    /// because the next press would otherwise be refused as a building
+    /// that already has rules.
+    fn withdrawn(&self, building: &city::Building, refused: AxError) -> AxError {
+        match city::withdraw_adoption(&self.city_root, building) {
+            Ok(()) => refused,
+            Err(left) => {
+                let recovery = format!(
+                    "{}; the rules this adoption wrote are still there ({}): delete that file,                      then adopt again",
+                    refused.recovery(),
+                    left.subject()
+                );
+                refused.rewrite_recovery(recovery)
+            }
+        }
+    }
+
+    /// The base checkpoint of an adopted directory.
+    ///
+    /// # Errors
+    /// The city's hash, the clock, and a checkpoint the store refuses,
+    /// a staged credential among them.
+    fn adoption_base(&mut self, building: &city::Building) -> Result<(), AxError> {
+        let addr = building.addr();
         // The base checkpoint is paid here rather than by the first dispatch,
         // which would otherwise hash every file of the folder before its
         // first tool call (`crates/storage/Spec.lean` §8-8). No run and no model exist
@@ -364,9 +402,8 @@ impl RunWorker {
                     );
                 })
             })
-            .map_err(storage::StorageError::into_ax)?;
-        let payload = city::building_adopted_payload(building, template)?;
-        self.record(EventKind::BuildingCreated, payload)
+            .map(drop)
+            .map_err(storage::StorageError::into_ax)
     }
 
     /// The startup scan: closes the account of every

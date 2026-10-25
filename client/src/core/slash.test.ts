@@ -12,6 +12,7 @@ import type { Command, Origin } from "../wire";
 import type { View } from "./route";
 import { SLASH, find, offered, parse } from "./slash";
 import type { Slash, SlashCall, SlashHands } from "./slash_hands";
+import { openSession } from "./commands";
 import { completed } from "./completion";
 import { forkAsked } from "./forking";
 
@@ -118,15 +119,16 @@ describe("new and fork", () => {
     const sent: Command[] = [];
     const written: string[] = [];
     const went: View[] = [];
+    const command = (frame: Command): boolean => {
+      sent.push(frame);
+      return true;
+    };
     return {
       sent,
       written,
       went,
       filled: {
-        command: (command) => {
-          sent.push(command);
-          return true;
-        },
+        command,
         go: (view) => went.push(view),
         here,
         live,
@@ -141,6 +143,9 @@ describe("new and fork", () => {
         tagged: null,
         retag: () => false,
         whenFrozen: () => undefined,
+        // The page's branch door sends the frame and moves main only
+        // once the city opens the session (`slash_session.test.ts`).
+        openSession: (room, carry) => command(openSession(room, carry, null)),
       },
     };
   }

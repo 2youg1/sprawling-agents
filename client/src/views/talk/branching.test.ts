@@ -20,10 +20,11 @@ import type { View } from "../../core/route";
 import { Address, RunId, Seq } from "../../wire";
 import type { AxError, Command, Origin } from "../../wire";
 import { branchClaims, keepBranches } from "./branching";
-import type { Branching } from "./branching";
+import type { Branching, Opening } from "./branching";
 
 const ROOM = Address.make("lab/a");
 const ORIGIN: Origin = { run: RunId.make("00000000-0000-4000-8000-000000000001"), at_seq: Seq.make(7) };
+const BRANCH: Opening = { kind: "branch", origin: ORIGIN };
 const EMPTY: Belief = get(createBelief(() => 0).belief);
 
 // The two facts of the model's `Seen`: the room's current session and
@@ -87,7 +88,7 @@ function page(start: Belief) {
     went: () => went,
     press(left: boolean): void {
       leaves = left;
-      branches.open(ROOM, ORIGIN, () => {
+      branches.open(ROOM, BRANCH, () => {
         went += 1;
       });
     },
@@ -104,7 +105,7 @@ describe("branching, then going", () => {
     ]);
     expect(at.views).toEqual([]);
     expect(at.went()).toBe(0);
-    expect(get(at.branches.held)).toEqual({ kind: "opening", room: ROOM, origin: ORIGIN, session: Seq.make(3), refusal: null });
+    expect(get(at.branches.held)).toEqual({ kind: "opening", room: ROOM, opening: BRANCH, session: Seq.make(3), refusal: null });
     at.belief.set(seen(9, 0));
     expect(at.views).toEqual([{ kind: "talk", address: ROOM }]);
     expect(at.went()).toBe(1);
@@ -118,7 +119,7 @@ describe("branching, then going", () => {
     expect(at.views).toEqual([]);
     expect(at.went()).toBe(0);
     const held: Branching = get(at.branches.held);
-    expect(held).toEqual({ kind: "refused", room: ROOM, origin: ORIGIN, error: refusalNumbered(1) });
+    expect(held).toEqual({ kind: "refused", room: ROOM, opening: BRANCH, error: refusalNumbered(1) });
     expect(branchClaims(held, refusalNumbered(1))).toBe(true);
     expect(branchClaims(held, refusalNumbered(2))).toBe(false);
   });

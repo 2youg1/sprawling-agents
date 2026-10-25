@@ -8,8 +8,8 @@
 // sessions and change tags through the hands, while the table only
 // spells and routes; `slash.ts` stays the one list of verbs.
 
-import type { Address } from "../wire";
-import { cancel, openSession } from "./commands";
+import type { Address, Carry } from "../wire";
+import { cancel } from "./commands";
 import type { given } from "./tags";
 import { readTag } from "./tags";
 import type { SlashCall, SlashHands } from "./slash_hands";
@@ -25,11 +25,11 @@ export function fresh(hands: SlashHands, call: SlashCall): void {
   opened(hands, hands.here, call.words.includes(CARRY) ? "handoff" : "nothing");
 }
 
-// A new session at `room`, and main brought to it: sent from a past
-// session in main, the new one is where the person is going.
-function opened(hands: SlashHands, room: Address, carry: "nothing" | "handoff"): void {
-  if (!hands.command(openSession(room, carry, null))) return;
-  hands.go({ kind: "talk", address: room });
+// A new session at `room`, and main brought to it once the city has
+// opened it: sent from a past session in main, the new one is where the
+// person is going, and a refusal leaves main where it was (#120).
+function opened(hands: SlashHands, room: Address, carry: Carry): void {
+  if (!hands.openSession(room, carry)) return;
   hands.write("");
 }
 
