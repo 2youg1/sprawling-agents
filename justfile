@@ -663,6 +663,15 @@ provider script record *listen:
 shots *args: build-web
     cargo xtask shots {{args}}
 
+# The walk through the running window, photographed (client/scripts/walk.ts):
+# a throwaway city under target/walk that the stand-in provider answers,
+# served and paired as a person would, every page at three windows in both
+# lightings, PNG files and an index in target/walk/out. Not a gate: a
+# person reads them. `--keep` leaves the city served for walking by hand.
+walk *args: build-web
+    cargo build --package sprawling --bin sprawling --package citysim --bin provider --locked
+    cd client && bun scripts/walk.ts {{args}}
+
 # The half of the shots camera's check that needs an engine that draws
 # frames: a page whose state is written by the frame after the scroll
 # (tools/xtask/Spec.lean §8-44, D25). It is `#[ignore]`d for `just check`,
