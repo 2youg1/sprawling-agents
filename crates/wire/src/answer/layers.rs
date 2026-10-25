@@ -26,11 +26,13 @@ pub struct LayersAnswer {
 
 /// One prompt document: where it is, or would be when it is absent;
 /// which slot of the prefix it goes into; which layer it belongs to;
-/// and whether the next run receives it.
+/// whether the next run receives it; and the version a step on it starts
+/// from, which is the hash of no bytes when it is absent.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct LayerDocument {
     pub at: Address,
+    pub version: B3Hash,
     pub slot: PrefixSlot,
     pub kind: PromptKind,
     pub layer: PromptLayer,

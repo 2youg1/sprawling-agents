@@ -71,6 +71,7 @@ Layers { addr: Address },                    // → Answer::Layers(Box<LayersAns
 pub struct LayersAnswer { pub addr: Address, pub documents: Vec<LayerDocument> }
 pub struct LayerDocument {
     pub at: Address,                         // 文件在哪，或不在时会在哪
+    pub version: B3Hash,                     // 盘上这一版的哈希，不在时是空字节的哈希：`PutPrompt` 的 `base`
     pub slot: PrefixSlot,                    // 它进前缀的哪一段
     pub kind: PromptKind,
     pub layer: PromptLayer,
@@ -98,7 +99,7 @@ pub enum VersionSource { OnDisk, Saved { .. }, Before { .. }, Shipped }
 
 - **次序就是发送的次序**：City 段（城的 `City.md`、楼的 `City.md`），Building 段（工作区与楼根的 `AGENTS.md`），Resident 段（这个地址的身份文件、楼根以下每一级房间的 `AGENTS.md`），Run 段（城与楼两层的每一份模型提示）。同一段里远的在前。哪份文档送不送、谁替换谁由 accounting 读盘时判，判法与冻结前缀时同一个函数（accounting §8-21），页面不另算。
 - **`slot` 上线而不由页面推**：哪份文档进哪一段是冻结的事，页面再写一张表就是第二个权威。复用 §8-35 的 `PrefixSlot`。
-- **模型提示列出盘上的每一份**，而不只是某一个模型的：一栋楼的 run 用哪个模型由每次派活决定，问这一问时还不知道。同一个模型在楼里有一份时，城那份是 `Replaced`。
+- **模型提示列出盘上的每一份**，而不只是某一个模型的：一栋楼的 run 用哪个模型由每次派活决定，问这一问时还不知道。同一个模型在楼里有一份时，城那份是 `Replaced`；没有时楼那一格也列出、为 `Absent`，与楼的 `City.md` 一样，页面因此能在那里「起一份」而不必自己拼楼层的地址。
 - **`Withheld` 带原因**：房间里一个叫 `AGENTS.md` 的目录，或一个链接指向读界之外（城外、机密楼、保留子树），下一个 run 不收到它；冻结照常进行，页面在这里说出原因，因为这是唯一说得出它没被送的地方。
 - **`shipped` 只给本版带默认文本的三份**（城根的 `City.md`、`MAYOR.md`、`CLERK.md`）：`version` 是默认文本的哈希，`standing` 是 city 的 `CopyStanding`（city §8-43）。页面据此写「当前默认／改过／旧版默认」。
 - **`VersionSource::Shipped`**：`Query::Versions` 对这三份文档在列表末尾多给一版，它是本版的默认文本，答之前放进内容库，`kept` 恒真。「与默认比较」因此就是 RefRain 已有的两版比较，不另写比较界面。

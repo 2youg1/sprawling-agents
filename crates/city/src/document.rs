@@ -176,18 +176,25 @@ pub fn edit<T>(
 pub fn edit_against(path: &Path, base: &[u8], body: &[u8]) -> Result<(), AxError> {
     revise(path, |held, on_disk| {
         if on_disk != base {
-            return Err(AxError::failure(
-                AxCode::VersionConflict,
-                "replace a document",
-                format!(
-                    "{}: the file is no longer the text the writer started from",
-                    path.display()
-                ),
-            )
-            .with_recovery("read the file again and send the change once more"));
+            return Err(moved(path));
         }
         held.replace(body)
     })
+}
+
+/// The refusal for a document that is no longer the version its writer
+/// started from: whoever wrote it since did so on purpose, and their
+/// bytes are kept.
+pub(crate) fn moved(path: &Path) -> AxError {
+    AxError::failure(
+        AxCode::VersionConflict,
+        "replace a document",
+        format!(
+            "{}: the file is no longer the text the writer started from",
+            path.display()
+        ),
+    )
+    .with_recovery("read the file again and send the change once more")
 }
 
 /// Runs `act` on the bytes `path` holds now, with `path` held against
@@ -250,6 +257,14 @@ impl Held<'_> {
             )
         })?;
         settle(dir)
+    }
+
+    /// Removes this document, so the next reader finds it absent.
+    ///
+    /// # Errors
+    /// `E_STORAGE_FATAL` naming the path when it will not go.
+    pub fn remove(&self) -> Result<(), AxError> {
+        std::fs::remove_file(self.path).map_err(|err| storage(self.path, err.to_string()))
     }
 }
 

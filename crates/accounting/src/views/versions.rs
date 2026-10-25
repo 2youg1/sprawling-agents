@@ -115,12 +115,30 @@ impl VersionsAsk {
         }
         let more = versions.len() > wire::VERSIONS_MAX;
         versions.truncate(wire::VERSIONS_MAX);
+        versions.extend(shipped(&self.city_root, &self.at));
         wire::Answer::Versions(Box::new(wire::VersionsAnswer {
             at: self.at,
             versions,
             more,
         }))
     }
+}
+
+/// This build's default, for the three documents whose default text the
+/// binary carries, listed last and after the cut so it is always there
+/// to compare with (`crates/accounting/Spec.lean` §8-38). It is put in
+/// the store first; a store that will not take it lists it as not kept.
+fn shipped(city_root: &Path, at: &Address) -> Option<DocumentVersion> {
+    let Some(city::PromptDocument::Shipped(doc)) = city::PromptDocument::of(at) else {
+        return None;
+    };
+    let text = doc.text().as_bytes();
+    Some(DocumentVersion {
+        version: B3Hash::digest(text),
+        bytes: u64::try_from(text.len()).ok(),
+        kept: super::document::keep(city_root, text).is_ok(),
+        source: VersionSource::Shipped,
+    })
 }
 
 /// The version on disk now, read through `Document`'s door so it is

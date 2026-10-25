@@ -35,8 +35,12 @@ impl RunWorker {
     /// replaced; and a history that will not take the line.
     pub(in crate::worker) fn put_range(&mut self, write: &wire::RangeWrite) -> Result<(), AxError> {
         let path = self.document_path(&write.doc)?;
+        let listed = city::PromptDocument::of(&write.doc);
         let applied = city::revise_document(&path, |held, source| {
             let applied = documents::save(source, write.baseline, &write.edits)?;
+            if let Some(doc) = &listed {
+                doc.admits(applied.bytes())?;
+            }
             keep(&self.city_root, applied.bytes())?;
             held.replace(applied.bytes())?;
             Ok(applied)
@@ -98,8 +102,10 @@ impl RunWorker {
     /// Where a document a page names lives, refused inside the reserved
     /// subtree: the files there have doors of their own that judge what
     /// they are given before it lands (`crates/wire/Spec.lean` §8-72).
+    /// The prompt documents on the city's list are the exception, judged
+    /// by that list (`city::PromptDocument`).
     fn document_path(&self, doc: &Address) -> Result<PathBuf, AxError> {
-        if doc.is_reserved() {
+        if doc.is_reserved() && city::PromptDocument::of(doc).is_none() {
             return Err(AxError::failure(
                 AxCode::OutsideWriteDomain,
                 "save a document",

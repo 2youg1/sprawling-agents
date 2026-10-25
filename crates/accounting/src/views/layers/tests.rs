@@ -27,13 +27,16 @@ fn ask(root: &Path, addr: &str) -> Vec<LayerDocument> {
     answer.documents
 }
 
+/// One document as the answer gives it; `text` is what is on disk, and
+/// none for a document that is absent or withheld.
 fn document(
-    spelled: &str,
+    (spelled, text): (&str, Option<&str>),
     (slot, kind, layer): (PrefixSlot, PromptKind, PromptLayer),
     state: LayerState,
 ) -> LayerDocument {
     LayerDocument {
         at: at(spelled),
+        version: B3Hash::digest(text.unwrap_or_default().as_bytes()),
         slot,
         kind,
         layer,
@@ -42,10 +45,10 @@ fn document(
     }
 }
 
-fn note() -> PromptKind {
+fn note(model: &str) -> PromptKind {
     PromptKind::ModelNote {
         provider: "local".to_owned(),
-        model: "m".to_owned(),
+        model: model.to_owned(),
     }
 }
 
@@ -53,7 +56,8 @@ fn note() -> PromptKind {
 /// the city's `City.md`, the two building conventions, the room's
 /// identity and its own conventions, then the model notes. A directory
 /// named `AGENTS.md` is withheld with its reason rather than refusing
-/// the room, and the building's note for a model replaces the city's.
+/// the room; the building's note for a model replaces the city's, and
+/// where the building keeps none its place is listed absent.
 #[test]
 fn the_layers_of_a_room_are_listed_in_send_order() {
     let dir = tempfile::tempdir().unwrap();
@@ -64,9 +68,10 @@ fn the_layers_of_a_room_are_listed_in_send_order() {
     put(root, "lab/room/AGENTS.md", "room\n");
     put(root, ".sprawling/models/local/m.md", "note\n");
     put(root, "lab/.sprawling/models/local/m.md", "lab note\n");
+    put(root, ".sprawling/models/local/n.md", "n\n");
 
     let mut city = document(
-        "City.md",
+        ("City.md", Some("city\n")),
         (PrefixSlot::City, PromptKind::City, PromptLayer::City),
         LayerState::Sent { bytes: 5 },
     );
@@ -79,12 +84,12 @@ fn the_layers_of_a_room_are_listed_in_send_order() {
         vec![
             city,
             document(
-                "lab/.sprawling/City.md",
+                ("lab/.sprawling/City.md", None),
                 (PrefixSlot::City, PromptKind::City, PromptLayer::Building),
                 LayerState::Absent,
             ),
             document(
-                "AGENTS.md",
+                ("AGENTS.md", Some("workspace\n")),
                 (
                     PrefixSlot::Building,
                     PromptKind::Conventions,
@@ -93,7 +98,7 @@ fn the_layers_of_a_room_are_listed_in_send_order() {
                 LayerState::Sent { bytes: 10 },
             ),
             document(
-                "lab/AGENTS.md",
+                ("lab/AGENTS.md", None),
                 (
                     PrefixSlot::Building,
                     PromptKind::Conventions,
@@ -104,7 +109,7 @@ fn the_layers_of_a_room_are_listed_in_send_order() {
                 },
             ),
             document(
-                "lab/room/URBANITE.md",
+                ("lab/room/URBANITE.md", None),
                 (
                     PrefixSlot::Resident,
                     PromptKind::Identity,
@@ -113,7 +118,7 @@ fn the_layers_of_a_room_are_listed_in_send_order() {
                 LayerState::Absent,
             ),
             document(
-                "lab/room/AGENTS.md",
+                ("lab/room/AGENTS.md", Some("room\n")),
                 (
                     PrefixSlot::Resident,
                     PromptKind::Conventions,
@@ -122,16 +127,26 @@ fn the_layers_of_a_room_are_listed_in_send_order() {
                 LayerState::Sent { bytes: 5 },
             ),
             document(
-                ".sprawling/models/local/m.md",
-                (PrefixSlot::Run, note(), PromptLayer::City),
+                (".sprawling/models/local/m.md", Some("note\n")),
+                (PrefixSlot::Run, note("m"), PromptLayer::City),
                 LayerState::Replaced {
                     by: at("lab/.sprawling/models/local/m.md")
                 },
             ),
             document(
-                "lab/.sprawling/models/local/m.md",
-                (PrefixSlot::Run, note(), PromptLayer::Building),
+                ("lab/.sprawling/models/local/m.md", Some("lab note\n")),
+                (PrefixSlot::Run, note("m"), PromptLayer::Building),
                 LayerState::Sent { bytes: 9 },
+            ),
+            document(
+                (".sprawling/models/local/n.md", Some("n\n")),
+                (PrefixSlot::Run, note("n"), PromptLayer::City),
+                LayerState::Sent { bytes: 2 },
+            ),
+            document(
+                ("lab/.sprawling/models/local/n.md", None),
+                (PrefixSlot::Run, note("n"), PromptLayer::Building),
+                LayerState::Absent,
             ),
         ]
     );

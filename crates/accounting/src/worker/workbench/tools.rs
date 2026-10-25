@@ -382,22 +382,10 @@ impl Laying {
         Ok(outside)
     }
 
-    /// What this run's building may read by a path its model chose: the read bound, closed over
-    /// the building and this city's rules (`crates/city/Spec.lean` §8-2).
-    ///
-    /// Another building's rules are read each time a path lands in it, not here, so a run that
-    /// stays in its own building never pays for them, and a building made confidential after this
-    /// dispatch is closed from that moment (city D2). What was read stays for this run
-    /// while the file's stamp holds (city D3).
+    /// What this run's building may read by a path its model chose: the read bound
+    /// (`crate::prompt_chain::read_bound`, the one the convention chain is read through).
     fn read_bound(&self, site: &Site) -> runtime::ReadBound {
-        let rules = city::RulesCache::new(&self.city_root);
-        let home = site.building.addr().clone();
-        Arc::new(move |target: &Address| {
-            kernel::address::may_read(&home, target, || {
-                let holder = city::Building::of(target)?;
-                rules.load(holder.addr()).map(|r| r.policy().confidential)
-            })
-        })
+        crate::prompt_chain::read_bound(&self.city_root, site.building.addr().clone())
     }
 
     /// Builds the one tool that answers what this run is, to itself.

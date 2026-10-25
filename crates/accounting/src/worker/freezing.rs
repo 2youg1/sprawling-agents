@@ -9,6 +9,8 @@ use std::path::Path;
 
 use kernel::Locator;
 use kernel::{Address, AxCode, AxError};
+
+use crate::prompt_chain::{self, Convention, Reading, addressed};
 use runtime::prefix::{FrozenPrefix, FrozenSegment, SegmentSlot, SegmentSource};
 use runtime::run::RunPlan;
 
@@ -115,78 +117,32 @@ pub(super) fn building_segment(city_root: &Path, building: &Address) -> Result<A
     if let Ok(rules) = std::fs::read(&rules_at) {
         out.extend(addressed(city_root, &rules_at)?, &rules);
     }
-    // The workspace's copy first and the building's after it, so the one
-    // nearest the work is read last.
     out.extend_conventions(
         city_root,
-        [
-            Convention {
-                path: city::city_agents_path(city_root),
-                heading: city::AGENTS_FILE.to_owned(),
-                whose: "How work is done across the workspace this city formed around, from the \
-                        workspace itself.",
-            },
-            Convention {
-                path: city::agents_path(city_root, building),
-                heading: format!("{}/{}", building.as_str(), city::AGENTS_FILE),
-                whose: "How work is done in this project, from the project itself.",
-            },
-        ],
+        building,
+        prompt_chain::building_conventions(city_root, building),
     )?;
     Ok(out)
 }
 
-/// The conventions of every room between the building's root and `addr`,
-/// for the end of the resident slot.
-///
-/// Not the building slot, which every resident of one building carries
-/// byte for byte (`crates/runtime/spec/Prefix.lean` D97): a room's file
-/// there would split that slot by room and lose the cache it is shared
-/// for. The resident slot already belongs to one address and is frozen
-/// for the whole run, so a room's conventions cost nothing there that
-/// the identity does not already cost.
-///
-/// # Errors
-/// As [`building_segment`].
-fn room_conventions(
-    city_root: &Path,
-    addr: &Address,
-    building: &Address,
-) -> Result<Vec<Convention>, AxError> {
-    Ok(city::room_agents_paths(city_root, building, addr)?
-        .into_iter()
-        .map(|(room, path)| Convention {
-            path,
-            heading: format!("{}/{}", room.as_str(), city::AGENTS_FILE),
-            whose: "How work is done in this part of the project, from the project itself.",
-        })
-        .collect())
-}
-
-/// One `AGENTS.md` a slot may carry: where it is, the heading it is
-/// given, and whose conventions the heading says they are.
-struct Convention {
-    path: std::path::PathBuf,
-    heading: String,
-    whose: &'static str,
-}
-
 impl Assembled {
-    /// Appends each convention file that is there under its heading, in
-    /// order, and accounts it.
+    /// Appends each convention file a run of `building` is sent, under
+    /// its heading, in order, and accounts it.
     ///
-    /// Written only when the file is: a heading over nothing would tell a
-    /// resident to follow conventions that do not exist. A file that is
-    /// there and does not read refuses the freeze instead of being left
-    /// out, because the run would start without conventions its project
-    /// wrote down and nothing would say so.
+    /// Read by [`prompt_chain::read_convention`], the reading the layers
+    /// answer gives a page: a file that is not there, a directory, and a
+    /// link the read bound refuses are left out, and the page says why
+    /// (`crates/accounting/Spec.lean` §8-38). Written only when the file
+    /// is sent: a heading over nothing would tell a resident to follow
+    /// conventions that do not exist.
     ///
     /// # Errors
-    /// `E_STORAGE_FATAL` naming the path for a convention file that is
-    /// there and will not read; otherwise as [`addressed`].
+    /// As [`prompt_chain::read_convention`] and
+    /// [`prompt_chain::addressed`].
     fn extend_conventions(
         &mut self,
         city_root: &Path,
+        building: &Address,
         conventions: impl IntoIterator<Item = Convention>,
     ) -> Result<(), AxError> {
         for Convention {
@@ -195,27 +151,9 @@ impl Assembled {
             whose,
         } in conventions
         {
-            let text = match std::fs::read(&path) {
-                Ok(text) => text,
-                Err(err)
-                    if matches!(
-                        err.kind(),
-                        std::io::ErrorKind::NotFound | std::io::ErrorKind::NotADirectory
-                    ) =>
-                {
-                    continue;
-                }
-                Err(err) => {
-                    return Err(AxError::failure(
-                        AxCode::StorageFatal,
-                        "read a project's conventions",
-                        format!("{}: {err}", path.display()),
-                    )
-                    .with_recovery(
-                        "every run here is sent that file; make it readable, or take it away \
-                         to send the prompt without it",
-                    ));
-                }
+            let text = match prompt_chain::read_convention(city_root, building, &path)? {
+                Reading::Sent(text) => text,
+                Reading::Absent | Reading::Withheld(_) => continue,
             };
             let mut block = format!(
                 "## {heading}\n\n{whose} Where this and the building's rules above disagree, \
@@ -227,44 +165,6 @@ impl Assembled {
         }
         Ok(())
     }
-}
-
-/// The city's own spelling of a path inside it.
-///
-/// The path comes from `city`, which is the authority for where a
-/// building's files sit; this only turns it back into the address a
-/// reader opens it by, so nothing here repeats that layout.
-///
-/// # Errors
-/// `E_INVALID_ARGS` for a path outside the city root or one the address
-/// grammar refuses.
-fn addressed(city_root: &Path, path: &Path) -> Result<Address, AxError> {
-    let relative = path.strip_prefix(city_root).map_err(|_| {
-        AxError::failure(
-            AxCode::InvalidArgs,
-            "address a prefix source document",
-            format!("{} is outside the city", path.display()),
-        )
-        .with_recovery(
-            "move this document under the city root, or drop it from the prefix: an \
-             address is relative to the city and cannot leave it",
-        )
-    })?;
-    let spelled = relative
-        .to_str()
-        .ok_or_else(|| {
-            AxError::failure(
-                AxCode::InvalidArgs,
-                "address a prefix source document",
-                format!("{} is not utf-8", relative.display()),
-            )
-            .with_recovery(
-                "rename this document to letters, digits, dashes and slashes: an \
-                 address is UTF-8 text",
-            )
-        })?
-        .replace('\\', "/");
-    Address::parse(&spelled)
 }
 
 /// What freezing a plan reads from outside the run's own site, as
@@ -389,7 +289,8 @@ impl Freezing<'_> {
         let mut resident = Assembled::of_nothing(resident);
         resident.extend_conventions(
             self.city_root,
-            room_conventions(self.city_root, addr, site.building.addr())?,
+            site.building.addr(),
+            prompt_chain::room_conventions(self.city_root, addr, site.building.addr())?,
         )?;
         let prefix = FrozenPrefix::assemble(
             names

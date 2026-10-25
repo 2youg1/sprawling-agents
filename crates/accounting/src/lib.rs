@@ -40,6 +40,7 @@ pub mod offered;
 pub mod person;
 pub mod plan_view;
 pub mod playback;
+mod prompt_chain;
 mod roster;
 pub mod toolkit_broker;
 pub mod trace;

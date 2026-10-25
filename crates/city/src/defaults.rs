@@ -198,6 +198,28 @@ pub fn follow_defaults(city_root: &Path) -> Result<Vec<Edited>, AxError> {
     Ok(edited)
 }
 
+/// Writes this build's default back over the city's copy of `doc`,
+/// keeping an identity area above it, only while the copy still holds
+/// the version `base` names (a copy that is not there reads as no
+/// bytes). The copy is then `Current`, and follows the binary's default
+/// from here on (`crates/city/Spec.lean` §8-44). Answers how long the copy
+/// now is.
+///
+/// # Errors
+/// `E_VERSION_CONFLICT` when the copy is no longer `base`, and
+/// `E_STORAGE_FATAL` naming the path when it cannot be read or written.
+pub fn restore(city_root: &Path, doc: Shipped, base: B3Hash) -> Result<usize, AxError> {
+    let path = doc.path(city_root);
+    crate::document::revise(&path, |held, on_disk| {
+        if B3Hash::digest(on_disk) != base {
+            return Err(crate::document::moved(&path));
+        }
+        let body = moved_forward(doc, Some(on_disk));
+        held.replace(&body)?;
+        Ok(body.len())
+    })
+}
+
 /// The copy's identity area, if it has one, over this build's default.
 fn moved_forward(doc: Shipped, copy: Option<&[u8]>) -> Vec<u8> {
     let area = copy
