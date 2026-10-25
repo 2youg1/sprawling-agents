@@ -319,7 +319,7 @@ A local server can also be named before the city starts: with `SPRAWLING_MODEL_U
 
 **the Mayor** is the conversation with `hall/mayor`, and the page the city opens on once a model is chosen. Enter sends a message; Shift+Enter starts a new line.
 
-The line at the top of the conversation names the room and its session, such as `hall/mayor · #23`. Pressing it opens the command palette, which lists this room's sessions first and then the pages, buildings and rooms, so this line is where you change room or session. A touch screen has no Ctrl+/, and on one this line is the way to the palette.
+While the box is empty, its placeholder says where the message goes, such as `to hall/mayor · #23…`: the room, and the number of its session once it has one. The address in it is a button. Pressing it opens the command palette, which lists this room's sessions first and then the pages, buildings and rooms, so the address is where you change room or session. A touch screen has no Ctrl+/, and on one the address is the way to the palette. The placeholder goes as soon as the box holds a character and comes back when the box is empty again.
 
 Under the box, the settings row says how the message runs, and a click changes each control:
 
@@ -403,7 +403,7 @@ A line that begins with `/` is a command, and the menu above the box lists them:
 | `/web`, `/quit` | in the CLI, open the page; on either face, close the city. A paired remote device cannot close the city, and a page cannot close a city served beyond loopback |
 | `/diff`, `/go <page>`, `/mcp`, `/doctor`, `/help` | open changes, a page, the MCP page, the machine check, the list |
 
-Ctrl+/ (⌘/ on a Mac) opens the palette, which offers every command with every page, building and room beside it. The line at the top of the conversation opens the same palette when you press it, which is how a touch screen, with no Ctrl+/, reaches it. No key the page binds takes a browser's own shortcut for printing, downloads, bookmarks, search or switching tabs, so three keys ship: Ctrl+/ for the palette, Ctrl+\ to change how much of the city the page draws, and `/` outside a text box to focus the box. Every other action — the pages, settings, the mailbox, **waiting on you**, the inspector, finding a file, stopping the run in front of you, the key list, forking, and answering a decide card — has no key until you give it one in **settings** → **keybindings**; until then its button, the palette or its slash command reaches it. A key you bind that holds no modifier does nothing while the focus is in a text box.
+Ctrl+/ (⌘/ on a Mac) opens the palette, which offers every command with every page, building and room beside it. The address in the box's placeholder opens the same palette when you press it, which is how a touch screen, with no Ctrl+/, reaches it. No key the page binds takes a browser's own shortcut for printing, downloads, bookmarks, search or switching tabs, so three keys ship: Ctrl+/ for the palette, Ctrl+\ to change how much of the city the page draws, and `/` outside a text box to focus the box. Every other action — the pages, settings, the mailbox, **waiting on you**, the inspector, finding a file, stopping the run in front of you, the key list, forking, and answering a decide card — has no key until you give it one in **settings** → **keybindings**; until then its button, the palette or its slash command reaches it. A key you bind that holds no modifier does nothing while the focus is in a text box.
 
 ## Sessions
 
