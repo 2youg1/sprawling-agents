@@ -37,7 +37,7 @@ Markdown 时的标签 `8-n`，别处引作 `tools/xtask/Spec.lean §8-n`。
 | wiring | 城能执行的动词必须从客户端够得到；三个来源零副本（wire crate 在 `command/kind.rs` 里声明的 `enum Command`、`run_command` 的臂、`client/src`），wire 的规格（`crates/wire/Spec.lean` §19-2 的 `def Command.reach`）只提供三者都说不出的那一件事——这个动词该由哪一侧够到 |
 | secret | 全仓加夹具扫 secret shape（判定复用 `kernel::secret::scan`，无内联豁免）；只扫人写的文件，生成的锁文件与记录的快照由它们被扫的输入作证（§8-9）；兼查 `Sealed::expose` 调用点白名单 |
 | specalign | kernel 枚举 ↔ kernel 的规格逐 variant（读 `crates/kernel/Spec.lean` 与分部里的受限形状，§8-43）：§8-1／§8-4 两张表消费真 enum（`AxCode::ALL`／`EventKind::ALL`）作证，归属、carrier／窗类逐臂同；规格里每一个与 kernel 枚举同名的 `inductive` 与 syn 解出的枚举双向对账（§8-10、§8-43）；模块图每一行的 `spec` 锚点落在盘上，已迁移的包写 Lean 模块名（§8-43） |
-| spec | 一个包恰有一份生效规格；散文里点名的 `<名>-SPEC` 在树上；Lean 的 import 纪律；`.lean` 里没有 `sorry`、`admit`、`axiom`；规格引用的仓内路径在盘上；状态机分部里没有定理的数与解析不到的 Rust 路径数只降不升（§8-42） |
+| spec | 一个包恰有一份生效规格；散文里点名的 `<名>-SPEC` 在树上；Lean 的 import 纪律；`.lean` 里没有 `sorry`、`admit`、`axiom`；规格引用的仓内路径在盘上；状态机分部里没有定理的数与解析不到的 Rust 路径数只降不升；一个决定号在一份规格里只开一个决定（§8-42） |
 | budget | `tools/xtask/budgets.toml` 里每一行可称重且被 gated 的预算，当场称一次；没有构建产物可称时沉默（`just check` 不构建 release 二进制），壁钟读数只入册不入门 |
 | color | 颜色在每个客户端里恰好被命名一次（产地表见 §8-8），且以色域上限的比值表达；扫仓库根，文件自豁免；玻璃按 `--glass-opacity` 盖在最亮的表面上时字仍够层级（§8-51） |
 | motion | 过渡的曲线与时长只住客户端的主题（入口 `client/src/theme.css` 与它 import 的部分）：别处的 `cubic-bezier(`、`linear(`、`steps(`、Tailwind 的 `duration-<数字>`、`duration-[`、`ease-[` 与只听系统的 `motion-reduce:`／`motion-safe:` 即红；组件样式表里的时长字面量、`@keyframes` 与动效令牌的声明即红（§8-51） |
@@ -1004,15 +1004,16 @@ pub(crate) fn notice(leader: Leader) -> [String; 4];
 
 ```rust
 // xtask::spec
-pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError>;   // 下面七条
+pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError>;   // 下面八条
 // xtask::spec::effective —— 第一、二条
 // xtask::spec::source    —— 第三、四、五条
 // xtask::spec::ratchet   —— 第六、七条：两个数与 budgets.toml 里的钉值比
 // xtask::spec::theorems  —— 分部的四类（第六条读它）
 // xtask::spec::rustpath  —— 反引号里的 Rust 路径解析到条目（第七条读它）
+// xtask::spec::decisions —— 第八条
 ```
 
-**七条断言**：
+**八条断言**：
 
 1. **一个包恰有一份生效规格。** `members` 列出的每个包（工具在内），以及不是包的检验器 `tools/adversary`（§8-47），目录里直接放着的 `*-SPEC.md` 与 `Spec.lean` 合起来恰好一份。两份都在，是一次迁移没有在一个变更集里完成（`skills/sdd` 迁移第 5 步）；一份都没有，是一个包没有规格。分部（`spec/` 下的 `.lean`）可以先于 `Spec.lean` 存在（ARCHITECTURE.md §11），不算一份规格。
 2. **散文不点名树上没有的 SPEC。** 散文取 `release::is_prose` 的定义（Markdown 与 HTML 的每一行、Rust 的 `//` 行、Lean 的整份）；其中每个 `<名>-SPEC`（带不带 `.md` 都算）都要有一个叫 `<名>-SPEC.md` 的文件在树上。拒词：若有一个包的目录名是 `<名>` 且它已有 `Spec.lean`，指向那份 Lean 规格（`<lib> D<n>` 或分部的路径）；否则让作者改正名字或删掉这句。`CHANGELOG.md` 豁免：它的每一节说的是那一版的树。代码里的字符串不算——测试夹具为它造的包造出 SPEC 文件，那些名字不是给读者的引用。
@@ -1022,6 +1023,9 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError>;   // 下
 
 6. **状态机分部里没有定理的数只降不升（LV0）。** 每个分部（规格目录 `spec/` 下的 `.lean`，检验器自身之外）归入四类之一，判据全在去掉注释与字符串之后的文本上：**只有文字**——一条 `theorem`／`lemma` 都没有；**只核对常量**——有定理，但每一条都没有约束变量；**量化未连到 Rust**——至少一条量化定理，但没有一条被下面意义上的 Rust 检查导出；**量化且有导出检查**。一条定理**量化**，当它的头部（名字之后、`:=` 之前）有 `∀`、`∃`、`→`、`forall`，或一个 `(名 :`、`{名 :` 形状的约束；否则它**封闭**。数的是：`architecture.toml` 里形状列为 `state machine` 或 `typestate` 的每一行，它的 `spec` 锚点所指的分部，连同与那个分部同名的目录下的全部分部，去重之后「只有文字」的个数。入口 `Spec.lean` 不计：按 `skills/sdd` 它本来就是十七节注释。这个数写在 `tools/xtask/budgets.toml` 的 `[spec_parts_without_theorem] pinned`；数大于钉值是一条违规，列出全部这类分部；数小于钉值也是一条违规，要求在同一个变更集里把钉值降到新数——这是 `budgets.toml` 的棘轮写法，钉值不动就等于留出了回升的余地。行不在是一条违规，拒词给出今天的数。
 7. **反引号里的 Rust 路径解析得到（SD0）。** 读 `.lean`、`.md`（`CHANGELOG.md` 除外，理由同第二条）与 `.rs` 的 rustdoc 行（`///`、`//!`）；一对反引号里恰好是 `首段::段(::段)*`、首段是模块表里某一行名字的首段（`kernel`、`bin`、`gateway`……），就是一个 Rust 路径（尾随的 `()` 与 `!` 去掉）。解析：模块表一行的名字取第一个空白之前的部分（`kernel::ledger (port)` 是 `kernel::ledger`），每个 crate 的根文件（`lib.rs`，没有时 `main.rs`）算作与 crate 同名的模块；取与路径逐段相同的最长前缀那一行；没有剩余段即解析到模块；有剩余段时，第一段要在那一行的文件里被声明（`fn`、`struct`、`enum`、`trait`、`type`、`const`、`static`、`mod`、`union`、`macro_rules!` 之后的名字，任何可见性），之后各段要在那个文件里作为一个词出现（变体、方法、字段）；或者第一段被那个文件的一条 `pub`／`pub(…)` `use` 点名、或被一条以 `*` 结尾的 `pub use` 覆盖（重导出），这时之后各段要在同一 crate 里声明这一段的某个文件里作为词出现，同一 crate 里没有文件声明它（从别的 crate 重导出）时只判名字本身。私有的 `use` 不算：它把名字带进作用域，却不造出一条路径。没有任何一行是它的前缀（模块已删）也是解析不到。解析不到的个数写在 `[rust_paths_unresolved] pinned`，比较方式同第六条；超出时列出每一处的文件与行。
+8. **一个决定号在一份规格里只开一个决定。** 一份规格是一个目录里的 `Spec.lean` 连同同一目录下 `spec/` 里的分部（包、检验器的规格与 `client/` 都是这样，按位置认，不经 `members`）；其中每一行以 `/-! D<n>` 开头的注释开一个决定（ARCHITECTURE.md §11）。`D<n>` 是 `D` 加数字，可带一个小写字母后缀，`D42a` 与 `D42` 是两个号。同一个号在一份规格里开两次是一条违规，两处的文件与行都写出；拒词要求其中一个改用这份规格的下一个空号，并改掉按旧号引用它的地方。不同规格里的同一个号互不相干，读者写 `<包> D<n>` 来引用。
+
+D41 **决定号的唯一性只判 `/-! D<n>` 这一种开头。** 理由：ARCHITECTURE.md §11 规定决定是一段以 `D<n>` 开头、直接在它所管声明之上的注释，树上四百多个决定都这样开头；正文里以 `D<n>` 开头的行多是引用（「D5 由 D6 取代」）、表格或 docstring（`/-- D1 …`），把它们算进来会把引用判成第二个决定。并行的分支各取「下一个空号」，九个号因此各开过两个决定，门让撞号在合并之前就红。被击败的备选：由 `docnum` 生成每份规格的决定表——要先让每份规格都有一张完整的决定表，今天没有。**重开参数**：决定改用别的开头书写时，这里跟着认那种开头。
 
 D22 **「导出检查」以文本判：一个 `.rs` 文件里有 `#[test]` 或 `proptest!`，且同一个文件里写着那个分部的仓内路径与它某条量化定理的短名（最后一个点之后的部分，作为一个词）。** 理由：门只读文本（D8），一条 Rust 检查要说明它从哪条性质导出，最便宜而可核对的写法就是在测试文件里点名分部与定理；这也让读者从测试一步找到性质。被击败的备选：在测试上加一个 `#[derives("…")]` 属性——要一个过程宏或一个约定俗成的注释格式，两者都是第二套文法；按测试名与定理名的相似度匹配——不可判定。**重开参数**：导出的检查改由 Lean `#eval` 生成向量文件时，向量文件名里带分部路径即可同样计入。
 
