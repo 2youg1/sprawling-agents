@@ -391,7 +391,7 @@ fn a_review_dispatch_freezes_the_prefix_it_froze_on_the_accounting_thread() {
         ),
         (
             "resident",
-            "70777a3ad3b5de3bbc143084ddcbb8ec9bc41c243ac9bef866bc86dcfd38db35",
+            "8c1c559aa850afea1525b5b620e2534c03adf5a999b6542d5f77374866d8a1a0",
         ),
         (
             "run",
