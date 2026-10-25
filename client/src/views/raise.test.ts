@@ -10,7 +10,7 @@ import { describe, expect, test } from "bun:test";
 
 import { Address } from "../wire";
 import type { BuildingProgress } from "../wire";
-import { raisingOf, waiting } from "./raise";
+import { fillable, raisingOf, waiting } from "./raise";
 
 const IDLE: BuildingProgress["progress"] = { planned: { blocked: 0, blocked_ppb: 0, done: 0, done_ppb: 0, total: 0 } };
 
@@ -32,7 +32,7 @@ describe("the raise page", () => {
     ]);
   });
 
-  test("the folders waiting to be adopted are the ones the city says are", () => {
-    expect(waiting(CITY)).toEqual([Address.make("notes")]);
+  test("the folders waiting to be adopted are the ones the city says are, and the one in the box is not offered", () => {
+    expect([waiting(CITY), fillable(CITY, ""), fillable(CITY, "notes")]).toEqual([[Address.make("notes")], [Address.make("notes")], []]);
   });
 });

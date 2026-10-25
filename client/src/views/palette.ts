@@ -145,7 +145,13 @@ export interface BoxWire {
   readonly onkeydown: (event: KeyPress) => void;
 }
 
+// What the box asks for: a place to go, or the room this conversation
+// is carried to. The carrying list says the second in the box once, so
+// its rows need not say it each (client/Spec.lean 4-64b).
+export type Asking = "places" | "carry";
+
 export interface BoxState {
+  readonly asking: Asking;
   readonly query: string;
   readonly cursor: number;
   // How many rows the cursor walks.
@@ -168,7 +174,7 @@ export interface BoxHands {
 // (`core/completion.ts`); ↓, ↑ and Enter walk and take the rows
 // (`cursor.ts`).
 export function boxOf(state: BoxState, hands: BoxHands): BoxWire {
-  const { query, cursor, count, list, lang } = state;
+  const { asking, query, cursor, count, list, lang } = state;
   const verbs = query.trim().startsWith("/");
   return {
     role: "combobox",
@@ -177,7 +183,7 @@ export function boxOf(state: BoxState, hands: BoxHands): BoxWire {
     "aria-controls": list,
     "aria-activedescendant": count > 0 ? rowId(list, cursor) : undefined,
     "aria-label": say(lang, "nav_palette"),
-    placeholder: say(lang, "palette_placeholder"),
+    placeholder: say(lang, asking === "carry" ? "palette_carry" : "palette_placeholder"),
     value: query,
     oninput: (event) => {
       hands.write(event.currentTarget.value);

@@ -69,7 +69,7 @@ describe("the picked building's panel", () => {
       () => undefined,
     );
     expect([look.badges, look.enter]).toEqual([
-      [{ key: "adoptable", text: "a folder, not adopted yet", weight: "quiet" }],
+      [{ key: "adoptable", text: "not adopted", weight: "quiet" }],
       { label: "adopt this folder as a building", wire: { href: "#/raise/notes" } },
     ]);
   });

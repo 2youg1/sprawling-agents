@@ -30,7 +30,7 @@
   import Segmented from "./parts/segmented.svelte";
   import { textBoxWire } from "./building/text_box";
   import TextBox from "./building/text_box.look.svelte";
-  import { OFFERED, raisingOf, waiting } from "./raise";
+  import { fillable, OFFERED, raisingOf } from "./raise";
 
   interface Props {
     // The address a link filled in: a folder waiting to be adopted.
@@ -48,6 +48,10 @@
 
   // svelte-ignore state_referenced_locally
   let typed = $state<string>(address ?? "");
+  // The address box and the folders offered under it. A pressed folder
+  // leaves the list it was pressed in, so the caret goes to the box the
+  // folder was written into rather than back to the top of the page.
+  let addressGroup = $state<HTMLDivElement>();
   let template = $state<Exclude<Template, "hall">>("minimal");
   let rules = $state("");
   // Whether the person changed the rules: until then the box follows
@@ -118,6 +122,7 @@
     }
   }
 
+  const fills = $derived(fillable(buildings, typed));
   const note = $derived.by(() => {
     switch (raising.kind) {
       case "blank":
@@ -134,13 +139,13 @@
 
 <Page title={say($lang, "raise_title")} note={say($lang, "raise_note")} {rank}>
   <form
-    class="flex min-w-0 max-w-talk flex-col gap-wide"
+    class="flex min-w-0 flex-col gap-wide"
     onsubmit={(event) => {
       event.preventDefault();
       raise();
     }}
   >
-    <div class="flex flex-col gap-snug">
+    <div class="flex flex-col gap-snug" bind:this={addressGroup}>
       <Field
         label={say($lang, "raise_address")}
         value={typed}
@@ -152,14 +157,15 @@
           typed = value;
         }}
       />
-      {#if waiting(buildings).length > 0}
+      {#if fills.length > 0}
         <div class="flex flex-wrap items-center gap-snug" role="group" aria-label={say($lang, "raise_waiting")}>
           <span class="text-note text-text-quiet">{say($lang, "raise_waiting")}</span>
-          {#each waiting(buildings) as folder (folder)}
+          {#each fills as folder (folder)}
             <Button
               label={folder}
               onPress={() => {
                 typed = folder;
+                addressGroup?.querySelector("input")?.focus();
               }}
             />
           {/each}

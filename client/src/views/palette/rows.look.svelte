@@ -12,7 +12,10 @@
   // and leaves on the theme's two curves (§4-43). A verb this place
   // cannot run is drawn in the disabled ink and never lifts under the
   // pointer, but the cursor still marks it, because the cursor is how a
-  // keyboard reaches its reason.
+  // keyboard reaches its reason. A row is for its label, so where the
+  // two do not fit the quieter line at the end gives way first; a chord
+  // is short and never cut. A refused row's end is its reason, which a
+  // person needs whole, so there it moves under the label instead.
   import { Kbd } from "../parts/kbd.svelte";
   import type { RowsLook } from "./rows";
 
@@ -32,13 +35,14 @@
           {...row.wire}
           class={[
             "flex w-full cursor-pointer items-center justify-between gap-snug rounded-control px-base py-snug text-left text-body",
+            row.refused ? "flex-wrap" : "",
             "transition-colors ease-leave aria-disabled:text-text-disabled",
             row.refused ? "" : "hover:bg-raised-hover hover:ease-arrive",
             row.active ? "bg-raised-hover ease-arrive" : "",
           ]}
         >
-          <span class="truncate font-mono">{row.label}</span>
-          <span class="shrink-0 text-note text-text-faint">
+          <span class="max-w-full shrink-0 truncate font-mono">{row.label}</span>
+          <span class={["text-note text-text-faint", row.end.kind === "chord" ? "shrink-0" : row.refused ? "min-w-0" : "min-w-0 shrink-1000 truncate"]}>
             {#if row.end.kind === "chord"}
               <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression, @typescript-eslint/no-unsafe-call (a snippet call is the render itself; svelte-check types this imported snippet fine, and typescript-eslint does not resolve exports of another .svelte module) -->
               {@render Kbd({ action: row.end.action })}

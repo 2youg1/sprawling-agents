@@ -16,6 +16,10 @@
   // it, and the cursor row the stronger wash with the accent edge on its
   // left (docs/frontend-method.md §7A-4, §7B); the wash arrives on the
   // arrive curve and leaves on leave (§4-43).
+  //
+  // The scale carries the rows' right inset, so its fold lines stand over
+  // the rows' bars and over the building table's above it on the city
+  // page, whose header carries the same inset.
   import Glyph from "../parts/glyph.svelte";
   import type { BoardLook } from "./board";
   import { PHASE_FILL, PHASE_MARK } from "./phase";
@@ -55,7 +59,7 @@
     {/each}
   </ul>
 
-  <div class="flex min-w-0 items-end gap-snug border-b border-edge pb-tight font-mono figure text-note text-text-quiet" aria-hidden="true">
+  <div class="flex min-w-0 items-end gap-snug border-b border-edge pr-snug pb-tight font-mono figure text-note text-text-quiet" aria-hidden="true">
     <span class="min-w-0 flex-1"></span>
     <span class="relative h-base w-[40%] shrink-0">
       {#each look.folds as fold (fold.minutes)}
