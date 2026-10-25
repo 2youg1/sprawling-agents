@@ -268,6 +268,7 @@ fn a_dropped_call_is_asked_again_and_both_handdowns_still_come_back() {
         .handle(wire::Command::CreateBuilding {
             addr: Address::parse("lab").unwrap(),
             template: wire::TemplateName::parse("minimal").unwrap(),
+            rules: None,
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"create"),
         })
         .unwrap();

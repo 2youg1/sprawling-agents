@@ -26,6 +26,7 @@ fn create(worker: &mut RunWorker, name: &str) {
         .handle(wire::Command::CreateBuilding {
             addr: addr(name),
             template: wire::TemplateName::parse("minimal").unwrap(),
+            rules: None,
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, name.as_bytes()),
         })
         .unwrap();

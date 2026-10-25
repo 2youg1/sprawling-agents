@@ -62,6 +62,7 @@ fn a_worker_stamps_its_lines_with_the_clock_it_was_handed() {
         .handle(wire::Command::CreateBuilding {
             addr: Address::parse("lab").unwrap(),
             template: wire::TemplateName::parse("minimal").unwrap(),
+            rules: None,
             idem: IdemKey::derive(&RunId::CITY, Seq::FIRST, b"create"),
         })
         .unwrap();

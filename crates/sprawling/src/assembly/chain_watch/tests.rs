@@ -56,6 +56,7 @@ fn a_chain_broken_under_a_served_city_refuses_the_next_command_with_the_audits_r
         .handle(wire::Command::CreateBuilding {
             addr: Address::parse("lab").unwrap(),
             template: wire::TemplateName::parse("minimal").unwrap(),
+            rules: None,
             idem: kernel::IdemKey::derive(&RunId::CITY, Seq::FIRST, b"create"),
         })
         .err();
@@ -103,6 +104,7 @@ fn a_served_worker_takes_commands_once_its_history_is_proved() {
     let create = |name: &str| wire::Command::CreateBuilding {
         addr: Address::parse(name).unwrap(),
         template: wire::TemplateName::parse("minimal").unwrap(),
+        rules: None,
         idem: kernel::IdemKey::derive(&RunId::CITY, Seq::FIRST, name.as_bytes()),
     };
     let watch = worker.chain_under_audit(storage::ChainHalt::awaiting_proof());

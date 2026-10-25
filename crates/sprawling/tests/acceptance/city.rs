@@ -102,6 +102,7 @@ pub(crate) fn raise(worker: &mut accounting::worker::RunWorker, addr: &str, temp
         .handle(wire::Command::CreateBuilding {
             addr: Address::parse(addr).unwrap(),
             template: wire::TemplateName::parse(template).unwrap(),
+            rules: None,
             idem: idem(addr.as_bytes()),
         })
         .unwrap();

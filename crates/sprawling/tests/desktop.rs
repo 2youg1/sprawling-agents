@@ -93,6 +93,7 @@ fn a_building_given_the_desktop_is_offered_its_six_tools_from_this_binary() {
         .handle(wire::Command::CreateBuilding {
             addr: Address::parse(LAB).unwrap(),
             template: wire::TemplateName::parse("minimal").unwrap(),
+            rules: None,
             idem: idem(b"create"),
         })
         .unwrap();

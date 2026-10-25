@@ -125,6 +125,7 @@ impl CityAsk {
                     problems: plan.problems,
                     blocked: plan.blocked,
                     ready: u32::try_from(plan.ready.len()).unwrap_or(u32::MAX),
+                    adoptable: false,
                 })
             })
             .collect();

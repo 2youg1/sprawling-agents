@@ -247,6 +247,7 @@ impl Views {
                     pins: self.skill_pins.clone(),
                 };
             }
+            wire::Query::Template { .. } => unavailable(query.name().to_owned()),
             wire::Query::GitStatus { building } => match self.git_status_ask(building) {
                 Ok(ask) => return Prepared::GitStatus(ask),
                 Err(stopped) => {

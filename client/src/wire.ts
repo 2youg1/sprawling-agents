@@ -9,9 +9,9 @@
 import { Schema } from "effect";
 
 /** The wire version both ends compare on connect. */
-export const WIRE_V = 67 as const;
+export const WIRE_V = 68 as const;
 /** The schema hash the server checks: `wire::schema_hash()`. */
-export const WIRE_HASH = "7b98fb8cb40a0d101c2f74e218c90f77ef4b94d7cc3cef0d4e1b93be009fa4e0" as const;
+export const WIRE_HASH = "b66dddabfff0032a19136152c044337b9b03c382757fa529ec90e62d1f08bb22" as const;
 /** The run a city-level record carries: `kernel::RunId::CITY`. */
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 /** The smallest body size a person may ask for: `wire::BODY_PX_MIN`. */
@@ -803,6 +803,7 @@ export type ChangesAnswer = typeof ChangesAnswer.Type;
  */
 export const BuildingProgress = Schema.Struct({
   addr: Address,
+  adoptable: Schema.Boolean,
   blocked: Schema.Array(BlockedLine),
   problems: Schema.Array(Schema.String),
   progress: Progress,
@@ -4587,6 +4588,24 @@ export const SkillsAnswer = Schema.Struct({
 export type SkillsAnswer = typeof SkillsAnswer.Type;
 
 /**
+ * A Building template name in transit. Authority is `city`.
+ */
+export const TemplateName = Schema.String.pipe(Schema.brand("TemplateName"));
+export type TemplateName = typeof TemplateName.Type;
+
+/**
+ * The `RULES.toml` a template lays a building out with at one address:
+ * what a page shows a person before they raise it, read from the one
+ * place the template's bytes live (`city::template_rules`).
+ */
+export const TemplateAnswer = Schema.Struct({
+  addr: Address,
+  rules: Schema.String,
+  template: TemplateName,
+}).annotate({ identifier: "TemplateAnswer" });
+export type TemplateAnswer = typeof TemplateAnswer.Type;
+
+/**
  * Where one application stands for this city.
  * 
  * Four states, each a different next action: connect it, finish the
@@ -4856,6 +4875,9 @@ export const Answer = Schema.Union([
   }),
   Schema.Struct({
     skills: SkillsAnswer,
+  }),
+  Schema.Struct({
+    template: TemplateAnswer,
   }),
   Schema.Struct({
     git_status: GitStatusAnswer,
@@ -5152,6 +5174,12 @@ export const Query = Schema.Union([
   Schema.Struct({
     skills: Schema.Struct({
       building: Address,
+    }),
+  }),
+  Schema.Struct({
+    template: Schema.Struct({
+      addr: Address,
+      template: TemplateName,
     }),
   }),
   Schema.Struct({
@@ -5577,12 +5605,6 @@ export const SpineDocument = Schema.Union([
 export type SpineDocument = typeof SpineDocument.Type;
 
 /**
- * A Building template name in transit. Authority is `city`.
- */
-export const TemplateName = Schema.String.pipe(Schema.brand("TemplateName"));
-export type TemplateName = typeof TemplateName.Type;
-
-/**
  * Commands change state, require authorization, and are idempotent. Deliberately *not*
  * `#[non_exhaustive]`, for the reason the module documentation of `command::wire` gives.
  */
@@ -5656,6 +5678,7 @@ export const Command = Schema.Union([
     create_building: Schema.Struct({
       addr: Address,
       idem: IdemKey,
+      rules: Schema.optional(Schema.NullOr(Schema.String)),
       template: TemplateName,
     }),
   }),

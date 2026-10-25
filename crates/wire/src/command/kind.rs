@@ -168,9 +168,16 @@ pub enum Command<Secret = Sealed<String>> {
         from: Option<Origin>,
         idem: IdemKey,
     },
+    /// Raises a building at `addr`, or adopts the directory already
+    /// there; whether the directory is there is the city's to see, so the
+    /// frame does not say (`city::raise_building`). Writes
+    /// `building_created`, with `adopted: true` for an adoption.
     CreateBuilding {
         addr: Address,
         template: TemplateName,
+        /// The building's `RULES.toml` as the person wrote it, evaluated
+        /// before anything lands; `None` lays the template's own bytes.
+        rules: Option<String>,
         idem: IdemKey,
     },
     /// Take a building out of the city. Its files move under the reserved subtree and its history

@@ -46,7 +46,7 @@ fn exposed() -> SocketAddr {
 fn the_command_and_query_tables_hold_their_declared_counts() {
     // The counts are the wire's closed surface, not a style choice.
     assert_eq!(COMMAND_NAMES.len(), 48, "command table");
-    assert_eq!(QUERY_NAMES.len(), 60, "query table");
+    assert_eq!(QUERY_NAMES.len(), 61, "query table");
 
     let mut sorted = COMMAND_NAMES.to_vec();
     sorted.sort_unstable();
@@ -56,7 +56,7 @@ fn the_command_and_query_tables_hold_their_declared_counts() {
     let mut sorted = QUERY_NAMES.to_vec();
     sorted.sort_unstable();
     sorted.dedup();
-    assert_eq!(sorted.len(), 60, "query names are distinct");
+    assert_eq!(sorted.len(), 61, "query names are distinct");
 }
 
 #[test]
@@ -89,7 +89,7 @@ fn the_schema_hash_is_stable_across_calls_and_covers_the_wire_version() {
         "schema hash changed - update `crates/wire/spec/Frames.lean` §8-1 in the same commit"
     );
     assert_eq!(
-        WIRE_V, 67,
+        WIRE_V, 68,
         "WIRE_V rises once between two pushes, for a shape change under names that stay (wire D1)"
     );
 }
@@ -113,7 +113,7 @@ fn the_schema_hash_covers_every_event_kind_name() {
 
 /// A function of WIRE_V, the two frame name tables and the event kind
 /// names, so any change to the protocol surface lands here first.
-const WIRE_SCHEMA_GOLDEN: &str = "7b98fb8cb40a0d101c2f74e218c90f77ef4b94d7cc3cef0d4e1b93be009fa4e0";
+const WIRE_SCHEMA_GOLDEN: &str = "b66dddabfff0032a19136152c044337b9b03c382757fa529ec90e62d1f08bb22";
 
 /// The schema hash reads names only, so a field added under names that
 /// stay leaves it where it was. This digest reads the whole shape with the
@@ -153,7 +153,7 @@ fn strip_prose(value: &mut serde_json::Value) {
 
 /// The digest of `wire_schema()` with its prose removed.
 #[cfg(feature = "schema")]
-const WIRE_SHAPE_GOLDEN: &str = "dea8a20ceee761291cf9a98db13189d3f81fe5311c283534830be29a15ebf1ab";
+const WIRE_SHAPE_GOLDEN: &str = "4d631944721279b9f9d4c70cd2df568687b0df7d35681fecb69212655b25b466";
 
 // -------------------------------------------------------------- binding face
 
@@ -535,6 +535,7 @@ title = \"a window\"
         Command::CreateBuilding {
             addr: addr.clone(),
             template: wire::TemplateName::parse("workshop").unwrap(),
+            rules: None,
             idem,
         },
         Command::RemoveBuilding {

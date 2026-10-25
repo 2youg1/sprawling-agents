@@ -38,6 +38,7 @@ pub use answer::HistoryAnswer;
 pub use answer::HistoryRangeAnswer;
 pub use answer::PlanRow;
 pub use answer::PursuitLine;
+pub use answer::TemplateAnswer;
 pub use answer::TuningDefaults;
 pub use answer::Used;
 pub use answer::VersionAuthor;

@@ -296,6 +296,13 @@ pub enum Query {
     /// has ever used says so instead of looking unused because nobody
     /// wrote it down.
     Skills { building: Address },
+    /// The `RULES.toml` `template` would lay a building out with at
+    /// `addr`, so a page can show it before the building is raised;
+    /// a room or the reserved subtree is answered `Unavailable`.
+    Template {
+        template: crate::TemplateName,
+        addr: Address,
+    },
     /// What is uncommitted in one building right now: the branch, how
     /// far it has drifted from its upstream, the files that moved, and
     /// the last checkpoint the city checkpointed there.

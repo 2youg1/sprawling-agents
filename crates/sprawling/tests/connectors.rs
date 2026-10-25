@@ -258,6 +258,7 @@ fn dispatch_one_run(
         .handle(wire::Command::CreateBuilding {
             addr: Address::parse(LAB).unwrap(),
             template: wire::TemplateName::parse("minimal").unwrap(),
+            rules: None,
             idem: idem(b"create"),
         })
         .unwrap();

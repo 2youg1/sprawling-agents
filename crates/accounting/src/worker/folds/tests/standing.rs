@@ -265,6 +265,7 @@ fn a_halted_scope_refuses_new_work_and_a_release_takes_it_again() {
         .handle(wire::Command::CreateBuilding {
             addr: Address::parse("shop").unwrap(),
             template: wire::TemplateName::parse("minimal").unwrap(),
+            rules: None,
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"create"),
         })
         .unwrap();
