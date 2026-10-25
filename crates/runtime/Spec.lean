@@ -354,7 +354,7 @@ envelope 探查与全解共用 kernel 的解析（Value 探查仅取五键，不
 | D106 | edit 以每个 run 的读戳准入，读后被改则拒绝并给出当前片段 | `crates/runtime/spec/Tools/Edit.lean` |
 | D107 | 工具结果的文本由带版本的渲染器画出，每一行记下自己的版本，V1 永久保留 | `crates/runtime/spec/Rendering.lean` |
 | D108 | read 每 10 行标一个行号，edit 原样匹配不到时剥掉抄进来的标记再匹配 | `crates/runtime/spec/Rendering.lean` |
-| D109 | search 有三种模式，缺省仍是 content | `crates/runtime/spec/Tools/Search.lean` |
+| D109 | search 的 `output_mode` 取 Claude Code 的三个值，缺省 files_with_matches | `crates/runtime/spec/Tools/Search.lean` |
 | D110 | 一个 `tool` 工具、四个 op 取代 `describe` 与 `call`；休眠索引一个命名空间一行 | `crates/runtime/spec/Catalog.lean` |
 | D111 | 一件工具的档位由楼与城的 `[catalog]` 表定，`tool` 与 `read` 固定常驻，表在 run 起点冻结 | `crates/runtime/spec/Catalog.lean` |
 | D114 | 常驻工具的参数名与合法值取 Claude Code 的拼写，出入只留本城的特性 | `crates/runtime/spec/Tools.lean` |
@@ -363,12 +363,14 @@ envelope 探查与全解共用 kernel 的解析（Value 探查仅取五键，不
 | D117 | 按文件名找住在 search 里：给 `glob` 而不给 `pattern` 时，答名字合 `glob` 的文件 | `crates/runtime/spec/Tools/Search.lean` |
 | D118 | `command` 在没有 shell 的楼里读作一个程序与它的参数 | `crates/runtime/spec/Tools/Exec.lean` |
 | D119 | 模型读到的行号从 1 数起（渲染器 V3），账本里的下标仍从 0 数起 | `crates/runtime/spec/Rendering.lean` |
+| D120 | `pattern` 是 ripgrep 语法的正则，由 `regex` crate 逐行判 | `crates/runtime/spec/Tools/Search.lean` |
+| D121 | 本城答不了的 Grep 参数：会让答案误导的拒，只改篇幅的不读 | `crates/runtime/spec/Tools/Search.lean` |
 -/
 
 /-! ## 13 依赖选型
 
 kernel、storage（读面与 cas）；serde_json（envelope 探查）。dev：proptest、tempfile、trybuild、insta（prefix golden）。
-`wasmtime`／`wasmtime-wasi = "48.0.7"`（feature `wasm` 内藏，钉版理由见 §8-13；wat 为 dev 依赖供 A10 模块）；`similar`？否——unified diff 自写最小形（edit 回显只需逐行对照，不引第三方 diff 库；被否理由：依赖面换一处 80 行纯函数，不值）。其余无新第三方（分段哈希经 kernel `B3Hash::digest`，不直依 blake3）。
+`regex`（search 的 `pattern`，D120：ripgrep 缺省引擎的同一份语法，有限自动机匹配、不回溯；被否：`fancy-regex`，多环视而回溯）与 `globset`（search 的 `glob`，D117：ripgrep 的 `--glob` 的同一个实现，带 `{a,b}` 与 `**`；被否：`glob` crate，没有 `{a,b}`；自写 glob 到正则的翻译，第二份语法）。`wasmtime`／`wasmtime-wasi = "48.0.7"`（feature `wasm` 内藏，钉版理由见 §8-13；wat 为 dev 依赖供 A10 模块）；`similar`？否——unified diff 自写最小形（edit 回显只需逐行对照，不引第三方 diff 库；被否理由：依赖面换一处 80 行纯函数，不值）。其余无新第三方（分段哈希经 kernel `B3Hash::digest`，不直依 blake3）。
 
 规格本身不加依赖：分部只 import 工具链的库与本 crate 的分部（ARCHITECTURE.md §3 的 `depmap` 允许 runtime 引 kernel、storage、gateway 的分部，今天一个都不需要）。
 -/
