@@ -31,9 +31,12 @@ pub fn exposure_of(
     name: &str,
     namespace: &str,
 ) -> (Exposure, ExposureFrom) {
-    match fallback(name) {
-        fixed @ (_, ExposureFrom::Fixed) => fixed,
-        default => stated.stated(name, namespace).unwrap_or(default),
+    let default = fallback(name);
+    match default.1 {
+        ExposureFrom::Fixed => default,
+        ExposureFrom::Default | ExposureFrom::City | ExposureFrom::Building => {
+            stated.stated(name, namespace).unwrap_or(default)
+        }
     }
 }
 
