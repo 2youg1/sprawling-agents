@@ -95,7 +95,7 @@ Two lists exist and they answer different questions, so both are kept and neithe
 
 **What this repository chose** is the table below: every crate named in the `Cargo.toml` of a workspace member, with the licence its own manifest declares. A person asking "whose work did these authors decide to stand on" reads this. The version each is pinned at is in the manifests, and the version it resolves to is in `Cargo.lock`; neither is repeated here.
 
-**What ends up in the binary** is <!-- xtask:begin dependency_count -->470<!-- xtask:end --> packages once every transitive dependency is resolved, and that list is the lockfile's. `cargo deny check` reads it on every CI run and refuses any licence outside the allowlist in `deny.toml`; `cargo xtask sbom` writes it out as CycloneDX, which `just dist` produces beside the release artifacts. **That is the machine authority, and this table is deliberately not a second one**: it is a list a reader can hold in their head, and it goes stale the way any prose does, while the gate does not.
+**What ends up in the binary** is <!-- xtask:begin dependency_count -->472<!-- xtask:end --> packages once every transitive dependency is resolved, and that list is the lockfile's. `cargo deny check` reads it on every CI run and refuses any licence outside the allowlist in `deny.toml`; `cargo xtask sbom` writes it out as CycloneDX, which `just dist` produces beside the release artifacts. **That is the machine authority, and this table is deliberately not a second one**: it is a list a reader can hold in their head, and it goes stale the way any prose does, while the gate does not.
 
 | Crate | Licence |
 |---|---|
@@ -115,6 +115,7 @@ Two lists exist and they answer different questions, so both are kept and neithe
 | [futures-util](https://crates.io/crates/futures-util) | MIT OR Apache-2.0 |
 | [getrandom](https://crates.io/crates/getrandom) | MIT OR Apache-2.0 |
 | [git2](https://crates.io/crates/git2) | MIT OR Apache-2.0 |
+| [globset](https://crates.io/crates/globset) | Unlicense OR MIT |
 | [insta](https://crates.io/crates/insta) | Apache-2.0 |
 | [keyring-core](https://crates.io/crates/keyring-core) | MIT OR Apache-2.0 |
 | [linux-keyutils-keyring-store](https://crates.io/crates/linux-keyutils-keyring-store) | MIT OR Apache-2.0 |
@@ -153,7 +154,7 @@ Two lists exist and they answer different questions, so both are kept and neithe
 | [zeroize](https://crates.io/crates/zeroize) | Apache-2.0 OR MIT |
 | [zip](https://crates.io/crates/zip) | MIT |
 
-**Every licence above is permissive, and none of them is copyleft**, which is why an MPL-2.0 binary may be built from them. MPL-2.0 is file-level copyleft: it governs the files in this repository and asks nothing of the crates linked beside them. Where a crate offers a choice, the choice on `deny.toml`'s list is the one taken; `same-file`'s Unlicense is not on that list, and its MIT is.
+**Every licence above is permissive, and none of them is copyleft**, which is why an MPL-2.0 binary may be built from them. MPL-2.0 is file-level copyleft: it governs the files in this repository and asks nothing of the crates linked beside them. Where a crate offers a choice, the choice on `deny.toml`'s list is the one taken; the Unlicense that `globset` and `same-file` offer is not on that list, and their MIT is.
 
 **Two obligations travel with a release artifact rather than with this repository**, and this table discharges neither. Apache-2.0 §4 requires the NOTICE to be kept on distribution and modified files to be marked; MIT requires the copyright and licence notice to be kept. For the JavaScript the client bundles, both travel inside the binary (section 4). For the crates, the release archive carries the bill of materials but not yet the licence texts; `tools/xtask/Spec.lean` §8-23 records what is left.
 

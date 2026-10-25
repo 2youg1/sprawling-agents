@@ -26,7 +26,8 @@ fn hits_in_long_lines_all_come_back_and_each_carries_its_match() {
     let tool = SearchTool::new(dir.path(), everywhere()).unwrap();
     let outcome = tool
         .invoke(&call(&[
-            ("text", Value::String("hall/mayor".to_owned())),
+            ("pattern", Value::String("hall/mayor".to_owned())),
+            ("output_mode", Value::String("content".to_owned())),
             ("path", Value::String("hall/clerk".to_owned())),
             ("context", Value::Number(1.into())),
         ]))
@@ -56,7 +57,7 @@ fn a_search_stopped_at_the_hit_cap_says_so_and_how_to_narrow() {
     )
     .unwrap();
     let tool = SearchTool::new(dir.path(), everywhere()).unwrap();
-    let outcome = tool.invoke(&text("needle")).unwrap();
+    let outcome = tool.invoke(&lines("needle")).unwrap();
     let map = outcome.result.as_map();
     assert_eq!(map["truncated"], Value::Bool(true));
     let stopped = map
@@ -85,7 +86,7 @@ fn a_hit_on_a_line_wider_than_the_window_is_cut_to_it() {
     std::fs::write(dir.path().join("lab").join("Wide.md"), wide).unwrap();
     let tool = SearchTool::new(dir.path(), everywhere()).unwrap();
 
-    let outcome = tool.invoke(&text("the ledger")).unwrap();
+    let outcome = tool.invoke(&lines("the ledger")).unwrap();
     let map = outcome.result.as_map();
     let hit = map["matches"][0]["text"].as_str().unwrap();
     assert!(

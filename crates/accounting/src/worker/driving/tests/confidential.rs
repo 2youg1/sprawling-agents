@@ -134,7 +134,7 @@ fn a_run_in_another_building_reads_nothing_of_a_confidential_one() {
                 "searching",
                 "tu_2",
                 "search",
-                serde_json::json!({ "text": "the dial reads" }),
+                serde_json::json!({ "pattern": "the dial reads" }),
             ),
             completion("nothing to report", None),
         ],

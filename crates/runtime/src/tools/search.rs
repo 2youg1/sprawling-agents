@@ -3,15 +3,9 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The search tool: one substring, one bounded subtree, and the line
-//! number `read` continues from.
-//!
-//! **A substring, never a regular expression.** This follows the ruling
-//! already recorded in the `compaction` module header, for its reason
-//! rather than by analogy: a pattern engine on a path a model drives
-//! puts backtracking between that model and its next turn, and here the
-//! pattern would be written by the model itself, so the pathological
-//! input is not a rare accident but an ordinary Tuesday.
+//! The search tool: Claude Code's `Grep` over one bounded subtree, and
+//! the line number `read` continues from. What a call asks, and which of
+//! its arguments are answered, is `predicate`'s to read.
 //!
 //! **What may be searched is what may be read.** The prefix goes
 //! through `chosen_path::admit` and `chosen_path::land`, every candidate
@@ -30,19 +24,21 @@ use serde_json::{Map, Value};
 
 mod descent;
 mod hit;
+mod predicate;
 
 use super::chosen_path::{self, ReadBound, Walked};
 use crate::elision::{self, Elided};
 use descent::{Entry, Step, admissible};
 use hit::{Limit, context_block};
+use predicate::{Lines, Mode, Predicate};
 
 /// How many entries one call may bring back: hits in `content`, files in
-/// `files` and `count`. A search that filled the window would be a
+/// `files_with_matches`, in `count` and for a glob alone. A search that filled the window would be a
 /// search nobody can afford to run twice.
 const MATCH_CAP: usize = 64;
 
 /// How large a file may be before the walk passes over it. Reading a
-/// large object into memory to look for a substring is a stall, and the
+/// large object into memory to look for a match is a stall, and the
 /// material this tool is for is source and prose. A file past it is
 /// reported, because `read` can still take it an interval at a time.
 const FILE_BYTE_CAP: u64 = 1 << 20;
@@ -50,47 +46,6 @@ const FILE_BYTE_CAP: u64 = 1 << 20;
 /// How many of the places the walk could not look through are named:
 /// the count covers all of them, and a model acts on a few names.
 const UNREAD_SHOWN: usize = 16;
-
-/// How many lines of context each side may be asked for.
-const CONTEXT_CAP: u8 = 4;
-
-/// What one call is looking for, settled once from the arguments so the
-/// walk carries a value rather than four parameters.
-struct Predicate {
-    needle: String,
-    context: usize,
-    mode: Mode,
-}
-
-/// What a call hands back for the files it matched
-/// (`crates/runtime/spec/Tools/Search.lean` D109).
-#[derive(Clone, Copy)]
-enum Mode {
-    /// Every hit, with its line number and context.
-    Content,
-    /// Only the files that hold a hit.
-    Files,
-    /// Each file that holds a hit, with how many lines matched.
-    Count,
-}
-
-impl Mode {
-    /// The spelling a call passes, and the one a refusal offers back.
-    const SPELLED: [(&'static str, Mode); 3] = [
-        ("content", Mode::Content),
-        ("files", Mode::Files),
-        ("count", Mode::Count),
-    ];
-
-    /// The payload key the entries travel under.
-    fn key(self) -> &'static str {
-        match self {
-            Mode::Content => "matches",
-            Mode::Files => "files",
-            Mode::Count => "counts",
-        }
-    }
-}
 
 /// What the walk has found so far, and what it could not open.
 struct Findings {
@@ -115,6 +70,16 @@ impl Findings {
             self.unread
                 .push(serde_json::json!({ "path": rel, "why": why }));
         }
+    }
+
+    /// Lists one file in a `files` or `count` answer, or stops the walk
+    /// when [`MATCH_CAP`] files are already listed.
+    fn list(&mut self, entry: Value) {
+        if self.hits.len() >= MATCH_CAP {
+            self.stopped = Some(Limit::Files);
+            return;
+        }
+        self.hits.push(entry);
     }
 }
 
@@ -144,26 +109,37 @@ impl SearchTool {
             bound,
             meta: ToolMeta {
                 name: ToolName::parse(Self::NAME)?,
-                disclosure: "Find a substring in the files under one path. Literal text, no \
-                             regular expressions; the line number it reports is the offset \
-                             `read` continues from. A `grep` through `exec` returns the same \
-                             text without that offset."
+                disclosure: "Searches the lines of files under one path for a regular \
+                             expression in ripgrep's syntax, or with `glob` alone finds files by \
+                             name. The line numbers it reports count from 1 and are the `offset` \
+                             `read` continues from."
                     .to_owned(),
                 params: Payload::of(&serde_json::json!({
                     "type": "object",
                     "properties": {
-                        "text": { "type": "string", "description": "the substring to look for, \
-                            matched literally: this tool has no pattern syntax" },
+                        "pattern": { "type": "string", "description": "the regular expression \
+                            to search the lines of files for, in ripgrep's syntax; leave it out \
+                            and give `glob` to find files by name" },
                         "path": { "type": "string", "description": "a city-relative directory \
                             or file to search under; everything you may read when omitted" },
-                        "context": { "type": "integer", "description": "how many lines to \
-                            show each side of a hit, 0 to 4, default 0" },
-                        "mode": { "type": "string", "enum": ["content", "files", "count"],
-                            "description": "content (default): every hit with its line number; \
-                            files: only the files that hold a hit; count: each such file with \
-                            how many lines matched" },
+                        "glob": { "type": "string", "description": "only files this glob \
+                            names, such as `*.rs` or `src/**/*.ts`; one without `/` is matched \
+                            against the file name" },
+                        "output_mode": { "type": "string",
+                            "enum": ["files_with_matches", "content", "count"],
+                            "description": "files_with_matches (default): the files that hold \
+                            a match; content: every matching line with its line number; count: \
+                            each such file with how many lines matched" },
+                        "-i": { "type": "boolean", "description": "match without regard to \
+                            case" },
+                        "-B": { "type": "integer", "description": "lines to show before each \
+                            match in content, 0 to 4" },
+                        "-A": { "type": "integer", "description": "lines to show after each \
+                            match in content, 0 to 4" },
+                        "-C": { "type": "integer", "description": "lines to show before and \
+                            after each match in content, 0 to 4" },
+                        "context": { "type": "integer", "description": "the same as `-C`" },
                     },
-                    "required": ["text"],
                 }))?,
                 effect: Effect::Read,
                 cost_tier: CostTier::Light,
@@ -172,72 +148,6 @@ impl SearchTool {
                 temporal: Temporal::Timeless,
             },
         })
-    }
-
-    /// What this call is looking for, or why it is not a question.
-    fn predicate(call: &ToolCall) -> Result<Predicate, AxError> {
-        let args = call.args.as_map();
-        let needle = args
-            .get("text")
-            .and_then(Value::as_str)
-            .filter(|text| !text.is_empty())
-            .ok_or_else(|| {
-                AxError::failure(
-                    AxCode::InvalidArgs,
-                    "search",
-                    "missing non-empty string argument `text`",
-                )
-                .with_recovery(
-                    "pass the literal text to look for; an empty predicate would match every \
-                     line in the city",
-                )
-            })?;
-        let context = match args.get("context") {
-            None => 0,
-            Some(value) => {
-                let asked = value.as_u64().ok_or_else(|| {
-                    AxError::failure(
-                        AxCode::InvalidArgs,
-                        "search",
-                        "`context` is not a whole number of lines",
-                    )
-                    .with_recovery("pass `context` as an integer from 0 to 4, or leave it out")
-                })?;
-                // Above the cap is served at the cap, and so is a number
-                // no `u8` holds.
-                usize::from(u8::try_from(asked).map_or(CONTEXT_CAP, |fits| fits.min(CONTEXT_CAP)))
-            }
-        };
-        Ok(Predicate {
-            needle: needle.to_owned(),
-            context,
-            mode: SearchTool::mode(call)?,
-        })
-    }
-
-    /// Which answer this call asked for; `content` when it did not say.
-    fn mode(call: &ToolCall) -> Result<Mode, AxError> {
-        let Some(asked) = call.args.as_map().get("mode") else {
-            return Ok(Mode::Content);
-        };
-        Mode::SPELLED
-            .iter()
-            .find(|(spelled, _)| asked.as_str() == Some(*spelled))
-            .map(|(_, mode)| *mode)
-            .ok_or_else(|| {
-                AxError::failure(
-                    AxCode::InvalidArgs,
-                    "search",
-                    format!("`mode` {asked} is not one this tool answers"),
-                )
-                .with_nearby(
-                    Mode::SPELLED
-                        .iter()
-                        .map(|(spelled, _)| (*spelled).to_owned())
-                        .collect(),
-                )
-                .with_recovery("pass one of the nearby modes, or leave `mode` out for content")
-            })
     }
 
     /// Where the walk starts, as an absolute path and as the city
@@ -266,8 +176,10 @@ impl SearchTool {
     }
 
     /// Walks the subtree in name order, so the same city and the same
-    /// question answer the same way twice.
+    /// question answer the same way twice. A file the predicate does not
+    /// admit by name is passed over unopened.
     fn walk(&self, from: (PathBuf, String), looking: &Predicate) -> Findings {
+        let root = from.1.clone();
         let mut found = Findings {
             hits: Vec::new(),
             spent: 0,
@@ -290,7 +202,9 @@ impl SearchTool {
             let path = match chosen_path::walked(&self.city, path, &rel, &*self.bound) {
                 Ok(Walked::Directory(path)) => path,
                 Ok(Walked::File(path)) => {
-                    self.scan_file(&path, &rel, looking, &mut found);
+                    if looking.admits(&root, &rel) {
+                        self.scan_file(&path, &rel, looking, &mut found);
+                    }
                     continue;
                 }
                 Ok(Walked::Passed) => continue,
@@ -321,8 +235,13 @@ impl SearchTool {
         found
     }
 
-    /// Looks through one file, adding what it finds until the cap.
+    /// Looks through one file, adding what it finds until the cap; a
+    /// file found by name alone is listed without being opened.
     fn scan_file(&self, path: &Path, rel: &str, looking: &Predicate, found: &mut Findings) {
+        let asked = match looking {
+            Predicate::Names(_) => return found.list(Value::String(rel.to_owned())),
+            Predicate::Lines(asked, _) => asked,
+        };
         let opened = std::fs::metadata(path).and_then(|meta| {
             if meta.len() > FILE_BYTE_CAP {
                 Ok(None)
@@ -347,30 +266,25 @@ impl SearchTool {
         let Ok(body) = String::from_utf8(bytes) else {
             return;
         };
-        let mut matching = body.lines().filter(|line| line.contains(&looking.needle));
-        let listed = match looking.mode {
-            Mode::Content => return Self::content_hits(&body, rel, looking, found),
+        let mut matching = body.lines().filter(|line| asked.pattern.is_match(line));
+        let listed = match asked.mode {
+            Mode::Content => return Self::content_hits(&body, rel, asked, found),
             Mode::Files => matching.next().map(|_| Value::String(rel.to_owned())),
             Mode::Count => match matching.count() {
                 0 => None,
                 count => Some(serde_json::json!({ "path": rel, "count": count })),
             },
         };
-        let Some(entry) = listed else {
-            return;
-        };
-        if found.hits.len() >= MATCH_CAP {
-            found.stopped = Some(Limit::Files);
-            return;
+        if let Some(entry) = listed {
+            found.list(entry);
         }
-        found.hits.push(entry);
     }
 
     /// Every hit in one file's text, with its context, until a cap.
-    fn content_hits(body: &str, rel: &str, looking: &Predicate, found: &mut Findings) {
+    fn content_hits(body: &str, rel: &str, asked: &Lines, found: &mut Findings) {
         let lines: Vec<&str> = body.lines().collect();
         for (at, line) in lines.iter().enumerate() {
-            if !line.contains(&looking.needle) {
+            if !asked.pattern.is_match(line) {
                 continue;
             }
             if found.hits.len() >= MATCH_CAP {
@@ -383,7 +297,7 @@ impl SearchTool {
             // on a line. The byte budget is the same ceiling `read`
             // keeps, and for the same reason - one result may not spend
             // the window a caller still has to think in.
-            let (from, block) = context_block(&lines, at, looking);
+            let (from, block) = context_block(&lines, at, asked);
             let budget = kernel::consts_policy::INTERVAL_CAP_BYTES;
             let fits = found.spent.saturating_add(block.len()) <= budget;
             if !fits && !found.hits.is_empty() {
@@ -445,7 +359,7 @@ impl Tool for SearchTool {
                 self.meta.name.as_str()
             )));
         }
-        let looking = SearchTool::predicate(call)?;
+        let looking = Predicate::asked_by(call)?;
         let found = self.walk(self.start(call)?, &looking);
         let mut out = Map::new();
         out.insert("count".to_owned(), Value::Number(found.hits.len().into()));
@@ -461,7 +375,7 @@ impl Tool for SearchTool {
             Value::Number(found.unreadable.into()),
         );
         out.insert("unread".to_owned(), Value::Array(found.unread));
-        out.insert(looking.mode.key().to_owned(), Value::Array(found.hits));
+        out.insert(looking.key().to_owned(), Value::Array(found.hits));
         Ok(ToolOutcome {
             result: Payload::new(out)?,
             attachments: Vec::new(),

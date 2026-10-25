@@ -8,7 +8,8 @@
 
 use crate::elision::{self, Elided};
 
-use super::{MATCH_CAP, Predicate};
+use super::MATCH_CAP;
+use super::predicate::Lines;
 
 /// How much of one line a hit carries. A line past it is cut to a
 /// window: the matched line around its first match, a context line from
@@ -32,13 +33,14 @@ impl Limit {
     /// What the model is told: which limit, and how to ask a smaller
     /// question.
     pub(super) fn said(self) -> String {
-        let narrow = "narrow `path` to one directory or file, or search for a longer `text`";
+        let narrow = "narrow `path` to one directory or file, add a `glob`, or make `pattern` \
+                      more specific";
         match self {
             Limit::Hits => {
                 format!("stopped at {MATCH_CAP} matches, the most one search returns; {narrow}")
             }
             Limit::Bytes => format!(
-                "stopped at {} bytes of match text, the most one search returns; {narrow}, or ask for less `context`",
+                "stopped at {} bytes of match text, the most one search returns; {narrow}, or ask for fewer lines of context",
                 kernel::consts_policy::INTERVAL_CAP_BYTES
             ),
             Limit::Files => {
@@ -50,16 +52,16 @@ impl Limit {
 
 /// The number of the first line around a hit, and the lines themselves,
 /// each cut to [`LINE_CAP`], joined as they were read.
-pub(super) fn context_block(lines: &[&str], at: usize, looking: &Predicate) -> (usize, String) {
-    let first = at.saturating_sub(looking.context);
+pub(super) fn context_block(lines: &[&str], at: usize, asked: &Lines) -> (usize, String) {
+    let first = at.saturating_sub(asked.context.before);
     let last = at
-        .saturating_add(looking.context)
+        .saturating_add(asked.context.after)
         .min(lines.len().saturating_sub(1));
     let block = (first..=last)
         .filter_map(|index| {
             let line = lines.get(index)?;
             let centre = if index == at {
-                line.find(&looking.needle).unwrap_or(0)
+                asked.pattern.find(line).map_or(0, |found| found.start())
             } else {
                 0
             };

@@ -21,11 +21,11 @@
 | `edit` | `file_path`、`old_string`、`new_string`、`replace_all`（可选，缺省 `false`） | `Edit`：同四个 | `old_string: ""` 新建一个不存在的文件，Claude Code 新建走 `Write`；读后被改即拒，Claude Code 在 `old_string` 仍唯一匹配时照改（D106）；`file_path` 收城相对路径，也收本平台落在城里的绝对路径（§8-30-1），Claude Code 要绝对路径 |
 | `exec` | `command` 或 `python` 恰给一个；`where`（可选，`sandbox`｜`host`） | `Bash`：`command`、`timeout`、`description`、`run_in_background` | 没有 `timeout` 与 `run_in_background`：前台窗口到了命令自己转进后台（§8-28）；没有 `description`；`python` 与 `where` 是本城的沙箱（§8-13-4，D118） |
 | `read` | `file_path`、`offset`（1 基行号）、`limit`（至多 512） | `Read`：`file_path`、`offset`（行号）、`limit`、`pages`、`allow_large` | `file_path` 也收 catalog 里一件 skill 的名字；没有 `pages` 与 `allow_large`：read 只交文本，一次至多 512 行（§8-29-1，D119） |
-| `search` | `text`（子串）、`path`、`context`、`mode` | `Grep`：`pattern`（ripgrep 正则）、`path`、`glob`、`output_mode`、`-i`、`context` 等；`Glob`：`pattern`、`path` | 本 Step 余下的一项：`pattern` 改成正则，`mode` 改成 `output_mode` 与它的三个值，按文件名找住在 search 里（§8-30-2，D117） |
+| `search` | `pattern`（ripgrep 语法的正则）、`path`、`glob`、`output_mode`（`files_with_matches`｜`content`｜`count`，缺省 `files_with_matches`）、`-i`、`-A`、`-B`、`-C`、`context`（每侧至多 4 行） | `Grep`：同名的这些，另有 `type`、`multiline`、`-n`、`-o`、`head_limit`、`offset`；`Glob`：`pattern`、`path` | 按文件名找住在 search 里：不给 `pattern`、只给 `glob`，Claude Code 走 `Glob`，按修改时间排、至多 100 条，本城按名字排、至多 64 条（D117）；`multiline`、`type`、`offset` 拒，`-n`、`-o`、`head_limit` 不读（D121）；逐行匹配，不认 `.gitignore`，读界与保留区代替它（§8-30-2，§8-30-3，D120） |
 | `status` | 无 | 无同类 | 本城的处境查询（§8-14） |
 | `tool` | `op`、`namespace`、`query`、`name`、`args` | `ToolSearch`：`query`、`max_results` | `find` 收 `query`，与 `ToolSearch` 同名；`list`、`detail`、`run` 是本城的目录门（§8-60） |
 
-**参数之外**：工具名不改（`edit`、`exec`、`read`、`search`），因为名字是账本、页面与规则里的拼写，一个模型见到 `Edit` 而叫 `edit` 的代价是零，改名的代价是每一张提到它的表。调用里多出来的键照旧不读：Claude Code 习惯给 `Bash` 带一句 `description`，拒它只换来一个回合。
+**参数之外**：工具名不改（`edit`、`exec`、`read`、`search`），因为名字是账本、页面与规则里的拼写，一个模型见到 `Edit` 而叫 `edit` 的代价是零，改名的代价是每一张提到它的表。调用里多出来的键照旧不读：Claude Code 习惯给 `Bash` 带一句 `description`，拒它只换来一个回合；不读会让答案误导的那几把例外，见 D121。
 -/
 
 /-!

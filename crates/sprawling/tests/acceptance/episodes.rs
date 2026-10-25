@@ -206,7 +206,7 @@ fn search() -> Episode {
     Episode {
         step: Step {
             tool: "search",
-            args: json!({ "text": MARK }),
+            args: json!({ "pattern": MARK, "output_mode": "content" }),
         },
         holds: |seen| {
             let result = answered(seen.answer)?;
