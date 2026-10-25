@@ -177,3 +177,31 @@ fn a_model_id_with_a_slash_is_one_note_the_list_reads_back() {
         )
     );
 }
+
+/// A note kept as a link, and a provider directory kept as one, are on
+/// the list because the freeze reads through both; a link back to a
+/// directory on the way down is walked once, so the list ends.
+#[cfg(unix)]
+#[test]
+fn linked_notes_are_listed_as_the_freeze_reads_them() {
+    use std::os::unix::fs::symlink;
+    let dir = tempfile::tempdir().unwrap();
+    let elsewhere = dir.path().join("elsewhere");
+    std::fs::create_dir_all(elsewhere.join("vendor")).unwrap();
+    std::fs::write(elsewhere.join("m-1.md"), "note").unwrap();
+    std::fs::write(elsewhere.join("vendor/m-2.md"), "note").unwrap();
+    let models = dir.path().join(RESERVED_PREFIX).join(MODELS_DIR);
+    std::fs::create_dir_all(models.join("local")).unwrap();
+    symlink(elsewhere.join("m-1.md"), models.join("local/m-1.md")).unwrap();
+    symlink(models.join("local"), models.join("local/again")).unwrap();
+    symlink(&elsewhere, models.join("gateway")).unwrap();
+
+    assert_eq!(
+        model_notes(dir.path(), None).unwrap(),
+        vec![
+            ("gateway".to_owned(), "m-1".to_owned()),
+            ("gateway".to_owned(), "vendor/m-2".to_owned()),
+            ("local".to_owned(), "m-1".to_owned()),
+        ]
+    );
+}
